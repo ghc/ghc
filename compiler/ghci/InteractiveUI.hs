@@ -1700,6 +1700,17 @@ spans :: SrcSpan -> (Int,Int) -> Bool
 spans span (l,c) = GHC.srcSpanStart span <= loc && loc <= GHC.srcSpanEnd span
    where loc = GHC.mkSrcLoc (GHC.srcSpanFile span) l c
 
+-- for now, use ANSI bold on Unixy systems.  On Windows, we add a line
+-- of carets under the active expression instead.  The Windows console
+-- doesn't support ANSI escape sequences, and most Unix terminals
+-- (including xterm) do, so this is a reasonable guess until we have a
+-- proper termcap/terminfo library.
+#if !defined(mingw32_TARGET_OS)
+do_bold = True
+#else
+do_bold = False
+#endif
+
 start_bold = BS.pack "\ESC[1m"
 end_bold   = BS.pack "\ESC[0m"
 
@@ -1784,7 +1795,10 @@ listAround span do_highlight = do
                    | otherwise  = 1
         pad_after = 1
 
-        highlight no line
+        highlight | do_bold   = highlight_bold
+                  | otherwise = highlight_carets
+
+        highlight_bold no line
           | no == line1 && no == line2
           = let (a,r) = BS.splitAt col1 line
                 (b,c) = BS.splitAt (col2-col1) r
@@ -1797,6 +1811,20 @@ listAround span do_highlight = do
           = let (a,b) = BS.splitAt col2 line in
             BS.concat [a, end_bold, b]
           | otherwise   = line
+
+        highlight_carets no line
+          | no == line1 && no == line2
+          = BS.concat [line, nl, indent, BS.replicate col1 ' ',
+                                         BS.replicate (col2-col1) '^']
+          | no == line1
+          = BS.concat [line, nl, indent, BS.replicate col1 ' ',
+                                         BS.replicate (BS.length line-col1) '^']
+          | no == line2
+          = BS.concat [line, nl, indent, BS.replicate col2 '^']
+          | otherwise   = line
+         where
+           indent = BS.pack "   "
+           nl = BS.singleton '\n'
 
 -- --------------------------------------------------------------------------
 -- Tick arrays
