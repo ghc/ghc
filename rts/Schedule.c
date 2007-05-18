@@ -2761,7 +2761,12 @@ threadStackOverflow(Capability *cap, StgTSO *tso)
   // while we are moving the TSO:
   lockClosure((StgClosure *)tso);
 
-  if (tso->stack_size >= tso->max_stack_size) {
+  if (tso->stack_size >= tso->max_stack_size && !(tso->flags & TSO_BLOCKEX)) {
+      // NB. never raise a StackOverflow exception if the thread is
+      // inside Control.Exceptino.block.  It is impractical to protect
+      // against stack overflow exceptions, since virtually anything
+      // can raise one (even 'catch'), so this is the only sensible
+      // thing to do here.  See bug #767.
 
       debugTrace(DEBUG_gc,
 		 "threadStackOverflow of TSO %ld (%p): stack too large (now %ld; max is %ld)",
