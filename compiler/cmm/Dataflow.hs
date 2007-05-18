@@ -1,4 +1,4 @@
-module Dataflow (cmmLivenessComment, cmmLiveness, CmmLive) where
+module Dataflow {-(fixedpoint, cmmLivenessComment, cmmLiveness, CmmLive)-} where
 
 import Cmm
 import PprCmm ()
@@ -36,6 +36,9 @@ cmmBranchTargets (BasicBlock _ stmts) =
 
 -- The variables that were made live and killed respectively
 type CmmLive = UniqSet LocalReg
+
+type BlockEntryLiveness = BlockEnv CmmLive	-- The variables live on entry to each block
+
 addLive new_live live = live `unionUniqSets` new_live
 addKilled new_killed live = live `minusUniqSet` new_killed
 
@@ -106,7 +109,7 @@ cmmBlockUpdate blocks node _ state =
 
 cmmBlockDependants :: UniqFM {-BlockId-} (UniqSet BlockId) -> BlockId -> [BlockId]
 cmmBlockDependants sources ident =
-    uniqSetToList $ lookupWithDefaultUFM sources emptyUFM ident
+    uniqSetToList $ lookupWithDefaultUFM sources emptyUniqSet ident
 
 cmmBlockSourcesAndTargets ::
     [CmmBasicBlock]
@@ -124,7 +127,7 @@ cmmBlockNames :: [CmmBasicBlock] -> UniqFM {-BlockId-} CmmBasicBlock
 cmmBlockNames blocks = listToUFM $ map block_name blocks where
     block_name b = (blockId b, b)
 
-cmmLiveness :: [CmmBasicBlock] -> UniqFM {-BlockId-} CmmLive
+cmmLiveness :: [CmmBasicBlock] -> BlockEnv CmmLive
 cmmLiveness blocks =
     fixedpoint (cmmBlockDependants sources) (cmmBlockUpdate blocks')
                (map blockId blocks) (listToUFM [(blockId b, emptyUniqSet) | b <- blocks]) where

@@ -275,6 +275,8 @@ newtype BlockId = BlockId Unique
 instance Uniquable BlockId where
   getUnique (BlockId u) = u
 
+type BlockEnv a = UniqFM {- BlockId -} a
+
 -----------------------------------------------------------------------------
 --		Static Data
 -----------------------------------------------------------------------------
