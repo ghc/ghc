@@ -20,7 +20,7 @@ module Cmm (
 	BlockId(..),
 	GlobalReg(..), globalRegRep,
 
-	node, nodeReg, spReg, hpReg,
+	node, nodeReg, spReg, hpReg, spLimReg
   ) where
 
 #include "HsVersions.h"
@@ -351,9 +351,10 @@ data GlobalReg
 	 )
 
 -- convenient aliases
-spReg, hpReg, nodeReg :: CmmReg
+spReg, hpReg, spLimReg, nodeReg :: CmmReg
 spReg = CmmGlobal Sp
 hpReg = CmmGlobal Hp
+spLimReg = CmmGlobal SpLim
 nodeReg = CmmGlobal node
 
 node :: GlobalReg
