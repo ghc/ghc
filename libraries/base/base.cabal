@@ -24,8 +24,6 @@ exposed-modules:
 	Control.Monad.ST,
 	Control.Monad.ST.Lazy,
 	Control.Monad.ST.Strict,
-	Control.Parallel,
-	Control.Parallel.Strategies,
 	Data.Array,
 	Data.Array.Base,
 	Data.Array.Diff,
