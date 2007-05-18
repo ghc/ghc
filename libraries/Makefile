@@ -64,6 +64,7 @@ SUBDIRS += $(wildcard arrows)
 ifeq "$(GhcLibsWithObjectIO)" "YES"
 SUBDIRS += $(wildcard ObjectIO)
 endif
+SUBDIRS += $(wildcard parallel)
 endif
 
 # -----------------------------------------------------------------------------

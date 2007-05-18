@@ -15,6 +15,7 @@ html
 mtl
 network
 parsec
+parallel
 regex-base
 regex-compat
 regex-posix
