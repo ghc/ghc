@@ -1677,7 +1677,8 @@ findBreakByCoord :: Maybe FastString -> (Int,Int) -> TickArray
 findBreakByCoord mb_file (line, col) arr
   | not (inRange (bounds arr) line) = Nothing
   | otherwise =
-    listToMaybe (sortBy rightmost contains)
+    listToMaybe (sortBy rightmost contains) `mplus`
+    listToMaybe (sortBy leftmost_smallest after_here)
   where 
         ticks = arr ! line
 
@@ -1688,6 +1689,10 @@ findBreakByCoord mb_file (line, col) arr
         is_correct_file span
                  | Just f <- mb_file = GHC.srcSpanFile span == f
                  | otherwise         = True
+
+        after_here = [ tick | tick@(nm,span) <- ticks,
+                              GHC.srcSpanStartLine span == line,
+                              GHC.srcSpanStartCol span >= col ]
 
 
 leftmost_smallest  (_,a) (_,b) = a `compare` b
