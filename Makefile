@@ -396,8 +396,8 @@ endif
 .PHONY: publish-binary-dist
 publish-binary-dist :
 	@for i in 0 1 2 3 4 5 6 7 8 9; do \
-		echo "Try $$i: $(PublishCp) $(BIN_DIST_TARBALL) $(PublishLocation)"; \
-		if $(PublishCp) $(BIN_DIST_TARBALL) $(PublishLocation); then break; fi; \
+		echo "Try $$i: $(PublishCp) $(BIN_DIST_TARBALL) $(PublishLocation)/dist"; \
+		if $(PublishCp) $(BIN_DIST_TARBALL) $(PublishLocation)/dist; then break; fi; \
 	done
 	$(PublishCp) -r $(BIN_DIST_DIR)/share/html/* $(PublishLocation)/docs
 
