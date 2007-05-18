@@ -244,6 +244,8 @@ binary-dist.library.%:
 	ifBuildable/ifBuildable $* cp    $*.cabal      $(BIN_DIST_LIBDIR)/$*
 	ifBuildable/ifBuildable $* cp -a dist          $(BIN_DIST_LIBDIR)/$*
 	ifBuildable/ifBuildable $* $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
+	     \( -name "*_split" -o -name "autogen" \) | xargs rm -rf
+	ifBuildable/ifBuildable $* $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
 	     \( \( -name "*.o" -o -name "*.p_o" \) -a ! -name "HS*" \) \
 	     -exec rm {} \;
 
