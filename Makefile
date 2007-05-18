@@ -295,26 +295,32 @@ binary-dist::
 # binary dist'ing the documentation.  
 # The default documentation to build/install is given below; overrideable
 # via build.mk or the 'make' command-line.
+#
+# If BINDIST_DOC_WAYS is set, use that
+# If XMLDocWays is set, use that
+# Otherwise, figure out what we can build based on configure results
 
 ifndef BINDIST_DOC_WAYS
 
+ifneq "$(XMLDocWays)" ""
 BINDIST_DOC_WAYS = $(XMLDocWays)
-
-# ifneq "$(XSLTPROC)" ""
-# BINDIST_DOC_WAYS = html
-# ifneq "$(FOP)" ""
-# BINDIST_DOC_WAYS += ps pdf
-# else
-# ifneq "$(PDFXMLTEX)" ""
-# BINDIST_DOC_WAYS += pdf
-# endif
-# ifneq "$(XMLTEX)" ""
-# ifneq "$(DVIPS)" ""
-# BINDIST_DOC_WAYS += ps
-# endif # DVIPS
-# endif # XMLTEX
-# endif # FOP
-# endif # XSLTPROC
+else
+ifneq "$(XSLTPROC)" ""
+BINDIST_DOC_WAYS = html
+ifneq "$(FOP)" ""
+BINDIST_DOC_WAYS += ps pdf
+else
+ifneq "$(PDFXMLTEX)" ""
+BINDIST_DOC_WAYS += pdf
+endif
+ifneq "$(XMLTEX)" ""
+ifneq "$(DVIPS)" ""
+BINDIST_DOC_WAYS += ps
+endif # DVIPS
+endif # XMLTEX
+endif # FOP
+endif # XSLTPROC
+endif # XMLDocWays
 
 endif # BINDIST_DOC_WAYS
 
