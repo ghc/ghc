@@ -555,6 +555,7 @@ runCommandEval c = ghciHandle handleEval (doCommand c)
 runStmt :: String -> SingleStep -> GHCi Bool
 runStmt stmt step
  | null (filter (not.isSpace) stmt) = return False
+ | ["import", mod] <- words stmt    = keepGoing setContext ('+':mod)
  | otherwise
  = do st <- getGHCiState
       session <- getSession
