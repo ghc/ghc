@@ -272,13 +272,21 @@ sandboxIO statusMVar thing =
                     putMVar statusMVar (Complete res)))
         (takeMVar statusMVar)
 
--- | this just re-throws any exceptions received.  The point of this
--- is that if -fbreak-on-excepsions is on, we only get a chance to break
--- for synchronous exceptions, and this turns an async exception into
--- a sync exception, so for instance a ^C exception will break right here
--- unless it is caught elsewhere.
+-- We want to turn ^C into a break when -fbreak-on-exception is on,
+-- but it's an async exception and we only break for sync exceptions.
+-- Idea: if we catch and re-throw it, then the re-throw will trigger
+-- a break.  Great - but we don't want to re-throw all exceptions, because
+-- then we'll get a double break for ordinary sync exceptions (you'd have
+-- to :continue twice, which looks strange).  So if the exception is
+-- not "Interrupted", we unset the exception flag before throwing.
+--
 rethrow :: IO a -> IO a
-rethrow io = Exception.catch io Exception.throwIO
+rethrow io = Exception.catch io $ \e -> -- NB. not catchDyn
+                case e of
+                   DynException d | Just Interrupted <- fromDynamic d
+                        -> Exception.throwIO e
+                   _ -> do poke exceptionFlag 0; Exception.throwIO e
+
 
 withInterruptsSentTo :: IO ThreadId -> IO r -> IO r
 withInterruptsSentTo io get_result = do
