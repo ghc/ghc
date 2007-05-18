@@ -43,10 +43,7 @@
    unsafePerformIO thunk will be updated with a stack object
    containing the unblockAsyncExceptions_ret frame.  Later, when
    someone else evaluates this thunk, the blocked exception state is
-   not restored, and the result is that unblockAsyncExceptions_ret
-   will attempt to unblock exceptions in the current thread, but it'll
-   find that the CurrentTSO->blocked_exceptions is NULL.  Hence, we
-   work around this by checking for NULL in awakenBlockedQueue().
+   not restored.
 
    -------------------------------------------------------------------------- */
 
@@ -54,9 +51,6 @@ INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret,
  		0/*framesize*/, 0/*bitmap*/, RET_SMALL )
 {
     CInt r;
-
-    // Not true: see comments above
-    // ASSERT(StgTSO_blocked_exceptions(CurrentTSO) != NULL);
 
     StgTSO_flags(CurrentTSO) = StgTSO_flags(CurrentTSO) & 
 	~(TSO_BLOCKEX::I32|TSO_INTERRUPTIBLE::I32);
@@ -115,9 +109,6 @@ INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret,
 INFO_TABLE_RET( stg_blockAsyncExceptionszh_ret,
   		0/*framesize*/, 0/*bitmap*/, RET_SMALL )
 {
-    // Not true: see comments above
-    // ASSERT(StgTSO_blocked_exceptions(CurrentTSO) == NULL);
-
     StgTSO_flags(CurrentTSO) = 
 	StgTSO_flags(CurrentTSO) | TSO_BLOCKEX::I32 | TSO_INTERRUPTIBLE::I32;
 
