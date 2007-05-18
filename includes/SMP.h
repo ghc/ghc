@@ -75,7 +75,7 @@ xchg(StgPtr p, StgWord w)
         "1:     lwarx     %0, 0, %2\n"
         "       stwcx.    %1, 0, %2\n"
         "       bne-      1b"
-        :"=r" (result)
+        :"=&r" (result)
         :"r" (w), "r" (p)
     );
 #elif sparc_HOST_ARCH
