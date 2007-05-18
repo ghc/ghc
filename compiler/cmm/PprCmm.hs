@@ -206,6 +206,7 @@ genJump expr args =
                 else case expr of
                     CmmLoad (CmmReg _) _ -> pprExpr expr 
                     _ -> parens (pprExpr expr)
+         , space
          , parens  ( commafy $ map ppr args )
          , semi ]
 
