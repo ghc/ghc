@@ -23,7 +23,7 @@ TOP=.
 include $(TOP)/mk/boilerplate.mk
 endif
 
-SUBDIRS = base filepath haskell98 template-haskell readline Cabal
+SUBDIRS = base filepath haskell98 pretty template-haskell readline Cabal
 
 ifeq "$(GhcLibsWithUnix)" "YES"
 SUBDIRS += unix
@@ -90,7 +90,7 @@ CONFIGURE_OPTS += --enable-split-objs
 CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-splitting
 endif
 
-BOOTSTRAPPING_STAMPS = $(addprefix stamp/bootstrapping.,Cabal filepath)
+BOOTSTRAPPING_STAMPS = $(addprefix stamp/bootstrapping.,Cabal filepath pretty)
 
 .PHONY: subdirs
 
@@ -116,6 +116,7 @@ $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup): \
 	$(CP) $*/Setup.*hs $*/setup
 	cd $*/setup && $(GHC) -i../../bootstrapping.Cabal \
 	                      -i../../bootstrapping.filepath \
+	                      -i../../bootstrapping.pretty \
 	                      -Wall -cpp --make Setup.*hs -o Setup
 
 installPackage/installPackage: installPackage.hs $(BOOTSTRAPPING_STAMPS)
@@ -125,7 +126,8 @@ installPackage/installPackage: installPackage.hs $(BOOTSTRAPPING_STAMPS)
 	cd installPackage && $(GHC) -Wall -cpp \
 	                            --make installPackage -o installPackage \
 	                      -i../bootstrapping.Cabal \
-	                      -i../bootstrapping.filepath
+	                      -i../bootstrapping.filepath \
+	                      -i../bootstrapping.pretty
 
 ifBuildable/ifBuildable: ifBuildable.hs
 	-$(RM) -rf ifBuildable

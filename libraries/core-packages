@@ -2,6 +2,7 @@ base
 Cabal
 filepath
 haskell98
+pretty
 readline
 template-haskell
 unix
