@@ -1148,16 +1148,30 @@ getRegister e@(CmmMachOp mop [x, y]) -- dyadic MachOps
 	  -- in
 	  return (Any rep code)
         
-    {- Case2: shift length is complex (non-immediate) -}
+    {- Case2: shift length is complex (non-immediate)
+      * y must go in %ecx.
+      * we cannot do y first *and* put its result in %ecx, because
+        %ecx might be clobbered by x.
+      * if we do y second, then x cannot be 
+        in a clobbered reg.  Also, we cannot clobber x's reg
+        with the instruction itself.
+      * so we can either:
+        - do y first, put its result in a fresh tmp, then copy it to %ecx later
+        - do y second and put its result into %ecx.  x gets placed in a fresh
+          tmp.  This is likely to be better, becuase the reg alloc can
+          eliminate this reg->reg move here (it won't eliminate the other one,
+          because the move is into the fixed %ecx).
+    -}
     shift_code rep instr x y{-amount-} = do
-        (x_reg, x_code) <- getNonClobberedReg x
+        x_code <- getAnyReg x
+	tmp <- getNewRegNat rep
         y_code <- getAnyReg y
 	let 
-	   code = x_code `appOL`
+	   code = x_code tmp `appOL`
 		  y_code ecx `snocOL`
-		  instr (OpReg ecx) (OpReg x_reg)
+		  instr (OpReg ecx) (OpReg tmp)
         -- in
-        return (Fixed rep x_reg code)
+        return (Fixed rep tmp code)
 
     --------------------
     add_code :: MachRep -> CmmExpr -> CmmExpr -> NatM Register
