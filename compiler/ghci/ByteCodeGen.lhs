@@ -1376,13 +1376,14 @@ lookupBCEnv_maybe = lookupFM
 idSizeW :: Id -> Int
 idSizeW id = cgRepSizeW (typeCgRep (idType id))
 
+-- See bug #1257
 unboxedTupleException :: a
 unboxedTupleException 
    = throwDyn 
-        (Panic 
-           ("Bytecode generator can't handle unboxed tuples.  Possibly due\n" ++
-            "\tto foreign import/export decls in source.  Workaround:\n" ++
-            "\tcompile this module to a .o file, then restart session."))
+        (ProgramError 
+           ("Error: bytecode compiler can't handle unboxed tuples.\n"++
+            "  Possibly due to foreign import/export decls in source.\n"++
+            "  Workaround: use -fobject-code, or compile this module to .o separately."))
 
 
 mkSLIDE n d = if d == 0 then nilOL else unitOL (SLIDE n d)
