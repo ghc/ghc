@@ -161,8 +161,6 @@ exposed-modules:
 	System.Time,
 	Text.ParserCombinators.ReadP,
 	Text.ParserCombinators.ReadPrec,
-	Text.PrettyPrint,
-	Text.PrettyPrint.HughesPJ,
 	Text.Printf,
 	Text.Read,
 	Text.Read.Lex,
