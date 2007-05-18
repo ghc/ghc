@@ -17,7 +17,7 @@ module Cmm (
 	CmmReg(..), cmmRegRep,
 	CmmLit(..), cmmLitRep,
 	LocalReg(..), localRegRep,
-	BlockId(..),
+	BlockId(..), BlockEnv,
 	GlobalReg(..), globalRegRep,
 
 	node, nodeReg, spReg, hpReg, spLimReg
@@ -29,6 +29,7 @@ import MachOp
 import CLabel
 import ForeignCall
 import Unique
+import UniqFM
 import FastString
 
 import Data.Word
