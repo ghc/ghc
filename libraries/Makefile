@@ -100,7 +100,8 @@ subdirs:
 .PHONY: boot
 
 boot: $(BOOTSTRAPPING_STAMPS) ifBuildable/ifBuildable \
-	  $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup)
+	  $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup) \
+	  installPackage/installPackage
 
 # We build the Setup program in a setup subdirectory to stop it trying
 # to use bits of base and Cabal when we build those packages.
@@ -116,6 +117,14 @@ $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup): \
 	cd $*/setup && $(GHC) -i../../bootstrapping.Cabal \
 	                      -i../../bootstrapping.filepath \
 	                      -Wall -cpp --make Setup.*hs -o Setup
+
+installPackage/installPackage: installPackage.hs $(BOOTSTRAPPING_STAMPS)
+	-$(RM) -rf installPackage
+	mkdir installPackage
+	$(CP) installPackage.hs installPackage/
+	cd installPackage && $(GHC) -Wall --make installPackage -o installPackage \
+	                      -i../bootstrapping.Cabal \
+	                      -i../bootstrapping.filepath
 
 ifBuildable/ifBuildable: ifBuildable.hs
 	-$(RM) -rf ifBuildable
@@ -139,6 +148,7 @@ all: doc
 endif
 
 build: $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR))
+build: installPackage/installPackage
 
 configure: $(foreach SUBDIR,$(SUBDIRS), \
              stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR))
@@ -210,37 +220,26 @@ install-docs:
 # Ideally this would depend on a stamp/build.library.%, but if it does
 # then we can't change the libraries and then just rerun make.
 # Thus if you install without building then it will just break.
-$(foreach SUBDIR,$(SUBDIRS),stamp/configure.library.install.$(SUBDIR)): \
-stamp/configure.library.install.%: %/setup/Setup ifBuildable/ifBuildable
-	-$(RM) -f stamp/configure.library.*.$*
-	ifBuildable/ifBuildable $* setup/Setup configure \
-	                                    $(CONFIGURE_OPTS) \
-	                                    --prefix=$(prefix) \
-	                                    --with-compiler=$(bindir)/ghc \
-	                                    --datasubdir=ghc
-	touch $@
-
-# We need to reconfigure as we now need to register with the normal ghc-pkg
 $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
-install.library.%: stamp/configure.library.install.% \
-                   %/setup/Setup ifBuildable/ifBuildable
-	ifBuildable/ifBuildable $* setup/Setup install
+install.library.%: installPackage/installPackage ifBuildable/ifBuildable
+	ifBuildable/ifBuildable $* ../installPackage/installPackage
 
 .PHONY: binary-dist binary-dist.library.%
 
 BIN_DIST_LIBDIR=$(BIN_DIST_DIR)/libraries
 
 binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR))
-	cp    Makefile           $(BIN_DIST_LIBDIR)
-	cp    gen_contents_index $(BIN_DIST_LIBDIR)
-	cp    index.html         $(BIN_DIST_LIBDIR)
-	cp    doc-index.html     $(BIN_DIST_LIBDIR)
-	cp -a stamp              $(BIN_DIST_LIBDIR)
+	mkdir                               $(BIN_DIST_LIBDIR)/installPackage
+	cp 	  installPackage/installPackage $(BIN_DIST_LIBDIR)/installPackage
+	cp    Makefile                      $(BIN_DIST_LIBDIR)
+	cp    gen_contents_index            $(BIN_DIST_LIBDIR)
+	cp    index.html                    $(BIN_DIST_LIBDIR)
+	cp    doc-index.html                $(BIN_DIST_LIBDIR)
+	cp -a stamp                         $(BIN_DIST_LIBDIR)
 
 $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR)): \
 binary-dist.library.%:
-	$(MKDIRHIER) $(BIN_DIST_LIBDIR)/$*/setup
-	ifBuildable/ifBuildable $* cp    setup/Setup   $(BIN_DIST_LIBDIR)/$*/setup
+	$(MKDIRHIER) $(BIN_DIST_LIBDIR)/$*
 	ifBuildable/ifBuildable $* cp    $*.cabal      $(BIN_DIST_LIBDIR)/$*
 	ifBuildable/ifBuildable $* cp -a dist          $(BIN_DIST_LIBDIR)/$*
 	ifBuildable/ifBuildable $* $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
