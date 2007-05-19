@@ -96,7 +96,10 @@ CONFIGURE_OPTS += --enable-split-objs
 CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-splitting
 endif
 
-BOOTSTRAPPING_STAMPS = $(addprefix stamp/bootstrapping.,Cabal filepath pretty)
+BOOTSTRAP_LIBS = Cabal filepath
+BOOTSTRAP_STAMPS = $(addprefix stamp/bootstrapping.,$(BOOTSTRAP_LIBS))
+BOOTSTRAP_INC_1_UP = $(addprefix -i../bootstrapping.,$(BOOTSTRAP_LIBS))
+BOOTSTRAP_INC_2_UP = $(addprefix -i../../bootstrapping.,$(BOOTSTRAP_LIBS))
 
 .PHONY: subdirs
 
@@ -105,7 +108,7 @@ subdirs:
 
 .PHONY: boot
 
-boot: $(BOOTSTRAPPING_STAMPS) ifBuildable/ifBuildable \
+boot: $(BOOTSTRAP_STAMPS) ifBuildable/ifBuildable \
 	  $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup) \
 	  installPackage/installPackage
 
@@ -116,24 +119,20 @@ boot: $(BOOTSTRAPPING_STAMPS) ifBuildable/ifBuildable \
 # We ought to be depending on %/Setup.*hs, but make makes that difficult.
 
 $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup): \
-%/setup/Setup: $(BOOTSTRAPPING_STAMPS)
+%/setup/Setup: $(BOOTSTRAP_STAMPS)
 	-$(RM) -rf $*/setup
 	mkdir $*/setup
 	$(CP) $*/Setup.*hs $*/setup
-	cd $*/setup && $(GHC) -i../../bootstrapping.Cabal \
-	                      -i../../bootstrapping.filepath \
-	                      -i../../bootstrapping.pretty \
-	                      -Wall -cpp --make Setup.*hs -o Setup
+	cd $*/setup && $(GHC) -Wall -cpp --make Setup.*hs -o Setup \
+	                      $(BOOTSTRAP_INC_2_UP)
 
-installPackage/installPackage: installPackage.hs $(BOOTSTRAPPING_STAMPS)
+installPackage/installPackage: installPackage.hs $(BOOTSTRAP_STAMPS)
 	-$(RM) -rf installPackage
 	mkdir installPackage
 	$(CP) installPackage.hs installPackage/
 	cd installPackage && $(GHC) -Wall -cpp \
 	                            --make installPackage -o installPackage \
-	                      -i../bootstrapping.Cabal \
-	                      -i../bootstrapping.filepath \
-	                      -i../bootstrapping.pretty
+	                            $(BOOTSTRAP_INC_1_UP)
 
 ifBuildable/ifBuildable: ifBuildable.hs
 	-$(RM) -rf ifBuildable
@@ -141,7 +140,7 @@ ifBuildable/ifBuildable: ifBuildable.hs
 	$(CP) ifBuildable.hs ifBuildable/
 	cd ifBuildable && $(GHC) -Wall --make ifBuildable -o ifBuildable
 
-$(BOOTSTRAPPING_STAMPS): stamp/bootstrapping.%:
+$(BOOTSTRAP_STAMPS): stamp/bootstrapping.%:
 	$(RM) -rf bootstrapping.$*
 	$(CP) -R $* bootstrapping.$*
 	$(FIND) bootstrapping.$* \( -name "*.o" -o -name "*.hi" \) \
