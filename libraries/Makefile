@@ -9,6 +9,10 @@
 #
 #   make clean.library.<package>
 #   make build.library.<package>
+#
+# or the following is equivalent:
+#
+#   make rebuild.library.<package>
 
 .PHONY: default_target
 
@@ -151,6 +155,11 @@ all: build
 ifneq "$(NO_HADDOCK_DOCS)" "YES"
 all: doc
 endif
+
+.PHONY: rebuild.library.%
+
+$(foreach SUBDIR,$(SUBDIRS),rebuild.library.$(SUBDIR)):\
+rebuild.library.%: clean.library.% build.library.%
 
 build: $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR))
 build: installPackage/installPackage
