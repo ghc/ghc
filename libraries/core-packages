@@ -1,8 +1,11 @@
 base
 Cabal
+directory
 filepath
 haskell98
+old-time
 pretty
+random
 readline
 template-haskell
 unix
