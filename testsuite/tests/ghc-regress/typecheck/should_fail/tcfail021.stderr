@@ -1,4 +1,4 @@
 
 tcfail021.hs:8:4:
     Pattern bindings (except simple variables) not allowed in instance declarations
-	(==, /=) = (\ x -> \ y -> ..., \ x -> \ y -> ...)
+	(==, /=) = (\ x -> \ y -> True, \ x -> \ y -> False)
