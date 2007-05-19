@@ -140,7 +140,6 @@ extern HsWord64 getUSecOfDay(void);
 #if defined(__MINGW32__)
 #include <io.h>
 #include <fcntl.h>
-#include "timeUtils.h"
 #include <shlobj.h>
 #include <share.h>
 #endif
@@ -481,36 +480,6 @@ __hscore_lstat( const char *fname, struct stat *st )
 #endif
 }
 
-#ifdef PATH_MAX
-/* A size that will contain many path names, but not necessarily all
- * (PATH_MAX is not defined on systems with unlimited path length,
- * e.g. the Hurd).
- */
-INLINE HsInt __hscore_long_path_size() { return PATH_MAX; }
-#else
-INLINE HsInt __hscore_long_path_size() { return 4096; }
-#endif
-
-#ifdef R_OK
-INLINE int __hscore_R_OK() { return R_OK; }
-#endif
-#ifdef W_OK
-INLINE int __hscore_W_OK() { return W_OK; }
-#endif
-#ifdef X_OK
-INLINE int __hscore_X_OK() { return X_OK; }
-#endif
-
-#ifdef S_IRUSR
-INLINE mode_t __hscore_S_IRUSR() { return S_IRUSR; }
-#endif
-#ifdef S_IWUSR
-INLINE mode_t __hscore_S_IWUSR() { return S_IWUSR; }
-#endif
-#ifdef S_IXUSR
-INLINE mode_t __hscore_S_IXUSR() { return S_IXUSR; }
-#endif
-
 INLINE char *
 __hscore_d_name( struct dirent* d )
 {
@@ -735,32 +704,6 @@ INLINE void setTimevalTicks(struct timeval *p, HsWord64 usecs)
     p->tv_usec = usecs % 1000000;
 }
 #endif /* !defined(__MINGW32__) */
-
-// Directory-related
-
-#if defined(__MINGW32__)
-
-/* Make sure we've got the reqd CSIDL_ constants in scope;
- * w32api header files are lagging a bit in defining the full set.
- */
-#if !defined(CSIDL_APPDATA)
-#define CSIDL_APPDATA 0x001a
-#endif
-#if !defined(CSIDL_PERSONAL)
-#define CSIDL_PERSONAL 0x0005
-#endif
-#if !defined(CSIDL_PROFILE)
-#define CSIDL_PROFILE 0x0028
-#endif
-#if !defined(CSIDL_WINDOWS)
-#define CSIDL_WINDOWS 0x0024
-#endif
-
-INLINE int __hscore_CSIDL_PROFILE()  { return CSIDL_PROFILE;  }
-INLINE int __hscore_CSIDL_APPDATA()  { return CSIDL_APPDATA;  }
-INLINE int __hscore_CSIDL_WINDOWS()  { return CSIDL_WINDOWS;  }
-INLINE int __hscore_CSIDL_PERSONAL() { return CSIDL_PERSONAL; }
-#endif
 
 #if defined(__MINGW32__)
 INLINE unsigned int __hscore_get_osver(void) { return _osver; }

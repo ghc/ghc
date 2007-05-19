@@ -55,7 +55,6 @@ module GHC.Handle (
 
  ) where
 
-import System.Directory.Internals
 import Control.Monad
 import Data.Bits
 import Data.Maybe
@@ -945,8 +944,14 @@ openTempFile' loc tmp_dir template binary = do
 	 return (filepath, h)
       where
         filename        = prefix ++ show x ++ suffix
-        filepath        = tmp_dir `joinFileName` filename
+        filepath        = tmp_dir ++ [pathSeparator] ++ filename
 
+pathSeparator :: Char
+#ifdef mingw32_HOST_OS
+pathSeparator = '\\'
+#else
+pathSeparator = '/'
+#endif
 
 std_flags    = o_NONBLOCK   .|. o_NOCTTY
 output_flags = std_flags    .|. o_CREAT

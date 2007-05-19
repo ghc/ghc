@@ -34,18 +34,9 @@ dnl FreeBSD has an emtpy wctype.h, so test one of the affected
 dnl functions if it's really there.
 AC_CHECK_HEADERS([wctype.h], [AC_CHECK_FUNCS(iswspace)])
 
-AC_CHECK_FUNCS([ftime gmtime_r localtime_r lstat readdir_r])
-AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer times])
+AC_CHECK_FUNCS([lstat readdir_r])
+AC_CHECK_FUNCS([getclock getrusage setitimer times])
 AC_CHECK_FUNCS([_chsize ftruncate])
-
-dnl ** check if it is safe to include both <time.h> and <sys/time.h>
-AC_HEADER_TIME
-
-dnl ** how do we get a timezone name, and UTC offset ?
-AC_STRUCT_TIMEZONE
-
-dnl ** do we have altzone?
-FP_DECL_ALTZONE
 
 # map standard C types and ISO types to Haskell types
 FPTOOLS_CHECK_HTYPE(char)

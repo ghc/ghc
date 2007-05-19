@@ -138,8 +138,6 @@ exposed-modules:
 	System.Cmd,
 	System.Console.GetOpt,
 	System.CPUTime,
-	System.Directory,
-	System.Directory.Internals,
 	System.Environment,
 	System.Exit,
 	System.IO,
@@ -155,8 +153,6 @@ exposed-modules:
 	System.Posix.Types,
 	System.Process,
 	System.Process.Internals,
-	System.Random,
-	System.Time,
 	Text.ParserCombinators.ReadP,
 	Text.ParserCombinators.ReadPrec,
 	Text.Printf,
@@ -180,7 +176,6 @@ c-sources:
 	cbits/longlong.c
 	cbits/runProcess.c
 	cbits/selectUtils.c
-	cbits/timeUtils.c
 include-dirs: include, ../../includes, ../../rts
 includes:	HsBase.h
 install-includes:	HsBase.h
