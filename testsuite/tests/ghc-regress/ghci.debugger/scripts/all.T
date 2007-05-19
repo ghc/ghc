@@ -1,4 +1,4 @@
-setTestOpts(extra_run_opts('-fno-warn-monomorphism-restriction'))
+setTestOpts(extra_run_opts('-ignore-dot-ghci'))
 
 test('print001', normal, ghci_script, ['print001.script'])
 test('print002', normal, ghci_script, ['print002.script'])
