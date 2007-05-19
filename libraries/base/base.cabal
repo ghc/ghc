@@ -144,7 +144,6 @@ exposed-modules:
 	System.IO.Error,
 	System.IO.Unsafe,
 	System.Info,
-	System.Locale,
 	System.Mem,
 	System.Mem.StableName,
 	System.Mem.Weak,
