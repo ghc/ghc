@@ -53,7 +53,7 @@ import TysPrim
 import PrelNames
 import TysWiredIn
 
-import Constants        ( wORD_SIZE )
+import Constants
 import Outputable
 import Maybes
 import Panic
@@ -61,17 +61,13 @@ import FiniteMap
 
 import GHC.Arr          ( Array(..) )
 import GHC.Ptr          ( Ptr(..), castPtr )
-import GHC.Exts         
-import GHC.Int          ( Int32(..),  Int64(..) )
-import GHC.Word         ( Word32(..), Word64(..) )
+import GHC.Exts
 
 import Control.Monad
 import Data.Maybe
 import Data.Array.Base
 import Data.List        ( partition, nub )
-import Foreign.Storable
-
-import IO
+import Foreign
 
 ---------------------------------------------
 -- * A representation of semi evaluated Terms
@@ -94,7 +90,7 @@ data Term = Term { ty        :: Type
                  , subTerms  :: [Term] }
 
           | Prim { ty        :: Type
-                 , value     :: String }
+                 , value     :: [Word] }
 
           | Suspension { ctype    :: ClosureType
                        , mb_ty    :: Maybe Type
@@ -138,7 +134,7 @@ data Closure = Closure { tipe         :: ClosureType
                        , infoPtr      :: Ptr ()
                        , infoTable    :: StgInfoTable
                        , ptrs         :: Array Int HValue
-                       , nonPtrs      :: ByteArray# 
+                       , nonPtrs      :: [Word]
                        }
 
 instance Outputable ClosureType where
@@ -159,7 +155,9 @@ getClosureData a =
            let tipe = readCType (BCI.tipe itbl)
                elems = BCI.ptrs itbl 
                ptrsList = Array 0 (fromIntegral$ elems) ptrs
-           ptrsList `seq` return (Closure tipe (Ptr iptr) itbl ptrsList nptrs)
+               nptrs_data = [W# (indexWordArray# nptrs i)
+                              | I# i <- [0.. fromIntegral (BCI.nptrs itbl)] ]
+           ptrsList `seq` return (Closure tipe (Ptr iptr) itbl ptrsList nptrs_data)
 
 readCType :: Integral a => a -> ClosureType
 readCType i
@@ -216,55 +214,25 @@ isPointed :: Type -> Bool
 isPointed t | Just (t, _) <- splitTyConApp_maybe t = not$ isUnliftedTypeKind (tyConKind t)
 isPointed _ = True
 
-#define MKDECODER(offset,cons,builder) (offset, show$ cons (builder addr 0#))
+extractUnboxed  :: [Type] -> Closure -> [[Word]]
+extractUnboxed tt clos = go tt (nonPtrs clos)
+   where sizeofType t
+           | Just (tycon,_) <- splitTyConApp_maybe t
+           = ASSERT (isPrimTyCon tycon) sizeofTyCon tycon
+           | otherwise = pprPanic "Expected a TcTyCon" (ppr t)
+         go [] _ = []
+         go (t:tt) xx 
+           | (x, rest) <- splitAt (sizeofType t `div` wORD_SIZE) xx 
+           = x : go tt rest
 
-extractUnboxed  :: [Type] -> ByteArray# -> [String]
-extractUnboxed tt ba = helper tt (byteArrayContents# ba)
-   where helper :: [Type] -> Addr# -> [String]
-         helper (t:tt) addr 
-          | Just ( tycon,_) <- splitTyConApp_maybe t 
-          =  let (offset, txt) = decode tycon addr
-                 (I# word_offset)   = offset*wORD_SIZE
-             in txt : helper tt (plusAddr# addr word_offset)
-          | otherwise 
-          = -- ["extractUnboxed.helper: Urk. I got a " ++ showSDoc (ppr t)]
-            panic$ "extractUnboxed.helper: Urk. I got a " ++ showSDoc (ppr t)
-         helper [] addr = []
-         decode :: TyCon -> Addr# -> (Int, String)
-         decode t addr                             
-           | t == charPrimTyCon   = MKDECODER(1,C#,indexCharOffAddr#)
-           | t == intPrimTyCon    = MKDECODER(1,I#,indexIntOffAddr#)
-           | t == wordPrimTyCon   = MKDECODER(1,W#,indexWordOffAddr#)
-           | t == floatPrimTyCon  = MKDECODER(1,F#,indexFloatOffAddr#)
-           | t == doublePrimTyCon = MKDECODER(2,D#,indexDoubleOffAddr#)
-           | t == int32PrimTyCon  = MKDECODER(1,I32#,indexInt32OffAddr#)
-           | t == word32PrimTyCon = MKDECODER(1,W32#,indexWord32OffAddr#)
-           | t == int64PrimTyCon  = MKDECODER(2,I64#,indexInt64OffAddr#)
-           | t == word64PrimTyCon = MKDECODER(2,W64#,indexWord64OffAddr#)
-           | t == addrPrimTyCon   = MKDECODER(1,I#,(\x off-> addr2Int# (indexAddrOffAddr# x off)))  --OPT Improve the presentation of addresses
-           | t == stablePtrPrimTyCon  = (1, "<stablePtr>")
-           | t == stableNamePrimTyCon = (1, "<stableName>")
-           | t == statePrimTyCon      = (1, "<statethread>")
-           | t == realWorldTyCon      = (1, "<realworld>")
-           | t == threadIdPrimTyCon   = (1, "<ThreadId>")
-           | t == weakPrimTyCon       = (1, "<Weak>")
-           | t == arrayPrimTyCon      = (1,"<array>")
-           | t == byteArrayPrimTyCon  = (1,"<bytearray>")
-           | t == mutableArrayPrimTyCon = (1, "<mutableArray>")
-           | t == mutableByteArrayPrimTyCon = (1, "<mutableByteArray>")
-           | t == mutVarPrimTyCon= (1, "<mutVar>")
-           | t == mVarPrimTyCon  = (1, "<mVar>")
-           | t == tVarPrimTyCon  = (1, "<tVar>")
-           | otherwise = (1, showSDoc (char '<' <> ppr t <> char '>')) 
-                 -- We cannot know the right offset in the otherwise case, so 1 is just a wild dangerous guess!
-           -- TODO: Improve the offset handling in decode (make it machine dependant)
+sizeofTyCon = sizeofPrimRep . tyConPrimRep
 
 -----------------------------------
 -- * Traversals for Terms
 -----------------------------------
 
 data TermFold a = TermFold { fTerm :: Type -> DataCon -> HValue -> [a] -> a
-                           , fPrim :: Type -> String -> a
+                           , fPrim :: Type -> [Word] -> a
                            , fSuspension :: ClosureType -> Maybe Type -> HValue -> Maybe Name -> a
                            }
 
@@ -319,7 +287,7 @@ pprTerm p Term{dc=dc, subTerms=tt}
 
 pprTerm _ t = pprTerm1 t
 
-pprTerm1 Prim{value=value} = text value 
+pprTerm1 Prim{value=words, ty=ty} = text$ repPrim (tyConAppTyCon ty) words
 pprTerm1 t@Term{} = pprTerm 0 t 
 pprTerm1 Suspension{bound_to=Nothing} =  char '_' -- <> ppr ct <> char '_'
 pprTerm1 Suspension{mb_ty=Just ty, bound_to=Just n}
@@ -379,6 +347,34 @@ cPprTermBase pprP =
                       getListTerms t@Suspension{}       = [t]
                       getListTerms t = pprPanic "getListTerms" (ppr t)
 
+repPrim :: TyCon -> [Word] -> String
+repPrim t = rep where 
+   rep x
+    | t == charPrimTyCon   = show (build x :: Char)
+    | t == intPrimTyCon    = show (build x :: Int)
+    | t == wordPrimTyCon   = show (build x :: Word)
+    | t == floatPrimTyCon  = show (build x :: Float)
+    | t == doublePrimTyCon = show (build x :: Double)
+    | t == int32PrimTyCon  = show (build x :: Int32)
+    | t == word32PrimTyCon = show (build x :: Word32)
+    | t == int64PrimTyCon  = show (build x :: Int64)
+    | t == word64PrimTyCon = show (build x :: Word64)
+    | t == addrPrimTyCon   = show (nullPtr `plusPtr` build x)
+    | t == stablePtrPrimTyCon  = "<stablePtr>"
+    | t == stableNamePrimTyCon = "<stableName>"
+    | t == statePrimTyCon      = "<statethread>"
+    | t == realWorldTyCon      = "<realworld>"
+    | t == threadIdPrimTyCon   = "<ThreadId>"
+    | t == weakPrimTyCon       = "<Weak>"
+    | t == arrayPrimTyCon      = "<array>"
+    | t == byteArrayPrimTyCon  = "<bytearray>"
+    | t == mutableArrayPrimTyCon = "<mutableArray>"
+    | t == mutableByteArrayPrimTyCon = "<mutableByteArray>"
+    | t == mutVarPrimTyCon= "<mutVar>"
+    | t == mVarPrimTyCon  = "<mVar>"
+    | t == tVarPrimTyCon  = "<tVar>"
+    | otherwise = showSDoc (char '<' <> ppr t <> char '>')
+    where build ww = unsafePerformIO $ withArray ww (peek . castPtr) 
 -----------------------------------
 -- Type Reconstruction
 -----------------------------------
@@ -530,7 +526,7 @@ cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
             subTermsP <- sequence $ drop extra_args -- all extra arguments are pointed
                   [ appArr (go tv t) (ptrs clos) i
                    | (i,tv,t) <- zip3 [0..] subTermTvs subTtypesP]
-            let unboxeds   = extractUnboxed subTtypesNP (nonPtrs clos)
+            let unboxeds   = extractUnboxed subTtypesNP clos
                 subTermsNP = map (uncurry Prim) (zip subTtypesNP unboxeds)      
                 subTerms   = reOrderTerms subTermsP subTermsNP (drop extra_args subTtypes)
             return (Term tv dc a subTerms)

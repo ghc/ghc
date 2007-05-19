@@ -11,6 +11,7 @@ module TyCon(
 
 	PrimRep(..),
 	tyConPrimRep,
+        sizeofPrimRep,
 
 	AlgTyConRhs(..), visibleDataCons, 
         TyConParent(..), 
@@ -76,6 +77,7 @@ import PrelNames
 import Maybes
 import Outputable
 import FastString
+import Constants
 \end{code}
 
 %************************************************************************
@@ -454,6 +456,17 @@ data PrimRep
   | AddrRep		-- a pointer, but not to a Haskell value
   | FloatRep
   | DoubleRep
+
+-- Size of a PrimRep, in bytes
+sizeofPrimRep :: PrimRep -> Int
+sizeofPrimRep IntRep   = wORD_SIZE
+sizeofPrimRep WordRep  = wORD_SIZE
+sizeofPrimRep Int64Rep = wORD64_SIZE
+sizeofPrimRep Word64Rep= wORD64_SIZE
+sizeofPrimRep FloatRep = 4
+sizeofPrimRep DoubleRep= 8
+sizeofPrimRep AddrRep  = wORD_SIZE
+sizeofPrimRep PtrRep   = wORD_SIZE
 \end{code}
 
 %************************************************************************
