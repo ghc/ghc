@@ -3,6 +3,7 @@ Cabal
 directory
 filepath
 haskell98
+old-locale
 old-time
 pretty
 random

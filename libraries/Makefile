@@ -27,8 +27,8 @@ TOP=.
 include $(TOP)/mk/boilerplate.mk
 endif
 
-SUBDIRS = base old-time directory filepath pretty template-haskell \
-          readline Cabal random haskell98
+SUBDIRS = base old-locale old-time directory filepath pretty \
+          template-haskell readline Cabal random haskell98
 
 ifeq "$(GhcLibsWithUnix)" "YES"
 SUBDIRS += unix
