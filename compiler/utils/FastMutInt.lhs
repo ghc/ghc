@@ -40,6 +40,6 @@ writeFastMutInt :: FastMutInt -> Int -> IO ()
 writeFastMutInt (FastMutInt arr) (I# i) = IO $ \s ->
   case writeIntArray# arr 0# i s of { s ->
   (# s, () #) }
-\end{code}
 #endif
+\end{code}
 
