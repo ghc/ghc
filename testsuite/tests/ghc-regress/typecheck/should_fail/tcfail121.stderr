@@ -4,8 +4,8 @@ tcfail121.hs:12:8:
       arising from a use of `op' at tcfail121.hs:12:8-11
     Matching instances:
       instance [overlap ok] (Foo a) => Foo [a]
-	-- Defined at tcfail121.hs:8:0
-      instance [overlap ok] Foo [Int] -- Defined at tcfail121.hs:9:0
+	-- Defined at tcfail121.hs:8:0-24
+      instance [overlap ok] Foo [Int] -- Defined at tcfail121.hs:9:0-17
     (The choice depends on the instantiation of `a'
      Use -fallow-incoherent-instances to use the first choice above)
     In the expression: op x
