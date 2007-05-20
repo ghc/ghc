@@ -25,7 +25,7 @@ module RtClosureInspect(
      mapTermType,
      termTyVars,
 --     unsafeDeepSeq, 
-     reconstructType
+     cvReconstructType
  ) where 
 
 #include "HsVersions.h"
