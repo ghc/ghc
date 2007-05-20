@@ -70,6 +70,7 @@ import System.Exit	( exitWith, ExitCode(..) )
 import System.Directory
 import System.IO
 import System.IO.Error as IO
+import System.FilePath
 import Data.Char
 import Data.Dynamic
 import Data.Array
@@ -1775,7 +1776,8 @@ listModuleLine modl line = do
 -- If the highlight flag is True, also highlight the span using
 -- start_bold/end_bold.
 listAround span do_highlight = do
-      contents <- BS.readFile (unpackFS file)
+      pwd      <- getEnv "PWD" 
+      contents <- BS.readFile (pwd </> unpackFS file)
       let 
           lines = BS.split '\n' contents
           these_lines = take (line2 - line1 + 1 + pad_before + pad_after) $ 
