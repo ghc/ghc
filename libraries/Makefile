@@ -122,7 +122,8 @@ installPackage/installPackage: installPackage.hs $(BOOTSTRAPPING_STAMPS)
 	-$(RM) -rf installPackage
 	mkdir installPackage
 	$(CP) installPackage.hs installPackage/
-	cd installPackage && $(GHC) -Wall --make installPackage -o installPackage \
+	cd installPackage && $(GHC) -Wall -cpp \
+	                            --make installPackage -o installPackage \
 	                      -i../bootstrapping.Cabal \
 	                      -i../bootstrapping.filepath
 
