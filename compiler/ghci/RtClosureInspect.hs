@@ -23,8 +23,9 @@ module RtClosureInspect(
      isPointed,
      isFullyEvaluatedTerm,
      mapTermType,
-     termTyVars
+     termTyVars,
 --     unsafeDeepSeq, 
+     reconstructType
  ) where 
 
 #include "HsVersions.h"
@@ -382,12 +383,12 @@ repPrim t = rep where
 -- The Type Reconstruction monad
 type TR a = TcM a
 
-runTR :: HscEnv -> TR Term -> IO Term
+runTR :: HscEnv -> TR a -> IO a
 runTR hsc_env c = do 
   mb_term <- initTcPrintErrors hsc_env iNTERACTIVE c
   case mb_term of 
     Nothing -> panic "Can't unify"
-    Just term -> return term
+    Just x -> return x
 
 trIO :: IO a -> TR a 
 trIO = liftTcM . ioToTcRn
@@ -534,12 +535,6 @@ cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
       otherwise -> 
          return (Suspension (tipe clos) (Just tv) a Nothing)
 
--- Access the array of pointers and recurse down. Needs to be done with
--- care of no introducing a thunk! or go will fail to do its job 
-  appArr f arr (I# i#) = case arr of 
-                 (Array _ _ ptrs#) -> case indexArray# ptrs# i# of 
-                       (# e #) -> f e
-
   matchSubTypes dc ty
     | Just (_,ty_args) <- splitTyConApp_maybe (repType ty) 
     , null (dataConExTyVars dc)  --TODO Handle the case of extra existential tyvars
@@ -558,8 +553,64 @@ cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
                            , ptext SLIT("reOrderTerms") $$ (ppr pointed $$ ppr unpointed))
                     head unpointed : reOrderTerms pointed (tail unpointed) tys
 
-isMonomorphic ty | isForAllTy ty = False
-isMonomorphic ty = (isEmptyVarSet . tyVarsOfType) ty
+-- Strict application of f at index i
+appArr f (Array _ _ ptrs#) (I# i#) = case indexArray# ptrs# i# of 
+                                       (# e #) -> f e
+
+-- Fast, breadth-first version of obtainTerm that deals only with type reconstruction
+cvReconstructType :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Type
+cvReconstructType hsc_env force mb_ty hval = runTR hsc_env $ do
+   tv <- liftM mkTyVarTy (newVar argTypeKind)
+   case mb_ty of
+     Nothing -> search (isMonomorphic `fmap` zonkTcType tv) (++) [(tv, hval)] >> 
+                zonkTcType tv  -- TODO untested!
+     Just ty | isMonomorphic ty -> return ty
+     Just ty -> do 
+              (ty',rev_subst) <- instScheme (sigmaType ty)
+              addConstraint tv ty'
+              search (isMonomorphic `fmap` zonkTcType tv) (++) [(tv, hval)]
+              substTy rev_subst `fmap` zonkTcType tv
+    where 
+--  search :: m Bool -> ([a] -> [a] -> [a]) -> [a] -> m ()
+  search stop combine []     = return ()
+  search stop combine ((t,a):jj) =  (jj `combine`) `fmap` go t a >>= 
+                                    unlessM stop . search stop combine
+
+   -- returns unification tasks, since we are going to want a breadth-first search
+  go :: Type -> HValue -> TR [(Type, HValue)]
+  go tv a = do 
+    clos <- trIO $ getClosureData a
+    case tipe clos of
+      Indirection _ -> go tv $! (ptrs clos ! 0)
+      Constr -> do
+        m_dc <- trIO$ tcRnRecoverDataCon hsc_env (infoPtr clos)
+        case m_dc of
+          Nothing -> panic "Can't find the DataCon for a term"
+          Just dc -> do 
+            let extra_args = length(dataConRepArgTys dc) - length(dataConOrigArgTys dc)
+            subTtypes <- mapMif (not . isMonomorphic)
+                                (\t -> mkTyVarTy `fmap` newVar (typeKind t))
+                                (dataConRepArgTys dc)
+            -- It is vital for newtype reconstruction that the unification step is done
+            --     right here, _before_ the subterms are RTTI reconstructed.
+            let myType = mkFunTys subTtypes tv
+            fst `fmap` instScheme(dataConRepType dc) >>= addConstraint myType
+            return $map (\(I# i#,t) -> case ptrs clos of 
+                                       (Array _ _ ptrs#) -> case indexArray# ptrs# i# of 
+                                                              (# e #) -> (t,e))
+                        (drop extra_args $ zip [0..] subTtypes)
+      otherwise -> return []
+
+
+isMonomorphic ty | (tvs, ty') <- splitForAllTys ty
+                 = null tvs && (isEmptyVarSet . tyVarsOfType) ty'
+
+mapMif :: Monad m => (a -> Bool) -> (a -> m a) -> [a] -> m [a]
+mapMif pred f xx = sequence $ mapMif_ pred f xx
+mapMif_ pred f []     = []
+mapMif_ pred f (x:xx) = (if pred x then f x else return x) : mapMif_ pred f xx
+
+unlessM condM acc = condM >>= \c -> unless c acc
 
 zonkTerm :: Term -> TcM Term
 zonkTerm = foldTerm idTermFoldM {
