@@ -29,7 +29,7 @@ import Util
 --import TRACE
 }
 
-$whitechar   = [\ \t\n\r\f\v\xa0]
+$whitechar   = [\ \t\n\r\f\v\xa0] -- \xa0 is Unicode no-break space
 $white_no_nl = $whitechar # \n
 
 $ascdigit  = 0-9
