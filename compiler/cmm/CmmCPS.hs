@@ -60,7 +60,7 @@ data BrokenBlock
                                 -- branch to one either by conditional
                                 -- branches or via the last statement
 
-      brokenBlockExit :: BlockExitInfo
+      brokenBlockExit :: FinalStmt
                                 -- How the block can be left
     }
 
@@ -75,18 +75,18 @@ data BlockEntryInfo
 
   | ControlEntry		-- A label in the input
 
-data BlockExitInfo
-  = ControlExit
+data FinalStmt
+  = FinalBranch
     BlockId -- next block (must be a ControlEntry)
 
-  | ReturnExit
+  | FinalReturn
     CmmActuals -- return values
 
-  | TailCallExit
+  | FinalJump
     CmmExpr -- the function to call
     CmmActuals -- arguments to call
 
-  | CallExit
+  | FinalCall
     BlockId -- next block after call (must be a ContinuationEntry)
     CmmCallTarget -- the function to call
     CmmFormals -- results from call (redundant with ContinuationEntry)
@@ -148,15 +148,15 @@ constructContinuation2 formats (BrokenBlock ident entry stmts _ exit) =
                  FunctionEntry -> []
                  ContinuationEntry formals -> unpack_continuation curr_format
       postfix = case exit of
-                  ControlExit next -> [CmmBranch next]
-                  ReturnExit arguments -> exit_function curr_format (CmmLoad (CmmReg spReg) wordRep) arguments
-                  TailCallExit target arguments -> exit_function curr_format target arguments
+                  FinalBranch next -> [CmmBranch next]
+                  FinalReturn arguments -> exit_function curr_format (CmmLoad (CmmReg spReg) wordRep) arguments
+                  FinalJump target arguments -> exit_function curr_format target arguments
                   -- TODO: do something about global saves
-                  CallExit next (CmmForeignCall target CmmCallConv) results arguments saves ->
+                  FinalCall next (CmmForeignCall target CmmCallConv) results arguments saves ->
                       let cont_format = lookupWithDefaultUFM formats (panic $ "format: unknown block " ++ (showSDoc $ ppr $ getUnique next)) next
                       in pack_continuation curr_format cont_format ++
                              [CmmJump target arguments]
-                  CallExit next _ results arguments saves -> panic "unimplemented CmmCall"
+                  FinalCall next _ results arguments saves -> panic "unimplemented CmmCall"
 
 --------------------------------------------------------------------------------
 -- Functions that generate CmmStmt sequences
@@ -233,13 +233,13 @@ breakBlock uniques (BasicBlock ident stmts) entry =
               [] -> panic "block doesn't end in jump, goto or return"
               [CmmJump target arguments] ->
                   [BrokenBlock current_id entry accum_stmts exits
-                                   (TailCallExit target arguments)]
+                                   (FinalJump target arguments)]
               [CmmReturn arguments] ->
                   [BrokenBlock current_id entry accum_stmts exits
-                                   (ReturnExit arguments)]
+                                   (FinalReturn arguments)]
               [CmmBranch target] ->
                   [BrokenBlock current_id entry accum_stmts (target:exits)
-                                   (ControlExit target)]
+                                   (FinalBranch target)]
               (CmmJump _ _:_) ->
                   panic "jump in middle of block"
               (CmmReturn _:_) ->
@@ -252,7 +252,7 @@ breakBlock uniques (BasicBlock ident stmts) entry =
                   let new_id = BlockId $ head uniques
                       rest = breakBlock' (tail uniques) new_id (ContinuationEntry results) [] [] stmts
                   in BrokenBlock current_id entry accum_stmts (new_id:exits)
-                         (CallExit new_id target results arguments saves) : rest
+                         (FinalCall new_id target results arguments saves) : rest
               (s@(CmmCondBranch test target):stmts) ->
                   breakBlock' uniques current_id entry (target:exits) (accum_stmts++[s]) stmts
               (s:stmts) ->
@@ -264,10 +264,10 @@ cmmBlockFromBrokenBlock (BrokenBlock ident _ stmts _ exit) = BasicBlock ident (s
     where
       exit_stmt =
           case exit of
-            ControlExit target -> [CmmBranch target]
-            ReturnExit arguments -> [CmmReturn arguments]
-            TailCallExit target arguments -> [CmmJump target arguments]
-            CallExit branch_target call_target results arguments saves -> [CmmCall call_target results arguments saves, CmmBranch branch_target]
+            FinalBranch target -> [CmmBranch target]
+            FinalReturn arguments -> [CmmReturn arguments]
+            FinalJump target arguments -> [CmmJump target arguments]
+            FinalCall branch_target call_target results arguments saves -> [CmmCall call_target results arguments saves, CmmBranch branch_target]
 
 -----------------------------------------------------------------------------
 -- CPS a single CmmTop (proceedure)
