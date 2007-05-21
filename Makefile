@@ -400,13 +400,22 @@ binary-dist :: publish-binary-dist
 endif
 
 .PHONY: publish-binary-dist
-publish-binary-dist :
+publish-binary-dist ::
 	@for i in 0 1 2 3 4 5 6 7 8 9; do \
 		echo "Try $$i: $(PublishCp) $(BIN_DIST_TARBALL) $(PublishLocation)/dist"; \
 		if $(PublishCp) $(BIN_DIST_TARBALL) $(PublishLocation)/dist; then break; fi; \
 	done
-	$(PublishCp) -r $(FPTOOLS_TOP)/$(BIN_DIST_NAME)/share/html/* $(PublishLocation)/docs
 
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+# On Windows, we cannot use absoluate pathnames to rsync, because they look
+# like remote pathnames ("c:/foo/bar").  Also, the docs reside in doc/
+# rather than share/, due to prep-bin-dist-mingw.
+publish-binary-dist ::
+	$(PublishCp) -r $(FPTOOLS_TOP)/$(BIN_DIST_NAME)/doc/html/* $(PublishLocation)/docs
+else
+publish-binary-dist ::
+	$(PublishCp) -r $(BIN_DIST_DIR)/share/html/* $(PublishLocation)/docs
+endif
 
 binary-dist::
 	@echo "Mechanical and super-natty! Inspect the result and *if* happy; freeze, sell and get some sleep!"
