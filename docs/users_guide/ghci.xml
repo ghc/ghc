@@ -577,7 +577,9 @@ hello
 Prelude IO>
 </screen>
 
-      <para>(Note: <literal>:module</literal> can be shortened to
+      <para>(Note: you can use <literal>import M</literal> as an
+      alternative to <literal>:module +M</literal>, and
+      <literal>:module</literal> can also be shortened to 
       <literal>:m</literal>). The full syntax of the
       <literal>:module</literal> command is:</para>
 
@@ -2066,9 +2068,15 @@ Prelude> :main foo bar
           <literal>:module <optional>+|-</optional> <optional>*</optional><replaceable>mod<subscript>1</subscript></replaceable> ... <optional>*</optional><replaceable>mod<subscript>n</subscript></replaceable></literal>
           <indexterm><primary><literal>:module</literal></primary></indexterm>
         </term>
+        <term>
+          <literal>import <replaceable>mod</replaceable></literal>
+        </term>
 	<listitem>
 	  <para>Sets or modifies the current context for statements
-	  typed at the prompt.  See <xref linkend="ghci-scope"/> for
+	  typed at the prompt.  The form <literal>import
+	  <replaceable>mod</replaceable></literal> is equivalent to
+	  <literal>:module +<replaceable>mod</replaceable></literal>.
+	  See <xref linkend="ghci-scope"/> for
 	  more details.</para>
 	</listitem>
       </varlistentry>
