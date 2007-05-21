@@ -241,6 +241,7 @@ flattenCgStmts id stmts =
 
 isJump (CmmJump _ _) = True
 isJump (CmmBranch _) = True
+isJump (CmmSwitch _ _) = True
 isJump _ = False
 
 isOrdinaryStmt (CgStmt _) = True
