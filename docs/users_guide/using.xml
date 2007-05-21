@@ -1485,6 +1485,50 @@ f "2"    = 2
 
 	<varlistentry>
 	  <term>
+            <option>-fno-state-hack</option>
+            <indexterm><primary><option>-fno-state-hack</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Turn off the "state hack" whereby any lambda with a
+	      <literal>State#</literal> token as argument is considered to be
+	      single-entry, hence it is considered OK to inline things inside
+	      it.  This can improve performance of IO and ST monad code, but it
+	    runs the risk of reducing sharing.</para> 
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <option>-fomit-interface-pragmas</option>
+	    <indexterm><primary><option>-fomit-interface-pragmas</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Tells GHC to omit all inessential information from the interface file
+	      generated for the module being compiled (say M).  This means that a module
+	      importing M will see only the <emphasis>types</emphasis> of the functions that M exports, but not
+	      their unfoldings, strictness info, etc.  Hence, for example,
+	      no function exported by M will be inlined
+	      into an importing module.  The benefit is that modules that import M will
+	      need to be recompiled less often (only when M's exports change their type,
+	      not when they change their implementation).
+	      </para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <option>-fignore-interface-pragmas</option>
+	    <indexterm><primary><option>-fignore-interface-pragmas</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Tells GHC to ignore all inessential information when reading interface files.
+	    That is, even if <filename>M.hi</filename> contains unfolding or strictness information
+	    for a function, GHC will ignore that information.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
             <option>-funbox-strict-fields</option>:
 	    <indexterm><primary><option>-funbox-strict-fields</option></primary></indexterm>
 	    <indexterm><primary>strict constructor fields</primary></indexterm>
@@ -1507,7 +1551,7 @@ f "2"    = 2
 
 	<varlistentry>
 	  <term>
-            <option>-funfolding-update-in-place&lt;n&gt;</option>
+            <option>-funfolding-update-in-place=<replaceable>n</replaceable></option>
             <indexterm><primary><option>-funfolding-update-in-place</option></primary></indexterm>
           </term>
 	  <listitem>
@@ -1525,7 +1569,7 @@ f "2"    = 2
 
 	<varlistentry>
 	  <term>
-            <option>-funfolding-creation-threshold&lt;n&gt;</option>:
+            <option>-funfolding-creation-threshold=<replaceable>n</replaceable></option>:
 	    <indexterm><primary><option>-funfolding-creation-threshold</option></primary></indexterm>
 	    <indexterm><primary>inlining, controlling</primary></indexterm>
 	    <indexterm><primary>unfolding, controlling</primary></indexterm>
@@ -1551,7 +1595,7 @@ f "2"    = 2
 	</varlistentry>
 
 	<varlistentry>
-	  <term><option>-funfolding-use-threshold&lt;n&gt;</option>:</term>
+	  <term><option>-funfolding-use-threshold=<replaceable>n</replaceable></option></term>
 	  <listitem>
 	    <indexterm><primary><option>-funfolding-use-threshold</option></primary></indexterm>
 	    <indexterm><primary>inlining, controlling</primary></indexterm>
