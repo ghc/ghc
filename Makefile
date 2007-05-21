@@ -405,7 +405,7 @@ publish-binary-dist :
 		echo "Try $$i: $(PublishCp) $(BIN_DIST_TARBALL) $(PublishLocation)/dist"; \
 		if $(PublishCp) $(BIN_DIST_TARBALL) $(PublishLocation)/dist; then break; fi; \
 	done
-	$(PublishCp) -r $(BIN_DIST_DIR)/share/html/* $(PublishLocation)/docs
+	$(PublishCp) -r $(FPTOOLS_TOP)/$(BIN_DIST_NAME)/share/html/* $(PublishLocation)/docs
 
 
 binary-dist::
