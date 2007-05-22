@@ -64,34 +64,57 @@ data BrokenBlock
                                 -- How the block can be left
     }
 
+continuationLabel (Continuation _ _ l _ _) = l
+data Continuation =
+  Continuation
+     Bool              -- True => Function entry, False => Continuation/return point
+     [CmmStatic]       -- Info table, may be empty
+     CLabel            -- Used to generate both info & entry labels
+     CmmFormals        -- Argument locals live on entry (C-- procedure params)
+     [BrokenBlock]   -- Code, may be empty.  The first block is
+                       -- the entry point.  The order is otherwise initially 
+                       -- unimportant, but at some point the code gen will
+                       -- fix the order.
+
+		       -- the BlockId of the first block does not give rise
+		       -- to a label.  To jump to the first block in a Proc,
+		       -- use the appropriate CLabel.
 
 data BlockEntryInfo
   = FunctionEntry		-- Beginning of function
+      CmmFormals                -- aguments to function
 
   | ContinuationEntry 		-- Return point of a call
-      CmmFormals                -- return values
+      CmmFormals                -- return values (argument to continuation)
   -- TODO:
   -- | ProcPointEntry -- no return values, but some live might end up as params or possibly in the frame
 
   | ControlEntry		-- A label in the input
 
+-- Final statement in a BlokenBlock
+-- Constructors and arguments match those in Cmm,
+-- but are restricted to branches, returns, jumps, calls and switches
 data FinalStmt
   = FinalBranch
-    BlockId -- next block (must be a ControlEntry)
+      BlockId -- next block (must be a ControlEntry)
 
   | FinalReturn
-    CmmActuals -- return values
+      CmmActuals -- return values
 
   | FinalJump
-    CmmExpr -- the function to call
-    CmmActuals -- arguments to call
+      CmmExpr -- the function to call
+      CmmActuals -- arguments to call
 
   | FinalCall
-    BlockId -- next block after call (must be a ContinuationEntry)
-    CmmCallTarget -- the function to call
-    CmmFormals -- results from call (redundant with ContinuationEntry)
-    CmmActuals -- arguments to call
-    (Maybe [GlobalReg]) -- registers that must be saved (TODO)
+      BlockId -- next block after call (must be a ContinuationEntry)
+      CmmCallTarget -- the function to call
+      CmmFormals -- results from call (redundant with ContinuationEntry)
+      CmmActuals -- arguments to call
+      (Maybe [GlobalReg]) -- registers that must be saved (TODO)
+
+  | FinalSwitch
+      CmmExpr [Maybe BlockId]   -- Table branch
+
   -- TODO: | ProcPointExit (needed?)
 
 data StackFormat
@@ -104,58 +127,293 @@ data StackFormat
 -- A block can be a continuation of another block (w/ or w/o joins)
 -- A block can be an entry to a function
 
+blocksToBlockEnv :: [BrokenBlock] -> BlockEnv BrokenBlock
+blocksToBlockEnv blocks = listToUFM $ map (\b -> (brokenBlockId b, b)) blocks
+
+-----------------------------------------------------------------------------
+calculateOwnership :: UniqSet BlockId -> [BrokenBlock] -> BlockEnv (UniqSet BlockId)
+calculateOwnership proc_points blocks =
+    fixedpoint dependants update (map brokenBlockId blocks) emptyUFM
+    where
+      blocks_ufm :: BlockEnv BrokenBlock
+      blocks_ufm = blocksToBlockEnv blocks
+
+      dependants :: BlockId -> [BlockId]
+      dependants ident =
+          brokenBlockTargets $ lookupWithDefaultUFM
+                                 blocks_ufm unknown_block ident
+
+      update :: BlockId -> Maybe BlockId
+             -> BlockEnv (UniqSet BlockId) -> Maybe (BlockEnv (UniqSet BlockId))
+      update ident cause owners =
+          case (cause, ident `elementOfUniqSet` proc_points) of
+            (Nothing, True) -> Just $ addToUFM owners ident (unitUniqSet ident)
+            (Nothing, False) -> Nothing
+            (Just cause', True) -> Nothing
+            (Just cause', False) ->
+                if (sizeUniqSet old) == (sizeUniqSet new)
+                   then Nothing
+                   else Just $ addToUFM owners ident new
+                where
+                  old = lookupWithDefaultUFM owners emptyUniqSet ident
+                  new = old `unionUniqSets` lookupWithDefaultUFM owners emptyUniqSet cause'
+
+      unknown_block = panic "unknown BlockId in selectStackFormat"
+
+calculateProcPoints :: [BrokenBlock] -> UniqSet BlockId
+calculateProcPoints blocks = calculateProcPoints' init_proc_points blocks
+    where
+      init_proc_points = mkUniqSet $
+                         map brokenBlockId $
+                         filter always_proc_point blocks
+      always_proc_point BrokenBlock {
+                              brokenBlockEntry = FunctionEntry _ } = True
+      always_proc_point BrokenBlock {
+                              brokenBlockEntry = ContinuationEntry _ } = True
+      always_proc_point _ = False
+
+calculateProcPoints' :: UniqSet BlockId -> [BrokenBlock] -> UniqSet BlockId
+calculateProcPoints' old_proc_points blocks =
+    if sizeUniqSet old_proc_points == sizeUniqSet new_proc_points
+      then old_proc_points
+      else calculateProcPoints' new_proc_points blocks
+    where
+      owners = calculateOwnership old_proc_points blocks
+      new_proc_points = unionManyUniqSets (old_proc_points:(map (calculateProcPoints'' owners) blocks))
+
+calculateProcPoints'' :: BlockEnv (UniqSet BlockId) -> BrokenBlock -> UniqSet BlockId
+calculateProcPoints''  owners block =
+    unionManyUniqSets (map (f parent_id) child_ids)
+    where
+      parent_id = brokenBlockId block
+      child_ids = brokenBlockTargets block
+      f parent_id child_id = 
+          if needs_proc_point
+            then unitUniqSet child_id
+            else emptyUniqSet
+          where
+            parent_owners = lookupWithDefaultUFM owners emptyUniqSet parent_id
+            child_owners = lookupWithDefaultUFM owners emptyUniqSet child_id
+            needs_proc_point = not $ isEmptyUniqSet $ child_owners `minusUniqSet` parent_owners
+            --needs_proc_point = sizeUniqSet (parent_owners `unionUniqSets` child_owners) /= sizeUniqSet parent_owners
+
+cmmCondBranchTargets (CmmCondBranch _ target) = [target]
+cmmCondBranchTargets _ = []
+
+finalBranchOrSwitchTargets (FinalBranch target) = [target]
+finalBranchOrSwitchTargets (FinalSwitch _ targets) = mapCatMaybes id targets
+finalBranchOrSwitchTargets _ = []
+
+collectNonProcPointTargets ::
+    UniqSet BlockId -> BlockEnv BrokenBlock
+    -> UniqSet BlockId -> BlockId -> UniqSet BlockId
+collectNonProcPointTargets proc_points blocks current_targets block =
+    if sizeUniqSet current_targets == sizeUniqSet new_targets
+       then current_targets
+       else foldl (collectNonProcPointTargets proc_points blocks) new_targets targets
+    where
+      block' = lookupWithDefaultUFM blocks (panic "TODO") block
+      targets = -- We can't use the brokenBlockTargets b/c we don't want to follow the final goto after a call -- brokenBlockTargets block'
+        --finalBranchOrSwitchTargets (brokenBlockExit block') ++ concatMap cmmCondBranchTargets (brokenBlockStmts block')
+        uniqSetToList $ (mkUniqSet $ brokenBlockTargets block') `minusUniqSet` proc_points
+        -- TODO: remove redundant uniqSetToList
+      new_targets = current_targets `unionUniqSets` (mkUniqSet targets)
+
+buildContinuation ::
+    UniqSet BlockId -> BlockEnv BrokenBlock
+    -> BlockId -> Continuation
+buildContinuation proc_points blocks start =
+  Continuation is_entry info_table clabel params body
+    where
+      children = (collectNonProcPointTargets proc_points blocks (unitUniqSet start) start) `delOneFromUniqSet` start
+      start_block = lookupWithDefaultUFM blocks (panic "TODO") start
+      children_blocks = map (lookupWithDefaultUFM blocks (panic "TODO")) (uniqSetToList children)
+      body = start_block : children_blocks
+      info_table = [] -- TODO
+      is_entry = case start_block of
+                   BrokenBlock { brokenBlockEntry = FunctionEntry _ } -> True
+                   _ -> False
+      clabel = mkReturnPtLabel $ getUnique start
+      params = case start_block of
+                 BrokenBlock { brokenBlockEntry = FunctionEntry args } -> args
+                 BrokenBlock { brokenBlockEntry = ContinuationEntry args } -> args
+                 BrokenBlock { brokenBlockEntry = ControlEntry } -> [] -- TODO: it's a proc-point, we could pass lives in parameter registers
+
 --------------------------------------------------------------------------------
 -- For now just select the continuation orders in the order they are in the set with no gaps
 
-selectStackFormat2 :: BlockEnv CmmLive -> [BrokenBlock] -> BlockEnv StackFormat
-selectStackFormat2 live blocks = fixedpoint dependants update (map brokenBlockId blocks) emptyUFM where
-  blocks_ufm = listToUFM $ map (\b -> (brokenBlockId b, b)) blocks
-  dependants ident =
-      brokenBlockTargets $ lookupWithDefaultUFM blocks_ufm (panic "TODO") ident
-  update ident cause formats =
-    let BrokenBlock _ entry _ _ _ = lookupWithDefaultUFM blocks_ufm (panic "unknown BlockId in selectStackFormat:live") ident in
-    case cause of
-      -- Propagate only to blocks entered by branches (not function entry blocks or continuation entry blocks)
-      Just cause_name ->
-          let cause_format = lookupWithDefaultUFM formats (panic "update signaled for block not in format") cause_name
-          in case entry of
-            ControlEntry -> Just $ addToUFM formats ident cause_format
-            FunctionEntry -> Nothing
-            ContinuationEntry _ -> Nothing
-      -- Do initial calculates for function blocks
-      Nothing ->
-          case entry of
-            ControlEntry -> Nothing
-            FunctionEntry -> Just $ addToUFM formats ident $ StackFormat ident 0 []
-            ContinuationEntry _ -> Just $ addToUFM formats ident $ live_to_format ident $ lookupWithDefaultUFM live (panic "TODO") ident
-  live_to_format label live =
-      foldl extend_format
-                (StackFormat label retAddrSizeW [])
-                (uniqSetToList live)
-  extend_format :: StackFormat -> LocalReg -> StackFormat
-  extend_format (StackFormat block size offsets) reg =
-      StackFormat block (slot_size reg + size) ((CmmLocal reg, size) : offsets)
+selectStackFormat :: BlockEnv CmmLive -> [BrokenBlock] -> BlockEnv StackFormat
+selectStackFormat live blocks =
+    fixedpoint dependants update (map brokenBlockId blocks) emptyUFM
+    where
+      blocks_ufm :: BlockEnv BrokenBlock
+      blocks_ufm = listToUFM $ map (\b -> (brokenBlockId b, b)) blocks
+
+      dependants :: BlockId -> [BlockId]
+      dependants ident =
+          brokenBlockTargets $ lookupWithDefaultUFM
+                                 blocks_ufm unknown_block ident
+
+      update :: BlockId -> Maybe BlockId
+             -> BlockEnv StackFormat -> Maybe (BlockEnv StackFormat)
+      update ident cause formats =
+          if ident `elemUFM` formats
+             then Nothing -- Blocks only need to be updated once
+             else case (cause,
+                        brokenBlockEntry $ lookupWithDefaultUFM blocks_ufm
+                                             unknown_block ident) of
+                    -- Propagate only to blocks entered by branches
+                    -- (not function entry blocks or continuation entry blocks)
+                    (Just cause_name, ControlEntry) ->
+                        Just $ addToUFM formats ident cause_format
+                            where cause_format = lookupWithDefaultUFM
+                                                   formats unknown_block
+                                                   cause_name
+                    -- Do initial calculates for function blocks
+                    (Nothing, FunctionEntry _) ->
+                        Just $
+                             addToUFM formats ident $
+                             StackFormat ident 0 []
+                    -- Do initial calculates for continuation blocks
+                    (Nothing, ContinuationEntry _) ->
+                        Just $
+                             addToUFM formats ident $
+                             live_to_format ident $
+                             lookupWithDefaultUFM live unknown_block ident
+                    _ -> Nothing
+
+      unknown_block = panic "unknown BlockId in selectStackFormat"
+
+      live_to_format :: BlockId -> CmmLive -> StackFormat
+      live_to_format label live =
+          foldl extend_format
+                    (StackFormat label retAddrSizeW [])
+                    (uniqSetToList live)
+
+      extend_format :: StackFormat -> LocalReg -> StackFormat
+      extend_format (StackFormat block size offsets) reg =
+          StackFormat block (slot_size reg + size) ((CmmLocal reg, size) : offsets)
+
+selectStackFormat2 :: BlockEnv CmmLive -> [Continuation] -> [(CLabel, StackFormat)]
+selectStackFormat2 live continuations =
+    map (\c -> (continuationLabel c, selectStackFormat' c)) continuations
+    where
+      selectStackFormat' (Continuation True info_table label formals blocks) =
+          let ident = brokenBlockId $ head blocks -- TODO: CLabel isn't a uniquable, but we need a better way than this
+          in StackFormat ident 0 []
+      selectStackFormat' (Continuation False info_table label formals blocks) =
+          let ident = brokenBlockId $ head blocks -- TODO: CLabel isn't a uniquable, but we need a better way than this
+          in live_to_format ident $ lookupWithDefaultUFM live unknown_block ident          
+
+      live_to_format :: BlockId -> CmmLive -> StackFormat
+      live_to_format label live =
+          foldl extend_format
+                    (StackFormat label retAddrSizeW [])
+                    (uniqSetToList live)
+
+      extend_format :: StackFormat -> LocalReg -> StackFormat
+      extend_format (StackFormat block size offsets) reg =
+          StackFormat block (slot_size reg + size) ((CmmLocal reg, size) : offsets)
+
+      unknown_block = panic "unknown BlockId in selectStackFormat"
 
 slot_size reg = ((machRepByteWidth (localRegRep reg) - 1) `div` wORD_SIZE) + 1
 
-constructContinuation2 :: BlockEnv StackFormat -> BrokenBlock -> CmmBasicBlock
+constructContinuation :: [(CLabel, StackFormat)] -> Continuation -> CmmTop
+constructContinuation formats (Continuation is_entry info label formals blocks) =
+    CmmProc info label formals (map (constructContinuation2' label formats) blocks)
+
+{-
+    BasicBlock ident (prefix++stmts++postfix)
+    where
+      
+      curr_format = lookupWithDefaultUFM formats unknown_block ident
+      unknown_block = panic "unknown BlockId in constructContinuation"
+      prefix = case entry of
+                 ControlEntry -> []
+                 FunctionEntry _ -> []
+                 ContinuationEntry formals ->
+                     unpack_continuation curr_format
+      postfix = case exit of
+                  FinalBranch next -> [CmmBranch next]
+                  FinalSwitch expr targets -> [CmmSwitch expr targets]
+                  FinalReturn arguments ->
+                      exit_function curr_format
+                                    (CmmLoad (CmmReg spReg) wordRep)
+                                    arguments
+                  FinalJump target arguments ->
+                      exit_function curr_format target arguments
+                  -- TODO: do something about global saves
+                  FinalCall next (CmmForeignCall target CmmCallConv)
+                            results arguments saves ->
+                                pack_continuation curr_format cont_format ++
+                                [CmmJump target arguments]
+                            where
+                              cont_format = lookupWithDefaultUFM formats
+                                              unknown_block next
+                  FinalCall next _ results arguments saves -> panic "unimplemented CmmCall"
+-}
+
+constructContinuation2' :: CLabel -> [(CLabel, StackFormat)] -> BrokenBlock
+                       -> CmmBasicBlock
+constructContinuation2' curr_ident formats (BrokenBlock ident entry stmts _ exit) =
+    BasicBlock ident (prefix++stmts++postfix)
+    where
+      curr_format = maybe unknown_block id $ lookup curr_ident formats
+      unknown_block = panic "unknown BlockId in constructContinuation"
+      prefix = case entry of
+                 ControlEntry -> []
+                 FunctionEntry _ -> []
+                 ContinuationEntry formals ->
+                     unpack_continuation curr_format
+      postfix = case exit of
+                  FinalBranch next -> [CmmBranch next]
+                  FinalSwitch expr targets -> [CmmSwitch expr targets]
+                  FinalReturn arguments ->
+                      exit_function curr_format
+                                    (CmmLoad (CmmReg spReg) wordRep)
+                                    arguments
+                  FinalJump target arguments ->
+                      exit_function curr_format target arguments
+                  -- TODO: do something about global saves
+                  FinalCall next (CmmForeignCall target CmmCallConv)
+                            results arguments saves ->
+                                pack_continuation curr_format cont_format ++
+                                [CmmJump target arguments]
+                            where
+                              cont_format = maybe unknown_block id $
+                                            lookup (mkReturnPtLabel $ getUnique next) formats
+                  FinalCall next _ results arguments saves -> panic "unimplemented CmmCall"
+
+constructContinuation2 :: BlockEnv StackFormat -> BrokenBlock
+                       -> CmmBasicBlock
 constructContinuation2 formats (BrokenBlock ident entry stmts _ exit) =
     BasicBlock ident (prefix++stmts++postfix)
     where
-      curr_format = lookupWithDefaultUFM formats (panic $ "format: unknown block " ++ (showSDoc $ ppr $ getUnique ident)) ident
+      curr_format = lookupWithDefaultUFM formats unknown_block ident
+      unknown_block = panic "unknown BlockId in constructContinuation"
       prefix = case entry of
                  ControlEntry -> []
-                 FunctionEntry -> []
-                 ContinuationEntry formals -> unpack_continuation curr_format
+                 FunctionEntry _ -> []
+                 ContinuationEntry formals ->
+                     unpack_continuation curr_format
       postfix = case exit of
                   FinalBranch next -> [CmmBranch next]
-                  FinalReturn arguments -> exit_function curr_format (CmmLoad (CmmReg spReg) wordRep) arguments
-                  FinalJump target arguments -> exit_function curr_format target arguments
+                  FinalSwitch expr targets -> [CmmSwitch expr targets]
+                  FinalReturn arguments ->
+                      exit_function curr_format
+                                    (CmmLoad (CmmReg spReg) wordRep)
+                                    arguments
+                  FinalJump target arguments ->
+                      exit_function curr_format target arguments
                   -- TODO: do something about global saves
-                  FinalCall next (CmmForeignCall target CmmCallConv) results arguments saves ->
-                      let cont_format = lookupWithDefaultUFM formats (panic $ "format: unknown block " ++ (showSDoc $ ppr $ getUnique next)) next
-                      in pack_continuation curr_format cont_format ++
-                             [CmmJump target arguments]
+                  FinalCall next (CmmForeignCall target CmmCallConv)
+                            results arguments saves ->
+                                pack_continuation curr_format cont_format ++
+                                [CmmJump target arguments]
+                            where
+                              cont_format = lookupWithDefaultUFM formats
+                                              unknown_block next
                   FinalCall next _ results arguments saves -> panic "unimplemented CmmCall"
 
 --------------------------------------------------------------------------------
@@ -195,7 +453,7 @@ pack_continuation (StackFormat curr_id curr_frame_size curr_offsets)
          | (reg, offset) <- cont_offsets]
     set_stack_header = -- TODO: only set when needed
         [CmmStore (CmmRegOff spReg (wORD_SIZE*(curr_frame_size - cont_frame_size))) continuation_function]
-    continuation_function = CmmLit $ CmmLabel $ mkReturnPtLabel $ getUnique cont_id
+    continuation_function = CmmLit $ CmmLabel $ mkReturnPtLabel {-TODO: use the correct function -} $ getUnique cont_id
     adjust_spReg =
         if curr_frame_size == cont_frame_size
         then []
@@ -220,26 +478,36 @@ unpack_continuation (StackFormat curr_id curr_frame_size curr_offsets)
 -----------------------------------------------------------------------------
 
 -----------------------------------------------------------------------------
+-- Takes a basic block and breaks it up into a list of broken blocks
+--
 -- Takes a basic block and returns a list of basic blocks that
 -- each have at most 1 CmmCall in them which must occur at the end.
 -- Also returns with each basic block, the variables that will
 -- be arguments to the continuation of the block once the call (if any)
 -- returns.
 
+breakBlock :: [Unique] -> CmmBasicBlock -> BlockEntryInfo -> [BrokenBlock]
 breakBlock uniques (BasicBlock ident stmts) entry =
     breakBlock' uniques ident entry [] [] stmts where
         breakBlock' uniques current_id entry exits accum_stmts stmts =
             case stmts of
               [] -> panic "block doesn't end in jump, goto or return"
               [CmmJump target arguments] ->
-                  [BrokenBlock current_id entry accum_stmts exits
-                                   (FinalJump target arguments)]
+                  [BrokenBlock current_id entry accum_stmts
+                               exits
+                               (FinalJump target arguments)]
               [CmmReturn arguments] ->
-                  [BrokenBlock current_id entry accum_stmts exits
-                                   (FinalReturn arguments)]
+                  [BrokenBlock current_id entry accum_stmts
+                               exits
+                               (FinalReturn arguments)]
               [CmmBranch target] ->
-                  [BrokenBlock current_id entry accum_stmts (target:exits)
-                                   (FinalBranch target)]
+                  [BrokenBlock current_id entry accum_stmts
+                               (target:exits)
+                               (FinalBranch target)]
+              [CmmSwitch expr targets] ->
+                  [BrokenBlock current_id entry accum_stmts
+                               (mapMaybe id targets ++ exits)
+                               (FinalSwitch expr targets)]
               (CmmJump _ _:_) ->
                   panic "jump in middle of block"
               (CmmReturn _:_) ->
@@ -247,27 +515,41 @@ breakBlock uniques (BasicBlock ident stmts) entry =
               (CmmBranch _:_) ->
                   panic "branch in middle of block"
               (CmmSwitch _ _:_) ->
-                  panic "switch in block not implemented"
-              (CmmCall target results arguments saves:stmts) ->
-                  let new_id = BlockId $ head uniques
-                      rest = breakBlock' (tail uniques) new_id (ContinuationEntry results) [] [] stmts
-                  in BrokenBlock current_id entry accum_stmts (new_id:exits)
-                         (FinalCall new_id target results arguments saves) : rest
+                  panic ("switch in middle of block" ++ (showSDoc $ ppr stmts))
+              (CmmCall target results arguments saves:stmts) -> block : rest
+                  where
+                    new_id = BlockId $ head uniques
+                    block = BrokenBlock current_id entry accum_stmts
+                            (new_id:exits)
+                            (FinalCall new_id target results arguments saves)
+                    rest = breakBlock' (tail uniques) new_id
+                           (ContinuationEntry results) [] [] stmts
               (s@(CmmCondBranch test target):stmts) ->
-                  breakBlock' uniques current_id entry (target:exits) (accum_stmts++[s]) stmts
+                  breakBlock' uniques current_id entry
+                              (target:exits) (accum_stmts++[s]) stmts
               (s:stmts) ->
-                  breakBlock' uniques current_id entry exits (accum_stmts++[s]) stmts
+                  breakBlock' uniques current_id entry
+                              exits (accum_stmts++[s]) stmts
 
------------------------------------------------------------------------------
+--------------------------------
+-- Convert from a BrokenBlock
+-- to a CmmBasicBlock so the
+-- liveness analysis can run
+-- on it.
+--------------------------------
 cmmBlockFromBrokenBlock :: BrokenBlock -> CmmBasicBlock
-cmmBlockFromBrokenBlock (BrokenBlock ident _ stmts _ exit) = BasicBlock ident (stmts++exit_stmt)
+cmmBlockFromBrokenBlock (BrokenBlock ident _ stmts _ exit) =
+    BasicBlock ident (stmts++exit_stmt)
     where
       exit_stmt =
           case exit of
             FinalBranch target -> [CmmBranch target]
             FinalReturn arguments -> [CmmReturn arguments]
             FinalJump target arguments -> [CmmJump target arguments]
-            FinalCall branch_target call_target results arguments saves -> [CmmCall call_target results arguments saves, CmmBranch branch_target]
+            FinalSwitch expr targets -> [CmmSwitch expr targets]
+            FinalCall branch_target call_target results arguments saves ->
+                [CmmCall call_target results arguments saves,
+                 CmmBranch branch_target]
 
 -----------------------------------------------------------------------------
 -- CPS a single CmmTop (proceedure)
@@ -276,23 +558,49 @@ cmmBlockFromBrokenBlock (BrokenBlock ident _ stmts _ exit) = BasicBlock ident (s
 cpsProc :: UniqSupply -> CmmTop -> [CmmTop]
 cpsProc uniqSupply x@(CmmData _ _) = [x]
 cpsProc uniqSupply x@(CmmProc info_table ident params blocks) =
-  [CmmProc info_table ident params $ map (constructContinuation2 formats) broken_blocks]
+    --[CmmProc info_table ident params cps_blocks]
+    cps_continuations
     where
       uniqes :: [[Unique]]
       uniqes = map uniqsFromSupply $ listSplitUniqSupply uniqSupply
 
+      -- Break the block at each function call
       broken_blocks :: [BrokenBlock]
-      broken_blocks = concat $ zipWith3 breakBlock uniqes blocks (FunctionEntry:repeat ControlEntry)
-  
+      broken_blocks = concat $ zipWith3 breakBlock uniqes blocks
+                                        (FunctionEntry params:repeat ControlEntry)
+
+      -- Calculate live variables for each broken block
       live :: BlockEntryLiveness
       live = cmmLiveness $ map cmmBlockFromBrokenBlock broken_blocks
 
-      -- TODO: branches for proc points
+      proc_points :: UniqSet BlockId
+      proc_points = calculateProcPoints broken_blocks
+
+      continuations :: [Continuation]
+      continuations = map (buildContinuation proc_points (blocksToBlockEnv broken_blocks)) (uniqSetToList proc_points)
+
+      -- TODO: insert proc point code here
+      --  * Branches and switches to proc points may cause new blocks to be created
+      --    (or proc points could leave behind phantom blocks that just jump to them)
+      --  * Proc points might get some live variables passed as arguments
+
       -- TODO: let blocks_with_live = map (cmmLivenessComment live . snd) broken_blocks
 
-      formats :: BlockEnv StackFormat	-- Stack format on entry
-      formats = selectStackFormat2 live broken_blocks
+      --procs = groupBlocksIntoContinuations live broken_blocks
 
+      -- Select the stack format on entry to each block
+      formats :: BlockEnv StackFormat
+      formats = selectStackFormat live broken_blocks
+
+      formats2 :: [(CLabel, StackFormat)]
+      formats2 = selectStackFormat2 live continuations
+
+      -- Do the actual CPS transform
+      cps_blocks :: [CmmBasicBlock]
+      cps_blocks = map (constructContinuation2 formats) broken_blocks
+
+      cps_continuations :: [CmmTop]
+      cps_continuations = map (constructContinuation formats2) continuations
 
 --------------------------------------------------------------------------------
 cmmCPS :: DynFlags
@@ -309,7 +617,6 @@ cmmCPS dflags abstractC = do
   showPass dflags "CPS"
   -- TODO: check for use of branches to non-existant blocks
   -- TODO: check for use of Sp, SpLim, R1, R2, etc.
-  -- continuationC <- return abstractC
   -- TODO: find out if it is valid to create a new unique source like this
   uniqSupply <- mkSplitUniqSupply 'p'
   let supplies = listSplitUniqSupply uniqSupply
