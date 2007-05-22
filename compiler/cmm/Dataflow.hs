@@ -5,10 +5,7 @@ module Dataflow (
 --------------------------------------------------------------------------------
 
 -- Solve a fixed-point of a dataflow problem.
--- O(N+H*E) calls to update where
---   N = number of nodes,
---   E = number of edges,
---   H = maximum height of the lattice for any particular node.
+--
 -- dependants: map from nodes to those who's value depend on the argument node
 -- update:
 --   Given the node which needs to be updated, and
@@ -20,6 +17,11 @@ module Dataflow (
 -- nodes: a set of nodes that initially need updating
 -- state: some sort of state (usually a map)
 --        containing the initial value for each node
+--
+-- Complexity: O(N+H*E) calls to 'update' where
+--   N = number of nodes,
+--   E = number of edges,
+--   H = maximum height of the lattice for any particular node.
 --
 -- Sketch for proof of complexity:
 -- Note that the state is threaded through the entire execution.
