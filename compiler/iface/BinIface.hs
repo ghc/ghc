@@ -1222,10 +1222,14 @@ instance Binary IfaceRule where
 	    return (IfaceRule a1 a2 a3 a4 a5 a6 a7)
 
 instance Binary IfaceVectInfo where
-    put_ bh (IfaceVectInfo a1) = do
+    put_ bh (IfaceVectInfo a1 a2 a3) = do
 	    put_ bh a1
+	    put_ bh a2
+	    put_ bh a3
     get bh = do
 	    a1 <- get bh
-	    return (IfaceVectInfo a1)
+	    a2 <- get bh
+	    a3 <- get bh
+	    return (IfaceVectInfo a1 a2 a3)
 
 

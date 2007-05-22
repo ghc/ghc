@@ -339,8 +339,19 @@ mkIface hsc_env maybe_old_iface
      deliberatelyOmitted x = panic ("Deliberately omitted: " ++ x)
      ifFamInstTcName = ifaceTyConName . ifFamInstTyCon
 
-     flattenVectInfo (VectInfo ccVar) = 
-       IfaceVectInfo [Var.varName v | (v, _) <- varEnvElts ccVar]
+     flattenVectInfo (VectInfo { vectInfoCCVar   = ccVar
+                               , vectInfoCCTyCon = ccTyCon
+                               }) = 
+       IfaceVectInfo { 
+         ifaceVectInfoCCVar        = [ Var.varName v 
+                                     | (v, _) <- varEnvElts ccVar],
+         ifaceVectInfoCCTyCon      = [ tyConName t 
+                                     | (t, t_CC) <- nameEnvElts ccTyCon
+                                     , t /= t_CC],
+         ifaceVectInfoCCTyConReuse = [ tyConName t
+                                     | (t, t_CC) <- nameEnvElts ccTyCon
+                                     , t == t_CC]
+       } 
 
 -----------------------------
 writeIfaceFile :: DynFlags -> ModLocation -> ModIface -> IO ()

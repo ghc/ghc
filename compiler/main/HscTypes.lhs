@@ -1255,28 +1255,42 @@ on just the OccName easily in a Core pass.
 -- ModGuts/ModDetails/EPS version
 data VectInfo      
   = VectInfo {
-      vectInfoCCVar :: VarEnv (Var, Var)        -- (f, f_CC) keyed on f
-                                                -- always tidy, even in ModGuts
+      vectInfoCCVar     :: VarEnv  (Var    , Var  ),   -- (f, f_CC) keyed on f
+      vectInfoCCTyCon   :: NameEnv (TyCon  , TyCon),   -- (T, T_CC) keyed on T
+      vectInfoCCDataCon :: NameEnv (DataCon, DataCon), -- (C, C_CC) keyed on C
+      vectInfoCCIso     :: NameEnv (TyCon  , Var)      -- (T, isoT) keyed on T
     }
+    -- all of this is always tidy, even in ModGuts
 
 -- ModIface version
 data IfaceVectInfo 
   = IfaceVectInfo {
-      ifaceVectInfoCCVar :: [Name]              -- all variables in here have
-                                                -- a closure-converted variant
-                                                -- the name of the CC'ed variant
-                                                -- is determined by `mkCloOcc'
+      ifaceVectInfoCCVar        :: [Name],
+        -- all variables in here have a closure-converted variant;
+        -- the name of the CC'ed variant is determined by `mkCloOcc'
+      ifaceVectInfoCCTyCon      :: [Name],
+        -- all tycons in here have a closure-converted variant;
+        -- the name of the CC'ed variant and those of its data constructors are
+        -- determined by `mkCloTyConOcc' and `mkCloDataConOcc'; the names of
+        -- the isomorphisms is determined by `mkCloIsoOcc'
+      ifaceVectInfoCCTyConReuse :: [Name]              
+        -- the closure-converted form of all the tycons in here coincids with
+        -- the unconverted from; the names of the isomorphisms is determined
+        -- by `mkCloIsoOcc'
     }
 
 noVectInfo :: VectInfo
-noVectInfo = VectInfo emptyVarEnv
+noVectInfo = VectInfo emptyVarEnv emptyNameEnv emptyNameEnv emptyNameEnv
 
 plusVectInfo :: VectInfo -> VectInfo -> VectInfo
 plusVectInfo vi1 vi2 = 
-  VectInfo (vectInfoCCVar vi1 `plusVarEnv` vectInfoCCVar vi2)
+  VectInfo (vectInfoCCVar     vi1 `plusVarEnv`  vectInfoCCVar     vi2)
+           (vectInfoCCTyCon   vi1 `plusNameEnv` vectInfoCCTyCon   vi2)
+           (vectInfoCCDataCon vi1 `plusNameEnv` vectInfoCCDataCon vi2)
+           (vectInfoCCIso     vi1 `plusNameEnv` vectInfoCCIso     vi2)
 
 noIfaceVectInfo :: IfaceVectInfo
-noIfaceVectInfo = IfaceVectInfo []
+noIfaceVectInfo = IfaceVectInfo [] [] []
 \end{code}
 
 %************************************************************************

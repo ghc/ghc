@@ -497,7 +497,7 @@ tcIfaceEqSpec spec
     do_item (occ, if_ty) = do { tv <- tcIfaceTyVar (occNameFS occ)
                               ; ty <- tcIfaceType if_ty
                               ; return (tv,ty) }
-\end{code}	
+\end{code}
 
 
 %************************************************************************
@@ -590,24 +590,78 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
 
 \begin{code}
 tcIfaceVectInfo :: Module -> TypeEnv  -> IfaceVectInfo -> IfL VectInfo
-tcIfaceVectInfo mod typeEnv (IfaceVectInfo names)
-  = do { ccVars <- mapM ccMapping names
-       ; return $ VectInfo (mkVarEnv ccVars)
+tcIfaceVectInfo mod typeEnv (IfaceVectInfo 
+                             { ifaceVectInfoCCVar        = vars
+                             , ifaceVectInfoCCTyCon      = tycons
+                             , ifaceVectInfoCCTyConReuse = tyconsReuse
+                             })
+  = do { ccVars    <- mapM ccVarMapping vars
+       ; tyConRes1 <- mapM ccTyConMapping      tycons
+       ; tyConRes2 <- mapM ccTyConReuseMapping tycons
+       ; let (ccTyCons, ccDataCons, ccIsos) = unzip3 (tyConRes1 ++ tyConRes2)
+       ; return $ VectInfo 
+                  { vectInfoCCVar     = mkVarEnv  ccVars
+                  , vectInfoCCTyCon   = mkNameEnv ccTyCons
+                  , vectInfoCCDataCon = mkNameEnv (concat ccDataCons)
+                  , vectInfoCCIso     = mkNameEnv ccIsos
+                  }
        }
   where
-    ccMapping name 
+    ccVarMapping name 
       = do { ccName <- lookupOrig mod (mkCloOcc (nameOccName name))
-           ; let { var   = lookup name
-                 ; ccVar = lookup ccName
+           ; let { var   = lookupVar name
+                 ; ccVar = lookupVar ccName
                  }
            ; return (var, (var, ccVar))
            }
-    lookup name = case lookupTypeEnv typeEnv name of
-                    Just (AnId var) -> var
-                    Just _          -> 
-                      panic "TcIface.tcIfaceVectInfo: wrong TyThing"
-                    Nothing         ->
-                      panic "TcIface.tcIfaceVectInfo: unknown name"
+    ccTyConMapping name 
+      = do { ccName  <- lookupOrig mod (mkCloTyConOcc (nameOccName name))
+           ; isoName <- lookupOrig mod (mkCloIsoOcc   (nameOccName name))
+           ; let { tycon    = lookupTyCon name
+                 ; ccTycon  = lookupTyCon ccName
+                 ; isoTycon = lookupVar isoName
+                 }
+           ; ccDataCons <- mapM ccDataConMapping (tyConDataCons tycon)
+           ; return ((name, (tycon, ccTycon)),   -- (T, T_CC)
+                     ccDataCons,                 -- list of (Ci, Ci_CC)
+                     (name, (tycon, isoTycon)))  -- (T, isoT)
+           }
+    ccTyConReuseMapping name 
+      = do { isoName <- lookupOrig mod (mkCloIsoOcc   (nameOccName name))
+           ; let { tycon      = lookupTyCon name
+                 ; isoTycon   = lookupVar isoName
+                 ; ccDataCons = [ (dataConName dc, (dc, dc)) 
+                                | dc <- tyConDataCons tycon]
+                 }
+           ; return ((name, (tycon, tycon)),     -- (T, T)
+                     ccDataCons,                 -- list of (Ci, Ci)
+                     (name, (tycon, isoTycon)))  -- (T, isoT)
+           }
+    ccDataConMapping datacon
+      = do { let name = dataConName datacon
+           ; ccName <- lookupOrig mod (mkCloDataConOcc (nameOccName name))
+           ; let ccDataCon = lookupDataCon ccName
+           ; return (name, (datacon, ccDataCon))
+           }
+    --
+    lookupVar name = case lookupTypeEnv typeEnv name of
+                       Just (AnId var) -> var
+                       Just _         -> 
+                         panic "TcIface.tcIfaceVectInfo: not an id"
+                       Nothing        ->
+                         panic "TcIface.tcIfaceVectInfo: unknown name"
+    lookupTyCon name = case lookupTypeEnv typeEnv name of
+                         Just (ATyCon tc) -> tc
+                         Just _         -> 
+                           panic "TcIface.tcIfaceVectInfo: not a tycon"
+                         Nothing        ->
+                           panic "TcIface.tcIfaceVectInfo: unknown name"
+    lookupDataCon name = case lookupTypeEnv typeEnv name of
+                           Just (ADataCon dc) -> dc
+                           Just _         -> 
+                             panic "TcIface.tcIfaceVectInfo: not a datacon"
+                           Nothing        ->
+                             panic "TcIface.tcIfaceVectInfo: unknown name"
 \end{code}
 
 %************************************************************************
