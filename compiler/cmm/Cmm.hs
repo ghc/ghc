@@ -58,7 +58,7 @@ data GenCmmTop d i
   = CmmProc
      [d]	       -- Info table, may be empty
      CLabel            -- Used to generate both info & entry labels
-     [LocalReg]        -- Argument locals live on entry (C-- procedure params)
+     CmmFormals        -- Argument locals live on entry (C-- procedure params)
      [GenBasicBlock i] -- Code, may be empty.  The first block is
                        -- the entry point.  The order is otherwise initially 
                        -- unimportant, but at some point the code gen will
@@ -132,10 +132,10 @@ data CmmStmt
 	-- Undefined outside range, and when there's a Nothing
 
   | CmmJump CmmExpr               -- Jump to another function,
-    CmmActuals                    -- with these parameters.
+      CmmActuals                  -- with these parameters.
 
   | CmmReturn                     -- Return from a function,
-    CmmActuals                    -- with these return values.
+      CmmActuals                  -- with these return values.
 
 type CmmActuals = [(CmmExpr,MachHint)]
 type CmmFormals = [(CmmReg,MachHint)]

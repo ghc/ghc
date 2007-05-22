@@ -80,6 +80,9 @@ instance Outputable CmmExpr where
 instance Outputable CmmReg where
     ppr e = pprReg e
 
+instance Outputable LocalReg where
+    ppr e = pprLocalReg e
+
 instance Outputable GlobalReg where
     ppr e = pprGlobalReg e
 
@@ -96,7 +99,7 @@ pprCmm (Cmm tops) = vcat $ intersperse (text "") $ map pprTop tops
 pprTop :: CmmTop -> SDoc
 pprTop (CmmProc info lbl params blocks )
 
-  = vcat [ pprCLabel lbl <> parens (commafy $ map pprLocalReg params) <+> lbrace
+  = vcat [ pprCLabel lbl <> parens (commafy $ map ppr params) <+> lbrace
          , nest 8 $ pprInfo info lbl
          , nest 4 $ vcat (map ppr blocks)
          , rbrace ]

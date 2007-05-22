@@ -70,7 +70,7 @@ import Constants
 --
 --	See includes/InfoTables.h
 
-emitClosureCodeAndInfoTable :: ClosureInfo -> [LocalReg] -> CgStmts -> Code
+emitClosureCodeAndInfoTable :: ClosureInfo -> CmmFormals -> CgStmts -> Code
 emitClosureCodeAndInfoTable cl_info args body
  = do	{ ty_descr_lit <- 
 		if opt_SccProfilingOn 
@@ -396,7 +396,7 @@ emitInfoTableAndCode
 	:: CLabel 		-- Label of info table
 	-> [CmmLit]		-- ...its invariant part
 	-> [CmmLit] 		-- ...and its variant part
-	-> [LocalReg]		-- ...args
+	-> CmmFormals		-- ...args
 	-> [CmmBasicBlock]	-- ...and body
 	-> Code
 

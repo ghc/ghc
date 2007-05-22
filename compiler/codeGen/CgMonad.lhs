@@ -730,7 +730,7 @@ emitData sect lits
   where
     data_block = CmmData sect lits
 
-emitProc :: [CmmLit] -> CLabel -> [LocalReg] -> [CmmBasicBlock] -> Code
+emitProc :: [CmmLit] -> CLabel -> CmmFormals -> [CmmBasicBlock] -> Code
 emitProc lits lbl args blocks
   = do  { let proc_block = CmmProc (map CmmStaticLit lits) lbl args blocks
 	; state <- getState
