@@ -840,8 +840,8 @@ setInteractiveContext hsc_env icxt thing_inside
 	tcg_inst_env = extendInstEnvList (tcg_inst_env env) dfuns }) $
 
 
-    tcExtendIdEnv (ic_tmp_ids icxt) $
-        -- tcExtendIdEnv does lots: 
+    tcExtendGhciEnv (ic_tmp_ids icxt) $
+        -- tcExtendGhciEnv does lots: 
         --   - it extends the local type env (tcl_env) with the given Ids,
         --   - it extends the local rdr env (tcl_rdr) with the Names from 
         --     the given Ids

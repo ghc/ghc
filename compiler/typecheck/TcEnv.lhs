@@ -22,6 +22,7 @@ module TcEnv(
 	-- Local environment
 	tcExtendKindEnv, tcExtendKindEnvTvs,
 	tcExtendTyVarEnv, tcExtendTyVarEnv2, 
+	tcExtendGhciEnv,
 	tcExtendIdEnv, tcExtendIdEnv1, tcExtendIdEnv2, 
 	tcLookup, tcLookupLocated, tcLookupLocalIds, 
 	tcLookupId, tcLookupTyVar, getScopedTyVarBinds,
@@ -334,12 +335,6 @@ getScopedTyVarBinds
 
 \begin{code}
 tcExtendIdEnv :: [TcId] -> TcM a -> TcM a
--- Invariant: the TcIds are fully zonked. Reasons:
---	(a) The kinds of the forall'd type variables are defaulted
---	    (see Kind.defaultKind, done in zonkQuantifiedTyVar)
---	(b) There are no via-Indirect occurrences of the bound variables
---	    in the types, because instantiation does not look through such things
---	(c) The call to tyVarsOfTypes is ok without looking through refs
 tcExtendIdEnv ids thing_inside = tcExtendIdEnv2 [(idName id, id) | id <- ids] thing_inside
 
 tcExtendIdEnv1 :: Name -> TcId -> TcM a -> TcM a
@@ -348,25 +343,47 @@ tcExtendIdEnv1 name id thing_inside = tcExtendIdEnv2 [(name,id)] thing_inside
 tcExtendIdEnv2 :: [(Name,TcId)] -> TcM a -> TcM a
 -- Invariant: the TcIds are fully zonked (see tcExtendIdEnv above)
 tcExtendIdEnv2 names_w_ids thing_inside
-  = getLclEnv		`thenM` \ env ->
-    let
-	extra_global_tyvars = tcTyVarsOfTypes [idType id | (_,id) <- names_w_ids]
-	th_lvl		    = thLevel (tcl_th_ctxt   env)
-	extra_env	    = [ (name, ATcId { tct_id = id, 
-					       tct_level = th_lvl,
-					       tct_type = id_ty, 
-					       tct_co = if isRefineableTy id_ty 
-							then Just idHsWrapper
-							else Nothing })
-			      | (name,id) <- names_w_ids, let id_ty = idType id]
-	le'		    = extendNameEnvList (tcl_env env) extra_env
-	rdr_env'	    = extendLocalRdrEnv (tcl_rdr env) [name | (name,_) <- names_w_ids]
-    in
-    traceTc (text "env2") `thenM_`
-    traceTc (text "env3" <+> ppr extra_env) `thenM_`
-    tc_extend_gtvs (tcl_tyvars env) extra_global_tyvars	`thenM` \ gtvs' ->
-    (traceTc (text "env4") `thenM_`
-    setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs', tcl_rdr = rdr_env'}) thing_inside)
+  = do	{ env <- getLclEnv
+	; tc_extend_local_id_env env (thLevel (tcl_th_ctxt env)) names_w_ids thing_inside }
+
+tcExtendGhciEnv :: [TcId] -> TcM a -> TcM a
+-- Used to bind Ids for GHCi identifiers bound earlier in the user interaction
+-- Note especially that we bind them at TH level 'impLevel'.  That's because it's
+-- OK to use a variable bound earlier in the interaction in a splice, becuase
+-- GHCi has already compiled it to bytecode
+tcExtendGhciEnv ids thing_inside
+  = do	{ env <- getLclEnv
+	; tc_extend_local_id_env env impLevel [(idName id, id) | id <- ids] thing_inside }
+
+tc_extend_local_id_env		-- This is the guy who does the work
+	:: TcLclEnv
+	-> ThLevel
+	-> [(Name,TcId)]
+	-> TcM a -> TcM a
+-- Invariant: the TcIds are fully zonked. Reasons:
+--	(a) The kinds of the forall'd type variables are defaulted
+--	    (see Kind.defaultKind, done in zonkQuantifiedTyVar)
+--	(b) There are no via-Indirect occurrences of the bound variables
+--	    in the types, because instantiation does not look through such things
+--	(c) The call to tyVarsOfTypes is ok without looking through refs
+
+tc_extend_local_id_env env th_lvl names_w_ids thing_inside
+  = do	{ traceTc (text "env2")
+	; traceTc (text "env3" <+> ppr extra_env)
+	; gtvs' <- tc_extend_gtvs (tcl_tyvars env) extra_global_tyvars
+	; let env' = env {tcl_env = le', tcl_tyvars = gtvs', tcl_rdr = rdr_env'}
+	; setLclEnv env' thing_inside }
+  where
+    extra_global_tyvars = tcTyVarsOfTypes [idType id | (_,id) <- names_w_ids]
+    extra_env	    = [ (name, ATcId { tct_id = id, 
+    				       tct_level = th_lvl,
+    				       tct_type = id_ty, 
+    				       tct_co = if isRefineableTy id_ty 
+    						then Just idHsWrapper
+    						else Nothing })
+    		      | (name,id) <- names_w_ids, let id_ty = idType id]
+    le'		    = extendNameEnvList (tcl_env env) extra_env
+    rdr_env'	    = extendLocalRdrEnv (tcl_rdr env) [name | (name,_) <- names_w_ids]
 \end{code}
 
 
