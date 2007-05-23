@@ -444,7 +444,7 @@ splitNewTypeRepCo_maybe other = Nothing
 	-- CoercionI is either 
 	--	(a) proper coercion
 	--	(b) the identity coercion
-data CoercionI     = IdCo     | ACo Coercion
+data CoercionI = IdCo | ACo Coercion
 
 isIdentityCoercion :: CoercionI -> Bool
 isIdentityCoercion IdCo = True
