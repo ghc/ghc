@@ -81,8 +81,9 @@ data Continuation =
 		       -- use the appropriate CLabel.
 
 data BlockEntryInfo
-  = FunctionEntry		-- Beginning of function
-      CmmFormals                -- aguments to function
+  = FunctionEntry		-- Beginning of a function
+      CLabel                    -- The function name
+      CmmFormals                -- Aguments to function
 
   | ContinuationEntry 		-- Return point of a call
       CmmFormals                -- return values (argument to continuation)
@@ -167,7 +168,7 @@ calculateProcPoints blocks = calculateProcPoints' init_proc_points blocks
                          map brokenBlockId $
                          filter always_proc_point blocks
       always_proc_point BrokenBlock {
-                              brokenBlockEntry = FunctionEntry _ } = True
+                              brokenBlockEntry = FunctionEntry _ _ } = True
       always_proc_point BrokenBlock {
                               brokenBlockEntry = ContinuationEntry _ } = True
       always_proc_point _ = False
@@ -230,14 +231,17 @@ buildContinuation proc_points blocks start =
       children_blocks = map (lookupWithDefaultUFM blocks (panic "TODO")) (uniqSetToList children)
       body = start_block : children_blocks
       info_table = [] -- TODO
-      is_entry = case start_block of
-                   BrokenBlock { brokenBlockEntry = FunctionEntry _ } -> True
+      start_block_entry = brokenBlockEntry start_block
+      is_entry = case start_block_entry of
+                   FunctionEntry _ _ -> True
                    _ -> False
-      clabel = mkReturnPtLabel $ getUnique start
-      params = case start_block of
-                 BrokenBlock { brokenBlockEntry = FunctionEntry args } -> args
-                 BrokenBlock { brokenBlockEntry = ContinuationEntry args } -> args
-                 BrokenBlock { brokenBlockEntry = ControlEntry } -> [] -- TODO: it's a proc-point, we could pass lives in parameter registers
+      clabel = case start_block_entry of
+                 FunctionEntry label _ -> label
+                 _ -> mkReturnPtLabel $ getUnique start
+      params = case start_block_entry of
+                 FunctionEntry _ args -> args
+                 ContinuationEntry args -> args
+                 ControlEntry -> [] -- TODO: it's a proc-point, we could pass lives in parameter registers
 
 --------------------------------------------------------------------------------
 -- For now just select the continuation orders in the order they are in the set with no gaps
@@ -270,7 +274,7 @@ selectStackFormat live blocks =
                                                    formats unknown_block
                                                    cause_name
                     -- Do initial calculates for function blocks
-                    (Nothing, FunctionEntry _) ->
+                    (Nothing, FunctionEntry _ _) ->
                         Just $
                              addToUFM formats ident $
                              StackFormat ident 0 []
@@ -363,7 +367,7 @@ constructContinuation2' curr_ident formats (BrokenBlock ident entry stmts _ exit
       unknown_block = panic "unknown BlockId in constructContinuation"
       prefix = case entry of
                  ControlEntry -> []
-                 FunctionEntry _ -> []
+                 FunctionEntry _ _ -> []
                  ContinuationEntry formals ->
                      unpack_continuation curr_format
       postfix = case exit of
@@ -567,7 +571,7 @@ cpsProc uniqSupply x@(CmmProc info_table ident params blocks) =
       -- Break the block at each function call
       broken_blocks :: [BrokenBlock]
       broken_blocks = concat $ zipWith3 breakBlock uniqes blocks
-                                        (FunctionEntry params:repeat ControlEntry)
+                                        (FunctionEntry ident params:repeat ControlEntry)
 
       -- Calculate live variables for each broken block
       live :: BlockEntryLiveness
