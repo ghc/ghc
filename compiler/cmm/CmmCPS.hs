@@ -118,11 +118,12 @@ data FinalStmt
 
   -- TODO: | ProcPointExit (needed?)
 
+-- Describes the layout of a stack frame for a continuation
 data StackFormat
     = StackFormat
-         BlockId {- block that is the start of the continuation. may or may not be the current block -}
-         WordOff {- total frame size -}
-         [(CmmReg, WordOff)] {- local reg offsets from stack top -}
+         (Maybe CLabel)		-- The label occupying the top slot
+         WordOff		-- Total frame size in words
+         [(CmmReg, WordOff)]	-- local reg offsets from stack top
 
 -- A block can be a continuation of a call
 -- A block can be a continuation of another block (w/ or w/o joins)
@@ -298,21 +299,23 @@ selectStackFormat2 live continuations =
     map (\c -> (continuationLabel c, selectStackFormat' c)) continuations
     where
       selectStackFormat' (Continuation True info_table label formals blocks) =
-          let ident = brokenBlockId $ head blocks -- TODO: CLabel isn't a uniquable, but we need a better way than this
-          in StackFormat ident 0 []
+          --let ident = brokenBlockId $ head blocks -- TODO: CLabel isn't a uniquable, but we need a better way than this
+          --in
+          StackFormat (Just label) 0 []
       selectStackFormat' (Continuation False info_table label formals blocks) =
+          -- TODO: assumes the first block is the entry block
           let ident = brokenBlockId $ head blocks -- TODO: CLabel isn't a uniquable, but we need a better way than this
-          in live_to_format ident $ lookupWithDefaultUFM live unknown_block ident          
+          in live_to_format label formals $ lookupWithDefaultUFM live unknown_block ident
 
-      live_to_format :: BlockId -> CmmLive -> StackFormat
-      live_to_format label live =
+      live_to_format :: CLabel -> CmmFormals -> CmmLive -> StackFormat
+      live_to_format label formals live =
           foldl extend_format
-                    (StackFormat label retAddrSizeW [])
-                    (uniqSetToList live)
+                    (StackFormat (Just label) retAddrSizeW [])
+                    (uniqSetToList (live `minusUniqSet` mkUniqSet (cmmFormalsToLiveLocals formals)))
 
       extend_format :: StackFormat -> LocalReg -> StackFormat
-      extend_format (StackFormat block size offsets) reg =
-          StackFormat block (slot_size reg + size) ((CmmLocal reg, size) : offsets)
+      extend_format (StackFormat label size offsets) reg =
+          StackFormat label (slot_size reg + size) ((CmmLocal reg, size) : offsets)
 
       unknown_block = panic "unknown BlockId in selectStackFormat"
 
@@ -361,9 +364,11 @@ constructContinuation2' curr_ident formats (BrokenBlock ident entry stmts _ exit
 exit_function :: StackFormat -> CmmExpr -> CmmActuals -> [CmmStmt]
 exit_function (StackFormat curr_id curr_frame_size curr_offsets) target arguments
   = adjust_spReg ++ jump where
-    adjust_spReg = [
-     CmmAssign spReg
-     (CmmRegOff spReg (curr_frame_size*wORD_SIZE))]
+    adjust_spReg =
+        if curr_frame_size == 0
+        then []
+        else [CmmAssign spReg
+                 (CmmRegOff spReg (curr_frame_size*wORD_SIZE))]
     jump = [CmmJump target arguments]
 
 enter_function :: WordOff -> [CmmStmt]
@@ -388,9 +393,15 @@ pack_continuation (StackFormat curr_id curr_frame_size curr_offsets)
           spReg (wORD_SIZE*(curr_frame_size - cont_frame_size + offset)))
          (CmmReg reg)
          | (reg, offset) <- cont_offsets]
-    set_stack_header = -- TODO: only set when needed
-        [CmmStore (CmmRegOff spReg (wORD_SIZE*(curr_frame_size - cont_frame_size))) continuation_function]
-    continuation_function = CmmLit $ CmmLabel $ mkReturnPtLabel {-TODO: use the correct function -} $ getUnique cont_id
+    needs_header =
+      case (curr_id, cont_id) of
+        (Just x, Just y) -> x /= y
+        _ -> isJust cont_id
+    set_stack_header =
+      if not needs_header
+         then []
+         else [CmmStore (CmmRegOff spReg (wORD_SIZE*(curr_frame_size - cont_frame_size))) continuation_function]
+    continuation_function = CmmLit $ CmmLabel $ fromJust cont_id
     adjust_spReg =
         if curr_frame_size == cont_frame_size
         then []

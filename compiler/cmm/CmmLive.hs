@@ -1,6 +1,7 @@
 module CmmLive (
         CmmLive, BlockEntryLiveness,
-        cmmLiveness
+        cmmLiveness,
+        cmmFormalsToLiveLocals
   ) where
 
 import Cmm
@@ -156,6 +157,11 @@ addKilled new_killed live = live `minusUniqSet` new_killed
 --------------------------------
 -- Liveness of a CmmStmt
 --------------------------------
+cmmFormalsToLiveLocals :: CmmFormals -> [LocalReg]
+cmmFormalsToLiveLocals [] = []
+cmmFormalsToLiveLocals ((CmmGlobal _,_):args) = cmmFormalsToLiveLocals args
+cmmFormalsToLiveLocals ((CmmLocal r,_):args) = r:cmmFormalsToLiveLocals args
+
 cmmStmtLive :: BlockEntryLiveness -> CmmStmt -> CmmLivenessTransformer
 cmmStmtLive _ (CmmNop) = id
 cmmStmtLive _ (CmmComment _) = id
@@ -170,10 +176,7 @@ cmmStmtLive _ (CmmStore expr1 expr2) =
 cmmStmtLive _ (CmmCall target results arguments _) =
     target_liveness .
     foldr ((.) . cmmExprLive) id (map fst arguments) .
-    addKilled (mkUniqSet $ only_local_regs results) where
-        only_local_regs [] = []
-        only_local_regs ((CmmGlobal _,_):args) = only_local_regs args
-        only_local_regs ((CmmLocal r,_):args) = r:only_local_regs args
+    addKilled (mkUniqSet $ cmmFormalsToLiveLocals results) where
         target_liveness =
             case target of
               (CmmForeignCall target _) -> cmmExprLive target
