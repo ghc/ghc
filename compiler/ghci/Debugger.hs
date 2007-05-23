@@ -71,7 +71,8 @@ pprintClosureCommand session bindThings force str = do
        unqual    <- GHC.getPrintUnqual cms
        let showSDocForUserOneLine unqual doc = 
                showDocWith LeftMode (doc (mkErrStyle unqual))
-       (putStrLn . showSDocForUserOneLine unqual) (ppr id <+> char '=' <+> showterm)
+       (putStrLn . showSDocForUserOneLine unqual) 
+                                   (ppr id <+> char '=' <+> showterm)
      -- Before leaving, we compare the type obtained to see if it's more specific
      --  Then, we extract a substitution, 
      --  mapping the old tyvars to the reconstructed types.
@@ -143,7 +144,8 @@ bindSuspensions cms@(Session ref) t = do
      where
 
 --    Processing suspensions. Give names and recopilate info
-        nameSuspensionsAndGetInfos :: IORef [String] -> TermFold (IO (Term, [(Name,Type,HValue)]))
+        nameSuspensionsAndGetInfos :: IORef [String] -> 
+                                       TermFold (IO (Term, [(Name,Type,HValue)]))
         nameSuspensionsAndGetInfos freeNames = TermFold 
                       {
                         fSuspension = doSuspension freeNames
