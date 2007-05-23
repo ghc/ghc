@@ -4,6 +4,8 @@ module CmmLive (
         cmmFormalsToLiveLocals
   ) where
 
+#include "HsVersions.h"
+
 import Cmm
 import Dataflow
 
