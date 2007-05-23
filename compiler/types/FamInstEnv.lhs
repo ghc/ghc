@@ -10,14 +10,14 @@ module FamInstEnv (
 	pprFamInst, pprFamInstHdr, pprFamInsts, 
 	famInstHead, mkLocalFamInst, mkImportedFamInst,
 
-	FamInstEnvs, FamInstEnv, emptyFamInstEnv, 
+	FamInstEnvs, FamInstEnv, emptyFamInstEnv, emptyFamInstEnvs, 
 	extendFamInstEnv, extendFamInstEnvList, 
 	famInstEnvElts, familyInstances,
 
 	lookupFamInstEnv, lookupFamInstEnvUnify,
 	
 	-- Normalisation
-	toplevelNormaliseFamInst
+	topNormaliseType
     ) where
 
 #include "HsVersions.h"
@@ -168,6 +168,9 @@ data FamilyInstEnv
 --  * The fs_tvs are distinct in each FamInst
 --	of a range value of the map (so we can safely unify them)
 
+emptyFamInstEnvs :: (FamInstEnv, FamInstEnv)
+emptyFamInstEnvs = (emptyFamInstEnv, emptyFamInstEnv)
+
 emptyFamInstEnv :: FamInstEnv
 emptyFamInstEnv = emptyUFM
 
@@ -196,7 +199,7 @@ extendFamInstEnv inst_env ins_item@(FamInst {fi_fam = cls_nm, fi_tcs = mb_tcs})
 
 %************************************************************************
 %*									*
-\subsection{Looking up a family instance}
+		Looking up a family instance
 %*									*
 %************************************************************************
 
@@ -224,6 +227,9 @@ lookupFamInstEnv :: FamInstEnvs
 	         -> TyCon -> [Type]		-- What we are looking for
 	         -> [FamInstMatch] 	        -- Successful matches
 lookupFamInstEnv (pkg_ie, home_ie) fam tys
+  | not (isOpenTyCon fam) 
+  = []
+  | otherwise
   = home_matches ++ pkg_matches
   where
     rough_tcs    = roughMatchTcs tys
@@ -273,6 +279,9 @@ indexed synonyms and we don't want to slow that down by needless unification.
 lookupFamInstEnvUnify :: (FamInstEnv, FamInstEnv) -> TyCon -> [Type]
 	              -> [(FamInstMatch)]
 lookupFamInstEnvUnify (pkg_ie, home_ie) fam tys
+  | not (isOpenTyCon fam) 
+  = []
+  | otherwise
   = home_matches ++ pkg_matches
   where
     rough_tcs    = roughMatchTcs tys
@@ -318,98 +327,94 @@ bind_fn tv | isTcTyVar tv && isExistentialTyVar tv = Skolem
 	   | otherwise	 		 	   = BindMe
 \end{code}
 
---------------------------------------
--- Normalisation 
+%************************************************************************
+%*									*
+		Looking up a family instance
+%*									*
+%************************************************************************
 
 \begin{code}
-	-- get rid of TOPLEVEL type functions by rewriting them 
-	-- i.e. treating their equations as a TRS
-toplevelNormaliseFamInst :: FamInstEnvs ->
-			    Type ->
-			    (CoercionI,Type)
-toplevelNormaliseFamInst env ty
-	| Just ty' <- tcView ty = normaliseFamInst env ty'
-toplevelNormaliseFamInst env ty@(TyConApp tyCon tys)
-	| isOpenTyCon tyCon
-	= normaliseFamInst env ty
-toplevelNormaliseFamInst env ty
-	= (IdCo,ty)
+topNormaliseType :: FamInstEnvs
+		      -> Type
+	   	      -> Maybe (Coercion, Type)
+
+-- Get rid of *outermost* (or toplevel) type functions by rewriting them
+-- By "outer" we mean that toplevelNormaliseType guarantees to return
+-- a type that does not have a reducible redex (F ty1 .. tyn) as its
+-- outermost form.  It *can* return something like (Maybe (F ty)), where
+-- (F ty) is a redex.
+
+topNormaliseType env ty
+  | Just ty' <- tcView ty = topNormaliseType env ty'
+
+topNormaliseType env ty@(TyConApp tc tys)
+  | isOpenTyCon tc
+  , (ACo co, ty) <- normaliseType env ty
+  = Just (co, ty)
+
+topNormaliseType env ty
+  = Nothing
 	 
 
-	-- get rid of ALL type functions by rewriting them 
-	-- i.e. treating their equations as a TRS
-normaliseFamInst :: FamInstEnvs ->	-- environment with family instances
-	            Type -> 		-- old type
-	 	    (CoercionI,Type)	-- (coercion,new type)
-normaliseFamInst env ty 
-	| Just ty' <- tcView ty = normaliseFamInst env ty' 
-normaliseFamInst env ty@(TyConApp tyCon tys) =
-	let (cois,ntys) = mapAndUnzip (normaliseFamInst env) tys
-	    tycon_coi   = mkTyConAppCoI tyCon ntys cois
-	    maybe_ty_co = lookupFamInst env tyCon ntys
-	 in case maybe_ty_co of
-		-- a matching family instance exists
-		Just (ty',co) ->
-			let first_coi      = mkTransCoI tycon_coi (ACo co)
-			    (rest_coi,nty) = normaliseFamInst env ty'
-			    fix_coi        = mkTransCoI first_coi rest_coi
-	   		in (fix_coi,nty)
-		-- no matching family instance exists
+normaliseType :: FamInstEnvs 		-- environment with family instances
+	      -> Type  			-- old type
+	      -> (CoercionI,Type)	-- (coercion,new type), where
+					-- co :: old-type ~ new_type
+-- Normalise the input type, by eliminating all type-function redexes
+
+normaliseType env ty 
+  | Just ty' <- coreView ty = normaliseType env ty' 
+
+normaliseType env ty@(TyConApp tyCon tys)
+  = let	-- First normalise the arg types
+	(cois, ntys) = mapAndUnzip (normaliseType env) tys
+	tycon_coi    = mkTyConAppCoI tyCon ntys cois
+    in 	-- Now try the top-level redex
+    case lookupFamInstEnv env tyCon ntys of
+		-- A matching family instance exists
+	[(fam_inst, tys)] -> (fix_coi, nty)
+	    where
+		rep_tc         = famInstTyCon fam_inst
+		co_tycon       = expectJust "lookupFamInst" (tyConFamilyCoercion_maybe rep_tc)
+		co	       = mkTyConApp co_tycon tys
+		first_coi      = mkTransCoI tycon_coi (ACo co)
+		(rest_coi,nty) = normaliseType env (mkTyConApp rep_tc tys)
+		fix_coi        = mkTransCoI first_coi rest_coi
+
+		-- No unique matching family instance exists;
 		-- we do not do anything
-		Nothing -> 
-			(tycon_coi,TyConApp tyCon ntys)
-normaliseFamInst env ty@(AppTy ty1 ty2)	=
-	let (coi1,nty1) = normaliseFamInst env ty1
-	    (coi2,nty2) = normaliseFamInst env ty2
+	other -> (tycon_coi, TyConApp tyCon ntys)
+
+  where
+
+normaliseType env ty@(AppTy ty1 ty2)
+  =	let (coi1,nty1) = normaliseType env ty1
+	    (coi2,nty2) = normaliseType env ty2
 	in  (mkAppTyCoI nty1 coi1 nty2 coi2, AppTy nty1 nty2)
-normaliseFamInst env ty@(FunTy ty1 ty2)	=
-	let (coi1,nty1) = normaliseFamInst env ty1
-	    (coi2,nty2) = normaliseFamInst env ty2
+normaliseType env ty@(FunTy ty1 ty2)
+  =	let (coi1,nty1) = normaliseType env ty1
+	    (coi2,nty2) = normaliseType env ty2
 	in  (mkFunTyCoI nty1 coi1 nty2 coi2, FunTy nty1 nty2)
-normaliseFamInst env ty@(ForAllTy tyvar ty1)	=
-	let (coi,nty1) = normaliseFamInst env ty1
+normaliseType env ty@(ForAllTy tyvar ty1)
+  =	let (coi,nty1) = normaliseType env ty1
 	in  (mkForAllTyCoI tyvar coi,ForAllTy tyvar nty1)
-normaliseFamInst env ty@(NoteTy note ty1)	=
-	let (coi,nty1) = normaliseFamInst env ty1
+normaliseType env ty@(NoteTy note ty1)
+  =	let (coi,nty1) = normaliseType env ty1
 	in  (mkNoteTyCoI note coi,NoteTy note nty1)
-normaliseFamInst env ty@(TyVarTy _) =
-	(IdCo,ty)
-normaliseFamInst env (PredTy predty) =
-	normaliseFamInstPred env predty	
+normaliseType env ty@(TyVarTy _)
+  =	(IdCo,ty)
+normaliseType env (PredTy predty)
+  =	normalisePred env predty	
 
-normaliseFamInstPred :: FamInstEnvs -> PredType -> (CoercionI,Type)
-normaliseFamInstPred env (ClassP cls tys) =
-	let (cois,tys') = mapAndUnzip (normaliseFamInst env) tys
+normalisePred :: FamInstEnvs -> PredType -> (CoercionI,Type)
+normalisePred env (ClassP cls tys)
+  =	let (cois,tys') = mapAndUnzip (normaliseType env) tys
 	in  (mkClassPPredCoI cls tys' cois, PredTy $ ClassP cls tys')
-normaliseFamInstPred env (IParam ipn ty) =
-	let (coi,ty') = normaliseFamInst env ty
+normalisePred env (IParam ipn ty)
+  = 	let (coi,ty') = normaliseType env ty
 	in  (mkIParamPredCoI ipn coi, PredTy $ IParam ipn ty')
-normaliseFamInstPred env (EqPred ty1 ty2) =
-	let (coi1,ty1') = normaliseFamInst env ty1
-            (coi2,ty2') = normaliseFamInst env ty2
+normalisePred env (EqPred ty1 ty2)
+  = 	let (coi1,ty1') = normaliseType env ty1
+            (coi2,ty2') = normaliseType env ty2
 	in  (mkEqPredCoI ty1' coi1 ty2' coi2, PredTy $ EqPred ty1' ty2')
- 
-lookupFamInst :: FamInstEnvs -> TyCon -> [Type] -> Maybe (Type,Coercion)
-
--- (lookupFamInst F tys) looks for a top-level instance
---	co : forall a. F tys' = G a
---   (The rhs is always of form G a; see Note [The FamInst structure]
---	in FamInst.)
--- where we can instantiate 'a' with t to make tys'[t/a] = tys
--- Hence   (co t) : F tys ~ G t
--- Then we return (Just (G t, co t))
-
-lookupFamInst env tycon tys 
-  | not (isOpenTyCon tycon)		-- Dead code; fix.
-  = Nothing
-  | otherwise
-  = case lookupFamInstEnv env tycon tys of
-	   [(subst, fam_inst)] -> 
-	     Just (mkTyConApp rep_tc substituted_vars, mkTyConApp coercion_tycon substituted_vars)
-		where	-- NB: invariant of lookupFamInstEnv is that (tyConTyVars rep_tc)
-			--     is in the domain of the substitution
-		  rep_tc           = famInstTyCon fam_inst
-		  coercion_tycon   = expectJust "lookupFamInst" (tyConFamilyCoercion_maybe rep_tc)
-		  substituted_vars = substTyVars subst (tyConTyVars rep_tc)
-	   other -> Nothing
 \end{code}

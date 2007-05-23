@@ -101,9 +101,6 @@ data SimplEnv
 	seChkr      :: SwitchChecker,
 	seCC        :: CostCentreStack,	-- The enclosing CCS (when profiling)
 
-	-- Rules from other modules
-	seExtRules  :: RuleBase,
-
 	-- The current set of in-scope variables
 	-- They are all OutVars, and all bound in this module
 	seInScope   :: InScopeSet,	-- OutVars only
@@ -207,11 +204,11 @@ seIdSubst:
 
 
 \begin{code}
-mkSimplEnv :: SimplifierMode -> SwitchChecker -> RuleBase -> SimplEnv
-mkSimplEnv mode switches rules
+mkSimplEnv :: SimplifierMode -> SwitchChecker -> SimplEnv
+mkSimplEnv mode switches
   = SimplEnv { seChkr = switches, seCC = subsumedCCS, 
 	       seMode = mode, seInScope = emptyInScopeSet, 
-	       seExtRules = rules, seFloats = emptyFloats,
+	       seFloats = emptyFloats,
 	       seTvSubst = emptyVarEnv, seIdSubst = emptyVarEnv }
 	-- The top level "enclosing CC" is "SUBSUMED".
 
@@ -289,10 +286,6 @@ mkContEx (SimplEnv { seTvSubst = tvs, seIdSubst = ids }) e = ContEx tvs ids e
 isEmptySimplSubst :: SimplEnv -> Bool
 isEmptySimplSubst (SimplEnv { seTvSubst = tvs, seIdSubst = ids })
   = isEmptyVarEnv tvs && isEmptyVarEnv ids
-
----------------------
-getRules :: SimplEnv -> RuleBase
-getRules = seExtRules
 \end{code}
 
 
@@ -639,8 +632,8 @@ substLetIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) old
 	      = delVarEnv id_subst old_id
 \end{code}
 
-Add IdInfo back onto a let-bound Id
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Add IdInfo back onto a let-bound Id]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We must transfer the IdInfo of the original binder to the new binder.
 This is crucial, to preserve
 	strictness

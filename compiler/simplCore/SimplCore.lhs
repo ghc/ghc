@@ -33,6 +33,7 @@ import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass )
 import CoreLint		( endPass )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
+import FamInstEnv
 import Id		( Id, modifyIdInfo, idInfo, isExportedId, isLocalId,
 			  idSpecialisation, idName )
 import VarSet
@@ -101,7 +102,7 @@ simplifyExpr dflags expr
 
 	; us <-  mkSplitUniqSupply 's'
 
-	; let (expr', _counts) = initSmpl dflags us $
+	; let (expr', _counts) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us $
 				 simplExprGently gentleSimplEnv expr
 
 	; dumpIfSet_dyn dflags Opt_D_dump_simpl "Simplified expression"
@@ -111,9 +112,7 @@ simplifyExpr dflags expr
 	}
 
 gentleSimplEnv :: SimplEnv
-gentleSimplEnv = mkSimplEnv SimplGently 
-			    (isAmongSimpl [])
-			    emptyRuleBase
+gentleSimplEnv = mkSimplEnv SimplGently  (isAmongSimpl [])
 
 doCorePasses :: HscEnv
              -> RuleBase        -- the imported main rule base
@@ -232,7 +231,8 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 		-- from the local binders, to avoid warnings from Simplify.simplVar
 	      local_ids        = mkInScopeSet (mkVarSet (bindersOfBinds binds))
 	      env	       = setInScopeSet gentleSimplEnv local_ids 
-	      (better_rules,_) = initSmpl dflags us (mapSmpl (simplRule env) local_rules)
+	      (better_rules,_) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us $
+				 (mapSmpl (simplRule env) local_rules)
 	      home_pkg_rules   = hptRules hsc_env (dep_mods deps)
 
 		-- Find the rules for locally-defined Ids; then we can attach them
@@ -445,7 +445,10 @@ simplifyPgm mode switches hsc_env us imp_rule_base guts
 		-- miss the rules for Ids hidden inside imported inlinings
 	   eps <- hscEPS hsc_env ;
 	   let	{ rule_base' = unionRuleBase imp_rule_base (eps_rule_base eps)
-		; simpl_env  = mkSimplEnv mode sw_chkr rule_base' } ;
+		; simpl_env  = mkSimplEnv mode sw_chkr 
+		; simpl_binds = _scc_ "SimplTopBinds" 
+				simplTopBinds simpl_env tagged_binds
+		; fam_envs = (eps_fam_inst_env eps, mg_fam_inst_env guts) } ;
 	   
 		-- Simplify the program
 		-- We do this with a *case* not a *let* because lazy pattern
@@ -458,7 +461,7 @@ simplifyPgm mode switches hsc_env us imp_rule_base guts
 		-- 	case t of {(_,counts') -> if counts'=0 then ... }
 		-- So the conditional didn't force counts', because the
 		-- selection got duplicated.  Sigh!
-	   case initSmpl dflags us1 (_scc_ "SimplTopBinds" simplTopBinds simpl_env tagged_binds) of {
+	   case initSmpl dflags rule_base' fam_envs us1 simpl_binds of {
 	  	(binds', counts') -> do {
 
 	   let	{ all_counts = counts `plusSimplCount` counts'

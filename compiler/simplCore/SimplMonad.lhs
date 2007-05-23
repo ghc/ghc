@@ -9,7 +9,7 @@ module SimplMonad (
 	SimplM,
 	initSmpl, returnSmpl, thenSmpl, thenSmpl_,
 	mapSmpl, mapAndUnzipSmpl, mapAccumLSmpl,
-	getDOptsSmpl,
+	getDOptsSmpl, getRules, getFamEnvs,
 
         -- Unique supply
         getUniqueSmpl, getUniquesSmpl, getUniqSupplySmpl, newId,
@@ -29,6 +29,8 @@ module SimplMonad (
 
 import Id		( Id, mkSysLocal )
 import Type             ( Type )
+import FamInstEnv	( FamInstEnv )
+import Rules		( RuleBase )
 import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
 			  UniqSupply
 			)
@@ -61,22 +63,28 @@ For the simplifier monad, we want to {\em thread} a unique supply and a counter.
 
 \begin{code}
 newtype SimplM result
-  =  SM  { unSM :: DynFlags		-- We thread the unique supply because
-		   -> UniqSupply	-- constantly splitting it is rather expensive
-		   -> SimplCount 
-		   -> (result, UniqSupply, SimplCount)}
+  =  SM  { unSM :: SimplTopEnv	-- Envt that does not change much
+		-> UniqSupply	-- We thread the unique supply because
+				-- constantly splitting it is rather expensive
+		-> SimplCount 
+		-> (result, UniqSupply, SimplCount)}
+
+data SimplTopEnv = STE	{ st_flags :: DynFlags 
+			, st_rules :: RuleBase
+			, st_fams  :: (FamInstEnv, FamInstEnv) }
 \end{code}
 
 \begin{code}
-initSmpl :: DynFlags
+initSmpl :: DynFlags -> RuleBase -> (FamInstEnv, FamInstEnv) 
 	 -> UniqSupply		-- No init count; set to 0
 	 -> SimplM a
 	 -> (a, SimplCount)
 
-initSmpl dflags us m
-  = case unSM m dflags us (zeroSimplCount dflags) of 
+initSmpl dflags rules fam_envs us m
+  = case unSM m env us (zeroSimplCount dflags) of 
 	(result, _, count) -> (result, count)
-
+  where
+    env = STE { st_flags = dflags, st_rules = rules, st_fams = fam_envs }
 
 {-# INLINE thenSmpl #-}
 {-# INLINE thenSmpl_ #-}
@@ -88,20 +96,20 @@ instance Monad SimplM where
    return = returnSmpl
 
 returnSmpl :: a -> SimplM a
-returnSmpl e = SM (\ dflags us sc -> (e, us, sc))
+returnSmpl e = SM (\ st_env us sc -> (e, us, sc))
 
 thenSmpl  :: SimplM a -> (a -> SimplM b) -> SimplM b
 thenSmpl_ :: SimplM a -> SimplM b -> SimplM b
 
 thenSmpl m k 
-  = SM (\ dflags us0 sc0 ->
-	  case (unSM m dflags us0 sc0) of 
-		(m_result, us1, sc1) -> unSM (k m_result) dflags us1 sc1 )
+  = SM (\ st_env us0 sc0 ->
+	  case (unSM m st_env us0 sc0) of 
+		(m_result, us1, sc1) -> unSM (k m_result) st_env us1 sc1 )
 
 thenSmpl_ m k 
-  = SM (\dflags us0 sc0 ->
-	 case (unSM m dflags us0 sc0) of 
-		(_, us1, sc1) -> unSM k dflags us1 sc1)
+  = SM (\st_env us0 sc0 ->
+	 case (unSM m st_env us0 sc0) of 
+		(_, us1, sc1) -> unSM k st_env us1 sc1)
 \end{code}
 
 
@@ -138,22 +146,27 @@ mapAccumLSmpl f acc (x:xs) = f acc x	`thenSmpl` \ (acc', x') ->
 \begin{code}
 getUniqSupplySmpl :: SimplM UniqSupply
 getUniqSupplySmpl 
-   = SM (\dflags us sc -> case splitUniqSupply us of
+   = SM (\st_env us sc -> case splitUniqSupply us of
 			        (us1, us2) -> (us1, us2, sc))
 
 getUniqueSmpl :: SimplM Unique
 getUniqueSmpl 
-   = SM (\dflags us sc -> case splitUniqSupply us of
+   = SM (\st_env us sc -> case splitUniqSupply us of
 			        (us1, us2) -> (uniqFromSupply us1, us2, sc))
 
 getUniquesSmpl :: SimplM [Unique]
 getUniquesSmpl 
-   = SM (\dflags us sc -> case splitUniqSupply us of
+   = SM (\st_env us sc -> case splitUniqSupply us of
 			        (us1, us2) -> (uniqsFromSupply us1, us2, sc))
 
 getDOptsSmpl :: SimplM DynFlags
-getDOptsSmpl 
-   = SM (\dflags us sc -> (dflags, us, sc))
+getDOptsSmpl = SM (\st_env us sc -> (st_flags st_env, us, sc))
+
+getRules :: SimplM RuleBase
+getRules = SM (\st_env us sc -> (st_rules st_env, us, sc))
+
+getFamEnvs :: SimplM (FamInstEnv, FamInstEnv)
+getFamEnvs = SM (\st_env us sc -> (st_fams st_env, us, sc))
 
 newId :: FastString -> Type -> SimplM Id
 newId fs ty = getUniqueSmpl 	`thenSmpl` \ uniq ->
@@ -169,18 +182,18 @@ newId fs ty = getUniqueSmpl 	`thenSmpl` \ uniq ->
 
 \begin{code}
 getSimplCount :: SimplM SimplCount
-getSimplCount = SM (\dflags us sc -> (sc, us, sc))
+getSimplCount = SM (\st_env us sc -> (sc, us, sc))
 
 tick :: Tick -> SimplM ()
 tick t 
-   = SM (\dflags us sc -> let sc' = doTick t sc 
+   = SM (\st_env us sc -> let sc' = doTick t sc 
 			  in sc' `seq` ((), us, sc'))
 
 freeTick :: Tick -> SimplM ()
 -- Record a tick, but don't add to the total tick count, which is
 -- used to decide when nothing further has happened
 freeTick t 
-   = SM (\dflags us sc -> let sc' = doFreeTick t sc
+   = SM (\st_env us sc -> let sc' = doFreeTick t sc
 			  in sc' `seq` ((), us, sc'))
 \end{code}
 

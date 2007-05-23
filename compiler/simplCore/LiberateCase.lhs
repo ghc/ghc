@@ -17,14 +17,9 @@ import Rules		( RuleBase )
 import UniqSupply	( UniqSupply )
 import SimplMonad	( SimplCount, zeroSimplCount )
 import Id
-import FamInstEnv
-import Type
-import Coercion
-import TyCon
 import VarEnv
 import Name		( localiseName )
 import Util             ( notNull )
-import Data.IORef	( readIORef )
 \end{code}
 
 The liberate-case transformation
@@ -120,43 +115,6 @@ scope.  For example:
 Here, the level of @f@ is zero, the level of @g@ is one,
 and the level of @h@ is zero (NB not one).
 
-Note [Indexed data types]
-~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-	data family T :: * -> *
-	data T Int = TI Int
-
-	f :: T Int -> Bool
-	f x = case x of { DEFAULT -> <body> }
-
-We would like to change this to
-	f x = case x `cast` co of { TI p -> <body> }
-
-so that <body> can make use of the fact that x is already evaluated to
-a TI; and a case on a known data type may be more efficient than a
-polymorphic one (not sure this is true any longer).  Anyway the former
-showed up in Roman's experiments.  Example:
-  foo :: FooT Int -> Int -> Int
-  foo t n = t `seq` bar n
-     where
-       bar 0 = 0
-       bar n = bar (n - case t of TI i -> i)
-Here we'd like to avoid repeated evaluating t inside the loop, by 
-taking advantage of the `seq`.
-
-We implement this as part of the liberate-case transformation by 
-spotting
-	case <scrut> of (x::T) tys { DEFAULT ->  <body> }
-where x :: T tys, and T is a indexed family tycon.  Find the
-representation type (T77 tys'), and coercion co, and transform to
-	case <scrut> `cast` co of (y::T77 tys')
-	    DEFAULT -> let x = y `cast` sym co in <body>
-
-The "find the representation type" part is done by looking up in the
-family-instance environment.
-
-NB: in fact we re-use x (changing its type) to avoid making a fresh y;
-this entails shadowing, but that's ok.
 
 %************************************************************************
 %*									*
@@ -169,11 +127,9 @@ liberateCase :: HscEnv -> UniqSupply -> RuleBase -> ModGuts
 	     -> IO (SimplCount, ModGuts)
 liberateCase hsc_env _ _ guts
   = do	{ let dflags = hsc_dflags hsc_env
-	; eps <- readIORef (hsc_EPS hsc_env)
-	; let fam_envs = (eps_fam_inst_env eps, mg_fam_inst_env guts)
 
 	; showPass dflags "Liberate case"
-	; let { env = initEnv dflags fam_envs
+	; let { env = initEnv dflags
 	      ; binds' = do_prog env (mg_binds guts) }
 	; endPass dflags "Liberate case" Opt_D_verbose_core2core binds'
 			{- no specific flag for dumping -} 
@@ -259,7 +215,7 @@ libCase env (Let bind body)
     (env_body, bind') = libCaseBind env bind
 
 libCase env (Case scrut bndr ty alts)
-  = mkCase env (libCase env scrut) bndr ty (map (libCaseAlt env_alts) alts)
+  = Case (libCase env scrut) bndr ty (map (libCaseAlt env_alts) alts)
   where
     env_alts = addBinders (mk_alt_env scrut) [bndr]
     mk_alt_env (Var scrut_var) = addScrutedVar env scrut_var
@@ -269,22 +225,6 @@ libCase env (Case scrut bndr ty alts)
 libCaseAlt env (con,args,rhs) = (con, args, libCase (addBinders env args) rhs)
 \end{code}
 
-\begin{code}
-mkCase :: LibCaseEnv -> CoreExpr -> Id -> Type -> [CoreAlt] -> CoreExpr
--- See Note [Indexed data types]
-mkCase env scrut bndr ty [(DEFAULT,_,rhs)]
-  | Just (tycon, tys)   <- splitTyConApp_maybe (idType bndr)
-  , [(fam_inst, rep_tys)] <- lookupFamInstEnv (lc_fams env) tycon tys
-  = let 
-	rep_tc     = famInstTyCon fam_inst
-	bndr'      = setIdType bndr (mkTyConApp rep_tc rep_tys)
-	Just co_tc = tyConFamilyCoercion_maybe rep_tc
-	co	   = mkTyConApp co_tc rep_tys
-	bind       = NonRec bndr (Cast (Var bndr') (mkSymCoercion co))
-    in mkCase env (Cast scrut co) bndr' ty [(DEFAULT,[],Let bind rhs)]
-mkCase env scrut bndr ty alts
-  = Case scrut bndr ty alts
-\end{code}
 
 Ids
 ~~~
@@ -393,7 +333,7 @@ data LibCaseEnv
 			-- to their own binding group,
 			-- and *only* in their own RHSs
 
-	lc_scruts :: [(Id,LibCaseLevel)],
+	lc_scruts :: [(Id,LibCaseLevel)]
      			-- Each of these Ids was scrutinised by an
 			-- enclosing case expression, with the
 			-- specified number of enclosing
@@ -401,19 +341,15 @@ data LibCaseEnv
 			-- the Id is bound at a lower level
 			-- than the case expression.  The order is
 			-- insignificant; it's a bag really
-
-	lc_fams :: FamInstEnvs
-			-- Instance env for indexed data types 
 	}
 
-initEnv :: DynFlags -> FamInstEnvs -> LibCaseEnv
-initEnv dflags fams
+initEnv :: DynFlags -> LibCaseEnv
+initEnv dflags 
   = LibCaseEnv { lc_size = specThreshold dflags,
 		 lc_lvl = 0,
 		 lc_lvl_env = emptyVarEnv, 
 		 lc_rec_env = emptyVarEnv,
-		 lc_scruts = [],
-		 lc_fams = fams }
+		 lc_scruts = [] }
 
 bombOutSize = lc_size
 \end{code}
