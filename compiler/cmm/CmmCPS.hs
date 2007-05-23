@@ -93,10 +93,10 @@ collectNonProcPointTargets proc_points blocks current_targets block =
         -- TODO: remove redundant uniqSetToList
       new_targets = current_targets `unionUniqSets` (mkUniqSet targets)
 
-buildContinuation ::
+procPointToContinuation ::
     UniqSet BlockId -> BlockEnv BrokenBlock
     -> BlockId -> Continuation
-buildContinuation proc_points blocks start =
+procPointToContinuation proc_points blocks start =
   Continuation is_entry info_table clabel params body
     where
       children = (collectNonProcPointTargets proc_points blocks (unitUniqSet start) start) `delOneFromUniqSet` start
@@ -119,8 +119,8 @@ buildContinuation proc_points blocks start =
 --------------------------------------------------------------------------------
 -- For now just select the continuation orders in the order they are in the set with no gaps
 
-selectStackFormat2 :: BlockEnv CmmLive -> [Continuation] -> [(CLabel, StackFormat)]
-selectStackFormat2 live continuations =
+selectStackFormat :: BlockEnv CmmLive -> [Continuation] -> [(CLabel, StackFormat)]
+selectStackFormat live continuations =
     map (\c -> (continuationLabel c, selectStackFormat' c)) continuations
     where
       selectStackFormat' (Continuation True info_table label formals blocks) =
@@ -142,44 +142,45 @@ selectStackFormat2 live continuations =
       extend_format (StackFormat label size offsets) reg =
           StackFormat label (slot_size reg + size) ((CmmLocal reg, size) : offsets)
 
+      slot_size :: LocalReg -> Int
+      slot_size reg = ((machRepByteWidth (localRegRep reg) - 1) `div` wORD_SIZE) + 1
+
       unknown_block = panic "unknown BlockId in selectStackFormat"
 
-slot_size reg = ((machRepByteWidth (localRegRep reg) - 1) `div` wORD_SIZE) + 1
-
-constructContinuation :: [(CLabel, StackFormat)] -> Continuation -> CmmTop
-constructContinuation formats (Continuation is_entry info label formals blocks) =
-    CmmProc info label formals (map (constructContinuation2' label formats) blocks)
-
-constructContinuation2' :: CLabel -> [(CLabel, StackFormat)] -> BrokenBlock
-                       -> CmmBasicBlock
-constructContinuation2' curr_ident formats (BrokenBlock ident entry stmts _ exit) =
-    BasicBlock ident (prefix++stmts++postfix)
+continuationToProc :: [(CLabel, StackFormat)] -> Continuation -> CmmTop
+continuationToProc formats (Continuation is_entry info label formals blocks) =
+    CmmProc info label formals (map (continuationToProc' label formats) blocks)
     where
-      curr_format = maybe unknown_block id $ lookup curr_ident formats
-      unknown_block = panic "unknown BlockId in constructContinuation"
-      prefix = case entry of
-                 ControlEntry -> []
-                 FunctionEntry _ _ -> []
-                 ContinuationEntry formals ->
-                     unpack_continuation curr_format
-      postfix = case exit of
-                  FinalBranch next -> [CmmBranch next]
-                  FinalSwitch expr targets -> [CmmSwitch expr targets]
-                  FinalReturn arguments ->
-                      exit_function curr_format
-                                    (CmmLoad (CmmReg spReg) wordRep)
-                                    arguments
-                  FinalJump target arguments ->
-                      exit_function curr_format target arguments
-                  -- TODO: do something about global saves
-                  FinalCall next (CmmForeignCall target CmmCallConv)
+      continuationToProc' :: CLabel -> [(CLabel, StackFormat)] -> BrokenBlock
+                             -> CmmBasicBlock
+      continuationToProc' curr_ident formats (BrokenBlock ident entry stmts _ exit) =
+          BasicBlock ident (prefix++stmts++postfix)
+          where
+            curr_format = maybe unknown_block id $ lookup curr_ident formats
+            unknown_block = panic "unknown BlockId in continuationToProc"
+            prefix = case entry of
+                       ControlEntry -> []
+                       FunctionEntry _ _ -> []
+                       ContinuationEntry formals ->
+                           unpack_continuation curr_format
+            postfix = case exit of
+                        FinalBranch next -> [CmmBranch next]
+                        FinalSwitch expr targets -> [CmmSwitch expr targets]
+                        FinalReturn arguments ->
+                            exit_function curr_format
+                                (CmmLoad (CmmReg spReg) wordRep)
+                                arguments
+                        FinalJump target arguments ->
+                            exit_function curr_format target arguments
+                        -- TODO: do something about global saves
+                        FinalCall next (CmmForeignCall target CmmCallConv)
                             results arguments saves ->
                                 pack_continuation curr_format cont_format ++
                                 [CmmJump target arguments]
                             where
                               cont_format = maybe unknown_block id $
                                             lookup (mkReturnPtLabel $ getUnique next) formats
-                  FinalCall next _ results arguments saves -> panic "unimplemented CmmCall"
+                        FinalCall next _ results arguments saves -> panic "unimplemented CmmCall"
 
 --------------------------------------------------------------------------------
 -- Functions that generate CmmStmt sequences
@@ -330,9 +331,7 @@ cmmBlockFromBrokenBlock (BrokenBlock ident _ stmts _ exit) =
 
 cpsProc :: UniqSupply -> CmmTop -> [CmmTop]
 cpsProc uniqSupply x@(CmmData _ _) = [x]
-cpsProc uniqSupply x@(CmmProc info_table ident params blocks) =
-    --[CmmProc info_table ident params cps_blocks]
-    cps_continuations
+cpsProc uniqSupply x@(CmmProc info_table ident params blocks) = cps_procs
     where
       uniqes :: [[Unique]]
       uniqes = map uniqsFromSupply $ listSplitUniqSupply uniqSupply
@@ -350,25 +349,21 @@ cpsProc uniqSupply x@(CmmProc info_table ident params blocks) =
       proc_points :: UniqSet BlockId
       proc_points = calculateProcPoints broken_blocks
 
-      continuations :: [Continuation]
-      continuations = map (buildContinuation proc_points (blocksToBlockEnv broken_blocks)) (uniqSetToList proc_points)
-
       -- TODO: insert proc point code here
       --  * Branches and switches to proc points may cause new blocks to be created
       --    (or proc points could leave behind phantom blocks that just jump to them)
       --  * Proc points might get some live variables passed as arguments
 
-      -- TODO: let blocks_with_live = map (cmmLivenessComment live . snd) broken_blocks
-
-      --procs = groupBlocksIntoContinuations live broken_blocks
+      continuations :: [Continuation]
+      continuations = map (procPointToContinuation proc_points (blocksToBlockEnv broken_blocks)) (uniqSetToList proc_points)
 
       -- Select the stack format on entry to each block
-      formats2 :: [(CLabel, StackFormat)]
-      formats2 = selectStackFormat2 live continuations
+      formats :: [(CLabel, StackFormat)]
+      formats = selectStackFormat live continuations
 
       -- Do the actual CPS transform
-      cps_continuations :: [CmmTop]
-      cps_continuations = map (constructContinuation formats2) continuations
+      cps_procs :: [CmmTop]
+      cps_procs = map (continuationToProc formats) continuations
 
 --------------------------------------------------------------------------------
 cmmCPS :: DynFlags
