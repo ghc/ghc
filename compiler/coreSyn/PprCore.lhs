@@ -33,7 +33,6 @@ import BasicTypes
 import Util
 import Outputable
 import FastString
-import Module
 \end{code}
 
 %************************************************************************
