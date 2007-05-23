@@ -858,7 +858,7 @@ foreign import ccall unsafe "readIOManagerEvent" -- in the RTS (ThrIOManager.c)
 foreign import ccall unsafe "sendIOManagerEvent" -- in the RTS (ThrIOManager.c)
   c_sendIOManagerEvent :: Word32 -> IO ()
 
-foreign import ccall unsafe "maperrno"             -- in runProcess.c
+foreign import ccall unsafe "maperrno"             -- in Win32Utils.c
    c_maperrno :: IO ()
 
 foreign import stdcall "WaitForSingleObject"
