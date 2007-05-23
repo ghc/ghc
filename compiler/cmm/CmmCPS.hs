@@ -8,6 +8,8 @@ import PprCmm
 
 import Dataflow (fixedpoint)
 import CmmLive
+import CmmCPSData
+import CmmProcPoint
 
 import MachOp
 import ForeignCall
@@ -45,25 +47,6 @@ import Data.List
 -- and heap memory (not sure if that's usefull at all though, but it may
 -- be worth exploring the design space).
 
-data BrokenBlock
-  = BrokenBlock {
-      brokenBlockId :: BlockId, -- Like a CmmBasicBlock
-      brokenBlockEntry :: BlockEntryInfo,
-                                -- How this block can be entered
-
-      brokenBlockStmts :: [CmmStmt],
-                                -- Like a CmmBasicBlock
-                                -- (but without the last statement)
-
-      brokenBlockTargets :: [BlockId],
-                                -- Blocks that this block could
-                                -- branch to one either by conditional
-                                -- branches or via the last statement
-
-      brokenBlockExit :: FinalStmt
-                                -- How the block can be left
-    }
-
 continuationLabel (Continuation _ _ l _ _) = l
 data Continuation =
   Continuation
@@ -80,44 +63,6 @@ data Continuation =
 		       -- to a label.  To jump to the first block in a Proc,
 		       -- use the appropriate CLabel.
 
-data BlockEntryInfo
-  = FunctionEntry		-- Beginning of a function
-      CLabel                    -- The function name
-      CmmFormals                -- Aguments to function
-
-  | ContinuationEntry 		-- Return point of a call
-      CmmFormals                -- return values (argument to continuation)
-  -- TODO:
-  -- | ProcPointEntry -- no return values, but some live might end up as params or possibly in the frame
-
-  | ControlEntry		-- A label in the input
-
--- Final statement in a BlokenBlock
--- Constructors and arguments match those in Cmm,
--- but are restricted to branches, returns, jumps, calls and switches
-data FinalStmt
-  = FinalBranch
-      BlockId -- next block (must be a ControlEntry)
-
-  | FinalReturn
-      CmmActuals -- return values
-
-  | FinalJump
-      CmmExpr -- the function to call
-      CmmActuals -- arguments to call
-
-  | FinalCall
-      BlockId -- next block after call (must be a ContinuationEntry)
-      CmmCallTarget -- the function to call
-      CmmFormals -- results from call (redundant with ContinuationEntry)
-      CmmActuals -- arguments to call
-      (Maybe [GlobalReg]) -- registers that must be saved (TODO)
-
-  | FinalSwitch
-      CmmExpr [Maybe BlockId]   -- Table branch
-
-  -- TODO: | ProcPointExit (needed?)
-
 -- Describes the layout of a stack frame for a continuation
 data StackFormat
     = StackFormat
@@ -129,75 +74,7 @@ data StackFormat
 -- A block can be a continuation of another block (w/ or w/o joins)
 -- A block can be an entry to a function
 
-blocksToBlockEnv :: [BrokenBlock] -> BlockEnv BrokenBlock
-blocksToBlockEnv blocks = listToUFM $ map (\b -> (brokenBlockId b, b)) blocks
-
 -----------------------------------------------------------------------------
-calculateOwnership :: UniqSet BlockId -> [BrokenBlock] -> BlockEnv (UniqSet BlockId)
-calculateOwnership proc_points blocks =
-    fixedpoint dependants update (map brokenBlockId blocks) emptyUFM
-    where
-      blocks_ufm :: BlockEnv BrokenBlock
-      blocks_ufm = blocksToBlockEnv blocks
-
-      dependants :: BlockId -> [BlockId]
-      dependants ident =
-          brokenBlockTargets $ lookupWithDefaultUFM
-                                 blocks_ufm unknown_block ident
-
-      update :: BlockId -> Maybe BlockId
-             -> BlockEnv (UniqSet BlockId) -> Maybe (BlockEnv (UniqSet BlockId))
-      update ident cause owners =
-          case (cause, ident `elementOfUniqSet` proc_points) of
-            (Nothing, True) -> Just $ addToUFM owners ident (unitUniqSet ident)
-            (Nothing, False) -> Nothing
-            (Just cause', True) -> Nothing
-            (Just cause', False) ->
-                if (sizeUniqSet old) == (sizeUniqSet new)
-                   then Nothing
-                   else Just $ addToUFM owners ident new
-                where
-                  old = lookupWithDefaultUFM owners emptyUniqSet ident
-                  new = old `unionUniqSets` lookupWithDefaultUFM owners emptyUniqSet cause'
-
-      unknown_block = panic "unknown BlockId in selectStackFormat"
-
-calculateProcPoints :: [BrokenBlock] -> UniqSet BlockId
-calculateProcPoints blocks = calculateProcPoints' init_proc_points blocks
-    where
-      init_proc_points = mkUniqSet $
-                         map brokenBlockId $
-                         filter always_proc_point blocks
-      always_proc_point BrokenBlock {
-                              brokenBlockEntry = FunctionEntry _ _ } = True
-      always_proc_point BrokenBlock {
-                              brokenBlockEntry = ContinuationEntry _ } = True
-      always_proc_point _ = False
-
-calculateProcPoints' :: UniqSet BlockId -> [BrokenBlock] -> UniqSet BlockId
-calculateProcPoints' old_proc_points blocks =
-    if sizeUniqSet old_proc_points == sizeUniqSet new_proc_points
-      then old_proc_points
-      else calculateProcPoints' new_proc_points blocks
-    where
-      owners = calculateOwnership old_proc_points blocks
-      new_proc_points = unionManyUniqSets (old_proc_points:(map (calculateProcPoints'' owners) blocks))
-
-calculateProcPoints'' :: BlockEnv (UniqSet BlockId) -> BrokenBlock -> UniqSet BlockId
-calculateProcPoints''  owners block =
-    unionManyUniqSets (map (f parent_id) child_ids)
-    where
-      parent_id = brokenBlockId block
-      child_ids = brokenBlockTargets block
-      -- TODO: name for f
-      f parent_id child_id = 
-          if needs_proc_point
-            then unitUniqSet child_id
-            else emptyUniqSet
-          where
-            parent_owners = lookupWithDefaultUFM owners emptyUniqSet parent_id
-            child_owners = lookupWithDefaultUFM owners emptyUniqSet child_id
-            needs_proc_point = not $ isEmptyUniqSet $ child_owners `minusUniqSet` parent_owners
 
 collectNonProcPointTargets ::
     UniqSet BlockId -> BlockEnv BrokenBlock
