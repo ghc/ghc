@@ -135,7 +135,6 @@ exposed-modules:
 	GHC.Word,
 	Numeric,
 	Prelude,
-	System.Cmd,
 	System.Console.GetOpt,
 	System.CPUTime,
 	System.Environment,
@@ -150,8 +149,6 @@ exposed-modules:
 	System.Posix.Internals,
 	System.Posix.Signals,
 	System.Posix.Types,
-	System.Process,
-	System.Process.Internals,
 	Text.ParserCombinators.ReadP,
 	Text.ParserCombinators.ReadPrec,
 	Text.Printf,
@@ -168,12 +165,10 @@ c-sources:
 	cbits/Win32Utils.c
 	cbits/consUtils.c
 	cbits/dirUtils.c
-	cbits/execvpe.c
 	cbits/fpstring.c
 	cbits/inputReady.c
 	cbits/lockFile.c
 	cbits/longlong.c
-	cbits/runProcess.c
 	cbits/selectUtils.c
 include-dirs: include, ../../includes, ../../rts
 includes:	HsBase.h

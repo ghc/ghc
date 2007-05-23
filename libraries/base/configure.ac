@@ -13,9 +13,6 @@ AC_PROG_CC()
 # do we have long longs?
 AC_CHECK_TYPES([long long])
 
-dnl ** Working vfork?
-AC_FUNC_FORK
-
 dnl ** determine whether or not const works
 AC_C_CONST
 
@@ -35,7 +32,7 @@ dnl functions if it's really there.
 AC_CHECK_HEADERS([wctype.h], [AC_CHECK_FUNCS(iswspace)])
 
 AC_CHECK_FUNCS([lstat readdir_r])
-AC_CHECK_FUNCS([getclock getrusage setitimer times])
+AC_CHECK_FUNCS([getclock getrusage times])
 AC_CHECK_FUNCS([_chsize ftruncate])
 
 # map standard C types and ISO types to Haskell types

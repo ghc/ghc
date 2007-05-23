@@ -129,8 +129,6 @@
 #include "dirUtils.h"
 #include "WCsubst.h"
 
-#include "runProcess.h"
-
 #if defined(__MINGW32__)
 /* in Win32Utils.c */
 extern void maperrno (void);
@@ -153,12 +151,6 @@ int inputReady(int fd, int msecs, int isSock);
 
 /* in Signals.c */
 extern HsInt nocldstop;
-
-#if !defined(_MSC_VER) && !defined(__MINGW32__) && !defined(_WIN32)
-/* in execvpe.c */
-extern int execvpe(char *name, char *const argv[], char **envp);
-extern void pPrPr_disableITimers (void);
-#endif
 
 /* -----------------------------------------------------------------------------
    64-bit operations, defined in longlong.c
@@ -704,10 +696,6 @@ INLINE void setTimevalTicks(struct timeval *p, HsWord64 usecs)
     p->tv_usec = usecs % 1000000;
 }
 #endif /* !defined(__MINGW32__) */
-
-#if defined(__MINGW32__)
-INLINE unsigned int __hscore_get_osver(void) { return _osver; }
-#endif
 
 /* ToDo: write a feature test that doesn't assume 'environ' to
  *    be in scope at link-time. */
