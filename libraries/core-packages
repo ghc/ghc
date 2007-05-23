@@ -6,6 +6,7 @@ haskell98
 old-locale
 old-time
 pretty
+process
 random
 readline
 template-haskell
