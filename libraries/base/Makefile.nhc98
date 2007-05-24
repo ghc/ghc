@@ -22,17 +22,15 @@ SRCS	= \
 	NHC/SizedTypes.hs NHC/PosixTypes.hsc \
 	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
 	System/Environment.hs System/Exit.hs System/Locale.hs \
-	System/Directory.hs System/Mem.hs System/Cmd.hs System/Info.hs \
-	System/Console/GetOpt.hs System/Random.hs \
+	System/Mem.hs System/Cmd.hs System/Info.hs \
+	System/Console/GetOpt.hs \
 	System/CPUTime.hsc System/Time.hsc \
-	System/Directory/Internals.hs \
 	Foreign/Ptr.hs Foreign/StablePtr.hs Foreign/Storable.hs \
 	Foreign/ForeignPtr.hs Foreign/C/Types.hs \
 	Foreign/Marshal/Alloc.hs Foreign/Marshal/Array.hs \
 	Foreign/Marshal/Utils.hs Foreign/Marshal/Error.hs \
 	Foreign/Marshal/Pool.hs Foreign/Marshal.hs \
 	Foreign/C/String.hs Foreign/C/Error.hs Foreign/C.hs Foreign.hs \
-	Text/PrettyPrint/HughesPJ.hs Text/PrettyPrint.hs \
 	Text/Printf.hs \
 	Text/Read.hs Text/Show.hs Text/Show/Functions.hs \
 	Text/ParserCombinators/ReadP.hs Data/Version.hs \
@@ -40,6 +38,11 @@ SRCS	= \
 	WCsubst.c \
 	System/Posix/Types.hs \
 
+# now moved to separate packages:
+#	System/Directory.hs \
+#	System/Directory/Internals.hs \
+#	Text/PrettyPrint/HughesPJ.hs Text/PrettyPrint.hs \
+#	System/Random.hs \
 
 #	Text/Regex/Posix.hsc Text/Regex.hs \
 #	Text/ParserCombinators/ReadPrec.hs
