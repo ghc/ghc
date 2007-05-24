@@ -569,8 +569,8 @@ cvReconstructType hsc_env force mb_ty hval = runTR hsc_env $ do
                                 (dataConRepArgTys dc)
             -- It is vital for newtype reconstruction that the unification step
             -- is done right here, _before_ the subterms are RTTI reconstructed
-            let myType = mkFunTys subTtypes tv
-            signatureType <- instScheme(dataConRepType dc) 
+            let myType         = mkFunTys subTtypes tv
+            (signatureType,_) <- instScheme(dataConRepType dc) 
             addConstraint myType signatureType
             return $ map (\(I# i#,t) -> case ptrs clos of 
                              (Array _ _ ptrs#) -> case indexArray# ptrs# i# of 
