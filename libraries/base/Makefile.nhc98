@@ -21,7 +21,7 @@ SRCS	= \
 	Debug/Trace.hs \
 	NHC/SizedTypes.hs NHC/PosixTypes.hsc \
 	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
-	System/Environment.hs System/Exit.hs System/Locale.hs \
+	System/Environment.hs System/Exit.hs \
 	System/Mem.hs System/Cmd.hs System/Info.hs \
 	System/Console/GetOpt.hs \
 	System/CPUTime.hsc System/Time.hsc \
@@ -42,7 +42,7 @@ SRCS	= \
 #	System/Directory.hs \
 #	System/Directory/Internals.hs \
 #	Text/PrettyPrint/HughesPJ.hs Text/PrettyPrint.hs \
-#	System/Random.hs \
+#	System/Random.hs System/Locale.hs \
 
 #	Text/Regex/Posix.hsc Text/Regex.hs \
 #	Text/ParserCombinators/ReadPrec.hs
