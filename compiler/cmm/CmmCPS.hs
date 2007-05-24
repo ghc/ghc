@@ -1,4 +1,8 @@
-module CmmCPS (cmmCPS) where
+module CmmCPS (
+  -- | Converts C-- with full proceedures and parameters
+  -- to a CPS transformed C-- with the stack made manifest.
+  cmmCPS
+) where
 
 #include "HsVersions.h"
 
@@ -8,7 +12,7 @@ import PprCmm
 
 import Dataflow (fixedpoint)
 import CmmLive
-import CmmCPSData
+import CmmBrokenBlock
 import CmmProcPoint
 
 import MachOp

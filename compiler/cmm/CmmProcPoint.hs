@@ -5,7 +5,7 @@ module CmmProcPoint (
 #include "HsVersions.h"
 
 import Cmm
-import CmmCPSData
+import CmmBrokenBlock
 import Dataflow
 
 import UniqSet
