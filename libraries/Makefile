@@ -200,6 +200,13 @@ build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 	                                $(addprefix --ghc-option=,$(GhcLibHcOpts))
 	ifBuildable/ifBuildable $* setup/Setup register --inplace
 
+$(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/CabalMakefile):\
+%/CabalMakefile: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
+                 %/setup/Setup ifBuildable/ifBuildable
+	$(RM) $*/CabalMakefile
+	ifBuildable/ifBuildable $* setup/Setup makefile -f CabalMakefile \
+	                             $(addprefix --ghc-option=,$(GhcLibHcOpts))
+
 .PHONY: doc
 
 DOC_SUBDIRS = $(filter-out haskell98,$(SUBDIRS))
