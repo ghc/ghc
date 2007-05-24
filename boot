@@ -14,11 +14,13 @@ done
 
 chmod +x rts/gmp/configure
 
+echo "Booting ."
 autoreconf
 
 for lib in libraries/*; do
     if test -e $lib/configure.ac
     then
+        echo "Booting $lib"
         cd $lib
         autoreconf
         cd ../..
