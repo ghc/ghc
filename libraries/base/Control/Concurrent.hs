@@ -496,7 +496,7 @@ runInUnboundThread action = do
 >    	    takeMVar m
 >    	    waitForChildren
 >    
->    forkChild :: IO () -> IO ()
+>    forkChild :: IO () -> IO ThreadId
 >    forkChild io = do
 >    	 mvar <- newEmptyMVar
 >    	 childs <- takeMVar children
