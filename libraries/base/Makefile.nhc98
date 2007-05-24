@@ -22,9 +22,9 @@ SRCS	= \
 	NHC/SizedTypes.hs NHC/PosixTypes.hsc \
 	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
 	System/Environment.hs System/Exit.hs \
-	System/Mem.hs System/Cmd.hs System/Info.hs \
+	System/Mem.hs System/Info.hs \
 	System/Console/GetOpt.hs \
-	System/CPUTime.hsc System/Time.hsc \
+	System/CPUTime.hsc \
 	Foreign/Ptr.hs Foreign/StablePtr.hs Foreign/Storable.hs \
 	Foreign/ForeignPtr.hs Foreign/C/Types.hs \
 	Foreign/Marshal/Alloc.hs Foreign/Marshal/Array.hs \
@@ -42,7 +42,8 @@ SRCS	= \
 #	System/Directory.hs \
 #	System/Directory/Internals.hs \
 #	Text/PrettyPrint/HughesPJ.hs Text/PrettyPrint.hs \
-#	System/Random.hs System/Locale.hs \
+#	System/Random.hs System/Locale.hs System/Time.hsc \
+#	System/Cmd.hs
 
 #	Text/Regex/Posix.hsc Text/Regex.hs \
 #	Text/ParserCombinators/ReadPrec.hs
