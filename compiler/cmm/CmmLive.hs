@@ -1,7 +1,8 @@
 module CmmLive (
-        CmmLive, BlockEntryLiveness,
+        CmmLive,
+        BlockEntryLiveness,
         cmmLiveness,
-        cmmFormalsToLiveLocals
+        cmmFormalsToLiveLocals,
   ) where
 
 #include "HsVersions.h"
@@ -14,20 +15,24 @@ import Panic
 import UniqFM
 import UniqSet
 
-import Data.List
-
 -----------------------------------------------------------------------------
 -- Calculating what variables are live on entry to a basic block
 -----------------------------------------------------------------------------
 
--- The variables live on entry to a block
+-- | The variables live on entry to a block
 type CmmLive = UniqSet LocalReg
 
--- A mapping from block labels to the variables live on entry
+-- | A mapping from block labels to the variables live on entry
 type BlockEntryLiveness = BlockEnv CmmLive
 
+-- | A mapping from block labels to the blocks that target it
+type BlockSources = BlockEnv (UniqSet BlockId)
+
+-- | A mapping from block labels to the statements in the block
+type BlockStmts = BlockEnv [CmmStmt]
+
 -----------------------------------------------------------------------------
--- cmmLiveness and helpers
+-- | Calculated liveness info for a list of 'CmmBasicBlock'
 -----------------------------------------------------------------------------
 cmmLiveness :: [CmmBasicBlock] -> BlockEntryLiveness
 cmmLiveness blocks =
@@ -36,8 +41,14 @@ cmmLiveness blocks =
                (map blockId blocks)
                (listToUFM [(blockId b, emptyUniqSet) | b <- blocks])
     where
+      sources :: BlockSources
       sources = cmmBlockSources blocks
-      blocks' = cmmBlockNames blocks
+
+      blocks' :: BlockStmts
+      blocks' = listToUFM $ map block_name blocks
+
+      block_name :: CmmBasicBlock -> (BlockId, [CmmStmt])
+      block_name b = (blockId b, blockStmts b)
 
 {-
 -- For debugging, annotate each block with a comment indicating
@@ -51,27 +62,24 @@ cmmLivenessComment live (BasicBlock ident stmts) =
 -}
 
 
---------------------------------
--- cmmBlockSources
---
--- Calculates a table of blocks
--- that might need updating after
--- a given block is updated
---------------------------------
-cmmBlockSources :: [CmmBasicBlock] -> BlockEnv (UniqSet BlockId)
+-----------------------------------------------------------------------------
+-- | Calculates a table of where one can lookup the blocks that might
+-- need updating after a given block is updated in the liveness analysis
+-----------------------------------------------------------------------------
+cmmBlockSources :: [CmmBasicBlock] -> BlockSources
 cmmBlockSources blocks = foldr aux emptyUFM blocks
     where
       aux :: CmmBasicBlock
-          -> BlockEnv (UniqSet BlockId)
-          -> BlockEnv (UniqSet BlockId)
+          -> BlockSources
+          -> BlockSources
       aux block sourcesUFM =
           foldUniqSet (add_source_edges $ blockId block)
                       sourcesUFM
                       (branch_targets $ blockStmts block)
 
       add_source_edges :: BlockId -> BlockId
-                       -> BlockEnv (UniqSet BlockId)
-                       -> BlockEnv (UniqSet BlockId)
+                       -> BlockSources
+                       -> BlockSources
       add_source_edges source target ufm =
           addToUFM_Acc (flip addOneToUniqSet) unitUniqSet ufm target source
 
@@ -83,40 +91,22 @@ cmmBlockSources blocks = foldr aux emptyUFM blocks
               target (CmmSwitch _ blocks) = mapMaybe id blocks
               target _ = []
 
---------------------------------
--- cmmBlockNames
+-----------------------------------------------------------------------------
+-- | Given the table calculated by 'cmmBlockSources', list all blocks
+-- that depend on the result of a particular block.
 --
--- Calculates a table that maps
--- block names to the list
--- of statements inside them
---------------------------------
-cmmBlockNames :: [CmmBasicBlock] -> BlockEnv [CmmStmt]
-cmmBlockNames blocks = listToUFM $ map block_name blocks where
-    block_name b = (blockId b, blockStmts b)
-
---------------------------------
--- cmmBlockDependants
---
--- Given the table calculated
--- by cmmBlockSources created,
--- list all blocks that depend
--- on the result of a particular
--- block.
---------------------------------
-cmmBlockDependants :: BlockEnv (UniqSet BlockId) -> BlockId -> [BlockId]
+-- Used by the call to 'fixedpoint'.
+-----------------------------------------------------------------------------
+cmmBlockDependants :: BlockSources -> BlockId -> [BlockId]
 cmmBlockDependants sources ident =
     uniqSetToList $ lookupWithDefaultUFM sources emptyUniqSet ident
 
---------------------------------
--- cmmBlockUpdate
---
--- Given the table from
--- cmmBlockNames and a block
--- that was updated, calculate
--- an updated BlockEntryLiveness
---------------------------------
+-----------------------------------------------------------------------------
+-- | Given the table of type 'BlockStmts' and a block that was updated,
+-- calculate an updated BlockEntryLiveness
+-----------------------------------------------------------------------------
 cmmBlockUpdate ::
-    BlockEnv [CmmStmt]
+    BlockStmts
     -> BlockId
     -> Maybe BlockId
     -> BlockEntryLiveness
@@ -126,12 +116,18 @@ cmmBlockUpdate blocks node _ state =
       then Nothing
       else Just $ addToUFM state node new_live
     where
-      new_live = cmmStmtListLive state block
+      new_live, old_live :: CmmLive
+      new_live = cmmStmtListLive state block_stmts
       old_live = lookupWithDefaultUFM state missing_live node
-      block = lookupWithDefaultUFM blocks missing_block node
+
+      block_stmts :: [CmmStmt]
+      block_stmts = lookupWithDefaultUFM blocks missing_block node
+
       missing_live = panic "unknown block id during liveness analysis"
       missing_block = panic "unknown block id during liveness analysis"
 
+-----------------------------------------------------------------------------
+-- Section: 
 -----------------------------------------------------------------------------
 -- CmmBlockLive, cmmStmtListLive and helpers
 -----------------------------------------------------------------------------

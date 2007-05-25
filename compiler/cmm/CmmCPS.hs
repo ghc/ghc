@@ -34,6 +34,90 @@ import Monad
 import IO
 import Data.List
 
+-----------------------------------------------------------------------------
+-- |Top level driver for the CPS pass
+-----------------------------------------------------------------------------
+cmmCPS :: DynFlags -- ^ Dynamic flags: -dcmm-lint -ddump-cps-cmm
+       -> [Cmm]    -- ^ Input C-- with Proceedures
+       -> IO [Cmm] -- ^ Output CPS transformed C--
+cmmCPS dflags abstractC = do
+  when (dopt Opt_DoCmmLinting dflags) $
+       do showPass dflags "CmmLint"
+	  case firstJust $ map cmmLint abstractC of
+	    Just err -> do printDump err
+			   ghcExit dflags 1
+	    Nothing  -> return ()
+  showPass dflags "CPS"
+
+  -- TODO: more lint checking
+  --        check for use of branches to non-existant blocks
+  --        check for use of Sp, SpLim, R1, R2, etc.
+
+  uniqSupply <- mkSplitUniqSupply 'p'
+  let supplies = listSplitUniqSupply uniqSupply
+  let doCpsProc s (Cmm c) =
+          Cmm $ concat $ zipWith cpsProc (listSplitUniqSupply s) c
+  let continuationC = zipWith doCpsProc supplies abstractC
+
+  dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "CPS Cmm" (pprCmms continuationC)
+
+  -- TODO: add option to dump Cmm to file
+
+  return continuationC
+
+-----------------------------------------------------------------------------
+-- |CPS a single CmmTop (proceedure)
+-- Only 'CmmProc' are transformed 'CmmData' will be left alone.
+-----------------------------------------------------------------------------
+
+cpsProc :: UniqSupply 
+        -> CmmTop     -- ^Input proceedure
+        -> [CmmTop]   -- ^Output proceedure and continuations
+cpsProc uniqSupply x@(CmmData _ _) = [x]
+cpsProc uniqSupply x@(CmmProc info_table ident params blocks) = cps_procs
+    where
+      uniqes :: [[Unique]]
+      uniqes = map uniqsFromSupply $ listSplitUniqSupply uniqSupply
+
+      -- Break the block at each function call.
+      -- The part after the function call will have to become a continuation.
+      broken_blocks :: [BrokenBlock]
+      broken_blocks =
+          concat $ zipWith3 breakBlock uniqes blocks
+                     (FunctionEntry ident params:repeat ControlEntry)
+
+      -- Calculate live variables for each broken block.
+      --
+      -- Nothing can be live on entry to the first block
+      -- so we could take the tail, but for now we wont
+      -- to help future proof the code.
+      live :: BlockEntryLiveness
+      live = cmmLiveness $ map cmmBlockFromBrokenBlock broken_blocks
+
+      -- Calculate which blocks must be made into full fledged procedures.
+      proc_points :: UniqSet BlockId
+      proc_points = calculateProcPoints broken_blocks
+
+      -- Construct a map so we can lookup a broken block by its 'BlockId'.
+      block_env :: BlockEnv BrokenBlock
+      block_env = blocksToBlockEnv broken_blocks
+
+      -- Group the blocks into continuations based on the set of proc-points.
+      continuations :: [Continuation]
+      continuations = map (gatherBlocksIntoContinuation proc_points block_env)
+                          (uniqSetToList proc_points)
+
+      -- Select the stack format on entry to each continuation.
+      --
+      -- This is an association list instead of a UniqFM because
+      -- CLabel's don't have a 'Uniqueable' instance.
+      formats :: [(CLabel, StackFormat)]
+      formats = selectStackFormat live continuations
+
+      -- Do the actual CPS transform.
+      cps_procs :: [CmmTop]
+      cps_procs = map (continuationToProc formats) continuations
+
 --------------------------------------------------------------------------------
 
 -- The format for the call to a continuation
@@ -97,10 +181,15 @@ collectNonProcPointTargets proc_points blocks current_targets block =
         -- TODO: remove redundant uniqSetToList
       new_targets = current_targets `unionUniqSets` (mkUniqSet targets)
 
-procPointToContinuation ::
+-- TODO: insert proc point code here
+--  * Branches and switches to proc points may cause new blocks to be created
+--    (or proc points could leave behind phantom blocks that just jump to them)
+--  * Proc points might get some live variables passed as arguments
+
+gatherBlocksIntoContinuation ::
     UniqSet BlockId -> BlockEnv BrokenBlock
     -> BlockId -> Continuation
-procPointToContinuation proc_points blocks start =
+gatherBlocksIntoContinuation proc_points blocks start =
   Continuation is_entry info_table clabel params body
     where
       children = (collectNonProcPointTargets proc_points blocks (unitUniqSet start) start) `delOneFromUniqSet` start
@@ -251,144 +340,3 @@ unpack_continuation (StackFormat curr_id curr_frame_size curr_offsets)
          (CmmLoad (CmmRegOff spReg (wORD_SIZE*offset)) (cmmRegRep reg))
          | (reg, offset) <- curr_offsets]
 
------------------------------------------------------------------------------
--- Breaking basic blocks on function calls
------------------------------------------------------------------------------
-
------------------------------------------------------------------------------
--- Takes a basic block and breaks it up into a list of broken blocks
---
--- Takes a basic block and returns a list of basic blocks that
--- each have at most 1 CmmCall in them which must occur at the end.
--- Also returns with each basic block, the variables that will
--- be arguments to the continuation of the block once the call (if any)
--- returns.
-
-breakBlock :: [Unique] -> CmmBasicBlock -> BlockEntryInfo -> [BrokenBlock]
-breakBlock uniques (BasicBlock ident stmts) entry =
-    breakBlock' uniques ident entry [] [] stmts where
-        breakBlock' uniques current_id entry exits accum_stmts stmts =
-            case stmts of
-              [] -> panic "block doesn't end in jump, goto or return"
-              [CmmJump target arguments] ->
-                  [BrokenBlock current_id entry accum_stmts
-                               exits
-                               (FinalJump target arguments)]
-              [CmmReturn arguments] ->
-                  [BrokenBlock current_id entry accum_stmts
-                               exits
-                               (FinalReturn arguments)]
-              [CmmBranch target] ->
-                  [BrokenBlock current_id entry accum_stmts
-                               (target:exits)
-                               (FinalBranch target)]
-              [CmmSwitch expr targets] ->
-                  [BrokenBlock current_id entry accum_stmts
-                               (mapMaybe id targets ++ exits)
-                               (FinalSwitch expr targets)]
-              (CmmJump _ _:_) ->
-                  panic "jump in middle of block"
-              (CmmReturn _:_) ->
-                  panic "return in middle of block"
-              (CmmBranch _:_) ->
-                  panic "branch in middle of block"
-              (CmmSwitch _ _:_) ->
-                  panic ("switch in middle of block" ++ (showSDoc $ ppr stmts))
-              (CmmCall target results arguments saves:stmts) -> block : rest
-                  where
-                    new_id = BlockId $ head uniques
-                    block = BrokenBlock current_id entry accum_stmts
-                            (new_id:exits)
-                            (FinalCall new_id target results arguments saves)
-                    rest = breakBlock' (tail uniques) new_id
-                           (ContinuationEntry results) [] [] stmts
-              (s@(CmmCondBranch test target):stmts) ->
-                  breakBlock' uniques current_id entry
-                              (target:exits) (accum_stmts++[s]) stmts
-              (s:stmts) ->
-                  breakBlock' uniques current_id entry
-                              exits (accum_stmts++[s]) stmts
-
---------------------------------
--- Convert from a BrokenBlock
--- to a CmmBasicBlock so the
--- liveness analysis can run
--- on it.
---------------------------------
-cmmBlockFromBrokenBlock :: BrokenBlock -> CmmBasicBlock
-cmmBlockFromBrokenBlock (BrokenBlock ident _ stmts _ exit) =
-    BasicBlock ident (stmts++exit_stmt)
-    where
-      exit_stmt =
-          case exit of
-            FinalBranch target -> [CmmBranch target]
-            FinalReturn arguments -> [CmmReturn arguments]
-            FinalJump target arguments -> [CmmJump target arguments]
-            FinalSwitch expr targets -> [CmmSwitch expr targets]
-            FinalCall branch_target call_target results arguments saves ->
-                [CmmCall call_target results arguments saves,
-                 CmmBranch branch_target]
-
------------------------------------------------------------------------------
--- CPS a single CmmTop (proceedure)
------------------------------------------------------------------------------
-
-cpsProc :: UniqSupply -> CmmTop -> [CmmTop]
-cpsProc uniqSupply x@(CmmData _ _) = [x]
-cpsProc uniqSupply x@(CmmProc info_table ident params blocks) = cps_procs
-    where
-      uniqes :: [[Unique]]
-      uniqes = map uniqsFromSupply $ listSplitUniqSupply uniqSupply
-
-      -- Break the block at each function call
-      broken_blocks :: [BrokenBlock]
-      broken_blocks = concat $ zipWith3 breakBlock uniqes blocks
-                                        (FunctionEntry ident params:repeat ControlEntry)
-
-      -- Calculate live variables for each broken block
-      live :: BlockEntryLiveness
-      live = cmmLiveness $ map cmmBlockFromBrokenBlock broken_blocks
-             -- nothing can be live on entry to the first block so we could take the tail
-
-      proc_points :: UniqSet BlockId
-      proc_points = calculateProcPoints broken_blocks
-
-      -- TODO: insert proc point code here
-      --  * Branches and switches to proc points may cause new blocks to be created
-      --    (or proc points could leave behind phantom blocks that just jump to them)
-      --  * Proc points might get some live variables passed as arguments
-
-      continuations :: [Continuation]
-      continuations = map (procPointToContinuation proc_points (blocksToBlockEnv broken_blocks)) (uniqSetToList proc_points)
-
-      -- Select the stack format on entry to each block
-      formats :: [(CLabel, StackFormat)]
-      formats = selectStackFormat live continuations
-
-      -- Do the actual CPS transform
-      cps_procs :: [CmmTop]
-      cps_procs = map (continuationToProc formats) continuations
-
---------------------------------------------------------------------------------
-cmmCPS :: DynFlags
-       -> [Cmm]                 -- C-- with Proceedures
-       -> IO [Cmm]		-- Output: CPS transformed C--
-
-cmmCPS dflags abstractC = do
-  when (dopt Opt_DoCmmLinting dflags) $
-       do showPass dflags "CmmLint"
-	  case firstJust $ map cmmLint abstractC of
-	    Just err -> do printDump err
-			   ghcExit dflags 1
-	    Nothing  -> return ()
-  showPass dflags "CPS"
-  -- TODO: check for use of branches to non-existant blocks
-  -- TODO: check for use of Sp, SpLim, R1, R2, etc.
-  -- TODO: find out if it is valid to create a new unique source like this
-  uniqSupply <- mkSplitUniqSupply 'p'
-  let supplies = listSplitUniqSupply uniqSupply
-  let continuationC = zipWith (\s (Cmm c) -> Cmm $ concat $ zipWith (cpsProc) (listSplitUniqSupply s) c) supplies abstractC
-
-  dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "CPS Cmm" (pprCmms continuationC)
-  -- TODO: add option to dump Cmm to file
-  return continuationC
