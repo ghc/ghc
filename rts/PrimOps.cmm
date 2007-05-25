@@ -1884,8 +1884,6 @@ unpackClosurezh_fast
 
     W_ info, ptrs, nptrs, p, ptrs_arr, nptrs_arr;
     info  = %GET_STD_INFO(R1);
-    ptrs  = TO_W_(%INFO_PTRS(info)); 
-    nptrs = TO_W_(%INFO_NPTRS(info));
 
     // Some closures have non-standard layout, so we omit those here.
     W_ type;
@@ -1903,6 +1901,8 @@ unpackClosurezh_fast
         goto out;
     }
     default: {
+        ptrs  = TO_W_(%INFO_PTRS(info)); 
+        nptrs = TO_W_(%INFO_NPTRS(info));
         goto out;
     }}
 out:
