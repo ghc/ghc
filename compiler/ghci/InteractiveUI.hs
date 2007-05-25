@@ -868,17 +868,12 @@ checkModule m = do
   afterLoad (successIf (isJust result)) session
 
 reloadModule :: String -> GHCi ()
-reloadModule "" = do
-  io (revertCAFs)		-- always revert CAFs on reload.
-  discardActiveBreakPoints
-  session <- getSession
-  doLoad session LoadAllTargets
-  return ()
 reloadModule m = do
   io (revertCAFs)		-- always revert CAFs on reload.
   discardActiveBreakPoints
   session <- getSession
-  doLoad session (LoadUpTo (GHC.mkModuleName m))
+  doLoad session $ if null m then LoadAllTargets 
+                             else LoadUpTo (GHC.mkModuleName m)
   return ()
 
 doLoad session howmuch = do
