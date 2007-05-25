@@ -265,15 +265,14 @@ continuationToProc formats (Continuation is_entry info label formals blocks) =
                                 arguments
                         FinalJump target arguments ->
                             exit_function curr_format target arguments
-                        -- TODO: do something about global saves
                         FinalCall next (CmmForeignCall target CmmCallConv)
-                            results arguments saves ->
+                            results arguments ->
                                 pack_continuation curr_format cont_format ++
                                 [CmmJump target arguments]
                             where
                               cont_format = maybe unknown_block id $
                                             lookup (mkReturnPtLabel $ getUnique next) formats
-                        FinalCall next _ results arguments saves -> panic "unimplemented CmmCall"
+                        FinalCall next _ results arguments -> panic "unimplemented CmmCall"
 
 --------------------------------------------------------------------------------
 -- Functions that generate CmmStmt sequences

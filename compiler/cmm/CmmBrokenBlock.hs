@@ -81,7 +81,6 @@ data FinalStmt
       CmmFormals                -- ^ Results from call
                                 -- (redundant with ContinuationEntry)
       CmmActuals                -- ^ Arguments to call
-      (Maybe [GlobalReg])       -- ^ registers that must be saved (TODO)
 
   | FinalSwitch                 -- ^ Same as a 'CmmSwitch'
       CmmExpr                   -- ^ Scrutinee (zero based)
@@ -130,16 +129,16 @@ breakBlock uniques (BasicBlock ident stmts) entry =
 
             -- Detect this special case to remain an inverse of
             -- 'cmmBlockFromBrokenBlock'
-            [CmmCall target results arguments saves,
+            [CmmCall target results arguments,
              CmmBranch next_id] -> [block]
               where
                 block = do_call current_id entry accum_stmts exits next_id
-                                target results arguments saves
-            (CmmCall target results arguments saves:stmts) -> block : rest
+                                target results arguments
+            (CmmCall target results arguments:stmts) -> block : rest
               where
                 next_id = BlockId $ head uniques
                 block = do_call current_id entry accum_stmts exits next_id
-                                target results arguments saves
+                                target results arguments
                 rest = breakBlock' (tail uniques) next_id
                                    (ContinuationEntry results) [] [] stmts
             (s:stmts) ->
@@ -149,9 +148,9 @@ breakBlock uniques (BasicBlock ident stmts) entry =
                             stmts
 
       do_call current_id entry accum_stmts exits next_id
-              target results arguments saves =
+              target results arguments =
           BrokenBlock current_id entry accum_stmts (next_id:exits)
-                      (FinalCall next_id target results arguments saves)
+                      (FinalCall next_id target results arguments)
 
       cond_branch_target (CmmCondBranch _ target) = [target]
       cond_branch_target _ = []
@@ -169,8 +168,8 @@ cmmBlockFromBrokenBlock (BrokenBlock ident _ stmts _ exit) =
             FinalReturn arguments -> [CmmReturn arguments]
             FinalJump target arguments -> [CmmJump target arguments]
             FinalSwitch expr targets -> [CmmSwitch expr targets]
-            FinalCall branch_target call_target results arguments saves ->
-                [CmmCall call_target results arguments saves,
+            FinalCall branch_target call_target results arguments ->
+                [CmmCall call_target results arguments,
                  CmmBranch branch_target]
 
 -----------------------------------------------------------------------------
