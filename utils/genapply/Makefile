@@ -12,6 +12,10 @@ ifeq "$(GhcUnregisterised)" "YES"
 SRC_HC_OPTS += -DNO_REGS
 endif
 
+ifeq "$(ghc_ge_607)" "YES"
+SRC_HC_OPTS += -package pretty
+endif
+
 # Try to get dependencies right...
 SRC_HC_OPTS += -no-recomp
 GenApply.o : $(GHC_INCLUDE_DIR)/ghcconfig.h
