@@ -69,7 +69,7 @@ endif
 
 # Some explicit dependencies, needed because ghc -M can't discover the
 # true dependencies of these stub files.
-System/Directory/Internals.$(way_)o : $(FPTOOLS_TOP)/libraries/base/System/Directory/Internals.hs
+System/Directory/Internals.$(way_)o : $(FPTOOLS_TOP)/libraries/directory/System/Directory/Internals.hs
 Distribution/Compat/ReadP.$(way_) : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Compat/ReadP.hs
 Distribution/GetOpt.$(way_)o    : $(FPTOOLS_TOP)/libraries/Cabal/Distribution/GetOpt.hs
 Distribution/InstalledPackageInfo.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/InstalledPackageInfo.hs

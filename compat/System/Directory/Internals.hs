@@ -1,4 +1,4 @@
 {-# OPTIONS -cpp #-}
 #include "../../includes/ghcplatform.h"
-#include "base/System/Directory/Internals.hs"
+#include "directory/System/Directory/Internals.hs"
 -- dummy comment
