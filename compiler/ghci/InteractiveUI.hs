@@ -723,25 +723,47 @@ changeDirectory dir = do
   io (setCurrentDirectory dir)
 
 editFile :: String -> GHCi ()
-editFile str
-  | null str  = do
-	-- find the name of the "topmost" file loaded
-     session <- getSession
-     graph0 <- io (GHC.getModuleGraph session)
-     graph1 <- filterM (io . GHC.isLoaded session . GHC.ms_mod_name) graph0
-     let graph2 = flattenSCCs (GHC.topSortModuleGraph True graph1 Nothing)
-     case GHC.ml_hs_file (GHC.ms_location (last graph2)) of
-	Just file -> do_edit file
-	Nothing   -> throwDyn (CmdLineError "unknown file name")
-  | otherwise = do_edit str
-  where
-	do_edit file = do
-	   st <- getGHCiState
-	   let cmd = editor st
-	   when (null cmd) $ 
-		throwDyn (CmdLineError "editor not set, use :set editor")
-	   io $ system (cmd ++ ' ':file)
-           return ()
+editFile str =
+  do file <- if null str then chooseEditFile else return str
+     st <- getGHCiState
+     let cmd = editor st
+     when (null cmd) 
+       $ throwDyn (CmdLineError "editor not set, use :set editor")
+     io $ system (cmd ++ ' ':file)
+     return ()
+
+-- The user didn't specify a file so we pick one for them.
+-- Our strategy is to pick the first module that failed to load,
+-- or otherwise the first target.
+--
+-- XXX: Can we figure out what happened if the depndecy analysis fails
+--      (e.g., because the porgrammeer mistyped the name of a module)?
+-- XXX: Can we figure out the location of an error to pass to the editor?
+-- XXX: if we could figure out the list of errors that occured during the
+-- last load/reaload, then we could start the editor focused on the first
+-- of those.
+chooseEditFile :: GHCi String
+chooseEditFile =
+  do session <- getSession
+     let hasFailed x = io $ fmap not $ GHC.isLoaded session $ GHC.ms_mod_name x
+
+     graph <- io (GHC.getModuleGraph session)
+     failed_graph <- filterM hasFailed graph
+     let order g  = flattenSCCs $ GHC.topSortModuleGraph True g Nothing
+         pick xs  = case xs of
+                      x : _ -> GHC.ml_hs_file (GHC.ms_location x)
+                      _     -> Nothing
+
+     case pick (order failed_graph) of
+       Just file -> return file
+       Nothing   -> 
+         do targets <- io (GHC.getTargets session)
+            case msum (map fromTarget targets) of
+              Just file -> return file
+              Nothing   -> throwDyn (CmdLineError "No files to edit.")
+          
+  where fromTarget (GHC.Target (GHC.TargetFile f _) _) = Just f
+        fromTarget _ = Nothing -- when would we get a module target?
 
 defineMacro :: String -> GHCi ()
 defineMacro s = do
