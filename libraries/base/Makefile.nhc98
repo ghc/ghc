@@ -4,6 +4,11 @@ SEARCH	= -I$(TOPDIR)/targets/$(MACHINE) -Iinclude \
 EXTRA_H_FLAGS   = -H4M -K3M
 EXTRA_HBC_FLAGS = -H16M -A1M
 
+DIRS	= \
+	Data Debug Control Control/Monad System System/IO System/Console \
+	Text Text/Html Text/Show Text/ParserCombinators Text/Regex \
+	Foreign Foreign/Marshal Foreign/C NHC Unsafe System/Posix
+
 SRCS	= \
 	Data/Bits.hs Data/Bool.hs Data/Char.hs Data/Complex.hs \
 	Data/Either.hs Data/IORef.hs Data/Int.hs \
