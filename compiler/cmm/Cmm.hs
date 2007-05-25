@@ -116,10 +116,6 @@ data CmmStmt
      CmmCallTarget
      CmmFormals			 -- zero or more results
      CmmActuals			 -- zero or more arguments
-     (Maybe [GlobalReg])	 -- Global regs that may need to be saved
-				 -- if they will be clobbered by the call.
-				 -- Nothing <=> save *all* globals that
-				 -- might be clobbered.
 
   | CmmBranch BlockId             -- branch to another BB in this fn
 

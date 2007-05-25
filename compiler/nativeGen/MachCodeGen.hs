@@ -119,8 +119,8 @@ stmtToInstrs stmt = case stmt of
       | otherwise	 -> assignMem_IntCode kind addr src
 	where kind = cmmExprRep src
 
-    CmmCall target result_regs args vols
-       -> genCCall target result_regs args vols
+    CmmCall target result_regs args
+       -> genCCall target result_regs args
 
     CmmBranch id	  -> genBranch id
     CmmCondBranch arg id  -> genCondJump id arg
@@ -2940,7 +2940,6 @@ genCCall
     :: CmmCallTarget		-- function to call
     -> [(CmmReg,MachHint)]	-- where to put the result
     -> [(CmmExpr,MachHint)]	-- arguments (of mixed type)
-    -> Maybe [GlobalReg]	-- volatile regs to save
     -> NatM InstrBlock
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -3019,12 +3018,12 @@ genCCall fn cconv result_regs args
 
 #if i386_TARGET_ARCH
 
-genCCall (CmmPrim MO_WriteBarrier) _ _ _ = return nilOL
+genCCall (CmmPrim MO_WriteBarrier) _ _ = return nilOL
 	-- write barrier compiles to no code on x86/x86-64; 
 	-- we keep it this long in order to prevent earlier optimisations.
 
 -- we only cope with a single result for foreign calls
-genCCall (CmmPrim op) [(r,_)] args vols = do
+genCCall (CmmPrim op) [(r,_)] args = do
   case op of
 	MO_F32_Sqrt -> actuallyInlineFloatOp F32  (GSQRT F32) args
 	MO_F64_Sqrt -> actuallyInlineFloatOp F64 (GSQRT F64) args
@@ -3038,14 +3037,14 @@ genCCall (CmmPrim op) [(r,_)] args vols = do
 	MO_F32_Tan  -> actuallyInlineFloatOp F32  (GTAN F32) args
 	MO_F64_Tan  -> actuallyInlineFloatOp F64 (GTAN F64) args
 	
-	other_op    -> outOfLineFloatOp op r args vols
+	other_op    -> outOfLineFloatOp op r args
  where
   actuallyInlineFloatOp rep instr [(x,_)]
 	= do res <- trivialUFCode rep instr x
 	     any <- anyReg res
  	     return (any (getRegisterReg r))
 
-genCCall target dest_regs args vols = do
+genCCall target dest_regs args = do
     let
         sizes               = map (arg_size . cmmExprRep . fst) (reverse args)
 #if !darwin_TARGET_OS        
@@ -3174,21 +3173,21 @@ genCCall target dest_regs args vols = do
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 
 outOfLineFloatOp :: CallishMachOp -> CmmReg -> [(CmmExpr,MachHint)]
-  -> Maybe [GlobalReg] -> NatM InstrBlock
-outOfLineFloatOp mop res args vols
+  -> NatM InstrBlock
+outOfLineFloatOp mop res args
   = do
       targetExpr <- cmmMakeDynamicReference addImportNat CallReference lbl
       let target = CmmForeignCall targetExpr CCallConv
         
       if cmmRegRep res == F64
         then
-          stmtToInstrs (CmmCall target [(res,FloatHint)] args vols)  
+          stmtToInstrs (CmmCall target [(res,FloatHint)] args)  
         else do
           uq <- getUniqueNat
           let 
             tmp = CmmLocal (LocalReg uq F64)
           -- in
-          code1 <- stmtToInstrs (CmmCall target [(tmp,FloatHint)] args vols)
+          code1 <- stmtToInstrs (CmmCall target [(tmp,FloatHint)] args)
           code2 <- stmtToInstrs (CmmAssign res (CmmReg tmp))
           return (code1 `appOL` code2)
   where
@@ -3233,14 +3232,14 @@ outOfLineFloatOp mop res args vols
 
 #if x86_64_TARGET_ARCH
 
-genCCall (CmmPrim MO_WriteBarrier) _ _ _ = return nilOL
+genCCall (CmmPrim MO_WriteBarrier) _ _ = return nilOL
 	-- write barrier compiles to no code on x86/x86-64; 
 	-- we keep it this long in order to prevent earlier optimisations.
 
-genCCall (CmmPrim op) [(r,_)] args vols = 
-  outOfLineFloatOp op r args vols
+genCCall (CmmPrim op) [(r,_)] args = 
+  outOfLineFloatOp op r args
 
-genCCall target dest_regs args vols = do
+genCCall target dest_regs args = do
 
 	-- load up the register arguments
     (stack_args, aregs, fregs, load_args_code)
@@ -3426,7 +3425,7 @@ genCCall target dest_regs args vols = do
    stack only immediately prior to the call proper.  Sigh.
 -}
 
-genCCall target dest_regs argsAndHints vols = do
+genCCall target dest_regs argsAndHints = do
     let
         args = map fst argsAndHints
     argcode_and_vregs <- mapM arg_to_int_vregs args
@@ -3622,7 +3621,7 @@ outOfLineFloatOp mop =
 genCCall (CmmPrim MO_WriteBarrier) _ _ _
  = return $ unitOL LWSYNC
 
-genCCall target dest_regs argsAndHints vols
+genCCall target dest_regs argsAndHints
   = ASSERT (not $ any (`elem` [I8,I16]) argReps)
         -- we rely on argument promotion in the codeGen
     do

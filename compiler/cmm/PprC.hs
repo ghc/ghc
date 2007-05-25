@@ -198,11 +198,11 @@ pprStmt stmt = case stmt of
 	where
 	  rep = cmmExprRep src
 
-    CmmCall (CmmForeignCall fn cconv) results args volatile -> 
+    CmmCall (CmmForeignCall fn cconv) results args ->
 	-- Controversial: leave this out for now.
 	-- pprUndef fn $$
 
-	pprCall ppr_fn cconv results args volatile
+	pprCall ppr_fn cconv results args
 	where
     	ppr_fn = case fn of
 		   CmmLit (CmmLabel lbl) -> pprCLabel lbl
@@ -219,8 +219,8 @@ pprStmt stmt = case stmt of
 	   ptext SLIT("#undef") <+> pprCLabel lbl
 	pprUndef _ = empty
 
-    CmmCall (CmmPrim op) results args volatile -> 
-	pprCall ppr_fn CCallConv results args volatile
+    CmmCall (CmmPrim op) results args ->
+	pprCall ppr_fn CCallConv results args
 	where
     	ppr_fn = pprCallishMachOp_for_C op
 
@@ -719,15 +719,14 @@ pprLocalReg (LocalReg uniq _rep) = char '_' <> ppr uniq
 -- Foreign Calls
 
 pprCall :: SDoc -> CCallConv -> [(CmmReg,MachHint)] -> [(CmmExpr,MachHint)]
-	-> Maybe [GlobalReg] -> SDoc
+	-> SDoc
 
-pprCall ppr_fn cconv results args vols
+pprCall ppr_fn cconv results args
   | not (is_cish cconv)
   = panic "pprCall: unknown calling convention"
 
   | otherwise
-  = save vols $$
-    ptext SLIT("CALLER_SAVE_SYSTEM") $$
+  =
 #if x86_64_TARGET_ARCH
 	-- HACK around gcc optimisations.
 	-- x86_64 needs a __DISCARD__() here, to create a barrier between
@@ -739,9 +738,7 @@ pprCall ppr_fn cconv results args vols
 	then ptext SLIT("__DISCARD__();") 
 	else empty) $$
 #endif
-    ppr_assign results (ppr_fn <> parens (commafy (map pprArg args))) <> semi $$
-    ptext SLIT("CALLER_RESTORE_SYSTEM") $$
-    restore vols
+    ppr_assign results (ppr_fn <> parens (commafy (map pprArg args))) <> semi
   where 
      ppr_assign []           rhs = rhs
      ppr_assign [(reg@(CmmGlobal BaseReg), hint)] rhs
@@ -768,15 +765,6 @@ pprCall ppr_fn cconv results args vols
      pprUnHint PtrHint    rep = parens (machRepCType rep)
      pprUnHint SignedHint rep = parens (machRepCType rep)
      pprUnHint _          _   = empty
-
-     save    = save_restore SLIT("CALLER_SAVE")
-     restore = save_restore SLIT("CALLER_RESTORE")
-
-	-- Nothing says "I don't know what's live; save everything"
-	-- CALLER_SAVE_USER is defined in ghc/includes/Regs.h
-     save_restore txt Nothing     = ptext txt <> ptext SLIT("_USER")
-     save_restore txt (Just these) = vcat (map saveRestoreGlobal these)
-	where saveRestoreGlobal r = ptext txt <> char '_' <> pprGlobalRegName r
 
 pprGlobalRegName :: GlobalReg -> SDoc
 pprGlobalRegName gr = case gr of
@@ -859,7 +847,7 @@ te_Lit _ = return ()
 te_Stmt :: CmmStmt -> TE ()
 te_Stmt (CmmAssign r e)		= te_Reg r >> te_Expr e
 te_Stmt (CmmStore l r)		= te_Expr l >> te_Expr r
-te_Stmt (CmmCall _ rs es _)	= mapM_ (te_Reg.fst) rs >>
+te_Stmt (CmmCall _ rs es)	= mapM_ (te_Reg.fst) rs >>
 				  mapM_ (te_Expr.fst) es
 te_Stmt (CmmCondBranch e _)	= te_Expr e
 te_Stmt (CmmSwitch e _)		= te_Expr e

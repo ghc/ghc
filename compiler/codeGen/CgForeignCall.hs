@@ -36,6 +36,12 @@ import Constants
 import StaticFlags
 import Outputable
 
+import MachRegs (callerSaveVolatileRegs)
+  -- HACK: this is part of the NCG so we shouldn't use this, but we need
+  -- it for now to eliminate the need for saved regs to be in CmmCall.
+  -- The long term solution is to factor callerSaveVolatileRegs
+  -- from nativeGen into codeGen
+
 import Control.Monad
 
 -- -----------------------------------------------------------------------------
@@ -105,29 +111,32 @@ emitForeignCall'
 emitForeignCall' safety results target args vols 
   | not (playSafe safety) = do
     temp_args <- load_args_into_temps args
-    stmtC (CmmCall target results temp_args vols)
+    let (caller_save, caller_load) = callerSaveVolatileRegs vols
+    stmtsC caller_save
+    stmtC (CmmCall target results temp_args)
+    stmtsC caller_load
 
   | otherwise = do
     id <- newTemp wordRep
     temp_args <- load_args_into_temps args
     temp_target <- load_target_into_temp target
+    let (caller_save, caller_load) = callerSaveVolatileRegs vols
     emitSaveThreadState
+    stmtsC caller_save
     stmtC (CmmCall (CmmForeignCall suspendThread CCallConv) 
 			[(id,PtrHint)]
 			[ (CmmReg (CmmGlobal BaseReg), PtrHint) ] 
-			vols
 			)
-    stmtC (CmmCall temp_target results temp_args vols)
+    stmtC (CmmCall temp_target results temp_args)
     stmtC (CmmCall (CmmForeignCall resumeThread CCallConv) 
 			[ (CmmGlobal BaseReg, PtrHint) ]
 				-- Assign the result to BaseReg: we
 				-- might now have a different
 				-- Capability!
 			[ (CmmReg id, PtrHint) ]
-			vols
 			)
+    stmtsC caller_load
     emitLoadThreadState
-
 
 suspendThread = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("suspendThread")))
 resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("resumeThread")))

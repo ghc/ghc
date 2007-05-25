@@ -53,6 +53,12 @@ import FastString
 import PackageConfig
 import Outputable
 
+import MachRegs (callerSaveVolatileRegs)
+  -- HACK: this is part of the NCG so we shouldn't use this, but we need
+  -- it for now to eliminate the need for saved regs to be in CmmCall.
+  -- The long term solution is to factor callerSaveVolatileRegs
+  -- from nativeGen into codeGen
+
 import Data.Char
 import Data.Bits
 import Data.Word
@@ -276,8 +282,12 @@ emitRtsCall'
    -> [(CmmExpr,MachHint)]
    -> Maybe [GlobalReg]
    -> Code
-emitRtsCall' res fun args vols = stmtC (CmmCall target res args vols)
+emitRtsCall' res fun args vols = do
+    stmtsC caller_save
+    stmtC (CmmCall target res args)
+    stmtsC caller_load
   where
+    (caller_save, caller_load) = callerSaveVolatileRegs vols
     target   = CmmForeignCall fun_expr CCallConv
     fun_expr = mkLblExpr (mkRtsCodeLabel fun)
 

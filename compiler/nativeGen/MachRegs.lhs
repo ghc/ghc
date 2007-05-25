@@ -343,6 +343,10 @@ get_Regtable_addr_from_offset rep offset
 -- Here we generate the sequence of saves/restores required around a
 -- foreign call instruction.
 
+-- TODO: reconcile with includes/Regs.h
+--  * Regs.h claims that BaseReg should be saved last and loaded first
+--    * This might not have been tickled before since BaseReg is callee save
+--  * Regs.h saves SparkHd, ParkT1, SparkBase and SparkLim
 callerSaveVolatileRegs :: Maybe [GlobalReg] -> ([CmmStmt], [CmmStmt])
 callerSaveVolatileRegs vols = (caller_save, caller_load)
   where

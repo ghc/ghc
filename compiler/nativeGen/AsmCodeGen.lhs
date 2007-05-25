@@ -444,16 +444,11 @@ fixAssign (CmmAssign (CmmGlobal reg) src)
   where
 	reg_or_addr = get_GlobalReg_reg_or_addr reg
 
-fixAssign (CmmCall target results args vols)
+fixAssign (CmmCall target results args)
   = mapAndUnzipUs fixResult results `thenUs` \ (results',stores) ->
-    returnUs (caller_save ++
-	      CmmCall target results' args vols :
-	      caller_restore ++
+    returnUs (CmmCall target results' args :
 	      concat stores)
   where
-	-- we also save/restore any caller-saves STG registers here
-	(caller_save, caller_restore) = callerSaveVolatileRegs vols
-
 	fixResult g@(CmmGlobal reg,hint) = 
 	  case get_GlobalReg_reg_or_addr reg of
 		Left realreg -> returnUs (g, [])
@@ -539,7 +534,7 @@ cmmStmtConFold stmt
            -> do addr' <- cmmExprConFold JumpReference addr
                  return $ CmmJump addr' regs
 
-	CmmCall target regs args vols
+	CmmCall target regs args
 	   -> do target' <- case target of
 			      CmmForeignCall e conv -> do
 			        e' <- cmmExprConFold CallReference e
@@ -548,7 +543,7 @@ cmmStmtConFold stmt
                  args' <- mapM (\(arg, hint) -> do
                                   arg' <- cmmExprConFold DataReference arg
                                   return (arg', hint)) args
-	         return $ CmmCall target' regs args' vols
+	         return $ CmmCall target' regs args'
 
         CmmCondBranch test dest
            -> do test' <- cmmExprConFold DataReference test
