@@ -716,10 +716,12 @@ if test "$WithGhc" != ""; then
   if test $GhcCanonVersion -ge 602; then ghc_ge_602=YES; else ghc_ge_602=NO; fi
   if test $GhcCanonVersion -ge 603; then ghc_ge_603=YES; else ghc_ge_603=NO; fi
   if test $GhcCanonVersion -ge 605; then ghc_ge_605=YES; else ghc_ge_605=NO; fi
+  if test $GhcCanonVersion -ge 607; then ghc_ge_607=YES; else ghc_ge_607=NO; fi
   AC_SUBST(ghc_ge_601)dnl
   AC_SUBST(ghc_ge_602)dnl
   AC_SUBST(ghc_ge_603)dnl
   AC_SUBST(ghc_ge_605)dnl
+  AC_SUBST(ghc_ge_607)dnl
 fi
 
 # Check whether this GHC has readline installed
