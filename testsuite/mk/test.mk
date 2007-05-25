@@ -72,12 +72,6 @@ else
 RUNTEST_OPTS += -e ghc_with_profiling=0
 endif
 
-ifeq "$(filter u, $(GhcLibWays))" "u"
-RUNTEST_OPTS += -e ghc_with_unreg=1
-else
-RUNTEST_OPTS += -e ghc_with_unreg=0
-endif
-
 ifeq "$(GhcWithInterpreter)" "YES"
 RUNTEST_OPTS += -e ghc_with_interpreter=1
 else
