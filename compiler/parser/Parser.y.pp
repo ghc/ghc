@@ -1270,7 +1270,7 @@ exp10 :: { LHsExpr RdrName }
   	| 'let' binds 'in' exp			{ LL $ HsLet (unLoc $2) $4 }
 	| 'if' exp 'then' exp 'else' exp	{ LL $ HsIf $2 $4 $6 }
    	| 'case' exp 'of' altslist		{ LL $ HsCase $2 (mkMatchGroup (unLoc $4)) }
-	| '-' fexp				{ LL $ mkHsNegApp $2 }
+	| '-' fexp				{ LL $ NegApp $2 noSyntaxExpr }
 
   	| 'do' stmtlist			{% let loc = comb2 $1 $2 in
 					   checkDo loc (unLoc $2)  >>= \ (stmts,body) ->

@@ -9,7 +9,7 @@ module RdrHsSyn (
 	extractHsRhoRdrTyVars, extractGenericPatTyVars,
  
 	mkHsOpApp, mkClassDecl,
-	mkHsNegApp, mkHsIntegral, mkHsFractional, mkHsIsString,
+	mkHsIntegral, mkHsFractional, mkHsIsString,
 	mkHsDo, mkHsSplice,
         mkTyData, mkPrefixCon, mkRecCon, mkInlineSpec,	
 	mkRecConstrOrUpdate, -- HsExp -> [HsFieldUpdate] -> P HsExp
@@ -170,18 +170,6 @@ mkTyData new_or_data (context, tname, tyvars, typats) ksig data_cons maybe_deriv
   = TyData { tcdND = new_or_data, tcdCtxt = context, tcdLName = tname,
 	     tcdTyVars = tyvars, tcdTyPats = typats, tcdCons = data_cons, 
 	     tcdKindSig = ksig, tcdDerivs = maybe_deriv }
-\end{code}
-
-\begin{code}
-mkHsNegApp :: LHsExpr RdrName -> HsExpr RdrName
--- RdrName If the type checker sees (negate 3#) it will barf, because negate
--- can't take an unboxed arg.  But that is exactly what it will see when
--- we write "-3#".  So we have to do the negation right now!
-mkHsNegApp (L loc e) = f e
-  where f (HsLit (HsIntPrim i))    = HsLit (HsIntPrim (-i))    
-	f (HsLit (HsFloatPrim i))  = HsLit (HsFloatPrim (-i))  
-	f (HsLit (HsDoublePrim i)) = HsLit (HsDoublePrim (-i)) 
-	f expr	    		   = NegApp (L loc e) noSyntaxExpr
 \end{code}
 
 %************************************************************************
@@ -656,8 +644,7 @@ checkAPat loc e = case e of
 
    -- Overloaded numeric patterns (e.g. f 0 x = x)
    -- Negation is recorded separately, so that the literal is zero or +ve
-   -- NB. Negative *primitive* literals are already handled by
-   --     RdrHsSyn.mkHsNegApp
+   -- NB. Negative *primitive* literals are already handled by the lexer
    HsOverLit pos_lit            -> return (mkNPat pos_lit Nothing)
    NegApp (L _ (HsOverLit pos_lit)) _ 
 			-> return (mkNPat pos_lit (Just noSyntaxExpr))
