@@ -33,7 +33,7 @@ module StringBuffer
         lexemeToFastString,
 
 	 -- * Parsing integers
-	parseInteger,
+	parseUnsignedInteger,
        ) where
 
 #include "HsVersions.h"
@@ -208,8 +208,8 @@ byteOff (StringBuffer buf _ cur) i =
     return (unsafeChr (fromIntegral (w::Word8)))
 
 -- | XXX assumes ASCII digits only (by using byteOff)
-parseInteger :: StringBuffer -> Int -> Integer -> (Char->Int) -> Integer
-parseInteger buf len radix char_to_int 
+parseUnsignedInteger :: StringBuffer -> Int -> Integer -> (Char->Int) -> Integer
+parseUnsignedInteger buf len radix char_to_int 
   = go 0 0
   where
     go i x | i == len  = x

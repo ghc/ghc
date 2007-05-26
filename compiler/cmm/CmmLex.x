@@ -180,7 +180,7 @@ global_regN :: (Int -> GlobalReg) -> Action
 global_regN con span buf len 
   = return (L span (CmmT_GlobalReg (con (fromIntegral n))))
   where buf' = stepOn buf
-	n = parseInteger buf' (len-1) 10 octDecDigit
+	n = parseUnsignedInteger buf' (len-1) 10 octDecDigit
 
 global_reg :: GlobalReg -> Action
 global_reg r span buf len = return (L span (CmmT_GlobalReg r))
@@ -227,13 +227,13 @@ reservedWordsFM = listToUFM $
 	]
 
 tok_decimal span buf len 
-  = return (L span (CmmT_Int  $! parseInteger buf len 10 octDecDigit))
+  = return (L span (CmmT_Int  $! parseUnsignedInteger buf len 10 octDecDigit))
 
 tok_octal span buf len 
-  = return (L span (CmmT_Int  $! parseInteger (offsetBytes 1 buf) (len-1) 8 octDecDigit))
+  = return (L span (CmmT_Int  $! parseUnsignedInteger (offsetBytes 1 buf) (len-1) 8 octDecDigit))
 
 tok_hexadecimal span buf len 
-  = return (L span (CmmT_Int  $! parseInteger (offsetBytes 2 buf) (len-2) 16 hexDigit))
+  = return (L span (CmmT_Int  $! parseUnsignedInteger (offsetBytes 2 buf) (len-2) 16 hexDigit))
 
 tok_float str = CmmT_Float $! readRational str
 
@@ -245,7 +245,7 @@ tok_string str = CmmT_String (read str)
 
 setLine :: Int -> Action
 setLine code span buf len = do
-  let line = parseInteger buf len 10 octDecDigit
+  let line = parseUnsignedInteger buf len 10 octDecDigit
   setSrcLoc (mkSrcLoc (srcSpanFile span) (fromIntegral line - 1) 0)
 	-- subtract one: the line number refers to the *following* line
   -- trace ("setLine "  ++ show line) $ do

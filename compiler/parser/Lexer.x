@@ -935,22 +935,22 @@ sym con span buf len =
 	fs = lexemeToFastString buf len
 
 tok_decimal span buf len 
-  = return (L span (ITinteger  $! parseInteger buf len 10 octDecDigit))
+  = return (L span (ITinteger  $! parseUnsignedInteger buf len 10 octDecDigit))
 
 tok_octal span buf len 
-  = return (L span (ITinteger  $! parseInteger (offsetBytes 2 buf) (len-2) 8 octDecDigit))
+  = return (L span (ITinteger  $! parseUnsignedInteger (offsetBytes 2 buf) (len-2) 8 octDecDigit))
 
 tok_hexadecimal span buf len 
-  = return (L span (ITinteger  $! parseInteger (offsetBytes 2 buf) (len-2) 16 hexDigit))
+  = return (L span (ITinteger  $! parseUnsignedInteger (offsetBytes 2 buf) (len-2) 16 hexDigit))
 
 prim_decimal span buf len 
-  = return (L span (ITprimint  $! parseInteger buf (len-1) 10 octDecDigit))
+  = return (L span (ITprimint  $! parseUnsignedInteger buf (len-1) 10 octDecDigit))
 
 prim_octal span buf len 
-  = return (L span (ITprimint  $! parseInteger (offsetBytes 2 buf) (len-3) 8 octDecDigit))
+  = return (L span (ITprimint  $! parseUnsignedInteger (offsetBytes 2 buf) (len-3) 8 octDecDigit))
 
 prim_hexadecimal span buf len 
-  = return (L span (ITprimint  $! parseInteger (offsetBytes 2 buf) (len-3) 16 hexDigit))
+  = return (L span (ITprimint  $! parseUnsignedInteger (offsetBytes 2 buf) (len-3) 16 hexDigit))
 
 tok_float        str = ITrational   $! readRational str
 prim_float       str = ITprimfloat  $! readRational str
@@ -1022,7 +1022,7 @@ do_layout_left span _buf _len = do
 
 setLine :: Int -> Action
 setLine code span buf len = do
-  let line = parseInteger buf len 10 octDecDigit
+  let line = parseUnsignedInteger buf len 10 octDecDigit
   setSrcLoc (mkSrcLoc (srcSpanFile span) (fromIntegral line - 1) 0)
 	-- subtract one: the line number refers to the *following* line
   popLexState
