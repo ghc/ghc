@@ -108,6 +108,11 @@ $docsym    = [\| \^ \* \$]
 
 @floating_point = @decimal \. @decimal @exponent? | @decimal @exponent
 
+-- normal signed numerical literals can only be explicitly negative,
+-- not explicitly positive (contrast @exponent)
+@negative = \-
+@signed = @negative ?
+
 haskell :-
 
 -- everywhere: skip whitespace and comments
@@ -353,21 +358,34 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   @consym			{ consym }
 }
 
+-- For the normal boxed literals we need to be careful
+-- when trying to be close to Haskell98
 <0,glaexts> {
-  @decimal			{ tok_decimal }
-  0[oO] @octal			{ tok_octal }
-  0[xX] @hexadecimal		{ tok_hexadecimal }
+  -- Normal integral literals (:: Num a => a, from Integer)
+  @decimal			{ tok_num positive 0 0 decimal }
+  0[oO] @octal			{ tok_num positive 2 2 octal }
+  0[xX] @hexadecimal		{ tok_num positive 2 2 hexadecimal }
+
+  -- Normal rational literals (:: Fractional a => a, from Rational)
+  @floating_point		{ strtoken tok_float }
 }
 
 <glaexts> {
-  @decimal \#			{ prim_decimal }
-  0[oO] @octal \#		{ prim_octal }
-  0[xX] @hexadecimal \#		{ prim_hexadecimal }
-}
+  -- Unboxed ints (:: Int#)
+  -- It's simpler (and faster?) to give separate cases to the negatives,
+  -- especially considering octal/hexadecimal prefixes.
+  @decimal \#			{ tok_primint positive 0 1 decimal }
+  0[oO] @octal \#		{ tok_primint positive 2 3 octal }
+  0[xX] @hexadecimal \#		{ tok_primint positive 2 3 hexadecimal }
+  @negative @decimal \#			{ tok_primint negative 1 2 decimal }
+  @negative 0[oO] @octal \#		{ tok_primint negative 3 4 octal }
+  @negative 0[xX] @hexadecimal \#	{ tok_primint negative 3 4 hexadecimal }
 
-<0,glaexts> @floating_point		{ strtoken tok_float }
-<glaexts>   @floating_point \#		{ init_strtoken 1 prim_float }
-<glaexts>   @floating_point \# \#	{ init_strtoken 2 prim_double }
+  -- Unboxed floats and doubles (:: Float#, :: Double#)
+  -- prim_{float,double} work with signed literals
+  @signed @floating_point \#		{ init_strtoken 1 tok_primfloat }
+  @signed @floating_point \# \#		{ init_strtoken 2 tok_primdouble }
+}
 
 -- Strings and chars are lexed by hand-written code.  The reason is
 -- that even if we recognise the string or char here in the regex
@@ -934,27 +952,29 @@ sym con span buf len =
   where
 	fs = lexemeToFastString buf len
 
-tok_decimal span buf len 
-  = return (L span (ITinteger  $! parseUnsignedInteger buf len 10 octDecDigit))
+-- Variations on the integral numeric literal.
+tok_integral :: (Integer -> Token)
+     -> (Integer -> Integer)
+ --    -> (StringBuffer -> StringBuffer) -> (Int -> Int)
+     -> Int -> Int
+     -> (Integer, (Char->Int)) -> Action
+tok_integral itint transint transbuf translen (radix,char_to_int) span buf len =
+  return $ L span $ itint $! transint $ parseUnsignedInteger
+     (offsetBytes transbuf buf) (subtract translen len) radix char_to_int
 
-tok_octal span buf len 
-  = return (L span (ITinteger  $! parseUnsignedInteger (offsetBytes 2 buf) (len-2) 8 octDecDigit))
+-- some conveniences for use with tok_integral
+tok_num = tok_integral ITinteger
+tok_primint = tok_integral ITprimint
+positive = id
+negative = negate
+decimal = (10,octDecDigit)
+octal = (8,octDecDigit)
+hexadecimal = (16,hexDigit)
 
-tok_hexadecimal span buf len 
-  = return (L span (ITinteger  $! parseUnsignedInteger (offsetBytes 2 buf) (len-2) 16 hexDigit))
-
-prim_decimal span buf len 
-  = return (L span (ITprimint  $! parseUnsignedInteger buf (len-1) 10 octDecDigit))
-
-prim_octal span buf len 
-  = return (L span (ITprimint  $! parseUnsignedInteger (offsetBytes 2 buf) (len-3) 8 octDecDigit))
-
-prim_hexadecimal span buf len 
-  = return (L span (ITprimint  $! parseUnsignedInteger (offsetBytes 2 buf) (len-3) 16 hexDigit))
-
+-- readRational can understand negative rationals, exponents, everything.
 tok_float        str = ITrational   $! readRational str
-prim_float       str = ITprimfloat  $! readRational str
-prim_double      str = ITprimdouble $! readRational str
+tok_primfloat    str = ITprimfloat  $! readRational str
+tok_primdouble   str = ITprimdouble $! readRational str
 
 -- -----------------------------------------------------------------------------
 -- Layout processing
