@@ -207,12 +207,14 @@ byteOff (StringBuffer buf _ cur) i =
     w <- peek (ptr `plusPtr` (cur+i))
     return (unsafeChr (fromIntegral (w::Word8)))
 
--- | XXX assumes ASCII digits only
+-- | XXX assumes ASCII digits only (by using byteOff)
 parseInteger :: StringBuffer -> Int -> Integer -> (Char->Int) -> Integer
-parseInteger buf len radix to_int 
+parseInteger buf len radix char_to_int 
   = go 0 0
-  where go i x | i == len  = x
-	       | otherwise = go (i+1) (x * radix + toInteger (to_int (byteOff buf i)))
+  where
+    go i x | i == len  = x
+           | otherwise = go (i+1)
+              (x * radix + toInteger (char_to_int (byteOff buf i)))
 
 -- -----------------------------------------------------------------------------
 -- under the carpet
