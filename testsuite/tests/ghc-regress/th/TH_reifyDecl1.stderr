@@ -26,5 +26,3 @@ TH_reifyDecl1.hs:33:9:
     Class op from TH_reifyDecl1.C: TH_reifyDecl1.m :: forall a_0 . TH_reifyDecl1.C a_0 => a_0 ->
                                                                                       GHC.Base.Int
                                infixl 3 TH_reifyDecl1.m
-Loading package base ... linking ... done.
-Loading package template-haskell ... linking ... done.

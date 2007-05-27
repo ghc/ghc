@@ -4,5 +4,3 @@ AppE (ConE GHC.Float.F#) (LitE (FloatPrimL (123%10)))
 GHC.Float.F# 12.3#
 AppE (ConE GHC.Float.D#) (LitE (DoublePrimL (123%5)))
 GHC.Float.D# 24.6##
-Loading package base ... linking ... done.
-Loading package template-haskell ... linking ... done.

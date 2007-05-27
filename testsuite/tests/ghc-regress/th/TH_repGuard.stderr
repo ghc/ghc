@@ -5,5 +5,3 @@ bar :: Data.Maybe.Maybe GHC.Base.Int -> GHC.Base.Int
 bar x_0 | Data.Maybe.Just y_1 <- x_0
             = y_1
 bar _ = 9
-Loading package base ... linking ... done.
-Loading package template-haskell ... linking ... done.
