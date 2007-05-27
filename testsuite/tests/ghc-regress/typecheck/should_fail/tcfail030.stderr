@@ -1,4 +1,3 @@
 
 tcfail030.hs:1:0:
-    The main function `main' is not defined in module `Main'
-    When checking the type of the main function `main'
+    The function `main' is not defined in module `Main'
