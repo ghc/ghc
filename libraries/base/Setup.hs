@@ -120,7 +120,7 @@ isPortableBuild :: String -> Bool
 isPortableBuild s
  | "GHC" `isPrefixOf` s = False
  | "Data.Generics" `isPrefixOf` s = False
- | otherwise = s `notElem` ["Foreign.Concurrent"]
+ | otherwise = s `notElem` ["Foreign.Concurrent", "System.Timeout"]
 
 forGHCBuild :: String -> Bool
 forGHCBuild = ("GHC.Prim" /=)

@@ -149,6 +149,7 @@ exposed-modules:
 	System.Posix.Internals,
 	System.Posix.Signals,
 	System.Posix.Types,
+	System.Timeout,
 	Text.ParserCombinators.ReadP,
 	Text.ParserCombinators.ReadPrec,
 	Text.Printf,
