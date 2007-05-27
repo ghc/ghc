@@ -6,15 +6,7 @@ tcfail177.hs:17:12:
     Couldn't match expected type `Bool' against inferred type `[Char]'
     In the expression: "Two"
     In the first argument of `foo', namely
-	`[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5",
-          "Five" ~?= "5", "Five" ~?= "5", "Five" ~?= "5", 
-	  "Five" ~?= "5", "Five" ~?= "5", "Two", "Two", "Two", 
-          "Two", "Two", "Two", "Two", "Two", "Two", "Two", "Two", 
- 	  "Two", "Two", "Two", "Two", "Two", "Two", "Two"]'
+	`[a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]'
     In the expression:
 	foo
-	  [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5",
-           "Five" ~?= "5", "Five" ~?= "5", "Five" ~?= "5", 
-	   "Five" ~?= "5", "Five" ~?= "5", "Two", "Two", "Two", 
-	   "Two", "Two", "Two", "Two", "Two", "Two", "Two", "Two", 
-	   "Two", "Two", "Two", "Two", "Two", "Two", "Two"]
+	  [a ~?= b, "Three" ~?= "3", "Four" ~?= "4", "Five" ~?= "5", ....]
