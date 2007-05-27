@@ -236,7 +236,7 @@ test('tc220', reqlib('mtl'), compile, [''])
 test('tc221', normal, compile, [''])
 test('tc222', normal, compile, [''])
 test('tc223', reqlib('mtl'), compile, [''])
-test('tc224', expect_broken(1332), compile, [''])
+test('tc224', normal, compile, [''])
 test('tc225', normal, compile, [''])
 test('tc226', normal, compile, [''])
 
