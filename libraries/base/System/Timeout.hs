@@ -15,6 +15,11 @@
 
 module System.Timeout ( timeout ) where
 
+#if __NHC__
+timeout :: Int -> IO a -> IO (Maybe a)
+timeout n f = fmap Just f
+#else
+
 import Prelude             (IO, Ord((<)), Eq((==)), Int, (.), otherwise, fmap)
 import Data.Maybe          (Maybe(..))
 import Control.Monad       (Monad(..), guard)
@@ -70,3 +75,4 @@ timeout n f
                    (bracket (forkIO (threadDelay n >> throwDynTo pid ex))
                             (killThread)
                             (\_ -> fmap Just f))
+#endif
