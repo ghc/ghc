@@ -179,4 +179,5 @@ extensions:	CPP
 -- We need to set the package name to base (without a version number)
 -- as it's magic.
 ghc-options: -fglasgow-exts -package-name base
+nhc98-options: -H4M -K3M
 
