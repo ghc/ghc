@@ -1,5 +1,6 @@
 {-# OPTIONS_GHC -fglasgow-exts #-}
-	-- Need GlaExts for the nested forall in defn of Q
+	-- Need GlaExts for the nested forall in defn of Q,
+	-- and the deriving Data, Typeable
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Language.Haskell.Syntax
@@ -47,6 +48,8 @@ module Language.Haskell.TH.Syntax(
 import Data.PackedString
 import GHC.Base		( Int(..), Int#, (<#), (==#) )
 
+import Data.Generics (Data(..), Typeable, mkConstr, mkDataType)
+import qualified Data.Generics as Generics
 import Data.IORef
 import GHC.IOBase	( unsafePerformIO )
 import Control.Monad (liftM)
@@ -318,7 +321,7 @@ occString occ = unpackPS occ
 --	let v = mkName "T" in [| data $v = $v |]
 -- Here we use the same Name for both type constructor and data constructor
 
-data Name = Name OccName NameFlavour
+data Name = Name OccName NameFlavour deriving (Typeable, Data)
 
 data NameFlavour
   = NameS 			-- An unqualified name; dynamically bound
@@ -337,12 +340,31 @@ data NameFlavour
   | NameG NameSpace PkgName ModName	-- An original name (occurrences only, not binders)
 				-- Need the namespace too to be sure which 
 				-- thing we are naming
+  deriving ( Typeable )
+
+instance Data NameFlavour where
+     gunfold = error "gunfold"
+     toConstr NameS = con_NameS
+     toConstr (NameQ _) = con_NameQ
+     toConstr (NameU _) = con_NameU
+     toConstr (NameL _) = con_NameL
+     toConstr (NameG _ _ _) = con_NameG
+     dataTypeOf _ = ty_NameFlavour
+
+con_NameS = mkConstr ty_NameFlavour "NameS" [] Generics.Prefix
+con_NameQ = mkConstr ty_NameFlavour "NameQ" [] Generics.Prefix
+con_NameU = mkConstr ty_NameFlavour "NameU" [] Generics.Prefix
+con_NameL = mkConstr ty_NameFlavour "NameL" [] Generics.Prefix
+con_NameG = mkConstr ty_NameFlavour "NameG" [] Generics.Prefix
+ty_NameFlavour = mkDataType "Language.Haskell.TH.Syntax.NameFlavour"
+                            [con_NameS, con_NameQ, con_NameU,
+                             con_NameL, con_NameG]
 
 data NameSpace = VarName	-- Variables
 	       | DataName	-- Data constructors 
 	       | TcClsName	-- Type constructors and classes; Haskell has them
 				-- in the same name space for now.
-	       deriving( Eq, Ord )
+	       deriving( Eq, Ord, Data, Typeable )
 
 type Uniq = Int
 
@@ -536,10 +558,12 @@ data Info
   | TyVarI 	-- Scoped type variable
 	Name
 	Type	-- What it is bound to
-  deriving( Show )
+  deriving( Show, Data, Typeable )
 
-data Fixity 	     = Fixity Int FixityDirection deriving( Eq, Show )
-data FixityDirection = InfixL | InfixR | InfixN   deriving( Eq, Show )
+data Fixity          = Fixity Int FixityDirection
+    deriving( Eq, Show, Data, Typeable )
+data FixityDirection = InfixL | InfixR | InfixN
+    deriving( Eq, Show, Data, Typeable )
 
 maxPrecedence :: Int
 maxPrecedence = (9::Int)
@@ -564,7 +588,7 @@ data Lit = CharL Char
          | IntPrimL Integer
          | FloatPrimL Rational
          | DoublePrimL Rational
-    deriving( Show, Eq )
+    deriving( Show, Eq, Data, Typeable )
 
     -- We could add Int, Float, Double etc, as we do in HsLit, 
     -- but that could complicate the
@@ -582,16 +606,16 @@ data Pat
   | RecP Name [FieldPat]        -- f (Pt { pointx = x }) = g x
   | ListP [ Pat ]                 -- { [1,2,3] }
   | SigP Pat Type                 -- p :: t
-  deriving( Show, Eq )
+  deriving( Show, Eq, Data, Typeable )
 
 type FieldPat = (Name,Pat)
 
 data Match = Match Pat Body [Dec]
                                     -- case e of { pat -> body where decs } 
-    deriving( Show, Eq )
+    deriving( Show, Eq, Data, Typeable )
 data Clause = Clause [Pat] Body [Dec]
                                     -- f { p1 p2 = body where decs }
-    deriving( Show, Eq )
+    deriving( Show, Eq, Data, Typeable )
  
 data Exp 
   = VarE Name                        -- { x }
@@ -618,7 +642,7 @@ data Exp
   | SigE Exp Type                      -- e :: t
   | RecConE Name [FieldExp]            -- { T { x = y, z = w } }
   | RecUpdE Exp [FieldExp]             -- { (f x) { z = w } }
-  deriving( Show, Eq )
+  deriving( Show, Eq, Data, Typeable )
 
 type FieldExp = (Name,Exp)
 
@@ -627,23 +651,23 @@ type FieldExp = (Name,Exp)
 data Body
   = GuardedB [(Guard,Exp)]   -- f p { | e1 = e2 | e3 = e4 } where ds
   | NormalB Exp              -- f p { = e } where ds
-  deriving( Show, Eq )
+  deriving( Show, Eq, Data, Typeable )
 
 data Guard
   = NormalG Exp
   | PatG [Stmt]
-  deriving( Show, Eq )
+  deriving( Show, Eq, Data, Typeable )
 
 data Stmt
   = BindS Pat Exp
   | LetS [ Dec ]
   | NoBindS Exp
   | ParS [[Stmt]]
-  deriving( Show, Eq )
+  deriving( Show, Eq, Data, Typeable )
 
 data Range = FromR Exp | FromThenR Exp Exp
            | FromToR Exp Exp | FromThenToR Exp Exp Exp
-          deriving( Show, Eq )
+          deriving( Show, Eq, Data, Typeable )
   
 data Dec 
   = FunD Name [Clause]            -- { f p1 p2 = b where decs }
@@ -661,31 +685,31 @@ data Dec
                                   --       where ds }
   | SigD Name Type                -- { length :: [a] -> Int }
   | ForeignD Foreign
-  deriving( Show, Eq )
+  deriving( Show, Eq, Data, Typeable )
 
 data FunDep = FunDep [Name] [Name]
-  deriving( Show, Eq )
+  deriving( Show, Eq, Data, Typeable )
 
 data Foreign = ImportF Callconv Safety String Name Type
              | ExportF Callconv        String Name Type
-         deriving( Show, Eq )
+         deriving( Show, Eq, Data, Typeable )
 
 data Callconv = CCall | StdCall
-          deriving( Show, Eq )
+          deriving( Show, Eq, Data, Typeable )
 
 data Safety = Unsafe | Safe | Threadsafe
-        deriving( Show, Eq )
+        deriving( Show, Eq, Data, Typeable )
 
 type Cxt = [Type]    -- (Eq a, Ord b)
 
 data Strict = IsStrict | NotStrict
-         deriving( Show, Eq )
+         deriving( Show, Eq, Data, Typeable )
 
 data Con = NormalC Name [StrictType]
          | RecC Name [VarStrictType]
          | InfixC StrictType Name StrictType
          | ForallC [Name] Cxt Con
-         deriving( Show, Eq )
+         deriving( Show, Eq, Data, Typeable )
 
 type StrictType = (Strict, Type)
 type VarStrictType = (Name, Strict, Type)
@@ -699,7 +723,7 @@ data Type = ForallT [Name] Cxt Type   -- forall <vars>. <ctxt> -> <type>
           | ArrowT                    -- ->
           | ListT                     -- []
           | AppT Type Type            -- T a b
-      deriving( Show, Eq )
+      deriving( Show, Eq, Data, Typeable )
 
 -----------------------------------------------------
 --		Internal helper functions
