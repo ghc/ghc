@@ -79,7 +79,9 @@ import Data.Array.Unboxed
 import Data.Array.IO
 import Data.Typeable
 import Data.Char
+#ifdef __GLASGOW_HASKELL__
 import Data.Generics
+#endif
 
 import System.IO
 
@@ -434,6 +436,7 @@ joinPS sep  = concatPS . intersperse sep
 
 #endif
 
+#ifdef __GLASGOW_HASKELL__
 instance Data PackedString where
      gunfold k z c = error "gunfold"
      toConstr (PS _) = con_PS
@@ -441,3 +444,4 @@ instance Data PackedString where
 
 con_PS = mkConstr ty_PackedString "PS" [] Prefix
 ty_PackedString   = mkDataType "Data.PackedString.PackedString" [con_PS]
+#endif
