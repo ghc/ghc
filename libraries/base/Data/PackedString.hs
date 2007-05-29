@@ -79,6 +79,7 @@ import Data.Array.Unboxed
 import Data.Array.IO
 import Data.Typeable
 import Data.Char
+import Data.Generics
 
 import System.IO
 
@@ -432,3 +433,11 @@ splitWithPS p =
 joinPS sep  = concatPS . intersperse sep
 
 #endif
+
+instance Data PackedString where
+     gunfold k z c = error "gunfold"
+     toConstr (PS _) = con_PS
+     dataTypeOf _ = ty_PackedString
+
+con_PS = mkConstr ty_PackedString "PS" [] Prefix
+ty_PackedString   = mkDataType "Data.PackedString.PackedString" [con_PS]
