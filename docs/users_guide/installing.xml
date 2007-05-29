@@ -533,7 +533,7 @@ on...</para>
 
 <para>
 Getting the Glasgow Haskell Compiler (post 5.02) to run on Windows platforms is
-a snap: the Installshield does everything you need.  
+a snap: the installer does everything you need.  
 </para>
 
 <sect2><title>Installing GHC on Windows</title>
@@ -542,36 +542,27 @@ a snap: the Installshield does everything you need.
 To install GHC, use the following steps:
 </para>
 <itemizedlist>
-<listitem><para>Download the Installshield <filename>setup.exe</filename>
-from the GHC download page
+<listitem><para>Download the installer
+from the
 <ulink
-url="http://www.haskell.org/ghc">haskell.org</ulink>.
+url="http://www.haskell.org/ghc/download.html">GHC download page</ulink>.
 </para></listitem>
 
-<listitem><para>Run <filename>setup.exe</filename>.
+<listitem><para>Run the installer.
 On Windows, all of GHC's files are installed in a single directory.
-If you choose ``Custom'' from the list of install options, you will be given a 
-choice about where this directory is; otherwise it will be installed 
-in <filename>c:/ghc/<replaceable>ghc-version</replaceable></filename>.
-The executable binary for GHC will be installed in the <filename>bin/</filename> sub-directory
-of the installation directory you choose.
-</para>
-<para>(If you have already installed the same version of GHC, Installshield will offer to "modify", 
-or "remove" GHC.  Choose "remove"; then run <filename>setup.exe</filename> a
-second time.  This time it should offer to install.)
+You can override it, but by default this directory is
+<filename>c:/ghc/<replaceable>ghc-version</replaceable></filename>.
+The executable binary for GHC will be installed in the
+<filename>bin/</filename> sub-directory of the installation directory.
+If you want to invoke GHC from a command line, add this
+to your PATH environment variable.
 </para>
 <para>
-When installation is complete, you should find GHCi and the GHC documentation are 
-available in your Start menu under "Start/Programs/Glasgow Haskell Compiler".
+When installation is complete, you should find GHCi and the GHC
+documentation are available in your Start menu under
+"Start/All Programs/GHC/<replaceable>ghc-version</replaceable>".
 </para>
 </listitem>
-
-<listitem><para>
-The final dialogue box from the install process reminds you where the GHC binary 
-has been installed (usually <filename>c:/ghc/<replaceable>ghc-version</replaceable>/bin/</filename>.  
-If you want to invoke GHC from a command line, add this 
-to your PATH environment variable.  
-</para></listitem>
 
 <listitem><para>
 GHC needs a directory in which to create, and later delete, temporary files.
@@ -608,7 +599,7 @@ bash$ ghc -o main main.hs
 ..
 bash$ ./main
 Hello, world!
-bash$ </screen>
+bash$</screen>
 </listitem>
 </itemizedlist>
 
@@ -617,7 +608,7 @@ You do <emphasis>not</emphasis> need the Cygwin toolchain, or anything
 else, to install and run GHC.
 </para>
 <para>
-An installation of GHC requires about 140M of disk space.
+An installation of GHC requires about 340M of disk space.
 To run GHC comfortably, your machine should have at least
 64M of memory.
 </para>
@@ -625,10 +616,11 @@ To run GHC comfortably, your machine should have at least
 
 <sect2><title>Moving GHC around</title>
 <para>
-At the moment, GHC installs in a fixed place (<filename>c:/ghc/ghc-x.yy</filename>,
-but once it is installed, you can freely move the entire GHC tree just by copying
-the <filename>ghc-x.yy</filename> directory.   (You may need to fix up 
-the links in "Start/Programs/Glasgow Haskell Compiler" if you do this.)
+Once GHC is installed, you can freely move the entire GHC tree just by copying
+the <filename>c:/ghc/<replaceable>ghc-version</replaceable></filename>
+directory. (You will need to fix up 
+the links in "Start/All Programs/GHC/<replaceable>ghc-version</replaceable>"
+if you do this.)
 </para>
 <para>
 It is OK to put GHC tree in a directory whose path involves spaces.  However,
@@ -647,7 +639,8 @@ put GHC in a place with a space-free path.
 	<varlistentry>
 	  <term>I'm having trouble with symlinks.</term>
 	  <listitem>
-	    <para>Symlinks only work under Cygwin (<xref linkend="install" />), so binaries not linked to the Cygwin
+	    <para>Symlinks only work under Cygwin (<xref linkend="install" />),
+          so binaries not linked to the Cygwin
 	      DLL, in particular those built for Mingwin, will not work with
 	      symlinks.</para>
 	  </listitem>
@@ -665,17 +658,6 @@ put GHC in a place with a space-free path.
 	  </listitem>
 	</varlistentry>
       </variablelist>
-
-<!-- doesn't add much value any longer; leave out [sof 7/2002].
-<para>
-Further information on using GHC under Windows can be found in <ulink
-url="http://www.dcs.gla.ac.uk/~sof/ghc-win32.html">Sigbj&oslash;rn Finne's
-pages</ulink>. Note: ignore the installation instructions, which are rather
-out of date; the <emphasis>Miscellaneous</emphasis> section at the bottom of
-the page is of most interest, covering topics beyond the scope of this
-manual.
-</para>
--->
 </sect2>
 
 </sect1>
