@@ -291,6 +291,13 @@ binary-dist::
 	@echo "Generating a shippable configure script.."
 	$(MV) $(BIN_DIST_DIR)/configure-bin.ac $(BIN_DIST_DIR)/configure.ac
 	( cd $(BIN_DIST_DIR); autoconf )
+
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+binary-dist::
+	$(MKDIRHIER) $(BIN_DIST_DIR)/icons
+	cp distrib/hsicon.ico $(BIN_DIST_DIR)/icons
+endif
+
 #
 # binary dist'ing the documentation.  
 # The default documentation to build/install is given below; overrideable
@@ -394,6 +401,22 @@ tar-binary-dist:
 	( cd $(BIN_DIST_TOPDIR); tar cf - $(BIN_DIST_NAME) | bzip2 >$(BIN_DIST_TARBALL) )
 	( cd $(BIN_DIST_TOPDIR); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >bin-manifest-$(ProjectVersion) )
 
+PUBLISH_FILES = $(BIN_DIST_TARBALL)
+
+# Upload the distribution and documentation
+ifneq "$(ISCC)" ""
+WINDOWS_INSTALLER_BASE = ghc-$(ProjectVersion)-$(TARGETPLATFORM)
+WINDOWS_INSTALLER = $(WINDOWS_INSTALLER)$(exeext)
+
+PUBLISH_FILES += $(WINDOWS_INSTALLER)
+
+binary-dist :: generate-windows-installer
+
+.PHONY: generate-windows-installer
+generate-windows-installer ::
+	$(SED) "s/@VERSION@/$(ProjectVersion)/" distrib/ghc.iss | $(ISCC) /O. /F$(WINDOWS_INSTALLER_BASE) -
+endif
+
 # Upload the distribution and documentation
 ifneq "$(PublishLocation)" ""
 binary-dist :: publish-binary-dist
@@ -401,9 +424,11 @@ endif
 
 .PHONY: publish-binary-dist
 publish-binary-dist ::
-	@for i in 0 1 2 3 4 5 6 7 8 9; do \
-		echo "Try $$i: $(PublishCp) $(BIN_DIST_TARBALL) $(PublishLocation)/dist"; \
-		if $(PublishCp) $(BIN_DIST_TARBALL) $(PublishLocation)/dist; then break; fi; \
+	@for f in $(PUBLISH_FILES); do \
+	    @for i in 0 1 2 3 4 5 6 7 8 9; do \
+	        echo "Try $$i: $(PublishCp) $$f $(PublishLocation)/dist"; \
+	        if $(PublishCp) $$f $(PublishLocation)/dist; then break; fi; \
+	    done \
 	done
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
