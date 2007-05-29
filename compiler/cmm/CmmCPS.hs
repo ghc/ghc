@@ -154,10 +154,12 @@ data Continuation =
 
 -- Describes the layout of a stack frame for a continuation
 data StackFormat
-    = StackFormat
-         (Maybe CLabel)		-- The label occupying the top slot
-         WordOff		-- Total frame size in words
-         [(CmmReg, WordOff)]	-- local reg offsets from stack top
+    = StackFormat {
+         stack_label :: Maybe CLabel,	-- The label occupying the top slot
+         stack_frame_size :: WordOff,	-- Total frame size in words (not including arguments)
+         stack_live :: [(CmmReg, WordOff)]	-- local reg offsets from stack top
+                       -- TODO: see if the above can be LocalReg
+      }
 
 -- A block can be a continuation of a call
 -- A block can be a continuation of another block (w/ or w/o joins)
@@ -252,22 +254,24 @@ continuationToProc formats (Continuation is_entry info label formals blocks) =
             unknown_block = panic "unknown BlockId in continuationToProc"
             prefix = case entry of
                        ControlEntry -> []
-                       FunctionEntry _ _ -> []
+                       FunctionEntry _ formals -> -- TODO: gc_stack_check
+                           function_entry formals curr_format
                        ContinuationEntry formals ->
-                           unpack_continuation curr_format
+                           function_entry formals curr_format
             postfix = case exit of
                         FinalBranch next -> [CmmBranch next]
                         FinalSwitch expr targets -> [CmmSwitch expr targets]
                         FinalReturn arguments ->
-                            exit_function curr_format
+                            tail_call (stack_frame_size curr_format)
                                 (CmmLoad (CmmReg spReg) wordRep)
                                 arguments
                         FinalJump target arguments ->
-                            exit_function curr_format target arguments
+                            tail_call (stack_frame_size curr_format) target arguments
                         FinalCall next (CmmForeignCall target CmmCallConv)
                             results arguments ->
                                 pack_continuation curr_format cont_format ++
-                                [CmmJump target arguments]
+                                tail_call (stack_frame_size curr_format - stack_frame_size cont_format)
+                                              target arguments
                             where
                               cont_format = maybe unknown_block id $
                                             lookup (mkReturnPtLabel $ getUnique next) formats
@@ -278,18 +282,24 @@ continuationToProc formats (Continuation is_entry info label formals blocks) =
 -- for packing/unpacking continuations
 -- and entering/exiting functions
 
-exit_function :: StackFormat -> CmmExpr -> CmmActuals -> [CmmStmt]
-exit_function (StackFormat curr_id curr_frame_size curr_offsets) target arguments
-  = adjust_spReg ++ jump where
+tail_call :: WordOff -> CmmExpr -> CmmActuals -> [CmmStmt]
+tail_call spRel target arguments
+  = store_arguments ++ adjust_spReg ++ jump where
+    store_arguments =
+        [stack_put spRel expr offset
+         | ((expr, _), StackParam offset) <- argument_formats] ++
+        [global_put expr global
+         | ((expr, _), RegisterParam global) <- argument_formats]
     adjust_spReg =
-        if curr_frame_size == 0
+        if spRel == 0
         then []
-        else [CmmAssign spReg
-                 (CmmRegOff spReg (curr_frame_size*wORD_SIZE))]
+        else [CmmAssign spReg (CmmRegOff spReg (spRel*wORD_SIZE))]
     jump = [CmmJump target arguments]
 
-enter_function :: WordOff -> [CmmStmt]
-enter_function max_frame_size
+    argument_formats = assignArguments (cmmExprRep . fst) arguments
+
+gc_stack_check :: WordOff -> [CmmStmt]
+gc_stack_check max_frame_size
   = check_stack_limit where
     check_stack_limit = [
      CmmCondBranch
@@ -300,41 +310,69 @@ enter_function max_frame_size
 
 -- TODO: fix branches to proc point (we have to insert a new block to marshel the continuation)
 pack_continuation :: StackFormat -> StackFormat -> [CmmStmt]
-pack_continuation (StackFormat curr_id curr_frame_size curr_offsets)
+pack_continuation (StackFormat curr_id curr_frame_size _)
                        (StackFormat cont_id cont_frame_size cont_offsets)
-  = save_live_values ++ set_stack_header ++ adjust_spReg where
-    -- TODO: only save variables when actually needed
-    save_live_values =
-        [CmmStore
-         (CmmRegOff
-          spReg (wORD_SIZE*(curr_frame_size - cont_frame_size + offset)))
-         (CmmReg reg)
+  = store_live_values ++ set_stack_header where
+    -- TODO: only save variables when actually needed (may be handled by latter pass)
+    store_live_values =
+        [stack_put spRel (CmmReg reg) offset
          | (reg, offset) <- cont_offsets]
-    needs_header =
-      case (curr_id, cont_id) of
-        (Just x, Just y) -> x /= y
-        _ -> isJust cont_id
     set_stack_header =
-      if not needs_header
-         then []
-         else [CmmStore (CmmRegOff spReg (wORD_SIZE*(curr_frame_size - cont_frame_size))) continuation_function]
-    continuation_function = CmmLit $ CmmLabel $ fromJust cont_id
-    adjust_spReg =
-        if curr_frame_size == cont_frame_size
+        if not needs_header
         then []
-        else [CmmAssign spReg (CmmRegOff spReg ((curr_frame_size - cont_frame_size)*wORD_SIZE))]
+        else [stack_put spRel continuation_function 0]
+
+    spRel = curr_frame_size - cont_frame_size
+    continuation_function = CmmLit $ CmmLabel $ fromJust cont_id
+    needs_header =
+        case (curr_id, cont_id) of
+          (Just x, Just y) -> x /= y
+          _ -> isJust cont_id
 
 -- Lazy adjustment of stack headers assumes all blocks
 -- that could branch to eachother (i.e. control blocks)
 -- have the same stack format (this causes a problem
 -- only for proc-point).
-unpack_continuation :: StackFormat -> [CmmStmt]
-unpack_continuation (StackFormat curr_id curr_frame_size curr_offsets)
-  = load_live_values where
-    -- TODO: only save variables when actually needed
+function_entry :: CmmFormals -> StackFormat -> [CmmStmt]
+function_entry formals (StackFormat _ _ curr_offsets)
+  = load_live_values ++ load_args where
+    -- TODO: only save variables when actually needed (may be handled by latter pass)
     load_live_values =
-        [CmmAssign
-         reg
-         (CmmLoad (CmmRegOff spReg (wORD_SIZE*offset)) (cmmRegRep reg))
+        [stack_get 0 reg offset
          | (reg, offset) <- curr_offsets]
+    load_args =
+        [stack_get 0 reg offset
+         | ((reg, _), StackParam offset) <- argument_formats] ++
+        [global_get reg global
+         | ((reg, _), RegisterParam global) <- argument_formats]
+
+    argument_formats = assignArguments (cmmRegRep . fst) formals
+
+-----------------------------------------------------------------------------
+-- Section: Stack and argument register puts and gets
+-----------------------------------------------------------------------------
+-- TODO: document
+
+-- |Construct a 'CmmStmt' that will save a value on the stack
+stack_put :: WordOff            -- ^ Offset from the real 'Sp' that 'offset'
+                                -- is relative to (added to offset)
+          -> CmmExpr            -- ^ What to store onto the stack
+          -> WordOff            -- ^ Where on the stack to store it
+                                -- (positive <=> higher addresses)
+          -> CmmStmt
+stack_put spRel expr offset =
+    CmmStore (CmmRegOff spReg (wORD_SIZE*(spRel + offset))) expr
+
+--------------------------------
+-- |Construct a 
+stack_get :: WordOff
+          -> CmmReg
+          -> WordOff
+          -> CmmStmt
+stack_get spRel reg offset =
+    CmmAssign reg (CmmLoad (CmmRegOff spReg (wORD_SIZE*(spRel + offset))) (cmmRegRep reg))
+global_put :: CmmExpr -> GlobalReg -> CmmStmt
+global_put expr global = CmmAssign (CmmGlobal global) expr
+global_get :: CmmReg -> GlobalReg -> CmmStmt
+global_get reg global = CmmAssign reg (CmmReg (CmmGlobal global))
 
