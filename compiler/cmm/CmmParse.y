@@ -254,24 +254,16 @@ stmt	:: { ExtCode }
 	| NAME ':'
 		{ do l <- newLabel $1; code (labelC l) }
 
-	| lreg '=' expr ';'			
-		{ do reg <- $1; e <- $3; stmtEC (CmmAssign reg e) }
+-- HACK: this should just be lregs but that causes a shift/reduce conflict
+-- with foreign calls
+	| hint_lregs '=' expr ';'
+		{ do reg <- head $1; e <- $3; stmtEC (CmmAssign (fst reg) e) }
 	| type '[' expr ']' '=' expr ';'
 		{ doStore $1 $3 $6 }
-	| 'foreign' STRING expr '(' hint_exprs0 ')' vols ';'
-		{% foreignCall $2 [] $3 $5 $7 }
-	| lreg '=' 'foreign' STRING expr '(' hint_exprs0 ')' vols ';'
-		{% let result = do r <- $1; return (r,NoHint) in
-		   foreignCall $4 [result] $5 $7 $9 }
-	| 'prim' '%' NAME '(' hint_exprs0 ')' vols ';'
-		{% primCall [] $3 $5 $7 }
-	| lreg '=' 'prim' '%' NAME '(' hint_exprs0 ')' vols ';'
-		{% let result = do r <- $1; return (r,NoHint) in
-		   primCall [result] $5 $7 $9 }
-	| STRING lreg '=' 'foreign' STRING expr '(' hint_exprs0 ')' vols ';'
-		{% do h <- parseHint $1;
-		      let result = do r <- $2; return (r,h) in
-		      foreignCall $5 [result] $6 $8 $10 }
+	| maybe_results 'foreign' STRING expr '(' hint_exprs0 ')' vols ';'
+		{% foreignCall $3 $1 $4 $6 $8 }
+	| maybe_results 'prim' '%' NAME '(' hint_exprs0 ')' vols ';'
+		{% primCall $1 $4 $6 $8 }
 	-- stmt-level macros, stealing syntax from ordinary C-- function calls.
 	-- Perhaps we ought to use the %%-form?
 	| NAME '(' exprs0 ')' ';'
@@ -404,6 +396,21 @@ exprs	:: { [ExtFCode CmmExpr] }
 reg	:: { ExtFCode CmmExpr }
 	: NAME			{ lookupName $1 }
 	| GLOBALREG		{ return (CmmReg (CmmGlobal $1)) }
+
+maybe_results :: { [ExtFCode (CmmReg, MachHint)] }
+	: {- empty -}		{ [] }
+	| hint_lregs '='	{ $1 }
+
+hint_lregs :: { [ExtFCode (CmmReg, MachHint)] }
+	: hint_lreg ','			{ [$1] }
+	| hint_lreg			{ [$1] }
+	| hint_lreg ',' hint_lregs	{ $1 : $3 }
+
+hint_lreg :: { ExtFCode (CmmReg, MachHint) }
+	: lreg				{ do e <- $1; return (e, inferHint (CmmReg e)) }
+	| STRING lreg			{% do h <- parseHint $1;
+					      return $ do
+						e <- $2; return (e,h) }
 
 lreg	:: { ExtFCode CmmReg }
 	: NAME			{ do e <- lookupName $1;
