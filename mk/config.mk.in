@@ -342,10 +342,16 @@ endif
 #   t		: ticky-ticky profiling
 #   debug_t	: debugging ticky-ticky profiling
 #
-ifeq "$(BootingFromHc)" "YES"
 GhcRTSWays=
-else
-GhcRTSWays=thr thr_p debug thr_debug
+
+# Usually want the debug version
+ifeq "$(BootingFromHc)" "NO"
+GhcRTSWays += debug 
+endif
+
+# Want the threaded versions unless we're unregisterised
+ifeq "$(GhcUnregisterised)" "NO"
+GhcRTSWays += thr thr_p thr_debug
 endif
 
 # Option flags to pass to GHC when it's compiling modules in
