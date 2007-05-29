@@ -129,11 +129,13 @@ breakBlock uniques (BasicBlock ident stmts) entry =
 
             -- Detect this special case to remain an inverse of
             -- 'cmmBlockFromBrokenBlock'
+            {- TODO: Interferes with proc point detection
             [CmmCall target results arguments,
              CmmBranch next_id] -> [block]
               where
                 block = do_call current_id entry accum_stmts exits next_id
                                 target results arguments
+             -}
             (CmmCall target results arguments:stmts) -> block : rest
               where
                 next_id = BlockId $ head uniques
