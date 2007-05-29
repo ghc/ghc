@@ -10,10 +10,11 @@ import Cmm
 import CmmLint
 import PprCmm
 
-import Dataflow (fixedpoint)
+import Dataflow
 import CmmLive
 import CmmBrokenBlock
 import CmmProcPoint
+import CmmCallConv
 
 import MachOp
 import ForeignCall
@@ -217,8 +218,6 @@ selectStackFormat live continuations =
     map (\c -> (continuationLabel c, selectStackFormat' c)) continuations
     where
       selectStackFormat' (Continuation True info_table label formals blocks) =
-          --let ident = brokenBlockId $ head blocks -- TODO: CLabel isn't a uniquable, but we need a better way than this
-          --in
           StackFormat (Just label) 0 []
       selectStackFormat' (Continuation False info_table label formals blocks) =
           -- TODO: assumes the first block is the entry block
@@ -297,7 +296,7 @@ enter_function max_frame_size
      (CmmMachOp (MO_U_Lt $ cmmRegRep spReg)
                     [CmmRegOff spReg max_frame_size, CmmReg spLimReg])
      gc_block]
-    gc_block = undefined -- TODO: get stack and heap checks to go to same
+    gc_block = panic "gc_check not implemented" -- TODO: get stack and heap checks to go to same
 
 -- TODO: fix branches to proc point (we have to insert a new block to marshel the continuation)
 pack_continuation :: StackFormat -> StackFormat -> [CmmStmt]
