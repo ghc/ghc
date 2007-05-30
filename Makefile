@@ -425,7 +425,7 @@ endif
 .PHONY: publish-binary-dist
 publish-binary-dist ::
 	@for f in $(PUBLISH_FILES); do \
-	    @for i in 0 1 2 3 4 5 6 7 8 9; do \
+	    for i in 0 1 2 3 4 5 6 7 8 9; do \
 	        echo "Try $$i: $(PublishCp) $$f $(PublishLocation)/dist"; \
 	        if $(PublishCp) $$f $(PublishLocation)/dist; then break; fi; \
 	    done \
