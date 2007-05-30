@@ -641,7 +641,9 @@ writeNewConfig filename packages = do
       if isPermissionError e
       then die (filename ++ ": you don't have permission to modify this file")
       else ioError e
-  hPutStrLn h (show packages)
+  let shown = concat $ intersperse ",\n " $ map show packages
+      fileContents = "[" ++ shown ++ "\n]"
+  hPutStrLn h fileContents
   hClose h
   hPutStrLn stdout "done."
 
