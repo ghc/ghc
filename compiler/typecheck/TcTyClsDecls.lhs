@@ -1008,7 +1008,8 @@ checkNewDataCon con
 		-- Return type is (T a b c)
 	; checkTc (null ex_tvs && null theta) (newtypeExError con)
 		-- No existentials
-	; checkTc (null (dataConStrictMarks con)) (newtypeStrictError con)
+	; checkTc (not (any isMarkedStrict (dataConStrictMarks con))) 
+		  (newtypeStrictError con)
 		-- No strictness
     }
   where
