@@ -209,8 +209,8 @@ Notice that
 
 -----------------------------------------
 
-Choosing Q
-~~~~~~~~~~
+Note [Choosing which variables to quantify]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Here's a good way to choose Q:
 
 	Q = grow( fv(T), C ) \ oclose( fv(G), C )
@@ -670,18 +670,35 @@ tcSimplifyInfer doc tau_tvs wanted
 	; gbl_tvs  <- tcGetGlobalTyVars
 	; let preds = fdPredsOfInsts wanted'
 	      qtvs  = grow preds tau_tvs' `minusVarSet` oclose preds gbl_tvs
-	      (free, bound) = partition (isFreeWhenInferring qtvs) wanted'
-	; traceTc (text "infer" <+> (ppr preds $$ ppr (grow preds tau_tvs') $$ ppr gbl_tvs $$ ppr (oclose preds gbl_tvs) $$ ppr free $$ ppr bound))
-	; extendLIEs free
+			-- See Note [Choosing which variables to quantify]
+
+		-- To maximise sharing, remove from consideration any 
+		-- constraints that don't mention qtvs at all
+	; let (free1, bound) = partition (isFreeWhenInferring qtvs) wanted'
+	; extendLIEs free1
 
 		-- To make types simple, reduce as much as possible
+	; traceTc (text "infer" <+> (ppr preds $$ ppr (grow preds tau_tvs') $$ ppr gbl_tvs $$ 
+		   ppr (oclose preds gbl_tvs) $$ ppr free1 $$ ppr bound))
 	; let try_me inst = ReduceMe AddSCs
 	; (irreds, binds) <- checkLoop (mkRedEnv doc try_me []) bound
-
 	; qtvs' <- zonkQuantifiedTyVars (varSetElems qtvs)
 
-	-- We can't abstract over implications
-	; let (dicts, implics) = partition isDict irreds
+		-- Do not quantify over constraints that *now* do not
+		-- mention quantified type variables, because they are
+		-- simply ambiguous.  Example:
+		-- 	f :: Eq b => a -> (a, b)
+		--	g x = fst (f x)
+		-- From the RHS of g we get the MethodInst f77 :: alpha -> (alpha, beta)
+		-- We decide to quantify over 'alpha' alone, bur free1 does not include f77
+		-- because f77 mentions 'alpha'.  Then reducing leaves only the (ambiguous)
+		-- constraint (Eq beta), which we dump back into the free set
+		-- See test tcfail181
+	; let (free2, irreds2) = partition (isFreeWhenInferring (mkVarSet qtvs')) irreds
+	; extendLIEs free2
+	
+		-- We can't abstract over implications
+	; let (dicts, implics) = partition isDict irreds2
 	; loc <- getInstLoc (ImplicOrigin doc)
 	; implic_bind <- bindIrreds loc qtvs' dicts implics
 
