@@ -1008,6 +1008,8 @@ checkNewDataCon con
 		-- Return type is (T a b c)
 	; checkTc (null ex_tvs && null theta) (newtypeExError con)
 		-- No existentials
+	; checkTc (null (dataConStrictMarks con)) (newtypeStrictError con)
+		-- No strictness
     }
   where
     (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty) = dataConFullSig con
@@ -1150,6 +1152,10 @@ newtypeConError tycon n
 
 newtypeExError con
   = sep [ptext SLIT("A newtype constructor cannot have an existential context,"),
+	 nest 2 $ ptext SLIT("but") <+> quotes (ppr con) <+> ptext SLIT("does")]
+
+newtypeStrictError con
+  = sep [ptext SLIT("A newtype constructor cannot have a strictness annotation,"),
 	 nest 2 $ ptext SLIT("but") <+> quotes (ppr con) <+> ptext SLIT("does")]
 
 newtypePredError con
