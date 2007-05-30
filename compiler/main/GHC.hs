@@ -172,10 +172,10 @@ module GHC (
 
 	-- ** Source locations
 	SrcLoc, pprDefnLoc,
-        mkSrcLoc, isGoodSrcLoc,
+        mkSrcLoc, isGoodSrcLoc, noSrcLoc,
 	srcLocFile, srcLocLine, srcLocCol,
         SrcSpan,
-        mkSrcSpan, srcLocSpan, isGoodSrcSpan,
+        mkSrcSpan, srcLocSpan, isGoodSrcSpan, noSrcSpan,
         srcSpanStart, srcSpanEnd,
 	srcSpanFile, 
         srcSpanStartLine, srcSpanEndLine, 
