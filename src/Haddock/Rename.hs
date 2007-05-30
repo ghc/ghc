@@ -11,7 +11,7 @@ module Haddock.Rename (
 
 import Haddock.Types
 
-import GHC hiding ( NoLink )
+import GHC
 import BasicTypes
 import SrcLoc 
 import Bag ( emptyBag )

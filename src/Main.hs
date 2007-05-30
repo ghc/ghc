@@ -17,7 +17,7 @@ import Haddock.Version
 import Haddock.InterfaceFile
 import Haddock.Exception
 import Haddock.Utils.GHC
-import Paths_haddock         ( getDataDir )
+import Paths_haddock_ghc     ( getDataDir )
 
 import Prelude hiding ( catch )
 import Control.Exception     
@@ -47,7 +47,7 @@ import qualified Data.Map as Map
 import Data.Map              (Map)
 
 import Distribution.InstalledPackageInfo ( InstalledPackageInfo(..) ) 
-import Distribution.Simple.Utils
+import Distribution.Simple.Utils         ( withTempFile )
 
 import GHC
 import Outputable
@@ -301,12 +301,12 @@ byeVersion =
 
 startGHC :: String -> IO (Session, DynFlags)
 startGHC libDir = do
-  --let ghcMode = BatchCompile
-  session <- newSession (Just libDir)
+  let ghcMode = BatchCompile
+  session <- newSession ghcMode (Just libDir)
   flags   <- getSessionDynFlags session
   flags'  <- liftM fst (initPackages flags)
   let flags'' = dopt_set flags' Opt_Haddock 
-  return (session, flags'')
+  return (session, flags'' { hscTarget = HscNothing })
 
 -- TODO: clean up, restructure and make sure it handles cleanup
 sortAndCheckModules :: Session -> [FilePath] -> IO [CheckedMod]
@@ -1044,7 +1044,7 @@ buildGlobalDocEnv modules
 	keep_new env n = Map.insert n (nameSetMod n modName) env 
 
 nameSetMod n newMod = mkExternalName (nameUnique n) newMod (nameOccName n)
-                      (nameSrcSpan n)
+                      (nameSrcLoc n)
 
 -- -----------------------------------------------------------------------------
 -- Named documentation

@@ -33,7 +33,7 @@ import Debug.Trace           ( trace )
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
 
-import GHC hiding ( NoLink )
+import GHC 
 import Name
 import Module
 import PackageConfig         ( stringToPackageId )

@@ -16,6 +16,8 @@ import qualified Data.Map as Map
 import System.IO
 import Control.Monad
 
+import GHC
+import SrcLoc   ( noSrcSpan ) -- tmp, GHC now exports this
 import Binary
 import Name
 import UniqSupply
@@ -23,7 +25,6 @@ import UniqFM
 import IfaceEnv
 import Module
 import Packages
-import SrcLoc
 import HscTypes
 import FastMutInt
 import InstEnv
@@ -182,7 +183,7 @@ fromOnDiskName arr nc (pid, mod_name, occ) =
         let 
                 us        = nsUniqs nc
                 uniq      = uniqFromSupply us
-                name      = mkExternalName uniq mod occ noSrcSpan
+                name      = mkExternalName uniq mod occ noSrcLoc
                 new_cache = extendNameCache cache mod occ name
         in        
         case splitUniqSupply us of { (us',_) -> 

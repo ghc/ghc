@@ -8,7 +8,7 @@
 
 module Haddock.Types where
 
-import GHC hiding (NoLink)
+import GHC
 import Outputable
 
 import Data.Map
