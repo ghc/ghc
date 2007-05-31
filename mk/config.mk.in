@@ -786,6 +786,7 @@ LNDIR			= $(GHC_LNDIR_DIR)/$(GHC_LNDIR_PGM)
 RUNTEST			= $(GHC_RUNTEST_DIR)/$(GHC_RUNTEST_PGM)
 
 GENERATED_FILE  = chmod a-w
+EXECUTABLE_FILE = chmod +x
 
 #-----------------------------------------------------------------------------
 # Haskell compilers and mkdependHS

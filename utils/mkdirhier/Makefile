@@ -3,9 +3,12 @@ include $(TOP)/mk/boilerplate.mk
 
 boot :: all
 
-SCRIPT_PROG=mkdirhier
-SCRIPT_OBJS=mkdirhier.sh
-INTERP=$(SHELL)
-CLEAN_FILES += $(SCRIPT_PROG)
+PROG=mkdirhier
+CLEAN_FILES += $(PROG)
+all::
+	$(RM) -f $(PROG)
+	echo '#!$(SHELL)'                              >> $(PROG)
+	cat $(PROG).sh                                 >> $(PROG)
+	$(EXECUTABLE_FILE) $(PROG)
 
 include $(TOP)/mk/target.mk

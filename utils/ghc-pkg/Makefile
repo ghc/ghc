@@ -1,9 +1,6 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
-# hack for ghci-inplace script, see below
-INSTALLING=1
-
 # -----------------------------------------------------------------------------
 # ghc-pkg.bin
 
@@ -53,60 +50,36 @@ DIST_CLEAN_FILES += $(VERSION_HS)
 # -----------------------------------------------------------------------------
 # ghc-pkg script
 
-ifeq "$(INSTALLING)" "1"
-ifeq "$(BIN_DIST)"   "1"
-GHCPKGBIN=$$\"\"libexecdir/$(HS_PROG)
-PKGCONF=$$\"\"libdir/package.conf
-else
-GHCPKGBIN=$(libexecdir)/$(HS_PROG)
-PKGCONF=$(libdir)/package.conf
-endif # BIN_DIST
-else
-GHCPKGBIN=$(FPTOOLS_TOP_ABS)/utils/ghc-pkg/$(HS_PROG)
-PKGCONF=$(FPTOOLS_TOP_ABS_PLATFORM)/driver/package.conf.inplace
-endif
-
-ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-INSTALLED_SCRIPT_PROG  = ghc-pkg-$(ProjectVersion)
-endif
-INPLACE_SCRIPT_PROG    = ghc-pkg-inplace
-
-SCRIPT_OBJS	  = ghc-pkg.sh
-INTERP		  = $(SHELL)
-SCRIPT_SUBST_VARS = GHCPKGBIN PKGCONFOPT
-ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-INSTALL_SCRIPTS  += $(SCRIPT_PROG)
-endif
-PKGCONFOPT 	  = --global-conf $(PKGCONF)
-
-ifeq "$(INSTALLING)" "1"
-SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
-ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-LINK 		=  ghc-pkg
-endif
-else
-SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
-endif
-
-# -----------------------------------------------------------------------------
-# don't recurse on 'make install'
-#
-ifeq "$(INSTALLING)" "1"
-all :: $(HS_PROG)
-	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
-clean distclean maintainer-clean ::
-	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
-endif
-
-ifeq "$(INSTALLING)$(HOSTPLATFORM)" "0i386-unknown-mingw32"
-all :: $(INPLACE_SCRIPT_PROG).bat
-
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 # See "MSys Note 3" in compiler/Makefile
-$(INPLACE_SCRIPT_PROG).bat :
-	echo '@call $(subst /,\,$(FPTOOLS_TOP_ABS_PLATFORM)/utils/ghc-pkg/$(HS_PROG)) --global-conf $(PKGCONF) %*' >> $@
-	chmod 755 $@
+INPLACE_SCRIPT=ghc-pkg-inplace.bat
+all::
+	$(RM) -f $(INPLACE_SCRIPT)
+	echo '@call $(subst /,\,$(FPTOOLS_TOP_ABS_PLATFORM)/utils/ghc-pkg/$(HS_PROG)) --global-conf $(FPTOOLS_TOP_ABS_PLATFORM)/driver/package.conf.inplace %*' >> $(INPLACE_SCRIPT)
+	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
+else
+INPLACE_SCRIPT=ghc-pkg-inplace
+all::
+	$(RM) -f $(INPLACE_SCRIPT)
+	echo "#!$(SHELL)"                                                      >> $(INPLACE_SCRIPT)
+	echo "GHCPKGBIN=$(FPTOOLS_TOP_ABS)/utils/ghc-pkg/$(HS_PROG)"           >> $(INPLACE_SCRIPT)
+	echo "PKGCONF=$(FPTOOLS_TOP_ABS_PLATFORM)/driver/package.conf.inplace" >> $(INPLACE_SCRIPT)
+	echo 'exec $$GHCPKGBIN --global-conf $$PKGCONF $${1+"$$@"}'            >> $(INPLACE_SCRIPT)
+	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
+endif
+CLEAN_FILES += $(INPLACE_SCRIPT)
 
-CLEAN_FILES += $(INPLACE_SCRIPT_PROG).bat
+ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+LINK = ghc-pkg
+LINK_TARGET = $(LINK)-$(ProjectVersion)
+INSTALLED_SCRIPT=$(bindir)/$(LINK_TARGET)
+install::
+	$(RM) -f $(INSTALLED_SCRIPT)
+	echo "#!$(SHELL)"                                           >> $(INSTALLED_SCRIPT)
+	echo "GHCPKGBIN=$(libexecdir)/$(HS_PROG)"                   >> $(INSTALLED_SCRIPT)
+	echo "PKGCONF=$(libdir)/package.conf"                       >> $(INSTALLED_SCRIPT)
+	echo 'exec $$GHCPKGBIN --global-conf $$PKGCONF $${1+"$$@"}' >> $(INSTALLED_SCRIPT)
+	$(EXECUTABLE_FILE) $(INSTALLED_SCRIPT)
 endif
 
 # ghc-pkg is needed to boot in rts/ and library dirs

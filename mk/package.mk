@@ -22,13 +22,8 @@ PKG_DATADIR = $$topdir
 
 else
 
-ifeq "$(BIN_DIST)" ""
-PKG_LIBDIR  = $(libdir)
-PKG_DATADIR = $(datadir)
-else
 PKG_LIBDIR  = $$libdir
 PKG_DATADIR = $$datadir
-endif
 
 endif # Unix
 
@@ -373,7 +368,6 @@ CLEAN_FILES += $(PACKAGE).haddock
 	$(HC) $(HC_OPTS) -D__HADDOCK__ -E $< -o $@
 
 HTML_INSTALL_DIR = $(datadir)/html/libraries/$(PACKAGE)
-#  NOT the same as HTML_DIR_INSTALLED when BIN_DIST is on
 
 install-docs :: $(HTML_DOC)
 	@$(INSTALL_DIR) $(HTML_INSTALL_DIR)

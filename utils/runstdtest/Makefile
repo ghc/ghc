@@ -1,12 +1,15 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
-SCRIPT_PROG=runstdtest
-SCRIPT_OBJS=runstdtest.prl
-SCRIPT_SUBST_VARS=RM DEFAULT_TMPDIR CONTEXT_DIFF
-INTERP=perl
-
-CLEAN_FILES += $(SCRIPT_PROG)
-DESTDIR=$(INSTSCRIPTDIR)
+PROG=runstdtest
+CLEAN_FILES += $(PROG)
+all::
+	$(RM) -f $(PROG)
+	echo '#!$(PERL)'                               >> $(PROG)
+	echo '$$RM             = "$(RM)";'             >> $(PROG)
+	echo '$$DEFAULT_TMPDIR = "$(DEFAULT_TMPDIR)";' >> $(PROG)
+	echo '$$CONTEXT_DIFF   = "$(CONTEXT_DIFF)";'   >> $(PROG)
+	cat $(PROG).prl                                >> $(PROG)
+	$(EXECUTABLE_FILE) $(PROG)
 
 include $(TOP)/mk/target.mk

@@ -6,7 +6,6 @@
 #
 # To use:
 #
-#   - make sure you set BIN_DIST=1 in your mk/build.mk before you built GHC.
 #   $ cd <top of GHC build tree>
 #   $ make binary-dist
 #

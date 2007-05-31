@@ -8,23 +8,18 @@ include $(TOP)/mk/boilerplate.mk
 # -----------------------------------------------------------------------------
 # ghc script
 
-ifeq "$(BIN_DIST)"   "1"
-GHCBIN=$$\"\"libexecdir/ghc-$(ProjectVersion)
-GHCLIB=$$\"\"libdir
-else
-GHCBIN=$(libexecdir)/ghc-$(ProjectVersion)
-GHCLIB=$(libdir)
-endif # BIN_DIST
-
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-SCRIPT_PROG  	  = ghc-$(ProjectVersion)
-LINK 		  = ghc
+ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+LINK = ghc
+LINK_TARGET = $(LINK)-$(ProjectVersion)
+INSTALLED_SCRIPT=$(bindir)/$(LINK_TARGET)
+install::
+	$(RM) -f $(INSTALLED_SCRIPT)
+	echo "#!$(SHELL)"                                 >> $(INSTALLED_SCRIPT)
+	echo "GHCBIN=$(libexecdir)/ghc-$(ProjectVersion)" >> $(INSTALLED_SCRIPT)
+	echo "TOPDIROPT=-B$(libdir)"                      >> $(INSTALLED_SCRIPT)
+	echo 'exec $$GHCBIN $$TOPDIROPT $${1+"$$@"}'      >> $(INSTALLED_SCRIPT)
+	$(EXECUTABLE_FILE) $(INSTALLED_SCRIPT)
 endif
-SCRIPT_OBJS	  = ghc.sh
-INTERP		  = $(SHELL)
-TOPDIROPT	  = -B$(GHCLIB)
-SCRIPT_SUBST_VARS = GHCBIN TOPDIROPT
-INSTALL_SCRIPTS  += $(SCRIPT_PROG)
 
 # -----------------------------------------------------------------------------
 

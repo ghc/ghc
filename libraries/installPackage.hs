@@ -6,11 +6,14 @@ import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Utils
 import Distribution.Verbosity
+import System.Cmd
 import System.Environment
 
 main :: IO ()
 main = do args <- getArgs
-          let verbosity = case args of
+          case args of
+              pref : ghcpkg : args' ->
+                  let verbosity = case args' of
                               [] -> normal
                               ['-':'v':v] ->
                                   let m = case v of
@@ -18,11 +21,24 @@ main = do args <- getArgs
                                               _ -> Just v
                                   in flagToVerbosity m
                               _ -> error ("Bad arguments: " ++ show args)
-              userHooks = simpleUserHooks
-              installFlags = InstallFlags {
-                                 installUserFlags = MaybeUserGlobal,
-                                 installVerbose = verbosity
-                             }
+                  in doit pref ghcpkg verbosity
+              _ ->
+                  error "Missing arguments"
+
+doit :: FilePath -> FilePath -> Verbosity -> IO ()
+doit pref ghcpkg verbosity =
+       do let userHooks = simpleUserHooks
+              copyFlags = CopyFlags {
+                              copyDest = NoCopyDest,
+                              copyVerbose = verbosity
+                          }
+              registerFlags = RegisterFlags {
+                                  regUser = MaybeUserGlobal,
+                                  regGenScript = False,
+                                  regInPlace = False,
+                                  regWithHcPkg = Just ghcpkg,
+                                  regVerbose = verbosity
+                              }
           pdFile <- defaultPackageDesc verbosity
           pd <- readPackageDescription verbosity pdFile
           lbi <- getPersistBuildConfig
@@ -36,25 +52,15 @@ main = do args <- getArgs
                          Nothing ->
                              error "Expected a library, but none found"
               pd' = pd { library = Just lib' }
-              -- When installing we need to use the non-inplace ghc-pkg.
-              -- We also set the compiler to be non-inplace, but that
-              -- probably doesn't matter.
-              c = compiler lbi
-              c' = c { compilerPath = dropInPlace (compilerPath c),
-                       compilerPkgTool = dropInPlace (compilerPkgTool c)
-                     }
-              lbi' = lbi { compiler = c' }
-          (instHook simpleUserHooks) pd' lbi' userHooks installFlags
-
-dropInPlace :: FilePath -> FilePath
-dropInPlace "" = ""
-dropInPlace xs@(x:xs') = case dropPrefix "-inplace" xs of
-                             Nothing -> x : dropInPlace xs'
-                             Just xs'' -> dropInPlace xs''
-
-dropPrefix :: Eq a => [a] -> [a] -> Maybe [a]
-dropPrefix [] ys = Just ys
-dropPrefix (x:xs) (y:ys)
- | x == y = dropPrefix xs ys
-dropPrefix _ _ = Nothing
+              -- When coying, we need to actually give a concrete
+              -- directory to copy to rather than "$topdir"
+              lbi_copy = lbi { prefix = pref }
+              -- When we run GHC we give it a $topdir that includes the
+              -- $compiler/lib/ part of libsubdir, so we only want the
+              -- $pkgid part in the package.conf file. This is a bit of
+              -- a hack, really.
+              lbi_register = lbi { libsubdir = "$pkgid" }
+          (copyHook simpleUserHooks) pd' lbi_copy userHooks copyFlags
+          (regHook simpleUserHooks) pd' lbi_register userHooks registerFlags
+          return ()
 

@@ -1,40 +1,30 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
-INSTALLING=1
-
-ifeq "$(INSTALLING)" "1"
 SUBDIRS = cgprof icons
-endif
 
-SCRIPT_SUBST_VARS= \
- FPTOOLS_TOP_ABS \
- INSTALLING \
- DEFAULT_TMPDIR \
- TARGETPLATFORM
+INPLACE_SCRIPT=ghcprof-inplace
+all::
+	$(RM) -f $(INPLACE_SCRIPT)
+	echo '#!$(PERL)'                                                              >> $(INPLACE_SCRIPT)
+	echo '$$DEFAULT_TMPDIR = "$(DEFAULT_TMPDIR)";'                                >> $(INPLACE_SCRIPT)
+	echo '$$TARGETPLATFORM = "$(TARGETPLATFORM)";'                                >> $(INPLACE_SCRIPT)
+	echo '$$icondir = "$(FPTOOLS_TOP_ABS)/ghc/utils/prof/icons";'                 >> $(INPLACE_SCRIPT)
+	echo '$$xmlparser = "$(FPTOOLS_TOP_ABS)/ghc/utils/prof/xmlparser/xmlparser";' >> $(INPLACE_SCRIPT)
+	echo '$$cgprof_dir = "$(FPTOOLS_TOP_ABS)/ghc/utils/prof/cgprof";'             >> $(INPLACE_SCRIPT)
+	cat ghcprof.prl                                                               >> $(INPLACE_SCRIPT)
+	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
 
-INSTALLED_SCRIPT_PROG  = ghcprof
-INPLACE_SCRIPT_PROG    = ghcprof-inplace
-
-ifeq "$(INSTALLING)" "1"
-SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
-else
-SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
-endif
-
-ifneq "$(BIN_DIST)" "1"
-SCRIPT_SUBST_VARS += libdir libexecdir
-endif
-
-# don't recurse on 'make install'
-#
-ifeq "$(INSTALLING)" "1"
-all clean distclean mostlyclean maintainer-clean ::
-	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
-endif
-
-INTERP          = perl
-SCRIPT_OBJS	= ghcprof.prl
-INSTALL_SCRIPTS += $(SCRIPT_PROG)
+INSTALLED_SCRIPT=$(bindir)/ghcprof
+install::
+	$(RM) -f $(INSTALLED_SCRIPT)
+	echo '#!$(PERL)'                                >> $(INSTALLED_SCRIPT)
+	echo '$$DEFAULT_TMPDIR = "$(DEFAULT_TMPDIR)";'  >> $(INSTALLED_SCRIPT)
+	echo '$$TARGETPLATFORM = "$(TARGETPLATFORM)";'  >> $(INSTALLED_SCRIPT)
+	echo '$$icondir = "$(libexecdir)/icons";'       >> $(INSTALLED_SCRIPT)
+	echo '$$xmlparser = "$(libexecdir)/xmlparser";' >> $(INSTALLED_SCRIPT)
+	echo '$$cgprof_dir = "$(libexecdir)";'          >> $(INSTALLED_SCRIPT)
+	cat ghcprof.prl                                 >> $(INSTALLED_SCRIPT)
+	$(EXECUTABLE_FILE) $(INSTALLED_SCRIPT)
 
 include $(TOP)/mk/target.mk

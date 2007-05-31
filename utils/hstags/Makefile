@@ -16,10 +16,6 @@ SCRIPT_SUBST_VARS=\
  TOP_PWD \
  ProjectVersionInt
 
-ifneq "$(BIN_DIST)" "1"
-SCRIPT_SUBST_VARS += libdir libexecdir DEFAULT_TMPDIR
-endif
-
 #
 # The hstags script is configured with different
 # set of config variables, depending on whether it
@@ -27,9 +23,7 @@ endif
 #
 ifeq "$(INSTALLING)" "1"
 TOP_PWD := $(prefix)
-ifeq "$(BIN_DIST)" "1"
 SCRIPT_PREFIX_FILES += prefix.txt
-endif
 else
 TOP_PWD := $(FPTOOLS_TOP_ABS)
 HSP_IMPORTS:="$(TOP_PWD)/ghc/lib/ghc":"$(TOP_PWD)/ghc/lib/required":"$(TOP_PWD)/ghc/lib/glaExts":"$(TOP_PWD)/ghc/lib/concurrent"
@@ -66,5 +60,5 @@ include $(TOP)/mk/target.mk
 #
 install ::
 	@$(RM) $(SCRIPT_PROG)
-	@$(MAKE) $(MFLAGS) BIN_DIST=0 $(SCRIPT_PROG)
+	@$(MAKE) $(MFLAGS) $(SCRIPT_PROG)
 

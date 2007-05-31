@@ -11,22 +11,6 @@ INSTALLING=1
 # -----------------------------------------------------------------------------
 # ghci script
 
-ifeq "$(INSTALLING)" "1"
-ifeq "$(BIN_DIST)"   "1"
-GHCBIN=$$\"\"libexecdir/ghc-$(ProjectVersion)
-GHCLIB=$$\"\"libdir
-else
-GHCBIN=$(libexecdir)/ghc-$(ProjectVersion)
-GHCLIB=$(libdir)
-endif # BIN_DIST
-else
-GHCBIN=$(FPTOOLS_TOP_ABS)/$(GHC_COMPILER_DIR_REL)/ghc-$(ProjectVersion)
-GHCLIB=$(FPTOOLS_TOP_ABS)
-endif
-
-INSTALLED_SCRIPT_PROG  = ghci-$(ProjectVersion)
-INPLACE_SCRIPT_PROG    = ghci-inplace
-
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 C_PROG = ghci
 C_OBJS += ghci.res
@@ -34,31 +18,42 @@ else
 C_SRCS=
 endif
 
-SCRIPT_OBJS	  = ghci.sh
-INTERP		  = $(SHELL)
-SCRIPT_SUBST_VARS = GHCBIN TOPDIROPT
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-INSTALL_SCRIPTS  += $(SCRIPT_PROG)
-else
-INSTALL_SCRIPTS  += ghcii.sh
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 INSTALL_PROGS    += $(C_PROG)
-endif
-TOPDIROPT 	  = -B$(GHCLIB)
-
-ifeq "$(INSTALLING)" "1"
-SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-LINK 		=  ghci
-endif
+GHCII_SCRIPT=$(bindir)/ghcii.sh
+install::
+	$(RM) -f $(GHCII_SCRIPT)
+	echo "#!$(SHELL)"                                 >> $(GHCII_SCRIPT)
+	echo 'exec "$0"/../ghc --interactive $${1+"$$@"}' >> $(GHCII_SCRIPT)
 else
-SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
+LINK = ghci
+LINK_TARGET = $(LINK)-$(ProjectVersion)
+INSTALLED_SCRIPT=$(bindir)/$(LINK_TARGET)
+install::
+	$(RM) -f $(INSTALLED_SCRIPT)
+	echo "#!$(SHELL)"                                          >> $(INSTALLED_SCRIPT)
+	echo "GHCBIN=$(libexecdir)/ghc-$(ProjectVersion)"          >> $(INSTALLED_SCRIPT)
+	echo "TOPDIROPT=-B$(libdir)"                               >> $(INSTALLED_SCRIPT)
+	echo 'exec $$GHCBIN $$TOPDIROPT --interactive $${1+"$$@"}' >> $(INSTALLED_SCRIPT)
+	$(EXECUTABLE_FILE) $(INSTALLED_SCRIPT)
+endif
+
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+INPLACE_SCRIPT=ghc-pkg-inplace
+all::
+	$(RM) -f $(INPLACE_SCRIPT)
+	echo "#!$(SHELL)"                                                              >> $(INPLACE_SCRIPT)
+	echo "GHCBIN=$(FPTOOLS_TOP_ABS)/$(GHC_COMPILER_DIR_REL)/ghc-$(ProjectVersion)" >> $(INPLACE_SCRIPT)
+	echo "TOPDIROPT=$(FPTOOLS_TOP_ABS)"                                            >> $(INPLACE_SCRIPT)
+	echo 'exec $$GHCPKGBIN --global-conf $$PKGCONF $${1+"$$@"}'                    >> $(INPLACE_SCRIPT)
+	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
 endif
 
 # don't recurse on 'make install'
 #
 ifeq "$(INSTALLING)" "1"
 all clean distclean maintainer-clean ::
-	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
+	$(MAKE) INSTALLING=0 $(MFLAGS) $@
 endif
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"

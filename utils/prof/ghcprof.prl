@@ -3,7 +3,7 @@
 #
 # (c) The GHC Team 2000
 #
-# needs: FPTOOLS_TOP_ABS, INSTALLING, DEFAULT_TMPDIR, TARGETPLATFORM, libexecdir
+# needs: DEFAULT_TMPDIR, TARGETPLATFORM, icondir, xmlparser, cgprof_dir
 #
 
 if ($ENV{'UDG_HOME'}) {
@@ -19,15 +19,6 @@ $bsp_s         = 10.0;
 $bsp_l         = 12;
 $bsp_g         = 13;
 $MaxNoNodes    = 1900;
-
-$icondir    = ( $INSTALLING ? "$libexecdir/icons" 
-	                    : "$FPTOOLS_TOP_ABS/ghc/utils/prof/icons" );
- 
-$xmlparser  = ( $INSTALLING ? "$libexecdir/xmlparser"
-	                    : "$FPTOOLS_TOP_ABS/ghc/utils/prof/xmlparser/xmlparser" );
-
-$cgprof_dir = ( $INSTALLING ? "$libexecdir"
-	                    : "$FPTOOLS_TOP_ABS/ghc/utils/prof/cgprof" );
 
 # where to make tmp file names?
 if ( $ENV{'TMPDIR'} ) {

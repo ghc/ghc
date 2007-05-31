@@ -135,6 +135,7 @@ endif
 
 # Same as default rule, but we pass $(INSTALL_STAGE) to $(MAKE) too
 install :: check-packages
+	$(INSTALL_DIR) $(bindir)
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS); do \
 	  echo "------------------------------------------------------------------------"; \
@@ -248,10 +249,6 @@ BINARY_DIST_PRE_RULES=$(foreach d,$(BinDistDirs),binary-dist-pre-$d)
 binary-dist:: binary-dist-pre $(BINARY_DIST_PRE_RULES)
 
 binary-dist-pre::
-ifeq "$(BIN_DIST)" ""
-	@echo "WARNING: To run the binary-dist target, you need to set BIN_DIST=1 in mk/build.mk"
-	@false
-endif
 	-rm -rf $(BIN_DIST_DIR)
 	-$(RM) $(BIN_DIST_DIR).tar.gz
 	$(MKDIRHIER) $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM)

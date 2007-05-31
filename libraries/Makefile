@@ -183,7 +183,8 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	-$(RM) -f stamp/configure.library.*.$* $*/unbuildable
 	( cd $* && setup/Setup configure \
 	           $(CONFIGURE_OPTS) \
-	           --prefix=$(prefix) \
+	           --prefix='$$topdir' \
+	           --libsubdir='$$compiler/lib/$$pkgid' \
 	           --with-compiler=../../compiler/ghc-inplace$(dot_bat) \
 	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace$(dot_bat) \
 	           --with-hsc2hs=../../utils/hsc2hs/hsc2hs-inplace$(dot_bat) \
@@ -227,16 +228,17 @@ doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 
 .PHONY: install install-docs install.library.%
 
-INSTALL_DIR=$(prefix)/share/ghc/doc/html/
+ROOT=$(prefix)/share/ghc/doc/html/
 
 install: $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR))
 ifneq "$(NO_HADDOCK_DOCS)" "YES"
-	$(INSTALL_DATA)   index.html doc-index.html 			  $(INSTALL_DIR)
-	$(INSTALL_SCRIPT) gen_contents_index 					  $(INSTALL_DIR)
+	$(INSTALL_DIR)                                            $(ROOT)
+	$(INSTALL_DATA)   index.html doc-index.html               $(ROOT)
+	$(INSTALL_SCRIPT) gen_contents_index                      $(ROOT)
 	# Hacks:
-	$(INSTALL_DATA)   $(prefix)/share/ghc/doc/html/base/*.css $(INSTALL_DIR)
-	$(INSTALL_DATA)   $(prefix)/share/ghc/doc/html/base/*.js  $(INSTALL_DIR)
-	$(INSTALL_DATA)   $(prefix)/share/ghc/doc/html/base/*.gif $(INSTALL_DIR)
+	$(INSTALL_DATA)   $(prefix)/share/ghc/doc/html/base/*.css $(ROOT)
+	$(INSTALL_DATA)   $(prefix)/share/ghc/doc/html/base/*.js  $(ROOT)
+	$(INSTALL_DATA)   $(prefix)/share/ghc/doc/html/base/*.gif $(ROOT)
 endif
 
 # Cabal doesn't let us ask to install docs only, so do nothing here
@@ -248,7 +250,7 @@ install-docs:
 # Thus if you install without building then it will just break.
 $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
-	ifBuildable/ifBuildable $* ../installPackage/installPackage
+	ifBuildable/ifBuildable $* ../installPackage/installPackage $(prefix) $(bindir)/ghc-pkg
 
 .PHONY: binary-dist binary-dist.library.%
 

@@ -215,7 +215,6 @@ endif
 #	HS_PROG		Haskell program
 #	C_PROG		C program
 #	LIBRARY		Library
-#	SCRIPT_PROG	Script (e.g. Perl script)
 #
 # For details of exactly what rule is generated, see the
 # relevant section below
@@ -483,77 +482,6 @@ DllVersionInfo.$(way_)rc ExeVersionInfo.$(way_)rc:
 	echo " END" >> $@
 	echo "END" >> $@
 
-#----------------------------------------
-#	Script programs
-
-ifneq "$(SCRIPT_PROG)" ""
-
-# To produce a fully functional script, you may
-# have to add some configuration variables at the top of 
-# the script, i.e., the compiler driver needs to know
-# the path to various utils in the build tree for instance.
-#
-# To have the build rule for the script automatically do this
-# for you, set the variable SCRIPT_SUBST_VARS to the list of
-# variables you need to put in.
-
-#
-# SCRIPT_SUBST creates a string of echo commands that
-# will when evaluated append the (perl)variable name and its value 
-# to the target it is used for, i.e.,
-#
-#    A=foo
-#    B=bar
-#    SCRIPT_SUBST_VARS = A B
-#    SCRIPT_SUBST=echo "$""A=\"foo\";" >> $@; echo "$""B=\"bar\";" >> $@
-#
-#    so if you have a rule like the following
-#    
-#     foo:
-#         @(RM) $@
-#         @(TOUCH) $@
-#         @eval $(SCRIPT_SUBST)
-#
-#    `make foo' would create a file `foo' containing the following
-#
-#    % cat foo
-#    $A=foo;
-#    $B=bar;
-#    %
-#
-# ToDo: make this work for shell scripts (drop the initial $).
-#
-ifeq "$(INTERP)" "$(SHELL)"
-SCRIPT_SUBST=$(foreach val,$(SCRIPT_SUBST_VARS),"echo \"$(val)=\\\"$($(val))\\\";\" >> $@;")
-else
-SCRIPT_SUBST=$(foreach val,$(SCRIPT_SUBST_VARS),"echo \"$$\"\"$(val)=\\\"$($(val))\\\";\" >> $@;")
-endif
-
-all :: $(SCRIPT_PROG)
-
-$(SCRIPT_PROG) : $(SCRIPT_OBJS)
-	$(RM) $@
-	@echo Creating $@...
-ifeq "$(INTERP)" "perl"
-	echo "#! "$(PERL) > $@
-else
-ifneq "$(INTERP)" ""
-	@echo "#!"$(INTERP) > $@
-else
-	@touch $@
-endif
-endif
-ifneq "$(SCRIPT_PREFIX_FILES)" ""
-	@cat $(SCRIPT_PREFIX_FILES) >> $@
-endif
-ifneq "$(SCRIPT_SUBST)" ""
-	@eval $(SCRIPT_SUBST) 
-endif
-	@cat $(SCRIPT_OBJS) >> $@
-	@chmod a+x $@
-	@echo Done.
-endif
-
 # ---------------------------------------------------------------------------
 # Symbolic links
 
@@ -562,43 +490,17 @@ endif
 
 ifneq "$(LINK)" ""
 
-all :: $(LINK)
-
-CLEAN_FILES += $(LINK)
-
 ifeq "$(LINK_TARGET)" ""
-ifneq "$(SCRIPT_PROG)" ""
-LINK_TARGET = $(SCRIPT_PROG)
-else
 ifneq "$(HS_PROG)" ""
 LINK_TARGET = $(HS_PROG)
 else
 ifneq "$(C_PROG)" ""
 LINK_TARGET = $(C_PROG)
 else
-LINK_TARGET = dunno
+$(error Cannot deduce LINK_TARGET)
 endif
 endif
 endif
-endif
-
-#
-# Don't want to overwrite $(LINK)s that aren't symbolic
-# links. Testing for symbolic links is problematic to do in
-# a portable fashion using a /bin/sh test, so we simply rely
-# on perl.
-#
-$(LINK) : $(LINK_TARGET)
-	@if ( $(PERL) -e '$$fn="$(LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
-	   echo "Creating a symbolic link from $(LINK_TARGET) to $(LINK)"; \
-	   $(RM) $(LINK); \
-	   $(LN_S) $(LINK_TARGET) $(LINK); \
-	 else \
-	   echo "Creating a symbolic link from $(LINK_TARGET) to $(LINK) failed: \`$(LINK)' already exists"; \
-	   echo "Perhaps remove \`$(LINK)' manually?"; \
-	   exit 1; \
-	 fi;
-
 
 #
 # install links to script drivers.

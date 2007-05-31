@@ -233,7 +233,7 @@ TAGS_C_SRCS=$(C_SRCS)
 # Specifically glafp-utils/mkdependC/mkdependC.prl and others in driver/ and
 # possibly others elsewhere in the tree.  ToDo: fix this properly.
 MOSTLY_CLEAN_FILES += $(HS_OBJS) $(C_OBJS) $(HSC_C_OBJS) $(GC_C_OBJS)
-CLEAN_FILES        += $(HS_PROG) $(C_PROG) $(SCRIPT_PROG) $(SCRIPT_LINK) \
+CLEAN_FILES        += $(HS_PROG) $(C_PROG) $(SCRIPT_LINK) \
 		      $(PROG) $(LIBRARY) a.out \
 		      $(DERIVED_HSC_SRCS) \
 		      $(DERIVED_GC_SRCS) \

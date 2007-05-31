@@ -13,22 +13,7 @@ SCRIPT_OBJS=stat2resid.prl
 #
 INSTALLING=0
 
-ifneq "$(BIN_DIST)" "1"
-SCRIPT_SUBST_VARS=DEFAULT_TMPDIR
-endif
-
 INTERP=perl
-
-#
-# The stat2resid script is configured with a different
-# path to the supporting perl scripts, depending on whether it
-# is to be installed or not.
-#
-ifeq "$(INSTALLING)" "1"
-ifeq "$(BIN_DIST)" "1"
-SCRIPT_PREFIX_FILES += prefix.txt
-endif
-endif
 
 #
 # install setup

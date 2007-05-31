@@ -4,14 +4,15 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
-SCRIPT_PROG 	= ghc-split
+PROG = ghc-split
+all:: $(PROG).prl
+	$(RM) -f $(PROG)
+	echo '#!$(PERL)'                                >> $(PROG)
+	echo '$$TARGETPLATFORM  = "$(TARGETPLATFORM)";' >> $(PROG)
+	cat $<                                          >> $(PROG)
+	$(EXECUTABLE_FILE) $(PROG)
 
-INTERP=perl
-
-SCRIPT_SUBST_VARS := TARGETPLATFORM
-
-INSTALL_LIBEXEC_SCRIPTS += $(SCRIPT_PROG)
-
-CLEAN_FILES += $(SCRIPT_OBJS)
+INSTALL_LIBEXEC_SCRIPTS += $(PROG)
+CLEAN_FILES += $(PROG) $(PROG).prl
 
 include $(TOP)/mk/target.mk

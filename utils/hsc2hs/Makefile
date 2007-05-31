@@ -5,8 +5,6 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
-INSTALLING=1
-
 # This causes libghccompat.a to be used:
 include $(GHC_COMPAT_DIR)/compat.mk
 
@@ -28,77 +26,57 @@ endif
 # clean solution impossible. So we revert to a hack in Main.hs...
 SRC_HC_OPTS      += -Wall
 
-ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-INSTALLED_SCRIPT_PROG  = hsc2hs-ghc
-endif
-INPLACE_SCRIPT_PROG    = hsc2hs-inplace
-
-ifeq "$(INSTALLING)" "1"
-TOP_PWD 	:= $(prefix)
-SCRIPT_PROG 	=  $(INSTALLED_SCRIPT_PROG)
-else
-TOP_PWD 	:= $(FPTOOLS_TOP_ABS)
-SCRIPT_PROG 	=  $(INPLACE_SCRIPT_PROG)
-endif
-
-ifeq "$(INSTALLING)" "1"
-ifeq "$(BIN_DIST)"   "1"
-HSC2HS_BINDIR=$$\"\"libexecdir
-HSC2HS_DIR=$$\"\"libdir
-HSC2HS_EXTRA=
-else
-HSC2HS_BINDIR=$(libexecdir)
-HSC2HS_DIR=$(libdir)
-HSC2HS_EXTRA=--cc=$(bindir)/ghc-$(ProjectVersion)
-endif # BIN_DIST
-else
-HSC2HS_BINDIR=$(FPTOOLS_TOP_ABS)/$(GHC_HSC2HS_DIR_REL)
-HSC2HS_DIR=$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_HSC2HS_DIR_REL)
+# -----------------------------------------------------------------------------
+# hsc2hs script
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 extra_flags=$(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS)))
 endif
+HSC2HS_INPLACE_EXTRA=--cc=$(CC) --ld=$(CC) $(extra_flags) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_INCLUDE_DIR_REL)
 
-HSC2HS_EXTRA=--cc=$(CC) --ld=$(CC) $(extra_flags) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_INCLUDE_DIR_REL)
-endif
-
-$(SCRIPT_PROG) : Makefile
-$(INSTALLED_SCRIPT_PROG) : $(TOP)/mk/config.mk
-
-SCRIPT_SUBST_VARS = HSC2HS_BINDIR HSC2HS_DIR HS_PROG HSC2HS_EXTRA
-
-SCRIPT_OBJS=hsc2hs.sh
-INTERP=$(SHELL)
-
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-INSTALL_SCRIPTS  += $(SCRIPT_PROG)
-INSTALL_LIBEXECS += $(HS_PROG)
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+# See "MSys Note 3" in compiler/Makefile
+INPLACE_SCRIPT=hsc2hs-inplace.bat
+FULL_INPLACE_PATH=$(subst /,\,$(FPTOOLS_TOP_ABS_PLATFORM)/utils/hsc2hs/)
+all::
+	$(RM) -f $(INPLACE_SCRIPT)
+	echo '@call $(FULL_INPLACE_PATH)$(HS_PROG)) ----template=$(FULL_INPLACE_PATH)template-hsc.h $(HSC2HS_EXTRA) %*' >> $(INPLACE_SCRIPT)
+	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
 else
-INSTALL_PROGS    += $(HS_PROG)
+INPLACE_SCRIPT=hsc2hs-inplace
+all::
+	$(RM) -f $(INPLACE_SCRIPT)
+	echo "#!$(SHELL)"                                                   >> $(INPLACE_SCRIPT)
+	echo "HSC2HS_BINDIR=$(FPTOOLS_TOP_ABS)/$(GHC_HSC2HS_DIR_REL)"       >> $(INPLACE_SCRIPT)
+	echo "HSC2HS_DIR=$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_HSC2HS_DIR_REL)" >> $(INPLACE_SCRIPT)
+	echo "HS_PROG=$(HS_PROG)"                                           >> $(INPLACE_SCRIPT)
+	echo "HSC2HS_EXTRA=$(HSC2HS_INPLACE_EXTRA)"                         >> $(INPLACE_SCRIPT)
+	cat hsc2hs.sh                                                       >> $(INPLACE_SCRIPT)
+	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
 endif
+CLEAN_FILES += $(INPLACE_SCRIPT)
+
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+INSTALL_PROGS    += $(HS_PROG)
+else
+INSTALL_LIBEXECS += $(HS_PROG)
+LINK = hsc2hs
+LINK_TARGET = $(LINK)-$(ProjectVersion)
+INSTALLED_SCRIPT=$(bindir)/$(LINK_TARGET)
+install::
+	$(RM) -f $(INSTALLED_SCRIPT)
+	echo "#!$(SHELL)"                  >> $(INSTALLED_SCRIPT)
+	echo "HSC2HS_BINDIR=$(libexecdir)" >> $(INSTALLED_SCRIPT)
+	echo "HSC2HS_DIR=$(libdir)"        >> $(INSTALLED_SCRIPT)
+	echo "HS_PROG=$(HS_PROG)"          >> $(INSTALLED_SCRIPT)
+	echo "HSC2HS_EXTRA="               >> $(INSTALLED_SCRIPT)
+	cat hsc2hs.sh                      >> $(INSTALLED_SCRIPT)
+	$(EXECUTABLE_FILE) $(INSTALLED_SCRIPT)
+endif
+
+# -----------------------------------------------------------------------------
 
 override datadir=$(libdir)
 INSTALL_DATAS += template-hsc.h
-
-# -----------------------------------------------------------------------------
-# don't recurse on 'make install'
-#
-ifeq "$(INSTALLING)" "1"
-all :: $(HS_PROG)
-	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
-
-clean distclean maintainer-clean :: 
-	$(MAKE) INSTALLING=0 BIN_DIST=0 $(MFLAGS) $@
-endif
-
-ifeq "$(INSTALLING)$(HOSTPLATFORM)" "0i386-unknown-mingw32"
-all :: $(INPLACE_SCRIPT_PROG).bat
-
-# See "MSys Note 3" in compiler/Makefile
-FULL_INPLACE_PATH=$(subst /,\,$(FPTOOLS_TOP_ABS_PLATFORM)/utils/hsc2hs/)
-$(INPLACE_SCRIPT_PROG).bat :
-	echo '@call $(FULL_INPLACE_PATH)$(HS_PROG) --template=$(FULL_INPLACE_PATH)template-hsc.h $(HSC2HS_EXTRA) %*' >> $@
-	chmod 755 $@
-endif
 
 include $(TOP)/mk/target.mk
