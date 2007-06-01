@@ -510,7 +510,9 @@ runAs dflags args = do
 runLink :: DynFlags -> [Option] -> IO ()
 runLink dflags args = do 
   let (p,args0) = pgm_l dflags
-  runSomething dflags "Linker" p (args0++args)
+      args1 = args0 ++ args
+  mb_env <- getGccEnv args1
+  runSomethingFiltered dflags id "Linker" p args1 mb_env
 
 runMkDLL :: DynFlags -> [Option] -> IO ()
 runMkDLL dflags args = do
