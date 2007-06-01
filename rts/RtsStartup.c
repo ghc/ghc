@@ -213,9 +213,6 @@ hs_init(int *argc, char **argv[])
     synchroniseSystem();             // calls initParallelSystem etc
 #endif	/* PAR */
 
-    /* Perform initialisation of adjustor thunk layer. */
-    initAdjustor();
-
     /* initialise scheduler data structures (needs to be done before
      * initStorage()).
      */

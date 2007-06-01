@@ -84,10 +84,6 @@ static void  GNUC3_ATTRIBUTE(used) obscure_ccall_wrapper(void)
 }
 extern void obscure_ccall_ret_code(void);
 
-#if defined(openbsd_HOST_OS)
-static unsigned char *obscure_ccall_ret_code_dyn;
-#endif
-
 #endif
 
 #if defined(x86_64_HOST_ARCH)
@@ -322,11 +318,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
 
 	adj_code[0x0a] = (unsigned char)0x68;  /* pushl obscure_ccall_ret_code */
 	*((StgFunPtr*)(adj_code + 0x0b)) = 
-#if !defined(openbsd_HOST_OS)
 			(StgFunPtr)obscure_ccall_ret_code;
-#else
-			(StgFunPtr)obscure_ccall_ret_code_dyn;
-#endif
 
 	adj_code[0x0f] = (unsigned char)0xff; /* jmp *%eax */
 	adj_code[0x10] = (unsigned char)0xe0; 
@@ -1098,22 +1090,4 @@ if ( *(unsigned char*)ptr != 0xe8 ) {
  *((unsigned char*)ptr) = '\0';
 
  freeExec(ptr);
-}
-
-
-/*
- * Function: initAdjustor()
- *
- * Perform initialisation of adjustor thunk layer (if needed.)
- */
-void
-initAdjustor(void)
-{
-#if defined(i386_HOST_ARCH) && defined(openbsd_HOST_OS)
-    obscure_ccall_ret_code_dyn = allocateExec(4);
-    obscure_ccall_ret_code_dyn[0] = ((unsigned char *)obscure_ccall_ret_code)[0];
-    obscure_ccall_ret_code_dyn[1] = ((unsigned char *)obscure_ccall_ret_code)[1];
-    obscure_ccall_ret_code_dyn[2] = ((unsigned char *)obscure_ccall_ret_code)[2];
-    obscure_ccall_ret_code_dyn[3] = ((unsigned char *)obscure_ccall_ret_code)[3];
-#endif
 }
