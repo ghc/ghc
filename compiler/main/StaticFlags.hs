@@ -61,6 +61,7 @@ module StaticFlags (
 
 	-- misc opts
 	opt_IgnoreDotGhci,
+	opt_ShortGhciBanner,
 	opt_ErrorSpans,
 	opt_GranMacros,
 	opt_HiVersion,
@@ -143,6 +144,8 @@ static_flags = [
 	------- GHCi -------------------------------------------------------
      ( "ignore-dot-ghci", PassFlag addOpt )
   ,  ( "read-dot-ghci"  , NoArg (removeOpt "-ignore-dot-ghci") )
+  ,  ( "short-ghci-banner", PassFlag addOpt )
+  ,  ( "long-ghci-banner" , NoArg (removeOpt "-short-ghci-banner") )
 
 	------- ways --------------------------------------------------------
   ,  ( "prof"		, NoArg (addWay WayProf) )
@@ -273,6 +276,7 @@ unpacked_opts =
 
 
 opt_IgnoreDotGhci		= lookUp FSLIT("-ignore-dot-ghci")
+opt_ShortGhciBanner             = lookUp FSLIT("-short-ghci-banner")
 
 -- debugging opts
 opt_PprStyle_Debug		= lookUp  FSLIT("-dppr-debug")

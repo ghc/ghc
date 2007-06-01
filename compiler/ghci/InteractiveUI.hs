@@ -8,7 +8,8 @@
 -----------------------------------------------------------------------------
 module InteractiveUI ( 
 	interactiveUI,
-	ghciWelcomeMsg
+	ghciWelcomeMsg,
+	ghciShortWelcomeMsg
    ) where
 
 #include "HsVersions.h"
@@ -89,6 +90,10 @@ ghciWelcomeMsg =
  " / /_\\// /_/ / /  | |    GHC Interactive, version " ++ cProjectVersion ++ ", for Haskell 98.\n"++
  "/ /_\\\\/ __  / /___| |    http://www.haskell.org/ghc/\n"++
  "\\____/\\/ /_/\\____/|_|    Type :? for help.\n"
+
+ghciShortWelcomeMsg =
+    "GHCi, version " ++ cProjectVersion ++
+    ": http://www.haskell.org/ghc/  :? for help"
 
 type Command = (String, String -> GHCi Bool, Bool, String -> IO [String])
 cmdName (n,_,_,_) = n

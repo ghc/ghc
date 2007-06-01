@@ -24,7 +24,7 @@ import HscMain          ( newHscEnv )
 import DriverPipeline	( oneShot, compileFile )
 import DriverMkDepend	( doMkDependHS )
 #ifdef GHCI
-import InteractiveUI	( ghciWelcomeMsg, interactiveUI )
+import InteractiveUI	( ghciWelcomeMsg, ghciShortWelcomeMsg, interactiveUI )
 #endif
 
 -- Various other random stuff that we need
@@ -430,8 +430,10 @@ showBanner cli_mode dflags = do
    let verb = verbosity dflags
 	-- Show the GHCi banner
 #  ifdef GHCI
-   when (isInteractiveMode cli_mode && verb >= 1) $
-      hPutStrLn stdout ghciWelcomeMsg
+   let msg = if opt_ShortGhciBanner
+             then ghciShortWelcomeMsg
+             else ghciWelcomeMsg
+   when (isInteractiveMode cli_mode && verb >= 1) $ hPutStrLn stdout msg
 #  endif
 
 	-- Display details of the configuration in verbose mode
