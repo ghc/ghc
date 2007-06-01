@@ -171,6 +171,12 @@ else
 Windows=NO
 endif
 
+ifeq "$(Windows)" "YES"
+dot_bat=.bat
+else
+dot_bat=
+endif
+
 # BootingFromHc - build GHC and the libraries from .hc files?
 BootingFromHc = @BootingFromHc@
 
@@ -752,7 +758,7 @@ GHC_TOUCHY_PGM		= touchy$(exeext)
 GHC_MANGLER_PGM		= ghc-asm
 GHC_SPLIT_PGM		= ghc-split
 GHC_SYSMAN_PGM 		= SysMan
-GHC_PKG_INPLACE_PGM	= ghc-pkg-inplace
+GHC_PKG_INPLACE_PGM	= ghc-pkg-inplace$(dot_bat)
 GHC_GENPRIMOP_PGM	= genprimopcode
 GHC_GENAPPLY_PGM	= genapply
 GHC_MKDEPENDC_PGM 	= mkdependC

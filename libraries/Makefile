@@ -79,12 +79,6 @@ endif
 empty=
 space=$(empty) $(empty)
 
-ifeq "$(Windows)" "YES"
-dot_bat=.bat
-else
-dot_bat=
-endif
-
 # -----------------------------------------------------------------------------
 
 ifneq "$(DOING_BIN_DIST)" "YES"
