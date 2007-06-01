@@ -42,6 +42,7 @@ module Data.Dynamic
 
 import Data.Typeable
 import Data.Maybe
+import Unsafe.Coerce
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
@@ -57,13 +58,7 @@ import Hugs.IORef
 import Hugs.IOExts
 #endif
 
-#ifdef __GLASGOW_HASKELL__
-unsafeCoerce :: a -> b
-unsafeCoerce = unsafeCoerce#
-#endif
-
 #ifdef __NHC__
-import NonStdUnsafeCoerce (unsafeCoerce)
 import NHC.IOExtras (IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
 #endif
 

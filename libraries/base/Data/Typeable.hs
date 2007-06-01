@@ -87,6 +87,7 @@ import Data.Either
 import Data.Int
 import Data.Word
 import Data.List( foldl )
+import Unsafe.Coerce
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
@@ -120,19 +121,13 @@ import Hugs.Prelude	( Key(..), TypeRep(..), TyCon(..), Ratio,
 			  ArrayException, AsyncException, Handle,
 			  Ptr, FunPtr, ForeignPtr, StablePtr )
 import Hugs.IORef	( IORef, newIORef, readIORef, writeIORef )
-import Hugs.IOExts	( unsafePerformIO, unsafeCoerce )
+import Hugs.IOExts	( unsafePerformIO )
 	-- For the Typeable instance
 import Hugs.Array	( Array )
 import Hugs.ConcBase	( MVar )
 #endif
 
-#ifdef __GLASGOW_HASKELL__
-unsafeCoerce :: a -> b
-unsafeCoerce = unsafeCoerce#
-#endif
-
 #ifdef __NHC__
-import NonStdUnsafeCoerce (unsafeCoerce)
 import NHC.IOExtras (IORef,newIORef,readIORef,writeIORef,unsafePerformIO)
 import IO (Handle)
 import Ratio (Ratio)
