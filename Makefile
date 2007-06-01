@@ -211,18 +211,7 @@ install-docs ::
 #	binary-dist is a GHC addition for binary distributions
 # 
 
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-BinDistShScripts = ghc-$(ProjectVersion) ghci-$(ProjectVersion) ghc-pkg-$(ProjectVersion) hsc2hs-ghc
-else
-BinDistShScripts =
-endif
-
-BinDistPrlScripts = ghcprof
-BinDistLibPrlScripts = ghc-asm ghc-split
-BinDistBins = hp2ps runghc
-BinDistLinks = ghc ghci ghc-pkg
-BinDistLibSplicedFiles = package.conf
-BinDistDirs = includes compiler docs driver rts utils
+BinDistDirs = includes compiler docs rts
 
 BIN_DIST_TARBALL=ghc-$(ProjectVersion)-$(TARGETPLATFORM).tar.bz2
 
@@ -232,7 +221,6 @@ BIN_DIST_TOP= distrib/Makefile \
               distrib/README \
               ANNOUNCE \
               LICENSE \
-              utils/mkdirhier/mkdirhier \
               install-sh \
               config.guess \
               config.sub   \
@@ -251,7 +239,13 @@ binary-dist:: binary-dist-pre $(BINARY_DIST_PRE_RULES)
 binary-dist-pre::
 	-rm -rf $(BIN_DIST_DIR)
 	-$(RM) $(BIN_DIST_DIR).tar.gz
-	$(MKDIRHIER) $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM)
+	$(MKDIRHIER) $(BIN_DIST_DIR)/mk
+	echo 'include $$(TOP)/Makefile-vars' >  $(BIN_DIST_DIR)/mk/boilerplate.mk
+	echo 'include $$(TOP)/mk/install.mk' >  $(BIN_DIST_DIR)/mk/target.mk
+	echo 'include $$(TOP)/mk/recurse.mk' >> $(BIN_DIST_DIR)/mk/target.mk
+	echo ''                              >  $(BIN_DIST_DIR)/mk/compat.mk
+	cp mk/install.mk $(BIN_DIST_DIR)/mk/
+	cp mk/recurse.mk $(BIN_DIST_DIR)/mk/
 	$(MKDIRHIER) $(BIN_DIST_DIR)/lib/$(TARGETPLATFORM)
 	$(MKDIRHIER) $(BIN_DIST_DIR)/share
 
@@ -263,6 +257,10 @@ $(BINARY_DIST_PRE_RULES): binary-dist-pre-%:
 	        libdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
 	        libexecdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
 	        datadir=$(BIN_DIST_DIR)/share
+
+binary-dist::
+	$(MAKE) -C driver binary-dist DOING_BIN_DIST=YES
+	$(MAKE) -C utils  binary-dist DOING_BIN_DIST=YES
 
 VARFILE=$(BIN_DIST_DIR)/Makefile-vars.in
 
@@ -277,17 +275,11 @@ binary-dist::
 	echo                                                         >  $(VARFILE)
 	echo "package = ghc"                                         >> $(VARFILE)
 	echo "version = $(ProjectVersion)"                           >> $(VARFILE)
-	echo "PACKAGE_SH_SCRIPTS = $(BinDistShScripts)"              >> $(VARFILE)
-	echo "PACKAGE_PRL_SCRIPTS = $(BinDistPrlScripts)"            >> $(VARFILE)
-	echo "PACKAGE_LIB_PRL_SCRIPTS = $(BinDistLibPrlScripts)"     >> $(VARFILE)
-	echo "PACKAGE_LIB_SPLICED_FILES = $(BinDistLibSplicedFiles)" >> $(VARFILE)
-	echo "PACKAGE_BINS = $(BinDistBins)"                         >> $(VARFILE)
-	echo "PACKAGE_OPT_BINS = $(BinDistOptBins)"                  >> $(VARFILE)
-	echo "PACKAGE_LINKS = $(BinDistLinks)"                       >> $(VARFILE)
+	echo "ProjectVersion = $(ProjectVersion)"                    >> $(VARFILE)
 	cat distrib/Makefile-bin-vars.in                             >> $(VARFILE)
 	@echo "Generating a shippable configure script.."
 	$(MV) $(BIN_DIST_DIR)/configure-bin.ac $(BIN_DIST_DIR)/configure.ac
-	( cd $(BIN_DIST_DIR); autoconf )
+	( cd $(BIN_DIST_DIR); autoreconf )
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 binary-dist::
@@ -346,35 +338,6 @@ $(BINARY_DIST_DOC_RULES): binary-dist-doc-%:
 	        libdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
 	        libexecdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
 	        datadir=$(BIN_DIST_DIR)/share
-endif
-
-# Rename scripts to $i.prl and $i.sh where necessary.
-# ToDo: do this in a cleaner way...
-
-ifneq "$(BinDistPrlScripts)" ""
-binary-dist::
-	@for i in $(BinDistPrlScripts); do \
-	     echo "Renaming $$i to $$i.prl"; \
-	    $(MV) $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM)/$$i  $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM)/$$i.prl; \
-	done
-endif
-
-ifneq "$(BinDistLibPrlScripts)" ""
-binary-dist::
-	@for i in $(BinDistLibPrlScripts); do \
-	     echo "Renaming $$i to $$i.prl"; \
-	    $(MV) $(BIN_DIST_DIR)/lib/$(TARGETPLATFORM)/$$i  $(BIN_DIST_DIR)/lib/$(TARGETPLATFORM)/$$i.prl; \
-	done
-endif
-
-ifneq "$(BinDistShScripts)" ""
-binary-dist::
-	@for i in $(BinDistShScripts); do \
-	    if test -x $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM)/$$i ; then \
-	    	echo "Renaming $$i to $$i.sh"; \
-	    	$(MV) $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM)/$$i  $(BIN_DIST_DIR)/bin/$(TARGETPLATFORM)/$$i.sh; \
-	    fi \
-	done
 endif
 
 .PHONY: binary-dist-doc-%

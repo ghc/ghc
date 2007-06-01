@@ -1,9 +1,9 @@
 TOP=..
 include $(TOP)/mk/boilerplate.mk
 
-ifeq "$(MAKING_BIN_DIST)" "1"
+ifeq "$(DOING_BIN_DIST)" "YES"
 # We're doing a binary-dist, descend into a subset of the dirs.
-SUBDIRS = hp2ps unlit
+SUBDIRS = mkdirhier ghc-pkg hasktags hp2ps hsc2hs parallel prof unlit runghc
 else
 ifeq "$(BootingFromHc)" "YES"
 SUBDIRS = mkdependC mkdirhier runstdtest genapply genprimopcode ghc-pkg unlit
@@ -11,15 +11,14 @@ else
 SUBDIRS = mkdependC mkdirhier runstdtest ghc-pkg hasktags hp2ps hsc2hs \
 	  parallel prof unlit genprimopcode genapply runghc
 endif
+ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+# lndir doesn't build on Windows
+SUBDIRS += lndir
+endif
 endif
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 SUBDIRS += touchy
-endif
-
-ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-# lndir doesn't build on Windows
-SUBDIRS += lndir
 endif
 
 # Utils that we don't build by default:
@@ -40,6 +39,11 @@ endif
 #  a Haskell compiler (which you may not have yet), and (b) you are
 #  unlikely to want it desperately.  It is easy to build once you have
 #  a Haskell compiler and if you want it.
+
+binary-dist:
+	$(INSTALL_DIR)           $(BIN_DIST_DIR)/utils
+	$(INSTALL_DATA) Makefile $(BIN_DIST_DIR)/utils/
+	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d binary-dist; done
 
 include $(TOP)/mk/target.mk
 

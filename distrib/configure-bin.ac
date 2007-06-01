@@ -108,6 +108,8 @@ echo "Which we'll further canonicalise into: $TargetPlatform"
 AC_SUBST(TargetPlatform)
 AC_SUBST(exeext)
 
+FP_FIND_ROOT
+
 #
 dnl ** Check Perl installation **
 #

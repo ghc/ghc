@@ -79,4 +79,11 @@ endif
 override datadir=$(libdir)
 INSTALL_DATAS += template-hsc.h
 
+binary-dist:
+	$(INSTALL_DIR)                      $(BIN_DIST_DIR)/utils/hsc2hs
+	$(INSTALL_DATA)    Makefile         $(BIN_DIST_DIR)/utils/hsc2hs/
+	$(INSTALL_DATA)    hsc2hs.sh        $(BIN_DIST_DIR)/utils/hsc2hs/
+	$(INSTALL_DATA)    $(INSTALL_DATAS) $(BIN_DIST_DIR)/utils/hsc2hs/
+	$(INSTALL_PROGRAM) $(HS_PROG)       $(BIN_DIST_DIR)/utils/hsc2hs/
+
 include $(TOP)/mk/target.mk

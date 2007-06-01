@@ -27,4 +27,10 @@ install::
 	cat ghcprof.prl                                 >> $(INSTALLED_SCRIPT)
 	$(EXECUTABLE_FILE) $(INSTALLED_SCRIPT)
 
+binary-dist:
+	$(INSTALL_DIR)              $(BIN_DIST_DIR)/utils/prof
+	$(INSTALL_DATA) Makefile    $(BIN_DIST_DIR)/utils/prof/
+	$(INSTALL_DATA) ghcprof.prl $(BIN_DIST_DIR)/utils/prof/
+	set -e; for d in $(SUBDIRS); do $(MAKE) -C $$d binary-dist; done
+
 include $(TOP)/mk/target.mk

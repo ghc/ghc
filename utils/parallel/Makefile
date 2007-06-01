@@ -21,8 +21,15 @@ PERL_PROGS = \
 
 BASH_PROGS = gr2ps gr2jv gr2ap gr2gran
 
-$(PERL_INSTALLERS) = $(addprefix install.perl.,$(PERL_PROGS))
-$(BASH_INSTALLERS) = $(addprefix install.bash.,$(BASH_PROGS))
+else
+
+PERL_PROGS =
+BASH_PROGS =
+
+endif
+
+PERL_INSTALLERS = $(addprefix install.perl.,$(PERL_PROGS))
+BASH_INSTALLERS = $(addprefix install.bash.,$(BASH_PROGS))
 
 .PHONY: install.perl.%
 .PHONY: install.bash.%
@@ -40,6 +47,13 @@ $(BASH_INSTALLERS): install.bash.%:
 	echo "#!$(BASH)" >> $(bindir)/$*
 	cat $*.bash      >> $(bindir)/$*
 	$(EXECUTABLE_FILE)  $(bindir)/$*
+
+binary-dist:
+	$(INSTALL_DIR)                                   $(BIN_DIST_DIR)/utils/parallel
+	$(INSTALL_DATA) Makefile                         $(BIN_DIST_DIR)/utils/parallel/
+ifeq "$(INSTALL_PARALLEL_SCRIPTS)" "YES"
+	$(INSTALL_DATA) $(addsuffix .pl,$(PERL_PROGS))   $(BIN_DIST_DIR)/utils/parallel/
+	$(INSTALL_DATA) $(addsuffix .bash,$(BASH_PROGS)) $(BIN_DIST_DIR)/utils/parallel/
 endif
 
 include $(TOP)/mk/target.mk

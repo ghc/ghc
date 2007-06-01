@@ -18,3 +18,8 @@ include $(TOP)/mk/target.mk
 # Get it over with!
 boot :: all
 
+binary-dist:
+	$(INSTALL_DIR)               $(BIN_DIST_DIR)/utils/touchy
+	$(INSTALL_DATA)    Makefile  $(BIN_DIST_DIR)/utils/touchy/
+	$(INSTALL_PROGRAM) $(C_PROG) $(BIN_DIST_DIR)/utils/touchy/
+

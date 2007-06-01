@@ -24,14 +24,10 @@
 
 default_target: build
 
-ifeq "$(IN_BIN_DIST)" "1"
-include ../Makefile-vars
-else
 # Ideally we'd just include something to give us variables
 # for paths and arguments to tools etc, and those set in mk/build.mk.
-TOP=.
+TOP=..
 include $(TOP)/mk/boilerplate.mk
-endif
 
 SUBDIRS = base old-locale old-time directory process filepath pretty \
           template-haskell readline Cabal random haskell98
@@ -88,6 +84,10 @@ dot_bat=.bat
 else
 dot_bat=
 endif
+
+# -----------------------------------------------------------------------------
+
+ifneq "$(DOING_BIN_DIST)" "YES"
 
 CONFIGURE_OPTS =
 CONFIGURE_STAMP_EXTRAS :=
@@ -226,6 +226,25 @@ doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                %/setup/Setup ifBuildable/ifBuildable
 	ifBuildable/ifBuildable $* setup/Setup haddock
 
+.PHONY: distclean clean clean.library.%
+
+distclean: clean
+
+clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
+	$(RM) -f stamp/bootstrapping.*
+	$(RM) -rf bootstrapping.*
+	$(RM) -rf ifBuildable
+	$(RM) -f libraries.txt index.html doc-index.html
+
+$(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR)): \
+clean.library.%:
+	$(RM) -f stamp/configure.library.*.$* $*/unbuildable
+	-cd $* && setup/Setup clean
+	$(RM) -rf $*/setup
+endif
+
+# -----------------------------------------------------------------------------
+
 .PHONY: install install-docs install.library.%
 
 ROOT=$(prefix)/share/ghc/doc/html/
@@ -259,6 +278,8 @@ BIN_DIST_LIBDIR=$(BIN_DIST_DIR)/libraries
 binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR))
 	mkdir                               $(BIN_DIST_LIBDIR)/installPackage
 	cp 	  installPackage/installPackage $(BIN_DIST_LIBDIR)/installPackage
+	mkdir                               $(BIN_DIST_LIBDIR)/ifBuildable
+	cp 	  ifBuildable/ifBuildable       $(BIN_DIST_LIBDIR)/ifBuildable
 	cp    Makefile                      $(BIN_DIST_LIBDIR)
 	cp    gen_contents_index            $(BIN_DIST_LIBDIR)
 	cp    index.html                    $(BIN_DIST_LIBDIR)
@@ -269,26 +290,13 @@ $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR)): \
 binary-dist.library.%:
 	$(MKDIRHIER) $(BIN_DIST_LIBDIR)/$*
 	ifBuildable/ifBuildable $* cp    $*.cabal      $(BIN_DIST_LIBDIR)/$*
+	ifBuildable/ifBuildable $* cp .setup-config    $(BIN_DIST_LIBDIR)/$*
 	ifBuildable/ifBuildable $* cp -a dist          $(BIN_DIST_LIBDIR)/$*
+	# Euch
+	ifBuildable/ifBuildable $* cp -aL include      $(BIN_DIST_LIBDIR)/$* || :
 	ifBuildable/ifBuildable $* $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
 	     \( -name "*_split" -o -name "autogen" \) | xargs rm -rf
 	ifBuildable/ifBuildable $* $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
 	     \( \( -name "*.o" -o -name "*.p_o" \) -a ! -name "HS*" \) \
 	     -exec rm {} \;
-
-.PHONY: distclean clean clean.library.%
-
-distclean: clean
-
-clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
-	$(RM) -f stamp/bootstrapping.*
-	$(RM) -rf bootstrapping.*
-	$(RM) -rf ifBuildable
-	$(RM) -f libraries.txt index.html doc-index.html
-
-$(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR)): \
-clean.library.%:
-	$(RM) -f stamp/configure.library.*.$* $*/unbuildable
-	-cd $* && setup/Setup clean
-	$(RM) -rf $*/setup
 

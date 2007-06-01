@@ -15,4 +15,9 @@ include $(GHC_COMPAT_DIR)/compat.mk
 # we must also build with $(GhcHcOpts) here:
 SRC_HC_OPTS += $(GhcHcOpts) $(GhcStage1HcOpts)
 
+binary-dist:
+	$(INSTALL_DIR)                $(BIN_DIST_DIR)/utils/runghc
+	$(INSTALL_DATA)    Makefile   $(BIN_DIST_DIR)/utils/runghc/
+	$(INSTALL_PROGRAM) $(HS_PROG) $(BIN_DIST_DIR)/utils/runghc/
+
 include $(TOP)/mk/target.mk

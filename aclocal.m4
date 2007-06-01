@@ -1094,4 +1094,71 @@ AC_DEFUN([CHECK_GMP],
 AC_REQUIRE([AC_PROG_CC])
 ])
 
+# --------------------------------------------------------------
+# Calculate absolute path to build tree
+# --------------------------------------------------------------
+
+AC_DEFUN([FP_FIND_ROOT],[
+AC_MSG_CHECKING(for path to top of build tree)
+
+hardtop=`pwd`
+
+dnl Remove common automounter nonsense
+dnl
+hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | sed 's|^/tmp_mnt/|/|' | sed 's|^//\(.\)/|\1:/|' `
+
+dnl Find 'hardtop_plat', the native format for 'hardtop'
+dnl (i.e., right kind of \dnl slashes on a Win32 box, but with b-slashes
+dnl being escaped).
+dnl
+dnl Note OSTYPE: On Cygwin we need to use 'cygpath' to convert
+dnl              /cygdrive/c/foo to c:/foo but we must not do that if we
+dnl              aren't building using Cygwin (notably msys), because
+dnl              cygpath doesn't exist.  It seems that 'bash' sets
+dnl              OSTYPE to 'cygwin' or 'msys' respectively, but cygwin's
+dnl              'sh' does not.  So we hackily assume that if the shell
+dnl              hasn't set it to 'msys' then we must be in Cygwin.
+dnl              Sigh.
+dnl
+dnl              The Right Thing is probably to test $BuildPlatform
+dnl              instead, but we are sloppy about setting that correctly
+dnl              at the moment, so we just work around for now.
+dnl
+dnl              The quotes round "$(OSTYPE)" are essential, for the
+dnl              Cygwin-sh case where OSTYPE is not set.
+case $HostPlatform in
+  i386-unknown-mingw32 | i386-unknown-cygwin32)
+        if test "${OSTYPE}" != "msys"
+          then
+            # convert $hardtop to a path that mingw will understand too
+            cyghardtop=${hardtop}
+            hardtop=`cygpath -w ${cyghardtop} | sed -e 's@\\\\@/@g'`
+            hardtop_plat=`cygpath -w ${cyghardtop} | sed -e 's@\\\\@\\\\\\\\@g'`
+          else
+dnl OK, so we're in the MSYS case.  hardtop looks like /c/....
+dnl We want to make hardtop_plat into c:/...
+dnl Stop using [] for quotes temporarily, so we can use [] in the sed regexp
+changequote(, )dnl
+               hardtop_plat=`echo ${hardtop} | sed -e 's@^/\\([a-zA-Z]\\)/@\\1:/@g'`
+changequote([, ])dnl
+        fi
+        ;;
+  *)
+        hardtop_plat=${hardtop}
+        ;;
+esac
+AC_SUBST(hardtop)
+AC_SUBST(hardtop_plat)
+
+AC_MSG_RESULT(${hardtop})
+
+# We don't support building in directories with spaces.
+case "$hardtop" in
+  *' '*) AC_MSG_ERROR([
+   The build system does not support building in a directory containing
+   space characters.  Suggestion: move the build tree somewhere else.])
+ ;;
+esac
+])
+
 # LocalWords:  fi

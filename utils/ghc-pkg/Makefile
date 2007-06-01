@@ -90,4 +90,9 @@ boot :: depend
 	$(MAKE) all
 endif
 
+binary-dist:
+	$(INSTALL_DIR)                $(BIN_DIST_DIR)/utils/ghc-pkg
+	$(INSTALL_DATA)    Makefile   $(BIN_DIST_DIR)/utils/ghc-pkg/
+	$(INSTALL_PROGRAM) $(HS_PROG) $(BIN_DIST_DIR)/utils/ghc-pkg/
+
 include $(TOP)/mk/target.mk
