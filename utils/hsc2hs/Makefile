@@ -40,7 +40,7 @@ INPLACE_SCRIPT=hsc2hs-inplace.bat
 FULL_INPLACE_PATH=$(subst /,\,$(FPTOOLS_TOP_ABS_PLATFORM)/utils/hsc2hs/)
 all::
 	$(RM) -f $(INPLACE_SCRIPT)
-	echo '@call $(FULL_INPLACE_PATH)$(HS_PROG)) ----template=$(FULL_INPLACE_PATH)template-hsc.h $(HSC2HS_EXTRA) %*' >> $(INPLACE_SCRIPT)
+	echo '@call $(FULL_INPLACE_PATH)$(HS_PROG) ----template=$(FULL_INPLACE_PATH)template-hsc.h $(HSC2HS_INPLACE_EXTRA) %*' >> $(INPLACE_SCRIPT)
 	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
 else
 INPLACE_SCRIPT=hsc2hs-inplace
