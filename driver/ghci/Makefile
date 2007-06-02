@@ -23,8 +23,8 @@ INSTALL_PROGS    += $(C_PROG)
 GHCII_SCRIPT=$(bindir)/ghcii.sh
 install::
 	$(RM) -f $(GHCII_SCRIPT)
-	echo "#!$(SHELL)"                                 >> $(GHCII_SCRIPT)
-	echo 'exec "$0"/../ghc --interactive $${1+"$$@"}' >> $(GHCII_SCRIPT)
+	echo "#!$(SHELL)"                                  >> $(GHCII_SCRIPT)
+	echo 'exec "$$0"/../ghc --interactive $${1+"$$@"}' >> $(GHCII_SCRIPT)
 else
 LINK = ghci
 LINK_TARGET = $(LINK)-$(ProjectVersion)
