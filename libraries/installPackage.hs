@@ -42,12 +42,24 @@ doit pref ghcpkg verbosity =
           pdFile <- defaultPackageDesc verbosity
           pd <- readPackageDescription verbosity pdFile
           lbi <- getPersistBuildConfig
-          let -- XXX This is an almighty hack, shadowing the base Setup.hs hack
+          let -- XXX These are almighty hacks, shadowing the base
+              -- Setup.hs hacks
+              extraExtraLibs = if pkgName (package pd) == "base"
+                               then ["wsock32", "msvcrt", "kernel32",
+                                     "user32", "shell32"]
+                               else []
               lib' = case library pd of
                          Just lib ->
-                             lib {
-                                 exposedModules = filter (("GHC.Prim" /=))
-                                                $ exposedModules lib
+                             let ems = filter (("GHC.Prim" /=))
+                                     $ exposedModules lib
+                                 lib_bi = libBuildInfo lib
+                                 lib_bi' = lib_bi {
+                                               extraLibs = extraExtraLibs
+                                                       ++ extraLibs lib_bi
+                                           }
+                             in lib {
+                                    exposedModules = ems,
+                                    libBuildInfo = lib_bi'
                                  }
                          Nothing ->
                              error "Expected a library, but none found"
