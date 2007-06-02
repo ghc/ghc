@@ -171,6 +171,10 @@ configure: $(foreach SUBDIR,$(SUBDIRS), \
 # We should depend on %/%.cabal here (and in other rules), but make
 # makes that difficult.
 
+# We explicitly set datadir to "$prefix/share" as, while that is the
+# default on Linux, on Windows it defaults to
+# "C:\\Program Files\\Common Files"
+
 $(foreach SUBDIR,$(SUBDIRS), \
 		  stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR)): \
 stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
@@ -178,6 +182,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	( cd $* && setup/Setup configure \
 	           $(CONFIGURE_OPTS) \
 	           --prefix='$$topdir' \
+	           --datadir='$$prefix/share' \
 	           --libsubdir='$$compiler/lib/$$pkgid' \
 	           --with-compiler=../../compiler/ghc-inplace$(dot_bat) \
 	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace$(dot_bat) \
