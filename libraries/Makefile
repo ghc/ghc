@@ -175,6 +175,16 @@ configure: $(foreach SUBDIR,$(SUBDIRS), \
 # default on Linux, on Windows it defaults to
 # "C:\\Program Files\\Common Files"
 
+# We also set libsubdir differently on Windows and non-Windows, as on
+# non-Windows the path we deduce is highre up than the path passed to
+# the executable with the shell script on non-Windows. This should
+# probably be tidied up so that we can always pass the same libsubdir.
+ifeq "$(Windows)" "YES"
+libsubdir = $$pkgid
+else
+libsubdir = $$compiler/lib/$$pkgid
+endif
+
 $(foreach SUBDIR,$(SUBDIRS), \
 		  stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR)): \
 stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
@@ -183,7 +193,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	           $(CONFIGURE_OPTS) \
 	           --prefix='$$topdir' \
 	           --datadir='$$prefix/share' \
-	           --libsubdir='$$compiler/lib/$$pkgid' \
+	           --libsubdir='$(libsubdir)' \
 	           --with-compiler=../../compiler/ghc-inplace$(dot_bat) \
 	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace$(dot_bat) \
 	           --with-hsc2hs=../../utils/hsc2hs/hsc2hs-inplace$(dot_bat) \
