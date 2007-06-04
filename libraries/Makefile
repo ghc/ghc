@@ -299,7 +299,6 @@ $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR)): \
 binary-dist.library.%:
 	$(MKDIRHIER) $(BIN_DIST_LIBDIR)/$*
 	ifBuildable/ifBuildable $* cp    $*.cabal      $(BIN_DIST_LIBDIR)/$*
-	ifBuildable/ifBuildable $* cp .setup-config    $(BIN_DIST_LIBDIR)/$*
 	ifBuildable/ifBuildable $* cp -a dist          $(BIN_DIST_LIBDIR)/$*
 	# Euch
 	ifBuildable/ifBuildable $* cp -aL include      $(BIN_DIST_LIBDIR)/$* || :
