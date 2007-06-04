@@ -8,6 +8,7 @@ import Distribution.Simple.Utils
 import Distribution.Verbosity
 import System.Cmd
 import System.Environment
+import System.Info
 
 main :: IO ()
 main = do args <- getArgs
@@ -44,7 +45,8 @@ doit pref ghcpkg verbosity =
           lbi <- getPersistBuildConfig
           let -- XXX These are almighty hacks, shadowing the base
               -- Setup.hs hacks
-              extraExtraLibs = if pkgName (package pd) == "base"
+              extraExtraLibs = if (os == "mingw32") &&
+                                  (pkgName (package pd) == "base")
                                then ["wsock32", "msvcrt", "kernel32",
                                      "user32", "shell32"]
                                else []
