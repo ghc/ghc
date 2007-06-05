@@ -1471,6 +1471,10 @@ wantNameFromInterpretedModule noCanDo str and_then = do
       []    -> return ()
       (n:_) -> do
             let modl = GHC.nameModule n
+            if not (GHC.isExternalName n)
+               then noCanDo n $ ppr n <>
+                                text " is not defined in an interpreted module"
+               else do
             is_interpreted <- io (GHC.moduleIsInterpreted session modl)
             if not is_interpreted
                then noCanDo n $ text "module " <> ppr modl <>

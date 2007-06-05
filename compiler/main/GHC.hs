@@ -110,7 +110,7 @@ module GHC (
 
 	-- ** Names
 	Name, 
-	nameModule, pprParenSymName, nameSrcSpan,
+	isExternalName, nameModule, pprParenSymName, nameSrcSpan,
 	NamedThing(..),
 	RdrName(Qual,Unqual),
 	
