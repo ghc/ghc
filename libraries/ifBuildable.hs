@@ -6,6 +6,7 @@ import System.Cmd
 import System.Directory
 import System.Environment
 import System.Exit
+import System.IO
 
 main :: IO ()
 main = do args <- getArgs
@@ -15,14 +16,19 @@ main = do args <- getArgs
               [_] ->
                   error "No command given"
               package : prog : progArgs ->
-                  do setCurrentDirectory package
-                     unbuildable <- doesFileExist "unbuildable"
-                     if unbuildable
-                        then do mustBeBuildables <- getMustBeBuildablePackages
-                                when (package `elem` mustBeBuildables)
-                                     (error (package ++ " is unbuildable"))
-                        else do ec <- rawSystem prog progArgs
-                                exitWith ec
+                  doit package prog progArgs
+
+doit :: String -> String -> [String] -> IO ()
+doit package prog progArgs
+ = do setCurrentDirectory package
+      unbuildable <- doesFileExist "unbuildable"
+      if unbuildable
+         then do mustBeBuildables <- getMustBeBuildablePackages
+                 if package `elem` mustBeBuildables
+                     then error (package ++ " is unbuildable")
+                     else hPutStrLn stderr "Warning: Package is unbuildable"
+         else do ec <- rawSystem prog progArgs
+                 exitWith ec
 
 getMustBeBuildablePackages :: IO [String]
 getMustBeBuildablePackages
