@@ -6,7 +6,6 @@ module Main(main) where
 #include "../../includes/Constants.h"
 
 
-#if __GLASGOW_HASKELL__ >= 504
 import Text.PrettyPrint
 import Data.Word
 import Data.Bits
@@ -14,14 +13,6 @@ import Data.List	( intersperse )
 import System.Exit
 import System.Environment
 import System.IO
-#else
-import System
-import IO
-import Bits
-import Word
-import Pretty
-import List		( intersperse )
-#endif
 
 -- -----------------------------------------------------------------------------
 -- Argument kinds (rougly equivalent to PrimRep)

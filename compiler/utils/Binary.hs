@@ -660,16 +660,6 @@ getFS bh = do
   --
   go 0
 
-#if __GLASGOW_HASKELL__ < 600
-mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
-mallocForeignPtrBytes n = do
-  r <- mallocBytes n
-  newForeignPtr r (finalizerFree r)
-
-foreign import ccall unsafe "stdlib.h free" 
-  finalizerFree :: Ptr a -> IO ()
-#endif
-
 instance Binary PackageId where
   put_ bh pid = put_ bh (packageIdFS pid)
   get bh = do { fs <- get bh; return (fsToPackageId fs) }

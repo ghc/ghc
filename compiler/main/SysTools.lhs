@@ -57,11 +57,7 @@ import Data.Maybe
 import Data.List
 
 #ifndef mingw32_HOST_OS
-#if __GLASGOW_HASKELL__ > 504
 import qualified System.Posix.Internals
-#else
-import qualified Posix
-#endif
 #else /* Must be Win32 */
 import Foreign
 import CString		( CString, peekCString )
@@ -877,12 +873,9 @@ getBaseDir = return Nothing
 
 #ifdef mingw32_HOST_OS
 foreign import ccall unsafe "_getpid" getProcessID :: IO Int -- relies on Int == Int32 on Windows
-#elif __GLASGOW_HASKELL__ > 504
-getProcessID :: IO Int
-getProcessID = System.Posix.Internals.c_getpid >>= return . fromIntegral
 #else
 getProcessID :: IO Int
-getProcessID = Posix.getProcessID
+getProcessID = System.Posix.Internals.c_getpid >>= return . fromIntegral
 #endif
 
 -- Divvy up text stream into lines, taking platform dependent

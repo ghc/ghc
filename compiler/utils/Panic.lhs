@@ -28,11 +28,7 @@ import Config
 import FastTypes
 
 #ifndef mingw32_HOST_OS
-# if __GLASGOW_HASKELL__ > 504
 import System.Posix.Signals
-# else
-import Posix		( Handler(Catch), installHandler, sigINT, sigQUIT )
-# endif /* GHC > 504 */
 #endif /* mingw32_HOST_OS */
 
 #if defined(mingw32_HOST_OS) && __GLASGOW_HASKELL__ >= 603
@@ -171,11 +167,7 @@ tryMost action = do r <- try action; filter r
 tryUser :: IO a -> IO (Either Exception.Exception a)
 tryUser action = tryJust tc_errors action
   where 
-#if __GLASGOW_HASKELL__ > 504
 	tc_errors e@(Exception.IOException ioe) | isUserError ioe = Just e
-#else 
-	tc_errors e@(Exception.IOException ioe) | isUserError e = Just e
-#endif
 	tc_errors _other = Nothing
 \end{code}	
 

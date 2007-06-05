@@ -224,19 +224,4 @@ parseUnsignedInteger buf len radix char_to_int
 inlinePerformIO :: IO a -> a
 inlinePerformIO (IO m) = case m realWorld# of (# _, r #)   -> r
 
-#if __GLASGOW_HASKELL__ < 600
-mallocForeignPtrArray :: Storable a => Int -> IO (ForeignPtr a)
-mallocForeignPtrArray  = doMalloc undefined
-  where
-    doMalloc            :: Storable b => b -> Int -> IO (ForeignPtr b)
-    doMalloc dummy size  = mallocForeignPtrBytes (size * sizeOf dummy)
-
-mallocForeignPtrBytes :: Int -> IO (ForeignPtr a)
-mallocForeignPtrBytes n = do
-  r <- mallocBytes n
-  newForeignPtr r (finalizerFree r)
-
-foreign import ccall unsafe "stdlib.h free" 
-  finalizerFree :: Ptr a -> IO ()
-#endif
 \end{code}

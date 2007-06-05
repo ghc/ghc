@@ -34,18 +34,10 @@ import Prelude
 
 #include "../../includes/ghcconfig.h"
 
-#if __GLASGOW_HASKELL__ >= 504
 import System.Console.GetOpt
 import Text.PrettyPrint
 import qualified Control.Exception as Exception
 import Data.Maybe
-#else
-import GetOpt
-import Pretty
-import qualified Exception
-import Maybe
-#endif
-
 import Data.Char	( isSpace )
 import Monad
 import Directory
@@ -53,21 +45,12 @@ import System	( getArgs, getProgName, getEnv,
 		  exitWith, ExitCode(..)
 		)
 import System.IO
-#if __GLASGOW_HASKELL__ >= 600
 import System.IO.Error (try)
-#else
-import System.IO (try)
-#endif
 import Data.List ( isPrefixOf, isSuffixOf, intersperse, sortBy )
 
 #ifdef mingw32_HOST_OS
 import Foreign
-
-#if __GLASGOW_HASKELL__ >= 504
 import Foreign.C.String
-#else
-import CString
-#endif
 #endif
 
 import IO ( isPermissionError, isDoesNotExistError )

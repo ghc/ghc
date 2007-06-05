@@ -41,10 +41,7 @@ import Util
 import FastString
 
 #ifndef mingw32_HOST_OS
-import System.Posix
-#if __GLASGOW_HASKELL__ > 504
-	hiding (getEnv)
-#endif
+import System.Posix hiding (getEnv)
 #else
 import GHC.ConsoleHandler ( flushConsole )
 import System.Win32	  ( setConsoleCP, setConsoleOutputCP )
