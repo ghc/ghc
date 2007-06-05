@@ -365,7 +365,7 @@ charsToCChars xs  = map castCharToCChar xs
 -- terminated by NUL.
 type CWString    = Ptr CWchar
 
--- | A wide character string with explicit length information in bytes
+-- | A wide character string with explicit length information in 'CWchar's
 -- instead of a terminating NUL (allowing NUL characters in the middle
 -- of the string).
 type CWStringLen = (Ptr CWchar, Int)
