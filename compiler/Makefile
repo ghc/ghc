@@ -894,15 +894,43 @@ else
 GhcLibraryName=libHS$(PACKAGE)$(_way).a
 endif
 
+ifneq "$(DOING_BIN_DIST)" "YES"
 $(GHC_PROG) : $(GhcLibraryName) main/Main.hs
 	$(RM) package.conf.inplace
 	$(RM) $(STAMP_PKG_CONF)
 	$(MAKE) $(STAMP_PKG_CONF)
 	$(MAKE) -f Makefile.ghcbin $(MFLAGS) HS_PROG=$(GHC_PROG) $@
+endif
 
 # Propagate standard targets to Makefile.ghcbin
 docs runtests $(BOOT_TARGET) TAGS clean distclean mostlyclean maintainer-clean $(INSTALL_TARGET) $(INSTALL_DOCS_TARGET) html chm HxS ps dvi txt::
 	$(MAKE) -f Makefile.ghcbin $(MFLAGS) $@
+endif
+
+include $(TOP)/mk/package.mk
+
+#-----------------------------------------------------------------------------
+# binary-dist
+
+# $(error Q$(INSTALL_PROGS)W)
+foo:
+	echo Q$(INSTALL_PROGS)W$(GHC_PROG)E
+	echo Q$(INSTALL_LIBEXECS)W$(GHC_PROG)E
+
+binary-dist:
+	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/compiler
+	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/compiler/stage$(stage)
+	echo "stage=$(stage)"                > $(BIN_DIST_DIR)/compiler/Makefile
+	cat Makefile                        >> $(BIN_DIST_DIR)/compiler/Makefile
+	$(INSTALL_DATA)    package.conf.in     $(BIN_DIST_DIR)/compiler/
+ifneq "$(INSTALL_LIBS)" ""
+	set -e; for f in $(INSTALL_LIBS); do $(INSTALL_DATA) $$f $(BIN_DIST_DIR)/compiler/$$f; done
+endif
+ifneq "$(INSTALL_PROGS)" ""
+	set -e; for f in $(INSTALL_PROGS); do $(INSTALL_PROGRAM) $$f $(BIN_DIST_DIR)/compiler/$$f; done
+endif
+ifneq "$(INSTALL_LIBEXECS)" ""
+	set -e; for f in $(INSTALL_LIBEXECS); do $(INSTALL_PROGRAM) $$f $(BIN_DIST_DIR)/compiler/$$f; done
 endif
 
 #-----------------------------------------------------------------------------
@@ -929,7 +957,6 @@ EXTRA_SRCS += parser/Parser.y
 # tree, which is where we are going to move the TAGS file to.a
 
 TAGS_HS_SRCS = parser/Parser.y.pp $(filter-out $(DERIVED_SRCS) main/Config.hs parser/Parser.y, $(sort $(SRCS)))
-
 
 include $(TOP)/mk/target.mk
 

@@ -10,9 +10,7 @@ ifneq "$(PACKAGE)" ""
 # to the compiler, and spliced into package.conf in place of $topdir at
 # runtime.
 #
-# On Unix, we only use absolute paths in package.conf, except that when
-# building a binary distribution we use $libdir and $datadir in package.conf
-# which are then replaced by the correct values at install time.
+# On Unix, we only use absolute paths in package.conf.
 #
 
 ifeq "$(Windows)" "YES"
@@ -22,8 +20,8 @@ PKG_DATADIR = $$topdir
 
 else
 
-PKG_LIBDIR  = $$libdir
-PKG_DATADIR = $$datadir
+PKG_LIBDIR  = $(libdir)
+PKG_DATADIR = $(datadir)
 
 endif # Unix
 
@@ -74,17 +72,19 @@ package.conf.inplace   : package.conf.in
 	grep -v '^#pragma GCC' | \
 	sed -e 's/""//g' -e 's/:[ 	]*,/: /g' >$@
 
-package.conf.installed : package.conf.in
+install::
 	$(CPP) $(RAWCPP_FLAGS) -P -DINSTALLING \
-		-DIMPORT_DIR='"$(IMPORT_DIR_INSTALLED)"' \
-		-DLIB_DIR='"$(LIB_DIR_INSTALLED)"' \
-		-DINCLUDE_DIR='"$(INCLUDE_DIR_INSTALLED)"' \
-		-DDATA_DIR='"$(DATA_DIR_INSTALLED)"' \
-		-DHTML_DIR='"$(HTML_DIR_INSTALLED)"' \
-		-DHADDOCK_IFACE='"$(HADDOCK_IFACE_INSTALLED)"' \
-		 -x c $(PACKAGE_CPP_OPTS) $< | \
-	grep -v '^#pragma GCC' | \
-	sed -e 's/""//g' -e 's/:[ 	]*,/: /g' >$@
+	       -DIMPORT_DIR='"$(IMPORT_DIR_INSTALLED)"' \
+	       -DLIB_DIR='"$(LIB_DIR_INSTALLED)"' \
+	       -DINCLUDE_DIR='"$(INCLUDE_DIR_INSTALLED)"' \
+	       -DDATA_DIR='"$(DATA_DIR_INSTALLED)"' \
+	       -DHTML_DIR='"$(HTML_DIR_INSTALLED)"' \
+	       -DHADDOCK_IFACE='"$(HADDOCK_IFACE_INSTALLED)"' \
+	       -I../includes \
+	       -x c $(PACKAGE_CPP_OPTS) package.conf.in \
+	    | grep -v '^#pragma GCC' \
+	    | sed -e 's/""//g' -e 's/:[   ]*,/: /g' \
+	    | $(bindir)/ghc-pkg update - --force
 
 # we could be more accurate here and add a dependency on
 # driver/package.conf, but that doesn't work too well because of
@@ -105,12 +105,11 @@ ifneq "$(BootingFromHc)" "YES"
 boot all :: $(STAMP_PKG_CONF)
 endif
 
-$(STAMP_PKG_CONF) : package.conf.inplace package.conf.installed
+$(STAMP_PKG_CONF) : package.conf.inplace
 	$(GHC_PKG_INPLACE) update - --force-files <package.conf.inplace
-	$(GHC_PKG_INPLACE) update - -f $(GHC_DRIVER_DIR)/package.conf --force-files <package.conf.installed
 	@touch $(STAMP_PKG_CONF)
 
-CLEAN_FILES += package.conf.installed package.conf.inplace 
+CLEAN_FILES += package.conf.inplace 
 
 endif # $(way) == ""
 
@@ -229,10 +228,6 @@ ifeq "$(GhcWithInterpreter)" "YES"
 
 ifndef GHCI_LIBRARY
 GHCI_LIBRARY = $(patsubst lib%.a,%.o,$(LIBRARY))
-endif
-
-ifneq "$(NO_INSTALL_LIBRARY)" "YES"
-INSTALL_LIBS += $(GHCI_LIBRARY)
 endif
 
 CLEAN_FILES  += $(GHCI_LIBRARY)

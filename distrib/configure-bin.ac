@@ -132,6 +132,11 @@ dnl ** how to do symlinks **
 AC_PROG_LN_S()
 
 #
+dnl ** how to invoke `ar' and `ranlib'
+#
+FP_PROG_AR_NEEDS_RANLIB
+
+#
 dnl ** Find the path to sed **
 #
 AC_PATH_PROG(SedCmd,sed)

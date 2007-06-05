@@ -383,17 +383,33 @@ ifneq "$(BootingFromHc)" "YES"
 	$(HC) $(HC_OPTS) -S $< -o $@
 endif
 
+include $(TOP)/mk/package.mk
+
 #-----------------------------------------------------------------------------
 #
 # Files to install
 #
 # Just libHSrts is installed uniformly across ways
 #
-INSTALL_LIBS += $(LIBRARY)
 ifeq "$(DLLized)" "YES"
-INSTALL_PROGS += $(DLL_NAME) gmp/gmp.dll
-INSTALL_LIBS += $(patsubst %.a,%_imp.a,$(LIBARY))
+INSTALL_PROGS += gmp/gmp.dll
 INSTALL_LIBS += gmp/libgmp_imp.a Main.dll_o
+endif
+
+#-----------------------------------------------------------------------------
+#
+# binary-dist
+
+binary-dist:
+	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/rts
+	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/rts/gmp
+	$(INSTALL_DATA)    Makefile            $(BIN_DIST_DIR)/rts/
+	$(INSTALL_DATA)    package.conf.in     $(BIN_DIST_DIR)/rts/
+ifneq "$(INSTALL_LIBS)" ""
+	$(INSTALL_DATA)    $(INSTALL_LIBS)     $(BIN_DIST_DIR)/rts/
+endif
+ifneq "$(INSTALL_LIBEXECS)" ""
+	$(INSTALL_PROGRAM) $(INSTALL_LIBEXECS) $(BIN_DIST_DIR)/rts/
 endif
 
 include $(TOP)/mk/target.mk

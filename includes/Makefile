@@ -4,9 +4,17 @@ TOP = ..
 include $(TOP)/mk/boilerplate.mk
 
 #
+# Header files built from the configure script's findings
+#
+H_CONFIG   = ghcautoconf.h
+H_PLATFORM = ghcplatform.h
+
+#
 # All header files
 #
-H_FILES = $(filter-out gmp.h,$(wildcard *.h)) gmp.h
+H_FILES = $(filter-out gmp.h $(H_CONFIG) $(H_PLATFORM),$(wildcard *.h)) gmp.h
+
+ifneq "$(DOING_BIN_DIST)" "YES"
 
 #
 # Options
@@ -24,12 +32,6 @@ SRC_CC_OPTS += -I. -I../rts
 ifneq "$(GhcWithSMP)" "YES"
 SRC_CC_OPTS += -DNOSMP
 endif
-
-#
-# Header file built from the configure script's findings
-#
-H_CONFIG   = ghcautoconf.h
-H_PLATFORM = ghcplatform.h
 
 boot :: gmp.h
 
@@ -160,6 +162,8 @@ endif
 
 CLEAN_FILES += mkGHCConstants$(exeext) GHCConstants.h
 
+endif
+
 # ---------------------------------------------------------------------------
 # boot setup:
 #
@@ -174,6 +178,11 @@ CLEAN_FILES += mkGHCConstants$(exeext) GHCConstants.h
 #
 override datadir:=$(libdir)/include
 INSTALL_DATAS += $(H_FILES) $(H_CONFIG) $(H_PLATFORM)
+
+binary-dist:
+	$(INSTALL_DIR)                   $(BIN_DIST_DIR)/includes
+	$(INSTALL_DATA) Makefile         $(BIN_DIST_DIR)/includes/
+	$(INSTALL_DATA) $(INSTALL_DATAS) $(BIN_DIST_DIR)/includes/
 
 #
 # `make clean' settings:

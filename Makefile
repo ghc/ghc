@@ -59,12 +59,12 @@ include $(TOP)/mk/boilerplate.mk
 
 # We can't 'make boot' in libraries until stage1 is built
 ifeq "$(BootingFromHc)" "YES"
-SUBDIRS_NOLIB = includes rts compat compiler docs utils driver
+SUBDIRS_BUILD = includes rts compat compiler docs utils driver
 else
-SUBDIRS_NOLIB = includes compat utils driver docs compiler rts
+SUBDIRS_BUILD = includes compat utils driver docs compiler rts
 endif
 
-SUBDIRS = $(SUBDIRS_NOLIB) libraries
+SUBDIRS_INSTALL = includes compat utils driver docs rts libraries compiler
 
 # Sanity check that all the core libraries are in the tree, to catch
 # failure to run darcs-all.
@@ -85,7 +85,7 @@ check-packages :
 stage1 : check-packages
 	$(MAKE) -C utils/mkdependC boot
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(SUBDIRS_NOLIB); do \
+	for i in $(SUBDIRS_BUILD); do \
 	  echo "------------------------------------------------------------------------"; \
 	  echo "== $(MAKE) boot $(MFLAGS);"; \
 	  echo " in $(shell pwd)/$$i"; \
@@ -93,7 +93,7 @@ stage1 : check-packages
 	  $(MAKE) --no-print-directory -C $$i $(MFLAGS) boot; \
 	  if [ $$? -eq 0 -o $$x_on_err -eq 0 ] ;  then true; else exit 1; fi; \
 	done; \
-	for i in $(SUBDIRS_NOLIB); do \
+	for i in $(SUBDIRS_BUILD); do \
 	  echo "------------------------------------------------------------------------"; \
 	  echo "== $(MAKE) all $(MFLAGS);"; \
 	  echo " in $(shell pwd)/$$i"; \
@@ -137,7 +137,7 @@ endif
 install :: check-packages
 	$(INSTALL_DIR) $(bindir)
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(SUBDIRS); do \
+	for i in $(SUBDIRS_INSTALL); do \
 	  echo "------------------------------------------------------------------------"; \
 	  echo "== $(MAKE) $@ $(MFLAGS);"; \
 	  echo " in $(shell pwd)/$$i"; \
@@ -179,7 +179,7 @@ endif
 
 install-docs ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(SUBDIRS); do \
+	for i in $(SUBDIRS_INSTALL); do \
 	  echo "------------------------------------------------------------------------"; \
 	  echo "== $(MAKE) $@ $(MFLAGS);"; \
 	  echo " in $(shell pwd)/$$i"; \
@@ -232,9 +232,7 @@ endif
 
 .PHONY: binary-dist-pre% binary-dist binary-pack
 
-BINARY_DIST_PRE_RULES=$(foreach d,$(BinDistDirs),binary-dist-pre-$d)
-
-binary-dist:: binary-dist-pre $(BINARY_DIST_PRE_RULES)
+binary-dist:: binary-dist-pre
 
 binary-dist-pre::
 	-rm -rf $(BIN_DIST_DIR)
@@ -244,23 +242,19 @@ binary-dist-pre::
 	echo 'include $$(TOP)/mk/install.mk' >  $(BIN_DIST_DIR)/mk/target.mk
 	echo 'include $$(TOP)/mk/recurse.mk' >> $(BIN_DIST_DIR)/mk/target.mk
 	echo ''                              >  $(BIN_DIST_DIR)/mk/compat.mk
+	cp mk/package.mk $(BIN_DIST_DIR)/mk/
 	cp mk/install.mk $(BIN_DIST_DIR)/mk/
 	cp mk/recurse.mk $(BIN_DIST_DIR)/mk/
 	$(MKDIRHIER) $(BIN_DIST_DIR)/lib/$(TARGETPLATFORM)
 	$(MKDIRHIER) $(BIN_DIST_DIR)/share
 
-$(BINARY_DIST_PRE_RULES): binary-dist-pre-%:
-	$(MAKE) -C $* $(MFLAGS) $(INSTALL_STAGE) install \
-	        prefix=$(BIN_DIST_DIR) \
-	        exec_prefix=$(BIN_DIST_DIR) \
-	        bindir=$(BIN_DIST_DIR)/bin/$(TARGETPLATFORM) \
-	        libdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
-	        libexecdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
-	        datadir=$(BIN_DIST_DIR)/share
-
 binary-dist::
-	$(MAKE) -C driver binary-dist DOING_BIN_DIST=YES
-	$(MAKE) -C utils  binary-dist DOING_BIN_DIST=YES
+	$(MAKE) -C includes binary-dist DOING_BIN_DIST=YES
+	$(MAKE) -C compiler binary-dist DOING_BIN_DIST=YES $(INSTALL_STAGE)
+	# XXX $(MAKE) -C docs     binary-dist DOING_BIN_DIST=YES
+	$(MAKE) -C rts      binary-dist DOING_BIN_DIST=YES
+	$(MAKE) -C driver   binary-dist DOING_BIN_DIST=YES
+	$(MAKE) -C utils    binary-dist DOING_BIN_DIST=YES
 
 VARFILE=$(BIN_DIST_DIR)/Makefile-vars.in
 
@@ -276,6 +270,8 @@ binary-dist::
 	echo "package = ghc"                                         >> $(VARFILE)
 	echo "version = $(ProjectVersion)"                           >> $(VARFILE)
 	echo "ProjectVersion = $(ProjectVersion)"                    >> $(VARFILE)
+	echo "HaveLibGmp = $(HaveLibGmp)"                            >> $(VARFILE)
+	echo "GhcLibsWithUnix = $(GhcLibsWithUnix)"                  >> $(VARFILE)
 	cat distrib/Makefile-bin-vars.in                             >> $(VARFILE)
 	@echo "Generating a shippable configure script.."
 	$(MV) $(BIN_DIST_DIR)/configure-bin.ac $(BIN_DIST_DIR)/configure.ac
@@ -354,7 +350,7 @@ endif
 fiddle-binary-dist:
 	cd $(BIN_DIST_DIR) && ../distrib/prep-bin-dist-mingw
 # Tar up the distribution and build a manifest
-binary-dist :: tar-binary-dist
+# XXX binary-dist :: tar-binary-dist
 
 .PHONY: tar-binary-dist
 tar-binary-dist:
@@ -427,7 +423,7 @@ SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 #
 # Files to include in source distributions
 #
-SRC_DIST_DIRS += mk docs distrib $(filter-out docs distrib,$(SUBDIRS))
+SRC_DIST_DIRS += mk docs distrib $(filter-out docs distrib,$(SUBDIRS_INSTALL))
 SRC_DIST_FILES += \
 	configure.ac config.guess config.sub configure \
 	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \

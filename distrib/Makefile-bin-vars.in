@@ -27,8 +27,11 @@ LN_S        = @LN_S@
 CHMOD       = chmod
 INSTALL	    = @INSTALL@
 exeext      = @exeext@
-SED	    = @SedCmd@
+SED	        = @SedCmd@
 DEFAULT_TMPDIR = /tmp
+RANLIB      = @RANLIB@
+
+RAWCPP_FLAGS            = -undef -traditional
 
 #----------end of user-serviceable parts------------
 #

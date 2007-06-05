@@ -39,11 +39,6 @@
 
 PRE_SRCS := $(ALL_SRCS)
 
-##################################################################
-# Include package building machinery
-
-include $(TOP)/mk/package.mk
-
 ###################################################################
 # Suffix rules for Haskell, C and literate 
 

@@ -12,14 +12,22 @@ in-place ::
 	fi
 	@echo "Finished configuring..to use, add `pwd`/bin/$(platform) to your PATH."
 
-install-dirs ::
+install ::
 	$(INSTALL_DIR) $(bindir)
 	(cd lib/$(platform); find . -type d -exec sh -c '$(INSTALL_DIR) $$0 $(libdir)/$$0' {} \; )
 	(cd share; find . -type d -exec sh -c '$(INSTALL_DIR) $(datadir)/$$0' {} \; )
 
-install :: install-dirs install-driver install-utils install-libs install-datas install-docs postinstall denounce
+install::
+	$(MAKE) -C includes  install DOING_BIN_DIST=YES
+	$(MAKE) -C driver    install DOING_BIN_DIST=YES
+	$(MAKE) -C utils     install DOING_BIN_DIST=YES
+	$(MAKE) -C rts       install DOING_BIN_DIST=YES
+	$(MAKE) -C libraries install DOING_BIN_DIST=YES
+	$(MAKE) -C compiler  install DOING_BIN_DIST=YES
 
-.PHONY: install-libs install-utils install-datas postinstall denounce
+install :: install-docs postinstall denounce
+
+.PHONY: postinstall denounce
 
 denounce:
 	@echo
@@ -43,21 +51,6 @@ postinstall:
 		./post-install-script $(platform) $(libdir) ; \
 		echo "Done" ; \
 	fi
-
-install-libs:
-	(cd lib/$(platform); find . -type f -exec sh -c '$(CP) $$0 $(libdir)/$$0' {} \; )
-	$(MAKE) -C libraries install DOING_BIN_DIST=YES
-
-install-driver:
-	$(MAKE) -C driver install DOING_BIN_DIST=YES
-
-install-utils:
-	$(MAKE) -C utils install DOING_BIN_DIST=YES
-
-install-datas:
-	set -e; for i in `(cd share; find . -type f )`; do \
-	   $(INSTALL_DATA) share/$$i $(datadir)/$$i; \
-	done
 
 show-install-setup:
 	@echo "Install setup..."
