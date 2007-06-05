@@ -955,7 +955,7 @@ badTypePat pat = ptext SLIT("Illegal type pattern") <+> ppr pat
 
 lazyPatErr pat tvs
   = failWithTc $
-    hang (ptext SLIT("A lazy (~) pattern connot bind existential type variables"))
+    hang (ptext SLIT("A lazy (~) pattern cannot bind existential type variables"))
        2 (vcat (map pprSkolTvBinding tvs))
 
 nonRigidMatch con
