@@ -445,7 +445,7 @@ don't understand the old comment either (which appears below).  I
 measured the effect on nofib of changing OLD CODE to 'True', and got
 zeros everywhere, but a 4% win for 'puzzle'.  Very small 0.5% loss for
 'cse'; turns out to be because our arity analysis isn't good enough
-yet (mentioned in Simon-nofib-notes.
+yet (mentioned in Simon-nofib-notes).
 
 OLD comment was:
 	 Even if it escapes a value lambda, we only
