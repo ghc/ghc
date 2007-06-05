@@ -155,7 +155,7 @@ helpText =
  "   :add <filename> ...         add module(s) to the current target set\n" ++
  "   :browse [*]<module>         display the names defined by <module>\n" ++
  "   :cd <dir>                   change directory to <dir>\n" ++
- "   :cmd <expr>                 run the commands returned by <expr>::IO String"++
+ "   :cmd <expr>                 run the commands returned by <expr>::IO String\n" ++
  "   :ctags [<file>]             create tags file for Vi (default: \"tags\")\n" ++
  "   :def <cmd> <expr>           define a command :<cmd>\n" ++
  "   :edit <file>                edit file\n" ++
