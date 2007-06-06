@@ -199,20 +199,23 @@ lits	:: { [ExtFCode CmmExpr] }
 	| ',' expr lits		{ $2 : $3 }
 
 cmmproc :: { ExtCode }
-	: info '{' body '}'
-		{ do  (info_lbl, info1, info2) <- $1;
-		      stmts <- getCgStmtsEC (loopDecls $3)
-		      blks <- code (cgStmtsToBlocks stmts)
-		      code (emitInfoTableAndCode info_lbl info1 info2 [] blks) }
-
-	| info ';'
+	: info maybe_formals '{' body '}'
 		{ do (info_lbl, info1, info2) <- $1;
-		     code (emitInfoTableAndCode info_lbl info1 info2 [] []) }
-
-	| NAME '{' body '}'
-		{ do stmts <- getCgStmtsEC (loopDecls $3);
+		     formals <- sequence $2;
+		     stmts <- getCgStmtsEC (loopDecls $4)
 		     blks <- code (cgStmtsToBlocks stmts)
-		     code (emitProc [] (mkRtsCodeLabelFS $1) [] blks) }
+		     code (emitInfoTableAndCode info_lbl info1 info2 formals blks) }
+
+	| info maybe_formals ';'
+		{ do (info_lbl, info1, info2) <- $1;
+		     formals <- sequence $2;
+		     code (emitInfoTableAndCode info_lbl info1 info2 formals []) }
+
+	| NAME maybe_formals '{' body '}'
+		{ do formals <- sequence $2;
+		     stmts <- getCgStmtsEC (loopDecls $4);
+		     blks <- code (cgStmtsToBlocks stmts);
+		     code (emitProc [] (mkRtsCodeLabelFS $1) formals blks) }
 
 info	:: { ExtFCode (CLabel, [CmmLit],[CmmLit]) }
 	: 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
@@ -232,6 +235,7 @@ info	:: { ExtFCode (CLabel, [CmmLit],[CmmLit]) }
 		{ basicInfo $3 (mkIntCLit (fromIntegral $5)) 0 $7 $9 $11 }
 
 	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' INT ',' INT ')'
+		-- size, live bits, closure type
 		{ retInfo $3 $5 $7 $9 }
 
 body	:: { ExtCode }
@@ -256,8 +260,8 @@ stmt	:: { ExtCode }
 
 -- HACK: this should just be lregs but that causes a shift/reduce conflict
 -- with foreign calls
-	| hint_lregs '=' expr ';'
-		{ do reg <- head $1; e <- $3; stmtEC (CmmAssign (fst reg) e) }
+--	| hint_lregs '=' expr ';'
+--		{ do reg <- head $1; e <- $3; stmtEC (CmmAssign (fst reg) e) }
 	| type '[' expr ']' '=' expr ';'
 		{ doStore $1 $3 $6 }
 	| maybe_results 'foreign' STRING expr '(' hint_exprs0 ')' vols ';'
@@ -419,6 +423,24 @@ lreg	:: { ExtFCode CmmReg }
 					CmmReg r -> r
 					other -> pprPanic "CmmParse:" (ftext $1 <> text " not a register") }
 	| GLOBALREG		{ return (CmmGlobal $1) }
+
+maybe_formals :: { [ExtFCode LocalReg] }
+	: {- empty -}		{ [] }
+	| '(' formals0 ')'	{ $2 }
+
+formals0 :: { [ExtFCode LocalReg] }
+	: {- empty -}		{ [] }
+	| formals		{ $1 }
+
+formals :: { [ExtFCode LocalReg] }
+	: formal ','		{ [$1] }
+	| formal		{ [$1] }
+	| formal ',' formals	{ $1 : $3 }
+
+formal :: { ExtFCode LocalReg }
+	: type NAME		{ newLocal defaultKind $1 $2 }
+	| STRING type NAME	{% do k <- parseKind $1;
+				     return $ newLocal k $2 $3 }
 
 type	:: { MachRep }
 	: 'bits8'		{ I8 }
