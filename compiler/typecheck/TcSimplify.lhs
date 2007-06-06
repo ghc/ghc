@@ -2506,15 +2506,17 @@ addTopIPErrs :: [Name] -> [Inst] -> TcM ()
 addTopIPErrs bndrs [] 
   = return ()
 addTopIPErrs bndrs ips
-  = addErrTcM (tidy_env, mk_msg tidy_ips)
+  = do	{ dflags <- getDOpts
+	; addErrTcM (tidy_env, mk_msg dflags tidy_ips) }
   where
     (tidy_env, tidy_ips) = tidyInsts ips
-    mk_msg ips = vcat [sep [ptext SLIT("Implicit parameters escape from"),
-			    nest 2 (ptext SLIT("the monomorphic top-level binding") 
+    mk_msg dflags ips 
+	= vcat [sep [ptext SLIT("Implicit parameters escape from"),
+	        nest 2 (ptext SLIT("the monomorphic top-level binding") 
 					    <> plural bndrs <+> ptext SLIT("of")
 					    <+> pprBinders bndrs <> colon)],
-		       nest 2 (vcat (map ppr_ip ips)),
-		       monomorphism_fix]
+		nest 2 (vcat (map ppr_ip ips)),
+		monomorphism_fix dflags]
     ppr_ip ip = pprPred (dictPred ip) <+> pprInstArising ip
 
 topIPErrs :: [Inst] -> TcM ()
@@ -2664,30 +2666,35 @@ mkMonomorphismMsg :: TidyEnv -> [TcTyVar] -> TcM (TidyEnv, Message)
 -- Try to identify the offending variable
 -- ASSUMPTION: the Insts are fully zonked
 mkMonomorphismMsg tidy_env inst_tvs
-  = findGlobals (mkVarSet inst_tvs) tidy_env	`thenM` \ (tidy_env, docs) ->
-    returnM (tidy_env, mk_msg docs)
+  = do	{ dflags <- getDOpts
+	; (tidy_env, docs) <- findGlobals (mkVarSet inst_tvs) tidy_env
+	; return (tidy_env, mk_msg dflags docs) }
   where
-    mk_msg _ | any isRuntimeUnk inst_tvs
+    mk_msg _ _ | any isRuntimeUnk inst_tvs
         =  vcat [ptext SLIT("Cannot resolve unknown runtime types:") <+>
                    (pprWithCommas ppr inst_tvs),
                 ptext SLIT("Use :print or :force to determine these types")]
-    mk_msg []   = ptext SLIT("Probable fix: add a type signature that fixes these type variable(s)")
+    mk_msg _ []   = ptext SLIT("Probable fix: add a type signature that fixes these type variable(s)")
 			-- This happens in things like
 			--	f x = show (read "foo")
 			-- where monomorphism doesn't play any role
-    mk_msg docs = vcat [ptext SLIT("Possible cause: the monomorphism restriction applied to the following:"),
-			nest 2 (vcat docs),
-			monomorphism_fix
-		       ]
+    mk_msg dflags docs 
+	= vcat [ptext SLIT("Possible cause: the monomorphism restriction applied to the following:"),
+		nest 2 (vcat docs),
+		monomorphism_fix dflags]
 
 isRuntimeUnk :: TcTyVar -> Bool
 isRuntimeUnk x | SkolemTv RuntimeUnkSkol <- tcTyVarDetails x = True
                | otherwise = False
 
-monomorphism_fix :: SDoc
-monomorphism_fix = ptext SLIT("Probable fix:") <+> 
-		   (ptext SLIT("give these definition(s) an explicit type signature")
-		    $$ ptext SLIT("or use -fno-monomorphism-restriction"))
+monomorphism_fix :: DynFlags -> SDoc
+monomorphism_fix dflags
+  = ptext SLIT("Probable fix:") <+> vcat
+	[ptext SLIT("give these definition(s) an explicit type signature"),
+	 if dopt Opt_MonomorphismRestriction dflags
+           then ptext SLIT("or use -fno-monomorphism-restriction")
+           else empty]	-- Only suggest adding "-fno-monomorphism-restriction"
+			-- if it is not already set!
     
 warnDefault ups default_ty
   = doptM Opt_WarnTypeDefaults  `thenM` \ warn_flag ->
