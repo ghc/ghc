@@ -29,6 +29,7 @@ import TcHsType
 import TcPat
 import TcMType
 import TcType
+import TcIface	( checkWiredInTyCon )
 import Id
 import DataCon
 import Name
@@ -302,10 +303,11 @@ tcExpr (ExplicitTuple exprs boxity) res_ty
   = do	{ tvs <- newBoxyTyVars [argTypeKind | e <- exprs]
 	; let tup_tc     = tupleTyCon boxity (length exprs)
 	      tup_res_ty = mkTyConApp tup_tc (mkTyVarTys tvs)
-	; arg_tys   <- preSubType tvs (mkVarSet tvs) tup_res_ty res_ty
-	; exprs'    <-  tcPolyExprs exprs arg_tys
+	; checkWiredInTyCon tup_tc	-- Ensure instances are available
+	; arg_tys  <- preSubType tvs (mkVarSet tvs) tup_res_ty res_ty
+	; exprs'   <- tcPolyExprs exprs arg_tys
 	; arg_tys' <- mapM refineBox arg_tys
-	; co_fn <- tcFunResTy (tyConName tup_tc) (mkTyConApp tup_tc arg_tys') res_ty
+	; co_fn    <- tcFunResTy (tyConName tup_tc) (mkTyConApp tup_tc arg_tys') res_ty
 	; return (mkHsWrap co_fn (ExplicitTuple exprs' boxity)) }
 
 tcExpr (HsProc pat cmd) res_ty
