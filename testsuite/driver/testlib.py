@@ -1012,6 +1012,17 @@ def guess_compiler_flags():
    else:
         return []
 
+# cmd is a complex command in Bourne-shell syntax 
+# e.g (cd . && 'c:/users/simonpj/darcs/HEAD/compiler/stage1/ghc-inplace' ...etc)
+# Hence it must ultimately be run by a Bourne shell
+# 
+# Mostly it invokes the command wrapped in 'timeout' thus
+#	timeout 300 'cd . && ...blah blah'
+# so it's timeout's job to invoke the Bourne shell
+#
+# But watch out for the case when there is no timeout program!
+# Then, when using the native Python, os.system will invoke the cmd shell
+
 def runCmd( cmd ):
     if_verbose( 1, cmd )
     r = 0
