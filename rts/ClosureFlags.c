@@ -23,8 +23,8 @@ StgWord16 closure_flags[] = {
  *  to thunks.)
  */
 
-/*                              0    1    2    3    4   5   6   7 */
-/*			      HNF  BTM   NS  STA  THU MUT UPT SRT */
+/*                              0    1    2    3    4   5   6   7     8 */
+/*			      HNF  BTM   NS  STA  THU MUT UPT SRT   IND */
 
 /* INVALID_OBJECT       = */ ( 0                                      	 ),
 /* CONSTR  		= */ (_HNF|     _NS                           	 ),
