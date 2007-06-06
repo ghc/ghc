@@ -603,7 +603,7 @@ rnPat (NPat lit mb_neg eq _)
     )					`thenM` \ (mb_neg', fvs2) ->
     lookupSyntaxName eqName		`thenM` \ (eq', fvs3) -> 
     returnM (NPat lit' mb_neg' eq' placeHolderType, 
-	      fvs1 `plusFV` fvs2 `plusFV` fvs3 `addOneFV` eqClassName)	
+	      fvs1 `plusFV` fvs2 `plusFV` fvs3)	
 	-- Needed to find equality on pattern
 
 rnPat (NPlusKPat name lit _ _)
@@ -612,7 +612,7 @@ rnPat (NPlusKPat name lit _ _)
     lookupSyntaxName minusName		`thenM` \ (minus, fvs2) ->
     lookupSyntaxName geName		`thenM` \ (ge, fvs3) ->
     returnM (NPlusKPat name' lit' ge minus,
-	     fvs1 `plusFV` fvs2 `plusFV` fvs3 `addOneFV` integralClassName)
+	     fvs1 `plusFV` fvs2 `plusFV` fvs3)
 	-- The Report says that n+k patterns must be in Integral
 
 rnPat (LazyPat pat)
@@ -637,23 +637,19 @@ rnPat (ParPat pat)
 
 rnPat (ListPat pats _)
   = rnLPats pats			`thenM` \ (patslist, fvs) ->
-    returnM (ListPat patslist placeHolderType, fvs `addOneFV` listTyCon_name)
+    returnM (ListPat patslist placeHolderType, fvs)
 
 rnPat (PArrPat pats _)
   = rnLPats pats			`thenM` \ (patslist, fvs) ->
     returnM (PArrPat patslist placeHolderType, 
-	      fvs `plusFV` implicit_fvs `addOneFV` parrTyCon_name)
+	      fvs `plusFV` implicit_fvs)
   where
     implicit_fvs = mkFVs [lengthPName, indexPName]
 
 rnPat (TuplePat pats boxed _)
-  = checkTupSize tup_size	`thenM_`
+  = checkTupSize (length pats)	`thenM_`
     rnLPats pats			`thenM` \ (patslist, fvs) ->
-    returnM (TuplePat patslist boxed placeHolderType, 
-	     fvs `addOneFV` tycon_name)
-  where
-    tup_size   = length pats
-    tycon_name = tupleTyCon_name boxed tup_size
+    returnM (TuplePat patslist boxed placeHolderType, fvs)
 
 rnPat (TypePat name) =
     rnHsTypeFVs (text "In a type pattern") name	`thenM` \ (name', fvs) ->

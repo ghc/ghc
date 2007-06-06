@@ -105,6 +105,7 @@ tcImportDecl :: Name -> TcM TyThing
 tcImportDecl name 
   | Just thing <- wiredInNameTyThing_maybe name
   = do	{ initIfaceTcRn (loadWiredInHomeIface name) 
+		-- See Note [Loading instances] in LoadIface
 	; return thing }
   | otherwise
   = do 	{ traceIf (text "tcImportDecl" <+> ppr name)
@@ -115,7 +116,8 @@ tcImportDecl name
 
 checkWiredInTyCon :: TyCon -> TcM ()
 -- Ensure that the home module of the TyCon (and hence its instances)
--- are loaded. It might not be a wired-in tycon (see the calls in TcUnify),
+-- are loaded. See See Note [Loading instances] in LoadIface
+-- It might not be a wired-in tycon (see the calls in TcUnify),
 -- in which case this is a no-op.
 checkWiredInTyCon tc	
   | not (isWiredInName tc_name) 
@@ -991,6 +993,7 @@ ifCheckWiredInThing :: Name -> IfL ()
 -- Even though we are in an interface file, we want to make
 -- sure the instances of a wired-in thing are loaded (imagine f :: Double -> Double)
 -- Ditto want to ensure that RULES are loaded too
+-- See Note [Loading instances] in LoadIface
 ifCheckWiredInThing name 
   = do	{ mod <- getIfModule
 		-- Check whether we are typechecking the interface for this

@@ -209,19 +209,16 @@ rnExpr e@(HsDo do_or_lc stmts body _)
 
 rnExpr (ExplicitList _ exps)
   = rnExprs exps		 	`thenM` \ (exps', fvs) ->
-    returnM  (ExplicitList placeHolderType exps', fvs `addOneFV` listTyCon_name)
+    returnM  (ExplicitList placeHolderType exps', fvs)
 
 rnExpr (ExplicitPArr _ exps)
   = rnExprs exps		 	`thenM` \ (exps', fvs) ->
     returnM  (ExplicitPArr placeHolderType exps', fvs)
 
 rnExpr e@(ExplicitTuple exps boxity)
-  = checkTupSize tup_size			`thenM_`
+  = checkTupSize (length exps)			`thenM_`
     rnExprs exps	 			`thenM` \ (exps', fvs) ->
-    returnM (ExplicitTuple exps' boxity, fvs `addOneFV` tycon_name)
-  where
-    tup_size   = length exps
-    tycon_name = tupleTyCon_name boxity tup_size
+    returnM (ExplicitTuple exps' boxity, fvs)
 
 rnExpr (RecordCon con_id _ (HsRecordBinds rbinds))
   = lookupLocatedOccRn con_id		`thenM` \ conname ->
