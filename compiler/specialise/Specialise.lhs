@@ -783,8 +783,8 @@ specDefn :: Subst			-- Subst to use for RHS
 
 specDefn subst calls (fn, rhs)
 	-- The first case is the interesting one
-  |  rhs_tyvars `lengthIs` n_tyvars 	-- Rhs of fn's defn has right number of big lambdas
-  && rhs_bndrs  `lengthAtLeast` n_dicts	-- and enough dict args
+  |  rhs_tyvars `lengthIs`     n_tyvars -- Rhs of fn's defn has right number of big lambdas
+  && rhs_ids    `lengthAtLeast` n_dicts	-- and enough dict args
   && notNull calls_for_me		-- And there are some calls to specialise
 
 --   && not (certainlyWillInline (idUnfolding fn))	-- And it's not small
@@ -806,7 +806,9 @@ specDefn subst calls (fn, rhs)
 	      rhs_uds `plusUDs` plusUDList spec_uds)
 
   | otherwise	-- No calls or RHS doesn't fit our preconceptions
-  = specExpr subst rhs			`thenSM` \ (rhs', rhs_uds) ->
+  = WARN( notNull calls_for_me, ptext SLIT("Missed specialisation opportunity for") <+> ppr fn )
+	  -- Note [Specialisation shape]
+    specExpr subst rhs			`thenSM` \ (rhs', rhs_uds) ->
     returnSM ((fn, rhs'), [], rhs_uds)
   
   where
@@ -898,9 +900,41 @@ specDefn subst calls (fn, rhs)
 
       where
 	my_zipEqual doc xs ys 
-	 | not (equalLength xs ys) = pprPanic "my_zipEqual" (ppr xs $$ ppr ys $$ (ppr fn <+> ppr call_ts) $$ ppr rhs)
+#ifdef DEBUG
+	 | not (equalLength xs ys) = pprPanic "my_zipEqual" (vcat 
+						[ ppr xs, ppr ys
+						, ppr fn <+> ppr call_ts
+						, ppr (idType fn), ppr theta
+						, ppr n_dicts, ppr rhs_dicts 
+						, ppr rhs])
+#endif
 	 | otherwise		   = zipEqual doc xs ys
 \end{code}
+
+Note [Specialisation shape]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We only specialise a function if it has visible top-level lambdas
+corresponding to its overloading.  E.g. if
+	f :: forall a. Eq a => ....
+then its body must look like
+	f = /\a. \d. ...
+
+Reason: when specialising the body for a call (f ty dexp), we want to
+substitute dexp for d, and pick up specialised calls in the body of f.
+
+This doesn't always work.  One example I came across was htis:
+	newtype Gen a = MkGen{ unGen :: Int -> a }
+
+	choose :: Eq a => a -> Gen a
+	choose n = MkGen (\r -> n)
+
+	oneof = choose (1::Int)
+
+It's a silly exapmle, but we get
+	choose = /\a. g `cast` co
+where choose doesn't have any dict arguments.  Thus far I have not
+tried to fix this (wait till there's a real example).
+
 
 Note [Inline specialisations]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
