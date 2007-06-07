@@ -28,7 +28,7 @@ test('arith010', skip_if_fast, compile_and_run, [''])
 test('arith011', normal, compile_and_run, [''])
 
 if config.platform.startswith('i386-'):
-	ways = expect_fail_for(['optasm'])
+	ways = expect_fail_for(['optasm','threaded2','hpc'])
 else:
 	ways = normal
 
