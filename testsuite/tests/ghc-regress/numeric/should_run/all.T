@@ -17,7 +17,7 @@ test('arith007', skip_if_fast, compile_and_run, [''])
 # because of the extra precision when floating point computations are
 # done in registers rather than going via memory.
 if config.platform.startswith('i386-'):
-	ways = expect_fail_for(['optasm','profasm'])
+	ways = expect_fail_for(['optasm','profasm','threaded2','hpc'])
 else:
 	ways = normal
 
