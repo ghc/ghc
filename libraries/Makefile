@@ -13,6 +13,12 @@
 # or the following is equivalent:
 #
 #   make rebuild.library.<package>
+#
+# To add a new library to the tree, do
+#
+#   darcs get http://darcs.haskell.org/packages/foo
+#   [ -e foo/configure.ac ] && ( cd foo && autoreconf )
+#   make build.library.foo
 
 .PHONY: default_target
 
