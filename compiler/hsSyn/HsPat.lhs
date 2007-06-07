@@ -50,6 +50,9 @@ type LPat id = Located (Pat id)
 data Pat id
   =	------------ Simple patterns ---------------
     WildPat	PostTcType		-- Wild card
+	-- The sole reason for a type on a WildPat is to
+	-- support hsPatType :: Pat Id -> Type
+
   | VarPat	id			-- Variable
   | VarPatOut	id (DictBinds id)	-- Used only for overloaded Ids; the 
 					-- bindings give its overloaded instances

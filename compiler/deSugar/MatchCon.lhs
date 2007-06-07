@@ -20,7 +20,7 @@ import Type
 import CoreSyn
 import DsMonad
 import DsUtils
-
+import Util	( takeList )
 import Id
 import SrcLoc
 import Outputable
@@ -88,21 +88,23 @@ matchConFamily (var:vars) ty groups
 
 matchOneCon vars ty (eqn1 : eqns)	-- All eqns for a single constructor
   = do	{ (wraps, eqns') <- mapAndUnzipM shift (eqn1:eqns)
-	; arg_vars <- selectMatchVars (take (dataConSourceArity con) 
+	; arg_vars <- selectMatchVars (take (dataConSourceArity con1) 
 					    (eqn_pats (head eqns')))
 		-- Use the new arugment patterns as a source of 
 		-- suggestions for the new variables
 	; match_result <- match (arg_vars ++ vars) ty eqns'
-      	; return (con, tvs1 ++ dicts1 ++ arg_vars, 
+      	; return (con1, tvs1 ++ dicts1 ++ arg_vars, 
 		  adjustMatchResult (foldr1 (.) wraps) match_result) }
   where
-    ConPatOut { pat_con = L _ con, pat_ty = pat_ty1,
+    ConPatOut { pat_con = L _ con1, pat_ty = pat_ty1,
 	        pat_tvs = tvs1, pat_dicts = dicts1 } = firstPat eqn1
 	
-    arg_tys  = dataConInstOrigArgTys con inst_tys
-    n_co_args = length (dataConEqSpec con)
-    inst_tys = tcTyConAppArgs pat_ty1 ++ (drop n_co_args $ mkTyVarTys tvs1)
+    arg_tys  = dataConInstOrigArgTys con1 inst_tys
+    inst_tys = tcTyConAppArgs pat_ty1 ++ 
+	       mkTyVarTys (takeList (dataConExTyVars con1) tvs1)
 	-- Newtypes opaque, hence tcTyConAppArgs
+	-- dataConInstOrigArgTys takes the univ and existential tyvars
+	-- and returns the types of the *value* args, which is what we want
 
     shift eqn@(EqnInfo { eqn_pats = ConPatOut{ pat_tvs = tvs, pat_dicts = ds, 
 					       pat_binds = bind, pat_args = args
@@ -111,10 +113,12 @@ matchOneCon vars ty (eqn1 : eqns)	-- All eqns for a single constructor
 	     ; return (wrapBinds (tvs `zip` tvs1) 
 		       . wrapBinds (ds  `zip` dicts1)
 		       . mkDsLet (Rec prs),
-		       eqn { eqn_pats = conArgPats con arg_tys args ++ pats }) }
+		       eqn { eqn_pats = conArgPats con1 arg_tys args ++ pats }) }
 
 conArgPats :: DataCon 
 	   -> [Type]	-- Instantiated argument types 
+			-- Used only to fill in the types of WildPats, which
+			-- are probably never looked at anyway
 	   -> HsConDetails Id (LPat Id)
 	   -> [Pat Id]
 conArgPats data_con arg_tys (PrefixCon ps)   = map unLoc ps

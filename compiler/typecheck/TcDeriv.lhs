@@ -479,7 +479,8 @@ mk_data_eqn loc orig tvs cls tycon tc_args rep_tc rep_tc_args
 	; let ordinary_constraints
 	        = [ mkClassPred cls [arg_ty] 
 	          | data_con <- tyConDataCons rep_tc,
-	            arg_ty   <- dataConInstOrigArgTys data_con rep_tc_args,
+	            arg_ty   <- ASSERT( isVanillaDataCon data_con )
+				dataConInstOrigArgTys data_con rep_tc_args,
 	            not (isUnLiftedType arg_ty) ] -- No constraints for unlifted types?
 
 	      tiresome_subst = zipTopTvSubst (tyConTyVars rep_tc) rep_tc_args

@@ -518,7 +518,7 @@ cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
 
   matchSubTypes dc ty
     | Just (_,ty_args) <- splitTyConApp_maybe (repType ty) 
-    , null (dataConExTyVars dc)  --TODO case of extra existential tyvars
+    , isVanillaDataCon dc  --TODO non-vanilla case
     = dataConInstArgTys dc ty_args
 --     assumes that newtypes are looked ^^^ through
     | otherwise = dataConRepArgTys dc

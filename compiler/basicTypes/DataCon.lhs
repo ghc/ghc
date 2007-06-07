@@ -640,34 +640,37 @@ dataConUserType  (MkData { dcUnivTyVars = univ_tvs,
     mkFunTys arg_tys $
     res_ty
 
-dataConInstArgTys :: DataCon
+dataConInstArgTys :: DataCon	-- A datacon with no existentials or equality constraints
+				-- However, it can have a dcTheta (notably it can be a 
+				-- class dictionary, with superclasses)
 	      	  -> [Type] 	-- Instantiated at these types
-	      	  		-- NB: these INCLUDE the existentially quantified arg types
 	      	  -> [Type]	-- Needs arguments of these types
-				-- NB: these INCLUDE the existentially quantified dict args
+				-- NB: these INCLUDE any dict args
 				--     but EXCLUDE the data-decl context which is discarded
 				-- It's all post-flattening etc; this is a representation type
-dataConInstArgTys dc@(MkData {dcRepArgTys = arg_tys, 
-			      dcUnivTyVars = univ_tvs, 
+dataConInstArgTys dc@(MkData {dcRepArgTys = rep_arg_tys, 
+			      dcUnivTyVars = univ_tvs, dcEqSpec = eq_spec,
 			      dcExTyVars = ex_tvs}) inst_tys
- = ASSERT2 ( length tyvars == length inst_tys 
-           , ptext SLIT("dataConInstArgTys") <+> ppr dc $$ ppr tyvars $$ ppr inst_tys)
-           
-   map (substTyWith tyvars inst_tys) arg_tys
- where
-   tyvars = univ_tvs ++ ex_tvs
+ = ASSERT2 ( length univ_tvs == length inst_tys 
+           , ptext SLIT("dataConInstArgTys") <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys)
+   ASSERT2 ( null ex_tvs && null eq_spec, ppr dc )        
+   map (substTyWith univ_tvs inst_tys) rep_arg_tys
 
-
--- And the same deal for the original arg tys
-dataConInstOrigArgTys :: DataCon -> [Type] -> [Type]
+dataConInstOrigArgTys 
+	:: DataCon	-- Works for any DataCon
+	-> [Type]	-- Includes existential tyvar args, but NOT
+			-- equality constraints or dicts
+	-> [Type]	-- Returns just the instsantiated *value* arguments
+-- For vanilla datacons, it's all quite straightforward
+-- But for the call in MatchCon, we really do want just the value args
 dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
 			          dcUnivTyVars = univ_tvs, 
 			          dcExTyVars = ex_tvs}) inst_tys
- = ASSERT2( length tyvars == length inst_tys
+  = ASSERT2( length tyvars == length inst_tys
           , ptext SLIT("dataConInstOrigArgTys") <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
-   map (substTyWith tyvars inst_tys) arg_tys
- where
-   tyvars = univ_tvs ++ ex_tvs
+    map (substTyWith tyvars inst_tys) arg_tys
+  where
+    tyvars = univ_tvs ++ ex_tvs
 \end{code}
 
 These two functions get the real argument types of the constructor,

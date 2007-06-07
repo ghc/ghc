@@ -148,6 +148,8 @@ mkNewTyConRhs tycon_name tycon con
     rhs_ty = head (dataConInstOrigArgTys con (mkTyVarTys tvs))
 	-- Instantiate the data con with the 
 	-- type variables from the tycon
+	-- NB: a newtype DataCon has no existentials; hence the
+	--     call to dataConInstOrigArgTys has the right type args
 
     etad_tvs :: [TyVar]	-- Matched lazily, so that mkNewTypeCoercion can
     etad_rhs :: Type	-- return a TyCon without pulling on rhs_ty
