@@ -26,7 +26,7 @@ import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..),
 			)
 import UniqSupply	( UniqSupply, initUs_, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
 import Unique		( hasKey )
-import BasicTypes	( RecFlag(..), isNonRec )
+import BasicTypes	( RecFlag(..), isNonRec, isNeverActive )
 import VarEnv		( isEmptyVarEnv )
 import Maybes		( orElse )
 import DynFlags
@@ -215,6 +215,11 @@ tryWW is_rec fn_id rhs
 	--	fw = \ab -> (__inline (\x -> E)) (a,b)
 	-- and the original __inline now vanishes, so E is no longer
 	-- inside its __inline wrapper.  Death!  Disaster!
+
+  || isNeverActive inline_prag
+	-- No point in worker/wrappering if the thing is never inlined!
+	-- Because the no-inline prag will prevent the wrapper ever
+	-- being inlined at a call site. 
   = returnUs [ (new_fn_id, rhs) ]
 
   | is_thunk && worthSplittingThunk maybe_fn_dmd res_info
