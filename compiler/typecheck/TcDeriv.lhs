@@ -426,7 +426,7 @@ tcLookupFamInstExact tycon tys
   = do { result@(rep_tycon, rep_tys) <- tcLookupFamInst tycon tys
        ; let { tvs		      = map (Type.getTyVar 
                                                "TcDeriv.tcLookupFamInstExact") 
-					    tys
+					    rep_tys
 	     ; variable_only_subst = all Type.isTyVarTy rep_tys &&
 				     sizeVarSet (mkVarSet tvs) == length tvs
 					-- renaming may have no repetitions
