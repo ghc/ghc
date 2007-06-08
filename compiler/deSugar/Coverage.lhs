@@ -25,6 +25,8 @@ import FastString
 import HscTypes	
 import StaticFlags
 import UniqFM
+import Type
+import TyCon
 
 import Data.Array
 import System.Time (ClockTime(..))
@@ -125,10 +127,11 @@ addTickLHsBinds :: LHsBinds Id -> TM (LHsBinds Id)
 addTickLHsBinds binds = mapBagM addTickLHsBind binds
 
 addTickLHsBind :: LHsBind Id -> TM (LHsBind Id)
-addTickLHsBind (L pos (AbsBinds abs_tvs abs_dicts abs_exports abs_binds)) = do
+addTickLHsBind bind | isDerivedLHsBind bind = do
+  return bind
+addTickLHsBind (L pos t@(AbsBinds abs_tvs abs_dicts abs_exports abs_binds)) = do
   abs_binds' <- addTickLHsBinds abs_binds
   return $ L pos $ AbsBinds abs_tvs abs_dicts abs_exports abs_binds'
-
 addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do 
   let name = getOccString id
   decl_path <- getPathEntry
@@ -176,6 +179,23 @@ addTickLHsBind (VarBind var_id var_rhs) = do
   return $ VarBind var_id var_rhs'
 -}
 addTickLHsBind other = return other
+
+-- This attempts to locate derived code, so as to not add ticks
+-- to compiler generated code. An alternative is to tie *all* the
+-- method functions to the deriving class name in the deriving list.
+
+-- This fuction works because we use the location of the datatype
+-- we are building the instance for as the location of derived code.
+
+isDerivedLHsBind :: LHsBind Id -> Bool
+isDerivedLHsBind (L pos t@(AbsBinds _ _ [(_,the_id,_,_)] _)) = 
+  case splitTyConApp_maybe (varType the_id) of
+    Just (tyCon,[ty]) | isClassTyCon tyCon ->
+	   case splitTyConApp_maybe ty of
+	     Just (tyCon',_) -> getSrcSpan (tyConName tyCon') == getSrcSpan the_id
+	     _ -> False
+    _ -> False
+isDerivedLHsBind _ = False
 
 -- Add a tick to the expression no matter what it is.  There is one exception:
 -- for the debugger, if the expression is a 'let', then we don't want to add
