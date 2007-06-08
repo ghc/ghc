@@ -38,7 +38,7 @@ chunkToBitmap chunk =
   foldr (.|.) 0 [ 1 `shiftL` n | (True,n) <- zip chunk [0..] ]
 
 -- | Make a bitmap where the slots specified are the /ones/ in the bitmap.
--- eg. @[1,2,4], size 4 ==> 0xb@.
+-- eg. @[0,1,3], size 4 ==> 0xb@.
 --
 -- The list of @Int@s /must/ be already sorted.
 intsToBitmap :: Int -> [Int] -> Bitmap
@@ -51,7 +51,7 @@ intsToBitmap size slots{- must be sorted -}
    where (these,rest) = span (<wORD_SIZE_IN_BITS) slots
 
 -- | Make a bitmap where the slots specified are the /zeros/ in the bitmap.
--- eg. @[1,2,4], size 4 ==> 0x8@  (we leave any bits outside the size as zero,
+-- eg. @[0,1,3], size 4 ==> 0x4@  (we leave any bits outside the size as zero,
 -- just to make the bitmap easier to read).
 --
 -- The list of @Int@s /must/ be already sorted.
