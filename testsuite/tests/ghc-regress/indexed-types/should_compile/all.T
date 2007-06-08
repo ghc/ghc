@@ -18,5 +18,6 @@ clean(['Ind2_help.hi', 'Ind2_help.o', 'Exp.hi', 'Imp.o'])
 test('ATLoop', normal, multimod_compile, ['ATLoop','-v0'])
 clean(['ATLoop_Help.o','ATLoop_Help.hi'])
 
-test('Deriving', expect_fail, compile, [''])
+test('Deriving', normal, compile, [''])
+test('DerivingNewType', expect_fail, compile, [''])
 test('Records', normal, compile, [''])
