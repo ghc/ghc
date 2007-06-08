@@ -211,7 +211,6 @@ Now we want
 mkDataConIds :: Name -> Name -> DataCon -> DataConIds
 mkDataConIds wrap_name wkr_name data_con
   | isNewTyCon tycon			-- Newtype, only has a worker
-  , not (isFamInstTyCon tycon)		-- unless it's a family instancex
   = DCIds Nothing nt_work_id                 
 
   | any isMarkedStrict all_strict_marks	     -- Algebraic, needs wrapper
