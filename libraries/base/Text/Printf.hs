@@ -18,7 +18,6 @@ module Text.Printf(
 ) where
 
 import Prelude
-import Data.Array
 import Data.Char
 import Numeric(showEFloat, showFFloat, showGFloat)
 import System.IO
@@ -221,14 +220,13 @@ itos n =
 	    let (q, r) = quotRem n 10 in
 	    itos q ++ [toEnum (fromEnum '0' + toInt r)]
 
-chars = array (0,15) (zipWith (,) [0..] "0123456789abcdef")
 itosb :: Integer -> Integer -> String
 itosb b n = 
 	if n < b then 
-	    [chars!n]
+	    [intToDigit $ fromInteger n]
 	else
 	    let (q, r) = quotRem n b in
-	    itosb b q ++ [chars!r]
+	    itosb b q ++ [intToDigit $ fromInteger r]
 
 stoi :: Int -> String -> (Int, String)
 stoi a (c:cs) | isDigit c = stoi (a*10 + fromEnum c - fromEnum '0') cs
