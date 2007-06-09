@@ -282,6 +282,9 @@ binary-dist::
 	echo "ProjectVersion = $(ProjectVersion)"                    >> $(VARFILE)
 	echo "HaveLibGmp = $(HaveLibGmp)"                            >> $(VARFILE)
 	echo "GhcLibsWithUnix = $(GhcLibsWithUnix)"                  >> $(VARFILE)
+	echo "GhcWithInterpreter = $(GhcWithInterpreter)"            >> $(VARFILE)
+	echo "GhcHasReadline = $(GhcHasReadline)"                    >> $(VARFILE)
+	echo "BootingFromHc = $(BootingFromHc)"                      >> $(VARFILE)
 	cat distrib/Makefile-bin-vars.in                             >> $(VARFILE)
 	@echo "Generating a shippable configure script.."
 	$(MV) $(BIN_DIST_DIR)/configure-bin.ac $(BIN_DIST_DIR)/configure.ac

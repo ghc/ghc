@@ -207,6 +207,8 @@ SRC_MKDEPENDC_OPTS += -DPROFILING -DTHREADED_RTS -DDEBUG
 # We want a slightly different version for the unregisterised way, so we make
 # AutoApply on a per-way basis (eg. AutoApply_p.cmm).
 
+ifneq "$(DOING_BIN_DIST)" "YES"
+
 AUTO_APPLY_CMM = AutoApply$(_way).cmm
 
 ifneq "$(BootingFromHc)" "YES"
@@ -218,6 +220,8 @@ endif
 EXTRA_CMM_SRCS += $(AUTO_APPLY_CMM)
 
 CLEAN_FILES += $(AUTO_APPLY_CMM)
+
+endif
 
 # -----------------------------------------------------------------------------
 #

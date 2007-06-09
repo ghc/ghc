@@ -912,10 +912,11 @@ include $(TOP)/mk/package.mk
 #-----------------------------------------------------------------------------
 # binary-dist
 
-# $(error Q$(INSTALL_PROGS)W)
-foo:
-	echo Q$(INSTALL_PROGS)W$(GHC_PROG)E
-	echo Q$(INSTALL_LIBEXECS)W$(GHC_PROG)E
+ifeq "$(DOING_BIN_DIST)" "YES"
+# This is derived from the sources when we are in a source tree, but we
+# don't have any sources in a bindist, so we have to shortcut it
+HS_IFACES := $(wildcard stage$(stage)/*/*.hi)
+endif
 
 binary-dist:
 	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/compiler
@@ -923,6 +924,8 @@ binary-dist:
 	echo "stage=$(stage)"                > $(BIN_DIST_DIR)/compiler/Makefile
 	cat Makefile                        >> $(BIN_DIST_DIR)/compiler/Makefile
 	$(INSTALL_DATA)    package.conf.in     $(BIN_DIST_DIR)/compiler/
+	set -e; for d in stage$(stage)/*/; do $(INSTALL_DIR) $(BIN_DIST_DIR)/compiler/$$d; done
+	set -e; for f in $(HS_IFACES); do $(INSTALL_DATA) $$f $(BIN_DIST_DIR)/compiler/$$f; done
 ifneq "$(INSTALL_LIBS)" ""
 	set -e; for f in $(INSTALL_LIBS); do $(INSTALL_DATA) $$f $(BIN_DIST_DIR)/compiler/$$f; done
 endif
