@@ -211,6 +211,12 @@ install-docs ::
 #	binary-dist is a GHC addition for binary distributions
 # 
 
+BIN_DIST_TARBALL=ghc-$(ProjectVersion)-$(TARGETPLATFORM).tar.bz2
+
+binary-dist::
+	-rm -rf $(BIN_DIST_DIR)
+	-$(RM) $(BIN_DIST_DIR).tar.gz
+
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 
 binary-dist::
@@ -222,8 +228,6 @@ binary-dist::
 else
 
 BinDistDirs = includes compiler docs rts
-
-BIN_DIST_TARBALL=ghc-$(ProjectVersion)-$(TARGETPLATFORM).tar.bz2
 
 BIN_DIST_TOP= distrib/Makefile \
               distrib/configure-bin.ac \
@@ -245,8 +249,6 @@ endif
 binary-dist:: binary-dist-pre
 
 binary-dist-pre::
-	-rm -rf $(BIN_DIST_DIR)
-	-$(RM) $(BIN_DIST_DIR).tar.gz
 	$(MKDIRHIER) $(BIN_DIST_DIR)/mk
 	echo 'include $$(TOP)/Makefile-vars' >  $(BIN_DIST_DIR)/mk/boilerplate.mk
 	echo 'include $$(TOP)/mk/install.mk' >  $(BIN_DIST_DIR)/mk/target.mk
