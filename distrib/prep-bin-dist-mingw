@@ -109,7 +109,7 @@ fi
 
 # Check that we're in an OK place before starting to re-org
 # the directory tree..
-if ! [ -d bin/i386-unknown-mingw32 ] ; then
+if ! [ -d bin ] ; then
   echo "Doesn't look as if I'm in the toplevel directory of a mingw tree"
   echo "Usage: cd ghc-<version> ; ../distrib/prep-bin-dist-mingw"
   exit 1;
@@ -120,19 +120,8 @@ rm -f config.guess config.sub configure configure.ac mkdirhier
 rm -f Makefile-bin.in Makefile.in aclocal.m4 install-sh
 rm -rf autom4te.cache
 
-echo "rejig bin/"
-mv bin/i386-unknown-mingw32/* bin/
-rmdir bin/i386-unknown-mingw32
+echo "strip ghc"
 strip bin/ghc.exe
-
-echo "rejig lib/"
-mv lib/i386-unknown-mingw32/include/* include/ 
-rmdir lib/i386-unknown-mingw32/include
-mv lib/i386-unknown-mingw32/* .
-rmdir lib/i386-unknown-mingw32
-rmdir lib
-mv ghc-asm.prl ghc-asm
-mv ghc-split.prl ghc-split
 
 echo "create gcc-lib/"
 #
@@ -193,8 +182,11 @@ cp ${perl_dir}/perl56.dll .
 # (leave them be for now.)
 
 echo "formatting documentation"
-cp README README.txt
-mv share doc
+unix2dos < README > README.txt
+rm README
+mv share/ghc/doc .
+rmdir share/ghc
+rmdir share
 
 # Leave out pdf users_guide documentation for now; problematic to build with the versions
 # of 'xsltproc' and 'fop' I've been able to lay my hands on.

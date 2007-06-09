@@ -211,6 +211,16 @@ install-docs ::
 #	binary-dist is a GHC addition for binary distributions
 # 
 
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+
+binary-dist::
+	$(MAKE) prefix=$(BIN_DIST_DIR) install
+
+binary-dist::
+	cd $(BIN_DIST_DIR) && ../distrib/prep-bin-dist-mingw
+
+else
+
 BinDistDirs = includes compiler docs rts
 
 BIN_DIST_TARBALL=ghc-$(ProjectVersion)-$(TARGETPLATFORM).tar.bz2
@@ -341,16 +351,10 @@ endif
 binary-dist::
 	$(MAKE) -C libraries binary-dist
 
-# Jiggle the files around to make a valid Windows distribution if necessary
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-binary-dist :: fiddle-binary-dist
 endif
 
-.PHONY: fiddle-binary-dist
-fiddle-binary-dist:
-	cd $(BIN_DIST_DIR) && ../distrib/prep-bin-dist-mingw
 # Tar up the distribution and build a manifest
-# XXX binary-dist :: tar-binary-dist
+binary-dist :: tar-binary-dist
 
 .PHONY: tar-binary-dist
 tar-binary-dist:
