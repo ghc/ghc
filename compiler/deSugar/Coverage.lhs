@@ -27,6 +27,7 @@ import StaticFlags
 import UniqFM
 import Type
 import TyCon
+import FiniteMap
 
 import Data.Array
 import System.Time (ClockTime(..))
@@ -54,10 +55,11 @@ addCoverageTicksToBinds
         :: DynFlags
         -> Module
         -> ModLocation          -- of the current module
+	-> [TyCon]		-- type constructor in this module
         -> LHsBinds Id
         -> IO (LHsBinds Id, HpcInfo, ModBreaks)
 
-addCoverageTicksToBinds dflags mod mod_loc binds = do 
+addCoverageTicksToBinds dflags mod mod_loc tyCons binds = do 
   let orig_file = 
              case ml_hs_file mod_loc of
 		    Just file -> file
@@ -73,6 +75,8 @@ addCoverageTicksToBinds dflags mod mod_loc binds = do
 		       { modName      = mod_name
 		      , declPath     = []
                       , inScope      = emptyVarSet
+		      , blackList    = listToFM [ (getSrcSpan (tyConName tyCon),()) 
+		      		       		| tyCon <- tyCons ]
 		       })
 		   (TT 
 		      { tickBoxCount = 0
@@ -127,8 +131,6 @@ addTickLHsBinds :: LHsBinds Id -> TM (LHsBinds Id)
 addTickLHsBinds binds = mapBagM addTickLHsBind binds
 
 addTickLHsBind :: LHsBind Id -> TM (LHsBind Id)
-addTickLHsBind bind | isDerivedLHsBind bind = do
-  return bind
 addTickLHsBind (L pos t@(AbsBinds abs_tvs abs_dicts abs_exports abs_binds)) = do
   abs_binds' <- addTickLHsBinds abs_binds
   return $ L pos $ AbsBinds abs_tvs abs_dicts abs_exports abs_binds'
@@ -141,8 +143,11 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
         addPathEntry name $
         addTickMatchGroup (fun_matches funBind)
 
+  blackListed <- isBlackListed pos
+
   -- Todo: we don't want redundant ticks on simple pattern bindings
-  if not opt_Hpc && isSimplePatBind funBind
+  -- We don't want to generate code for blacklisted positions
+  if blackListed || (not opt_Hpc && isSimplePatBind funBind)
      then 
         return $ L pos $ funBind { fun_matches = MatchGroup matches' ty 
                                  , fun_tick = Nothing 
@@ -179,23 +184,6 @@ addTickLHsBind (VarBind var_id var_rhs) = do
   return $ VarBind var_id var_rhs'
 -}
 addTickLHsBind other = return other
-
--- This attempts to locate derived code, so as to not add ticks
--- to compiler generated code. An alternative is to tie *all* the
--- method functions to the deriving class name in the deriving list.
-
--- This fuction works because we use the location of the datatype
--- we are building the instance for as the location of derived code.
-
-isDerivedLHsBind :: LHsBind Id -> Bool
-isDerivedLHsBind (L pos t@(AbsBinds _ _ [(_,the_id,_,_)] _)) = 
-  case splitTyConApp_maybe (varType the_id) of
-    Just (tyCon,[ty]) | isClassTyCon tyCon ->
-	   case splitTyConApp_maybe ty of
-	     Just (tyCon',_) -> getSrcSpan (tyConName tyCon') == getSrcSpan the_id
-	     _ -> False
-    _ -> False
-isDerivedLHsBind _ = False
 
 -- Add a tick to the expression no matter what it is.  There is one exception:
 -- for the debugger, if the expression is a 'let', then we don't want to add
@@ -541,6 +529,7 @@ data TickTransState = TT { tickBoxCount:: Int
 data TickTransEnv = TTE { modName      :: String
 			, declPath     :: [String]
                         , inScope      :: VarSet
+			, blackList   :: FiniteMap SrcSpan ()
 			}
 
 --	deriving Show
@@ -609,6 +598,12 @@ bindLocals new_ids (TM m)
                  case m env{ inScope = inScope env `extendVarSetList` new_ids } st of
                    (r, fv, st') -> (r, fv `delListFromUFM` occs, st')
   where occs = [ nameOccName (idName id) | id <- new_ids ] 
+
+isBlackListed :: SrcSpan -> TM Bool
+isBlackListed pos = TM $ \ env st -> 
+	      case lookupFM (blackList env) pos of
+	        Nothing -> (False,noFVs,st)
+		Just () -> (True,noFVs,st)
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations 

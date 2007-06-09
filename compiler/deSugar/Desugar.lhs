@@ -90,7 +90,7 @@ deSugar hsc_env
 	             HscNothing -> return (Just ([], [], NoStubs, noHpcInfo, emptyModBreaks))
                      _        -> do (binds_cvr,ds_hpc_info, modBreaks) 
 					      <- if opt_Hpc || target == HscInterpreted
-                                                 then addCoverageTicksToBinds dflags mod mod_loc binds
+                                                 then addCoverageTicksToBinds dflags mod mod_loc (typeEnvTyCons type_env) binds 
                                                  else return (binds, noHpcInfo, emptyModBreaks)
                                     initDs hsc_env mod rdr_env type_env $ do
 		                        { core_prs <- dsTopLHsBinds auto_scc binds_cvr
