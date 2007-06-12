@@ -223,7 +223,7 @@ dataConInfoPtrToName x = do
        offsetToString <- peek $ ptr `plusPtr` (- wORD_SIZE)
        return $ (ptr `plusPtr` stdInfoTableSizeB) `plusPtr` (fromIntegral (offsetToString :: StgWord))
 #else
-       peek $ intPtrToPtr $ (ptrToIntPtr ptr) + stdInfoTableSizeB
+       peek $ intPtrToPtr $ (ptrToIntPtr ptr) + fromIntegral stdInfoTableSizeB
 #endif
 
    -- parsing names is a little bit fiddly because we have a string in the form: 
