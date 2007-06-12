@@ -37,8 +37,10 @@ endif
 
 endif
 
+ifneq "$(findstring thr, $(GhcRTSWays))" ""
 ifneq "$(GhcNotThreaded)" "YES"
 SRC_HC_OPTS += -threaded
+endif
 endif
 
 odir=stage$(stage)
