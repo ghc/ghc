@@ -75,6 +75,8 @@ extern int hs_hpc_module(char *modName,int modCount,int modHashNo,StgWord64 *tix
 extern void hs_hpc_tick(int globIx,struct StgTSO_ *current_tso);
 extern void hs_hpc_raise_event(struct StgTSO_ *current_tso);	
 extern void hs_hpc_thread_finished_event(struct StgTSO_ *current_tso);
+extern void hs_hpc_read(char *filename);
+extern void hs_hpc_write(char *filename);
 
 #if defined(mingw32_HOST_OS)
 extern int  rts_InstallConsoleEvent ( int action, StgStablePtr *handler );

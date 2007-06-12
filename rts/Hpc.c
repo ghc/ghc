@@ -73,9 +73,8 @@ static void failure(char *msg) {
   exit(-1);
 }
 
-static int init_open(char *filename) 
-{
-  tixFile = fopen(filename,"r");
+static int init_open(FILE *file) {
+  tixFile = file;
  if (tixFile == 0) {
     return 0;
   }
@@ -121,10 +120,72 @@ static StgWord64 expectWord64(void) {
   return tmp;
 }
 
-static void hpc_init(void) {
+static void
+readTix(void) {
   int i;
-  Info *tmpModule;  
+  Info *tmpModule;
 
+  totalTixes = 0;
+    
+  ws();
+  expect('T');
+  expect('i');
+  expect('x');
+  ws();
+  expect('[');
+  ws();
+  
+  while(tix_ch != ']') {
+    tmpModule = (Info *)calloc(1,sizeof(Info));
+    expect('T');
+    expect('i');
+    expect('x');
+    expect('M');
+    expect('o');
+    expect('d');
+    expect('u');
+    expect('l');
+    expect('e');
+    ws();
+    tmpModule -> modName = expectString();
+    ws();
+    tmpModule -> hashNo = (unsigned int)expectWord64();
+    ws();
+    tmpModule -> tickCount = (int)expectWord64();
+    tmpModule -> tixArr = (StgWord64 *)calloc(tmpModule->tickCount,sizeof(StgWord64));
+    tmpModule -> tickOffset = totalTixes;
+    totalTixes += tmpModule -> tickCount;
+    ws();
+    expect('[');
+    ws();
+    for(i = 0;i < tmpModule->tickCount;i++) {
+      tmpModule->tixArr[i] = expectWord64();
+      ws();
+      if (tix_ch == ',') {
+	expect(',');
+	ws();
+      }
+    }
+    expect(']');
+    ws();
+    
+    if (!modules) {
+      modules = tmpModule;
+    } else {
+      nextModule->next=tmpModule;
+    }
+    nextModule=tmpModule;
+    
+    if (tix_ch == ',') {
+      expect(',');
+      ws();
+    }
+  }
+  expect(']');
+  fclose(tixFile);
+}
+
+static void hpc_init(void) {
   if (hpc_inited != 0) {
     return;
   }
@@ -133,64 +194,8 @@ static void hpc_init(void) {
   tixFilename = (char *) malloc(strlen(prog_name) + 6);
   sprintf(tixFilename, "%s.tix", prog_name);
 
-  if (init_open(tixFilename)) { 
-    totalTixes = 0;
-
-    ws();
-    expect('T');
-    expect('i');
-    expect('x');
-    ws();
-    expect('[');
-    ws();
-    while(tix_ch != ']') {
-      tmpModule = (Info *)calloc(1,sizeof(Info));
-      expect('T');
-      expect('i');
-      expect('x');
-      expect('M');
-      expect('o');
-      expect('d');
-      expect('u');
-      expect('l');
-      expect('e');
-      ws();
-      tmpModule -> modName = expectString();
-      ws();
-      tmpModule -> hashNo = (unsigned int)expectWord64();
-      ws();
-      tmpModule -> tickCount = (int)expectWord64();
-      tmpModule -> tixArr = (StgWord64 *)calloc(tmpModule->tickCount,sizeof(StgWord64));
-      tmpModule -> tickOffset = totalTixes;
-      totalTixes += tmpModule -> tickCount;
-      ws();
-      expect('[');
-      ws();
-      for(i = 0;i < tmpModule->tickCount;i++) {
-	tmpModule->tixArr[i] = expectWord64();
-	ws();
-	if (tix_ch == ',') {
-	  expect(',');
-	  ws();
-	}
-      }
-      expect(']');
-      ws();
-
-      if (!modules) {
-	modules = tmpModule;
-      } else {
-	nextModule->next=tmpModule;
-      }
-      nextModule=tmpModule;
-      
-      if (tix_ch == ',') {
-	expect(',');
-	ws();
-      }
-    }
-    expect(']');
-    fclose(tixFile);
+  if (init_open(fopen(tixFilename,"r"))) {
+    readTix();
   }
 }
 
@@ -526,23 +531,16 @@ startupHpc(void) {
 }
 
 
-/* Called at the end of execution, to write out the Hpc *.tix file  
- * for this exection. Safe to call, even if coverage is not used.
- */
-void
-exitHpc(void) {
+static void
+writeTix(FILE *f) {
   Info *tmpModule;  
   int i, inner_comma, outer_comma;
 
-  debugTrace(DEBUG_hpc,"exitHpc");
+  outer_comma = 0;
 
-  if (hpc_inited == 0) {
+  if (f == 0) {
     return;
   }
-
-  FILE *f = fopen(tixFilename,"w");
-  
-  outer_comma = 0;
 
   fprintf(f,"Tix [");
   tmpModule = modules;
@@ -580,34 +578,22 @@ exitHpc(void) {
   }
   fprintf(f,"]\n");
   
-  /*
-  tmpModule = modules;
-  for(;tmpModule != 0;tmpModule = tmpModule->next) {
-      if (!tmpModule->tixArr) {
-	debugTrace(DEBUG_hpc,
-		   "warning: module %s did not register any hpc tick data\n",
-		   tmpModule->modName);
-      }
-
-    for(i = 0;i < tmpModule->tickCount;i++) {
-      if (comma) {
-	fprintf(f,",");
-      } else {
-	comma = 1;
-      }
-
-      if (tmpModule->tixArr) {
-	fprintf(f,"%" PRIuWORD64,tmpModule->tixArr[i]);
-      } else {
-	fprintf(f,"0");
-      }
-
-    }
-  }
-      
-  fprintf(f,"]\n");
-  */
   fclose(f);
+}
+
+/* Called at the end of execution, to write out the Hpc *.tix file  
+ * for this exection. Safe to call, even if coverage is not used.
+ */
+void
+exitHpc(void) {
+  debugTrace(DEBUG_hpc,"exitHpc");
+
+  if (hpc_inited == 0) {
+    return;
+  }
+
+  FILE *f = fopen(tixFilename,"w");
+  writeTix(f);
 
   if (rixFile != NULL) {
     hs_hpc_tick(RixFinishedOp,(StgThreadID)0);
@@ -618,4 +604,41 @@ exitHpc(void) {
   }
   
 }
+
+void hs_hpc_read(char *filename) {
+  Info *orig_modules = 0, *tmpModule, *tmpOrigModule;
+  int i;
+
+  orig_modules = modules;
+  modules = 0;
+  if (init_open(fopen(filename,"r"))) {
+    readTix();
+    // Now we copy across the arrays. O(n^2), but works
+    for(tmpModule = modules;
+	tmpModule != 0;
+	tmpModule = tmpModule->next) {
+
+      for(tmpOrigModule = orig_modules;
+	  tmpOrigModule != 0;
+	  tmpOrigModule = tmpOrigModule->next) {
+	if (!strcmp(tmpModule->modName,tmpOrigModule->modName)) {    
+	  assert(tmpModule->tixArr != 0);		
+	  assert(tmpOrigModule->tixArr != 0);		
+	  assert(tmpModule->tickCount == tmpOrigModule->tickCount);
+	  for(i=0;i < tmpModule->tickCount;i++) {
+	    tmpOrigModule->tixArr[i] = tmpModule->tixArr[i];
+	  }
+	  tmpModule->tixArr = tmpOrigModule->tixArr;
+	  break;
+	}
+      }
+    }
+  }
+}
+
+void hs_hpc_write(char *filename) {
+  writeTix(fopen(filename,"w"));
+}
+
+
 
