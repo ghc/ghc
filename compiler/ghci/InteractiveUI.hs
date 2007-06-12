@@ -6,11 +6,7 @@
 -- (c) The GHC Team 2005-2006
 --
 -----------------------------------------------------------------------------
-module InteractiveUI ( 
-	interactiveUI,
-	ghciWelcomeMsg,
-	ghciShortWelcomeMsg
-   ) where
+module InteractiveUI ( interactiveUI ) where
 
 #include "HsVersions.h"
 
@@ -246,21 +242,22 @@ interactiveUI session srcs maybe_expr = do
    newStablePtr stdout
    newStablePtr stderr
 
-	-- Initialise buffering for the *interpreted* I/O system
+    -- Initialise buffering for the *interpreted* I/O system
    initInterpBuffering session
 
    when (isNothing maybe_expr) $ do
-	-- Only for GHCi (not runghc and ghc -e):
-	-- Turn buffering off for the compiled program's stdout/stderr
-	turnOffBuffering
-	-- Turn buffering off for GHCi's stdout
-	hFlush stdout
-	hSetBuffering stdout NoBuffering
-	-- We don't want the cmd line to buffer any input that might be
-	-- intended for the program, so unbuffer stdin.
-	hSetBuffering stdin NoBuffering
+        -- Only for GHCi (not runghc and ghc -e):
 
-	-- initial context is just the Prelude
+        -- Turn buffering off for the compiled program's stdout/stderr
+        turnOffBuffering
+        -- Turn buffering off for GHCi's stdout
+        hFlush stdout
+        hSetBuffering stdout NoBuffering
+        -- We don't want the cmd line to buffer any input that might be
+        -- intended for the program, so unbuffer stdin.
+        hSetBuffering stdin NoBuffering
+
+        -- initial context is just the Prelude
    prel_mod <- GHC.findModule session prel_name (Just basePackageId)
    GHC.setContext session [] [prel_mod]
 
@@ -352,28 +349,33 @@ runGHCi paths maybe_expr = do
   let show_prompt = verbosity dflags > 0 || is_tty
 
   case maybe_expr of
-	Nothing -> 
+        Nothing ->
           do
 #if defined(mingw32_HOST_OS)
-            -- The win32 Console API mutates the first character of 
+            -- The win32 Console API mutates the first character of
             -- type-ahead when reading from it in a non-buffered manner. Work
             -- around this by flushing the input buffer of type-ahead characters,
             -- but only if stdin is available.
             flushed <- io (IO.try (GHC.ConsoleHandler.flushConsole stdin))
-            case flushed of 
-   	     Left err | isDoesNotExistError err -> return ()
-   		      | otherwise -> io (ioError err)
-   	     Right () -> return ()
+            case flushed of
+             Left err | isDoesNotExistError err -> return ()
+                      | otherwise -> io (ioError err)
+             Right () -> return ()
 #endif
-	    -- initialise the console if necessary
-	    io setUpConsole
+            -- initialise the console if necessary
+            io setUpConsole
 
-	    -- enter the interactive loop
-	    interactiveLoop is_tty show_prompt
-	Just expr -> do
-	    -- just evaluate the expression we were given
-	    runCommandEval expr
-	    return ()
+            let msg = if dopt Opt_ShortGhciBanner dflags
+                      then ghciShortWelcomeMsg
+                      else ghciWelcomeMsg
+            when (verbosity dflags >= 1) $ io $ putStrLn msg
+
+            -- enter the interactive loop
+            interactiveLoop is_tty show_prompt
+        Just expr -> do
+            -- just evaluate the expression we were given
+            runCommandEval expr
+            return ()
 
   -- and finally, exit
   io $ do when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."

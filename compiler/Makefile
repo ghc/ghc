@@ -214,6 +214,7 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
 	@echo "cProjectVersionInt    = \"$(ProjectVersionInt)\"" >> $(CONFIG_HS)
 	@echo "cProjectPatchLevel    = \"$(ProjectPatchLevel)\"" >> $(CONFIG_HS)
 	@echo "cBooterVersion        = \"$(GhcVersion)\"" >> $(CONFIG_HS)
+	@echo "cStage                = STAGE" >> $(CONFIG_HS)
 	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> $(CONFIG_HS)
 	@echo "cGhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> $(CONFIG_HS)
 	@echo "cGhcUnregisterised    = \"$(GhcUnregisterised)\"" >> $(CONFIG_HS)
@@ -962,6 +963,8 @@ EXTRA_SRCS += parser/Parser.y
 TAGS_HS_SRCS = parser/Parser.y.pp $(filter-out $(DERIVED_SRCS) main/Config.hs parser/Parser.y, $(sort $(SRCS)))
 
 include $(TOP)/mk/target.mk
+
+$(odir)/main/Config.$(way_)o: SRC_HC_OPTS+=-DSTAGE='"$(stage)"'
 
 # -----------------------------------------------------------------------------
 # Explicit dependencies

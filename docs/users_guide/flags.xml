@@ -484,13 +484,13 @@
 	    <row>
 	      <entry><option>-short-ghci-banner</option></entry>
 	      <entry>Display a one-line banner at GHCi startup</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
 	      <entry><option>-long-ghci-banner</option></entry>
 	      <entry>Display a full banner at GHCi startup</entry>
-	      <entry>static</entry>
+	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>

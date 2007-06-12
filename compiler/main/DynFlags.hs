@@ -196,6 +196,7 @@ data DynFlag
    | Opt_RewriteRules
 
    -- misc opts
+   | Opt_ShortGhciBanner
    | Opt_Cpp
    | Opt_Pp
    | Opt_ForceRecomp
@@ -836,6 +837,8 @@ dynamic_flags = [
   ,  ( "F"		, NoArg  (setDynFlag Opt_Pp))
   ,  ( "#include"	, HasArg (addCmdlineHCInclude) )
   ,  ( "v"		, OptIntSuffix setVerbosity )
+  ,  ( "short-ghci-banner", NoArg (setDynFlag Opt_ShortGhciBanner) )
+  ,  ( "long-ghci-banner" , NoArg (unSetDynFlag Opt_ShortGhciBanner) )
 
         ------- Specific phases  --------------------------------------------
   ,  ( "pgmL"           , HasArg (upd . setPgmL) )  

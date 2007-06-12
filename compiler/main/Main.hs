@@ -24,11 +24,11 @@ import HscMain          ( newHscEnv )
 import DriverPipeline	( oneShot, compileFile )
 import DriverMkDepend	( doMkDependHS )
 #ifdef GHCI
-import InteractiveUI	( ghciWelcomeMsg, ghciShortWelcomeMsg, interactiveUI )
+import InteractiveUI	( interactiveUI )
 #endif
 
 -- Various other random stuff that we need
-import Config		( cProjectVersion, cBooterVersion, cProjectName )
+import Config
 import Packages		( dumpPackages )
 import DriverPhases	( Phase(..), isSourceFilename, anyHsc,
 			  startPhase, isHaskellSrcFilename )
@@ -126,7 +126,6 @@ main =
 	-- make sure we clean up after ourselves
   GHC.defaultCleanupHandler dflags $ do
 
-	-- Display banner
   showBanner cli_mode dflags
 
   -- we've finished manipulating the DynFlags, update the session
@@ -428,25 +427,15 @@ doShowIface dflags file = do
 showBanner :: CmdLineMode -> DynFlags -> IO ()
 showBanner cli_mode dflags = do
    let verb = verbosity dflags
-	-- Show the GHCi banner
-#  ifdef GHCI
-   let msg = if opt_ShortGhciBanner
-             then ghciShortWelcomeMsg
-             else ghciWelcomeMsg
-   when (isInteractiveMode cli_mode && verb >= 1) $ hPutStrLn stdout msg
-#  endif
 
-	-- Display details of the configuration in verbose mode
-   when (not (isInteractiveMode cli_mode) && verb >= 2) $
-	do hPutStr stderr "Glasgow Haskell Compiler, Version "
- 	   hPutStr stderr cProjectVersion
-	   hPutStr stderr ", for Haskell 98, compiled by GHC version "
-#ifdef GHCI
-	   -- GHCI is only set when we are bootstrapping...
- 	   hPutStrLn stderr cProjectVersion
-#else
-	   hPutStrLn stderr cBooterVersion
-#endif
+   -- Display details of the configuration in verbose mode
+   when (verb >= 2) $
+    do hPutStr stderr "Glasgow Haskell Compiler, Version "
+       hPutStr stderr cProjectVersion
+       hPutStr stderr ", for Haskell 98, stage "
+       hPutStr stderr cStage
+       hPutStr stderr " booted by GHC version "
+       hPutStrLn stderr cBooterVersion
 
 showVersion :: IO ()
 showVersion = do
