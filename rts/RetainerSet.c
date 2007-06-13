@@ -239,7 +239,7 @@ traverseAllRetainerSet(void (*f)(RetainerSet *))
 void
 printRetainer(FILE *f, retainer itbl)
 {
-    fprintf(f, "%s[%s]", itbl->prof.closure_desc, itbl->prof.closure_type);
+    fprintf(f, "%s[%s]", GET_PROF_DESC(itbl), itbl->prof.closure_type);
 }
 #elif defined(RETAINER_SCHEME_CCS)
 // Retainer scheme 2: retainer = cost centre stack
@@ -283,7 +283,7 @@ printRetainerSetShort(FILE *f, RetainerSet *rs)
 
     for (j = 0; j < rs->num; j++) {
 	if (j < rs->num - 1) {
-	    strncpy(tmp + size, rs->element[j]->prof.closure_desc, MAX_RETAINER_SET_SPACE - size);
+	    strncpy(tmp + size, GET_PROF_DESC(rs->element[j]), MAX_RETAINER_SET_SPACE - size);
 	    size = strlen(tmp);
 	    if (size == MAX_RETAINER_SET_SPACE)
 		break;
@@ -293,7 +293,7 @@ printRetainerSetShort(FILE *f, RetainerSet *rs)
 		break;
 	}
 	else {
-	    strncpy(tmp + size, rs->element[j]->prof.closure_desc, MAX_RETAINER_SET_SPACE - size);
+	    strncpy(tmp + size, GET_PROF_DESC(rs->element[j]), MAX_RETAINER_SET_SPACE - size);
 	    // size = strlen(tmp);
 	}
     }

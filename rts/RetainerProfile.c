@@ -2110,8 +2110,8 @@ sanityCheckHeapClosure( StgClosure *c )
 
     if ((((StgWord)RSET(c) & 1) ^ flip) != 0) {
 	if (get_itbl(c)->type == CONSTR &&
-	    !strcmp(get_itbl(c)->prof.closure_type, "DEAD_WEAK") &&
-	    !strcmp(get_itbl(c)->prof.closure_desc, "DEAD_WEAK")) {
+	    !strcmp(GET_PROF_TYPE(get_itbl(c)), "DEAD_WEAK") &&
+	    !strcmp(GET_PROF_DESC(get_itbl(c)), "DEAD_WEAK")) {
 	    debugBelch("\tUnvisited dead weak pointer object found: c = %p\n", c);
 	    costArray[get_itbl(c)->type] += cost(c);
 	    sumOfNewCost += cost(c);
@@ -2119,7 +2119,7 @@ sanityCheckHeapClosure( StgClosure *c )
 	    debugBelch(
 		    "Unvisited object: flip = %d, c = %p(%d, %s, %s), rs = %p\n",
 		    flip, c, get_itbl(c)->type,
-		    get_itbl(c)->prof.closure_type, get_itbl(c)->prof.closure_desc,
+		    get_itbl(c)->prof.closure_type, GET_PROF_DESC(get_itbl(c)),
 		    RSET(c));
     } else {
 	// debugBelch("sanityCheckHeapClosure) S: flip = %d, c = %p(%d), rs = %p\n", flip, c, get_itbl(c)->type, RSET(c));

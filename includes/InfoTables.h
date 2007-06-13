@@ -9,13 +9,48 @@
 #ifndef INFOTABLES_H
 #define INFOTABLES_H
 
+/* ----------------------------------------------------------------------------
+   Relative pointers
+
+   Several pointer fields in info tables are expressed as offsets
+   relative to the info pointer, so that we can generate
+   position-independent code.
+
+   Note [x86-64-relative]
+   There is a complication on the x86_64 platform, where pointeres are
+   64 bits, but the tools don't support 64-bit relative relocations.
+   However, the default memory model (small) ensures that all symbols
+   have values in the lower 2Gb of the address space, so offsets all
+   fit in 32 bits.  Hence we can use 32-bit offset fields.
+
+   When going via-C, the mangler arranges that we only generate
+   relative relocations between symbols in the same segment (the text
+   segment).  The NCG, however, puts things in the right sections and
+   uses 32-bit relative offsets instead.
+
+   Somewhere between binutils-2.16.1 and binutils-2.16.91.0.6,
+   support for 64-bit PC-relative relocations was added, so maybe this
+   hackery can go away sometime.
+   ------------------------------------------------------------------------- */
+
+#if x86_64_TARGET_ARCH
+#define OFFSET_FIELD(n) StgHalfInt n; StgHalfWord __pad_##n;
+#else   
+#define OFFSET_FIELD(n) StgInt n;
+#endif
+
 /* -----------------------------------------------------------------------------
    Profiling info
    -------------------------------------------------------------------------- */
 
 typedef struct {
+#ifndef TABLES_NEXT_TO_CODE
     char *closure_type;
     char *closure_desc;
+#else
+    OFFSET_FIELD(closure_type_off);
+    OFFSET_FIELD(closure_desc_off);
+#endif
 } StgProfInfo;
 
 /* -----------------------------------------------------------------------------
@@ -210,36 +245,6 @@ typedef struct StgLargeSRT_ {
 } StgLargeSRT;
 
 /* ----------------------------------------------------------------------------
-   Relative pointers
-
-   Several pointer fields in info tables are expressed as offsets
-   relative to the info pointer, so that we can generate
-   position-independent code.
-
-   Note [x86-64-relative]
-   There is a complication on the x86_64 platform, where pointeres are
-   64 bits, but the tools don't support 64-bit relative relocations.
-   However, the default memory model (small) ensures that all symbols
-   have values in the lower 2Gb of the address space, so offsets all
-   fit in 32 bits.  Hence we can use 32-bit offset fields.
-
-   When going via-C, the mangler arranges that we only generate
-   relative relocations between symbols in the same segment (the text
-   segment).  The NCG, however, puts things in the right sections and
-   uses 32-bit relative offsets instead.
-
-   Somewhere between binutils-2.16.1 and binutils-2.16.91.0.6,
-   support for 64-bit PC-relative relocations was added, so maybe this
-   hackery can go away sometime.
-   ------------------------------------------------------------------------- */
-
-#if x86_64_TARGET_ARCH
-#define OFFSET_FIELD(n) StgHalfInt n; StgHalfWord __pad_##n;
-#else   
-#define OFFSET_FIELD(n) StgInt n;
-#endif
-
-/* ----------------------------------------------------------------------------
    Info Tables
    ------------------------------------------------------------------------- */
 
@@ -398,8 +403,12 @@ typedef struct _StgConInfoTable {
     StgInfoTable i;
 #endif
 
+#ifndef TABLES_NEXT_TO_CODE
+    char *con_desc;
+#else
     OFFSET_FIELD(con_desc) // the name of the data constructor 
                            // as: Package:Module.Name
+#endif
 
 #if defined(TABLES_NEXT_TO_CODE)
     StgInfoTable i;
@@ -455,5 +464,17 @@ typedef struct _StgConInfoTable {
 #define GET_FUN_LARGE_BITMAP(info) ((StgLargeBitmap*) ((info)->f.b.bitmap))
 #endif
 
-
+/*
+ * GET_PROF_TYPE, GET_PROF_DESC
+ */
+#ifdef TABLES_NEXT_TO_CODE
+#define GET_PROF_TYPE(info) ((char *)((StgWord)((info)+1) + (info->prof.closure_type_off)))
+#else
+#define GET_PROF_TYPE(info) ((info)->prof.closure_type)
+#endif
+#ifdef TABLES_NEXT_TO_CODE
+#define GET_PROF_DESC(info) ((char *)((StgWord)((info)+1) + (info->prof.closure_desc_off)))
+#else
+#define GET_PROF_DESC(info) ((info)->prof.closure_desc)
+#endif
 #endif /* INFOTABLES_H */

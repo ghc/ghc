@@ -138,7 +138,7 @@ printClosure( StgClosure *obj )
             StgWord i, j;
 
 #ifdef PROFILING
-	    debugBelch("%s(", info->prof.closure_desc);
+	    debugBelch("%s(", GET_PROF_DESC(info));
 	    debugBelch("%s", obj->header.prof.ccs->cc->label);
 #else
             debugBelch("CONSTR(");
@@ -174,7 +174,7 @@ printClosure( StgClosure *obj )
     case THUNK_STATIC:
             /* ToDo: will this work for THUNK_STATIC too? */
 #ifdef PROFILING
-	    printThunkObject((StgThunk *)obj,info->prof.closure_desc);
+            printThunkObject((StgThunk *)obj,GET_PROF_DESC(info));
 #else
             printThunkObject((StgThunk *)obj,"THUNK");
 #endif

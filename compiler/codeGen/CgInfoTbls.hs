@@ -74,11 +74,13 @@ emitClosureCodeAndInfoTable :: ClosureInfo -> [LocalReg] -> CgStmts -> Code
 emitClosureCodeAndInfoTable cl_info args body
  = do	{ ty_descr_lit <- 
 		if opt_SccProfilingOn 
-		   then mkStringCLit (closureTypeDescr cl_info)
+		   then do lit <- mkStringCLit (closureTypeDescr cl_info)
+                           return (makeRelativeRefTo info_lbl lit)
 		   else return (mkIntCLit 0)
   	; cl_descr_lit <- 
 		if opt_SccProfilingOn 
-		   then mkStringCLit cl_descr_string
+		   then do lit <- mkStringCLit cl_descr_string
+                           return (makeRelativeRefTo info_lbl lit)
 		   else return (mkIntCLit 0)
 	; let std_info = mkStdInfoTable ty_descr_lit cl_descr_lit 
 					cl_type srt_len layout_lit

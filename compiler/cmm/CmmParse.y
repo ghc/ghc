@@ -724,16 +724,19 @@ conInfo name ptrs nptrs srt_bitmap cl_type desc_str ty_str = do
   return (lbl, info1, [desc_field])
 
 basicInfo name layout srt_bitmap cl_type desc_str ty_str = do
+  let info_lbl = mkRtsInfoLabelFS name
   lit1 <- if opt_SccProfilingOn 
-		   then code $ mkStringCLit desc_str
+		   then code $ do lit <- mkStringCLit desc_str
+                                  return (makeRelativeRefTo info_lbl lit)
 		   else return (mkIntCLit 0)
   lit2 <- if opt_SccProfilingOn 
-		   then code $ mkStringCLit ty_str
+		   then code $ do lit <- mkStringCLit ty_str
+                                  return (makeRelativeRefTo info_lbl lit)
 		   else return (mkIntCLit 0)
   let info1 = mkStdInfoTable lit1 lit2 (fromIntegral cl_type) 
 			(fromIntegral srt_bitmap)
 			layout
-  return (mkRtsInfoLabelFS name, info1, [])
+  return (info_lbl, info1, [])
 
 funInfo name ptrs nptrs cl_type desc_str ty_str fun_type = do
   (label,info1,_) <- stdInfo name ptrs nptrs 0{-srt_bitmap-}

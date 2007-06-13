@@ -99,6 +99,7 @@ static void dumpCensus( Census *census );
    Closure Type Profiling;
    ------------------------------------------------------------------------- */
 
+#ifndef PROFILING
 static char *type_names[] = {
     "INVALID_OBJECT",
     "CONSTR",
@@ -173,6 +174,7 @@ static char *type_names[] = {
     "CATCH_STM_FRAME",
     "N_CLOSURE_TYPES"
   };
+#endif
 
 /* ----------------------------------------------------------------------------
  * Find the "closure identity", which is a unique pointer reresenting
@@ -190,9 +192,9 @@ closureIdentity( StgClosure *p )
     case HEAP_BY_MOD:
 	return p->header.prof.ccs->cc->module;
     case HEAP_BY_DESCR:
-	return get_itbl(p)->prof.closure_desc;
+	return GET_PROF_DESC(get_itbl(p));
     case HEAP_BY_TYPE:
-	return get_itbl(p)->prof.closure_type;
+	return GET_PROF_TYPE(get_itbl(p));
     case HEAP_BY_RETAINER:
 	// AFAIK, the only closures in the heap which might not have a
 	// valid retainer set are DEAD_WEAK closures.
@@ -645,12 +647,12 @@ closureSatisfiesConstraints( StgClosure* p )
    }
 
    if (RtsFlags.ProfFlags.descrSelector) {
-       b = strMatchesSelector( (get_itbl((StgClosure *)p))->prof.closure_desc,
+       b = strMatchesSelector( (GET_PROF_DESC(get_itbl((StgClosure *)p))),
 				 RtsFlags.ProfFlags.descrSelector );
        if (!b) return rtsFalse;
    }
    if (RtsFlags.ProfFlags.typeSelector) {
-       b = strMatchesSelector( (get_itbl((StgClosure *)p))->prof.closure_type,
+       b = strMatchesSelector( (GET_PROF_TYPE(get_itbl((StgClosure *)p))),
                                 RtsFlags.ProfFlags.typeSelector );
        if (!b) return rtsFalse;
    }
