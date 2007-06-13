@@ -130,6 +130,9 @@ class TestOptions:
        # skip all ways except these ([] == do all ways)
        self.only_ways = []
 
+       # add these ways to the default set
+       self.extra_ways = []
+
        # the result we normally expect for this test
        self.expect = 'pass';
 

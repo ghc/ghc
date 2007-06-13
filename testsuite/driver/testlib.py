@@ -125,6 +125,14 @@ def _only_ways( opts, ways ):
 
 # -----
 
+def extra_ways( ways ):
+    return lambda opts, w=ways: _extra_ways( opts, w )
+
+def _extra_ways( opts, ways ):
+    opts.extra_ways = ways
+
+# -----
+
 def omit_compiler_types( compiler_types ):
    return lambda opts, c=compiler_types: _omit_compiler_types(opts, c)
 
@@ -332,6 +340,8 @@ def test_common_work (name, opts, func, args):
             all_ways = []
     else:
         all_ways = ['normal']
+
+    all_ways = all_ways + opts.extra_ways
 
     t.total_test_cases = t.total_test_cases + len(all_ways)
 
