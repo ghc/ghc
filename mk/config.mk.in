@@ -253,11 +253,10 @@ endif
 ArchSupportsNCG=$(strip $(patsubst $(HostArch_CPP), YES, $(findstring $(HostArch_CPP), i386 x86_64 powerpc)))
 OsSupportsNCG=$(strip $(patsubst $(HostOS_CPP), YES, $(patsubst aix,,$(HostOS_CPP))))
 
-ifeq "$(OsSupportsNCG)$(ArchSupportsNCG)$(GhcUnregisterised)" "YESYESNO"
-GhcWithNativeCodeGen=YES
-else
-GhcWithNativeCodeGen=NO
-endif
+# lazy test, because $(GhcUnregisterised) might be set in build.mk later.
+GhcWithNativeCodeGen=$(strip\
+    $(if $(filter YESYESNO,\
+		  $(OsSupportsNCG)$(ArchSupportsNCG)$(GhcUnregisterised)),YES,NO))
 
 # Include support for generating Java
 GhcWithJavaGen=NO
@@ -268,11 +267,8 @@ HaveLibDL = @HaveLibDL@
 # includes/SMP.h
 ArchSupportsSMP=$(strip $(patsubst $(HostArch_CPP), YES, $(findstring $(HostArch_CPP), i386 x86_64 sparc powerpc)))
 
-ifeq "$(ArchSupportsSMP)$(GhcUnregisterised)" "YESNO"
-GhcWithSMP=YES
-else
-GhcWithSMP=NO
-endif
+# lazy test, because $(GhcUnregisterised) might be set in build.mk later.
+GhcWithSMP=$(strip $(if $(filter YESNO, $(ArchSupportsSMP)$(GhcUnregisterised)),YES,NO))
 
 # Whether to include GHCi in the compiler.  Depends on whether the RTS linker
 # has support for this OS/ARCH combination.
@@ -401,26 +397,15 @@ CorePackages = base Cabal haskell98 readline regex-base regex-compat \
 #	Don't use -split-objs in in GhcLibHcOpts, because the build
 #		system needs to do other special magic if you are
 #		doing object-file splitting
-ifneq "$(findstring $(HostArch_CPP), i386 x86_64 powerpc sparc)" ""
-SplitObjs=YES
-else
-SplitObjs=NO
-endif
 
-# Don't split object files for libs if we're building DLLs, or booting from
-# .hc files.
-ifeq "$(DLLized)" "YES"
-SplitObjs=NO
-endif
-ifeq "$(BootingFromHc)" "YES"
-SplitObjs=NO
-endif
-ifeq "$(GhcUnregisterised)" "YES"
-SplitObjs=NO
-endif
-ifeq "$(TargetArch_CPP)" "ia64"
-SplitObjs=NO
-endif
+# lazy test, so that $(GhcUnregisterised) can be set in build.mk
+SplitObjs=$(strip $(if $(filter $(TargetArch_CPP),i386 x86_64 powerpc sparc),\
+	            $(if $(filter YES,$(BootingFromHC)),\
+		      NO,\
+	              $(if $(filter NO,$(GhcUnregisterised)),\
+			YES,\
+			NO)),\
+		    NO))
 
 # Math library
 LIBM=@LIBM@
