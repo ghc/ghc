@@ -173,7 +173,7 @@ c-sources:
 	cbits/selectUtils.c
 include-dirs: include, ../../includes, ../../rts
 includes:	HsBase.h
-install-includes:	HsBase.h
+install-includes:	HsBase.h HsBaseConfig.h WCsubst.h dirUtils.h lockFile.h consUtils.hs Typeable.h
 extensions:	CPP
 -- XXX is there an extension for using # in varids?
 -- We need to set the package name to base (without a version number)
