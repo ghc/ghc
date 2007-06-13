@@ -1164,7 +1164,7 @@ void prettyPrintClosure_ (StgClosure *obj)
            con_info = get_con_itbl (obj);
 
            /* obtain the name of the constructor */
-           descriptor = con_info->con_desc;
+           descriptor = GET_CON_DESC(con_info);
 
            debugBelch ("(%s", descriptor);
 
