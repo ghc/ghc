@@ -3363,8 +3363,8 @@ genCCall target dest_regs args vols = do
          setDeltaNat (delta-arg_size)
 	 let code' = code `appOL` arg_code `appOL` toOL [
 			SUB wordRep (OpImm (ImmInt arg_size)) (OpReg rsp) ,
-			MOV arg_rep (OpReg arg_reg) (OpAddr  (spRel 0)),
-	 		DELTA (delta-arg_size)]
+	 		DELTA (delta-arg_size),
+			MOV arg_rep (OpReg arg_reg) (OpAddr  (spRel 0))]
 	 push_args rest code'
 
        | otherwise = do
