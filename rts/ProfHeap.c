@@ -343,8 +343,12 @@ initEra(Census *census)
 STATIC_INLINE void
 freeEra(Census *census)
 {
-    arenaFree(census->arena);
-    freeHashTable(census->hash, NULL);
+    if (RtsFlags.ProfFlags.bioSelector != NULL)
+        // when bioSelector==NULL, these are freed in heapCensus()
+    {
+        arenaFree(census->arena);
+        freeHashTable(census->hash, NULL);
+    }
 }
 
 /* --------------------------------------------------------------------------
