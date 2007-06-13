@@ -1157,7 +1157,7 @@ void prettyPrintClosure_ (StgClosure *obj)
         case CONSTR_STATIC:
         case CONSTR_NOCAF_STATIC: 
         {
-           int i; 
+           nat i; 
            char *descriptor;
 
            /* find the con_info for the constructor */
