@@ -12,7 +12,6 @@ exposed-modules:
 	Binary
 	BitSet
 	Bitmap
-    	Breakpoints
 	BuildTyCl
 	ByteCodeAsm
 	ByteCodeFFI
