@@ -54,7 +54,12 @@ config.way_flags = {
 	'optextcore' : ['-O -fext-core'],
 	'threaded1'  : ['-threaded', '-debug'],
 	'threaded2'  : ['-O', '-threaded'],
-	'hpc'	     : ['-O', '-fhpc' ]
+	'hpc'	     : ['-O', '-fhpc' ],
+        'prof_hc_hb' : ['-O -prof -auto-all'],
+        'prof_hb'    : ['-O -prof -auto-all'],
+        'prof_hd'    : ['-O -prof -auto-all'],
+        'prof_hy'    : ['-O -prof -auto-all'],
+        'prof_hr'    : ['-O -prof -auto-all']
 	}
 
 config.way_rts_flags = { 
@@ -68,7 +73,12 @@ config.way_rts_flags = {
 	'optextcore' : [],
 	'threaded1'  : [],
 	'threaded2'  : ['-N2'],
-	'hpc'	     : []
+	'hpc'	     : [],
+        'prof_hc_hb' : ['-hc -hbvoid'],
+        'prof_hb'    : ['-hb'],
+        'prof_hd'    : ['-hd'],
+        'prof_hy'    : ['-hy'],
+        'prof_hr'    : ['-hr']
     	}
 
 def get_compiler_info():
