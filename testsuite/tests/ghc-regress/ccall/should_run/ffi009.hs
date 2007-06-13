@@ -25,27 +25,37 @@ test5I = do
 
 --------------------------------------------------------------------------------
 
-type FunType6D = Double -> Double -> Double -> Double -> Double -> Double
-              -> Double
+type FunType11D = Double -> Double -> Double -> Double -> Double -> Double
+               -> Double -> Double -> Double -> Double -> Double -> Double
 
-foreign import ccall "dynamic" callFun6D :: FunPtr FunType6D -> FunType6D
-foreign import ccall "wrapper" mkFun6D   :: FunType6D -> IO (FunPtr FunType6D)
+foreign import ccall "dynamic" callFun11D :: FunPtr FunType11D -> FunType11D
+foreign import ccall "wrapper" mkFun11D   :: FunType11D -> IO (FunPtr FunType11D)
 
-manyArgs6D :: FunType6D
-manyArgs6D a1 a2 a3 a4 a5 a6 =
-   ((((a1 * 31 + a2) * 31 + a3) * 31 + a4) * 31 + a5) * 31 + a6
+manyArgs11D :: FunType11D
+manyArgs11D a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 = 
+  ((((a1 * 31 + a2) * 31 + a3) * 31 + a4) * 31 + a5) * 31 + a6
+  + a7 + a8 + a9 + a10 + a11
 
-test6D :: IO ()
-test6D = do
+test11D :: IO ()
+test11D = do
   a1 <- randomIO
   a2 <- randomIO
   a3 <- randomIO
   a4 <- randomIO
   a5 <- randomIO
   a6 <- randomIO
-  funAddr <- mkFun6D manyArgs6D
-  print (callFun6D funAddr a1 a2 a3 a4 a5 a6 ==
-         manyArgs6D        a1 a2 a3 a4 a5 a6)
+  a7 <- randomIO
+  a8 <- randomIO
+  a9 <- randomIO
+  a10 <- randomIO
+  a11 <- randomIO
+  funAddr <- mkFun11D manyArgs11D
+  let x = callFun11D funAddr a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11
+      y = manyArgs11D        a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 
+  if x /= y then
+        print x >> print y
+     else
+       print True
   freeHaskellFunPtr funAddr
 
 --------------------------------------------------------------------------------
@@ -526,7 +536,7 @@ main :: IO ()
 main = do
   setStdGen (mkStdGen 4711)
   rep "5 Int arguments" test5I
-  rep "6 Double arguments" test6D
+  rep "11 Double arguments" test11D
   rep "11 mixed arguments" test11M
   rep "Double as 1st argument, rest Int" testM1
   rep "Double as 2nd argument, rest Int" testM2
