@@ -3361,9 +3361,9 @@ genCCall target dest_regs args vols = do
 	 (arg_reg, arg_code) <- getSomeReg arg
          delta <- getDeltaNat
          setDeltaNat (delta-arg_size)
-	 let code' = code `appOL` toOL [
-			MOV arg_rep (OpReg arg_reg) (OpAddr  (spRel 0)),
+	 let code' = code `appOL` arg_code `appOL` toOL [
 			SUB wordRep (OpImm (ImmInt arg_size)) (OpReg rsp) ,
+			MOV arg_rep (OpReg arg_reg) (OpAddr  (spRel 0)),
 	 		DELTA (delta-arg_size)]
 	 push_args rest code'
 
