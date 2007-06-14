@@ -147,7 +147,7 @@ extern HsWord64 getUSecOfDay(void);
 #endif
 
 /* in inputReady.c */
-int inputReady(int fd, int msecs, int isSock);
+extern int fdReady(int fd, int write, int msecs, int isSock);
 
 /* in Signals.c */
 extern HsInt nocldstop;
