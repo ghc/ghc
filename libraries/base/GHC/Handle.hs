@@ -589,7 +589,7 @@ readRawBufferNoBlock loc fd is_nonblock buf off len
                                 else return 0
        -- XXX see note [nonblock]
  where
-   do_read call = throwErrnoIfMinus1RetryMayBlock loc call (return 0)
+   do_read call = throwErrnoIfMinus1RetryOnBlock loc call (return 0)
    unsafe_read  = do_read (read_rawBuffer fd buf off len)
    safe_read    = do_read (safe_read_rawBuffer fd buf off len)
 
