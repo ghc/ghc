@@ -50,7 +50,7 @@ all::
 	echo "HSC2HS_BINDIR=$(FPTOOLS_TOP_ABS)/$(GHC_HSC2HS_DIR_REL)"       >> $(INPLACE_SCRIPT)
 	echo "HSC2HS_DIR=$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_HSC2HS_DIR_REL)" >> $(INPLACE_SCRIPT)
 	echo "HS_PROG=$(HS_PROG)"                                           >> $(INPLACE_SCRIPT)
-	echo "HSC2HS_EXTRA=$(HSC2HS_INPLACE_EXTRA)"                         >> $(INPLACE_SCRIPT)
+	echo "HSC2HS_EXTRA=\"$(HSC2HS_INPLACE_EXTRA)\""                     >> $(INPLACE_SCRIPT)
 	cat hsc2hs.sh                                                       >> $(INPLACE_SCRIPT)
 	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
 endif
