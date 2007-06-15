@@ -31,14 +31,14 @@
 
 #define str(a,b) #a "_" #b
 
-#define OFFSET(s_type, field) ((unsigned int)&(((s_type*)0)->field))
+#define OFFSET(s_type, field) ((size_t)&(((s_type*)0)->field))
 
 #if defined(GEN_HASKELL)
 #define def_offset(str, offset) \
-    printf("oFFSET_" str " = %d::Int\n", offset);
+    printf("oFFSET_" str " = %zd::Int\n", offset);
 #else
 #define def_offset(str, offset) \
-    printf("#define OFFSET_" str " %d\n", offset);
+    printf("#define OFFSET_" str " %zd\n", offset);
 #endif
 
 #if defined(GEN_HASKELL)
