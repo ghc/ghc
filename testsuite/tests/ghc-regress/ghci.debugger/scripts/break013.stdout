@@ -3,9 +3,9 @@ _result :: (Bool, Bool, ())
 Stopped at break013.hs:1:6-12
 _result :: (Bool, Bool, ())
 a :: Bool
-c :: ()
 b :: Bool
+c :: ()
 _result :: (Bool, Bool, ())
 a :: Bool
-c :: ()
 b :: Bool
+c :: ()

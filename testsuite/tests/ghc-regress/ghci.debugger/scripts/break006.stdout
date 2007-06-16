@@ -2,18 +2,18 @@ Stopped at ../Test3.hs:(1,0)-(2,30)
 _result :: [a]
 Stopped at ../Test3.hs:2:17-30
 _result :: [a]
-x :: t
 f :: t -> a
+x :: t
 xs :: [t]
 _result :: [a]
-x :: t
 f :: t -> a
+x :: t
 xs :: [t]
 y = (_t1::a)
 y = 2
 _result :: [Integer]
-x :: t
 f :: t -> Integer
+x :: t
 xs :: [t]
 y :: Integer
 _t1 :: Integer
