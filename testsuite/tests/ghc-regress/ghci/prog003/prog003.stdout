@@ -1,22 +1,63 @@
+Run 1
 a :: Int -> Int
 168
-(Main.a,B.b,C.c,D.d) :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Run 2
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
 28.0
-(Main.a,B.b,C.c,D.d) :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Run 3
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
 28.0
-(Main.a,B.b,C.c,D.d) :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Run 4
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
 28.0
-(Main.a,B.b,C.c,D.d) :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Run 5
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
 28.0
-(Main.a,B.b,C.c,D.d) :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Run 6
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
 28.0
-(Main.a,B.b,C.c,D.d) :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Run 7
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
 28.0
-(Main.a,B.b,C.c,D.d) :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Run 8
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
 28.0
-(Main.a,B.b,C.c,D.d) :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Run 9
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
 28.0
-(Main.a,B.b,C.c,D.d) :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Run 10
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
 28.0
-(Main.a,B.b,C.c,D.d) :: (Float -> Float, Float -> Float, Float -> Float, Float -> Float)
+Run 11
+(Main.a,B.b,C.c,D.d) :: (Float -> Float,
+			 Float -> Float,
+			 Float -> Float,
+			 Float -> Float)
 28.0
