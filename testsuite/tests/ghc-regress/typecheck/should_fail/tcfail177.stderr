@@ -2,6 +2,9 @@
 *** white space, so doesn't show it up.  Hence this message, to force
 *** it to fail until we fix the bug.   
 
+*** The ...'s may mean the problem isn't actually shown by this example
+*** any more anyway.
+
 tcfail177.hs:17:12:
     Couldn't match expected type `Bool' against inferred type `[Char]'
     In the expression: "Two"
