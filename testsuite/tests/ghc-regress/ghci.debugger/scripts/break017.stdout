@@ -2,8 +2,8 @@
 _exception :: e
 Logged breakpoint at ../QSort.hs:6:23-37
 _result :: [a]
-as :: [a]
 a :: a
+as :: [a]
 as = 'b' : 'c' : (_t1::[Char])
 *** Exception: Prelude.undefined
 as = 'b' : 'c' : (_t2::[Char])

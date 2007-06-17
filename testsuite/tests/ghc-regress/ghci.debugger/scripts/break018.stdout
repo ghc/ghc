@@ -6,11 +6,11 @@ x :: a
 xs :: [a]
 Stopped at ../mdo.hs:30:29-53
 _result :: IO (N a)
-x :: a
 f :: N a
 l :: N a
+x :: a
 Stopped at ../mdo.hs:30:41-53
 _result :: IO (N a)
-x :: a
 f :: N a
 l :: N a
+x :: a
