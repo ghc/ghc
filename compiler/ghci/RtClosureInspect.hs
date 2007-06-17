@@ -48,6 +48,7 @@ import Var
 import Name 
 import VarEnv
 import OccName
+import Util
 import VarSet
 import {-#SOURCE#-} TcRnDriver ( tcRnRecoverDataCon )
 
@@ -88,7 +89,8 @@ import System.IO.Unsafe
 -}
 
 data Term = Term { ty        :: Type 
-                 , dc        :: DataCon 
+                 , dc        :: DataCon  -- The heap datacon. If ty is a newtype,
+                                         -- this is NOT the newtype datacon
                  , val       :: HValue 
                  , subTerms  :: [Term] }
 
@@ -276,75 +278,83 @@ termTyVars = foldTerm TermFold {
 -- Pretty printing of terms
 ----------------------------------
 
-app_prec::Int
+app_prec,cons_prec ::Int
 app_prec = 10
+cons_prec = 5 -- TODO Extract this info from GHC itself
 
-pprTerm :: Int -> Term -> SDoc
-pprTerm p Term{dc=dc, subTerms=tt} 
-{-  | dataConIsInfix dc, (t1:t2:tt') <- tt 
+pprTerm y p t | Just doc <- pprTermM y p t = doc
+
+pprTermM :: Monad m => (Int -> Term -> m SDoc) -> Int -> Term -> m SDoc
+pprTermM y p t@Term{dc=dc, subTerms=tt, ty=ty} 
+{-  | dataConIsInfix dc, (t1:t2:tt') <- tt  --TODO fixity
   = parens (pprTerm1 True t1 <+> ppr dc <+> pprTerm1 True ppr t2) 
     <+> hsep (map (pprTerm1 True) tt) 
 -}
-  | null tt   = ppr dc
-  | otherwise = cparen (p >= app_prec) 
-                       (ppr dc <+> sep (map (pprTerm app_prec) tt))
+  | null tt   = return$ ppr dc
+  | Just (tc,_) <- splitNewTyConApp_maybe ty
+  , isNewTyCon tc
+  , Just new_dc <- maybeTyConSingleCon tc = do 
+         real_value <- y 10 t{ty=repType ty}
+         return$ cparen (p >= app_prec) (ppr new_dc <+> real_value)
+  | otherwise = do
+         tt_docs <- mapM (y app_prec) tt
+         return$ cparen (p >= app_prec) (ppr dc <+> sep tt_docs)
 
-  where fixity   = undefined 
+pprTermM y _ t = pprTermM1 y t
 
-pprTerm _ t = pprTerm1 t
+pprTermM1 _ Prim{value=words, ty=ty} = return$ text$ repPrim (tyConAppTyCon ty)
+                                                             words
+pprTermM1 y t@Term{} = panic "pprTermM1 - unreachable"
+pprTermM1 _ Suspension{bound_to=Nothing} = return$ char '_'
+pprTermM1 _ Suspension{mb_ty=Just ty, bound_to=Just n}
+  | Just _ <- splitFunTy_maybe ty = return$ ptext SLIT("<function>")
+  | otherwise = return$ parens$ ppr n <> text "::" <> ppr ty 
 
-pprTerm1 Prim{value=words, ty=ty} = text$ repPrim (tyConAppTyCon ty) words
-pprTerm1 t@Term{} = pprTerm 0 t 
-pprTerm1 Suspension{bound_to=Nothing} =  char '_' -- <> ppr ct <> char '_'
-pprTerm1 Suspension{mb_ty=Just ty, bound_to=Just n}
-  | Just _ <- splitFunTy_maybe ty = ptext SLIT("<function>")
-  | otherwise = parens$ ppr n <> text "::" <> ppr ty 
-
-
+-- Takes a list of custom printers with a explicit recursion knot and a term, 
+-- and returns the output of the first succesful printer, or the default printer
 cPprTerm :: forall m. Monad m => 
            ((Int->Term->m SDoc)->[Int->Term->m (Maybe SDoc)]) -> Term -> m SDoc
 cPprTerm custom = go 0 where
   go prec t@Term{subTerms=tt, dc=dc} = do
-    let mb_customDocs = map (($t) . ($prec)) (custom go) :: [m (Maybe SDoc)]    
-    first_success <- firstJustM mb_customDocs
-    case first_success of
-      Just doc -> return$ cparen (prec>app_prec+1) doc
---    | dataConIsInfix dc, (t1:t2:tt') <- tt =
-      Nothing  -> do pprSubterms <- mapM (go (app_prec+1)) tt
-                     return$ cparen (prec >= app_prec) 
-                                    (ppr dc <+> sep pprSubterms)
-  go _ t = return$ pprTerm1 t
+    let default_ prec t = Just `liftM` pprTermM go prec t
+        mb_customDocs = [pp prec t | pp <- custom go ++ [default_]]
+    Just doc <- firstJustM mb_customDocs
+    return$ cparen (prec>app_prec+1) doc
+  go _ t = pprTermM1 go t
   firstJustM (mb:mbs) = mb >>= maybe (firstJustM mbs) (return . Just)
   firstJustM [] = return Nothing
 
+-- Default set of custom printers. Note that the recursion knot is explicit
 cPprTermBase :: Monad m => (Int->Term-> m SDoc)->[Int->Term->m (Maybe SDoc)]
-cPprTermBase pprP =
+cPprTermBase y =
   [ 
-    ifTerm isTupleDC            (\_ -> liftM (parens . hcat . punctuate comma) 
-                                 . mapM (pprP (-1)) . subTerms)
-  , ifTerm (isDC consDataCon)   (\ p Term{subTerms=[h,t]} -> doList p h t)
-  , ifTerm (isDC intDataCon)    (coerceShow$ \(a::Int)->a)
-  , ifTerm (isDC charDataCon)   (coerceShow$ \(a::Char)->a)
---  , ifTerm (isDC wordDataCon) (coerceShow$ \(a::Word)->a)
-  , ifTerm (isDC floatDataCon)  (coerceShow$ \(a::Float)->a)
-  , ifTerm (isDC doubleDataCon) (coerceShow$ \(a::Double)->a)
-  , ifTerm isIntegerDC          (coerceShow$ \(a::Integer)->a)
+    ifTerm isTupleTy             (\_ -> liftM (parens . hcat . punctuate comma) 
+                                 . mapM (y (-1)) . subTerms)
+  , ifTerm (\t -> isTyCon listTyCon t && subTerms t `lengthIs` 2)
+                                 (\ p Term{subTerms=[h,t]} -> doList p h t)
+  , ifTerm (isTyCon intTyCon)    (coerceShow$ \(a::Int)->a)
+  , ifTerm (isTyCon charTyCon)   (coerceShow$ \(a::Char)->a)
+--  , ifTerm (isTyCon wordTyCon) (coerceShow$ \(a::Word)->a)
+  , ifTerm (isTyCon floatTyCon)  (coerceShow$ \(a::Float)->a)
+  , ifTerm (isTyCon doubleTyCon) (coerceShow$ \(a::Double)->a)
+  , ifTerm isIntegerTy           (coerceShow$ \(a::Integer)->a)
   ] 
-     where ifTerm pred f p t = if pred t then liftM Just (f p t) 
-                                         else return Nothing
-           isIntegerDC Term{dc=dc} = 
-              dataConName dc `elem` [ smallIntegerDataConName
-                                    , largeIntegerDataConName] 
-           isTupleDC Term{dc=dc} = dc `elem` snd (unzip (elems boxedTupleArr))
-           isDC a_dc Term{dc=dc} = a_dc == dc
+     where ifTerm pred f p t@Term{} | pred t    = liftM Just (f p t) 
+                                    | otherwise = return Nothing
+           isIntegerTy Term{ty=ty}  | Just (tc,_) <- splitTyConApp_maybe ty 
+                                    = tyConName tc == integerTyConName
+           isTupleTy Term{ty=ty}    | Just (tc,_) <- splitTyConApp_maybe ty 
+                                    = tc `elem` (fst.unzip.elems) boxedTupleArr
+           isTyCon a_tc Term{ty=ty} | Just (tc,_) <- splitTyConApp_maybe ty
+                                    = a_tc == tc
            coerceShow f _ = return . text . show . f . unsafeCoerce# . val
            --TODO pprinting of list terms is not lazy
            doList p h t = do
                let elems = h : getListTerms t
                    isConsLast = termType(last elems) /= termType h
-               print_elems <- mapM (pprP 5) elems
+               print_elems <- mapM (y cons_prec) elems
                return$ if isConsLast
-                     then cparen (p >= 5) . hsep . punctuate (space<>colon) 
+                     then cparen (p >= cons_prec) . hsep . punctuate (space<>colon) 
                            $ print_elems
                      else brackets (hcat$ punctuate comma print_elems)
 
@@ -354,6 +364,7 @@ cPprTermBase pprP =
                       getListTerms t@Term{subTerms=[]}  = []
                       getListTerms t@Suspension{}       = [t]
                       getListTerms t = pprPanic "getListTerms" (ppr t)
+
 
 repPrim :: TyCon -> [Word] -> String
 repPrim t = rep where 
@@ -509,7 +520,7 @@ cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
     | Just (_,ty_args) <- splitTyConApp_maybe (repType ty) 
     , null (dataConExTyVars dc)  --TODO case of extra existential tyvars
     = dataConInstArgTys dc ty_args
-
+--     assumes that newtypes are looked ^^^ through
     | otherwise = dataConRepArgTys dc
 
 -- This is used to put together pointed and nonpointed subterms in the 
@@ -610,52 +621,34 @@ cvReconstructType hsc_env force mb_ty hval = runTR hsc_env $ do
  using TcM wrongly).
 -}
 congruenceNewtypes ::  TcType -> TcType -> TcM (TcType,TcType)
-congruenceNewtypes = go True
-  where 
-   go rewriteRHS lhs rhs  
+congruenceNewtypes lhs rhs 
  -- TyVar lhs inductive case
     | Just tv <- getTyVar_maybe lhs 
     = recoverM (return (lhs,rhs)) $ do  
          Indirect ty_v <- readMetaTyVar tv
-         (lhs', rhs') <- go rewriteRHS ty_v rhs
-         writeMutVar (metaTvRef tv) (Indirect lhs')
-         return (lhs, rhs')
- -- TyVar rhs inductive case
-    | Just tv <- getTyVar_maybe rhs 
-    = recoverM (return (lhs,rhs)) $ do  
-         Indirect ty_v <- readMetaTyVar tv
-         (lhs', rhs') <- go rewriteRHS lhs ty_v
-         writeMutVar (metaTvRef tv) (Indirect rhs')
-         return (lhs', rhs)
+         (lhs1, rhs1) <- congruenceNewtypes ty_v rhs
+         return (lhs, rhs1)
 -- FunTy inductive case
     | Just (l1,l2) <- splitFunTy_maybe lhs
     , Just (r1,r2) <- splitFunTy_maybe rhs
-    = do (l2',r2') <- go True l2 r2
-         (l1',r1') <- go False l1 r1
+    = do (l2',r2') <- congruenceNewtypes l2 r2
+         (l1',r1') <- congruenceNewtypes l1 r1
          return (mkFunTy l1' l2', mkFunTy r1' r2')
 -- TyconApp Inductive case; this is the interesting bit.
     | Just (tycon_l, args_l) <- splitNewTyConApp_maybe lhs
-    , Just (tycon_r, args_r) <- splitNewTyConApp_maybe rhs = do
-
-      let (tycon_l',args_l') = if isNewTyCon tycon_r && not(isNewTyCon tycon_l)
-                                then (tycon_r, rewrite tycon_r lhs)
-                                else (tycon_l, args_l)
-          (tycon_r',args_r') = if rewriteRHS && isNewTyCon tycon_l && 
-                                    not(isNewTyCon tycon_r)
-                                then (tycon_l, rewrite tycon_l rhs)
-                                else (tycon_r, args_r)
-      (args_l'', args_r'') <- unzip `liftM` zipWithM (go rewriteRHS) 
-                                                     args_l' 
-                                                     args_r'
-      return (mkTyConApp tycon_l' args_l'', mkTyConApp tycon_r' args_r'') 
+    , Just (tycon_r, args_r) <- splitNewTyConApp_maybe rhs 
+    , tycon_l /= tycon_r 
+    = return (lhs, upgrade tycon_l rhs)
 
     | otherwise = return (lhs,rhs)
 
-    where rewrite newtyped_tc lame_tipe
-           | (tvs, tipe) <- newTyConRep newtyped_tc 
-           = case tcUnifyTys (const BindMe) [tipe] [lame_tipe] of
-               Just subst -> substTys subst (map mkTyVarTy tvs)
-               otherwise  -> panic "congruenceNewtypes: Can't unify a newtype"
+    where upgrade :: TyCon -> Type -> Type
+          upgrade new_tycon ty
+            | not (isNewTyCon new_tycon) = ty 
+            | ty' <- mkTyConApp new_tycon (map mkTyVarTy $ tyConTyVars new_tycon)
+            , Just subst <- tcUnifyTys (const BindMe) [ty] [repType ty']
+            = substTy subst ty'
+        -- assumes that reptype doesn't touch tyconApp args ^^^
 
 
 --------------------------------------------------------------------------------
