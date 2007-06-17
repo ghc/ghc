@@ -18,7 +18,7 @@ import Debugger
 import qualified GHC
 import GHC              ( Session, LoadHowMuch(..), Target(..),  TargetId(..),
                           Type, Module, ModuleName, TyThing(..), Phase,
-                          BreakIndex, Name, SrcSpan, Resume, SingleStep )
+                          BreakIndex, SrcSpan, Resume, SingleStep )
 import DynFlags
 import Packages
 import PackageConfig
@@ -26,6 +26,7 @@ import UniqFM
 import PprTyThing
 import Outputable       hiding (printForUser)
 import Module           -- for ModuleEnv
+import Name
 
 -- Other random utilities
 import Digraph
@@ -576,12 +577,12 @@ afterRunStmt run_result = do
   case run_result of
      GHC.RunOk names -> do
         show_types <- isOptionSet ShowType
-        when show_types $ mapM_ (showTypeOfName session) names
+        when show_types $ printTypeOfNames session names
      GHC.RunBreak _ names mb_info -> do
         resumes <- io $ GHC.getResumeContext session
         printForUser $ ptext SLIT("Stopped at") <+> 
                        ppr (GHC.resumeSpan (head resumes))
-        mapM_ (showTypeOfName session) names
+        printTypeOfNames session names
         maybe (return ()) runBreakCmd mb_info
         -- run the command set with ":set stop <cmd>"
         st <- getGHCiState
@@ -608,12 +609,18 @@ runBreakCmd info = do
               | otherwise -> do enqueueCommands [cmd]; return ()
               where cmd = onBreakCmd loc
 
-showTypeOfName :: Session -> Name -> GHCi ()
-showTypeOfName session n
+printTypeOfNames :: Session -> [Name] -> GHCi ()
+printTypeOfNames session names
+ = mapM_ (printTypeOfName session) $ sortBy compareFun names
+    where compareWith n = (getOccString n, getSrcSpan n)
+          compareFun n1 n2 = compareWith n1 `compare` compareWith n2
+
+printTypeOfName :: Session -> Name -> GHCi ()
+printTypeOfName session n
    = do maybe_tything <- io (GHC.lookupName session n)
-	case maybe_tything of
-	  Nothing    -> return ()
-	  Just thing -> showTyThing thing
+        case maybe_tything of
+            Nothing    -> return ()
+            Just thing -> printTyThing thing
 
 specialCommand :: String -> GHCi Bool
 specialCommand ('!':str) = shellEscape (dropWhile isSpace str)
@@ -1251,13 +1258,14 @@ showBindings = do
   s <- getSession
   unqual <- io (GHC.getPrintUnqual s)
   bindings <- io (GHC.getBindings s)
-  mapM_ showTyThing bindings
+  mapM_ printTyThing bindings
   return ()
 
-showTyThing (AnId id) = do 
+printTyThing :: TyThing -> GHCi ()
+printTyThing (AnId id) = do
   ty' <- cleanType (GHC.idType id)
   printForUser $ ppr id <> text " :: " <> ppr ty'
-showTyThing _  = return ()
+printTyThing _ = return ()
 
 -- if -fglasgow-exts is on we show the foralls, otherwise we don't.
 cleanType :: Type -> GHCi Type
@@ -1586,7 +1594,7 @@ backCmd = noArgs $ do
   s <- getSession
   (names, ix, span) <- io $ GHC.back s
   printForUser $ ptext SLIT("Logged breakpoint at") <+> ppr span
-  mapM_ (showTypeOfName s) names
+  printTypeOfNames s names
    -- run the command set with ":set stop <cmd>"
   st <- getGHCiState
   enqueueCommands [stop st]
@@ -1598,7 +1606,7 @@ forwardCmd = noArgs $ do
   printForUser $ (if (ix == 0)
                     then ptext SLIT("Stopped at")
                     else ptext SLIT("Logged breakpoint at")) <+> ppr span
-  mapM_ (showTypeOfName s) names
+  printTypeOfNames s names
    -- run the command set with ":set stop <cmd>"
   st <- getGHCiState
   enqueueCommands [stop st]
