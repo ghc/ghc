@@ -447,15 +447,6 @@ tidy1 v (TuplePat pats boxity ty)
     arity = length pats
     tuple_ConPat = mkPrefixConPat (tupleCon boxity arity) pats ty
 
-tidy1 v (DictPat dicts methods)
-  = case num_of_d_and_ms of
-	0 -> tidy1 v (TuplePat [] Boxed unitTy) 
-	1 -> tidy1 v (unLoc (head dict_and_method_pats))
-	_ -> tidy1 v (mkVanillaTuplePat dict_and_method_pats Boxed)
-  where
-    num_of_d_and_ms	 = length dicts + length methods
-    dict_and_method_pats = map nlVarPat (dicts ++ methods)
-
 -- LitPats: we *might* be able to replace these w/ a simpler form
 tidy1 v (LitPat lit)
   = returnDs (idDsWrapper, tidyLitPat lit)

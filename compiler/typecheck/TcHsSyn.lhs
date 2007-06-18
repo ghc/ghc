@@ -86,11 +86,6 @@ hsPatType (SigPatOut pat ty)	    = ty
 hsPatType (NPat lit _ _ ty)	    = ty
 hsPatType (NPlusKPat id _ _ _)      = idType (unLoc id)
 hsPatType (CoPat _ _ ty)	    = ty
-hsPatType (DictPat ds ms)           = case (ds ++ ms) of
-				       []  -> unitTy
-				       [d] -> idType d
-				       ds  -> mkTupleTy Boxed (length ds) (map idType ds)
-
 
 hsLitType :: HsLit -> TcType
 hsLitType (HsChar c)       = charTy
@@ -750,11 +745,6 @@ zonk_pat env (NPlusKPat (L loc n) lit e1 e2)
  	; e1' <- zonkExpr env e1
 	; e2' <- zonkExpr env e2
 	; return (extendZonkEnv1 env n', NPlusKPat (L loc n') lit' e1' e2') }
-
-zonk_pat env (DictPat ds ms)
-  = do	{ ds' <- zonkIdBndrs env ds
-	; ms' <- zonkIdBndrs env ms
-	; return (extendZonkEnv env (ds' ++ ms'), DictPat ds' ms') }
 
 zonk_pat env (CoPat co_fn pat ty) 
   = do { (env', co_fn') <- zonkCoFn env co_fn

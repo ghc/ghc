@@ -608,7 +608,7 @@ has_nplusk_pat (PArrPat ps _)  	   	     = any has_nplusk_lpat ps
 has_nplusk_pat (LazyPat p)     	   	     = False	-- Why?
 has_nplusk_pat (BangPat p)     	   	     = has_nplusk_lpat p	-- I think
 has_nplusk_pat (ConPatOut { pat_args = ps }) = any has_nplusk_lpat (hsConArgs ps)
-has_nplusk_pat p = False 	-- VarPat, VarPatOut, WildPat, LitPat, NPat, TypePat, DictPat
+has_nplusk_pat p = False 	-- VarPat, VarPatOut, WildPat, LitPat, NPat, TypePat
 
 simplify_lpat :: LPat Id -> LPat Id  
 simplify_lpat p = fmap simplify_pat p
@@ -660,15 +660,6 @@ simplify_pat (NPat lit mb_neg eq lit_ty) = tidyNPat lit mb_neg eq lit_ty
 
 simplify_pat (NPlusKPat id hslit hsexpr1 hsexpr2)
    = WildPat (idType (unLoc id))
-
-simplify_pat (DictPat dicts methods)
-  = case num_of_d_and_ms of
-       0 -> simplify_pat (TuplePat [] Boxed unitTy) 
-       1 -> simplify_pat (head dict_and_method_pats) 
-       _ -> simplify_pat (mkVanillaTuplePat (map noLoc dict_and_method_pats) Boxed)
-    where
-       num_of_d_and_ms	 = length dicts + length methods
-       dict_and_method_pats = map VarPat (dicts ++ methods)
 
 simplify_pat (CoPat co pat ty) = simplify_pat pat 
 

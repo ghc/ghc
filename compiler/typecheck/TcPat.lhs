@@ -471,7 +471,7 @@ tc_pat pstate pat@(NPlusKPat (L nm_loc name) lit ge minus) pat_ty thing_inside
 	; res <- tcExtendIdEnv1 name bndr_id (thing_inside pstate)
 	; returnM (NPlusKPat (L nm_loc bndr_id) lit' ge' minus', [], res) }
 
-tc_pat _ _other_pat _ _ = panic "tc_pat" 	-- DictPat, ConPatOut, SigPatOut, VarPatOut
+tc_pat _ _other_pat _ _ = panic "tc_pat" 	-- ConPatOut, SigPatOut, VarPatOut
 \end{code}
 
 

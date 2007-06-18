@@ -125,11 +125,6 @@ data Pat id
   | SigPatOut	    (LPat id)		-- Pattern with a type signature
 		    Type
 
-	------------ Dictionary patterns (translation only) ---------------
-  | DictPat	    -- Used when destructing Dictionaries with an explicit case
-		    [id]		-- Superclass dicts
-		    [id]		-- Methods
-
 	------------ Pattern coercions (translation only) ---------------
   | CoPat 	HsWrapper		-- If co::t1 -> t2, p::t2, 
 					-- then (CoPat co p) :: t1
@@ -211,9 +206,6 @@ pprPat (TypePat ty)	      = ptext SLIT("{|") <> ppr ty <> ptext SLIT("|}")
 pprPat (CoPat co pat _)	      = parens (pprHsWrapper (ppr pat) co)
 pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
 pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
-pprPat (DictPat ds ms)	      = parens (sep [ptext SLIT("{-dict-}"),
-					     brackets (interpp'SP ds),
-					     brackets (interpp'SP ms)])
 
 pprUserCon c (InfixCon p1 p2) = ppr p1 <+> ppr c <+> ppr p2
 pprUserCon c details          = ppr c <+> pprConArgs details
@@ -305,7 +297,6 @@ isConPat (ConPatOut {})  = True
 isConPat (ListPat {})	 = True
 isConPat (PArrPat {})	 = True
 isConPat (TuplePat {})	 = True
-isConPat (DictPat ds ms) = (length ds + length ms) > 1
 isConPat other		 = False
 
 isSigPat (SigPatIn _ _)  = True
@@ -359,6 +350,5 @@ isIrrefutableHsPat pat
     go1 (NPlusKPat _ _ _ _) = False
 
     go1 (TypePat _)   = panic "isIrrefutableHsPat: type pattern"
-    go1 (DictPat _ _) = panic "isIrrefutableHsPat: type pattern"
 \end{code}
 
