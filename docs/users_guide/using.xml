@@ -1276,7 +1276,7 @@ f "2"    = 2
       <para>Note that higher optimisation levels cause more
       cross-module optimisation to be performed, which can have an
       impact on how much of your program needs to be recompiled when
-      you change something.  This is one reaosn to stick to
+      you change something.  This is one reason to stick to
       no-optimisation when developing code.</para>
 
       <variablelist>
