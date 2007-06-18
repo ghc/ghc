@@ -16,7 +16,7 @@ newtype MyInt = My Int
 newtype MkT a = MkT a
   deriving (Show)
 
-data MkT2 a = MkT2 (MkT a)
+newtype MkT2 a = MkT2 (MkT a)
   deriving Show
 
 data Param2 s r = P2 (FakeSTRef r (s(Param2 s r)))
