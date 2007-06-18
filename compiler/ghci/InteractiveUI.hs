@@ -611,9 +611,11 @@ runBreakCmd info = do
 
 printTypeOfNames :: Session -> [Name] -> GHCi ()
 printTypeOfNames session names
- = mapM_ (printTypeOfName session) $ sortBy compareFun names
+ = mapM_ (printTypeOfName session) $ sortBy compareNames names
+
+compareNames :: Name -> Name -> Ordering
+n1 `compareNames` n2 = compareWith n1 `compare` compareWith n2
     where compareWith n = (getOccString n, getSrcSpan n)
-          compareFun n1 n2 = compareWith n1 `compare` compareWith n2
 
 printTypeOfName :: Session -> Name -> GHCi ()
 printTypeOfName session n
@@ -1258,8 +1260,11 @@ showBindings = do
   s <- getSession
   unqual <- io (GHC.getPrintUnqual s)
   bindings <- io (GHC.getBindings s)
-  mapM_ printTyThing bindings
+  mapM_ printTyThing $ sortBy compareTyThings bindings
   return ()
+
+compareTyThings :: TyThing -> TyThing -> Ordering
+t1 `compareTyThings` t2 = getName t1 `compareNames` getName t2
 
 printTyThing :: TyThing -> GHCi ()
 printTyThing (AnId id) = do
