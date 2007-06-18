@@ -12,9 +12,9 @@ xs :: [t]
 y = (_t1::a)
 y = 2
 _result :: [Integer]
+_t1 :: Integer
 f :: t -> Integer
 x :: t
 xs :: [t]
 y :: Integer
-_t1 :: Integer
 2
