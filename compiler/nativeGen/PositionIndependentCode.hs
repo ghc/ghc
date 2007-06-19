@@ -131,7 +131,7 @@ cmmMakePicReference :: CLabel -> CmmExpr
         -- everything gets relocated at runtime
 
 cmmMakePicReference lbl
-    | opt_PIC && absoluteLabel lbl = CmmMachOp (MO_Add wordRep) [
+    | (opt_PIC || not opt_Static) && absoluteLabel lbl = CmmMachOp (MO_Add wordRep) [
             CmmReg (CmmGlobal PicBaseReg),
             CmmLit $ picRelative lbl
         ]
