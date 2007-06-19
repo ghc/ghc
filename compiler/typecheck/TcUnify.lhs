@@ -1780,6 +1780,10 @@ unifyFunKind other		       = returnM Nothing
 checkExpectedKind :: Outputable a => a -> TcKind -> TcKind -> TcM ()
 -- A fancy wrapper for 'unifyKind', which tries 
 -- to give decent error messages.
+-- 	(checkExpectedKind ty act_kind exp_kind)
+-- checks that the actual kind act_kind is compatible 
+-- 	with the expected kind exp_kind
+-- The first argument, ty, is used only in the error message generation
 checkExpectedKind ty act_kind exp_kind
   | act_kind `isSubKind` exp_kind -- Short cut for a very common case
   = returnM ()
