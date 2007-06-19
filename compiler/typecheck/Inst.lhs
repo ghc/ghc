@@ -31,7 +31,7 @@ module Inst (
 
 	isDict, isClassDict, isMethod, isImplicInst,
 	isIPDict, isInheritableInst, isMethodOrLit,
-	isTyVarDict, isMethodFor, getDefaultableDicts,
+	isTyVarDict, isMethodFor, 
 
 	zonkInst, zonkInsts,
 	instToId, instToVar, instName,
@@ -54,7 +54,6 @@ import FunDeps
 import TcMType
 import TcType
 import Type
-import Class
 import Unify
 import Module
 import Coercion
@@ -211,26 +210,6 @@ isMethodOrLit (LitInst {}) = True
 isMethodOrLit other        = False
 \end{code}
 
-\begin{code}
-getDefaultableDicts :: [Inst] -> ([(Inst, Class, TcTyVar)], TcTyVarSet)
--- Look for free dicts of the form (C tv), even inside implications
--- *and* the set of tyvars mentioned by all *other* constaints
--- This disgustingly ad-hoc function is solely to support defaulting
-getDefaultableDicts insts
-  = (concat ps, unionVarSets tvs)
-  where
-    (ps, tvs) = mapAndUnzip get insts
-    get d@(Dict {tci_pred = ClassP cls [ty]})
-	| Just tv <- tcGetTyVar_maybe ty = ([(d,cls,tv)], emptyVarSet)
-	| otherwise		         = ([], tyVarsOfType ty)
-    get (ImplicInst {tci_tyvars = tvs, tci_wanted = wanteds})
-	= ([ up | up@(_,_,tv) <- ups, not (tv `elemVarSet` tv_set)],
-	   ftvs `minusVarSet` tv_set)
-	where
-	   tv_set = mkVarSet tvs
-	   (ups, ftvs) = getDefaultableDicts wanteds
-    get inst = ([], tyVarsOfInst inst)
-\end{code}
 
 %************************************************************************
 %*									*
@@ -303,7 +282,7 @@ instCallDicts loc (pred : preds)
 	; return (dict:dicts, co_fn <.> WpApp (instToId dict)) }
 
 -------------
-cloneDict :: Inst -> TcM Inst	-- Only used for linear implicit params
+cloneDict :: Inst -> TcM Inst
 cloneDict dict@(Dict nm ty loc) = do { uniq <- newUnique
 				     ; return (dict {tci_name = setNameUnique nm uniq}) }
 cloneDict other = pprPanic "cloneDict" (ppr other)
