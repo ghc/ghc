@@ -1300,8 +1300,8 @@ dodgyExportWarn item = dodgyMsg (ptext SLIT("export")) item
 
 dodgyMsg kind tc
   = sep [ ptext SLIT("The") <+> kind <+> ptext SLIT("item") <+> quotes (ppr (IEThingAll tc)),
-	  ptext SLIT("suggests that") <+> quotes (ppr tc) <+> ptext SLIT("has constructor or class methods"),
-	  ptext SLIT("but it has none; it is a type synonym or abstract type or class") ]
+	  ptext SLIT("suggests that") <+> quotes (ppr tc) <+> ptext SLIT("has constructors or class methods,"),
+	  ptext SLIT("but it has none") ]
 	  
 exportItemErr export_item
   = sep [ ptext SLIT("The export item") <+> quotes (ppr export_item),
