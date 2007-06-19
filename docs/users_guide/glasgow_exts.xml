@@ -751,13 +751,6 @@ than <literal>do</literal>).
 </para></listitem>
 
 <listitem><para>
-You should <literal>import Control.Monad.Fix</literal>.
-(Note: Strictly speaking, this import is required only when you need to refer to the name
-<literal>MonadFix</literal> in your program, but the import is always safe, and the programmers
-are encouraged to always import this module when using the mdo-notation.)
-</para></listitem>
-
-<listitem><para>
 As with other extensions, ghc should be given the flag <literal>-fglasgow-exts</literal>
 </para></listitem>
 </itemizedlist>
