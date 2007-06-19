@@ -1302,8 +1302,128 @@ to re-read its input file:
 </screen>
 </para>
 </sect2>
+  </sect1>
 
+  <sect1 id="hpc">
+    <title>Observing Code Coverage</title>
+    <indexterm><primary>code coverage</primary></indexterm>
+    <indexterm><primary>Haskell Program Coverage</primary></indexterm>
+    <indexterm><primary>hpc</primary></indexterm>
 
+    <para>
+      Code coverage tools allow a programer to determine what parts of
+      their code have been actually executed, and which parts have
+      never actually been invoked.  GHC has an option for generating
+      instrumented code that records code coverage as part of the
+      <ulink url="http://www.haskell.org/hpc">Haskell Program Coverage
+      </ulink>(HPC) toolkit.  HPC tools can be used to render the
+      outputed code coverage infomation into human understandable
+      format.  
+   </para>
+
+    <para>
+      HPC provides coverage information of two kinds: source coverage
+      and boolean-control coverage. Source coverage is the extent to
+      which every part of the program was used, measured at three
+      different levels: declarations (both top-level and local),
+      alternatives (among several equations or case branches) and
+      expressions (at every level).  Boolean coverage is the extent to
+      which each of the values True and False is obtained in every
+      syntactic boolean context (ie. guard, condition, qualifier).
+    </para>
+
+    <para>
+      HPC displays both kinds of information in two different ways:
+      textual reports with summary statistics (hpc-report) and sources
+      with color mark-up (hpc-markup).  For boolean coverage, there
+      are four possible outcomes for each guard, condition or
+      qualifier: both True and False values occur; only True; only
+      False; never evaluated. In hpc-markup output, highlighting with
+      a yellow background indicates a part of the program that was
+      never evaluated; a green background indicates an always-True
+      expression and a red background indicates an always-False one.
+    </para> 
+
+   <sect2><title>A small example: Reciprocation</title>
+
+    <para>
+     For an example we have a program which computes exact decimal
+     representations of reciprocals, with recurring parts indicated in
+     brackets.  We first build an instrumented version using the
+     hpc-build script. Assuming the source file is Recip.hs.
+    </para>
+<programlisting>
+reciprocal :: Int -> (String, Int)
+reciprocal n | n > 1 = ('0' : '.' : digits, recur)
+             | otherwise = error
+	          "attempting to compute reciprocal of number &lt;= 1"
+  where
+  (digits, recur) = divide n 1 []
+divide :: Int -> Int -> [Int] -> (String, Int)
+divide n c cs | c `elem` cs = ([], position c cs)
+              | r == 0      = (show q, 0)
+              | r /= 0      = (show q ++ digits, recur)
+  where
+  (q, r) = (c*10) `quotRem` n
+  (digits, recur) = divide n r (c:cs)
+
+position :: Int -> [Int] -> Int
+position n (x:xs) | n==x      = 1
+                  | otherwise = 1 + position n xs
+
+showRecip :: Int -> String
+showRecip n =
+  "1/" ++ show n ++ " = " ++
+  if r==0 then d else take p d ++ "(" ++ drop p d ++ ")"
+  where
+  p = length d - r
+  (d, r) = reciprocal n
+
+main = do
+  number &lt;- readLn
+  putStrLn (showRecip number)
+  main
+</programlisting>
+
+`    <para>The HPC intrumentation is enabled using the -fhpc flag.
+    </para>
+
+<screen>
+$ ghc -fhpc Recip.hs --make 
+</screen>
+    <para>HPC index (.mix) files are placed placed in .hpc subdirectory. These can be considered like
+    the .hi files for HPC. They contain information about what parts of the haskell each modules.
+   </para>
+<screen>
+$ ./Recip
+1/3
+= 0.(3)
+</screen>
+    <para>Now for a textual summary of coverage:</para>
+<screen>
+$ hpc-report Recip
+ 80% expressions used (81/101)
+ 12% boolean coverage (1/8)
+      14% guards (1/7), 3 always True, 
+                        1 always False, 
+                        2 unevaluated
+       0% 'if' conditions (0/1), 1 always False
+     100% qualifiers (0/0)
+ 55% alternatives used (5/9)
+100% local declarations used (9/9)
+100% top-level declarations used (5/5)
+</screen>
+    <para>Finally, we generate a marked-up version of the source.</para>
+<screen>
+$ hpc-markup Recip
+writing Recip.hs.html
+</screen>
+<figure>
+       <title>Recip.hs.html</title>
+       <graphic fileref="images/Recip.png"></graphic>
+    </figure>
+
+    </sect2> 
   </sect1>
 
   <sect1 id="ticky-ticky">

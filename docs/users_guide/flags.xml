@@ -1189,6 +1189,39 @@
     </sect2>
 
     <sect2>
+      <title>Program coverage options</title>
+      
+      <para><xref linkend="hpc"/></para>
+
+      <informaltable>
+	<tgroup cols="4" align="left" colsep="1" rowsep="1">
+	  <thead>
+	    <row>
+	      <entry>Flag</entry>
+	      <entry>Description</entry>
+	      <entry>Static/Dynamic</entry>
+	      <entry>Reverse</entry>
+	    </row>
+	  </thead>
+	  <tbody>
+	    <row>
+	      <entry><option>-fhpc</option></entry>
+	      <entry>Turn on Haskell program coverage instrumentation</entry>
+	      <entry>static</entry>
+	      <entry><option>-</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-hpcdir dir</option></entry>
+	      <entry>Directory to deposit .mix files during compilation</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-</option></entry>
+	    </row>
+	  </tbody>
+	</tgroup>
+      </informaltable>
+    </sect2>
+
+    <sect2>
       <title>Haskell pre-processor options</title>
 
       <para><xref linkend="pre-processor"/></para>
@@ -1742,6 +1775,12 @@
 	    <row>
 	      <entry><option>-ddump-foreign</option></entry>
 	      <entry>Dump <literal>foreign export</literal> stubs</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-ddump-hpc</option></entry>
+	      <entry>Dump after intrumentation for program coverage</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
