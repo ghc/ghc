@@ -12,6 +12,7 @@ do
     fi
 done
 
+chmod +x push-all
 chmod +x rts/gmp/configure
 
 echo "Booting ."

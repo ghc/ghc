@@ -1,0 +1,93 @@
+#!/usr/bin/perl -w
+
+use strict;
+
+my @top_dirs = ("nofib", "testsuite");
+
+my $reporoot;
+
+my $verbose = 1;
+my $ignore_failure = 0;
+
+# --checked-out says we are pushing to a checked out tree
+my $checked_out = 0;
+
+sub message {
+    if ($verbose) {
+        print "@_\n";
+    }
+}
+
+sub warning {
+    print "warning: @_\n";
+}
+
+sub darcs {
+    message "== running darcs @_";
+    system ("darcs", @_) == 0
+        or $ignore_failure
+        or die "darcs failed: $?";
+}
+
+sub darcs_push {
+    darcs ("push", "--no-set-default", @_);
+}
+
+sub pushall {
+    my $dir;
+    my $ghcrepo = $checked_out ? $reporoot : "$reporoot/ghc";
+    darcs_push ($ghcrepo, @_);
+    for $dir (@top_dirs) {
+        if (-d $dir && -d "$dir/_darcs") {
+            darcs_push ("$reporoot/$dir", @_, "--repodir", $dir);
+        }
+        else {
+            message "== $dir not present or not a repository; skipping";
+        }
+    }
+    for my $pkg (`cat libraries/core-packages libraries/extra-packages`) {
+        chomp $pkg;
+        $dir = "libraries/$pkg";
+        if (-d "$dir") {
+            darcs_push ("$reporoot/$dir", @_, "--repodir", "$dir");
+        }
+        else {
+            warning("$pkg doesn't exist, use 'darcs-all get' to get it");
+        }
+    }
+}
+
+sub main {
+    if (! -d "_darcs" || ! -d "compiler") {
+        die "error: darcs-all must be run from the top level of the ghc tree."
+    }
+
+    if ($#_ ne -1) {
+        while ($#_ ne -1) {
+            my $arg = shift;
+            # We handle -q here as well as lower down as we need to skip
+            # over it if it comes before the darcs command
+            if ($arg eq "-q") {
+                $verbose = 0;
+            }
+            elsif ($arg eq "--checked-out") {
+                $checked_out = 1;
+            }
+            else {
+                $reporoot = $arg;
+                if (grep /^-q$/, @_) {
+                    $verbose = 0;
+                }
+                last;
+            }
+        }
+    }
+    else {
+        die "Where do you want to push to?";
+    }
+
+    pushall (@_);
+}
+
+main(@ARGV);
+
