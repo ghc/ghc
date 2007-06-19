@@ -290,7 +290,7 @@ getSequelAmode
 -- There are four kinds of things on the stack:
 --
 --	- pointer variables (bound in the environment)
--- 	- non-pointer variables (boudn in the environment)
+-- 	- non-pointer variables (bound in the environment)
 -- 	- free slots (recorded in the stack free list)
 -- 	- non-pointer data slots (recorded in the stack free list)
 -- 
