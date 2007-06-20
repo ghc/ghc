@@ -269,6 +269,7 @@ clean.library.%:
 	$(RM) -f stamp/configure.library.*.$* $*/unbuildable
 	-cd $* && setup/Setup clean
 	$(RM) -rf $*/setup
+	$(RM) $*/GNUmakefile $*/Makefile.local
 endif
 
 # -----------------------------------------------------------------------------
