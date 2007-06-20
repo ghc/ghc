@@ -680,18 +680,11 @@ tcSimplifyInfer doc tau_tvs wanted
 		-- To make types simple, reduce as much as possible
 	; traceTc (text "infer" <+> (ppr preds $$ ppr (grow preds tau_tvs') $$ ppr gbl_tvs $$ 
 		   ppr (oclose preds gbl_tvs) $$ ppr free1 $$ ppr bound))
-	; let try_me inst = ReduceMe AddSCs
-	      red_env     = mkRedEnv doc try_me []
-	; (irreds1, binds1) <- checkLoop red_env bound
+	; (irreds1, binds1) <- tryHardCheckLoop doc bound
 
 		-- Note [Inference and implication constraints]
-		-- By putting extra_dicts first, we make them available
-		-- to solve the implication constraints
-	; let extra_dicts = getImplicWanteds qtvs irreds1
-	; (irreds2, binds2) <- if null extra_dicts 
-			       then return (irreds1, emptyBag)
-			       else do { extra_dicts' <- mapM cloneDict extra_dicts
-				       ; checkLoop red_env (extra_dicts' ++ irreds1) }
+	; let want_dict d = tyVarsOfInst d `intersectsVarSet` qtvs
+	; (irreds2, binds2) <- approximateImplications doc want_dict irreds1
 
 		-- By now improvment may have taken place, and we must *not*
 		-- quantify over any variable free in the environment
@@ -723,32 +716,60 @@ tcSimplifyInfer doc tau_tvs wanted
 	-- NB: when we are done, we might have some bindings, but
 	-- the final qtvs might be empty.  See Note [NO TYVARS] below.
 
-getImplicWanteds :: TcTyVarSet -> [Inst] -> [Inst]
--- See Note [Inference and implication constraints]
--- Find the wanted constraints in implication constraints that mention the 
--- quantified type variables, and are not bound by forall's in the constraint itself
--- Returns only Dicts
-getImplicWanteds qtvs implics
-  = concatMap get implics
-  where
-    get d@(Dict {}) | tyVarsOfInst d `intersectsVarSet` qtvs = [d]
-		    | otherwise				     = []
-    get (ImplicInst {tci_tyvars = tvs, tci_wanted = wanteds})
+approximateImplications :: SDoc -> (Inst -> Bool) -> [Inst] -> TcM ([Inst], TcDictBinds)
+-- Note [Inference and implication constraints]
+-- Given a bunch of Dict and ImplicInsts, try to approximate the implications by
+--	- fetching any dicts inside them that are free
+--	- using those dicts as cruder constraints, to solve the implications
+--	- returning the extra ones too
+
+approximateImplications doc want_dict irreds
+  | null extra_dicts 
+  = return (irreds, emptyBag)
+  | otherwise
+  = do	{ extra_dicts' <- mapM cloneDict extra_dicts
+	; tryHardCheckLoop doc (extra_dicts' ++ irreds) }
+		-- By adding extra_dicts', we make them 
+		-- available to solve the implication constraints
+  where 
+    extra_dicts = get_dicts (filter isImplicInst irreds)
+
+    get_dicts :: [Inst] -> [Inst]	-- Returns only Dicts
+	-- Find the wanted constraints in implication constraints that satisfy
+	-- want_dict, and are not bound by forall's in the constraint itself
+    get_dicts ds = concatMap get_dict ds
+
+    get_dict d@(Dict {}) | want_dict d = [d]
+		         | otherwise   = []
+    get_dict (ImplicInst {tci_tyvars = tvs, tci_wanted = wanteds})
 	= [ d | let tv_set = mkVarSet tvs
-	      , d <- getImplicWanteds qtvs wanteds 
+	      , d <- get_dicts wanteds 
 	      , not (tyVarsOfInst d `intersectsVarSet` tv_set)]
+    get_dict other = pprPanic "approximateImplications" (ppr other)
 \end{code}
 
 Note [Inference and implication constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
-We can't (or at least don't) abstract over implications.  But we might
-have an implication constraint (perhaps arising from a nested pattern
-match) like
-	C a => D a
-when we are now trying to quantify over 'a'.  Our best approximation
-is to make (D a) part of the inferred context, so we can use that to
-discharge the implication. Hence getImplicWanteds.
+Suppose we have a wanted implication constraint (perhaps arising from
+a nested pattern match) like
+	C a => D [a]
+and we are now trying to quantify over 'a' when inferring the type for
+a function.  In principle it's possible that there might be an instance
+	instance (C a, E a) => D [a]
+so the context (E a) would suffice.  The Right Thing is to abstract over
+the implication constraint, but we don't do that (a) because it'll be
+surprising to programmers and (b) because we don't have the machinery to deal
+with 'given' implications.
 
+So our best approximation is to make (D [a]) part of the inferred
+context, so we can use that to discharge the implication. Hence
+the strange function getImplicWanteds.
+
+The common cases are more clear-cut, when we have things like
+	forall a. C a => C b
+Here, abstracting over (C b) is not an approximation at all -- but see
+Note [Freeness and implications].
+ 
 See Trac #1430 and test tc228.
 
 
@@ -766,7 +787,7 @@ tcSimplifyInferCheck
 		 TcDictBinds)	-- Bindings
 
 tcSimplifyInferCheck loc tau_tvs givens wanteds
-  = do	{ (irreds, binds) <- innerCheckLoop loc givens wanteds
+  = do	{ (irreds, binds) <- gentleCheckLoop loc givens wanteds
 
 	-- Figure out which type variables to quantify over
 	-- You might think it should just be the signature tyvars,
@@ -872,7 +893,7 @@ tcSimplifyCheck	:: InstLoc
 	 	-> TcM TcDictBinds	-- Bindings
 tcSimplifyCheck loc qtvs givens wanteds 
   = ASSERT( all isTcTyVar qtvs && all isSkolemTyVar qtvs )
-    do	{ (irreds, binds) <- innerCheckLoop loc givens wanteds
+    do	{ (irreds, binds) <- gentleCheckLoop loc givens wanteds
 	; implic_bind <- bindIrreds loc qtvs givens irreds
 	; return (binds `unionBags` implic_bind) }
 
@@ -886,7 +907,7 @@ tcSimplifyCheckPat :: InstLoc
 	 	   -> TcM TcDictBinds	-- Bindings
 tcSimplifyCheckPat loc co_vars reft qtvs givens wanteds
   = ASSERT( all isTcTyVar qtvs && all isSkolemTyVar qtvs )
-    do	{ (irreds, binds) <- innerCheckLoop loc givens wanteds
+    do	{ (irreds, binds) <- gentleCheckLoop loc givens wanteds
 	; implic_bind <- bindIrredsR loc qtvs co_vars reft 
 				    givens irreds
 	; return (binds `unionBags` implic_bind) }
@@ -972,22 +993,23 @@ makeImplicationBind loc all_tvs reft
 	  return ([implic_inst], unitBag (L span bind)) }
 
 -----------------------------------------------------------
-topCheckLoop :: SDoc
+tryHardCheckLoop :: SDoc
 	     -> [Inst]			-- Wanted
 	     -> TcM ([Inst], TcDictBinds)
 
-topCheckLoop doc wanteds
+tryHardCheckLoop doc wanteds
   = checkLoop (mkRedEnv doc try_me []) wanteds
   where
     try_me inst = ReduceMe AddSCs
+	-- Here's the try-hard bit
 
 -----------------------------------------------------------
-innerCheckLoop :: InstLoc
+gentleCheckLoop :: InstLoc
 	       -> [Inst]		-- Given
 	       -> [Inst]		-- Wanted
 	       -> TcM ([Inst], TcDictBinds)
 
-innerCheckLoop inst_loc givens wanteds
+gentleCheckLoop inst_loc givens wanteds
   = checkLoop env wanteds
   where
     env = mkRedEnv (pprInstLoc inst_loc) try_me givens
@@ -1019,7 +1041,7 @@ But we MUST NOT reduce (Show [a]) to (Show a), else the whole
 thing becomes insoluble.  So we simplify gently (get rid of literals
 and methods only, plus common up equal things), deferring the real
 work until top level, when we solve the implication constraint
-with topCheckLooop.
+with tryHardCheckLooop.
 
 
 \begin{code}
@@ -1028,6 +1050,7 @@ checkLoop :: RedEnv
 	  -> [Inst]			-- Wanted
 	  -> TcM ([Inst], TcDictBinds)
 -- Precondition: givens are completely rigid
+-- Postcondition: returned Insts are zonked
 
 checkLoop env wanteds
   = do { -- Givens are skolems, so no need to zonk them
@@ -1125,7 +1148,7 @@ tcSimplifySuperClasses loc givens sc_wanteds
   where
     env = mkRedEnv (pprInstLoc loc) try_me givens
     try_me inst = ReduceMe NoSCs
-	-- Like topCheckLoop, but with NoSCs
+	-- Like tryHardCheckLoop, but with NoSCs
 \end{code}
 
 
@@ -1411,7 +1434,7 @@ this bracket again at its usage site.
 \begin{code}
 tcSimplifyBracket :: [Inst] -> TcM ()
 tcSimplifyBracket wanteds
-  = do	{ topCheckLoop doc wanteds
+  = do	{ tryHardCheckLoop doc wanteds
 	; return () }
   where
     doc = text "tcSimplifyBracket"
@@ -1624,7 +1647,11 @@ reduceContext env wanteds
 	; init_state <- foldlM addGiven emptyAvails (red_givens env)
 
         -- Do the real work
-	; avails <- reduceList env wanteds init_state
+	-- Process non-implication constraints first, so that they are
+	-- available to help solving the implication constraints
+	-- 	ToDo: seems a bit inefficient and ad-hoc
+	; let (implics, rest) = partition isImplicInst wanteds
+	; avails <- reduceList env (rest ++ implics) init_state
 
 	; let improved = availsImproved avails
 	; (binds, irreds) <- extractResults avails wanteds
@@ -2263,24 +2290,19 @@ tcSimplifyInteractive wanteds
 -- The TcLclEnv should be valid here, solely to improve
 -- error message generation for the monomorphism restriction
 tc_simplify_top doc interactive wanteds
-  = do	{ wanteds <- mapM zonkInst wanteds
+  = do	{ dflags <- getDOpts
+	; wanteds <- mapM zonkInst wanteds
 	; mapM_ zonkTopTyVar (varSetElems (tyVarsOfInsts wanteds))
 
-	; (irreds1, binds1) <- topCheckLoop doc wanteds
+	; (irreds1, binds1) <- tryHardCheckLoop doc1 wanteds
+	; (irreds2, binds2) <- approximateImplications doc2 (\d -> True) irreds1
 
-	; if null irreds1 then 
-		return binds1
-	  else do
-	-- OK, so there are some errors
-	{	-- Use the defaulting rules to do extra unification
-		-- NB: irreds are already zonked
-	; dflags <- getDOpts
-	; disambiguate interactive dflags irreds1	-- Does unification
-							-- hence try again
+		-- Use the defaulting rules to do extra unification
+		-- NB: irreds2 are already zonked
+	; (irreds3, binds3) <- disambiguate doc3 interactive dflags irreds2
 
 		-- Deal with implicit parameters
-	; (irreds2, binds2) <- topCheckLoop doc irreds1
-	; let (bad_ips, non_ips) = partition isIPDict irreds2
+	; let (bad_ips, non_ips) = partition isIPDict irreds3
 	      (ambigs, others)   = partition isTyVarDict non_ips
 
 	; topIPErrs bad_ips	-- Can arise from   f :: Int -> Int
@@ -2288,7 +2310,11 @@ tc_simplify_top doc interactive wanteds
 	; addNoInstanceErrs others
 	; addTopAmbigErrs ambigs	
 
-	; return (binds1 `unionBags` binds2) }}
+	; return (binds1 `unionBags` binds2 `unionBags` binds3) }
+  where
+    doc1 = doc <+> ptext SLIT("(first round)")
+    doc2 = doc <+> ptext SLIT("(approximate)")
+    doc3 = doc <+> ptext SLIT("(disambiguate)")
 \end{code}
 
 If a dictionary constrains a type variable which is
@@ -2324,26 +2350,40 @@ Since we're not using the result of @foo@, the result if (presumably)
 @void@.
 
 \begin{code}
-disambiguate :: Bool -> DynFlags -> [Inst] -> TcM ()
+disambiguate :: SDoc -> Bool -> DynFlags -> [Inst] -> TcM ([Inst], TcDictBinds)
 	-- Just does unification to fix the default types
 	-- The Insts are assumed to be pre-zonked
-disambiguate interactive dflags insts
+disambiguate doc interactive dflags insts
+  | null insts
+  = return (insts, emptyBag)
+
   | null defaultable_groups
-  = do { traceTc (text "disambigutate" <+> vcat [ppr unaries, ppr bad_tvs, ppr defaultable_groups])
-	;     return () }
+  = do	{ traceTc (text "disambigutate" <+> vcat [ppr unaries, ppr bad_tvs, ppr defaultable_groups])
+	; return (insts, emptyBag) }
+
   | otherwise
   = do 	{  	-- Figure out what default types to use
-	; default_tys <- getDefaultTys extended_defaulting ovl_strings
+	  default_tys <- getDefaultTys extended_defaulting ovl_strings
 
 	; traceTc (text "disambigutate" <+> vcat [ppr unaries, ppr bad_tvs, ppr defaultable_groups])
-	; mapM_ (disambigGroup default_tys) defaultable_groups  }
+	; mapM_ (disambigGroup default_tys) defaultable_groups
+
+	-- disambigGroup does unification, hence try again
+	; tryHardCheckLoop doc insts }
+
   where
    extended_defaulting = interactive || dopt Opt_ExtendedDefaultRules dflags
    ovl_strings = dopt Opt_OverloadedStrings dflags
 
-   unaries :: [(Inst,Class, TcTyVar)]  -- (C tv) constraints
-   bad_tvs :: TcTyVarSet	  -- Tyvars mentioned by *other* constraints
-   (unaries, bad_tvs) = getDefaultableDicts insts
+   unaries :: [(Inst, Class, TcTyVar)]  -- (C tv) constraints
+   bad_tvs :: TcTyVarSet  -- Tyvars mentioned by *other* constraints
+   (unaries, bad_tvs_s) = partitionWith find_unary insts 
+   bad_tvs 		= unionVarSets bad_tvs_s
+
+	-- Finds unary type-class constraints
+   find_unary d@(Dict {tci_pred = ClassP cls [ty]})
+	| Just tv <- tcGetTyVar_maybe ty = Left (d,cls,tv)
+   find_unary inst			 = Right (tyVarsOfInst inst)
 
 		-- Group by type variable
    defaultable_groups :: [[(Inst,Class,TcTyVar)]]
@@ -2421,26 +2461,6 @@ getDefaultTys extended_deflts ovl_strings
   where
     opt_deflt True  ty = [ty]
     opt_deflt False ty = []
-
------------------------
-getDefaultableDicts :: [Inst] -> ([(Inst, Class, TcTyVar)], TcTyVarSet)
--- Look for free dicts of the form (C tv), even inside implications
--- *and* the set of tyvars mentioned by all *other* constaints
--- This disgustingly ad-hoc function is solely to support defaulting
-getDefaultableDicts insts
-  = (concat ps, unionVarSets tvs)
-  where
-    (ps, tvs) = mapAndUnzip get insts
-    get d@(Dict {tci_pred = ClassP cls [ty]})
-	| Just tv <- tcGetTyVar_maybe ty = ([(d,cls,tv)], emptyVarSet)
-	| otherwise		         = ([], tyVarsOfType ty)
-    get (ImplicInst {tci_tyvars = tvs, tci_wanted = wanteds})
-	= ([ up | up@(_,_,tv) <- ups, not (tv `elemVarSet` tv_set)],
-	   ftvs `minusVarSet` tv_set)
-	where
-	   tv_set = mkVarSet tvs
-	   (ups, ftvs) = getDefaultableDicts wanteds
-    get inst = ([], tyVarsOfInst inst)
 \end{code}
 
 Note [Default unitTy]
@@ -2500,7 +2520,7 @@ tcSimplifyDeriv orig tyvars theta
 	-- it doesn't see a TcTyVar, so we have to instantiate. Sigh
 	-- ToDo: what if two of them do get unified?
 	; wanteds <- newDictBndrsO orig (substTheta tenv theta)
-	; (irreds, _) <- topCheckLoop doc wanteds
+	; (irreds, _) <- tryHardCheckLoop doc wanteds
 
 	; let rev_env = zipTopTvSubst tvs (mkTyVarTys tyvars)
 	      simpl_theta = substTheta rev_env (map dictPred irreds)
@@ -2527,7 +2547,7 @@ tcSimplifyDefault :: ThetaType	-- Wanted; has no type variables in it
 
 tcSimplifyDefault theta
   = newDictBndrsO DefaultOrigin theta	`thenM` \ wanteds ->
-    topCheckLoop doc wanteds		`thenM` \ (irreds, _) ->
+    tryHardCheckLoop doc wanteds	`thenM` \ (irreds, _) ->
     addNoInstanceErrs  irreds	 	`thenM_`
     if null irreds then
 	returnM ()
