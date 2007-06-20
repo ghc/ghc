@@ -14,7 +14,7 @@ my $defaultrepo_lib;
 if ($defaultrepo =~ /:/) {
     # HTTP or SSH
     $defaultrepo_base = $defaultrepo;
-    $defaultrepo_base =~ s#/ghc$##;
+    $defaultrepo_base =~ s#/[^/]+/?$##;
     $defaultrepo_lib = "$defaultrepo_base/packages";
 }
 elsif ($defaultrepo =~ /^\//) {
