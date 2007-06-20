@@ -1,7 +1,7 @@
 
-tcfail169.hs:7:5:
+tcfail169.hs:7:0:
     No instance for (Show (Succ a))
       arising from the 'deriving' clause of a data type declaration
-      at tcfail169.hs:7:5
+		   at tcfail169.hs:7:0-53
     Possible fix: add an instance declaration for (Show (Succ a))
-    When deriving the instance for `Show (Seq a)'
+    When deriving the instance for (Show (Seq a))

@@ -4,9 +4,11 @@ drvfail001.hs:15:0:
       arising from the 'deriving' clause of a data type declaration
 		   at drvfail001.hs:(15,0)-(16,21)
     Possible fix: add an instance declaration for (Show (f (f a)))
+    When deriving the instance for (Show (SM f a))
 
 drvfail001.hs:21:0:
     No instance for (Show (f a))
       arising from the 'deriving' clause of a data type declaration
 		   at drvfail001.hs:(21,0)-(22,21)
     Possible fix: add an instance declaration for (Show (f a))
+    When deriving the instance for (Show (Cons f a))

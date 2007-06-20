@@ -10,3 +10,4 @@ drvfail002.hs:18:0:
       arising from the 'deriving' clause of a data type declaration
 		   at drvfail002.hs:18:0-25
     Possible fix: add an instance declaration for (X T c)
+    When deriving the instance for (Show S)

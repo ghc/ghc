@@ -4,3 +4,4 @@ drvfail003.hs:13:0:
       arising from the 'deriving' clause of a data type declaration
 		   at drvfail003.hs:(13,0)-(16,58)
     Possible fix: add an instance declaration for (Show (v (v a)))
+    When deriving the instance for (Show (Square_ v w a))
