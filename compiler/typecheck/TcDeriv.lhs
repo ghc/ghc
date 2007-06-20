@@ -866,11 +866,11 @@ solveDerivEqns overlap_flag orig_eqns
     gen_soln :: DerivEqn -> TcM [PredType]
     gen_soln (loc, orig, _, tyvars, clas, inst_ty, deriv_rhs)
       = setSrcSpan loc	$
+	addErrCtxt (derivInstCtxt clas [inst_ty]) $ 
 	do { theta <- tcSimplifyDeriv orig tyvars deriv_rhs
-	   ; addErrCtxt (derivInstCtxt theta clas [inst_ty]) $ 
-	do { checkNoErrs (checkValidInstance tyvars theta clas [inst_ty])
-	 	-- See Note [Deriving context]
-		-- If this fails, don't continue
+	   	-- checkValidInstance tyvars theta clas [inst_ty]
+		-- Not necessary; see Note [Exotic derived instance contexts]
+		-- 		  in TcSimplify
 
 		  -- Check for a bizarre corner case, when the derived instance decl should
 		  -- have form 	instance C a b => D (T a) where ...
@@ -884,7 +884,7 @@ solveDerivEqns overlap_flag orig_eqns
 		-- Claim: the result instance declaration is guaranteed valid
 		-- Hence no need to call:
 		--   checkValidInstance tyvars theta clas inst_tys
-	   ; return (sortLe (<=) theta) } }	-- Canonicalise before returning the solution
+	   ; return (sortLe (<=) theta) }	-- Canonicalise before returning the solution
 
     ------------------------------------------------------------------
     mk_inst_spec :: DerivEqn -> DerivSoln -> Instance
@@ -903,25 +903,6 @@ extendLocalInstEnv dfuns thing_inside
       ; setGblEnv env' thing_inside }
 \end{code}
 
-Note [Deriving context]
-~~~~~~~~~~~~~~~~~~~~~~~
-With -fglasgow-exts, we allow things like (C Int a) in the simplified
-context for a derived instance declaration, because at a use of this
-instance, we might know that a=Bool, and have an instance for (C Int
-Bool)
-
-We nevertheless insist that each predicate meets the termination
-conditions. If not, the deriving mechanism generates larger and larger
-constraints.  Example:
-  data Succ a = S a
-  data Seq a = Cons a (Seq (Succ a)) | Nil deriving Show
-
-Note the lack of a Show instance for Succ.  First we'll generate
-  instance (Show (Succ a), Show a) => Show (Seq a)
-and then
-  instance (Show (Succ (Succ a)), Show (Succ a), Show a) => Show (Seq a)
-and so on.  Instead we want to complain of no instance for (Show (Succ a)).
-  
 
 %************************************************************************
 %*									*
@@ -1137,10 +1118,8 @@ derivingThingErr clas tys ty why
 standaloneCtxt :: LHsType Name -> SDoc
 standaloneCtxt ty = ptext SLIT("In the stand-alone deriving instance for") <+> quotes (ppr ty)
 
-derivInstCtxt theta clas inst_tys
-  = hang (ptext SLIT("In the derived instance:"))
-	 2 (pprThetaArrow theta <+> pprClassPred clas inst_tys)
--- Used for the ...Thetas variants; all top level
+derivInstCtxt clas inst_tys
+  = ptext SLIT("When deriving the instance for") <+> parens (pprClassPred clas inst_tys)
 
 badDerivedPred pred
   = vcat [ptext SLIT("Can't derive instances where the instance context mentions"),
