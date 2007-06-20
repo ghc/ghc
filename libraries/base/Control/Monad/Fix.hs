@@ -26,7 +26,11 @@ import Prelude
 import System.IO
 import Control.Monad.Instances ()
 import Data.Function (fix)
+#ifdef __HUGS__
+import Hugs.Prelude (MonadFix(mfix))
+#endif
 
+#ifndef __HUGS__
 -- | Monads having fixed points with a \'knot-tying\' semantics.
 -- Instances of 'MonadFix' should satisfy the following laws:
 --
@@ -51,6 +55,7 @@ class (Monad m) => MonadFix m where
 	-- output fed back as the input.  Hence @f@ should not be strict,
 	-- for then @'mfix' f@ would diverge.
 	mfix :: (a -> m a) -> m a
+#endif /* !__HUGS__ */
 
 -- Instances of MonadFix for Prelude monads
 
