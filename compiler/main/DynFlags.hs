@@ -59,7 +59,7 @@ import PrelNames	( mAIN )
 import StaticFlags	( opt_Static )
 #endif
 import StaticFlags	( opt_PIC, WayName(..), v_Ways, v_Build_tag,
-			  v_RTS_Build_tag )
+			  v_RTS_Build_tag, opt_Hpc )
 import {-# SOURCE #-} Packages (PackageState)
 import DriverPhases	( Phase(..), phaseInputExt )
 import Config
@@ -677,6 +677,7 @@ getCoreToDo dflags
     cse           = dopt Opt_CSE dflags
     spec_constr   = dopt Opt_SpecConstr dflags
     liberate_case = dopt Opt_LiberateCase dflags
+		  && not opt_Hpc 
     rule_check    = ruleCheck dflags
 
     core_todo = 
