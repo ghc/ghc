@@ -88,9 +88,26 @@ Exactly the same optimisation (unrolling one call to f) will work here,
 despite the cast.  See mk_alt_env in the Case branch of libCase.
 
 
+Note [Only functions!]
+~~~~~~~~~~~~~~~~~~~~~~
+Consider the following code
+
+       f = g (case v of V a b -> a : t f)
+
+where g is expensive. If we aren't careful, liberate case will turn this into
+
+       f = g (case v of
+               V a b -> a : t (letrec f = g (case v of V a b -> a : f t)
+                                in f)
+             )
+
+Yikes! We evaluate g twice. This leads to a O(2^n) explosion
+if g calls back to the same code recursively.
+
+Solution: make sure that we only do the liberate-case thing on *functions*
+
 To think about (Apr 94)
 ~~~~~~~~~~~~~~
-
 Main worry: duplicating code excessively.  At the moment we duplicate
 the entire binding group once at each recursive call.  But there may
 be a group of recursive calls which share a common set of evaluated
@@ -165,7 +182,7 @@ libCaseBind env (Rec pairs)
 
     pairs' = [(binder, libCase env_rhs rhs) | (binder,rhs) <- pairs]
 
-    env_rhs = if all rhs_small_enough rhss then extended_env else env
+    env_rhs = if all rhs_small_enough pairs then extended_env else env
 
 	-- We extend the rec-env by binding each Id to its rhs, first
 	-- processing the rhs with an *un-extended* environment, so
@@ -186,8 +203,9 @@ libCaseBind env (Rec pairs)
 	-- 	clash at code generation time.
     adjust bndr = setIdNotExported (setIdName bndr (localiseName (idName bndr)))
 
-    rhs_small_enough rhs = couldBeSmallEnoughToInline lIBERATE_BOMB_SIZE rhs
-    lIBERATE_BOMB_SIZE   = bombOutSize env
+    rhs_small_enough (id,rhs)
+	=  idArity id > 0	-- Note [Only functions!]
+	&& couldBeSmallEnoughToInline (bombOutSize env) rhs
 \end{code}
 
 
