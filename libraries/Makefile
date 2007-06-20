@@ -168,6 +168,8 @@ endif
 $(foreach SUBDIR,$(SUBDIRS),rebuild.library.$(SUBDIR)):\
 rebuild.library.%: clean.library.% make.library.%
 
+# NB. we're depending on make chasing dependencies from left to right here.
+# This bit goes wrong with 'make -j'.
 build: $(foreach SUBDIR,$(SUBDIRS),make.library.$(SUBDIR))
 build: installPackage/installPackage
 
