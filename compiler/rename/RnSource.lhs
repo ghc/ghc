@@ -280,7 +280,7 @@ rnHsForeignDecl (ForeignImport name ty spec)
 rnHsForeignDecl (ForeignExport name ty spec)
   = lookupLocatedOccRn name	        `thenM` \ name' ->
     rnHsTypeFVs (fo_decl_msg name) ty  	`thenM` \ (ty', fvs) ->
-    returnM (ForeignExport name' ty' spec, fvs )
+    returnM (ForeignExport name' ty' spec, fvs `addOneFV` unLoc name')
 	-- NB: a foreign export is an *occurrence site* for name, so 
 	--     we add it to the free-variable list.  It might, for example,
 	--     be imported from another module
