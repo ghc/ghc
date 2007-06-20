@@ -39,6 +39,13 @@
 
 PRE_SRCS := $(ALL_SRCS)
 
+##################################################################
+# Include package building machinery
+# NB. needs to be after PRE_SRCS setting above, because otherwise the
+# rule dependencies won't be set correctly.
+
+include $(TOP)/mk/package.mk
+
 ###################################################################
 # Suffix rules for Haskell, C and literate 
 

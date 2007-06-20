@@ -387,8 +387,6 @@ ifneq "$(BootingFromHc)" "YES"
 	$(HC) $(HC_OPTS) -S $< -o $@
 endif
 
-include $(TOP)/mk/package.mk
-
 #-----------------------------------------------------------------------------
 #
 # Files to install
@@ -404,6 +402,8 @@ endif
 #
 # binary-dist
 
+include $(TOP)/mk/target.mk
+
 binary-dist:
 	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/rts
 	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/rts/gmp
@@ -415,5 +415,3 @@ endif
 ifneq "$(INSTALL_LIBEXECS)" ""
 	$(INSTALL_PROGRAM) $(INSTALL_LIBEXECS) $(BIN_DIST_DIR)/rts/
 endif
-
-include $(TOP)/mk/target.mk
