@@ -1025,7 +1025,7 @@ dynamic_flags = [
   ,  ( "f", 		PrefixPred (isNoFlag fFlags) (\f -> unSetDynFlag (getNoFlag fFlags f)) )
 
 	-- For now, allow -X flags with -f; ToDo: report this as deprecated
-  ,  ( "f",		PrefixPred (isFlag xFlags) (\f ->  setDynFlag (getFlag fFlags f)) )
+  ,  ( "f",		PrefixPred (isFlag xFlags) (\f ->  setDynFlag (getFlag xFlags f)) )
 
 	-- the rest of the -X* and -Xno-* flags
   ,  ( "X",		PrefixPred (isFlag xFlags)   (\f -> setDynFlag   (getFlag xFlags f)) )
@@ -1138,10 +1138,12 @@ getFlag, getNoFlag :: [(String,a)] -> String -> a
 
 getFlag flags f = get_flag flags (normaliseFlag f)
 
-getNoFlag flags f = getFlag flags (fromJust (noFlag_maybe (normaliseFlag f)))
+getNoFlag flags f = get_flag flags (fromJust (noFlag_maybe (normaliseFlag f)))
 			-- The flag should be a no-flag already
 
-get_flag flags nf = head [ opt | (ff, opt) <- flags, normaliseFlag ff == nf]
+get_flag flags nf = case [ opt | (ff, opt) <- flags, normaliseFlag ff == nf] of
+			(o:os) -> o
+			[]     -> panic ("get_flag " ++ nf)
 
 ------------------
 noFlag_maybe :: String -> Maybe String
