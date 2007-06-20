@@ -8,7 +8,7 @@
 # To rebuild a particular library <package>:
 #
 #   make clean.library.<package>
-#   make build.library.<package>
+#   make make.library.<package>
 #
 # or the following is equivalent:
 #
@@ -18,7 +18,7 @@
 #
 #   darcs get http://darcs.haskell.org/packages/foo
 #   [ -e foo/configure.ac ] && ( cd foo && autoreconf )
-#   make build.library.foo
+#   make make.library.foo
 
 .PHONY: default_target
 
@@ -117,6 +117,7 @@ subdirs:
 
 boot: $(BOOTSTRAP_STAMPS) ifBuildable/ifBuildable \
 	  $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup) \
+	  $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/GNUmakefile) \
 	  installPackage/installPackage
 
 # We build the Setup program in a setup subdirectory to stop it trying
@@ -165,15 +166,16 @@ endif
 .PHONY: rebuild.library.%
 
 $(foreach SUBDIR,$(SUBDIRS),rebuild.library.$(SUBDIR)):\
-rebuild.library.%: clean.library.% build.library.%
+rebuild.library.%: clean.library.% make.library.%
 
-build: $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR))
+build: $(foreach SUBDIR,$(SUBDIRS),make.library.$(SUBDIR))
 build: installPackage/installPackage
 
 configure: $(foreach SUBDIR,$(SUBDIRS), \
              stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR))
 
 .PHONY: build.library.%
+.PHONY: make.library.%
 
 # We should depend on %/%.cabal here (and in other rules), but make
 # makes that difficult.
@@ -216,19 +218,27 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 # This is particularly important for corelibs, where failure means the
 # build dies!
 
+# Build the library using 'make'
+$(foreach SUBDIR,$(SUBDIRS),make.library.$(SUBDIR)):\
+make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
+		%/GNUmakefile \
+                %/setup/Setup ifBuildable/ifBuildable
+	ifBuildable/ifBuildable $* $(MAKE)
+	ifBuildable/ifBuildable $* setup/Setup register --inplace
+
+# Build the library using 'setup build' (not the default)
 $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR)):\
 build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                  %/setup/Setup ifBuildable/ifBuildable
 	ifBuildable/ifBuildable $* setup/Setup build \
 	                                $(addprefix --ghc-option=,$(GhcLibHcOpts))
-	ifBuildable/ifBuildable $* setup/Setup register --inplace
 
-$(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/CabalMakefile):\
-%/CabalMakefile: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
+$(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/GNUmakefile):\
+%/GNUmakefile: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                  %/setup/Setup ifBuildable/ifBuildable
-	$(RM) $*/CabalMakefile
-	ifBuildable/ifBuildable $* setup/Setup makefile -f CabalMakefile \
-	                             $(addprefix --ghc-option=,$(GhcLibHcOpts))
+	$(RM) $*/GNUmakefile
+	cp Makefile.local $*
+	ifBuildable/ifBuildable $* setup/Setup makefile -f GNUmakefile
 
 .PHONY: doc
 
