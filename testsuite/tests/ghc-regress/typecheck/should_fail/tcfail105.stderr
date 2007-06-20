@@ -1,5 +1,0 @@
-
-tcfail105.hs:8:26:
-    Can't combine named fields with locally-quantified type variables or context
-    In the declaration of data constructor M
-    In the data type declaration for `M'
