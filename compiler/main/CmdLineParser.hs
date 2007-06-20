@@ -62,10 +62,11 @@ processOneArg :: OptKind m -> String -> String -> [String]
 	      -> Either String (m (), [String])
 processOneArg action rest arg args 
   = let dash_arg = '-' : arg
+	rest_no_eq = dropEq rest
     in case action of
 	NoArg  a -> ASSERT(null rest) Right (a, args)
 
-	HasArg f | notNull rest -> Right (f rest, args)
+	HasArg f | notNull rest_no_eq -> Right (f rest_no_eq, args)
 		 | otherwise    -> case args of
 				    [] -> missingArgErr dash_arg
 				    (arg1:args1) -> Right (f arg1, args1)
@@ -74,23 +75,23 @@ processOneArg action rest arg args
 			[] -> unknownFlagErr dash_arg
 			(arg1:args1) -> Right (f arg1, args1)
 
-	Prefix f | notNull rest -> Right (f rest, args)
+	Prefix f | notNull rest_no_eq -> Right (f rest_no_eq, args)
 		 | otherwise  -> unknownFlagErr dash_arg
 	
-	PrefixPred p f | notNull rest -> Right (f rest, args)
-		       | otherwise    -> unknownFlagErr dash_arg
+	PrefixPred p f | notNull rest_no_eq -> Right (f rest_no_eq, args)
+		       | otherwise          -> unknownFlagErr dash_arg
 	
 	PassFlag f  | notNull rest -> unknownFlagErr dash_arg
 		    | otherwise    -> Right (f dash_arg, args)
 
-	OptIntSuffix f | null rest 		 -> Right (f Nothing,  args)
-		       | Just n <- parseInt rest -> Right (f (Just n), args)
+	OptIntSuffix f | null rest 		       -> Right (f Nothing,  args)
+		       | Just n <- parseInt rest_no_eq -> Right (f (Just n), args)
 		       | otherwise -> Left ("malformed integer argument in " ++ dash_arg)
 
-	IntSuffix f | Just n <- parseInt rest -> Right (f n, args)
+	IntSuffix f | Just n <- parseInt rest_no_eq -> Right (f n, args)
 		    | otherwise -> Left ("malformed integer argument in " ++ dash_arg)
 
-	OptPrefix f       -> Right (f rest, args)
+	OptPrefix f       -> Right (f rest_no_eq, args)
 	AnySuffix f       -> Right (f dash_arg, args)
 	AnySuffixPred p f -> Right (f dash_arg, args)
 
@@ -109,7 +110,7 @@ arg_ok (NoArg _)            rest arg = null rest
 arg_ok (HasArg _)           rest arg = True
 arg_ok (SepArg _)           rest arg = null rest
 arg_ok (Prefix _)	    rest arg = notNull rest
-arg_ok (PrefixPred p _)     rest arg = notNull rest && p rest
+arg_ok (PrefixPred p _)     rest arg = notNull rest && p (dropEq rest)
 arg_ok (OptIntSuffix _)	    rest arg = True
 arg_ok (IntSuffix _)	    rest arg = True
 arg_ok (OptPrefix _)	    rest arg = True
@@ -121,7 +122,7 @@ parseInt :: String -> Maybe Int
 -- Looks for "433" or "=342", with no trailing gubbins
 --   n or =n	  => Just n
 --   gibberish    => Nothing
-parseInt s = case reads (dropEq s) of
+parseInt s = case reads s of
 		((n,""):_) -> Just n
 		other	   -> Nothing
 

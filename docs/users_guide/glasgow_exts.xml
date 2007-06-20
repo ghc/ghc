@@ -38,11 +38,28 @@ documentation</ulink> describes all the libraries that come with GHC.
     <indexterm><primary>extensions</primary><secondary>options controlling</secondary>
     </indexterm>
 
-    <para>These flags control what variation of the language are
+    <para>The language option flag control what variation of the language are
     permitted.  Leaving out all of them gives you standard Haskell
     98.</para>
 
-    <para>NB. turning on an option that enables special syntax
+    <para>Generally speaking, all the language options are introduced by "<option>-X</option>" or "<option>-X=</option>"; 
+    e.g. <option>-X=TemplateHaskell</option>.  Before anything else is done, the string following
+     "<option>-X</option>" is normalised by removing hyphens and converting
+    to lower case.  So <option>-X=TemplateHaskell</option>, <option>-XTemplateHaskell</option>, and
+         <option>-Xtemplate-haskell</option> are all equivalent.
+    </para>
+
+   <para> All the language options can be turned off by using the prefix "<option>No</option>"; 
+      e.g. "<option>-X=NoTemplateHaskell</option>".</para>
+
+   <para> Language options recognised by Cabal can also be enabled using the <literal>LANGUAGE</literal> pragma,
+   thus <literal>{-# LANGUAGE TemplateHaskell #-}</literal> (see <xref linkend="language-pragma"/>>). </para>
+
+   <para> All the language options can be introduced with "<option>-f</option>" as well as "<option>-X</option>",
+      but this is a deprecated feature for backward compatibility.  Use the "<option>-X</option>" 
+      or LANGUAGE-pragma form.</para>
+
+    <para>Turning on an option that enables special syntax
     <emphasis>might</emphasis> cause working Haskell 98 code to fail
     to compile, perhaps because it uses a variable name which has
     become a reserved word.  So, together with each option below, we
@@ -81,7 +98,8 @@ documentation</ulink> describes all the libraries that come with GHC.
 	  <para>This simultaneously enables all of the extensions to
           Haskell 98 described in <xref
           linkend="ghc-language-features"/>, except where otherwise
-          noted. </para>
+          noted. We are trying to move away from this portmanteau flag, 
+	  and towards enabling features individaully.</para>
 
 	  <para>New reserved words: <literal>forall</literal> (only in
 	  types), <literal>mdo</literal>.</para>
@@ -95,14 +113,20 @@ documentation</ulink> describes all the libraries that come with GHC.
 	      <replaceable>float</replaceable><literal>&num;&num;</literal>,    
 	      <literal>(&num;</literal>, <literal>&num;)</literal>,	    
 	      <literal>|)</literal>, <literal>{|</literal>.</para>
+
+	  <para>Implies these specific language options: 
+	    <option>-X=ForeignFunctionInterface</option>,
+	    <option>-X=ImplicitParams</option>,
+	    <option>-X=ScopedTypeVariables</option>,
+	    <option>-X=GADTs</option>, 
+	    <option>-X=TypeFamilies</option>. </para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
 	<term>
-          <option>-ffi</option> and <option>-fffi</option>:
-          <indexterm><primary><option>-ffi</option></primary></indexterm>
-          <indexterm><primary><option>-fffi</option></primary></indexterm>
+          <option>-X=ffi</option> and <option>-X=ForeignFunctionInterface</option>:
+          <indexterm><primary><option>-X=FFI</option></primary></indexterm>
         </term>
 	<listitem>
 	  <para>This option enables the language extension defined in the
@@ -114,7 +138,7 @@ documentation</ulink> describes all the libraries that come with GHC.
 
       <varlistentry>
 	<term>
-          <option>-fno-monomorphism-restriction</option>,<option>-fno-mono-pat-binds</option>:
+          <option>-X=MonomorphismRestriction</option>,<option>-X=MonoPatBinds</option>:
         </term>
 	<listitem>
 	  <para> These two flags control how generalisation is done.
@@ -125,8 +149,8 @@ documentation</ulink> describes all the libraries that come with GHC.
 
       <varlistentry>
 	<term>
-          <option>-fextended-default-rules</option>:
-          <indexterm><primary><option>-fextended-default-rules</option></primary></indexterm>
+          <option>-X=ExtendedDefaultRules</option>:
+          <indexterm><primary><option>-X=ExtendedDefaultRules</option></primary></indexterm>
         </term>
 	<listitem>
 	  <para> Use GHCi's extended default rules in a regular module (<xref linkend="extended-default-rules"/>).
@@ -137,16 +161,16 @@ documentation</ulink> describes all the libraries that come with GHC.
 
       <varlistentry>
 	<term>
-          <option>-fallow-overlapping-instances</option>
-          <indexterm><primary><option>-fallow-overlapping-instances</option></primary></indexterm>
+          <option>-X=AllowOverlappingInstances</option>
+          <indexterm><primary><option>-X=AllowOverlappingInstances</option></primary></indexterm>
         </term>
 	<term>
-          <option>-fallow-undecidable-instances</option>
-          <indexterm><primary><option>-fallow-undecidable-instances</option></primary></indexterm>
+          <option>-X=AllowUndecidableInstances</option>
+          <indexterm><primary><option>-X=AllowUndecidableInstances</option></primary></indexterm>
         </term>
 	<term>
-          <option>-fallow-incoherent-instances</option>
-          <indexterm><primary><option>-fallow-incoherent-instances</option></primary></indexterm>
+          <option>-X=AllowIncoherentInstances</option>
+          <indexterm><primary><option>-X=AllowIncoherentInstances</option></primary></indexterm>
         </term>
 	<term>
           <option>-fcontext-stack=N</option>
@@ -171,8 +195,8 @@ documentation</ulink> describes all the libraries that come with GHC.
 
       <varlistentry>
 	<term>
-          <option>-farrows</option>
-          <indexterm><primary><option>-farrows</option></primary></indexterm>
+          <option>-X=Arrows</option>
+          <indexterm><primary><option>-X=Arrows</option></primary></indexterm>
         </term>
 	<listitem>
 	  <para>See <xref linkend="arrow-notation"/>.  Independent of
@@ -190,8 +214,8 @@ documentation</ulink> describes all the libraries that come with GHC.
 
       <varlistentry>
 	<term>
-          <option>-fgenerics</option>
-          <indexterm><primary><option>-fgenerics</option></primary></indexterm>
+          <option>-X=Generics</option>
+          <indexterm><primary><option>-X=Generics</option></primary></indexterm>
         </term>
 	<listitem>
 	  <para>See <xref linkend="generic-classes"/>.  Independent of
@@ -200,13 +224,13 @@ documentation</ulink> describes all the libraries that come with GHC.
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fno-implicit-prelude</option></term>
+	<term><option>-X=NoImplicitIrelude</option></term>
 	<listitem>
-	  <para><indexterm><primary>-fno-implicit-prelude
+	  <para><indexterm><primary>-XnoImplicitPrelude
           option</primary></indexterm> GHC normally imports
           <filename>Prelude.hi</filename> files for you.  If you'd
           rather it didn't, then give it a
-          <option>-fno-implicit-prelude</option> option.  The idea is
+          <option>-XnoImplicitPrelude</option> option.  The idea is
           that you can then import a Prelude of your own.  (But don't
           call it <literal>Prelude</literal>; the Haskell module
           namespace is flat, and you must not conflict with any
@@ -221,14 +245,14 @@ documentation</ulink> describes all the libraries that come with GHC.
           translation for list comprehensions continues to use
           <literal>Prelude.map</literal> etc.</para>
 
-	  <para>However, <option>-fno-implicit-prelude</option> does
+	  <para>However, <option>-X=NoImplicitPrelude</option> does
 	  change the handling of certain built-in syntax: see <xref
 	  linkend="rebindable-syntax"/>.</para>
 	</listitem>
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fimplicit-params</option></term>
+	<term><option>-X=ImplicitParams</option></term>
 	<listitem>
 	  <para>Enables implicit parameters (see <xref
 	  linkend="implicit-parameters"/>).  Currently also implied by 
@@ -241,7 +265,7 @@ documentation</ulink> describes all the libraries that come with GHC.
       </varlistentry>
 
       <varlistentry>
-	<term><option>-foverloaded-strings</option></term>
+	<term><option>-X=OverloadedStrings</option></term>
 	<listitem>
 	  <para>Enables overloaded string literals (see <xref
 	  linkend="overloaded-strings"/>).</para>
@@ -249,7 +273,7 @@ documentation</ulink> describes all the libraries that come with GHC.
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fscoped-type-variables</option></term>
+	<term><option>-X=ScopedTypeVariables</option></term>
 	<listitem>
 	  <para>Enables lexically-scoped type variables (see <xref
 	  linkend="scoped-type-variables"/>).  Implied by
@@ -258,7 +282,7 @@ documentation</ulink> describes all the libraries that come with GHC.
       </varlistentry>
 
       <varlistentry>
-	<term><option>-fth</option></term>
+	<term><option>-X=TH</option>, <option>-X=TemplateHaskell</option></term>
 	<listitem>
 	  <para>Enables Template Haskell (see <xref
 	  linkend="template-haskell"/>).  This flag must
@@ -835,7 +859,7 @@ This name is not supported by GHC.
             hierarchy.  It completely defeats that purpose if the
             literal "1" means "<literal>Prelude.fromInteger
             1</literal>", which is what the Haskell Report specifies.
-            So the <option>-fno-implicit-prelude</option> flag causes
+            So the <option>-X=NoImplicitPrelude</option> flag causes
             the following pieces of built-in syntax to refer to
             <emphasis>whatever is in scope</emphasis>, not the Prelude
             versions:
@@ -1780,7 +1804,8 @@ and Ralf Hinze's
 may use different notation to that implemented in GHC.
 </para>
 <para>
-The rest of this section outlines the extensions to GHC that support GADTs. 
+The rest of this section outlines the extensions to GHC that support GADTs.   The extension is enabled with 
+<option>-X=GADTs</option>.
 <itemizedlist>
 <listitem><para>
 A GADT can only be declared using GADT-style syntax (<xref linkend="gadt-style"/>); 
@@ -2683,9 +2708,9 @@ makes instance inference go into a loop, because it requires the constraint
 </para>
 <para>
 Nevertheless, GHC allows you to experiment with more liberal rules.  If you use
-the experimental flag <option>-fallow-undecidable-instances</option>
-<indexterm><primary>-fallow-undecidable-instances
-option</primary></indexterm>, both the Paterson Conditions and the Coverage Condition
+the experimental flag <option>-X=AllowUndecidableInstances</option>
+<indexterm><primary>-X=AllowUndecidableInstances</primary></indexterm>, 
+both the Paterson Conditions and the Coverage Condition
 (described in <xref linkend="instance-rules"/>) are lifted.  Termination is ensured by having a
 fixed-depth recursion stack.  If you exceed the stack depth you get a
 sort of backtrace, and the opportunity to increase the stack depth
@@ -2701,11 +2726,11 @@ with <option>-fcontext-stack=</option><emphasis>N</emphasis>.
 In general, <emphasis>GHC requires that that it be unambiguous which instance
 declaration
 should be used to resolve a type-class constraint</emphasis>. This behaviour
-can be modified by two flags: <option>-fallow-overlapping-instances</option>
-<indexterm><primary>-fallow-overlapping-instances
+can be modified by two flags: <option>-X=AllowOverlappingInstances</option>
+<indexterm><primary>-X=AllowOverlappingInstances
 </primary></indexterm> 
-and <option>-fallow-incoherent-instances</option>
-<indexterm><primary>-fallow-incoherent-instances
+and <option>-X=AllowIncoherentInstances</option>
+<indexterm><primary>-X=AllowIncoherentInstances
 </primary></indexterm>, as this section discusses.  Both these
 flags are dynamic flags, and can be set on a per-module basis, using 
 an <literal>OPTIONS_GHC</literal> pragma if desired (<xref linkend="source-file-options"/>).</para>
@@ -2733,7 +2758,7 @@ particular constraint matches more than one.
 </para>
 
 <para>
-The <option>-fallow-overlapping-instances</option> flag instructs GHC to allow
+The <option>-X=AllowOverlappingInstances</option> flag instructs GHC to allow
 more than one instance to match, provided there is a most specific one.  For
 example, the constraint <literal>C Int [Int]</literal> matches instances (A),
 (C) and (D), but the last is more specific, and hence is chosen.  If there is no
@@ -2750,22 +2775,22 @@ Suppose that from the RHS of <literal>f</literal> we get the constraint
 GHC does not commit to instance (C), because in a particular
 call of <literal>f</literal>, <literal>b</literal> might be instantiate 
 to <literal>Int</literal>, in which case instance (D) would be more specific still.
-So GHC rejects the program.  If you add the flag <option>-fallow-incoherent-instances</option>,
+So GHC rejects the program.  If you add the flag <option>-X=AllowIncoherentInstances</option>,
 GHC will instead pick (C), without complaining about 
 the problem of subsequent instantiations.
 </para>
 <para>
 The willingness to be overlapped or incoherent is a property of 
 the <emphasis>instance declaration</emphasis> itself, controlled by the
-presence or otherwise of the <option>-fallow-overlapping-instances</option> 
-and <option>-fallow-incoherent-instances</option> flags when that mdodule is
+presence or otherwise of the <option>-X=AllowOverlappingInstances</option> 
+and <option>-X=AllowIncoherentInstances</option> flags when that mdodule is
 being defined.  Neither flag is required in a module that imports and uses the
 instance declaration.  Specifically, during the lookup process:
 <itemizedlist>
 <listitem><para>
 An instance declaration is ignored during the lookup process if (a) a more specific
 match is found, and (b) the instance declaration was compiled with 
-<option>-fallow-overlapping-instances</option>.  The flag setting for the
+<option>-X=AllowOverlappingInstances</option>.  The flag setting for the
 more-specific instance does not matter.
 </para></listitem>
 <listitem><para>
@@ -2773,7 +2798,7 @@ Suppose an instance declaration does not matche the constraint being looked up, 
 does unify with it, so that it might match when the constraint is further 
 instantiated.  Usually GHC will regard this as a reason for not committing to
 some other constraint.  But if the instance declaration was compiled with
-<option>-fallow-incoherent-instances</option>, GHC will skip the "does-it-unify?" 
+<option>-X=AllowIncoherentInstances</option>, GHC will skip the "does-it-unify?" 
 check for that declaration.
 </para></listitem>
 </itemizedlist>
@@ -2782,18 +2807,18 @@ overlapping instances without the library client having to know.
 </para>
 <para>
 If an instance declaration is compiled without
-<option>-fallow-overlapping-instances</option>,
+<option>-X=AllowOverlappingInstances</option>,
 then that instance can never be overlapped.  This could perhaps be
 inconvenient.  Perhaps the rule should instead say that the
 <emphasis>overlapping</emphasis> instance declaration should be compiled in
 this way, rather than the <emphasis>overlapped</emphasis> one.  Perhaps overlap
 at a usage site should be permitted regardless of how the instance declarations
-are compiled, if the <option>-fallow-overlapping-instances</option> flag is
+are compiled, if the <option>-X=AllowOverlappingInstances</option> flag is
 used at the usage site.  (Mind you, the exact usage site can occasionally be
 hard to pin down.)  We are interested to receive feedback on these points.
 </para>
-<para>The <option>-fallow-incoherent-instances</option> flag implies the
-<option>-fallow-overlapping-instances</option> flag, but not vice versa.
+<para>The <option>-X=AllowIncoherentInstances</option> flag implies the
+<option>-X=AllowOverlappingInstances</option> flag, but not vice versa.
 </para>
 </sect3>
 
@@ -2976,7 +3001,7 @@ Boston, Jan 2000.
 due to Jeff Lewis.)</para>
 
 <para>Implicit parameter support is enabled with the option
-<option>-fimplicit-params</option>.</para>
+<option>-X=ImplicitParams</option>.</para>
 
 <para>
 A variable is called <emphasis>dynamically bound</emphasis> when it is bound by the calling
@@ -4064,7 +4089,7 @@ pattern binding must have the same context.  For example, this is fine:
 <para>
 GHC supports <emphasis>overloaded string literals</emphasis>.  Normally a
 string literal has type <literal>String</literal>, but with overloaded string
-literals enabled (with <literal>-foverloaded-strings</literal>)
+literals enabled (with <literal>-X=OverloadedStrings</literal>)
  a string literal has type <literal>(IsString a) => a</literal>.
 </para>
 <para>
@@ -4090,7 +4115,7 @@ it explicitly (for exmaple, to give an instance declaration for it), you can imp
 from module <literal>GHC.Exts</literal>.
 </para>
 <para>
-Haskell's defaulting mechanism is extended to cover string literals, when <option>-foverloaded-strings</option> is specified.
+Haskell's defaulting mechanism is extended to cover string literals, when <option>-X-OverloadedStrings</option> is specified.
 Specifically:
 <itemizedlist>
 <listitem><para>
@@ -4153,7 +4178,7 @@ wiki page on type families</ulink>.  The material will be moved to this user's
 guide when it has stabilised.
 </para>
 <para>
-Type families are enabled by the flag <option>-ftype-families</option>.
+Type families are enabled by the flag <option>-X=TypeFamilies</option>.
 </para>
 
 
@@ -4202,9 +4227,10 @@ Tim Sheard is going to expand it.)
 
       <para> Template Haskell has the following new syntactic
       constructions.  You need to use the flag
-      <option>-fth</option><indexterm><primary><option>-fth</option></primary>
+      <option>-X=TemplateHaskell</option> or <option>-X=TH</option>
+	<indexterm><primary><option>-X=TemplateHaskell</option></primary>
       </indexterm>to switch these syntactic extensions on
-      (<option>-fth</option> is no longer implied by
+      (<option>-X=TemplateHaskell</option> is no longer implied by
       <option>-fglasgow-exts</option>).</para>
 
 	<itemizedlist>
@@ -4350,7 +4376,7 @@ pr s      = gen (parse s)
 <para>Now run the compiler (here we are a Cygwin prompt on Windows):
 </para>
 <programlisting>
-$ ghc --make -fth main.hs -o main.exe
+$ ghc --make -X=TemplateHaskell main.hs -o main.exe
 </programlisting>
 
 <para>Run "main.exe" and here is your output:</para>
@@ -4439,7 +4465,7 @@ Palgrave, 2003.
 </itemizedlist>
 and the arrows web page at
 <ulink url="http://www.haskell.org/arrows/"><literal>http://www.haskell.org/arrows/</literal></ulink>.
-With the <option>-farrows</option> flag, GHC supports the arrow
+With the <option>-X=Arrows</option> flag, GHC supports the arrow
 notation described in the second of these papers.
 What follows is a brief introduction to the notation;
 it won't make much sense unless you've read Hughes's paper.
@@ -4909,7 +4935,7 @@ prime feature description</ulink> contains more discussion and examples
 than the material below.
 </para>
 <para>
-Bang patterns are enabled by the flag <option>-fbang-patterns</option>.
+Bang patterns are enabled by the flag <option>-X=BangPatterns</option>.
 </para>
 
 <sect2 id="bang-patterns-informal">
@@ -6457,7 +6483,7 @@ where clause and over-ride whichever methods you please.
       <itemizedlist>
 	<listitem>
 	  <para>Use the flags <option>-fglasgow-exts</option> (to enable the extra syntax), 
-                <option>-fgenerics</option> (to generate extra per-data-type code),
+                <option>-X=Generics</option> (to generate extra per-data-type code),
                 and <option>-package lang</option> (to make the <literal>Generics</literal> library
                 available.  </para>
 	</listitem>
@@ -6666,21 +6692,21 @@ carried out at let and where bindings.
 
 <sect2>
 <title>Switching off the dreaded Monomorphism Restriction</title>
-          <indexterm><primary><option>-fno-monomorphism-restriction</option></primary></indexterm>
+          <indexterm><primary><option>-X=NoMonomorphismRestriction</option></primary></indexterm>
 
 <para>Haskell's monomorphism restriction (see 
 <ulink url="http://haskell.org/onlinereport/decls.html#sect4.5.5">Section
 4.5.5</ulink>
 of the Haskell Report)
 can be completely switched off by
-<option>-fno-monomorphism-restriction</option>.
+<option>-X=NoMonomorphismRestriction</option>.
 </para>
 </sect2>
 
 <sect2>
 <title>Monomorphic pattern bindings</title>
-          <indexterm><primary><option>-fno-mono-pat-binds</option></primary></indexterm>
-          <indexterm><primary><option>-fmono-pat-binds</option></primary></indexterm>
+          <indexterm><primary><option>-X=NoMonoPatBinds</option></primary></indexterm>
+          <indexterm><primary><option>-X=MonoPatBinds</option></primary></indexterm>
 
 	  <para> As an experimental change, we are exploring the possibility of
 	  making pattern bindings monomorphic; that is, not generalised at all.  
@@ -6696,7 +6722,7 @@ can be completely switched off by
   [x] = e                    -- A pattern binding
 </programlisting>
 Experimentally, GHC now makes pattern bindings monomorphic <emphasis>by
-default</emphasis>.  Use <option>-fno-mono-pat-binds</option> to recover the
+default</emphasis>.  Use <option>-X=MonoPatBinds</option> to recover the
 standard behaviour.
 </para>
 </sect2>

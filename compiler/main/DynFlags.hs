@@ -68,7 +68,7 @@ import Constants	( mAX_CONTEXT_REDUCTION_DEPTH )
 import Panic		( panic, GhcException(..) )
 import UniqFM           ( UniqFM )
 import Util		( notNull, splitLongestPrefix, normalisePath )
-import Maybes		( fromJust, orElse )
+import Maybes		( orElse, fromJust )
 import SrcLoc           ( SrcSpan )
 import Outputable
 import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
@@ -82,7 +82,7 @@ import Data.List	( isPrefixOf )
 import Util		( split )
 #endif
 
-import Data.Char	( isUpper )
+import Data.Char	( isUpper, toLower )
 import System.IO        ( hPutStrLn, stderr )
 
 -- -----------------------------------------------------------------------------
@@ -177,6 +177,8 @@ data DynFlag
    | Opt_BangPatterns
    | Opt_TypeFamilies
    | Opt_OverloadedStrings
+   | Opt_GADTs
+   | Opt_RelaxedPolyRec			-- -X=RelaxedPolyRec
 
    -- optimisation opts
    | Opt_Strictness
@@ -1018,10 +1020,16 @@ dynamic_flags = [
   ,  ( "fglasgow-exts",    NoArg (mapM_ setDynFlag   glasgowExtsFlags) )
   ,  ( "fno-glasgow-exts", NoArg (mapM_ unSetDynFlag glasgowExtsFlags) )
 
-
 	-- the rest of the -f* and -fno-* flags
-  ,  ( "fno-", 		PrefixPred (\f -> isFFlag f) (\f -> unSetDynFlag (getFFlag f)) )
-  ,  ( "f",		PrefixPred (\f -> isFFlag f) (\f -> setDynFlag (getFFlag f)) )
+  ,  ( "f",		PrefixPred (isFlag fFlags)   (\f -> setDynFlag   (getFlag fFlags f)) )
+  ,  ( "f", 		PrefixPred (isNoFlag fFlags) (\f -> unSetDynFlag (getNoFlag fFlags f)) )
+
+	-- For now, allow -X flags with -f; ToDo: report this as deprecated
+  ,  ( "f",		PrefixPred (isFlag xFlags) (\f ->  setDynFlag (getFlag fFlags f)) )
+
+	-- the rest of the -X* and -Xno-* flags
+  ,  ( "X",		PrefixPred (isFlag xFlags)   (\f -> setDynFlag   (getFlag xFlags f)) )
+  ,  ( "X", 		PrefixPred (isNoFlag xFlags) (\f -> unSetDynFlag (getNoFlag xFlags f)) )
  ]
 
 -- these -f<blah> flags can all be reversed with -fno-<blah>
@@ -1046,24 +1054,6 @@ fFlags = [
   ( "warn-deprecations",         	Opt_WarnDeprecations ),
   ( "warn-orphans",	         	Opt_WarnOrphans ),
   ( "warn-tabs",	         	Opt_WarnTabs ),
-  ( "fi",				Opt_FFI ),  -- support `-ffi'...
-  ( "ffi",				Opt_FFI ),  -- ...and also `-fffi'
-  ( "arrows",				Opt_Arrows ), -- arrow syntax
-  ( "parr",				Opt_PArr ),
-  ( "th",				Opt_TH ),
-  ( "implicit-prelude",  		Opt_ImplicitPrelude ),
-  ( "scoped-type-variables",  		Opt_ScopedTypeVariables ),
-  ( "bang-patterns",	  		Opt_BangPatterns ),
-  ( "overloaded-strings",		Opt_OverloadedStrings ),
-  ( "type-families",	  		Opt_TypeFamilies ),
-  ( "monomorphism-restriction",		Opt_MonomorphismRestriction ),
-  ( "mono-pat-binds",			Opt_MonoPatBinds ),
-  ( "extended-default-rules",		Opt_ExtendedDefaultRules ),
-  ( "implicit-params",			Opt_ImplicitParams ),
-  ( "allow-overlapping-instances", 	Opt_AllowOverlappingInstances ),
-  ( "allow-undecidable-instances", 	Opt_AllowUndecidableInstances ),
-  ( "allow-incoherent-instances", 	Opt_AllowIncoherentInstances ),
-  ( "generics",  			Opt_Generics ),
   ( "strictness",			Opt_Strictness ),
   ( "full-laziness",			Opt_FullLaziness ),
   ( "liberate-case",			Opt_LiberateCase ),
@@ -1088,15 +1078,85 @@ fFlags = [
   ]
 
 
-glasgowExtsFlags = [ 
-  Opt_GlasgowExts, 
-  Opt_FFI, 
-  Opt_ImplicitParams, 
-  Opt_ScopedTypeVariables,
-  Opt_TypeFamilies ]
+-- These -X<blah> flags can all be reversed with -Xno-<blah>
+xFlags :: [(String, DynFlag)]
+xFlags = [
+  ( "FI",				Opt_FFI ),  -- support `-ffi'...
+  ( "FFI",				Opt_FFI ),  -- ...and also `-fffi'
+  ( "ForeignFunctionInterface",		Opt_FFI ),  -- ...and also `-fffi'
 
-isFFlag f = f `elem` (map fst fFlags)
-getFFlag f = fromJust (lookup f fFlags)
+  ( "Arrows",				Opt_Arrows ), -- arrow syntax
+  ( "Parr",				Opt_PArr ),
+
+  ( "TH",				Opt_TH ),
+  ( "TemplateHaskelll",			Opt_TH ),
+
+  ( "Generics",  			Opt_Generics ),
+
+  ( "ImplicitPrelude",  		Opt_ImplicitPrelude ),	-- On by default
+
+  ( "OverloadedStrings",		Opt_OverloadedStrings ),
+  ( "GADTs",		  		Opt_GADTs ),
+  ( "TypeFamilies",	  		Opt_TypeFamilies ),
+  ( "BangPatterns",	  		Opt_BangPatterns ),
+  ( "MonomorphismRestriction",		Opt_MonomorphismRestriction ),	-- On by default
+  ( "MonoPatBinds",			Opt_MonoPatBinds ),		-- On by default (which is not strictly H98)
+  ( "RelaxedPolyRec", 			Opt_RelaxedPolyRec),
+  ( "ExtendedDefaultRules",		Opt_ExtendedDefaultRules ),
+  ( "ImplicitParams",			Opt_ImplicitParams ),
+  ( "ScopedTypeVariables",  		Opt_ScopedTypeVariables ),
+  ( "AllowOverlappingInstances", 	Opt_AllowOverlappingInstances ),
+  ( "AllowUndecidableInstances", 	Opt_AllowUndecidableInstances ),
+  ( "AllowIncoherentInstances", 	Opt_AllowIncoherentInstances )
+  ]
+
+impliedFlags :: [(DynFlag, [DynFlag])]
+impliedFlags = [
+  ( Opt_GADTs, [Opt_RelaxedPolyRec] )	-- We want type-sig variables to be completely rigid for GADTs
+  ]
+
+glasgowExtsFlags = [ Opt_GlasgowExts 
+		   , Opt_FFI 
+		   , Opt_ImplicitParams 
+		   , Opt_ScopedTypeVariables
+		   , Opt_TypeFamilies ]
+
+------------------
+isNoFlag, isFlag :: [(String,a)] -> String -> Bool
+
+isFlag flags f = is_flag flags (normaliseFlag f)
+
+isNoFlag flags no_f
+  | Just f <- noFlag_maybe (normaliseFlag no_f) = is_flag flags f
+  | otherwise					= False
+
+is_flag flags nf = any (\(ff,_) -> normaliseFlag ff == nf) flags
+	-- nf is normalised alreadly
+
+------------------
+getFlag, getNoFlag :: [(String,a)] -> String -> a
+
+getFlag flags f = get_flag flags (normaliseFlag f)
+
+getNoFlag flags f = getFlag flags (fromJust (noFlag_maybe (normaliseFlag f)))
+			-- The flag should be a no-flag already
+
+get_flag flags nf = head [ opt | (ff, opt) <- flags, normaliseFlag ff == nf]
+
+------------------
+noFlag_maybe :: String -> Maybe String
+-- The input is normalised already
+noFlag_maybe ('n' : 'o' : f) = Just f
+noFlag_maybe other	     = Nothing
+
+normaliseFlag :: String -> String
+-- Normalise a option flag by
+--	* map to lower case
+--	* removing hyphens
+-- Thus: -X=overloaded-strings or -XOverloadedStrings
+normaliseFlag []      = []
+normaliseFlag ('-':s) = normaliseFlag s
+normaliseFlag (c:s)   = toLower c : normaliseFlag s
 
 -- -----------------------------------------------------------------------------
 -- Parsing the dynamic flags.
@@ -1117,10 +1177,18 @@ upd f = do
    dfs <- getCmdLineState
    putCmdLineState $! (f dfs)
 
+--------------------------
 setDynFlag, unSetDynFlag :: DynFlag -> DynP ()
-setDynFlag f   = upd (\dfs -> dopt_set dfs f)
+setDynFlag f = upd (\dfs -> foldl dopt_set (dopt_set dfs f) deps)
+  where
+    deps = [ d | (f', ds) <- impliedFlags, f' == f, d <- ds ]
+	-- When you set f, set the ones it implies
+	-- When you un-set f, however, we don't un-set the things it implies
+	--	(except for -fno-glasgow-exts, which is treated specially)
+
 unSetDynFlag f = upd (\dfs -> dopt_unset dfs f)
 
+--------------------------
 setDumpFlag :: DynFlag -> OptKind DynP
 setDumpFlag dump_flag 
   = NoArg (setDynFlag Opt_ForceRecomp >> setDynFlag dump_flag)

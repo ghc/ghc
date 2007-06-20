@@ -596,23 +596,29 @@
 	  </thead>
 	  <tbody>
 	    <row>
-	      <entry><option>-fallow-overlapping-instances</option></entry>
+	      <entry><option>-fglasgow-exts</option></entry>
+	      <entry>Enable most language extensions</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-glasgow-exts</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=AllowOverlappingInstances</option></entry>
 	      <entry>Enable <link linkend="instance-overlap">overlapping instances</link></entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fno-allow-overlapping-instances</option></entry>
+	      <entry><option>-X=NoAllowOverlappingInstances</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-fallow-incoherent-instances</option></entry>
+	      <entry><option>-X=AllowIncoherentInstances</option></entry>
 	      <entry>Enable <link linkend="instance-overlap">incoherent instances</link>.  
-	      Implies <option>-fallow-overlapping-instances</option> </entry>
+	      Implies <option>-X=AllowOverlappingInstances</option> </entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fno-allow-incoherent-instances</option></entry>
+	      <entry><option>-X=NoAllowIncoherentInstances</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-fallow-undecidable-instances</option></entry>
+	      <entry><option>-X=AllowUndecidableInstances</option></entry>
 	      <entry>Enable <link linkend="undecidable-instances">undecidable instances</link></entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fno-allow-undecidable-instances</option></entry>
+	      <entry><option>-X=NoAllowUndecidableInstances</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-fcontext-stack=N</option><replaceable>n</replaceable></entry>
@@ -621,37 +627,31 @@
 	      <entry><option>20</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-farrows</option></entry>
+	      <entry><option>-X=Arrows</option></entry>
 	      <entry>Enable <link linkend="arrow-notation">arrow
 	      notation</link> extension</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fno-arrows</option></entry>
+	      <entry><option>-X=NoArrows</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-ffi</option> or <option>-fffi</option></entry>
+	      <entry><option>-X=FFI</option> or <option>-X=ForeignFunctionInterface</option></entry>
 	      <entry>Enable <link linkend="ffi">foreign function interface</link> (implied by
 	      <option>-fglasgow-exts</option>)</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fno-ffi</option></entry>
+	      <entry><option>-X=NoFFI</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-fgenerics</option></entry>
+	      <entry><option>-X=Generics</option></entry>
 	      <entry>Enable <link linkend="generic-classes">generic classes</link></entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fno-fgenerics</option></entry>
+	      <entry><option>-X=NoGenerics</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-fglasgow-exts</option></entry>
-	      <entry>Enable most language extensions</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-fno-glasgow-exts</option></entry>
-	    </row>
-	    <row>
-	      <entry><option>-fimplicit-params</option></entry>
+	      <entry><option>-X=ImplicitParams</option></entry>
 	      <entry>Enable <link linkend="implicit-parameters">Implicit Parameters</link>.
 	      Implied by <option>-fglasgow-exts</option>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fno-implicit-params</option></entry>
+	      <entry><option>-X=NoImplicitParams</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-firrefutable-tuples</option></entry>
@@ -660,61 +660,61 @@
 	      <entry><option>-fno-irrefutable-tuples</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-fno-implicit-prelude</option></entry>
+	      <entry><option>-X=NoImplicitPrelude</option></entry>
 	      <entry>Don't implicitly <literal>import Prelude</literal></entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fimplicit-prelude</option></entry>
+	      <entry><option>-X=ImplicitPrelude</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-fno-monomorphism-restriction</option></entry>
+	      <entry><option>-X=NoMonomorphismRestriction</option></entry>
 	      <entry>Disable the <link linkend="monomorphism">monomorphism restriction</link></entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fmonomorphism-restriction</option></entry>
+	      <entry><option>-X=MonomorphismRrestriction</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-fno-mono-pat-binds</option></entry>
+	      <entry><option>-X=NoMonoPatBinds</option></entry>
 	      <entry>Make <link linkend="monomorphism">pattern bindings polymorphic</link></entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fmono-pat-binds</option></entry>
+	      <entry><option>-X=MonoPatBinds</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-fextended-default-rules</option></entry>
+	      <entry><option>-X=ExtendedDefaultRules</option></entry>
 	      <entry>Use GHCi's <link linkend="extended-default-rules">extended default rules</link> in a normal module</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fno-extended-default-rules</option></entry>
+	      <entry><option>-X=NoExtendedDefaultRules</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-foverloaded-strings</option></entry>
+	      <entry><option>-X=OverloadedStrings</option></entry>
 	      <entry>Enable <link linkend="overloaded-strings">overloaded string literals</link>.
 	      </entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fno-overloaded-strings</option></entry>
+	      <entry><option>-X=OverloadedStrings</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-fscoped-type-variables</option></entry>
+	      <entry><option>-X=ScopedTypeVariables</option></entry>
 	      <entry>Enable <link linkend="scoped-type-variables">lexically-scoped type variables</link>.
 	      Implied by <option>-fglasgow-exts</option>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fno-scoped-type-variables</option></entry>
+	      <entry><option>-X=NoScopedTypeVariables</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-fth</option></entry>
+	      <entry><option>-X=TH</option> or <option>-X=TemplateHaskell</option></entry>
 	      <entry>Enable <link linkend="template-haskell">Template Haskell</link>. 
 		No longer implied by <option>-fglasgow-exts</option>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fno-th</option></entry>
+	      <entry><option>-X=NoTH</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-ftype-families</option></entry>
+	      <entry><option>-X=TypeFamilies</option></entry>
 	      <entry>Enable <link linkend="type-families">type families</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fno-type-families</option></entry>
+	      <entry><option>-X=NoTypeFamilies</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-fbang-patterns</option></entry>
+	      <entry><option>-X=BangPtterns</option></entry>
 	      <entry>Enable <link linkend="bang-patterns">bang patterns</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-fno-bang-patterns</option></entry>
+	      <entry><option>-X=NoBangPatterns</option></entry>
 	    </row>
 	  </tbody>
 	</tgroup>
