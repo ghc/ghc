@@ -48,7 +48,7 @@ module PositionIndependentCode (
 #include "nativeGen/NCG.h"
 
 import Cmm
-import MachOp           ( MachOp(MO_Add), wordRep )
+import MachOp           ( MachOp(MO_Add), wordRep, MachRep(..) )
 import CLabel           ( CLabel, pprCLabel,
                           mkDynamicLinkerLabel, DynamicLinkerLabelInfo(..),
                           dynamicLinkerLabelInfo, mkPicBaseLabel,
@@ -530,7 +530,7 @@ pprGotDeclaration
         ptext SLIT(".LCTOC1 = .+32768")
     ]
 
--- We generate one .long literal for every symbol we import;
+-- We generate one .long/.quad literal for every symbol we import;
 -- the dynamic linker will relocate those addresses.
 
 pprImportedSymbol importedLbl
@@ -538,11 +538,16 @@ pprImportedSymbol importedLbl
     = vcat [
         ptext SLIT(".section \".got2\", \"aw\""),
         ptext SLIT(".LC_") <> pprCLabel_asm lbl <> char ':',
-        ptext SLIT("\t.long") <+> pprCLabel_asm lbl
+        ptext symbolSize <+> pprCLabel_asm lbl
     ]
 
 -- PLT code stubs are generated automatically be the dynamic linker.
     | otherwise = empty
+    where
+      symbolSize = case wordRep of
+		     I32 -> SLIT("\t.long")
+		     I64 -> SLIT("\t.quad")
+		     _ -> panic "Unknown wordRep in pprImportedSymbol"
 
 #else
 
