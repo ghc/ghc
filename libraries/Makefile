@@ -24,6 +24,12 @@
 
 default_target: build
 
+# make doesn't give us an easy way to get the libraries built in
+# dependency order the first time, but not rebuild base (for example)
+# when we want to rebuild another library later.
+# So for now we just don't do anything in parallel in here.
+.NOTPARALLEL:
+
 # Ideally we'd just include something to give us variables
 # for paths and arguments to tools etc, and those set in mk/build.mk.
 TOP=..
