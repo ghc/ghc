@@ -865,7 +865,7 @@ GhcLibHcOpts =
 HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_OBJS)))
 
 # Haddock can't handle recursive modules currently, so we disable it for now.
-NO_HADDOCK_DOCS = YES
+HADDOCK_DOCS = NO
 
 # Tell package.mk not to set $(HC)
 NO_SET_HC = YES

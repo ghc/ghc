@@ -158,7 +158,7 @@ $(BOOTSTRAP_STAMPS): stamp/bootstrapping.%:
 
 all: build
 
-ifneq "$(NO_HADDOCK_DOCS)" "YES"
+ifeq "$(HADDOCK_DOCS)" "YES"
 all: doc
 endif
 
@@ -266,7 +266,7 @@ endif
 ROOT=$(prefix)/share/ghc/doc/html/
 
 install: $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR))
-ifneq "$(NO_HADDOCK_DOCS)" "YES"
+ifeq "$(HADDOCK_DOCS)" "YES"
 	$(INSTALL_DIR)                                            $(ROOT)
 	$(INSTALL_DATA)   index.html doc-index.html               $(ROOT)
 	$(INSTALL_SCRIPT) gen_contents_index                      $(ROOT)

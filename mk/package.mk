@@ -315,7 +315,7 @@ endif # $(LIBRARY) /= ""
 # Doc building with Haddock
 
 ifneq "$(PACKAGE)" ""
-ifneq "$(NO_HADDOCK_DOCS)" "YES"
+ifeq "$(HADDOCK_DOCS)" "YES"
 
 HS_PPS = $(addsuffix .raw-hs, $(basename $(filter-out $(EXCLUDED_HADDOCK_SRCS), $(HS_SRCS)))) $(EXTRA_HADDOCK_SRCS)
 
@@ -373,7 +373,7 @@ install-docs :: $(HTML_DOC)
 	$(INSTALL_DATA) $(INSTALL_OPTS) $(PACKAGE).haddock $(HTML_INSTALL_DIR); \
 
 endif # HS_PPS
-endif # NO_HADDOCK_DOCS
+endif # HADDOCK_DOCS
 endif # $(PACKAGE) /= ""
 
 # -----------------------------------------------------------------------------
