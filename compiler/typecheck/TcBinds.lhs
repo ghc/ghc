@@ -162,9 +162,9 @@ tcValBinds top_lvl (ValBindsOut binds sigs) thing_inside
 
 		-- Extend the envt right away with all 
 		-- the Ids declared with type signatures
-	; gla_exts     <- doptM Opt_GlasgowExts
+	; poly_rec <- doptM Opt_RelaxedPolyRec
   	; (binds', thing) <- tcExtendIdEnv poly_ids $
-			     tc_val_binds gla_exts top_lvl sig_fn prag_fn 
+			     tc_val_binds poly_rec top_lvl sig_fn prag_fn 
 					  binds thing_inside
 
 	; return (ValBindsOut binds' sigs, thing) }
@@ -176,14 +176,14 @@ tc_val_binds :: Bool -> TopLevelFlag -> TcSigFun -> TcPragFun
 -- Typecheck a whole lot of value bindings,
 -- one strongly-connected component at a time
 
-tc_val_binds gla_exts top_lvl sig_fn prag_fn [] thing_inside
+tc_val_binds poly_rec top_lvl sig_fn prag_fn [] thing_inside
   = do	{ thing <- thing_inside
 	; return ([], thing) }
 
-tc_val_binds gla_exts top_lvl sig_fn prag_fn (group : groups) thing_inside
+tc_val_binds poly_rec top_lvl sig_fn prag_fn (group : groups) thing_inside
   = do	{ (group', (groups', thing))
-		<- tc_group gla_exts top_lvl sig_fn prag_fn group $ 
-		   tc_val_binds gla_exts top_lvl sig_fn prag_fn groups thing_inside
+		<- tc_group poly_rec top_lvl sig_fn prag_fn group $ 
+		   tc_val_binds poly_rec top_lvl sig_fn prag_fn groups thing_inside
 	; return (group' ++ groups', thing) }
 
 ------------------------
@@ -195,15 +195,15 @@ tc_group :: Bool -> TopLevelFlag -> TcSigFun -> TcPragFun
 -- We get a list of groups back, because there may 
 -- be specialisations etc as well
 
-tc_group gla_exts top_lvl sig_fn prag_fn (NonRecursive, binds) thing_inside
+tc_group poly_rec top_lvl sig_fn prag_fn (NonRecursive, binds) thing_inside
     	-- A single non-recursive binding
      	-- We want to keep non-recursive things non-recursive
         -- so that we desugar unlifted bindings correctly
  =  do	{ (binds, thing) <- tc_haskell98 top_lvl sig_fn prag_fn NonRecursive binds thing_inside
 	; return ([(NonRecursive, b) | b <- binds], thing) }
 
-tc_group gla_exts top_lvl sig_fn prag_fn (Recursive, binds) thing_inside
-  | not gla_exts	-- Recursive group, normal Haskell 98 route
+tc_group poly_rec top_lvl sig_fn prag_fn (Recursive, binds) thing_inside
+  | not poly_rec	-- Recursive group, normal Haskell 98 route
   = do	{ (binds1, thing) <- tc_haskell98 top_lvl sig_fn prag_fn Recursive binds thing_inside
 	; return ([(Recursive, unionManyBags binds1)], thing) }
 

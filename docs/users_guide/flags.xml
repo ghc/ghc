@@ -678,6 +678,12 @@
 	      <entry><option>-X=MonoPatBinds</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-X=RelaxedPolyRed</option></entry>
+	      <entry>Relaxed checking for <link linkend="typing-binds">mutually-recursive polymorphic functions</link></entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=NoRelaxedPolyRec</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-X=ExtendedDefaultRules</option></entry>
 	      <entry>Use GHCi's <link linkend="extended-default-rules">extended default rules</link> in a normal module</entry>
 	      <entry>dynamic</entry>
@@ -688,7 +694,20 @@
 	      <entry>Enable <link linkend="overloaded-strings">overloaded string literals</link>.
 	      </entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=OverloadedStrings</option></entry>
+	      <entry><option>-X=NoOverloadedStrings</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=GADTs</option></entry>
+	      <entry>Enable <link linkend="gadts">generalised algebraic data types</link>.
+	      </entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=NoGADTs</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=TypeFamilies</option></entry>
+	      <entry>Enable <link linkend="type-families">type families</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=NoTypeFamilies</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-X=ScopedTypeVariables</option></entry>
@@ -703,12 +722,6 @@
 		No longer implied by <option>-fglasgow-exts</option>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-X=NoTH</option></entry>
-	    </row>
-	    <row>
-	      <entry><option>-X=TypeFamilies</option></entry>
-	      <entry>Enable <link linkend="type-families">type families</link>.</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-X=NoTypeFamilies</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-X=BangPtterns</option></entry>

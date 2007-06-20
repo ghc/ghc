@@ -657,10 +657,11 @@ tcTyClDecl1 calc_isrec
   ; want_generic <- doptM Opt_Generics
   ; unbox_strict <- doptM Opt_UnboxStrictFields
   ; gla_exts     <- doptM Opt_GlasgowExts
+  ; gadt_ok      <- doptM Opt_GADTs
   ; is_boot	 <- tcIsHsBoot	-- Are we compiling an hs-boot file?
 
 	-- Check that we don't use GADT syntax in H98 world
-  ; checkTc (gla_exts || h98_syntax) (badGadtDecl tc_name)
+  ; checkTc (gadt_ok || h98_syntax) (badGadtDecl tc_name)
 
 	-- Check that we don't use kind signatures without Glasgow extensions
   ; checkTc (gla_exts || isNothing mb_ksig) (badSigTyDecl tc_name)
@@ -1142,7 +1143,7 @@ badDataConTyCon data_con
 
 badGadtDecl tc_name
   = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+> quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Use -fglasgow-exts to allow GADTs")) ]
+	 , nest 2 (parens $ ptext SLIT("Use -X=GADT to allow GADTs")) ]
 
 badStupidTheta tc_name
   = ptext SLIT("A data type declared in GADT style cannot have a context:") <+> quotes (ppr tc_name)
@@ -1175,7 +1176,7 @@ badSigTyDecl tc_name
 badFamInstDecl tc_name
   = vcat [ ptext SLIT("Illegal family instance for") <+>
 	   quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Use -ftype-families to allow indexed type families")) ]
+	 , nest 2 (parens $ ptext SLIT("Use -X=TypeFamilies to allow indexed type families")) ]
 
 badGadtIdxTyDecl tc_name
   = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+>

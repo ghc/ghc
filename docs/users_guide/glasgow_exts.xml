@@ -4039,7 +4039,7 @@ and all others are monomorphic until the group is generalised
 <para>Following a suggestion of Mark Jones, in his paper
 <ulink url="http://www.cse.ogi.edu/~mpj/thih/">Typing Haskell in
 Haskell</ulink>,
-GHC implements a more general scheme.  If <option>-fglasgow-exts</option> is
+GHC implements a more general scheme.  If <option>-X=RelaxedPolyRec</option> is
 specified:
 <emphasis>the dependency analysis ignores references to variables that have an explicit
 type signature</emphasis>.
@@ -4068,7 +4068,7 @@ Now, the defintion for <literal>f</literal> is typechecked, with this type for
 The same refined dependency analysis also allows the type signatures of 
 mutually-recursive functions to have different contexts, something that is illegal in
 Haskell 98 (Section 4.5.2, last sentence).  With
-<option>-fglasgow-exts</option>
+<option>-X=RelaxedPolyRec</option>
 GHC only insists that the type signatures of a <emphasis>refined</emphasis> group have identical
 type signatures; in practice this means that only variables bound by the same
 pattern binding must have the same context.  For example, this is fine:

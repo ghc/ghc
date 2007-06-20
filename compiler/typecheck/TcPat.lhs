@@ -34,6 +34,7 @@ import Type
 import StaticFlags
 import TyCon
 import DataCon
+import DynFlags
 import PrelNames
 import BasicTypes hiding (SuccessFlag(..))
 import SrcLoc
@@ -729,8 +730,11 @@ refineAlt con pstate ex_tvs [] pat_ty
   = return pstate	-- Common case: no equational constraints
 
 refineAlt con pstate ex_tvs co_vars pat_ty
-  | not (isRigidTy pat_ty)
-  = failWithTc (nonRigidMatch con)
+  = do	{ opt_gadt <- doptM Opt_GADTs	-- No type-refinement unless GADTs are on
+	; if (not opt_gadt) then return pstate
+	  else do 
+
+	{ checkTc (isRigidTy pat_ty) (nonRigidMatch con)
 	-- We are matching against a GADT constructor with non-trivial
 	-- constraints, but pattern type is wobbly.  For now we fail.
 	-- We can make sense of this, however:
@@ -745,8 +749,8 @@ refineAlt con pstate ex_tvs co_vars pat_ty
 	-- then unify these constraints to make pat_ty the right shape;
 	-- then proceed exactly as in the rigid case
 
-  | otherwise	-- In the rigid case, we perform type refinement
-  = case gadtRefine (pat_reft pstate) ex_tvs co_vars of {
+		-- In the rigid case, we perform type refinement
+	; case gadtRefine (pat_reft pstate) ex_tvs co_vars of {
 	    Failed msg     -> failWithTc (inaccessibleAlt msg) ;
 	    Succeeded reft -> do { traceTc trace_msg
 			  	 ; return (pstate { pat_reft = reft }) }
@@ -758,7 +762,7 @@ refineAlt con pstate ex_tvs co_vars pat_ty
 				vcat [ ppr con <+> ppr ex_tvs,
 				       ppr [(v, tyVarKind v) | v <- co_vars],
 				       ppr reft]
-	}
+	} } }
 \end{code}
 
 
