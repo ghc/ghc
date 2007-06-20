@@ -217,7 +217,6 @@ closureIdentity( StgClosure *p )
         case CONSTR_0_2:
         case CONSTR_STATIC:
         case CONSTR_NOCAF_STATIC:
-            printf("",strlen(GET_CON_DESC(itbl_to_con_itbl(info))));
             return GET_CON_DESC(itbl_to_con_itbl(info));
         default:
             return type_names[info->type];
