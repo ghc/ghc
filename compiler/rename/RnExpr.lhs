@@ -20,7 +20,6 @@ import RnSource  ( rnSrcDecls, rnSplice, checkTH )
 import RnBinds	 ( rnLocalBindsAndThen, rnValBinds,
 		   rnMatchGroup, trimWith ) 
 import HsSyn
-import RnHsSyn
 import TcRnMonad
 import RnEnv
 import HscTypes         ( availNames )
