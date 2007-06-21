@@ -29,32 +29,30 @@ SRC_HC_OPTS      += -Wall
 # -----------------------------------------------------------------------------
 # hsc2hs script
 
-ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-extra_flags=$(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS)))
-endif
-HSC2HS_INPLACE_EXTRA=--cc=$(CC) --ld=$(CC) $(extra_flags) --cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt) -I$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_INCLUDE_DIR_REL)
+INPLACE_HS=hsc2hs-inplace.hs
+INPLACE_PROG=hsc2hs-inplace
+EXCLUDED_SRCS+=$(INPLACE_HS)
+
+# FPTOOLS_TOP_ABS platform uses backslashes, at least on Cygwin, but that
+# will go wrong when we use it in a Haskell string below.
+TOP_ABS=$(subst \\,/,$(FPTOOLS_TOP_ABS_PLATFORM))
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-# See "MSys Note 3" in compiler/Makefile
-INPLACE_SCRIPT=hsc2hs-inplace.bat
-FULL_INPLACE_PATH=$(subst /,\,$(FPTOOLS_TOP_ABS_PLATFORM)/utils/hsc2hs/)
-all::
-	$(RM) -f $(INPLACE_SCRIPT)
-	echo '@call $(FULL_INPLACE_PATH)$(HS_PROG) --template=$(FULL_INPLACE_PATH)template-hsc.h $(HSC2HS_INPLACE_EXTRA) %*' >> $(INPLACE_SCRIPT)
-	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
+extra_flags=$(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS)))
 else
-INPLACE_SCRIPT=hsc2hs-inplace
-all::
-	$(RM) -f $(INPLACE_SCRIPT)
-	echo "#!$(SHELL)"                                                   >> $(INPLACE_SCRIPT)
-	echo "HSC2HS_BINDIR=$(FPTOOLS_TOP_ABS)/$(GHC_HSC2HS_DIR_REL)"       >> $(INPLACE_SCRIPT)
-	echo "HSC2HS_DIR=$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_HSC2HS_DIR_REL)" >> $(INPLACE_SCRIPT)
-	echo "HS_PROG=$(HS_PROG)"                                           >> $(INPLACE_SCRIPT)
-	echo "HSC2HS_EXTRA=\"$(HSC2HS_INPLACE_EXTRA)\""                     >> $(INPLACE_SCRIPT)
-	cat hsc2hs.sh                                                       >> $(INPLACE_SCRIPT)
-	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
+extra_flags=
 endif
-CLEAN_FILES += $(INPLACE_SCRIPT)
+
+$(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
+	echo "import System.Cmd; import System.Environment" > $@
+	echo "main = getArgs >>= \args -> rawSystem \"$(TOP_ABS)/$(GHC_HSC2HS_DIR_REL)/$(HS_PROG)\" (\"--cc=$(CC)\":\"--ld=$(LD)\"$(patsubst %,:\"%\",$(extra_flags)):\"--cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt)\":\"-I$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_INCLUDE_DIR_REL)\":args)" >> $@
+
+$(INPLACE_PROG): $(INPLACE_HS)
+	$(GHC) --make $< -o $@
+
+all :: $(INPLACE_PROG)
+
+CLEAN_FILES += $(INPLACE_HS) $(INPLACE_PROG)
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INSTALL_PROGS    += $(HS_PROG)
