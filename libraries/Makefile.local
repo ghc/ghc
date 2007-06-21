@@ -9,7 +9,7 @@ SAVE_GHC := $(GHC)
 SAVE_AR  := $(AR)
 SAVE_LD  := $(LD)
 include $(TOP)/mk/config.mk
-include $(TOP)/mk/build.mk
+-include $(TOP)/mk/build.mk
 GHC := $(SAVE_GHC)
 AR  := $(SAVE_AR)
 LD  := $(SAVE_LD)
