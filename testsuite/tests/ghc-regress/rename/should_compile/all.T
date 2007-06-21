@@ -65,6 +65,7 @@ test('rn054', normal, compile, [''])
 test('rn055', normal, compile, [''])
 test('rn056', normal, compile, [''])
 test('rn057', normal, compile, [''])
+test('rn058', normal, compile, [''])
 
 test('timing001', normal, compile, [''])
 test('timing002', normal, compile, [''])
