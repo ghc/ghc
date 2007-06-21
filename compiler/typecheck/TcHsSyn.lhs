@@ -642,7 +642,7 @@ zonkStmt env (BindStmt pat expr bind_op fail_op)
 zonkRecFields :: ZonkEnv -> HsRecordBinds TcId -> TcM (HsRecordBinds TcId)
 zonkRecFields env (HsRecFields flds dd)
   = do	{ flds' <- mappM zonk_rbind flds
-	; return (HsRecFields flds dd) }
+	; return (HsRecFields flds' dd) }
   where
     zonk_rbind fld
       = do { new_expr <- zonkLExpr env (hsRecFieldArg fld)
