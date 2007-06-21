@@ -168,7 +168,7 @@ cgCase (StgOpApp op@(StgFCallOp fcall _) args _)
    unsafe_foreign_call
 	 = case fcall of
 	 	CCall (CCallSpec _ _ s) -> not (playSafe s)
-		_other			-> False				
+		_other			-> False
 \end{code}
 
 Special case: scrutinising a non-primitive variable.
