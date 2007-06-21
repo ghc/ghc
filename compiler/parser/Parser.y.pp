@@ -1494,7 +1494,7 @@ gdpat	:: { LGRHS RdrName }
 -- Bangs inside are parsed as infix operator applications, so that
 -- we parse them right when bang-patterns are off
 pat     :: { LPat RdrName }
-pat 	: infixexp		{% checkPattern $1 }
+pat 	:  exp		 	{% checkPattern $1 }
 	| '!' aexp		{% checkPattern (LL (SectionR (L1 (HsVar bang_RDR)) $2)) }
 
 apat   :: { LPat RdrName }	
