@@ -273,6 +273,7 @@ clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
 	$(RM) -f stamp/bootstrapping.*
 	$(RM) -rf bootstrapping.*
 	$(RM) -rf ifBuildable
+	$(RM) -rf installPackage
 	$(RM) -f libraries.txt index.html doc-index.html
 
 $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR)): \
