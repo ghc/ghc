@@ -145,7 +145,9 @@ untidy b (L loc p) = L loc (untidy' b p)
 
 untidy_con (PrefixCon pats) = PrefixCon (map untidy_pars pats) 
 untidy_con (InfixCon p1 p2) = InfixCon  (untidy_pars p1) (untidy_pars p2)
-untidy_con (RecCon bs)      = RecCon    [ HsRecField f (untidy_pars p) d | HsRecField f p d <- bs ]
+untidy_con (RecCon (HsRecFields flds dd)) 
+  = RecCon (HsRecFields [ fld { hsRecFieldArg = untidy_pars (hsRecFieldArg fld) }
+			| fld <- flds ] dd)
 
 pars :: NeedPars -> WarningPat -> Pat Name
 pars True p = ParPat p
@@ -607,7 +609,7 @@ has_nplusk_pat (TuplePat ps _ _)   	     = any has_nplusk_lpat ps
 has_nplusk_pat (PArrPat ps _)  	   	     = any has_nplusk_lpat ps
 has_nplusk_pat (LazyPat p)     	   	     = False	-- Why?
 has_nplusk_pat (BangPat p)     	   	     = has_nplusk_lpat p	-- I think
-has_nplusk_pat (ConPatOut { pat_args = ps }) = any has_nplusk_lpat (hsConArgs ps)
+has_nplusk_pat (ConPatOut { pat_args = ps }) = any has_nplusk_lpat (hsConPatArgs ps)
 has_nplusk_pat p = False 	-- VarPat, VarPatOut, WildPat, LitPat, NPat, TypePat
 
 simplify_lpat :: LPat Id -> LPat Id  
@@ -666,7 +668,7 @@ simplify_pat (CoPat co pat ty) = simplify_pat pat
 -----------------
 simplify_con con (PrefixCon ps)   = PrefixCon (map simplify_lpat ps)
 simplify_con con (InfixCon p1 p2) = PrefixCon [simplify_lpat p1, simplify_lpat p2]
-simplify_con con (RecCon fs)      
+simplify_con con (RecCon (HsRecFields fs _))      
   | null fs   = PrefixCon [nlWildPat | t <- dataConOrigArgTys con]
 		-- Special case for null patterns; maybe not a record at all
   | otherwise = PrefixCon (map (simplify_lpat.snd) all_pats)

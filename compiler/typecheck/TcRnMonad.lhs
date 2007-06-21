@@ -84,12 +84,13 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 		| otherwise	 = Nothing ;
 			
 	     gbl_env = TcGblEnv {
-		tcg_mod      = mod,
-		tcg_src	     = hsc_src,
-		tcg_rdr_env  = hsc_global_rdr_env hsc_env,
-		tcg_fix_env  = emptyNameEnv,
-		tcg_default  = Nothing,
-		tcg_type_env = hsc_global_type_env hsc_env,
+		tcg_mod       = mod,
+		tcg_src	      = hsc_src,
+		tcg_rdr_env   = hsc_global_rdr_env hsc_env,
+		tcg_fix_env   = emptyNameEnv,
+		tcg_field_env = emptyNameEnv,
+		tcg_default   = Nothing,
+		tcg_type_env  = hsc_global_type_env hsc_env,
 		tcg_type_env_var = type_env_var,
 		tcg_inst_env  = emptyInstEnv,
 		tcg_fam_inst_env  = emptyFamInstEnv,
@@ -402,6 +403,14 @@ extendFixityEnv :: [(Name,FixItem)] -> RnM a -> RnM a
 extendFixityEnv new_bit
   = updGblEnv (\env@(TcGblEnv { tcg_fix_env = old_fix_env }) -> 
 		env {tcg_fix_env = extendNameEnvList old_fix_env new_bit})	     
+
+getRecFieldEnv :: TcRn RecFieldEnv
+getRecFieldEnv = do { env <- getGblEnv; return (tcg_field_env env) }
+
+extendRecFieldEnv :: RecFieldEnv -> RnM a -> RnM a
+extendRecFieldEnv new_bit
+  = updGblEnv (\env@(TcGblEnv { tcg_field_env = old_env }) -> 
+		env {tcg_field_env = old_env `plusNameEnv` new_bit})	     
 
 getDeclaredDefaultTys :: TcRn (Maybe [Type])
 getDeclaredDefaultTys = do { env <- getGblEnv; return (tcg_default env) }

@@ -12,7 +12,7 @@ module RnEnv (
 	lookupLocatedGlobalOccRn, lookupGlobalOccRn,
 	lookupLocalDataTcNames, lookupSrcOcc_maybe,
 	lookupFixityRn, lookupTyFixityRn, lookupLocatedSigOccRn, 
-	lookupLocatedInstDeclBndr,
+	lookupInstDeclBndr, lookupRecordBndr, lookupConstructorFields,
 	lookupSyntaxName, lookupSyntaxTable, lookupImportedName,
 	lookupGreRn, lookupGreRn_maybe,
 	getLookupOccRn,
@@ -50,10 +50,13 @@ import RdrName		( RdrName, isQual, isUnqual, isOrig_maybe,
 			  importSpecLoc, importSpecModule
 			)
 import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity )
+import TcEnv		( tcLookupDataCon )
 import TcRnMonad
 import Name		( Name, nameIsLocalOrFrom, mkInternalName, isWiredInName,
 			  nameSrcLoc, nameOccName, nameModule, isExternalName )
 import NameSet
+import NameEnv
+import DataCon		( dataConFieldLabels )
 import OccName		( tcName, isDataOcc, pprNonVarNameSpace, occNameSpace,
 			  reportIfUnused )
 import Module		( Module, ModuleName )
@@ -64,6 +67,7 @@ import SrcLoc		( SrcSpan, srcSpanStart, Located(..), eqLocated, unLoc,
 			  srcLocSpan, getLoc, combineSrcSpans, isOneLineSpan )
 import Outputable
 import Util		( sortLe )
+import Maybes
 import ListSetOps	( removeDups )
 import List		( nubBy )
 import Monad		( when )
@@ -215,33 +219,88 @@ lookupLocatedSigOccRn = wrapLocM $ \ rdr_name -> do
 		Nothing  -> lookupGlobalOccRn rdr_name
 	}}}
 
--- lookupInstDeclBndr is used for the binders in an 
--- instance declaration.   Here we use the class name to
--- disambiguate.  
-
-lookupLocatedInstDeclBndr :: Name -> Located RdrName -> RnM (Located Name)
-lookupLocatedInstDeclBndr cls rdr = wrapLocM (lookupInstDeclBndr cls) rdr
-
-lookupInstDeclBndr :: Name -> RdrName -> RnM Name
+-----------------------------------------------
+lookupInstDeclBndr :: Name -> Located RdrName -> RnM (Located Name)
 -- This is called on the method name on the left-hand side of an 
 -- instance declaration binding. eg.  instance Functor T where
 --                                       fmap = ...
 --                                       ^^^^ called on this
 -- Regardless of how many unqualified fmaps are in scope, we want
 -- the one that comes from the Functor class.
-lookupInstDeclBndr cls_name rdr_name
+--
+-- Furthermore, note that we take no account of whether the 
+-- name is only in scope qualified.  I.e. even if method op is
+-- in scope as M.op, we still allow plain 'op' on the LHS of
+-- an instance decl
+lookupInstDeclBndr cls rdr = lookup_located_sub_bndr is_op
+				(ptext SLIT("method of class")) rdr
+  where
+    doc = ptext SLIT("method of class") <+> quotes (ppr cls)
+    is_op gre@(GRE {gre_par = ParentIs n}) = n == cls
+    is_op other			           = False
+
+-----------------------------------------------
+lookupRecordBndr :: Maybe (Located Name) -> Located RdrName -> RnM (Located Name)
+-- Used for record construction and pattern matching
+-- When the -fdisambiguate-record-fields flag is on, take account of the
+-- constructor name to disambiguate which field to use; it's just the
+-- same as for instance decls
+lookupRecordBndr Nothing rdr_name
+  = lookupLocatedGlobalOccRn rdr_name
+lookupRecordBndr (Just (L _ data_con)) rdr_name
+  = do 	{ flag_on <- doptM Opt_DisambiguateRecordFields
+	; if not flag_on 
+          then lookupLocatedGlobalOccRn rdr_name
+	  else do {
+	  fields <- lookupConstructorFields data_con
+	; let is_field gre = gre_name gre `elem` fields
+	; lookup_located_sub_bndr is_field doc rdr_name
+	}}
+   where
+     doc = ptext SLIT("field of constructor") <+> quotes (ppr data_con)
+
+
+lookupConstructorFields :: Name -> RnM [Name]
+-- Look up the fields of a given constructor
+--   *	For constructors from this module, use the record field env,
+--	which is itself gathered from the (as yet un-typechecked)
+--	data type decls
+-- 
+--    *	For constructors from imported modules, use the *type* environment
+--	since imported modles are already compiled, the info is conveniently
+--	right there
+
+lookupConstructorFields con_name
+  = do	{ this_mod <- getModule
+	; if nameIsLocalOrFrom this_mod con_name then
+	  do { field_env <- getRecFieldEnv
+	     ; return (lookupNameEnv field_env con_name `orElse` []) }
+	  else
+	  do { con <- tcLookupDataCon con_name
+	     ; return (dataConFieldLabels con) } }
+
+-----------------------------------------------
+lookup_located_sub_bndr :: (GlobalRdrElt -> Bool)
+			-> SDoc -> Located RdrName
+			-> RnM (Located Name)
+lookup_located_sub_bndr is_good doc rdr_name
+  = wrapLocM (lookup_sub_bndr is_good doc) rdr_name
+
+lookup_sub_bndr is_good doc rdr_name
   | isUnqual rdr_name	-- Find all the things the rdr-name maps to
   = do	{		-- and pick the one with the right parent name
-	  let { is_op gre@(GRE {gre_par = ParentIs n}) = cls_name == n
-	      ;	is_op other			       = False
-	      ; occ	      = rdrNameOcc rdr_name
-	      ; lookup_fn env = filter is_op (lookupGlobalRdrEnv env occ) }
-	; mb_gre <- lookupGreRn_help rdr_name lookup_fn
-	; case mb_gre of
-	    Just gre -> return (gre_name gre)
-	    Nothing  -> do { addErr (unknownInstBndrErr cls_name rdr_name)
-			   ; traceRn (text "lookupInstDeclBndr" <+> ppr rdr_name)
-			   ; return (mkUnboundName rdr_name) } }
+	; env <- getGlobalRdrEnv
+	; case filter is_good (lookupGlobalRdrEnv env (rdrNameOcc rdr_name)) of
+		-- NB: lookupGlobalRdrEnv, not lookupGRE_RdrName!
+		--     The latter does pickGREs, but we want to allow 'x'
+		--     even if only 'M.x' is in scope
+	    [gre] -> return (gre_name gre)
+	    []    -> do { addErr (unknownSubordinateErr doc rdr_name)
+			; traceRn (text "RnEnv.lookup_sub_bndr" <+> ppr rdr_name)
+			; return (mkUnboundName rdr_name) }
+	    gres  -> do { addNameClashErrRn rdr_name gres
+			; return (gre_name (head gres)) }
+	}
 
   | otherwise	-- Occurs in derived instances, where we just
 		-- refer directly to the right method
@@ -855,8 +914,9 @@ unknownNameErr rdr_name
 	 nest 2 $ pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
 		  <+> quotes (ppr rdr_name)]
 
-unknownInstBndrErr cls op
-  = quotes (ppr op) <+> ptext SLIT("is not a (visible) method of class") <+> quotes (ppr cls)
+unknownSubordinateErr doc op	-- Doc is "method of class" or 
+				-- "field of constructor"
+  = quotes (ppr op) <+> ptext SLIT("is not a (visible)") <+> doc
 
 badOrigBinding name
   = ptext SLIT("Illegal binding of built-in syntax:") <+> ppr (rdrNameOcc name)

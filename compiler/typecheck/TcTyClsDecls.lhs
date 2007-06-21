@@ -568,7 +568,8 @@ kcDataDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
     kc_con_details (RecCon fields) 
 	= do { fields' <- mappM kc_field fields; return (RecCon fields') }
 
-    kc_field (HsRecField fld bty d) = do { bty' <- kc_larg_ty bty ; return (HsRecField fld bty' d) }
+    kc_field (ConDeclField fld bty d) = do { bty' <- kc_larg_ty bty
+					   ; return (ConDeclField fld bty' d) }
 
     kc_larg_ty bty = case new_or_data of
 			DataType -> kcHsSigType bty
@@ -776,8 +777,8 @@ tcConDecl unbox_strict tycon tc_tvs	-- Data types
 	InfixCon bty1 bty2 -> tc_datacon True  [] [bty1,bty2]
 	RecCon fields      -> tc_datacon False field_names btys
 			   where
-			      (field_names, btys) = unzip [ (n, t) | HsRecField n t _ <- fields ] 
-                              
+			      field_names = map cd_fld_name fields
+			      btys        = map cd_fld_type fields
     }
 
 tcResultType :: TyCon

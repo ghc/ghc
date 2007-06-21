@@ -452,16 +452,16 @@ zonkExpr env (ExplicitTuple exprs boxed)
     returnM (ExplicitTuple new_exprs boxed)
 
 zonkExpr env (RecordCon data_con con_expr rbinds)
-  = zonkExpr env con_expr	`thenM` \ new_con_expr ->
-    zonkRbinds env rbinds	`thenM` \ new_rbinds ->
-    returnM (RecordCon data_con new_con_expr new_rbinds)
+  = do	{ new_con_expr <- zonkExpr env con_expr
+	; new_rbinds   <- zonkRecFields env rbinds
+	; return (RecordCon data_con new_con_expr new_rbinds) }
 
 zonkExpr env (RecordUpd expr rbinds cons in_tys out_tys)
-  = zonkLExpr env expr			`thenM` \ new_expr ->
-    mapM (zonkTcTypeToType env) in_tys	`thenM` \ new_in_tys ->
-    mapM (zonkTcTypeToType env) out_tys	`thenM` \ new_out_tys ->
-    zonkRbinds env rbinds		`thenM` \ new_rbinds ->
-    returnM (RecordUpd new_expr new_rbinds cons new_in_tys new_out_tys)
+  = do	{ new_expr    <- zonkLExpr env expr
+	; new_in_tys  <- mapM (zonkTcTypeToType env) in_tys
+	; new_out_tys <- mapM (zonkTcTypeToType env) out_tys
+	; new_rbinds  <- zonkRecFields env rbinds
+	; return (RecordUpd new_expr new_rbinds cons new_in_tys new_out_tys) }
 
 zonkExpr env (ExprWithTySigOut e ty) 
   = do { e' <- zonkLExpr env e
@@ -639,14 +639,15 @@ zonkStmt env (BindStmt pat expr bind_op fail_op)
 
 
 -------------------------------------------------------------------------
-zonkRbinds :: ZonkEnv -> HsRecordBinds TcId -> TcM (HsRecordBinds Id)
-
-zonkRbinds env (HsRecordBinds rbinds)
-  = mappM zonk_rbind rbinds >>= return . HsRecordBinds
+zonkRecFields :: ZonkEnv -> HsRecordBinds TcId -> TcM (HsRecordBinds TcId)
+zonkRecFields env (HsRecFields flds dd)
+  = do	{ flds' <- mappM zonk_rbind flds
+	; return (HsRecFields flds dd) }
   where
-    zonk_rbind (field, expr)
-      = zonkLExpr env expr	`thenM` \ new_expr ->
-	returnM (fmap (zonkIdOcc env) field, new_expr)
+    zonk_rbind fld
+      = do { new_expr <- zonkLExpr env (hsRecFieldArg fld)
+	   ; return (fld { hsRecFieldArg = new_expr }) }
+	-- Field selectors have declared types; hence no zonking
 
 -------------------------------------------------------------------------
 mapIPNameTc :: (a -> TcM b) -> IPName a -> TcM (IPName b)
@@ -764,11 +765,11 @@ zonkConStuff env (InfixCon p1 p2)
 	; (env', p2') <- zonkPat env1 p2
 	; return (env', InfixCon p1' p2') }
 
-zonkConStuff env (RecCon rpats)
-  = do	{ let (fields, pats) = unzip [ (f, p) | HsRecField f p _  <- rpats ]
-	; (env', pats') <- zonkPats env pats
-	; let recCon = RecCon [ mkRecField f p | (f, p) <- zip fields pats' ]
-	; returnM (env', recCon) }
+zonkConStuff env (RecCon (HsRecFields rpats dd))
+  = do	{ (env', pats') <- zonkPats env (map hsRecFieldArg rpats)
+	; let rpats' = zipWith (\rp p' -> rp { hsRecFieldArg = p' }) rpats pats'
+	; returnM (env', RecCon (HsRecFields rpats' dd)) }
+	-- Field selectors have declared types; hence no zonking
 
 ---------------------------
 zonkPats env []		= return (env, [])

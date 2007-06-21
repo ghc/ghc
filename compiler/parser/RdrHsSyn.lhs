@@ -348,7 +348,7 @@ add_sig  s (ValBindsIn bs sigs) = ValBindsIn bs	              (s:sigs)
 -- arguments, and converts the type constructor back into a data constructor.
 
 mkPrefixCon :: LHsType RdrName -> [LBangType RdrName]
-  -> P (Located RdrName, HsConDetails RdrName (LBangType RdrName))
+	    -> P (Located RdrName, HsConDeclDetails RdrName)
 mkPrefixCon ty tys
  = split ty tys
  where
@@ -359,10 +359,10 @@ mkPrefixCon ty tys
 
 mkRecCon :: Located RdrName -> 
             [([Located RdrName], LBangType RdrName, Maybe (LHsDoc RdrName))] ->
-            P (Located RdrName, HsConDetails RdrName (LBangType RdrName))
+            P (Located RdrName, HsConDeclDetails RdrName)
 mkRecCon (L loc con) fields
   = do data_con <- tyConToDataCon loc con
-       return (data_con, RecCon [ (HsRecField l t d) | (ls, t, d) <- fields, l <- ls ])
+       return (data_con, RecCon [ ConDeclField l t d | (ls, t, d) <- fields, l <- ls ])
 
 tyConToDataCon :: SrcSpan -> RdrName -> P (Located RdrName)
 tyConToDataCon loc tc
@@ -689,8 +689,9 @@ checkAPat loc e = case e of
    ExplicitTuple es b -> mapM (\e -> checkLPat e) es >>= \ps ->
    			 return (TuplePat ps b placeHolderType)
    
-   RecordCon c _ (HsRecordBinds fs)   -> mapM checkPatField fs >>= \fs ->
-			 return (ConPatIn c (RecCon (map (uncurry mkRecField) fs)))
+   RecordCon c _ (HsRecFields fs dd) 
+		      -> mapM checkPatField fs >>= \fs ->
+			 return (ConPatIn c (RecCon (HsRecFields fs dd)))
 -- Generics 
    HsType ty          -> return (TypePat ty) 
    _                  -> patFail loc
@@ -699,10 +700,9 @@ plus_RDR, bang_RDR :: RdrName
 plus_RDR = mkUnqual varName FSLIT("+")	-- Hack
 bang_RDR = mkUnqual varName FSLIT("!")	-- Hack
 
-checkPatField :: (Located RdrName, LHsExpr RdrName) -> P (Located RdrName, LPat RdrName)
-checkPatField (n,e) = do
-  p <- checkLPat e
-  return (n,p)
+checkPatField :: HsRecField RdrName (LHsExpr RdrName) -> P (HsRecField RdrName (LPat RdrName))
+checkPatField fld = do	{ p <- checkLPat (hsRecFieldArg fld)
+			; return (fld { hsRecFieldArg = p }) }
 
 patFail loc = parseError loc "Parse error in pattern"
 
@@ -852,15 +852,17 @@ checkPrecP (L l i)
 mkRecConstrOrUpdate 
 	:: LHsExpr RdrName 
 	-> SrcSpan
-	-> HsRecordBinds RdrName
+	-> ([HsRecField RdrName (LHsExpr RdrName)], Bool)
 	-> P (HsExpr RdrName)
 
-mkRecConstrOrUpdate (L l (HsVar c)) loc fs | isRdrDataCon c
-  = return (RecordCon (L l c) noPostTcExpr fs)
-mkRecConstrOrUpdate exp loc fs@(HsRecordBinds (_:_))
-  = return (RecordUpd exp fs [] [] [])
-mkRecConstrOrUpdate _ loc (HsRecordBinds [])
-  = parseError loc "Empty record update"
+mkRecConstrOrUpdate (L l (HsVar c)) loc (fs,dd) | isRdrDataCon c
+  = return (RecordCon (L l c) noPostTcExpr (mk_rec_fields fs dd))
+mkRecConstrOrUpdate exp loc (fs,dd)
+  | null fs   = parseError loc "Empty record update"
+  | otherwise = return (RecordUpd exp (mk_rec_fields fs dd) [] [] [])
+
+mk_rec_fields fs False = HsRecFields { rec_flds = fs, rec_dotdot = Nothing }
+mk_rec_fields fs True  = HsRecFields { rec_flds = fs, rec_dotdot = Just (length fs) }
 
 mkInlineSpec :: Maybe Activation -> Bool -> InlineSpec
 -- The Maybe is becuase the user can omit the activation spec (and usually does)

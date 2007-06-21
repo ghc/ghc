@@ -383,8 +383,8 @@ collectl (L l pat) bndrs
     go (PArrPat pats _)    	  = foldr collectl bndrs pats
     go (TuplePat pats _ _)  	  = foldr collectl bndrs pats
 				  
-    go (ConPatIn c ps)   	  = foldr collectl bndrs (hsConArgs ps)
-    go (ConPatOut {pat_args=ps})  = foldr collectl bndrs (hsConArgs ps)
+    go (ConPatIn c ps)   	  = foldr collectl bndrs (hsConPatArgs ps)
+    go (ConPatOut {pat_args=ps})  = foldr collectl bndrs (hsConPatArgs ps)
 	-- See Note [Dictionary binders in ConPatOut]
     go (LitPat _)	      	  = bndrs
     go (NPat _ _ _ _)		  = bndrs
@@ -425,6 +425,6 @@ collect_pat (ParPat  pat)      	acc = collect_lpat pat acc
 collect_pat (ListPat pats _)   	acc = foldr collect_lpat acc pats
 collect_pat (PArrPat pats _)   	acc = foldr collect_lpat acc pats
 collect_pat (TuplePat pats _ _) acc = foldr collect_lpat acc pats
-collect_pat (ConPatIn c ps)     acc = foldr collect_lpat acc (hsConArgs ps)
+collect_pat (ConPatIn c ps)     acc = foldr collect_lpat acc (hsConPatArgs ps)
 collect_pat other	        acc = acc 	-- Literals, vars, wildcard
 \end{code}

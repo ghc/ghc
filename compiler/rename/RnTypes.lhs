@@ -10,19 +10,19 @@ module RnTypes (
 	rnHsSigType, rnHsTypeFVs,
 
 	-- Patterns and literals
-	rnLPat, rnPat, rnPatsAndThen,	-- Here because it's not part 
+	rnLPat, rnPatsAndThen,		-- Here because it's not part 
 	rnLit, rnOverLit, 		-- of any mutual recursion	
+	rnHsRecFields,
 
 	-- Precence related stuff
 	mkOpAppRn, mkNegAppRn, mkOpFormRn, 
 	checkPrecMatch, checkSectionPrec, 
 	
 	-- Error messages
-	dupFieldErr, patSigErr, checkTupSize
+	patSigErr, checkTupSize
   ) where
 
-import DynFlags		( DynFlag(Opt_WarnUnusedMatches, Opt_GlasgowExts, Opt_ScopedTypeVariables, Opt_OverloadedStrings ) )
-
+import DynFlags
 import HsSyn
 import RdrHsSyn		( extractHsRhoRdrTyVars )
 import RnHsSyn		( extractHsTyNames, parrTyCon_name, tupleTyCon_name, 
@@ -32,25 +32,25 @@ import RnHsDoc          ( rnLHsDoc )
 import RnEnv		( lookupOccRn, lookupBndrRn, lookupSyntaxName,
 			  lookupLocatedOccRn, lookupLocatedBndrRn,
 			  lookupLocatedGlobalOccRn, bindTyVarsRn, 
-			  lookupFixityRn, lookupTyFixityRn,
-			  mapFvRn, warnUnusedMatches,
+			  lookupFixityRn, lookupTyFixityRn, lookupConstructorFields,
+			  lookupRecordBndr, mapFvRn, warnUnusedMatches,
 			  newIPNameRn, bindPatSigTyVarsFV, bindLocatedLocalsFV )
 import TcRnMonad
-import RdrName		( RdrName, elemLocalRdrEnv )
+import RdrName
 import PrelNames	( eqClassName, integralClassName, geName, eqName,
 		  	  negateName, minusName, lengthPName, indexPName,
 			  plusIntegerName, fromIntegerName, timesIntegerName,
 			  ratioDataConName, fromRationalName, fromStringName )
 import TypeRep		( funTyCon )
 import Constants	( mAX_TUPLE_SIZE )
-import Name		( Name )
-import SrcLoc		( SrcSpan, Located(..), unLoc, noLoc, combineLocs )
+import Name
+import SrcLoc
 import NameSet
 
 import Literal		( inIntRange, inCharRange )
 import BasicTypes	( compareFixity, funTyFixity, negateFixity, 
 			  Fixity(..), FixityDirection(..) )
-import ListSetOps	( removeDups )
+import ListSetOps	( removeDups, minusList )
 import Outputable
 
 #include "HsVersions.h"
@@ -386,19 +386,17 @@ mkConOpPatRn :: Located Name -> Fixity -> LPat Name -> LPat Name
 	     -> RnM (Pat Name)
 
 mkConOpPatRn op2 fix2 p1@(L loc (ConPatIn op1 (InfixCon p11 p12))) p2
-  = lookupFixityRn (unLoc op1)	`thenM` \ fix1 ->
-    let
-	(nofix_error, associate_right) = compareFixity fix1 fix2
-    in
-    if nofix_error then
-	addErr (precParseErr (ppr_op op1,fix1) (ppr_op op2,fix2))	`thenM_`
-	returnM (ConPatIn op2 (InfixCon p1 p2))
-    else 
-    if associate_right then
-	mkConOpPatRn op2 fix2 p12 p2		`thenM` \ new_p ->
-	returnM (ConPatIn op1 (InfixCon p11 (L loc new_p)))  -- XXX loc right?
-    else
-    returnM (ConPatIn op2 (InfixCon p1 p2))
+  = do	{ fix1 <- lookupFixityRn (unLoc op1)
+	; let (nofix_error, associate_right) = compareFixity fix1 fix2
+
+	; if nofix_error then do
+		{ addErr (precParseErr (ppr_op op1,fix1) (ppr_op op2,fix2))
+		; return (ConPatIn op2 (InfixCon p1 p2)) }
+
+	  else if associate_right then do
+		{ new_p <- mkConOpPatRn op2 fix2 p12 p2
+		; return (ConPatIn op1 (InfixCon p11 (L loc new_p))) } -- XXX loc right?
+	  else return (ConPatIn op2 (InfixCon p1 p2)) }
 
 mkConOpPatRn op fix p1 p2 			-- Default case, no rearrangment
   = ASSERT( not_op_pat (unLoc p2) )
@@ -630,7 +628,6 @@ rnPat (AsPat name pat)
 
 rnPat (ConPatIn con stuff) = rnConPat con stuff
 
-
 rnPat (ParPat pat)
   = rnLPat pat		`thenM` \ (pat', fvs) ->
     returnM (ParPat pat', fvs)
@@ -658,44 +655,81 @@ rnPat (TypePat name) =
 -- -----------------------------------------------------------------------------
 -- rnConPat
 
+rnConPat :: Located RdrName -> HsConPatDetails RdrName -> RnM (Pat Name, FreeVars)
 rnConPat con (PrefixCon pats)
-  = lookupLocatedOccRn con 	`thenM` \ con' ->
-    rnLPats pats		`thenM` \ (pats', fvs) ->
-    returnM (ConPatIn con' (PrefixCon pats'), fvs `addOneFV` unLoc con')
+  = do	{ con' <- lookupLocatedOccRn con
+	; (pats', fvs) <- rnLPats pats
+	; return (ConPatIn con' (PrefixCon pats'), fvs `addOneFV` unLoc con') }
 
 rnConPat con (RecCon rpats)
-  = lookupLocatedOccRn con 	`thenM` \ con' ->
-    rnRpats rpats		`thenM` \ (rpats', fvs) ->
-    returnM (ConPatIn con' (RecCon rpats'), fvs `addOneFV` unLoc con')
+  = do	{ con' <- lookupLocatedOccRn con
+	; (rpats', fvs) <- rnHsRecFields "pattern" (Just con') rnLPat VarPat rpats
+	; return (ConPatIn con' (RecCon rpats'), fvs `addOneFV` unLoc con') }
 
 rnConPat con (InfixCon pat1 pat2)
-  = lookupLocatedOccRn con			`thenM` \ con' ->
-    rnLPat pat1					`thenM` \ (pat1', fvs1) ->
-    rnLPat pat2					`thenM` \ (pat2', fvs2) ->
-    lookupFixityRn (unLoc con')			`thenM` \ fixity ->
-    mkConOpPatRn con' fixity pat1' pat2'	`thenM` \ pat' ->
-    returnM (pat', fvs1 `plusFV` fvs2 `addOneFV` unLoc con')
+  = do	{ con' <- lookupLocatedOccRn con
+	; (pat1', fvs1) <- rnLPat pat1
+	; (pat2', fvs2) <- rnLPat pat2
+	; fixity 	<- lookupFixityRn (unLoc con')
+	; pat' <- mkConOpPatRn con' fixity pat1' pat2'
+	; return (pat', fvs1 `plusFV` fvs2 `addOneFV` unLoc con') }
 
 -- -----------------------------------------------------------------------------
--- rnRpats
-
+rnHsRecFields :: String	-- "pattern" or "construction" or "update"
+	      -> Maybe (Located Name)
+	      -> (Located a -> RnM (Located b, FreeVars))
+	      -> (RdrName -> a)			-- How to fill in ".."
+	      -> HsRecFields RdrName (Located a)
+              -> RnM (HsRecFields Name (Located b), FreeVars)
 -- Haddock comments for record fields are renamed to Nothing here
-rnRpats :: [HsRecField RdrName (LPat RdrName)] 
-        -> RnM ([HsRecField Name (LPat Name)], FreeVars)
-rnRpats rpats
-  = mappM_ field_dup_err dup_fields 	`thenM_`
-    mapFvRn rn_rpat rpats		`thenM` \ (rpats', fvs) ->
-    returnM (rpats', fvs)
+rnHsRecFields str mb_con rn_thing mk_rhs (HsRecFields fields dd)
+  = do	{ mappM_ field_dup_err dup_fields
+	; pun_flag <- doptM Opt_RecordPuns
+	; (fields1, fvs1) <- mapFvRn (rn_rpat pun_flag) fields
+	; case dd of
+	    Nothing -> return (HsRecFields fields1 dd, fvs1)
+	    Just n  -> ASSERT( n == length fields ) do
+	{ dd_flag <- doptM Opt_RecordDotDot
+	; checkErr dd_flag (needFlagDotDot str)
+
+	; let fld_names1 = map (unLoc . hsRecFieldId) fields1
+	; (fields2, fvs2) <- dot_dot_fields fld_names1 mb_con
+
+	; return (HsRecFields (fields1 ++ fields2) dd, fvs1 `plusFV` fvs2) } }
   where
-    (_, dup_fields) = removeDups compare [ unLoc f | HsRecField f _ _ <- rpats ]
+    (_, dup_fields) = removeDups compare (map (unLoc . hsRecFieldId) fields)
 
-    field_dup_err dups = addErr (dupFieldErr "pattern" dups)
+    field_dup_err dups = addErr (dupFieldErr str (head dups))
 
-    rn_rpat (HsRecField field pat _)
-      = lookupLocatedGlobalOccRn field	`thenM` \ fieldname ->
-	rnLPat pat			`thenM` \ (pat', fvs) ->
-	returnM ((mkRecField fieldname pat'), fvs `addOneFV` unLoc fieldname)
+    rn_rpat pun_ok (HsRecField field pat pun)
+      = do { fieldname   <- lookupRecordBndr mb_con field
+	   ; checkErr (not pun || pun_ok) (badPun field)
+	   ; (pat', fvs) <- rn_thing pat
+	   ; return (HsRecField fieldname pat' pun, 
+		     fvs `addOneFV` unLoc fieldname) }
 
+    dot_dot_fields fs Nothing = do { addErr (badDotDot str) 
+				   ; return ([], emptyFVs) }
+
+	-- Compute the extra fields to be filled in by the dot-dot notation
+    dot_dot_fields fs (Just con)
+	= do { con_fields <- lookupConstructorFields (unLoc con)
+	     ; let missing_fields = con_fields `minusList` fs
+	     ; loc <- getSrcSpanM	-- Rather approximate
+	     ; (rhss, fvs_s) <- mapAndUnzipM rn_thing 
+				  [ L loc (mk_rhs (mkRdrUnqual (getOccName f)))
+				  | f <- missing_fields ]
+	     ; let new_fs = [ HsRecField (L loc f) r False
+			    | (f, r) <- missing_fields `zip` rhss ]
+	     ; return (new_fs, plusFVs fvs_s) }
+
+needFlagDotDot str = vcat [ptext SLIT("Illegal `..' in record") <+> text str,
+			  ptext SLIT("Use -frecord-dot-dot to permit this")]
+
+badDotDot str = ptext SLIT("You cannot use `..' in record") <+> text str
+
+badPun fld = vcat [ptext SLIT("Illegal use of punning for field") <+> quotes (ppr fld),
+		   ptext SLIT("Use -frecord-puns to permit this")]
 \end{code}
 
 

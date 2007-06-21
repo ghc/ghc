@@ -84,15 +84,10 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 		-- Deal with top-level fixity decls 
 		-- (returns the total new fixity env)
         rn_fix_decls <- rnSrcFixityDecls fix_decls ;
-	fix_env <- rnSrcFixityDeclsEnv rn_fix_decls ;
-	updGblEnv (\gbl -> gbl { tcg_fix_env = fix_env })
-		  $ do {
+	tcg_env      <- extendGblFixityEnv rn_fix_decls ;
+	setGblEnv tcg_env $ do {
 
-		-- Rename other declarations
-	traceRn (text "Start rnmono") ;
-	(rn_val_decls, bind_dus) <- rnTopBinds val_decls ;
-	traceRn (text "finish rnmono" <+> ppr rn_val_decls) ;
-
+		-- Rename type and class decls
 		-- You might think that we could build proper def/use information
 		-- for type and class declarations, but they can be involved
 		-- in mutual recursion across modules, and we only do the SCC
@@ -101,7 +96,18 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 		-- means we'll only report a declaration as unused if it isn't
 		-- mentioned at all.  Ah well.
 	traceRn (text "Start rnTyClDecls") ;
-	(rn_tycl_decls,    src_fvs1) <- rnList rnTyClDecl      tycl_decls ;
+	(rn_tycl_decls,    src_fvs1) <- rnList rnTyClDecl tycl_decls ;
+
+		-- Extract the mapping from data constructors to field names
+	tcg_env <- extendRecordFieldEnv rn_tycl_decls ;
+	setGblEnv tcg_env $ do {
+
+		-- Value declarations
+	traceRn (text "Start rnmono") ;
+	(rn_val_decls, bind_dus) <- rnTopBinds val_decls ;
+	traceRn (text "finish rnmono" <+> ppr rn_val_decls) ;
+
+		-- Other decls
 	(rn_inst_decls,    src_fvs2) <- rnList rnSrcInstDecl   inst_decls ;
 	(rn_rule_decls,    src_fvs3) <- rnList rnHsRuleDecl    rule_decls ;
 	(rn_foreign_decls, src_fvs4) <- rnList rnHsForeignDecl foreign_decls ;
@@ -134,9 +140,8 @@ rnSrcDecls (HsGroup { hs_valds  = val_decls,
 
 	traceRn (text "finish rnSrc" <+> ppr rn_group) ;
 	traceRn (text "finish Dus" <+> ppr src_dus ) ;
-	tcg_env <- getGblEnv ;
 	return (tcg_env `addTcgDUs` src_dus, rn_group)
-    }}}
+    }}}}
 
 rnTyClDecls :: [LTyClDecl RdrName] -> RnM [LTyClDecl Name]
 -- Used for external core
@@ -182,38 +187,39 @@ rnDocDecl (DocGroup lev doc) = do
 
 \begin{code}
 rnSrcFixityDecls :: [LFixitySig RdrName] -> RnM [LFixitySig Name]
+-- First rename the fixity decls, so we can put
+-- the renamed decls in the renamed syntax tre
 rnSrcFixityDecls fix_decls
-    = do fix_decls <- mapM rnFixityDecl fix_decls
-         return (concat fix_decls)
-
-rnFixityDecl :: LFixitySig RdrName -> RnM [LFixitySig Name]
-rnFixityDecl (L loc (FixitySig (L nameLoc rdr_name) fixity))
-    = setSrcSpan nameLoc $
+  = do fix_decls <- mapM rn_decl fix_decls
+       return (concat fix_decls)
+  where
+    rn_decl :: LFixitySig RdrName -> RnM [LFixitySig Name]
         -- GHC extension: look up both the tycon and data con 
-	-- for con-like things
+	-- for con-like things; hence returning a list
 	-- If neither are in scope, report an error; otherwise
 	-- add both to the fixity env
-      do names <- lookupLocalDataTcNames rdr_name
-         return [ L loc (FixitySig (L nameLoc name) fixity)
-                      | name <- names ]
+    rn_decl (L loc (FixitySig (L name_loc rdr_name) fixity))
+      = setSrcSpan name_loc $
+        do names <- lookupLocalDataTcNames rdr_name
+           return [ L loc (FixitySig (L name_loc name) fixity)
+                  | name <- names ]
 
-rnSrcFixityDeclsEnv :: [LFixitySig Name] -> RnM FixityEnv
-rnSrcFixityDeclsEnv fix_decls
-  = getGblEnv					`thenM` \ gbl_env ->
-    foldlM rnFixityDeclEnv (tcg_fix_env gbl_env) 
-	    fix_decls				 	`thenM` \ fix_env ->
-    traceRn (text "fixity env" <+> pprFixEnv fix_env)	`thenM_`
-    returnM fix_env
-
-rnFixityDeclEnv :: FixityEnv -> LFixitySig Name -> RnM FixityEnv
-rnFixityDeclEnv fix_env (L loc (FixitySig (L nameLoc name) fixity))
-  = case lookupNameEnv fix_env name of
-      Just (FixItem _ _ loc') 
-	  -> do addLocErr (L nameLoc name) (dupFixityDecl loc')
-    	        return fix_env
-      Nothing
-          -> return (extendNameEnv fix_env name fix_item)
-    where fix_item = FixItem (nameOccName name) fixity nameLoc
+extendGblFixityEnv :: [LFixitySig Name] -> RnM TcGblEnv
+-- Extend the global envt with fixity decls, checking for duplicate decls
+extendGblFixityEnv decls
+  = do	{ env <- getGblEnv
+	; fix_env' <- foldlM add_one (tcg_fix_env env) decls
+	; return (env { tcg_fix_env = fix_env' }) }
+  where
+    add_one fix_env (L loc (FixitySig (L name_loc name) fixity))
+	| Just (FixItem _ _ loc') <- lookupNameEnv fix_env name
+	= do { setSrcSpan loc $
+	       addLocErr (L name_loc name) (dupFixityDecl loc')
+    	     ; return fix_env }
+	| otherwise
+	= return (extendNameEnv fix_env name fix_item)
+      where 
+	fix_item = FixItem (nameOccName name) fixity loc
 
 pprFixEnv :: FixityEnv -> SDoc
 pprFixEnv env 
@@ -719,7 +725,7 @@ rnConDecl (ConDecl name expl tvs cxt details res_ty mb_doc)
 	-- For GADT syntax, the tvs are all the quantified tyvars
 	-- Hence the 'filter' in the ResTyH98 case only
 	; let not_in_scope  = not . (`elemLocalRdrEnv` name_env) . unLoc
-	      arg_tys       = hsConArgs details
+	      arg_tys       = hsConDeclArgTys details
 	      implicit_tvs  = case res_ty of
 	      	    		ResTyH98 -> filter not_in_scope $
 						get_rdr_tvs arg_tys
@@ -732,7 +738,7 @@ rnConDecl (ConDecl name expl tvs cxt details res_ty mb_doc)
 
 	; bindTyVarsRn doc tvs' $ \new_tyvars -> do
 	{ new_context <- rnContext doc cxt
-        ; new_details <- rnConDetails doc details
+        ; new_details <- rnConDeclDetails doc details
         ; (new_details', new_res_ty)  <- rnConResult doc new_details res_ty
         ; return (ConDecl new_name expl new_tyvars new_context new_details' new_res_ty mb_doc') }}
  where
@@ -750,28 +756,26 @@ rnConResult doc details (ResTyGADT ty) = do
 	RecCon fields -> return (details, ResTyGADT ty')
 	InfixCon {}   -> panic "rnConResult"
 
-rnConDetails doc (PrefixCon tys)
+rnConDeclDetails doc (PrefixCon tys)
   = mappM (rnLHsType doc) tys	`thenM` \ new_tys  ->
     returnM (PrefixCon new_tys)
 
-rnConDetails doc (InfixCon ty1 ty2)
+rnConDeclDetails doc (InfixCon ty1 ty2)
   = rnLHsType doc ty1  		`thenM` \ new_ty1 ->
     rnLHsType doc ty2  		`thenM` \ new_ty2 ->
     returnM (InfixCon new_ty1 new_ty2)
 
-rnConDetails doc (RecCon fields)
-  = checkDupNames doc field_names	`thenM_`
-    mappM (rnField doc) fields		`thenM` \ new_fields ->
-    returnM (RecCon new_fields)
-  where
-    field_names = [ name | HsRecField name _ _ <- fields ]
+rnConDeclDetails doc (RecCon fields)
+  = do	{ checkDupNames doc (map cd_fld_name fields)
+	; new_fields <- mappM (rnField doc) fields
+	; return (RecCon new_fields) }
 
 -- Document comments are renamed to Nothing here
-rnField doc (HsRecField name ty haddock_doc)
+rnField doc (ConDeclField name ty haddock_doc)
   = lookupLocatedTopBndrRn name	`thenM` \ new_name ->
     rnLHsType doc ty		`thenM` \ new_ty ->
     rnMbLHsDoc haddock_doc      `thenM` \ new_haddock_doc ->
-    returnM (HsRecField new_name new_ty new_haddock_doc) 
+    returnM (ConDeclField new_name new_ty new_haddock_doc) 
 
 -- Rename family declarations
 --
@@ -866,6 +870,30 @@ badDataCon name
    = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]
 \end{code}
 
+
+%*********************************************************
+%*							*
+\subsection{Support code for type/data declarations}
+%*							*
+%*********************************************************
+
+Get the mapping from constructors to fields for this module.
+It's convenient to do this after the data type decls have been renamed
+\begin{code}
+extendRecordFieldEnv :: [LTyClDecl Name] -> TcM TcGblEnv
+extendRecordFieldEnv decls 
+  = do	{ tcg_env <- getGblEnv
+	; let field_env' = foldr get (tcg_field_env tcg_env) decls
+	; return (tcg_env { tcg_field_env = field_env' }) }
+  where
+    get (L _ (TyData { tcdCons = cons })) env = foldr get_con env cons
+    get other 			    	  env = env
+
+    get_con (L _ (ConDecl { con_name = con, con_details = RecCon flds })) env
+	= extendNameEnv env (unLoc con) (map (unLoc . cd_fld_name) flds)
+    get_con other env
+	= env
+\end{code}
 
 %*********************************************************
 %*							*

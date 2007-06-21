@@ -26,7 +26,7 @@ import HscTypes         ( availNames )
 import RnNames		( getLocalDeclBinders, extendRdrEnvRn )
 import RnTypes		( rnHsTypeFVs, rnLPat, rnOverLit, rnPatsAndThen, rnLit,
 			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec, 
-			  dupFieldErr, checkTupSize )
+			  rnHsRecFields, checkTupSize )
 import DynFlags		( DynFlag(..) )
 import BasicTypes	( FixityDirection(..) )
 import SrcLoc           ( SrcSpan )
@@ -219,17 +219,18 @@ rnExpr e@(ExplicitTuple exps boxity)
     rnExprs exps	 			`thenM` \ (exps', fvs) ->
     returnM (ExplicitTuple exps' boxity, fvs)
 
-rnExpr (RecordCon con_id _ (HsRecordBinds rbinds))
-  = lookupLocatedOccRn con_id		`thenM` \ conname ->
-    rnRbinds "construction" rbinds	`thenM` \ (rbinds', fvRbinds) ->
-    returnM (RecordCon conname noPostTcExpr (HsRecordBinds rbinds'), 
-	     fvRbinds `addOneFV` unLoc conname)
+rnExpr (RecordCon con_id _ rbinds)
+  = do	{ conname <- lookupLocatedOccRn con_id
+	; (rbinds', fvRbinds) <- rnHsRecFields "construction" (Just conname) 
+						rnLExpr HsVar rbinds
+	; return (RecordCon conname noPostTcExpr rbinds', 
+		  fvRbinds `addOneFV` unLoc conname) }
 
-rnExpr (RecordUpd expr (HsRecordBinds rbinds) _ _ _)
-  = rnLExpr expr		`thenM` \ (expr', fvExpr) ->
-    rnRbinds "update" rbinds	`thenM` \ (rbinds', fvRbinds) ->
-    returnM (RecordUpd expr' (HsRecordBinds rbinds') [] [] [], 
-	     fvExpr `plusFV` fvRbinds)
+rnExpr (RecordUpd expr rbinds _ _ _)
+  = do	{ (expr', fvExpr) <- rnLExpr expr
+	; (rbinds', fvRbinds) <- rnHsRecFields "update" Nothing rnLExpr HsVar rbinds
+	; return (RecordUpd expr' rbinds' [] [] [], 
+		  fvExpr `plusFV` fvRbinds) }
 
 rnExpr (ExprWithTySig expr pty)
   = do	{ (pty', fvTy) <- rnHsTypeFVs doc pty
@@ -499,29 +500,6 @@ rnArithSeq (FromThenTo expr1 expr2 expr3)
    rnLExpr expr3	`thenM` \ (expr3', fvExpr3) ->
    returnM (FromThenTo expr1' expr2' expr3',
 	    plusFVs [fvExpr1, fvExpr2, fvExpr3])
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsubsection{@Rbinds@s and @Rpats@s: in record expressions}
-%*									*
-%************************************************************************
-
-\begin{code}
-rnRbinds str rbinds 
-  = mappM_ field_dup_err dup_fields	`thenM_`
-    mapFvRn rn_rbind rbinds		`thenM` \ (rbinds', fvRbind) ->
-    returnM (rbinds', fvRbind)
-  where
-    (_, dup_fields) = removeDups cmpLocated [ f | (f,_) <- rbinds ]
-
-    field_dup_err dups = mappM_ (\f -> addLocErr f (dupFieldErr str)) dups
-
-    rn_rbind (field, expr)
-      = lookupLocatedGlobalOccRn field	`thenM` \ fieldname ->
-	rnLExpr expr			`thenM` \ (expr', fvExpr) ->
-	returnM ((fieldname, expr'), fvExpr `addOneFV` unLoc fieldname)
 \end{code}
 
 %************************************************************************

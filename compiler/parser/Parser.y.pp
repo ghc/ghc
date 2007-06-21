@@ -1136,7 +1136,7 @@ forall :: { Located [LHsTyVarBndr RdrName] }
 	: 'forall' tv_bndrs '.'		{ LL $2 }
 	| {- empty -}			{ noLoc [] }
 
-constr_stuff :: { Located (Located RdrName, HsConDetails RdrName (LBangType RdrName)) }
+constr_stuff :: { Located (Located RdrName, HsConDeclDetails RdrName) }
 -- We parse the constructor declaration 
 --	C t1 t2
 -- as a btype (treating C as a type constructor) and then convert C to be
@@ -1149,7 +1149,7 @@ constr_stuff :: { Located (Located RdrName, HsConDetails RdrName (LBangType RdrN
 	| oqtycon '{' fielddecls '}' 	{% mkRecCon $1 $3 >>= return.LL }
 	| btype conop btype		{ LL ($2, InfixCon $1 $3) }
 
-constr_stuff_record :: { Located (Located RdrName, HsConDetails RdrName (LBangType RdrName)) }
+constr_stuff_record :: { Located (Located RdrName, HsConDeclDetails RdrName) }
 	: oqtycon '{' '}' 		{% mkRecCon $1 [] >>= return.sL (comb2 $1 $>) }
 	| oqtycon '{' fielddecls '}' 	{% mkRecCon $1 $3 >>= return.sL (comb2 $1 $>) }
 
@@ -1321,9 +1321,8 @@ aexp	:: { LHsExpr RdrName }
 	| aexp1				{ $1 }
 
 aexp1	:: { LHsExpr RdrName }
-        : aexp1 '{' fbinds '}' 	{% do { r <- mkRecConstrOrUpdate $1 (comb2 $2 $4) 
-							$3;
-				        return (LL r) }}
+        : aexp1 '{' fbinds '}' 	{% do { r <- mkRecConstrOrUpdate $1 (comb2 $2 $4) $3
+				      ; return (LL r) }}
   	| aexp2			{ $1 }
 
 -- Here was the syntax for type applications that I was planning
@@ -1548,16 +1547,21 @@ qual  :: { LStmt RdrName }
 -----------------------------------------------------------------------------
 -- Record Field Update/Construction
 
-fbinds 	:: { HsRecordBinds RdrName }
-	: fbinds1			{ HsRecordBinds (reverse $1) }
-  	| {- empty -}			{ HsRecordBinds [] }
+fbinds 	:: { ([HsRecField RdrName (LHsExpr RdrName)], Bool) }
+	: fbinds1			{ $1 }
+  	| {- empty -}			{ ([], False) }
 
-fbinds1	:: { [(Located id, LHsExpr id)] }
-	: fbinds1 ',' fbind		{ $3 : $1 }
-	| fbind				{ [$1] }
+fbinds1	:: { ([HsRecField RdrName (LHsExpr RdrName)], Bool) }
+	: fbind ',' fbinds1		{ case $3 of (flds, dd) -> ($1 : flds, dd) } 
+	| fbind				{ ([$1], False) }
+	| '..'				{ ([],   True) }
   
-fbind	:: { (Located RdrName, LHsExpr RdrName) }
-	: qvar '=' exp			{ ($1,$3) }
+fbind	:: { HsRecField RdrName (LHsExpr RdrName) }
+	: qvar '=' exp	{ HsRecField $1 $3 False }
+	| qvar 		{ HsRecField $1 (L (getLoc $1) (HsVar (unLoc $1))) True }
+			-- Here's where we say that plain 'x'
+			-- means exactly 'x = x'.  The pun-flag boolean is
+			-- there so we can still print it right
 
 -----------------------------------------------------------------------------
 -- Implicit Parameter Bindings

@@ -13,7 +13,7 @@ module TcRnTypes(
 	IfGblEnv(..), IfLclEnv(..), 
 
 	-- Ranamer types
-	ErrCtxt,
+	ErrCtxt, RecFieldEnv,
 	ImportAvails(..), emptyImportAvails, plusImportAvails, 
 	WhereFrom(..), mkModDeps,
 
@@ -133,7 +133,8 @@ data TcGblEnv
 	tcg_default :: Maybe [Type],	-- Types used for defaulting
 					-- Nothing => no 'default' decl
 
-	tcg_fix_env  :: FixityEnv,	-- Just for things in this module
+	tcg_fix_env   :: FixityEnv,	-- Just for things in this module
+	tcg_field_env :: RecFieldEnv,	-- Just for things in this module
 
 	tcg_type_env :: TypeEnv,	-- Global type env for the module we are compiling now
 		-- All TyCons and Classes (for this module) end up in here right away,
@@ -227,6 +228,14 @@ data TcGblEnv
 	tcg_doc :: Maybe (HsDoc Name), -- Maybe Haddock documentation
         tcg_hmi :: HaddockModInfo Name -- Haddock module information
     }
+
+type RecFieldEnv = NameEnv [Name]	-- Maps a constructor name *in this module*
+					-- to the fields for that constructor
+	-- This is used when dealing with ".." notation in record 
+	-- construction and pattern matching.
+	-- The FieldEnv deals *only* with constructors defined in
+	-- *thie* module.  For imported modules, we get the same info
+	-- from the TypeEnv
 \end{code}
 
 %************************************************************************

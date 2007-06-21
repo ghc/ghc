@@ -634,6 +634,13 @@
 	      <entry><option>-X=NoArrows</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-fdisambiguate-record-fields</option></entry>
+	      <entry>Enable <link linkend="disambiguate-fields">record 
+	      field disambiguation</link></entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-disambiguate-record-fields</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-X=FFI</option> or <option>-X=ForeignFunctionInterface</option></entry>
 	      <entry>Enable <link linkend="ffi">foreign function interface</link> (implied by
 	      <option>-fglasgow-exts</option>)</entry>

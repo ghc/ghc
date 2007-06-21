@@ -19,6 +19,7 @@ import DsListComp
 import DsUtils
 import DsArrows
 import DsMonad
+import Name
 
 #ifdef GHCI
 import PrelNames
@@ -407,7 +408,7 @@ We also handle @C{}@ as valid construction syntax for an unlabelled
 constructor @C@, setting all of @C@'s fields to bottom.
 
 \begin{code}
-dsExpr (RecordCon (L _ data_con_id) con_expr (HsRecordBinds rbinds))
+dsExpr (RecordCon (L _ data_con_id) con_expr rbinds)
   = dsExpr con_expr	`thenDs` \ con_expr' ->
     let
 	(arg_tys, _) = tcSplitFunTys (exprType con_expr')
@@ -415,7 +416,7 @@ dsExpr (RecordCon (L _ data_con_id) con_expr (HsRecordBinds rbinds))
 	-- hence TcType.tcSplitFunTys
 
 	mk_arg (arg_ty, lbl)	-- Selector id has the field label as its name
-	  = case [rhs | (L _ sel_id, rhs) <- rbinds, lbl == idName sel_id] of
+	  = case findField (rec_flds rbinds) lbl of
 	      (rhs:rhss) -> ASSERT( null rhss )
 		 	    dsLExpr rhs
 	      []         -> mkErrorAppDs rEC_CON_ERROR_ID arg_ty (showSDoc (ppr lbl))
@@ -455,10 +456,11 @@ might do some argument-evaluation first; and may have to throw away some
 dictionaries.
 
 \begin{code}
-dsExpr (RecordUpd record_expr (HsRecordBinds []) _ _ _)
+dsExpr expr@(RecordUpd record_expr (HsRecFields { rec_flds = fields })
+		       cons_to_upd in_inst_tys out_inst_tys)
+  | null fields
   = dsLExpr record_expr
-
-dsExpr expr@(RecordUpd record_expr (HsRecordBinds rbinds) cons_to_upd in_inst_tys out_inst_tys)
+  | otherwise
   =	-- Record stuff doesn't work for existentials
 	-- The type checker checks for this, but we need 
 	-- worry only about the constructors that are to be updated
@@ -473,7 +475,7 @@ dsExpr expr@(RecordUpd record_expr (HsRecordBinds rbinds) cons_to_upd in_inst_ty
 				    (mkFamilyTyConApp tycon out_inst_tys)
 
 		mk_val_arg field old_arg_id 
-		  = case [rhs | (L _ sel_id, rhs) <- rbinds, field == idName sel_id] of
+		  = case findField fields field  of
 		      (rhs:rest) -> ASSERT(null rest) rhs
 		      []	 -> nlHsVar old_arg_id
 
@@ -543,6 +545,11 @@ dsExpr (HsBinTick ixT ixF e) = do
 dsExpr (ExprWithTySig _ _)  = panic "dsExpr:ExprWithTySig"
 #endif
 
+
+findField :: [HsRecField Id arg] -> Name -> [arg]
+findField rbinds lbl 
+  = [rhs | HsRecField { hsRecFieldId = id, hsRecFieldArg = rhs } <- rbinds 
+	 , lbl == idName (unLoc id) ]
 \end{code}
 
 %--------------------------------------------------------------------

@@ -384,20 +384,21 @@ tcExpr expr@(RecordCon (L loc con_name) _ rbinds) res_ty
 -- don't know how to do the update otherwise.
 
 
-tcExpr expr@(RecordUpd record_expr hrbinds@(HsRecordBinds rbinds) _ _ _) res_ty
+tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
   = 	-- STEP 0
 	-- Check that the field names are really field names
-    ASSERT( notNull rbinds )
     let 
-	field_names = map fst rbinds
+	field_names = hsRecFields rbinds
     in
-    mappM (tcLookupField . unLoc) field_names	`thenM` \ sel_ids ->
+    ASSERT( notNull field_names )
+    mappM tcLookupField field_names	`thenM` \ sel_ids ->
 	-- The renamer has already checked that they
 	-- are all in scope
     let
 	bad_guys = [ setSrcSpan loc $ addErrTc (notSelector field_name) 
-		   | (L loc field_name, sel_id) <- field_names `zip` sel_ids,
-		     not (isRecordSelector sel_id) 	-- Excludes class ops
+		   | (fld, sel_id) <- rec_flds rbinds `zip` sel_ids,
+		     not (isRecordSelector sel_id), 	-- Excludes class ops
+		     let L loc field_name = hsRecFieldId fld
 		   ]
     in
     checkM (null bad_guys) (sequenceM bad_guys `thenM_` failM)	`thenM_`
@@ -406,21 +407,20 @@ tcExpr expr@(RecordUpd record_expr hrbinds@(HsRecordBinds rbinds) _ _ _) res_ty
 	-- Figure out the tycon and data cons from the first field name
     let
 		-- It's OK to use the non-tc splitters here (for a selector)
-	upd_field_lbls  = recBindFields hrbinds
 	sel_id : _   	= sel_ids
 	(tycon, _)   	= recordSelectorFieldLabel sel_id	-- We've failed already if
 	data_cons    	= tyConDataCons tycon			-- it's not a field label
 		-- NB: for a data type family, the tycon is the instance tycon
 
 	relevant_cons   = filter is_relevant data_cons
-	is_relevant con = all (`elem` dataConFieldLabels con) upd_field_lbls
+	is_relevant con = all (`elem` dataConFieldLabels con) field_names
     in
 
 	-- STEP 2
 	-- Check that at least one constructor has all the named fields
 	-- i.e. has an empty set of bad fields returned by badFields
     checkTc (not (null relevant_cons))
-	    (badFieldsUpd hrbinds)	`thenM_`
+	    (badFieldsUpd rbinds)	`thenM_`
 
 	-- Check that all relevant data cons are vanilla.  Doing record updates on 
 	-- GADTs and/or existentials is more than my tiny brain can cope with today
@@ -440,7 +440,7 @@ tcExpr expr@(RecordUpd record_expr hrbinds@(HsRecordBinds rbinds) _ _ _) res_ty
 	(con1_tyvars, theta, con1_arg_tys, con1_res_ty) = dataConSig con1
 	con1_flds     = dataConFieldLabels con1
 	common_tyvars = exactTyVarsOfTypes [ty | (fld,ty) <- con1_flds `zip` con1_arg_tys
-					       , not (fld `elem` upd_field_lbls) ]
+					       , not (fld `elem` field_names) ]
 
  	is_common_tv tv = tv `elemVarSet` common_tyvars
 
@@ -460,7 +460,7 @@ tcExpr expr@(RecordUpd record_expr hrbinds@(HsRecordBinds rbinds) _ _ _) res_ty
 	con1_arg_tys' = map (substTy result_inst_env) con1_arg_tys
     in
     tcSubExp result_ty res_ty			`thenM` \ co_fn ->
-    tcRecordBinds con1 con1_arg_tys' hrbinds	`thenM` \ rbinds' ->
+    tcRecordBinds con1 con1_arg_tys' rbinds	`thenM` \ rbinds' ->
 
 	-- STEP 5: Typecheck the expression to be updated
     let
@@ -488,7 +488,7 @@ tcExpr expr@(RecordUpd record_expr hrbinds@(HsRecordBinds rbinds) _ _ _) res_ty
 		 = idHsWrapper
     in
 	-- Phew!
-    returnM (mkHsWrap co_fn (RecordUpd (mkLHsWrap scrut_co record_expr') rbinds' 
+    returnM (mkHsWrap co_fn (RecordUpd (mkLHsWrap scrut_co record_expr') rbinds'
 				       relevant_cons scrut_inst_tys result_inst_tys))
 \end{code}
 
@@ -1058,18 +1058,18 @@ tcRecordBinds
 	-> HsRecordBinds Name
 	-> TcM (HsRecordBinds TcId)
 
-tcRecordBinds data_con arg_tys (HsRecordBinds rbinds)
+tcRecordBinds data_con arg_tys (HsRecFields rbinds dd)
   = do	{ mb_binds <- mappM do_bind rbinds
-	; return (HsRecordBinds (catMaybes mb_binds)) }
+	; return (HsRecFields (catMaybes mb_binds) dd) }
   where
     flds_w_tys = zipEqual "tcRecordBinds" (dataConFieldLabels data_con) arg_tys
-    do_bind (L loc field_lbl, rhs)
+    do_bind fld@(HsRecField { hsRecFieldId = L loc field_lbl, hsRecFieldArg = rhs })
       | Just field_ty <- assocMaybe flds_w_tys field_lbl
       = addErrCtxt (fieldCtxt field_lbl)	$
 	do { rhs'   <- tcPolyExprNC rhs field_ty
 	   ; sel_id <- tcLookupField field_lbl
 	   ; ASSERT( isRecordSelector sel_id )
-	     return (Just (L loc sel_id, rhs')) }
+	     return (Just (fld { hsRecFieldId = L loc sel_id, hsRecFieldArg = rhs' })) }
       | otherwise
       = do { addErrTc (badFieldCon data_con field_lbl)
 	   ; return Nothing }
@@ -1104,7 +1104,7 @@ checkMissingFields data_con rbinds
 	  	 not (fl `elem` field_names_used)
 	  ]
 
-    field_names_used = recBindFields rbinds
+    field_names_used = hsRecFields rbinds
     field_labels     = dataConFieldLabels data_con
 
     field_info = zipEqual "missingFields"
@@ -1146,7 +1146,7 @@ nonVanillaUpd tycon
 	  ptext SLIT("Use pattern-matching instead")]
 badFieldsUpd rbinds
   = hang (ptext SLIT("No constructor has all these fields:"))
-	 4 (pprQuotedList (recBindFields rbinds))
+	 4 (pprQuotedList (hsRecFields rbinds))
 
 naughtyRecordSel sel_id
   = ptext SLIT("Cannot use record selector") <+> quotes (ppr sel_id) <+> 

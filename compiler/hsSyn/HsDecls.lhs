@@ -17,7 +17,8 @@ module HsDecls (
 	DefaultDecl(..), LDefaultDecl, SpliceDecl(..),
 	ForeignDecl(..), LForeignDecl, ForeignImport(..), ForeignExport(..),
 	CImportSpec(..), FoType(..),
-	ConDecl(..), ResType(..), LConDecl,	
+	ConDecl(..), ResType(..), ConDeclField(..), LConDecl,	
+	HsConDeclDetails, hsConDeclArgTys,
 	DocDecl(..), LDocDecl, docDeclDoc,
 	DeprecDecl(..),  LDeprecDecl,
 	HsGroup(..),  emptyRdrGroup, emptyRnGroup, appendGroups,
@@ -25,7 +26,6 @@ module HsDecls (
 	isClassDecl, isSynDecl, isDataDecl, isTypeDecl, isFamilyDecl,
 	isFamInstDecl, 
 	countTyClDecls,
-	conDetailsTys,
 	instDeclATs,
 	collectRuleBndrSigTys, 
     ) where
@@ -650,12 +650,24 @@ data ConDecl name
     , con_cxt       :: LHsContext name      -- The context.  This *does not* include the
 					    -- "stupid theta" which lives only in the TyData decl
 
-    , con_details   :: HsConDetails name (LBangType name)	-- The main payload
+    , con_details   :: HsConDeclDetails name	-- The main payload
 
     , con_res       :: ResType name         -- Result type of the constructor
 
     , con_doc       :: Maybe (LHsDoc name)  -- A possible Haddock comment
     }
+
+type HsConDeclDetails name = HsConDetails (LBangType name) [ConDeclField name]
+
+hsConDeclArgTys :: HsConDeclDetails name -> [LBangType name]
+hsConDeclArgTys (PrefixCon tys)    = tys
+hsConDeclArgTys (InfixCon ty1 ty2) = [ty1,ty2]
+hsConDeclArgTys (RecCon flds)      = map cd_fld_type flds
+
+data ConDeclField name	-- Record fields have Haddoc docs on them
+  = ConDeclField { cd_fld_name :: Located name,
+		   cd_fld_type :: LBangType name, 
+		   cd_fld_doc  :: Maybe (LHsDoc name) }
 
 data ResType name
    = ResTyH98		-- Constructor was declared using Haskell 98 syntax
@@ -664,7 +676,7 @@ data ResType name
 \end{code}
 
 \begin{code}
-conDeclsNames :: Eq name => [ConDecl name] -> [Located name]
+conDeclsNames :: forall name. Eq name => [ConDecl name] -> [Located name]
   -- See tyClDeclNames for what this does
   -- The function is boringly complicated because of the records
   -- And since we only have equality, we have to be a little careful
@@ -672,14 +684,13 @@ conDeclsNames cons
   = snd (foldl do_one ([], []) cons)
   where
     do_one (flds_seen, acc) (ConDecl { con_name = lname, con_details = RecCon flds })
-	= (map unLoc new_flds ++ flds_seen, lname : [f | f <- new_flds] ++ acc)
+	= (map unLoc new_flds ++ flds_seen, lname : new_flds ++ acc)
 	where
-	  new_flds = [ f | (HsRecField f _ _) <- flds, not (unLoc f `elem` flds_seen) ]
+	  new_flds = filterOut (\f -> unLoc f `elem` flds_seen) 
+			       (map cd_fld_name flds)
 
     do_one (flds_seen, acc) c
 	= (flds_seen, (con_name c):acc)
-
-conDetailsTys details = map getBangType (hsConArgs details)
 \end{code}
   
 
@@ -687,6 +698,7 @@ conDetailsTys details = map getBangType (hsConArgs details)
 instance (OutputableBndr name) => Outputable (ConDecl name) where
     ppr = pprConDecl
 
+pprConDecl :: OutputableBndr name => ConDecl name -> SDoc
 pprConDecl (ConDecl con expl tvs cxt details ResTyH98 doc)
   = sep [ppr_mbDoc doc, pprHsForAll expl tvs cxt, ppr_details con details]
   where
@@ -703,7 +715,11 @@ pprConDecl (ConDecl con expl tvs cxt (PrefixCon arg_tys) (ResTyGADT res_ty) _)
 pprConDecl (ConDecl con expl tvs cxt (RecCon fields) (ResTyGADT res_ty) _)
   = sep [pprHsForAll expl tvs cxt, ppr con <+> ppr_fields fields <+> dcolon <+> ppr res_ty]
 
-ppr_fields fields = braces (sep (punctuate comma (map ppr fields)))
+ppr_fields fields = braces (sep (punctuate comma (map ppr_fld fields)))
+  where
+    ppr_fld (ConDeclField { cd_fld_name = n, cd_fld_type = ty, 
+			    cd_fld_doc = doc })
+  	= ppr n <+> dcolon <+> ppr ty <+> ppr_mbDoc doc
 \end{code}
 
 %************************************************************************

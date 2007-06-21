@@ -495,12 +495,13 @@ addTickDictBinds :: DictBinds Id -> TM (DictBinds Id)
 addTickDictBinds x = addTickLHsBinds x
 
 addTickHsRecordBinds :: HsRecordBinds Id -> TM (HsRecordBinds Id)
-addTickHsRecordBinds (HsRecordBinds pairs) = liftM HsRecordBinds (mapM process pairs)
-    where
-	process (ids,expr) = 
-		liftM2 (,) 
-			(return ids)
-			(addTickLHsExpr expr)			
+addTickHsRecordBinds (HsRecFields fields dd) 
+  = do	{ fields' <- mapM process fields
+	; return (HsRecFields fields' dd) }
+  where
+    process (HsRecField ids expr doc)
+	= do { expr' <- addTickLHsExpr expr
+	     ; return (HsRecField ids expr' doc) }
 
 addTickArithSeqInfo :: ArithSeqInfo Id -> TM (ArithSeqInfo Id)
 addTickArithSeqInfo (From e1) =

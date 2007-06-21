@@ -394,10 +394,10 @@ ppr_expr (ExplicitTuple exprs boxity)
   = tupleParens boxity (sep (punctuate comma (map ppr_lexpr exprs)))
 
 ppr_expr (RecordCon con_id con_expr rbinds)
-  = pp_rbinds (ppr con_id) rbinds
+  = hang (ppr con_id) 2 (ppr rbinds)
 
 ppr_expr (RecordUpd aexp rbinds _ _ _)
-  = pp_rbinds (pprParendExpr aexp) rbinds
+  = hang (pprParendExpr aexp) 2 (ppr rbinds)
 
 ppr_expr (ExprWithTySig expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
@@ -584,17 +584,7 @@ data HsCmdTop id
 %************************************************************************
 
 \begin{code}
-data HsRecordBinds id = HsRecordBinds [(Located id, LHsExpr id)]
-
-recBindFields :: HsRecordBinds id -> [id]
-recBindFields (HsRecordBinds rbinds) = [unLoc field | (field,_) <- rbinds]
-
-pp_rbinds :: OutputableBndr id => SDoc -> HsRecordBinds id -> SDoc
-pp_rbinds thing (HsRecordBinds rbinds)
-  = hang thing 
-	 4 (braces (pprDeeperList sep (punctuate comma (map (pp_rbind) rbinds))))
-  where
-    pp_rbind (v, e) = hsep [pprBndr LetBind (unLoc v), char '=', ppr e]
+type HsRecordBinds id = HsRecFields id (LHsExpr id)
 \end{code}
 
 

@@ -544,7 +544,7 @@ further type refinement is local to the alternative.
 
 tcConPat :: PatState -> SrcSpan -> DataCon -> TyCon 
 	 -> BoxySigmaType	-- Type of the pattern
-	 -> HsConDetails Name (LPat Name) -> (PatState -> TcM a)
+	 -> HsConPatDetails Name -> (PatState -> TcM a)
 	 -> TcM (Pat TcId, [TcTyVar], a)
 tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
   = do	{ let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _) = dataConFullSig data_con
@@ -622,8 +622,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 
 
 tcConArgs :: DataCon -> [TcSigmaType]
-	  -> Checker (HsConDetails Name (LPat Name)) 
-		     (HsConDetails Id (LPat Id))
+	  -> Checker (HsConPatDetails Name) (HsConPatDetails Id)
 
 tcConArgs data_con arg_tys (PrefixCon arg_pats) pstate thing_inside
   = do	{ checkTc (con_arity == no_of_args)	-- Check correct arity
@@ -648,16 +647,15 @@ tcConArgs data_con [arg_ty1,arg_ty2] (InfixCon p1 p2) pstate thing_inside
 tcConArgs data_con other_args (InfixCon p1 p2) pstate thing_inside
   = pprPanic "tcConArgs" (ppr data_con)	-- InfixCon always has two arguments
 
-tcConArgs data_con arg_tys (RecCon rpats) pstate thing_inside
+tcConArgs data_con arg_tys (RecCon (HsRecFields rpats dd)) pstate thing_inside
   = do	{ (rpats', tvs, res) <- tcMultiple tc_field rpats pstate thing_inside
-	; return (RecCon rpats', tvs, res) }
+	; return (RecCon (HsRecFields rpats' dd), tvs, res) }
   where
-    -- doc comments are typechecked to Nothing here
     tc_field :: Checker (HsRecField FieldLabel (LPat Name)) (HsRecField TcId (LPat TcId))
-    tc_field (HsRecField field_lbl pat _) pstate thing_inside
+    tc_field (HsRecField field_lbl pat pun) pstate thing_inside
       = do { (sel_id, pat_ty) <- wrapLocFstM find_field_ty field_lbl
 	   ; (pat', tvs, res) <- tcConArg (pat, pat_ty) pstate thing_inside
-	   ; return (mkRecField sel_id pat', tvs, res) }
+	   ; return (HsRecField sel_id pat' pun, tvs, res) }
 
     find_field_ty :: FieldLabel -> TcM (Id, TcType)
     find_field_ty field_lbl

@@ -527,11 +527,11 @@ repE e@(ExplicitPArr ty es) = notHandled "Parallel arrays" (ppr e)
 repE e@(ExplicitTuple es boxed) 
   | isBoxed boxed         = do { xs <- repLEs es; repTup xs }
   | otherwise		  = notHandled "Unboxed tuples" (ppr e)
-repE (RecordCon c _ (HsRecordBinds flds))
+repE (RecordCon c _ flds)
  = do { x <- lookupLOcc c;
         fs <- repFields flds;
         repRecCon x fs }
-repE (RecordUpd e (HsRecordBinds flds) _ _ _)
+repE (RecordUpd e flds _ _ _)
  = do { x <- repLE e;
         fs <- repFields flds;
         repRecUpd x fs }
@@ -613,12 +613,12 @@ repGuards other
                 g <- repPatGE (nonEmptyCoreList ss') rhs'
                 return (gs, g)
 
-repFields :: [(Located Name, LHsExpr Name)] -> DsM (Core [TH.Q TH.FieldExp])
-repFields flds = do
-        fnames <- mapM lookupLOcc (map fst flds)
-        es <- mapM repLE (map snd flds)
-        fs <- zipWithM repFieldExp fnames es
-        coreList fieldExpQTyConName fs
+repFields :: [HsRecField Name (LHsExpr Name)] -> DsM (Core [TH.Q TH.FieldExp])
+repFields flds
+  = do	{ fnames <- mapM lookupLOcc (map hsRecFieldId flds)
+	; es <- mapM repLE (map hsRecFieldArg flds)
+	; fs <- zipWithM repFieldExp fnames es
+	; coreList fieldExpQTyConName fs }
 
 
 -----------------------------------------------------------------------------

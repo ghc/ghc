@@ -962,6 +962,48 @@ definitions; you must define such a function in prefix form.</para>
 
 </sect2>
 
+<sect2 id="disambiguate-fields">
+<title>Record field disambiguation</title>
+<para>
+In record construction and record pattern matching
+it is entirely unambiguous which field is referred to, even if there are two different
+data types in scope with a common field name.  For example:
+<programlisting>
+module M where
+  data S = MkS { x :: Int, y :: Bool }
+
+module Foo where
+  import M
+
+  data T = MkT { x :: Int }
+  
+  ok1 (MkS { x = n }) = n+1   -- Unambiguous
+
+  ok2 n = MkT { x = n+1 }     -- Unambiguous
+
+  bad1 k = k { x = 3 }  -- Ambiguous
+  bad2 k = x k          -- Ambiguous
+</programlisting>
+Even though there are two <literal>x</literal>'s in scope,
+it is clear that the <literal>x</literal> in the pattern in the
+definition of <literal>ok1</literal> can only mean the field
+<literal>x</literal> from type <literal>S</literal>. Similarly for
+the function <literal>ok2</literal>.  However, in the record update
+in <literal>bad1</literal> and the record selection in <literal>bad2</literal>
+it is not clear which of the two types is intended.
+</para>
+<para>
+Haskell 98 regards all four as ambiguous, but with the
+<option>-fdisambiguate-record-fields</option> flag, GHC will accept
+the former two.  The rules are precisely the same as those for instance
+declarations in Haskell 98, where the method names on the left-hand side 
+of the method bindings in an instance declaration refer unambiguously
+to the method of that class (provided they are in scope at all), even
+if there are other variables in scope with the same name.
+This reduces the clutter of qualified names when you import two
+records from different modules that use the same field name.
+</para>
+</sect2>
 </sect1>
 
 

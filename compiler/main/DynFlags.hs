@@ -177,6 +177,9 @@ data DynFlag
    | Opt_BangPatterns
    | Opt_TypeFamilies
    | Opt_OverloadedStrings
+   | Opt_DisambiguateRecordFields
+   | Opt_RecordDotDot
+   | Opt_RecordPuns
    | Opt_GADTs
    | Opt_RelaxedPolyRec			-- -X=RelaxedPolyRec
 

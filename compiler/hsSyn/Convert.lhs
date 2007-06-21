@@ -364,12 +364,12 @@ cvtl e = wrapL (cvt e)
 			      ; return $ ExprWithTySig e' t' }
     cvt (RecConE c flds) = do { c' <- cNameL c
 			      ; flds' <- mapM cvtFld flds
-			      ; return $ RecordCon c' noPostTcExpr (HsRecordBinds flds') }
+			      ; return $ RecordCon c' noPostTcExpr flds' }
     cvt (RecUpdE e flds) = do { e' <- cvtl e
 			      ; flds' <- mapM cvtFld flds
-			      ; return $ RecordUpd e' (HsRecordBinds flds') [] [] [] }
+			      ; return $ RecordUpd e' flds' [] [] [] }
 
-cvtFld (v,e) = do { v' <- vNameL v; e' <- cvtl e; return (v',e') }
+cvtFld (v,e) = do { v' <- vNameL v; e' <- cvtl e; return (mkHsRecField v' e') }
 
 cvtDD :: Range -> CvtM (ArithSeqInfo RdrName)
 cvtDD (FromR x) 	  = do { x' <- cvtl x; return $ From x' }

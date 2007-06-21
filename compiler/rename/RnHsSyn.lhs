@@ -130,9 +130,8 @@ conDeclFVs (L _ (ConDecl { con_qvars = tyvars, con_cxt = context,
 conResTyFVs ResTyH98       = emptyFVs
 conResTyFVs (ResTyGADT ty) = extractHsTyNames ty
 
-conDetailsFVs (PrefixCon btys)     = plusFVs (map bangTyFVs btys)
-conDetailsFVs (InfixCon bty1 bty2) = bangTyFVs bty1 `plusFV` bangTyFVs bty2
-conDetailsFVs (RecCon flds)	   = plusFVs [bangTyFVs bty | (HsRecField _ bty  _) <- flds]
+conDetailsFVs :: HsConDeclDetails Name -> FreeVars
+conDetailsFVs details = plusFVs (map bangTyFVs (hsConDeclArgTys details))
 
 bangTyFVs bty = extractHsTyNames (getBangType bty)
 \end{code}

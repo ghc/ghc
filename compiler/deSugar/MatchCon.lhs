@@ -119,11 +119,11 @@ conArgPats :: DataCon
 	   -> [Type]	-- Instantiated argument types 
 			-- Used only to fill in the types of WildPats, which
 			-- are probably never looked at anyway
-	   -> HsConDetails Id (LPat Id)
+	   -> HsConDetails (LPat Id) (HsRecFields Id (LPat Id))
 	   -> [Pat Id]
 conArgPats data_con arg_tys (PrefixCon ps)   = map unLoc ps
 conArgPats data_con arg_tys (InfixCon p1 p2) = [unLoc p1, unLoc p2]
-conArgPats data_con arg_tys (RecCon rpats)
+conArgPats data_con arg_tys (RecCon (HsRecFields rpats _))
   | null rpats
   =	-- Special case for C {}, which can be used for 
 	-- a constructor that isn't declared to have

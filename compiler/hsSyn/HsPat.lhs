@@ -8,8 +8,9 @@
 module HsPat (
 	Pat(..), InPat, OutPat, LPat, 
 	
-	HsConDetails(..), hsConArgs,
-	HsRecField(..), mkRecField,
+	HsConDetails(..), 
+	HsConPatDetails, hsConPatArgs, 
+	HsRecFields(..), HsRecField(..), hsRecFields,
 
 	mkPrefixConPat, mkCharLitPat, mkNilPat, mkCoPat,
 
@@ -85,7 +86,7 @@ data Pat id
 
 	------------ Constructor patterns ---------------
   | ConPatIn	(Located id)
-		(HsConDetails id (LPat id))
+		(HsConPatDetails id)
 
   | ConPatOut {
 	pat_con   :: Located DataCon,
@@ -93,7 +94,7 @@ data Pat id
 					--   including any bound coercion variables
 	pat_dicts :: [id],		-- Ditto dictionaries
 	pat_binds :: DictBinds id,	-- Bindings involving those dictionaries
-	pat_args  :: HsConDetails id (LPat id),
+	pat_args  :: HsConPatDetails id,
 	pat_ty	  :: Type   		-- The type of the pattern
     }
 
@@ -134,26 +135,55 @@ data Pat id
 	-- the scrutinee, followed by a match on 'pat'
 \end{code}
 
-HsConDetails is use both for patterns and for data type declarations
+HsConDetails is use for patterns/expressions *and* for data type declarations
 
 \begin{code}
-data HsConDetails id arg
-  = PrefixCon [arg]               -- C p1 p2 p3
-  | RecCon    [HsRecField id arg] -- C { x = p1, y = p2 }
-  | InfixCon  arg arg		  -- p1 `C` p2
+data HsConDetails arg rec
+  = PrefixCon [arg]             -- C p1 p2 p3
+  | RecCon    rec		-- C { x = p1, y = p2 }
+  | InfixCon  arg arg		-- p1 `C` p2
+
+type HsConPatDetails id = HsConDetails (LPat id) (HsRecFields id (LPat id))
+
+hsConPatArgs :: HsConPatDetails id -> [LPat id]
+hsConPatArgs (PrefixCon ps)   = ps
+hsConPatArgs (RecCon fs)      = map hsRecFieldArg (rec_flds fs)
+hsConPatArgs (InfixCon p1 p2) = [p1,p2]
+\end{code}
+
+However HsRecFields is used only for patterns and expressions
+(not data type declarations)
+
+\begin{code}
+data HsRecFields id arg 	-- A bunch of record fields
+				--	{ x = 3, y = True }
+	-- Used for both expressiona and patterns
+  = HsRecFields { rec_flds   :: [HsRecField id arg],
+		  rec_dotdot :: Maybe Int }
+	-- Nothing => the normal case
+	-- Just n  => the group uses ".." notation, 
+	--		and the first n elts of rec_flds
+	--		were the user-written ones
+	-- (In the latter case, the remaining elts of
+	--  rec_flds are the non-user-written ones)
 
 data HsRecField id arg = HsRecField {
 	hsRecFieldId  :: Located id,
 	hsRecFieldArg :: arg,
-	hsRecFieldDoc :: Maybe (LHsDoc id)
-}
+	hsRecPun      :: Bool 		-- Note [Punning]
+  }
 
-mkRecField id arg = HsRecField id arg Nothing
+-- Note [Punning]
+-- ~~~~~~~~~~~~~~
+-- If you write T { x, y = v+1 }, the HsRecFields will be
+--	HsRecField x x True ...
+--	HsRecField y (v+1) False ...
+-- That is, for "punned" field x is immediately expanded to x=x
+-- but with a punning flag so we can detect it later
+-- (e.g. when pretty printing)
 
-hsConArgs :: HsConDetails id arg -> [arg]
-hsConArgs (PrefixCon ps)   = ps
-hsConArgs (RecCon fs)      = map hsRecFieldArg fs
-hsConArgs (InfixCon p1 p2) = [p1,p2]
+hsRecFields :: HsRecFields id arg -> [id]
+hsRecFields rbinds = map (unLoc . hsRecFieldId) (rec_flds rbinds)
 \end{code}
 
 
@@ -212,19 +242,27 @@ pprUserCon c details          = ppr c <+> pprConArgs details
 
 pprConArgs (PrefixCon pats) = interppSP pats
 pprConArgs (InfixCon p1 p2) = interppSP [p1,p2]
-pprConArgs (RecCon rpats)   = braces (hsep (punctuate comma (map (pp_rpat) rpats)))
-			    where
-			      pp_rpat (HsRecField v p _d) = 
-                                hsep [ppr v, char '=', ppr p]
+pprConArgs (RecCon rpats)   = ppr rpats
+
+instance (OutputableBndr id, Outputable arg)
+      => Outputable (HsRecFields id arg) where
+  ppr (HsRecFields { rec_flds = flds, rec_dotdot = Nothing })
+	= braces (fsep (punctuate comma (map ppr flds)))
+  ppr (HsRecFields { rec_flds = flds, rec_dotdot = Just n })
+	= braces (fsep (punctuate comma (map ppr (take n flds) ++ [dotdot])))
+	where
+	  dotdot = ptext SLIT("..") <+> ifPprDebug (ppr (drop n flds))
+
+instance (OutputableBndr id, Outputable arg)
+      => Outputable (HsRecField id arg) where
+  ppr (HsRecField { hsRecFieldId = f, hsRecFieldArg = arg, 
+		    hsRecPun = pun })
+    = ppr f <+> (if pun then empty else equals <+> ppr arg)
 
 -- add parallel array brackets around a document
 --
 pabrackets   :: SDoc -> SDoc
 pabrackets p  = ptext SLIT("[:") <> p <> ptext SLIT(":]")
-
-instance (OutputableBndr id, Outputable arg) =>
-         Outputable (HsRecField id arg) where
-    ppr (HsRecField n ty doc) = ppr n <+> dcolon <+> ppr ty <+> ppr_mbDoc doc
 \end{code}
 
 
@@ -343,7 +381,7 @@ isIrrefutableHsPat pat
     go1 (ConPatIn _ _) = False	-- Conservative
     go1 (ConPatOut{ pat_con = L _ con, pat_args = details }) 
 	=  isProductTyCon (dataConTyCon con)
-	&& all go (hsConArgs details)
+	&& all go (hsConPatArgs details)
 
     go1 (LitPat _) 	   = False
     go1 (NPat _ _ _ _)	   = False

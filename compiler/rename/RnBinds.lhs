@@ -27,7 +27,7 @@ import TcRnMonad
 import RnTypes		( rnHsSigType, rnLHsType, rnHsTypeFVs, 
 			  rnLPat, rnPatsAndThen, patSigErr, checkPrecMatch )
 import RnEnv		( bindLocatedLocalsRn, lookupLocatedBndrRn, 
-			  lookupLocatedInstDeclBndr, newIPNameRn,
+			  lookupInstDeclBndr, newIPNameRn,
 			  lookupLocatedSigOccRn, bindPatSigTyVarsFV,
 			  bindLocalFixities, bindSigTyVarsFV, 
 			  warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
@@ -422,7 +422,7 @@ rnMethodBinds cls sig_fn gen_tyvars binds
 rnMethodBind cls sig_fn gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = inf, 
 					             fun_matches = MatchGroup matches _ }))
   = setSrcSpan loc $ 
-    lookupLocatedInstDeclBndr cls name			`thenM` \ sel_name -> 
+    lookupInstDeclBndr cls name			`thenM` \ sel_name -> 
     let plain_name = unLoc sel_name in
 	-- We use the selector name as the binder
 
