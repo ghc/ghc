@@ -1026,6 +1026,7 @@ dynamic_flags = [
 
 	-- For now, allow -X flags with -f; ToDo: report this as deprecated
   ,  ( "f",		PrefixPred (isFlag xFlags) (\f ->  setDynFlag (getFlag xFlags f)) )
+  ,  ( "f", 		PrefixPred (isNoFlag xFlags) (\f -> unSetDynFlag (getNoFlag xFlags f)) )
 
 	-- the rest of the -X* and -Xno-* flags
   ,  ( "X",		PrefixPred (isFlag xFlags)   (\f -> setDynFlag   (getFlag xFlags f)) )
