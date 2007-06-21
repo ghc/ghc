@@ -1,5 +1,5 @@
+{-# OPTIONS_GHC -X=GADTs -fglasgow-exts #-}
 
-{-# OPTIONS_GHC -fglasgow-exts #-}
 module Gadt23_AST where
 
 data Exp_;
