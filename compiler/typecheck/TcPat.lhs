@@ -920,6 +920,7 @@ patCtxt pat 	    = Just (hang (ptext SLIT("In the pattern:"))
 existentialExplode pat
   = hang (vcat [text "My brain just exploded.",
 	        text "I can't handle pattern bindings for existentially-quantified constructors.",
+	        text "Instead, use a case-expression to unpack the constructor.",
 		text "In the binding group for"])
 	4 (ppr pat)
 
