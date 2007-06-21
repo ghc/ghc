@@ -38,14 +38,14 @@ EXCLUDED_SRCS+=$(INPLACE_HS)
 TOP_ABS=$(subst \\,/,$(FPTOOLS_TOP_ABS_PLATFORM))
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-extra_flags=$(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS)))
+extra_flags=--template=$(TOP_ABS)/$(GHC_HSC2HS_DIR_REL)/template-hsc.h $(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS)))
 else
 extra_flags=
 endif
 
 $(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
 	echo "import System.Cmd; import System.Environment; import System.Exit" > $@
-	echo "main = getArgs >>= \args -> rawSystem \"$(TOP_ABS)/$(GHC_HSC2HS_DIR_REL)/$(HS_PROG)\" (\"--cc=$(CC)\":\"--ld=$(LD)\"$(patsubst %,:\"%\",$(extra_flags)):\"--cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt)\":\"-I$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_INCLUDE_DIR_REL)\":args) >>= exitWith" >> $@
+	echo "main = getArgs >>= \args -> rawSystem \"$(TOP_ABS)/$(GHC_HSC2HS_DIR_REL)/$(HS_PROG)\" (\"--cc=$(CC)\":\"--ld=$(CC)\"$(patsubst %,:\"%\",$(extra_flags)):\"--cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt)\":\"-I$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_INCLUDE_DIR_REL)\":args) >>= exitWith" >> $@
 
 $(INPLACE_PROG): $(INPLACE_HS)
 	$(GHC) --make $< -o $@
