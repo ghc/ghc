@@ -4262,7 +4262,7 @@ Tim Sheard is going to expand it.)
                              the quotation has type <literal>Expr</literal>.</para></listitem>
 		    <listitem><para> <literal>[d| ... |]</literal>, where the "..." is a list of top-level declarations;
                              the quotation has type <literal>Q [Dec]</literal>.</para></listitem>
-		    <listitem><para>  [Planned, but not implemented yet.]  <literal>[t| ... |]</literal>, where the "..." is a type; 
+		    <listitem><para> <literal>[t| ... |]</literal>, where the "..." is a type;
                              the quotation has type <literal>Type</literal>.</para></listitem>
 		  </itemizedlist></para></listitem>
 
