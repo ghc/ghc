@@ -613,8 +613,8 @@ repGuards other
                 g <- repPatGE (nonEmptyCoreList ss') rhs'
                 return (gs, g)
 
-repFields :: [HsRecField Name (LHsExpr Name)] -> DsM (Core [TH.Q TH.FieldExp])
-repFields flds
+repFields :: HsRecordBinds Name -> DsM (Core [TH.Q TH.FieldExp])
+repFields (HsRecFields { rec_flds = flds })
   = do	{ fnames <- mapM lookupLOcc (map hsRecFieldId flds)
 	; es <- mapM repLE (map hsRecFieldArg flds)
 	; fs <- zipWithM repFieldExp fnames es
@@ -814,9 +814,10 @@ repP (TuplePat ps _ _) = do { qs <- repLPs ps; repPtup qs }
 repP (ConPatIn dc details)
  = do { con_str <- lookupLOcc dc
       ; case details of
-         PrefixCon ps   -> do { qs <- repLPs ps; repPcon con_str qs }
-         RecCon pairs -> do { vs <- sequence $ map lookupLOcc (map hsRecFieldId pairs)
-                            ; ps <- sequence $ map repLP (map hsRecFieldArg pairs)
+         PrefixCon ps -> do { qs <- repLPs ps; repPcon con_str qs }
+         RecCon rec   -> do { let flds = rec_flds rec
+			    ; vs <- sequence $ map lookupLOcc (map hsRecFieldId flds)
+                            ; ps <- sequence $ map repLP (map hsRecFieldArg flds)
                             ; fps <- zipWithM (\x y -> rep2 fieldPatName [unC x,unC y]) vs ps
                             ; fps' <- coreList fieldPatQTyConName fps
                             ; repPrec con_str fps' }
@@ -1185,15 +1186,15 @@ repProto (MkC s) (MkC ty) = rep2 sigDName [s, ty]
 repCtxt :: Core [TH.TypeQ] -> DsM (Core TH.CxtQ)
 repCtxt (MkC tys) = rep2 cxtName [tys]
 
-repConstr :: Core TH.Name -> HsConDetails Name (LBangType Name)
+repConstr :: Core TH.Name -> HsConDeclDetails Name
           -> DsM (Core TH.ConQ)
 repConstr con (PrefixCon ps)
     = do arg_tys  <- mapM repBangTy ps
          arg_tys1 <- coreList strictTypeQTyConName arg_tys
          rep2 normalCName [unC con, unC arg_tys1]
 repConstr con (RecCon ips)
-    = do arg_vs   <- mapM lookupLOcc (map hsRecFieldId ips)
-         arg_tys  <- mapM repBangTy (map hsRecFieldArg ips)
+    = do arg_vs   <- mapM lookupLOcc (map cd_fld_name ips)
+         arg_tys  <- mapM repBangTy (map cd_fld_type ips)
          arg_vtys <- zipWithM (\x y -> rep2 varStrictTypeName [unC x, unC y])
                               arg_vs arg_tys
          arg_vtys' <- coreList varStrictTypeQTyConName arg_vtys

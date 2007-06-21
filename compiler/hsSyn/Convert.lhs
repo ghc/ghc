@@ -185,9 +185,10 @@ cvtConstr (ForallC tvs ctxt con)
 cvt_arg (IsStrict, ty)  = do { ty' <- cvtType ty; returnL $ HsBangTy HsStrict ty' }
 cvt_arg (NotStrict, ty) = cvtType ty
 
-cvt_id_arg (i, str, ty) = do { i' <- vNameL i
-			     ; ty' <- cvt_arg (str,ty)
-			     ; return (mkRecField i' ty') }
+cvt_id_arg (i, str, ty) 
+  = do	{ i' <- vNameL i
+	; ty' <- cvt_arg (str,ty)
+	; return (ConDeclField { cd_fld_name = i', cd_fld_type =  ty', cd_fld_doc = Nothing}) }
 
 cvtDerivs [] = return Nothing
 cvtDerivs cs = do { cs' <- mapM cvt_one cs
@@ -364,12 +365,14 @@ cvtl e = wrapL (cvt e)
 			      ; return $ ExprWithTySig e' t' }
     cvt (RecConE c flds) = do { c' <- cNameL c
 			      ; flds' <- mapM cvtFld flds
-			      ; return $ RecordCon c' noPostTcExpr flds' }
+			      ; return $ RecordCon c' noPostTcExpr (HsRecFields flds' Nothing)}
     cvt (RecUpdE e flds) = do { e' <- cvtl e
 			      ; flds' <- mapM cvtFld flds
-			      ; return $ RecordUpd e' flds' [] [] [] }
+			      ; return $ RecordUpd e' (HsRecFields flds' Nothing) [] [] [] }
 
-cvtFld (v,e) = do { v' <- vNameL v; e' <- cvtl e; return (mkHsRecField v' e') }
+cvtFld (v,e) 
+  = do	{ v' <- vNameL v; e' <- cvtl e
+	; return (HsRecField { hsRecFieldId = v', hsRecFieldArg = e', hsRecPun = False}) }
 
 cvtDD :: Range -> CvtM (ArithSeqInfo RdrName)
 cvtDD (FromR x) 	  = do { x' <- cvtl x; return $ From x' }
@@ -452,11 +455,13 @@ cvtp (TildeP p)       = do { p' <- cvtPat p; return $ LazyPat p' }
 cvtp (TH.AsP s p)     = do { s' <- vNameL s; p' <- cvtPat p; return $ AsPat s' p' }
 cvtp TH.WildP         = return $ WildPat void
 cvtp (RecP c fs)      = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs 
-		  	   ; return $ ConPatIn c' $ Hs.RecCon fs' }
+		  	   ; return $ ConPatIn c' $ Hs.RecCon (HsRecFields fs' Nothing) }
 cvtp (ListP ps)       = do { ps' <- cvtPats ps; return $ ListPat ps' void }
 cvtp (SigP p t)       = do { p' <- cvtPat p; t' <- cvtType t; return $ SigPatIn p' t' }
 
-cvtPatFld (s,p) = do { s' <- vNameL s; p' <- cvtPat p; return (mkRecField s' p') }
+cvtPatFld (s,p)
+  = do	{ s' <- vNameL s; p' <- cvtPat p
+	; return (HsRecField { hsRecFieldId = s', hsRecFieldArg = p', hsRecPun = False}) }
 
 -----------------------------------------------------------
 --	Types and type variables
