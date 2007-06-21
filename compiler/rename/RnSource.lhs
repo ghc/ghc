@@ -378,11 +378,11 @@ type variable environment iff -fglasgow-exts
 
 \begin{code}
 extendTyVarEnvForMethodBinds tyvars thing_inside
-  = doptM Opt_GlasgowExts			`thenM` \ opt_GlasgowExts ->
-    if opt_GlasgowExts then
-	extendTyVarEnvFVRn (map hsLTyVarName tyvars) thing_inside
-    else
-	thing_inside
+  = do	{ scoped_tvs <- doptM Opt_ScopedTypeVariables
+	; if scoped_tvs then
+		extendTyVarEnvFVRn (map hsLTyVarName tyvars) thing_inside
+	  else
+		thing_inside }
 \end{code}
 
 %*********************************************************
