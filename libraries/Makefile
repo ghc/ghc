@@ -117,7 +117,6 @@ subdirs:
 
 boot: $(BOOTSTRAP_STAMPS) ifBuildable/ifBuildable \
 	  $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/setup/Setup) \
-	  $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/GNUmakefile) \
 	  installPackage/installPackage
 
 # We build the Setup program in a setup subdirectory to stop it trying
