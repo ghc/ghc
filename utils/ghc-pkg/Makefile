@@ -66,8 +66,8 @@ EXCLUDED_SRCS+=$(INPLACE_HS)
 TOP_ABS=$(subst \\,/,$(FPTOOLS_TOP_ABS_PLATFORM))
 
 $(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
-	echo "import System.Cmd; import System.Environment" > $@
-	echo "main = getArgs >>= \args -> rawSystem \"$(TOP_ABS)/$(GHC_PKG_DIR_REL)/$(HS_PROG)\" (\"--global-conf\":\"$(TOP_ABS)/driver/package.conf.inplace\":args)" >> $@
+	echo "import System.Cmd; import System.Environment; import System.Exit" > $@
+	echo "main = getArgs >>= \args -> rawSystem \"$(TOP_ABS)/$(GHC_PKG_DIR_REL)/$(HS_PROG)\" (\"--global-conf\":\"$(TOP_ABS)/driver/package.conf.inplace\":args) >>= exitWith" >> $@
 
 $(INPLACE_PROG): $(INPLACE_HS)
 	$(GHC) --make $< -o $@

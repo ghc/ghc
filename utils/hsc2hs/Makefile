@@ -44,8 +44,8 @@ extra_flags=
 endif
 
 $(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
-	echo "import System.Cmd; import System.Environment" > $@
-	echo "main = getArgs >>= \args -> rawSystem \"$(TOP_ABS)/$(GHC_HSC2HS_DIR_REL)/$(HS_PROG)\" (\"--cc=$(CC)\":\"--ld=$(LD)\"$(patsubst %,:\"%\",$(extra_flags)):\"--cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt)\":\"-I$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_INCLUDE_DIR_REL)\":args)" >> $@
+	echo "import System.Cmd; import System.Environment; import System.Exit" > $@
+	echo "main = getArgs >>= \args -> rawSystem \"$(TOP_ABS)/$(GHC_HSC2HS_DIR_REL)/$(HS_PROG)\" (\"--cc=$(CC)\":\"--ld=$(LD)\"$(patsubst %,:\"%\",$(extra_flags)):\"--cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt)\":\"-I$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_INCLUDE_DIR_REL)\":args) >>= exitWith" >> $@
 
 $(INPLACE_PROG): $(INPLACE_HS)
 	$(GHC) --make $< -o $@

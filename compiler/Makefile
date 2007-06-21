@@ -702,8 +702,6 @@ SRC_LD_OPTS += -no-link-chk
 # See comments in $(FPTOOLS_TOP)/utils/ghc-pkg/Makefile for why we use
 # a real binary here rather than a shell script.
 
-all :: $(odir)/ghc-inplace ghc-inplace
-
 INPLACE_HS   = $(odir)/ghc-inplace.hs
 INPLACE_PROG = $(odir)/ghc-inplace$(exeext)
 EXCLUDED_SRCS += $(INPLACE_HS)
@@ -713,8 +711,8 @@ EXCLUDED_SRCS += $(INPLACE_HS)
 TOP_ABS=$(subst \\,/,$(FPTOOLS_TOP_ABS_PLATFORM))
 
 $(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
-	echo "import System.Cmd; import System.Environment" > $@
-	echo "main = getArgs >>= \args -> rawSystem \"$(TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)\" (\"-B$(TOP_ABS)\":args)" >> $@
+	echo "import System.Cmd; import System.Environment; import System.Exit" > $@
+	echo "main = getArgs >>= \args -> rawSystem \"$(TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)\" (\"-B$(TOP_ABS)\":args) >>= exitWith" >> $@
 
 $(INPLACE_PROG): $(INPLACE_HS)
 	$(GHC) --make $< -o $@
@@ -726,6 +724,8 @@ CLEAN_FILES += $(INPLACE_HS) $(INPLACE_PROG)
 ifeq "$(stage)" "1"
 ghc-inplace : $(INPLACE_PROG)
 	$(RM) -f $@ && $(LN_S) $< $@
+
+all :: ghc-inplace
 
 CLEAN_FILES += ghc-inplace
 endif
