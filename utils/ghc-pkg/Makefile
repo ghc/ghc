@@ -48,26 +48,28 @@ Version.hs : Makefile $(TOP)/mk/config.mk
 DIST_CLEAN_FILES += $(VERSION_HS)
 
 # -----------------------------------------------------------------------------
-# ghc-pkg script
+# ghc-pkg and ghc-pkg-inplace scripts
 
-ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-# See "MSys Note 3" in compiler/Makefile
-INPLACE_SCRIPT=ghc-pkg-inplace.bat
-all::
-	$(RM) -f $(INPLACE_SCRIPT)
-	echo '@call $(subst /,\,$(FPTOOLS_TOP_ABS_PLATFORM)/utils/ghc-pkg/$(HS_PROG)) --global-conf $(FPTOOLS_TOP_ABS_PLATFORM)/driver/package.conf.inplace %*' >> $(INPLACE_SCRIPT)
-	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
-else
-INPLACE_SCRIPT=ghc-pkg-inplace
-all::
-	$(RM) -f $(INPLACE_SCRIPT)
-	echo "#!$(SHELL)"                                                      >> $(INPLACE_SCRIPT)
-	echo "GHCPKGBIN=$(FPTOOLS_TOP_ABS)/utils/ghc-pkg/$(HS_PROG)"           >> $(INPLACE_SCRIPT)
-	echo "PKGCONF=$(FPTOOLS_TOP_ABS_PLATFORM)/driver/package.conf.inplace" >> $(INPLACE_SCRIPT)
-	echo 'exec $$GHCPKGBIN --global-conf $$PKGCONF $${1+"$$@"}'            >> $(INPLACE_SCRIPT)
-	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
-endif
-CLEAN_FILES += $(INPLACE_SCRIPT)
+# ghc-pkg-inplace used to be either a /bin/sh script, or a .bat script
+# on Windows.  It is now a real binary, compiled from a tiny .hs
+# file.  The problem with using scripts here was that the .bat script
+# cannot be executed by /bin/sh on MSYS (it can on Cygwin), but the
+# /bin/sh script cannot be executed by Cabal.  So we would have needed
+# both.  A single binary is therefore simpler.
+
+INPLACE_HS=ghc-pkg-inplace.hs
+INPLACE_PROG=ghc-pkg-inplace
+
+$(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
+	echo "import System.Cmd; import System.Environment" > $@
+	echo "main = getArgs >>= \args -> rawSystem \"$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_PKG_DIR_REL)/$(HS_PROG)\" (\"--global-conf\":\"$(FPTOOLS_TOP_ABS_PLATFORM)/driver/package.conf.inplace\":args)" >> $@
+
+$(INPLACE_PROG): $(INPLACE_HS)
+	$(GHC) --make $< -o $@
+
+all :: $(INPLACE_PROG)
+
+CLEAN_FILES += $(INPLACE_HS) $(INPLACE_PROG)
 
 ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 LINK = ghc-pkg

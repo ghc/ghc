@@ -699,78 +699,31 @@ SRC_LD_OPTS += -no-link-chk
 
 # -----------------------------------------------------------------------------
 # create ghc-inplace, a convenient way to run ghc from the build tree...
+# See comments in $(FPTOOLS_TOP)/utils/ghc-pkg/Makefile for why we use
+# a real binary here rather than a shell script.
 
 all :: $(odir)/ghc-inplace ghc-inplace
 
-# MSys notes
-# Note 1
-#   I'm exec'ing $(SCRIPT_SHELL), rather than the usual #!/bin/sh, to make
-#   sure that the right shell is invoked.  If we use /bin/sh, then
-#   when ghc-inplace is invoked from a Cygwin Python (which is the only Python
-#   that seems to run the test-suite correctly), we get the Cygwin shell,
-#   and it in turn interprets the path-names in the second (exec) line
-#   differently to the MSys shell.  That's bad, because ghc-inplace must
-#   also work when invoked from MSys shells
-#
-#   To figure out what the MSys shell is, we cd to '/bin' and do 'pwd -W'
-#   On MSys, the -W flag prints out the directory in c:/msys/bin format
-#   (On other system, -W isn't a pwd flag at all.)
+INPLACE_HS   = $(odir)/ghc-inplace.hs
+INPLACE_PROG = $(odir)/ghc-inplace$(exeext)
 
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-all :: $(odir)/ghc-inplace.bat ghc-inplace.bat
-CLEAN_FILES += $(odir)/ghc-inplace.bat ghc-inplace.bat
-endif
+$(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
+	echo "import System.Cmd; import System.Environment" > $@
+	echo "main = getArgs >>= \args -> rawSystem \"$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)\" (\"-B$(FPTOOLS_TOP_ABS_PLATFORM)\":args)" >> $@
 
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-#	MSys (...and cygwin with a mingw toolchain)
-SCRIPT_SHELL = $(shell cd /bin; pwd -W 2>/dev/null || echo "/bin")/sh
-else
-#	Cygwin and Unix
-SCRIPT_SHELL = /bin/sh
-endif
+$(INPLACE_PROG): $(INPLACE_HS)
+	$(GHC) --make $< -o $@
 
-# MSys Note 2
-# On MSys, we must use the following script for ghc-inplace:
-#   exec /c/darcs/fc-branch-2/compiler/stage1/ghc -Bc:/darcs/fc-branch-2 "$@"
-# That is, 
-#  (a) You *must* use the /c/ form for the first arg to exec.  Using the
-#      c:/ form makes exec complain that it can't find $pwd/c:/darcs/.../ghc
-#		The /c/ form is $(FPTOOLS_TOP_ABS)
-#  (b) You *must* use the c:/ form for the -B argument, else the testsuite
-#      doesn't work.  I think that's something to do with ghc-inplace being
-#      invoked by Python
-#		The c:/ form is $(FPTOOLS_TOP_ABS_PLATFORM)
+all :: $(INPLACE_PROG)
 
-$(odir)/ghc-inplace : $(GHC_PROG)
-	@$(RM) $@
-	echo '#!$(SCRIPT_SHELL)' >>$@
-# Re SCRIPT_SHELL, see note 1 above
-	echo exec  $(GHC_COMPILER_DIR_ABS)/$(GHC_PROG) \
-		'-B$(subst \,\\,$(FPTOOLS_TOP_ABS_PLATFORM))' '"$$@"' >>$@
-# Re exec, see note 2 above
-	chmod 755 $@
-
-# MSys Note 3
-# When we generate a .bat file, we must also use the form
-#	@call c:\darcs\fc-branch-2\compiler\stage1\ghc-inplace
-# else the cmd shell gets confused; indeed it seems to simply hang
-# Hence the use of $(FPTOOLS_TOP_ABS_PLATFORM) here, just like MSys Note 2
-
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-ghc-inplace.bat $(odir)/ghc-inplace.bat: $(GHC_PROG)
-	@$(RM) $@
-	echo '@call $(subst /,\,$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)) -B$(FPTOOLS_TOP_ABS_PLATFORM) %*' >> $@
-	chmod 755 $@
-endif	
-
-ghc-inplace : stage1/ghc-inplace
-	$(RM) -f $@ && $(LN_S) $< $@
+CLEAN_FILES += $(INPLACE_HS) $(INPLACE_PROG)
 
 ifeq "$(stage)" "1"
+ghc-inplace : $(INPLACE_PROG)
+	$(RM) -f $@ && $(LN_S) $< $@
+
 CLEAN_FILES += ghc-inplace
 endif
-
-CLEAN_FILES += $(odir)/ghc-inplace
 
 #-----------------------------------------------------------------------------
 # 		install
