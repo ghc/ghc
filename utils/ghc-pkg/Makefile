@@ -59,10 +59,15 @@ DIST_CLEAN_FILES += $(VERSION_HS)
 
 INPLACE_HS=ghc-pkg-inplace.hs
 INPLACE_PROG=ghc-pkg-inplace
+EXCLUDED_SRCS+=$(INPLACE_HS)
+
+# FPTOOLS_TOP_ABS platform uses backslashes, at least on Cygwin, but that
+# will go wrong when we use it in a Haskell string below.
+TOP_ABS=$(subst \\,/,$(FPTOOLS_TOP_ABS_PLATFORM))
 
 $(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
 	echo "import System.Cmd; import System.Environment" > $@
-	echo "main = getArgs >>= \args -> rawSystem \"$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_PKG_DIR_REL)/$(HS_PROG)\" (\"--global-conf\":\"$(FPTOOLS_TOP_ABS_PLATFORM)/driver/package.conf.inplace\":args)" >> $@
+	echo "main = getArgs >>= \args -> rawSystem \"$(TOP_ABS)/$(GHC_PKG_DIR_REL)/$(HS_PROG)\" (\"--global-conf\":\"$(TOP_ABS)/driver/package.conf.inplace\":args)" >> $@
 
 $(INPLACE_PROG): $(INPLACE_HS)
 	$(GHC) --make $< -o $@

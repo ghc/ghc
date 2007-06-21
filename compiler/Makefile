@@ -706,10 +706,15 @@ all :: $(odir)/ghc-inplace ghc-inplace
 
 INPLACE_HS   = $(odir)/ghc-inplace.hs
 INPLACE_PROG = $(odir)/ghc-inplace$(exeext)
+EXCLUDED_SRCS += $(INPLACE_HS)
+
+# FPTOOLS_TOP_ABS platform uses backslashes, at least on Cygwin, but that
+# will go wrong when we use it in a Haskell string below.
+TOP_ABS=$(subst \\,/,$(FPTOOLS_TOP_ABS_PLATFORM))
 
 $(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
 	echo "import System.Cmd; import System.Environment" > $@
-	echo "main = getArgs >>= \args -> rawSystem \"$(FPTOOLS_TOP_ABS_PLATFORM)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)\" (\"-B$(FPTOOLS_TOP_ABS_PLATFORM)\":args)" >> $@
+	echo "main = getArgs >>= \args -> rawSystem \"$(TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)\" (\"-B$(TOP_ABS)\":args)" >> $@
 
 $(INPLACE_PROG): $(INPLACE_HS)
 	$(GHC) --make $< -o $@
