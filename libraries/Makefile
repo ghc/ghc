@@ -224,7 +224,10 @@ $(foreach SUBDIR,$(SUBDIRS),make.library.$(SUBDIR)):\
 make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 		%/GNUmakefile \
                 %/setup/Setup ifBuildable/ifBuildable
-	ifBuildable/ifBuildable $* $(MAKE)
+#       HACK: invoke make via $(SHELL), otherwise on Windows it apparently
+#       gets argv[0] set to "make" (with quotes), which causes a problem
+#       when make re-invokes itself after creating .depend.  Ugh.
+	ifBuildable/ifBuildable $* $(SHELL) -c $(MAKE)
 	ifBuildable/ifBuildable $* setup/Setup register --inplace
 
 # Build the library using 'setup build' (not the default)
