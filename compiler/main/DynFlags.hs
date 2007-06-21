@@ -1121,6 +1121,7 @@ impliedFlags = [
 
 glasgowExtsFlags = [ Opt_GlasgowExts 
 		   , Opt_FFI 
+		   , Opt_GADTs
 		   , Opt_ImplicitParams 
 		   , Opt_ScopedTypeVariables
 		   , Opt_TypeFamilies ]
