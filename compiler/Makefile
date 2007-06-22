@@ -406,15 +406,15 @@ endif
 # -----------------------------------------------------------------------------
 # Building a compiler with interpreter support
 #
-# The interpreter, GHCi interface, and Template Haskell are only
+# The interpreter, GHCi interface, Template Haskell and Hpc are only
 # enabled when we are bootstrapping with the same version of GHC, and
 # the interpreter is supported on this platform.
 
 ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
 
 # Yes, include the interepreter, readline, and Template Haskell extensions
-SRC_HC_OPTS += -DGHCI -package template-haskell
-PKG_DEPENDS += template-haskell
+SRC_HC_OPTS += -DGHCI -package template-haskell -package hpc
+PKG_DEPENDS += template-haskell hpc
 
 # Should GHCI be building info tables in the TABLES_NEXT_TO_CODE style
 # or not?

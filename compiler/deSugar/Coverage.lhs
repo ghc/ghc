@@ -31,12 +31,16 @@ import FiniteMap
 
 import Data.Array
 import System.Time (ClockTime(..))
-import System.Directory (getModificationTime)
 import System.IO   (FilePath)
 #if __GLASGOW_HASKELL__ < 603
 import Compat.Directory ( createDirectoryIfMissing )
 #else
 import System.Directory ( createDirectoryIfMissing )
+#endif
+
+#if GHCI
+import Trace.Hpc.Mix
+import Trace.Hpc.Util
 #endif
 
 import BreakArray 
@@ -59,7 +63,9 @@ addCoverageTicksToBinds
         -> LHsBinds Id
         -> IO (LHsBinds Id, HpcInfo, ModBreaks)
 
+#if GHCI
 addCoverageTicksToBinds dflags mod mod_loc tyCons binds = do 
+
   let orig_file = 
              case ml_hs_file mod_loc of
 		    Just file -> file
@@ -90,13 +96,13 @@ addCoverageTicksToBinds dflags mod mod_loc tyCons binds = do
      let hpc_dir = hpcDir dflags
      let tabStop = 1 -- <tab> counts as a normal char in GHC's location ranges.
      createDirectoryIfMissing True hpc_dir
-     modTime <- getModificationTime' orig_file
+     modTime <- getModificationTime orig_file
      let entries' = [ (hpcPos, box) 
                     | (span,_,box) <- entries, hpcPos <- [mkHpcPos span] ]
      when (length entries' /= tickBoxCount st) $ do
        panic "the number of .mix entries are inconsistent"
      let hashNo = mixHash orig_file modTime tabStop entries'
-     mixCreate hpc_dir mod_name (Mix orig_file modTime hashNo tabStop entries')
+     mixCreate hpc_dir mod_name (Mix orig_file modTime (toHash hashNo) tabStop entries')
      return $ hashNo 
    else do
      return $ 0
@@ -524,7 +530,7 @@ addTickArithSeqInfo (FromThenTo e1 e2 e3) =
 
 \begin{code}
 data TickTransState = TT { tickBoxCount:: Int
-                         , mixEntries  :: [MixEntry]
+                         , mixEntries  :: [MixEntry_]
                          }                        
 
 data TickTransEnv = TTE { modName      :: String
@@ -697,37 +703,7 @@ matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
 
 
 \begin{code}
--- | 'Mix' is the information about a modules static properties, like 
--- location of Tix's in a file.
--- tab stops are the size of a tab in the provided line:colunm values.
---  * In GHC, this is 1 (a tab is just a character)
---  * With hpc-tracer, this is 8 (a tab represents several spaces).
-
-data Mix = Mix 
- 	     FilePath		-- ^location of original file
- 	     Integer		-- ^time (in seconds) of original file's last update, since 1970.
- 	     Int		-- ^hash of mix entry + timestamp
- 	     Int 		-- ^tab stop value.
- 	     [MixEntry_] 	-- ^entries
-        deriving (Show, Read)
-
--- We would rather use ClockTime in Mix, but ClockTime has no Read instance in 6.4 and before,
--- but does in 6.6. Definining the instance for ClockTime here is the Wrong Thing to do,
--- because if some other program also defined that instance, we will not be able to compile.
-
-type MixEntry  = (SrcSpan, [OccName], BoxLabel)
-type MixEntry_ = (HpcPos, BoxLabel)
-
-data BoxLabel = ExpBox Bool	-- isAlt
-              | TopLevelBox [String]
-              | LocalBox [String]
-	      | BinBox CondBox Bool
-              deriving (Read, Show, Eq, Ord)
-
-data CondBox = GuardBinBox
-             | CondBinBox
-             | QualBinBox
-              deriving (Read, Show, Eq, Ord)
+type MixEntry_ = (SrcSpan, [OccName], BoxLabel)
 
 -- For the hash value, we hash everything: the file name, 
 --  the timestamp of the original source file, the tab stop,
@@ -735,42 +711,15 @@ data CondBox = GuardBinBox
 -- This hash only has to be hashed at Mix creation time,
 -- and is for sanity checking only.
 
-mixHash :: FilePath -> Integer -> Int -> [MixEntry_] -> Int
+mixHash :: FilePath -> Integer -> Int -> [MixEntry] -> Int
 mixHash file tm tabstop entries = fromIntegral $ hashString
 	(show $ Mix file tm 0 tabstop entries)
-
-mixCreate :: String -> String -> Mix -> IO ()
-mixCreate dirName modName mix =
-   writeFile (mixName dirName modName) (show mix)
-
-mixName :: FilePath -> String -> String
-mixName dirName name = dirName ++ "/" ++ name ++ ".mix"
-
-getModificationTime' :: FilePath -> IO Integer
-getModificationTime' file = do
-  (TOD sec _) <- System.Directory.getModificationTime file
-  return $ sec
-
--- a program index records module names and numbers of tick-boxes
--- introduced in each module that has been transformed for coverage 
-
-data HpcPos = P !Int !Int !Int !Int deriving (Eq)
-
-toHpcPos :: (Int,Int,Int,Int) -> HpcPos
-toHpcPos (l1,c1,l2,c2) = P l1 c1 l2 c2
-
-instance Show HpcPos where
-   show (P l1 c1 l2 c2) = show l1 ++ ':' : show c1 ++ '-' : show l2 ++ ':' : show c2
-
-instance Read HpcPos where
-  readsPrec _i pos = [(toHpcPos (read l1,read c1,read l2,read c2),after)]
-      where
-         (before,after)   = span (/= ',') pos
-         (lhs,rhs)    = case span (/= '-') before of
-	 		       (lhs,'-':rhs) -> (lhs,rhs)
-			       (lhs,"")      -> (lhs,lhs)
-         (l1,':':c1)	  = span (/= ':') lhs
-         (l2,':':c2)	  = span (/= ':') rhs
-
 \end{code}
 
+
+\begin{code}
+#else
+addCoverageTicksToBinds dflags mod mod_loc tyCons binds =
+	return (binds, noHpcInfo, emptyModBreaks)
+#endif
+\end{code}
