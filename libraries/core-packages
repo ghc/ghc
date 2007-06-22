@@ -12,3 +12,4 @@ readline
 template-haskell
 unix
 Win32
+hpc
