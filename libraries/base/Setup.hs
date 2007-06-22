@@ -23,7 +23,8 @@ main = do let hooks = defaultUserHooks {
                   buildHook = build_primitive_sources
                             $ filter_modules_hook
                             $ buildHook defaultUserHooks,
-                  makefileHook = filter_modules_hook
+                  makefileHook = build_primitive_sources
+                               $ filter_modules_hook
                                $ makefileHook defaultUserHooks,
                   regHook = add_extra_libs
                           $ regHook defaultUserHooks,
