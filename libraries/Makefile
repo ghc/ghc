@@ -204,9 +204,9 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	           --prefix='$$topdir' \
 	           --datadir='$$prefix/share' \
 	           --libsubdir='$(libsubdir)' \
-	           --with-compiler=../../compiler/ghc-inplace$(dot_bat) \
-	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace$(dot_bat) \
-	           --with-hsc2hs=../../utils/hsc2hs/hsc2hs-inplace$(dot_bat) \
+	           --with-compiler=../../compiler/stage1/ghc-inplace$ \
+	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace$ \
+	           --with-hsc2hs=../../utils/hsc2hs/hsc2hs-inplace \
 	           --with-ld=$(LD) \
 	           --datasubdir=ghc \
 	           --haddock-args="--use-contents=../index.html \
