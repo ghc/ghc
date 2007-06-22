@@ -30,7 +30,6 @@ module StaticFlags (
 
         -- Hpc opts
 	opt_Hpc,
-        opt_Hpc_Tracer,
 
 	-- language opts
 	opt_DictsStrict,
@@ -286,10 +285,7 @@ opt_SccProfilingOn		= lookUp  FSLIT("-fscc-profiling")
 opt_DoTickyProfiling            = WayTicky `elem` (unsafePerformIO $ readIORef v_Ways)
 
 -- Hpc opts
-
 opt_Hpc				= lookUp FSLIT("-fhpc")  
-				  || opt_Hpc_Tracer 
-opt_Hpc_Tracer			= lookUp FSLIT("-fhpc-tracer")
 
 -- language opts
 opt_DictsStrict			= lookUp  FSLIT("-fdicts-strict")

@@ -94,7 +94,6 @@ module CLabel (
 
         mkHpcTicksLabel,
         mkHpcModuleNameLabel,
-        mkHpcModuleOffsetLabel,
 
 	infoLblToEntryLbl, entryLblToInfoLbl,
 	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
@@ -210,7 +209,6 @@ data CLabel
 
   | HpcTicksLabel Module       -- Per-module table of tick locations
   | HpcModuleNameLabel         -- Per-module name of the module for Hpc
-  | HpcModuleOffsetLabel Module-- Per-module offset of the module for Hpc (dynamically generated)
 
   deriving (Eq, Ord)
 
@@ -412,7 +410,6 @@ mkRtsSlowTickyCtrLabel pat = RtsLabel (RtsSlowTickyCtr pat)
 
 mkHpcTicksLabel                = HpcTicksLabel
 mkHpcModuleNameLabel           = HpcModuleNameLabel
-mkHpcModuleOffsetLabel         = HpcModuleOffsetLabel
 
         -- Dynamic linking
         
@@ -486,7 +483,6 @@ needsCDecl (ForeignLabel _ _ _)		= False
 needsCDecl (CC_Label _)			= True
 needsCDecl (CCS_Label _)		= True
 needsCDecl (HpcTicksLabel _)            = True
-needsCDecl (HpcModuleOffsetLabel _)     = True
 needsCDecl HpcModuleNameLabel           = False
 
 -- Whether the label is an assembler temporary:
@@ -521,7 +517,6 @@ externallyVisibleCLabel (CC_Label _)	   = True
 externallyVisibleCLabel (CCS_Label _)	   = True
 externallyVisibleCLabel (DynamicLinkerLabel _ _)  = False
 externallyVisibleCLabel (HpcTicksLabel _)   = True
-externallyVisibleCLabel (HpcModuleOffsetLabel _)  = True
 externallyVisibleCLabel HpcModuleNameLabel      = False
 
 -- -----------------------------------------------------------------------------
@@ -787,9 +782,6 @@ pprCLbl (PlainModuleInitLabel mod _)
 
 pprCLbl (HpcTicksLabel mod)
   = ptext SLIT("_hpc_tickboxes_")  <> ppr mod <> ptext SLIT("_hpc")
-
-pprCLbl (HpcModuleOffsetLabel mod)
-  = ptext SLIT("_hpc_module_offset_")  <> ppr mod <> ptext SLIT("_hpc")
 
 pprCLbl HpcModuleNameLabel
   = ptext SLIT("_hpc_module_name_str")
