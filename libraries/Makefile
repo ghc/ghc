@@ -195,6 +195,12 @@ else
 libsubdir = $$compiler/lib/$$pkgid
 endif
 
+# We rely on all the CONFIGURE_ARGS being quoted with '...', and there
+# being no 's inside the values.
+FLAGGED_CONFIGURE_ARGS = $(subst $(space)',\
+                                 $(space)--configure-option=',\
+                                 $(space)$(CONFIGURE_ARGS))
+
 $(foreach SUBDIR,$(SUBDIRS), \
 		  stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).$(SUBDIR)): \
 stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
@@ -211,7 +217,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	           --datasubdir=ghc \
 	           --haddock-args="--use-contents=../index.html \
 	                           --use-index=../doc-index.html" \
-	           $(addprefix --configure-option=,$(CONFIGURE_ARGS)) \
+	           $(FLAGGED_CONFIGURE_ARGS) \
 	           --configure-option=--with-cc=$(CC) ) \
 	      && touch $@ || touch $*/unbuildable
 # We don't touch $@ if configure failed as we would prefer to try
