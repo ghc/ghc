@@ -133,7 +133,7 @@ main = do
 	-- to find one by looking near the executable.  This only
 	-- works on Win32 or Hugs (getExecDir). On Unix, there's a wrapper
 	-- script which specifies an explicit template flag.
-    flags_w_tpl <- if any template_flag flags then
+    flags_w_tpl0 <- if any template_flag flags then
 			return flags
 		   else
 			do mb_path <- getExecDir "/bin/hsc2hs.exe"
@@ -147,6 +147,12 @@ main = do
 				 then return ((Template templ):)
 				 else return id
 		           return (add_opt flags)
+
+    -- take only the last --template flag on the cmd line
+    let
+      (before,tpl:after) = break template_flag (reverse flags_w_tpl0)
+      flags_w_tpl = reverse (before ++ tpl : filter (not.template_flag) after)
+
     case (files, errs) of
         (_, _)
             | any isHelp    flags_w_tpl -> bye (usageInfo header options)
