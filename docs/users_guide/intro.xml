@@ -319,18 +319,18 @@
     <title>GHC version numbering policy</title>
     <indexterm><primary>version, of ghc</primary></indexterm>
 
-    <para>As of GHC version 6.0, we have adopted the following policy
+    <para>As of GHC version 6.8, we have adopted the following policy
     for numbering GHC versions:</para>
 
     <variablelist>
       <varlistentry>
 	<term>Stable Releases</term>
 	<listitem>
-	  <para>These are numbered <literal><replaceable>x</replaceable>.<replaceable>y</replaceable>.<replaceable>z</replaceable></literal>, where
-	  <replaceable>y</replaceable> is <emphasis>even</emphasis>, and
-	  <replaceable>z</replaceable> is the patchlevel number (the trailing
-	  <literal>.<replaceable>z</replaceable></literal> can be omitted if <replaceable>z</replaceable>
-	  is zero).  Patchlevels are bug-fix releases only, and never
+	  <para>Stable branches are numbered <literal><replaceable>x</replaceable>.<replaceable>y</replaceable></literal>, where
+	  <replaceable>y</replaceable> is <emphasis>even</emphasis>.
+	  Releases on the stable branch <literal><replaceable>x</replaceable>.<replaceable>y</replaceable></literal> are numbered <literal><replaceable>x</replaceable>.<replaceable>y</replaceable>.<replaceable>z</replaceable></literal>, where
+	  <replaceable>z</replaceable> (>= 1) is the patchlevel number.
+	  Patchlevels are bug-fix releases only, and never
 	  change the programmer interface to any system-supplied code.
 	  However, if you install a new patchlevel over an old one you
 	  will need to recompile any code that was compiled against the
@@ -341,8 +341,8 @@
 	  <literal><replaceable>x</replaceable>.<replaceable>y</replaceable>.<replaceable>z</replaceable></literal>
 	  is the integer <replaceable>xyy</replaceable> (if
 	  <replaceable>y</replaceable> is a single digit, then a leading zero
-	  is added, so for example in version 6.2 of GHC,
-	  <literal>__GLASGOW_HASKELL__==602</literal>).</para>
+	  is added, so for example in version 6.8.2 of GHC we would have
+	  <literal>__GLASGOW_HASKELL__==608</literal>).</para>
 	  <indexterm>
 	    <primary><literal>__GLASGOW_HASKELL__</literal></primary>
 	  </indexterm>
@@ -350,28 +350,52 @@
       </varlistentry>
       
       <varlistentry>
-	<term>Snapshots/unstable releases</term>
+	<term>Stable snapshots</term>
 	<listitem>
-	  <para>We may make snapshot releases of the current
-	  development sources from time to time, and the current
-	  sources are always available via the CVS repository (see the
-	  <ulink url="http://www.haskell.org/ghc/">GHC web
-	  site</ulink> for details).</para>
+	  <para>
+      We may make snapshot releases of the current
+      stable branch <ulink url="http://www.haskell.org/ghc/dist/stable/dist/">available for download</ulink>, and the latest sources are available from <ulink url="http://hackage.haskell.org/trac/ghc/wiki/DarcsRepositories">the darcs repositories</ulink>.
+	  </para>
 
-	  <para>Snapshot releases are named
-	  <literal><replaceable>x</replaceable>.<replaceable>y</replaceable>.YYYYMMDD</literal>
-	  where <literal>YYYYMMDD</literal> is the date of the sources
-	  from which the snapshot was built.  In theory, you can check
-	  out the exact same sources from the CVS repository using
-	  this date.</para>
+	  <para>Stable snapshot releases are named
+	  <literal><replaceable>x</replaceable>.<replaceable>y</replaceable>.<replaceable>z</replaceable>.<replaceable>YYYYMMDD</replaceable></literal>.
+	  where <literal><replaceable>YYYYMMDD</replaceable></literal> is the date of the sources
+	  from which the snapshot was built, and <literal><replaceable>x</replaceable>.<replaceable>y</replaceable>.<replaceable>z+1</replaceable></literal> is the next release to be made on that branch.
+	  For example, <literal>6.8.1.20040225</literal> would be a
+	  snapshot of the <literal>6.8</literal> branch during the development
+      of <literal>6.8.2</literal>.</para>
 
-	  <para>If <replaceable>y</replaceable> is odd, then this is a
-	  snapshot of the CVS HEAD (the main development branch).  If
-	  <replaceable>y</replaceable> is even, then it is a snapshot
-	  of the stable branch between patchlevel releases.  For
-	  example, <literal>6.3.20040225</literal> would be a snapshot
-	  of the HEAD, but <literal>6.2.20040225</literal> would be a
-	  snapshot of the <literal>6.2</literal> branch.</para>
+	  <para>The value of <literal>__GLASGOW_HASKELL__</literal>
+	  for a snapshot release is the integer
+	  <replaceable>xyy</replaceable>.  You should never write any
+	  conditional code which tests for this value, however: since
+	  interfaces change on a day-to-day basis, and we don't have
+	  finer granularity in the values of
+	  <literal>__GLASGOW_HASKELL__</literal>, you should only
+	  conditionally compile using predicates which test whether
+	  <literal>__GLASGOW_HASKELL__</literal> is equal to, later
+	  than, or earlier than a given major release.</para>
+	  <indexterm>
+	    <primary><literal>__GLASGOW_HASKELL__</literal></primary>
+	  </indexterm>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>Unstable snapshots</term>
+	<listitem>
+	  <para>
+      We may make snapshot releases of the
+      HEAD <ulink url="http://www.haskell.org/ghc/dist/current/dist/">available for download</ulink>, and the latest sources are available from <ulink url="http://hackage.haskell.org/trac/ghc/wiki/DarcsRepositories">the darcs repositories</ulink>.
+	  </para>
+
+	  <para>Unstable snapshot releases are named
+	  <literal><replaceable>x</replaceable>.<replaceable>y</replaceable>.<replaceable>YYYYMMDD</replaceable></literal>.
+	  where <literal><replaceable>YYYYMMDD</replaceable></literal> is the date of the sources
+	  from which the snapshot was built.
+	  For example, <literal>6.7.20040225</literal> would be a
+	  snapshot of the HEAD before the creation of the
+      <literal>6.8</literal> branch.</para>
 
 	  <para>The value of <literal>__GLASGOW_HASKELL__</literal>
 	  for a snapshot release is the integer
