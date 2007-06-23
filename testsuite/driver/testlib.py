@@ -93,6 +93,9 @@ def _expect_broken( opts, bug ):
 def ignore_output( opts ):
     opts.ignore_output = 1
 
+def no_stdin( opts ):
+    opts.no_stdin = 1
+
 # -----
 
 def expect_fail_for( ways ):
@@ -631,10 +634,14 @@ def simple_run( name, way, prog, args ):
    
    my_rts_flags = rts_flags(way)
 
+   if getTestOpts().no_stdin:
+     stdin_comes_from = ''
+   else:
+     stdin_comes_from = ' <' + use_stdin
    cmd = 'cd ' + testdir + ' && ' \
 	  + prog + ' ' + args + ' ' \
           + my_rts_flags + ' ' \
-          + ' <' + use_stdin \
+          + stdin_comes_from \
           + ' >' + run_stdout \
           + ' 2>' + run_stderr
 

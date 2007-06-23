@@ -145,6 +145,9 @@ class TestOptions:
        # don't compare output
        self.ignore_output = 0
 
+       # don't give anything as stdin
+       self.no_stdin = 0
+
        # compile this test to .hc only
        self.compile_to_hc = 0
 
