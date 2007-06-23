@@ -232,8 +232,7 @@ lookupInstDeclBndr :: Name -> Located RdrName -> RnM (Located Name)
 -- name is only in scope qualified.  I.e. even if method op is
 -- in scope as M.op, we still allow plain 'op' on the LHS of
 -- an instance decl
-lookupInstDeclBndr cls rdr = lookup_located_sub_bndr is_op
-				(ptext SLIT("method of class")) rdr
+lookupInstDeclBndr cls rdr = lookup_located_sub_bndr is_op doc rdr
   where
     doc = ptext SLIT("method of class") <+> quotes (ppr cls)
     is_op gre@(GRE {gre_par = ParentIs n}) = n == cls
