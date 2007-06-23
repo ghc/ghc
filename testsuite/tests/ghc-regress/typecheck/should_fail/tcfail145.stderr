@@ -1,9 +1,9 @@
 
 tcfail145.hs:9:5:
     Couldn't match expected type `a' (a rigid variable)
-	   against inferred type `[a]'
+       against inferred type `[a]'
+    When matching `forall a. [a] -> [a]'
+              and `forall a. a -> a'
       Expected type: forall a1. a1 -> a1
       Inferred type: forall a1. [a1] -> [a1]
     In the pattern: f :: forall a. [a] -> [a]
-    In the definition of `foo':
-	foo (f :: forall a. [a] -> [a]) = f undefined
