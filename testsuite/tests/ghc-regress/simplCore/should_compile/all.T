@@ -16,6 +16,7 @@ test('simpl012', normal, compile, [''])
 test('simpl013', normal, compile, [''])
 test('simpl014', normal, compile, [''])
 test('simpl015', only_ways(['opt']), compile, [''])
+test('simpl016', normal, compile, [''])
 
 test('spec001', skip_if_fast, compile, [''])
 test('spec002', normal, compile, [''])
