@@ -561,13 +561,14 @@ data Option
 updOptLevel :: Int -> DynFlags -> DynFlags
 -- Set dynflags appropriate to the optimisation level
 updOptLevel n dfs
-  = dfs2{ optLevel = n }
+  = dfs2{ optLevel = final_n }
   where
+   final_n = max 0 (min 2 n)	-- Clamp to 0 <= n <= 2
    dfs1 = foldr (flip dopt_unset) dfs  remove_dopts
    dfs2 = foldr (flip dopt_set)   dfs1 extra_dopts
 
-   extra_dopts  = [ f | (ns,f) <- optLevelFlags, n `elem` ns ]
-   remove_dopts = [ f | (ns,f) <- optLevelFlags, n `notElem` ns ]
+   extra_dopts  = [ f | (ns,f) <- optLevelFlags, final_n `elem` ns ]
+   remove_dopts = [ f | (ns,f) <- optLevelFlags, final_n `notElem` ns ]
 	
 optLevelFlags :: [([Int], DynFlag)]
 optLevelFlags
