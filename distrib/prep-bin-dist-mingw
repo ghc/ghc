@@ -184,9 +184,6 @@ cp ${perl_dir}/perl56.dll .
 echo "formatting documentation"
 unix2dos < README > README.txt
 rm README
-mv share/ghc/doc .
-rmdir share/ghc
-rmdir share
 
 # Leave out pdf users_guide documentation for now; problematic to build with the versions
 # of 'xsltproc' and 'fop' I've been able to lay my hands on.
