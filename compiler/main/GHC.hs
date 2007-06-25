@@ -332,6 +332,7 @@ defaultCleanupHandler dflags inner =
 
 -- | Starts a new session.  A session consists of a set of loaded
 -- modules, a set of options (DynFlags), and an interactive context.
+-- ToDo: explain argument [[mb_top_dir]]
 newSession :: Maybe FilePath -> IO Session
 newSession mb_top_dir = do
   -- catch ^C
