@@ -922,6 +922,35 @@ EXTRA_SRCS += parser/Parser.y
 
 TAGS_HS_SRCS = parser/Parser.y.pp $(filter-out $(DERIVED_SRCS) main/Config.hs parser/Parser.y, $(sort $(SRCS)))
 
+WRONG_GHCTAGS_HS_SRCS = $(filter-out $(DERIVED_SRCS) main/Config.hs parser/Parser.y, $(sort $(SRCS)))
+# above is wrong because of the following problem:
+#      module `main:DataCon' is defined in multiple files: basicTypes/DataCon.lhs
+#                                                        basicTypes/DataCon.lhs-boot
+
+GHCTAGS_HS_SRCS = $(HS_SRCS)
+GHCTAGS_HC_OPTS = $(patsubst -i$(odir)/%, -i%, $(HC_OPTS))
+
+
+#------------------------------------------------------------
+# 			Tags
+
+.PHONY: ghctags
+
+ghctags :: $(GHCTAGS_HS_SRCS) $(TAGS_C_SRCS)
+	@if [ "$(stage)" != 2 ]; then echo "Must use 'make stage=2 ghctags'"; exit 1; fi
+	@$(RM) TAGS
+	@touch TAGS
+	@echo SOURCES ARE "$(GHCTAGS_HS_SRCS)"
+	: ifneq "$(GHCTAGS_HS_SRCS)" ""
+	@echo TIME TO ROCK AND ROLL
+	# $(GHCTAGS) -- $(MKDEPENDHS_OPTS) $(filter-out -split-objs, $(MKDEPENDHS_HC_OPTS)) -- $(GHCTAGS_HS_SRCS)
+	$(GHCTAGS) -- $(GHCTAGS_HC_OPTS) -- $(GHCTAGS_HS_SRCS)
+	: endif
+ifneq "$(TAGS_C_SRCS)" ""
+	etags -a $(TAGS_C_SRCS)
+endif
+	@( DEREFFED=`ls -l Makefile | sed -e 's/.*-> \(.*\)/\1/g'` && $(RM) `dirname $$DEREFFED`/TAGS && $(CP) TAGS `dirname $$DEREFFED` ) 2>/dev/null || echo TAGS file generated, perhaps copy over to source tree?
+
 include $(TOP)/mk/target.mk
 
 ifeq "$(BUILD_GHC_PACKAGE)" "YES"
