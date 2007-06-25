@@ -69,7 +69,7 @@ pprTyThingHdr exts (AClass cls)       = pprClassHdr   exts cls
         
 pprTyConHdr exts tyCon
   | Just (fam_tc, tys) <- tyConFamInst_maybe tyCon
-  = ptext keyword <+> ptext SLIT("instance") <+> pprTypeApp (ppr_bndr tyCon) tys
+  = ptext keyword <+> ptext SLIT("instance") <+> pprTypeApp tyCon (ppr_bndr tyCon) tys
   | otherwise
   = ptext keyword <+> opt_family <+> ppr_bndr tyCon <+> hsep (map ppr vars)
   where

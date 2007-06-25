@@ -707,7 +707,7 @@ wrongThingErr expected thing name
 		ptext SLIT("used as a") <+> text expected)
 
 famInstNotFound tycon tys what
-  = failWithTc (msg <+> quotes (pprTypeApp (ppr tycon) tys))
+  = failWithTc (msg <+> quotes (pprTypeApp tycon (ppr tycon) tys))
   where
     msg = ptext $ if length what > 1 
 		  then SLIT("More than one family instance for")
