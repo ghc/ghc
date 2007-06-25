@@ -1,22 +1,24 @@
 module Main where
-import Bag
-import Char
-import DriverPhases ( isHaskellSrcFilename )
-import DynFlags(GhcMode, defaultDynFlags)
-import ErrUtils ( printBagOfErrors )
-import FastString
+
 import GHC
+import DriverPhases ( isHaskellSrcFilename )
 import HscTypes (msHsFilePath)
-import IO
-import List
-import Maybe
 import Name
 import Outputable
+import ErrUtils ( printBagOfErrors )
+import DynFlags(GhcMode, defaultDynFlags)
 import SrcLoc
+import Bag
+import Util ( handle, handleDyn )
+import FastString
+
 import System.Environment
 import System.Console.GetOpt
 import System.Exit
-import Util ( handle, handleDyn )
+import Data.Char
+import System.IO
+import Data.List as List
+import Data.Maybe
 
 -- search for definitions of things 
 -- we do this by parsing the source and grabbing top-level definitions
