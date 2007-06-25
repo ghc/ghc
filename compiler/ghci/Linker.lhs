@@ -278,17 +278,31 @@ linkDependencies hsc_env span needed_mods = do
    linkModules dflags lnks
 
 
+-- | Temporarily extend the linker state.
+
 withExtendedLinkEnv :: [(Name,HValue)] -> IO a -> IO a
 withExtendedLinkEnv new_env action
     = bracket set_new_env
               reset_old_env
               (const action)
-    where set_new_env = do pls <- readIORef v_PersistentLinkerState
-                           let new_closure_env = extendClosureEnv (closure_env pls) new_env
-                               new_pls = pls { closure_env = new_closure_env }
-                           writeIORef v_PersistentLinkerState new_pls
-                           return (closure_env pls)
-          reset_old_env env = modifyIORef v_PersistentLinkerState (\pls -> pls{ closure_env = env })
+    where set_new_env = do 
+            pls <- readIORef v_PersistentLinkerState
+            let new_closure_env = extendClosureEnv (closure_env pls) new_env
+                new_pls = pls { closure_env = new_closure_env }
+            writeIORef v_PersistentLinkerState new_pls
+            return (closure_env pls)
+
+        -- Remember that the linker state might be side-effected
+        -- during the execution of the IO action, and we don't want to
+        -- lose those changes (we might have linked a new module or
+        -- package), so the reset action only removes the names we
+        -- added earlier.
+          reset_old_env env = do
+            modifyIORef v_PersistentLinkerState $ \pls ->
+                let cur = closure_env pls
+                    new = delListFromNameEnv cur (map fst new_env)
+                in
+                pls{ closure_env = new }
 
 -- filterNameMap removes from the environment all entries except 
 -- 	those for a given set of modules;
