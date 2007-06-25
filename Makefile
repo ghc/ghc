@@ -64,6 +64,9 @@ else
 SUBDIRS_BUILD = includes compat utils driver docs compiler rts
 endif
 
+# Needed for, e.g., clean
+SUBDIRS = $(SUBDIRS_BUILD)
+
 SUBDIRS_INSTALL = includes compat utils driver docs rts libraries compiler
 
 # Sanity check that all the core libraries are in the tree, to catch
