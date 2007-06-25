@@ -65,7 +65,7 @@ main = do
 	   exitWith (ExitFailure 1)
          else return ()
         GHC.defaultErrorHandler defaultDynFlags $ do
-          session <- newSession JustTypecheck (Just ghcRootDir)
+          session <- newSession (Just ghcRootDir)
           flags <- getSessionDynFlags session
           (pflags, _) <- parseDynamicFlags flags ghcArgs
           let flags = pflags { hscTarget = HscNothing } -- don't generate anything
@@ -239,9 +239,9 @@ boundThings modname lbinding =
                TypePat _ -> tl -- XXX need help here
                SigPatIn p _ -> patThings p tl
                SigPatOut p _ -> patThings p tl
-               DictPat _ _ -> tl
         conArgs (PrefixCon ps) tl = foldr patThings tl ps
-        conArgs (RecCon pairs) tl = foldr (\f tl -> patThings (hsRecFieldArg f) tl) tl pairs
+        conArgs (RecCon (HsRecFields { rec_flds = flds })) tl 
+             = foldr (\f tl -> patThings (hsRecFieldArg f) tl) tl flds
         conArgs (InfixCon p1 p2) tl = patThings p1 $ patThings p2 tl
 
 
