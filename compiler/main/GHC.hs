@@ -41,6 +41,7 @@ module GHC (
 	workingDirectoryChanged,
 	checkModule, CheckedModule(..),
 	TypecheckedSource, ParsedSource, RenamedSource,
+        compileToCore,
 
 	-- * Parsing Haddock comments
 	parseHaddockComment,
@@ -225,8 +226,11 @@ import Name             hiding ( varName )
 import OccName		( parenSymOcc )
 import InstEnv		( Instance, instanceDFunId, pprInstance, pprInstanceHdr )
 import SrcLoc
+import Desugar
+import CoreSyn
+import TcRnDriver       ( tcRnModule )
 import DriverPipeline
-import DriverPhases	( Phase(..), isHaskellSrcFilename, startPhase )
+import DriverPhases	( HscSource(..), Phase(..), isHaskellSrcFilename, startPhase )
 import HeaderInfo	( getImports, getOptions )
 import Finder
 import HscMain          ( newHscEnv, hscFileCheck, HscChecked(..) )
@@ -827,7 +831,34 @@ checkModule session@(Session ref) mod = do
 					typecheckedSource = Just tc_binds,
 					checkedModuleInfo = Just minf }))
 
--- ---------------------------------------------------------------------------
+-- | This is the way to get access to the Core bindings corresponding
+-- to a module. 'compileToCore' first invokes 'checkModule' to parse and
+-- typecheck the module, then desugars it and returns the resulting list
+-- of Core bindings if successful.
+compileToCore :: Session -> ModuleName -> FilePath -> IO (Maybe [CoreBind])
+compileToCore session@(Session ref) mod fn = do
+   hsc_env <- readIORef ref
+   maybeCheckedModule <- checkModule session mod
+   case maybeCheckedModule of
+     Nothing -> return Nothing 
+     Just checkedMod -> do
+       let parsedMod = parsedSource checkedMod
+       -- Note: this typechecks the module twice (because checkModule
+       -- also calls tcRnModule), but arranging for checkModule to
+       -- return the type env would require changing a lot of data
+       -- structures, so I'm leaving it like that for now.
+       (_, maybe_tc_result) <- tcRnModule hsc_env HsSrcFile False parsedMod
+       case maybe_tc_result of
+       -- TODO: this ignores the type error messages and just returns Nothing
+         Nothing -> return Nothing
+         Just tcgEnv -> do
+           let dflags = hsc_dflags hsc_env 
+           location <- mkHomeModLocation dflags mod fn
+           maybeModGuts <- deSugar hsc_env location tcgEnv
+           case maybeModGuts of
+             Nothing -> return Nothing
+             Just mg -> return $ Just $ mg_binds mg
+ -- ---------------------------------------------------------------------------
 -- Unloading
 
 unload :: HscEnv -> [Linkable] -> IO ()
