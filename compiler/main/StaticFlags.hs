@@ -163,7 +163,6 @@ static_flags = [
 	--------- Haskell Program Coverage -----------------------------------
 
   ,  ( "fhpc"           , PassFlag addOpt )
-  ,  ( "fhpc-tracer"    , PassFlag addOpt )
 
 	--------- Profiling --------------------------------------------------
   ,  ( "auto-all"	, NoArg (addOpt "-fauto-sccs-on-all-toplevs") )
@@ -284,12 +283,8 @@ opt_AutoSccsOnIndividualCafs	= lookUp  FSLIT("-fauto-sccs-on-individual-cafs")
 opt_SccProfilingOn		= lookUp  FSLIT("-fscc-profiling")
 opt_DoTickyProfiling            = WayTicky `elem` (unsafePerformIO $ readIORef v_Ways)
 
--- Hpc opts, only work in a stage2 build
-#if GHCI
+-- Hpc opts
 opt_Hpc				= lookUp FSLIT("-fhpc")  
-#else
-opt_Hpc				= False
-#endif
 
 -- language opts
 opt_DictsStrict			= lookUp  FSLIT("-fdicts-strict")

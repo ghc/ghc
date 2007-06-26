@@ -38,10 +38,8 @@ import Compat.Directory ( createDirectoryIfMissing )
 import System.Directory ( createDirectoryIfMissing )
 #endif
 
-#if GHCI
 import Trace.Hpc.Mix
 import Trace.Hpc.Util
-#endif
 
 import BreakArray 
 import Data.HashTable   ( hashString )
@@ -63,7 +61,6 @@ addCoverageTicksToBinds
         -> LHsBinds Id
         -> IO (LHsBinds Id, HpcInfo, ModBreaks)
 
-#if GHCI
 addCoverageTicksToBinds dflags mod mod_loc tyCons binds = do 
 
   let orig_file = 
@@ -102,7 +99,8 @@ addCoverageTicksToBinds dflags mod mod_loc tyCons binds = do
      when (length entries' /= tickBoxCount st) $ do
        panic "the number of .mix entries are inconsistent"
      let hashNo = mixHash orig_file modTime tabStop entries'
-     mixCreate hpc_dir mod_name (Mix orig_file modTime (toHash hashNo) tabStop entries')
+     mixCreate hpc_dir mod_name 
+     	       $ Mix orig_file modTime (toHash hashNo) tabStop entries'
      return $ hashNo 
    else do
      return $ 0
@@ -714,12 +712,4 @@ type MixEntry_ = (SrcSpan, [OccName], BoxLabel)
 mixHash :: FilePath -> Integer -> Int -> [MixEntry] -> Int
 mixHash file tm tabstop entries = fromIntegral $ hashString
 	(show $ Mix file tm 0 tabstop entries)
-\end{code}
-
-
-\begin{code}
-#else
-addCoverageTicksToBinds dflags mod mod_loc tyCons binds =
-	return (binds, noHpcInfo, emptyModBreaks)
-#endif
 \end{code}
