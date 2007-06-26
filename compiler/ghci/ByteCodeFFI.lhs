@@ -356,15 +356,23 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
      -- flt arg regs: xmm0..xmm7
      int_loads   = [ movq_rbpoff_rdi, movq_rbpoff_rsi, movq_rbpoff_rdx,
  		     movq_rbpoff_rcx, movq_rbpoff_r8,  movq_rbpoff_r9 ]
-     float_loads = [ (mov_f32_rbpoff_xmm n, mov_f64_rbpoff_xmm n) | n <- [0..7] ]
+     float_loads = [ 0..7 ]
 
      load_arg_regs args [] [] code     =  (args, [], code)
      load_arg_regs [] iregs fregs code =  ([], fregs, code)
      load_arg_regs ((off,rep):args) iregs fregs code
-	| FloatArg  <- rep, ((mov_f32,_):frest) <- fregs =
-		load_arg_regs args iregs frest (mov_f32 (bytes_per_word * off) : code)
-	| DoubleArg <- rep, ((_,mov_f64):frest) <- fregs =
-		load_arg_regs args iregs frest (mov_f64 (bytes_per_word * off) : code)
+	| FloatArg  <- rep =
+            case fregs of
+              [] -> push_this_arg
+              n : frest ->
+		load_arg_regs args iregs frest 
+                      (mov_f32_rbpoff_xmm n (bytes_per_word * off) : code)
+	| DoubleArg <- rep =
+            case fregs of
+              [] -> push_this_arg
+              n : frest ->
+		load_arg_regs args iregs frest 
+                       (mov_f64_rbpoff_xmm n (bytes_per_word * off) : code)
 	| (mov_reg:irest) <- iregs =
 		load_arg_regs args irest fregs (mov_reg (bytes_per_word * off) : code)
 	| otherwise =
@@ -409,17 +417,21 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
 --  2d:   4c 8b 95 78 56 34 12    mov    0x12345678(%rbp),%r10
 --  34:   48 c7 c0 78 56 34 12    mov    $0x12345678,%rax
 --  3b:   48 89 85 78 56 34 12    mov    %rax,0x12345678(%rbp)
---  42:   f3 0f 10 85 78 56 34 12 movss  0x12345678(%rbp),%xmm0
---  4a:   f2 0f 10 85 78 56 34 12 movsd  0x12345678(%rbp),%xmm0
---  52:   f3 0f 11 85 78 56 34 12 movss  %xmm0,0x12345678(%rbp)
---  5a:   f2 0f 11 85 78 56 34 12 movsd  %xmm0,0x12345678(%rbp)
---  62:   ff b5 78 56 34 12       pushq  0x12345678(%rbp)
---  68:   f3 44 0f 11 04 24       movss  %xmm8,(%rsp)
---  6e:   f2 44 0f 11 04 24       movsd  %xmm8,(%rsp)
---  74:   48 81 ec 78 56 34 12    sub    $0x12345678,%rsp
---  7b:   48 81 c4 78 56 34 12    add    $0x12345678,%rsp
---  82:   41 ff d2                callq  *%r10
---  85:   c3                      retq   
+--  42:   f3 0f 10 bd 78 56 34 12 movss  0x12345678(%rbp),%xmm7
+--  4a:   f2 0f 10 9d 78 56 34 12 movsd  0x12345678(%rbp),%xmm3
+--  52:   f2 44 0f 10 85 78 56 34 12 movsd  0x12345678(%rbp),%xmm8
+--  5b:   f3 0f 11 9d 78 56 34 12 movss  %xmm3,0x12345678(%rbp)
+--  63:   f2 0f 11 9d 78 56 34 12 movsd  %xmm3,0x12345678(%rbp)
+--  6b:   f2 44 0f 11 85 78 56 34 12 movsd  %xmm8,0x12345678(%rbp)
+--  74:   ff b5 78 56 34 12       pushq  0x12345678(%rbp)
+--  7a:   f3 44 0f 11 04 24       movss  %xmm8,(%rsp)
+--  80:   f2 44 0f 11 04 24       movsd  %xmm8,(%rsp)
+--  86:   48 81 ec 78 56 34 12    sub    $0x12345678,%rsp
+--  8d:   48 81 c4 78 56 34 12    add    $0x12345678,%rsp
+--  94:   41 ff d2                callq  *%r10
+--  97:   55                      push   %rbp
+--  98:   5d                      pop    %rbp
+--  99:   c3                      retq   
 
      movq_rdi_rbp         = [0x48,0x89,0xfd]
      movq_rbpoff_rdi  off = [0x48, 0x8b, 0xbd] ++ lit32 off
@@ -431,19 +443,23 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
      movq_rbpoff_r10  off = [0x4c, 0x8b, 0x95] ++ lit32 off
      movq_lit_rax     lit = [0x48, 0xc7, 0xc0] ++ lit32 lit
      movq_rax_rbpoff  off = [0x48, 0x89, 0x85] ++ lit32 off
-     mov_f32_rbpoff_xmm n off = [0xf3, 0x0f, 0x10, 0x85 + n`shiftL`3] ++ lit32 off
-     mov_f64_rbpoff_xmm n off = [0xf2, 0x0f, 0x10, 0x85 + n`shiftL`3] ++ lit32 off
+     mov_f32_rbpoff_xmm n off
+         = 0xf3 : if n >= 8 then 0x44 : rest else rest
+         where rest = [0x0f, 0x10, 0x85 + (n.&.7)`shiftL`3] ++ lit32 off
+     mov_f64_rbpoff_xmm n off
+         = 0xf2 : if n >= 8 then 0x44 : rest else rest
+         where rest = [0x0f, 0x10, 0x85 + (n.&.7)`shiftL`3] ++ lit32 off
      mov_f32_xmm0_rbpoff  off = [0xf3, 0x0f, 0x11, 0x85] ++ lit32 off
      mov_f64_xmm0_rbpoff  off = [0xf2, 0x0f, 0x11, 0x85] ++ lit32 off
      pushq_rbpoff     off = [0xff, 0xb5] ++ lit32 off
      push_f32_rbpoff  off = 
+	subq_lit_rsp 8 ++			 -- subq $8, %rsp
 	mov_f32_rbpoff_xmm 8 off ++		 -- movss off(%rbp), %xmm8
-	[0xf3, 0x44, 0x0f, 0x11, 0x04, 0x24] ++	 -- movss %xmm8, (%rsp)
-	subq_lit_rsp 8				 -- subq $8, %rsp
+	[0xf3, 0x44, 0x0f, 0x11, 0x04, 0x24]	 -- movss %xmm8, (%rsp)
      push_f64_rbpoff  off =
+	subq_lit_rsp 8 ++			 -- subq $8, %rsp
 	mov_f64_rbpoff_xmm 8 off ++		 -- movsd off(%rbp), %xmm8
-	[0xf2, 0x44, 0x0f, 0x11, 0x04, 0x24] ++  -- movsd %xmm8, (%rsp)
-	subq_lit_rsp 8				 -- subq $8, %rsp
+	[0xf2, 0x44, 0x0f, 0x11, 0x04, 0x24]     -- movsd %xmm8, (%rsp)
      subq_lit_rsp     lit = [0x48, 0x81, 0xec] ++ lit32 lit
      addq_lit_rsp     lit = [0x48, 0x81, 0xc4] ++ lit32 lit
      call_star_r10 = [0x41,0xff,0xd2]
