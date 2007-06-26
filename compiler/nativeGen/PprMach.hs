@@ -770,7 +770,6 @@ pprDataItem lit
 	   | otherwise =
 		[ptext SLIT("\t.quad\t") <> pprImm imm]
 	   where
-		isRelativeReloc (CmmLabelOff _ _)       = True
 		isRelativeReloc (CmmLabelDiffOff _ _ _) = True
 		isRelativeReloc _ = False
 #endif
