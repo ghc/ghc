@@ -841,7 +841,7 @@ INFO_TABLE_RET( stg_block_takemvar, 1/*framesize*/, 0/*bitmap*/, RET_SMALL )
 stg_block_takemvar_finally
 {
 #ifdef THREADED_RTS
-    foreign "C" unlockClosure(R3 "ptr", stg_EMPTY_MVAR_info);
+    unlockClosure(R3, stg_EMPTY_MVAR_info);
 #endif
     jump StgReturn;
 }
@@ -867,7 +867,7 @@ INFO_TABLE_RET( stg_block_putmvar, 2/*framesize*/, 0/*bitmap*/, RET_SMALL )
 stg_block_putmvar_finally
 {
 #ifdef THREADED_RTS
-    foreign "C" unlockClosure(R3 "ptr", stg_FULL_MVAR_info);
+    unlockClosure(R3, stg_FULL_MVAR_info);
 #endif
     jump StgReturn;
 }

@@ -273,6 +273,8 @@
 #include "DerivedConstants.h"
 #include "ClosureTypes.h"
 #include "StgFun.h"
+#include "OSThreads.h"
+#include "SMP.h"
 
 /*
  * Need MachRegs, because some of the RTS code is conditionally

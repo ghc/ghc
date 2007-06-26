@@ -16,6 +16,14 @@
  *      Unregisterised builds are ok, but only 1 CPU supported.
  */
 
+#ifdef CMINUSMINUS
+
+#define unlockClosure(ptr,info)                 \
+    prim %write_barrier() [];                   \
+    StgHeader_info(ptr) = info;    
+
+#else
+
 #if defined(THREADED_RTS)
 
 #if  defined(TICKY_TICKY)
@@ -175,7 +183,15 @@ write_barrier(void) {
 
 #define SPIN_COUNT 4000
 
-INLINE_HEADER StgInfoTable *
+#ifdef KEEP_LOCKCLOSURE
+// We want a callable copy of lockClosure() so that we can refer to it
+// from .cmm files compiled using the native codegen.
+extern StgInfoTable *lockClosure(StgClosure *p);
+INLINE_ME
+#else
+INLINE_HEADER
+#endif
+StgInfoTable *
 lockClosure(StgClosure *p)
 {
     StgWord info;
@@ -323,3 +339,5 @@ INLINE_HEADER void unlockTSO(StgTSO *tso)
 { unlockClosure((StgClosure*)tso, (StgInfoTable*)&stg_TSO_info); }
 
 #endif /* SMP_H */
+
+#endif /* CMINUSMINUS */

@@ -14,6 +14,14 @@
 
 # if defined(HAVE_PTHREAD_H) && !defined(WANT_NATIVE_WIN32_THREADS)
 
+#if CMINUSMINUS
+
+#define ACQUIRE_LOCK(mutex) pthread_mutex_lock(mutex)
+#define RELEASE_LOCK(mutex) pthread_mutex_unlock(mutex)
+#define ASSERT_LOCK_HELD(mutex) /* nothing */
+
+#else
+
 #include <pthread.h>
 
 typedef pthread_cond_t  Condition;
@@ -67,6 +75,8 @@ typedef pthread_key_t   ThreadLocalKey;
 #define ASSERT_LOCK_HELD(mutex) /* nothing */
 
 #endif
+
+#endif // CMINUSMINUS
 
 # elif defined(HAVE_WINDOWS_H)
 #include <windows.h>
@@ -137,6 +147,8 @@ typedef HANDLE Mutex;
 #  error "Threads not supported"
 # endif
 
+
+#ifndef CMINUSMINUS
 //
 // General thread operations
 //
@@ -173,6 +185,8 @@ void  newThreadLocalKey (ThreadLocalKey *key);
 void *getThreadLocalVar (ThreadLocalKey *key);
 void  setThreadLocalVar (ThreadLocalKey *key, void *value);
 void  freeThreadLocalKey (ThreadLocalKey *key);
+
+#endif // !CMINUSMINUS
 
 #else
 

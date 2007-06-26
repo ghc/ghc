@@ -1533,7 +1533,7 @@ takeMVarzh_fast
       }
 
 #if defined(THREADED_RTS)
-      foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info) [];
+      unlockClosure(mvar, stg_FULL_MVAR_info);
 #endif
       RET_P(val);
   } 
@@ -1543,7 +1543,7 @@ takeMVarzh_fast
       StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
  
 #if defined(THREADED_RTS)
-      foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info) [];
+      unlockClosure(mvar, stg_EMPTY_MVAR_info);
 #else
       SET_INFO(mvar,stg_EMPTY_MVAR_info);
 #endif
@@ -1569,7 +1569,7 @@ tryTakeMVarzh_fast
 
     if (info == stg_EMPTY_MVAR_info) {
 #if defined(THREADED_RTS)
-        foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info) [];
+        unlockClosure(mvar, stg_EMPTY_MVAR_info);
 #endif
 	/* HACK: we need a pointer to pass back, 
 	 * so we abuse NO_FINALIZER_closure
@@ -1606,7 +1606,7 @@ tryTakeMVarzh_fast
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
 	}
 #if defined(THREADED_RTS)
-        foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info) [];
+        unlockClosure(mvar, stg_FULL_MVAR_info);
 #endif
     }
     else 
@@ -1614,7 +1614,7 @@ tryTakeMVarzh_fast
 	/* No further putMVars, MVar is now empty */
 	StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
 #if defined(THREADED_RTS)
-    	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info) [];
+    	unlockClosure(mvar, stg_EMPTY_MVAR_info);
 #else
 	SET_INFO(mvar,stg_EMPTY_MVAR_info);
 #endif
@@ -1676,7 +1676,7 @@ putMVarzh_fast
 	}
 
 #if defined(THREADED_RTS)
-    	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info) [];
+    	unlockClosure(mvar, stg_EMPTY_MVAR_info);
 #endif
 	jump %ENTRY_CODE(Sp(0));
     }
@@ -1686,7 +1686,7 @@ putMVarzh_fast
 	StgMVar_value(mvar) = R2;
 
 #if defined(THREADED_RTS)
-    	foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info) [];
+    	unlockClosure(mvar, stg_FULL_MVAR_info);
 #else
 	SET_INFO(mvar,stg_FULL_MVAR_info);
 #endif
@@ -1712,7 +1712,7 @@ tryPutMVarzh_fast
 
     if (info == stg_FULL_MVAR_info) {
 #if defined(THREADED_RTS)
-    	foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info) [];
+    	unlockClosure(mvar, stg_FULL_MVAR_info);
 #endif
 	RET_N(0);
     }
@@ -1742,7 +1742,7 @@ tryPutMVarzh_fast
 	}
 
 #if defined(THREADED_RTS)
-    	foreign "C" unlockClosure(mvar "ptr", stg_EMPTY_MVAR_info) [];
+    	unlockClosure(mvar, stg_EMPTY_MVAR_info);
 #endif
     }
     else
@@ -1751,7 +1751,7 @@ tryPutMVarzh_fast
 	StgMVar_value(mvar) = R2;
 
 #if defined(THREADED_RTS)
-    	foreign "C" unlockClosure(mvar "ptr", stg_FULL_MVAR_info) [];
+    	unlockClosure(mvar, stg_FULL_MVAR_info);
 #else
 	SET_INFO(mvar,stg_FULL_MVAR_info);
 #endif

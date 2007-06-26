@@ -7,6 +7,7 @@
  * --------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
+#define KEEP_LOCKCLOSURE
 #include "Rts.h"
 #include "SchedAPI.h"
 #include "RtsUtils.h"
