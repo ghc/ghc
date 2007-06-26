@@ -162,7 +162,7 @@ cgExpr x@(StgOpApp op@(StgPrimOp primop) args res_ty)
   | ReturnsPrim rep <- result_info
 	= do cgPrimOp [dataReturnConvPrim (primRepToCgRep rep)] 
 			primop args emptyVarSet
-	     performReturn emitReturnInstr
+	     performPrimReturn (primRepToCgRep rep) (CmmReg (CmmLocal res))
 
   | ReturnsAlg tycon <- result_info, isUnboxedTupleTyCon tycon
 	= do (reps, regs, _hints) <- newUnboxedTupleRegs res_ty
