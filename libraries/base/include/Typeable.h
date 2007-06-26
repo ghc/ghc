@@ -1,14 +1,15 @@
-{- ----------------------------------------------------------------------------
- * Macros to help make Typeable instances.
- *
- * INSTANCE_TYPEABLEn(tc,tcname,"tc") defines
- *
- *	instance Typeable/n/ tc
- *	instance Typeable a => Typeable/n-1/ (tc a)
- *	instance (Typeable a, Typeable b) => Typeable/n-2/ (tc a b)
- *	...
- *	instance (Typeable a1, ..., Typeable an) => Typeable (tc a1 ... an)
- * -------------------------------------------------------------------------- -}
+{- --------------------------------------------------------------------------
+// Macros to help make Typeable instances.
+//
+// INSTANCE_TYPEABLEn(tc,tcname,"tc") defines
+//
+//	instance Typeable/n/ tc
+//	instance Typeable a => Typeable/n-1/ (tc a)
+//	instance (Typeable a, Typeable b) => Typeable/n-2/ (tc a b)
+//	...
+//	instance (Typeable a1, ..., Typeable an) => Typeable (tc a1 ... an)
+// --------------------------------------------------------------------------
+-}
 
 #ifndef TYPEABLE_H
 #define TYPEABLE_H
@@ -19,8 +20,8 @@ instance Typeable tycon where { typeOf _ = mkTyConApp tcname [] }
 
 #ifdef __GLASGOW_HASKELL__
 
--- For GHC, the extra instances follow from general instance declarations
--- defined in Data.Typeable.
+-- // For GHC, the extra instances follow from general instance declarations
+-- // defined in Data.Typeable.
 
 #define INSTANCE_TYPEABLE1(tycon,tcname,str) \
 tcname = mkTyCon str; \

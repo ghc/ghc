@@ -1,19 +1,22 @@
-{- -----------------------------------------------------------------------------
- * Dirty CPP hackery for CTypes/CTypesISO
- *
- * (c) The FFI task force, 2000
- * -------------------------------------------------------------------------- -}
+{- --------------------------------------------------------------------------
+// Dirty CPP hackery for CTypes/CTypesISO
+//
+// (c) The FFI task force, 2000
+// --------------------------------------------------------------------------
+-}
 
 #ifndef CTYPES__H
 #define CTYPES__H
 
 #include "Typeable.h"
 
-{- As long as there is no automatic derivation of classes for newtypes we resort
-   to extremely dirty cpp-hackery.   :-P   Some care has to be taken when the
-   macros below are modified, otherwise the layout rule will bite you.-}
+{-
+// As long as there is no automatic derivation of classes for newtypes we resort
+// to extremely dirty cpp-hackery.   :-P   Some care has to be taken when the
+// macros below are modified, otherwise the layout rule will bite you.
+-}
 
-{- A hacked version for GHC follows the Haskell 98 version... -}
+-- // A hacked version for GHC follows the Haskell 98 version...
 #ifndef __GLASGOW_HASKELL__
 
 #define ARITHMETIC_TYPE(T,C,S,B) \
@@ -168,9 +171,7 @@ instance Storable T where { \
 
 #else /* __GLASGOW_HASKELL__ */
 
-{- GHC can derive any class for a newtype, so we make use of that
- * here...
- -}
+-- // GHC can derive any class for a newtype, so we make use of that here...
 
 #define ARITHMETIC_CLASSES  Eq,Ord,Num,Enum,Storable,Real
 #define INTEGRAL_CLASSES Bounded,Integral,Bits
