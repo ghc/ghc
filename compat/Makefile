@@ -10,6 +10,7 @@ ALL_DIRS = \
 	System \
 	System/FilePath \
 	System/Directory \
+	Trace/Hpc \
 	cbits
 
 SplitObjs=NO
@@ -79,6 +80,9 @@ Distribution/ParseUtils.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/
 Distribution/Compiler.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Compiler.hs
 Distribution/Version.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Version.hs
 Language/Haskell/Extension.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Language/Haskell/Extension.hs
+Trace/Hpc/Mix.$(way_)o :  $(FPTOOLS_TOP)/libraries/hpc/Trace/Hpc/Mix.hs
+Trace/Hpc/Util.$(way_)o :  $(FPTOOLS_TOP)/libraries/hpc/Trace/Hpc/Util.hs
+
 cbits/unicode.o : $(FPTOOLS_TOP)/libraries/base/cbits/WCsubst.c $(FPTOOLS_TOP)/libraries/base/include/WCsubst.h
 
 SRC_CC_OPTS += -I$(FPTOOLS_TOP)/libraries/base/cbits -I$(FPTOOLS_TOP)/libraries/base/include
