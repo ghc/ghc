@@ -5,12 +5,13 @@ HS_PROG		= hpc$(exeext)
 INSTALL_PROGS  += $(HS_PROG)
 HPC_LIB         = $(TOP)/libraries/hpc
 
-SRCS += Trace/Hpc/Mix.hs Trace/Hpc/Tix.hs Trace/Hpc/Util.hs
+# This causes libghccompat.a to be used:
+include $(GHC_COMPAT_DIR)/compat.mk
 
-# workaround till we can force hpc to be built with stage-1.
-Trace/Hpc/%.hs: $(HPC_LIB)/Trace/Hpc/%.hs
-	mkdir -p Trace/Hpc
-	cp $(HPC_LIB)/$@ $@
+# This is required because libghccompat.a must be built with
+# $(GhcHcOpts) because it is linked to the compiler, and hence
+# we must also build with $(GhcHcOpts) here:
+SRC_HC_OPTS += $(GhcHcOpts) $(GhcStage1HcOpts)
 
 binary-dist:
 	$(INSTALL_DIR)                $(BIN_DIST_DIR)/utils/hpc
