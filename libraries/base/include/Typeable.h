@@ -20,8 +20,8 @@ instance Typeable tycon where { typeOf _ = mkTyConApp tcname [] }
 
 #ifdef __GLASGOW_HASKELL__
 
--- // For GHC, the extra instances follow from general instance declarations
--- // defined in Data.Typeable.
+--  // For GHC, the extra instances follow from general instance declarations
+--  // defined in Data.Typeable.
 
 #define INSTANCE_TYPEABLE1(tycon,tcname,str) \
 tcname = mkTyCon str; \

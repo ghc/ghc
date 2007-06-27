@@ -16,7 +16,7 @@
 // macros below are modified, otherwise the layout rule will bite you.
 -}
 
--- // A hacked version for GHC follows the Haskell 98 version...
+--  // A hacked version for GHC follows the Haskell 98 version...
 #ifndef __GLASGOW_HASKELL__
 
 #define ARITHMETIC_TYPE(T,C,S,B) \
@@ -171,7 +171,7 @@ instance Storable T where { \
 
 #else /* __GLASGOW_HASKELL__ */
 
--- // GHC can derive any class for a newtype, so we make use of that here...
+--  // GHC can derive any class for a newtype, so we make use of that here...
 
 #define ARITHMETIC_CLASSES  Eq,Ord,Num,Enum,Storable,Real
 #define INTEGRAL_CLASSES Bounded,Integral,Bits
