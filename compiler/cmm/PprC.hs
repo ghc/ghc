@@ -199,11 +199,11 @@ pprStmt stmt = case stmt of
 	where
 	  rep = cmmExprRep src
 
-    CmmCall (CmmForeignCall fn cconv) results args srt ->
+    CmmCall (CmmForeignCall fn cconv) results args safety ->
 	-- Controversial: leave this out for now.
 	-- pprUndef fn $$
 
-	pprCall ppr_fn cconv results args srt
+	pprCall ppr_fn cconv results args safety
 	where
     	ppr_fn = case fn of
 		   CmmLit (CmmLabel lbl) -> pprCLabel lbl
@@ -220,8 +220,8 @@ pprStmt stmt = case stmt of
 	   ptext SLIT("#undef") <+> pprCLabel lbl
 	pprUndef _ = empty
 
-    CmmCall (CmmPrim op) results args srt ->
-	pprCall ppr_fn CCallConv results args srt
+    CmmCall (CmmPrim op) results args safety ->
+	pprCall ppr_fn CCallConv results args safety
 	where
     	ppr_fn = pprCallishMachOp_for_C op
 
@@ -719,7 +719,7 @@ pprLocalReg (LocalReg uniq _ _) = char '_' <> ppr uniq
 -- -----------------------------------------------------------------------------
 -- Foreign Calls
 
-pprCall :: SDoc -> CCallConv -> CmmHintFormals -> CmmActuals -> C_SRT
+pprCall :: SDoc -> CCallConv -> CmmHintFormals -> CmmActuals -> CmmSafety
 	-> SDoc
 
 pprCall ppr_fn cconv results args _

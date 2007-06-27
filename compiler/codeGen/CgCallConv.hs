@@ -15,7 +15,7 @@ module CgCallConv (
 	mkArgDescr, argDescrType,
 
 	-- Liveness
-	isBigLiveness, buildContLiveness, mkRegLiveness, 
+	isBigLiveness, mkRegLiveness, 
 	smallLiveness, mkLivenessCLit,
 
 	-- Register assignment
@@ -71,7 +71,7 @@ import Data.Bits
 #include "../includes/StgFun.h"
 
 -------------------------
-argDescrType :: ArgDescr -> Int
+argDescrType :: ArgDescr -> StgHalfWord
 -- The "argument type" RTS field type
 argDescrType (ArgSpec n) = n
 argDescrType (ArgGen liveness)
@@ -98,7 +98,7 @@ argBits [] 		= []
 argBits (PtrArg : args) = False : argBits args
 argBits (arg    : args) = take (cgRepSizeW arg) (repeat True) ++ argBits args
 
-stdPattern :: [CgRep] -> Maybe Int
+stdPattern :: [CgRep] -> Maybe StgHalfWord
 stdPattern []          = Just ARG_NONE	-- just void args, probably
 
 stdPattern [PtrArg]    = Just ARG_P
@@ -133,6 +133,14 @@ stdPattern other = Nothing
 --
 -------------------------------------------------------------------------
 
+-- TODO: This along with 'mkArgDescr' should be unified
+-- with 'CmmInfo.mkLiveness'.  However that would require
+-- potentially invasive changes to the 'ClosureInfo' type.
+-- For now, 'CmmInfo.mkLiveness' handles only continuations and
+-- this one handles liveness everything else.  Another distinction
+-- between these two is that 'CmmInfo.mkLiveness' information
+-- about the stack layout, and this one is information about
+-- the heap layout of PAPs.
 mkLiveness :: Name -> Int -> Bitmap -> FCode Liveness
 mkLiveness name size bits
   | size > mAX_SMALL_BITMAP_SIZE		-- Bitmap does not fit in one word
@@ -281,56 +289,6 @@ getSequelAmode
 	    UpdateCode 	      -> returnFC (CmmLit (CmmLabel mkUpdInfoLabel))
 	    CaseAlts lbl _ _  -> returnFC (CmmLit (CmmLabel lbl))
 	}
-
--------------------------------------------------------------------------
---
---		Build a liveness mask for the current stack
---
--------------------------------------------------------------------------
-
--- There are four kinds of things on the stack:
---
---	- pointer variables (bound in the environment)
--- 	- non-pointer variables (bound in the environment)
--- 	- free slots (recorded in the stack free list)
--- 	- non-pointer data slots (recorded in the stack free list)
--- 
--- We build up a bitmap of non-pointer slots by searching the environment
--- for all the pointer variables, and subtracting these from a bitmap
--- with initially all bits set (up to the size of the stack frame).
-
-buildContLiveness :: Name		-- Basis for label (only)
-		  -> [VirtualSpOffset] 	-- Live stack slots
-		  -> FCode Liveness
-buildContLiveness name live_slots
- = do	{ stk_usg    <- getStkUsage
-	; let	StackUsage { realSp = real_sp, 
-			     frameSp = frame_sp } = stk_usg
-
-		start_sp :: VirtualSpOffset
-		start_sp = real_sp - retAddrSizeW
-		-- In a continuation, we want a liveness mask that 
-		-- starts from just after the return address, which is 
-		-- on the stack at real_sp.
-
-		frame_size :: WordOff
-		frame_size = start_sp - frame_sp
-		-- real_sp points to the frame-header for the current
-		-- stack frame, and the end of this frame is frame_sp.
-		-- The size is therefore real_sp - frame_sp - retAddrSizeW
-		-- (subtract one for the frame-header = return address).
-	
-		rel_slots :: [WordOff]
-	 	rel_slots = sortLe (<=) 
-	    	    [ start_sp - ofs  -- Get slots relative to top of frame
-	    	    | ofs <- live_slots ]
-
-		bitmap = intsToReverseBitmap frame_size rel_slots
-
-	; WARN( not (all (>=0) rel_slots), 
-		ppr name $$ ppr live_slots $$ ppr frame_size $$ ppr start_sp $$ ppr rel_slots )
-	  mkLiveness name frame_size bitmap }
-
 
 -------------------------------------------------------------------------
 --

@@ -12,10 +12,7 @@ module CgInfoTbls (
 	dataConTagZ,
 	emitReturnTarget, emitAlgReturnTarget,
 	emitReturnInstr,
-	mkRetInfoTable,
-	mkStdInfoTable,
 	stdInfoTableSizeB,
-	mkFunGenInfoExtraBits,
 	entryCode, closureInfoPtr,
 	getConstrTag,
 	infoTable, infoTableClosureType,
@@ -46,6 +43,8 @@ import StaticFlags
 import Maybes
 import Constants
 import Panic
+import Util
+import Outputable
 
 -------------------------------------------------------------------------
 --
@@ -53,114 +52,80 @@ import Panic
 --
 -------------------------------------------------------------------------
 
--- Here we make a concrete info table, represented as a list of CmmAddr
--- (it can't be simply a list of Word, because the SRT field is
--- represented by a label+offset expression).
-
--- With tablesNextToCode, the layout is
---	<reversed variable part>
---	<normal forward StgInfoTable, but without 
---		an entry point at the front>
---	<code>
---
--- Without tablesNextToCode, the layout of an info table is
---	<entry label>
---	<normal forward rest of StgInfoTable>
---	<forward variable part>
---
---	See includes/InfoTables.h
+-- Here we make an info table of type 'CmmInfo'.  The concrete
+-- representation as a list of 'CmmAddr' is handled later
+-- in the pipeline by 'cmmToRawCmm'.
 
 emitClosureCodeAndInfoTable :: ClosureInfo -> CmmFormals -> CgStmts -> Code
 emitClosureCodeAndInfoTable cl_info args body
- = do	{ ty_descr_lit <- 
-		if opt_SccProfilingOn 
-		   then do lit <- mkStringCLit (closureTypeDescr cl_info)
-                           return (makeRelativeRefTo info_lbl lit)
-		   else return (mkIntCLit 0)
-  	; cl_descr_lit <- 
-		if opt_SccProfilingOn 
-		   then do lit <- mkStringCLit cl_descr_string
-                           return (makeRelativeRefTo info_lbl lit)
-		   else return (mkIntCLit 0)
-	; let std_info = mkStdInfoTable ty_descr_lit cl_descr_lit 
-					cl_type srt_len layout_lit
-
-	; blks <- cgStmtsToBlocks body
-
-        ; conName <-  
-             if is_con
-                then do cstr <- mkByteStringCLit $ fromJust conIdentity
-                        return (makeRelativeRefTo info_lbl cstr)
-                else return (mkIntCLit 0)
-
-	; panic "emitClosureCodeAndInfoTable" } --emitInfoTableAndCode info_lbl std_info (extra_bits conName) args blks }
+ = do	{ blks <- cgStmtsToBlocks body
+        ; info <- mkCmmInfo cl_info
+        ; emitInfoTableAndCode info_lbl info args blks }
   where
     info_lbl  = infoTableLabelFromCI cl_info
-
-    cl_descr_string = closureValDescr cl_info
-    cl_type = smRepClosureTypeInt (closureSMRep cl_info)
-
-    srt = closureSRT cl_info	     
-    needs_srt = needsSRT srt
-
-    mb_con = isConstrClosure_maybe  cl_info
-    is_con = isJust mb_con
-
-    (srt_label,srt_len,conIdentity)
-	= case mb_con of
-	    Just con -> -- Constructors don't have an SRT
-			-- We keep the *zero-indexed* tag in the srt_len
-			-- field of the info table. 
-			(mkIntCLit 0, fromIntegral (dataConTagZ con), 
-                         Just $ dataConIdentity con) 
-
-	    Nothing  -> -- Not a constructor
-                        let (label, len) = srtLabelAndLength srt info_lbl
-                        in (label, len, Nothing)
-
-    ptrs       = closurePtrsSize cl_info
-    nptrs      = size - ptrs
-    size       = closureNonHdrSize cl_info
-    layout_lit = packHalfWordsCLit ptrs nptrs
-
-    extra_bits conName 
-	| is_fun    = fun_extra_bits
-	| is_con    = [conName]
-	| needs_srt = [srt_label]
- 	| otherwise = []
-
-    maybe_fun_stuff = closureFunInfo cl_info
-    is_fun = isJust maybe_fun_stuff
-    (Just (arity, arg_descr)) = maybe_fun_stuff
-
-    fun_extra_bits
-	| ArgGen liveness <- arg_descr
-	= [ fun_amode,
-	    srt_label,
-	    makeRelativeRefTo info_lbl $ mkLivenessCLit liveness, 
-	    slow_entry ]
-	| needs_srt = [fun_amode, srt_label]
-	| otherwise = [fun_amode]
-
-    slow_entry = makeRelativeRefTo info_lbl (CmmLabel slow_entry_label)
-    slow_entry_label = mkSlowEntryLabel (closureName cl_info)
-
-    fun_amode = packHalfWordsCLit fun_type arity
-    fun_type  = argDescrType arg_descr
 
 -- We keep the *zero-indexed* tag in the srt_len field of the info
 -- table of a data constructor.
 dataConTagZ :: DataCon -> ConTagZ
 dataConTagZ con = dataConTag con - fIRST_TAG
 
--- A low-level way to generate the variable part of a fun-style info table.
--- (must match fun_extra_bits above).  Used by the C-- parser.
-mkFunGenInfoExtraBits :: Int -> Int -> CmmLit -> CmmLit -> CmmLit -> [CmmLit]
-mkFunGenInfoExtraBits fun_type arity srt_label liveness slow_entry
-  = [ packHalfWordsCLit fun_type arity,
-      srt_label,
-      liveness,
-      slow_entry ]
+-- Convert from 'ClosureInfo' to 'CmmInfo'.
+-- Not used for return points.  (The 'smRepClosureTypeInt' call would panic.)
+mkCmmInfo :: ClosureInfo -> FCode CmmInfo
+mkCmmInfo cl_info = do
+  prof <- 
+      if opt_SccProfilingOn 
+      then do ty_descr_lit <- mkStringCLit (closureTypeDescr cl_info)
+              cl_descr_lit <- mkStringCLit (closureValDescr cl_info)
+              return $ ProfilingInfo
+                         (makeRelativeRefTo info_lbl ty_descr_lit)
+                         (makeRelativeRefTo info_lbl cl_descr_lit)
+      else return $ ProfilingInfo (mkIntCLit 0) (mkIntCLit 0)
+
+  case cl_info of
+    ConInfo { closureCon = con } -> do
+       cstr <- mkByteStringCLit $ dataConIdentity con
+       let conName = makeRelativeRefTo info_lbl cstr
+           info = ConstrInfo (ptrs, nptrs)
+                             (fromIntegral (dataConTagZ con))
+                             conName
+       return $ CmmInfo prof gc_target cl_type info
+
+    ClosureInfo { closureName   = name,
+                  closureLFInfo = lf_info,
+                  closureSRT    = srt } ->
+       return $ CmmInfo prof gc_target cl_type info
+       where
+         info =
+             case lf_info of
+               LFReEntrant _ arity _ arg_descr ->
+                   FunInfo (ptrs, nptrs)
+                           srt 
+                           (argDescrType arg_descr)
+                           (fromIntegral arity)
+                           arg_descr 
+                           (CmmLabel (mkSlowEntryLabel name))
+               LFThunk _ _ _ (SelectorThunk offset) _ ->
+                   ThunkSelectorInfo (fromIntegral offset) srt
+               LFThunk _ _ _ _ _ ->
+                   ThunkInfo (ptrs, nptrs) srt
+               _ -> panic "unexpected lambda form in mkCmmInfo"
+  where
+    info_lbl = infoTableLabelFromCI cl_info
+
+    cl_type  = smRepClosureTypeInt (closureSMRep cl_info)
+
+    ptrs     = fromIntegral $ closurePtrsSize cl_info
+    size     = fromIntegral $ closureNonHdrSize cl_info
+    nptrs    = size - ptrs
+
+    -- The gc_target is to inform the CPS pass when it inserts a stack check.
+    -- Since that pass isn't used yet we'll punt for now.
+    -- When the CPS pass is fully integrated, this should
+    -- be replaced by the label that any heap check jumped to,
+    -- so that branch can be shared by both the heap (from codeGen)
+    -- and stack checks (from the CPS pass).
+    gc_target = panic "TODO: gc_target"
 
 -------------------------------------------------------------------------
 --
@@ -168,63 +133,134 @@ mkFunGenInfoExtraBits fun_type arity srt_label liveness slow_entry
 --
 -------------------------------------------------------------------------
 
---	Here's the layout of a return-point info table
---
--- Tables next to code:
---
---			<srt slot>
---			<standard info table>
---  	ret-addr -->	<entry code (if any)>
---
--- Not tables-next-to-code:
---
---	ret-addr -->	<ptr to entry code>
---			<standard info table>
---			<srt slot>
---
---  * The SRT slot is only there is SRT info to record
+-- The concrete representation as a list of 'CmmAddr' is handled later
+-- in the pipeline by 'cmmToRawCmm'.
 
 emitReturnTarget
    :: Name
    -> CgStmts			-- The direct-return code (if any)
    -> FCode CLabel
 emitReturnTarget name stmts
-  = do	{ live_slots <- getLiveStackSlots
-	; liveness   <- buildContLiveness name live_slots
-	; srt_info   <- getSRTInfo
-
-	; let
-	      cl_type | isBigLiveness liveness = rET_BIG
-                      | otherwise              = rET_SMALL
- 
-	      (std_info, extra_bits) = 
-		   mkRetInfoTable info_lbl liveness srt_info cl_type
-
+  = do	{ srt_info   <- getSRTInfo
 	; blks <- cgStmtsToBlocks stmts
-	; panic "emitReturnTarget" --emitInfoTableAndCode info_lbl std_info extra_bits args blks
+        ; frame <- mkStackLayout
+        ; let info = CmmInfo
+                       (ProfilingInfo zeroCLit zeroCLit)
+                       gc_target
+                       rET_SMALL -- cmmToRawCmm may convert it to rET_BIG
+                       (ContInfo frame srt_info)
+        ; emitInfoTableAndCode info_lbl info args blks
 	; return info_lbl }
   where
     args      = {- trace "emitReturnTarget: missing args" -} []
     uniq      = getUnique name
     info_lbl  = mkReturnInfoLabel uniq
 
+    -- The gc_target is to inform the CPS pass when it inserts a stack check.
+    -- Since that pass isn't used yet we'll punt for now.
+    -- When the CPS pass is fully integrated, this should
+    -- be replaced by the label that any heap check jumped to,
+    -- so that branch can be shared by both the heap (from codeGen)
+    -- and stack checks (from the CPS pass).
+    gc_target = panic "TODO: gc_target"
 
-mkRetInfoTable
-  :: CLabel             -- info label
-  -> Liveness		-- liveness
-  -> C_SRT		-- SRT Info
-  -> StgHalfWord	-- type (eg. rET_SMALL)
-  -> ([CmmLit],[CmmLit])
-mkRetInfoTable info_lbl liveness srt_info cl_type
-  =  (std_info, srt_slot)
+
+-- Build stack layout information from the state of the 'FCode' monad.
+-- Should go away once 'codeGen' starts using the CPS conversion
+-- pass to handle the stack.  Until then, this is really just
+-- here to convert from the 'codeGen' representation of the stack
+-- to the 'CmmInfo' representation of the stack.
+--
+-- See 'CmmInfo.mkLiveness' for where this is converted to a bitmap.
+
+{-
+This seems to be a very error prone part of the code.
+It is surprisingly prone to off-by-one errors, because
+it converts between offset form (codeGen) and list form (CmmInfo).
+Thus a bit of explanation is in order.
+Fortunately, this code should go away once the code generator
+starts using the CPS conversion pass to handle the stack.
+
+The stack looks like this:
+
+             |             |
+             |-------------|
+frame_sp --> | return addr |
+             |-------------|
+             | dead slot   |
+             |-------------|
+             | live ptr b  |
+             |-------------|
+             | live ptr a  |
+             |-------------|
+real_sp  --> | return addr |
+             +-------------+
+
+Both 'frame_sp' and 'real_sp' are measured downwards
+(i.e. larger frame_sp means smaller memory address).
+
+For that frame we want a result like: [Just a, Just b, Nothing]
+Note that the 'head' of the list is the top
+of the stack, and that the return address
+is not present in the list (it is always assumed).
+-}
+mkStackLayout :: FCode [Maybe LocalReg]
+mkStackLayout = do
+  StackUsage { realSp = real_sp,
+               frameSp = frame_sp } <- getStkUsage
+  binds <- getLiveStackBindings
+  let frame_size = real_sp - frame_sp - retAddrSizeW
+      rel_binds = reverse $ sortWith fst
+                    [(offset - frame_sp - retAddrSizeW, b)
+                    | (offset, b) <- binds]
+
+  WARN( not (all (\bind -> fst bind >= 0) rel_binds),
+	ppr binds $$ ppr rel_binds $$
+        ppr frame_size $$ ppr real_sp $$ ppr frame_sp )
+    return $ stack_layout rel_binds frame_size
+
+stack_layout :: [(VirtualSpOffset, CgIdInfo)]
+             -> WordOff
+             -> [Maybe LocalReg]
+stack_layout [] sizeW = replicate sizeW Nothing
+stack_layout ((off, bind):binds) sizeW | off == sizeW - 1 =
+  (Just stack_bind) : (stack_layout binds (sizeW - rep_size))
   where
-	(srt_label, srt_len) = srtLabelAndLength srt_info info_lbl
- 
-	srt_slot | needsSRT srt_info = [srt_label]
-	         | otherwise         = []
- 
-	liveness_lit = makeRelativeRefTo info_lbl $ mkLivenessCLit liveness
-	std_info = mkStdInfoTable zeroCLit zeroCLit cl_type srt_len liveness_lit
+    rep_size = cgRepSizeW (cgIdInfoArgRep bind)
+    stack_bind = LocalReg unique machRep kind
+    unique = getUnique (cgIdInfoId bind)
+    machRep = argMachRep (cgIdInfoArgRep bind)
+    kind = if isFollowableArg (cgIdInfoArgRep bind)
+           then KindPtr
+           else KindNonPtr
+stack_layout binds@((off, _):_) sizeW | otherwise =
+  Nothing : (stack_layout binds (sizeW - 1))
+
+{- Another way to write the function that might be less error prone (untested)
+stack_layout offsets sizeW = result
+  where
+    y = map (flip lookup offsets) [0..]
+      -- offsets -> nothing and just (each slot is one word)
+    x = take sizeW y -- set the frame size
+    z = clip x -- account for multi-word slots
+    result = map mk_reg z
+
+    clip [] = []
+    clip list@(x : _) = x : clip (drop count list)
+      ASSERT(all isNothing (tail (take count list)))
+    
+    count Nothing = 1
+    count (Just x) = cgRepSizeW (cgIdInfoArgRep x)
+
+    mk_reg Nothing = Nothing
+    mk_reg (Just x) = LocalReg unique machRep kind
+      where
+        unique = getUnique (cgIdInfoId x)
+        machRep = argMachrep (cgIdInfoArgRep bind)
+        kind = if isFollowableArg (cgIdInfoArgRep bind)
+           then KindPtr
+           else KindNonPtr
+-}
 
 emitAlgReturnTarget
 	:: Name				-- Just for its unique
@@ -250,39 +286,11 @@ emitReturnInstr
   = do 	{ info_amode <- getSequelAmode
 	; stmtC (CmmJump (entryCode info_amode) []) }
 
--------------------------------------------------------------------------
+-----------------------------------------------------------------------------
 --
---	Generating a standard info table
+--	Info table offsets
 --
--------------------------------------------------------------------------
-
--- The standard bits of an info table.  This part of the info table
--- corresponds to the StgInfoTable type defined in InfoTables.h.
---
--- Its shape varies with ticky/profiling/tables next to code etc
--- so we can't use constant offsets from Constants
-
-mkStdInfoTable
-   :: CmmLit		-- closure type descr (profiling)
-   -> CmmLit		-- closure descr (profiling)
-   -> StgHalfWord	-- closure type
-   -> StgHalfWord	-- SRT length
-   -> CmmLit		-- layout field
-   -> [CmmLit]
-
-mkStdInfoTable type_descr closure_descr cl_type srt_len layout_lit
- = 	-- Parallel revertible-black hole field
-    prof_info
-	-- Ticky info (none at present)
-	-- Debug info (none at present)
- ++ [layout_lit, type_lit]
-
- where  
-    prof_info 
-	| opt_SccProfilingOn = [type_descr, closure_descr]
-	| otherwise	     = []
-
-    type_lit = packHalfWordsCLit cl_type srt_len
+-----------------------------------------------------------------------------
 	
 stdInfoTableSizeW :: WordOff
 -- The size of a standard info table varies with profiling/ticky etc,
@@ -401,35 +409,6 @@ emitInfoTableAndCode info_lbl info args blocks
   = emitProc info entry_lbl args blocks
   where
 	entry_lbl = infoLblToEntryLbl info_lbl
-
-{-
-emitInfoTableAndCode 
-	:: CLabel 		-- Label of info table
-	-> [CmmLit]		-- ...its invariant part
-	-> [CmmLit] 		-- ...and its variant part
-	-> CmmFormals		-- ...args
-	-> [CmmBasicBlock]	-- ...and body
-	-> Code
-
-emitInfoTableAndCode info_lbl std_info extra_bits args blocks
-  | tablesNextToCode 	-- Reverse the extra_bits; and emit the top-level proc
-  = emitProc (reverse extra_bits ++ std_info) 
-	     entry_lbl args blocks
-	-- NB: the info_lbl is discarded
-
-  | null blocks -- No actual code; only the info table is significant
-  =		-- Use a zero place-holder in place of the 
-		-- entry-label in the info table
-    emitRODataLits info_lbl (zeroCLit : std_info ++ extra_bits)
-
-  | otherwise	-- Separately emit info table (with the function entry 
-  =		-- point as first entry) and the entry code 
-    do	{ emitDataLits info_lbl (CmmLabel entry_lbl : std_info ++ extra_bits)
-	; emitProc [] entry_lbl args blocks }
-
-  where
-	entry_lbl = infoLblToEntryLbl info_lbl
--}
 
 -------------------------------------------------------------------------
 --

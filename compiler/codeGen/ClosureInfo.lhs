@@ -13,8 +13,9 @@ the STG paper.
 
 \begin{code}
 module ClosureInfo (
-	ClosureInfo, LambdaFormInfo, SMRep, 	-- all abstract
-	StandardFormInfo, 
+	ClosureInfo(..), LambdaFormInfo(..),	-- would be abstract but
+	StandardFormInfo(..),			-- mkCmmInfo looks inside
+        SMRep,
 
 	ArgDescr(..), Liveness(..), 
 	C_SRT(..), needsSRT,
@@ -188,7 +189,7 @@ data LambdaFormInfo
 
 data ArgDescr
   = ArgSpec		-- Fits one of the standard patterns
-	!Int		-- RTS type identifier ARG_P, ARG_N, ...
+	!StgHalfWord	-- RTS type identifier ARG_P, ARG_N, ...
 
   | ArgGen	 	-- General case
 	Liveness	-- Details about the arguments
@@ -957,5 +958,3 @@ getTyDescription ty
 getPredTyDescription (ClassP cl tys) = getOccString cl
 getPredTyDescription (IParam ip ty)  = getOccString (ipNameName ip)
 \end{code}
-
-

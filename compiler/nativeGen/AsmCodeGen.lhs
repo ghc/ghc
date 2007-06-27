@@ -429,9 +429,6 @@ fixAssigns stmts =
   returnUs (concat stmtss)
 
 fixAssign :: CmmStmt -> UniqSM [CmmStmt]
-fixAssign (CmmAssign (CmmGlobal BaseReg) src)
-   = panic "cmmStmtConFold: assignment to BaseReg";
-
 fixAssign (CmmAssign (CmmGlobal reg) src)
   | Left  realreg <- reg_or_addr
   = returnUs [CmmAssign (CmmGlobal reg) src]
@@ -443,24 +440,6 @@ fixAssign (CmmAssign (CmmGlobal reg) src)
            -- illegal, so we check for that.
   where
 	reg_or_addr = get_GlobalReg_reg_or_addr reg
-
-{-
-fixAssign (CmmCall target results args)
-  = mapAndUnzipUs fixResult results `thenUs` \ (results',stores) ->
-    returnUs (CmmCall target results' args :
-	      concat stores)
-  where
-	fixResult g@(CmmGlobal reg,hint) = 
-	  case get_GlobalReg_reg_or_addr reg of
-		Left realreg -> returnUs (g, [])
-		Right baseRegAddr ->
-		    getUniqueUs `thenUs` \ uq ->
-		    let local = CmmLocal (LocalReg uq (globalRegRep reg)) in
-		    returnUs ((local,hint), 
-			      [CmmStore baseRegAddr (CmmReg local)])
-	fixResult other =
-	  returnUs (other,[])
--}
 
 fixAssign other_stmt = returnUs [other_stmt]
 

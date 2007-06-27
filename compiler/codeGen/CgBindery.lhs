@@ -19,6 +19,7 @@ module CgBindery (
 	nukeVolatileBinds,
 	nukeDeadBindings,
 	getLiveStackSlots,
+        getLiveStackBindings,
 
 	bindArgsToStack,  rebindToStack,
 	bindNewToNode, bindNewToReg, bindArgsToRegs,
@@ -493,4 +494,15 @@ getLiveStackSlots
 	; return [off | CgIdInfo { cg_stb = VirStkLoc off, 
 				   cg_rep = rep } <- varEnvElts binds, 
 		        isFollowableArg rep] }
+\end{code}
+
+\begin{code}
+getLiveStackBindings :: FCode [(VirtualSpOffset, CgIdInfo)]
+getLiveStackBindings
+  = do { binds <- getBinds
+       ; return [(off, bind) |
+                 bind <- varEnvElts binds,
+                 CgIdInfo { cg_stb = VirStkLoc off,
+                            cg_rep = rep} <- [bind],
+                 isFollowableArg rep] }
 \end{code}

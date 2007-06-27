@@ -76,6 +76,7 @@ import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
 import CmmParse		( parseCmmFile )
 import CmmCPS
+import CmmInfo
 import CodeOutput	( codeOutput )
 import NameEnv          ( emptyNameEnv )
 
@@ -605,7 +606,8 @@ hscCompile cgguts
                               foreign_stubs dir_imps cost_centre_info
                               stg_binds hpc_info
          ------------------  Convert to CPS --------------------
-         continuationC <- {-return abstractC-} cmmCPS dflags abstractC
+         --continuationC <- cmmCPS dflags abstractC
+         continuationC <- cmmToRawCmm abstractC
          ------------------  Code output -----------------------
          (stub_h_exists,stub_c_exists)
              <- codeOutput dflags this_mod location foreign_stubs 
@@ -721,7 +723,8 @@ hscCmmFile dflags filename = do
   case maybe_cmm of
     Nothing -> return False
     Just cmm -> do
-        continuationC <- {-return [cmm]-} cmmCPS dflags [cmm]
+        --continuationC <- cmmCPS dflags [cmm]
+        continuationC <- cmmToRawCmm [cmm]
 	codeOutput dflags no_mod no_loc NoStubs [] continuationC
 	return True
   where

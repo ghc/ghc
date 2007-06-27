@@ -47,8 +47,7 @@
 
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret,
- 		0/*framesize*/, 0/*bitmap*/, RET_SMALL )
+INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret, RET_SMALL )
 {
     CInt r;
 
@@ -73,7 +72,7 @@ INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret,
         Sp_adj(1);
 #endif
         SAVE_THREAD_STATE();
-        r = foreign "C" maybePerformBlockedException (MyCapability() "ptr", 
+        (r) = foreign "C" maybePerformBlockedException (MyCapability() "ptr", 
     					              CurrentTSO "ptr") [R1];
 
         if (r != 0::CInt) {
@@ -106,8 +105,7 @@ INFO_TABLE_RET( stg_unblockAsyncExceptionszh_ret,
 #endif
 }
 
-INFO_TABLE_RET( stg_blockAsyncExceptionszh_ret,
-  		0/*framesize*/, 0/*bitmap*/, RET_SMALL )
+INFO_TABLE_RET( stg_blockAsyncExceptionszh_ret, RET_SMALL )
 {
     StgTSO_flags(CurrentTSO) = 
 	StgTSO_flags(CurrentTSO) | TSO_BLOCKEX::I32 | TSO_INTERRUPTIBLE::I32;
@@ -165,7 +163,7 @@ unblockAsyncExceptionszh_fast
              * thread, which might result in the thread being killed.
              */
             SAVE_THREAD_STATE();
-            r = foreign "C" maybePerformBlockedException (MyCapability() "ptr", 
+            (r) = foreign "C" maybePerformBlockedException (MyCapability() "ptr", 
 						      CurrentTSO "ptr") [R1];
 
             if (r != 0::CInt) {
@@ -229,7 +227,7 @@ killThreadzh_fast
 	W_ retcode;
 	out = BaseReg + OFFSET_StgRegTable_rmp_tmp_w;
 	
-	retcode = foreign "C" throwTo(MyCapability() "ptr",
+	(retcode) = foreign "C" throwTo(MyCapability() "ptr",
 				      CurrentTSO "ptr",
 				      target "ptr",
 				      exception "ptr",
@@ -260,22 +258,16 @@ killThreadzh_fast
 #define SP_OFF 1
 #endif
 
-#if defined(PROFILING)
-#define CATCH_FRAME_BITMAP 7
-#define CATCH_FRAME_WORDS  4
-#else
-#define CATCH_FRAME_BITMAP 1
-#define CATCH_FRAME_WORDS  2
-#endif
-
 /* Catch frames are very similar to update frames, but when entering
  * one we just pop the frame off the stack and perform the correct
  * kind of return to the activation record underneath us on the stack.
  */
 
-INFO_TABLE_RET(stg_catch_frame,
-	       CATCH_FRAME_WORDS, CATCH_FRAME_BITMAP,
-	       CATCH_FRAME)
+INFO_TABLE_RET(stg_catch_frame, CATCH_FRAME,
+#if defined(PROFILING)
+  W_ unused1, W_ unused2,
+#endif
+  W_ unused3, "ptr" W_ unused4)
 #ifdef REG_R1
    {
       Sp = Sp + SIZEOF_StgCatchFrame;
@@ -347,7 +339,7 @@ section "data" {
   no_break_on_exception: W_[1];
 }
 
-INFO_TABLE_RET(stg_raise_ret, 1, 0, RET_SMALL)
+INFO_TABLE_RET(stg_raise_ret, RET_SMALL, "ptr" W_ arg1)
 {
   R1 = Sp(1);
   Sp = Sp + WDS(2);
@@ -377,7 +369,7 @@ raisezh_fast
     
 retry_pop_stack:
     StgTSO_sp(CurrentTSO) = Sp;
-    frame_type = foreign "C" raiseExceptionHelper(BaseReg "ptr", CurrentTSO "ptr", exception "ptr") [];
+    (frame_type) = foreign "C" raiseExceptionHelper(BaseReg "ptr", CurrentTSO "ptr", exception "ptr") [];
     Sp = StgTSO_sp(CurrentTSO);
     if (frame_type == ATOMICALLY_FRAME) {
       /* The exception has reached the edge of a memory transaction.  Check that 
@@ -391,8 +383,8 @@ retry_pop_stack:
       W_ trec, outer;
       W_ r;
       trec = StgTSO_trec(CurrentTSO);
-      r = foreign "C" stmValidateNestOfTransactions(trec "ptr") [];
-      "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+      (r) = foreign "C" stmValidateNestOfTransactions(trec "ptr") [];
+      ("ptr" outer) = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
       foreign "C" stmAbortTransaction(MyCapability() "ptr", trec "ptr") [];
       foreign "C" stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr") [];
 
@@ -409,7 +401,7 @@ retry_pop_stack:
       } else {
         // Transaction was not valid: we retry the exception (otherwise continue
         // with a further call to raiseExceptionHelper)
-        "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr") [];
+        ("ptr" trec) = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr") [];
         StgTSO_trec(CurrentTSO) = trec;
         R1 = StgAtomicallyFrame_code(Sp);
         jump stg_ap_v_fast;
@@ -433,7 +425,7 @@ retry_pop_stack:
             // for exmplae.  Perhaps the stop_on_exception flag should
             // be per-thread.
             W_[rts_stop_on_exception] = 0;
-            "ptr" ioAction = foreign "C" deRefStablePtr (W_[rts_breakpoint_io_action] "ptr") [];
+            ("ptr" ioAction) = foreign "C" deRefStablePtr (W_[rts_breakpoint_io_action] "ptr") [];
             Sp = Sp - WDS(6);
             Sp(5) = exception;
             Sp(4) = stg_raise_ret_info;
@@ -491,7 +483,7 @@ retry_pop_stack:
     } else {
       W_ trec, outer;
       trec = StgTSO_trec(CurrentTSO);
-      "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+      ("ptr" outer) = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
       foreign "C" stmAbortTransaction(MyCapability() "ptr", trec "ptr") [];
       foreign "C" stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr") [];
       StgTSO_trec(CurrentTSO) = outer;

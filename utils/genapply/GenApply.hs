@@ -336,6 +336,18 @@ genMkPAP regstatus macro jump ticker disamb
 -- generate an apply function
 
 -- args is a list of 'p', 'n', 'f', 'd' or 'l'
+formalParam :: ArgRep -> Int -> Doc
+formalParam V _ = empty
+formalParam arg n =
+    formalParamType arg <> space <>
+    text "arg" <> int n <> text ", "
+formalParamType arg | isPtr arg = text "\"ptr\"" <> space <> argRep arg
+                    | otherwise = argRep arg
+
+argRep F = text "F_"
+argRep D = text "D_"
+argRep L = text "L_"
+argRep _ = text "W_"
 
 genApply regstatus args =
    let
@@ -345,9 +357,8 @@ genApply regstatus args =
    in
     vcat [
       text "INFO_TABLE_RET(" <> mkApplyName args <> text ", " <>
-        int all_args_size <> text "/*framsize*/," <>
-	int (fromIntegral (mkBitmap args)) <> text "/*bitmap*/, " <>
-        text "RET_SMALL)\n{",
+        text "RET_SMALL, " <> (cat $ zipWith formalParam args [1..]) <>
+        text ")\n{",
       nest 4 (vcat [
        text "W_ info;",
        text "W_ arity;",

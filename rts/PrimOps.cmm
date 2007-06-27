@@ -49,7 +49,7 @@ newByteArrayzh_fast
     n = R1;
     payload_words = ROUNDUP_BYTES_TO_WDS(n);
     words = BYTES_TO_WDS(SIZEOF_StgArrWords) + payload_words;
-    "ptr" p = foreign "C" allocateLocal(MyCapability() "ptr",words) [];
+    ("ptr" p) = foreign "C" allocateLocal(MyCapability() "ptr",words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
     SET_HDR(p, stg_ARR_WORDS_info, W_[CCCS]);
     StgArrWords_words(p) = payload_words;
@@ -73,7 +73,7 @@ newPinnedByteArrayzh_fast
 	words = words + 1;
     }
 
-    "ptr" p = foreign "C" allocatePinned(words) [];
+    ("ptr" p) = foreign "C" allocatePinned(words) [];
     TICK_ALLOC_PRIM(SIZEOF_StgArrWords,WDS(payload_words),0);
 
     // Again, if the ArrWords header isn't a multiple of 8 bytes, we
@@ -97,7 +97,7 @@ newArrayzh_fast
     MAYBE_GC(R2_PTR,newArrayzh_fast);
 
     words = BYTES_TO_WDS(SIZEOF_StgMutArrPtrs) + n;
-    "ptr" arr = foreign "C" allocateLocal(MyCapability() "ptr",words) [R2];
+    ("ptr" arr) = foreign "C" allocateLocal(MyCapability() "ptr",words) [R2];
     TICK_ALLOC_PRIM(SIZEOF_StgMutArrPtrs, WDS(n), 0);
 
     SET_HDR(arr, stg_MUT_ARR_PTRS_DIRTY_info, W_[CCCS]);
@@ -676,7 +676,7 @@ gcdIntzh_fast
     FETCH_MP_TEMP(mp_tmp_w);
 
     W_[mp_tmp_w] = R1;
-    r = foreign "C" __gmpn_gcd_1(mp_tmp_w "ptr", 1, R2) [];
+    (r) = foreign "C" __gmpn_gcd_1(mp_tmp_w "ptr", 1, R2) [];
 
     R1 = r;
     /* Result parked in R1, return via info-pointer at TOS */
@@ -687,7 +687,9 @@ gcdIntzh_fast
 gcdIntegerIntzh_fast
 {
     /* R1 = s1; R2 = d1; R3 = the int */
-    R1 = foreign "C" __gmpn_gcd_1( BYTE_ARR_CTS(R2) "ptr", R1, R3) [];
+    W_ s1;
+    (s1) = foreign "C" __gmpn_gcd_1( BYTE_ARR_CTS(R2) "ptr", R1, R3) [];
+    R1 = s1;
     
     /* Result parked in R1, return via info-pointer at TOS */
     jump %ENTRY_CODE(Sp(0));
@@ -768,7 +770,7 @@ cmpIntegerzh_fast
     up = BYTE_ARR_CTS(R2);
     vp = BYTE_ARR_CTS(R4);
 
-    cmp = foreign "C" __gmpn_cmp(up "ptr", vp "ptr", size) [];
+    (cmp) = foreign "C" __gmpn_cmp(up "ptr", vp "ptr", size) [];
 
     if (cmp == 0 :: CInt) {
 	R1 = 0; 
@@ -891,7 +893,7 @@ forkzh_fast
   W_ threadid;
   closure = R1;
 
-  "ptr" threadid = foreign "C" createIOThread( MyCapability() "ptr", 
+  ("ptr" threadid) = foreign "C" createIOThread( MyCapability() "ptr", 
 				RtsFlags_GcFlags_initialStkSize(RtsFlags), 
 				closure "ptr") [];
   foreign "C" scheduleThread(MyCapability() "ptr", threadid "ptr") [];
@@ -914,7 +916,7 @@ forkOnzh_fast
   cpu = R1;
   closure = R2;
 
-  "ptr" threadid = foreign "C" createIOThread( MyCapability() "ptr", 
+  ("ptr" threadid) = foreign "C" createIOThread( MyCapability() "ptr", 
 				RtsFlags_GcFlags_initialStkSize(RtsFlags), 
 				closure "ptr") [];
   foreign "C" scheduleThreadOn(MyCapability() "ptr", cpu, threadid "ptr") [];
@@ -951,7 +953,7 @@ isCurrentThreadBoundzh_fast
 {
   /* no args */
   W_ r;
-  r = foreign "C" isThreadBound(CurrentTSO) [];
+  (r) = foreign "C" isThreadBound(CurrentTSO) [];
   RET_N(r);
 }
 
@@ -970,25 +972,19 @@ isCurrentThreadBoundzh_fast
 
 // Catch retry frame ------------------------------------------------------------
 
+INFO_TABLE_RET(stg_catch_retry_frame, CATCH_RETRY_FRAME,
 #if defined(PROFILING)
-#define CATCH_RETRY_FRAME_BITMAP 7
-#define CATCH_RETRY_FRAME_WORDS  5
-#else
-#define CATCH_RETRY_FRAME_BITMAP 1
-#define CATCH_RETRY_FRAME_WORDS  3
+  W_ unused1, W_ unused2,
 #endif
-
-INFO_TABLE_RET(stg_catch_retry_frame,
-	       CATCH_RETRY_FRAME_WORDS, CATCH_RETRY_FRAME_BITMAP,
-	       CATCH_RETRY_FRAME)
+  W_ unused3, "ptr" W_ unused4, "ptr" W_ unused5)
 {
    W_ r, frame, trec, outer;
    IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )
 
    frame = Sp;
    trec = StgTSO_trec(CurrentTSO);
-   "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
-   r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr") [];
+   ("ptr" outer) = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+   (r) = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr") [];
    if (r != 0) {
      /* Succeeded (either first branch or second branch) */
      StgTSO_trec(CurrentTSO) = outer;
@@ -998,7 +994,7 @@ INFO_TABLE_RET(stg_catch_retry_frame,
    } else {
      /* Did not commit: re-execute */
      W_ new_trec;
-     "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];
+     ("ptr" new_trec) = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];
      StgTSO_trec(CurrentTSO) = new_trec;
      if (StgCatchRetryFrame_running_alt_code(frame) != 0::I32) {
        R1 = StgCatchRetryFrame_alt_code(frame);
@@ -1012,28 +1008,22 @@ INFO_TABLE_RET(stg_catch_retry_frame,
 
 // Atomically frame ------------------------------------------------------------
 
+INFO_TABLE_RET(stg_atomically_frame, ATOMICALLY_FRAME,
 #if defined(PROFILING)
-#define ATOMICALLY_FRAME_BITMAP 3
-#define ATOMICALLY_FRAME_WORDS  4
-#else
-#define ATOMICALLY_FRAME_BITMAP 0
-#define ATOMICALLY_FRAME_WORDS  2
+  W_ unused1, W_ unused2,
 #endif
-
-INFO_TABLE_RET(stg_atomically_frame,
-	       ATOMICALLY_FRAME_WORDS, ATOMICALLY_FRAME_BITMAP,
-	       ATOMICALLY_FRAME)
+  "ptr" W_ unused3, "ptr" W_ unused4)
 {
   W_ frame, trec, valid, next_invariant, q, outer;
   IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )
 
   frame = Sp;
   trec = StgTSO_trec(CurrentTSO);
-  "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+  ("ptr" outer) = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
 
   if (outer == NO_TREC) {
     /* First time back at the atomically frame -- pick up invariants */
-    "ptr" q = foreign "C" stmGetInvariantsToCheck(MyCapability() "ptr", trec "ptr") [];
+    ("ptr" q) = foreign "C" stmGetInvariantsToCheck(MyCapability() "ptr", trec "ptr") [];
     StgAtomicallyFrame_next_invariant_to_check(frame) = q;
 
   } else {
@@ -1054,7 +1044,7 @@ INFO_TABLE_RET(stg_atomically_frame,
 
   if (q != END_INVARIANT_CHECK_QUEUE) {
     /* We can't commit yet: another invariant to check */
-    "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", trec "ptr") [];
+    ("ptr" trec) = foreign "C" stmStartTransaction(MyCapability() "ptr", trec "ptr") [];
     StgTSO_trec(CurrentTSO) = trec;
 
     next_invariant = StgInvariantCheckQueue_invariant(q);
@@ -1064,7 +1054,7 @@ INFO_TABLE_RET(stg_atomically_frame,
   } else {
 
     /* We've got no more invariants to check, try to commit */
-    valid = foreign "C" stmCommitTransaction(MyCapability() "ptr", trec "ptr") [];
+    (valid) = foreign "C" stmCommitTransaction(MyCapability() "ptr", trec "ptr") [];
     if (valid != 0) {
       /* Transaction was valid: commit succeeded */
       StgTSO_trec(CurrentTSO) = NO_TREC;
@@ -1073,7 +1063,7 @@ INFO_TABLE_RET(stg_atomically_frame,
       jump %ENTRY_CODE(Sp(SP_OFF));
     } else {
       /* Transaction was not valid: try again */
-      "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr") [];
+      ("ptr" trec) = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr") [];
       StgTSO_trec(CurrentTSO) = trec;
       StgAtomicallyFrame_next_invariant_to_check(frame) = END_INVARIANT_CHECK_QUEUE;
       R1 = StgAtomicallyFrame_code(frame);
@@ -1082,9 +1072,11 @@ INFO_TABLE_RET(stg_atomically_frame,
   }
 }
 
-INFO_TABLE_RET(stg_atomically_waiting_frame,
-	       ATOMICALLY_FRAME_WORDS, ATOMICALLY_FRAME_BITMAP,
-	       ATOMICALLY_FRAME)
+INFO_TABLE_RET(stg_atomically_waiting_frame, ATOMICALLY_FRAME,
+#if defined(PROFILING)
+  W_ unused1, W_ unused2,
+#endif
+  "ptr" W_ unused3, "ptr" W_ unused4)
 {
   W_ frame, trec, valid;
   IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )
@@ -1092,7 +1084,7 @@ INFO_TABLE_RET(stg_atomically_waiting_frame,
   frame = Sp;
 
   /* The TSO is currently waiting: should we stop waiting? */
-  valid = foreign "C" stmReWait(MyCapability() "ptr", CurrentTSO "ptr") [];
+  (valid) = foreign "C" stmReWait(MyCapability() "ptr", CurrentTSO "ptr") [];
   if (valid != 0) {
     /* Previous attempt is still valid: no point trying again yet */
 	  IF_NOT_REG_R1(Sp_adj(-2);
@@ -1101,7 +1093,7 @@ INFO_TABLE_RET(stg_atomically_waiting_frame,
     jump stg_block_noregs;
   } else {
     /* Previous attempt is no longer valid: try again */
-    "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr") [];
+    ("ptr" trec) = foreign "C" stmStartTransaction(MyCapability() "ptr", NO_TREC "ptr") [];
     StgTSO_trec(CurrentTSO) = trec;
     StgHeader_info(frame) = stg_atomically_frame_info;
     R1 = StgAtomicallyFrame_code(frame);
@@ -1117,29 +1109,23 @@ INFO_TABLE_RET(stg_atomically_waiting_frame,
 #define SP_OFF 1
 #endif
 
-#if defined(PROFILING)
-#define CATCH_STM_FRAME_BITMAP 3
-#define CATCH_STM_FRAME_WORDS  4
-#else
-#define CATCH_STM_FRAME_BITMAP 0
-#define CATCH_STM_FRAME_WORDS  2
-#endif
-
 /* Catch frames are very similar to update frames, but when entering
  * one we just pop the frame off the stack and perform the correct
  * kind of return to the activation record underneath us on the stack.
  */
 
-INFO_TABLE_RET(stg_catch_stm_frame,
-	       CATCH_STM_FRAME_WORDS, CATCH_STM_FRAME_BITMAP,
-	       CATCH_STM_FRAME)
+INFO_TABLE_RET(stg_catch_stm_frame, CATCH_STM_FRAME,
+#if defined(PROFILING)
+  W_ unused1, W_ unused2,
+#endif
+  "ptr" W_ unused3, "ptr" W_ unused4)
    {
       IF_NOT_REG_R1(W_ rval;  rval = Sp(0);  Sp_adj(1); )
       W_ r, frame, trec, outer;
       frame = Sp;
       trec = StgTSO_trec(CurrentTSO);
-      "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
-      r = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr") [];
+      ("ptr" outer) = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+      (r) = foreign "C" stmCommitNestedTransaction(MyCapability() "ptr", trec "ptr") [];
       if (r != 0) {
         /* Commit succeeded */
         StgTSO_trec(CurrentTSO) = outer;
@@ -1149,7 +1135,7 @@ INFO_TABLE_RET(stg_catch_stm_frame,
       } else {
         /* Commit failed */
         W_ new_trec;
-        "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];
+        ("ptr" new_trec) = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];
         StgTSO_trec(CurrentTSO) = new_trec;
         R1 = StgCatchSTMFrame_code(frame);
         jump stg_ap_v_fast;
@@ -1188,7 +1174,7 @@ atomicallyzh_fast
   StgAtomicallyFrame_next_invariant_to_check(frame) = END_INVARIANT_CHECK_QUEUE;
 
   /* Start the memory transcation */
-  "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", old_trec "ptr") [R1];
+  ("ptr" new_trec) = foreign "C" stmStartTransaction(MyCapability() "ptr", old_trec "ptr") [R1];
   StgTSO_trec(CurrentTSO) = new_trec;
 
   /* Apply R1 to the realworld token */
@@ -1216,7 +1202,7 @@ catchSTMzh_fast
   W_ cur_trec;  
   W_ new_trec;
   cur_trec = StgTSO_trec(CurrentTSO);
-  "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", cur_trec "ptr");
+  ("ptr" new_trec) = foreign "C" stmStartTransaction(MyCapability() "ptr", cur_trec "ptr");
   StgTSO_trec(CurrentTSO) = new_trec;
 
   /* Apply R1 to the realworld token */
@@ -1239,7 +1225,7 @@ catchRetryzh_fast
 
   /* Start a nested transaction within which to run the first code */
   trec = StgTSO_trec(CurrentTSO);
-  "ptr" new_trec = foreign "C" stmStartTransaction(MyCapability() "ptr", trec "ptr") [R1,R2];
+  ("ptr" new_trec) = foreign "C" stmStartTransaction(MyCapability() "ptr", trec "ptr") [R1,R2];
   StgTSO_trec(CurrentTSO) = new_trec;
 
   /* Set up the catch-retry frame */
@@ -1269,11 +1255,11 @@ retryzh_fast
   // Find the enclosing ATOMICALLY_FRAME or CATCH_RETRY_FRAME
 retry_pop_stack:
   StgTSO_sp(CurrentTSO) = Sp;
-  frame_type = foreign "C" findRetryFrameHelper(CurrentTSO "ptr") [];
+  (frame_type) = foreign "C" findRetryFrameHelper(CurrentTSO "ptr") [];
   Sp = StgTSO_sp(CurrentTSO);
   frame = Sp;
   trec = StgTSO_trec(CurrentTSO);
-  "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+  ("ptr" outer) = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
 
   if (frame_type == CATCH_RETRY_FRAME) {
     // The retry reaches a CATCH_RETRY_FRAME before the atomic frame
@@ -1283,7 +1269,7 @@ retry_pop_stack:
     foreign "C" stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr") [];
     if (!StgCatchRetryFrame_running_alt_code(frame) != 0::I32) {
       // Retry in the first branch: try the alternative
-      "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];
+      ("ptr" trec) = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];
       StgTSO_trec(CurrentTSO) = trec;
       StgCatchRetryFrame_running_alt_code(frame) = 1 :: CInt; // true;
       R1 = StgCatchRetryFrame_alt_code(frame);
@@ -1305,12 +1291,12 @@ retry_pop_stack:
     foreign "C" stmAbortTransaction(MyCapability() "ptr", trec "ptr") [];
     foreign "C" stmFreeAbortedTRec(MyCapability() "ptr", trec "ptr") [];
     trec = outer;
-     StgTSO_trec(CurrentTSO) = trec;
-    "ptr" outer = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
+    StgTSO_trec(CurrentTSO) = trec;
+    ("ptr" outer) = foreign "C" stmGetEnclosingTRec(trec "ptr") [];
   }
   ASSERT(outer == NO_TREC);
 
-  r = foreign "C" stmWait(MyCapability() "ptr", CurrentTSO "ptr", trec "ptr") [];
+  (r) = foreign "C" stmWait(MyCapability() "ptr", CurrentTSO "ptr", trec "ptr") [];
   if (r != 0) {
     // Transaction was valid: stmWait put us on the TVars' queues, we now block
     StgHeader_info(frame) = stg_atomically_waiting_frame_info;
@@ -1323,7 +1309,7 @@ retry_pop_stack:
     jump stg_block_stmwait;
   } else {
     // Transaction was not valid: retry immediately
-    "ptr" trec = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];
+    ("ptr" trec) = foreign "C" stmStartTransaction(MyCapability() "ptr", outer "ptr") [];
     StgTSO_trec(CurrentTSO) = trec;
     R1 = StgAtomicallyFrame_code(frame);
     Sp = frame;
@@ -1358,7 +1344,7 @@ newTVarzh_fast
 
   MAYBE_GC (R1_PTR, newTVarzh_fast); 
   new_value = R1;
-  "ptr" tv = foreign "C" stmNewTVar(MyCapability() "ptr", new_value "ptr") [];
+  ("ptr" tv) = foreign "C" stmNewTVar(MyCapability() "ptr", new_value "ptr") [];
   RET_P(tv);
 }
 
@@ -1374,7 +1360,7 @@ readTVarzh_fast
   MAYBE_GC (R1_PTR, readTVarzh_fast); // Call to stmReadTVar may allocate
   trec = StgTSO_trec(CurrentTSO);
   tvar = R1;
-  "ptr" result = foreign "C" stmReadTVar(MyCapability() "ptr", trec "ptr", tvar "ptr") [];
+  ("ptr" result) = foreign "C" stmReadTVar(MyCapability() "ptr", trec "ptr", tvar "ptr") [];
 
   RET_P(result);
 }
@@ -1481,7 +1467,7 @@ takeMVarzh_fast
     mvar = R1;
 
 #if defined(THREADED_RTS)
-    "ptr" info = foreign "C" lockClosure(mvar "ptr") [];
+    ("ptr" info) = foreign "C" lockClosure(mvar "ptr") [];
 #else
     info = GET_INFO(mvar);
 #endif
@@ -1520,10 +1506,10 @@ takeMVarzh_fast
 
 #if defined(GRAN) || defined(PAR)
       /* ToDo: check 2nd arg (mvar) is right */
-      "ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar),mvar) [];
+      ("ptr" tso) = foreign "C" unblockOne(StgMVar_head(mvar),mvar) [];
       StgMVar_head(mvar) = tso;
 #else
-      "ptr" tso = foreign "C" unblockOne(MyCapability() "ptr", 
+      ("ptr" tso) = foreign "C" unblockOne(MyCapability() "ptr", 
 				         StgMVar_head(mvar) "ptr") [];
       StgMVar_head(mvar) = tso;
 #endif
@@ -1562,7 +1548,7 @@ tryTakeMVarzh_fast
     mvar = R1;
 
 #if defined(THREADED_RTS)
-    "ptr" info = foreign "C" lockClosure(mvar "ptr") [];
+    ("ptr" info) = foreign "C" lockClosure(mvar "ptr") [];
 #else
     info = GET_INFO(mvar);
 #endif
@@ -1594,10 +1580,10 @@ tryTakeMVarzh_fast
 
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
-	"ptr" tso = foreign "C" unblockOne(StgMVar_head(mvar) "ptr", mvar "ptr") [];
+	("ptr" tso) = foreign "C" unblockOne(StgMVar_head(mvar) "ptr", mvar "ptr") [];
 	StgMVar_head(mvar) = tso;
 #else
-	"ptr" tso = foreign "C" unblockOne(MyCapability() "ptr",
+	("ptr" tso) = foreign "C" unblockOne(MyCapability() "ptr",
 					   StgMVar_head(mvar) "ptr") [];
 	StgMVar_head(mvar) = tso;
 #endif
@@ -1632,7 +1618,7 @@ putMVarzh_fast
     mvar = R1;
 
 #if defined(THREADED_RTS)
-    "ptr" info = foreign "C" lockClosure(mvar "ptr") [R2];
+    ("ptr" info) = foreign "C" lockClosure(mvar "ptr") [R2];
 #else
     info = GET_INFO(mvar);
 #endif
@@ -1664,10 +1650,10 @@ putMVarzh_fast
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
-	"ptr" tso = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr",mvar "ptr") [];
+	("ptr" tso) = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr",mvar "ptr") [];
 	StgMVar_head(mvar) = tso;
 #else
-	"ptr" tso = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr") [];
+	("ptr" tso) = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr") [];
 	StgMVar_head(mvar) = tso;
 #endif
 
@@ -1705,7 +1691,7 @@ tryPutMVarzh_fast
     mvar = R1;
 
 #if defined(THREADED_RTS)
-    "ptr" info = foreign "C" lockClosure(mvar "ptr") [R2];
+    ("ptr" info) = foreign "C" lockClosure(mvar "ptr") [R2];
 #else
     info = GET_INFO(mvar);
 #endif
@@ -1730,10 +1716,10 @@ tryPutMVarzh_fast
       
 #if defined(GRAN) || defined(PAR)
 	/* ToDo: check 2nd arg (mvar) is right */
-	"ptr" tso = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr",mvar "ptr") [];
+	("ptr" tso) = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr",mvar "ptr") [];
 	StgMVar_head(mvar) = tso;
 #else
-	"ptr" tso = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr") [];
+	("ptr" tso) = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr") [];
 	StgMVar_head(mvar) = tso;
 #endif
 
@@ -1772,7 +1758,7 @@ makeStableNamezh_fast
 
     ALLOC_PRIM( SIZEOF_StgStableName, R1_PTR, makeStableNamezh_fast );
   
-    index = foreign "C" lookupStableName(R1 "ptr") [];
+    (index) = foreign "C" lookupStableName(R1 "ptr") [];
 
     /* Is there already a StableName for this heap object?
      *  stable_ptr_table is a pointer to an array of snEntry structs.
@@ -1795,7 +1781,7 @@ makeStablePtrzh_fast
     /* Args: R1 = a */
     W_ sp;
     MAYBE_GC(R1_PTR, makeStablePtrzh_fast);
-    "ptr" sp = foreign "C" getStablePtr(R1 "ptr") [];
+    ("ptr" sp) = foreign "C" getStablePtr(R1 "ptr") [];
     RET_N(sp);
 }
 
@@ -2010,7 +1996,7 @@ delayzh_fast
 #ifdef mingw32_HOST_OS
 
     /* could probably allocate this on the heap instead */
-    "ptr" ares = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
+    ("ptr" ares) = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
 					    stg_delayzh_malloc_str);
     reqID = foreign "C" addDelayRequest(R1);
     StgAsyncIOResult_reqID(ares)   = reqID;
@@ -2030,7 +2016,7 @@ delayzh_fast
 
     W_ time;
     W_ divisor;
-    time = foreign "C" getourtimeofday() [R1];
+    (time) = foreign "C" getourtimeofday() [R1];
     divisor = TO_W_(RtsFlags_MiscFlags_tickInterval(RtsFlags))*1000;
     target = ((R1 + divisor - 1) / divisor) /* divide rounding up */
            + time + 1; /* Add 1 as getourtimeofday rounds down */

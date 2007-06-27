@@ -9,9 +9,10 @@
 module Cmm ( 
 	GenCmm(..), Cmm, RawCmm,
 	GenCmmTop(..), CmmTop, RawCmmTop,
-	CmmInfo(..), ClosureTypeInfo(..), ProfilingInfo(..),
+	CmmInfo(..), ClosureTypeInfo(..), ProfilingInfo(..), ClosureTypeTag,
 	GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts,
 	CmmStmt(..), CmmActuals, CmmFormal, CmmFormals, CmmHintFormals,
+        CmmSafety(..),
 	CmmCallTarget(..),
 	CmmStatic(..), Section(..),
 	CmmExpr(..), cmmExprRep, 
@@ -133,12 +134,14 @@ data ClosureTypeInfo
 -- TODO: These types may need refinement
 data ProfilingInfo = ProfilingInfo CmmLit CmmLit -- closure_type, closure_desc
 type ClosureTypeTag = StgHalfWord
-type ClosureLayout = (StgHalfWord, StgHalfWord) -- pts, nptrs
+type ClosureLayout = (StgHalfWord, StgHalfWord) -- ptrs, nptrs
 type ConstrTag = StgHalfWord
 type ConstrDescription = CmmLit
 type FunType = StgHalfWord
 type FunArity = StgHalfWord
-type SlowEntry = CLabel
+type SlowEntry = CmmLit
+  -- ^We would like this to be a CLabel but
+  -- for now the parser sets this to zero on an INFO_TABLE_FUN.
 type SelectorOffset = StgWord
 
 -----------------------------------------------------------------------------
@@ -161,7 +164,7 @@ data CmmStmt
      CmmCallTarget
      CmmHintFormals		 -- zero or more results
      CmmActuals			 -- zero or more arguments
-     C_SRT			 -- SRT for the continuation of the call
+     CmmSafety			 -- whether to build a continuation
 
   | CmmBranch BlockId             -- branch to another BB in this fn
 
@@ -184,6 +187,7 @@ type CmmActuals = [(CmmActual,MachHint)]
 type CmmFormal = LocalReg
 type CmmHintFormals = [(CmmFormal,MachHint)]
 type CmmFormals = [CmmFormal]
+data CmmSafety = CmmUnsafe | CmmSafe C_SRT
 
 {-
 Discussion

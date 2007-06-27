@@ -57,9 +57,7 @@ stg_interp_constr_entry
    haven't got a good story about that yet.
 */
 
-INFO_TABLE_RET( stg_ctoi_R1p, 
-		0/*size*/, 0/*bitmap*/,    /* special layout! */
-		RET_BCO)
+INFO_TABLE_RET( stg_ctoi_R1p, RET_BCO)
 {
     Sp_adj(-2);
     Sp(1) = R1;
@@ -70,9 +68,7 @@ INFO_TABLE_RET( stg_ctoi_R1p,
 /*
  * When the returned value is a pointer, but unlifted, in R1 ... 
  */
-INFO_TABLE_RET( stg_ctoi_R1unpt,
-		0/*size*/, 0/*bitmap*/,    /* special layout! */
-		RET_BCO )
+INFO_TABLE_RET( stg_ctoi_R1unpt, RET_BCO )
 {
     Sp_adj(-2);
     Sp(1) = R1;
@@ -83,9 +79,7 @@ INFO_TABLE_RET( stg_ctoi_R1unpt,
 /*
  * When the returned value is a non-pointer in R1 ...
  */
-INFO_TABLE_RET( stg_ctoi_R1n,
-		0/*size*/, 0/*bitmap*/,    /* special layout! */
-		RET_BCO )
+INFO_TABLE_RET( stg_ctoi_R1n, RET_BCO )
 {
     Sp_adj(-2);
     Sp(1) = R1;
@@ -96,9 +90,7 @@ INFO_TABLE_RET( stg_ctoi_R1n,
 /*
  * When the returned value is in F1
  */
-INFO_TABLE_RET( stg_ctoi_F1,
-		0/*size*/, 0/*bitmap*/,    /* special layout! */
-		RET_BCO )
+INFO_TABLE_RET( stg_ctoi_F1, RET_BCO )
 {
     Sp_adj(-2);
     F_[Sp + WDS(1)] = F1;
@@ -109,9 +101,7 @@ INFO_TABLE_RET( stg_ctoi_F1,
 /*
  * When the returned value is in D1
  */
-INFO_TABLE_RET( stg_ctoi_D1,
-		0/*size*/, 0/*bitmap*/,    /* special layout! */
-		RET_BCO )
+INFO_TABLE_RET( stg_ctoi_D1, RET_BCO )
 {
     Sp_adj(-1) - SIZEOF_DOUBLE;
     D_[Sp + WDS(1)] = D1;
@@ -122,9 +112,7 @@ INFO_TABLE_RET( stg_ctoi_D1,
 /*
  * When the returned value is in L1
  */
-INFO_TABLE_RET( stg_ctoi_L1,
-		0/*size*/, 0/*bitmap*/,    /* special layout! */
-		RET_BCO )
+INFO_TABLE_RET( stg_ctoi_L1, RET_BCO )
 {
     Sp_adj(-1) - 8;
     L_[Sp + WDS(1)] = L1;
@@ -135,9 +123,7 @@ INFO_TABLE_RET( stg_ctoi_L1,
 /*
  * When the returned value is a void
  */
-INFO_TABLE_RET( stg_ctoi_V,
-		0/*size*/, 0/*bitmap*/,    /* special layout! */
-		RET_BCO )
+INFO_TABLE_RET( stg_ctoi_V, RET_BCO )
 {
     Sp_adj(-1);
     Sp(0) = stg_gc_void_info;
@@ -149,9 +135,7 @@ INFO_TABLE_RET( stg_ctoi_V,
  * should apply the BCO on the stack to its arguments, also on the
  * stack.
  */
-INFO_TABLE_RET( stg_apply_interp,
-		0/*size*/, 0/*bitmap*/,    /* special layout! */
-		RET_BCO )
+INFO_TABLE_RET( stg_apply_interp, RET_BCO )
 {
     /* Just in case we end up in here... (we shouldn't) */
     jump stg_yield_to_interpreter;

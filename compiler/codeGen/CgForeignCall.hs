@@ -116,7 +116,7 @@ emitForeignCall' safety results target args vols srt
     temp_args <- load_args_into_temps args
     let (caller_save, caller_load) = callerSaveVolatileRegs vols
     stmtsC caller_save
-    stmtC (CmmCall target results temp_args srt)
+    stmtC (CmmCall target results temp_args CmmUnsafe)
     stmtsC caller_load
 
   | otherwise = do
@@ -129,17 +129,20 @@ emitForeignCall' safety results target args vols srt
     let (caller_save, caller_load) = callerSaveVolatileRegs vols
     emitSaveThreadState
     stmtsC caller_save
-    -- Using the same SRT for each of these is a little bit conservative
-    -- but it should work for now.
+    -- The CmmUnsafe arguments are only correct because this part
+    -- of the code hasn't been moved into the CPS pass yet.
+    -- Once that happens, this function will just emit a (CmmSafe srt) call,
+    -- and the CPS will will be the one to convert that
+    -- to this sequence of three CmmUnsafe calls.
     stmtC (CmmCall (CmmForeignCall suspendThread CCallConv) 
 			[ (id,PtrHint) ]
 			[ (CmmReg (CmmGlobal BaseReg), PtrHint) ] 
-			srt)
-    stmtC (CmmCall temp_target results temp_args srt)
+			CmmUnsafe)
+    stmtC (CmmCall temp_target results temp_args CmmUnsafe)
     stmtC (CmmCall (CmmForeignCall resumeThread CCallConv) 
 			[ (new_base, PtrHint) ]
 			[ (CmmReg (CmmLocal id), PtrHint) ]
-			srt)
+			CmmUnsafe)
     -- Assign the result to BaseReg: we
     -- might now have a different Capability!
     stmtC (CmmAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base)))

@@ -231,7 +231,9 @@ info	:: { ExtFCode (CLabel, CmmInfo) }
 		{ do prof <- profilingInfo $11 $13
 		     return (mkRtsInfoLabelFS $3,
 			CmmInfo prof Nothing (fromIntegral $9)
-				(FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT (fromIntegral $15) 0 (panic "INFO_TABLE_FUN:ArgDesr") (panic "INFO_TABLE_FUN:SlowEntry"))) }
+				(FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT (fromIntegral $15) 0
+				 (ArgSpec 0)
+				 zeroCLit)) }
 		-- we leave most of the fields zero here.  This is only used
 		-- to generate the BCO info table in the RTS at the moment.
 	
@@ -258,7 +260,7 @@ info	:: { ExtFCode (CLabel, CmmInfo) }
 			CmmInfo (ProfilingInfo zeroCLit zeroCLit) Nothing (fromIntegral $5)
 				(ContInfo [] NoC_SRT)) }
 
-	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals ')'
+	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals0 ')'
 		-- closure type, live regs
 		{ do live <- sequence (map (liftM Just) $7)
 		     return (mkRtsInfoLabelFS $3,
@@ -792,48 +794,6 @@ forkLabelledCodeEC ec = do
   stmts <- getCgStmtsEC ec
   code (forkCgStmts stmts)
 
-retInfo name size live_bits cl_type = do
-  let liveness = smallLiveness (fromIntegral size) (fromIntegral live_bits)
-      info_lbl = mkRtsRetInfoLabelFS name
-      (info1,info2) = mkRetInfoTable info_lbl liveness NoC_SRT 
-				(fromIntegral cl_type)
-  return (info_lbl, info1, info2)
-
-stdInfo name ptrs nptrs srt_bitmap cl_type desc_str ty_str =
-  basicInfo name (packHalfWordsCLit ptrs nptrs) 
-	srt_bitmap cl_type desc_str ty_str
-
-conInfo name ptrs nptrs srt_bitmap cl_type desc_str ty_str = do
-  (lbl, info1, _) <- basicInfo name (packHalfWordsCLit ptrs nptrs) 
-                	srt_bitmap cl_type desc_str ty_str
-  desc_lit <- code $ mkStringCLit desc_str
-  let desc_field = makeRelativeRefTo lbl desc_lit
-  return (lbl, info1, [desc_field])
-
-basicInfo name layout srt_bitmap cl_type desc_str ty_str = do
-  let info_lbl = mkRtsInfoLabelFS name
-  lit1 <- if opt_SccProfilingOn 
-		   then code $ do lit <- mkStringCLit desc_str
-                                  return (makeRelativeRefTo info_lbl lit)
-		   else return (mkIntCLit 0)
-  lit2 <- if opt_SccProfilingOn 
-		   then code $ do lit <- mkStringCLit ty_str
-                                  return (makeRelativeRefTo info_lbl lit)
-		   else return (mkIntCLit 0)
-  let info1 = mkStdInfoTable lit1 lit2 (fromIntegral cl_type) 
-			(fromIntegral srt_bitmap)
-			layout
-  return (info_lbl, info1, [])
-
-funInfo name ptrs nptrs cl_type desc_str ty_str fun_type = do
-  (label,info1,_) <- stdInfo name ptrs nptrs 0{-srt_bitmap-}
-			 cl_type desc_str ty_str 
-  let info2 = mkFunGenInfoExtraBits (fromIntegral fun_type) 0 zero zero zero
-		-- we leave most of the fields zero here.  This is only used
-		-- to generate the BCO info table in the RTS at the moment.
-  return (label,info1,info2)
- where
-   zero = mkIntCLit 0
 
 profilingInfo desc_str ty_str = do
   lit1 <- if opt_SccProfilingOn 
@@ -907,6 +867,7 @@ emitRetUT args = do
   emitStmts stmts
   when (sp /= 0) $ stmtC (CmmAssign spReg (cmmRegOffW spReg (-sp)))
   stmtC (CmmJump (entryCode (CmmLoad (cmmRegOffW spReg sp) wordRep)) [])
+  -- TODO (when using CPS): emitStmt (CmmReturn (map snd args))
 
 -- -----------------------------------------------------------------------------
 -- If-then-else and boolean expressions

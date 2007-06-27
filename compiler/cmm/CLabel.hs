@@ -521,6 +521,8 @@ externallyVisibleCLabel (CCS_Label _)	   = True
 externallyVisibleCLabel (DynamicLinkerLabel _ _)  = False
 externallyVisibleCLabel (HpcTicksLabel _)   = True
 externallyVisibleCLabel HpcModuleNameLabel      = False
+externallyVisibleCLabel (LargeBitmapLabel _) = False
+externallyVisibleCLabel (LargeSRTLabel _) = False
 
 -- -----------------------------------------------------------------------------
 -- Finding the "type" of a CLabel 
@@ -702,7 +704,11 @@ pprCLbl (CaseLabel u CaseDefault)
   = hcat [pprUnique u, ptext SLIT("_dflt")]
 
 pprCLbl (LargeSRTLabel u)  = pprUnique u <> pp_cSEP <> ptext SLIT("srtd")
-pprCLbl (LargeBitmapLabel u)  = pprUnique u <> pp_cSEP <> ptext SLIT("btm")
+pprCLbl (LargeBitmapLabel u)  = text "b" <> pprUnique u <> pp_cSEP <> ptext SLIT("btm")
+-- Some bitsmaps for tuple constructors have a numeric tag (e.g. '7')
+-- until that gets resolved we'll just force them to start
+-- with a letter so the label will be legal assmbly code.
+        
 
 pprCLbl (RtsLabel (RtsCode str))   = ptext str
 pprCLbl (RtsLabel (RtsData str))   = ptext str

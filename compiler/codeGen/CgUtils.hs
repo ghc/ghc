@@ -269,18 +269,18 @@ emitIfThenElse cond then_part else_part
        ; labelC join_id
        }
 
-emitRtsCall :: LitString -> [(CmmExpr,MachHint)] -> Code
-emitRtsCall fun args = emitRtsCall' [] fun args Nothing
+emitRtsCall :: LitString -> [(CmmExpr,MachHint)] -> Bool -> Code
+emitRtsCall fun args safe = emitRtsCall' [] fun args Nothing safe
    -- The 'Nothing' says "save all global registers"
 
-emitRtsCallWithVols :: LitString -> [(CmmExpr,MachHint)] -> [GlobalReg] -> Code
-emitRtsCallWithVols fun args vols
-   = emitRtsCall' [] fun args (Just vols)
+emitRtsCallWithVols :: LitString -> [(CmmExpr,MachHint)] -> [GlobalReg] -> Bool -> Code
+emitRtsCallWithVols fun args vols safe
+   = emitRtsCall' [] fun args (Just vols) safe
 
 emitRtsCallWithResult :: LocalReg -> MachHint -> LitString
-	-> [(CmmExpr,MachHint)] -> Code
-emitRtsCallWithResult res hint fun args
-   = emitRtsCall' [(res,hint)] fun args Nothing
+	-> [(CmmExpr,MachHint)] -> Bool -> Code
+emitRtsCallWithResult res hint fun args safe
+   = emitRtsCall' [(res,hint)] fun args Nothing safe
 
 -- Make a call to an RTS C procedure
 emitRtsCall'
@@ -288,12 +288,15 @@ emitRtsCall'
    -> LitString
    -> [(CmmExpr,MachHint)]
    -> Maybe [GlobalReg]
+   -> Bool -- True <=> CmmSafe call
    -> Code
-emitRtsCall' res fun args vols = do
-    srt <- getSRTInfo
-    stmtsC caller_save
-    stmtC (CmmCall target res args srt)
-    stmtsC caller_load
+emitRtsCall' res fun args vols safe = do
+  safety <- if safe
+            then getSRTInfo >>= (return . CmmSafe)
+            else return CmmUnsafe
+  stmtsC caller_save
+  stmtC (CmmCall target res args safety)
+  stmtsC caller_load
   where
     (caller_save, caller_load) = callerSaveVolatileRegs vols
     target   = CmmForeignCall fun_expr CCallConv

@@ -36,16 +36,12 @@
    Returning from the STG world.
    -------------------------------------------------------------------------- */
 
+INFO_TABLE_RET( stg_stop_thread, STOP_FRAME,
 #if defined(PROFILING)
-#define STOP_THREAD_BITMAP 3
-#define STOP_THREAD_WORDS  2
-#else
-#define STOP_THREAD_BITMAP 0
-#define STOP_THREAD_WORDS  0
+  W_ unused,
+  W_ unused
 #endif
-
-INFO_TABLE_RET( stg_stop_thread, STOP_THREAD_WORDS, STOP_THREAD_BITMAP,
-		STOP_FRAME)
+)
 {
     /* 
        The final exit.
@@ -148,7 +144,7 @@ stg_threadFinished
     results that comes back.
     ------------------------------------------------------------------------- */
 
-INFO_TABLE_RET( stg_forceIO, 0/*size*/, 0/*bitmap*/, RET_SMALL)
+INFO_TABLE_RET( stg_forceIO, RET_SMALL)
 
 #ifdef REG_R1
 {
@@ -172,7 +168,7 @@ INFO_TABLE_RET( stg_forceIO, 0/*size*/, 0/*bitmap*/, RET_SMALL)
     is a register or not.
     ------------------------------------------------------------------------- */
 
-INFO_TABLE_RET( stg_noforceIO, 0/*size*/, 0/*bitmap*/, RET_SMALL )
+INFO_TABLE_RET( stg_noforceIO, RET_SMALL )
 
 #ifdef REG_R1
 {

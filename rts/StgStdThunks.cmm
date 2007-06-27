@@ -32,17 +32,15 @@
 #ifdef PROFILING
 #define SAVE_CCCS(fs)  	StgHeader_ccs(Sp-fs) = W_[CCCS]
 #define GET_SAVED_CCCS  W_[CCCS] = StgHeader_ccs(Sp)
-#define RET_BITMAP    3
-#define RET_FRAMESIZE 2
+#define RET_PARAMS      W_ unused1, W_ unused2
 #else
 #define SAVE_CCCS(fs)   /* empty */
 #define GET_SAVED_CCCS  /* empty */
-#define RET_BITMAP    0
-#define RET_FRAMESIZE 0
+#define RET_PARAMS
 #endif
 
 #define SELECTOR_CODE_UPD(offset) \
-  INFO_TABLE_RET(stg_sel_ret_##offset##_upd, RET_FRAMESIZE, RET_BITMAP, RET_SMALL)	\
+  INFO_TABLE_RET(stg_sel_ret_##offset##_upd, RET_SMALL, RET_PARAMS)	\
   {									\
       R1 = StgClosure_payload(R1,offset);				\
       GET_SAVED_CCCS;							\
@@ -85,7 +83,7 @@ SELECTOR_CODE_UPD(14)
 SELECTOR_CODE_UPD(15)
 
 #define SELECTOR_CODE_NOUPD(offset) \
-  INFO_TABLE_RET(stg_sel_ret_##offset##_noupd, RET_FRAMESIZE, RET_BITMAP, RET_SMALL)	\
+  INFO_TABLE_RET(stg_sel_ret_##offset##_noupd, RET_SMALL, RET_PARAMS)	\
   {									\
       R1 = StgClosure_payload(R1,offset);				\
       GET_SAVED_CCCS;							\

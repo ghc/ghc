@@ -3182,13 +3182,13 @@ outOfLineFloatOp mop res args
         
       if localRegRep res == F64
         then
-          stmtToInstrs (CmmCall target [(res,FloatHint)] args NoC_SRT)
+          stmtToInstrs (CmmCall target [(res,FloatHint)] args CmmUnsafe)
         else do
           uq <- getUniqueNat
           let 
             tmp = LocalReg uq F64 KindNonPtr
           -- in
-          code1 <- stmtToInstrs (CmmCall target [(tmp,FloatHint)] args NoC_SRT)
+          code1 <- stmtToInstrs (CmmCall target [(tmp,FloatHint)] args CmmUnsafe)
           code2 <- stmtToInstrs (CmmAssign (CmmLocal res) (CmmReg (CmmLocal tmp)))
           return (code1 `appOL` code2)
   where

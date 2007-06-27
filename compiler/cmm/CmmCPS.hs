@@ -70,9 +70,9 @@ cmmCPS dflags abstractC = do
   return continuationC
 
 stg_gc_gen = mkRtsApFastLabel SLIT("gen_cg_TODO") --panic "Need the label for gc"
-make_gc_block block_id fun_label formals srt = BasicBlock block_id stmts
+make_gc_block block_id fun_label formals safety = BasicBlock block_id stmts
     where
-      stmts = [CmmCall stg_gc_gen_target [] [] srt,
+      stmts = [CmmCall stg_gc_gen_target [] [] safety,
                CmmJump fun_expr actuals]
       stg_gc_gen_target =
           CmmForeignCall (CmmLit (CmmLabel stg_gc_gen)) CmmCallConv
@@ -85,10 +85,10 @@ force_gc_block old_info block_id fun_label formals blocks =
       CmmInfo _ (Just _) _ _ -> (old_info, [])
       CmmNonInfo Nothing
           -> (CmmNonInfo (Just block_id),
-              [make_gc_block block_id fun_label formals NoC_SRT])
+              [make_gc_block block_id fun_label formals (CmmSafe NoC_SRT)])
       CmmInfo prof Nothing type_tag type_info
         -> (CmmInfo prof (Just block_id) type_tag type_info,
-            [make_gc_block block_id fun_label formals srt])
+            [make_gc_block block_id fun_label formals (CmmSafe srt)])
            where
              srt = case type_info of
                      ConstrInfo _ _ _ -> NoC_SRT
@@ -361,9 +361,7 @@ applyStackFormat formats (Continuation (Left srt) label formals blocks) =
       -- TODO prof: this is the same as the current implementation
       -- but I think it could be improved
       prof = ProfilingInfo zeroCLit zeroCLit
-      tag = if stack_frame_size format > mAX_SMALL_BITMAP_SIZE
-            then rET_BIG
-            else rET_SMALL
+      tag = rET_SMALL -- cmmToRawCmm will convert this to rET_BIG if needed
       format = maybe unknown_block id $ lookup label formats
       unknown_block = panic "unknown BlockId in applyStackFormat"
 

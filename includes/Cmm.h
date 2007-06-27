@@ -524,7 +524,7 @@
  __bd = W_[mut_list];							\
   if (bdescr_free(__bd) >= bdescr_start(__bd) + BLOCK_SIZE) {		\
       W_ __new_bd;							\
-      "ptr" __new_bd = foreign "C" allocBlock_lock() [regs];		\
+      ("ptr" __new_bd) = foreign "C" allocBlock_lock() [regs];		\
       bdescr_link(__new_bd) = __bd;					\
       __bd = __new_bd;							\
       W_[mut_list] = __bd;						\

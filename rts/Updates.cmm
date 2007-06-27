@@ -45,11 +45,9 @@
 	}
 
 #if defined(PROFILING)
-#define UPD_FRAME_BITMAP 3
-#define UPD_FRAME_WORDS  3
+#define UPD_FRAME_PARAMS W_ unused1, W_ unused2, "ptr" W_ unused3
 #else
-#define UPD_FRAME_BITMAP 0
-#define UPD_FRAME_WORDS  1
+#define UPD_FRAME_PARAMS "ptr" W_ unused1
 #endif
 
 /* this bitmap indicates that the first word of an update frame is a
@@ -57,11 +55,9 @@
  * there's a cost-centre-stack in there too).
  */
 
-INFO_TABLE_RET( stg_upd_frame, 
-	    UPD_FRAME_WORDS, UPD_FRAME_BITMAP, UPDATE_FRAME)
+INFO_TABLE_RET( stg_upd_frame, UPDATE_FRAME, UPD_FRAME_PARAMS)
 UPD_FRAME_ENTRY_TEMPLATE
 
 
-INFO_TABLE_RET( stg_marked_upd_frame, 
-	    UPD_FRAME_WORDS, UPD_FRAME_BITMAP, UPDATE_FRAME)
+INFO_TABLE_RET( stg_marked_upd_frame, UPDATE_FRAME, UPD_FRAME_PARAMS)
 UPD_FRAME_ENTRY_TEMPLATE

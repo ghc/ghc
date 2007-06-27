@@ -108,7 +108,7 @@
    There are canned sequences for 'n' pointer values in registers.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_RET( stg_enter, 1/*framesize*/, 0/*bitmap*/, RET_SMALL)
+INFO_TABLE_RET( stg_enter, RET_SMALL, "ptr" W_ unused)
 {
     R1 = Sp(1);
     Sp_adj(2);
@@ -430,7 +430,7 @@ stg_gc_noregs
 
 /*-- void return ------------------------------------------------------------ */
 
-INFO_TABLE_RET( stg_gc_void, 0/*framesize*/, 0/*bitmap*/, RET_SMALL)
+INFO_TABLE_RET( stg_gc_void, RET_SMALL)
 {
     Sp_adj(1);
     jump %ENTRY_CODE(Sp(0));
@@ -438,7 +438,7 @@ INFO_TABLE_RET( stg_gc_void, 0/*framesize*/, 0/*bitmap*/, RET_SMALL)
 
 /*-- R1 is boxed/unpointed -------------------------------------------------- */
 
-INFO_TABLE_RET( stg_gc_unpt_r1, 1/*framesize*/, 0/*bitmap*/, RET_SMALL)
+INFO_TABLE_RET( stg_gc_unpt_r1, RET_SMALL, "ptr" W_ unused)
 {
     R1 = Sp(1);
     Sp_adj(2);
@@ -456,7 +456,7 @@ stg_gc_unpt_r1
 /*-- R1 is unboxed -------------------------------------------------- */
 
 /* the 1 is a bitmap - i.e. 1 non-pointer word on the stack. */
-INFO_TABLE_RET(	stg_gc_unbx_r1, 1/*framesize*/, 1/*bitmap*/, RET_SMALL )
+INFO_TABLE_RET(	stg_gc_unbx_r1, RET_SMALL, W_ unused )
 {
     R1 = Sp(1);
     Sp_adj(2);
@@ -473,7 +473,7 @@ stg_gc_unbx_r1
 
 /*-- F1 contains a float ------------------------------------------------- */
 
-INFO_TABLE_RET(	stg_gc_f1, 1/*framesize*/, 1/*bitmap*/, RET_SMALL )
+INFO_TABLE_RET(	stg_gc_f1, RET_SMALL, F_ unused )
 {
     F1 = F_[Sp+WDS(1)];
     Sp_adj(2);
@@ -490,17 +490,7 @@ stg_gc_f1
 
 /*-- D1 contains a double ------------------------------------------------- */
 
-/* we support doubles of either 1 or 2 words in size */
-
-#if SIZEOF_DOUBLE == SIZEOF_VOID_P
-#  define DBL_BITMAP 1
-#  define DBL_WORDS  1
-#else
-#  define DBL_BITMAP 3
-#  define DBL_WORDS  2
-#endif 
-
-INFO_TABLE_RET(	stg_gc_d1, DBL_WORDS/*framesize*/, DBL_BITMAP/*bitmap*/, RET_SMALL )
+INFO_TABLE_RET(	stg_gc_d1, RET_SMALL, D_ unused )
 {
     D1 = D_[Sp + WDS(1)];
     Sp = Sp + WDS(1) + SIZEOF_StgDouble;
@@ -518,17 +508,7 @@ stg_gc_d1
 
 /*-- L1 contains an int64 ------------------------------------------------- */
 
-/* we support int64s of either 1 or 2 words in size */
-
-#if SIZEOF_VOID_P == 8
-#  define LLI_BITMAP 1
-#  define LLI_WORDS  1
-#else
-#  define LLI_BITMAP 3
-#  define LLI_WORDS  2
-#endif 
-
-INFO_TABLE_RET( stg_gc_l1, LLI_WORDS/*framesize*/, LLI_BITMAP/*bitmap*/, RET_SMALL )
+INFO_TABLE_RET( stg_gc_l1, RET_SMALL, L_ unused )
 {
     L1 = L_[Sp + WDS(1)];
     Sp_adj(1) + SIZEOF_StgWord64;
@@ -545,7 +525,7 @@ stg_gc_l1
 
 /*-- Unboxed tuple return, one pointer (unregisterised build only) ---------- */
 
-INFO_TABLE_RET( stg_ut_1_0_unreg, 1/*size*/, 0/*BITMAP*/, RET_SMALL )
+INFO_TABLE_RET( stg_ut_1_0_unreg, RET_SMALL, "ptr" W_ unused )
 {
     Sp_adj(1);
     // one ptr is on the stack (Sp(0))
@@ -642,7 +622,7 @@ __stg_gc_fun
    appropriately.  The stack layout is given above.
    -------------------------------------------------------------------------- */
 
-INFO_TABLE_RET( stg_gc_fun, 0/*framesize*/, 0/*bitmap*/, RET_FUN )
+INFO_TABLE_RET( stg_gc_fun, RET_FUN )
 {
     R1 = Sp(2);
     Sp_adj(3);
@@ -729,7 +709,7 @@ INFO_TABLE_RET( stg_gc_fun, 0/*framesize*/, 0/*bitmap*/, RET_FUN )
     Sp(1) = R9;     /* liveness mask  */	\
     Sp(0) = stg_gc_gen_info;
 
-INFO_TABLE_RET( stg_gc_gen, 0/*framesize*/, 0/*bitmap*/, RET_DYN )
+INFO_TABLE_RET( stg_gc_gen, RET_DYN )
 /* bitmap in the above info table is unused, the real one is on the stack. */
 {
     RESTORE_EVERYTHING;
@@ -830,7 +810,7 @@ stg_block_1
  * 
  * -------------------------------------------------------------------------- */
 
-INFO_TABLE_RET( stg_block_takemvar, 1/*framesize*/, 0/*bitmap*/, RET_SMALL )
+INFO_TABLE_RET( stg_block_takemvar, RET_SMALL, "ptr" W_ unused )
 {
     R1 = Sp(1);
     Sp_adj(2);
@@ -855,7 +835,7 @@ stg_block_takemvar
     BLOCK_BUT_FIRST(stg_block_takemvar_finally);
 }
 
-INFO_TABLE_RET( stg_block_putmvar, 2/*framesize*/, 0/*bitmap*/, RET_SMALL )
+INFO_TABLE_RET( stg_block_putmvar, RET_SMALL, "ptr" W_ unused1, "ptr" W_ unused2 )
 {
     R2 = Sp(2);
     R1 = Sp(1);
@@ -902,7 +882,7 @@ stg_block_blackhole
     BLOCK_BUT_FIRST(stg_block_blackhole_finally);
 }
 
-INFO_TABLE_RET( stg_block_throwto, 2/*framesize*/, 0/*bitmap*/, RET_SMALL )
+INFO_TABLE_RET( stg_block_throwto, RET_SMALL, "ptr" W_ unused, "ptr" W_ unused )
 {
     R2 = Sp(2);
     R1 = Sp(1);
@@ -928,7 +908,7 @@ stg_block_throwto
 }
 
 #ifdef mingw32_HOST_OS
-INFO_TABLE_RET( stg_block_async, 0/*framesize*/, 0/*bitmap*/, RET_SMALL )
+INFO_TABLE_RET( stg_block_async, RET_SMALL )
 {
     W_ ares;
     W_ len, errC;

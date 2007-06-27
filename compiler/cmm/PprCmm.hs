@@ -117,7 +117,10 @@ pprTop (CmmData section ds) =
     (hang (pprSection section <+> lbrace) 4 (vcat (map pprStatic ds)))
     $$ rbrace
 
-
+-- --------------------------------------------------------------------------
+instance Outputable CmmSafety where
+  ppr CmmUnsafe = ptext SLIT("_unsafe_call_")
+  ppr (CmmSafe srt) = ppr srt
 
 -- --------------------------------------------------------------------------
 -- Info tables. The current pretty printer needs refinement
@@ -128,13 +131,15 @@ pprTop (CmmData section ds) =
 -- and were labelled with the procedure name ++ "_info".
 pprInfo (CmmNonInfo gc_target) =
     ptext SLIT("gc_target: ") <>
-          maybe (ptext SLIT("<none>")) pprBlockId gc_target
+          ptext SLIT("TODO") --maybe (ptext SLIT("<none>")) pprBlockId gc_target
+          -- ^ gc_target is currently unused and wired to a panic
 pprInfo (CmmInfo (ProfilingInfo closure_type closure_desc)
                  gc_target tag info) =
     vcat [ptext SLIT("type: ") <> pprLit closure_type,
           ptext SLIT("desc: ") <> pprLit closure_desc,
           ptext SLIT("gc_target: ") <>
-                maybe (ptext SLIT("<none>")) pprBlockId gc_target,
+                ptext SLIT("TODO"), --maybe (ptext SLIT("<none>")) pprBlockId gc_target,
+                -- ^ gc_target is currently unused and wired to a panic
           ptext SLIT("tag: ") <> integer (toInteger tag),
           pprTypeInfo info]
 
@@ -192,7 +197,7 @@ pprStmt stmt = case stmt of
 
     -- call "ccall" foo(x, y)[r1, r2];
     -- ToDo ppr volatile
-    CmmCall (CmmForeignCall fn cconv) results args srt ->
+    CmmCall (CmmForeignCall fn cconv) results args safety ->
         hcat [ if null results
                   then empty
                   else parens (commafy $ map ppr results) <>
@@ -200,14 +205,14 @@ pprStmt stmt = case stmt of
                ptext SLIT("call"), space, 
                doubleQuotes(ppr cconv), space,
                target fn, parens  ( commafy $ map ppr args ),
-               brackets (ppr srt), semi ]
+               brackets (ppr safety), semi ]
         where
             target (CmmLit lit) = pprLit lit
             target fn'          = parens (ppr fn')
 
-    CmmCall (CmmPrim op) results args srt ->
+    CmmCall (CmmPrim op) results args safety ->
         pprStmt (CmmCall (CmmForeignCall (CmmLit lbl) CCallConv)
-                        results args srt)
+                        results args safety)
         where
           lbl = CmmLabel (mkForeignLabel (mkFastString (show op)) Nothing False)
 
