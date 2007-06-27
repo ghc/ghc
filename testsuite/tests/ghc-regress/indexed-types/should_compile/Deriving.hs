@@ -19,3 +19,12 @@ data family R a
 data instance R [a] = R
 
 derive instance Eq (R [a])
+
+class C a where
+  data S a
+
+instance C Int where
+  data S Int = SInt deriving Eq
+
+bar :: S Int -> Bool
+bar x = x == x
