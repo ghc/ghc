@@ -12,6 +12,7 @@ import Trace.Hpc.Util
 import HpcFlags
 
 import System.Environment
+import System.Directory
 import Data.List
 import Data.Maybe(fromJust)
 import Data.Array
@@ -55,6 +56,9 @@ markup_main flags (prog:modNames) = do
     Nothing -> error $ "unable to find tix file for: " ++ prog
     Just a -> return a
 
+  -- create the dest_dir if needed
+  createDirectoryIfMissing True dest_dir
+
   mods <-
      sequence [ genHtmlFromMod dest_dir hpcDirs tix theFunTotals theHsPath invertOutput
 	      | tix <- tixs
@@ -68,6 +72,9 @@ markup_main flags (prog:modNames) = do
 
   let writeSummary name cmp = do
         let mods' = sortBy cmp mods
+
+
+
    
         putStrLn $ "Writing: " ++ (name ++ ".html")
         writeFile (dest_dir ++ "/" ++ name ++ ".html") $ 
@@ -75,6 +82,7 @@ markup_main flags (prog:modNames) = do
 	    "<style type=\"text/css\">" ++
 	    "table.bar { background-color: #f25913; }\n" ++
 	    "td.bar { background-color: #60de51;  }\n" ++
+	    "td.invbar { background-color: #f25913;  }\n" ++
 	    "table.dashboard { border-collapse: collapse  ; border: solid 1px black }\n" ++
 	    ".dashboard td { border: solid 1px black }\n" ++
 	    ".dashboard th { border: solid 1px black }\n" ++
@@ -411,14 +419,16 @@ showSummary ticked total =
 		"<td width=100>" ++ 
 		    (case percent ticked total of
 		       Nothing -> "&nbsp;"
-		       Just w -> "<table cellpadding=0 cellspacing=0 width=\"100\" class=\"bar\">" ++
-		       		     "<tr><td><table cellpadding=0 cellspacing=0 width=\"" ++ show w ++ "%\">" ++
-		              "<tr><td height=12 class=\"bar\"></td></tr>" ++
-			      "</table></td></tr></table>")
-			      ++ "</td>"
+		       Just w -> bar w "bar"
+		     )  ++ "</td>"
      where
         showP Nothing = "-&nbsp;"
         showP (Just x) = show x ++ "%"
+        bar 0 inner = bar 100 "invbar"
+        bar w inner = "<table cellpadding=0 cellspacing=0 width=\"100\" class=\"bar\">" ++
+			 "<tr><td><table cellpadding=0 cellspacing=0 width=\"" ++ show w ++ "%\">" ++
+		              "<tr><td height=12 class=" ++ show inner ++ "></td></tr>" ++
+			      "</table></td></tr></table>"
 
 percent :: (Integral a) => a -> a -> Maybe a
 percent ticked total = if total == 0 then Nothing else Just (ticked * 100 `div` total)
