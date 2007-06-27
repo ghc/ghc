@@ -50,7 +50,8 @@ SRC_MKDEPENDHS_OPTS += \
 	-optdep--exclude-module=System.FilePath.Windows \
 	-optdep--exclude-module=System.Directory.Internals \
 	-optdep--exclude-module=Trace.Hpc.Mix \
-	-optdep--exclude-module=Trace.Hpc.Util
+	-optdep--exclude-module=Trace.Hpc.Util \
+	-optdep--exclude-module=Trace.Hpc.Tix 
 
 
 PACKAGE_CABAL =

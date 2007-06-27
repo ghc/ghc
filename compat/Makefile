@@ -82,6 +82,7 @@ Distribution/Version.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Distribution/Ver
 Language/Haskell/Extension.$(way_)o :  $(FPTOOLS_TOP)/libraries/Cabal/Language/Haskell/Extension.hs
 Trace/Hpc/Mix.$(way_)o :  $(FPTOOLS_TOP)/libraries/hpc/Trace/Hpc/Mix.hs
 Trace/Hpc/Util.$(way_)o :  $(FPTOOLS_TOP)/libraries/hpc/Trace/Hpc/Util.hs
+Trace/Hpc/Tix.$(way_)o :  $(FPTOOLS_TOP)/libraries/hpc/Trace/Hpc/Tix.hs
 
 cbits/unicode.o : $(FPTOOLS_TOP)/libraries/base/cbits/WCsubst.c $(FPTOOLS_TOP)/libraries/base/include/WCsubst.h
 
