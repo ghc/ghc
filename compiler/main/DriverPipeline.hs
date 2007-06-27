@@ -1279,7 +1279,6 @@ linkDynLib dflags o_files dep_packages = do
     let static = opt_Static
     let no_hs_main = dopt Opt_NoHsMain dflags
     let o_file = outputFile dflags
-    let output_fn = case o_file of { Just s -> s; Nothing -> "HSdll.dll"; }
 
     pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
     let pkg_lib_path_opts = map ("-L"++) pkg_lib_paths
@@ -1292,7 +1291,15 @@ linkDynLib dflags o_files dep_packages = do
 	-- probably _stub.o files
     extra_ld_inputs <- readIORef v_Ld_inputs
 
-	-- opts from -optdll-<blah>
+    let (md_c_flags, _) = machdepCCOpts dflags
+#if defined(mingw32_HOST_OS)
+    -----------------------------------------------------------------------------
+    -- Making a DLL
+    -----------------------------------------------------------------------------
+
+    let output_fn = case o_file of { Just s -> s; Nothing -> "HSdll.dll"; }
+
+    -- opts from -optdll-<blah>
     let extra_ld_opts = getOpts dflags opt_dll 
 
     let pstate = pkgState dflags
@@ -1303,8 +1310,6 @@ linkDynLib dflags o_files dep_packages = do
                    then []
                    else [ head (libraryDirs rts_pkg) ++ "/Main.dll_o",
                           head (libraryDirs base_pkg) ++ "/PrelMain.dll_o" ]
-
-    let (md_c_flags, _) = machdepCCOpts dflags
     SysTools.runMkDLL dflags
 	 ([ SysTools.Option verb
 	  , SysTools.Option "-o"
@@ -1324,7 +1329,30 @@ linkDynLib dflags o_files dep_packages = do
 	       then [ "" ]
                else [ "--export-all" ])
 	))
+#else
+    -----------------------------------------------------------------------------
+    -- Making a DSO
+    -----------------------------------------------------------------------------
+    -- opts from -optl-<blah>
+    let extra_ld_opts = getOpts dflags opt_l 
+    let output_fn = case o_file of { Just s -> s; Nothing -> "a.out"; }
 
+    SysTools.runLink dflags
+	 ([ SysTools.Option verb
+	  , SysTools.Option "-o"
+	  , SysTools.FileOption "" output_fn
+	  ]
+	 ++ map SysTools.Option (
+	    md_c_flags
+	 ++ o_files
+	 ++ [ "-shared", "-Wl,-Bsymbolic" ] -- we need symbolic linking to resolve non-PIC intra-package-relocations
+	 ++ extra_ld_inputs
+	 ++ lib_path_opts
+	 ++ extra_ld_opts
+	 ++ pkg_lib_path_opts
+	 ++ pkg_link_opts
+	))
+#endif
 -- -----------------------------------------------------------------------------
 -- Running CPP
 
