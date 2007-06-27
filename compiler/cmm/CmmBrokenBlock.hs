@@ -37,7 +37,7 @@ data BrokenBlock
 
       brokenBlockTargets :: [BlockId],
                                 -- ^ Blocks that this block could
-                                -- branch to one either by conditional
+                                -- branch to either by conditional
                                 -- branches or via the last statement
 
       brokenBlockExit :: FinalStmt
@@ -47,6 +47,7 @@ data BrokenBlock
 -- | How a block could be entered
 data BlockEntryInfo
   = FunctionEntry		-- ^ Block is the beginning of a function
+      CmmInfo                   -- ^ Function header info
       CLabel                    -- ^ The function name
       CmmFormals                -- ^ Aguments to function
 

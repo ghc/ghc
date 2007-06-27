@@ -51,6 +51,7 @@ import Util
 import StaticFlags
 import FastString
 import Outputable
+import Unique
 
 import Data.Bits
 
@@ -135,7 +136,7 @@ stdPattern other = Nothing
 mkLiveness :: Name -> Int -> Bitmap -> FCode Liveness
 mkLiveness name size bits
   | size > mAX_SMALL_BITMAP_SIZE		-- Bitmap does not fit in one word
-  = do	{ let lbl = mkBitmapLabel name
+  = do	{ let lbl = mkBitmapLabel (getUnique name)
 	; emitRODataLits lbl ( mkWordCLit (fromIntegral size)
 		             : map mkWordCLit bits)
 	; return (BigLiveness lbl) }

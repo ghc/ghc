@@ -199,23 +199,24 @@ lits	:: { [ExtFCode CmmExpr] }
 	| ',' expr lits		{ $2 : $3 }
 
 cmmproc :: { ExtCode }
-	: info maybe_formals '{' body '}'
-		{ do (info_lbl, info1, info2) <- $1;
-		     formals <- sequence $2;
-		     stmts <- getCgStmtsEC (loopDecls $4)
-		     blks <- code (cgStmtsToBlocks stmts)
-		     code (emitInfoTableAndCode info_lbl info1 info2 formals blks) }
+-- TODO: add real SRT/info tables to parsed Cmm
+--	: info maybe_formals '{' body '}'
+--		{ do (info_lbl, info1, info2) <- $1;
+--		     formals <- sequence $2;
+--		     stmts <- getCgStmtsEC (loopDecls $4)
+--		     blks <- code (cgStmtsToBlocks stmts)
+--		     code (emitInfoTableAndCode info_lbl info1 info2 formals blks) }
+--
+--	| info maybe_formals ';'
+--		{ do (info_lbl, info1, info2) <- $1;
+--		     formals <- sequence $2;
+--		     code (emitInfoTableAndCode info_lbl info1 info2 formals []) }
 
-	| info maybe_formals ';'
-		{ do (info_lbl, info1, info2) <- $1;
-		     formals <- sequence $2;
-		     code (emitInfoTableAndCode info_lbl info1 info2 formals []) }
-
-	| NAME maybe_formals '{' body '}'
+	: NAME maybe_formals '{' body '}'
 		{ do formals <- sequence $2;
 		     stmts <- getCgStmtsEC (loopDecls $4);
 		     blks <- code (cgStmtsToBlocks stmts);
-		     code (emitProc [] (mkRtsCodeLabelFS $1) formals blks) }
+		     code (emitProc CmmNonInfo (mkRtsCodeLabelFS $1) formals blks) }
 
 info	:: { ExtFCode (CLabel, [CmmLit],[CmmLit]) }
 	: 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
@@ -261,13 +262,17 @@ stmt	:: { ExtCode }
 	| NAME ':'
 		{ do l <- newLabel $1; code (labelC l) }
 
--- HACK: this should just be lregs but that causes a shift/reduce conflict
--- with foreign calls
---	| hint_lregs '=' expr ';'
---		{ do reg <- head $1; e <- $3; stmtEC (CmmAssign (fst reg) e) }
+	| lreg '=' expr ';'
+		{ do reg <- $1; e <- $3; stmtEC (CmmAssign reg e) }
 	| type '[' expr ']' '=' expr ';'
 		{ doStore $1 $3 $6 }
--- TODO: add real SRT to parsed Cmm
+
+	-- Gah! We really want to say "maybe_results" but that causes
+	-- a shift/reduce conflict with assignment.  We either
+	-- we expand out the no-result and single result cases or
+	-- we tweak the syntax to avoid the conflict.  The later
+	-- option is taken here because the other way would require
+	-- multiple levels of expanding and get unwieldy.
 	| maybe_results 'foreign' STRING expr '(' hint_exprs0 ')' vols ';'
 		{% foreignCall $3 $1 $4 $6 $8 NoC_SRT }
 	| maybe_results 'prim' '%' NAME '(' hint_exprs0 ')' vols ';'
@@ -407,15 +412,11 @@ reg	:: { ExtFCode CmmExpr }
 
 maybe_results :: { [ExtFCode (CmmFormal, MachHint)] }
 	: {- empty -}		{ [] }
-	| hint_lregs '='	{ $1 }
-
-hint_lregs0 :: { [ExtFCode (CmmFormal, MachHint)] }
-	: {- empty -}		{ [] }
-	| hint_lregs		{ $1 }
+	| '(' hint_lregs ')' '='	{ $2 }
 
 hint_lregs :: { [ExtFCode (CmmFormal, MachHint)] }
-	: hint_lreg ','			{ [$1] }
-	| hint_lreg			{ [$1] }
+	: hint_lreg			{ [$1] }
+	| hint_lreg ','			{ [$1] }
 	| hint_lreg ',' hint_lregs	{ $1 : $3 }
 
 hint_lreg :: { ExtFCode (CmmFormal, MachHint) }

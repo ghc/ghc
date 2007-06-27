@@ -9,7 +9,9 @@
 module CgUtils (
 	addIdReps,
 	cgLit,
-	emitDataLits, emitRODataLits, emitIf, emitIfThenElse,
+	emitDataLits, mkDataLits,
+        emitRODataLits, mkRODataLits,
+        emitIf, emitIfThenElse,
 	emitRtsCall, emitRtsCallWithVols, emitRtsCallWithResult,
 	assignNonPtrTemp, newNonPtrTemp,
 	assignPtrTemp, newPtrTemp,
@@ -309,10 +311,24 @@ emitDataLits :: CLabel -> [CmmLit] -> Code
 emitDataLits lbl lits
   = emitData Data (CmmDataLabel lbl : map CmmStaticLit lits)
 
+mkDataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatic info stmt
+-- Emit a data-segment data block
+mkDataLits lbl lits
+  = CmmData Data (CmmDataLabel lbl : map CmmStaticLit lits)
+
 emitRODataLits :: CLabel -> [CmmLit] -> Code
 -- Emit a read-only data block
 emitRODataLits lbl lits
   = emitData section (CmmDataLabel lbl : map CmmStaticLit lits)
+  where section | any needsRelocation lits = RelocatableReadOnlyData
+                | otherwise                = ReadOnlyData
+        needsRelocation (CmmLabel _)      = True
+        needsRelocation (CmmLabelOff _ _) = True
+        needsRelocation _                 = False
+
+mkRODataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatic info stmt
+mkRODataLits lbl lits
+  = CmmData section (CmmDataLabel lbl : map CmmStaticLit lits)
   where section | any needsRelocation lits = RelocatableReadOnlyData
                 | otherwise                = ReadOnlyData
         needsRelocation (CmmLabel _)      = True

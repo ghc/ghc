@@ -52,7 +52,7 @@ import Data.List
 import System.IO
 import Data.Maybe
 
-pprCmms :: [Cmm] -> SDoc
+pprCmms :: (Outputable info) => [GenCmm CmmStatic info CmmStmt] -> SDoc
 pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
         where
           separator = space $$ ptext SLIT("-------------------") $$ space
@@ -62,10 +62,10 @@ writeCmms handle cmms = printForC handle (pprCmms cmms)
 
 -----------------------------------------------------------------------------
 
-instance Outputable Cmm where
+instance (Outputable info) => Outputable (GenCmm CmmStatic info CmmStmt) where
     ppr c = pprCmm c
 
-instance Outputable CmmTop where
+instance (Outputable info) => Outputable (GenCmmTop CmmStatic info CmmStmt) where
     ppr t = pprTop t
 
 instance Outputable CmmBasicBlock where
@@ -86,30 +86,27 @@ instance Outputable LocalReg where
 instance Outputable GlobalReg where
     ppr e = pprGlobalReg e
 
+instance Outputable CmmStatic where
+    ppr e = pprStatic e
+
+instance Outputable CmmInfo where
+    ppr e = pprInfo e
+
 -----------------------------------------------------------------------------
 
-pprCmm :: Cmm -> SDoc
+pprCmm :: (Outputable info) => GenCmm CmmStatic info CmmStmt -> SDoc
 pprCmm (Cmm tops) = vcat $ intersperse (text "") $ map pprTop tops
 
 -- --------------------------------------------------------------------------
--- Top level `procedure' blocks. The info tables, if not null, are
--- printed in the style of C--'s 'stackdata' declaration, just inside
--- the proc body, and are labelled with the procedure name ++ "_info".
+-- Top level `procedure' blocks.
 --
-pprTop :: CmmTop -> SDoc
+pprTop :: (Outputable info) => GenCmmTop CmmStatic info CmmStmt -> SDoc
 pprTop (CmmProc info lbl params blocks )
 
   = vcat [ pprCLabel lbl <> parens (commafy $ map ppr params) <+> lbrace
-         , nest 8 $ pprInfo info lbl
+         , nest 8 $ lbrace <+> ppr info $$ rbrace
          , nest 4 $ vcat (map ppr blocks)
          , rbrace ]
-
-  where
-    pprInfo [] _  = empty
-    pprInfo i label = 
-        (hang (pprCLabel (entryLblToInfoLbl label) <+> lbrace )
-            4 $ vcat (map pprStatic i))
-        $$ rbrace
 
 -- --------------------------------------------------------------------------
 -- We follow [1], 4.5
@@ -120,6 +117,46 @@ pprTop (CmmData section ds) =
     (hang (pprSection section <+> lbrace) 4 (vcat (map pprStatic ds)))
     $$ rbrace
 
+
+
+-- --------------------------------------------------------------------------
+-- Info tables. The current pretty printer needs refinement
+-- but will work for now.
+--
+-- For ideas on how to refine it, they used to be printed in the
+-- style of C--'s 'stackdata' declaration, just inside the proc body,
+-- and were labelled with the procedure name ++ "_info".
+pprInfo CmmNonInfo = empty
+pprInfo (CmmInfo (ProfilingInfo closure_type closure_desc)
+                 gc_target tag info) =
+    vcat [ptext SLIT("type: ") <> pprLit closure_type,
+          ptext SLIT("desc: ") <> pprLit closure_desc,
+          ptext SLIT("gc_target: ") <>
+                maybe (ptext SLIT("<none>")) pprBlockId gc_target,
+          ptext SLIT("tag: ") <> integer (toInteger tag),
+          pprTypeInfo info]
+
+pprTypeInfo (ConstrInfo layout constr descr) =
+    vcat [ptext SLIT("ptrs: ") <> integer (toInteger (fst layout)),
+          ptext SLIT("nptrs: ") <> integer (toInteger (snd layout)),
+          ptext SLIT("constructor: ") <> integer (toInteger constr),
+          ppr descr]
+pprTypeInfo (FunInfo layout srt fun_type arity args slow_entry) =
+    vcat [ptext SLIT("ptrs: ") <> integer (toInteger (fst layout)),
+          ptext SLIT("nptrs: ") <> integer (toInteger (snd layout)),
+          ptext SLIT("srt: ") <> ppr srt,
+          ptext SLIT("fun_type: ") <> integer (toInteger fun_type),
+          ptext SLIT("arity: ") <> integer (toInteger arity)
+          --ppr args, -- TODO: needs to be printed
+          --ppr slow_entry -- TODO: needs to be printed
+         ]
+pprTypeInfo (ThunkInfo layout srt) =
+    vcat [ptext SLIT("ptrs: ") <> integer (toInteger (fst layout)),
+          ptext SLIT("nptrs: ") <> integer (toInteger (snd layout)),
+          ptext SLIT("srt: ") <> ppr srt]
+pprTypeInfo (ContInfo stack srt) =
+    vcat [ptext SLIT("stack: ") <> ppr stack,
+          ptext SLIT("srt: ") <> ppr srt]
 
 -- --------------------------------------------------------------------------
 -- Basic blocks look like assembly blocks.
@@ -151,12 +188,13 @@ pprStmt stmt = case stmt of
     -- call "ccall" foo(x, y)[r1, r2];
     -- ToDo ppr volatile
     CmmCall (CmmForeignCall fn cconv) results args srt ->
-        hcat [ ptext SLIT("call"), space, 
+        hcat [ if null results
+                  then empty
+                  else parens (commafy $ map ppr results) <>
+                       ptext SLIT(" = "),
+               ptext SLIT("call"), space, 
                doubleQuotes(ppr cconv), space,
                target fn, parens  ( commafy $ map ppr args ),
-               (if null results
-                    then empty
-                    else brackets( commafy $ map ppr results)),
                brackets (ppr srt), semi ]
         where
             target (CmmLit lit) = pprLit lit

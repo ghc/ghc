@@ -62,7 +62,7 @@ import Data.Int
 
 type InstrBlock = OrdList Instr
 
-cmmTopCodeGen :: CmmTop -> NatM [NatCmmTop]
+cmmTopCodeGen :: RawCmmTop -> NatM [NatCmmTop]
 cmmTopCodeGen (CmmProc info lab params blocks) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
   picBaseMb <- getPicBaseMaybeNat

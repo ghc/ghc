@@ -213,6 +213,9 @@ data CLabel
   | LargeSRTLabel           -- Label of an StgLargeSRT
         {-# UNPACK #-} !Unique
 
+  | LargeBitmapLabel        -- A bitmap (function or case return)
+        {-# UNPACK #-} !Unique
+
   deriving (Eq, Ord)
 
 data IdLabelInfo
@@ -224,8 +227,6 @@ data IdLabelInfo
 
   | RednCounts		-- Label of place to keep Ticky-ticky  info for 
 			-- this Id
-
-  | Bitmap		-- A bitmap (function or case return)
 
   | ConEntry	  	-- constructor entry point
   | ConInfoTable 		-- corresponding info table
@@ -290,7 +291,6 @@ data DynamicLinkerLabelInfo
 -- These are always local:
 mkSRTLabel		name 	= IdLabel name  SRT
 mkSlowEntryLabel      	name 	= IdLabel name  Slow
-mkBitmapLabel   	name 	= IdLabel name  Bitmap
 mkRednCountsLabel     	name 	= IdLabel name  RednCounts
 
 -- These have local & (possibly) external variants:
@@ -335,6 +335,7 @@ mkStaticConEntryLabel this_pkg name
   | otherwise             = IdLabel name StaticConEntry
 
 mkLargeSRTLabel	uniq 	= LargeSRTLabel uniq
+mkBitmapLabel	uniq 	= LargeBitmapLabel uniq
 
 mkReturnPtLabel uniq		= CaseLabel uniq CaseReturnPt
 mkReturnInfoLabel uniq		= CaseLabel uniq CaseReturnInfo
@@ -470,7 +471,7 @@ needsCDecl :: CLabel -> Bool
   -- they are defined before use.
 needsCDecl (IdLabel _ SRT)		= False
 needsCDecl (LargeSRTLabel _)		= False
-needsCDecl (IdLabel _ Bitmap)		= False
+needsCDecl (LargeBitmapLabel _)		= False
 needsCDecl (IdLabel _ _)		= True
 needsCDecl (DynIdLabel _ _)		= True
 needsCDecl (CaseLabel _ _)	        = True
@@ -550,6 +551,8 @@ labelType (CaseLabel _ CaseReturnInfo)        = DataLabel
 labelType (CaseLabel _ _)	              = CodeLabel
 labelType (ModuleInitLabel _ _ _)             = CodeLabel
 labelType (PlainModuleInitLabel _ _)          = CodeLabel
+labelType (LargeSRTLabel _)                   = DataLabel
+labelType (LargeBitmapLabel _)                = DataLabel
 
 labelType (IdLabel _ info) = idInfoLabelType info
 labelType (DynIdLabel _ info) = idInfoLabelType info
@@ -559,7 +562,6 @@ idInfoLabelType info =
   case info of
     InfoTable  	  -> DataLabel
     Closure    	  -> DataLabel
-    Bitmap     	  -> DataLabel
     ConInfoTable  -> DataLabel
     StaticInfoTable -> DataLabel
     ClosureTable  -> DataLabel
@@ -700,6 +702,7 @@ pprCLbl (CaseLabel u CaseDefault)
   = hcat [pprUnique u, ptext SLIT("_dflt")]
 
 pprCLbl (LargeSRTLabel u)  = pprUnique u <> pp_cSEP <> ptext SLIT("srtd")
+pprCLbl (LargeBitmapLabel u)  = pprUnique u <> pp_cSEP <> ptext SLIT("btm")
 
 pprCLbl (RtsLabel (RtsCode str))   = ptext str
 pprCLbl (RtsLabel (RtsData str))   = ptext str
@@ -799,7 +802,6 @@ ppIdFlavor x = pp_cSEP <>
 		       Entry	    	-> ptext SLIT("entry")
 		       Slow	    	-> ptext SLIT("slow")
 		       RednCounts	-> ptext SLIT("ct")
-		       Bitmap		-> ptext SLIT("btm")
 		       ConEntry	    	-> ptext SLIT("con_entry")
 		       ConInfoTable    	-> ptext SLIT("con_info")
 		       StaticConEntry  	-> ptext SLIT("static_entry")

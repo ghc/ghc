@@ -26,7 +26,7 @@ import Packages
 import PackageConfig	( rtsPackageId )
 import Util
 import FastString	( unpackFS )
-import Cmm		( Cmm )
+import Cmm		( RawCmm )
 import HscTypes
 import DynFlags
 
@@ -55,7 +55,7 @@ codeOutput :: DynFlags
 	   -> ModLocation
 	   -> ForeignStubs
 	   -> [PackageId]
-	   -> [Cmm]			-- Compiled C--
+	   -> [RawCmm]			-- Compiled C--
 	   -> IO (Bool{-stub_h_exists-}, Bool{-stub_c_exists-})
 
 codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC

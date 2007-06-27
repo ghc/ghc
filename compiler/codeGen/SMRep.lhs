@@ -304,7 +304,7 @@ smRepClosureType :: SMRep -> Maybe ClosureType
 smRepClosureType (GenericRep _ _ _ ty) = Just ty
 smRepClosureType BlackHoleRep	       = Nothing
 
-smRepClosureTypeInt :: SMRep -> Int
+smRepClosureTypeInt :: SMRep -> StgHalfWord
 smRepClosureTypeInt (GenericRep False 1 0 Constr) = CONSTR_1_0
 smRepClosureTypeInt (GenericRep False 0 1 Constr) = CONSTR_0_1
 smRepClosureTypeInt (GenericRep False 2 0 Constr) = CONSTR_2_0
@@ -339,7 +339,7 @@ smRepClosureTypeInt rep = panic "smRepClosuretypeint"
 
 
 -- We export these ones
-rET_SMALL     = (RET_SMALL     :: Int)
-rET_BIG       = (RET_BIG       :: Int)
+rET_SMALL     = (RET_SMALL     :: StgHalfWord)
+rET_BIG       = (RET_BIG       :: StgHalfWord)
 \end{code}
 

@@ -108,12 +108,12 @@ The machine-dependent bits break down as follows:
 
 -- NB. We *lazilly* compile each block of code for space reasons.
 
-nativeCodeGen :: DynFlags -> [Cmm] -> UniqSupply -> IO Pretty.Doc
+nativeCodeGen :: DynFlags -> [RawCmm] -> UniqSupply -> IO Pretty.Doc
 nativeCodeGen dflags cmms us
   = let (res, _) = initUs us $
 	   cgCmm (concat (map add_split cmms))
 
-	cgCmm :: [CmmTop] -> UniqSM (Cmm, Pretty.Doc, [CLabel])
+	cgCmm :: [RawCmmTop] -> UniqSM (RawCmm, Pretty.Doc, [CLabel])
 	cgCmm tops = 
 	   lazyMapUs (cmmNativeGen dflags) tops  `thenUs` \ results -> 
 	   case unzip3 results of { (cmms,docs,imps) ->
@@ -196,7 +196,7 @@ nativeCodeGen dflags cmms us
 -- Complete native code generation phase for a single top-level chunk
 -- of Cmm.
 
-cmmNativeGen :: DynFlags -> CmmTop -> UniqSM (CmmTop, Pretty.Doc, [CLabel])
+cmmNativeGen :: DynFlags -> RawCmmTop -> UniqSM (RawCmmTop, Pretty.Doc, [CLabel])
 cmmNativeGen dflags cmm
    = {-# SCC "fixAssigns"       #-} 
  	fixAssignsTop cmm	     `thenUs` \ fixed_cmm ->
@@ -390,7 +390,7 @@ apply_mapping ufm (CmmProc info lbl params blocks)
 -- Switching between the two monads whilst carrying along the same
 -- Unique supply breaks abstraction.  Is that bad?
 
-genMachCode :: CmmTop -> UniqSM ([NatCmmTop], [CLabel])
+genMachCode :: RawCmmTop -> UniqSM ([NatCmmTop], [CLabel])
 
 genMachCode cmm_top
   = do	{ initial_us <- getUs
@@ -412,7 +412,7 @@ genMachCode cmm_top
 -- the generic optimiser below, to avoid having two separate passes
 -- over the Cmm.
 
-fixAssignsTop :: CmmTop -> UniqSM CmmTop
+fixAssignsTop :: RawCmmTop -> UniqSM RawCmmTop
 fixAssignsTop top@(CmmData _ _) = returnUs top
 fixAssignsTop (CmmProc info lbl params blocks) =
   mapUs fixAssignsBlock blocks `thenUs` \ blocks' ->
@@ -490,7 +490,7 @@ Ideas for other things we could do (ToDo):
     temp assignments, and certain assigns to mem...)
 -}
 
-cmmToCmm :: CmmTop -> (CmmTop, [CLabel])
+cmmToCmm :: RawCmmTop -> (RawCmmTop, [CLabel])
 cmmToCmm top@(CmmData _ _) = (top, [])
 cmmToCmm (CmmProc info lbl params blocks) = runCmmOpt $ do
   blocks' <- mapM cmmBlockConFold (cmmMiniInline blocks)

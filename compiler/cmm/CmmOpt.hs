@@ -531,7 +531,7 @@ narrowS _ _ = panic "narrowTo"
   except factorial, but what the hell.
 -}
 
-cmmLoopifyForC :: CmmTop -> CmmTop
+cmmLoopifyForC :: RawCmmTop -> RawCmmTop
 cmmLoopifyForC p@(CmmProc info entry_lbl [] blocks@(BasicBlock top_id _ : _))
   | null info = p  -- only if there's an info table, ignore case alts
   | otherwise =  

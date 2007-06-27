@@ -45,7 +45,7 @@ calculateProcPoints blocks = calculateProcPoints' init_proc_points blocks
                          map brokenBlockId $
                          filter always_proc_point blocks
       always_proc_point BrokenBlock {
-                              brokenBlockEntry = FunctionEntry _ _ } = True
+                              brokenBlockEntry = FunctionEntry _ _ _ } = True
       always_proc_point BrokenBlock {
                               brokenBlockEntry = ContinuationEntry _ _ } = True
       always_proc_point _ = False

@@ -7,8 +7,9 @@
 -----------------------------------------------------------------------------
 
 module Cmm ( 
-	GenCmm(..), Cmm,
-	GenCmmTop(..), CmmTop,
+	GenCmm(..), Cmm, RawCmm,
+	GenCmmTop(..), CmmTop, RawCmmTop,
+	CmmInfo(..), ClosureTypeInfo(..), ProfilingInfo(..),
 	GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts,
 	CmmStmt(..), CmmActuals, CmmFormal, CmmFormals, CmmHintFormals,
 	CmmCallTarget(..),
@@ -16,7 +17,7 @@ module Cmm (
 	CmmExpr(..), cmmExprRep, 
 	CmmReg(..), cmmRegRep,
 	CmmLit(..), cmmLitRep,
-	LocalReg(..), localRegRep, Kind(..),
+	LocalReg(..), localRegRep, localRegGCFollow, Kind(..),
 	BlockId(..), BlockEnv,
 	GlobalReg(..), globalRegRep,
 
@@ -28,6 +29,7 @@ module Cmm (
 import MachOp
 import CLabel
 import ForeignCall
+import SMRep
 import ClosureInfo
 import Unique
 import UniqFM
@@ -49,15 +51,19 @@ import Data.Word
 --   (a) Plain C--, i.e. populated with CmmLit and CmmExpr respectively,
 --   (b) Native code, populated with instructions
 --
-newtype GenCmm d i = Cmm [GenCmmTop d i]
+newtype GenCmm d h i = Cmm [GenCmmTop d h i]
 
-type Cmm = GenCmm CmmStatic CmmStmt
+-- | Cmm with the info table as a data type
+type Cmm = GenCmm CmmStatic CmmInfo CmmStmt
+
+-- | Cmm with the info tables converted to a list of 'CmmStatic'
+type RawCmm = GenCmm CmmStatic [CmmStatic] CmmStmt
 
 -- A top-level chunk, abstracted over the type of the contents of
 -- the basic blocks (Cmm or instructions are the likely instantiations).
-data GenCmmTop d i
+data GenCmmTop d h i
   = CmmProc
-     [d]	       -- Info table, may be empty
+     h	               -- Extra header such as the info table
      CLabel            -- Used to generate both info & entry labels
      CmmFormals        -- Argument locals live on entry (C-- procedure params)
      [GenBasicBlock i] -- Code, may be empty.  The first block is
@@ -72,7 +78,8 @@ data GenCmmTop d i
   -- some static data.
   | CmmData Section [d]	-- constant values only
 
-type CmmTop = GenCmmTop CmmStatic CmmStmt
+type CmmTop = GenCmmTop CmmStatic CmmInfo CmmStmt
+type RawCmmTop = GenCmmTop CmmStatic [CmmStatic] CmmStmt
 
 -- A basic block containing a single label, at the beginning.
 -- The list of basic blocks in a top-level code block may be re-ordered.
@@ -96,6 +103,36 @@ blockId (BasicBlock blk_id _ ) = blk_id
 blockStmts :: GenBasicBlock i -> [i]
 blockStmts (BasicBlock _ stmts) = stmts
 
+-----------------------------------------------------------------------------
+--     Info Tables
+-----------------------------------------------------------------------------
+
+-- Info table as a haskell data type
+data CmmInfo
+  = CmmInfo
+      ProfilingInfo
+      (Maybe BlockId) -- GC target
+      ClosureTypeTag -- Int
+      ClosureTypeInfo
+  | CmmNonInfo   -- Procedure doesn't need an info table
+
+data ClosureTypeInfo
+  = ConstrInfo ClosureLayout ConstrTag ConstrDescription
+  | FunInfo ClosureLayout C_SRT FunType FunArity ArgDescr SlowEntry
+  | ThunkInfo ClosureLayout C_SRT
+  | ContInfo
+      [Maybe LocalReg]  -- Forced stack parameters
+      C_SRT
+
+-- TODO: These types may need refinement
+data ProfilingInfo = ProfilingInfo CmmLit CmmLit -- closure_type, closure_desc
+type ClosureTypeTag = StgHalfWord
+type ClosureLayout = (StgHalfWord, StgHalfWord) -- pts, nptrs
+type ConstrTag = StgHalfWord
+type ConstrDescription = CLabel
+type FunType = StgHalfWord
+type FunArity = StgHalfWord
+type SlowEntry = CLabel
 
 -----------------------------------------------------------------------------
 --		CmmStmt

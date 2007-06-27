@@ -66,7 +66,7 @@ import StaticFlags	( opt_Unregisterised )
 -- --------------------------------------------------------------------------
 -- Top level
 
-pprCs :: DynFlags -> [Cmm] -> SDoc
+pprCs :: DynFlags -> [RawCmm] -> SDoc
 pprCs dflags cmms
  = pprCode CStyle (vcat $ map (\c -> split_marker $$ pprC c) cmms)
  where
@@ -74,7 +74,7 @@ pprCs dflags cmms
      | dopt Opt_SplitObjs dflags = ptext SLIT("__STG_SPLIT_MARKER")
      | otherwise     	         = empty
 
-writeCs :: DynFlags -> Handle -> [Cmm] -> IO ()
+writeCs :: DynFlags -> Handle -> [RawCmm] -> IO ()
 writeCs dflags handle cmms 
   = printForC handle (pprCs dflags cmms)
 
@@ -84,13 +84,13 @@ writeCs dflags handle cmms
 -- for fun, we could call cmmToCmm over the tops...
 --
 
-pprC :: Cmm -> SDoc
+pprC :: RawCmm -> SDoc
 pprC (Cmm tops) = vcat $ intersperse (text "") $ map pprTop tops
 
 --
 -- top level procs
 -- 
-pprTop :: CmmTop -> SDoc
+pprTop :: RawCmmTop -> SDoc
 pprTop (CmmProc info clbl _params blocks) =
     (if not (null info)
         then pprDataExterns info $$

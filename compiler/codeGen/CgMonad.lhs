@@ -734,9 +734,9 @@ emitData sect lits
   where
     data_block = CmmData sect lits
 
-emitProc :: [CmmLit] -> CLabel -> CmmFormals -> [CmmBasicBlock] -> Code
-emitProc lits lbl args blocks
-  = do  { let proc_block = CmmProc (map CmmStaticLit lits) lbl args blocks
+emitProc :: CmmInfo -> CLabel -> CmmFormals -> [CmmBasicBlock] -> Code
+emitProc info lbl args blocks
+  = do  { let proc_block = CmmProc info lbl args blocks
 	; state <- getState
 	; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
 
@@ -745,7 +745,7 @@ emitSimpleProc :: CLabel -> Code -> Code
 emitSimpleProc lbl code
   = do	{ stmts <- getCgStmts code
 	; blks <- cgStmtsToBlocks stmts
-	; emitProc [] lbl [] blks }
+	; emitProc CmmNonInfo lbl [] blks }
 
 getCmm :: Code -> FCode Cmm
 -- Get all the CmmTops (there should be no stmts)

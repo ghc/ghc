@@ -45,6 +45,7 @@ import StaticFlags
 
 import Maybes
 import Constants
+import Panic
 
 -------------------------------------------------------------------------
 --
@@ -92,7 +93,7 @@ emitClosureCodeAndInfoTable cl_info args body
                         return (makeRelativeRefTo info_lbl cstr)
                 else return (mkIntCLit 0)
 
-	; emitInfoTableAndCode info_lbl std_info (extra_bits conName) args blks }
+	; panic "emitClosureCodeAndInfoTable" } --emitInfoTableAndCode info_lbl std_info (extra_bits conName) args blks }
   where
     info_lbl  = infoTableLabelFromCI cl_info
 
@@ -200,7 +201,7 @@ emitReturnTarget name stmts
 		   mkRetInfoTable info_lbl liveness srt_info cl_type
 
 	; blks <- cgStmtsToBlocks stmts
-	; emitInfoTableAndCode info_lbl std_info extra_bits args blks
+	; panic "emitReturnTarget" --emitInfoTableAndCode info_lbl std_info extra_bits args blks
 	; return info_lbl }
   where
     args      = {- trace "emitReturnTarget: missing args" -} []
@@ -212,7 +213,7 @@ mkRetInfoTable
   :: CLabel             -- info label
   -> Liveness		-- liveness
   -> C_SRT		-- SRT Info
-  -> Int		-- type (eg. rET_SMALL)
+  -> StgHalfWord	-- type (eg. rET_SMALL)
   -> ([CmmLit],[CmmLit])
 mkRetInfoTable info_lbl liveness srt_info cl_type
   =  (std_info, srt_slot)
@@ -264,7 +265,7 @@ emitReturnInstr
 mkStdInfoTable
    :: CmmLit		-- closure type descr (profiling)
    -> CmmLit		-- closure descr (profiling)
-   -> Int		-- closure type
+   -> StgHalfWord	-- closure type
    -> StgHalfWord	-- SRT length
    -> CmmLit		-- layout field
    -> [CmmLit]
@@ -391,6 +392,19 @@ funInfoTable info_ptr
 
 emitInfoTableAndCode 
 	:: CLabel 		-- Label of info table
+	-> CmmInfo 		-- ...the info table
+	-> CmmFormals		-- ...args
+	-> [CmmBasicBlock]	-- ...and body
+	-> Code
+
+emitInfoTableAndCode info_lbl info args blocks
+  = emitProc info entry_lbl args blocks
+  where
+	entry_lbl = infoLblToEntryLbl info_lbl
+
+{-
+emitInfoTableAndCode 
+	:: CLabel 		-- Label of info table
 	-> [CmmLit]		-- ...its invariant part
 	-> [CmmLit] 		-- ...and its variant part
 	-> CmmFormals		-- ...args
@@ -415,6 +429,7 @@ emitInfoTableAndCode info_lbl std_info extra_bits args blocks
 
   where
 	entry_lbl = infoLblToEntryLbl info_lbl
+-}
 
 -------------------------------------------------------------------------
 --
