@@ -26,7 +26,7 @@ mkInfoTable :: Unique -> CmmTop -> [RawCmmTop]
 mkInfoTable uniq (CmmData sec dat) = [CmmData sec dat]
 mkInfoTable uniq (CmmProc info entry_label arguments blocks) =
     case info of
-      CmmNonInfo -> [CmmProc [] entry_label arguments blocks]
+      CmmNonInfo _ -> [CmmProc [] entry_label arguments blocks]
       CmmInfo (ProfilingInfo ty_prof cl_prof) _ type_tag
               (FunInfo (ptrs, nptrs) srt fun_type fun_arity pap_bitmap slow_entry) ->
           mkInfoTableAndCode info_label std_info fun_extra_bits entry_label arguments blocks
@@ -55,7 +55,7 @@ mkInfoTable uniq (CmmProc info entry_label arguments blocks) =
           where
             std_info = mkStdInfoTable ty_prof cl_prof type_tag con_tag layout
             info_label = entryLblToInfoLbl entry_label
-            con_name = makeRelativeRefTo info_label (CmmLabel descr)
+            con_name = makeRelativeRefTo info_label descr
             layout = packHalfWordsCLit ptrs nptrs
 
       CmmInfo (ProfilingInfo ty_prof cl_prof) _ type_tag
@@ -71,6 +71,19 @@ mkInfoTable uniq (CmmProc info entry_label arguments blocks) =
                       ([makeRelativeRefTo info_label (cmmLabelOffW lbl off)],
                        bitmap)
             layout = packHalfWordsCLit ptrs nptrs
+
+      CmmInfo (ProfilingInfo ty_prof cl_prof) _ type_tag
+              (ThunkSelectorInfo offset srt) ->
+          mkInfoTableAndCode info_label std_info srt_label entry_label arguments blocks
+          where
+            std_info = mkStdInfoTable ty_prof cl_prof type_tag srt_bitmap (mkWordCLit offset)
+            info_label = entryLblToInfoLbl entry_label
+            (srt_label, srt_bitmap) =
+                case srt of
+                  NoC_SRT -> ([], 0)
+                  (C_SRT lbl off bitmap) ->
+                      ([makeRelativeRefTo info_label (cmmLabelOffW lbl off)],
+                       bitmap)
 
       CmmInfo (ProfilingInfo ty_prof cl_prof) _ type_tag (ContInfo stack_layout srt) ->
           liveness_data ++

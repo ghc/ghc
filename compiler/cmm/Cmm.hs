@@ -115,11 +115,17 @@ data CmmInfo
       ClosureTypeTag -- Int
       ClosureTypeInfo
   | CmmNonInfo   -- Procedure doesn't need an info table
+      (Maybe BlockId) -- But we still need a GC target for it
+
+-- TODO: The GC target shouldn't really be part of CmmInfo
+-- as it doesn't appear in the resulting info table.
+-- It should be factored out.
 
 data ClosureTypeInfo
   = ConstrInfo ClosureLayout ConstrTag ConstrDescription
   | FunInfo ClosureLayout C_SRT FunType FunArity ArgDescr SlowEntry
   | ThunkInfo ClosureLayout C_SRT
+  | ThunkSelectorInfo SelectorOffset C_SRT
   | ContInfo
       [Maybe LocalReg]  -- Forced stack parameters
       C_SRT
@@ -129,10 +135,11 @@ data ProfilingInfo = ProfilingInfo CmmLit CmmLit -- closure_type, closure_desc
 type ClosureTypeTag = StgHalfWord
 type ClosureLayout = (StgHalfWord, StgHalfWord) -- pts, nptrs
 type ConstrTag = StgHalfWord
-type ConstrDescription = CLabel
+type ConstrDescription = CmmLit
 type FunType = StgHalfWord
 type FunArity = StgHalfWord
 type SlowEntry = CLabel
+type SelectorOffset = StgWord
 
 -----------------------------------------------------------------------------
 --		CmmStmt

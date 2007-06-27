@@ -126,7 +126,9 @@ pprTop (CmmData section ds) =
 -- For ideas on how to refine it, they used to be printed in the
 -- style of C--'s 'stackdata' declaration, just inside the proc body,
 -- and were labelled with the procedure name ++ "_info".
-pprInfo CmmNonInfo = empty
+pprInfo (CmmNonInfo gc_target) =
+    ptext SLIT("gc_target: ") <>
+          maybe (ptext SLIT("<none>")) pprBlockId gc_target
 pprInfo (CmmInfo (ProfilingInfo closure_type closure_desc)
                  gc_target tag info) =
     vcat [ptext SLIT("type: ") <> pprLit closure_type,
@@ -140,7 +142,7 @@ pprTypeInfo (ConstrInfo layout constr descr) =
     vcat [ptext SLIT("ptrs: ") <> integer (toInteger (fst layout)),
           ptext SLIT("nptrs: ") <> integer (toInteger (snd layout)),
           ptext SLIT("constructor: ") <> integer (toInteger constr),
-          ppr descr]
+          pprLit descr]
 pprTypeInfo (FunInfo layout srt fun_type arity args slow_entry) =
     vcat [ptext SLIT("ptrs: ") <> integer (toInteger (fst layout)),
           ptext SLIT("nptrs: ") <> integer (toInteger (snd layout)),
@@ -153,6 +155,9 @@ pprTypeInfo (FunInfo layout srt fun_type arity args slow_entry) =
 pprTypeInfo (ThunkInfo layout srt) =
     vcat [ptext SLIT("ptrs: ") <> integer (toInteger (fst layout)),
           ptext SLIT("nptrs: ") <> integer (toInteger (snd layout)),
+          ptext SLIT("srt: ") <> ppr srt]
+pprTypeInfo (ThunkSelectorInfo offset srt) =
+    vcat [ptext SLIT("ptrs: ") <> integer (toInteger offset),
           ptext SLIT("srt: ") <> ppr srt]
 pprTypeInfo (ContInfo stack srt) =
     vcat [ptext SLIT("stack: ") <> ppr stack,

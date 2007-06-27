@@ -39,7 +39,8 @@ calculateOwnership blocks_ufm proc_points blocks =
       unknown_block = panic "unknown BlockId in selectStackFormat"
 
 calculateProcPoints :: [BrokenBlock] -> UniqSet BlockId
-calculateProcPoints blocks = calculateProcPoints' init_proc_points blocks
+calculateProcPoints blocks =
+    calculateProcPoints' init_proc_points blocks
     where
       init_proc_points = mkUniqSet $
                          map brokenBlockId $

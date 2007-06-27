@@ -69,6 +69,34 @@ cmmCPS dflags abstractC = do
 
   return continuationC
 
+stg_gc_gen = mkRtsApFastLabel SLIT("gen_cg_TODO") --panic "Need the label for gc"
+make_gc_block block_id fun_label formals srt = BasicBlock block_id stmts
+    where
+      stmts = [CmmCall stg_gc_gen_target [] [] srt,
+               CmmJump fun_expr actuals]
+      stg_gc_gen_target =
+          CmmForeignCall (CmmLit (CmmLabel stg_gc_gen)) CmmCallConv
+      actuals = map (\x -> (CmmReg (CmmLocal x), NoHint)) formals
+      fun_expr = CmmLit (CmmLabel fun_label)
+
+force_gc_block old_info block_id fun_label formals blocks =
+    case old_info of
+      CmmNonInfo (Just _) -> (old_info, [])
+      CmmInfo _ (Just _) _ _ -> (old_info, [])
+      CmmNonInfo Nothing
+          -> (CmmNonInfo (Just block_id),
+              [make_gc_block block_id fun_label formals NoC_SRT])
+      CmmInfo prof Nothing type_tag type_info
+        -> (CmmInfo prof (Just block_id) type_tag type_info,
+            [make_gc_block block_id fun_label formals srt])
+           where
+             srt = case type_info of
+                     ConstrInfo _ _ _ -> NoC_SRT
+                     FunInfo _ srt' _ _ _ _ -> srt'
+                     ThunkInfo _ srt' -> srt'
+                     ThunkSelectorInfo _ srt' -> srt'
+                     ContInfo _ srt' -> srt'    
+
 -----------------------------------------------------------------------------
 -- |CPS a single CmmTop (proceedure)
 -- Only 'CmmProc' are transformed 'CmmData' will be left alone.
@@ -82,14 +110,24 @@ cpsProc uniqSupply (CmmProc info ident params blocks) = info_procs
     where
       uniques :: [[Unique]]
       uniques = map uniqsFromSupply $ listSplitUniqSupply uniqSupply
-      info_uniques:block_uniques = uniques
+      (gc_unique:info_uniques):block_uniques = uniques
+
+      -- Ensure that 
+      forced_gc :: (CmmInfo, [CmmBasicBlock])
+      forced_gc = force_gc_block info (BlockId gc_unique) ident params blocks
+
+      forced_info = fst forced_gc
+      forced_blocks = blocks ++ snd forced_gc
+      forced_gc_id = case forced_info of
+                       CmmNonInfo (Just x) -> x
+                       CmmInfo _ (Just x) _ _ -> x
 
       -- Break the block at each function call.
       -- The part after the function call will have to become a continuation.
       broken_blocks :: [BrokenBlock]
       broken_blocks =
-          concat $ zipWith3 breakBlock block_uniques blocks
-                     (FunctionEntry info ident params:repeat ControlEntry)
+          concat $ zipWith3 breakBlock block_uniques forced_blocks
+                     (FunctionEntry forced_info ident params:repeat ControlEntry)
 
       -- Calculate live variables for each broken block.
       --
@@ -109,8 +147,10 @@ cpsProc uniqSupply (CmmProc info ident params blocks) = info_procs
 
       -- Group the blocks into continuations based on the set of proc-points.
       continuations :: [Continuation (Either C_SRT CmmInfo)]
-      continuations = map (gatherBlocksIntoContinuation proc_points block_env)
-                          (uniqSetToList proc_points)
+      continuations = zipWith
+                        (gatherBlocksIntoContinuation proc_points block_env)
+                        (uniqSetToList proc_points)
+                        (Just forced_gc_id : repeat Nothing)
 
       -- Select the stack format on entry to each continuation.
       -- Return the max stack offset and an association list
@@ -191,18 +231,22 @@ data StackFormat
 
 collectNonProcPointTargets ::
     UniqSet BlockId -> BlockEnv BrokenBlock
-    -> UniqSet BlockId -> BlockId -> UniqSet BlockId
-collectNonProcPointTargets proc_points blocks current_targets block =
+    -> UniqSet BlockId -> [BlockId] -> UniqSet BlockId
+collectNonProcPointTargets proc_points blocks current_targets new_blocks =
     if sizeUniqSet current_targets == sizeUniqSet new_targets
        then current_targets
-       else foldl (collectNonProcPointTargets proc_points blocks) new_targets targets
+       else foldl
+                (collectNonProcPointTargets proc_points blocks)
+                new_targets
+                (map (:[]) targets)
     where
-      block' = lookupWithDefaultUFM blocks (panic "TODO") block
+      blocks' = map (lookupWithDefaultUFM blocks (panic "TODO")) new_blocks
       targets =
         -- Note the subtlety that since the extra branch after a call
         -- will always be to a block that is a proc-point,
         -- this subtraction will always remove that case
-        uniqSetToList $ (mkUniqSet $ brokenBlockTargets block') `minusUniqSet` proc_points
+        uniqSetToList $ (unionManyUniqSets $ map (mkUniqSet . brokenBlockTargets) blocks')
+                          `minusUniqSet` proc_points
         -- TODO: remove redundant uniqSetToList
       new_targets = current_targets `unionUniqSets` (mkUniqSet targets)
 
@@ -213,14 +257,16 @@ collectNonProcPointTargets proc_points blocks current_targets block =
 
 gatherBlocksIntoContinuation ::
     UniqSet BlockId -> BlockEnv BrokenBlock
-    -> BlockId -> Continuation (Either C_SRT CmmInfo)
-gatherBlocksIntoContinuation proc_points blocks start =
+    -> BlockId -> Maybe BlockId -> Continuation (Either C_SRT CmmInfo)
+gatherBlocksIntoContinuation proc_points blocks start gc =
   Continuation info_table clabel params body
     where
-      children = (collectNonProcPointTargets proc_points blocks (unitUniqSet start) start) `delOneFromUniqSet` start
+      start_and_gc = start : maybeToList gc
+      children = (collectNonProcPointTargets proc_points blocks (mkUniqSet start_and_gc) start_and_gc) `minusUniqSet` (mkUniqSet start_and_gc)
       start_block = lookupWithDefaultUFM blocks (panic "TODO") start
+      gc_block = map (lookupWithDefaultUFM blocks (panic "TODO)")) (maybeToList gc)
       children_blocks = map (lookupWithDefaultUFM blocks (panic "TODO")) (uniqSetToList children)
-      body = start_block : children_blocks
+      body = start_block : gc_block ++ children_blocks
 
       -- We can't properly annotate the continuation's stack parameters
       -- at this point because this is before stack selection
@@ -228,7 +274,7 @@ gatherBlocksIntoContinuation proc_points blocks start =
       info_table = case start_block_entry of
                      FunctionEntry info _ _ -> Right info
                      ContinuationEntry _ srt -> Left srt
-                     ControlEntry -> Right CmmNonInfo
+                     ControlEntry -> Right (CmmNonInfo Nothing)
 
       start_block_entry = brokenBlockEntry start_block
       clabel = case start_block_entry of
@@ -342,11 +388,12 @@ continuationToProc (max_stack, formats)
                            gc_stack_check gc_block max_stack ++
                            function_entry formals curr_format
                        FunctionEntry (CmmInfo _ Nothing _ _) _ formals ->
-                           panic "continuationToProc: TODO generate GC block" ++
+                           panic "continuationToProc: missing GC block"
+                       FunctionEntry (CmmNonInfo (Just gc_block)) _ formals ->
+                           gc_stack_check gc_block max_stack ++
                            function_entry formals curr_format
-                       FunctionEntry CmmNonInfo _ formals ->
-                           panic "TODO: gc_stack_check gc_block max_stack" ++
-                           function_entry formals curr_format
+                       FunctionEntry (CmmNonInfo Nothing) _ formals ->
+                           panic "continuationToProc: missing non-info GC block"
                        ContinuationEntry formals _ ->
                            function_entry formals curr_format
             postfix = case exit of
@@ -395,10 +442,12 @@ gc_stack_check gc_block max_frame_size
     check_stack_limit = [
      CmmCondBranch
      (CmmMachOp (MO_U_Lt $ cmmRegRep spReg)
-                    [CmmRegOff spReg max_frame_size, CmmReg spLimReg])
+                    [CmmRegOff spReg (-max_frame_size*wORD_SIZE),
+                     CmmReg spLimReg])
      gc_block]
 
--- TODO: fix branches to proc point (we have to insert a new block to marshel the continuation)
+-- TODO: fix branches to proc point
+-- (we have to insert a new block to marshel the continuation)
 pack_continuation :: StackFormat -> StackFormat -> [CmmStmt]
 pack_continuation (StackFormat curr_id curr_frame_size _)
                        (StackFormat cont_id cont_frame_size live_regs)

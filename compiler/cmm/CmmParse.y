@@ -200,44 +200,70 @@ lits	:: { [ExtFCode CmmExpr] }
 
 cmmproc :: { ExtCode }
 -- TODO: add real SRT/info tables to parsed Cmm
---	: info maybe_formals '{' body '}'
---		{ do (info_lbl, info1, info2) <- $1;
---		     formals <- sequence $2;
---		     stmts <- getCgStmtsEC (loopDecls $4)
---		     blks <- code (cgStmtsToBlocks stmts)
---		     code (emitInfoTableAndCode info_lbl info1 info2 formals blks) }
---
---	| info maybe_formals ';'
---		{ do (info_lbl, info1, info2) <- $1;
---		     formals <- sequence $2;
---		     code (emitInfoTableAndCode info_lbl info1 info2 formals []) }
+	: info maybe_formals '{' body '}'
+		{ do (info_lbl, info) <- $1;
+		     formals <- sequence $2;
+		     stmts <- getCgStmtsEC (loopDecls $4)
+		     blks <- code (cgStmtsToBlocks stmts)
+		     code (emitInfoTableAndCode info_lbl info formals blks) }
 
-	: NAME maybe_formals '{' body '}'
+	| info maybe_formals ';'
+		{ do (info_lbl, info) <- $1;
+		     formals <- sequence $2;
+		     code (emitInfoTableAndCode info_lbl info formals []) }
+
+	| NAME maybe_formals '{' body '}'
 		{ do formals <- sequence $2;
 		     stmts <- getCgStmtsEC (loopDecls $4);
 		     blks <- code (cgStmtsToBlocks stmts);
-		     code (emitProc CmmNonInfo (mkRtsCodeLabelFS $1) formals blks) }
+		     code (emitProc (CmmNonInfo Nothing) (mkRtsCodeLabelFS $1) formals blks) }
 
-info	:: { ExtFCode (CLabel, [CmmLit],[CmmLit]) }
+info	:: { ExtFCode (CLabel, CmmInfo) }
 	: 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- ptrs, nptrs, closure type, description, type
-		{ stdInfo $3 $5 $7 0 $9 $11 $13 }
+		{ do prof <- profilingInfo $11 $13
+		     return (mkRtsInfoLabelFS $3,
+			CmmInfo prof Nothing (fromIntegral $9)
+				(ThunkInfo (fromIntegral $5, fromIntegral $7) NoC_SRT)) }
 	
 	| 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ')'
 		-- ptrs, nptrs, closure type, description, type, fun type
-		{ funInfo $3 $5 $7 $9 $11 $13 $15 }
+		{ do prof <- profilingInfo $11 $13
+		     return (mkRtsInfoLabelFS $3,
+			CmmInfo prof Nothing (fromIntegral $9)
+				(FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT (fromIntegral $15) 0 (panic "INFO_TABLE_FUN:ArgDesr") (panic "INFO_TABLE_FUN:SlowEntry"))) }
+		-- we leave most of the fields zero here.  This is only used
+		-- to generate the BCO info table in the RTS at the moment.
 	
 	| 'INFO_TABLE_CONSTR' '(' NAME ',' INT ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- ptrs, nptrs, tag, closure type, description, type
-		{ conInfo $3 $5 $7 $9 $11 $13 $15 }
+		{ do prof <- profilingInfo $13 $15
+		     -- If profiling is on, this string gets duplicated,
+		     -- but that's the way the old code did it we can fix it some other time.
+		     desc_lit <- code $ mkStringCLit $13
+		     return (mkRtsInfoLabelFS $3,
+			CmmInfo prof Nothing (fromIntegral $11)
+				(ConstrInfo (fromIntegral $5, fromIntegral $7) (fromIntegral $9) desc_lit)) }
 	
 	| 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- selector, closure type, description, type
-		{ basicInfo $3 (mkIntCLit (fromIntegral $5)) 0 $7 $9 $11 }
+		{ do prof <- profilingInfo $9 $11
+		     return (mkRtsInfoLabelFS $3,
+			CmmInfo prof Nothing (fromIntegral $7)
+				(ThunkSelectorInfo (fromIntegral $5) NoC_SRT)) }
 
-	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' INT ',' INT ')'
-		-- size, live bits, closure type
-		{ retInfo $3 $5 $7 $9 }
+	| 'INFO_TABLE_RET' '(' NAME ',' INT ')'
+		-- closure type (no live regs)
+		{ return (mkRtsInfoLabelFS $3,
+			CmmInfo (ProfilingInfo zeroCLit zeroCLit) Nothing (fromIntegral $5)
+				(ContInfo [] NoC_SRT)) }
+
+	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals ')'
+		-- closure type, live regs
+		{ do live <- sequence (map (liftM Just) $7)
+		     return (mkRtsInfoLabelFS $3,
+			CmmInfo (ProfilingInfo zeroCLit zeroCLit) Nothing (fromIntegral $5)
+			(ContInfo live NoC_SRT)) }
 
 body	:: { ExtCode }
 	: {- empty -}			{ return () }
@@ -808,6 +834,15 @@ funInfo name ptrs nptrs cl_type desc_str ty_str fun_type = do
   return (label,info1,info2)
  where
    zero = mkIntCLit 0
+
+profilingInfo desc_str ty_str = do
+  lit1 <- if opt_SccProfilingOn 
+		   then code $ mkStringCLit desc_str
+		   else return (mkIntCLit 0)
+  lit2 <- if opt_SccProfilingOn 
+		   then code $ mkStringCLit ty_str
+		   else return (mkIntCLit 0)
+  return (ProfilingInfo lit1 lit2)
 
 
 staticClosure :: FastString -> FastString -> [CmmLit] -> ExtCode
