@@ -95,7 +95,6 @@ cgCase	:: StgExpr
 	-> StgLiveVars
 	-> StgLiveVars
 	-> Id
-	-> SRT
 	-> AltType
 	-> [StgAlt]
 	-> Code
@@ -104,7 +103,7 @@ cgCase	:: StgExpr
 Special case #1: case of literal.
 
 \begin{code}
-cgCase (StgLit lit) live_in_whole_case live_in_alts bndr srt 
+cgCase (StgLit lit) live_in_whole_case live_in_alts bndr
        alt_type@(PrimAlt tycon) alts
   = do	{ tmp_reg <- bindNewToTemp bndr
 	; cm_lit <- cgLit lit
@@ -120,7 +119,7 @@ allocating more heap than strictly necessary, but it will sometimes
 eliminate a heap check altogether.
 
 \begin{code}
-cgCase (StgApp v []) live_in_whole_case live_in_alts bndr srt
+cgCase (StgApp v []) live_in_whole_case live_in_alts bndr
        alt_type@(PrimAlt tycon) alts
   = do	{ -- Careful! we can't just bind the default binder to the same thing
 	  -- as the scrutinee, since it might be a stack location, and having
@@ -137,7 +136,7 @@ Special case #3: inline PrimOps and foreign calls.
 
 \begin{code}
 cgCase (StgOpApp op@(StgPrimOp primop) args _) 
-       live_in_whole_case live_in_alts bndr srt alt_type alts
+       live_in_whole_case live_in_alts bndr alt_type alts
   | not (primOpOutOfLine primop)
   = cgInlinePrimOp primop args bndr alt_type live_in_alts alts
 \end{code}
@@ -152,7 +151,7 @@ right here, just like an inline primop.
 
 \begin{code}
 cgCase (StgOpApp op@(StgFCallOp fcall _) args _) 
-       live_in_whole_case live_in_alts bndr srt alt_type alts
+       live_in_whole_case live_in_alts bndr alt_type alts
   | unsafe_foreign_call
   = ASSERT( isSingleton alts )
     do	--  *must* be an unboxed tuple alt.
@@ -177,7 +176,7 @@ we can reuse/trim the stack slot holding the variable (if it is in one).
 
 \begin{code}
 cgCase (StgApp fun args)
-	live_in_whole_case live_in_alts bndr srt alt_type alts
+	live_in_whole_case live_in_alts bndr alt_type alts
   = do	{ fun_info <- getCgIdInfo fun
 	; arg_amodes <- getArgAmodes args
 
@@ -195,7 +194,7 @@ cgCase (StgApp fun args)
 	    <- forkEval alts_eob_info 
 			(allocStackTop retAddrSizeW >> nopC)
 			(do { deAllocStackTop retAddrSizeW
-			    ; cgEvalAlts maybe_cc_slot bndr srt alt_type alts })
+			    ; cgEvalAlts maybe_cc_slot bndr alt_type alts })
 
 	; setEndOfBlockInfo scrut_eob_info
 			    (performTailCall fun_info arg_amodes save_assts) }
@@ -215,7 +214,7 @@ deAllocStackTop call is doing above.
 Finally, here is the general case.
 
 \begin{code}
-cgCase expr live_in_whole_case live_in_alts bndr srt alt_type alts
+cgCase expr live_in_whole_case live_in_alts bndr alt_type alts
   = do	{	-- Figure out what volatile variables to save
 	  nukeDeadBindings live_in_whole_case
     
@@ -232,7 +231,7 @@ cgCase expr live_in_whole_case live_in_alts bndr srt alt_type alts
 				; allocStackTop retAddrSizeW   -- space for retn address 
 				; nopC })
 			   (do	{ deAllocStackTop retAddrSizeW
-				; cgEvalAlts maybe_cc_slot bndr srt alt_type alts })
+				; cgEvalAlts maybe_cc_slot bndr alt_type alts })
 
 	; setEndOfBlockInfo scrut_eob_info (cgExpr expr)
     }
@@ -355,14 +354,13 @@ is some evaluation to be done.
 \begin{code}
 cgEvalAlts :: Maybe VirtualSpOffset	-- Offset of cost-centre to be restored, if any
 	   -> Id
-	   -> SRT			-- SRT for the continuation
 	   -> AltType
 	   -> [StgAlt]
 	   -> FCode Sequel	-- Any addr modes inside are guaranteed
 				-- to be a label so that we can duplicate it 
 				-- without risk of duplicating code
 
-cgEvalAlts cc_slot bndr srt alt_type@(PrimAlt tycon) alts
+cgEvalAlts cc_slot bndr alt_type@(PrimAlt tycon) alts
   = do	{ let   rep = tyConCgRep tycon
 		reg = dataReturnConvPrim rep	-- Bottom for voidRep
 
@@ -374,10 +372,10 @@ cgEvalAlts cc_slot bndr srt alt_type@(PrimAlt tycon) alts
 		; restoreCurrentCostCentre cc_slot True
 		; cgPrimAlts GCMayHappen alt_type reg alts }
 
-	; lbl <- emitReturnTarget (idName bndr) abs_c srt
+	; lbl <- emitReturnTarget (idName bndr) abs_c
 	; returnFC (CaseAlts lbl Nothing bndr) }
 
-cgEvalAlts cc_slot bndr srt (UbxTupAlt _) [(con,args,_,rhs)]
+cgEvalAlts cc_slot bndr (UbxTupAlt _) [(con,args,_,rhs)]
   =	-- Unboxed tuple case
 	-- By now, the simplifier should have have turned it
 	-- into 	case e of (# a,b #) -> e
@@ -396,10 +394,10 @@ cgEvalAlts cc_slot bndr srt (UbxTupAlt _) [(con,args,_,rhs)]
 			-- and finally the code for the alternative
 		; unbxTupleHeapCheck live_regs ptrs nptrs noStmts
 				     (cgExpr rhs) }
-	; lbl <- emitReturnTarget (idName bndr) abs_c srt
+	; lbl <- emitReturnTarget (idName bndr) abs_c
 	; returnFC (CaseAlts lbl Nothing bndr) }
 
-cgEvalAlts cc_slot bndr srt alt_type alts
+cgEvalAlts cc_slot bndr alt_type alts
   = 	-- Algebraic and polymorphic case
     do	{	-- Bind the default binder
 	  bindNewToReg bndr nodeReg (mkLFArgument bndr)
@@ -416,7 +414,7 @@ cgEvalAlts cc_slot bndr srt alt_type alts
 	; (alts, mb_deflt) <- cgAlgAlts GCMayHappen cc_slot alt_type alts
 
 	; (lbl, branches) <- emitAlgReturnTarget (idName bndr) 
-				alts mb_deflt srt fam_sz
+				alts mb_deflt fam_sz
 
 	; returnFC (CaseAlts lbl branches bndr) }
   where

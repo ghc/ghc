@@ -28,6 +28,7 @@ import Cmm
 import CLabel
 import MachOp
 import ForeignCall
+import ClosureInfo
 
 -- Utils
 import DynFlags
@@ -198,11 +199,11 @@ pprStmt stmt = case stmt of
 	where
 	  rep = cmmExprRep src
 
-    CmmCall (CmmForeignCall fn cconv) results args ->
+    CmmCall (CmmForeignCall fn cconv) results args srt ->
 	-- Controversial: leave this out for now.
 	-- pprUndef fn $$
 
-	pprCall ppr_fn cconv results args
+	pprCall ppr_fn cconv results args srt
 	where
     	ppr_fn = case fn of
 		   CmmLit (CmmLabel lbl) -> pprCLabel lbl
@@ -219,8 +220,8 @@ pprStmt stmt = case stmt of
 	   ptext SLIT("#undef") <+> pprCLabel lbl
 	pprUndef _ = empty
 
-    CmmCall (CmmPrim op) results args ->
-	pprCall ppr_fn CCallConv results args
+    CmmCall (CmmPrim op) results args srt ->
+	pprCall ppr_fn CCallConv results args srt
 	where
     	ppr_fn = pprCallishMachOp_for_C op
 
@@ -718,10 +719,10 @@ pprLocalReg (LocalReg uniq _ _) = char '_' <> ppr uniq
 -- -----------------------------------------------------------------------------
 -- Foreign Calls
 
-pprCall :: SDoc -> CCallConv -> CmmHintFormals -> CmmActuals
+pprCall :: SDoc -> CCallConv -> CmmHintFormals -> CmmActuals -> C_SRT
 	-> SDoc
 
-pprCall ppr_fn cconv results args
+pprCall ppr_fn cconv results args _
   | not (is_cish cconv)
   = panic "pprCall: unknown calling convention"
 
@@ -839,7 +840,7 @@ te_Lit _ = return ()
 te_Stmt :: CmmStmt -> TE ()
 te_Stmt (CmmAssign r e)		= te_Reg r >> te_Expr e
 te_Stmt (CmmStore l r)		= te_Expr l >> te_Expr r
-te_Stmt (CmmCall _ rs es)	= mapM_ (te_temp.fst) rs >>
+te_Stmt (CmmCall _ rs es _)	= mapM_ (te_temp.fst) rs >>
 				  mapM_ (te_Expr.fst) es
 te_Stmt (CmmCondBranch e _)	= te_Expr e
 te_Stmt (CmmSwitch e _)		= te_Expr e

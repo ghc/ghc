@@ -203,7 +203,7 @@ module, @CgCase@.
 \begin{code}
 
 cgExpr (StgCase expr live_vars save_vars bndr srt alt_type alts)
-  = cgCase expr live_vars save_vars bndr srt alt_type alts
+  = setSRT srt $ cgCase expr live_vars save_vars bndr alt_type alts
 \end{code}
 
 
@@ -293,7 +293,7 @@ cgRhs name (StgRhsCon maybe_cc con args)
 
 cgRhs name (StgRhsClosure cc bi fvs upd_flag srt args body)
   = do this_pkg <- getThisPackage
-       mkRhsClosure this_pkg name cc bi srt fvs upd_flag args body
+       setSRT srt $ mkRhsClosure this_pkg name cc bi fvs upd_flag args body
 \end{code}
 
 mkRhsClosure looks for two special forms of the right-hand side:
@@ -316,12 +316,12 @@ form:
 
 
 \begin{code}
-mkRhsClosure	this_pkg bndr cc bi srt
+mkRhsClosure	this_pkg bndr cc bi
 		[the_fv]   		-- Just one free var
 		upd_flag		-- Updatable thunk
 		[]			-- A thunk
 		body@(StgCase (StgApp scrutinee [{-no args-}])
-		      _ _ _ _   -- ignore uniq, etc.
+		      _ _ _ srt   -- ignore uniq, etc.
 		      (AlgAlt tycon)
 		      [(DataAlt con, params, use_mask,
 			    (StgApp selectee [{-no args-}]))])
@@ -334,7 +334,7 @@ mkRhsClosure	this_pkg bndr cc bi srt
     -- other constructors in the datatype.  It's still ok to make a selector
     -- thunk in this case, because we *know* which constructor the scrutinee
     -- will evaluate to.
-    cgStdRhsClosure bndr cc bi [the_fv] [] body lf_info [StgVarArg the_fv]
+    setSRT srt $ cgStdRhsClosure bndr cc bi [the_fv] [] body lf_info [StgVarArg the_fv]
   where
     lf_info 		  = mkSelectorLFInfo bndr offset_into_int
 				 (isUpdatable upd_flag)
@@ -362,7 +362,7 @@ We only generate an Ap thunk if all the free variables are pointers,
 for semi-obvious reasons.
 
 \begin{code}
-mkRhsClosure 	this_pkg bndr cc bi srt
+mkRhsClosure 	this_pkg bndr cc bi
 		fvs
 		upd_flag
 		[]			-- No args; a thunk
@@ -387,8 +387,8 @@ mkRhsClosure 	this_pkg bndr cc bi srt
 The default case
 ~~~~~~~~~~~~~~~~
 \begin{code}
-mkRhsClosure this_pkg bndr cc bi srt fvs upd_flag args body
-  = cgRhsClosure bndr cc bi srt fvs upd_flag args body
+mkRhsClosure this_pkg bndr cc bi fvs upd_flag args body
+  = cgRhsClosure bndr cc bi fvs upd_flag args body
 \end{code}
 
 
@@ -434,7 +434,7 @@ cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec binder
     -- case upd_flag of
     --     Updatable -> panic "cgLetNoEscapeRhs"	-- Nothing to update!
     --     other     -> cgLetNoEscapeClosure binder cc bi live_in_whole_let live_in_rhss args body
-    cgLetNoEscapeClosure binder cc bi srt full_live_in_rhss rhs_eob_info
+    setSRT srt $ cgLetNoEscapeClosure binder cc bi full_live_in_rhss rhs_eob_info
 	maybe_cc_slot rec args body
 
 -- For a constructor RHS we want to generate a single chunk of code which
@@ -442,7 +442,7 @@ cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec binder
 -- It's easy; just behave as if it was an StgRhsClosure with a ConApp inside!
 cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec binder
     	    	 (StgRhsCon cc con args)
-  = cgLetNoEscapeClosure binder cc noBinderInfo{-safe-} NoSRT
+  = setSRT NoSRT $ cgLetNoEscapeClosure binder cc noBinderInfo{-safe-}
 			 full_live_in_rhss rhs_eob_info maybe_cc_slot rec
 	[] 	--No args; the binder is data structure, not a function
 	(StgConApp con args)

@@ -127,6 +127,10 @@ data C_SRT = NoC_SRT
 needsSRT :: C_SRT -> Bool
 needsSRT NoC_SRT       = False
 needsSRT (C_SRT _ _ _) = True
+
+instance Outputable C_SRT where
+  ppr (NoC_SRT) = ptext SLIT("_no_srt_")
+  ppr (C_SRT label off bitmap) = parens (ppr label <> comma <> ppr off <> comma <> text (show bitmap))
 \end{code}
 
 %************************************************************************

@@ -209,7 +209,7 @@ gatherBlocksIntoContinuation proc_points blocks start =
                  _ -> mkReturnPtLabel $ getUnique start
       params = case start_block_entry of
                  FunctionEntry _ args -> args
-                 ContinuationEntry args -> args
+                 ContinuationEntry args _ -> args
                  ControlEntry -> [] -- TODO: it's a proc-point, we could pass lives in parameter registers
 
 --------------------------------------------------------------------------------
@@ -256,7 +256,7 @@ continuationToProc formats (Continuation is_entry info label formals blocks) =
                        ControlEntry -> []
                        FunctionEntry _ formals -> -- TODO: gc_stack_check
                            function_entry formals curr_format
-                       ContinuationEntry formals ->
+                       ContinuationEntry formals _ ->
                            function_entry formals curr_format
             postfix = case exit of
                         FinalBranch next -> [CmmBranch next]

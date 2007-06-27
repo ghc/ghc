@@ -11,7 +11,6 @@ module CLabel (
 
 	mkClosureLabel,
 	mkSRTLabel,
-	mkSRTDescLabel,
 	mkInfoTableLabel,
 	mkEntryLabel,
 	mkSlowEntryLabel,
@@ -20,6 +19,7 @@ module CLabel (
 	mkRednCountsLabel,
 	mkConInfoTableLabel,
 	mkStaticInfoTableLabel,
+	mkLargeSRTLabel,
 	mkApEntryLabel,
 	mkApInfoTableLabel,
 	mkClosureTableLabel,
@@ -210,12 +210,14 @@ data CLabel
   | HpcTicksLabel Module       -- Per-module table of tick locations
   | HpcModuleNameLabel         -- Per-module name of the module for Hpc
 
+  | LargeSRTLabel           -- Label of an StgLargeSRT
+        {-# UNPACK #-} !Unique
+
   deriving (Eq, Ord)
 
 data IdLabelInfo
   = Closure		-- Label for closure
   | SRT                 -- Static reference table
-  | SRTDesc             -- Static reference table descriptor
   | InfoTable		-- Info tables for closures; always read-only
   | Entry		-- entry point
   | Slow		-- slow entry point
@@ -287,7 +289,6 @@ data DynamicLinkerLabelInfo
 
 -- These are always local:
 mkSRTLabel		name 	= IdLabel name  SRT
-mkSRTDescLabel		name 	= IdLabel name  SRTDesc
 mkSlowEntryLabel      	name 	= IdLabel name  Slow
 mkBitmapLabel   	name 	= IdLabel name  Bitmap
 mkRednCountsLabel     	name 	= IdLabel name  RednCounts
@@ -333,6 +334,7 @@ mkStaticConEntryLabel this_pkg name
   | isDllName this_pkg name = DynIdLabel    name StaticConEntry
   | otherwise             = IdLabel name StaticConEntry
 
+mkLargeSRTLabel	uniq 	= LargeSRTLabel uniq
 
 mkReturnPtLabel uniq		= CaseLabel uniq CaseReturnPt
 mkReturnInfoLabel uniq		= CaseLabel uniq CaseReturnInfo
@@ -467,7 +469,7 @@ needsCDecl :: CLabel -> Bool
   -- don't bother declaring SRT & Bitmap labels, we always make sure
   -- they are defined before use.
 needsCDecl (IdLabel _ SRT)		= False
-needsCDecl (IdLabel _ SRTDesc)		= False
+needsCDecl (LargeSRTLabel _)		= False
 needsCDecl (IdLabel _ Bitmap)		= False
 needsCDecl (IdLabel _ _)		= True
 needsCDecl (DynIdLabel _ _)		= True
@@ -697,6 +699,8 @@ pprCLbl (CaseLabel u (CaseAlt tag))
 pprCLbl (CaseLabel u CaseDefault)
   = hcat [pprUnique u, ptext SLIT("_dflt")]
 
+pprCLbl (LargeSRTLabel u)  = pprUnique u <> pp_cSEP <> ptext SLIT("srtd")
+
 pprCLbl (RtsLabel (RtsCode str))   = ptext str
 pprCLbl (RtsLabel (RtsData str))   = ptext str
 pprCLbl (RtsLabel (RtsCodeFS str)) = ftext str
@@ -791,7 +795,6 @@ ppIdFlavor x = pp_cSEP <>
 	       (case x of
 		       Closure	    	-> ptext SLIT("closure")
 		       SRT		-> ptext SLIT("srt")
-		       SRTDesc		-> ptext SLIT("srtd")
 		       InfoTable    	-> ptext SLIT("info")
 		       Entry	    	-> ptext SLIT("entry")
 		       Slow	    	-> ptext SLIT("slow")

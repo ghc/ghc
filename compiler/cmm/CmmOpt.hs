@@ -140,7 +140,7 @@ lookForInline u expr (stmt:stmts)
 getStmtUses :: CmmStmt -> UniqFM Int
 getStmtUses (CmmAssign _ e) = getExprUses e
 getStmtUses (CmmStore e1 e2) = plusUFM_C (+) (getExprUses e1) (getExprUses e2)
-getStmtUses (CmmCall target _ es)
+getStmtUses (CmmCall target _ es _)
    = plusUFM_C (+) (uses target) (getExprsUses (map fst es))
    where uses (CmmForeignCall e _) = getExprUses e
 	 uses _ = emptyUFM
@@ -161,8 +161,8 @@ getExprsUses es = foldr (plusUFM_C (+)) emptyUFM (map getExprUses es)
 inlineStmt :: Unique -> CmmExpr -> CmmStmt -> CmmStmt
 inlineStmt u a (CmmAssign r e) = CmmAssign r (inlineExpr u a e)
 inlineStmt u a (CmmStore e1 e2) = CmmStore (inlineExpr u a e1) (inlineExpr u a e2)
-inlineStmt u a (CmmCall target regs es)
-   = CmmCall (infn target) regs es'
+inlineStmt u a (CmmCall target regs es srt)
+   = CmmCall (infn target) regs es' srt
    where infn (CmmForeignCall fn cconv) = CmmForeignCall fn cconv
 	 infn (CmmPrim p) = CmmPrim p
 	 es' = [ (inlineExpr u a e, hint) | (e,hint) <- es ]

@@ -10,7 +10,6 @@ module CgInfoTbls (
 	emitClosureCodeAndInfoTable,
 	emitInfoTableAndCode,
 	dataConTagZ,
-	getSRTInfo,
 	emitReturnTarget, emitAlgReturnTarget,
 	emitReturnInstr,
 	mkRetInfoTable,
@@ -187,12 +186,11 @@ mkFunGenInfoExtraBits fun_type arity srt_label liveness slow_entry
 emitReturnTarget
    :: Name
    -> CgStmts			-- The direct-return code (if any)
-   -> SRT
    -> FCode CLabel
-emitReturnTarget name stmts srt
+emitReturnTarget name stmts
   = do	{ live_slots <- getLiveStackSlots
 	; liveness   <- buildContLiveness name live_slots
-	; srt_info   <- getSRTInfo name srt
+	; srt_info   <- getSRTInfo
 
 	; let
 	      cl_type | isBigLiveness liveness = rET_BIG
@@ -231,15 +229,14 @@ emitAlgReturnTarget
 	:: Name				-- Just for its unique
 	-> [(ConTagZ, CgStmts)]		-- Tagged branches
 	-> Maybe CgStmts		-- Default branch (if any)
-	-> SRT				-- Continuation's SRT
 	-> Int                          -- family size
 	-> FCode (CLabel, SemiTaggingStuff)
 
-emitAlgReturnTarget name branches mb_deflt srt fam_sz
+emitAlgReturnTarget name branches mb_deflt fam_sz
   = do  { blks <- getCgStmts $
 		    emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1)
 		-- NB: tag_expr is zero-based
-	; lbl <- emitReturnTarget name blks srt 
+	; lbl <- emitReturnTarget name blks
 	; return (lbl, Nothing) }
 		-- Nothing: the internal branches in the switch don't have
 		-- global labels, so we can't use them at the 'call site'
@@ -424,29 +421,6 @@ emitInfoTableAndCode info_lbl std_info extra_bits args blocks
 --	Static reference tables
 --
 -------------------------------------------------------------------------
-
--- There is just one SRT for each top level binding; all the nested
--- bindings use sub-sections of this SRT.  The label is passed down to
--- the nested bindings via the monad.
-
-getSRTInfo :: Name -> SRT -> FCode C_SRT
-getSRTInfo id NoSRT = return NoC_SRT
-getSRTInfo id (SRT off len bmp)
-  | len > hALF_WORD_SIZE_IN_BITS || bmp == [fromIntegral srt_escape]
-  = do	{ srt_lbl <- getSRTLabel
-	; let srt_desc_lbl = mkSRTDescLabel id
-	; emitRODataLits srt_desc_lbl
-		   ( cmmLabelOffW srt_lbl off
-		   : mkWordCLit (fromIntegral len)
-		   : map mkWordCLit bmp)
-	; return (C_SRT srt_desc_lbl 0 srt_escape) }
-
-  | otherwise 
-  = do	{ srt_lbl <- getSRTLabel
-	; return (C_SRT srt_lbl off (fromIntegral (head bmp))) }
-		-- The fromIntegral converts to StgHalfWord
-
-srt_escape = (-1) :: StgHalfWord
 
 srtLabelAndLength :: C_SRT -> CLabel -> (CmmLit, StgHalfWord)
 srtLabelAndLength NoC_SRT _		

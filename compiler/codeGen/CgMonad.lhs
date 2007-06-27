@@ -32,6 +32,7 @@ module CgMonad (
 	EndOfBlockInfo(..),
 	setEndOfBlockInfo, getEndOfBlockInfo,
 
+	setSRT, getSRT,
 	setSRTLabel, getSRTLabel, 
 	setTickyCtrLabel, getTickyCtrLabel,
 
@@ -65,6 +66,7 @@ import PackageConfig
 import Cmm
 import CmmUtils
 import CLabel
+import StgSyn (SRT)
 import SMRep
 import Module
 import Id
@@ -98,7 +100,8 @@ data CgInfoDownwards	-- information only passed *downwards* by the monad
 	cgd_dflags  :: DynFlags,
 	cgd_mod     :: Module,		-- Module being compiled
 	cgd_statics :: CgBindings,	-- [Id -> info] : static environment
-	cgd_srt     :: CLabel,		-- label of the current SRT
+	cgd_srt_lbl :: CLabel,		-- label of the current SRT
+        cgd_srt     :: SRT,		-- the current SRT
 	cgd_ticky   :: CLabel,		-- current destination for ticky counts
 	cgd_eob     :: EndOfBlockInfo	-- Info for stuff to do at end of basic block:
   }
@@ -108,6 +111,7 @@ initCgInfoDown dflags mod
   = MkCgInfoDown {	cgd_dflags  = dflags,
 			cgd_mod     = mod,
 			cgd_statics = emptyVarEnv,
+			cgd_srt_lbl = error "initC: srt_lbl",
 			cgd_srt     = error "initC: srt",
 			cgd_ticky   = mkTopTickyCtrLabel,
 			cgd_eob     = initEobInfo }
@@ -828,12 +832,21 @@ getEndOfBlockInfo = do
 
 getSRTLabel :: FCode CLabel	-- Used only by cgPanic
 getSRTLabel = do info  <- getInfoDown
-		 return (cgd_srt info)
+		 return (cgd_srt_lbl info)
 
 setSRTLabel :: CLabel -> FCode a -> FCode a
 setSRTLabel srt_lbl code
   = do  info <- getInfoDown
-	withInfoDown code (info { cgd_srt = srt_lbl})
+	withInfoDown code (info { cgd_srt_lbl = srt_lbl})
+
+getSRT :: FCode SRT
+getSRT = do info <- getInfoDown
+            return (cgd_srt info)
+
+setSRT :: SRT -> FCode a -> FCode a
+setSRT srt code
+  = do info <- getInfoDown
+       withInfoDown code (info { cgd_srt = srt})
 
 -- ----------------------------------------------------------------------------
 -- Get/set the current ticky counter label

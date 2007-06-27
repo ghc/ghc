@@ -12,6 +12,8 @@ module CmmBrokenBlock (
 import Cmm
 import CLabel
 
+import ClosureInfo
+
 import Maybes
 import Panic
 import Unique
@@ -50,6 +52,7 @@ data BlockEntryInfo
 
   | ContinuationEntry 		-- ^ Return point of a function call
       CmmFormals                -- ^ return values (argument to continuation)
+      C_SRT                     -- ^ SRT for the continuation's info table
 
   | ControlEntry		-- ^ Any other kind of block.
                                 -- Only entered due to control flow.
@@ -136,13 +139,13 @@ breakBlock uniques (BasicBlock ident stmts) entry =
                 block = do_call current_id entry accum_stmts exits next_id
                                 target results arguments
              -}
-            (CmmCall target results arguments:stmts) -> block : rest
+            (CmmCall target results arguments srt:stmts) -> block : rest
               where
                 next_id = BlockId $ head uniques
                 block = do_call current_id entry accum_stmts exits next_id
                                 target results arguments
                 rest = breakBlock' (tail uniques) next_id
-                                   (ContinuationEntry (map fst results)) [] [] stmts
+                                   (ContinuationEntry (map fst results) srt) [] [] stmts
             (s:stmts) ->
                 breakBlock' uniques current_id entry
                             (cond_branch_target s++exits)
@@ -171,7 +174,7 @@ cmmBlockFromBrokenBlock (BrokenBlock ident _ stmts _ exit) =
             FinalJump target arguments -> [CmmJump target arguments]
             FinalSwitch expr targets -> [CmmSwitch expr targets]
             FinalCall branch_target call_target results arguments ->
-                [CmmCall call_target results arguments,
+                [CmmCall call_target results arguments (panic "needed SRT from cmmBlockFromBrokenBlock"),
                  CmmBranch branch_target]
 
 -----------------------------------------------------------------------------

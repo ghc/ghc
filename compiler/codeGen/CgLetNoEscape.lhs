@@ -136,7 +136,6 @@ cgLetNoEscapeClosure
 	:: Id			-- binder
 	-> CostCentreStack   	-- NB: *** NOT USED *** ToDo (WDP 94/06)
 	-> StgBinderInfo	-- NB: ditto
-	-> SRT
 	-> StgLiveVars		-- variables live in RHS, including the binders
 				-- themselves in the case of a recursive group
 	-> EndOfBlockInfo       -- where are we going to?
@@ -149,7 +148,7 @@ cgLetNoEscapeClosure
 -- ToDo: deal with the cost-centre issues
 
 cgLetNoEscapeClosure 
-	bndr cc binder_info srt full_live_in_rhss 
+	bndr cc binder_info full_live_in_rhss 
 	rhs_eob_info cc_slot rec args body
   = let
 	arity   = length args
@@ -168,7 +167,7 @@ cgLetNoEscapeClosure
 
 			-- Ignore the label that comes back from
 			-- mkRetDirectTarget.  It must be conjured up elswhere
-		    ; emitReturnTarget (idName bndr) abs_c srt
+		    ; emitReturnTarget (idName bndr) abs_c
 		    ; return () })
 
 	; returnFC (bndr, letNoEscapeIdInfo bndr vSp lf_info) }

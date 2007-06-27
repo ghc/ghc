@@ -323,8 +323,9 @@ cgTopRhs bndr (StgRhsCon cc con args)
 
 cgTopRhs bndr (StgRhsClosure cc bi fvs upd_flag srt args body)
   = ASSERT(null fvs)    -- There should be no free variables
-    setSRTLabel (mkSRTLabel (idName bndr)) $ 
-    forkStatics (cgTopRhsClosure bndr cc bi srt upd_flag args body)
+    setSRTLabel (mkSRTLabel (idName bndr)) $
+    setSRT srt $
+    forkStatics (cgTopRhsClosure bndr cc bi upd_flag args body)
 \end{code}
 
 

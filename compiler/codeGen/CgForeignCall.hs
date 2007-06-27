@@ -32,6 +32,7 @@ import CmmUtils
 import MachOp
 import SMRep
 import ForeignCall
+import ClosureInfo
 import Constants
 import StaticFlags
 import Outputable
@@ -76,8 +77,9 @@ emitForeignCall
 
 emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
   = do vols <- getVolatileRegs live
+       srt <- getSRTInfo
        emitForeignCall' safety results
-		(CmmForeignCall cmm_target cconv) call_args (Just vols)
+		(CmmForeignCall cmm_target cconv) call_args (Just vols) srt
   where
       (call_args, cmm_target)
 	= case target of
@@ -96,7 +98,7 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
 	-- ToDo: this might not be correct for 64-bit API
       arg_size rep = max (machRepByteWidth rep) wORD_SIZE
 
-emitForeignCall results (DNCall _) args live
+emitForeignCall _ (DNCall _) _ _
   = panic "emitForeignCall: DNCall"
 
 
@@ -107,13 +109,14 @@ emitForeignCall'
 	-> CmmCallTarget	-- the op
 	-> [(CmmExpr,MachHint)] -- arguments
 	-> Maybe [GlobalReg]	-- live vars, in case we need to save them
+        -> C_SRT                -- the SRT of the calls continuation
 	-> Code
-emitForeignCall' safety results target args vols 
+emitForeignCall' safety results target args vols srt
   | not (playSafe safety) = do
     temp_args <- load_args_into_temps args
     let (caller_save, caller_load) = callerSaveVolatileRegs vols
     stmtsC caller_save
-    stmtC (CmmCall target results temp_args)
+    stmtC (CmmCall target results temp_args srt)
     stmtsC caller_load
 
   | otherwise = do
@@ -126,15 +129,17 @@ emitForeignCall' safety results target args vols
     let (caller_save, caller_load) = callerSaveVolatileRegs vols
     emitSaveThreadState
     stmtsC caller_save
+    -- Using the same SRT for each of these is a little bit conservative
+    -- but it should work for now.
     stmtC (CmmCall (CmmForeignCall suspendThread CCallConv) 
 			[ (id,PtrHint) ]
 			[ (CmmReg (CmmGlobal BaseReg), PtrHint) ] 
-			)
-    stmtC (CmmCall temp_target results temp_args)
+			srt)
+    stmtC (CmmCall temp_target results temp_args srt)
     stmtC (CmmCall (CmmForeignCall resumeThread CCallConv) 
 			[ (new_base, PtrHint) ]
 			[ (CmmReg (CmmLocal id), PtrHint) ]
-			)
+			srt)
     -- Assign the result to BaseReg: we
     -- might now have a different Capability!
     stmtC (CmmAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base)))

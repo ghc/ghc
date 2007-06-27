@@ -28,6 +28,7 @@ module Cmm (
 import MachOp
 import CLabel
 import ForeignCall
+import ClosureInfo
 import Unique
 import UniqFM
 import FastString
@@ -116,6 +117,7 @@ data CmmStmt
      CmmCallTarget
      CmmHintFormals		 -- zero or more results
      CmmActuals			 -- zero or more arguments
+     C_SRT			 -- SRT for the continuation of the call
 
   | CmmBranch BlockId             -- branch to another BB in this fn
 

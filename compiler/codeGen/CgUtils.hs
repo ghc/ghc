@@ -29,7 +29,9 @@ module CgUtils (
 	mkWordCLit,
 	mkStringCLit, mkByteStringCLit,
 	packHalfWordsCLit,
-	blankWord
+	blankWord,
+
+	getSRTInfo
   ) where
 
 #include "HsVersions.h"
@@ -45,6 +47,8 @@ import CLabel
 import CmmUtils
 import MachOp
 import ForeignCall
+import ClosureInfo
+import StgSyn (SRT(..))
 import Literal
 import Digraph
 import ListSetOps
@@ -284,8 +288,9 @@ emitRtsCall'
    -> Maybe [GlobalReg]
    -> Code
 emitRtsCall' res fun args vols = do
+    srt <- getSRTInfo
     stmtsC caller_save
-    stmtC (CmmCall target res args)
+    stmtC (CmmCall target res args srt)
     stmtsC caller_load
   where
     (caller_save, caller_load) = callerSaveVolatileRegs vols
@@ -705,3 +710,38 @@ possiblySameLoc (CmmRegOff r1 start1) rep1 (CmmRegOff r2 start2) rep2
 
 possiblySameLoc l1 rep1 (CmmLit _) rep2 = False
 possiblySameLoc l1 rep1 l2	   rep2 = True	-- Conservative
+
+-------------------------------------------------------------------------
+--
+--	Static Reference Tables
+--
+-------------------------------------------------------------------------
+
+-- There is just one SRT for each top level binding; all the nested
+-- bindings use sub-sections of this SRT.  The label is passed down to
+-- the nested bindings via the monad.
+
+getSRTInfo :: FCode C_SRT
+getSRTInfo = do
+  srt_lbl <- getSRTLabel
+  srt <- getSRT
+  case srt of
+    -- TODO: Should we panic in this case?
+    -- Someone obviously thinks there should be an SRT
+    NoSRT -> return NoC_SRT
+    SRT off len bmp
+      | len > hALF_WORD_SIZE_IN_BITS || bmp == [fromIntegral srt_escape]
+      -> do id <- newUnique
+            let srt_desc_lbl = mkLargeSRTLabel id
+	    emitRODataLits srt_desc_lbl
+             ( cmmLabelOffW srt_lbl off
+	       : mkWordCLit (fromIntegral len)
+	       : map mkWordCLit bmp)
+	    return (C_SRT srt_desc_lbl 0 srt_escape)
+
+    SRT off len bmp
+      | otherwise 
+      -> return (C_SRT srt_lbl off (fromIntegral (head bmp)))
+		-- The fromIntegral converts to StgHalfWord
+
+srt_escape = (-1) :: StgHalfWord

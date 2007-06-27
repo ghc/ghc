@@ -61,17 +61,16 @@ They should have no free variables.
 cgTopRhsClosure :: Id
 		-> CostCentreStack	-- Optional cost centre annotation
 		-> StgBinderInfo
-		-> SRT
 		-> UpdateFlag
 		-> [Id]		-- Args
 		-> StgExpr
 		-> FCode (Id, CgIdInfo)
 
-cgTopRhsClosure id ccs binder_info srt upd_flag args body = do
+cgTopRhsClosure id ccs binder_info upd_flag args body = do
   {	-- LAY OUT THE OBJECT
     let name = idName id
   ; lf_info  <- mkClosureLFInfo id TopLevel [] upd_flag args
-  ; srt_info <- getSRTInfo name srt
+  ; srt_info <- getSRTInfo
   ; mod_name <- getModuleName
   ; let descr         = closureDescription mod_name name
 	closure_info  = mkClosureInfo True id lf_info 0 0 srt_info descr
@@ -136,14 +135,13 @@ Here's the general case.
 cgRhsClosure	:: Id
 		-> CostCentreStack	-- Optional cost centre annotation
 		-> StgBinderInfo
-		-> SRT
 		-> [Id]			-- Free vars
 		-> UpdateFlag
 		-> [Id]			-- Args
 		-> StgExpr
 		-> FCode (Id, CgIdInfo)
 
-cgRhsClosure bndr cc bndr_info srt fvs upd_flag args body = do
+cgRhsClosure bndr cc bndr_info fvs upd_flag args body = do
   { 	-- LAY OUT THE OBJECT
 	-- If the binder is itself a free variable, then don't store
 	-- it in the closure.  Instead, just bind it to Node on entry.
@@ -161,7 +159,7 @@ cgRhsClosure bndr cc bndr_info srt fvs upd_flag args body = do
 
   ; lf_info <- mkClosureLFInfo bndr NotTopLevel fvs upd_flag args
   ; fv_infos <- mapFCs getCgIdInfo reduced_fvs
-  ; srt_info <- getSRTInfo name srt
+  ; srt_info <- getSRTInfo
   ; mod_name <- getModuleName
   ; let	bind_details :: [(CgIdInfo, VirtualHpOffset)]
 	(tot_wds, ptr_wds, bind_details) 

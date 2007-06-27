@@ -267,10 +267,11 @@ stmt	:: { ExtCode }
 --		{ do reg <- head $1; e <- $3; stmtEC (CmmAssign (fst reg) e) }
 	| type '[' expr ']' '=' expr ';'
 		{ doStore $1 $3 $6 }
+-- TODO: add real SRT to parsed Cmm
 	| maybe_results 'foreign' STRING expr '(' hint_exprs0 ')' vols ';'
-		{% foreignCall $3 $1 $4 $6 $8 }
+		{% foreignCall $3 $1 $4 $6 $8 NoC_SRT }
 	| maybe_results 'prim' '%' NAME '(' hint_exprs0 ')' vols ';'
-		{% primCall $1 $4 $6 $8 }
+		{% primCall $1 $4 $6 $8 NoC_SRT }
 	-- stmt-level macros, stealing syntax from ordinary C-- function calls.
 	-- Perhaps we ought to use the %%-form?
 	| NAME '(' exprs0 ')' ';'
@@ -818,8 +819,10 @@ foreignCall
 	-> [ExtFCode (CmmFormal,MachHint)]
 	-> ExtFCode CmmExpr
 	-> [ExtFCode (CmmExpr,MachHint)]
-	-> Maybe [GlobalReg] -> P ExtCode
-foreignCall conv_string results_code expr_code args_code vols
+	-> Maybe [GlobalReg]
+        -> C_SRT
+        -> P ExtCode
+foreignCall conv_string results_code expr_code args_code vols srt
   = do  convention <- case conv_string of
           "C" -> return CCallConv
           "C--" -> return CmmCallConv
@@ -829,20 +832,22 @@ foreignCall conv_string results_code expr_code args_code vols
 	  expr <- expr_code
 	  args <- sequence args_code
           code (emitForeignCall' PlayRisky results 
-                 (CmmForeignCall expr convention) args vols) where
+                 (CmmForeignCall expr convention) args vols srt) where
 
 primCall
 	:: [ExtFCode (CmmFormal,MachHint)]
 	-> FastString
 	-> [ExtFCode (CmmExpr,MachHint)]
-	-> Maybe [GlobalReg] -> P ExtCode
-primCall results_code name args_code vols
+	-> Maybe [GlobalReg]
+        -> C_SRT
+        -> P ExtCode
+primCall results_code name args_code vols srt
   = case lookupUFM callishMachOps name of
 	Nothing -> fail ("unknown primitive " ++ unpackFS name)
 	Just p  -> return $ do
 		results <- sequence results_code
 		args <- sequence args_code
-        	code (emitForeignCall' PlayRisky results (CmmPrim p) args vols)
+        	code (emitForeignCall' PlayRisky results (CmmPrim p) args vols srt)
 
 doStore :: MachRep -> ExtFCode CmmExpr  -> ExtFCode CmmExpr -> ExtCode
 doStore rep addr_code val_code

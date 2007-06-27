@@ -13,6 +13,7 @@ module CgPrimOp (
 #include "HsVersions.h"
 
 import ForeignCall
+import ClosureInfo
 import StgSyn
 import CgForeignCall
 import CgBindery
@@ -122,6 +123,7 @@ emitPrimOp [res] ParOp [arg] live
     	(CmmForeignCall newspark CCallConv) 
 	[(CmmReg (CmmGlobal BaseReg), PtrHint), (arg,PtrHint)] 
 	(Just vols)
+        NoC_SRT -- No SRT b/c we do PlayRisky
   where
 	newspark = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("newSpark")))
 
@@ -138,6 +140,7 @@ emitPrimOp [] WriteMutVarOp [mutv,var] live
 			 CCallConv)
 		[(CmmReg (CmmGlobal BaseReg), PtrHint), (mutv,PtrHint)]
 		(Just vols)
+                NoC_SRT -- No SRT b/c we do PlayRisky
 
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = (((StgArrWords *)(a))->words * sizeof(W_))
@@ -342,6 +345,7 @@ emitPrimOp [res] op args live
 	   (CmmPrim prim) 
 	   [(a,NoHint) | a<-args]  -- ToDo: hints?
 	   (Just vols)
+           NoC_SRT -- No SRT b/c we do PlayRisky
 
    | Just mop <- translateOp op
    = let stmt = CmmAssign (CmmLocal res) (CmmMachOp mop args) in
