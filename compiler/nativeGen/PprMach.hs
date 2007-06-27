@@ -646,9 +646,9 @@ pprSectionHeader RelocatableReadOnlyData
 	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
 	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
 	,IF_ARCH_i386(IF_OS_darwin(SLIT(".const_data\n.align 2"),
-                                   SLIT(".section .rodata\n\t.align 4"))
+                                   SLIT(".section .data\n\t.align 4"))
 	,IF_ARCH_x86_64(IF_OS_darwin(SLIT(".const_data\n.align 3"),
-                                     SLIT(".section .rodata\n\t.align 8"))
+                                     SLIT(".section .data\n\t.align 8"))
         ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const_data\n.align 2"),
                                       SLIT(".data\n\t.align 2"))
 	,)))))
