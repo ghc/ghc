@@ -66,6 +66,10 @@ class TestConfig:
         # libraries.
         self.compile_ways = []
         self.run_ways     = []
+        self.other_ways   = []
+
+        # The ways selected via the command line.
+        self.cmdline_ways = []
 
         # Lists of flags for each way
         self.way_flags = {}

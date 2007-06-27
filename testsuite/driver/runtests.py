@@ -59,8 +59,10 @@ for opt,arg in opts:
             sys.stderr.write("ERROR: requested way \'" +
                              arg + "\' does not exist\n")
             sys.exit(1)
-        config.run_ways = filter(eq(arg), config.run_ways + config.other_ways)
-        config.compile_ways = filter(eq(arg), config.compile_ways + config.other_ways)
+        config.cmdline_ways = [arg] + config.cmdline_ways
+        if (arg in config.other_ways):
+            config.run_ways = [arg] + config.run_ways
+            config.compile_ways = [arg] + config.compile_ways
 
     if opt == '--skipway':
         if (arg not in config.run_ways and arg not in config.compile_ways and arg not in config.other_ways):
