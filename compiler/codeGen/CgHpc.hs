@@ -71,7 +71,7 @@ initHpc this_mod (HpcInfo tickCount hashNo)
                , (CmmLit $ CmmLabel $ mkHpcTicksLabel $ this_mod,PtrHint)
                ]
                (Just [])
-               C_SRT -- No SRT b/c we PlayRisky
+               NoC_SRT -- No SRT b/c we PlayRisky
        }
   where
        mod_alloc = mkFastString "hs_hpc_module"
