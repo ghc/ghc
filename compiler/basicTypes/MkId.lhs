@@ -72,7 +72,7 @@ import Outputable
 import FastString
 import ListSetOps
 import Module
-\end{code}		
+\end{code}
 
 %************************************************************************
 %*									*

@@ -314,7 +314,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 		 case new_or_data of
 		   DataType -> return (mkDataTyConRhs data_cons)
 		   NewType  -> ASSERT( isSingleton data_cons )
-			       mkNewTyConRhs tc_name tycon (head data_cons)
+			       mkNewTyConRhs rep_tc_name tycon (head data_cons)
 	     ; buildAlgTyCon rep_tc_name t_tvs stupid_theta tc_rhs Recursive
 			     False h98_syntax (Just (family, t_typats))
                  -- We always assume that indexed types are recursive.  Why?

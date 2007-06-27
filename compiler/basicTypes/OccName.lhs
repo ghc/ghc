@@ -445,7 +445,7 @@ mkIPOcc		    = mk_simple_deriv varName  "$i"
 mkSpecOcc	    = mk_simple_deriv varName  "$s"
 mkForeignExportOcc  = mk_simple_deriv varName  "$f"
 mkNewTyCoOcc        = mk_simple_deriv tcName  ":Co"
-mkInstTyCoOcc       = mk_simple_deriv tcName  ":Co"      -- derived from rep ty
+mkInstTyCoOcc       = mk_simple_deriv tcName  ":CoF"     -- derived from rep ty
 mkEqPredCoOcc	    = mk_simple_deriv tcName  "$co"
 
 -- Generic derivable classes
