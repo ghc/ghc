@@ -72,11 +72,18 @@ extern void   freeHaskellFunctionPtr(void* ptr);
 
 /* Hpc stuff */
 extern int hs_hpc_module(char *modName,int modCount,int modHashNo,StgWord64 *tixArr);
-extern void hs_hpc_tick(int globIx,struct StgTSO_ *current_tso);
-extern void hs_hpc_raise_event(struct StgTSO_ *current_tso);	
-extern void hs_hpc_thread_finished_event(struct StgTSO_ *current_tso);
-extern void hs_hpc_read(char *filename);
-extern void hs_hpc_write(char *filename);
+// Simple linked list of modules
+typedef struct _HpcModuleInfo {
+  char *modName;		// name of module
+  int tickCount;		// number of ticks
+  int tickOffset;		// offset into a single large .tix Array
+  int hashNo;			// Hash number for this module's mix info
+  StgWord64 *tixArr;		// tix Array; local for this module
+  struct _HpcModuleInfo *next;
+} HpcModuleInfo;
+
+extern HpcModuleInfo *hs_hpc_rootModule(void);
+
 
 #if defined(mingw32_HOST_OS)
 extern int  rts_InstallConsoleEvent ( int action, StgStablePtr *handler );

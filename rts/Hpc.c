@@ -22,20 +22,9 @@
  *
  */
 
-#define WOP_SIZE 1024	
-
 static int hpc_inited = 0;		// Have you started this component?
 static FILE *tixFile;			// file being read/written
 static int tix_ch;			// current char
-
-typedef struct _HpcModuleInfo {
-  char *modName;		// name of module
-  int tickCount;		// number of ticks
-  int tickOffset;		// offset into a single large .tix Array
-  int hashNo;			// Hash number for this module's mix info
-  StgWord64 *tixArr;		// tix Array from the program execution (local for this module)
-  struct _HpcModuleInfo *next;
-} HpcModuleInfo;
 
 // This is a cruel hack, we should completely redesign the format specifier handling in the RTS.
 #if SIZEOF_LONG == 8
@@ -49,6 +38,9 @@ HpcModuleInfo *nextModule = 0;
 int totalTixes = 0;		// total number of tix boxes.
 
 static char *tixFilename;
+
+void hs_hpc_read(char *filename);
+void hs_hpc_write(char *filename);
 
 static void failure(char *msg) {
   debugTrace(DEBUG_hpc,"hpc failure: %s\n",msg);
@@ -371,5 +363,10 @@ void hs_hpc_write(char *filename) {
   writeTix(fopen(filename,"w"));
 }
 
+//////////////////////////////////////////////////////////////////////////////
+// This is the API into Hpc RTS from Haskell, allowing the tixs boxes
+// to be first class.
 
-
+HpcModuleInfo *hs_hpc_rootModule(void) {
+  return modules;
+}
