@@ -403,7 +403,7 @@ usage_text[] = {
 "  -C<secs>  Context-switch interval in seconds.",
 "            0 or no argument means switch as often as possible.",
 "            Default: 0.02 sec; resolution is set by -V below.",
-"  -V<secs>  Master tick interval in seconds.",
+"  -V<secs>  Master tick interval in seconds (0 == disable timer).",
 "            This sets the resolution for -C and the profile timer -i.",
 "            Default: 0.02 sec.",
 "",

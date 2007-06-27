@@ -85,7 +85,9 @@ void
 startTimer(void)
 {
   initProfTimer();
-  startTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
+  if (RtsFlags.MiscFlags.tickInterval != 0) {
+      startTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
+  }
 }
 
 void
