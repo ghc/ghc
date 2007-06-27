@@ -49,6 +49,18 @@
 
 lnat mblocks_allocated = 0;
 
+#if !defined(mingw32_HOST_OS) && !defined(cygwin32_HOST_OS)
+static caddr_t next_request = 0;
+#endif
+
+void
+initMBlocks(void)
+{
+#if !defined(mingw32_HOST_OS) && !defined(cygwin32_HOST_OS)
+    next_request = (caddr_t)RtsFlags.GcFlags.heapBase;
+#endif
+}
+
 /* -----------------------------------------------------------------------------
    The MBlock Map: provides our implementation of HEAP_ALLOCED()
    -------------------------------------------------------------------------- */
@@ -258,7 +270,6 @@ gen_map_mblocks (lnat size)
 void *
 getMBlocks(nat n)
 {
-  static caddr_t next_request = (caddr_t)HEAP_BASE;
   caddr_t ret;
   lnat size = MBLOCK_SIZE * n;
   nat i;

@@ -115,6 +115,8 @@ initStorage( void )
       return;
   }
 
+  initMBlocks();
+
   /* Sanity check to make sure the LOOKS_LIKE_ macros appear to be
    * doing something reasonable.
    */

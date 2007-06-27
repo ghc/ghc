@@ -150,6 +150,18 @@ void initRtsFlagsDefaults(void)
 #endif
     RtsFlags.GcFlags.idleGCDelayTime    = 300; /* millisecs */
 
+#if osf3_HOST_OS
+/* ToDo: Perhaps by adjusting this value we can make linking without
+ * -static work (i.e., not generate a core-dumping executable)? */
+# if SIZEOF_VOID_P == 8
+    RtsFlags.GcFlags.heapBase           = 0x180000000L;
+# else
+#  error I have no idea where to begin the heap on a non-64-bit osf3 machine.
+# endif
+#else
+    RtsFlags.GcFlags.heapBase           = 0;   /* means don't care */
+#endif
+
 #ifdef DEBUG
     RtsFlags.DebugFlags.scheduler	= rtsFalse;
     RtsFlags.DebugFlags.interpreter	= rtsFalse;
@@ -1191,6 +1203,16 @@ error = rtsTrue;
 		    errorBelch("incomplete RTS option: %s",rts_argv[arg]);
 		    error = rtsTrue;
 		    break;
+
+                case 'b': /* heapBase in hex; undocumented */
+                    if (rts_argv[arg][3] != '\0') {
+                        RtsFlags.GcFlags.heapBase
+                            = strtol(rts_argv[arg]+3, (char **) NULL, 16);
+                    } else {
+                        errorBelch("-xb: requires argument");
+                        error = rtsTrue;
+                    }
+                    break;
 
                   case 'c': /* Debugging tool: show current cost centre on an exception */
                     PROFILING_BUILD_ONLY(

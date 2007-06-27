@@ -43,6 +43,8 @@ struct GC_FLAGS {
     rtsBool frontpanel;
 
     int idleGCDelayTime;	/* in milliseconds */
+
+    StgWord heapBase;           /* address to ask the OS for memory */
 };
 
 struct DEBUG_FLAGS {  

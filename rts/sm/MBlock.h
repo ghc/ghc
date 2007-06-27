@@ -11,25 +11,10 @@
 
 extern lnat RTS_VAR(mblocks_allocated);
 
+extern void initMBlocks(void);
 extern void * getMBlock(void);
 extern void * getMBlocks(nat n);
 extern void freeAllMBlocks(void);
-
-#if osf3_HOST_OS
-/* ToDo: Perhaps by adjusting this value we can make linking without
- * -static work (i.e., not generate a core-dumping executable)? */
-#if SIZEOF_VOID_P == 8
-#define HEAP_BASE 0x180000000L
-#else
-#error I have no idea where to begin the heap on a non-64-bit osf3 machine.
-#endif
-
-#else
-
-// we're using the generic method
-#define HEAP_BASE 0
-
-#endif
 
 /* -----------------------------------------------------------------------------
    The HEAP_ALLOCED() test.
