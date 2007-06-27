@@ -834,10 +834,15 @@ checkModule session@(Session ref) mod = do
 -- | This is the way to get access to the Core bindings corresponding
 -- to a module. 'compileToCore' first invokes 'checkModule' to parse and
 -- typecheck the module, then desugars it and returns the resulting list
--- of Core bindings if successful.
-compileToCore :: Session -> ModuleName -> FilePath -> IO (Maybe [CoreBind])
-compileToCore session@(Session ref) mod fn = do
+-- of Core bindings if successful. It is assumed that the given filename
+-- has already been loaded.
+compileToCore :: Session -> FilePath -> IO (Maybe [CoreBind])
+compileToCore session@(Session ref) fn = do
    hsc_env <- readIORef ref
+   -- First, determine the module name.
+   modSummary <- summariseFile hsc_env [] fn Nothing Nothing
+   let mod = moduleName $ ms_mod modSummary
+   -- Next, parse and typecheck the module
    maybeCheckedModule <- checkModule session mod
    case maybeCheckedModule of
      Nothing -> return Nothing 
@@ -848,13 +853,14 @@ compileToCore session@(Session ref) mod fn = do
        -- return the type env would require changing a lot of data
        -- structures, so I'm leaving it like that for now.
        (_, maybe_tc_result) <- tcRnModule hsc_env HsSrcFile False parsedMod
+       -- Get the type environment from the typechecking result
        case maybe_tc_result of
        -- TODO: this ignores the type error messages and just returns Nothing
          Nothing -> return Nothing
          Just tcgEnv -> do
            let dflags = hsc_dflags hsc_env 
-           location <- mkHomeModLocation dflags mod fn
-           maybeModGuts <- deSugar hsc_env location tcgEnv
+           -- Finally, compile to Core and return the resulting bindings
+           maybeModGuts <- deSugar hsc_env (ms_location modSummary) tcgEnv
            case maybeModGuts of
              Nothing -> return Nothing
              Just mg -> return $ Just $ mg_binds mg
