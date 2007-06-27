@@ -692,8 +692,14 @@ pprGloblDecl lbl
 				    SLIT(".globl ")) <>
 		pprCLabel_asm lbl
 
+pprTypeAndSizeDecl :: CLabel -> Doc
+pprTypeAndSizeDecl lbl
+  | not (externallyVisibleCLabel lbl) = empty
+  | otherwise = ptext SLIT(".type ") <>
+		pprCLabel_asm lbl <> ptext SLIT(", @object")
+
 pprLabel :: CLabel -> Doc
-pprLabel lbl = pprGloblDecl lbl $$ (pprCLabel_asm lbl <> char ':')
+pprLabel lbl = pprGloblDecl lbl $$ pprTypeAndSizeDecl lbl $$ (pprCLabel_asm lbl <> char ':')
 
 
 pprASCII str
