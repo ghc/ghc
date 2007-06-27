@@ -21,3 +21,9 @@ clean(['ATLoop_Help.o','ATLoop_Help.hi'])
 test('Deriving', normal, compile, [''])
 test('DerivingNewType', expect_fail, compile, [''])
 test('Records', normal, compile, [''])
+
+# The point about this test is that it compiles NewTyCo1 and NewTyCo2
+# *separately*
+#
+test('NewTyCo', ignore_output, run_command, ['$MAKE NewTyCo'])
+clean(['NewTyCo1.o', 'NewTyCo1.hi', 'NewTyCo2.o', 'NewTyCo2.hi'])
