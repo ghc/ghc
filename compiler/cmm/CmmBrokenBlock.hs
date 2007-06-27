@@ -140,13 +140,15 @@ breakBlock uniques (BasicBlock ident stmts) entry =
                 block = do_call current_id entry accum_stmts exits next_id
                                 target results arguments
              -}
-            (CmmCall target results arguments srt:stmts) -> block : rest
-              where
-                next_id = BlockId $ head uniques
-                block = do_call current_id entry accum_stmts exits next_id
-                                target results arguments
-                rest = breakBlock' (tail uniques) next_id
-                                   (ContinuationEntry (map fst results) srt) [] [] stmts
+            (CmmCall target results arguments (CmmSafe srt):stmts) ->
+                block : rest
+                where
+                  next_id = BlockId $ head uniques
+                  block = do_call current_id entry accum_stmts exits next_id
+                                  target results arguments
+                  rest = breakBlock' (tail uniques) next_id
+                                     (ContinuationEntry (map fst results) srt)
+                                     [] [] stmts
             (s:stmts) ->
                 breakBlock' uniques current_id entry
                             (cond_branch_target s++exits)
