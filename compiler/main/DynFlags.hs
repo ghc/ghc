@@ -361,7 +361,7 @@ data GhcLink	-- What to do in the link step, if there is one
   = NoLink		-- Don't link at all
   | LinkBinary		-- Link object code into a binary
   | LinkInMemory        -- Use the in-memory dynamic linker
-  | MkDLL		-- Make a DLL
+  | LinkDynLib		-- Link objects into a dynamic lib (DLL on Windows, DSO on ELF platforms)
   deriving Eq
 
 isNoLink :: GhcLink -> Bool
@@ -874,7 +874,7 @@ dynamic_flags = [
 	-------- Linking ----------------------------------------------------
   ,  ( "c"		, NoArg (upd $ \d -> d{ ghcLink=NoLink } ))
   ,  ( "no-link"	, NoArg (upd $ \d -> d{ ghcLink=NoLink } )) -- Dep.
-  ,  ( "-mk-dll"	, NoArg (upd $ \d -> d{ ghcLink=MkDLL } ))
+  ,  ( "shared"		, NoArg (upd $ \d -> d{ ghcLink=LinkDynLib } ))
 
 	------- Libraries ---------------------------------------------------
   ,  ( "L"		, Prefix addLibraryPath )

@@ -12,15 +12,12 @@ module DriverPipeline (
    oneShot, compileFile,
 
 	-- Interfaces for the batch-mode driver
-   staticLink,
+   linkBinary,
 
 	-- Interfaces for the compilation manager (interpreted/batch-mode)
    preprocess, 
    compile, CompResult(..), 
    link, 
-
-        -- DLL building
-   doMkDLL,
 
   ) where
 
@@ -314,13 +311,13 @@ link LinkBinary dflags batch_attempt_linking hpt
 
 	-- Don't showPass in Batch mode; doLink will do that for us.
 	let link = case ghcLink dflags of
-	        MkDLL       -> doMkDLL
-	        LinkBinary  -> staticLink
+	        LinkBinary  -> linkBinary
+	        LinkDynLib  -> linkDynLib
 	link dflags obj_files pkg_deps
 
         debugTraceMsg dflags 3 (text "link: done")
 
-	-- staticLink only returns if it succeeds
+	-- linkBinary only returns if it succeeds
         return Succeeded
 
    | otherwise
@@ -375,8 +372,8 @@ doLink dflags stop_phase o_files
   | otherwise
   = case ghcLink dflags of
 	NoLink     -> return ()
-	LinkBinary -> staticLink dflags o_files link_pkgs
-	MkDLL      -> doMkDLL dflags o_files link_pkgs
+	LinkBinary -> linkBinary dflags o_files link_pkgs
+	LinkDynLib -> linkDynLib dflags o_files []
   where
    -- Always link in the haskell98 package for static linking.  Other
    -- packages have to be specified via the -package flag.
@@ -1050,7 +1047,7 @@ runPhase SplitAs stop dflags basename _suff _input_fn get_output_fn maybe_loc
 -- wrapper script calling the binary. Currently, we need this only in 
 -- a parallel way (i.e. in GUM), because PVM expects the binary in a
 -- central directory.
--- This is called from staticLink below, after linking. I haven't made it
+-- This is called from linkBinary below, after linking. I haven't made it
 -- a separate phase to minimise interfering with other modules, and
 -- we don't need the generality of a phase (MoveBinary is always
 -- done after linking and makes only sense in a parallel setup)   -- HWL
@@ -1164,8 +1161,8 @@ getHCFilePackages filename =
 -- read any interface files), so the user must explicitly specify all
 -- the packages.
 
-staticLink :: DynFlags -> [FilePath] -> [PackageId] -> IO ()
-staticLink dflags o_files dep_packages = do
+linkBinary :: DynFlags -> [FilePath] -> [PackageId] -> IO ()
+linkBinary dflags o_files dep_packages = do
     let verb = getVerbFlag dflags
         output_fn = exeFileName dflags
 
@@ -1276,11 +1273,8 @@ exeFileName dflags
 	"a.out"
 #endif
 
------------------------------------------------------------------------------
--- Making a DLL (only for Win32)
-
-doMkDLL :: DynFlags -> [String] -> [PackageId] -> IO ()
-doMkDLL dflags o_files dep_packages = do
+linkDynLib :: DynFlags -> [String] -> [PackageId] -> IO ()
+linkDynLib dflags o_files dep_packages = do
     let verb = getVerbFlag dflags
     let static = opt_Static
     let no_hs_main = dopt Opt_NoHsMain dflags
