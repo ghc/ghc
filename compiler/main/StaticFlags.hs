@@ -160,10 +160,6 @@ static_flags = [
   ,  ( "dppr-user-length", AnySuffix addOpt )
       -- rest of the debugging flags are dynamic
 
-	--------- Haskell Program Coverage -----------------------------------
-
-  ,  ( "fhpc"           , PassFlag addOpt )
-
 	--------- Profiling --------------------------------------------------
   ,  ( "auto-all"	, NoArg (addOpt "-fauto-sccs-on-all-toplevs") )
   ,  ( "auto"		, NoArg (addOpt "-fauto-sccs-on-exported-toplevs") )
@@ -370,7 +366,8 @@ isStaticFlag f =
 	"fext-core",
 	"fcpr-off",
 	"ferror-spans",
-	"fPIC"
+	"fPIC",
+	"fhpc"
 	]
   || any (flip prefixMatch f) [
 	"fliberate-case-threshold",
