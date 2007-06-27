@@ -21,7 +21,9 @@ config.compile_ways	     = ['normal', 'optc', 'hpc']
 config.run_ways		     = ['normal', 'optc', 'hpc']
 
 # ways that are not enabled by default, but can always be invoked explicitly
-config.other_ways            = ['extcore','optextcore']
+config.other_ways            = ['extcore','optextcore',
+                                'prof_hc_hb','prof_hb',
+                                'prof_hd','prof_hy','prof_hr']
 
 if (ghc_with_native_codegen == 1):
 	config.compile_ways.append('optasm')
