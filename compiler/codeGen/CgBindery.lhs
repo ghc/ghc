@@ -22,7 +22,7 @@ module CgBindery (
 
 	bindArgsToStack,  rebindToStack,
 	bindNewToNode, bindNewToReg, bindArgsToRegs,
-	bindNewToTemp, 
+	bindNewToTemp,
 	getArgAmode, getArgAmodes, 
 	getCgIdInfo, 
 	getCAddrModeIfVolatile, getVolatileRegs,
@@ -391,13 +391,16 @@ bindNewToNode id offset lf_info
 -- Create a new temporary whose unique is that in the id,
 -- bind the id to it, and return the addressing mode for the
 -- temporary.
-bindNewToTemp :: Id -> FCode CmmReg
+bindNewToTemp :: Id -> FCode LocalReg
 bindNewToTemp id
-  = do	addBindC id (regIdInfo id temp_reg lf_info)
+  = do	addBindC id (regIdInfo id (CmmLocal temp_reg) lf_info)
 	return temp_reg
   where
     uniq     = getUnique id
-    temp_reg = CmmLocal (LocalReg uniq (argMachRep (idCgRep id)))
+    temp_reg = LocalReg uniq (argMachRep (idCgRep id)) kind
+    kind     = if isFollowableArg (idCgRep id)
+               then KindPtr
+               else KindNonPtr
     lf_info  = mkLFArgument id	-- Always used of things we
 				-- know nothing about
 

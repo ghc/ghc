@@ -56,7 +56,7 @@ hpcTable this_mod (NoHpcInfo) = error "TODO: impossible"
 
 initHpc :: Module -> HpcInfo -> Code
 initHpc this_mod (HpcInfo tickCount hashNo)
-  = do { id <- newTemp wordRep
+  = do { id <- newNonPtrTemp wordRep -- TODO FIXME NOW
        ; emitForeignCall'
                PlayRisky
                [(id,NoHint)]

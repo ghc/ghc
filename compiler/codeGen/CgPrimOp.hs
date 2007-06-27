@@ -34,7 +34,7 @@ import Outputable
 -- ---------------------------------------------------------------------------
 -- Code generation for PrimOps
 
-cgPrimOp   :: [CmmReg] 		-- where to put the results
+cgPrimOp   :: CmmFormals	-- where to put the results
 	   -> PrimOp		-- the op
 	   -> [StgArg]		-- arguments
 	   -> StgLiveVars	-- live vars, in case we need to save them
@@ -46,7 +46,7 @@ cgPrimOp results op args live
        emitPrimOp results op non_void_args live
 
 
-emitPrimOp :: [CmmReg] 		-- where to put the results
+emitPrimOp :: CmmFormals	-- where to put the results
 	   -> PrimOp		-- the op
 	   -> [CmmExpr]		-- arguments
 	   -> StgLiveVars	-- live vars, in case we need to save them
@@ -77,12 +77,12 @@ emitPrimOp [res_r,res_c] IntAddCOp [aa,bb] live
 
 -}
    = stmtsC [
-        CmmAssign res_r (CmmMachOp mo_wordAdd [aa,bb]),
-        CmmAssign res_c $
+        CmmAssign (CmmLocal res_r) (CmmMachOp mo_wordAdd [aa,bb]),
+        CmmAssign (CmmLocal res_c) $
 	  CmmMachOp mo_wordUShr [
 		CmmMachOp mo_wordAnd [
 		    CmmMachOp mo_wordNot [CmmMachOp mo_wordXor [aa,bb]],
-		    CmmMachOp mo_wordXor [aa, CmmReg res_r]
+		    CmmMachOp mo_wordXor [aa, CmmReg (CmmLocal res_r)]
 		], 
 	        CmmLit (mkIntCLit (wORD_SIZE_IN_BITS - 1))
 	  ]
@@ -100,12 +100,12 @@ emitPrimOp [res_r,res_c] IntSubCOp [aa,bb] live
    c =  ((a^b) & (a^r)) >>unsigned (BITS_IN(I_)-1)
 -}
    = stmtsC [
-        CmmAssign res_r (CmmMachOp mo_wordSub [aa,bb]),
-        CmmAssign res_c $
+        CmmAssign (CmmLocal res_r) (CmmMachOp mo_wordSub [aa,bb]),
+        CmmAssign (CmmLocal res_c) $
 	  CmmMachOp mo_wordUShr [
 		CmmMachOp mo_wordAnd [
 		    CmmMachOp mo_wordXor [aa,bb],
-		    CmmMachOp mo_wordXor [aa, CmmReg res_r]
+		    CmmMachOp mo_wordXor [aa, CmmReg (CmmLocal res_r)]
 		], 
 	        CmmLit (mkIntCLit (wORD_SIZE_IN_BITS - 1))
 	  ]
@@ -126,7 +126,7 @@ emitPrimOp [res] ParOp [arg] live
 	newspark = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("newSpark")))
 
 emitPrimOp [res] ReadMutVarOp [mutv] live
-   = stmtC (CmmAssign res (cmmLoadIndexW mutv fixedHdrSize))
+   = stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW mutv fixedHdrSize))
 
 emitPrimOp [] WriteMutVarOp [mutv,var] live
    = do
@@ -143,7 +143,7 @@ emitPrimOp [] WriteMutVarOp [mutv,var] live
 --     r = (((StgArrWords *)(a))->words * sizeof(W_))
 emitPrimOp [res] SizeofByteArrayOp [arg] live
    = stmtC $
-	CmmAssign res (CmmMachOp mo_wordMul [
+	CmmAssign (CmmLocal res) (CmmMachOp mo_wordMul [
 			  cmmLoadIndexW arg fixedHdrSize,
 			  CmmLit (mkIntCLit wORD_SIZE)
 			])
@@ -160,31 +160,31 @@ emitPrimOp [] TouchOp [arg] live
 
 --  #define byteArrayContentszh(r,a) r = BYTE_ARR_CTS(a)
 emitPrimOp [res] ByteArrayContents_Char [arg] live
-   = stmtC (CmmAssign res (cmmOffsetB arg arrWordsHdrSize))
+   = stmtC (CmmAssign (CmmLocal res) (cmmOffsetB arg arrWordsHdrSize))
 
 --  #define stableNameToIntzh(r,s)   (r = ((StgStableName *)s)->sn)
 emitPrimOp [res] StableNameToIntOp [arg] live
-   = stmtC (CmmAssign res (cmmLoadIndexW arg fixedHdrSize))
+   = stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW arg fixedHdrSize))
 
 --  #define eqStableNamezh(r,sn1,sn2)					\
 --    (r = (((StgStableName *)sn1)->sn == ((StgStableName *)sn2)->sn))
 emitPrimOp [res] EqStableNameOp [arg1,arg2] live
-   = stmtC (CmmAssign res (CmmMachOp mo_wordEq [
+   = stmtC (CmmAssign (CmmLocal res) (CmmMachOp mo_wordEq [
 				cmmLoadIndexW arg1 fixedHdrSize,
 				cmmLoadIndexW arg2 fixedHdrSize
 			 ]))
 
 
 emitPrimOp [res] ReallyUnsafePtrEqualityOp [arg1,arg2] live
-   = stmtC (CmmAssign res (CmmMachOp mo_wordEq [arg1,arg2]))
+   = stmtC (CmmAssign (CmmLocal res) (CmmMachOp mo_wordEq [arg1,arg2]))
 
 --  #define addrToHValuezh(r,a) r=(P_)a
 emitPrimOp [res] AddrToHValueOp [arg] live
-   = stmtC (CmmAssign res arg)
+   = stmtC (CmmAssign (CmmLocal res) arg)
 
 --  #define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))
 emitPrimOp [res] DataToTagOp [arg] live
-   = stmtC (CmmAssign res (getConstrTag arg))
+   = stmtC (CmmAssign (CmmLocal res) (getConstrTag arg))
 
 {- Freezing arrays-of-ptrs requires changing an info table, for the
    benefit of the generational collector.  It needs to scavenge mutable
@@ -198,11 +198,11 @@ emitPrimOp [res] DataToTagOp [arg] live
 --	}
 emitPrimOp [res] UnsafeFreezeArrayOp [arg] live
    = stmtsC [ setInfo arg (CmmLit (CmmLabel mkMAP_FROZEN_infoLabel)),
-	     CmmAssign res arg ]
+	     CmmAssign (CmmLocal res) arg ]
 
 --  #define unsafeFreezzeByteArrayzh(r,a)	r=(a)
 emitPrimOp [res] UnsafeFreezeByteArrayOp [arg] live
-   = stmtC (CmmAssign res arg)
+   = stmtC (CmmAssign (CmmLocal res) arg)
 
 -- Reading/writing pointer arrays
 
@@ -328,10 +328,10 @@ emitPrimOp res WriteByteArrayOp_Word64    args live = doWriteByteArrayOp Nothing
 -- The rest just translate straightforwardly
 emitPrimOp [res] op [arg] live
    | nopOp op
-   = stmtC (CmmAssign res arg)
+   = stmtC (CmmAssign (CmmLocal res) arg)
 
    | Just (mop,rep) <- narrowOp op
-   = stmtC (CmmAssign res (CmmMachOp (mop rep wordRep) [
+   = stmtC (CmmAssign (CmmLocal res) (CmmMachOp (mop rep wordRep) [
 			  CmmMachOp (mop wordRep rep) [arg]]))
 
 emitPrimOp [res] op args live
@@ -344,7 +344,7 @@ emitPrimOp [res] op args live
 	   (Just vols)
 
    | Just mop <- translateOp op
-   = let stmt = CmmAssign res (CmmMachOp mop args) in
+   = let stmt = CmmAssign (CmmLocal res) (CmmMachOp mop args) in
      stmtC stmt
 
 emitPrimOp _ op _ _
@@ -557,9 +557,9 @@ doWritePtrArrayOp addr idx val
 
 
 mkBasicIndexedRead off Nothing read_rep res base idx
-   = stmtC (CmmAssign res (cmmLoadIndexOffExpr off read_rep base idx))
+   = stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexOffExpr off read_rep base idx))
 mkBasicIndexedRead off (Just cast) read_rep res base idx
-   = stmtC (CmmAssign res (CmmMachOp cast [
+   = stmtC (CmmAssign (CmmLocal res) (CmmMachOp cast [
 				cmmLoadIndexOffExpr off read_rep base idx]))
 
 mkBasicIndexedWrite off Nothing write_rep base idx val

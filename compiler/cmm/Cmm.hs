@@ -10,13 +10,13 @@ module Cmm (
 	GenCmm(..), Cmm,
 	GenCmmTop(..), CmmTop,
 	GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts,
-	CmmStmt(..), CmmActuals, CmmFormals,
+	CmmStmt(..), CmmActuals, CmmFormal, CmmFormals, CmmHintFormals,
 	CmmCallTarget(..),
 	CmmStatic(..), Section(..),
 	CmmExpr(..), cmmExprRep, 
 	CmmReg(..), cmmRegRep,
 	CmmLit(..), cmmLitRep,
-	LocalReg(..), localRegRep,
+	LocalReg(..), localRegRep, Kind(..),
 	BlockId(..), BlockEnv,
 	GlobalReg(..), globalRegRep,
 
@@ -114,7 +114,7 @@ data CmmStmt
 
   | CmmCall	 		 -- A foreign call, with 
      CmmCallTarget
-     CmmFormals			 -- zero or more results
+     CmmHintFormals		 -- zero or more results
      CmmActuals			 -- zero or more arguments
 
   | CmmBranch BlockId             -- branch to another BB in this fn
@@ -133,8 +133,11 @@ data CmmStmt
   | CmmReturn                     -- Return from a function,
       CmmActuals                  -- with these return values.
 
-type CmmActuals = [(CmmExpr,MachHint)]
-type CmmFormals = [(CmmReg,MachHint)]
+type CmmActual = CmmExpr
+type CmmActuals = [(CmmActual,MachHint)]
+type CmmFormal = LocalReg
+type CmmHintFormals = [(CmmFormal,MachHint)]
+type CmmFormals = [CmmFormal]
 
 {-
 Discussion
@@ -221,17 +224,25 @@ cmmRegRep :: CmmReg -> MachRep
 cmmRegRep (CmmLocal  reg) 	= localRegRep reg
 cmmRegRep (CmmGlobal reg)	= globalRegRep reg
 
+-- | Whether a 'LocalReg' is a GC followable pointer
+data Kind = KindPtr | KindNonPtr deriving (Eq)
+
 data LocalReg
-  = LocalReg !Unique MachRep
+  = LocalReg
+      !Unique   -- ^ Identifier
+      MachRep   -- ^ Type
+      Kind      -- ^ Should the GC follow as a pointer
 
 instance Eq LocalReg where
-  (LocalReg u1 _) == (LocalReg u2 _) = u1 == u2
+  (LocalReg u1 _ _) == (LocalReg u2 _ _) = u1 == u2
 
 instance Uniquable LocalReg where
-  getUnique (LocalReg uniq _) = uniq
+  getUnique (LocalReg uniq _ _) = uniq
 
 localRegRep :: LocalReg -> MachRep
-localRegRep (LocalReg _ rep) = rep
+localRegRep (LocalReg _ rep _) = rep
+
+localRegGCFollow (LocalReg _ _ p) = p
 
 data CmmLit
   = CmmInt Integer  MachRep

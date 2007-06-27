@@ -48,7 +48,7 @@ import Control.Monad
 -- Code generation for Foreign Calls
 
 cgForeignCall
-	:: [(CmmReg,MachHint)]	-- where to put the results
+	:: CmmHintFormals	-- where to put the results
 	-> ForeignCall		-- the op
 	-> [StgArg]		-- arguments
 	-> StgLiveVars	-- live vars, in case we need to save them
@@ -68,7 +68,7 @@ cgForeignCall results fcall stg_args live
 
 
 emitForeignCall
-	:: [(CmmReg,MachHint)]	-- where to put the results
+	:: CmmHintFormals	-- where to put the results
 	-> ForeignCall		-- the op
 	-> [(CmmExpr,MachHint)] -- arguments
 	-> StgLiveVars	-- live vars, in case we need to save them
@@ -103,7 +103,7 @@ emitForeignCall results (DNCall _) args live
 -- alternative entry point, used by CmmParse
 emitForeignCall'
 	:: Safety
-	-> [(CmmReg,MachHint)]	-- where to put the results
+	-> CmmHintFormals	-- where to put the results
 	-> CmmCallTarget	-- the op
 	-> [(CmmExpr,MachHint)] -- arguments
 	-> Maybe [GlobalReg]	-- live vars, in case we need to save them
@@ -117,24 +117,27 @@ emitForeignCall' safety results target args vols
     stmtsC caller_load
 
   | otherwise = do
-    id <- newTemp wordRep
+    -- Both 'id' and 'new_base' are KindNonPtr because they're
+    -- RTS only objects and are not subject to garbage collection
+    id <- newNonPtrTemp wordRep
+    new_base <- newNonPtrTemp (cmmRegRep (CmmGlobal BaseReg))
     temp_args <- load_args_into_temps args
     temp_target <- load_target_into_temp target
     let (caller_save, caller_load) = callerSaveVolatileRegs vols
     emitSaveThreadState
     stmtsC caller_save
     stmtC (CmmCall (CmmForeignCall suspendThread CCallConv) 
-			[(id,PtrHint)]
+			[ (id,PtrHint) ]
 			[ (CmmReg (CmmGlobal BaseReg), PtrHint) ] 
 			)
     stmtC (CmmCall temp_target results temp_args)
     stmtC (CmmCall (CmmForeignCall resumeThread CCallConv) 
-			[ (CmmGlobal BaseReg, PtrHint) ]
-				-- Assign the result to BaseReg: we
-				-- might now have a different
-				-- Capability!
-			[ (CmmReg id, PtrHint) ]
+			[ (new_base, PtrHint) ]
+			[ (CmmReg (CmmLocal id), PtrHint) ]
 			)
+    -- Assign the result to BaseReg: we
+    -- might now have a different Capability!
+    stmtC (CmmAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base)))
     stmtsC caller_load
     emitLoadThreadState
 
@@ -157,17 +160,18 @@ load_args_into_temps = mapM arg_assign_temp
 load_target_into_temp (CmmForeignCall expr conv) = do 
   tmp <- maybe_assign_temp expr
   return (CmmForeignCall tmp conv)
-load_target_info_temp other_target =
+load_target_into_temp other_target =
   return other_target
 
 maybe_assign_temp e
   | hasNoGlobalRegs e = return e
   | otherwise          = do 
 	-- don't use assignTemp, it uses its own notion of "trivial"
-	-- expressions, which are wrong here
-	reg <- newTemp (cmmExprRep e)
-	stmtC (CmmAssign reg e)
-	return (CmmReg reg)
+	-- expressions, which are wrong here.
+        -- this is a NonPtr because it only duplicates an existing
+	reg <- newNonPtrTemp (cmmExprRep e) --TODO FIXME NOW
+	stmtC (CmmAssign (CmmLocal reg) e)
+	return (CmmReg (CmmLocal reg))
 
 -- -----------------------------------------------------------------------------
 -- Save/restore the thread state in the TSO
@@ -187,22 +191,22 @@ emitSaveThreadState = do
 emitCloseNursery = stmtC $ CmmStore nursery_bdescr_free (cmmOffsetW stgHp 1)
 
 emitLoadThreadState = do
-  tso <- newTemp wordRep
+  tso <- newNonPtrTemp wordRep -- TODO FIXME NOW
   stmtsC [
 	-- tso = CurrentTSO;
-  	CmmAssign tso stgCurrentTSO,
+  	CmmAssign (CmmLocal tso) stgCurrentTSO,
 	-- Sp = tso->sp;
-	CmmAssign sp (CmmLoad (cmmOffset (CmmReg tso) tso_SP)
+	CmmAssign sp (CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_SP)
 	                      wordRep),
 	-- SpLim = tso->stack + RESERVED_STACK_WORDS;
-	CmmAssign spLim (cmmOffsetW (cmmOffset (CmmReg tso) tso_STACK)
+	CmmAssign spLim (cmmOffsetW (cmmOffset (CmmReg (CmmLocal tso)) tso_STACK)
 			            rESERVED_STACK_WORDS)
     ]
   emitOpenNursery
   -- and load the current cost centre stack from the TSO when profiling:
   when opt_SccProfilingOn $
 	stmtC (CmmStore curCCSAddr 
-		(CmmLoad (cmmOffset (CmmReg tso) tso_CCCS) wordRep))
+		(CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) wordRep))
 
 emitOpenNursery = stmtsC [
         -- Hp = CurrentNursery->free - 1;

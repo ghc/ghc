@@ -188,7 +188,7 @@ assignMem_I64Code addrTree valueTree = do
   return (vcode `appOL` addr_code `snocOL` mov_lo `snocOL` mov_hi)
 
 
-assignReg_I64Code (CmmLocal (LocalReg u_dst pk)) valueTree = do
+assignReg_I64Code (CmmLocal (LocalReg u_dst pk _)) valueTree = do
    ChildCode64 vcode r_src_lo <- iselExpr64 valueTree
    let 
          r_dst_lo = mkVReg u_dst I32
@@ -230,7 +230,7 @@ iselExpr64 (CmmLoad addrTree I64) = do
                         rlo
      )
 
-iselExpr64 (CmmReg (CmmLocal (LocalReg vu I64)))
+iselExpr64 (CmmReg (CmmLocal (LocalReg vu I64 _)))
    = return (ChildCode64 nilOL (mkVReg vu I32))
          
 -- we handle addition, but rather badly
@@ -399,7 +399,7 @@ iselExpr64 (CmmLoad addrTree I64) = do
     return $ ChildCode64 (addr_code `snocOL` mov_lo `snocOL` mov_hi) 
                          rlo
 
-iselExpr64 (CmmReg (CmmLocal (LocalReg vu I64)))
+iselExpr64 (CmmReg (CmmLocal (LocalReg vu I64 _)))
    = return (ChildCode64 nilOL (mkVReg vu I32))
 
 iselExpr64 (CmmLit (CmmInt i _)) = do
@@ -476,7 +476,7 @@ getSomeReg expr = do
 
 getRegisterReg :: CmmReg -> Reg
 
-getRegisterReg (CmmLocal (LocalReg u pk))
+getRegisterReg (CmmLocal (LocalReg u pk _))
   = mkVReg u pk
 
 getRegisterReg (CmmGlobal mid)
@@ -2938,8 +2938,8 @@ genCondJump id bool = do
 
 genCCall
     :: CmmCallTarget		-- function to call
-    -> [(CmmReg,MachHint)]	-- where to put the result
-    -> [(CmmExpr,MachHint)]	-- arguments (of mixed type)
+    -> CmmHintFormals		-- where to put the result
+    -> CmmActuals		-- arguments (of mixed type)
     -> NatM InstrBlock
 
 -- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -3042,7 +3042,7 @@ genCCall (CmmPrim op) [(r,_)] args = do
   actuallyInlineFloatOp rep instr [(x,_)]
 	= do res <- trivialUFCode rep instr x
 	     any <- anyReg res
- 	     return (any (getRegisterReg r))
+ 	     return (any (getRegisterReg (CmmLocal r)))
 
 genCCall target dest_regs args = do
     let
@@ -3107,8 +3107,8 @@ genCCall target dest_regs args = do
 		rep -> unitOL (MOV rep (OpReg eax) (OpReg r_dest))
 	  where 
 		r_dest_hi = getHiVRegFromLo r_dest
-		rep = cmmRegRep dest
-		r_dest = getRegisterReg dest
+		rep = localRegRep dest
+		r_dest = getRegisterReg (CmmLocal dest)
 	assign_code many = panic "genCCall.assign_code many"
 
     return (push_code `appOL` 
@@ -3172,23 +3172,23 @@ genCCall target dest_regs args = do
 
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 
-outOfLineFloatOp :: CallishMachOp -> CmmReg -> [(CmmExpr,MachHint)]
+outOfLineFloatOp :: CallishMachOp -> CmmFormal -> CmmActuals
   -> NatM InstrBlock
 outOfLineFloatOp mop res args
   = do
       targetExpr <- cmmMakeDynamicReference addImportNat CallReference lbl
       let target = CmmForeignCall targetExpr CCallConv
         
-      if cmmRegRep res == F64
+      if localRegRep res == F64
         then
           stmtToInstrs (CmmCall target [(res,FloatHint)] args)  
         else do
           uq <- getUniqueNat
           let 
-            tmp = CmmLocal (LocalReg uq F64)
+            tmp = LocalReg uq F64 KindNonPtr
           -- in
           code1 <- stmtToInstrs (CmmCall target [(tmp,FloatHint)] args)
-          code2 <- stmtToInstrs (CmmAssign res (CmmReg tmp))
+          code2 <- stmtToInstrs (CmmAssign (CmmLocal res) (CmmReg (CmmLocal tmp)))
           return (code1 `appOL` code2)
   where
 	lbl = mkForeignLabel fn Nothing False

@@ -19,7 +19,7 @@ module SMRep (
 	CgRep(..), nonVoidArg,
 	argMachRep, primRepToCgRep, primRepHint,
 	isFollowableArg, isVoidArg, 
-	isFloatingArg, isNonPtrArg, is64BitArg,
+	isFloatingArg, is64BitArg,
 	separateByPtrFollowness,
 	cgRepSizeW, cgRepSizeB,
 	retAddrSizeW,
@@ -199,11 +199,6 @@ isFloatingArg :: CgRep -> Bool
 isFloatingArg DoubleArg = True
 isFloatingArg FloatArg  = True
 isFloatingArg _         = False
-
-isNonPtrArg :: CgRep -> Bool
--- Identify anything which is one word large and not a pointer.
-isNonPtrArg NonPtrArg = True
-isNonPtrArg other     = False
 
 is64BitArg :: CgRep -> Bool
 is64BitArg LongArg = True

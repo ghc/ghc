@@ -318,13 +318,13 @@ bumpHistogram lbl n
 
 bumpHistogramE :: LitString -> CmmExpr -> Code
 bumpHistogramE lbl n 
-  = do  t <- newTemp cLongRep
-	stmtC (CmmAssign t n)
-	emitIf (CmmMachOp (MO_U_Le cLongRep) [CmmReg t, eight]) $
-		stmtC (CmmAssign t eight)
+  = do  t <- newNonPtrTemp cLongRep
+	stmtC (CmmAssign (CmmLocal t) n)
+	emitIf (CmmMachOp (MO_U_Le cLongRep) [CmmReg (CmmLocal t), eight]) $
+		stmtC (CmmAssign (CmmLocal t) eight)
 	stmtC (addToMemLong (cmmIndexExpr cLongRep 
 				(CmmLit (CmmLabel (mkRtsDataLabel lbl)))
-				(CmmReg t))
+				(CmmReg (CmmLocal t)))
 			    1)
   where 
    eight = CmmLit (CmmInt 8 cLongRep)

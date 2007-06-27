@@ -2,7 +2,7 @@ module CmmLive (
         CmmLive,
         BlockEntryLiveness,
         cmmLiveness,
-        cmmFormalsToLiveLocals,
+        cmmHintFormalsToLiveLocals,
   ) where
 
 #include "HsVersions.h"
@@ -156,10 +156,8 @@ addKilled new_killed live = live `minusUniqSet` new_killed
 --------------------------------
 -- Liveness of a CmmStmt
 --------------------------------
-cmmFormalsToLiveLocals :: CmmFormals -> [LocalReg]
-cmmFormalsToLiveLocals [] = []
-cmmFormalsToLiveLocals ((CmmGlobal _,_):args) = cmmFormalsToLiveLocals args
-cmmFormalsToLiveLocals ((CmmLocal r,_):args) = r:cmmFormalsToLiveLocals args
+cmmHintFormalsToLiveLocals :: CmmHintFormals -> [LocalReg]
+cmmHintFormalsToLiveLocals formals = map fst formals
 
 cmmStmtLive :: BlockEntryLiveness -> CmmStmt -> CmmLivenessTransformer
 cmmStmtLive _ (CmmNop) = id
@@ -175,7 +173,7 @@ cmmStmtLive _ (CmmStore expr1 expr2) =
 cmmStmtLive _ (CmmCall target results arguments) =
     target_liveness .
     foldr ((.) . cmmExprLive) id (map fst arguments) .
-    addKilled (mkUniqSet $ cmmFormalsToLiveLocals results) where
+    addKilled (mkUniqSet $ cmmHintFormalsToLiveLocals results) where
         target_liveness =
             case target of
               (CmmForeignCall target _) -> cmmExprLive target

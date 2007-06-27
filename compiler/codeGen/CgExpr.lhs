@@ -117,17 +117,21 @@ cgExpr (StgOpApp (StgFCallOp fcall _) stg_args res_ty) = do
     reps_n_amodes <- getArgAmodes stg_args
     let 
 	-- Get the *non-void* args, and jiggle them with shimForeignCall
-	arg_exprs = [ shimForeignCallArg stg_arg expr 
+	arg_exprs = [ (shimForeignCallArg stg_arg expr, stg_arg)
 		    | (stg_arg, (rep,expr)) <- stg_args `zip` reps_n_amodes, 
 		      nonVoidArg rep]
 
-    arg_tmps <- mapM assignTemp arg_exprs
+    arg_tmps <- sequence [
+                 if isFollowableArg (typeCgRep (stgArgType stg_arg))
+                 then assignPtrTemp arg
+                 else assignNonPtrTemp arg
+                     | (arg, stg_arg) <- arg_exprs]
     let	arg_hints = zip arg_tmps (map (typeHint.stgArgType) stg_args)
     {-
 	Now, allocate some result regs.
     -}
     (res_reps,res_regs,res_hints)  <- newUnboxedTupleRegs res_ty
-    ccallReturnUnboxedTuple (zip res_reps (map CmmReg res_regs)) $
+    ccallReturnUnboxedTuple (zip res_reps (map (CmmReg . CmmLocal) res_regs)) $
 	emitForeignCall (zip res_regs res_hints) fcall 
 	   arg_hints emptyVarSet{-no live vars-}
       
@@ -136,8 +140,11 @@ cgExpr (StgOpApp (StgFCallOp fcall _) stg_args res_ty) = do
 
 cgExpr (StgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty) 
   = ASSERT(isEnumerationTyCon tycon)
-    do	{ (_,amode) <- getArgAmode arg
-	; amode' <- assignTemp amode	-- We're going to use it twice,
+    do	{ (rep,amode) <- getArgAmode arg
+	; amode' <- if isFollowableArg rep
+                    then assignPtrTemp amode
+	            else assignNonPtrTemp amode
+					-- We're going to use it twice,
 					-- so save in a temp if non-trivial
 	; this_pkg <- getThisPackage
 	; stmtC (CmmAssign nodeReg (tagToClosure this_pkg tycon amode'))
@@ -160,21 +167,27 @@ cgExpr x@(StgOpApp op@(StgPrimOp primop) args res_ty)
 	     performReturn emitReturnInstr
 
   | ReturnsPrim rep <- result_info
-	= do cgPrimOp [dataReturnConvPrim (primRepToCgRep rep)] 
-			primop args emptyVarSet
+	= do res <- if isFollowableArg (typeCgRep res_ty)
+                        then newPtrTemp (argMachRep (typeCgRep res_ty))
+                        else newNonPtrTemp (argMachRep (typeCgRep res_ty))
+             cgPrimOp [res] primop args emptyVarSet
 	     performPrimReturn (primRepToCgRep rep) (CmmReg (CmmLocal res))
 
   | ReturnsAlg tycon <- result_info, isUnboxedTupleTyCon tycon
 	= do (reps, regs, _hints) <- newUnboxedTupleRegs res_ty
 	     cgPrimOp regs primop args emptyVarSet{-no live vars-}
-	     returnUnboxedTuple (zip reps (map CmmReg regs))
+	     returnUnboxedTuple (zip reps (map (CmmReg . CmmLocal) regs))
 
   | ReturnsAlg tycon <- result_info, isEnumerationTyCon tycon
 	-- c.f. cgExpr (...TagToEnumOp...)
-	= do tag_reg <- newTemp wordRep
+	= do tag_reg <- if isFollowableArg (typeCgRep res_ty)
+                        then newPtrTemp wordRep
+                        else newNonPtrTemp wordRep
 	     this_pkg <- getThisPackage
 	     cgPrimOp [tag_reg] primop args emptyVarSet
-	     stmtC (CmmAssign nodeReg (tagToClosure this_pkg tycon (CmmReg tag_reg)))
+	     stmtC (CmmAssign nodeReg
+                    (tagToClosure this_pkg tycon
+                     (CmmReg (CmmLocal tag_reg))))
 	     performReturn emitReturnInstr
   where
 	result_info = getPrimOpResultInfo primop
@@ -438,14 +451,17 @@ cgLetNoEscapeRhs full_live_in_rhss rhs_eob_info maybe_cc_slot rec binder
 Little helper for primitives that return unboxed tuples.
 
 \begin{code}
-newUnboxedTupleRegs :: Type -> FCode ([CgRep], [CmmReg], [MachHint])
+newUnboxedTupleRegs :: Type -> FCode ([CgRep], [LocalReg], [MachHint])
 newUnboxedTupleRegs res_ty =
    let
 	ty_args = tyConAppArgs (repType res_ty)
-	(reps,hints) = unzip [ (rep, typeHint ty) | ty <- ty_args, 
+	(reps,hints) = unzip [ (rep, typeHint ty) | ty <- ty_args,
 					   	    let rep = typeCgRep ty,
 					 	    nonVoidArg rep ]
+	make_new_temp rep = if isFollowableArg rep
+                            then newPtrTemp (argMachRep rep)
+                            else newNonPtrTemp (argMachRep rep)
    in do
-   regs <- mapM (newTemp . argMachRep) reps
+   regs <- mapM make_new_temp reps
    return (reps,regs,hints)
 \end{code}

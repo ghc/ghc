@@ -93,7 +93,7 @@ cmmMiniInline blocks = map do_inline blocks
 
 cmmMiniInlineStmts :: UniqFM Int -> [CmmStmt] -> [CmmStmt]
 cmmMiniInlineStmts uses [] = []
-cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _)) expr) : stmts)
+cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _ _)) expr) : stmts)
   | Just 1 <- lookupUFM uses u,
     Just stmts' <- lookForInline u expr stmts
   = 
@@ -109,7 +109,7 @@ cmmMiniInlineStmts uses (stmt:stmts)
 -- Try to inline a temporary assignment.  We can skip over assignments to
 -- other tempoararies, because we know that expressions aren't side-effecting
 -- and temporaries are single-assignment.
-lookForInline u expr (stmt@(CmmAssign (CmmLocal (LocalReg u' _)) rhs) : rest)
+lookForInline u expr (stmt@(CmmAssign (CmmLocal (LocalReg u' _ _)) rhs) : rest)
   | u /= u' 
   = case lookupUFM (getExprUses rhs) u of
 	Just 1 -> Just (inlineStmt u expr stmt : rest)
@@ -150,8 +150,8 @@ getStmtUses (CmmJump e _) = getExprUses e
 getStmtUses _ = emptyUFM
 
 getExprUses :: CmmExpr -> UniqFM Int
-getExprUses (CmmReg (CmmLocal (LocalReg u _))) = unitUFM u 1
-getExprUses (CmmRegOff (CmmLocal (LocalReg u _)) _) = unitUFM u 1
+getExprUses (CmmReg (CmmLocal (LocalReg u _ _))) = unitUFM u 1
+getExprUses (CmmRegOff (CmmLocal (LocalReg u _ _)) _) = unitUFM u 1
 getExprUses (CmmLoad e _) = getExprUses e
 getExprUses (CmmMachOp _ es) = getExprsUses es
 getExprUses _other = emptyUFM
@@ -172,10 +172,10 @@ inlineStmt u a (CmmJump e d) = CmmJump (inlineExpr u a e) d
 inlineStmt u a other_stmt = other_stmt
 
 inlineExpr :: Unique -> CmmExpr -> CmmExpr -> CmmExpr
-inlineExpr u a e@(CmmReg (CmmLocal (LocalReg u' _)))
+inlineExpr u a e@(CmmReg (CmmLocal (LocalReg u' _ _)))
   | u == u' = a
   | otherwise = e
-inlineExpr u a e@(CmmRegOff (CmmLocal (LocalReg u' rep)) off)
+inlineExpr u a e@(CmmRegOff (CmmLocal (LocalReg u' rep _)) off)
   | u == u' = CmmMachOp (MO_Add rep) [a, CmmLit (CmmInt (fromIntegral off) rep)]
   | otherwise = e
 inlineExpr u a (CmmLoad e rep) = CmmLoad (inlineExpr u a e) rep

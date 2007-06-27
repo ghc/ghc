@@ -11,7 +11,8 @@ module CgUtils (
 	cgLit,
 	emitDataLits, emitRODataLits, emitIf, emitIfThenElse,
 	emitRtsCall, emitRtsCallWithVols, emitRtsCallWithResult,
-	assignTemp, newTemp,
+	assignNonPtrTemp, newNonPtrTemp,
+	assignPtrTemp, newPtrTemp,
 	emitSimultaneously,
 	emitSwitch, emitLitSwitch,
 	tagToClosure,
@@ -270,14 +271,14 @@ emitRtsCallWithVols :: LitString -> [(CmmExpr,MachHint)] -> [GlobalReg] -> Code
 emitRtsCallWithVols fun args vols
    = emitRtsCall' [] fun args (Just vols)
 
-emitRtsCallWithResult :: CmmReg -> MachHint -> LitString
+emitRtsCallWithResult :: LocalReg -> MachHint -> LitString
 	-> [(CmmExpr,MachHint)] -> Code
 emitRtsCallWithResult res hint fun args
    = emitRtsCall' [(res,hint)] fun args Nothing
 
 -- Make a call to an RTS C procedure
 emitRtsCall'
-   :: [(CmmReg,MachHint)]
+   :: CmmHintFormals
    -> LitString
    -> [(CmmExpr,MachHint)]
    -> Maybe [GlobalReg]
@@ -331,18 +332,29 @@ mkByteStringCLit bytes
 --
 -------------------------------------------------------------------------
 
-assignTemp :: CmmExpr -> FCode CmmExpr
+assignNonPtrTemp :: CmmExpr -> FCode CmmExpr
 -- For a non-trivial expression, e, create a local
 -- variable and assign the expression to it
-assignTemp e 
+assignNonPtrTemp e 
   | isTrivialCmmExpr e = return e
-  | otherwise 	       = do { reg <- newTemp (cmmExprRep e)
-			    ; stmtC (CmmAssign reg e)
-			    ; return (CmmReg reg) }
+  | otherwise 	       = do { reg <- newNonPtrTemp (cmmExprRep e) 
+			    ; stmtC (CmmAssign (CmmLocal reg) e)
+			    ; return (CmmReg (CmmLocal reg)) }
 
+assignPtrTemp :: CmmExpr -> FCode CmmExpr
+-- For a non-trivial expression, e, create a local
+-- variable and assign the expression to it
+assignPtrTemp e 
+  | isTrivialCmmExpr e = return e
+  | otherwise 	       = do { reg <- newPtrTemp (cmmExprRep e) 
+			    ; stmtC (CmmAssign (CmmLocal reg) e)
+			    ; return (CmmReg (CmmLocal reg)) }
 
-newTemp :: MachRep -> FCode CmmReg
-newTemp rep = do { uniq <- newUnique; return (CmmLocal (LocalReg uniq rep)) }
+newNonPtrTemp :: MachRep -> FCode LocalReg
+newNonPtrTemp rep = do { uniq <- newUnique; return (LocalReg uniq rep KindNonPtr) }
+
+newPtrTemp :: MachRep -> FCode LocalReg
+newPtrTemp rep = do { uniq <- newUnique; return (LocalReg uniq rep KindPtr) }
 
 
 -------------------------------------------------------------------------
@@ -445,7 +457,7 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
 
   -- if we can knock off a bunch of default cases with one if, then do so
   | Just deflt <- mb_deflt, (lowest_branch - lo_tag) >= n_branches
-  = do { (assign_tag, tag_expr') <- assignTemp' tag_expr
+  = do { (assign_tag, tag_expr') <- assignNonPtrTemp' tag_expr
        ; let cond = cmmULtWord tag_expr' (CmmLit (mkIntCLit lowest_branch))
 	     branch = CmmCondBranch cond deflt
        ; stmts <- mk_switch tag_expr' branches mb_deflt 
@@ -454,7 +466,7 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
        }
 
   | Just deflt <- mb_deflt, (hi_tag - highest_branch) >= n_branches
-  = do { (assign_tag, tag_expr') <- assignTemp' tag_expr
+  = do { (assign_tag, tag_expr') <- assignNonPtrTemp' tag_expr
        ; let cond = cmmUGtWord tag_expr' (CmmLit (mkIntCLit highest_branch))
 	     branch = CmmCondBranch cond deflt
        ; stmts <- mk_switch tag_expr' branches mb_deflt 
@@ -463,7 +475,7 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
        }
 
   | otherwise	-- Use an if-tree
-  = do	{ (assign_tag, tag_expr') <- assignTemp' tag_expr
+  = do	{ (assign_tag, tag_expr') <- assignNonPtrTemp' tag_expr
 		-- To avoid duplication
 	; lo_stmts <- mk_switch tag_expr' lo_branches mb_deflt 
 				lo_tag (mid_tag-1) via_C
@@ -528,11 +540,10 @@ mk_switch tag_expr branches mb_deflt lo_tag hi_tag via_C
     is_lo (t,_) = t < mid_tag
 
 
-assignTemp' e
+assignNonPtrTemp' e
   | isTrivialCmmExpr e = return (CmmNop, e)
-  | otherwise          = do { reg <- newTemp (cmmExprRep e)
-                            ; return (CmmAssign reg e, CmmReg reg) }
-
+  | otherwise          = do { reg <- newNonPtrTemp (cmmExprRep e)
+                            ; return (CmmAssign (CmmLocal reg) e, CmmReg (CmmLocal reg)) }
 
 emitLitSwitch :: CmmExpr			-- Tag to switch on
 	      -> [(Literal, CgStmts)]		-- Tagged branches
@@ -547,7 +558,7 @@ emitLitSwitch :: CmmExpr			-- Tag to switch on
 emitLitSwitch scrut [] deflt 
   = emitCgStmts deflt
 emitLitSwitch scrut branches deflt_blk
-  = do	{ scrut' <- assignTemp scrut
+  = do	{ scrut' <- assignNonPtrTemp scrut
 	; deflt_blk_id <- forkCgStmts deflt_blk
 	; blk <- mk_lit_switch scrut' deflt_blk_id (sortLe le branches)
 	; emitCgStmts blk }
@@ -639,13 +650,13 @@ doSimultaneously1 vertices
 		; stmtC from_temp }
 
 	go_via_temp (CmmAssign dest src)
-	  = do	{ tmp <- newTemp (cmmRegRep dest)
-		; stmtC (CmmAssign tmp src)
-		; return (CmmAssign dest (CmmReg tmp)) }
+	  = do	{ tmp <- newNonPtrTemp (cmmRegRep dest) -- TODO FIXME NOW if the pair of assignments move across a call this will be wrong
+		; stmtC (CmmAssign (CmmLocal tmp) src)
+		; return (CmmAssign dest (CmmReg (CmmLocal tmp))) }
 	go_via_temp (CmmStore dest src)
-	  = do	{ tmp <- newTemp (cmmExprRep src)
-		; stmtC (CmmAssign tmp src)
-		; return (CmmStore dest (CmmReg tmp)) }
+	  = do	{ tmp <- newNonPtrTemp (cmmExprRep src) -- TODO FIXME NOW if the pair of assignemnts move across a call this will be wrong
+		; stmtC (CmmAssign (CmmLocal tmp) src)
+		; return (CmmStore dest (CmmReg (CmmLocal tmp))) }
     in
     mapCs do_component components
 

@@ -157,7 +157,7 @@ data StackFormat
     = StackFormat {
          stack_label :: Maybe CLabel,	-- The label occupying the top slot
          stack_frame_size :: WordOff,	-- Total frame size in words (not including arguments)
-         stack_live :: [(CmmReg, WordOff)]	-- local reg offsets from stack top
+         stack_live :: [(LocalReg, WordOff)]	-- local reg offsets from stack top
                        -- TODO: see if the above can be LocalReg
       }
 
@@ -230,11 +230,11 @@ selectStackFormat live continuations =
       live_to_format label formals live =
           foldl extend_format
                     (StackFormat (Just label) retAddrSizeW [])
-                    (uniqSetToList (live `minusUniqSet` mkUniqSet (cmmFormalsToLiveLocals formals)))
+                    (uniqSetToList (live `minusUniqSet` mkUniqSet formals))
 
       extend_format :: StackFormat -> LocalReg -> StackFormat
       extend_format (StackFormat label size offsets) reg =
-          StackFormat label (slot_size reg + size) ((CmmLocal reg, size) : offsets)
+          StackFormat label (slot_size reg + size) ((reg, size) : offsets)
 
       slot_size :: LocalReg -> Int
       slot_size reg = ((machRepByteWidth (localRegRep reg) - 1) `div` wORD_SIZE) + 1
@@ -315,7 +315,7 @@ pack_continuation (StackFormat curr_id curr_frame_size _)
   = store_live_values ++ set_stack_header where
     -- TODO: only save variables when actually needed (may be handled by latter pass)
     store_live_values =
-        [stack_put spRel (CmmReg reg) offset
+        [stack_put spRel (CmmReg (CmmLocal reg)) offset
          | (reg, offset) <- cont_offsets]
     set_stack_header =
         if not needs_header
@@ -342,11 +342,11 @@ function_entry formals (StackFormat _ _ curr_offsets)
          | (reg, offset) <- curr_offsets]
     load_args =
         [stack_get 0 reg offset
-         | ((reg, _), StackParam offset) <- argument_formats] ++
+         | (reg, StackParam offset) <- argument_formats] ++
         [global_get reg global
-         | ((reg, _), RegisterParam global) <- argument_formats]
+         | (reg, RegisterParam global) <- argument_formats]
 
-    argument_formats = assignArguments (cmmRegRep . fst) formals
+    argument_formats = assignArguments (localRegRep) formals
 
 -----------------------------------------------------------------------------
 -- Section: Stack and argument register puts and gets
@@ -366,13 +366,13 @@ stack_put spRel expr offset =
 --------------------------------
 -- |Construct a 
 stack_get :: WordOff
-          -> CmmReg
+          -> LocalReg
           -> WordOff
           -> CmmStmt
 stack_get spRel reg offset =
-    CmmAssign reg (CmmLoad (CmmRegOff spReg (wORD_SIZE*(spRel + offset))) (cmmRegRep reg))
+    CmmAssign (CmmLocal reg) (CmmLoad (CmmRegOff spReg (wORD_SIZE*(spRel + offset))) (localRegRep reg))
 global_put :: CmmExpr -> GlobalReg -> CmmStmt
 global_put expr global = CmmAssign (CmmGlobal global) expr
-global_get :: CmmReg -> GlobalReg -> CmmStmt
-global_get reg global = CmmAssign reg (CmmReg (CmmGlobal global))
+global_get :: LocalReg -> GlobalReg -> CmmStmt
+global_get reg global = CmmAssign (CmmLocal reg) (CmmReg (CmmGlobal global))
 

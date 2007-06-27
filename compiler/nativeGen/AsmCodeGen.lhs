@@ -444,6 +444,7 @@ fixAssign (CmmAssign (CmmGlobal reg) src)
   where
 	reg_or_addr = get_GlobalReg_reg_or_addr reg
 
+{-
 fixAssign (CmmCall target results args)
   = mapAndUnzipUs fixResult results `thenUs` \ (results',stores) ->
     returnUs (CmmCall target results' args :
@@ -459,6 +460,7 @@ fixAssign (CmmCall target results args)
 			      [CmmStore baseRegAddr (CmmReg local)])
 	fixResult other =
 	  returnUs (other,[])
+-}
 
 fixAssign other_stmt = returnUs [other_stmt]
 

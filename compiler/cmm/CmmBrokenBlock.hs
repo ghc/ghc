@@ -78,7 +78,7 @@ data FinalStmt
       BlockId                   -- ^ Target of the 'CmmGoto'
                                 -- (must be a 'ContinuationEntry')
       CmmCallTarget             -- ^ The function to call
-      CmmFormals                -- ^ Results from call
+      CmmHintFormals                -- ^ Results from call
                                 -- (redundant with ContinuationEntry)
       CmmActuals                -- ^ Arguments to call
 
@@ -142,7 +142,7 @@ breakBlock uniques (BasicBlock ident stmts) entry =
                 block = do_call current_id entry accum_stmts exits next_id
                                 target results arguments
                 rest = breakBlock' (tail uniques) next_id
-                                   (ContinuationEntry results) [] [] stmts
+                                   (ContinuationEntry (map fst results)) [] [] stmts
             (s:stmts) ->
                 breakBlock' uniques current_id entry
                             (cond_branch_target s++exits)

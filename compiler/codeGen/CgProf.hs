@@ -155,9 +155,9 @@ emitCCS ccs = push_em (ccsExpr ccs') (reverse cc's)
 
 	push_em ccs [] = return ccs
 	push_em ccs (cc:rest) = do
-  	  tmp <- newTemp wordRep
+  	  tmp <- newNonPtrTemp wordRep -- TODO FIXME NOW
 	  pushCostCentre tmp ccs cc
-	  push_em (CmmReg tmp) rest
+	  push_em (CmmReg (CmmLocal tmp)) rest
 
 ccsExpr :: CostCentreStack -> CmmExpr
 ccsExpr ccs
@@ -349,14 +349,14 @@ sizeof_ccs_words
 
 emitRegisterCC :: CostCentre -> Code
 emitRegisterCC cc = do
-  { tmp <- newTemp cIntRep
+  { tmp <- newNonPtrTemp cIntRep
   ; stmtsC [
      CmmStore (cmmOffsetB cc_lit oFFSET_CostCentre_link)
 		 (CmmLoad cC_LIST wordRep),
      CmmStore cC_LIST cc_lit,
-     CmmAssign tmp (CmmLoad cC_ID cIntRep),
-     CmmStore (cmmOffsetB cc_lit oFFSET_CostCentre_ccID) (CmmReg tmp),
-     CmmStore cC_ID (cmmRegOffB tmp 1)
+     CmmAssign (CmmLocal tmp) (CmmLoad cC_ID cIntRep),
+     CmmStore (cmmOffsetB cc_lit oFFSET_CostCentre_ccID) (CmmReg (CmmLocal tmp)),
+     CmmStore cC_ID (cmmRegOffB (CmmLocal tmp) 1)
    ]
   }
   where
@@ -368,14 +368,14 @@ emitRegisterCC cc = do
 
 emitRegisterCCS :: CostCentreStack -> Code
 emitRegisterCCS ccs = do
-  { tmp <- newTemp cIntRep
+  { tmp <- newNonPtrTemp cIntRep
   ; stmtsC [
      CmmStore (cmmOffsetB ccs_lit oFFSET_CostCentreStack_prevStack) 
 			(CmmLoad cCS_LIST wordRep),
      CmmStore cCS_LIST ccs_lit,
-     CmmAssign tmp (CmmLoad cCS_ID cIntRep),
-     CmmStore (cmmOffsetB ccs_lit oFFSET_CostCentreStack_ccsID) (CmmReg tmp),
-     CmmStore cCS_ID (cmmRegOffB tmp 1)
+     CmmAssign (CmmLocal tmp) (CmmLoad cCS_ID cIntRep),
+     CmmStore (cmmOffsetB ccs_lit oFFSET_CostCentreStack_ccsID) (CmmReg (CmmLocal tmp)),
+     CmmStore cCS_ID (cmmRegOffB (CmmLocal tmp) 1)
    ]
   }
   where
@@ -395,14 +395,14 @@ emitSetCCC :: CostCentre -> Code
 emitSetCCC cc
   | not opt_SccProfilingOn = nopC
   | otherwise = do 
-    tmp <- newTemp wordRep
+    tmp <- newNonPtrTemp wordRep -- TODO FIXME NOW
     ASSERT( sccAbleCostCentre cc )
       pushCostCentre tmp curCCS cc
-    stmtC (CmmStore curCCSAddr (CmmReg tmp))
+    stmtC (CmmStore curCCSAddr (CmmReg (CmmLocal tmp)))
     when (isSccCountCostCentre cc) $ 
 	stmtC (bumpSccCount curCCS)
 
-pushCostCentre :: CmmReg -> CmmExpr -> CostCentre -> Code
+pushCostCentre :: LocalReg -> CmmExpr -> CostCentre -> Code
 pushCostCentre result ccs cc
   = emitRtsCallWithResult result PtrHint
 	SLIT("PushCostCentre") [(ccs,PtrHint), 

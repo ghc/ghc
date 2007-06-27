@@ -425,10 +425,14 @@ pprReg r
 -- We only print the type of the local reg if it isn't wordRep
 --
 pprLocalReg :: LocalReg -> SDoc
-pprLocalReg (LocalReg uniq rep) 
-    = hcat [ char '_', ppr uniq, 
-            (if rep == wordRep 
-                then empty else dcolon <> ppr rep) ]
+pprLocalReg (LocalReg uniq rep follow) 
+    = hcat [ char '_', ppr uniq, ty ] where
+  ty = if rep == wordRep && follow == KindNonPtr
+                then empty
+                else dcolon <> ptr <> ppr rep
+  ptr = if follow == KindNonPtr
+                then empty
+                else doubleQuotes (text "ptr")
 
 -- needs to be kept in syn with Cmm.hs.GlobalReg
 --

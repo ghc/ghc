@@ -206,7 +206,7 @@ pprStmt stmt = case stmt of
 	where
     	ppr_fn = case fn of
 		   CmmLit (CmmLabel lbl) -> pprCLabel lbl
-		   _other -> parens (cCast (pprCFunType cconv results args) fn)
+		   _ -> parens (cCast (pprCFunType cconv results args) fn)
 			-- for a dynamic call, cast the expression to
 			-- a function of the right type (we hope).
 
@@ -229,7 +229,7 @@ pprStmt stmt = case stmt of
     CmmJump lbl _params      -> mkJMP_(pprExpr lbl) <> semi
     CmmSwitch arg ids        -> pprSwitch arg ids
 
-pprCFunType :: CCallConv -> [(CmmReg,MachHint)] -> [(CmmExpr,MachHint)] -> SDoc
+pprCFunType :: CCallConv -> CmmHintFormals -> CmmActuals -> SDoc
 pprCFunType cconv ress args
   = hcat [
 	res_type ress,
@@ -238,7 +238,7 @@ pprCFunType cconv ress args
    ]
   where
 	res_type [] = ptext SLIT("void")
-	res_type [(one,hint)] = machRepHintCType (cmmRegRep one) hint
+	res_type [(one,hint)] = machRepHintCType (localRegRep one) hint
 
 	arg_type (expr,hint) = machRepHintCType (cmmExprRep expr) hint
 
@@ -713,12 +713,12 @@ pprGlobalReg gr = case gr of
     GCFun          -> ptext SLIT("stg_gc_fun")
 
 pprLocalReg :: LocalReg -> SDoc
-pprLocalReg (LocalReg uniq _rep) = char '_' <> ppr uniq
+pprLocalReg (LocalReg uniq _ _) = char '_' <> ppr uniq
 
 -- -----------------------------------------------------------------------------
 -- Foreign Calls
 
-pprCall :: SDoc -> CCallConv -> [(CmmReg,MachHint)] -> [(CmmExpr,MachHint)]
+pprCall :: SDoc -> CCallConv -> CmmHintFormals -> CmmActuals
 	-> SDoc
 
 pprCall ppr_fn cconv results args
@@ -741,17 +741,9 @@ pprCall ppr_fn cconv results args
     ppr_assign results (ppr_fn <> parens (commafy (map pprArg args))) <> semi
   where 
      ppr_assign []           rhs = rhs
-     ppr_assign [(reg@(CmmGlobal BaseReg), hint)] rhs
-	 | Just ty <- strangeRegType reg
-	 = ptext SLIT("ASSIGN_BaseReg") <> parens (parens ty <> rhs)
-	 -- BaseReg is special, sometimes it isn't an lvalue and we
-	 -- can't assign to it.
      ppr_assign [(one,hint)] rhs
-	 | Just ty <- strangeRegType one
-	 = pprReg one <> ptext SLIT(" = ") <> parens ty <> rhs
-	 | otherwise
-	 = pprReg one <> ptext SLIT(" = ")
-		 <> pprUnHint hint (cmmRegRep one) <> rhs
+	 = pprLocalReg one <> ptext SLIT(" = ")
+		 <> pprUnHint hint (localRegRep one) <> rhs
      ppr_assign _other _rhs = panic "pprCall: multiple results"
 
      pprArg (expr, PtrHint)
@@ -792,7 +784,7 @@ pprDataExterns statics
   where (_, lbls) = runTE (mapM_ te_Static statics)
 
 pprTempDecl :: LocalReg -> SDoc
-pprTempDecl l@(LocalReg _uniq rep)
+pprTempDecl l@(LocalReg _ rep _)
   = hcat [ machRepCType rep, space, pprLocalReg l, semi ]
 
 pprExternDecl :: Bool -> CLabel -> SDoc
@@ -847,7 +839,7 @@ te_Lit _ = return ()
 te_Stmt :: CmmStmt -> TE ()
 te_Stmt (CmmAssign r e)		= te_Reg r >> te_Expr e
 te_Stmt (CmmStore l r)		= te_Expr l >> te_Expr r
-te_Stmt (CmmCall _ rs es)	= mapM_ (te_Reg.fst) rs >>
+te_Stmt (CmmCall _ rs es)	= mapM_ (te_temp.fst) rs >>
 				  mapM_ (te_Expr.fst) es
 te_Stmt (CmmCondBranch e _)	= te_Expr e
 te_Stmt (CmmSwitch e _)		= te_Expr e

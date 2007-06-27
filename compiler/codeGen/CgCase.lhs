@@ -108,8 +108,8 @@ cgCase (StgLit lit) live_in_whole_case live_in_alts bndr srt
        alt_type@(PrimAlt tycon) alts
   = do	{ tmp_reg <- bindNewToTemp bndr
 	; cm_lit <- cgLit lit
-	; stmtC (CmmAssign tmp_reg (CmmLit cm_lit))
-	; cgPrimAlts NoGC alt_type tmp_reg alts }
+	; stmtC (CmmAssign (CmmLocal tmp_reg) (CmmLit cm_lit))
+	; cgPrimAlts NoGC alt_type (CmmLocal tmp_reg) alts }
 \end{code}
 
 Special case #2: scrutinising a primitive-typed variable.	No
@@ -129,8 +129,8 @@ cgCase (StgApp v []) live_in_whole_case live_in_alts bndr srt
 	  v_info <- getCgIdInfo v
 	; amode <- idInfoToAmode v_info
 	; tmp_reg <- bindNewToTemp bndr
-	; stmtC (CmmAssign tmp_reg amode)
-	; cgPrimAlts NoGC alt_type tmp_reg alts }
+	; stmtC (CmmAssign (CmmLocal tmp_reg) amode)
+	; cgPrimAlts NoGC alt_type (CmmLocal tmp_reg) alts }
 \end{code}
 
 Special case #3: inline PrimOps and foreign calls.
@@ -285,7 +285,7 @@ cgInlinePrimOp primop args bndr (PrimAlt tycon) live_in_alts alts
   = do	{ 	-- PRIMITIVE ALTS, with non-void result
 	  tmp_reg <- bindNewToTemp bndr
 	; cgPrimOp [tmp_reg] primop args live_in_alts
-	; cgPrimAlts NoGC (PrimAlt tycon) tmp_reg alts }
+	; cgPrimAlts NoGC (PrimAlt tycon) (CmmLocal tmp_reg) alts }
 
 cgInlinePrimOp primop args bndr (UbxTupAlt tycon) live_in_alts alts
   = ASSERT( isSingleton alts )
@@ -315,7 +315,9 @@ cgInlinePrimOp primop args bndr (AlgAlt tycon) live_in_alts alts
 	; this_pkg <- getThisPackage
 	; whenC (not (isDeadBinder bndr))
 		(do { tmp_reg <- bindNewToTemp bndr
-		    ; stmtC (CmmAssign tmp_reg (tagToClosure this_pkg tycon tag_amode)) })
+		    ; stmtC (CmmAssign
+                             (CmmLocal tmp_reg)
+                             (tagToClosure this_pkg tycon tag_amode)) })
 
 		-- Compile the alts
 	; (branches, mb_deflt) <- cgAlgAlts NoGC Nothing{-cc_slot-}
@@ -332,9 +334,9 @@ cgInlinePrimOp primop args bndr (AlgAlt tycon) live_in_alts alts
          (_,e) <- getArgAmode arg
 	 return e
     do_enum_primop primop
-      = do tmp <- newTemp wordRep
+      = do tmp <- newNonPtrTemp wordRep
 	   cgPrimOp [tmp] primop args live_in_alts
-    	   returnFC (CmmReg tmp)
+    	   returnFC (CmmReg (CmmLocal tmp))
 
 cgInlinePrimOp primop arg_amodes bndr PolyAlt live_in_alts alts
   = pprPanic "cgCase: case of primop has polymorphic type" (ppr bndr)

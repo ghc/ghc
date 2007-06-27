@@ -244,7 +244,10 @@ body	:: { ExtCode }
 	| stmt body			{ do $1; $2 }
 
 decl	:: { ExtCode }
-	: type names ';'		{ mapM_ (newLocal $1) $2 }
+	: type names ';'		{ mapM_ (newLocal defaultKind $1) $2 }
+	| STRING type names ';'		{% do k <- parseKind $1;
+					      return $ mapM_ (newLocal k $2) $3 }
+
 	| 'import' names ';'		{ return () }  -- ignore imports
 	| 'export' names ';'		{ return () }  -- ignore exports
 
@@ -401,20 +404,31 @@ reg	:: { ExtFCode CmmExpr }
 	: NAME			{ lookupName $1 }
 	| GLOBALREG		{ return (CmmReg (CmmGlobal $1)) }
 
-maybe_results :: { [ExtFCode (CmmReg, MachHint)] }
+maybe_results :: { [ExtFCode (CmmFormal, MachHint)] }
 	: {- empty -}		{ [] }
 	| hint_lregs '='	{ $1 }
 
-hint_lregs :: { [ExtFCode (CmmReg, MachHint)] }
+hint_lregs0 :: { [ExtFCode (CmmFormal, MachHint)] }
+	: {- empty -}		{ [] }
+	| hint_lregs		{ $1 }
+
+hint_lregs :: { [ExtFCode (CmmFormal, MachHint)] }
 	: hint_lreg ','			{ [$1] }
 	| hint_lreg			{ [$1] }
 	| hint_lreg ',' hint_lregs	{ $1 : $3 }
 
-hint_lreg :: { ExtFCode (CmmReg, MachHint) }
-	: lreg				{ do e <- $1; return (e, inferHint (CmmReg e)) }
-	| STRING lreg			{% do h <- parseHint $1;
+hint_lreg :: { ExtFCode (CmmFormal, MachHint) }
+	: local_lreg			{ do e <- $1; return (e, inferHint (CmmReg (CmmLocal e))) }
+	| STRING local_lreg		{% do h <- parseHint $1;
 					      return $ do
 						e <- $2; return (e,h) }
+
+local_lreg :: { ExtFCode LocalReg }
+	: NAME			{ do e <- lookupName $1;
+				     return $
+				       case e of 
+					CmmReg (CmmLocal r) -> r
+					other -> pprPanic "CmmParse:" (ftext $1 <> text " not a local register") }
 
 lreg	:: { ExtFCode CmmReg }
 	: NAME			{ do e <- lookupName $1;
@@ -580,6 +594,13 @@ parseHint "signed" = return SignedHint
 parseHint "float"  = return FloatHint
 parseHint str      = fail ("unrecognised hint: " ++ str)
 
+parseKind :: String -> P Kind
+parseKind "ptr"    = return KindPtr
+parseKind str      = fail ("unrecognized kin: " ++ str)
+
+defaultKind :: Kind
+defaultKind = KindNonPtr
+
 -- labels are always pointers, so we might as well infer the hint
 inferHint :: CmmExpr -> MachHint
 inferHint (CmmLit (CmmLabel _)) = PtrHint
@@ -694,10 +715,12 @@ addVarDecl var expr = EC $ \e s -> return ((var, Var expr):s, ())
 addLabel :: FastString -> BlockId -> ExtCode
 addLabel name block_id = EC $ \e s -> return ((name, Label block_id):s, ())
 
-newLocal :: MachRep -> FastString -> ExtCode
-newLocal ty name  = do
+newLocal :: Kind -> MachRep -> FastString -> ExtFCode LocalReg
+newLocal kind ty name = do
    u <- code newUnique
-   addVarDecl name (CmmReg (CmmLocal (LocalReg u ty)))
+   let reg = LocalReg u ty kind
+   addVarDecl name (CmmReg (CmmLocal reg))
+   return reg
 
 newLabel :: FastString -> ExtFCode BlockId
 newLabel name = do
@@ -792,7 +815,7 @@ staticClosure cl_label info payload
 
 foreignCall
 	:: String
-	-> [ExtFCode (CmmReg,MachHint)]
+	-> [ExtFCode (CmmFormal,MachHint)]
 	-> ExtFCode CmmExpr
 	-> [ExtFCode (CmmExpr,MachHint)]
 	-> Maybe [GlobalReg] -> P ExtCode
@@ -809,7 +832,7 @@ foreignCall conv_string results_code expr_code args_code vols
                  (CmmForeignCall expr convention) args vols) where
 
 primCall
-	:: [ExtFCode (CmmReg,MachHint)]
+	:: [ExtFCode (CmmFormal,MachHint)]
 	-> FastString
 	-> [ExtFCode (CmmExpr,MachHint)]
 	-> Maybe [GlobalReg] -> P ExtCode
