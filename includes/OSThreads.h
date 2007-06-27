@@ -79,6 +79,15 @@ typedef pthread_key_t   ThreadLocalKey;
 #endif // CMINUSMINUS
 
 # elif defined(HAVE_WINDOWS_H)
+
+#if CMINUSMINUS
+
+#define ACQUIRE_LOCK(mutex) EnterCriticalSection(mutex)
+#define RELEASE_LOCK(mutex) LeaveCriticalSection(mutex)
+#define ASSERT_LOCK_HELD(mutex) /* nothing */
+
+#else
+
 #include <windows.h>
 
 typedef HANDLE Condition;
@@ -142,6 +151,8 @@ typedef HANDLE Mutex;
 
 #define ASSERT_LOCK_HELD(mutex) /* nothing */
 #endif
+
+#endif // CMINUSMINUS
 
 # else
 #  error "Threads not supported"
