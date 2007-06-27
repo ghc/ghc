@@ -179,7 +179,10 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
 	        -- (4) Compute instances from "deriving" clauses; 
 		-- This stuff computes a context for the derived instance
 		-- decl, so it needs to know about all the instances possible
-       ; (deriv_inst_info, deriv_binds) <- tcDeriving tycl_decls deriv_decls
+                -- NB: class instance declarations can contain derivings as
+                --     part of associated data type declarations
+       ; (deriv_inst_info, deriv_binds) <- tcDeriving tycl_decls inst_decls 
+                                                      deriv_decls
        ; addInsts deriv_inst_info   $ do {
 
        ; gbl_env <- getGblEnv

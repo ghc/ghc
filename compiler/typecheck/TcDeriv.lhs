@@ -205,16 +205,18 @@ And then translate it to:
 %************************************************************************
 
 \begin{code}
-tcDeriving  :: [LTyClDecl Name]	-- All type constructors
+tcDeriving  :: [LTyClDecl Name]  -- All type constructors
+            -> [LInstDecl Name]  -- All instance declarations
             -> [LDerivDecl Name] -- All stand-alone deriving declarations
 	    -> TcM ([InstInfo],		-- The generated "instance decls"
 		    HsValBinds Name)	-- Extra generated top-level bindings
 
-tcDeriving tycl_decls deriv_decls
+tcDeriving tycl_decls inst_decls deriv_decls
   = recoverM (returnM ([], emptyValBindsOut)) $
     do	{   	-- Fish the "deriving"-related information out of the TcEnv
 		-- and make the necessary "equations".
-	; (ordinary_eqns, newtype_inst_info) <- makeDerivEqns tycl_decls deriv_decls
+	; (ordinary_eqns, newtype_inst_info) 
+                <- makeDerivEqns tycl_decls inst_decls deriv_decls
 
 	; (ordinary_inst_info, deriv_binds) 
 		<- extendLocalInstEnv (map iSpec newtype_inst_info)  $
@@ -338,17 +340,24 @@ when the dict is constructed in TcInstDcls.tcInstDecl2
 
 \begin{code}
 makeDerivEqns :: [LTyClDecl Name] 
+              -> [LInstDecl Name]
 	      -> [LDerivDecl Name] 
 	      -> TcM ([DerivEqn],	-- Ordinary derivings
 		      [InstInfo])	-- Special newtype derivings
 
-makeDerivEqns tycl_decls deriv_decls
+makeDerivEqns tycl_decls inst_decls deriv_decls
   = do	{ eqns1 <- mapM deriveTyData $
-		   [ (p,d) | d@(L _ (TyData {tcdDerivs = Just preds})) <- tycl_decls
-			   , p <- preds ]
+                     extractTyDataPreds tycl_decls ++
+		     [ pd                        -- traverse assoc data families
+                     | L _ (InstDecl _ _ _ ats) <- inst_decls
+		     , pd <- extractTyDataPreds ats ]
 	; eqns2 <- mapM deriveStandalone deriv_decls
 	; return ([eqn  | (Just eqn, _)  <- eqns1 ++ eqns2],
 		  [inst | (_, Just inst) <- eqns1 ++ eqns2]) }
+  where
+    extractTyDataPreds decls = 		   
+      [(p, d) | d@(L _ (TyData {tcdDerivs = Just preds})) <- decls, p <- preds]
+
 
 ------------------------------------------------------------------
 deriveStandalone :: LDerivDecl Name -> TcM (Maybe DerivEqn, Maybe InstInfo)
