@@ -413,6 +413,7 @@ continuationToProc (max_stack, formats)
     where
       curr_format = maybe unknown_block id $ lookup label formats
       unknown_block = panic "unknown BlockId in continuationToProc"
+      curr_stack = stack_frame_size curr_format
 
       continuationToProc' :: BrokenBlock -> CmmBasicBlock
       continuationToProc' (BrokenBlock ident entry stmts _ exit) =
@@ -421,12 +422,12 @@ continuationToProc (max_stack, formats)
             prefix = case entry of
                        ControlEntry -> []
                        FunctionEntry (CmmInfo _ (Just gc_block) _ _) _ formals ->
-                           gc_stack_check gc_block max_stack ++
+                           gc_stack_check gc_block (max_stack - curr_stack) ++
                            function_entry formals curr_format
                        FunctionEntry (CmmInfo _ Nothing _ _) _ formals ->
                            panic "continuationToProc: missing GC block"
                        FunctionEntry (CmmNonInfo (Just gc_block)) _ formals ->
-                           gc_stack_check gc_block max_stack ++
+                           gc_stack_check gc_block (max_stack - curr_stack) ++
                            function_entry formals curr_format
                        FunctionEntry (CmmNonInfo Nothing) _ formals ->
                            panic "continuationToProc: missing non-info GC block"
@@ -436,19 +437,20 @@ continuationToProc (max_stack, formats)
                         FinalBranch next -> [CmmBranch next]
                         FinalSwitch expr targets -> [CmmSwitch expr targets]
                         FinalReturn arguments ->
-                            tail_call (stack_frame_size curr_format)
+                            tail_call curr_stack
                                 (CmmLoad (CmmReg spReg) wordRep)
                                 arguments
                         FinalJump target arguments ->
-                            tail_call (stack_frame_size curr_format) target arguments
+                            tail_call curr_stack target arguments
                         FinalCall next (CmmForeignCall target CmmCallConv)
                             results arguments ->
                                 pack_continuation curr_format cont_format ++
-                                tail_call (stack_frame_size curr_format - stack_frame_size cont_format)
+                                tail_call (curr_stack - cont_stack)
                                               target arguments
                             where
                               cont_format = maybe unknown_block id $
                                             lookup (mkReturnPtLabel $ getUnique next) formats
+                              cont_stack = stack_frame_size cont_format
                         FinalCall next _ results arguments -> panic "unimplemented CmmCall"
 
 -----------------------------------------------------------------------------
