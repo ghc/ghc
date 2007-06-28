@@ -3323,8 +3323,8 @@ genCCall target dest_regs args = do
 		F64 -> unitOL (MOV rep (OpReg xmm0) (OpReg r_dest))
 		rep -> unitOL (MOV rep (OpReg rax) (OpReg r_dest))
 	  where 
-		rep = cmmRegRep dest
-		r_dest = getRegisterReg dest
+		rep = localRegRep dest
+		r_dest = getRegisterReg (CmmLocal dest)
 	assign_code many = panic "genCCall.assign_code many"
 
     return (load_args_code 	`appOL` 
