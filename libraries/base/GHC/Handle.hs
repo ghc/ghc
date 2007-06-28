@@ -598,8 +598,9 @@ writeRawBuffer loc fd is_nonblock buf off len
   | is_nonblock = unsafe_write
   | threaded    = safe_write
   | otherwise   = do r <- fdReady (fromIntegral fd) 1 0 False
-                     if r /= 0 then safe_write
-                                else return 0
+                     if r /= 0 
+                        then safe_write
+                        else do threadWaitWrite (fromIntegral fd); unsafe_write
   where  
     do_write call = throwErrnoIfMinus1RetryMayBlock loc call
 		        (threadWaitWrite (fromIntegral fd)) 
@@ -611,8 +612,9 @@ writeRawBufferPtr loc fd is_nonblock buf off len
   | is_nonblock = unsafe_write
   | threaded    = safe_write
   | otherwise   = do r <- fdReady (fromIntegral fd) 1 0 False
-                     if r /= 0 then safe_write
-                                else return 0
+                     if r /= 0 
+                        then safe_write
+                        else do threadWaitWrite (fromIntegral fd); unsafe_write
   where
     do_write call = throwErrnoIfMinus1RetryMayBlock loc call
 		        (threadWaitWrite (fromIntegral fd)) 
