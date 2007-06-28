@@ -19,6 +19,8 @@ module Text.Printf(
 
 import Prelude
 import Data.Char
+import Data.Int
+import Data.Word
 import Numeric(showEFloat, showFFloat, showGFloat)
 import System.IO
 
@@ -33,6 +35,7 @@ import System.IO
 -- character @%@, followed by one or more of the following flags:
 --
 -- >    -      left adjust (default is right adjust)
+-- >    +      always use a sign (+ or -) for signed conversions
 -- >    0      pad with zeroes rather than spaces
 --
 -- followed optionally by a field width:
@@ -46,14 +49,17 @@ import System.IO
 --
 -- and finally, a format character:
 --
--- >    c      character               Char, Int, Integer
--- >    d      decimal                 Char, Int, Integer
--- >    o      octal                   Char, Int, Integer
--- >    x      hexadecimal             Char, Int, Integer
--- >    u      unsigned decimal        Char, Int, Integer
+-- >    c      character               Char, Int, Integer, ...
+-- >    d      decimal                 Char, Int, Integer, ...
+-- >    o      octal                   Char, Int, Integer, ...
+-- >    x      hexadecimal             Char, Int, Integer, ...
+-- >    X      hexadecimal             Char, Int, Integer, ...
+-- >    u      unsigned decimal        Char, Int, Integer, ...
 -- >    f      floating point          Float, Double
 -- >    g      general format float    Float, Double
+-- >    G      general format float    Float, Double
 -- >    e      exponent format float   Float, Double
+-- >    E      exponent format float   Float, Double
 -- >    s      string                  String
 --
 -- Mismatch between the argument types and the format string will cause
@@ -69,12 +75,12 @@ import System.IO
 -- >   3.14
 --
 printf :: (PrintfType r) => String -> r
-printf fmt = spr fmt []
+printf fmts = spr fmts []
 
 -- | Similar to 'printf', except that output is via the specified
 -- 'Handle'.  The return type is restricted to @('IO' a)@.
 hPrintf :: (HPrintfType r) => Handle -> String -> r
-hPrintf hdl fmt = hspr hdl fmt []
+hPrintf hdl fmts = hspr hdl fmts []
 
 -- |The 'PrintfType' class provides the variable argument magic for
 -- 'printf'.  Its implementation is intentionally not visible from
@@ -95,23 +101,23 @@ instance PrintfType String where
     spr fmt args = uprintf fmt (reverse args)
 -}
 instance (IsChar c) => PrintfType [c] where
-    spr fmt args = map fromChar (uprintf fmt (reverse args))
+    spr fmts args = map fromChar (uprintf fmts (reverse args))
 
 instance PrintfType (IO a) where
-    spr fmt args = do
-	putStr (uprintf fmt (reverse args))
+    spr fmts args = do
+	putStr (uprintf fmts (reverse args))
 	return undefined
 
 instance HPrintfType (IO a) where
-    hspr hdl fmt args = do
-	hPutStr hdl (uprintf fmt (reverse args))
+    hspr hdl fmts args = do
+	hPutStr hdl (uprintf fmts (reverse args))
 	return undefined
 
 instance (PrintfArg a, PrintfType r) => PrintfType (a -> r) where
-    spr fmt args = \ a -> spr fmt (toUPrintf a : args)
+    spr fmts args = \ a -> spr fmts (toUPrintf a : args)
 
 instance (PrintfArg a, HPrintfType r) => HPrintfType (a -> r) where
-    hspr hdl fmt args = \ a -> hspr hdl fmt (toUPrintf a : args)
+    hspr hdl fmts args = \ a -> hspr hdl fmts (toUPrintf a : args)
 
 class PrintfArg a where
     toUPrintf :: a -> UPrintf
@@ -124,19 +130,49 @@ instance PrintfArg String where
     toUPrintf s = UString s
 -}
 instance (IsChar c) => PrintfArg [c] where
-    toUPrintf s = UString (map toChar s)
+    toUPrintf = UString . map toChar
 
 instance PrintfArg Int where
-    toUPrintf i = UInt i
+    toUPrintf = uInteger
+
+instance PrintfArg Int8 where
+    toUPrintf = uInteger
+
+instance PrintfArg Int16 where
+    toUPrintf = uInteger
+
+instance PrintfArg Int32 where
+    toUPrintf = uInteger
+
+instance PrintfArg Int64 where
+    toUPrintf = uInteger
+
+instance PrintfArg Word where
+    toUPrintf = uInteger
+
+instance PrintfArg Word8 where
+    toUPrintf = uInteger
+
+instance PrintfArg Word16 where
+    toUPrintf = uInteger
+
+instance PrintfArg Word32 where
+    toUPrintf = uInteger
+
+instance PrintfArg Word64 where
+    toUPrintf = uInteger
 
 instance PrintfArg Integer where
-    toUPrintf i = UInteger i
+    toUPrintf = UInteger 0
 
 instance PrintfArg Float where
-    toUPrintf f = UFloat f
+    toUPrintf = UFloat
 
 instance PrintfArg Double where
-    toUPrintf d = UDouble d
+    toUPrintf = UDouble
+
+uInteger :: (Integral a, Bounded a) => a -> UPrintf
+uInteger x = UInteger (toInteger $ minBound `asTypeOf` x) (toInteger x)
 
 class IsChar c where
     toChar :: c -> Char
@@ -148,7 +184,7 @@ instance IsChar Char where
 
 -------------------
 
-data UPrintf = UChar Char | UString String | UInt Int | UInteger Integer | UFloat Float | UDouble Double
+data UPrintf = UChar Char | UString String | UInteger Integer Integer | UFloat Float | UDouble Double
 
 uprintf :: String -> [UPrintf] -> String
 uprintf ""       []       = ""
@@ -160,12 +196,14 @@ uprintf (c:cs)   us       = c:uprintf cs us
 
 fmt :: String -> [UPrintf] -> String
 fmt cs us =
-	let (width, prec, ladj, zero, cs', us') = getSpecs False False cs us
+	let (width, prec, ladj, zero, plus, cs', us') = getSpecs False False False cs us
 	    adjust (pre, str) = 
 		let lstr = length str
 		    lpre = length pre
 		    fill = if lstr+lpre < width then take (width-(lstr+lpre)) (repeat (if zero then '0' else ' ')) else ""
 		in  if ladj then pre ++ str ++ fill else if zero then pre ++ fill ++ str else fill ++ pre ++ str
+            adjust' ("", str) | plus = adjust ("+", str)
+            adjust' ps = adjust ps
         in
 	case cs' of
 	[]     -> fmterr
@@ -174,51 +212,40 @@ fmt cs us =
 	    []     -> argerr
 	    u:us'' ->
 		(case c of
-		'c' -> adjust ("", [toEnum (toint u)])
-		'd' -> adjust (fmti u)
-		'x' -> adjust ("", fmtu 16 u)
-		'o' -> adjust ("", fmtu 8  u)
-		'u' -> adjust ("", fmtu 10 u)
-		'e' -> adjust (dfmt' c prec u)
-		'f' -> adjust (dfmt' c prec u)
-		'g' -> adjust (dfmt' c prec u)
-		's' -> adjust ("", tostr u)
-		c   -> perror ("bad formatting char " ++ [c])
+		'c' -> adjust  ("", [toEnum (toint u)])
+		'd' -> adjust' (fmti u)
+		'i' -> adjust' (fmti u)
+		'x' -> adjust  ("", fmtu 16 u)
+		'X' -> adjust  ("", map toUpper $ fmtu 16 u)
+		'o' -> adjust  ("", fmtu 8  u)
+		'u' -> adjust  ("", fmtu 10 u)
+		'e' -> adjust' (dfmt' c prec u)
+		'E' -> adjust' (dfmt' c prec u)
+		'f' -> adjust' (dfmt' c prec u)
+		'g' -> adjust' (dfmt' c prec u)
+		'G' -> adjust' (dfmt' c prec u)
+		's' -> adjust  ("", tostr u)
+		_   -> perror ("bad formatting char " ++ [c])
 		 ) ++ uprintf cs'' us''
 
-fmti (UInt i)     = if i < 0 then
-			if i == -i then fmti (UInteger (toInteger i)) else ("-", itos (-i))
-		    else
-			("", itos i)
-fmti (UInteger i) = if i < 0 then ("-", itos (-i)) else ("", itos i)
-fmti (UChar c)    = fmti (UInt (fromEnum c))
-fmti u		  = baderr
+fmti :: UPrintf -> (String, String)
+fmti (UInteger _ i) = if i < 0 then ("-", show (-i)) else ("", show i)
+fmti (UChar c)      = fmti (uInteger (fromEnum c))
+fmti _		    = baderr
 
-fmtu b (UInt i)     = if i < 0 then
-			  if i == -i then itosb b (maxi - toInteger (i+1) - 1) else itosb b (maxi - toInteger (-i))
-		      else
-			  itosb b (toInteger i)
-fmtu b (UInteger i) = itosb b i
-fmtu b (UChar c)    = itosb b (toInteger (fromEnum c))
-fmtu b u            = baderr
+fmtu :: Integer -> UPrintf -> String
+fmtu b (UInteger l i) = itosb b (if i < 0 then -2*l + i else i)
+fmtu b (UChar c)      = itosb b (toInteger (fromEnum c))
+fmtu _ _              = baderr
 
-maxi :: Integer
-maxi = (toInteger (maxBound::Int) + 1) * 2
+toint :: UPrintf -> Int
+toint (UInteger _ i) = fromInteger i
+toint (UChar c)      = fromEnum c
+toint _		     = baderr
 
-toint (UInt i)     = i
-toint (UInteger i) = toInt i
-toint (UChar c)    = fromEnum c
-toint u		   = baderr
-
+tostr :: UPrintf -> String
 tostr (UString s) = s
-tostr u		  = baderr
-
-itos n = 
-	if n < 10 then 
-	    [toEnum (fromEnum '0' + toInt n)]
-	else
-	    let (q, r) = quotRem n 10 in
-	    itos q ++ [toEnum (fromEnum '0' + toInt r)]
+tostr _		  = baderr
 
 itosb :: Integer -> Integer -> String
 itosb b n = 
@@ -229,48 +256,56 @@ itosb b n =
 	    itosb b q ++ [intToDigit $ fromInteger r]
 
 stoi :: Int -> String -> (Int, String)
-stoi a (c:cs) | isDigit c = stoi (a*10 + fromEnum c - fromEnum '0') cs
+stoi a (c:cs) | isDigit c = stoi (a*10 + digitToInt c) cs
 stoi a cs                 = (a, cs)
 
-getSpecs :: Bool -> Bool -> String -> [UPrintf] -> (Int, Int, Bool, Bool, String, [UPrintf])
-getSpecs l z ('-':cs) us = getSpecs True z cs us
-getSpecs l z ('0':cs) us = getSpecs l True cs us
-getSpecs l z ('*':cs) us = 
+getSpecs :: Bool -> Bool -> Bool -> String -> [UPrintf] -> (Int, Int, Bool, Bool, Bool, String, [UPrintf])
+getSpecs _ z s ('-':cs) us = getSpecs True z s cs us
+getSpecs l z _ ('+':cs) us = getSpecs l z True cs us
+getSpecs l _ s ('0':cs) us = getSpecs l True s cs us
+getSpecs l z s ('*':cs) us = 
         case us of
         [] -> argerr
         nu : us' ->
 	    let n = toint nu
 		(p, cs'', us'') =
 		    case cs of
-                    '.':'*':r -> case us' of { [] -> argerr; pu:us'' -> (toint pu, r, us'') }
-		    '.':r     -> let (n, cs') = stoi 0 r in (n, cs', us')
+                    '.':'*':r -> case us' of { [] -> argerr; pu:us''' -> (toint pu, r, us''') }
+		    '.':r     -> let (n', cs') = stoi 0 r in (n', cs', us')
 		    _         -> (-1, cs, us')
-	    in  (n, p, l, z, cs'', us'')
-getSpecs l z ('.':cs) us =
+	    in  (n, p, l, z, s, cs'', us'')
+getSpecs l z s ('.':cs) us =
 	let (p, cs') = stoi 0 cs
-	in  (0, p, l, z, cs', us)
-getSpecs l z cs@(c:_) us | isDigit c =
+	in  (0, p, l, z, s, cs', us)
+getSpecs l z s cs@(c:_) us | isDigit c =
 	let (n, cs') = stoi 0 cs
 	    (p, cs'') = case cs' of
 			'.':r -> stoi 0 r
 			_     -> (-1, cs')
-	in  (n, p, l, z, cs'', us)
-getSpecs l z cs       us = (0, -1, l, z, cs, us)
+	in  (n, p, l, z, s, cs'', us)
+getSpecs l z s cs       us = (0, -1, l, z, s, cs, us)
 
+dfmt' :: Char -> Int -> UPrintf -> (String, String)
 dfmt' c p (UDouble d) = dfmt c p d
 dfmt' c p (UFloat f)  = dfmt c p f
-dfmt' c p u           = baderr
+dfmt' _ _ _           = baderr
 
-dfmt c p d = 
-	case (case c of 'e' -> showEFloat; 'f' -> showFFloat; 'g' -> showGFloat) 
+dfmt :: (RealFloat a) => Char -> Int -> a -> (String, String)
+dfmt c p d =
+	case (if isUpper c then map toUpper else id) $
+             (case toLower c of
+                  'e' -> showEFloat
+                  'f' -> showFFloat
+                  'g' -> showGFloat
+                  _   -> error "Printf.dfmt: impossible"
+             )
                (if p < 0 then Nothing else Just p) d "" of
 	'-':cs -> ("-", cs)
 	cs     -> ("" , cs)
 
+perror :: String -> a
 perror s = error ("Printf.printf: "++s)
+fmterr, argerr, baderr :: a
 fmterr = perror "formatting string ended prematurely"
 argerr = perror "argument list ended prematurely"
 baderr = perror "bad argument"
-
-toInt :: (Integral a) => a -> Int
-toInt x = fromInteger (toInteger x)
