@@ -430,10 +430,11 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
     (pkg_matches,  pkg_unifs)  = lookup pkg_ie  
     all_matches = home_matches ++ pkg_matches
     all_unifs   = home_unifs   ++ pkg_unifs
-    pruned_matches 
-	| null all_unifs = foldr insert_overlapping [] all_matches
-	| otherwise	 = all_matches	-- Non-empty unifs is always an error situation,
-					-- so don't attempt to pune the matches
+    pruned_matches = foldr insert_overlapping [] all_matches
+	-- Even if the unifs is non-empty (an error situation)
+	-- we still prune the matches, so that the error message isn't
+	-- misleading (complaining of multiple matches when some should be
+	-- overlapped away)
 
     --------------
     lookup env = case lookupUFM env cls of
