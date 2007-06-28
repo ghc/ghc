@@ -313,10 +313,10 @@ stmt	:: { ExtCode }
 	-- we tweak the syntax to avoid the conflict.  The later
 	-- option is taken here because the other way would require
 	-- multiple levels of expanding and get unwieldy.
-	| maybe_results 'foreign' STRING expr '(' hint_exprs0 ')' vols ';'
-		{% foreignCall $3 $1 $4 $6 $8 NoC_SRT }
-	| maybe_results 'prim' '%' NAME '(' hint_exprs0 ')' vols ';'
-		{% primCall $1 $4 $6 $8 NoC_SRT }
+	| maybe_results 'foreign' STRING expr '(' hint_exprs0 ')' safety vols ';'
+		{% foreignCall $3 $1 $4 $6 $9 $8 }
+	| maybe_results 'prim' '%' NAME '(' hint_exprs0 ')' safety vols ';'
+		{% primCall $1 $4 $6 $9 $8 }
 	-- stmt-level macros, stealing syntax from ordinary C-- function calls.
 	-- Perhaps we ought to use the %%-form?
 	| NAME '(' exprs0 ')' ';'
@@ -343,6 +343,11 @@ bool_op :: { ExtFCode BoolExpr }
 					  return (BoolOr e1 e2)  }
 	| '!' bool_expr			{ do e <- $2; return (BoolNot e) }
 	| '(' bool_op ')'		{ $2 }
+
+-- This is not C-- syntax.  What to do?
+safety  :: { CmmSafety }
+	: {- empty -}			{ CmmUnsafe } -- Default may change soon
+	| STRING			{% parseSafety $1 }
 
 -- This is not C-- syntax.  What to do?
 vols 	:: { Maybe [GlobalReg] }
@@ -630,6 +635,11 @@ callishMachOps = listToUFM $
         -- ToDo: the rest, maybe
     ]
 
+parseSafety :: String -> P CmmSafety
+parseSafety "safe"   = return (CmmSafe NoC_SRT)
+parseSafety "unsafe" = return CmmUnsafe
+parseSafety str      = fail ("unrecognised safety: " ++ str)
+
 parseHint :: String -> P MachHint
 parseHint "ptr"    = return PtrHint
 parseHint "signed" = return SignedHint
@@ -830,9 +840,9 @@ foreignCall
 	-> ExtFCode CmmExpr
 	-> [ExtFCode (CmmExpr,MachHint)]
 	-> Maybe [GlobalReg]
-        -> C_SRT
+        -> CmmSafety
         -> P ExtCode
-foreignCall conv_string results_code expr_code args_code vols srt
+foreignCall conv_string results_code expr_code args_code vols safety
   = do  convention <- case conv_string of
           "C" -> return CCallConv
           "C--" -> return CmmCallConv
@@ -841,23 +851,39 @@ foreignCall conv_string results_code expr_code args_code vols srt
 	  results <- sequence results_code
 	  expr <- expr_code
 	  args <- sequence args_code
-          code (emitForeignCall' PlayRisky results 
-                 (CmmForeignCall expr convention) args vols srt) where
+          case convention of
+            -- Temporary hack so at least some functions are CmmSafe
+            CmmCallConv -> code (stmtC (CmmCall (CmmForeignCall expr convention) results args safety))
+            _ -> case safety of
+	      CmmUnsafe ->
+                code (emitForeignCall' PlayRisky results 
+                   (CmmForeignCall expr convention) args vols NoC_SRT)
+              CmmSafe srt ->
+                code (emitForeignCall' (PlaySafe unused) results 
+                   (CmmForeignCall expr convention) args vols NoC_SRT) where
+	        unused = panic "not used by emitForeignCall'"
 
 primCall
 	:: [ExtFCode (CmmFormal,MachHint)]
 	-> FastString
 	-> [ExtFCode (CmmExpr,MachHint)]
 	-> Maybe [GlobalReg]
-        -> C_SRT
+        -> CmmSafety
         -> P ExtCode
-primCall results_code name args_code vols srt
+primCall results_code name args_code vols safety
   = case lookupUFM callishMachOps name of
 	Nothing -> fail ("unknown primitive " ++ unpackFS name)
 	Just p  -> return $ do
 		results <- sequence results_code
 		args <- sequence args_code
-        	code (emitForeignCall' PlayRisky results (CmmPrim p) args vols srt)
+		case safety of
+		  CmmUnsafe ->
+		    code (emitForeignCall' PlayRisky results
+		      (CmmPrim p) args vols NoC_SRT)
+		  CmmSafe srt ->
+		    code (emitForeignCall' (PlaySafe unused) results 
+		      (CmmPrim p) args vols NoC_SRT) where
+		    unused = panic "not used by emitForeignCall'"
 
 doStore :: MachRep -> ExtFCode CmmExpr  -> ExtFCode CmmExpr -> ExtCode
 doStore rep addr_code val_code
