@@ -715,9 +715,16 @@ tcSplitFunTys ty = case tcSplitFunTy_maybe ty of
 					  (args,res') = tcSplitFunTys res
 
 tcSplitFunTy_maybe :: Type -> Maybe (Type, Type)
-tcSplitFunTy_maybe ty | Just ty' <- tcView ty = tcSplitFunTy_maybe ty'
-tcSplitFunTy_maybe (FunTy arg res)  = Just (arg, res)
-tcSplitFunTy_maybe other	    = Nothing
+tcSplitFunTy_maybe ty | Just ty' <- tcView ty           = tcSplitFunTy_maybe ty'
+tcSplitFunTy_maybe (FunTy arg res) | not (isPredTy arg) = Just (arg, res)
+tcSplitFunTy_maybe other	  			= Nothing
+	-- Note the (not (isPredTy arg)) guard
+	-- Consider	(?x::Int) => Bool
+	-- We don't want to treat this as a function type!
+	-- A concrete example is test tc230:
+	--	f :: () -> (?p :: ()) => () -> ()
+	--
+	--	g = f () ()
 
 tcSplitFunTysN
 	:: TcRhoType 
