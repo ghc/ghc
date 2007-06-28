@@ -689,7 +689,7 @@ rnHsRecFields str mb_con rn_thing mk_rhs (HsRecFields fields dd)
 	; case dd of
 	    Nothing -> return (HsRecFields fields1 dd, fvs1)
 	    Just n  -> ASSERT( n == length fields ) do
-	{ dd_flag <- doptM Opt_RecordDotDot
+	{ dd_flag <- doptM Opt_RecordWildCards
 	; checkErr dd_flag (needFlagDotDot str)
 
 	; let fld_names1 = map (unLoc . hsRecFieldId) fields1

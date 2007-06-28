@@ -178,7 +178,7 @@ data DynFlag
    | Opt_TypeFamilies
    | Opt_OverloadedStrings
    | Opt_DisambiguateRecordFields
-   | Opt_RecordDotDot
+   | Opt_RecordWildCards
    | Opt_RecordPuns
    | Opt_GADTs
    | Opt_RelaxedPolyRec			-- -X=RelaxedPolyRec
@@ -1099,6 +1099,10 @@ xFlags = [
   ( "Generics",  			Opt_Generics ),
 
   ( "ImplicitPrelude",  		Opt_ImplicitPrelude ),	-- On by default
+
+  ( "RecordWildCards",			Opt_RecordWildCards ),
+  ( "RecordPuns",			Opt_RecordPuns ),
+  ( "DisambiguateRecordFields",		Opt_DisambiguateRecordFields ),
 
   ( "OverloadedStrings",		Opt_OverloadedStrings ),
   ( "GADTs",		  		Opt_GADTs ),
