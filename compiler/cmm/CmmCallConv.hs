@@ -1,7 +1,6 @@
 module CmmCallConv (
   ParamLocation(..),
   ArgumentFormat,
-  assignRegs,
   assignArguments,
 ) where
 
@@ -15,26 +14,35 @@ import Constants
 import StaticFlags (opt_Unregisterised)
 import Panic
 
+-- Calculate the 'GlobalReg' or stack locations for function call
+-- parameters as used by the Cmm calling convention.
+
 data ParamLocation
   = RegisterParam GlobalReg
   | StackParam WordOff
 
-assignRegs :: [LocalReg] -> ArgumentFormat LocalReg
-assignRegs regs = assignRegs' regs 0 availRegs
-    where
-      assignRegs' (r:rs) offset availRegs = (r,assignment):assignRegs' rs new_offset remaining
-          where 
-            (assignment, new_offset, remaining) = assign_reg (localRegRep r) offset availRegs
+type ArgumentFormat a = [(a, ParamLocation)]
 
 assignArguments :: (a -> MachRep) -> [a] -> ArgumentFormat a
 assignArguments f reps = assignArguments' reps 0 availRegs
     where
       assignArguments' [] offset availRegs = []
-      assignArguments' (r:rs) offset availRegs = (r,assignment):assignArguments' rs new_offset remaining
+      assignArguments' (r:rs) offset availRegs =
+          (r,assignment):assignArguments' rs new_offset remaining
           where 
-            (assignment, new_offset, remaining) = assign_reg (f r) offset availRegs
+            (assignment, new_offset, remaining) =
+                assign_reg (f r) offset availRegs
 
-type ArgumentFormat a = [(a, ParamLocation)]
+argumentsSize :: (a -> MachRep) -> [a] -> WordOff
+argumentsSize f reps = maximum (0 : map arg_top args)
+    where
+      args = assignArguments f reps
+
+      arg_top (a, StackParam offset) = -offset
+      arg_top (_, RegisterParam _) = 0
+
+-----------------------------------------------------------------------------
+-- Local information about the registers available
 
 type AvailRegs = ( [GlobalReg]   -- available vanilla regs.
 		 , [GlobalReg]   -- floats
@@ -65,7 +73,8 @@ availRegs = (regList VanillaReg useVanillaRegs,
       regList f max = map f [1 .. max]
 
 slot_size :: LocalReg -> Int
-slot_size reg = ((machRepByteWidth (localRegRep reg) - 1) `div` wORD_SIZE) + 1
+slot_size reg =
+    ((machRepByteWidth (localRegRep reg) - 1) `div` wORD_SIZE) + 1
 
 slot_size' :: MachRep -> Int
 slot_size' reg = ((machRepByteWidth reg - 1) `div` wORD_SIZE) + 1

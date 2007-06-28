@@ -157,7 +157,9 @@ cpsProc uniqSupply (CmmProc info ident params blocks) = info_procs
       --
       -- This is an association list instead of a UniqFM because
       -- CLabel's don't have a 'Uniqueable' instance.
-      formats :: [(CLabel, (Maybe CLabel, [Maybe LocalReg]))]
+      formats :: [(CLabel,              -- key
+                   (Maybe CLabel,       -- label in top slot
+                    [Maybe LocalReg]))] -- slots
       formats = selectStackFormat live continuations
 
       -- Do a little meta-processing on the stack formats such as
@@ -203,7 +205,7 @@ cpsProc uniqSupply (CmmProc info ident params blocks) = info_procs
 continuationLabel (Continuation _ l _ _) = l
 data Continuation info =
   Continuation
-     info --(Either C_SRT CmmInfo)   -- Left <=> Continuation created by the CPS
+     info              -- Left <=> Continuation created by the CPS
                        -- Right <=> Function or Proc point
      CLabel            -- Used to generate both info & entry labels
      CmmFormals        -- Argument locals live on entry (C-- procedure params)
@@ -361,7 +363,7 @@ applyStackFormat formats (Continuation (Left srt) label formals blocks) =
       -- TODO prof: this is the same as the current implementation
       -- but I think it could be improved
       prof = ProfilingInfo zeroCLit zeroCLit
-      tag = rET_SMALL -- cmmToRawCmm will convert this to rET_BIG if needed
+      tag = rET_SMALL -- cmmToRawCmm may convert it to rET_BIG
       format = maybe unknown_block id $ lookup label formats
       unknown_block = panic "unknown BlockId in applyStackFormat"
 

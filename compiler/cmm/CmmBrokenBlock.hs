@@ -19,6 +19,11 @@ import Panic
 import Unique
 import UniqFM
 
+-- This module takes a 'CmmBasicBlock' which might have 'CmmCall'
+-- statements in it with 'CmmSafe' set and breaks it up at each such call.
+-- It also collects information about the block for later use
+-- by the CPS algorithm.
+
 -----------------------------------------------------------------------------
 -- Data structures
 -----------------------------------------------------------------------------
@@ -110,6 +115,8 @@ breakBlock uniques (BasicBlock ident stmts) entry =
       breakBlock' uniques current_id entry exits accum_stmts stmts =
           case stmts of
             [] -> panic "block doesn't end in jump, goto, return or switch"
+
+            -- Last statement.  Make the 'BrokenBlock'
             [CmmJump target arguments] ->
                 [BrokenBlock current_id entry accum_stmts
                              exits
@@ -126,6 +133,9 @@ breakBlock uniques (BasicBlock ident stmts) entry =
                 [BrokenBlock current_id entry accum_stmts
                              (mapMaybe id targets ++ exits)
                              (FinalSwitch expr targets)]
+
+            -- These shouldn't happen in the middle of a block.
+            -- They would cause dead code.
             (CmmJump _ _:_) -> panic "jump in middle of block"
             (CmmReturn _:_) -> panic "return in middle of block"
             (CmmBranch _:_) -> panic "branch in middle of block"
@@ -140,6 +150,8 @@ breakBlock uniques (BasicBlock ident stmts) entry =
                 block = do_call current_id entry accum_stmts exits next_id
                                 target results arguments
              -}
+
+            -- Break the block on safe calls (the main job of this function)
             (CmmCall target results arguments (CmmSafe srt):stmts) ->
                 block : rest
                 where
@@ -149,6 +161,9 @@ breakBlock uniques (BasicBlock ident stmts) entry =
                   rest = breakBlock' (tail uniques) next_id
                                      (ContinuationEntry (map fst results) srt)
                                      [] [] stmts
+
+            -- Default case.  Just keep accumulating statements
+            -- and branch targets.
             (s:stmts) ->
                 breakBlock' uniques current_id entry
                             (cond_branch_target s++exits)
