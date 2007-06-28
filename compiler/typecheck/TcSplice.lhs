@@ -501,8 +501,7 @@ lookupThName th_name@(TH.Name occ flavour)
 	    Nothing | not (isSrcRdrName rdr_name)	-- Exact, Orig
 		    -> lookupImportedName rdr_name
 		    | otherwise				-- Unqual, Qual
-		    -> do { 
-				  mb_name <- lookupSrcOcc_maybe rdr_name
+		    -> do { mb_name <- lookupSrcOcc_maybe rdr_name
 			  ; case mb_name of
 			      Just name -> return name
 			      Nothing   -> failWithTc (notInScope th_name) }
