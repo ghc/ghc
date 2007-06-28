@@ -165,11 +165,7 @@ cpsProc uniqSupply (CmmProc info ident params blocks) = info_procs
       -- Do a little meta-processing on the stack formats such as
       -- getting the individual frame sizes and the maximum frame size
       formats' :: (WordOff, [(CLabel, StackFormat)])
-      formats' = processFormats formats
-
-      -- TODO FIXME NOW: calculate a real max stack (including function call args)
-      -- TODO: from the maximum frame size get the maximum stack size.
-      -- The difference is due to the size taken by function calls.
+      formats' = processFormats formats continuations
 
       -- Update the info table data on the continuations with
       -- the selected stack formats.
@@ -310,10 +306,12 @@ selectStackFormat live continuations =
       unknown_block = panic "unknown BlockId in selectStackFormat"
 
 processFormats :: [(CLabel, (Maybe CLabel, [Maybe LocalReg]))]
+               -> [Continuation (Either C_SRT CmmInfo)]
                -> (WordOff, [(CLabel, StackFormat)])
-processFormats formats = (max_size, formats')
+processFormats formats continuations = (max_size, formats')
     where
-      max_size = foldl max 0 (map (stack_frame_size . snd) formats')
+      max_size = maximum $
+                 0 : map (continuationMaxStack formats') continuations
       formats' = map make_format formats
       make_format (label, format) =
           (label,
@@ -334,6 +332,44 @@ processFormats formats = (max_size, formats')
           where
             width = machRepByteWidth (localRegRep reg) `quot` wORD_SIZE
             -- TODO: it would be better if we had a machRepWordWidth
+
+continuationMaxStack :: [(CLabel, StackFormat)]
+                     -> Continuation a
+                     -> WordOff
+continuationMaxStack formats (Continuation _ label _ blocks) =
+    max_arg_size + stack_frame_size stack_format
+    where
+      stack_format = maybe unknown_format id $ lookup label formats
+      unknown_format = panic "Unknown format in continuationMaxStack"
+
+      max_arg_size = maximum $ 0 : map block_max_arg_size blocks
+
+      block_max_arg_size block =
+          maximum (final_arg_size (brokenBlockExit block) :
+                   map stmt_arg_size (brokenBlockStmts block))
+
+      final_arg_size (FinalReturn args) =
+          argumentsSize (cmmExprRep . fst) args
+      final_arg_size (FinalJump _ args) =
+          argumentsSize (cmmExprRep . fst) args
+      final_arg_size (FinalCall next _ _ args) =
+          -- We have to account for the stack used when we build a frame
+          -- for the *next* continuation from *this* continuation
+          argumentsSize (cmmExprRep . fst) args +
+          stack_frame_size next_format
+          where 
+            next_format = maybe unknown_format id $ lookup next' formats
+            next' = mkReturnPtLabel $ getUnique next
+
+      final_arg_size _ = 0
+
+      stmt_arg_size (CmmJump _ args) =
+          argumentsSize (cmmExprRep . fst) args
+      stmt_arg_size (CmmCall _ _ _ (CmmSafe _)) =
+          panic "Safe call in processFormats"
+      stmt_arg_size (CmmReturn _) =
+          panic "CmmReturn in processFormats"
+      stmt_arg_size _ = 0
 
 -----------------------------------------------------------------------------
 applyStackFormat :: [(CLabel, StackFormat)]

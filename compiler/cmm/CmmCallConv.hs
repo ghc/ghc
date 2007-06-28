@@ -2,6 +2,7 @@ module CmmCallConv (
   ParamLocation(..),
   ArgumentFormat,
   assignArguments,
+  argumentsSize,
 ) where
 
 #include "HsVersions.h"
