@@ -694,9 +694,13 @@ pprGloblDecl lbl
 
 pprTypeAndSizeDecl :: CLabel -> Doc
 pprTypeAndSizeDecl lbl
+#if mingw32_TARGET_OS
+  = empty
+#else
   | not (externallyVisibleCLabel lbl) = empty
   | otherwise = ptext SLIT(".type ") <>
 		pprCLabel_asm lbl <> ptext SLIT(", @object")
+#endif
 
 pprLabel :: CLabel -> Doc
 pprLabel lbl = pprGloblDecl lbl $$ pprTypeAndSizeDecl lbl $$ (pprCLabel_asm lbl <> char ':')
