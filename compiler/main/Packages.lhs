@@ -588,26 +588,17 @@ getPackageLinkOpts dflags pkgs = do
   let tag = buildTag dflags
       rts_tag = rtsBuildTag dflags
   let 
-	imp        = if opt_Static then "" else "_dyn"
-      	libs p     = map ((++imp) . addSuffix) (hsLibraries p)
-      	                 ++ hACK_dyn (extraLibraries p)
+	mkDynName | opt_Static = id
+		  | otherwise = (++ ("-ghc" ++ cProjectVersion))
+      	libs p     = map (mkDynName . addSuffix) (hsLibraries p)
+      	                 ++ extraLibraries p
 	all_opts p = map ("-l" ++) (libs p) ++ ldOptions p
 
-	suffix     = if null tag then "" else  '_':tag
-	rts_suffix = if null rts_tag then "" else  '_':rts_tag
+        addSuffix rts@"HSrts"    = rts       ++ (expandTag rts_tag)
+        addSuffix other_lib      = other_lib ++ (expandTag tag)
 
-        addSuffix rts@"HSrts"    = rts       ++ rts_suffix
-        addSuffix other_lib      = other_lib ++ suffix
-
-        -- This is a hack that's even more horrible (and hopefully more temporary)
-        -- than the one below [referring to previous splittage of HSbase into chunks
-	-- to work around GNU ld bug]. HSbase_cbits and friends require the _dyn suffix
-        -- for dynamic linking, but not _p or other 'way' suffix. So we just add
-        -- _dyn to extraLibraries if they already have a _cbits suffix.
-        
-        hACK_dyn = map hack
-          where hack lib | not opt_Static && "_cbits" `isSuffixOf` lib = lib ++ "_dyn"
-                         | otherwise = lib
+        expandTag t | null t = ""
+		    | otherwise = '_':t
 
   return (concat (map all_opts ps))
 
