@@ -857,8 +857,8 @@ pprDynamicLinkerAsmLabel GotSymbolPtr lbl
   = pprCLabel lbl <> text "@gotpcrel"
 pprDynamicLinkerAsmLabel GotSymbolOffset lbl
   = pprCLabel lbl
-pprDynamicLinkerAsmLabel _ _
-  = panic "pprDynamicLinkerAsmLabel"
+pprDynamicLinkerAsmLabel SymbolPtr lbl
+  = text ".LC_" <> pprCLabel lbl
 #elif linux_TARGET_OS
 pprDynamicLinkerAsmLabel CodeStub lbl
   = pprCLabel lbl <> text "@plt"
