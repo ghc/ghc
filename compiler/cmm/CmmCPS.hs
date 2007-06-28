@@ -79,7 +79,7 @@ make_gc_block block_id fun_label formals safety = BasicBlock block_id stmts
       actuals = map (\x -> (CmmReg (CmmLocal x), NoHint)) formals
       fun_expr = CmmLit (CmmLabel fun_label)
 
-force_gc_block old_info block_id fun_label formals blocks =
+force_gc_block old_info block_id fun_label formals =
     case old_info of
       CmmNonInfo (Just _) -> (old_info, [])
       CmmInfo _ (Just _) _ _ -> (old_info, [])
@@ -114,7 +114,7 @@ cpsProc uniqSupply (CmmProc info ident params blocks) = info_procs
 
       -- Ensure that 
       forced_gc :: (CmmInfo, [CmmBasicBlock])
-      forced_gc = force_gc_block info (BlockId gc_unique) ident params blocks
+      forced_gc = force_gc_block info (BlockId gc_unique) ident params
 
       forced_info = fst forced_gc
       forced_blocks = blocks ++ snd forced_gc
