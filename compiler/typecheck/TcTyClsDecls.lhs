@@ -267,8 +267,13 @@ tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
        ; t_typats <- mappM tcHsKindedType k_typats
        ; t_rhs    <- tcHsKindedType k_rhs
 
-       ; -- (3) check that the right-hand side is a tau type
-       ; unless (isTauTy t_rhs) $
+         -- (3) check that 
+         --     - left-hand side contains no type family applications
+         --       (vanilla synonyms are fine, though)
+       ; mappM_ checkTyFamFreeness t_typats
+
+         --     - the right-hand side is a tau type
+       ; unless (isTauTy t_rhs) $ 
 	   addErr (polyTyErr t_rhs)
 
          -- (4) construct representation tycon
@@ -299,17 +304,23 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
        ; tcTyVarBndrs k_tvs $ \t_tvs -> do {  -- turn kinded into proper tyvars
        ; unbox_strict <- doptM Opt_UnboxStrictFields
 
-	 -- Check that we don't use GADT syntax for indexed types
-       ; checkTc h98_syntax (badGadtIdxTyDecl tc_name)
-
-	 -- Check that a newtype has exactly one constructor
-       ; checkTc (new_or_data == DataType || isSingleton k_cons) $
-	   newtypeConError tc_name (length k_cons)
-
+         -- kind check the type indexes and the context
        ; t_typats     <- mappM tcHsKindedType k_typats
        ; stupid_theta <- tcHsKindedContext k_ctxt
 
-         -- (3) construct representation tycon
+         -- (3) Check that
+         --     - left-hand side contains no type family applications
+         --       (vanilla synonyms are fine, though)
+       ; mappM_ checkTyFamFreeness t_typats
+
+	 --     - we don't use GADT syntax for indexed types
+       ; checkTc h98_syntax (badGadtIdxTyDecl tc_name)
+
+	 --     - a newtype has exactly one constructor
+       ; checkTc (new_or_data == DataType || isSingleton k_cons) $
+	   newtypeConError tc_name (length k_cons)
+
+         -- (4) construct representation tycon
        ; rep_tc_name <- newFamInstTyConName tc_name loc
        ; tycon <- fixM (\ tycon -> do 
 	     { data_cons <- mappM (addLocM (tcConDecl unbox_strict tycon t_tvs))
@@ -335,6 +346,27 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 	 h98_syntax = case cons of 	-- All constructors have same shape
 			L _ (ConDecl { con_res = ResTyGADT _ }) : _ -> False
 			other -> True
+
+-- Check that a type index does not contain any type family applications
+--
+-- * Earlier phases have already checked that there are no foralls in the
+--   type; we also cannot have PredTys and NoteTys are being skipped by using
+--   the core view. 
+--
+checkTyFamFreeness :: Type -> TcM ()
+checkTyFamFreeness ty | Just (tycon, tys) <- splitTyConApp_maybe ty
+                      = if isSynTyCon tycon 
+                        then addErr $ tyFamAppInIndexErr ty
+                        else mappM_ checkTyFamFreeness tys
+                          -- splitTyConApp_maybe uses the core view; hence,
+                          -- any synonym tycon must be a family tycon
+
+                      | Just (ty1, ty2) <- splitAppTy_maybe ty
+                      = checkTyFamFreeness ty1 >> checkTyFamFreeness ty2
+
+                      | otherwise          -- only vars remaining
+                      = return ()
+
 
 -- Kind checking of indexed types
 -- -
@@ -1209,6 +1241,11 @@ wrongKindOfFamily family =
 
 polyTyErr ty 
   = hang (ptext SLIT("Illegal polymorphic type in type instance") <> colon) 4 $
+      ppr ty
+
+tyFamAppInIndexErr ty
+  = hang (ptext SLIT("Illegal type family application in type instance") <> 
+         colon) 4 $
       ppr ty
 
 emptyConDeclsErr tycon
