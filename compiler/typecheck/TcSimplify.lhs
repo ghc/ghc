@@ -2716,11 +2716,11 @@ report_no_instances tidy_env mb_what insts
 	    (clas,tys) = getDictClassTys wanted
 
     mk_overlap_msg dict (matches, unifiers)
-      = vcat [	addInstLoc [dict] ((ptext SLIT("Overlapping instances for") 
+      = ASSERT( not (null matches) )
+        vcat [	addInstLoc [dict] ((ptext SLIT("Overlapping instances for") 
 					<+> pprPred (dictPred dict))),
     		sep [ptext SLIT("Matching instances") <> colon,
     		     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])],
-		ASSERT( not (null matches) )
 		if not (isSingleton matches)
     		then 	-- Two or more matches
 		     empty
@@ -2728,7 +2728,8 @@ report_no_instances tidy_env mb_what insts
 		ASSERT( not (null unifiers) )
 		parens (vcat [ptext SLIT("The choice depends on the instantiation of") <+>
 	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfInst dict))),
-			      ptext SLIT("Use -fallow-incoherent-instances to use the first choice above")])]
+			      ptext SLIT("To pick the first instance above, use -fallow-incoherent-instances"),
+			      ptext SLIT("when compiling the other instances")])]
       where
     	ispecs = [ispec | (ispec, _) <- matches]
 
