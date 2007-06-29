@@ -277,7 +277,7 @@ indexed synonyms and we don't want to slow that down by needless unification.
 
 \begin{code}
 lookupFamInstEnvUnify :: (FamInstEnv, FamInstEnv) -> TyCon -> [Type]
-	              -> [(FamInstMatch)]
+	              -> [(FamInstMatch, TvSubst)]
 lookupFamInstEnvUnify (pkg_ie, home_ie) fam tys
   | not (isOpenTyCon fam) 
   = []
@@ -318,7 +318,7 @@ lookupFamInstEnvUnify (pkg_ie, home_ie) fam tys
         case tcUnifyTys bind_fn tpl_tys tys of
 	    Just subst -> let rep_tys = substTyVars subst (tyConTyVars tycon)
                           in
-                          (item, rep_tys) : find rest
+                          ((item, rep_tys), subst) : find rest
 	    Nothing    -> find rest
 
 -- See explanation at @InstEnv.bind_fn@.

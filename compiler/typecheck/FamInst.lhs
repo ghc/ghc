@@ -180,19 +180,27 @@ checkForConflicts inst_envs famInst
 
        ; let { matches   = lookupFamInstEnvUnify inst_envs fam tys'
 	     ; conflicts = [ conflictingFamInst
-			   | match@(conflictingFamInst, _) <- matches
-			   , conflicting fam tys' tycon match 
+			   | match@((conflictingFamInst, _), _) <- matches
+			   , conflicting tycon match 
 			   ]
 	     }
        ; unless (null conflicts) $
 	   conflictInstErr famInst (head conflicts)
        }
   where
-    -- In the case of data/newtype instances, any overlap is a conflict (as
-    -- these instances imply injective type mappings).
-    conflicting _   _    tycon _                 | isAlgTyCon tycon = True
-    conflicting fam tys' tycon (subst, cFamInst) | otherwise	  =
-      panic "FamInst.checkForConflicts: overlap check for indexed synonyms is still missing"
+      -- * In the case of data family instances, any overlap is fundamentally a 
+      --   conflict (as these instances imply injective type mappings).
+      -- * In the case of type family instances, overlap is admitted as long as 
+      --   the right-hand sides of the overlapping rules coincide under the
+      --   overlap substitution.  We require that they are syntactically equal;
+      --   anything else would be difficult to test for at this stage.
+    conflicting tycon1 ((famInst2, _), subst) 
+      | isAlgTyCon tycon1 = True
+      | otherwise         = not (rhs1 `tcEqType` rhs2)
+      where
+        tycon2 = famInstTyCon famInst2
+        rhs1   = substTy subst $ synTyConType tycon1
+        rhs2   = substTy subst $ synTyConType tycon2
 
 conflictInstErr famInst conflictingFamInst
   = addFamInstLoc famInst $
