@@ -104,6 +104,7 @@ basicKnownKeyNames :: [Name]
 basicKnownKeyNames
  = genericTyConNames
  ++ typeableClassNames
+ ++ ndpNames
  ++ [	-- Type constructors (synonyms especially)
 	ioTyConName, ioDataConName,
 	runMainIOName,
@@ -214,6 +215,13 @@ basicKnownKeyNames
 
 genericTyConNames :: [Name]
 genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
+
+ndpNames :: [Name]
+ndpNames = [ parrayTyConName, paTyConName, closureTyConName
+           , mkClosureName, applyClosureName
+           , mkClosurePName, applyClosurePName
+           , closurePAName
+           , lengthPAName, replicatePAName ]
 \end{code}
 
 
@@ -265,6 +273,8 @@ aRROW		= mkBaseModule FSLIT("Control.Arrow")
 rANDOM		= mkBaseModule FSLIT("System.Random")
 gLA_EXTS	= mkBaseModule FSLIT("GHC.Exts")
 
+nDP_LIFTED      = mkNDPModule FSLIT("Data.Array.Parallel.Lifted")
+
 mAIN	        = mkMainModule_ mAIN_NAME
 rOOT_MAIN	= mkMainModule FSLIT(":Main") -- Root module for initialisation 
 
@@ -283,6 +293,12 @@ mkBaseModule m = mkModule basePackageId (mkModuleNameFS m)
 
 mkBaseModule_ :: ModuleName -> Module
 mkBaseModule_ m = mkModule basePackageId m
+
+mkNDPModule :: FastString -> Module
+mkNDPModule m = mkModule ndpPackageId (mkModuleNameFS m)
+
+mkNDPModule_ :: ModuleName -> Module
+mkNDPModule_ m = mkModule ndpPackageId m
 
 mkMainModule :: FastString -> Module
 mkMainModule m = mkModule mainPackageId (mkModuleNameFS m)
@@ -670,6 +686,18 @@ marshalObjectName   = varQual  dOTNET FSLIT("marshalObject") marshalObjectIdKey
 marshalStringName   = varQual  dOTNET FSLIT("marshalString") marshalStringIdKey
 unmarshalStringName = varQual  dOTNET FSLIT("unmarshalString") unmarshalStringIdKey
 checkDotnetResName  = varQual  dOTNET FSLIT("checkResult")     checkDotnetResNameIdKey
+
+-- NDP stuff
+parrayTyConName     = tcQual   nDP_LIFTED FSLIT("PArray") parrayTyConKey
+paTyConName         = tcQual   nDP_LIFTED FSLIT("PA")     paTyConKey
+closureTyConName    = tcQual   nDP_LIFTED FSLIT(":->")    closureTyConKey
+mkClosureName       = varQual  nDP_LIFTED FSLIT("mkClosure")  mkClosureIdKey
+applyClosureName    = varQual  nDP_LIFTED FSLIT("$:")         applyClosureIdKey
+mkClosurePName      = varQual  nDP_LIFTED FSLIT("mkClosureP") mkClosurePIdKey
+applyClosurePName   = varQual  nDP_LIFTED FSLIT("$:^")        applyClosurePIdKey
+closurePAName       = varQual  nDP_LIFTED FSLIT("closurePA")  closurePAIdKey
+lengthPAName        = varQual  nDP_LIFTED FSLIT("lengthP")    lengthPAIdKey
+replicatePAName     = varQual  nDP_LIFTED FSLIT("replicateP") replicatePAIdKey
 \end{code}
 
 %************************************************************************
@@ -848,6 +876,10 @@ unknown3TyConKey			= mkPreludeTyConUnique 132
 opaqueTyConKey                          = mkPreludeTyConUnique 133
 
 stringTyConKey				= mkPreludeTyConUnique 134
+
+parrayTyConKey                          = mkPreludeTyConUnique 135
+paTyConKey                              = mkPreludeTyConUnique 136
+closureTyConKey                         = mkPreludeTyConUnique 137
 
 
 ---------------- Template Haskell -------------------
@@ -1028,6 +1060,15 @@ choiceAIdKey	= mkPreludeMiscIdUnique 123 --  |||
 loopAIdKey	= mkPreludeMiscIdUnique 124
 
 fromStringClassOpKey	      = mkPreludeMiscIdUnique 125
+
+-- Flattened parallel array functions
+mkClosureIdKey                = mkPreludeMiscIdUnique 126
+applyClosureIdKey             = mkPreludeMiscIdUnique 127
+mkClosurePIdKey               = mkPreludeMiscIdUnique 128
+applyClosurePIdKey            = mkPreludeMiscIdUnique 129
+closurePAIdKey                = mkPreludeMiscIdUnique 130
+lengthPAIdKey                 = mkPreludeMiscIdUnique 131
+replicatePAIdKey              = mkPreludeMiscIdUnique 132
 
 ---------------- Template Haskell -------------------
 --	USES IdUniques 200-399
