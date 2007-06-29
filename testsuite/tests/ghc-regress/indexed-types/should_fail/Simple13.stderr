@@ -1,0 +1,6 @@
+
+Simple13.hs:9:0:
+    Illegal type family application in type instance: C a
+
+Simple13.hs:13:0:
+    Illegal type family application in type instance: C a
