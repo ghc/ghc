@@ -3,3 +3,8 @@ Simple11b.hs:7:14:
     Conflicting family instance declarations:
       data instance C9 [a] Int -- Defined at Simple11b.hs:7:14-15
       data instance C9 [a] Int -- Defined at Simple11b.hs:9:14-15
+
+Simple11b.hs:13:14:
+    Conflicting family instance declarations:
+      type instance D9 [a] Int -- Defined at Simple11b.hs:13:14-15
+      type instance D9 [a] Int -- Defined at Simple11b.hs:15:14-15
