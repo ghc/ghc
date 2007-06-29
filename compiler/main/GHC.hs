@@ -762,7 +762,8 @@ data CheckedModule =
   CheckedModule { parsedSource      :: ParsedSource,
 		  renamedSource     :: Maybe RenamedSource,
 		  typecheckedSource :: Maybe TypecheckedSource,
-		  checkedModuleInfo :: Maybe ModuleInfo
+		  checkedModuleInfo :: Maybe ModuleInfo,
+                  coreBinds         :: Maybe [CoreBind]
 	        }
 	-- ToDo: improvements that could be made here:
 	--  if the module succeeded renaming but not typechecking,
@@ -789,32 +790,33 @@ type TypecheckedSource = LHsBinds Id
 
 
 -- | This is the way to get access to parsed and typechecked source code
--- for a module.  'checkModule' loads all the dependencies of the specified
--- module in the Session, and then attempts to typecheck the module.  If
+-- for a module.  'checkModule' attempts to typecheck the module.  If
 -- successful, it returns the abstract syntax for the module.
-checkModule :: Session -> ModuleName -> IO (Maybe CheckedModule)
-checkModule session@(Session ref) mod = do
-	-- load up the dependencies first
-   r <- load session (LoadDependenciesOf mod)
-   if (failed r) then return Nothing else do
-
-	-- now parse & typecheck the module
+-- If compileToCore is true, it also desugars the module and returns the 
+-- resulting Core bindings as a component of the CheckedModule.
+checkModule :: Session -> ModuleName -> Bool -> IO (Maybe CheckedModule)
+checkModule session@(Session ref) mod compileToCore = do
+	-- parse & typecheck the module
    hsc_env <- readIORef ref   
    let mg  = hsc_mod_graph hsc_env
    case [ ms | ms <- mg, ms_mod_name ms == mod ] of
 	[] -> return Nothing
 	(ms:_) -> do 
-	   mbChecked <- hscFileCheck hsc_env{hsc_dflags=ms_hspp_opts ms} ms
+	   mbChecked <- hscFileCheck 
+                          hsc_env{hsc_dflags=ms_hspp_opts ms} 
+                          ms compileToCore
 	   case mbChecked of
              Nothing -> return Nothing
-             Just (HscChecked parsed renamed Nothing) ->
+             Just (HscChecked parsed renamed Nothing _) ->
 		   return (Just (CheckedModule {
 					parsedSource = parsed,
 					renamedSource = renamed,
 					typecheckedSource = Nothing,
-					checkedModuleInfo = Nothing }))
+					checkedModuleInfo = Nothing,
+                                        coreBinds = Nothing }))
              Just (HscChecked parsed renamed
-			   (Just (tc_binds, rdr_env, details))) -> do
+			   (Just (tc_binds, rdr_env, details))
+                           maybeCoreBinds) -> do
 		   let minf = ModuleInfo {
 				minf_type_env  = md_types details,
 				minf_exports   = availsToNameSet $
@@ -829,41 +831,34 @@ checkModule session@(Session ref) mod = do
 					parsedSource = parsed,
 					renamedSource = renamed,
 					typecheckedSource = Just tc_binds,
-					checkedModuleInfo = Just minf }))
+					checkedModuleInfo = Just minf,
+                                        coreBinds = maybeCoreBinds}))
 
 -- | This is the way to get access to the Core bindings corresponding
--- to a module. 'compileToCore' first invokes 'checkModule' to parse and
--- typecheck the module, then desugars it and returns the resulting list
--- of Core bindings if successful. It is assumed that the given filename
--- has already been loaded.
+-- to a module. 'compileToCore' invokes 'checkModule' to parse, typecheck, and
+-- desugar the module, then returns the resulting list of Core bindings if 
+-- successful. 
 compileToCore :: Session -> FilePath -> IO (Maybe [CoreBind])
 compileToCore session@(Session ref) fn = do
    hsc_env <- readIORef ref
-   -- First, determine the module name.
-   modSummary <- summariseFile hsc_env [] fn Nothing Nothing
-   let mod = moduleName $ ms_mod modSummary
-   -- Next, parse and typecheck the module
-   maybeCheckedModule <- checkModule session mod
-   case maybeCheckedModule of
-     Nothing -> return Nothing 
-     Just checkedMod -> do
-       let parsedMod = parsedSource checkedMod
-       -- Note: this typechecks the module twice (because checkModule
-       -- also calls tcRnModule), but arranging for checkModule to
-       -- return the type env would require changing a lot of data
-       -- structures, so I'm leaving it like that for now.
-       (_, maybe_tc_result) <- tcRnModule hsc_env HsSrcFile False parsedMod
-       -- Get the type environment from the typechecking result
-       case maybe_tc_result of
-       -- TODO: this ignores the type error messages and just returns Nothing
-         Nothing -> return Nothing
-         Just tcgEnv -> do
-           let dflags = hsc_dflags hsc_env 
-           -- Finally, compile to Core and return the resulting bindings
-           maybeModGuts <- deSugar hsc_env (ms_location modSummary) tcgEnv
-           case maybeModGuts of
-             Nothing -> return Nothing
-             Just mg -> return $ Just $ mg_binds mg
+   -- First, set the target to the desired filename
+   target <- guessTarget fn Nothing
+   addTarget session target
+   load session LoadAllTargets
+   -- Then find dependencies
+   maybeModGraph <- depanal session [] True
+   case maybeModGraph of
+     Nothing -> return Nothing
+     Just modGraph -> do
+       case find ((== fn) . msHsFilePath) modGraph of
+         Just modSummary -> do 
+           -- Now we have the module name;
+           -- parse, typecheck and desugar the module
+           let mod = ms_mod_name modSummary
+           maybeCheckedModule <- checkModule session mod True
+           case maybeCheckedModule of
+             Nothing -> return Nothing 
+             Just checkedMod -> return $ coreBinds checkedMod
  -- ---------------------------------------------------------------------------
 -- Unloading
 

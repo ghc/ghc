@@ -865,7 +865,7 @@ checkModule :: String -> GHCi ()
 checkModule m = do
   let modl = GHC.mkModuleName m
   session <- getSession
-  result <- io (GHC.checkModule session modl)
+  result <- io (GHC.checkModule session modl False)
   case result of
     Nothing -> io $ putStrLn "Nothing"
     Just r  -> io $ putStrLn (showSDoc (

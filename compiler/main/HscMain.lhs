@@ -51,6 +51,7 @@ import Module		( emptyModuleEnv, ModLocation(..) )
 import RdrName		( GlobalRdrEnv, RdrName, emptyGlobalRdrEnv )
 import HsSyn		( HsModule, LHsBinds, HsGroup, LIE, LImportDecl, HsDoc,
                           HaddockModInfo )
+import CoreSyn
 import SrcLoc		( Located(..) )
 import StringBuffer	( hGetStringBuffer, stringToStringBuffer )
 import Parser
@@ -183,7 +184,8 @@ data HscChecked
                 Maybe (HsDoc Name), HaddockModInfo Name))
         -- typechecked
         (Maybe (LHsBinds Id, GlobalRdrEnv, ModDetails))
-
+        -- desugared
+        (Maybe [CoreBind])
 
 -- Status of a compilation to hard-code or nothing.
 data HscStatus
@@ -646,8 +648,8 @@ hscInteractive (iface, details, cgguts)
 
 ------------------------------
 
-hscFileCheck :: HscEnv -> ModSummary -> IO (Maybe HscChecked)
-hscFileCheck hsc_env mod_summary = do {
+hscFileCheck :: HscEnv -> ModSummary -> Bool -> IO (Maybe HscChecked)
+hscFileCheck hsc_env mod_summary compileToCore = do {
  	    -------------------
  	    -- PARSE
  	    -------------------
@@ -673,7 +675,7 @@ hscFileCheck hsc_env mod_summary = do {
 
 	; printErrorsAndWarnings dflags tc_msgs
 	; case maybe_tc_result of {
-      	     Nothing -> return (Just (HscChecked rdr_module Nothing Nothing));
+      	     Nothing -> return (Just (HscChecked rdr_module Nothing Nothing Nothing));
       	     Just tc_result -> do
 		let type_env = tcg_type_env tc_result
 		    md = ModDetails { 
@@ -696,11 +698,17 @@ hscFileCheck hsc_env mod_summary = do {
 			        let doc = tcg_doc tc_result
 				    hmi = tcg_hmi tc_result
                                 return (decl,imports,exports,doc,hmi)
-		return (Just (HscChecked rdr_module 
+		maybeModGuts <- 
+                 if compileToCore then
+                   deSugar hsc_env (ms_location mod_summary) tc_result
+                 else
+                   return Nothing
+                return (Just (HscChecked rdr_module 
                                    rnInfo
 				   (Just (tcg_binds tc_result,
 					  tcg_rdr_env tc_result,
-					  md))))
+					  md))
+                                   (fmap mg_binds maybeModGuts)))
 	}}}}
 
 
