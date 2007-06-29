@@ -373,7 +373,8 @@ findWiredInPackages dflags pkgs preload this_package = do
 	wired_in_pkgids = [ basePackageId,
 			    rtsPackageId,
 			    haskell98PackageId,
-			    thPackageId ]
+			    thPackageId,
+                            ndpPackageId ]
 
 	wired_in_names = map packageIdString wired_in_pkgids
 

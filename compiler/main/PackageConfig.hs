@@ -20,6 +20,7 @@ module PackageConfig (
 	rtsPackageId,
 	haskell98PackageId,
 	thPackageId,
+        ndpPackageId,
 	mainPackageId
   ) where
 
@@ -105,6 +106,7 @@ basePackageId      = fsToPackageId FSLIT("base")
 rtsPackageId	   = fsToPackageId FSLIT("rts")
 haskell98PackageId = fsToPackageId FSLIT("haskell98")
 thPackageId        = fsToPackageId FSLIT("template-haskell")
+ndpPackageId       = fsToPackageId FSLIT("ndp")
 
 -- This is the package Id for the program.  It is the default package
 -- Id if you don't specify a package name.  We don't add this prefix
