@@ -1617,16 +1617,23 @@ ppr_extra env (TyConApp tc1 _) (TyConApp tc2 _)
     --	   Could not match 'T' does not match 'M.T'
     -- which is not helpful
     do	{ this_mod <- getModule
-	; return (env, quotes (ppr tc1) <+> ptext SLIT("is defined in") <+> mk_mod this_mod) }
+	; return (env, quotes (ppr tc1) <+> ptext SLIT("is defined") <+> mk_mod this_mod) }
   where
-    tc_mod = nameModule (getName tc1)
-    tc_pkg = modulePackageId tc_mod
+    tc_mod  = nameModule (getName tc1)
+    tc_pkg  = modulePackageId tc_mod
+    tc2_pkg = modulePackageId (nameModule (getName tc2))
     mk_mod this_mod 
-	| tc_mod == this_mod = ptext SLIT("this module")
-	| otherwise = ptext SLIT("module") <+> quotes (ppr tc_mod) <+> mk_pkg this_mod
-    mk_pkg this_mod
-	| tc_pkg == modulePackageId this_mod = empty
-	| otherwise = ptext SLIT("from package") <+> quotes (ppr tc_pkg)
+	| tc_mod == this_mod = ptext SLIT("in this module")
+
+	| not home_pkg && tc2_pkg /= tc_pkg = pp_pkg
+		-- Suppress the module name if (a) it's from another package
+		--			       (b) other_ty isn't from that same package
+
+	| otherwise = ptext SLIT("in module") <+> quotes (ppr tc_mod) <+> pp_pkg
+	where
+	  home_pkg = tc_pkg == modulePackageId this_mod
+	  pp_pkg | home_pkg  = empty
+		 | otherwise = ptext SLIT("in package") <+> quotes (ppr tc_pkg)
 
 ppr_extra env ty other_ty = return (env, empty)		-- Normal case
 
