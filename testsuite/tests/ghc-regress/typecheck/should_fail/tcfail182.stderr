@@ -1,0 +1,8 @@
+
+tcfail182.hs:9:2:
+    Couldn't match expected type `Prelude.Maybe a'
+	   against inferred type `Maybe a1'
+      `Prelude.Maybe' is defined in module `Data.Maybe' from package `base'
+      `Maybe' is defined in this module
+    In the pattern: Foo
+    In the definition of `f': f Foo = 3
