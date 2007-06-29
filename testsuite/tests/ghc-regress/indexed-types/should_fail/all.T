@@ -18,6 +18,7 @@ test('Simple11a', normal, compile_fail, [''])
 test('Simple11b', normal, compile_fail, [''])
 test('Simple11c', normal, compile_fail, [''])
 test('Simple11d', normal, compile_fail, [''])
-test('Over', normal, multimod_compile_fail, ['OverD', '-no-hs-main -no-link'])
+test('Simple12', normal, compile_fail, [''])
 
+test('Over', normal, multimod_compile_fail, ['OverD', '-no-hs-main -no-link'])
 clean(['OverA.hi', 'OverA.o', 'OverB.hi', 'OverB.o', 'OverC.hi', 'OverC.o'])

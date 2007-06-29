@@ -1,0 +1,3 @@
+
+Simple12.hs:6:0:
+    Illegal polymorphic type in type instance: forall a. [a]
