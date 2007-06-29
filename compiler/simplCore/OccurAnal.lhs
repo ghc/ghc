@@ -332,9 +332,12 @@ reOrderCycle bndrs (bind : binds)
 	-- which comes up when C is a dictionary constructor and
 	-- f is a default method.  
 	-- Example: the instance for Show (ST s a) in GHC.ST
+	--
+	-- However we *also* treat (\x. C p q) as a con-app-like thing, 
+	-- 	Note [Closure conversion]
     is_con_app (Var v)    = isDataConWorkId v
     is_con_app (App f _)  = is_con_app f
-    is_con_app (Lam b e) | isTyVar b = is_con_app e
+    is_con_app (Lam b e)  = is_con_app e
     is_con_app (Note _ e) = is_con_app e
     is_con_app other      = False
 
@@ -348,6 +351,29 @@ makeLoopBreaker bndrs rhs_usg bndr
   where
     rules_only = bndrs `intersectsUFM` rhs_usg
 \end{code}
+
+Note [Closure conversion]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+We treat (\x. C p q) as a high-score candidate in the letrec scoring algorithm.
+The immediate motivation came from the result of a closure-conversion transformation
+which generated code like this:
+
+    data Clo a b = forall c. Clo (c -> a -> b) c
+
+    ($:) :: Clo a b -> a -> b
+    Clo f env $: x = f env x
+
+    rec { plus = Clo plus1 ()
+
+        ; plus1 _ n = Clo plus2 n
+
+	; plus2 Zero     n = n
+	; plus2 (Succ m) n = Succ (plus $: m $: n) }
+
+If we inline 'plus' and 'plus1', everything unravels nicely.  But if
+we choose 'plus1' as the loop breaker (which is entirely possible
+otherwise), the loop does not unravel nicely.
+
 
 @occAnalRhs@ deals with the question of bindings where the Id is marked
 by an INLINE pragma.  For these we record that anything which occurs
