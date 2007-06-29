@@ -11,9 +11,8 @@ import Trace.Hpc.Util
 import HpcFlags
 
 import Control.Monad
-import qualified Data.Map as Map
-import qualified Data.Set as Set
-
+import qualified HpcSet as Set
+import qualified HpcMap as Map
 import System.Environment
 
 ------------------------------------------------------------------------------

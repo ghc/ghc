@@ -6,7 +6,7 @@ INSTALL_PROGS  += $(HS_PROG)
 HPC_LIB         = $(TOP)/libraries/hpc
 
 include $(GHC_COMPAT_DIR)/compat.mk
-SRC_HC_OPTS += $(PACKAGE_HPC)
+SRC_HC_OPTS += $(PACKAGE_HPC) -cpp 
 
 binary-dist:
 	$(INSTALL_DIR)                $(BIN_DIST_DIR)/utils/hpc

@@ -4,7 +4,7 @@ module HpcFlags where
 
 import System.Console.GetOpt
 import Data.Maybe ( fromMaybe )
-import qualified Data.Set as Set
+import qualified HpcSet as Set
 import Data.Char
 import Trace.Hpc.Tix
 

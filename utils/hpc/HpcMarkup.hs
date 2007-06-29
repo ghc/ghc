@@ -16,14 +16,16 @@ import System.Directory
 import Data.List
 import Data.Maybe(fromJust)
 import Data.Array
-import qualified Data.Set as Set
+import qualified HpcSet as Set
 
 ------------------------------------------------------------------------------
 
 markup_options = 
   [ excludeOpt,includeOpt,hpcDirOpt,hsDirOpt,funTotalsOpt
   , altHighlightOpt
+#if __GLASGOW_HASKELL__ >= 604 
   , destDirOpt
+#endif
   ]
        	 
 markup_plugin = Plugin { name = "markup"
@@ -56,8 +58,10 @@ markup_main flags (prog:modNames) = do
     Nothing -> error $ "unable to find tix file for: " ++ prog
     Just a -> return a
 
+#if __GLASGOW_HASKELL__ >= 604 
   -- create the dest_dir if needed
   createDirectoryIfMissing True dest_dir
+#endif
 
   mods <-
      sequence [ genHtmlFromMod dest_dir hpcDirs tix theFunTotals theHsPath invertOutput

@@ -13,7 +13,7 @@ import HpcFlags
 import Trace.Hpc.Mix
 import Trace.Hpc.Tix
 import Control.Monad hiding (guard)
-import qualified Data.Set as Set
+import qualified HpcSet as Set
 
 notExpecting :: String -> a
 notExpecting s = error ("not expecting "++s)
