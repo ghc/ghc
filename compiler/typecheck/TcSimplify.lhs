@@ -132,14 +132,9 @@ from.
 The Right Thing is to improve whenever the constraint set changes at
 all.  Not hard in principle, but it'll take a bit of fiddling to do.  
 
-
-
-	--------------------------------------
-		Notes on quantification
-	--------------------------------------
-
-Suppose we are about to do a generalisation step.
-We have in our hand
+Note [Choosing which variables to quantify]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we are about to do a generalisation step.  We have in our hand
 
 	G	the environment
 	T	the type of the RHS
@@ -162,11 +157,12 @@ Here are the things that *must* be true:
  (A)	Q intersect fv(G) = EMPTY			limits how big Q can be
  (B)	Q superset fv(Cq union T) \ oclose(fv(G),C)	limits how small Q can be
 
-(A) says we can't quantify over a variable that's free in the
-environment.  (B) says we must quantify over all the truly free
-variables in T, else we won't get a sufficiently general type.  We do
-not *need* to quantify over any variable that is fixed by the free
-vars of the environment G.
+ (A) says we can't quantify over a variable that's free in the environment. 
+ (B) says we must quantify over all the truly free variables in T, else 
+     we won't get a sufficiently general type.  
+
+We do not *need* to quantify over any variable that is fixed by the
+free vars of the environment G.
 
 	BETWEEN THESE TWO BOUNDS, ANY Q WILL DO!
 
@@ -180,38 +176,15 @@ Example:	class H x y | x->y where ...
 
 	So Q can be {c,d}, {b,c,d}
 
+In particular, it's perfectly OK to quantify over more type variables
+than strictly necessary; there is no need to quantify over 'b', since
+it is determined by 'a' which is free in the envt, but it's perfectly
+OK to do so.  However we must not quantify over 'a' itself.
+
 Other things being equal, however, we'd like to quantify over as few
 variables as possible: smaller types, fewer type applications, more
-constraints can get into Ct instead of Cq.
-
-
------------------------------------------
-We will make use of
-
-  fv(T)	 	the free type vars of T
-
-  oclose(vs,C)	The result of extending the set of tyvars vs
-		using the functional dependencies from C
-
-  grow(vs,C)	The result of extend the set of tyvars vs
-		using all conceivable links from C.
-
-		E.g. vs = {a}, C = {H [a] b, K (b,Int) c, Eq e}
-		Then grow(vs,C) = {a,b,c}
-
-		Note that grow(vs,C) `superset` grow(vs,simplify(C))
-		That is, simplfication can only shrink the result of grow.
-
-Notice that
-   oclose is conservative one way:      v `elem` oclose(vs,C) => v is definitely fixed by vs
-   grow is conservative the other way:  if v might be fixed by vs => v `elem` grow(vs,C)
-
-
------------------------------------------
-
-Note [Choosing which variables to quantify]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Here's a good way to choose Q:
+constraints can get into Ct instead of Cq.  Here's a good way to
+choose Q:
 
 	Q = grow( fv(T), C ) \ oclose( fv(G), C )
 
@@ -245,9 +218,8 @@ all the functional dependencies yet:
 	T = c->c
 	C = (Eq (T c d))
 
-  Now oclose(fv(T),C) = {c}, because the functional dependency isn't
-  apparent yet, and that's wrong.  We must really quantify over d too.
-
+Now oclose(fv(T),C) = {c}, because the functional dependency isn't
+apparent yet, and that's wrong.  We must really quantify over d too.
 
 There really isn't any point in quantifying over any more than
 grow( fv(T), C ), because the call sites can't possibly influence

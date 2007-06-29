@@ -37,6 +37,26 @@ import Data.Maybe	( isJust )
 %*									*
 %************************************************************************
 
+  oclose(vs,C)	The result of extending the set of tyvars vs
+		using the functional dependencies from C
+
+  grow(vs,C)	The result of extend the set of tyvars vs
+		using all conceivable links from C.
+
+		E.g. vs = {a}, C = {H [a] b, K (b,Int) c, Eq e}
+		Then grow(vs,C) = {a,b,c}
+
+		Note that grow(vs,C) `superset` grow(vs,simplify(C))
+		That is, simplfication can only shrink the result of grow.
+
+Notice that
+   oclose is conservative 	v `elem` oclose(vs,C)
+          one way:     		 => v is definitely fixed by vs
+
+   grow is conservative		if v might be fixed by vs 
+          the other way:	=> v `elem` grow(vs,C)
+
+----------------------------------------------------------
 (oclose preds tvs) closes the set of type variables tvs, 
 wrt functional dependencies in preds.  The result is a superset
 of the argument set.  For example, if we have
@@ -45,60 +65,39 @@ then
 	oclose [C (x,y) z, C (x,p) q] {x,y} = {x,y,z}
 because if we know x and y then that fixes z.
 
-Using oclose
-~~~~~~~~~~~~
-oclose is used
+oclose is used (only) when generalising a type T; see extensive
+notes in TcSimplify.
 
-a) When determining ambiguity.  The type
-	forall a,b. C a b => a
-is not ambiguous (given the above class decl for C) because
-a determines b.  
+Note [Important subtlety in oclose]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (oclose (C Int t) {}), where class C a b | a->b
+Then, since a->b, 't' is fully determined by Int, and the
+uniform thing is to return {t}.
 
-b) When generalising a type T.  Usually we take FV(T) \ FV(Env),
-but in fact we need
-	FV(T) \ (FV(Env)+)
-where the '+' is the oclosure operation.  Notice that we do not 
-take FV(T)+.  This puzzled me for a bit.  Consider
+However, consider
+	class D a b c | b->c
+	f x = e	  -- Generates constraint (D s Int t)
+		  -- \x.e has type s->s
+Then, if (oclose (D s Int t) {}) = {t}, we'll make the function
+monomorphic in 't', thus
+	f :: forall s. D s Int t => s -> s
 
-	f = E
+But if this function is never called, t will never be instantiated;
+the functional dependencies that fix t may well be instance decls in
+some importing module.  But the top-level defaulting of unconstrained
+type variales will fix t=GHC.Prim.Any, and that's simply a bug.
 
-and suppose e have that E :: C a b => a, and suppose that b is
-free in the environment. Then we quantify over 'a' only, giving
-the type forall a. C a b => a.  Since a->b but we don't have b->a,
-we might have instance decls like
-	instance C Bool Int where ...
-	instance C Char Int where ...
-so knowing that b=Int doesn't fix 'a'; so we quantify over it.
+Conclusion: oclose only returns a type variable as "fixed" if it 
+depends on at least one type variable in the input fixed_tvs.
 
-		---------------
-		A WORRY: ToDo!
-		---------------
-If we have	class C a b => D a b where ....
-     		class D a b | a -> b where ...
-and the preds are [C (x,y) z], then we want to see the fd in D,
-even though it is not explicit in C, giving [({x,y},{z})]
-
-Similarly for instance decls?  E.g. Suppose we have
-	instance C a b => Eq (T a b) where ...
-and we infer a type t with constraints Eq (T a b) for a particular
-expression, and suppose that 'a' is free in the environment.  
-We could generalise to
-	forall b. Eq (T a b) => t
-but if we reduced the constraint, to C a b, we'd see that 'a' determines
-b, so that a better type might be
-	t (with free constraint C a b) 
-Perhaps it doesn't matter, because we'll still force b to be a
-particular type at the call sites.  Generalising over too many
-variables (provided we don't shadow anything by quantifying over a
-variable that is actually free in the envt) may postpone errors; it
-won't hide them altogether.
-
+Remember, it's always sound for oclose to return a smaller set.
 
 \begin{code}
 oclose :: [PredType] -> TyVarSet -> TyVarSet
 oclose preds fixed_tvs
-  | null tv_fds = fixed_tvs	-- Fast escape hatch for common case
-  | otherwise   = loop fixed_tvs
+  | null tv_fds 	    = fixed_tvs	   -- Fast escape hatch for common case
+  | isEmptyVarSet fixed_tvs = emptyVarSet  -- Note [Important subtlety in oclose]
+  | otherwise 		    = loop fixed_tvs
   where
     loop fixed_tvs
 	| new_fixed_tvs `subVarSet` fixed_tvs = fixed_tvs
@@ -106,8 +105,10 @@ oclose preds fixed_tvs
 	where
 	  new_fixed_tvs = foldl extend fixed_tvs tv_fds
 
-    extend fixed_tvs (ls,rs) | ls `subVarSet` fixed_tvs = fixed_tvs `unionVarSet` rs
-			     | otherwise		= fixed_tvs
+    extend fixed_tvs (ls,rs) 
+	| not (isEmptyVarSet ls)	-- Note [Important subtlety in oclose]
+	, ls `subVarSet` fixed_tvs = fixed_tvs `unionVarSet` rs
+	| otherwise		   = fixed_tvs
 
     tv_fds  :: [(TyVarSet,TyVarSet)]
 	-- In our example, tv_fds will be [ ({x,y}, {z}), ({x,p},{q}) ]
