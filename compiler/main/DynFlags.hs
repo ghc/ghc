@@ -200,6 +200,7 @@ data DynFlag
    | Opt_UnboxStrictFields
    | Opt_DictsCheap
    | Opt_RewriteRules
+   | Opt_Vectorise
 
    -- misc opts
    | Opt_Cpp
@@ -1083,7 +1084,8 @@ fFlags = [
   ( "force-recomp",			Opt_ForceRecomp ),
   ( "hpc-no-auto",			Opt_Hpc_No_Auto ),
   ( "rewrite-rules",			Opt_RewriteRules ),
-  ( "break-on-exception",               Opt_BreakOnException )
+  ( "break-on-exception",               Opt_BreakOnException ),
+  ( "vectorise",                        Opt_Vectorise )
   ]
 
 
