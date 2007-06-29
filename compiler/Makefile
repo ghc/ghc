@@ -367,7 +367,7 @@ SRC_HC_OPTS += -Istage$(stage)
 
 ALL_DIRS = \
   utils basicTypes types hsSyn prelude rename typecheck deSugar coreSyn \
-  specialise simplCore stranal stgSyn simplStg codeGen main \
+  vectorise specialise simplCore stranal stgSyn simplStg codeGen main \
   profiling parser cprAnalysis ndpFlatten iface cmm
 
 # Make sure we include Config.hs even if it doesn't exist yet...
