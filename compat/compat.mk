@@ -48,17 +48,15 @@ SRC_MKDEPENDHS_OPTS += \
 	-optdep--exclude-module=System.FilePath \
 	-optdep--exclude-module=System.FilePath.Posix \
 	-optdep--exclude-module=System.FilePath.Windows \
-	-optdep--exclude-module=System.Directory.Internals \
-	-optdep--exclude-module=Trace.Hpc.Mix \
-	-optdep--exclude-module=Trace.Hpc.Util \
-	-optdep--exclude-module=Trace.Hpc.Tix 
-
+	-optdep--exclude-module=System.Directory.Internals
 
 PACKAGE_CABAL =
+PACKAGE_HPC   =
 
 else
 
 PACKAGE_CABAL = -package Cabal
+PACKAGE_HPC   = -package hpc
 
 endif
 
