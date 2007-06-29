@@ -259,7 +259,7 @@ tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
 	 unless (isSynTyCon family) $
 	   addErr (wrongKindOfFamily family)
 
-       ; -- (1) kind check the right hand side of the type equation
+       ; -- (1) kind check the right-hand side of the type equation
        ; k_rhs <- kcCheckHsType (tcdSynRhs decl) resKind
 
          -- (2) type check type equation
@@ -267,7 +267,11 @@ tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
        ; t_typats <- mappM tcHsKindedType k_typats
        ; t_rhs    <- tcHsKindedType k_rhs
 
-         -- (3) construct representation tycon
+       ; -- (3) check that the right-hand side is a tau type
+       ; unless (isTauTy t_rhs) $
+	   addErr (polyTyErr t_rhs)
+
+         -- (4) construct representation tycon
        ; rep_tc_name <- newFamInstTyConName tc_name loc
        ; tycon <- buildSynTyCon rep_tc_name t_tvs (SynonymTyCon t_rhs) 
                                 (Just (family, t_typats))
@@ -339,7 +343,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 --
 -- * Here we check that a type instance matches its kind signature, but we do
 --   not check whether there is a pattern for each type index; the latter
---   check is only required for type functions.
+--   check is only required for type synonym instances.
 --
 kcIdxTyPats :: TyClDecl Name
 	    -> ([LHsTyVarBndr Name] -> [LHsType Name] -> Kind -> TyCon -> TcM a)
@@ -1202,6 +1206,10 @@ wrongKindOfFamily family =
     kindOfFamily | isSynTyCon family = ptext SLIT("type synonym")
 		 | isAlgTyCon family = ptext SLIT("data type")
 		 | otherwise = pprPanic "wrongKindOfFamily" (ppr family)
+
+polyTyErr ty 
+  = hang (ptext SLIT("Illegal polymorphic type in type instance") <> colon) 4 $
+      ppr ty
 
 emptyConDeclsErr tycon
   = sep [quotes (ppr tycon) <+> ptext SLIT("has no constructors"),
