@@ -78,8 +78,8 @@ import {-# SOURCE #-}  InteractiveEval ( Resume )
 #endif
 
 import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv, GlobalRdrElt(..), 
-                          unQualOK, ImpDeclSpec(..), Provenance(..),
-                          ImportSpec(..), lookupGlobalRdrEnv )
+                          mkRdrUnqual, ImpDeclSpec(..), Provenance(..),
+                          ImportSpec(..), lookupGlobalRdrEnv, lookupGRE_RdrName )
 import Name		( Name, NamedThing, getName, nameOccName, nameModule )
 import NameEnv
 import NameSet	
@@ -115,7 +115,6 @@ import SrcLoc		( SrcSpan, Located )
 import UniqFM		( lookupUFM, eltsUFM, emptyUFM )
 import UniqSupply	( UniqSupply )
 import FastString	( FastString )
-
 import StringBuffer	( StringBuffer )
 
 import System.Time	( ClockTime )
@@ -701,19 +700,28 @@ extendInteractiveContext ictxt ids tyvars
 mkPrintUnqualified :: GlobalRdrEnv -> PrintUnqualified
 mkPrintUnqualified env = (qual_name, qual_mod)
   where
-  qual_name mod occ
-        | null gres = Just (moduleName mod)
+  qual_name mod occ	-- The (mod,occ) pair is the original name of the thing
+        | [gre] <- unqual_gres, right_name gre = Nothing
+		-- If there's a unique entity that's in scope unqualified with 'occ'
+		-- AND that entity is the right one, then we can use the unqualified name
+
+        | [gre] <- qual_gres = Just (get_qual_mod (gre_prov gre))
+
+        | null qual_gres = Just (moduleName mod)
                 -- it isn't in scope at all, this probably shouldn't happen,
                 -- but we'll qualify it by the original module anyway.
-        | any unQualOK gres = Nothing
-        | (Imported is : _) <- map gre_prov gres, (idecl : _) <- is
-          = Just (is_as (is_decl idecl))
-        | otherwise = panic "mkPrintUnqualified" 
-      where
-        gres  = [ gre | gre <- lookupGlobalRdrEnv env occ,
-	                nameModule (gre_name gre) == mod ]
 
-  qual_mod mod = Nothing       -- For now...
+	| otherwise = panic "mkPrintUnqualified"
+      where
+	right_name gre = nameModule (gre_name gre) == mod
+
+        unqual_gres = lookupGRE_RdrName (mkRdrUnqual occ) env
+        qual_gres   = filter right_name (lookupGlobalRdrEnv env occ)
+
+	get_qual_mod LocalDef      = moduleName mod
+	get_qual_mod (Imported is) = ASSERT( not (null is) ) is_as (is_decl (head is))
+
+  qual_mod mod = Nothing       -- For now, we never qualify module names with their packages
 \end{code}
 
 

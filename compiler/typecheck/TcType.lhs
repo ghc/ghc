@@ -442,17 +442,18 @@ pprSkolTvBinding :: TcTyVar -> SDoc
 -- or nothing if we don't have anything useful to say
 pprSkolTvBinding tv
   = ASSERT ( isTcTyVar tv )
-    ppr_details (tcTyVarDetails tv)
+    quotes (ppr tv) <+> ppr_details (tcTyVarDetails tv)
   where
-    ppr_details (MetaTv TauTv _)   = quotes (ppr tv) <+> ptext SLIT("is a meta type variable")
-    ppr_details (MetaTv BoxTv _)   = quotes (ppr tv) <+> ptext SLIT("is a boxy type variable")
+    ppr_details (MetaTv TauTv _)   	= ptext SLIT("is a meta type variable")
+    ppr_details (MetaTv BoxTv _)   	= ptext SLIT("is a boxy type variable")
     ppr_details (MetaTv (SigTv info) _) = ppr_skol info
     ppr_details (SkolemTv info)		= ppr_skol info
 
-    ppr_skol UnkSkol = empty	-- Unhelpful; omit
-    ppr_skol RuntimeUnkSkol = quotes (ppr tv) <+> ptext SLIT("is an unknown runtime type")
-    ppr_skol info    = quotes (ppr tv) <+> ptext SLIT("is bound by") 
-			<+> sep [pprSkolInfo info, nest 2 (ptext SLIT("at") <+> ppr (getSrcLoc tv))]
+    ppr_skol UnkSkol	    = empty	-- Unhelpful; omit
+    ppr_skol RuntimeUnkSkol = ptext SLIT("is an unknown runtime type")
+    ppr_skol info           = ptext SLIT("is a rigid type variable bound by") 
+				<+> sep [pprSkolInfo info, 
+					 nest 2 (ptext SLIT("at") <+> ppr (getSrcLoc tv))]
  
 pprSkolInfo :: SkolemInfo -> SDoc
 pprSkolInfo (SigSkol ctxt)   = pprUserTypeCtxt ctxt

@@ -44,6 +44,7 @@ import TysWiredIn
 import Var
 import VarSet
 import VarEnv
+import Module
 import Name
 import ErrUtils
 import Maybes
@@ -1584,31 +1585,52 @@ unifyMisMatch outer swapped ty1 ty2
 	  	   else failWithTcM (env, msg)
 	} 
 
+-----------------------
+misMatchMsg :: TcType -> TcType -> TcM (TidyEnv, SDoc)
+-- Generate the message when two types fail to match,
+-- going to some trouble to make it helpful
 misMatchMsg ty1 ty2
   = do	{ env0 <- tcInitTidyEnv
-	; (env1, pp1, extra1) <- ppr_ty env0 ty1
-	; (env2, pp2, extra2) <- ppr_ty env1 ty2
+	; (env1, pp1, extra1) <- ppr_ty env0 ty1 ty2
+	; (env2, pp2, extra2) <- ppr_ty env1 ty2 ty1
 	; return (env2, sep [sep [ptext SLIT("Couldn't match expected type") <+> pp1, 
 				  nest 7 (ptext SLIT("against inferred type") <+> pp2)],
-			     nest 2 extra1, nest 2 extra2]) }
+			     nest 2 (extra1 $$ extra2)]) }
 
-ppr_ty :: TidyEnv -> TcType -> TcM (TidyEnv, SDoc, SDoc)
-ppr_ty env ty
-  = do { ty' <- zonkTcType ty
-       ; let (env1,tidy_ty) = tidyOpenType env ty'
-	     simple_result  = (env1, quotes (ppr tidy_ty), empty)
-       ; case tidy_ty of
-	   TyVarTy tv 
-		| isSkolemTyVar tv || isSigTyVar tv
-		-> return (env2, pp_rigid tv', pprSkolTvBinding tv')
-		| otherwise -> return simple_result
-		where
-		  (env2, tv') = tidySkolemTyVar env1 tv
-	   other -> return simple_result }
+ppr_ty :: TidyEnv -> TcType -> TcType -> TcM (TidyEnv, SDoc, SDoc)
+ppr_ty env ty other_ty 
+  = do	{ ty' <- zonkTcType ty
+	; let (env1, tidy_ty) = tidyOpenType env ty'
+	; (env2, extra) <- ppr_extra env1 ty' other_ty
+	; return (env2, quotes (ppr tidy_ty), extra) }
+
+-- (ppr_extra env ty other_ty) shows extra info about 'ty'
+ppr_extra env (TyVarTy tv) other_ty
+  | isSkolemTyVar tv || isSigTyVar tv
+  = return (env1, pprSkolTvBinding tv1)
   where
-    pp_rigid tv = quotes (ppr tv) <+> parens (ptext SLIT("a rigid variable"))
+    (env1, tv1) = tidySkolemTyVar env tv
 
+ppr_extra env (TyConApp tc1 _) (TyConApp tc2 _) 
+  | getOccName tc1 == getOccName tc2
+  = --	This case helps with messages that would otherwise say
+    --	   Could not match 'T' does not match 'M.T'
+    -- which is not helpful
+    do	{ this_mod <- getModule
+	; return (env, quotes (ppr tc1) <+> ptext SLIT("is defined in") <+> mk_mod this_mod) }
+  where
+    tc_mod = nameModule (getName tc1)
+    tc_pkg = modulePackageId tc_mod
+    mk_mod this_mod 
+	| tc_mod == this_mod = ptext SLIT("this module")
+	| otherwise = ptext SLIT("module") <+> quotes (ppr tc_mod) <+> mk_pkg this_mod
+    mk_pkg this_mod
+	| tc_pkg == modulePackageId this_mod = empty
+	| otherwise = ptext SLIT("from package") <+> quotes (ppr tc_pkg)
 
+ppr_extra env ty other_ty = return (env, empty)		-- Normal case
+
+-----------------------
 notMonoType ty
   = do	{ ty' <- zonkTcType ty
 	; env0 <- tcInitTidyEnv
