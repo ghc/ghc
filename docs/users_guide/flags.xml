@@ -286,19 +286,22 @@
 	  </thead>
 	  <tbody>
 	    <row>
-	      <entry><option>-keep-hc-file</option></entry>
+	      <entry><option>-keep-hc-file</option> or
+                 <option>-keep-hc-files</option></entry>
 	      <entry>retain intermediate <literal>.hc</literal> files</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-keep-s-file</option></entry>
+	      <entry><option>-keep-s-file</option> or
+                 <option>-keep-s-files</option></entry>
 	      <entry>retain intermediate <literal>.s</literal> files</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-keep-raw-s-file</option></entry>
+	      <entry><option>-keep-raw-s-file</option> or
+                 <option>-keep-raw-s-files</option></entry>
 	      <entry>retain intermediate <literal>.raw_s</literal> files</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>

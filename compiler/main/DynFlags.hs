@@ -898,10 +898,15 @@ dynamic_flags = [
   ,  ( "stubdir"	, HasArg (upd . setStubDir . Just))
 
 	------- Keeping temporary files -------------------------------------
-  ,  ( "keep-hc-file"   , AnySuffix (\_ -> setDynFlag Opt_KeepHcFiles))
-  ,  ( "keep-s-file"    , AnySuffix (\_ -> setDynFlag Opt_KeepSFiles))
-  ,  ( "keep-raw-s-file", AnySuffix (\_ -> setDynFlag Opt_KeepRawSFiles))
-  ,  ( "keep-tmp-files" , AnySuffix (\_ -> setDynFlag Opt_KeepTmpFiles))
+     -- These can be singular (think ghc -c) or plural (think ghc --make)
+  ,  ( "keep-hc-file"    , NoArg (setDynFlag Opt_KeepHcFiles))
+  ,  ( "keep-hc-files"   , NoArg (setDynFlag Opt_KeepHcFiles))
+  ,  ( "keep-s-file"     , NoArg (setDynFlag Opt_KeepSFiles))
+  ,  ( "keep-s-files"    , NoArg (setDynFlag Opt_KeepSFiles))
+  ,  ( "keep-raw-s-file" , NoArg (setDynFlag Opt_KeepRawSFiles))
+  ,  ( "keep-raw-s-files", NoArg (setDynFlag Opt_KeepRawSFiles))
+     -- This only makes sense as plural
+  ,  ( "keep-tmp-files"  , NoArg (setDynFlag Opt_KeepTmpFiles))
 
 	------- Miscellaneous ----------------------------------------------
   ,  ( "no-hs-main"     , NoArg (setDynFlag Opt_NoHsMain))

@@ -81,7 +81,7 @@ module X where
       <para>It is not recommended to move all the contents of your
       Makefiles into your source files, but in some circumstances, the
       <literal>OPTIONS_GHC</literal> pragma is the Right Thing. (If you
-      use <option>-keep-hc-file-too</option> and have OPTION flags in
+      use <option>-keep-hc-file</option> and have OPTION flags in
       your module, the OPTIONS_GHC will get put into the generated .hc
       file).</para>
     </sect2>

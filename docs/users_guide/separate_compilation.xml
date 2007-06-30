@@ -436,7 +436,9 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
       <variablelist>
 	<varlistentry>
 	  <term>
+            <option>-keep-hc-file</option>,
             <option>-keep-hc-files</option>
+            <indexterm><primary><option>-keep-hc-file</option></primary></indexterm>
             <indexterm><primary><option>-keep-hc-files</option></primary></indexterm>
           </term>
 	  <listitem>
@@ -451,7 +453,9 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 
 	<varlistentry>
 	  <term>
+            <option>-keep-s-file</option>,
             <option>-keep-s-files</option>
+            <indexterm><primary><option>-keep-s-file</option></primary></indexterm>
             <indexterm><primary><option>-keep-s-files</option></primary></indexterm>
           </term>
 	  <listitem>
@@ -461,7 +465,9 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
 
 	<varlistentry>
 	  <term>
+            <option>-keep-raw-s-file</option>,
             <option>-keep-raw-s-files</option>
+            <indexterm><primary><option>-keep-raw-s-file</option></primary></indexterm>
             <indexterm><primary><option>-keep-raw-s-files</option></primary></indexterm>
           </term>
 	  <listitem>
