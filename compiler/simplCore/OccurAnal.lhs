@@ -300,16 +300,18 @@ reOrderCycle bndrs (bind : binds)
 		-- where df is the exported dictionary. Then df makes a really
 		-- bad choice for loop breaker
 	  
-	| is_con_app rhs = 3	-- Data types help with cases
+	| idHasRules bndr = 3
+		-- Avoid things with specialisations; we'd like
+		-- to take advantage of them in the subsequent bindings
+		-- Also vital to avoid risk of divergence:
+		-- Note [Recursive rules]
+
+	| is_con_app rhs = 2	-- Data types help with cases
 		-- This used to have a lower score than inlineCandidate, but
 		-- it's *really* helpful if dictionaries get inlined fast,
 		-- so I'm experimenting with giving higher priority to data-typed things
 
-	| inlineCandidate bndr rhs = 2	-- Likely to be inlined
-
-	| idHasRules bndr = 1
-		-- Avoid things with specialisations; we'd like
-		-- to take advantage of them in the subsequent bindings
+	| inlineCandidate bndr rhs = 1	-- Likely to be inlined
 
 	| otherwise = 0
 
@@ -351,6 +353,25 @@ makeLoopBreaker bndrs rhs_usg bndr
   where
     rules_only = bndrs `intersectsUFM` rhs_usg
 \end{code}
+
+Note [Recursive rules]
+~~~~~~~~~~~~~~~~~~~~~~
+Consider this group, which is typical of what SpecConstr builds:
+
+   fs a = ....f (C a)....
+   f  x = ....f (C a)....
+   {-# RULE f (C a) = fs a #-}
+
+So 'f' and 'fs' are mutually recursive.  If we choose 'fs' as the loop breaker,
+all is well; the RULE is applied, and 'fs' becomes self-recursive.
+
+But if we choose 'f' as the loop breaker, we may get an infinite loop:
+	- the RULE is applied in f's RHS (see Note [Self-recursive rules] in Simplify
+	- fs is inlined (say it's small)
+	- now there's another opportunity to apply the RULE
+
+So it's very important to choose the RULE-variable as the loop breaker.
+This showed up when compiling Control.Concurrent.Chan.getChanContents.
 
 Note [Closure conversion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~

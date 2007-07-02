@@ -952,6 +952,8 @@ completeCall env var cont
 	-- the wrapper didn't occur for things that have specialisations till a 
 	-- later phase, so but now we just try RULES first
 	--
+	-- Note [Self-recursive rules]
+	-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	-- You might think that we shouldn't apply rules for a loop breaker: 
 	-- doing so might give rise to an infinite loop, because a RULE is
 	-- rather like an extra equation for the function:
