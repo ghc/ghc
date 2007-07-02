@@ -1018,7 +1018,7 @@ dynamic_flags = [
 
         ------ Compiler flags -----------------------------------------------
 
-  ,  ( "fasm",		AnySuffix (\_ -> setObjTarget HscAsm) )
+  ,  ( "fasm",		NoArg (setObjTarget HscAsm) )
   ,  ( "fvia-c",	NoArg (setObjTarget HscC) )
   ,  ( "fvia-C",	NoArg (setObjTarget HscC) )
 
