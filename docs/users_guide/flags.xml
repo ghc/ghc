@@ -485,18 +485,6 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
-	      <entry><option>-short-ghci-banner</option></entry>
-	      <entry>Display a one-line banner at GHCi startup</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
-	      <entry><option>-long-ghci-banner</option></entry>
-	      <entry>Display a full banner at GHCi startup</entry>
-	      <entry>dynamic</entry>
-	      <entry>-</entry>
-	    </row>
-	    <row>
 	      <entry><option>-fdebugging</option></entry>
 	      <entry>Generate bytecode enabled for debugging</entry>
 	      <entry>dynamic</entry>

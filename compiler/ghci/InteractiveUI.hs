@@ -6,7 +6,7 @@
 -- (c) The GHC Team 2005-2006
 --
 -----------------------------------------------------------------------------
-module InteractiveUI ( interactiveUI ) where
+module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 
 #include "HsVersions.h"
 
@@ -81,16 +81,9 @@ import System.Posix.Internals ( setNonBlockingFD )
 
 -----------------------------------------------------------------------------
 
-ghciWelcomeMsg =
- "   ___         ___ _\n"++
- "  / _ \\ /\\  /\\/ __(_)\n"++
- " / /_\\// /_/ / /  | |    GHC Interactive, version " ++ cProjectVersion ++ ", for Haskell 98.\n"++
- "/ /_\\\\/ __  / /___| |    http://www.haskell.org/ghc/\n"++
- "\\____/\\/ /_/\\____/|_|    Type :? for help.\n"
-
-ghciShortWelcomeMsg =
-    "GHCi, version " ++ cProjectVersion ++
-    ": http://www.haskell.org/ghc/  :? for help"
+ghciWelcomeMsg :: String
+ghciWelcomeMsg = "GHCi, version " ++ cProjectVersion ++
+                 ": http://www.haskell.org/ghc/  :? for help"
 
 type Command = (String, String -> GHCi Bool, Bool, String -> IO [String])
 cmdName (n,_,_,_) = n
@@ -365,11 +358,6 @@ runGHCi paths maybe_expr = do
 #endif
             -- initialise the console if necessary
             io setUpConsole
-
-            let msg = if dopt Opt_ShortGhciBanner dflags
-                      then ghciShortWelcomeMsg
-                      else ghciWelcomeMsg
-            when (verbosity dflags >= 1) $ io $ putStrLn msg
 
             -- enter the interactive loop
             interactiveLoop is_tty show_prompt
