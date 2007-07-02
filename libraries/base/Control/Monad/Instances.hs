@@ -1,4 +1,4 @@
-{-# OPTIONS_NHC98 -prelude #-}
+{-# OPTIONS_NHC98 --prelude #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  Control.Monad.Instances
