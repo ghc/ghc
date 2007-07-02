@@ -705,22 +705,6 @@ removeSpaces = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 %*									*
 %************************************************************************
 
-The following provide us higher order functions that, when applied
-to a function, operate on pairs.
-
-\begin{code}
-#if NOT_USED
-applyToPair :: ((a -> c),(b -> d)) -> (a,b) -> (c,d)
-applyToPair (f,g) (x,y) = (f x, g y)
-
-applyToFst :: (a -> c) -> (a,b)-> (c,b)
-applyToFst f (x,y) = (f x,y)
-
-applyToSnd :: (b -> d) -> (a,b) -> (a,d)
-applyToSnd f (x,y) = (x,f y)
-#endif
-\end{code}
-
 \begin{code}
 unzipWith :: (a -> b -> c) -> [(a, b)] -> [c]
 unzipWith f pairs = map ( \ (a, b) -> f a b ) pairs
