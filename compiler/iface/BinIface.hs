@@ -34,6 +34,7 @@ import Config
 import FastMutInt
 import Outputable
 
+import Data.List
 import Data.Word
 import Data.Array
 import Data.IORef

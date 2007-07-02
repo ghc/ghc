@@ -45,7 +45,7 @@ import Maybes
 import OrdList
 import Bag
 import Util
-import List hiding( mapAccumL )	-- Also defined in Util
+import Data.List
 \end{code}
 
 

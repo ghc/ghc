@@ -42,6 +42,8 @@ import Util
 import HsUtils
 import VarSet
 import SrcLoc
+
+import Data.List
 \end{code}
 
 \begin{code}

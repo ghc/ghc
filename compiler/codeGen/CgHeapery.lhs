@@ -45,6 +45,8 @@ import Util
 import Constants
 import PackageConfig
 import Outputable
+
+import Data.List
 \end{code}
 
 

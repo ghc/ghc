@@ -76,6 +76,8 @@ import DynFlags
 import Maybes
 import Util
 import Outputable
+
+import Data.List
 \end{code}
 
 

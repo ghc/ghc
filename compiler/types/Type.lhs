@@ -122,6 +122,7 @@ import Util
 import Outputable
 import UniqSet
 
+import Data.List
 import Data.Maybe	( isJust )
 \end{code}
 

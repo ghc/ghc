@@ -35,8 +35,10 @@ import Digraph		( stronglyConnCompR, SCC(..) )
 import PrelNames	( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique		( Unique )
 import UniqFM		( keysUFM, intersectsUFM )  
-import Util		( mapAndUnzip, mapAccumL )
+import Util		( mapAndUnzip )
 import Outputable
+
+import Data.List
 \end{code}
 
 

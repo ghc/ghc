@@ -58,6 +58,8 @@ import BasicTypes
 import DynFlags
 import Util
 import Outputable
+
+import Data.List
 \end{code}
 
 %************************************************************************

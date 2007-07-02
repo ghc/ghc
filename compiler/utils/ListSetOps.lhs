@@ -24,9 +24,9 @@ module ListSetOps (
 import Outputable
 import Unique	( Unique )
 import UniqFM	( eltsUFM, emptyUFM, addToUFM_C )
-import Util	( isn'tIn, isIn, mapAccumR, sortLe )
+import Util	( isn'tIn, isIn, sortLe )
 
-import Data.List ( partition )
+import Data.List
 \end{code}
 
 

@@ -79,6 +79,7 @@ import FastString
 import Outputable
 
 import Control.Monad
+import Data.List
 
 infixr 9 `thenC`	-- Right-associative!
 infixr 9 `thenFC`

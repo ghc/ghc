@@ -45,6 +45,8 @@ import Outputable
 import PprCore		()		-- Instances
 import Util
 import FastTypes
+
+import Data.List
 \end{code}
 
 

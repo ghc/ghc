@@ -44,7 +44,7 @@ import ListSetOps
 import Digraph
 import DynFlags
 
-import Data.List        ( partition, elemIndex )
+import Data.List
 import Control.Monad    ( mplus )
 \end{code}
 

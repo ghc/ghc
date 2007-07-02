@@ -32,7 +32,6 @@ module Util (
 	transitiveClosure,
 
 	-- accumulating
-	mapAccumL, mapAccumR, mapAccumB, 
 	foldl2, count, all2,
 	
 	takeList, dropList, splitAtList, split,
@@ -487,62 +486,6 @@ transitiveClosure succ eq xs
 \subsection[Utils-accum]{Accumulating}
 %*									*
 %************************************************************************
-
-@mapAccumL@ behaves like a combination
-of  @map@ and @foldl@;
-it applies a function to each element of a list, passing an accumulating
-parameter from left to right, and returning a final value of this
-accumulator together with the new list.
-
-\begin{code}
-mapAccumL :: (acc -> x -> (acc, y)) 	-- Function of elt of input list
-					-- and accumulator, returning new
-					-- accumulator and elt of result list
-	    -> acc 		-- Initial accumulator
-	    -> [x] 		-- Input list
-	    -> (acc, [y])		-- Final accumulator and result list
-
-mapAccumL f b []     = (b, [])
-mapAccumL f b (x:xs) = (b'', x':xs') where
-					  (b', x') = f b x
-					  (b'', xs') = mapAccumL f b' xs
-\end{code}
-
-@mapAccumR@ does the same, but working from right to left instead.  Its type is
-the same as @mapAccumL@, though.
-
-\begin{code}
-mapAccumR :: (acc -> x -> (acc, y)) 	-- Function of elt of input list
-					-- and accumulator, returning new
-					-- accumulator and elt of result list
-	    -> acc 		-- Initial accumulator
-	    -> [x] 		-- Input list
-	    -> (acc, [y])		-- Final accumulator and result list
-
-mapAccumR f b []     = (b, [])
-mapAccumR f b (x:xs) = (b'', x':xs') where
-					  (b'', x') = f b' x
-					  (b', xs') = mapAccumR f b xs
-\end{code}
-
-Here is the bi-directional version, that works from both left and right.
-
-\begin{code}
-mapAccumB :: (accl -> accr -> x -> (accl, accr,y))
-      				-- Function of elt of input list
-      				-- and accumulator, returning new
-      				-- accumulator and elt of result list
-	  -> accl 			-- Initial accumulator from left
-	  -> accr 			-- Initial accumulator from right
-	  -> [x] 			-- Input list
-	  -> (accl, accr, [y])	-- Final accumulators and result list
-
-mapAccumB f a b []     = (a,b,[])
-mapAccumB f a b (x:xs) = (a'',b'',y:ys)
-   where
-	(a',b'',y)  = f a b' x
-	(a'',b',ys) = mapAccumB f a' b xs
-\end{code}
 
 A strict version of foldl.
 

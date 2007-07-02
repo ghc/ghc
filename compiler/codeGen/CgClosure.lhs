@@ -46,6 +46,8 @@ import BasicTypes
 import Constants
 import Outputable
 import FastString
+
+import Data.List
 \end{code}
 
 %********************************************************

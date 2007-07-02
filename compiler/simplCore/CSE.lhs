@@ -21,8 +21,10 @@ import CoreLint		( showPass, endPass )
 import Outputable
 import StaticFlags	( opt_PprStyle_Debug )
 import BasicTypes	( isAlwaysActive )
-import Util		( mapAccumL, lengthExceeds )
+import Util		( lengthExceeds )
 import UniqFM
+
+import Data.List
 \end{code}
 
 

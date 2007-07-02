@@ -26,6 +26,8 @@ import OccName
 import SrcLoc
 import Maybes
 import Util
+
+import Data.List
 \end{code}
 
 
