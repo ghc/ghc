@@ -109,41 +109,6 @@ infixr 9 `thenCmp`
 
 %************************************************************************
 %*									*
-\subsection{The Eager monad}
-%*									*
-%************************************************************************
-
-The @Eager@ monad is just an encoding of continuation-passing style,
-used to allow you to express "do this and then that", mainly to avoid
-space leaks. It's done with a type synonym to save bureaucracy.
-
-\begin{code}
-#if NOT_USED
-
-type Eager ans a = (a -> ans) -> ans
-
-runEager :: Eager a a -> a
-runEager m = m (\x -> x)
-
-appEager :: Eager ans a -> (a -> ans) -> ans
-appEager m cont = m cont
-
-thenEager :: Eager ans a -> (a -> Eager ans b) -> Eager ans b
-thenEager m k cont = m (\r -> k r cont)
-
-returnEager :: a -> Eager ans a
-returnEager v cont = cont v
-
-mapEager :: (a -> Eager ans b) -> [a] -> Eager ans [b]
-mapEager f [] = returnEager []
-mapEager f (x:xs) = f x			`thenEager` \ y ->
-		    mapEager f xs	`thenEager` \ ys ->
-		    returnEager (y:ys)
-#endif
-\end{code}
-
-%************************************************************************
-%*									*
 \subsection{A for loop}
 %*									*
 %************************************************************************
