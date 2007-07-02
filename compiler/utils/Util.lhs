@@ -733,6 +733,7 @@ consIORef var x = do
 Module names:
 
 \begin{code}
+looksLikeModuleName :: String -> Bool
 looksLikeModuleName [] = False
 looksLikeModuleName (c:cs) = isUpper c && go cs
   where go [] = True
