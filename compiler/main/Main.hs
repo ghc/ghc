@@ -444,8 +444,8 @@ showVersion = do
 
 showGhcUsage dflags cli_mode = do 
   let usage_path 
-	| DoInteractive <- cli_mode = ghcUsagePath dflags
-	| otherwise		    = ghciUsagePath dflags
+	| DoInteractive <- cli_mode = ghciUsagePath dflags
+	| otherwise		    = ghcUsagePath dflags
   usage <- readFile usage_path
   dump usage
   exitWith ExitSuccess
