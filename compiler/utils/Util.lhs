@@ -705,15 +705,6 @@ removeSpaces = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 %*									*
 %************************************************************************
 
-The following are curried versions of @fst@ and @snd@.
-
-\begin{code}
-#if NOT_USED
-cfst :: a -> b -> a	-- stranal-sem only (Note)
-cfst x y = x
-#endif
-\end{code}
-
 The following provide us higher order functions that, when applied
 to a function, operate on pairs.
 
