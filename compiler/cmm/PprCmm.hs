@@ -51,7 +51,6 @@ import FastString
 import Data.List
 import System.IO
 import Data.Maybe
-import Data.Char
 
 pprCmms :: [Cmm] -> SDoc
 pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
@@ -397,8 +396,7 @@ pprStatic s = case s of
     CmmUninitialised i -> nest 4 $ text "I8" <> brackets (int i)
     CmmAlign i         -> nest 4 $ text "align" <+> int i
     CmmDataLabel clbl  -> pprCLabel clbl <> colon
-    CmmString s'       -> nest 4 $ text "I8[]" <+> 
-			   doubleQuotes (text (map (chr.fromIntegral) s'))
+    CmmString s'       -> nest 4 $ text "I8[]" <+> text (show s')
 
 -- --------------------------------------------------------------------------
 -- Registers, whether local (temps) or global
