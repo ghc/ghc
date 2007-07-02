@@ -10,7 +10,7 @@ module Cmm (
 	GenCmm(..), Cmm, RawCmm,
 	GenCmmTop(..), CmmTop, RawCmmTop,
 	CmmInfo(..), ClosureTypeInfo(..), ProfilingInfo(..), ClosureTypeTag,
-	GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts,
+	GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts, mapBlockStmts,
 	CmmStmt(..), CmmActuals, CmmFormal, CmmFormals, CmmHintFormals,
         CmmSafety(..),
 	CmmCallTarget(..),
@@ -103,6 +103,8 @@ blockId (BasicBlock blk_id _ ) = blk_id
 
 blockStmts :: GenBasicBlock i -> [i]
 blockStmts (BasicBlock _ stmts) = stmts
+
+mapBlockStmts f (BasicBlock id bs) = BasicBlock id (map f bs)
 
 -----------------------------------------------------------------------------
 --     Info Tables

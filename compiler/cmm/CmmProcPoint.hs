@@ -46,7 +46,7 @@ calculateProcPoints blocks =
       always_proc_point BrokenBlock {
                               brokenBlockEntry = FunctionEntry _ _ _ } = True
       always_proc_point BrokenBlock {
-                              brokenBlockEntry = ContinuationEntry _ _ } = True
+                              brokenBlockEntry = ContinuationEntry _ _ _ } = True
       always_proc_point _ = False
 
 calculateProcPoints' :: UniqSet BlockId -> [BrokenBlock] -> UniqSet BlockId

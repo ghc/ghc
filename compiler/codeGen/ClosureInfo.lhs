@@ -124,6 +124,7 @@ data ClosureInfo
 
 data C_SRT = NoC_SRT
 	   | C_SRT !CLabel !WordOff !StgHalfWord {-bitmap or escape-}
+           deriving (Eq)
 
 needsSRT :: C_SRT -> Bool
 needsSRT NoC_SRT       = False

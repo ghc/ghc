@@ -5,17 +5,24 @@ module CmmBrokenBlock (
   breakBlock,
   cmmBlockFromBrokenBlock,
   blocksToBlockEnv,
+  adaptBlockToFormat,
+  selectContinuations,
+  ContFormat,
+  makeContinuationEntries,
   ) where
 
 #include "HsVersions.h"
 
 import Cmm
 import CLabel
+import MachOp (MachHint(..))
 
 import ClosureInfo
 
 import Maybes
+import List
 import Panic
+import UniqSupply
 import Unique
 import UniqFM
 
@@ -59,6 +66,7 @@ data BlockEntryInfo
   | ContinuationEntry 		-- ^ Return point of a function call
       CmmFormals                -- ^ return values (argument to continuation)
       C_SRT                     -- ^ SRT for the continuation's info table
+      Bool                      -- ^ True <=> GC block so ignore stack size
 
   | ControlEntry		-- ^ Any other kind of block.
                                 -- Only entered due to control flow.
@@ -67,6 +75,11 @@ data BlockEntryInfo
   -- no return values, but some live might end up as
   -- params or possibly in the frame
 
+data ContFormat = ContFormat
+      CmmHintFormals            -- ^ return values (argument to continuation)
+      C_SRT                     -- ^ SRT for the continuation's info table
+      Bool                      -- ^ True <=> GC block so ignore stack size
+  deriving (Eq)
 
 -- | Final statement in a 'BlokenBlock'.
 -- Constructors and arguments match those in 'Cmm',
@@ -90,6 +103,8 @@ data FinalStmt
       CmmHintFormals                -- ^ Results from call
                                 -- (redundant with ContinuationEntry)
       CmmActuals                -- ^ Arguments to call
+      C_SRT                     -- ^ SRT for the continuation's info table
+      Bool                      -- ^ True <=> GC block so ignore stack size
 
   | FinalSwitch                 -- ^ Same as a 'CmmSwitch'
       CmmExpr                   -- ^ Scrutinee (zero based)
@@ -99,17 +114,74 @@ data FinalStmt
 -- Operations for broken blocks
 -----------------------------------------------------------------------------
 
+-- Naively breaking at *every* CmmCall leads to sub-optimal code.
+-- In particular, a CmmCall followed by a CmmBranch would result
+-- in a continuation that has the single CmmBranch statement in it.
+-- It would be better have the CmmCall directly return to the block
+-- that the branch jumps to.
+--
+-- This requires the target of the branch to look like the parameter
+-- format that the CmmCall is expecting.  If other CmmCall/CmmBranch
+-- sequences go to the same place they might not be expecting the
+-- same format.  So this transformation uses the following solution.
+-- First the blocks are broken up but none of the blocks are marked
+-- as continuations yet.  This is the 'breakBlock' function.
+-- Second, the blocks "vote" on what other blocks need to be continuations
+-- and how they should be layed out.  Plurality wins, but other selection
+-- methods could be selected at a later time.
+-- This is the 'selectContinuations' function.
+-- Finally, the blocks are upgraded to 'ContEntry' continuations
+-- based on the results with the 'makeContinuationEntries' function,
+-- and the blocks that didn't get the format they wanted for their
+-- targets get a small adaptor block created for them by
+-- the 'adaptBlockToFormat' function.
+-- could be 
+
+breakProc ::
+    [BlockId]                   -- ^ Any GC blocks that should be special
+    -> [[Unique]]               -- ^ An infinite list of uniques
+                                -- to create names of the new blocks with
+    -> CmmInfo                  -- ^ Info table for the procedure
+    -> CLabel                   -- ^ Name of the procedure
+    -> CmmFormals               -- ^ Parameters of the procedure
+    -> [CmmBasicBlock]          -- ^ Blocks of the procecure
+                                -- (First block is the entry block)
+    -> [BrokenBlock]
+
+breakProc gc_block_idents uniques info ident params blocks =
+    let
+        (adaptor_uniques : block_uniques) = uniques
+
+        broken_blocks :: ([(BlockId, ContFormat)], [BrokenBlock])
+        broken_blocks =
+            let new_blocks =
+                    zipWith3 (breakBlock gc_block_idents)
+                             block_uniques
+                             blocks
+                             (FunctionEntry info ident params :
+                              repeat ControlEntry)
+            in (concatMap fst new_blocks, concatMap snd new_blocks)
+
+        selected = selectContinuations (fst broken_blocks)
+
+    in map (makeContinuationEntries selected) $
+       concat $
+       zipWith (adaptBlockToFormat selected)
+               adaptor_uniques
+               (snd broken_blocks)
+
 -----------------------------------------------------------------------------
 -- | Takes a 'CmmBasicBlock' and breaks it up into a list of 'BrokenBlock'
 -- by splitting on each 'CmmCall' in the 'CmmBasicBlock'.
 
 breakBlock ::
-    [Unique]                    -- ^ An infinite list of uniques
+    [BlockId]                   -- ^ Any GC blocks that should be special
+    -> [Unique]                 -- ^ An infinite list of uniques
                                 -- to create names of the new blocks with
     -> CmmBasicBlock            -- ^ Input block to break apart
     -> BlockEntryInfo           -- ^ Info for the first created 'BrokenBlock'
-    -> [BrokenBlock]
-breakBlock uniques (BasicBlock ident stmts) entry =
+    -> ([(BlockId, ContFormat)], [BrokenBlock])
+breakBlock gc_block_idents uniques (BasicBlock ident stmts) entry =
     breakBlock' uniques ident entry [] [] stmts
     where
       breakBlock' uniques current_id entry exits accum_stmts stmts =
@@ -118,21 +190,25 @@ breakBlock uniques (BasicBlock ident stmts) entry =
 
             -- Last statement.  Make the 'BrokenBlock'
             [CmmJump target arguments] ->
-                [BrokenBlock current_id entry accum_stmts
-                             exits
-                             (FinalJump target arguments)]
+                ([],
+                 [BrokenBlock current_id entry accum_stmts
+                              exits
+                              (FinalJump target arguments)])
             [CmmReturn arguments] ->
-                [BrokenBlock current_id entry accum_stmts
+                ([],
+                 [BrokenBlock current_id entry accum_stmts
                              exits
-                             (FinalReturn arguments)]
+                             (FinalReturn arguments)])
             [CmmBranch target] ->
-                [BrokenBlock current_id entry accum_stmts
+                ([],
+                 [BrokenBlock current_id entry accum_stmts
                              (target:exits)
-                             (FinalBranch target)]
+                             (FinalBranch target)])
             [CmmSwitch expr targets] ->
-                [BrokenBlock current_id entry accum_stmts
+                ([],
+                 [BrokenBlock current_id entry accum_stmts
                              (mapMaybe id targets ++ exits)
-                             (FinalSwitch expr targets)]
+                             (FinalSwitch expr targets)])
 
             -- These shouldn't happen in the middle of a block.
             -- They would cause dead code.
@@ -143,24 +219,28 @@ breakBlock uniques (BasicBlock ident stmts) entry =
 
             -- Detect this special case to remain an inverse of
             -- 'cmmBlockFromBrokenBlock'
-            {- TODO: Interferes with proc point detection
-            [CmmCall target results arguments,
-             CmmBranch next_id] -> [block]
-              where
-                block = do_call current_id entry accum_stmts exits next_id
-                                target results arguments
-             -}
+            [CmmCall target results arguments (CmmSafe srt),
+             CmmBranch next_id] ->
+                ([cont_info], [block])
+                where
+                  cont_info = (next_id,
+                               ContFormat results srt
+                                              (ident `elem` gc_block_idents))
+                  block = do_call current_id entry accum_stmts exits next_id
+                                target results arguments srt
 
             -- Break the block on safe calls (the main job of this function)
             (CmmCall target results arguments (CmmSafe srt):stmts) ->
-                block : rest
+                (cont_info : cont_infos, block : blocks)
                 where
                   next_id = BlockId $ head uniques
                   block = do_call current_id entry accum_stmts exits next_id
-                                  target results arguments
-                  rest = breakBlock' (tail uniques) next_id
-                                     (ContinuationEntry (map fst results) srt)
-                                     [] [] stmts
+                                  target results arguments srt
+                  cont_info = (next_id,
+                               ContFormat results srt
+                                              (ident `elem` gc_block_idents))
+                  (cont_infos, blocks) = breakBlock' (tail uniques) next_id
+                                         ControlEntry [] [] stmts
 
             -- Default case.  Just keep accumulating statements
             -- and branch targets.
@@ -171,12 +251,84 @@ breakBlock uniques (BasicBlock ident stmts) entry =
                             stmts
 
       do_call current_id entry accum_stmts exits next_id
-              target results arguments =
+              target results arguments srt =
           BrokenBlock current_id entry accum_stmts (next_id:exits)
-                      (FinalCall next_id target results arguments)
+                      (FinalCall next_id target results arguments srt
+                                     (current_id `elem` gc_block_idents))
 
       cond_branch_target (CmmCondBranch _ target) = [target]
       cond_branch_target _ = []
+
+-----------------------------------------------------------------------------
+
+selectContinuations :: [(BlockId, ContFormat)] -> [(BlockId, ContFormat)]
+selectContinuations needed_continuations = formats
+    where
+      formats = map select_format format_groups
+      format_groups = groupBy by_target needed_continuations
+      by_target x y = fst x == fst y
+
+      select_format formats = winner
+          where
+            winner = head $ head $ sortBy more_votes format_votes
+            format_votes = groupBy by_format formats
+            by_format x y = snd x == snd y
+            more_votes x y = compare (length y) (length x)
+              -- sort so the most votes goes *first*
+              -- (thus the order of x and y is reversed)
+
+makeContinuationEntries formats
+                        block@(BrokenBlock ident entry stmts targets exit) =
+    case lookup ident formats of
+      Nothing -> block
+      Just (ContFormat formals srt is_gc) ->
+          BrokenBlock ident (ContinuationEntry (map fst formals) srt is_gc)
+                      stmts targets exit
+
+adaptBlockToFormat :: [(BlockId, ContFormat)]
+                   -> Unique
+                   -> BrokenBlock
+                   -> [BrokenBlock]
+adaptBlockToFormat formats unique
+                   block@(BrokenBlock ident entry stmts targets
+                                      exit@(FinalCall next target formals
+                                                      actuals srt is_gc)) =
+    if format_formals == formals &&
+       format_srt == srt &&
+       format_is_gc == is_gc
+    then [block] -- Woohoo! This block got the continuation format it wanted
+    else [adaptor_block, revised_block]
+           -- This block didn't get the format it wanted for the
+           -- continuation, so we have to build an adaptor.
+    where
+      (ContFormat format_formals format_srt format_is_gc) =
+          maybe unknown_block id $ lookup next formats
+      unknown_block = panic "unknown block in adaptBlockToFormat"
+
+      revised_block = BrokenBlock ident entry stmts revised_targets revised_exit
+      revised_targets = adaptor_ident : delete next targets
+      revised_exit = FinalCall
+                       adaptor_ident -- ^ The only part that changed
+                       target formals actuals srt is_gc
+
+      adaptor_block = mk_adaptor_block adaptor_ident
+                  (ContinuationEntry (map fst formals) srt is_gc)
+                  next format_formals
+      adaptor_ident = BlockId unique
+
+      mk_adaptor_block :: BlockId -> BlockEntryInfo -> BlockId -> CmmHintFormals -> BrokenBlock
+      mk_adaptor_block ident entry next formals =
+          BrokenBlock ident entry [] [next] exit
+              where
+                exit = FinalJump
+                         (CmmLit (CmmLabel (mkReturnPtLabel (getUnique next))))
+                         (map formal_to_actual format_formals)
+
+                formal_to_actual (reg, hint) = ((CmmReg (CmmLocal reg)), hint)
+                -- TODO: Check if NoHint is right.  We're
+                -- jumping to a C-- function not a foreign one
+                -- so it might always be right.
+adaptBlockToFormat _ _ block = [block]
 
 -----------------------------------------------------------------------------
 -- | Convert from a BrokenBlock back to an equivalent CmmBasicBlock
@@ -191,8 +343,8 @@ cmmBlockFromBrokenBlock (BrokenBlock ident _ stmts _ exit) =
             FinalReturn arguments -> [CmmReturn arguments]
             FinalJump target arguments -> [CmmJump target arguments]
             FinalSwitch expr targets -> [CmmSwitch expr targets]
-            FinalCall branch_target call_target results arguments ->
-                [CmmCall call_target results arguments (panic "needed SRT from cmmBlockFromBrokenBlock"),
+            FinalCall branch_target call_target results arguments srt _ ->
+                [CmmCall call_target results arguments (CmmSafe srt),
                  CmmBranch branch_target]
 
 -----------------------------------------------------------------------------
