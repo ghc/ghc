@@ -223,96 +223,13 @@
     <indexterm><primary>reporting bugs</primary>
     </indexterm>
 
-    <para>Glasgow Haskell is a changing system so there are sure to be
-    bugs in it. </para>
+    <para>
+        Glasgow Haskell is a changing system so there are sure to be
+        bugs in it. If you find one, please see
+        <ulink url="http://hackage.haskell.org/trac/ghc/wiki/ReportABug">this wiki page</ulink>
+        for information on how to report it.
+    </para>
 
-    <para>To report a bug, either:</para>
-
-    <itemizedlist>
-      <listitem>
-	<para>Preferred: <ulink
-    url="http://hackage.haskell.org/trac/ghc/newticket?type=bug">Create
-    a new bug</ulink>, and enter your bug report.  You can also
-    search the bug database here to make sure your bug hasn't already
-    been reported (if it has, it might still help to add information
-    from your experience to the existing report).</para>
-      </listitem>
-      <listitem>
-	<para>Bug reports can also be emailed to
-    <email>glasgow-haskell-bugs@haskell.org</email>. </para>
-      </listitem>
-    </itemizedlist>
-
-    <sect2>
-      <title>How do I tell if I should report my bug?</title>
-
-      <para>Take a look at the <ulink
-      url="http://hackage.haskell.org/trac/ghc/wiki/FAQ">FAQ</ulink> and <xref
-      linkend="wrong"/>, which will give you some guidance as to
-      whether the behaviour you're seeing is really a bug or
-      not.</para>
-
-      <para>If it is a bug, then it might have been reported before:
-      try searching on the <ulink
-      url="http://hackage.haskell.org/trac/ghc">bug tracker</ulink>,
-      and failing that, try <ulink
-      url="http://www.google.com">Google</ulink>.</para>
-
-      <para>If in doubt, just report it.</para>
-    </sect2>
-
-    <sect2>
-      <title>What to put in a bug report</title>
-      <indexterm><primary>bug reports</primary><secondary>contents</secondary></indexterm>
-
-      <para>The name of the bug-reporting game is: facts, facts,
-      facts.  Don't omit them because &ldquo;Oh, they won't be
-      interested&hellip;&rdquo;</para>
-
-      <orderedlist>
-	<listitem>
-	  <para>What kind of machine are you running on, and exactly
-          what version of the operating system are you using?  (on a
-          Unix system, <command>uname -a</command> or <command>cat
-          /etc/motd</command> will show the desired information.)  In
-          the bug tracker, this information can be given in the
-          &ldquo;Architecture&rdquo; and &ldquo;Operating
-          system&rdquo; fields.</para>
-	</listitem>
-
-	<listitem>
-	  <para>What version of GCC are you using? <command>gcc&nbsp;-v</command> will tell you.</para>
-	</listitem>
-
-	<listitem>
-	  <para>Run the sequence of compiles/runs that caused the
-          offending behaviour, cut-and-paste the whole session into
-          the bug report.  We'd prefer to see the whole thing.</para>
-	</listitem>
-
-	<listitem>
-	  <para>Add the -v flag when running GHC, so we can see exactly
-          what was run, what versions of things you have, etc.</para>
-	</listitem>
-
-	<listitem>
-	  <para>What is the program behaviour that is wrong, in your
-	  opinion?</para>
-	</listitem>
-
-	<listitem>
-	  <para>If practical, please attach or send enough source
-          files for us to duplicate the problem.</para>
-	</listitem>
-
-	<listitem>
-	  <para>If you are a Hero and track down the problem in the
-          compilation-system sources, please send us patches (either
-          <literal>darcs send</literal>, plain patches, or just whole
-          files if you prefer).</para>
-	</listitem>
-      </orderedlist>
-    </sect2>
   </sect1>
 
   <sect1 id="version-numbering">
