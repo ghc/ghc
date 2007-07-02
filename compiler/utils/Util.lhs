@@ -39,7 +39,7 @@ module Util (
 
 	-- comparisons
 	isEqual, eqListBy, 
-	thenCmp, cmpList, prefixMatch, suffixMatch, maybePrefixMatch,
+	thenCmp, cmpList, maybePrefixMatch,
 	removeSpaces,
 
 	-- strictness
@@ -688,21 +688,12 @@ cmpList cmp (a:as) (b:bs)
 \end{code}
 
 \begin{code}
-prefixMatch :: Eq a => [a] -> [a] -> Bool
-prefixMatch [] _str = True
-prefixMatch _pat [] = False
-prefixMatch (p:ps) (s:ss) | p == s    = prefixMatch ps ss
-			  | otherwise = False
-
 maybePrefixMatch :: String -> String -> Maybe String
 maybePrefixMatch []    rest = Just rest
 maybePrefixMatch (_:_) []   = Nothing
 maybePrefixMatch (p:pat) (r:rest)
   | p == r    = maybePrefixMatch pat rest
   | otherwise = Nothing
-
-suffixMatch :: Eq a => [a] -> [a] -> Bool
-suffixMatch pat str = prefixMatch (reverse pat) (reverse str)
 
 removeSpaces :: String -> String
 removeSpaces = reverse . dropWhile isSpace . reverse . dropWhile isSpace

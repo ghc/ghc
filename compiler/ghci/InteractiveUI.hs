@@ -628,7 +628,7 @@ lookupCommand str = do
   -- look for exact match first, then the first prefix match
   case [ c | c <- cmds, str == cmdName c ] of
      c:_ -> return (Just c)
-     [] -> case [ c | c@(s,_,_,_) <- cmds, prefixMatch str s ] of
+     [] -> case [ c | c@(s,_,_,_) <- cmds, str `isPrefixOf` s ] of
      		[] -> return Nothing
      		c:_ -> return (Just c)
 

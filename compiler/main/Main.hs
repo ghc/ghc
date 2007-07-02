@@ -70,7 +70,7 @@ main =
   argv0 <- getArgs
 
   let
-        (minusB_args, argv1) = partition (prefixMatch "-B") argv0
+        (minusB_args, argv1) = partition ("-B" `isPrefixOf`) argv0
         mbMinusB | null minusB_args = Nothing
                  | otherwise = Just (drop 2 (last minusB_args))
 

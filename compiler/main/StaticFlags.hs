@@ -85,7 +85,7 @@ import Data.IORef
 import System.IO.Unsafe	( unsafePerformIO )
 import Control.Monad	( when )
 import Data.Char	( isDigit )
-import Data.List	( sort, intersperse, nub )
+import Data.List
 
 -----------------------------------------------------------------------------
 -- Static flags
@@ -369,7 +369,7 @@ isStaticFlag f =
 	"fPIC",
 	"fhpc"
 	]
-  || any (flip prefixMatch f) [
+  || any (`isPrefixOf` f) [
 	"fliberate-case-threshold",
 	"fmax-worker-args",
 	"fhistory-size",

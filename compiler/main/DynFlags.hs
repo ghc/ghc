@@ -1429,7 +1429,7 @@ machdepCCOpts dflags
 	       sta = opt_Static
 	   in
 	            ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else ""
---                    , if suffixMatch "mingw32" cTARGETPLATFORM then "-mno-cygwin" else "" 
+--                    , if "mingw32" `isSuffixOf` cTARGETPLATFORM then "-mno-cygwin" else "" 
 		      ],
 		      [ "-fno-defer-pop",
 #ifdef HAVE_GCC_MNO_OMIT_LFPTR
