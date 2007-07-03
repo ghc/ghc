@@ -85,12 +85,12 @@ mkInfoTable uniq (CmmProc info entry_label arguments blocks) =
           where
             fun_extra_bits =
                [packHalfWordsCLit fun_type fun_arity] ++
-               srt_label ++
                case pap_bitmap of
                  ArgGen liveness ->
+                     (if null srt_label then [mkIntCLit 0] else srt_label) ++
                      [makeRelativeRefTo info_label $ mkLivenessCLit liveness,
                       makeRelativeRefTo info_label slow_entry]
-                 _ -> []
+                 _ -> srt_label
             std_info = mkStdInfoTable ty_prof cl_prof type_tag srt_bitmap layout
             info_label = entryLblToInfoLbl entry_label
             (srt_label, srt_bitmap) = mkSRTLit info_label srt
@@ -121,12 +121,11 @@ mkInfoTable uniq (CmmProc info entry_label arguments blocks) =
       -- | A selector thunk.
       CmmInfo (ProfilingInfo ty_prof cl_prof) _ type_tag
               (ThunkSelectorInfo offset srt) ->
-          mkInfoTableAndCode info_label std_info srt_label entry_label
+          mkInfoTableAndCode info_label std_info [{- no SRT -}] entry_label
                              arguments blocks
           where
-            std_info = mkStdInfoTable ty_prof cl_prof type_tag srt_bitmap (mkWordCLit offset)
+            std_info = mkStdInfoTable ty_prof cl_prof type_tag 0 (mkWordCLit offset)
             info_label = entryLblToInfoLbl entry_label
-            (srt_label, srt_bitmap) = mkSRTLit info_label srt
 
       -- A continuation/return-point.
       CmmInfo (ProfilingInfo ty_prof cl_prof) _ type_tag (ContInfo stack_layout srt) ->
