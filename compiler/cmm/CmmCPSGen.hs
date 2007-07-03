@@ -78,12 +78,12 @@ data ContinuationFormat
 -- A block can be an entry to a function
 
 -----------------------------------------------------------------------------
-continuationToProc :: (WordOff, [(CLabel, ContinuationFormat)])
+continuationToProc :: (WordOff, WordOff, [(CLabel, ContinuationFormat)])
                    -> CmmReg
                    -> [[Unique]]
                    -> Continuation CmmInfo
                    -> CmmTop
-continuationToProc (max_stack, formats) stack_use uniques
+continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                    (Continuation info label formals _ blocks) =
     CmmProc info label formals (concat $ zipWith3 continuationToProc' uniques blocks (True : repeat False))
     where
@@ -98,14 +98,18 @@ continuationToProc (max_stack, formats) stack_use uniques
       gc_stmts :: [CmmStmt]
       gc_stmts =
           case info of
-            CmmInfo _ (Just gc_block) _ _ ->
+            CmmInfo (Just gc_block) _ _ ->
                 gc_stack_check' stack_use arg_stack (max_stack - curr_stack)
-            CmmInfo _ Nothing _ _ ->
+            CmmInfo Nothing _ _ ->
                 panic "continuationToProc: missing GC block"
-            CmmNonInfo (Just gc_block) ->
-                gc_stack_check' stack_use arg_stack (max_stack - curr_stack)
-            CmmNonInfo Nothing ->
-                panic "continuationToProc: missing non-info GC block"
+
+      update_stmts :: [CmmStmt]
+      update_stmts =
+          case info of
+            CmmInfo _ (Just (UpdateFrame target args)) _ ->
+                pack_frame curr_stack update_frame_size (Just target) (map Just args) ++
+                adjust_sp_reg (curr_stack - update_frame_size)
+            CmmInfo _ Nothing _ -> []
 
 -- At present neither the Cmm parser nor the code generator
 -- produce code that will allow the target of a CmmCondBranch
@@ -148,7 +152,18 @@ continuationToProc (max_stack, formats) stack_use uniques
             block_for_branch' unique (Just next) = (Just new_next, new_blocks)
               where (new_next, new_blocks) = block_for_branch unique next
 
-            main_block = BasicBlock ident (stmts ++ postfix_stmts)
+            main_block =
+                case entry of
+                  FunctionEntry _ _ _ ->
+                      -- Ugh, the statements for an update frame must come
+                      -- *after* the GC check that was added at the beginning
+                      -- of the CPS pass.  So we have do edit the statements
+                      -- a bit.  This depends on the knowledge that the
+                      -- statements in the first block are only the GC check.
+                      -- That's fragile but it works for now.
+                      BasicBlock ident (stmts ++ update_stmts ++ postfix_stmts)
+                  ControlEntry -> BasicBlock ident (stmts ++ postfix_stmts)
+                  ContinuationEntry _ _ _ -> BasicBlock ident (stmts ++ postfix_stmts)
             prefix_id = BlockId prefix_unique
             gc_prefix = case entry of
                        FunctionEntry _ _ _ -> gc_stmts
@@ -336,19 +351,20 @@ currentNursery 	  = CmmGlobal CurrentNursery
 
 tail_call :: WordOff -> CmmExpr -> CmmActuals -> [CmmStmt]
 tail_call spRel target arguments
-  = store_arguments ++ adjust_spReg ++ jump where
+  = store_arguments ++ adjust_sp_reg spRel ++ jump where
     store_arguments =
         [stack_put spRel expr offset
          | ((expr, _), StackParam offset) <- argument_formats] ++
         [global_put expr global
          | ((expr, _), RegisterParam global) <- argument_formats]
-    adjust_spReg =
-        if spRel == 0
-        then []
-        else [CmmAssign spReg (CmmRegOff spReg (spRel*wORD_SIZE))]
     jump = [CmmJump target arguments]
 
     argument_formats = assignArguments (cmmExprRep . fst) arguments
+
+adjust_sp_reg spRel =
+    if spRel == 0
+    then []
+    else [CmmAssign spReg (CmmRegOff spReg (spRel*wORD_SIZE))]
 
 gc_stack_check' stack_use arg_stack max_frame_size =
     if max_frame_size > arg_stack
@@ -367,10 +383,6 @@ gc_stack_check gc_block max_frame_size
      gc_block]
 
 
--- TODO: fix branches to proc point
--- (we have to insert a new block to marshel the continuation)
-
-
 pack_continuation :: Bool               -- ^ Whether to set the top/header
                                         -- of the stack.  We only need to
                                         -- set it if we are calling down
@@ -382,35 +394,52 @@ pack_continuation :: Bool               -- ^ Whether to set the top/header
 pack_continuation allow_header_set
                       (ContinuationFormat _ curr_id curr_frame_size _)
                       (ContinuationFormat _ cont_id cont_frame_size live_regs)
-  = store_live_values ++ set_stack_header where
-    -- TODO: only save variables when actually needed
-    -- (may be handled by latter pass)
-    store_live_values =
-        [stack_put spRel (CmmReg (CmmLocal reg)) offset
-         | (reg, offset) <- cont_offsets]
-    set_stack_header =
-        if needs_header_set && allow_header_set
-        then [stack_put spRel continuation_function 0]
-        else []
-
-    -- TODO: factor with function_entry and CmmInfo.hs(?)
-    cont_offsets = mkOffsets label_size live_regs
-
-    label_size = 1 :: WordOff
-
-    mkOffsets size [] = []
-    mkOffsets size (Nothing:regs) = mkOffsets (size+1) regs
-    mkOffsets size (Just reg:regs) = (reg, size):mkOffsets (size + width) regs
-        where
-          width = machRepByteWidth (localRegRep reg) `quot` wORD_SIZE
-          -- TODO: it would be better if we had a machRepWordWidth
-
-    spRel = curr_frame_size - cont_frame_size
+  = pack_frame curr_frame_size cont_frame_size maybe_header continuation_args
+  where
     continuation_function = CmmLit $ CmmLabel $ fromJust cont_id
+    continuation_args = map (maybe Nothing (Just . CmmReg . CmmLocal))
+                            live_regs
     needs_header_set =
         case (curr_id, cont_id) of
           (Just x, Just y) -> x /= y
           _ -> isJust cont_id
+
+    maybe_header = if allow_header_set && needs_header_set
+                   then Just continuation_function
+                   else Nothing
+
+pack_frame :: WordOff         -- ^ Current frame size
+           -> WordOff         -- ^ Next frame size
+           -> Maybe CmmExpr   -- ^ Next frame header if any
+           -> [Maybe CmmExpr] -- ^ Next frame data
+           -> [CmmStmt]
+pack_frame curr_frame_size next_frame_size next_frame_header frame_args =
+    store_live_values ++ set_stack_header
+    where
+    -- TODO: only save variables when actually needed
+    -- (may be handled by latter pass)
+    store_live_values =
+        [stack_put spRel expr offset
+         | (expr, offset) <- cont_offsets]
+    set_stack_header =
+        case next_frame_header of
+          Nothing -> []
+          Just expr -> [stack_put spRel expr 0]
+
+    -- TODO: factor with function_entry and CmmInfo.hs(?)
+    cont_offsets = mkOffsets label_size frame_args
+
+    label_size = 1 :: WordOff
+
+    mkOffsets size [] = []
+    mkOffsets size (Nothing:exprs) = mkOffsets (size+1) exprs
+    mkOffsets size (Just expr:exprs) = (expr, size):mkOffsets (size + width) exprs
+        where
+          width = machRepByteWidth (cmmExprRep expr) `quot` wORD_SIZE
+          -- TODO: it would be better if we had a machRepWordWidth
+
+    spRel = curr_frame_size - next_frame_size
+
 
 -- Lazy adjustment of stack headers assumes all blocks
 -- that could branch to eachother (i.e. control blocks)

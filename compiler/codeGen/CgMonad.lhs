@@ -745,7 +745,7 @@ emitSimpleProc :: CLabel -> Code -> Code
 emitSimpleProc lbl code
   = do	{ stmts <- getCgStmts code
 	; blks <- cgStmtsToBlocks stmts
-	; emitProc (CmmNonInfo Nothing) lbl [] blks }
+	; emitProc (CmmInfo Nothing Nothing CmmNonInfoTable) lbl [] blks }
 
 getCmm :: Code -> FCode Cmm
 -- Get all the CmmTops (there should be no stmts)

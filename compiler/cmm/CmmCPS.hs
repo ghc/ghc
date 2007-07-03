@@ -87,23 +87,19 @@ make_gc_check stack_use gc_block =
 
 force_gc_block old_info stack_use block_id fun_label formals =
     case old_info of
-      CmmNonInfo (Just existing) -> (old_info, [], make_gc_check stack_use existing)
-      CmmInfo _ (Just existing) _ _ -> (old_info, [], make_gc_check stack_use existing)
-      CmmNonInfo Nothing
-          -> (CmmNonInfo (Just block_id),
-              [make_gc_block block_id fun_label formals (CmmSafe NoC_SRT)],
+      CmmInfo (Just existing) _ _
+          -> (old_info, [], make_gc_check stack_use existing)
+      CmmInfo Nothing update_frame info_table
+          -> (CmmInfo (Just block_id) update_frame info_table,
+              [make_gc_block block_id fun_label formals (CmmSafe $ cmmInfoTableSRT info_table)],
               make_gc_check stack_use block_id)
-      CmmInfo prof Nothing type_tag type_info
-          -> (CmmInfo prof (Just block_id) type_tag type_info,
-              [make_gc_block block_id fun_label formals (CmmSafe srt)],
-              make_gc_check stack_use block_id)
-             where
-               srt = case type_info of
-                       ConstrInfo _ _ _ -> NoC_SRT
-                       FunInfo _ srt' _ _ _ _ -> srt'
-                       ThunkInfo _ srt' -> srt'
-                       ThunkSelectorInfo _ srt' -> srt'
-                       ContInfo _ srt' -> srt'
+
+cmmInfoTableSRT CmmNonInfoTable = NoC_SRT
+cmmInfoTableSRT (CmmInfoTable _ _ (ConstrInfo _ _ _)) = NoC_SRT
+cmmInfoTableSRT (CmmInfoTable _ _ (FunInfo _ srt _ _ _ _)) = srt
+cmmInfoTableSRT (CmmInfoTable _ _ (ThunkInfo _ srt)) = srt
+cmmInfoTableSRT (CmmInfoTable _ _ (ThunkSelectorInfo _ srt)) = srt
+cmmInfoTableSRT (CmmInfoTable _ _ (ContInfo _ srt)) = srt
 
 -----------------------------------------------------------------------------
 -- |CPS a single CmmTop (proceedure)
@@ -127,7 +123,7 @@ cpsProc uniqSupply (CmmProc info ident params blocks) = cps_procs
       (uniqSupply1, uniqSupply2) = splitUniqSupply uniqSupply
       uniques :: [[Unique]]
       uniques = map uniqsFromSupply $ listSplitUniqSupply uniqSupply1
-      (gc_unique:stack_use_unique:info_uniques):adaptor_uniques:block_uniques = uniques
+      (gc_unique:gc_block_unique:stack_use_unique:info_uniques):adaptor_uniques:block_uniques = uniques
       proc_uniques = map (map uniqsFromSupply . listSplitUniqSupply) $ listSplitUniqSupply uniqSupply2
 
       stack_use = CmmLocal (LocalReg stack_use_unique (cmmRegRep spReg) KindPtr)
@@ -136,16 +132,17 @@ cpsProc uniqSupply (CmmProc info ident params blocks) = cps_procs
       forced_gc :: (CmmInfo, [CmmBasicBlock], [CmmStmt])
       forced_gc = force_gc_block info stack_use (BlockId gc_unique) ident params
       (forced_info, gc_blocks, check_stmts) = forced_gc
+      gc_block_id = BlockId gc_block_unique
 
-      forced_blocks =
-          case blocks of
-            (BasicBlock id stmts) : bs ->
-                (BasicBlock id (check_stmts ++ stmts)) : (bs ++ gc_blocks)
-            [] -> [] -- If there is no code then we don't need a stack check
+      forced_blocks = 
+          BasicBlock gc_block_id
+                     (check_stmts++[CmmBranch $ blockId $ head blocks]) :
+          blocks ++ gc_blocks
 
       forced_gc_id = case forced_info of
-                       CmmNonInfo (Just x) -> x
-                       CmmInfo _ (Just x) _ _ -> x
+                       CmmInfo (Just x) _ _ -> x
+
+      update_frame = case info of CmmInfo _ u _ -> u
 
       -- Break the block at each function call.
       -- The part after the function call will have to become a continuation.
@@ -199,13 +196,13 @@ cpsProc uniqSupply (CmmProc info ident params blocks) = cps_procs
 
       -- Do a little meta-processing on the stack formats such as
       -- getting the individual frame sizes and the maximum frame size
-      formats' :: (WordOff, [(CLabel, ContinuationFormat)])
-      formats' = processFormats formats continuations
+      formats' :: (WordOff, WordOff, [(CLabel, ContinuationFormat)])
+      formats'@(_, _, format_list) = processFormats formats update_frame continuations
 
       -- Update the info table data on the continuations with
       -- the selected stack formats.
       continuations' :: [Continuation CmmInfo]
-      continuations' = map (applyContinuationFormat (snd formats')) continuations
+      continuations' = map (applyContinuationFormat format_list) continuations
 
       -- Do the actual CPS transform.
       cps_procs :: [CmmTop]
@@ -257,7 +254,7 @@ gatherBlocksIntoContinuation live proc_points blocks start =
       info_table = case start_block_entry of
                      FunctionEntry info _ _ -> Right info
                      ContinuationEntry _ srt _ -> Left srt
-                     ControlEntry -> Right (CmmNonInfo Nothing)
+                     ControlEntry -> Right (CmmInfo Nothing Nothing CmmNonInfoTable)
 
       is_gc_cont = case start_block_entry of
                      FunctionEntry _ _ _ -> False
@@ -287,7 +284,7 @@ selectContinuationFormat live continuations =
     where
       -- User written continuations
       selectContinuationFormat' (Continuation
-                          (Right (CmmInfo _ _ _ (ContInfo format srt)))
+                          (Right (CmmInfo _ _ (CmmInfoTable _ _ (ContInfo format srt))))
                           label formals _ _) =
           (formals, Just label, format)
       -- Either user written non-continuation code
@@ -306,9 +303,11 @@ selectContinuationFormat live continuations =
       unknown_block = panic "unknown BlockId in selectContinuationFormat"
 
 processFormats :: [(CLabel, (CmmFormals, Maybe CLabel, [Maybe LocalReg]))]
+               -> Maybe UpdateFrame
                -> [Continuation (Either C_SRT CmmInfo)]
-               -> (WordOff, [(CLabel, ContinuationFormat)])
-processFormats formats continuations = (max_size, formats')
+               -> (WordOff, WordOff, [(CLabel, ContinuationFormat)])
+processFormats formats update_frame continuations =
+    (max_size + update_frame_size, update_frame_size, formats')
     where
       max_size = maximum $
                  0 : map (continuationMaxStack formats') continuations
@@ -323,6 +322,17 @@ processFormats formats continuations = (max_size, formats')
                                 then label_size
                                 else 0,
              continuation_stack = stack })
+
+      update_frame_size = case update_frame of
+                            Nothing -> 0
+                            (Just (UpdateFrame _ args))
+                                -> label_size + update_size args
+
+      update_size [] = 0
+      update_size (expr:exprs) = width + update_size exprs
+          where
+            width = machRepByteWidth (cmmExprRep expr) `quot` wORD_SIZE
+            -- TODO: it would be better if we had a machRepWordWidth
 
       -- TODO: get rid of "+ 1" etc.
       label_size = 1 :: WordOff
@@ -381,9 +391,9 @@ applyContinuationFormat :: [(CLabel, ContinuationFormat)]
 
 -- User written continuations
 applyContinuationFormat formats (Continuation
-                          (Right (CmmInfo prof gc tag (ContInfo _ srt)))
+                          (Right (CmmInfo gc update_frame (CmmInfoTable prof tag (ContInfo _ srt))))
                           label formals is_gc blocks) =
-    Continuation (CmmInfo prof gc tag (ContInfo format srt))
+    Continuation (CmmInfo gc update_frame (CmmInfoTable prof tag (ContInfo format srt)))
                  label formals is_gc blocks
     where
       format = continuation_stack $ maybe unknown_block id $ lookup label formats
@@ -397,7 +407,7 @@ applyContinuationFormat formats (Continuation
 -- CPS generated continuations
 applyContinuationFormat formats (Continuation
                           (Left srt) label formals is_gc blocks) =
-    Continuation (CmmInfo prof gc tag (ContInfo (continuation_stack $ format) srt))
+    Continuation (CmmInfo gc Nothing (CmmInfoTable prof tag (ContInfo (continuation_stack $ format) srt)))
                  label formals is_gc blocks
     where
       gc = Nothing -- Generated continuations never need a stack check

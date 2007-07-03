@@ -129,17 +129,19 @@ instance Outputable CmmSafety where
 -- For ideas on how to refine it, they used to be printed in the
 -- style of C--'s 'stackdata' declaration, just inside the proc body,
 -- and were labelled with the procedure name ++ "_info".
-pprInfo (CmmNonInfo gc_target) =
-    ptext SLIT("gc_target: ") <>
-          ptext SLIT("TODO") --maybe (ptext SLIT("<none>")) pprBlockId gc_target
-          -- ^ gc_target is currently unused and wired to a panic
-pprInfo (CmmInfo (ProfilingInfo closure_type closure_desc)
-                 gc_target tag info) =
-    vcat [ptext SLIT("type: ") <> pprLit closure_type,
+pprInfo (CmmInfo gc_target update_frame CmmNonInfoTable) =
+    vcat [ptext SLIT("gc_target: ") <>
+                maybe (ptext SLIT("<none>")) pprBlockId gc_target,
+          ptext SLIT("update_frame: ") <>
+                maybe (ptext SLIT("<none>")) pprUpdateFrame update_frame]
+pprInfo (CmmInfo gc_target update_frame
+         (CmmInfoTable (ProfilingInfo closure_type closure_desc) tag info)) =
+    vcat [ptext SLIT("gc_target: ") <>
+                maybe (ptext SLIT("<none>")) pprBlockId gc_target,
+          ptext SLIT("update_frame: ") <>
+                maybe (ptext SLIT("<none>")) pprUpdateFrame update_frame,
+          ptext SLIT("type: ") <> pprLit closure_type,
           ptext SLIT("desc: ") <> pprLit closure_desc,
-          ptext SLIT("gc_target: ") <>
-                ptext SLIT("TODO"), --maybe (ptext SLIT("<none>")) pprBlockId gc_target,
-                -- ^ gc_target is currently unused and wired to a panic
           ptext SLIT("tag: ") <> integer (toInteger tag),
           pprTypeInfo info]
 
@@ -167,6 +169,19 @@ pprTypeInfo (ThunkSelectorInfo offset srt) =
 pprTypeInfo (ContInfo stack srt) =
     vcat [ptext SLIT("stack: ") <> ppr stack,
           ptext SLIT("srt: ") <> ppr srt]
+
+pprUpdateFrame :: UpdateFrame -> SDoc
+pprUpdateFrame (UpdateFrame expr args) = 
+    hcat [ ptext SLIT("jump")
+         , space
+         , if isTrivialCmmExpr expr
+                then pprExpr expr
+                else case expr of
+                    CmmLoad (CmmReg _) _ -> pprExpr expr 
+                    _ -> parens (pprExpr expr)
+         , space
+         , parens  ( commafy $ map ppr args ) ]
+
 
 -- --------------------------------------------------------------------------
 -- Basic blocks look like assembly blocks.

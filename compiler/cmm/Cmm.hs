@@ -9,7 +9,8 @@
 module Cmm ( 
 	GenCmm(..), Cmm, RawCmm,
 	GenCmmTop(..), CmmTop, RawCmmTop,
-	CmmInfo(..), ClosureTypeInfo(..), ProfilingInfo(..), ClosureTypeTag,
+	CmmInfo(..), UpdateFrame(..),
+        CmmInfoTable(..), ClosureTypeInfo(..), ProfilingInfo(..), ClosureTypeTag,
 	GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts, mapBlockStmts,
 	CmmStmt(..), CmmActuals, CmmFormal, CmmFormals, CmmHintFormals,
         CmmSafety(..),
@@ -110,15 +111,19 @@ mapBlockStmts f (BasicBlock id bs) = BasicBlock id (map f bs)
 --     Info Tables
 -----------------------------------------------------------------------------
 
--- Info table as a haskell data type
 data CmmInfo
   = CmmInfo
-      ProfilingInfo
       (Maybe BlockId) -- GC target
+      (Maybe UpdateFrame) -- Update frame
+      CmmInfoTable -- Info table
+
+-- Info table as a haskell data type
+data CmmInfoTable
+  = CmmInfoTable
+      ProfilingInfo
       ClosureTypeTag -- Int
       ClosureTypeInfo
-  | CmmNonInfo   -- Procedure doesn't need an info table
-      (Maybe BlockId) -- But we still need a GC target for it
+  | CmmNonInfoTable   -- Procedure doesn't need an info table
 
 -- TODO: The GC target shouldn't really be part of CmmInfo
 -- as it doesn't appear in the resulting info table.
@@ -145,6 +150,13 @@ type SlowEntry = CmmLit
   -- ^We would like this to be a CLabel but
   -- for now the parser sets this to zero on an INFO_TABLE_FUN.
 type SelectorOffset = StgWord
+
+-- | A frame that is to be pushed before entry to the function.
+-- Used to handle 'update' frames.
+data UpdateFrame =
+    UpdateFrame
+      CmmExpr    -- Frame header.  Behaves like the target of a 'jump'.
+      [CmmExpr]  -- Frame remainder.  Behaves like the arguments of a 'jump'.
 
 -----------------------------------------------------------------------------
 --		CmmStmt

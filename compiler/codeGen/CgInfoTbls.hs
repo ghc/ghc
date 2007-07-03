@@ -89,12 +89,12 @@ mkCmmInfo cl_info = do
            info = ConstrInfo (ptrs, nptrs)
                              (fromIntegral (dataConTagZ con))
                              conName
-       return $ CmmInfo prof gc_target cl_type info
+       return $ CmmInfo gc_target Nothing (CmmInfoTable prof cl_type info)
 
     ClosureInfo { closureName   = name,
                   closureLFInfo = lf_info,
                   closureSRT    = srt } ->
-       return $ CmmInfo prof gc_target cl_type info
+       return $ CmmInfo gc_target Nothing (CmmInfoTable prof cl_type info)
        where
          info =
              case lf_info of
@@ -145,10 +145,12 @@ emitReturnTarget name stmts
 	; blks <- cgStmtsToBlocks stmts
         ; frame <- mkStackLayout
         ; let info = CmmInfo
-                       (ProfilingInfo zeroCLit zeroCLit)
                        gc_target
-                       rET_SMALL -- cmmToRawCmm may convert it to rET_BIG
-                       (ContInfo frame srt_info)
+                       Nothing
+                       (CmmInfoTable
+                        (ProfilingInfo zeroCLit zeroCLit)
+                        rET_SMALL -- cmmToRawCmm may convert it to rET_BIG
+                        (ContInfo frame srt_info))
         ; emitInfoTableAndCode info_lbl info args blks
 	; return info_lbl }
   where

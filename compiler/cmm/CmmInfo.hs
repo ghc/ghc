@@ -71,15 +71,15 @@ cmmToRawCmm cmm = do
 
 mkInfoTable :: Unique -> CmmTop -> [RawCmmTop]
 mkInfoTable uniq (CmmData sec dat) = [CmmData sec dat]
-mkInfoTable uniq (CmmProc info entry_label arguments blocks) =
+mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
     case info of
       -- | Code without an info table.  Easy.
-      CmmNonInfo _ -> [CmmProc [] entry_label arguments blocks]
+      CmmNonInfoTable -> [CmmProc [] entry_label arguments blocks]
 
       -- | A function entry point.
-      CmmInfo (ProfilingInfo ty_prof cl_prof) _ type_tag
-              (FunInfo (ptrs, nptrs) srt fun_type fun_arity
-                       pap_bitmap slow_entry) ->
+      CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag
+                   (FunInfo (ptrs, nptrs) srt fun_type fun_arity
+                            pap_bitmap slow_entry) ->
           mkInfoTableAndCode info_label std_info fun_extra_bits entry_label
                              arguments blocks
           where
@@ -97,8 +97,8 @@ mkInfoTable uniq (CmmProc info entry_label arguments blocks) =
             layout = packHalfWordsCLit ptrs nptrs
 
       -- | A constructor.
-      CmmInfo (ProfilingInfo ty_prof cl_prof) _ type_tag
-              (ConstrInfo (ptrs, nptrs) con_tag descr) ->
+      CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag
+                   (ConstrInfo (ptrs, nptrs) con_tag descr) ->
           mkInfoTableAndCode info_label std_info [con_name] entry_label
                              arguments blocks
           where
@@ -108,8 +108,8 @@ mkInfoTable uniq (CmmProc info entry_label arguments blocks) =
             layout = packHalfWordsCLit ptrs nptrs
 
       -- | A thunk.
-      CmmInfo (ProfilingInfo ty_prof cl_prof) _ type_tag
-              (ThunkInfo (ptrs, nptrs) srt) ->
+      CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag
+                   (ThunkInfo (ptrs, nptrs) srt) ->
           mkInfoTableAndCode info_label std_info srt_label entry_label
                              arguments blocks
           where
@@ -119,8 +119,8 @@ mkInfoTable uniq (CmmProc info entry_label arguments blocks) =
             layout = packHalfWordsCLit ptrs nptrs
 
       -- | A selector thunk.
-      CmmInfo (ProfilingInfo ty_prof cl_prof) _ type_tag
-              (ThunkSelectorInfo offset srt) ->
+      CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag
+                   (ThunkSelectorInfo offset srt) ->
           mkInfoTableAndCode info_label std_info [{- no SRT -}] entry_label
                              arguments blocks
           where
@@ -128,7 +128,8 @@ mkInfoTable uniq (CmmProc info entry_label arguments blocks) =
             info_label = entryLblToInfoLbl entry_label
 
       -- A continuation/return-point.
-      CmmInfo (ProfilingInfo ty_prof cl_prof) _ type_tag (ContInfo stack_layout srt) ->
+      CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag
+                   (ContInfo stack_layout srt) ->
           liveness_data ++
           mkInfoTableAndCode info_label std_info srt_label entry_label
                              arguments blocks

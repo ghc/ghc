@@ -200,47 +200,49 @@ lits	:: { [ExtFCode CmmExpr] }
 
 cmmproc :: { ExtCode }
 -- TODO: add real SRT/info tables to parsed Cmm
-	: info maybe_formals '{' body '}'
-		{ do ((info_lbl, info, live, formals), stmts) <-
+	: info maybe_formals maybe_frame '{' body '}'
+		{ do ((info_lbl, info, live, formals, frame), stmts) <-
 		       getCgStmtsEC' $ loopDecls $ do {
 		         (info_lbl, info, live) <- $1;
 		         formals <- sequence $2;
-		         $4;
-		         return (info_lbl, info, live, formals) }
+		         frame <- $3;
+		         $5;
+		         return (info_lbl, info, live, formals, frame) }
 		     blks <- code (cgStmtsToBlocks stmts)
-		     code (emitInfoTableAndCode info_lbl info formals blks) }
+		     code (emitInfoTableAndCode info_lbl (CmmInfo Nothing frame info) formals blks) }
 
 	| info maybe_formals ';'
 		{ do (info_lbl, info, live) <- $1;
 		     formals <- sequence $2;
-		     code (emitInfoTableAndCode info_lbl info formals []) }
+		     code (emitInfoTableAndCode info_lbl (CmmInfo Nothing Nothing info) formals []) }
 
-	| NAME maybe_formals '{' body '}'
-		{ do (formals, stmts) <-
+	| NAME maybe_formals maybe_frame '{' body '}'
+		{ do ((formals, frame), stmts) <-
 			getCgStmtsEC' $ loopDecls $ do {
 		          formals <- sequence $2;
-		          $4;
-		          return formals }
+			  frame <- $3;
+		          $5;
+		          return (formals, frame) }
                      blks <- code (cgStmtsToBlocks stmts)
-		     code (emitProc (CmmNonInfo Nothing) (mkRtsCodeLabelFS $1) formals blks) }
+		     code (emitProc (CmmInfo Nothing frame CmmNonInfoTable) (mkRtsCodeLabelFS $1) formals blks) }
 
-info	:: { ExtFCode (CLabel, CmmInfo, [Maybe LocalReg]) }
+info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	: 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- ptrs, nptrs, closure type, description, type
 		{ do prof <- profilingInfo $11 $13
 		     return (mkRtsInfoLabelFS $3,
-			CmmInfo prof Nothing (fromIntegral $9)
-				(ThunkInfo (fromIntegral $5, fromIntegral $7) NoC_SRT),
+			CmmInfoTable prof (fromIntegral $9)
+				     (ThunkInfo (fromIntegral $5, fromIntegral $7) NoC_SRT),
 			[]) }
 	
 	| 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ')'
 		-- ptrs, nptrs, closure type, description, type, fun type
 		{ do prof <- profilingInfo $11 $13
 		     return (mkRtsInfoLabelFS $3,
-			CmmInfo prof Nothing (fromIntegral $9)
-				(FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT (fromIntegral $15) 0
-				 (ArgSpec 0)
-				 zeroCLit),
+			CmmInfoTable prof (fromIntegral $9)
+				     (FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT (fromIntegral $15) 0
+				      (ArgSpec 0)
+				      zeroCLit),
 			[]) }
 		-- we leave most of the fields zero here.  This is only used
 		-- to generate the BCO info table in the RTS at the moment.
@@ -252,31 +254,31 @@ info	:: { ExtFCode (CLabel, CmmInfo, [Maybe LocalReg]) }
 		     -- but that's the way the old code did it we can fix it some other time.
 		     desc_lit <- code $ mkStringCLit $13
 		     return (mkRtsInfoLabelFS $3,
-			CmmInfo prof Nothing (fromIntegral $11)
-				(ConstrInfo (fromIntegral $5, fromIntegral $7) (fromIntegral $9) desc_lit),
+			CmmInfoTable prof (fromIntegral $11)
+				     (ConstrInfo (fromIntegral $5, fromIntegral $7) (fromIntegral $9) desc_lit),
 			[]) }
 	
 	| 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- selector, closure type, description, type
 		{ do prof <- profilingInfo $9 $11
 		     return (mkRtsInfoLabelFS $3,
-			CmmInfo prof Nothing (fromIntegral $7)
-				(ThunkSelectorInfo (fromIntegral $5) NoC_SRT),
+			CmmInfoTable prof (fromIntegral $7)
+				     (ThunkSelectorInfo (fromIntegral $5) NoC_SRT),
 			[]) }
 
 	| 'INFO_TABLE_RET' '(' NAME ',' INT ')'
 		-- closure type (no live regs)
 		{ return (mkRtsInfoLabelFS $3,
-			CmmInfo (ProfilingInfo zeroCLit zeroCLit) Nothing (fromIntegral $5)
-				(ContInfo [] NoC_SRT),
+			CmmInfoTable (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
+				     (ContInfo [] NoC_SRT),
 			[]) }
 
 	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals0 ')'
 		-- closure type, live regs
 		{ do live <- sequence (map (liftM Just) $7)
 		     return (mkRtsInfoLabelFS $3,
-			CmmInfo (ProfilingInfo zeroCLit zeroCLit) Nothing (fromIntegral $5)
-			(ContInfo live NoC_SRT),
+			CmmInfoTable (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
+			             (ContInfo live NoC_SRT),
 			live) }
 
 body	:: { ExtCode }
@@ -502,6 +504,12 @@ formal :: { ExtFCode LocalReg }
 	: type NAME		{ newLocal defaultKind $1 $2 }
 	| STRING type NAME	{% do k <- parseKind $1;
 				     return $ newLocal k $2 $3 }
+
+maybe_frame :: { ExtFCode (Maybe UpdateFrame) }
+	: {- empty -}			{ return Nothing }
+	| 'jump' expr '(' exprs0 ')'	{ do { target <- $2;
+					       args <- sequence $4;
+					       return $ Just (UpdateFrame target args) } }
 
 type	:: { MachRep }
 	: 'bits8'		{ I8 }
