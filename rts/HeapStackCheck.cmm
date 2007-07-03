@@ -933,7 +933,7 @@ stg_block_async
 /* Used by threadDelay implementation; it would be desirable to get rid of
  * this free()'ing void return continuation.
  */
-INFO_TABLE_RET( stg_block_async_void, 0/*framesize*/, 0/*bitmap*/, RET_SMALL )
+INFO_TABLE_RET( stg_block_async_void, RET_SMALL )
 {
     W_ ares;
 

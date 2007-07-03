@@ -1998,7 +1998,7 @@ delayzh_fast
     /* could probably allocate this on the heap instead */
     ("ptr" ares) = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
 					    stg_delayzh_malloc_str);
-    reqID = foreign "C" addDelayRequest(R1);
+    (reqID) = foreign "C" addDelayRequest(R1);
     StgAsyncIOResult_reqID(ares)   = reqID;
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;
@@ -2060,10 +2060,10 @@ asyncReadzh_fast
     StgTSO_why_blocked(CurrentTSO) = BlockedOnRead::I16;
 
     /* could probably allocate this on the heap instead */
-    "ptr" ares = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
+    ("ptr" ares) = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
 					    stg_asyncReadzh_malloc_str)
 			[R1,R2,R3,R4];
-    reqID = foreign "C" addIORequest(R1, 0/*FALSE*/,R2,R3,R4 "ptr") [];
+    (reqID) = foreign "C" addIORequest(R1, 0/*FALSE*/,R2,R3,R4 "ptr") [];
     StgAsyncIOResult_reqID(ares)   = reqID;
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;
@@ -2087,10 +2087,10 @@ asyncWritezh_fast
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
     StgTSO_why_blocked(CurrentTSO) = BlockedOnWrite::I16;
 
-    "ptr" ares = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
+    ("ptr" ares) = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
 					    stg_asyncWritezh_malloc_str)
 			[R1,R2,R3,R4];
-    reqID = foreign "C" addIORequest(R1, 1/*TRUE*/,R2,R3,R4 "ptr") [];
+    (reqID) = foreign "C" addIORequest(R1, 1/*TRUE*/,R2,R3,R4 "ptr") [];
 
     StgAsyncIOResult_reqID(ares)   = reqID;
     StgAsyncIOResult_len(ares)     = 0;
@@ -2116,10 +2116,10 @@ asyncDoProczh_fast
     StgTSO_why_blocked(CurrentTSO) = BlockedOnDoProc::I16;
 
     /* could probably allocate this on the heap instead */
-    "ptr" ares = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
+    ("ptr" ares) = foreign "C" stgMallocBytes(SIZEOF_StgAsyncIOResult,
 					    stg_asyncDoProczh_malloc_str) 
 				[R1,R2];
-    reqID = foreign "C" addDoProcRequest(R1 "ptr",R2 "ptr") [];
+    (reqID) = foreign "C" addDoProcRequest(R1 "ptr",R2 "ptr") [];
     StgAsyncIOResult_reqID(ares)   = reqID;
     StgAsyncIOResult_len(ares)     = 0;
     StgAsyncIOResult_errCode(ares) = 0;
