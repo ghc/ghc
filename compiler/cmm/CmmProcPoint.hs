@@ -113,4 +113,4 @@ calculateOwnership blocks_ufm proc_points blocks =
                   new = old `unionUniqSets`
                         lookupWithDefaultUFM owners emptyUniqSet cause'
 
-      unknown_block = panic "unknown BlockId in selectStackFormat"
+      unknown_block = panic "unknown BlockId in calculateOwnership"
