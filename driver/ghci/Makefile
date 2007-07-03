@@ -58,7 +58,7 @@ endif
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 ghci.res : ghci.rc ghci.ico
-	windres -o ghci.res -i ghci.rc -O coff
+	windres --preprocessor="$(CPP) -xc -DRC_INVOKED" -o ghci.res -i ghci.rc -O coff
 endif
 
 binary-dist:
