@@ -175,10 +175,8 @@ cpsProc uniqSupply (CmmProc info ident params blocks) = info_procs
 
       -- Group the blocks into continuations based on the set of proc-points.
       continuations :: [Continuation (Either C_SRT CmmInfo)]
-      continuations = zipWith
-                        (gatherBlocksIntoContinuation live proc_points block_env)
-                        (uniqSetToList proc_points)
-                        (Just forced_gc_id : repeat Nothing) {-dead-}
+      continuations = map (gatherBlocksIntoContinuation live proc_points block_env)
+                          (uniqSetToList proc_points)
 
       -- Select the stack format on entry to each continuation.
       -- Return the max stack offset and an association list
@@ -240,19 +238,15 @@ collectNonProcPointTargets proc_points blocks current_targets new_blocks =
 
 gatherBlocksIntoContinuation ::
     BlockEntryLiveness -> UniqSet BlockId -> BlockEnv BrokenBlock
-    -> BlockId -> Maybe BlockId -> Continuation (Either C_SRT CmmInfo)
-gatherBlocksIntoContinuation live proc_points blocks start gc =
+    -> BlockId -> Continuation (Either C_SRT CmmInfo)
+gatherBlocksIntoContinuation live proc_points blocks start =
   Continuation info_table clabel params is_gc_cont body
     where
-      --start_and_gc = [start] -- : maybeToList gc
-      --children = (collectNonProcPointTargets proc_points blocks (mkUniqSet start_and_gc) start_and_gc) `minusUniqSet` (mkUniqSet start_and_gc)
       children = (collectNonProcPointTargets proc_points blocks (unitUniqSet start) [start]) `minusUniqSet` (unitUniqSet start)
       start_block = lookupWithDefaultUFM blocks (panic "TODO") start
       unknown_block = panic "unknown block in gatherBlocksIntoContinuation"
-      --gc_block = map (lookupWithDefaultUFM blocks (panic "TODO)"))
-      --               (maybeToList gc)
       children_blocks = map (lookupWithDefaultUFM blocks (panic "TODO")) (uniqSetToList children)
-      body = start_block : {-gc_block ++ -} children_blocks
+      body = start_block : children_blocks
 
       -- We can't properly annotate the continuation's stack parameters
       -- at this point because this is before stack selection
