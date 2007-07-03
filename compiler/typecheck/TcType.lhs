@@ -451,9 +451,9 @@ pprSkolTvBinding tv
 
     ppr_skol UnkSkol	    = empty	-- Unhelpful; omit
     ppr_skol RuntimeUnkSkol = ptext SLIT("is an unknown runtime type")
-    ppr_skol info           = ptext SLIT("is a rigid type variable bound by") 
-				<+> sep [pprSkolInfo info, 
-					 nest 2 (ptext SLIT("at") <+> ppr (getSrcLoc tv))]
+    ppr_skol info           = sep [ptext SLIT("is a rigid type variable bound by"),
+				   sep [pprSkolInfo info, 
+					 nest 2 (ptext SLIT("at") <+> ppr (getSrcLoc tv))]]
  
 pprSkolInfo :: SkolemInfo -> SDoc
 pprSkolInfo (SigSkol ctxt)   = pprUserTypeCtxt ctxt

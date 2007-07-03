@@ -1601,7 +1601,7 @@ ppr_ty :: TidyEnv -> TcType -> TcType -> TcM (TidyEnv, SDoc, SDoc)
 ppr_ty env ty other_ty 
   = do	{ ty' <- zonkTcType ty
 	; let (env1, tidy_ty) = tidyOpenType env ty'
-	; (env2, extra) <- ppr_extra env1 ty' other_ty
+	; (env2, extra) <- ppr_extra env1 tidy_ty other_ty
 	; return (env2, quotes (ppr tidy_ty), extra) }
 
 -- (ppr_extra env ty other_ty) shows extra info about 'ty'
