@@ -150,5 +150,5 @@ accept:
 	$(MAKE) accept=YES
 
 fast:
-	$(MAKE) fast=YES MAKEFLAGS=
+	$(MAKE) fast=YES
 
