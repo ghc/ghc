@@ -43,7 +43,7 @@ import Data.List
 -----------------------------------------------------------------------------
 cmmCPS :: DynFlags -- ^ Dynamic flags: -dcmm-lint -ddump-cps-cmm
        -> [GenCmm CmmStatic CmmInfo CmmStmt]    -- ^ Input C-- with Proceedures
-       -> IO [GenCmm CmmStatic [CmmStatic] CmmStmt] -- ^ Output CPS transformed C--
+       -> IO [GenCmm CmmStatic CmmInfo CmmStmt] -- ^ Output CPS transformed C--
 cmmCPS dflags abstractC = do
   when (dopt Opt_DoCmmLinting dflags) $
        do showPass dflags "CmmLint"
@@ -112,9 +112,17 @@ force_gc_block old_info stack_use block_id fun_label formals =
 
 cpsProc :: UniqSupply 
         -> GenCmmTop CmmStatic CmmInfo CmmStmt     -- ^Input proceedure
-        -> [GenCmmTop CmmStatic [CmmStatic] CmmStmt]   -- ^Output proceedure and continuations
-cpsProc uniqSupply (CmmData sec dat) = [CmmData sec dat]
-cpsProc uniqSupply (CmmProc info ident params blocks) = info_procs
+        -> [GenCmmTop CmmStatic CmmInfo CmmStmt]   -- ^Output proceedure and continuations
+
+-- Data blocks don't need to be CPS transformed
+cpsProc uniqSupply proc@(CmmData _ _) = [proc]
+
+-- Empty functions just don't work with the CPS algorithm, but
+-- they don't need the transformation anyway so just output them directly
+cpsProc uniqSupply proc@(CmmProc _ _ _ []) = [proc]
+
+-- CPS transform for those procs that actually need it
+cpsProc uniqSupply (CmmProc info ident params blocks) = cps_procs
     where
       (uniqSupply1, uniqSupply2) = splitUniqSupply uniqSupply
       uniques :: [[Unique]]
@@ -202,11 +210,6 @@ cpsProc uniqSupply (CmmProc info ident params blocks) = info_procs
       -- Do the actual CPS transform.
       cps_procs :: [CmmTop]
       cps_procs = zipWith (continuationToProc formats' stack_use) proc_uniques continuations'
-
-      -- Convert the info tables from CmmInfo to [CmmStatic]
-      -- We might want to put this in another pass eventually
-      info_procs :: [RawCmmTop]
-      info_procs = concat (zipWith mkInfoTable info_uniques cps_procs)
 
 -----------------------------------------------------------------------------
 
