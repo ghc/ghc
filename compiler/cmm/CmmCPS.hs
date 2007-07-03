@@ -210,8 +210,6 @@ cpsProc uniqSupply (CmmProc info ident params blocks) = info_procs
       info_procs :: [RawCmmTop]
       info_procs = concat (zipWith mkInfoTable info_uniques cps_procs)
 
---------------------------------------------------------------------------------
-
 -----------------------------------------------------------------------------
 
 collectNonProcPointTargets ::
