@@ -18,6 +18,8 @@ module CmmUtils(
  	mkIntCLit, zeroCLit,
 
 	mkLblExpr,
+
+        loadArgsIntoTemps, maybeAssignTemp,
   ) where
 
 #include "HsVersions.h"
@@ -27,6 +29,7 @@ import Cmm
 import MachOp
 import OrdList
 import Outputable
+import Unique
 
 ---------------------------------------------------
 --
@@ -175,3 +178,28 @@ zeroCLit = CmmInt 0 wordRep
 
 mkLblExpr :: CLabel -> CmmExpr
 mkLblExpr lbl = CmmLit (CmmLabel lbl)
+
+---------------------------------------------------
+--
+--	Helpers for foreign call arguments
+--
+---------------------------------------------------
+
+loadArgsIntoTemps :: [Unique]
+                  -> CmmActuals
+                  -> ([Unique], [CmmStmt], CmmActuals)
+loadArgsIntoTemps uniques [] = (uniques, [], [])
+loadArgsIntoTemps uniques ((e, hint):args) =
+    (uniques'',
+     new_stmts ++ remaining_stmts,
+     (new_e, hint) : remaining_e)
+    where
+      (uniques', new_stmts, new_e) = maybeAssignTemp uniques e
+      (uniques'', remaining_stmts, remaining_e) =
+          loadArgsIntoTemps uniques' args
+
+maybeAssignTemp :: [Unique] -> CmmExpr -> ([Unique], [CmmStmt], CmmExpr)
+maybeAssignTemp uniques e
+    | hasNoGlobalRegs e = (uniques, [], e)
+    | otherwise         = (tail uniques, [CmmAssign local e], CmmReg local)
+    where local = CmmLocal (LocalReg (head uniques) (cmmExprRep e) KindNonPtr)

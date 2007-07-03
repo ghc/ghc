@@ -14,6 +14,7 @@ module CmmBrokenBlock (
 #include "HsVersions.h"
 
 import Cmm
+import CmmUtils
 import CLabel
 import MachOp (MachHint(..))
 
@@ -25,6 +26,12 @@ import Panic
 import UniqSupply
 import Unique
 import UniqFM
+
+import MachRegs (callerSaveVolatileRegs)
+  -- HACK: this is part of the NCG so we shouldn't use this, but we need
+  -- it for now to eliminate the need for saved regs to be in CmmCall.
+  -- The long term solution is to factor callerSaveVolatileRegs
+  -- from nativeGen into codeGen
 
 -- This module takes a 'CmmBasicBlock' which might have 'CmmCall'
 -- statements in it with 'CmmSafe' set and breaks it up at each such call.
@@ -230,7 +237,7 @@ breakBlock gc_block_idents uniques (BasicBlock ident stmts) entry =
                                 target results arguments srt
 
             -- Break the block on safe calls (the main job of this function)
-            (CmmCall target results arguments (CmmSafe srt):stmts) ->
+            (CmmCall target results arguments (CmmSafe srt) : stmts) ->
                 (cont_info : cont_infos, block : blocks)
                 where
                   next_id = BlockId $ head uniques
@@ -242,9 +249,24 @@ breakBlock gc_block_idents uniques (BasicBlock ident stmts) entry =
                   (cont_infos, blocks) = breakBlock' (tail uniques) next_id
                                          ControlEntry [] [] stmts
 
+            -- Unsafe calls don't need a continuation
+            -- but they do need to be expanded
+            (CmmCall target results arguments CmmUnsafe : stmts) ->
+                breakBlock' remaining_uniques current_id entry exits
+                            (accum_stmts ++
+                             arg_stmts ++
+                             caller_save ++
+                             [CmmCall target results new_args CmmUnsafe] ++
+                             caller_load)
+                            stmts
+                where
+                  (remaining_uniques, arg_stmts, new_args) =
+                      loadArgsIntoTemps uniques arguments
+                  (caller_save, caller_load) = callerSaveVolatileRegs (Just [])
+
             -- Default case.  Just keep accumulating statements
             -- and branch targets.
-            (s:stmts) ->
+            (s : stmts) ->
                 breakBlock' uniques current_id entry
                             (cond_branch_target s++exits)
                             (accum_stmts++[s])
