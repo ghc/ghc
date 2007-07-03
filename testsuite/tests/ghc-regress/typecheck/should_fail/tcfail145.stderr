@@ -1,7 +1,6 @@
 
 tcfail145.hs:9:5:
-    Couldn't match expected type `a' (a rigid variable)
-       against inferred type `[a]'
+    Couldn't match expected type `a' against inferred type `[a]' `a'
     When matching `forall a. [a] -> [a]'
               and `forall a. a -> a'
       Expected type: forall a1. a1 -> a1
