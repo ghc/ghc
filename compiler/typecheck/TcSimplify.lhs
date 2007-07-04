@@ -47,6 +47,7 @@ import VarEnv
 import FiniteMap
 import Bag
 import Outputable
+import Maybes
 import ListSetOps
 import Util
 import SrcLoc
@@ -735,7 +736,7 @@ with 'given' implications.
 
 So our best approximation is to make (D [a]) part of the inferred
 context, so we can use that to discharge the implication. Hence
-the strange function getImplicWanteds.
+the strange function get_dictsin approximateImplications.
 
 The common cases are more clear-cut, when we have things like
 	forall a. C a => C b
@@ -1902,20 +1903,22 @@ reduceImplication env orig_avails reft tvs extra_givens wanteds inst_loc
 			  ppr reft, ppr wanteds, ppr avails ])
 	; avails <- reduceList env' wanteds avails
 
-		-- Extract the binding
+		-- Extract the results 
+		-- Note [Reducing implication constraints]
 	; (binds, irreds) <- extractResults avails wanteds
- 
+	; let (outer, inner) = partition (isJust . findAvail orig_avails) irreds
+
 	; traceTc (text "reduceImplication result" <+> vcat
-			[ ppr irreds, ppr binds])
+			[ ppr outer, ppr inner, ppr binds])
 
 		-- We always discard the extra avails we've generated;
 		-- but we remember if we have done any (global) improvement
 	; let ret_avails = updateImprovement orig_avails avails
 
-	; if isEmptyLHsBinds binds then 	-- No progress
+	; if isEmptyLHsBinds binds && null outer then 	-- No progress
 		return (ret_avails, NoInstance)
 	  else do
-	{ (implic_insts, bind) <- makeImplicationBind inst_loc tvs reft extra_givens irreds
+	{ (implic_insts, bind) <- makeImplicationBind inst_loc tvs reft extra_givens inner
 
 	; let	dict_ids = map instToId extra_givens
 		co  = mkWpTyLams tvs <.> mkWpLams dict_ids <.> WpLet (binds `unionBags` bind)
@@ -1924,10 +1927,35 @@ reduceImplication env orig_avails reft tvs extra_givens wanteds inst_loc
 		payload | [wanted] <- wanteds = HsVar (instToId wanted)
 			| otherwise = ExplicitTuple (map (L loc . HsVar . instToId) wanteds) Boxed
 
-		-- If there are any irreds, we back off and return NoInstance
-	; return (ret_avails, GenInst implic_insts (L loc rhs))
+	; return (ret_avails, GenInst (implic_insts ++ outer) (L loc rhs))
   } }
 \end{code}
+
+Note [Reducing implication constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we are trying to simplify
+	(Ord a, forall b. C a b => (W [a] b, D c b))
+where
+	instance (C a b, Ord a) => W [a] b
+When solving the implication constraint, we'll start with
+	Ord a -> Irred
+in the Avails.  Then we add (C a b -> Given) and solve. Extracting
+the results gives us a binding for the (W [a] b), with an Irred of 
+(Ord a, D c b).  Now, the (Ord a) comes from "outside" the implication,
+but the (D d b) is from "inside".  So we want to generate a Rhs binding
+like this
+
+	ic = /\b \dc:C a b). (df a b dc do, ic' b dc)
+	   depending on
+		do :: Ord a
+		ic' :: forall b. C a b => D c b
+
+The 'depending on' part of the Rhs is important, because it drives
+the extractResults code.
+
+The "inside" and "outside" distinction is what's going on with 'inner' and
+'outer' in reduceImplication
+
 
 Note [Freeness and implications]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -2009,7 +2037,7 @@ instance Outputable AvailHow where
 pprAvail :: AvailHow -> SDoc
 pprAvail (IsIrred x)	= text "Irred" <+> ppr x
 pprAvail (Given x)   	= text "Given" <+> ppr x
-pprAvail (Rhs rhs bs)   = text "Rhs" <+> ppr rhs <+> braces (ppr bs)
+pprAvail (Rhs rhs bs)   = text "Rhs" <+> sep [ppr rhs, braces (ppr bs)]
 
 -------------------------
 extendAvailEnv :: AvailEnv -> Inst -> AvailHow -> AvailEnv
@@ -2067,8 +2095,8 @@ extractResults (Avails _ avails) wanteds
 
     go avails binds irreds (w:ws)
       = case findAvailEnv avails w of
-	  Nothing    -> pprTrace "Urk: extractResults" (ppr w) $
-			go avails binds irreds ws
+	  Nothing -> pprTrace "Urk: extractResults" (ppr w) $
+		     go avails binds irreds ws
 
 	  Just (Given id) 
 		| id == w_id -> go avails binds irreds ws 
@@ -2076,9 +2104,8 @@ extractResults (Avails _ avails) wanteds
 		-- The sought Id can be one of the givens, via a superclass chain
 		-- and then we definitely don't want to generate an x=x binding!
 
-	  Just (IsIrred id) 
-		| id == w_id -> go (add_given avails w) binds 	        (w:irreds) ws
-		| otherwise  -> go avails (addBind binds w_id (nlHsVar id)) irreds ws
+	  Just (IsIrred _) -> go (add_given avails w) binds (w:irreds) ws
+		-- | otherwise  -> go avails (addBind binds w_id (nlHsVar id)) irreds ws
 		-- The add_given handles the case where we want (Ord a, Eq a), and we
 		-- don't want to emit *two* Irreds for Ord a, one via the superclass chain
 		-- This showed up in a dupliated Ord constraint in the error message for 
@@ -2330,14 +2357,14 @@ disambiguate doc interactive dflags insts
   = return (insts, emptyBag)
 
   | null defaultable_groups
-  = do	{ traceTc (text "disambigutate" <+> vcat [ppr unaries, ppr bad_tvs, ppr defaultable_groups])
+  = do	{ traceTc (text "disambiguate1" <+> vcat [ppr insts, ppr unaries, ppr bad_tvs, ppr defaultable_groups])
 	; return (insts, emptyBag) }
 
   | otherwise
   = do 	{  	-- Figure out what default types to use
 	  default_tys <- getDefaultTys extended_defaulting ovl_strings
 
-	; traceTc (text "disambigutate" <+> vcat [ppr unaries, ppr bad_tvs, ppr defaultable_groups])
+	; traceTc (text "disambiguate1" <+> vcat [ppr insts, ppr unaries, ppr bad_tvs, ppr defaultable_groups])
 	; mapM_ (disambigGroup default_tys) defaultable_groups
 
 	-- disambigGroup does unification, hence try again
