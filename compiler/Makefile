@@ -715,7 +715,7 @@ $(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
 	echo "main = do args <- getArgs; rawSystem \"$(TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)\" (\"-B$(TOP_ABS)\":args) >>= exitWith" >> $@
 
 $(INPLACE_PROG): $(INPLACE_HS)
-	$(GHC) --make $< -o $@
+	$(HC) --make $< -o $@
 
 all :: $(INPLACE_PROG)
 
