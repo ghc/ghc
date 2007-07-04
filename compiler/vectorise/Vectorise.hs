@@ -10,10 +10,13 @@ import CoreLint       ( showPass, endPass )
 import TyCon
 import Var
 import VarEnv
+import NameEnv
 
 import DsMonad
 
 import PrelNames
+
+import Outputable
 
 vectorise :: HscEnv -> ModGuts -> IO ModGuts
 vectorise hsc_env guts
@@ -80,17 +83,40 @@ data VEnv = VEnv {
               -- Mapping from variables to their vectorised versions
               --
               vect_vars :: VarEnv Var
+
+              -- Exported variables which have a vectorised version
+              --
+            , vect_exported_vars :: VarEnv (Var, Var)
+
+              -- Mapping from TyCons to their vectorised versions.
+              -- TyCons which do not have to be vectorised are mapped to
+              -- themselves.
+            , vect_tycons :: NameEnv TyCon
             }
 
 initVEnv :: VectInfo -> DsM VEnv
 initVEnv info
   = return $ VEnv {
-               vect_vars = mapVarEnv snd $ vectInfoCCVar info
+               vect_vars          = mapVarEnv  snd $ vectInfoCCVar   info
+             , vect_exported_vars = emptyVarEnv
+             , vect_tycons        = mapNameEnv snd $ vectInfoCCTyCon info
              }
 
 -- FIXME
-updVectInfo :: VEnv -> VectInfo -> VectInfo
-updVectInfo env info = info
+updVectInfo :: VEnv -> ModGuts -> ModGuts
+updVectInfo env guts = guts { mg_vect_info = info' }
+  where
+    info' = info {
+              vectInfoCCVar   = vect_exported_vars env
+            , vectInfoCCTyCon = tc_env
+            }
+
+    info  = mg_vect_info guts
+    tyenv = mg_types guts
+
+    tc_env = mkNameEnv [(tc_name, (tc,tc')) | tc <- typeEnvTyCons tyenv
+                                            , let tc_name = tyConName tc
+                                            , Just tc' <- [lookupNameEnv (vect_tycons env) tc_name]]
 
 newtype VM a = VM { runVM :: Builtins -> VEnv -> DsM (VEnv, a) }
 
@@ -100,13 +126,32 @@ instance Monad VM where
                                  (env', x) <- p bi env
                                  runVM (f x) bi env'
 
+builtin :: (Builtins -> a) -> VM a
+builtin f = VM $ \bi env -> return (env, f bi)
+
+readEnv :: (VEnv -> a) -> VM a
+readEnv f = VM $ \bi env -> return (env, f env)
+
+setEnv :: VEnv -> VM ()
+setEnv env = VM $ \_ _ -> return (env, ())
+
+updEnv :: (VEnv -> VEnv) -> VM ()
+updEnv f = VM $ \_ env -> return (f env, ())
+
+
+lookupTyCon :: TyCon -> VM (Maybe TyCon)
+lookupTyCon tc = readEnv $ \env -> lookupNameEnv (vect_tycons env) (tyConName tc)
+
+-- ----------------------------------------------------------------------------
+-- Bindings
+
 vectoriseModule :: VectInfo -> ModGuts -> DsM ModGuts
 vectoriseModule info guts
   = do
       builtins <- initBuiltins
       env <- initVEnv info
       (env', guts') <- runVM (vectModule guts) builtins env
-      return $ guts' { mg_vect_info = updVectInfo env' info }
+      return $ updVectInfo env' guts'
 
 vectModule :: ModGuts -> VM ModGuts
 vectModule guts = return guts
