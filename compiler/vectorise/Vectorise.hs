@@ -6,10 +6,13 @@ where
 import DynFlags
 import HscTypes
 
-import CoreLint       ( showPass, endPass )
+import CoreLint             ( showPass, endPass )
 import TyCon
+import Type
+import TypeRep
 import Var
 import VarEnv
+import Name                 ( mkSysTvName )
 import NameEnv
 
 import DsMonad
@@ -17,6 +20,8 @@ import DsMonad
 import PrelNames
 
 import Outputable
+import FastString
+import Control.Monad        ( liftM2 )
 
 vectorise :: HscEnv -> ModGuts -> IO ModGuts
 vectorise hsc_env guts
@@ -126,6 +131,9 @@ instance Monad VM where
                                  (env', x) <- p bi env
                                  runVM (f x) bi env'
 
+liftDs :: DsM a -> VM a
+liftDs p = VM $ \bi env -> do { x <- p; return (env, x) }
+
 builtin :: (Builtins -> a) -> VM a
 builtin f = VM $ \bi env -> return (env, f bi)
 
@@ -138,6 +146,11 @@ setEnv env = VM $ \_ _ -> return (env, ())
 updEnv :: (VEnv -> VEnv) -> VM ()
 updEnv f = VM $ \_ env -> return (f env, ())
 
+newTyVar :: FastString -> Kind -> VM Var
+newTyVar fs k
+  = do
+      u <- liftDs newUnique
+      return $ mkTyVar (mkSysTvName u fs) k
 
 lookupTyCon :: TyCon -> VM (Maybe TyCon)
 lookupTyCon tc = readEnv $ \env -> lookupNameEnv (vect_tycons env) (tyConName tc)
@@ -155,4 +168,63 @@ vectoriseModule info guts
 
 vectModule :: ModGuts -> VM ModGuts
 vectModule guts = return guts
+
+-- ----------------------------------------------------------------------------
+-- Types
+
+paArgType :: Type -> Kind -> VM (Maybe Type)
+paArgType ty k
+  | Just k' <- kindView k = paArgType ty k'
+
+-- Here, we assume that for a kind (k1 -> k2) to be valid, k1 and k2 can only
+-- be made up of * and (->), i.e., they can't be coercion kinds or #.
+paArgType ty (FunTy k1 k2)
+  = do
+      tv  <- newTyVar FSLIT("a") k1
+      ty1 <- paArgType' (TyVarTy tv) k1
+      ty2 <- paArgType' (AppTy ty (TyVarTy tv)) k2
+      return . Just $ ForAllTy tv (FunTy ty1 ty2)
+
+paArgType ty k
+  | isLiftedTypeKind k
+  = do
+      tc <- builtin paTyCon
+      return . Just $ TyConApp tc [ty]
+
+  | otherwise
+  = return Nothing 
+
+paArgType' :: Type -> Kind -> VM Type
+paArgType' ty k
+  = do
+      r <- paArgType ty k
+      case r of
+        Just ty' -> return ty'
+        Nothing  -> pprPanic "paArgType'" (ppr ty)
+
+vectTyCon :: TyCon -> VM TyCon
+vectTyCon tc
+  | isFunTyCon tc = builtin closureTyCon
+  | otherwise = do
+                  r <- lookupTyCon tc
+                  case r of
+                    Just tc' -> return tc'
+
+                    -- FIXME: just for now
+                    Nothing  -> pprTrace "ccTyCon:" (ppr tc) $ return tc
+
+vectType :: Type -> VM Type
+vectType ty | Just ty' <- coreView ty = vectType ty
+vectType (TyVarTy tv) = return $ TyVarTy tv
+vectType (AppTy ty1 ty2) = liftM2 AppTy (vectType ty1) (vectType ty2)
+vectType (TyConApp tc tys) = liftM2 TyConApp (vectTyCon tc) (mapM vectType tys)
+vectType (FunTy ty1 ty2)   = liftM2 TyConApp (builtin closureTyCon)
+                                             (mapM vectType [ty1,ty2])
+vectType (ForAllTy tv ty)
+  = do
+      r   <- paArgType (TyVarTy tv) (tyVarKind tv)
+      ty' <- vectType ty
+      return . ForAllTy tv $ case r of { Just paty -> FunTy paty ty'; Nothing -> ty' }
+
+vectType ty = pprPanic "vectType:" (ppr ty)
 
