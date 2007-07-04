@@ -204,7 +204,9 @@ paArgType' ty k
 
 vectTyCon :: TyCon -> VM TyCon
 vectTyCon tc
-  | isFunTyCon tc = builtin closureTyCon
+  | isFunTyCon tc        = builtin closureTyCon
+  | isBoxedTupleTyCon tc = return tc
+  | isUnLiftedTyCon tc   = return tc
   | otherwise = do
                   r <- lookupTyCon tc
                   case r of
