@@ -28,7 +28,7 @@ test('gadt20', normal, compile, [''])
 test('gadt21', normal, compile_fail, [''])
 test('gadt22', normal, compile, [''])
 
-test('gadt23', normal, run_command, ['$MAKE -s gadt23'])
+test('gadt23', normal, run_command, ['$MAKE -s --no-print-directory gadt23'])
 clean(['Gadt23_AST.hi', 'Gadt23_AST.o'])
 
 test('gadt24', normal, compile, [''])
