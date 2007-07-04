@@ -64,10 +64,7 @@ else
 SUBDIRS_BUILD = includes compat utils driver docs compiler rts
 endif
 
-# Needed for, e.g., clean
-SUBDIRS = $(SUBDIRS_BUILD)
-
-SUBDIRS_INSTALL = includes compat utils driver docs rts libraries compiler
+SUBDIRS = includes compat utils driver docs rts libraries compiler
 
 # Sanity check that all the core libraries are in the tree, to catch
 # failure to run darcs-all.
@@ -140,7 +137,7 @@ endif
 install :: check-packages
 	$(INSTALL_DIR) $(bindir)
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(SUBDIRS_INSTALL); do \
+	for i in $(SUBDIRS); do \
 	  echo "------------------------------------------------------------------------"; \
 	  echo "== $(MAKE) $@ $(MFLAGS);"; \
 	  echo " in $(shell pwd)/$$i"; \
@@ -182,7 +179,7 @@ endif
 
 install-docs ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
-	for i in $(SUBDIRS_INSTALL); do \
+	for i in $(SUBDIRS); do \
 	  echo "------------------------------------------------------------------------"; \
 	  echo "== $(MAKE) $@ $(MFLAGS);"; \
 	  echo " in $(shell pwd)/$$i"; \
@@ -435,7 +432,7 @@ SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 #
 # Files to include in source distributions
 #
-SRC_DIST_DIRS += mk docs distrib $(filter-out docs distrib,$(SUBDIRS_INSTALL))
+SRC_DIST_DIRS += mk docs distrib $(filter-out docs distrib,$(SUBDIRS))
 SRC_DIST_FILES += \
 	configure.ac config.guess config.sub configure \
 	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
