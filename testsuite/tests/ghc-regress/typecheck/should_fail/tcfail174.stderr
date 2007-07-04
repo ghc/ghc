@@ -9,9 +9,10 @@ tcfail174.hs:13:13:
     In the first argument of `Capture', namely `g'
 
 tcfail174.hs:16:13:
-    Couldn't match expected type `b' (a rigid variable)
-	   against inferred type `a' (a rigid variable)
-      `b' is bound by the type signature for `h2' at tcfail174.hs:15:14
+    Couldn't match expected type `b' against inferred type `a'
+      `b' is a rigid type variable bound by
+	  the type signature for `h2' at tcfail174.hs:15:14
+      `a'
     When matching `forall a. a -> a'
               and `forall a. a -> b'
       Expected type: Capture (forall x. x -> b)

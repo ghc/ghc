@@ -1,9 +1,10 @@
 
 tcfail103.hs:15:22:
-    Couldn't match expected type `s' (a rigid variable)
-	   against inferred type `t' (a rigid variable)
-      `s' is bound by the type signature for `g' at tcfail103.hs:13:16
-      `t' is bound by the type signature for `f' at tcfail103.hs:10:7
+    Couldn't match expected type `s' against inferred type `t'
+      `s' is a rigid type variable bound by
+	  the type signature for `g' at tcfail103.hs:13:16
+      `t' is a rigid type variable bound by
+	  the type signature for `f' at tcfail103.hs:10:7
       Expected type: STRef s Int
       Inferred type: STRef t t1
     In the first argument of `readSTRef', namely `v'

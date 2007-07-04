@@ -10,8 +10,9 @@ tcfail071.hs:9:0:
 
 tcfail071.hs:10:19:
     Couldn't match expected type `a -> b -> b'
-	   against inferred type `e' (a rigid variable)
-      `e' is bound by the type signature for `g' at tcfail071.hs:8:5
+	   against inferred type `e'
+      `e' is a rigid type variable bound by
+	  the type signature for `g' at tcfail071.hs:8:5
     In the first argument of `foldr', namely `(f c)'
     In the expression: foldr (f c) [] []
     In the definition of `p': p = foldr (f c) [] []
