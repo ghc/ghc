@@ -80,9 +80,11 @@ instance MArray IOUArray Bool IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -94,9 +96,11 @@ instance MArray IOUArray Char IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -108,9 +112,11 @@ instance MArray IOUArray Int IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -122,9 +128,11 @@ instance MArray IOUArray Word IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -136,9 +144,11 @@ instance MArray IOUArray (Ptr a) IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -150,9 +160,11 @@ instance MArray IOUArray (FunPtr a) IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -164,9 +176,11 @@ instance MArray IOUArray Float IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -178,9 +192,11 @@ instance MArray IOUArray Double IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -192,9 +208,11 @@ instance MArray IOUArray (StablePtr a) IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -206,9 +224,11 @@ instance MArray IOUArray Int8 IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -220,9 +240,11 @@ instance MArray IOUArray Int16 IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -234,9 +256,11 @@ instance MArray IOUArray Int32 IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -248,9 +272,11 @@ instance MArray IOUArray Int64 IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -262,9 +288,11 @@ instance MArray IOUArray Word8 IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -276,9 +304,11 @@ instance MArray IOUArray Word16 IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -290,9 +320,11 @@ instance MArray IOUArray Word32 IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}
@@ -304,9 +336,11 @@ instance MArray IOUArray Word64 IO where
     {-# INLINE newArray #-}
     newArray lu init = stToIO $ do
         marr <- newArray lu init; return (IOUArray marr)
+    {-# INLINE unsafeNewArray_ #-}
+    unsafeNewArray_ lu = stToIO $ do
+        marr <- unsafeNewArray_ lu; return (IOUArray marr)
     {-# INLINE newArray_ #-}
-    newArray_ lu = stToIO $ do
-        marr <- newArray_ lu; return (IOUArray marr)
+    newArray_ = unsafeNewArray_
     {-# INLINE unsafeRead #-}
     unsafeRead (IOUArray marr) i = stToIO (unsafeRead marr i)
     {-# INLINE unsafeWrite #-}

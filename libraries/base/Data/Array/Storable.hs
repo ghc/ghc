@@ -60,10 +60,12 @@ instance Storable e => MArray StorableArray e IO where
         where
         size = rangeSize (l,u)
 
-    newArray_ (l,u) = do
+    unsafeNewArray_ (l,u) = do
         fp <- mallocForeignPtrArray (rangeSize (l,u))
         return (StorableArray l u fp)
 
+    newArray_ = unsafeNewArray_
+        
     unsafeRead (StorableArray _ _ fp) i =
         withForeignPtr fp $ \a -> peekElemOff a i
 
