@@ -164,22 +164,6 @@ StgPtr *next_pending_handler = pending_handler_buf;
 #endif /* THREADED_RTS */
 
 /* -----------------------------------------------------------------------------
- * SIGCONT handler
- *
- * It seems that shells tend to put stdin back into blocking mode
- * following a suspend/resume of the process.  Here we arrange to put
- * it back into non-blocking mode.  We don't do anything to
- * stdout/stderr because these handles don't get put into non-blocking
- * mode at all - see the comments on stdout/stderr in PrelHandle.hsc.
- * -------------------------------------------------------------------------- */
-
-static void
-cont_handler(int sig STG_UNUSED)
-{
-    setNonBlockingFd(0);
-}
-
-/* -----------------------------------------------------------------------------
  * Low-level signal handler
  *
  * Places the requested handler on a stack of pending handlers to be
@@ -248,11 +232,6 @@ generic_handler(int sig)
     sigemptyset(&signals);
     sigaddset(&signals, sig);
     sigprocmask(SIG_UNBLOCK, &signals, NULL);
-
-    // *always* do the SIGCONT handler, even if the user overrides it.
-    if (sig == SIGCONT) {
-	cont_handler(sig);
-    }
 
     context_switch = 1;
 }
@@ -513,14 +492,6 @@ initDefaultHandlers()
 #if defined(HAVE_SIGINTERRUPT)
     siginterrupt(SIGINT, 1);	// isn't this the default? --SDM
 #endif
-
-    // install the SIGCONT handler
-    action.sa_handler = cont_handler;
-    sigemptyset(&action.sa_mask);
-    action.sa_flags = 0;
-    if (sigaction(SIGCONT, &action, &oact) != 0) {
-	sysErrorBelch("warning: failed to install SIGCONT handler");
-    }
 
     // install the SIGFPE handler
 
