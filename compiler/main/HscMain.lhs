@@ -608,7 +608,7 @@ hscCompile cgguts
                               foreign_stubs dir_imps cost_centre_info
                               stg_binds hpc_info
          ------------------  Convert to CPS --------------------
-         --continuationC <- cmmCPS dflags abstractC
+         --continuationC <- cmmCPS dflags abstractC >>= cmmToRawCmm
          continuationC <- cmmToRawCmm abstractC
          ------------------  Code output -----------------------
          (stub_h_exists,stub_c_exists)
@@ -725,7 +725,7 @@ hscCmmFile dflags filename = do
   case maybe_cmm of
     Nothing -> return False
     Just cmm -> do
-        --continuationC <- cmmCPS dflags [cmm]
+        --continuationC <- cmmCPS dflags [cmm] >>= cmmToRawCmm
         continuationC <- cmmToRawCmm [cmm]
 	codeOutput dflags no_mod no_loc NoStubs [] continuationC
 	return True
