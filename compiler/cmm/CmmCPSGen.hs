@@ -168,7 +168,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                             else case lookup (mkReturnPtLabel $ getUnique next) formats of
                               Nothing -> [CmmBranch next]
                               Just cont_format ->
-                                pack_continuation False curr_format cont_format ++
+                                pack_continuation True curr_format cont_format ++
                                 tail_call (curr_stack - cont_stack)
                                           (CmmLit $ CmmLabel $ mkReturnPtLabel $ getUnique next)
                                           arguments
