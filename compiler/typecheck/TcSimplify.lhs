@@ -2012,7 +2012,7 @@ type ImprovementDone = Bool	-- True <=> some unification has happened
 
 type AvailEnv = FiniteMap Inst AvailHow
 data AvailHow
-  = IsIrred TcId	-- Used for irreducible dictionaries,
+  = IsIrred 		-- Used for irreducible dictionaries,
 			-- which are going to be lambda bound
 
   | Given TcId 		-- Used for dictionaries for which we have a binding
@@ -2035,7 +2035,7 @@ instance Outputable AvailHow where
 
 -------------------------
 pprAvail :: AvailHow -> SDoc
-pprAvail (IsIrred x)	= text "Irred" <+> ppr x
+pprAvail IsIrred	= text "Irred"
 pprAvail (Given x)   	= text "Given" <+> ppr x
 pprAvail (Rhs rhs bs)   = text "Rhs" <+> sep [ppr rhs, braces (ppr bs)]
 
@@ -2104,8 +2104,7 @@ extractResults (Avails _ avails) wanteds
 		-- The sought Id can be one of the givens, via a superclass chain
 		-- and then we definitely don't want to generate an x=x binding!
 
-	  Just (IsIrred _) -> go (add_given avails w) binds (w:irreds) ws
-		-- | otherwise  -> go avails (addBind binds w_id (nlHsVar id)) irreds ws
+	  Just IsIrred -> go (add_given avails w) binds (w:irreds) ws
 		-- The add_given handles the case where we want (Ord a, Eq a), and we
 		-- don't want to emit *two* Irreds for Ord a, one via the superclass chain
 		-- This showed up in a dupliated Ord constraint in the error message for 
@@ -2192,7 +2191,7 @@ than with the Avails handling stuff in TcSimplify
 \begin{code}
 addIrred :: WantSCs -> Avails -> Inst -> TcM Avails
 addIrred want_scs avails irred = ASSERT2( not (irred `elemAvails` avails), ppr irred $$ ppr avails )
-    	      		         addAvailAndSCs want_scs avails irred (IsIrred (instToId irred))
+    	      		         addAvailAndSCs want_scs avails irred IsIrred
 
 addAvailAndSCs :: WantSCs -> Avails -> Inst -> AvailHow -> TcM Avails
 addAvailAndSCs want_scs avails inst avail
