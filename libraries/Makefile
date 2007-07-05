@@ -36,7 +36,7 @@ TOP=..
 include $(TOP)/mk/boilerplate.mk
 
 SUBDIRS = base old-locale old-time filepath directory process pretty \
-          template-haskell readline Cabal random haskell98
+          hpc template-haskell readline Cabal random haskell98
 
 ifeq "$(GhcLibsWithUnix)" "YES"
 SUBDIRS += unix
@@ -61,7 +61,6 @@ SUBDIRS += $(wildcard mtl)
 SUBDIRS += $(wildcard fgl)
 SUBDIRS += $(wildcard X11)
 SUBDIRS += $(wildcard time)
-SUBDIRS += $(wildcard hpc)
 ifeq "$(Windows)" "NO"
 # HGL is not working on Win32, so omit it for now.  Better not to ship it
 # at all than to ship a broken version.
