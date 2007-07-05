@@ -42,7 +42,6 @@ import FastTypes	( isFastTrue )
 import Constants	( wORD_SIZE )
 
 #ifdef DEBUG
-import Outputable	( assertPanic )
 import Debug.Trace	( trace )
 #endif
 

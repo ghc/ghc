@@ -168,9 +168,9 @@ assembleBCO (ProtoBCO nm instrs bitmap bsize arity origin malloced)
          -- when (notNull malloced) (addFinalizer ul_bco (mapM_ zonk malloced))
 
          return ul_bco
-     where
-         zonk ptr = do -- putStrLn ("freeing malloc'd block at " ++ show (A# a#))
-                           free ptr
+     -- where
+     --     zonk ptr = do -- putStrLn ("freeing malloc'd block at " ++ show (A# a#))
+     --                      free ptr
 
 mkBitmapArray :: Int -> [StgWord] -> UArray Int StgWord
 mkBitmapArray bsize bitmap

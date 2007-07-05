@@ -396,7 +396,6 @@ genMachCode cmm_top
   = do	{ initial_us <- getUs
 	; let initial_st           = mkNatM_State initial_us 0
 	      (new_tops, final_st) = initNat initial_st (cmmTopCodeGen cmm_top)
-	      final_us             = natm_us final_st
 	      final_delta          = natm_delta final_st
 	      final_imports        = natm_imports final_st
 	; if   final_delta == 0

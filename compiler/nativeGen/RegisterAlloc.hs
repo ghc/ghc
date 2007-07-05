@@ -102,7 +102,6 @@ import Outputable
 #ifndef DEBUG
 import Data.Maybe	( fromJust )
 #endif
-import Data.Maybe	( fromMaybe )
 import Data.List	( nub, partition, mapAccumL, groupBy )
 import Control.Monad	( when )
 import Data.Word
@@ -453,7 +452,7 @@ linearRegAlloc block_live sccs = linearRA_SCCs emptyBlockMap emptyStackMap sccs
 	(CyclicSCC blocks : sccs) 
 	= getUs `thenUs` \us ->
 	  let
-            ((block_assig', stack', us'), blocks') = mapAccumL processBlock
+            ((block_assig', stack', _), blocks') = mapAccumL processBlock
                                                        (block_assig, stack, us)
                                                        ({-reverse-} blocks)
           in
@@ -968,7 +967,7 @@ spillR reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
   (# s{ra_stack=stack'}, (instr,slot) #)
 
 loadR :: Reg -> Int -> RegM Instr
-loadR reg slot = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
+loadR reg slot = RegM $ \ s@RA_State{ra_delta=delta} ->
   (# s, mkLoadInstr reg delta slot #)
 
 getFreeRegsR :: RegM FreeRegs
@@ -986,14 +985,6 @@ getAssigR = RegM $ \ s@RA_State{ra_assig = assig} ->
 setAssigR :: RegMap Loc -> RegM ()
 setAssigR assig = RegM $ \ s ->
   (# s{ra_assig=assig}, () #)
-
-getStackR :: RegM StackMap
-getStackR = RegM $ \ s@RA_State{ra_stack = stack} ->
-  (# s, stack #)
-
-setStackR :: StackMap -> RegM ()
-setStackR stack = RegM $ \ s ->
-  (# s{ra_stack=stack}, () #)
 
 getBlockAssigR :: RegM BlockAssignment
 getBlockAssigR = RegM $ \ s@RA_State{ra_blockassig = assig} ->

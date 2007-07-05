@@ -89,10 +89,6 @@ import BasicTypes   (Boxity(..))
 import Outputable
 import FastString
 
-
--- FIXME: fro debugging - remove this
-import Debug.Trace  (trace)
-
 -- standard
 import Monad        (liftM, foldM)
 

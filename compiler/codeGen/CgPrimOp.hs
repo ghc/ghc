@@ -20,16 +20,13 @@ import CgBindery
 import CgMonad
 import CgInfoTbls
 import CgUtils
-import ForeignCall
 import Cmm
 import CLabel
 import CmmUtils
 import MachOp
-import SMRep
 import PrimOp
 import SMRep
 import Constants
-import StaticFlags
 import Outputable
 
 -- ---------------------------------------------------------------------------

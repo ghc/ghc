@@ -45,7 +45,6 @@ import Foreign
 import System.IO		( hGetBuf, hFileSize,IOMode(ReadMode), hClose
                                 , Handle, hTell )
 
-import GHC.Ptr			( Ptr(..) )
 import GHC.Exts
 import GHC.IOBase		( IO(..) )
 import GHC.Base			( unsafeChr )
