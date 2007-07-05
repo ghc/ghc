@@ -24,7 +24,7 @@ module Compat.Directory (
 #include "../../includes/ghcconfig.h"
 
 import System.Environment (getEnv)
-import System.Directory.Internals
+import System.FilePath
 #if __GLASGOW_HASKELL__ > 600
 import Control.Exception	( bracket )
 import Control.Monad		( when )
@@ -99,33 +99,69 @@ copyFile fromFPath toFPath =
 				copyContents hFrom hTo buffer
 #endif
 
-
+-- | Given an executable file name, searches for such file
+-- in the directories listed in system PATH. The returned value 
+-- is the path to the found executable or Nothing if there isn't
+-- such executable. For example (findExecutable \"ghc\")
+-- gives you the path to GHC.
 findExecutable :: String -> IO (Maybe FilePath)
-findExecutable binary = do
-  path <- getEnv "PATH"
-  search (parseSearchPath path)
-  where
-#ifdef mingw32_HOST_OS
-    fileName = binary `joinFileExt` "exe"
+findExecutable binary =
+#if defined(mingw32_HOST_OS)
+  withCString binary $ \c_binary ->
+  withCString ('.':exeExtension) $ \c_ext ->
+  allocaBytes long_path_size $ \pOutPath ->
+  alloca $ \ppFilePart -> do
+    res <- c_SearchPath nullPtr c_binary c_ext (fromIntegral long_path_size) pOutPath ppFilePart
+    if res > 0 && res < fromIntegral long_path_size
+      then do fpath <- peekCString pOutPath
+              return (Just fpath)
+      else return Nothing
+
+foreign import stdcall unsafe "SearchPathA"
+            c_SearchPath :: CString
+                         -> CString
+                         -> CString
+                         -> CInt
+                         -> CString
+                         -> Ptr CString
+                         -> IO CInt
 #else
-    fileName = binary
-#endif
+ do
+  path <- getEnv "PATH"
+  search (splitSearchPath path)
+  where
+    fileName = binary <.> exeExtension
 
     search :: [FilePath] -> IO (Maybe FilePath)
     search [] = return Nothing
     search (d:ds) = do
-	let path = d `joinFileName` fileName
-	b <- doesFileExist path
-	if b then return (Just path)
+        let path = d </> fileName
+        b <- doesFileExist path
+        if b then return (Just path)
              else search ds
+#endif
 
+-- ToDo: This should be determined via autoconf (AC_EXEEXT)
+-- | Extension for executable files
+-- (typically @\"\"@ on Unix and @\"exe\"@ on Windows or OS\/2)
+exeExtension :: String
+#ifdef mingw32_HOST_OS
+exeExtension = "exe"
+#else
+exeExtension = ""
+#endif
+
+-- | @'createDirectoryIfMissing' parents dir@ creates a new directory 
+-- @dir@ if it doesn\'t exist. If the first argument is 'True'
+-- the function will also create all parent directories if they are missing.
 createDirectoryIfMissing :: Bool     -- ^ Create its parents too?
 		         -> FilePath -- ^ The path to the directory you want to make
 		         -> IO ()
 createDirectoryIfMissing parents file = do
   b <- doesDirectoryExist file
-  case (b,parents, file) of 
+  case (b,parents, file) of
     (_,     _, "") -> return ()
     (True,  _,  _) -> return ()
-    (_,  True,  _) -> mapM_ (createDirectoryIfMissing False) (tail (pathParents file))
+    (_,  True,  _) -> mapM_ (createDirectoryIfMissing False) $ mkParents file
     (_, False,  _) -> createDirectory file
+ where mkParents = scanl1 (</>) . splitDirectories . normalise

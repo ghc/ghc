@@ -54,13 +54,6 @@ SRC_CC_OPTS += -D__GHC_PATCHLEVEL__=$(GhcPatchLevel)
 EXCLUDED_SRCS += System/FilePath/Internal.hs
 
 ifeq "$(ghc_ge_603)" "YES"
-# These modules are provided in GHC 6.3+
-EXCLUDED_SRCS += \
-	System/Directory/Internals.hs
-
-SRC_MKDEPENDHS_OPTS += \
-	-optdep--exclude-module=System.Directory.Internals
-
 # GHC 6.3+ has Cabal, but we're replacing it:
 SRC_HC_OPTS += -ignore-package Cabal
 
