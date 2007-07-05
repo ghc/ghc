@@ -7,9 +7,6 @@
 #  .hc files are "Haskellized-C", compiled using the C compiler and
 #      (possibly) the assembly-mangler.  The GHC driver script
 #      knows how to compile this stuff.
-#
-#  Other sorta independent, compile-once subdirs are:
-#	gmp		-- GNU multi-precision library (for Integer)
 
 #-----------------------------------------------------------------------------
 # Preamble
@@ -254,46 +251,6 @@ endif
 # We use GMP's own configuration stuff, because it's all rather hairy
 # and not worth re-implementing in our Makefile framework.
 
-ifneq "$(HaveLibGmp)" "YES"
-ifneq "$(HaveFrameworkGMP)" "YES"
-boot ::
-	if [ -f gmp/config.status ]; then \
-	   cd gmp && CC=$(WhatGccIsCalled) ./config.status; \
-        else \
-	   cd gmp && CC=$(WhatGccIsCalled) $(SHELL) configure --enable-shared=no \
-		        --host=`echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g'`; \
-	fi
-
-# Slight cheatage here to pass host as target, but x-compilation isn't supported by ghc.
-
-ifeq "$(way)" ""
-all :: gmp/libgmp.a
-
-ifeq "$(DLLized)" "YES"
-all :: $(DLL_PEN)/gmp.dll
-
-$(DLL_PEN)/gmp.dll:
-	$(MAKE) -C gmp gmp.dll
-	$(MV) gmp/gmp.dll $(DLL_PEN)
-endif
-endif
-
-install :: gmp/libgmp.a
-
-ifeq "$(way)" ""
-clean distclean maintainer-clean ::
-	-$(MAKE) -C gmp MAKEFLAGS= $@
-
-INSTALL_LIBS += gmp/libgmp.a
-endif
-endif
-
-gmp/libgmp.a ::
-	$(MAKE) -C gmp MAKEFLAGS=
-	@$(CP) gmp/.libs/libgmp.a gmp
-	@$(RANLIB) gmp/libgmp.a
-endif
-
 CLEAN_FILES += gmp/libgmp.a
 
 # Need to get the GMP vars in through CPP to package.conf.in, and put
@@ -313,6 +270,11 @@ endif
 ifneq "$(GMP_LIB_DIRS)" ""
 SRC_LD_OPTS += -L$(GMP_LIB_DIRS)
 endif
+
+SRC_CC_OPTS += -I../gmp/gmpbuild
+SRC_HC_OPTS += -I../gmp/gmpbuild
+SRC_HSC2HS_OPTS += -I../gmp/gmpbuild
+SRC_LD_OPTS += -L../gmp/gmpbuild
 
 #-----------------------------------------------------------------------------
 #

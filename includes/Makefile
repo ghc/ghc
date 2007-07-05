@@ -12,7 +12,7 @@ H_PLATFORM = ghcplatform.h
 #
 # All header files
 #
-H_FILES = $(filter-out gmp.h $(H_CONFIG) $(H_PLATFORM),$(wildcard *.h)) gmp.h
+H_FILES = $(filter-out $(H_CONFIG) $(H_PLATFORM),$(wildcard *.h))
 
 ifneq "$(DOING_BIN_DIST)" "YES"
 
@@ -27,19 +27,13 @@ ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
 SRC_CC_OPTS += -DTABLES_NEXT_TO_CODE
 endif
 
-SRC_CC_OPTS += -I. -I../rts
+SRC_CC_OPTS += -I. -I../rts -I../gmp/gmpbuild
 
 ifneq "$(GhcWithSMP)" "YES"
 SRC_CC_OPTS += -DNOSMP
 endif
 
-boot :: gmp.h
-
 all :: $(H_CONFIG) $(H_PLATFORM)
-
-# gmp.h is copied from the GMP directory
-gmp.h : $(FPTOOLS_TOP)/rts/gmp/gmp.h
-	$(CP) $< $@
 
 # The fptools configure script creates the configuration header file and puts it
 # in fptools/mk/config.h. We copy it down to here (without any PACKAGE_FOO

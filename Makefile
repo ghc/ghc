@@ -59,12 +59,12 @@ include $(TOP)/mk/boilerplate.mk
 
 # We can't 'make boot' in libraries until stage1 is built
 ifeq "$(BootingFromHc)" "YES"
-SUBDIRS_BUILD = includes rts compat compiler docs utils driver
+SUBDIRS_BUILD = gmp includes rts compat compiler docs utils driver
 else
-SUBDIRS_BUILD = includes compat utils driver docs compiler rts
+SUBDIRS_BUILD = gmp includes compat utils driver docs compiler rts
 endif
 
-SUBDIRS = includes compat utils driver docs rts libraries compiler
+SUBDIRS = gmp includes compat utils driver docs rts libraries compiler
 
 # Sanity check that all the core libraries are in the tree, to catch
 # failure to run darcs-all.
@@ -261,6 +261,7 @@ binary-dist-pre::
 	$(MKDIRHIER) $(BIN_DIST_DIR)/share
 
 binary-dist::
+	$(MAKE) -C gmp      binary-dist DOING_BIN_DIST=YES
 	$(MAKE) -C includes binary-dist DOING_BIN_DIST=YES
 	$(MAKE) -C compiler binary-dist DOING_BIN_DIST=YES $(INSTALL_STAGE)
 	# XXX $(MAKE) -C docs     binary-dist DOING_BIN_DIST=YES

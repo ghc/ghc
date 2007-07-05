@@ -23,7 +23,7 @@ library-dirs:		LIB_DIR GMP_LIB_DIRS
 #else /* !INSTALLING */
 library-dirs:		FPTOOLS_TOP_ABS"/rts" GMP_LIB_DIRS
 # if !defined(HAVE_LIBGMP) && !defined(HAVE_FRAMEWORK_GMP)
-			, FPTOOLS_TOP_ABS"/rts/gmp"
+			, FPTOOLS_TOP_ABS"/gmp/gmpbuild"
 # endif
 #endif
 
@@ -64,6 +64,8 @@ include-dirs:		INCLUDE_DIR GMP_INCLUDE_DIRS
 # endif
 #else /* !INSTALLING */
 include-dirs:		FPTOOLS_TOP_ABS"/includes"
+             		FPTOOLS_TOP_ABS"/rts"
+             		FPTOOLS_TOP_ABS"/gmp/gmpbuild"
 #endif
 
 includes:		Stg.h
