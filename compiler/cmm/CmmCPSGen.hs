@@ -385,7 +385,6 @@ pack_continuation allow_header_set
                       (ContinuationFormat _ cont_id cont_frame_size live_regs)
   = pack_frame curr_frame_size cont_frame_size maybe_header continuation_args
   where
-    continuation_function = CmmLit $ CmmLabel $ fromJust cont_id
     continuation_args = map (maybe Nothing (Just . CmmReg . CmmLocal))
                             live_regs
     needs_header_set =
@@ -394,7 +393,7 @@ pack_continuation allow_header_set
           _ -> isJust cont_id
 
     maybe_header = if allow_header_set && needs_header_set
-                   then Just continuation_function
+                   then maybe Nothing (Just . CmmLit . CmmLabel) cont_id
                    else Nothing
 
 pack_frame :: WordOff         -- ^ Current frame size
