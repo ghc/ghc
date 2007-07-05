@@ -200,14 +200,15 @@ lits	:: { [ExtFCode CmmExpr] }
 
 cmmproc :: { ExtCode }
 -- TODO: add real SRT/info tables to parsed Cmm
-	: info maybe_formals maybe_frame '{' body '}'
-		{ do ((info_lbl, info, live, formals, frame), stmts) <-
+	: info maybe_formals maybe_frame maybe_gc_block '{' body '}'
+		{ do ((info_lbl, info, live, formals, frame, gc_block), stmts) <-
 		       getCgStmtsEC' $ loopDecls $ do {
 		         (info_lbl, info, live) <- $1;
 		         formals <- sequence $2;
 		         frame <- $3;
-		         $5;
-		         return (info_lbl, info, live, formals, frame) }
+		         gc_block <- $4;
+		         $6;
+		         return (info_lbl, info, live, formals, frame, gc_block) }
 		     blks <- code (cgStmtsToBlocks stmts)
 		     code (emitInfoTableAndCode info_lbl (CmmInfo Nothing frame info) formals blks) }
 
@@ -216,15 +217,16 @@ cmmproc :: { ExtCode }
 		     formals <- sequence $2;
 		     code (emitInfoTableAndCode info_lbl (CmmInfo Nothing Nothing info) formals []) }
 
-	| NAME maybe_formals maybe_frame '{' body '}'
-		{ do ((formals, frame), stmts) <-
+	| NAME maybe_formals maybe_frame maybe_gc_block '{' body '}'
+		{ do ((formals, frame, gc_block), stmts) <-
 			getCgStmtsEC' $ loopDecls $ do {
 		          formals <- sequence $2;
 			  frame <- $3;
-		          $5;
-		          return (formals, frame) }
+		          gc_block <- $4;
+		          $6;
+		          return (formals, frame, gc_block) }
                      blks <- code (cgStmtsToBlocks stmts)
-		     code (emitProc (CmmInfo Nothing frame CmmNonInfoTable) (mkRtsCodeLabelFS $1) formals blks) }
+		     code (emitProc (CmmInfo gc_block frame CmmNonInfoTable) (mkRtsCodeLabelFS $1) formals blks) }
 
 info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	: 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
@@ -510,6 +512,11 @@ maybe_frame :: { ExtFCode (Maybe UpdateFrame) }
 	| 'jump' expr '(' exprs0 ')'	{ do { target <- $2;
 					       args <- sequence $4;
 					       return $ Just (UpdateFrame target args) } }
+
+maybe_gc_block :: { ExtFCode (Maybe BlockId) }
+	: {- empty -}			{ return Nothing }
+	| 'goto' NAME
+		{ do l <- lookupLabel $2; return (Just l) }
 
 type	:: { MachRep }
 	: 'bits8'		{ I8 }

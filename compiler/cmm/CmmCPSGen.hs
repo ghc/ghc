@@ -97,11 +97,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
 
       gc_stmts :: [CmmStmt]
       gc_stmts =
-          case info of
-            CmmInfo (Just gc_block) _ _ ->
-                gc_stack_check' stack_use arg_stack (max_stack - curr_stack)
-            CmmInfo Nothing _ _ ->
-                panic "continuationToProc: missing GC block"
+        assign_gc_stack_use stack_use arg_stack (max_stack - curr_stack)
 
       update_stmts :: [CmmStmt]
       update_stmts =
@@ -124,10 +120,11 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
           prefix_blocks ++ [main_block]
           where
             prefix_blocks =
-                case gc_prefix ++ param_prefix of
-                  [] -> []
-                  entry_stmts -> [BasicBlock prefix_id
-                                  (entry_stmts ++ [CmmBranch ident])]
+                if is_entry
+                then [BasicBlock
+                      (BlockId prefix_unique)
+                      (param_stmts ++ [CmmBranch ident])]
+                else []
 
             prefix_unique : call_uniques = uniques
             toCLabel = mkReturnPtLabel . getUnique
@@ -161,17 +158,9 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                       -- a bit.  This depends on the knowledge that the
                       -- statements in the first block are only the GC check.
                       -- That's fragile but it works for now.
-                      BasicBlock ident (stmts ++ update_stmts ++ postfix_stmts)
+                      BasicBlock ident (gc_stmts ++ stmts ++ update_stmts ++ postfix_stmts)
                   ControlEntry -> BasicBlock ident (stmts ++ postfix_stmts)
                   ContinuationEntry _ _ _ -> BasicBlock ident (stmts ++ postfix_stmts)
-            prefix_id = BlockId prefix_unique
-            gc_prefix = case entry of
-                       FunctionEntry _ _ _ -> gc_stmts
-                       ControlEntry -> []
-                       ContinuationEntry _ _ _ -> []
-            param_prefix = if is_entry
-                           then param_stmts
-                           else []
             postfix_stmts = case exit of
                         FinalBranch next ->
                             if (mkReturnPtLabel $ getUnique next) == label
@@ -366,7 +355,7 @@ adjust_sp_reg spRel =
     then []
     else [CmmAssign spReg (CmmRegOff spReg (spRel*wORD_SIZE))]
 
-gc_stack_check' stack_use arg_stack max_frame_size =
+assign_gc_stack_use stack_use arg_stack max_frame_size =
     if max_frame_size > arg_stack
     then [CmmAssign stack_use (CmmRegOff spReg (-max_frame_size*wORD_SIZE))]
     else [CmmAssign stack_use (CmmReg spLimReg)]

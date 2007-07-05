@@ -15,7 +15,6 @@ import CmmBrokenBlock
 import CmmProcPoint
 import CmmCallConv
 import CmmCPSGen
-import CmmInfo
 import CmmUtils
 
 import ClosureInfo
@@ -69,37 +68,23 @@ cmmCPS dflags abstractC = do
 
   return continuationC
 
-stg_gc_gen = mkRtsApFastLabel SLIT("gen_cg_TODO") --panic "Need the label for gc"
-make_gc_block block_id fun_label formals safety = BasicBlock block_id stmts
+make_stack_check stack_check_block_id info stack_use next_block_id =
+    BasicBlock stack_check_block_id $
+                   check_stmts ++ [CmmBranch next_block_id]
     where
-      stmts = [CmmCall stg_gc_gen_target [] [] safety,
-               CmmJump fun_expr actuals]
-      stg_gc_gen_target =
-          CmmForeignCall (CmmLit (CmmLabel stg_gc_gen)) CmmCallConv
-      actuals = map (\x -> (CmmReg (CmmLocal x), NoHint)) formals
-      fun_expr = CmmLit (CmmLabel fun_label)
-
-make_gc_check stack_use gc_block =
-    [CmmCondBranch
-     (CmmMachOp (MO_U_Lt $ cmmRegRep spReg)
-                    [CmmReg stack_use, CmmReg spLimReg])
-    gc_block]
-
-force_gc_block old_info stack_use block_id fun_label formals =
-    case old_info of
-      CmmInfo (Just existing) _ _
-          -> (old_info, [], make_gc_check stack_use existing)
-      CmmInfo Nothing update_frame info_table
-          -> (CmmInfo (Just block_id) update_frame info_table,
-              [make_gc_block block_id fun_label formals (CmmSafe $ cmmInfoTableSRT info_table)],
-              make_gc_check stack_use block_id)
-
-cmmInfoTableSRT CmmNonInfoTable = NoC_SRT
-cmmInfoTableSRT (CmmInfoTable _ _ (ConstrInfo _ _ _)) = NoC_SRT
-cmmInfoTableSRT (CmmInfoTable _ _ (FunInfo _ srt _ _ _ _)) = srt
-cmmInfoTableSRT (CmmInfoTable _ _ (ThunkInfo _ srt)) = srt
-cmmInfoTableSRT (CmmInfoTable _ _ (ThunkSelectorInfo _ srt)) = srt
-cmmInfoTableSRT (CmmInfoTable _ _ (ContInfo _ srt)) = srt
+      check_stmts =
+          case info of
+            -- If we are given a stack check handler,
+            -- then great, well check the stack.
+            CmmInfo (Just gc_block) _ _
+                -> [CmmCondBranch
+                    (CmmMachOp (MO_U_Lt $ cmmRegRep spReg)
+                     [CmmReg stack_use, CmmReg spLimReg])
+                    gc_block]
+            -- If we aren't given a stack check handler,
+            -- then humph! we just won't check the stack for them.
+            CmmInfo Nothing _ _
+                -> []
 
 -----------------------------------------------------------------------------
 -- |CPS a single CmmTop (proceedure)
@@ -120,39 +105,35 @@ cpsProc uniqSupply proc@(CmmProc _ _ _ []) = [proc]
 -- CPS transform for those procs that actually need it
 cpsProc uniqSupply (CmmProc info ident params blocks) = cps_procs
     where
+      -- We need to be generating uniques for several things.
+      -- We could make this function monadic to handle that
+      -- but since there is no other reason to make it monadic,
+      -- we instead will just split them all up right here.
       (uniqSupply1, uniqSupply2) = splitUniqSupply uniqSupply
       uniques :: [[Unique]]
       uniques = map uniqsFromSupply $ listSplitUniqSupply uniqSupply1
-      (gc_unique:gc_block_unique:stack_use_unique:info_uniques):adaptor_uniques:block_uniques = uniques
+      (stack_check_block_unique:stack_use_unique:info_uniques) :
+       adaptor_uniques :
+       block_uniques = uniques
       proc_uniques = map (map uniqsFromSupply . listSplitUniqSupply) $ listSplitUniqSupply uniqSupply2
 
       stack_use = CmmLocal (LocalReg stack_use_unique (cmmRegRep spReg) KindPtr)
+      stack_check_block_id = BlockId stack_check_block_unique
+      stack_check_block = make_stack_check stack_check_block_id info stack_use (blockId $ head blocks)
 
-      -- TODO: doc
-      forced_gc :: (CmmInfo, [CmmBasicBlock], [CmmStmt])
-      forced_gc = force_gc_block info stack_use (BlockId gc_unique) ident params
-      (forced_info, gc_blocks, check_stmts) = forced_gc
-      gc_block_id = BlockId gc_block_unique
+      forced_blocks = stack_check_block : blocks
 
-      forced_blocks = 
-          BasicBlock gc_block_id
-                     (check_stmts++[CmmBranch $ blockId $ head blocks]) :
-          blocks ++ gc_blocks
-
-      forced_gc_id = case forced_info of
-                       CmmInfo (Just x) _ _ -> x
-
-      update_frame = case info of CmmInfo _ u _ -> u
+      CmmInfo maybe_gc_block_id update_frame _ = info
 
       -- Break the block at each function call.
       -- The part after the function call will have to become a continuation.
       broken_blocks :: ([(BlockId, ContFormat)], [BrokenBlock])
       broken_blocks =
           (\x -> (concatMap fst x, concatMap snd x)) $
-          zipWith3 (breakBlock [forced_gc_id])
+          zipWith3 (breakBlock (maybeToList maybe_gc_block_id))
                      block_uniques
                      forced_blocks
-                     (FunctionEntry forced_info ident params :
+                     (FunctionEntry info ident params :
                       repeat ControlEntry)
 
       f' = selectContinuations (fst broken_blocks)
@@ -243,9 +224,9 @@ gatherBlocksIntoContinuation live proc_points blocks start =
   Continuation info_table clabel params is_gc_cont body
     where
       children = (collectNonProcPointTargets proc_points blocks (unitUniqSet start) [start]) `minusUniqSet` (unitUniqSet start)
-      start_block = lookupWithDefaultUFM blocks (panic "TODO") start
+      start_block = lookupWithDefaultUFM blocks unknown_block start
+      children_blocks = map (lookupWithDefaultUFM blocks unknown_block) (uniqSetToList children)
       unknown_block = panic "unknown block in gatherBlocksIntoContinuation"
-      children_blocks = map (lookupWithDefaultUFM blocks (panic "TODO")) (uniqSetToList children)
       body = start_block : children_blocks
 
       -- We can't properly annotate the continuation's stack parameters

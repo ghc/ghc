@@ -156,7 +156,7 @@ pprTypeInfo (FunInfo layout srt fun_type arity args slow_entry) =
           ptext SLIT("srt: ") <> ppr srt,
           ptext SLIT("fun_type: ") <> integer (toInteger fun_type),
           ptext SLIT("arity: ") <> integer (toInteger arity),
-          --ppr args, -- TODO: needs to be printed
+          --ptext SLIT("args: ") <> ppr args, -- TODO: needs to be printed
           ptext SLIT("slow: ") <> pprLit slow_entry
          ]
 pprTypeInfo (ThunkInfo layout srt) =

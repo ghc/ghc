@@ -113,7 +113,7 @@ mapBlockStmts f (BasicBlock id bs) = BasicBlock id (map f bs)
 
 data CmmInfo
   = CmmInfo
-      (Maybe BlockId) -- GC target
+      (Maybe BlockId) -- GC target. Nothing <=> CPS won't do stack check
       (Maybe UpdateFrame) -- Update frame
       CmmInfoTable -- Info table
 
