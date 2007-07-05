@@ -171,7 +171,7 @@ c-sources:
 	cbits/lockFile.c
 	cbits/longlong.c
 	cbits/selectUtils.c
-include-dirs: include, ../../includes, ../../rts
+include-dirs: include
 includes:	HsBase.h
 install-includes:	HsBase.h HsBaseConfig.h WCsubst.h dirUtils.h lockFile.h consUtils.h Typeable.h
 extensions:	CPP
