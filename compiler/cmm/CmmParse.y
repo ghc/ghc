@@ -866,6 +866,7 @@ foreignCall conv_string results_code expr_code args_code vols safety
 	  results <- sequence results_code
 	  expr <- expr_code
 	  args <- sequence args_code
+	  --code (stmtC (CmmCall (CmmForeignCall expr convention) results args safety))
           case convention of
             -- Temporary hack so at least some functions are CmmSafe
             CmmCallConv -> code (stmtC (CmmCall (CmmForeignCall expr convention) results args safety))
