@@ -138,7 +138,7 @@ sub collectDyldStuff_darwin {
     
     while ( 1 ) {
 	$_ = <TMPI>;
-	if ( $_ eq '' || /^L(_.+)\$.+:/ ) {
+	if ( $_ eq '' || (/^L(_.+)\$.+:/ && !(/^L(.*)\$stub_binder:/))) {
 	    if ( $label ne '' ) {
 		$DyldChunksDefined{$label} .= $section . $alignment . $chunk_label . $ chunk;
 		if( $section =~ s/\.data/\.non_lazy_symbol_pointer/ ) {
@@ -155,7 +155,7 @@ sub collectDyldStuff_darwin {
 	    $section = $cur_section;
 	    $alignment = $cur_alignment;
 	    print STDERR "label: $label\n" if $Dump_asm_splitting_info;
-	} elsif ( /^\s*\.(symbol_stub|picsymbol_stub|lazy_symbol_pointer|non_lazy_symbol_pointer|data|section __IMPORT,.*)/ ) {
+	} elsif ( /^\s*\.(symbol_stub|picsymbol_stub|lazy_symbol_pointer|non_lazy_symbol_pointer|data|section __IMPORT,.*|section __DATA, __la_sym_ptr(2|3),lazy_symbol_pointers)/ ) {
 	    $cur_section = $_;
 	    printf STDERR "section: $cur_section\n" if $Dump_asm_splitting_info;
 	    $cur_alignment = ''

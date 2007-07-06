@@ -372,6 +372,9 @@ pprGotDeclaration = Pretty.empty
 -- On Darwin, we have to generate our own stub code for lazy binding..
 -- For each processor architecture, there are two versions, one for PIC
 -- and one for non-PIC.
+--
+-- Whenever you change something in this assembler output, make sure
+-- the splitter in driver/split/ghc-split.lprl recognizes the new output
 pprImportedSymbol importedLbl
 #if powerpc_TARGET_ARCH
     | Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
