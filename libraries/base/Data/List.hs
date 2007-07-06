@@ -871,8 +871,14 @@ unfoldr f b  =
 
 -- | A strict version of 'foldl'.
 foldl'           :: (a -> b -> a) -> a -> [b] -> a
+#ifdef __GLASGOW_HASKELL__
+foldl' f z xs = lgo z xs
+    where lgo z []     = z
+          lgo z (x:xs) = let z' = f z x in z' `seq` lgo z' xs
+#else
 foldl' f a []     = a
 foldl' f a (x:xs) = let a' = f a x in a' `seq` foldl' f a' xs
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 -- | 'foldl1' is a variant of 'foldl' that has no starting value argument,
