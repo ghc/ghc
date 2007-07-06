@@ -145,7 +145,11 @@ extern void _assertFail (const char *, unsigned int);
 #include "SMP.h"
 
 /* GNU mp library */
+#if defined(HAVE_FRAMEWORK_GMP)
+#include <GMP/gmp.h>
+#else
 #include "gmp.h"
+#endif
 
 /* Macros for STG/C code */
 #include "Block.h"

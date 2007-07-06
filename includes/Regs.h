@@ -22,7 +22,11 @@
 #ifndef REGS_H
 #define REGS_H
 
+#if defined(HAVE_FRAMEWORK_GMP)
+#include <GMP/gmp.h>
+#else
 #include "gmp.h" // Needs MP_INT definition 
+#endif
 
 /*
  * Spark pools: used to store pending sparks 
