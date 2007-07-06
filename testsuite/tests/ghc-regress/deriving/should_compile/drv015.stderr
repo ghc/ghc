@@ -1,0 +1,8 @@
+
+drv015.hs:14:0:
+    No instances for (Show (g a), Show (f a))
+      arising from the 'deriving' clause of a data type declaration
+		   at drv015.hs:(14,0)-(15,25)
+    Possible fix:
+      add an instance declaration for (Show (g a), Show (f a))
+    When deriving the instance for (Show (Pair1 f g a))
