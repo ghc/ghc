@@ -1801,8 +1801,7 @@ listModuleLine modl line = do
 -- If the highlight flag is True, also highlight the span using
 -- start_bold/end_bold.
 listAround span do_highlight = do
-      pwd      <- getEnv "PWD" 
-      contents <- BS.readFile (pwd `joinFileName` unpackFS file)
+      contents <- BS.readFile (unpackFS file)
       let 
           lines = BS.split '\n' contents
           these_lines = take (line2 - line1 + 1 + pad_before + pad_after) $ 
