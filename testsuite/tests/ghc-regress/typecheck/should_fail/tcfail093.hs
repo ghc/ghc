@@ -8,6 +8,9 @@ module ShouldFail where
 -- "basicTypes/Var.lhs:194: Non-exhaustive patterns in function readMutTyVar"
 -- Reported by Thomas Hallgren Nov 00
 
+-- July 07: I'm changing this from "should fail" to "should succeed"
+-- See Note [Important subtlety in oclose] in FunDeps
+
 
 primDup :: Int -> IO Int
 primDup = undefined
