@@ -1,0 +1,18 @@
+// Test stack check targets
+
+// One with a target
+foo1(bits32 x, bits32 y) goto L {
+  bits32 z;
+  foreign "C--" bar() "safe";
+  return (z+12);
+L:
+  z = 3;
+  return (z+13);
+}
+
+// And one without a target
+foo2(bits32 x, bits32 y) {
+  bits32 z;
+  foreign "C--" bar() "safe";
+  return (z+14);
+}

@@ -1,0 +1,5 @@
+// This puts GHC into an infinite loop(!) when -O is on
+
+foo {
+ L: goto L;
+}

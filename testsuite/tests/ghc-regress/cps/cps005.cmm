@@ -1,0 +1,7 @@
+// Basic test of return
+
+foo3 {
+  foreign "C--" glap() "safe";
+  return (12);
+}
+

@@ -1,0 +1,21 @@
+// Test the calling conventions
+
+// Test the default calling convention
+// which is "unsafe" but will change soon to "safe"
+foo1() {
+  foreign "C--" bar(x, y);
+  return (1);
+}
+
+// Test the "unsafe" calling convention
+foo2() {
+  foreign "C--" bar(x, y) "unsafe";
+  return (1);
+}
+
+// Test the "safe" calling convention
+foo3() {
+  bits32 x, y, z;
+  foreign "C--" bar(x, y, z) "safe";
+  return (1);
+}

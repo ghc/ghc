@@ -1,0 +1,3 @@
+// Another test for empty functions
+
+INFO_TABLE_RET(foo, 0, bits32 x, bits32 y);

@@ -1,0 +1,14 @@
+// Test explicit continuations.
+
+// Note, we might want to check about suffix on foo2 (i.e. "_entry").
+// I'm not sure that that is right.
+
+foo1 (bits32 update) jump foo2(update) {
+  bits32 x;
+  return (x);
+}
+
+INFO_TABLE_RET (foo2, 0, bits32 update) (bits32 x) {
+  bits32[update] = x;
+  return (x);
+}
