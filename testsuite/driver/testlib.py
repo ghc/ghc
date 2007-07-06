@@ -4,6 +4,7 @@
 
 import sys
 import os
+import subprocess
 import string
 import re
 import traceback
@@ -1046,11 +1047,13 @@ def runCmd( cmd ):
     if config.platform == 'i386-unknown-mingw32':
 	# On MinGW, we will always have timeout
         assert config.timeout_prog!=''
-        r = os.spawnl(os.P_WAIT, config.timeout_prog,
-		      config.timeout_prog,`config.timeout`,cmd )
-    elif config.timeout_prog!='':
-    	r = os.spawnv(os.P_WAIT, config.timeout_prog,
-		      [config.timeout_prog,`config.timeout`,cmd] )
+
+    if config.timeout_prog != '':
+        # We use subprocess.call rather than os.spawnv as the latter
+        # seems to send its arguments through a shell or something
+        # with the Windows (non-cygwin) python. An argument "a b c"
+        # turns into three arguments ["a", "b", "c"].
+    	r = subprocess.call([config.timeout_prog, str(config.timeout), cmd])
     else:
         r = os.system(cmd)
     return r << 8
