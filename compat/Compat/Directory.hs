@@ -36,7 +36,7 @@ import GHC.IOBase ( IOException(..), IOErrorType(..) )
 import System.IO		( try )
 #endif
 #if __GLASGOW_HASKELL__ && defined(mingw32_HOST_OS)
-import Foreign.Ptr
+import Foreign
 import Foreign.C
 #endif
 import System.Directory(doesFileExist, doesDirectoryExist, getPermissions, setPermissions, createDirectory)
