@@ -42,7 +42,7 @@ module Util (
 	removeSpaces,
 
 	-- strictness
-	foldl', seqList,
+	seqList,
 
 	-- pairs
 	unzipWith,
@@ -486,16 +486,6 @@ transitiveClosure succ eq xs
 \subsection[Utils-accum]{Accumulating}
 %*									*
 %************************************************************************
-
-A strict version of foldl.
-
-\begin{code}
-foldl'        :: (a -> b -> a) -> a -> [b] -> a
-foldl' f z xs = lgo z xs
-	     where
-		lgo z []     =  z
-		lgo z (x:xs) = (lgo $! (f z x)) xs
-\end{code}
 
 A combination of foldl with zip.  It works with equal length lists.
 

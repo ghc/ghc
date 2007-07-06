@@ -64,6 +64,8 @@ import Outputable
 
 import GHC.Exts
 
+import Data.List
+
 #if ! OMIT_NATIVE_CODEGEN
 #  define IF_NCG(a) a
 #else
