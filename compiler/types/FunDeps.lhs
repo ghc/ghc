@@ -76,21 +76,29 @@ uniform thing is to return {t}.
 
 However, consider
 	class D a b c | b->c
-	f x = e	  -- Generates constraint (D s Int t)
+	f x = e	  -- 'e' generates constraint (D s Int t)
 		  -- \x.e has type s->s
 Then, if (oclose (D s Int t) {}) = {t}, we'll make the function
 monomorphic in 't', thus
 	f :: forall s. D s Int t => s -> s
 
-But if this function is never called, t will never be instantiated;
-the functional dependencies that fix t may well be instance decls in
+But if this function is never called, 't' will never be instantiated;
+the functional dependencies that fix 't' may well be instance decls in
 some importing module.  But the top-level defaulting of unconstrained
-type variales will fix t=GHC.Prim.Any, and that's simply a bug.
+type variables will fix t=GHC.Prim.Any, and that's simply a bug.
 
 Conclusion: oclose only returns a type variable as "fixed" if it 
 depends on at least one type variable in the input fixed_tvs.
 
 Remember, it's always sound for oclose to return a smaller set.
+An interesting example is tcfail093, where we get this inferred type:
+    class C a b | a->b
+    dup :: forall h. (Call (IO Int) h) => () -> Int -> h
+This is perhaps a bit silly, because 'h' is fixed by the (IO Int);
+previously GHC rejected this saying 'no instance for Call (IO Int) h'.
+But it's right on the borderline. If there was an extra, otherwise
+uninvolved type variable, like 's' in the type of 'f' above, then
+we must accept the function.  So, for now anyway, we accept 'dup' too.
 
 \begin{code}
 oclose :: [PredType] -> TyVarSet -> TyVarSet
