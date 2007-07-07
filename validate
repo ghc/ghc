@@ -7,8 +7,14 @@ fi
 if [ -f mk/build.mk ]; then
    mv mk/build.mk mk/build.mk.bak
 fi
+
+# The default is a "quick" build
 echo BuildFlavour=quick >mk/build.mk
 cat mk/build.mk.sample >>mk/build.mk
+
+# You can override the default validate settings using mk/validate.mk
+# e.g. you could add GhcLibWays=p to test profiling.
+echo '-include $(TOP)/mk/validate.mk' >>mk/build.mk
 
 sh boot
 ./configure
