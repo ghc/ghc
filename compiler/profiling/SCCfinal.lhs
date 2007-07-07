@@ -136,7 +136,7 @@ stgMassageForProfiling this_pkg mod_name us stg_binds
                          modl | Just m <- nameModule_maybe (idName binder) = m
                               | otherwise = mod_name
 		     in
-		     collectCC  cc  `thenMM_`
+		     collectNewCC  cc  `thenMM_`
 		     collectCCS ccs `thenMM_`
 		     returnMM ccs
 		else 
@@ -416,6 +416,14 @@ collectCC cc mod_name scope_cc us ids (local_ccs, extern_ccs, ccss)
 	((cc : local_ccs, extern_ccs, ccss), ())
     else -- must declare it "extern"
 	((local_ccs, cc : extern_ccs, ccss), ())
+
+-- Version of collectCC used when we definitely want to declare this
+-- CC as local, even if its module name is not the same as the current
+-- module name (eg. the special :Main module) see bug #249, #1472, 
+-- test prof001,prof002.
+collectNewCC :: CostCentre -> MassageM ()
+collectNewCC cc mod_name scope_cc us ids (local_ccs, extern_ccs, ccss)
+  = ((cc : local_ccs, extern_ccs, ccss), ())
 
 collectCCS :: CostCentreStack -> MassageM ()
 
