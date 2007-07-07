@@ -4,12 +4,18 @@
 
 import sys
 import os
-import subprocess
 import string
 import re
 import traceback
 import copy
 import glob
+
+have_subprocess = False
+try:
+    import subprocess
+    have_subprocess = True
+except:
+    print "Warning: subprocess not found, will fall back to spawnv"
 
 from string import join
 from testglobals import *
@@ -1052,11 +1058,19 @@ def runCmd( cmd ):
         assert config.timeout_prog!=''
 
     if config.timeout_prog != '':
-        # We use subprocess.call rather than os.spawnv as the latter
+        # We prefer subprocess.call to os.spawnv as the latter
         # seems to send its arguments through a shell or something
         # with the Windows (non-cygwin) python. An argument "a b c"
         # turns into three arguments ["a", "b", "c"].
-    	r = subprocess.call([config.timeout_prog, str(config.timeout), cmd])
+
+        # However, subprocess is new in python 2.4, so fall back to
+        # using spawnv if we don't have it
+
+        if have_subprocess:
+            r = subprocess.call([config.timeout_prog, str(config.timeout), cmd])
+        else:
+            r = os.spawnv(os.P_WAIT, config.timeout_prog,
+                          [config.timeout_prog, str(config.timeout), cmd])
     else:
         r = os.system(cmd)
     return r << 8
