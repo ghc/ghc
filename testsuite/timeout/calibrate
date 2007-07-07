@@ -4,7 +4,14 @@ import math
 import os
 from os import *
 from sys import *
-from resource import *
+try:
+    from resource import *
+except:
+    # We don't have resource, so this is a non-UNIX machine.
+    # It's probably a reasonable modern x86/x86_64 machines, so we'd
+    # probably calibrate to 300 anyway; thus just print 300.
+    print 300
+    exit(0)
 
 compiler = argv[1]
 compiler_name = os.path.basename(compiler)
