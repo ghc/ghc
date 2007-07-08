@@ -183,6 +183,7 @@ data DynFlag
    | Opt_RecordPuns
    | Opt_GADTs
    | Opt_RelaxedPolyRec			-- -X=RelaxedPolyRec
+   | Opt_MagicHash
 
    -- optimisation opts
    | Opt_Strictness
@@ -1092,6 +1093,7 @@ fFlags = [
 -- These -X<blah> flags can all be reversed with -Xno-<blah>
 xFlags :: [(String, DynFlag)]
 xFlags = [
+  ( "MagicHash",                        Opt_MagicHash ),
   ( "FI",				Opt_FFI ),  -- support `-ffi'...
   ( "FFI",				Opt_FFI ),  -- ...and also `-fffi'
   ( "ForeignFunctionInterface",		Opt_FFI ),
@@ -1135,6 +1137,7 @@ glasgowExtsFlags = [ Opt_GlasgowExts
 		   , Opt_GADTs
 		   , Opt_ImplicitParams 
 		   , Opt_ScopedTypeVariables
+		   , Opt_MagicHash
 		   , Opt_TypeFamilies ]
 
 ------------------
