@@ -614,7 +614,7 @@ reservedWordsFM = listToUFM $
 	( "_scc_",	ITscc, 		0 ),		-- ToDo: remove
 
       	( "forall",	ITforall,	 bit tvBit),
-	( "mdo",	ITmdo,		 bit glaExtsBit),
+	( "mdo",	ITmdo,		 bit recursiveDoBit),
 	( "family",	ITfamily,	 bit tyFamBit),
 
 	( "foreign",	ITforeign,	 bit ffiBit),
@@ -1518,7 +1518,8 @@ bangPatBit = 8	-- Tells the parser to understand bang-patterns
 tyFamBit   = 9	-- indexed type families: 'family' keyword and kind sigs
 haddockBit = 10 -- Lex and parse Haddock comments
 magicHashBit = 11 -- # in both functions and operators
-kindSigsBit = 12 -- # in both functions and operators
+kindSigsBit = 12 -- Kind signatures on type variables
+recursiveDoBit = 13 -- mdo
 
 glaExtsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 glaExtsEnabled   flags = testBit flags glaExtsBit
@@ -1533,6 +1534,7 @@ tyFamEnabled     flags = testBit flags tyFamBit
 haddockEnabled   flags = testBit flags haddockBit
 magicHashEnabled flags = testBit flags magicHashBit
 kindSigsEnabled  flags = testBit flags kindSigsBit
+recursiveDoEnabled flags = testBit flags recursiveDoBit
 
 -- PState for parsing options pragmas
 --
@@ -1586,6 +1588,7 @@ mkPState buf loc flags  =
 	       .|. haddockBit   `setBitIf` dopt Opt_Haddock      flags
 	       .|. magicHashBit `setBitIf` dopt Opt_MagicHash    flags
 	       .|. kindSigsBit  `setBitIf` dopt Opt_KindSignatures flags
+	       .|. recursiveDoBit `setBitIf` dopt Opt_RecursiveDo flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b

@@ -189,6 +189,7 @@ data DynFlag
    | Opt_KindSignatures
    | Opt_ParallelListComp
    | Opt_GeneralizedNewtypeDeriving
+   | Opt_RecursiveDo
 
    -- optimisation opts
    | Opt_Strictness
@@ -1106,6 +1107,7 @@ xFlags = [
   ( "FFI",				Opt_FFI ),  -- ...and also `-fffi'
   ( "ForeignFunctionInterface",		Opt_FFI ),
 
+  ( "RecursiveDo",                      Opt_RecursiveDo ),
   ( "Arrows",				Opt_Arrows ), -- arrow syntax
   ( "Parr",				Opt_PArr ),
 
@@ -1149,6 +1151,7 @@ glasgowExtsFlags = [ Opt_GlasgowExts
 		   , Opt_ScopedTypeVariables
            , Opt_MultiParamTypeClasses
 		   , Opt_MagicHash
+           , Opt_RecursiveDo
            , Opt_ParallelListComp
            , Opt_EmptyDataDecls
            , Opt_KindSignatures
