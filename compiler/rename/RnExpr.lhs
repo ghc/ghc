@@ -645,8 +645,8 @@ rnStmt ctxt (RecStmt rec_stmts _ _ _ _) thing_inside
     doc = text "In a recursive do statement"
 
 rnStmt ctxt (ParStmt segs) thing_inside
-  = do	{ opt_GlasgowExts <- doptM Opt_GlasgowExts
-	; checkM opt_GlasgowExts parStmtErr
+  = do	{ parallel_list_comp <- doptM Opt_ParallelListComp
+	; checkM parallel_list_comp parStmtErr
  	; orig_lcl_env <- getLocalRdrEnv
 	; ((segs',thing), fvs) <- go orig_lcl_env [] segs
 	; return ((ParStmt segs', thing), fvs) }
@@ -935,7 +935,7 @@ patSynErr e = do { addErr (sep [ptext SLIT("Pattern syntax in expression context
 			 	nest 4 (ppr e)])
 		 ; return (EWildPat, emptyFVs) }
 
-parStmtErr = addErr (ptext SLIT("Illegal parallel list comprehension: use -fglasgow-exts"))
+parStmtErr = addErr (ptext SLIT("Illegal parallel list comprehension: use -XParallelListComp"))
 
 badIpBinds what binds
   = hang (ptext SLIT("Implicit-parameter bindings illegal in") <+> what)

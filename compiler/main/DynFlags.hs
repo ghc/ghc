@@ -187,6 +187,7 @@ data DynFlag
    | Opt_MagicHash
    | Opt_EmptyDataDecls
    | Opt_KindSignatures
+   | Opt_ParallelListComp
 
    -- optimisation opts
    | Opt_Strictness
@@ -1099,6 +1100,7 @@ xFlags = [
   ( "MagicHash",                        Opt_MagicHash ),
   ( "KindSignatures",                   Opt_KindSignatures ),
   ( "EmptyDataDecls",                   Opt_EmptyDataDecls ),
+  ( "ParallelListComp",                 Opt_ParallelListComp ),
   ( "FI",				Opt_FFI ),  -- support `-ffi'...
   ( "FFI",				Opt_FFI ),  -- ...and also `-fffi'
   ( "ForeignFunctionInterface",		Opt_FFI ),
@@ -1145,6 +1147,7 @@ glasgowExtsFlags = [ Opt_GlasgowExts
 		   , Opt_ScopedTypeVariables
            , Opt_MultiParamTypeClasses
 		   , Opt_MagicHash
+           , Opt_ParallelListComp
            , Opt_EmptyDataDecls
            , Opt_KindSignatures
 		   , Opt_TypeFamilies ]
