@@ -369,7 +369,7 @@ assignMem_I64Code addrTree valueTree = do
 	-- in
 	return (vcode `appOL` addr_code `snocOL` mov_lo `snocOL` mov_hi)
 
-assignReg_I64Code (CmmLocal (LocalReg u_dst pk)) valueTree = do
+assignReg_I64Code (CmmLocal (LocalReg u_dst pk _)) valueTree = do
    ChildCode64 vcode r_src_lo <- iselExpr64 valueTree
    let 
          r_dst_lo = mkVReg u_dst I32
@@ -3618,7 +3618,7 @@ outOfLineFloatOp mop =
 -}
 
 
-genCCall (CmmPrim MO_WriteBarrier) _ _ _
+genCCall (CmmPrim MO_WriteBarrier) _ _ 
  = return $ unitOL LWSYNC
 
 genCCall target dest_regs argsAndHints
@@ -3782,8 +3782,8 @@ genCCall target dest_regs argsAndHints
                     | rep == I64 -> toOL [MR (getHiVRegFromLo r_dest) r3,
                                           MR r_dest r4]
                     | otherwise -> unitOL (MR r_dest r3)
-                    where rep = cmmRegRep dest
-                          r_dest = getRegisterReg dest
+                    where rep = cmmRegRep (CmmLocal dest)
+                          r_dest = getRegisterReg (CmmLocal dest)
                           
         outOfLineFloatOp mop =
             do
