@@ -1094,12 +1094,12 @@ xFlags :: [(String, DynFlag)]
 xFlags = [
   ( "FI",				Opt_FFI ),  -- support `-ffi'...
   ( "FFI",				Opt_FFI ),  -- ...and also `-fffi'
-  ( "ForeignFunctionInterface",		Opt_FFI ),  -- ...and also `-fffi'
+  ( "ForeignFunctionInterface",		Opt_FFI ),
 
   ( "Arrows",				Opt_Arrows ), -- arrow syntax
   ( "Parr",				Opt_PArr ),
 
-  ( "TH",				Opt_TH ),
+  ( "TH",				Opt_TH ), -- support -fth
   ( "TemplateHaskelll",			Opt_TH ),
 
   ( "Generics",  			Opt_Generics ),
