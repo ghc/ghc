@@ -1244,13 +1244,20 @@ error = rtsTrue;
 	}
     }
 
-    // Determine what tick interval we should use for the RTS timer
-    // by taking the shortest of the various intervals that we need to
-    // monitor.
-    if (RtsFlags.MiscFlags.tickInterval <= 0) {
+    if (RtsFlags.MiscFlags.tickInterval < 0) {
         RtsFlags.MiscFlags.tickInterval = 50;
     }
 
+    // If the master timer is disabled, turn off the other timers.
+    if (RtsFlags.MiscFlags.tickInterval == 0) {
+        RtsFlags.ConcFlags.ctxtSwitchTime  = 0;
+        RtsFlags.GcFlags.idleGCDelayTime   = 0;
+        RtsFlags.ProfFlags.profileInterval = 0;
+    }
+
+    // Determine what tick interval we should use for the RTS timer
+    // by taking the shortest of the various intervals that we need to
+    // monitor.
     if (RtsFlags.ConcFlags.ctxtSwitchTime > 0) {
         RtsFlags.MiscFlags.tickInterval =
             stg_min(RtsFlags.ConcFlags.ctxtSwitchTime,
@@ -1277,8 +1284,13 @@ error = rtsTrue;
         RtsFlags.ConcFlags.ctxtSwitchTicks = 0;
     }
 
-    RtsFlags.ProfFlags.profileIntervalTicks =
-        RtsFlags.ProfFlags.profileInterval / RtsFlags.MiscFlags.tickInterval;
+    if (RtsFlags.ProfFlags.profileInterval > 0) {
+        RtsFlags.ProfFlags.profileIntervalTicks =
+            RtsFlags.ProfFlags.profileInterval / 
+            RtsFlags.MiscFlags.tickInterval;
+    } else {
+        RtsFlags.ProfFlags.profileIntervalTicks = 0;
+    }
 
     if (error) {
 	const char **p;

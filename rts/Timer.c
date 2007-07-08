@@ -93,5 +93,7 @@ startTimer(void)
 void
 stopTimer(void)
 {
-  stopTicker();
+  if (RtsFlags.MiscFlags.tickInterval != 0) {
+      stopTicker();
+  }
 }
