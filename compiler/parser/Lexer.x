@@ -649,7 +649,7 @@ reservedSymsFM = listToUFM $
        ,("-",	ITminus, 	0)
        ,("!",	ITbang, 	0)
 
-       ,("*",	ITstar,		bit glaExtsBit .|. 
+       ,("*",	ITstar,		bit glaExtsBit .|. bit kindSigsBit .|.
 				bit tyFamBit)	    -- For data T (a::*) = MkT
        ,(".",	ITdot,		bit tvBit)	    -- For 'forall a . t'
 
@@ -1518,6 +1518,7 @@ bangPatBit = 8	-- Tells the parser to understand bang-patterns
 tyFamBit   = 9	-- indexed type families: 'family' keyword and kind sigs
 haddockBit = 10 -- Lex and parse Haddock comments
 magicHashBit = 11 -- # in both functions and operators
+kindSigsBit = 12 -- # in both functions and operators
 
 glaExtsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 glaExtsEnabled   flags = testBit flags glaExtsBit
@@ -1531,6 +1532,7 @@ bangPatEnabled   flags = testBit flags bangPatBit
 tyFamEnabled     flags = testBit flags tyFamBit
 haddockEnabled   flags = testBit flags haddockBit
 magicHashEnabled flags = testBit flags magicHashBit
+kindSigsEnabled  flags = testBit flags kindSigsBit
 
 -- PState for parsing options pragmas
 --
@@ -1583,6 +1585,7 @@ mkPState buf loc flags  =
 	       .|. tyFamBit     `setBitIf` dopt Opt_TypeFamilies flags
 	       .|. haddockBit   `setBitIf` dopt Opt_Haddock      flags
 	       .|. magicHashBit `setBitIf` dopt Opt_MagicHash    flags
+	       .|. kindSigsBit  `setBitIf` dopt Opt_KindSignatures flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b

@@ -695,6 +695,7 @@ tcTyClDecl1 calc_isrec
   ; unbox_strict <- doptM Opt_UnboxStrictFields
   ; gla_exts     <- doptM Opt_GlasgowExts
   ; empty_data_decls <- doptM Opt_EmptyDataDecls
+  ; kind_signatures <- doptM Opt_KindSignatures
   ; gadt_ok      <- doptM Opt_GADTs
   ; is_boot	 <- tcIsHsBoot	-- Are we compiling an hs-boot file?
 
@@ -702,7 +703,7 @@ tcTyClDecl1 calc_isrec
   ; checkTc (gadt_ok || h98_syntax) (badGadtDecl tc_name)
 
 	-- Check that we don't use kind signatures without Glasgow extensions
-  ; checkTc (gla_exts || isNothing mb_ksig) (badSigTyDecl tc_name)
+  ; checkTc (kind_signatures || isNothing mb_ksig) (badSigTyDecl tc_name)
 
 	-- Check that the stupid theta is empty for a GADT-style declaration
   ; checkTc (null stupid_theta || h98_syntax) (badStupidTheta tc_name)
@@ -1209,7 +1210,7 @@ newtypeFieldErr con_name n_flds
 badSigTyDecl tc_name
   = vcat [ ptext SLIT("Illegal kind signature") <+>
 	   quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Use -fglasgow-exts to allow kind signatures")) ]
+	 , nest 2 (parens $ ptext SLIT("Use -XKindSignatures to allow kind signatures")) ]
 
 badFamInstDecl tc_name
   = vcat [ ptext SLIT("Illegal family instance for") <+>
