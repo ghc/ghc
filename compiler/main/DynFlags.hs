@@ -184,6 +184,7 @@ data DynFlag
    | Opt_GADTs
    | Opt_RelaxedPolyRec			-- -X=RelaxedPolyRec
    | Opt_MagicHash
+   | Opt_EmptyDataDecls
 
    -- optimisation opts
    | Opt_Strictness
@@ -1094,6 +1095,7 @@ fFlags = [
 xFlags :: [(String, DynFlag)]
 xFlags = [
   ( "MagicHash",                        Opt_MagicHash ),
+  ( "EmptyDataDecls",                   Opt_EmptyDataDecls ),
   ( "FI",				Opt_FFI ),  -- support `-ffi'...
   ( "FFI",				Opt_FFI ),  -- ...and also `-fffi'
   ( "ForeignFunctionInterface",		Opt_FFI ),
@@ -1138,6 +1140,7 @@ glasgowExtsFlags = [ Opt_GlasgowExts
 		   , Opt_ImplicitParams 
 		   , Opt_ScopedTypeVariables
 		   , Opt_MagicHash
+           , Opt_EmptyDataDecls
 		   , Opt_TypeFamilies ]
 
 ------------------

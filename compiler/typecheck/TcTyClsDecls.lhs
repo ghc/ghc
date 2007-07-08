@@ -694,6 +694,7 @@ tcTyClDecl1 calc_isrec
   ; want_generic <- doptM Opt_Generics
   ; unbox_strict <- doptM Opt_UnboxStrictFields
   ; gla_exts     <- doptM Opt_GlasgowExts
+  ; empty_data_decls <- doptM Opt_EmptyDataDecls
   ; gadt_ok      <- doptM Opt_GADTs
   ; is_boot	 <- tcIsHsBoot	-- Are we compiling an hs-boot file?
 
@@ -707,8 +708,8 @@ tcTyClDecl1 calc_isrec
   ; checkTc (null stupid_theta || h98_syntax) (badStupidTheta tc_name)
 
 	-- Check that there's at least one condecl,
-	-- or else we're reading an hs-boot file, or -fglasgow-exts
-  ; checkTc (not (null cons) || gla_exts || is_boot)
+	-- or else we're reading an hs-boot file, or -XEmptyDataDecls
+  ; checkTc (not (null cons) || empty_data_decls || is_boot)
 	    (emptyConDeclsErr tc_name)
     
 	-- Check that a newtype has exactly one constructor
@@ -1250,5 +1251,5 @@ tyFamAppInIndexErr ty
 
 emptyConDeclsErr tycon
   = sep [quotes (ppr tycon) <+> ptext SLIT("has no constructors"),
-	 nest 2 $ ptext SLIT("(-fglasgow-exts permits this)")]
+	 nest 2 $ ptext SLIT("(-XEmptyDataDecls permits this)")]
 \end{code}
