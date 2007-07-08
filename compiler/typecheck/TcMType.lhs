@@ -1125,19 +1125,30 @@ checkValidInstHead ty	-- Should be a source type
 
 check_inst_head dflags clas tys
 	-- If GlasgowExts then check at least one isn't a type variable
-  | dopt Opt_GlasgowExts dflags
-  = mapM_ check_one tys
-
-	-- WITH HASKELL 98, MUST HAVE C (T a b c)
-  | otherwise
-  = checkTc (isSingleton tys && tcValidInstHeadTy first_ty)
-	    (instTypeErr (pprClassPred clas tys) head_shape_msg)
-
+  = do checkTc (dopt Opt_TypeSynonymInstances dflags ||
+                all tcInstHeadTyNotSynonym tys)
+               (instTypeErr (pprClassPred clas tys) head_type_synonym_msg)
+       checkTc (dopt Opt_FlexibleInstances dflags ||
+                all tcInstHeadTyAppAllTyVars tys)
+               (instTypeErr (pprClassPred clas tys) head_type_args_tyvars_msg)
+       checkTc (dopt Opt_MultiParamTypeClasses dflags ||
+                isSingleton tys)
+               (instTypeErr (pprClassPred clas tys) head_one_type_msg)
+       mapM_ check_one tys
   where
-    (first_ty : _) = tys
+    head_type_synonym_msg = parens (
+                text "All instance types must be of the form (T t1 ... tn)" $$
+                text "where T is not a synonym." $$
+                text "Use -XTypeSynonymInstances if you want to disable this.")
 
-    head_shape_msg = parens (text "The instance type must be of form (T a1 ... an)" $$
-			     text "where T is not a synonym, and a1 ... an are distinct type *variables*")
+    head_type_args_tyvars_msg = parens (
+                text "All instance types must be of the form (T a1 ... an)" $$
+                text "where a1 ... an are distinct type *variables*" $$
+                text "Use -XFlexibleInstances if you want to disable this.")
+
+    head_one_type_msg = parens (
+                text "Only one type can be given in an instance head." $$
+                text "Use -XMultiParamTypeClasses if you want to allow more.")
 
 	-- For now, I only allow tau-types (not polytypes) in 
 	-- the head of an instance decl.  

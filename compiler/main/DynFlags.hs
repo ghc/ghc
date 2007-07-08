@@ -183,6 +183,8 @@ data DynFlag
    | Opt_RecordPuns
    | Opt_GADTs
    | Opt_RelaxedPolyRec			-- -X=RelaxedPolyRec
+   | Opt_TypeSynonymInstances
+   | Opt_FlexibleInstances
    | Opt_MultiParamTypeClasses
    | Opt_FunctionalDependencies
    | Opt_MagicHash
@@ -1133,6 +1135,8 @@ xFlags = [
   ( "ExtendedDefaultRules",		Opt_ExtendedDefaultRules ),
   ( "ImplicitParams",			Opt_ImplicitParams ),
   ( "ScopedTypeVariables",  		Opt_ScopedTypeVariables ),
+  ( "TypeSynonymInstances",         Opt_TypeSynonymInstances ),
+  ( "FlexibleInstances",            Opt_FlexibleInstances ),
   ( "MultiParamTypeClasses",        Opt_MultiParamTypeClasses ),
   ( "FunctionalDependencies",        Opt_FunctionalDependencies ),
   ( "GeneralizedNewtypeDeriving",   Opt_GeneralizedNewtypeDeriving ),
@@ -1151,6 +1155,8 @@ glasgowExtsFlags = [ Opt_GlasgowExts
 		   , Opt_GADTs
 		   , Opt_ImplicitParams 
 		   , Opt_ScopedTypeVariables
+           , Opt_TypeSynonymInstances
+           , Opt_FlexibleInstances
            , Opt_MultiParamTypeClasses
            , Opt_FunctionalDependencies
 		   , Opt_MagicHash

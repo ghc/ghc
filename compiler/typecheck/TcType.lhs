@@ -45,7 +45,8 @@ module TcType (
   tcSplitFunTy_maybe, tcSplitFunTys, tcFunArgTy, tcFunResultTy, tcSplitFunTysN,
   tcSplitTyConApp, tcSplitTyConApp_maybe, tcTyConAppTyCon, tcTyConAppArgs,
   tcSplitAppTy_maybe, tcSplitAppTy, tcSplitAppTys, repSplitAppTy_maybe,
-  tcValidInstHeadTy, tcGetTyVar_maybe, tcGetTyVar,
+  tcInstHeadTyNotSynonym, tcInstHeadTyAppAllTyVars,
+  tcGetTyVar_maybe, tcGetTyVar,
   tcSplitSigmaTy, tcMultiSplitSigmaTy, 
 
   ---------------------------------
@@ -790,14 +791,24 @@ tcSplitDFunHead tau
 	Just (ClassP clas tys) -> (clas, tys)
 	other -> panic "tcSplitDFunHead"
 
-tcValidInstHeadTy :: Type -> Bool
+tcInstHeadTyNotSynonym :: Type -> Bool
 -- Used in Haskell-98 mode, for the argument types of an instance head
 -- These must not be type synonyms, but everywhere else type synonyms
 -- are transparent, so we need a special function here
-tcValidInstHeadTy ty
+tcInstHeadTyNotSynonym ty
   = case ty of
-	NoteTy _ ty     -> tcValidInstHeadTy ty
-	TyConApp tc tys -> not (isSynTyCon tc) && ok tys
+	NoteTy _ ty     -> tcInstHeadTyNotSynonym ty
+	TyConApp tc tys -> not (isSynTyCon tc)
+	FunTy arg res   -> True
+	other		-> False
+
+tcInstHeadTyAppAllTyVars :: Type -> Bool
+-- Used in Haskell-98 mode, for the argument types of an instance head
+-- These must be a constructor applied to type variable arguments
+tcInstHeadTyAppAllTyVars ty
+  = case ty of
+	NoteTy _ ty     -> tcInstHeadTyAppAllTyVars ty
+	TyConApp _ tys  -> ok tys
 	FunTy arg res   -> ok [arg, res]
 	other		-> False
   where
