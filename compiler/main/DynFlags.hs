@@ -193,6 +193,7 @@ data DynFlag
    | Opt_ParallelListComp
    | Opt_GeneralizedNewtypeDeriving
    | Opt_RecursiveDo
+   | Opt_PatternGuards
 
    -- optimisation opts
    | Opt_Strictness
@@ -1102,6 +1103,7 @@ fFlags = [
 -- These -X<blah> flags can all be reversed with -Xno-<blah>
 xFlags :: [(String, DynFlag)]
 xFlags = [
+  ( "PatternGuards",                    Opt_PatternGuards ),
   ( "MagicHash",                        Opt_MagicHash ),
   ( "KindSignatures",                   Opt_KindSignatures ),
   ( "EmptyDataDecls",                   Opt_EmptyDataDecls ),
@@ -1160,6 +1162,7 @@ glasgowExtsFlags = [ Opt_GlasgowExts
            , Opt_MultiParamTypeClasses
            , Opt_FunctionalDependencies
 		   , Opt_MagicHash
+           , Opt_PatternGuards
            , Opt_RecursiveDo
            , Opt_ParallelListComp
            , Opt_EmptyDataDecls

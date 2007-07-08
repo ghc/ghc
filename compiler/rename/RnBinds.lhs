@@ -596,11 +596,11 @@ rnGRHS :: HsMatchContext Name -> LGRHS RdrName -> RnM (LGRHS Name, FreeVars)
 rnGRHS ctxt = wrapLocFstM (rnGRHS' ctxt)
 
 rnGRHS' ctxt (GRHS guards rhs)
-  = do	{ opt_GlasgowExts <- doptM Opt_GlasgowExts
+  = do	{ pattern_guards_allowed <- doptM Opt_PatternGuards
 	; ((guards', rhs'), fvs) <- rnStmts (PatGuard ctxt) guards $
 				    rnLExpr rhs
 
-	; checkM (opt_GlasgowExts || is_standard_guard guards')
+	; checkM (pattern_guards_allowed || is_standard_guard guards')
 	  	 (addWarn (nonStdGuardErr guards'))
 
 	; return (GRHS guards' rhs', fvs) }
@@ -653,6 +653,6 @@ bindsInHsBootFile mbinds
        2 (ppr mbinds)
 
 nonStdGuardErr guards
-  = hang (ptext SLIT("accepting non-standard pattern guards (-fglasgow-exts to suppress this message)"))
+  = hang (ptext SLIT("accepting non-standard pattern guards (use -XPatternGuards to suppress this message)"))
        4 (interpp'SP guards)
 \end{code}
