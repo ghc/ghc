@@ -188,6 +188,7 @@ data DynFlag
    | Opt_EmptyDataDecls
    | Opt_KindSignatures
    | Opt_ParallelListComp
+   | Opt_GeneralizedNewtypeDeriving
 
    -- optimisation opts
    | Opt_Strictness
@@ -1130,6 +1131,7 @@ xFlags = [
   ( "ImplicitParams",			Opt_ImplicitParams ),
   ( "ScopedTypeVariables",  		Opt_ScopedTypeVariables ),
   ( "MultiParamTypeClasses",        Opt_MultiParamTypeClasses ),
+  ( "GeneralizedNewtypeDeriving",   Opt_GeneralizedNewtypeDeriving ),
   ( "AllowOverlappingInstances", 	Opt_AllowOverlappingInstances ),
   ( "AllowUndecidableInstances", 	Opt_AllowUndecidableInstances ),
   ( "AllowIncoherentInstances", 	Opt_AllowIncoherentInstances )
@@ -1150,6 +1152,7 @@ glasgowExtsFlags = [ Opt_GlasgowExts
            , Opt_ParallelListComp
            , Opt_EmptyDataDecls
            , Opt_KindSignatures
+           , Opt_GeneralizedNewtypeDeriving
 		   , Opt_TypeFamilies ]
 
 ------------------

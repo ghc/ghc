@@ -408,16 +408,18 @@ mkEqnHelp orig tvs cls cls_tys tc_app
 		
 	; (rep_tc, rep_tc_args) <- tcLookupFamInstExact tycon full_tc_args
 
-	; gla_exts <- doptM Opt_GlasgowExts
+	; mayDeriveDataTypeable <- doptM Opt_GlasgowExts
+	; newtype_deriving <- doptM Opt_GeneralizedNewtypeDeriving
 	; overlap_flag <- getOverlapFlag
 
           -- Be careful to test rep_tc here: in the case of families, we want
           -- to check the instance tycon, not the family tycon
 	; if isDataTyCon rep_tc then
-		mkDataTypeEqn orig gla_exts full_tvs cls cls_tys 
+		mkDataTypeEqn orig mayDeriveDataTypeable full_tvs cls cls_tys 
 			      tycon full_tc_args rep_tc rep_tc_args
 	  else
-		mkNewTypeEqn  orig gla_exts overlap_flag full_tvs cls cls_tys 
+		mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving overlap_flag
+                  full_tvs cls cls_tys 
 			      tycon full_tc_args rep_tc rep_tc_args }
   | otherwise
   = baleOut (derivingThingErr cls cls_tys tc_app
@@ -455,8 +457,9 @@ tcLookupFamInstExact tycon tys
 %************************************************************************
 
 \begin{code}
-mkDataTypeEqn orig gla_exts tvs cls cls_tys tycon tc_args rep_tc rep_tc_args
-  | Just err <- checkSideConditions gla_exts cls cls_tys rep_tc
+mkDataTypeEqn orig mayDeriveDataTypeable tvs cls cls_tys
+              tycon tc_args rep_tc rep_tc_args
+  | Just err <- checkSideConditions mayDeriveDataTypeable cls cls_tys rep_tc
 	-- NB: pass the *representation* tycon to checkSideConditions
   = baleOut (derivingThingErr cls cls_tys (mkTyConApp tycon tc_args) err)
 
@@ -509,13 +512,13 @@ mk_data_eqn loc orig tvs cls tycon tc_args rep_tc rep_tc_args
 -- family tycon (with indexes) in error messages.
 
 checkSideConditions :: Bool -> Class -> [TcType] -> TyCon -> Maybe SDoc
-checkSideConditions gla_exts cls cls_tys rep_tc
+checkSideConditions mayDeriveDataTypeable cls cls_tys rep_tc
   | notNull cls_tys	
   = Just ty_args_why	-- e.g. deriving( Foo s )
   | otherwise
   = case [cond | (key,cond) <- sideConditions, key == getUnique cls] of
 	[]     -> Just (non_std_why cls)
-	[cond] -> cond (gla_exts, rep_tc)
+	[cond] -> cond (mayDeriveDataTypeable, rep_tc)
 	other  -> pprPanic "checkSideConditions" (ppr cls)
   where
     ty_args_why	= quotes (ppr (mkClassPred cls cls_tys)) <+> ptext SLIT("is not a class")
@@ -531,12 +534,12 @@ sideConditions
 	(enumClassKey,	   cond_std `andCond` cond_isEnumeration),
 	(ixClassKey,	   cond_std `andCond` (cond_isEnumeration `orCond` cond_isProduct)),
 	(boundedClassKey,  cond_std `andCond` (cond_isEnumeration `orCond` cond_isProduct)),
- 	(typeableClassKey, cond_glaExts `andCond` cond_typeableOK),
-	(dataClassKey,	   cond_glaExts `andCond` cond_std)
+ 	(typeableClassKey, cond_mayDeriveDataTypeable `andCond` cond_typeableOK),
+	(dataClassKey,	   cond_mayDeriveDataTypeable `andCond` cond_std)
     ]
 
 type Condition = (Bool, TyCon) -> Maybe SDoc
-	-- Bool is gla-exts flag
+	-- Bool is whether or not we are allowed to derive Data and Typeable
 	-- TyCon is the *representation* tycon if the 
 	--	data type is an indexed one
 	-- Nothing => OK
@@ -555,7 +558,7 @@ andCond c1 c2 tc = case c1 tc of
 		     Just x  -> Just x	-- c1 fails
 
 cond_std :: Condition
-cond_std (gla_exts, rep_tc)
+cond_std (_, rep_tc)
   | any (not . isVanillaDataCon) data_cons = Just existential_why     
   | null data_cons		    	   = Just no_cons_why
   | otherwise      			   = Nothing
@@ -567,7 +570,7 @@ cond_std (gla_exts, rep_tc)
 		      ptext SLIT("has non-Haskell-98 constructor(s)")
   
 cond_isEnumeration :: Condition
-cond_isEnumeration (gla_exts, rep_tc)
+cond_isEnumeration (_, rep_tc)
   | isEnumerationTyCon rep_tc = Nothing
   | otherwise		      = Just why
   where
@@ -575,7 +578,7 @@ cond_isEnumeration (gla_exts, rep_tc)
 	  ptext SLIT("has non-nullary constructors")
 
 cond_isProduct :: Condition
-cond_isProduct (gla_exts, rep_tc)
+cond_isProduct (_, rep_tc)
   | isProductTyCon rep_tc = Nothing
   | otherwise	          = Just why
   where
@@ -586,7 +589,7 @@ cond_typeableOK :: Condition
 -- OK for Typeable class
 -- Currently: (a) args all of kind *
 --	      (b) 7 or fewer args
-cond_typeableOK (gla_exts, rep_tc)
+cond_typeableOK (_, rep_tc)
   | tyConArity rep_tc > 7	= Just too_many
   | not (all (isSubArgTypeKind . tyVarKind) (tyConTyVars rep_tc)) 
                                 = Just bad_kind
@@ -600,9 +603,10 @@ cond_typeableOK (gla_exts, rep_tc)
     fam_inst = quotes (pprSourceTyCon rep_tc) <+> 
 	       ptext SLIT("is a type family")
 
-cond_glaExts :: Condition
-cond_glaExts (gla_exts, _rep_tc) | gla_exts  = Nothing
-			         | otherwise = Just why
+cond_mayDeriveDataTypeable :: Condition
+cond_mayDeriveDataTypeable (mayDeriveDataTypeable, _)
+ | mayDeriveDataTypeable = Nothing
+ | otherwise = Just why
   where
     why  = ptext SLIT("You need -fglasgow-exts to derive an instance for this class")
 
@@ -627,10 +631,13 @@ new_dfun_name clas tycon 	-- Just a simple wrapper
 %************************************************************************
 
 \begin{code}
-mkNewTypeEqn orig gla_exts overlap_flag tvs cls cls_tys
+mkNewTypeEqn :: InstOrigin -> Bool -> Bool -> OverlapFlag -> [Var] -> Class
+             -> [Type] -> TyCon -> [Type] -> TyCon -> [Type]
+             -> TcRn (Maybe DerivEqn, Maybe InstInfo)
+mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving overlap_flag tvs cls cls_tys
 	     tycon tc_args 
 	     rep_tycon rep_tc_args
-  | can_derive_via_isomorphism && (gla_exts || std_class_via_iso cls)
+  | can_derive_via_isomorphism && (newtype_deriving || std_class_via_iso cls)
   = do	{ traceTc (text "newtype deriving:" <+> ppr tycon <+> ppr rep_tys)
 	; 	-- Go ahead and use the isomorphism
 	   dfun_name <- new_dfun_name cls tycon
@@ -643,10 +650,10 @@ mkNewTypeEqn orig gla_exts overlap_flag tvs cls cls_tys
 	; return (Just eqn, Nothing) }
 
   	-- Otherwise we can't derive
-  | gla_exts  = baleOut cant_derive_err	-- Too hard
+  | newtype_deriving = baleOut cant_derive_err -- Too hard
   | otherwise = baleOut std_err		-- Just complain about being a non-std instance
   where
-	mb_std_err = checkSideConditions gla_exts cls cls_tys rep_tycon
+	mb_std_err = checkSideConditions mayDeriveDataTypeable cls cls_tys rep_tycon
 	std_err = derivingThingErr cls cls_tys tc_app $
 		  vcat [fromJust mb_std_err,
 			ptext SLIT("Try -fglasgow-exts for GHC's newtype-deriving extension")]
