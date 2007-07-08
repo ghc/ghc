@@ -1,6 +1,7 @@
 
 tcfail139.hs:6:0:
     Illegal instance declaration for `Bounded Foo'
-	(The instance type must be of form (T a1 ... an)
-	 where T is not a synonym, and a1 ... an are distinct type *variables*)
+	(All instance types must be of the form (T t1 ... tn)
+	 where T is not a synonym.
+	 Use -XTypeSynonymInstances if you want to disable this.)
     In the instance declaration for `Bounded Foo'

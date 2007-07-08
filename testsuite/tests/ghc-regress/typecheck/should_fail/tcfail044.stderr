@@ -1,12 +1,14 @@
 
 tcfail044.hs:5:0:
     Illegal instance declaration for `Eq (a -> a)'
-	(The instance type must be of form (T a1 ... an)
-	 where T is not a synonym, and a1 ... an are distinct type *variables*)
+	(All instance types must be of the form (T a1 ... an)
+	 where a1 ... an are distinct type *variables*
+	 Use -XFlexibleInstances if you want to disable this.)
     In the instance declaration for `Eq (a -> a)'
 
 tcfail044.hs:8:0:
     Illegal instance declaration for `Num (a -> a)'
-	(The instance type must be of form (T a1 ... an)
-	 where T is not a synonym, and a1 ... an are distinct type *variables*)
+	(All instance types must be of the form (T a1 ... an)
+	 where a1 ... an are distinct type *variables*
+	 Use -XFlexibleInstances if you want to disable this.)
     In the instance declaration for `Num (a -> a)'

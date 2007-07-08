@@ -1,6 +1,7 @@
 
 tcfail047.hs:6:0:
     Illegal instance declaration for `A (a, (b, c))'
-	(The instance type must be of form (T a1 ... an)
-	 where T is not a synonym, and a1 ... an are distinct type *variables*)
+	(All instance types must be of the form (T a1 ... an)
+	 where a1 ... an are distinct type *variables*
+	 Use -XFlexibleInstances if you want to disable this.)
     In the instance declaration for `A (a, (b, c))'
