@@ -1060,10 +1060,11 @@ checkValidClass :: Class -> TcM ()
 checkValidClass cls
   = do	{ 	-- CHECK ARITY 1 FOR HASKELL 1.4
 	  gla_exts <- doptM Opt_GlasgowExts
+	; multi_param_type_classes <- doptM Opt_MultiParamTypeClasses
 
     	-- Check that the class is unary, unless GlaExs
 	; checkTc (notNull tyvars) (nullaryClassErr cls)
-	; checkTc (gla_exts || unary) (classArityErr cls)
+	; checkTc (multi_param_type_classes || unary) (classArityErr cls)
 
    	-- Check the super-classes
 	; checkValidTheta (ClassSCCtxt (className cls)) theta
@@ -1138,7 +1139,7 @@ nullaryClassErr cls
 
 classArityErr cls
   = vcat [ptext SLIT("Too many parameters for class") <+> quotes (ppr cls),
-	  parens (ptext SLIT("Use -fglasgow-exts to allow multi-parameter classes"))]
+	  parens (ptext SLIT("Use -XMultiParamTypeClasses to allow multi-parameter classes"))]
 
 noClassTyVarErr clas op
   = sep [ptext SLIT("The class method") <+> quotes (ppr op),
