@@ -118,8 +118,14 @@ parseStaticFlags args = do
   let cg_flags | tablesNextToCode = ["-optc-DTABLES_NEXT_TO_CODE"]
 	       | otherwise	  = []
 
+    -- HACK: -fexcess-precision is both a static and a dynamic flag.  If
+    -- the static flag parser has slurped it, we must return it as a 
+    -- leftover too.  ToDo: make -fexcess-precision dynamic only.
+  let excess_prec | opt_SimplExcessPrecision = ["-fexcess-precision"]
+                  | otherwise                = []
+
   when (not (null errs)) $ ghcError (UsageError (unlines errs))
-  return (cg_flags++more_leftover++leftover)
+  return (excess_prec++cg_flags++more_leftover++leftover)
 
 initStaticOpts :: IO ()
 initStaticOpts = writeIORef v_opt_C_ready True
