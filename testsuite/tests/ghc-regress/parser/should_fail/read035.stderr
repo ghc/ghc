@@ -1,0 +1,4 @@
+
+read035.hs:4:0:
+    `Foo' has no constructors (-XEmptyDataDecls permits this)
+    In the data type declaration for `Foo'
