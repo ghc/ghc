@@ -44,6 +44,7 @@
 ^libraries/filepath(/|$)
 ^libraries/haskell-src(/|$)
 ^libraries/haskell98(/|$)
+^libraries/hpc(/|$)
 ^libraries/html(/|$)
 ^libraries/old-locale(/|$)
 ^libraries/old-time(/|$)
