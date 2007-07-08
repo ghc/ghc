@@ -1061,10 +1061,12 @@ checkValidClass cls
   = do	{ 	-- CHECK ARITY 1 FOR HASKELL 1.4
 	  gla_exts <- doptM Opt_GlasgowExts
 	; multi_param_type_classes <- doptM Opt_MultiParamTypeClasses
+	; fundep_classes <- doptM Opt_FunctionalDependencies
 
     	-- Check that the class is unary, unless GlaExs
 	; checkTc (notNull tyvars) (nullaryClassErr cls)
 	; checkTc (multi_param_type_classes || unary) (classArityErr cls)
+	; checkTc (fundep_classes || null fundeps) (classFunDepsErr cls)
 
    	-- Check the super-classes
 	; checkValidTheta (ClassSCCtxt (className cls)) theta
@@ -1078,7 +1080,7 @@ checkValidClass cls
 	; checkTc (unary || no_generics) (genericMultiParamErr cls)
 	}
   where
-    (tyvars, theta, _, op_stuff) = classBigSig cls
+    (tyvars, fundeps, theta, _, _, op_stuff) = classExtraBigSig cls
     unary 	= isSingleton tyvars
     no_generics = null [() | (_, GenDefMeth) <- op_stuff]
 
@@ -1140,6 +1142,10 @@ nullaryClassErr cls
 classArityErr cls
   = vcat [ptext SLIT("Too many parameters for class") <+> quotes (ppr cls),
 	  parens (ptext SLIT("Use -XMultiParamTypeClasses to allow multi-parameter classes"))]
+
+classFunDepsErr cls
+  = vcat [ptext SLIT("Fundeps in class") <+> quotes (ppr cls),
+	  parens (ptext SLIT("Use -XFunctionalDependencies to allow fundeps"))]
 
 noClassTyVarErr clas op
   = sep [ptext SLIT("The class method") <+> quotes (ppr op),

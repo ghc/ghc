@@ -184,6 +184,7 @@ data DynFlag
    | Opt_GADTs
    | Opt_RelaxedPolyRec			-- -X=RelaxedPolyRec
    | Opt_MultiParamTypeClasses
+   | Opt_FunctionalDependencies
    | Opt_MagicHash
    | Opt_EmptyDataDecls
    | Opt_KindSignatures
@@ -1133,6 +1134,7 @@ xFlags = [
   ( "ImplicitParams",			Opt_ImplicitParams ),
   ( "ScopedTypeVariables",  		Opt_ScopedTypeVariables ),
   ( "MultiParamTypeClasses",        Opt_MultiParamTypeClasses ),
+  ( "FunctionalDependencies",        Opt_FunctionalDependencies ),
   ( "GeneralizedNewtypeDeriving",   Opt_GeneralizedNewtypeDeriving ),
   ( "AllowOverlappingInstances", 	Opt_AllowOverlappingInstances ),
   ( "AllowUndecidableInstances", 	Opt_AllowUndecidableInstances ),
@@ -1150,6 +1152,7 @@ glasgowExtsFlags = [ Opt_GlasgowExts
 		   , Opt_ImplicitParams 
 		   , Opt_ScopedTypeVariables
            , Opt_MultiParamTypeClasses
+           , Opt_FunctionalDependencies
 		   , Opt_MagicHash
            , Opt_RecursiveDo
            , Opt_ParallelListComp
