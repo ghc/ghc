@@ -1103,6 +1103,7 @@ fFlags = [
 -- These -X<blah> flags can all be reversed with -Xno-<blah>
 xFlags :: [(String, DynFlag)]
 xFlags = [
+  ( "CPP",                              Opt_Cpp ),
   ( "PatternGuards",                    Opt_PatternGuards ),
   ( "MagicHash",                        Opt_MagicHash ),
   ( "KindSignatures",                   Opt_KindSignatures ),
