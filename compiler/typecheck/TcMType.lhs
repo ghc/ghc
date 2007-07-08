@@ -695,8 +695,11 @@ checkValidType :: UserTypeCtxt -> Type -> TcM ()
 checkValidType ctxt ty
   = traceTc (text "checkValidType" <+> ppr ty)	`thenM_`
     doptM Opt_GlasgowExts	`thenM` \ gla_exts ->
+    doptM Opt_Rank2Types	`thenM` \ rank2 ->
+    doptM Opt_RankNTypes	`thenM` \ rankn ->
     let 
-	rank | gla_exts = Arbitrary
+	rank | rankn = Arbitrary
+	     | rank2 = Rank 2
 	     | otherwise
 	     = case ctxt of	-- Haskell 98
 		 GenPatCtxt	-> Rank 0
