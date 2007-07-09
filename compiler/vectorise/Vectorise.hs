@@ -8,6 +8,8 @@ import HscTypes
 
 import CoreLint             ( showPass, endPass )
 import CoreSyn
+import CoreUtils
+import CoreFVs
 import TyCon
 import Type
 import TypeRep
