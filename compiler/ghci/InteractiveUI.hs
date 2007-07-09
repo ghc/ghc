@@ -1642,14 +1642,17 @@ breakByModule :: Session -> Module -> [String] -> GHCi ()
 breakByModule session mod args@(arg1:rest)
    | all isDigit arg1 = do  -- looks like a line number
         breakByModuleLine mod (read arg1) rest
-   | otherwise = io $ putStrLn "Invalid arguments to :break"
+breakByModule session mod _
+   = breakSyntax
 
 breakByModuleLine :: Module -> Int -> [String] -> GHCi ()
 breakByModuleLine mod line args
    | [] <- args = findBreakAndSet mod $ findBreakByLine line
    | [col] <- args, all isDigit col =
         findBreakAndSet mod $ findBreakByCoord Nothing (line, read col)
-   | otherwise = io $ putStrLn "Invalid arguments to :break"
+   | otherwise = breakSyntax
+
+breakSyntax = throwDyn (CmdLineError "Syntax: :break [<mod>] <line> [<column>]")
 
 findBreakAndSet :: Module -> (TickArray -> Maybe (Int, SrcSpan)) -> GHCi ()
 findBreakAndSet mod lookupTickTree = do 
