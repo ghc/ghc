@@ -555,10 +555,10 @@ rnMatch' ctxt match@(Match pats maybe_rhs_sig grhss)
   = 
 	-- Deal with the rhs type signature
     bindPatSigTyVarsFV rhs_sig_tys	$ 
-    doptM Opt_GlasgowExts		`thenM` \ opt_GlasgowExts ->
+    doptM Opt_PatternSignatures `thenM` \ opt_PatternSignatures ->
     (case maybe_rhs_sig of
 	Nothing -> returnM (Nothing, emptyFVs)
-	Just ty | opt_GlasgowExts -> rnHsTypeFVs doc_sig ty	`thenM` \ (ty', ty_fvs) ->
+	Just ty | opt_PatternSignatures -> rnHsTypeFVs doc_sig ty	`thenM` \ (ty', ty_fvs) ->
 				     returnM (Just ty', ty_fvs)
 		| otherwise	  -> addLocErr ty patSigErr	`thenM_`
 				     returnM (Nothing, emptyFVs)

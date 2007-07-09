@@ -194,6 +194,7 @@ data DynFlag
    | Opt_MagicHash
    | Opt_EmptyDataDecls
    | Opt_KindSignatures
+   | Opt_PatternSignatures
    | Opt_ParallelListComp
    | Opt_GeneralizedNewtypeDeriving
    | Opt_RecursiveDo
@@ -1120,6 +1121,7 @@ xFlags = [
   ( "PolymorphicComponents",            Opt_PolymorphicComponents ),
   ( "ExistentialQuantification",        Opt_ExistentialQuantification ),
   ( "KindSignatures",                   Opt_KindSignatures ),
+  ( "PatternSignatures",                Opt_PatternSignatures ),
   ( "EmptyDataDecls",                   Opt_EmptyDataDecls ),
   ( "ParallelListComp",                 Opt_ParallelListComp ),
   ( "FI",				Opt_FFI ),  -- support `-ffi'...
@@ -1192,6 +1194,7 @@ glasgowExtsFlags = [ Opt_GlasgowExts
            , Opt_ParallelListComp
            , Opt_EmptyDataDecls
            , Opt_KindSignatures
+           , Opt_PatternSignatures
            , Opt_GeneralizedNewtypeDeriving
 		   , Opt_TypeFamilies ]
 

@@ -572,7 +572,7 @@ rnPat (VarPat name)
     returnM (VarPat vname, emptyFVs)
 
 rnPat (SigPatIn pat ty)
-  = doptM Opt_GlasgowExts `thenM` \ glaExts ->
+  = doptM Opt_PatternSignatures `thenM` \ glaExts ->
     
     if glaExts
     then rnLPat pat		`thenM` \ (pat', fvs1) ->
@@ -815,7 +815,7 @@ bogusCharError c
 
 patSigErr ty
   =  (ptext SLIT("Illegal signature in pattern:") <+> ppr ty)
-	$$ nest 4 (ptext SLIT("Use -fglasgow-exts to permit it"))
+	$$ nest 4 (ptext SLIT("Use -XPatternSigs to permit it"))
 
 dupFieldErr str dup
   = hsep [ptext SLIT("duplicate field name"), 
