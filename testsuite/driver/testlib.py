@@ -83,7 +83,17 @@ def reqlib( lib ):
 
 def _reqlib( opts, lib ):
     # opts.reqlibs.append(lib)
-    r = os.system(config.ghc_pkg + ' describe ' + lib + ' > /dev/null 2> /dev/null')
+    if have_subprocess:
+        # By preference we use subprocess, as the alternative uses /dev/null
+        # which mingw doesn't have.
+        p = subprocess.Popen([config.ghc_pkg, 'describe', lib],
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        # read from stdout and stderr to avoid blocking due to buffers filling
+        p.communicate()
+        r = p.wait()
+    else:
+        r = os.system(config.ghc_pkg + ' describe ' + lib + ' > /dev/null 2> /dev/null')
+
     if r != 0:
         opts.expect = 'fail'
 
