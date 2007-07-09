@@ -201,6 +201,8 @@ data DynFlag
    | Opt_Rank2Types
    | Opt_RankNTypes
 
+   | Opt_PrintExplicitForalls
+
    -- optimisation opts
    | Opt_Strictness
    | Opt_FullLaziness
@@ -1081,6 +1083,7 @@ fFlags = [
   ( "warn-deprecations",         	Opt_WarnDeprecations ),
   ( "warn-orphans",	         	Opt_WarnOrphans ),
   ( "warn-tabs",	         	Opt_WarnTabs ),
+  ( "print-explicit-foralls", Opt_PrintExplicitForalls ),
   ( "strictness",			Opt_Strictness ),
   ( "full-laziness",			Opt_FullLaziness ),
   ( "liberate-case",			Opt_LiberateCase ),
@@ -1166,6 +1169,7 @@ impliedFlags = [
   ]
 
 glasgowExtsFlags = [ Opt_GlasgowExts 
+           , Opt_PrintExplicitForalls
 		   , Opt_FFI 
 		   , Opt_GADTs
 		   , Opt_ImplicitParams 

@@ -663,17 +663,17 @@ info "" = throwDyn (CmdLineError "syntax: ':i <thing-you-want-info-about>'")
 info s  = do { let names = words s
 	     ; session <- getSession
 	     ; dflags <- getDynFlags
-	     ; let exts = dopt Opt_GlasgowExts dflags
-	     ; mapM_ (infoThing exts session) names }
+	     ; let pefas = dopt Opt_PrintExplicitForalls dflags
+	     ; mapM_ (infoThing pefas session) names }
   where
-    infoThing exts session str = io $ do
+    infoThing pefas session str = io $ do
 	names <- GHC.parseName session str
 	let filtered = filterOutChildren names
 	mb_stuffs <- mapM (GHC.getInfo session) filtered
 	unqual <- GHC.getPrintUnqual session
 	putStrLn (showSDocForUser unqual $
      		   vcat (intersperse (text "") $
-		   [ pprInfo exts stuff | Just stuff <-  mb_stuffs ]))
+		   [ pprInfo pefas stuff | Just stuff <-  mb_stuffs ]))
 
   -- Filter out names whose parent is also there Good
   -- example is '[]', which is both a type and data
@@ -685,8 +685,9 @@ filterOutChildren names = filter (not . parent_is_there) names
 -- ToDo!!
 	 | otherwise		           = False
 
-pprInfo exts (thing, fixity, insts)
-  =  pprTyThingInContextLoc exts thing 
+pprInfo :: PrintExplicitForalls -> (TyThing, Fixity, [GHC.Instance]) -> SDoc
+pprInfo pefas (thing, fixity, insts)
+  =  pprTyThingInContextLoc pefas thing
   $$ show_fixity fixity
   $$ vcat (map GHC.pprInstance insts)
   where
@@ -1000,9 +1001,9 @@ browseModule m exports_only = do
         things <- io $ mapM (GHC.lookupName s) filtered
 
         dflags <- getDynFlags
-	let exts = dopt Opt_GlasgowExts dflags
+	let pefas = dopt Opt_PrintExplicitForalls dflags
 	io (putStrLn (showSDocForUser unqual (
-		vcat (map (pprTyThingInContext exts) (catMaybes things))
+		vcat (map (pprTyThingInContext pefas) (catMaybes things))
 	   )))
 	-- ToDo: modInfoInstances currently throws an exception for
 	-- package modules.  When it works, we can do this:
@@ -1264,7 +1265,7 @@ printTyThing _ = return ()
 cleanType :: Type -> GHCi Type
 cleanType ty = do
   dflags <- getDynFlags
-  if dopt Opt_GlasgowExts dflags 
+  if dopt Opt_PrintExplicitForalls dflags 
 	then return ty
 	else return $! GHC.dropForAlls ty
 

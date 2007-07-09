@@ -7,6 +7,7 @@
 -----------------------------------------------------------------------------
 
 module PprTyThing (
+	PrintExplicitForalls,
 	pprTyThing,
 	pprTyThingInContext,
 	pprTyThingLoc,
@@ -21,6 +22,7 @@ import qualified GHC
 import TyCon	( tyConFamInst_maybe )
 import Type	( pprTypeApp )
 import GHC	( TyThing(..), SrcSpan )
+import Var
 import Outputable
 
 -- -----------------------------------------------------------------------------
@@ -29,45 +31,47 @@ import Outputable
 -- This should be a good source of sample code for using the GHC API to
 -- inspect source code entities.
 
+type PrintExplicitForalls = Bool
+
 -- | Pretty-prints a 'TyThing' with its defining location.
-pprTyThingLoc :: Bool -> TyThing -> SDoc
-pprTyThingLoc exts tyThing 
-  = showWithLoc loc (pprTyThing exts tyThing)
+pprTyThingLoc :: PrintExplicitForalls -> TyThing -> SDoc
+pprTyThingLoc pefas tyThing 
+  = showWithLoc loc (pprTyThing pefas tyThing)
   where loc = GHC.nameSrcSpan (GHC.getName tyThing)
 
 -- | Pretty-prints a 'TyThing'.
-pprTyThing :: Bool -> TyThing -> SDoc
-pprTyThing exts (AnId id)          = pprId         exts id
-pprTyThing exts (ADataCon dataCon) = pprDataConSig exts dataCon
-pprTyThing exts (ATyCon tyCon)     = pprTyCon      exts tyCon
-pprTyThing exts (AClass cls)       = pprClass      exts cls
-        
+pprTyThing :: PrintExplicitForalls -> TyThing -> SDoc
+pprTyThing pefas (AnId id)          = pprId         pefas id
+pprTyThing pefas (ADataCon dataCon) = pprDataConSig pefas dataCon
+pprTyThing pefas (ATyCon tyCon)     = pprTyCon      pefas tyCon
+pprTyThing pefas (AClass cls)       = pprClass      pefas cls
+
 -- | Like 'pprTyThingInContext', but adds the defining location.
-pprTyThingInContextLoc :: Bool -> TyThing -> SDoc
-pprTyThingInContextLoc exts tyThing 
-  = showWithLoc loc (pprTyThingInContext exts tyThing)
+pprTyThingInContextLoc :: PrintExplicitForalls -> TyThing -> SDoc
+pprTyThingInContextLoc pefas tyThing
+  = showWithLoc loc (pprTyThingInContext pefas tyThing)
   where loc = GHC.nameSrcSpan (GHC.getName tyThing)
 
 -- | Pretty-prints a 'TyThing' in context: that is, if the entity
 -- is a data constructor, record selector, or class method, then 
 -- the entity's parent declaration is pretty-printed with irrelevant
 -- parts omitted.
-pprTyThingInContext :: Bool -> TyThing -> SDoc
-pprTyThingInContext exts (AnId id)          = pprIdInContext exts id
-pprTyThingInContext exts (ADataCon dataCon) = pprDataCon exts dataCon
-pprTyThingInContext exts (ATyCon tyCon)     = pprTyCon   exts tyCon
-pprTyThingInContext exts (AClass cls)       = pprClass   exts cls
+pprTyThingInContext :: PrintExplicitForalls -> TyThing -> SDoc
+pprTyThingInContext pefas (AnId id)          = pprIdInContext pefas id
+pprTyThingInContext pefas (ADataCon dataCon) = pprDataCon pefas dataCon
+pprTyThingInContext pefas (ATyCon tyCon)     = pprTyCon   pefas tyCon
+pprTyThingInContext pefas (AClass cls)       = pprClass   pefas cls
 
 -- | Pretty-prints the 'TyThing' header. For functions and data constructors
 -- the function is equivalent to 'pprTyThing' but for type constructors
 -- and classes it prints only the header part of the declaration.
-pprTyThingHdr :: Bool -> TyThing -> SDoc
-pprTyThingHdr exts (AnId id)          = pprId         exts id
-pprTyThingHdr exts (ADataCon dataCon) = pprDataConSig exts dataCon
-pprTyThingHdr exts (ATyCon tyCon)     = pprTyConHdr   exts tyCon
-pprTyThingHdr exts (AClass cls)       = pprClassHdr   exts cls
+pprTyThingHdr :: PrintExplicitForalls -> TyThing -> SDoc
+pprTyThingHdr pefas (AnId id)          = pprId         pefas id
+pprTyThingHdr pefas (ADataCon dataCon) = pprDataConSig pefas dataCon
+pprTyThingHdr pefas (ATyCon tyCon)     = pprTyConHdr   pefas tyCon
+pprTyThingHdr pefas (AClass cls)       = pprClassHdr   pefas cls
         
-pprTyConHdr exts tyCon
+pprTyConHdr pefas tyCon
   | Just (fam_tc, tys) <- tyConFamInst_maybe tyCon
   = ptext keyword <+> ptext SLIT("instance") <+> pprTypeApp tyCon (ppr_bndr tyCon) tys
   | otherwise
@@ -85,10 +89,10 @@ pprTyConHdr exts tyCon
       | GHC.isOpenTyCon tyCon = ptext SLIT("family")
       | otherwise             = empty
 
-pprDataConSig exts dataCon =
-  ppr_bndr dataCon <+> dcolon <+> pprType exts (GHC.dataConType dataCon)
+pprDataConSig pefas dataCon =
+  ppr_bndr dataCon <+> dcolon <+> pprType pefas (GHC.dataConType dataCon)
 
-pprClassHdr exts cls =
+pprClassHdr pefas cls =
   let (tyVars, funDeps) = GHC.classTvsFds cls
   in ptext SLIT("class") <+> 
      GHC.pprThetaArrow (GHC.classSCTheta cls) <+>
@@ -96,53 +100,55 @@ pprClassHdr exts cls =
      hsep (map ppr tyVars) <+>
      GHC.pprFundeps funDeps
 
-pprIdInContext exts id
-  | GHC.isRecordSelector id  		  = pprRecordSelector exts id
-  | Just cls <- GHC.isClassOpId_maybe id  = pprClassOneMethod exts cls id
-  | otherwise				  = pprId exts id
+pprIdInContext pefas id
+  | GHC.isRecordSelector id  		  = pprRecordSelector pefas id
+  | Just cls <- GHC.isClassOpId_maybe id  = pprClassOneMethod pefas cls id
+  | otherwise				  = pprId pefas id
 
-pprRecordSelector exts id
-  = pprAlgTyCon exts tyCon show_con show_label
+pprRecordSelector pefas id
+  = pprAlgTyCon pefas tyCon show_con show_label
   where
 	(tyCon,label) = GHC.recordSelectorFieldLabel id
 	show_con dataCon  = label `elem` GHC.dataConFieldLabels dataCon
 	show_label label' = label == label'
 
-pprId exts id
-  = hang (ppr_bndr id <+> dcolon) 2 
-	(pprType exts (GHC.idType id))
+pprId :: PrintExplicitForalls -> Var -> SDoc
+pprId pefas ident
+  = hang (ppr_bndr ident <+> dcolon) 2 
+	(pprType pefas (GHC.idType ident))
 
+pprType :: PrintExplicitForalls -> GHC.Type -> SDoc
 pprType True  ty = ppr ty
 pprType False ty = ppr (GHC.dropForAlls ty)
 
-pprTyCon exts tyCon
+pprTyCon pefas tyCon
   | GHC.isSynTyCon tyCon
   = if GHC.isOpenTyCon tyCon
-    then pprTyConHdr exts tyCon <+> dcolon <+> 
-	 pprType exts (GHC.synTyConResKind tyCon)
+    then pprTyConHdr pefas tyCon <+> dcolon <+> 
+	 pprType pefas (GHC.synTyConResKind tyCon)
     else 
       let rhs_type = GHC.synTyConType tyCon
-      in hang (pprTyConHdr exts tyCon <+> equals) 2 (pprType exts rhs_type)
+      in hang (pprTyConHdr pefas tyCon <+> equals) 2 (pprType pefas rhs_type)
   | otherwise
-  = pprAlgTyCon exts tyCon (const True) (const True)
+  = pprAlgTyCon pefas tyCon (const True) (const True)
 
-pprAlgTyCon exts tyCon ok_con ok_label
-  | gadt      = pprTyConHdr exts tyCon <+> ptext SLIT("where") $$ 
+pprAlgTyCon pefas tyCon ok_con ok_label
+  | gadt      = pprTyConHdr pefas tyCon <+> ptext SLIT("where") $$ 
 		   nest 2 (vcat (ppr_trim show_con datacons))
-  | otherwise = hang (pprTyConHdr exts tyCon)
+  | otherwise = hang (pprTyConHdr pefas tyCon)
     		   2 (add_bars (ppr_trim show_con datacons))
   where
     datacons = GHC.tyConDataCons tyCon
     gadt = any (not . GHC.isVanillaDataCon) datacons
 
     show_con dataCon
-      | ok_con dataCon = Just (pprDataConDecl exts gadt ok_label dataCon)
+      | ok_con dataCon = Just (pprDataConDecl pefas gadt ok_label dataCon)
       | otherwise      = Nothing
 
-pprDataCon exts dataCon = pprAlgTyCon exts tyCon (== dataCon) (const True)
+pprDataCon pefas dataCon = pprAlgTyCon pefas tyCon (== dataCon) (const True)
   where tyCon = GHC.dataConTyCon dataCon
 
-pprDataConDecl exts gadt_style show_label dataCon
+pprDataConDecl pefas gadt_style show_label dataCon
   | not gadt_style = ppr_fields tys_w_strs
   | otherwise      = ppr_bndr dataCon <+> dcolon <+> 
 			sep [ ppr_tvs, GHC.pprThetaArrow theta, pp_tau ]
@@ -186,25 +192,25 @@ pprDataConDecl exts gadt_style show_label dataCon
 		braces (sep (punctuate comma (ppr_trim maybe_show_label 
 					(zip labels fields))))
 
-pprClass exts cls
+pprClass pefas cls
   | null methods = 
-	pprClassHdr exts cls
+	pprClassHdr pefas cls
   | otherwise = 
-	hang (pprClassHdr exts cls <+> ptext SLIT("where"))
-	    2 (vcat (map (pprClassMethod exts) methods))
+	hang (pprClassHdr pefas cls <+> ptext SLIT("where"))
+	    2 (vcat (map (pprClassMethod pefas) methods))
   where
 	methods = GHC.classMethods cls
 
-pprClassOneMethod exts cls this_one = 
-  hang (pprClassHdr exts cls <+> ptext SLIT("where"))
+pprClassOneMethod pefas cls this_one = 
+  hang (pprClassHdr pefas cls <+> ptext SLIT("where"))
 	2 (vcat (ppr_trim show_meth methods))
   where
 	methods = GHC.classMethods cls
-	show_meth id | id == this_one = Just (pprClassMethod exts id)
+	show_meth id | id == this_one = Just (pprClassMethod pefas id)
 		     | otherwise      = Nothing
 
-pprClassMethod exts id =
-  hang (ppr_bndr id <+> dcolon) 2 (pprType exts (classOpType id))
+pprClassMethod pefas id =
+  hang (ppr_bndr id <+> dcolon) 2 (pprType pefas (classOpType id))
   where
   -- Here's the magic incantation to strip off the dictionary
   -- from the class op type.  Stolen from IfaceSyn.tyThingToIfaceDecl.
