@@ -1,3 +1,6 @@
+
+{-# OPTIONS_GHC -XAllowUndecidableInstances #-}
+
 module ShouldFail where
 
 -- !!! ambiguous constraint in the context of an instance declaration

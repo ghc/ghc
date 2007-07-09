@@ -1,5 +1,5 @@
 
-tcfail098.hs:5:0:
+tcfail098.hs:8:0:
     Ambiguous constraint `Bar a'
 	At least one of the forall'd type variables mentioned by the constraint
 	must be reachable from the type after the '=>'
