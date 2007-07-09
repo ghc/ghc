@@ -613,7 +613,7 @@ reservedWordsFM = listToUFM $
 	( "where",	ITwhere, 	0 ),
 	( "_scc_",	ITscc, 		0 ),		-- ToDo: remove
 
-      	( "forall",	ITforall,	 bit tvBit),
+      	( "forall",	ITforall,	 bit explicitForallBit),
 	( "mdo",	ITmdo,		 bit recursiveDoBit),
 	( "family",	ITfamily,	 bit tyFamBit),
 
@@ -655,7 +655,7 @@ reservedSymsFM = listToUFM $
                             kindSigsEnabled i ||
                             tyFamEnabled i)
         -- For 'forall a . t'
-       ,(".", ITdot, tvEnabled)
+       ,(".", ITdot, explicitForallEnabled)
 
        ,("-<",  ITlarrowtail, arrowsEnabled)
        ,(">-",  ITrarrowtail, arrowsEnabled)
@@ -665,7 +665,8 @@ reservedSymsFM = listToUFM $
 #if __GLASGOW_HASKELL__ >= 605
        ,("∷",   ITdcolon, unicodeSyntaxEnabled)
        ,("⇒",   ITdarrow, unicodeSyntaxEnabled)
-       ,("∀",   ITforall, \i -> unicodeSyntaxEnabled i && tvEnabled i)
+       ,("∀",   ITforall, \i -> unicodeSyntaxEnabled i &&
+                                explicitForallEnabled i)
        ,("→",   ITrarrow, unicodeSyntaxEnabled)
        ,("←",   ITlarrow, unicodeSyntaxEnabled)
        ,("⋯",   ITdotdot, unicodeSyntaxEnabled)
@@ -1515,7 +1516,7 @@ parrBit	   = 2
 arrowsBit  = 4
 thBit	   = 5
 ipBit      = 6
-tvBit	   = 7	-- Scoped type variables enables 'forall' keyword
+explicitForallBit = 7 -- the 'forall' keyword and '.' symbol
 bangPatBit = 8	-- Tells the parser to understand bang-patterns
 		-- (doesn't affect the lexer)
 tyFamBit   = 9	-- indexed type families: 'family' keyword and kind sigs
@@ -1533,7 +1534,7 @@ parrEnabled      flags = testBit flags parrBit
 arrowsEnabled    flags = testBit flags arrowsBit
 thEnabled        flags = testBit flags thBit
 ipEnabled        flags = testBit flags ipBit
-tvEnabled        flags = testBit flags tvBit
+explicitForallEnabled flags = testBit flags explicitForallBit
 bangPatEnabled   flags = testBit flags bangPatBit
 tyFamEnabled     flags = testBit flags tyFamBit
 haddockEnabled   flags = testBit flags haddockBit
@@ -1588,7 +1589,7 @@ mkPState buf loc flags  =
 	       .|. arrowsBit    `setBitIf` dopt Opt_Arrows       flags
 	       .|. thBit        `setBitIf` dopt Opt_TH           flags
 	       .|. ipBit        `setBitIf` dopt Opt_ImplicitParams flags
-	       .|. tvBit        `setBitIf` dopt Opt_ScopedTypeVariables flags
+	       .|. explicitForallBit `setBitIf` dopt Opt_ScopedTypeVariables flags
 	       .|. bangPatBit   `setBitIf` dopt Opt_BangPatterns flags
 	       .|. tyFamBit     `setBitIf` dopt Opt_TypeFamilies flags
 	       .|. haddockBit   `setBitIf` dopt Opt_Haddock      flags
