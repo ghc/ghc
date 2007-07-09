@@ -87,52 +87,57 @@ initBuiltins
                , replicatePAVar   = replicatePAVar
                }
 
-data VEnv = VEnv {
-              -- Mapping from global variables to their vectorised versions.
-              -- 
-              vect_global_vars :: VarEnv CoreExpr
+data GlobalEnv = GlobalEnv {
+                  -- Mapping from global variables to their vectorised versions.
+                  -- 
+                  global_vars :: VarEnv CoreExpr
 
-              -- Mapping from local variables to their vectorised and lifted
-              -- versions.
-              --
-            , vect_local_vars :: VarEnv (CoreExpr, CoreExpr)
+                  -- Exported variables which have a vectorised version
+                  --
+                , global_exported_vars :: VarEnv (Var, Var)
 
-              -- Exported variables which have a vectorised version
-              --
-            , vect_exported_vars :: VarEnv (Var, Var)
+                  -- Mapping from TyCons to their vectorised versions.
+                  -- TyCons which do not have to be vectorised are mapped to
+                  -- themselves.
+                  --
+                , global_tycons :: NameEnv TyCon
 
-              -- Mapping from TyCons to their vectorised versions.
-              -- TyCons which do not have to be vectorised are mapped to
-              -- themselves.
-              --
-            , vect_tycons :: NameEnv TyCon
+                  -- Mapping from TyCons to their PA dictionaries
+                  --
+                , global_tycon_pa :: NameEnv CoreExpr
+                }
 
-              -- Mapping from TyCons to their PA dictionaries
-              --
-            , vect_tycon_pa :: NameEnv CoreExpr
+data LocalEnv = LocalEnv {
+                 -- Mapping from local variables to their vectorised and
+                 -- lifted versions
+                 --
+                 local_vars :: VarEnv (CoreExpr, CoreExpr)
 
-              -- Mapping from tyvars to their PA dictionaries
-              --
-            , vect_tyvar_pa :: VarEnv CoreExpr
-            }
+                 -- Mapping from tyvars to their PA dictionaries
+               , local_tyvar_pa :: VarEnv CoreExpr
+               }
+              
 
-initVEnv :: VectInfo -> DsM VEnv
-initVEnv info
-  = return $ VEnv {
-               vect_global_vars   = mapVarEnv  (Var . snd) $ vectInfoCCVar   info
-             , vect_local_vars    = emptyVarEnv
-             , vect_exported_vars = emptyVarEnv
-             , vect_tycons        = mapNameEnv snd $ vectInfoCCTyCon info
-             , vect_tycon_pa      = emptyNameEnv
-             , vect_tyvar_pa      = emptyVarEnv
-             }
+initGlobalEnv :: VectInfo -> GlobalEnv
+initGlobalEnv info
+  = GlobalEnv {
+      global_vars          = mapVarEnv  (Var . snd) $ vectInfoCCVar   info
+    , global_exported_vars = emptyVarEnv
+    , global_tycons        = mapNameEnv snd $ vectInfoCCTyCon info
+    , global_tycon_pa      = emptyNameEnv
+    }
+
+emptyLocalEnv = LocalEnv {
+                   local_vars     = emptyVarEnv
+                 , local_tyvar_pa = emptyVarEnv
+                 }
 
 -- FIXME
-updVectInfo :: VEnv -> ModGuts -> ModGuts
+updVectInfo :: GlobalEnv -> ModGuts -> ModGuts
 updVectInfo env guts = guts { mg_vect_info = info' }
   where
     info' = info {
-              vectInfoCCVar   = vect_exported_vars env
+              vectInfoCCVar   = global_exported_vars env
             , vectInfoCCTyCon = tc_env
             }
 
@@ -141,29 +146,30 @@ updVectInfo env guts = guts { mg_vect_info = info' }
 
     tc_env = mkNameEnv [(tc_name, (tc,tc')) | tc <- typeEnvTyCons tyenv
                                             , let tc_name = tyConName tc
-                                            , Just tc' <- [lookupNameEnv (vect_tycons env) tc_name]]
+                                            , Just tc' <- [lookupNameEnv (global_tycons env) tc_name]]
 
-data VResult a = Yes VEnv a | No
+data VResult a = Yes GlobalEnv LocalEnv a | No
 
-newtype VM a = VM { runVM :: Builtins -> VEnv -> DsM (VResult a) }
+newtype VM a = VM { runVM :: Builtins -> GlobalEnv -> LocalEnv -> DsM (VResult a) }
 
 instance Monad VM where
-  return x   = VM $ \bi env -> return (Yes env x)
-  VM p >>= f = VM $ \bi env -> do
-                                 r <- p bi env
-                                 case r of
-                                   Yes env' x -> runVM (f x) bi env'
-                                   No         -> return No
+  return x   = VM $ \bi genv lenv -> return (Yes genv lenv x)
+  VM p >>= f = VM $ \bi genv lenv -> do
+                                      r <- p bi genv lenv
+                                      case r of
+                                        Yes genv' lenv' x -> runVM (f x) bi genv' lenv'
+                                        No                -> return No
 
 noV :: VM a
-noV = VM $ \bi env -> return No
+noV = VM $ \_ _ _ -> return No
 
 tryV :: VM a -> VM (Maybe a)
-tryV (VM p) = VM $ \bi env -> do
-                                r <- p bi env
-                                case r of
-                                  Yes env' x -> return (Yes env' (Just x))
-                                  No         -> return (Yes env Nothing)
+tryV (VM p) = VM $ \bi genv lenv ->
+  do
+    r <- p bi genv lenv
+    case r of
+      Yes genv' lenv' x -> return (Yes genv' lenv' (Just x))
+      No                -> return (Yes genv  lenv  Nothing)
 
 maybeV :: VM (Maybe a) -> VM a
 maybeV p = maybe noV return =<< p
@@ -172,19 +178,28 @@ orElseV :: VM a -> VM a -> VM a
 orElseV p q = maybe q return =<< tryV p
 
 liftDs :: DsM a -> VM a
-liftDs p = VM $ \bi env -> do { x <- p; return (Yes env x) }
+liftDs p = VM $ \bi genv lenv -> do { x <- p; return (Yes genv lenv x) }
 
 builtin :: (Builtins -> a) -> VM a
-builtin f = VM $ \bi env -> return (Yes env (f bi))
+builtin f = VM $ \bi genv lenv -> return (Yes genv lenv (f bi))
 
-readEnv :: (VEnv -> a) -> VM a
-readEnv f = VM $ \bi env -> return (Yes env (f env))
+readGEnv :: (GlobalEnv -> a) -> VM a
+readGEnv f = VM $ \bi genv lenv -> return (Yes genv lenv (f genv))
 
-setEnv :: VEnv -> VM ()
-setEnv env = VM $ \_ _ -> return (Yes env ())
+setGEnv :: GlobalEnv -> VM ()
+setGEnv genv = VM $ \_ _ lenv -> return (Yes genv lenv ())
 
-updEnv :: (VEnv -> VEnv) -> VM ()
-updEnv f = VM $ \_ env -> return (Yes (f env) ())
+updGEnv :: (GlobalEnv -> GlobalEnv) -> VM ()
+updGEnv f = VM $ \_ genv lenv -> return (Yes (f genv) lenv ())
+
+readLEnv :: (LocalEnv -> a) -> VM a
+readLEnv f = VM $ \bi genv lenv -> return (Yes genv lenv (f lenv))
+
+setLEnv :: LocalEnv -> VM ()
+setLEnv lenv = VM $ \_ genv _ -> return (Yes genv lenv ())
+
+updLEnv :: (LocalEnv -> LocalEnv) -> VM ()
+updLEnv f = VM $ \_ genv lenv -> return (Yes genv (f lenv) ())
 
 newTyVar :: FastString -> Kind -> VM Var
 newTyVar fs k
@@ -193,7 +208,7 @@ newTyVar fs k
       return $ mkTyVar (mkSysTvName u fs) k
 
 lookupTyCon :: TyCon -> VM (Maybe TyCon)
-lookupTyCon tc = readEnv $ \env -> lookupNameEnv (vect_tycons env) (tyConName tc)
+lookupTyCon tc = readGEnv $ \env -> lookupNameEnv (global_tycons env) (tyConName tc)
 
 -- ----------------------------------------------------------------------------
 -- Bindings
@@ -202,11 +217,10 @@ vectoriseModule :: VectInfo -> ModGuts -> DsM ModGuts
 vectoriseModule info guts
   = do
       builtins <- initBuiltins
-      env <- initVEnv info
-      r <- runVM (vectModule guts) builtins env
+      r <- runVM (vectModule guts) builtins (initGlobalEnv info) emptyLocalEnv
       case r of
-        Yes env' guts' -> return $ updVectInfo env' guts'
-        No             -> return guts
+        Yes genv _ guts' -> return $ updVectInfo genv guts'
+        No               -> return guts
 
 vectModule :: ModGuts -> VM ModGuts
 vectModule guts = return guts
@@ -237,9 +251,9 @@ capply (vfn, lfn) (varg, larg)
 vectVar :: CoreExpr -> Var -> VM (CoreExpr, CoreExpr)
 vectVar lc v = local v `orElseV` global v
   where
-    local  v = maybeV (readEnv $ \env -> lookupVarEnv (vect_local_vars env) v)
+    local  v = maybeV (readLEnv $ \env -> lookupVarEnv (local_vars env) v)
     global v = do
-                 vexpr <- maybeV (readEnv $ \env -> lookupVarEnv (vect_global_vars env) v)
+                 vexpr <- maybeV (readGEnv $ \env -> lookupVarEnv (global_vars env) v)
                  lexpr <- replicateP vexpr lc
                  return (vexpr, lexpr)
                 
@@ -299,12 +313,12 @@ paArgType' ty k
 
 paOfTyCon :: TyCon -> VM CoreExpr
 -- FIXME: just for now
-paOfTyCon tc = maybeV (readEnv $ \env -> lookupNameEnv (vect_tycon_pa env) (tyConName tc))
+paOfTyCon tc = maybeV (readGEnv $ \env -> lookupNameEnv (global_tycon_pa env) (tyConName tc))
 
 paOfType :: Type -> VM CoreExpr
 paOfType ty | Just ty' <- coreView ty = paOfType ty'
 
-paOfType (TyVarTy tv) = maybeV (readEnv $ \env -> lookupVarEnv (vect_tyvar_pa env) tv)
+paOfType (TyVarTy tv) = maybeV (readLEnv $ \env -> lookupVarEnv (local_tyvar_pa env) tv)
 paOfType (AppTy ty1 ty2)
   = do
       e1 <- paOfType ty1
