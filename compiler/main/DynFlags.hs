@@ -187,6 +187,7 @@ data DynFlag
    | Opt_FlexibleInstances
    | Opt_MultiParamTypeClasses
    | Opt_FunctionalDependencies
+   | Opt_UnicodeSyntax
    | Opt_MagicHash
    | Opt_EmptyDataDecls
    | Opt_KindSignatures
@@ -1107,6 +1108,7 @@ xFlags :: [(String, DynFlag)]
 xFlags = [
   ( "CPP",                              Opt_Cpp ),
   ( "PatternGuards",                    Opt_PatternGuards ),
+  ( "UnicodeSyntax",                    Opt_UnicodeSyntax ),
   ( "MagicHash",                        Opt_MagicHash ),
   ( "KindSignatures",                   Opt_KindSignatures ),
   ( "EmptyDataDecls",                   Opt_EmptyDataDecls ),
@@ -1167,6 +1169,7 @@ glasgowExtsFlags = [ Opt_GlasgowExts
            , Opt_MultiParamTypeClasses
            , Opt_FunctionalDependencies
 		   , Opt_MagicHash
+           , Opt_UnicodeSyntax
            , Opt_PatternGuards
            , Opt_RankNTypes
            , Opt_RecursiveDo

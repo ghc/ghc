@@ -632,39 +632,43 @@ reservedWordsFM = listToUFM $
 	( "proc",	ITproc,		 bit arrowsBit)
      ]
 
+reservedSymsFM :: UniqFM (Token, Int -> Bool)
 reservedSymsFM = listToUFM $
-	map (\ (x,y,z) -> (mkFastString x,(y,z)))
-      [ ("..",	ITdotdot,	0)
-       ,(":",	ITcolon,	0)	-- (:) is a reserved op, 
-						-- meaning only list cons
-       ,("::",	ITdcolon, 	0)
-       ,("=",	ITequal, 	0)
-       ,("\\",	ITlam, 		0)
-       ,("|",	ITvbar, 	0)
-       ,("<-",	ITlarrow, 	0)
-       ,("->",	ITrarrow, 	0)
-       ,("@",	ITat, 		0)
-       ,("~",	ITtilde, 	0)
-       ,("=>",	ITdarrow, 	0)
-       ,("-",	ITminus, 	0)
-       ,("!",	ITbang, 	0)
+    map (\ (x,y,z) -> (mkFastString x,(y,z)))
+      [ ("..",  ITdotdot,   always)
+        -- (:) is a reserved op, meaning only list cons
+       ,(":",   ITcolon,    always)
+       ,("::",  ITdcolon,   always)
+       ,("=",   ITequal,    always)
+       ,("\\",  ITlam,      always)
+       ,("|",   ITvbar,     always)
+       ,("<-",  ITlarrow,   always)
+       ,("->",  ITrarrow,   always)
+       ,("@",   ITat,       always)
+       ,("~",   ITtilde,    always)
+       ,("=>",  ITdarrow,   always)
+       ,("-",   ITminus,    always)
+       ,("!",   ITbang,     always)
 
-       ,("*",	ITstar,		bit glaExtsBit .|. bit kindSigsBit .|.
-				bit tyFamBit)	    -- For data T (a::*) = MkT
-       ,(".",	ITdot,		bit tvBit)	    -- For 'forall a . t'
+        -- For data T (a::*) = MkT
+       ,("*", ITstar, \i -> glaExtsEnabled i ||
+                            kindSigsEnabled i ||
+                            tyFamEnabled i)
+        -- For 'forall a . t'
+       ,(".", ITdot, tvEnabled)
 
-       ,("-<",	ITlarrowtail,	bit arrowsBit)
-       ,(">-",	ITrarrowtail,	bit arrowsBit)
-       ,("-<<",	ITLarrowtail,	bit arrowsBit)
-       ,(">>-",	ITRarrowtail,	bit arrowsBit)
+       ,("-<",  ITlarrowtail, arrowsEnabled)
+       ,(">-",  ITrarrowtail, arrowsEnabled)
+       ,("-<<", ITLarrowtail, arrowsEnabled)
+       ,(">>-", ITRarrowtail, arrowsEnabled)
 
 #if __GLASGOW_HASKELL__ >= 605
-       ,("∷",   ITdcolon,       bit glaExtsBit)
-       ,("⇒",   ITdarrow,	bit glaExtsBit)
-       ,("∀",	ITforall,	bit glaExtsBit)
-       ,("→",   ITrarrow,	bit glaExtsBit)
-       ,("←",   ITlarrow,	bit glaExtsBit)
-       ,("⋯", 	ITdotdot,	bit glaExtsBit)
+       ,("∷",   ITdcolon, unicodeSyntaxEnabled)
+       ,("⇒",   ITdarrow, unicodeSyntaxEnabled)
+       ,("∀",   ITforall, \i -> unicodeSyntaxEnabled i && tvEnabled i)
+       ,("→",   ITrarrow, unicodeSyntaxEnabled)
+       ,("←",   ITlarrow, unicodeSyntaxEnabled)
+       ,("⋯",   ITdotdot, unicodeSyntaxEnabled)
         -- ToDo: ideally, → and ∷ should be "specials", so that they cannot
         -- form part of a large operator.  This would let us have a better
         -- syntax for kinds: ɑ∷*→* would be a legal kind signature. (maybe).
@@ -943,9 +947,8 @@ consym = sym ITconsym
 
 sym con span buf len = 
   case lookupUFM reservedSymsFM fs of
-	Just (keyword,0)    -> return (L span keyword)
 	Just (keyword,exts) -> do
-		b <- extension (\i -> exts .&. i /= 0)
+		b <- extension exts
 		if b then return (L span keyword)
 		     else return (L span $! con fs)
 	_other -> return (L span $! con fs)
@@ -1520,8 +1523,10 @@ haddockBit = 10 -- Lex and parse Haddock comments
 magicHashBit = 11 -- # in both functions and operators
 kindSigsBit = 12 -- Kind signatures on type variables
 recursiveDoBit = 13 -- mdo
+unicodeSyntaxBit = 14 -- the forall symbol, arrow symbols, etc
 
 glaExtsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
+always           _     = True
 glaExtsEnabled   flags = testBit flags glaExtsBit
 ffiEnabled       flags = testBit flags ffiBit
 parrEnabled      flags = testBit flags parrBit
@@ -1535,6 +1540,7 @@ haddockEnabled   flags = testBit flags haddockBit
 magicHashEnabled flags = testBit flags magicHashBit
 kindSigsEnabled  flags = testBit flags kindSigsBit
 recursiveDoEnabled flags = testBit flags recursiveDoBit
+unicodeSyntaxEnabled flags = testBit flags unicodeSyntaxBit
 
 -- PState for parsing options pragmas
 --
@@ -1589,6 +1595,7 @@ mkPState buf loc flags  =
 	       .|. magicHashBit `setBitIf` dopt Opt_MagicHash    flags
 	       .|. kindSigsBit  `setBitIf` dopt Opt_KindSignatures flags
 	       .|. recursiveDoBit `setBitIf` dopt Opt_RecursiveDo flags
+	       .|. unicodeSyntaxBit `setBitIf` dopt Opt_UnicodeSyntax flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
