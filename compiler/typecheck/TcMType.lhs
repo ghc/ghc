@@ -1179,15 +1179,15 @@ instTypeErr pp_ty msg
 \begin{code}
 checkValidInstance :: [TyVar] -> ThetaType -> Class -> [TcType] -> TcM ()
 checkValidInstance tyvars theta clas inst_tys
-  = do	{ gla_exts <- doptM Opt_GlasgowExts
-	; undecidable_ok <- doptM Opt_AllowUndecidableInstances
+  = do	{ undecidable_ok <- doptM Opt_AllowUndecidableInstances
 
 	; checkValidTheta InstThetaCtxt theta
 	; checkAmbiguity tyvars theta (tyVarsOfTypes inst_tys)
 
 	-- Check that instance inference will terminate (if we care)
-	-- For Haskell 98, checkValidTheta has already done that
-	; when (gla_exts && not undecidable_ok) $
+	-- For Haskell 98 this will already have been done by checkValidTheta,
+    -- but as we may be using other extensions we need to check.
+	; unless undecidable_ok $
 	  mapM_ addErrTc (checkInstTermination inst_tys theta)
 	
 	-- The Coverage Condition
