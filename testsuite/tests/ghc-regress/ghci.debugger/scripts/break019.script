@@ -1,0 +1,3 @@
+-- Test for #1505
+:load ../Test2.hs
+:break Test2
