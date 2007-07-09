@@ -247,6 +247,33 @@ paArgType' ty k
         Just ty' -> return ty'
         Nothing  -> pprPanic "paArgType'" (ppr ty)
 
+paOfTyCon :: TyCon -> VM CoreExpr
+-- FIXME: just for now
+paOfTyCon tc = maybeV (readEnv $ \env -> lookupNameEnv (vect_tycon_pa env) (tyConName tc))
+
+paOfType :: Type -> VM CoreExpr
+paOfType ty | Just ty' <- coreView ty = paOfType ty'
+
+paOfType (TyVarTy tv) = maybeV (readEnv $ \env -> lookupVarEnv (vect_tyvar_pa env) tv)
+paOfType (AppTy ty1 ty2)
+  = do
+      e1 <- paOfType ty1
+      e2 <- paOfType ty2
+      return $ mkApps e1 [Type ty2, e2]
+paOfType (TyConApp tc tys)
+  = do
+      e  <- paOfTyCon tc
+      es <- mapM paOfType tys
+      return $ mkApps e [arg | (t,e) <- zip tys es, arg <- [Type t, e]]
+paOfType (FunTy ty1 ty2) = paOfType (TyConApp funTyCon [ty1,ty2])
+paOfType t@(ForAllTy tv ty) = pprPanic "paOfType:" (ppr t)
+paOfType ty = pprPanic "paOfType:" (ppr ty)
+        
+
+
+-- ----------------------------------------------------------------------------
+-- Types
+
 vectTyCon :: TyCon -> VM TyCon
 vectTyCon tc
   | isFunTyCon tc        = builtin closureTyCon
