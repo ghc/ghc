@@ -7,6 +7,7 @@ import DynFlags
 import HscTypes
 
 import CoreLint             ( showPass, endPass )
+import CoreSyn
 import TyCon
 import Type
 import TypeRep
@@ -85,9 +86,10 @@ initBuiltins
                }
 
 data VEnv = VEnv {
-              -- Mapping from variables to their vectorised versions
-              --
-              vect_vars :: VarEnv Var
+              -- Mapping from variables to their vectorised versions. Mapping
+              -- to expressions instead of just Vars gives us more freedom.
+              -- 
+              vect_vars :: VarEnv CoreExpr
 
               -- Exported variables which have a vectorised version
               --
@@ -102,7 +104,7 @@ data VEnv = VEnv {
 initVEnv :: VectInfo -> DsM VEnv
 initVEnv info
   = return $ VEnv {
-               vect_vars          = mapVarEnv  snd $ vectInfoCCVar   info
+               vect_vars          = mapVarEnv  (Var . snd) $ vectInfoCCVar   info
              , vect_exported_vars = emptyVarEnv
              , vect_tycons        = mapNameEnv snd $ vectInfoCCTyCon info
              }
@@ -145,6 +147,9 @@ tryV (VM p) = VM $ \bi env -> do
                                   Yes env' x -> return (Yes env' (Just x))
                                   No         -> return (Yes env Nothing)
 
+maybeV :: VM (Maybe a) -> VM a
+maybeV p = maybe noV return =<< p
+
 liftDs :: DsM a -> VM a
 liftDs p = VM $ \bi env -> do { x <- p; return (Yes env x) }
 
@@ -165,6 +170,9 @@ newTyVar fs k
   = do
       u <- liftDs newUnique
       return $ mkTyVar (mkSysTvName u fs) k
+
+lookupVar :: Var -> VM CoreExpr
+lookupVar v = maybeV . readEnv $ \env -> lookupVarEnv (vect_vars env) v
 
 lookupTyCon :: TyCon -> VM (Maybe TyCon)
 lookupTyCon tc = readEnv $ \env -> lookupNameEnv (vect_tycons env) (tyConName tc)
