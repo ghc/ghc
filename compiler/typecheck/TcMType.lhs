@@ -694,7 +694,8 @@ checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Checks that the type is valid for the given context
 checkValidType ctxt ty
   = traceTc (text "checkValidType" <+> ppr ty)	`thenM_`
-    doptM Opt_GlasgowExts	`thenM` \ gla_exts ->
+    doptM Opt_ExpressionSignaturesUnboxedTuples `thenM` \ exp_sigs_unboxed ->
+    doptM Opt_TypeSynonymUnboxedTuples `thenM` \ type_synonym_unboxed ->
     doptM Opt_Rank2Types	`thenM` \ rank2 ->
     doptM Opt_RankNTypes	`thenM` \ rankn ->
     doptM Opt_PolymorphicComponents	`thenM` \ polycomp ->
@@ -729,14 +730,10 @@ checkValidType ctxt ty
 			ForSigCtxt _ -> isLiftedTypeKind actual_kind
 			other	     -> isSubArgTypeKind    actual_kind
 	
-	ubx_tup | not gla_exts = UT_NotOk
-		| otherwise    = case ctxt of
-				   TySynCtxt _ -> UT_Ok
-				   ExprSigCtxt -> UT_Ok
-				   other       -> UT_NotOk
-		-- Unboxed tuples ok in function results,
-		-- but for type synonyms we allow them even at
-		-- top level
+	ubx_tup = case ctxt of
+	              TySynCtxt _ | type_synonym_unboxed -> UT_Ok
+	              ExprSigCtxt | exp_sigs_unboxed     -> UT_Ok
+	              _                                  -> UT_NotOk
     in
 	-- Check that the thing has kind Type, and is lifted if necessary
     checkTc kind_ok (kindErr actual_kind)	`thenM_`
@@ -857,8 +854,8 @@ check_tau_type rank ubx_tup ty@(TyConApp tc tys)
 	}
     
   | isUnboxedTupleTyCon tc
-  = doptM Opt_GlasgowExts			`thenM` \ gla_exts ->
-    checkTc (ubx_tup_ok gla_exts) ubx_tup_msg	`thenM_`
+  = doptM Opt_UnboxedTuples `thenM` \ ub_tuples_allowed ->
+    checkTc (ubx_tup_ok ub_tuples_allowed) ubx_tup_msg	`thenM_`
     mappM_ (check_tau_type (Rank 0) UT_Ok) tys	
 		-- Args are allowed to be unlifted, or
 		-- more unboxed tuples, so can't use check_arg_ty
@@ -867,7 +864,7 @@ check_tau_type rank ubx_tup ty@(TyConApp tc tys)
   = mappM_ check_arg_type tys
 
   where
-    ubx_tup_ok gla_exts = case ubx_tup of { UT_Ok -> gla_exts; other -> False }
+    ubx_tup_ok ub_tuples_allowed = case ubx_tup of { UT_Ok -> ub_tuples_allowed; other -> False }
 
     n_args    = length tys
     tc_arity  = tyConArity tc

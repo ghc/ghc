@@ -175,6 +175,9 @@ data DynFlag
    | Opt_Generics
    | Opt_ImplicitPrelude 
    | Opt_ScopedTypeVariables
+   | Opt_UnboxedTuples
+   | Opt_ExpressionSignaturesUnboxedTuples
+   | Opt_TypeSynonymUnboxedTuples
    | Opt_BangPatterns
    | Opt_TypeFamilies
    | Opt_OverloadedStrings
@@ -1158,6 +1161,9 @@ xFlags = [
   ( "ExtendedDefaultRules",		Opt_ExtendedDefaultRules ),
   ( "ImplicitParams",			Opt_ImplicitParams ),
   ( "ScopedTypeVariables",  		Opt_ScopedTypeVariables ),
+  ( "UnboxedTuples",                Opt_UnboxedTuples ),
+  ( "ExpressionSignaturesUnboxedTuples", Opt_ExpressionSignaturesUnboxedTuples ),
+  ( "TypeSynonymUnboxedTuples",     Opt_TypeSynonymUnboxedTuples ),
   ( "TypeSynonymInstances",         Opt_TypeSynonymInstances ),
   ( "FlexibleContexts",             Opt_FlexibleContexts ),
   ( "FlexibleInstances",            Opt_FlexibleInstances ),
@@ -1180,6 +1186,9 @@ glasgowExtsFlags = [ Opt_GlasgowExts
 		   , Opt_GADTs
 		   , Opt_ImplicitParams 
 		   , Opt_ScopedTypeVariables
+           , Opt_UnboxedTuples
+           , Opt_ExpressionSignaturesUnboxedTuples
+           , Opt_TypeSynonymUnboxedTuples
            , Opt_TypeSynonymInstances
            , Opt_FlexibleContexts
            , Opt_FlexibleInstances

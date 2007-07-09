@@ -308,9 +308,14 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   \? @varid / { ifExtension ipEnabled }	{ skip_one_varid ITdupipvarid }
 }
 
+<0,glaexts> {
+  "(#" / { ifExtension unboxedTuplesEnabled `alexAndPred` notFollowedBySymbol }
+         { token IToubxparen }
+  "#)" / { ifExtension unboxedTuplesEnabled }
+         { token ITcubxparen }
+}
+
 <glaexts> {
-  "(#" / { notFollowedBySymbol }	{ token IToubxparen }
-  "#)"					{ token ITcubxparen }
   "{|"					{ token ITocurlybar }
   "|}"					{ token ITccurlybar }
 }
@@ -1525,6 +1530,7 @@ magicHashBit = 11 -- # in both functions and operators
 kindSigsBit = 12 -- Kind signatures on type variables
 recursiveDoBit = 13 -- mdo
 unicodeSyntaxBit = 14 -- the forall symbol, arrow symbols, etc
+unboxedTuplesBit = 15 -- (# and #)
 
 glaExtsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 always           _     = True
@@ -1542,6 +1548,7 @@ magicHashEnabled flags = testBit flags magicHashBit
 kindSigsEnabled  flags = testBit flags kindSigsBit
 recursiveDoEnabled flags = testBit flags recursiveDoBit
 unicodeSyntaxEnabled flags = testBit flags unicodeSyntaxBit
+unboxedTuplesEnabled flags = testBit flags unboxedTuplesBit
 
 -- PState for parsing options pragmas
 --
@@ -1599,6 +1606,7 @@ mkPState buf loc flags  =
 	       .|. kindSigsBit  `setBitIf` dopt Opt_KindSignatures flags
 	       .|. recursiveDoBit `setBitIf` dopt Opt_RecursiveDo flags
 	       .|. unicodeSyntaxBit `setBitIf` dopt Opt_UnicodeSyntax flags
+	       .|. unboxedTuplesBit `setBitIf` dopt Opt_UnboxedTuples flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
