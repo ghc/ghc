@@ -190,6 +190,7 @@ data DynFlag
    | Opt_TypeSynonymInstances
    | Opt_FlexibleContexts
    | Opt_FlexibleInstances
+   | Opt_ConstrainedClassMethods
    | Opt_MultiParamTypeClasses
    | Opt_FunctionalDependencies
    | Opt_UnicodeSyntax
@@ -1169,6 +1170,7 @@ xFlags = [
   ( "TypeSynonymInstances",         Opt_TypeSynonymInstances ),
   ( "FlexibleContexts",             Opt_FlexibleContexts ),
   ( "FlexibleInstances",            Opt_FlexibleInstances ),
+  ( "ConstrainedClassMethods",      Opt_ConstrainedClassMethods ),
   ( "MultiParamTypeClasses",        Opt_MultiParamTypeClasses ),
   ( "FunctionalDependencies",        Opt_FunctionalDependencies ),
   ( "GeneralizedNewtypeDeriving",   Opt_GeneralizedNewtypeDeriving ),
@@ -1195,6 +1197,7 @@ glasgowExtsFlags = [ Opt_GlasgowExts
            , Opt_TypeSynonymInstances
            , Opt_FlexibleContexts
            , Opt_FlexibleInstances
+           , Opt_ConstrainedClassMethods
            , Opt_MultiParamTypeClasses
            , Opt_FunctionalDependencies
 		   , Opt_MagicHash

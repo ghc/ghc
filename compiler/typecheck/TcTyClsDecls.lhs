@@ -1057,8 +1057,7 @@ checkNewDataCon con
 -------------------------------
 checkValidClass :: Class -> TcM ()
 checkValidClass cls
-  = do	{ 	-- CHECK ARITY 1 FOR HASKELL 1.4
-	  gla_exts <- doptM Opt_GlasgowExts
+  = do	{ constrained_class_methods <- doptM Opt_ConstrainedClassMethods
 	; multi_param_type_classes <- doptM Opt_MultiParamTypeClasses
 	; fundep_classes <- doptM Opt_FunctionalDependencies
 
@@ -1071,7 +1070,7 @@ checkValidClass cls
 	; checkValidTheta (ClassSCCtxt (className cls)) theta
 
 	-- Check the class operations
-	; mappM_ (check_op gla_exts) op_stuff
+	; mappM_ (check_op constrained_class_methods) op_stuff
 
   	-- Check that if the class has generic methods, then the
 	-- class has only one parameter.  We can't do generic
@@ -1083,7 +1082,7 @@ checkValidClass cls
     unary 	= isSingleton tyvars
     no_generics = null [() | (_, GenDefMeth) <- op_stuff]
 
-    check_op gla_exts (sel_id, dm) 
+    check_op constrained_class_methods (sel_id, dm) 
       = addErrCtxt (classOpCtxt sel_id tau) $ do
 	{ checkValidTheta SigmaCtxt (tail theta)
 		-- The 'tail' removes the initial (C a) from the
@@ -1111,11 +1110,11 @@ checkValidClass cls
 	  op_ty   = idType sel_id
 	  (_,theta1,tau1) = tcSplitSigmaTy op_ty
 	  (_,theta2,tau2)  = tcSplitSigmaTy tau1
-	  (theta,tau) | gla_exts  = (theta1 ++ theta2, tau2)
-		      | otherwise = (theta1, 	       mkPhiTy (tail theta1) tau1)
+	  (theta,tau) | constrained_class_methods = (theta1 ++ theta2, tau2)
+		      | otherwise = (theta1, mkPhiTy (tail theta1) tau1)
 		-- Ugh!  The function might have a type like
 		-- 	op :: forall a. C a => forall b. (Eq b, Eq a) => tau2
-		-- With -fglasgow-exts, we want to allow this, even though the inner 
+		-- With -XConstrainedClassMethods, we want to allow this, even though the inner 
 		-- forall has an (Eq a) constraint.  Whereas in general, each constraint 
 		-- in the context of a for-all must mention at least one quantified
 		-- type variable.  What a mess!
