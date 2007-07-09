@@ -199,6 +199,7 @@ data DynFlag
    | Opt_GeneralizedNewtypeDeriving
    | Opt_RecursiveDo
    | Opt_PatternGuards
+   | Opt_PartiallyAppliedClosedTypeSynonyms
    | Opt_Rank2Types
    | Opt_RankNTypes
    | Opt_TypeOperators
@@ -1128,6 +1129,7 @@ xFlags = [
   ( "FFI",				Opt_FFI ),  -- ...and also `-fffi'
   ( "ForeignFunctionInterface",		Opt_FFI ),
 
+  ( "PartiallyAppliedClosedTypeSynonyms", Opt_PartiallyAppliedClosedTypeSynonyms ),
   ( "Rank2Types",                       Opt_Rank2Types ),
   ( "RankNTypes",                       Opt_RankNTypes ),
   ( "TypeOperators",                    Opt_TypeOperators ),
@@ -1188,6 +1190,7 @@ glasgowExtsFlags = [ Opt_GlasgowExts
            , Opt_ExistentialQuantification
            , Opt_UnicodeSyntax
            , Opt_PatternGuards
+           , Opt_PartiallyAppliedClosedTypeSynonyms
            , Opt_RankNTypes
            , Opt_TypeOperators
            , Opt_RecursiveDo

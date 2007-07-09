@@ -838,10 +838,9 @@ check_tau_type rank ubx_tup ty@(TyConApp tc tys)
 			        && tyConArity tc <= length tys) $
 		          failWithTc arity_msg
 
-	; gla_exts <- doptM Opt_GlasgowExts
-	; if gla_exts && not (isOpenTyCon tc) then
-	-- If -fglasgow-exts then don't check the type arguments of 
-	-- *closed* synonyms.
+	; ok <- doptM Opt_PartiallyAppliedClosedTypeSynonyms
+	; if ok && not (isOpenTyCon tc) then
+	-- Don't check the type arguments of *closed* synonyms.
 	-- This allows us to instantiate a synonym defn with a 
 	-- for-all type, or with a partially-applied type synonym.
 	-- 	e.g.   type T a b = a
