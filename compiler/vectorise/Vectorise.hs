@@ -273,3 +273,14 @@ vectType (ForAllTy tv ty)
 
 vectType ty = pprPanic "vectType:" (ppr ty)
 
+isClosureTyCon :: TyCon -> Bool
+isClosureTyCon tc = tyConUnique tc == closureTyConKey
+
+splitClosureTy :: Type -> (Type, Type)
+splitClosureTy ty
+  | Just (tc, [arg_ty, res_ty]) <- splitTyConApp_maybe ty
+  , isClosureTyCon tc
+  = (arg_ty, res_ty)
+
+  | otherwise = pprPanic "splitClosureTy" (ppr ty)
+
