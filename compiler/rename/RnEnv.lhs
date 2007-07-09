@@ -571,10 +571,7 @@ lookupFixityRn name
 
 ---------------
 lookupTyFixityRn :: Located Name -> RnM Fixity
-lookupTyFixityRn (L loc n)
-  = do	{ glaExts <- doptM Opt_GlasgowExts
-	; when (not glaExts) (addWarnAt loc (infixTyConWarn n))
-	; lookupFixityRn n }
+lookupTyFixityRn (L loc n) = lookupFixityRn n
 
 ---------------
 dataTcOccs :: RdrName -> [RdrName]
@@ -937,8 +934,4 @@ dupNamesErr descriptor located_names
 
 badQualBndrErr rdr_name
   = ptext SLIT("Qualified name in binding position:") <+> ppr rdr_name
-
-infixTyConWarn op
-  = vcat [ftext FSLIT("Accepting non-standard infix type constructor") <+> quotes (ppr op),
-	  ftext FSLIT("Use -fglasgow-exts to avoid this warning")]
 \end{code}

@@ -124,7 +124,7 @@ rnHsType doc (HsTyVar tyvar)
 
 rnHsType doc ty@(HsOpTy ty1 (L loc op) ty2)
   = setSrcSpan loc $ 
-    do	{ ty_ops_ok <- doptM Opt_ScopedTypeVariables	-- Badly named option
+    do	{ ty_ops_ok <- doptM Opt_TypeOperators
 	; checkErr ty_ops_ok (opTyErr op ty)
 	; op' <- lookupOccRn op
 	; let l_op' = L loc op'
@@ -808,7 +808,7 @@ forAllWarn doc ty (L loc tyvar)
 
 opTyErr op ty 
   = hang (ptext SLIT("Illegal operator") <+> quotes (ppr op) <+> ptext SLIT("in type") <+> quotes (ppr ty))
-	 2 (parens (ptext SLIT("Use -fscoped-type-variables to allow operators in types")))
+	 2 (parens (ptext SLIT("Use -XTypeOperators to allow operators in types")))
 
 bogusCharError c
   = ptext SLIT("character literal out of range: '\\") <> char c  <> char '\''

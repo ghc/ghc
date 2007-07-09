@@ -200,6 +200,7 @@ data DynFlag
    | Opt_PatternGuards
    | Opt_Rank2Types
    | Opt_RankNTypes
+   | Opt_TypeOperators
 
    | Opt_PrintExplicitForalls
 
@@ -1127,6 +1128,7 @@ xFlags = [
 
   ( "Rank2Types",                       Opt_Rank2Types ),
   ( "RankNTypes",                       Opt_RankNTypes ),
+  ( "TypeOperators",                    Opt_TypeOperators ),
   ( "RecursiveDo",                      Opt_RecursiveDo ),
   ( "Arrows",				Opt_Arrows ), -- arrow syntax
   ( "Parr",				Opt_PArr ),
@@ -1185,6 +1187,7 @@ glasgowExtsFlags = [ Opt_GlasgowExts
            , Opt_UnicodeSyntax
            , Opt_PatternGuards
            , Opt_RankNTypes
+           , Opt_TypeOperators
            , Opt_RecursiveDo
            , Opt_ParallelListComp
            , Opt_EmptyDataDecls
