@@ -188,6 +188,7 @@ data DynFlag
    | Opt_MultiParamTypeClasses
    | Opt_FunctionalDependencies
    | Opt_UnicodeSyntax
+   | Opt_PolymorphicComponents
    | Opt_MagicHash
    | Opt_EmptyDataDecls
    | Opt_KindSignatures
@@ -1110,6 +1111,7 @@ xFlags = [
   ( "PatternGuards",                    Opt_PatternGuards ),
   ( "UnicodeSyntax",                    Opt_UnicodeSyntax ),
   ( "MagicHash",                        Opt_MagicHash ),
+  ( "PolymorphicComponents",            Opt_PolymorphicComponents ),
   ( "KindSignatures",                   Opt_KindSignatures ),
   ( "EmptyDataDecls",                   Opt_EmptyDataDecls ),
   ( "ParallelListComp",                 Opt_ParallelListComp ),
@@ -1169,6 +1171,7 @@ glasgowExtsFlags = [ Opt_GlasgowExts
            , Opt_MultiParamTypeClasses
            , Opt_FunctionalDependencies
 		   , Opt_MagicHash
+           , Opt_PolymorphicComponents
            , Opt_UnicodeSyntax
            , Opt_PatternGuards
            , Opt_RankNTypes

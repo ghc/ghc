@@ -697,6 +697,7 @@ checkValidType ctxt ty
     doptM Opt_GlasgowExts	`thenM` \ gla_exts ->
     doptM Opt_Rank2Types	`thenM` \ rank2 ->
     doptM Opt_RankNTypes	`thenM` \ rankn ->
+    doptM Opt_PolymorphicComponents	`thenM` \ polycomp ->
     let 
 	rank | rankn = Arbitrary
 	     | rank2 = Rank 2
@@ -710,8 +711,11 @@ checkValidType ctxt ty
 		 TySynCtxt _    -> Rank 0
 		 ExprSigCtxt 	-> Rank 1
 		 FunSigCtxt _   -> Rank 1
-		 ConArgCtxt _   -> Rank 1	-- We are given the type of the entire
-						-- constructor, hence rank 1
+		 ConArgCtxt _   -> if polycomp
+                           then Rank 2
+                                -- We are given the type of the entire
+                                -- constructor, hence rank 1
+                           else Rank 1
 		 ForSigCtxt _	-> Rank 1
 		 SpecInstCtxt   -> Rank 1
 

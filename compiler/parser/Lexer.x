@@ -1590,6 +1590,7 @@ mkPState buf loc flags  =
 	       .|. thBit        `setBitIf` dopt Opt_TH           flags
 	       .|. ipBit        `setBitIf` dopt Opt_ImplicitParams flags
 	       .|. explicitForallBit `setBitIf` dopt Opt_ScopedTypeVariables flags
+	       .|. explicitForallBit `setBitIf` dopt Opt_PolymorphicComponents flags
 	       .|. bangPatBit   `setBitIf` dopt Opt_BangPatterns flags
 	       .|. tyFamBit     `setBitIf` dopt Opt_TypeFamilies flags
 	       .|. haddockBit   `setBitIf` dopt Opt_Haddock      flags
