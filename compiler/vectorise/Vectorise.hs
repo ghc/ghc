@@ -123,28 +123,42 @@ updVectInfo env guts = guts { mg_vect_info = info' }
                                             , let tc_name = tyConName tc
                                             , Just tc' <- [lookupNameEnv (vect_tycons env) tc_name]]
 
-newtype VM a = VM { runVM :: Builtins -> VEnv -> DsM (VEnv, a) }
+data VResult a = Yes VEnv a | No
+
+newtype VM a = VM { runVM :: Builtins -> VEnv -> DsM (VResult a) }
 
 instance Monad VM where
-  return x   = VM $ \bi env -> return (env, x)
+  return x   = VM $ \bi env -> return (Yes env x)
   VM p >>= f = VM $ \bi env -> do
-                                 (env', x) <- p bi env
-                                 runVM (f x) bi env'
+                                 r <- p bi env
+                                 case r of
+                                   Yes env' x -> runVM (f x) bi env'
+                                   No         -> return No
+
+noV :: VM a
+noV = VM $ \bi env -> return No
+
+tryV :: VM a -> VM (Maybe a)
+tryV (VM p) = VM $ \bi env -> do
+                                r <- p bi env
+                                case r of
+                                  Yes env' x -> return (Yes env' (Just x))
+                                  No         -> return (Yes env Nothing)
 
 liftDs :: DsM a -> VM a
-liftDs p = VM $ \bi env -> do { x <- p; return (env, x) }
+liftDs p = VM $ \bi env -> do { x <- p; return (Yes env x) }
 
 builtin :: (Builtins -> a) -> VM a
-builtin f = VM $ \bi env -> return (env, f bi)
+builtin f = VM $ \bi env -> return (Yes env (f bi))
 
 readEnv :: (VEnv -> a) -> VM a
-readEnv f = VM $ \bi env -> return (env, f env)
+readEnv f = VM $ \bi env -> return (Yes env (f env))
 
 setEnv :: VEnv -> VM ()
-setEnv env = VM $ \_ _ -> return (env, ())
+setEnv env = VM $ \_ _ -> return (Yes env ())
 
 updEnv :: (VEnv -> VEnv) -> VM ()
-updEnv f = VM $ \_ env -> return (f env, ())
+updEnv f = VM $ \_ env -> return (Yes (f env) ())
 
 newTyVar :: FastString -> Kind -> VM Var
 newTyVar fs k
@@ -163,8 +177,10 @@ vectoriseModule info guts
   = do
       builtins <- initBuiltins
       env <- initVEnv info
-      (env', guts') <- runVM (vectModule guts) builtins env
-      return $ updVectInfo env' guts'
+      r <- runVM (vectModule guts) builtins env
+      case r of
+        Yes env' guts' -> return $ updVectInfo env' guts'
+        No             -> return guts
 
 vectModule :: ModGuts -> VM ModGuts
 vectModule guts = return guts
