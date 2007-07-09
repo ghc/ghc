@@ -74,8 +74,12 @@ clean(['readFile001.out'])
 test('readwrite001', normal, compile_and_run, ['-cpp'])
 clean(['readwrite001.inout'])
 
-test('readwrite002', compose(omit_ways(['ghci']), set_stdin('readwrite002.hs')),
-	compile_and_run, ['-cpp'])
+
+test('readwrite002',
+     composes([omit_ways(['ghci']), 
+               set_stdin('readwrite002.hs'),
+               expect_broken_if_platform(1198,'i386-unknown-mingw32')]),
+     compile_and_run, ['-cpp'])
 clean(['readwrite002.inout'])
 
 test('hGetBuf001', compose(only_compiler_types(['ghc']),
