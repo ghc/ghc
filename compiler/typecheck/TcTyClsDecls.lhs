@@ -693,7 +693,6 @@ tcTyClDecl1 calc_isrec
   ; stupid_theta <- tcHsKindedContext ctxt
   ; want_generic <- doptM Opt_Generics
   ; unbox_strict <- doptM Opt_UnboxStrictFields
-  ; gla_exts     <- doptM Opt_GlasgowExts
   ; empty_data_decls <- doptM Opt_EmptyDataDecls
   ; kind_signatures <- doptM Opt_KindSignatures
   ; gadt_ok      <- doptM Opt_GADTs
