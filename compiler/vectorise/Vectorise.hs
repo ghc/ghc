@@ -166,6 +166,9 @@ tryV (VM p) = VM $ \bi env -> do
 maybeV :: VM (Maybe a) -> VM a
 maybeV p = maybe noV return =<< p
 
+orElseV :: VM a -> VM a -> VM a
+orElseV p q = maybe q return =<< tryV p
+
 liftDs :: DsM a -> VM a
 liftDs p = VM $ \bi env -> do { x <- p; return (Yes env x) }
 
