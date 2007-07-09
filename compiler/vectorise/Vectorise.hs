@@ -86,10 +86,14 @@ initBuiltins
                }
 
 data VEnv = VEnv {
-              -- Mapping from variables to their vectorised versions. Mapping
-              -- to expressions instead of just Vars gives us more freedom.
+              -- Mapping from global variables to their vectorised versions.
               -- 
-              vect_vars :: VarEnv CoreExpr
+              vect_global_vars :: VarEnv CoreExpr
+
+              -- Mapping from local variables to their vectorised and lifted
+              -- versions.
+              --
+            , vect_local_vars :: VarEnv (CoreExpr, CoreExpr)
 
               -- Exported variables which have a vectorised version
               --
@@ -98,15 +102,27 @@ data VEnv = VEnv {
               -- Mapping from TyCons to their vectorised versions.
               -- TyCons which do not have to be vectorised are mapped to
               -- themselves.
+              --
             , vect_tycons :: NameEnv TyCon
+
+              -- Mapping from TyCons to their PA dictionaries
+              --
+            , vect_tycon_pa :: NameEnv CoreExpr
+
+              -- Mapping from tyvars to their PA dictionaries
+              --
+            , vect_tyvar_pa :: VarEnv CoreExpr
             }
 
 initVEnv :: VectInfo -> DsM VEnv
 initVEnv info
   = return $ VEnv {
-               vect_vars          = mapVarEnv  (Var . snd) $ vectInfoCCVar   info
+               vect_global_vars   = mapVarEnv  (Var . snd) $ vectInfoCCVar   info
+             , vect_local_vars    = emptyVarEnv
              , vect_exported_vars = emptyVarEnv
              , vect_tycons        = mapNameEnv snd $ vectInfoCCTyCon info
+             , vect_tycon_pa      = emptyNameEnv
+             , vect_tyvar_pa      = emptyVarEnv
              }
 
 -- FIXME
