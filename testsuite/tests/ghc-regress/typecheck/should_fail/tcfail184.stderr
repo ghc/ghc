@@ -1,0 +1,7 @@
+
+tcfail184.hs:8:18:
+    Illegal polymorphic or qualified type: forall a.
+                                          (Ord a) =>
+                                          [a] -> [a]
+    In the definition of data constructor `MkSwizzle'
+    In the newtype declaration for `Swizzle'
