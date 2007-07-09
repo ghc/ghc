@@ -1253,7 +1253,7 @@ legalFFITyCon tc
   = isUnLiftedTyCon tc || boxedMarshalableTyCon tc || tc == unitTyCon
 
 marshalableTyCon dflags tc
-  =  (dopt Opt_GlasgowExts dflags && isUnLiftedTyCon tc)
+  =  (dopt Opt_UnliftedFFITypes dflags && isUnLiftedTyCon tc)
   || boxedMarshalableTyCon tc
 
 boxedMarshalableTyCon tc

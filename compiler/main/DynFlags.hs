@@ -168,6 +168,7 @@ data DynFlag
    | Opt_ExtendedDefaultRules		-- Use GHC's extended rules for defaulting
    | Opt_GlasgowExts
    | Opt_FFI
+   | Opt_UnliftedFFITypes
    | Opt_PArr				-- Syntactic support for parallel arrays
    | Opt_Arrows				-- Arrow-notation syntax
    | Opt_TH
@@ -1131,6 +1132,7 @@ xFlags = [
   ( "FI",				Opt_FFI ),  -- support `-ffi'...
   ( "FFI",				Opt_FFI ),  -- ...and also `-fffi'
   ( "ForeignFunctionInterface",		Opt_FFI ),
+  ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes ),
 
   ( "PartiallyAppliedClosedTypeSynonyms", Opt_PartiallyAppliedClosedTypeSynonyms ),
   ( "Rank2Types",                       Opt_Rank2Types ),
@@ -1183,6 +1185,7 @@ impliedFlags = [
 glasgowExtsFlags = [ Opt_GlasgowExts 
            , Opt_PrintExplicitForalls
 		   , Opt_FFI 
+           , Opt_UnliftedFFITypes
 		   , Opt_GADTs
 		   , Opt_ImplicitParams 
 		   , Opt_ScopedTypeVariables
