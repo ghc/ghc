@@ -184,6 +184,7 @@ data DynFlag
    | Opt_GADTs
    | Opt_RelaxedPolyRec			-- -X=RelaxedPolyRec
    | Opt_TypeSynonymInstances
+   | Opt_FlexibleContexts
    | Opt_FlexibleInstances
    | Opt_MultiParamTypeClasses
    | Opt_FunctionalDependencies
@@ -1149,6 +1150,7 @@ xFlags = [
   ( "ImplicitParams",			Opt_ImplicitParams ),
   ( "ScopedTypeVariables",  		Opt_ScopedTypeVariables ),
   ( "TypeSynonymInstances",         Opt_TypeSynonymInstances ),
+  ( "FlexibleContexts",             Opt_FlexibleContexts ),
   ( "FlexibleInstances",            Opt_FlexibleInstances ),
   ( "MultiParamTypeClasses",        Opt_MultiParamTypeClasses ),
   ( "FunctionalDependencies",        Opt_FunctionalDependencies ),
@@ -1169,6 +1171,7 @@ glasgowExtsFlags = [ Opt_GlasgowExts
 		   , Opt_ImplicitParams 
 		   , Opt_ScopedTypeVariables
            , Opt_TypeSynonymInstances
+           , Opt_FlexibleContexts
            , Opt_FlexibleInstances
            , Opt_MultiParamTypeClasses
            , Opt_FunctionalDependencies

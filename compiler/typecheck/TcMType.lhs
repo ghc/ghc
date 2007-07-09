@@ -947,7 +947,7 @@ check_pred_ty dflags ctxt pred@(ClassP cls tys)
     arity      = classArity cls
     n_tys      = length tys
     arity_err  = arityErr "Class" class_name arity n_tys
-    how_to_allow = parens (ptext SLIT("Use -fglasgow-exts to permit this"))
+    how_to_allow = parens (ptext SLIT("Use -XFlexibleContexts to permit this"))
 
 check_pred_ty dflags ctxt pred@(EqPred ty1 ty2)
   = do {	-- Equational constraints are valid in all contexts if type
@@ -979,12 +979,12 @@ check_pred_ty dflags ctxt sty = failWithTc (badPredTyErr sty)
 check_class_pred_tys dflags ctxt tys 
   = case ctxt of
 	TypeCtxt      -> True	-- {-# SPECIALISE instance Eq (T Int) #-} is fine
-	InstThetaCtxt -> gla_exts || undecidable_ok || all tcIsTyVarTy tys
+	InstThetaCtxt -> flexible_contexts || undecidable_ok || all tcIsTyVarTy tys
 				-- Further checks on head and theta in
 				-- checkInstTermination
-	other	      -> gla_exts || all tyvar_head tys
+	other	      -> flexible_contexts || all tyvar_head tys
   where
-    gla_exts       = dopt Opt_GlasgowExts dflags
+    flexible_contexts = dopt Opt_FlexibleContexts dflags
     undecidable_ok = dopt Opt_AllowUndecidableInstances dflags
 
 -------------------------
@@ -1058,9 +1058,8 @@ even in a scope where b is in scope.
 
 \begin{code}
 checkFreeness forall_tyvars theta
-  = do	{ gla_exts <- doptM Opt_GlasgowExts
-	; if gla_exts then return ()	-- New!  Oct06
-	  else mappM_ complain (filter is_free theta) }
+  = do	{ flexible_contexts <- doptM Opt_FlexibleContexts
+	; unless flexible_contexts $ mappM_ complain (filter is_free theta) }
   where    
     is_free pred     =  not (isIPPred pred)
 		     && not (any bound_var (varSetElems (tyVarsOfPred pred)))
