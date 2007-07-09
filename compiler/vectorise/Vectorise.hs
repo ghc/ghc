@@ -192,9 +192,6 @@ newTyVar fs k
       u <- liftDs newUnique
       return $ mkTyVar (mkSysTvName u fs) k
 
-lookupVar :: Var -> VM CoreExpr
-lookupVar v = maybeV . readEnv $ \env -> lookupVarEnv (vect_vars env) v
-
 lookupTyCon :: TyCon -> VM (Maybe TyCon)
 lookupTyCon tc = readEnv $ \env -> lookupNameEnv (vect_tycons env) (tyConName tc)
 
@@ -215,7 +212,60 @@ vectModule :: ModGuts -> VM ModGuts
 vectModule guts = return guts
 
 -- ----------------------------------------------------------------------------
--- Types
+-- Expressions
+
+replicateP :: CoreExpr -> CoreExpr -> VM CoreExpr
+replicateP expr len
+  = do
+      pa  <- paOfType ty
+      rep <- builtin replicatePAVar
+      return $ mkApps (Var rep) [Type ty, pa, expr, len]
+  where
+    ty = exprType expr
+
+capply :: (CoreExpr, CoreExpr) -> (CoreExpr, CoreExpr) -> VM (CoreExpr, CoreExpr)
+capply (vfn, lfn) (varg, larg)
+  = do
+      apply  <- builtin applyClosureVar
+      applyP <- builtin applyClosurePVar
+      return (mkApps (Var apply)  [Type arg_ty, Type res_ty, vfn, varg],
+              mkApps (Var applyP) [Type arg_ty, Type res_ty, lfn, larg])
+  where
+    fn_ty            = exprType vfn
+    (arg_ty, res_ty) = splitClosureTy fn_ty
+
+vectVar :: CoreExpr -> Var -> VM (CoreExpr, CoreExpr)
+vectVar lc v = local v `orElseV` global v
+  where
+    local  v = maybeV (readEnv $ \env -> lookupVarEnv (vect_local_vars env) v)
+    global v = do
+                 vexpr <- maybeV (readEnv $ \env -> lookupVarEnv (vect_global_vars env) v)
+                 lexpr <- replicateP vexpr lc
+                 return (vexpr, lexpr)
+                
+vectExpr :: CoreExpr -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
+vectExpr lc (_, AnnType ty)
+  = do
+      vty <- vectType ty
+      return (Type vty, Type vty)
+vectExpr lc (_, AnnVar v)   = vectVar lc v
+vectExpr lc (_, AnnLit lit)
+  = do
+      let vexpr = Lit lit
+      lexpr <- replicateP vexpr lc
+      return (vexpr, lexpr)
+vectExpr lc (_, AnnNote note expr)
+  = do
+      (vexpr, lexpr) <- vectExpr lc expr
+      return (Note note vexpr, Note note lexpr)
+vectExpr lc (_, AnnApp fn arg)
+  = do
+      fn'  <- vectExpr lc fn
+      arg' <- vectExpr lc arg
+      capply fn' arg'
+
+-- ----------------------------------------------------------------------------
+-- PA dictionaries
 
 paArgType :: Type -> Kind -> VM (Maybe Type)
 paArgType ty k
