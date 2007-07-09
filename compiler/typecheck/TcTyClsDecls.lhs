@@ -241,9 +241,9 @@ tcFamInstDecl (L loc decl)
     tcAddDeclCtxt decl				$
     do { -- type families require -ftype-families and can't be in an
 	 -- hs-boot file
-       ; gla_exts <- doptM Opt_TypeFamilies
+       ; type_families <- doptM Opt_TypeFamilies
        ; is_boot  <- tcIsHsBoot	  -- Are we compiling an hs-boot file?
-       ; checkTc gla_exts      $ badFamInstDecl (tcdLName decl)
+       ; checkTc type_families $ badFamInstDecl (tcdLName decl)
        ; checkTc (not is_boot) $ badBootFamInstDeclErr
 
 	 -- perform kind and type checking
