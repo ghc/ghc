@@ -4,7 +4,7 @@ module VectMonad (
   noV, tryV, maybeV, orElseV, localV, initV,
   newLocalVar, newTyVar,
   
-  Builtins(..),
+  Builtins(..), paDictTyCon,
   builtin,
 
   GlobalEnv(..),
@@ -46,41 +46,41 @@ import FastString
 
 data Builtins = Builtins {
                   parrayTyCon      :: TyCon
-                , paTyCon          :: TyCon
+                , paClass          :: Class
                 , closureTyCon     :: TyCon
                 , mkClosureVar     :: Var
                 , applyClosureVar  :: Var
                 , mkClosurePVar    :: Var
                 , applyClosurePVar :: Var
-                , closurePAVar     :: Var
                 , lengthPAVar      :: Var
                 , replicatePAVar   :: Var
                 }
+
+paDictTyCon :: Builtins -> TyCon
+paDictTyCon = classTyCon . paClass
 
 initBuiltins :: DsM Builtins
 initBuiltins
   = do
       parrayTyCon  <- dsLookupTyCon parrayTyConName
-      paTyCon      <- dsLookupTyCon paTyConName
+      paClass      <- dsLookupClass paClassName
       closureTyCon <- dsLookupTyCon closureTyConName
 
       mkClosureVar     <- dsLookupGlobalId mkClosureName
       applyClosureVar  <- dsLookupGlobalId applyClosureName
       mkClosurePVar    <- dsLookupGlobalId mkClosurePName
       applyClosurePVar <- dsLookupGlobalId applyClosurePName
-      closurePAVar     <- dsLookupGlobalId closurePAName
       lengthPAVar      <- dsLookupGlobalId lengthPAName
       replicatePAVar   <- dsLookupGlobalId replicatePAName
 
       return $ Builtins {
                  parrayTyCon      = parrayTyCon
-               , paTyCon          = paTyCon
+               , paClass          = paClass
                , closureTyCon     = closureTyCon
                , mkClosureVar     = mkClosureVar
                , applyClosureVar  = applyClosureVar
                , mkClosurePVar    = mkClosurePVar
                , applyClosurePVar = applyClosurePVar
-               , closurePAVar     = closurePAVar
                , lengthPAVar      = lengthPAVar
                , replicatePAVar   = replicatePAVar
                }

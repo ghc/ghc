@@ -217,10 +217,9 @@ genericTyConNames :: [Name]
 genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 
 ndpNames :: [Name]
-ndpNames = [ parrayTyConName, paTyConName, closureTyConName
+ndpNames = [ parrayTyConName, paClassName, closureTyConName
            , mkClosureName, applyClosureName
            , mkClosurePName, applyClosurePName
-           , closurePAName
            , lengthPAName, replicatePAName ]
 \end{code}
 
@@ -689,15 +688,14 @@ checkDotnetResName  = varQual  dOTNET FSLIT("checkResult")     checkDotnetResNam
 
 -- NDP stuff
 parrayTyConName     = tcQual   nDP_LIFTED FSLIT("PArray") parrayTyConKey
-paTyConName         = tcQual   nDP_LIFTED FSLIT("PA")     paTyConKey
+paClassName         = clsQual  nDP_LIFTED FSLIT("PA")     paClassKey
 closureTyConName    = tcQual   nDP_LIFTED FSLIT(":->")    closureTyConKey
 mkClosureName       = varQual  nDP_LIFTED FSLIT("mkClosure")  mkClosureIdKey
 applyClosureName    = varQual  nDP_LIFTED FSLIT("$:")         applyClosureIdKey
 mkClosurePName      = varQual  nDP_LIFTED FSLIT("mkClosureP") mkClosurePIdKey
 applyClosurePName   = varQual  nDP_LIFTED FSLIT("$:^")        applyClosurePIdKey
-closurePAName       = varQual  nDP_LIFTED FSLIT("closurePA")  closurePAIdKey
-lengthPAName        = varQual  nDP_LIFTED FSLIT("lengthP")    lengthPAIdKey
-replicatePAName     = varQual  nDP_LIFTED FSLIT("replicateP") replicatePAIdKey
+lengthPAName        = methName nDP_LIFTED FSLIT("lengthPA")    lengthPAClassOpKey
+replicatePAName     = methName nDP_LIFTED FSLIT("replicatePA") replicatePAClassOpKey
 \end{code}
 
 %************************************************************************
@@ -767,6 +765,8 @@ randomClassKey		= mkPreludeClassUnique 31
 randomGenClassKey	= mkPreludeClassUnique 32
 
 isStringClassKey	= mkPreludeClassUnique 33
+
+paClassKey              = mkPreludeClassUnique 34
 \end{code}
 
 %************************************************************************
@@ -878,8 +878,7 @@ opaqueTyConKey                          = mkPreludeTyConUnique 133
 stringTyConKey				= mkPreludeTyConUnique 134
 
 parrayTyConKey                          = mkPreludeTyConUnique 135
-paTyConKey                              = mkPreludeTyConUnique 136
-closureTyConKey                         = mkPreludeTyConUnique 137
+closureTyConKey                         = mkPreludeTyConUnique 136
 
 
 ---------------- Template Haskell -------------------
@@ -1067,8 +1066,8 @@ applyClosureIdKey             = mkPreludeMiscIdUnique 127
 mkClosurePIdKey               = mkPreludeMiscIdUnique 128
 applyClosurePIdKey            = mkPreludeMiscIdUnique 129
 closurePAIdKey                = mkPreludeMiscIdUnique 130
-lengthPAIdKey                 = mkPreludeMiscIdUnique 131
-replicatePAIdKey              = mkPreludeMiscIdUnique 132
+lengthPAClassOpKey            = mkPreludeMiscIdUnique 131
+replicatePAClassOpKey         = mkPreludeMiscIdUnique 132
 
 ---------------- Template Haskell -------------------
 --	USES IdUniques 200-399

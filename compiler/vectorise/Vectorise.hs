@@ -181,7 +181,7 @@ paArgType ty (FunTy k1 k2)
 paArgType ty k
   | isLiftedTypeKind k
   = do
-      tc <- builtin paTyCon
+      tc <- builtin paDictTyCon
       return . Just $ TyConApp tc [ty]
 
   | otherwise
