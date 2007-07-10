@@ -166,7 +166,6 @@ data DynFlag
    | Opt_MonomorphismRestriction
    | Opt_MonoPatBinds
    | Opt_ExtendedDefaultRules		-- Use GHC's extended rules for defaulting
-   | Opt_GlasgowExts
    | Opt_FFI
    | Opt_UnliftedFFITypes
    | Opt_PArr				-- Syntactic support for parallel arrays
@@ -1188,8 +1187,8 @@ impliedFlags = [
   ( Opt_GADTs, [Opt_RelaxedPolyRec] )	-- We want type-sig variables to be completely rigid for GADTs
   ]
 
-glasgowExtsFlags = [ Opt_GlasgowExts 
-           , Opt_PrintExplicitForalls
+glasgowExtsFlags = [
+             Opt_PrintExplicitForalls
 		   , Opt_FFI 
            , Opt_UnliftedFFITypes
 		   , Opt_GADTs
