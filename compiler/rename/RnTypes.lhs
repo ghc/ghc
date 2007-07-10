@@ -572,9 +572,9 @@ rnPat (VarPat name)
     returnM (VarPat vname, emptyFVs)
 
 rnPat (SigPatIn pat ty)
-  = doptM Opt_PatternSignatures `thenM` \ glaExts ->
+  = doptM Opt_PatternSignatures `thenM` \ patsigs ->
     
-    if glaExts
+    if patsigs
     then rnLPat pat		`thenM` \ (pat', fvs1) ->
          rnHsTypeFVs doc ty	`thenM` \ (ty',  fvs2) ->
          returnM (SigPatIn pat' ty', fvs1 `plusFV` fvs2)
