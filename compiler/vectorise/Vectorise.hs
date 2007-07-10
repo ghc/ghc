@@ -84,9 +84,9 @@ vectBndrsIn vs p
 replicateP :: CoreExpr -> CoreExpr -> VM CoreExpr
 replicateP expr len
   = do
-      pa  <- paOfType ty
-      rep <- builtin replicatePAVar
-      return $ mkApps (Var rep) [Type ty, pa, expr, len]
+      dict <- paDictOfType ty
+      rep  <- builtin replicatePAVar
+      return $ mkApps (Var rep) [Type ty, dict, expr, len]
   where
     ty = exprType expr
 
@@ -163,33 +163,6 @@ vectExpr lc (_, AnnLam bndr body)
                              pa_var <- newLocalVar FSLIT("dPA") pa_ty
                              return (extendTyVarPA bndr (Var pa_var),
                                      Lam pa_var)
-
--- ----------------------------------------------------------------------------
--- PA dictionaries
-
-paOfTyCon :: TyCon -> VM CoreExpr
--- FIXME: just for now
-paOfTyCon tc = maybeV (readGEnv $ \env -> lookupNameEnv (global_tycon_pa env) (tyConName tc))
-
-paOfType :: Type -> VM CoreExpr
-paOfType ty | Just ty' <- coreView ty = paOfType ty'
-
-paOfType (TyVarTy tv) = maybeV (readLEnv $ \env -> lookupVarEnv (local_tyvar_pa env) tv)
-paOfType (AppTy ty1 ty2)
-  = do
-      e1 <- paOfType ty1
-      e2 <- paOfType ty2
-      return $ mkApps e1 [Type ty2, e2]
-paOfType (TyConApp tc tys)
-  = do
-      e  <- paOfTyCon tc
-      es <- mapM paOfType tys
-      return $ mkApps e [arg | (t,e) <- zip tys es, arg <- [Type t, e]]
-paOfType (FunTy ty1 ty2) = paOfType (TyConApp funTyCon [ty1,ty2])
-paOfType t@(ForAllTy tv ty) = pprPanic "paOfType:" (ppr t)
-paOfType ty = pprPanic "paOfType:" (ppr ty)
-        
-
 
 -- ----------------------------------------------------------------------------
 -- Types

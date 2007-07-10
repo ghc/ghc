@@ -13,7 +13,8 @@ module VectMonad (
   LocalEnv(..),
   readLEnv, setLEnv, updLEnv,
 
-  lookupTyCon, extendTyVarPA, deleteTyVarPA,
+  lookupTyCon,
+  lookupTyVarPA, extendTyVarPA, deleteTyVarPA,
 
   lookupInst, lookupFamInst
 ) where
@@ -236,6 +237,9 @@ newTyVar fs k
 lookupTyCon :: TyCon -> VM (Maybe TyCon)
 lookupTyCon tc = readGEnv $ \env -> lookupNameEnv (global_tycons env) (tyConName tc)
 
+lookupTyVarPA :: Var -> VM (Maybe CoreExpr)
+lookupTyVarPA tv = readLEnv $ \env -> lookupVarEnv (local_tyvar_pa env) tv 
+
 extendTyVarPA :: Var -> CoreExpr -> VM ()
 extendTyVarPA tv pa = updLEnv $ \env -> env { local_tyvar_pa = extendVarEnv (local_tyvar_pa env) tv pa }
 
@@ -262,9 +266,7 @@ lookupInst cls tys
              where
                inst_tys'  = [ty | Right ty <- inst_tys]
                noFlexiVar = all isRight inst_tys
-	   _other                  -> 
-             pprPanic "VectMonad.lookupInst: not found: " 
-                      (ppr $ mkTyConApp (classTyCon cls) tys)
+	   _other         -> noV
        }
   where
     isRight (Left  _) = False

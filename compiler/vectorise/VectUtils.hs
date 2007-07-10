@@ -1,14 +1,17 @@
 module VectUtils (
-  paDictArgType
+  paDictArgType, paDictOfType
 ) where
 
 #include "HsVersions.h"
 
 import VectMonad
 
+import CoreSyn
 import Type
 import TypeRep
 import Var
+
+import Outputable
 
 paDictArgType :: TyVar -> VM (Maybe Type)
 paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
@@ -30,6 +33,30 @@ paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
           tc <- builtin paDictTyCon
           return . Just $ TyConApp tc [ty]
 
-
     go ty k = return Nothing
+
+paDictOfType :: Type -> VM CoreExpr
+paDictOfType ty = paDictOfTyApp ty_fn ty_args
+  where
+    (ty_fn, ty_args) = splitAppTys ty
+
+paDictOfTyApp :: Type -> [Type] -> VM CoreExpr
+paDictOfTyApp ty_fn ty_args
+  | Just ty_fn' <- coreView ty_fn = paDictOfTyApp ty_fn' ty_args
+paDictOfTyApp (TyVarTy tv) ty_args
+  = do
+      dfun <- maybeV (lookupTyVarPA tv)
+      paDFunApply dfun ty_args
+paDictOfTyApp (TyConApp tc _) ty_args
+  = do
+      pa_class <- builtin paClass
+      (dfun, ty_args') <- lookupInst pa_class [TyConApp tc ty_args]
+      paDFunApply (Var dfun) ty_args'
+paDictOfTyApp ty ty_args = pprPanic "paDictOfTyApp" (ppr ty)
+
+paDFunApply :: CoreExpr -> [Type] -> VM CoreExpr
+paDFunApply dfun tys
+  = do
+      dicts <- mapM paDictOfType tys
+      return $ mkApps (mkTyApps dfun tys) dicts
 
