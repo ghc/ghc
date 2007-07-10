@@ -1197,9 +1197,9 @@ lex_char_tok span buf len = do	-- We've seen '
 finish_char_tok :: SrcLoc -> Char -> P (Located Token)
 finish_char_tok loc ch	-- We've already seen the closing quote
 			-- Just need to check for trailing #
-  = do	glaexts <- extension glaExtsEnabled
+  = do	magicHash <- extension magicHashEnabled
 	i@(AI end _ _) <- getInput
-	if glaexts then do
+	if magicHash then do
 		case alexGetChar' i of
 			Just ('#',i@(AI end _ _)) -> do
 				setInput i
