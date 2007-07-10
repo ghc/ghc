@@ -1,7 +1,7 @@
 
 mod42.hs:3:0:
     Illegal instance declaration for `Eq a'
-	(All instance types must be of the form (T t1 ... tn)
-	 where T is not a synonym.
-	 Use -XTypeSynonymInstances if you want to disable this.)
+	(All instance types must be of the form (T a1 ... an)
+	 where a1 ... an are distinct type *variables*
+	 Use -XFlexibleInstances if you want to disable this.)
     In the instance declaration for `Eq a'
