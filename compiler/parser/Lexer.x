@@ -1112,8 +1112,8 @@ lex_string s = do
 
     Just ('"',i)  -> do
 	setInput i
-	glaexts <- extension glaExtsEnabled
-	if glaexts
+	magicHash <- extension magicHashEnabled
+	if magicHash
 	  then do
 	    i <- getInput
 	    case alexGetChar' i of
