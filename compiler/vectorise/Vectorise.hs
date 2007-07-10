@@ -345,6 +345,18 @@ vectExpr lc (_, AnnLet (AnnRec prs) body)
              (vrhss, lrhss) <- mapAndUnzipM (vectExpr lc) rhss
              (vbody, lbody) <- vectExpr lc body
              return (vrhss, vbody, lrhss, lbody)
+vectExpr lc (_, AnnLam bndr body)
+  | isTyVar bndr
+  = do
+      pa_ty          <- paArgType' (TyVarTy bndr) (tyVarKind bndr)
+      pa_var         <- newLocalVar FSLIT("dPA") pa_ty
+      (vbody, lbody) <- localV
+                      $ do
+                          extendTyVarPA bndr (Var pa_var)
+                          -- FIXME: what about shadowing here (bndr in lc)?
+                          vectExpr lc body
+      return (mkLams [bndr, pa_var] vbody,
+              mkLams [bndr, pa_var] lbody)
 
 -- ----------------------------------------------------------------------------
 -- PA dictionaries
