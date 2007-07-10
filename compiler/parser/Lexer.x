@@ -220,13 +220,14 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
    -- NOTE: accept -} at the end of a LINE pragma, for compatibility
    -- with older versions of GHC which generated these.
 
--- We only want RULES pragmas to be picked up when -fglasgow-exts
--- is on, because the contents of the pragma is always written using
--- glasgow-exts syntax (using forall etc.), so if glasgow exts are not
--- enabled, we're sure to get a parse error.
+-- We only want RULES pragmas to be picked up when explicit forall
+-- syntax is enabled is on, because the contents of the pragma always
+-- uses it. If it's not on then we're sure to get a parse error.
 -- (ToDo: we should really emit a warning when ignoring pragmas)
-<glaexts>
-  "{-#" $whitechar* (RULES|rules)	{ token ITrules_prag }
+-- XXX Now that we can enable this without the -fglasgow-exts hammer,
+-- is it better just to let the parse error happen?
+<0,glaexts>
+  "{-#" $whitechar* (RULES|rules) / { ifExtension explicitForallEnabled } { token ITrules_prag }
 
 <0,option_prags,glaexts> {
   "{-#" $whitechar* (INLINE|inline)	{ token (ITinline_prag True) }
