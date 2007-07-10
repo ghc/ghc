@@ -41,8 +41,7 @@
   call-graph like structure.  See <xref linkend="profiling"/> for more
   details.</para>
 
-  <para>GHC comes with a large collection of libraries, with
-  everything from parser combinators to networking.  The libraries are
+  <para>GHC comes with a number of libraries. These are
   described in separate documentation.</para>
 
   <sect1 id="mailing-lists-GHC">
