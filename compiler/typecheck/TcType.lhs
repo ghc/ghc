@@ -797,10 +797,9 @@ tcInstHeadTyNotSynonym :: Type -> Bool
 -- are transparent, so we need a special function here
 tcInstHeadTyNotSynonym ty
   = case ty of
-	NoteTy _ ty     -> tcInstHeadTyNotSynonym ty
-	TyConApp tc tys -> not (isSynTyCon tc)
-	FunTy arg res   -> True
-	other		-> False
+        NoteTy _ ty     -> tcInstHeadTyNotSynonym ty
+        TyConApp tc tys -> not (isSynTyCon tc)
+        _ -> True
 
 tcInstHeadTyAppAllTyVars :: Type -> Bool
 -- Used in Haskell-98 mode, for the argument types of an instance head
