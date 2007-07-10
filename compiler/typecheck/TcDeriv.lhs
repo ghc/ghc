@@ -409,7 +409,7 @@ mkEqnHelp orig tvs cls cls_tys tc_app
 		
 	; (rep_tc, rep_tc_args) <- tcLookupFamInstExact tycon full_tc_args
 
-	; mayDeriveDataTypeable <- doptM Opt_GlasgowExts
+	; mayDeriveDataTypeable <- doptM Opt_DeriveDataTypeable
 	; newtype_deriving <- doptM Opt_GeneralizedNewtypeDeriving
 	; overlap_flag <- getOverlapFlag
 
