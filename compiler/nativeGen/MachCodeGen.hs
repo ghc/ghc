@@ -433,6 +433,13 @@ iselExpr64 (CmmMachOp (MO_Add _) [e1,e2]) = do
    -- in
    return (ChildCode64 code rlo)
 
+iselExpr64 (CmmMachOp (MO_U_Conv I32 I64) [expr]) = do
+    (expr_reg,expr_code) <- getSomeReg expr
+    (rlo, rhi) <- getNewRegPairNat I32
+    let mov_hi = LI rhi (ImmInt 0)
+        mov_lo = MR rlo expr_reg
+    return $ ChildCode64 (expr_code `snocOL` mov_lo `snocOL` mov_hi)
+                         rlo
 iselExpr64 expr
    = pprPanic "iselExpr64(powerpc)" (ppr expr)
 
