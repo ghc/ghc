@@ -521,9 +521,12 @@ data ModGuts
 	mg_fix_env   :: !FixityEnv,	 -- Fixity env, for things declared in
 					 --   this module 
 
+	mg_inst_env     :: InstEnv,	 -- Class instance enviroment fro
+					 -- *home-package* modules (including
+					 -- this one); c.f. tcg_inst_env
 	mg_fam_inst_env :: FamInstEnv,	 -- Type-family instance enviroment
 					 -- for *home-package* modules (including
-					 -- this one).  c.f. tcg_fam_inst_env
+					 -- this one); c.f. tcg_fam_inst_env
 
 	mg_types     :: !TypeEnv,
 	mg_insts     :: ![Instance],	 -- Instances 
