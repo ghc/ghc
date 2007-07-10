@@ -316,9 +316,9 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
          { token ITcubxparen }
 }
 
-<glaexts> {
-  "{|"					{ token ITocurlybar }
-  "|}"					{ token ITccurlybar }
+<0,glaexts> {
+  "{|" / { ifExtension genericsEnabled } { token ITocurlybar }
+  "|}" / { ifExtension genericsEnabled } { token ITccurlybar }
 }
 
 <0,option_prags,glaexts> {
@@ -1532,6 +1532,7 @@ kindSigsBit = 12 -- Kind signatures on type variables
 recursiveDoBit = 13 -- mdo
 unicodeSyntaxBit = 14 -- the forall symbol, arrow symbols, etc
 unboxedTuplesBit = 15 -- (# and #)
+genericsBit = 16 -- {| and |}
 
 glaExtsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 always           _     = True
@@ -1550,6 +1551,7 @@ kindSigsEnabled  flags = testBit flags kindSigsBit
 recursiveDoEnabled flags = testBit flags recursiveDoBit
 unicodeSyntaxEnabled flags = testBit flags unicodeSyntaxBit
 unboxedTuplesEnabled flags = testBit flags unboxedTuplesBit
+genericsEnabled      flags = testBit flags genericsBit
 
 -- PState for parsing options pragmas
 --
@@ -1610,6 +1612,7 @@ mkPState buf loc flags  =
 	       .|. recursiveDoBit `setBitIf` dopt Opt_RecursiveDo flags
 	       .|. unicodeSyntaxBit `setBitIf` dopt Opt_UnicodeSyntax flags
 	       .|. unboxedTuplesBit `setBitIf` dopt Opt_UnboxedTuples flags
+	       .|. genericsBit `setBitIf` dopt Opt_Generics flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b
