@@ -120,47 +120,6 @@
       </varlistentry>
 
       <varlistentry>
-	<term>glasgow-haskell-bugs:</term>
-	<listitem>
-	  <para>Send bug reports for GHC to this address!  The sad and
-          lonely people who subscribe to this list will muse upon
-          what's wrong and what you might do about it.</para>
-
-	  <variablelist>
-	    <varlistentry>
-	      <term>list email address:</term>
-	      <listitem>
-		<para><email>glasgow-haskell-bugs@haskell.org</email></para>
-	      </listitem>
-	    </varlistentry>
-
-	    <varlistentry>
-	      <term>subscribe at:</term> 
-	      <listitem>
-		<para><ulink
-	      url="http://www.haskell.org/mailman/listinfo/glasgow-haskell-bugs"><literal>http://www.haskell.org/mailman/listinfo/glasgow-haskell-bugs</literal></ulink>.</para>
-	      </listitem>
-	    </varlistentry>
-
-	    <varlistentry>
-	      <term>admin email address:</term>
-	      <listitem>
-		<para><email>glasgow-haskell-bugs-admin@haskell.org</email></para>
-	      </listitem>
-	    </varlistentry>
-
-	    <varlistentry>
-	      <term>list archives:</term>
-	      <listitem>
-		<para><ulink
-          url="http://www.haskell.org/pipermail/glasgow-haskell-bugs/"><literal>http://www.haskell.org/pipermail/glasgow-haskell-bugs/</literal></ulink></para>
-	      </listitem>
-	    </varlistentry>
-	  </variablelist>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
 	<term>cvs-ghc:</term>
 	<listitem>
 	  <para>The hardcore GHC developers hang out here.  This list
