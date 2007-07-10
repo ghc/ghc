@@ -123,11 +123,10 @@
 	<term>cvs-ghc:</term>
 	<listitem>
 	  <para>The hardcore GHC developers hang out here.  This list
-	  also gets commit message from the CVS repository.  There are
-	  several other similar lists for other parts of the CVS
-	  repository (eg. <literal>cvs-hslibs</literal>,
-	  <literal>cvs-happy</literal>, <literal>cvs-hdirect</literal>
-	  etc.)</para>
+	  also gets commit message from the GHC darcs repository.  There are
+	  other lists for other darcs
+	  repositories (most notably <literal>cvs-libraries</literal>).
+	  </para>
 	  
 	  <variablelist>
 	    <varlistentry>
