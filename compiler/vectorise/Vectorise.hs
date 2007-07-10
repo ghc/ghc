@@ -209,6 +209,12 @@ setLEnv lenv = VM $ \_ genv _ -> return (Yes genv lenv ())
 updLEnv :: (LocalEnv -> LocalEnv) -> VM ()
 updLEnv f = VM $ \_ genv lenv -> return (Yes genv (f lenv) ())
 
+newLocalVar :: FastString -> Type -> VM Var
+newLocalVar fs ty
+  = do
+      u <- liftDs newUnique
+      return $ mkSysLocal fs u ty
+
 newTyVar :: FastString -> Kind -> VM Var
 newTyVar fs k
   = do
@@ -217,6 +223,10 @@ newTyVar fs k
 
 lookupTyCon :: TyCon -> VM (Maybe TyCon)
 lookupTyCon tc = readGEnv $ \env -> lookupNameEnv (global_tycons env) (tyConName tc)
+
+
+extendTyVarPA :: Var -> CoreExpr -> VM ()
+extendTyVarPA tv pa = updLEnv $ \env -> env { local_tyvar_pa = extendVarEnv (local_tyvar_pa env) tv pa }
 
 -- ----------------------------------------------------------------------------
 -- Bindings
