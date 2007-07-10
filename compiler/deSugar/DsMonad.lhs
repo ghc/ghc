@@ -20,6 +20,7 @@ module DsMonad (
 	UniqSupply, newUniqueSupply,
 	getDOptsDs, getGhcModeDs, doptDs,
 	dsLookupGlobal, dsLookupGlobalId, dsLookupTyCon, dsLookupDataCon,
+        dsLookupClass,
 
 	DsMetaEnv, DsMetaVal(..), dsLookupMetaEnv, dsExtendMetaEnv,
 
@@ -43,6 +44,7 @@ import HscTypes
 import Bag
 import DataCon
 import TyCon
+import Class
 import Id
 import Module
 import Var
@@ -314,6 +316,11 @@ dsLookupDataCon :: Name -> DsM DataCon
 dsLookupDataCon name
   = dsLookupGlobal name		`thenDs` \ thing ->
     returnDs (tyThingDataCon thing)
+
+dsLookupClass :: Name -> DsM Class
+dsLookupClass name
+  = dsLookupGlobal name         `thenDs` \ thing ->
+    returnDs (tyThingClass thing)
 \end{code}
 
 \begin{code}
