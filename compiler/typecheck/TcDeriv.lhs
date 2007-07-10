@@ -656,7 +656,7 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving overlap_flag tvs cls cl
 	mb_std_err = checkSideConditions mayDeriveDataTypeable cls cls_tys rep_tycon
 	std_err = derivingThingErr cls cls_tys tc_app $
 		  vcat [fromJust mb_std_err,
-			ptext SLIT("Try -fglasgow-exts for GHC's newtype-deriving extension")]
+			ptext SLIT("Try -XGeneralizedNewtypeDeriving for GHC's newtype-deriving extension")]
 
 	-- Here is the plan for newtype derivings.  We see
 	--	  newtype T a1...an = MkT (t ak+1...an) deriving (.., C s1 .. sm, ...)
