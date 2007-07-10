@@ -203,7 +203,7 @@ module Data.List
    ) where
 
 #ifdef __NHC__
-import Prelude hiding (Maybe(..))
+import Prelude
 #endif
 
 import Data.Maybe
