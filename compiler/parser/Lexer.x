@@ -28,7 +28,7 @@ module Lexer (
    getMessages,
    popContext, pushCurrentContext, setLastToken, setSrcLoc,
    getLexState, popLexState, pushLexState,
-   extension, glaExtsEnabled, bangPatEnabled
+   extension, standaloneDerivingEnabled, bangPatEnabled
   ) where
 
 #include "HsVersions.h"
@@ -202,7 +202,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- generate a matching '}' token.
 <layout_left>  ()			{ do_layout_left }
 
-<0,option_prags,glaexts> \n				{ begin bol }
+<0,option_prags> \n				{ begin bol }
 
 "{-#" $whitechar* (line|LINE) 		{ begin line_prag2 }
 
@@ -226,10 +226,10 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- (ToDo: we should really emit a warning when ignoring pragmas)
 -- XXX Now that we can enable this without the -fglasgow-exts hammer,
 -- is it better just to let the parse error happen?
-<0,glaexts>
+<0>
   "{-#" $whitechar* (RULES|rules) / { ifExtension explicitForallEnabled } { token ITrules_prag }
 
-<0,option_prags,glaexts> {
+<0,option_prags> {
   "{-#" $whitechar* (INLINE|inline)	{ token (ITinline_prag True) }
   "{-#" $whitechar* (NO(T?)INLINE|no(t?)inline)
   					{ token (ITinline_prag False) }
@@ -266,29 +266,28 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   "{-#" $whitechar* (INCLUDE|include)   { lex_string_prag ITinclude_prag }
 }
 
-<0,option_prags,glaexts> {
+<0,option_prags> {
 	-- This is to catch things like {-# OPTIONS OPTIONS_HUGS ... 
   "{-#" $whitechar* $idchar+		{ nested_comment lexToken }
 }
 
 -- '0' state: ordinary lexemes
--- 'glaexts' state: glasgow extensions (postfix '#', etc.)
 
 -- Haddock comments
 
-<0,glaexts> {
+<0> {
   "-- " $docsym    / { ifExtension haddockEnabled } { multiline_doc_comment }
   "{-" \ ? $docsym / { ifExtension haddockEnabled } { nested_doc_comment }
 }
 
 -- "special" symbols
 
-<0,glaexts> {
+<0> {
   "[:" / { ifExtension parrEnabled }	{ token ITopabrack }
   ":]" / { ifExtension parrEnabled }	{ token ITcpabrack }
 }
   
-<0,glaexts> {
+<0> {
   "[|"	    / { ifExtension thEnabled }	{ token ITopenExpQuote }
   "[e|"	    / { ifExtension thEnabled }	{ token ITopenExpQuote }
   "[p|"	    / { ifExtension thEnabled }	{ token ITopenPatQuote }
@@ -299,29 +298,29 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   "$("	    / { ifExtension thEnabled }	{ token ITparenEscape }
 }
 
-<0,glaexts> {
+<0> {
   "(|" / { ifExtension arrowsEnabled `alexAndPred` notFollowedBySymbol }
 					{ special IToparenbar }
   "|)" / { ifExtension arrowsEnabled }  { special ITcparenbar }
 }
 
-<0,glaexts> {
+<0> {
   \? @varid / { ifExtension ipEnabled }	{ skip_one_varid ITdupipvarid }
 }
 
-<0,glaexts> {
+<0> {
   "(#" / { ifExtension unboxedTuplesEnabled `alexAndPred` notFollowedBySymbol }
          { token IToubxparen }
   "#)" / { ifExtension unboxedTuplesEnabled }
          { token ITcubxparen }
 }
 
-<0,glaexts> {
+<0> {
   "{|" / { ifExtension genericsEnabled } { token ITocurlybar }
   "|}" / { ifExtension genericsEnabled } { token ITccurlybar }
 }
 
-<0,option_prags,glaexts> {
+<0,option_prags> {
   \(					{ special IToparen }
   \)					{ special ITcparen }
   \[					{ special ITobrack }
@@ -334,7 +333,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   \}					{ close_brace }
 }
 
-<0,option_prags,glaexts> {
+<0,option_prags> {
   @qual @varid			{ check_qvarid }
   @qual @conid			{ idtoken qconid }
   @varid			{ varid }
@@ -348,7 +347,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   @qual @conid			{ pop_and (idtoken qconid) }
 }
 
-<0,glaexts> {
+<0> {
   @qual @varid "#"+ / { ifExtension magicHashEnabled } { idtoken qvarid }
   @qual @conid "#"+ / { ifExtension magicHashEnabled } { idtoken qconid }
   @varid "#"+       / { ifExtension magicHashEnabled } { varid }
@@ -357,7 +356,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 
 -- ToDo: M.(,,,)
 
-<0,glaexts> {
+<0> {
   @qual @varsym			{ idtoken qvarsym }
   @qual @consym			{ idtoken qconsym }
   @varsym			{ varsym }
@@ -366,7 +365,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 
 -- For the normal boxed literals we need to be careful
 -- when trying to be close to Haskell98
-<0,glaexts> {
+<0> {
   -- Normal integral literals (:: Num a => a, from Integer)
   @decimal			{ tok_num positive 0 0 decimal }
   0[oO] @octal			{ tok_num positive 2 2 octal }
@@ -376,7 +375,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   @floating_point		{ strtoken tok_float }
 }
 
-<0,glaexts> {
+<0> {
   -- Unboxed ints (:: Int#)
   -- It's simpler (and faster?) to give separate cases to the negatives,
   -- especially considering octal/hexadecimal prefixes.
@@ -397,7 +396,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- that even if we recognise the string or char here in the regex
 -- lexer, we would still have to parse the string afterward in order
 -- to convert it to a String.
-<0,glaexts> {
+<0> {
   \'				{ lex_char_tok }
   \" 				{ lex_string_tok }
 }
@@ -657,9 +656,7 @@ reservedSymsFM = listToUFM $
        ,("!",   ITbang,     always)
 
         -- For data T (a::*) = MkT
-       ,("*", ITstar, \i -> glaExtsEnabled i ||
-                            kindSigsEnabled i ||
-                            tyFamEnabled i)
+       ,("*", ITstar, \i -> kindSigsEnabled i || tyFamEnabled i)
         -- For 'forall a . t'
        ,(".", ITdot, explicitForallEnabled)
 
@@ -1515,8 +1512,8 @@ getLexState = P $ \s@PState{ lex_state=ls:l } -> POk s ls
 -- -fglasgow-exts or -fparr) are represented by a bitmap stored in an unboxed
 -- integer
 
-glaExtsBit, ffiBit, parrBit :: Int
-glaExtsBit = 0
+genericsBit, ffiBit, parrBit :: Int
+genericsBit = 0 -- {| and |}
 ffiBit	   = 1
 parrBit	   = 2
 arrowsBit  = 4
@@ -1532,11 +1529,11 @@ kindSigsBit = 12 -- Kind signatures on type variables
 recursiveDoBit = 13 -- mdo
 unicodeSyntaxBit = 14 -- the forall symbol, arrow symbols, etc
 unboxedTuplesBit = 15 -- (# and #)
-genericsBit = 16 -- {| and |}
+standaloneDerivingBit = 16 -- standalone instance deriving declarations
 
-glaExtsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
+genericsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 always           _     = True
-glaExtsEnabled   flags = testBit flags glaExtsBit
+genericsEnabled  flags = testBit flags genericsBit
 ffiEnabled       flags = testBit flags ffiBit
 parrEnabled      flags = testBit flags parrBit
 arrowsEnabled    flags = testBit flags arrowsBit
@@ -1551,7 +1548,7 @@ kindSigsEnabled  flags = testBit flags kindSigsBit
 recursiveDoEnabled flags = testBit flags recursiveDoBit
 unicodeSyntaxEnabled flags = testBit flags unicodeSyntaxBit
 unboxedTuplesEnabled flags = testBit flags unboxedTuplesBit
-genericsEnabled      flags = testBit flags genericsBit
+standaloneDerivingEnabled flags = testBit flags standaloneDerivingBit
 
 -- PState for parsing options pragmas
 --
@@ -1589,11 +1586,11 @@ mkPState buf loc flags  =
       loc           = loc,
       extsBitmap    = fromIntegral bitmap,
       context       = [],
-      lex_state     = [bol, if glaExtsEnabled bitmap then glaexts else 0]
+      lex_state     = [bol, 0]
 	-- we begin in the layout state if toplev_layout is set
     }
     where
-      bitmap =     glaExtsBit `setBitIf` dopt Opt_GlasgowExts  flags
+      bitmap = genericsBit `setBitIf` dopt Opt_Generics flags
 	       .|. ffiBit       `setBitIf` dopt Opt_FFI          flags
 	       .|. parrBit      `setBitIf` dopt Opt_PArr         flags
 	       .|. arrowsBit    `setBitIf` dopt Opt_Arrows       flags
@@ -1612,7 +1609,7 @@ mkPState buf loc flags  =
 	       .|. recursiveDoBit `setBitIf` dopt Opt_RecursiveDo flags
 	       .|. unicodeSyntaxBit `setBitIf` dopt Opt_UnicodeSyntax flags
 	       .|. unboxedTuplesBit `setBitIf` dopt Opt_UnboxedTuples flags
-	       .|. genericsBit `setBitIf` dopt Opt_Generics flags
+	       .|. standaloneDerivingBit `setBitIf` dopt Opt_StandaloneDeriving flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b

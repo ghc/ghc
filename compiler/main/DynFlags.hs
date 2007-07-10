@@ -187,6 +187,7 @@ data DynFlag
    | Opt_RecordPuns
    | Opt_GADTs
    | Opt_RelaxedPolyRec			-- -X=RelaxedPolyRec
+   | Opt_StandaloneDeriving
    | Opt_DeriveDataTypeable
    | Opt_TypeSynonymInstances
    | Opt_FlexibleContexts
@@ -1168,6 +1169,7 @@ xFlags = [
   ( "UnboxedTuples",                Opt_UnboxedTuples ),
   ( "ExpressionSignaturesUnboxedTuples", Opt_ExpressionSignaturesUnboxedTuples ),
   ( "TypeSynonymUnboxedTuples",     Opt_TypeSynonymUnboxedTuples ),
+  ( "StandaloneDeriving",           Opt_StandaloneDeriving ),
   ( "DeriveDataTypeable",           Opt_DeriveDataTypeable ),
   ( "TypeSynonymInstances",         Opt_TypeSynonymInstances ),
   ( "FlexibleContexts",             Opt_FlexibleContexts ),
@@ -1197,6 +1199,7 @@ glasgowExtsFlags = [ Opt_GlasgowExts
            , Opt_ExpressionSignaturesUnboxedTuples
            , Opt_TypeSynonymUnboxedTuples
            , Opt_TypeSynonymInstances
+           , Opt_StandaloneDeriving
            , Opt_DeriveDataTypeable
            , Opt_FlexibleContexts
            , Opt_FlexibleInstances

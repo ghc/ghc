@@ -58,7 +58,7 @@ import RdrName		( RdrName, isRdrTyVar, isRdrTc, mkUnqual, rdrNameOcc,
 			  isRdrDataCon, isUnqual, getRdrName, isQual,
 			  setRdrNameSpace )
 import BasicTypes	( maxPrecedence, Activation, InlineSpec(..), alwaysInlineSpec, neverInlineSpec )
-import Lexer		( P, failSpanMsgP, extension, glaExtsEnabled, bangPatEnabled )
+import Lexer		( P, failSpanMsgP, extension, standaloneDerivingEnabled, bangPatEnabled )
 import TysWiredIn	( unitTyCon ) 
 import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
 			  DNCallSpec(..), DNKind(..), CLabelString )
@@ -577,9 +577,9 @@ checkPred (L spn ty)
 
 checkDerivDecl :: LDerivDecl RdrName -> P (LDerivDecl RdrName)
 checkDerivDecl d@(L loc _) = 
-    do glaExtOn <- extension glaExtsEnabled
-       if glaExtOn then return d
-	 else parseError loc "Illegal stand-alone deriving declaration (use -fglasgow-exts)"
+    do stDerivOn <- extension standaloneDerivingEnabled
+       if stDerivOn then return d
+	 else parseError loc "Illegal stand-alone deriving declaration (use -XStandaloneDeriving)"
 
 ---------------------------------------------------------------------------
 -- Checking statements in a do-expression
