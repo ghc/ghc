@@ -54,7 +54,7 @@ vectBndr :: Var -> VM (Var, Var)
 vectBndr v
   = do
       vty <- vectType (idType v)
-      lty <- mkPArrayTy vty
+      lty <- mkPArrayType vty
       let vv = v `Id.setIdType` vty
           lv = v `Id.setIdType` lty
       updLEnv (mapTo vv lv)
@@ -197,20 +197,4 @@ vectType (ForAllTy tv ty)
     wrap (Just pa_ty) = FunTy pa_ty
 
 vectType ty = pprPanic "vectType:" (ppr ty)
-
-isClosureTyCon :: TyCon -> Bool
-isClosureTyCon tc = tyConUnique tc == closureTyConKey
-
-splitClosureTy :: Type -> (Type, Type)
-splitClosureTy ty
-  | Just (tc, [arg_ty, res_ty]) <- splitTyConApp_maybe ty
-  , isClosureTyCon tc
-  = (arg_ty, res_ty)
-
-  | otherwise = pprPanic "splitClosureTy" (ppr ty)
-
-mkPArrayTy :: Type -> VM Type
-mkPArrayTy ty = do
-                  tc <- builtin parrayTyCon
-                  return $ TyConApp tc [ty]
 

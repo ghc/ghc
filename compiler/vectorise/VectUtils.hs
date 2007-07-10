@@ -1,4 +1,6 @@
 module VectUtils (
+  splitClosureTy,
+  mkPADictType, mkPArrayType,
   paDictArgType, paDictOfType
 ) where
 
@@ -9,9 +11,36 @@ import VectMonad
 import CoreSyn
 import Type
 import TypeRep
+import TyCon
 import Var
+import PrelNames
 
 import Outputable
+
+import Control.Monad         ( liftM )
+
+isClosureTyCon :: TyCon -> Bool
+isClosureTyCon tc = tyConUnique tc == closureTyConKey
+
+splitClosureTy :: Type -> (Type, Type)
+splitClosureTy ty
+  | Just (tc, [arg_ty, res_ty]) <- splitTyConApp_maybe ty
+  , isClosureTyCon tc
+  = (arg_ty, res_ty)
+
+  | otherwise = pprPanic "splitClosureTy" (ppr ty)
+
+mkPADictType :: Type -> VM Type
+mkPADictType ty
+  = do
+      tc <- builtin paDictTyCon
+      return $ TyConApp tc [ty]
+
+mkPArrayType :: Type -> VM Type
+mkPArrayType ty
+  = do
+      tc <- builtin parrayTyCon
+      return $ TyConApp tc [ty]
 
 paDictArgType :: TyVar -> VM (Maybe Type)
 paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
@@ -29,9 +58,7 @@ paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
 
     go ty k
       | isLiftedTypeKind k
-      = do
-          tc <- builtin paDictTyCon
-          return . Just $ TyConApp tc [ty]
+      = liftM Just (mkPADictType ty)
 
     go ty k = return Nothing
 
