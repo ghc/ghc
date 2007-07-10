@@ -259,6 +259,8 @@ exposed-modules:
 	Var
 	VarEnv
 	VarSet
+        VectMonad
+        Vectorise
 	WorkWrap
 	WwLib
 	HaddockParse
