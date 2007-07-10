@@ -695,10 +695,10 @@ tcTopSrcDecls boot_details
 	(tc_val_binds,   tcl_env) <- tcTopBinds val_binds ;
 	setLclTypeEnv tcl_env 	$ do {
 
-		-- Now GHC-generated derived bindings and generics
-		-- Do not generate warnings from compiler-generated code
-	(tc_deriv_binds, tcl_env) <- discardWarnings $ setOptM Opt_GlasgowExts $ 
-				     tcTopBinds deriv_binds ;
+		-- Now GHC-generated derived bindings and generics.
+		-- Do not generate warnings from compiler-generated code.
+	(tc_deriv_binds, tcl_env) <- discardWarnings $
+                                 tcTopBinds deriv_binds ;
 
 	     	-- Second pass over class and instance declarations, 
         traceTc (text "Tc6") ;

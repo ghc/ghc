@@ -238,10 +238,11 @@ tcDeriving tycl_decls inst_decls deriv_decls
 	; gen_binds <- mkGenericBinds tycl_decls
 
 	-- Rename these extra bindings, discarding warnings about unused bindings etc
-	-- Set -fglasgow exts so that we can have type signatures in patterns,
-	-- which is used in the generic binds
+	-- Type signatures in patterns are used in the generic binds
 	; rn_binds
-		<- discardWarnings $ setOptM Opt_GlasgowExts $ do
+		<- discardWarnings $
+           setOptM Opt_PatternSignatures $
+           do
 			{ (rn_deriv, _dus1) <- rnTopBinds (ValBindsIn deriv_binds [])
 			; (rn_gen, dus_gen) <- rnTopBinds (ValBindsIn gen_binds   [])
 			; keepAliveSetTc (duDefs dus_gen)	-- Mark these guys to
