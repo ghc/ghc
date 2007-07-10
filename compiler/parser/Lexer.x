@@ -376,21 +376,21 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   @floating_point		{ strtoken tok_float }
 }
 
-<glaexts> {
+<0,glaexts> {
   -- Unboxed ints (:: Int#)
   -- It's simpler (and faster?) to give separate cases to the negatives,
   -- especially considering octal/hexadecimal prefixes.
-  @decimal \#			{ tok_primint positive 0 1 decimal }
-  0[oO] @octal \#		{ tok_primint positive 2 3 octal }
-  0[xX] @hexadecimal \#		{ tok_primint positive 2 3 hexadecimal }
-  @negative @decimal \#			{ tok_primint negative 1 2 decimal }
-  @negative 0[oO] @octal \#		{ tok_primint negative 3 4 octal }
-  @negative 0[xX] @hexadecimal \#	{ tok_primint negative 3 4 hexadecimal }
+  @decimal \# / { ifExtension magicHashEnabled } { tok_primint positive 0 1 decimal }
+  0[oO] @octal \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 octal }
+  0[xX] @hexadecimal \# / { ifExtension magicHashEnabled } { tok_primint positive 2 3 hexadecimal }
+  @negative @decimal \# / { ifExtension magicHashEnabled } { tok_primint negative 1 2 decimal }
+  @negative 0[oO] @octal \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 octal }
+  @negative 0[xX] @hexadecimal \# / { ifExtension magicHashEnabled } { tok_primint negative 3 4 hexadecimal }
 
   -- Unboxed floats and doubles (:: Float#, :: Double#)
   -- prim_{float,double} work with signed literals
-  @signed @floating_point \#		{ init_strtoken 1 tok_primfloat }
-  @signed @floating_point \# \#		{ init_strtoken 2 tok_primdouble }
+  @signed @floating_point \# / { ifExtension magicHashEnabled } { init_strtoken 1 tok_primfloat }
+  @signed @floating_point \# \# / { ifExtension magicHashEnabled } { init_strtoken 2 tok_primdouble }
 }
 
 -- Strings and chars are lexed by hand-written code.  The reason is
