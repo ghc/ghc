@@ -4,6 +4,7 @@ where
 #include "HsVersions.h"
 
 import VectMonad
+import VectUtils
 
 import DynFlags
 import HscTypes
@@ -152,48 +153,19 @@ vectExpr lc (_, AnnLet (AnnRec prs) body)
 vectExpr lc (_, AnnLam bndr body)
   | isTyVar bndr
   = do
-      pa_ty          <- paArgType' (TyVarTy bndr) (tyVarKind bndr)
-      pa_var         <- newLocalVar FSLIT("dPA") pa_ty
-      (vbody, lbody) <- localV
-                      $ do
-                          extendTyVarPA bndr (Var pa_var)
-                          -- FIXME: what about shadowing here (bndr in lc)?
-                          vectExpr lc body
-      return (mkLams [bndr, pa_var] vbody,
-              mkLams [bndr, pa_var] lbody)
+      r <- paDictArgType bndr
+      (upd_env, add_lam) <- get_upd r
+      (vbody, lbody) <- localV (upd_env >> vectExpr lc body)
+      return (Lam bndr (add_lam vbody), Lam bndr (add_lam lbody))
+  where
+    get_upd Nothing = return (deleteTyVarPA bndr, id)
+    get_upd (Just pa_ty) = do
+                             pa_var <- newLocalVar FSLIT("dPA") pa_ty
+                             return (extendTyVarPA bndr (Var pa_var),
+                                     Lam pa_var)
 
 -- ----------------------------------------------------------------------------
 -- PA dictionaries
-
-paArgType :: Type -> Kind -> VM (Maybe Type)
-paArgType ty k
-  | Just k' <- kindView k = paArgType ty k'
-
--- Here, we assume that for a kind (k1 -> k2) to be valid, k1 and k2 can only
--- be made up of * and (->), i.e., they can't be coercion kinds or #.
-paArgType ty (FunTy k1 k2)
-  = do
-      tv  <- newTyVar FSLIT("a") k1
-      ty1 <- paArgType' (TyVarTy tv) k1
-      ty2 <- paArgType' (AppTy ty (TyVarTy tv)) k2
-      return . Just $ ForAllTy tv (FunTy ty1 ty2)
-
-paArgType ty k
-  | isLiftedTypeKind k
-  = do
-      tc <- builtin paDictTyCon
-      return . Just $ TyConApp tc [ty]
-
-  | otherwise
-  = return Nothing 
-
-paArgType' :: Type -> Kind -> VM Type
-paArgType' ty k
-  = do
-      r <- paArgType ty k
-      case r of
-        Just ty' -> return ty'
-        Nothing  -> pprPanic "paArgType'" (ppr ty)
 
 paOfTyCon :: TyCon -> VM CoreExpr
 -- FIXME: just for now
@@ -244,9 +216,12 @@ vectType (FunTy ty1 ty2)   = liftM2 TyConApp (builtin closureTyCon)
                                              (mapM vectType [ty1,ty2])
 vectType (ForAllTy tv ty)
   = do
-      r   <- paArgType (TyVarTy tv) (tyVarKind tv)
+      r   <- paDictArgType tv
       ty' <- vectType ty
-      return . ForAllTy tv $ case r of { Just paty -> FunTy paty ty'; Nothing -> ty' }
+      return $ ForAllTy tv (wrap r ty')
+  where
+    wrap Nothing      = id
+    wrap (Just pa_ty) = FunTy pa_ty
 
 vectType ty = pprPanic "vectType:" (ppr ty)
 

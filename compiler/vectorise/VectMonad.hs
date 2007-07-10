@@ -13,7 +13,7 @@ module VectMonad (
   LocalEnv(..),
   readLEnv, setLEnv, updLEnv,
 
-  lookupTyCon, extendTyVarPA,
+  lookupTyCon, extendTyVarPA, deleteTyVarPA,
 
   lookupInst, lookupFamInst
 ) where
@@ -238,6 +238,9 @@ lookupTyCon tc = readGEnv $ \env -> lookupNameEnv (global_tycons env) (tyConName
 
 extendTyVarPA :: Var -> CoreExpr -> VM ()
 extendTyVarPA tv pa = updLEnv $ \env -> env { local_tyvar_pa = extendVarEnv (local_tyvar_pa env) tv pa }
+
+deleteTyVarPA :: Var -> VM ()
+deleteTyVarPA tv = updLEnv $ \env -> env { local_tyvar_pa = delVarEnv (local_tyvar_pa env) tv }
 
 -- Look up the dfun of a class instance.
 --

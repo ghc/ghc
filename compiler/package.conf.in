@@ -260,6 +260,7 @@ exposed-modules:
 	VarEnv
 	VarSet
         VectMonad
+        VectUtils
         Vectorise
 	WorkWrap
 	WwLib
