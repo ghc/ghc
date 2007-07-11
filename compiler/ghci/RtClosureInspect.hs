@@ -37,12 +37,12 @@ import HscTypes         ( HscEnv )
 
 import DataCon          
 import Type             
-import TcRnMonad        ( TcM, initTcPrintErrors, ioToTcRn, recoverM
-                        , writeMutVar )
+import TcRnMonad        ( TcM, initTcPrintErrors, ioToTcRn, recoverM)
 import TcType
 import TcMType
 import TcUnify
 import TcGadt
+import TcEnv
 import TyCon		
 import Var
 import Name 
@@ -103,6 +103,7 @@ data Term = Term { ty        :: Type
                        , bound_to :: Maybe Name   -- Useful for printing
                        }
 
+isTerm, isSuspension, isPrim :: Term -> Bool
 isTerm Term{} = True
 isTerm   _    = False
 isSuspension Suspension{} = True
@@ -110,6 +111,7 @@ isSuspension      _       = False
 isPrim Prim{} = True
 isPrim   _    = False
 
+termType :: Term -> Maybe Type
 termType t@(Suspension {}) = mb_ty t
 termType t = Just$ ty t
 
@@ -178,7 +180,7 @@ readCType i
  | fromIntegral i == pAP_CODE              = PAP
  | otherwise                               = Other (fromIntegral i)
 
-isConstr, isIndirection :: ClosureType -> Bool
+isConstr, isIndirection, isThunk :: ClosureType -> Bool
 isConstr Constr = True
 isConstr    _   = False
 
@@ -262,11 +264,13 @@ idTermFoldM = TermFold {
               fSuspension = (((return.).).). Suspension
                        }
 
+mapTermType :: (Type -> Type) -> Term -> Term
 mapTermType f = foldTerm idTermFold {
           fTerm       = \ty dc hval tt -> Term (f ty) dc hval tt,
           fSuspension = \ct mb_ty hval n ->
                           Suspension ct (fmap f mb_ty) hval n }
 
+termTyVars :: Term -> TyVarSet
 termTyVars = foldTerm TermFold {
             fTerm       = \ty _ _ tt   -> 
                           tyVarsOfType ty `plusVarEnv` concatVarEnv tt,
@@ -315,7 +319,7 @@ pprTermM1 _ Suspension{mb_ty=Just ty, bound_to=Just n}
 cPprTerm :: forall m. Monad m => 
            ((Int->Term->m SDoc)->[Int->Term->m (Maybe SDoc)]) -> Term -> m SDoc
 cPprTerm custom = go 0 where
-  go prec t@Term{subTerms=tt, dc=dc} = do
+  go prec t@Term{} = do
     let default_ prec t = Just `liftM` pprTermM go prec t
         mb_customDocs = [pp prec t | pp <- custom go ++ [default_]]
     Just doc <- firstJustM mb_customDocs
@@ -431,6 +435,7 @@ runTR hsc_env c = do
 trIO :: IO a -> TR a 
 trIO = liftTcM . ioToTcRn
 
+liftTcM :: TcM a -> TR a
 liftTcM = id
 
 newVar :: Kind -> TR TcTyVar
