@@ -329,7 +329,6 @@ addTickHsExpr (RecordUpd e rec_binds cons tys1 tys2) =
 		(addTickHsRecordBinds rec_binds)
 		(return cons) (return tys1) (return tys2)
 
-addTickHsExpr (ExprWithTySig {}) = error "addTickHsExpr: ExprWithTySig"
 addTickHsExpr (ExprWithTySigOut e ty) =
 	liftM2 ExprWithTySigOut
 		(addTickLHsExprNever e) -- No need to tick the inner expression
@@ -381,12 +380,13 @@ addTickHsExpr (HsArrForm e fix cmdtop) =
 
 addTickHsExpr e@(HsType ty) = return e
 
--- Should never happen in expression content.
-addTickHsExpr (EAsPat _ _) = error "addTickHsExpr: EAsPat _ _"
-addTickHsExpr (ELazyPat _) = error "addTickHsExpr: ELazyPat _"
-addTickHsExpr (EWildPat) = error "addTickHsExpr: EWildPat"
-addTickHsExpr (HsBinTick _ _ _) = error "addTickhsExpr: HsBinTick _ _ _"
-addTickHsExpr (HsTick _ _ _) = error "addTickhsExpr: HsTick _ _"
+-- Others dhould never happen in expression content.
+addTickHsExpr e@(ExprWithTySig {}) = pprPanic "addTickHsExpr" (ppr e)
+addTickHsExpr e@(EAsPat _ _)       = pprPanic "addTickHsExpr" (ppr e)
+addTickHsExpr e@(ELazyPat _)       = pprPanic "addTickHsExpr" (ppr e)
+addTickHsExpr e@(EWildPat)         = pprPanic "addTickHsExpr" (ppr e)
+addTickHsExpr e@(HsBinTick _ _ _)  = pprPanic "addTickHsExpr" (ppr e)
+addTickHsExpr e@(HsTick _ _ _)     = pprPanic "addTickHsExpr" (ppr e)
 
 addTickMatchGroup (MatchGroup matches ty) = do
   let isOneOfMany = matchesOneOfMany matches
