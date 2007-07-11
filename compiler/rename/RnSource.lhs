@@ -770,7 +770,6 @@ rnConDeclDetails doc (RecCon fields)
 	; new_fields <- mappM (rnField doc) fields
 	; return (RecCon new_fields) }
 
--- Document comments are renamed to Nothing here
 rnField doc (ConDeclField name ty haddock_doc)
   = lookupLocatedTopBndrRn name	`thenM` \ new_name ->
     rnLHsType doc ty		`thenM` \ new_ty ->
