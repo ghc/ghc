@@ -130,7 +130,6 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
    
 	-- OK, here's the business end!
 	maybe_res <- initTcRnIf 'a' hsc_env gbl_env lcl_env $
-		     addBreakpointBindings $
 		     do { r <- tryM do_this
 			; case r of
 			  Right res -> return (Just res)
@@ -155,12 +154,6 @@ initTcPrintErrors env mod todo = do
   (msgs, res) <- initTc env HsSrcFile False mod todo
   printErrorsAndWarnings (hsc_dflags env) msgs
   return res
-\end{code}
-
-\begin{code}
-addBreakpointBindings :: TcM a -> TcM a
-addBreakpointBindings thing_inside
-   = thing_inside
 \end{code}
 
 %************************************************************************
