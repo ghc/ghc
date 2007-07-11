@@ -7,6 +7,7 @@ import Data.Maybe ( fromMaybe )
 import qualified HpcSet as Set
 import Data.Char
 import Trace.Hpc.Tix
+import System.Exit
 
 data Flags = Flags 
   { outputFile		:: String
@@ -108,6 +109,12 @@ command_usage plugin =
 				        then ""
   	                                else usageInfo "\n\nOptions:\n" (options plugin)
 
+hpcError :: Plugin -> String -> IO a
+hpcError plugin msg = do
+   putStrLn $ "Error: " ++ msg
+   command_usage plugin
+   exitFailure
+ 
 -------------------------------------------------------------------------------
 
 data Plugin = Plugin { name           :: String
