@@ -16,6 +16,7 @@ module Literal
 
 	, inIntRange, inWordRange, tARGET_MAX_INT, inCharRange
 	, isZeroLit
+	, litFitsInChar
 
 	, word2IntLit, int2WordLit
 	, narrow8IntLit, narrow16IntLit, narrow32IntLit
@@ -283,6 +284,12 @@ litIsDupable :: Literal -> Bool
 -- Currently we treat it just like litIsTrivial
 litIsDupable (MachStr _) = False
 litIsDupable other	 = True
+
+litFitsInChar :: Literal -> Bool
+litFitsInChar (MachInt i)
+    		         = fromInteger i <= ord minBound 
+                        && fromInteger i >= ord maxBound 
+litFitsInChar _         = False
 
 litSize :: Literal -> Int
 -- Used by CoreUnfold.sizeExpr

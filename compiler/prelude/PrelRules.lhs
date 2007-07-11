@@ -28,7 +28,7 @@ import Literal		( Literal(..), mkMachInt, mkMachWord
 			, narrow8WordLit, narrow16WordLit, narrow32WordLit
 			, char2IntLit, int2CharLit
 			, float2IntLit, int2FloatLit, double2IntLit, int2DoubleLit
-			, float2DoubleLit, double2FloatLit
+			, float2DoubleLit, double2FloatLit, litFitsInChar
 			)
 import PrimOp		( PrimOp(..), tagToEnumKey )
 import TysWiredIn	( boolTy, trueDataConId, falseDataConId )
@@ -119,7 +119,7 @@ primOpRules op op_name = primop_rule op
     primop_rule Narrow16WordOp 	= one_lit (litCoerce narrow16WordLit)
     primop_rule Narrow32WordOp 	= one_lit (litCoerce narrow32WordLit)
     primop_rule OrdOp   	= one_lit (litCoerce char2IntLit)
-    primop_rule ChrOp    	= one_lit (litCoerce int2CharLit)
+    primop_rule ChrOp    	= one_lit (predLitCoerce litFitsInChar int2CharLit)
     primop_rule Float2IntOp	= one_lit (litCoerce float2IntLit)
     primop_rule Int2FloatOp	= one_lit (litCoerce int2FloatLit)
     primop_rule Double2IntOp	= one_lit (litCoerce double2IntLit)
@@ -198,6 +198,11 @@ so this could be cleaned up.
 --------------------------
 litCoerce :: (Literal -> Literal) -> Literal -> Maybe CoreExpr
 litCoerce fn lit = Just (Lit (fn lit))
+
+predLitCoerce :: (Literal -> Bool) -> (Literal -> Literal) -> Literal -> Maybe CoreExpr
+predLitCoerce p fn lit
+   | p lit     = Just (Lit (fn lit))
+   | otherwise = Nothing
 
 --------------------------
 cmpOp :: (Ordering -> Bool) -> Literal -> Literal -> Maybe CoreExpr
