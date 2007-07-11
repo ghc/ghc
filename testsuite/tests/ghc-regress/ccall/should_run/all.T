@@ -70,6 +70,9 @@ test('ffi011', normal, compile_and_run, [''])
 # so ffi012 should fail everywhere else.
 
 if config.platform.startswith("i386-"):
+  if config.platform.startswith("i386-apple"):
+	f = expect_fail
+  else:
 	f = normal
 else:
 	f = expect_fail
