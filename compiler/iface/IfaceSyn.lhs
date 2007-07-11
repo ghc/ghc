@@ -39,6 +39,7 @@ import ForeignCall
 import BasicTypes
 import Outputable
 import FastString
+import Module
 
 import Data.List
 import Data.Maybe
@@ -208,6 +209,7 @@ data IfaceExpr
   | IfaceCast   IfaceExpr IfaceCoercion
   | IfaceLit	Literal
   | IfaceFCall	ForeignCall IfaceType
+  | IfaceTick   Module Int
 
 data IfaceNote = IfaceSCC CostCentre
 	       | IfaceInlineMe
@@ -520,6 +522,7 @@ pprIfaceExpr add_par (IfaceLcl v)       = ppr v
 pprIfaceExpr add_par (IfaceExt v)       = ppr v
 pprIfaceExpr add_par (IfaceLit l)       = ppr l
 pprIfaceExpr add_par (IfaceFCall cc ty) = braces (ppr cc <+> ppr ty)
+pprIfaceExpr add_par (IfaceTick m ix)   = braces (text "tick" <+> ppr m <+> ppr ix)
 pprIfaceExpr add_par (IfaceType ty)     = char '@' <+> pprParendIfaceType ty
 
 pprIfaceExpr add_par app@(IfaceApp _ _) = add_par (pprIfaceApp app [])
@@ -815,6 +818,7 @@ eq_ifaceExpr env (IfaceLcl v1)	      (IfaceLcl v2)	   = eqIfOcc env v1 v2
 eq_ifaceExpr env (IfaceExt v1)	      (IfaceExt v2)	   = eqIfExt v1 v2
 eq_ifaceExpr env (IfaceLit l1)        (IfaceLit l2) 	   = bool (l1 == l2)
 eq_ifaceExpr env (IfaceFCall c1 ty1)  (IfaceFCall c2 ty2)  = bool (c1==c2) &&& eq_ifType env ty1 ty2
+eq_ifaceExpr env (IfaceTick m1 ix1)   (IfaceTick m2 ix2)   = bool (m1==m2) &&& bool (ix1 == ix2)
 eq_ifaceExpr env (IfaceType ty1)      (IfaceType ty2)	   = eq_ifType env ty1 ty2
 eq_ifaceExpr env (IfaceTuple n1 as1)  (IfaceTuple n2 as2)  = bool (n1==n2) &&& eqListBy (eq_ifaceExpr env) as1 as2
 eq_ifaceExpr env (IfaceLam b1 body1)  (IfaceLam b2 body2)  = eq_ifBndr env b1 b2 (\env -> eq_ifaceExpr env body1 body2)

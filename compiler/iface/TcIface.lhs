@@ -711,6 +711,10 @@ tcIfaceExpr (IfaceLcl name)
   = tcIfaceLclId name 	`thenM` \ id ->
     returnM (Var id)
 
+tcIfaceExpr (IfaceTick modName tickNo)
+  = tcIfaceTick modName tickNo	`thenM` \ id ->
+    returnM (Var id)
+
 tcIfaceExpr (IfaceExt gbl)
   = tcIfaceExtId gbl 	`thenM` \ id ->
     returnM (Var id)

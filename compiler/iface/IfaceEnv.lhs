@@ -8,6 +8,7 @@ module IfaceEnv (
 	newIfaceName, newIfaceNames,
 	extendIfaceIdEnv, extendIfaceTyVarEnv, 
 	tcIfaceLclId,     tcIfaceTyVar, 
+	tcIfaceTick,
 
 	ifaceExportNames,
 
@@ -34,6 +35,7 @@ import UniqSupply
 import FiniteMap
 import BasicTypes
 import SrcLoc
+import MkId
 
 import Outputable
 \end{code}
@@ -300,3 +302,19 @@ newIfaceNames occs
 	; return [ mkInternalName uniq occ noSrcSpan
 		 | (occ,uniq) <- occs `zip` uniqsFromSupply uniqs] }
 \end{code}
+
+%************************************************************************
+%*									*
+		(Re)creating tick boxes
+%*									*
+%************************************************************************
+
+\begin{code}
+tcIfaceTick :: Module -> Int -> IfL Id
+tcIfaceTick modName tickNo 
+  = do { uniq <- newUnique
+       ; return $ mkTickBoxOpId uniq modName tickNo
+       }
+\end{code}
+
+

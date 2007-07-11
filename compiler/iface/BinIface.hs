@@ -889,6 +889,10 @@ instance Binary IfaceExpr where
             putByte bh 11
             put_ bh ie
             put_ bh ico
+    put_ bh (IfaceTick m ix) = do
+            putByte bh 12
+            put_ bh m
+            put_ bh ix
     get bh = do
 	    h <- getByte bh
 	    case h of
@@ -928,6 +932,9 @@ instance Binary IfaceExpr where
               11 -> do ie <- get bh
                        ico <- get bh
                        return (IfaceCast ie ico)
+              12 -> do m <- get bh
+                       ix <- get bh
+                       return (IfaceTick m ix)
 
 instance Binary IfaceConAlt where
     put_ bh IfaceDefault = do
