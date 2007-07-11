@@ -67,9 +67,9 @@ anArg flag detail argtype fn = Option [] [flag] (ReqArg fn argtype) detail
 infoArg :: String -> OptDescr (Flags -> Flags)
 infoArg info = Option [] [] (NoArg $ id) info
 
-excludeOpt    = anArg "exclude"    "exclude MODULE" "MODULE"  $ \ a f -> f { excludeMods = a `Set.insert` excludeMods f }
+excludeOpt    = anArg "exclude"    "exclude MODULE and/or PACKAGE" "[PACKAGE:][MODULE]"  $ \ a f -> f { excludeMods = a `Set.insert` excludeMods f }
 
-includeOpt    = anArg "include"    "include MODULE" "MODULE"  $ \ a f -> f { includeMods = a `Set.insert` includeMods f }
+includeOpt    = anArg "include"    "include MODULE and/or PACKAGE" "[PACKAGE:][MODULE]"  $ \ a f -> f { includeMods = a `Set.insert` includeMods f }
 hpcDirOpt     = anArg "hpcdir"     "path to .mix files (default .hpc)" "DIR"
 	      	      		   	 		      $ \ a f -> f { hpcDirs = hpcDirs f ++ [a] }
 hsDirOpt      = anArg "hsdir"     "path to .hs files (default .)" "DIR"
@@ -128,11 +128,22 @@ data Plugin = Plugin { name           :: String
 --  * otherwise, accepts just the included modules.
 
 allowModule :: Flags -> String -> Bool
-allowModule flags mod 
-      | mod `Set.member` excludeMods flags = False
-      | Set.null (includeMods flags)       = True
-      | mod `Set.member` includeMods flags = True
-      | otherwise	 	     	   = False
+allowModule flags full_mod 
+      | full_mod `Set.member` excludeMods flags = False
+      | pkg_name `Set.member` excludeMods flags = False
+      | mod_name `Set.member` excludeMods flags = False
+      | Set.null (includeMods flags)            = True
+      | full_mod `Set.member` includeMods flags = True
+      | pkg_name `Set.member` includeMods flags = True
+      | mod_name `Set.member` includeMods flags = True
+      | otherwise	 	       	        = False
+  where
+      -- pkg name always ends with '/', main 
+	  (pkg_name,mod_name) = 
+			case span (/= ':') full_mod of
+		     (p,':':m) -> (p ++ ":",m)
+		     (m,[])    -> (":",m)
+		     _         -> error "impossible case in allowModule" 
 
 filterTix :: Flags -> Tix -> Tix
 filterTix flags (Tix tixs) =
