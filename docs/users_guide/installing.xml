@@ -10,10 +10,7 @@ Installing from binary distributions is easiest, and recommended!
 so you've got to bootstrap it somehow.  We provide machine-generated
 C-files-from-Haskell for this purpose, but it's really quite a pain to
 use them.  If you must build GHC from its sources, using a
-binary-distributed GHC to do so is a sensible way to proceed. For the
-other <literal>fptools</literal> programs, many are written in
-Haskell, so binary distributions allow you to install them without
-having a Haskell compiler.)
+binary-distributed GHC to do so is a sensible way to proceed.)
 </para>
 
 <para>This guide is in several parts:</para>
