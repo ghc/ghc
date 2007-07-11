@@ -22,6 +22,7 @@ import FastString
 import HscTypes
 import Char
 import StaticFlags
+import PackageConfig 
 
 cgTickBox :: Module -> Int -> Code
 cgTickBox mod n = do
@@ -35,15 +36,13 @@ cgTickBox mod n = do
                                                , CmmLit (CmmInt 1 I64)
                                                ])
               ] 
-   where
-      visible_tick = mkFastString "hs_hpc_tick"
 
 hpcTable :: Module -> HpcInfo -> Code
 hpcTable this_mod (HpcInfo hpc_tickCount _) = do
                         emitData ReadOnlyData
                                         [ CmmDataLabel mkHpcModuleNameLabel
                                         , CmmString $ map (fromIntegral . ord)
-                                                         (module_name_str)
+                                                         (full_name_str)
                                                       ++ [0]
                                         ]
                         emitData Data $ [ CmmDataLabel (mkHpcTicksLabel this_mod)
@@ -53,6 +52,11 @@ hpcTable this_mod (HpcInfo hpc_tickCount _) = do
                                         ]
   where
     module_name_str = moduleNameString (Module.moduleName this_mod)
+    full_name_str   = if modulePackageId this_mod == mainPackageId 
+		      then module_name_str
+		      else packageIdString (modulePackageId this_mod) ++ "/" ++
+			   module_name_str
+
 hpcTable this_mod (NoHpcInfo) = error "TODO: impossible"
 
 initHpc :: Module -> HpcInfo -> Code

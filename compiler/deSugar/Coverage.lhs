@@ -28,6 +28,7 @@ import UniqFM
 import Type
 import TyCon
 import FiniteMap
+import PackageConfig 
 
 import Data.Array
 import System.Time (ClockTime(..))
@@ -91,15 +92,20 @@ addCoverageTicksToBinds dflags mod mod_loc tyCons binds = do
   -- write the mix entries for this module
   hashNo <- if opt_Hpc then do
      let hpc_dir = hpcDir dflags
+
+     let hpc_mod_dir = if modulePackageId mod == mainPackageId 
+		       then hpc_dir
+		       else hpc_dir ++ "/" ++ packageIdString (modulePackageId mod)
+
      let tabStop = 1 -- <tab> counts as a normal char in GHC's location ranges.
-     createDirectoryIfMissing True hpc_dir
+     createDirectoryIfMissing True hpc_mod_dir
      modTime <- getModificationTime orig_file
      let entries' = [ (hpcPos, box) 
                     | (span,_,box) <- entries, hpcPos <- [mkHpcPos span] ]
      when (length entries' /= tickBoxCount st) $ do
        panic "the number of .mix entries are inconsistent"
      let hashNo = mixHash orig_file modTime tabStop entries'
-     mixCreate hpc_dir mod_name 
+     mixCreate hpc_mod_dir mod_name 
      	       $ Mix orig_file modTime (toHash hashNo) tabStop entries'
      return $ hashNo 
    else do
