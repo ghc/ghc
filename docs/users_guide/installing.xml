@@ -37,7 +37,7 @@ binary-distributed GHC to do so is a sensible way to proceed.)
     <sect2>
       <title>When a platform-specific package is available</title>
       
-      <para>For certain platforms, we provide GHC binaries packaged
+      <para>Most common OSes provide GHC binaries packaged
       using the native package format for the platform.  This is
       likely to be by far the best way to install GHC for your
       platform if one of these packages is available, since
@@ -45,39 +45,7 @@ binary-distributed GHC to do so is a sensible way to proceed.)
       system normally provides a way to uninstall the package at a
       later date.</para>
 
-      <para>We generally provide the following packages:</para>
-
-      <variablelist>
-	<varlistentry>
-	  <term>RedHat or SuSE Linux/x86</term>
-	  <listitem>
-	    <para>RPM source &amp; binary packages for RedHat and SuSE
-	    Linux (x86 only) are available for most major
-	    releases.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term>Debian Linux/x86</term>
-	  <listitem>
-	    <para>Debian packages for Linux (x86 only), also for most
-	    major releases.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term>FreeBSD/x86</term>
-	  <listitem>
-	    <para>On FreeBSD/x86, GHC can be installed using either
-	    the ports tree (<literal>cd /usr/ports/lang/ghc &amp;&amp; make
-	    install</literal>) or from a pre-compiled package
-	    available from your local FreeBSD mirror.</para>
-	  </listitem>
-	</varlistentry>
-      </variablelist>
-      
-      <para>Other platform-specific packages may be available, check
-      the GHC download page for details.</para>
+      <para>Check the <ulink url="http://www.haskell.org/ghc/distribution_packages.html">distribution packages</ulink> page to see if there is a package available for your platform.</para>
     </sect2>
 
 <sect2>
@@ -88,16 +56,14 @@ binary-distributed GHC to do so is a sensible way to proceed.)
 </para>
 
 <para>
-Binary distributions come in &ldquo;bundles,&rdquo; one bundle per file called
-<literal><replaceable>bundle</replaceable>-<replaceable>platform</replaceable>.tar.gz</literal>.  (See the <ulink url="http://hackage.haskell.org/trac/ghc/wiki/Building">building guide</ulink> for the definition of a platform.)  Suppose that you untar a binary-distribution bundle, thus:
+Binary distributions come in &ldquo;bundles,&rdquo; called
+<literal>ghc-<replaceable>version</replaceable>-<replaceable>platform</replaceable>.tar.bz2</literal>. (See the <ulink url="http://hackage.haskell.org/trac/ghc/wiki/Building">building guide</ulink> for the definition of a platform.)  Suppose that you untar a binary-distribution bundle, thus:
 </para>
 
 <para>
-
 <screen>
 % cd /your/scratch/space
-% gunzip &#60; ghc-x.xx-sun-sparc-solaris2.tar.gz | tar xvf -</screen>
-
+% bunnzip2 &#60; ghc-<replaceable>version</replaceable>-<replaceable>platform</replaceable>.tar.bz2 | tar xvf -</screen>
 </para>
 
 <para>
