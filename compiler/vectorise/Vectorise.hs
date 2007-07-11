@@ -28,7 +28,8 @@ import PrelNames
 
 import Outputable
 import FastString
-import Control.Monad        ( liftM, liftM2, mapAndUnzipM )
+import Control.Monad        ( liftM, liftM2, mapAndUnzipM, zipWithM_ )
+import Data.Maybe           ( maybeToList )
 
 vectorise :: HscEnv -> ModGuts -> IO ModGuts
 vectorise hsc_env guts
@@ -109,6 +110,49 @@ vectVar lc v = local v `orElseV` global v
                  vexpr <- maybeV (readGEnv $ \env -> lookupVarEnv (global_vars env) v)
                  lexpr <- replicateP vexpr lc
                  return (vexpr, lexpr)
+
+vectPolyVar :: CoreExpr -> Var -> [Type] -> VM (CoreExpr, CoreExpr)
+vectPolyVar lc v tys
+  = do
+      r <- readLEnv $ \env -> lookupVarEnv (local_vars env) v
+      case r of
+        Just (vexpr, lexpr) -> liftM2 (,) (mk_app vexpr) (mk_app lexpr)
+        Nothing ->
+          do
+            poly  <- maybeV (readGEnv $ \env -> lookupVarEnv (global_vars env) v)
+            vexpr <- mk_app poly
+            lexpr <- replicateP vexpr lc
+            return (vexpr, lexpr)
+  where
+    mk_app e = do
+                 vtys  <- mapM vectType tys
+                 dicts <- mapM paDictOfType vtys
+                 return $ mkApps e [arg | (vty, dict) <- zip vtys dicts
+                                        , arg <- [Type vty, dict]]
+
+vectPolyExpr :: CoreExpr -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
+vectPolyExpr lc expr
+  = do
+      mdicts <- mapM mk_dict_var tvs
+      
+      -- FIXME: shadowing (tvs in lc)
+      (vmono, lmono) <- localV
+                      $ do
+                          zipWithM_ (\tv -> maybe (deleteTyVarPA tv) (extendTyVarPA tv . Var))
+                                    tvs mdicts
+                          vectExpr lc mono
+      return (mk_lams tvs mdicts vmono, mk_lams tvs mdicts lmono)
+  where
+    (tvs, mono) = collectAnnTypeBinders expr
+
+    mk_dict_var tv = do
+                       r <- paDictArgType tv
+                       case r of
+                         Just ty -> liftM Just (newLocalVar FSLIT("dPA") ty)
+                         Nothing -> return Nothing
+
+    mk_lams tvs mdicts = mkLams [arg | (tv, mdict) <- zip tvs mdicts
+                                     , arg <- tv : maybeToList mdict]
                 
 vectExpr :: CoreExpr -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
 vectExpr lc (_, AnnType ty)
@@ -125,6 +169,11 @@ vectExpr lc (_, AnnNote note expr)
   = do
       (vexpr, lexpr) <- vectExpr lc expr
       return (Note note vexpr, Note note lexpr)
+vectExpr lc e@(_, AnnApp _ arg)
+  | isAnnTypeArg arg
+  = vectTyAppExpr lc fn tys
+  where
+    (fn, tys) = collectAnnTypeArgs e
 vectExpr lc (_, AnnApp fn arg)
   = do
       fn'  <- vectExpr lc fn
@@ -134,7 +183,7 @@ vectExpr lc (_, AnnCase expr bndr ty alts)
   = panic "vectExpr: case"
 vectExpr lc (_, AnnLet (AnnNonRec bndr rhs) body)
   = do
-      (vrhs, lrhs) <- vectExpr lc rhs
+      (vrhs, lrhs) <- vectPolyExpr lc rhs
       (vbndr, lbndr, (vbody, lbody)) <- vectBndrIn bndr (vectExpr lc body)
       return (Let (NonRec vbndr vrhs) vbody,
               Let (NonRec lbndr lrhs) lbody)
@@ -148,21 +197,14 @@ vectExpr lc (_, AnnLet (AnnRec prs) body)
     
     vect = do
              (vrhss, lrhss) <- mapAndUnzipM (vectExpr lc) rhss
-             (vbody, lbody) <- vectExpr lc body
+             (vbody, lbody) <- vectPolyExpr lc body
              return (vrhss, vbody, lrhss, lbody)
-vectExpr lc (_, AnnLam bndr body)
-  | isTyVar bndr
-  = do
-      r <- paDictArgType bndr
-      (upd_env, add_lam) <- get_upd r
-      (vbody, lbody) <- localV (upd_env >> vectExpr lc body)
-      return (Lam bndr (add_lam vbody), Lam bndr (add_lam lbody))
-  where
-    get_upd Nothing = return (deleteTyVarPA bndr, id)
-    get_upd (Just pa_ty) = do
-                             pa_var <- newLocalVar FSLIT("dPA") pa_ty
-                             return (extendTyVarPA bndr (Var pa_var),
-                                     Lam pa_var)
+vectExpr lc e@(_, AnnLam bndr body)
+  | isTyVar bndr = pprPanic "vectExpr" (ppr $ deAnnotate e)
+
+vectTyAppExpr :: CoreExpr -> CoreExprWithFVs -> [Type] -> VM (CoreExpr, CoreExpr)
+vectTyAppExpr lc (_, AnnVar v) tys = vectPolyVar lc v tys
+vectTyAppExpr lc e tys = pprPanic "vectTyAppExpr" (ppr $ deAnnotate e)
 
 -- ----------------------------------------------------------------------------
 -- Types

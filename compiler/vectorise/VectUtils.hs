@@ -1,4 +1,5 @@
 module VectUtils (
+  collectAnnTypeBinders, collectAnnTypeArgs, isAnnTypeArg,
   splitClosureTy,
   mkPADictType, mkPArrayType,
   paDictArgType, paDictOfType
@@ -18,6 +19,22 @@ import PrelNames
 import Outputable
 
 import Control.Monad         ( liftM )
+
+collectAnnTypeArgs :: AnnExpr b ann -> (AnnExpr b ann, [Type])
+collectAnnTypeArgs expr = go expr []
+  where
+    go (_, AnnApp f (_, AnnType ty)) tys = go f (ty : tys)
+    go e                             tys = (e, tys)
+
+collectAnnTypeBinders :: AnnExpr Var ann -> ([Var], AnnExpr Var ann)
+collectAnnTypeBinders expr = go [] expr
+  where
+    go bs (_, AnnLam b e) | isTyVar b = go (b:bs) e
+    go bs e                           = (reverse bs, e)
+
+isAnnTypeArg :: AnnExpr b ann -> Bool
+isAnnTypeArg (_, AnnType t) = True
+isAnnTypeArg _              = False
 
 isClosureTyCon :: TyCon -> Bool
 isClosureTyCon tc = tyConUnique tc == closureTyConKey
