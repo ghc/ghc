@@ -130,29 +130,33 @@ vectPolyVar lc v tys
                  return $ mkApps e [arg | (vty, dict) <- zip vtys dicts
                                         , arg <- [Type vty, dict]]
 
-vectPolyExpr :: CoreExpr -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
-vectPolyExpr lc expr
+abstractOverTyVars :: [TyVar] -> ((CoreExpr -> CoreExpr) -> VM a) -> VM a
+abstractOverTyVars tvs p
   = do
       mdicts <- mapM mk_dict_var tvs
-      
-      -- FIXME: shadowing (tvs in lc)
-      (vmono, lmono) <- localV
-                      $ do
-                          zipWithM_ (\tv -> maybe (deleteTyVarPA tv) (extendTyVarPA tv . Var))
-                                    tvs mdicts
-                          vectExpr lc mono
-      return (mk_lams tvs mdicts vmono, mk_lams tvs mdicts lmono)
+      zipWithM_ (\tv -> maybe (deleteTyVarPA tv) (extendTyVarPA tv . Var)) tvs mdicts
+      p (mk_lams mdicts)
   where
-    (tvs, mono) = collectAnnTypeBinders expr
-
     mk_dict_var tv = do
                        r <- paDictArgType tv
                        case r of
                          Just ty -> liftM Just (newLocalVar FSLIT("dPA") ty)
                          Nothing -> return Nothing
 
-    mk_lams tvs mdicts = mkLams [arg | (tv, mdict) <- zip tvs mdicts
-                                     , arg <- tv : maybeToList mdict]
+    mk_lams mdicts = mkLams [arg | (tv, mdict) <- zip tvs mdicts
+                                 , arg <- tv : maybeToList mdict]
+    
+
+vectPolyExpr :: CoreExpr -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
+vectPolyExpr lc expr
+  = localV
+  . abstractOverTyVars tvs $ \mk_lams ->
+    -- FIXME: shadowing (tvs in lc)
+    do
+      (vmono, lmono) <- vectExpr lc mono
+      return $ (mk_lams vmono, mk_lams lmono)
+  where
+    (tvs, mono) = collectAnnTypeBinders expr  
                 
 vectExpr :: CoreExpr -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
 vectExpr lc (_, AnnType ty)
