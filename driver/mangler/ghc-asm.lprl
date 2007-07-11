@@ -542,10 +542,13 @@ print STDERR "T_HDR_vector: $T_HDR_vector\n";
 \begin{code}
 sub mangle_asm {
     local($in_asmf, $out_asmf) = @_;
+    local($i, $c);
 
     # multi-line regexp matching:
-    local($*) = 1;
-    local($i, $c);
+    #   local($*) = 1;
+    # the above line used to work, but Perl 5.10 removes $*, so we uses an
+    # equivalent construct that works in Perl 5.6 and later.
+    BEGIN { require overload; overload::constant( qr => sub { "(?m:$_[1])" } ) }
 
     # ia64-specific information for code chunks
     my $ia64_locnum;
