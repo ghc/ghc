@@ -571,22 +571,17 @@ AC_DEFUN([FP_MINGW_GCC],
 ])
 
 dnl Small feature test for perl version. Assumes PerlCmd
-dnl contains path to perl binary
+dnl contains path to perl binary.
+dnl
+dnl (Perl versions prior to v5.6 does not contain the string "v5";
+dnl instead they display version strings such as "version 5.005".)
 dnl
 AC_DEFUN([FPTOOLS_CHECK_PERL_VERSION],
 [$PerlCmd -v >conftest.out 2>&1
-   if grep "v5.6" conftest.out >/dev/null 2>&1; then
+   if grep "v5" conftest.out >/dev/null 2>&1; then
       :
    else
-      if grep "v5.8" conftest.out >/dev/null 2>&1; then
-         :
-      else
-         if grep "version 6" conftest.out >/dev/null 2>&1; then
-            :
-         else
-            AC_MSG_ERROR([your version of perl probably won't work, try upgrading it.])
-         fi
-      fi
+      AC_MSG_ERROR([your version of perl probably won't work, try upgrading it.])
    fi
 rm -fr conftest*
 ])
