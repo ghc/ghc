@@ -310,7 +310,10 @@ addTickHsExpr (ExplicitList ty es) =
 	liftM2 ExplicitList 
 		(return ty)
 		(mapM (addTickLHsExpr) es)
-addTickHsExpr (ExplicitPArr	 {}) = error "addTickHsExpr: ExplicitPArr"
+addTickHsExpr (ExplicitPArr ty es) =
+	liftM2 ExplicitPArr
+		(return ty)
+		(mapM (addTickLHsExpr) es)
 addTickHsExpr (ExplicitTuple es box) =
 	liftM2 ExplicitTuple
 		(mapM (addTickLHsExpr) es)
@@ -340,9 +343,18 @@ addTickHsExpr (HsTickPragma (file,(l1,c1),(l2,c2)) (L pos e0)) = do
     e2 <- allocTickBox (ExpBox False) pos $
                 addTickHsExpr e0
     return $ unLoc e2
-addTickHsExpr (PArrSeq	 {}) = error "addTickHsExpr: PArrSeq"
-addTickHsExpr (HsSCC	 {}) = error "addTickHsExpr: HsSCC"
-addTickHsExpr (HsCoreAnn   {}) = error "addTickHsExpr: HsCoreAnn"
+addTickHsExpr (PArrSeq	 ty arith_seq) =
+	liftM2 PArrSeq	
+		(return ty)
+		(addTickArithSeqInfo arith_seq)
+addTickHsExpr (HsSCC nm e) =
+        liftM2 HsSCC 
+                (return nm)
+                (addTickLHsExpr e)
+addTickHsExpr (HsCoreAnn nm e) = 
+        liftM2 HsCoreAnn 
+                (return nm)
+                (addTickLHsExpr e)
 addTickHsExpr e@(HsBracket     {}) = return e
 addTickHsExpr e@(HsBracketOut  {}) = return e
 addTickHsExpr e@(HsSpliceE  {}) = return e
