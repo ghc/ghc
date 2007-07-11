@@ -159,34 +159,42 @@ vectExpr lc (_, AnnType ty)
   = do
       vty <- vectType ty
       return (Type vty, Type vty)
+
 vectExpr lc (_, AnnVar v)   = vectVar lc v
+
 vectExpr lc (_, AnnLit lit)
   = do
       let vexpr = Lit lit
       lexpr <- replicateP vexpr lc
       return (vexpr, lexpr)
+
 vectExpr lc (_, AnnNote note expr)
   = do
       (vexpr, lexpr) <- vectExpr lc expr
       return (Note note vexpr, Note note lexpr)
+
 vectExpr lc e@(_, AnnApp _ arg)
   | isAnnTypeArg arg
   = vectTyAppExpr lc fn tys
   where
     (fn, tys) = collectAnnTypeArgs e
+
 vectExpr lc (_, AnnApp fn arg)
   = do
       fn'  <- vectExpr lc fn
       arg' <- vectExpr lc arg
       capply fn' arg'
+
 vectExpr lc (_, AnnCase expr bndr ty alts)
   = panic "vectExpr: case"
+
 vectExpr lc (_, AnnLet (AnnNonRec bndr rhs) body)
   = do
       (vrhs, lrhs) <- vectPolyExpr lc rhs
       (vbndr, lbndr, (vbody, lbody)) <- vectBndrIn bndr (vectExpr lc body)
       return (Let (NonRec vbndr vrhs) vbody,
               Let (NonRec lbndr lrhs) lbody)
+
 vectExpr lc (_, AnnLet (AnnRec prs) body)
   = do
       (vbndrs, lbndrs, (vrhss, vbody, lrhss, lbody)) <- vectBndrsIn bndrs vect
@@ -199,6 +207,7 @@ vectExpr lc (_, AnnLet (AnnRec prs) body)
              (vrhss, lrhss) <- mapAndUnzipM (vectExpr lc) rhss
              (vbody, lbody) <- vectPolyExpr lc body
              return (vrhss, vbody, lrhss, lbody)
+
 vectExpr lc e@(_, AnnLam bndr body)
   | isTyVar bndr = pprPanic "vectExpr" (ppr $ deAnnotate e)
 
