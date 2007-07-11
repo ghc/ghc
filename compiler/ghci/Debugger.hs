@@ -63,12 +63,12 @@ pprintClosureCommand session bindThings force str = do
    -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
    go :: Session -> Id -> IO (Maybe TvSubst)
    go cms id = do 
-       term_ <- obtainTerm cms force id 
-       term      <- tidyTermTyVars cms term_
-       term'     <- if not bindThings then return term 
+       term_    <- withSession cms $ \hsc_env -> obtainTerm hsc_env force id 
+       term     <- tidyTermTyVars cms term_
+       term'    <- if not bindThings then return term 
                      else bindSuspensions cms term                         
-       showterm  <- printTerm cms term'
-       unqual    <- GHC.getPrintUnqual cms
+       showterm <- printTerm cms term'
+       unqual   <- GHC.getPrintUnqual cms
        let showSDocForUserOneLine unqual doc = 
                showDocWith LeftMode (doc (mkErrStyle unqual))
        (putStrLn . showSDocForUserOneLine unqual) 

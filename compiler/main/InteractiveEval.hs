@@ -819,11 +819,11 @@ isModuleInterpreted s mod_summary = withSession s $ \hsc_env ->
 		      where
 			 obj_linkable = isObjectLinkable (expectJust "showModule" (hm_linkable mod_info))
 
-obtainTerm1 :: Session -> Bool -> Maybe Type -> a -> IO Term
-obtainTerm1 sess force mb_ty x = withSession sess $ \hsc_env -> cvObtainTerm hsc_env force mb_ty (unsafeCoerce# x)
+obtainTerm1 :: HscEnv -> Bool -> Maybe Type -> a -> IO Term
+obtainTerm1 hsc_env force mb_ty x = cvObtainTerm hsc_env force mb_ty (unsafeCoerce# x)
 
-obtainTerm :: Session -> Bool -> Id -> IO Term
-obtainTerm sess force id = withSession sess $ \hsc_env -> do
+obtainTerm :: HscEnv -> Bool -> Id -> IO Term
+obtainTerm hsc_env force id =  do
               hv <- Linker.getHValue hsc_env (varName id) 
               cvObtainTerm hsc_env force (Just$ idType id) hv
 
