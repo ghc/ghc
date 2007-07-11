@@ -325,7 +325,7 @@ sortAndCheckModules session files = do
                       modsum <- sortedModules, 
                       modSumFile modsum `elem` files ] 
   checkedMods <- mapM (\(mod, file) -> do
-    mbMod <- checkModule session (moduleName mod)
+    mbMod <- checkModule session (moduleName mod) False
     checkedMod <- case mbMod of 
       Just m  -> return m
       Nothing -> throwE ("Failed to load module: " ++ moduleString mod)
@@ -336,7 +336,7 @@ sortAndCheckModules session files = do
       | length modules' == length modules = return modules'
       | otherwise = throwE "Failed to check all modules properly" 
       where modules' = [ (mod, f, (a,b,c,d)) | 
-                         (mod, f, CheckedModule a (Just b) (Just c) (Just d)) 
+                         (mod, f, CheckedModule a (Just b) (Just c) (Just d) _) 
                          <- modules ] 
 
 run :: [Flag] -> [CheckedMod] -> Map Name Name -> IO ()
