@@ -539,14 +539,15 @@ cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
 
 
 -- Fast, breadth-first Type reconstruction
-
+max_depth = 10 :: Int
 cvReconstructType :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Type
 cvReconstructType hsc_env force mb_ty hval = runTR hsc_env $ do
    tv <- liftM mkTyVarTy (newVar argTypeKind)
    case mb_ty of
-     Nothing -> do search (isMonomorphic `fmap` zonkTcType tv) 
-                       (uncurry go) 
-                       [(tv, hval)]  
+     Nothing -> do search (isMonomorphic `fmap` zonkTcType tv)
+                          (uncurry go)  
+                          [(tv, hval)]  
+                          max_depth
                    zonkTcType tv  -- TODO untested!
      Just ty | isMonomorphic ty -> return ty
      Just ty -> do 
@@ -555,12 +556,16 @@ cvReconstructType hsc_env force mb_ty hval = runTR hsc_env $ do
               search (isMonomorphic `fmap` zonkTcType tv) 
                      (uncurry go) 
                      [(tv, hval)]
+                     max_depth
               substTy rev_subst `fmap` zonkTcType tv
     where 
 --  search :: m Bool -> ([a] -> [a] -> [a]) -> [a] -> m ()
-  search stop expand []     = return ()
-  search stop expand  (x:xx) = do new <- expand x 
-                                  unlessM stop $ search stop expand (xx ++ new)
+  search stop expand [] depth  = return ()
+  search stop expand x 0 = fail$ "Failed to reconstruct a type after " ++
+                                show max_depth ++ " steps"
+  search stop expand (x:xx) d  = do 
+    new <- expand x 
+    unlessM stop $ search stop expand (xx ++ new) $! (pred d)
 
    -- returns unification tasks,since we are going to want a breadth-first search
   go :: Type -> HValue -> TR [(Type, HValue)]
@@ -583,10 +588,8 @@ cvReconstructType hsc_env force mb_ty hval = runTR hsc_env $ do
             let myType         = mkFunTys subTtypes tv
             (signatureType,_) <- instScheme(dataConRepType dc) 
             addConstraint myType signatureType
-            return $ map (\(I# i#,t) -> case ptrs clos of 
-                             (Array _ _ ptrs#) -> case indexArray# ptrs# i# of 
-                                                       (# e #) -> (t,e))
-                        (drop extra_args $ zip [0..] subTtypes)
+            return $ [ appArr (\e->(t,e)) (ptrs clos) i
+                       | (i,t) <- drop extra_args $ zip [0..] subTtypes]
       otherwise -> return []
 
 
