@@ -11,7 +11,7 @@ module Haddock.Rename (
 
 import Haddock.Types
 
-import GHC
+import GHC hiding ( NoLink )
 import BasicTypes
 import SrcLoc 
 import Bag ( emptyBag )
@@ -186,7 +186,7 @@ renameType t = case t of
     return (HsDocTy t' doc')
 
   _ -> error "renameType"
- 
+
 renameLTyVarBndr (L loc tv) = do
   name' <- rename (hsTyVarName tv)
   return $ L loc (replaceTyVarName tv name')
@@ -261,11 +261,11 @@ renameTyClD d = case d of
       a' <- renameLType a
       b' <- renameLType b
       return (InfixCon a' b')
-  
-    renameField (HsRecField id arg doc) = do
-      arg' <- renameLType arg
-      doc' <- mapM renameLDoc doc 
-      return (HsRecField (keepL id) arg' doc')
+
+    renameField (ConDeclField name t doc) = do
+      t'   <- renameLType t
+      doc' <- mapM renameLDoc doc
+      return (ConDeclField (keepL name) t' doc')
 
     renameResType (ResTyH98) = return ResTyH98
     renameResType (ResTyGADT t) = return . ResTyGADT =<< renameLType t

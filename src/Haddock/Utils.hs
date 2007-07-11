@@ -95,8 +95,8 @@ restrictCons names decls = [ L p d | L p (Just d) <- map (fmap keep) decls ]
           -- it's the best we can do.
         InfixCon _ _ -> Just d
       where
-        field_avail (HsRecField n _ _) = (unLoc n) `elem` names
-        field_types flds = [ ty | HsRecField n ty _ <- flds] 
+        field_avail (ConDeclField n _ _) = (unLoc n) `elem` names
+        field_types flds = [ t | ConDeclField _ t _ <- flds ] 
       
     keep d | otherwise = Nothing
 

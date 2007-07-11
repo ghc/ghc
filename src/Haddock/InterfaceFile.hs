@@ -182,7 +182,7 @@ fromOnDiskName arr nc (pid, mod_name, occ) =
         let 
                 us        = nsUniqs nc
                 uniq      = uniqFromSupply us
-                name      = mkExternalName uniq mod occ noSrcLoc
+                name      = mkExternalName uniq mod occ noSrcSpan
                 new_cache = extendNameCache cache mod occ name
         in        
         case splitUniqSupply us of { (us',_) -> 

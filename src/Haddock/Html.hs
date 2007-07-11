@@ -33,7 +33,7 @@ import Debug.Trace           ( trace )
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
 
-import GHC 
+import GHC hiding ( NoLink )
 import Name
 import Module
 import PackageConfig         ( stringToPackageId )
@@ -1044,8 +1044,8 @@ ppSideBySideConstr (L _ con) = case con_res con of
     mbLDoc  = con_doc con
     mkFunTy a b = noLoc (HsFunTy a b)
 
-ppSideBySideField :: HsRecField DocName (LHsType DocName) -> HtmlTable
-ppSideBySideField (HsRecField lname ltype mbLDoc) =
+ppSideBySideField :: ConDeclField DocName -> HtmlTable
+ppSideBySideField (ConDeclField lname ltype mbLDoc) =
   argBox (ppBinder False (orig lname)
     <+> dcolon <+> ppLType ltype) <->
   maybeRDocBox mbLDoc
@@ -1077,8 +1077,8 @@ ppHsFullConstr (HsRecDecl _ nm tvs ctxt fields doc) =
 		)
 -}
 
-ppShortField :: Bool -> HsRecField DocName (LHsType DocName)-> HtmlTable
-ppShortField summary (HsRecField lname ltype mbLDoc) 
+ppShortField :: Bool -> ConDeclField DocName -> HtmlTable
+ppShortField summary (ConDeclField lname ltype _) 
   = tda [theclass "recfield"] << (
       ppBinder summary (orig lname)
       <+> dcolon <+> ppLType ltype

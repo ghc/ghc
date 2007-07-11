@@ -17,7 +17,7 @@ import Haddock.Version
 import Haddock.InterfaceFile
 import Haddock.Exception
 import Haddock.Utils.GHC
-import Paths_haddock_ghc     ( getDataDir )
+import Paths_haddock         ( getDataDir )
 
 import Prelude hiding ( catch )
 import Control.Exception     
@@ -47,7 +47,7 @@ import qualified Data.Map as Map
 import Data.Map              (Map)
 
 import Distribution.InstalledPackageInfo ( InstalledPackageInfo(..) ) 
-import Distribution.Simple.Utils         ( withTempFile )
+import Distribution.Simple.Utils
 
 import GHC
 import Outputable
@@ -301,8 +301,8 @@ byeVersion =
 
 startGHC :: String -> IO (Session, DynFlags)
 startGHC libDir = do
-  let ghcMode = BatchCompile
-  session <- newSession ghcMode (Just libDir)
+  --let ghcMode = BatchCompile
+  session <- newSession (Just libDir)
   flags   <- getSessionDynFlags session
   flags'  <- liftM fst (initPackages flags)
   let flags'' = dopt_set flags' Opt_Haddock 
@@ -575,7 +575,7 @@ mkDocMap group = Map.fromList (topDeclDocs ++ classMethDocs ++ recordFieldDocs)
     classMethDocs = concatMap (collectDocs . collectClassEntities) classes
 
     recordFieldDocs = [ (unLoc lname, doc) | 
-                        HsRecField lname _ (Just (L _ doc)) <- fields ]
+                        ConDeclField lname _ (Just (L _ doc)) <- fields ]
 
 --------------------------------------------------------------------------------
 -- Source code entities
@@ -937,11 +937,11 @@ extractRecSel _ _ _ _ [] = error "extractRecSel: selector not found"
 
 extractRecSel nm mdl t tvs (L _ con : rest) =
   case con_details con of
-    RecCon fields | (HsRecField n ty _ : _) <- matching_fields fields -> 
+    RecCon fields | (ConDeclField n ty _ : _) <- matching_fields fields -> 
       L (getLoc n) (TypeSig (noLoc nm) (noLoc (HsFunTy data_ty (getBangType ty))))
     _ -> extractRecSel nm mdl t tvs rest
  where 
-  matching_fields flds = [ f | f@(HsRecField n _ _) <- flds, (unLoc n) == nm ]   
+  matching_fields flds = [ f | f@(ConDeclField n _ _) <- flds, (unLoc n) == nm ]   
   data_ty = foldl (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar t)) (map toTypeNoLoc tvs)
 
 -- -----------------------------------------------------------------------------
@@ -1044,7 +1044,7 @@ buildGlobalDocEnv modules
 	keep_new env n = Map.insert n (nameSetMod n modName) env 
 
 nameSetMod n newMod = mkExternalName (nameUnique n) newMod (nameOccName n)
-                      (nameSrcLoc n)
+                      (nameSrcSpan n)
 
 -- -----------------------------------------------------------------------------
 -- Named documentation
