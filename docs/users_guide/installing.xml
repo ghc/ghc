@@ -84,20 +84,6 @@ bundle and typing <literal>./configure</literal>.  That should convert
 </para>
 
 <para>
-<indexterm><primary>installing in-place</primary></indexterm>
-<indexterm><primary>in-place installation</primary></indexterm>
-You can now either start using the tools <emphasis>in-situ</emphasis> without going
-through any installation process, just type <literal>make in-place</literal> to set the
-tools up for this. You'll also want to add the path which <literal>make</literal> will
-now echo to your <literal>PATH</literal> environment variable. This option is useful if
-you simply want to try out the package and/or you don't have the
-necessary privileges (or inclination) to properly install the tools
-locally. Note that if you do decide to install the package `properly'
-at a later date, you have to go through the installation steps that
-follow.
-</para>
-
-<para>
 To install a package, you'll have to do the following:
 </para>
 
