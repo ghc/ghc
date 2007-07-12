@@ -182,20 +182,27 @@ printTerm cms@(Session ref) = cPprTerm cPpr
            GHC.setSessionDynFlags cms dflags{log_action=noop_log}
            mb_txt <- withExtendedLinkEnv [(bname, val)] 
                                          (GHC.compileExpr cms expr)
-           let myprec = 9 -- TODO Infix constructors
+           let myprec = 10 -- application precedence. TODO Infix constructors
            case mb_txt of 
-             Just txt -> return . Just . text . unsafeCoerce# 
-                           $ txt
-             Nothing  -> return Nothing
+             Just txt_ | txt <- unsafeCoerce# txt_, not (null txt) 
+                       -> return $ Just$ cparen (prec >= myprec && 
+                                                      needsParens txt) 
+                                                (text txt)
+             _  -> return Nothing
          `finally` do 
            writeIORef ref hsc_env
            GHC.setSessionDynFlags cms dflags
-     
+  needsParens ('"':txt) = False -- some simple heuristics to see whether parens
+                                -- are redundant in an arbitrary Show output
+  needsParens ('(':txt) = False 
+  needsParens txt = ' ' `elem` txt
+
+ 
   bindToFreshName hsc_env ty userName = do
     name <- newGrimName cms userName 
     let ictxt    = hsc_IC hsc_env
         tmp_ids  = ic_tmp_ids ictxt
-        id       = mkGlobalId VanillaGlobal name ty vanillaIdInfo
+        id       = mkGlobalId VanillaGlobal name (sigmaType ty) vanillaIdInfo
         new_ic   = ictxt { ic_tmp_ids = id : tmp_ids }
     return (hsc_env {hsc_IC = new_ic }, name)
 

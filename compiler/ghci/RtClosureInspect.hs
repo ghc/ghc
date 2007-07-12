@@ -25,32 +25,32 @@ module RtClosureInspect(
      mapTermType,
      termTyVars,
 --     unsafeDeepSeq, 
-     cvReconstructType
+     cvReconstructType,
+     sigmaType
  ) where 
 
 #include "HsVersions.h"
 
 import ByteCodeItbls    ( StgInfoTable )
 import qualified ByteCodeItbls as BCI( StgInfoTable(..) )
-import ByteCodeLink     ( HValue )
 import HscTypes         ( HscEnv )
+import Linker
 
 import DataCon          
 import Type             
-import TcRnMonad        ( TcM, initTcPrintErrors, ioToTcRn, recoverM)
+import TcRnMonad        ( TcM, initTc, initTcPrintErrors, ioToTcRn, 
+                          tryTcErrs)
 import TcType
 import TcMType
 import TcUnify
 import TcGadt
 import TcEnv
+import DriverPhases
 import TyCon		
-import Var
 import Name 
 import VarEnv
-import OccName
 import Util
 import VarSet
-import {-#SOURCE#-} TcRnDriver ( tcRnRecoverDataCon )
 
 import TysPrim		
 import PrelNames
@@ -60,16 +60,15 @@ import Constants
 import Outputable
 import Maybes
 import Panic
-import FiniteMap
 
 import GHC.Arr          ( Array(..) )
-import GHC.Ptr          ( Ptr(..), castPtr )
 import GHC.Exts
 
 import Control.Monad
 import Data.Maybe
 import Data.Array.Base
-import Data.List        ( partition, nub )
+import Data.List        ( partition )
+import qualified Data.Sequence as Seq
 import Foreign
 import System.IO.Unsafe
 
@@ -89,8 +88,11 @@ import System.IO.Unsafe
 -}
 
 data Term = Term { ty        :: Type 
-                 , dc        :: DataCon  -- The heap datacon. If ty is a newtype,
-                                         -- this is NOT the newtype datacon
+                 , dc        :: Either String DataCon
+                               -- The heap datacon. If ty is a newtype,
+                               -- this is NOT the newtype datacon.
+                               -- Empty if the datacon aint exported by the .hi
+                               -- (private constructors in -O0 libraries)
                  , val       :: HValue 
                  , subTerms  :: [Term] }
 
@@ -241,7 +243,7 @@ sizeofTyCon = sizeofPrimRep . tyConPrimRep
 -- * Traversals for Terms
 -----------------------------------
 
-data TermFold a = TermFold { fTerm :: Type -> DataCon -> HValue -> [a] -> a
+data TermFold a = TermFold { fTerm :: Type -> Either String DataCon -> HValue -> [a] -> a
                            , fPrim :: Type -> [Word] -> a
                            , fSuspension :: ClosureType -> Maybe Type -> HValue
                                            -> Maybe Name -> a
@@ -290,11 +292,15 @@ cons_prec = 5 -- TODO Extract this info from GHC itself
 pprTerm y p t | Just doc <- pprTermM y p t = doc
 
 pprTermM :: Monad m => (Int -> Term -> m SDoc) -> Int -> Term -> m SDoc
-pprTermM y p t@Term{dc=dc, subTerms=tt, ty=ty} 
+pprTermM y p t@Term{dc=Left dc_tag, subTerms=tt, ty=ty} = do
+  tt_docs <- mapM (y app_prec) tt
+  return$ cparen (not(null tt) && p >= app_prec) (text dc_tag <+> sep tt_docs)
+  
+pprTermM y p t@Term{dc=Right dc, subTerms=tt, ty=ty} 
 {-  | dataConIsInfix dc, (t1:t2:tt') <- tt  --TODO fixity
   = parens (pprTerm1 True t1 <+> ppr dc <+> pprTerm1 True ppr t2) 
     <+> hsep (map (pprTerm1 True) tt) 
--}
+-} -- TODO Printing infix constructors properly
   | null tt   = return$ ppr dc
   | Just (tc,_) <- splitNewTyConApp_maybe ty
   , isNewTyCon tc
@@ -306,9 +312,8 @@ pprTermM y p t@Term{dc=dc, subTerms=tt, ty=ty}
          return$ cparen (p >= app_prec) (ppr dc <+> sep tt_docs)
 
 pprTermM y _ t = pprTermM1 y t
-
-pprTermM1 _ Prim{value=words, ty=ty} = return$ text$ repPrim (tyConAppTyCon ty)
-                                                             words
+pprTermM1 _ Prim{value=words, ty=ty} = 
+    return$ text$ repPrim (tyConAppTyCon ty) words
 pprTermM1 y t@Term{} = panic "pprTermM1 - unreachable"
 pprTermM1 _ Suspension{bound_to=Nothing} = return$ char '_'
 pprTermM1 _ Suspension{mb_ty=Just ty, bound_to=Just n}
@@ -344,14 +349,17 @@ cPprTermBase y =
   , ifTerm (isTyCon doubleTyCon) (coerceShow$ \(a::Double)->a)
   , ifTerm isIntegerTy           (coerceShow$ \(a::Integer)->a)
   ] 
-     where ifTerm pred f p t@Term{} | pred t    = liftM Just (f p t) 
-                                    | otherwise = return Nothing
-           isIntegerTy Term{ty=ty}  | Just (tc,_) <- splitTyConApp_maybe ty 
-                                    = tyConName tc == integerTyConName
-           isTupleTy Term{ty=ty}    | Just (tc,_) <- splitTyConApp_maybe ty 
-                                    = tc `elem` (fst.unzip.elems) boxedTupleArr
-           isTyCon a_tc Term{ty=ty} | Just (tc,_) <- splitTyConApp_maybe ty
-                                    = a_tc == tc
+     where ifTerm pred f p t@Term{} | pred t = liftM Just (f p t) 
+           ifTerm _    _ _ _                 = return Nothing
+           isIntegerTy Term{ty=ty} = fromMaybe False $ do
+             (tc,_) <- splitTyConApp_maybe ty 
+             return (tyConName tc == integerTyConName)
+           isTupleTy Term{ty=ty} = fromMaybe False $ do 
+             (tc,_) <- splitTyConApp_maybe ty 
+             return (tc `elem` (fst.unzip.elems) boxedTupleArr)
+           isTyCon a_tc Term{ty=ty} = fromMaybe False $ do 
+             (tc,_) <- splitTyConApp_maybe ty
+             return (a_tc == tc)
            coerceShow f _ = return . text . show . f . unsafeCoerce# . val
            --TODO pprinting of list terms is not lazy
            doList p h t = do
@@ -428,10 +436,13 @@ type TR a = TcM a
 
 runTR :: HscEnv -> TR a -> IO a
 runTR hsc_env c = do 
-  mb_term <- initTcPrintErrors hsc_env iNTERACTIVE c
+  mb_term <- runTR_maybe hsc_env c
   case mb_term of 
     Nothing -> panic "Can't unify"
-    Just x -> return x
+    Just x  -> return x
+
+runTR_maybe :: HscEnv -> TR a -> IO (Maybe a)
+runTR_maybe hsc_env = fmap snd . initTc hsc_env HsSrcFile False iNTERACTIVE
 
 trIO :: IO a -> TR a 
 trIO = liftTcM . ioToTcRn
@@ -439,8 +450,8 @@ trIO = liftTcM . ioToTcRn
 liftTcM :: TcM a -> TR a
 liftTcM = id
 
-newVar :: Kind -> TR TcTyVar
-newVar = liftTcM . newFlexiTyVar
+newVar :: Kind -> TR TcType
+newVar = liftTcM . fmap mkTyVarTy . newFlexiTyVar
 
 -- | Returns the instantiated type scheme ty', and the substitution sigma 
 --   such that sigma(ty') = ty 
@@ -462,7 +473,7 @@ addConstraint t1 t2  = congruenceNewtypes t1 t2 >>= uncurry unifyType
 -- Type & Term reconstruction 
 cvObtainTerm :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Term
 cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
-   tv <- liftM mkTyVarTy (newVar argTypeKind)
+   tv <- newVar argTypeKind
    case mb_ty of
      Nothing -> go tv tv hval >>= zonkTerm
      Just ty | isMonomorphic ty -> go ty ty hval >>= zonkTerm
@@ -488,9 +499,20 @@ cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
       Indirection _ -> go tv ty $! (ptrs clos ! 0)
  -- The interesting case
       Constr -> do
-        m_dc <- trIO$ tcRnRecoverDataCon hsc_env (infoPtr clos)
-        case m_dc of
-          Nothing -> panic "Can't find the DataCon for a term"
+        Right dcname <- dataConInfoPtrToName (infoPtr clos)
+        (_,mb_dc)    <- tryTcErrs (tcLookupDataCon dcname)
+        case mb_dc of
+          Nothing -> do -- This can happen for private constructors compiled -O0
+                        -- where the .hi descriptor does not export them
+                        -- In such case, we return a best approximation:
+                        --  ignore the unpointed args, and recover the pointeds
+                        -- This preserves laziness, and should be safe.
+                       let tag = showSDoc (ppr dcname)
+                       vars     <- replicateM (length$ elems$ ptrs clos) 
+                                              (newVar (liftedTypeKind))
+                       subTerms <- sequence [appArr (go tv tv) (ptrs clos) i 
+                                              | (i, tv) <- zip [0..] vars]
+                       return (Term tv (Left ('<' : tag ++ ">")) a subTerms)
           Just dc -> do 
             let extra_args = length(dataConRepArgTys dc) - 
                              length(dataConOrigArgTys dc)
@@ -498,7 +520,7 @@ cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
                 (subTtypesP, subTtypesNP) = partition isPointed subTtypes
             subTermTvs <- sequence
                  [ if isMonomorphic t then return t 
-                                      else (mkTyVarTy `fmap` newVar k)
+                                      else (newVar k)
                    | (t,k) <- zip subTtypesP (map typeKind subTtypesP)]
             -- It is vital for newtype reconstruction that the unification step
             --  is done right here, _before_ the subterms are RTTI reconstructed
@@ -517,16 +539,16 @@ cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
                 subTermsNP = map (uncurry Prim) (zip subTtypesNP unboxeds)      
                 subTerms   = reOrderTerms subTermsP subTermsNP 
                                 (drop extra_args subTtypes)
-            return (Term tv dc a subTerms)
+            return (Term tv (Right dc) a subTerms)
 -- The otherwise case: can be a Thunk,AP,PAP,etc.
       otherwise -> 
          return (Suspension (tipe clos) (Just tv) a Nothing)
 
   matchSubTypes dc ty
     | Just (_,ty_args) <- splitTyConApp_maybe (repType ty) 
+--     assumption:             ^^^ looks through newtypes 
     , isVanillaDataCon dc  --TODO non-vanilla case
     = dataConInstArgTys dc ty_args
---     assumes that newtypes are looked ^^^ through
     | otherwise = dataConRepArgTys dc
 
 -- This is used to put together pointed and nonpointed subterms in the 
@@ -546,9 +568,9 @@ cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
 
 -- Fast, breadth-first Type reconstruction
 max_depth = 10 :: Int
-cvReconstructType :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Type
-cvReconstructType hsc_env force mb_ty hval = runTR hsc_env $ do
-   tv <- liftM mkTyVarTy (newVar argTypeKind)
+cvReconstructType :: HscEnv -> Bool -> Maybe Type -> HValue -> IO (Maybe Type)
+cvReconstructType hsc_env force mb_ty hval = runTR_maybe hsc_env $ do
+   tv <- newVar argTypeKind
    case mb_ty of
      Nothing -> do search (isMonomorphic `fmap` zonkTcType tv)
                           (uncurry go)  
@@ -557,7 +579,7 @@ cvReconstructType hsc_env force mb_ty hval = runTR hsc_env $ do
                    zonkTcType tv  -- TODO untested!
      Just ty | isMonomorphic ty -> return ty
      Just ty -> do 
-              (ty',rev_subst) <- instScheme (sigmaType ty)
+              (ty',rev_subst) <- instScheme (sigmaType ty) 
               addConstraint tv ty'
               search (isMonomorphic `fmap` zonkTcType tv) 
                      (uncurry go) 
@@ -580,14 +602,23 @@ cvReconstructType hsc_env force mb_ty hval = runTR hsc_env $ do
     case tipe clos of
       Indirection _ -> go tv $! (ptrs clos ! 0)
       Constr -> do
-        m_dc <- trIO$ tcRnRecoverDataCon hsc_env (infoPtr clos)
-        case m_dc of
-          Nothing -> panic "Can't find the DataCon for a term"
-          Just dc -> do 
+        mb_dcname <- dataConInfoPtrToName (infoPtr clos)
+        case mb_dcname of
+          Left tag -> do 
+            vars     <- replicateM (length$ elems$ ptrs clos) 
+                                   (newVar (liftedTypeKind))
+            subTerms <- sequence [ appArr (go tv) (ptrs clos) i 
+                                   | (i, tv) <- zip [0..] vars]    
+            forM [0..length (elems $ ptrs clos)] $ \i -> do
+                        tv <- newVar openTypeKind 
+                        return$ appArr (\e->(tv,e)) (ptrs clos) i
+
+          Right name -> do 
+            dc <- tcLookupDataCon name
             let extra_args = length(dataConRepArgTys dc) - 
                              length(dataConOrigArgTys dc)
             subTtypes <- mapMif (not . isMonomorphic)
-                                (\t -> mkTyVarTy `fmap` newVar (typeKind t))
+                                (\t -> newVar (typeKind t))
                                 (dataConRepArgTys dc)
             -- It is vital for newtype reconstruction that the unification step
             -- is done right here, _before_ the subterms are RTTI reconstructed
@@ -633,7 +664,7 @@ congruenceNewtypes ::  TcType -> TcType -> TcM (TcType,TcType)
 congruenceNewtypes lhs rhs 
  -- TyVar lhs inductive case
     | Just tv <- getTyVar_maybe lhs 
-    = recoverM (return (lhs,rhs)) $ do  
+    = recoverTc (return (lhs,rhs)) $ do  
          Indirect ty_v <- readMetaTyVar tv
          (lhs1, rhs1) <- congruenceNewtypes ty_v rhs
          return (lhs, rhs1)
@@ -661,6 +692,14 @@ congruenceNewtypes lhs rhs
 
 
 --------------------------------------------------------------------------------
+-- Semantically different to recoverM in TcRnMonad 
+-- recoverM retains the errors in the first action,
+--  whereas recoverTc here does not
+recoverTc recover thing = do 
+  (_,mb_res) <- tryTcErrs thing
+  case mb_res of 
+    Nothing  -> recover
+    Just res -> return res
 
 isMonomorphic ty | (tvs, ty') <- splitForAllTys ty
                  = null tvs && (isEmptyVarSet . tyVarsOfType) ty'
@@ -673,7 +712,8 @@ mapMif_ pred f (x:xx) = (if pred x then f x else return x) : mapMif_ pred f xx
 unlessM condM acc = condM >>= \c -> unless c acc
 
 -- Strict application of f at index i
-appArr f (Array _ _ ptrs#) (I# i#) = case indexArray# ptrs# i# of 
+appArr f a@(Array _ _ ptrs#) i@(I# i#) = ASSERT (i < length(elems a))
+                                  case indexArray# ptrs# i# of 
                                        (# e #) -> f e
 
 zonkTerm :: Term -> TcM Term

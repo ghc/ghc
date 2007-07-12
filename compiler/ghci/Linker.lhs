@@ -161,7 +161,7 @@ deleteFromLinkEnv to_remove
 --   We use this string to lookup the interpreter's internal representation of the name
 --   using the lookupOrig.    
 
-dataConInfoPtrToName :: Ptr () -> TcM Name
+dataConInfoPtrToName :: Ptr () -> TcM (Either String Name)
 dataConInfoPtrToName x = do 
    theString <- ioToTcRn $ do
       let ptr = castPtr x :: Ptr StgInfoTable
@@ -173,7 +173,8 @@ dataConInfoPtrToName x = do
        occFS = mkFastStringByteList occ
        occName = mkOccNameFS OccName.dataName occFS
        modName = mkModule (fsToPackageId pkgFS) (mkModuleNameFS modFS) 
-   lookupOrig modName occName
+   return (Left$ showSDoc$ ppr modName <> dot <> ppr occName ) 
+    `recoverM` (Right `fmap` lookupOrig modName occName)
 
    where
 

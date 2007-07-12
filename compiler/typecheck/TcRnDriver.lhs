@@ -12,7 +12,6 @@ module TcRnDriver (
 	tcRnLookupName,
 	tcRnGetInfo,
 	getModuleExports, 
-        tcRnRecoverDataCon,
 #endif
 	tcRnModule, 
 	tcTopSrcDecls,
@@ -1204,13 +1203,6 @@ lookup_rdr_name rdr_name = do {
     
     return good_names
  }
-
-tcRnRecoverDataCon :: HscEnv -> Ptr () -> IO (Maybe DataCon) 
-tcRnRecoverDataCon hsc_env ptr
-  = initTcPrintErrors hsc_env iNTERACTIVE $ 
-    setInteractiveContext hsc_env (hsc_IC hsc_env) $ do
-        name <- dataConInfoPtrToName ptr
-        tcLookupDataCon name
 
 tcRnLookupName :: HscEnv -> Name -> IO (Maybe TyThing)
 tcRnLookupName hsc_env name
