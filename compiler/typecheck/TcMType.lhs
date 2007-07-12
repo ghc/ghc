@@ -694,8 +694,7 @@ checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Checks that the type is valid for the given context
 checkValidType ctxt ty
   = traceTc (text "checkValidType" <+> ppr ty)	`thenM_`
-    doptM Opt_ExpressionSignaturesUnboxedTuples `thenM` \ exp_sigs_unboxed ->
-    doptM Opt_TypeSynonymUnboxedTuples `thenM` \ type_synonym_unboxed ->
+    doptM Opt_UnboxedTuples `thenM` \ unboxed ->
     doptM Opt_Rank2Types	`thenM` \ rank2 ->
     doptM Opt_RankNTypes	`thenM` \ rankn ->
     doptM Opt_PolymorphicComponents	`thenM` \ polycomp ->
@@ -731,9 +730,9 @@ checkValidType ctxt ty
 			other	     -> isSubArgTypeKind    actual_kind
 	
 	ubx_tup = case ctxt of
-	              TySynCtxt _ | type_synonym_unboxed -> UT_Ok
-	              ExprSigCtxt | exp_sigs_unboxed     -> UT_Ok
-	              _                                  -> UT_NotOk
+	              TySynCtxt _ | unboxed -> UT_Ok
+	              ExprSigCtxt | unboxed -> UT_Ok
+	              _                     -> UT_NotOk
     in
 	-- Check that the thing has kind Type, and is lifted if necessary
     checkTc kind_ok (kindErr actual_kind)	`thenM_`
