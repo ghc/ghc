@@ -132,8 +132,9 @@ main = handleTopExceptions $ do
   libDir <- handleFlags flags fileArgs
   
   -- initialize GHC 
+  restGhcFlags <- tryParseStaticFlags flags
   (session, dynflags) <- startGHC libDir
-  dynflags' <- parseGhcFlags dynflags flags
+  dynflags' <- parseGhcFlags dynflags restGhcFlags
   setSessionDynFlags session dynflags'
 
   -- load package data (from .haddock-files), typecheck input files and create 
@@ -170,17 +171,19 @@ handleFlags flags fileArgs = do
 -- Flags 
 --------------------------------------------------------------------------------
 
-parseGhcFlags dflags flags = foldlM parseFlag dflags ghcFlags
-  where 
-    -- a list of ghc flags with arguments, e.g. [[-o, odir],[-O]]
-    ghcFlags = [ words str | Flag_GhcFlag str <- flags ]
+-- | Filter out the GHC specific flags and try to parse and set them as static 
+-- flags. Return a list of flags that couldn't be parsed. 
+tryParseStaticFlags flags = do
+  let ghcFlags = [ str | Flag_GhcFlag str <- flags ]
+  parseStaticFlags ghcFlags
 
+-- | Try to parse and set dynamic GHC flags
+parseGhcFlags dflags ghcFlags = foldlM parseFlag dflags (map words ghcFlags)
+  where 
     -- try to parse a flag as either a dynamic or static GHC flag
     parseFlag dynflags ghcFlag = do
       (dynflags', rest) <- parseDynamicFlags dynflags ghcFlag
-      when (rest == ghcFlag) $ do 
-        rest' <- parseStaticFlags ghcFlag
-        when (rest' == ghcFlag) $
+      when (rest == ghcFlag) $
           throwE ("Couldn't parse GHC flag: " ++ (unwords ghcFlag))           
       return dynflags'
  
@@ -310,7 +313,6 @@ startGHC libDir = do
 -- TODO: clean up, restructure and make sure it handles cleanup
 sortAndCheckModules :: Session -> [FilePath] -> IO [CheckedMod]
 sortAndCheckModules session files = do 
-  parseStaticFlags [] -- to avoid a GHC bug
   targets <- mapM (\s -> guessTarget s Nothing) files
   setTargets session targets 
   mbModGraph <- depanal session [] True
