@@ -21,6 +21,7 @@ module MkId (
 	mkPrimOpId, mkFCallId, mkTickBoxOpId, mkBreakPointOpId,
 
 	mkReboxingAlt, wrapNewTypeBody, unwrapNewTypeBody,
+        wrapFamInstBody, unwrapFamInstScrut,
         mkUnpackCase, mkProductBox,
 
 	-- And some particular Ids; see below for why they are wired in
