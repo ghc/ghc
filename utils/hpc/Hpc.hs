@@ -10,6 +10,8 @@ import System.Console.GetOpt
 import HpcReport
 import HpcMarkup
 import HpcCombine
+import HpcShowTix
+import HpcDraft
 
 helpList :: IO ()
 helpList =
@@ -18,16 +20,18 @@ helpList =
     	   section "Commands" help ++
 	   section "Reporting Coverage" reporting ++
 	   section "Processing Coverage files" processing ++
+	   section "Coverage Overlays" overlays ++
 	   section "Others" other ++
 	   ""
   where 
     help       = ["help"]
     reporting  = ["report","markup"]
+    overlays   = ["overlay","draft"]
     processing = ["combine"]
     other     = [ name hook
     	        | hook <- hooks
 		, name hook `notElem` 
-		     (concat [help,reporting,processing])
+		     (concat [help,reporting,processing,overlays])
 		]
 
 section :: String -> [String] -> String
@@ -72,6 +76,8 @@ hooks = [ help_plugin
         , report_plugin 
 	, markup_plugin
 	, combine_plugin
+	, showtix_plugin
+	, draft_plugin
 	, version_plugin
         ]
 

@@ -147,14 +147,16 @@ allowModule flags full_mod
   where
       -- pkg name always ends with '/', main 
 	  (pkg_name,mod_name) = 
-			case span (/= ':') full_mod of
-		     (p,':':m) -> (p ++ ":",m)
+			case span (/= '/') full_mod of
+		     (p,'/':m) -> (p ++ ":",m)
 		     (m,[])    -> (":",m)
 		     _         -> error "impossible case in allowModule" 
 
 filterTix :: Flags -> Tix -> Tix
 filterTix flags (Tix tixs) =
      Tix $ filter (allowModule flags . tixModuleName) tixs
+
+         
 
 ------------------------------------------------------------------------------
 -- HpcCombine specifics 
