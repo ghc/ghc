@@ -80,7 +80,7 @@ next? Well, you will at least need to run the
 <literal>configure</literal><indexterm><primary>configure</primary></indexterm>
 script by changing directory into the top-level directory for the
 bundle and typing <literal>./configure</literal>.  That should convert
-<literal>Makefile.in</literal> to <literal>Makefile</literal>.
+<literal>Makefile-vars.in</literal> to <literal>Makefile-vars</literal>.
 </para>
 
 <para>
