@@ -76,7 +76,7 @@ addCoverageTicksToBinds dflags mod mod_loc tyCons binds = do
   let (binds1,_,st)
 		 = unTM (addTickLHsBinds binds) 
 		   (TTE
-		       { modName      = mod_name
+		       { fileName    = mkFastString orig_file
 		      , declPath     = []
                       , inScope      = emptyVarSet
 		      , blackList    = listToFM [ (getSrcSpan (tyConName tyCon),()) 
@@ -549,7 +549,7 @@ data TickTransState = TT { tickBoxCount:: Int
                          , mixEntries  :: [MixEntry_]
                          }                        
 
-data TickTransEnv = TTE { modName      :: String
+data TickTransEnv = TTE { fileName      :: FastString
 			, declPath     :: [String]
                         , inScope      :: VarSet
 			, blackList   :: FiniteMap SrcSpan ()
@@ -615,6 +615,17 @@ addPathEntry nm = withEnv (\ env -> env { declPath = declPath env ++ [nm] })
 getPathEntry :: TM [String]
 getPathEntry = declPath `liftM` getEnv
 
+getFileName :: TM FastString
+getFileName = fileName `liftM` getEnv
+
+sameFileName :: SrcSpan -> TM a -> TM a -> TM a
+sameFileName pos out_of_scope in_scope = do
+  file_name <- getFileName
+  case optSrcSpanFileName pos of 
+    Just file_name2 
+      | file_name == file_name2 -> in_scope
+    _ -> out_of_scope
+
 bindLocals :: [Id] -> TM a -> TM a
 bindLocals new_ids (TM m)
   = TM $ \ env st -> 
@@ -631,7 +642,9 @@ isBlackListed pos = TM $ \ env st ->
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations 
 allocTickBox :: BoxLabel -> SrcSpan -> TM (HsExpr Id) -> TM (LHsExpr Id)
-allocTickBox boxLabel pos m | isGoodSrcSpan' pos = do
+allocTickBox boxLabel pos m | isGoodSrcSpan' pos = 
+  sameFileName pos 
+    (do e <- m; return (L pos e)) $ do
   (fvs, e) <- getFreeVars m
   TM $ \ env st ->
     let c = tickBoxCount st
@@ -648,7 +661,9 @@ allocTickBox boxLabel pos m = do e <- m; return (L pos e)
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations 
 allocATickBox :: BoxLabel -> SrcSpan -> FreeVars -> TM (Maybe (Int,[Id]))
-allocATickBox boxLabel pos fvs | isGoodSrcSpan' pos = TM $ \ env st ->
+allocATickBox boxLabel pos fvs | isGoodSrcSpan' pos = 
+  sameFileName pos 
+    (return Nothing) $ TM $ \ env st ->
   let me = (pos, map (nameOccName.idName) ids, boxLabel)
       c = tickBoxCount st
       mes = mixEntries st

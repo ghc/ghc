@@ -28,6 +28,7 @@ module SrcLoc (
 	mkSrcSpan, srcLocSpan,
 	combineSrcSpans,
 	srcSpanStart, srcSpanEnd,
+	optSrcSpanFileName,
 
 	-- These are dubious exports, because they crash on some inputs,
 	-- used only in Lexer.x where we are sure what the Span looks like
@@ -217,6 +218,12 @@ isGoodSrcSpan SrcSpanOneLine{} = True
 isGoodSrcSpan SrcSpanMultiLine{} = True
 isGoodSrcSpan SrcSpanPoint{} = True
 isGoodSrcSpan _ = False
+
+optSrcSpanFileName :: SrcSpan -> Maybe FastString
+optSrcSpanFileName (SrcSpanOneLine { srcSpanFile = nm })   = Just nm
+optSrcSpanFileName (SrcSpanMultiLine { srcSpanFile = nm }) = Just nm
+optSrcSpanFileName (SrcSpanPoint { srcSpanFile = nm})      = Just nm
+optSrcSpanFileName _                                       = Nothing
 
 isOneLineSpan :: SrcSpan -> Bool
 -- True if the span is known to straddle more than one line
