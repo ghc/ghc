@@ -68,7 +68,9 @@ for the same reason.  Advantage: No more ridiculous call sequences.
 # This used to work, but Perl 5.10 removes support for $*, so we uses an
 # equivalent construct that works in Perl 5.6 and later.
 #
-BEGIN { require overload; overload::constant( qr => sub { "(?m:$_[1])" } ) }
+BEGIN { if ($] >= 5.010) {
+    require overload; overload::constant( qr => sub { "(?m:$_[1])" } );
+} }
 ############################################################################
 
 $TargetPlatform = $TARGETPLATFORM;
@@ -555,6 +557,7 @@ print STDERR "T_HDR_vector: $T_HDR_vector\n";
 sub mangle_asm {
     local($in_asmf, $out_asmf) = @_;
     local($i, $c);
+    local($*) = 1;
 
     # ia64-specific information for code chunks
     my $ia64_locnum;
