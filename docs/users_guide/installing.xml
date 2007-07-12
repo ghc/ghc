@@ -84,93 +84,23 @@ bundle and typing <literal>./configure</literal>.  That should convert
 </para>
 
 <para>
+The <literal>configure</literal> script takes a number of flags. The most
+commonly used is the
+<literal>--prefix=<replaceable>/path/to/install/in</replaceable></literal>
+flag, which tells the bundle that you want it to be installed in
+<replaceable>/path/to/install/in</replaceable> rather than the default
+location (/usr/local).
+To see all the flags that configure accepts, run
+<literal>configure --help</literal>.
+</para>
+
+<para>
 To install a package, you'll have to do the following:
 </para>
 
 <para>
 
 <orderedlist>
-<listitem>
-
-<para>
- Edit the <literal>Makefile</literal> and check the settings of the following variables:
-
-<indexterm><primary>directories, installation</primary></indexterm>
-<indexterm><primary>installation directories</primary></indexterm>
-
-<variablelist>
-
-<varlistentry>
-<term><literal>platform</literal></term>
-<listitem>
-<para>
-the platform you are going to install for.
-</para>
-</listitem></varlistentry>
-<varlistentry>
-<term><literal>bindir</literal></term>
-<listitem>
-<para>
-the directory in which to install user-invokable
-binaries.
-</para>
-</listitem></varlistentry>
-<varlistentry>
-<term><literal>libdir</literal></term>
-<listitem>
-<para>
-the directory in which to install
-platform-dependent support files.
-</para>
-</listitem></varlistentry>
-<varlistentry>
-<term><literal>datadir</literal></term>
-<listitem>
-<para>
-the directory in which to install
-platform-independent support files.
-</para>
-</listitem></varlistentry>
-<varlistentry>
-<term><literal>infodir</literal></term>
-<listitem>
-<para>
-the directory in which to install Emacs info
-files.
-</para>
-</listitem></varlistentry>
-<varlistentry>
-<term><literal>htmldir</literal></term>
-<listitem>
-<para>
-the directory in which to install HTML
-documentation.
-</para>
-</listitem></varlistentry>
-<varlistentry>
-<term><literal>dvidir</literal></term>
-<listitem>
-<para>
-the directory in which to install DVI
-documentation.
-</para>
-</listitem></varlistentry>
-</variablelist>
-
-The values for these variables can be set through invocation of the
-<command>configure</command><indexterm><primary>configure</primary></indexterm>
-script that comes with the distribution, but doing an optical diff to
-see if the values match your expectations is always a Good Idea.
-</para>
-
-<para>
-<emphasis>Instead of running <command>configure</command>, it is
-perfectly OK to copy <filename>Makefile.in</filename> to
-<filename>Makefile</filename> and set all these variables directly
-yourself.  But do it right!</emphasis>
-</para>
-
-</listitem>
 <listitem>
 
 <para>
