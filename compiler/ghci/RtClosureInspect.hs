@@ -161,9 +161,10 @@ getClosureData a =
            itbl <- peek (Ptr iptr)
            let tipe = readCType (BCI.tipe itbl)
                elems = BCI.ptrs itbl 
-               ptrsList = Array 0 (fromIntegral$ elems) ptrs
+               ptrsList = Array 0 ((fromIntegral elems) - 1) ptrs
                nptrs_data = [W# (indexWordArray# nptrs i)
                               | I# i <- [0.. fromIntegral (BCI.nptrs itbl)] ]
+           ASSERT(fromIntegral elems >= 0) return ()
            ptrsList `seq` 
             return (Closure tipe (Ptr iptr) itbl ptrsList nptrs_data)
 
