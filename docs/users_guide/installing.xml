@@ -76,10 +76,11 @@ Then you should find the bundle contents inside a single directory,
 
 <para>
 OK, so let's assume that you have unpacked your chosen bundles. What
-next? Well, you will at least need to run the
+next? Well, you will first need to
 <literal>configure</literal><indexterm><primary>configure</primary></indexterm>
-script by changing directory into the top-level directory for the
-bundle and typing <literal>./configure</literal>.  That should convert
+the bundle by
+changing to the bundle's top-level directory
+and typing <literal>./configure</literal>. That should convert
 <literal>Makefile-vars.in</literal> to <literal>Makefile-vars</literal>.
 </para>
 
@@ -95,7 +96,7 @@ To see all the flags that configure accepts, run
 </para>
 
 <para>
-To install a package, you'll have to do the following:
+Then do the following:
 </para>
 
 <para>
@@ -108,27 +109,31 @@ Run <literal>make install</literal>.  This <emphasis>
 should</emphasis> work with ordinary Unix
 <literal>make</literal>&mdash;no need for fancy stuff like GNU
 <literal>make</literal>.
-
 </para>
 </listitem>
-<listitem>
 
+<listitem>
 <para>
-<literal>rehash</literal> (t?csh or zsh users), so your shell will see the new
-stuff in your bin directory.
-
+If appropriate, add the bin directory to your PATH, as instructed.
 </para>
 </listitem>
-<listitem>
 
+<listitem>
+<para>
+You may need to run <literal>rehash</literal> (t?csh or zsh users), in
+order for your shell to see the new stuff in your bin directory.
+</para>
+</listitem>
+
+<listitem>
 <para>
  Once done, test your &ldquo;installation&rdquo; as suggested in 
 <xref linkend="GHC-test"/>.  Be sure to use a <literal>-v</literal>
 option, so you can see exactly what pathnames it's using.
-
 If things don't work as expected, check the list of known pitfalls in
 the <ulink url="http://hackage.haskell.org/trac/ghc/wiki/Building">building guide</ulink>.
 </para>
+
 </listitem>
 
 </orderedlist>
