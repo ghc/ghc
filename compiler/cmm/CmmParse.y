@@ -294,7 +294,7 @@ decl	:: { ExtCode }
 	| STRING type names ';'		{% do k <- parseKind $1;
 					      return $ mapM_ (newLocal k $2) $3 }
 
-	| 'import' names ';'		{ return () }  -- ignore imports
+	| 'import' names ';'		{ mapM_ newImport $2 }
 	| 'export' names ';'		{ return () }  -- ignore exports
 
 names 	:: { [FastString] }
@@ -792,6 +792,13 @@ newLocal kind ty name = do
    let reg = LocalReg u ty kind
    addVarDecl name (CmmReg (CmmLocal reg))
    return reg
+
+-- Creates a foreign label in the import. CLabel's labelDynamic
+-- classifies these labels as dynamic, hence the code generator emits the
+-- PIC code for them.
+newImport :: FastString -> ExtFCode ()
+newImport name =
+       addVarDecl name (CmmLit (CmmLabel (mkForeignLabel name Nothing True)))
 
 newLabel :: FastString -> ExtFCode BlockId
 newLabel name = do
