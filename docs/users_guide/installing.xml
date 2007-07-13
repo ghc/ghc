@@ -193,14 +193,6 @@ Hello, world!</screen>
 
 </para>
 
-<para>
-Some simple-but-profitable tests are to compile and run the notorious
-<literal>nfib</literal><indexterm><primary>nfib</primary></indexterm> program, using different numeric types.  Start with
-<literal>nfib :: Int -&gt; Int</literal>, and then try <literal>Integer</literal>, <literal>Float</literal>, <literal>Double</literal>,
-<literal>Rational</literal> and perhaps the overloaded version.  Code for this is
-distributed in <literal>ghc/misc/examples/nfib/</literal> in a source distribution.
-</para>
-
 <para>For more information on how to &ldquo;drive&rdquo; GHC, read
 on...</para>
 
