@@ -484,7 +484,7 @@ are annotated <literal>[Win32 only]</literal> and are commented below.</para>
 	<listitem>
 	  <para><filename>$(libdir)</filename> also contains support
           binaries.  These are <emphasis>not</emphasis> expected to be
-          on the user's <filename>PATH</filename>, but and are invoked
+          on the user's <filename>PATH</filename>, but are invoked
           directly by GHC.  In the Makefile system, this directory is
           also called <filename>$(libexecdir)</filename>, but
           <emphasis>you are not free to change it</emphasis>.  It must
@@ -507,11 +507,11 @@ with the Win32 distribution of GHC. </para>
 	<listitem>
 	  <para>The support programs <filename>ghc-split</filename>
           and <filename>ghc-asm</filename> are Perl scripts.  The
-          first line says <literal>#!/bin/perl</literal>; on Unix, the
+          first line says <literal>#!/usr/bin/perl</literal>; on Unix, the
           script is indeed invoked as a shell script, which invokes
           Perl; on Windows, GHC invokes
           <filename>$(libdir)/perl.exe</filename> directly, which
-          treats the <literal>#!/bin/perl</literal> as a comment.
+          treats the <literal>#!/usr/bin/perl</literal> as a comment.
           Reason: on Windows we want to invoke the Perl distributed
           with GHC, rather than assume some installed one.  </para>
 	</listitem>
