@@ -225,7 +225,7 @@ url="http://www.haskell.org/ghc/download.html">GHC download page</ulink>.
 <listitem><para>Run the installer.
 On Windows, all of GHC's files are installed in a single directory.
 You can override it, but by default this directory is
-<filename>c:/ghc/<replaceable>ghc-version</replaceable></filename>.
+<filename>c:/ghc/ghc-<replaceable>version</replaceable></filename>.
 The executable binary for GHC will be installed in the
 <filename>bin/</filename> sub-directory of the installation directory.
 If you want to invoke GHC from a command line, add this
@@ -234,7 +234,7 @@ to your <literal>$PATH</literal> environment variable.
 <para>
 When installation is complete, you should find GHCi and the GHC
 documentation are available in your Start menu under
-"Start/All Programs/GHC/<replaceable>ghc-version</replaceable>".
+"Start/All Programs/GHC/ghc-<replaceable>version</replaceable>".
 </para>
 </listitem>
 
@@ -243,17 +243,17 @@ GHC needs a directory in which to create, and later delete, temporary files.
 It uses the standard Windows procedure <literal>GetTempPath()</literal> to
 find a suitable directory.  This procedure returns:
 <itemizedlist>
-<listitem><para>The path in environment variable TMP, 
+<listitem><para>The path in the environment variable TMP, 
 if TMP is set.</para></listitem>
-<listitem><para>Otherwise, the path in environment variable TEMP, 
+<listitem><para>Otherwise, the path in the environment variable TEMP, 
 if TEMP is set.</para></listitem>
 <listitem><para>Otherwise, there is a per-user default which varies
 between versions of Windows. On NT and XP-ish versions, it might 
 be:
-<filename>c:\Documents and Settings\&lt;username&gt;\Local Settings\Temp</filename>
+<filename>c:\Documents and Settings\&lt;username&gt;\Local Settings\Temp</filename>.
 </para></listitem>
 </itemizedlist>
-The main point is that if you don't do anything GHC will work fine;
+The main point is that if you don't do anything GHC will work fine,
 but if you want to control where the directory is, you can do so by
 setting TMP or TEMP.
 </para></listitem>
@@ -282,7 +282,7 @@ You do <emphasis>not</emphasis> need the Cygwin toolchain, or anything
 else, to install and run GHC.
 </para>
 <para>
-An installation of GHC requires about 340M of disk space.
+An installation of GHC requires about 365M of disk space.
 To run GHC comfortably, your machine should have at least
 64M of memory.
 </para>
@@ -291,16 +291,16 @@ To run GHC comfortably, your machine should have at least
 <sect2><title>Moving GHC around</title>
 <para>
 Once GHC is installed, you can freely move the entire GHC tree just by copying
-the <filename>c:/ghc/<replaceable>ghc-version</replaceable></filename>
+the <filename>c:/ghc/ghc-<replaceable>version</replaceable></filename>
 directory. (You will need to fix up 
-the links in "Start/All Programs/GHC/<replaceable>ghc-version</replaceable>"
+the links in "Start/All Programs/GHC/ghc-<replaceable>version</replaceable>"
 if you do this.)
 </para>
 <para>
 It is OK to put GHC tree in a directory whose path involves spaces.  However,
 don't do this if you use want to use GHC with the Cygwin tools, 
 because Cygwin can get confused when this happens.
-We havn't quite got to the bottom of this, but so far as we know it's not 
+We haven't quite got to the bottom of this, but so far as we know it's not
 a problem with GHC itself.  Nevertheless, just to keep life simple we usually
 put GHC in a place with a space-free path.
 </para>
