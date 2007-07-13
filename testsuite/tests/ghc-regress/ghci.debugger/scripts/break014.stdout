@@ -1,0 +1,5 @@
+Breakpoint 0 activated at break014.hs:3:14-18
+Stopped at break014.hs:3:14-18
+_result :: (Bool, Bool)
+a :: Bool
+b :: Bool
