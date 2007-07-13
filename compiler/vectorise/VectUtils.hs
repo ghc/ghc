@@ -2,7 +2,8 @@ module VectUtils (
   collectAnnTypeBinders, collectAnnTypeArgs, isAnnTypeArg,
   splitClosureTy,
   mkPADictType, mkPArrayType,
-  paDictArgType, paDictOfType
+  paDictArgType, paDictOfType,
+  lookupPArrayFamInst
 ) where
 
 #include "HsVersions.h"
@@ -103,4 +104,7 @@ paDFunApply dfun tys
   = do
       dicts <- mapM paDictOfType tys
       return $ mkApps (mkTyApps dfun tys) dicts
+
+lookupPArrayFamInst :: Type -> VM (TyCon, [Type])
+lookupPArrayFamInst ty = builtin parrayTyCon >>= (`lookupFamInst` [ty])
 
