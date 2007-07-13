@@ -5,9 +5,7 @@
 
 module HpcReport (report_plugin) where
 
-import System.Exit
 import Prelude hiding (exp)
-import System(getArgs)
 import List(sort,intersperse)
 import HpcFlags
 import Trace.Hpc.Mix

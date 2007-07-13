@@ -11,7 +11,6 @@ import Trace.Hpc.Util
 
 import HpcFlags
 
-import System.Environment
 import System.Directory
 import Data.List
 import Data.Maybe(fromJust)

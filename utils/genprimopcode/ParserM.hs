@@ -18,8 +18,6 @@ module ParserM (
     happyError
  ) where
 
-import Syntax
-
 -- Parser Monad
 newtype ParserM a = ParserM (AlexInput -> St -> Either String (AlexInput, St, a))
 

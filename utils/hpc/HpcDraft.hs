@@ -9,7 +9,6 @@ import HpcFlags
 import Control.Monad
 import qualified HpcSet as Set
 import qualified HpcMap as Map
-import System.Environment
 import HpcUtils
 import Data.Tree
 

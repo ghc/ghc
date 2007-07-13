@@ -79,8 +79,11 @@ module Util (
 
 #include "HsVersions.h"
 
-import Panic		( panic, trace )
 import FastTypes
+
+#ifdef DEBUG
+import Panic		( panic, trace )
+#endif
 
 import Control.Exception ( Exception(..), finally, catchDyn, throw )
 import qualified Control.Exception as Exception
@@ -89,10 +92,11 @@ import Data.IORef	( IORef, newIORef )
 import System.IO.Unsafe	( unsafePerformIO )
 import Data.IORef	( readIORef, writeIORef )
 
-import qualified Data.List as List ( elem, notElem )
-
+import qualified Data.List as List ( elem )
 #ifndef DEBUG
 import Data.List		( zipWith4 )
+#else
+import qualified Data.List as List ( notElem )
 #endif
 
 import Control.Monad	( when )

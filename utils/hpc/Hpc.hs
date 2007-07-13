@@ -1,7 +1,6 @@
 -- (c) 2007 Andy Gill
 
 -- Main driver for Hpc
-import Trace.Hpc.Tix
 import HpcFlags
 import System.Environment
 import System.Exit

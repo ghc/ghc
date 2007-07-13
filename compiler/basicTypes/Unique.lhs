@@ -54,7 +54,6 @@ import BasicTypes
 import PackageConfig
 import FastString
 import Outputable
-import FastTypes
 
 import GHC.Exts
 import Data.Char	( chr, ord )

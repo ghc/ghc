@@ -3,7 +3,7 @@
 module Lexer (lex_tok) where
 
 import ParserM (ParserM (..), mkT, mkTv, Token(..), St, start_code,
-                StartCode, Action, set_start_code,
+                set_start_code,
                 inc_brace_depth, dec_brace_depth,
                 show_pos, position, input,
                 AlexInput, alexGetChar, alexInputPrevChar)

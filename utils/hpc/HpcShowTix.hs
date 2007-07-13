@@ -2,7 +2,6 @@ module HpcShowTix (showtix_plugin) where
 
 import Trace.Hpc.Mix
 import Trace.Hpc.Tix
-import Trace.Hpc.Util
 
 import HpcFlags
 

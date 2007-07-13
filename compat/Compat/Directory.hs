@@ -31,7 +31,7 @@ import Control.Monad		( when )
 import Foreign.Marshal.Alloc	( allocaBytes )
 import System.IO (IOMode(..), openBinaryFile, hGetBuf, hPutBuf, hClose)
 import System.IO.Error		( try )
-import GHC.IOBase ( IOException(..), IOErrorType(..) )
+import GHC.IOBase ( IOException(..) )
 #else
 import System.IO		( try )
 #endif
