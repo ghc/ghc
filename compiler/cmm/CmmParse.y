@@ -770,9 +770,12 @@ instance Monad ExtFCode where
 -- an environment, which is looped back into the computation.  In this
 -- way, we can have embedded declarations that scope over the whole
 -- procedure, and imports that scope over the entire module.
+-- Discards the local declaration contained within decl'
 loopDecls :: ExtFCode a -> ExtFCode a
-loopDecls (EC fcode) = 
-   EC $ \e s -> fixC (\ ~(decls,a) -> fcode (addListToUFM e decls) [])
+loopDecls (EC fcode) =
+      EC $ \e globalDecls -> do
+	(decls', a) <- fixC (\ ~(decls,a) -> fcode (addListToUFM e (decls ++ globalDecls)) globalDecls)
+	return (globalDecls, a)
 
 getEnv :: ExtFCode Env
 getEnv = EC $ \e s -> return (s, e)
