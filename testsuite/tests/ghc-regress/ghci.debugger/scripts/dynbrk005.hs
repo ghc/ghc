@@ -1,7 +1,5 @@
 import TupleN
 
-tuple3 = $(tuple 3)
+tuple3 x = $(tuple 3) x
 
-normal_fn x = x + 2
-
-normal_fn2 x = tuple3 x
+normal_fn x = tuple3 x

@@ -3,7 +3,11 @@
 :set -fglasgow-exts
 :set -fth
 :l dynbrk005
-:st normal_fn2 [1,2,3]
+:st normal_fn [1,2,3]
+:st
+:st
+:st
+:st
 :st
 :st
 :st
