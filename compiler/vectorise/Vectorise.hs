@@ -124,11 +124,7 @@ vectPolyVar lc v tys
             lexpr <- replicateP vexpr lc
             return (vexpr, lexpr)
   where
-    mk_app e = do
-                 vtys  <- mapM vectType tys
-                 dicts <- mapM paDictOfType vtys
-                 return $ mkApps e [arg | (vty, dict) <- zip vtys dicts
-                                        , arg <- [Type vty, dict]]
+    mk_app e = applyToTypes e =<< mapM vectType tys
 
 abstractOverTyVars :: [TyVar] -> ((CoreExpr -> CoreExpr) -> VM a) -> VM a
 abstractOverTyVars tvs p
@@ -145,6 +141,13 @@ abstractOverTyVars tvs p
 
     mk_lams mdicts = mkLams [arg | (tv, mdict) <- zip tvs mdicts
                                  , arg <- tv : maybeToList mdict]
+
+applyToTypes :: CoreExpr -> [Type] -> VM CoreExpr
+applyToTypes expr tys
+  = do
+      dicts <- mapM paDictOfType tys
+      return $ mkApps expr [arg | (ty, dict) <- zip tys dicts
+                                , arg <- [Type ty, dict]]
     
 
 vectPolyExpr :: CoreExpr -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
