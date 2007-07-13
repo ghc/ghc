@@ -420,16 +420,17 @@ truncates them.  Similarly <filename>ghci</filename> is a C wrapper program that
 <para>The layout of the library directory, <filename>$(libdir)</filename>,
 is almost identical on
 Windows and Unix, as follows.  Differences between Windows and Unix
-are annoted <literal>[Win32 only]</literal> and are commented below.</para>
+are annotated <literal>[Win32 only]</literal> and are commented below.</para>
 
 <programlisting>
   $(libdir)/
     package.conf           GHC package configuration
     ghc-usage.txt          Message displayed by ghc &ndash;&ndash;help
+    ghci-usage.txt         Message displayed by ghci &ndash;&ndash;help
     
     bin/                   [Win32 only]  User-visible binaries
-         ghc.exe
-         ghci.exe
+        ghc.exe
+        ghci.exe
 
     unlit                  Remove literate markup
     
@@ -440,7 +441,7 @@ are annoted <literal>[Win32 only]</literal> and are commented below.</para>
     ghc-x.xx               GHC executable [Unix only]
    
     ghc-split              Asm code splitter
-    ghc-asm	           Asm code mangler
+    ghc-asm                Asm code mangler
 
     gcc-lib/               [Win32 only] Support files for gcc
         specs              gcc configuration
@@ -450,32 +451,31 @@ are annoted <literal>[Win32 only]</literal> and are commented below.</para>
         ld.exe
 
         crt0.o              Standard
-	   ..etc..	    binaries
+           ..etc..          binaries
         
         libmingw32.a        Standard
-	   ..etc..	    libraries
+           ..etc..          libraries
 
         *.h                 Include files
 
-    imports/                GHC interface files
-        std/*.hi              'std' library
-	lang/*.hi             'lang' library
-        ..etc..
+    hslibs-imports/         GHC interface files for the...
+        ghc/*.hi            ...'ghc' library
 
     include/                 C header files
         StgMacros.h           GHC-specific
-        ..etc...              header files
+        ..etc..               header files
 
         mingw/*.h            [Win32 only] Mingwin header files
 
-    libHSrts.a              GHC library archives
-    libHSstd.a
-    libHSlang.a
-      ..etc..
+    lib/                    GHC's library
+        base-2.1
+        ..etc..
 
-    HSstd1.o                GHC library linkables
-    HSstd2.o                  (used by ghci, which does
-    HSlang.o                  not grok .a files yet)
+    libHSrts*.a             GHC RTS archive
+    libHSghc.a              GHC package archive
+
+    HSrts.o                 GHC RTS linkable, used by ghci
+    HSghc.o                 GHC package linkable, used by ghci
 </programlisting>
 
 <para>Note that:
