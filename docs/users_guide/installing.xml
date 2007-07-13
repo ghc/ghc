@@ -229,7 +229,7 @@ You can override it, but by default this directory is
 The executable binary for GHC will be installed in the
 <filename>bin/</filename> sub-directory of the installation directory.
 If you want to invoke GHC from a command line, add this
-to your PATH environment variable.
+to your <literal>$PATH</literal> environment variable.
 </para>
 <para>
 When installation is complete, you should find GHCi and the GHC
@@ -392,9 +392,9 @@ That is why <filename>$(bindir)</filename> must be <filename>$(libdir)/bin</file
 
 <sect2> <title>The binary directory</title>
 
-<para>The binary directory, <filename>$(bindir)</filename> contains user-visible
+<para>The binary directory, <filename>$(bindir)</filename>, contains user-visible
 executables, notably <filename>ghc</filename> and <filename>ghci</filename>.
-You should add it to your <literal>$PATH</literal>
+You should add it to your <literal>$PATH</literal>.
 </para>
 
 <para>On Unix, the user-invokable <filename>ghc</filename> invokes <filename>$(libdir)/ghc-<replaceable>version</replaceable></filename>,
@@ -417,9 +417,10 @@ truncates them.  Similarly <filename>ghci</filename> is a C wrapper program that
 
 <sect2> <title>The library directory</title>
 
-<para>The layout of the library directory, <filename>$(libdir)</filename> is almost identical on
+<para>The layout of the library directory, <filename>$(libdir)</filename>,
+is almost identical on
 Windows and Unix, as follows.  Differences between Windows and Unix
-are noted thus <literal>[Win32 only]</literal> and are commented below.</para>
+are annoted <literal>[Win32 only]</literal> and are commented below.</para>
 
 <programlisting>
   $(libdir)/
