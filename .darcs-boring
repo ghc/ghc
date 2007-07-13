@@ -53,6 +53,7 @@
 ^libraries/ndp(/|$)
 ^libraries/network(/|$)
 ^libraries/parsec(/|$)
+^libraries/parallel(/|$)
 ^libraries/pretty(/|$)
 ^libraries/process(/|$)
 ^libraries/random(/|$)
