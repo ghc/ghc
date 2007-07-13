@@ -13,18 +13,24 @@ import CoreLint             ( showPass, endPass )
 import CoreSyn
 import CoreUtils
 import CoreFVs
+import DataCon
 import TyCon
 import Type
 import TypeRep
 import Var
 import VarEnv
+import VarSet
 import Name                 ( mkSysTvName )
 import NameEnv
 import Id
+import MkId                 ( unwrapFamInstScrut )
 
 import DsMonad hiding (mapAndUnzipM)
+import DsUtils              ( mkCoreTup, mkCoreTupTy )
 
 import PrelNames
+import TysWiredIn
+import BasicTypes           ( Boxity(..) )
 
 import Outputable
 import FastString
@@ -218,6 +224,155 @@ vectExpr lc (_, AnnLet (AnnRec prs) body)
 vectExpr lc e@(_, AnnLam bndr body)
   | isTyVar bndr = pprPanic "vectExpr" (ppr $ deAnnotate e)
 
+vectExpr lc (fvs, AnnLam bndr body)
+  = do
+      let tyvars = filter isTyVar (varSetElems fvs)
+      info <- mkCEnvInfo fvs bndr body
+      (poly_vfn, poly_lfn) <- mkClosureFns info tyvars bndr body
+      let (venv, lenv) = mkClosureEnvs info lc
+
+      let env_ty = cenv_vty info
+
+      pa_dict <- paDictOfType env_ty
+
+      arg_ty <- vectType (varType bndr)
+      res_ty <- vectType (exprType $ deAnnotate body)
+
+      -- FIXME: move the functions to the top level
+      mono_vfn <- applyToTypes poly_vfn (map TyVarTy tyvars)
+      mono_lfn <- applyToTypes poly_lfn (map TyVarTy tyvars)
+
+      mk_clo <- builtin mkClosureVar
+      mk_cloP <- builtin mkClosurePVar
+
+      let vclo = Var mk_clo  `mkTyApps` [arg_ty, res_ty, env_ty]
+                             `mkApps`   [pa_dict, mono_vfn, mono_lfn, venv]
+          
+          lclo = Var mk_cloP `mkTyApps` [arg_ty, res_ty, env_ty]
+                             `mkApps`   [pa_dict, mono_vfn, mono_lfn, lenv]
+
+      return (vclo, lclo)
+       
+
+data CEnvInfo = CEnvInfo {
+               cenv_vars         :: [Var]
+             , cenv_values       :: [(CoreExpr, CoreExpr)]
+             , cenv_vty          :: Type
+             , cenv_lty          :: Type
+             , cenv_repr_tycon   :: TyCon
+             , cenv_repr_tyargs  :: [Type]
+             , cenv_repr_datacon :: DataCon
+             }
+
+mkCEnvInfo :: VarSet -> Var -> CoreExprWithFVs -> VM CEnvInfo
+mkCEnvInfo fvs arg body
+  = do
+      locals <- readLEnv local_vars
+      let
+          (vars, vals) = unzip
+                 [(var, val) | var      <- varSetElems fvs
+                             , Just val <- [lookupVarEnv locals var]]
+      vtys <- mapM (vectType . varType) vars
+
+      (vty, repr_tycon, repr_tyargs, repr_datacon) <- mk_env_ty vtys
+      lty <- mkPArrayType vty
+      
+      return $ CEnvInfo {
+                 cenv_vars         = vars
+               , cenv_values       = vals
+               , cenv_vty          = vty
+               , cenv_lty          = lty
+               , cenv_repr_tycon   = repr_tycon
+               , cenv_repr_tyargs  = repr_tyargs
+               , cenv_repr_datacon = repr_datacon
+               }
+  where
+    mk_env_ty [vty]
+      = return (vty, error "absent cinfo_repr_tycon"
+                   , error "absent cinfo_repr_tyargs"
+                   , error "absent cinfo_repr_datacon")
+
+    mk_env_ty vtys
+      = do
+          let ty = mkCoreTupTy vtys
+          (repr_tc, repr_tyargs) <- lookupPArrayFamInst ty
+          let [repr_con] = tyConDataCons repr_tc
+          return (ty, repr_tc, repr_tyargs, repr_con)
+
+    
+
+mkClosureEnvs :: CEnvInfo -> CoreExpr -> (CoreExpr, CoreExpr)
+mkClosureEnvs info lc
+  | [] <- vals
+  = (Var unitDataConId, mkApps (Var $ dataConWrapId (cenv_repr_datacon info))
+                               [lc, Var unitDataConId])
+
+  | [(vval, lval)] <- vals
+  = (vval, lval)
+
+  | otherwise
+  = (mkCoreTup vvals, Var (dataConWrapId $ cenv_repr_datacon info)
+                      `mkTyApps` cenv_repr_tyargs info
+                      `mkApps`   (lc : lvals))
+
+  where
+    vals = cenv_values info
+    (vvals, lvals) = unzip vals
+
+mkClosureFns :: CEnvInfo -> [TyVar] -> Var -> CoreExprWithFVs
+             -> VM (CoreExpr, CoreExpr)
+mkClosureFns info tyvars arg body
+  = closedV
+  . abstractOverTyVars tyvars
+  $ \mk_tlams ->
+  do
+    (vfn, lfn) <- mkClosureMonoFns info arg body
+    return (mk_tlams vfn, mk_tlams lfn)
+
+mkClosureMonoFns :: CEnvInfo -> Var -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
+mkClosureMonoFns info arg body
+  = do
+      lc_bndr <- newLocalVar FSLIT("lc") intTy
+      (varg : vbndrs, larg : lbndrs, (vbody, lbody))
+        <- vectBndrsIn (arg : cenv_vars info)
+                       (vectExpr (Var lc_bndr) body)
+
+      venv_bndr <- newLocalVar FSLIT("env") vty
+      lenv_bndr <- newLocalVar FSLIT("env") lty
+
+      let vcase = bind_venv (Var venv_bndr) vbody vbndrs
+      lcase <- bind_lenv (Var lenv_bndr) lbody lc_bndr lbndrs
+      return (mkLams [venv_bndr, varg] vcase, mkLams [lenv_bndr, larg] lcase)
+  where
+    vty = cenv_vty info
+    lty = cenv_lty info
+
+    arity = length (cenv_vars info)
+
+    bind_venv venv vbody []      = vbody
+    bind_venv venv vbody [vbndr] = Let (NonRec vbndr venv) vbody
+    bind_venv venv vbody vbndrs
+      = Case venv (mkWildId vty) (exprType vbody)
+             [(DataAlt (tupleCon Boxed arity), vbndrs, vbody)]
+
+    bind_lenv lenv lbody lc_bndr [lbndr]
+      = do
+          lengthPA <- builtin lengthPAVar
+          return . Let (NonRec lbndr lenv)
+                 $ Case (mkApps (Var lengthPA) [Type vty, (Var lbndr)])
+                        lc_bndr
+                        intTy
+                        [(DEFAULT, [], lbody)]
+
+    bind_lenv lenv lbody lc_bndr lbndrs
+      = return
+      $ Case (unwrapFamInstScrut (cenv_repr_tycon info)
+                                 (cenv_repr_tyargs info)
+                                 lenv)
+             (mkWildId lty)
+             (exprType lbody)
+             [(DataAlt (cenv_repr_datacon info), lc_bndr : lbndrs, lbody)]
+          
 vectTyAppExpr :: CoreExpr -> CoreExprWithFVs -> [Type] -> VM (CoreExpr, CoreExpr)
 vectTyAppExpr lc (_, AnnVar v) tys = vectPolyVar lc v tys
 vectTyAppExpr lc e tys = pprPanic "vectTyAppExpr" (ppr $ deAnnotate e)
