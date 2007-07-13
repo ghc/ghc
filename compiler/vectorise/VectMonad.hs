@@ -1,7 +1,7 @@
 module VectMonad (
   VM,
 
-  noV, tryV, maybeV, orElseV, localV, initV,
+  noV, tryV, maybeV, orElseV, localV, closedV, initV,
   newLocalVar, newTyVar,
   
   Builtins(..), paDictTyCon,
@@ -191,6 +191,14 @@ localV p = do
              x <- p
              setLEnv env
              return x
+
+closedV :: VM a -> VM a
+closedV p = do
+              env <- readLEnv id
+              setLEnv emptyLocalEnv
+              x <- p
+              setLEnv env
+              return x
 
 liftDs :: DsM a -> VM a
 liftDs p = VM $ \bi genv lenv -> do { x <- p; return (Yes genv lenv x) }
