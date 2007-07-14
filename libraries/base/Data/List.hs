@@ -93,6 +93,8 @@ module Data.List
    , span              -- :: (a -> Bool) -> [a] -> ([a], [a])
    , break             -- :: (a -> Bool) -> [a] -> ([a], [a])
 
+   , stripPrefix       -- :: Eq a => [a] -> [a] -> Maybe [a]
+
    , group             -- :: Eq a => [a] -> [[a]]
 
    , inits             -- :: [a] -> [[a]]
@@ -220,6 +222,20 @@ infix 5 \\ -- comment to fool cpp
 
 -- -----------------------------------------------------------------------------
 -- List functions
+
+-- | The 'stripPrefix' function drops the given prefix from a list.
+-- It returns 'Nothing' if the list did not start with the prefix
+-- given, or 'Just' the list after the prefix, if it does.
+--
+-- > stripPrefix "foo" "foobar" -> Just "bar"
+-- > stripPrefix "foo" "foo" -> Just ""
+-- > stripPrefix "foo" "barfoo" -> Nothing
+-- > stripPrefix "foo" "barfoobaz" -> Nothing
+stripPrefix :: Eq a => [a] -> [a] -> Maybe [a]
+stripPrefix [] ys = Just ys
+stripPrefix (x:xs) (y:ys)
+ | x == y = stripPrefix xs ys
+stripPrefix _ _ = Nothing
 
 -- | The 'elemIndex' function returns the index of the first element
 -- in the given list which is equal (by '==') to the query element,
