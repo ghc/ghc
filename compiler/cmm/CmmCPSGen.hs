@@ -393,7 +393,7 @@ pack_continuation allow_header_set
           _ -> isJust cont_id
 
     maybe_header = if allow_header_set && needs_header_set
-                   then maybe Nothing (Just . CmmLit . CmmLabel) cont_id
+                   then maybe Nothing (Just . CmmLit . CmmLabel . entryLblToInfoLbl) cont_id
                    else Nothing
 
 pack_frame :: WordOff         -- ^ Current frame size
