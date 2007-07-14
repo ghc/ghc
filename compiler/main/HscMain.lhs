@@ -694,8 +694,7 @@ hscFileCheck hsc_env mod_summary compileToCore = do {
 				md_rules     = [panic "no rules"],
 				   -- Rules are CoreRules, not the
 				   -- RuleDecls we get out of the typechecker
-                                md_vect_info = 
-                                  panic "HscMain.hscFileCheck: no VectInfo"
+                                md_vect_info = noVectInfo
                                    -- VectInfo is added by the Core 
                                    -- vectorisation pass
                           }
