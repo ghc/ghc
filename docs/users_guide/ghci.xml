@@ -219,19 +219,17 @@ Ok, modules loaded: Main.
 <screen>
 Prelude> :! ghc -c D.hs
 Prelude> :load A
-Skipping  D                ( D.hs, D.o )
-Compiling C                ( C.hs, interpreted )
 Compiling B                ( B.hs, interpreted )
+Compiling C                ( C.hs, interpreted )
 Compiling A                ( A.hs, interpreted )
 Ok, modules loaded: A, B, C, D.
 *Main>
 </screen>
 
-    <para>In the messages from the compiler, we see that it skipped D,
-    and used the object file <filename>D.o</filename>.  The message
-    <literal>Skipping</literal> <replaceable>module</replaceable>
-    indicates that compilation for <replaceable>module</replaceable>
-    isn't necessary, because the source and everything it depends on
+    <para>In the messages from the compiler, we see that there is no line
+    for <literal>D</literal>. This is because
+    it isn't necessary to compile <literal>D</literal>,
+    because the source and everything it depends on
     is unchanged since the last compilation.</para>
 
     <para>At any time you can use the command 
@@ -247,7 +245,7 @@ B                ( B.hs, interpreted )
 A                ( A.hs, interpreted )
 *Main></screen>
 
-    <para>If we now modify the source of D (or pretend to: using Unix
+    <para>If we now modify the source of D (or pretend to: using the Unix
     command <literal>touch</literal> on the source file is handy for
     this), the compiler will no longer be able to use the object file,
     because it might be out of date:</para>
@@ -256,9 +254,6 @@ A                ( A.hs, interpreted )
 *Main> :! touch D.hs
 *Main> :reload
 Compiling D                ( D.hs, interpreted )
-Skipping  C                ( C.hs, interpreted )
-Skipping  B                ( B.hs, interpreted )
-Skipping  A                ( A.hs, interpreted )
 Ok, modules loaded: A, B, C, D.
 *Main> 
 </screen>
@@ -274,8 +269,8 @@ Ok, modules loaded: A, B, C, D.
 *Main> :! ghc -c C.hs
 *Main> :load A
 Compiling D                ( D.hs, interpreted )
-Compiling C                ( C.hs, interpreted )
 Compiling B                ( B.hs, interpreted )
+Compiling C                ( C.hs, interpreted )
 Compiling A                ( A.hs, interpreted )
 Ok, modules loaded: A, B, C, D.
 </screen>
@@ -298,8 +293,6 @@ Ok, modules loaded: A, B, C, D.
 
 <screen>
 *Main> :load A
-Skipping  D                ( D.hs, D.o )
-Skipping  C                ( C.hs, C.o )
 Compiling B                ( B.hs, interpreted )
 Compiling A                ( A.hs, interpreted )
 Ok, modules loaded: A, B, C, D.
@@ -310,7 +303,7 @@ Ok, modules loaded: A, B, C, D.
     when working on a large program is to occasionally run
     <literal>ghc &ndash;&ndash;make</literal> to compile the whole project (say
     before you go for lunch :-), then continue working in the
-    interpreter.  As you modify code, the new modules will be
+    interpreter.  As you modify code, the changed modules will be
     interpreted, but the rest of the project will remain
     compiled.</para>
 
