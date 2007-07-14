@@ -25,7 +25,7 @@ xs :: [t]
 _result = []
 Logged breakpoint at ../Test3.hs:2:17-19
 _result :: a
-f :: t -> a
-x :: t
+f :: Integer -> a
+x :: Integer
 Logged breakpoint at ../Test3.hs:2:21-30
 _result :: [a]

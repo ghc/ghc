@@ -7,13 +7,13 @@ right :: [a]
 right = (_t1::[a])
 ()
 right = []
-left = (_t2::[a])
+left = (_t2::[Integer])
 ()
 left = 4 : (_t3::[Integer])
 1
 left = [4]
 Stopped at ../QSort.hs:5:15-50
-_result :: [a]
-a :: a
-left :: [a]
-right :: [a]
+_result :: [Integer]
+a :: Integer
+left :: [Integer]
+right :: [Integer]

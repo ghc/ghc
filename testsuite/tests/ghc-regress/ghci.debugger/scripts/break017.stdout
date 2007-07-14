@@ -1,9 +1,9 @@
 "Stopped at <exception thrown>
 _exception :: e
 Logged breakpoint at ../QSort.hs:6:23-37
-_result :: [a]
-a :: a
-as :: [a]
+_result :: [Char]
+a :: Char
+as :: [Char]
 as = 'b' : 'c' : (_t1::[Char])
 *** Exception: Prelude.undefined
 as = 'b' : 'c' : (_t2::[Char])
