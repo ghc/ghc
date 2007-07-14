@@ -901,11 +901,31 @@ joinToTargets block_live new_blocks instr (dest:dests) = do
 		-- we have eliminated any possibility of single-node cylces
 		-- in expandNode above.
 	           handleComponent (AcyclicSCC (vreg,src,dsts))
-	               = map (makeMove vreg src) dsts
-	           handleComponent (CyclicSCC things)
-	               = panic $ "Register Allocator: handleComponent: cyclic"
-	                         ++ " (workaround: use -fviaC)"
-	           
+	               = return $ map (makeMove vreg src) dsts
+
+		-- we can not have cycles that involve memory
+		-- locations as source nor as single destination
+		-- because memory locations (stack slots) are
+		-- allocated exclusively for a virtual register and
+		-- therefore can not require a fixup
+	           handleComponent (CyclicSCC ((vreg,src@(InReg sreg),dsts):rest))
+	               = do
+		           spill_id <- getUniqueR
+		           (saveInstr,slot) <- spillR (RealReg sreg) spill_id
+			   remainingFixUps <- mapM handleComponent (stronglyConnCompR rest)
+			   restoreAndFixInstr <- getRestoreMoves dsts slot
+			   return ([instr] ++ concat remainingFixUps ++ restoreAndFixInstr)
+			 where
+			   getRestoreMoves [r@(InReg reg), mem@(InMem _)] slot
+			     = do
+				 restoreToReg <- loadR (RealReg reg) slot
+				 return $ [restoreToReg, makeMove vreg r mem]
+			   getRestoreMoves [InReg reg] slot
+			     = loadR (RealReg reg) slot >>= return . (:[])
+			   getRestoreMoves [InMem _] _ = panic "getRestoreMoves can not handle memory only restores"
+			   getRestoreMoves _ _ = panic "getRestoreMoves unknown case"
+	           handleComponent (CyclicSCC _)
+		       = panic "Register Allocator: handleComponent cyclic"
 	           makeMove vreg (InReg src) (InReg dst)
 	               = mkRegRegMoveInstr (RealReg src) (RealReg dst)
 	     	   makeMove vreg (InMem src) (InReg dst)
@@ -918,8 +938,9 @@ joinToTargets block_live new_blocks instr (dest:dests) = do
 	                         ++ " (workaround: use -fviaC)"
 	     
 	       block_id <- getUniqueR
+	       fixUpInstrs <- mapM handleComponent sccs
 	       let block = BasicBlock (BlockId block_id) $
-	               concatMap handleComponent sccs ++ mkBranchInstr dest
+	               concat fixUpInstrs ++ mkBranchInstr dest
 	       let instr' = patchJump instr dest (BlockId block_id)
 	       joinToTargets block_live (block : new_blocks) instr' dests
   where
