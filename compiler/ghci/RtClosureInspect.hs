@@ -235,7 +235,7 @@ extractUnboxed tt clos = go tt (nonPtrs clos)
            | otherwise = pprPanic "Expected a TcTyCon" (ppr t)
          go [] _ = []
          go (t:tt) xx 
-           | (x, rest) <- splitAt (sizeofType t `div` wORD_SIZE) xx 
+           | (x, rest) <- splitAt ((sizeofType t + wORD_SIZE - 1) `div` wORD_SIZE) xx 
            = x : go tt rest
 
 sizeofTyCon = sizeofPrimRep . tyConPrimRep
