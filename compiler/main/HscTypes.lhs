@@ -29,6 +29,7 @@ module HscTypes (
 
 	InteractiveContext(..), emptyInteractiveContext, 
 	icPrintUnqual, mkPrintUnqualified, extendInteractiveContext,
+        substInteractiveContext,
 
 	ModIface(..), mkIfaceDepCache, mkIfaceVerCache, mkIfaceFixCache,
 	emptyIfaceDepCache,
@@ -92,9 +93,9 @@ import Rules		( RuleBase )
 import CoreSyn		( CoreBind )
 import VarEnv
 import VarSet
-import Var
+import Var       hiding ( setIdType )
 import Id
-import Type		( TyThing(..) )
+import Type		
 
 import Class		( Class, classSelIds, classATs, classTyCon )
 import TyCon
@@ -120,6 +121,7 @@ import StringBuffer	( StringBuffer )
 import System.Time	( ClockTime )
 import Data.IORef
 import Data.Array       ( Array, array )
+import Data.List
 \end{code}
 
 
@@ -691,6 +693,22 @@ extendInteractiveContext ictxt ids tyvars
                           -- NB. must be this way around, because we want
                           -- new ids to shadow existing bindings.
             ic_tyvars   = ic_tyvars ictxt `unionVarSet` tyvars }
+
+
+substInteractiveContext :: InteractiveContext -> TvSubst -> InteractiveContext
+substInteractiveContext ictxt subst | isEmptyTvSubst subst = ictxt
+substInteractiveContext ictxt@InteractiveContext{ic_tmp_ids=ids} subst =
+   let ids'     = map (\id -> id `setIdType` substTy subst (idType id)) ids
+       subst_dom= varEnvKeys$ getTvSubstEnv subst
+       subst_ran= varEnvElts$ getTvSubstEnv subst
+       new_tvs  = [ tv | Just tv <- map getTyVar_maybe subst_ran]  
+       ic_tyvars'= (`delVarSetListByKey` subst_dom) 
+                 . (`extendVarSetList`   new_tvs)
+                   $ ic_tyvars ictxt
+    in ictxt { ic_tmp_ids = ids'
+             , ic_tyvars   = ic_tyvars' }
+
+          where delVarSetListByKey = foldl' delVarSetByKey
 \end{code}
 
 %************************************************************************

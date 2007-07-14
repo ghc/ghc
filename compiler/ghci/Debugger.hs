@@ -28,7 +28,8 @@ import Type
 import TcType
 import TcGadt
 import GHC
-
+import GhciMonad
+import InteractiveEval
 import Outputable
 import Pretty                    ( Mode(..), showDocWith )
 import FastString
@@ -44,7 +45,6 @@ import System.IO
 import GHC.Exts
 
 #include "HsVersions.h"
-
 -------------------------------------
 -- | The :print & friends commands
 -------------------------------------
@@ -56,8 +56,10 @@ pprintClosureCommand session bindThings force str = do
                       (words str)
   substs <- catMaybes `liftM` mapM (go session) 
                                    [id | AnId id <- tythings]
-  mapM (applySubstToEnv session . skolemSubst) substs
-  return ()
+  modifySession session $ \hsc_env -> 
+         hsc_env{hsc_IC = foldr (flip substInteractiveContext) 
+                                (hsc_IC hsc_env) 
+                                (map skolemiseSubst substs)}
  where 
 
    -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
@@ -77,37 +79,10 @@ pprintClosureCommand session bindThings force str = do
      --  Then, we extract a substitution, 
      --  mapping the old tyvars to the reconstructed types.
        let Just reconstructed_type = termType term
-
-     -- tcUnifyTys doesn't look through forall's, so we drop them from 
-     -- the original type, instead of sigma-typing the reconstructed type
-     -- In addition, we strip newtypes too, since the reconstructed type might
-     --   not have recovered them all
-           mb_subst = tcUnifyTys (const BindMe) 
-                                 [repType' $ dropForAlls$ idType id] 
-                                 [repType' $ reconstructed_type]  
+           mb_subst = computeRTTIsubst (idType id) (reconstructed_type)
 
        ASSERT2 (isJust mb_subst, ppr reconstructed_type $$ (ppr$ idType id)) 
         return mb_subst
-
-   applySubstToEnv :: Session -> TvSubst -> IO ()
-   applySubstToEnv cms subst | isEmptyTvSubst subst = return ()
-   applySubstToEnv cms@(Session ref) subst = do
-      hsc_env <- readIORef ref
-      inScope <- GHC.getBindings cms
-      let ictxt    = hsc_IC hsc_env
-          ids      = ic_tmp_ids ictxt
-          ids'     = map (\id -> id `setIdType` substTy subst (idType id)) ids
-          subst_dom= varEnvKeys$ getTvSubstEnv subst
-          subst_ran= varEnvElts$ getTvSubstEnv subst
-          new_tvs  = [ tv | Just tv <- map getTyVar_maybe subst_ran]  
-          ic_tyvars'= (`delVarSetListByKey` subst_dom) 
-                    . (`extendVarSetList`   new_tvs)
-                        $ ic_tyvars ictxt
-          ictxt'   = ictxt { ic_tmp_ids = ids'
-                           , ic_tyvars   = ic_tyvars' }
-      writeIORef ref (hsc_env {hsc_IC = ictxt'})
-
-          where delVarSetListByKey = foldl' delVarSetByKey
 
    tidyTermTyVars :: Session -> Term -> IO Term
    tidyTermTyVars (Session ref) t = do
@@ -133,7 +108,7 @@ bindSuspensions cms@(Session ref) t = do
       availNames_var  <- newIORef availNames
       (t', stuff)     <- foldTerm (nameSuspensionsAndGetInfos availNames_var) t
       let (names, tys, hvals) = unzip3 stuff
-      let tys' = map mk_skol_ty tys
+      let tys' = map (fst.skolemiseTy) tys
       let ids = [ mkGlobalId VanillaGlobal name ty vanillaIdInfo
                 | (name,ty) <- zip names tys']
           new_tyvars   = tyVarsOfTypes tys'
@@ -214,11 +189,3 @@ newGrimName cms userName  = do
         occname = mkOccName varName userName
         name    = mkInternalName unique occname noSrcSpan
     return name
-
-skolemSubst subst = subst `setTvSubstEnv` 
-                      mapVarEnv mk_skol_ty (getTvSubstEnv subst)
-mk_skol_ty ty | tyvars  <- varSetElems (tyVarsOfType ty)
-              , tyvars' <- map (mkTyVarTy . mk_skol_tv) tyvars
-              = substTyWith tyvars tyvars' ty
-mk_skol_tv tv = mkTcTyVar (tyVarName tv) (tyVarKind tv) 
-                      (SkolemTv RuntimeUnkSkol)

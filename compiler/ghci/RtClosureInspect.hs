@@ -26,6 +26,7 @@ module RtClosureInspect(
      termTyVars,
 --     unsafeDeepSeq, 
      cvReconstructType,
+     computeRTTIsubst, 
      sigmaType
  ) where 
 
@@ -582,7 +583,7 @@ cvReconstructType hsc_env force mb_ty hval = runTR_maybe hsc_env $ do
               (ty',rev_subst) <- instScheme (sigmaType ty) 
               addConstraint tv ty'
               search (isMonomorphic `fmap` zonkTcType tv) 
-                     (uncurry go) 
+                     (\(ty,a) -> go ty a) 
                      [(tv, hval)]
                      max_depth
               substTy rev_subst `fmap` zonkTcType tv
@@ -591,9 +592,9 @@ cvReconstructType hsc_env force mb_ty hval = runTR_maybe hsc_env $ do
   search stop expand [] depth  = return ()
   search stop expand x 0 = fail$ "Failed to reconstruct a type after " ++
                                 show max_depth ++ " steps"
-  search stop expand (x:xx) d  = do 
+  search stop expand (x:xx) d  = unlessM stop $ do 
     new <- expand x 
-    unlessM stop $ search stop expand (xx ++ new) $! (pred d)
+    search stop expand (xx ++ new) $! (pred d)
 
    -- returns unification tasks,since we are going to want a breadth-first search
   go :: Type -> HValue -> TR [(Type, HValue)]
@@ -602,19 +603,20 @@ cvReconstructType hsc_env force mb_ty hval = runTR_maybe hsc_env $ do
     case tipe clos of
       Indirection _ -> go tv $! (ptrs clos ! 0)
       Constr -> do
-        mb_dcname <- dataConInfoPtrToName (infoPtr clos)
-        case mb_dcname of
-          Left tag -> do 
+        Right dcname <- dataConInfoPtrToName (infoPtr clos)
+        (_,mb_dc)    <- tryTcErrs (tcLookupDataCon dcname)
+        case mb_dc of
+          Nothing-> do 
+                     --  TODO: Check this case
             vars     <- replicateM (length$ elems$ ptrs clos) 
                                    (newVar (liftedTypeKind))
             subTerms <- sequence [ appArr (go tv) (ptrs clos) i 
                                    | (i, tv) <- zip [0..] vars]    
             forM [0..length (elems $ ptrs clos)] $ \i -> do
-                        tv <- newVar openTypeKind 
+                        tv <- newVar liftedTypeKind 
                         return$ appArr (\e->(tv,e)) (ptrs clos) i
 
-          Right name -> do 
-            dc <- tcLookupDataCon name
+          Just dc -> do 
             let extra_args = length(dataConRepArgTys dc) - 
                              length(dataConOrigArgTys dc)
             subTtypes <- mapMif (not . isMonomorphic)
@@ -628,6 +630,19 @@ cvReconstructType hsc_env force mb_ty hval = runTR_maybe hsc_env $ do
             return $ [ appArr (\e->(t,e)) (ptrs clos) i
                        | (i,t) <- drop extra_args $ zip [0..] subTtypes]
       otherwise -> return []
+
+     -- This helper computes the difference between a base type t and the 
+     -- improved rtti_t computed by RTTI
+     -- The main difference between RTTI types and their normal counterparts
+     --  is that the former are _not_ polymorphic, thus polymorphism must
+     --  be stripped. Syntactically, forall's must be stripped
+computeRTTIsubst ty rtti_ty = 
+     -- In addition, we strip newtypes too, since the reconstructed type might
+     --   not have recovered them all
+           tcUnifyTys (const BindMe) 
+                      [repType' $ dropForAlls$ ty]
+                      [repType' $ rtti_ty]  
+-- TODO stripping newtypes shouldn't be necessary, test
 
 
 -- Dealing with newtypes

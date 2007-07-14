@@ -28,7 +28,8 @@ module InteractiveEval (
         isModuleInterpreted,
 	compileExpr, dynCompileExpr,
 	lookupName,
-        obtainTerm, obtainTerm1
+        obtainTerm, obtainTerm1, reconstructType,
+        skolemiseSubst, skolemiseTy
 #endif
         ) where
 
@@ -163,7 +164,7 @@ runStmt (Session ref) expr step
 
               let thing_to_run = unsafeCoerce# hval :: IO [HValue]
               status <- sandboxIO statusMVar thing_to_run
-
+              
               let ic = hsc_IC hsc_env
                   bindings = (ic_tmp_ids ic, ic_tyvars ic)
 
@@ -205,8 +206,9 @@ handleRunStatus expr ref bindings final_ids breakMVar statusMVar status
                                         final_ids emptyVarSet
                         -- the bound Ids never have any free TyVars
                     final_names = map idName final_ids
-                writeIORef ref hsc_env{hsc_IC=final_ic}
                 Linker.extendLinkEnv (zip final_names hvals)
+                hsc_env' <- rttiEnvironment hsc_env{hsc_IC=final_ic}
+                writeIORef ref hsc_env' 
                 return (RunOk final_names)
 
 
@@ -420,7 +422,8 @@ moveHist fn (Session ref) = do
 
 -- -----------------------------------------------------------------------------
 -- After stopping at a breakpoint, add free variables to the environment
-
+result_fs = FSLIT("_result")
+       
 bindLocalsAtBreakpoint
         :: HscEnv
         -> HValue
@@ -475,7 +478,8 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
    -- So that we don't fall over in a heap when this happens, just don't
    -- bind any free variables instead, and we emit a warning.
    mb_hValues <- mapM (getIdValFromApStack apStack) offsets
-   let filtered_ids = [ id | (id, Just _) <- zip ids mb_hValues ]
+   let (filtered_hvs, filtered_ids) = 
+                       unzip [ (hv, id) | (id, Just hv) <- zip ids mb_hValues ]
    when (any isNothing mb_hValues) $
       debugTraceMsg (hsc_dflags hsc_env) 1 $
 	  text "Warning: _result has been evaluated, some bindings have been lost"
@@ -486,8 +490,7 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
    -- make an Id for _result.  We use the Unique of the FastString "_result";
    -- we don't care about uniqueness here, because there will only be one
    -- _result in scope at any time.
-   let result_fs = FSLIT("_result")
-       result_name = mkInternalName (getUnique result_fs)
+   let result_name = mkInternalName (getUnique result_fs)
                           (mkVarOccFS result_fs) span
        result_id   = Id.mkGlobalId VanillaGlobal result_name result_ty 
                                    vanillaIdInfo
@@ -504,14 +507,13 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
        (id_tys, tyvarss) = mapAndUnzip (skolemiseTy.idType) all_ids
        (_,tidy_tys) = tidyOpenTypes emptyTidyEnv id_tys
        new_tyvars = unionVarSets tyvarss             
-       final_ids = zipWith setIdType all_ids tidy_tys
-
-   let   ictxt0 = hsc_IC hsc_env
-         ictxt1 = extendInteractiveContext ictxt0 final_ids new_tyvars
-
+   let final_ids = zipWith setIdType all_ids tidy_tys
+       ictxt0 = hsc_IC hsc_env
+       ictxt1 = extendInteractiveContext ictxt0 final_ids new_tyvars
    Linker.extendLinkEnv [ (name,hval) | (name, Just hval) <- zip names mb_hValues ]
    Linker.extendLinkEnv [(result_name, unsafeCoerce# apStack)]
-   return (hsc_env{ hsc_IC = ictxt1 }, result_name:names, span)
+   hsc_env1 <- rttiEnvironment hsc_env{ hsc_IC = ictxt1 }
+   return (hsc_env1, result_name:names, span)
   where
    mkNewId :: OccName -> Id -> IO Id
    mkNewId occ id = do
@@ -521,6 +523,26 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
          ty = idType id
          new_id = Id.mkGlobalId VanillaGlobal name ty (idInfo id)
      return new_id
+
+rttiEnvironment :: HscEnv -> IO HscEnv 
+rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
+   let InteractiveContext{ic_tmp_ids=tmp_ids, ic_tyvars = tyvars} = ic
+       incompletelyTypedIds = 
+           [id | id <- tmp_ids
+               , not $ null [v | v <- varSetElems$ tyVarsOfType (idType id)
+                              , isSkolemTyVar v]
+               , (occNameFS.nameOccName.idName) id /= result_fs]
+   tys <- reconstructType hsc_env False `mapM` incompletelyTypedIds
+          -- map termType `fmap` (obtainTerm hsc_env False `mapM` incompletelyTypedIds)
+   
+   let substs = [computeRTTIsubst ty ty' 
+                 | (ty, Just ty') <- zip (map idType incompletelyTypedIds) tys]
+       ic'    = foldr (flip substInteractiveContext) ic 
+                           (map skolemiseSubst $ catMaybes substs)
+   return hsc_env{hsc_IC=ic'}
+
+skolemiseSubst subst = subst `setTvSubstEnv` 
+                        mapVarEnv (fst.skolemiseTy) (getTvSubstEnv subst)
 
 skolemiseTy :: Type -> (Type, TyVarSet)
 skolemiseTy ty = (substTy subst ty, mkVarSet new_tyvars)
@@ -819,12 +841,21 @@ isModuleInterpreted s mod_summary = withSession s $ \hsc_env ->
 		      where
 			 obj_linkable = isObjectLinkable (expectJust "showModule" (hm_linkable mod_info))
 
+----------------------------------------------------------------------------
+-- RTTI primitives
+
 obtainTerm1 :: HscEnv -> Bool -> Maybe Type -> a -> IO Term
-obtainTerm1 hsc_env force mb_ty x = cvObtainTerm hsc_env force mb_ty (unsafeCoerce# x)
+obtainTerm1 hsc_env force mb_ty x = 
+              cvObtainTerm hsc_env force mb_ty (unsafeCoerce# x)
 
 obtainTerm :: HscEnv -> Bool -> Id -> IO Term
 obtainTerm hsc_env force id =  do
               hv <- Linker.getHValue hsc_env (varName id) 
               cvObtainTerm hsc_env force (Just$ idType id) hv
 
+-- Uses RTTI to reconstruct the type of an Id, making it less polymorphic
+reconstructType :: HscEnv -> Bool -> Id -> IO (Maybe Type)
+reconstructType hsc_env force id = do
+              hv <- Linker.getHValue hsc_env (varName id) 
+              cvReconstructType hsc_env force (Just$ idType id) hv
 #endif /* GHCI */
