@@ -225,6 +225,10 @@ binary-dist::
 binary-dist::
 	cd $(BIN_DIST_DIR) && ../distrib/prep-bin-dist-mingw
 
+binary-dist::
+	$(MKDIRHIER) $(BIN_DIST_DIR)/icons
+	cp distrib/hsicon.ico $(BIN_DIST_DIR)/icons
+
 else
 
 BinDistDirs = includes compiler docs rts
@@ -292,12 +296,6 @@ binary-dist::
 	@echo "Generating a shippable configure script.."
 	$(MV) $(BIN_DIST_DIR)/configure-bin.ac $(BIN_DIST_DIR)/configure.ac
 	( cd $(BIN_DIST_DIR); autoreconf )
-
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-binary-dist::
-	$(MKDIRHIER) $(BIN_DIST_DIR)/icons
-	cp distrib/hsicon.ico $(BIN_DIST_DIR)/icons
-endif
 
 #
 # binary dist'ing the documentation.  
