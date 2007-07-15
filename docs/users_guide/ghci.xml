@@ -788,7 +788,7 @@ def = toEnum 0
     <para>The debugger provides the following:
     <itemizedlist>
         <listitem>
-          <para>The abilty to set a <firstterm>breakpoint</firstterm> on a
+          <para>The ability to set a <firstterm>breakpoint</firstterm> on a
             function definition or expression in the program.  When the function
             is called, or the expression evaluated, GHCi suspends 
             execution and returns to the prompt, where you can inspect the
