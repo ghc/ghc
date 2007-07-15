@@ -19,7 +19,6 @@ import CmmUtils
 
 import ClosureInfo
 import MachOp
-import ForeignCall
 import CLabel
 import SMRep
 import Constants
