@@ -140,7 +140,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                     arguments = map formal_to_actual (continuation_formals cont_format)
                   in (new_next,
                      [BasicBlock new_next $
-                      pack_continuation False curr_format cont_format ++
+                      pack_continuation curr_format cont_format ++
                       tail_call (curr_stack - cont_stack)
                               (CmmLit $ CmmLabel $ toCLabel next)
                               arguments])
@@ -201,7 +201,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                         -- A regular Cmm function call
                         FinalCall next (CmmForeignCall target CmmCallConv)
                             results arguments _ _ ->
-                                pack_continuation True curr_format cont_format ++
+                                pack_continuation curr_format cont_format ++
                                 tail_call (curr_stack - cont_stack)
                                               target arguments
                             where
@@ -387,17 +387,11 @@ gc_stack_check gc_block max_frame_size
      gc_block]
 
 
-pack_continuation :: Bool               -- ^ Whether to set the top/header
-                                        -- of the stack.  We only need to
-                                        -- set it if we are calling down
-                                        -- as opposed to continuation
-                                        -- adaptors.
-                  -> ContinuationFormat -- ^ The current format
+pack_continuation :: ContinuationFormat -- ^ The current format
                   -> ContinuationFormat -- ^ The return point format
                   -> [CmmStmt]
-pack_continuation allow_header_set
-                      (ContinuationFormat _ curr_id curr_frame_size _)
-                      (ContinuationFormat _ cont_id cont_frame_size live_regs)
+pack_continuation (ContinuationFormat _ curr_id curr_frame_size _)
+                  (ContinuationFormat _ cont_id cont_frame_size live_regs)
   = pack_frame curr_frame_size cont_frame_size maybe_header continuation_args
   where
     continuation_args = map (maybe Nothing (Just . CmmReg . CmmLocal))
@@ -407,7 +401,7 @@ pack_continuation allow_header_set
           (Just x, Just y) -> x /= y
           _ -> isJust cont_id
 
-    maybe_header = if allow_header_set && needs_header_set
+    maybe_header = if needs_header_set
                    then maybe Nothing (Just . CmmLit . CmmLabel . entryLblToInfoLbl) cont_id
                    else Nothing
 
