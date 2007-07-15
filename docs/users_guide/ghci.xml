@@ -1080,7 +1080,7 @@ right :: [a]
         <title>Listing and deleting breakpoints</title>
 
         <para>The list of breakpoints currently enabled can be displayed using
-          <literal>:show&nbsp;breaks</literal></para>:
+          <literal>:show&nbsp;breaks</literal>:</para>
 <screen>
 *Main> :show breaks
 [0] Main qsort.hs:1:11-12
@@ -1488,7 +1488,7 @@ Just 20
         </listitem>
 	<listitem><para>
 	  Implicit parameters (see <xref linkend="implicit-parameters"/>) are only available 
-	  at the scope of a breakpoint if there is a explicit type signature.
+	  at the scope of a breakpoint if there is an explicit type signature.
 	</para>
         </listitem>
       </itemizedlist>
