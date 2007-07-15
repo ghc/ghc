@@ -5,7 +5,7 @@ import Trace.Hpc.Tix
 
 import HpcFlags
 
-import qualified Data.Set as Set
+import qualified HpcSet as Set
 
 showtix_options = 
   [ excludeOpt,includeOpt,hpcDirOpt
