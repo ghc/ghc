@@ -25,6 +25,7 @@ import Constants
 import StaticFlags
 import Unique
 import Maybe
+import List
 
 import Panic
 
@@ -81,7 +82,7 @@ data ContinuationFormat
 -----------------------------------------------------------------------------
 continuationToProc :: (WordOff, WordOff, [(CLabel, ContinuationFormat)])
                    -> CmmReg
-                   -> [[Unique]]
+                   -> [[[Unique]]]
                    -> Continuation CmmInfo
                    -> CmmTop
 continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
@@ -108,17 +109,12 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                 adjust_sp_reg (curr_stack - update_frame_size)
             CmmInfo _ Nothing _ -> []
 
--- At present neither the Cmm parser nor the code generator
--- produce code that will allow the target of a CmmCondBranch
--- or a CmmSwitch to become a continuation or a proc-point.
--- If future revisions, might allow these to happen
--- then special care will have to be take to allow for that case.
-      continuationToProc' :: [Unique]
+      continuationToProc' :: [[Unique]]
                           -> BrokenBlock
                           -> Bool
                           -> [CmmBasicBlock]
       continuationToProc' uniques (BrokenBlock ident entry stmts _ exit) is_entry =
-          prefix_blocks ++ [main_block]
+          prefix_blocks ++ [BasicBlock ident fixed_main_stmts] ++ concat new_blocks
           where
             prefix_blocks =
                 if is_entry
@@ -127,10 +123,16 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                       (param_stmts ++ [CmmBranch ident])]
                 else []
 
-            prefix_unique : call_uniques = uniques
+            (prefix_unique : call_uniques) : new_block_uniques = uniques
             toCLabel = mkReturnPtLabel . getUnique
 
+            block_for_branch :: Unique -> BlockId -> (BlockId, [CmmBasicBlock])
             block_for_branch unique next
+                -- branches to the current function don't have to jump
+                | (mkReturnPtLabel $ getUnique next) == label
+                = (next, [])
+
+                -- branches to any other function have to jump
                 | (Just cont_format) <- lookup (toCLabel next) formats
                 = let
                     new_next = BlockId unique
@@ -142,15 +144,34 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                       tail_call (curr_stack - cont_stack)
                               (CmmLit $ CmmLabel $ toCLabel next)
                               arguments])
+
+                -- branches to blocks in the current function don't have to jump
                 | otherwise
                 = (next, [])
 
+            -- Wrapper for block_for_branch for when the target
+            -- is inside a 'Maybe'.
             block_for_branch' :: Unique -> Maybe BlockId -> (Maybe BlockId, [CmmBasicBlock])
             block_for_branch' _ Nothing = (Nothing, [])
             block_for_branch' unique (Just next) = (Just new_next, new_blocks)
               where (new_next, new_blocks) = block_for_branch unique next
 
-            main_block =
+            -- If the target of a switch, branch or cond branch becomes a proc point
+            -- then we have to make a new block what will then *jump* to the original target.
+            proc_point_fix unique (CmmCondBranch test target)
+                = (CmmCondBranch test new_target, new_blocks)
+                  where (new_target, new_blocks) = block_for_branch (head unique) target
+            proc_point_fix unique (CmmSwitch test targets)
+                = (CmmSwitch test new_targets, concat new_blocks)
+                  where (new_targets, new_blocks) =
+                            unzip $ zipWith block_for_branch' unique targets
+            proc_point_fix unique (CmmBranch target)
+                = (CmmBranch new_target, new_blocks)
+                  where (new_target, new_blocks) = block_for_branch (head unique) target
+            proc_point_fix _ other = (other, [])
+
+            (fixed_main_stmts, new_blocks) = unzip $ zipWith proc_point_fix new_block_uniques main_stmts
+            main_stmts =
                 case entry of
                   FunctionEntry _ _ _ ->
                       -- Ugh, the statements for an update frame must come
@@ -159,28 +180,21 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                       -- a bit.  This depends on the knowledge that the
                       -- statements in the first block are only the GC check.
                       -- That's fragile but it works for now.
-                      BasicBlock ident (gc_stmts ++ stmts ++ update_stmts ++ postfix_stmts)
-                  ControlEntry -> BasicBlock ident (stmts ++ postfix_stmts)
-                  ContinuationEntry _ _ _ -> BasicBlock ident (stmts ++ postfix_stmts)
+                      gc_stmts ++ stmts ++ update_stmts ++ postfix_stmts
+                  ControlEntry -> stmts ++ postfix_stmts
+                  ContinuationEntry _ _ _ -> stmts ++ postfix_stmts
             postfix_stmts = case exit of
-                        FinalBranch next ->
-                            if (mkReturnPtLabel $ getUnique next) == label
-                            then [CmmBranch next]
-                            else case lookup (mkReturnPtLabel $ getUnique next) formats of
-                              Nothing -> [CmmBranch next]
-                              Just cont_format ->
-                                pack_continuation True curr_format cont_format ++
-                                tail_call (curr_stack - cont_stack)
-                                          (CmmLit $ CmmLabel $ mkReturnPtLabel $ getUnique next)
-                                          arguments
-                                where
-                                  cont_stack = continuation_frame_size cont_format
-                                  arguments = map formal_to_actual (continuation_formals cont_format)
+                        -- Branches and switches may get modified by proc_point_fix
+                        FinalBranch next -> [CmmBranch next]
                         FinalSwitch expr targets -> [CmmSwitch expr targets]
+
+                        -- A return is a tail call to the stack top
                         FinalReturn arguments ->
                             tail_call curr_stack
                                 (entryCode (CmmLoad (CmmReg spReg) wordRep))
                                 arguments
+
+                        -- A tail call
                         FinalJump target arguments ->
                             tail_call curr_stack target arguments
 

@@ -113,7 +113,7 @@ cpsProc uniqSupply (CmmProc info ident params blocks) = cps_procs
       uniques = map uniqsFromSupply $ listSplitUniqSupply uniqSupply1
       (stack_check_block_unique:stack_use_unique:adaptor_uniques) :
        block_uniques = uniques
-      proc_uniques = map (map uniqsFromSupply . listSplitUniqSupply) $ listSplitUniqSupply uniqSupply2
+      proc_uniques = map (map (map uniqsFromSupply . listSplitUniqSupply) . listSplitUniqSupply) $ listSplitUniqSupply uniqSupply2
 
       stack_use = CmmLocal (LocalReg stack_use_unique (cmmRegRep spReg) KindPtr)
       stack_check_block_id = BlockId stack_check_block_unique
