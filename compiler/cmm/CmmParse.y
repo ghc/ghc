@@ -210,7 +210,7 @@ cmmproc :: { ExtCode }
 		         $6;
 		         return (info_lbl, info, live, formals, frame, gc_block) }
 		     blks <- code (cgStmtsToBlocks stmts)
-		     code (emitInfoTableAndCode info_lbl (CmmInfo Nothing frame info) formals blks) }
+		     code (emitInfoTableAndCode info_lbl (CmmInfo gc_block frame info) formals blks) }
 
 	| info maybe_formals ';'
 		{ do (info_lbl, info, live) <- $1;
