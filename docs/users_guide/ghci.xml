@@ -564,7 +564,7 @@ Prelude IO>
       <para>
         Hint: GHCi will tab-complete names that are in scope; for
         example, if you run GHCi and type <literal>J&lt;tab&gt;</literal>
-        then GHCi will expand it to <literal>Just </literal>.
+        then GHCi will expand it to &ldquo;<literal>Just </literal>&rdquo;.
       </para>
 
       <sect3>
@@ -715,7 +715,7 @@ it &lt;- <replaceable>e</replaceable>
         </listitem>
     </orderedlist>
     At the GHCi prompt, or with GHC if the
-    <literal>-fextended-default-rules</literal> flag is given,
+    <literal>-XExtendedDefaultRules</literal> flag is given,
     the following additional differences apply:
     <itemizedlist>
         <listitem>
@@ -764,8 +764,8 @@ def = toEnum 0
     instance that returns <literal>IO a</literal>.
     However, it is only able to return
     <literal>undefined</literal>
-    (the reason for the instance having this type is to not require
-    extensions to the class system), so if the type defaults to
+    (the reason for the instance having this type is so that printf
+    doesn't require extensions to the class system), so if the type defaults to
     <literal>Integer</literal> then ghci gives an error when running a
     printf.
    </para>
