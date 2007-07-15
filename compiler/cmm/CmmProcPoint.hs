@@ -79,8 +79,12 @@ calculateNewProcPoints  owners block =
           where
             parent_owners = lookupWithDefaultUFM owners emptyUniqSet parent_id
             child_owners = lookupWithDefaultUFM owners emptyUniqSet child_id
-            needs_proc_point = not $ isEmptyUniqSet $
-                               child_owners `minusUniqSet` parent_owners
+            needs_proc_point =
+                -- only if parent isn't dead
+                (not $ isEmptyUniqSet parent_owners) &&
+                -- and only if child has more owners than parent
+                (not $ isEmptyUniqSet $
+                     child_owners `minusUniqSet` parent_owners)
 
 calculateOwnership :: BlockEnv BrokenBlock
                    -> UniqSet BlockId
