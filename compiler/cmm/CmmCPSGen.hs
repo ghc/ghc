@@ -17,6 +17,7 @@ import CmmCallConv
 
 import CgProf (curCCS, curCCSAddr)
 import CgUtils (cmmOffsetW)
+import CgInfoTbls (entryCode)
 import SMRep
 import ForeignCall
 
@@ -178,7 +179,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                         FinalSwitch expr targets -> [CmmSwitch expr targets]
                         FinalReturn arguments ->
                             tail_call curr_stack
-                                (CmmLoad (CmmReg spReg) wordRep)
+                                (entryCode (CmmLoad (CmmReg spReg) wordRep))
                                 arguments
                         FinalJump target arguments ->
                             tail_call curr_stack target arguments
