@@ -1532,12 +1532,7 @@ $ ghci Main.hs
 
 <screen>
 $ ghci -package readline
-   ___         ___ _
-  / _ \ /\  /\/ __(_)
- / /_\// /_/ / /  | |      GHC Interactive, version 6.6, for Haskell 98.
-/ /_\\/ __  / /___| |      http://www.haskell.org/ghc/
-\____/\/ /_/\____/|_|      Type :? for help.
-
+GHCi, version 6.8.1: http://www.haskell.org/ghc/  :? for help
 Loading package base ... linking ... done.
 Loading package readline-1.0 ... linking ... done.
 Prelude> 
