@@ -1516,9 +1516,7 @@ $ ghci Main.hs
 
     <para>Most of the command-line options accepted by GHC (see <xref
     linkend="using-ghc"/>) also make sense in interactive mode.  The ones
-    that don't make sense are mostly obvious; for example, GHCi
-    doesn't generate interface files, so options related to interface
-    file generation won't have any effect.</para>
+    that don't make sense are mostly obvious.</para>
 
     <sect2>
       <title>Packages</title>
