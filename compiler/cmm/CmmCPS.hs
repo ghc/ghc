@@ -111,8 +111,7 @@ cpsProc uniqSupply (CmmProc info ident params blocks) = cps_procs
       (uniqSupply1, uniqSupply2) = splitUniqSupply uniqSupply
       uniques :: [[Unique]]
       uniques = map uniqsFromSupply $ listSplitUniqSupply uniqSupply1
-      (stack_check_block_unique:stack_use_unique:info_uniques) :
-       adaptor_uniques :
+      (stack_check_block_unique:stack_use_unique:adaptor_uniques) :
        block_uniques = uniques
       proc_uniques = map (map uniqsFromSupply . listSplitUniqSupply) $ listSplitUniqSupply uniqSupply2
 
