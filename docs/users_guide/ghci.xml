@@ -2424,9 +2424,10 @@ Prelude> :set -fno-glasgow-exts
     <indexterm><primary>startup</primary><secondary>files, GHCi</secondary>
     </indexterm>
 
-    <para>When it starts, GHCi always reads and executes commands from
-    <filename>$HOME/.ghci</filename>, followed by
-    <filename>./.ghci</filename>.</para>
+    <para>When it starts, unless the <literal>-ignore-dot-ghci</literal>
+    flag is given, GHCi reads and executes commands from
+    <filename>./.ghci</filename>, followed by
+    <filename>$HOME/.ghci</filename>.</para>
 
     <para>The <filename>.ghci</filename> in your home directory is
     most useful for turning on favourite options (eg. <literal>:set
