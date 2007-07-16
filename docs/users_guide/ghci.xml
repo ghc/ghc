@@ -1017,7 +1017,7 @@ right :: [a]
       <para>The execution continued at the point it previously stopped, and has
         now stopped at the breakpoint for a second time.</para>
 
-      <sect3 id="setting-breakpoings">
+      <sect3 id="setting-breakpoints">
         <title>Setting breakpoints</title>
 
         <para>Breakpoints can be set in various ways.  Perhaps the easiest way to
