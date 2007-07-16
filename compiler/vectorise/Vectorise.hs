@@ -33,6 +33,7 @@ import DsUtils              ( mkCoreTup, mkCoreTupTy )
 
 import PrelNames
 import TysWiredIn
+import TysPrim              ( intPrimTy )
 import BasicTypes           ( Boxity(..) )
 
 import Outputable
@@ -374,7 +375,7 @@ mkClosureFns info tyvars arg body
 mkClosureMonoFns :: CEnvInfo -> Var -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
 mkClosureMonoFns info arg body
   = do
-      lc_bndr <- newLocalVar FSLIT("lc") intTy
+      lc_bndr <- newLocalVar FSLIT("lc") intPrimTy
       (varg : vbndrs, larg : lbndrs, (vbody, lbody))
         <- vectBndrsIn (arg : cenv_vars info)
                        (vectExpr (Var lc_bndr) body)
@@ -403,17 +404,21 @@ mkClosureMonoFns info arg body
           return . Let (NonRec lbndr lenv)
                  $ Case (mkApps (Var lengthPA) [Type vty, (Var lbndr)])
                         lc_bndr
-                        intTy
+                        intPrimTy
                         [(DEFAULT, [], lbody)]
 
     bind_lenv lenv lbody lc_bndr lbndrs
-      = return
-      $ Case (unwrapFamInstScrut (cenv_repr_tycon info)
-                                 (cenv_repr_tyargs info)
-                                 lenv)
-             (mkWildId lty)
+      = let scrut = unwrapFamInstScrut (cenv_repr_tycon info)
+                                       (cenv_repr_tyargs info)
+                                       lenv
+            lbndrs' | null lbndrs = [mkWildId unitTy]
+                    | otherwise   = lbndrs
+        in
+        return
+      $ Case scrut
+             (mkWildId (exprType scrut))
              (exprType lbody)
-             [(DataAlt (cenv_repr_datacon info), lc_bndr : lbndrs, lbody)]
+             [(DataAlt (cenv_repr_datacon info), lc_bndr : lbndrs', lbody)]
           
 vectTyAppExpr :: CoreExpr -> CoreExprWithFVs -> [Type] -> VM (CoreExpr, CoreExpr)
 vectTyAppExpr lc (_, AnnVar v) tys = vectPolyVar lc v tys
