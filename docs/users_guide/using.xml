@@ -819,17 +819,10 @@ ghc -c Foo.hs</screen>
 	  <indexterm><primary>-W option</primary></indexterm>
 	  <para>Provides the standard warnings plus
 	  <option>-fwarn-incomplete-patterns</option>,
+	  <option>-fwarn-dodgy-imports</option>,
 	  <option>-fwarn-unused-matches</option>,
 	  <option>-fwarn-unused-imports</option>, and
 	  <option>-fwarn-unused-binds</option>.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term><option>-w</option>:</term>
-	<listitem>
-	  <indexterm><primary><option>-w</option></primary></indexterm>
-	  <para>Turns off all warnings, including the standard ones.</para>
 	</listitem>
       </varlistentry>
 
@@ -840,14 +833,21 @@ ghc -c Foo.hs</screen>
 	  <para>Turns on all warning options that indicate potentially
 	  suspicious code.  The warnings that are
 	  <emphasis>not</emphasis> enabled by <option>-Wall</option>
-	  are:</para>
-          <itemizedlist>
-            <listitem><option>-fwarn-simple-patterns</option></listitem>
-            <listitem><option>-fwarn-tabs</option></listitem>
-            <listitem><option>-fwarn-incomplete-record-updates</option></listitem>
-            <listitem><option>-fwarn-monomorphism-restriction</option></listitem>
-            <listitem><option>-fwarn-implicit-prelude</option></listitem>
-          </itemizedlist>
+	  are
+            <option>-fwarn-simple-patterns</option>,
+            <option>-fwarn-tabs</option>,
+            <option>-fwarn-incomplete-record-updates</option>,
+            <option>-fwarn-monomorphism-restriction</option>, and
+            <option>-fwarn-implicit-prelude</option>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-w</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-w</option></primary></indexterm>
+	  <para>Turns off all warnings, including the standard ones and
+      those that <literal>-Wall</literal> doesn't enable.</para>
 	</listitem>
       </varlistentry>
 
