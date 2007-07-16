@@ -677,14 +677,14 @@ pprFixities fixes = ptext SLIT("fixities") <+> pprWithCommas pprFix fixes
 		    pprFix (occ,fix) = ppr fix <+> ppr occ 
 
 pprVectInfo :: IfaceVectInfo -> SDoc
-pprVectInfo (IfaceVectInfo { ifaceVectInfoCCVar        = vars
-                           , ifaceVectInfoCCTyCon      = tycons
-                           , ifaceVectInfoCCTyConReuse = tyconsReuse
+pprVectInfo (IfaceVectInfo { ifaceVectInfoVar        = vars
+                           , ifaceVectInfoTyCon      = tycons
+                           , ifaceVectInfoTyConReuse = tyconsReuse
                            }) = 
   vcat 
-  [ ptext SLIT("CC'ed variables:") <+> hsep (map ppr vars)
-  , ptext SLIT("CC'ed tycons:") <+> hsep (map ppr tycons)
-  , ptext SLIT("CC reused tycons:") <+> hsep (map ppr tyconsReuse)
+  [ ptext SLIT("vectorised variables:") <+> hsep (map ppr vars)
+  , ptext SLIT("vectorised tycons:") <+> hsep (map ppr tycons)
+  , ptext SLIT("vectorised reused tycons:") <+> hsep (map ppr tyconsReuse)
   ]
 
 pprDeprecs NoDeprecs	    = empty

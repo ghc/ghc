@@ -133,9 +133,9 @@ data LocalEnv = LocalEnv {
 initGlobalEnv :: VectInfo -> (InstEnv, InstEnv) -> FamInstEnvs -> GlobalEnv
 initGlobalEnv info instEnvs famInstEnvs
   = GlobalEnv {
-      global_vars          = mapVarEnv  (Var . snd) $ vectInfoCCVar   info
+      global_vars          = mapVarEnv  (Var . snd) $ vectInfoVar   info
     , global_exported_vars = emptyVarEnv
-    , global_tycons        = mapNameEnv snd $ vectInfoCCTyCon info
+    , global_tycons        = mapNameEnv snd $ vectInfoTyCon info
     , global_tycon_pa      = emptyNameEnv
     , global_inst_env      = instEnvs
     , global_fam_inst_env  = famInstEnvs
@@ -151,8 +151,8 @@ emptyLocalEnv = LocalEnv {
 updVectInfo :: GlobalEnv -> TypeEnv -> VectInfo -> VectInfo
 updVectInfo env tyenv info
   = info {
-      vectInfoCCVar   = global_exported_vars env
-    , vectInfoCCTyCon = tc_env
+      vectInfoVar   = global_exported_vars env
+    , vectInfoTyCon = tc_env
     }
   where
     tc_env = mkNameEnv [(tc_name, (tc,tc'))

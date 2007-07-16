@@ -1275,37 +1275,38 @@ The following information is generated and consumed by the vectorisation
 subsystem.  It communicates the vectorisation status of declarations from one
 module to another.
 
-Why do we need both f and f_CC in the ModGuts/ModDetails/EPS version VectInfo
+Why do we need both f and f_v in the ModGuts/ModDetails/EPS version VectInfo
 below?  We need to know `f' when converting to IfaceVectInfo.  However, during
-closure conversion, we need to know `f_CC', whose `Var' we cannot lookup based
+vectorisation, we need to know `f_v', whose `Var' we cannot lookup based
 on just the OccName easily in a Core pass.
 
 \begin{code}
 -- ModGuts/ModDetails/EPS version
 data VectInfo      
   = VectInfo {
-      vectInfoCCVar     :: VarEnv  (Var    , Var  ),   -- (f, f_CC) keyed on f
-      vectInfoCCTyCon   :: NameEnv (TyCon  , TyCon),   -- (T, T_CC) keyed on T
-      vectInfoCCDataCon :: NameEnv (DataCon, DataCon), -- (C, C_CC) keyed on C
-      vectInfoCCIso     :: NameEnv (TyCon  , Var)      -- (T, isoT) keyed on T
+      vectInfoVar     :: VarEnv  (Var    , Var  ),   -- (f, f_v) keyed on f
+      vectInfoTyCon   :: NameEnv (TyCon  , TyCon),   -- (T, T_v) keyed on T
+      vectInfoDataCon :: NameEnv (DataCon, DataCon), -- (C, C_v) keyed on C
+      vectInfoIso     :: NameEnv (TyCon  , Var)      -- (T, isoT) keyed on T
     }
     -- all of this is always tidy, even in ModGuts
 
 -- ModIface version
 data IfaceVectInfo 
   = IfaceVectInfo {
-      ifaceVectInfoCCVar        :: [Name],
-        -- all variables in here have a closure-converted variant;
-        -- the name of the CC'ed variant is determined by `mkCloOcc'
-      ifaceVectInfoCCTyCon      :: [Name],
-        -- all tycons in here have a closure-converted variant;
-        -- the name of the CC'ed variant and those of its data constructors are
-        -- determined by `mkCloTyConOcc' and `mkCloDataConOcc'; the names of
-        -- the isomorphisms is determined by `mkCloIsoOcc'
-      ifaceVectInfoCCTyConReuse :: [Name]              
-        -- the closure-converted form of all the tycons in here coincids with
+      ifaceVectInfoVar        :: [Name],
+        -- all variables in here have a vectorised variant;
+        -- the name of the vectorised variant is determined by `mkCloVect'
+      ifaceVectInfoTyCon      :: [Name],
+        -- all tycons in here have a vectorised variant;
+        -- the name of the vectorised variant and those of its
+        -- data constructors are determined by `mkVectTyConOcc'
+        -- and `mkVectDataConOcc'; the names of
+        -- the isomorphisms is determined by `mkVectIsoOcc'
+      ifaceVectInfoTyConReuse :: [Name]              
+        -- the vectorised form of all the tycons in here coincids with
         -- the unconverted from; the names of the isomorphisms is determined
-        -- by `mkCloIsoOcc'
+        -- by `mkVectIsoOcc'
     }
 
 noVectInfo :: VectInfo
@@ -1313,10 +1314,10 @@ noVectInfo = VectInfo emptyVarEnv emptyNameEnv emptyNameEnv emptyNameEnv
 
 plusVectInfo :: VectInfo -> VectInfo -> VectInfo
 plusVectInfo vi1 vi2 = 
-  VectInfo (vectInfoCCVar     vi1 `plusVarEnv`  vectInfoCCVar     vi2)
-           (vectInfoCCTyCon   vi1 `plusNameEnv` vectInfoCCTyCon   vi2)
-           (vectInfoCCDataCon vi1 `plusNameEnv` vectInfoCCDataCon vi2)
-           (vectInfoCCIso     vi1 `plusNameEnv` vectInfoCCIso     vi2)
+  VectInfo (vectInfoVar     vi1 `plusVarEnv`  vectInfoVar     vi2)
+           (vectInfoTyCon   vi1 `plusNameEnv` vectInfoTyCon   vi2)
+           (vectInfoDataCon vi1 `plusNameEnv` vectInfoDataCon vi2)
+           (vectInfoIso     vi1 `plusNameEnv` vectInfoIso     vi2)
 
 noIfaceVectInfo :: IfaceVectInfo
 noIfaceVectInfo = IfaceVectInfo [] [] []

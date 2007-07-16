@@ -593,57 +593,57 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
 \begin{code}
 tcIfaceVectInfo :: Module -> TypeEnv  -> IfaceVectInfo -> IfL VectInfo
 tcIfaceVectInfo mod typeEnv (IfaceVectInfo 
-                             { ifaceVectInfoCCVar        = vars
-                             , ifaceVectInfoCCTyCon      = tycons
-                             , ifaceVectInfoCCTyConReuse = tyconsReuse
+                             { ifaceVectInfoVar        = vars
+                             , ifaceVectInfoTyCon      = tycons
+                             , ifaceVectInfoTyConReuse = tyconsReuse
                              })
-  = do { ccVars    <- mapM ccVarMapping vars
-       ; tyConRes1 <- mapM ccTyConMapping      tycons
-       ; tyConRes2 <- mapM ccTyConReuseMapping tycons
-       ; let (ccTyCons, ccDataCons, ccIsos) = unzip3 (tyConRes1 ++ tyConRes2)
+  = do { vVars     <- mapM vectVarMapping vars
+       ; tyConRes1 <- mapM vectTyConMapping      tycons
+       ; tyConRes2 <- mapM vectTyConReuseMapping tycons
+       ; let (vTyCons, vDataCons, vIsos) = unzip3 (tyConRes1 ++ tyConRes2)
        ; return $ VectInfo 
-                  { vectInfoCCVar     = mkVarEnv  ccVars
-                  , vectInfoCCTyCon   = mkNameEnv ccTyCons
-                  , vectInfoCCDataCon = mkNameEnv (concat ccDataCons)
-                  , vectInfoCCIso     = mkNameEnv ccIsos
+                  { vectInfoVar     = mkVarEnv  vVars
+                  , vectInfoTyCon   = mkNameEnv vTyCons
+                  , vectInfoDataCon = mkNameEnv (concat vDataCons)
+                  , vectInfoIso     = mkNameEnv vIsos
                   }
        }
   where
-    ccVarMapping name 
-      = do { ccName <- lookupOrig mod (mkCloOcc (nameOccName name))
-           ; let { var   = lookupVar name
-                 ; ccVar = lookupVar ccName
+    vectVarMapping name 
+      = do { vName <- lookupOrig mod (mkVectOcc (nameOccName name))
+           ; let { var  = lookupVar name
+                 ; vVar = lookupVar vName
                  }
-           ; return (var, (var, ccVar))
+           ; return (var, (var, vVar))
            }
-    ccTyConMapping name 
-      = do { ccName  <- lookupOrig mod (mkCloTyConOcc (nameOccName name))
-           ; isoName <- lookupOrig mod (mkCloIsoOcc   (nameOccName name))
+    vectTyConMapping name 
+      = do { vName   <- lookupOrig mod (mkVectTyConOcc (nameOccName name))
+           ; isoName <- lookupOrig mod (mkVectIsoOcc   (nameOccName name))
            ; let { tycon    = lookupTyCon name
-                 ; ccTycon  = lookupTyCon ccName
+                 ; vTycon   = lookupTyCon vName
                  ; isoTycon = lookupVar isoName
                  }
-           ; ccDataCons <- mapM ccDataConMapping (tyConDataCons tycon)
-           ; return ((name, (tycon, ccTycon)),   -- (T, T_CC)
-                     ccDataCons,                 -- list of (Ci, Ci_CC)
+           ; vDataCons <- mapM vectDataConMapping (tyConDataCons tycon)
+           ; return ((name, (tycon, vTycon)),    -- (T, T_v)
+                     vDataCons,                  -- list of (Ci, Ci_v)
                      (name, (tycon, isoTycon)))  -- (T, isoT)
            }
-    ccTyConReuseMapping name 
-      = do { isoName <- lookupOrig mod (mkCloIsoOcc   (nameOccName name))
+    vectTyConReuseMapping name 
+      = do { isoName <- lookupOrig mod (mkVectIsoOcc   (nameOccName name))
            ; let { tycon      = lookupTyCon name
                  ; isoTycon   = lookupVar isoName
-                 ; ccDataCons = [ (dataConName dc, (dc, dc)) 
+                 ; vDataCons  = [ (dataConName dc, (dc, dc)) 
                                 | dc <- tyConDataCons tycon]
                  }
            ; return ((name, (tycon, tycon)),     -- (T, T)
-                     ccDataCons,                 -- list of (Ci, Ci)
+                     vDataCons,                  -- list of (Ci, Ci)
                      (name, (tycon, isoTycon)))  -- (T, isoT)
            }
-    ccDataConMapping datacon
+    vectDataConMapping datacon
       = do { let name = dataConName datacon
-           ; ccName <- lookupOrig mod (mkCloDataConOcc (nameOccName name))
-           ; let ccDataCon = lookupDataCon ccName
-           ; return (name, (datacon, ccDataCon))
+           ; vName <- lookupOrig mod (mkVectDataConOcc (nameOccName name))
+           ; let vDataCon = lookupDataCon vName
+           ; return (name, (datacon, vDataCon))
            }
     --
     lookupVar name = case lookupTypeEnv typeEnv name of

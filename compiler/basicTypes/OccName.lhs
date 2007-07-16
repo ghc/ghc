@@ -32,7 +32,7 @@ module OccName (
 	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc,
 	mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
 	mkInstTyCoOcc, mkEqPredCoOcc,
-        mkCloOcc, mkCloTyConOcc, mkCloDataConOcc, mkCloIsoOcc,
+        mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc,
 
 	-- ** Deconstruction
 	occNameFS, occNameString, occNameSpace, 
@@ -458,11 +458,11 @@ mkGenOcc2           = mk_simple_deriv varName  "$gto"
 mkDataTOcc = mk_simple_deriv varName  "$t"
 mkDataCOcc = mk_simple_deriv varName  "$c"
 
--- Closure conversion
-mkCloOcc        = mk_simple_deriv varName  "$CC_"
-mkCloTyConOcc   = mk_simple_deriv tcName   ":CC_"
-mkCloDataConOcc = mk_simple_deriv dataName ":CD_"
-mkCloIsoOcc     = mk_simple_deriv varName  "$CCiso_"
+-- Vectorisation
+mkVectOcc        = mk_simple_deriv varName  "$v_"
+mkVectTyConOcc   = mk_simple_deriv tcName   ":V_"
+mkVectDataConOcc = mk_simple_deriv dataName ":VD_"
+mkVectIsoOcc     = mk_simple_deriv varName  "$VI_"
 
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
 
