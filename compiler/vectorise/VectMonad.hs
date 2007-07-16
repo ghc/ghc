@@ -31,6 +31,7 @@ import Type
 import Var
 import VarEnv
 import Id
+import OccName
 import Name
 import NameEnv
 
@@ -239,6 +240,16 @@ getInstEnv = readGEnv global_inst_env
 
 getFamInstEnv :: VM FamInstEnvs
 getFamInstEnv = readGEnv global_fam_inst_env
+
+cloneName :: (OccName -> OccName) -> Name -> VM Name
+cloneName mk_occ name = liftM make (liftDs newUnique)
+  where
+    occ_name = mk_occ (nameOccName name)
+
+    make u | isExternalName name = mkExternalName u (nameModule name)
+                                                    occ_name
+                                                    (nameSrcSpan name)
+           | otherwise           = mkSystemName u occ_name
 
 newLocalVar :: FastString -> Type -> VM Var
 newLocalVar fs ty
