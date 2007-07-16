@@ -157,8 +157,8 @@ helpText =
  "   :info [<name> ...]          display information about the given names\n" ++
  "   :kind <type>                show the kind of <type>\n" ++
  "   :load <filename> ...        load module(s) and their dependents\n" ++
- "   :module [+/-] [*]<mod> ...  set the context for expression evaluation\n" ++
  "   :main [<arguments> ...]     run the main function with the given arguments\n" ++
+ "   :module [+/-] [*]<mod> ...  set the context for expression evaluation\n" ++
  "   :quit                       exit GHCi\n" ++
  "   :reload                     reload the current module set\n" ++
  "   :type <expr>                show the type of <expr>\n" ++
