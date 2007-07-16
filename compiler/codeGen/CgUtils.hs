@@ -484,7 +484,7 @@ baseRegOffset _			  = panic "baseRegOffset:other"
 
 -------------------------------------------------------------------------
 --
---	Strings gnerate a top-level data block
+--	Strings generate a top-level data block
 --
 -------------------------------------------------------------------------
 
