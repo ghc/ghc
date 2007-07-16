@@ -14,7 +14,7 @@
     Options can be specified in three ways:</para>
 
     <sect2>
-      <title>command-line arguments</title>
+      <title>Command-line arguments</title>
       
       <indexterm><primary>structure, command-line</primary></indexterm>
       <indexterm><primary>command-line</primary><secondary>arguments</secondary></indexterm>
@@ -26,9 +26,9 @@
 ghc [argument...]
 </screen>
 
-      <para>command-line arguments are either options or file names.</para>
+      <para>Command-line arguments are either options or file names.</para>
 
-      <para>command-line options begin with <literal>-</literal>.
+      <para>Command-line options begin with <literal>-</literal>.
       They may <emphasis>not</emphasis> be grouped:
       <option>-vO</option> is different from <option>-v -O</option>.
       Options need not precede filenames: e.g., <literal>ghc *.o -o
@@ -40,7 +40,7 @@ ghc [argument...]
     </sect2>
 
     <sect2 id="source-file-options">
-      <title>command line options in source files</title>
+      <title>Command line options in source files</title>
     
       <indexterm><primary>source-file options</primary></indexterm>
 
@@ -104,8 +104,8 @@ module X where
     <indexterm><primary>mode</primary><secondary>options</secondary>
     </indexterm>
 
-    <para>Each of GHC's command line options is classified as either
-    <firstterm>static</firstterm> or <firstterm>dynamic</firstterm> or
+    <para>Each of GHC's command line options is classified as
+    <firstterm>static</firstterm>, <firstterm>dynamic</firstterm> or
       <firstterm>mode</firstterm>:</para>
 
     <variablelist>
@@ -113,7 +113,7 @@ module X where
 	<term>Mode flags</term>
 	<listitem>
 	  <para>For example, <option>--make</option> or <option>-E</option>.
-	    There may be only a single mode flag on the command line.  The
+	    There may only be a single mode flag on the command line.  The
 	    available modes are listed in <xref linkend="modes"/>.</para>
 	</listitem>
       </varlistentry>
