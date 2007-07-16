@@ -184,7 +184,7 @@
       dots replaced by the directory separator ('/' or '\', depending
       on the system), and <replaceable>extension</replaceable> is a
       source extension (<literal>hs</literal>, <literal>lhs</literal>)
-      if we are in <option>--make</option> mode and GHCi, or
+      if we are in <option>--make</option> mode or GHCi, or
       <replaceable>hisuf</replaceable> otherwise.</para>
 
       <para>For example, suppose the search path contains directories
@@ -220,7 +220,7 @@
 
       <para>This isn't the whole story: GHC also looks for modules in
       pre-compiled libraries, known as packages.  See the section on
-      packages (<xref linkend="packages"/>), for details.</para>
+      packages (<xref linkend="packages"/>) for details.</para>
     </sect2>
 
     <sect2 id="options-output">
@@ -712,7 +712,7 @@ module A where
 </para>
 <para>To compile these three files, issue the following commands:
 <programlisting>
-  ghc -c A.hs-boot    -- Poduces A.hi-boot, A.o-boot
+  ghc -c A.hs-boot    -- Produces A.hi-boot, A.o-boot
   ghc -c B.hs         -- Consumes A.hi-boot, produces B.hi, B.o
   ghc -c A.hs	      -- Consumes B.hi, produces A.hi, A.o
   ghc -o foo A.o B.o  -- Linking the program
@@ -778,7 +778,7 @@ When a hs-boot file <filename>A.hs-boot</filename>
    <listitem><para> A module <literal>M</literal> that is 
    <literal>{-# SOURCE #-}</literal>-imported in a program will usually also be
    ordinarily imported elsewhere.  If not, <command>ghc --make</command>
-   automatically adds <literal>M</literal> to the set of moudles it tries to
+   automatically adds <literal>M</literal> to the set of modules it tries to
    compile and link, to ensure that <literal>M</literal>'s implementation is included in
    the final program.
    </para></listitem>
@@ -824,7 +824,7 @@ can be given abstractly, by omitting the '=' sign and everything that follows.  
 <programlisting>
   data R (x :: * -&#62; *) y
 </programlisting>
-You cannot use <literal>deriving</literal> on a data type declaration; write in
+You cannot use <literal>deriving</literal> on a data type declaration; write an
 <literal>instance</literal> declaration instead.
 </para></listitem>
 <listitem><para> Class declarations is exactly as in Haskell, except that you may not put
@@ -1184,7 +1184,7 @@ and GHC has no other reason for visiting the module.  Example:
     class C a where ...
 </programlisting>
 Here, neither D nor T is declared in module Orphan.
-We call such modules ``orphan modules'',
+We call such modules &ldquo;orphan modules&rdquo;,
 defined thus:</para>
 <itemizedlist>
   <listitem> <para> An <emphasis>orphan module</emphasis>
@@ -1195,7 +1195,7 @@ defined thus:</para>
   <listitem><para> An instance declaration in a module M is an <emphasis>orphan instance</emphasis> if
   <indexterm><primary>orphan instance</primary></indexterm>
   none of the type constructors
-  or classes mentioned in the instance head (the part after the ``<literal>=&gt;</literal>'') are declared
+  or classes mentioned in the instance head (the part after the &ldquo;<literal>=&gt;</literal>&rdquo;) are declared
   in M.</para>
 
   <para> Only the instance head counts.  In the example above, it is not good enough for C's declaration
@@ -1219,8 +1219,8 @@ your best to have as few orphan modules as possible.
 
 <para> You can identify an orphan module by looking in its interface
 file, <filename>M.hi</filename>, using the
-<option>--show-iface</option>.  If there is a ``!'' on the first line,
-GHC considers it an orphan module.
+<option>--show-iface</option>.  If there is a &ldquo;!&rdquo; on the
+first line, GHC considers it an orphan module.
 </para>
 </sect2>
 
