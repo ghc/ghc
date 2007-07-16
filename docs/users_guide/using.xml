@@ -379,9 +379,9 @@ module X where
 	  interfaces, and include files (usually something like
 	  <literal>/usr/local/lib/ghc-5.04</literal> on Unix).  This
 	  is the value of
-	  <literal>$libdir</literal><indexterm><primary><literal>libdir</literal></primary>
-	  </indexterm>in the package configuration file (see <xref
-	  linkend="packages"/>).</para>
+	  <literal>$libdir</literal><indexterm><primary><literal>libdir</literal></primary></indexterm>
+      in the package configuration file
+      (see <xref linkend="packages"/>).</para>
 	</listitem>
       </varlistentry>
 
@@ -394,7 +394,7 @@ module X where
       
       <para>When given the <option>&ndash;&ndash;make</option> option,
       GHC will build a multi-module Haskell program by following
-      dependencies from a single root module (usually
+      dependencies from one or more root modules (usually just
       <literal>Main</literal>).  For example, if your
       <literal>Main</literal> module is in a file called
       <filename>Main.hs</filename>, you could compile and link the
@@ -408,7 +408,7 @@ ghc &ndash;&ndash;make Main.hs
       names or module names; GHC will figure out all the modules in
       the program by following the imports from these initial modules.
       It will then attempt to compile each module which is out of
-      date, and finally if there is a <literal>Main</literal> module,
+      date, and finally, if there is a <literal>Main</literal> module,
       the program will also be linked into an executable.</para>
 
       <para>The main advantages to using <literal>ghc
@@ -503,7 +503,7 @@ olleh
       
       <para>The first phase to run is determined by each input-file
       suffix, and the last phase is determined by a flag.  If no
-      relevant flag is present, then go all the way through linking.
+      relevant flag is present, then go all the way through to linking.
       This table summarises:</para>
       
       <informaltable>
