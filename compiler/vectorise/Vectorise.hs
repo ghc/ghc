@@ -53,8 +53,12 @@ vectorise hsc_env guts
     dflags = hsc_dflags hsc_env
 
 vectModule :: ModGuts -> VM ModGuts
-vectModule guts = return guts
+vectModule guts
+  = do
+      binds' <- mapM vectTopBind (mg_binds guts)
+      return $ guts { mg_binds = binds' }
 
+vectTopBind :: CoreBind -> VM CoreBind
 vectTopBind b@(NonRec var expr)
   = do
       var'  <- vectTopBinder var
