@@ -404,7 +404,7 @@ mkClosureMonoFns info arg body
           return . Let (NonRec lbndr lenv)
                  $ Case (mkApps (Var lengthPA) [Type vty, (Var lbndr)])
                         lc_bndr
-                        intPrimTy
+                        (exprType lbody)
                         [(DEFAULT, [], lbody)]
 
     bind_lenv lenv lbody lc_bndr lbndrs
