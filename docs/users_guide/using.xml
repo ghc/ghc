@@ -595,9 +595,7 @@ ghc -c Foo.hs</screen>
       
       <para>Note: The option <option>-E</option><indexterm><primary>-E
       option</primary></indexterm> runs just the pre-processing passes
-      of the compiler, dumping the result in a file.  Note that this
-      differs from the previous behaviour of dumping the file to
-      standard output.</para>
+      of the compiler, dumping the result in a file.</para>
 
       <sect3 id="overriding-suffixes">
 	<title>Overriding the default behaviour for a file</title>
