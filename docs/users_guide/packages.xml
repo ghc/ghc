@@ -396,7 +396,7 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
 <screen>ld -r &ndash;&ndash;whole-archive -o HSfoo.o libHSfoo.a</screen>
 
 	<para>(replace
-          <literal>&ndash;&ndash;--whole-archive</literal> with
+          <literal>&ndash;&ndash;whole-archive</literal> with
           <literal>&ndash;all_load</literal> on MacOS X)</para>
 	
 	  <para>GHC does not maintain detailed cross-package
