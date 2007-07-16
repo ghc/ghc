@@ -121,6 +121,9 @@ data GlobalEnv = GlobalEnv {
                 -- instances
                 --
                 , global_fam_inst_env :: FamInstEnvs
+
+                -- Hoisted bindings
+                , global_bindings :: [(Var, CoreExpr)]
                 }
 
 data LocalEnv = LocalEnv {
@@ -131,9 +134,6 @@ data LocalEnv = LocalEnv {
 
                  -- Mapping from tyvars to their PA dictionaries
                , local_tyvar_pa :: VarEnv CoreExpr
-
-                 -- Hoisted bindings
-               , local_bindings :: [(Var, CoreExpr)]
                }
               
 
@@ -146,12 +146,12 @@ initGlobalEnv info instEnvs famInstEnvs
     , global_tycon_pa      = emptyNameEnv
     , global_inst_env      = instEnvs
     , global_fam_inst_env  = famInstEnvs
+    , global_bindings      = []
     }
 
 emptyLocalEnv = LocalEnv {
                    local_vars     = emptyVarEnv
                  , local_tyvar_pa = emptyVarEnv
-                 , local_bindings = []
                  }
 
 -- FIXME

@@ -115,7 +115,7 @@ hoistExpr :: FastString -> CoreExpr -> VM Var
 hoistExpr fs expr
   = do
       var <- newLocalVar fs (exprType expr)
-      updLEnv $ \env ->
-        env { local_bindings = (var, expr) : local_bindings env }
+      updGEnv $ \env ->
+        env { global_bindings = (var, expr) : global_bindings env }
       return var
 
