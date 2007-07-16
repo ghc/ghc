@@ -4,7 +4,7 @@ module VectUtils (
   mkPADictType, mkPArrayType,
   paDictArgType, paDictOfType,
   lookupPArrayFamInst,
-  hoistExpr
+  hoistExpr, takeHoisted
 ) where
 
 #include "HsVersions.h"
@@ -118,4 +118,11 @@ hoistExpr fs expr
       updGEnv $ \env ->
         env { global_bindings = (var, expr) : global_bindings env }
       return var
+
+takeHoisted :: VM [(Var, CoreExpr)]
+takeHoisted
+  = do
+      env <- readGEnv id
+      setGEnv $ env { global_bindings = [] }
+      return $ global_bindings env
 

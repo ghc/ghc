@@ -263,8 +263,14 @@ newTyVar fs k
       u <- liftDs newUnique
       return $ mkTyVar (mkSysTvName u fs) k
 
-defGlobalVar :: Var -> CoreExpr -> VM ()
-defGlobalVar v e = updGEnv $ \env -> env { global_vars = extendVarEnv (global_vars env) v e }
+defGlobalVar :: Var -> Var -> VM ()
+defGlobalVar v v' = updGEnv $ \env ->
+  env { global_vars = extendVarEnv (global_vars env) v (Var v')
+      , global_exported_vars = upd (global_exported_vars env)
+      }
+  where
+    upd env | isExportedId v = extendVarEnv env v (v, v')
+            | otherwise      = env
 
 lookupVar :: Var -> VM (Scope CoreExpr (CoreExpr, CoreExpr))
 lookupVar v

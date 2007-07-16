@@ -20,10 +20,11 @@ import TypeRep
 import Var
 import VarEnv
 import VarSet
-import Name                 ( mkSysTvName )
+import Name                 ( mkSysTvName, getName )
 import NameEnv
 import Id
 import MkId                 ( unwrapFamInstScrut )
+import OccName
 
 import DsMonad hiding (mapAndUnzipM)
 import DsUtils              ( mkCoreTup, mkCoreTupTy )
@@ -53,6 +54,41 @@ vectorise hsc_env guts
 
 vectModule :: ModGuts -> VM ModGuts
 vectModule guts = return guts
+
+vectTopBind b@(NonRec var expr)
+  = do
+      var'  <- vectTopBinder var
+      expr' <- vectTopRhs expr
+      hs    <- takeHoisted
+      return . Rec $ (var, expr) : (var', expr') : hs
+  `orElseV`
+    return b
+
+vectTopBind b@(Rec bs)
+  = do
+      vars'  <- mapM vectTopBinder vars
+      exprs' <- mapM vectTopRhs exprs
+      hs     <- takeHoisted
+      return . Rec $ bs ++ zip vars' exprs' ++ hs
+  `orElseV`
+    return b
+  where
+    (vars, exprs) = unzip bs
+
+vectTopBinder :: Var -> VM Var
+vectTopBinder var
+  = do
+      vty <- liftM (mkForAllTys tyvars) $ vectType mono_ty
+      name <- cloneName mkVectOcc (getName var)
+      let var' | isExportedId var = Id.mkExportedLocalId name vty
+               | otherwise        = Id.mkLocalId         name vty
+      defGlobalVar var var'
+      return var'
+  where
+    (tyvars, mono_ty) = splitForAllTys (idType var)
+    
+vectTopRhs :: CoreExpr -> VM CoreExpr
+vectTopRhs = liftM fst . closedV . vectPolyExpr (panic "Empty lifting context") . freeVars
 
 -- ----------------------------------------------------------------------------
 -- Bindings
