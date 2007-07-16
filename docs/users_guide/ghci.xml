@@ -1737,7 +1737,8 @@ $ ghci -lm
 	</term>
 	<listitem>
 	  <para>Generates a &ldquo;tags&rdquo; file for Vi-style editors
-	    (<literal>:ctags</literal>) or Emacs-style editors (<literal>etags</literal>).  If
+	    (<literal>:ctags</literal>) or
+        Emacs-style editors (<literal>:etags</literal>).  If
 	    no filename is specified, the defaulit <filename>tags</filename> or
 	    <filename>TAGS</filename> is
 	    used, respectively.  Tags for all the functions, constructors and
@@ -1840,6 +1841,15 @@ Prelude> :. cmds.ghci
 	  environment variable, or a default editor on your system if
 	  <literal>EDITOR</literal> is not set.  You can change the
 	  editor using <literal>:set editor</literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:etags</literal> 
+        </term>
+	<listitem>
+	  <para>See <literal>:ctags</literal>.</para>
 	</listitem>
       </varlistentry>
 
@@ -1981,7 +1991,7 @@ Prelude> :. cmds.ghci
             However, we cannot simply pass the arguments to the
             <literal>main</literal> function while we are testing in ghci,
             as the <literal>main</literal> function doesn't take its
-            directly.
+            arguments directly.
           </para>
 
           <para>
@@ -2026,7 +2036,7 @@ Prelude> :main foo bar
 	<listitem>
 	  <para>Prints a value without forcing its evaluation.
             <literal>:print</literal> may be used on values whose types are
-            unkonwn or partially known, which might be the case for local
+            unknown or partially known, which might be the case for local
             variables with polymorphic types at a breakpoint.  While inspecting
             the runtime value, <literal>:print</literal> attempts to
             reconstruct the type of the value, and will elaborate the type in
@@ -2046,7 +2056,7 @@ Prelude> :main foo bar
           <indexterm><primary><literal>:quit</literal></primary></indexterm>
         </term>
 	<listitem>
-	  <para>Quits GHCi.  You can also quit by typing a control-D
+	  <para>Quits GHCi.  You can also quit by typing control-D
 	  at the prompt.</para>
 	</listitem>
       </varlistentry>
@@ -2191,7 +2201,7 @@ Prelude> :main foo bar
           <indexterm><primary><literal>:show modules</literal></primary></indexterm>
         </term>
 	<listitem>
-	  <para>Show the list of modules currently load.</para>
+	  <para>Show the list of modules currently loaded.</para>
 	</listitem>
       </varlistentry>
 
