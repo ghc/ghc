@@ -272,7 +272,8 @@ aRROW		= mkBaseModule FSLIT("Control.Arrow")
 rANDOM		= mkBaseModule FSLIT("System.Random")
 gLA_EXTS	= mkBaseModule FSLIT("GHC.Exts")
 
-nDP_LIFTED      = mkNDPModule FSLIT("Data.Array.Parallel.Lifted")
+nDP_PARRAY      = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.PArray")
+nDP_CLOSURE     = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Closure")
 
 mAIN	        = mkMainModule_ mAIN_NAME
 rOOT_MAIN	= mkMainModule FSLIT(":Main") -- Root module for initialisation 
@@ -687,15 +688,15 @@ unmarshalStringName = varQual  dOTNET FSLIT("unmarshalString") unmarshalStringId
 checkDotnetResName  = varQual  dOTNET FSLIT("checkResult")     checkDotnetResNameIdKey
 
 -- NDP stuff
-parrayTyConName     = tcQual   nDP_LIFTED FSLIT("PArray") parrayTyConKey
-paClassName         = clsQual  nDP_LIFTED FSLIT("PA")     paClassKey
-closureTyConName    = tcQual   nDP_LIFTED FSLIT(":->")    closureTyConKey
-mkClosureName       = varQual  nDP_LIFTED FSLIT("mkClosure")  mkClosureIdKey
-applyClosureName    = varQual  nDP_LIFTED FSLIT("$:")         applyClosureIdKey
-mkClosurePName      = varQual  nDP_LIFTED FSLIT("mkClosureP") mkClosurePIdKey
-applyClosurePName   = varQual  nDP_LIFTED FSLIT("$:^")        applyClosurePIdKey
-lengthPAName        = methName nDP_LIFTED FSLIT("lengthPA")    lengthPAClassOpKey
-replicatePAName     = methName nDP_LIFTED FSLIT("replicatePA") replicatePAClassOpKey
+parrayTyConName     = tcQual   nDP_PARRAY FSLIT("PArray") parrayTyConKey
+paClassName         = clsQual  nDP_PARRAY FSLIT("PA")     paClassKey
+lengthPAName        = methName nDP_PARRAY FSLIT("lengthPA")    lengthPAClassOpKey
+replicatePAName     = methName nDP_PARRAY FSLIT("replicatePA") replicatePAClassOpKey
+closureTyConName    = tcQual   nDP_CLOSURE FSLIT(":->")    closureTyConKey
+mkClosureName       = varQual  nDP_CLOSURE FSLIT("mkClosure")  mkClosureIdKey
+applyClosureName    = varQual  nDP_CLOSURE FSLIT("$:")         applyClosureIdKey
+mkClosurePName      = varQual  nDP_CLOSURE FSLIT("mkClosureP") mkClosurePIdKey
+applyClosurePName   = varQual  nDP_CLOSURE FSLIT("$:^")        applyClosurePIdKey
 \end{code}
 
 %************************************************************************
