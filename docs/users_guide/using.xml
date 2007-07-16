@@ -878,6 +878,20 @@ ghc -c Foo.hs</screen>
 	  function or type is used.  Entities can be marked as
 	  deprecated using a pragma, see <xref
 	  linkend="deprecated-pragma"/>.</para>
+
+	  <para>This option is on by default.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><option>-fwarn-dodgy-imports</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-fwarn-dodgy-imports</option></primary>
+	  </indexterm>
+	  <para>Causes a warning to be emitted when a a datatype
+      <literal>T</literal> is imported
+      with all constructors, i.e. <literal>T(..)</literal>, but has been
+      exported abstractly, i.e. <literal>T</literal>.</para>
 	</listitem>
       </varlistentry>
 
@@ -954,7 +968,7 @@ ghc -c Foo.hs</screen>
 g [] = 2
 </programlisting>
 
-	  <para>This option isn't enabled be default because it can be
+	  <para>This option isn't enabled by default because it can be
           a bit noisy, and it doesn't always indicate a bug in the
           program.  However, it's generally considered good practice
           to cover all the cases in your functions.</para>
@@ -982,7 +996,7 @@ f :: Foo -> Foo
 f foo = foo { x = 6 }
 </programlisting>
 
-	  <para>This option isn't enabled be default because it can be
+	  <para>This option isn't enabled by default because it can be
           very noisy, and it often doesn't indicate a bug in the
           program.</para>
 	</listitem>
@@ -1055,12 +1069,8 @@ f foo = foo { x = 6 }
           inner-scope value has the same name as an outer-scope value,
           i.e. the inner value shadows the outer one.  This can catch
           typographical errors that turn into hard-to-find bugs, e.g.,
-          in the inadvertent cyclic definition <literal>let x = ... x
-          ... in</literal>.</para>
-
-	  <para>Consequently, this option
-          <emphasis>will</emphasis> complain about cyclic recursive
-          definitions.</para>
+          in the inadvertent capture of what would be a recursive call in
+          <literal>f = ... let f = id in ... f ...</literal>.</para>
 	</listitem>
       </varlistentry>
 
@@ -1094,7 +1104,7 @@ f foo = foo { x = 6 }
         </term>
 	<listitem>
 	  <para>By default, the compiler will warn you if a set of
-          patterns are overlapping, i.e.,</para>
+          patterns are overlapping, e.g.,</para>
 
 <programlisting>
 f :: String -&#62; Int
@@ -1119,7 +1129,7 @@ f "2"    = 2
 	  patterns that can fail, eg. <literal>\(x:xs)->...</literal>.
 	  Normally, these aren't treated as incomplete patterns by
 	  <option>-fwarn-incomplete-patterns</option>.</para>
-	  <para>``Lambda-bound patterns'' includes all places where there is a single pattern,
+	  <para>&ldquo;Lambda-bound patterns&rdquo; includes all places where there is a single pattern,
 	    including list comprehensions and do-notation.  In these cases, a pattern-match 
 	    failure is quite legitimate, and triggers filtering (list comprehensions) or
 	    the monad <literal>fail</literal> operation (monads). For example:
@@ -1129,10 +1139,6 @@ f "2"    = 2
 	      </programlisting>
 	    Switching on <option>-fwarn-simple-patterns</option> will elicit warnings about
 	    these probably-innocent cases, which is why the flag is off by default. </para>
-	  <para> The <literal>deriving( Read )</literal> mechanism produces monadic code with
-	    pattern matches, so you will also get misleading warnings about the compiler-generated
-	    code.  (This is arguably a Bad Thing, but it's awkward to fix.)</para>
-
 	</listitem>
       </varlistentry>
 
@@ -1157,7 +1163,7 @@ f "2"    = 2
           the Haskell defaulting mechanism for numeric types kicks
           in. This is useful information when converting code from a
           context that assumed one default into one with another,
-          e.g., the `default default' for Haskell 1.4 caused the
+          e.g., the &lsquo;default default&rsquo; for Haskell 1.4 caused the
           otherwise unconstrained value <constant>1</constant> to be
           given the type <literal>Int</literal>, whereas Haskell 98
           defaults it to <literal>Integer</literal>.  This may lead to
