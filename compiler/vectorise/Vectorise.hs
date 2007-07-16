@@ -184,16 +184,13 @@ abstractOverTyVars tvs p
                          Just ty -> liftM Just (newLocalVar FSLIT("dPA") ty)
                          Nothing -> return Nothing
 
-    mk_lams mdicts = mkLams [arg | (tv, mdict) <- zip tvs mdicts
-                                 , arg <- tv : maybeToList mdict]
+    mk_lams mdicts = mkLams (tvs ++ [dict | Just dict <- mdicts])
 
 applyToTypes :: CoreExpr -> [Type] -> VM CoreExpr
 applyToTypes expr tys
   = do
       dicts <- mapM paDictOfType tys
-      return $ mkApps expr [arg | (ty, dict) <- zip tys dicts
-                                , arg <- [Type ty, dict]]
-    
+      return $ expr `mkTyApps` tys `mkApps` dicts
 
 vectPolyExpr :: CoreExpr -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
 vectPolyExpr lc expr
@@ -447,14 +444,13 @@ vectType (AppTy ty1 ty2) = liftM2 AppTy (vectType ty1) (vectType ty2)
 vectType (TyConApp tc tys) = liftM2 TyConApp (vectTyCon tc) (mapM vectType tys)
 vectType (FunTy ty1 ty2)   = liftM2 TyConApp (builtin closureTyCon)
                                              (mapM vectType [ty1,ty2])
-vectType (ForAllTy tv ty)
+vectType ty@(ForAllTy _ _)
   = do
-      r   <- paDictArgType tv
-      ty' <- vectType ty
-      return $ ForAllTy tv (wrap r ty')
+      mdicts   <- mapM paDictArgType tyvars
+      mono_ty' <- vectType mono_ty
+      return $ tyvars `mkForAllTys` ([dict | Just dict <- mdicts] `mkFunTys` mono_ty')
   where
-    wrap Nothing      = id
-    wrap (Just pa_ty) = FunTy pa_ty
+    (tyvars, mono_ty) = splitForAllTys ty
 
 vectType ty = pprPanic "vectType:" (ppr ty)
 
