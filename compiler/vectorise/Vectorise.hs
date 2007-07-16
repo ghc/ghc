@@ -83,14 +83,12 @@ vectTopBind b@(Rec bs)
 vectTopBinder :: Var -> VM Var
 vectTopBinder var
   = do
-      vty <- liftM (mkForAllTys tyvars) $ vectType mono_ty
+      vty <- vectType (idType var)
       name <- cloneName mkVectOcc (getName var)
       let var' | isExportedId var = Id.mkExportedLocalId name vty
                | otherwise        = Id.mkLocalId         name vty
       defGlobalVar var var'
       return var'
-  where
-    (tyvars, mono_ty) = splitForAllTys (idType var)
     
 vectTopRhs :: CoreExpr -> VM CoreExpr
 vectTopRhs = liftM fst . closedV . vectPolyExpr (panic "Empty lifting context") . freeVars
