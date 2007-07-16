@@ -1704,16 +1704,6 @@ $ ghci -lm
 
       <varlistentry>
 	<term>
-          <literal>:continue</literal> 
-          <indexterm><primary><literal>:continue</literal></primary></indexterm>
-        </term>
-	<listitem><para>Continue the current evaluation, when stopped at a
-            breakpoint.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
           <literal>:cmd</literal> <replaceable>expr</replaceable>
           <indexterm><primary><literal>:cmd</literal></primary></indexterm>
         </term>
@@ -1723,6 +1713,16 @@ $ ghci -lm
             string as a list of GHCi commands.  Multiple commands are separated
             by newlines.  The <literal>:cmd</literal> command is useful with
             <literal>:def</literal> and <literal>:set stop</literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:continue</literal> 
+          <indexterm><primary><literal>:continue</literal></primary></indexterm>
+        </term>
+	<listitem><para>Continue the current evaluation, when stopped at a
+            breakpoint.</para>
 	</listitem>
       </varlistentry>
 
