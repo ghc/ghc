@@ -438,7 +438,7 @@ vectTyCon tc
                     Nothing  -> pprTrace "ccTyCon:" (ppr tc) $ return tc
 
 vectType :: Type -> VM Type
-vectType ty | Just ty' <- coreView ty = vectType ty
+vectType ty | Just ty' <- coreView ty = vectType ty'
 vectType (TyVarTy tv) = return $ TyVarTy tv
 vectType (AppTy ty1 ty2) = liftM2 AppTy (vectType ty1) (vectType ty2)
 vectType (TyConApp tc tys) = liftM2 TyConApp (vectTyCon tc) (mapM vectType tys)
