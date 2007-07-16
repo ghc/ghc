@@ -398,8 +398,9 @@ mkClosureMonoFns info arg body
     bind_lenv lenv lbody lc_bndr [lbndr]
       = do
           lengthPA <- builtin lengthPAVar
+          pa_dict  <- paDictOfType vty
           return . Let (NonRec lbndr lenv)
-                 $ Case (mkApps (Var lengthPA) [Type vty, (Var lbndr)])
+                 $ Case (mkApps (Var lengthPA) [Type vty, pa_dict, (Var lbndr)])
                         lc_bndr
                         (exprType lbody)
                         [(DEFAULT, [], lbody)]
