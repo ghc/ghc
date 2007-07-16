@@ -650,6 +650,16 @@ minusWallOpts
 	Opt_WarnOrphans
       ]
 
+-- minuswRemovesOpts should be every warning option
+minuswRemovesOpts
+    = minusWallOpts ++
+      [Opt_WarnImplicitPrelude,
+       Opt_WarnIncompletePatternsRecUpd,
+       Opt_WarnSimplePatterns,
+       Opt_WarnMonomorphism,
+       Opt_WarnTabs
+      ]
+
 -- -----------------------------------------------------------------------------
 -- CoreToDo:  abstraction of core-to-core passes to run.
 
@@ -1035,7 +1045,7 @@ dynamic_flags = [
   ,  ( "Werror"		, NoArg (setDynFlag   	    Opt_WarnIsError) )
   ,  ( "Wall"		, NoArg (mapM_ setDynFlag   minusWallOpts) )
   ,  ( "Wnot"		, NoArg (mapM_ unSetDynFlag minusWallOpts) ) /* DEPREC */
-  ,  ( "w"		, NoArg (mapM_ unSetDynFlag minusWallOpts) )
+  ,  ( "w"		, NoArg (mapM_ unSetDynFlag minuswRemovesOpts) )
 
 	------ Optimisation flags ------------------------------------------
   ,  ( "O"	, NoArg (upd (setOptLevel 1)))
