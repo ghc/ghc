@@ -2584,7 +2584,7 @@ Prelude> :set -fno-glasgow-exts
 	<term>I can't use Control-C to interrupt computations in
           GHCi on Windows.</term>
         <listitem>
-          <para>See <xref linkend="ghci-windows"/></para>
+          <para>See <xref linkend="ghci-windows"/>.</para>
         </listitem>
       </varlistentry>
     </variablelist>
