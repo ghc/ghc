@@ -13,6 +13,8 @@ import CoreLint             ( showPass, endPass )
 import CoreSyn
 import CoreUtils
 import CoreFVs
+import SimplMonad           ( SimplCount, zeroSimplCount )
+import Rules                ( RuleBase )
 import DataCon
 import TyCon
 import Type
@@ -38,17 +40,16 @@ import FastString
 import Control.Monad        ( liftM, liftM2, mapAndUnzipM, zipWithM_ )
 import Data.Maybe           ( maybeToList )
 
-vectorise :: HscEnv -> ModGuts -> IO ModGuts
-vectorise hsc_env guts
-  | not (Opt_Vectorise `dopt` dflags) = return guts
-  | otherwise
+vectorise :: HscEnv -> UniqSupply -> RuleBase -> ModGuts
+          -> IO (SimplCount, ModGuts)
+vectorise hsc_env _ _ guts
   = do
       showPass dflags "Vectorisation"
       eps <- hscEPS hsc_env
       let info = hptVectInfo hsc_env `plusVectInfo` eps_vect_info eps
       Just (info', guts') <- initV hsc_env guts info (vectModule guts)
       endPass dflags "Vectorisation" Opt_D_dump_vect (mg_binds guts')
-      return $ guts' { mg_vect_info = info' }
+      return (zeroSimplCount dflags, guts' { mg_vect_info = info' })
   where
     dflags = hsc_dflags hsc_env
 

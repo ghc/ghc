@@ -49,6 +49,7 @@ import WorkWrap	        ( wwTopBinds )
 import StrictAnal	( saBinds )
 import CprAnalyse       ( cprAnalyse )
 #endif
+import Vectorise        ( vectorise )
 
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import IO		( hPutStr, stderr )
@@ -147,6 +148,7 @@ doCorePass CoreDoWorkerWrapper         = _scc_ "WorkWrap"      trBindsU wwTopBin
 doCorePass CoreDoSpecialising          = _scc_ "Specialise"    trBindsU specProgram
 doCorePass CoreDoSpecConstr	       = _scc_ "SpecConstr"    trBindsU specConstrProgram
 doCorePass CoreDoGlomBinds	       = trBinds glomBinds
+doCorePass CoreDoVectorisation         = _scc_ "Vectorise"     vectorise
 doCorePass CoreDoPrintCore	       = observe printCore
 doCorePass (CoreDoRuleCheck phase pat) = observe (ruleCheck phase pat)
 doCorePass CoreDoNothing	       = observe (\ _ _ -> return ())

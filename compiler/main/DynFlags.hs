@@ -676,6 +676,7 @@ data CoreToDo		-- These are diff core-to-core passes,
   | CoreCSE
   | CoreDoRuleCheck Int{-CompilerPhase-} String	-- Check for non-application of rules 
 						-- matching this string
+  | CoreDoVectorisation
   | CoreDoNothing 		 -- Useful when building up 
   | CoreDoPasses [CoreToDo] 	 -- lists of these things
 
@@ -711,6 +712,7 @@ getCoreToDo dflags
     spec_constr   = dopt Opt_SpecConstr dflags
     liberate_case = dopt Opt_LiberateCase dflags
     rule_check    = ruleCheck dflags
+    vectorisation = dopt Opt_Vectorise dflags
 
     core_todo = 
      if opt_level == 0 then
@@ -737,6 +739,15 @@ getCoreToDo dflags
 				-- This makes full laziness work better
 	    MaxSimplifierIterations max_iter
 	],
+
+
+        -- We run vectorisation here for now, but we might also try to run
+        -- it later
+        runWhen vectorisation (CoreDoPasses [
+                  CoreDoVectorisation,
+                  CoreDoSimplify SimplGently
+                                  [NoCaseOfCase,
+                                   MaxSimplifierIterations max_iter]]),
 
 	-- Specialisation is best done before full laziness
 	-- so that overloaded functions have all their dictionary lambdas manifest

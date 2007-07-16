@@ -33,7 +33,6 @@ import CoreSyn		( CoreExpr )
 import CoreTidy		( tidyExpr )
 import CorePrep		( corePrepExpr )
 import Flattening	( flattenExpr )
-import Vectorise        ( vectorise )
 import Desugar          ( deSugarExpr )
 import SimplCore        ( simplifyExpr )
 import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnType ) 
@@ -67,7 +66,6 @@ import PrelInfo		( wiredInThings, basicKnownKeyNames )
 import MkIface		( checkOldIface, mkIface, writeIfaceFile )
 import Desugar          ( deSugar )
 import Flattening       ( flatten )
-import Vectorise        ( vectorise )
 import SimplCore        ( core2core )
 import TidyPgm		( tidyProgram, mkBootModDetails )
 import CorePrep		( corePrepPgm )
@@ -478,13 +476,11 @@ hscSimplify :: ModGuts -> Comp ModGuts
 hscSimplify ds_result
   = do hsc_env <- gets compHscEnv
        liftIO $ do
-       vect_result <- {-# SCC "Vectorisation" #-}
-                      vectorise hsc_env ds_result
            -------------------
            -- SIMPLIFY
            -------------------
        simpl_result <- {-# SCC "Core2Core" #-}
-                       core2core hsc_env vect_result
+                       core2core hsc_env ds_result
        return simpl_result
 
 --------------------------------------------------------------
