@@ -1082,6 +1082,7 @@ dynamic_flags = [
 -- these -f<blah> flags can all be reversed with -fno-<blah>
 
 fFlags = [
+  ( "warn-dodgy-imports",        	Opt_WarnDodgyImports ),
   ( "warn-duplicate-exports",    	Opt_WarnDuplicateExports ),
   ( "warn-hi-shadowing",         	Opt_WarnHiShadows ),
   ( "warn-implicit-prelude",            Opt_WarnImplicitPrelude ),
