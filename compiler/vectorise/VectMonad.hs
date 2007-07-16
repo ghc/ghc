@@ -1,8 +1,9 @@
 module VectMonad (
+  Scope(..),
   VM,
 
   noV, tryV, maybeV, orElseV, localV, closedV, initV,
-  newLocalVar, newTyVar,
+  cloneName, newLocalVar, newTyVar,
   
   Builtins(..), paDictTyCon,
   builtin,
@@ -13,6 +14,7 @@ module VectMonad (
   LocalEnv(..),
   readLEnv, setLEnv, updLEnv,
 
+  defGlobalVar, lookupVar,
   lookupTyCon,
   lookupTyVarPA, extendTyVarPA, deleteTyVarPA,
 
@@ -41,6 +43,10 @@ import FamInstEnv
 import Panic
 import Outputable
 import FastString
+
+import Control.Monad ( liftM )
+
+data Scope a b = Global a | Local b
 
 -- ----------------------------------------------------------------------------
 -- Vectorisation monad
@@ -245,6 +251,18 @@ newTyVar fs k
   = do
       u <- liftDs newUnique
       return $ mkTyVar (mkSysTvName u fs) k
+
+defGlobalVar :: Var -> CoreExpr -> VM ()
+defGlobalVar v e = updGEnv $ \env -> env { global_vars = extendVarEnv (global_vars env) v e }
+
+lookupVar :: Var -> VM (Scope CoreExpr (CoreExpr, CoreExpr))
+lookupVar v
+  = do
+      r <- readLEnv $ \env -> lookupVarEnv (local_vars env) v
+      case r of
+        Just e  -> return (Local e)
+        Nothing -> liftM Global
+                 $  maybeV (readGEnv $ \env -> lookupVarEnv (global_vars env) v)
 
 lookupTyCon :: TyCon -> VM (Maybe TyCon)
 lookupTyCon tc = readGEnv $ \env -> lookupNameEnv (global_tycons env) (tyConName tc)
