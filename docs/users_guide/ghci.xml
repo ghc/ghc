@@ -2436,7 +2436,7 @@ Prelude> :set -fno-glasgow-exts
     project is a useful way to set certain project-wide options so you
     don't have to type them everytime you start GHCi: eg. if your
     project uses GHC extensions and CPP, and has source files in three
-    subdirectories A B and C, you might put the following lines in
+    subdirectories A, B and C, you might put the following lines in
     <filename>.ghci</filename>:</para>
 
 <screen>
