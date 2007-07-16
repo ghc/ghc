@@ -124,6 +124,9 @@ data LocalEnv = LocalEnv {
 
                  -- Mapping from tyvars to their PA dictionaries
                , local_tyvar_pa :: VarEnv CoreExpr
+
+                 -- Hoisted bindings
+               , local_bindings :: [(Var, CoreExpr)]
                }
               
 
@@ -141,6 +144,7 @@ initGlobalEnv info instEnvs famInstEnvs
 emptyLocalEnv = LocalEnv {
                    local_vars     = emptyVarEnv
                  , local_tyvar_pa = emptyVarEnv
+                 , local_bindings = []
                  }
 
 -- FIXME

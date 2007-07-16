@@ -3,7 +3,8 @@ module VectUtils (
   splitClosureTy,
   mkPADictType, mkPArrayType,
   paDictArgType, paDictOfType,
-  lookupPArrayFamInst
+  lookupPArrayFamInst,
+  hoistExpr
 ) where
 
 #include "HsVersions.h"
@@ -11,6 +12,7 @@ module VectUtils (
 import VectMonad
 
 import CoreSyn
+import CoreUtils
 import Type
 import TypeRep
 import TyCon
@@ -18,6 +20,7 @@ import Var
 import PrelNames
 
 import Outputable
+import FastString
 
 import Control.Monad         ( liftM )
 
@@ -107,4 +110,12 @@ paDFunApply dfun tys
 
 lookupPArrayFamInst :: Type -> VM (TyCon, [Type])
 lookupPArrayFamInst ty = builtin parrayTyCon >>= (`lookupFamInst` [ty])
+
+hoistExpr :: FastString -> CoreExpr -> VM Var
+hoistExpr fs expr
+  = do
+      var <- newLocalVar fs (exprType expr)
+      updLEnv $ \env ->
+        env { local_bindings = (var, expr) : local_bindings env }
+      return var
 

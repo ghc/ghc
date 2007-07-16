@@ -229,6 +229,10 @@ vectExpr lc (fvs, AnnLam bndr body)
       let tyvars = filter isTyVar (varSetElems fvs)
       info <- mkCEnvInfo fvs bndr body
       (poly_vfn, poly_lfn) <- mkClosureFns info tyvars bndr body
+
+      vfn_var <- hoistExpr FSLIT("vfn") poly_vfn
+      lfn_var <- hoistExpr FSLIT("lfn") poly_lfn
+
       let (venv, lenv) = mkClosureEnvs info lc
 
       let env_ty = cenv_vty info
@@ -239,8 +243,8 @@ vectExpr lc (fvs, AnnLam bndr body)
       res_ty <- vectType (exprType $ deAnnotate body)
 
       -- FIXME: move the functions to the top level
-      mono_vfn <- applyToTypes poly_vfn (map TyVarTy tyvars)
-      mono_lfn <- applyToTypes poly_lfn (map TyVarTy tyvars)
+      mono_vfn <- applyToTypes (Var vfn_var) (map TyVarTy tyvars)
+      mono_lfn <- applyToTypes (Var lfn_var) (map TyVarTy tyvars)
 
       mk_clo <- builtin mkClosureVar
       mk_cloP <- builtin mkClosurePVar
