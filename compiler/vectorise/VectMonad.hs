@@ -16,7 +16,7 @@ module VectMonad (
 
   defGlobalVar, lookupVar,
   lookupTyCon,
-  lookupTyVarPA, extendTyVarPA, deleteTyVarPA,
+  lookupTyVarPA, defLocalTyVar, defLocalTyVarWithPA, localTyVars,
 
   lookupInst, lookupFamInst
 ) where
@@ -132,6 +132,10 @@ data LocalEnv = LocalEnv {
                  --
                  local_vars :: VarEnv (CoreExpr, CoreExpr)
 
+                 -- In-scope type variables
+                 --
+               , local_tyvars :: [TyVar]
+
                  -- Mapping from tyvars to their PA dictionaries
                , local_tyvar_pa :: VarEnv CoreExpr
                }
@@ -151,6 +155,7 @@ initGlobalEnv info instEnvs famInstEnvs
 
 emptyLocalEnv = LocalEnv {
                    local_vars     = emptyVarEnv
+                 , local_tyvars   = []
                  , local_tyvar_pa = emptyVarEnv
                  }
 
@@ -287,11 +292,20 @@ lookupTyCon tc = readGEnv $ \env -> lookupNameEnv (global_tycons env) (tyConName
 lookupTyVarPA :: Var -> VM (Maybe CoreExpr)
 lookupTyVarPA tv = readLEnv $ \env -> lookupVarEnv (local_tyvar_pa env) tv 
 
-extendTyVarPA :: Var -> CoreExpr -> VM ()
-extendTyVarPA tv pa = updLEnv $ \env -> env { local_tyvar_pa = extendVarEnv (local_tyvar_pa env) tv pa }
+defLocalTyVar :: TyVar -> VM ()
+defLocalTyVar tv = updLEnv $ \env ->
+  env { local_tyvars   = tv : local_tyvars env
+      , local_tyvar_pa = local_tyvar_pa env `delVarEnv` tv
+      }
 
-deleteTyVarPA :: Var -> VM ()
-deleteTyVarPA tv = updLEnv $ \env -> env { local_tyvar_pa = delVarEnv (local_tyvar_pa env) tv }
+defLocalTyVarWithPA :: TyVar -> CoreExpr -> VM ()
+defLocalTyVarWithPA tv pa = updLEnv $ \env ->
+  env { local_tyvars   = tv : local_tyvars env
+      , local_tyvar_pa = extendVarEnv (local_tyvar_pa env) tv pa
+      }
+
+localTyVars :: VM [TyVar]
+localTyVars = readLEnv (reverse . local_tyvars)
 
 -- Look up the dfun of a class instance.
 --

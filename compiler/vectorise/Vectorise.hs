@@ -175,7 +175,7 @@ abstractOverTyVars :: [TyVar] -> ((CoreExpr -> CoreExpr) -> VM a) -> VM a
 abstractOverTyVars tvs p
   = do
       mdicts <- mapM mk_dict_var tvs
-      zipWithM_ (\tv -> maybe (deleteTyVarPA tv) (extendTyVarPA tv . Var)) tvs mdicts
+      zipWithM_ (\tv -> maybe (defLocalTyVar tv) (defLocalTyVarWithPA tv . Var)) tvs mdicts
       p (mk_lams mdicts)
   where
     mk_dict_var tv = do
@@ -262,7 +262,7 @@ vectExpr lc e@(_, AnnLam bndr body)
 
 vectExpr lc (fvs, AnnLam bndr body)
   = do
-      let tyvars = filter isTyVar (varSetElems fvs)
+      tyvars <- localTyVars
       info <- mkCEnvInfo fvs bndr body
       (poly_vfn, poly_lfn) <- mkClosureFns info tyvars bndr body
 
