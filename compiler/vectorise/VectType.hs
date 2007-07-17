@@ -1,4 +1,4 @@
-module VectType ( vectTyCon, vectType )
+module VectType ( vectTyCon, vectType, vectTypeEnv )
 where
 
 #include "HsVersions.h"
@@ -6,6 +6,7 @@ where
 import VectMonad
 import VectUtils
 
+import HscTypes          ( TypeEnv, extendTypeEnvList, typeEnvTyCons )
 import DataCon
 import TyCon
 import Type
@@ -13,7 +14,9 @@ import TypeRep
 import OccName
 import MkId
 import BasicTypes        ( StrictnessMark(..), boolToRecFlag )
+import NameEnv
 
+import Unique
 import UniqFM
 import UniqSet
 import Digraph           ( SCC(..), stronglyConnComp )
@@ -59,6 +62,29 @@ vectType ty = pprPanic "vectType:" (ppr ty)
 -- Type definitions
 
 type TyConGroup = ([TyCon], UniqSet TyCon)
+
+vectTypeEnv :: TypeEnv -> VM TypeEnv
+vectTypeEnv env
+  = do
+      cs <- readGEnv $ mk_map . global_tycons
+      let (conv_tcs, keep_tcs) = classifyTyCons cs groups
+          keep_dcs             = concatMap tyConDataCons keep_tcs
+      zipWithM_ defTyCon   keep_tcs keep_tcs
+      zipWithM_ defDataCon keep_dcs keep_dcs
+      new_tcs <- vectTyConDecls conv_tcs
+      return $ extendTypeEnvList env
+                 (map ATyCon new_tcs ++ [ADataCon dc | tc <- new_tcs
+                                                     , dc <- tyConDataCons tc])
+  where
+    tycons = typeEnvTyCons env
+    groups = tyConGroups tycons
+
+    mk_map env = listToUFM_Directly [(u, getUnique n /= u) | (u,n) <- nameEnvUniqueElts env]
+
+    keep_tc tc = let dcs = tyConDataCons tc
+                 in
+                 defTyCon tc tc >> zipWithM_ defDataCon dcs dcs
+
 
 vectTyConDecls :: [TyCon] -> VM [TyCon]
 vectTyConDecls tcs = fixV $ \tcs' ->

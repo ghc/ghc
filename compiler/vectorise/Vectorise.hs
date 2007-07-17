@@ -56,8 +56,10 @@ vectorise hsc_env _ _ guts
 vectModule :: ModGuts -> VM ModGuts
 vectModule guts
   = do
+      types' <- vectTypeEnv (mg_types guts)
       binds' <- mapM vectTopBind (mg_binds guts)
-      return $ guts { mg_binds = binds' }
+      return $ guts { mg_types = types'
+                    , mg_binds = binds' }
 
 vectTopBind :: CoreBind -> VM CoreBind
 vectTopBind b@(NonRec var expr)
