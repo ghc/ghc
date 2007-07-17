@@ -14,6 +14,9 @@ import Outputable
 
 import Control.Monad  ( liftM2 )
 
+-- ----------------------------------------------------------------------------
+-- Types
+
 vectTyCon :: TyCon -> VM TyCon
 vectTyCon tc
   | isFunTyCon tc        = builtin closureTyCon
