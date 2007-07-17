@@ -2,7 +2,7 @@ module VectMonad (
   Scope(..),
   VM,
 
-  noV, tryV, maybeV, orElseV, localV, closedV, initV,
+  noV, tryV, maybeV, orElseV, fixV, localV, closedV, initV,
   cloneName, newLocalVar, newTyVar,
   
   Builtins(..), paDictTyCon,
@@ -200,6 +200,11 @@ maybeV p = maybe noV return =<< p
 
 orElseV :: VM a -> VM a -> VM a
 orElseV p q = maybe q return =<< tryV p
+
+fixV :: (a -> VM a) -> VM a
+fixV f = VM (\bi genv lenv -> fixDs $ \r -> runVM (f (unYes r)) bi genv lenv )
+  where
+    unYes (Yes _ _ x) = x
 
 localV :: VM a -> VM a
 localV p = do
