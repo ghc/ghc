@@ -244,7 +244,8 @@ mkIface hsc_env maybe_old_iface
 		      mg_deps      = deps,
 		      mg_rdr_env   = rdr_env,
 		      mg_fix_env   = fix_env,
-		      mg_deprecs   = src_deprecs})
+		      mg_deprecs   = src_deprecs,
+	              mg_hpc_info  = hpc_info })
 	(ModDetails{  md_insts 	   = insts, 
 		      md_fam_insts = fam_insts,
 		      md_rules 	   = rules,
@@ -304,6 +305,7 @@ mkIface hsc_env maybe_old_iface
                         mi_finsts    = False,   -- Ditto
 			mi_decls     = deliberatelyOmitted "decls",
 			mi_ver_fn    = deliberatelyOmitted "ver_fn",
+			mi_hpc       = isHpcUsed hpc_info,
 
 			-- And build the cached values
 			mi_dep_fn = mkIfaceDepCache deprecs,
@@ -472,7 +474,8 @@ addVersionInfo ver_fn (Just old_iface@(ModIface {
 
 	-- If the usages havn't changed either, we don't need to write the interface file
     no_other_changes = mi_usages new_iface == mi_usages old_iface && 
-		       mi_deps new_iface == mi_deps old_iface
+		       mi_deps new_iface == mi_deps old_iface &&
+		       mi_hpc new_iface == mi_hpc old_iface
     no_change_at_all = no_output_change && no_other_changes
  
     pp_diffs = vcat [pp_change no_export_change "Export list" 

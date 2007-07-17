@@ -69,7 +69,7 @@ addCoverageTicksToBinds dflags mod mod_loc tyCons binds = do
 		    Just file -> file
 		    Nothing -> panic "can not find the original file during hpc trans"
 
-  if "boot" `isSuffixOf` orig_file then return (binds, noHpcInfo, emptyModBreaks) else do
+  if "boot" `isSuffixOf` orig_file then return (binds, emptyHpcInfo False, emptyModBreaks) else do
 
   let mod_name = moduleNameString (moduleName mod)
 

@@ -61,7 +61,7 @@ module HscTypes (
 	Linkable(..), isObjectLinkable,
 	Unlinked(..), CompiledByteCode,
 	isObject, nameOfObject, isInterpretable, byteCodeOfObject,
-        HpcInfo(..), noHpcInfo,
+        HpcInfo(..), emptyHpcInfo, isHpcUsed, AnyHpcUsage,
 
         -- Breakpoints
         ModBreaks (..), BreakIndex, emptyModBreaks,
@@ -473,12 +473,14 @@ data ModIface
 		-- and are not put into the interface file
 	mi_dep_fn  :: Name -> Maybe DeprecTxt,	-- Cached lookup for mi_deprecs
 	mi_fix_fn  :: OccName -> Fixity,	-- Cached lookup for mi_fixities
-	mi_ver_fn  :: OccName -> Maybe (OccName, Version)
+	mi_ver_fn  :: OccName -> Maybe (OccName, Version),
                         -- Cached lookup for mi_decls
 			-- The Nothing in mi_ver_fn means that the thing
 			-- isn't in decls. It's useful to know that when
 			-- seeing if we are up to date wrt the old interface
                         -- The 'OccName' is the parent of the name, if it has one.
+	mi_hpc    :: !AnyHpcUsage
+	  -- True if this program uses Hpc at any point in the program.
      }
 
 -- Should be able to construct ModDetails from mi_decls in ModIface
@@ -629,7 +631,8 @@ emptyModIface mod
                mi_vect_info = noIfaceVectInfo,
 	       mi_dep_fn = emptyIfaceDepCache,
 	       mi_fix_fn = emptyIfaceFixCache,
-	       mi_ver_fn = emptyIfaceVerCache
+	       mi_ver_fn = emptyIfaceVerCache,
+	       mi_hpc    = False
     }		
 \end{code}
 
@@ -1255,14 +1258,26 @@ showModMsg target recomp mod_summary
 %************************************************************************
 
 \begin{code}
-data HpcInfo = HpcInfo 
+data HpcInfo 
+  = HpcInfo 
      { hpcInfoTickCount :: Int 
      , hpcInfoHash      :: Int  
      }
-     | NoHpcInfo
+  | NoHpcInfo 
+     { hpcUsed          :: AnyHpcUsage  -- is hpc used anywhere on the module tree?
+     }
 
-noHpcInfo :: HpcInfo
-noHpcInfo = NoHpcInfo
+-- This is used to mean there is no module-local hpc usage,
+-- but one of my imports used hpc instrumentation.
+
+type AnyHpcUsage = Bool
+
+emptyHpcInfo :: AnyHpcUsage -> HpcInfo
+emptyHpcInfo = NoHpcInfo 
+
+isHpcUsed :: HpcInfo -> AnyHpcUsage
+isHpcUsed (HpcInfo {})     		 = True
+isHpcUsed (NoHpcInfo { hpcUsed = used }) = used
 \end{code}
 
 %************************************************************************

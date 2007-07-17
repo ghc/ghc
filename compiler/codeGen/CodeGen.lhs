@@ -224,7 +224,7 @@ mkModuleInit dflags way cost_centre_info this_mod main_mod foreign_stubs importe
                       , CmmJump (CmmLoad (cmmRegOffW spReg (-1)) wordRep) [] ]
 
 
-    rec_descent_init = if opt_SccProfilingOn || opt_Hpc
+    rec_descent_init = if opt_SccProfilingOn || isHpcUsed hpc_info
 		       then jump_to_init
 		       else ret_code
 

@@ -295,7 +295,8 @@ instance Binary ModIface where
 		 mi_fam_insts = fam_insts,
 		 mi_rules     = rules,
 		 mi_rule_vers = rule_vers,
-                 mi_vect_info = vect_info }) = do
+                 mi_vect_info = vect_info,
+		 mi_hpc       = hpc_info }) = do
 	put_ bh mod
 	put_ bh is_boot
 	put_ bh mod_vers
@@ -313,6 +314,7 @@ instance Binary ModIface where
 	lazyPut bh rules
 	put_ bh rule_vers
         put_ bh vect_info
+	put_ bh hpc_info
 
    get bh = do
 	mod_name  <- get bh
@@ -332,6 +334,7 @@ instance Binary ModIface where
 	rules	  <- {-# SCC "bin_rules" #-} lazyGet bh
 	rule_vers <- get bh
         vect_info <- get bh
+        hpc_info  <- get bh
 	return (ModIface {
 		 mi_module    = mod_name,
 		 mi_boot      = is_boot,
@@ -351,6 +354,7 @@ instance Binary ModIface where
 		 mi_rules     = rules,
 		 mi_rule_vers = rule_vers,
                  mi_vect_info = vect_info,
+		 mi_hpc       = hpc_info,
 			-- And build the cached values
 		 mi_dep_fn    = mkIfaceDepCache deprecs,
 		 mi_fix_fn    = mkIfaceFixCache fixities,

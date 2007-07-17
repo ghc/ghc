@@ -226,7 +226,8 @@ data TcGblEnv
 	tcg_fords     :: [LForeignDecl Id], -- ...Foreign import & exports
 
 	tcg_doc :: Maybe (HsDoc Name), -- Maybe Haddock documentation
-        tcg_hmi :: HaddockModInfo Name -- Haddock module information
+        tcg_hmi :: HaddockModInfo Name, -- Haddock module information
+        tcg_hpc :: AnyHpcUsage -- True if any part of the prog uses hpc instrumentation.
     }
 
 type RecFieldEnv = NameEnv [Name]	-- Maps a constructor name *in this module*

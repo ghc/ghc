@@ -57,7 +57,7 @@ hpcTable this_mod (HpcInfo hpc_tickCount _) = do
 		      else packageIdString (modulePackageId this_mod) ++ "/" ++
 			   module_name_str
 
-hpcTable this_mod (NoHpcInfo) = error "TODO: impossible"
+hpcTable this_mod (NoHpcInfo {}) = error "TODO: impossible"
 
 initHpc :: Module -> HpcInfo -> Code
 initHpc this_mod (HpcInfo tickCount hashNo)

@@ -197,7 +197,7 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 \begin{code}
 tcRnImports :: HscEnv -> Module -> [LImportDecl RdrName] -> TcM TcGblEnv
 tcRnImports hsc_env this_mod import_decls
-  = do	{ (rn_imports, rdr_env, imports) <- rnImports import_decls ;
+  = do	{ (rn_imports, rdr_env, imports,hpc_info) <- rnImports import_decls ;
 
 	; let { dep_mods :: ModuleNameEnv (ModuleName, IsBootInterface)
 	      ; dep_mods = imp_dep_mods imports
@@ -226,7 +226,8 @@ tcRnImports hsc_env this_mod import_decls
               tcg_rn_imports   = fmap (const rn_imports) (tcg_rn_imports gbl),
 	      tcg_inst_env     = extendInstEnvList (tcg_inst_env gbl) home_insts,
 	      tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env gbl) 
-                                                      home_fam_insts
+                                                      home_fam_insts,
+	      tcg_hpc          = hpc_info
 	    }) $ do {
 
 	; traceRn (text "rn1" <+> ppr (imp_dep_mods imports))
@@ -323,7 +324,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 				mg_fix_env   = emptyFixityEnv,
 				mg_deprecs   = NoDeprecs,
 				mg_foreign   = NoStubs,
-				mg_hpc_info  = noHpcInfo,
+				mg_hpc_info  = emptyHpcInfo False,
                                 mg_modBreaks = emptyModBreaks,
                                 mg_vect_info = noVectInfo
 		    } } ;

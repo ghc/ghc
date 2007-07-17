@@ -78,7 +78,8 @@ deSugar hsc_env
 			    tcg_fords        = fords,
 			    tcg_rules        = rules,
 		    	    tcg_insts        = insts,
-		    	    tcg_fam_insts    = fam_insts })
+		    	    tcg_fam_insts    = fam_insts,
+			    tcg_hpc          = other_hpc_info })
 
   = do	{ let dflags = hsc_dflags hsc_env
         ; showPass dflags "Desugar"
@@ -87,12 +88,15 @@ deSugar hsc_env
         ; let export_set = availsToNameSet exports
 	; let auto_scc = mkAutoScc mod export_set
         ; let target = hscTarget dflags
+        ; let hpcInfo = emptyHpcInfo other_hpc_info
 	; mb_res <- case target of
-	             HscNothing -> return (Just ([], [], NoStubs, noHpcInfo, emptyModBreaks))
+	             HscNothing -> return (Just ([], [], NoStubs, hpcInfo, emptyModBreaks))
                      _        -> do (binds_cvr,ds_hpc_info, modBreaks) 
-					      <- if opt_Hpc || target == HscInterpreted
+					      <- if (opt_Hpc 
+							|| target == HscInterpreted)
+						     && (not (isHsBoot hsc_src))							
                                                  then addCoverageTicksToBinds dflags mod mod_loc (typeEnvTyCons type_env) binds 
-                                                 else return (binds, noHpcInfo, emptyModBreaks)
+                                                 else return (binds, hpcInfo, emptyModBreaks)
                                     initDs hsc_env mod rdr_env type_env $ do
 		                        { core_prs <- dsTopLHsBinds auto_scc binds_cvr
 		                        ; (ds_fords, foreign_prs) <- dsForeigns fords

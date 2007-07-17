@@ -57,7 +57,7 @@ import Monad		( when )
 
 \begin{code}
 rnImports :: [LImportDecl RdrName]
-           -> RnM ([LImportDecl Name], GlobalRdrEnv, ImportAvails)
+           -> RnM ([LImportDecl Name], GlobalRdrEnv, ImportAvails,AnyHpcUsage)
 
 rnImports imports
          -- PROCESS IMPORT DECLS
@@ -75,18 +75,19 @@ rnImports imports
 
          stuff1 <- mapM (rnImportDecl this_mod) (prel_imports ++ ordinary)
          stuff2 <- mapM (rnImportDecl this_mod) source
-         let (decls, rdr_env, imp_avails) = combine (stuff1 ++ stuff2)
-         return (decls, rdr_env, imp_avails) 
+         let (decls, rdr_env, imp_avails,hpc_usage) = combine (stuff1 ++ stuff2)
+         return (decls, rdr_env, imp_avails,hpc_usage) 
 
     where
-   combine :: [(LImportDecl Name,  GlobalRdrEnv, ImportAvails)]
-           -> ([LImportDecl Name], GlobalRdrEnv, ImportAvails)
-   combine = foldr plus ([], emptyGlobalRdrEnv, emptyImportAvails)
-        where plus (decl,  gbl_env1, imp_avails1)
-                   (decls, gbl_env2, imp_avails2)
+   combine :: [(LImportDecl Name,  GlobalRdrEnv, ImportAvails,AnyHpcUsage)]
+           -> ([LImportDecl Name], GlobalRdrEnv, ImportAvails,AnyHpcUsage)
+   combine = foldr plus ([], emptyGlobalRdrEnv, emptyImportAvails,False)
+        where plus (decl,  gbl_env1, imp_avails1,hpc_usage1)
+                   (decls, gbl_env2, imp_avails2,hpc_usage2)
                 = (decl:decls, 
                    gbl_env1 `plusGlobalRdrEnv` gbl_env2,
-                   imp_avails1 `plusImportAvails` imp_avails2)
+                   imp_avails1 `plusImportAvails` imp_avails2,
+		   hpc_usage1 || hpc_usage2)
 
 mkPrelImports :: Module -> Bool -> [LImportDecl RdrName] -> [LImportDecl RdrName]
 -- Consruct the implicit declaration "import Prelude" (or not)
@@ -119,7 +120,7 @@ mkPrelImports this_mod implicit_prelude import_decls
 
 rnImportDecl  :: Module
 	      -> LImportDecl RdrName
-	      -> RnM (LImportDecl Name, GlobalRdrEnv, ImportAvails)
+	      -> RnM (LImportDecl Name, GlobalRdrEnv, ImportAvails,AnyHpcUsage)
 
 rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
                                          qual_only as_mod imp_details))
@@ -245,7 +246,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
     let new_imp_decl = L loc (ImportDecl loc_imp_mod_name want_boot
                                          qual_only as_mod new_imp_details)
 
-    returnM (new_imp_decl, gbl_env, imports)
+    returnM (new_imp_decl, gbl_env, imports, mi_hpc iface)
     )
 
 warnRedundantSourceImport mod_name
