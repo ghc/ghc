@@ -725,7 +725,7 @@ endif
 
 $(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
 	echo "import System.Cmd; import $(EnvImport); import System.Exit" > $@
-	echo "main = do args <- $(GetArgs); rawSystem \"$(TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)\" (\"-B$(TOP_ABS)\":args) >>= exitWith" >> $@
+	echo "main = do args <- $(GetArgs); rawSystem \"$(TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)\" (\"-B$(TOP_ABS)\":\"-fhardwire-lib-paths\":args) >>= exitWith" >> $@
 
 $(INPLACE_PROG): $(INPLACE_HS)
 	$(HC) --make $< -o $@

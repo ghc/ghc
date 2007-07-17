@@ -35,7 +35,7 @@ import Module
 import UniqFM		( eltsUFM )
 import ErrUtils
 import DynFlags
-import StaticFlags	( v_Ld_inputs, opt_Static, WayName(..) )
+import StaticFlags	( v_Ld_inputs, opt_Static, opt_HardwireLibPaths, WayName(..) )
 import Config
 import Panic
 import Util
@@ -1173,7 +1173,9 @@ linkBinary dflags o_files dep_packages = do
     -- dependencies, and eliminating duplicates.
 
     pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
-    let pkg_lib_path_opts = map ("-L"++) pkg_lib_paths
+    let pkg_lib_path_opts = concat (map get_pkg_lib_path_opts pkg_lib_paths)
+	get_pkg_lib_path_opts l | opt_HardwireLibPaths = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
+				| otherwise = ["-L" ++ l]
 
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths
