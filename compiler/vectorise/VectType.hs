@@ -10,6 +10,9 @@ import DataCon
 import TyCon
 import Type
 import TypeRep
+import OccName
+import MkId
+import BasicTypes        ( StrictnessMark(..), boolToRecFlag )
 
 import UniqFM
 import UniqSet
@@ -17,7 +20,7 @@ import Digraph           ( SCC(..), stronglyConnComp )
 
 import Outputable
 
-import Control.Monad  ( liftM2 )
+import Control.Monad  ( liftM2, zipWithM_ )
 
 -- ----------------------------------------------------------------------------
 -- Types
@@ -56,6 +59,81 @@ vectType ty = pprPanic "vectType:" (ppr ty)
 -- Type definitions
 
 type TyConGroup = ([TyCon], UniqSet TyCon)
+
+vectTyConDecls :: [TyCon] -> VM [TyCon]
+vectTyConDecls tcs = fixV $ \tcs' ->
+  do
+    mapM_ (uncurry defTyCon) (lazy_zip tcs tcs')
+    mapM vectTyConDecl tcs
+  where
+    lazy_zip [] _ = []
+    lazy_zip (x:xs) ~(y:ys) = (x,y) : lazy_zip xs ys
+
+vectTyConDecl :: TyCon -> VM TyCon
+vectTyConDecl tc
+  = do
+      name' <- cloneName mkVectTyConOcc name
+      rhs'  <- vectAlgTyConRhs (algTyConRhs tc)
+
+      return $ mkAlgTyCon name'
+                          kind
+                          tyvars
+                          []              -- no stupid theta
+                          rhs'
+                          []              -- no selector ids
+                          NoParentTyCon   -- FIXME
+                          rec_flag        -- FIXME: is this ok?
+                          False           -- FIXME: no generics
+                          False           -- not GADT syntax
+  where
+    name   = tyConName tc
+    kind   = tyConKind tc
+    tyvars = tyConTyVars tc
+    rec_flag = boolToRecFlag (isRecursiveTyCon tc)
+
+vectAlgTyConRhs :: AlgTyConRhs -> VM AlgTyConRhs
+vectAlgTyConRhs (DataTyCon { data_cons = data_cons
+                           , is_enum   = is_enum
+                           })
+  = do
+      data_cons' <- mapM vectDataCon data_cons
+      zipWithM_ defDataCon data_cons data_cons'
+      return $ DataTyCon { data_cons = data_cons'
+                         , is_enum   = is_enum
+                         }
+
+vectDataCon :: DataCon -> VM DataCon
+vectDataCon dc
+  | not . null $ dataConExTyVars dc = pprPanic "vectDataCon: existentials" (ppr dc)
+  | not . null $ dataConEqSpec   dc = pprPanic "vectDataCon: eq spec" (ppr dc)
+  | otherwise
+  = do
+      name'    <- cloneName mkVectDataConOcc name
+      tycon'   <- vectTyCon tycon
+      arg_tys  <- mapM vectType rep_arg_tys
+      wrk_name <- cloneName mkDataConWorkerOcc name'
+
+      let ids      = mkDataConIds (panic "vectDataCon: wrapped id")
+                                  wrk_name
+                                  data_con
+          data_con = mkDataCon name'
+                               False           -- not infix
+                               (map (const NotMarkedStrict) arg_tys)
+                               []              -- no labelled fields
+                               univ_tvs
+                               []              -- no existential tvs for now
+                               []              -- no eq spec for now
+                               []              -- no theta
+                               arg_tys
+                               tycon'
+                               []              -- no stupid theta
+                               ids
+      return data_con
+  where
+    name        = dataConName dc
+    univ_tvs    = dataConUnivTyVars dc
+    rep_arg_tys = dataConOrigArgTys dc
+    tycon       = dataConTyCon dc
 
 -- | Split the given tycons into two sets depending on whether they have to be
 -- converted (first list) or not (second list). The first argument contains
