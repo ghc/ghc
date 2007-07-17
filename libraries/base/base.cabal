@@ -106,6 +106,7 @@ exposed-modules:
 	GHC.ConsoleHandler,
 	GHC.Dotnet,
 	GHC.Enum,
+	GHC.Environment,
 	GHC.Err,
 	GHC.Exception,
 	GHC.Exts,
