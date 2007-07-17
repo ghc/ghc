@@ -165,19 +165,14 @@ updVectInfo :: GlobalEnv -> TypeEnv -> VectInfo -> VectInfo
 updVectInfo env tyenv info
   = info {
       vectInfoVar     = global_exported_vars env
-    , vectInfoTyCon   = tc_env
-    , vectInfoDataCon = dc_env
+    , vectInfoTyCon   = mk_env typeEnvTyCons global_tycons
+    , vectInfoDataCon = mk_env typeEnvDataCons global_datacons
     }
   where
-    tc_env = mkNameEnv [(tc_name, (tc,tc'))
-               | tc <- typeEnvTyCons tyenv
-               , let tc_name = tyConName tc
-               , Just tc' <- [lookupNameEnv (global_tycons env) tc_name]]
-
-    dc_env = mkNameEnv [(dc_name, (dc,dc'))
-               | dc <- typeEnvDataCons tyenv
-               , let dc_name = dataConName dc
-               , Just dc' <- [lookupNameEnv (global_datacons env) dc_name]]
+    mk_env from_tyenv from_env = mkNameEnv [(name, (from,to))
+                                   | from <- from_tyenv tyenv
+                                   , let name = getName from
+                                   , Just to <- [lookupNameEnv (from_env env) name]]
 
 data VResult a = Yes GlobalEnv LocalEnv a | No
 
