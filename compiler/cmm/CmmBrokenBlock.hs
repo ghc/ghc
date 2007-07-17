@@ -18,6 +18,7 @@ import CmmUtils
 import CLabel
 import MachOp (MachHint(..))
 
+import CgUtils (callerSaveVolatileRegs)
 import ClosureInfo
 
 import Maybes
@@ -26,12 +27,6 @@ import Panic
 import UniqSupply
 import Unique
 import UniqFM
-
-import MachRegs (callerSaveVolatileRegs)
-  -- HACK: this is part of the NCG so we shouldn't use this, but we need
-  -- it for now to eliminate the need for saved regs to be in CmmCall.
-  -- The long term solution is to factor callerSaveVolatileRegs
-  -- from nativeGen into codeGen
 
 -- This module takes a 'CmmBasicBlock' which might have 'CmmCall'
 -- statements in it with 'CmmSafe' set and breaks it up at each such call.

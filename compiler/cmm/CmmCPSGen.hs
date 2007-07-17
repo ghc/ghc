@@ -17,7 +17,6 @@ import CmmCallConv
 
 import CgProf (curCCS, curCCSAddr)
 import CgUtils (cmmOffsetW)
-import CgInfoTbls (entryCode)
 import SMRep
 import ForeignCall
 
@@ -28,12 +27,6 @@ import Maybe
 import List
 
 import Panic
-
-import MachRegs (callerSaveVolatileRegs)
-  -- HACK: this is part of the NCG so we shouldn't use this, but we need
-  -- it for now to eliminate the need for saved regs to be in CmmCall.
-  -- The long term solution is to factor callerSaveVolatileRegs
-  -- from nativeGen into CPS
 
 -- The format for the call to a continuation
 -- The fst is the arguments that must be passed to the continuation

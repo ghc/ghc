@@ -19,6 +19,8 @@ module CgUtils (
 	emitSwitch, emitLitSwitch,
 	tagToClosure,
 
+        callerSaveVolatileRegs, get_GlobalReg_addr,
+
 	cmmAndWord, cmmOrWord, cmmNegate, cmmEqWord, cmmNeWord,
 	cmmOffsetExprW, cmmOffsetExprB,
 	cmmRegOffW, cmmRegOffB,
@@ -37,6 +39,7 @@ module CgUtils (
   ) where
 
 #include "HsVersions.h"
+#include "MachRegs.h"
 
 import CgMonad
 import TyCon
@@ -59,12 +62,6 @@ import DynFlags
 import FastString
 import PackageConfig
 import Outputable
-
-import MachRegs (callerSaveVolatileRegs)
-  -- HACK: this is part of the NCG so we shouldn't use this, but we need
-  -- it for now to eliminate the need for saved regs to be in CmmCall.
-  -- The long term solution is to factor callerSaveVolatileRegs
-  -- from nativeGen into codeGen
 
 import Data.Char
 import Data.Bits
@@ -301,6 +298,188 @@ emitRtsCall' res fun args vols safe = do
     (caller_save, caller_load) = callerSaveVolatileRegs vols
     target   = CmmForeignCall fun_expr CCallConv
     fun_expr = mkLblExpr (mkRtsCodeLabel fun)
+
+-----------------------------------------------------------------------------
+--
+--	Caller-Save Registers
+--
+-----------------------------------------------------------------------------
+
+-- Here we generate the sequence of saves/restores required around a
+-- foreign call instruction.
+
+-- TODO: reconcile with includes/Regs.h
+--  * Regs.h claims that BaseReg should be saved last and loaded first
+--    * This might not have been tickled before since BaseReg is callee save
+--  * Regs.h saves SparkHd, ParkT1, SparkBase and SparkLim
+callerSaveVolatileRegs :: Maybe [GlobalReg] -> ([CmmStmt], [CmmStmt])
+callerSaveVolatileRegs vols = (caller_save, caller_load)
+  where
+    caller_save = foldr ($!) [] (map callerSaveGlobalReg    regs_to_save)
+    caller_load = foldr ($!) [] (map callerRestoreGlobalReg regs_to_save)
+
+    system_regs = [Sp,SpLim,Hp,HpLim,CurrentTSO,CurrentNursery,
+		   {-SparkHd,SparkTl,SparkBase,SparkLim,-}BaseReg ]
+
+    regs_to_save = system_regs ++ vol_list
+
+    vol_list = case vols of Nothing -> all_of_em; Just regs -> regs
+
+    all_of_em = [ VanillaReg n | n <- [0..mAX_Vanilla_REG] ]
+	     ++ [ FloatReg   n | n <- [0..mAX_Float_REG] ]
+	     ++ [ DoubleReg  n | n <- [0..mAX_Double_REG] ]
+	     ++ [ LongReg    n | n <- [0..mAX_Long_REG] ]
+
+    callerSaveGlobalReg reg next
+	| callerSaves reg = 
+		CmmStore (get_GlobalReg_addr reg) 
+			 (CmmReg (CmmGlobal reg)) : next
+	| otherwise = next
+
+    callerRestoreGlobalReg reg next
+	| callerSaves reg = 
+		CmmAssign (CmmGlobal reg)
+			  (CmmLoad (get_GlobalReg_addr reg) (globalRegRep reg))
+			: next
+	| otherwise = next
+
+-- -----------------------------------------------------------------------------
+-- Global registers
+
+-- We map STG registers onto appropriate CmmExprs.  Either they map
+-- to real machine registers or stored as offsets from BaseReg.  Given
+-- a GlobalReg, get_GlobalReg_addr always produces the 
+-- register table address for it.
+-- (See also get_GlobalReg_reg_or_addr in MachRegs)
+
+get_GlobalReg_addr              :: GlobalReg -> CmmExpr
+get_GlobalReg_addr BaseReg = regTableOffset 0
+get_GlobalReg_addr mid     = get_Regtable_addr_from_offset 
+				(globalRegRep mid) (baseRegOffset mid)
+
+-- Calculate a literal representing an offset into the register table.
+-- Used when we don't have an actual BaseReg to offset from.
+regTableOffset n = 
+  CmmLit (CmmLabelOff mkMainCapabilityLabel (oFFSET_Capability_r + n))
+
+get_Regtable_addr_from_offset   :: MachRep -> Int -> CmmExpr
+get_Regtable_addr_from_offset rep offset =
+#ifdef REG_Base
+  CmmRegOff (CmmGlobal BaseReg) offset
+#else
+  regTableOffset offset
+#endif
+
+
+-- | Returns 'True' if this global register is stored in a caller-saves
+-- machine register.
+
+callerSaves :: GlobalReg -> Bool
+
+#ifdef CALLER_SAVES_Base
+callerSaves BaseReg		= True
+#endif
+#ifdef CALLER_SAVES_R1
+callerSaves (VanillaReg 1)	= True
+#endif
+#ifdef CALLER_SAVES_R2
+callerSaves (VanillaReg 2)	= True
+#endif
+#ifdef CALLER_SAVES_R3
+callerSaves (VanillaReg 3)	= True
+#endif
+#ifdef CALLER_SAVES_R4
+callerSaves (VanillaReg 4)	= True
+#endif
+#ifdef CALLER_SAVES_R5
+callerSaves (VanillaReg 5)	= True
+#endif
+#ifdef CALLER_SAVES_R6
+callerSaves (VanillaReg 6)	= True
+#endif
+#ifdef CALLER_SAVES_R7
+callerSaves (VanillaReg 7)	= True
+#endif
+#ifdef CALLER_SAVES_R8
+callerSaves (VanillaReg 8)	= True
+#endif
+#ifdef CALLER_SAVES_F1
+callerSaves (FloatReg 1)	= True
+#endif
+#ifdef CALLER_SAVES_F2
+callerSaves (FloatReg 2)	= True
+#endif
+#ifdef CALLER_SAVES_F3
+callerSaves (FloatReg 3)	= True
+#endif
+#ifdef CALLER_SAVES_F4
+callerSaves (FloatReg 4)	= True
+#endif
+#ifdef CALLER_SAVES_D1
+callerSaves (DoubleReg 1)	= True
+#endif
+#ifdef CALLER_SAVES_D2
+callerSaves (DoubleReg 2)	= True
+#endif
+#ifdef CALLER_SAVES_L1
+callerSaves (LongReg 1)		= True
+#endif
+#ifdef CALLER_SAVES_Sp
+callerSaves Sp			= True
+#endif
+#ifdef CALLER_SAVES_SpLim
+callerSaves SpLim		= True
+#endif
+#ifdef CALLER_SAVES_Hp
+callerSaves Hp			= True
+#endif
+#ifdef CALLER_SAVES_HpLim
+callerSaves HpLim		= True
+#endif
+#ifdef CALLER_SAVES_CurrentTSO
+callerSaves CurrentTSO		= True
+#endif
+#ifdef CALLER_SAVES_CurrentNursery
+callerSaves CurrentNursery	= True
+#endif
+callerSaves _			= False
+
+
+-- -----------------------------------------------------------------------------
+-- Information about global registers
+
+baseRegOffset :: GlobalReg -> Int
+
+baseRegOffset (VanillaReg 1)      = oFFSET_StgRegTable_rR1
+baseRegOffset (VanillaReg 2)      = oFFSET_StgRegTable_rR2
+baseRegOffset (VanillaReg 3)      = oFFSET_StgRegTable_rR3
+baseRegOffset (VanillaReg 4)      = oFFSET_StgRegTable_rR4
+baseRegOffset (VanillaReg 5)      = oFFSET_StgRegTable_rR5
+baseRegOffset (VanillaReg 6)      = oFFSET_StgRegTable_rR6
+baseRegOffset (VanillaReg 7)      = oFFSET_StgRegTable_rR7
+baseRegOffset (VanillaReg 8)      = oFFSET_StgRegTable_rR8
+baseRegOffset (VanillaReg 9)      = oFFSET_StgRegTable_rR9
+baseRegOffset (VanillaReg 10)     = oFFSET_StgRegTable_rR10
+baseRegOffset (FloatReg  1)       = oFFSET_StgRegTable_rF1
+baseRegOffset (FloatReg  2)       = oFFSET_StgRegTable_rF2
+baseRegOffset (FloatReg  3)       = oFFSET_StgRegTable_rF3
+baseRegOffset (FloatReg  4)       = oFFSET_StgRegTable_rF4
+baseRegOffset (DoubleReg 1)       = oFFSET_StgRegTable_rD1
+baseRegOffset (DoubleReg 2)       = oFFSET_StgRegTable_rD2
+baseRegOffset Sp		  = oFFSET_StgRegTable_rSp
+baseRegOffset SpLim		  = oFFSET_StgRegTable_rSpLim
+baseRegOffset (LongReg 1)         = oFFSET_StgRegTable_rL1
+baseRegOffset Hp		  = oFFSET_StgRegTable_rHp
+baseRegOffset HpLim		  = oFFSET_StgRegTable_rHpLim
+baseRegOffset CurrentTSO	  = oFFSET_StgRegTable_rCurrentTSO
+baseRegOffset CurrentNursery	  = oFFSET_StgRegTable_rCurrentNursery
+baseRegOffset HpAlloc		  = oFFSET_StgRegTable_rHpAlloc
+baseRegOffset GCEnter1		  = oFFSET_stgGCEnter1
+baseRegOffset GCFun		  = oFFSET_stgGCFun
+#ifdef DEBUG
+baseRegOffset BaseReg		  = panic "baseRegOffset:BaseReg"
+baseRegOffset _			  = panic "baseRegOffset:other"
+#endif
 
 
 -------------------------------------------------------------------------

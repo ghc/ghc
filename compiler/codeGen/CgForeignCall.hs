@@ -37,12 +37,6 @@ import Constants
 import StaticFlags
 import Outputable
 
-import MachRegs (callerSaveVolatileRegs)
-  -- HACK: this is part of the NCG so we shouldn't use this, but we need
-  -- it for now to eliminate the need for saved regs to be in CmmCall.
-  -- The long term solution is to factor callerSaveVolatileRegs
-  -- from nativeGen into codeGen
-
 import Control.Monad
 
 -- -----------------------------------------------------------------------------
