@@ -710,9 +710,17 @@ EXCLUDED_SRCS += $(INPLACE_HS)
 # will go wrong when we use it in a Haskell string below.
 TOP_ABS=$(subst \\,/,$(FPTOOLS_TOP_ABS_PLATFORM))
 
+ifeq "$(stage)" "1"
+EnvImport = System.Environment
+GetArgs = getArgs
+else
+EnvImport = GHC.Environment
+GetArgs = getFullArgs
+endif
+
 $(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
-	echo "import System.Cmd; import System.Environment; import System.Exit" > $@
-	echo "main = do args <- getArgs; rawSystem \"$(TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)\" (\"-B$(TOP_ABS)\":args) >>= exitWith" >> $@
+	echo "import System.Cmd; import $(EnvImport); import System.Exit" > $@
+	echo "main = do args <- $(GetArgs); rawSystem \"$(TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)\" (\"-B$(TOP_ABS)\":args) >>= exitWith" >> $@
 
 $(INPLACE_PROG): $(INPLACE_HS)
 	$(HC) --make $< -o $@

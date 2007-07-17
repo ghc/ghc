@@ -199,6 +199,7 @@ hs_init(int *argc, char **argv[])
 
     /* Parse the flags, separating the RTS flags from the programs args */
     if (argc != NULL && argv != NULL) {
+	setFullProgArgv(*argc,*argv);
 	setupRtsFlags(argc, *argv, &rts_argc, rts_argv);
 	setProgArgv(*argc,*argv);
     }

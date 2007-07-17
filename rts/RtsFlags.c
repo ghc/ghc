@@ -28,6 +28,8 @@ RTS_FLAGS RtsFlags;
  */
 int     prog_argc = 0;    /* an "int" so as to match normal "argc" */
 char  **prog_argv = NULL;
+int     full_prog_argc = 0;    /* an "int" so as to match normal "argc" */
+char  **full_prog_argv = NULL;
 char   *prog_name = NULL; /* 'basename' of prog_argv[0] */
 int     rts_argc = 0;  /* ditto */
 char   *rts_argv[MAX_RTS_ARGS];
@@ -2411,3 +2413,29 @@ setProgArgv(int argc, char *argv[])
    prog_argv = argv;
    setProgName(prog_argv);
 }
+
+/* These functions record and recall the full arguments, including the
+   +RTS ... -RTS options. The reason for adding them was so that the
+   ghc-inplace program can pass /all/ the arguments on to the real ghc. */
+void
+getFullProgArgv(int *argc, char **argv[])
+{
+    if (argc) { *argc = full_prog_argc; }
+    if (argv) { *argv = full_prog_argv; }
+}
+
+void
+setFullProgArgv(int argc, char *argv[])
+{
+    int i;
+    full_prog_argc = argc;
+    full_prog_argv = stgCallocBytes(argc + 1, sizeof (char *),
+                                    "setFullProgArgv 1");
+    for (i = 0; i < argc; i++) {
+        full_prog_argv[i] = stgMallocBytes(strlen(argv[i]) + 1,
+                                           "setFullProgArgv 2");
+        strcpy(full_prog_argv[i], argv[i]);
+    }
+    full_prog_argv[argc] = NULL;
+}
+

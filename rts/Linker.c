@@ -523,6 +523,7 @@ typedef struct _RtsSymbolVal {
       SymX(genSymZh)				\
       SymX(genericRaise)			\
       SymX(getProgArgv)				\
+      SymX(getFullProgArgv)				\
       SymX(getStablePtr)			\
       SymX(hs_init)				\
       SymX(hs_exit)				\
