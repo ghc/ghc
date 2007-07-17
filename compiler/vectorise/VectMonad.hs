@@ -14,8 +14,9 @@ module VectMonad (
   LocalEnv(..),
   readLEnv, setLEnv, updLEnv,
 
-  defGlobalVar, lookupVar,
-  lookupTyCon,
+  lookupVar, defGlobalVar,
+  lookupTyCon, defTyCon,
+  lookupDataCon, defDataCon,
   lookupTyVarPA, defLocalTyVar, defLocalTyVarWithPA, localTyVars,
 
   lookupInst, lookupFamInst
@@ -295,6 +296,17 @@ lookupVar v
 
 lookupTyCon :: TyCon -> VM (Maybe TyCon)
 lookupTyCon tc = readGEnv $ \env -> lookupNameEnv (global_tycons env) (tyConName tc)
+
+defTyCon :: TyCon -> TyCon -> VM ()
+defTyCon tc tc' = updGEnv $ \env ->
+  env { global_tycons = extendNameEnv (global_tycons env) (tyConName tc) tc' }
+
+lookupDataCon :: DataCon -> VM (Maybe DataCon)
+lookupDataCon dc = readGEnv $ \env -> lookupNameEnv (global_datacons env) (dataConName dc)
+
+defDataCon :: DataCon -> DataCon -> VM ()
+defDataCon dc dc' = updGEnv $ \env ->
+  env { global_datacons = extendNameEnv (global_datacons env) (dataConName dc) dc' }
 
 lookupTyVarPA :: Var -> VM (Maybe CoreExpr)
 lookupTyVarPA tv = readLEnv $ \env -> lookupVarEnv (local_tyvar_pa env) tv 
