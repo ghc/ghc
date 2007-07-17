@@ -27,6 +27,7 @@ import HscTypes
 import CoreSyn
 import Class
 import TyCon
+import DataCon
 import Type
 import Var
 import VarEnv
@@ -112,6 +113,10 @@ data GlobalEnv = GlobalEnv {
                   --
                 , global_tycon_pa :: NameEnv CoreExpr
 
+                  -- Mapping from DataCons to their vectorised versions
+                  --
+                , global_datacons :: NameEnv DataCon
+
                 -- External package inst-env & home-package inst-env for class
                 -- instances
                 --
@@ -148,6 +153,7 @@ initGlobalEnv info instEnvs famInstEnvs
     , global_exported_vars = emptyVarEnv
     , global_tycons        = mapNameEnv snd $ vectInfoTyCon info
     , global_tycon_pa      = emptyNameEnv
+    , global_datacons      = mapNameEnv snd $ vectInfoDataCon info
     , global_inst_env      = instEnvs
     , global_fam_inst_env  = famInstEnvs
     , global_bindings      = []
@@ -163,14 +169,20 @@ emptyLocalEnv = LocalEnv {
 updVectInfo :: GlobalEnv -> TypeEnv -> VectInfo -> VectInfo
 updVectInfo env tyenv info
   = info {
-      vectInfoVar   = global_exported_vars env
-    , vectInfoTyCon = tc_env
+      vectInfoVar     = global_exported_vars env
+    , vectInfoTyCon   = tc_env
+    , vectInfoDataCon = dc_env
     }
   where
     tc_env = mkNameEnv [(tc_name, (tc,tc'))
                | tc <- typeEnvTyCons tyenv
                , let tc_name = tyConName tc
                , Just tc' <- [lookupNameEnv (global_tycons env) tc_name]]
+
+    dc_env = mkNameEnv [(dc_name, (dc,dc'))
+               | dc <- typeEnvDataCons tyenv
+               , let dc_name = dataConName dc
+               , Just dc' <- [lookupNameEnv (global_datacons env) dc_name]]
 
 data VResult a = Yes GlobalEnv LocalEnv a | No
 
