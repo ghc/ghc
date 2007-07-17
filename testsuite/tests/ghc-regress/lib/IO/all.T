@@ -92,5 +92,5 @@ clean(['tmp'])
 test('countReaders001', expect_broken(629), compile_and_run, [''])
 clean(['countReaders001.txt'])
 
-test('concio001', normal, run_command, ['$MAKE -s --no-print-directory test.concio001'])
-test('concio001.thr', normal, run_command, ['$MAKE -s --no-print-directory test.concio001.thr'])
+test('concio001', skip_if_fast, run_command, ['$MAKE -s --no-print-directory test.concio001'])
+test('concio001.thr', skip_if_fast, run_command, ['$MAKE -s --no-print-directory test.concio001.thr'])
