@@ -297,7 +297,10 @@ lookupVar v
                  $  maybeV (readGEnv $ \env -> lookupVarEnv (global_vars env) v)
 
 lookupTyCon :: TyCon -> VM (Maybe TyCon)
-lookupTyCon tc = readGEnv $ \env -> lookupNameEnv (global_tycons env) (tyConName tc)
+lookupTyCon tc
+  | isUnLiftedTyCon tc || isTupleTyCon tc = return (Just tc)
+
+  | otherwise = readGEnv $ \env -> lookupNameEnv (global_tycons env) (tyConName tc)
 
 defTyCon :: TyCon -> TyCon -> VM ()
 defTyCon tc tc' = updGEnv $ \env ->

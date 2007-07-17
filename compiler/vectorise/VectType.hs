@@ -209,7 +209,13 @@ tyConsOfType :: Type -> UniqSet TyCon
 tyConsOfType ty
   | Just ty' <- coreView ty    = tyConsOfType ty'
 tyConsOfType (TyVarTy v)       = emptyUniqSet
-tyConsOfType (TyConApp tc tys) = tyConsOfTypes tys `addOneToUniqSet` tc
+tyConsOfType (TyConApp tc tys) = extend (tyConsOfTypes tys)
+  where
+    extend | isUnLiftedTyCon tc
+           || isTupleTyCon   tc = id
+
+           | otherwise          = (`addOneToUniqSet` tc)
+
 tyConsOfType (AppTy a b)       = tyConsOfType a `unionUniqSets` tyConsOfType b
 tyConsOfType (FunTy a b)       = (tyConsOfType a `unionUniqSets` tyConsOfType b)
                                  `addOneToUniqSet` funTyCon
