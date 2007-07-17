@@ -109,10 +109,6 @@ data GlobalEnv = GlobalEnv {
                   --
                 , global_tycons :: NameEnv TyCon
 
-                  -- Mapping from TyCons to their PA dictionaries
-                  --
-                , global_tycon_pa :: NameEnv CoreExpr
-
                   -- Mapping from DataCons to their vectorised versions
                   --
                 , global_datacons :: NameEnv DataCon
@@ -152,7 +148,6 @@ initGlobalEnv info instEnvs famInstEnvs
       global_vars          = mapVarEnv  (Var . snd) $ vectInfoVar   info
     , global_exported_vars = emptyVarEnv
     , global_tycons        = mapNameEnv snd $ vectInfoTyCon info
-    , global_tycon_pa      = emptyNameEnv
     , global_datacons      = mapNameEnv snd $ vectInfoDataCon info
     , global_inst_env      = instEnvs
     , global_fam_inst_env  = famInstEnvs
