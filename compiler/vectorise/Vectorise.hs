@@ -5,6 +5,7 @@ where
 
 import VectMonad
 import VectUtils
+import VectType
 
 import DynFlags
 import HscTypes
@@ -18,7 +19,6 @@ import Rules                ( RuleBase )
 import DataCon
 import TyCon
 import Type
-import TypeRep
 import Var
 import VarEnv
 import VarSet
@@ -39,7 +39,6 @@ import BasicTypes           ( Boxity(..) )
 import Outputable
 import FastString
 import Control.Monad        ( liftM, liftM2, mapAndUnzipM, zipWithM_ )
-import Data.Maybe           ( maybeToList )
 
 vectorise :: HscEnv -> UniqSupply -> RuleBase -> ModGuts
           -> IO (SimplCount, ModGuts)
@@ -279,8 +278,8 @@ vectExpr lc (fvs, AnnLam bndr body)
       res_ty <- vectType (exprType $ deAnnotate body)
 
       -- FIXME: move the functions to the top level
-      mono_vfn <- applyToTypes (Var vfn_var) (map TyVarTy tyvars)
-      mono_lfn <- applyToTypes (Var lfn_var) (map TyVarTy tyvars)
+      mono_vfn <- applyToTypes (Var vfn_var) (mkTyVarTys tyvars)
+      mono_lfn <- applyToTypes (Var lfn_var) (mkTyVarTys tyvars)
 
       mk_clo <- builtin mkClosureVar
       mk_cloP <- builtin mkClosurePVar
@@ -425,33 +424,4 @@ vectTyAppExpr lc e tys = pprPanic "vectTyAppExpr" (ppr $ deAnnotate e)
 -- ----------------------------------------------------------------------------
 -- Types
 
-vectTyCon :: TyCon -> VM TyCon
-vectTyCon tc
-  | isFunTyCon tc        = builtin closureTyCon
-  | isBoxedTupleTyCon tc = return tc
-  | isUnLiftedTyCon tc   = return tc
-  | otherwise = do
-                  r <- lookupTyCon tc
-                  case r of
-                    Just tc' -> return tc'
-
-                    -- FIXME: just for now
-                    Nothing  -> pprTrace "ccTyCon:" (ppr tc) $ return tc
-
-vectType :: Type -> VM Type
-vectType ty | Just ty' <- coreView ty = vectType ty'
-vectType (TyVarTy tv) = return $ TyVarTy tv
-vectType (AppTy ty1 ty2) = liftM2 AppTy (vectType ty1) (vectType ty2)
-vectType (TyConApp tc tys) = liftM2 TyConApp (vectTyCon tc) (mapM vectType tys)
-vectType (FunTy ty1 ty2)   = liftM2 TyConApp (builtin closureTyCon)
-                                             (mapM vectType [ty1,ty2])
-vectType ty@(ForAllTy _ _)
-  = do
-      mdicts   <- mapM paDictArgType tyvars
-      mono_ty' <- vectType mono_ty
-      return $ tyvars `mkForAllTys` ([dict | Just dict <- mdicts] `mkFunTys` mono_ty')
-  where
-    (tyvars, mono_ty) = splitForAllTys ty
-
-vectType ty = pprPanic "vectType:" (ppr ty)
 
