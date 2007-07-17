@@ -143,12 +143,14 @@ data LocalEnv = LocalEnv {
                }
               
 
-initGlobalEnv :: VectInfo -> (InstEnv, InstEnv) -> FamInstEnvs -> GlobalEnv
-initGlobalEnv info instEnvs famInstEnvs
+initGlobalEnv :: VectInfo -> (InstEnv, InstEnv) -> FamInstEnvs -> Builtins -> GlobalEnv
+initGlobalEnv info instEnvs famInstEnvs bi
   = GlobalEnv {
       global_vars          = mapVarEnv  (Var . snd) $ vectInfoVar   info
     , global_exported_vars = emptyVarEnv
-    , global_tycons        = mapNameEnv snd $ vectInfoTyCon info
+    , global_tycons        = extendNameEnv (mapNameEnv snd (vectInfoTyCon info))
+                                           (tyConName funTyCon) (closureTyCon bi)
+                              
     , global_datacons      = mapNameEnv snd $ vectInfoDataCon info
     , global_inst_env      = instEnvs
     , global_fam_inst_env  = famInstEnvs
@@ -396,7 +398,7 @@ initV hsc_env guts info p
     go instEnvs famInstEnvs = 
       do
         builtins <- initBuiltins
-        r <- runVM p builtins (initGlobalEnv info instEnvs famInstEnvs) 
+        r <- runVM p builtins (initGlobalEnv info instEnvs famInstEnvs builtins) 
                    emptyLocalEnv
         case r of
           Yes genv _ x -> return $ Just (new_info genv, x)
