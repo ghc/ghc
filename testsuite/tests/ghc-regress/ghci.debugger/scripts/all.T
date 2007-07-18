@@ -1,3 +1,10 @@
+
+# trac #1545: GHCi debugger doesn't work on an unregisterised compiler
+def f(opts):
+  if config.unregisterised:
+    opts.skip = 1
+setTestOpts(f)
+
 setTestOpts(extra_run_opts('-ignore-dot-ghci'))
 
 test('print001', normal, ghci_script, ['print001.script'])

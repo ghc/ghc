@@ -40,6 +40,8 @@ if (ghc_with_profiling == 1):
 if (ghc_with_interpreter == 1):
 	config.run_ways.append('ghci')
 
+config.unregisterised = (ghc_unregisterised == 1)
+
 if (ghc_with_threaded_rts == 1):
 	config.run_ways.append('threaded1')
 	if (ghc_with_smp == 1):
