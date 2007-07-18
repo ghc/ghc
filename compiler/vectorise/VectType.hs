@@ -77,8 +77,8 @@ vectTypeEnv env
       zipWithM_ defTyCon   keep_tcs keep_tcs
       zipWithM_ defDataCon keep_dcs keep_dcs
       vect_tcs <- vectTyConDecls conv_tcs
-      parr_tcs1 <- mapM (\tc -> buildPArrayTyCon (tyConName tc) tc) keep_tcs
-      parr_tcs2 <- zipWithM (buildPArrayTyCon . tyConName) conv_tcs vect_tcs
+      parr_tcs1 <- zipWithM buildPArrayTyCon keep_tcs keep_tcs
+      parr_tcs2 <- zipWithM buildPArrayTyCon conv_tcs vect_tcs
       let new_tcs = vect_tcs ++ parr_tcs1 ++ parr_tcs2
 
       let new_env = extendTypeEnvList env
@@ -173,8 +173,8 @@ vectDataCon dc
     rep_arg_tys = dataConRepArgTys dc
     tycon       = dataConTyCon dc
 
-buildPArrayTyCon :: Name -> TyCon -> VM TyCon
-buildPArrayTyCon orig_name vect_tc = fixV $ \repr_tc ->
+buildPArrayTyCon :: TyCon -> TyCon -> VM TyCon
+buildPArrayTyCon orig_tc vect_tc = fixV $ \repr_tc ->
   do
     name'  <- cloneName mkPArrayTyConOcc orig_name
     parent <- buildPArrayParentInfo orig_name vect_tc repr_tc
@@ -191,6 +191,7 @@ buildPArrayTyCon orig_name vect_tc = fixV $ \repr_tc ->
                         False           -- FIXME: no generics
                         False           -- not GADT syntax
   where
+    orig_name = tyConName orig_tc
     name   = tyConName vect_tc
     kind   = tyConKind vect_tc
     tyvars = tyConTyVars vect_tc
