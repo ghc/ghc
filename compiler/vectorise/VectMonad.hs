@@ -9,6 +9,7 @@ module VectMonad (
   builtin,
 
   GlobalEnv(..),
+  setInstEnvs,
   readGEnv, setGEnv, updGEnv,
 
   LocalEnv(..),
@@ -156,6 +157,13 @@ initGlobalEnv info instEnvs famInstEnvs bi
     , global_fam_inst_env  = famInstEnvs
     , global_bindings      = []
     }
+
+setInstEnvs :: InstEnv -> FamInstEnv -> GlobalEnv -> GlobalEnv
+setInstEnvs l_inst l_fam_inst genv
+  | (g_inst,     _) <- global_inst_env genv
+  , (g_fam_inst, _) <- global_fam_inst_env genv
+  = genv { global_inst_env     = (g_inst, l_inst)
+         , global_fam_inst_env = (g_fam_inst, l_fam_inst) }
 
 emptyLocalEnv = LocalEnv {
                    local_vars     = emptyVarEnv

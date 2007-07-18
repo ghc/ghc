@@ -19,6 +19,8 @@ import Rules                ( RuleBase )
 import DataCon
 import TyCon
 import Type
+import FamInstEnv           ( extendFamInstEnvList )
+import InstEnv              ( extendInstEnvList )
 import Var
 import VarEnv
 import VarSet
@@ -56,10 +58,20 @@ vectorise hsc_env _ _ guts
 vectModule :: ModGuts -> VM ModGuts
 vectModule guts
   = do
-      types' <- vectTypeEnv (mg_types guts)
+      (types', fam_insts, insts) <- vectTypeEnv (mg_types guts)
+
+      let fam_inst_env' = extendFamInstEnvList (mg_fam_inst_env guts) fam_insts
+          inst_env'     = extendInstEnvList (mg_inst_env guts) insts
+      updGEnv (setInstEnvs inst_env' fam_inst_env')
+      
       binds' <- mapM vectTopBind (mg_binds guts)
-      return $ guts { mg_types = types'
-                    , mg_binds = binds' }
+      return $ guts { mg_types        = types'
+                    , mg_binds        = binds'
+                    , mg_inst_env     = inst_env'
+                    , mg_fam_inst_env = fam_inst_env'
+                    , mg_insts        = mg_insts guts ++ insts
+                    , mg_fam_insts    = mg_fam_insts guts ++ fam_insts
+                    }
 
 vectTopBind :: CoreBind -> VM CoreBind
 vectTopBind b@(NonRec var expr)

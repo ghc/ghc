@@ -12,6 +12,8 @@ import TyCon
 import Type
 import TypeRep
 import Coercion
+import FamInstEnv        ( FamInst, mkLocalFamInst )
+import InstEnv           ( Instance )
 import OccName
 import MkId
 import BasicTypes        ( StrictnessMark(..), boolToRecFlag )
@@ -66,7 +68,7 @@ vectType ty = pprPanic "vectType:" (ppr ty)
 
 type TyConGroup = ([TyCon], UniqSet TyCon)
 
-vectTypeEnv :: TypeEnv -> VM TypeEnv
+vectTypeEnv :: TypeEnv -> VM (TypeEnv, [FamInst], [Instance])
 vectTypeEnv env
   = do
       cs <- readGEnv $ mk_map . global_tycons
@@ -78,9 +80,13 @@ vectTypeEnv env
       parr_tcs1 <- mapM (\tc -> buildPArrayTyCon (tyConName tc) tc) keep_tcs
       parr_tcs2 <- zipWithM (buildPArrayTyCon . tyConName) conv_tcs vect_tcs
       let new_tcs = vect_tcs ++ parr_tcs1 ++ parr_tcs2
-      return $ extendTypeEnvList env
-                 (map ATyCon new_tcs ++ [ADataCon dc | tc <- new_tcs
-                                                     , dc <- tyConDataCons tc])
+
+      let new_env = extendTypeEnvList env
+                       (map ATyCon new_tcs
+                        ++ [ADataCon dc | tc <- new_tcs
+                                        , dc <- tyConDataCons tc])
+
+      return (new_env, map mkLocalFamInst (parr_tcs1 ++ parr_tcs2), [])
   where
     tycons = typeEnvTyCons env
     groups = tyConGroups tycons
