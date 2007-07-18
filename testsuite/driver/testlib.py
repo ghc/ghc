@@ -351,7 +351,9 @@ def test_common_work (name, opts, func, args):
     # All the ways we might run this test
     if func == compile or func == multimod_compile:
         all_ways = config.compile_ways
-    elif func == compile_and_run or func == multimod_compile_and_run:
+    elif func == compile_and_run or func == multimod_compile_and_run \
+        or func == multimod_compile_and_run_with_prefix \
+        or func == compile_and_run_with_prefix:
         all_ways = config.run_ways
     elif func == ghci_script:
         if 'ghci' in config.run_ways:
@@ -559,7 +561,7 @@ def do_compile( name, way, should_fail, top_mod, extra_hc_opts ):
 # -----------------------------------------------------------------------------
 # Compile-and-run tests
 
-def compile_and_run__( name, way, extra_hc_opts, top_mod ):
+def compile_and_run__( name, way, extra_hc_opts, top_mod, prefix_cmd ):
     # print 'Compile and run, extra args = ', extra_hc_opts
     pretest_cleanup(name)
 
@@ -573,14 +575,24 @@ def compile_and_run__( name, way, extra_hc_opts, top_mod ):
         if result != 0:
             return 'fail'
 
-        # we don't check the compiler's stderr for a compile-and-run test
-        return simple_run( name, way, './'+name, getTestOpts().extra_run_opts )
+        cmd = './' + name;
+        if prefix_cmd != '':
+            cmd = prefix_cmd + ' ' + cmd;
 
-def compile_and_run( name, way, extra_hc_opts ):
-    return compile_and_run__( name, way, extra_hc_opts, '' )
+        # we don't check the compiler's stderr for a compile-and-run test
+        return simple_run( name, way, cmd, getTestOpts().extra_run_opts )
+
+def compile_and_run( name, way, extra_hc_opts):
+    return compile_and_run__( name, way, extra_hc_opts, '' , '')
+
+def compile_and_run_with_prefix( name, way, prefix, extra_hc_opts):
+    return compile_and_run__( name, way, extra_hc_opts, '' , prefix )
 
 def multimod_compile_and_run( name, way, top_mod, extra_hc_opts ):
-    return compile_and_run__( name, way, extra_hc_opts, top_mod )
+    return compile_and_run__( name, way, extra_hc_opts, top_mod, '' )
+
+def multimod_compile_and_run_with_prefix( name, way, prefix, top_mod, extra_hc_opts ):
+    return compile_and_run__( name, way, extra_hc_opts, top_mod, prefix )
 
 # -----------------------------------------------------------------------------
 # Build a single-module program
