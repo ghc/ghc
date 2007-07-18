@@ -203,8 +203,8 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ProfFlags.bioSelector        = NULL;
 #endif
 
-    RtsFlags.MiscFlags.tickInterval	= 50;  /* In milliseconds */
-    RtsFlags.ConcFlags.ctxtSwitchTime	= 50;  /* In milliseconds */
+    RtsFlags.MiscFlags.tickInterval	= 20;  /* In milliseconds */
+    RtsFlags.ConcFlags.ctxtSwitchTime	= 20;  /* In milliseconds */
 
     RtsFlags.MiscFlags.install_signal_handlers = rtsTrue;
 
