@@ -61,7 +61,7 @@ wakeUpSleepingThreads(lnat ticks)
     rtsBool flag = rtsFalse;
 
     while (sleeping_queue != END_TSO_QUEUE &&
-	   (int)(ticks - sleeping_queue->block_info.target) > 0) {
+	   (int)(ticks - sleeping_queue->block_info.target) >= 0) {
 	tso = sleeping_queue;
 	sleeping_queue = tso->link;
 	tso->why_blocked = NotBlocked;
