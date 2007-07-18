@@ -523,8 +523,8 @@ updateAt :: (k -> a -> Maybe a) -> Int -> Map k a -> Map k a
 updateAt f i Tip  = error "Map.updateAt: index out of range"
 updateAt f i (Bin sx kx x l r)
   = case compare i sizeL of
-      LT -> updateAt f i l
-      GT -> updateAt f (i-sizeL-1) r
+      LT -> balance kx x (updateAt f i l) r
+      GT -> balance kx x l (updateAt f (i-sizeL-1) r)
       EQ -> case f kx x of
               Just x' -> Bin sx kx x' l r
               Nothing -> glue l r
