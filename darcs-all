@@ -18,7 +18,12 @@ if ($defaultrepo =~ /:/) {
     $defaultrepo_lib = "$defaultrepo_base/packages";
 }
 elsif ($defaultrepo =~ /^\//) {
-    # Local filesystem (assumes a checked-out tree):
+    # Local filesystem, absolute path (assumes a checked-out tree):
+    $defaultrepo_base = $defaultrepo;
+    $defaultrepo_lib = "$defaultrepo/libraries";
+}
+elsif ($defaultrepo =~ /^..\//) {
+    # Local filesystem, relative path (assumes a checked-out tree):
     $defaultrepo_base = $defaultrepo;
     $defaultrepo_lib = "$defaultrepo/libraries";
 }
