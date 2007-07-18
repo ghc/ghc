@@ -15,6 +15,7 @@ import OccName
 import MkId
 import BasicTypes        ( StrictnessMark(..), boolToRecFlag )
 import NameEnv
+import TysWiredIn
 
 import Unique
 import UniqFM
@@ -160,6 +161,40 @@ vectDataCon dc
     univ_tvs    = dataConUnivTyVars dc
     rep_arg_tys = dataConRepArgTys dc
     tycon       = dataConTyCon dc
+
+{-
+mkPArrTyCon :: TyCon -> VM TyCon
+mkPArrTyCon tc = fixV $ \repr_tc ->
+  do
+-}
+
+mkPArrayDataCon :: TyCon -> TyCon -> VM DataCon
+mkPArrayDataCon orig_tc repr_tc
+  = do
+      name     <- cloneName mkPArrayDataConOcc (tyConName orig_tc)
+      shape_ty <- mkPArrayType intTy   -- FIXME: we want to unbox this!
+      repr_tys <- mapM mkPArrayType types
+      wrk_name <- cloneName mkDataConWorkerOcc name
+      wrp_name <- cloneName mkDataConWrapperOcc name
+
+      let ids      = mkDataConIds wrp_name wrk_name data_con
+          data_con = mkDataCon name
+                               False
+                               (MarkedStrict : map (const NotMarkedStrict) repr_tys)
+                               []
+                               (tyConTyVars orig_tc)
+                               []
+                               []
+                               []
+                               repr_tys
+                               repr_tc
+                               []
+                               ids
+
+      return data_con
+  where
+    types = [ty | dc <- tyConDataCons orig_tc
+                , ty <- dataConRepArgTys dc]
 
 -- | Split the given tycons into two sets depending on whether they have to be
 -- converted (first list) or not (second list). The first argument contains
