@@ -11,6 +11,7 @@ import DataCon
 import TyCon
 import Type
 import TypeRep
+import Coercion
 import OccName
 import MkId
 import BasicTypes        ( StrictnessMark(..), boolToRecFlag )
@@ -72,7 +73,9 @@ vectTypeEnv env
           keep_dcs             = concatMap tyConDataCons keep_tcs
       zipWithM_ defTyCon   keep_tcs keep_tcs
       zipWithM_ defDataCon keep_dcs keep_dcs
-      new_tcs <- vectTyConDecls conv_tcs
+      vect_tcs <- vectTyConDecls conv_tcs
+      parr_tcs <- mapM buildPArrayTyCon (keep_tcs ++ vect_tcs)
+      let new_tcs = vect_tcs ++ parr_tcs
       return $ extendTypeEnvList env
                  (map ATyCon new_tcs ++ [ADataCon dc | tc <- new_tcs
                                                      , dc <- tyConDataCons tc])
@@ -162,14 +165,55 @@ vectDataCon dc
     rep_arg_tys = dataConRepArgTys dc
     tycon       = dataConTyCon dc
 
-{-
-mkPArrTyCon :: TyCon -> VM TyCon
-mkPArrTyCon tc = fixV $ \repr_tc ->
+buildPArrayTyCon :: TyCon -> VM TyCon
+buildPArrayTyCon orig_tc = fixV $ \repr_tc ->
   do
--}
+    name'  <- cloneName mkPArrayTyConOcc name
+    parent <- buildPArrayParentInfo orig_tc repr_tc
+    rhs    <- buildPArrayTyConRhs orig_tc repr_tc
 
-mkPArrayDataCon :: TyCon -> TyCon -> VM DataCon
-mkPArrayDataCon orig_tc repr_tc
+    return $ mkAlgTyCon name'
+                        kind
+                        tyvars
+                        []              -- no stupid theta
+                        rhs
+                        []              -- no selector ids
+                        parent
+                        rec_flag        -- FIXME: is this ok?
+                        False           -- FIXME: no generics
+                        False           -- not GADT syntax
+  where
+    name   = tyConName orig_tc
+    kind   = tyConKind orig_tc
+    tyvars = tyConTyVars orig_tc
+    rec_flag = boolToRecFlag (isRecursiveTyCon orig_tc)
+    
+
+buildPArrayParentInfo :: TyCon -> TyCon -> VM TyConParent
+buildPArrayParentInfo orig_tc repr_tc
+  = do
+      parray_tc <- builtin parrayTyCon
+      co_name <- cloneName mkInstTyCoOcc (tyConName repr_tc)
+
+      let inst_tys = [mkTyConApp orig_tc (map mkTyVarTy tyvars)]
+
+      return . FamilyTyCon parray_tc inst_tys
+             $ mkFamInstCoercion co_name
+                                 tyvars
+                                 parray_tc
+                                 inst_tys
+                                 repr_tc
+  where
+    tyvars = tyConTyVars orig_tc
+
+buildPArrayTyConRhs :: TyCon -> TyCon -> VM AlgTyConRhs
+buildPArrayTyConRhs orig_tc repr_tc
+  = do
+      data_con <- buildPArrayDataCon orig_tc repr_tc
+      return $ DataTyCon { data_cons = [data_con], is_enum = False }
+
+buildPArrayDataCon :: TyCon -> TyCon -> VM DataCon
+buildPArrayDataCon orig_tc repr_tc
   = do
       name     <- cloneName mkPArrayDataConOcc (tyConName orig_tc)
       shape_ty <- mkPArrayType intTy   -- FIXME: we want to unbox this!
@@ -186,7 +230,7 @@ mkPArrayDataCon orig_tc repr_tc
                                []
                                []
                                []
-                               repr_tys
+                               (shape_ty : repr_tys)
                                repr_tc
                                []
                                ids
