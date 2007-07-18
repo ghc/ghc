@@ -15,8 +15,9 @@ import Coercion
 import OccName
 import MkId
 import BasicTypes        ( StrictnessMark(..), boolToRecFlag )
+import Name              ( Name )
 import NameEnv
-import TysWiredIn
+import TysWiredIn        ( intTy )
 
 import Unique
 import UniqFM
@@ -25,7 +26,7 @@ import Digraph           ( SCC(..), stronglyConnComp )
 
 import Outputable
 
-import Control.Monad  ( liftM2, zipWithM_ )
+import Control.Monad  ( liftM2, zipWithM, zipWithM_ )
 
 -- ----------------------------------------------------------------------------
 -- Types
@@ -74,8 +75,9 @@ vectTypeEnv env
       zipWithM_ defTyCon   keep_tcs keep_tcs
       zipWithM_ defDataCon keep_dcs keep_dcs
       vect_tcs <- vectTyConDecls conv_tcs
-      parr_tcs <- mapM buildPArrayTyCon (keep_tcs ++ vect_tcs)
-      let new_tcs = vect_tcs ++ parr_tcs
+      parr_tcs1 <- mapM (\tc -> buildPArrayTyCon (tyConName tc) tc) keep_tcs
+      parr_tcs2 <- zipWithM (buildPArrayTyCon . tyConName) conv_tcs vect_tcs
+      let new_tcs = vect_tcs ++ parr_tcs1 ++ parr_tcs2
       return $ extendTypeEnvList env
                  (map ATyCon new_tcs ++ [ADataCon dc | tc <- new_tcs
                                                      , dc <- tyConDataCons tc])
@@ -165,12 +167,12 @@ vectDataCon dc
     rep_arg_tys = dataConRepArgTys dc
     tycon       = dataConTyCon dc
 
-buildPArrayTyCon :: TyCon -> VM TyCon
-buildPArrayTyCon orig_tc = fixV $ \repr_tc ->
+buildPArrayTyCon :: Name -> TyCon -> VM TyCon
+buildPArrayTyCon orig_name vect_tc = fixV $ \repr_tc ->
   do
-    name'  <- cloneName mkPArrayTyConOcc name
-    parent <- buildPArrayParentInfo orig_tc repr_tc
-    rhs    <- buildPArrayTyConRhs orig_tc repr_tc
+    name'  <- cloneName mkPArrayTyConOcc orig_name
+    parent <- buildPArrayParentInfo orig_name vect_tc repr_tc
+    rhs    <- buildPArrayTyConRhs orig_name vect_tc repr_tc
 
     return $ mkAlgTyCon name'
                         kind
@@ -183,19 +185,19 @@ buildPArrayTyCon orig_tc = fixV $ \repr_tc ->
                         False           -- FIXME: no generics
                         False           -- not GADT syntax
   where
-    name   = tyConName orig_tc
-    kind   = tyConKind orig_tc
-    tyvars = tyConTyVars orig_tc
-    rec_flag = boolToRecFlag (isRecursiveTyCon orig_tc)
+    name   = tyConName vect_tc
+    kind   = tyConKind vect_tc
+    tyvars = tyConTyVars vect_tc
+    rec_flag = boolToRecFlag (isRecursiveTyCon vect_tc)
     
 
-buildPArrayParentInfo :: TyCon -> TyCon -> VM TyConParent
-buildPArrayParentInfo orig_tc repr_tc
+buildPArrayParentInfo :: Name -> TyCon -> TyCon -> VM TyConParent
+buildPArrayParentInfo orig_name vect_tc repr_tc
   = do
       parray_tc <- builtin parrayTyCon
-      co_name <- cloneName mkInstTyCoOcc (tyConName repr_tc)
+      co_name <- cloneName mkInstTyCoOcc orig_name
 
-      let inst_tys = [mkTyConApp orig_tc (map mkTyVarTy tyvars)]
+      let inst_tys = [mkTyConApp vect_tc (map mkTyVarTy tyvars)]
 
       return . FamilyTyCon parray_tc inst_tys
              $ mkFamInstCoercion co_name
@@ -204,29 +206,29 @@ buildPArrayParentInfo orig_tc repr_tc
                                  inst_tys
                                  repr_tc
   where
-    tyvars = tyConTyVars orig_tc
+    tyvars = tyConTyVars vect_tc
 
-buildPArrayTyConRhs :: TyCon -> TyCon -> VM AlgTyConRhs
-buildPArrayTyConRhs orig_tc repr_tc
+buildPArrayTyConRhs :: Name -> TyCon -> TyCon -> VM AlgTyConRhs
+buildPArrayTyConRhs orig_name vect_tc repr_tc
   = do
-      data_con <- buildPArrayDataCon orig_tc repr_tc
+      data_con <- buildPArrayDataCon orig_name vect_tc repr_tc
       return $ DataTyCon { data_cons = [data_con], is_enum = False }
 
-buildPArrayDataCon :: TyCon -> TyCon -> VM DataCon
-buildPArrayDataCon orig_tc repr_tc
+buildPArrayDataCon :: Name -> TyCon -> TyCon -> VM DataCon
+buildPArrayDataCon orig_name vect_tc repr_tc
   = do
-      name     <- cloneName mkPArrayDataConOcc (tyConName orig_tc)
+      dc_name  <- cloneName mkPArrayDataConOcc orig_name
       shape_ty <- mkPArrayType intTy   -- FIXME: we want to unbox this!
       repr_tys <- mapM mkPArrayType types
-      wrk_name <- cloneName mkDataConWorkerOcc name
-      wrp_name <- cloneName mkDataConWrapperOcc name
+      wrk_name <- cloneName mkDataConWorkerOcc  dc_name
+      wrp_name <- cloneName mkDataConWrapperOcc dc_name
 
       let ids      = mkDataConIds wrp_name wrk_name data_con
-          data_con = mkDataCon name
+          data_con = mkDataCon dc_name
                                False
                                (MarkedStrict : map (const NotMarkedStrict) repr_tys)
                                []
-                               (tyConTyVars orig_tc)
+                               (tyConTyVars vect_tc)
                                []
                                []
                                []
@@ -237,7 +239,7 @@ buildPArrayDataCon orig_tc repr_tc
 
       return data_con
   where
-    types = [ty | dc <- tyConDataCons orig_tc
+    types = [ty | dc <- tyConDataCons vect_tc
                 , ty <- dataConRepArgTys dc]
 
 -- | Split the given tycons into two sets depending on whether they have to be
