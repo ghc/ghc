@@ -139,7 +139,7 @@ vectDataCon dc
       arg_tys  <- mapM vectType rep_arg_tys
       wrk_name <- cloneName mkDataConWorkerOcc name'
 
-      let ids      = mkDataConIds (panic "vectDataCon: wrapped id")
+      let ids      = mkDataConIds (panic "vectDataCon: wrapper id")
                                   wrk_name
                                   data_con
           data_con = mkDataCon name'
@@ -158,7 +158,7 @@ vectDataCon dc
   where
     name        = dataConName dc
     univ_tvs    = dataConUnivTyVars dc
-    rep_arg_tys = dataConOrigArgTys dc
+    rep_arg_tys = dataConRepArgTys dc
     tycon       = dataConTyCon dc
 
 -- | Split the given tycons into two sets depending on whether they have to be
