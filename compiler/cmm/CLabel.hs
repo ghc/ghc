@@ -95,7 +95,7 @@ module CLabel (
         mkHpcTicksLabel,
         mkHpcModuleNameLabel,
 
-	infoLblToEntryLbl, entryLblToInfoLbl, infoLblToRetLbl,
+	infoLblToEntryLbl, entryLblToInfoLbl,
 	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
 	CLabelType(..), labelType, labelDynamic,
 
@@ -461,12 +461,6 @@ entryLblToInfoLbl (RtsLabel (RtsRet s)) = RtsLabel (RtsRetInfo s)
 entryLblToInfoLbl (RtsLabel (RtsEntryFS s)) = RtsLabel (RtsInfoFS s)
 entryLblToInfoLbl (RtsLabel (RtsRetFS s)) = RtsLabel (RtsRetInfoFS s)
 entryLblToInfoLbl l = pprPanic "CLabel.entryLblToInfoLbl" (pprCLabel l)
-
-infoLblToRetLbl :: CLabel -> CLabel 
-infoLblToRetLbl (RtsLabel (RtsInfo s)) = RtsLabel (RtsRet s)
-infoLblToRetLbl (RtsLabel (RtsInfoFS s)) = RtsLabel (RtsRetFS s)
-infoLblToRetLbl (RtsLabel (RtsRetInfoFS s)) = RtsLabel (RtsRetFS s)
-infoLblToRetLbl _ = panic "CLabel.infoLblToRetLbl"
 
 -- -----------------------------------------------------------------------------
 -- Does a CLabel need declaring before use or not?

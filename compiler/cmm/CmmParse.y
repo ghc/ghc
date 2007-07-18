@@ -201,19 +201,19 @@ lits	:: { [ExtFCode CmmExpr] }
 cmmproc :: { ExtCode }
 -- TODO: add real SRT/info tables to parsed Cmm
 	: info maybe_formals maybe_frame maybe_gc_block '{' body '}'
-		{ do ((info_lbl, entry_ret_label, info, live, formals, frame, gc_block), stmts) <-
+		{ do ((entry_ret_label, info, live, formals, frame, gc_block), stmts) <-
 		       getCgStmtsEC' $ loopDecls $ do {
-		         (info_lbl, entry_ret_label, info, live) <- $1;
+		         (entry_ret_label, info, live) <- $1;
 		         formals <- sequence $2;
 		         frame <- $3;
 		         gc_block <- $4;
 		         $6;
-		         return (info_lbl, entry_ret_label, info, live, formals, frame, gc_block) }
+		         return (entry_ret_label, info, live, formals, frame, gc_block) }
 		     blks <- code (cgStmtsToBlocks stmts)
 		     code (emitInfoTableAndCode entry_ret_label (CmmInfo gc_block frame info) formals blks) }
 
 	| info maybe_formals ';'
-		{ do (info_lbl, entry_ret_label, info, live) <- $1;
+		{ do (entry_ret_label, info, live) <- $1;
 		     formals <- sequence $2;
 		     code (emitInfoTableAndCode entry_ret_label (CmmInfo Nothing Nothing info) formals []) }
 
@@ -228,12 +228,11 @@ cmmproc :: { ExtCode }
                      blks <- code (cgStmtsToBlocks stmts)
 		     code (emitProc (CmmInfo gc_block frame CmmNonInfoTable) (mkRtsCodeLabelFS $1) formals blks) }
 
-info	:: { ExtFCode (CLabel, CLabel, CmmInfoTable, [Maybe LocalReg]) }
+info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	: 'INFO_TABLE' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- ptrs, nptrs, closure type, description, type
 		{ do prof <- profilingInfo $11 $13
-		     let infoLabel = mkRtsInfoLabelFS $3
-		     return (infoLabel, infoLblToEntryLbl infoLabel,
+		     return (mkRtsEntryLabelFS $3,
 			CmmInfoTable prof (fromIntegral $9)
 				     (ThunkInfo (fromIntegral $5, fromIntegral $7) NoC_SRT),
 			[]) }
@@ -241,8 +240,7 @@ info	:: { ExtFCode (CLabel, CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	| 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ')'
 		-- ptrs, nptrs, closure type, description, type, fun type
 		{ do prof <- profilingInfo $11 $13
-		     let infoLabel = mkRtsInfoLabelFS $3
-		     return (infoLabel, infoLblToEntryLbl infoLabel,
+		     return (mkRtsEntryLabelFS $3,
 			CmmInfoTable prof (fromIntegral $9)
 				     (FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT (fromIntegral $15) 0
 				      (ArgSpec 0)
@@ -257,8 +255,7 @@ info	:: { ExtFCode (CLabel, CLabel, CmmInfoTable, [Maybe LocalReg]) }
 		     -- If profiling is on, this string gets duplicated,
 		     -- but that's the way the old code did it we can fix it some other time.
 		     desc_lit <- code $ mkStringCLit $13
-		     let infoLabel = mkRtsInfoLabelFS $3
-		     return (infoLabel, infoLblToEntryLbl infoLabel,
+		     return (mkRtsEntryLabelFS $3,
 			CmmInfoTable prof (fromIntegral $11)
 				     (ConstrInfo (fromIntegral $5, fromIntegral $7) (fromIntegral $9) desc_lit),
 			[]) }
@@ -266,8 +263,7 @@ info	:: { ExtFCode (CLabel, CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	| 'INFO_TABLE_SELECTOR' '(' NAME ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- selector, closure type, description, type
 		{ do prof <- profilingInfo $9 $11
-		     let infoLabel = mkRtsInfoLabelFS $3
-		     return (infoLabel, infoLblToEntryLbl infoLabel,
+		     return (mkRtsEntryLabelFS $3,
 			CmmInfoTable prof (fromIntegral $7)
 				     (ThunkSelectorInfo (fromIntegral $5) NoC_SRT),
 			[]) }
@@ -275,7 +271,7 @@ info	:: { ExtFCode (CLabel, CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	| 'INFO_TABLE_RET' '(' NAME ',' INT ')'
 		-- closure type (no live regs)
 		{ do let infoLabel = mkRtsInfoLabelFS $3
-		     return (infoLabel, infoLblToRetLbl infoLabel,
+		     return (mkRtsRetLabelFS $3,
 			CmmInfoTable (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
 				     (ContInfo [] NoC_SRT),
 			[]) }
@@ -283,8 +279,7 @@ info	:: { ExtFCode (CLabel, CLabel, CmmInfoTable, [Maybe LocalReg]) }
 	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals0 ')'
 		-- closure type, live regs
 		{ do live <- sequence (map (liftM Just) $7)
-		     let infoLabel = mkRtsInfoLabelFS $3
-		     return (infoLabel, infoLblToRetLbl infoLabel,
+		     return (mkRtsRetLabelFS $3,
 			CmmInfoTable (ProfilingInfo zeroCLit zeroCLit) (fromIntegral $5)
 			             (ContInfo live NoC_SRT),
 			live) }
