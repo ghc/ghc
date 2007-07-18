@@ -201,7 +201,7 @@ buildPArrayParentInfo :: Name -> TyCon -> TyCon -> VM TyConParent
 buildPArrayParentInfo orig_name vect_tc repr_tc
   = do
       parray_tc <- builtin parrayTyCon
-      co_name <- cloneName mkInstTyCoOcc orig_name
+      co_name <- cloneName mkInstTyCoOcc (tyConName repr_tc)
 
       let inst_tys = [mkTyConApp vect_tc (map mkTyVarTy tyvars)]
 
