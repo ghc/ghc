@@ -95,7 +95,7 @@ module CLabel (
         mkHpcTicksLabel,
         mkHpcModuleNameLabel,
 
-	infoLblToEntryLbl, entryLblToInfoLbl,
+	infoLblToEntryLbl, entryLblToInfoLbl, infoLblToRetLbl,
 	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
 	CLabelType(..), labelType, labelDynamic,
 
@@ -432,7 +432,7 @@ mkDeadStripPreventer :: CLabel -> CLabel
 mkDeadStripPreventer lbl = DeadStripPreventer lbl
 
 -- -----------------------------------------------------------------------------
--- Converting info labels to entry labels.
+-- Converting between info labels and entry/ret labels.
 
 infoLblToEntryLbl :: CLabel -> CLabel 
 infoLblToEntryLbl (IdLabel n InfoTable) = IdLabel n Entry
@@ -461,6 +461,12 @@ entryLblToInfoLbl (RtsLabel (RtsRet s)) = RtsLabel (RtsRetInfo s)
 entryLblToInfoLbl (RtsLabel (RtsEntryFS s)) = RtsLabel (RtsInfoFS s)
 entryLblToInfoLbl (RtsLabel (RtsRetFS s)) = RtsLabel (RtsRetInfoFS s)
 entryLblToInfoLbl l = pprPanic "CLabel.entryLblToInfoLbl" (pprCLabel l)
+
+infoLblToRetLbl :: CLabel -> CLabel 
+infoLblToRetLbl (RtsLabel (RtsInfo s)) = RtsLabel (RtsRet s)
+infoLblToRetLbl (RtsLabel (RtsInfoFS s)) = RtsLabel (RtsRetFS s)
+infoLblToRetLbl (RtsLabel (RtsRetInfoFS s)) = RtsLabel (RtsRetFS s)
+infoLblToRetLbl _ = panic "CLabel.infoLblToRetLbl"
 
 -- -----------------------------------------------------------------------------
 -- Does a CLabel need declaring before use or not?

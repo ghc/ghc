@@ -632,12 +632,12 @@ pprAssign r1 (CmmRegOff r2 off)
 -- We can't cast the lvalue, so we have to cast the rhs if necessary.  Casting
 -- the lvalue elicits a warning from new GCC versions (3.4+).
 pprAssign r1 r2
-  | isFixedPtrReg r1
-  = pprReg r1 <> ptext SLIT(" = ") <> mkP_ <> pprExpr1 r2 <> semi
-  | Just ty <- strangeRegType r1
-  = pprReg r1 <> ptext SLIT(" = ") <> parens ty <> pprExpr1 r2 <> semi
-  | otherwise
-  = pprReg r1 <> ptext SLIT(" = ") <> pprExpr r2 <> semi
+  | isFixedPtrReg r1             = mkAssign (mkP_ <> pprExpr1 r2)
+  | Just ty <- strangeRegType r1 = mkAssign (parens ty <> pprExpr1 r2)
+  | otherwise                    = mkAssign (pprExpr r2)
+    where mkAssign x = if r1 == CmmGlobal BaseReg
+                       then ptext SLIT("ASSIGN_BaseReg") <> parens x <> semi
+                       else pprReg r1 <> ptext SLIT(" = ") <> x <> semi
 
 -- ---------------------------------------------------------------------
 -- Registers

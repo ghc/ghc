@@ -165,8 +165,8 @@ mkInfoTableAndCode info_lbl std_info extra_bits entry_lbl args blocks
 
   | otherwise	-- Separately emit info table (with the function entry 
   =		-- point as first entry) and the entry code 
-    [mkDataLits info_lbl (CmmLabel entry_lbl : std_info ++ extra_bits),
-     CmmProc [] entry_lbl args blocks]
+    [CmmProc [] entry_lbl args blocks,
+     mkDataLits info_lbl (CmmLabel entry_lbl : std_info ++ extra_bits)]
 
 mkSRTLit :: CLabel
          -> C_SRT

@@ -60,7 +60,7 @@ emitClosureCodeAndInfoTable :: ClosureInfo -> CmmFormals -> CgStmts -> Code
 emitClosureCodeAndInfoTable cl_info args body
  = do	{ blks <- cgStmtsToBlocks body
         ; info <- mkCmmInfo cl_info
-        ; emitInfoTableAndCode info_lbl info args blks }
+        ; emitInfoTableAndCode (infoLblToEntryLbl info_lbl) info args blks }
   where
     info_lbl  = infoTableLabelFromCI cl_info
 
@@ -151,7 +151,7 @@ emitReturnTarget name stmts
                         (ProfilingInfo zeroCLit zeroCLit)
                         rET_SMALL -- cmmToRawCmm may convert it to rET_BIG
                         (ContInfo frame srt_info))
-        ; emitInfoTableAndCode info_lbl info args blks
+        ; emitInfoTableAndCode (infoLblToEntryLbl info_lbl) info args blks
 	; return info_lbl }
   where
     args      = {- trace "emitReturnTarget: missing args" -} []
@@ -401,16 +401,14 @@ funInfoTable info_ptr
 -- put the info table next to the code
 
 emitInfoTableAndCode 
-	:: CLabel 		-- Label of info table
+	:: CLabel 		-- Label of entry or ret
 	-> CmmInfo 		-- ...the info table
 	-> CmmFormals		-- ...args
 	-> [CmmBasicBlock]	-- ...and body
 	-> Code
 
-emitInfoTableAndCode info_lbl info args blocks
-  = emitProc info entry_lbl args blocks
-  where
-	entry_lbl = infoLblToEntryLbl info_lbl
+emitInfoTableAndCode entry_ret_lbl info args blocks
+  = emitProc info entry_ret_lbl args blocks
 
 -------------------------------------------------------------------------
 --

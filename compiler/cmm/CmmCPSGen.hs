@@ -15,8 +15,9 @@ import MachOp
 import CmmUtils
 import CmmCallConv
 
-import CgProf (curCCS, curCCSAddr)
-import CgUtils (cmmOffsetW)
+import CgProf
+import CgUtils
+import CgInfoTbls
 import SMRep
 import ForeignCall
 
