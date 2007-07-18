@@ -33,6 +33,7 @@ module OccName (
 	mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
 	mkInstTyCoOcc, mkEqPredCoOcc,
         mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc,
+        mkPArrayTyConOcc, mkPArrayDataConOcc,
 
 	-- ** Deconstruction
 	occNameFS, occNameString, occNameSpace, 
@@ -459,10 +460,12 @@ mkDataTOcc = mk_simple_deriv varName  "$t"
 mkDataCOcc = mk_simple_deriv varName  "$c"
 
 -- Vectorisation
-mkVectOcc        = mk_simple_deriv varName  "$v_"
-mkVectTyConOcc   = mk_simple_deriv tcName   ":V_"
-mkVectDataConOcc = mk_simple_deriv dataName ":VD_"
-mkVectIsoOcc     = mk_simple_deriv varName  "$VI_"
+mkVectOcc          = mk_simple_deriv varName  "$v_"
+mkVectTyConOcc     = mk_simple_deriv tcName   ":V_"
+mkVectDataConOcc   = mk_simple_deriv dataName ":VD_"
+mkVectIsoOcc       = mk_simple_deriv varName  "$VI_"
+mkPArrayTyConOcc   = mk_simple_deriv tcName   ":VP_"
+mkPArrayDataConOcc = mk_simple_deriv dataName ":VPD_"
 
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
 
