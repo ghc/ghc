@@ -156,7 +156,9 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
              return (CompOK details iface maybe_old_linkable)
        handleBatch (HscRecomp hasStub, iface, details)
            | isHsBoot src_flavour
-               = return (CompOK details iface Nothing)
+               = do SysTools.touch dflags' "Touching object file"
+                                   object_filename
+                    return (CompOK details iface Nothing)
            | otherwise
                = do stub_unlinked <- getStubLinkable hasStub
                     (hs_unlinked, unlinked_time) <-
@@ -1433,8 +1435,6 @@ hscNextPhase dflags other hsc_lang =
 
 
 hscMaybeAdjustTarget :: DynFlags -> Phase -> HscSource -> HscTarget -> HscTarget
-hscMaybeAdjustTarget dflags stop HsBootFile current_hsc_lang 
-  = HscNothing		-- No output (other than Foo.hi-boot) for hs-boot files
 hscMaybeAdjustTarget dflags stop other current_hsc_lang 
   = hsc_lang 
   where
