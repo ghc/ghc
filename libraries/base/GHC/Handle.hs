@@ -1158,6 +1158,7 @@ hClose_handle_ handle_ = do
 
     -- free the spare buffers
     writeIORef (haBuffers handle_) BufferListNil
+    writeIORef (haBuffer  handle_) noBuffer
   
 #ifndef mingw32_HOST_OS
     -- unlock it
@@ -1169,6 +1170,9 @@ hClose_handle_ handle_ = do
     return (handle_{ haFD        = -1, 
   		     haType      = ClosedHandle
   		   })
+
+{-# NOINLINE noBuffer #-}
+noBuffer = unsafePerformIO $ allocateBuffer 1 ReadBuffer
 
 -----------------------------------------------------------------------------
 -- Detecting and changing the size of a file
