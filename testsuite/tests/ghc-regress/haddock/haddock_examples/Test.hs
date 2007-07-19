@@ -253,7 +253,7 @@ We can also include URLs in documentation: <http://www.haskell.org/>.
 f :: C a => a -> Int
 
 -- | we can export foreign declarations too
-foreign import ccall g :: Int -> IO CInt
+foreign import ccall "header.h" g :: Int -> IO CInt
 
 -- | this doc string has a parse error in it: \'
 h :: Int
@@ -380,7 +380,7 @@ newn = undefined
 
 
 -- | A foreign import with argument docs
-foreign import ccall unsafe 
+foreign import ccall unsafe "header.h"
  o :: Float  -- ^ The input float
    -> IO Float  -- ^ The output float
 
