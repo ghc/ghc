@@ -6,7 +6,6 @@ import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Utils
 import Distribution.Verbosity
-import System.Cmd
 import System.Environment
 import System.Info
 
@@ -50,22 +49,24 @@ doit pref ghcpkg verbosity =
                                then ["wsock32", "msvcrt", "kernel32",
                                      "user32", "shell32"]
                                else []
-              lib' = case library pd of
-                         Just lib ->
-                             let ems = filter (("GHC.Prim" /=))
-                                     $ exposedModules lib
-                                 lib_bi = libBuildInfo lib
-                                 lib_bi' = lib_bi {
-                                               extraLibs = extraExtraLibs
-                                                       ++ extraLibs lib_bi
-                                           }
-                             in lib {
-                                    exposedModules = ems,
-                                    libBuildInfo = lib_bi'
-                                 }
-                         Nothing ->
-                             error "Expected a library, but none found"
-              pd' = pd { library = Just lib' }
+              mkLib filt = case library pd of
+                           Just lib ->
+                               let ems = filter filt $ exposedModules lib
+                                   lib_bi = libBuildInfo lib
+                                   lib_bi' = lib_bi {
+                                                 extraLibs = extraExtraLibs
+                                                         ++ extraLibs lib_bi
+                                             }
+                               in lib {
+                                      exposedModules = ems,
+                                      libBuildInfo = lib_bi'
+                                   }
+                           Nothing ->
+                               error "Expected a library, but none found"
+              -- There's no files for GHC.Prim, so we will fail if we
+              -- try to copy them
+              pd_copy = pd { library = Just (mkLib ("GHC.Prim" /=)) }
+              pd_reg  = pd { library = Just (mkLib (const True)) }
               -- When coying, we need to actually give a concrete
               -- directory to copy to rather than "$topdir"
               lbi_copy = lbi { prefix = pref }
@@ -73,8 +74,8 @@ doit pref ghcpkg verbosity =
               -- $compiler/lib/ part of libsubdir, so we only want the
               -- $pkgid part in the package.conf file. This is a bit of
               -- a hack, really.
-              lbi_register = lbi { libsubdir = "$pkgid" }
-          (copyHook simpleUserHooks) pd' lbi_copy userHooks copyFlags
-          (regHook simpleUserHooks) pd' lbi_register userHooks registerFlags
+              lbi_reg = lbi { libsubdir = "$pkgid" }
+          (copyHook simpleUserHooks) pd_copy lbi_copy userHooks copyFlags
+          (regHook simpleUserHooks)  pd_reg  lbi_reg  userHooks registerFlags
           return ()
 
