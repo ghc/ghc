@@ -11,6 +11,7 @@ import Trace.Hpc.Util
 
 import HpcFlags
 
+import System.Environment
 import System.Directory
 import Data.List
 import Data.Maybe(fromJust)
@@ -19,13 +20,14 @@ import qualified HpcSet as Set
 
 ------------------------------------------------------------------------------
 
-markup_options = 
-  [ excludeOpt,includeOpt,hpcDirOpt,hsDirOpt,funTotalsOpt
-  , altHighlightOpt
-#if __GLASGOW_HASKELL__ >= 604 
-  , destDirOpt
-#endif
-  ]
+markup_options 
+        = excludeOpt
+        . includeOpt
+        . srcDirOpt
+        . hpcDirOpt
+        . funTotalsOpt
+        . altHighlightOpt
+        . destDirOpt
        	 
 markup_plugin = Plugin { name = "markup"
 	      	       , usage = "[OPTION] .. <TIX_FILE> [<MODULE> [<MODULE> ..]]" 
@@ -45,16 +47,14 @@ markup_main flags (prog:modNames) = do
   	      	     	 	   `Set.union` 
 				includeMods flags }
   let Flags
-       { hpcDirs = hpcDirs
-       , hsDirs = theHsPath
-       , funTotals = theFunTotals
+       { funTotals = theFunTotals
        , altHighlight = invertOutput
        , destDir = dest_dir
        }  = hpcflags1
 
   mtix <- readTix (getTixFileName prog)
   Tix tixs <- case mtix of
-    Nothing -> error $ "unable to find tix file for: " ++ prog
+    Nothing -> hpcError markup_plugin $ "unable to find tix file for: " ++ prog
     Just a -> return a
 
 #if __GLASGOW_HASKELL__ >= 604 
@@ -63,7 +63,7 @@ markup_main flags (prog:modNames) = do
 #endif
 
   mods <-
-     sequence [ genHtmlFromMod dest_dir hpcDirs tix theFunTotals theHsPath invertOutput
+     sequence [ genHtmlFromMod dest_dir hpcflags1 tix theFunTotals invertOutput
 	      | tix <- tixs
 	      , allowModule hpcflags1 (tixModuleName tix)
    	      ]
@@ -130,20 +130,20 @@ markup_main flags (prog:modNames) = do
 		(percent (expTicked s1) (expTotal s1))
 
 
-markup_main flags [] = error $ "no .tix file or executable name specified" 
+markup_main flags [] = hpcError markup_plugin $ "no .tix file or executable name specified" 
 
 genHtmlFromMod
   :: String
-  -> [FilePath]
+  -> Flags
   -> TixModule
   -> Bool
-  -> [String]
   -> Bool
   -> IO (String, [Char], ModuleSummary)
-genHtmlFromMod dest_dir hpcDirs tix theFunTotals theHsPath invertOutput = do
+genHtmlFromMod dest_dir flags tix theFunTotals invertOutput = do
+  let theHsPath = srcDirs flags
   let modName0 = tixModuleName tix 
 
-  (Mix origFile _ mixHash tabStop mix') <- readMix hpcDirs modName0
+  (Mix origFile _ mixHash tabStop mix') <- readMixWithFlags flags modName0
 
   let arr_tix :: Array Int Integer
       arr_tix = listArray (0,length (tixModuleTixs tix) - 1)
@@ -457,7 +457,8 @@ readFileFromPath filename@('/':_) _ = readFile filename
 readFileFromPath filename path0 = readTheFile path0
   where
 	readTheFile :: [String] -> IO String
-	readTheFile [] = error $ "could not find " ++ show filename 
+	readTheFile [] = hpcError markup_plugin
+	                     $ "could not find " ++ show filename 
 			         ++ " in path " ++ show path0
 	readTheFile (dir:dirs) = 
 		catch (do str <- readFile (dir ++ "/" ++ filename) 

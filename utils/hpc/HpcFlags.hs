@@ -3,17 +3,19 @@
 module HpcFlags where
 
 import System.Console.GetOpt
+import Data.Maybe ( fromMaybe )
 import qualified HpcSet as Set
 import Data.Char
 import Trace.Hpc.Tix
+import Trace.Hpc.Mix
 import System.Exit
 
 data Flags = Flags 
   { outputFile		:: String
   , includeMods         :: Set.Set String
   , excludeMods         :: Set.Set String
-  , hsDirs		:: [String]
-  , hpcDirs		:: [String]
+  , hpcDir		:: String
+  , srcDirs		:: [String]
   , destDir		:: String
 
   , perModule 		:: Bool
@@ -31,8 +33,8 @@ default_flags = Flags
   { outputFile		= "-"
   , includeMods         = Set.empty
   , excludeMods         = Set.empty
-  , hpcDirs             = []
-  , hsDirs              = []
+  , hpcDir              = ".hpc"
+  , srcDirs             = []
   , destDir             = "."
 
   , perModule           = False
@@ -50,37 +52,45 @@ default_flags = Flags
 -- depends on if specific flags we used.
 
 default_final_flags flags = flags 
-  { hpcDirs = if null (hpcDirs flags)
-    	      then [".hpc"]
-	      else hpcDirs flags
-  , hsDirs = if null (hsDirs flags)
+  { srcDirs = if null (srcDirs flags)
     	      then ["."]
-	      else hsDirs flags
+	      else srcDirs flags
   }
 
-noArg :: String -> String -> (Flags -> Flags) -> OptDescr (Flags -> Flags)
-noArg flag detail fn = Option [] [flag] (NoArg $ fn) detail
+type FlagOptSeq = [OptDescr (Flags -> Flags)] -> [OptDescr (Flags -> Flags)]
 
-anArg :: String -> String -> String -> (String -> Flags -> Flags) -> OptDescr (Flags -> Flags)
-anArg flag detail argtype fn = Option [] [flag] (ReqArg fn argtype) detail
+noArg :: String -> String -> (Flags -> Flags) -> FlagOptSeq
+noArg flag detail fn = (:) $ Option [] [flag] (NoArg $ fn) detail
 
-infoArg :: String -> OptDescr (Flags -> Flags)
-infoArg info = Option [] [] (NoArg $ id) info
+anArg :: String -> String -> String -> (String -> Flags -> Flags) -> FlagOptSeq
+anArg flag detail argtype fn = (:) $ Option [] [flag] (ReqArg fn argtype) detail
 
-excludeOpt    = anArg "exclude"    "exclude MODULE and/or PACKAGE" "[PACKAGE:][MODULE]"  $ \ a f -> f { excludeMods = a `Set.insert` excludeMods f }
+infoArg :: String -> FlagOptSeq
+infoArg info = (:) $ Option [] [] (NoArg $ id) info
 
-includeOpt    = anArg "include"    "include MODULE and/or PACKAGE" "[PACKAGE:][MODULE]"  $ \ a f -> f { includeMods = a `Set.insert` includeMods f }
-hpcDirOpt     = anArg "hpcdir"     "path to .mix files (default .hpc)" "DIR"
-	      	      		   	 		      $ \ a f -> f { hpcDirs = hpcDirs f ++ [a] }
-hsDirOpt      = anArg "hsdir"     "path to .hs files (default .)" "DIR"
-	      	      		   	 		      $ \ a f -> f { hsDirs = hsDirs f ++ [a] }
-destDirOpt    = anArg "destdir"   "path to write output to" "DIR"
-	      	      		  	   	 	      $ \ a f -> f { destDir = a }
+excludeOpt      = anArg "exclude"    "exclude MODULE and/or PACKAGE" "[PACKAGE:][MODULE]"  
+                $ \ a f -> f { excludeMods = a `Set.insert` excludeMods f }
+
+includeOpt      = anArg "include"    "include MODULE and/or PACKAGE" "[PACKAGE:][MODULE]"  
+                $ \ a f -> f { includeMods = a `Set.insert` includeMods f }
+
+hpcDirOpt        = anArg "hpcdir"     "sub-directory that contains .mix files" "DIR"
+                   (\ a f -> f { hpcDir = a })
+                .  infoArg "default .hpc [rarely used]"
+
+srcDirOpt       = anArg "srcdir"     "path to source directory of .hs files" "DIR"
+	          (\ a f -> f { srcDirs = srcDirs f ++ [a] })
+	        . infoArg "multi-use of srcdir possible"
+	        
+destDirOpt      = anArg "destdir"   "path to write output to" "DIR"
+	        $ \ a f -> f { destDir = a }
+
+	        
 outputOpt     = anArg "output"    "output FILE" "FILE"        $ \ a f -> f { outputFile = a }
 -- markup
 
 perModuleOpt  = noArg "per-module" "show module level detail" $ \ f -> f { perModule = True }
-decListOpt    = noArg "dec-list"   "show unused decls"	      $ \ f -> f { decList = True }
+decListOpt    = noArg "decl-list"  "show unused decls"	      $ \ f -> f { decList = True }
 xmlOutputOpt  = noArg "xml-output" "show output in XML"       $ \ f -> f { xmlOutput = True }  
 funTotalsOpt  = noArg "fun-entry-count" "show top-level function entry counts"      
 							      $ \ f -> f { funTotals = True }  
@@ -100,13 +110,19 @@ postInvertOpt = noArg "post-invert" "invert output; ticked becomes unticked, unt
 							      $ \ f -> f { funTotals = True }  
 -------------------------------------------------------------------------------
 
+readMixWithFlags flags mod = readMix [ dir ++  "/" ++ hpcDir flags
+                                     | dir <- srcDirs flags 
+                                     ] mod
+
+-------------------------------------------------------------------------------
+
 command_usage plugin = 
   putStrLn $
 				       "Usage: hpc " ++ (name plugin) ++ " " ++ 
 				        (usage plugin) ++
-				        if null (options plugin)
+				        if null (options plugin [])
 				        then ""
-  	                                else usageInfo "\n\nOptions:\n" (options plugin)
+  	                                else usageInfo "\n\nOptions:\n" (options plugin [])
 
 hpcError :: Plugin -> String -> IO a
 hpcError plugin msg = do
@@ -118,7 +134,7 @@ hpcError plugin msg = do
 
 data Plugin = Plugin { name           :: String
      	             , usage          :: String
-		     , options        :: [OptDescr (Flags -> Flags)]
+		     , options        :: FlagOptSeq
 		     , summary        :: String
 		     , implementation :: Flags -> [String] -> IO ()
 		     , init_flags     :: Flags
@@ -135,15 +151,16 @@ data Plugin = Plugin { name           :: String
 
 allowModule :: Flags -> String -> Bool
 allowModule flags full_mod 
-      | full_mod `Set.member` excludeMods flags = False
-      | pkg_name `Set.member` excludeMods flags = False
-      | mod_name `Set.member` excludeMods flags = False
-      | Set.null (includeMods flags)            = True
-      | full_mod `Set.member` includeMods flags = True
-      | pkg_name `Set.member` includeMods flags = True
-      | mod_name `Set.member` includeMods flags = True
-      | otherwise	 	       	        = False
+      | full_mod' `Set.member` excludeMods flags = False
+      | pkg_name  `Set.member` excludeMods flags = False
+      | mod_name  `Set.member` excludeMods flags = False
+      | Set.null (includeMods flags)             = True
+      | full_mod' `Set.member` includeMods flags = True
+      | pkg_name  `Set.member` includeMods flags = True
+      | mod_name  `Set.member` includeMods flags = True
+      | otherwise	 	       	         = False
   where
+          full_mod' = pkg_name ++ mod_name
       -- pkg name always ends with '/', main 
 	  (pkg_name,mod_name) = 
 			case span (/= '/') full_mod of

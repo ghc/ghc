@@ -5,7 +5,9 @@
 
 module HpcReport (report_plugin) where
 
+import System.Exit
 import Prelude hiding (exp)
+import System(getArgs)
 import List(sort,intersperse)
 import HpcFlags
 import Trace.Hpc.Mix
@@ -150,7 +152,7 @@ single (BinBox {}) = False
 
 modInfo :: Flags -> Bool -> (String,[Integer]) -> IO ModInfo
 modInfo hpcflags qualDecList (moduleName,tickCounts) = do
-  Mix _ _ _ _ mes <- readMix (hpcDirs hpcflags) moduleName
+  Mix _ _ _ _ mes <- readMixWithFlags hpcflags moduleName
   return (q (accumCounts (zip (map snd mes) tickCounts) miZero))
   where
   q mi = if qualDecList then mi{decPaths = map (moduleName:) (decPaths mi)}
@@ -223,9 +225,9 @@ report_main hpcflags (progName:mods) = do
 	   	      | TixModule m _h _ tcs <- tickCounts
 		      , allowModule hpcflags1 m 
 		      ]
-    Nothing -> error $ "unable to find tix file for:" ++ progName
-
-
+    Nothing -> hpcError report_plugin  $ "unable to find tix file for:" ++ progName
+report_main hpcflags [] = 
+        hpcError report_plugin $ "no .tix file or executable name specified" 
 
 makeReport :: Flags -> String -> [(String,[Integer])] -> IO ()
 makeReport hpcflags progName modTcs | xmlOutput hpcflags = do
@@ -259,5 +261,13 @@ xmlBBT (BBT b tt tf bt) = [("boxes",show b),("true",show tt),("false",show tf),(
 
 ------------------------------------------------------------------------------
 
-report_options = [perModuleOpt,decListOpt,excludeOpt,includeOpt,hpcDirOpt,xmlOutputOpt]
+report_options 
+        = perModuleOpt
+        . decListOpt
+        . excludeOpt
+        . includeOpt
+        . srcDirOpt
+        . hpcDirOpt
+        . xmlOutputOpt
+        
 

@@ -1,6 +1,7 @@
 -- (c) 2007 Andy Gill
 
 -- Main driver for Hpc
+import Trace.Hpc.Tix
 import HpcFlags
 import System.Environment
 import System.Exit
@@ -11,6 +12,7 @@ import HpcMarkup
 import HpcCombine
 import HpcShowTix
 import HpcDraft
+import HpcOverlay
 
 helpList :: IO ()
 helpList =
@@ -48,11 +50,11 @@ dispatch [] = do
 	     exitWith ExitSuccess
 dispatch (txt:args) = do
      case lookup txt hooks' of
-       Just plugin -> parse plugin
-       _ -> parse help_plugin
+       Just plugin -> parse plugin args
+       _ -> parse help_plugin (txt:args)
   where
-     parse plugin =
-              case getOpt Permute (options plugin) args of
+     parse plugin args =
+              case getOpt Permute (options plugin []) args of
                 (_,_,errs) | not (null errs)
                      -> do putStrLn "hpc failed:"
                 	   sequence [ putStr ("  " ++ err)
@@ -62,7 +64,8 @@ dispatch (txt:args) = do
                            command_usage plugin
           		   exitFailure
 	        (o,ns,_) -> do
-			 let flags = foldr (.) (final_flags plugin) o 
+			 let flags = final_flags plugin 
+			           $ foldr (.) id o 
 			     	   $ init_flags plugin
 			 implementation plugin flags ns
 main = do 
@@ -76,6 +79,7 @@ hooks = [ help_plugin
 	, markup_plugin
 	, combine_plugin
 	, showtix_plugin
+	, overlay_plugin
 	, draft_plugin
 	, version_plugin
         ]
@@ -105,14 +109,14 @@ help_main flags (sub_txt:_) = do
 	  command_usage plugin'
 	  exitWith ExitSuccess
 
-help_options   = []
+help_options   = id
 
 ------------------------------------------------------------------------------
 
 version_plugin = Plugin { name = "version"
 		   , usage = ""
 		   , summary = "Display version for hpc"
-		   , options = []
+		   , options = id
 		   , implementation = version_main
 		   , init_flags = default_flags
 		   , final_flags = default_final_flags

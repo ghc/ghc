@@ -13,10 +13,16 @@ import HpcFlags
 import Control.Monad
 import qualified HpcSet as Set
 import qualified HpcMap as Map
+import System.Environment
 
 ------------------------------------------------------------------------------
-combine_options = 
-  [ excludeOpt,includeOpt,outputOpt,combineFunOpt, combineFunOptInfo, postInvertOpt ]
+combine_options 
+        = excludeOpt
+        . includeOpt
+        . outputOpt
+        . combineFunOpt
+        . combineFunOptInfo
+        . postInvertOpt
        	 
 combine_plugin = Plugin { name = "combine"
 	      	       , usage = "[OPTION] .. <TIX_FILE> [<TIX_FILE> [<TIX_FILE> ..]]" 

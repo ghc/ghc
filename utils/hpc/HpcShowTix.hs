@@ -2,15 +2,18 @@ module HpcShowTix (showtix_plugin) where
 
 import Trace.Hpc.Mix
 import Trace.Hpc.Tix
+import Trace.Hpc.Util
 
 import HpcFlags
 
 import qualified HpcSet as Set
 
-showtix_options = 
-  [ excludeOpt,includeOpt,hpcDirOpt
-  , outputOpt
-  ]
+showtix_options 
+        = excludeOpt
+        . includeOpt
+        . srcDirOpt
+        . hpcDirOpt
+        . outputOpt
 
 showtix_plugin = Plugin { name = "show"
 	      	       , usage = "[OPTION] .. <TIX_FILE> [<MODULE> [<MODULE> ..]]" 
@@ -34,12 +37,11 @@ showtix_main flags (prog:modNames) = do
   case optTixs of
     Nothing -> hpcError showtix_plugin $ "could not read .tix file : "  ++ prog
     Just (Tix tixs) -> do
-       let modules = map tixModuleName tixs       
-
-       mixs <- sequence
-               [ readMix (hpcDirs hpcflags1) modName            -- hard wired to .hpc for now
-               | modName <- modules
-	       , allowModule hpcflags1 modName
+       tixs_mixs <- sequence
+               [ do mix <- readMixWithFlags hpcflags1 (tixModuleName tix) 
+                    return $ (tix,mix)
+               | tix <- tixs
+	       , allowModule hpcflags1 (tixModuleName tix)
                ]
      
        let rjust n str = take (n - length str) (repeat ' ') ++ str 
@@ -52,7 +54,8 @@ showtix_main flags (prog:modNames) = do
                              ]
                  | ( TixModule modName hash _ tixs
                    , Mix _file _timestamp _hash _tab entries
-                   ) <- zip tixs mixs
+                   ) <- tixs_mixs
                  ]
        
        return ()
+

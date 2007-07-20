@@ -9,12 +9,17 @@ import HpcFlags
 import Control.Monad
 import qualified HpcSet as Set
 import qualified HpcMap as Map
+import System.Environment
 import HpcUtils
 import Data.Tree
 
 ------------------------------------------------------------------------------
-draft_options = 
-  [ excludeOpt,includeOpt,hpcDirOpt,hsDirOpt,outputOpt ]
+draft_options 
+        = excludeOpt
+        . includeOpt
+        . srcDirOpt
+        . hpcDirOpt
+        . outputOpt
        	 
 draft_plugin = Plugin { name = "draft"
 	      	       , usage = "[OPTION] .. <TIX_FILE>" 
@@ -54,7 +59,7 @@ makeDraft hpcflags tix = do
       hash = tixModuleHash tix
       tixs = tixModuleTixs tix
 
-  mix@(Mix filepath timestamp hash tabstop entries) <- readMix (hpcDirs hpcflags) mod
+  mix@(Mix filepath timestamp hash tabstop entries) <- readMixWithFlags hpcflags mod
 
   let forest = createMixEntryDom 
               [ (span,(box,v > 0))
@@ -66,7 +71,7 @@ makeDraft hpcflags tix = do
 
   let non_ticked = findNotTickedFromList forest
 
-  hs  <- readFileFromPath filepath (hsDirs hpcflags)
+  hs  <- readFileFromPath filepath (srcDirs hpcflags)
 
   let hsMap :: Map.Map Int String
       hsMap = Map.fromList (zip [1..] $ lines hs)
@@ -79,10 +84,10 @@ makeDraft hpcflags tix = do
 
   let showPleaseTick :: Int -> PleaseTick -> String
       showPleaseTick d (TickFun str pos) =
-                     spaces d ++ "tick function \"" ++ head str ++ "\" "
+                     spaces d ++ "tick function \"" ++ last str ++ "\" "
                               ++ "on line " ++ show (firstLine pos) ++ ";"
       showPleaseTick d (TickExp pos) =
-                     spaces d ++ "tick expression "
+                     spaces d ++ "tick "
                               ++ if '\n' `elem` txt 
                                  then "at position " ++ show pos ++ ";"
                                  else quoteString txt ++ " "  ++ "on line " ++ show (firstLine pos) ++ ";"
@@ -91,7 +96,7 @@ makeDraft hpcflags tix = do
                   txt = grabHpcPos hsMap pos
 
       showPleaseTick d (TickInside [str] pos pleases) =
-                     spaces d ++ "function \"" ++ str ++ "\" {\n" ++
+                     spaces d ++ "inside \"" ++ str ++ "\" {\n" ++
                      showPleaseTicks (d + 2) pleases ++
                      spaces d ++ "}"
 
