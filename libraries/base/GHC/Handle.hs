@@ -35,7 +35,7 @@ module GHC.Handle (
   ioe_closedHandle, ioe_EOF, ioe_notReadable, ioe_notWritable,
 
   stdin, stdout, stderr,
-  IOMode(..), openFile, openBinaryFile, openTempFile, openBinaryTempFile, openFd, fdToHandle,
+  IOMode(..), openFile, openBinaryFile, openTempFile, openBinaryTempFile, fdToHandle', fdToHandle,
   hFileSize, hSetFileSize, hIsEOF, isEOF, hLookAhead, hSetBuffering, hSetBinaryMode,
   hFlush, hDuplicate, hDuplicateTo,
 
@@ -883,11 +883,11 @@ openFile' filepath mode binary =
 
     fd_type <- fdType fd
 
-    h <- openFd fd (Just fd_type) False filepath mode binary
+    h <- fdToHandle' fd (Just fd_type) False filepath mode binary
             `catchException` \e -> do c_close fd; throw e
-	-- NB. don't forget to close the FD if openFd fails, otherwise
+	-- NB. don't forget to close the FD if fdToHandle' fails, otherwise
 	-- this FD leaks.
-	-- ASSERT: if we just created the file, then openFd won't fail
+	-- ASSERT: if we just created the file, then fdToHandle' won't fail
 	-- (so we don't need to worry about removing the newly created file
 	--  in the event of an error).
 
@@ -941,7 +941,7 @@ openTempFile' loc tmp_dir template binary = do
            then findTempName (x+1)
            else ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
        else do
-         h <- openFd fd Nothing False filepath ReadWriteMode True
+         h <- fdToHandle' fd Nothing False filepath ReadWriteMode True
 	        `catchException` \e -> do c_close fd; throw e
 	 return (filepath, h)
       where
@@ -963,10 +963,10 @@ rw_flags     = output_flags .|. o_RDWR
 append_flags = write_flags  .|. o_APPEND
 
 -- ---------------------------------------------------------------------------
--- openFd
+-- fdToHandle'
 
-openFd :: FD -> Maybe FDType -> Bool -> FilePath -> IOMode -> Bool -> IO Handle
-openFd fd mb_fd_type is_socket filepath mode binary = do
+fdToHandle' :: FD -> Maybe FDType -> Bool -> FilePath -> IOMode -> Bool -> IO Handle
+fdToHandle' fd mb_fd_type is_socket filepath mode binary = do
     -- turn on non-blocking mode
     setNonBlockingFD fd
 
@@ -1022,7 +1022,7 @@ fdToHandle :: FD -> IO Handle
 fdToHandle fd = do
    mode <- fdGetMode fd
    let fd_str = "<file descriptor: " ++ show fd ++ ">"
-   openFd fd Nothing False{-XXX!-} fd_str mode True{-bin mode-}
+   fdToHandle' fd Nothing False{-XXX!-} fd_str mode True{-bin mode-}
 
 
 #ifndef mingw32_HOST_OS
