@@ -1,7 +1,7 @@
 TOP = .
 include $(TOP)/mk/boilerplate.mk
 
-SUBDIRS = timeout
+SUBDIRS = timeout utils
 
 CLEAN_FILES += mk/wordsize.mk
 

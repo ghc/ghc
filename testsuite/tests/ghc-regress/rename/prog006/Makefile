@@ -16,9 +16,8 @@ include $(TOP)/mk/test.mk
 # using the supplied Cabal configuration.
 
 rn.prog006:
-	$(TEST_HC) -v0 pwd.hs -o pwd
 	$(TEST_HC) --make -package-name test-1.0 B.C -no-recomp -v0
-	sed "s@__IMPORT__@`./pwd`@" <pkg.conf.in >pkg.conf
+	sed "s@__IMPORT__@`$(TOP)/utils/pwd quadruple-backslash`@" <pkg.conf.in >pkg.conf
 	$(TEST_HC) -c -package-conf pkg.conf -package test -no-recomp A.hs -i
 # The -i clears the search path, so A.hs will find B.C from package test
 #

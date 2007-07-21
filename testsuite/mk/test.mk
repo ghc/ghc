@@ -141,7 +141,13 @@ $(TOP)/timeout/timeout$(exeext) :
 	@echo "Looks like you don't have timeout, building it first..."
 	cd $(TOP)/timeout && $(MAKE) $(MFLAGS) all
 
-test: timeout
+pwd : $(TOP)/utils/pwd$(exeext)
+
+$(TOP)/utils/pwd$(exeext) :
+	@echo "Looks like you don't have pwd, building utils first..."
+	cd $(TOP)/utils && $(MAKE) $(MFLAGS) all
+
+test: timeout pwd
 	$(PYTHON) $(RUNTESTS) $(RUNTEST_OPTS) \
 		$(patsubst %, --only=%, $(TEST)) \
 		$(patsubst %, --only=%, $(TESTS)) \
