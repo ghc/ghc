@@ -32,6 +32,9 @@ import Foreign.Marshal.Alloc	( allocaBytes )
 import System.IO (IOMode(..), openBinaryFile, hGetBuf, hPutBuf, hClose)
 import System.IO.Error		( try )
 import GHC.IOBase ( IOException(..) )
+#if defined(mingw32_HOST_OS)
+import GHC.IOBase ( IOErrorType(..) )
+#endif
 #else
 import System.IO		( try )
 #endif
