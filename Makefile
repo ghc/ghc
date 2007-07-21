@@ -120,6 +120,28 @@ bootstrap2 : stage1
 bootstrap3 : bootstrap2
 	$(MAKE) stage3
 
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifneq "$(WhatGccIsCalled)" ""
+all :: stamp.inplace-gcc-lib
+
+.PHONY: stamp.inplace-gcc-lib
+
+# This is a hack to make Cabal able to find ld when we run tests with
+# the inplace ghc. We should probably install all the gcc stuff in our
+# tree somewhere, and then have install copy it from there rather than
+# from the filesystem.
+stamp.inplace-gcc-lib:
+	$(RM) -r compiler/gcc-lib
+	mkdir compiler/gcc-lib
+	cp $(GccDir)ld.exe compiler/gcc-lib
+	touch $@
+
+clean ::
+	$(RM) -r compiler/gcc-lib
+	$(RM) -f inplace-gcc-lib
+endif
+endif
+
 all :: bootstrap
 
 # -----------------------------------------------------------------------------
