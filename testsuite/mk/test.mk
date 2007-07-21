@@ -111,6 +111,7 @@ RUNTEST_OPTS +=  \
 	-e "if '$(USETHREADS)': config.use_threads=int($(USETHREADS))" \
 	-e config.timeout="int($(TIMEOUT)) or config.timeout" \
 	-e config.timeout_prog=\"$(TOP)/timeout/timeout\" \
+	-e config.exeext=\"$(exeext)\" \
 	-e config.top=\"$(TOP)\" \
 	$(EXTRA_RUNTEST_OPTS)
 
