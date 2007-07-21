@@ -6,7 +6,6 @@ import HpcLexer
 
 %name parser
 %tokentype { Token }
-%error { \ e -> error $ show (take 10 e) }
 
 %token
 	MODULE 		{ ID "module" }
@@ -102,5 +101,5 @@ hpcParser filename = do
   let tokens = initLexer txt
   return $ parser tokens  	
 
-
+happyError e = error $ show (take 10 e)
 }
