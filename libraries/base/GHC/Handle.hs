@@ -35,7 +35,7 @@ module GHC.Handle (
   ioe_closedHandle, ioe_EOF, ioe_notReadable, ioe_notWritable,
 
   stdin, stdout, stderr,
-  IOMode(..), openFile, openBinaryFile, openTempFile, openBinaryTempFile, fdToHandle', fdToHandle,
+  IOMode(..), openFile, openBinaryFile, fdToHandle', fdToHandle,
   hFileSize, hSetFileSize, hIsEOF, isEOF, hLookAhead, hSetBuffering, hSetBinaryMode,
   hFlush, hDuplicate, hDuplicateTo,
 
@@ -902,58 +902,6 @@ openFile' filepath mode binary =
 #endif
     return h
 
-
--- | The function creates a temporary file in ReadWrite mode.
--- The created file isn\'t deleted automatically, so you need to delete it manually.
-openTempFile :: FilePath   -- ^ Directory in which to create the file
-             -> String     -- ^ File name template. If the template is \"foo.ext\" then
-                           -- the create file will be \"fooXXX.ext\" where XXX is some
-                           -- random number.
-             -> IO (FilePath, Handle)
-openTempFile tmp_dir template = openTempFile' "openTempFile" tmp_dir template dEFAULT_OPEN_IN_BINARY_MODE
-
--- | Like 'openTempFile', but opens the file in binary mode. See 'openBinaryFile' for more comments.
-openBinaryTempFile :: FilePath -> String -> IO (FilePath, Handle)
-openBinaryTempFile tmp_dir template = openTempFile' "openBinaryTempFile" tmp_dir template True
-
-openTempFile' :: String -> FilePath -> String -> Bool -> IO (FilePath, Handle)
-openTempFile' loc tmp_dir template binary = do
-  pid <- c_getpid
-  findTempName pid
-  where
-    (prefix,suffix) = break (=='.') template
-
-    oflags1 = rw_flags .|. o_EXCL
-
-    binary_flags
-      | binary    = o_BINARY
-      | otherwise = 0
-
-    oflags = oflags1 .|. binary_flags
-
-    findTempName x = do
-      fd <- withCString filepath $ \ f ->
-              c_open f oflags 0o666
-      if fd < 0 
-       then do
-         errno <- getErrno
-         if errno == eEXIST
-           then findTempName (x+1)
-           else ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
-       else do
-         h <- fdToHandle' fd Nothing False filepath ReadWriteMode True
-	        `catchException` \e -> do c_close fd; throw e
-	 return (filepath, h)
-      where
-        filename        = prefix ++ show x ++ suffix
-        filepath        = tmp_dir ++ [pathSeparator] ++ filename
-
-pathSeparator :: Char
-#ifdef mingw32_HOST_OS
-pathSeparator = '\\'
-#else
-pathSeparator = '/'
-#endif
 
 std_flags    = o_NONBLOCK   .|. o_NOCTTY
 output_flags = std_flags    .|. o_CREAT
