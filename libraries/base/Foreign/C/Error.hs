@@ -83,7 +83,14 @@ module Foreign.C.Error (
   throwErrnoIfRetryMayBlock_,
   throwErrnoIfMinus1RetryMayBlock,
   throwErrnoIfMinus1RetryMayBlock_,  
-  throwErrnoIfNullRetryMayBlock
+  throwErrnoIfNullRetryMayBlock,
+
+  throwErrnoPath,
+  throwErrnoPathIf,
+  throwErrnoPathIf_,
+  throwErrnoPathIfNull,
+  throwErrnoPathIfMinus1,
+  throwErrnoPathIfMinus1_,
 ) where
 
 
