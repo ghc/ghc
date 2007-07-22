@@ -24,7 +24,10 @@ make -j2
 
 make -C testsuite/tests/ghc-regress fast stage=2 CLEANUP=1 2>&1 | tee testlog
 
-if grep '0 unexpected failures' testlog >/dev/null 2>/dev/null; then
+if
+    grep '\<0 caused framework failures' testlog >/dev/null 2>/dev/null &&
+    grep '\<0 unexpected passes' testlog >/dev/null 2>/dev/null &&
+    grep '\<0 unexpected failures' testlog >/dev/null 2>/dev/null ; then
    echo "-------------------------------------------------------------------"
    echo "Congratulations!  This tree is has passed minimal testing."
    echo
@@ -37,7 +40,8 @@ if grep '0 unexpected failures' testlog >/dev/null 2>/dev/null; then
    echo "-------------------------------------------------------------------"
 else
    echo "-------------------------------------------------------------------"
-   echo "Oops!  Looks like you have some test failures."
+   echo "Oops!  Looks like you have some unexpected test results or"
+   echo "framework failures."
    echo "Please fix them before pushing/sending patches."
    echo "-------------------------------------------------------------------"
 fi
