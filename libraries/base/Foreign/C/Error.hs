@@ -448,27 +448,44 @@ throwErrnoIfNullRetry  = throwErrnoIfRetry (== nullPtr)
 throwErrnoIfNullRetryMayBlock :: String -> IO (Ptr a) -> IO b -> IO (Ptr a)
 throwErrnoIfNullRetryMayBlock  = throwErrnoIfRetryMayBlock (== nullPtr)
 
+-- | as 'throwErrno', but exceptions include the given path when appropriate.
+--
 throwErrnoPath :: String -> FilePath -> IO a
 throwErrnoPath loc path =
   do
     errno <- getErrno
     ioError (errnoToIOError loc errno Nothing (Just path))
 
+-- | as 'throwErrnoIf', but exceptions include the given path when
+--   appropriate.
+--
 throwErrnoPathIf :: (a -> Bool) -> String -> FilePath -> IO a -> IO a
 throwErrnoPathIf pred loc path f =
   do
     res <- f
     if pred res then throwErrnoPath loc path else return res
 
+-- | as 'throwErrnoIf_', but exceptions include the given path when
+--   appropriate.
+--
 throwErrnoPathIf_ :: (a -> Bool) -> String -> FilePath -> IO a -> IO ()
 throwErrnoPathIf_ pred loc path f  = void $ throwErrnoPathIf pred loc path f
 
+-- | as 'throwErrnoIfNull', but exceptions include the given path when
+--   appropriate.
+--
 throwErrnoPathIfNull :: String -> FilePath -> IO (Ptr a) -> IO (Ptr a)
 throwErrnoPathIfNull  = throwErrnoPathIf (== nullPtr)
 
+-- | as 'throwErrnoIfMinus1', but exceptions include the given path when
+--   appropriate.
+--
 throwErrnoPathIfMinus1 :: Num a => String -> FilePath -> IO a -> IO a
 throwErrnoPathIfMinus1 = throwErrnoPathIf (== -1)
 
+-- | as 'throwErrnoIfMinus1_', but exceptions include the given path when
+--   appropriate.
+--
 throwErrnoPathIfMinus1_ :: Num a => String -> FilePath -> IO a -> IO ()
 throwErrnoPathIfMinus1_  = throwErrnoPathIf_ (== -1)
 
