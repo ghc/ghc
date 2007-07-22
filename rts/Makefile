@@ -127,6 +127,11 @@ endif
 # SRC_HC_OPTS += -fPIC
 
 RtsMessages_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
+RtsFlags_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
+RtsFlags_CC_OPTS += -DRtsWay=\"rts$(_way)\"
+RtsFlags_CC_OPTS += -DHostPlatform=\"$(HOSTPLATFORM)\"
+RtsFlags_CC_OPTS += -DBuildPlatform=\"$(BUILDPLATFORM)\"
+RtsFlags_CC_OPTS += -DTargetPlatform=\"$(TARGETPLATFORM)\"
 
 ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include

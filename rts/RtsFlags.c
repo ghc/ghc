@@ -682,6 +682,16 @@ error = rtsTrue;
                                &rts_argv[arg][2])) {
                       RtsFlags.MiscFlags.install_signal_handlers = rtsFalse;
                   }
+                  else if (strequal("info",
+                               &rts_argv[arg][2])) {
+                      printf("RTS info:\n");
+                      printf("RTS from GHC " ProjectVersion "\n");
+                      printf("RTS way " RtsWay "\n");
+                      printf("Host platform " HostPlatform "\n");
+                      printf("Build platform " BuildPlatform "\n");
+                      printf("Target platform " TargetPlatform "\n");
+                      exit(0);
+                  }
                   else {
 		      errorBelch("unknown RTS option: %s",rts_argv[arg]);
 		      error = rtsTrue;
