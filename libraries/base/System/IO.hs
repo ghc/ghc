@@ -425,7 +425,12 @@ openTempFile' loc tmp_dir template binary = do
   pid <- c_getpid
   findTempName pid
   where
-    (prefix,suffix) = break (=='.') template
+    -- We split off the last extension, so we can use .foo.ext files
+    -- for temporary files (hidden on Unix OSes). Unfortunately we're
+    -- below filepath in the hierarchy here.
+    (prefix,suffix) = case break (== '.') $ reverse template of
+                          (rev_suffix, rev_prefix) ->
+                              (reverse rev_prefix, reverse rev_suffix)
 
     oflags1 = rw_flags .|. o_EXCL
 
