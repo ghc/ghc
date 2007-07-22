@@ -157,10 +157,8 @@ module System.IO (
 
     -- * Temporary files (not portable: GHC only)
 
-#ifdef __GLASGOW_HASKELL__
     openTempFile,
     openBinaryTempFile,
-#endif
   ) where
 
 import Data.Bits
@@ -169,6 +167,13 @@ import Data.Maybe
 import Foreign.C.Error
 import Foreign.C.String
 import System.Posix.Internals
+
+#ifdef __GLASGOW_HASKELL__
+import GHC.Exception    as ExceptionBase hiding (catch)
+#endif
+#ifdef __HUGS__
+import Hugs.Exception   as ExceptionBase
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
@@ -450,8 +455,11 @@ openTempFile' loc tmp_dir template binary = do
            then findTempName (x+1)
            else ioError (errnoToIOError loc errno Nothing (Just tmp_dir))
        else do
-         h <- fdToHandle' fd Nothing False filepath ReadWriteMode True
-	        `catchException` \e -> do c_close fd; throw e
+         -- XXX We want to tell fdToHandle what the filepath is,
+         -- as any exceptions etc will only be able to report the
+         -- fd currently
+         h <- fdToHandle fd
+	        `ExceptionBase.catchException` \e -> do c_close fd; throw e
 	 return (filepath, h)
       where
         filename        = prefix ++ show x ++ suffix
