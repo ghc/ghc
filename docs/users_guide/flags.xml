@@ -613,9 +613,9 @@
 	    </row>
 	    <row>
 	      <entry><option>-fcontext-stack=N</option><replaceable>n</replaceable></entry>
-	      <entry>set the <link linkend="undecidable-instances">limit for context reduction</link></entry>
+	      <entry>set the <link linkend="undecidable-instances">limit for context reduction</link>. Default is 20.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>20</option></entry>
+	      <entry></entry>
 	    </row>
 	    <row>
 	      <entry><option>-X=Arrows</option></entry>
@@ -726,6 +726,186 @@
 	      <entry>Enable <link linkend="bang-patterns">bang patterns</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-X=NoBangPatterns</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=CPP</option></entry>
+	      <entry>Enable the <link linkend="c-pre-processor">C preprocessor</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=CPP</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=PatternGuards</option></entry>
+	      <entry>Enable <link linkend="pattern-guards">pattern guards</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=PatternGuards</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=UnicodeSyntax</option></entry>
+	      <entry>Enable unicode syntax.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=UnicodeSyntax</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=MagicHash</option></entry>
+	      <entry>Enable the &ldquo;magic hash&rdquo;.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=MagicHash</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=PolymorphicComponents</option></entry>
+	      <entry>Enable polymorphic components.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=PolymorphicComponents</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=ExistentialQuantification</option></entry>
+	      <entry>Enable <link linkend="existential-quantification">existential quantification</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=ExistentialQuantification</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=KindSignatures</option></entry>
+	      <entry>Enable kind signatures.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=KindSignatures</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=PatternSignatures</option></entry>
+	      <entry>Enable <link linkend="pattern-type-sigs">pattern type signatures</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=PatternSignatures</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=EmptyDataDecls</option></entry>
+	      <entry>Enable empty data declarations.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=EmptyDataDecls</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=ParallelListComp</option></entry>
+	      <entry>Enable <link linkend="parallel-list-comprehensions">parallel list comprehensions</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=ParallelListComp</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=UnliftedFFITypes</option></entry>
+	      <entry>Enable unlifted FFI types.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=UnliftedFFITypes</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=PartiallyAppliedClosedTypeSynonyms</option></entry>
+	      <entry>Enable partially applied type synonyms.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=PartiallyAppliedClosedTypeSynonyms</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=Rank2Types</option></entry>
+	      <entry>Enable rank-2 types.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=Rank2Types</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=RankNTypes</option></entry>
+	      <entry>Enable rank-N types.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=RankNTypes</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=TypeOperators</option></entry>
+	      <entry>Enable type operators.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=TypeOperators</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=RecursiveDo</option></entry>
+	      <entry>Enable <link linkend="mdo-notation">recursive do (mdo) notation</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=RecursiveDo</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=Parr</option></entry>
+	      <entry>Enable parallel arrays.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=Parr</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=RecordWildCards</option></entry>
+	      <entry>Enable record wildcards.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=RecordWildCards</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=RecordPuns</option></entry>
+	      <entry>Enable record puns.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=RecordPuns</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=DisambiguateRecordFields</option></entry>
+	      <entry>Enable the <link linkend="disambiguate-fields">disambiguate fields.</link> exception</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=DisambiguateRecordFields</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=UnboxedTuples</option></entry>
+	      <entry>Enable <link linkend="unboxed-tuples">unboxed tuples</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=UnboxedTuples</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=StandaloneDeriving</option></entry>
+	      <entry>Enable standalone deriving.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=StandaloneDeriving</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=DeriveDataTypeable</option></entry>
+	      <entry>Enable deriving for the Data and Typeable classes.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=DeriveDataTypeable</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=TypeSynonymInstances</option></entry>
+	      <entry>Enable <link linkend="type-synonyms">type synonyms</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=TypeSynonymInstances</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=FlexibleContexts</option></entry>
+	      <entry>Enable flexible contexts.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=FlexibleContexts</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=FlexibleInstances</option></entry>
+	      <entry>Enable flexible instances.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=FlexibleInstances</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=ConstrainedClassMethods</option></entry>
+	      <entry>Enable constrained class methods.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=ConstrainedClassMethods</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=MultiParamTypeClasses</option></entry>
+	      <entry>Enable <link linkend="multi-param-type-classes">multi parameter type classes</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=MultiParamTypeClasses</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=FunctionalDependencies</option></entry>
+	      <entry>Enable <link linkend="functional-dependencies">functional dependencies</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=FunctionalDependencies</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-X=GeneralizedNewtypeDeriving</option></entry>
+	      <entry>Enable <link linkend="newtype-deriving">newtype deriving</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-X=GeneralizedNewtypeDeriving</option></entry>
 	    </row>
 	  </tbody>
 	</tgroup>
