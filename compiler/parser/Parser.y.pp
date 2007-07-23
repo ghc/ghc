@@ -1534,9 +1534,6 @@ maybe_stmt :: { Maybe (LStmt RdrName) }
 
 stmt  :: { LStmt RdrName }
 	: qual				{ $1 }
--- What is this next production doing?  I have no clue!  SLPJ Dec06
-	| infixexp '->' exp		{% checkPattern $3 >>= \p ->
-					   return (LL $ mkBindStmt p $1) }
   	| 'rec' stmtlist		{ LL $ mkRecStmt (unLoc $2) }
 
 qual  :: { LStmt RdrName }
