@@ -132,6 +132,8 @@ RtsFlags_CC_OPTS += -DRtsWay=\"rts$(_way)\"
 RtsFlags_CC_OPTS += -DHostPlatform=\"$(HOSTPLATFORM)\"
 RtsFlags_CC_OPTS += -DBuildPlatform=\"$(BUILDPLATFORM)\"
 RtsFlags_CC_OPTS += -DTargetPlatform=\"$(TARGETPLATFORM)\"
+RtsFlags_CC_OPTS += -DGhcUnregisterised=\"$(GhcUnregisterised)\"
+RtsFlags_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCode)\"
 
 ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include
