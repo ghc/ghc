@@ -98,6 +98,11 @@ CONFIGURE_OPTS += --enable-library-profiling
 CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-profiling
 endif
 
+ifneq "$(findstring $(space)dyn$(space), $(space)$(GhcLibWays)$(space))" ""
+CONFIGURE_OPTS += --enable-shared
+CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-shared
+endif
+
 ifeq "$(SplitObjs)" "YES"
 CONFIGURE_OPTS += --enable-split-objs
 CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-splitting
