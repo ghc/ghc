@@ -334,17 +334,10 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 }
 
 <0,option_prags> {
-  @qual @varid			{ check_qvarid }
+  @qual @varid			{ idtoken qvarid }
   @qual @conid			{ idtoken qconid }
   @varid			{ varid }
   @conid			{ idtoken conid }
-}
-
--- after an illegal qvarid, such as 'M.let', 
--- we back up and try again in the bad_qvarid state:
-<bad_qvarid> {
-  @conid			{ pop_and (idtoken conid) }
-  @qual @conid			{ pop_and (idtoken qconid) }
 }
 
 <0> {
@@ -870,30 +863,6 @@ open_brace span _str _len = do
 close_brace span _str _len = do 
   popContext
   return (L span ITccurly)
-
--- We have to be careful not to count M.<varid> as a qualified name
--- when <varid> is a keyword.  We hack around this by catching 
--- the offending tokens afterward, and re-lexing in a different state.
-check_qvarid span buf len = do
-  case lookupUFM reservedWordsFM var of
-	Just (keyword,exts)
-	  | not (isSpecial keyword) ->
-	  if exts == 0 
-	     then try_again
-	     else do
-		b <- extension (\i -> exts .&. i /= 0)
-		if b then try_again
-		     else return token
-	_other -> return token
-  where
-	(mod,var) = splitQualName buf len
-	token     = L span (ITqvarid (mod,var))
-
-	try_again = do
-		(AI _ offs _) <- getInput	
-		setInput (AI (srcSpanStart span) (offs-len) buf)
-		pushLexState bad_qvarid
-		lexToken
 
 qvarid buf len = ITqvarid $! splitQualName buf len
 qconid buf len = ITqconid $! splitQualName buf len
