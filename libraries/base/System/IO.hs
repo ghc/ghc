@@ -155,7 +155,7 @@ module System.IO (
     hGetBufNonBlocking,	       -- :: Handle -> Ptr a -> Int -> IO Int
 #endif
 
-    -- * Temporary files (not portable: GHC only)
+    -- * Temporary files
 
     openTempFile,
     openBinaryTempFile,
@@ -464,6 +464,9 @@ openTempFile' loc tmp_dir template binary = do
       where
         filename        = prefix ++ show x ++ suffix
         filepath        = tmp_dir ++ [pathSeparator] ++ filename
+#if __HUGS__
+        fdToHandle fd   = openFd (fromIntegral fd) False ReadWriteMode binary
+#endif
 
 -- XXX Should use filepath library
 pathSeparator :: Char
