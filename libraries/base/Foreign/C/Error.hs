@@ -118,6 +118,9 @@ import Data.Maybe
 import GHC.IOBase
 import GHC.Num
 import GHC.Base
+#elif __HUGS__
+import Hugs.Prelude		( Handle, IOError, ioError )
+import System.IO.Unsafe		( unsafePerformIO )
 #else
 import System.IO		( Handle )
 import System.IO.Error		( IOError, ioError )

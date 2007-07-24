@@ -32,18 +32,19 @@ import Foreign.C
 import Data.Bits
 import Data.Maybe
 
-#ifdef __GLASGOW_HASKELL__
+#if __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.Num
 import GHC.Real
 import GHC.IOBase
+#elif __HUGS__
+import Hugs.Prelude (IOException(..), IOErrorType(..))
+import Hugs.IO (IOMode(..))
 #else
 import System.IO
 #endif
 
 #ifdef __HUGS__
-import Hugs.Prelude (IOException(..), IOErrorType(..))
-
 {-# CFILES cbits/PrelIOUtils.c cbits/dirUtils.c cbits/consUtils.c #-}
 #endif
 
