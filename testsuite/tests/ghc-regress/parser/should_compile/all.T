@@ -30,7 +30,12 @@ test('read019', normal, compile, [''])
 
 test('read021', normal, compile, [''])
 test('read022', normal, compile, ["-fglasgow-exts"])
-test('read023', expect_fail_if_compiler_type('hugs'), compile, [''])
+
+# we don't support strict Haskell 98 with respect to qualified identifiers
+# any more (read023), see #1215.  This test is in fact incorrect Haskell 98
+# anyway, so expect_fail would be wrong.
+test('read023', skip, compile, [''])
+
 test('read024', normal, compile, ["-fglasgow-exts"])
 test('read025', normal, compile, [''])
 test('read026', normal, compile, [''])
