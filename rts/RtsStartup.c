@@ -355,12 +355,25 @@ hs_add_root(void (*init_root)(void))
     initProfiling2();
 }
 
-/* -----------------------------------------------------------------------------
-   Shutting down the RTS
-   -------------------------------------------------------------------------- */
+/* ----------------------------------------------------------------------------
+ * Shutting down the RTS
+ *
+ * The wait_foreign parameter means:
+ *       True  ==> wait for any threads doing foreign calls now.
+ *       False ==> threads doing foreign calls may return in the
+ *                 future, but will immediately block on a mutex.
+ *                 (capability->lock).
+ * 
+ * If this RTS is a DLL that we're about to unload, then you want
+ * safe=True, otherwise the thread might return to code that has been
+ * unloaded.  If this is a standalone program that is about to exit,
+ * then you can get away with safe=False, which is better because we
+ * won't hang on exit if there is a blocked foreign call outstanding.
+ *
+ ------------------------------------------------------------------------- */
 
-void
-hs_exit(void)
+static void
+hs_exit_(rtsBool wait_foreign)
 {
     if (hs_init_count <= 0) {
 	errorBelch("warning: too many hs_exit()s");
@@ -386,7 +399,7 @@ hs_exit(void)
 #endif
 
     /* stop all running tasks */
-    exitScheduler();
+    exitScheduler(wait_foreign);
     
 #if defined(GRAN)
     /* end_gr_simulation prints global stats if requested -- HWL */
@@ -497,6 +510,14 @@ hs_exit(void)
 
 }
 
+// The real hs_exit():
+void
+hs_exit(void)
+{
+    hs_exit_(rtsTrue);
+    // be safe; this might be a DLL
+}
+
 // Compatibility interfaces
 void
 shutdownHaskell(void)
@@ -509,7 +530,8 @@ shutdownHaskellAndExit(int n)
 {
     if (hs_init_count == 1) {
 	OnExitHook();
-	hs_exit();
+	hs_exit_(rtsFalse);
+        // we're about to exit(), no need to wait for foreign calls to return.
 #if defined(PAR)
 	/* really exit (stg_exit() would call shutdownParallelSystem() again) */
 	exit(n);

@@ -217,7 +217,7 @@ void prodAllCapabilities (void);
 // Waits for a capability to drain of runnable threads and workers,
 // and then acquires it.  Used at shutdown time.
 //
-void shutdownCapability (Capability *cap, Task *task);
+void shutdownCapability (Capability *cap, Task *task, rtsBool wait_foreign);
 
 // Attempt to gain control of a Capability if it is free.
 //

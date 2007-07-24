@@ -18,7 +18,7 @@
  * Locks assumed   :  none
  */
 void initScheduler (void);
-void exitScheduler (void);
+void exitScheduler (rtsBool wait_foreign);
 void freeScheduler (void);
 
 // Place a new thread on the run queue of the current Capability

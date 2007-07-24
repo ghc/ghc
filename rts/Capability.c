@@ -639,7 +639,7 @@ prodOneCapability (void)
  * ------------------------------------------------------------------------- */
 
 void
-shutdownCapability (Capability *cap, Task *task)
+shutdownCapability (Capability *cap, Task *task, rtsBool safe)
 {
     nat i;
 
@@ -696,8 +696,24 @@ shutdownCapability (Capability *cap, Task *task)
 	    yieldThread();
 	    continue;
 	}
+
+        // If "safe", then busy-wait for any threads currently doing
+        // foreign calls.  If we're about to unload this DLL, for
+        // example, we need to be sure that there are no OS threads
+        // that will try to return to code that has been unloaded.
+        // We can be a bit more relaxed when this is a standalone
+        // program that is about to terminate, and let safe=false.
+        if (cap->suspended_ccalling_tasks && safe) {
+	    debugTrace(DEBUG_sched, 
+		       "thread(s) are involved in foreign calls, yielding");
+            cap->running_task = NULL;
+	    RELEASE_LOCK(&cap->lock);
+            yieldThread();
+            continue;
+        }
+            
 	debugTrace(DEBUG_sched, "capability %d is stopped.", cap->no);
-    freeCapability(cap);
+        freeCapability(cap);
 	RELEASE_LOCK(&cap->lock);
 	break;
     }

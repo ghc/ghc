@@ -2577,7 +2577,8 @@ initScheduler(void)
 }
 
 void
-exitScheduler( void )
+exitScheduler( rtsBool wait_foreign )
+               /* see Capability.c, shutdownCapability() */
 {
     Task *task = NULL;
 
@@ -2599,7 +2600,7 @@ exitScheduler( void )
 	nat i;
 	
 	for (i = 0; i < n_capabilities; i++) {
-	    shutdownCapability(&capabilities[i], task);
+	    shutdownCapability(&capabilities[i], task, wait_foreign);
 	}
 	boundTaskExiting(task);
 	stopTaskManager();
