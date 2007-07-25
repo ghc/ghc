@@ -141,10 +141,6 @@ vectBndrsIn vs p
 -- ----------------------------------------------------------------------------
 -- Expressions
 
-replicateP :: CoreExpr -> CoreExpr -> VM CoreExpr
-replicateP expr len = liftM (`mkApps` [expr, len])
-                            (paMethod replicatePAVar (exprType expr))
-
 capply :: (CoreExpr, CoreExpr) -> (CoreExpr, CoreExpr) -> VM (CoreExpr, CoreExpr)
 capply (vfn, lfn) (varg, larg)
   = do
@@ -163,7 +159,7 @@ vectVar lc v
       case r of
         Local es     -> return es
         Global vexpr -> do
-                          lexpr <- replicateP vexpr lc
+                          lexpr <- replicatePA vexpr lc
                           return (vexpr, lexpr)
 
 vectPolyVar :: CoreExpr -> Var -> [Type] -> VM (CoreExpr, CoreExpr)
@@ -174,7 +170,7 @@ vectPolyVar lc v tys
         Local (vexpr, lexpr) -> liftM2 (,) (mk_app vexpr) (mk_app lexpr)
         Global poly          -> do
                                   vexpr <- mk_app poly
-                                  lexpr <- replicateP vexpr lc
+                                  lexpr <- replicatePA vexpr lc
                                   return (vexpr, lexpr)
   where
     mk_app e = applyToTypes e =<< mapM vectType tys
@@ -222,7 +218,7 @@ vectExpr lc (_, AnnVar v)   = vectVar lc v
 vectExpr lc (_, AnnLit lit)
   = do
       let vexpr = Lit lit
-      lexpr <- replicateP vexpr lc
+      lexpr <- replicatePA vexpr lc
       return (vexpr, lexpr)
 
 vectExpr lc (_, AnnNote note expr)
@@ -405,9 +401,9 @@ mkClosureMonoFns info arg body
 
     bind_lenv lenv lbody lc_bndr [lbndr]
       = do
-          lengthPA <- paMethod lengthPAVar vty
+          len <- lengthPA (Var lbndr)
           return . Let (NonRec lbndr lenv)
-                 $ Case (App lengthPA (Var lbndr))
+                 $ Case len
                         lc_bndr
                         (exprType lbody)
                         [(DEFAULT, [], lbody)]
