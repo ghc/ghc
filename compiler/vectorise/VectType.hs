@@ -7,6 +7,7 @@ import VectMonad
 import VectUtils
 
 import HscTypes          ( TypeEnv, extendTypeEnvList, typeEnvTyCons )
+import CoreSyn
 import DataCon
 import TyCon
 import Type
@@ -17,9 +18,11 @@ import InstEnv           ( Instance )
 import OccName
 import MkId
 import BasicTypes        ( StrictnessMark(..), boolToRecFlag )
+import Id                ( mkWildId )
 import Name              ( Name )
 import NameEnv
 import TysWiredIn        ( intTy )
+import TysPrim           ( intPrimTy )
 
 import Unique
 import UniqFM
@@ -248,6 +251,20 @@ buildPArrayDataCon orig_name vect_tc repr_tc
   where
     types = [ty | dc <- tyConDataCons vect_tc
                 , ty <- dataConRepArgTys dc]
+
+buildLengthPA :: TyCon -> VM CoreExpr
+buildLengthPA repr_tc
+  = do
+      arg   <- newLocalVar FSLIT("xs") arg_ty
+      shape <- newLocalVar FSLIT("sel") shape_ty
+      body  <- lengthPA (Var shape)
+      return . Lam arg
+             $ Case (Var arg) (mkWildId arg_ty) intPrimTy
+                    [(DataAlt repr_dc, shape : map mkWildId repr_tys, body)]
+  where
+    arg_ty = mkTyConApp repr_tc . mkTyVarTys $ tyConTyVars repr_tc
+    [repr_dc] = tyConDataCons repr_tc
+    shape_ty : repr_tys = dataConRepArgTys repr_dc
 
 -- | Split the given tycons into two sets depending on whether they have to be
 -- converted (first list) or not (second list). The first argument contains
