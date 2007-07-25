@@ -2,7 +2,7 @@ module VectUtils (
   collectAnnTypeBinders, collectAnnTypeArgs, isAnnTypeArg,
   splitClosureTy,
   mkPADictType, mkPArrayType,
-  paDictArgType, paDictOfType,
+  paDictArgType, paDictOfType, paMethod,
   lookupPArrayFamInst,
   hoistExpr, takeHoisted
 ) where
@@ -107,6 +107,13 @@ paDFunApply dfun tys
   = do
       dicts <- mapM paDictOfType tys
       return $ mkApps (mkTyApps dfun tys) dicts
+
+paMethod :: (Builtins -> Var) -> Type -> VM CoreExpr
+paMethod method ty
+  = do
+      fn   <- builtin method
+      dict <- paDictOfType ty
+      return $ mkApps (Var fn) [Type ty, dict]
 
 lookupPArrayFamInst :: Type -> VM (TyCon, [Type])
 lookupPArrayFamInst ty = builtin parrayTyCon >>= (`lookupFamInst` [ty])

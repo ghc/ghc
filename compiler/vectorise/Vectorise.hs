@@ -142,13 +142,8 @@ vectBndrsIn vs p
 -- Expressions
 
 replicateP :: CoreExpr -> CoreExpr -> VM CoreExpr
-replicateP expr len
-  = do
-      dict <- paDictOfType ty
-      rep  <- builtin replicatePAVar
-      return $ mkApps (Var rep) [Type ty, dict, expr, len]
-  where
-    ty = exprType expr
+replicateP expr len = liftM (`mkApps` [expr, len])
+                            (paMethod replicatePAVar (exprType expr))
 
 capply :: (CoreExpr, CoreExpr) -> (CoreExpr, CoreExpr) -> VM (CoreExpr, CoreExpr)
 capply (vfn, lfn) (varg, larg)
@@ -410,10 +405,9 @@ mkClosureMonoFns info arg body
 
     bind_lenv lenv lbody lc_bndr [lbndr]
       = do
-          lengthPA <- builtin lengthPAVar
-          pa_dict  <- paDictOfType vty
+          lengthPA <- paMethod lengthPAVar vty
           return . Let (NonRec lbndr lenv)
-                 $ Case (mkApps (Var lengthPA) [Type vty, pa_dict, (Var lbndr)])
+                 $ Case (App lengthPA (Var lbndr))
                         lc_bndr
                         (exprType lbody)
                         [(DEFAULT, [], lbody)]
