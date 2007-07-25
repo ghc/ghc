@@ -220,7 +220,7 @@ ndpNames :: [Name]
 ndpNames = [ parrayTyConName, paClassName, closureTyConName
            , mkClosureName, applyClosureName
            , mkClosurePName, applyClosurePName
-           , lengthPAName, replicatePAName ]
+           , lengthPAName, replicatePAName, emptyPAName ]
 \end{code}
 
 
@@ -692,6 +692,7 @@ parrayTyConName     = tcQual   nDP_PARRAY FSLIT("PArray") parrayTyConKey
 paClassName         = clsQual  nDP_PARRAY FSLIT("PA")     paClassKey
 lengthPAName        = methName nDP_PARRAY FSLIT("lengthPA")    lengthPAClassOpKey
 replicatePAName     = methName nDP_PARRAY FSLIT("replicatePA") replicatePAClassOpKey
+emptyPAName         = varQual  nDP_PARRAY FSLIT("emptyPA") emptyPAClassOpKey
 closureTyConName    = tcQual   nDP_CLOSURE FSLIT(":->")    closureTyConKey
 mkClosureName       = varQual  nDP_CLOSURE FSLIT("mkClosure")  mkClosureIdKey
 applyClosureName    = varQual  nDP_CLOSURE FSLIT("$:")         applyClosureIdKey
@@ -1069,6 +1070,7 @@ applyClosurePIdKey            = mkPreludeMiscIdUnique 129
 closurePAIdKey                = mkPreludeMiscIdUnique 130
 lengthPAClassOpKey            = mkPreludeMiscIdUnique 131
 replicatePAClassOpKey         = mkPreludeMiscIdUnique 132
+emptyPAClassOpKey             = mkPreludeMiscIdUnique 133
 
 ---------------- Template Haskell -------------------
 --	USES IdUniques 200-399
