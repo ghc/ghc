@@ -5,7 +5,7 @@ module VectMonad (
   noV, tryV, maybeV, orElseV, fixV, localV, closedV, initV,
   cloneName, newLocalVar, newTyVar,
   
-  Builtins(..), paDictTyCon,
+  Builtins(..), paDictTyCon, paDictDataCon,
   builtin,
 
   GlobalEnv(..),
@@ -70,6 +70,9 @@ data Builtins = Builtins {
 
 paDictTyCon :: Builtins -> TyCon
 paDictTyCon = classTyCon . paClass
+
+paDictDataCon :: Builtins -> DataCon
+paDictDataCon = classDataCon . paClass
 
 initBuiltins :: DsM Builtins
 initBuiltins

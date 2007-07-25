@@ -8,6 +8,7 @@ import VectUtils
 
 import HscTypes          ( TypeEnv, extendTypeEnvList, typeEnvTyCons )
 import CoreSyn
+import CoreUtils
 import DataCon
 import TyCon
 import Type
@@ -18,6 +19,7 @@ import InstEnv           ( Instance )
 import OccName
 import MkId
 import BasicTypes        ( StrictnessMark(..), boolToRecFlag )
+import Var               ( Var )
 import Id                ( mkWildId )
 import Name              ( Name )
 import NameEnv
@@ -253,8 +255,33 @@ buildPArrayDataCon orig_name vect_tc repr_tc
     types = [ty | dc <- tyConDataCons vect_tc
                 , ty <- dataConRepArgTys dc]
 
-buildLengthPA :: TyCon -> VM CoreExpr
-buildLengthPA repr_tc
+buildPADict :: Var -> TyCon -> TyCon -> VM [(Var, CoreExpr)]
+buildPADict var vect_tc arr_tc
+  = localV . abstractOverTyVars (tyConTyVars arr_tc) $ \abstract ->
+    do
+      meth_binds <- mapM (mk_method abstract) paMethods
+      let meth_vars = map (Var . fst) meth_binds
+      meth_exprs <- mapM (`applyToTypes` arg_tys) meth_vars
+
+      pa_dc <- builtin paDictDataCon
+      let dict = mkConApp pa_dc (Type (mkTyConApp vect_tc arg_tys) : meth_exprs)
+      return $ (var, dict) : meth_binds
+  where
+    tvs = tyConTyVars arr_tc
+    arg_tys = mkTyVarTys tvs
+
+    mk_method abstract (name, build)
+      = localV
+      $ do
+          body <- liftM abstract $ build vect_tc arr_tc
+          var <- newLocalVar name (exprType body)
+          return (var, mkInlineMe body)
+          
+paMethods = [(FSLIT("lengthPA"),    buildLengthPA),
+             (FSLIT("replicatePA"), buildReplicatePA)]
+
+buildLengthPA :: TyCon -> TyCon -> VM CoreExpr
+buildLengthPA _ arr_tc
   = do
       arg   <- newLocalVar FSLIT("xs") arg_ty
       shape <- newLocalVar FSLIT("sel") shape_ty
@@ -263,8 +290,8 @@ buildLengthPA repr_tc
              $ Case (Var arg) (mkWildId arg_ty) intPrimTy
                     [(DataAlt repr_dc, shape : map mkWildId repr_tys, body)]
   where
-    arg_ty = mkTyConApp repr_tc . mkTyVarTys $ tyConTyVars repr_tc
-    [repr_dc] = tyConDataCons repr_tc
+    arg_ty = mkTyConApp arr_tc . mkTyVarTys $ tyConTyVars arr_tc
+    [repr_dc] = tyConDataCons arr_tc
     shape_ty : repr_tys = dataConRepArgTys repr_dc
 
 
