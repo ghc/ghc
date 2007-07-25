@@ -376,15 +376,9 @@ newEmptyBuffer b state size
 
 allocateBuffer :: Int -> BufferState -> IO Buffer
 allocateBuffer sz@(I# size) state = IO $ \s -> 
-#ifdef mingw32_HOST_OS
-   -- To implement asynchronous I/O under Win32, we have to pass
-   -- buffer references to external threads that handles the
-   -- filling/emptying of their contents. Hence, the buffer cannot
-   -- be moved around by the GC.
+   -- We sometimes need to pass the address of this buffer to
+   -- a "safe" foreign call, hence it must be immovable.
   case newPinnedByteArray# size s of { (# s, b #) ->
-#else
-  case newByteArray# size s of { (# s, b #) ->
-#endif
   (# s, newEmptyBuffer b state sz #) }
 
 writeCharIntoBuffer :: RawBuffer -> Int -> Char -> IO Int
