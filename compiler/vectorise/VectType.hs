@@ -21,7 +21,7 @@ import BasicTypes        ( StrictnessMark(..), boolToRecFlag )
 import Id                ( mkWildId )
 import Name              ( Name )
 import NameEnv
-import TysWiredIn        ( intTy )
+import TysWiredIn        ( intTy, intDataCon )
 import TysPrim           ( intPrimTy )
 
 import Unique
@@ -31,7 +31,8 @@ import Digraph           ( SCC(..), stronglyConnComp )
 
 import Outputable
 
-import Control.Monad  ( liftM2, zipWithM, zipWithM_ )
+import Control.Monad  ( liftM, liftM2, zipWithM, zipWithM_ )
+import Data.List      ( inits, tails )
 
 -- ----------------------------------------------------------------------------
 -- Types
@@ -265,6 +266,75 @@ buildLengthPA repr_tc
     arg_ty = mkTyConApp repr_tc . mkTyVarTys $ tyConTyVars repr_tc
     [repr_dc] = tyConDataCons repr_tc
     shape_ty : repr_tys = dataConRepArgTys repr_dc
+
+
+-- data T = C0 t1 ... tm
+--          ...
+--          Ck u1 ... un
+--
+-- data [:T:] = A ![:Int:] [:t1:] ... [:un:]
+--
+-- replicatePA :: Int# -> T -> [:T:]
+-- replicatePA n# t
+--   = let c = case t of
+--               C0 _ ... _ -> 0
+--               ...
+--               Ck _ ... _ -> k
+--
+--         xs1 = case t of
+--                 C0 x1 _ ... _ -> replicatePA @t1 n# x1
+--                 _             -> emptyPA @t1
+--
+--         ...
+--
+--         ysn = case t of
+--                 Ck _ ... _ yn -> replicatePA @un n# yn
+--                 _             -> emptyPA @un
+--     in
+--     A (replicatePA @Int n# c) xs1 ... ysn
+--
+--
+
+buildReplicatePA :: TyCon -> TyCon -> VM CoreExpr
+buildReplicatePA vect_tc arr_tc
+  = do
+      len_var <- newLocalVar FSLIT("n") intPrimTy
+      val_var <- newLocalVar FSLIT("x") val_ty
+
+      let len = Var len_var
+          val = Var val_var
+
+      shape <- replicatePA len (ctr_num val)
+      reprs <- liftM concat $ mapM (mk_comp_arrs len val) vect_dcs
+      
+      return . mkLams [len_var, val_var]
+             $ mkConApp arr_dc (map (Type . TyVarTy) (tyConTyVars arr_tc) ++ (shape : reprs))
+  where
+    val_ty = mkTyConApp vect_tc . mkTyVarTys $ tyConTyVars arr_tc
+    wild   = mkWildId val_ty
+    vect_dcs = tyConDataCons vect_tc
+    [arr_dc] = tyConDataCons arr_tc
+
+    ctr_num val = Case val wild intTy (zipWith ctr_num_alt vect_dcs [0..])
+    ctr_num_alt dc i = (DataAlt dc, map mkWildId (dataConRepArgTys dc),
+                                    mkConApp intDataCon [mkIntLitInt i])
+
+
+    mk_comp_arrs len val dc = let tys = dataConRepArgTys dc
+                                  wilds = map mkWildId tys
+                              in
+                              sequence (zipWith3 (mk_comp_arr len val dc)
+                                       tys (inits wilds) (tails wilds))
+
+    mk_comp_arr len val dc ty pre (_:post)
+      = do
+          var   <- newLocalVar FSLIT("x") ty
+          rep   <- replicatePA len (Var var)
+          empty <- emptyPA ty
+          arr_ty <- mkPArrayType ty
+
+          return $ Case val wild arr_ty
+                     [(DataAlt dc, pre ++ (var : post), rep), (DEFAULT, [], empty)]
 
 -- | Split the given tycons into two sets depending on whether they have to be
 -- converted (first list) or not (second list). The first argument contains
