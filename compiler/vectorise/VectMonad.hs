@@ -65,6 +65,7 @@ data Builtins = Builtins {
                 , applyClosurePVar :: Var
                 , lengthPAVar      :: Var
                 , replicatePAVar   :: Var
+                , emptyPAVar       :: Var
                 }
 
 paDictTyCon :: Builtins -> TyCon
@@ -83,6 +84,7 @@ initBuiltins
       applyClosurePVar <- dsLookupGlobalId applyClosurePName
       lengthPAVar      <- dsLookupGlobalId lengthPAName
       replicatePAVar   <- dsLookupGlobalId replicatePAName
+      emptyPAVar       <- dsLookupGlobalId emptyPAName
 
       return $ Builtins {
                  parrayTyCon      = parrayTyCon
@@ -94,6 +96,7 @@ initBuiltins
                , applyClosurePVar = applyClosurePVar
                , lengthPAVar      = lengthPAVar
                , replicatePAVar   = replicatePAVar
+               , emptyPAVar       = emptyPAVar
                }
 
 data GlobalEnv = GlobalEnv {

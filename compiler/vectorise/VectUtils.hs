@@ -3,7 +3,7 @@ module VectUtils (
   splitClosureTy,
   mkPADictType, mkPArrayType,
   paDictArgType, paDictOfType,
-  paMethod, lengthPA, replicatePA,
+  paMethod, lengthPA, replicatePA, emptyPA,
   lookupPArrayFamInst,
   hoistExpr, takeHoisted
 ) where
@@ -122,6 +122,9 @@ lengthPA x = liftM (`App` x) (paMethod lengthPAVar (exprType x))
 replicatePA :: CoreExpr -> CoreExpr -> VM CoreExpr
 replicatePA len x = liftM (`mkApps` [len,x])
                           (paMethod replicatePAVar (exprType x))
+
+emptyPA :: Type -> VM CoreExpr
+emptyPA = paMethod emptyPAVar
 
 lookupPArrayFamInst :: Type -> VM (TyCon, [Type])
 lookupPArrayFamInst ty = builtin parrayTyCon >>= (`lookupFamInst` [ty])
