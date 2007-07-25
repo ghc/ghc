@@ -494,7 +494,7 @@ hs_exit_(rtsBool wait_foreign)
 #endif
 
 #if defined(mingw32_HOST_OS) && !defined(THREADED_RTS)
-    shutdownAsyncIO();
+    shutdownAsyncIO(wait_foreign);
 #endif
 
     /* free hash table storage */

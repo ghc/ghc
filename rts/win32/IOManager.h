@@ -84,7 +84,7 @@ extern CompletionProc onComplete;
  * Starting up and shutting down. 
  */ 
 extern BOOL StartIOManager     ( void );
-extern void ShutdownIOManager  ( void );
+extern void ShutdownIOManager  ( rtsBool wait_threads );
 
 /*
  * Adding I/O and delay requests. With each request a

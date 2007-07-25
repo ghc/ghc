@@ -443,25 +443,27 @@ AddProcRequest ( void* proc,
     return depositWorkItem(reqID, wItem);
 }
 
-void ShutdownIOManager ( void )
+void ShutdownIOManager ( rtsBool wait_threads )
 {
     int num;
 
     SetEvent(ioMan->hExitEvent);
   
-    /* Wait for all worker threads to die. */
-    for (;;) {
-        EnterCriticalSection(&ioMan->manLock);
-	num = ioMan->numWorkers;
-	LeaveCriticalSection(&ioMan->manLock);
-	if (num == 0)
-	    break;
-	Sleep(10);
+    if (wait_threads) {
+        /* Wait for all worker threads to die. */
+        for (;;) {
+            EnterCriticalSection(&ioMan->manLock);
+            num = ioMan->numWorkers;
+            LeaveCriticalSection(&ioMan->manLock);
+            if (num == 0)
+                break;
+            Sleep(10);
+        }
+        FreeWorkQueue(ioMan->workQueue);
+        CloseHandle(ioMan->hExitEvent);
+        free(ioMan);
+        ioMan = NULL;
     }
-    FreeWorkQueue(ioMan->workQueue);
-    CloseHandle(ioMan->hExitEvent);
-    free(ioMan);
-    ioMan = NULL;
 }
 
 /* Keep track of WorkItems currently being serviced. */

@@ -174,9 +174,9 @@ startupAsyncIO()
 }
 
 void
-shutdownAsyncIO()
+shutdownAsyncIO(rtsBool wait_threads)
 {
-    ShutdownIOManager();
+    ShutdownIOManager(wait_threads);
     if (completed_req_event != INVALID_HANDLE_VALUE) {
         CloseHandle(completed_req_event);
 	completed_req_event = INVALID_HANDLE_VALUE;
