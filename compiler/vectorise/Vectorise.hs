@@ -40,7 +40,7 @@ import BasicTypes           ( Boxity(..) )
 
 import Outputable
 import FastString
-import Control.Monad        ( liftM, liftM2, mapAndUnzipM, zipWithM_ )
+import Control.Monad        ( liftM, liftM2, mapAndUnzipM )
 
 vectorise :: HscEnv -> UniqSupply -> RuleBase -> ModGuts
           -> IO (SimplCount, ModGuts)
@@ -174,27 +174,6 @@ vectPolyVar lc v tys
                                   return (vexpr, lexpr)
   where
     mk_app e = applyToTypes e =<< mapM vectType tys
-
-abstractOverTyVars :: [TyVar] -> ((CoreExpr -> CoreExpr) -> VM a) -> VM a
-abstractOverTyVars tvs p
-  = do
-      mdicts <- mapM mk_dict_var tvs
-      zipWithM_ (\tv -> maybe (defLocalTyVar tv) (defLocalTyVarWithPA tv . Var)) tvs mdicts
-      p (mk_lams mdicts)
-  where
-    mk_dict_var tv = do
-                       r <- paDictArgType tv
-                       case r of
-                         Just ty -> liftM Just (newLocalVar FSLIT("dPA") ty)
-                         Nothing -> return Nothing
-
-    mk_lams mdicts = mkLams (tvs ++ [dict | Just dict <- mdicts])
-
-applyToTypes :: CoreExpr -> [Type] -> VM CoreExpr
-applyToTypes expr tys
-  = do
-      dicts <- mapM paDictOfType tys
-      return $ expr `mkTyApps` tys `mkApps` dicts
 
 vectPolyExpr :: CoreExpr -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
 vectPolyExpr lc expr

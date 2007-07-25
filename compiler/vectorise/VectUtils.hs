@@ -4,6 +4,7 @@ module VectUtils (
   mkPADictType, mkPArrayType,
   paDictArgType, paDictOfType,
   paMethod, lengthPA, replicatePA, emptyPA,
+  abstractOverTyVars, applyToTypes,
   lookupPArrayFamInst,
   hoistExpr, takeHoisted
 ) where
@@ -23,7 +24,7 @@ import PrelNames
 import Outputable
 import FastString
 
-import Control.Monad         ( liftM )
+import Control.Monad         ( liftM, zipWithM_ )
 
 collectAnnTypeArgs :: AnnExpr b ann -> (AnnExpr b ann, [Type])
 collectAnnTypeArgs expr = go expr []
@@ -125,6 +126,27 @@ replicatePA len x = liftM (`mkApps` [len,x])
 
 emptyPA :: Type -> VM CoreExpr
 emptyPA = paMethod emptyPAVar
+
+abstractOverTyVars :: [TyVar] -> ((CoreExpr -> CoreExpr) -> VM a) -> VM a
+abstractOverTyVars tvs p
+  = do
+      mdicts <- mapM mk_dict_var tvs
+      zipWithM_ (\tv -> maybe (defLocalTyVar tv) (defLocalTyVarWithPA tv . Var)) tvs mdicts
+      p (mk_lams mdicts)
+  where
+    mk_dict_var tv = do
+                       r <- paDictArgType tv
+                       case r of
+                         Just ty -> liftM Just (newLocalVar FSLIT("dPA") ty)
+                         Nothing -> return Nothing
+
+    mk_lams mdicts = mkLams (tvs ++ [dict | Just dict <- mdicts])
+
+applyToTypes :: CoreExpr -> [Type] -> VM CoreExpr
+applyToTypes expr tys
+  = do
+      dicts <- mapM paDictOfType tys
+      return $ expr `mkTyApps` tys `mkApps` dicts
 
 lookupPArrayFamInst :: Type -> VM (TyCon, [Type])
 lookupPArrayFamInst ty = builtin parrayTyCon >>= (`lookupFamInst` [ty])
