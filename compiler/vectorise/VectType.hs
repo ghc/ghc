@@ -191,6 +191,35 @@ vectDataCon dc
     rep_arg_tys = dataConRepArgTys dc
     tycon       = dataConTyCon dc
 
+data Shape = Shape {
+               shapeReprTys    :: [Type]
+             , shapeStrictness :: [StrictnessMark]
+             , shapeLength     :: [CoreExpr] -> VM CoreExpr
+             , shapeReplicate  :: CoreExpr -> CoreExpr -> VM [CoreExpr]
+             }
+
+tyConShape :: TyCon -> VM Shape
+tyConShape vect_tc
+  | isProductTyCon vect_tc
+  = return $ Shape {
+                shapeReprTys    = [intPrimTy]
+              , shapeStrictness = [NotMarkedStrict]
+              , shapeLength     = \[len] -> return len
+              , shapeReplicate  = \len _ -> return [len]
+              }
+
+  | otherwise
+  = do
+      repr_ty <- mkPArrayType intTy   -- FIXME: we want to unbox this
+      return $ Shape {
+                 shapeReprTys    = [repr_ty]
+               , shapeStrictness = [MarkedStrict]
+               , shapeLength     = \[sel] -> lengthPA sel
+               , shapeReplicate  = \len n -> do
+                                               e <- replicatePA len n
+                                               return [e]
+               }
+        
 buildPArrayTyCon :: TyCon -> TyCon -> VM TyCon
 buildPArrayTyCon orig_tc vect_tc = fixV $ \repr_tc ->
   do
@@ -243,7 +272,7 @@ buildPArrayDataCon :: Name -> TyCon -> TyCon -> VM DataCon
 buildPArrayDataCon orig_name vect_tc repr_tc
   = do
       dc_name  <- cloneName mkPArrayDataConOcc orig_name
-      shape_ty <- mkPArrayType intTy   -- FIXME: we want to unbox this!
+      shape    <- tyConShape vect_tc
       repr_tys <- mapM mkPArrayType types
       wrk_name <- cloneName mkDataConWorkerOcc  dc_name
       wrp_name <- cloneName mkDataConWrapperOcc dc_name
@@ -251,13 +280,13 @@ buildPArrayDataCon orig_name vect_tc repr_tc
       let ids      = mkDataConIds wrp_name wrk_name data_con
           data_con = mkDataCon dc_name
                                False
-                               (MarkedStrict : map (const NotMarkedStrict) repr_tys)
+                               (shapeStrictness shape ++ map (const NotMarkedStrict) repr_tys)
                                []
                                (tyConTyVars vect_tc)
                                []
                                []
                                []
-                               (shape_ty : repr_tys)
+                               (shapeReprTys shape ++ repr_tys)
                                repr_tc
                                []
                                ids
@@ -293,7 +322,8 @@ buildPADict (PAInstance {
              , painstArrTyCon  = arr_tc })
   = localV . abstractOverTyVars (tyConTyVars arr_tc) $ \abstract ->
     do
-      meth_binds <- mapM mk_method paMethods
+      shape <- tyConShape vect_tc
+      meth_binds <- mapM (mk_method shape) paMethods
       let meth_exprs = map (Var . fst) meth_binds
 
       pa_dc <- builtin paDictDataCon
@@ -304,33 +334,37 @@ buildPADict (PAInstance {
     tvs = tyConTyVars arr_tc
     arg_tys = mkTyVarTys tvs
 
-    mk_method (name, build)
+    mk_method shape (name, build)
       = localV
       $ do
-          body <- build vect_tc arr_tc
+          body <- build shape vect_tc arr_tc
           var  <- newLocalVar name (exprType body)
           return (var, mkInlineMe body)
           
 paMethods = [(FSLIT("lengthPA"),    buildLengthPA),
              (FSLIT("replicatePA"), buildReplicatePA)]
 
-buildLengthPA :: TyCon -> TyCon -> VM CoreExpr
-buildLengthPA vect_tc arr_tc
+buildLengthPA :: Shape -> TyCon -> TyCon -> VM CoreExpr
+buildLengthPA shape vect_tc arr_tc
   = do
       parr_ty <- mkPArrayType (mkTyConApp vect_tc arg_tys)
-      arg <- newLocalVar FSLIT("xs") parr_ty
+      arg    <- newLocalVar FSLIT("xs") parr_ty
+      shapes <- mapM (newLocalVar FSLIT("sh")) shape_tys
+      wilds  <- mapM newDummyVar repr_tys
       let scrut    = unwrapFamInstScrut arr_tc arg_tys (Var arg)
           scrut_ty = exprType scrut
-      shape <- newLocalVar FSLIT("sel") shape_ty
-      body  <- lengthPA (Var shape)
-      wilds <- mapM newDummyVar repr_tys
+
+      body <- shapeLength shape (map Var shapes)
+
       return . Lam arg
              $ Case scrut (mkWildId scrut_ty) intPrimTy
-                    [(DataAlt repr_dc, shape : wilds, body)]
+                    [(DataAlt repr_dc, shapes ++ wilds, body)]
   where
     arg_tys = mkTyVarTys $ tyConTyVars arr_tc
     [repr_dc] = tyConDataCons arr_tc
-    shape_ty : repr_tys = dataConRepArgTys repr_dc
+    
+    shape_tys = shapeReprTys shape
+    repr_tys  = drop (length shape_tys) (dataConRepArgTys repr_dc)
 
 -- data T = C0 t1 ... tm
 --          ...
@@ -359,8 +393,8 @@ buildLengthPA vect_tc arr_tc
 --
 --
 
-buildReplicatePA :: TyCon -> TyCon -> VM CoreExpr
-buildReplicatePA vect_tc arr_tc
+buildReplicatePA :: Shape -> TyCon -> TyCon -> VM CoreExpr
+buildReplicatePA shape vect_tc arr_tc
   = do
       len_var <- newLocalVar FSLIT("n") intPrimTy
       val_var <- newLocalVar FSLIT("x") val_ty
@@ -368,12 +402,12 @@ buildReplicatePA vect_tc arr_tc
       let len = Var len_var
           val = Var val_var
 
-      shape <- replicatePA len (ctr_num val)
+      shape_reprs <- shapeReplicate shape len (ctr_num val)
       reprs <- liftM concat $ mapM (mk_comp_arrs len val) vect_dcs
 
       return . mkLams [len_var, val_var]
              . wrapFamInstBody arr_tc arg_tys
-             $ mkConApp arr_dc (map Type arg_tys ++ (shape : reprs))
+             $ mkConApp arr_dc (map Type arg_tys ++ shape_reprs ++ reprs)
   where
     arg_tys = mkTyVarTys (tyConTyVars arr_tc)
     val_ty  = mkTyConApp vect_tc arg_tys
