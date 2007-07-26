@@ -3,7 +3,7 @@ module VectMonad (
   VM,
 
   noV, tryV, maybeV, orElseV, fixV, localV, closedV, initV,
-  cloneName, newExportedVar, newLocalVar, newTyVar,
+  cloneName, newExportedVar, newLocalVar, newDummyVar, newTyVar,
   
   Builtins(..), paDictTyCon, paDictDataCon,
   builtin,
@@ -296,6 +296,9 @@ newLocalVar fs ty
   = do
       u <- liftDs newUnique
       return $ mkSysLocal fs u ty
+
+newDummyVar :: Type -> VM Var
+newDummyVar = newLocalVar FSLIT("ds")
 
 newTyVar :: FastString -> Kind -> VM Var
 newTyVar fs k

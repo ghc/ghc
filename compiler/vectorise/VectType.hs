@@ -315,19 +315,22 @@ paMethods = [(FSLIT("lengthPA"),    buildLengthPA),
              (FSLIT("replicatePA"), buildReplicatePA)]
 
 buildLengthPA :: TyCon -> TyCon -> VM CoreExpr
-buildLengthPA _ arr_tc
+buildLengthPA vect_tc arr_tc
   = do
-      arg   <- newLocalVar FSLIT("xs") arg_ty
+      parr_ty <- mkPArrayType (mkTyConApp vect_tc arg_tys)
+      arg <- newLocalVar FSLIT("xs") parr_ty
+      let scrut    = unwrapFamInstScrut arr_tc arg_tys (Var arg)
+          scrut_ty = exprType scrut
       shape <- newLocalVar FSLIT("sel") shape_ty
       body  <- lengthPA (Var shape)
+      wilds <- mapM newDummyVar repr_tys
       return . Lam arg
-             $ Case (Var arg) (mkWildId arg_ty) intPrimTy
-                    [(DataAlt repr_dc, shape : map mkWildId repr_tys, body)]
+             $ Case scrut (mkWildId scrut_ty) intPrimTy
+                    [(DataAlt repr_dc, shape : wilds, body)]
   where
-    arg_ty = mkTyConApp arr_tc . mkTyVarTys $ tyConTyVars arr_tc
+    arg_tys = mkTyVarTys $ tyConTyVars arr_tc
     [repr_dc] = tyConDataCons arr_tc
     shape_ty : repr_tys = dataConRepArgTys repr_dc
-
 
 -- data T = C0 t1 ... tm
 --          ...
