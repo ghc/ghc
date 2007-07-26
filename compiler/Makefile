@@ -410,11 +410,16 @@ endif
 # enabled when we are bootstrapping with the same version of GHC, and
 # the interpreter is supported on this platform.
 
+ifeq "$(bootstrapped)" "YES"
+SRC_HC_OPTS += -package hpc
+PKG_DEPENDS += hpc
+endif
+
 ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
 
 # Yes, include the interepreter, readline, and Template Haskell extensions
-SRC_HC_OPTS += -DGHCI -package template-haskell -package hpc
-PKG_DEPENDS += template-haskell hpc
+SRC_HC_OPTS += -DGHCI -package template-haskell
+PKG_DEPENDS += template-haskell
 
 # Should GHCI be building info tables in the TABLES_NEXT_TO_CODE style
 # or not?
