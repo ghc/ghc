@@ -398,7 +398,7 @@ buildReplicatePA vect_tc arr_tc
           arr_ty <- mkPArrayType ty
 
           return $ Case val wild arr_ty
-                     [(DataAlt dc, pre ++ (var : post), rep), (DEFAULT, [], empty)]
+                     [(DEFAULT, [], empty), (DataAlt dc, pre ++ (var : post), rep)]
 
 -- | Split the given tycons into two sets depending on whether they have to be
 -- converted (first list) or not (second list). The first argument contains
