@@ -293,22 +293,22 @@ buildPADict (PAInstance {
              , painstArrTyCon  = arr_tc })
   = localV . abstractOverTyVars (tyConTyVars arr_tc) $ \abstract ->
     do
-      meth_binds <- mapM (mk_method abstract) paMethods
-      let meth_vars = map (Var . fst) meth_binds
-      meth_exprs <- mapM (`applyToTypes` arg_tys) meth_vars
+      meth_binds <- mapM mk_method paMethods
+      let meth_exprs = map (Var . fst) meth_binds
 
       pa_dc <- builtin paDictDataCon
       let dict = mkConApp pa_dc (Type (mkTyConApp vect_tc arg_tys) : meth_exprs)
-      return $ (instanceDFunId inst, abstract dict) : meth_binds
+          body = Let (Rec meth_binds) dict
+      return [(instanceDFunId inst, abstract body)]
   where
     tvs = tyConTyVars arr_tc
     arg_tys = mkTyVarTys tvs
 
-    mk_method abstract (name, build)
+    mk_method (name, build)
       = localV
       $ do
-          body <- liftM abstract $ build vect_tc arr_tc
-          var <- newLocalVar name (exprType body)
+          body <- build vect_tc arr_tc
+          var  <- newLocalVar name (exprType body)
           return (var, mkInlineMe body)
           
 paMethods = [(FSLIT("lengthPA"),    buildLengthPA),
