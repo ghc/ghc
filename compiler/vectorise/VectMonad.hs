@@ -3,7 +3,7 @@ module VectMonad (
   VM,
 
   noV, tryV, maybeV, orElseV, fixV, localV, closedV, initV,
-  cloneName, newLocalVar, newTyVar,
+  cloneName, newExportedVar, newLocalVar, newTyVar,
   
   Builtins(..), paDictTyCon, paDictDataCon,
   builtin,
@@ -47,6 +47,7 @@ import FamInstEnv
 import Panic
 import Outputable
 import FastString
+import SrcLoc        ( noSrcSpan )
 
 import Control.Monad ( liftM )
 
@@ -279,6 +280,16 @@ cloneName mk_occ name = liftM make (liftDs newUnique)
                                                     occ_name
                                                     (nameSrcSpan name)
            | otherwise           = mkSystemName u occ_name
+
+newExportedVar :: OccName -> Type -> VM Var
+newExportedVar occ_name ty 
+  = do
+      mod <- liftDs getModuleDs
+      u   <- liftDs newUnique
+
+      let name = mkExternalName u mod occ_name noSrcSpan
+      
+      return $ Id.mkExportedLocalId name ty
 
 newLocalVar :: FastString -> Type -> VM Var
 newLocalVar fs ty
