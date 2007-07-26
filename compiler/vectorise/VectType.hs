@@ -1,4 +1,5 @@
-module VectType ( vectTyCon, vectType, vectTypeEnv )
+module VectType ( vectTyCon, vectType, vectTypeEnv,
+                   PAInstance, painstInstance, buildPADict )
 where
 
 #include "HsVersions.h"
@@ -80,7 +81,7 @@ data PAInstance = PAInstance {
                   , painstArrTyCon  :: TyCon
                   }
 
-vectTypeEnv :: TypeEnv -> VM (TypeEnv, [FamInst], [Instance])
+vectTypeEnv :: TypeEnv -> VM (TypeEnv, [FamInst], [PAInstance])
 vectTypeEnv env
   = do
       cs <- readGEnv $ mk_map . global_tycons
@@ -88,17 +89,22 @@ vectTypeEnv env
           keep_dcs             = concatMap tyConDataCons keep_tcs
       zipWithM_ defTyCon   keep_tcs keep_tcs
       zipWithM_ defDataCon keep_dcs keep_dcs
-      vect_tcs <- vectTyConDecls conv_tcs
-      parr_tcs1 <- zipWithM buildPArrayTyCon keep_tcs keep_tcs
-      parr_tcs2 <- zipWithM buildPArrayTyCon conv_tcs vect_tcs
-      let new_tcs = vect_tcs ++ parr_tcs1 ++ parr_tcs2
+      new_tcs <- vectTyConDecls conv_tcs
+
+      let orig_tcs = keep_tcs ++ conv_tcs
+          vect_tcs  = keep_tcs ++ new_tcs
+
+      parr_tcs <- zipWithM buildPArrayTyCon orig_tcs vect_tcs
+      pa_insts <- zipWithM buildPAInstance  vect_tcs parr_tcs
+      
+      let all_new_tcs = new_tcs ++ parr_tcs
 
       let new_env = extendTypeEnvList env
-                       (map ATyCon new_tcs
-                        ++ [ADataCon dc | tc <- new_tcs
+                       (map ATyCon all_new_tcs
+                        ++ [ADataCon dc | tc <- all_new_tcs
                                         , dc <- tyConDataCons tc])
 
-      return (new_env, map mkLocalFamInst (parr_tcs1 ++ parr_tcs2), [])
+      return (new_env, map mkLocalFamInst parr_tcs, pa_insts)
   where
     tycons = typeEnvTyCons env
     groups = tyConGroups tycons
@@ -261,8 +267,8 @@ buildPArrayDataCon orig_name vect_tc repr_tc
     types = [ty | dc <- tyConDataCons vect_tc
                 , ty <- dataConRepArgTys dc]
 
-mkPAInstance :: TyCon -> TyCon -> VM PAInstance
-mkPAInstance vect_tc arr_tc
+buildPAInstance :: TyCon -> TyCon -> VM PAInstance
+buildPAInstance vect_tc arr_tc
   = do
       pa <- builtin paClass
       let inst_ty = mkForAllTys tvs
@@ -293,7 +299,7 @@ buildPADict (PAInstance {
 
       pa_dc <- builtin paDictDataCon
       let dict = mkConApp pa_dc (Type (mkTyConApp vect_tc arg_tys) : meth_exprs)
-      return $ (instanceDFunId inst, dict) : meth_binds
+      return $ (instanceDFunId inst, abstract dict) : meth_binds
   where
     tvs = tyConTyVars arr_tc
     arg_tys = mkTyVarTys tvs
