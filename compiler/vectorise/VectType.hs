@@ -370,12 +370,14 @@ buildReplicatePA vect_tc arr_tc
 
       shape <- replicatePA len (ctr_num val)
       reprs <- liftM concat $ mapM (mk_comp_arrs len val) vect_dcs
-      
+
       return . mkLams [len_var, val_var]
-             $ mkConApp arr_dc (map (Type . TyVarTy) (tyConTyVars arr_tc) ++ (shape : reprs))
+             . wrapFamInstBody arr_tc arg_tys
+             $ mkConApp arr_dc (map Type arg_tys ++ (shape : reprs))
   where
-    val_ty = mkTyConApp vect_tc . mkTyVarTys $ tyConTyVars arr_tc
-    wild   = mkWildId val_ty
+    arg_tys = mkTyVarTys (tyConTyVars arr_tc)
+    val_ty  = mkTyConApp vect_tc arg_tys
+    wild    = mkWildId val_ty
     vect_dcs = tyConDataCons vect_tc
     [arr_dc] = tyConDataCons arr_tc
 
