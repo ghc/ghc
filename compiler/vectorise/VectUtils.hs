@@ -43,7 +43,7 @@ isAnnTypeArg (_, AnnType t) = True
 isAnnTypeArg _              = False
 
 isClosureTyCon :: TyCon -> Bool
-isClosureTyCon tc = tyConUnique tc == closureTyConKey
+isClosureTyCon tc = tyConName tc == closureTyConName
 
 splitClosureTy :: Type -> (Type, Type)
 splitClosureTy ty
@@ -52,6 +52,17 @@ splitClosureTy ty
   = (arg_ty, res_ty)
 
   | otherwise = pprPanic "splitClosureTy" (ppr ty)
+
+isPArrayTyCon :: TyCon -> Bool
+isPArrayTyCon tc = tyConName tc == parrayTyConName
+
+splitPArrayTy :: Type -> Type
+splitPArrayTy ty
+  | Just (tc, [arg_ty]) <- splitTyConApp_maybe ty
+  , isPArrayTyCon tc
+  = arg_ty
+
+  | otherwise = pprPanic "splitPArrayTy" (ppr ty)
 
 mkPADictType :: Type -> VM Type
 mkPADictType ty
@@ -118,7 +129,9 @@ paMethod method ty
       return $ mkApps (Var fn) [Type ty, dict]
 
 lengthPA :: CoreExpr -> VM CoreExpr
-lengthPA x = liftM (`App` x) (paMethod lengthPAVar (exprType x))
+lengthPA x = liftM (`App` x) (paMethod lengthPAVar ty)
+  where
+    ty = splitPArrayTy (exprType x)
 
 replicatePA :: CoreExpr -> CoreExpr -> VM CoreExpr
 replicatePA len x = liftM (`mkApps` [len,x])
