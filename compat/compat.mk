@@ -19,6 +19,11 @@ ifeq "$(ghc_ge_603)" "YES"
 SRC_HC_OPTS += -ignore-package Cabal
 endif
 
+ifeq "$(ghc_ge_607)" "YES"
+SRC_HC_OPTS += -package directory
+SRC_HC_OPTS += -package pretty
+endif
+
 # And similarly for when booting from .hc files:
 HC_BOOT_LD_OPTS += -L$(GHC_COMPAT_DIR)
 HC_BOOT_LIBS += -lghccompat

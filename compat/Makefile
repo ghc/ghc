@@ -54,11 +54,18 @@ SRC_CC_OPTS += -D__GHC_PATCHLEVEL__=$(GhcPatchLevel)
 EXCLUDED_SRCS += System/FilePath/Internal.hs
 
 ifeq "$(ghc_ge_603)" "YES"
+ifneq "$(ghc_ge_607)" "YES"
 # GHC 6.3+ has Cabal, but we're replacing it:
 SRC_HC_OPTS += -ignore-package Cabal
 
 # only GHC 6.3+ has -ignore-package
 SRC_HC_OPTS += -ignore-package filepath
+endif
+endif
+
+ifeq "$(ghc_ge_607)" "YES"
+SRC_HC_OPTS += -package directory
+SRC_HC_OPTS += -package pretty
 endif
 
 # Some explicit dependencies, needed because ghc -M can't discover the
