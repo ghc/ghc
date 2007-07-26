@@ -10,37 +10,25 @@ Foreign function interface (FFI)
   Addendum 1.0, whose definition is available from <ulink url="http://haskell.org/"><literal>http://haskell.org/</literal></ulink>.</para>
 
   <para>To enable FFI support in GHC, give the <option>-fffi</option><indexterm><primary><option>-fffi</option></primary>
-    </indexterm>flag, or
+    </indexterm> flag, or
 the <option>-fglasgow-exts</option><indexterm><primary><option>-fglasgow-exts</option></primary>
     </indexterm> flag which implies <option>-fffi</option>
 .</para>
 
-  <para>The FFI support in GHC diverges from the Addendum in the following ways:</para>
-
-  <itemizedlist>
-    <listitem>
-      <para>Syntactic forms and library functions proposed in earlier versions
-      of the FFI are still supported for backwards compatibility.</para>
-    </listitem>
-
-    <listitem>
-      <para>GHC implements a number of GHC-specific extensions to the FFI
-      Addendum.  These extensions are described in <xref linkend="ffi-ghcexts" />, but please note that programs using
-      these features are not portable.  Hence, these features should be
-      avoided where possible.</para>
-    </listitem>
-  </itemizedlist>
+  <para>GHC implements a number of GHC-specific extensions to the FFI
+    Addendum.  These extensions are described in <xref linkend="ffi-ghcexts" />, but please note that programs using
+    these features are not portable.  Hence, these features should be
+    avoided where possible.</para>
 
   <para>The FFI libraries are documented in the accompanying library
-  documentation; see for example the <literal>Foreign</literal>
-  module.</para>
+  documentation; see for example the
+    <ulink url="../libraries/base/Control-Concurrent.html"><literal>Foreign</literal></ulink> module.</para>
 
   <sect1 id="ffi-ghcexts">
     <title>GHC extensions to the FFI Addendum</title>
 
     <para>The FFI features that are described in this section are specific to
-    GHC.  Avoid them where possible to not compromise the portability of the
-    resulting code.</para>
+    GHC.  Your code will not be portable to other compilers if you use them.</para>
 
     <sect2>
       <title>Unboxed types</title>
@@ -78,7 +66,6 @@ OK:
 </programlisting>
 </para>
       </sect2>
-
   </sect1>
 
   <sect1 id="ffi-ghc">
@@ -137,6 +124,13 @@ extern HsInt foo(HsInt a0);</programlisting>
 	<option>-stubdir</option> option; see <xref linkend="options-output"
 	  />.</para>
 
+      <para>When linking the program, remember to include
+        <filename>M_stub.o</filename> in the final link command line, or
+        you'll get link errors for the missing function(s) (this isn't
+        necessary when building your program with <literal>ghc
+        &ndash;&ndash;make</literal>, as GHC will automatically link in the
+        correct bits).</para>
+
       <sect3 id="using-own-main"> 
 	<title>Using your own <literal>main()</literal></title>
 
@@ -188,10 +182,10 @@ int main(int argc, char *argv[])
 	<para>The call to <literal>hs_init()</literal>
 	initializes GHC's runtime system.  Do NOT try to invoke any
 	Haskell functions before calling
-	<literal>hs_init()</literal>: strange things will
+	<literal>hs_init()</literal>: bad things will
 	undoubtedly happen.</para>
 
-	<para>We pass <literal>argc</literal> and
+	<para>We pass references to <literal>argc</literal> and
 	<literal>argv</literal> to <literal>hs_init()</literal>
 	so that it can separate out any arguments for the RTS
 	(i.e. those arguments between
@@ -251,10 +245,8 @@ int main(int argc, char *argv[])
       </informaltable>
 
 	<para>After we've finished invoking our Haskell functions, we
-	can call <literal>hs_exit()</literal>, which
-	terminates the RTS.  It runs any outstanding finalizers and
-	generates any profiling or stats output that might have been
-	requested.</para>
+	can call <literal>hs_exit()</literal>, which terminates the
+	RTS.</para>
 
 	<para>There can be multiple calls to
 	<literal>hs_init()</literal>, but each one should be matched
@@ -273,23 +265,87 @@ int main(int argc, char *argv[])
 	to the <literal>Main</literal> Haskell module.</para>
       </sect3>
 
-      <sect3 id="foreign-export-dynamic-ghc">
-	<title>Using <literal>foreign import ccall "wrapper"</literal> with GHC</title>
+      <sect3 id="ffi-library">
+        <title>Making a Haskell library that can be called from foreign
+          code</title>
 
-	<indexterm><primary><literal>foreign import
-	ccall "wrapper"</literal></primary><secondary>with GHC</secondary>
-	</indexterm>
+        <para>The scenario here is much like in <xref linkend="using-own-main"
+            />, except that the aim is not to link a complete program, but to
+          make a library from Haskell code that can be deployed in the same
+          way that you would deploy a library of C code.</para>
 
-	<para>When <literal>foreign import ccall "wrapper"</literal> is used
-        in a Haskell module, The C stub file <filename>M_stub.c</filename>
-        generated by GHC contains small helper functions used by the code
-        generated for the imported wrapper, so it must be linked in to the
-        final program.  When linking the program, remember to include
-        <filename>M_stub.o</filename> in the final link command line, or
-        you'll get link errors for the missing function(s) (this isn't
-        necessary when building your program with <literal>ghc
-        &ndash;&ndash;make</literal>, as GHC will automatically link in the
-        correct bits).</para>
+        <para>The main requirement here is that the runtime needs to be
+          initialized before any Haskell code can be called, so your library
+          should provide initialisation and deinitialisation entry points,
+          implemented in C or C++.  For example:</para>
+
+<programlisting>
+ HsBool mylib_init(void){
+   int argc = ...
+   char *argv[] = ...
+
+   // Initialize Haskell runtime
+   hs_init(&amp;argc, &amp;argv);
+
+   // Tell Haskell about all root modules
+   hs_add_root(__stginit_Foo);
+
+   // do any other initialization here and
+   // return false if there was a problem
+   return HS_BOOL_TRUE;
+ }
+
+ void mylib_end(void){
+   hs_exit();
+ }
+</programlisting>
+
+        <para>The intialisation routine, <literal>mylib_init</literal>, calls
+          <literal>hs_init()</literal> and <literal>hs_add_root()</literal> as
+          normal to initialise the Haskell runtime, and the corresponding
+          deinitialisation funtion <literal>mylib_end()</literal> calls
+          <literal>hs_exit()</literal> to shut down the runtime.</para>
+      </sect3>
+
+      <sect3 id="hs-exit">
+        <title>On the use of <literal>hs_exit()</literal></title>
+
+        <para><literal>hs_exit()</literal> normally causes the termination of
+          any running Haskell threads in the system, and when
+          <literal>hs_exit()</literal> returns, there will be no more Haskell
+          threads running.  The runtime will then shut down the system in an
+          orderly way, generating profiling
+          output and statistics if necessary, and freeing all the memory it
+          owns.</para>
+
+        <para>It isn't always possible to terminate a Haskell thread forcibly:
+          for example, the thread might be currently executing a foreign call,
+          and we have no way to force the foreign call to complete.  What's
+          more, the runtime must
+          assume that in the worst case the Haskell code and runtime are about
+          to be removed from memory (e.g. if this is a <link linkend="win32-dlls">Windows DLL</link>,
+          <literal>hs_exit()</literal> is normally called before unloading the
+          DLL).  So <literal>hs_exit()</literal> <emphasis>must</emphasis> wait
+          until all outstanding foreign calls return before it can return
+          itself.</para>
+
+        <para>The upshot of this is that if you have Haskell threads that are
+          blocked in foreign calls, then <literal>hs_exit()</literal> may hang
+          (or possibly busy-wait) until the calls return.  Therefore it's a
+          good idea to make sure you don't have any such threads in the system
+          when calling <literal>hs_exit()</literal>.  This includes any threads
+          doing I/O, because I/O may (or may not, depending on the
+          type of I/O and the platform) be implemented using blocking foreign
+          calls.</para>
+
+        <para>The GHC runtime treats program exit as a special case, to avoid
+          the need to wait for blocked threads when a standalone
+          executable exits.  Since the program and all its threads are about to
+          terminate at the same time that the code is removed from memory, it
+          isn't necessary to ensure that the threads have exited first.
+          (Unofficially, if you want to use this fast and loose version of
+          <literal>hs_exit()</literal>, then call
+          <literal>shutdownHaskellAndExit()</literal> instead).</para> 
       </sect3>
     </sect2>
     
@@ -299,7 +355,7 @@ int main(int argc, char *argv[])
       <indexterm><primary>C calls, function headers</primary></indexterm>
 
       <para>When generating C (using the <option>-fvia-C</option>
-      directive), one can assist the C compiler in detecting type
+      flag), one can assist the C compiler in detecting type
       errors by using the <option>-&num;include</option> directive
       (<xref linkend="options-C-compiler"/>) to provide
       <filename>.h</filename> files containing function
@@ -336,10 +392,10 @@ the module being compiled, you should supply all the <option>-&num;include</opti
 that you supplied when compiling the imported module.  If the imported module comes
 from another package, you won't necessarily know what the appropriate 
 <option>-&num;include</option> options are; but they should be in the package 
-configuration, which GHC knows about.  So if you are building a package, remember
-to put all those <option>-&num;include</option> options into the package configuration.
-See the <literal>c_includes</literal> field in <xref linkend="package-management"/>.
-</para>
+configuration, which GHC knows about.  So if you are building a package using
+        Cabal, remember to put all those include files in the package
+        description (see the <literal>includes</literal> field in the Cabal
+        documentation).</para>
 
 <para>
 It is also possible, according the FFI specification, to put the 
