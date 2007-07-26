@@ -15,13 +15,13 @@ import Type
 import TypeRep
 import Coercion
 import FamInstEnv        ( FamInst, mkLocalFamInst )
-import InstEnv           ( Instance )
+import InstEnv           ( Instance, mkLocalInstance, instanceDFunId )
 import OccName
 import MkId
-import BasicTypes        ( StrictnessMark(..), boolToRecFlag )
+import BasicTypes        ( StrictnessMark(..), OverlapFlag(..), boolToRecFlag )
 import Var               ( Var )
 import Id                ( mkWildId )
-import Name              ( Name )
+import Name              ( Name, getOccName )
 import NameEnv
 import TysWiredIn        ( intTy, intDataCon )
 import TysPrim           ( intPrimTy )
@@ -73,6 +73,12 @@ vectType ty = pprPanic "vectType:" (ppr ty)
 -- Type definitions
 
 type TyConGroup = ([TyCon], UniqSet TyCon)
+
+data PAInstance = PAInstance {
+                    painstInstance  :: Instance
+                  , painstVectTyCon :: TyCon
+                  , painstArrTyCon  :: TyCon
+                  }
 
 vectTypeEnv :: TypeEnv -> VM (TypeEnv, [FamInst], [Instance])
 vectTypeEnv env
@@ -255,8 +261,30 @@ buildPArrayDataCon orig_name vect_tc repr_tc
     types = [ty | dc <- tyConDataCons vect_tc
                 , ty <- dataConRepArgTys dc]
 
-buildPADict :: Var -> TyCon -> TyCon -> VM [(Var, CoreExpr)]
-buildPADict var vect_tc arr_tc
+mkPAInstance :: TyCon -> TyCon -> VM PAInstance
+mkPAInstance vect_tc arr_tc
+  = do
+      pa <- builtin paClass
+      let inst_ty = mkForAllTys tvs
+                  . (mkFunTys $ mkPredTys [ClassP pa [ty] | ty <- arg_tys])
+                  $ mkPredTy (ClassP pa [mkTyConApp vect_tc arg_tys])
+
+      dfun <- newExportedVar (mkPADFunOcc $ getOccName vect_tc) inst_ty
+
+      return $ PAInstance {
+                 painstInstance  = mkLocalInstance dfun NoOverlap
+               , painstVectTyCon = vect_tc
+               , painstArrTyCon  = arr_tc
+               }
+  where
+    tvs = tyConTyVars arr_tc
+    arg_tys = mkTyVarTys tvs
+
+buildPADict :: PAInstance -> VM [(Var, CoreExpr)]
+buildPADict (PAInstance {
+               painstInstance  = inst
+             , painstVectTyCon = vect_tc
+             , painstArrTyCon  = arr_tc })
   = localV . abstractOverTyVars (tyConTyVars arr_tc) $ \abstract ->
     do
       meth_binds <- mapM (mk_method abstract) paMethods
@@ -265,7 +293,7 @@ buildPADict var vect_tc arr_tc
 
       pa_dc <- builtin paDictDataCon
       let dict = mkConApp pa_dc (Type (mkTyConApp vect_tc arg_tys) : meth_exprs)
-      return $ (var, dict) : meth_binds
+      return $ (instanceDFunId inst, dict) : meth_binds
   where
     tvs = tyConTyVars arr_tc
     arg_tys = mkTyVarTys tvs
