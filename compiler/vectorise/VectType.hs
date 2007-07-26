@@ -299,7 +299,7 @@ buildPADict (PAInstance {
       pa_dc <- builtin paDictDataCon
       let dict = mkConApp pa_dc (Type (mkTyConApp vect_tc arg_tys) : meth_exprs)
           body = Let (Rec meth_binds) dict
-      return [(instanceDFunId inst, abstract body)]
+      return [(instanceDFunId inst, mkInlineMe $ abstract body)]
   where
     tvs = tyConTyVars arr_tc
     arg_tys = mkTyVarTys tvs
