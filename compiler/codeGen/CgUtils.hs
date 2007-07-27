@@ -22,12 +22,17 @@ module CgUtils (
         callerSaveVolatileRegs, get_GlobalReg_addr,
 
 	cmmAndWord, cmmOrWord, cmmNegate, cmmEqWord, cmmNeWord,
+        cmmUGtWord,
 	cmmOffsetExprW, cmmOffsetExprB,
 	cmmRegOffW, cmmRegOffB,
 	cmmLabelOffW, cmmLabelOffB,
 	cmmOffsetW, cmmOffsetB,
 	cmmOffsetLitW, cmmOffsetLitB,
 	cmmLoadIndexW,
+        cmmConstrTag, cmmConstrTag1,
+
+        tagForCon, tagCons, isSmallFamily,
+        cmmUntag, cmmIsTagged, cmmGetTag,
 
 	addToMem, addToMemE,
 	mkWordCLit,
@@ -43,6 +48,7 @@ module CgUtils (
 
 import CgMonad
 import TyCon
+import DataCon
 import Id
 import Constants
 import SMRep
@@ -61,7 +67,9 @@ import Util
 import DynFlags
 import FastString
 import PackageConfig
+#ifdef DEBUG
 import Outputable
+#endif
 
 import Data.Char
 import Data.Bits
@@ -164,6 +172,9 @@ cmmEqWord  e1 e2 = CmmMachOp mo_wordEq  [e1, e2]
 cmmULtWord e1 e2 = CmmMachOp mo_wordULt [e1, e2]
 cmmUGeWord e1 e2 = CmmMachOp mo_wordUGe [e1, e2]
 cmmUGtWord e1 e2 = CmmMachOp mo_wordUGt [e1, e2]
+--cmmShlWord e1 e2 = CmmMachOp mo_wordShl [e1, e2]
+--cmmUShrWord e1 e2 = CmmMachOp mo_wordUShr [e1, e2]
+cmmSubWord e1 e2 = CmmMachOp mo_wordSub [e1, e2]
 
 cmmNegate :: CmmExpr -> CmmExpr
 cmmNegate (CmmLit (CmmInt n rep)) = CmmLit (CmmInt (-n) rep)
@@ -171,6 +182,57 @@ cmmNegate e			  = CmmMachOp (MO_S_Neg (cmmExprRep e)) [e]
 
 blankWord :: CmmStatic
 blankWord = CmmUninitialised wORD_SIZE
+
+-- Tagging --
+-- Tag bits mask
+--cmmTagBits = CmmLit (mkIntCLit tAG_BITS)
+cmmTagMask = CmmLit (mkIntCLit tAG_MASK)
+cmmPointerMask = CmmLit (mkIntCLit (complement tAG_MASK))
+
+-- Used to untag a possibly tagged pointer
+-- A static label need not be untagged
+cmmUntag e@(CmmLit (CmmLabel _)) = e
+-- Default case
+cmmUntag e = (e `cmmAndWord` cmmPointerMask)
+
+cmmGetTag e = (e `cmmAndWord` cmmTagMask)
+
+-- Test if a closure pointer is untagged
+cmmIsTagged e = (e `cmmAndWord` cmmTagMask)
+                 `cmmNeWord` CmmLit zeroCLit
+
+cmmConstrTag e = (e `cmmAndWord` cmmTagMask) `cmmSubWord` (CmmLit (mkIntCLit 1))
+-- Get constructor tag, but one based.
+cmmConstrTag1 e = e `cmmAndWord` cmmTagMask
+
+{-
+   The family size of a data type (the number of constructors)
+   can be either:
+    * small, if the family size < 2**tag_bits
+    * big, otherwise.
+
+   Small families can have the constructor tag in the tag
+   bits.
+   Big families only use the tag value 1 to represent
+   evaluatedness.
+-}
+isSmallFamily fam_size = fam_size <= mAX_PTR_TAG
+
+tagForCon con = tag
+    where
+    con_tag           = dataConTagZ con
+    fam_size   = tyConFamilySize (dataConTyCon con)
+    tag | isSmallFamily fam_size = con_tag + 1
+        | otherwise              = 1
+
+--Tag an expression, to do: refactor, this appears in some other module.
+tagCons con expr = cmmOffsetB expr (tagForCon con)
+
+-- Copied from CgInfoTbls.hs
+-- We keep the *zero-indexed* tag in the srt_len field of the info
+-- table of a data constructor.
+dataConTagZ :: DataCon -> ConTagZ
+dataConTagZ con = dataConTag con - fIRST_TAG
 
 -----------------------
 --	Making literals

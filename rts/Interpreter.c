@@ -224,7 +224,7 @@ interpretBCO (Capability* cap)
     //      	+---------------+
     //       
     else if (Sp[0] == (W_)&stg_apply_interp_info) {
-	obj = (StgClosure *)Sp[1];
+	obj = UNTAG_CLOSURE((StgClosure *)Sp[1]);
 	Sp += 2;
 	goto run_BCO_fun;
     }
@@ -244,6 +244,7 @@ eval:
     obj = (StgClosure*)Sp[0]; Sp++;
 
 eval_obj:
+    obj = UNTAG_CLOSURE(obj);
     INTERP_TICK(it_total_evals);
 
     IF_DEBUG(interpreter,
@@ -327,7 +328,7 @@ eval_obj:
 	    Sp[i] = (W_)ap->payload[i];
 	}
 
-	obj = (StgClosure*)ap->fun;
+	obj = UNTAG_CLOSURE((StgClosure*)ap->fun);
 	ASSERT(get_itbl(obj)->type == BCO);
 	goto run_BCO_fun;
     }
@@ -531,7 +532,7 @@ do_apply:
 	    pap = (StgPAP *)obj;
 
 	    // we only cope with PAPs whose function is a BCO
-	    if (get_itbl(pap->fun)->type != BCO) {
+	    if (get_itbl(UNTAG_CLOSURE(pap->fun))->type != BCO) {
 		goto defer_apply_to_sched;
 	    }
 
@@ -556,7 +557,7 @@ do_apply:
 		for (i = 0; i < pap->n_args; i++) {
 		    Sp[i] = (W_)pap->payload[i];
 		}
-		obj = pap->fun;
+		obj = UNTAG_CLOSURE(pap->fun);
 		goto run_BCO_fun;
 	    } 
 	    else if (arity == n) {
@@ -564,7 +565,7 @@ do_apply:
 		for (i = 0; i < pap->n_args; i++) {
 		    Sp[i] = (W_)pap->payload[i];
 		}
-		obj = pap->fun;
+		obj = UNTAG_CLOSURE(pap->fun);
 		goto run_BCO_fun;
 	    } 
 	    else /* arity > n */ {

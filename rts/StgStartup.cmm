@@ -142,6 +142,7 @@ stg_threadFinished
 
     forceIO takes care of this, performing the IO action and entering the
     results that comes back.
+
     ------------------------------------------------------------------------- */
 
 INFO_TABLE_RET( stg_forceIO, RET_SMALL)

@@ -2216,6 +2216,18 @@ condIntCode cond (CmmLoad x pk) (CmmLit lit) | not (is64BitLit lit) = do
     --
     return (CondCode False cond code)
 
+-- anything vs zero, using a mask
+-- TODO: Add some sanity checking!!!!
+condIntCode cond (CmmMachOp (MO_And rep) [x,o2]) (CmmLit (CmmInt 0 pk))
+    | (CmmLit (CmmInt mask pk2)) <- o2
+    = do
+      (x_reg, x_code) <- getSomeReg x
+      let
+         code = x_code `snocOL`
+                TEST pk (OpImm (ImmInteger mask)) (OpReg x_reg)
+      --
+      return (CondCode False cond code)
+
 -- anything vs zero
 condIntCode cond x (CmmLit (CmmInt 0 pk)) = do
     (x_reg, x_code) <- getSomeReg x

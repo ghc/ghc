@@ -1031,6 +1031,7 @@ GarbageCollect ( rtsBool force_major_gc )
    closure if it is alive, or NULL otherwise.
 
    NOTE: Use it before compaction only!
+         It untags and (if needed) retags pointers to closures.
    -------------------------------------------------------------------------- */
 
 
@@ -1039,8 +1040,12 @@ isAlive(StgClosure *p)
 {
   const StgInfoTable *info;
   bdescr *bd;
+  StgWord tag;
 
   while (1) {
+    /* The tag and the pointer are split, to be merged later when needed. */
+    tag = GET_CLOSURE_TAG(p);
+    p = UNTAG_CLOSURE(p);
 
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl(p);
@@ -1052,18 +1057,18 @@ isAlive(StgClosure *p)
     // for static closures with an empty SRT or CONSTR_STATIC_NOCAFs.
     //
     if (!HEAP_ALLOCED(p)) {
-	return p;
+	return TAG_CLOSURE(tag,p);
     }
 
     // ignore closures in generations that we're not collecting. 
     bd = Bdescr((P_)p);
     if (bd->gen_no > N) {
-	return p;
+	return TAG_CLOSURE(tag,p);
     }
 
     // if it's a pointer into to-space, then we're done
     if (bd->flags & BF_EVACUATED) {
-	return p;
+	return TAG_CLOSURE(tag,p);
     }
 
     // large objects use the evacuated flag
@@ -1073,7 +1078,7 @@ isAlive(StgClosure *p)
 
     // check the mark bit for compacted steps
     if ((bd->flags & BF_COMPACTED) && is_marked((P_)p,bd)) {
-	return p;
+	return TAG_CLOSURE(tag,p);
     }
 
     switch (info->type) {

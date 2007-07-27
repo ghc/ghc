@@ -1869,7 +1869,7 @@ unpackClosurezh_fast
 // TODO: Consider the absence of ptrs or nonptrs as a special case ?
 
     W_ info, ptrs, nptrs, p, ptrs_arr, nptrs_arr;
-    info  = %GET_STD_INFO(R1);
+    info  = %GET_STD_INFO(UNTAG(R1));
 
     // Some closures have non-standard layout, so we omit those here.
     W_ type;
@@ -1899,6 +1899,9 @@ out:
 
     ALLOC_PRIM (ptrs_arr_sz + nptrs_arr_sz, R1_PTR, unpackClosurezh_fast);
 
+    W_ clos;
+    clos = UNTAG(R1);
+
     ptrs_arr  = Hp - nptrs_arr_sz - ptrs_arr_sz + WDS(1);
     nptrs_arr = Hp - nptrs_arr_sz + WDS(1);
 
@@ -1907,7 +1910,7 @@ out:
     p = 0;
 for:
     if(p < ptrs) {
-    	 W_[ptrs_arr + SIZEOF_StgMutArrPtrs + WDS(p)] = StgClosure_payload(R1,p);
+    	 W_[ptrs_arr + SIZEOF_StgMutArrPtrs + WDS(p)] = StgClosure_payload(clos,p);
 	 p = p + 1;
 	 goto for;
     }
@@ -1917,7 +1920,7 @@ for:
     p = 0;
 for2:
     if(p < nptrs) {
-    	 W_[BYTE_ARR_CTS(nptrs_arr) + WDS(p)] = StgClosure_payload(R1, p+ptrs);
+    	 W_[BYTE_ARR_CTS(nptrs_arr) + WDS(p)] = StgClosure_payload(clos, p+ptrs);
     	 p = p + 1;
 	 goto for2;
     }

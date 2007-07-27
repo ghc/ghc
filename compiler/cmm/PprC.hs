@@ -322,8 +322,9 @@ pprExpr e = case e of
 	-> char '*' <> pprAsPtrReg r
 
     CmmLoad (CmmRegOff r off) rep
-	| isPtrReg r && rep == wordRep 
+	| isPtrReg r && rep == wordRep && (off `rem` wORD_SIZE == 0)
 	-- ToDo: check that the offset is a word multiple?
+        --       (For tagging to work, I had to avoid unaligned loads. --ARY)
 	-> pprAsPtrReg r <> brackets (ppr (off `shiftR` wordShift))
 
     CmmLoad expr rep ->

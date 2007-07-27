@@ -177,7 +177,14 @@ cgRhsClosure bndr cc bndr_info fvs upd_flag args body = do
 	-- BUILD ITS INFO TABLE AND CODE
   ; forkClosureBody (do
 	{	-- Bind the fvs
-	  let bind_fv (info, offset) 
+	  let 
+              -- A function closure pointer may be tagged, so we
+              -- must take it into account when accessing the free variables.
+              mbtag       = tagForArity (length args)
+              bind_fv (info, offset)
+                | Just tag <- mbtag
+                = bindNewToUntagNode (cgIdInfoId info) offset (cgIdInfoLF info) tag
+                | otherwise
 		= bindNewToNode (cgIdInfoId info) offset (cgIdInfoLF info)
 	; mapCs bind_fv bind_details
 
@@ -236,7 +243,7 @@ NB: Thunks cannot have a primitive type!
 closureCodeBody binder_info cl_info cc [{- No args i.e. thunk -}] body = do
   { body_absC <- getCgStmts $ do
 	{ tickyEnterThunk cl_info
-	; ldvEnter (CmmReg nodeReg)  -- NB: Node always points when profiling
+	; ldvEnterClosure cl_info  -- NB: Node always points when profiling
 	; thunkWrapper cl_info $ do
 		-- We only enter cc after setting up update so
 		-- that cc of enclosing scope will be recorded
@@ -400,8 +407,19 @@ funWrapper :: ClosureInfo 	-- Closure whose code body this is
 funWrapper closure_info arg_regs reg_save_code fun_body = do
   { let node_points = nodeMustPointToIt (closureLFInfo closure_info)
 
+  {-
+        -- Debugging: check that R1 has the correct tag
+  ; let tag = funTag closure_info
+  ; whenC (tag /= 0 && node_points) $ do
+        l <- newLabelC
+        stmtC (CmmCondBranch (CmmMachOp mo_wordEq [cmmGetTag (CmmReg nodeReg),
+                                                   CmmLit (mkIntCLit tag)]) l)
+        stmtC (CmmStore (CmmLit (mkWordCLit 0)) (CmmLit (mkWordCLit 0)))
+        labelC l
+  -}
+
    	-- Enter for Ldv profiling
-  ; whenC node_points (ldvEnter (CmmReg nodeReg))
+  ; whenC node_points (ldvEnterClosure closure_info)
 
 	-- GranSim yeild poin
   ; granYield arg_regs node_points

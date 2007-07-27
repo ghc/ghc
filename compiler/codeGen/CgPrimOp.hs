@@ -183,8 +183,9 @@ emitPrimOp [res] AddrToHValueOp [arg] live
    = stmtC (CmmAssign (CmmLocal res) arg)
 
 --  #define dataToTagzh(r,a)  r=(GET_TAG(((StgClosure *)a)->header.info))
+--  Note: argument may be tagged!
 emitPrimOp [res] DataToTagOp [arg] live
-   = stmtC (CmmAssign (CmmLocal res) (getConstrTag arg))
+   = stmtC (CmmAssign (CmmLocal res) (getConstrTag (cmmUntag arg)))
 
 {- Freezing arrays-of-ptrs requires changing an info table, for the
    benefit of the generational collector.  It needs to scavenge mutable

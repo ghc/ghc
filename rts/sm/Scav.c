@@ -200,7 +200,7 @@ scavenge_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
     StgWord bitmap;
     StgFunInfoTable *fun_info;
     
-    fun_info = get_fun_itbl(fun);
+    fun_info = get_fun_itbl(UNTAG_CLOSURE(fun));
     ASSERT(fun_info->i.type != PAP);
     p = (StgPtr)payload;
 
@@ -1720,7 +1720,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	StgFunInfoTable *fun_info;
 
 	ret_fun->fun = evacuate(ret_fun->fun);
- 	fun_info = get_fun_itbl(ret_fun->fun);
+ 	fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
 	p = scavenge_arg_block(fun_info, ret_fun->payload);
 	goto follow_srt;
     }

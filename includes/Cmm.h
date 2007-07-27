@@ -91,11 +91,33 @@
 
 #if SIZEOF_VOID_P == 4
 #define W_ bits32
+/* Maybe it's better to include MachDeps.h */
+#define TAG_BITS                2
 #elif SIZEOF_VOID_P == 8
 #define W_ bits64
+/* Maybe it's better to include MachDeps.h */
+#define TAG_BITS                3
 #else
 #error Unknown word size
 #endif
+
+/*
+ * The RTS must UNTAG a pointer before dereferencing it.
+ * The use of UNTAG follows the following rules of thumb:
+ *
+ * - Any pointer might be tagged.
+ * - Except the pointers that are passed in R1 to RTS functions.
+ * - R1 is also untagged when entering constructor code.
+ * 
+ * TODO:
+ *
+ * - Remove redundancies of tagging and untagging in code generation.
+ * - Optimize getTag or dataToTag# ?
+ *
+ */
+#define TAG_MASK ((1 << TAG_BITS) - 1)
+#define UNTAG(p) (p & ~TAG_MASK)
+#define GETTAG(p) (p & TAG_MASK)
 
 #if SIZEOF_INT == 4
 #define CInt bits32
@@ -228,11 +250,23 @@
 
    ToDo: range should end in N_CLOSURE_TYPES-1, not N_CLOSURE_TYPES,
    but switch doesn't allow us to use exprs there yet.
+
+   If R1 points to a tagged object it points either to
+   * A constructor.
+   * A function with arity <= TAG_MASK.
+   In both cases the right thing to do is to return.
+   Note: it is rather lucky that we can use the tag bits to do this
+         for both objects. Maybe it points to a brittle design?
+
+   Indirections can contain tagged pointers, so their tag is checked.
    -------------------------------------------------------------------------- */
 
 #define ENTER()						\
  again:							\
   W_ info;						\
+  if (GETTAG(R1) != 0) {                                \
+      jump %ENTRY_CODE(Sp(0));				\
+  }                                                     \
   info = %INFO_PTR(R1);					\
   switch [INVALID_OBJECT .. N_CLOSURE_TYPES]		\
          (TO_W_( %INFO_TYPE(%STD_INFO(info)) )) {	\
@@ -247,14 +281,13 @@
       goto again;					\
    }							\
   case							\
-    BCO,						\
     FUN,						\
     FUN_1_0,						\
     FUN_0_1,						\
     FUN_2_0,						\
     FUN_1_1,						\
-    FUN_0_2,						\
-    FUN_STATIC,						\
+    FUN_STATIC,                                         \
+    BCO,						\
     PAP:						\
    {							\
       jump %ENTRY_CODE(Sp(0));				\
@@ -264,6 +297,10 @@
       jump %ENTRY_CODE(info);				\
    }							\
   }
+
+// The FUN cases almost never happen: a pointer to a non-static FUN
+// should always be tagged.  This unfortunately isn't true for the
+// interpreter right now, which leaves untagged FUNs on the stack.
 
 /* -----------------------------------------------------------------------------
    Constants.
@@ -375,7 +412,7 @@
      (TO_W_(%INFO_TYPE(%STD_INFO(p))) != INVALID_OBJECT) &&	\
      (TO_W_(%INFO_TYPE(%STD_INFO(p))) <  N_CLOSURE_TYPES))
 
-#define LOOKS_LIKE_CLOSURE_PTR(p) (LOOKS_LIKE_INFO_PTR(GET_INFO(p)))
+#define LOOKS_LIKE_CLOSURE_PTR(p) (LOOKS_LIKE_INFO_PTR(GET_INFO(UNTAG(p))))
 
 /*
  * The layout of the StgFunInfoExtra part of an info table changes

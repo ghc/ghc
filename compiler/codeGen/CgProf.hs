@@ -20,7 +20,7 @@ module CgProf (
 	emitSetCCC, emitCCS,
 
 	-- Lag/drag/void stuff
-	ldvEnter, ldvRecordCreate
+	ldvEnter, ldvEnterClosure, ldvRecordCreate
   ) where
 
 #include "HsVersions.h"
@@ -242,8 +242,11 @@ enter_cost_centre closure_info ccs body
   where
     enc_ccs    = CmmLit (mkCCostCentreStack ccs)
     re_entrant = closureReEntrant closure_info
-    node_ccs   = costCentreFrom (CmmReg nodeReg)
+    node_ccs   = costCentreFrom (cmmOffsetB (CmmReg nodeReg) (-node_tag))
     is_box     = isBox body
+
+    -- if this is a function, then node will be tagged; we must subract the tag
+    node_tag = funTag closure_info
 
 -- set the current CCS when entering a PAP
 enterCostCentrePAP :: CmmExpr -> Code
@@ -448,9 +451,14 @@ ldvRecordCreate closure = stmtC $ CmmStore (ldvWord closure) dynLdvInit
 -- The closure is not IND or IND_OLDGEN because neither is considered for LDV
 -- profiling.
 --
+ldvEnterClosure :: ClosureInfo -> Code
+ldvEnterClosure closure_info = ldvEnter (cmmOffsetB (CmmReg nodeReg) (-tag))
+  where tag = funTag closure_info
+        -- don't forget to substract node's tag
+  
 ldvEnter :: CmmExpr -> Code
 -- Argument is a closure pointer
-ldvEnter cl_ptr 
+ldvEnter cl_ptr
   =  ifProfiling $
      -- if (era > 0) {
      --    LDVW((c)) = (LDVW((c)) & LDV_CREATE_MASK) |
@@ -458,6 +466,7 @@ ldvEnter cl_ptr
     emitIf (CmmMachOp mo_wordUGt [loadEra, CmmLit zeroCLit])
 	   (stmtC (CmmStore ldv_wd new_ldv_wd))
   where
+        -- don't forget to substract node's tag
     ldv_wd = ldvWord cl_ptr
     new_ldv_wd = cmmOrWord (cmmAndWord (CmmLoad ldv_wd wordRep)
 				       (CmmLit (mkWordCLit lDV_CREATE_MASK)))

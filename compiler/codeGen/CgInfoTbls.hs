@@ -15,6 +15,7 @@ module CgInfoTbls (
 	stdInfoTableSizeB,
 	entryCode, closureInfoPtr,
 	getConstrTag,
+        cmmGetClosureType,
 	infoTable, infoTableClosureType,
 	infoTablePtrs, infoTableNonPtrs,
 	funInfoTable, makeRelativeRefTo
@@ -273,14 +274,24 @@ emitAlgReturnTarget
 
 emitAlgReturnTarget name branches mb_deflt fam_sz
   = do  { blks <- getCgStmts $
-		    emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1)
-		-- NB: tag_expr is zero-based
+                    -- is the constructor tag in the node reg?
+                    if isSmallFamily fam_sz
+                        then do -- yes, node has constr. tag
+                          let tag_expr = cmmConstrTag1 (CmmReg nodeReg)
+                              branches' = [(tag+1,branch)|(tag,branch)<-branches]
+                          emitSwitch tag_expr branches' mb_deflt 1 fam_sz
+                        else do -- no, get tag from info table
+                          let -- Note that ptr _always_ has tag 1
+                              -- when the family size is big enough
+                              untagged_ptr = cmmRegOffB nodeReg (-1)
+                              tag_expr = getConstrTag (untagged_ptr)
+                          emitSwitch tag_expr branches mb_deflt 0 (fam_sz - 1)
 	; lbl <- emitReturnTarget name blks
 	; return (lbl, Nothing) }
 		-- Nothing: the internal branches in the switch don't have
 		-- global labels, so we can't use them at the 'call site'
   where
-    tag_expr = getConstrTag (CmmReg nodeReg)
+    uniq = getUnique name 
 
 --------------------------------
 emitReturnInstr :: Code
@@ -343,6 +354,14 @@ getConstrTag :: CmmExpr -> CmmExpr
 -- (constructors don't need SRTs).
 getConstrTag closure_ptr 
   = CmmMachOp (MO_U_Conv halfWordRep wordRep) [infoTableConstrTag info_table]
+  where
+    info_table = infoTable (closureInfoPtr closure_ptr)
+
+cmmGetClosureType :: CmmExpr -> CmmExpr
+-- Takes a closure pointer, and return the closure type
+-- obtained from the info table
+cmmGetClosureType closure_ptr 
+  = CmmMachOp (MO_U_Conv halfWordRep wordRep) [infoTableClosureType info_table]
   where
     info_table = infoTable (closureInfoPtr closure_ptr)
 

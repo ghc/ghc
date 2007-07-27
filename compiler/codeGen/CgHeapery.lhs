@@ -288,6 +288,9 @@ hpStkCheck cl_info is_fun reg_save_code code
 	= noStmts
 	| otherwise
 	= oneStmt (CmmAssign nodeReg (CmmLit (CmmLabel closure_lbl)))
+        -- Strictly speaking, we should tag node here.  But if
+        -- node doesn't point to the closure, the code for the closure
+        -- cannot depend on the value of R1 anyway, so we're safe.
     closure_lbl = closureLabelFromCI cl_info
 
     full_save_code = node_asst `plusStmts` reg_save_code

@@ -90,8 +90,6 @@ stg_PAP_apply
   // Enter PAP cost centre 
   ENTER_CCS_PAP_CL(pap);
 
-  R1 = StgPAP_fun(pap);
-
   // Reload the stack 
   W_ i;
   W_ p;
@@ -105,14 +103,30 @@ for:
     goto for;
   }
 
+  R1 = StgPAP_fun(pap);
+
+/* DEBUGGING CODE, ensures that arity 1 and 2 functions are entered tagged
+  if (TO_W_(StgFunInfoExtra_arity(%FUN_INFO(%INFO_PTR(UNTAG(R1))))) == 1 ) {
+    if (GETTAG(R1)!=1) {
+	W_[0]=1;
+    }
+  }
+
+  if (TO_W_(StgFunInfoExtra_arity(%FUN_INFO(%INFO_PTR(UNTAG(R1))))) == 2 ) {
+    if (GETTAG(R1)!=2) {
+	W_[0]=1;
+    }
+  }
+*/
+
   // Off we go! 
   TICK_ENT_VIA_NODE();
 
 #ifdef NO_ARG_REGS
-  jump %GET_ENTRY(R1);
+  jump %GET_ENTRY(UNTAG(R1));
 #else
       W_ info;
-      info = %GET_FUN_INFO(R1);
+      info = %GET_FUN_INFO(UNTAG(R1));
       W_ type;
       type = TO_W_(StgFunInfoExtra_fun_type(info));
       if (type == ARG_GEN) {
@@ -167,8 +181,6 @@ INFO_TABLE(stg_AP,/*special layout*/0,0,AP,"AP","AP")
   // Enter PAP cost centre
   ENTER_CCS_PAP_CL(ap);   // ToDo: ENTER_CC_AP_CL 
 
-  R1 = StgAP_fun(ap);
-
   // Reload the stack 
   W_ i;
   W_ p;
@@ -182,14 +194,16 @@ for:
     goto for;
   }
 
+  R1 = StgAP_fun(ap);
+
   // Off we go! 
   TICK_ENT_VIA_NODE();
 
 #ifdef NO_ARG_REGS
-  jump %GET_ENTRY(R1);
+  jump %GET_ENTRY(UNTAG(R1));
 #else
       W_ info;
-      info = %GET_FUN_INFO(R1);
+      info = %GET_FUN_INFO(UNTAG(R1));
       W_ type;
       type = TO_W_(StgFunInfoExtra_fun_type(info));
       if (type == ARG_GEN) {
@@ -246,8 +260,6 @@ INFO_TABLE(stg_AP_STACK,/*special layout*/0,0,AP_STACK,"AP_STACK","AP_STACK")
   // Enter PAP cost centre
   ENTER_CCS_PAP_CL(ap);   // ToDo: ENTER_CC_AP_CL 
 
-  R1 = StgAP_STACK_fun(ap);
-
   // Reload the stack
   W_ i;
   W_ p;
@@ -263,6 +275,8 @@ for:
 
   // Off we go!
   TICK_ENT_VIA_NODE();
+
+  R1 = StgAP_STACK_fun(ap);
 
   ENTER();
 }

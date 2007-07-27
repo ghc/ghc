@@ -177,6 +177,9 @@ exitStablePtrTable(void)
 
 /*
  * get at the real stuff...remove indirections.
+ * It untags pointers before dereferencing and
+ * retags the real stuff with its tag (if there
+ * is any) when returning.
  *
  * ToDo: move to a better home.
  */
@@ -184,16 +187,18 @@ static
 StgClosure*
 removeIndirections(StgClosure* p)
 {
-  StgClosure* q = p;
+  StgWord tag = GET_CLOSURE_TAG(p);
+  StgClosure* q = UNTAG_CLOSURE(p);
 
   while (get_itbl(q)->type == IND ||
          get_itbl(q)->type == IND_STATIC ||
          get_itbl(q)->type == IND_OLDGEN ||
          get_itbl(q)->type == IND_PERM ||
          get_itbl(q)->type == IND_OLDGEN_PERM ) {
-      q = ((StgInd *)q)->indirectee;
+      tag = GET_CLOSURE_TAG(q);
+      q = UNTAG_CLOSURE(((StgInd *)q)->indirectee);
   }
-  return q;
+  return TAG_CLOSURE(tag,q);
 }
 
 static StgWord

@@ -303,7 +303,7 @@ void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
     ((StgInfoTable *)(INFO_PTR_TO_STRUCT(p)))->type < N_CLOSURE_TYPES)
 
 #define LOOKS_LIKE_CLOSURE_PTR(p) \
-   (LOOKS_LIKE_INFO_PTR(((StgClosure *)(p))->header.info))
+  (LOOKS_LIKE_INFO_PTR((UNTAG_CLOSURE((StgClosure *)(p)))->header.info))
 
 /* -----------------------------------------------------------------------------
    Macros for calculating how big a closure will be (used during allocation)

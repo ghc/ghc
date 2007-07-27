@@ -441,6 +441,52 @@ stat_endHeapCensus(void)
    were left unused when the heap-check failed.
    -------------------------------------------------------------------------- */
 
+#ifdef DEBUG
+#define TICK_VAR(arity) \
+  extern StgInt SLOW_CALLS_##arity; \
+  extern StgInt RIGHT_ARITY_##arity; \
+  extern StgInt TAGGED_PTR_##arity;
+
+#define TICK_VAR_INI(arity) \
+  StgInt SLOW_CALLS_##arity = 1; \
+  StgInt RIGHT_ARITY_##arity = 1; \
+  StgInt TAGGED_PTR_##arity = 0;
+
+extern StgInt TOTAL_CALLS;
+
+TICK_VAR(1)
+TICK_VAR(2)
+
+TICK_VAR_INI(1)
+TICK_VAR_INI(2)
+
+StgInt TOTAL_CALLS=1;
+#endif
+
+/* Report the value of a counter */
+#define REPORT(counter) \
+  { \
+    ullong_format_string(counter,temp,rtsTrue/*commas*/); \
+    statsPrintf("  (" #counter ")  : %s\n",temp);				\
+  }
+
+/* Report the value of a counter as a percentage of another counter */
+#define REPORT_PCT(counter,countertot) \
+  statsPrintf("  (" #counter ") %% of (" #countertot ") : %.1f%%\n", \
+	      counter*100.0/countertot)
+
+#define TICK_PRINT(arity) \
+  REPORT(SLOW_CALLS_##arity); \
+  REPORT_PCT(RIGHT_ARITY_##arity,SLOW_CALLS_##arity); \
+  REPORT_PCT(TAGGED_PTR_##arity,RIGHT_ARITY_##arity); \
+  REPORT(RIGHT_ARITY_##arity); \
+  REPORT(TAGGED_PTR_##arity)
+
+#define TICK_PRINT_TOT(arity) \
+  statsPrintf("  (SLOW_CALLS_" #arity ") %% of (TOTAL_CALLS) : %.1f%%\n", \
+	      SLOW_CALLS_##arity * 100.0/TOTAL_CALLS)
+
+
 void
 stat_exit(int alloc)
 {
@@ -557,6 +603,15 @@ stat_exit(int alloc)
 		    TICK_TO_DBL(time - GC_tot_time - 
 				PROF_VAL(RP_tot_time + HC_tot_time) - InitUserTime) * 100 
 		    / TICK_TO_DBL(etime));
+
+            /*
+            TICK_PRINT(1);
+            TICK_PRINT(2);
+	    REPORT(TOTAL_CALLS);
+            TICK_PRINT_TOT(1);
+            TICK_PRINT_TOT(2);
+            */
+
 #if USE_PAPI
 	    /* PAPI reporting, should put somewhere else?
 	     * Note that the cycles are counted _after_ the initialization of the RTS -- AR */

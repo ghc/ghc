@@ -107,6 +107,29 @@ extern void _assertFail (const char *, unsigned int);
 #define FMT_Int64  "lld"
 #endif
 
+/*
+ * Macros for untagging and retagging closure pointers
+ * For more information look at the comments in Cmm.h
+ */
+
+static inline StgWord
+GET_CLOSURE_TAG(StgClosure * p)
+{
+    return (StgWord)p & TAG_MASK;
+}
+
+static inline StgClosure *
+UNTAG_CLOSURE(StgClosure * p)
+{
+    return (StgClosure*)((StgWord)p & ~TAG_MASK);
+}
+
+static inline StgClosure *
+TAG_CLOSURE(StgWord tag,StgClosure * p)
+{
+    return (StgClosure*)((StgWord)p | tag);
+}
+
 /* -----------------------------------------------------------------------------
    Include everything STG-ish
    -------------------------------------------------------------------------- */
@@ -206,6 +229,23 @@ extern void stg_exit(int n) GNU_ATTRIBUTE(__noreturn__);
 
 /* declarations for runtime flags/values */
 #define MAX_RTS_ARGS 32
+
+#ifdef DEBUG
+#define TICK_VAR(arity) \
+  extern StgInt SLOW_CALLS_##arity; \
+  extern StgInt RIGHT_ARITY_##arity; \
+  extern StgInt TAGGED_PTR_##arity;
+
+#define TICK_VAR_INI(arity) \
+  StgInt SLOW_CALLS_##arity = 1; \
+  StgInt RIGHT_ARITY_##arity = 1; \
+  StgInt TAGGED_PTR_##arity = 0;
+
+extern StgInt TOTAL_CALLS;
+
+TICK_VAR(1)
+TICK_VAR(2)
+#endif
 
 /* -----------------------------------------------------------------------------
    Assertions and Debuggery

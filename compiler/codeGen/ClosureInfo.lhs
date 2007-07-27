@@ -23,7 +23,7 @@ module ClosureInfo (
 	mkLFThunk, mkLFReEntrant, mkConLFInfo, mkSelectorLFInfo,
 	mkApLFInfo, mkLFImported, mkLFArgument, mkLFLetNoEscape,
 
-	mkClosureInfo, mkConInfo,
+	mkClosureInfo, mkConInfo, maybeIsLFCon,
 
 	closureSize, closureNonHdrSize,
 	closureGoodStuffSize, closurePtrsSize,
@@ -35,6 +35,7 @@ module ClosureInfo (
 	closureNeedsUpdSpace, closureIsThunk,
 	closureSingleEntry, closureReEntrant, isConstrClosure_maybe,
 	closureFunInfo,	isStandardFormThunk, isKnownFun,
+        funTag, funTagLFInfo, tagForArity,
 
 	enterIdLabel, enterLocalIdLabel, enterReturnPtLabel,
 
@@ -58,6 +59,7 @@ module ClosureInfo (
 #include "../includes/MachDeps.h"
 #include "HsVersions.h"
 
+--import CgUtils
 import StgSyn
 import SMRep
 
@@ -276,6 +278,10 @@ might_be_a_function ty
 \begin{code}
 mkConLFInfo :: DataCon -> LambdaFormInfo
 mkConLFInfo con = LFCon con
+
+maybeIsLFCon :: LambdaFormInfo -> Maybe DataCon
+maybeIsLFCon (LFCon con) = Just con
+maybeIsLFCon _ = Nothing
 
 mkSelectorLFInfo id offset updatable
   = LFThunk NotTopLevel False updatable (SelectorThunk offset) 
@@ -804,10 +810,32 @@ isConstrClosure_maybe (ConInfo { closureCon = data_con }) = Just data_con
 isConstrClosure_maybe _ 				  = Nothing
 
 closureFunInfo :: ClosureInfo -> Maybe (Int, ArgDescr)
-closureFunInfo (ClosureInfo { closureLFInfo = LFReEntrant _ arity _ arg_desc})
-  = Just (arity, arg_desc)
-closureFunInfo _
-  = Nothing
+closureFunInfo (ClosureInfo { closureLFInfo = lf_info }) = lfFunInfo lf_info
+closureFunInfo _ = Nothing
+
+lfFunInfo :: LambdaFormInfo ->  Maybe (Int, ArgDescr)
+lfFunInfo (LFReEntrant _ arity _ arg_desc)  = Just (arity, arg_desc)
+lfFunInfo _                                 = Nothing
+
+funTag :: ClosureInfo -> Int
+funTag (ClosureInfo { closureLFInfo = lf_info }) = funTagLFInfo lf_info
+funTag _ = 0
+
+-- maybe this should do constructor tags too?
+funTagLFInfo :: LambdaFormInfo -> Int
+funTagLFInfo lf
+    -- A function is tagged with its arity
+  | Just (arity,_) <- lfFunInfo lf,
+    Just tag <- tagForArity arity
+  = tag
+
+    -- other closures (and unknown ones) are not tagged
+  | otherwise
+  = 0
+
+tagForArity :: Int -> Maybe Int
+tagForArity i | i <= mAX_PTR_TAG = Just i
+              | otherwise        = Nothing
 \end{code}
 
 \begin{code}

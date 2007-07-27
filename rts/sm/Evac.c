@@ -39,7 +39,7 @@ upd_evacuee(StgClosure *p, StgClosure *dest)
 
 
 STATIC_INLINE StgClosure *
-copy(StgClosure *src, nat size, step *stp)
+copy_tag(StgClosure *src, nat size, step *stp,StgWord tag)
 {
   StgPtr to, from;
   nat i;
@@ -75,6 +75,10 @@ copy(StgClosure *src, nat size, step *stp)
   for (i = 0; i < size; i++) { // unroll for small i
       to[i] = from[i];
   }
+
+  /* retag pointer before updating EVACUATE closure and returning */
+  to = (StgPtr)TAG_CLOSURE(tag,(StgClosure*)to);
+
   upd_evacuee((StgClosure *)from,(StgClosure *)to);
 
 #ifdef PROFILING
@@ -89,7 +93,7 @@ copy(StgClosure *src, nat size, step *stp)
 // that will not be scavenged.  Used for object that have no pointer
 // fields.
 STATIC_INLINE StgClosure *
-copy_noscav(StgClosure *src, nat size, step *stp)
+copy_noscav_tag(StgClosure *src, nat size, step *stp, StgWord tag)
 {
   StgPtr to, from;
   nat i;
@@ -125,6 +129,10 @@ copy_noscav(StgClosure *src, nat size, step *stp)
   for (i = 0; i < size; i++) { // unroll for small i
       to[i] = from[i];
   }
+
+  /* retag pointer before updating EVACUATE closure and returning */
+  to = (StgPtr)TAG_CLOSURE(tag,(StgClosure*)to);
+
   upd_evacuee((StgClosure *)from,(StgClosure *)to);
 
 #ifdef PROFILING
@@ -183,6 +191,19 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
   return (StgClosure *)dest;
 }
 
+
+/* Copy wrappers that don't tag the closure after copying */
+STATIC_INLINE StgClosure *
+copy(StgClosure *src, nat size, step *stp)
+{
+    return copy_tag(src,size,stp,0);
+}
+
+STATIC_INLINE StgClosure *
+copy_noscav(StgClosure *src, nat size, step *stp)
+{
+    return copy_noscav_tag(src,size,stp,0);
+}
 
 /* -----------------------------------------------------------------------------
    Evacuate a large object
@@ -295,13 +316,18 @@ evacuate(StgClosure *q)
   bdescr *bd = NULL;
   step *stp;
   const StgInfoTable *info;
+  StgWord tag;
 
 loop:
+  /* The tag and the pointer are split, to be merged after evacing */
+  tag = GET_CLOSURE_TAG(q);
+  q = UNTAG_CLOSURE(q);
+
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
 
   if (!HEAP_ALLOCED(q)) {
 
-      if (!major_gc) return q;
+      if (!major_gc) return TAG_CLOSURE(tag,q);
 
       info = get_itbl(q);
       switch (info->type) {
@@ -338,14 +364,16 @@ loop:
 	  if (*STATIC_LINK(info,(StgClosure *)q) == NULL) {
 	      *STATIC_LINK(info,(StgClosure *)q) = static_objects;
 	      static_objects = (StgClosure *)q;
+	        /* I am assuming that static_objects pointers are not
+		 * written to other objects, and thus, no need to retag. */
 	  }
-	  return q;
+	  return TAG_CLOSURE(tag,q);
 	  
       case CONSTR_NOCAF_STATIC:
 	  /* no need to put these on the static linked list, they don't need
 	   * to be scavenged.
 	   */
-	  return q;
+	  return TAG_CLOSURE(tag,q);
 	  
       default:
 	  barf("evacuate(static): strange closure type %d", (int)(info->type));
@@ -365,7 +393,7 @@ loop:
 	  failed_to_evac = rtsTrue;
 	  TICK_GC_FAILED_PROMOTION();
       }
-      return q;
+      return TAG_CLOSURE(tag,q);
   }
 
   if ((bd->flags & (BF_LARGE | BF_COMPACTED | BF_EVACUATED)) != 0) {
@@ -380,7 +408,7 @@ loop:
 	      failed_to_evac = rtsTrue;
 	      TICK_GC_FAILED_PROMOTION();
 	  }
-	  return q;
+	  return TAG_CLOSURE(tag,q);
       }
 
       /* evacuate large objects by re-linking them onto a different list.
@@ -393,7 +421,7 @@ loop:
 	      goto loop;
 	  }
 	  evacuate_large((P_)q);
-	  return q;
+	  return TAG_CLOSURE(tag,q);
       }
       
       /* If the object is in a step that we're compacting, then we
@@ -408,7 +436,7 @@ loop:
 	      }
 	      push_mark_stack((P_)q);
 	  }
-	  return q;
+	  return TAG_CLOSURE(tag,q);
       }
   }
       
@@ -429,20 +457,24 @@ loop:
       if (q->header.info == Czh_con_info &&
 	  // unsigned, so always true:  (StgChar)w >= MIN_CHARLIKE &&  
 	  (StgChar)w <= MAX_CHARLIKE) {
-	  return (StgClosure *)CHARLIKE_CLOSURE((StgChar)w);
+	  return TAG_CLOSURE(tag,
+			     (StgClosure *)CHARLIKE_CLOSURE((StgChar)w)
+			     );
       }
       if (q->header.info == Izh_con_info &&
 	  (StgInt)w >= MIN_INTLIKE && (StgInt)w <= MAX_INTLIKE) {
-	  return (StgClosure *)INTLIKE_CLOSURE((StgInt)w);
+	  return TAG_CLOSURE(tag,
+			     (StgClosure *)INTLIKE_CLOSURE((StgInt)w)
+			     );
       }
       // else
-      return copy_noscav(q,sizeofW(StgHeader)+1,stp);
+      return copy_noscav_tag(q,sizeofW(StgHeader)+1,stp,tag);
   }
 
   case FUN_0_1:
   case FUN_1_0:
   case CONSTR_1_0:
-    return copy(q,sizeofW(StgHeader)+1,stp);
+    return copy_tag(q,sizeofW(StgHeader)+1,stp,tag);
 
   case THUNK_1_0:
   case THUNK_0_1:
@@ -462,27 +494,27 @@ loop:
 
   case FUN_1_1:
   case FUN_2_0:
+  case FUN_0_2:
   case CONSTR_1_1:
   case CONSTR_2_0:
-  case FUN_0_2:
-    return copy(q,sizeofW(StgHeader)+2,stp);
+    return copy_tag(q,sizeofW(StgHeader)+2,stp,tag);
 
   case CONSTR_0_2:
-    return copy_noscav(q,sizeofW(StgHeader)+2,stp);
+    return copy_noscav_tag(q,sizeofW(StgHeader)+2,stp,tag);
 
   case THUNK:
     return copy(q,thunk_sizeW_fromITBL(info),stp);
 
   case FUN:
-  case CONSTR:
   case IND_PERM:
   case IND_OLDGEN_PERM:
   case WEAK:
   case STABLE_NAME:
-    return copy(q,sizeW_fromITBL(info),stp);
+  case CONSTR:
+    return copy_tag(q,sizeW_fromITBL(info),stp,tag);
 
   case BCO:
-      return copy(q,bco_sizeW((StgBCO *)q),stp);
+    return copy(q,bco_sizeW((StgBCO *)q),stp);
 
   case CAF_BLACKHOLE:
   case SE_CAF_BLACKHOLE:
@@ -739,7 +771,9 @@ eval_thunk_selector( nat field, StgSelector * p )
     const StgInfoTable *info_ptr;
     StgClosure *selectee;
     
-    selectee = p->selectee;
+    // The selectee might be a constructor closure,
+    // so we untag the pointer.
+    selectee = UNTAG_CLOSURE(p->selectee);
 
     // Save the real info pointer (NOTE: not the same as get_itbl()).
     info_ptr = p->header.info;
@@ -814,7 +848,7 @@ selector_loop:
 	  { 
 	      StgClosure *q;
 	      q = selectee->payload[field];
-	      if (is_to_space(q)) {
+	      if (is_to_space(UNTAG_CLOSURE(q))) {
 		  goto bale_out;
 	      } else {
 		  return q;
@@ -826,7 +860,8 @@ selector_loop:
       case IND_OLDGEN:
       case IND_OLDGEN_PERM:
       case IND_STATIC:
-	  selectee = ((StgInd *)selectee)->indirectee;
+	// Again, we might need to untag a constructor.
+	selectee = UNTAG_CLOSURE( ((StgInd *)selectee)->indirectee );
 	  goto selector_loop;
 
       case EVACUATED:
@@ -880,7 +915,8 @@ selector_loop:
 	      // indirection.
 	      LDV_RECORD_CREATE(selectee);
 
-	      selectee = val;
+	      // Of course this pointer might be tagged
+	      selectee = UNTAG_CLOSURE(val);
 	      goto selector_loop;
 	  }
       }

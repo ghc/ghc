@@ -167,7 +167,7 @@ INFO_TABLE_FUN( stg_BCO, 4, 0, BCO, "BCO", "BCO", ARG_BCO )
 INFO_TABLE(stg_IND,1,0,IND,"IND","IND")
 {
     TICK_ENT_DYN_IND();	/* tick */
-    R1 = StgInd_indirectee(R1);
+    R1 = UNTAG(StgInd_indirectee(R1));
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1);
 }
@@ -183,7 +183,7 @@ INFO_TABLE(stg_IND_direct,1,0,IND,"IND","IND")
 INFO_TABLE(stg_IND_STATIC,1,0,IND_STATIC,"IND_STATIC","IND_STATIC")
 {
     TICK_ENT_STATIC_IND();	/* tick */
-    R1 = StgInd_indirectee(R1);
+    R1 = UNTAG(StgInd_indirectee(R1));
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1);
 }
@@ -220,7 +220,7 @@ INFO_TABLE(stg_IND_PERM,1,0,IND_PERM,"IND_PERM","IND_PERM")
     StgHeader_info(R1) = stg_IND_info;
 #endif /* TICKY_TICKY */
 
-    R1 = StgInd_indirectee(R1);
+    R1 = UNTAG(StgInd_indirectee(R1));
 
 #if defined(TICKY_TICKY) && !defined(PROFILING)
     TICK_ENT_VIA_NODE();
@@ -233,7 +233,7 @@ INFO_TABLE(stg_IND_PERM,1,0,IND_PERM,"IND_PERM","IND_PERM")
 INFO_TABLE(stg_IND_OLDGEN,1,0,IND_OLDGEN,"IND_OLDGEN","IND_OLDGEN")
 {
     TICK_ENT_STATIC_IND();	/* tick */
-    R1 = StgInd_indirectee(R1);
+    R1 = UNTAG(StgInd_indirectee(R1));
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1);
 }
@@ -262,7 +262,7 @@ INFO_TABLE(stg_IND_OLDGEN_PERM,1,0,IND_OLDGEN_PERM,"IND_OLDGEN_PERM","IND_OLDGEN
     StgHeader_info(R1) = stg_IND_OLDGEN_info;
 #endif /* TICKY_TICKY */
 
-    R1 = StgInd_indirectee(R1);
+    R1 = UNTAG(StgInd_indirectee(R1));
 
     TICK_ENT_VIA_NODE();
     jump %GET_ENTRY(R1);

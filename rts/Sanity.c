@@ -80,13 +80,16 @@ checkLargeBitmap( StgPtr payload, StgLargeBitmap* large_bitmap, nat size )
 static void 
 checkClosureShallow( StgClosure* p )
 {
-    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
+    StgClosure *q;
+
+    q = UNTAG_CLOSURE(p);
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
 
     /* Is it a static closure? */
-    if (!HEAP_ALLOCED(p)) {
-	ASSERT(closure_STATIC(p));
+    if (!HEAP_ALLOCED(q)) {
+	ASSERT(closure_STATIC(q));
     } else {
-	ASSERT(!closure_STATIC(p));
+	ASSERT(!closure_STATIC(q));
     }
 }
 
@@ -162,7 +165,7 @@ checkStackFrame( StgPtr c )
 	StgRetFun *ret_fun;
 
 	ret_fun = (StgRetFun *)c;
-	fun_info = get_fun_itbl(ret_fun->fun);
+	fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
 	size = ret_fun->size;
 	switch (fun_info->f.fun_type) {
 	case ARG_GEN:
@@ -206,6 +209,7 @@ checkPAP (StgClosure *fun, StgClosure** payload, StgWord n_args)
     StgClosure *p;
     StgFunInfoTable *fun_info;
     
+    fun = UNTAG_CLOSURE(fun);
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(fun));
     fun_info = get_fun_itbl(fun);
     
@@ -241,6 +245,7 @@ checkClosure( StgClosure* p )
 
     ASSERT(LOOKS_LIKE_INFO_PTR(p->header.info));
 
+    p = UNTAG_CLOSURE(p);
     /* Is it a static closure (i.e. in the data segment)? */
     if (!HEAP_ALLOCED(p)) {
 	ASSERT(closure_STATIC(p));
@@ -815,7 +820,7 @@ checkStaticObjects ( StgClosure* static_objects )
     switch (info->type) {
     case IND_STATIC:
       { 
-	StgClosure *indirectee = ((StgIndStatic *)p)->indirectee;
+        StgClosure *indirectee = UNTAG_CLOSURE(((StgIndStatic *)p)->indirectee);
 
 	ASSERT(LOOKS_LIKE_CLOSURE_PTR(indirectee));
 	ASSERT(LOOKS_LIKE_INFO_PTR(indirectee->header.info));

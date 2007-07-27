@@ -88,7 +88,8 @@ cmmCheckMachOp op args
   = return (resultRepOfMachOp op)
 
 isWordOffsetReg (CmmGlobal Sp) = True
-isWordOffsetReg (CmmGlobal Hp) = True
+-- No warnings for unaligned arithmetic, which is used to tag dynamic constructor closures.
+--isWordOffsetReg (CmmGlobal Hp) = True
 isWordOffsetReg _ = False
 
 isOffsetOp (MO_Add _) = True
@@ -98,14 +99,18 @@ isOffsetOp _ = False
 -- This expression should be an address from which a word can be loaded:
 -- check for funny-looking sub-word offsets.
 cmmCheckWordAddress e@(CmmMachOp op [arg, CmmLit (CmmInt i _)])
-  | isOffsetOp op && i `rem` fromIntegral wORD_SIZE /= 0
+  | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral wORD_SIZE /= 0
   = cmmLintDubiousWordOffset e
 cmmCheckWordAddress e@(CmmMachOp op [CmmLit (CmmInt i _), arg])
-  | isOffsetOp op && i `rem` fromIntegral wORD_SIZE /= 0
+  | isOffsetOp op && notNodeReg arg && i `rem` fromIntegral wORD_SIZE /= 0
   = cmmLintDubiousWordOffset e
 cmmCheckWordAddress _
   = return ()
 
+-- No warnings for unaligned arithmetic with the node register,
+-- which is used to extract fields from tagged constructor closures.
+notNodeReg (CmmReg reg) | reg == nodeReg = False
+notNodeReg _                             = True
 
 lintCmmStmt :: CmmStmt -> CmmLint ()
 lintCmmStmt stmt@(CmmAssign reg expr) = do

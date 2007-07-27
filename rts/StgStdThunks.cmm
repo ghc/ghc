@@ -39,10 +39,23 @@
 #define RET_PARAMS
 #endif
 
+/*
+ * TODO: On return, we can use a more efficient
+ *       untagging (we know the constructor tag).
+ * 
+ * When entering stg_sel_#_upd, we know R1 points to its closure,
+ * so it's untagged.
+ * The payload might be a thunk or a constructor,
+ * so we enter it.
+ *
+ * When returning, we know for sure it is a constructor,
+ * so we untag it before accessing the field.
+ *
+ */
 #define SELECTOR_CODE_UPD(offset) \
   INFO_TABLE_RET(stg_sel_ret_##offset##_upd, RET_SMALL, RET_PARAMS)	\
   {									\
-      R1 = StgClosure_payload(R1,offset);				\
+      R1 = StgClosure_payload(UNTAG(R1),offset);			\
       GET_SAVED_CCCS;							\
       Sp = Sp + SIZEOF_StgHeader;					\
       ENTER();								\
@@ -58,8 +71,11 @@
       ENTER_CCS_THUNK(R1);						\
       SAVE_CCCS(WITHUPD_FRAME_SIZE);					\
       W_[Sp-WITHUPD_FRAME_SIZE] = stg_sel_ret_##offset##_upd_info;	\
-      R1 = StgThunk_payload(R1,0);					\
       Sp = Sp - WITHUPD_FRAME_SIZE;					\
+      R1 = StgThunk_payload(R1,0);				        \
+      if (GETTAG(R1) != 0) {                                            \
+          jump RET_LBL(stg_sel_ret_##offset##_upd);		        \
+      }                                                                 \
       jump %GET_ENTRY(R1);						\
   }
   /* NOTE: no need to ENTER() here, we know the closure cannot evaluate to a function,
@@ -85,10 +101,10 @@ SELECTOR_CODE_UPD(15)
 #define SELECTOR_CODE_NOUPD(offset) \
   INFO_TABLE_RET(stg_sel_ret_##offset##_noupd, RET_SMALL, RET_PARAMS)	\
   {									\
-      R1 = StgClosure_payload(R1,offset);				\
+      R1 = StgClosure_payload(UNTAG(R1),offset);			\
       GET_SAVED_CCCS;							\
       Sp = Sp + SIZEOF_StgHeader;					\
-      jump %GET_ENTRY(R1);						\
+      ENTER();								\
   }									\
 									\
   INFO_TABLE_SELECTOR(stg_sel_##offset##_noupd, offset, THUNK_SELECTOR, "stg_sel_noupd", "stg_sel_noupd")\
@@ -101,8 +117,11 @@ SELECTOR_CODE_UPD(15)
       ENTER_CCS_THUNK(R1);						\
       SAVE_CCCS(NOUPD_FRAME_SIZE);					\
       W_[Sp-NOUPD_FRAME_SIZE] = stg_sel_ret_##offset##_noupd_info;	\
-      R1 = StgThunk_payload(R1,0);					\
       Sp = Sp - NOUPD_FRAME_SIZE;					\
+      R1 = StgThunk_payload(R1,0);					\
+      if (GETTAG(R1) != 0) {                                            \
+          jump RET_LBL(stg_sel_ret_##offset##_noupd);		        \
+      }                                                                 \
       jump %GET_ENTRY(R1);						\
   }
 

@@ -22,6 +22,10 @@
 
 /* ----------------------------------------------------------------------------
    Building Haskell objects from C datatypes.
+
+   TODO: Currently this code does not tag created pointers,
+         however it is not unsafe (the contructor code will do it)
+         just inefficient.
    ------------------------------------------------------------------------- */
 HaskellObj
 rts_mkChar (Capability *cap, HsChar c)
@@ -221,7 +225,7 @@ rts_getChar (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == Czh_con_info ||
     //        p->header.info == Czh_static_info);
-    return (StgChar)(StgWord)(p->payload[0]);
+    return (StgChar)(StgWord)(UNTAG_CLOSURE(p)->payload[0]);
 }
 
 HsInt
@@ -230,7 +234,7 @@ rts_getInt (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == Izh_con_info ||
     //        p->header.info == Izh_static_info);
-    return (HsInt)(p->payload[0]);
+    return (HsInt)(UNTAG_CLOSURE(p)->payload[0]);
 }
 
 HsInt8
@@ -239,7 +243,7 @@ rts_getInt8 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == I8zh_con_info ||
     //        p->header.info == I8zh_static_info);
-    return (HsInt8)(HsInt)(p->payload[0]);
+    return (HsInt8)(HsInt)(UNTAG_CLOSURE(p)->payload[0]);
 }
 
 HsInt16
@@ -248,7 +252,7 @@ rts_getInt16 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == I16zh_con_info ||
     //        p->header.info == I16zh_static_info);
-    return (HsInt16)(HsInt)(p->payload[0]);
+    return (HsInt16)(HsInt)(UNTAG_CLOSURE(p)->payload[0]);
 }
 
 HsInt32
@@ -257,7 +261,7 @@ rts_getInt32 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == I32zh_con_info ||
     //        p->header.info == I32zh_static_info);
-    return (HsInt32)(HsInt)(p->payload[0]);
+  return (HsInt32)(HsInt)(UNTAG_CLOSURE(p)->payload[0]);
 }
 
 HsInt64
@@ -267,7 +271,7 @@ rts_getInt64 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == I64zh_con_info ||
     //        p->header.info == I64zh_static_info);
-    tmp = (HsInt64*)&(p->payload[0]);
+    tmp = (HsInt64*)&(UNTAG_CLOSURE(p)->payload[0]);
     return *tmp;
 }
 HsWord
@@ -276,7 +280,7 @@ rts_getWord (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == Wzh_con_info ||
     //        p->header.info == Wzh_static_info);
-    return (HsWord)(p->payload[0]);
+    return (HsWord)(UNTAG_CLOSURE(p)->payload[0]);
 }
 
 HsWord8
@@ -285,7 +289,7 @@ rts_getWord8 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == W8zh_con_info ||
     //        p->header.info == W8zh_static_info);
-    return (HsWord8)(HsWord)(p->payload[0]);
+    return (HsWord8)(HsWord)(UNTAG_CLOSURE(p)->payload[0]);
 }
 
 HsWord16
@@ -294,7 +298,7 @@ rts_getWord16 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == W16zh_con_info ||
     //        p->header.info == W16zh_static_info);
-    return (HsWord16)(HsWord)(p->payload[0]);
+    return (HsWord16)(HsWord)(UNTAG_CLOSURE(p)->payload[0]);
 }
 
 HsWord32
@@ -303,7 +307,7 @@ rts_getWord32 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == W32zh_con_info ||
     //        p->header.info == W32zh_static_info);
-    return (HsWord32)(HsWord)(p->payload[0]);
+    return (HsWord32)(HsWord)(UNTAG_CLOSURE(p)->payload[0]);
 }
 
 
@@ -314,7 +318,7 @@ rts_getWord64 (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == W64zh_con_info ||
     //        p->header.info == W64zh_static_info);
-    tmp = (HsWord64*)&(p->payload[0]);
+    tmp = (HsWord64*)&(UNTAG_CLOSURE(p)->payload[0]);
     return *tmp;
 }
 
@@ -324,7 +328,7 @@ rts_getFloat (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == Fzh_con_info ||
     //        p->header.info == Fzh_static_info);
-    return (float)(PK_FLT((P_)p->payload));
+    return (float)(PK_FLT((P_)UNTAG_CLOSURE(p)->payload));
 }
 
 HsDouble
@@ -333,7 +337,7 @@ rts_getDouble (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == Dzh_con_info ||
     //        p->header.info == Dzh_static_info);
-    return (double)(PK_DBL((P_)p->payload));
+    return (double)(PK_DBL((P_)UNTAG_CLOSURE(p)->payload));
 }
 
 HsStablePtr
@@ -342,7 +346,7 @@ rts_getStablePtr (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == StablePtr_con_info ||
     //        p->header.info == StablePtr_static_info);
-    return (StgStablePtr)(p->payload[0]);
+    return (StgStablePtr)(UNTAG_CLOSURE(p)->payload[0]);
 }
 
 HsPtr
@@ -351,7 +355,7 @@ rts_getPtr (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == Ptr_con_info ||
     //        p->header.info == Ptr_static_info);
-    return (Capability *)(p->payload[0]);
+    return (Capability *)(UNTAG_CLOSURE(p)->payload[0]);
 }
 
 HsFunPtr
@@ -360,7 +364,7 @@ rts_getFunPtr (HaskellObj p)
     // See comment above:
     // ASSERT(p->header.info == FunPtr_con_info ||
     //        p->header.info == FunPtr_static_info);
-    return (void *)(p->payload[0]);
+    return (void *)(UNTAG_CLOSURE(p)->payload[0]);
 }
 
 HsBool
@@ -368,7 +372,7 @@ rts_getBool (HaskellObj p)
 {
     StgInfoTable *info;
 
-    info = get_itbl((StgClosure *)p);
+    info = get_itbl((StgClosure *)UNTAG_CLOSURE(p));
     if (info->srt_bitmap == 0) { // srt_bitmap is the constructor tag
 	return 0;
     } else {

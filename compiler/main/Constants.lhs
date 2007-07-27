@@ -6,6 +6,8 @@
 \begin{code}
 module Constants (module Constants) where
 
+import Data.Bits (shiftL)
+
 -- This magical #include brings in all the everybody-knows-these magic
 -- constants unfortunately, we need to be *explicit* about which one
 -- we want; if we just hope a -I... will get the right one, we could
@@ -106,6 +108,14 @@ Size of a word, in bytes
 \begin{code}
 wORD_SIZE = (SIZEOF_HSWORD :: Int)
 wORD_SIZE_IN_BITS = wORD_SIZE * 8 :: Int
+\end{code}
+
+Amount of pointer bits used for semi-tagging constructor closures
+
+\begin{code}
+tAG_BITS    = (TAG_BITS :: Int)
+tAG_MASK    = ((1 `shiftL` tAG_BITS) - 1) :: Int
+mAX_PTR_TAG = tAG_MASK :: Int
 \end{code}
 
 Size of a C int, in bytes. May be smaller than wORD_SIZE.

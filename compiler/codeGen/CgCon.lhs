@@ -43,8 +43,10 @@ import Id
 import Type
 import PrelInfo
 import Outputable
-import Util
 import ListSetOps
+#ifdef DEBUG
+import Util             ( lengthIs )
+#endif
 \end{code}
 
 
@@ -93,7 +95,7 @@ cgTopRhsCon id con args
 	; emitDataLits closure_label closure_rep
 
 		-- RETURN
-	; returnFC (id, stableIdInfo id (mkLblExpr closure_label) lf_info) }
+	; returnFC (id, taggedStableIdInfo id (mkLblExpr closure_label) lf_info con) }
 \end{code}
 
 %************************************************************************
@@ -134,9 +136,10 @@ at all.
 \begin{code}
 buildDynCon binder cc con []
   = do this_pkg <- getThisPackage
-       returnFC (stableIdInfo binder
+       returnFC (taggedStableIdInfo binder
 			   (mkLblExpr (mkClosureLabel this_pkg (dataConName con)))
-    			   (mkConLFInfo con))
+    			   (mkConLFInfo con)
+                           con)
 \end{code}
 
 The following three paragraphs about @Char@-like and @Int@-like
@@ -170,7 +173,7 @@ buildDynCon binder cc con [arg_amode]
 	      offsetW = (val_int - mIN_INTLIKE) * (fixedHdrSize + 1)
 		-- INTLIKE closures consist of a header and one word payload
 	      intlike_amode = CmmLit (cmmLabelOffW intlike_lbl offsetW)
-	; returnFC (stableIdInfo binder intlike_amode (mkConLFInfo con)) }
+	; returnFC (taggedStableIdInfo binder intlike_amode (mkConLFInfo con) con) }
 
 buildDynCon binder cc con [arg_amode]
   | maybeCharLikeCon con 
@@ -181,7 +184,7 @@ buildDynCon binder cc con [arg_amode]
 	      offsetW = (val_int - mIN_CHARLIKE) * (fixedHdrSize + 1)
 		-- CHARLIKE closures consist of a header and one word payload
 	      charlike_amode = CmmLit (cmmLabelOffW charlike_lbl offsetW)
-	; returnFC (stableIdInfo binder charlike_amode (mkConLFInfo con)) }
+	; returnFC (taggedStableIdInfo binder charlike_amode (mkConLFInfo con) con) }
 \end{code}
 
 Now the general case.
@@ -194,7 +197,7 @@ buildDynCon binder ccs con args
 	    (closure_info, amodes_w_offsets) = layOutDynConstr this_pkg con args
 
 	; hp_off <- allocDynClosure closure_info use_cc blame_cc amodes_w_offsets
- 	; returnFC (heapIdInfo binder hp_off lf_info) }
+ 	; returnFC (taggedHeapIdInfo binder hp_off lf_info con) }
   where
     lf_info = mkConLFInfo con
 
@@ -223,7 +226,9 @@ bindConArgs :: DataCon -> [Id] -> Code
 bindConArgs con args
   = do this_pkg <- getThisPackage
        let
-	  bind_arg (arg, offset) = bindNewToNode arg offset (mkLFArgument arg)
+          -- The binding below forces the masking out of the tag bits
+          -- when accessing the constructor field.
+	  bind_arg (arg, offset) = bindNewToUntagNode arg offset (mkLFArgument arg) (tagForCon con)
 	  (_, args_w_offsets)    = layOutDynConstr this_pkg con (addIdReps args)
 	--
        ASSERT(not (isUnboxedTupleCon con)) return ()
@@ -386,11 +391,12 @@ cgTyCon tycon
 	    -- Put the table after the data constructor decls, because the
 	    -- datatype closure table (for enumeration types)
 	    -- to (say) PrelBase_$wTrue_closure, which is defined in code_stuff
+            -- Note that the closure pointers are tagged.
 	; extra <- 
 	   if isEnumerationTyCon tycon then do
 	        tbl <- getCmm (emitRODataLits (mkLocalClosureTableLabel 
 						(tyConName tycon))
-			   [ CmmLabel (mkLocalClosureLabel (dataConName con))
+			   [ CmmLabelOff (mkLocalClosureLabel (dataConName con)) (tagForCon con)
     			   | con <- tyConDataCons tycon])
 		return [tbl]
 	   else
@@ -434,6 +440,9 @@ cgDataCon data_con
 	    body_code = do { 	
 			-- NB: We don't set CC when entering data (WDP 94/06)
 			     tickyReturnOldCon (length arg_things)
+                           -- The case continuation code is expecting a tagged pointer
+                           ; stmtC (CmmAssign nodeReg
+                                              (tagCons data_con (CmmReg nodeReg)))
 			   ; performReturn emitReturnInstr }
 				-- noStmts: Ptr to thing already in Node
 

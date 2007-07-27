@@ -11,7 +11,8 @@ module CgBindery (
 
 	cgIdInfoId, cgIdInfoArgRep, cgIdInfoLF,
 
-	stableIdInfo, heapIdInfo, 
+	stableIdInfo, heapIdInfo,
+        taggedStableIdInfo, taggedHeapIdInfo,
 	letNoEscapeIdInfo, idInfoToAmode,
 
 	addBindC, addBindsC,
@@ -22,7 +23,7 @@ module CgBindery (
         getLiveStackBindings,
 
 	bindArgsToStack,  rebindToStack,
-	bindNewToNode, bindNewToReg, bindArgsToRegs,
+	bindNewToNode, bindNewToUntagNode, bindNewToReg, bindArgsToRegs,
 	bindNewToTemp,
 	getArgAmode, getArgAmodes, 
 	getCgIdInfo, 
@@ -38,11 +39,13 @@ import CgStackery
 import CgUtils
 import CLabel
 import ClosureInfo
+import Constants
 
 import Cmm
 import PprCmm		( {- instance Outputable -} )
 import SMRep
 import Id
+import DataCon
 import VarEnv
 import VarSet
 import Literal
@@ -52,6 +55,7 @@ import StgSyn
 import Unique
 import UniqSet
 import Outputable
+
 \end{code}
 
 
@@ -80,23 +84,44 @@ data CgIdInfo
 	, cg_rep :: CgRep
 	, cg_vol :: VolatileLoc
 	, cg_stb :: StableLoc
-	, cg_lf  :: LambdaFormInfo }
+	, cg_lf  :: LambdaFormInfo 
+        , cg_tag :: {-# UNPACK #-} !Int  -- tag to be added in idInfoToAmode
+         }
 
 mkCgIdInfo id vol stb lf
   = CgIdInfo { cg_id = id, cg_vol = vol, cg_stb = stb, 
-	       cg_lf = lf, cg_rep = idCgRep id }
+	       cg_lf = lf, cg_rep = idCgRep id, cg_tag = tag }
+  where
+    tag
+      | Just con <- isDataConWorkId_maybe id,
+          {- Is this an identifier for a static constructor closure? -}
+        isNullaryRepDataCon con
+          {- If yes, is this a nullary constructor?
+             If yes, we assume that the constructor is evaluated and can
+             be tagged.
+           -}
+      = tagForCon con
+
+      | otherwise
+      = funTagLFInfo lf
 
 voidIdInfo id = CgIdInfo { cg_id = id, cg_vol = NoVolatileLoc
 			 , cg_stb = VoidLoc, cg_lf = mkLFArgument id
-			 , cg_rep = VoidArg }
+			 , cg_rep = VoidArg, cg_tag = 0 }
 	-- Used just for VoidRep things
 
 data VolatileLoc	-- These locations die across a call
   = NoVolatileLoc
   | RegLoc	CmmReg		   -- In one of the registers (global or local)
   | VirHpLoc	VirtualHpOffset  -- Hp+offset (address of closure)
-  | VirNodeLoc	VirtualHpOffset  -- Cts of offset indirect from Node
-				   -- ie *(Node+offset)
+  | VirNodeLoc	ByteOff            -- Cts of offset indirect from Node
+				   -- ie *(Node+offset).
+                                   -- NB. Byte offset, because we subtract R1's
+                                   -- tag from the offset.
+
+mkTaggedCgIdInfo id vol stb lf con
+  = CgIdInfo { cg_id = id, cg_vol = vol, cg_stb = stb, 
+	       cg_lf = lf, cg_rep = idCgRep id, cg_tag = tagForCon con }
 \end{code}
 
 @StableLoc@ encodes where an Id can be found, used by
@@ -121,7 +146,7 @@ data StableLoc
 
 \begin{code}
 instance Outputable CgIdInfo where
-  ppr (CgIdInfo id rep vol stb lf)
+  ppr (CgIdInfo id rep vol stb lf _) -- TODO, pretty pring the tag info
     = ppr id <+> ptext SLIT("-->") <+> vcat [ppr vol, ppr stb]
 
 instance Outputable VolatileLoc where
@@ -149,19 +174,29 @@ stableIdInfo id amode   lf_info = mkCgIdInfo id NoVolatileLoc (StableLoc amode) 
 heapIdInfo id offset    lf_info = mkCgIdInfo id (VirHpLoc offset) NoStableLoc lf_info
 letNoEscapeIdInfo id sp lf_info = mkCgIdInfo id NoVolatileLoc (VirStkLNE sp) lf_info
 stackIdInfo id sp	lf_info = mkCgIdInfo id NoVolatileLoc (VirStkLoc sp) lf_info
-nodeIdInfo id offset    lf_info = mkCgIdInfo id (VirNodeLoc offset) NoStableLoc lf_info
+nodeIdInfo id offset    lf_info = mkCgIdInfo id (VirNodeLoc (wORD_SIZE*offset)) NoStableLoc lf_info
 regIdInfo id reg        lf_info = mkCgIdInfo id (RegLoc reg) NoStableLoc lf_info
+
+taggedStableIdInfo id amode lf_info con
+  = mkTaggedCgIdInfo id NoVolatileLoc (StableLoc amode) lf_info con
+taggedHeapIdInfo id offset lf_info con
+  = mkTaggedCgIdInfo id (VirHpLoc offset) NoStableLoc lf_info con
+untagNodeIdInfo id offset    lf_info tag
+  = mkCgIdInfo id (VirNodeLoc (wORD_SIZE*offset - tag)) NoStableLoc lf_info
+
 
 idInfoToAmode :: CgIdInfo -> FCode CmmExpr
 idInfoToAmode info
   = case cg_vol info of {
       RegLoc reg 	-> returnFC (CmmReg reg) ;
-      VirNodeLoc nd_off -> returnFC (CmmLoad (cmmOffsetW (CmmReg nodeReg) nd_off) mach_rep) ;
-      VirHpLoc hp_off   -> getHpRelOffset hp_off ;
+      VirNodeLoc nd_off -> returnFC (CmmLoad (cmmOffsetB (CmmReg nodeReg) nd_off)
+                                             mach_rep) ;
+      VirHpLoc hp_off   -> do { off <- getHpRelOffset hp_off
+                              ; return $! maybeTag off };
       NoVolatileLoc -> 
 
     case cg_stb info of
-      StableLoc amode  -> returnFC amode
+      StableLoc amode  -> returnFC $! maybeTag amode
       VirStkLoc sp_off -> do { sp_rel <- getSpRelOffset sp_off
 			     ; return (CmmLoad sp_rel mach_rep) }
 
@@ -176,6 +211,11 @@ idInfoToAmode info
     }
   where
     mach_rep = argMachRep (cg_rep info)
+
+    maybeTag amode  -- add the tag, if we have one
+      | tag == 0   = amode
+      | otherwise  = cmmOffsetB amode tag
+      where tag = cg_tag info
 
 cgIdInfoId :: CgIdInfo -> Id
 cgIdInfoId = cg_id 
@@ -388,6 +428,10 @@ bindArgsToRegs args
 bindNewToNode :: Id -> VirtualHpOffset -> LambdaFormInfo -> Code
 bindNewToNode id offset lf_info
   = addBindC id (nodeIdInfo id offset lf_info)
+
+bindNewToUntagNode :: Id -> VirtualHpOffset -> LambdaFormInfo -> Int -> Code
+bindNewToUntagNode id offset lf_info tag
+  = addBindC id (untagNodeIdInfo id offset lf_info tag)
 
 -- Create a new temporary whose unique is that in the id,
 -- bind the id to it, and return the addressing mode for the

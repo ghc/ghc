@@ -55,23 +55,32 @@
 STATIC_INLINE void
 thread (StgClosure **p)
 {
-    StgPtr q = *(StgPtr *)p;
+    StgClosure *q0 = *p;
+    StgPtr q  = (StgPtr)UNTAG_CLOSURE(q0);
+    nat tag = GET_CLOSURE_TAG(q0);
     bdescr *bd;
 
     // It doesn't look like a closure at the moment, because the info
     // ptr is possibly threaded:
     // ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
+    
+    // We need one tag value here, because we a non-zero tag to
+    // indicate "not an info pointer".  So we add one to the existing
+    // tag.  If this would overflow the tag bits, we throw away the
+    // original tag (which is safe but pessimistic; tags are optional).
+    if (tag == TAG_MASK)  tag = 0;
 
-    if (HEAP_ALLOCED(q)) {
+    if (HEAP_ALLOCED(q))
+    {
 	bd = Bdescr(q); 
 	// a handy way to discover whether the ptr is into the
 	// compacted area of the old gen, is that the EVACUATED flag
 	// is zero (it's non-zero for all the other areas of live
 	// memory).
-	if ((bd->flags & BF_EVACUATED) == 0) {
-
+	if ((bd->flags & BF_EVACUATED) == 0)
+        {
 	    *(StgPtr)p = (StgWord)*q;
-	    *q = (StgWord)p + 1;	// set the low bit
+	    *q = (StgWord)p + tag + 1;	// set the low bit
 	}
     }
 }
@@ -84,11 +93,15 @@ STATIC_INLINE void
 unthread( StgPtr p, StgPtr free )
 {
     StgWord q = *p, r;
+    nat tag;
+    StgPtr q1;
     
-    while ((q & 1) != 0) {
-	q -= 1;	// unset the low bit again
-	r = *((StgPtr)q);
-	*((StgPtr)q) = (StgWord)free;
+    while (GET_CLOSURE_TAG((StgClosure *)q) != 0) {
+	q -= 1;	// restore the original tag
+        tag = GET_CLOSURE_TAG((StgClosure *)q);
+        q1 = (StgPtr)UNTAG_CLOSURE((StgClosure *)q);
+	r = *q1;
+	*q1 = (StgWord)free + tag;
 	q = r;
     }
     *p = q;
@@ -97,10 +110,10 @@ unthread( StgPtr p, StgPtr free )
 STATIC_INLINE StgInfoTable *
 get_threaded_info( StgPtr p )
 {
-    StgPtr q = (P_)GET_INFO((StgClosure *)p);
+    StgPtr q = (P_)GET_INFO(UNTAG_CLOSURE((StgClosure *)p));
 
-    while (((StgWord)q & 1) != 0) {
-	q = (P_)*((StgPtr)((StgWord)q-1));
+    while (GET_CLOSURE_TAG((StgClosure *)q) != 0) {
+	q = (P_)*((StgPtr)((StgWord)(UNTAG_CLOSURE((StgClosure *)q))));
     }
 
     ASSERT(LOOKS_LIKE_INFO_PTR(q));

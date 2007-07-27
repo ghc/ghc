@@ -1,10 +1,12 @@
-{-# OPTIONS -cpp #-}
+{-# OPTIONS -cpp -fglasgow-exts #-}
 module Main(main) where
 
 #include "../../includes/ghcconfig.h"
 #include "../../includes/MachRegs.h"
 #include "../../includes/Constants.h"
 
+-- Needed for TAG_BITS
+#include "../../includes/MachDeps.h"
 
 import Text.PrettyPrint
 import Data.Word
@@ -165,10 +167,16 @@ mkApplyFastName args
 mkApplyInfoName args
   = mkApplyName args <> text "_info"
 
+mb_tag_node arity | Just tag <- tagForArity arity = mkTagStmt tag <> semi
+		  | otherwise = empty
+
+mkTagStmt tag = text ("R1 = R1 + "++ show tag)
+
 genMkPAP regstatus macro jump ticker disamb
 	no_load_regs  	-- don't load argumnet regs before jumping
 	args_in_regs  	-- arguments are already in regs
 	is_pap args all_args_size fun_info_label
+        is_fun_case
   =  smaller_arity_cases
   $$ exact_arity_case
   $$ larger_arity_case
@@ -214,7 +222,8 @@ genMkPAP regstatus macro jump ticker disamb
 	     if is_pap 
 		then text "R2 = " <> mkApplyInfoName this_call_args <> semi
 
-		else empty,
+		else empty, 
+            if is_fun_case then mb_tag_node arity else empty,
 	     text "jump " <> text jump <> semi
 	    ]) $$
  	   text "}"
@@ -294,9 +303,10 @@ genMkPAP regstatus macro jump ticker disamb
 --	    text "TICK_SLOW_CALL_" <> text ticker <> text "_CORRECT();",
 	    reg_doc,
 	    text "Sp_adj(" <> int sp' <> text ");",
-	    if is_pap 
-		then text "R2 = " <> fun_info_label <> semi
-		else empty,
+            if is_pap 
+                then text "R2 = " <> fun_info_label <> semi
+                else empty,
+            if is_fun_case then mb_tag_node n_args else empty,
 	    text "jump " <> text jump <> semi
 	  ])
 
@@ -319,6 +329,15 @@ genMkPAP regstatus macro jump ticker disamb
 	   nest 4 (vcat [
 --	  	text "TICK_SLOW_CALL_" <> text ticker <> text "_TOO_FEW();",
 		save_regs,
+                -- Before building the PAP, tag the function closure pointer
+                if is_fun_case then
+                  vcat [
+                     text "if (arity < " <> int tAG_BITS_MAX <> text ") {",
+                     text "  R1 = R1 + arity" <> semi,
+                     text "}"
+                   ]
+                  else empty
+                ,
 		text macro <> char '(' <> int n_args <> comma <> 
 					int all_args_size <>  
 					text "," <> fun_info_label <>
@@ -331,6 +350,66 @@ genMkPAP regstatus macro jump ticker disamb
 	  (reg_locs, leftovers, sp_offset) 
 		= assignRegs regstatus stk_args_slow_offset args
 		-- BUILD_PAP assumes args start at offset 1
+
+-- --------------------------------------
+-- Examine tag bits of function pointer and enter it
+-- directly if needed.
+-- TODO: remove the redundant case in the original code.
+enterFastPath regstatus no_load_regs args_in_regs args
+    | Just tag <- tagForArity (length args)
+    = enterFastPathHelper tag regstatus no_load_regs args_in_regs args
+enterFastPath _ _ _ _ = empty
+
+-- Copied from Constants.lhs & CgUtils.hs, i'd rather have this imported:
+-- (arity,tag)
+tAG_BITS = (TAG_BITS :: Int)
+tAG_BITS_MAX = ((1 `shiftL` tAG_BITS) :: Int)
+
+tagForArity :: Int -> Maybe Int
+tagForArity i | i < tAG_BITS_MAX = Just i
+              | otherwise        = Nothing
+
+enterFastPathHelper tag regstatus no_load_regs args_in_regs args =
+  vcat [text "if (GETTAG(R1)==" <> int tag <> text ") {",
+	reg_doc,
+        text "  Sp_adj(" <> int sp' <> text ");",
+        -- enter, but adjust offset with tag
+	text "  jump " <> text "%GET_ENTRY(R1-" <> int tag <> text ");",
+        text "}"
+       ]
+  -- I don't totally understand this code, I copied it from
+  -- exact_arity_case
+  -- TODO: refactor
+    where
+	-- offset of arguments on the stack at slow apply calls.
+    stk_args_slow_offset = 1
+
+    stk_args_offset
+	| args_in_regs = 0
+	| otherwise    = stk_args_slow_offset
+
+    (reg_doc, sp')
+	| no_load_regs || args_in_regs = (empty, stk_args_offset)
+	| otherwise    = loadRegArgs regstatus stk_args_offset args
+
+tickForArity arity
+    | True
+    = empty
+    | Just tag <- tagForArity arity
+    = vcat [
+	    text "W_[TOTAL_CALLS] = W_[TOTAL_CALLS] + 1;",
+	    text "W_[SLOW_CALLS_" <> int arity <> text "] = W_[SLOW_CALLS_" <> int arity <> text "] + 1;",
+	    text "if (TO_W_(StgFunInfoExtra_arity(%FUN_INFO(%INFO_PTR(UNTAG(R1))))) == " <> int arity <> text " ) {",
+	    text "  W_[RIGHT_ARITY_" <> int arity <> text "] = W_[RIGHT_ARITY_" <> int arity <> text "] + 1;",
+	    text "  if (GETTAG(R1)==" <> int tag <> text ") {",
+	    text "    W_[TAGGED_PTR_" <> int arity <> text "] = W_[TAGGED_PTR_" <> int arity <> text "] + 1;",
+	    text "  } else {",
+	    -- force a halt when not tagged!
+--	    text "    W_[0]=0;",
+	    text "  }",
+	    text "}"
+ 	  ]
+tickForArity _ = text "W_[TOTAL_CALLS] = W_[TOTAL_CALLS] + 1;"
 
 -- -----------------------------------------------------------------------------
 -- generate an apply function
@@ -388,6 +467,7 @@ genApply regstatus args =
 --        print "    [IND_OLDGEN_PERM] &&ind_lbl"
 --        print "  };"
     
+       tickForArity (length args),
        text "",
        text "IF_DEBUG(apply,foreign \"C\" debugBelch(\"" <> fun_ret_label <> 
 	  text "... \"); foreign \"C\" printClosure(R1 \"ptr\"));",
@@ -411,6 +491,12 @@ genApply regstatus args =
        vcat (do_assert args 1),
 
        text  "again:",
+
+       -- if pointer is tagged enter it fast!
+       enterFastPath regstatus False False args,
+
+       -- Functions can be tagged, so we untag them!
+       text  "R1 = UNTAG(R1);",
        text  "info = %INFO_PTR(R1);",
 
 --    if fast == 1:
@@ -428,7 +514,7 @@ genApply regstatus args =
 	  text "ASSERT(arity > 0);",
 	  genMkPAP regstatus "BUILD_PAP" "ENTRY_LBL(stg_BCO)" "FUN" "BCO"
 		True{-stack apply-} False{-args on stack-} False{-not a PAP-}
-		args all_args_size fun_info_label
+		args all_args_size fun_info_label {- tag stmt -}False
 	 ]),
 	text "}",
 
@@ -445,9 +531,9 @@ genApply regstatus args =
 	nest 4 (vcat [
 	  text "arity = TO_W_(StgFunInfoExtra_arity(%FUN_INFO(info)));",
 	  text "ASSERT(arity > 0);",
-          genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(R1)" "FUN" "FUN"
+          genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(UNTAG(R1))" "FUN" "FUN"
 		False{-reg apply-} False{-args on stack-} False{-not a PAP-}
-		args all_args_size fun_info_label
+		args all_args_size fun_info_label {- tag stmt -}True
 	 ]),
 	text "}",
 
@@ -461,7 +547,7 @@ genApply regstatus args =
 	  text "ASSERT(arity > 0);",
 	  genMkPAP regstatus "NEW_PAP" "stg_PAP_apply" "PAP" "PAP"
 		True{-stack apply-} False{-args on stack-} True{-is a PAP-}
-		args all_args_size fun_info_label
+		args all_args_size fun_info_label {- tag stmt -}False
 	 ]),
 	text "}",
 
@@ -506,6 +592,7 @@ genApply regstatus args =
         text "     IND_OLDGEN_PERM: {",
 	nest 4 (vcat [
 	  text "R1 = StgInd_indirectee(R1);",
+            -- An indirection node might contain a tagged pointer
 	  text "goto again;"
 	 ]),
 	text "}",
@@ -541,6 +628,14 @@ genApplyFast regstatus args =
      nest 4 (vcat [     
         text "W_ info;",
         text "W_ arity;",
+
+        tickForArity (length args),
+
+        -- if pointer is tagged enter it fast!
+        enterFastPath regstatus False True args,
+
+        -- Functions can be tagged, so we untag them!
+        text  "R1 = UNTAG(R1);",
         text  "info = %GET_STD_INFO(R1);",
         text "switch [INVALID_OBJECT .. N_CLOSURE_TYPES] (TO_W_(%INFO_TYPE(info))) {",
 	nest 4 (vcat [
@@ -554,9 +649,9 @@ genApplyFast regstatus args =
 	  nest 4 (vcat [
 	    text "arity = TO_W_(StgFunInfoExtra_arity(%GET_FUN_INFO(R1)));",
 	    text "ASSERT(arity > 0);",
-            genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(R1)" "FUN" "FUN"
+            genMkPAP regstatus "BUILD_PAP" "%GET_ENTRY(UNTAG(R1))" "FUN" "FUN"
 	  	False{-reg apply-} True{-args in regs-} False{-not a PAP-}
-	  	args all_args_size fun_info_label
+	  	args all_args_size fun_info_label {- tag stmt -}True
 	   ]),
 	  char '}',
 	  
@@ -607,7 +702,7 @@ genStackApply regstatus args =
    (assign_regs, sp') = loadRegArgs regstatus 0 args
    body = vcat [assign_regs,
 		text "Sp_adj" <> parens (int sp') <> semi,
-		text "jump %GET_ENTRY(R1);"
+		text "jump %GET_ENTRY(UNTAG(R1));"
 		]
 
 -- -----------------------------------------------------------------------------

@@ -551,6 +551,8 @@ INFO_TABLE_RET( stg_ut_1_0_unreg, RET_SMALL, "ptr" W_ unused )
 	 +---------------------+
          |      f_closure      |
 	 +---------------------+
+         |         tag         |
+	 +- - - - - - - - - - -+
          |        size         |
 	 +---------------------+
          |   stg_gc_fun_info   |
@@ -567,8 +569,11 @@ __stg_gc_fun
     W_ size;
     W_ info;
     W_ type;
+    W_ tag;
+    W_ ret_fun;
 
-    info = %GET_FUN_INFO(R1);
+    tag  = GETTAG(R1);
+    info = %GET_FUN_INFO(UNTAG(R1));
 
     // cache the size
     type = TO_W_(StgFunInfoExtra_fun_type(info));
@@ -579,7 +584,7 @@ __stg_gc_fun
 #ifdef TABLES_NEXT_TO_CODE
             // bitmap field holds an offset
             size = StgLargeBitmap_size( StgFunInfoExtra_bitmap(info)
-                                        + %GET_ENTRY(R1) /* ### */ );
+                                        + %GET_ENTRY(UNTAG(R1)) /* ### */ );
 #else
 	    size = StgLargeBitmap_size( StgFunInfoExtra_bitmap(info) );
 #endif
@@ -591,9 +596,11 @@ __stg_gc_fun
 #ifdef NO_ARG_REGS
     // we don't have to save any registers away
     Sp_adj(-3);
-    Sp(2) = R1;
-    Sp(1) = size;
     Sp(0) = stg_gc_fun_info;
+    ret_fun = Sp;
+    StgRetFun_size(ret_fun) = HALF_W_(size);
+    StgRetFun_tag(ret_fun)  = HALF_W_(tag);
+    StgRetFun_fun(ret_fun)  = R1;
     GC_GENERIC
 #else
     W_ type;
@@ -602,9 +609,11 @@ __stg_gc_fun
     if (type == ARG_GEN || type == ARG_GEN_BIG) {
         // regs already saved by the heap check code
         Sp_adj(-3);
-        Sp(2) = R1;
-        Sp(1) = size;
         Sp(0) = stg_gc_fun_info;
+        ret_fun = Sp;
+        StgRetFun_size(ret_fun) = HALF_W_(size);
+        StgRetFun_tag(ret_fun)  = HALF_W_(tag);
+        StgRetFun_fun(ret_fun)  = R1;
         // DEBUG_ONLY(foreign "C" debugBelch("stg_fun_gc_gen(ARG_GEN)"););
         GC_GENERIC
     } else { 
@@ -624,17 +633,22 @@ __stg_gc_fun
 
 INFO_TABLE_RET( stg_gc_fun, RET_FUN )
 {
-    R1 = Sp(2);
+    // Grab the fun, but remember to add in the tag.  The GC doesn't
+    // guarantee to retain the tag on the pointer, so we have to do
+    // it manually, because the function entry code assumes it.
+    W_ ret_fun;
+    ret_fun = Sp;
+    R1 = StgRetFun_fun(ret_fun) | TO_W_(StgRetFun_tag(ret_fun));
     Sp_adj(3);
 #ifdef NO_ARG_REGS
     // Minor optimisation: there are no argument registers to load up,
     // so we can just jump straight to the function's entry point.
-    jump %GET_ENTRY(R1);
+    jump %GET_ENTRY(UNTAG(R1));
 #else
     W_ info;
     W_ type;
     
-    info = %GET_FUN_INFO(R1);
+    info = %GET_FUN_INFO(UNTAG(R1));
     type = TO_W_(StgFunInfoExtra_fun_type(info));
     if (type == ARG_GEN || type == ARG_GEN_BIG) {
 	jump StgFunInfoExtra_slow_apply(info);

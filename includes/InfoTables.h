@@ -164,7 +164,7 @@ typedef struct {
 
 extern StgWord16 closure_flags[];
 
-#define closureFlags(c)         (closure_flags[get_itbl(c)->type])
+#define closureFlags(c)         (closure_flags[get_itbl(UNTAG_CLOSURE(c))->type])
 
 #define closure_HNF(c)          (  closureFlags(c) & _HNF)
 #define closure_BITMAP(c)       (  closureFlags(c) & _BTM)

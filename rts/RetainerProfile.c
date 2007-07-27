@@ -1486,7 +1486,9 @@ retainStack( StgClosure *c, retainer c_child_r,
  * ------------------------------------------------------------------------- */
 
 static INLINE StgPtr
-retain_PAP_payload (StgClosure *pap,  retainer c_child_r, StgClosure *fun, 
+retain_PAP_payload (StgClosure *pap,    /* NOT tagged */
+                    retainer c_child_r, /* NOT tagged */ 
+                    StgClosure *fun,    /* tagged */
 		    StgClosure** payload, StgWord n_args)
 {
     StgPtr p;
@@ -1494,6 +1496,7 @@ retain_PAP_payload (StgClosure *pap,  retainer c_child_r, StgClosure *fun,
     StgFunInfoTable *fun_info;
 
     retainClosure(fun, pap, c_child_r);
+    fun = UNTAG_CLOSURE(fun);
     fun_info = get_fun_itbl(fun);
     ASSERT(fun_info->i.type != PAP);
 
@@ -1542,9 +1545,9 @@ retain_PAP_payload (StgClosure *pap,  retainer c_child_r, StgClosure *fun,
 static void
 retainClosure( StgClosure *c0, StgClosure *cp0, retainer r0 )
 {
-    // c = Current closure
-    // cp = Current closure's Parent
-    // r = current closures' most recent Retainer
+    // c = Current closure                          (possibly tagged)
+    // cp = Current closure's Parent                (NOT tagged)
+    // r = current closures' most recent Retainer   (NOT tagged)
     // c_child_r = current closure's children's most recent retainer
     // first_child = first child of c
     StgClosure *c, *cp, *first_child;
@@ -1582,6 +1585,8 @@ loop:
     //debugBelch("inner_loop");
 
 inner_loop:
+    c = UNTAG_CLOSURE(c);
+
     // c  = current closure under consideration,
     // cp = current closure's parent,
     // r  = current closure's most recent retainer
@@ -1794,16 +1799,19 @@ inner_loop:
 static void
 retainRoot( StgClosure **tl )
 {
+    StgClosure *c;
+
     // We no longer assume that only TSOs and WEAKs are roots; any closure can
     // be a root.
 
     ASSERT(isEmptyRetainerStack());
     currentStackBoundary = stackTop;
 
-    if (*tl != &stg_END_TSO_QUEUE_closure && isRetainer(*tl)) {
-	retainClosure(*tl, *tl, getRetainerFrom(*tl));
+    c = UNTAG_CLOSURE(*tl);
+    if (c != &stg_END_TSO_QUEUE_closure && isRetainer(c)) {
+	retainClosure(c, c, getRetainerFrom(c));
     } else {
-	retainClosure(*tl, *tl, CCS_SYSTEM);
+	retainClosure(c, c, CCS_SYSTEM);
     }
 
     // NOT TRUE: ASSERT(isMember(getRetainerFrom(*tl), retainerSetOf(*tl)));

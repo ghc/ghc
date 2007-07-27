@@ -27,6 +27,7 @@ import CgUtils
 import CgTicky
 import ClosureInfo
 import SMRep
+import MachOp
 import Cmm	
 import CmmUtils
 import CLabel
@@ -102,7 +103,8 @@ performTailCall fun_info arg_amodes pending_assts
 
   | otherwise
   = do 	{ fun_amode <- idInfoToAmode fun_info
-	; let node_asst = oneStmt (CmmAssign nodeReg fun_amode)
+	; let assignSt  = CmmAssign nodeReg fun_amode
+              node_asst = oneStmt assignSt
 	      opt_node_asst | nodeMustPointToIt lf_info = node_asst
 			    | otherwise		        = noStmts
 	; EndOfBlockInfo sp _ <- getEndOfBlockInfo
@@ -113,8 +115,15 @@ performTailCall fun_info arg_amodes pending_assts
 	    -- Node must always point to things we enter
 	    EnterIt -> do
 		{ emitSimultaneously (node_asst `plusStmts` pending_assts) 
-		; let target = entryCode (closureInfoPtr (CmmReg nodeReg))
-		; doFinalJump sp False (stmtC (CmmJump target [])) }
+		; let target     = entryCode (closureInfoPtr (CmmReg nodeReg))
+                      enterClosure = stmtC (CmmJump target [])
+                      -- If this is a scrutinee
+                      -- let's check if the closure is a constructor
+                      -- so we can directly jump to the alternatives switch
+                      -- statement.
+                      jumpInstr = getEndOfBlockInfo >>=
+                                  maybeSwitchOnCons enterClosure
+		; doFinalJump sp False jumpInstr }
     
 	    -- A function, but we have zero arguments.  It is already in WHNF,
 	    -- so we can just return it.  
@@ -149,6 +158,7 @@ performTailCall fun_info arg_amodes pending_assts
 
 		; directCall sp apply_lbl args extra_args 
 			(node_asst `plusStmts` pending_assts)
+
 		}
     
 	    -- A direct function call (possibly with some left-over arguments)
@@ -169,8 +179,58 @@ performTailCall fun_info arg_amodes pending_assts
   where
     fun_name  = idName (cgIdInfoId fun_info)
     lf_info   = cgIdInfoLF fun_info
+    untag_node = CmmAssign nodeReg (cmmUntag (CmmReg nodeReg))
+    -- Test if closure is a constructor
+    maybeSwitchOnCons enterClosure eob
+              | EndOfBlockInfo _ (CaseAlts lbl _ _) <- eob
+              = do { is_constr <- newLabelC
+                   -- Is the pointer tagged?
+                   -- Yes, jump to switch statement
+                   ; stmtC (CmmCondBranch (cmmIsTagged (CmmReg nodeReg)) 
+                                is_constr)
+                   -- No, enter the closure.
+                   ; enterClosure
+                   ; labelC is_constr
+                   ; stmtC (CmmJump (CmmLit (CmmLabel lbl)) [])
+                   }
+{-
+              -- This is a scrutinee for a case expression
+              -- so let's see if we can directly inspect the closure
+              | EndOfBlockInfo _ (CaseAlts lbl _ _ _) <- eob
+              = do { no_cons <- newLabelC
+                   -- Both the NCG and gcc optimize away the temp
+                   ; z <- newTemp  wordRep
+                   ; stmtC (CmmAssign z tag_expr)
+                   ; let tag = CmmReg z
+                   -- Is the closure a cons?
+                   ; stmtC (CmmCondBranch (cond1 tag) no_cons)
+                   ; stmtC (CmmCondBranch (cond2 tag) no_cons)
+                   -- Yes, jump to switch statement
+                   ; stmtC (CmmJump (CmmLit (CmmLabel lbl)) [])
+                   ; labelC no_cons
+                   -- No, enter the closure.
+                   ; enterClosure
+                   }
+-}
+              -- No case expression involved, enter the closure.
+              | otherwise
+              = do { stmtC untag_node
+                   ; enterClosure
+                   }
+        where
+          --cond1 tag  = cmmULtWord tag lowCons
+          -- More efficient than the above?
+          tag_expr   = cmmGetClosureType (CmmReg nodeReg)
+          cond1 tag  = cmmEqWord tag (CmmLit (mkIntCLit 0))
+          cond2 tag  = cmmUGtWord tag highCons
+          lowCons    = CmmLit (mkIntCLit 1)
+            -- CONSTR
+          highCons   = CmmLit (mkIntCLit 8)
+            -- CONSTR_NOCAF_STATIC (from ClosureType.h)
 
 
+untagCmmAssign (CmmAssign r cmmExpr) = CmmAssign r (cmmUntag cmmExpr)
+untagCmmAssign stmt                  = stmt
 
 directCall sp lbl args extra_args assts = do
   let

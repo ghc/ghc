@@ -105,4 +105,14 @@
 #endif
 #endif
 
+#ifndef TAG_BITS
+#if SIZEOF_HSWORD == 4
+#define TAG_BITS                2
+#else 
+#define TAG_BITS                3
+#endif
+#endif
+
+#define TAG_MASK ((1 << TAG_BITS) - 1)
+
 #endif /* MACHDEPS_H */
