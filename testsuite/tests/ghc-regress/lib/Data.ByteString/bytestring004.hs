@@ -28,7 +28,7 @@ import Foreign.Ptr
 
 import Data.ByteString.Lazy (ByteString(..), pack , unpack)
 import qualified Data.ByteString.Lazy as L
-import qualified Data.ByteString.Base as L (LazyByteString(..))
+import qualified Data.ByteString.Lazy.Internal as L
 
 import Data.ByteString.Fusion
 import qualified Data.ByteString      as P
@@ -37,7 +37,7 @@ import qualified Data.ByteString.Lazy as L
 import qualified Data.ByteString.Char8      as PC
 import qualified Data.ByteString.Lazy.Char8 as LC
 import qualified Data.ByteString       as P
-import qualified Data.ByteString.Base  as P
+import qualified Data.ByteString.Internal as P
 import qualified Data.ByteString.Char8 as C
 import qualified Data.ByteString.Lazy.Char8 as D
 import Data.ByteString.Fusion
