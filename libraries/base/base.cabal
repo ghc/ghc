@@ -95,12 +95,6 @@ Library {
         Data.Array.Unboxed,
         Data.Bits,
         Data.Bool,
-        Data.ByteString,
-        Data.ByteString.Char8,
-        Data.ByteString.Lazy
-        Data.ByteString.Lazy.Char8
-        Data.ByteString.Base
-        Data.ByteString.Fusion
         Data.Char,
         Data.Complex,
         Data.Dynamic,
@@ -184,7 +178,6 @@ Library {
         cbits/Win32Utils.c
         cbits/consUtils.c
         cbits/dirUtils.c
-        cbits/fpstring.c
         cbits/inputReady.c
         cbits/lockFile.c
         cbits/longlong.c
