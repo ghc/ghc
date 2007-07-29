@@ -160,7 +160,6 @@ Library {
         System.Mem.StableName,
         System.Mem.Weak,
         System.Posix.Internals,
-        System.Posix.Signals,
         System.Posix.Types,
         Text.ParserCombinators.ReadP,
         Text.ParserCombinators.ReadPrec,
