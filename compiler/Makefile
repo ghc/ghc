@@ -411,8 +411,8 @@ endif
 # the interpreter is supported on this platform.
 
 ifeq "$(bootstrapped)" "YES"
-SRC_HC_OPTS += -package hpc
-PKG_DEPENDS += hpc
+SRC_HC_OPTS += -package hpc -package bytestring
+PKG_DEPENDS += hpc bytestring
 endif
 
 ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
