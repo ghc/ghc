@@ -4,10 +4,8 @@ import Distribution.Setup
 import Distribution.Simple
 import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
-import Distribution.Simple.Utils
 import Distribution.Verbosity
 import System.Environment
-import System.Info
 
 main :: IO ()
 main = do args <- getArgs
@@ -39,27 +37,15 @@ doit pref ghcpkg verbosity =
                                   regWithHcPkg = Just ghcpkg,
                                   regVerbose = verbosity
                               }
-          pdFile <- defaultPackageDesc verbosity
-          pd <- readPackageDescription verbosity pdFile
           lbi <- getPersistBuildConfig
-          let -- XXX These are almighty hacks, shadowing the base
-              -- Setup.hs hacks
-              extraExtraLibs = if (os == "mingw32") &&
-                                  (pkgName (package pd) == "base")
-                               then ["wsock32", "msvcrt", "kernel32",
-                                     "user32", "shell32"]
-                               else []
+          let pd = localPkgDescr lbi
+              -- XXX This is an almighty hack, shadowing the base
+              -- Setup.hs hack
               mkLib filt = case library pd of
                            Just lib ->
                                let ems = filter filt $ exposedModules lib
-                                   lib_bi = libBuildInfo lib
-                                   lib_bi' = lib_bi {
-                                                 extraLibs = extraExtraLibs
-                                                         ++ extraLibs lib_bi
-                                             }
                                in lib {
-                                      exposedModules = ems,
-                                      libBuildInfo = lib_bi'
+                                      exposedModules = ems
                                    }
                            Nothing ->
                                error "Expected a library, but none found"
