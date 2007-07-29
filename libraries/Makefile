@@ -35,15 +35,14 @@ default_target: all
 TOP=..
 include $(TOP)/mk/boilerplate.mk
 
-SUBDIRS = base bytestring old-locale old-time filepath directory process pretty \
-          hpc template-haskell readline Cabal random haskell98
-
+SUBDIRS = base bytestring old-locale old-time filepath directory
 ifeq "$(GhcLibsWithUnix)" "YES"
 SUBDIRS += unix
 endif
 ifeq "$(Windows)" "YES"
 SUBDIRS += $(wildcard Win32)
 endif
+SUBDIRS += process pretty hpc template-haskell readline Cabal random haskell98
 
 # Set GhcBootLibs=YES from the command line to work with just the libraries
 # needed to bootstrap GHC.
