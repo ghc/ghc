@@ -20,7 +20,7 @@ Library {
     -- actually ought to fail.
     if flag(IsGHC) {
         build-depends: rts
-        if os(windows) {
+        if os(mingw32) {
             extra-libraries: wsock32, msvcrt, kernel32, user32, shell32
         }
         exposed-modules:
