@@ -39,6 +39,8 @@ import System.Directory ( findExecutable )
 main = do 
   args <- getArgs
   case args of
+    ("-f" : ghc : args) -> do
+        doIt ghc args
     ('-':'f' : ghc) : args -> do
 	doIt (dropWhile isSpace ghc) args
     args -> do
