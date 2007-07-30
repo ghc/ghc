@@ -30,7 +30,7 @@
 # define STATIC_INLINE static
 #endif
 
-/* -----------------------------------------------------------------------------
+/* ----------------------------------------------------------------------------
    Threading / unthreading pointers.
 
    The basic idea here is to chain together all the fields pointing at
@@ -46,32 +46,42 @@
    the chain with the new location of the object.  We stop when we
    reach the info pointer at the end.
 
-   We use a trick to identify the info pointer: when swapping pointers
-   for threading, we set the low bit of the original pointer, with the
-   result that all the pointers in the chain have their low bits set
-   except for the info pointer.
-   -------------------------------------------------------------------------- */
+   The main difficulty here is that we need to be able to identify the
+   info pointer at the end of the chain.  We can't use the low bits of
+   the pointer for this; they are already being used for
+   pointer-tagging.  What's more, we need to retain the
+   pointer-tagging tag bits on each pointer during the
+   threading/unthreading process.
+
+   Our solution is as follows: 
+     - an info pointer (chain length zero) is identified by having tag 0
+     - in a threaded chain of length > 0:
+        - the pointer-tagging tag bits are attached to the info pointer
+        - the first entry in the chain has tag 1
+        - second and subsequent entries in the chain have tag 2
+
+   This exploits the fact that the tag on each pointer to a given
+   closure is normally the same (if they are not the same, then
+   presumably the tag is not essential and it therefore doesn't matter
+   if we throw away some of the tags).
+   ------------------------------------------------------------------------- */
 
 STATIC_INLINE void
 thread (StgClosure **p)
 {
-    StgClosure *q0 = *p;
-    StgPtr q  = (StgPtr)UNTAG_CLOSURE(q0);
-    nat tag = GET_CLOSURE_TAG(q0);
+    StgClosure *q0;
+    StgPtr q;
+    StgWord iptr;
     bdescr *bd;
+
+    q0  = *p;
+    q   = (StgPtr)UNTAG_CLOSURE(q0);
 
     // It doesn't look like a closure at the moment, because the info
     // ptr is possibly threaded:
     // ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
     
-    // We need one tag value here, because we a non-zero tag to
-    // indicate "not an info pointer".  So we add one to the existing
-    // tag.  If this would overflow the tag bits, we throw away the
-    // original tag (which is safe but pessimistic; tags are optional).
-    if (tag == TAG_MASK)  tag = 0;
-
-    if (HEAP_ALLOCED(q))
-    {
+    if (HEAP_ALLOCED(q)) {
 	bd = Bdescr(q); 
 	// a handy way to discover whether the ptr is into the
 	// compacted area of the old gen, is that the EVACUATED flag
@@ -79,9 +89,23 @@ thread (StgClosure **p)
 	// memory).
 	if ((bd->flags & BF_EVACUATED) == 0)
         {
-	    *(StgPtr)p = (StgWord)*q;
-	    *q = (StgWord)p + tag + 1;	// set the low bit
-	}
+            iptr = *q;
+            switch (GET_CLOSURE_TAG((StgClosure *)iptr))
+            {
+            case 0: 
+                // this is the info pointer; we are creating a new chain.
+                // save the original tag at the end of the chain.
+                *p = (StgClosure *)((StgWord)iptr + GET_CLOSURE_TAG(q0));
+                *q = (StgWord)p + 1;
+                break;
+            case 1:
+            case 2:
+                // this is a chain of length 1 or more
+                *p = (StgClosure *)iptr;
+                *q = (StgWord)p + 2;
+                break;
+            }
+        }
     }
 }
 
@@ -90,34 +114,64 @@ thread (StgClosure **p)
 STATIC_INLINE void thread_ (void *p) { thread((StgClosure **)p); }
 
 STATIC_INLINE void
-unthread( StgPtr p, StgPtr free )
+unthread( StgPtr p, StgWord free )
 {
-    StgWord q = *p, r;
-    nat tag;
-    StgPtr q1;
-    
-    while (GET_CLOSURE_TAG((StgClosure *)q) != 0) {
-	q -= 1;	// restore the original tag
-        tag = GET_CLOSURE_TAG((StgClosure *)q);
-        q1 = (StgPtr)UNTAG_CLOSURE((StgClosure *)q);
-	r = *q1;
-	*q1 = (StgWord)free + tag;
-	q = r;
+    StgWord q, r;
+    StgPtr q0;
+
+    q = *p;
+loop:
+    switch (GET_CLOSURE_TAG((StgClosure *)q))
+    {
+    case 0:
+        // nothing to do; the chain is length zero
+        return;
+    case 1:
+        q0 = (StgPtr)(q-1);
+        r = *q0;  // r is the info ptr, tagged with the pointer-tag
+        *q0 = free;
+        *p = (StgWord)UNTAG_CLOSURE((StgClosure *)r);
+        return;
+    case 2:
+        q0 = (StgPtr)(q-2);
+        r = *q0;
+        *q0 = free;
+        q = r;
+        goto loop;
+    default:
+        barf("unthread");
     }
-    *p = q;
 }
 
-STATIC_INLINE StgInfoTable *
+// Traverse a threaded chain and pull out the info pointer at the end.
+// The info pointer is also tagged with the appropriate pointer tag
+// for this closure, which should be attached to the pointer
+// subsequently passed to unthread().
+STATIC_INLINE StgWord
 get_threaded_info( StgPtr p )
 {
-    StgPtr q = (P_)GET_INFO(UNTAG_CLOSURE((StgClosure *)p));
+    StgWord q;
+    
+    q = (W_)GET_INFO(UNTAG_CLOSURE((StgClosure *)p));
 
-    while (GET_CLOSURE_TAG((StgClosure *)q) != 0) {
-	q = (P_)*((StgPtr)((StgWord)(UNTAG_CLOSURE((StgClosure *)q))));
+loop:
+    switch (GET_CLOSURE_TAG((StgClosure *)q)) 
+    {
+    case 0:
+        ASSERT(LOOKS_LIKE_INFO_PTR(q));
+        return q;
+    case 1:
+    {
+        StgWord r = *(StgPtr)(q-1);
+        ASSERT(LOOKS_LIKE_INFO_PTR(UNTAG_CLOSURE((StgClosure *)r)));
+        return r;
     }
-
-    ASSERT(LOOKS_LIKE_INFO_PTR(q));
-    return INFO_PTR_TO_STRUCT((StgInfoTable *)q);
+    case 2:
+        q = *(StgPtr)(q-2);
+        goto loop;
+    default:
+        barf("get_threaded_info");
+    }
 }
 
 // A word-aligned memmove will be faster for small objects than libc's or gcc's.
@@ -321,8 +375,8 @@ thread_stack(StgPtr p, StgPtr stack_end)
 	    StgRetFun *ret_fun = (StgRetFun *)p;
 	    StgFunInfoTable *fun_info;
 	    
-	    fun_info = itbl_to_fun_itbl(
-		get_threaded_info((StgPtr)ret_fun->fun));
+	    fun_info = FUN_INFO_PTR_TO_STRUCT(UNTAG_CLOSURE((StgClosure *)
+                           get_threaded_info((StgPtr)ret_fun->fun)));
 	         // *before* threading it!
 	    thread(&ret_fun->fun);
 	    p = thread_arg_block(fun_info, ret_fun->payload);
@@ -343,7 +397,8 @@ thread_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
     StgWord bitmap;
     StgFunInfoTable *fun_info;
 
-    fun_info = itbl_to_fun_itbl(get_threaded_info((StgPtr)fun));
+    fun_info = FUN_INFO_PTR_TO_STRUCT(UNTAG_CLOSURE((StgClosure *)
+                        get_threaded_info((StgPtr)fun)));
     ASSERT(fun_info->i.type != PAP);
 
     p = (StgPtr)payload;
@@ -735,6 +790,7 @@ update_fwd_compact( bdescr *blocks )
     bdescr *bd, *free_bd;
     StgInfoTable *info;
     nat size;
+    StgWord iptr;
 
     bd = blocks;
     free_bd = blocks;
@@ -780,7 +836,8 @@ update_fwd_compact( bdescr *blocks )
             // ToDo: one possible avenue of attack is to use the fact
             // that if (p&BLOCK_MASK) >= (free&BLOCK_MASK), then we
             // definitely have enough room.  Also see bug #1147.
-	    info = get_threaded_info(p);
+            iptr = get_threaded_info(p);
+	    info = INFO_PTR_TO_STRUCT(UNTAG_CLOSURE((StgClosure *)iptr));
 
 	    q = p;
 
@@ -799,7 +856,7 @@ update_fwd_compact( bdescr *blocks )
 		ASSERT(is_marked(q+1,bd));
 	    }
 
-	    unthread(q,free);
+	    unthread(q,(StgWord)free + GET_CLOSURE_TAG((StgClosure *)iptr));
 	    free += size;
 #if 0
 	    goto next;
@@ -818,6 +875,7 @@ update_bkwd_compact( step *stp )
     bdescr *bd, *free_bd;
     StgInfoTable *info;
     nat size, free_blocks;
+    StgWord iptr;
 
     bd = free_bd = stp->old_blocks;
     free = free_bd->start;
@@ -862,7 +920,8 @@ update_bkwd_compact( step *stp )
 		free_blocks++;
 	    }
 
-	    unthread(p,free);
+            iptr = get_threaded_info(p);
+	    unthread(p, (StgWord)free + GET_CLOSURE_TAG((StgClosure *)iptr));
 	    ASSERT(LOOKS_LIKE_INFO_PTR(((StgClosure *)p)->header.info));
 	    info = get_itbl((StgClosure *)p);
 	    size = closure_sizeW_((StgClosure *)p,info);
