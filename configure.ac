@@ -609,8 +609,6 @@ AC_SUBST(TargetVendor_CPP)
 
 AC_SUBST(exeext)
 
-FP_FIND_ROOT
-
 dnl --------------------------------------------------------------
 dnl * Project specific configuration options
 dnl --------------------------------------------------------------
@@ -631,6 +629,8 @@ AC_ARG_WITH([ghc],
   fi
   WithGhc="$GHC"])
 AC_SUBST([WithGhc])
+
+FP_FIND_ROOT
 
 AC_ARG_WITH(hc,
 [AC_HELP_STRING([--with-hc=ARG],

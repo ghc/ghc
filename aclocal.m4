@@ -1096,11 +1096,22 @@ AC_REQUIRE([AC_PROG_CC])
 AC_DEFUN([FP_FIND_ROOT],[
 AC_MSG_CHECKING(for path to top of build tree)
 
-hardtop=`pwd`
+dnl This would be
+dnl     make -C utils/pwd clean && make -C utils/pwd
+dnl except we don't want to have to know what make is called. Sigh.
+cd utils/pwd
+rm -f *.o
+rm -f *.hi
+rm -f pwd
+rm -f pwd.exe
+$WithGhc -v0 --make pwd
+cd ../..
+
+hardtop=`utils/pwd/pwd forwardslash`
 
 dnl Remove common automounter nonsense
 dnl
-hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | sed 's|^/tmp_mnt/|/|' | sed 's|^//\(.\)/|\1:/|' `
+hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | sed 's|^/tmp_mnt/|/|'`
 
 dnl Find 'hardtop_plat', the native format for 'hardtop'
 dnl (i.e., right kind of \dnl slashes on a Win32 box, but with b-slashes
