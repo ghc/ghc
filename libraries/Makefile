@@ -235,22 +235,29 @@ $(foreach SUBDIR,$(SUBDIRS),make.library.$(SUBDIR)):\
 make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 		%/GNUmakefile \
                 %/setup/Setup ifBuildable/ifBuildable
-	ifBuildable/ifBuildable $* $(MAKE)
-	ifBuildable/ifBuildable $* setup/Setup register --inplace
+	if ifBuildable/ifBuildable $*; then \
+	  cd $* && \
+	  $(MAKE) $(MFLAGS) && \
+	  setup/Setup register --inplace; \
+	fi
 
 # Build the library using 'setup build' (not the default)
 $(foreach SUBDIR,$(SUBDIRS),build.library.$(SUBDIR)):\
 build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                  %/setup/Setup ifBuildable/ifBuildable
-	ifBuildable/ifBuildable $* setup/Setup build \
-	                                $(addprefix --ghc-option=,$(GhcLibHcOpts))
+	if ifBuildable/ifBuildable $*; then \
+	  cd $* && \
+	  setup/Setup build $(addprefix --ghc-option=,$(GhcLibHcOpts)); \
+	fi
 
 $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/GNUmakefile):\
 %/GNUmakefile: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                  %/setup/Setup ifBuildable/ifBuildable
 	$(RM) $*/GNUmakefile
 	cp Makefile.local $*
-	ifBuildable/ifBuildable $* setup/Setup makefile -f GNUmakefile
+	if ifBuildable/ifBuildable $*; then \
+	   cd $* && setup/Setup makefile -f GNUmakefile; \
+	fi
 
 .PHONY: doc
 
@@ -262,7 +269,9 @@ doc: $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR))
 $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                %/setup/Setup ifBuildable/ifBuildable
-	ifBuildable/ifBuildable $* setup/Setup haddock
+	if ifBuildable/ifBuildable $*; then \
+	  cd $* && setup/Setup haddock; \
+	fi
 
 .PHONY: distclean clean clean.library.%
 
@@ -307,7 +316,10 @@ install-docs:
 # Thus if you install without building then it will just break.
 $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
-	ifBuildable/ifBuildable $* ../installPackage/installPackage $(prefix) $(bindir)/ghc-pkg
+	if ifBuildable/ifBuildable $*; then \
+	  cd $* && \
+	  ../installPackage/installPackage $(prefix) $(bindir)/ghc-pkg; \
+	fi
 
 .PHONY: binary-dist binary-dist.library.%
 
@@ -327,13 +339,15 @@ binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR))
 $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR)): \
 binary-dist.library.%:
 	$(MKDIRHIER) $(BIN_DIST_LIBDIR)/$*
-	ifBuildable/ifBuildable $* cp    $*.cabal      $(BIN_DIST_LIBDIR)/$*
-	ifBuildable/ifBuildable $* cp -a dist          $(BIN_DIST_LIBDIR)/$*
-	# Euch
-	ifBuildable/ifBuildable $* cp -aL include      $(BIN_DIST_LIBDIR)/$* || :
-	ifBuildable/ifBuildable $* $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
-	     \( -name "*_split" -o -name "autogen" \) | xargs rm -rf
-	ifBuildable/ifBuildable $* $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
+	if ifBuildable/ifBuildable $*; then \
+	  cd $* && \
+	  cp    $*.cabal      $(BIN_DIST_LIBDIR)/$* && \
+	  cp -a dist          $(BIN_DIST_LIBDIR)/$* && \
+	# Euch \
+	  (cp -aL include      $(BIN_DIST_LIBDIR)/$* || :) && \
+	  $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
+	     \( -name "*_split" -o -name "autogen" \) | xargs rm -rf && \
+	  $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
 	     \( \( -name "*.o" -o -name "*.p_o" \) -a ! -name "HS*" \) \
-	     -exec rm {} \;
-
+	     -exec rm {} \; ; \
+	fi
