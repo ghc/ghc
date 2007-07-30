@@ -38,9 +38,9 @@ in this Software without prior written authorization from the X Consortium.
   If your master sources are located in /usr/local/src/X and you would like
   your link tree to be in /usr/local/src/new-X, do the following:
 
-   	%  mkdir /usr/local/src/new-X
-	%  cd /usr/local/src/new-X
-   	%  lndir ../X
+        %  mkdir /usr/local/src/new-X
+        %  cd /usr/local/src/new-X
+        %  lndir ../X
 */
 
 #include "lndir-Xos.h"
@@ -81,8 +81,8 @@ in this Software without prior written authorization from the X Consortium.
 #ifdef X_NOT_STDC_ENV
 extern int errno;
 #endif
-int silent = 0;			/* -silent */
-int ignore_links = 0;		/* -ignorelinks */
+int silent = 0;                 /* -silent */
+int ignore_links = 0;           /* -ignorelinks */
 
 char *rcurdir;
 char *curdir;
@@ -131,8 +131,8 @@ msg (
     va_list args;
 #endif
     if (curdir) {
-	fprintf (stderr, "%s:\n", curdir);
-	curdir = 0;
+        fprintf (stderr, "%s:\n", curdir);
+        curdir = 0;
     }
 #if NeedVarargsPrototypes
     va_start(args, fmt);
@@ -149,8 +149,8 @@ mperror (s)
     char *s;
 {
     if (curdir) {
-	fprintf (stderr, "%s:\n", curdir);
-	curdir = 0;
+        fprintf (stderr, "%s:\n", curdir);
+        curdir = 0;
     }
     perror (s);
 }
@@ -163,10 +163,10 @@ int equivalent(lname, rname)
     char *s;
 
     if (!strcmp(lname, rname))
-	return 1;
+        return 1;
     for (s = lname; *s && (s = strchr(s, '/')); s++) {
-	while (s[1] == '/')
-	    strcpy(s+1, s+2);
+        while (s[1] == '/')
+            strcpy(s+1, s+2);
     }
     return !strcmp(lname, rname);
 }
@@ -176,10 +176,10 @@ int equivalent(lname, rname)
    directory.  Assumes that files described by fs and ts are directories. */
 
 dodir (fn, fs, ts, rel)
-char *fn;			/* name of "from" directory, either absolute or
-				   relative to cwd */
-struct stat *fs, *ts;		/* stats for the "from" directory and cwd */
-int rel;			/* if true, prepend "../" to fn before using */
+char *fn;                       /* name of "from" directory, either absolute or
+                                   relative to cwd */
+struct stat *fs, *ts;           /* stats for the "from" directory and cwd */
+int rel;                        /* if true, prepend "../" to fn before using */
 {
     DIR *df;
     struct dirent *dp;
@@ -193,124 +193,124 @@ int rel;			/* if true, prepend "../" to fn before using */
     char *ocurdir;
 
     if ((fs->st_dev == ts->st_dev) && (fs->st_ino == ts->st_ino)) {
-	msg ("%s: From and to directories are identical!", fn);
-	return 1;
+        msg ("%s: From and to directories are identical!", fn);
+        return 1;
     }
 
     if (rel)
-	strcpy (buf, "../");
+        strcpy (buf, "../");
     else
-	buf[0] = '\0';
+        buf[0] = '\0';
     strcat (buf, fn);
     
     if (!(df = opendir (buf))) {
-	msg ("%s: Cannot opendir", buf);
-	return 1;
+        msg ("%s: Cannot opendir", buf);
+        return 1;
     }
 
     p = buf + strlen (buf);
     *p++ = '/';
     n_dirs = fs->st_nlink;
     while (dp = readdir (df)) {
-	if (dp->d_name[strlen(dp->d_name) - 1] == '~')
-	    continue;
-	if (dp->d_name[0] == '.' && dp->d_name[1] == '#') /* 'non-conflict files' left behind by CVS */
-	    continue;
-	strcpy (p, dp->d_name);
+        if (dp->d_name[strlen(dp->d_name) - 1] == '~')
+            continue;
+        if (dp->d_name[0] == '.' && dp->d_name[1] == '#') /* 'non-conflict files' left behind by CVS */
+            continue;
+        strcpy (p, dp->d_name);
 
-	if (n_dirs > 0) {
-	    if (stat (buf, &sb) < 0) {
-		mperror (buf);
-		continue;
-	    }
+        if (n_dirs > 0) {
+            if (stat (buf, &sb) < 0) {
+                mperror (buf);
+                continue;
+            }
 
 #ifdef S_ISDIR
-	    if(S_ISDIR(sb.st_mode))
+            if(S_ISDIR(sb.st_mode))
 #else
-	    if (sb.st_mode & S_IFDIR) 
+            if (sb.st_mode & S_IFDIR) 
 #endif
-	    {
-		/* directory */
+            {
+                /* directory */
 #ifndef __CYGWIN32__   /* don't trust cygwin's n_dirs count */
-		n_dirs--;
+                n_dirs--;
 #endif
-		if (dp->d_name[0] == '.' &&
-		    (dp->d_name[1] == '\0' || (dp->d_name[1] == '.' &&
-					       dp->d_name[2] == '\0')))
-		    continue;
-		if (!strcmp (dp->d_name, "RCS"))
-		    continue;
-		if (!strcmp (dp->d_name, "SCCS"))
-		    continue;
-		if (!strcmp (dp->d_name, "CVS"))
-		    continue;
-		if (!strcmp (dp->d_name, ".svn"))
-		    continue;
-		if (!strcmp (dp->d_name, "_darcs"))
-		    continue;
-		if (!strcmp (dp->d_name, "CVS.adm"))
-		    continue;
-		ocurdir = rcurdir;
-		rcurdir = buf;
-		curdir = silent ? buf : (char *)0;
-		if (!silent)
-		    printf ("%s:\n", buf);
-		if ((stat (dp->d_name, &sc) < 0) && (errno == ENOENT)) {
-		    if (mkdir (dp->d_name, 0777) < 0 ||
-			stat (dp->d_name, &sc) < 0) {
-			mperror (dp->d_name);
-			curdir = rcurdir = ocurdir;
-			continue;
-		    }
-		}
-		if (readlink (dp->d_name, symbuf, sizeof(symbuf) - 1) >= 0) {
-		    msg ("%s: is a link instead of a directory", dp->d_name);
-		    curdir = rcurdir = ocurdir;
-		    continue;
-		}
-		if (chdir (dp->d_name) < 0) {
-		    mperror (dp->d_name);
-		    curdir = rcurdir = ocurdir;
-		    continue;
-		}
-		dodir (buf, &sb, &sc, (buf[0] != '/'));
-		if (chdir ("..") < 0)
-		    quiterr (1, "..");
-		curdir = rcurdir = ocurdir;
-		continue;
-	    }
-	}
+                if (dp->d_name[0] == '.' &&
+                    (dp->d_name[1] == '\0' || (dp->d_name[1] == '.' &&
+                                               dp->d_name[2] == '\0')))
+                    continue;
+                if (!strcmp (dp->d_name, "RCS"))
+                    continue;
+                if (!strcmp (dp->d_name, "SCCS"))
+                    continue;
+                if (!strcmp (dp->d_name, "CVS"))
+                    continue;
+                if (!strcmp (dp->d_name, ".svn"))
+                    continue;
+                if (!strcmp (dp->d_name, "_darcs"))
+                    continue;
+                if (!strcmp (dp->d_name, "CVS.adm"))
+                    continue;
+                ocurdir = rcurdir;
+                rcurdir = buf;
+                curdir = silent ? buf : (char *)0;
+                if (!silent)
+                    printf ("%s:\n", buf);
+                if ((stat (dp->d_name, &sc) < 0) && (errno == ENOENT)) {
+                    if (mkdir (dp->d_name, 0777) < 0 ||
+                        stat (dp->d_name, &sc) < 0) {
+                        mperror (dp->d_name);
+                        curdir = rcurdir = ocurdir;
+                        continue;
+                    }
+                }
+                if (readlink (dp->d_name, symbuf, sizeof(symbuf) - 1) >= 0) {
+                    msg ("%s: is a link instead of a directory", dp->d_name);
+                    curdir = rcurdir = ocurdir;
+                    continue;
+                }
+                if (chdir (dp->d_name) < 0) {
+                    mperror (dp->d_name);
+                    curdir = rcurdir = ocurdir;
+                    continue;
+                }
+                dodir (buf, &sb, &sc, (buf[0] != '/'));
+                if (chdir ("..") < 0)
+                    quiterr (1, "..");
+                curdir = rcurdir = ocurdir;
+                continue;
+            }
+        }
 
-	/* non-directory */
-	symlen = readlink (dp->d_name, symbuf, sizeof(symbuf) - 1);
-	if (symlen >= 0)
-	    symbuf[symlen] = '\0';
+        /* non-directory */
+        symlen = readlink (dp->d_name, symbuf, sizeof(symbuf) - 1);
+        if (symlen >= 0)
+            symbuf[symlen] = '\0';
 
-	/* The option to ignore links exists mostly because
-	   checking for them slows us down by 10-20%.
-	   But it is off by default because this really is a useful check. */
-	if (!ignore_links) {
-	    /* see if the file in the base tree was a symlink */
-	    basesymlen = readlink(buf, basesym, sizeof(basesym) - 1);
-	    if (basesymlen >= 0)
-		basesym[basesymlen] = '\0';
-	}
+        /* The option to ignore links exists mostly because
+           checking for them slows us down by 10-20%.
+           But it is off by default because this really is a useful check. */
+        if (!ignore_links) {
+            /* see if the file in the base tree was a symlink */
+            basesymlen = readlink(buf, basesym, sizeof(basesym) - 1);
+            if (basesymlen >= 0)
+                basesym[basesymlen] = '\0';
+        }
 
-	if (symlen >= 0) {
-	  if (!equivalent (basesymlen>=0 ? basesym : buf, symbuf)) {
-	    if (force) {
-	      unlink(dp->d_name);
-	      if (symlink (basesymlen>=0 ? basesym : buf, dp->d_name) < 0)
-		mperror (dp->d_name);
-	    } else {
-	      /* Link exists in new tree.  Print message if it doesn't match. */
-	      msg ("%s: %s", dp->d_name, symbuf);
-	    }
-	  }
-	} else {
-	  if (symlink (basesymlen>=0 ? basesym : buf, dp->d_name) < 0)
-	    mperror (dp->d_name);
-	}
+        if (symlen >= 0) {
+          if (!equivalent (basesymlen>=0 ? basesym : buf, symbuf)) {
+            if (force) {
+              unlink(dp->d_name);
+              if (symlink (basesymlen>=0 ? basesym : buf, dp->d_name) < 0)
+                mperror (dp->d_name);
+            } else {
+              /* Link exists in new tree.  Print message if it doesn't match. */
+              msg ("%s: %s", dp->d_name, symbuf);
+            }
+          }
+        } else {
+          if (symlink (basesymlen>=0 ? basesym : buf, dp->d_name) < 0)
+            mperror (dp->d_name);
+        }
     }
     
     closedir (df);
@@ -340,21 +340,21 @@ char **av;
 
     while (++av, --ac) {
       if (strcmp(*av, "-silent") == 0)
-	  silent = 1;
+          silent = 1;
       else if (strcmp(*av, "-f") == 0)
-	  force = 1;
+          force = 1;
       else if (strcmp(*av, "-ignorelinks") == 0)
-	  ignore_links = 1;
+          ignore_links = 1;
       else if (strcmp(*av, "--") == 0) {
-	  ++av, --ac;
-	  break;
+          ++av, --ac;
+          break;
       } else
-	  break;
+          break;
     }
 
     if (ac < 1 || ac > 2)
-	quit (1, "usage: %s [-f] [-silent] [-ignorelinks] fromdir [todir]",
-	      prog_name);
+        quit (1, "usage: %s [-f] [-silent] [-ignorelinks] fromdir [todir]",
+              prog_name);
 
 #ifdef __CYGWIN32__
     cygwin_conv_to_full_posix_path(av[0], fn);
@@ -363,9 +363,9 @@ char **av;
 #endif
 
     if (ac == 2)
-	tn = av[1];
+        tn = av[1];
     else
-	tn = ".";
+        tn = ".";
 
     /* to directory */
     if (stat (tn, &ts) < 0) {
@@ -373,27 +373,27 @@ char **av;
          mkdir(tn, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH );
       } 
       else {
-	quiterr (1, tn);
+        quiterr (1, tn);
 #ifdef S_ISDIR
         if (!(S_ISDIR(ts.st_mode)))
 #else
         if (!(ts.st_mode & S_IFDIR))
 #endif
-	   quit (2, "%s: Not a directory", tn);
+           quit (2, "%s: Not a directory", tn);
       }
     }
     if (chdir (tn) < 0)
-	quiterr (1, tn);
+        quiterr (1, tn);
 
     /* from directory */
     if (stat (fn, &fs) < 0)
-	quiterr (1, fn);
+        quiterr (1, fn);
 #ifdef S_ISDIR
     if (!(S_ISDIR(fs.st_mode)))
 #else
     if (!(fs.st_mode & S_IFDIR))
 #endif
-	quit (2, "%s: Not a directory", fn);
+        quit (2, "%s: Not a directory", fn);
 
     exit (dodir (fn, &fs, &ts, 0));
 }
