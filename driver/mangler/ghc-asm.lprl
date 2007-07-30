@@ -59,27 +59,13 @@ for the same reason.  Advantage: No more ridiculous call sequences.
 %************************************************************************
 
 \begin{code}
-############################################################################
-# Make all regexp matching multi-line aware.  This replaces the line below
-# originally found in "sub mangle_asm":
-#
-#  local($*) = 1;
-#
-# This used to work, but Perl 5.10 removes support for $*, so we uses an
-# equivalent construct that works in Perl 5.6 and later.
-#
-BEGIN { if ($] >= 5.010) {
-    require overload; overload::constant( qr => sub { "(?m:$_[1])" } );
-} }
-############################################################################
-
 $TargetPlatform = $TARGETPLATFORM;
 
-($Pgm = $0) =~ s|.*/||;
+($Pgm = $0) =~ s|.*/||m;
 $ifile = $ARGV[0];
 $ofile = $ARGV[1];
 
-if ( $TargetPlatform =~ /^i386-/ ) {
+if ( $TargetPlatform =~ /^i386-/m ) {
     if ($ARGV[2] eq '') {
 	$StolenX86Regs = 4;
     } else {
@@ -102,7 +88,7 @@ exit(0);
 sub init_TARGET_STUFF {
 
     #--------------------------------------------------------#
-    if ( $TargetPlatform =~ /^alpha-.*-.*/ ) {
+    if ( $TargetPlatform =~ /^alpha-.*-.*/m ) {
 
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = ''; # _ if symbols have an underscore on the front
@@ -125,7 +111,7 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\.text\n\t\.align 3\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^hppa/ ) {
+    } elsif ( $TargetPlatform =~ /^hppa/m ) {
 
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = ''; # _ if symbols have an underscore on the front
@@ -148,7 +134,7 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\t.SPACE \$TEXT\$\n\t.SUBSPA \$CODE\$\n\t\.align 4\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd2|nextstep3|cygwin32|mingw32)$/ ) {
+    } elsif ( $TargetPlatform =~ /^i386-.*-(linuxaout|freebsd2|nextstep3|cygwin32|mingw32)$/m ) {
 				# NeXT added but not tested. CaS
 
     $T_STABBY	    = 1; # 1 iff .stab things (usually if a.out format)
@@ -174,12 +160,12 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\.text\n\t\.align 2\n"; # NB: requires padding
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux|gnu|freebsd|netbsd|openbsd|kfreebsdgnu)$/ ) {
+    } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux|gnu|freebsd|netbsd|openbsd|kfreebsdgnu)$/m ) {
 
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = ''; # _ if symbols have an underscore on the front
     $T_PRE_APP	    = # regexp that says what comes before APP/NO_APP
-		      ($TargetPlatform =~ /-(linux|gnu|freebsd|netbsd|openbsd)$/) ? '#' : '/' ;
+		      ($TargetPlatform =~ /-(linux|gnu|freebsd|netbsd|openbsd)$/m) ? '#' : '/' ;
     $T_CONST_LBL    = '^\.LC(\d+):$'; # regexp for what such a lbl looks like
     $T_POST_LBL	    = ':';
     $T_X86_PRE_LLBL_PAT = '\.L';
@@ -187,7 +173,7 @@ sub init_TARGET_STUFF {
     $T_X86_BADJMP   = '^\tjmp\s+[^\.\*]';
 
     $T_MOVE_DIRVS   = '^(\s*(\.(p2)?align\s.*|\.globl\s+\S+|\.text|\.data|\.section\s+.*|\.type\s+.*|\.size\s+\S+\s*,\s*\d+|\.ident.*|\.local.*)\n)';
-    if ( $TargetPlatform =~ /solaris2/ ) {
+    if ( $TargetPlatform =~ /solaris2/m ) {
             # newer Solaris linkers are picky about .size information, so
             # omit it (see #1421)
             $T_COPY_DIRVS   = '^\s*\.(globl|local)';
@@ -207,7 +193,7 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\.text\n\t\.align 4\n"; # NB: requires padding
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^ia64-.*-linux$/ ) {
+    } elsif ( $TargetPlatform =~ /^ia64-.*-linux$/m ) {
 
     $T_STABBY       = 0; # 1 iff .stab things (usually if a.out format)
     $T_US           = ''; # _ if symbols have an underscore on the front
@@ -230,7 +216,7 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\.text\n\t\.align 8\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^x86_64-.*-(linux|openbsd)$/ ) {
+    } elsif ( $TargetPlatform =~ /^x86_64-.*-(linux|openbsd)$/m ) {
 
     $T_STABBY       = 0; # 1 iff .stab things (usually if a.out format)
     $T_US           = ''; # _ if symbols have an underscore on the front
@@ -266,7 +252,7 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\.text\n\t\.align 8\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^m68k-.*-sunos4/ ) {
+    } elsif ( $TargetPlatform =~ /^m68k-.*-sunos4/m ) {
 
     $T_STABBY	    = 1; # 1 iff .stab things (usually if a.out format)
     $T_US	    = '_'; # _ if symbols have an underscore on the front
@@ -289,7 +275,7 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\.text\n\t\.even\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^mips-.*/ ) {
+    } elsif ( $TargetPlatform =~ /^mips-.*/m ) {
 
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = ''; # _ if symbols have an underscore on the front
@@ -312,7 +298,7 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^powerpc-apple-darwin.*/ ) {
+    } elsif ( $TargetPlatform =~ /^powerpc-apple-darwin.*/m ) {
 				# Apple PowerPC Darwin/MacOS X.
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = '_'; # _ if symbols have an underscore on the front
@@ -337,7 +323,7 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^i386-apple-darwin.*/ ) {
+    } elsif ( $TargetPlatform =~ /^i386-apple-darwin.*/m ) {
 				# Apple PowerPC Darwin/MacOS X.
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = '_'; # _ if symbols have an underscore on the front
@@ -366,7 +352,7 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^x86_64-apple-darwin.*/ ) {
+    } elsif ( $TargetPlatform =~ /^x86_64-apple-darwin.*/m ) {
 				# Apple PowerPC Darwin/MacOS X.
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = '_'; # _ if symbols have an underscore on the front
@@ -392,7 +378,7 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^powerpc-.*-linux/ ) {
+    } elsif ( $TargetPlatform =~ /^powerpc-.*-linux/m ) {
 				# PowerPC Linux
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = ''; # _ if symbols have an underscore on the front
@@ -416,7 +402,7 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^powerpc64-.*-linux/ ) {
+    } elsif ( $TargetPlatform =~ /^powerpc64-.*-linux/m ) {
 				# PowerPC 64 Linux
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = '\.'; # _ if symbols have an underscore on the front
@@ -440,7 +426,7 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\t\.text\n\t\.align 2\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^sparc-.*-(solaris2|openbsd)/ ) {
+    } elsif ( $TargetPlatform =~ /^sparc-.*-(solaris2|openbsd)/m ) {
 
     $T_STABBY	    = 0; # 1 iff .stab things (usually if a.out format)
     $T_US	    = ''; # _ if symbols have an underscore on the front
@@ -463,7 +449,7 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\.text\n\t\.align 4\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^sparc-.*-sunos4/ ) {
+    } elsif ( $TargetPlatform =~ /^sparc-.*-sunos4/m ) {
 
     $T_STABBY	    = 1; # 1 iff .stab things (usually if a.out format)
     $T_US	    = '_'; # _ if symbols have an underscore on the front
@@ -486,7 +472,7 @@ sub init_TARGET_STUFF {
     $T_HDR_vector   = "\.text\n\t\.align 4\n";
 
     #--------------------------------------------------------#
-    } elsif ( $TargetPlatform =~ /^sparc-.*-linux/ ) {
+    } elsif ( $TargetPlatform =~ /^sparc-.*-linux/m ) {
     $T_STABBY       = 0; # 1 iff .stab things (usually if a.out format)
     $T_US           = ''; # _ if symbols have an underscore on the front
     $T_PRE_APP      = '#'; # regexp that says what comes before APP/NO_APP
@@ -526,7 +512,7 @@ print STDERR "T_US: $T_US\n";
 print STDERR "T_PRE_APP: $T_PRE_APP\n";
 print STDERR "T_CONST_LBL: $T_CONST_LBL\n";
 print STDERR "T_POST_LBL: $T_POST_LBL\n";
-if ( $TargetPlatform =~ /^i386-/ ) {
+if ( $TargetPlatform =~ /^i386-/m ) {
     print STDERR "T_X86_PRE_LLBL_PAT: $T_X86_PRE_LLBL_PAT\n";
     print STDERR "T_X86_PRE_LLBL: $T_X86_PRE_LLBL\n";
     print STDERR "T_X86_BADJMP: $T_X86_BADJMP\n";
@@ -557,7 +543,6 @@ print STDERR "T_HDR_vector: $T_HDR_vector\n";
 sub mangle_asm {
     local($in_asmf, $out_asmf) = @_;
     local($i, $c);
-    local($*) = 1;
 
     # ia64-specific information for code chunks
     my $ia64_locnum;
@@ -588,18 +573,18 @@ sub mangle_asm {
     $i = 0; $chkcat[0] = 'misc'; $chk[0] = '';
 
     while (<INASM>) {
-	tr/\r//d if $TargetPlatform =~ /-mingw32$/; # In case Perl doesn't convert line endings
-	next if $T_STABBY && /^\.stab.*${T_US}__stg_split_marker/o;
-	next if $T_STABBY && /^\.stab.*ghc.*c_ID/;
-	next if /^\t\.def.*endef$/;
-	next if /${T_PRE_APP}(NO_)?APP/o; 
-    	next if /^;/ && $TargetPlatform =~ /^hppa/;
+	tr/\r//d if $TargetPlatform =~ /-mingw32$/m; # In case Perl doesn't convert line endings
+	next if $T_STABBY && /^\.stab.*${T_US}__stg_split_marker/om;
+	next if $T_STABBY && /^\.stab.*ghc.*c_ID/m;
+	next if /^\t\.def.*endef$/m;
+	next if /${T_PRE_APP}(NO_)?APP/om; 
+    	next if /^;/m && $TargetPlatform =~ /^hppa/m;
 
-	next if /(^$|^\t\.file\t|^ # )/ && $TargetPlatform =~ /^(mips|ia64)-/;
+	next if /(^$|^\t\.file\t|^ # )/m && $TargetPlatform =~ /^(mips|ia64)-/m;
 
-	if ( $TargetPlatform =~ /^mips-/ 
-	  && /^\t\.(globl\S+\.text|comm\t)/ ) {
-	    $EXTERN_DECLS .= $_ unless /(__DISCARD__|\b(PK_|ASSIGN_)(FLT|DBL)\b)/;
+	if ( $TargetPlatform =~ /^mips-/m 
+	  && /^\t\.(globl\S+\.text|comm\t)/m ) {
+	    $EXTERN_DECLS .= $_ unless /(__DISCARD__|\b(PK_|ASSIGN_)(FLT|DBL)\b)/m;
 	# Treat .comm variables as data.  These show up in two (known) places:
 	#
 	#    - the module_registered variable used in the __stginit fragment.
@@ -610,81 +595,81 @@ sub mangle_asm {
 	#    - global variables used to pass arguments from C to STG in
 	#      a foreign export.  (is this still true? --SDM)
 	# 
-	} elsif ( /^\t\.comm.*$/ ) {
+	} elsif ( /^\t\.comm.*$/m ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'data';
 	    $chksymb[$i] = '';
 
 	# Labels ending "_str": these are literal strings.
-	} elsif ( /^${T_US}([A-Za-z0-9_]+)_str${T_POST_LBL}$/ ) {
+	} elsif ( /^${T_US}([A-Za-z0-9_]+)_str${T_POST_LBL}$/m ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'relrodata';
 	    $chksymb[$i] = '';
-        } elsif ( $TargetPlatform =~ /-darwin/
-                && (/^\s*\.subsections_via_symbols/
-                  ||/^\s*\.no_dead_strip.*/)) {
+        } elsif ( $TargetPlatform =~ /-darwin/m
+                && (/^\s*\.subsections_via_symbols/m
+                  ||/^\s*\.no_dead_strip.*/m)) {
             # Don't allow Apple's linker to do any dead-stripping of symbols
             # in this file, because it will mess up info-tables in mangled
             # code.
             # The .no_dead_strip directives are actually put there by
             # the gcc3 "used" attribute on entry points.
         
-        } elsif ( $TargetPlatform =~ /^.*-apple-darwin.*/ && ( 
-		   /^\s*\.picsymbol_stub/
-		|| /^\s*\.section __TEXT,__picsymbol_stub\d,.*/
-		|| /^\s*\.section __TEXT,__picsymbolstub\d,.*/
-		|| /^\s*\.symbol_stub/
-		|| /^\s*\.section __TEXT,__symbol_stub\d,.*/
-		|| /^\s*\.section __TEXT,__symbolstub\d,.*/
-		|| /^\s*\.lazy_symbol_pointer/
-		|| /^\s*\.non_lazy_symbol_pointer/
-		|| /^\s*\.section __IMPORT.*/))
+        } elsif ( $TargetPlatform =~ /^.*-apple-darwin.*/m && ( 
+		   /^\s*\.picsymbol_stub/m
+		|| /^\s*\.section __TEXT,__picsymbol_stub\d,.*/m
+		|| /^\s*\.section __TEXT,__picsymbolstub\d,.*/m
+		|| /^\s*\.symbol_stub/m
+		|| /^\s*\.section __TEXT,__symbol_stub\d,.*/m
+		|| /^\s*\.section __TEXT,__symbolstub\d,.*/m
+		|| /^\s*\.lazy_symbol_pointer/m
+		|| /^\s*\.non_lazy_symbol_pointer/m
+		|| /^\s*\.section __IMPORT.*/m))
 	{
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'dyld';
 	    $chksymb[$i] = '';
 	    $dyld_section = $_;
 
-	} elsif ( $TargetPlatform =~ /^.*-apple-darwin.*/ && $chkcat[$i] eq 'dyld' && /^\s*\.data/)
+	} elsif ( $TargetPlatform =~ /^.*-apple-darwin.*/m && $chkcat[$i] eq 'dyld' && /^\s*\.data/m)
 	{	# non_lazy_symbol_ptrs that point to local symbols
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'dyld';
 	    $chksymb[$i] = '';
 	    $dyld_section = $_;
-	} elsif ( $TargetPlatform =~ /^.*-apple-darwin.*/ && $chkcat[$i] eq 'dyld' && /^\s*\.align/)
+	} elsif ( $TargetPlatform =~ /^.*-apple-darwin.*/m && $chkcat[$i] eq 'dyld' && /^\s*\.align/m)
 	{	# non_lazy_symbol_ptrs that point to local symbols
 	    $dyld_section .= $_;
-	} elsif ( $TargetPlatform =~ /^.*-apple-darwin.*/ && $chkcat[$i] eq 'dyld' && /^L_.*:$/)
+	} elsif ( $TargetPlatform =~ /^.*-apple-darwin.*/m && $chkcat[$i] eq 'dyld' && /^L_.*:$/m)
 	{	# non_lazy_symbol_ptrs that point to local symbols
 	    $chk[++$i]   = $dyld_section . $_;
 	    $chkcat[$i]  = 'dyld';
 	    $chksymb[$i] = '';
 
-	} elsif ( /^\s+/ ) { # most common case first -- a simple line!
+	} elsif ( /^\s+/m ) { # most common case first -- a simple line!
 	    # duplicated from the bottom
 
 	    $chk[$i] .= $_;
 
-	} elsif ( /\.\.ng:$/ && $TargetPlatform =~ /^alpha-/ ) {
+	} elsif ( /\.\.ng:$/m && $TargetPlatform =~ /^alpha-/m ) {
 	    # Alphas: Local labels not to be confused with new chunks
 	    $chk[$i] .= $_;
 	# NB: all the rest start with a non-space
 
-	} elsif ( $TargetPlatform =~ /^mips-/
-	       && /^\d+:/ ) { # a funny-looking very-local label
+	} elsif ( $TargetPlatform =~ /^mips-/m
+	       && /^\d+:/m ) { # a funny-looking very-local label
 	    $chk[$i] .= $_;
 
-	} elsif ( /$T_CONST_LBL/o ) {
+	} elsif ( /$T_CONST_LBL/om ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'literal';
 	    $chksymb[$i] = $1;
 
-	} elsif ( /^${T_US}__stg_split_marker(\d*)${T_POST_LBL}$/o ) {
+	} elsif ( /^${T_US}__stg_split_marker(\d*)${T_POST_LBL}$/om ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'splitmarker';
 	    $chksymb[$i] = $1;
 
-	} elsif ( /^${T_US}([A-Za-z0-9_]+)_info${T_POST_LBL}$/o ) {
+	} elsif ( /^${T_US}([A-Za-z0-9_]+)_info${T_POST_LBL}$/om ) {
 	    $symb = $1;
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'infotbl';
@@ -694,79 +679,79 @@ sub mangle_asm {
 
 	    $infochk{$symb} = $i;
 
-	} elsif ( /^${T_US}([A-Za-z0-9_]+)_(entry|ret)${T_POST_LBL}$/o ) {
+	} elsif ( /^${T_US}([A-Za-z0-9_]+)_(entry|ret)${T_POST_LBL}$/om ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'entry';
 	    $chksymb[$i] = $1;
 
 	    $entrychk{$1} = $i;
 
-	} elsif ( /^${T_US}([A-Za-z0-9_]+)_closure${T_POST_LBL}$/o ) {
+	} elsif ( /^${T_US}([A-Za-z0-9_]+)_closure${T_POST_LBL}$/om ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'closure';
 	    $chksymb[$i] = $1;
 
 	    $closurechk{$1} = $i;
 
-	} elsif ( /^${T_US}([A-Za-z0-9_]+)_srt${T_POST_LBL}$/o ) {
+	} elsif ( /^${T_US}([A-Za-z0-9_]+)_srt${T_POST_LBL}$/om ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'srt';
 	    $chksymb[$i] = $1;
 
 	    $srtchk{$1} = $i;
 
-	} elsif ( /^${T_US}([A-Za-z0-9_]+)_ct${T_POST_LBL}$/o ) {
+	} elsif ( /^${T_US}([A-Za-z0-9_]+)_ct${T_POST_LBL}$/om ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'data';
 	    $chksymb[$i] = '';
 
-	} elsif ( /^${T_US}(stg_ap_stack_entries|stg_stack_save_entries|stg_arg_bitmaps)${T_POST_LBL}$/o ) {
+	} elsif ( /^${T_US}(stg_ap_stack_entries|stg_stack_save_entries|stg_arg_bitmaps)${T_POST_LBL}$/om ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'data';
 	    $chksymb[$i] = '';
 
-	} elsif ( /^(${T_US}__gnu_compiled_c|gcc2_compiled\.)${T_POST_LBL}/o ) {
+	} elsif ( /^(${T_US}__gnu_compiled_c|gcc2_compiled\.)${T_POST_LBL}/om ) {
 	    ; # toss it
 
-	} elsif ( /^${T_US}[A-Za-z0-9_]+\.\d+${T_POST_LBL}$/o
-	       || /^${T_US}.*_CAT${T_POST_LBL}$/o 		# PROF: _entryname_CAT
-	       || /^${T_US}.*_done${T_POST_LBL}$/o		# PROF: _module_done
-	       || /^${T_US}_module_registered${T_POST_LBL}$/o	# PROF: _module_registered
+	} elsif ( /^${T_US}[A-Za-z0-9_]+\.\d+${T_POST_LBL}$/om
+	       || /^${T_US}.*_CAT${T_POST_LBL}$/om 		# PROF: _entryname_CAT
+	       || /^${T_US}.*_done${T_POST_LBL}$/om		# PROF: _module_done
+	       || /^${T_US}_module_registered${T_POST_LBL}$/om	# PROF: _module_registered
 	       ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'data';
 	    $chksymb[$i] = '';
 
-	} elsif ( /^([A-Za-z0-9_]+)\s+\.comm/ && $TargetPlatform =~ /^hppa/ ) {
+	} elsif ( /^([A-Za-z0-9_]+)\s+\.comm/m && $TargetPlatform =~ /^hppa/m ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'bss';
   	    $chksymb[$i] = '';
 
-	} elsif ( /^${T_US}([A-Za-z0-9_]+)_cc(s)?${T_POST_LBL}$/o ) {
+	} elsif ( /^${T_US}([A-Za-z0-9_]+)_cc(s)?${T_POST_LBL}$/om ) {
             # all CC_ symbols go in the data section...
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'data';
 	    $chksymb[$i] = '';
 
-        } elsif ( /^${T_US}([A-Za-z0-9_]+)_hpc${T_POST_LBL}$/o ) {
+        } elsif ( /^${T_US}([A-Za-z0-9_]+)_hpc${T_POST_LBL}$/om ) {
            # hpc shares tick boxes across modules
            $chk[++$i]   = $_;
            $chkcat[$i]  = 'data';
            $chksymb[$i] = '';
 
-	} elsif ( /^${T_US}([A-Za-z0-9_]+)_(alt|dflt)${T_POST_LBL}$/o ) {
+	} elsif ( /^${T_US}([A-Za-z0-9_]+)_(alt|dflt)${T_POST_LBL}$/om ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'misc';
 	    $chksymb[$i] = '';
-	} elsif ( /^${T_US}([A-Za-z0-9_]+)_vtbl${T_POST_LBL}$/o ) {
+	} elsif ( /^${T_US}([A-Za-z0-9_]+)_vtbl${T_POST_LBL}$/om ) {
 	    $chk[++$i]   = $_;
 	    $chkcat[$i]  = 'vector';
 	    $chksymb[$i] = $1;
 
 	    $vectorchk{$1} = $i;
 
-	} elsif ( $TargetPlatform =~ /^i386-.*-solaris2/
-	     &&   /^[A-Za-z0-9][A-Za-z0-9_]*:/ ) {
+	} elsif ( $TargetPlatform =~ /^i386-.*-solaris2/m
+	     &&   /^[A-Za-z0-9][A-Za-z0-9_]*:/m ) {
             # Some Solaris system headers contain function definitions (as
 	    # opposed to mere prototypes), which end up in the .hc file when
 	    # a Haskell module foreign imports the corresponding system 
@@ -778,7 +763,7 @@ sub mangle_asm {
 	    $chkcat[$i]  = 'misc';
 	    $chksymb[$i] = $1;
 
-        } elsif ( $TargetPlatform =~ /^i386-apple-darwin/ && /^(___i686\.get_pc_thunk\.[abcd]x):/o) {
+        } elsif ( $TargetPlatform =~ /^i386-apple-darwin/m && /^(___i686\.get_pc_thunk\.[abcd]x):/om) {
                 # To handle PIC on Darwin/x86, we need to appropriately pass through
                 # the get_pc_thunk functions. The need to be put into a special section
                 # marked as coalesced (otherwise the .weak_definition doesn't work
@@ -787,31 +772,31 @@ sub mangle_asm {
             $chkcat[$i]  = 'get_pc_thunk';
             $chksymb[$i] = $1;
 
-	} elsif ( /^${T_US}[A-Za-z0-9_]/o
-		&& ( $TargetPlatform !~ /^hppa/ # need to avoid local labels in this case
-		   || ! /^L\$\d+$/ ) 
-		&& ( $TargetPlatform !~ /^powerpc64/ # we need to avoid local labels in this case
-		   || ! /^\.L\d+:$/ ) ) {
+	} elsif ( /^${T_US}[A-Za-z0-9_]/om
+		&& ( $TargetPlatform !~ /^hppa/m # need to avoid local labels in this case
+		   || ! /^L\$\d+$/m ) 
+		&& ( $TargetPlatform !~ /^powerpc64/m # we need to avoid local labels in this case
+		   || ! /^\.L\d+:$/m ) ) {
 	    local($thing);
 	    chop($thing = $_);
-	    $thing =~ s/:$//;
+	    $thing =~ s/:$//m;
 	    $chk[++$i]   = $_;
 	    $chksymb[$i] = '';
 	    if (
-		       /^${T_US}stg_.*${T_POST_LBL}$/o          # RTS internals
-		    || /^${T_US}__stg_.*${T_POST_LBL}$/o        # more RTS internals
-		    || /^${T_US}__fexp_.*${T_POST_LBL}$/o       # foreign export
-		    || /^${T_US}.*_slow${T_POST_LBL}$/o         # slow entry
-		    || /^${T_US}__stginit.*${T_POST_LBL}$/o     # __stginit<module>
-		    || /^${T_US}.*_btm${T_POST_LBL}$/o          # large bitmaps
-		    || /^${T_US}.*_fast${T_POST_LBL}$/o         # primops
-                    || /^_uname:/o			        # x86/Solaris2
+		       /^${T_US}stg_.*${T_POST_LBL}$/om          # RTS internals
+		    || /^${T_US}__stg_.*${T_POST_LBL}$/om        # more RTS internals
+		    || /^${T_US}__fexp_.*${T_POST_LBL}$/om       # foreign export
+		    || /^${T_US}.*_slow${T_POST_LBL}$/om         # slow entry
+		    || /^${T_US}__stginit.*${T_POST_LBL}$/om     # __stginit<module>
+		    || /^${T_US}.*_btm${T_POST_LBL}$/om          # large bitmaps
+		    || /^${T_US}.*_fast${T_POST_LBL}$/om         # primops
+                    || /^_uname:/om			        # x86/Solaris2
 		)
             {
 	    	$chkcat[$i]  = 'misc';
             } elsif (
-		       /^${T_US}.*_srtd${T_POST_LBL}$/o          # large bitmaps
-		    || /^${T_US}.*_closure_tbl${T_POST_LBL}$/o  # closure tables
+		       /^${T_US}.*_srtd${T_POST_LBL}$/om          # large bitmaps
+		    || /^${T_US}.*_closure_tbl${T_POST_LBL}$/om  # closure tables
                 )
             {
                 $chkcat[$i] = 'relrodata';
@@ -821,7 +806,7 @@ sub mangle_asm {
 	    	$chkcat[$i]  = 'unknown';
 	    }
 
-	} elsif ( $TargetPlatform =~ /^powerpc-.*-linux/ && /^\.LCTOC1 = /o ) {
+	} elsif ( $TargetPlatform =~ /^powerpc-.*-linux/m && /^\.LCTOC1 = /om ) {
 		# PowerPC Linux's large-model PIC (-fPIC) generates a gobal offset
 		# table "by hand". Be sure to copy it over.
 		# Note that this label and all entries in the table should actually
@@ -852,8 +837,8 @@ sub mangle_asm {
     # about the whole module before we start spitting
     # output.
 
-    local($FIRST_MANGLABLE) = ($TargetPlatform =~ /^(alpha-|hppa|mips-)/) ? 1 : 0;
-    local($FIRST_TOSSABLE ) = ($TargetPlatform =~ /^(hppa|mips-)/) ? 1 : 0;
+    local($FIRST_MANGLABLE) = ($TargetPlatform =~ /^(alpha-|hppa|mips-)/m) ? 1 : 0;
+    local($FIRST_TOSSABLE ) = ($TargetPlatform =~ /^(hppa|mips-)/m) ? 1 : 0;
 
 #   print STDERR "first chunk to mangle: $FIRST_MANGLABLE\n";
 
@@ -872,22 +857,22 @@ sub mangle_asm {
 
 	# toss all prologue stuff; HPPA is pretty weird
 	# (see elsewhere)
-	$c = &hppa_mash_prologue($c) if $TargetPlatform =~ /^hppa-/;
+	$c = &hppa_mash_prologue($c) if $TargetPlatform =~ /^hppa-/m;
 
 	undef $ia64_locnum;
 	undef $ia64_outnum;
 
 	# be slightly paranoid to make sure there's
 	# nothing surprising in there
-	if ( $c =~ /--- BEGIN ---/ ) {
-	    if (($p, $r) = split(/--- BEGIN ---/, $c)) {
+	if ( $c =~ /--- BEGIN ---/m ) {
+	    if (($p, $r) = split(/--- BEGIN ---/m, $c)) {
 
 		# remove junk whitespace around the split point
-		$p =~ s/\t+$//;
-		$r =~ s/^\s*\n//;
+		$p =~ s/\t+$//m;
+		$r =~ s/^\s*\n//m;
 
-		if ($TargetPlatform =~ /^i386-/) {
-		    if ($p =~ /^\tsubl\s+\$(\d+),\s*\%esp\n/) {
+		if ($TargetPlatform =~ /^i386-/m) {
+		    if ($p =~ /^\tsubl\s+\$(\d+),\s*\%esp\n/m) {
 			if ($1 >= 8192) {
 			    die "Error: reserved stack space exceeded!\n  Possible workarounds: compile with -fasm, or try another version of gcc.\n"
 			}
@@ -907,20 +892,20 @@ sub mangle_asm {
 		# away the initialisation.  Let's live dangerously and
 		# discard these initalisations.
 
-		    $p =~ s/^\tpushl\s+\%e(di|si|bx)\n//g;
-		    $p =~ s/^\txorl\s+\%e(ax|cx|dx),\s*\%e(ax|cx|dx)\n//g;
-		    $p =~ s/^\tmovl\s+\%e(ax|cx|dx|si|di),\s*\d*\(\%esp\)\n//g;
-		    $p =~ s/^\tmovl\s+\$\d+,\s*\d*\(\%esp\)\n//g;
-		    $p =~ s/^\tsubl\s+\$\d+,\s*\%esp\n//;
-                    $p =~ s/^\tmovl\s+\$\d+,\s*\%eax\n\tcall\s+__alloca\n// if ($TargetPlatform =~ /^.*-(cygwin32|mingw32)/);
+		    $p =~ s/^\tpushl\s+\%e(di|si|bx)\n//gm;
+		    $p =~ s/^\txorl\s+\%e(ax|cx|dx),\s*\%e(ax|cx|dx)\n//gm;
+		    $p =~ s/^\tmovl\s+\%e(ax|cx|dx|si|di),\s*\d*\(\%esp\)\n//gm;
+		    $p =~ s/^\tmovl\s+\$\d+,\s*\d*\(\%esp\)\n//gm;
+		    $p =~ s/^\tsubl\s+\$\d+,\s*\%esp\n//m;
+                    $p =~ s/^\tmovl\s+\$\d+,\s*\%eax\n\tcall\s+__alloca\n//m if ($TargetPlatform =~ /^.*-(cygwin32|mingw32)/m);
 
-                    if ($TargetPlatform =~ /^i386-apple-darwin/) {
+                    if ($TargetPlatform =~ /^i386-apple-darwin/m) {
                         $pcrel_label = $p;
-                        $pcrel_label =~ s/(.|\n)*^(\"?L\d+\$pb\"?):\n(.|\n)*/$2/ or $pcrel_label = "";
+                        $pcrel_label =~ s/(.|\n)*^(\"?L\d+\$pb\"?):\n(.|\n)*/$2/m or $pcrel_label = "";
                         $pcrel_reg = $p;
-                        $pcrel_reg =~ s/(.|\n)*.*___i686\.get_pc_thunk\.([abcd]x)\n(.|\n)*/$2/ or $pcrel_reg = "";
-                        $p =~ s/^\s+call\s+___i686\.get_pc_thunk\..x//;
-                        $p =~ s/^\"?L\d+\$pb\"?:\n//;
+                        $pcrel_reg =~ s/(.|\n)*.*___i686\.get_pc_thunk\.([abcd]x)\n(.|\n)*/$2/m or $pcrel_reg = "";
+                        $p =~ s/^\s+call\s+___i686\.get_pc_thunk\..x//m;
+                        $p =~ s/^\"?L\d+\$pb\"?:\n//m;
 
                         if ($pcrel_reg eq "bx") {
                             # Bad gcc. Goes and uses %ebx, our BaseReg, for PIC. Bad gcc.
@@ -928,165 +913,165 @@ sub mangle_asm {
                         }
                     }
 
-		} elsif ($TargetPlatform =~ /^x86_64-/) {
-		    $p =~ s/^\tpushq\s+\%r(bx|bp|12|13|14)\n//g;
-		    $p =~ s/^\tmovq\s+\%r(bx|bp|12|13|14),\s*\d*\(\%rsp\)\n//g;
-		    $p =~ s/^\tsubq\s+\$\d+,\s*\%rsp\n//;
+		} elsif ($TargetPlatform =~ /^x86_64-/m) {
+		    $p =~ s/^\tpushq\s+\%r(bx|bp|12|13|14)\n//gm;
+		    $p =~ s/^\tmovq\s+\%r(bx|bp|12|13|14),\s*\d*\(\%rsp\)\n//gm;
+		    $p =~ s/^\tsubq\s+\$\d+,\s*\%rsp\n//m;
 
-		} elsif ($TargetPlatform =~ /^ia64-/) {
-		    $p =~ s/^\t\.prologue .*\n//;
+		} elsif ($TargetPlatform =~ /^ia64-/m) {
+		    $p =~ s/^\t\.prologue .*\n//m;
 
 		    # Record the number of local and out registers for register relocation later
-		    $p =~ s/^\t\.save ar\.pfs, r\d+\n\talloc r\d+ = ar\.pfs, 0, (\d+), (\d+), 0\n//;
+		    $p =~ s/^\t\.save ar\.pfs, r\d+\n\talloc r\d+ = ar\.pfs, 0, (\d+), (\d+), 0\n//m;
 		    $ia64_locnum = $1;
 		    $ia64_outnum = $2;
 
-		    $p =~ s/^\t\.fframe \d+\n\tadds r12 = -\d+, r12\n//;
-		    $p =~ s/^\t\.save rp, r\d+\n\tmov r\d+ = b0\n//;
+		    $p =~ s/^\t\.fframe \d+\n\tadds r12 = -\d+, r12\n//m;
+		    $p =~ s/^\t\.save rp, r\d+\n\tmov r\d+ = b0\n//m;
 
 		    # Ignore save/restore of these registers; they're taken
 		    # care of in StgRun()
-		    $p =~ s/^\t\.save ar\.lc, r\d+\n//;
-		    $p =~ s/^\t\.save pr, r\d+\n//;
-		    $p =~ s/^\tmov r\d+ = ar\.lc\n//;
-		    $p =~ s/^\tmov r\d+ = pr\n//;
+		    $p =~ s/^\t\.save ar\.lc, r\d+\n//m;
+		    $p =~ s/^\t\.save pr, r\d+\n//m;
+		    $p =~ s/^\tmov r\d+ = ar\.lc\n//m;
+		    $p =~ s/^\tmov r\d+ = pr\n//m;
 
 		    # Remove .proc and .body directives
-		    $p =~ s/^\t\.proc [a-zA-Z0-9_.]+#\n//;
-            	    $p =~ s/^\t\.body\n//;
+		    $p =~ s/^\t\.proc [a-zA-Z0-9_.]+#\n//m;
+            	    $p =~ s/^\t\.body\n//m;
 
             	    # If there's a label, move it to the body
-            	    if ($p =~ /^[a-zA-Z0-9.]+:\n/) {
+            	    if ($p =~ /^[a-zA-Z0-9.]+:\n/m) {
             	        $p = $` . $';
             	        $r = $& . $r;
             	      }
 
             	    # Remove floating-point spill instructions.
             	    # Only fp registers 2-5 and 16-23 are saved by the runtime.
-            	    if ($p =~ s/^\tstf\.spill \[r1[4-9]\] = f([2-5]|1[6-9]|2[0-3])(, [0-9]+)?\n//g) {
+            	    if ($p =~ s/^\tstf\.spill \[r1[4-9]\] = f([2-5]|1[6-9]|2[0-3])(, [0-9]+)?\n//gm) {
             	        # Being paranoid, only try to remove these if we saw a
 			# spill operation.
-                        $p =~ s/^\tmov r1[4-9] = r12\n//;
-                        $p =~ s/^\tadds r1[4-9] = -[0-9]+, r12\n//g;
-                        $p =~ s/^\t\.save\.f 0x[0-9a-fA-F]\n//g;
-                        $p =~ s/^\t\.save\.gf 0x0, 0x[0-9a-fA-F]+\n//g;
+                        $p =~ s/^\tmov r1[4-9] = r12\n//m;
+                        $p =~ s/^\tadds r1[4-9] = -[0-9]+, r12\n//gm;
+                        $p =~ s/^\t\.save\.f 0x[0-9a-fA-F]\n//gm;
+                        $p =~ s/^\t\.save\.gf 0x0, 0x[0-9a-fA-F]+\n//gm;
             	    }
 
-            	    $p =~ s/^\tnop(?:\.[mifb])?\s+\d+\n//g; # remove nop instructions
-            	    $p =~ s/^\t\.(mii|mmi|mfi)\n//g;    # bundling is no longer sensible
-		    $p =~ s/^\t;;\n//g;		# discard stops
-		    $p =~ s/^\t\/\/.*\n//g;	# gcc inserts timings in // comments
+            	    $p =~ s/^\tnop(?:\.[mifb])?\s+\d+\n//gm; # remove nop instructions
+            	    $p =~ s/^\t\.(mii|mmi|mfi)\n//gm;    # bundling is no longer sensible
+		    $p =~ s/^\t;;\n//gm;		# discard stops
+		    $p =~ s/^\t\/\/.*\n//gm;	# gcc inserts timings in // comments
 
                	    # GCC 3.3 saves r1 in the prologue, move this to the body
 		    # (Does this register get restored anywhere?)
-               	    if ($p =~ /^\tmov r\d+ = r1\n/) {
+               	    if ($p =~ /^\tmov r\d+ = r1\n/m) {
                	      $p = $` . $';
                	      $r = $& . $r;
                	    }
-		} elsif ($TargetPlatform =~ /^m68k-/) {
-		    $p =~ s/^\tlink a6,#-?\d.*\n//;
- 		    $p =~ s/^\tpea a6@\n\tmovel sp,a6\n//;    
+		} elsif ($TargetPlatform =~ /^m68k-/m) {
+		    $p =~ s/^\tlink a6,#-?\d.*\n//m;
+ 		    $p =~ s/^\tpea a6@\n\tmovel sp,a6\n//m;    
  				# The above showed up in the asm code,
  				# so I added it here.
  				# I hope it's correct.
  				# CaS
-		    $p =~ s/^\tmovel d2,sp\@-\n//;
-		    $p =~ s/^\tmovel d5,sp\@-\n//; # SMmark.* only?
-		    $p =~ s/^\tmoveml \#0x[0-9a-f]+,sp\@-\n//; # SMmark.* only?
-		} elsif ($TargetPlatform =~ /^mips-/) {
+		    $p =~ s/^\tmovel d2,sp\@-\n//m;
+		    $p =~ s/^\tmovel d5,sp\@-\n//m; # SMmark.* only?
+		    $p =~ s/^\tmoveml \#0x[0-9a-f]+,sp\@-\n//m; # SMmark.* only?
+		} elsif ($TargetPlatform =~ /^mips-/m) {
 		    # the .frame/.mask/.fmask that we use is the same
 		    # as that produced by GCC for miniInterpret; this
 		    # gives GDB some chance of figuring out what happened
 		    $FRAME = "\t.frame\t\$sp,2168,\$31\n\t.mask\t0x90000000,-4\n\t.fmask\t0x00000000,0\n";
-		    $p =~ s/^\t\.(frame).*\n/__FRAME__/g;
-		    $p =~ s/^\t\.(mask|fmask).*\n//g;
-		    $p =~ s/^\t\.cprestore.*\n/\t\.cprestore 416\n/; # 16 + 100 4-byte args
-		    $p =~ s/^\tsubu\t\$sp,\$sp,\d+\n//;
-		    $p =~ s/^\tsw\t\$31,\d+\(\$sp\)\n//;
-		    $p =~ s/^\tsw\t\$fp,\d+\(\$sp\)\n//;
-		    $p =~ s/^\tsw\t\$28,\d+\(\$sp\)\n//;
-		    $p =~ s/__FRAME__/$FRAME/;
-		} elsif ($TargetPlatform =~ /^powerpc-apple-darwin.*/) {
+		    $p =~ s/^\t\.(frame).*\n/__FRAME__/gm;
+		    $p =~ s/^\t\.(mask|fmask).*\n//gm;
+		    $p =~ s/^\t\.cprestore.*\n/\t\.cprestore 416\n/m; # 16 + 100 4-byte args
+		    $p =~ s/^\tsubu\t\$sp,\$sp,\d+\n//m;
+		    $p =~ s/^\tsw\t\$31,\d+\(\$sp\)\n//m;
+		    $p =~ s/^\tsw\t\$fp,\d+\(\$sp\)\n//m;
+		    $p =~ s/^\tsw\t\$28,\d+\(\$sp\)\n//m;
+		    $p =~ s/__FRAME__/$FRAME/m;
+		} elsif ($TargetPlatform =~ /^powerpc-apple-darwin.*/m) {
 		    $pcrel_label = $p;
-		    $pcrel_label =~ s/(.|\n)*^(\"?L\d+\$pb\"?):\n(.|\n)*/$2/ or $pcrel_label = "";
+		    $pcrel_label =~ s/(.|\n)*^(\"?L\d+\$pb\"?):\n(.|\n)*/$2/m or $pcrel_label = "";
 
-		    $p =~ s/^\tmflr r0\n//;
- 		    $p =~ s/^\tbl saveFP # f\d+\n//;
- 		    $p =~ s/^\tbl saveFP ; save f\d+-f\d+\n//;
-		    $p =~ s/^\"?L\d+\$pb\"?:\n//;
- 		    $p =~ s/^\tstmw r\d+,-\d+\(r1\)\n//;
-   		    $p =~ s/^\tstfd f\d+,-\d+\(r1\)\n//g;
- 		    $p =~ s/^\tstw r0,\d+\(r1\)\n//g;
-  		    $p =~ s/^\tstwu r1,-\d+\(r1\)\n//; 
-  		    $p =~ s/^\tstw r\d+,-\d+\(r1\)\n//g; 
-  		    $p =~ s/^\tbcl 20,31,\"?L\d+\$pb\"?\n//;
-  		    $p =~ s/^\"?L\d+\$pb\"?:\n//;
-  		    $p =~ s/^\tmflr r31\n//;
+		    $p =~ s/^\tmflr r0\n//m;
+ 		    $p =~ s/^\tbl saveFP # f\d+\n//m;
+ 		    $p =~ s/^\tbl saveFP ; save f\d+-f\d+\n//m;
+		    $p =~ s/^\"?L\d+\$pb\"?:\n//m;
+ 		    $p =~ s/^\tstmw r\d+,-\d+\(r1\)\n//m;
+   		    $p =~ s/^\tstfd f\d+,-\d+\(r1\)\n//gm;
+ 		    $p =~ s/^\tstw r0,\d+\(r1\)\n//gm;
+  		    $p =~ s/^\tstwu r1,-\d+\(r1\)\n//m; 
+  		    $p =~ s/^\tstw r\d+,-\d+\(r1\)\n//gm; 
+  		    $p =~ s/^\tbcl 20,31,\"?L\d+\$pb\"?\n//m;
+  		    $p =~ s/^\"?L\d+\$pb\"?:\n//m;
+  		    $p =~ s/^\tmflr r31\n//m;
 
 		    # This is bad: GCC 3 seems to zero-fill some local variables in the prologue
 		    # under some circumstances, only when generating position dependent code.
 		    # I have no idea why, and I don't think it is necessary, so let's toss it.
-		    $p =~ s/^\tli r\d+,0\n//g;
-		    $p =~ s/^\tstw r\d+,\d+\(r1\)\n//g;
-		} elsif ($TargetPlatform =~ /^powerpc-.*-linux/) {
-		    $p =~ s/^\tmflr 0\n//;
-		    $p =~ s/^\tstmw \d+,\d+\(1\)\n//;
-   		    $p =~ s/^\tstfd \d+,\d+\(1\)\n//g;
- 		    $p =~ s/^\tstw r0,8\(1\)\n//;
-  		    $p =~ s/^\tstwu 1,-\d+\(1\)\n//; 
-  		    $p =~ s/^\tstw \d+,\d+\(1\)\n//g; 
+		    $p =~ s/^\tli r\d+,0\n//gm;
+		    $p =~ s/^\tstw r\d+,\d+\(r1\)\n//gm;
+		} elsif ($TargetPlatform =~ /^powerpc-.*-linux/m) {
+		    $p =~ s/^\tmflr 0\n//m;
+		    $p =~ s/^\tstmw \d+,\d+\(1\)\n//m;
+   		    $p =~ s/^\tstfd \d+,\d+\(1\)\n//gm;
+ 		    $p =~ s/^\tstw r0,8\(1\)\n//m;
+  		    $p =~ s/^\tstwu 1,-\d+\(1\)\n//m; 
+  		    $p =~ s/^\tstw \d+,\d+\(1\)\n//gm; 
                     
                         # GCC's "large-model" PIC (-fPIC)
 		    $pcrel_label = $p;
-		    $pcrel_label =~ s/(.|\n)*^.LCF(\d+):\n(.|\n)*/$2/ or $pcrel_label = "";
+		    $pcrel_label =~ s/(.|\n)*^.LCF(\d+):\n(.|\n)*/$2/m or $pcrel_label = "";
 
-                    $p =~ s/^\tbcl 20,31,.LCF\d+\n//;
-                    $p =~ s/^.LCF\d+:\n//;
-                    $p =~ s/^\tmflr 30\n//;
-                    $p =~ s/^\tlwz 0,\.LCL\d+-\.LCF\d+\(30\)\n//;
-                    $p =~ s/^\tadd 30,0,30\n//;
+                    $p =~ s/^\tbcl 20,31,.LCF\d+\n//m;
+                    $p =~ s/^.LCF\d+:\n//m;
+                    $p =~ s/^\tmflr 30\n//m;
+                    $p =~ s/^\tlwz 0,\.LCL\d+-\.LCF\d+\(30\)\n//m;
+                    $p =~ s/^\tadd 30,0,30\n//m;
 
 		    # This is bad: GCC 3 seems to zero-fill some local variables in the prologue
 		    # under some circumstances, only when generating position dependent code.
 		    # I have no idea why, and I don't think it is necessary, so let's toss it.
-		    $p =~ s/^\tli \d+,0\n//g;
-		    $p =~ s/^\tstw \d+,\d+\(1\)\n//g;
-		} elsif ($TargetPlatform =~ /^powerpc64-.*-linux/) {
-		    $p =~ s/^\tmr 31,1\n//;
-		    $p =~ s/^\tmflr 0\n//;
-		    $p =~ s/^\tstmw \d+,\d+\(1\)\n//;
-   		    $p =~ s/^\tstfd \d+,-?\d+\(1\)\n//g;
- 		    $p =~ s/^\tstd r0,8\(1\)\n//;
-  		    $p =~ s/^\tstdu 1,-\d+\(1\)\n//; 
-  		    $p =~ s/^\tstd \d+,-?\d+\(1\)\n//g; 
+		    $p =~ s/^\tli \d+,0\n//gm;
+		    $p =~ s/^\tstw \d+,\d+\(1\)\n//gm;
+		} elsif ($TargetPlatform =~ /^powerpc64-.*-linux/m) {
+		    $p =~ s/^\tmr 31,1\n//m;
+		    $p =~ s/^\tmflr 0\n//m;
+		    $p =~ s/^\tstmw \d+,\d+\(1\)\n//m;
+   		    $p =~ s/^\tstfd \d+,-?\d+\(1\)\n//gm;
+ 		    $p =~ s/^\tstd r0,8\(1\)\n//m;
+  		    $p =~ s/^\tstdu 1,-\d+\(1\)\n//m; 
+  		    $p =~ s/^\tstd \d+,-?\d+\(1\)\n//gm; 
                     
 		    # This is bad: GCC 3 seems to zero-fill some local variables in the prologue
 		    # under some circumstances, only when generating position dependent code.
 		    # I have no idea why, and I don't think it is necessary, so let's toss it.
-		    $p =~ s/^\tli \d+,0\n//g;
-		    $p =~ s/^\tstd \d+,\d+\(1\)\n//g;
+		    $p =~ s/^\tli \d+,0\n//gm;
+		    $p =~ s/^\tstd \d+,\d+\(1\)\n//gm;
 		} else {
 		    print STDERR "$Pgm: unknown prologue mangling? $TargetPlatform\n";
 		}
 		
 		# HWL HACK: dont die, just print a warning
 		#print stderr  "HWL: this should die! Prologue junk?: $p\n" if $p =~ /^\t[^\.]/;
-		die "Prologue junk?: $p\n" if $p =~ /^\s+[^\s\.]/;
+		die "Prologue junk?: $p\n" if $p =~ /^\s+[^\s\.]/m;
 		
                 # For PIC, we want to keep part of the prologue
-		if ($TargetPlatform =~ /^powerpc-apple-darwin.*/ && $pcrel_label ne "") {
+		if ($TargetPlatform =~ /^powerpc-apple-darwin.*/m && $pcrel_label ne "") {
 		    # Darwin: load the current instruction pointer into register r31
 		    $p .= "bcl 20,31,$pcrel_label\n";
 		    $p .= "$pcrel_label:\n";
 		    $p .= "\tmflr r31\n";
-		} elsif ($TargetPlatform =~ /^powerpc-.*-linux/ && $pcrel_label ne "") {
+		} elsif ($TargetPlatform =~ /^powerpc-.*-linux/m && $pcrel_label ne "") {
                     # Linux: load the GOT pointer into register 30
                     $p .= "\tbcl 20,31,.LCF$pcrel_label\n";
                     $p .= ".LCF$pcrel_label:\n";
                     $p .= "\tmflr 30\n";
                     $p .= "\tlwz 0,.LCL$pcrel_label-.LCF$pcrel_label(30)\n";
                     $p .= "\tadd 30,0,30\n";
-                } elsif ($TargetPlatform =~ /^i386-apple-darwin.*/ && $pcrel_label ne "") {
+                } elsif ($TargetPlatform =~ /^i386-apple-darwin.*/m && $pcrel_label ne "") {
                     $p .= "\tcall ___i686.get_pc_thunk.$pcrel_reg\n";
                     $p .= "$pcrel_label:\n";
                 }
@@ -1096,17 +1081,17 @@ sub mangle_asm {
 	    }
 	}
 
-	if ( $TargetPlatform =~ /^mips-/ ) {
+	if ( $TargetPlatform =~ /^mips-/m ) {
 	    # MIPS: first, this basic sequence may occur "--- END ---" or not
-	    $c =~ s/^\tlw\t\$31,\d+\(\$sp\)\n\taddu\t\$sp,\$sp,\d+\n\tj\t\$31\n\t\.end/\t\.end/;
+	    $c =~ s/^\tlw\t\$31,\d+\(\$sp\)\n\taddu\t\$sp,\$sp,\d+\n\tj\t\$31\n\t\.end/\t\.end/m;
 	}
 
 	# toss all epilogue stuff; again, paranoidly
-	if ( $c =~ /--- END ---/ ) {
+	if ( $c =~ /--- END ---/m ) {
 	    # Gcc may decide to replicate the function epilogue.  We want
 	    # to process all epilogues, so we split the function and then
 	    # loop here.
-	    @fragments = split(/--- END ---/, $c);
+	    @fragments = split(/--- END ---/m, $c);
 	    $r = shift(@fragments);
 
 	    # Rebuild `c'; processed fragments will be appended to `c'
@@ -1116,92 +1101,92 @@ sub mangle_asm {
                 # etail holds code that is after the epilogue in the assembly-code
                 # layout and should not be filtered as part of the epilogue.
                 $etail = "";
-		if ($TargetPlatform =~ /^i386-/) {
-		    $e =~ s/^\tret\n//;
-		    $e =~ s/^\tpopl\s+\%edi\n//;
-		    $e =~ s/^\tpopl\s+\%esi\n//;
-		    $e =~ s/^\tpopl\s+\%edx\n//;
-		    $e =~ s/^\tpopl\s+\%ecx\n//;
-		    $e =~ s/^\taddl\s+\$\d+,\s*\%esp\n//;
-		    $e =~ s/^\tsubl\s+\$-\d+,\s*\%esp\n//;
-		} elsif ($TargetPlatform =~ /^ia64-/) {
+		if ($TargetPlatform =~ /^i386-/m) {
+		    $e =~ s/^\tret\n//m;
+		    $e =~ s/^\tpopl\s+\%edi\n//m;
+		    $e =~ s/^\tpopl\s+\%esi\n//m;
+		    $e =~ s/^\tpopl\s+\%edx\n//m;
+		    $e =~ s/^\tpopl\s+\%ecx\n//m;
+		    $e =~ s/^\taddl\s+\$\d+,\s*\%esp\n//m;
+		    $e =~ s/^\tsubl\s+\$-\d+,\s*\%esp\n//m;
+		} elsif ($TargetPlatform =~ /^ia64-/m) {
             	    # The epilogue is first split into:
             	    #     $e,    the epilogue code (up to the return instruction)
             	    #     $etail, non-epilogue code (after the return instruction)
             	    # The return instruction is stripped in the process.
-            	    if (!(($e, $etail) = split(/^\tbr\.ret\.sptk\.many b0\n/, $e))) {
+            	    if (!(($e, $etail) = split(/^\tbr\.ret\.sptk\.many b0\n/m, $e))) {
             	        die "Epilogue doesn't seem to have one return instruction: $e\n";
             	    }
 		    # Remove 'endp' directive from the tail
-            	    $etail =~ s/^\t\.endp [a-zA-Z0-9_.]+#\n//;
+            	    $etail =~ s/^\t\.endp [a-zA-Z0-9_.]+#\n//m;
 
             	    # If a return value is saved here, discard it
- 		    $e =~ s/^\tmov r8 = r14\n//;
+ 		    $e =~ s/^\tmov r8 = r14\n//m;
 
             	    # Remove floating-point fill instructions.
             	    # Only fp registers 2-5 and 16-23 are saved by the runtime.
-            	    if ($e =~ s/^\tldf\.fill f([2-5]|1[6-9]|2[0-3]) = \[r1[4-9]\](, [0-9]+)?\n//g) {
+            	    if ($e =~ s/^\tldf\.fill f([2-5]|1[6-9]|2[0-3]) = \[r1[4-9]\](, [0-9]+)?\n//gm) {
             	        # Being paranoid, only try to remove this if we saw a fill
             	        # operation.
-            	        $e =~ s/^\tadds r1[4-9] = [0-9]+, r12//g;
+            	        $e =~ s/^\tadds r1[4-9] = [0-9]+, r12//gm;
             	    }
 
-            	    $e =~ s/^\tnop(?:\.[mifb])?\s+\d+\n//g; # remove nop instructions
-	    	    $e =~ s/^\tmov ar\.pfs = r\d+\n//;
-	    	    $e =~ s/^\tmov ar\.lc = r\d+\n//;
-		    $e =~ s/^\tmov pr = r\d+, -1\n//;
-	    	    $e =~ s/^\tmov b0 = r\d+\n//;
-	    	    $e =~ s/^\t\.restore sp\n\tadds r12 = \d+, r12\n//;
+            	    $e =~ s/^\tnop(?:\.[mifb])?\s+\d+\n//gm; # remove nop instructions
+	    	    $e =~ s/^\tmov ar\.pfs = r\d+\n//m;
+	    	    $e =~ s/^\tmov ar\.lc = r\d+\n//m;
+		    $e =~ s/^\tmov pr = r\d+, -1\n//m;
+	    	    $e =~ s/^\tmov b0 = r\d+\n//m;
+	    	    $e =~ s/^\t\.restore sp\n\tadds r12 = \d+, r12\n//m;
 	    	    #$e =~ s/^\tbr\.ret\.sptk\.many b0\n//; # already removed
-	    	    $e =~ s/^\t\.(mii|mmi|mfi|mib)\n//g; # bundling is no longer sensible
-	    	    $e =~ s/^\t;;\n//g; # discard stops - stop at end of body is sufficient
-	    	    $e =~ s/^\t\/\/.*\n//g; # gcc inserts timings in // comments
-		} elsif ($TargetPlatform =~ /^m68k-/) {
-		    $e =~ s/^\tunlk a6\n//;
-		    $e =~ s/^\trts\n//;
-		} elsif ($TargetPlatform =~ /^mips-/) {
-		    $e =~ s/^\tlw\t\$31,\d+\(\$sp\)\n//;
-		    $e =~ s/^\tlw\t\$fp,\d+\(\$sp\)\n//;
-		    $e =~ s/^\taddu\t\$sp,\$sp,\d+\n//;
-		    $e =~ s/^\tj\t\$31\n//;
- 		} elsif ($TargetPlatform =~ /^powerpc-apple-darwin.*/) {
-  		    $e =~ s/^\taddi r1,r1,\d+\n//;
-  		    $e =~ s/^\tlwz r\d+,\d+\(r1\)\n//; 
-  		    $e =~ s/^\tlmw r\d+,-\d+\(r1\)\n//;
- 		    $e =~ s/^\tmtlr r0\n//;
-  		    $e =~ s/^\tblr\n//;
-  		    $e =~ s/^\tb restFP ;.*\n//;
- 		} elsif ($TargetPlatform =~ /^powerpc64-.*-linux/) {
-		    $e =~ s/^\tmr 3,0\n//;
-		    $e =~ s/^\taddi 1,1,\d+\n//;
-		    $e =~ s/^\tld 0,16\(1\)\n//;
-		    $e =~ s/^\tmtlr 0\n//;
+	    	    $e =~ s/^\t\.(mii|mmi|mfi|mib)\n//gm; # bundling is no longer sensible
+	    	    $e =~ s/^\t;;\n//gm; # discard stops - stop at end of body is sufficient
+	    	    $e =~ s/^\t\/\/.*\n//gm; # gcc inserts timings in // comments
+		} elsif ($TargetPlatform =~ /^m68k-/m) {
+		    $e =~ s/^\tunlk a6\n//m;
+		    $e =~ s/^\trts\n//m;
+		} elsif ($TargetPlatform =~ /^mips-/m) {
+		    $e =~ s/^\tlw\t\$31,\d+\(\$sp\)\n//m;
+		    $e =~ s/^\tlw\t\$fp,\d+\(\$sp\)\n//m;
+		    $e =~ s/^\taddu\t\$sp,\$sp,\d+\n//m;
+		    $e =~ s/^\tj\t\$31\n//m;
+ 		} elsif ($TargetPlatform =~ /^powerpc-apple-darwin.*/m) {
+  		    $e =~ s/^\taddi r1,r1,\d+\n//m;
+  		    $e =~ s/^\tlwz r\d+,\d+\(r1\)\n//m; 
+  		    $e =~ s/^\tlmw r\d+,-\d+\(r1\)\n//m;
+ 		    $e =~ s/^\tmtlr r0\n//m;
+  		    $e =~ s/^\tblr\n//m;
+  		    $e =~ s/^\tb restFP ;.*\n//m;
+ 		} elsif ($TargetPlatform =~ /^powerpc64-.*-linux/m) {
+		    $e =~ s/^\tmr 3,0\n//m;
+		    $e =~ s/^\taddi 1,1,\d+\n//m;
+		    $e =~ s/^\tld 0,16\(1\)\n//m;
+		    $e =~ s/^\tmtlr 0\n//m;
 
 		    # callee-save registers
-		    $e =~ s/^\tld \d+,-?\d+\(1\)\n//g;
-		    $e =~ s/^\tlfd \d+,-?\d+\(1\)\n//g;
+		    $e =~ s/^\tld \d+,-?\d+\(1\)\n//gm;
+		    $e =~ s/^\tlfd \d+,-?\d+\(1\)\n//gm;
 
 		    # get rid of the debug junk along with the blr
-		    $e =~ s/^\tblr\n\t.long .*\n\t.byte .*\n//;
+		    $e =~ s/^\tblr\n\t.long .*\n\t.byte .*\n//m;
 
 		    # incase we missed it with the last one get the blr alone
-		    $e =~ s/^\tblr\n//;
+		    $e =~ s/^\tblr\n//m;
 		} else {
 		    print STDERR "$Pgm: unknown epilogue mangling? $TargetPlatform\n";
 		}
 
-		print STDERR "WARNING: Epilogue junk?: $e\n" if $e =~ /^\t\s*[^\.\s\n]/;
+		print STDERR "WARNING: Epilogue junk?: $e\n" if $e =~ /^\t\s*[^\.\s\n]/m;
 
 		# glue together what's left
 		$c .= $e . $etail;
 	    }
-	    $c =~ s/\n\t\n/\n/; # junk blank line
+	    $c =~ s/\n\t\n/\n/m; # junk blank line
 	}
  	else {
- 	    if ($TargetPlatform =~ /^ia64-/) {
+ 	    if ($TargetPlatform =~ /^ia64-/m) {
  	        # On IA64, remove an .endp directive even if no epilogue was found.
  	        # Code optimizations may have removed the "--- END ---" token.
- 	        $c =~ s/^\t\.endp [a-zA-Z0-9_.]+#\n//;
+ 	        $c =~ s/^\t\.endp [a-zA-Z0-9_.]+#\n//m;
  	    }
  	}
 
@@ -1209,43 +1194,43 @@ sub mangle_asm {
 	# toss the register-windowing save/restore/ret* instructions
 	# directly unless they've been generated by function definitions in header
 	# files on Solaris:
-	if ( $TargetPlatform =~ /^sparc-/ ) {
-	    if ( ! ( $TargetPlatform =~ /solaris2$/ && $chkcat[$i] eq 'unknown' )) {
-	    	$c =~ s/^\t(save.*|restore.*|ret|retl)\n//g;
+	if ( $TargetPlatform =~ /^sparc-/m ) {
+	    if ( ! ( $TargetPlatform =~ /solaris2$/m && $chkcat[$i] eq 'unknown' )) {
+	    	$c =~ s/^\t(save.*|restore.*|ret|retl)\n//gm;
 	    }
 	    # throw away PROLOGUE comments
-	    $c =~ s/^\t!#PROLOGUE# 0\n\t!#PROLOGUE# 1\n//;
+	    $c =~ s/^\t!#PROLOGUE# 0\n\t!#PROLOGUE# 1\n//m;
 	}
 
 	# On Alphas, the prologue mangling is done a little later (below)
 
     	# toss all calls to __DISCARD__
-	$c =~ s/^\t(call|jbsr|jal)\s+${T_US}__DISCARD__\n//go;
-	$c =~ s/^\tjsr\s+\$26\s*,\s*${T_US}__DISCARD__\n//go if $TargetPlatform =~ /^alpha-/;
-	$c =~ s/^\tbl\s+L___DISCARD__\$stub\n//go if $TargetPlatform =~ /^powerpc-apple-darwin.*/;
-	$c =~ s/^\tbl\s+__DISCARD__(\@plt)?\n//go if $TargetPlatform =~ /^powerpc-.*-linux/;
-	$c =~ s/^\tbl\s+\.__DISCARD__\n\s+nop\n//go if $TargetPlatform =~ /^powerpc64-.*-linux/;
-	$c =~ s/^\tcall\s+L___DISCARD__\$stub\n//go if $TargetPlatform =~ /i386-apple-darwin.*/;
+	$c =~ s/^\t(call|jbsr|jal)\s+${T_US}__DISCARD__\n//gom;
+	$c =~ s/^\tjsr\s+\$26\s*,\s*${T_US}__DISCARD__\n//gom if $TargetPlatform =~ /^alpha-/m;
+	$c =~ s/^\tbl\s+L___DISCARD__\$stub\n//gom if $TargetPlatform =~ /^powerpc-apple-darwin.*/m;
+	$c =~ s/^\tbl\s+__DISCARD__(\@plt)?\n//gom if $TargetPlatform =~ /^powerpc-.*-linux/m;
+	$c =~ s/^\tbl\s+\.__DISCARD__\n\s+nop\n//gom if $TargetPlatform =~ /^powerpc64-.*-linux/m;
+	$c =~ s/^\tcall\s+L___DISCARD__\$stub\n//gom if $TargetPlatform =~ /i386-apple-darwin.*/m;
 
 	# IA64: fix register allocation; mangle tailcalls into jumps
- 	if ($TargetPlatform =~ /^ia64-/) {
+ 	if ($TargetPlatform =~ /^ia64-/m) {
 	    ia64_rename_registers($ia64_locnum, $ia64_outnum) if (defined($ia64_locnum));
 	    ia64_mangle_tailcalls();
 	}
 
 	# MIPS: that may leave some gratuitous asm macros around
 	# (no harm done; but we get rid of them to be tidier)
-	$c =~ s/^\t\.set\tnoreorder\n\t\.set\tnomacro\n\taddu\t(\S+)\n\t\.set\tmacro\n\t\.set\treorder\n/\taddu\t$1\n/
-	    if $TargetPlatform =~ /^mips-/;
+	$c =~ s/^\t\.set\tnoreorder\n\t\.set\tnomacro\n\taddu\t(\S+)\n\t\.set\tmacro\n\t\.set\treorder\n/\taddu\t$1\n/m
+	    if $TargetPlatform =~ /^mips-/m;
 
     	# toss stack adjustment after DoSparks
-    	$c =~ s/^(\tjbsr _DoSparks\n)\taddqw #8,sp/$1/g
-		if $TargetPlatform =~ /^m68k-/; # this looks old...
+    	$c =~ s/^(\tjbsr _DoSparks\n)\taddqw #8,sp/$1/gm
+		if $TargetPlatform =~ /^m68k-/m; # this looks old...
 
-	if ( $TargetPlatform =~ /^alpha-/ &&
+	if ( $TargetPlatform =~ /^alpha-/m &&
 	   ! $magic_rdata_seen &&
-	   $c =~ /^\s*\.rdata\n\t\.quad 0\n\t\.align \d\n/ ) {
-	    $c =~ s/^\s*\.rdata\n\t\.quad 0\n\t\.align (\d)\n/\.rdata\n\t\.align $1\n/;
+	   $c =~ /^\s*\.rdata\n\t\.quad 0\n\t\.align \d\n/m ) {
+	    $c =~ s/^\s*\.rdata\n\t\.quad 0\n\t\.align (\d)\n/\.rdata\n\t\.align $1\n/m;
 	    $magic_rdata_seen = 1;
 	}
 
@@ -1254,7 +1239,7 @@ sub mangle_asm {
 	# pin a funny end-thing on (for easier matching):
 	$c .= 'FUNNY#END#THING';
 
-	while ( $c =~ /${T_MOVE_DIRVS}FUNNY#END#THING/o ) {
+	while ( $c =~ /${T_MOVE_DIRVS}FUNNY#END#THING/om ) {
 
 	    $to_move = $1;
 
@@ -1268,9 +1253,9 @@ sub mangle_asm {
 	    #    blah_closure:
 	    #		...
             #
-	    if ( $TargetPlatform =~ /^(i386|sparc|powerpc)/ && $to_move =~ /${T_COPY_DIRVS}/ ) {
+	    if ( $TargetPlatform =~ /^(i386|sparc|powerpc)/m && $to_move =~ /${T_COPY_DIRVS}/m ) {
 		$j = $i + 1;
-		while ( $j < $numchks  && $chk[$j] =~ /$T_CONST_LBL/) {
+		while ( $j < $numchks  && $chk[$j] =~ /$T_CONST_LBL/m) {
 			$j++;
 		}
 		if ( $j < $numchks ) {
@@ -1279,29 +1264,30 @@ sub mangle_asm {
 	    }
 
             elsif (   (    $i < ($numchks - 1)
-                       && ( $to_move =~ /${T_COPY_DIRVS}/
-                           || (   $TargetPlatform =~ /^hppa/
-                               && $to_move =~ /align/
+                       && ( $to_move =~ /${T_COPY_DIRVS}/m
+                           || (   $TargetPlatform =~ /^hppa/m
+                               && $to_move =~ /align/m
                                && $chkcat[$i+1] eq 'literal')
                           )
                       )
-                   || ($to_move =~ /^[ \t]*\.section[ \t]+\.note\.GNU-stack,/)
+                   || ($to_move =~ /^[ \t]*\.section[ \t]+\.note\.GNU-stack,/m)
                   ) {
                 $chk[$i + 1] = $to_move . $chk[$i + 1];
                 # otherwise they're tossed
             }
 
-	    $c =~ s/${T_MOVE_DIRVS}FUNNY#END#THING/FUNNY#END#THING/o;
+	    $c =~ s/${T_MOVE_DIRVS}FUNNY#END#THING/FUNNY#END#THING/om;
 	}
 
-    	if ( $TargetPlatform =~ /^alpha-/ && $c =~ /^\t\.ent\s+(\S+)/ ) {
+    	if ( $TargetPlatform =~ /^alpha-/m && $c =~ /^\t\.ent\s+(\S+)/m ) {
     	    $ent = $1;
 	    # toss all prologue stuff, except for loading gp, and the ..ng address
-	    unless ($c =~ /\.ent.*\n\$.*\.\.ng:/) {
-		if (($p, $r) = split(/^\t\.prologue/, $c)) {
-		    if (($keep, $junk) = split(/\.\.ng:/, $p)) {
-			$keep =~ s/^\t\.frame.*\n/\t.frame \$30,0,\$26,0\n/;
-			$keep =~ s/^\t\.(mask|fmask).*\n//g;
+	    unless ($c =~ /\.ent.*\n\$.*\.\.ng:/m) {
+		if (($p, $r) = split(/^\t\.prologue/m, $c)) {
+                    use vars '$junk'; # Unused?
+		    if (($keep, $junk) = split(/\.\.ng:/m, $p)) {
+			$keep =~ s/^\t\.frame.*\n/\t.frame \$30,0,\$26,0\n/m;
+			$keep =~ s/^\t\.(mask|fmask).*\n//gm;
 			$c = $keep . "..ng:\n";
 		    } else {
 			print STDERR "malformed code block ($ent)?\n"
@@ -1311,7 +1297,7 @@ sub mangle_asm {
 	    }
     	}
   
-	$c =~ s/FUNNY#END#THING//;
+	$c =~ s/FUNNY#END#THING//m;
 
 #	print STDERR "\nCHK $i (AFTER) (",$chkcat[$i],"):\n", $c;
 
@@ -1322,34 +1308,34 @@ sub mangle_asm {
     # for (my $i = 0; $i < @chk; ++$i) { print CHUNKS "======= $i =======\n", $chk[$i] }
     # close CHUNKS;
 
-    if ( $TargetPlatform =~ /^alpha-/ ) {
+    if ( $TargetPlatform =~ /^alpha-/m ) {
 	# print out the header stuff first
-	$chk[0] =~ s/^(\t\.file.*)"(ghc\d+\.c)"/$1"$ifile_root.hc"/;
+	$chk[0] =~ s/^(\t\.file.*)"(ghc\d+\.c)"/$1"$ifile_root.hc"/m;
 	print OUTASM $chk[0];
 
-    } elsif ( $TargetPlatform =~ /^hppa/ ) {
+    } elsif ( $TargetPlatform =~ /^hppa/m ) {
 	print OUTASM $chk[0];
 
-    } elsif ( $TargetPlatform =~ /^mips-/ ) {
+    } elsif ( $TargetPlatform =~ /^mips-/m ) {
 	$chk[0] = "\t\.file\t1 \"$ifile_root.hc\"\n" . $chk[0];
 
 	# get rid of horrible "<dollar>Revision: .*$" strings
-	local(@lines0) = split(/\n/, $chk[0]);
+	local(@lines0) = split(/\n/m, $chk[0]);
 	local($z) = 0;
 	while ( $z <= $#lines0 ) {
-	    if ( $lines0[$z] =~ /^\t\.byte\t0x24,0x52,0x65,0x76,0x69,0x73,0x69,0x6f$/ ) {
+	    if ( $lines0[$z] =~ /^\t\.byte\t0x24,0x52,0x65,0x76,0x69,0x73,0x69,0x6f$/m ) {
 		undef($lines0[$z]);
 		$z++;
 		while ( $z <= $#lines0 ) {
 		    undef($lines0[$z]);
-		    last if $lines0[$z] =~ /[,\t]0x0$/;
+		    last if $lines0[$z] =~ /[,\t]0x0$/m;
 		    $z++;
 		}
 	    }
 	    $z++;
 	}
 	$chk[0] = join("\n", @lines0);
-	$chk[0] =~ s/\n\n+/\n/;
+	$chk[0] =~ s/\n\n+/\n/m;
 	print OUTASM $chk[0];
     }
 
@@ -1360,10 +1346,10 @@ sub mangle_asm {
 	    # HACK: try to detect 16-byte constants and align them
 	    # on a 16-byte boundary.  x86_64 sometimes needs 128-bit
 	    # aligned constants, and so does Darwin/x86.
-	    if ( $TargetPlatform =~ /^x86_64/
-                || $TargetPlatform =~ /^i386-apple-darwin/ ) { 
+	    if ( $TargetPlatform =~ /^x86_64/m
+                || $TargetPlatform =~ /^i386-apple-darwin/m ) { 
 		$z = $chk[$i];
- 		if ($z =~ /(\.long.*\n.*\.long.*\n.*\.long.*\n.*\.long|\.quad.*\n.*\.quad)/) {
+ 		if ($z =~ /(\.long.*\n.*\.long.*\n.*\.long.*\n.*\.long|\.quad.*\n.*\.quad)/m) {
 		    print OUTASM $T_HDR_literal16;
 		} else {
 		    print OUTASM $T_HDR_literal;
@@ -1373,14 +1359,14 @@ sub mangle_asm {
 	    }
 
 	    print OUTASM $chk[$i];
-	    print OUTASM "; end literal\n" if $TargetPlatform =~ /^hppa/; # for the splitter
+	    print OUTASM "; end literal\n" if $TargetPlatform =~ /^hppa/m; # for the splitter
 
 	    $chkcat[$i] = 'DONE ALREADY';
 	}
     }
 
     # on the HPPA, print out all the bss next
-    if ( $TargetPlatform =~ /^hppa/ ) {
+    if ( $TargetPlatform =~ /^hppa/m ) {
 	for ($i = 1; $i < $numchks; $i++) {
 	    if ( $chkcat[$i] eq 'bss' ) {
 		print OUTASM "\t.SPACE \$PRIVATE\$\n\t.SUBSPA \$BSS\$\n\t.align 4\n";
@@ -1459,21 +1445,21 @@ sub mangle_asm {
 
 		# If this is an entry point with an info table,
                 # eliminate the entry symbol and all directives involving it.
-		if (defined($infochk{$symb}) && $TargetPlatform !~ /^ia64-/) {
+		if (defined($infochk{$symb}) && $TargetPlatform !~ /^ia64-/m) {
 			@o = ();
-			foreach $l (split(/\n/,$c)) {
-			    next if $l =~ /^.*$symb_(entry|ret)${T_POST_LBL}/;
+			foreach $l (split(/\n/m,$c)) {
+			    next if $l =~ /^.*$symb_(entry|ret)${T_POST_LBL}/m;
 
 			    # If we have .type/.size direrctives involving foo_entry,
 			    # then make them refer to foo_info instead.  The information
 			    # in these directives is used by the cachegrind annotator,
 			    # so it is worthwhile keeping.
-			    if ($l =~ /^\s*\.(type|size).*$symb_(entry|ret)/) {
-				$l =~ s/$symb(_entry|_ret)/${symb}_info/g;
+			    if ($l =~ /^\s*\.(type|size).*$symb_(entry|ret)/m) {
+				$l =~ s/$symb(_entry|_ret)/${symb}_info/gm;
 				push(@o,$l);
 				next;
 			    }
-                            next if $l =~ /^\s*\..*$symb.*\n?/;
+                            next if $l =~ /^\s*\..*$symb.*\n?/m;
 			    push(@o,$l);
 			}
 			$c = join("\n",@o) . "\n";
@@ -1497,7 +1483,7 @@ sub mangle_asm {
 		# direct return code will be put here!
 		$chkcat[$vectorchk{$symb}] = 'DONE ALREADY';
 
-	    } elsif ( $TargetPlatform =~ /^alpha-/ ) {
+	    } elsif ( $TargetPlatform =~ /^alpha-/m ) {
 		# Alphas: the commented nop is for the splitter, to ensure
 		# that no module ends with a label as the very last
 		# thing.  (The linker will adjust the label to point
@@ -1520,7 +1506,7 @@ sub mangle_asm {
  	    print OUTASM $T_HDR_toc;
             local($j)	= $i;
             while ($chkcat[$j] eq 'toc')
-              { if (   $chk[$j] !~ /\.tc UpdatePAP\[TC\]/ # not needed: always turned into a jump.
+              { if (   $chk[$j] !~ /\.tc UpdatePAP\[TC\]/m # not needed: always turned into a jump.
                    ) 
                 {
                   print OUTASM $chk[$j];
@@ -1529,13 +1515,13 @@ sub mangle_asm {
                 $j++;
  	    }
  	    
- 	} elsif ( $TargetPlatform =~ /^.*-apple-darwin.*/ && $chkcat[$i] eq 'dyld' ) {
+ 	} elsif ( $TargetPlatform =~ /^.*-apple-darwin.*/m && $chkcat[$i] eq 'dyld' ) {
 	    # apple-darwin: dynamic linker stubs
-	    if($chk[$i] !~ /\.indirect_symbol ___DISCARD__/)
+	    if($chk[$i] !~ /\.indirect_symbol ___DISCARD__/m)
 	    {	# print them out unchanged, but remove the stubs for __DISCARD__
 		print OUTASM $chk[$i];
 	    }
-        } elsif ( $TargetPlatform =~ /^i386-apple-darwin.*/ && $chkcat[$i] eq 'get_pc_thunk' ) {
+        } elsif ( $TargetPlatform =~ /^i386-apple-darwin.*/m && $chkcat[$i] eq 'get_pc_thunk' ) {
             # i386-apple-darwin: __i686.get_pc_thunk.[abcd]x
             print OUTASM ".section __TEXT,__textcoal_nt,coalesced,no_toc\n";
             print OUTASM $chk[$i];
@@ -1544,7 +1530,7 @@ sub mangle_asm {
 	}
     }
 
-    print OUTASM $EXTERN_DECLS if $TargetPlatform =~ /^mips-/;
+    print OUTASM $EXTERN_DECLS if $TargetPlatform =~ /^mips-/m;
 
     # finished
     close(OUTASM) || &tidy_up_and_die(1,"Failed writing to $out_asmf\n");
@@ -1608,14 +1594,14 @@ sub ia64_mangle_tailcalls {
     }
 
     # Find and mangle tailcalls
-    while ($c =~ s/$IA64_MATCH_TAILCALL/\tbr\.few $1\n/o) {
+    while ($c =~ s/$IA64_MATCH_TAILCALL/\tbr\.few $1\n/om) {
         # Eek, the gcc optimiser is getting smarter... if we see a jump to the
         # --- TAILCALL --- marker then we reapply the substitution at the source sites
-        $c =~ s/^\tbr \.L$2\n/\t--- TAILCALL ---\n/g if ($2);
+        $c =~ s/^\tbr \.L$2\n/\t--- TAILCALL ---\n/gm if ($2);
     }
 
     # Verify that all instances of TAILCALL were processed
-    if ($c =~ /^\t--- TAILCALL ---\n/) {
+    if ($c =~ /^\t--- TAILCALL ---\n/m) {
         die "Unmangled TAILCALL tokens remain after mangling"
     }
 }
@@ -1655,8 +1641,8 @@ sub ia64_rename_registers() {
     # Split the string into fragments containing one register name each.
     # Rename the register in each fragment and concatenate.
     $cout = "";
-    foreach $fragment (split(/(?=r\d+[^a-zA-Z0-9_.])/s, $c)) {
-        if ($fragment =~ /^r(\d+)((?:[^a-zA-Z0-9_.].*)?)$/s) {
+    foreach $fragment (split(/(?=r\d+[^a-zA-Z0-9_.])/sm, $c)) {
+        if ($fragment =~ /^r(\d+)((?:[^a-zA-Z0-9_.].*)?)$/sm) {
 	    $regnum = $1;
 
 	    if ($regnum < $first_out_reg) {
@@ -1692,21 +1678,21 @@ sub hppa_mash_prologue { # OK, epilogue, too
     local($_) = @_;
 
     # toss all prologue stuff
-    s/^\s+\.ENTRY[^\0]*--- BEGIN ---/\t.ENTRY/;
+    s/^\s+\.ENTRY[^\0]*--- BEGIN ---/\t.ENTRY/m;
 
     # Lie about our .CALLINFO
-    s/^\s+\.CALLINFO.*$/\t.CALLINFO NO_CALLS,NO_UNWIND/;
+    s/^\s+\.CALLINFO.*$/\t.CALLINFO NO_CALLS,NO_UNWIND/m;
 
     # Get rid of P'
 
-    s/LP'/L'/g;
-    s/RP'/R'/g;
+    s/LP'/L'/gm;
+    s/RP'/R'/gm;
 
     # toss all epilogue stuff
-    s/^\s+--- END ---[^\0]*\.EXIT/\t.EXIT/;
+    s/^\s+--- END ---[^\0]*\.EXIT/\t.EXIT/m;
 
     # Sorry; we moved the _info stuff to the code segment.
-    s/_info,DATA/_info,CODE/g;
+    s/_info,DATA/_info,CODE/gm;
 
     return($_);
 }
@@ -1716,7 +1702,7 @@ sub hppa_mash_prologue { # OK, epilogue, too
 sub print_doctored {
     local($_, $need_fallthru_patch) = @_;
 
-    if ( $TargetPlatform =~ /^x86_64-/ ) {
+    if ( $TargetPlatform =~ /^x86_64-/m ) {
 	    # Catch things like
 	    #	
 	    #    movq -4(%ebp), %rax
@@ -1724,13 +1710,13 @@ sub print_doctored {
 	    # 
 	    # and optimise:
 	    #
-	    s/^\tmovq\s+(-?\d*\(\%r(bx|bp|13)\)),\s*(\%r(ax|cx|dx|10|11))\n\tjmp\s+\*\3/\tjmp\t\*$1/g;
-	    s/^\tmovl\s+\$${T_US}(.*),\s*(\%e(ax|cx|si|di))\n\tjmp\s+\*\%r\3/\tjmp\t$T_US$1/g;
+	    s/^\tmovq\s+(-?\d*\(\%r(bx|bp|13)\)),\s*(\%r(ax|cx|dx|10|11))\n\tjmp\s+\*\3/\tjmp\t\*$1/gm;
+	    s/^\tmovl\s+\$${T_US}(.*),\s*(\%e(ax|cx|si|di))\n\tjmp\s+\*\%r\3/\tjmp\t$T_US$1/gm;
     }
 
-    if ( $TargetPlatform !~ /^i386-/ 
-      || ! /^\t[a-z]/  # no instructions in here, apparently
-      || /^${T_US}__stginit_[A-Za-z0-9_]+${T_POST_LBL}/) {
+    if ( $TargetPlatform !~ /^i386-/m 
+      || ! /^\t[a-z]/m  # no instructions in here, apparently
+      || /^${T_US}__stginit_[A-Za-z0-9_]+${T_POST_LBL}/m) {
 	print OUTASM $_;
 	return;
     }
@@ -1773,7 +1759,7 @@ sub print_doctored {
     #   movl $_blah,<bad-reg>
     #   jmp  *<bad-reg>
     #
-    s/^\tmovl\s+\$${T_US}(.*),\s*(\%e[acd]x)\n\tjmp\s+\*\2/\tjmp $T_US$1/g;
+    s/^\tmovl\s+\$${T_US}(.*),\s*(\%e[acd]x)\n\tjmp\s+\*\2/\tjmp $T_US$1/gm;
 
     # Catch things like
     #
@@ -1782,21 +1768,21 @@ sub print_doctored {
     # 
     # and optimise:
     #
-    s/^\tmovl\s+(-?\d*\(\%e(bx|si)\)),\s*(\%e[acd]x)\n\tjmp\s+\*\3/\tjmp\t\*$1/g;
+    s/^\tmovl\s+(-?\d*\(\%e(bx|si)\)),\s*(\%e[acd]x)\n\tjmp\s+\*\3/\tjmp\t\*$1/gm;
 
     if ($StolenX86Regs <= 2 ) { # YURGH! spurious uses of esi?
-	s/^\tmovl\s+(.*),\s*\%esi\n\tjmp\s+\*%esi\n/\tmovl $1,\%eax\n\tjmp \*\%eax\n/g;
-	s/^\tjmp\s+\*(.*\(.*\%esi.*\))\n/\tmovl $1,\%eax\n\tjmp \*\%eax\n/g;
-	s/^\tjmp\s+\*\%esi\n/\tmovl \%esi,\%eax\n\tjmp \*\%eax\n/g;
+	s/^\tmovl\s+(.*),\s*\%esi\n\tjmp\s+\*%esi\n/\tmovl $1,\%eax\n\tjmp \*\%eax\n/gm;
+	s/^\tjmp\s+\*(.*\(.*\%esi.*\))\n/\tmovl $1,\%eax\n\tjmp \*\%eax\n/gm;
+	s/^\tjmp\s+\*\%esi\n/\tmovl \%esi,\%eax\n\tjmp \*\%eax\n/gm;
 	die "$Pgm: (mangler) still have jump involving \%esi!\n$_"
-	    if /(jmp|call)\s+.*\%esi/;
+	    if /(jmp|call)\s+.*\%esi/m;
     }
     if ($StolenX86Regs <= 3 ) { # spurious uses of edi?
-	s/^\tmovl\s+(.*),\s*\%edi\n\tjmp\s+\*%edi\n/\tmovl $1,\%eax\n\tjmp \*\%eax\n/g;
-	s/^\tjmp\s+\*(.*\(.*\%edi.*\))\n/\tmovl $1,\%eax\n\tjmp \*\%eax\n/g;
-	s/^\tjmp\s+\*\%edi\n/\tmovl \%edi,\%eax\n\tjmp \*\%eax\n/g;
+	s/^\tmovl\s+(.*),\s*\%edi\n\tjmp\s+\*%edi\n/\tmovl $1,\%eax\n\tjmp \*\%eax\n/gm;
+	s/^\tjmp\s+\*(.*\(.*\%edi.*\))\n/\tmovl $1,\%eax\n\tjmp \*\%eax\n/gm;
+	s/^\tjmp\s+\*\%edi\n/\tmovl \%edi,\%eax\n\tjmp \*\%eax\n/gm;
 	die "$Pgm: (mangler) still have jump involving \%edi!\n$_"
-	    if /(jmp|call)\s+.*\%edi/;
+	    if /(jmp|call)\s+.*\%edi/m;
     }
 
     # OK, now we can decide what our patch-up code is going to
@@ -1809,14 +1795,14 @@ sub print_doctored {
 
 	# Note funky ".=" stuff; we're *adding* to these _patch guys
     if ( $StolenX86Regs <= 2
-	 && ( /[^0-9]\(\%ebx\)/ || /\%esi/ || /^\tcmps/ ) ) { # R1 (esi)
+	 && ( /[^0-9]\(\%ebx\)/m || /\%esi/m || /^\tcmps/m ) ) { # R1 (esi)
 	$entry_patch .= "\tmovl \%esi,(\%ebx)\n";
 	$exit_patch  .= "\tmovl (\%ebx),\%esi\n";
 
 	# nothing for call_{entry,exit} because %esi is callee-save
     }
     if ( $StolenX86Regs <= 3
-	 && ( /${OFFSET_Hp}\(\%ebx\)/ || /\%edi/ || /^\t(scas|cmps)/ ) ) { # Hp (edi)
+	 && ( /${OFFSET_Hp}\(\%ebx\)/m || /\%edi/m || /^\t(scas|cmps)/m ) ) { # Hp (edi)
 	$entry_patch .= "\tmovl \%edi,${OFFSET_Hp}(\%ebx)\n";
 	$exit_patch  .= "\tmovl ${OFFSET_Hp}(\%ebx),\%edi\n";
 
@@ -1826,37 +1812,37 @@ sub print_doctored {
     # --------------------------------------------------------
     # next, here we go with non-%esp patching!
     #
-    s/^(\t[a-z])/$entry_patch$1/; # before first instruction
+    s/^(\t[a-z])/$entry_patch$1/m; # before first instruction
 
 # Before calling GC we must set up the exit condition before the call
 # and entry condition when we come back
 
     # fix _all_ non-local jumps:
 
-    if ( $TargetPlatform =~ /^.*-apple-darwin.*/ ) {
+    if ( $TargetPlatform =~ /^.*-apple-darwin.*/m ) {
         # On Darwin, we've got local-looking jumps that are
         # actually global (i.e. jumps to Lfoo$stub or via
         # Lfoo$non_lazy_ptr), so we fix those first.
         # In fact, we just fix everything that contains a dollar
         # because false positives don't hurt here.
 
-        s/^(\tjmp\s+\*?L.*\$.*\n)/$exit_patch$1/g;
+        s/^(\tjmp\s+\*?L.*\$.*\n)/$exit_patch$1/gm;
     }
 
-    s/^\tjmp\s+\*${T_X86_PRE_LLBL_PAT}/\tJMP___SL/go;
-    s/^\tjmp\s+${T_X86_PRE_LLBL_PAT}/\tJMP___L/go;
+    s/^\tjmp\s+\*${T_X86_PRE_LLBL_PAT}/\tJMP___SL/gom;
+    s/^\tjmp\s+${T_X86_PRE_LLBL_PAT}/\tJMP___L/gom;
 
-    s/^(\tjmp\s+.*\n)/$exit_patch$1/g; # here's the fix...
+    s/^(\tjmp\s+.*\n)/$exit_patch$1/gm; # here's the fix...
 
-    s/^\tJMP___SL/\tjmp \*${T_X86_PRE_LLBL}/go;
-    s/^\tJMP___L/\tjmp ${T_X86_PRE_LLBL}/go;
+    s/^\tJMP___SL/\tjmp \*${T_X86_PRE_LLBL}/gom;
+    s/^\tJMP___L/\tjmp ${T_X86_PRE_LLBL}/gom;
 
     if ($StolenX86Regs == 2 ) {
 	die "ARGH! Jump uses \%esi or \%edi with -monly-2-regs:\n$_" 
-	    if /^\t(jmp|call)\s+.*\%e(si|di)/;
+	    if /^\t(jmp|call)\s+.*\%e(si|di)/m;
     } elsif ($StolenX86Regs == 3 ) {
 	die "ARGH! Jump uses \%edi with -monly-3-regs:\n$_" 
-	    if /^\t(jmp|call)\s+.*\%edi/;
+	    if /^\t(jmp|call)\s+.*\%edi/m;
     }
 
     # --------------------------------------------------------
@@ -1875,6 +1861,7 @@ sub print_doctored {
 
 \begin{code}
 sub init_FUNNY_THINGS {
+    use vars '%KNOWN_FUNNY_THING'; # Unused?
     %KNOWN_FUNNY_THING = (
 	# example
 	# "${T_US}stg_.*{T_POST_LBL}", 1,  
@@ -1890,59 +1877,60 @@ right after the table itself.  (The code pasting is done elsewhere.)
 
 \begin{code}
 sub rev_tbl {
+    use vars '$discard1';   # Unused?
     local($symb, $tbl, $discard1) = @_;
 
-    return ($tbl) if ($TargetPlatform =~ /^ia64-/);
+    return ($tbl) if ($TargetPlatform =~ /^ia64-/m);
 
     local($before) = '';
     local($label) = '';
     local(@imports) = (); # hppa only
     local(@words) = ();
     local($after) = '';
-    local(@lines) = split(/\n/, $tbl);
+    local(@lines) = split(/\n/m, $tbl);
     local($i, $j);
 
     # Deal with the header...
-    for ($i = 0; $i <= $#lines && $lines[$i] !~ /^\t?${T_DOT_WORD}\s+/o; $i++) {
+    for ($i = 0; $i <= $#lines && $lines[$i] !~ /^\t?${T_DOT_WORD}\s+/om; $i++) {
 	$label .= $lines[$i] . "\n",
-	    next if $lines[$i] =~ /^[A-Za-z0-9_]+_info${T_POST_LBL}$/o
-		 || $lines[$i] =~ /${T_DOT_GLOBAL}/o
-		 || $lines[$i] =~ /^${T_US}\S+_vtbl${T_POST_LBL}$/o;
+	    next if $lines[$i] =~ /^[A-Za-z0-9_]+_info${T_POST_LBL}$/om
+		 || $lines[$i] =~ /${T_DOT_GLOBAL}/om
+		 || $lines[$i] =~ /^${T_US}\S+_vtbl${T_POST_LBL}$/om;
 
 	$before .= $lines[$i] . "\n"; # otherwise...
     }
 
     $infoname = $label;
-    $infoname =~ s/(.|\n)*^([A-Za-z0-9_]+_info)${T_POST_LBL}$(.|\n)*/\2/;
+    $infoname =~ s/(.|\n)*^([A-Za-z0-9_]+_info)${T_POST_LBL}$(.|\n)*/$2/m;
     
     # Grab the table data...
-    if ( $TargetPlatform !~ /^hppa/ ) {
-	for ( ; $i <= $#lines && $lines[$i] =~ /^\t?${T_DOT_WORD}\s+/o; $i++) {
+    if ( $TargetPlatform !~ /^hppa/m ) {
+	for ( ; $i <= $#lines && $lines[$i] =~ /^\t?${T_DOT_WORD}\s+/om; $i++) {
 	    $line = $lines[$i];
 	    # Convert addresses of SRTs, slow entrypoints and large bitmaps
 	    # to offsets (relative to the info label),
 	    # in order to support position independent code.
-            $line =~ s/$infoname/0/
-            || $line =~ s/([A-Za-z0-9_]+_srtd)$/\1 - $infoname/
-            || $line =~ s/([A-Za-z0-9_]+_srt(\+\d+)?)$/\1 - $infoname/
-            || $line =~ s/([A-Za-z0-9_]+_str)$/\1 - $infoname/
-	    || $line =~ s/([A-Za-z0-9_]+_slow)$/\1 - $infoname/
-	    || $line =~ s/([A-Za-z0-9_]+_btm)$/\1 - $infoname/
-            || $line =~ s/([A-Za-z0-9_]+_alt)$/\1 - $infoname/
-            || $line =~ s/([A-Za-z0-9_]+_dflt)$/\1 - $infoname/
-            || $line =~ s/([A-Za-z0-9_]+_ret)$/\1 - $infoname/;
+            $line =~ s/$infoname/0/m
+            || $line =~ s/([A-Za-z0-9_]+_srtd)$/$1 - $infoname/m
+            || $line =~ s/([A-Za-z0-9_]+_srt(\+\d+)?)$/$1 - $infoname/m
+            || $line =~ s/([A-Za-z0-9_]+_str)$/$1 - $infoname/m
+	    || $line =~ s/([A-Za-z0-9_]+_slow)$/$1 - $infoname/m
+	    || $line =~ s/([A-Za-z0-9_]+_btm)$/$1 - $infoname/m
+            || $line =~ s/([A-Za-z0-9_]+_alt)$/$1 - $infoname/m
+            || $line =~ s/([A-Za-z0-9_]+_dflt)$/$1 - $infoname/m
+            || $line =~ s/([A-Za-z0-9_]+_ret)$/$1 - $infoname/m;
 	    push(@words, $line);
 	}
     } else { # hppa weirdness
-	for ( ; $i <= $#lines && $lines[$i] =~ /^\s+(${T_DOT_WORD}|\.IMPORT)/; $i++) {
+	for ( ; $i <= $#lines && $lines[$i] =~ /^\s+(${T_DOT_WORD}|\.IMPORT)/m; $i++) {
             # FIXME: the RTS now expects offsets instead of addresses
             # for all labels in info tables.
-	    if ($lines[$i] =~ /^\s+\.IMPORT/) {
+	    if ($lines[$i] =~ /^\s+\.IMPORT/m) {
 		push(@imports, $lines[$i]);
 	    } else {
 		# We don't use HP's ``function pointers''
 		# We just use labels in code space, like normal people
-		$lines[$i] =~ s/P%//;
+		$lines[$i] =~ s/P%//m;
 		push(@words, $lines[$i]);
 	    }
 	}
@@ -1970,9 +1958,9 @@ sub rev_tbl {
     # To suppress this, we place a .ent/.end pair around the code.
     # At the same time, we have to be careful and not enclose any leading
     # .file/.loc directives.
-    if ( $TargetPlatform =~ /^alpha-/ && $label =~ /^([A-Za-z0-9_]+):$/) {
+    if ( $TargetPlatform =~ /^alpha-/m && $label =~ /^([A-Za-z0-9_]+):$/m) {
         local ($ident) = $1;
-        $before =~ s/^((\s*\.(file|loc)\s+[^\n]*\n)*)/$1\t.ent $ident\n/;
+        $before =~ s/^((\s*\.(file|loc)\s+[^\n]*\n)*)/$1\t.ent $ident\n/m;
     	$after .= "\t.end $ident\n";
     }
 
@@ -1981,11 +1969,11 @@ sub rev_tbl {
     # first narrowed to 32 bits then sign-extended back to 64 bits.
     # This obviously screws up our 64-bit bitmaps, so we work around
     # the bug by replacing .quad with .align 3 + .long + .long [ccshan]
-    if ( $TargetPlatform =~ /^alpha-/ ) {
+    if ( $TargetPlatform =~ /^alpha-/m ) {
 	foreach (@words) {
-	    if (/^\s*\.quad\s+([-+0-9].*\S)\s*$/ && length $1 >= 10) {
+	    if (/^\s*\.quad\s+([-+0-9].*\S)\s*$/m && length $1 >= 10) {
 		local ($number) = $1;
-		if ($number =~ /^([-+])?(0x?)?([0-9]+)$/) {
+		if ($number =~ /^([-+])?(0x?)?([0-9]+)$/m) {
 		    local ($sign, $base, $digits) = ($1, $2, $3);
 		    $base = (10, 8, 16)[length $base];
 		    local ($hi, $lo) = (0, 0);
@@ -2006,7 +1994,7 @@ sub rev_tbl {
 	}
     }
 
-    if ( $TargetPlatform =~ /x86_64-apple-darwin/ ) {
+    if ( $TargetPlatform =~ /x86_64-apple-darwin/m ) {
         # Tack a label to the front of the info table, too.
         # For now, this just serves to work around a crash in Apple's new
         # 64-bit linker (it seems to assume that there is no data before the
@@ -2021,7 +2009,7 @@ sub rev_tbl {
     }
 
     $tbl = $before
-	 . (($TargetPlatform !~ /^hppa/) ? '' : join("\n", @imports) . "\n")
+	 . (($TargetPlatform !~ /^hppa/m) ? '' : join("\n", @imports) . "\n")
 	 . join("\n", @words) . "\n"
 	 . $label . $after;
 
@@ -2050,8 +2038,8 @@ sub mini_mangle_asm_hppa {
 	|| &tidy_up_and_die(1,"$Pgm: failed to open `$out_asmf' (to write)\n");
 
     while (<INASM>) {
-	s/_info,DATA/_info,CODE/;   # Move _info references to code space
-	s/P%_PR/_PR/;
+	s/_info,DATA/_info,CODE/m;   # Move _info references to code space
+	s/P%_PR/_PR/m;
 	print OUTASM;
     }
 
