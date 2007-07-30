@@ -82,12 +82,24 @@ in this Software without prior written authorization from the X Consortium.
 extern int errno;
 #endif
 int silent = 0;                 /* -silent */
+int copy = 0;                   /* -copy */
 int ignore_links = 0;           /* -ignorelinks */
 
 char *rcurdir;
 char *curdir;
 
 int force=0;
+
+#ifdef WIN32
+#define mymkdir(X, Y) mkdir(X)
+#else
+#define mymkdir(X, Y) mkdir(X, Y)
+#endif
+
+#ifndef WIN32
+#define SYMLINKS
+#define BELIEVE_ST_NLINK
+#endif
 
 void
 quit (
@@ -155,6 +167,58 @@ mperror (s)
     perror (s);
 }
 
+#define BUFSIZE 1024
+int copyfile(const char *oldpath, const char *newpath) {
+    FILE *f_old;
+    FILE *f_new;
+    int e;
+    ssize_t s;
+    char buf[BUFSIZE];
+
+#ifdef SYMLINKS
+    if (copy) {
+        return symlink(oldpath, newpath);
+    } else {
+#endif
+        f_old = fopen(oldpath, "rb");
+        if (f_old == NULL) {
+            return -1;
+        }
+        f_new = fopen(newpath, "wbx");
+        if (f_new == NULL) {
+            e = errno;
+            fclose(f_old);
+            errno = e;
+            return -1;
+        }
+        while ((s = fread(buf, 1, BUFSIZE, f_old)) > 0) {
+            if (fwrite(buf, 1, s, f_new) < s) {
+                e = errno;
+                fclose(f_old);
+                fclose(f_new);
+                errno = e;
+                return -1;
+            }
+        }
+        if (!feof(f_old)) {
+            e = errno;
+            fclose(f_old);
+            fclose(f_new);
+            errno = e;
+            return -1;
+        }
+        if (fclose(f_new) == EOF) {
+            e = errno;
+            fclose(f_old);
+            errno = e;
+            return -1;
+        }
+        fclose(f_old);
+        return 0;
+#ifdef SYMLINKS
+    }
+#endif
+}
 
 int equivalent(lname, rname)
     char *lname;
@@ -188,11 +252,15 @@ int rel;                        /* if true, prepend "../" to fn before using */
     char basesym[MAXPATHLEN + 1];
     struct stat sb, sc;
     int n_dirs;
-    int symlen;
+    int symlen = -1;
     int basesymlen = -1;
     char *ocurdir;
 
-    if ((fs->st_dev == ts->st_dev) && (fs->st_ino == ts->st_ino)) {
+    if ((fs->st_dev == ts->st_dev) &&
+        (fs->st_ino == ts->st_ino) &&
+        /* inode is always 0 on Windows; we don't want to fail in that case */
+        (fs->st_ino != 0)
+       ) {
         msg ("%s: From and to directories are identical!", fn);
         return 1;
     }
@@ -218,7 +286,15 @@ int rel;                        /* if true, prepend "../" to fn before using */
             continue;
         strcpy (p, dp->d_name);
 
-        if (n_dirs > 0) {
+        if (
+#ifdef BELIEVE_ST_NLINK
+            n_dirs > 0
+#else
+            /* st_nlink is 1 on Windows, so we have to keep looking for
+             * directories forever */
+            1
+#endif
+           ) {
             if (stat (buf, &sb) < 0) {
                 mperror (buf);
                 continue;
@@ -256,24 +332,27 @@ int rel;                        /* if true, prepend "../" to fn before using */
                 if (!silent)
                     printf ("%s:\n", buf);
                 if ((stat (dp->d_name, &sc) < 0) && (errno == ENOENT)) {
-                    if (mkdir (dp->d_name, 0777) < 0 ||
+                    if (mymkdir (dp->d_name, 0777) < 0 ||
                         stat (dp->d_name, &sc) < 0) {
                         mperror (dp->d_name);
                         curdir = rcurdir = ocurdir;
                         continue;
                     }
                 }
+#ifdef SYMLINKS
                 if (readlink (dp->d_name, symbuf, sizeof(symbuf) - 1) >= 0) {
                     msg ("%s: is a link instead of a directory", dp->d_name);
                     curdir = rcurdir = ocurdir;
                     continue;
                 }
+#endif
                 if (chdir (dp->d_name) < 0) {
                     mperror (dp->d_name);
                     curdir = rcurdir = ocurdir;
                     continue;
                 }
-                dodir (buf, &sb, &sc, (buf[0] != '/'));
+                rel = (fn[0] != '/') && ((fn[0] == '\0') || (fn[1] != ':'));
+                dodir (buf, &sb, &sc, rel);
                 if (chdir ("..") < 0)
                     quiterr (1, "..");
                 curdir = rcurdir = ocurdir;
@@ -282,6 +361,7 @@ int rel;                        /* if true, prepend "../" to fn before using */
         }
 
         /* non-directory */
+#ifdef SYMLINKS
         symlen = readlink (dp->d_name, symbuf, sizeof(symbuf) - 1);
         if (symlen >= 0)
             symbuf[symlen] = '\0';
@@ -295,12 +375,13 @@ int rel;                        /* if true, prepend "../" to fn before using */
             if (basesymlen >= 0)
                 basesym[basesymlen] = '\0';
         }
+#endif
 
         if (symlen >= 0) {
           if (!equivalent (basesymlen>=0 ? basesym : buf, symbuf)) {
             if (force) {
               unlink(dp->d_name);
-              if (symlink (basesymlen>=0 ? basesym : buf, dp->d_name) < 0)
+              if (copyfile (basesymlen>=0 ? basesym : buf, dp->d_name) < 0)
                 mperror (dp->d_name);
             } else {
               /* Link exists in new tree.  Print message if it doesn't match. */
@@ -308,7 +389,7 @@ int rel;                        /* if true, prepend "../" to fn before using */
             }
           }
         } else {
-          if (symlink (basesymlen>=0 ? basesym : buf, dp->d_name) < 0)
+          if (copyfile (basesymlen>=0 ? basesym : buf, dp->d_name) < 0)
             mperror (dp->d_name);
         }
     }
@@ -316,7 +397,6 @@ int rel;                        /* if true, prepend "../" to fn before using */
     closedir (df);
     return 0;
 }
-
 
 main (ac, av)
 int ac;
@@ -345,6 +425,8 @@ char **av;
           force = 1;
       else if (strcmp(*av, "-ignorelinks") == 0)
           ignore_links = 1;
+      else if (strcmp(*av, "-copy") == 0)
+          copy = 1;
       else if (strcmp(*av, "--") == 0) {
           ++av, --ac;
           break;
@@ -370,7 +452,7 @@ char **av;
     /* to directory */
     if (stat (tn, &ts) < 0) {
       if (force && (tn[0] != '.' || tn[1] != '\0') ) {
-         mkdir(tn, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH );
+         mymkdir(tn, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH );
       } 
       else {
         quiterr (1, tn);
