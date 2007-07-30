@@ -27,13 +27,9 @@ case $OSTYPE in
 esac
 
 if [ "$CPUS" = "" ]; then
-   # ToDo: make -j doesn't work in libraries/ on Windows (see #1559)
-   case $OSTYPE in
-       cygwin|msys) threads=1;;
-       *)           threads=2;;
-   esac
+    threads=2
 else
-   threads=`expr $CPUS + 1`
+    threads=`expr $CPUS + 1`
 fi
 
 sh boot
