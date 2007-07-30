@@ -133,11 +133,9 @@ foreign import stdcall unsafe "HsBase.h closesocket"
 fdGetMode :: FD -> IO IOMode
 fdGetMode fd = do
 #if defined(mingw32_HOST_OS) || defined(__MINGW32__)
-    -- XXX: this code is *BROKEN*, _setmode only deals with O_TEXT/O_BINARY
-    flags1 <- throwErrnoIfMinus1Retry "fdGetMode" 
-                (c__setmode fd (fromIntegral o_WRONLY))
-    flags  <- throwErrnoIfMinus1Retry "fdGetMode" 
-                (c__setmode fd (fromIntegral flags1))
+    -- We don't have a way of finding out which flags are set on FDs
+    -- on Windows, so make a handle that thinks that anything goes.
+    let flags = o_RDWR
 #else
     flags <- throwErrnoIfMinus1Retry "fdGetMode" 
 		(c_fcntl_read fd const_f_getfl)
@@ -428,16 +426,6 @@ foreign import ccall unsafe "HsBase.h utime"
 
 foreign import ccall unsafe "HsBase.h waitpid"
    c_waitpid :: CPid -> Ptr CInt -> CInt -> IO CPid
-#else
-foreign import ccall unsafe "HsBase.h _setmode"
-   c__setmode :: CInt -> CInt -> IO CInt
-
---   /* Set "stdin" to have binary mode: */
---   result = _setmode( _fileno( stdin ), _O_BINARY );
---   if( result == -1 )
---      perror( "Cannot set mode" );
---   else
---      printf( "'stdin' successfully changed to binary mode\n" );
 #endif
 
 -- traversing directories
