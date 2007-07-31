@@ -6,6 +6,7 @@ where
 import VectMonad
 import VectUtils
 import VectType
+import VectCore
 
 import DynFlags
 import HscTypes
@@ -112,7 +113,7 @@ vectTopRhs = liftM fst . closedV . vectPolyExpr (panic "Empty lifting context") 
 -- ----------------------------------------------------------------------------
 -- Bindings
 
-vectBndr :: Var -> VM (Var, Var)
+vectBndr :: Var -> VM VVar
 vectBndr v
   = do
       vty <- vectType (idType v)
@@ -124,26 +125,26 @@ vectBndr v
   where
     mapTo vv lv env = env { local_vars = extendVarEnv (local_vars env) v (vv, lv) }
 
-vectBndrIn :: Var -> VM a -> VM (Var, Var, a)
+vectBndrIn :: Var -> VM a -> VM (VVar, a)
 vectBndrIn v p
   = localV
   $ do
-      (vv, lv) <- vectBndr v
+      vv <- vectBndr v
       x <- p
-      return (vv, lv, x)
+      return (vv, x)
 
-vectBndrsIn :: [Var] -> VM a -> VM ([Var], [Var], a)
+vectBndrsIn :: [Var] -> VM a -> VM ([VVar], a)
 vectBndrsIn vs p
   = localV
   $ do
-      (vvs, lvs) <- mapAndUnzipM vectBndr vs
+      vvs <- mapM vectBndr vs
       x <- p
-      return (vvs, lvs, x)
+      return (vvs, x)
 
 -- ----------------------------------------------------------------------------
 -- Expressions
 
-capply :: (CoreExpr, CoreExpr) -> (CoreExpr, CoreExpr) -> VM (CoreExpr, CoreExpr)
+capply :: VExpr -> VExpr -> VM VExpr
 capply (vfn, lfn) (varg, larg)
   = do
       apply  <- builtin applyClosureVar
@@ -154,7 +155,7 @@ capply (vfn, lfn) (varg, larg)
     fn_ty            = exprType vfn
     (arg_ty, res_ty) = splitClosureTy fn_ty
 
-vectVar :: Var -> Var -> VM (CoreExpr, CoreExpr)
+vectVar :: Var -> Var -> VM VExpr
 vectVar lc v
   = do
       r <- lookupVar v
@@ -165,7 +166,7 @@ vectVar lc v
                            lexpr <- replicatePA vexpr (Var lc)
                            return (vexpr, lexpr)
 
-vectPolyVar :: Var -> Var -> [Type] -> VM (CoreExpr, CoreExpr)
+vectPolyVar :: Var -> Var -> [Type] -> VM VExpr
 vectPolyVar lc v tys
   = do
       vtys <- mapM vectType tys
@@ -178,17 +179,17 @@ vectPolyVar lc v tys
                             lexpr <- replicatePA vexpr (Var lc)
                             return (vexpr, lexpr)
 
-vectPolyExpr :: Var -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
+vectPolyExpr :: Var -> CoreExprWithFVs -> VM VExpr
 vectPolyExpr lc expr
-  = polyAbstract tvs $ \mk_lams ->
+  = polyAbstract tvs $ \abstract ->
     -- FIXME: shadowing (tvs in lc)
     do
-      (vmono, lmono) <- vectExpr lc mono
-      return $ (mk_lams vmono, mk_lams lmono)
+      mono' <- vectExpr lc mono
+      return $ mapVect abstract mono'
   where
     (tvs, mono) = collectAnnTypeBinders expr  
                 
-vectExpr :: Var -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
+vectExpr :: Var -> CoreExprWithFVs -> VM VExpr
 vectExpr lc (_, AnnType ty)
   = do
       vty <- vectType ty
@@ -225,13 +226,14 @@ vectExpr lc (_, AnnCase expr bndr ty alts)
 vectExpr lc (_, AnnLet (AnnNonRec bndr rhs) body)
   = do
       (vrhs, lrhs) <- vectPolyExpr lc rhs
-      (vbndr, lbndr, (vbody, lbody)) <- vectBndrIn bndr (vectExpr lc body)
+      ((vbndr, lbndr), (vbody, lbody)) <- vectBndrIn bndr (vectExpr lc body)
       return (Let (NonRec vbndr vrhs) vbody,
               Let (NonRec lbndr lrhs) lbody)
 
 vectExpr lc (_, AnnLet (AnnRec prs) body)
   = do
-      (vbndrs, lbndrs, (vrhss, vbody, lrhss, lbody)) <- vectBndrsIn bndrs vect
+      (bndrs, (vrhss, vbody, lrhss, lbody)) <- vectBndrsIn bndrs vect
+      let (vbndrs, lbndrs) = unzip bndrs
       return (Let (Rec (zip vbndrs vrhss)) vbody,
               Let (Rec (zip lbndrs lrhss)) lbody)
   where
@@ -357,9 +359,10 @@ mkClosureMonoFns :: CEnvInfo -> Var -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr
 mkClosureMonoFns info arg body
   = do
       lc_bndr <- newLocalVar FSLIT("lc") intPrimTy
-      (varg : vbndrs, larg : lbndrs, (vbody, lbody))
+      (bndrs, (vbody, lbody))
         <- vectBndrsIn (arg : cenv_vars info)
                        (vectExpr lc_bndr body)
+      let (varg : vbndrs, larg : lbndrs) = unzip bndrs
 
       venv_bndr <- newLocalVar FSLIT("env") vty
       lenv_bndr <- newLocalVar FSLIT("env") lty
