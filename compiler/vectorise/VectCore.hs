@@ -1,20 +1,25 @@
 module VectCore (
-  Vect, VVar, VExpr,
+  Vect, VVar, VExpr, VBind,
 
   vectorised, lifted,
   mapVect,
 
-  vVar, mkVLams, mkVVarApps
+  vNonRec, vRec,
+
+  vVar, vType, vNote, vLet,
+  mkVLams, mkVVarApps
 ) where
 
 #include "HsVersions.h"
 
 import CoreSyn
+import Type           ( Type )
 import Var
 
 type Vect a = (a,a)
 type VVar   = Vect Var
 type VExpr  = Vect CoreExpr
+type VBind  = Vect CoreBind
 
 vectorised :: Vect a -> a
 vectorised = fst
@@ -25,8 +30,29 @@ lifted = snd
 mapVect :: (a -> b) -> Vect a -> Vect b
 mapVect f (x,y) = (f x, f y)
 
+zipWithVect :: (a -> b -> c) -> Vect a -> Vect b -> Vect c
+zipWithVect f (x1,y1) (x2,y2) = (f x1 x2, f y1 y2)
+
 vVar :: VVar -> VExpr
 vVar = mapVect Var
+
+vType :: Type -> VExpr
+vType ty = (Type ty, Type ty)
+
+vNote :: Note -> VExpr -> VExpr
+vNote = mapVect . Note
+
+vNonRec :: VVar -> VExpr -> VBind
+vNonRec = zipWithVect NonRec
+
+vRec :: [VVar] -> [VExpr] -> VBind
+vRec vs es = (Rec (zip vvs ves), Rec (zip lvs les))
+  where
+    (vvs, lvs) = unzip vs
+    (ves, les) = unzip es
+
+vLet :: VBind -> VExpr -> VExpr
+vLet = zipWithVect Let
 
 mkVLams :: [VVar] -> VExpr -> VExpr
 mkVLams vvs (ve,le) = (mkLams vs ve, mkLams ls le)

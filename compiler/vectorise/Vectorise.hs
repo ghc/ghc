@@ -34,6 +34,7 @@ import OccName
 import DsMonad hiding (mapAndUnzipM)
 import DsUtils              ( mkCoreTup, mkCoreTupTy )
 
+import Literal              ( Literal )
 import PrelNames
 import TysWiredIn
 import TysPrim              ( intPrimTy )
@@ -179,6 +180,12 @@ vectPolyVar lc v tys
                             lexpr <- replicatePA vexpr (Var lc)
                             return (vexpr, lexpr)
 
+vectLiteral :: Var -> Literal -> VM VExpr
+vectLiteral lc lit
+  = do
+      lexpr <- replicatePA (Lit lit) (Var lc)
+      return (Lit lit, lexpr)
+
 vectPolyExpr :: Var -> CoreExprWithFVs -> VM VExpr
 vectPolyExpr lc expr
   = polyAbstract tvs $ \abstract ->
@@ -191,22 +198,14 @@ vectPolyExpr lc expr
                 
 vectExpr :: Var -> CoreExprWithFVs -> VM VExpr
 vectExpr lc (_, AnnType ty)
-  = do
-      vty <- vectType ty
-      return (Type vty, Type vty)
+  = liftM vType (vectType ty)
 
 vectExpr lc (_, AnnVar v) = vectVar lc v
 
-vectExpr lc (_, AnnLit lit)
-  = do
-      let vexpr = Lit lit
-      lexpr <- replicatePA vexpr (Var lc)
-      return (vexpr, lexpr)
+vectExpr lc (_, AnnLit lit) = vectLiteral lc lit
 
 vectExpr lc (_, AnnNote note expr)
-  = do
-      (vexpr, lexpr) <- vectExpr lc expr
-      return (Note note vexpr, Note note lexpr)
+  = liftM (vNote note) (vectExpr lc expr)
 
 vectExpr lc e@(_, AnnApp _ arg)
   | isAnnTypeArg arg
@@ -225,24 +224,19 @@ vectExpr lc (_, AnnCase expr bndr ty alts)
 
 vectExpr lc (_, AnnLet (AnnNonRec bndr rhs) body)
   = do
-      (vrhs, lrhs) <- vectPolyExpr lc rhs
-      ((vbndr, lbndr), (vbody, lbody)) <- vectBndrIn bndr (vectExpr lc body)
-      return (Let (NonRec vbndr vrhs) vbody,
-              Let (NonRec lbndr lrhs) lbody)
+      vrhs <- vectPolyExpr lc rhs
+      (vbndr, vbody) <- vectBndrIn bndr (vectExpr lc body)
+      return $ vLet (vNonRec vbndr vrhs) vbody
 
-vectExpr lc (_, AnnLet (AnnRec prs) body)
+vectExpr lc (_, AnnLet (AnnRec bs) body)
   = do
-      (bndrs, (vrhss, vbody, lrhss, lbody)) <- vectBndrsIn bndrs vect
-      let (vbndrs, lbndrs) = unzip bndrs
-      return (Let (Rec (zip vbndrs vrhss)) vbody,
-              Let (Rec (zip lbndrs lrhss)) lbody)
+      (vbndrs, (vrhss, vbody)) <- vectBndrsIn bndrs
+                                $ liftM2 (,)
+                                  (mapM (vectExpr lc) rhss)
+                                  (vectPolyExpr lc body)
+      return $ vLet (vRec vbndrs vrhss) vbody
   where
-    (bndrs, rhss) = unzip prs
-    
-    vect = do
-             (vrhss, lrhss) <- mapAndUnzipM (vectExpr lc) rhss
-             (vbody, lbody) <- vectPolyExpr lc body
-             return (vrhss, vbody, lrhss, lbody)
+    (bndrs, rhss) = unzip bs
 
 vectExpr lc e@(_, AnnLam bndr body)
   | isTyVar bndr = pprPanic "vectExpr" (ppr $ deAnnotate e)
