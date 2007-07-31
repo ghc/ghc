@@ -48,7 +48,7 @@ $(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
 	echo "main = do args <- getArgs; rawSystem \"$(TOP_ABS)/$(GHC_HSC2HS_DIR_REL)/$(HS_PROG)\" (\"--template=$(TOP_ABS)/$(GHC_HSC2HS_DIR_REL)/template-hsc.h\":\"--cc=$(CC)\":\"--ld=$(CC)\"$(patsubst %,:\"%\",$(extra_flags)):\"--cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt)\":\"-I$(TOP_ABS)/$(GHC_INCLUDE_DIR_REL)\":\"-I$(TOP_ABS)/gmp/gmpbuild\":args) >>= exitWith" >> $@
 
 $(INPLACE_PROG): $(INPLACE_HS)
-	$(GHC) --make $< -o $@
+	$(HC) --make $< -o $@
 
 all :: $(INPLACE_PROG)
 

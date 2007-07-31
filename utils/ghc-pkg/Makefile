@@ -70,7 +70,7 @@ $(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
 	echo "main = do args <- getArgs; rawSystem \"$(TOP_ABS)/$(GHC_PKG_DIR_REL)/$(HS_PROG)\" (\"--global-conf\":\"$(TOP_ABS)/driver/package.conf.inplace\":args) >>= exitWith" >> $@
 
 $(INPLACE_PROG): $(INPLACE_HS)
-	$(GHC) --make $< -o $@
+	$(HC) --make $< -o $@
 
 all :: $(INPLACE_PROG)
 
