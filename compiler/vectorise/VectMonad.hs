@@ -106,7 +106,7 @@ initBuiltins
 data GlobalEnv = GlobalEnv {
                   -- Mapping from global variables to their vectorised versions.
                   -- 
-                  global_vars :: VarEnv CoreExpr
+                  global_vars :: VarEnv Var
 
                   -- Exported variables which have a vectorised version
                   --
@@ -140,7 +140,7 @@ data LocalEnv = LocalEnv {
                  -- Mapping from local variables to their vectorised and
                  -- lifted versions
                  --
-                 local_vars :: VarEnv (CoreExpr, CoreExpr)
+                 local_vars :: VarEnv (Var, Var)
 
                  -- In-scope type variables
                  --
@@ -154,7 +154,7 @@ data LocalEnv = LocalEnv {
 initGlobalEnv :: VectInfo -> (InstEnv, InstEnv) -> FamInstEnvs -> Builtins -> GlobalEnv
 initGlobalEnv info instEnvs famInstEnvs bi
   = GlobalEnv {
-      global_vars          = mapVarEnv  (Var . snd) $ vectInfoVar   info
+      global_vars          = mapVarEnv snd $ vectInfoVar info
     , global_exported_vars = emptyVarEnv
     , global_tycons        = extendNameEnv (mapNameEnv snd (vectInfoTyCon info))
                                            (tyConName funTyCon) (closureTyCon bi)
@@ -308,14 +308,14 @@ newTyVar fs k
 
 defGlobalVar :: Var -> Var -> VM ()
 defGlobalVar v v' = updGEnv $ \env ->
-  env { global_vars = extendVarEnv (global_vars env) v (Var v')
+  env { global_vars = extendVarEnv (global_vars env) v v'
       , global_exported_vars = upd (global_exported_vars env)
       }
   where
     upd env | isExportedId v = extendVarEnv env v (v, v')
             | otherwise      = env
 
-lookupVar :: Var -> VM (Scope CoreExpr (CoreExpr, CoreExpr))
+lookupVar :: Var -> VM (Scope Var (Var, Var))
 lookupVar v
   = do
       r <- readLEnv $ \env -> lookupVarEnv (local_vars env) v

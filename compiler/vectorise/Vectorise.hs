@@ -122,7 +122,7 @@ vectBndr v
       updLEnv (mapTo vv lv)
       return (vv, lv)
   where
-    mapTo vv lv env = env { local_vars = extendVarEnv (local_vars env) v (Var vv, Var lv) }
+    mapTo vv lv env = env { local_vars = extendVarEnv (local_vars env) v (vv, lv) }
 
 vectBndrIn :: Var -> VM a -> VM (Var, Var, a)
 vectBndrIn v p
@@ -159,23 +159,24 @@ vectVar lc v
   = do
       r <- lookupVar v
       case r of
-        Local es     -> return es
-        Global vexpr -> do
-                          lexpr <- replicatePA vexpr lc
-                          return (vexpr, lexpr)
+        Local (vv,lv) -> return (Var vv, Var lv)
+        Global vv     -> do
+                           let vexpr = Var vv
+                           lexpr <- replicatePA vexpr lc
+                           return (vexpr, lexpr)
 
 vectPolyVar :: CoreExpr -> Var -> [Type] -> VM (CoreExpr, CoreExpr)
 vectPolyVar lc v tys
   = do
+      vtys <- mapM vectType tys
       r <- lookupVar v
       case r of
-        Local (vexpr, lexpr) -> liftM2 (,) (mk_app vexpr) (mk_app lexpr)
-        Global poly          -> do
-                                  vexpr <- mk_app poly
-                                  lexpr <- replicatePA vexpr lc
-                                  return (vexpr, lexpr)
-  where
-    mk_app e = polyApply e =<< mapM vectType tys
+        Local (vv, lv) -> liftM2 (,) (polyApply (Var vv) vtys)
+                                     (polyApply (Var lv) vtys)
+        Global poly    -> do
+                            vexpr <- polyApply (Var poly) vtys
+                            lexpr <- replicatePA vexpr lc
+                            return (vexpr, lexpr)
 
 vectPolyExpr :: CoreExpr -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
 vectPolyExpr lc expr
@@ -276,7 +277,6 @@ vectExpr lc (fvs, AnnLam bndr body)
                              `mkApps`   [pa_dict, mono_vfn, mono_lfn, lenv]
 
       return (vclo, lclo)
-       
 
 data CEnvInfo = CEnvInfo {
                cenv_vars         :: [Var]
@@ -294,8 +294,8 @@ mkCEnvInfo fvs arg body
       locals <- readLEnv local_vars
       let
           (vars, vals) = unzip
-                 [(var, val) | var      <- varSetElems fvs
-                             , Just val <- [lookupVarEnv locals var]]
+                 [(var, (Var v, Var v')) | var      <- varSetElems fvs
+                                         , Just (v,v') <- [lookupVarEnv locals var]]
       vtys <- mapM (vectType . varType) vars
 
       (vty, repr_tycon, repr_tyargs, repr_datacon) <- mk_env_ty vtys
