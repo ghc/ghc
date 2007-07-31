@@ -11,6 +11,7 @@ module VectUtils (
 
 #include "HsVersions.h"
 
+import VectCore
 import VectMonad
 
 import DsUtils
@@ -146,19 +147,6 @@ replicatePA len x = liftM (`mkApps` [len,x])
 emptyPA :: Type -> VM CoreExpr
 emptyPA = paMethod emptyPAVar
 
-type Vect a = (a,a)
-type VVar   = Vect Var
-type VExpr  = Vect CoreExpr
-
-vectorised :: Vect a -> a
-vectorised = fst
-
-lifted :: Vect a -> a
-lifted = snd
-
-mapVect :: (a -> b) -> Vect a -> Vect b
-mapVect f (x,y) = (f x, f y)
-
 newLocalVVar :: FastString -> Type -> VM VVar
 newLocalVVar fs vty
   = do
@@ -166,19 +154,6 @@ newLocalVVar fs vty
       vv  <- newLocalVar fs vty
       lv  <- newLocalVar fs lty
       return (vv,lv)
-
-vVar :: VVar -> VExpr
-vVar = mapVect Var
-
-mkVLams :: [VVar] -> VExpr -> VExpr
-mkVLams vvs (ve,le) = (mkLams vs ve, mkLams ls le)
-  where
-    (vs,ls) = unzip vvs
-
-mkVVarApps :: Var -> VExpr -> [VVar] -> VExpr
-mkVVarApps lc (ve, le) vvs = (ve `mkVarApps` vs, le `mkVarApps` (lc : ls))
-  where
-    (vs,ls) = unzip vvs 
 
 polyAbstract :: [TyVar] -> ((CoreExpr -> CoreExpr) -> VM a) -> VM a
 polyAbstract tvs p
@@ -256,7 +231,7 @@ buildClosure tvs lv vars arg body
       env_bndr            <- newLocalVVar FSLIT("env") env_ty
 
       fn <- hoistPolyVExpr FSLIT("fn") tvs
-          .  mkVLams [env_bndr, arg]
+          . mkVLams [env_bndr, arg]
           . bind (vVar env_bndr)
           $ mkVVarApps lv body (vars ++ [arg])
 
