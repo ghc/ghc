@@ -175,12 +175,11 @@ vectPolyVar lc v tys
                                   lexpr <- replicatePA vexpr lc
                                   return (vexpr, lexpr)
   where
-    mk_app e = applyToTypes e =<< mapM vectType tys
+    mk_app e = polyApply e =<< mapM vectType tys
 
 vectPolyExpr :: CoreExpr -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
 vectPolyExpr lc expr
-  = localV
-  . abstractOverTyVars tvs $ \mk_lams ->
+  = polyAbstract tvs $ \mk_lams ->
     -- FIXME: shadowing (tvs in lc)
     do
       (vmono, lmono) <- vectExpr lc mono
@@ -264,8 +263,8 @@ vectExpr lc (fvs, AnnLam bndr body)
       res_ty <- vectType (exprType $ deAnnotate body)
 
       -- FIXME: move the functions to the top level
-      mono_vfn <- applyToTypes (Var vfn_var) (mkTyVarTys tyvars)
-      mono_lfn <- applyToTypes (Var lfn_var) (mkTyVarTys tyvars)
+      mono_vfn <- polyApply (Var vfn_var) (mkTyVarTys tyvars)
+      mono_lfn <- polyApply (Var lfn_var) (mkTyVarTys tyvars)
 
       mk_clo <- builtin mkClosureVar
       mk_cloP <- builtin mkClosurePVar
@@ -348,7 +347,7 @@ mkClosureFns :: CEnvInfo -> [TyVar] -> Var -> CoreExprWithFVs
              -> VM (CoreExpr, CoreExpr)
 mkClosureFns info tyvars arg body
   = closedV
-  . abstractOverTyVars tyvars
+  . polyAbstract tyvars
   $ \mk_tlams ->
   do
     (vfn, lfn) <- mkClosureMonoFns info arg body

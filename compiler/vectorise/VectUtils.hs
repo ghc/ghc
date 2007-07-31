@@ -4,7 +4,7 @@ module VectUtils (
   mkPADictType, mkPArrayType,
   paDictArgType, paDictOfType,
   paMethod, lengthPA, replicatePA, emptyPA,
-  abstractOverTyVars, applyToTypes,
+  polyAbstract, polyApply,
   lookupPArrayFamInst,
   hoistExpr, takeHoisted
 ) where
@@ -140,9 +140,10 @@ replicatePA len x = liftM (`mkApps` [len,x])
 emptyPA :: Type -> VM CoreExpr
 emptyPA = paMethod emptyPAVar
 
-abstractOverTyVars :: [TyVar] -> ((CoreExpr -> CoreExpr) -> VM a) -> VM a
-abstractOverTyVars tvs p
-  = do
+polyAbstract :: [TyVar] -> ((CoreExpr -> CoreExpr) -> VM a) -> VM a
+polyAbstract tvs p
+  = localV
+  $ do
       mdicts <- mapM mk_dict_var tvs
       zipWithM_ (\tv -> maybe (defLocalTyVar tv) (defLocalTyVarWithPA tv . Var)) tvs mdicts
       p (mk_lams mdicts)
@@ -155,8 +156,8 @@ abstractOverTyVars tvs p
 
     mk_lams mdicts = mkLams (tvs ++ [dict | Just dict <- mdicts])
 
-applyToTypes :: CoreExpr -> [Type] -> VM CoreExpr
-applyToTypes expr tys
+polyApply :: CoreExpr -> [Type] -> VM CoreExpr
+polyApply expr tys
   = do
       dicts <- mapM paDictOfType tys
       return $ expr `mkTyApps` tys `mkApps` dicts

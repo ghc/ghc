@@ -320,7 +320,7 @@ buildPADict (PAInstance {
                painstInstance  = inst
              , painstVectTyCon = vect_tc
              , painstArrTyCon  = arr_tc })
-  = localV . abstractOverTyVars (tyConTyVars arr_tc) $ \abstract ->
+  = polyAbstract (tyConTyVars arr_tc) $ \abstract ->
     do
       shape <- tyConShape vect_tc
       meth_binds <- mapM (mk_method shape) paMethods
