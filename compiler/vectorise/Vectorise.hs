@@ -154,7 +154,7 @@ capply (vfn, lfn) (varg, larg)
     fn_ty            = exprType vfn
     (arg_ty, res_ty) = splitClosureTy fn_ty
 
-vectVar :: CoreExpr -> Var -> VM (CoreExpr, CoreExpr)
+vectVar :: Var -> Var -> VM (CoreExpr, CoreExpr)
 vectVar lc v
   = do
       r <- lookupVar v
@@ -162,10 +162,10 @@ vectVar lc v
         Local (vv,lv) -> return (Var vv, Var lv)
         Global vv     -> do
                            let vexpr = Var vv
-                           lexpr <- replicatePA vexpr lc
+                           lexpr <- replicatePA vexpr (Var lc)
                            return (vexpr, lexpr)
 
-vectPolyVar :: CoreExpr -> Var -> [Type] -> VM (CoreExpr, CoreExpr)
+vectPolyVar :: Var -> Var -> [Type] -> VM (CoreExpr, CoreExpr)
 vectPolyVar lc v tys
   = do
       vtys <- mapM vectType tys
@@ -175,10 +175,10 @@ vectPolyVar lc v tys
                                      (polyApply (Var lv) vtys)
         Global poly    -> do
                             vexpr <- polyApply (Var poly) vtys
-                            lexpr <- replicatePA vexpr lc
+                            lexpr <- replicatePA vexpr (Var lc)
                             return (vexpr, lexpr)
 
-vectPolyExpr :: CoreExpr -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
+vectPolyExpr :: Var -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
 vectPolyExpr lc expr
   = polyAbstract tvs $ \mk_lams ->
     -- FIXME: shadowing (tvs in lc)
@@ -188,18 +188,18 @@ vectPolyExpr lc expr
   where
     (tvs, mono) = collectAnnTypeBinders expr  
                 
-vectExpr :: CoreExpr -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
+vectExpr :: Var -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
 vectExpr lc (_, AnnType ty)
   = do
       vty <- vectType ty
       return (Type vty, Type vty)
 
-vectExpr lc (_, AnnVar v)   = vectVar lc v
+vectExpr lc (_, AnnVar v) = vectVar lc v
 
 vectExpr lc (_, AnnLit lit)
   = do
       let vexpr = Lit lit
-      lexpr <- replicatePA vexpr lc
+      lexpr <- replicatePA vexpr (Var lc)
       return (vexpr, lexpr)
 
 vectExpr lc (_, AnnNote note expr)
@@ -254,7 +254,7 @@ vectExpr lc (fvs, AnnLam bndr body)
       vfn_var <- hoistExpr FSLIT("vfn") poly_vfn
       lfn_var <- hoistExpr FSLIT("lfn") poly_lfn
 
-      let (venv, lenv) = mkClosureEnvs info lc
+      let (venv, lenv) = mkClosureEnvs info (Var lc)
 
       let env_ty = cenv_vty info
 
@@ -359,7 +359,7 @@ mkClosureMonoFns info arg body
       lc_bndr <- newLocalVar FSLIT("lc") intPrimTy
       (varg : vbndrs, larg : lbndrs, (vbody, lbody))
         <- vectBndrsIn (arg : cenv_vars info)
-                       (vectExpr (Var lc_bndr) body)
+                       (vectExpr lc_bndr body)
 
       venv_bndr <- newLocalVar FSLIT("env") vty
       lenv_bndr <- newLocalVar FSLIT("env") lty
@@ -401,7 +401,7 @@ mkClosureMonoFns info arg body
              (exprType lbody)
              [(DataAlt (cenv_repr_datacon info), lc_bndr : lbndrs', lbody)]
           
-vectTyAppExpr :: CoreExpr -> CoreExprWithFVs -> [Type] -> VM (CoreExpr, CoreExpr)
+vectTyAppExpr :: Var -> CoreExprWithFVs -> [Type] -> VM (CoreExpr, CoreExpr)
 vectTyAppExpr lc (_, AnnVar v) tys = vectPolyVar lc v tys
 vectTyAppExpr lc e tys = pprPanic "vectTyAppExpr" (ppr $ deAnnotate e)
 
