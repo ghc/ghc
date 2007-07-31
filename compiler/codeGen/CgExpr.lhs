@@ -146,8 +146,7 @@ cgExpr (StgOpApp (StgPrimOp TagToEnumOp) [arg] res_ty)
 	            else assignNonPtrTemp amode
 					-- We're going to use it twice,
 					-- so save in a temp if non-trivial
-	; this_pkg <- getThisPackage
-	; stmtC (CmmAssign nodeReg (tagToClosure this_pkg tycon amode'))
+	; stmtC (CmmAssign nodeReg (tagToClosure tycon amode'))
 	; performReturn emitReturnInstr }
    where
 	  -- If you're reading this code in the attempt to figure
@@ -183,10 +182,9 @@ cgExpr x@(StgOpApp op@(StgPrimOp primop) args res_ty)
 	= do tag_reg <- if isFollowableArg (typeCgRep res_ty)
                         then newPtrTemp wordRep
                         else newNonPtrTemp wordRep
-	     this_pkg <- getThisPackage
 	     cgPrimOp [tag_reg] primop args emptyVarSet
 	     stmtC (CmmAssign nodeReg
-                    (tagToClosure this_pkg tycon
+                    (tagToClosure tycon
                      (CmmReg (CmmLocal tag_reg))))
 	     performReturn emitReturnInstr
   where
@@ -292,8 +290,7 @@ cgRhs name (StgRhsCon maybe_cc con args)
 	; returnFC (name, idinfo) }
 
 cgRhs name (StgRhsClosure cc bi fvs upd_flag srt args body)
-  = do this_pkg <- getThisPackage
-       setSRT srt $ mkRhsClosure this_pkg name cc bi fvs upd_flag args body
+  = setSRT srt $ mkRhsClosure name cc bi fvs upd_flag args body
 \end{code}
 
 mkRhsClosure looks for two special forms of the right-hand side:
@@ -316,7 +313,7 @@ form:
 
 
 \begin{code}
-mkRhsClosure	this_pkg bndr cc bi
+mkRhsClosure	bndr cc bi
 		[the_fv]   		-- Just one free var
 		upd_flag		-- Updatable thunk
 		[]			-- A thunk
@@ -338,7 +335,7 @@ mkRhsClosure	this_pkg bndr cc bi
   where
     lf_info 		  = mkSelectorLFInfo bndr offset_into_int
 				 (isUpdatable upd_flag)
-    (_, params_w_offsets) = layOutDynConstr this_pkg con (addIdReps params)
+    (_, params_w_offsets) = layOutDynConstr con (addIdReps params)
 			-- Just want the layout
     maybe_offset	  = assocMaybe params_w_offsets selectee
     Just the_offset 	  = maybe_offset
@@ -362,7 +359,7 @@ We only generate an Ap thunk if all the free variables are pointers,
 for semi-obvious reasons.
 
 \begin{code}
-mkRhsClosure 	this_pkg bndr cc bi
+mkRhsClosure    bndr cc bi
 		fvs
 		upd_flag
 		[]			-- No args; a thunk
@@ -387,7 +384,7 @@ mkRhsClosure 	this_pkg bndr cc bi
 The default case
 ~~~~~~~~~~~~~~~~
 \begin{code}
-mkRhsClosure this_pkg bndr cc bi fvs upd_flag args body
+mkRhsClosure bndr cc bi fvs upd_flag args body
   = cgRhsClosure bndr cc bi fvs upd_flag args body
 \end{code}
 

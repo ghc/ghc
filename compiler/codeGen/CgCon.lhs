@@ -63,9 +63,9 @@ cgTopRhsCon :: Id		-- Name of thing bound to this RHS
 	    -> FCode (Id, CgIdInfo)
 cgTopRhsCon id con args
   = do { 
-	; this_pkg <- getThisPackage
 #if mingw32_TARGET_OS
         -- Windows DLLs have a problem with static cross-DLL refs.
+	; this_pkg <- getThisPackage
         ; ASSERT( not (isDllConApp this_pkg con args) ) return ()
 #endif
 	; ASSERT( args `lengthIs` dataConRepArity con ) return ()
@@ -76,9 +76,9 @@ cgTopRhsCon id con args
 	; let
 	    name          = idName id
 	    lf_info	  = mkConLFInfo con
-    	    closure_label = mkClosureLabel this_pkg name
+    	    closure_label = mkClosureLabel name
 	    caffy         = any stgArgHasCafRefs args
-	    (closure_info, amodes_w_offsets) = layOutStaticConstr this_pkg con amodes
+	    (closure_info, amodes_w_offsets) = layOutStaticConstr con amodes
 	    closure_rep = mkStaticClosureFields
 	    		     closure_info
 	    		     dontCareCCS		-- Because it's static data
@@ -135,9 +135,8 @@ at all.
 
 \begin{code}
 buildDynCon binder cc con []
-  = do this_pkg <- getThisPackage
-       returnFC (taggedStableIdInfo binder
-			   (mkLblExpr (mkClosureLabel this_pkg (dataConName con)))
+  = returnFC (taggedStableIdInfo binder
+			   (mkLblExpr (mkClosureLabel (dataConName con)))
     			   (mkConLFInfo con)
                            con)
 \end{code}
@@ -192,9 +191,8 @@ Now the general case.
 \begin{code}
 buildDynCon binder ccs con args
   = do	{ 
-	; this_pkg <- getThisPackage
 	; let
-	    (closure_info, amodes_w_offsets) = layOutDynConstr this_pkg con args
+	    (closure_info, amodes_w_offsets) = layOutDynConstr con args
 
 	; hp_off <- allocDynClosure closure_info use_cc blame_cc amodes_w_offsets
  	; returnFC (taggedHeapIdInfo binder hp_off lf_info con) }
@@ -224,12 +222,12 @@ found a $con$.
 \begin{code}
 bindConArgs :: DataCon -> [Id] -> Code
 bindConArgs con args
-  = do this_pkg <- getThisPackage
+  = do
        let
           -- The binding below forces the masking out of the tag bits
           -- when accessing the constructor field.
 	  bind_arg (arg, offset) = bindNewToUntagNode arg offset (mkLFArgument arg) (tagForCon con)
-	  (_, args_w_offsets)    = layOutDynConstr this_pkg con (addIdReps args)
+	  (_, args_w_offsets)    = layOutDynConstr con (addIdReps args)
 	--
        ASSERT(not (isUnboxedTupleCon con)) return ()
        mapCs bind_arg args_w_offsets
@@ -413,7 +411,6 @@ static closure, for a constructor.
 cgDataCon :: DataCon -> Code
 cgDataCon data_con
   = do	{     -- Don't need any dynamic closure code for zero-arity constructors
-	  this_pkg <- getThisPackage
 
 	; let
 	    -- To allow the debuggers, interpreters, etc to cope with
@@ -421,10 +418,10 @@ cgDataCon data_con
 	    -- time), we take care that info-table contains the
 	    -- information we need.
 	    (static_cl_info, _) = 
-		layOutStaticConstr this_pkg data_con arg_reps
+		layOutStaticConstr data_con arg_reps
 
 	    (dyn_cl_info, arg_things) = 
-		layOutDynConstr    this_pkg data_con arg_reps
+		layOutDynConstr    data_con arg_reps
 
 	    emit_info cl_info ticky_code
 		= do { code_blks <- getCgStmts the_code

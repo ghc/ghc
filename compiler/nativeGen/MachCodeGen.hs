@@ -42,8 +42,10 @@ import FastTypes	( isFastTrue )
 import Constants	( wORD_SIZE )
 
 #ifdef DEBUG
+import Outputable	( assertPanic )
 import Debug.Trace	( trace )
 #endif
+import Debug.Trace	( trace )
 
 import Control.Monad	( mapAndUnzipM )
 import Data.Maybe	( fromJust )
@@ -784,7 +786,8 @@ getRegister leaf
 
 getRegister (CmmLit (CmmFloat f F32)) = do
     lbl <- getNewLabelNat
-    dynRef <- cmmMakeDynamicReference addImportNat DataReference lbl
+    dflags <- getDynFlagsNat
+    dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let code dst =
 	    LDATA ReadOnlyData
@@ -807,7 +810,8 @@ getRegister (CmmLit (CmmFloat d F64))
 
   | otherwise = do
     lbl <- getNewLabelNat
-    dynRef <- cmmMakeDynamicReference addImportNat DataReference lbl
+    dflags <- getDynFlagsNat
+    dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let code dst =
 	    LDATA ReadOnlyData
@@ -1727,7 +1731,8 @@ getRegister (CmmLit (CmmInt i rep))
 
 getRegister (CmmLit (CmmFloat f frep)) = do
     lbl <- getNewLabelNat
-    dynRef <- cmmMakeDynamicReference addImportNat DataReference lbl
+    dflags <- getDynFlagsNat
+    dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let code dst = 
 	    LDATA ReadOnlyData  [CmmDataLabel lbl,
@@ -3195,7 +3200,8 @@ outOfLineFloatOp :: CallishMachOp -> CmmFormal -> CmmActuals
   -> NatM InstrBlock
 outOfLineFloatOp mop res args
   = do
-      targetExpr <- cmmMakeDynamicReference addImportNat CallReference lbl
+      dflags <- getDynFlagsNat
+      targetExpr <- cmmMakeDynamicReference dflags addImportNat CallReference lbl
       let target = CmmForeignCall targetExpr CCallConv
         
       if localRegRep res == F64
@@ -3551,7 +3557,8 @@ genCCall target dest_regs argsAndHints = do
                          )
 outOfLineFloatOp mop =
     do
-      mopExpr <- cmmMakeDynamicReference addImportNat CallReference $
+      dflags <- getDynFlagsNat
+      mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference $
 		  mkForeignLabel functionName Nothing True
       let mopLabelOrExpr = case mopExpr of
 			CmmLit (CmmLabel lbl) -> Left lbl
@@ -3806,7 +3813,8 @@ genCCall target dest_regs argsAndHints
                           
         outOfLineFloatOp mop =
             do
-                mopExpr <- cmmMakeDynamicReference addImportNat CallReference $
+                dflags <- getDynFlagsNat
+                mopExpr <- cmmMakeDynamicReference dflags addImportNat CallReference $
                               mkForeignLabel functionName Nothing True
                 let mopLabelOrExpr = case mopExpr of
                         CmmLit (CmmLabel lbl) -> Left lbl
@@ -3866,7 +3874,8 @@ genSwitch expr ids
   = do
         (reg,e_code) <- getSomeReg expr
         lbl <- getNewLabelNat
-        dynRef <- cmmMakeDynamicReference addImportNat DataReference lbl
+        dflags <- getDynFlagsNat
+        dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let
             jumpTable = map jumpTableEntryRel ids
@@ -3920,7 +3929,8 @@ genSwitch expr ids
         (reg,e_code) <- getSomeReg expr
         tmp <- getNewRegNat I32
         lbl <- getNewLabelNat
-        dynRef <- cmmMakeDynamicReference addImportNat DataReference lbl
+        dflags <- getDynFlagsNat
+        dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
         (tableReg,t_code) <- getSomeReg $ dynRef
         let
             jumpTable = map jumpTableEntryRel ids
@@ -4761,7 +4771,8 @@ coerceInt2FP fromRep toRep x = do
     lbl <- getNewLabelNat
     itmp <- getNewRegNat I32
     ftmp <- getNewRegNat F64
-    dynRef <- cmmMakeDynamicReference addImportNat DataReference lbl
+    dflags <- getDynFlagsNat
+    dynRef <- cmmMakeDynamicReference dflags addImportNat DataReference lbl
     Amode addr addr_code <- getAmode dynRef
     let
     	code' dst = code `appOL` maybe_exts `appOL` toOL [

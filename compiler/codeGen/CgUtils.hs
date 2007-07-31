@@ -281,11 +281,11 @@ addToMemE rep ptr n
 --
 -------------------------------------------------------------------------
 
-tagToClosure :: PackageId -> TyCon -> CmmExpr -> CmmExpr
-tagToClosure this_pkg tycon tag
+tagToClosure :: TyCon -> CmmExpr -> CmmExpr
+tagToClosure tycon tag
   = CmmLoad (cmmOffsetExprW closure_tbl tag) wordRep
   where closure_tbl = CmmLit (CmmLabel lbl)
-	lbl = mkClosureTableLabel this_pkg (tyConName tycon)
+	lbl = mkClosureTableLabel (tyConName tycon)
 
 -------------------------------------------------------------------------
 --

@@ -117,6 +117,7 @@ import Config
 import CostCentre
 import Outputable
 import FastString
+import DynFlags
 
 -- -----------------------------------------------------------------------------
 -- The CLabel type
@@ -148,10 +149,6 @@ data CLabel
 	Name			-- definition of a particular Id or Con
 	IdLabelInfo
 
-  | DynIdLabel			-- like IdLabel, but in a separate package,
-	Name			-- and might therefore need a dynamic
-	IdLabelInfo		-- reference.
-
   | CaseLabel			-- A family of labels related to a particular
 				-- case expression.
 	{-# UNPACK #-} !Unique	-- Unique says which case expression
@@ -166,7 +163,6 @@ data CLabel
   | ModuleInitLabel 
 	Module			-- the module name
 	String			-- its "way"
-	Bool			-- True <=> is in a different package
 	-- at some point we might want some kind of version number in
 	-- the module init label, to guard against compiling modules in
 	-- the wrong order.  We can't use the interface file version however,
@@ -175,7 +171,6 @@ data CLabel
 
   | PlainModuleInitLabel	-- without the vesrion & way info
 	Module
-	Bool			-- True <=> is in a different package
 
   | ModuleRegdLabel
 
@@ -299,40 +294,19 @@ mkLocalInfoTableLabel  	name 	= IdLabel name  InfoTable
 mkLocalEntryLabel	name 	= IdLabel name  Entry
 mkLocalClosureTableLabel name	= IdLabel name ClosureTable
 
-mkClosureLabel this_pkg name
-  | isDllName this_pkg name = DynIdLabel    name Closure
-  | otherwise             = IdLabel name Closure
+mkClosureLabel name             = IdLabel name Closure
+mkInfoTableLabel name           = IdLabel name InfoTable
+mkEntryLabel name               = IdLabel name Entry
+mkClosureTableLabel name        = IdLabel name ClosureTable
+mkLocalConInfoTableLabel    con = IdLabel con ConInfoTable
+mkLocalConEntryLabel	    con = IdLabel con ConEntry
+mkLocalStaticInfoTableLabel con = IdLabel con StaticInfoTable
+mkLocalStaticConEntryLabel  con = IdLabel con StaticConEntry
+mkConInfoTableLabel name        = IdLabel    name ConInfoTable
+mkStaticInfoTableLabel name     = IdLabel    name StaticInfoTable
 
-mkInfoTableLabel this_pkg name
-  | isDllName this_pkg name = DynIdLabel    name InfoTable
-  | otherwise		 = IdLabel name InfoTable
-
-mkEntryLabel this_pkg name
-  | isDllName this_pkg name = DynIdLabel    name Entry
-  | otherwise             = IdLabel name Entry
-
-mkClosureTableLabel this_pkg name
-  | isDllName this_pkg name = DynIdLabel    name ClosureTable
-  | otherwise             = IdLabel name ClosureTable
-
-mkLocalConInfoTableLabel     con = IdLabel con ConInfoTable
-mkLocalConEntryLabel	     con = IdLabel con ConEntry
-mkLocalStaticInfoTableLabel  con = IdLabel con StaticInfoTable
-mkLocalStaticConEntryLabel   con = IdLabel con StaticConEntry
-
-mkConInfoTableLabel name False = IdLabel    name ConInfoTable
-mkConInfoTableLabel name True  = DynIdLabel name ConInfoTable
-
-mkStaticInfoTableLabel name False = IdLabel    name StaticInfoTable
-mkStaticInfoTableLabel name True  = DynIdLabel name StaticInfoTable
-
-mkConEntryLabel this_pkg name
-  | isDllName this_pkg name = DynIdLabel    name ConEntry
-  | otherwise             = IdLabel name ConEntry
-
-mkStaticConEntryLabel this_pkg name
-  | isDllName this_pkg name = DynIdLabel    name StaticConEntry
-  | otherwise             = IdLabel name StaticConEntry
+mkConEntryLabel name            = IdLabel name ConEntry
+mkStaticConEntryLabel name      = IdLabel name StaticConEntry
 
 mkLargeSRTLabel	uniq 	= LargeSRTLabel uniq
 mkBitmapLabel	uniq 	= LargeBitmapLabel uniq
@@ -345,13 +319,11 @@ mkDefaultLabel  uniq 		= CaseLabel uniq CaseDefault
 mkStringLitLabel		= StringLitLabel
 mkAsmTempLabel 			= AsmTempLabel
 
-mkModuleInitLabel :: PackageId -> Module -> String -> CLabel
-mkModuleInitLabel this_pkg mod way
-  = ModuleInitLabel mod way $! modulePackageId mod /= this_pkg
+mkModuleInitLabel :: Module -> String -> CLabel
+mkModuleInitLabel mod way        = ModuleInitLabel mod way
 
-mkPlainModuleInitLabel :: PackageId -> Module -> CLabel
-mkPlainModuleInitLabel this_pkg mod
-  = PlainModuleInitLabel mod $! modulePackageId mod /= this_pkg
+mkPlainModuleInitLabel :: Module -> CLabel
+mkPlainModuleInitLabel mod       = PlainModuleInitLabel mod
 
 	-- Some fixed runtime system labels
 
@@ -438,9 +410,6 @@ infoLblToEntryLbl :: CLabel -> CLabel
 infoLblToEntryLbl (IdLabel n InfoTable) = IdLabel n Entry
 infoLblToEntryLbl (IdLabel n ConInfoTable) = IdLabel n ConEntry
 infoLblToEntryLbl (IdLabel n StaticInfoTable) = IdLabel n StaticConEntry
-infoLblToEntryLbl (DynIdLabel n InfoTable) = DynIdLabel n Entry
-infoLblToEntryLbl (DynIdLabel n ConInfoTable) = DynIdLabel n ConEntry
-infoLblToEntryLbl (DynIdLabel n StaticInfoTable) = DynIdLabel n StaticConEntry
 infoLblToEntryLbl (CaseLabel n CaseReturnInfo) = CaseLabel n CaseReturnPt
 infoLblToEntryLbl (RtsLabel (RtsInfo s)) = RtsLabel (RtsEntry s)
 infoLblToEntryLbl (RtsLabel (RtsRetInfo s)) = RtsLabel (RtsRet s)
@@ -452,9 +421,6 @@ entryLblToInfoLbl :: CLabel -> CLabel
 entryLblToInfoLbl (IdLabel n Entry) = IdLabel n InfoTable
 entryLblToInfoLbl (IdLabel n ConEntry) = IdLabel n ConInfoTable
 entryLblToInfoLbl (IdLabel n StaticConEntry) = IdLabel n StaticInfoTable
-entryLblToInfoLbl (DynIdLabel n Entry) = DynIdLabel n InfoTable
-entryLblToInfoLbl (DynIdLabel n ConEntry) = DynIdLabel n ConInfoTable
-entryLblToInfoLbl (DynIdLabel n StaticConEntry) = DynIdLabel n StaticInfoTable
 entryLblToInfoLbl (CaseLabel n CaseReturnPt) = CaseLabel n CaseReturnInfo
 entryLblToInfoLbl (RtsLabel (RtsEntry s)) = RtsLabel (RtsInfo s)
 entryLblToInfoLbl (RtsLabel (RtsRet s)) = RtsLabel (RtsRetInfo s)
@@ -473,10 +439,9 @@ needsCDecl (IdLabel _ SRT)		= False
 needsCDecl (LargeSRTLabel _)		= False
 needsCDecl (LargeBitmapLabel _)		= False
 needsCDecl (IdLabel _ _)		= True
-needsCDecl (DynIdLabel _ _)		= True
 needsCDecl (CaseLabel _ _)	        = True
-needsCDecl (ModuleInitLabel _ _ _)	= True
-needsCDecl (PlainModuleInitLabel _ _)	= True
+needsCDecl (ModuleInitLabel _ _)	= True
+needsCDecl (PlainModuleInitLabel _)	= True
 needsCDecl ModuleRegdLabel		= False
 
 needsCDecl (StringLitLabel _)		= False
@@ -509,13 +474,12 @@ externallyVisibleCLabel :: CLabel -> Bool -- not C "static"
 externallyVisibleCLabel (CaseLabel _ _)	   = False
 externallyVisibleCLabel (StringLitLabel _) = False
 externallyVisibleCLabel (AsmTempLabel _)   = False
-externallyVisibleCLabel (ModuleInitLabel _ _ _)= True
-externallyVisibleCLabel (PlainModuleInitLabel _ _)= True
+externallyVisibleCLabel (ModuleInitLabel _ _) = True
+externallyVisibleCLabel (PlainModuleInitLabel _)= True
 externallyVisibleCLabel ModuleRegdLabel    = False
 externallyVisibleCLabel (RtsLabel _)	   = True
 externallyVisibleCLabel (ForeignLabel _ _ _) = True
 externallyVisibleCLabel (IdLabel name _)     = isExternalName name
-externallyVisibleCLabel (DynIdLabel name _)  = isExternalName name
 externallyVisibleCLabel (CC_Label _)	   = True
 externallyVisibleCLabel (CCS_Label _)	   = True
 externallyVisibleCLabel (DynamicLinkerLabel _ _)  = False
@@ -551,13 +515,12 @@ labelType (RtsLabel (RtsRetFS _))             = CodeLabel
 labelType (RtsLabel (RtsApFast _))            = CodeLabel
 labelType (CaseLabel _ CaseReturnInfo)        = DataLabel
 labelType (CaseLabel _ _)	              = CodeLabel
-labelType (ModuleInitLabel _ _ _)             = CodeLabel
-labelType (PlainModuleInitLabel _ _)          = CodeLabel
+labelType (ModuleInitLabel _ _)               = CodeLabel
+labelType (PlainModuleInitLabel _)            = CodeLabel
 labelType (LargeSRTLabel _)                   = DataLabel
 labelType (LargeBitmapLabel _)                = DataLabel
 
 labelType (IdLabel _ info) = idInfoLabelType info
-labelType (DynIdLabel _ info) = idInfoLabelType info
 labelType _        = DataLabel
 
 idInfoLabelType info =
@@ -580,12 +543,11 @@ idInfoLabelType info =
 -- @labelDynamic@ returns @True@ if the label is located
 -- in a DLL, be it a data reference or not.
 
-labelDynamic :: CLabel -> Bool
-labelDynamic lbl = 
+labelDynamic :: PackageId -> CLabel -> Bool
+labelDynamic this_pkg lbl =
   case lbl of
-   RtsLabel _  	     -> not opt_Static  -- i.e., is the RTS in a DLL or not?
-   IdLabel n k       -> False
-   DynIdLabel n k    -> True
+   RtsLabel _  	     -> not opt_Static && (this_pkg /= rtsPackageId) -- i.e., is the RTS in a DLL or not?
+   IdLabel n k       -> isDllName this_pkg n
 #if mingw32_TARGET_OS
    ForeignLabel _ _ d  -> d
 #else
@@ -593,8 +555,8 @@ labelDynamic lbl =
    -- so we claim that all foreign imports come from dynamic libraries
    ForeignLabel _ _ _ -> True
 #endif
-   ModuleInitLabel m _ dyn    -> not opt_Static && dyn
-   PlainModuleInitLabel m dyn -> not opt_Static && dyn
+   ModuleInitLabel m _    -> not opt_Static && this_pkg /= (modulePackageId m)
+   PlainModuleInitLabel m -> not opt_Static && this_pkg /= (modulePackageId m)
    
    -- Note that DynamicLinkerLabels do NOT require dynamic linking themselves.
    _ 		     -> False
@@ -782,15 +744,14 @@ pprCLbl (ForeignLabel str _ _)
   = ftext str
 
 pprCLbl (IdLabel name  flavor) = ppr name <> ppIdFlavor flavor
-pprCLbl (DynIdLabel name  flavor) = ppr name <> ppIdFlavor flavor
 
 pprCLbl (CC_Label cc) 		= ppr cc
 pprCLbl (CCS_Label ccs) 	= ppr ccs
 
-pprCLbl (ModuleInitLabel mod way _)	
+pprCLbl (ModuleInitLabel mod way)
    = ptext SLIT("__stginit_") <> ppr mod
 	<> char '_' <> text way
-pprCLbl (PlainModuleInitLabel mod _)	
+pprCLbl (PlainModuleInitLabel mod)
    = ptext SLIT("__stginit_") <> ppr mod
 
 pprCLbl (HpcTicksLabel mod)

@@ -68,6 +68,7 @@ import Pretty
 import qualified Outputable
 
 import Panic            ( panic )
+import DynFlags
 
 
 -- The most important function here is cmmMakeDynamicReference.
@@ -90,16 +91,17 @@ data ReferenceKind = DataReference
                    deriving(Eq)
 
 cmmMakeDynamicReference
-  :: Monad m => (CLabel -> m ())  -- a monad & a function
+  :: Monad m => DynFlags
+             -> (CLabel -> m ())  -- a monad & a function
                                   -- used for recording imported symbols
              -> ReferenceKind     -- whether this is the target of a jump
              -> CLabel            -- the label
              -> m CmmExpr
   
-cmmMakeDynamicReference addImport referenceKind lbl
+cmmMakeDynamicReference dflags addImport referenceKind lbl
   | Just _ <- dynamicLinkerLabelInfo lbl
   = return $ CmmLit $ CmmLabel lbl   -- already processed it, pass through
-  | otherwise = case howToAccessLabel referenceKind lbl of
+  | otherwise = case howToAccessLabel dflags referenceKind lbl of
         AccessViaStub -> do
               let stub = mkDynamicLinkerLabel CodeStub lbl
               addImport stub
@@ -161,7 +163,7 @@ data LabelAccessStyle = AccessViaStub
                       | AccessViaSymbolPtr
                       | AccessDirectly
 
-howToAccessLabel :: ReferenceKind -> CLabel -> LabelAccessStyle
+howToAccessLabel :: DynFlags -> ReferenceKind -> CLabel -> LabelAccessStyle
 
 #if mingw32_TARGET_OS
 -- Windows
@@ -170,8 +172,8 @@ howToAccessLabel :: ReferenceKind -> CLabel -> LabelAccessStyle
 -- are imported from a DLL via an __imp_* label.
 -- There are no stubs for imported code.
 
-howToAccessLabel _ lbl | labelDynamic lbl = AccessViaSymbolPtr
-                       | otherwise        = AccessDirectly
+howToAccessLabel dflags _ lbl | labelDynamic (thisPackage dflags) lbl = AccessViaSymbolPtr
+			      | otherwise        = AccessDirectly
 #elif darwin_TARGET_OS
 -- Mach-O (Darwin, Mac OS X)
 --
@@ -181,9 +183,9 @@ howToAccessLabel _ lbl | labelDynamic lbl = AccessViaSymbolPtr
 -- It is always possible to access something indirectly,
 -- even when it's not necessary.
 
-howToAccessLabel DataReference lbl
+howToAccessLabel dflags DataReference lbl
       -- data access to a dynamic library goes via a symbol pointer
-    | labelDynamic lbl = AccessViaSymbolPtr
+    | labelDynamic (thisPackage dflags) lbl = AccessViaSymbolPtr
     
 #if !x86_64_TARGET_ARCH
       -- when generating PIC code, all cross-module data references must
@@ -204,17 +206,17 @@ howToAccessLabel DataReference lbl
     -- dyld code stubs don't work for tailcalls because the
     -- stack alignment is only right for regular calls.
     -- Therefore, we have to go via a symbol pointer:
-howToAccessLabel JumpReference lbl
-    | labelDynamic lbl
+howToAccessLabel dflags JumpReference lbl
+    | labelDynamic (thisPackage dflags) lbl
     = AccessViaSymbolPtr
 #endif
 
-howToAccessLabel _ lbl
+howToAccessLabel dflags _ lbl
 #if !x86_64_TARGET_ARCH
     -- Code stubs are the usual method of choice for imported code;
     -- not needed on x86_64 because Apple's new linker, ld64, generates
     -- them automatically.
-    | labelDynamic lbl
+    | labelDynamic (thisPackage dflags) lbl
     = AccessViaStub
 #endif
     | otherwise
@@ -224,8 +226,8 @@ howToAccessLabel _ lbl
 #elif linux_TARGET_OS && powerpc64_TARGET_ARCH
 -- ELF PPC64 (powerpc64-linux), AIX, MacOS 9, BeOS/PPC
 
-howToAccessLabel DataReference lbl = AccessViaSymbolPtr
-howToAccessLabel _ lbl = AccessDirectly -- actually, .label instead of label
+howToAccessLabel _ DataReference lbl = AccessViaSymbolPtr
+howToAccessLabel _ _ lbl = AccessDirectly -- actually, .label instead of label
 
 #elif linux_TARGET_OS
 -- ELF (Linux)
@@ -239,15 +241,15 @@ howToAccessLabel _ lbl = AccessDirectly -- actually, .label instead of label
 -- from position independent code. It is also required from the main program
 -- when dynamic libraries containing Haskell code are used.
 
-howToAccessLabel _ lbl
+howToAccessLabel _ _ lbl
 	-- no PIC -> the dynamic linker does everything for us;
 	--           if we don't dynamically link to Haskell code,
 	--           it actually manages to do so without messing thins up.
     | not opt_PIC && opt_Static = AccessDirectly
    
-howToAccessLabel DataReference lbl
+howToAccessLabel dflags DataReference lbl
     	-- A dynamic label needs to be accessed via a symbol pointer.
-    | labelDynamic lbl = AccessViaSymbolPtr
+    | labelDynamic (thisPackage dflags) lbl = AccessViaSymbolPtr
 #if powerpc_TARGET_ARCH
  	-- For PowerPC32 -fPIC, we have to access even static data
 	-- via a symbol pointer (see below for an explanation why
@@ -269,22 +271,22 @@ howToAccessLabel DataReference lbl
 -- (AccessDirectly, because we get an implicit symbol stub)
 -- and calling functions from PIC code on non-i386 platforms (via a symbol stub) 
 
-howToAccessLabel CallReference lbl
-    | labelDynamic lbl && not opt_PIC
+howToAccessLabel dflags CallReference lbl
+    | labelDynamic (thisPackage dflags) lbl && not opt_PIC
     = AccessDirectly
 #if !i386_TARGET_ARCH
-    | labelDynamic lbl && opt_PIC
+    | labelDynamic (thisPackage dflags) lbl && opt_PIC
     = AccessViaStub
 #endif
 
-howToAccessLabel _ lbl
-    | labelDynamic lbl = AccessViaSymbolPtr
+howToAccessLabel dflags _ lbl
+    | labelDynamic (thisPackage dflags) lbl = AccessViaSymbolPtr
     | otherwise = AccessDirectly
 #else
 --
 -- all other platforms
 --
-howToAccessLabel _ _
+howToAccessLabel _ _ _
         | not opt_PIC = AccessDirectly
         | otherwise   = panic "howToAccessLabel: PIC not defined for this platform"
 #endif

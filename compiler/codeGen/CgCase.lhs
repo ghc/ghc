@@ -316,7 +316,7 @@ cgInlinePrimOp primop args bndr (AlgAlt tycon) live_in_alts alts
 		(do { tmp_reg <- bindNewToTemp bndr
 		    ; stmtC (CmmAssign
                              (CmmLocal tmp_reg)
-                             (tagToClosure this_pkg tycon tag_amode)) })
+                             (tagToClosure tycon tag_amode)) })
 
 		-- Compile the alts
 	; (branches, mb_deflt) <- cgAlgAlts NoGC Nothing{-cc_slot-}

@@ -795,12 +795,8 @@ pprExternDecl in_srt lbl
   | not (needsCDecl lbl) = empty
   | otherwise		    = 
 	hcat [ visibility, label_type (labelType lbl), 
-	       lparen, dyn_wrapper (pprCLabel lbl), text ");" ]
+	       lparen, pprCLabel lbl, text ");" ]
  where
-  dyn_wrapper d
-    | in_srt && labelDynamic lbl = text "DLL_IMPORT_DATA_VAR" <> parens d
-    | otherwise			 = d
-
   label_type CodeLabel = ptext SLIT("F_")
   label_type DataLabel = ptext SLIT("I_")
 

@@ -13,7 +13,7 @@ module NCGMonad (
 	initNat, addImportNat, getUniqueNat,
 	mapAccumLNat, setDeltaNat, getDeltaNat,
 	getBlockIdNat, getNewLabelNat, getNewRegNat, getNewRegPairNat,
-	getPicBaseMaybeNat, getPicBaseNat
+	getPicBaseMaybeNat, getPicBaseNat, getDynFlagsNat
  ) where
   
 #include "HsVersions.h"
@@ -24,21 +24,22 @@ import MachRegs
 import MachOp		( MachRep )
 import UniqSupply
 import Unique		( Unique )
-
+import DynFlags
 
 data NatM_State = NatM_State {
 			natm_us      :: UniqSupply,
 			natm_delta   :: Int,
 			natm_imports :: [(CLabel)],
-			natm_pic     :: Maybe Reg
+			natm_pic     :: Maybe Reg,
+			natm_dflags  :: DynFlags
 		}
 
 newtype NatM result = NatM (NatM_State -> (result, NatM_State))
 
 unNat (NatM a) = a
 
-mkNatM_State :: UniqSupply -> Int -> NatM_State
-mkNatM_State us delta = NatM_State us delta [] Nothing
+mkNatM_State :: UniqSupply -> Int -> DynFlags -> NatM_State
+mkNatM_State us delta dflags = NatM_State us delta [] Nothing dflags
 
 initNat :: NatM_State -> NatM a -> (a, NatM_State)
 initNat init_st m = case unNat m init_st of { (r,st) -> (r,st) }
@@ -68,20 +69,25 @@ mapAccumLNat f b (x:xs)
        return (b__3, x__2:xs__2)
 
 getUniqueNat :: NatM Unique
-getUniqueNat = NatM $ \ (NatM_State us delta imports pic) ->
+getUniqueNat = NatM $ \ (NatM_State us delta imports pic dflags) ->
     case splitUniqSupply us of
-         (us1,us2) -> (uniqFromSupply us1, (NatM_State us2 delta imports pic))
+         (us1,us2) -> (uniqFromSupply us1, (NatM_State us2 delta imports pic dflags))
+
+
+getDynFlagsNat :: NatM DynFlags
+getDynFlagsNat = NatM $ \ (NatM_State us delta imports pic dflags) ->
+		          (dflags, (NatM_State us delta imports pic dflags))
 
 getDeltaNat :: NatM Int
 getDeltaNat = NatM $ \ st -> (natm_delta st, st)
 
 setDeltaNat :: Int -> NatM ()
-setDeltaNat delta = NatM $ \ (NatM_State us _ imports pic) ->
-   ((), NatM_State us delta imports pic)
+setDeltaNat delta = NatM $ \ (NatM_State us _ imports pic dflags) ->
+   ((), NatM_State us delta imports pic dflags)
 
 addImportNat :: CLabel -> NatM ()
-addImportNat imp = NatM $ \ (NatM_State us delta imports pic) -> 
-   ((), NatM_State us delta (imp:imports) pic)
+addImportNat imp = NatM $ \ (NatM_State us delta imports pic dflags) ->
+   ((), NatM_State us delta (imp:imports) pic dflags)
 
 getBlockIdNat :: NatM BlockId
 getBlockIdNat = do u <- getUniqueNat; return (BlockId u)

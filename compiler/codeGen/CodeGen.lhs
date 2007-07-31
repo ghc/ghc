@@ -77,7 +77,7 @@ codeGen dflags this_mod data_tycons foreign_stubs imported_mods
   ; code_stuff <- initC dflags this_mod $ do 
 		{ cmm_binds  <- mapM (getCmm . cgTopBinding dflags) stg_binds
 		; cmm_tycons <- mapM cgTyCon data_tycons
-		; cmm_init   <- getCmm (mkModuleInit dflags way cost_centre_info 
+		; cmm_init   <- getCmm (mkModuleInit way cost_centre_info 
 					     this_mod main_mod
 				  	     foreign_stubs imported_mods hpc_info)
 		; return (cmm_binds ++ concat cmm_tycons ++ [cmm_init])
@@ -137,8 +137,7 @@ We initialise the module tree by keeping a work-stack,
 
 \begin{code}
 mkModuleInit 
-	:: DynFlags
-	-> String		-- the "way"
+	:: String		-- the "way"
 	-> CollectedCCs         -- cost centre info
 	-> Module
 	-> Module		-- name of the Main module
@@ -146,7 +145,7 @@ mkModuleInit
 	-> [Module]
 	-> HpcInfo
 	-> Code
-mkModuleInit dflags way cost_centre_info this_mod main_mod foreign_stubs imported_mods hpc_info
+mkModuleInit way cost_centre_info this_mod main_mod foreign_stubs imported_mods hpc_info
   = do	{ -- Allocate the static boolean that records if this
           -- module has been registered already
 	  emitData Data [CmmDataLabel moduleRegdLabel, 
@@ -187,11 +186,9 @@ mkModuleInit dflags way cost_centre_info this_mod main_mod foreign_stubs importe
 		(emitSimpleProc plain_main_init_lbl rec_descent_init)
     }
   where
-    this_pkg = thisPackage dflags
-
-    plain_init_lbl = mkPlainModuleInitLabel this_pkg this_mod
-    real_init_lbl  = mkModuleInitLabel this_pkg this_mod way
-    plain_main_init_lbl = mkPlainModuleInitLabel this_pkg rOOT_MAIN
+    plain_init_lbl = mkPlainModuleInitLabel this_mod
+    real_init_lbl  = mkModuleInitLabel this_mod way
+    plain_main_init_lbl = mkPlainModuleInitLabel rOOT_MAIN
 
     jump_to_init = stmtC (CmmJump (mkLblExpr real_init_lbl) [])
 
@@ -213,7 +210,7 @@ mkModuleInit dflags way cost_centre_info this_mod main_mod foreign_stubs importe
         ; whenC (opt_Hpc) $
             initHpc this_mod hpc_info
          
-	; mapCs (registerModuleImport this_pkg way) 
+	; mapCs (registerModuleImport way)
 		(imported_mods++extra_imported_mods)
 
 	} 
@@ -229,13 +226,13 @@ mkModuleInit dflags way cost_centre_info this_mod main_mod foreign_stubs importe
 		       else ret_code
 
 -----------------------
-registerModuleImport :: PackageId -> String -> Module -> Code
-registerModuleImport this_pkg way mod 
+registerModuleImport :: String -> Module -> Code
+registerModuleImport way mod
   | mod == gHC_PRIM
   = nopC 
   | otherwise 	-- Push the init procedure onto the work stack
   = stmtsC [ CmmAssign spReg (cmmRegOffW spReg (-1))
-	   , CmmStore (CmmReg spReg) (mkLblExpr (mkModuleInitLabel this_pkg mod way)) ]
+	   , CmmStore (CmmReg spReg) (mkLblExpr (mkModuleInitLabel mod way)) ]
 \end{code}
 
 
@@ -279,7 +276,7 @@ variable.
 cgTopBinding :: DynFlags -> (StgBinding,[(Id,[Id])]) -> Code
 cgTopBinding dflags (StgNonRec id rhs, srts)
   = do	{ id' <- maybeExternaliseId dflags id
-	; mapM_ (mkSRT (thisPackage dflags) [id']) srts
+	; mapM_ (mkSRT [id']) srts
 	; (id,info) <- cgTopRhs id' rhs
 	; addBindC id info 	-- Add the *un-externalised* Id to the envt,
 				-- so we find it when we look up occurrences
@@ -289,19 +286,19 @@ cgTopBinding dflags (StgRec pairs, srts)
   = do	{ let (bndrs, rhss) = unzip pairs
 	; bndrs' <- mapFCs (maybeExternaliseId dflags) bndrs
 	; let pairs' = zip bndrs' rhss
-	; mapM_ (mkSRT (thisPackage dflags) bndrs')  srts
+	; mapM_ (mkSRT bndrs')  srts
 	; _new_binds <- fixC (\ new_binds -> do 
 		{ addBindsC new_binds
 		; mapFCs ( \ (b,e) -> cgTopRhs b e ) pairs' })
 	; nopC }
 
-mkSRT :: PackageId -> [Id] -> (Id,[Id]) -> Code
-mkSRT this_pkg these (id,[])  = nopC
-mkSRT this_pkg these (id,ids)
+mkSRT :: [Id] -> (Id,[Id]) -> Code
+mkSRT these (id,[])  = nopC
+mkSRT these (id,ids)
   = do	{ ids <- mapFCs remap ids
 	; id  <- remap id
 	; emitRODataLits (mkSRTLabel (idName id)) 
-		       (map (CmmLabel . mkClosureLabel this_pkg . idName) ids)
+		       (map (CmmLabel . mkClosureLabel . idName) ids)
 	}
   where
 	-- Sigh, better map all the ids against the environment in 

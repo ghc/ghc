@@ -110,7 +110,7 @@ performTailCall fun_info arg_amodes pending_assts
 	; EndOfBlockInfo sp _ <- getEndOfBlockInfo
 	; this_pkg <- getThisPackage
 
-	; case (getCallMethod this_pkg fun_name lf_info (length arg_amodes)) of
+	; case (getCallMethod fun_name lf_info (length arg_amodes)) of
 
 	    -- Node must always point to things we enter
 	    EnterIt -> do

@@ -117,8 +117,7 @@ data ClosureInfo
   -- the constructor's info table), and they don't have an SRT.
   | ConInfo {
 	closureCon       :: !DataCon,
-	closureSMRep     :: !SMRep,
-	closureDllCon	 :: !Bool	-- is in a separate DLL
+	closureSMRep     :: !SMRep
     }
 
 -- C_SRT is what StgSyn.SRT gets translated to... 
@@ -341,15 +340,13 @@ mkClosureInfo is_static id lf_info tot_wds ptr_wds srt_info descr
     name   = idName id
     sm_rep = chooseSMRep is_static lf_info tot_wds ptr_wds
 
-mkConInfo :: PackageId
-	  -> Bool	-- Is static
+mkConInfo :: Bool	-- Is static
 	  -> DataCon	
 	  -> Int -> Int	-- Total and pointer words
 	  -> ClosureInfo
-mkConInfo this_pkg is_static data_con tot_wds ptr_wds
+mkConInfo is_static data_con tot_wds ptr_wds
    = ConInfo {	closureSMRep = sm_rep,
-		closureCon = data_con,
-		closureDllCon = isDllName this_pkg (dataConName data_con) }
+		closureCon = data_con }
   where
     sm_rep = chooseSMRep is_static (mkConLFInfo data_con) tot_wds ptr_wds
 \end{code}
@@ -571,30 +568,29 @@ data CallMethod
 	CLabel 				--   The code label
 	Int 				--   Its arity
 
-getCallMethod :: PackageId
-	      -> Name		-- Function being applied
+getCallMethod :: Name		-- Function being applied
 	      -> LambdaFormInfo	-- Its info
 	      -> Int		-- Number of available arguments
 	      -> CallMethod
 
-getCallMethod this_pkg name lf_info n_args
+getCallMethod name lf_info n_args
   | nodeMustPointToIt lf_info && opt_Parallel
   =	-- If we're parallel, then we must always enter via node.  
 	-- The reason is that the closure may have been 	
 	-- fetched since we allocated it.
     EnterIt
 
-getCallMethod this_pkg name (LFReEntrant _ arity _ _) n_args
+getCallMethod name (LFReEntrant _ arity _ _) n_args
   | n_args == 0    = ASSERT( arity /= 0 )
 		     ReturnIt	-- No args at all
   | n_args < arity = SlowCall	-- Not enough args
-  | otherwise      = DirectEntry (enterIdLabel this_pkg name) arity
+  | otherwise      = DirectEntry (enterIdLabel name) arity
 
-getCallMethod this_pkg name (LFCon con) n_args
+getCallMethod name (LFCon con) n_args
   = ASSERT( n_args == 0 )
     ReturnCon con
 
-getCallMethod this_pkg name (LFThunk _ _ updatable std_form_info is_fun) n_args
+getCallMethod name (LFThunk _ _ updatable std_form_info is_fun) n_args
   | is_fun 	-- *Might* be a function, so we must "call" it (which is always safe)
   = SlowCall	-- We cannot just enter it [in eval/apply, the entry code
 		-- is the fast-entry code]
@@ -616,24 +612,24 @@ getCallMethod this_pkg name (LFThunk _ _ updatable std_form_info is_fun) n_args
 
   | otherwise	-- Jump direct to code for single-entry thunks
   = ASSERT( n_args == 0 )
-    JumpToIt (thunkEntryLabel this_pkg name std_form_info updatable)
+    JumpToIt (thunkEntryLabel name std_form_info updatable)
 
-getCallMethod this_pkg name (LFUnknown True) n_args
+getCallMethod name (LFUnknown True) n_args
   = SlowCall -- might be a function
 
-getCallMethod this_pkg name (LFUnknown False) n_args
+getCallMethod name (LFUnknown False) n_args
   = ASSERT2 ( n_args == 0, ppr name <+> ppr n_args ) 
     EnterIt -- Not a function
 
-getCallMethod this_pkg name (LFBlackHole _) n_args
+getCallMethod name (LFBlackHole _) n_args
   = SlowCall	-- Presumably the black hole has by now
 		-- been updated, but we don't know with
 		-- what, so we slow call it
 
-getCallMethod this_pkg name (LFLetNoEscape 0) n_args
+getCallMethod name (LFLetNoEscape 0) n_args
   = JumpToIt (enterReturnPtLabel (nameUnique name))
 
-getCallMethod this_pkg name (LFLetNoEscape arity) n_args
+getCallMethod name (LFLetNoEscape arity) n_args
   | n_args == arity = DirectEntry (enterReturnPtLabel (nameUnique name)) arity
   | otherwise = pprPanic "let-no-escape: " (ppr name <+> ppr arity)
 
@@ -871,10 +867,9 @@ infoTableLabelFromCI (ClosureInfo { closureName = name,
 	other -> panic "infoTableLabelFromCI"
 
 infoTableLabelFromCI (ConInfo { closureCon = con, 
-				closureSMRep = rep,
-				closureDllCon = dll })
-  | isStaticRep rep = mkStaticInfoTableLabel  name dll
-  | otherwise	    = mkConInfoTableLabel     name dll
+				closureSMRep = rep })
+  | isStaticRep rep = mkStaticInfoTableLabel  name
+  | otherwise	    = mkConInfoTableLabel     name
   where
     name = dataConName con
 
@@ -885,12 +880,12 @@ closureLabelFromCI _ = panic "closureLabelFromCI"
 -- thunkEntryLabel is a local help function, not exported.  It's used from both
 -- entryLabelFromCI and getCallMethod.
 
-thunkEntryLabel this_pkg thunk_id (ApThunk arity) is_updatable
+thunkEntryLabel thunk_id (ApThunk arity) is_updatable
   = enterApLabel is_updatable arity
-thunkEntryLabel this_pkg thunk_id (SelectorThunk offset) upd_flag
+thunkEntryLabel thunk_id (SelectorThunk offset) upd_flag
   = enterSelectorLabel upd_flag offset
-thunkEntryLabel this_pkg thunk_id _ is_updatable
-  = enterIdLabel this_pkg thunk_id
+thunkEntryLabel thunk_id _ is_updatable
+  = enterIdLabel thunk_id
 
 enterApLabel is_updatable arity
   | tablesNextToCode = mkApInfoTableLabel is_updatable arity
@@ -900,9 +895,9 @@ enterSelectorLabel upd_flag offset
   | tablesNextToCode = mkSelectorInfoLabel upd_flag offset
   | otherwise        = mkSelectorEntryLabel upd_flag offset
 
-enterIdLabel this_pkg id
-  | tablesNextToCode = mkInfoTableLabel this_pkg id
-  | otherwise        = mkEntryLabel this_pkg id
+enterIdLabel id
+  | tablesNextToCode = mkInfoTableLabel id
+  | otherwise        = mkEntryLabel id
 
 enterLocalIdLabel id
   | tablesNextToCode = mkLocalInfoTableLabel id

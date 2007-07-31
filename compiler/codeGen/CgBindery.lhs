@@ -280,8 +280,7 @@ getCgIdInfo id
 	    name = idName id
 	in
 	if isExternalName name then do
-	    this_pkg <- getThisPackage
-	    let ext_lbl = CmmLit (CmmLabel (mkClosureLabel this_pkg name))
+	    let ext_lbl = CmmLit (CmmLabel (mkClosureLabel name))
 	    return (stableIdInfo id ext_lbl (mkLFImported id))
 	else
 	if isVoidArg (idCgRep id) then

@@ -201,12 +201,12 @@ cmmNativeGen dflags cmm
    = {-# SCC "fixAssigns"       #-} 
  	fixAssignsTop cmm	     `thenUs` \ fixed_cmm ->
      {-# SCC "genericOpt"       #-} 
-	cmmToCmm fixed_cmm           `bind`   \ (cmm, imports) ->
+	cmmToCmm dflags fixed_cmm           `bind`   \ (cmm, imports) ->
         (if dopt Opt_D_dump_opt_cmm dflags  -- space leak avoidance
 	   then cmm 
 	   else CmmData Text [])     `bind`   \ ppr_cmm ->
      {-# SCC "genMachCode"      #-}
-	genMachCode cmm              `thenUs` \ (pre_regalloc, lastMinuteImports) ->
+	genMachCode dflags cmm       `thenUs` \ (pre_regalloc, lastMinuteImports) ->
      {-# SCC "regAlloc"         #-}
 	mapUs regAlloc pre_regalloc `thenUs`   \ with_regs ->
      {-# SCC "shortcutBranches"   #-}
@@ -390,11 +390,11 @@ apply_mapping ufm (CmmProc info lbl params blocks)
 -- Switching between the two monads whilst carrying along the same
 -- Unique supply breaks abstraction.  Is that bad?
 
-genMachCode :: RawCmmTop -> UniqSM ([NatCmmTop], [CLabel])
+genMachCode :: DynFlags -> RawCmmTop -> UniqSM ([NatCmmTop], [CLabel])
 
-genMachCode cmm_top
+genMachCode dflags cmm_top
   = do	{ initial_us <- getUs
-	; let initial_st           = mkNatM_State initial_us 0
+	; let initial_st           = mkNatM_State initial_us 0 dflags
 	      (new_tops, final_st) = initNat initial_st (cmmTopCodeGen cmm_top)
 	      final_delta          = natm_delta final_st
 	      final_imports        = natm_imports final_st
@@ -468,28 +468,31 @@ Ideas for other things we could do (ToDo):
     temp assignments, and certain assigns to mem...)
 -}
 
-cmmToCmm :: RawCmmTop -> (RawCmmTop, [CLabel])
-cmmToCmm top@(CmmData _ _) = (top, [])
-cmmToCmm (CmmProc info lbl params blocks) = runCmmOpt $ do
+cmmToCmm :: DynFlags -> RawCmmTop -> (RawCmmTop, [CLabel])
+cmmToCmm _ top@(CmmData _ _) = (top, [])
+cmmToCmm dflags (CmmProc info lbl params blocks) = runCmmOpt dflags $ do
   blocks' <- mapM cmmBlockConFold (cmmMiniInline blocks)
   return $ CmmProc info lbl params blocks'
 
-newtype CmmOptM a = CmmOptM ([CLabel] -> (# a, [CLabel] #))
+newtype CmmOptM a = CmmOptM (([CLabel], DynFlags) -> (# a, [CLabel] #))
 
 instance Monad CmmOptM where
-  return x = CmmOptM $ \imports -> (# x,imports #)
+  return x = CmmOptM $ \(imports, _) -> (# x,imports #)
   (CmmOptM f) >>= g =
-    CmmOptM $ \imports ->
-                case f imports of
+    CmmOptM $ \(imports, dflags) ->
+                case f (imports, dflags) of
                   (# x, imports' #) ->
                     case g x of
-                      CmmOptM g' -> g' imports'
+                      CmmOptM g' -> g' (imports', dflags)
 
 addImportCmmOpt :: CLabel -> CmmOptM ()
-addImportCmmOpt lbl = CmmOptM $ \imports -> (# (), lbl:imports #)
+addImportCmmOpt lbl = CmmOptM $ \(imports, dflags) -> (# (), lbl:imports #)
 
-runCmmOpt :: CmmOptM a -> (a, [CLabel])
-runCmmOpt (CmmOptM f) = case f [] of
+getDynFlagsCmmOpt :: CmmOptM DynFlags
+getDynFlagsCmmOpt = CmmOptM $ \(imports, dflags) -> (# dflags, imports #)
+
+runCmmOpt :: DynFlags -> CmmOptM a -> (a, [CLabel])
+runCmmOpt dflags (CmmOptM f) = case f ([], dflags) of
                         (# result, imports #) -> (result, imports)
 
 cmmBlockConFold :: CmmBasicBlock -> CmmOptM CmmBasicBlock
@@ -556,9 +559,13 @@ cmmExprConFold referenceKind expr
                  return $ cmmMachOpFold mop args'
 
         CmmLit (CmmLabel lbl)
-           -> cmmMakeDynamicReference addImportCmmOpt referenceKind lbl
+           -> do
+		dflags <- getDynFlagsCmmOpt
+		cmmMakeDynamicReference dflags addImportCmmOpt referenceKind lbl
         CmmLit (CmmLabelOff lbl off)
-           -> do dynRef <- cmmMakeDynamicReference addImportCmmOpt referenceKind lbl
+           -> do
+		 dflags <- getDynFlagsCmmOpt
+		 dynRef <- cmmMakeDynamicReference dflags addImportCmmOpt referenceKind lbl
                  return $ cmmMachOpFold (MO_Add wordRep) [
                      dynRef,
                      (CmmLit $ CmmInt (fromIntegral off) wordRep)
