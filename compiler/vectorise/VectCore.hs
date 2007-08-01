@@ -7,8 +7,7 @@ module VectCore (
   vNonRec, vRec,
 
   vVar, vType, vNote, vLet,
-  vLams,
-  mkVLams, mkVVarApps
+  vLams, vLamsWithoutLC, vVarApps
 ) where
 
 #include "HsVersions.h"
@@ -60,13 +59,13 @@ vLams lc vs (ve, le) = (mkLams vvs ve, mkLams (lc:lvs) le)
   where
     (vvs,lvs) = unzip vs
 
-mkVLams :: [VVar] -> VExpr -> VExpr
-mkVLams vvs (ve,le) = (mkLams vs ve, mkLams ls le)
+vLamsWithoutLC :: [VVar] -> VExpr -> VExpr
+vLamsWithoutLC vvs (ve,le) = (mkLams vs ve, mkLams ls le)
   where
     (vs,ls) = unzip vvs
 
-mkVVarApps :: Var -> VExpr -> [VVar] -> VExpr
-mkVVarApps lc (ve, le) vvs = (ve `mkVarApps` vs, le `mkVarApps` (lc : ls))
+vVarApps :: Var -> VExpr -> [VVar] -> VExpr
+vVarApps lc (ve, le) vvs = (ve `mkVarApps` vs, le `mkVarApps` (lc : ls))
   where
     (vs,ls) = unzip vvs 
 

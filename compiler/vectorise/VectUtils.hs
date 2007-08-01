@@ -243,8 +243,8 @@ buildClosure tvs lv vars arg_ty res_ty mk_body
           $ do
               body  <- mk_body
               body' <- bind (vVar env_bndr)
-                            (mkVVarApps lv body (vars ++ [arg_bndr]))
-              return (mkVLams [env_bndr, arg_bndr] body')
+                            (vVarApps lv body (vars ++ [arg_bndr]))
+              return (vLamsWithoutLC [env_bndr, arg_bndr] body')
 
       mkClosure arg_ty res_ty env_ty fn env
 
