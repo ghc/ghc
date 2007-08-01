@@ -242,26 +242,31 @@ vectExpr lc (_, AnnLet (AnnRec bs) body)
   where
     (bndrs, rhss) = unzip bs
 
-vectExpr lc e@(_, AnnLam bndr body)
-  | isTyVar bndr = pprPanic "vectExpr" (ppr $ deAnnotate e)
+vectExpr lc e@(fvs, AnnLam bndr _)
+  | not (isId bndr) = pprPanic "vectExpr" (ppr $ deAnnotate e)
+  | otherwise = vectLam lc fvs bs body
+  where
+    (bs,body) = collectAnnValBinders e
 
-vectExpr lc (fvs, AnnLam bndr body)
+vectLam :: Var -> VarSet -> [Var] -> CoreExprWithFVs -> VM VExpr
+vectLam lc fvs bs body
   = do
       tyvars <- localTyVars
       (vs, vvs) <- readLEnv $ \env ->
                    unzip [(var, vv) | var <- varSetElems fvs
                                     , Just vv <- [lookupVarEnv (local_vars env) var]]
 
-      arg_ty <- vectType (idType bndr)
-      res_ty <- vectType (exprType $ deAnnotate body)
-      buildClosure tyvars lc vvs arg_ty res_ty
+      arg_tys <- mapM (vectType . idType) bs
+      res_ty  <- vectType (exprType $ deAnnotate body)
+
+      buildClosures tyvars lc vvs arg_tys res_ty
         . hoistPolyVExpr FSLIT("fn") tyvars
         $ do
             new_lc <- newLocalVar FSLIT("lc") intPrimTy
-            (vbndrs, vbody) <- vectBndrsIn (vs ++ [bndr])
+            (vbndrs, vbody) <- vectBndrsIn (vs ++ bs)
                                            (vectExpr new_lc body)
             return $ vLams new_lc vbndrs vbody
-
+  
 vectTyAppExpr :: Var -> CoreExprWithFVs -> [Type] -> VM (CoreExpr, CoreExpr)
 vectTyAppExpr lc (_, AnnVar v) tys = vectPolyVar lc v tys
 vectTyAppExpr lc e tys = pprPanic "vectTyAppExpr" (ppr $ deAnnotate e)

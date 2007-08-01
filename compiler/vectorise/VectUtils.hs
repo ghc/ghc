@@ -1,5 +1,6 @@
 module VectUtils (
   collectAnnTypeBinders, collectAnnTypeArgs, isAnnTypeArg,
+  collectAnnValBinders,
   splitClosureTy,
   mkPADictType, mkPArrayType,
   paDictArgType, paDictOfType,
@@ -7,7 +8,7 @@ module VectUtils (
   polyAbstract, polyApply, polyVApply,
   lookupPArrayFamInst,
   hoistExpr, hoistPolyVExpr, takeHoisted,
-  buildClosure
+  buildClosure, buildClosures
 ) where
 
 #include "HsVersions.h"
@@ -46,6 +47,12 @@ collectAnnTypeBinders expr = go [] expr
     go bs (_, AnnLam b e) | isTyVar b = go (b:bs) e
     go bs e                           = (reverse bs, e)
 
+collectAnnValBinders :: AnnExpr Var ann -> ([Var], AnnExpr Var ann)
+collectAnnValBinders expr = go [] expr
+  where
+    go bs (_, AnnLam b e) | isId b = go (b:bs) e
+    go bs e                        = (reverse bs, e)
+
 isAnnTypeArg :: AnnExpr b ann -> Bool
 isAnnTypeArg (_, AnnType t) = True
 isAnnTypeArg _              = False
@@ -71,6 +78,20 @@ splitPArrayTy ty
   = arg_ty
 
   | otherwise = pprPanic "splitPArrayTy" (ppr ty)
+
+mkClosureType :: Type -> Type -> VM Type
+mkClosureType arg_ty res_ty
+  = do
+      tc <- builtin closureTyCon
+      return $ mkTyConApp tc [arg_ty, res_ty]
+
+mkClosureTypes :: [Type] -> Type -> VM Type
+mkClosureTypes arg_tys res_ty
+  = do
+      tc <- builtin closureTyCon
+      return $ foldr (mk tc) res_ty arg_tys
+  where
+    mk tc arg_ty res_ty = mkTyConApp tc [arg_ty, res_ty]
 
 mkPADictType :: Type -> VM Type
 mkPADictType ty
@@ -227,11 +248,24 @@ mkClosure arg_ty res_ty env_ty (vfn,lfn) (venv,lenv)
       return (Var mkv `mkTyApps` [arg_ty, res_ty, env_ty] `mkApps` [dict, vfn, lfn, venv],
               Var mkl `mkTyApps` [arg_ty, res_ty, env_ty] `mkApps` [dict, vfn, lfn, lenv])
 
+buildClosures :: [TyVar] -> Var -> [VVar] -> [Type] -> Type -> VM VExpr -> VM VExpr
+buildClosures tvs lc vars [arg_ty] res_ty mk_body
+  = buildClosure tvs lc vars arg_ty res_ty mk_body
+buildClosures tvs lc vars (arg_ty : arg_tys) res_ty mk_body
+  = do
+      res_ty' <- mkClosureTypes arg_tys res_ty
+      arg <- newLocalVVar FSLIT("x") arg_ty
+      buildClosure tvs lc vars arg_ty res_ty'
+        . hoistPolyVExpr FSLIT("fn") tvs
+        $ do
+            clo <- buildClosures tvs lc (vars ++ [arg]) arg_tys res_ty mk_body
+            return $ vLams lc (vars ++ [arg]) clo
+
 -- (clo <x1,...,xn> <f,f^>, aclo (Arr lc xs1 ... xsn) <f,f^>)
 --   where
 --     f  = \env v -> case env of <x1,...,xn> -> e x1 ... xn v
 --     f^ = \env v -> case env of Arr l xs1 ... xsn -> e^ l x1 ... xn v
-
+--
 buildClosure :: [TyVar] -> Var -> [VVar] -> Type -> Type -> VM VExpr -> VM VExpr
 buildClosure tvs lv vars arg_ty res_ty mk_body
   = do
