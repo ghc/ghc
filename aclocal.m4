@@ -1104,10 +1104,14 @@ rm -f *.o
 rm -f *.hi
 rm -f pwd
 rm -f pwd.exe
-$WithGhc -v0 --make pwd
+$WithGhc -v0 --make pwd -o pwd
 cd ../..
 
 hardtop=`utils/pwd/pwd forwardslash`
+
+if ! test -d "$hardtop"; then
+  AC_MSG_ERROR([cannot determine current directory])
+fi   
 
 dnl Remove common automounter nonsense
 dnl
