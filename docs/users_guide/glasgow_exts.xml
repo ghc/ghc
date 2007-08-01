@@ -2836,7 +2836,7 @@ match is found, and (b) the instance declaration was compiled with
 more-specific instance does not matter.
 </para></listitem>
 <listitem><para>
-Suppose an instance declaration does not matche the constraint being looked up, but
+Suppose an instance declaration does not match the constraint being looked up, but
 does unify with it, so that it might match when the constraint is further 
 instantiated.  Usually GHC will regard this as a reason for not committing to
 some other constraint.  But if the instance declaration was compiled with
