@@ -95,7 +95,7 @@ module System.IO (
     hIsReadable, hIsWritable,  -- :: Handle -> IO Bool
     hIsSeekable,               -- :: Handle -> IO Bool
 
-    -- ** Terminal operations
+    -- ** Terminal operations (not portable: ghc/hugs only)
 
 #if !defined(__NHC__)
     hIsTerminalDevice,	 	-- :: Handle -> IO Bool
@@ -104,7 +104,7 @@ module System.IO (
     hGetEcho,			-- :: Handle -> IO Bool
 #endif
 
-    -- ** Showing handle state
+    -- ** Showing handle state (not portable: ghc only)
 
 #ifdef __GLASGOW_HASKELL__
     hShow,			-- :: Handle -> IO String
@@ -155,18 +155,22 @@ module System.IO (
     hGetBufNonBlocking,	       -- :: Handle -> Ptr a -> Int -> IO Int
 #endif
 
-    -- * Temporary files
+    -- * Temporary files (not portable: ghc/hugs only)
 
+#if !defined(__NHC__)
     openTempFile,
     openBinaryTempFile,
+#endif
   ) where
 
+#ifndef __NHC__
 import Data.Bits
 import Data.List
 import Data.Maybe
 import Foreign.C.Error
 import Foreign.C.String
 import System.Posix.Internals
+#endif
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Exception    as ExceptionBase hiding (catch)
@@ -412,6 +416,7 @@ openBinaryFile = openFile
 hSetBinaryMode _ _ = return ()
 #endif
 
+#ifndef __NHC__
 -- | The function creates a temporary file in ReadWrite mode.
 -- The created file isn\'t deleted automatically, so you need to delete it manually.
 openTempFile :: FilePath   -- ^ Directory in which to create the file
@@ -483,6 +488,7 @@ read_flags   = std_flags    .|. o_RDONLY
 write_flags  = output_flags .|. o_WRONLY
 rw_flags     = output_flags .|. o_RDWR
 append_flags = write_flags  .|. o_APPEND
+#endif
 
 -- $locking
 -- Implementations should enforce as far as possible, at least locally to the
