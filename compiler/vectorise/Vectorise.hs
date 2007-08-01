@@ -256,10 +256,9 @@ vectLam lc fvs bs body
       buildClosures tyvars lc vvs arg_tys res_ty
         . hoistPolyVExpr tyvars
         $ do
-            new_lc <- newLocalVar FSLIT("lc") intPrimTy
             (vbndrs, vbody) <- vectBndrsIn (vs ++ bs)
-                                           (vectExpr new_lc body)
-            return $ vLams new_lc vbndrs vbody
+                                           (vectExpr lc body)
+            return $ vLams lc vbndrs vbody
   
 vectTyAppExpr :: Var -> CoreExprWithFVs -> [Type] -> VM VExpr
 vectTyAppExpr lc (_, AnnVar v) tys = vectPolyVar lc v tys
