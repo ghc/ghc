@@ -150,17 +150,6 @@ vectBndrsIn vs p
 -- ----------------------------------------------------------------------------
 -- Expressions
 
-capply :: VExpr -> VExpr -> VM VExpr
-capply (vfn, lfn) (varg, larg)
-  = do
-      apply  <- builtin applyClosureVar
-      applyP <- builtin applyClosurePVar
-      return (mkApps (Var apply)  [Type arg_ty, Type res_ty, vfn, varg],
-              mkApps (Var applyP) [Type arg_ty, Type res_ty, lfn, larg])
-  where
-    fn_ty            = exprType vfn
-    (arg_ty, res_ty) = splitClosureTy fn_ty
-
 vectVar :: Var -> Var -> VM VExpr
 vectVar lc v
   = do
@@ -222,7 +211,7 @@ vectExpr lc (_, AnnApp fn arg)
   = do
       fn'  <- vectExpr lc fn
       arg' <- vectExpr lc arg
-      capply fn' arg'
+      mkClosureApp fn' arg'
 
 vectExpr lc (_, AnnCase expr bndr ty alts)
   = panic "vectExpr: case"
@@ -272,7 +261,7 @@ vectLam lc fvs bs body
                                            (vectExpr new_lc body)
             return $ vLams new_lc vbndrs vbody
   
-vectTyAppExpr :: Var -> CoreExprWithFVs -> [Type] -> VM (CoreExpr, CoreExpr)
+vectTyAppExpr :: Var -> CoreExprWithFVs -> [Type] -> VM VExpr
 vectTyAppExpr lc (_, AnnVar v) tys = vectPolyVar lc v tys
 vectTyAppExpr lc e tys = pprPanic "vectTyAppExpr" (ppr $ deAnnotate e)
 

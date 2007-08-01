@@ -8,7 +8,8 @@ module VectUtils (
   polyAbstract, polyApply, polyVApply,
   lookupPArrayFamInst,
   hoistExpr, hoistPolyVExpr, takeHoisted,
-  buildClosure, buildClosures
+  buildClosure, buildClosures,
+  mkClosureApp
 ) where
 
 #include "HsVersions.h"
@@ -239,7 +240,6 @@ takeHoisted
       setGEnv $ env { global_bindings = [] }
       return $ global_bindings env
 
-
 mkClosure :: Type -> Type -> Type -> VExpr -> VExpr -> VM VExpr
 mkClosure arg_ty res_ty env_ty (vfn,lfn) (venv,lenv)
   = do
@@ -248,6 +248,16 @@ mkClosure arg_ty res_ty env_ty (vfn,lfn) (venv,lenv)
       mkl  <- builtin mkClosurePVar
       return (Var mkv `mkTyApps` [arg_ty, res_ty, env_ty] `mkApps` [dict, vfn, lfn, venv],
               Var mkl `mkTyApps` [arg_ty, res_ty, env_ty] `mkApps` [dict, vfn, lfn, lenv])
+
+mkClosureApp :: VExpr -> VExpr -> VM VExpr
+mkClosureApp (vclo, lclo) (varg, larg)
+  = do
+      vapply <- builtin applyClosureVar
+      lapply <- builtin applyClosurePVar
+      return (Var vapply `mkTyApps` [arg_ty, res_ty] `mkApps` [vclo, varg],
+              Var lapply `mkTyApps` [arg_ty, res_ty] `mkApps` [lclo, larg])
+  where
+    (arg_ty, res_ty) = splitClosureTy (exprType vclo)
 
 buildClosures :: [TyVar] -> Var -> [VVar] -> [Type] -> Type -> VM VExpr -> VM VExpr
 buildClosures tvs lc vars [arg_ty] res_ty mk_body
