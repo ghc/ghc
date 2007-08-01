@@ -560,7 +560,6 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
 		   ; rhs'  <- tcIfaceExpr rhs
 		   ; return (bndrs', args', rhs') }
 	; let mb_tcs = map ifTopFreeName args
-        ; lcl <- getLclEnv
 	; returnM (Rule { ru_name = name, ru_fn = fn, ru_act = act, 
 			  ru_bndrs = bndrs', ru_args = args', 
 			  ru_rhs = rhs', 
@@ -763,8 +762,8 @@ tcIfaceExpr (IfaceCase scrut case_bndr ty alts)
 		--     corresponds to the datacon in this case alternative
     in
     extendIfaceIdEnv [case_bndr']	$
-    mappM (tcIfaceAlt tc_app) alts	`thenM` \ alts' ->
-    tcIfaceType ty		`thenM` \ ty' ->
+    mappM (tcIfaceAlt scrut' tc_app) alts	`thenM` \ alts' ->
+    tcIfaceType ty				`thenM` \ ty' ->
     returnM (Case scrut' case_bndr' ty' alts')
 
 tcIfaceExpr (IfaceLet (IfaceNonRec bndr rhs) body)
@@ -795,12 +794,12 @@ tcIfaceExpr (IfaceNote note expr)
 	IfaceCoreNote n   -> returnM (Note (CoreNote n) expr')
 
 -------------------------
-tcIfaceAlt _ (IfaceDefault, names, rhs)
+tcIfaceAlt _ _ (IfaceDefault, names, rhs)
   = ASSERT( null names )
     tcIfaceExpr rhs		`thenM` \ rhs' ->
     returnM (DEFAULT, [], rhs')
   
-tcIfaceAlt _ (IfaceLitAlt lit, names, rhs)
+tcIfaceAlt _ _ (IfaceLitAlt lit, names, rhs)
   = ASSERT( null names )
     tcIfaceExpr rhs		`thenM` \ rhs' ->
     returnM (LitAlt lit, [], rhs')
@@ -808,13 +807,15 @@ tcIfaceAlt _ (IfaceLitAlt lit, names, rhs)
 -- A case alternative is made quite a bit more complicated
 -- by the fact that we omit type annotations because we can
 -- work them out.  True enough, but its not that easy!
-tcIfaceAlt (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
+tcIfaceAlt scrut (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
   = do	{ con <- tcIfaceDataCon data_occ
-	; ASSERT2( con `elem` tyConDataCons tycon,
-		   ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon) )
-	  tcIfaceDataAlt con inst_tys arg_strs rhs }
+#ifdef DEBUG
+	; ifM (not (con `elem` tyConDataCons tycon))
+	      (failIfM (ppr scrut $$ ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon)))
+#endif
+	; tcIfaceDataAlt con inst_tys arg_strs rhs }
 		  
-tcIfaceAlt (tycon, inst_tys) (IfaceTupleAlt boxity, arg_occs, rhs)
+tcIfaceAlt _ (tycon, inst_tys) (IfaceTupleAlt boxity, arg_occs, rhs)
   = ASSERT( isTupleTyCon tycon )
     do	{ let [data_con] = tyConDataCons tycon
 	; tcIfaceDataAlt data_con inst_tys arg_occs rhs }
@@ -968,14 +969,8 @@ tcIfaceGlobal name
 	-- Wired-in things include TyCons, DataCons, and Ids
   = do { ifCheckWiredInThing name; return thing }
   | otherwise
-  = do	{ (eps,hpt) <- getEpsAndHpt
- 	; dflags <- getDOpts
-	; case lookupType dflags hpt (eps_PTE eps) name of {
-	    Just thing -> return thing ;
-	    Nothing    -> do
-
-	{ env <- getGblEnv
-	; case if_rec_types env of {
+  = do	{ env <- getGblEnv
+	; case if_rec_types env of {	-- Note [Tying the knot]
 	    Just (mod, get_type_env) 
 		| nameIsLocalOrFrom mod name
 		-> do 		-- It's defined in the module being compiled
@@ -987,11 +982,33 @@ tcIfaceGlobal name
 
 	  ; other -> do
 
+	{ (eps,hpt) <- getEpsAndHpt
+ 	; dflags <- getDOpts
+	; case lookupType dflags hpt (eps_PTE eps) name of {
+	    Just thing -> return thing ;
+	    Nothing    -> do
+
 	{ mb_thing <- importDecl name 	-- It's imported; go get it
 	; case mb_thing of
 	    Failed err      -> failIfM err
 	    Succeeded thing -> return thing
     }}}}}
+
+-- Note [Tying the knot]
+-- ~~~~~~~~~~~~~~~~~~~~~
+-- The if_rec_types field is used in two situations:
+--
+-- a) Compiling M.hs, which indiretly imports Foo.hi, which mentions M.T
+--    Then we look up M.T in M's type environment, which is splatted into if_rec_types
+--    after we've built M's type envt.
+--
+-- b) In ghc --make, during the upsweep, we encounter M.hs, whose interface M.hi
+--    is up to date.  So we call typecheckIface on M.hi.  This splats M.T into 
+--    if_rec_types so that the (lazily typechecked) decls see all the other decls
+--
+-- In case (b) it's important to do the if_rec_types check *before* looking in the HPT
+-- Because if M.hs also has M.hs-boot, M.T will *already be* in the HPT, but in its
+-- emasculated form (e.g. lacking data constructors).
 
 ifCheckWiredInThing :: Name -> IfL ()
 -- Even though we are in an interface file, we want to make
