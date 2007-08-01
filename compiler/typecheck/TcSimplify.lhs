@@ -638,47 +638,59 @@ tcSimplifyInfer
 
 \begin{code}
 tcSimplifyInfer doc tau_tvs wanted
-  = do	{ tau_tvs' <- zonkTcTyVarsAndFV (varSetElems tau_tvs)
-	; wanted' <- mappM zonkInst wanted	-- Zonk before deciding quantified tyvars
+  = do	{ tau_tvs1 <- zonkTcTyVarsAndFV (varSetElems tau_tvs)
+	; wanted'  <- mappM zonkInst wanted	-- Zonk before deciding quantified tyvars
 	; gbl_tvs  <- tcGetGlobalTyVars
 	; let preds = fdPredsOfInsts wanted'
-	      qtvs  = grow preds tau_tvs' `minusVarSet` oclose preds gbl_tvs
+	      qtvs  = grow preds tau_tvs1 `minusVarSet` oclose preds gbl_tvs
 			-- See Note [Choosing which variables to quantify]
 
 		-- To maximise sharing, remove from consideration any 
 		-- constraints that don't mention qtvs at all
-	; let (free1, bound) = partition (isFreeWhenInferring qtvs) wanted'
-	; extendLIEs free1
+	; let (free, bound) = partition (isFreeWhenInferring qtvs) wanted'
+	; extendLIEs free
 
 		-- To make types simple, reduce as much as possible
-	; traceTc (text "infer" <+> (ppr preds $$ ppr (grow preds tau_tvs') $$ ppr gbl_tvs $$ 
-		   ppr (oclose preds gbl_tvs) $$ ppr free1 $$ ppr bound))
+	; traceTc (text "infer" <+> (ppr preds $$ ppr (grow preds tau_tvs1) $$ ppr gbl_tvs $$ 
+		   ppr (oclose preds gbl_tvs) $$ ppr free $$ ppr bound))
 	; (irreds1, binds1) <- tryHardCheckLoop doc bound
 
 		-- Note [Inference and implication constraints]
 	; let want_dict d = tyVarsOfInst d `intersectsVarSet` qtvs
 	; (irreds2, binds2) <- approximateImplications doc want_dict irreds1
 
-		-- By now improvment may have taken place, and we must *not*
-		-- quantify over any variable free in the environment
-		-- tc137 (function h inside g) is an example
-	; gbl_tvs <- tcGetGlobalTyVars
-	; qtvs1 <- zonkTcTyVarsAndFV (varSetElems qtvs)
-	; qtvs2 <- zonkQuantifiedTyVars (varSetElems (qtvs1 `minusVarSet` gbl_tvs))
+		-- Now work out all over again which type variables to quantify,
+		-- exactly in the same way as before, but starting from irreds2.  Why?
+		-- a) By now improvment may have taken place, and we must *not*
+		--    quantify over any variable free in the environment
+		--    tc137 (function h inside g) is an example
+		--
+		-- b) Do not quantify over constraints that *now* do not
+		--    mention quantified type variables, because they are
+		--    simply ambiguous (or might be bound further out).  Example:
+		--    	f :: Eq b => a -> (a, b)
+		--    	g x = fst (f x)
+		--    From the RHS of g we get the MethodInst f77 :: alpha -> (alpha, beta)
+		--    We decide to quantify over 'alpha' alone, but free1 does not include f77
+		--    because f77 mentions 'alpha'.  Then reducing leaves only the (ambiguous)
+		--    constraint (Eq beta), which we dump back into the free set
+		--    See test tcfail181
+		--
+		-- c) irreds may contain type variables not previously mentioned,
+		--    e.g.  instance D a x => Foo [a] 
+		--	    wanteds = Foo [a]
+		--       Then after simplifying we'll get (D a x), and x is fresh
+		-- 	 We must quantify over x else it'll be totally unbound
+	; tau_tvs2 <- zonkTcTyVarsAndFV (varSetElems tau_tvs1)
+	; gbl_tvs  <- tcGetGlobalTyVars
+	; let preds = fdPredsOfInsts irreds2	-- irreds2 is zonked
+	      qtvs  = grow preds tau_tvs2 `minusVarSet` oclose preds gbl_tvs
+	; let (free, irreds3) = partition (isFreeWhenInferring qtvs) irreds2
+	; extendLIEs free
 
-		-- Do not quantify over constraints that *now* do not
-		-- mention quantified type variables, because they are
-		-- simply ambiguous (or might be bound further out).  Example:
-		-- 	f :: Eq b => a -> (a, b)
-		--	g x = fst (f x)
-		-- From the RHS of g we get the MethodInst f77 :: alpha -> (alpha, beta)
-		-- We decide to quantify over 'alpha' alone, but free1 does not include f77
-		-- because f77 mentions 'alpha'.  Then reducing leaves only the (ambiguous)
-		-- constraint (Eq beta), which we dump back into the free set
-		-- See test tcfail181
-	; let (free3, irreds3) = partition (isFreeWhenInferring (mkVarSet qtvs2)) irreds2
-	; extendLIEs free3
-	
+		-- Turn the quantified meta-type variables into real type variables
+	; qtvs2 <- zonkQuantifiedTyVars (varSetElems qtvs)
+
 		-- We can't abstract over any remaining unsolved 
 		-- implications so instead just float them outwards. Ugh.
 	; let (q_dicts, implics) = partition isDict irreds3
