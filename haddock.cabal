@@ -24,9 +24,9 @@ hs-source-dirs: src
 exposed-modules:
 	Distribution.Haddock
 other-modules:
-	Haddock.InterfaceFile
-        Haddock.Exception
-        Haddock.Types
+  Haddock.InterfaceFile
+  Haddock.Exception
+  Haddock.Types
 data-files:
 	html/haddock-DEBUG.css
 	html/haddock.css
