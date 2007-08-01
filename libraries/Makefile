@@ -35,7 +35,8 @@ default_target: all
 TOP=..
 include $(TOP)/mk/boilerplate.mk
 
-SUBDIRS = base containers bytestring old-locale old-time filepath directory
+SUBDIRS  = base array packedstring containers bytestring
+SUBDIRS += old-locale old-time filepath directory
 ifeq "$(GhcLibsWithUnix)" "YES"
 SUBDIRS += unix
 endif
