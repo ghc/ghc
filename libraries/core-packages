@@ -1,5 +1,6 @@
 base
 Cabal
+containers
 directory
 filepath
 haskell98
