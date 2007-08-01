@@ -42,7 +42,7 @@ import BasicTypes           ( Boxity(..) )
 
 import Outputable
 import FastString
-import Control.Monad        ( liftM, liftM2, mapAndUnzipM )
+import Control.Monad        ( liftM, liftM2, zipWithM, mapAndUnzipM )
 
 vectorise :: HscEnv -> UniqSupply -> RuleBase -> ModGuts
           -> IO (SimplCount, ModGuts)
@@ -81,7 +81,7 @@ vectTopBind :: CoreBind -> VM CoreBind
 vectTopBind b@(NonRec var expr)
   = do
       var'  <- vectTopBinder var
-      expr' <- vectTopRhs expr
+      expr' <- vectTopRhs var expr
       hs    <- takeHoisted
       return . Rec $ (var, expr) : (var', expr') : hs
   `orElseV`
@@ -90,7 +90,7 @@ vectTopBind b@(NonRec var expr)
 vectTopBind b@(Rec bs)
   = do
       vars'  <- mapM vectTopBinder vars
-      exprs' <- mapM vectTopRhs exprs
+      exprs' <- zipWithM vectTopRhs vars exprs
       hs     <- takeHoisted
       return . Rec $ bs ++ zip vars' exprs' ++ hs
   `orElseV`
@@ -108,11 +108,12 @@ vectTopBinder var
       defGlobalVar var var'
       return var'
     
-vectTopRhs :: CoreExpr -> VM CoreExpr
-vectTopRhs expr
+vectTopRhs :: Var -> CoreExpr -> VM CoreExpr
+vectTopRhs var expr
   = do
       lc <- newLocalVar FSLIT("lc") intPrimTy
       closedV . liftM vectorised
+              . inBind var
               $ vectPolyExpr lc (freeVars expr)
 
 -- ----------------------------------------------------------------------------
@@ -228,7 +229,7 @@ vectExpr lc (_, AnnCase expr bndr ty alts)
 
 vectExpr lc (_, AnnLet (AnnNonRec bndr rhs) body)
   = do
-      vrhs <- vectPolyExpr lc rhs
+      vrhs <- localV . inBind bndr $ vectPolyExpr lc rhs
       (vbndr, vbody) <- vectBndrIn bndr (vectExpr lc body)
       return $ vLet (vNonRec vbndr vrhs) vbody
 
@@ -236,11 +237,15 @@ vectExpr lc (_, AnnLet (AnnRec bs) body)
   = do
       (vbndrs, (vrhss, vbody)) <- vectBndrsIn bndrs
                                 $ liftM2 (,)
-                                  (mapM (vectExpr lc) rhss)
+                                  (zipWithM vect_rhs bndrs rhss)
                                   (vectPolyExpr lc body)
       return $ vLet (vRec vbndrs vrhss) vbody
   where
     (bndrs, rhss) = unzip bs
+
+    vect_rhs bndr rhs = localV
+                      . inBind bndr
+                      $ vectExpr lc rhs
 
 vectExpr lc e@(fvs, AnnLam bndr _)
   | not (isId bndr) = pprPanic "vectExpr" (ppr $ deAnnotate e)
@@ -260,7 +265,7 @@ vectLam lc fvs bs body
       res_ty  <- vectType (exprType $ deAnnotate body)
 
       buildClosures tyvars lc vvs arg_tys res_ty
-        . hoistPolyVExpr FSLIT("fn") tyvars
+        . hoistPolyVExpr tyvars
         $ do
             new_lc <- newLocalVar FSLIT("lc") intPrimTy
             (vbndrs, vbody) <- vectBndrsIn (vs ++ bs)

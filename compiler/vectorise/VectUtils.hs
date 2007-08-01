@@ -216,19 +216,20 @@ hoistExpr fs expr
         env { global_bindings = (var, expr) : global_bindings env }
       return var
 
-hoistVExpr :: FastString -> VExpr -> VM VVar
-hoistVExpr fs (ve, le)
+hoistVExpr :: VExpr -> VM VVar
+hoistVExpr (ve, le)
   = do
+      fs <- getBindName
       vv <- hoistExpr ('v' `consFS` fs) ve
       lv <- hoistExpr ('l' `consFS` fs) le
       return (vv, lv)
 
-hoistPolyVExpr :: FastString -> [TyVar] -> VM VExpr -> VM VExpr
-hoistPolyVExpr fs tvs p
+hoistPolyVExpr :: [TyVar] -> VM VExpr -> VM VExpr
+hoistPolyVExpr tvs p
   = do
       expr <- closedV . polyAbstract tvs $ \abstract ->
               liftM (mapVect abstract) p
-      fn   <- hoistVExpr fs expr
+      fn   <- hoistVExpr expr
       polyVApply (vVar fn) (mkTyVarTys tvs)
 
 takeHoisted :: VM [(Var, CoreExpr)]
@@ -256,7 +257,7 @@ buildClosures tvs lc vars (arg_ty : arg_tys) res_ty mk_body
       res_ty' <- mkClosureTypes arg_tys res_ty
       arg <- newLocalVVar FSLIT("x") arg_ty
       buildClosure tvs lc vars arg_ty res_ty'
-        . hoistPolyVExpr FSLIT("fn") tvs
+        . hoistPolyVExpr tvs
         $ do
             clo <- buildClosures tvs lc (vars ++ [arg]) arg_tys res_ty mk_body
             return $ vLams lc (vars ++ [arg]) clo
@@ -273,7 +274,7 @@ buildClosure tvs lv vars arg_ty res_ty mk_body
       env_bndr <- newLocalVVar FSLIT("env") env_ty
       arg_bndr <- newLocalVVar FSLIT("arg") arg_ty
 
-      fn <- hoistPolyVExpr FSLIT("fn") tvs
+      fn <- hoistPolyVExpr tvs
           $ do
               body  <- mk_body
               body' <- bind (vVar env_bndr)

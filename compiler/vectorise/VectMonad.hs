@@ -15,6 +15,8 @@ module VectMonad (
   LocalEnv(..),
   readLEnv, setLEnv, updLEnv,
 
+  getBindName, inBind,
+
   lookupVar, defGlobalVar,
   lookupTyCon, defTyCon,
   lookupDataCon, defDataCon,
@@ -148,6 +150,9 @@ data LocalEnv = LocalEnv {
 
                  -- Mapping from tyvars to their PA dictionaries
                , local_tyvar_pa :: VarEnv CoreExpr
+
+                 -- Local binding name
+               , local_bind_name :: FastString
                }
               
 
@@ -176,6 +181,7 @@ emptyLocalEnv = LocalEnv {
                    local_vars     = emptyVarEnv
                  , local_tyvars   = []
                  , local_tyvar_pa = emptyVarEnv
+                 , local_bind_name  = FSLIT("fn")
                  }
 
 -- FIXME
@@ -236,7 +242,7 @@ localV p = do
 closedV :: VM a -> VM a
 closedV p = do
               env <- readLEnv id
-              setLEnv emptyLocalEnv
+              setLEnv (emptyLocalEnv { local_bind_name = local_bind_name env })
               x <- p
               setLEnv env
               return x
@@ -270,6 +276,14 @@ getInstEnv = readGEnv global_inst_env
 
 getFamInstEnv :: VM FamInstEnvs
 getFamInstEnv = readGEnv global_fam_inst_env
+
+getBindName :: VM FastString
+getBindName = readLEnv local_bind_name
+
+inBind :: Id -> VM a -> VM a
+inBind id p
+  = do updLEnv $ \env -> env { local_bind_name = occNameFS (getOccName id) }
+       p
 
 cloneName :: (OccName -> OccName) -> Name -> VM Name
 cloneName mk_occ name = liftM make (liftDs newUnique)
