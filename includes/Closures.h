@@ -306,8 +306,7 @@ typedef struct {
  */
 typedef struct {
     const struct _StgInfoTable* info;
-    StgHalfWord    size;
-    StgHalfWord    tag;
+    StgWord        size;
     StgClosure *   fun;
     StgClosure *   payload[FLEXIBLE_ARRAY];
 } StgRetFun;

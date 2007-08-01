@@ -403,10 +403,6 @@ main(int argc, char *argv[])
     struct_field(StgLargeBitmap, size);
     field_offset(StgLargeBitmap, bitmap);
 
-    struct_field(StgRetFun, size);
-    struct_field(StgRetFun, tag);
-    struct_field(StgRetFun, fun);
-
     struct_size(snEntry);
     struct_field(snEntry,sn_obj);
     struct_field(snEntry,addr);
