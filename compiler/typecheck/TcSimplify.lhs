@@ -2739,7 +2739,7 @@ report_no_instances tidy_env mb_what insts
 		parens (vcat [ptext SLIT("The choice depends on the instantiation of") <+>
 	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfInst dict))),
 			      ptext SLIT("To pick the first instance above, use -fallow-incoherent-instances"),
-			      ptext SLIT("when compiling the other instances")])]
+			      ptext SLIT("when compiling the other instance declarations")])]
       where
     	ispecs = [ispec | (ispec, _) <- matches]
 
