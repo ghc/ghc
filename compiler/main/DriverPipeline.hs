@@ -1174,7 +1174,7 @@ linkBinary dflags o_files dep_packages = do
 
     pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
     let pkg_lib_path_opts = concat (map get_pkg_lib_path_opts pkg_lib_paths)
-	get_pkg_lib_path_opts l | opt_HardwireLibPaths = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
+	get_pkg_lib_path_opts l | opt_HardwireLibPaths && not opt_Static = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
 				| otherwise = ["-L" ++ l]
 
     let lib_paths = libraryPaths dflags
