@@ -122,7 +122,7 @@ something = everything orElse
 --   2nd argument o is for reduction of results from subterms;
 --   3rd argument f updates the synthesised data according to the given term
 --
-synthesize :: s  -> (s -> s -> s) -> GenericQ (s -> s) -> GenericQ s
+synthesize :: s  -> (t -> s -> s) -> GenericQ (s -> t) -> GenericQ t
 synthesize z o f x = f x (foldr o z (gmapQ (synthesize z o f) x))
 
 
