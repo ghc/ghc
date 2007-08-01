@@ -213,6 +213,9 @@ instance Monad VM where
 noV :: VM a
 noV = VM $ \_ _ _ -> return No
 
+traceNoV :: String -> SDoc -> VM a
+traceNoV s d = pprTrace s d noV
+
 tryV :: VM a -> VM (Maybe a)
 tryV (VM p) = VM $ \bi genv lenv ->
   do
@@ -223,6 +226,9 @@ tryV (VM p) = VM $ \bi genv lenv ->
 
 maybeV :: VM (Maybe a) -> VM a
 maybeV p = maybe noV return =<< p
+
+traceMaybeV :: String -> SDoc -> VM (Maybe a) -> VM a
+traceMaybeV s d p = maybe (traceNoV s d) return =<< p
 
 orElseV :: VM a -> VM a -> VM a
 orElseV p q = maybe q return =<< tryV p
@@ -336,7 +342,8 @@ lookupVar v
       case r of
         Just e  -> return (Local e)
         Nothing -> liftM Global
-                 $  maybeV (readGEnv $ \env -> lookupVarEnv (global_vars env) v)
+                 $  traceMaybeV "lookupVar" (ppr v)
+                                (readGEnv $ \env -> lookupVarEnv (global_vars env) v)
 
 lookupTyCon :: TyCon -> VM (Maybe TyCon)
 lookupTyCon tc
@@ -393,7 +400,7 @@ lookupInst cls tys
              where
                inst_tys'  = [ty | Right ty <- inst_tys]
                noFlexiVar = all isRight inst_tys
-	   _other         -> noV
+	   _other         -> traceNoV "lookupInst" (ppr cls <+> ppr tys)
        }
   where
     isRight (Left  _) = False
