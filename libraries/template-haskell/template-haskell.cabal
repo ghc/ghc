@@ -5,7 +5,7 @@ license-file:	LICENSE
 maintainer:	libraries@haskell.org
 description:
 	XXX write or steal me
-build-depends: base, pretty
+build-depends: base, pretty, packedstring, containers
 exposed-modules:
 	Language.Haskell.TH.Syntax,
     Language.Haskell.TH.PprLib,
