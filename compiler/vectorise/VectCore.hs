@@ -7,6 +7,7 @@ module VectCore (
   vNonRec, vRec,
 
   vVar, vType, vNote, vLet,
+  vLams,
   mkVLams, mkVVarApps
 ) where
 
@@ -53,6 +54,11 @@ vRec vs es = (Rec (zip vvs ves), Rec (zip lvs les))
 
 vLet :: VBind -> VExpr -> VExpr
 vLet = zipWithVect Let
+
+vLams :: Var -> [VVar] -> VExpr -> VExpr
+vLams lc vs (ve, le) = (mkLams vvs ve, mkLams (lc:lvs) le)
+  where
+    (vvs,lvs) = unzip vs
 
 mkVLams :: [VVar] -> VExpr -> VExpr
 mkVLams vvs (ve,le) = (mkLams vs ve, mkLams ls le)

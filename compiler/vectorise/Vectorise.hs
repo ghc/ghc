@@ -109,7 +109,11 @@ vectTopBinder var
       return var'
     
 vectTopRhs :: CoreExpr -> VM CoreExpr
-vectTopRhs = liftM fst . closedV . vectPolyExpr (panic "Empty lifting context") . freeVars
+vectTopRhs expr
+  = do
+      lc <- newLocalVar FSLIT("lc") intPrimTy
+      closedV . liftM vectorised
+              $ vectPolyExpr lc (freeVars expr)
 
 -- ----------------------------------------------------------------------------
 -- Bindings
@@ -244,160 +248,20 @@ vectExpr lc e@(_, AnnLam bndr body)
 vectExpr lc (fvs, AnnLam bndr body)
   = do
       tyvars <- localTyVars
-      info <- mkCEnvInfo fvs bndr body
-      (poly_vfn, poly_lfn) <- mkClosureFns info tyvars bndr body
+      (vs, vvs) <- readLEnv $ \env ->
+                   unzip [(var, vv) | var <- varSetElems fvs
+                                    , Just vv <- [lookupVarEnv (local_vars env) var]]
 
-      vfn_var <- hoistExpr FSLIT("vfn") poly_vfn
-      lfn_var <- hoistExpr FSLIT("lfn") poly_lfn
-
-      let (venv, lenv) = mkClosureEnvs info (Var lc)
-
-      let env_ty = cenv_vty info
-
-      pa_dict <- paDictOfType env_ty
-
-      arg_ty <- vectType (varType bndr)
+      arg_ty <- vectType (idType bndr)
       res_ty <- vectType (exprType $ deAnnotate body)
+      buildClosure tyvars lc vvs arg_ty res_ty
+        . hoistPolyVExpr FSLIT("fn") tyvars
+        $ do
+            new_lc <- newLocalVar FSLIT("lc") intPrimTy
+            (vbndrs, vbody) <- vectBndrsIn (vs ++ [bndr])
+                                           (vectExpr new_lc body)
+            return $ vLams new_lc vbndrs vbody
 
-      -- FIXME: move the functions to the top level
-      mono_vfn <- polyApply (Var vfn_var) (mkTyVarTys tyvars)
-      mono_lfn <- polyApply (Var lfn_var) (mkTyVarTys tyvars)
-
-      mk_clo <- builtin mkClosureVar
-      mk_cloP <- builtin mkClosurePVar
-
-      let vclo = Var mk_clo  `mkTyApps` [arg_ty, res_ty, env_ty]
-                             `mkApps`   [pa_dict, mono_vfn, mono_lfn, venv]
-          
-          lclo = Var mk_cloP `mkTyApps` [arg_ty, res_ty, env_ty]
-                             `mkApps`   [pa_dict, mono_vfn, mono_lfn, lenv]
-
-      return (vclo, lclo)
-
-data CEnvInfo = CEnvInfo {
-               cenv_vars         :: [Var]
-             , cenv_values       :: [(CoreExpr, CoreExpr)]
-             , cenv_vty          :: Type
-             , cenv_lty          :: Type
-             , cenv_repr_tycon   :: TyCon
-             , cenv_repr_tyargs  :: [Type]
-             , cenv_repr_datacon :: DataCon
-             }
-
-mkCEnvInfo :: VarSet -> Var -> CoreExprWithFVs -> VM CEnvInfo
-mkCEnvInfo fvs arg body
-  = do
-      locals <- readLEnv local_vars
-      let
-          (vars, vals) = unzip
-                 [(var, (Var v, Var v')) | var      <- varSetElems fvs
-                                         , Just (v,v') <- [lookupVarEnv locals var]]
-      vtys <- mapM (vectType . varType) vars
-
-      (vty, repr_tycon, repr_tyargs, repr_datacon) <- mk_env_ty vtys
-      lty <- mkPArrayType vty
-      
-      return $ CEnvInfo {
-                 cenv_vars         = vars
-               , cenv_values       = vals
-               , cenv_vty          = vty
-               , cenv_lty          = lty
-               , cenv_repr_tycon   = repr_tycon
-               , cenv_repr_tyargs  = repr_tyargs
-               , cenv_repr_datacon = repr_datacon
-               }
-  where
-    mk_env_ty [vty]
-      = return (vty, error "absent cinfo_repr_tycon"
-                   , error "absent cinfo_repr_tyargs"
-                   , error "absent cinfo_repr_datacon")
-
-    mk_env_ty vtys
-      = do
-          let ty = mkCoreTupTy vtys
-          (repr_tc, repr_tyargs) <- lookupPArrayFamInst ty
-          let [repr_con] = tyConDataCons repr_tc
-          return (ty, repr_tc, repr_tyargs, repr_con)
-
-    
-
-mkClosureEnvs :: CEnvInfo -> CoreExpr -> (CoreExpr, CoreExpr)
-mkClosureEnvs info lc
-  | [] <- vals
-  = (Var unitDataConId, mkApps (Var $ dataConWrapId (cenv_repr_datacon info))
-                               [lc, Var unitDataConId])
-
-  | [(vval, lval)] <- vals
-  = (vval, lval)
-
-  | otherwise
-  = (mkCoreTup vvals, Var (dataConWrapId $ cenv_repr_datacon info)
-                      `mkTyApps` cenv_repr_tyargs info
-                      `mkApps`   (lc : lvals))
-
-  where
-    vals = cenv_values info
-    (vvals, lvals) = unzip vals
-
-mkClosureFns :: CEnvInfo -> [TyVar] -> Var -> CoreExprWithFVs
-             -> VM (CoreExpr, CoreExpr)
-mkClosureFns info tyvars arg body
-  = closedV
-  . polyAbstract tyvars
-  $ \mk_tlams ->
-  do
-    (vfn, lfn) <- mkClosureMonoFns info arg body
-    return (mk_tlams vfn, mk_tlams lfn)
-
-mkClosureMonoFns :: CEnvInfo -> Var -> CoreExprWithFVs -> VM (CoreExpr, CoreExpr)
-mkClosureMonoFns info arg body
-  = do
-      lc_bndr <- newLocalVar FSLIT("lc") intPrimTy
-      (bndrs, (vbody, lbody))
-        <- vectBndrsIn (arg : cenv_vars info)
-                       (vectExpr lc_bndr body)
-      let (varg : vbndrs, larg : lbndrs) = unzip bndrs
-
-      venv_bndr <- newLocalVar FSLIT("env") vty
-      lenv_bndr <- newLocalVar FSLIT("env") lty
-
-      let vcase = bind_venv (Var venv_bndr) vbody vbndrs
-      lcase <- bind_lenv (Var lenv_bndr) lbody lc_bndr lbndrs
-      return (mkLams [venv_bndr, varg] vcase, mkLams [lenv_bndr, larg] lcase)
-  where
-    vty = cenv_vty info
-    lty = cenv_lty info
-
-    arity = length (cenv_vars info)
-
-    bind_venv venv vbody []      = vbody
-    bind_venv venv vbody [vbndr] = Let (NonRec vbndr venv) vbody
-    bind_venv venv vbody vbndrs
-      = Case venv (mkWildId vty) (exprType vbody)
-             [(DataAlt (tupleCon Boxed arity), vbndrs, vbody)]
-
-    bind_lenv lenv lbody lc_bndr [lbndr]
-      = do
-          len <- lengthPA (Var lbndr)
-          return . Let (NonRec lbndr lenv)
-                 $ Case len
-                        lc_bndr
-                        (exprType lbody)
-                        [(DEFAULT, [], lbody)]
-
-    bind_lenv lenv lbody lc_bndr lbndrs
-      = let scrut = unwrapFamInstScrut (cenv_repr_tycon info)
-                                       (cenv_repr_tyargs info)
-                                       lenv
-            lbndrs' | null lbndrs = [mkWildId unitTy]
-                    | otherwise   = lbndrs
-        in
-        return
-      $ Case scrut
-             (mkWildId (exprType scrut))
-             (exprType lbody)
-             [(DataAlt (cenv_repr_datacon info), lc_bndr : lbndrs', lbody)]
-          
 vectTyAppExpr :: Var -> CoreExprWithFVs -> [Type] -> VM (CoreExpr, CoreExpr)
 vectTyAppExpr lc (_, AnnVar v) tys = vectPolyVar lc v tys
 vectTyAppExpr lc e tys = pprPanic "vectTyAppExpr" (ppr $ deAnnotate e)
