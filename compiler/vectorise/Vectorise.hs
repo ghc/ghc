@@ -158,7 +158,7 @@ vectVar lc v
         Local (vv,lv) -> return (Var vv, Var lv)
         Global vv     -> do
                            let vexpr = Var vv
-                           lexpr <- replicatePA vexpr (Var lc)
+                           lexpr <- replicatePA (Var lc) vexpr
                            return (vexpr, lexpr)
 
 vectPolyVar :: Var -> Var -> [Type] -> VM VExpr
@@ -171,13 +171,13 @@ vectPolyVar lc v tys
                                      (polyApply (Var lv) vtys)
         Global poly    -> do
                             vexpr <- polyApply (Var poly) vtys
-                            lexpr <- replicatePA vexpr (Var lc)
+                            lexpr <- replicatePA (Var lc) vexpr
                             return (vexpr, lexpr)
 
 vectLiteral :: Var -> Literal -> VM VExpr
 vectLiteral lc lit
   = do
-      lexpr <- replicatePA (Lit lit) (Var lc)
+      lexpr <- replicatePA (Var lc) (Lit lit)
       return (Lit lit, lexpr)
 
 vectPolyExpr :: Var -> CoreExprWithFVs -> VM VExpr
