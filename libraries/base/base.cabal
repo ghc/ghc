@@ -84,15 +84,6 @@ Library {
         Control.Monad.ST,
         Control.Monad.ST.Lazy,
         Control.Monad.ST.Strict,
-        Data.Array,
-        Data.Array.Base,
-        Data.Array.Diff,
-        Data.Array.IArray,
-        Data.Array.IO,
-        Data.Array.MArray,
-        Data.Array.ST,
-        Data.Array.Storable,
-        Data.Array.Unboxed,
         Data.Bits,
         Data.Bool,
         Data.Char,
@@ -110,7 +101,6 @@ Library {
         Data.Maybe,
         Data.Monoid,
         Data.Ord,
-        Data.PackedString,
         Data.Ratio,
         Data.STRef,
         Data.STRef.Lazy,
@@ -160,8 +150,6 @@ Library {
         Text.Show,
         Text.Show.Functions
         Unsafe.Coerce
-    other-modules:
-        Data.Array.IO.Internals
     c-sources:
         cbits/PrelIOUtils.c
         cbits/WCsubst.c
