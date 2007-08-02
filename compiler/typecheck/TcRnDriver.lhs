@@ -877,6 +877,7 @@ tcRnStmt hsc_env ictxt rdr_stmt
     (([rn_stmt], _), fvs) <- rnStmts DoExpr [rdr_stmt] (return ((), emptyFVs)) ;
     traceRn (text "tcRnStmt" <+> vcat [ppr rdr_stmt, ppr rn_stmt, ppr fvs]) ;
     failIfErrsM ;
+    rnDump (ppr rn_stmt) ;
     
     -- The real work is done here
     (bound_ids, tc_expr) <- mkPlan rn_stmt ;
