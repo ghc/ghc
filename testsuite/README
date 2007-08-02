@@ -179,37 +179,55 @@ these steps:
       <name>    is the name of the test, in quotes (' or ").
 
       <opt-fn> is a function (i.e. any callable object in Python)
-		which allows the options for this test to be changed.
-		There are several pre-defined functions which can be
-		used in this field:
+                which allows the options for this test to be changed.
+                There are several pre-defined functions which can be
+                used in this field:
 
-		normal                don't change any options from the defaults
-		skip		      skip this test
-		omit_ways(ways)       skip this test for certain ways
-		only_ways(ways)       do this test certain ways only
-		omit_compiler_types(compilers)
-				      skip this test for certain compilers
-		only_compiler_types(compilers)
-				      do this test for certain compilers only
-		expect_fail	      this test is an expected failure
-		expect_fail_for(ways) expect failure for certain ways 
-		expect_fail_if_platform(plat)
-				      expect failure on a certain platform
-		expect_fail_if_compiler_type(compiler)
-				      expect failure from a certain compiler
-		set_stdin(file)       use a different file for stdin
-		exit_code(n)	      expect an exit code of 'n' from the prog
-		extra_run_opts(opts)  pass some extra opts to the prog
-		no_clean              don't clean up after this test
+                normal                don't change any options from the defaults
+                skip                  skip this test
+                omit_ways(ways)       skip this test for certain ways
+                only_ways(ways)       do this test certain ways only
+                omit_compiler_types(compilers)
+                                      skip this test for certain compilers
+                only_compiler_types(compilers)
+                                      do this test for certain compilers only
+                expect_broken(bug)    this test is a expected not to work
+                                      due to the indicated trac bug number
+                expect_broken_for(bug, ways)
+                                      As expect_broken, but only for the
+                                      indicated ways
+                expect_broken_if_platform(bug, plat)
+                                      As expect_broken, but only for the
+                                      specific platform given
+                expect_broken_if_compiler_type(bug, compiler_type)
+                                      As expect_broken, but only for the
+                                      given compiler type
+                set_stdin(file)       use a different file for stdin
+                exit_code(n)          expect an exit code of 'n' from the prog
+                extra_run_opts(opts)  pass some extra opts to the prog
+                no_clean              don't clean up after this test
 
-		you can compose two of these functions together by
-		saying compose(f,g).  For example, to expect an exit
-		code of 3 and omit way 'opt', we could use
+        These functions should normally not be used; instead, use the
+        expect_broken* functions above so that the problem doesn't
+        get forgotten about, and when we come back to look at the test
+        later we know whether current behaviour is why we marked it
+        as expected to fail:
 
-		     compose(omit_ways(['opt']), exit_code(3))
+                expect_fail           this test is an expected failure
+                expect_fail_for(ways) expect failure for certain ways
+                expect_fail_if_platform(plat)
+                                      expect failure on a certain platform
+                expect_fail_if_compiler_type(compiler)
+                                      expect failure from a certain compiler
 
-		as the <opt-fn> argument.  Calls to compose() can of
-		course be nested.
+        you can compose two of these functions together by
+        saying compose(f,g).  For example, to expect an exit
+        code of 3 and omit way 'opt', we could use
+
+                     compose(omit_ways(['opt']), exit_code(3))
+
+                as the <opt-fn> argument.  Calls to compose() can of
+                course be nested.
 
 
       <test-fn> is a function which describes how the test should be
