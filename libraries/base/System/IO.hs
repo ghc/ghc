@@ -95,7 +95,7 @@ module System.IO (
     hIsReadable, hIsWritable,  -- :: Handle -> IO Bool
     hIsSeekable,               -- :: Handle -> IO Bool
 
-    -- ** Terminal operations (not portable: ghc/hugs only)
+    -- ** Terminal operations (not portable: GHC\/Hugs only)
 
 #if !defined(__NHC__)
     hIsTerminalDevice,	 	-- :: Handle -> IO Bool
@@ -104,7 +104,7 @@ module System.IO (
     hGetEcho,			-- :: Handle -> IO Bool
 #endif
 
-    -- ** Showing handle state (not portable: ghc only)
+    -- ** Showing handle state (not portable: GHC only)
 
 #ifdef __GLASGOW_HASKELL__
     hShow,			-- :: Handle -> IO String
@@ -155,7 +155,7 @@ module System.IO (
     hGetBufNonBlocking,	       -- :: Handle -> Ptr a -> Int -> IO Int
 #endif
 
-    -- * Temporary files (not portable: ghc/hugs only)
+    -- * Temporary files (not portable: GHC\/Hugs only)
 
 #if !defined(__NHC__)
     openTempFile,
