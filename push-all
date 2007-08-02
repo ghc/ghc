@@ -75,6 +75,9 @@ sub main {
             if ($arg eq "-q") {
                 $verbose = 0;
             }
+            elsif ($arg eq "--ignore-failure") {
+                $ignore_failure = 1;
+            }
             elsif ($arg eq "--checked-out") {
                 $checked_out = 1;
             }
