@@ -8,6 +8,6 @@ tcfail121.hs:12:8:
       instance [overlap ok] Foo [Int] -- Defined at tcfail121.hs:9:0-17
     (The choice depends on the instantiation of `a'
      To pick the first instance above, use -fallow-incoherent-instances
-     when compiling the other instances)
+     when compiling the other instance declarations)
     In the expression: op x
     In the definition of `foo': foo x = op x
