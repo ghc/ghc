@@ -224,10 +224,13 @@ these steps:
         saying compose(f,g).  For example, to expect an exit
         code of 3 and omit way 'opt', we could use
 
-                     compose(omit_ways(['opt']), exit_code(3))
+             compose(omit_ways(['opt']), exit_code(3))
 
-                as the <opt-fn> argument.  Calls to compose() can of
-                course be nested.
+        as the <opt-fn> argument.  Calls to compose() can of
+        course be nested, but it is simpler to use the composes
+        function which takes a list of functions to be composed, e.g.:
+
+             composes([omit_ways(['opt']), exit_code(3)])
 
 
       <test-fn> is a function which describes how the test should be
