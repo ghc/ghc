@@ -21,7 +21,7 @@ import Paths_haddock         ( getDataDir )
 
 import Prelude hiding ( catch )
 import Control.Exception     
-import Control.Monad         ( when, liftM, foldM )
+import Control.Monad
 import Control.Monad.Writer  ( Writer, runWriter, tell )
 import Data.Char             ( isSpace )
 import Data.IORef            ( writeIORef )
@@ -308,38 +308,67 @@ startGHC libDir = do
   flags   <- getSessionDynFlags session
   flags'  <- liftM fst (initPackages flags)
   let flags'' = dopt_set flags' Opt_Haddock 
-  return (session, flags'' { hscTarget = HscNothing })
+  setSessionDynFlags session flags'' {
+      hscTarget = HscNothing,
+      ghcMode   = CompManager,
+      ghcLink   = NoLink
+    }
+  flags''' <- getSessionDynFlags session
+  return (session, flags''')
 
--- TODO: clean up, restructure and make sure it handles cleanup
+
+-- | Get the sorted graph of all loaded modules and their dependencies
+getSortedModuleGraph :: Session -> IO [(Module, FilePath)]
+getSortedModuleGraph session = do
+  mbModGraph <- depanal session [] True
+  moduleGraph <- case mbModGraph of
+    Just mg -> return mg
+    Nothing -> throwE "Failed to load all modules"
+  let
+    getModFile    = fromJust . ml_hs_file . ms_location
+    sortedGraph   = topSortModuleGraph False moduleGraph Nothing
+    sortedModules = concatMap flattenSCC sortedGraph
+    modsAndFiles  = [ (ms_mod modsum, getModFile modsum) |
+                      modsum <- sortedModules ]
+  return modsAndFiles
+
+
+-- TODO: make it handle cleanup
 sortAndCheckModules :: Session -> [FilePath] -> IO [CheckedMod]
 sortAndCheckModules session files = do 
-  targets <- mapM (\s -> guessTarget s Nothing) files
+
+  -- load all argument files
+  targets <- mapM (\f -> guessTarget f Nothing) files
   setTargets session targets 
-  mbModGraph <- depanal session [] True
-  moduleGraph <- case mbModGraph of 
-    Just mg -> return mg 
-    Nothing -> throwE "Failed to load all modules" 
-  let 
-    modSumFile    = fromJust . ml_hs_file . ms_location
-    sortedGraph   = topSortModuleGraph False moduleGraph Nothing
-    sortedModules = concatMap flattenSCC sortedGraph 
-    modsAndFiles  = [ (ms_mod modsum, modSumFile modsum) | 
-                      modsum <- sortedModules, 
-                      modSumFile modsum `elem` files ] 
-  checkedMods <- mapM (\(mod, file) -> do
+  putStrLn "argument targets:"
+  mapM (putStrLn . showSDoc . pprTarget) targets
+
+  -- compute the dependencies and load them as well
+  allMods <- getSortedModuleGraph session
+  targets' <- mapM (\(_, f) -> guessTarget f Nothing) allMods
+  setTargets session targets'
+  putStrLn "all targets:"
+  targets'' <- getTargets session
+  mapM (putStrLn . showSDoc . pprTarget) targets''
+
+  -- typecheck the argument modules
+  let argMods = filter ((`elem` files) . snd) allMods
+
+  checkedMods <- forM argMods $ \(mod, file) -> do
     mbMod <- checkModule session (moduleName mod) False
-    checkedMod <- case mbMod of 
+    checkedMod <- case mbMod of
       Just m  -> return m
       Nothing -> throwE ("Failed to load module: " ++ moduleString mod)
-    return (mod, file, checkedMod)) modsAndFiles 
+    return (mod, file, checkedMod)
+
   ensureFullyChecked checkedMods
   where
-    ensureFullyChecked modules 
+    ensureFullyChecked modules
       | length modules' == length modules = return modules'
       | otherwise = throwE "Failed to check all modules properly" 
       where modules' = [ (mod, f, (a,b,c,d)) | 
                          (mod, f, CheckedModule a (Just b) (Just c) (Just d) _) 
-                         <- modules ] 
+                         <- modules ]
 
 run :: [Flag] -> [CheckedMod] -> Map Name Name -> IO ()
 run flags modules extEnv = do
