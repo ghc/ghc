@@ -23,6 +23,7 @@ import DynFlags
 import Packages
 import PackageConfig
 import UniqFM
+import HscTypes		( implicitTyThings )
 import PprTyThing
 import Outputable       hiding (printForUser)
 import Module           -- for ModuleEnv
@@ -36,6 +37,8 @@ import Config
 import StaticFlags
 import Linker
 import Util
+import NameSet
+import Maybes		( orElse )
 import FastString
 
 #ifndef mingw32_HOST_OS
@@ -667,23 +670,22 @@ info s  = do { let names = words s
 	     ; mapM_ (infoThing pefas session) names }
   where
     infoThing pefas session str = io $ do
-	names <- GHC.parseName session str
-	let filtered = filterOutChildren names
-	mb_stuffs <- mapM (GHC.getInfo session) filtered
+	names     <- GHC.parseName session str
+	mb_stuffs <- mapM (GHC.getInfo session) names
+	let filtered = filterOutChildren (\(t,f,i) -> t) (catMaybes mb_stuffs)
 	unqual <- GHC.getPrintUnqual session
 	putStrLn (showSDocForUser unqual $
      		   vcat (intersperse (text "") $
-		   [ pprInfo pefas stuff | Just stuff <-  mb_stuffs ]))
+		         map (pprInfo pefas) filtered))
 
   -- Filter out names whose parent is also there Good
   -- example is '[]', which is both a type and data
   -- constructor in the same type
-filterOutChildren :: [Name] -> [Name]
-filterOutChildren names = filter (not . parent_is_there) names
- where parent_is_there n 
---	 | Just p <- GHC.nameParent_maybe n = p `elem` names
--- ToDo!!
-	 | otherwise		           = False
+filterOutChildren :: (a -> TyThing) -> [a] -> [a]
+filterOutChildren get_thing xs 
+  = [x | x <- xs, not (getName (get_thing x) `elemNameSet` implicits)]
+  where
+    implicits = mkNameSet [getName t | x <- xs, t <- implicitTyThings (get_thing x)]
 
 pprInfo :: PrintExplicitForalls -> (TyThing, Fixity, [GHC.Instance]) -> SDoc
 pprInfo pefas (thing, fixity, insts)
@@ -994,16 +996,16 @@ browseModule m exports_only = do
     Just mod_info -> do
         let names
 	       | exports_only = GHC.modInfoExports mod_info
-	       | otherwise    = fromMaybe [] (GHC.modInfoTopLevelScope mod_info)
+	       | otherwise    = GHC.modInfoTopLevelScope mod_info
+				`orElse` []
 
-	    filtered = filterOutChildren names
-	
-        things <- io $ mapM (GHC.lookupName s) filtered
+        mb_things <- io $ mapM (GHC.lookupName s) names
+ 	let filtered_things = filterOutChildren (\t -> t) (catMaybes mb_things)
 
         dflags <- getDynFlags
 	let pefas = dopt Opt_PrintExplicitForalls dflags
 	io (putStrLn (showSDocForUser unqual (
-		vcat (map (pprTyThingInContext pefas) (catMaybes things))
+		vcat (map (pprTyThingInContext pefas) filtered_things)
 	   )))
 	-- ToDo: modInfoInstances currently throws an exception for
 	-- package modules.  When it works, we can do this:
