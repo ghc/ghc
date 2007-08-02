@@ -641,8 +641,9 @@ tcSimplifyInfer doc tau_tvs wanted
   = do	{ tau_tvs1 <- zonkTcTyVarsAndFV (varSetElems tau_tvs)
 	; wanted'  <- mappM zonkInst wanted	-- Zonk before deciding quantified tyvars
 	; gbl_tvs  <- tcGetGlobalTyVars
-	; let preds = fdPredsOfInsts wanted'
-	      qtvs  = grow preds tau_tvs1 `minusVarSet` oclose preds gbl_tvs
+	; let preds1   = fdPredsOfInsts wanted'
+	      gbl_tvs1 = oclose preds1 gbl_tvs
+	      qtvs     = grow preds1 tau_tvs1 `minusVarSet` gbl_tvs1
 			-- See Note [Choosing which variables to quantify]
 
 		-- To maximise sharing, remove from consideration any 
@@ -651,8 +652,8 @@ tcSimplifyInfer doc tau_tvs wanted
 	; extendLIEs free
 
 		-- To make types simple, reduce as much as possible
-	; traceTc (text "infer" <+> (ppr preds $$ ppr (grow preds tau_tvs1) $$ ppr gbl_tvs $$ 
-		   ppr (oclose preds gbl_tvs) $$ ppr free $$ ppr bound))
+	; traceTc (text "infer" <+> (ppr preds1 $$ ppr (grow preds1 tau_tvs1) $$ ppr gbl_tvs $$ 
+		   ppr gbl_tvs1 $$ ppr free $$ ppr bound))
 	; (irreds1, binds1) <- tryHardCheckLoop doc bound
 
 		-- Note [Inference and implication constraints]
@@ -682,9 +683,17 @@ tcSimplifyInfer doc tau_tvs wanted
 		--       Then after simplifying we'll get (D a x), and x is fresh
 		-- 	 We must quantify over x else it'll be totally unbound
 	; tau_tvs2 <- zonkTcTyVarsAndFV (varSetElems tau_tvs1)
-	; gbl_tvs  <- tcGetGlobalTyVars
-	; let preds = fdPredsOfInsts irreds2	-- irreds2 is zonked
-	      qtvs  = grow preds tau_tvs2 `minusVarSet` oclose preds gbl_tvs
+	; gbl_tvs2 <- zonkTcTyVarsAndFV (varSetElems gbl_tvs1)
+		-- Note that we start from gbl_tvs1
+		-- We use tcGetGlobalTyVars, then oclose wrt preds2, because
+		-- we've already put some of the original preds1 into frees
+		-- E.g. 	wanteds = C a b	  (where a->b)
+		--		gbl_tvs = {a}
+		--		tau_tvs = {b}
+		-- Then b is fixed by gbl_tvs, so (C a b) will be in free, and
+		-- irreds2 will be empty.  But we don't want to generalise over b!
+	; let preds2 = fdPredsOfInsts irreds2	-- irreds2 is zonked
+	      qtvs   = grow preds2 tau_tvs2 `minusVarSet` oclose preds2 gbl_tvs2
 	; let (free, irreds3) = partition (isFreeWhenInferring qtvs) irreds2
 	; extendLIEs free
 
