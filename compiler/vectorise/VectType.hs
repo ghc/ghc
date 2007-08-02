@@ -77,6 +77,7 @@ type TyConGroup = ([TyCon], UniqSet TyCon)
 
 data PAInstance = PAInstance {
                     painstInstance  :: Instance
+                  , painstOrigTyCon :: TyCon
                   , painstVectTyCon :: TyCon
                   , painstArrTyCon  :: TyCon
                   }
@@ -95,7 +96,7 @@ vectTypeEnv env
           vect_tcs  = keep_tcs ++ new_tcs
 
       parr_tcs <- zipWithM buildPArrayTyCon orig_tcs vect_tcs
-      pa_insts <- zipWithM buildPAInstance  vect_tcs parr_tcs
+      pa_insts <- sequence $ zipWith3 buildPAInstance orig_tcs vect_tcs parr_tcs
       
       let all_new_tcs = new_tcs ++ parr_tcs
 
@@ -296,8 +297,8 @@ buildPArrayDataCon orig_name vect_tc repr_tc
     types = [ty | dc <- tyConDataCons vect_tc
                 , ty <- dataConRepArgTys dc]
 
-buildPAInstance :: TyCon -> TyCon -> VM PAInstance
-buildPAInstance vect_tc arr_tc
+buildPAInstance :: TyCon -> TyCon -> TyCon -> VM PAInstance
+buildPAInstance orig_tc vect_tc arr_tc
   = do
       pa <- builtin paClass
       let inst_ty = mkForAllTys tvs
@@ -308,6 +309,7 @@ buildPAInstance vect_tc arr_tc
 
       return $ PAInstance {
                  painstInstance  = mkLocalInstance dfun NoOverlap
+               , painstOrigTyCon = orig_tc
                , painstVectTyCon = vect_tc
                , painstArrTyCon  = arr_tc
                }
