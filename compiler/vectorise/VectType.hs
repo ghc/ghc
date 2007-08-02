@@ -1,11 +1,13 @@
 module VectType ( vectTyCon, vectType, vectTypeEnv,
-                   PAInstance, painstInstance, buildPADict )
+                   PAInstance, painstInstance, buildPADict,
+                   vectDataConWorkers )
 where
 
 #include "HsVersions.h"
 
 import VectMonad
 import VectUtils
+import VectCore
 
 import HscTypes          ( TypeEnv, extendTypeEnvList, typeEnvTyCons )
 import CoreSyn
@@ -191,6 +193,66 @@ vectDataCon dc
     univ_tvs    = dataConUnivTyVars dc
     rep_arg_tys = dataConRepArgTys dc
     tycon       = dataConTyCon dc
+
+vectDataConWorkers :: PAInstance -> VM [(Var, CoreExpr)]
+vectDataConWorkers (PAInstance { painstOrigTyCon = orig_tc
+                               , painstVectTyCon = vect_tc
+                               , painstArrTyCon  = arr_tc
+                               })
+  = do
+      shape <- tyConShape vect_tc
+      sequence_ (zipWith3 (vectDataConWorker shape vect_tc arr_tc arr_dc)
+                          num_dcs
+                          (inits repr_tys)
+                          (tails repr_tys))
+      takeHoisted
+  where
+    orig_dcs = tyConDataCons orig_tc
+    vect_dcs = tyConDataCons vect_tc
+    [arr_dc] = tyConDataCons arr_tc
+
+    num_dcs  = zip3 orig_dcs vect_dcs [0..]
+    repr_tys = map dataConRepArgTys vect_dcs
+
+vectDataConWorker :: Shape -> TyCon -> TyCon -> DataCon
+                  -> (DataCon, DataCon, Int) -> [[Type]] -> [[Type]]
+                  -> VM ()
+vectDataConWorker shape vect_tc arr_tc arr_dc (orig_dc, vect_dc, dc_num) pre (dc_tys : post)
+  = do
+      clo <- closedV
+           . inBind orig_worker
+           . polyAbstract tvs $ \abstract ->
+             liftM (abstract . vectorised)
+           $ buildClosures tvs [] dc_tys res_ty (liftM2 (,) mk_vect mk_lift)
+
+      worker <- cloneId mkVectOcc orig_worker (exprType clo)
+      hoistBinding worker clo
+      defGlobalVar orig_worker worker
+      return ()
+  where
+    tvs     = tyConTyVars vect_tc
+    arg_tys = mkTyVarTys tvs
+    res_ty  = mkTyConApp vect_tc arg_tys
+
+    orig_worker = dataConWorkId orig_dc
+
+    mk_vect = return . mkConApp vect_dc $ map Type arg_tys
+    mk_lift = do
+                len     <- newLocalVar FSLIT("n") intPrimTy
+                arr_tys <- mapM mkPArrayType dc_tys
+                args    <- mapM (newLocalVar FSLIT("xs")) arr_tys
+                shapes  <- shapeReplicate shape (Var len) (mkIntLitInt dc_num)
+                
+                empty_pre  <- mapM emptyPA (concat pre)
+                empty_post <- mapM emptyPA (concat post)
+
+                return . mkLams (len : args)
+                       . wrapFamInstBody arr_tc arg_tys
+                       . mkConApp arr_dc
+                       $ map Type arg_tys ++ shapes
+                                          ++ empty_pre
+                                          ++ map Var args
+                                          ++ empty_post
 
 data Shape = Shape {
                shapeReprTys    :: [Type]
