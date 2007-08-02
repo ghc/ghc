@@ -11,7 +11,7 @@ module Main (main) where
 import Haddock.Html
 import Haddock.Hoogle
 import Haddock.Rename
-import Haddock.Types
+import Haddock.Types hiding ( NoLink )
 import Haddock.Utils
 import Haddock.Version
 import Haddock.InterfaceFile
