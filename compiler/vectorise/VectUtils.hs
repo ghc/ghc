@@ -7,7 +7,7 @@ module VectUtils (
   paMethod, lengthPA, replicatePA, emptyPA, liftPA,
   polyAbstract, polyApply, polyVApply,
   lookupPArrayFamInst,
-  hoistExpr, hoistPolyVExpr, takeHoisted,
+  hoistBinding, hoistExpr, hoistPolyVExpr, takeHoisted,
   buildClosure, buildClosures,
   mkClosureApp
 ) where
@@ -215,12 +215,15 @@ polyVApply expr tys
 lookupPArrayFamInst :: Type -> VM (TyCon, [Type])
 lookupPArrayFamInst ty = builtin parrayTyCon >>= (`lookupFamInst` [ty])
 
+hoistBinding :: Var -> CoreExpr -> VM ()
+hoistBinding v e = updGEnv $ \env ->
+  env { global_bindings = (v,e) : global_bindings env }
+
 hoistExpr :: FastString -> CoreExpr -> VM Var
 hoistExpr fs expr
   = do
       var <- newLocalVar fs (exprType expr)
-      updGEnv $ \env ->
-        env { global_bindings = (var, expr) : global_bindings env }
+      hoistBinding var expr
       return var
 
 hoistVExpr :: VExpr -> VM VVar
