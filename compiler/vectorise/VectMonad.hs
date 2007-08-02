@@ -3,7 +3,8 @@ module VectMonad (
   VM,
 
   noV, tryV, maybeV, orElseV, fixV, localV, closedV, initV,
-  cloneName, newExportedVar, newLocalVar, newDummyVar, newTyVar,
+  cloneName, cloneId,
+  newExportedVar, newLocalVar, newDummyVar, newTyVar,
   
   Builtins(..), paDictTyCon, paDictDataCon,
   builtin,
@@ -306,6 +307,14 @@ cloneName mk_occ name = liftM make (liftDs newUnique)
                                                     occ_name
                                                     (nameSrcSpan name)
            | otherwise           = mkSystemName u occ_name
+
+cloneId :: (OccName -> OccName) -> Id -> Type -> VM Id
+cloneId mk_occ id ty
+  = do
+      name <- cloneName mk_occ (getName id)
+      let id' | isExportedId id = Id.mkExportedLocalId name ty
+              | otherwise       = Id.mkLocalId         name ty
+      return id'
 
 newExportedVar :: OccName -> Type -> VM Var
 newExportedVar occ_name ty 

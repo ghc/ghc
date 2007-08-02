@@ -101,10 +101,8 @@ vectTopBind b@(Rec bs)
 vectTopBinder :: Var -> VM Var
 vectTopBinder var
   = do
-      vty <- vectType (idType var)
-      name <- cloneName mkVectOcc (getName var)
-      let var' | isExportedId var = Id.mkExportedLocalId name vty
-               | otherwise        = Id.mkLocalId         name vty
+      vty  <- vectType (idType var)
+      var' <- cloneId mkVectOcc var vty
       defGlobalVar var var'
       return var'
     
