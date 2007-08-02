@@ -4,7 +4,7 @@ module VectUtils (
   splitClosureTy,
   mkPADictType, mkPArrayType,
   paDictArgType, paDictOfType,
-  paMethod, lengthPA, replicatePA, emptyPA,
+  paMethod, lengthPA, replicatePA, emptyPA, liftPA,
   polyAbstract, polyApply, polyVApply,
   lookupPArrayFamInst,
   hoistExpr, hoistPolyVExpr, takeHoisted,
@@ -170,6 +170,12 @@ replicatePA len x = liftM (`mkApps` [len,x])
 emptyPA :: Type -> VM CoreExpr
 emptyPA = paMethod emptyPAVar
 
+liftPA :: CoreExpr -> VM CoreExpr
+liftPA x
+  = do
+      lc <- builtin liftingContext
+      replicatePA (Var lc) x
+
 newLocalVVar :: FastString -> Type -> VM VVar
 newLocalVVar fs vty
   = do
@@ -259,17 +265,18 @@ mkClosureApp (vclo, lclo) (varg, larg)
   where
     (arg_ty, res_ty) = splitClosureTy (exprType vclo)
 
-buildClosures :: [TyVar] -> Var -> [VVar] -> [Type] -> Type -> VM VExpr -> VM VExpr
-buildClosures tvs lc vars [arg_ty] res_ty mk_body
-  = buildClosure tvs lc vars arg_ty res_ty mk_body
-buildClosures tvs lc vars (arg_ty : arg_tys) res_ty mk_body
+buildClosures :: [TyVar] -> [VVar] -> [Type] -> Type -> VM VExpr -> VM VExpr
+buildClosures tvs vars [arg_ty] res_ty mk_body
+  = buildClosure tvs vars arg_ty res_ty mk_body
+buildClosures tvs vars (arg_ty : arg_tys) res_ty mk_body
   = do
       res_ty' <- mkClosureTypes arg_tys res_ty
       arg <- newLocalVVar FSLIT("x") arg_ty
-      buildClosure tvs lc vars arg_ty res_ty'
+      buildClosure tvs vars arg_ty res_ty'
         . hoistPolyVExpr tvs
         $ do
-            clo <- buildClosures tvs lc (vars ++ [arg]) arg_tys res_ty mk_body
+            lc <- builtin liftingContext
+            clo <- buildClosures tvs (vars ++ [arg]) arg_tys res_ty mk_body
             return $ vLams lc (vars ++ [arg]) clo
 
 -- (clo <x1,...,xn> <f,f^>, aclo (Arr lc xs1 ... xsn) <f,f^>)
@@ -277,27 +284,29 @@ buildClosures tvs lc vars (arg_ty : arg_tys) res_ty mk_body
 --     f  = \env v -> case env of <x1,...,xn> -> e x1 ... xn v
 --     f^ = \env v -> case env of Arr l xs1 ... xsn -> e^ l x1 ... xn v
 --
-buildClosure :: [TyVar] -> Var -> [VVar] -> Type -> Type -> VM VExpr -> VM VExpr
-buildClosure tvs lv vars arg_ty res_ty mk_body
+buildClosure :: [TyVar] -> [VVar] -> Type -> Type -> VM VExpr -> VM VExpr
+buildClosure tvs vars arg_ty res_ty mk_body
   = do
-      (env_ty, env, bind) <- buildEnv lv vars
+      (env_ty, env, bind) <- buildEnv vars
       env_bndr <- newLocalVVar FSLIT("env") env_ty
       arg_bndr <- newLocalVVar FSLIT("arg") arg_ty
 
       fn <- hoistPolyVExpr tvs
           $ do
+              lc    <- builtin liftingContext
               body  <- mk_body
               body' <- bind (vVar env_bndr)
-                            (vVarApps lv body (vars ++ [arg_bndr]))
+                            (vVarApps lc body (vars ++ [arg_bndr]))
               return (vLamsWithoutLC [env_bndr, arg_bndr] body')
 
       mkClosure arg_ty res_ty env_ty fn env
 
-buildEnv :: Var -> [VVar] -> VM (Type, VExpr, VExpr -> VExpr -> VM VExpr)
-buildEnv lv vvs
+buildEnv :: [VVar] -> VM (Type, VExpr, VExpr -> VExpr -> VM VExpr)
+buildEnv vvs
   = do
+      lc <- builtin liftingContext
       let (ty, venv, vbind) = mkVectEnv tys vs
-      (lenv, lbind) <- mkLiftEnv lv tys ls
+      (lenv, lbind) <- mkLiftEnv lc tys ls
       return (ty, (venv, lenv),
               \(venv,lenv) (vbody,lbody) ->
               do
@@ -318,28 +327,28 @@ mkVectEnv tys  vs  = (ty, mkCoreTup (map Var vs),
     ty = mkCoreTupTy tys
 
 mkLiftEnv :: Var -> [Type] -> [Var] -> VM (CoreExpr, CoreExpr -> CoreExpr -> VM CoreExpr)
-mkLiftEnv lv [ty] [v]
+mkLiftEnv lc [ty] [v]
   = return (Var v, \env body ->
                    do
                      len <- lengthPA (Var v)
                      return . Let (NonRec v env)
-                            $ Case len lv (exprType body) [(DEFAULT, [], body)])
+                            $ Case len lc (exprType body) [(DEFAULT, [], body)])
 
 -- NOTE: this transparently deals with empty environments
-mkLiftEnv lv tys vs
+mkLiftEnv lc tys vs
   = do
       (env_tc, env_tyargs) <- lookupPArrayFamInst vty
       let [env_con] = tyConDataCons env_tc
           
           env = Var (dataConWrapId env_con)
                 `mkTyApps`  env_tyargs
-                `mkVarApps` (lv : vs)
+                `mkVarApps` (lc : vs)
 
           bind env body = let scrut = unwrapFamInstScrut env_tc env_tyargs env
                           in
                           return $ Case scrut (mkWildId (exprType scrut))
                                         (exprType body)
-                                        [(DataAlt env_con, lv : bndrs, body)]
+                                        [(DataAlt env_con, lc : bndrs, body)]
       return (env, bind)
   where
     vty = mkCoreTupTy tys

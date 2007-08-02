@@ -111,10 +111,9 @@ vectTopBinder var
 vectTopRhs :: Var -> CoreExpr -> VM CoreExpr
 vectTopRhs var expr
   = do
-      lc <- newLocalVar FSLIT("lc") intPrimTy
       closedV . liftM vectorised
               . inBind var
-              $ vectPolyExpr lc (freeVars expr)
+              $ vectPolyExpr (freeVars expr)
 
 -- ----------------------------------------------------------------------------
 -- Bindings
@@ -150,19 +149,19 @@ vectBndrsIn vs p
 -- ----------------------------------------------------------------------------
 -- Expressions
 
-vectVar :: Var -> Var -> VM VExpr
-vectVar lc v
+vectVar :: Var -> VM VExpr
+vectVar v
   = do
       r <- lookupVar v
       case r of
         Local (vv,lv) -> return (Var vv, Var lv)
         Global vv     -> do
                            let vexpr = Var vv
-                           lexpr <- replicatePA (Var lc) vexpr
+                           lexpr <- liftPA vexpr
                            return (vexpr, lexpr)
 
-vectPolyVar :: Var -> Var -> [Type] -> VM VExpr
-vectPolyVar lc v tys
+vectPolyVar :: Var -> [Type] -> VM VExpr
+vectPolyVar v tys
   = do
       vtys <- mapM vectType tys
       r <- lookupVar v
@@ -171,79 +170,78 @@ vectPolyVar lc v tys
                                      (polyApply (Var lv) vtys)
         Global poly    -> do
                             vexpr <- polyApply (Var poly) vtys
-                            lexpr <- replicatePA (Var lc) vexpr
+                            lexpr <- liftPA vexpr
                             return (vexpr, lexpr)
 
-vectLiteral :: Var -> Literal -> VM VExpr
-vectLiteral lc lit
+vectLiteral :: Literal -> VM VExpr
+vectLiteral lit
   = do
-      lexpr <- replicatePA (Var lc) (Lit lit)
+      lexpr <- liftPA (Lit lit)
       return (Lit lit, lexpr)
 
-vectPolyExpr :: Var -> CoreExprWithFVs -> VM VExpr
-vectPolyExpr lc expr
+vectPolyExpr :: CoreExprWithFVs -> VM VExpr
+vectPolyExpr expr
   = polyAbstract tvs $ \abstract ->
-    -- FIXME: shadowing (tvs in lc)
     do
-      mono' <- vectExpr lc mono
+      mono' <- vectExpr mono
       return $ mapVect abstract mono'
   where
     (tvs, mono) = collectAnnTypeBinders expr  
                 
-vectExpr :: Var -> CoreExprWithFVs -> VM VExpr
-vectExpr lc (_, AnnType ty)
+vectExpr :: CoreExprWithFVs -> VM VExpr
+vectExpr (_, AnnType ty)
   = liftM vType (vectType ty)
 
-vectExpr lc (_, AnnVar v) = vectVar lc v
+vectExpr (_, AnnVar v) = vectVar v
 
-vectExpr lc (_, AnnLit lit) = vectLiteral lc lit
+vectExpr (_, AnnLit lit) = vectLiteral lit
 
-vectExpr lc (_, AnnNote note expr)
-  = liftM (vNote note) (vectExpr lc expr)
+vectExpr (_, AnnNote note expr)
+  = liftM (vNote note) (vectExpr expr)
 
-vectExpr lc e@(_, AnnApp _ arg)
+vectExpr e@(_, AnnApp _ arg)
   | isAnnTypeArg arg
-  = vectTyAppExpr lc fn tys
+  = vectTyAppExpr fn tys
   where
     (fn, tys) = collectAnnTypeArgs e
 
-vectExpr lc (_, AnnApp fn arg)
+vectExpr (_, AnnApp fn arg)
   = do
-      fn'  <- vectExpr lc fn
-      arg' <- vectExpr lc arg
+      fn'  <- vectExpr fn
+      arg' <- vectExpr arg
       mkClosureApp fn' arg'
 
-vectExpr lc (_, AnnCase expr bndr ty alts)
+vectExpr (_, AnnCase expr bndr ty alts)
   = panic "vectExpr: case"
 
-vectExpr lc (_, AnnLet (AnnNonRec bndr rhs) body)
+vectExpr (_, AnnLet (AnnNonRec bndr rhs) body)
   = do
-      vrhs <- localV . inBind bndr $ vectPolyExpr lc rhs
-      (vbndr, vbody) <- vectBndrIn bndr (vectExpr lc body)
+      vrhs <- localV . inBind bndr $ vectPolyExpr rhs
+      (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
       return $ vLet (vNonRec vbndr vrhs) vbody
 
-vectExpr lc (_, AnnLet (AnnRec bs) body)
+vectExpr (_, AnnLet (AnnRec bs) body)
   = do
       (vbndrs, (vrhss, vbody)) <- vectBndrsIn bndrs
                                 $ liftM2 (,)
                                   (zipWithM vect_rhs bndrs rhss)
-                                  (vectPolyExpr lc body)
+                                  (vectPolyExpr body)
       return $ vLet (vRec vbndrs vrhss) vbody
   where
     (bndrs, rhss) = unzip bs
 
     vect_rhs bndr rhs = localV
                       . inBind bndr
-                      $ vectExpr lc rhs
+                      $ vectExpr rhs
 
-vectExpr lc e@(fvs, AnnLam bndr _)
+vectExpr e@(fvs, AnnLam bndr _)
   | not (isId bndr) = pprPanic "vectExpr" (ppr $ deAnnotate e)
-  | otherwise = vectLam lc fvs bs body
+  | otherwise = vectLam fvs bs body
   where
     (bs,body) = collectAnnValBinders e
 
-vectLam :: Var -> VarSet -> [Var] -> CoreExprWithFVs -> VM VExpr
-vectLam lc fvs bs body
+vectLam :: VarSet -> [Var] -> CoreExprWithFVs -> VM VExpr
+vectLam fvs bs body
   = do
       tyvars <- localTyVars
       (vs, vvs) <- readLEnv $ \env ->
@@ -253,14 +251,15 @@ vectLam lc fvs bs body
       arg_tys <- mapM (vectType . idType) bs
       res_ty  <- vectType (exprType $ deAnnotate body)
 
-      buildClosures tyvars lc vvs arg_tys res_ty
+      buildClosures tyvars vvs arg_tys res_ty
         . hoistPolyVExpr tyvars
         $ do
+            lc <- builtin liftingContext
             (vbndrs, vbody) <- vectBndrsIn (vs ++ bs)
-                                           (vectExpr lc body)
+                                           (vectExpr body)
             return $ vLams lc vbndrs vbody
   
-vectTyAppExpr :: Var -> CoreExprWithFVs -> [Type] -> VM VExpr
-vectTyAppExpr lc (_, AnnVar v) tys = vectPolyVar lc v tys
-vectTyAppExpr lc e tys = pprPanic "vectTyAppExpr" (ppr $ deAnnotate e)
+vectTyAppExpr :: CoreExprWithFVs -> [Type] -> VM VExpr
+vectTyAppExpr (_, AnnVar v) tys = vectPolyVar v tys
+vectTyAppExpr e tys = pprPanic "vectTyAppExpr" (ppr $ deAnnotate e)
 

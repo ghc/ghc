@@ -39,6 +39,7 @@ import Id
 import OccName
 import Name
 import NameEnv
+import TysPrim       ( intPrimTy )
 
 import DsMonad
 import PrelNames
@@ -69,6 +70,7 @@ data Builtins = Builtins {
                 , lengthPAVar      :: Var
                 , replicatePAVar   :: Var
                 , emptyPAVar       :: Var
+                , liftingContext   :: Var
                 }
 
 paDictTyCon :: Builtins -> TyCon
@@ -92,6 +94,9 @@ initBuiltins
       replicatePAVar   <- dsLookupGlobalId replicatePAName
       emptyPAVar       <- dsLookupGlobalId emptyPAName
 
+      liftingContext <- liftM (\u -> mkSysLocal FSLIT("lc") u intPrimTy)
+                              newUnique
+
       return $ Builtins {
                  parrayTyCon      = parrayTyCon
                , paClass          = paClass
@@ -103,6 +108,7 @@ initBuiltins
                , lengthPAVar      = lengthPAVar
                , replicatePAVar   = replicatePAVar
                , emptyPAVar       = emptyPAVar
+               , liftingContext   = liftingContext
                }
 
 data GlobalEnv = GlobalEnv {
