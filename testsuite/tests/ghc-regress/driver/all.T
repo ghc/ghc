@@ -10,9 +10,9 @@ def cleanall():
            'depend', 'depend.bak', 'hello'])
 
     if default_testopts.cleanup != '':
-        os.spawnlp(os.P_WAIT, 'rm', 'rm', '-rf', in_testdir('hi'))
-        os.spawnlp(os.P_WAIT, 'rm', 'rm', '-rf', in_testdir('obj'))
-        os.spawnlp(os.P_WAIT, 'rm', 'rm', '-rf', in_testdir('stub'))
+        rawSystem(['rm', '-rf', in_testdir('hi')])
+        rawSystem(['rm', '-rf', in_testdir('obj')])
+        rawSystem(['rm', '-rf', in_testdir('stub')])
 
 test('driver011', ignore_output, run_command, ['$MAKE test011'])
 cleanall()

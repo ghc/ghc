@@ -1061,6 +1061,20 @@ def guess_compiler_flags():
    else:
         return []
 
+def rawSystem(cmd_and_args):
+    # We prefer subprocess.call to os.spawnv as the latter
+    # seems to send its arguments through a shell or something
+    # with the Windows (non-cygwin) python. An argument "a b c"
+    # turns into three arguments ["a", "b", "c"].
+
+    # However, subprocess is new in python 2.4, so fall back to
+    # using spawnv if we don't have it
+
+    if have_subprocess:
+        return subprocess.call(cmd_and_args)
+    else:
+        return os.spawnv(os.P_WAIT, cmd_and_args[0], cmd_and_args)
+
 # cmd is a complex command in Bourne-shell syntax 
 # e.g (cd . && 'c:/users/simonpj/darcs/HEAD/compiler/stage1/ghc-inplace' ...etc)
 # Hence it must ultimately be run by a Bourne shell
@@ -1080,19 +1094,7 @@ def runCmd( cmd ):
         assert config.timeout_prog!=''
 
     if config.timeout_prog != '':
-        # We prefer subprocess.call to os.spawnv as the latter
-        # seems to send its arguments through a shell or something
-        # with the Windows (non-cygwin) python. An argument "a b c"
-        # turns into three arguments ["a", "b", "c"].
-
-        # However, subprocess is new in python 2.4, so fall back to
-        # using spawnv if we don't have it
-
-        if have_subprocess:
-            r = subprocess.call([config.timeout_prog, str(config.timeout), cmd])
-        else:
-            r = os.spawnv(os.P_WAIT, config.timeout_prog,
-                          [config.timeout_prog, str(config.timeout), cmd])
+        r = rawSystem([config.timeout_prog, str(config.timeout), cmd])
     else:
         r = os.system(cmd)
     return r << 8
