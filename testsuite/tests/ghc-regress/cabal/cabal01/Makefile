@@ -24,7 +24,7 @@ cabal01:
 	  $(GHC_PKG_INPLACE) --user unregister test; \
 	fi
 
-	./setup configure -v0 --prefix=$(shell $(TOP)/utils/pwd forwardslash)/install --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG_INPLACE) $(PROF)
+	./setup configure -v0 --prefix=$(shell $(TOP)/utils/pwd forwardslash)/install --with-compiler=$(TEST_HC) --with-hc-pkg=$(GHC_PKG_INPLACE) $(PROF) --with-ld=$(LD)
 	./setup build -v0
 	./setup copy -v0
 	ls install
