@@ -31,7 +31,7 @@ test('memo002', compose(skip_if_fast,extra_run_opts('20')), \
 	multimod_compile_and_run, ['memo002',''])
 clean(['Memo.hi', 'Memo.o'])
 
-test('packedstring001', normal, compile_and_run, [''])
+test('packedstring001', normal, compile_and_run, ['-package packedstring'])
 
 test('stableptr001', compose(skip_if_fast,extra_run_opts('+RTS -K8m -RTS')), compile_and_run, [''])
 test('stableptr003', normal, compile_and_run, [''])

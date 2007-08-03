@@ -1,7 +1,7 @@
 setTestOpts(only_compiler_types(['ghc']))
 
 test('newtype',          normal, compile_and_run, [''])
-test('datatype',         normal, compile_and_run, [''])
+test('datatype',         normal, compile_and_run, ['-package containers'])
 test('encode',           omit_ways(['opt','optasm']), compile, [''])
 test('ext',              normal, compile,         [''])
 test('getC',             normal, compile_and_run, [''])
