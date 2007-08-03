@@ -65,6 +65,7 @@ import Bag
 import HscTypes
 import Util                  ( handleDyn )
 import ErrUtils              ( printBagOfErrors )
+import BasicTypes
 
 import FastString
 #define FSLIT(x) (mkFastString# (x#))
@@ -338,37 +339,33 @@ sortAndCheckModules :: Session -> [FilePath] -> IO [CheckedMod]
 sortAndCheckModules session files = do 
 
   -- load all argument files
+
   targets <- mapM (\f -> guessTarget f Nothing) files
   setTargets session targets 
-  putStrLn "argument targets:"
-  mapM (putStrLn . showSDoc . pprTarget) targets
 
   -- compute the dependencies and load them as well
+
   allMods <- getSortedModuleGraph session
   targets' <- mapM (\(_, f) -> guessTarget f Nothing) allMods
   setTargets session targets'
-  putStrLn "all targets:"
-  targets'' <- getTargets session
-  mapM (putStrLn . showSDoc . pprTarget) targets''
+
+  flag <- load session LoadAllTargets
+  when (failed flag) $ 
+    throwE "Failed to load all needed modules"
 
   -- typecheck the argument modules
+
   let argMods = filter ((`elem` files) . snd) allMods
 
   checkedMods <- forM argMods $ \(mod, file) -> do
     mbMod <- checkModule session (moduleName mod) False
-    checkedMod <- case mbMod of
-      Just m  -> return m
-      Nothing -> throwE ("Failed to load module: " ++ moduleString mod)
-    return (mod, file, checkedMod)
+    case mbMod of
+      Just (CheckedModule a (Just b) (Just c) (Just d) _) 
+        -> return (mod, file, (a,b,c,d))
+      _ -> throwE ("Failed to check module: " ++ moduleString mod)
 
-  ensureFullyChecked checkedMods
-  where
-    ensureFullyChecked modules
-      | length modules' == length modules = return modules'
-      | otherwise = throwE "Failed to check all modules properly" 
-      where modules' = [ (mod, f, (a,b,c,d)) | 
-                         (mod, f, CheckedModule a (Just b) (Just c) (Just d) _) 
-                         <- modules ]
+  return checkedMods
+
 
 run :: [Flag] -> [CheckedMod] -> Map Name Name -> IO ()
 run flags modules extEnv = do
