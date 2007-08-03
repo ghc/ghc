@@ -214,7 +214,9 @@ mkLiveness uniq live =
     mkBits (reg:regs) = take sizeW bits ++ mkBits regs where
         sizeW = case reg of
                   Nothing -> 1
-                  Just r -> machRepByteWidth (localRegRep r) `quot` wORD_SIZE
+                  Just r -> (machRepByteWidth (localRegRep r) + wORD_SIZE - 1)
+                            `quot` wORD_SIZE
+                            -- number of words, rounded up
         bits = repeat $ is_non_ptr reg -- True <=> Non Ptr
 
     is_non_ptr Nothing = True
