@@ -193,7 +193,7 @@ import InstEnv
 import FamInstEnv
 import TcRnMonad
 import HscTypes
-
+import Finder
 import DynFlags
 import VarEnv
 import Var
@@ -893,7 +893,7 @@ check_old_iface hsc_env mod_summary source_unchanged maybe_iface
       case maybe_iface of {
         Just old_iface -> do -- Use the one we already have
 	  { traceIf (text "We already have the old interface for" <+> ppr (ms_mod mod_summary))
-	  ; recomp <- checkVersions hsc_env source_unchanged old_iface
+	  ; recomp <- checkVersions hsc_env source_unchanged mod_summary old_iface
 	  ; return (recomp, Just old_iface) }
 
       ; Nothing -> do
@@ -912,9 +912,10 @@ check_old_iface hsc_env mod_summary source_unchanged maybe_iface
 
 	-- We have got the old iface; check its versions
     { traceIf (text "Read the interface file" <+> text iface_path)
-    ; recomp <- checkVersions hsc_env source_unchanged iface
+    ; recomp <- checkVersions hsc_env source_unchanged mod_summary iface
     ; returnM (recomp, Just iface)
     }}}}}
+
 \end{code}
 
 @recompileRequired@ is called from the HscMain.   It checks whether
@@ -929,14 +930,18 @@ outOfDate = True	-- Recompile required
 
 checkVersions :: HscEnv
 	      -> Bool		-- True <=> source unchanged
+              -> ModSummary
 	      -> ModIface 	-- Old interface
 	      -> IfG RecompileRequired
-checkVersions hsc_env source_unchanged iface
+checkVersions hsc_env source_unchanged mod_summary iface
   | not source_unchanged
   = returnM outOfDate
   | otherwise
   = do	{ traceHiDiffs (text "Considering whether compilation is required for" <+> 
 		        ppr (mi_module iface) <> colon)
+
+        ; recomp <- checkDependencies hsc_env mod_summary iface
+        ; if recomp then return outOfDate else do {
 
 	-- Source code unchanged and no errors yet... carry on 
 
@@ -950,15 +955,62 @@ checkVersions hsc_env source_unchanged iface
 	-- We do this regardless of compilation mode, although in --make mode
 	-- all the dependent modules should be in the HPT already, so it's
 	-- quite redundant
-	; updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
+	  updateEps_ $ \eps  -> eps { eps_is_boot = mod_deps }
 
 	; let this_pkg = thisPackage (hsc_dflags hsc_env)
 	; checkList [checkModUsage this_pkg u | u <- mi_usages iface]
-    }
+    }}
   where
 	-- This is a bit of a hack really
     mod_deps :: ModuleNameEnv (ModuleName, IsBootInterface)
     mod_deps = mkModDeps (dep_mods (mi_deps iface))
+
+
+-- If the direct imports of this module are resolved to targets that
+-- are not among the dependencies of the previous interface file,
+-- then we definitely need to recompile.  This catches cases like
+--   - an exposed package has been upgraded
+--   - we are compiling with different package flags
+--   - a home module that was shadowing a package module has been removed
+--   - a new home module has been added that shadows a package module
+-- See bug #1372.
+--
+-- Returns True if recompilation is required.
+checkDependencies :: HscEnv -> ModSummary -> ModIface -> IfG RecompileRequired
+checkDependencies hsc_env summary iface
+ = orM (map dep_missing (ms_imps summary ++ ms_srcimps summary))
+  where
+   prev_dep_mods = dep_mods (mi_deps iface)
+   prev_dep_pkgs = dep_pkgs (mi_deps iface)
+
+   this_pkg = thisPackage (hsc_dflags hsc_env)
+
+   orM = foldr f (return False)
+    where f m rest = do b <- m; if b then return True else rest
+
+   dep_missing (L _ mod) = do
+     find_res <- ioToIOEnv $ findImportedModule hsc_env mod Nothing
+     case find_res of
+        Found _ mod
+          | pkg == this_pkg
+           -> if moduleName mod `notElem` map fst prev_dep_mods
+                 then do traceHiDiffs $
+                           text "imported module " <> quotes (ppr mod) <>
+                           text " not among previous dependencies"
+                         return outOfDate
+                 else
+                         return upToDate
+          | otherwise
+           -> if pkg `notElem` prev_dep_pkgs
+                 then do traceHiDiffs $
+                           text "imported module " <> quotes (ppr mod) <>
+                           text " is from package " <> quotes (ppr pkg) <>
+                           text ", which is not among previous dependencies"
+                         return outOfDate
+                 else
+                         return upToDate
+           where pkg = modulePackageId mod
+        _otherwise  -> return outOfDate
 
 checkModUsage :: PackageId ->Usage -> IfG RecompileRequired
 -- Given the usage information extracted from the old

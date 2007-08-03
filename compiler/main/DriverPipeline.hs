@@ -640,15 +640,15 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 	    dflags = dflags0 { includePaths = current_dir : paths }
 	
   -- gather the imports and module name
-        (hspp_buf,mod_name) <- 
+        (hspp_buf,mod_name,imps,src_imps) <- 
             case src_flavour of
 		ExtCoreFile -> do {  -- no explicit imports in ExtCore input.
 			          ; m <- getCoreModuleName input_fn
-			          ; return (Nothing, mkModuleName m) }
+			          ; return (Nothing, mkModuleName m, [], []) }
 
 		other -> do { buf <- hGetStringBuffer input_fn
-			    ; (_,_,L _ mod_name) <- getImports dflags buf input_fn
-			    ; return (Just buf, mod_name) }
+			    ; (src_imps,imps,L _ mod_name) <- getImports dflags buf input_fn
+			    ; return (Just buf, mod_name, imps, src_imps) }
 
   -- Build a ModLocation to pass to hscMain.
   -- The source filename is rather irrelevant by now, but it's used
@@ -735,8 +735,8 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 					ms_location  = location4,
 					ms_hs_date   = src_timestamp,
 					ms_obj_date  = Nothing,
-					ms_imps	     = unused_field,
-					ms_srcimps   = unused_field }
+					ms_imps	     = imps,
+					ms_srcimps   = src_imps }
 
   -- run the compiler!
 	mbResult <- hscCompileOneShot hsc_env
