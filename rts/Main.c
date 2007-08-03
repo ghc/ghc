@@ -16,6 +16,7 @@
 #include "RtsUtils.h"
 #include "Prelude.h"
 #include "Task.h"
+#include "seh_excn.h"
 #include <stdlib.h>
 
 #ifdef DEBUG
@@ -48,6 +49,7 @@ int main(int argc, char *argv[])
     SchedulerStatus status;
     /* all GranSim/GUM init is done in startupHaskell; sets IAmMainThread! */
 
+    BEGIN_CATCH
     startupHaskell(argc,argv,__stginit_ZCMain);
 
     /* kick off the computation by creating the main thread with a pointer
@@ -133,6 +135,8 @@ int main(int argc, char *argv[])
       barf("main thread completed with invalid status");
     }
     shutdownHaskellAndExit(exit_status);
-    return 0; /* never reached, keep gcc -Wall happy */
+    END_CATCH
+    return 0; /* not reached unless a Windows exception happens,
+                 also keeps gcc -Wall happy */
 }
 # endif /* BATCH_MODE */
