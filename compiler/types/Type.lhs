@@ -57,7 +57,7 @@ module Type (
 	predTypeRep, mkPredTy, mkPredTys, pprSourceTyCon, mkFamilyTyConApp,
 
 	-- Newtypes
-	splitRecNewType_maybe, newTyConInstRhs,
+	newTyConInstRhs,
 
 	-- Lifting and boxity
 	isUnLiftedType, isUnboxedTupleType, isAlgType, isPrimitiveType,
@@ -627,31 +627,6 @@ pprSourceTyCon tycon
   = ppr $ fam_tc `TyConApp` tys	       -- can't be FunTyCon
   | otherwise
   = ppr tycon
-\end{code}
-
-
-%************************************************************************
-%*									*
-		NewTypes
-%*									*
-%************************************************************************
-
-\begin{code}
-splitRecNewType_maybe :: Type -> Maybe Type
--- Sometimes we want to look through a recursive newtype, and that's what happens here
--- It only strips *one layer* off, so the caller will usually call itself recursively
--- Only applied to types of kind *, hence the newtype is always saturated
-splitRecNewType_maybe ty | Just ty' <- coreView ty = splitRecNewType_maybe ty'
-splitRecNewType_maybe (TyConApp tc tys)
-  | isClosedNewTyCon tc
-  = ASSERT( tys `lengthIs` tyConArity tc )	-- splitRecNewType_maybe only be applied 
-						-- 	to *types* (of kind *)
-    ASSERT( isRecursiveTyCon tc ) 		-- Guaranteed by coreView
-    case newTyConRhs tc of
-	(tvs, rep_ty) -> ASSERT( length tvs == length tys )
-			 Just (substTyWith tvs tys rep_ty)
-	
-splitRecNewType_maybe other = Nothing
 \end{code}
 
 
