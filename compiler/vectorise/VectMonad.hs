@@ -131,6 +131,10 @@ data GlobalEnv = GlobalEnv {
                   --
                 , global_datacons :: NameEnv DataCon
 
+                  -- Mapping from TyCons to their PA dfuns
+                  --
+                , global_pa_funs :: NameEnv Var
+
                 -- External package inst-env & home-package inst-env for class
                 -- instances
                 --
@@ -172,6 +176,7 @@ initGlobalEnv info instEnvs famInstEnvs bi
                                            (tyConName funTyCon) (closureTyCon bi)
                               
     , global_datacons      = mapNameEnv snd $ vectInfoDataCon info
+    , global_pa_funs       = mapNameEnv snd $ vectInfoPADFun info
     , global_inst_env      = instEnvs
     , global_fam_inst_env  = famInstEnvs
     , global_bindings      = []
@@ -198,6 +203,7 @@ updVectInfo env tyenv info
       vectInfoVar     = global_exported_vars env
     , vectInfoTyCon   = mk_env typeEnvTyCons global_tycons
     , vectInfoDataCon = mk_env typeEnvDataCons global_datacons
+    , vectInfoPADFun  = mk_env typeEnvTyCons global_pa_funs
     }
   where
     mk_env from_tyenv from_env = mkNameEnv [(name, (from,to))
