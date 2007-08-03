@@ -599,11 +599,12 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
   = do { vVars     <- mapM vectVarMapping vars
        ; tyConRes1 <- mapM vectTyConMapping      tycons
        ; tyConRes2 <- mapM vectTyConReuseMapping tycons
-       ; let (vTyCons, vDataCons, vIsos) = unzip3 (tyConRes1 ++ tyConRes2)
+       ; let (vTyCons, vDataCons, vPAs, vIsos) = unzip4 (tyConRes1 ++ tyConRes2)
        ; return $ VectInfo 
                   { vectInfoVar     = mkVarEnv  vVars
                   , vectInfoTyCon   = mkNameEnv vTyCons
                   , vectInfoDataCon = mkNameEnv (concat vDataCons)
+                  , vectInfoPADFun  = mkNameEnv vPAs
                   , vectInfoIso     = mkNameEnv vIsos
                   }
        }
@@ -617,25 +618,31 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
            }
     vectTyConMapping name 
       = do { vName   <- lookupOrig mod (mkVectTyConOcc (nameOccName name))
+           ; paName  <- lookupOrig mod (mkPADFunOcc    (nameOccName name))
            ; isoName <- lookupOrig mod (mkVectIsoOcc   (nameOccName name))
            ; let { tycon    = lookupTyCon name
                  ; vTycon   = lookupTyCon vName
+                 ; paTycon  = lookupVar paName
                  ; isoTycon = lookupVar isoName
                  }
            ; vDataCons <- mapM vectDataConMapping (tyConDataCons tycon)
            ; return ((name, (tycon, vTycon)),    -- (T, T_v)
                      vDataCons,                  -- list of (Ci, Ci_v)
+                     (name, (tycon, paTycon)),   -- (T, paT)
                      (name, (tycon, isoTycon)))  -- (T, isoT)
            }
     vectTyConReuseMapping name 
-      = do { isoName <- lookupOrig mod (mkVectIsoOcc   (nameOccName name))
+      = do { paName  <- lookupOrig mod (mkPADFunOcc    (nameOccName name))
+           ; isoName <- lookupOrig mod (mkVectIsoOcc   (nameOccName name))
            ; let { tycon      = lookupTyCon name
+                 ; paTycon    = lookupVar paName
                  ; isoTycon   = lookupVar isoName
                  ; vDataCons  = [ (dataConName dc, (dc, dc)) 
                                 | dc <- tyConDataCons tycon]
                  }
            ; return ((name, (tycon, tycon)),     -- (T, T)
                      vDataCons,                  -- list of (Ci, Ci)
+                     (name, (tycon, paTycon)),   -- (T, paT)
                      (name, (tycon, isoTycon)))  -- (T, isoT)
            }
     vectDataConMapping datacon

@@ -1302,6 +1302,7 @@ data VectInfo
       vectInfoVar     :: VarEnv  (Var    , Var  ),   -- (f, f_v) keyed on f
       vectInfoTyCon   :: NameEnv (TyCon  , TyCon),   -- (T, T_v) keyed on T
       vectInfoDataCon :: NameEnv (DataCon, DataCon), -- (C, C_v) keyed on C
+      vectInfoPADFun  :: NameEnv (TyCon  , Var),     -- (C, paT) keyed on T
       vectInfoIso     :: NameEnv (TyCon  , Var)      -- (T, isoT) keyed on T
     }
     -- all of this is always tidy, even in ModGuts
@@ -1325,13 +1326,14 @@ data IfaceVectInfo
     }
 
 noVectInfo :: VectInfo
-noVectInfo = VectInfo emptyVarEnv emptyNameEnv emptyNameEnv emptyNameEnv
+noVectInfo = VectInfo emptyVarEnv emptyNameEnv emptyNameEnv emptyNameEnv emptyNameEnv
 
 plusVectInfo :: VectInfo -> VectInfo -> VectInfo
 plusVectInfo vi1 vi2 = 
   VectInfo (vectInfoVar     vi1 `plusVarEnv`  vectInfoVar     vi2)
            (vectInfoTyCon   vi1 `plusNameEnv` vectInfoTyCon   vi2)
            (vectInfoDataCon vi1 `plusNameEnv` vectInfoDataCon vi2)
+           (vectInfoPADFun  vi1 `plusNameEnv` vectInfoPADFun  vi2)
            (vectInfoIso     vi1 `plusNameEnv` vectInfoIso     vi2)
 
 noIfaceVectInfo :: IfaceVectInfo
