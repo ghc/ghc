@@ -7,3 +7,11 @@ test('testblockalloc', compose(c_src,
 # See bug #101, test requires +RTS -c (or equivalently +RTS -M<something>)
 # only GHCi triggers the bug, but we run the test all ways for completeness.
 test('bug1010', normal, compile_and_run, ['+RTS -c -RTS'])
+test('derefnull',
+     compose(exit_code(139),
+             exit_code_if_platform(5, 'i386-unknown-mingw32')),
+     compile_and_run, [''])
+test('divbyzero',
+     compose(exit_code(136),
+             exit_code_if_platform(5, 'i386-unknown-mingw32')),
+     compile_and_run, [''])
