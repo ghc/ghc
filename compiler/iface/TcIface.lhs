@@ -628,7 +628,7 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
            ; vDataCons <- mapM vectDataConMapping (tyConDataCons tycon)
            ; return ((name, (tycon, vTycon)),    -- (T, T_v)
                      vDataCons,                  -- list of (Ci, Ci_v)
-                     (name, (tycon, paTycon)),   -- (T, paT)
+                     (vName, (vTycon, paTycon)), -- (T_v, paT)
                      (name, (tycon, isoTycon)))  -- (T, isoT)
            }
     vectTyConReuseMapping name 

@@ -1302,7 +1302,7 @@ data VectInfo
       vectInfoVar     :: VarEnv  (Var    , Var  ),   -- (f, f_v) keyed on f
       vectInfoTyCon   :: NameEnv (TyCon  , TyCon),   -- (T, T_v) keyed on T
       vectInfoDataCon :: NameEnv (DataCon, DataCon), -- (C, C_v) keyed on C
-      vectInfoPADFun  :: NameEnv (TyCon  , Var),     -- (C, paT) keyed on T
+      vectInfoPADFun  :: NameEnv (TyCon  , Var),     -- (T_v, paT) keyed on T_v
       vectInfoIso     :: NameEnv (TyCon  , Var)      -- (T, isoT) keyed on T
     }
     -- all of this is always tidy, even in ModGuts
