@@ -130,14 +130,14 @@ instance Outputable CmmSafety where
 -- style of C--'s 'stackdata' declaration, just inside the proc body,
 -- and were labelled with the procedure name ++ "_info".
 pprInfo (CmmInfo gc_target update_frame CmmNonInfoTable) =
-    vcat [ptext SLIT("gc_target: ") <>
-                maybe (ptext SLIT("<none>")) pprBlockId gc_target,
+    vcat [{-ptext SLIT("gc_target: ") <>
+                maybe (ptext SLIT("<none>")) pprBlockId gc_target,-}
           ptext SLIT("update_frame: ") <>
                 maybe (ptext SLIT("<none>")) pprUpdateFrame update_frame]
 pprInfo (CmmInfo gc_target update_frame
          (CmmInfoTable (ProfilingInfo closure_type closure_desc) tag info)) =
-    vcat [ptext SLIT("gc_target: ") <>
-                maybe (ptext SLIT("<none>")) pprBlockId gc_target,
+    vcat [{-ptext SLIT("gc_target: ") <>
+                maybe (ptext SLIT("<none>")) pprBlockId gc_target,-}
           ptext SLIT("update_frame: ") <>
                 maybe (ptext SLIT("<none>")) pprUpdateFrame update_frame,
           ptext SLIT("type: ") <> pprLit closure_type,
