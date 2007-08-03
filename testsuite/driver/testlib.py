@@ -217,6 +217,13 @@ def exit_code( val ):
 def _exit_code( opts, v ):
     opts.exit_code = v
 
+def exit_code_if_platform( val, plat ):
+   return lambda opts, v=val, p=plat: _exit_code_if_platform(opts, v, p)
+
+def _exit_code_if_platform( opts, val, plat ):
+    if config.platform == plat:
+        opts.exit_code = val
+
 # -----
 
 def extra_run_opts( val ):
