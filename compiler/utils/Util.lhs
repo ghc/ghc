@@ -590,6 +590,8 @@ cmpList cmp (a:as) (b:bs)
 \end{code}
 
 \begin{code}
+-- This (with a more general type) is Data.List.stripPrefix from GHC 6.8.
+-- This definition can be removed once we require at least 6.8 to build.
 maybePrefixMatch :: String -> String -> Maybe String
 maybePrefixMatch []    rest = Just rest
 maybePrefixMatch (_:_) []   = Nothing
