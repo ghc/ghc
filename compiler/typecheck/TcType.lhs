@@ -1163,13 +1163,11 @@ isFFIDotnetTy dflags ty
 	--     it no longer does so.  May need to adjust isFFIDotNetTy
 	--     if we do want to look through newtypes.
 
-isFFIDotnetObjTy ty = 
-  let
+isFFIDotnetObjTy ty
+  = checkRepTyCon check_tc t_ty
+  where
    (_, t_ty) = tcSplitForAllTys ty
-  in
-  case tcSplitTyConApp_maybe (repType t_ty) of
-    Just (tc, [arg_ty]) | getName tc == objectTyConName -> True
-    _ -> False
+   check_tc tc = getName tc == objectTyConName
 
 toDNType :: Type -> DNType
 toDNType ty
@@ -1252,7 +1250,11 @@ legalFFITyCon tc
   = isUnLiftedTyCon tc || boxedMarshalableTyCon tc || tc == unitTyCon
 
 marshalableTyCon dflags tc
-  =  (dopt Opt_UnliftedFFITypes dflags && isUnLiftedTyCon tc)
+  =  (dopt Opt_UnliftedFFITypes dflags 
+      && isUnLiftedTyCon tc
+      && case tyConPrimRep tc of	-- Note [Marshalling VoidRep]
+	   VoidRep -> False
+	   other   -> True)
   || boxedMarshalableTyCon tc
 
 boxedMarshalableTyCon tc
@@ -1267,3 +1269,12 @@ boxedMarshalableTyCon tc
 			 , boolTyConKey
 			 ]
 \end{code}
+
+Note [Marshalling VoidRep]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+We don't treat State# (whose PrimRep is VoidRep) as marshalable.
+In turn that means you can't write
+	foreign import foo :: Int -> State# RealWorld
+
+Reason: the back end falls over with panic "primRepHint:VoidRep";
+	and there is no compelling reason to permit it
