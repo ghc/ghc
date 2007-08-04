@@ -467,6 +467,7 @@ sizeofPrimRep FloatRep = 4
 sizeofPrimRep DoubleRep= 8
 sizeofPrimRep AddrRep  = wORD_SIZE
 sizeofPrimRep PtrRep   = wORD_SIZE
+sizeofPrimRep VoidRep  = 0
 \end{code}
 
 %************************************************************************
