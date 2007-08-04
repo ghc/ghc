@@ -1187,7 +1187,7 @@ badDataConTyCon data_con
 
 badGadtDecl tc_name
   = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+> quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Use -X=GADT to allow GADTs")) ]
+	 , nest 2 (parens $ ptext SLIT("Use -XGADTs to allow GADTs")) ]
 
 badStupidTheta tc_name
   = ptext SLIT("A data type declared in GADT style cannot have a context:") <+> quotes (ppr tc_name)
@@ -1220,7 +1220,7 @@ badSigTyDecl tc_name
 badFamInstDecl tc_name
   = vcat [ ptext SLIT("Illegal family instance for") <+>
 	   quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Use -X=TypeFamilies to allow indexed type families")) ]
+	 , nest 2 (parens $ ptext SLIT("Use -XTypeFamilies to allow indexed type families")) ]
 
 badGadtIdxTyDecl tc_name
   = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+>

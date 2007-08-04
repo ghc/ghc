@@ -183,7 +183,7 @@ data DynFlag
    | Opt_RecordWildCards
    | Opt_RecordPuns
    | Opt_GADTs
-   | Opt_RelaxedPolyRec			-- -X=RelaxedPolyRec
+   | Opt_RelaxedPolyRec
    | Opt_StandaloneDeriving
    | Opt_DeriveDataTypeable
    | Opt_TypeSynonymInstances
