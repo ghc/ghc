@@ -1563,7 +1563,7 @@ mkPState buf loc flags  =
 	       .|. ffiBit       `setBitIf` dopt Opt_ForeignFunctionInterface flags
 	       .|. parrBit      `setBitIf` dopt Opt_PArr         flags
 	       .|. arrowsBit    `setBitIf` dopt Opt_Arrows       flags
-	       .|. thBit        `setBitIf` dopt Opt_TH           flags
+	       .|. thBit        `setBitIf` dopt Opt_TemplateHaskell flags
 	       .|. ipBit        `setBitIf` dopt Opt_ImplicitParams flags
 	       .|. explicitForallBit `setBitIf` dopt Opt_ScopedTypeVariables flags
 	       .|. explicitForallBit `setBitIf` dopt Opt_PolymorphicComponents flags

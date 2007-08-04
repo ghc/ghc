@@ -170,7 +170,7 @@ data DynFlag
    | Opt_UnliftedFFITypes
    | Opt_PArr				-- Syntactic support for parallel arrays
    | Opt_Arrows				-- Arrow-notation syntax
-   | Opt_TH
+   | Opt_TemplateHaskell
    | Opt_ImplicitParams
    | Opt_Generics
    | Opt_ImplicitPrelude 
@@ -1136,7 +1136,7 @@ fFlags = [
   ( "break-on-exception",               Opt_BreakOnException ),
   ( "vectorise",                        Opt_Vectorise ),
   -- Deprecated in favour of -XTemplateHaskell:
-  ( "th",                               Opt_TH ),
+  ( "th",                               Opt_TemplateHaskell ),
   -- Deprecated in favour of -XForeignFunctionInterface:
   ( "fi",                               Opt_ForeignFunctionInterface ),
   -- Deprecated in favour of -XForeignFunctionInterface:
@@ -1193,7 +1193,7 @@ xFlags = [
   ( "RecursiveDo",                      Opt_RecursiveDo ),
   ( "Arrows",                           Opt_Arrows ),
   ( "PArr",                             Opt_PArr ),
-  ( "TemplateHaskell",                  Opt_TH ),
+  ( "TemplateHaskell",                  Opt_TemplateHaskell ),
   ( "Generics",                         Opt_Generics ),
   -- On by default:
   ( "ImplicitPrelude",                  Opt_ImplicitPrelude ),
