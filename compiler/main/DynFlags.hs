@@ -1159,6 +1159,8 @@ fFlags = [
   ( "implicit-params",                  Opt_ImplicitParams ),
   -- Deprecated in favour of -XScopedTypeVariables:
   ( "scoped-type-variables",            Opt_ScopedTypeVariables ),
+  -- Deprecated in favour of -XPArr:
+  ( "parr",                             Opt_PArr ),
   -- Deprecated in favour of -XOverlappingInstances:
   ( "AllowOverlappingInstances",        Opt_AllowOverlappingInstances ),
   -- Deprecated in favour of -XUndecidableInstances:
@@ -1190,7 +1192,7 @@ xFlags = [
   ( "TypeOperators",                    Opt_TypeOperators ),
   ( "RecursiveDo",                      Opt_RecursiveDo ),
   ( "Arrows",                           Opt_Arrows ),
-  ( "Parr",                             Opt_PArr ),
+  ( "PArr",                             Opt_PArr ),
   ( "TemplateHaskell",                  Opt_TH ),
   ( "Generics",                         Opt_Generics ),
   -- On by default:
