@@ -22,6 +22,7 @@ import Module		( ModuleName, moduleName )
 import PrelNames        ( gHC_PRIM, mAIN_NAME )
 import StringBuffer	( StringBuffer(..), hGetStringBuffer, hGetStringBufferBlock
                         , appendStringBuffers )
+import Config
 import SrcLoc
 import DynFlags
 import ErrUtils
@@ -33,6 +34,7 @@ import Maybes
 import Bag		( emptyBag, listToBag )
 
 import Distribution.Compiler
+import Distribution.Version
 
 import Control.Exception
 import Control.Monad
@@ -176,11 +178,16 @@ getOptions' buf filename
 
 checkExtension :: Located FastString -> Located String
 checkExtension (L l ext)
-    = case reads (unpackFS ext) of
-        [] -> languagePragParseError l
-        (okExt,""):_ -> case extensionsToGHCFlag [okExt] of
-                          ([],[opt]) -> L l opt
-                          _ -> unsupportedExtnError l okExt
+ = case reads (unpackFS ext) of
+       [] -> languagePragParseError l
+       (okExt,""):_ ->
+           case readVersion cProjectVersion of
+               Just version ->
+                   case extensionsToGHCFlag version [okExt] of
+                       ([],[opt]) -> L l opt
+                       _ -> unsupportedExtnError l okExt
+               Nothing ->
+                   panic ("Can't parse version: " ++ show cProjectVersion)
 
 languagePragParseError loc =
   pgmError (showSDoc (mkLocMessage loc (
