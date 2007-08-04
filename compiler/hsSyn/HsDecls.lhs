@@ -864,11 +864,11 @@ data FoType = DNType 		-- In due course we'll add subtype stuff
 
 instance OutputableBndr name => Outputable (ForeignDecl name) where
   ppr (ForeignImport n ty fimport) =
-    ptext SLIT("foreign import") <+> ppr fimport <+> 
-    ppr n <+> dcolon <+> ppr ty
+    hang (ptext SLIT("foreign import") <+> ppr fimport <+> ppr n)
+       2 (dcolon <+> ppr ty)
   ppr (ForeignExport n ty fexport) =
-    ptext SLIT("foreign export") <+> ppr fexport <+> 
-    ppr n <+> dcolon <+> ppr ty
+    hang (ptext SLIT("foreign export") <+> ppr fexport <+> ppr n)
+       2 (dcolon <+> ppr ty)
 
 instance Outputable ForeignImport where
   ppr (DNImport			        spec) = 
