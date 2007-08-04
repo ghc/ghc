@@ -26,4 +26,5 @@ test('ghci015', ignore_output, ghci_script, ['ghci015.script'])
 test('ghci016', expect_broken(552), ghci_script, ['ghci016.script'])
 test('ghci017', extra_run_opts('-hide-package haskell98'), ghci_script, ['ghci017.script'])
 test('ghci018', expect_broken(1201), ghci_script, ['ghci018.script'])
+test('ghci019', normal, ghci_script, ['ghci019.script'])
 
