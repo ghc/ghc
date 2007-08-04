@@ -619,8 +619,8 @@ addLocalInst home_ie ispec
 getOverlapFlag :: TcM OverlapFlag
 getOverlapFlag 
   = do 	{ dflags <- getDOpts
-	; let overlap_ok    = dopt Opt_AllowOverlappingInstances dflags
-	      incoherent_ok = dopt Opt_AllowIncoherentInstances  dflags
+	; let overlap_ok    = dopt Opt_OverlappingInstances dflags
+	      incoherent_ok = dopt Opt_IncoherentInstances  dflags
 	      overlap_flag | incoherent_ok = Incoherent
 			   | overlap_ok    = OverlapOk
 			   | otherwise     = NoOverlap

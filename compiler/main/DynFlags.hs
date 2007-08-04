@@ -160,9 +160,9 @@ data DynFlag
    | Opt_WarnTabs
 
    -- language opts
-   | Opt_AllowOverlappingInstances
-   | Opt_AllowUndecidableInstances
-   | Opt_AllowIncoherentInstances
+   | Opt_OverlappingInstances
+   | Opt_UndecidableInstances
+   | Opt_IncoherentInstances
    | Opt_MonomorphismRestriction
    | Opt_MonoPatBinds
    | Opt_ExtendedDefaultRules		-- Use GHC's extended rules for defaulting
@@ -1162,11 +1162,11 @@ fFlags = [
   -- Deprecated in favour of -XPArr:
   ( "parr",                             Opt_PArr ),
   -- Deprecated in favour of -XOverlappingInstances:
-  ( "AllowOverlappingInstances",        Opt_AllowOverlappingInstances ),
+  ( "AllowOverlappingInstances",        Opt_OverlappingInstances ),
   -- Deprecated in favour of -XUndecidableInstances:
-  ( "AllowUndecidableInstances",        Opt_AllowUndecidableInstances ),
+  ( "AllowUndecidableInstances",        Opt_UndecidableInstances ),
   -- Deprecated in favour of -XIncoherentInstances:
-  ( "AllowIncoherentInstances",         Opt_AllowIncoherentInstances )
+  ( "AllowIncoherentInstances",         Opt_IncoherentInstances )
   ]
 
 
@@ -1222,9 +1222,9 @@ xFlags = [
   ( "MultiParamTypeClasses",            Opt_MultiParamTypeClasses ),
   ( "FunctionalDependencies",           Opt_FunctionalDependencies ),
   ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving ),
-  ( "OverlappingInstances",             Opt_AllowOverlappingInstances ),
-  ( "UndecidableInstances",             Opt_AllowUndecidableInstances ),
-  ( "IncoherentInstances",              Opt_AllowIncoherentInstances )
+  ( "OverlappingInstances",             Opt_OverlappingInstances ),
+  ( "UndecidableInstances",             Opt_UndecidableInstances ),
+  ( "IncoherentInstances",              Opt_IncoherentInstances )
   ]
 
 impliedFlags :: [(DynFlag, [DynFlag])]

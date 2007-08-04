@@ -980,7 +980,7 @@ check_class_pred_tys dflags ctxt tys
 	other	      -> flexible_contexts || all tyvar_head tys
   where
     flexible_contexts = dopt Opt_FlexibleContexts dflags
-    undecidable_ok = dopt Opt_AllowUndecidableInstances dflags
+    undecidable_ok = dopt Opt_UndecidableInstances dflags
 
 -------------------------
 tyvar_head ty			-- Haskell 98 allows predicates of form 
@@ -1175,7 +1175,7 @@ instTypeErr pp_ty msg
 \begin{code}
 checkValidInstance :: [TyVar] -> ThetaType -> Class -> [TcType] -> TcM ()
 checkValidInstance tyvars theta clas inst_tys
-  = do	{ undecidable_ok <- doptM Opt_AllowUndecidableInstances
+  = do	{ undecidable_ok <- doptM Opt_UndecidableInstances
 
 	; checkValidTheta InstThetaCtxt theta
 	; checkAmbiguity tyvars theta (tyVarsOfTypes inst_tys)
