@@ -1,4 +1,4 @@
-{-# OPTIONS -ftype-families #-}
+{-# LANGUAGE TypeFamilies #-}
 module ATLoop_help where
 
 class Foo a where

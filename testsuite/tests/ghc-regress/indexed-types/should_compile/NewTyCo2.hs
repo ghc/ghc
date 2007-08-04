@@ -1,4 +1,4 @@
-{-# OPTIONS -ftype-families #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module NewTyCo2 where
 

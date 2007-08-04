@@ -1,4 +1,4 @@
-{-# OPTIONS -ftype-families #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Ind2_help where
 

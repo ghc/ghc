@@ -1,5 +1,5 @@
 
-{-# OPTIONS_GHC -XAllowUndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module ShouldFail where
 

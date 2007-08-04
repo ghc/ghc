@@ -1,4 +1,4 @@
-{-# OPTIONS -ftype-families -fglasgow-exts #-}
+{-# LANGUAGE TypeFamilies, StandaloneDeriving, FlexibleInstances #-}
 
 module ShouldCompile where
 

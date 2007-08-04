@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fdisambiguate-record-fields #-}
+{-# OPTIONS_GHC -XDisambiguateRecordFields #-}
 
 module Foo () where
 

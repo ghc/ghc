@@ -1,4 +1,4 @@
-{-# OPTIONS -ftype-families #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Exp (C, C(type T), T, foo, S)
 where

@@ -1,4 +1,4 @@
-{-# OPTIONS -ftype-families #-}
+{-# LANGUAGE TypeFamilies #-}
 
 -- See Trac #1204
 

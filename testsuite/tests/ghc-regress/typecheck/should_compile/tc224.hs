@@ -1,4 +1,4 @@
-{-# OPTIONS -foverloaded-strings #-}
+{-# OPTIONS_GHC -XOverloadedStrings #-}
 module T where
 
 import Data.String

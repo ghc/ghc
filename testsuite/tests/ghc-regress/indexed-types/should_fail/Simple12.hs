@@ -1,4 +1,5 @@
-{-# OPTIONS -ftype-families -fglasgow-exts #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -fglasgow-exts #-}
 
 module ShouldFail where
 

@@ -1,4 +1,4 @@
-{-# OPTIONS -ftype-families -fglasgow-exts #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module OverA (C, D)
 where

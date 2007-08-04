@@ -1,4 +1,4 @@
-{-# OPTIONS -ftype-families -fglasgow-exts #-}
+{-# LANGUAGE TypeFamilies, GeneralizedNewtypeDeriving #-}
 
 module ShouldCompile where
 
