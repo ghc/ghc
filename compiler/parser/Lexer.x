@@ -1560,7 +1560,7 @@ mkPState buf loc flags  =
     }
     where
       bitmap = genericsBit `setBitIf` dopt Opt_Generics flags
-	       .|. ffiBit       `setBitIf` dopt Opt_FFI          flags
+	       .|. ffiBit       `setBitIf` dopt Opt_ForeignFunctionInterface flags
 	       .|. parrBit      `setBitIf` dopt Opt_PArr         flags
 	       .|. arrowsBit    `setBitIf` dopt Opt_Arrows       flags
 	       .|. thBit        `setBitIf` dopt Opt_TH           flags

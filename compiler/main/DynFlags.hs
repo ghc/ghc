@@ -166,7 +166,7 @@ data DynFlag
    | Opt_MonomorphismRestriction
    | Opt_MonoPatBinds
    | Opt_ExtendedDefaultRules		-- Use GHC's extended rules for defaulting
-   | Opt_FFI
+   | Opt_ForeignFunctionInterface
    | Opt_UnliftedFFITypes
    | Opt_PArr				-- Syntactic support for parallel arrays
    | Opt_Arrows				-- Arrow-notation syntax
@@ -1138,9 +1138,9 @@ fFlags = [
   -- Deprecated in favour of -XTemplateHaskell:
   ( "th",                               Opt_TH ),
   -- Deprecated in favour of -XForeignFunctionInterface:
-  ( "fi",                               Opt_FFI ),
+  ( "fi",                               Opt_ForeignFunctionInterface ),
   -- Deprecated in favour of -XForeignFunctionInterface:
-  ( "ffi",                              Opt_FFI ),
+  ( "ffi",                              Opt_ForeignFunctionInterface ),
   -- Deprecated in favour of -XArrows:
   ( "arrows",                           Opt_Arrows ),
   -- Deprecated in favour of -XGenerics:
@@ -1181,7 +1181,7 @@ xFlags = [
   ( "PatternSignatures",                Opt_PatternSignatures ),
   ( "EmptyDataDecls",                   Opt_EmptyDataDecls ),
   ( "ParallelListComp",                 Opt_ParallelListComp ),
-  ( "ForeignFunctionInterface",         Opt_FFI ),
+  ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface ),
   ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes ),
   ( "PartiallyAppliedClosedTypeSynonyms",
     Opt_PartiallyAppliedClosedTypeSynonyms ),
@@ -1232,7 +1232,7 @@ impliedFlags = [
 
 glasgowExtsFlags = [
              Opt_PrintExplicitForalls
-		   , Opt_FFI 
+           , Opt_ForeignFunctionInterface
            , Opt_UnliftedFFITypes
 		   , Opt_GADTs
 		   , Opt_ImplicitParams 
