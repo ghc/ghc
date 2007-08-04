@@ -67,7 +67,7 @@ import CmdLineParser
 import Constants	( mAX_CONTEXT_REDUCTION_DEPTH )
 import Panic		( panic, GhcException(..) )
 import UniqFM           ( UniqFM )
-import Util		( notNull, splitLongestPrefix, normalisePath )
+import Util
 import Maybes		( orElse, fromJust )
 import SrcLoc           ( SrcSpan )
 import Outputable
@@ -1065,80 +1065,110 @@ dynamic_flags = [
 
         ------ Compiler flags -----------------------------------------------
 
-  ,  ( "fasm",		NoArg (setObjTarget HscAsm) )
-  ,  ( "fvia-c",	NoArg (setObjTarget HscC) )
-  ,  ( "fvia-C",	NoArg (setObjTarget HscC) )
+  ,  ( "fasm",             NoArg (setObjTarget HscAsm) )
+  ,  ( "fvia-c",           NoArg (setObjTarget HscC) )
+  ,  ( "fvia-C",           NoArg (setObjTarget HscC) )
 
-  ,  ( "fno-code",	NoArg (setTarget HscNothing))
-  ,  ( "fbyte-code",    NoArg (setTarget HscInterpreted) )
-  ,  ( "fobject-code",  NoArg (setTarget defaultHscTarget) )
+  ,  ( "fno-code",         NoArg (setTarget HscNothing))
+  ,  ( "fbyte-code",       NoArg (setTarget HscInterpreted) )
+  ,  ( "fobject-code",     NoArg (setTarget defaultHscTarget) )
 
   ,  ( "fglasgow-exts",    NoArg (mapM_ setDynFlag   glasgowExtsFlags) )
   ,  ( "fno-glasgow-exts", NoArg (mapM_ unSetDynFlag glasgowExtsFlags) )
 
-	-- the rest of the -f* and -fno-* flags
-  ,  ( "f",		PrefixPred (isFlag fFlags)   (\f -> setDynFlag   (getFlag fFlags f)) )
-  ,  ( "f", 		PrefixPred (isNoFlag fFlags) (\f -> unSetDynFlag (getNoFlag fFlags f)) )
+     -- the rest of the -f* and -fno-* flags
+  ,  ( "f",                PrefixPred (isFlag   fFlags)
+                           (\f -> setDynFlag   (getFlag   fFlags f)) )
+  ,  ( "f",                PrefixPred (isPrefFlag "no-" fFlags)
+                           (\f -> unSetDynFlag (getPrefFlag "no-" fFlags f)) )
 
-	-- For now, allow -X flags with -f; ToDo: report this as deprecated
-  ,  ( "f",		PrefixPred (isFlag xFlags) (\f ->  setDynFlag (getFlag xFlags f)) )
-  ,  ( "f", 		PrefixPred (isNoFlag xFlags) (\f -> unSetDynFlag (getNoFlag xFlags f)) )
-
-	-- the rest of the -X* and -Xno-* flags
-  ,  ( "X",		PrefixPred (isFlag xFlags)   (\f -> setDynFlag   (getFlag xFlags f)) )
-  ,  ( "X", 		PrefixPred (isNoFlag xFlags) (\f -> unSetDynFlag (getNoFlag xFlags f)) )
+     -- the -X* and -XNo* flags
+  ,  ( "X",                PrefixPred (isFlag   xFlags)
+                           (\f -> setDynFlag   (getFlag   xFlags f)) )
+  ,  ( "X",                PrefixPred (isPrefFlag "No" xFlags)
+                           (\f -> unSetDynFlag (getPrefFlag "No" xFlags f)) )
  ]
 
 -- these -f<blah> flags can all be reversed with -fno-<blah>
 
 fFlags = [
-  ( "warn-dodgy-imports",        	Opt_WarnDodgyImports ),
-  ( "warn-duplicate-exports",    	Opt_WarnDuplicateExports ),
-  ( "warn-hi-shadowing",         	Opt_WarnHiShadows ),
+  ( "warn-dodgy-imports",               Opt_WarnDodgyImports ),
+  ( "warn-duplicate-exports",           Opt_WarnDuplicateExports ),
+  ( "warn-hi-shadowing",                Opt_WarnHiShadows ),
   ( "warn-implicit-prelude",            Opt_WarnImplicitPrelude ),
-  ( "warn-incomplete-patterns",  	Opt_WarnIncompletePatterns ),
-  ( "warn-incomplete-record-updates",  	Opt_WarnIncompletePatternsRecUpd ),
-  ( "warn-missing-fields",       	Opt_WarnMissingFields ),
-  ( "warn-missing-methods",      	Opt_WarnMissingMethods ),
-  ( "warn-missing-signatures",   	Opt_WarnMissingSigs ),
-  ( "warn-name-shadowing",       	Opt_WarnNameShadowing ),
-  ( "warn-overlapping-patterns", 	Opt_WarnOverlappingPatterns ),
-  ( "warn-simple-patterns",      	Opt_WarnSimplePatterns ),
-  ( "warn-type-defaults",        	Opt_WarnTypeDefaults ),
-  ( "warn-monomorphism-restriction",   	Opt_WarnMonomorphism ),
-  ( "warn-unused-binds",         	Opt_WarnUnusedBinds ),
-  ( "warn-unused-imports",       	Opt_WarnUnusedImports ),
-  ( "warn-unused-matches",       	Opt_WarnUnusedMatches ),
-  ( "warn-deprecations",         	Opt_WarnDeprecations ),
-  ( "warn-orphans",	         	Opt_WarnOrphans ),
-  ( "warn-tabs",	         	Opt_WarnTabs ),
-  ( "print-explicit-foralls", Opt_PrintExplicitForalls ),
-  ( "strictness",			Opt_Strictness ),
-  ( "full-laziness",			Opt_FullLaziness ),
-  ( "liberate-case",			Opt_LiberateCase ),
-  ( "spec-constr",			Opt_SpecConstr ),
-  ( "cse",				Opt_CSE ),
-  ( "ignore-interface-pragmas",		Opt_IgnoreInterfacePragmas ),
-  ( "omit-interface-pragmas",		Opt_OmitInterfacePragmas ),
-  ( "do-lambda-eta-expansion",		Opt_DoLambdaEtaExpansion ),
-  ( "ignore-asserts",			Opt_IgnoreAsserts ),
+  ( "warn-incomplete-patterns",         Opt_WarnIncompletePatterns ),
+  ( "warn-incomplete-record-updates",   Opt_WarnIncompletePatternsRecUpd ),
+  ( "warn-missing-fields",              Opt_WarnMissingFields ),
+  ( "warn-missing-methods",             Opt_WarnMissingMethods ),
+  ( "warn-missing-signatures",          Opt_WarnMissingSigs ),
+  ( "warn-name-shadowing",              Opt_WarnNameShadowing ),
+  ( "warn-overlapping-patterns",        Opt_WarnOverlappingPatterns ),
+  ( "warn-simple-patterns",             Opt_WarnSimplePatterns ),
+  ( "warn-type-defaults",               Opt_WarnTypeDefaults ),
+  ( "warn-monomorphism-restriction",    Opt_WarnMonomorphism ),
+  ( "warn-unused-binds",                Opt_WarnUnusedBinds ),
+  ( "warn-unused-imports",              Opt_WarnUnusedImports ),
+  ( "warn-unused-matches",              Opt_WarnUnusedMatches ),
+  ( "warn-deprecations",                Opt_WarnDeprecations ),
+  ( "warn-orphans",                     Opt_WarnOrphans ),
+  ( "warn-tabs",                        Opt_WarnTabs ),
+  ( "print-explicit-foralls",           Opt_PrintExplicitForalls ),
+  ( "strictness",                       Opt_Strictness ),
+  ( "full-laziness",                    Opt_FullLaziness ),
+  ( "liberate-case",                    Opt_LiberateCase ),
+  ( "spec-constr",                      Opt_SpecConstr ),
+  ( "cse",                              Opt_CSE ),
+  ( "ignore-interface-pragmas",         Opt_IgnoreInterfacePragmas ),
+  ( "omit-interface-pragmas",           Opt_OmitInterfacePragmas ),
+  ( "do-lambda-eta-expansion",          Opt_DoLambdaEtaExpansion ),
+  ( "ignore-asserts",                   Opt_IgnoreAsserts ),
   ( "ignore-breakpoints",               Opt_IgnoreBreakpoints),
-  ( "do-eta-reduction",			Opt_DoEtaReduction ),
-  ( "case-merge",			Opt_CaseMerge ),
-  ( "unbox-strict-fields",		Opt_UnboxStrictFields ),
-  ( "dicts-cheap",			Opt_DictsCheap ),
-  ( "excess-precision",			Opt_ExcessPrecision ),
-  ( "asm-mangling",			Opt_DoAsmMangling ),
-  ( "print-bind-result",		Opt_PrintBindResult ),
-  ( "force-recomp",			Opt_ForceRecomp ),
-  ( "hpc-no-auto",			Opt_Hpc_No_Auto ),
-  ( "rewrite-rules",			Opt_RewriteRules ),
+  ( "do-eta-reduction",                 Opt_DoEtaReduction ),
+  ( "case-merge",                       Opt_CaseMerge ),
+  ( "unbox-strict-fields",              Opt_UnboxStrictFields ),
+  ( "dicts-cheap",                      Opt_DictsCheap ),
+  ( "excess-precision",                 Opt_ExcessPrecision ),
+  ( "asm-mangling",                     Opt_DoAsmMangling ),
+  ( "print-bind-result",                Opt_PrintBindResult ),
+  ( "force-recomp",                     Opt_ForceRecomp ),
+  ( "hpc-no-auto",                      Opt_Hpc_No_Auto ),
+  ( "rewrite-rules",                    Opt_RewriteRules ),
   ( "break-on-exception",               Opt_BreakOnException ),
-  ( "vectorise",                        Opt_Vectorise )
+  ( "vectorise",                        Opt_Vectorise ),
+  -- Deprecated in favour of -XTemplateHaskell:
+  ( "th",                               Opt_TH ),
+  -- Deprecated in favour of -XForeignFunctionInterface:
+  ( "fi",                               Opt_FFI ),
+  -- Deprecated in favour of -XForeignFunctionInterface:
+  ( "ffi",                              Opt_FFI ),
+  -- Deprecated in favour of -XArrows:
+  ( "arrows",                           Opt_Arrows ),
+  -- Deprecated in favour of -XGenerics:
+  ( "generics",                         Opt_Generics ),
+  -- Deprecated in favour of -XImplicitPrelude:
+  ( "implicit-prelude",                 Opt_ImplicitPrelude ),
+  -- Deprecated in favour of -XBangPatterns:
+  ( "bang-patterns",                    Opt_BangPatterns ),
+  -- Deprecated in favour of -XMonomorphismRestriction:
+  ( "monomorphism-restriction",         Opt_MonomorphismRestriction ),
+  -- Deprecated in favour of -XMonoPatBinds:
+  ( "mono-pat-binds",                   Opt_MonoPatBinds ),
+  -- Deprecated in favour of -XExtendedDefaultRules:
+  ( "extended-default-rules",           Opt_ExtendedDefaultRules ),
+  -- Deprecated in favour of -XImplicitParams:
+  ( "implicit-params",                  Opt_ImplicitParams ),
+  -- Deprecated in favour of -XScopedTypeVariables:
+  ( "scoped-type-variables",            Opt_ScopedTypeVariables ),
+  -- Deprecated in favour of -XOverlappingInstances:
+  ( "AllowOverlappingInstances",        Opt_AllowOverlappingInstances ),
+  -- Deprecated in favour of -XUndecidableInstances:
+  ( "AllowUndecidableInstances",        Opt_AllowUndecidableInstances ),
+  -- Deprecated in favour of -XIncoherentInstances:
+  ( "AllowIncoherentInstances",         Opt_AllowIncoherentInstances )
   ]
 
 
--- These -X<blah> flags can all be reversed with -Xno-<blah>
+-- These -X<blah> flags can all be reversed with -XNo<blah>
 xFlags :: [(String, DynFlag)]
 xFlags = [
   ( "CPP",                              Opt_Cpp ),
@@ -1151,53 +1181,48 @@ xFlags = [
   ( "PatternSignatures",                Opt_PatternSignatures ),
   ( "EmptyDataDecls",                   Opt_EmptyDataDecls ),
   ( "ParallelListComp",                 Opt_ParallelListComp ),
-  ( "FI",				Opt_FFI ),  -- support `-ffi'...
-  ( "FFI",				Opt_FFI ),  -- ...and also `-fffi'
-  ( "ForeignFunctionInterface",		Opt_FFI ),
+  ( "ForeignFunctionInterface",         Opt_FFI ),
   ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes ),
-
-  ( "PartiallyAppliedClosedTypeSynonyms", Opt_PartiallyAppliedClosedTypeSynonyms ),
+  ( "PartiallyAppliedClosedTypeSynonyms",
+    Opt_PartiallyAppliedClosedTypeSynonyms ),
   ( "Rank2Types",                       Opt_Rank2Types ),
   ( "RankNTypes",                       Opt_RankNTypes ),
   ( "TypeOperators",                    Opt_TypeOperators ),
   ( "RecursiveDo",                      Opt_RecursiveDo ),
-  ( "Arrows",				Opt_Arrows ), -- arrow syntax
-  ( "Parr",				Opt_PArr ),
-
-  ( "TH",				Opt_TH ), -- support -fth
-  ( "TemplateHaskelll",			Opt_TH ),
-
-  ( "Generics",  			Opt_Generics ),
-
-  ( "ImplicitPrelude",  		Opt_ImplicitPrelude ),	-- On by default
-
-  ( "RecordWildCards",			Opt_RecordWildCards ),
-  ( "RecordPuns",			Opt_RecordPuns ),
-  ( "DisambiguateRecordFields",		Opt_DisambiguateRecordFields ),
-
-  ( "OverloadedStrings",		Opt_OverloadedStrings ),
-  ( "GADTs",		  		Opt_GADTs ),
-  ( "TypeFamilies",	  		Opt_TypeFamilies ),
-  ( "BangPatterns",	  		Opt_BangPatterns ),
-  ( "MonomorphismRestriction",		Opt_MonomorphismRestriction ),	-- On by default
-  ( "MonoPatBinds",			Opt_MonoPatBinds ),		-- On by default (which is not strictly H98)
-  ( "RelaxedPolyRec", 			Opt_RelaxedPolyRec),
-  ( "ExtendedDefaultRules",		Opt_ExtendedDefaultRules ),
-  ( "ImplicitParams",			Opt_ImplicitParams ),
-  ( "ScopedTypeVariables",  		Opt_ScopedTypeVariables ),
-  ( "UnboxedTuples",                Opt_UnboxedTuples ),
-  ( "StandaloneDeriving",           Opt_StandaloneDeriving ),
-  ( "DeriveDataTypeable",           Opt_DeriveDataTypeable ),
-  ( "TypeSynonymInstances",         Opt_TypeSynonymInstances ),
-  ( "FlexibleContexts",             Opt_FlexibleContexts ),
-  ( "FlexibleInstances",            Opt_FlexibleInstances ),
-  ( "ConstrainedClassMethods",      Opt_ConstrainedClassMethods ),
-  ( "MultiParamTypeClasses",        Opt_MultiParamTypeClasses ),
-  ( "FunctionalDependencies",        Opt_FunctionalDependencies ),
-  ( "GeneralizedNewtypeDeriving",   Opt_GeneralizedNewtypeDeriving ),
-  ( "AllowOverlappingInstances", 	Opt_AllowOverlappingInstances ),
-  ( "AllowUndecidableInstances", 	Opt_AllowUndecidableInstances ),
-  ( "AllowIncoherentInstances", 	Opt_AllowIncoherentInstances )
+  ( "Arrows",                           Opt_Arrows ),
+  ( "Parr",                             Opt_PArr ),
+  ( "TemplateHaskell",                  Opt_TH ),
+  ( "Generics",                         Opt_Generics ),
+  -- On by default:
+  ( "ImplicitPrelude",                  Opt_ImplicitPrelude ),
+  ( "RecordWildCards",                  Opt_RecordWildCards ),
+  ( "RecordPuns",                       Opt_RecordPuns ),
+  ( "DisambiguateRecordFields",         Opt_DisambiguateRecordFields ),
+  ( "OverloadedStrings",                Opt_OverloadedStrings ),
+  ( "GADTs",                            Opt_GADTs ),
+  ( "TypeFamilies",                     Opt_TypeFamilies ),
+  ( "BangPatterns",                     Opt_BangPatterns ),
+  -- On by default:
+  ( "MonomorphismRestriction",          Opt_MonomorphismRestriction ),
+  -- On by default (which is not strictly H98):
+  ( "MonoPatBinds",                     Opt_MonoPatBinds ),
+  ( "RelaxedPolyRec",                   Opt_RelaxedPolyRec),
+  ( "ExtendedDefaultRules",             Opt_ExtendedDefaultRules ),
+  ( "ImplicitParams",                   Opt_ImplicitParams ),
+  ( "ScopedTypeVariables",              Opt_ScopedTypeVariables ),
+  ( "UnboxedTuples",                    Opt_UnboxedTuples ),
+  ( "StandaloneDeriving",               Opt_StandaloneDeriving ),
+  ( "DeriveDataTypeable",               Opt_DeriveDataTypeable ),
+  ( "TypeSynonymInstances",             Opt_TypeSynonymInstances ),
+  ( "FlexibleContexts",                 Opt_FlexibleContexts ),
+  ( "FlexibleInstances",                Opt_FlexibleInstances ),
+  ( "ConstrainedClassMethods",          Opt_ConstrainedClassMethods ),
+  ( "MultiParamTypeClasses",            Opt_MultiParamTypeClasses ),
+  ( "FunctionalDependencies",           Opt_FunctionalDependencies ),
+  ( "GeneralizedNewtypeDeriving",       Opt_GeneralizedNewtypeDeriving ),
+  ( "OverlappingInstances",             Opt_AllowOverlappingInstances ),
+  ( "UndecidableInstances",             Opt_AllowUndecidableInstances ),
+  ( "IncoherentInstances",              Opt_AllowIncoherentInstances )
   ]
 
 impliedFlags :: [(DynFlag, [DynFlag])]
@@ -1238,43 +1263,23 @@ glasgowExtsFlags = [
 		   , Opt_TypeFamilies ]
 
 ------------------
-isNoFlag, isFlag :: [(String,a)] -> String -> Bool
+isFlag :: [(String,a)] -> String -> Bool
+isFlag flags f = any (\(ff,_) -> ff == f) flags
 
-isFlag flags f = is_flag flags (normaliseFlag f)
-
-isNoFlag flags no_f
-  | Just f <- noFlag_maybe (normaliseFlag no_f) = is_flag flags f
-  | otherwise					= False
-
-is_flag flags nf = any (\(ff,_) -> normaliseFlag ff == nf) flags
-	-- nf is normalised alreadly
+isPrefFlag :: String -> [(String,a)] -> String -> Bool
+isPrefFlag pref flags no_f
+  | Just f <- maybePrefixMatch pref no_f = isFlag flags f
+  | otherwise                            = False
 
 ------------------
-getFlag, getNoFlag :: [(String,a)] -> String -> a
+getFlag :: [(String,a)] -> String -> a
+getFlag flags f = case [ opt | (ff, opt) <- flags, ff == f] of
+                      (o:os) -> o
+                      []     -> panic ("get_flag " ++ f)
 
-getFlag flags f = get_flag flags (normaliseFlag f)
-
-getNoFlag flags f = get_flag flags (fromJust (noFlag_maybe (normaliseFlag f)))
-			-- The flag should be a no-flag already
-
-get_flag flags nf = case [ opt | (ff, opt) <- flags, normaliseFlag ff == nf] of
-			(o:os) -> o
-			[]     -> panic ("get_flag " ++ nf)
-
-------------------
-noFlag_maybe :: String -> Maybe String
--- The input is normalised already
-noFlag_maybe ('n' : 'o' : f) = Just f
-noFlag_maybe other	     = Nothing
-
-normaliseFlag :: String -> String
--- Normalise a option flag by
---	* map to lower case
---	* removing hyphens
--- Thus: -X=overloaded-strings or -XOverloadedStrings
-normaliseFlag []      = []
-normaliseFlag ('-':s) = normaliseFlag s
-normaliseFlag (c:s)   = toLower c : normaliseFlag s
+getPrefFlag :: String -> [(String,a)] -> String -> a
+getPrefFlag pref flags f = getFlag flags (fromJust (maybePrefixMatch pref f))
+-- We should only be passed flags which match the prefix
 
 -- -----------------------------------------------------------------------------
 -- Parsing the dynamic flags.
