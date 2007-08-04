@@ -593,23 +593,23 @@
 	      <entry><option>-fno-glasgow-exts</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=AllowOverlappingInstances</option></entry>
+	      <entry><option>-XOverlappingInstances</option></entry>
 	      <entry>Enable <link linkend="instance-overlap">overlapping instances</link></entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=NoAllowOverlappingInstances</option></entry>
+	      <entry><option>-XNoOverlappingInstances</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=AllowIncoherentInstances</option></entry>
+	      <entry><option>-XIncoherentInstances</option></entry>
 	      <entry>Enable <link linkend="instance-overlap">incoherent instances</link>.  
-	      Implies <option>-X=AllowOverlappingInstances</option> </entry>
+	      Implies <option>-XOverlappingInstances</option> </entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=NoAllowIncoherentInstances</option></entry>
+	      <entry><option>-XNoIncoherentInstances</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=AllowUndecidableInstances</option></entry>
+	      <entry><option>-XUndecidableInstances</option></entry>
 	      <entry>Enable <link linkend="undecidable-instances">undecidable instances</link></entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=NoAllowUndecidableInstances</option></entry>
+	      <entry><option>-XNoUndecidableInstances</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-fcontext-stack=N</option><replaceable>n</replaceable></entry>
@@ -618,11 +618,11 @@
 	      <entry></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=Arrows</option></entry>
+	      <entry><option>-XArrows</option></entry>
 	      <entry>Enable <link linkend="arrow-notation">arrow
 	      notation</link> extension</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=NoArrows</option></entry>
+	      <entry><option>-XNoArrows</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-fdisambiguate-record-fields</option></entry>
@@ -632,24 +632,24 @@
 	      <entry><option>-fno-disambiguate-record-fields</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=FFI</option> or <option>-X=ForeignFunctionInterface</option></entry>
+	      <entry><option>-XForeignFunctionInterface</option></entry>
 	      <entry>Enable <link linkend="ffi">foreign function interface</link> (implied by
 	      <option>-fglasgow-exts</option>)</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=NoFFI</option></entry>
+	      <entry><option>-XNoForeignFunctionInterface</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=Generics</option></entry>
+	      <entry><option>-XGenerics</option></entry>
 	      <entry>Enable <link linkend="generic-classes">generic classes</link></entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=NoGenerics</option></entry>
+	      <entry><option>-XNoGenerics</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=ImplicitParams</option></entry>
+	      <entry><option>-XImplicitParams</option></entry>
 	      <entry>Enable <link linkend="implicit-parameters">Implicit Parameters</link>.
 	      Implied by <option>-fglasgow-exts</option>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=NoImplicitParams</option></entry>
+	      <entry><option>-XNoImplicitParams</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-firrefutable-tuples</option></entry>
@@ -658,254 +658,254 @@
 	      <entry><option>-fno-irrefutable-tuples</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=NoImplicitPrelude</option></entry>
+	      <entry><option>-XNoImplicitPrelude</option></entry>
 	      <entry>Don't implicitly <literal>import Prelude</literal></entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=ImplicitPrelude</option></entry>
+	      <entry><option>-XImplicitPrelude</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=NoMonomorphismRestriction</option></entry>
+	      <entry><option>-XNoMonomorphismRestriction</option></entry>
 	      <entry>Disable the <link linkend="monomorphism">monomorphism restriction</link></entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=MonomorphismRrestriction</option></entry>
+	      <entry><option>-XMonomorphismRrestriction</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=NoMonoPatBinds</option></entry>
+	      <entry><option>-XNoMonoPatBinds</option></entry>
 	      <entry>Make <link linkend="monomorphism">pattern bindings polymorphic</link></entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=MonoPatBinds</option></entry>
+	      <entry><option>-XMonoPatBinds</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=RelaxedPolyRed</option></entry>
+	      <entry><option>-XRelaxedPolyRed</option></entry>
 	      <entry>Relaxed checking for <link linkend="typing-binds">mutually-recursive polymorphic functions</link></entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=NoRelaxedPolyRec</option></entry>
+	      <entry><option>-XNoRelaxedPolyRec</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=ExtendedDefaultRules</option></entry>
+	      <entry><option>-XExtendedDefaultRules</option></entry>
 	      <entry>Use GHCi's <link linkend="extended-default-rules">extended default rules</link> in a normal module</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=NoExtendedDefaultRules</option></entry>
+	      <entry><option>-XNoExtendedDefaultRules</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=OverloadedStrings</option></entry>
+	      <entry><option>-XOverloadedStrings</option></entry>
 	      <entry>Enable <link linkend="overloaded-strings">overloaded string literals</link>.
 	      </entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=NoOverloadedStrings</option></entry>
+	      <entry><option>-XNoOverloadedStrings</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=GADTs</option></entry>
+	      <entry><option>-XGADTs</option></entry>
 	      <entry>Enable <link linkend="gadts">generalised algebraic data types</link>.
 	      </entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=NoGADTs</option></entry>
+	      <entry><option>-XNoGADTs</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=TypeFamilies</option></entry>
+	      <entry><option>-XTypeFamilies</option></entry>
 	      <entry>Enable <link linkend="type-families">type families</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=NoTypeFamilies</option></entry>
+	      <entry><option>-XNoTypeFamilies</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=ScopedTypeVariables</option></entry>
+	      <entry><option>-XScopedTypeVariables</option></entry>
 	      <entry>Enable <link linkend="scoped-type-variables">lexically-scoped type variables</link>.
 	      Implied by <option>-fglasgow-exts</option>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=NoScopedTypeVariables</option></entry>
+	      <entry><option>-XNoScopedTypeVariables</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=TH</option> or <option>-X=TemplateHaskell</option></entry>
+	      <entry><option>-XTemplateHaskell</option></entry>
 	      <entry>Enable <link linkend="template-haskell">Template Haskell</link>. 
 		No longer implied by <option>-fglasgow-exts</option>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=NoTH</option></entry>
+	      <entry><option>-XNoTemplateHaskell</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=BangPtterns</option></entry>
+	      <entry><option>-XBangPtterns</option></entry>
 	      <entry>Enable <link linkend="bang-patterns">bang patterns</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=NoBangPatterns</option></entry>
+	      <entry><option>-XNoBangPatterns</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=CPP</option></entry>
+	      <entry><option>-XCPP</option></entry>
 	      <entry>Enable the <link linkend="c-pre-processor">C preprocessor</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=CPP</option></entry>
+	      <entry><option>-XNoCPP</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=PatternGuards</option></entry>
+	      <entry><option>-XPatternGuards</option></entry>
 	      <entry>Enable <link linkend="pattern-guards">pattern guards</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=PatternGuards</option></entry>
+	      <entry><option>-XNoPatternGuards</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=UnicodeSyntax</option></entry>
+	      <entry><option>-XUnicodeSyntax</option></entry>
 	      <entry>Enable unicode syntax.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=UnicodeSyntax</option></entry>
+	      <entry><option>-XNoUnicodeSyntax</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=MagicHash</option></entry>
+	      <entry><option>-XMagicHash</option></entry>
 	      <entry>Enable the &ldquo;magic hash&rdquo;.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=MagicHash</option></entry>
+	      <entry><option>-XNoMagicHash</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=PolymorphicComponents</option></entry>
+	      <entry><option>-XPolymorphicComponents</option></entry>
 	      <entry>Enable polymorphic components.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=PolymorphicComponents</option></entry>
+	      <entry><option>-XNoPolymorphicComponents</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=ExistentialQuantification</option></entry>
+	      <entry><option>-XExistentialQuantification</option></entry>
 	      <entry>Enable <link linkend="existential-quantification">existential quantification</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=ExistentialQuantification</option></entry>
+	      <entry><option>-XNoExistentialQuantification</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=KindSignatures</option></entry>
+	      <entry><option>-XKindSignatures</option></entry>
 	      <entry>Enable kind signatures.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=KindSignatures</option></entry>
+	      <entry><option>-XNoKindSignatures</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=PatternSignatures</option></entry>
+	      <entry><option>-XPatternSignatures</option></entry>
 	      <entry>Enable <link linkend="pattern-type-sigs">pattern type signatures</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=PatternSignatures</option></entry>
+	      <entry><option>-XNoPatternSignatures</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=EmptyDataDecls</option></entry>
+	      <entry><option>-XEmptyDataDecls</option></entry>
 	      <entry>Enable empty data declarations.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=EmptyDataDecls</option></entry>
+	      <entry><option>-XNoEmptyDataDecls</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=ParallelListComp</option></entry>
+	      <entry><option>-XParallelListComp</option></entry>
 	      <entry>Enable <link linkend="parallel-list-comprehensions">parallel list comprehensions</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=ParallelListComp</option></entry>
+	      <entry><option>-XNoParallelListComp</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=UnliftedFFITypes</option></entry>
+	      <entry><option>-XUnliftedFFITypes</option></entry>
 	      <entry>Enable unlifted FFI types.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=UnliftedFFITypes</option></entry>
+	      <entry><option>-XNoUnliftedFFITypes</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=PartiallyAppliedClosedTypeSynonyms</option></entry>
+	      <entry><option>-XPartiallyAppliedClosedTypeSynonyms</option></entry>
 	      <entry>Enable partially applied type synonyms.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=PartiallyAppliedClosedTypeSynonyms</option></entry>
+	      <entry><option>-XNoPartiallyAppliedClosedTypeSynonyms</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=Rank2Types</option></entry>
+	      <entry><option>-XNoRank2Types</option></entry>
 	      <entry>Enable rank-2 types.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=Rank2Types</option></entry>
+	      <entry><option>-XNoRank2Types</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=RankNTypes</option></entry>
+	      <entry><option>-XRankNTypes</option></entry>
 	      <entry>Enable rank-N types.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=RankNTypes</option></entry>
+	      <entry><option>-XNoRankNTypes</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=TypeOperators</option></entry>
+	      <entry><option>-XTypeOperators</option></entry>
 	      <entry>Enable type operators.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=TypeOperators</option></entry>
+	      <entry><option>-XNoTypeOperators</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=RecursiveDo</option></entry>
+	      <entry><option>-XRecursiveDo</option></entry>
 	      <entry>Enable <link linkend="mdo-notation">recursive do (mdo) notation</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=RecursiveDo</option></entry>
+	      <entry><option>-XNoRecursiveDo</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=Parr</option></entry>
+	      <entry><option>-XPArr</option></entry>
 	      <entry>Enable parallel arrays.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=Parr</option></entry>
+	      <entry><option>-XNoPArr</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=RecordWildCards</option></entry>
+	      <entry><option>-XRecordWildCards</option></entry>
 	      <entry>Enable record wildcards.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=RecordWildCards</option></entry>
+	      <entry><option>-XNoRecordWildCards</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=RecordPuns</option></entry>
+	      <entry><option>-XRecordPuns</option></entry>
 	      <entry>Enable record puns.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=RecordPuns</option></entry>
+	      <entry><option>-XNoRecordPuns</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=DisambiguateRecordFields</option></entry>
+	      <entry><option>-XDisambiguateRecordFields</option></entry>
 	      <entry>Enable the <link linkend="disambiguate-fields">disambiguate fields.</link> exception</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=DisambiguateRecordFields</option></entry>
+	      <entry><option>-XNoDisambiguateRecordFields</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=UnboxedTuples</option></entry>
+	      <entry><option>-XUnboxedTuples</option></entry>
 	      <entry>Enable <link linkend="unboxed-tuples">unboxed tuples</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=UnboxedTuples</option></entry>
+	      <entry><option>-XNoUnboxedTuples</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=StandaloneDeriving</option></entry>
+	      <entry><option>-XStandaloneDeriving</option></entry>
 	      <entry>Enable standalone deriving.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=StandaloneDeriving</option></entry>
+	      <entry><option>-XNoStandaloneDeriving</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=DeriveDataTypeable</option></entry>
+	      <entry><option>-XDeriveDataTypeable</option></entry>
 	      <entry>Enable deriving for the Data and Typeable classes.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=DeriveDataTypeable</option></entry>
+	      <entry><option>-XNoDeriveDataTypeable</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=TypeSynonymInstances</option></entry>
+	      <entry><option>-XTypeSynonymInstances</option></entry>
 	      <entry>Enable <link linkend="type-synonyms">type synonyms</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=TypeSynonymInstances</option></entry>
+	      <entry><option>-XNoTypeSynonymInstances</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=FlexibleContexts</option></entry>
+	      <entry><option>-XFlexibleContexts</option></entry>
 	      <entry>Enable flexible contexts.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=FlexibleContexts</option></entry>
+	      <entry><option>-XNoFlexibleContexts</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=FlexibleInstances</option></entry>
+	      <entry><option>-XFlexibleInstances</option></entry>
 	      <entry>Enable flexible instances.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=FlexibleInstances</option></entry>
+	      <entry><option>-XNoFlexibleInstances</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=ConstrainedClassMethods</option></entry>
+	      <entry><option>-XConstrainedClassMethods</option></entry>
 	      <entry>Enable constrained class methods.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=ConstrainedClassMethods</option></entry>
+	      <entry><option>-XNoConstrainedClassMethods</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=MultiParamTypeClasses</option></entry>
+	      <entry><option>-XMultiParamTypeClasses</option></entry>
 	      <entry>Enable <link linkend="multi-param-type-classes">multi parameter type classes</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=MultiParamTypeClasses</option></entry>
+	      <entry><option>-XNoMultiParamTypeClasses</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=FunctionalDependencies</option></entry>
+	      <entry><option>-XFunctionalDependencies</option></entry>
 	      <entry>Enable <link linkend="functional-dependencies">functional dependencies</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=FunctionalDependencies</option></entry>
+	      <entry><option>-XNoFunctionalDependencies</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-X=GeneralizedNewtypeDeriving</option></entry>
+	      <entry><option>-XGeneralizedNewtypeDeriving</option></entry>
 	      <entry>Enable <link linkend="newtype-deriving">newtype deriving</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-X=GeneralizedNewtypeDeriving</option></entry>
+	      <entry><option>-XNoGeneralizedNewtypeDeriving</option></entry>
 	    </row>
 	  </tbody>
 	</tgroup>
