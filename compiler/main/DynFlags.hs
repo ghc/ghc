@@ -1162,11 +1162,11 @@ fFlags = [
   -- Deprecated in favour of -XPArr:
   ( "parr",                             Opt_PArr ),
   -- Deprecated in favour of -XOverlappingInstances:
-  ( "AllowOverlappingInstances",        Opt_OverlappingInstances ),
+  ( "allow-overlapping-instances",      Opt_OverlappingInstances ),
   -- Deprecated in favour of -XUndecidableInstances:
-  ( "AllowUndecidableInstances",        Opt_UndecidableInstances ),
+  ( "allow-undecidable-instances",      Opt_UndecidableInstances ),
   -- Deprecated in favour of -XIncoherentInstances:
-  ( "AllowIncoherentInstances",         Opt_IncoherentInstances )
+  ( "allow-incoherent-instances",       Opt_IncoherentInstances )
   ]
 
 
