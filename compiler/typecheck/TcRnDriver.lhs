@@ -1246,21 +1246,17 @@ tcRnGetInfo hsc_env name
 	--  in the home package all relevant modules are loaded.)
     loadUnqualIfaces ictxt
 
-    thing <- tcRnLookupName' name
+    thing  <- tcRnLookupName' name
     fixity <- lookupFixityRn name
-    ispecs <- lookupInsts (icPrintUnqual ictxt) thing
+    ispecs <- lookupInsts thing
     return (thing, fixity, ispecs)
 
-lookupInsts :: PrintUnqualified -> TyThing -> TcM [Instance]
--- Filter the instances by the ones whose tycons (or clases resp) 
--- are in scope unqualified.  Otherwise we list a whole lot too many!
-lookupInsts print_unqual (AClass cls)
+lookupInsts :: TyThing -> TcM [Instance]
+lookupInsts (AClass cls)
   = do	{ inst_envs <- tcGetInstEnvs
-	; return [ ispec
-		 | ispec <- classInstances inst_envs cls
-		 , plausibleDFun print_unqual (instanceDFunId ispec) ] }
+	; return (classInstances inst_envs cls) }
 
-lookupInsts print_unqual (ATyCon tc)
+lookupInsts (ATyCon tc)
   = do 	{ eps <- getEps	-- Load all instances for all classes that are
 			-- in the type environment (which are all the ones
 			-- we've seen in any interface file so far)
@@ -1268,22 +1264,12 @@ lookupInsts print_unqual (ATyCon tc)
 	; return [ ispec
 		 | ispec <- instEnvElts home_ie ++ instEnvElts pkg_ie
 		 , let dfun = instanceDFunId ispec
-		 , relevant dfun
-		 , plausibleDFun print_unqual dfun ] }
+		 , relevant dfun ] } 
   where
     relevant df = tc_name `elemNameSet` tyClsNamesOfDFunHead (idType df)
     tc_name     = tyConName tc		  
 
-lookupInsts print_unqual other = return []
-
-plausibleDFun print_unqual dfun	-- Dfun involving only names that print unqualified
-  = all ok (nameSetToList (tyClsNamesOfType (idType dfun)))
-  where
-    ok name | isBuiltInSyntax name = True
-	    | isExternalName name  = 
-                isNothing $ fst print_unqual (nameModule name) 
-                                             (nameOccName name)
-	    | otherwise		   = True
+lookupInsts other = return []
 
 loadUnqualIfaces :: InteractiveContext -> TcM ()
 -- Load the home module for everything that is in scope unqualified

@@ -1923,6 +1923,12 @@ Prelude> :. cmds.ghci
 	  will be printed.  If <replaceable>name</replaceable> has
 	  been loaded from a source file, then GHCi will also display
 	  the location of its definition in the source.</para>
+	  <para>For types and classes, GHCi also summarises instances that
+	  mention them.  To avoid showing irrelevant information, an instance
+	  is shown only if (a) its head mentions <relaceable>name</replaceable>, 
+	  and (b) all the other things mentioned in the instance
+	  are in scope (either qualified or otherwise) as a result of 
+	  a <literal>:load</literal> or <literal>:module</literal> commands. </para>
 	</listitem>
       </varlistentry>
 

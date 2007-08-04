@@ -711,8 +711,29 @@ moduleIsInterpreted s modl = withSession s $ \h ->
                 _not_a_home_module -> return False
 
 -- | Looks up an identifier in the current interactive context (for :info)
+-- Filter the instances by the ones whose tycons (or clases resp) 
+-- are in scope (qualified or otherwise).  Otherwise we list a whole lot too many!
+-- The exact choice of which ones to show, and which to hide, is a judgement call.
+-- 	(see Trac #1581)
 getInfo :: Session -> Name -> IO (Maybe (TyThing,Fixity,[Instance]))
-getInfo s name = withSession s $ \hsc_env -> tcRnGetInfo hsc_env name
+getInfo s name 
+  = withSession s $ \hsc_env -> 
+    do	{ mb_stuff <- tcRnGetInfo hsc_env name
+	; case mb_stuff of
+	    Nothing -> return Nothing
+	    Just (thing, fixity, ispecs) -> do
+	{ let rdr_env = ic_rn_gbl_env (hsc_IC hsc_env)
+	; return (Just (thing, fixity, filter (plausible rdr_env) ispecs)) } }
+  where
+    plausible rdr_env ispec	-- Dfun involving only names that are in ic_rn_glb_env
+	= all ok $ nameSetToList $ tyClsNamesOfType $ idType $ instanceDFunId ispec
+	where	-- A name is ok if it's in the rdr_env, 
+		-- whether qualified or not
+	  ok n | n == name	   = True	-- The one we looked for in the first place!
+	       | isBuiltInSyntax n = True
+	       | isExternalName n  = any ((== n) . gre_name)
+					 (lookupGRE_Name rdr_env n)
+	       | otherwise	   = True
 
 -- | Returns all names in scope in the current interactive context
 getNamesInScope :: Session -> IO [Name]
