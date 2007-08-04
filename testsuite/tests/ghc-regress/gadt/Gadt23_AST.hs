@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -X=GADTs -fglasgow-exts #-}
+{-# OPTIONS_GHC -XGADTs -fglasgow-exts #-}
 
 module Gadt23_AST where
 

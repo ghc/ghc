@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -X=GADTs #-}
+{-# OPTIONS_GHC -XGADTs #-}
 
 module Main where
 
