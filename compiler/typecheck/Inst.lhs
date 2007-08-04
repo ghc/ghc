@@ -661,7 +661,7 @@ data LookupInstResult
   | GenInst [Inst] (LHsExpr TcId)	-- The expression and its needed insts
 
 lookupSimpleInst :: Inst -> TcM LookupInstResult
--- This is "simple" in tthat it returns NoInstance for implication constraints
+-- This is "simple" in that it returns NoInstance for implication constraints
 
 -- It's important that lookupInst does not put any new stuff into
 -- the LIE.  Instead, any Insts needed by the lookup are returned in
