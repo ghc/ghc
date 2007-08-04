@@ -6,6 +6,7 @@ ALL_DIRS = \
 	Compat \
 	Distribution \
 	Distribution/Compat \
+	Distribution/Simple \
 	Language/Haskell \
 	System \
 	System/FilePath \
