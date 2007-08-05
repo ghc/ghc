@@ -289,17 +289,17 @@ verifyOutputFiles dflags = do
 -- GHC modes of operation
 
 data CmdLineMode
-  = ShowUsage			-- ghc -?
-  | PrintLibdir			-- ghc --print-libdir
-  | ShowVersion			-- ghc -V/--version
-  | ShowNumVersion		-- ghc --numeric-version
-  | ShowInterface String	-- ghc --show-iface
-  | DoMkDependHS		-- ghc -M
-  | StopBefore Phase		-- ghc -E | -C | -S
-				-- StopBefore StopLn is the default
-  | DoMake			-- ghc --make
-  | DoInteractive		-- ghc --interactive
-  | DoEval String		-- ghc -e
+  = ShowUsage               -- ghc -?
+  | PrintLibdir             -- ghc --print-libdir
+  | ShowVersion             -- ghc -V/--version
+  | ShowNumVersion          -- ghc --numeric-version
+  | ShowInterface String    -- ghc --show-iface
+  | DoMkDependHS            -- ghc -M
+  | StopBefore Phase        -- ghc -E | -C | -S
+                            -- StopBefore StopLn is the default
+  | DoMake                  -- ghc --make
+  | DoInteractive           -- ghc --interactive
+  | DoEval String           -- ghc -e
   deriving (Show)
 
 isInteractiveMode, isInterpretiveMode     :: CmdLineMode -> Bool
