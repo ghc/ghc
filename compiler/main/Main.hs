@@ -33,7 +33,7 @@ import Packages		( dumpPackages )
 import DriverPhases	( Phase(..), isSourceFilename, anyHsc,
 			  startPhase, isHaskellSrcFilename )
 import StaticFlags
-import DynFlags         ( defaultDynFlags )
+import DynFlags
 import BasicTypes	( failed )
 import ErrUtils		( putMsg )
 import FastString	( getFastStringTable, isZEncoded, hasZEncoding )
@@ -85,11 +85,13 @@ main =
   -- to find out what version of GHC it's using before package.conf
   -- exists, so starting the session fails.
   case cli_mode of
-    ShowVersion     -> do showVersion
-                          exitWith ExitSuccess
-    ShowNumVersion  -> do putStrLn cProjectVersion
-                          exitWith ExitSuccess
-    _               -> return ()
+    ShowSupportedLanguages  -> do showSupportedLanguages
+                                  exitWith ExitSuccess
+    ShowVersion             -> do showVersion
+                                  exitWith ExitSuccess
+    ShowNumVersion          -> do putStrLn cProjectVersion
+                                  exitWith ExitSuccess
+    _                       -> return ()
 
   -- start our GHC session
   session <- GHC.newSession mbMinusB
@@ -153,18 +155,21 @@ main =
 	---------------- Final sanity checking -----------
   checkOptions cli_mode dflags srcs objs
 
-	---------------- Do the business -----------
+  ---------------- Do the business -----------
+  let alreadyHandled = panic (show cli_mode ++
+                              " should already have been handled")
   case cli_mode of
-    ShowUsage       -> showGhcUsage dflags cli_mode
-    PrintLibdir     -> putStrLn (topDir dflags)
-    ShowVersion     -> panic "ShowVersion should already have been handled"
-    ShowNumVersion  -> panic "ShowNumVersion should already have been handled"
-    ShowInterface f -> doShowIface dflags f
-    DoMake          -> doMake session srcs
-    DoMkDependHS    -> doMkDependHS session (map fst srcs)
-    StopBefore p    -> oneShot dflags p srcs
-    DoInteractive   -> interactiveUI session srcs Nothing
-    DoEval expr     -> interactiveUI session srcs (Just expr)
+    ShowUsage              -> showGhcUsage dflags cli_mode
+    PrintLibdir            -> putStrLn (topDir dflags)
+    ShowSupportedLanguages -> alreadyHandled
+    ShowVersion            -> alreadyHandled
+    ShowNumVersion         -> alreadyHandled
+    ShowInterface f        -> doShowIface dflags f
+    DoMake                 -> doMake session srcs
+    DoMkDependHS           -> doMkDependHS session (map fst srcs)
+    StopBefore p           -> oneShot dflags p srcs
+    DoInteractive          -> interactiveUI session srcs Nothing
+    DoEval expr            -> interactiveUI session srcs (Just expr)
 
   dumpFinalStats dflags
   exitWith ExitSuccess
@@ -291,6 +296,7 @@ verifyOutputFiles dflags = do
 data CmdLineMode
   = ShowUsage               -- ghc -?
   | PrintLibdir             -- ghc --print-libdir
+  | ShowSupportedLanguages  -- ghc --supported-languages
   | ShowVersion             -- ghc -V/--version
   | ShowNumVersion          -- ghc --numeric-version
   | ShowInterface String    -- ghc --show-iface
@@ -354,6 +360,7 @@ mode_flags =
   ,  ( "V"	 	 , PassFlag (setMode ShowVersion))
   ,  ( "-version"	 , PassFlag (setMode ShowVersion))
   ,  ( "-numeric-version", PassFlag (setMode ShowNumVersion))
+  ,  ( "-supported-languages", PassFlag (setMode ShowSupportedLanguages))
 
       ------- interfaces ----------------------------------------------------
   ,  ( "-show-iface"     , HasArg (\f -> setMode (ShowInterface f)
@@ -441,6 +448,10 @@ showBanner cli_mode dflags = do
        hPutStr stderr cStage
        hPutStr stderr " booted by GHC version "
        hPutStrLn stderr cBooterVersion
+
+showSupportedLanguages :: IO ()
+showSupportedLanguages = do mapM_ putStrLn supportedLanguages
+                            exitWith ExitSuccess
 
 showVersion :: IO ()
 showVersion = do

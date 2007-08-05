@@ -343,6 +343,18 @@ module X where
       <varlistentry>
 	<term>
           <cmdsynopsis>
+            <command>ghc --supported-languages</command>
+          </cmdsynopsis>
+          <indexterm><primary><option>&ndash;&ndash;supported-languages</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Print the supported language extensions.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <cmdsynopsis>
             <command>ghc --version</command>
             <command>ghc -V</command>
           </cmdsynopsis>

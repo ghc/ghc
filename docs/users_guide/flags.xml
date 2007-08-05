@@ -60,6 +60,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>&ndash;&ndash;supported-languages</option></entry>
+	      <entry>display the supported language extensions</entry>
+	      <entry>mode</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>&ndash;&ndash;version</option></entry>
 	      <entry>display GHC version</entry>
 	      <entry>mode</entry>

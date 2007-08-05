@@ -47,7 +47,8 @@ module DynFlags (
         allFlags,
 
 	-- misc stuff
-	machdepCCOpts, picCCOpts
+	machdepCCOpts, picCCOpts,
+    supportedLanguages,
   ) where
 
 #include "HsVersions.h"
@@ -1169,6 +1170,8 @@ fFlags = [
   ( "allow-incoherent-instances",       Opt_IncoherentInstances )
   ]
 
+supportedLanguages :: [String]
+supportedLanguages = map fst xFlags
 
 -- These -X<blah> flags can all be reversed with -XNo<blah>
 xFlags :: [(String, DynFlag)]
