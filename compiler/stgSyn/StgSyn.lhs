@@ -168,6 +168,8 @@ constructors, primitives, and literals.
 \begin{code}
   | StgLit	Literal
   
+	-- StgConApp is vital for returning unboxed tuples
+	-- which can't be let-bound first
   | StgConApp	DataCon
 		[GenStgArg occ]	-- Saturated
 
