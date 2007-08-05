@@ -22,7 +22,7 @@ import WwLib		( mkWorkerArgs )
 import DataCon		( dataConRepArity, dataConUnivTyVars )
 import Type		( Type, tyConAppArgs )
 import Coercion		( coercionKind )
-import Id		( Id, idName, idType, isDataConWorkId_maybe, 
+import Id		( Id, idName, idType, isDataConWorkId_maybe, idArity,
 			  mkUserLocal, mkSysLocal, idUnfolding, isLocalId )
 import Var		( Var )
 import VarEnv
@@ -33,7 +33,7 @@ import OccName		( mkSpecOcc )
 import ErrUtils		( dumpIfSet_dyn )
 import DynFlags		( DynFlags(..), DynFlag(..) )
 import BasicTypes	( Activation(..) )
-import Maybes		( orElse, catMaybes )
+import Maybes		( orElse, catMaybes, isJust )
 import Util
 import List		( nubBy, partition )
 import UniqSupply
@@ -457,8 +457,9 @@ data ScEnv = SCE { sc_size :: Int,	-- Size threshold
 			-- Binds interesting non-top-level variables
 			-- Domain is OutVars (*after* applying the substitution)
 
-		   sc_cons  :: ConstrEnv
+		   sc_vals  :: ValueEnv
 			-- Domain is OutIds (*after* applying the substitution)
+			-- Used even for top-level bindings (but not imported ones)
 	     }
 
 ---------------------
@@ -473,21 +474,20 @@ type OutVar  = Var
 type HowBoundEnv = VarEnv HowBound	-- Domain is OutVars
 
 ---------------------
-type ConstrEnv = IdEnv ConValue		-- Domain is OutIds
-data ConValue  = CV AltCon [CoreArg]
-	-- Variables known to be bound to a constructor
-	-- in a particular case alternative
+type ValueEnv = IdEnv Value		-- Domain is OutIds
+data Value    = ConVal AltCon [CoreArg]	-- *Saturated* constructors
+	      | LambdaVal		-- Inlinable lambdas or PAPs
 
-
-instance Outputable ConValue where
-   ppr (CV con args) = ppr con <+> interpp'SP args
+instance Outputable Value where
+   ppr (ConVal con args) = ppr con <+> interpp'SP args
+   ppr LambdaVal	 = ptext SLIT("<Lambda>")
 
 ---------------------
 initScEnv dflags
   = SCE { sc_size = specThreshold dflags,
 	  sc_subst = emptySubst, 
 	  sc_how_bound = emptyVarEnv, 
-	  sc_cons = emptyVarEnv }
+	  sc_vals = emptyVarEnv }
 
 data HowBound = RecFun	-- These are the recursive functions for which 
 			-- we seek interesting call patterns
@@ -549,26 +549,26 @@ extendBndr  env bndr  = (env { sc_subst = subst' }, bndr')
 		      where
 			(subst', bndr') = substBndr (sc_subst env) bndr
 
-extendConEnv :: ScEnv -> Id -> Maybe ConValue -> ScEnv
-extendConEnv env id Nothing   = env
-extendConEnv env id (Just cv) = env { sc_cons = extendVarEnv (sc_cons env) id cv }
+extendValEnv :: ScEnv -> Id -> Maybe Value -> ScEnv
+extendValEnv env id Nothing   = env
+extendValEnv env id (Just cv) = env { sc_vals = extendVarEnv (sc_vals env) id cv }
 
 extendCaseBndrs :: ScEnv -> CoreExpr -> Id -> AltCon -> [Var] -> ScEnv
 -- When we encounter
 --	case scrut of b
 --	    C x y -> ...
 -- we want to bind b, and perhaps scrut too, to (C x y)
--- NB: Extends only the sc_cons part of the envt
+-- NB: Extends only the sc_vals part of the envt
 extendCaseBndrs env scrut case_bndr con alt_bndrs
   = case scrut of
-	Var v -> extendConEnv env1 v cval
+	Var v -> extendValEnv env1 v cval
 	other -> env1
  where
-   env1 = extendConEnv env case_bndr cval
+   env1 = extendValEnv env case_bndr cval
    cval = case con of
 		DEFAULT    -> Nothing
-		LitAlt lit -> Just (CV con [])
-		DataAlt dc -> Just (CV con vanilla_args)
+		LitAlt lit -> Just (ConVal con [])
+		DataAlt dc -> Just (ConVal con vanilla_args)
 		      where
 		       	vanilla_args = map Type (tyConAppArgs (idType case_bndr)) ++
 				       varsToCoreExprs alt_bndrs
@@ -593,7 +593,7 @@ data ScUsage
 					--	RecArg in the ScEnv
 
 type CallEnv = IdEnv [Call]
-type Call = (ConstrEnv, [CoreArg])
+type Call = (ValueEnv, [CoreArg])
 	-- The arguments of the call, together with the
 	-- env giving the constructor bindings at the call site
 
@@ -719,16 +719,15 @@ scExpr' env (Lam b e)   = do { let (env', b') = extendBndr env b
 
 scExpr' env (Case scrut b ty alts) 
   = do	{ (scrut_usg, scrut') <- scExpr env scrut
-	; case isConApp (sc_cons env) scrut' of
-		Nothing   -> sc_vanilla scrut_usg scrut'
-		Just cval -> sc_con_app cval scrut'
+	; case isValue (sc_vals env) scrut' of
+		Just (ConVal con args) -> sc_con_app con args scrut'
+		other		       -> sc_vanilla scrut_usg scrut'
 	}
   where
-    sc_con_app cval@(CV con args) scrut' 	-- Known constructor; simplify
+    sc_con_app con args scrut' 	-- Known constructor; simplify
 	= do { let (_, bs, rhs) = findAlt con alts
 		   alt_env' = extendScSubst env ((b,scrut') : bs `zip` trimConArgs con args)
 	     ; scExpr alt_env' rhs }
-
 				
     sc_vanilla scrut_usg scrut'	-- Normal case
      = do { let (alt_env,b') = extendBndrWith RecArg env b
@@ -764,8 +763,8 @@ scExpr' env (Let (NonRec bndr rhs) body)
 	; if null args' || isEmptyVarEnv (calls rhs_usg) then do
 	    do	{ 	-- Vanilla case
 		  let rhs' = mkLams args' rhs_body'
-		      body_env2 = extendConEnv body_env bndr' (isConApp (sc_cons env) rhs')
-			-- Record if the RHS is a constructor
+		      body_env2 = extendValEnv body_env bndr' (isValue (sc_vals env) rhs')
+			-- Record if the RHS is a value
 		; (body_usg, body') <- scExpr body_env2 body
 		; return (body_usg `combineUsage` rhs_usg, Let (NonRec bndr' rhs') body') }
 	  else 
@@ -807,7 +806,7 @@ scExpr' env e@(App _ _)
 	; let call_usg = case fn' of
 		 	   Var f | Just RecFun <- lookupHowBound env f
 				 , not (null args)	-- Not a proper call!
-			         -> SCU { calls = unitVarEnv f [(sc_cons env, args')], 
+			         -> SCU { calls = unitVarEnv f [(sc_vals env, args')], 
 				          occs  = emptyVarEnv }
 			   other -> nullUsage
 	; return (combineUsages arg_usgs `combineUsage` fn_usg' 
@@ -859,8 +858,9 @@ scBind env (Rec prs)
 
 scBind env (NonRec bndr rhs)
   = do	{ (usg, rhs') <- scExpr env rhs
-	; let (env', bndr') = extendBndr env bndr
-	; return (env', usg, NonRec bndr' rhs') }
+	; let (env1, bndr') = extendBndr env bndr
+	      env2 = extendValEnv env1 bndr' (isValue (sc_vals env) rhs')
+	; return (env2, usg, NonRec bndr' rhs') }
 
 ----------------------
 scRecRhs :: ScEnv -> (OutId, InExpr) -> UniqSM (ScUsage, RhsInfo)
@@ -1065,7 +1065,7 @@ callToPats env bndr_occs (con_env, args)
     --    C a (D (f x) (g y))  ==>  C p1 (D p2 p3)
 
 argToPat :: InScopeSet			-- What's in scope at the fn defn site
-	 -> ConstrEnv			-- ConstrEnv at the call site
+	 -> ValueEnv			-- ValueEnv at the call site
 	 -> CoreArg			-- A call arg (or component thereof)
 	 -> ArgOcc
 	 -> UniqSM (Bool, CoreArg)
@@ -1079,11 +1079,11 @@ argToPat :: InScopeSet			-- What's in scope at the fn defn site
 --		lvl7	     --> (True, lvl7)	   if lvl7 is bound 
 --						   somewhere further out
 
-argToPat in_scope con_env arg@(Type ty) arg_occ
+argToPat in_scope val_env arg@(Type ty) arg_occ
   = return (False, arg)
 
-argToPat in_scope con_env (Note n arg) arg_occ
-  = argToPat in_scope con_env arg arg_occ
+argToPat in_scope val_env (Note n arg) arg_occ
+  = argToPat in_scope val_env arg arg_occ
 	-- Note [Notes in call patterns]
 	-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	-- Ignore Notes.  In particular, we want to ignore any InlineMe notes
@@ -1091,15 +1091,15 @@ argToPat in_scope con_env (Note n arg) arg_occ
 	-- ride roughshod over them all for now.
 	--- See Note [Notes in RULE matching] in Rules
 
-argToPat in_scope con_env (Let _ arg) arg_occ
-  = argToPat in_scope con_env arg arg_occ
+argToPat in_scope val_env (Let _ arg) arg_occ
+  = argToPat in_scope val_env arg arg_occ
 	-- Look through let expressions
 	-- e.g.		f (let v = rhs in \y -> ...v...)
 	-- Here we can specialise for f (\y -> ...)
 	-- because the rule-matcher will look through the let.
 
-argToPat in_scope con_env (Cast arg co) arg_occ
-  = do	{ (interesting, arg') <- argToPat in_scope con_env arg arg_occ
+argToPat in_scope val_env (Cast arg co) arg_occ
+  = do	{ (interesting, arg') <- argToPat in_scope val_env arg arg_occ
 	; if interesting then 
 		return (interesting, Cast arg' co)
 	  else 
@@ -1107,7 +1107,7 @@ argToPat in_scope con_env (Cast arg co) arg_occ
 
 {-	Disabling lambda specialisation for now
 	It's fragile, and the spec_loop can be infinite
-argToPat in_scope con_env arg arg_occ
+argToPat in_scope val_env arg arg_occ
   | is_value_lam arg
   = return (True, arg)
   where
@@ -1119,15 +1119,15 @@ argToPat in_scope con_env arg arg_occ
 
   -- Check for a constructor application
   -- NB: this *precedes* the Var case, so that we catch nullary constrs
-argToPat in_scope con_env arg arg_occ
-  | Just (CV dc args) <- isConApp con_env arg
+argToPat in_scope val_env arg arg_occ
+  | Just (ConVal dc args) <- isValue val_env arg
   , case arg_occ of
 	ScrutOcc _ -> True		-- Used only by case scrutinee
 	BothOcc    -> case arg of	-- Used elsewhere
 			App {} -> True	--     see Note [Reboxing]
 			other  -> False
 	other	   -> False	-- No point; the arg is not decomposed
-  = do	{ args' <- argsToPats in_scope con_env (args `zip` conArgOccs arg_occ dc)
+  = do	{ args' <- argsToPats in_scope val_env (args `zip` conArgOccs arg_occ dc)
 	; return (True, mk_con_app dc (map snd args')) }
 
   -- Check if the argument is a variable that 
@@ -1135,11 +1135,17 @@ argToPat in_scope con_env arg arg_occ
   -- It's worth specialising on this if
   --	(a) it's used in an interesting way in the body
   --	(b) we know what its value is
-argToPat in_scope con_env (Var v) arg_occ
-  | not (isLocalId v) || v `elemInScopeSet` in_scope,
-    case arg_occ of { UnkOcc -> False; other -> True },	-- (a)
-    isValueUnfolding (idUnfolding v)			-- (b)
+argToPat in_scope val_env (Var v) arg_occ
+  | case arg_occ of { UnkOcc -> False; other -> True },	-- (a)
+    is_value						-- (b)
   = return (True, Var v)
+  where
+    is_value 
+	| isLocalId v = v `elemInScopeSet` in_scope 
+			&& isJust (lookupVarEnv val_env v)
+		-- Local variables have values in val_env
+	| otherwise   = isValueUnfolding (idUnfolding v)
+		-- Imports have unfoldings
 
 --	I'm really not sure what this comment means
 --	And by not wild-carding we tend to get forall'd 
@@ -1150,11 +1156,11 @@ argToPat in_scope con_env (Var v) arg_occ
   -- Don't make a wild-card, because we may usefully share
   --	e.g.  f a = let x = ... in f (x,x)
   -- NB: this case follows the lambda and con-app cases!!
-argToPat in_scope con_env (Var v) arg_occ
+argToPat in_scope val_env (Var v) arg_occ
   = return (False, Var v)
 
   -- The default case: make a wild-card
-argToPat in_scope con_env arg arg_occ
+argToPat in_scope val_env arg arg_occ
   = wildCardPat (exprType arg)
 
 wildCardPat :: Type -> UniqSM (Bool, CoreArg)
@@ -1162,42 +1168,54 @@ wildCardPat ty = do { uniq <- getUniqueUs
 		    ; let id = mkSysLocal FSLIT("sc") uniq ty
 		    ; return (False, Var id) }
 
-argsToPats :: InScopeSet -> ConstrEnv
+argsToPats :: InScopeSet -> ValueEnv
 	   -> [(CoreArg, ArgOcc)]
 	   -> UniqSM [(Bool, CoreArg)]
-argsToPats in_scope con_env args
+argsToPats in_scope val_env args
   = mapUs do_one args
   where
-    do_one (arg,occ) = argToPat in_scope con_env arg occ
+    do_one (arg,occ) = argToPat in_scope val_env arg occ
 \end{code}
 
 
 \begin{code}
-isConApp :: ConstrEnv -> CoreExpr -> Maybe ConValue
-isConApp env (Lit lit)
-  = Just (CV (LitAlt lit) [])
+isValue :: ValueEnv -> CoreExpr -> Maybe Value
+isValue env (Lit lit)
+  = Just (ConVal (LitAlt lit) [])
 
-isConApp env expr	-- Maybe it's a constructor application
-  | (Var fun, args) <- collectArgs expr,
-    Just con <- isDataConWorkId_maybe fun,
-    args `lengthAtLeast` dataConRepArity con
-	-- Might be > because the arity excludes type args
-  = Just (CV (DataAlt con) args)
-
-isConApp env (Var v)
+isValue env (Var v)
   | Just stuff <- lookupVarEnv env v
   = Just stuff	-- You might think we could look in the idUnfolding here
 		-- but that doesn't take account of which branch of a 
 		-- case we are in, which is the whole point
 
   | not (isLocalId v) && isCheapUnfolding unf
-  = isConApp env (unfoldingTemplate unf)
+  = isValue env (unfoldingTemplate unf)
   where
     unf = idUnfolding v
 	-- However we do want to consult the unfolding 
 	-- as well, for let-bound constructors!
 
-isConApp env expr = Nothing
+isValue env (Lam b e)
+  | isTyVar b = isValue env e
+  | otherwise = Just LambdaVal
+
+isValue env expr	-- Maybe it's a constructor application
+  | (Var fun, args) <- collectArgs expr
+  = case isDataConWorkId_maybe fun of
+
+	Just con | args `lengthAtLeast` dataConRepArity con 
+		-- Check saturated; might be > because the 
+		--		    arity excludes type args
+		-> Just (ConVal (DataAlt con) args)
+
+	other | valArgCount args < idArity fun
+		-- Under-applied function
+	      -> Just LambdaVal	-- Partial application
+
+	other -> Nothing
+
+isValue env expr = Nothing
 
 mk_con_app :: AltCon -> [CoreArg] -> CoreExpr
 mk_con_app (LitAlt lit)  []   = Lit lit
