@@ -34,6 +34,7 @@ import Maybes
 import Bag		( emptyBag, listToBag )
 
 import Distribution.Compiler
+import Distribution.Package
 import Distribution.Version
 
 import Control.Exception
@@ -176,18 +177,31 @@ getOptions' buf filename
                            POk state' t -> (buffer state,t):lexAll state'
                            _ -> [(buffer state,L (last_loc state) ITeof)]
 
+thisCompiler :: Compiler
+thisCompiler = Compiler {
+                   compilerFlavor = GHC,
+                   compilerId = PackageIdentifier {
+                                    pkgName = "ghc",
+                                    pkgVersion = v
+                                },
+                   compilerProg = panic "No compiler program yet",
+                   compilerPkgTool = panic "No package program yet",
+                   compilerLanguagesKnown = True,
+                   compilerLanguages = supportedLanguages
+               }
+    where v = case readVersion cProjectVersion of
+                  Just version -> version
+                  Nothing ->
+                      panic ("Can't parse version: " ++ show cProjectVersion)
+
 checkExtension :: Located FastString -> Located String
 checkExtension (L l ext)
  = case reads (unpackFS ext) of
        [] -> languagePragParseError l
        (okExt,""):_ ->
-           case readVersion cProjectVersion of
-               Just version ->
-                   case extensionsToGHCFlag version [okExt] of
-                       ([],[opt]) -> L l opt
-                       _ -> unsupportedExtnError l okExt
-               Nothing ->
-                   panic ("Can't parse version: " ++ show cProjectVersion)
+           case extensionsToFlags thisCompiler [okExt] of
+               ([],[opt]) -> L l opt
+               _ -> unsupportedExtnError l okExt
 
 languagePragParseError loc =
   pgmError (showSDoc (mkLocMessage loc (
