@@ -50,6 +50,10 @@ writeFastMutInt (FastMutInt arr) (I# i) = IO $ \s ->
   case writeIntArray# arr 0# i s of { s ->
   (# s, () #) }
 #else /* ! __GLASGOW_HASKELL__ */
+--maybe someday we could use
+--http://haskell.org/haskellwiki/Library/ArrayRef
+--which has an implementation of IOURefs
+--that is unboxed in GHC and just strict in all other compilers...
 newtype FastMutInt = FastMutInt (IORef Int)
 
 -- If any default value was chosen, it surely would be 0,
