@@ -477,12 +477,12 @@ typedef struct _RtsSymbolVal {
       SymX(__encodeDouble)			\
       SymX(__encodeFloat)			\
       SymX(addDLL)               		\
-      SymX(__gmpn_gcd_1)			\
-      SymX(__gmpz_cmp)				\
-      SymX(__gmpz_cmp_si)			\
-      SymX(__gmpz_cmp_ui)			\
-      SymX(__gmpz_get_si)			\
-      SymX(__gmpz_get_ui)			\
+      SymExtern(__gmpn_gcd_1)			\
+      SymExtern(__gmpz_cmp)			\
+      SymExtern(__gmpz_cmp_si)			\
+      SymExtern(__gmpz_cmp_ui)			\
+      SymExtern(__gmpz_get_si)			\
+      SymExtern(__gmpz_get_ui)			\
       SymX(__int_encodeDouble)			\
       SymX(__int_encodeFloat)			\
       SymX(andIntegerzh_fast)			\
@@ -766,6 +766,11 @@ typedef struct _RtsSymbolVal {
 
 /* entirely bogus claims about types of these symbols */
 #define Sym(vvv)  extern void vvv(void);
+#ifdef ENABLE_WIN32_DLL_SUPPORT
+#define SymExtern(vvv)  extern void _imp__ ## vvv (void);
+#else
+#define SymExtern(vvv)  SymX(vvv)
+#endif
 #define SymX(vvv) /**/
 #define SymX_redirect(vvv,xxx) /**/
 RTS_SYMBOLS
@@ -779,6 +784,7 @@ RTS_LIBGCC_SYMBOLS
 #undef Sym
 #undef SymX
 #undef SymX_redirect
+#undef SymExtern
 
 #ifdef LEADING_UNDERSCORE
 #define MAYBE_LEADING_UNDERSCORE_STR(s) ("_" s)
@@ -789,6 +795,12 @@ RTS_LIBGCC_SYMBOLS
 #define Sym(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
                     (void*)(&(vvv)) },
 #define SymX(vvv) Sym(vvv)
+#ifdef ENABLE_WIN32_DLL_SUPPORT
+#define SymExtern(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
+	    (void*)(_imp__ ## vvv) },
+#else
+#define SymExtern(vvv) Sym(vvv)
+#endif
 
 // SymX_redirect allows us to redirect references to one symbol to
 // another symbol.  See newCAF/newDynCAF for an example.
