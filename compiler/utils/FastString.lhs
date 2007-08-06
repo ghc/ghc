@@ -134,12 +134,10 @@ cmpFS (FastString u1 l1 _ buf1 _) (FastString u2 l2 _ buf2 _) =
     withForeignPtr buf1 $ \p1 ->
     withForeignPtr buf2 $ \p2 -> do
       res <- memcmp p1 p2 l
-      case () of
-       _ | res <  0  -> return LT
-	 | res == 0  -> if l1 == l2 then return EQ 
-				    else if l1 < l2 then return LT
-						    else return GT
- 	 | otherwise -> return GT
+      return $ case compare res 0 of
+                 LT -> LT
+                 EQ -> compare l1 l2
+                 GT -> GT
 
 #ifndef __HADDOCK__
 foreign import ccall unsafe "ghc_memcmp" 
