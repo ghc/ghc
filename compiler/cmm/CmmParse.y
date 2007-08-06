@@ -202,15 +202,15 @@ lits	:: { [ExtFCode CmmExpr] }
 
 cmmproc :: { ExtCode }
 -- TODO: add real SRT/info tables to parsed Cmm
-	: info maybe_formals maybe_frame maybe_gc_block '{' body '}'
-		{ do ((entry_ret_label, info, live, formals, frame, gc_block), stmts) <-
+	: info maybe_formals maybe_gc_block maybe_frame '{' body '}'
+		{ do ((entry_ret_label, info, live, formals, gc_block, frame), stmts) <-
 		       getCgStmtsEC' $ loopDecls $ do {
 		         (entry_ret_label, info, live) <- $1;
 		         formals <- sequence $2;
-		         frame <- $3;
-		         gc_block <- $4;
+		         gc_block <- $3;
+		         frame <- $4;
 		         $6;
-		         return (entry_ret_label, info, live, formals, frame, gc_block) }
+		         return (entry_ret_label, info, live, formals, gc_block, frame) }
 		     blks <- code (cgStmtsToBlocks stmts)
 		     code (emitInfoTableAndCode entry_ret_label (CmmInfo gc_block frame info) formals blks) }
 
@@ -219,14 +219,14 @@ cmmproc :: { ExtCode }
 		     formals <- sequence $2;
 		     code (emitInfoTableAndCode entry_ret_label (CmmInfo Nothing Nothing info) formals []) }
 
-	| NAME maybe_formals maybe_frame maybe_gc_block '{' body '}'
-		{ do ((formals, frame, gc_block), stmts) <-
+	| NAME maybe_formals maybe_gc_block maybe_frame '{' body '}'
+		{ do ((formals, gc_block, frame), stmts) <-
 			getCgStmtsEC' $ loopDecls $ do {
 		          formals <- sequence $2;
-			  frame <- $3;
-		          gc_block <- $4;
+		          gc_block <- $3;
+			  frame <- $4;
 		          $6;
-		          return (formals, frame, gc_block) }
+		          return (formals, gc_block, frame) }
                      blks <- code (cgStmtsToBlocks stmts)
 		     code (emitProc (CmmInfo gc_block frame CmmNonInfoTable) (mkRtsCodeLabelFS $1) formals blks) }
 
