@@ -25,13 +25,14 @@ data ParamLocation
 type ArgumentFormat a = [(a, ParamLocation)]
 
 assignArguments :: (a -> MachRep) -> [a] -> ArgumentFormat a
-assignArguments f reps = assignArguments' reps 0 availRegs
+assignArguments f reps = assignments
     where
+      (sizes, assignments) = unzip $ assignArguments' reps (negate (sum sizes)) availRegs
       assignArguments' [] offset availRegs = []
       assignArguments' (r:rs) offset availRegs =
-          (r,assignment):assignArguments' rs new_offset remaining
+          (size,(r,assignment)):assignArguments' rs new_offset remaining
           where 
-            (assignment, new_offset, remaining) =
+            (assignment, new_offset, size, remaining) =
                 assign_reg (f r) offset availRegs
 
 argumentsSize :: (a -> MachRep) -> [a] -> WordOff
@@ -80,13 +81,13 @@ slot_size reg =
 slot_size' :: MachRep -> Int
 slot_size' reg = ((machRepByteWidth reg - 1) `div` wORD_SIZE) + 1
 
-assign_reg :: MachRep -> WordOff -> AvailRegs -> (ParamLocation, WordOff, AvailRegs)
-assign_reg I8  off (v:vs, fs, ds, ls) = (RegisterParam $ v, off, (vs, fs, ds, ls))
-assign_reg I16 off (v:vs, fs, ds, ls) = (RegisterParam $ v, off, (vs, fs, ds, ls))
-assign_reg I32 off (v:vs, fs, ds, ls) = (RegisterParam $ v, off, (vs, fs, ds, ls))
-assign_reg I64 off (vs, fs, ds, l:ls) = (RegisterParam $ l, off, (vs, fs, ds, ls))
+assign_reg :: MachRep -> WordOff -> AvailRegs -> (ParamLocation, WordOff, WordOff, AvailRegs)
+assign_reg I8  off (v:vs, fs, ds, ls) = (RegisterParam $ v, off, 0, (vs, fs, ds, ls))
+assign_reg I16 off (v:vs, fs, ds, ls) = (RegisterParam $ v, off, 0, (vs, fs, ds, ls))
+assign_reg I32 off (v:vs, fs, ds, ls) = (RegisterParam $ v, off, 0, (vs, fs, ds, ls))
+assign_reg I64 off (vs, fs, ds, l:ls) = (RegisterParam $ l, off, 0, (vs, fs, ds, ls))
 assign_reg I128 off _                 = panic "I128 is not a supported register type"
-assign_reg F32 off (vs, f:fs, ds, ls) = (RegisterParam $ f, off, (vs, fs, ds, ls))
-assign_reg F64 off (vs, fs, d:ds, ls) = (RegisterParam $ d, off, (vs, fs, ds, ls))
+assign_reg F32 off (vs, f:fs, ds, ls) = (RegisterParam $ f, off, 0, (vs, fs, ds, ls))
+assign_reg F64 off (vs, fs, d:ds, ls) = (RegisterParam $ d, off, 0, (vs, fs, ds, ls))
 assign_reg F80 off _                  = panic "F80 is not a supported register type"
-assign_reg reg off _                  = (StackParam $ off - size, off - size, ([], [], [], [])) where size = slot_size' reg
+assign_reg reg off _                  = (StackParam $ off, off + size, size, ([], [], [], [])) where size = slot_size' reg
