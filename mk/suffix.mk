@@ -378,7 +378,7 @@ endif
 
 %.$(way_)o : %.$(way_)rc
 	@$(RM) $@
-	windres $< $@
+	windres --preprocessor="$(CPP) -xc -DRC_INVOKED" $< $@
 
 #-----------------------------------------------------------------------------
 # Preprocessor suffix rule
