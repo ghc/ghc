@@ -27,6 +27,26 @@
 
 #include "Cmm.h"
 
+import __gmpz_init;
+import __gmpz_add;
+import __gmpz_sub;
+import __gmpz_mul;
+import __gmpz_gcd;
+import __gmpn_gcd_1;
+import __gmpn_cmp;
+import __gmpz_tdiv_q;
+import __gmpz_tdiv_r;
+import __gmpz_tdiv_qr;
+import __gmpz_fdiv_qr;
+import __gmpz_divexact;
+import __gmpz_and;
+import __gmpz_xor;
+import __gmpz_ior;
+import __gmpz_com;
+import base_GHCziIOBase_NestedAtomically_closure;
+import pthread_mutex_lock;
+import pthread_mutex_unlock;
+
 /*-----------------------------------------------------------------------------
   Array Primitives
 

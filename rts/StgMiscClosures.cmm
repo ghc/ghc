@@ -12,6 +12,10 @@
 
 #include "Cmm.h"
 
+import pthread_mutex_lock;
+import base_GHCziBase_Czh_static_info;
+import base_GHCziBase_Izh_static_info;
+
 /* ----------------------------------------------------------------------------
    Support for the bytecode interpreter.
    ------------------------------------------------------------------------- */
@@ -599,10 +603,9 @@ CLOSURE(stg_dummy_ret_closure,stg_dummy_ret);
  * when we've got the real addresses to the C# and I# closures.
  *
  */
-static INFO_TBL_CONST StgInfoTable czh_static_info;
-static INFO_TBL_CONST StgInfoTable izh_static_info;
-#define Char_hash_static_info czh_static_info
-#define Int_hash_static_info izh_static_info
+#warning Is this correct? _imp is a pointer!
+#define Char_hash_static_info _imp__base_GHCziBase_Czh_static
+#define Int_hash_static_info _imp__base_GHCziBase_Izh_static
 #else
 #define Char_hash_static_info base_GHCziBase_Czh_static
 #define Int_hash_static_info base_GHCziBase_Izh_static

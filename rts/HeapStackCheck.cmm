@@ -12,6 +12,8 @@
 
 #include "Cmm.h"
 
+import pthread_mutex_unlock;
+
 /* Stack/Heap Check Failure
  * ------------------------
  *
