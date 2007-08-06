@@ -26,15 +26,12 @@ main = do args <- getArgs
 doit :: FilePath -> FilePath -> Verbosity -> IO ()
 doit pref ghcpkg verbosity =
        do let userHooks = simpleUserHooks
-              copyFlags = CopyFlags {
+              copyFlags = emptyCopyFlags {
                               copyDest = NoCopyDest,
                               copyVerbose = verbosity
                           }
-              registerFlags = RegisterFlags {
+              registerFlags = emptyRegisterFlags {
                                   regUser = MaybeUserGlobal,
-                                  regGenScript = False,
-                                  regInPlace = False,
-                                  regWithHcPkg = Just ghcpkg,
                                   regVerbose = verbosity
                               }
           lbi <- getPersistBuildConfig
