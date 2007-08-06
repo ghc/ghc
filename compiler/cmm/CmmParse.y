@@ -250,6 +250,19 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 			[]) }
 		-- we leave most of the fields zero here.  This is only used
 		-- to generate the BCO info table in the RTS at the moment.
+
+	-- A variant with a non-zero arity (needed to write Main_main in Cmm)
+	| 'INFO_TABLE_FUN' '(' NAME ',' INT ',' INT ',' INT ',' STRING ',' STRING ',' INT ',' INT ')'
+		-- ptrs, nptrs, closure type, description, type, fun type, arity
+		{ do prof <- profilingInfo $11 $13
+		     return (mkRtsEntryLabelFS $3,
+			CmmInfoTable prof (fromIntegral $9)
+				     (FunInfo (fromIntegral $5, fromIntegral $7) NoC_SRT (fromIntegral $15) (fromIntegral $17)
+				      (ArgSpec 0)
+				      zeroCLit),
+			[]) }
+		-- we leave most of the fields zero here.  This is only used
+		-- to generate the BCO info table in the RTS at the moment.
 	
 	| 'INFO_TABLE_CONSTR' '(' NAME ',' INT ',' INT ',' INT ',' INT ',' STRING ',' STRING ')'
 		-- ptrs, nptrs, tag, closure type, description, type
