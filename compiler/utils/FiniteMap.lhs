@@ -49,7 +49,6 @@ module FiniteMap (
     ) where
 
 #include "HsVersions.h"
-#define IF_NOT_GHC(a) {--}
 
 #if defined(DEBUG_FINITEMAPS)/* NB NB NB */
 #define OUTPUTABLE_key , Outputable key
@@ -62,23 +61,21 @@ import Bag	  ( Bag, foldrBag )
 import Util
 import Outputable
 
+#if 0
 import GHC.Exts
+-- was this import only needed for I#, or does it have something
+-- to do with the (not-presently-used) IF_NCG also?
+#endif
 
 import Data.List
 
+#if 0
 #if ! OMIT_NATIVE_CODEGEN
 #  define IF_NCG(a) a
 #else
 #  define IF_NCG(a) {--}
 #endif
-
-
--- SIGH: but we use unboxed "sizes"...
-#if __GLASGOW_HASKELL__
-#define IF_GHC(a,b) a
-#else /* not GHC */
-#define IF_GHC(a,b) b
-#endif /* not GHC */
+#endif
 \end{code}
 
 
@@ -181,9 +178,9 @@ factor of at most \tr{sIZE_RATIO}
 \begin{code}
 data FiniteMap key elt
   = EmptyFM
-  | Branch key elt	    	-- Key and elt stored here
-    IF_GHC(Int#,Int{-STRICT-})	-- Size >= 1
-    (FiniteMap key elt)	    	-- Children
+  | Branch key elt        -- Key and elt stored here
+    {-# UNPACK #-} !Int   -- Size >= 1
+    (FiniteMap key elt)   -- Children
     (FiniteMap key elt)
 \end{code}
 
@@ -191,14 +188,14 @@ data FiniteMap key elt
 emptyFM = EmptyFM
 {-
 emptyFM
-  = Branch bottom bottom IF_GHC(0#,0) bottom bottom
+  = Branch bottom bottom 0 bottom bottom
   where
     bottom = panic "emptyFM"
 -}
 
---  #define EmptyFM (Branch _ _ IF_GHC(0#,0) _ _)
+--  #define EmptyFM (Branch _ _ 0 _ _)
 
-unitFM key elt = Branch key elt IF_GHC(1#,1) emptyFM emptyFM
+unitFM key elt = Branch key elt 1 emptyFM emptyFM
 
 listToFM = addListToFM emptyFM
 
@@ -335,7 +332,7 @@ filterFM p (Branch key elt _ fm_l fm_r)
 \begin{code}
 --{-# INLINE sizeFM #-}
 sizeFM EmptyFM		     = 0
-sizeFM (Branch _ _ size _ _) = IF_GHC(I# size, size)
+sizeFM (Branch _ _ size _ _) = size
 
 isEmptyFM fm = sizeFM fm == 0
 
@@ -404,7 +401,7 @@ mkBranch which key elt fm_l fm_r
     else
 #endif
     let
-	result = Branch key elt (unbox (1 + left_size + right_size)) fm_l fm_r
+	result = Branch key elt (1 + left_size + right_size) fm_l fm_r
     in
 --    if sizeFM result <= 8 then
 	result
@@ -440,14 +437,6 @@ mkBranch which key elt fm_l fm_r
 
     left_size  = sizeFM fm_l
     right_size = sizeFM fm_r
-
-#ifdef __GLASGOW_HASKELL__
-    unbox :: Int -> Int#
-    unbox (I# size) = size
-#else
-    unbox :: Int -> Int
-    unbox x = x
-#endif
 \end{code}
 
 %************************************************************************
@@ -651,7 +640,7 @@ instance (Outputable key) => Outputable (FiniteMap key elt) where
 pprX EmptyFM = char '!'
 pprX (Branch key elt sz fm_l fm_r)
  = parens (hcat [pprX fm_l, space,
-		      ppr key, space, int (IF_GHC(I# sz, sz)), space,
+		      ppr key, space, int sz, space,
 		      pprX fm_r])
 #else
 -- and when not debugging the package itself...
