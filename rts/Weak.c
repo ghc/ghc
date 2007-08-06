@@ -7,7 +7,6 @@
  * ---------------------------------------------------------------------------*/
 
 #include "PosixSource.h"
-#define COMPILING_RTS_MAIN
 #include "Rts.h"
 #include "RtsUtils.h"
 #include "SchedAPI.h"
