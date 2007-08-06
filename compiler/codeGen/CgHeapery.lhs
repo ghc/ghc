@@ -458,7 +458,7 @@ do_checks' stk_expr hp_expr stk_nonzero hp_nonzero reg_save_code rts_lbl
 		  [CmmMachOp mo_wordSub [CmmReg spReg, stk_expr],
 		   CmmReg (CmmGlobal SpLim)]
 
-	-- Hp overflow if (Hpp > HpLim)
+	-- Hp overflow if (Hp > HpLim)
 	-- (Hp has been incremented by now)
 	-- HpLim points to the LAST WORD of valid allocation space.
     hp_oflo = CmmMachOp mo_wordUGt 
