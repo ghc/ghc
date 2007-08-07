@@ -140,7 +140,7 @@ paDictOfTyApp (TyVarTy tv) ty_args
       paDFunApply dfun ty_args
 paDictOfTyApp (TyConApp tc _) ty_args
   = do
-      dfun <- maybeV (lookupTyConPA tc)
+      dfun <- traceMaybeV "paDictOfTyApp" (ppr tc) (lookupTyConPA tc)
       paDFunApply (Var dfun) ty_args
 paDictOfTyApp ty ty_args = pprPanic "paDictOfTyApp" (ppr ty)
 

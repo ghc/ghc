@@ -2,7 +2,7 @@ module VectMonad (
   Scope(..),
   VM,
 
-  noV, tryV, maybeV, orElseV, fixV, localV, closedV, initV,
+  noV, tryV, maybeV, traceMaybeV, orElseV, fixV, localV, closedV, initV,
   cloneName, cloneId,
   newExportedVar, newLocalVar, newDummyVar, newTyVar,
   
