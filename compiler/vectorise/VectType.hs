@@ -312,7 +312,9 @@ buildTyConBindings orig_tc vect_tc arr_tc dfun
                           num_dcs
                           (inits repr_tys)
                           (tails repr_tys))
-      takeHoisted
+      dict <- buildPADict shape vect_tc arr_tc dfun
+      binds <- takeHoisted
+      return $ (dfun, dict) : binds
   where
     orig_dcs = tyConDataCons orig_tc
     vect_dcs = tyConDataCons vect_tc
@@ -361,21 +363,17 @@ vectDataConWorker shape vect_tc arr_tc arr_dc (orig_dc, vect_dc, dc_num) pre (dc
                                           ++ map Var args
                                           ++ empty_post
 
-buildPADict :: PAInstance -> VM [(Var, CoreExpr)]
-buildPADict (PAInstance {
-               painstDFun      = dfun
-             , painstVectTyCon = vect_tc
-             , painstArrTyCon  = arr_tc })
-  = polyAbstract (tyConTyVars arr_tc) $ \abstract ->
+buildPADict :: Shape -> TyCon -> TyCon -> Var -> VM CoreExpr
+buildPADict shape vect_tc arr_tc dfun
+  = polyAbstract tvs $ \abstract ->
     do
-      shape <- tyConShape vect_tc
       meth_binds <- mapM (mk_method shape) paMethods
       let meth_exprs = map (Var . fst) meth_binds
 
       pa_dc <- builtin paDataCon
       let dict = mkConApp pa_dc (Type (mkTyConApp vect_tc arg_tys) : meth_exprs)
           body = Let (Rec meth_binds) dict
-      return [(dfun, mkInlineMe $ abstract body)]
+      return . mkInlineMe $ abstract body
   where
     tvs = tyConTyVars arr_tc
     arg_tys = mkTyVarTys tvs
