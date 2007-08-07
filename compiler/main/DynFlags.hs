@@ -470,7 +470,9 @@ defaultDynFlags =
         hpcDir		        = ".hpc",
 
 	opt_L			= [],
-	opt_P			= [],
+	opt_P			= (if opt_PIC
+				   then ["-D__PIC__"]
+				   else []),
 	opt_F			= [],
 	opt_c			= [],
 	opt_a			= [],
@@ -1628,15 +1630,18 @@ picCCOpts dflags
       --     in dynamic libraries.
 
     | opt_PIC
-        = ["-fno-common"]
+        = ["-fno-common", "-D__PIC__"]
     | otherwise
         = ["-mdynamic-no-pic"]
 #elif mingw32_TARGET_OS
       -- no -fPIC for Windows
+    | opt_PIC
+        = ["-D__PIC__"]
+    | otherwise
         = []
 #else
     | opt_PIC
-        = ["-fPIC"]
+        = ["-fPIC", "-D__PIC__"]
     | otherwise
         = []
 #endif
