@@ -46,11 +46,22 @@ import Outputable
 import FastString
 import Control.Monad        ( liftM, liftM2, zipWithM, mapAndUnzipM )
 
-mkNDPVar :: FastString -> RdrName
-mkNDPVar fs = mkRdrQual nDP_BUILTIN (mkVarOccFS fs)
+mkNDPVar :: String -> RdrName
+mkNDPVar s = mkRdrQual nDP_BUILTIN (mkVarOcc s)
+
+mkNDPVarFS :: FastString -> RdrName
+mkNDPVarFS fs = mkRdrQual nDP_BUILTIN (mkVarOccFS fs)
 
 builtin_PAs :: [(Name, RdrName)]
-builtin_PAs = [(intTyConName, mkNDPVar FSLIT("dPA_Int"))]
+builtin_PAs = [
+                mk intTyConName FSLIT("dPA_Int")
+              ]
+              ++ tups
+  where
+    mk name fs = (name, mkNDPVarFS fs)
+
+    tups = mk_tup 0 : map mk_tup [2..3]
+    mk_tup n   = (getName $ tupleTyCon Boxed n, mkNDPVar $ "dPA_" ++ show n)
 
 vectorise :: HscEnv -> UniqSupply -> RuleBase -> ModGuts
           -> IO (SimplCount, ModGuts)
