@@ -59,7 +59,7 @@ readMVar m =
     putMVar m a
     return a
 
--- |Swap the contents of an 'MVar' for a new value.
+-- |Atomically, put a new value into an 'MVar' and return the old value.
 swapMVar :: MVar a -> a -> IO a
 swapMVar mvar new =
   block $ do
