@@ -276,8 +276,6 @@ gLA_EXTS	= mkBaseModule FSLIT("GHC.Exts")
 nDP_PARRAY      = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.PArray")
 nDP_UTILS       = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Utils")
 nDP_CLOSURE     = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Closure")
-nDP_INTERFACE_NAME = mkModuleNameFS FSLIT("Data.Array.Parallel.Lifted")
-nDP_BUILTIN     = mkModuleNameFS FSLIT(":NDP")
 
 mAIN	        = mkMainModule_ mAIN_NAME
 rOOT_MAIN	= mkMainModule FSLIT(":Main") -- Root module for initialisation 
