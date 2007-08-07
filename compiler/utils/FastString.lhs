@@ -161,6 +161,7 @@ data FastStringTable =
     {-# UNPACK #-} !Int
     (MutableArray# RealWorld [FastString])
 
+{-# NOINLINE string_table #-}
 string_table :: IORef FastStringTable
 string_table = 
  unsafePerformIO $ do
