@@ -412,7 +412,7 @@ decodeSize str
   | c == "G" || c == "g" = truncate (n * 1000 * 1000 * 1000)
   | otherwise            = throwDyn (CmdLineError ("can't decode size: " ++ str))
   where (m, c) = span pred str
-        n      = read m  :: Double
+        n      = readRational m
 	pred c = isDigit c || c == '.'
 
 
