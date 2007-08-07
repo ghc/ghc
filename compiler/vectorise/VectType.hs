@@ -1,6 +1,5 @@
 module VectType ( vectTyCon, vectType, vectTypeEnv,
-                   PAInstance, buildPADict,
-                   vectDataConWorkers )
+                   PAInstance, buildPADict )
 where
 
 #include "HsVersions.h"
@@ -37,7 +36,7 @@ import Digraph           ( SCC(..), stronglyConnComp )
 import Outputable
 
 import Control.Monad  ( liftM, liftM2, zipWithM, zipWithM_ )
-import Data.List      ( inits, tails )
+import Data.List      ( inits, tails, zipWith4 )
 
 -- ----------------------------------------------------------------------------
 -- Types
@@ -84,7 +83,7 @@ data PAInstance = PAInstance {
                   , painstArrTyCon  :: TyCon
                   }
 
-vectTypeEnv :: TypeEnv -> VM (TypeEnv, [FamInst])
+vectTypeEnv :: TypeEnv -> VM (TypeEnv, [FamInst], [(Var, CoreExpr)])
 vectTypeEnv env
   = do
       cs <- readGEnv $ mk_map . global_tycons
@@ -100,6 +99,7 @@ vectTypeEnv env
       parr_tcs <- zipWithM buildPArrayTyCon orig_tcs vect_tcs
       dfuns    <- mapM mkPADFun vect_tcs
       defTyConPAs (zip vect_tcs dfuns)
+      binds    <- sequence (zipWith4 buildTyConBindings orig_tcs vect_tcs parr_tcs dfuns)
       
       let all_new_tcs = new_tcs ++ parr_tcs
 
@@ -108,7 +108,7 @@ vectTypeEnv env
                         ++ [ADataCon dc | tc <- all_new_tcs
                                         , dc <- tyConDataCons tc])
 
-      return (new_env, map mkLocalFamInst parr_tcs)
+      return (new_env, map mkLocalFamInst parr_tcs, concat binds)
   where
     tycons = typeEnvTyCons env
     groups = tyConGroups tycons
@@ -303,12 +303,9 @@ tyConShape vect_tc
                                                e <- replicatePA len n
                                                return [e]
                }
-        
-vectDataConWorkers :: PAInstance -> VM [(Var, CoreExpr)]
-vectDataConWorkers (PAInstance { painstOrigTyCon = orig_tc
-                               , painstVectTyCon = vect_tc
-                               , painstArrTyCon  = arr_tc
-                               })
+
+buildTyConBindings :: TyCon -> TyCon -> TyCon -> Var -> VM [(Var, CoreExpr)]
+buildTyConBindings orig_tc vect_tc arr_tc dfun
   = do
       shape <- tyConShape vect_tc
       sequence_ (zipWith3 (vectDataConWorker shape vect_tc arr_tc arr_dc)
