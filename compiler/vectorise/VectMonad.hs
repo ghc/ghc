@@ -42,6 +42,7 @@ import OccName
 import Name
 import NameEnv
 import TysPrim       ( intPrimTy )
+import RdrName
 
 import DsMonad
 import PrelNames
@@ -148,6 +149,10 @@ data GlobalEnv = GlobalEnv {
 
                 -- Hoisted bindings
                 , global_bindings :: [(Var, CoreExpr)]
+
+                  -- Global Rdr environment (from ModGuts)
+                  --
+                , global_rdr_env :: GlobalRdrEnv
                 }
 
 data LocalEnv = LocalEnv {
@@ -168,8 +173,9 @@ data LocalEnv = LocalEnv {
                }
               
 
-initGlobalEnv :: VectInfo -> (InstEnv, InstEnv) -> FamInstEnvs -> Builtins -> GlobalEnv
-initGlobalEnv info instEnvs famInstEnvs bi
+initGlobalEnv :: VectInfo -> (InstEnv, InstEnv) -> FamInstEnvs -> Builtins -> GlobalRdrEnv
+              -> GlobalEnv
+initGlobalEnv info instEnvs famInstEnvs bi rdr_env
   = GlobalEnv {
       global_vars          = mapVarEnv snd $ vectInfoVar info
     , global_exported_vars = emptyVarEnv
@@ -181,6 +187,7 @@ initGlobalEnv info instEnvs famInstEnvs bi
     , global_inst_env      = instEnvs
     , global_fam_inst_env  = famInstEnvs
     , global_bindings      = []
+    , global_rdr_env       = rdr_env
     }
 
 setInstEnvs :: InstEnv -> FamInstEnv -> GlobalEnv -> GlobalEnv
@@ -479,7 +486,11 @@ initV hsc_env guts info p
     go instEnvs famInstEnvs = 
       do
         builtins <- initBuiltins
-        r <- runVM p builtins (initGlobalEnv info instEnvs famInstEnvs builtins) 
+        r <- runVM p builtins (initGlobalEnv info
+                                             instEnvs
+                                             famInstEnvs
+                                             builtins
+                                             (mg_rdr_env guts))
                    emptyLocalEnv
         case r of
           Yes genv _ x -> return $ Just (new_info genv, x)
