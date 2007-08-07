@@ -26,8 +26,8 @@ import Constants
 data BreakArray = BA (MutableByteArray# RealWorld)
 
 breakOff, breakOn :: Word
-breakOn  = fromIntegral 1
-breakOff = fromIntegral 0
+breakOn  = 1
+breakOff = 0
 
 -- XXX crude
 showBreakArray :: BreakArray -> IO ()

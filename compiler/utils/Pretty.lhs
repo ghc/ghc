@@ -446,7 +446,7 @@ int      n = text (show n)
 integer  n = text (show n)
 float    n = text (show n)
 double   n = text (show n)
-rational n = text (show (fromRat n))
+rational n = text (show (fromRat n :: Double))
 --rational n = text (show (fromRationalX n)) -- _showRational 30 n)
 
 quotes p        = char '`' <> p <> char '\''

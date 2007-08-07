@@ -113,7 +113,7 @@ hGetStringBufferBlock handle wanted
          withForeignPtr buf $ \ptr ->
              do r <- if size == 0 then return 0 else hGetBuf handle ptr size
                 if r /= size
-                   then ioError (userError $ "short read of file: "++show(r,size,fromIntegral size_i,handle))
+                   then ioError (userError $ "short read of file: "++show(r,size,size_i,handle))
                    else do pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
                            return (StringBuffer buf size 0)
 

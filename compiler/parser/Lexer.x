@@ -774,7 +774,7 @@ multiline_doc_comment span buf _len = withLexedDocType (worker "")
 nested_comment :: P (Located Token) -> Action
 nested_comment cont span _str _len = do
   input <- getInput
-  go 1 input
+  go (1::Int) input
   where
     go 0 input = do setInput input; cont
     go n input = case alexGetChar input of

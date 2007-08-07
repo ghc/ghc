@@ -448,7 +448,7 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 		MachRep)]	-- the MachRep
   arg_info  = [ (text ('a':show n), showStgType ty, ty, 
 		 typeMachRep (getPrimTyOf ty))
-	      | (ty,n) <- zip arg_htys [1..] ]
+	      | (ty,n) <- zip arg_htys [1::Int ..] ]
 
   -- add some auxiliary args; the stable ptr in the wrapper case, and
   -- a slot for the dummy return address in the wrapper + ccall case

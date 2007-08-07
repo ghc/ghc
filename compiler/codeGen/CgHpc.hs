@@ -48,7 +48,7 @@ hpcTable this_mod (HpcInfo hpc_tickCount _) = do
                         emitData Data $ [ CmmDataLabel (mkHpcTicksLabel this_mod)
                                         ] ++
                                         [ CmmStaticLit (CmmInt 0 I64)
-                                        | _ <- take hpc_tickCount [0..]
+                                        | _ <- take hpc_tickCount [0::Int ..]
                                         ]
   where
     module_name_str = moduleNameString (Module.moduleName this_mod)

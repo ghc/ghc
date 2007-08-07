@@ -579,7 +579,8 @@ newTempName dflags extn
   = do d <- getTempDir dflags
        x <- getProcessID
        findTempName (d ++ "/ghc" ++ show x ++ "_") 0
-  where 
+  where
+    findTempName :: FilePath -> Integer -> IO FilePath
     findTempName prefix x
       = do let filename = (prefix ++ show x) `joinFileExt` extn
   	   b  <- doesFileExist filename
@@ -596,6 +597,8 @@ getTempDir dflags@(DynFlags{tmpDir=tmp_dir})
            Nothing ->
                do x <- getProcessID
                   let prefix = tmp_dir ++ "/ghc" ++ show x ++ "_"
+                  let
+                      mkTempDir :: Integer -> IO FilePath
                       mkTempDir x
                        = let dirname = prefix ++ show x
                          in do createDirectory dirname
@@ -719,7 +722,11 @@ builderMainLoop dflags filter_fn pgm real_args mb_env = do
   hSetBuffering hStdErr LineBuffering
   forkIO (readerProc chan hStdOut filter_fn)
   forkIO (readerProc chan hStdErr filter_fn)
-  rc <- loop chan hProcess 2 1 ExitSuccess
+  -- we don't want to finish until 2 streams have been completed
+  -- (stdout and stderr)
+  -- nor until 1 exit code has been retrieved.
+  rc <- loop chan hProcess (2::Integer) (1::Integer) ExitSuccess
+  -- after that, we're done here.
   hClose hStdIn
   hClose hStdOut
   hClose hStdErr
