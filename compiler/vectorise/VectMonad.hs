@@ -21,7 +21,7 @@ module VectMonad (
   lookupVar, defGlobalVar,
   lookupTyCon, defTyCon,
   lookupDataCon, defDataCon,
-  lookupTyConPA, defTyConPA,
+  lookupTyConPA, defTyConPA, defTyConRdrPAs,
   lookupTyVarPA, defLocalTyVar, defLocalTyVarWithPA, localTyVars,
 
   lookupInst, lookupFamInst
@@ -412,6 +412,16 @@ lookupTyConPA tc = readGEnv $ \env -> lookupNameEnv (global_pa_funs env) (tyConN
 defTyConPA :: TyCon -> Var -> VM ()
 defTyConPA tc pa = updGEnv $ \env ->
   env { global_pa_funs = extendNameEnv (global_pa_funs env) (tyConName tc) pa }
+
+defTyConRdrPAs :: [(Name, RdrName)] -> VM ()
+defTyConRdrPAs ps
+  = do
+      pas <- mapM lookupRdrVar rdr_names
+      updGEnv $ \env ->
+        env { global_pa_funs = extendNameEnvList (global_pa_funs env)
+                                                 (zip tcs pas) }
+  where
+    (tcs, rdr_names) = unzip ps
 
 lookupTyVarPA :: Var -> VM (Maybe CoreExpr)
 lookupTyVarPA tv = readLEnv $ \env -> lookupVarEnv (local_tyvar_pa env) tv 

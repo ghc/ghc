@@ -25,11 +25,13 @@ import InstEnv              ( extendInstEnvList )
 import Var
 import VarEnv
 import VarSet
-import Name                 ( mkSysTvName, getName )
+import Name                 ( Name, mkSysTvName, getName )
 import NameEnv
 import Id
 import MkId                 ( unwrapFamInstScrut )
 import OccName
+import RdrName              ( RdrName, mkRdrQual )
+import Module               ( mkModuleNameFS )
 
 import DsMonad hiding (mapAndUnzipM)
 import DsUtils              ( mkCoreTup, mkCoreTupTy )
@@ -43,6 +45,12 @@ import BasicTypes           ( Boxity(..) )
 import Outputable
 import FastString
 import Control.Monad        ( liftM, liftM2, zipWithM, mapAndUnzipM )
+
+mkNDPVar :: FastString -> RdrName
+mkNDPVar fs = mkRdrQual nDP_BUILTIN (mkVarOccFS fs)
+
+builtin_PAs :: [(Name, RdrName)]
+builtin_PAs = [(intTyConName, mkNDPVar FSLIT("dPA_Int"))]
 
 vectorise :: HscEnv -> UniqSupply -> RuleBase -> ModGuts
           -> IO (SimplCount, ModGuts)
@@ -60,6 +68,7 @@ vectorise hsc_env _ _ guts
 vectModule :: ModGuts -> VM ModGuts
 vectModule guts
   = do
+      defTyConRdrPAs builtin_PAs
       (types', fam_insts, pa_insts) <- vectTypeEnv (mg_types guts)
       
       let insts         = map painstInstance pa_insts
