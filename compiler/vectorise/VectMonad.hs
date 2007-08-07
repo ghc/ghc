@@ -6,11 +6,11 @@ module VectMonad (
   cloneName, cloneId,
   newExportedVar, newLocalVar, newDummyVar, newTyVar,
   
-  Builtins(..), paDictTyCon, paDictDataCon,
+  Builtins(..),
   builtin,
 
   GlobalEnv(..),
-  setInstEnvs,
+  setFamInstEnv,
   readGEnv, setGEnv, updGEnv,
 
   LocalEnv(..),
@@ -24,14 +24,13 @@ module VectMonad (
   lookupTyConPA, defTyConPA, defTyConRdrPAs,
   lookupTyVarPA, defLocalTyVar, defLocalTyVarWithPA, localTyVars,
 
-  lookupInst, lookupFamInst
+  {-lookupInst,-} lookupFamInst
 ) where
 
 #include "HsVersions.h"
 
 import HscTypes
 import CoreSyn
-import Class
 import TyCon
 import DataCon
 import Type
@@ -64,7 +63,8 @@ data Scope a b = Global a | Local b
 
 data Builtins = Builtins {
                   parrayTyCon      :: TyCon
-                , paClass          :: Class
+                , paTyCon          :: TyCon
+                , paDataCon        :: DataCon
                 , closureTyCon     :: TyCon
                 , mkClosureVar     :: Var
                 , applyClosureVar  :: Var
@@ -76,17 +76,12 @@ data Builtins = Builtins {
                 , liftingContext   :: Var
                 }
 
-paDictTyCon :: Builtins -> TyCon
-paDictTyCon = classTyCon . paClass
-
-paDictDataCon :: Builtins -> DataCon
-paDictDataCon = classDataCon . paClass
-
 initBuiltins :: DsM Builtins
 initBuiltins
   = do
       parrayTyCon  <- dsLookupTyCon parrayTyConName
-      paClass      <- dsLookupClass paClassName
+      paTyCon      <- dsLookupTyCon paTyConName
+      let paDataCon = case tyConDataCons paTyCon of [dc] -> dc
       closureTyCon <- dsLookupTyCon closureTyConName
 
       mkClosureVar     <- dsLookupGlobalId mkClosureName
@@ -102,7 +97,8 @@ initBuiltins
 
       return $ Builtins {
                  parrayTyCon      = parrayTyCon
-               , paClass          = paClass
+               , paTyCon          = paTyCon
+               , paDataCon        = paDataCon
                , closureTyCon     = closureTyCon
                , mkClosureVar     = mkClosureVar
                , applyClosureVar  = applyClosureVar
@@ -190,12 +186,11 @@ initGlobalEnv info instEnvs famInstEnvs bi rdr_env
     , global_rdr_env       = rdr_env
     }
 
-setInstEnvs :: InstEnv -> FamInstEnv -> GlobalEnv -> GlobalEnv
-setInstEnvs l_inst l_fam_inst genv
-  | (g_inst,     _) <- global_inst_env genv
-  , (g_fam_inst, _) <- global_fam_inst_env genv
-  = genv { global_inst_env     = (g_inst, l_inst)
-         , global_fam_inst_env = (g_fam_inst, l_fam_inst) }
+setFamInstEnv :: FamInstEnv -> GlobalEnv -> GlobalEnv
+setFamInstEnv l_fam_inst genv
+  = genv { global_fam_inst_env = (g_fam_inst, l_fam_inst) }
+  where
+    (g_fam_inst, _) = global_fam_inst_env genv
 
 emptyLocalEnv = LocalEnv {
                    local_vars     = emptyVarEnv
@@ -450,6 +445,7 @@ localTyVars = readLEnv (reverse . local_tyvars)
 -- instances head (i.e., no flexi vars); for details for what this means,
 -- see the docs at InstEnv.lookupInstEnv.
 --
+{-
 lookupInst :: Class -> [Type] -> VM (DFunId, [Type])
 lookupInst cls tys
   = do { instEnv <- getInstEnv
@@ -466,6 +462,7 @@ lookupInst cls tys
   where
     isRight (Left  _) = False
     isRight (Right _) = True
+-}
 
 -- Look up the representation tycon of a family instance.
 --

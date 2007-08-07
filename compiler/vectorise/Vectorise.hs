@@ -69,21 +69,18 @@ vectModule :: ModGuts -> VM ModGuts
 vectModule guts
   = do
       defTyConRdrPAs builtin_PAs
-      (types', fam_insts, pa_insts) <- vectTypeEnv (mg_types guts)
+      (types', fam_insts) <- vectTypeEnv (mg_types guts)
       
-      let insts         = map painstInstance pa_insts
-          fam_inst_env' = extendFamInstEnvList (mg_fam_inst_env guts) fam_insts
-          inst_env'     = extendInstEnvList (mg_inst_env guts) insts
-      updGEnv (setInstEnvs inst_env' fam_inst_env')
+      let fam_inst_env' = extendFamInstEnvList (mg_fam_inst_env guts) fam_insts
+      updGEnv (setFamInstEnv fam_inst_env')
      
-      dicts   <- mapM buildPADict pa_insts
-      workers <- mapM vectDataConWorkers pa_insts
+      -- dicts   <- mapM buildPADict pa_insts
+      -- workers <- mapM vectDataConWorkers pa_insts
       binds'  <- mapM vectTopBind (mg_binds guts)
       return $ guts { mg_types        = types'
-                    , mg_binds        = Rec (concat workers ++ concat dicts) : binds'
-                    , mg_inst_env     = inst_env'
+                    , mg_binds        = -- Rec (concat workers ++ concat dicts) :
+                                        binds'
                     , mg_fam_inst_env = fam_inst_env'
-                    , mg_insts        = mg_insts guts ++ insts
                     , mg_fam_insts    = mg_fam_insts guts ++ fam_insts
                     }
 

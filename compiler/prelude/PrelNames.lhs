@@ -217,7 +217,7 @@ genericTyConNames :: [Name]
 genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 
 ndpNames :: [Name]
-ndpNames = [ parrayTyConName, paClassName, closureTyConName
+ndpNames = [ parrayTyConName, paTyConName, closureTyConName
            , mkClosureName, applyClosureName
            , mkClosurePName, applyClosurePName
            , lengthPAName, replicatePAName, emptyPAName ]
@@ -691,7 +691,7 @@ checkDotnetResName  = varQual  dOTNET FSLIT("checkResult")     checkDotnetResNam
 
 -- NDP stuff
 parrayTyConName     = tcQual   nDP_PARRAY FSLIT("PArray") parrayTyConKey
-paClassName         = clsQual  nDP_PARRAY FSLIT("PA")     paClassKey
+paTyConName         = tcQual   nDP_PARRAY FSLIT("PA")     paTyConKey
 lengthPAName        = methName nDP_PARRAY FSLIT("lengthPA")    lengthPAClassOpKey
 replicatePAName     = methName nDP_PARRAY FSLIT("replicatePA") replicatePAClassOpKey
 emptyPAName         = varQual  nDP_PARRAY FSLIT("emptyPA") emptyPAClassOpKey
@@ -769,8 +769,6 @@ randomClassKey		= mkPreludeClassUnique 31
 randomGenClassKey	= mkPreludeClassUnique 32
 
 isStringClassKey	= mkPreludeClassUnique 33
-
-paClassKey              = mkPreludeClassUnique 34
 \end{code}
 
 %************************************************************************
@@ -883,6 +881,7 @@ stringTyConKey				= mkPreludeTyConUnique 134
 
 parrayTyConKey                          = mkPreludeTyConUnique 135
 closureTyConKey                         = mkPreludeTyConUnique 136
+paTyConKey                              = mkPreludeTyConUnique 137
 
 
 ---------------- Template Haskell -------------------

@@ -1,5 +1,5 @@
 module VectType ( vectTyCon, vectType, vectTypeEnv,
-                   PAInstance, painstInstance, buildPADict,
+                   PAInstance, buildPADict,
                    vectDataConWorkers )
 where
 
@@ -78,13 +78,13 @@ vectType ty = pprPanic "vectType:" (ppr ty)
 type TyConGroup = ([TyCon], UniqSet TyCon)
 
 data PAInstance = PAInstance {
-                    painstInstance  :: Instance
+                    painstDFun      :: Var
                   , painstOrigTyCon :: TyCon
                   , painstVectTyCon :: TyCon
                   , painstArrTyCon  :: TyCon
                   }
 
-vectTypeEnv :: TypeEnv -> VM (TypeEnv, [FamInst], [PAInstance])
+vectTypeEnv :: TypeEnv -> VM (TypeEnv, [FamInst])
 vectTypeEnv env
   = do
       cs <- readGEnv $ mk_map . global_tycons
@@ -107,7 +107,7 @@ vectTypeEnv env
                         ++ [ADataCon dc | tc <- all_new_tcs
                                         , dc <- tyConDataCons tc])
 
-      return (new_env, map mkLocalFamInst parr_tcs, pa_insts)
+      return (new_env, map mkLocalFamInst parr_tcs)
   where
     tycons = typeEnvTyCons env
     groups = tyConGroups tycons
@@ -362,26 +362,19 @@ buildPArrayDataCon orig_name vect_tc repr_tc
 buildPAInstance :: TyCon -> TyCon -> TyCon -> VM PAInstance
 buildPAInstance orig_tc vect_tc arr_tc
   = do
-      pa <- builtin paClass
-      let inst_ty = mkForAllTys tvs
-                  . (mkFunTys $ mkPredTys [ClassP pa [ty] | ty <- arg_tys])
-                  $ mkPredTy (ClassP pa [mkTyConApp vect_tc arg_tys])
-
-      dfun <- newExportedVar (mkPADFunOcc $ getOccName vect_tc) inst_ty
+      dfun_ty <- paDFunType vect_tc
+      dfun <- newExportedVar (mkPADFunOcc $ getOccName vect_tc) dfun_ty
 
       return $ PAInstance {
-                 painstInstance  = mkLocalInstance dfun NoOverlap
+                 painstDFun      = dfun
                , painstOrigTyCon = orig_tc
                , painstVectTyCon = vect_tc
                , painstArrTyCon  = arr_tc
                }
-  where
-    tvs = tyConTyVars arr_tc
-    arg_tys = mkTyVarTys tvs
 
 buildPADict :: PAInstance -> VM [(Var, CoreExpr)]
 buildPADict (PAInstance {
-               painstInstance  = inst
+               painstDFun      = dfun
              , painstVectTyCon = vect_tc
              , painstArrTyCon  = arr_tc })
   = polyAbstract (tyConTyVars arr_tc) $ \abstract ->
@@ -390,10 +383,10 @@ buildPADict (PAInstance {
       meth_binds <- mapM (mk_method shape) paMethods
       let meth_exprs = map (Var . fst) meth_binds
 
-      pa_dc <- builtin paDictDataCon
+      pa_dc <- builtin paDataCon
       let dict = mkConApp pa_dc (Type (mkTyConApp vect_tc arg_tys) : meth_exprs)
           body = Let (Rec meth_binds) dict
-      return [(instanceDFunId inst, mkInlineMe $ abstract body)]
+      return [(dfun, mkInlineMe $ abstract body)]
   where
     tvs = tyConTyVars arr_tc
     arg_tys = mkTyVarTys tvs

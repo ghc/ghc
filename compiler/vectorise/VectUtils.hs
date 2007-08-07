@@ -3,7 +3,7 @@ module VectUtils (
   collectAnnValBinders,
   splitClosureTy,
   mkPADictType, mkPArrayType,
-  paDictArgType, paDictOfType,
+  paDictArgType, paDictOfType, paDFunType,
   paMethod, lengthPA, replicatePA, emptyPA, liftPA,
   polyAbstract, polyApply, polyVApply,
   lookupPArrayFamInst,
@@ -97,7 +97,7 @@ mkClosureTypes arg_tys res_ty
 mkPADictType :: Type -> VM Type
 mkPADictType ty
   = do
-      tc <- builtin paDictTyCon
+      tc <- builtin paTyCon
       return $ TyConApp tc [ty]
 
 mkPArrayType :: Type -> VM Type
@@ -140,10 +140,20 @@ paDictOfTyApp (TyVarTy tv) ty_args
       paDFunApply dfun ty_args
 paDictOfTyApp (TyConApp tc _) ty_args
   = do
-      pa_class <- builtin paClass
-      (dfun, ty_args') <- lookupInst pa_class [TyConApp tc ty_args]
-      paDFunApply (Var dfun) ty_args'
+      dfun <- maybeV (lookupTyConPA tc)
+      paDFunApply (Var dfun) ty_args
 paDictOfTyApp ty ty_args = pprPanic "paDictOfTyApp" (ppr ty)
+
+paDFunType :: TyCon -> VM Type
+paDFunType tc
+  = do
+      margs <- mapM paDictArgType tvs
+      res   <- mkPADictType (mkTyConApp tc arg_tys)
+      return . mkForAllTys tvs
+             $ mkFunTys [arg | Just arg <- margs] res
+  where
+    tvs = tyConTyVars tc
+    arg_tys = mkTyVarTys tvs
 
 paDFunApply :: CoreExpr -> [Type] -> VM CoreExpr
 paDFunApply dfun tys
