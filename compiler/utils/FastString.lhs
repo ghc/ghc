@@ -129,15 +129,17 @@ instance Show FastString where
 cmpFS :: FastString -> FastString -> Ordering
 cmpFS (FastString u1 l1 _ buf1 _) (FastString u2 l2 _ buf2 _) =
   if u1 == u2 then EQ else
-  let l = if l1 <= l2 then l1 else l2 in
-  inlinePerformIO $
-    withForeignPtr buf1 $ \p1 ->
-    withForeignPtr buf2 $ \p2 -> do
-      res <- memcmp p1 p2 l
-      return $ case compare res 0 of
-                 LT -> LT
-                 EQ -> compare l1 l2
-                 GT -> GT
+  case unsafeMemcmp buf1 buf2 (min l1 l2) `compare` 0 of
+     LT -> LT
+     EQ -> compare l1 l2
+     GT -> GT
+
+unsafeMemcmp :: ForeignPtr a -> ForeignPtr b -> Int -> Int
+unsafeMemcmp buf1 buf2 l =
+      inlinePerformIO $
+        withForeignPtr buf1 $ \p1 ->
+        withForeignPtr buf2 $ \p2 ->
+          memcmp p1 p2 l
 
 #ifndef __HADDOCK__
 foreign import ccall unsafe "ghc_memcmp" 
