@@ -65,7 +65,9 @@ rnImports imports
          -- warning for {- SOURCE -} ones that are unnecessary
     = do this_mod <- getModule
          implicit_prelude <- doptM Opt_ImplicitPrelude
+         implicit_ndp     <- doptM Opt_Vectorise
          let prel_imports	= mkPrelImports this_mod implicit_prelude imports
+             ndp_imports        = mkNDPImports implicit_ndp
              (source, ordinary) = partition is_source_import imports
              is_source_import (L _ (ImportDecl _ is_boot _ _ _)) = is_boot
 
@@ -73,7 +75,9 @@ rnImports imports
             when (notNull prel_imports) $ addWarn (implicitPreludeWarn)
           )
 
-         stuff1 <- mapM (rnImportDecl this_mod) (prel_imports ++ ordinary)
+         stuff1 <- mapM (rnImportDecl this_mod) (prel_imports
+                                                 ++ ndp_imports
+                                                 ++ ordinary)
          stuff2 <- mapM (rnImportDecl this_mod) source
          let (decls, rdr_env, imp_avails,hpc_usage) = combine (stuff1 ++ stuff2)
          return (decls, rdr_env, imp_avails,hpc_usage) 
@@ -116,6 +120,20 @@ mkPrelImports this_mod implicit_prelude import_decls
 	       Nothing	{- No import list -}
 
       loc = mkGeneralSrcSpan FSLIT("Implicit import declaration")         
+
+mkNDPImports :: Bool -> [LImportDecl RdrName]
+mkNDPImports False = []
+mkNDPImports True  = [ndpImportDecl]
+  where
+    ndpImportDecl
+      = L loc $
+        ImportDecl (L loc nDP_INTERFACE_NAME)
+             False                -- not a boot interface
+             True                 -- qualified
+             (Just nDP_BUILTIN)   -- "as"
+             Nothing              -- no import list
+
+    loc = mkGeneralSrcSpan FSLIT("Implicit import declaration")
 
 
 rnImportDecl  :: Module
