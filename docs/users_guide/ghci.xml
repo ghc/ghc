@@ -2587,6 +2587,18 @@ Prelude> :set -fno-glasgow-exts
           <para>See <xref linkend="ghci-windows"/>.</para>
         </listitem>
       </varlistentry>
+
+      <varlistentry>
+	<term>The default buffering mode is different in GHCi to GHC.</term>
+        <listitem>
+          <para>
+            In GHC, the stdout handle is line-buffered by default.
+            However, in GHCi we turn off the buffering on stdout,
+            because this is normally what you want in an interpreter:
+            output appears as it is generated.
+          </para>
+        </listitem>
+      </varlistentry>
     </variablelist>
   </sect1>
 
