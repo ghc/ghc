@@ -312,6 +312,21 @@ inBind id p
   = do updLEnv $ \env -> env { local_bind_name = occNameFS (getOccName id) }
        p
 
+lookupRdrName :: RdrName -> VM Name
+lookupRdrName rdr_name
+  = do
+      rdr_env <- readGEnv global_rdr_env
+      case lookupGRE_RdrName rdr_name rdr_env of
+        [gre] -> return (gre_name gre)
+        []    -> pprPanic "VectMonad.lookupRdrName: not found" (ppr rdr_name)
+        _     -> pprPanic "VectMonad.lookupRdrName: ambiguous" (ppr rdr_name)
+
+lookupRdrVar :: RdrName -> VM Var
+lookupRdrVar rdr_name
+  = do
+      name <- lookupRdrName rdr_name
+      liftDs (dsLookupGlobalId name)
+
 cloneName :: (OccName -> OccName) -> Name -> VM Name
 cloneName mk_occ name = liftM make (liftDs newUnique)
   where
