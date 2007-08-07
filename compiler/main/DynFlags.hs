@@ -323,7 +323,6 @@ data DynFlags = DynFlags {
   opt_m			:: [String],
   opt_a			:: [String],
   opt_l			:: [String],
-  opt_dll		:: [String],
   opt_dep		:: [String],
 
   -- commands for particular phases
@@ -477,7 +476,6 @@ defaultDynFlags =
 	opt_a			= [],
 	opt_m			= [],
 	opt_l			= [],
-	opt_dll			= [],
 	opt_dep			= [],
 	
 	extraPkgConfs		= [],
@@ -569,7 +567,6 @@ addOptc   f d = d{ opt_c   = f : opt_c d}
 addOptm   f d = d{ opt_m   = f : opt_m d}
 addOpta   f d = d{ opt_a   = f : opt_a d}
 addOptl   f d = d{ opt_l   = f : opt_l d}
-addOptdll f d = d{ opt_dll = f : opt_dll d}
 addOptdep f d = d{ opt_dep = f : opt_dep d}
 
 addCmdlineFramework f d = d{ cmdlineFrameworks = f : cmdlineFrameworks d}
@@ -919,7 +916,6 @@ dynamic_flags = [
   ,  ( "optm"		, HasArg (upd . addOptm) )  
   ,  ( "opta"		, HasArg (upd . addOpta) )  
   ,  ( "optl"		, HasArg (upd . addOptl) )  
-  ,  ( "optdll"		, HasArg (upd . addOptdll) )  
   ,  ( "optdep"		, HasArg (upd . addOptdep) )
 
   ,  ( "split-objs"	, NoArg (if can_split
@@ -933,8 +929,7 @@ dynamic_flags = [
 
 	------- Libraries ---------------------------------------------------
   ,  ( "L"		, Prefix addLibraryPath )
-  ,  ( "l"		, AnySuffix (\s -> do upd (addOptl s)
-					      upd (addOptdll s)))
+  ,  ( "l"		, AnySuffix (\s -> do upd (addOptl s)))
 
 	------- Frameworks --------------------------------------------------
         -- -framework-path should really be -F ...
