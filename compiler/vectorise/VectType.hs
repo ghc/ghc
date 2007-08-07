@@ -100,7 +100,6 @@ vectTypeEnv env
       parr_tcs <- zipWithM buildPArrayTyCon orig_tcs vect_tcs
       dfuns    <- mapM mkPADFun vect_tcs
       defTyConPAs (zip vect_tcs dfuns)
-      -- pa_insts <- sequence $ zipWith3 buildPAInstance orig_tcs vect_tcs parr_tcs
       
       let all_new_tcs = new_tcs ++ parr_tcs
 
@@ -364,19 +363,6 @@ buildPArrayDataCon orig_name vect_tc repr_tc
 mkPADFun :: TyCon -> VM Var
 mkPADFun vect_tc
   = newExportedVar (mkPADFunOcc $ getOccName vect_tc) =<< paDFunType vect_tc
-
-buildPAInstance :: TyCon -> TyCon -> TyCon -> VM PAInstance
-buildPAInstance orig_tc vect_tc arr_tc
-  = do
-      dfun_ty <- paDFunType vect_tc
-      dfun <- newExportedVar (mkPADFunOcc $ getOccName vect_tc) dfun_ty
-
-      return $ PAInstance {
-                 painstDFun      = dfun
-               , painstOrigTyCon = orig_tc
-               , painstVectTyCon = vect_tc
-               , painstArrTyCon  = arr_tc
-               }
 
 buildPADict :: PAInstance -> VM [(Var, CoreExpr)]
 buildPADict (PAInstance {
