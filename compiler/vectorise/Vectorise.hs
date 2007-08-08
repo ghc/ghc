@@ -54,7 +54,8 @@ mkNDPVarFS fs = mkRdrQual nDP_BUILTIN (mkVarOccFS fs)
 
 builtin_PAs :: [(Name, RdrName)]
 builtin_PAs = [
-                mk intTyConName FSLIT("dPA_Int")
+                mk closureTyConName FSLIT("dPA_Clo")
+              , mk intTyConName     FSLIT("dPA_Int")
               ]
               ++ tups
   where
