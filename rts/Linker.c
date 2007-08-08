@@ -2534,13 +2534,16 @@ ocResolve_PEi386 ( ObjectCode* oc )
 #endif
 
 #if !defined(openbsd_HOST_OS)
-#include <elf.h>
+#  include <elf.h>
+#  ifndef R_X86_64_PC64     /* If elf.h doesn't define it */
+#    define R_X86_64_PC64 24
+#  endif
 #else
 /* openbsd elf has things in different places, with diff names */
-#include <elf_abi.h>
-#include <machine/reloc.h>
-#define R_386_32    RELOC_32
-#define R_386_PC32  RELOC_PC32
+#  include <elf_abi.h>
+#  include <machine/reloc.h>
+#  define R_386_32    RELOC_32
+#  define R_386_PC32  RELOC_PC32
 #endif
 
 /*
@@ -3480,6 +3483,13 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 	      barf("R_X86_64_PC32 relocation out of range: %s = %p",
 		   symbol, off);
 	  }
+	  *(Elf64_Word *)P = (Elf64_Word)off;
+	  break;
+      }
+
+      case R_X86_64_PC64:
+      {
+	  StgInt64 off = value - P;
 	  *(Elf64_Word *)P = (Elf64_Word)off;
 	  break;
       }
