@@ -33,10 +33,6 @@ import Panic
 import Maybes
 import Bag		( emptyBag, listToBag )
 
-import Distribution.Compiler
-import Distribution.Package
-import Distribution.Version
-
 import Control.Exception
 import Control.Monad
 import System.Exit
@@ -177,31 +173,15 @@ getOptions' buf filename
                            POk state' t -> (buffer state,t):lexAll state'
                            _ -> [(buffer state,L (last_loc state) ITeof)]
 
-thisCompiler :: Compiler
-thisCompiler = Compiler {
-                   compilerFlavor = GHC,
-                   compilerId = PackageIdentifier {
-                                    pkgName = "ghc",
-                                    pkgVersion = v
-                                },
-                   compilerProg = panic "No compiler program yet",
-                   compilerPkgTool = panic "No package program yet",
-                   compilerLanguagesKnown = True,
-                   compilerLanguages = supportedLanguages
-               }
-    where v = case readVersion cProjectVersion of
-                  Just version -> version
-                  Nothing ->
-                      panic ("Can't parse version: " ++ show cProjectVersion)
-
 checkExtension :: Located FastString -> Located String
 checkExtension (L l ext)
- = case reads (unpackFS ext) of
-       [] -> languagePragParseError l
-       (okExt,""):_ ->
-           case extensionsToFlags thisCompiler [okExt] of
-               ([],[opt]) -> L l opt
-               _ -> unsupportedExtnError l okExt
+-- Checks if a given extension is valid, and if so returns
+-- its corresponding flag. Otherwise it throws an exception.
+ =  let ext' = unpackFS ext in
+    if ext' `elem` supportedLanguages
+       || ext' `elem` (map ("No"++) supportedLanguages)
+    then L l ("-X"++ext')
+    else unsupportedExtnError l ext'
 
 languagePragParseError loc =
   pgmError (showSDoc (mkLocMessage loc (
