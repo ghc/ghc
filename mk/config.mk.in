@@ -163,6 +163,7 @@ LeadingUnderscore=@LeadingUnderscore@
 
 # Pin a suffix on executables? If so, what (Windows only).
 exeext=@exeext@
+soext=@soext@
 
 # Windows=YES if on a Windows platform
 ifneq "$(findstring $(HostOS_CPP), mingw32 cygwin32)" ""
@@ -1165,6 +1166,23 @@ WAY_thr_debug_HC_OPTS=-optc-DTHREADED_RTS -optc-DDEBUG
 # Way 'thr_debug_p':
 WAY_thr_debug_p_NAME=threaded
 WAY_thr_debug_p_HC_OPTS=-optc-DTHREADED_RTS -optc-DDEBUG -prof
+
+# Way 'dyn': build dynamic shared libraries
+WAY_dyn_NAME=dyn
+WAY_dyn_HC_OPTS=-fPIC -dynamic
+WAY_dyn_LIB_TARGET=libHSrts-gcc661.so
+
+# Way 'thr_dyn':
+WAY_thr_dyn_NAME=thr_dyn
+WAY_thr_dyn_HC_OPTS=-fPIC -dynamic -optc-DTHREADED_RTS
+
+# Way 'thr_debug_dyn':
+WAY_thr_debug_dyn_NAME=thr_dyn
+WAY_thr_debug_dyn_HC_OPTS=-fPIC -dynamic -optc-DTHREADED_RTS -optc-DDEBUG
+
+# Way 'debug_dyn':
+WAY_debug_dyn_NAME=thr_dyn
+WAY_debug_dyn_HC_OPTS=-fPIC -dynamic -optc-DDEBUG
 
 #
 # Add user-way configurations here:

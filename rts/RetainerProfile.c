@@ -364,8 +364,7 @@ find_srt( stackPos *info )
 	bitmap = info->next.srt.srt_bitmap;
 	while (bitmap != 0) {
 	    if ((bitmap & 1) != 0) {
-#ifdef ENABLE_WIN32_DLL_SUPPORT
-		
+#if defined(__PIC__) && defined(mingw32_TARGET_OS)
 		if ((unsigned long)(*(info->next.srt.srt)) & 0x1)
 		    c = (* (StgClosure **)((unsigned long)*(info->next.srt.srt)) & ~0x1);
 		else

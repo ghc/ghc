@@ -15,8 +15,7 @@
 #endif
 
 /* I'd be mildly surprised if this wasn't defined, but still. */
-#ifdef ENABLE_WIN32_DLL_SUPPORT
-
+#if defined(__PIC__) && defined(mingw32_TARGET_OS)
 BOOL
 WINAPI
 DllMain ( HINSTANCE hInstance
@@ -36,4 +35,4 @@ DllMain ( HINSTANCE hInstance
   return TRUE;
 }
 
-#endif /* ENABLE_WIN32_DLL_SUPPORT */
+#endif /* defined(__PIC__) && defined(mingw32_TARGET_OS) */

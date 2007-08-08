@@ -592,7 +592,7 @@ CLOSURE(stg_dummy_ret_closure,stg_dummy_ret);
    replace them with references to the static objects.
    ------------------------------------------------------------------------- */
 
-#if defined(ENABLE_WIN32_DLL_SUPPORT)
+#if defined(__PIC__) && defined(mingw32_TARGET_OS)
 /*
  * When sticking the RTS in a DLL, we delay populating the
  * Charlike and Intlike tables until load-time, which is only

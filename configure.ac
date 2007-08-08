@@ -100,6 +100,7 @@ if test x"$TargetPlatform" != x"$HostPlatform" ; then
 fi
 
 exeext=''
+soext='.so'
 #
 # The following will be more difficult when we *are* cross-compiling.
 # Suitable names to slam in *_CPP are in platform.h.in.
@@ -295,6 +296,7 @@ i[[3456]]86-*-cygwin*)
         HostVendor_CPP='unknown'
         HostOS_CPP='cygwin32'
         exeext='.exe'
+	soext='.dll'
         ;;
 i[[3456]]86-*-mingw32*)
         HostPlatform=i386-unknown-mingw32 # hack again
@@ -305,6 +307,7 @@ i[[3456]]86-*-mingw32*)
         HostVendor_CPP='unknown'
         HostOS_CPP='mingw32'
         exeext='.exe'
+	soext='.dll'
         ;;
 i[[3456]]86-apple-darwin*)
         HostPlatform=i386-apple-darwin
@@ -314,6 +317,7 @@ i[[3456]]86-apple-darwin*)
         HostArch_CPP='i386'
         HostVendor_CPP='apple'
         HostOS_CPP='darwin'
+	soext='.dylib'
         ;;
 i[[3456]]86-*-gnu*)
         HostPlatform=i386-unknown-gnu
@@ -350,6 +354,7 @@ x86_64-apple-darwin*)
         HostArch_CPP='x86_64'
         HostVendor_CPP='apple'
         HostOS_CPP='darwin'
+	soext='.dylib'
         ;;
 m68k-*-linux*)
         HostPlatform=m68k-unknown-linux # hack again
@@ -476,6 +481,7 @@ powerpc-apple-darwin*)
         HostArch_CPP='powerpc'
         HostVendor_CPP='apple'
         HostOS_CPP='darwin'
+	soext='.dylib'
         ;;
 powerpc-unknown-linux*)
         HostPlatform=powerpc-unknown-linux
@@ -608,6 +614,7 @@ AC_SUBST(BuildVendor_CPP)
 AC_SUBST(TargetVendor_CPP)
 
 AC_SUBST(exeext)
+AC_SUBST(soext)
 
 dnl --------------------------------------------------------------
 dnl * Project specific configuration options

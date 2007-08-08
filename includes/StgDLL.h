@@ -1,19 +1,19 @@
 #ifndef __STGDLL_H__
 #define __STGDLL_H__ 1
 
-#if defined(HAVE_WIN32_DLL_SUPPORT) && !defined(DONT_WANT_WIN32_DLL_SUPPORT)
-#define ENABLE_WIN32_DLL_SUPPORT
-#endif
-
-#ifdef ENABLE_WIN32_DLL_SUPPORT
-# if __GNUC__ && !defined(__declspec)
-#  define DLLIMPORT
-# else
-#  define DLLIMPORT __declspec(dllimport)
-#  define DLLIMPORT_DATA(x) _imp__##x
-# endif
+#if defined(__PIC__) && defined(mingw32_TARGET_OS)
+#  define DLL_IMPORT_DATA_REF(x) (_imp__##x)
+#  define DLL_IMPORT_DATA_VARNAME(x) *_imp__##x
+#  if __GNUC__ && !defined(__declspec)
+#    define DLLIMPORT
+#  else
+#    define DLLIMPORT __declspec(dllimport)
+#    define DLLIMPORT_DATA(x) _imp__##x
+#  endif
 #else
-# define DLLIMPORT
+#  define DLL_IMPORT_DATA_REF(x) (&(x))
+#  define DLL_IMPORT_DATA_VARNAME(x) x
+#  define DLLIMPORT
 #endif
 
 /* The view of the ghc/includes/ header files differ ever so
@@ -32,7 +32,7 @@
 #else
 #define DLL_IMPORT
 #define DLL_IMPORT_RTS DLLIMPORT
-# ifdef ENABLE_WIN32_DLL_SUPPORT
+# if defined(__PIC__) && defined(mingw32_TARGET_OS)
 #  define DLL_IMPORT_DATA_VAR(x) _imp__##x
 # else
 #  define DLL_IMPORT_DATA_VAR(x) x

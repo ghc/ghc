@@ -766,7 +766,7 @@ typedef struct _RtsSymbolVal {
 
 /* entirely bogus claims about types of these symbols */
 #define Sym(vvv)  extern void vvv(void);
-#ifdef ENABLE_WIN32_DLL_SUPPORT
+#if defined(__PIC__) && defined(mingw32_TARGET_OS)
 #define SymExtern(vvv)  extern void _imp__ ## vvv (void);
 #else
 #define SymExtern(vvv)  SymX(vvv)
@@ -795,12 +795,8 @@ RTS_LIBGCC_SYMBOLS
 #define Sym(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
                     (void*)(&(vvv)) },
 #define SymX(vvv) Sym(vvv)
-#ifdef ENABLE_WIN32_DLL_SUPPORT
 #define SymExtern(vvv) { MAYBE_LEADING_UNDERSCORE_STR(#vvv), \
-	    (void*)(_imp__ ## vvv) },
-#else
-#define SymExtern(vvv) Sym(vvv)
-#endif
+	    (void*)DLL_IMPORT_DATA_REF(vvv) },
 
 // SymX_redirect allows us to redirect references to one symbol to
 // another symbol.  See newCAF/newDynCAF for an example.

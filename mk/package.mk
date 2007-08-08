@@ -138,7 +138,11 @@ SRC_HC_OPTS	+= -fgenerics
 endif
 
 ifndef LIBRARY
+ifeq "$(_way:%_dyn=YES)" "YES"
+LIBRARY      	= libHS$(PACKAGE)$(_way:%_dyn=%)-ghc$(ProjectVersion)$(soext)
+else
 LIBRARY      	= libHS$(PACKAGE)$(_way).a
+endif
 endif
 
 ifeq "$(WAYS)" ""
@@ -246,69 +250,6 @@ $(GHCI_LIBRARY) : $(LIBOBJS)
 endif # DONT_WANT_STD_GHCI_LIB_RULE
 endif # GhcWithInterpreter
 endif # way
-
-ifeq "$(GhcBuildDylibs)" "YES"
-
-    # Build dynamic libraries.
-    # Currently, this is a hack. Anyone, PLEASE clean it up.
-
-    # For now, we pretend that there are two operating systems in the world;
-    # Darwin, and Everything Else. Furthermore, we pretend that Everything Else
-    # behaves like Linux.
-    
-ifeq "$(darwin_TARGET_OS)" "1"
-    # Darwin: Shared libraries end in .dylib
-DYLD_LIBRARY = $(patsubst %.a,%_dyn.dylib,$(LIBRARY))
-
-    # About the options used for Darwin:
-    # -dynamiclib
-    #   Apple's way of saying -shared
-    # -undefined dynamic_lookup:
-    #   Without these options, we'd have to specify the correct dependencies
-    #   for each of the dylibs. Note that we could (and should) do without this
-    #	for all libraries except the RTS; all we need to do is to pass the
-    #	correct HSfoo_dyn.dylib files to the link command.
-    #	This feature requires Mac OS X 10.3 or later; there is a similar feature,
-    #	-flat_namespace -undefined suppress, which works on earlier versions,
-    #	but it has other disadvantages.
-    # -single_module
-    #	Build the dynamic library as a single "module", i.e. no dynamic binding
-    #	nonsense when referring to symbols from within the library. The NCG
-    #	assumes that this option is specified (on i386, at least).
-    # -Wl,-macosx_version_min -Wl,10.3
-    #	Tell the linker its safe to assume that the library will run on 10.3 or
-    #	later, so that it will not complain about the use of the option
-    #	-undefined dynamic_lookup above.
-    # -install_name
-    #   Causes the dynamic linker to ignore the DYLD_LIBRARY_PATH when loading
-    #   this lib and instead look for it at its absolute path.
-    #   When installing the .dylibs (see target.mk), we'll change that path to
-    #   point to the place they are installed. Therefore, we won't have to set
-    #	up DYLD_LIBRARY_PATH specifically for ghc.
-
-$(DYLD_LIBRARY) : $(LIBOBJS) $(STUBOBJS)
-	$(CC) -dynamiclib -o $@ $(STUBOBJS) $(LIBOBJS) \
-		-undefined dynamic_lookup -single_module \
-		 -Wl,-macosx_version_min -Wl,10.3 \
-		-install_name `pwd`/$@
-
-else
-DYLD_LIBRARY = $(patsubst %.a,%_dyn.so,$(LIBRARY))
-
-$(DYLD_LIBRARY) : $(LIBOBJS) $(STUBOBJS)
-	$(CC) -shared -o $@ $(STUBOBJS) $(LIBOBJS)
-endif
-
-ifneq "$(NO_INSTALL_LIBRARY)" "YES"
-INSTALL_LIBS += $(DYLD_LIBRARY)
-endif
-
-CLEAN_FILES += $(DYLD_LIBRARY)
-
-all :: $(DYLD_LIBRARY)
-
-endif # $(GhcBuildDylibs) == "YES"
-
 endif # $(LIBRARY) /= ""
 
 # -----------------------------------------------------------------------------

@@ -265,13 +265,13 @@ ifneq "$(LIBRARY)" ""
 all :: $(LIBRARY)
 
 ifneq "$(way)" "i"
-define BUILD_LIB
+define BUILD_STATIC_LIB
 $(RM) $@
 $(AR) $(AR_OPTS) $@ $(STUBOBJS) $(LIBOBJS)
 $(RANLIB) $@
 endef
 else
-define BUILD_LIB
+define BUILD_STATIC_LIB
 $(RM) $@
 al -out:$@ $(STUBOBJS) $(LIBOBJS)
 endef
@@ -298,13 +298,13 @@ SRC_HC_OPTS += -split-objs
 # rename it at the end.  This avoids the problem that ar may sometimes
 # fail, leaving a partially built archive behind.
 ifeq "$(ArSupportsInput)" ""
-define BUILD_LIB
+define BUILD_STATIC_LIB
 $(RM) $@ $@.tmp
 (echo $(STUBOBJS) $(C_OBJS) $(GC_C_OBJS); $(FIND) $(patsubst %.$(way_)o,%_split,$(HS_OBJS)) -name '*.$(way_)o' -print) | xargs $(AR) $@
 $(RANLIB) $@
 endef
 else
-define BUILD_LIB
+define BUILD_STATIC_LIB
 $(RM) $@ $@.tmp
 echo $(STUBOBJS) > $@.list
 echo $(C_OBJS) >> $@.list
@@ -351,70 +351,35 @@ endif # StripLibraries
 # Note: $(STUBOBJS) isn't depended on here, but included when building the lib.
 #       (i.e., the assumption is that $(STUBOBJS) are created as a side-effect
 #       of building $(LIBOBJS)).
-$(LIBRARY) : $(LIBOBJS)
-	$(BUILD_LIB)
-endif # LIBRARY = ""
 
+ifeq "$(LIBRARY:%.so=YES)" "YES"
+# ELF styled DSO
+$(LIBRARY): $(LIBOBJS) $(LIB_DEPS)
+	$(RM) $@
+	$(HC) -shared -dynamic -o $@ $(STUBOBJS) $(LIBOBJS) $(LIB_LD_OPTS)
+else
+ifeq "$(LIBRARY:%.dylib=YES)" "YES"
+$(LIBRARY): $(LIBOBJS) $(LIB_DEPS)
+	$(HC) -shared -dynamic -o $@ $(STUBOBJS) $(LIBOBJS) $(LIB_LD_OPTS)
+else
+ifeq "$(LIBRARY:%.dll=YES)" "YES"
 #----------------------------------------
 #	Building Win32 DLLs
 #
+$(LIBRARY): $(LIBOBJS) $(LIBRARY).o $(LIB_DEPS)
+	$(HC) -shared -dynamic -o $@ $(STUBOBJS) $(LIBOBJS) $(LIBRARY).o $(LIB_LD_OPTS)
 
-ifeq "$(DLLized)" "YES"
-SRC_CC_OPTS += -DDLLized
+DLLTOOL=dlltool
 
-ifneq "$(PACKAGE)" ""
+$(LIBRARY).def: $(LIBOBJS)
+	$(DLLTOOL) --output-def $@ --export-all $(LIBOBJS)
 
-SRC_BLD_DLL_OPTS += --export-all --output-def=HS$(PACKAGE)$(_cbits)$(_way).def DllVersionInfo.$(way_)o
+$(LIBRARY).o:
+	$(DLLTOOL) --output-exp $(LIBRARY).o $(LIBOBJS)
 
-ifneq "$(PACKAGE) $(IS_CBITS_LIB)" "std YES"
-ifneq "$(PACKAGE)" "rts"
-SRC_BLD_DLL_OPTS += -lHSstd_cbits_imp -L$(GHC_LIB_DIR)/std/cbits
-SRC_BLD_DLL_OPTS += -lHSrts_$(way_)imp -L$(GHC_RTS_DIR)
-ifneq "$(PACKAGE)" "std"
-  ifeq "$(IS_CBITS_LIB)" ""
-  SRC_BLD_DLL_OPTS += -lHSstd_$(way_)imp -L$(GHC_LIB_DIR)/std 
-  endif
-endif
-endif
-endif
-
-SRC_BLD_DLL_OPTS += -lgmp -L. -L$(GHC_RTS_DIR)/gmp
-ifeq "$(IS_CBITS_LIB)" ""
-SRC_BLD_DLL_OPTS += $(patsubst %,-lHS%_$(way_)imp, $(PACKAGE_DEPS))
-SRC_BLD_DLL_OPTS += $(patsubst %,-L../%, $(PACKAGE_DEPS))
-endif
-ifneq "$(HAS_CBITS)" ""
-SRC_BLD_DLL_OPTS += -lHS$(PACKAGE)_cbits_imp -Lcbits
-endif
-SRC_BLD_DLL_OPTS += -lwsock32 -lwinmm
-
-endif # PACKAGE != ""
-
-SplitObjs = NO 
-
-ifneq "$(LIBRARY)" ""
-
-all :: DllVersionInfo.$(way_)o
-
-ifeq "$(DLL_NAME)" ""
-DLL_NAME = $(patsubst %.a,%.dll,$(subst lib,,$(LIBRARY)))
-endif
-
-ifneq "$(DLL_NAME)" ""
-DLL_NAME := $(DLL_PEN)/$(DLL_NAME)
-endif
-
-all :: $(DLL_NAME)
-
-ifeq "$(DLL_IMPLIB_NAME)" ""
-DLL_IMPLIB_NAME = $(patsubst %.a,%_imp.a,$(LIBRARY))
-endif
-
-$(DLL_NAME) :: $(LIBRARY)
-	$(BLD_DLL) --output-lib $(DLL_IMPLIB_NAME) -o $(DLL_NAME) $(LIBRARY) $(BLD_DLL_OPTS)
-endif # LIBRARY != ""
-
-endif # DLLized
+# Generates library.dll.a; by MinGW conventions, this is the dll's import library
+$(LIBRARY).a: $(LIBOBJS) $(LIBRARY).def
+	$(DLLTOOL) --def $(LIBRARY).def --output-lib $@
 
 #
 # Version information is baked into a DLL by having the DLL include DllVersionInfo.o.
@@ -483,6 +448,14 @@ DllVersionInfo.$(way_)rc ExeVersionInfo.$(way_)rc:
 	echo "  VALUE \"Translation\", 0x0409, 1200" >> $@
 	echo " END" >> $@
 	echo "END" >> $@
+else
+# Regular static library
+$(LIBRARY): $(LIBOBJS)
+	$(BUILD_STATIC_LIB)
+endif # %.dll
+endif # %.dylib
+endif # %.so
+endif # LIBRARY = ""
 
 include $(TOP)/mk/install.mk
 
@@ -651,7 +624,8 @@ ifeq "$(way)" ""
 FPTOOLS_SUFFIXES := o hi hc
 
 WAY_TARGETS     = $(foreach way,$(WAYS),$(foreach suffix, $(FPTOOLS_SUFFIXES), %.$(way)_$(suffix)))
-LIB_WAY_TARGETS = $(foreach way,$(WAYS),%_$(way).a %_$(way))
+LIB_WAY_TARGETS = $(foreach way,$(filter-out %dyn,$(WAYS)), %_$(way).a)
+LIB_WAY_TARGETS_DYN =  $(foreach way,$(filter %dyn,$(WAYS)), %$(subst dyn,-ghc$(ProjectVersion),$(subst _dyn,dyn,$(way)))$(soext))
 
 # $@ will be something like Foo.p_o
 # $(suffix $@)     returns .p_o
@@ -668,6 +642,9 @@ $(WAY_TARGETS) :
 
 $(LIB_WAY_TARGETS) :
 	$(MAKE) $(MFLAGS) $@ way=$(subst .,,$(suffix $(subst _,.,$(basename $@))))
+
+$(LIB_WAY_TARGETS_DYN) :
+	$(MAKE) $(MFLAGS) $@ way=$(patsubst _dyn,dyn,$(subst .,,$(suffix $(subst _,.,$(basename $(subst -ghc$(ProjectVersion),,$@)))))_dyn)
 
 endif	# if way
 

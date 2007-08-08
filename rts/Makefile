@@ -49,10 +49,20 @@ else
 ALL_DIRS += posix
 endif
 
-ifneq "$(DLLized)" "YES"
-EXCLUDED_SRCS += RtsDllMain.c
+ifneq "$(findstring dyn, $(way))" ""
+DYNAMIC_RTS=YES
 else
+DYNAMIC_RTS=NO
+endif
+
+ifeq "$(DYNAMIC_RTS) $(HOSTPLATFORM)" "YES i386-unknown-mingw32"
 EXCLUDED_SRCS += Main.c
+# It's not included in the DLL, but we need to compile it up separately.
+
+all :: Main.$(way_)o
+INSTALL_LIBS += Main.$(way_)o
+else
+EXCLUDED_SRCS += RtsDllMain.c
 endif
 
 # This file ends up being empty unless we're building for a powerpc
@@ -114,17 +124,29 @@ SRC_CC_OPTS += $(WARNING_OPTS)
 SRC_CC_OPTS += $(STANDARD_OPTS)
 
 SRC_CC_OPTS += $(GhcRtsCcOpts)
-SRC_HC_OPTS += $(GhcRtsHcOpts)
+SRC_HC_OPTS += $(GhcRtsHcOpts) -package-name rts
 
 ifneq "$(GhcWithSMP)" "YES"
 SRC_CC_OPTS += -DNOSMP
 SRC_HC_OPTS += -optc-DNOSMP
 endif
 
-ifneq "$(DLLized)" "YES"
+ifneq "$(DYNAMIC_RTS)" "YES"
 SRC_HC_OPTS += -static
+else
+LIB_LD_OPTS += -ignore-package base -ignore-package rts
+ifeq "$(DYNAMIC_RTS) $(HOSTPLATFORM)" "YES i386-unknown-mingw32"
+BASE_VERSION=$(strip $(shell grep version: $(TOP)/libraries/base/base.cabal | cut -f2 -d:))
+BASE_NAME=HSbase-$(BASE_VERSION)-ghc$(ProjectVersion)$(soext)
+BASE_DIST_LIB=$(TOP)/libraries/base/dist/build
+BASE_IMPORT_LIBRARY=$(BASE_DIST_LIB)/lib$(BASE_NAME).a
+LIB_DEPS=$(BASE_IMPORT_LIBRARY)
+LIB_LD_OPTS += -L$(BASE_DIST_LIB) -l$(BASE_NAME)
+# We extract a good bit of information out of the rts package.conf by going via ghc-pkg
+LIB_LD_OPTS += $(foreach lib,$(shell $(GHC_PKG_INPLACE) field rts extra-libraries | sed -e s/extra-libraries://),"-l$(lib)")
+LIB_LD_OPTS += $(foreach libdir,$(shell $(GHC_PKG_INPLACE) field rts library-dirs | sed -e s/library-dirs://),"-L$(libdir)")
 endif
-# SRC_HC_OPTS += -fPIC
+endif
 
 RtsMessages_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
 RtsFlags_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
@@ -228,31 +250,6 @@ CLEAN_FILES += $(AUTO_APPLY_CMM)
 endif
 
 # -----------------------------------------------------------------------------
-#
-#  Building DLLs is only supported on mingw32 at the moment.
-#
-ifeq "$(DLLized)" "YES"
-SRC_BLD_DLL_OPTS += -lHS_imp_stub -lgmp_imp
-
-# It's not included in the DLL, but we need to compile it up separately.
-all :: Main.dll_o
-
-# Need an import library containing the symbols the RTS uses from the Prelude.
-# So, to avoid bootstrapping trouble, we build one containing just the syms
-# we need. Weirdly named to avoid clashing later on when compiling the contents
-# of ghc/lib/..
-#
-# Note: if you do change the name of the Prelude DLL, the "--dllname <nm>.dll"
-# below will need to be updated as well.
-
-$(DLL_PEN)/HSrts$(_way).dll :: libHS_imp_stub.a
-
-libHS_imp_stub.a :
-	dlltool --output-lib libHS_imp_stub.a --def HSprel.def --dllname HSstd.dll
-
-endif
-
-# -----------------------------------------------------------------------------
 # Compile GMP only if we don't have it already
 #
 # We use GMP's own configuration stuff, because it's all rather hairy
@@ -336,9 +333,6 @@ sm/Compact_HC_OPTS += -optc-finline-limit=2500
 # upd_evacee() assigments get moved before the object copy.
 SRC_CC_OPTS += -fno-strict-aliasing
 
-# Cmm must be compiled via-C for now, because the NCG can't handle loops
-SRC_HC_OPTS += -fvia-C
-
 # We *want* type-checking of hand-written cmm.
 SRC_HC_OPTS += -dcmm-lint 
 
@@ -362,16 +356,19 @@ endif
 #
 # Just libHSrts is installed uniformly across ways
 #
-ifeq "$(DLLized)" "YES"
-INSTALL_PROGS += gmp/gmp.dll
-INSTALL_LIBS += gmp/libgmp_imp.a Main.dll_o
+
+include $(TOP)/mk/target.mk
+
+ifeq "$(DYNAMIC_RTS) $(HOSTPLATFORM)" "YES i386-unknown-mingw32"
+$(BASE_IMPORT_LIBRARY): $(LIBRARY).a
+	$(MAKE) -C ../libraries/ make.library.base
+# just for the timestamps
+	touch $(BASE_IMPORT_LIBRARY)
 endif
 
 #-----------------------------------------------------------------------------
 #
 # binary-dist
-
-include $(TOP)/mk/target.mk
 
 binary-dist:
 	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/rts
