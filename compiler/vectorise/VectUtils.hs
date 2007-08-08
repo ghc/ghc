@@ -4,10 +4,10 @@ module VectUtils (
   mkDataConTag,
   splitClosureTy,
   mkPADictType, mkPArrayType,
+  parrayReprTyCon, parrayReprDataCon,
   paDictArgType, paDictOfType, paDFunType,
   paMethod, lengthPA, replicatePA, emptyPA, liftPA,
   polyAbstract, polyApply, polyVApply,
-  lookupPArrayFamInst,
   hoistBinding, hoistExpr, hoistPolyVExpr, takeHoisted,
   buildClosure, buildClosures,
   mkClosureApp
@@ -109,6 +109,16 @@ mkPArrayType ty
   = do
       tc <- builtin parrayTyCon
       return $ TyConApp tc [ty]
+
+parrayReprTyCon :: Type -> VM (TyCon, [Type])
+parrayReprTyCon ty = builtin parrayTyCon >>= (`lookupFamInst` [ty])
+
+parrayReprDataCon :: Type -> VM (DataCon, [Type])
+parrayReprDataCon ty
+  = do
+      (tc, arg_tys) <- parrayReprTyCon ty
+      let [dc] = tyConDataCons tc
+      return (dc, arg_tys)
 
 paDictArgType :: TyVar -> VM (Maybe Type)
 paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
@@ -225,9 +235,6 @@ polyVApply expr tys
   = do
       dicts <- mapM paDictOfType tys
       return $ mapVect (\e -> e `mkTyApps` tys `mkApps` dicts) expr
-
-lookupPArrayFamInst :: Type -> VM (TyCon, [Type])
-lookupPArrayFamInst ty = builtin parrayTyCon >>= (`lookupFamInst` [ty])
 
 hoistBinding :: Var -> CoreExpr -> VM ()
 hoistBinding v e = updGEnv $ \env ->
@@ -354,7 +361,7 @@ mkLiftEnv lc [ty] [v]
 -- NOTE: this transparently deals with empty environments
 mkLiftEnv lc tys vs
   = do
-      (env_tc, env_tyargs) <- lookupPArrayFamInst vty
+      (env_tc, env_tyargs) <- parrayReprTyCon vty
       let [env_con] = tyConDataCons env_tc
           
           env = Var (dataConWrapId env_con)
