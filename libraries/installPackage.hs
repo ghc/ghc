@@ -26,8 +26,7 @@ main = do args <- getArgs
 doit :: FilePath -> FilePath -> Verbosity -> IO ()
 doit pref ghcpkg verbosity =
        do let userHooks = simpleUserHooks
-              copyFlags = emptyCopyFlags {
-                              copyDest = NoCopyDest,
+              copyFlags = (emptyCopyFlags NoCopyDest) {
                               copyVerbose = verbosity
                           }
               registerFlags = emptyRegisterFlags {
