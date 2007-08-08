@@ -692,9 +692,9 @@ checkDotnetResName  = varQual  dOTNET FSLIT("checkResult")     checkDotnetResNam
 -- NDP stuff
 parrayTyConName     = tcQual   nDP_PARRAY FSLIT("PArray") parrayTyConKey
 paTyConName         = tcQual   nDP_PARRAY FSLIT("PA")     paTyConKey
-lengthPAName        = methName nDP_PARRAY FSLIT("lengthPA")    lengthPAClassOpKey
-replicatePAName     = methName nDP_PARRAY FSLIT("replicatePA") replicatePAClassOpKey
-emptyPAName         = varQual  nDP_PARRAY FSLIT("emptyPA") emptyPAClassOpKey
+lengthPAName        = varQual  nDP_PARRAY FSLIT("lengthPA")    lengthPAIdKey
+replicatePAName     = varQual  nDP_PARRAY FSLIT("replicatePA") replicatePAIdKey
+emptyPAName         = varQual  nDP_PARRAY FSLIT("emptyPA") emptyPAIdKey
 closureTyConName    = tcQual   nDP_CLOSURE FSLIT(":->")    closureTyConKey
 mkClosureName       = varQual  nDP_CLOSURE FSLIT("mkClosure")  mkClosureIdKey
 applyClosureName    = varQual  nDP_CLOSURE FSLIT("$:")         applyClosureIdKey
@@ -1069,9 +1069,9 @@ applyClosureIdKey             = mkPreludeMiscIdUnique 127
 mkClosurePIdKey               = mkPreludeMiscIdUnique 128
 applyClosurePIdKey            = mkPreludeMiscIdUnique 129
 closurePAIdKey                = mkPreludeMiscIdUnique 130
-lengthPAClassOpKey            = mkPreludeMiscIdUnique 131
-replicatePAClassOpKey         = mkPreludeMiscIdUnique 132
-emptyPAClassOpKey             = mkPreludeMiscIdUnique 133
+lengthPAIdKey                 = mkPreludeMiscIdUnique 131
+replicatePAIdKey              = mkPreludeMiscIdUnique 132
+emptyPAIdKey                  = mkPreludeMiscIdUnique 133
 
 ---------------- Template Haskell -------------------
 --	USES IdUniques 200-399
