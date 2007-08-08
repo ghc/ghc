@@ -308,8 +308,9 @@ buildTyConBindings :: TyCon -> TyCon -> TyCon -> Var -> VM [(Var, CoreExpr)]
 buildTyConBindings orig_tc vect_tc arr_tc dfun
   = do
       shape <- tyConShape vect_tc
-      sequence_ (zipWith3 (vectDataConWorker shape vect_tc arr_tc arr_dc)
-                          num_dcs
+      sequence_ (zipWith4 (vectDataConWorker shape vect_tc arr_tc arr_dc)
+                          orig_dcs
+                          vect_dcs
                           (inits repr_tys)
                           (tails repr_tys))
       dict <- buildPADict shape vect_tc arr_tc dfun
@@ -320,13 +321,12 @@ buildTyConBindings orig_tc vect_tc arr_tc dfun
     vect_dcs = tyConDataCons vect_tc
     [arr_dc] = tyConDataCons arr_tc
 
-    num_dcs  = zip3 orig_dcs vect_dcs [0..]
     repr_tys = map dataConRepArgTys vect_dcs
 
 vectDataConWorker :: Shape -> TyCon -> TyCon -> DataCon
-                  -> (DataCon, DataCon, Int) -> [[Type]] -> [[Type]]
+                  -> DataCon -> DataCon -> [[Type]] -> [[Type]]
                   -> VM ()
-vectDataConWorker shape vect_tc arr_tc arr_dc (orig_dc, vect_dc, dc_num) pre (dc_tys : post)
+vectDataConWorker shape vect_tc arr_tc arr_dc orig_dc vect_dc pre (dc_tys : post)
   = do
       clo <- closedV
            . inBind orig_worker
@@ -350,7 +350,9 @@ vectDataConWorker shape vect_tc arr_tc arr_dc (orig_dc, vect_dc, dc_num) pre (dc
                 len     <- newLocalVar FSLIT("n") intPrimTy
                 arr_tys <- mapM mkPArrayType dc_tys
                 args    <- mapM (newLocalVar FSLIT("xs")) arr_tys
-                shapes  <- shapeReplicate shape (Var len) (mkIntLitInt dc_num)
+                shapes  <- shapeReplicate shape
+                                          (Var len)
+                                          (mkIntLitInt $ dataConTag vect_dc)
                 
                 empty_pre  <- mapM emptyPA (concat pre)
                 empty_post <- mapM emptyPA (concat post)
