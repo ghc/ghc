@@ -4,7 +4,7 @@ module VectUtils (
   mkDataConTag,
   splitClosureTy,
   mkPADictType, mkPArrayType,
-  parrayReprTyCon, parrayReprDataCon,
+  parrayReprTyCon, parrayReprDataCon, mkVScrut,
   paDictArgType, paDictOfType, paDFunType,
   paMethod, lengthPA, replicatePA, emptyPA, liftPA,
   polyAbstract, polyApply, polyVApply,
@@ -119,6 +119,12 @@ parrayReprDataCon ty
       (tc, arg_tys) <- parrayReprTyCon ty
       let [dc] = tyConDataCons tc
       return (dc, arg_tys)
+
+mkVScrut :: VExpr -> VM (VExpr, TyCon, [Type])
+mkVScrut (ve, le)
+  = do
+      (tc, arg_tys) <- parrayReprTyCon (exprType ve)
+      return ((ve, unwrapFamInstScrut tc arg_tys le), tc, arg_tys)
 
 paDictArgType :: TyVar -> VM (Maybe Type)
 paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)

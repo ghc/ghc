@@ -7,13 +7,17 @@ module VectCore (
   vNonRec, vRec,
 
   vVar, vType, vNote, vLet,
-  vLams, vLamsWithoutLC, vVarApps
+  vLams, vLamsWithoutLC, vVarApps,
+  vCaseDEFAULT, vCaseProd
 ) where
 
 #include "HsVersions.h"
 
 import CoreSyn
+import CoreUtils      ( exprType )
+import DataCon        ( DataCon )
 import Type           ( Type )
+import Id             ( mkWildId )
 import Var
 
 type Vect a = (a,a)
@@ -69,4 +73,20 @@ vVarApps lc (ve, le) vvs = (ve `mkVarApps` vs, le `mkVarApps` (lc : ls))
   where
     (vs,ls) = unzip vvs 
 
+vCaseDEFAULT :: VExpr -> VVar -> Type -> Type -> VExpr -> VExpr
+vCaseDEFAULT (vscrut, lscrut) (vbndr, lbndr) vty lty (vbody, lbody)
+  = (Case vscrut vbndr vty (mkDEFAULT vbody),
+     Case lscrut lbndr lty (mkDEFAULT lbody))
+  where
+    mkDEFAULT e = [(DEFAULT, [], e)]
 
+vCaseProd :: VExpr -> Type -> Type
+          -> DataCon -> DataCon -> [Var] -> [VVar] -> VExpr -> VExpr
+vCaseProd (vscrut, lscrut) vty lty vdc ldc sh_bndrs bndrs
+          (vbody,lbody)
+  = (Case vscrut (mkWildId $ exprType vscrut) vty
+          [(DataAlt vdc, vbndrs, vbody)],
+     Case lscrut (mkWildId $ exprType lscrut) lty
+          [(DataAlt ldc, sh_bndrs ++ lbndrs, lbody)])
+  where
+    (vbndrs, lbndrs) = unzip bndrs

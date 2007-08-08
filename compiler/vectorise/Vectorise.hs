@@ -154,6 +154,14 @@ vectBndrIn v p
       x <- p
       return (vv, x)
 
+vectBndrIn' :: Var -> (VVar -> VM a) -> VM (VVar, a)
+vectBndrIn' v p
+  = localV
+  $ do
+      vv <- vectBndr v
+      x  <- p vv
+      return (vv, x)
+
 vectBndrsIn :: [Var] -> VM a -> VM ([VVar], a)
 vectBndrsIn vs p
   = localV
@@ -227,6 +235,12 @@ vectExpr (_, AnnApp fn arg)
       arg' <- vectExpr arg
       mkClosureApp fn' arg'
 
+vectExpr (_, AnnCase scrut bndr ty alts)
+  | isAlgType scrut_ty
+  = vectAlgCase scrut bndr ty alts
+  where
+    scrut_ty = exprType (deAnnotate scrut)
+
 vectExpr (_, AnnCase expr bndr ty alts)
   = panic "vectExpr: case"
 
@@ -279,3 +293,44 @@ vectTyAppExpr :: CoreExprWithFVs -> [Type] -> VM VExpr
 vectTyAppExpr (_, AnnVar v) tys = vectPolyVar v tys
 vectTyAppExpr e tys = pprPanic "vectTyAppExpr" (ppr $ deAnnotate e)
 
+type CoreAltWithFVs = AnnAlt Id VarSet
+
+-- We convert
+--
+--   case e :: t of v { ... }
+--
+-- to
+--
+--   V:    let v = e in case v of _ { ... }
+--   L:    let v = e in case v `cast` ... of _ { ... }
+--
+-- When lifting, we have to do it this way because v must have the type
+-- [:V(T):] but the scrutinee must be cast to the representation type.
+--   
+
+-- FIXME: this is too lazy
+vectAlgCase scrut bndr ty [(DEFAULT, [], body)]
+  = do
+      vscrut <- vectExpr scrut
+      vty    <- vectType ty
+      lty    <- mkPArrayType vty
+      (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
+      return $ vCaseDEFAULT vscrut vbndr vty lty vbody
+
+vectAlgCase scrut bndr ty [(DataAlt dc, bndrs, body)]
+  = do
+      vty <- vectType ty
+      lty <- mkPArrayType vty
+      vexpr <- vectExpr scrut
+      (vbndr, (vbndrs, vbody)) <- vectBndrIn bndr
+                                . vectBndrsIn bndrs
+                                $ vectExpr body
+
+      (vscrut, arr_tc, arg_tys) <- mkVScrut (vVar vbndr)
+      vect_dc <- maybeV (lookupDataCon dc)
+      let [arr_dc] = tyConDataCons arr_tc
+      let shape_tys = take (dataConRepArity arr_dc - length bndrs)
+                           (dataConRepArgTys arr_dc)
+      shape_bndrs <- mapM (newLocalVar FSLIT("s")) shape_tys
+      return . vLet (vNonRec vbndr vexpr)
+             $ vCaseProd vscrut vty lty vect_dc arr_dc shape_bndrs vbndrs vbody
