@@ -352,7 +352,7 @@ vectDataConWorker shape vect_tc arr_tc arr_dc orig_dc vect_dc pre (dc_tys : post
                 args    <- mapM (newLocalVar FSLIT("xs")) arr_tys
                 shapes  <- shapeReplicate shape
                                           (Var len)
-                                          (mkIntLitInt $ dataConTag vect_dc)
+                                          (mkDataConTag vect_dc)
                 
                 empty_pre  <- mapM emptyPA (concat pre)
                 empty_post <- mapM emptyPA (concat post)

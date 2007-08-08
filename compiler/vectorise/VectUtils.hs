@@ -1,6 +1,7 @@
 module VectUtils (
   collectAnnTypeBinders, collectAnnTypeArgs, isAnnTypeArg,
   collectAnnValBinders,
+  mkDataConTag,
   splitClosureTy,
   mkPADictType, mkPArrayType,
   paDictArgType, paDictOfType, paDFunType,
@@ -23,7 +24,7 @@ import CoreUtils
 import Type
 import TypeRep
 import TyCon
-import DataCon            ( dataConWrapId )
+import DataCon            ( DataCon, dataConWrapId, dataConTag )
 import Var
 import Id                 ( mkWildId )
 import MkId               ( unwrapFamInstScrut )
@@ -57,6 +58,9 @@ collectAnnValBinders expr = go [] expr
 isAnnTypeArg :: AnnExpr b ann -> Bool
 isAnnTypeArg (_, AnnType t) = True
 isAnnTypeArg _              = False
+
+mkDataConTag :: DataCon -> CoreExpr
+mkDataConTag dc = mkConApp intDataCon [mkIntLitInt $ dataConTag dc]
 
 isClosureTyCon :: TyCon -> Bool
 isClosureTyCon tc = tyConName tc == closureTyConName
