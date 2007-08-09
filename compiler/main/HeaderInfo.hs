@@ -190,7 +190,7 @@ languagePragParseError loc =
 unsupportedExtnError loc unsup =
   pgmError (showSDoc (mkLocMessage loc (
                 text "unsupported extension: " <>
-                (text.show) unsup)))
+                text unsup)))
 
 
 optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages
