@@ -111,6 +111,9 @@ instance Monad GHCi where
   (GHCi m) >>= k  =  GHCi $ \s -> m s >>= \a -> unGHCi (k a) s
   return a  = GHCi $ \s -> return a
 
+instance Functor GHCi where
+    fmap f m = m >>= return . f
+
 ghciHandleDyn :: Typeable t => (t -> GHCi a) -> GHCi a -> GHCi a
 ghciHandleDyn h (GHCi m) = GHCi $ \s -> 
    Exception.catchDyn (m s) (\e -> unGHCi (h e) s)
