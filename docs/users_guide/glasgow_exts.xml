@@ -2810,9 +2810,23 @@ Suppose that from the RHS of <literal>f</literal> we get the constraint
 GHC does not commit to instance (C), because in a particular
 call of <literal>f</literal>, <literal>b</literal> might be instantiate 
 to <literal>Int</literal>, in which case instance (D) would be more specific still.
-So GHC rejects the program.  If you add the flag <option>-XIncoherentInstances</option>,
+So GHC rejects the program.  
+(If you add the flag <option>-XIncoherentInstances</option>,
 GHC will instead pick (C), without complaining about 
-the problem of subsequent instantiations.
+the problem of subsequent instantiations.)
+
+Notice that we gave a type signature to <literal>f</literal>, so GHC had to
+<emphasis>check</emphasis> that <literal>f</literal> has the specified type.  
+Suppose instead we do not give a type signature, asking GHC to <emphasis>infer</emphasis>
+it instead.  In this case, GHC will refrain from
+simplifying the constraint <literal>C Int [Int]</literal> (for the same reason
+as before) but, rather than rejecting the program, it will infer the type
+<programlisting>
+  f :: C Int b => [b] -> [b]
+</programlisting>
+That postpones the question of which instance to pick to the 
+call site for <literal>f</literal>
+by which time more is known about the type <literal>b</literal>.
 </para>
 <para>
 The willingness to be overlapped or incoherent is a property of 
