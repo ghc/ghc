@@ -358,7 +358,7 @@ resume (Session ref) step
         when (isStep step) $ setStepFlag
         case r of 
           Resume expr tid breakMVar statusMVar bindings 
-              final_ids apStack info _ _ _ -> do
+              final_ids apStack info _ hist _ -> do
                 withBreakAction (isStep step) (hsc_dflags hsc_env) 
                                         breakMVar statusMVar $ do
                 status <- withInterruptsSentTo
@@ -366,14 +366,18 @@ resume (Session ref) step
                                       -- this awakens the stopped thread...
                                  return tid)
                              (takeMVar statusMVar)
-                                      -- and wait for the result
+                                      -- and wait for the result 
+                let hist' = case info of 
+                              Nothing -> fromListBL 50 hist
+                              Just i -> History apStack i `consBL` 
+                                                     fromListBL 50 hist
                 case step of
                   RunAndLogSteps -> 
                         traceRunStatus expr ref bindings final_ids
-                                       breakMVar statusMVar status emptyHistory
+                                       breakMVar statusMVar status hist'
                   _other ->
                         handleRunStatus expr ref bindings final_ids
-                                        breakMVar statusMVar status emptyHistory
+                                        breakMVar statusMVar status hist'
 
 
 back :: Session -> IO ([Name], Int, SrcSpan)
@@ -631,6 +635,8 @@ consBL a (BL len bound left right)
   | otherwise   = BL len     bound (a:left) $! tail right
 
 toListBL (BL _ _ left right) = left ++ reverse right
+
+fromListBL bound l = BL (length l) bound l []
 
 -- lenBL (BL len _ _ _) = len
 
