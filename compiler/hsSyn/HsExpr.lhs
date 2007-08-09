@@ -326,8 +326,8 @@ ppr_expr (OpApp e1 op fixity e2)
       HsVar v -> pp_infixly v
       _	      -> pp_prefixly
   where
-    pp_e1 = pprParendExpr e1		-- Add parens to make precedence clear
-    pp_e2 = pprParendExpr e2
+    pp_e1 = pprDebugParendExpr e1   -- In debug mode, add parens 
+    pp_e2 = pprDebugParendExpr e2   -- to make precedence clear
 
     pp_prefixly
       = hang (ppr op) 2 (sep [pp_e1, pp_e2])
@@ -335,14 +335,14 @@ ppr_expr (OpApp e1 op fixity e2)
     pp_infixly v
       = sep [nest 2 pp_e1, pprInfix v, nest 2 pp_e2]
 
-ppr_expr (NegApp e _) = char '-' <+> pprParendExpr e
+ppr_expr (NegApp e _) = char '-' <+> pprDebugParendExpr e
 
 ppr_expr (SectionL expr op)
   = case unLoc op of
       HsVar v -> pp_infixly v
       _	      -> pp_prefixly
   where
-    pp_expr = pprParendExpr expr
+    pp_expr = pprDebugParendExpr expr
 
     pp_prefixly = hang (hsep [text " \\ x_ ->", ppr op])
 		       4 (hsep [pp_expr, ptext SLIT("x_ )")])
@@ -353,7 +353,7 @@ ppr_expr (SectionR op expr)
       HsVar v -> pp_infixly v
       _	      -> pp_prefixly
   where
-    pp_expr = pprParendExpr expr
+    pp_expr = pprDebugParendExpr expr
 
     pp_prefixly = hang (hsep [text "( \\ x_ ->", ppr op, ptext SLIT("x_")])
 		       4 ((<>) pp_expr rparen)
@@ -473,8 +473,23 @@ pa_brackets :: SDoc -> SDoc
 pa_brackets p = ptext SLIT("[:") <> p <> ptext SLIT(":]")    
 \end{code}
 
-Parenthesize unless very simple:
+HsSyn records exactly where the user put parens, with HsPar.
+So generally speaking we print without adding any parens.
+However, some code is internally generated, and in some places
+parens are absolutely required; so for these places we use
+pprParendExpr (but don't print double parens of course).
+
+For operator applications we don't add parens, because the oprerator
+fixities should do the job, except in debug mode (-dppr-debug) so we
+can see the structure of the parse tree.
+
 \begin{code}
+pprDebugParendExpr :: OutputableBndr id => LHsExpr id -> SDoc
+pprDebugParendExpr expr
+  = getPprStyle (\sty ->
+    if debugStyle sty then pprParendExpr expr
+		      else pprLExpr      expr)
+  
 pprParendExpr :: OutputableBndr id => LHsExpr id -> SDoc
 pprParendExpr expr
   = let
