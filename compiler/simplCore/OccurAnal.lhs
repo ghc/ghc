@@ -308,12 +308,10 @@ reOrderCycle bndrs (bind : binds)
 		-- Also vital to avoid risk of divergence:
 		-- Note [Recursive rules]
 
-	| is_con_app rhs = 2	-- Data types help with cases
-		-- This used to have a lower score than inlineCandidate, but
-		-- it's *really* helpful if dictionaries get inlined fast,
-		-- so I'm experimenting with giving higher priority to data-typed things
+	| inlineCandidate bndr rhs = 2	-- Likely to be inlined
+		-- Note [Inline candidates]
 
-	| inlineCandidate bndr rhs = 1	-- Likely to be inlined
+	| is_con_app rhs = 1	-- Data types help with cases
 
 	| otherwise = 0
 
@@ -355,6 +353,25 @@ makeLoopBreaker bndrs rhs_usg bndr
   where
     rules_only = bndrs `intersectsUFM` rhs_usg
 \end{code}
+
+Note [Inline candidates]
+~~~~~~~~~~~~~~~~~~~~~~~~
+At one point I gave is_con_app a higher score than inline-candidate,
+on the grounds that "it's *really* helpful if dictionaries get inlined fast".
+However a nofib run revealed no change if they were swapped so that 
+inline-candidate has the higher score.  And it's important that it does,
+else you can get a bad worker-wrapper split thus:
+  rec {
+	$wfoo x = ....foo x....
+	
+	{-loop brk-} foo x = ...$wfoo x...
+  }
+But we *want* the wrapper to be inlined!  If it isn't, the interface
+file sees the unfolding for $wfoo, and sees that foo is strict (and
+hence it gets an auto-generated wrapper.  Result: an infinite inlining
+in the importing scope.  So be a bit careful if you change this.  A
+good example is Tree.repTree in nofib/spectral/minimax.  If is_con_app
+has the higher score, then compiling Game.hs goes into an infinite loop.
 
 Note [Recursive rules]
 ~~~~~~~~~~~~~~~~~~~~~~
