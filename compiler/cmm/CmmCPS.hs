@@ -40,68 +40,63 @@ import Data.List
 -- |Top level driver for the CPS pass
 -----------------------------------------------------------------------------
 cmmCPS :: DynFlags -- ^ Dynamic flags: -dcmm-lint -ddump-cps-cmm
-       -> [GenCmm CmmStatic CmmInfo CmmStmt]    -- ^ Input C-- with Proceedures
-       -> IO [GenCmm CmmStatic CmmInfo CmmStmt] -- ^ Output CPS transformed C--
-cmmCPS dflags abstractC = do
-  when (dopt Opt_DoCmmLinting dflags) $
-       do showPass dflags "CmmLint"
-	  case firstJust $ map cmmLint abstractC of
-	    Just err -> do printDump err
-			   ghcExit dflags 1
-	    Nothing  -> return ()
-  showPass dflags "CPS"
+       -> [Cmm]    -- ^ Input C-- with Proceedures
+       -> IO [Cmm] -- ^ Output CPS transformed C--
+cmmCPS dflags cmm_with_calls
+  = do	{ when (dopt Opt_DoCmmLinting dflags) $
+	       do showPass dflags "CmmLint"
+		  case firstJust $ map cmmLint cmm_with_calls of
+		    Just err -> do printDump err
+				   ghcExit dflags 1
+		    Nothing  -> return ()
+	; showPass dflags "CPS"
 
   -- TODO: more lint checking
   --        check for use of branches to non-existant blocks
   --        check for use of Sp, SpLim, R1, R2, etc.
 
-  uniqSupply <- mkSplitUniqSupply 'p'
-  let supplies = listSplitUniqSupply uniqSupply
-  let doCpsProc s (Cmm c) =
-          Cmm $ concat $ zipWith cpsProc (listSplitUniqSupply s) c
-  let continuationC = zipWith doCpsProc supplies abstractC
+	; uniqSupply <- mkSplitUniqSupply 'p'
+	; let supplies = listSplitUniqSupply uniqSupply
+	; let cpsd_cmm = zipWith doCpsProc supplies cmm_with_calls
 
-  dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "CPS Cmm" (pprCmms continuationC)
+	; dumpIfSet_dyn dflags Opt_D_dump_cps_cmm "CPS Cmm" (pprCmms cpsd_cmm)
 
   -- TODO: add option to dump Cmm to file
 
-  return continuationC
+	; return cpsd_cmm }
 
-make_stack_check stack_check_block_id info stack_use next_block_id =
-    BasicBlock stack_check_block_id $
-                   check_stmts ++ [CmmBranch next_block_id]
-    where
-      check_stmts =
-          case info of
-            -- If we are given a stack check handler,
-            -- then great, well check the stack.
-            CmmInfo (Just gc_block) _ _
-                -> [CmmCondBranch
-                    (CmmMachOp (MO_U_Lt $ cmmRegRep spReg)
-                     [CmmReg stack_use, CmmReg spLimReg])
-                    gc_block]
-            -- If we aren't given a stack check handler,
-            -- then humph! we just won't check the stack for them.
-            CmmInfo Nothing _ _
-                -> []
 
 -----------------------------------------------------------------------------
 -- |CPS a single CmmTop (proceedure)
 -- Only 'CmmProc' are transformed 'CmmData' will be left alone.
 -----------------------------------------------------------------------------
 
+doCpsProc :: UniqSupply -> Cmm -> Cmm
+doCpsProc s (Cmm c) 
+  = Cmm $ concat $ zipWith cpsProc (listSplitUniqSupply s) c
+
 cpsProc :: UniqSupply 
-        -> GenCmmTop CmmStatic CmmInfo CmmStmt     -- ^Input proceedure
-        -> [GenCmmTop CmmStatic CmmInfo CmmStmt]   -- ^Output proceedure and continuations
+        -> CmmTop     -- ^Input procedure
+        -> [CmmTop]   -- ^Output procedures; 
+		      --   a single input procedure is converted to
+		      --   multiple output procedures
 
 -- Data blocks don't need to be CPS transformed
 cpsProc uniqSupply proc@(CmmData _ _) = [proc]
 
 -- Empty functions just don't work with the CPS algorithm, but
 -- they don't need the transformation anyway so just output them directly
-cpsProc uniqSupply proc@(CmmProc _ _ _ []) = [proc]
+cpsProc uniqSupply proc@(CmmProc _ _ _ []) 
+  = pprTrace "cpsProc: unexpected empty proc" (ppr proc) [proc]
 
 -- CPS transform for those procs that actually need it
+-- The plan is this:
+--
+--   * Introduce a stack-check block as the first block
+--   * The first blocks gets a FunctionEntry; the rest are ControlEntry
+--   * Now break each block into a bunch of blocks (at call sites); 
+--	all but the first will be ContinuationEntry
+--
 cpsProc uniqSupply (CmmProc info ident params blocks) = cps_procs
     where
       -- We need to be generating uniques for several things.
@@ -187,6 +182,23 @@ cpsProc uniqSupply (CmmProc info ident params blocks) = cps_procs
       cps_procs :: [CmmTop]
       cps_procs = zipWith (continuationToProc formats' stack_use) proc_uniques continuations'
 
+make_stack_check stack_check_block_id info stack_use next_block_id =
+    BasicBlock stack_check_block_id $
+                   check_stmts ++ [CmmBranch next_block_id]
+    where
+      check_stmts =
+          case info of
+            -- If we are given a stack check handler,
+            -- then great, well check the stack.
+            CmmInfo (Just gc_block) _ _
+                -> [CmmCondBranch
+                    (CmmMachOp (MO_U_Lt $ cmmRegRep spReg)
+                     [CmmReg stack_use, CmmReg spLimReg])
+                    gc_block]
+            -- If we aren't given a stack check handler,
+            -- then humph! we just won't check the stack for them.
+            CmmInfo Nothing _ _
+                -> []
 -----------------------------------------------------------------------------
 
 collectNonProcPointTargets ::

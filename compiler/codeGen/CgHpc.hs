@@ -65,7 +65,7 @@ initHpc this_mod (HpcInfo tickCount hashNo)
        ; emitForeignCall'
                PlayRisky
                [(id,NoHint)]
-               (CmmForeignCall
+               (CmmCallee
                  (CmmLit $ CmmLabel $ mkForeignLabel mod_alloc Nothing False)
                   CCallConv
                )

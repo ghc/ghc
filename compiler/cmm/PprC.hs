@@ -199,7 +199,7 @@ pprStmt stmt = case stmt of
 	where
 	  rep = cmmExprRep src
 
-    CmmCall (CmmForeignCall fn cconv) results args safety ->
+    CmmCall (CmmCallee fn cconv) results args safety ->
 	-- Controversial: leave this out for now.
 	-- pprUndef fn $$
 

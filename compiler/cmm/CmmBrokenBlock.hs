@@ -59,16 +59,20 @@ data BrokenBlock
     }
 
 -- | How a block could be entered
+-- See Note [An example of CPS conversion]
 data BlockEntryInfo
   = FunctionEntry		-- ^ Block is the beginning of a function
       CmmInfo                   -- ^ Function header info
       CLabel                    -- ^ The function name
       CmmFormals                -- ^ Aguments to function
+		-- Only the formal parameters are live 
 
   | ContinuationEntry 		-- ^ Return point of a function call
       CmmFormals                -- ^ return values (argument to continuation)
       C_SRT                     -- ^ SRT for the continuation's info table
       Bool                      -- ^ True <=> GC block so ignore stack size
+		-- Live variables, other than 
+		-- the return values, are on the stack
 
   | ControlEntry		-- ^ Any other kind of block.
                                 -- Only entered due to control flow.
@@ -76,6 +80,39 @@ data BlockEntryInfo
   -- TODO: Consider adding ProcPointEntry
   -- no return values, but some live might end up as
   -- params or possibly in the frame
+
+{-	Note [An example of CPS conversion]
+
+This is NR's and SLPJ's guess about how things might work;
+it may not be consistent with the actual code (particularly
+in the matter of what's in parameters and what's on the stack).
+
+f(x,y) {
+   if x>2 then goto L
+   x = x+1
+L: if x>1 then y = g(y)
+        else x = x+1 ;
+   return( x+y )
+}
+	BECOMES
+
+f(x,y) {   // FunctionEntry
+   if x>2 then goto L
+   x = x+1
+L: 	   // ControlEntry
+   if x>1 then push x; push f1; jump g(y)
+        else x=x+1; jump f2(x, y)
+}
+
+f1(y) {    // ContinuationEntry
+  pop x; jump f2(x, y);
+}
+  
+f2(x, y) { // ProcPointEntry
+  return (z+y);
+}
+
+-}
 
 data ContFormat = ContFormat
       CmmHintFormals            -- ^ return values (argument to continuation)
@@ -97,7 +134,7 @@ data FinalStmt
       CmmExpr                   -- ^ The function to call
       CmmActuals                -- ^ Arguments of the call
 
-  | FinalCall                   -- ^ Same as 'CmmForeignCall'
+  | FinalCall                   -- ^ Same as 'CmmCallee'
                                 -- followed by 'CmmGoto'
       BlockId                   -- ^ Target of the 'CmmGoto'
                                 -- (must be a 'ContinuationEntry')
@@ -238,9 +275,13 @@ breakBlock gc_block_idents uniques (BasicBlock ident stmts) entry =
                   next_id = BlockId $ head uniques
                   block = do_call current_id entry accum_stmts exits next_id
                                   target results arguments srt
-                  cont_info = (next_id,
+
+                  cont_info = (next_id,	-- Entry convention for the 
+					-- continuation of the call
                                ContFormat results srt
                                               (ident `elem` gc_block_idents))
+
+			-- Break up the part after the call
                   (cont_infos, blocks) = breakBlock' (tail uniques) next_id
                                          ControlEntry [] [] stmts
 

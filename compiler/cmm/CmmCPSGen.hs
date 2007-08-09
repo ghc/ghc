@@ -193,7 +193,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                             tail_call curr_stack target arguments
 
                         -- A regular Cmm function call
-                        FinalCall next (CmmForeignCall target CmmCallConv)
+                        FinalCall next (CmmCallee target CmmCallConv)
                             results arguments _ _ ->
                                 pack_continuation curr_format cont_format ++
                                 tail_call (curr_stack - cont_stack)
@@ -204,10 +204,10 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                               cont_stack = continuation_frame_size cont_format
 
                         -- A safe foreign call
-                        FinalCall next (CmmForeignCall target conv)
+                        FinalCall next (CmmCallee target conv)
                             results arguments _ _ ->
                                 target_stmts ++
-                                foreignCall call_uniques' (CmmForeignCall new_target conv)
+                                foreignCall call_uniques' (CmmCallee new_target conv)
                                             results arguments
                             where
                               (call_uniques', target_stmts, new_target) =
@@ -226,12 +226,12 @@ foreignCall uniques call results arguments =
     arg_stmts ++
     saveThreadState ++
     caller_save ++
-    [CmmCall (CmmForeignCall suspendThread CCallConv)
+    [CmmCall (CmmCallee suspendThread CCallConv)
 		 [ (id,PtrHint) ]
 		 [ (CmmReg (CmmGlobal BaseReg), PtrHint) ]
 		 CmmUnsafe,
      CmmCall call results new_args CmmUnsafe,
-     CmmCall (CmmForeignCall resumeThread CCallConv)
+     CmmCall (CmmCallee resumeThread CCallConv)
                  [ (new_base, PtrHint) ]
 		 [ (CmmReg (CmmLocal id), PtrHint) ]
 		 CmmUnsafe,

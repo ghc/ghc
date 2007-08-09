@@ -358,7 +358,7 @@ emitRtsCall' res fun args vols safe = do
   stmtsC caller_load
   where
     (caller_save, caller_load) = callerSaveVolatileRegs vols
-    target   = CmmForeignCall fun_expr CCallConv
+    target   = CmmCallee fun_expr CCallConv
     fun_expr = mkLblExpr (mkRtsCodeLabel fun)
 
 -----------------------------------------------------------------------------

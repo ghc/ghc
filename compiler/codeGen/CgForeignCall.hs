@@ -73,7 +73,7 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
   = do vols <- getVolatileRegs live
        srt <- getSRTInfo
        emitForeignCall' safety results
-		(CmmForeignCall cmm_target cconv) call_args (Just vols) srt
+		(CmmCallee cmm_target cconv) call_args (Just vols) srt
   where
       (call_args, cmm_target)
 	= case target of
@@ -128,12 +128,12 @@ emitForeignCall' safety results target args vols srt
     -- Once that happens, this function will just emit a (CmmSafe srt) call,
     -- and the CPS will will be the one to convert that
     -- to this sequence of three CmmUnsafe calls.
-    stmtC (CmmCall (CmmForeignCall suspendThread CCallConv) 
+    stmtC (CmmCall (CmmCallee suspendThread CCallConv) 
 			[ (id,PtrHint) ]
 			[ (CmmReg (CmmGlobal BaseReg), PtrHint) ] 
 			CmmUnsafe)
     stmtC (CmmCall temp_target results temp_args CmmUnsafe)
-    stmtC (CmmCall (CmmForeignCall resumeThread CCallConv) 
+    stmtC (CmmCall (CmmCallee resumeThread CCallConv) 
 			[ (new_base, PtrHint) ]
 			[ (CmmReg (CmmLocal id), PtrHint) ]
 			CmmUnsafe)
@@ -159,9 +159,9 @@ load_args_into_temps = mapM arg_assign_temp
 	   tmp <- maybe_assign_temp e
 	   return (tmp,hint)
 	
-load_target_into_temp (CmmForeignCall expr conv) = do 
+load_target_into_temp (CmmCallee expr conv) = do 
   tmp <- maybe_assign_temp expr
-  return (CmmForeignCall tmp conv)
+  return (CmmCallee tmp conv)
 load_target_into_temp other_target =
   return other_target
 

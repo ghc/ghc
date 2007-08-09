@@ -47,41 +47,48 @@ import Data.Word
 -- re-orderd during code generation.
 
 -- GenCmm is abstracted over
---   (a) the type of static data elements
---   (b) the contents of a basic block.
+--   d, the type of static data elements in CmmData
+--   h, the static info preceding the code of a CmmProc
+--   i, the contents of a basic block within a CmmProc
+--
 -- We expect there to be two main instances of this type:
---   (a) Plain C--, i.e. populated with CmmLit and CmmExpr respectively,
---   (b) Native code, populated with instructions
+--   (a) C--, i.e. populated with various C-- constructs
+--		(Cmm and RawCmm below)
+--   (b) Native code, populated with data/instructions
 --
 newtype GenCmm d h i = Cmm [GenCmmTop d h i]
 
--- | Cmm with the info table as a data type
-type Cmm = GenCmm CmmStatic CmmInfo CmmStmt
-
--- | Cmm with the info tables converted to a list of 'CmmStatic'
-type RawCmm = GenCmm CmmStatic [CmmStatic] CmmStmt
-
--- A top-level chunk, abstracted over the type of the contents of
+-- | A top-level chunk, abstracted over the type of the contents of
 -- the basic blocks (Cmm or instructions are the likely instantiations).
 data GenCmmTop d h i
-  = CmmProc
+  = CmmProc	-- A procedure
      h	               -- Extra header such as the info table
      CLabel            -- Used to generate both info & entry labels
      CmmFormals        -- Argument locals live on entry (C-- procedure params)
      [GenBasicBlock i] -- Code, may be empty.  The first block is
-                       -- the entry point.  The order is otherwise initially 
+                       -- the entry point, and should be labelled by the code gen
+		       -- with the CLabel.  The order is otherwise initially 
                        -- unimportant, but at some point the code gen will
                        -- fix the order.
 
-		       -- the BlockId of the first block does not give rise
+		       -- The BlockId of the first block does not give rise
 		       -- to a label.  To jump to the first block in a Proc,
 		       -- use the appropriate CLabel.
 
-  -- some static data.
-  | CmmData Section [d]	-- constant values only
+		       -- BlockIds are only unique within a procedure
 
+  | CmmData 	-- Static data
+	Section 
+	[d]
+
+-- | Cmm with the info table as a data type
+type Cmm    = GenCmm    CmmStatic CmmInfo CmmStmt
 type CmmTop = GenCmmTop CmmStatic CmmInfo CmmStmt
+
+-- | Cmm with the info tables converted to a list of 'CmmStatic'
+type RawCmm    = GenCmm    CmmStatic [CmmStatic] CmmStmt
 type RawCmmTop = GenCmmTop CmmStatic [CmmStatic] CmmStmt
+
 
 -- A basic block containing a single label, at the beginning.
 -- The list of basic blocks in a top-level code block may be re-ordered.
@@ -90,12 +97,7 @@ type RawCmmTop = GenCmmTop CmmStatic [CmmStatic] CmmStmt
 -- blocks in order to turn some jumps into fallthroughs.
 
 data GenBasicBlock i = BasicBlock BlockId [i]
-  -- ToDo: Julian suggests that we might need to annotate this type
-  -- with the out & in edges in the graph, i.e. two * [BlockId].  This
-  -- information can be derived from the contents, but it might be
-  -- helpful to cache it here.
-
-type CmmBasicBlock = GenBasicBlock CmmStmt
+type CmmBasicBlock   = GenBasicBlock CmmStmt
 
 blockId :: GenBasicBlock i -> BlockId
 -- The branch block id is that of the first block in 
@@ -113,9 +115,9 @@ mapBlockStmts f (BasicBlock id bs) = BasicBlock id (map f bs)
 
 data CmmInfo
   = CmmInfo
-      (Maybe BlockId) -- GC target. Nothing <=> CPS won't do stack check
+      (Maybe BlockId)     -- GC target. Nothing <=> CPS won't do stack check
       (Maybe UpdateFrame) -- Update frame
-      CmmInfoTable -- Info table
+      CmmInfoTable        -- Info table
 
 -- Info table as a haskell data type
 data CmmInfoTable
@@ -174,7 +176,7 @@ data CmmStmt
   | CmmStore CmmExpr CmmExpr     -- Assign to memory location.  Size is
                                  -- given by cmmExprRep of the rhs.
 
-  | CmmCall	 		 -- A foreign call, with 
+  | CmmCall	 		 -- A call (forign, native or primitive), with 
      CmmCallTarget
      CmmHintFormals		 -- zero or more results
      CmmActuals			 -- zero or more arguments
@@ -190,18 +192,18 @@ data CmmStmt
 	--	one  -> second block etc
 	-- Undefined outside range, and when there's a Nothing
 
-  | CmmJump CmmExpr               -- Jump to another function,
-      CmmActuals                  -- with these parameters.
+  | CmmJump CmmExpr      -- Jump to another C-- function,
+      CmmActuals         -- with these parameters.
 
-  | CmmReturn                     -- Return from a function,
-      CmmActuals                  -- with these return values.
+  | CmmReturn            -- Return from a native C-- function,
+      CmmActuals         -- with these return values.
 
-type CmmActual = CmmExpr
-type CmmActuals = [(CmmActual,MachHint)]
-type CmmFormal = LocalReg
+type CmmActual      = CmmExpr
+type CmmActuals     = [(CmmActual,MachHint)]
+type CmmFormal      = LocalReg
 type CmmHintFormals = [(CmmFormal,MachHint)]
-type CmmFormals = [CmmFormal]
-data CmmSafety = CmmUnsafe | CmmSafe C_SRT
+type CmmFormals     = [CmmFormal]
+data CmmSafety      = CmmUnsafe | CmmSafe C_SRT
 
 {-
 Discussion
@@ -246,12 +248,12 @@ So we'll stick with the way it is, and add the optimisation to the NCG.
 -----------------------------------------------------------------------------
 
 data CmmCallTarget
-  = CmmForeignCall		-- Call to a foreign function
+  = CmmCallee		-- Call a function (foreign or native)
 	CmmExpr 		-- literal label <=> static call
 				-- other expression <=> dynamic call
 	CCallConv		-- The calling convention
 
-  | CmmPrim			-- Call to a "primitive" (eg. sin, cos)
+  | CmmPrim		-- Call a "primitive" (eg. sin, cos)
 	CallishMachOp		-- These might be implemented as inline
 				-- code by the backend.
 
@@ -272,21 +274,10 @@ data CmmExpr
 	--	where rep = cmmRegRep reg
   deriving Eq
 
-cmmExprRep :: CmmExpr -> MachRep
-cmmExprRep (CmmLit lit)      = cmmLitRep lit
-cmmExprRep (CmmLoad _ rep)   = rep
-cmmExprRep (CmmReg reg)      = cmmRegRep reg
-cmmExprRep (CmmMachOp op _)  = resultRepOfMachOp op
-cmmExprRep (CmmRegOff reg _) = cmmRegRep reg
-
 data CmmReg 
   = CmmLocal  LocalReg
   | CmmGlobal GlobalReg
   deriving( Eq )
-
-cmmRegRep :: CmmReg -> MachRep
-cmmRegRep (CmmLocal  reg) 	= localRegRep reg
-cmmRegRep (CmmGlobal reg)	= globalRegRep reg
 
 -- | Whether a 'LocalReg' is a GC followable pointer
 data Kind = KindPtr | KindNonPtr deriving (Eq)
@@ -296,17 +287,6 @@ data LocalReg
       !Unique   -- ^ Identifier
       MachRep   -- ^ Type
       Kind      -- ^ Should the GC follow as a pointer
-
-instance Eq LocalReg where
-  (LocalReg u1 _ _) == (LocalReg u2 _ _) = u1 == u2
-
-instance Uniquable LocalReg where
-  getUnique (LocalReg uniq _ _) = uniq
-
-localRegRep :: LocalReg -> MachRep
-localRegRep (LocalReg _ rep _) = rep
-
-localRegGCFollow (LocalReg _ _ p) = p
 
 data CmmLit
   = CmmInt Integer  MachRep
@@ -328,6 +308,31 @@ data CmmLit
         -- position-independent code. 
   | CmmLabelDiffOff CLabel CLabel Int   -- label1 - label2 + offset
   deriving Eq
+
+instance Eq LocalReg where
+  (LocalReg u1 _ _) == (LocalReg u2 _ _) = u1 == u2
+
+instance Uniquable LocalReg where
+  getUnique (LocalReg uniq _ _) = uniq
+
+-----------------------------------------------------------------------------
+--		MachRep
+-----------------------------------------------------------------------------
+cmmExprRep :: CmmExpr -> MachRep
+cmmExprRep (CmmLit lit)      = cmmLitRep lit
+cmmExprRep (CmmLoad _ rep)   = rep
+cmmExprRep (CmmReg reg)      = cmmRegRep reg
+cmmExprRep (CmmMachOp op _)  = resultRepOfMachOp op
+cmmExprRep (CmmRegOff reg _) = cmmRegRep reg
+
+cmmRegRep :: CmmReg -> MachRep
+cmmRegRep (CmmLocal  reg) 	= localRegRep reg
+cmmRegRep (CmmGlobal reg)	= globalRegRep reg
+
+localRegRep :: LocalReg -> MachRep
+localRegRep (LocalReg _ rep _) = rep
+
+localRegGCFollow (LocalReg _ _ p) = p
 
 cmmLitRep :: CmmLit -> MachRep
 cmmLitRep (CmmInt _ rep)    = rep

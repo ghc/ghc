@@ -117,7 +117,7 @@ emitPrimOp [res] ParOp [arg] live
     vols <- getVolatileRegs live
     emitForeignCall' PlayRisky
 	[(res,NoHint)]
-    	(CmmForeignCall newspark CCallConv) 
+    	(CmmCallee newspark CCallConv) 
 	[(CmmReg (CmmGlobal BaseReg), PtrHint), (arg,PtrHint)] 
 	(Just vols)
         NoC_SRT -- No SRT b/c we do PlayRisky
@@ -133,7 +133,7 @@ emitPrimOp [] WriteMutVarOp [mutv,var] live
 	vols <- getVolatileRegs live
 	emitForeignCall' PlayRisky
 		[{-no results-}]
-		(CmmForeignCall (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
+		(CmmCallee (CmmLit (CmmLabel mkDirty_MUT_VAR_Label))
 			 CCallConv)
 		[(CmmReg (CmmGlobal BaseReg), PtrHint), (mutv,PtrHint)]
 		(Just vols)

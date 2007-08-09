@@ -176,7 +176,7 @@ cmmStmtLive _ (CmmCall target results arguments _) =
     addKilled (mkUniqSet $ cmmHintFormalsToLiveLocals results) where
         target_liveness =
             case target of
-              (CmmForeignCall target _) -> cmmExprLive target
+              (CmmCallee target _) -> cmmExprLive target
               (CmmPrim _) -> id
 cmmStmtLive other_live (CmmBranch target) =
     addLive (lookupWithDefaultUFM other_live emptyUniqSet target)

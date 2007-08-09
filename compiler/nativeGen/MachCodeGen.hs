@@ -3089,11 +3089,11 @@ genCCall target dest_regs args = do
     (callinsns,cconv) <-
       case target of
 	-- CmmPrim -> ...
-        CmmForeignCall (CmmLit (CmmLabel lbl)) conv
+        CmmCallee (CmmLit (CmmLabel lbl)) conv
            -> -- ToDo: stdcall arg sizes
 	      return (unitOL (CALL (Left fn_imm) []), conv)
 	   where fn_imm = ImmCLbl lbl
-        CmmForeignCall expr conv
+        CmmCallee expr conv
            -> do (dyn_c, dyn_r, dyn_rep) <- get_op expr
                  ASSERT(dyn_rep == I32)
                   return (dyn_c `snocOL` CALL (Right dyn_r) [], conv)
@@ -3202,7 +3202,7 @@ outOfLineFloatOp mop res args
   = do
       dflags <- getDynFlagsNat
       targetExpr <- cmmMakeDynamicReference dflags addImportNat CallReference lbl
-      let target = CmmForeignCall targetExpr CCallConv
+      let target = CmmCallee targetExpr CCallConv
         
       if localRegRep res == F64
         then
@@ -3307,11 +3307,11 @@ genCCall target dest_regs args = do
     (callinsns,cconv) <-
       case target of
 	-- CmmPrim -> ...
-        CmmForeignCall (CmmLit (CmmLabel lbl)) conv
+        CmmCallee (CmmLit (CmmLabel lbl)) conv
            -> -- ToDo: stdcall arg sizes
 	      return (unitOL (CALL (Left fn_imm) arg_regs), conv)
 	   where fn_imm = ImmCLbl lbl
-        CmmForeignCall expr conv
+        CmmCallee expr conv
            -> do (dyn_r, dyn_c) <- getSomeReg expr
 		 return (dyn_c `snocOL` CALL (Right dyn_r) arg_regs, conv)
 
@@ -3461,9 +3461,9 @@ genCCall target dest_regs argsAndHints = do
         vregs              = concat vregss
     -- deal with static vs dynamic call targets
     callinsns <- (case target of
-        CmmForeignCall (CmmLit (CmmLabel lbl)) conv -> do
+        CmmCallee (CmmLit (CmmLabel lbl)) conv -> do
 		return (unitOL (CALL (Left (litToImm (CmmLabel lbl))) n_argRegs_used False))
-        CmmForeignCall expr conv -> do
+        CmmCallee expr conv -> do
                 (dyn_c, [dyn_r]) <- arg_to_int_vregs expr
                 return (dyn_c `snocOL` CALL (Right dyn_r) n_argRegs_used False)
 	CmmPrim mop -> do
@@ -3658,8 +3658,8 @@ genCCall target dest_regs argsAndHints
                                                         (toOL []) []
                                                 
         (labelOrExpr, reduceToF32) <- case target of
-            CmmForeignCall (CmmLit (CmmLabel lbl)) conv -> return (Left lbl, False)
-            CmmForeignCall expr conv -> return  (Right expr, False)
+            CmmCallee (CmmLit (CmmLabel lbl)) conv -> return (Left lbl, False)
+            CmmCallee expr conv -> return  (Right expr, False)
             CmmPrim mop -> outOfLineFloatOp mop
                                                         
         let codeBefore = move_sp_down finalStack `appOL` passArgumentsCode

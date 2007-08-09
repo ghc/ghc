@@ -877,17 +877,17 @@ foreignCall conv_string results_code expr_code args_code vols safety
 	  results <- sequence results_code
 	  expr <- expr_code
 	  args <- sequence args_code
-	  --code (stmtC (CmmCall (CmmForeignCall expr convention) results args safety))
+	  --code (stmtC (CmmCall (CmmCallee expr convention) results args safety))
           case convention of
             -- Temporary hack so at least some functions are CmmSafe
-            CmmCallConv -> code (stmtC (CmmCall (CmmForeignCall expr convention) results args safety))
+            CmmCallConv -> code (stmtC (CmmCall (CmmCallee expr convention) results args safety))
             _ -> case safety of
 	      CmmUnsafe ->
                 code (emitForeignCall' PlayRisky results 
-                   (CmmForeignCall expr convention) args vols NoC_SRT)
+                   (CmmCallee expr convention) args vols NoC_SRT)
               CmmSafe srt ->
                 code (emitForeignCall' (PlaySafe unused) results 
-                   (CmmForeignCall expr convention) args vols NoC_SRT) where
+                   (CmmCallee expr convention) args vols NoC_SRT) where
 	        unused = panic "not used by emitForeignCall'"
 
 primCall

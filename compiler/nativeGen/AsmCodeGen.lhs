@@ -519,9 +519,9 @@ cmmStmtConFold stmt
 
 	CmmCall target regs args srt
 	   -> do target' <- case target of
-			      CmmForeignCall e conv -> do
+			      CmmCallee e conv -> do
 			        e' <- cmmExprConFold CallReference e
-			        return $ CmmForeignCall e' conv
+			        return $ CmmCallee e' conv
 			      other -> return other
                  args' <- mapM (\(arg, hint) -> do
                                   arg' <- cmmExprConFold DataReference arg
