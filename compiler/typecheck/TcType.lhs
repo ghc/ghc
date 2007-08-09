@@ -140,6 +140,7 @@ import ForeignCall
 import Unify
 import VarSet
 import Type
+import Coercion
 import TyCon
 
 -- others:
@@ -840,6 +841,7 @@ tcSplitPredTy_maybe other	  = Nothing
 predTyUnique :: PredType -> Unique
 predTyUnique (IParam n _)      = getUnique (ipNameName n)
 predTyUnique (ClassP clas tys) = getUnique clas
+predTyUnique (EqPred a b)      = pprPanic "predTyUnique" (ppr (EqPred a b))
 \end{code}
 
 
@@ -1050,6 +1052,7 @@ exactTyVarsOfType ty
     go (AppTy fun arg)	    	  = go fun `unionVarSet` go arg
     go (ForAllTy tyvar ty)  	  = delVarSet (go ty) tyvar
                                     `unionVarSet` go_tv tyvar
+    go (NoteTy _ _) 		  = panic "exactTyVarsOfType"	-- Handled by tcView
 
     go_pred (IParam _ ty)    = go ty
     go_pred (ClassP _ tys)   = exactTyVarsOfTypes tys
@@ -1103,22 +1106,28 @@ restricted set of types as arguments and results (the restricting factor
 being the )
 
 \begin{code}
-tcSplitIOType_maybe :: Type -> Maybe (TyCon, Type)
--- (isIOType t) returns (Just (IO,t')) if t is of the form (IO t'), or
---				       some newtype wrapping thereof
+tcSplitIOType_maybe :: Type -> Maybe (TyCon, Type, CoercionI)
+-- (isIOType t) returns Just (IO,t',co)
+--				if co : t ~ IO t'
 --		returns Nothing otherwise
 tcSplitIOType_maybe ty 
-  | Just (io_tycon, [io_res_ty]) <- tcSplitTyConApp_maybe ty,
+  = case tcSplitTyConApp_maybe ty of
 	-- This split absolutely has to be a tcSplit, because we must
 	-- see the IO type; and it's a newtype which is transparent to splitTyConApp.
-    io_tycon `hasKey` ioTyConKey
-  = Just (io_tycon, io_res_ty)
 
-  | Just ty' <- coreView ty	-- Look through non-recursive newtypes
-  = tcSplitIOType_maybe ty'
+	Just (io_tycon, [io_res_ty]) 
+	   |  io_tycon `hasKey` ioTyConKey 
+	   -> Just (io_tycon, io_res_ty, IdCo)
 
-  | otherwise
-  = Nothing
+	Just (tc, tys)
+	   | not (isRecursiveTyCon tc)
+	   , Just (ty, co1) <- instNewTyCon_maybe tc tys
+		  -- Newtypes that require a coercion are ok
+	   -> case tcSplitIOType_maybe ty of
+		Nothing		    -> Nothing
+		Just (tc, ty', co2) -> Just (tc, ty', co1 `mkTransCoI` co2)
+
+	other -> Nothing
 
 isFFITy :: Type -> Bool
 -- True for any TyCon that can possibly be an arg or result of an FFI call

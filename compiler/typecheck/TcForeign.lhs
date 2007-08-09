@@ -263,7 +263,7 @@ mustBeIO = False
 
 checkForeignRes non_io_result_ok pred_res_ty ty
 	-- (IO t) is ok, and so is any newtype wrapping thereof
-  | Just (io, res_ty) <- tcSplitIOType_maybe ty,
+  | Just (io, res_ty, _) <- tcSplitIOType_maybe ty,
     pred_res_ty res_ty
   = returnM ()
  

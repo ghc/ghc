@@ -27,7 +27,7 @@ module Coercion (
         mkForAllCoercion, mkFunCoercion, mkInstsCoercion, mkUnsafeCoercion,
         mkNewTypeCoercion, mkFamInstCoercion, mkAppsCoercion,
 
-        splitNewTypeRepCo_maybe, decomposeCo,
+        splitNewTypeRepCo_maybe, instNewTyCon_maybe, decomposeCo,
 
         unsafeCoercionTyCon, symCoercionTyCon,
         transCoercionTyCon, leftCoercionTyCon, 
@@ -413,24 +413,37 @@ unsafeCoercionTyConName = mkCoConName FSLIT("CoUnsafe") unsafeCoercionTyConKey u
 
 
 
+instNewTyCon_maybe :: TyCon -> [Type] -> Maybe (Type, CoercionI)
+-- instNewTyCon_maybe T ts
+--	= Just (rep_ty, co)	if   co : T ts ~ rep_ty
+instNewTyCon_maybe tc tys
+  | Just (tvs, ty, mb_co_tc) <- unwrapNewTyCon_maybe tc
+  = ASSERT( tys `lengthIs` tyConArity tc )
+    Just (substTyWith tvs tys ty, 
+	  case mb_co_tc of
+	   Nothing    -> IdCo
+	   Just co_tc -> ACo (mkTyConApp co_tc tys))
+  | otherwise
+  = Nothing
+
 -- this is here to avoid module loops
 splitNewTypeRepCo_maybe :: Type -> Maybe (Type, Coercion)  
 -- Sometimes we want to look through a newtype and get its associated coercion
 -- It only strips *one layer* off, so the caller will usually call itself recursively
 -- Only applied to types of kind *, hence the newtype is always saturated
+--    splitNewTypeRepCo_maybe ty
+--	= Just (ty', co)  if   co : ty ~ ty'
+-- Returns Nothing for non-newtypes or fully-transparent newtypes
 splitNewTypeRepCo_maybe ty 
   | Just ty' <- coreView ty = splitNewTypeRepCo_maybe ty'
 splitNewTypeRepCo_maybe (TyConApp tc tys)
-  | isClosedNewTyCon tc 
-  = ASSERT( tys `lengthIs` tyConArity tc )	-- splitNewTypeRepCo_maybe only be applied 
-                                                -- 	to *types* (of kind *)
-        case newTyConRhs tc of
-	  (tvs, rep_ty) -> 
-              ASSERT( length tvs == length tys )
-	      Just (substTyWith tvs tys rep_ty, mkTyConApp co_con tys)
-  where
-    co_con = maybe (pprPanic "splitNewTypeRepCo_maybe" (ppr tc)) id (newTyConCo_maybe tc)
-splitNewTypeRepCo_maybe other = Nothing
+  | Just (ty', coi) <- instNewTyCon_maybe tc tys
+  = case coi of
+	ACo co -> Just (ty', co)
+	IdCo   -> panic "splitNewTypeRepCo_maybe"
+			-- This case handled by coreView
+splitNewTypeRepCo_maybe other 
+  = Nothing
 \end{code}
 
 
@@ -440,7 +453,6 @@ splitNewTypeRepCo_maybe other = Nothing
 
 
 \begin{code}
-
 	-- CoercionI is either 
 	--	(a) proper coercion
 	--	(b) the identity coercion

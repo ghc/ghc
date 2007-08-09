@@ -91,9 +91,9 @@ dsCCall :: CLabelString	-- C routine to invoke
 	-> DsM CoreExpr	-- Result, of type ???
 
 dsCCall lbl args may_gc result_ty
-  = mapAndUnzipDs unboxArg args	       `thenDs` \ (unboxed_args, arg_wrappers) ->
+  = mapAndUnzipDs unboxArg args	    `thenDs` \ (unboxed_args, arg_wrappers) ->
     boxResult id Nothing result_ty  `thenDs` \ (ccall_result_ty, res_wrapper) ->
-    newUnique			       `thenDs` \ uniq ->
+    newUnique			    `thenDs` \ uniq ->
     let
 	target = StaticTarget lbl
 	the_fcall    = CCall (CCallSpec target CCallConv may_gc)
@@ -182,6 +182,7 @@ unboxArg arg
 
     )
 
+  ----- Cases for .NET; almost certainly bit-rotted ---------
   | Just (tc, [arg_ty]) <- splitTyConApp_maybe arg_ty,
     tc == listTyCon,
     Just (cc,[]) <- splitTyConApp_maybe arg_ty,
@@ -193,7 +194,7 @@ unboxArg arg
     	      \ body ->
 	        let
 		 io_ty = exprType body
-		 Just (_,io_arg) = tcSplitIOType_maybe io_ty
+		 Just (_,io_arg,_) = tcSplitIOType_maybe io_ty
 		in
 	      	mkApps (Var unpack_id)
 		       [ Type io_arg
@@ -209,13 +210,14 @@ unboxArg arg
     	      \ body ->
 	        let
 		 io_ty = exprType body
-		 Just (_,io_arg) = tcSplitIOType_maybe io_ty
+		 Just (_,io_arg,_) = tcSplitIOType_maybe io_ty
 		in
 	      	mkApps (Var unpack_id)
 		       [ Type io_arg
 		       , arg
 		       , Lam prim_obj body
 		       ])
+  --------------- End of cases for .NET --------------------
 
   | otherwise
   = getSrcSpanDs `thenDs` \ l ->
@@ -235,7 +237,8 @@ unboxArg arg
 
 
 \begin{code}
-boxResult :: ((Maybe Type, CoreExpr -> CoreExpr) -> (Maybe Type, CoreExpr -> CoreExpr))
+boxResult :: ((Maybe Type, CoreExpr -> CoreExpr)
+		 -> (Maybe Type, CoreExpr -> CoreExpr))
 	  -> Maybe Id
 	  -> Type
 	  -> DsM (Type, CoreExpr -> CoreExpr)
@@ -255,45 +258,45 @@ boxResult :: ((Maybe Type, CoreExpr -> CoreExpr) -> (Maybe Type, CoreExpr -> Cor
 -- It looks a mess: I wonder if it could be refactored.
 
 boxResult augment mbTopCon result_ty
-  | Just (io_tycon, io_res_ty) <- tcSplitIOType_maybe result_ty
+  | Just (io_tycon, io_res_ty, co) <- tcSplitIOType_maybe result_ty
 	-- isIOType_maybe handles the case where the type is a 
 	-- simple wrapping of IO.  E.g.
 	-- 	newtype Wrap a = W (IO a)
-	-- No coercion necessay because its a non-recursive newtype
+	-- No coercion necessary because its a non-recursive newtype
 	-- (If we wanted to handle a *recursive* newtype too, we'd need
 	-- another case, and a coercion.)
-  = 	-- The result is IO t, so wrap the result in an IO constructor
-	
-    resultWrapper io_res_ty             `thenDs` \ res ->
-    let aug_res          = augment res
-        extra_result_tys = case aug_res of
-			     (Just ty,_) 
-			       | isUnboxedTupleType ty 
-			       -> let (Just (_, ls)) = splitTyConApp_maybe ty in tail ls
-			     _ -> []
+   	-- The result is IO t, so wrap the result in an IO constructor
+  = do	{ res <- resultWrapper io_res_ty
+	; let aug_res = augment res
+	      extra_result_tys 
+		= case aug_res of
+		     (Just ty,_) 
+		       | isUnboxedTupleType ty 
+		       -> let (Just (_, ls)) = splitTyConApp_maybe ty in tail ls
+		     _ -> []
 
-        return_result state anss
-	  = mkConApp (tupleCon Unboxed (2 + length extra_result_tys))
-	             (map Type (realWorldStatePrimTy : io_res_ty : extra_result_tys)
-		      ++ (state : anss)) 
-    in
-    mk_alt return_result aug_res 	`thenDs` \ (ccall_res_ty, the_alt) ->
-    newSysLocalDs realWorldStatePrimTy	`thenDs` \ state_id ->
-    let
-	io_data_con = head (tyConDataCons io_tycon)
-	toIOCon = case mbTopCon of
-			Nothing -> dataConWrapId io_data_con
-			Just x  -> x
-	wrap = \ the_call -> mkApps (Var toIOCon)
-				    [ Type io_res_ty, 
-				      Lam state_id $
-				       Case (App the_call (Var state_id))
-				    	   (mkWildId ccall_res_ty)
-                                            (coreAltType the_alt) 
-				    	   [the_alt]
-				    ]
-    in
-    returnDs (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap)
+	      return_result state anss
+		= mkConApp (tupleCon Unboxed (2 + length extra_result_tys))
+	         	   (map Type (realWorldStatePrimTy : io_res_ty : extra_result_tys)
+			      ++ (state : anss)) 
+
+	; (ccall_res_ty, the_alt) <- mk_alt return_result aug_res
+
+	; state_id <- newSysLocalDs realWorldStatePrimTy
+	; let io_data_con = head (tyConDataCons io_tycon)
+	      toIOCon     = mbTopCon `orElse` dataConWrapId io_data_con
+
+	      wrap the_call = mkCoerceI (mkSymCoI co) $
+			      mkApps (Var toIOCon)
+			    	     [ Type io_res_ty, 
+			    	       Lam state_id $
+			    	       Case (App the_call (Var state_id))
+			    	     	     (mkWildId ccall_res_ty)
+			                     (coreAltType the_alt) 
+			    	     	     [the_alt]
+			    	     ]
+
+	; return (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap) }
 
 boxResult augment mbTopCon result_ty
   = 	-- It isn't IO, so do unsafePerformIO
@@ -302,9 +305,9 @@ boxResult augment mbTopCon result_ty
     mk_alt return_result (augment res) `thenDs` \ (ccall_res_ty, the_alt) ->
     let
 	wrap = \ the_call -> Case (App the_call (Var realWorldPrimId)) 
-					      (mkWildId ccall_res_ty)
-                                              (coreAltType the_alt)
-					      [the_alt]
+			    	  (mkWildId ccall_res_ty)
+			          (coreAltType the_alt)
+			    	  [the_alt]
     in
     returnDs (realWorldStatePrimTy `mkFunTy` ccall_res_ty, wrap)
   where
@@ -360,6 +363,9 @@ mk_alt return_result (Just prim_res_ty, wrap_result)
 resultWrapper :: Type
    	      -> DsM (Maybe Type,		-- Type of the expected result, if any
 		      CoreExpr -> CoreExpr)	-- Wrapper for the result 
+-- resultWrapper deals with the result *value*
+-- E.g. foreign import foo :: Int -> IO T
+-- Then resultWrapper deals with marshalling the 'T' part
 resultWrapper result_ty
   -- Base case 1: primitive types
   | isPrimitiveType result_ty

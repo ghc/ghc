@@ -766,8 +766,9 @@ splitProductType str ty
 deepSplitProductType_maybe ty
   = do { (res@(tycon, tycon_args, _, _)) <- splitProductType_maybe ty
        ; let {result 
-             | isClosedNewTyCon tycon && not (isRecursiveTyCon tycon)
-             = deepSplitProductType_maybe (newTyConInstRhs tycon tycon_args)
+             | Just (ty', _co) <- instNewTyCon_maybe tycon tycon_args
+	     , not (isRecursiveTyCon tycon)
+             = deepSplitProductType_maybe ty'	-- Ignore the coercion?
              | isNewTyCon tycon = Nothing  -- cannot unbox through recursive
 					   -- newtypes nor through families
              | otherwise = Just res}

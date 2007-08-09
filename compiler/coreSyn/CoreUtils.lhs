@@ -8,7 +8,7 @@ Utility functions on @Core@ syntax
 \begin{code}
 module CoreUtils (
 	-- Construction
-	mkInlineMe, mkSCC, mkCoerce, 
+	mkInlineMe, mkSCC, mkCoerce, mkCoerceI,
 	bindNonRec, needsCaseBinding,
 	mkIfThenElse, mkAltExpr, mkPiType, mkPiTypes,
 
@@ -194,6 +194,10 @@ mkInlineMe e	   = Note InlineMe e
 
 
 \begin{code}
+mkCoerceI :: CoercionI -> CoreExpr -> CoreExpr
+mkCoerceI IdCo e = e
+mkCoerceI (ACo co) e = mkCoerce co e
+
 mkCoerce :: Coercion -> CoreExpr -> CoreExpr
 mkCoerce co (Cast expr co2)
   = ASSERT(let { (from_ty, _to_ty) = coercionKind co; 
@@ -1159,8 +1163,8 @@ eta_expand n us expr ty
 		--	coerce T (\x::[T] -> (coerce ([T]->Int) e) x)
 
     	case splitNewTypeRepCo_maybe ty of {
- 	  Just(ty1,co) -> 
-              mkCoerce (mkSymCoercion co) (eta_expand n us (mkCoerce co expr) ty1) ;
+ 	  Just(ty1,co) -> mkCoerce (mkSymCoercion co) 
+				   (eta_expand n us (mkCoerce co expr) ty1) ;
  	  Nothing  -> 
 
 	-- We have an expression of arity > 0, but its type isn't a function

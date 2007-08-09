@@ -282,8 +282,9 @@ dsFExport fn_id ty ext_name cconv isDyn
 	-- If it's IO t, return		(t, True)
 	-- If it's plain t, return	(t, False)
      (case tcSplitIOType_maybe orig_res_ty of
-	Just (ioTyCon, res_ty) -> returnDs (res_ty, True)
+	Just (ioTyCon, res_ty, co) -> returnDs (res_ty, True)
 		-- The function already returns IO t
+		-- ToDo: what about the coercion?
 	Nothing 	       -> returnDs (orig_res_ty, False)	
 		-- The function returns t
      )					`thenDs` \ (res_ty,		-- t
@@ -339,7 +340,6 @@ dsFExportDynamic id cconv
      dsLookupGlobalId newStablePtrName		`thenDs` \ newStablePtrId ->
      dsLookupTyCon stablePtrTyConName		`thenDs` \ stable_ptr_tycon ->
      let
-	mk_stbl_ptr_app = mkApps (Var newStablePtrId) [ Type arg_ty, Var cback ]
 	stable_ptr_ty	= mkTyConApp stable_ptr_tycon [arg_ty]
 	export_ty	= mkFunTy stable_ptr_ty arg_ty
      in
@@ -348,12 +348,6 @@ dsFExportDynamic id cconv
      dsFExport id export_ty fe_nm cconv True  	
 		`thenDs` \ (h_code, c_code, arg_reps, args_size) ->
      let
-      stbl_app cont ret_ty = mkApps (Var bindIOId)
-				    [ Type stable_ptr_ty
-				    , Type ret_ty       
-				    , mk_stbl_ptr_app
-				    , cont
-				    ]
        {-
         The arguments to the external function which will
 	create a little bit of (template) code on the fly
@@ -384,18 +378,19 @@ dsFExportDynamic id cconv
 		      _ 	  -> Nothing
 
      in
-     dsCCall adjustor adj_args PlayRisky io_res_ty	`thenDs` \ ccall_adj ->
+     dsCCall adjustor adj_args PlayRisky (mkTyConApp io_tc [res_ty])  `thenDs` \ ccall_adj ->
 	-- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
-     let ccall_adj_ty = exprType ccall_adj
-         ccall_io_adj = mkLams [stbl_value]		     $
-#ifdef DEBUG
-			pprTrace "DsForeign: why is there an unsafeCoerce here?" (text "") $
-#endif
-			(Cast ccall_adj (mkUnsafeCoercion ccall_adj_ty io_res_ty ))
 
-         io_app = mkLams tvs	 $
-		  mkLams [cback] $
-		  stbl_app ccall_io_adj res_ty
+     let io_app = mkLams tvs	 	    $
+		  Lam cback	 	    $          
+		  mkCoerceI (mkSymCoI co)   $
+		  mkApps (Var bindIOId)
+			 [ Type stable_ptr_ty
+			 , Type res_ty       
+			 , mkApps (Var newStablePtrId) [ Type arg_ty, Var cback ]
+			 , Lam stbl_value ccall_adj
+			 ]
+
 	 fed = (id `setInlinePragma` NeverActive, io_app)
 		-- Never inline the f.e.d. function, because the litlit
 		-- might not be in scope in other modules.
@@ -403,11 +398,12 @@ dsFExportDynamic id cconv
      returnDs ([fed], h_code, c_code)
 
  where
-  ty			= idType id
-  (tvs,sans_foralls)	= tcSplitForAllTys ty
-  ([arg_ty], io_res_ty)	= tcSplitFunTys sans_foralls
-  [res_ty]		= tcTyConAppArgs io_res_ty
-	-- Must use tcSplit* to see the (IO t), which is a newtype
+  ty			   = idType id
+  (tvs,sans_foralls)	   = tcSplitForAllTys ty
+  ([arg_ty], fn_res_ty)	   = tcSplitFunTys sans_foralls
+  Just (io_tc, res_ty, co) = tcSplitIOType_maybe fn_res_ty
+	-- Must have an IO type; hence Just
+	-- co : fn_res_ty ~ IO res_ty
 
 toCName :: Id -> String
 toCName i = showSDoc (pprCode CStyle (ppr (idName i)))

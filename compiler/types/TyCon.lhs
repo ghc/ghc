@@ -18,8 +18,10 @@ module TyCon(
 	SynTyConRhs(..),
 
 	isFunTyCon, isUnLiftedTyCon, isProductTyCon, 
-	isAlgTyCon, isDataTyCon, isNewTyCon, isClosedNewTyCon, isSynTyCon,
-	isClosedSynTyCon, isPrimTyCon, 
+	isAlgTyCon, isDataTyCon, 
+	isNewTyCon, unwrapNewTyCon_maybe, 
+	isSynTyCon, isClosedSynTyCon, 
+	isPrimTyCon, 
 	isEnumerationTyCon, isGadtSyntaxTyCon, isOpenTyCon,
 	assocTyConArgPoss_maybe, isTyConAssoc, setTyConArgPoss,
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
@@ -642,19 +644,15 @@ isDataTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
 isDataTyCon other = False
 
 isNewTyCon :: TyCon -> Bool
-isNewTyCon (AlgTyCon {algTcRhs = rhs}) = 
-  case rhs of
-    NewTyCon {}  -> True
-    _	         -> False
-isNewTyCon other		       = False
+isNewTyCon (AlgTyCon {algTcRhs = NewTyCon {}}) = True
+isNewTyCon other		               = False
 
--- This is an important refinement as typical newtype optimisations do *not*
--- hold for newtype families.  Why?  Given a type `T a', if T is a newtype
--- family, there is no unique right hand side by which `T a' can be replaced
--- by a cast.
---
-isClosedNewTyCon :: TyCon -> Bool
-isClosedNewTyCon tycon = isNewTyCon tycon && not (isOpenTyCon tycon)
+unwrapNewTyCon_maybe :: TyCon -> Maybe ([TyVar], Type, Maybe TyCon)
+unwrapNewTyCon_maybe (AlgTyCon { tyConTyVars = tvs, 
+				 algTcRhs = NewTyCon { nt_co = mb_co, 
+						       nt_rhs = rhs }})
+			   = Just (tvs, rhs, mb_co)
+unwrapNewTyCon_maybe other = Nothing
 
 isProductTyCon :: TyCon -> Bool
 -- A "product" tycon

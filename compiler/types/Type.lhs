@@ -407,8 +407,6 @@ splitNewTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 splitNewTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
 splitNewTyConApp_maybe other	      = Nothing
 
--- get instantiated newtype rhs, the arguments had better saturate 
--- the constructor
 newTyConInstRhs :: TyCon -> [Type] -> Type
 newTyConInstRhs tycon tys =
     let (tvs, ty) = newTyConRhs tycon in substTyWith tvs tys ty
@@ -450,12 +448,15 @@ repType :: Type -> Type
 repType ty | Just ty' <- coreView ty = repType ty'
 repType (ForAllTy _ ty)  = repType ty
 repType (TyConApp tc tys)
-  | isClosedNewTyCon tc  = -- Recursive newtypes are opaque to coreView
-			   -- but we must expand them here.  Sure to
-			   -- be saturated because repType is only applied
-			   -- to types of kind *
-			   ASSERT( {- isRecursiveTyCon tc && -} tys `lengthIs` tyConArity tc )
-			   repType (new_type_rep tc tys)
+  | isNewTyCon tc
+  , (tvs, rep_ty) <- newTyConRep tc
+  = -- Recursive newtypes are opaque to coreView
+    -- but we must expand them here.  Sure to
+    -- be saturated because repType is only applied
+    -- to types of kind *
+    ASSERT( tys `lengthIs` tyConArity tc )
+    repType (substTyWith tvs tys rep_ty)
+
 repType ty = ty
 
 -- repType' aims to be a more thorough version of repType
@@ -467,12 +468,6 @@ repType' ty -- | pprTrace "repType'" (ppr ty $$ ppr (go1 ty)) False = undefined
         go (TyConApp tc tys) = mkTyConApp tc (map repType' tys)
         go ty = ty
 
-
--- new_type_rep doesn't ask any questions: 
--- it just expands newtype, whether recursive or not
-new_type_rep new_tycon tys = ASSERT( tys `lengthIs` tyConArity new_tycon )
-			     case newTyConRep new_tycon of
-				 (tvs, rep_ty) -> substTyWith tvs tys rep_ty
 
 -- ToDo: this could be moved to the code generator, using splitTyConApp instead
 -- of inspecting the type directly.
@@ -488,7 +483,6 @@ typePrimRep ty = case repType ty of
 	-- The reason is that f must have kind *->*, not *->*#, because
 	-- (we claim) there is no way to constrain f's kind any other
 	-- way.
-
 \end{code}
 
 
