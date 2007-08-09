@@ -28,6 +28,7 @@ import PprTyThing
 import Outputable       hiding (printForUser)
 import Module           -- for ModuleEnv
 import Name
+import SrcLoc
 
 -- Other random utilities
 import Digraph
@@ -129,6 +130,7 @@ builtin_commands = [
   ("show",	keepGoing showCmd,		False, completeNone),
   ("sprint",    keepGoing sprintCmd,            False, completeIdentifier),
   ("step",      keepGoing stepCmd,              False, completeIdentifier), 
+  ("stepover",  keepGoing stepOverCmd,          False, completeIdentifier), 
   ("type",	keepGoing typeOfExpr,		False, completeIdentifier),
   ("trace",     keepGoing traceCmd,             False, completeIdentifier), 
   ("undef",     keepGoing undefineMacro,	False, completeMacro),
@@ -557,28 +559,32 @@ runStmt stmt step
       session <- getSession
       result <- io $ withProgName (progname st) $ withArgs (args st) $
 	     	     GHC.runStmt session stmt step
-      afterRunStmt result
+      afterRunStmt (const True) result
 
 
-afterRunStmt :: GHC.RunResult -> GHCi Bool
+--afterRunStmt :: GHC.RunResult -> GHCi Bool
                                  -- False <=> the statement failed to compile
-afterRunStmt (GHC.RunException e) = throw e
-afterRunStmt run_result = do
-  session <- getSession
+afterRunStmt _ (GHC.RunException e) = throw e
+afterRunStmt pred run_result = do
+  session     <- getSession
+  resumes <- io $ GHC.getResumeContext session
   case run_result of
      GHC.RunOk names -> do
         show_types <- isOptionSet ShowType
         when show_types $ printTypeOfNames session names
-     GHC.RunBreak _ names mb_info -> do
-        resumes <- io $ GHC.getResumeContext session
-        printForUser $ ptext SLIT("Stopped at") <+> 
-                       ppr (GHC.resumeSpan (head resumes))
-        printTypeOfNames session names
-        maybe (return ()) runBreakCmd mb_info
-        -- run the command set with ":set stop <cmd>"
-        st <- getGHCiState
-        enqueueCommands [stop st]
-        return ()
+     GHC.RunBreak _ names mb_info 
+         | isNothing  mb_info || 
+           pred (GHC.resumeSpan $ head resumes) -> do
+               printForUser $ ptext SLIT("Stopped at") <+> 
+                       ppr (GHC.resumeSpan $ head resumes)
+               printTypeOfNames session names
+               maybe (return ()) runBreakCmd mb_info
+               -- run the command set with ":set stop <cmd>"
+               st <- getGHCiState
+               enqueueCommands [stop st]
+               return ()
+         | otherwise -> io(GHC.resume session GHC.SingleStep) >>= 
+                        afterRunStmt pred >> return ()
      _ -> return ()
 
   flushInterpBuffers
@@ -650,6 +656,20 @@ getCurrentBreakSpan = do
                 let hist = GHC.resumeHistory r !! (ix-1)
                 span <- io $ GHC.getHistorySpan session hist
                 return (Just span)
+
+getCurrentBreakModule :: GHCi (Maybe Module)
+getCurrentBreakModule = do
+  session <- getSession
+  resumes <- io $ GHC.getResumeContext session
+  case resumes of
+    [] -> return Nothing
+    (r:rs) -> do
+        let ix = GHC.resumeHistoryIx r
+        if ix == 0
+           then return (GHC.breakInfo_module `fmap` GHC.resumeBreakInfo r)
+           else do
+                let hist = GHC.resumeHistory r !! (ix-1)
+                return $ Just $ GHC.getHistoryModule  hist
 
 -----------------------------------------------------------------------------
 -- Commands
@@ -1525,21 +1545,73 @@ pprintCommand bind force str = do
   io $ pprintClosureCommand session bind force str
 
 stepCmd :: String -> GHCi ()
-stepCmd []         = doContinue GHC.SingleStep
+stepCmd []         = doContinue (const True) GHC.SingleStep
 stepCmd expression = do runStmt expression GHC.SingleStep; return ()
 
+stepOverCmd [] = do 
+  mb_span <- getCurrentBreakSpan
+  case mb_span of
+    Nothing  -> stepCmd []
+    Just loc -> do
+       Just mod <- getCurrentBreakModule
+       parent   <- enclosingSubSpan mod loc
+       allTicksRightmost <- sortBy rightmost `fmap` 
+                               ticksIn mod parent
+       let lastTick = null allTicksRightmost || 
+                      snd(head allTicksRightmost) == loc
+       if not lastTick
+              then doContinue (`lexicalSubSpanOf` parent) GHC.SingleStep
+              else doContinue (const True) GHC.SingleStep
+
+    where 
+
+{- 
+ So, the only tricky part in stepOver is detecting that we have 
+ arrived to the last tick in an expression, in which case we must
+ step normally to the next tick.
+ What we do is:
+  1. Retrieve the enclosing expression block
+  2. Retrieve all the ticks there and sort them out by 'rightness'
+  3. See if the current tick turned out the first one in the list
+-}
+
+--ticksIn :: Module -> SrcSpan -> GHCi [Tick]
+ticksIn mod src = do
+  ticks <- getTickArray mod
+  let lines = [srcSpanStartLine src .. srcSpanEndLine src]
+  return [  t   | line <- lines
+                , t@(_,span) <- ticks ! line
+                , srcSpanStart src <= srcSpanStart span
+                , srcSpanEnd src   >= srcSpanEnd span
+                ]
+
+enclosingSubSpan :: Module -> SrcSpan -> GHCi SrcSpan
+enclosingSubSpan mod src = do
+  ticks <- getTickArray mod
+  let line = srcSpanStartLine src
+  ASSERT (inRange (bounds arr) line) do
+  let enclosing_spans = [ t | t@(_,span) <- ticks ! line
+                            , srcSpanEnd span >= srcSpanEnd src]
+  return . snd . head . sortBy leftmost_largest $ enclosing_spans
+          
+lexicalSubSpanOf :: SrcSpan -> SrcSpan -> Bool
+lexicalSubSpanOf src parent 
+    | GHC.srcSpanFile parent /= GHC.srcSpanFile src = False
+    | otherwise = srcSpanStart parent <= srcSpanStart src &&
+                  srcSpanEnd parent >=  srcSpanEnd src
+
 traceCmd :: String -> GHCi ()
-traceCmd []         = doContinue GHC.RunAndLogSteps
+traceCmd []         = doContinue (const True) GHC.RunAndLogSteps
 traceCmd expression = do runStmt expression GHC.RunAndLogSteps; return ()
 
 continueCmd :: String -> GHCi ()
-continueCmd = noArgs $ doContinue GHC.RunToCompletion
+continueCmd = noArgs $ doContinue (const True) GHC.RunToCompletion
 
-doContinue :: SingleStep -> GHCi ()
-doContinue step = do 
+-- doContinue :: SingleStep -> GHCi ()
+doContinue pred step = do 
   session <- getSession
   runResult <- io $ GHC.resume session step
-  afterRunStmt runResult
+  afterRunStmt pred runResult
   return ()
 
 abandonCmd :: String -> GHCi ()

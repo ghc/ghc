@@ -84,7 +84,7 @@ module GHC (
         resume,
         Resume(resumeStmt, resumeThreadId, resumeBreakInfo, resumeSpan,
                resumeHistory, resumeHistoryIx),
-        History(historyBreakInfo), getHistorySpan,
+        History(historyBreakInfo), getHistorySpan, getHistoryModule,
         getResumeContext,
         abandon, abandonAll,
         InteractiveEval.back,

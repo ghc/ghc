@@ -14,6 +14,7 @@ module InteractiveEval (
         abandon, abandonAll,
         getResumeContext,
         getHistorySpan,
+        getHistoryModule,
         back, forward,
 	setContext, getContext,	
         nameSetToGlobalRdrEnv,
@@ -130,6 +131,9 @@ data History
         historyApStack   :: HValue,
         historyBreakInfo :: BreakInfo
    }
+
+getHistoryModule :: History -> Module 
+getHistoryModule = breakInfo_module . historyBreakInfo
 
 getHistorySpan :: Session -> History -> IO SrcSpan
 getHistorySpan s hist = withSession s $ \hsc_env -> do
