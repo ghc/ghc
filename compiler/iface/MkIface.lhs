@@ -806,22 +806,53 @@ mkIfaceExports exports
     | (mod, avails) <- fmToList groupFM
     ]
   where
+	-- Group by the module where the exported entities are defined
+	-- (which may not be the same for all Names in an Avail)
 	-- Deliberately use FiniteMap rather than UniqFM so we
 	-- get a canonical ordering
     groupFM :: ModuleEnv (FiniteMap FastString (GenAvailInfo OccName))
     groupFM = foldl add emptyModuleEnv exports
 
-    add env avail
-      = extendModuleEnv_C add_avail env mod (unitFM avail_fs avail_occ)
-      where
-	avail_occ = availToOccs avail
-	mod  = nameModule (availName avail)
-	avail_fs = occNameFS (availName avail_occ)
-	add_avail avail_fm _ = addToFM avail_fm avail_fs avail_occ
+    add_one :: ModuleEnv (FiniteMap FastString (GenAvailInfo OccName))
+	    -> Module -> GenAvailInfo OccName
+	    -> ModuleEnv (FiniteMap FastString (GenAvailInfo OccName))
+    add_one env mod avail 
+      =  extendModuleEnv_C plusFM env mod 
+		(unitFM (occNameFS (availName avail)) avail)
 
-    availToOccs (Avail n) = Avail (nameOccName n)
-    availToOccs (AvailTC tc ns) = AvailTC (nameOccName tc) (map nameOccName ns)
+	-- NB: we should not get T(X) and T(Y) in the export list
+	--     else the plusFM will simply discard one!  They
+	--     should have been combined by now.
+    add env (Avail n)
+      = add_one env (nameModule n) (Avail (nameOccName n))
+
+    add env (AvailTC tc ns)
+      = foldl add_for_mod env mods
+      where
+	tc_occ = nameOccName tc
+	mods   = nub (map nameModule ns)
+		-- Usually just one, but see Note [Original module]
+
+	add_for_mod env mod
+	    = add_one env mod (AvailTC tc_occ names_from_mod)
+	    where
+	      names_from_mod = [nameOccName n | n <- ns, nameModule n == mod]
 \end{code}
+
+Note [Orignal module]
+~~~~~~~~~~~~~~~~~~~~~
+Consider this:
+	module X where { data family T }
+	module Y( T(..) ) where { import X; data instance T Int = MkT Int }
+The exported Avail from Y will look like
+	X.T{X.T, Y.MkT}
+That is, in Y, 
+  - only MkT is brought into scope by the data instance;
+  - but the parent (used for grouping and naming in T(..) exports) is X.T
+  - and in this case we export X.T too
+
+In the result of MkIfaceExports, the names are grouped by defining module,
+so we may need to split up a single Avail into multiple ones.
 
 
 %************************************************************************
