@@ -165,7 +165,7 @@ instance OutputableBndr id => Outputable (HsValBinds id) where
 pprValBindsForUser :: (OutputableBndr id1, OutputableBndr id2)
 		   => LHsBinds id1 -> [LSig id2] -> SDoc
 pprValBindsForUser binds sigs
-  = vcat (map snd (sort_by_loc decls))
+  = pprDeeperList vcat (map snd (sort_by_loc decls))
   where
 
     decls :: [(SrcSpan, SDoc)]
@@ -177,7 +177,7 @@ pprValBindsForUser binds sigs
 pprLHsBinds :: OutputableBndr id => LHsBinds id -> SDoc
 pprLHsBinds binds 
   | isEmptyLHsBinds binds = empty
-  | otherwise = lbrace <+> vcat (map ppr (bagToList binds)) <+> rbrace
+  | otherwise = lbrace <+> pprDeeperList vcat (map ppr (bagToList binds)) <+> rbrace
 
 ------------
 emptyLocalBinds :: HsLocalBinds a
@@ -292,7 +292,7 @@ data IPBind id
 	(LHsExpr id)
 
 instance (OutputableBndr id) => Outputable (HsIPBinds id) where
-  ppr (IPBinds bs ds) = vcat (map ppr bs) 
+  ppr (IPBinds bs ds) = pprDeeperList vcat (map ppr bs) 
 			$$ pprLHsBinds ds
 
 instance (OutputableBndr id) => Outputable (IPBind id) where
