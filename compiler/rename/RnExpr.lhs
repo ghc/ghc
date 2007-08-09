@@ -45,7 +45,7 @@ import Util		( isSingleton )
 import ListSetOps	( removeDups )
 import Maybes		( expectJust )
 import Outputable
-import SrcLoc		( Located(..), unLoc, getLoc, cmpLocated )
+import SrcLoc		( Located(..), unLoc, getLoc )
 import FastString
 
 import List		( unzip4 )
