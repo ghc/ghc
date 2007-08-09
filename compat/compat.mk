@@ -24,6 +24,10 @@ SRC_HC_OPTS += -package directory
 SRC_HC_OPTS += -package pretty
 endif
 
+ifeq "$(ghc_ge_603)" "NO"
+SRC_HC_OPTS += -package unix
+endif
+
 # And similarly for when booting from .hc files:
 HC_BOOT_LD_OPTS += -L$(GHC_COMPAT_DIR)
 HC_BOOT_LIBS += -lghccompat
