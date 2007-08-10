@@ -12,7 +12,7 @@ include $(TOP)/mk/boilerplate.mk
 ifneq "$(HaveLibGmp)" "YES"
 ifneq "$(HaveFrameworkGMP)" "YES"
 
-boot :: stamp.gmp
+boot :: stamp.gmp.static
 
 PLATFORM := $(shell echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g')
 
@@ -35,7 +35,13 @@ GMP_TARBALL := $(firstword $(wildcard gmp*.tar.gz))
 GMP_DIR := $(subst .tar.gz,,$(GMP_TARBALL))
 BMP_BUILD_DIR := build
 
-stamp.gmp:
+ifeq "$(findstring dyn, $(GhcRTSWays))" "dyn"
+BUILD_SHARED=yes
+else
+BUILD_SHARED=no
+endif
+
+stamp.gmp.static:
 	$(RM) -rf $(GMP_DIR) gmpbuild
 	$(TAR) -zxf $(GMP_TARBALL)
 	mv $(GMP_DIR) gmpbuild
@@ -47,42 +53,51 @@ stamp.gmp:
 	          --enable-shared=no --host=$(PLATFORM) --build=$(PLATFORM)
 	touch $@
 
-all :: gmpbuild/libgmp.a
+stamp.gmp.shared:
+	$(RM) -rf $(GMP_DIR) gmpbuild-shared
+	$(TAR) -zxf $(GMP_TARBALL)
+	mv $(GMP_DIR) gmpbuild-shared
+	chmod +x ln
+	set -o igncr; export SHELLOPTS; \
+	    export PATH=`pwd`:$$PATH; \
+	    cd gmpbuild-shared && \
+	    CC=$(WhatGccIsCalled) $(SHELL) configure \
+	          --enable-shared=yes --disable-static --host=$(PLATFORM) --build=$(PLATFORM)
+	touch $@
 
-ifeq "$(DLLized)" "YES"
-all :: $(DLL_PEN)/gmp.dll
+libgmp.a: stamp.gmp.static
+	$(MAKE) -C gmpbuild MAKEFLAGS=
+	$(CP) gmpbuild/.libs/libgmp.a .
+	$(RANLIB) libgmp.a
 
-$(DLL_PEN)/gmp.dll:
-	$(MAKE) -C gmpbuild gmp.dll
-	$(CP) gmpbuild/gmp.dll $(DLL_PEN)
-endif
+all :: libgmp.a
 
-install :: gmpbuild/libgmp.a
+install :: libgmp.a
 
 INSTALL_LIBS += gmpbuild/libgmp.a
 
-gmpbuild/libgmp.a ::
-	$(MAKE) -C gmpbuild MAKEFLAGS=
-	$(CP) gmpbuild/.libs/libgmp.a gmpbuild
-	$(RANLIB) gmpbuild/libgmp.a
+ifeq "$(BUILD_SHARED)" "yes"
+libgmp-3.dll: stamp.gmp.shared
+	$(MAKE) -C gmpbuild-shared MAKEFLAGS=
+	$(CP) gmpbuild-shared/.libs/libgmp-3.dll .
+
+libgmp.dll.a: libgmp-3.dll
+	$(CP) gmpbuild-shared/.libs/libgmp.dll.a .
+
+all :: libgmp-3.dll libgmp.dll.a
+
+install :: libgmp-3.dll libgmp.dll.a
+
+INSTALL_LIBS += libgmp.dll.a
+INSTALL_PROGS += libgmp-3.dll
+endif
 endif
 endif
 
 clean distclean maintainer-clean ::
-	$(RM) -f stamp.gmp
+	$(RM) -f stamp.gmp.static stamp.gmp.shared
 	$(RM) -rf gmpbuild
-	$(RM) -rf gmpbuild
-
-#-----------------------------------------------------------------------------
-#
-# Files to install
-#
-# Just libHSrts is installed uniformly across ways
-#
-ifeq "$(DLLized)" "YES"
-INSTALL_PROGS += gmpbuild/gmp.dll
-INSTALL_LIBS += gmpbuild/libgmp_imp.a
-endif
+	$(RM) -rf gmpbuild-shared
 
 #-----------------------------------------------------------------------------
 #

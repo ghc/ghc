@@ -23,7 +23,7 @@ library-dirs:		LIB_DIR GMP_LIB_DIRS
 #else /* !INSTALLING */
 library-dirs:		FPTOOLS_TOP_ABS"/rts" GMP_LIB_DIRS
 # if !defined(HAVE_LIBGMP) && !defined(HAVE_FRAMEWORK_GMP)
-			, FPTOOLS_TOP_ABS"/gmp/gmpbuild"
+			, FPTOOLS_TOP_ABS"/gmp"
 # endif
 #endif
 
