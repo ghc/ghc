@@ -18,7 +18,7 @@ instance Eq (T Char) where
 data family R a
 data instance R [a] = R
 
-derive instance Eq (R [a])
+deriving instance Eq (R [a])
 
 class C a where
   data S a
