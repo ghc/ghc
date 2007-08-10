@@ -1,0 +1,18 @@
+
+tcfail185.hs:7:31:
+    Couldn't match expected type `Int -> Int'
+	   against inferred type `Bool'
+    In the expression:
+	let
+	  y1 = y
+	  y2 = y1
+	  y3 = y2
+	  ....
+	in x
+    In the expression:
+	\ x y
+	    -> let
+		 y1 = ...
+		 ....
+	       in x
+    In the definition of `f': f a b = \ x y -> let ... in x
