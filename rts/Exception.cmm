@@ -13,7 +13,9 @@
 #include "Cmm.h"
 #include "RaiseAsync.h"
 
+#ifdef __PIC__
 import base_GHCziBase_True_closure;
+#endif
 
 /* -----------------------------------------------------------------------------
    Exception Primitives

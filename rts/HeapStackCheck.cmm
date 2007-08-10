@@ -12,7 +12,9 @@
 
 #include "Cmm.h"
 
+#ifdef __PIC__
 import pthread_mutex_unlock;
+#endif
 
 /* Stack/Heap Check Failure
  * ------------------------
