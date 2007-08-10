@@ -304,7 +304,6 @@ mkBits findLabel st proto_insns
                   (p1, st2) <- ptr st  (BCOPtrArray array) 
                   (p2, st3) <- ptr st2 (BCOPtrBreakInfo info)
                   instr4 st3 bci_BRK_FUN p1 index p2
-               PUSH_LLL  o1 o2 o3 -> instr4 st bci_PUSH_LLL o1 o2 o3
 
        i2s :: Int -> Word16
        i2s = fromIntegral
