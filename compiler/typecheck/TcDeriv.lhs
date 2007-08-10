@@ -363,17 +363,27 @@ makeDerivEqns tycl_decls inst_decls deriv_decls
 ------------------------------------------------------------------
 deriveStandalone :: LDerivDecl Name -> TcM (Maybe DerivEqn, Maybe InstInfo)
 -- Standalone deriving declarations
--- 	e.g.   derive instance Show T
+--  e.g.   deriving instance show a => Show (T a)
 -- Rather like tcLocalInstDecl
 deriveStandalone (L loc (DerivDecl deriv_ty))
   = setSrcSpan loc                   $
     addErrCtxt (standaloneCtxt deriv_ty)  $
-    do	{ (tvs, theta, tau) <- tcHsInstHead deriv_ty
-	; (cls, inst_tys) <- checkValidInstHead tau
-	; let cls_tys = take (length inst_tys - 1) inst_tys
-	      inst_ty = last inst_tys
+    do { traceTc (text "standalone deriving decl for" <+> ppr deriv_ty)
+       ; (tvs, theta, tau) <- tcHsInstHead deriv_ty
+       ; traceTc (text "standalone deriving;"
+              <+> text "tvs:" <+> ppr tvs
+              <+> text "theta:" <+> ppr theta
+              <+> text "tau:" <+> ppr tau)
+       ; (cls, inst_tys) <- checkValidInstHead tau
+       ; let cls_tys = take (length inst_tys - 1) inst_tys
+             inst_ty = last inst_tys
 
-	; mkEqnHelp StandAloneDerivOrigin tvs cls cls_tys inst_ty }
+       ; traceTc (text "standalone deriving;"
+              <+> text "class:" <+> ppr cls
+              <+> text "class types:" <+> ppr cls_tys
+              <+> text "type:" <+> ppr inst_ty)
+       ; mkEqnHelp StandAloneDerivOrigin tvs cls cls_tys inst_ty
+                   (Just theta) }
 
 ------------------------------------------------------------------
 deriveTyData :: (LHsType Name, LTyClDecl Name) -> TcM (Maybe DerivEqn, Maybe InstInfo)
@@ -392,12 +402,15 @@ deriveTyData (deriv_pred, L loc decl@(TyData { tcdLName = L _ tycon_name,
     do	{ (deriv_tvs, cls, cls_tys) <- tcHsDeriv deriv_pred
 		-- The "deriv_pred" is a LHsType to take account of the fact that for
 		-- newtype deriving we allow deriving (forall a. C [a]).
-	; mkEqnHelp DerivOrigin (tvs++deriv_tvs) cls cls_tys tc_app } }
+	; mkEqnHelp DerivOrigin (tvs++deriv_tvs) cls cls_tys tc_app Nothing } }
 deriveTyData (deriv_pred, other_decl)
   = panic "derivTyData"	-- Caller ensures that only TyData can happen
 
 ------------------------------------------------------------------
-mkEqnHelp orig tvs cls cls_tys tc_app
+mkEqnHelp :: InstOrigin -> [TyVar] -> Class -> [Type] -> Type
+          -> Maybe DerivRhs
+          -> TcRn (Maybe DerivEqn, Maybe InstInfo)
+mkEqnHelp orig tvs cls cls_tys tc_app mtheta
   | Just (tycon, tc_args) <- tcSplitTyConApp_maybe tc_app
   = do	{ 	-- Make tc_app saturated, because that's what the
 		-- mkDataTypeEqn things expect
@@ -417,11 +430,11 @@ mkEqnHelp orig tvs cls cls_tys tc_app
           -- to check the instance tycon, not the family tycon
 	; if isDataTyCon rep_tc then
 		mkDataTypeEqn orig mayDeriveDataTypeable full_tvs cls cls_tys 
-			      tycon full_tc_args rep_tc rep_tc_args
+			      tycon full_tc_args rep_tc rep_tc_args mtheta
 	  else
 		mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving overlap_flag
                   full_tvs cls cls_tys 
-			      tycon full_tc_args rep_tc rep_tc_args }
+			      tycon full_tc_args rep_tc rep_tc_args mtheta }
   | otherwise
   = baleOut (derivingThingErr cls cls_tys tc_app
 		(ptext SLIT("Last argument of the instance must be a type application")))
@@ -458,8 +471,11 @@ tcLookupFamInstExact tycon tys
 %************************************************************************
 
 \begin{code}
+mkDataTypeEqn :: InstOrigin -> Bool -> [Var] -> Class -> [Type]
+              -> TyCon -> [Type] -> TyCon -> [Type] -> Maybe DerivRhs
+              -> TcRn (Maybe DerivEqn, Maybe InstInfo)
 mkDataTypeEqn orig mayDeriveDataTypeable tvs cls cls_tys
-              tycon tc_args rep_tc rep_tc_args
+              tycon tc_args rep_tc rep_tc_args mtheta
   | Just err <- checkSideConditions mayDeriveDataTypeable cls cls_tys rep_tc
 	-- NB: pass the *representation* tycon to checkSideConditions
   = baleOut (derivingThingErr cls cls_tys (mkTyConApp tycon tc_args) err)
@@ -467,12 +483,14 @@ mkDataTypeEqn orig mayDeriveDataTypeable tvs cls cls_tys
   | otherwise 
   = ASSERT( null cls_tys )
     do	{ loc <- getSrcSpanM
-	; eqn <- mk_data_eqn loc orig tvs cls tycon tc_args rep_tc rep_tc_args
+	; eqn <- mk_data_eqn loc orig tvs cls tycon tc_args rep_tc
+                         rep_tc_args mtheta
 	; return (Just eqn, Nothing) }
 
 mk_data_eqn :: SrcSpan -> InstOrigin -> [TyVar] -> Class 
-	    -> TyCon -> [TcType] -> TyCon -> [TcType] -> TcM DerivEqn
-mk_data_eqn loc orig tvs cls tycon tc_args rep_tc rep_tc_args
+            -> TyCon -> [TcType] -> TyCon -> [TcType] -> Maybe DerivRhs
+            -> TcM DerivEqn
+mk_data_eqn loc orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
   | cls `hasKey` typeableClassKey
   =	-- The Typeable class is special in several ways
 	-- 	  data T a b = ... deriving( Typeable )
@@ -485,7 +503,9 @@ mk_data_eqn loc orig tvs cls tycon tc_args rep_tc rep_tc_args
 	--	Typeable; it depends on the arity of the type
     do	{ real_clas <- tcLookupClass (typeableClassNames !! tyConArity tycon)
 	; dfun_name <- new_dfun_name real_clas tycon
-  	; return (loc, orig, dfun_name, [], real_clas, mkTyConApp tycon [], []) }
+    ; let theta = fromMaybe [] mtheta
+  	; return (loc, orig, dfun_name, [], real_clas, mkTyConApp tycon [], theta)
+    }
 
   | otherwise
   = do	{ dfun_name <- new_dfun_name cls tycon
@@ -495,13 +515,14 @@ mk_data_eqn loc orig tvs cls tycon tc_args rep_tc rep_tc_args
 	            arg_ty   <- ASSERT( isVanillaDataCon data_con )
 				dataConInstOrigArgTys data_con rep_tc_args,
 	            not (isUnLiftedType arg_ty) ] -- No constraints for unlifted types?
+	      theta = fromMaybe ordinary_constraints mtheta
 
 	      tiresome_subst = zipTopTvSubst (tyConTyVars rep_tc) rep_tc_args
 	      stupid_constraints = substTheta tiresome_subst (tyConStupidTheta rep_tc)
 		 -- see note [Data decl contexts] above
 
   	; return (loc, orig, dfun_name, tvs, cls, mkTyConApp tycon tc_args, 
-		  stupid_constraints ++ ordinary_constraints)
+		  stupid_constraints ++ theta)
 	}
 
 ------------------------------------------------------------------
@@ -634,10 +655,10 @@ new_dfun_name clas tycon 	-- Just a simple wrapper
 \begin{code}
 mkNewTypeEqn :: InstOrigin -> Bool -> Bool -> OverlapFlag -> [Var] -> Class
              -> [Type] -> TyCon -> [Type] -> TyCon -> [Type]
+             -> Maybe DerivRhs
              -> TcRn (Maybe DerivEqn, Maybe InstInfo)
-mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving overlap_flag tvs cls cls_tys
-	     tycon tc_args 
-	     rep_tycon rep_tc_args
+mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving overlap_flag tvs
+             cls cls_tys tycon tc_args rep_tycon rep_tc_args mtheta
   | can_derive_via_isomorphism && (newtype_deriving || std_class_via_iso cls)
   = do	{ traceTc (text "newtype deriving:" <+> ppr tycon <+> ppr rep_tys)
 	; 	-- Go ahead and use the isomorphism
@@ -647,7 +668,8 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving overlap_flag tvs cls cl
 
   | isNothing mb_std_err	-- Use the standard H98 method
   = do	{ loc <- getSrcSpanM
-	; eqn <- mk_data_eqn loc orig tvs cls tycon tc_args rep_tycon rep_tc_args
+	; eqn <- mk_data_eqn loc orig tvs cls tycon tc_args rep_tycon
+                         rep_tc_args mtheta
 	; return (Just eqn, Nothing) }
 
   	-- Otherwise we can't derive

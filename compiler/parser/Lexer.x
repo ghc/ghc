@@ -405,7 +405,6 @@ data Token
   | ITdata
   | ITdefault
   | ITderiving
-  | ITderive
   | ITdo
   | ITelse
   | IThiding
@@ -559,7 +558,6 @@ isSpecial :: Token -> Bool
 -- not as a keyword.
 isSpecial ITas        	= True
 isSpecial IThiding    	= True
-isSpecial ITderive    	= True
 isSpecial ITqualified 	= True
 isSpecial ITforall    	= True
 isSpecial ITexport    	= True
@@ -590,7 +588,6 @@ reservedWordsFM = listToUFM $
 	( "data",	ITdata, 	0 ),     
 	( "default",	ITdefault, 	0 ),  
 	( "deriving",	ITderiving, 	0 ), 
-	( "derive",	ITderive, 	0 ), 
 	( "do",		ITdo, 		0 ),       
 	( "else",	ITelse, 	0 ),     
 	( "hiding",	IThiding, 	0 ),

@@ -200,7 +200,6 @@ incorrect.
  'data' 	{ L _ ITdata } 
  'default' 	{ L _ ITdefault }
  'deriving' 	{ L _ ITderiving }
- 'derive' 	{ L _ ITderive }
  'do' 		{ L _ ITdo }
  'else' 	{ L _ ITelse }
  'hiding' 	{ L _ IThiding }
@@ -754,7 +753,7 @@ tycl_hdr :: { Located (LHsContext RdrName,
 
 -- Glasgow extension: stand-alone deriving declarations
 stand_alone_deriving :: { LDerivDecl RdrName }
-  	: 'derive' 'instance' inst_type {% checkDerivDecl (LL (DerivDecl $3)) }
+  	: 'deriving' 'instance' inst_type {% checkDerivDecl (LL (DerivDecl $3)) }
 
 -----------------------------------------------------------------------------
 -- Nested declarations
@@ -1756,7 +1755,6 @@ special_id
 	: 'as'			{ L1 FSLIT("as") }
 	| 'qualified'		{ L1 FSLIT("qualified") }
 	| 'hiding'		{ L1 FSLIT("hiding") }
-	| 'derive'		{ L1 FSLIT("derive") }
 	| 'export'		{ L1 FSLIT("export") }
 	| 'label'		{ L1 FSLIT("label")  }
 	| 'dynamic'		{ L1 FSLIT("dynamic") }
