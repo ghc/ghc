@@ -144,6 +144,7 @@ cp $mingw_lib/* gcc-lib/
 cp $mingw_bin/as.exe gcc-lib/
 cp $mingw_bin/ld.exe gcc-lib/
 cp $mingw_bin/ar.exe bin/
+cp $mingw_bin/windres.exe bin/
 # Note: later versions of dlltool.exe depend on a bfd helper DLL.
 cp $mingw_bin/dllwrap.exe gcc-lib/
 cp $mingw_bin/dlltool.exe gcc-lib/

@@ -17,6 +17,7 @@ module SysTools (
 	runMangle, runSplit,	 -- [Option] -> IO ()
 	runAs, runLink,		 -- [Option] -> IO ()
 	runMkDLL,
+        runWindres,
 
 	touch,			-- String -> String -> IO ()
 	copy,
@@ -196,6 +197,10 @@ initSysTools mbMinusB dflags
 		| am_installed = installed_bin cGHC_MANGLER_PGM
 		| otherwise    = inplace cGHC_MANGLER_DIR_REL cGHC_MANGLER_PGM
 
+              windres_path
+		| am_installed = installed_bin "windres"
+		| otherwise    = "windres"
+
 	; let dflags0 = defaultDynFlags
 #ifndef mingw32_HOST_OS
 	-- check whether TMPDIR is set in the environment
@@ -326,7 +331,8 @@ initSysTools mbMinusB dflags
 			pgm_l	= (ld_prog,ld_args),
 			pgm_dll = (mkdll_prog,mkdll_args),
                         pgm_T   = touch_path,
-                        pgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan"
+                        pgm_sysman = top_dir ++ "/ghc/rts/parallel/SysMan",
+                        pgm_windres = windres_path
         		-- Hans: this isn't right in general, but you can 
         		-- elaborate it in the same way as the others
                 }
@@ -517,6 +523,16 @@ runMkDLL dflags args = do
       args1 = args0 ++ args
   mb_env <- getGccEnv (args0++args)
   runSomethingFiltered dflags id "Make DLL" p args1 mb_env
+
+runWindres :: DynFlags -> [Option] -> IO ()
+runWindres dflags args = do
+  let (gcc,gcc_args) = pgm_c dflags
+      windres        = pgm_windres dflags
+  runSomething dflags "Windres" windres 
+        (Option ("--preprocessor=" ++ gcc ++ unwords (map showOpt gcc_args) ++
+                 " -E -xc -DRC_INVOKED")
+         : args)
+        -- we must tell windres where to find gcc: it might not be on PATH
 
 touch :: DynFlags -> String -> String -> IO ()
 touch dflags purpose arg =

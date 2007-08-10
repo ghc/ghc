@@ -253,6 +253,8 @@ data DynFlag
    | Opt_Haddock
    | Opt_Hpc_No_Auto
    | Opt_BreakOnException
+   | Opt_GenManifest
+   | Opt_EmbedManifest
 
    -- keeping stuff
    | Opt_KeepHiDiffs
@@ -324,6 +326,7 @@ data DynFlags = DynFlags {
   opt_a			:: [String],
   opt_l			:: [String],
   opt_dep		:: [String],
+  opt_windres		:: [String],
 
   -- commands for particular phases
   pgm_L			:: String,
@@ -337,6 +340,7 @@ data DynFlags = DynFlags {
   pgm_dll		:: (String,[Option]),
   pgm_T                 :: String,
   pgm_sysman            :: String,
+  pgm_windres           :: String,
 
   --  Package flags
   extraPkgConfs		:: [FilePath],
@@ -479,6 +483,7 @@ defaultDynFlags =
 	opt_m			= [],
 	opt_l			= [],
 	opt_dep			= [],
+        opt_windres             = [],
 	
 	extraPkgConfs		= [],
 	packageFlags		= [],
@@ -496,6 +501,9 @@ defaultDynFlags =
 
     	    Opt_DoAsmMangling,
     
+            Opt_GenManifest,
+            Opt_EmbedManifest,
+
 	    -- on by default:
 	    Opt_PrintBindResult ]
 	    ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
@@ -561,6 +569,7 @@ setPgms   f d = d{ pgm_s   = (f,[])}
 setPgma   f d = d{ pgm_a   = (f,[])}
 setPgml   f d = d{ pgm_l   = (f,[])}
 setPgmdll f d = d{ pgm_dll = (f,[])}
+setPgmwindres f d = d{ pgm_windres = f}
 
 addOptL   f d = d{ opt_L   = f : opt_L d}
 addOptP   f d = d{ opt_P   = f : opt_P d}
@@ -570,6 +579,7 @@ addOptm   f d = d{ opt_m   = f : opt_m d}
 addOpta   f d = d{ opt_a   = f : opt_a d}
 addOptl   f d = d{ opt_l   = f : opt_l d}
 addOptdep f d = d{ opt_dep = f : opt_dep d}
+addOptwindres f d = d{ opt_windres = f : opt_windres d}
 
 addCmdlineFramework f d = d{ cmdlineFrameworks = f : cmdlineFrameworks d}
 
@@ -910,6 +920,7 @@ dynamic_flags = [
   ,  ( "pgma"           , HasArg (upd . setPgma) )  
   ,  ( "pgml"           , HasArg (upd . setPgml) )  
   ,  ( "pgmdll"		, HasArg (upd . setPgmdll) )
+  ,  ( "pgmwindres"     , HasArg (upd . setPgmwindres) )
 
   ,  ( "optL"		, HasArg (upd . addOptL) )  
   ,  ( "optP"		, HasArg (upd . addOptP) )  
@@ -919,6 +930,7 @@ dynamic_flags = [
   ,  ( "opta"		, HasArg (upd . addOpta) )  
   ,  ( "optl"		, HasArg (upd . addOptl) )  
   ,  ( "optdep"		, HasArg (upd . addOptdep) )
+  ,  ( "optwindres"     , HasArg (upd . addOptwindres) )
 
   ,  ( "split-objs"	, NoArg (if can_split
 				    then setDynFlag Opt_SplitObjs
@@ -1180,7 +1192,9 @@ fFlags = [
   -- Deprecated in favour of -XUndecidableInstances:
   ( "allow-undecidable-instances",      Opt_UndecidableInstances ),
   -- Deprecated in favour of -XIncoherentInstances:
-  ( "allow-incoherent-instances",       Opt_IncoherentInstances )
+  ( "allow-incoherent-instances",       Opt_IncoherentInstances ),
+  ( "gen-manifest",                     Opt_GenManifest ),
+  ( "embed-manifest",                   Opt_EmbedManifest )
   ]
 
 supportedLanguages :: [String]

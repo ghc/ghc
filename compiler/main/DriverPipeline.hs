@@ -327,7 +327,6 @@ link LinkBinary dflags batch_attempt_linking hpt
                                 text "   Main.main not exported; not linking.")
         return Succeeded
       
-
 -- -----------------------------------------------------------------------------
 -- Compile files in one-shot mode.
 
@@ -1231,6 +1230,8 @@ linkBinary dflags o_files dep_packages = do
 			]
 		    | otherwise               = []
 
+    rc_objs <- maybeCreateManifest dflags output_fn
+
     let (md_c_flags, _) = machdepCCOpts dflags
     SysTools.runLink dflags ( 
 		       [ SysTools.Option verb
@@ -1243,6 +1244,7 @@ linkBinary dflags o_files dep_packages = do
 		      ++ extra_ld_inputs
 	 	      ++ lib_path_opts
 	 	      ++ extra_ld_opts
+                      ++ rc_objs
 #ifdef darwin_TARGET_OS
 	 	      ++ framework_path_opts
 	 	      ++ framework_opts
@@ -1280,6 +1282,59 @@ exeFileName dflags
 #else
 	"a.out"
 #endif
+
+maybeCreateManifest
+   :: DynFlags
+   -> FilePath                          -- filename of executable
+   -> IO [FilePath]                     -- extra objects to embed, maybe
+maybeCreateManifest dflags exe_filename = do
+#ifndef mingw32_TARGET_OS
+  return []
+#else
+  if not (dopt Opt_GenManifest dflags) then return [] else do
+
+  let manifest_filename = exe_filename `joinFileExt` "manifest"
+
+  writeFile manifest_filename $ 
+      "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"++
+      "  <assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">\n"++
+      "  <assemblyIdentity version=\"1.0.0.0\"\n"++
+      "     processorArchitecture=\"X86\"\n"++
+      "     name=\"" ++ basenameOf exe_filename ++ "\"\n"++
+      "     type=\"win32\"/>\n\n"++
+      "  <trustInfo xmlns=\"urn:schemas-microsoft-com:asm.v3\">\n"++
+      "    <security>\n"++
+      "      <requestedPrivileges>\n"++
+      "        <requestedExecutionLevel level=\"asInvoker\" uiAccess=\"false\"/>\n"++
+      "        </requestedPrivileges>\n"++
+      "       </security>\n"++
+      "  </trustInfo>\n"++
+      "</assembly>\n"
+
+  -- Windows will fine the manifest file if it is named foo.exe.manifest.
+  -- However, for extra robustness, and so that we can move the binary around,
+  -- we can embed the manifest in the binary itself using windres:
+  if not (dopt Opt_EmbedManifest dflags) then return [] else do
+
+  rc_filename <- newTempName dflags "rc"
+  rc_obj_filename <- newTempName dflags (objectSuf dflags)
+
+  writeFile rc_filename $
+      "1 24 MOVEABLE PURE \"" ++ manifest_filename ++ "\"\n"
+        -- magic numbers :-)
+
+  let wr_opts = getOpts dflags opt_windres
+  runWindres dflags $ map SysTools.Option $
+        ["--input="++rc_filename, 
+         "--output="++rc_obj_filename,
+         "--output-format=coff"] 
+        ++ wr_opts
+        -- no FileOptions here: windres doesn't like seeing
+        -- backslashes, apparently
+
+  return [rc_obj_filename]
+#endif
+
 
 linkDynLib :: DynFlags -> [String] -> [PackageId] -> IO ()
 linkDynLib dflags o_files dep_packages = do
