@@ -32,6 +32,7 @@ test('Infix', expect_fail, compile, [''])
 
 test('GADT1', expect_fail, compile, [''])
 test('GADT2', expect_fail, compile, [''])
+test('GADT3', expect_fail, compile, [''])
 
 test('Class1', expect_fail, compile, [''])
 
