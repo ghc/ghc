@@ -153,7 +153,7 @@ tcMatch ctxt pat_tys rhs_ty match
   = wrapLocM (tc_match ctxt pat_tys rhs_ty) match
   where
     tc_match ctxt pat_tys rhs_ty match@(Match pats maybe_rhs_sig grhss)
-      = addErrCtxt (matchCtxt (mc_what ctxt) match)	$	
+      = add_match_ctxt match $
         do { (pats', grhss') <- tcLamPats pats pat_tys rhs_ty $
     			        tc_grhss ctxt maybe_rhs_sig grhss
 	   ; return (Match pats' Nothing grhss') }
@@ -166,6 +166,13 @@ tcMatch ctxt pat_tys rhs_ty match
       = do { addErr (ptext SLIT("Ignoring (deprecated) result type signature")
 			<+> ppr res_sig)
     	   ; tcGRHSs ctxt grhss (co, rhs_ty) }
+
+	-- For (\x -> e), tcExpr has already said "In the expresssion \x->e"
+	-- so we don't want to add "In the lambda abstraction \x->e"
+    add_match_ctxt match thing_inside
+	= case mc_what ctxt of
+	    LambdaExpr -> thing_inside
+	    m_ctxt     -> addErrCtxt (matchCtxt m_ctxt match) thing_inside
 
 -------------
 tcGRHSs :: TcMatchCtxt -> GRHSs Name -> (Refinement, BoxyRhoType) 
