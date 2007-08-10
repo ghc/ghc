@@ -78,11 +78,12 @@ import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
 import System.IO	( hPutBuf )
 import Data.Maybe	( isJust )
 
-import GHC.Arr		( STArray(..), newSTArray )
+import GHC.ST
 import GHC.IOBase	( IO(..) )
 import GHC.Ptr		( Ptr(..) )
 
-#define hASH_TBL_SIZE  4091
+#define hASH_TBL_SIZE          4091
+#define hASH_TBL_SIZE_UNBOXED  4091#
 
 
 {-|
@@ -165,8 +166,10 @@ data FastStringTable =
 string_table :: IORef FastStringTable
 string_table = 
  unsafePerformIO $ do
-   (STArray _ _ arr#) <- stToIO (newSTArray (0::Int,hASH_TBL_SIZE) [])
-   newIORef (FastStringTable 0 arr#)
+   tab <- IO $ \s1# -> case newArray# hASH_TBL_SIZE_UNBOXED [] s1# of
+                           (# s2#, arr# #) ->
+                               (# s2#, FastStringTable 0 arr# #)
+   newIORef tab
 
 lookupTbl :: FastStringTable -> Int -> IO [FastString]
 lookupTbl (FastStringTable _ arr#) (I# i#) =

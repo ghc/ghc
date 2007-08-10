@@ -163,8 +163,8 @@ getClosureData a =
      (# iptr, ptrs, nptrs #) -> do
            itbl <- peek (Ptr iptr)
            let tipe = readCType (BCI.tipe itbl)
-               elems = BCI.ptrs itbl 
-               ptrsList = Array 0 ((fromIntegral elems) - 1) ptrs
+               elems = fromIntegral (BCI.ptrs itbl)
+               ptrsList = Array 0 (elems - 1) elems ptrs
                nptrs_data = [W# (indexWordArray# nptrs i)
                               | I# i <- [0.. fromIntegral (BCI.nptrs itbl)] ]
            ASSERT(fromIntegral elems >= 0) return ()
@@ -206,9 +206,9 @@ isFullyEvaluated a = do
     otherwise -> return False
   where amapM f = sequence . amap' f
 
-amap' f (Array i0 i arr#) = map (\(I# i#) -> case indexArray# arr# i# of
-                                   (# e #) -> f e)
-                                [0 .. i - i0]
+amap' f (Array i0 i _ arr#) = map g [0 .. i - i0]
+    where g (I# i#) = case indexArray# arr# i# of
+                          (# e #) -> f e
 
 -- TODO: Fix it. Probably the otherwise case is failing, trace/debug it
 {-
@@ -727,9 +727,10 @@ mapMif_ pred f (x:xx) = (if pred x then f x else return x) : mapMif_ pred f xx
 unlessM condM acc = condM >>= \c -> unless c acc
 
 -- Strict application of f at index i
-appArr f a@(Array _ _ ptrs#) i@(I# i#) = ASSERT (i < length(elems a))
-                                  case indexArray# ptrs# i# of 
-                                       (# e #) -> f e
+appArr f a@(Array _ _ _ ptrs#) i@(I# i#)
+ = ASSERT (i < length(elems a))
+   case indexArray# ptrs# i# of
+       (# e #) -> f e
 
 zonkTerm :: Term -> TcM Term
 zonkTerm = foldTerm idTermFoldM {

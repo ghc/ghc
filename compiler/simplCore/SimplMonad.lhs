@@ -45,9 +45,8 @@ import FastTypes
 
 import GHC.Exts		( indexArray# )
 
-import GHC.Arr  ( Array(..) )
-
-import Array		( array, (//) )
+import Data.Array
+import Data.Array.Base (unsafeAt)
 
 infixr 0  `thenSmpl`, `thenSmpl_`
 \end{code}
@@ -469,11 +468,7 @@ isAmongSimpl on_switches		-- Switches mentioned later occur *earlier*
 	defined_elems = map mk_assoc_elem tidied_on_switches
     in
     -- (avoid some unboxing, bounds checking, and other horrible things:)
-    case sw_tbl of { Array _ _ stuff ->
-    \ switch ->
-	case (indexArray# stuff (tagOf_SimplSwitch switch)) of
-	  (# v #) -> v
-    }
+    \ switch -> unsafeAt sw_tbl $ iBox (tagOf_SimplSwitch switch)
   where
     mk_assoc_elem k@(MaxSimplifierIterations lvl)
 	= (iBox (tagOf_SimplSwitch k), SwInt lvl)
