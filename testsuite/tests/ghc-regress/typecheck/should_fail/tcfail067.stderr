@@ -25,9 +25,7 @@ tcfail067.hs:46:11:
     In the pattern: SubRange (lower, upper) value
     In the definition of `showRange':
 	showRange (SubRange (lower, upper) value)
-		    = (show value)
-		    ++
-		      (" :" ++ ((show lower) ++ (".." ++ (show upper))))
+		    = show value ++ " :" ++ show lower ++ ".." ++ show upper
 
 tcfail067.hs:60:0:
     Could not deduce (Show (SubRange a)) from the context (Num a)

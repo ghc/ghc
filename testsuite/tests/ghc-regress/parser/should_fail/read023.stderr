@@ -2,4 +2,4 @@
 read023.hs:9:4:
     The operator `**' [infixl 7] of a section
 	must have lower precedence than the operand prefix `-' [infixl 6]
-	in the section: `((- 3) **)'
+	in the section: `(- 3 **)'

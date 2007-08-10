@@ -3,4 +3,4 @@ gadt13.hs:12:5:
     GADT pattern match in non-rigid context for `I'
       Tell GHC HQ if you'd like this to unify the context
     In the pattern: I t
-    In the definition of `shw': shw (I t) = (("I " ++)) . (shows t)
+    In the definition of `shw': shw (I t) = ("I " ++) . shows t

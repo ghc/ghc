@@ -5,4 +5,4 @@ tcfail010.hs:3:17:
     Possible fix: add an instance declaration for (Num [t])
     In the second argument of `(+)', namely `2'
     In the expression: z + 2
-    In a lambda abstraction: \ (y : z) -> z + 2
+    In the expression: \ (y : z) -> z + 2

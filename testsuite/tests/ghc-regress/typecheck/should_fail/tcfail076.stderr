@@ -10,4 +10,4 @@ tcfail076.hs:18:67:
       Expected type: m res
       Inferred type: m res1
     In the expression: cont a
-    In a lambda abstraction: \ cont' -> cont a
+    In the first argument of `KContT', namely `(\ cont' -> cont a)'

@@ -7,6 +7,6 @@ tcfail133.hs:67:13:
       (AddDigit (Zero :@ (One :@ One)) One a)
     In the second argument of `($)', namely
 	`add (One :@ Zero) (One :@ One)'
-    In the expression: show $ (add (One :@ Zero) (One :@ One))
+    In the expression: show $ add (One :@ Zero) (One :@ One)
     In the definition of `foo':
-	foo = show $ (add (One :@ Zero) (One :@ One))
+	foo = show $ add (One :@ Zero) (One :@ One)

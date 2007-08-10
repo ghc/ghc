@@ -10,4 +10,4 @@ tcfail115.hs:12:24:
     The variable `r' cannot be bound to an unboxed tuple
     In a case alternative: r -> r
     In the expression: case t x of r -> r
-    In a lambda abstraction: \ x -> case t x of r -> r
+    In the expression: \ x -> case t x of r -> r

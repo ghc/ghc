@@ -12,4 +12,4 @@ tcfail144.hs:14:32:
       Expected type: [Char] -> Bool
       Inferred type: Bool -> Bool
     In the second argument of `(||)', namely `g2 "Yes"'
-    In the second argument of `(||)', namely `(g2 True) || (g2 "Yes")'
+    In the second argument of `(||)', namely `g2 True || g2 "Yes"'

@@ -8,4 +8,4 @@ tcfail153.hs:6:8:
     In the definition of `f':
 	f x = g x
 	    where
-		g y = if y then [] else [y]
+		g y = if y then [] else [...]
