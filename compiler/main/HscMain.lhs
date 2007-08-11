@@ -53,7 +53,7 @@ import HsSyn		( HsModule, LHsBinds, HsGroup, LIE, LImportDecl, HsDoc,
                           HaddockModInfo )
 import CoreSyn
 import SrcLoc		( Located(..) )
-import StringBuffer	( hGetStringBuffer, stringToStringBuffer )
+import StringBuffer
 import Parser
 import Lexer
 import SrcLoc		( mkSrcLoc )
@@ -731,6 +731,8 @@ hscCmmFile dflags filename = do
                               ml_obj_file = panic "hscCmmFile: no obj file" }
 
 
+myParseModule :: DynFlags -> FilePath -> Maybe StringBuffer
+              -> IO (Either ErrMsg (Located (HsModule RdrName)))
 myParseModule dflags src_filename maybe_src_buf
  =    --------------------------  Parser  ----------------
       showPass dflags "Parser" >>
