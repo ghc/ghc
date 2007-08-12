@@ -92,6 +92,7 @@ Library {
         Data.Either,
         Data.Eq,
         Data.Fixed,
+        Data.Foldable
         Data.Function,
         Data.HashTable,
         Data.IORef,
@@ -106,6 +107,7 @@ Library {
         Data.STRef.Lazy,
         Data.STRef.Strict,
         Data.String,
+        Data.Traversable
         Data.Tuple,
         Data.Typeable,
         Data.Unique,
