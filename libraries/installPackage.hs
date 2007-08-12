@@ -31,7 +31,10 @@ doit pref ghcpkg verbosity =
                           }
               registerFlags = emptyRegisterFlags {
                                   regUser = MaybeUserGlobal,
-                                  regVerbose = verbosity
+                                  regVerbose = verbosity,
+                                  regGenScript = False,
+                                  regInPlace = False,
+                                  regWithHcPkg = Just ghcpkg
                               }
           lbi <- getPersistBuildConfig
           let pd = localPkgDescr lbi
