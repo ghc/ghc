@@ -23,17 +23,16 @@ UseGhcForCc = YES
 
 include $(TOP)/mk/boilerplate.mk
 
+ifeq "$(GhcThreaded)$(GhcProfiled)" "YESYES"
+$(error Cannot make GHC both threaded and profiled)
+endif
+
 #-----------------------------------------------------------------------------
 # Counting source code lines
 
 USER_SRCS = $(filter-out $(DERIVED_SRCS),$(SRCS))
 count :
 	./count_lines $(USER_SRCS)
-
-#-----------------------------------------------------------------------------
-# Building ghc different ways (default is just `normal' sequential)
-
-WAYS=$(GhcCompilerWays)
 
 # -----------------------------------------------------------------------------
 # Bootstrapping
@@ -427,9 +426,12 @@ ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
 SRC_HC_OPTS += -DGHCI_TABLES_NEXT_TO_CODE
 endif
 
-ifneq "$(GhcNotThreaded)" "YES"
+ifeq "$(GhcThreaded)" "YES"
 # Use threaded RTS with GHCi, so threads don't get blocked at the prompt.
-SRC_HC_OPTS += -threaded
+SRC_LD_OPTS += -threaded
+endif
+ifeq "$(GhcProfiled)" "YES"
+SRC_LD_OPTS += -prof
 endif
 
 ALL_DIRS += ghci
@@ -810,6 +812,10 @@ coreSyn/CorePrep_HC_OPTS += -auto-all
 # right thing for us here.
 
 ifneq "$(findstring $(stage), 2 3)" ""
+BUILD_GHC_PACKAGE=YES
+endif
+
+ifeq "$(BUILD_GHC_PACKAGE)" "YES"
 PACKAGE = ghc
 HIERARCHICAL_LIB = NO
 VERSION = $(ProjectVersion)
@@ -818,7 +824,9 @@ PACKAGE_CPP_OPTS += -DPKG_DEPENDS='$(PKG_DEPENDS)'
 PACKAGE_CPP_OPTS += -DSTAGE='"$(stage)"'
 
 # Omit Main from the library, the client will want to plug their own Main in
-LIBOBJS = $(filter-out $(odir)/main/Main.o $(odir)/parser/hschooks.o, $(OBJS))
+LIBOBJS = $(filter-out $(odir)/main/Main.o   $(odir)/parser/hschooks.o     \
+                       $(odir)/main/Main.p_o $(odir)/parser/hschooks.p_o,  \
+                       $(OBJS))
 
 # disable splitting: it won't really help with GHC, and the specialised
 # build system for compiler/ isn't set up to handle it.
@@ -847,8 +855,6 @@ NO_SET_HC = YES
 # This is done by compiling Main.hs separately and linking it with 
 # -package ghc.  This is done using a separate Makefile, Makefile.ghcbin
 # Why? See comments in Makefile.ghcbin
-
-all :: $(GHC_PROG)
 
 # The stage 2 and stage 3 package.conf.in files are different, because they
 # point to either the stage2/ or stage3/ dirs in import-dirs.  Hence before
@@ -905,6 +911,12 @@ EXTRA_SRCS += parser/Parser.y
 TAGS_HS_SRCS = parser/Parser.y.pp $(filter-out $(DERIVED_SRCS) main/Config.hs parser/Parser.y, $(sort $(SRCS)))
 
 include $(TOP)/mk/target.mk
+
+ifeq "$(BUILD_GHC_PACKAGE)" "YES"
+ifeq "$(way)" ""
+all :: $(GHC_PROG)
+endif
+endif
 
 $(odir)/main/Config.$(way_)o: SRC_HC_OPTS+=-DSTAGE='"$(stage)"'
 
@@ -996,7 +1008,7 @@ ifneq "$(BootingFromHc)" "YES"
 	$(MKDEPENDHS) -M -optdep-f -optdep.depend-BASE $(foreach way,$(WAYS),-optdep-s -optdep$(way)) $(foreach obj,$(MKDEPENDHS_OBJ_SUFFICES),-osuf $(obj)) $(MKDEPENDHS_OPTS) $(filter-out -split-objs, $(MKDEPENDHS_HC_OPTS)) $(HS_SRCS)
 endif
 	$(MKDEPENDC) -f .depend-BASE $(MKDEPENDC_OPTS) $(foreach way,$(WAYS),-s $(way)) -- $(CC_OPTS) -- $(C_SRCS) 
-	$(PERL) -pe 'binmode(stdin); binmode(stdout); s@^(\S*\.o)@stage$(stage)/$$1@g; s@(\S*\.hi)@stage$(stage)/$$1@g; s@^.*/compat.*$$@@g;' <.depend-BASE >.depend-$(stage)
+	$(PERL) -pe 'binmode(stdin); binmode(stdout); s@(\S*[._]o)@stage$(stage)/$$1@g; s@(\S*[._]hi)@stage$(stage)/$$1@g; s@^.*/compat.*$$@@g;' <.depend-BASE >.depend-$(stage)
 # The binmode stuff tells perl not to add stupid ^M's to the output
 #
 # The /lib/compat replacement is to workaround a bug in the
