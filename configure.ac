@@ -1075,6 +1075,9 @@ dnl ** check whether this machine has gmp3 installed
 AC_CHECK_LIB(gmp,  __gmpz_fdiv_qr, HaveLibGmp=YES; LibGmp=gmp,
   AC_CHECK_LIB(gmp3, __gmpz_fdiv_qr,  HaveLibGmp=YES; LibGmp=gmp3,
     HaveLibGmp=NO; LibGmp=not-installed))
+  if test $HaveLibGmp = YES; then
+    AC_DEFINE([HAVE_LIB_GMP], [1], [Define to 1 if GMP library is installed.])
+  fi;
 AC_SUBST(HaveLibGmp)
 AC_SUBST(LibGmp)
 

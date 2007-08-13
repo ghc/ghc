@@ -24,6 +24,8 @@
 
 #if defined(HAVE_FRAMEWORK_GMP)
 #include <GMP/gmp.h>
+#elif defined(HAVE_LIB_GMP)
+#include <gmp.h>
 #else
 #include "gmp.h" // Needs MP_INT definition 
 #endif

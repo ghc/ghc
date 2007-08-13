@@ -27,7 +27,11 @@ ifeq "$(GhcEnableTablesNextToCode) $(GhcUnregisterised)" "YES NO"
 SRC_CC_OPTS += -DTABLES_NEXT_TO_CODE
 endif
 
+ifeq "$(HaveLibGmp)" "YES"
+SRC_CC_OPTS += -I. -I../rts -I$(GMP_INCLUDE_DIRS)
+else
 SRC_CC_OPTS += -I. -I../rts -I../gmp/gmpbuild
+endif
 
 ifneq "$(GhcWithSMP)" "YES"
 SRC_CC_OPTS += -DNOSMP
