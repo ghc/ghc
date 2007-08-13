@@ -12,14 +12,13 @@ DIRS	= \
 SRCS	= \
 	Data/Bits.hs Data/Bool.hs Data/Char.hs Data/Complex.hs \
 	Data/Either.hs Data/IORef.hs Data/Int.hs \
-	Data/Ix.hs Data/List.hs Data/Maybe.hs Data/PackedString.hs \
-	Data/Ratio.hs Data/Set.hs Data/Tuple.hs Data/Word.hs Data/Array.hs \
+	Data/Ix.hs Data/List.hs Data/Maybe.hs \
+	Data/Ratio.hs Data/Tuple.hs Data/Word.hs \
 	Data/HashTable.hs Data/Typeable.hs Data/Dynamic.hs \
-	Data/Monoid.hs Data/Tree.hs \
-	Data/Map.hs Data/IntMap.hs Data/IntSet.hs \
+	Data/Monoid.hs \
 	Data/Eq.hs Data/Ord.hs Data/Fixed.hs \
-	Data/Foldable.hs Data/Traversable.hs Data/Sequence.hs \
-	Data/Function.hs Data/Graph.hs \
+	Data/Foldable.hs Data/Traversable.hs \
+	Data/Function.hs \
 	Control/Monad.hs Control/Monad/Fix.hs Control/Monad/Instances.hs \
 	Control/Arrow.hs Control/Applicative.hs \
 	Control/Exception.hs \
@@ -43,6 +42,10 @@ SRCS	= \
 	WCsubst.c \
 	System/Posix/Types.hs \
 
+#	Data/String.hs
+#	Text/ParserCombinators/ReadPrec.hs
+#	Text/Read/Lex.hs
+
 # now moved to separate packages:
 #	System/Directory.hs \
 #	System/Directory/Internals.hs \
@@ -51,11 +54,9 @@ SRCS	= \
 #	System/Cmd.hs
 
 #	Text/Regex/Posix.hsc Text/Regex.hs \
-#	Text/ParserCombinators/ReadPrec.hs
 #	[Data/Dynamic.hs] Data/Generics.hs Data/STRef.hs Data/Unique.hs
 #	System/Mem.hs System/Mem/StableName.hs System/Mem/Weak.hs
 #	System/Posix/Types.hs System/Posix/Signals.hsc
-#	Text/Read/Lex.hs
 #	System/FilePath.hs
 
 
