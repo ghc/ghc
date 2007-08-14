@@ -59,7 +59,12 @@ readMVar m =
     putMVar m a
     return a
 
--- |Atomically, put a new value into an 'MVar' and return the old value.
+{-|
+  Take a value from an 'MVar', put a new value into the 'MVar' and
+  return the value taken. Note that there is a race condition whereby
+  another process can put something in the 'MVar' after the take
+  happens but before the put does.
+-}
 swapMVar :: MVar a -> a -> IO a
 swapMVar mvar new =
   block $ do
