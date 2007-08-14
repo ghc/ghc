@@ -26,8 +26,9 @@ module MachRegs (
 
 	-- * The 'Reg' type
 	RegNo,
-	Reg(..), isRealReg, isVirtualReg,
+	Reg(..), isRealReg, isVirtualReg, renameVirtualReg,
         RegClass(..), regClass,
+	trivColorable,
 	getHiVRegFromLo, 
 	mkVReg,
 
@@ -92,6 +93,7 @@ import Pretty
 import Outputable	( Outputable(..), pprPanic, panic )
 import qualified Outputable
 import Unique
+import UniqSet
 import Constants
 import FastTypes
 
@@ -353,6 +355,11 @@ data RegClass
    | RcDouble
      deriving Eq
 
+instance Uniquable RegClass where
+    getUnique RcInteger	= mkUnique 'L' 0
+    getUnique RcFloat	= mkUnique 'L' 1
+    getUnique RcDouble	= mkUnique 'L' 2
+
 type RegNo = Int
 
 data Reg
@@ -396,6 +403,15 @@ isVirtualReg (VirtualRegD _)  = True
 isRealReg :: Reg -> Bool
 isRealReg = not . isVirtualReg
 
+renameVirtualReg :: Unique -> Reg -> Reg
+renameVirtualReg u r
+ = case r of
+ 	RealReg _	-> error "renameVirtualReg: can't change unique on a real reg"
+	VirtualRegI _	-> VirtualRegI  u
+	VirtualRegHi _	-> VirtualRegHi u
+	VirtualRegF _	-> VirtualRegF  u
+	VirtualRegD _	-> VirtualRegD  u
+
 instance Show Reg where
     show (RealReg i)      = showReg i
     show (VirtualRegI u)  = "%vI_" ++ show u
@@ -403,8 +419,60 @@ instance Show Reg where
     show (VirtualRegF u)  = "%vF_" ++ show u
     show (VirtualRegD u)  = "%vD_" ++ show u
 
+instance Outputable RegClass where
+    ppr RcInteger	= Outputable.text "I"
+    ppr RcFloat		= Outputable.text "F"
+    ppr RcDouble	= Outputable.text "D"
+
 instance Outputable Reg where
     ppr r = Outputable.text (show r)
+
+
+
+
+-- trivColorable function for the graph coloring allocator
+--	This gets hammered by scanGraph during register allocation,
+--	so needs to be fairly efficient.
+--
+--	NOTE: 	This only works for arcitectures with just RcInteger and RcDouble
+--		(which are disjoint) ie. x86, x86_64 and ppc
+--
+trivColorable :: RegClass -> UniqSet Reg -> UniqSet Reg -> Bool
+trivColorable classN conflicts exclusions
+ = let	
+	acc r (cd, cf)	
+	 = case regClass r of
+		RcInteger	-> (cd+1, cf)
+		RcDouble	-> (cd,   cf+1)
+		_		-> panic "MachRegs.trivColorable: reg class not handled"
+
+	tmp		= foldUniqSet acc (0, 0) conflicts
+	(rsD,  rsFP)	= foldUniqSet acc tmp    exclusions
+
+	squeese		= worst rsD  classN RcInteger
+			+ worst rsFP classN RcDouble
+
+   in	squeese < allocatableRegsInClass classN
+
+
+-- | Worst case displacement
+--	node N of classN has n neighbors of class C.
+--
+--	We currently only have RcInteger and RcDouble, which don't conflict at all.
+--	This is a bit boring compared to what's in RegArchX86.
+--
+worst :: Int -> RegClass -> RegClass -> Int
+worst n classN classC
+ = case classN of
+ 	RcInteger
+	 -> case classC of
+	 	RcInteger	-> min n (allocatableRegsInClass RcInteger)
+		RcDouble	-> 0
+		
+	RcDouble
+	 -> case classC of
+	 	RcDouble	-> min n (allocatableRegsInClass RcDouble)
+		RcInteger	-> 0
 
 
 -- -----------------------------------------------------------------------------
@@ -468,6 +536,7 @@ fake3 = RealReg 11
 fake4 = RealReg 12
 fake5 = RealReg 13
 
+
 -- On x86, we might want to have an 8-bit RegClass, which would
 -- contain just regs 1-4 (the others don't have 8-bit versions).
 -- However, we can get away without this at the moment because the
@@ -488,6 +557,7 @@ showReg n
    = if   n >= 0 && n < 14
      then regNames !! n
      else "%unknown_x86_real_reg_" ++ show n
+
 
 #endif
 
@@ -951,6 +1021,25 @@ allocatableRegs :: [RegNo]
 allocatableRegs
    = let isFree i = isFastTrue (freeReg i)
      in  filter isFree allMachRegNos
+
+
+-- | The number of regs in each class.
+--	We go via top level CAFs to ensure that we're not recomputing
+--	the length of these lists each time the fn is called.
+allocatableRegsInClass :: RegClass -> Int
+allocatableRegsInClass cls
+ = case cls of
+ 	RcInteger	-> allocatableRegsInteger
+	RcDouble	-> allocatableRegsDouble
+
+allocatableRegsInteger	
+	= length $ filter (\r -> regClass r == RcInteger) 
+		 $ map RealReg allocatableRegs
+
+allocatableRegsDouble
+	= length $ filter (\r -> regClass r == RcDouble) 
+		 $ map RealReg allocatableRegs
+
 
 -- these are the regs which we cannot assume stay alive over a
 -- C call.  

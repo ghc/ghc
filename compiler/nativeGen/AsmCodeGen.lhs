@@ -16,14 +16,18 @@ import MachInstrs
 import MachRegs
 import MachCodeGen
 import PprMach
-import RegisterAlloc
 import RegAllocInfo
 import NCGMonad
 import PositionIndependentCode
+import RegAllocLinear
+import RegLiveness
+import RegCoalesce
+import qualified RegAllocColor	as Color
+import qualified GraphColor	as Color
 
 import Cmm
 import CmmOpt		( cmmMiniInline, cmmMachOpFold )
-import PprCmm		( pprStmt, pprCmms )
+import PprCmm		( pprStmt, pprCmms, pprCmm )
 import MachOp
 import CLabel
 
@@ -42,6 +46,7 @@ import Digraph
 import qualified Pretty
 import Outputable
 import FastString
+import UniqSet
 
 -- DEBUGGING ONLY
 --import OrdList
@@ -53,6 +58,7 @@ import List		( intersperse )
 import Data.Int
 import Data.Word
 import Data.Bits
+import Data.Maybe
 import GHC.Exts
 
 {-
@@ -108,21 +114,68 @@ The machine-dependent bits break down as follows:
 
 -- NB. We *lazilly* compile each block of code for space reasons.
 
+--------------------
 nativeCodeGen :: DynFlags -> [RawCmm] -> UniqSupply -> IO Pretty.Doc
 nativeCodeGen dflags cmms us
   = let (res, _) = initUs us $
 	   cgCmm (concat (map add_split cmms))
 
-	cgCmm :: [RawCmmTop] -> UniqSM (RawCmm, Pretty.Doc, [CLabel])
+	cgCmm :: [RawCmmTop] -> UniqSM ( [CmmNativeGenDump], Pretty.Doc, [CLabel])
 	cgCmm tops = 
 	   lazyMapUs (cmmNativeGen dflags) tops  `thenUs` \ results -> 
-	   case unzip3 results of { (cmms,docs,imps) ->
-	   returnUs (Cmm cmms, my_vcat docs, concat imps)
+	   case unzip3 results of { (dump,docs,imps) ->
+	   returnUs (dump, my_vcat docs, concat imps)
 	   }
     in 
-    case res of { (ppr_cmms, insn_sdoc, imports) -> do
-    dumpIfSet_dyn dflags Opt_D_dump_opt_cmm "Optimised Cmm" (pprCmms [ppr_cmms])
+    case res of { (dump, insn_sdoc, imports) -> do
+
+    -- stripe across the outputs for each block so all the information for a
+    --    certain stage is concurrent in the dumps.
+
+    dumpIfSet_dyn dflags 
+    	Opt_D_dump_opt_cmm "Optimised Cmm"
+	(pprCmm $ Cmm $ map cdCmmOpt dump)
+
+    dumpIfSet_dyn dflags 
+    	Opt_D_dump_asm_native   "(asm-native) Native code"
+	(vcat $ map (docToSDoc . pprNatCmmTop)	$ concatMap cdNative dump)
+
+    dumpIfSet_dyn dflags
+    	Opt_D_dump_asm_liveness "(asm-liveness) Liveness info added"
+	(vcat $ map (ppr . cdLiveness) dump)
+
+    dumpIfSet_dyn dflags
+    	Opt_D_dump_asm_coalesce "(asm-coalesce) Register moves coalesced."
+	(vcat $ map (ppr . cdCoalesce) dump)
+
+    dumpIfSet_dyn dflags
+    	Opt_D_dump_asm_regalloc "(asm-regalloc) Registers allocated"
+	(vcat $ map (docToSDoc . pprNatCmmTop) $ concatMap cdAlloced dump)
+
+    -- with the graph coloring allocator, show the result of each build/spill stage
+    --	  for each block in turn.
+    mapM_ (\codeGraphs
+     -> dumpIfSet_dyn dflags
+		Opt_D_dump_asm_regalloc_stages
+			"(asm-regalloc-stages)"
+			(vcat $ map (\(stage, (code, graph)) ->
+					( text "-- Stage " <> int stage
+					  $$ ppr code
+					  $$ Color.dotGraph Color.regDotColor trivColorable graph))
+					(zip [0..] codeGraphs)))
+	$ map cdCodeGraphs dump
+
+    -- Build a global register conflict graph.
+    --	If you want to see the graph for just one basic block then use asm-regalloc-stages instead.
+    dumpIfSet_dyn dflags
+    	Opt_D_dump_asm_conflicts "(asm-conflicts) Register conflict graph"
+		$ Color.dotGraph Color.regDotColor trivColorable
+	 		$ foldl Color.union Color.initGraph
+			$ catMaybes $ map cdColoredGraph dump
+
+
     return (insn_sdoc Pretty.$$ dyld_stubs imports
+
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
                 -- On recent versions of Darwin, the linker supports
                 -- dead-stripping of code and data on a per-symbol basis.
@@ -193,44 +246,160 @@ nativeCodeGen dflags cmms us
 #endif
 
 
--- Complete native code generation phase for a single top-level chunk
--- of Cmm.
+-- Carries output of the code generator passes, for dumping.
+--	Make sure to only fill the one's we're interested in to avoid
+--	creating space leaks.
 
-cmmNativeGen :: DynFlags -> RawCmmTop -> UniqSM (RawCmmTop, Pretty.Doc, [CLabel])
+data CmmNativeGenDump
+	= CmmNativeGenDump
+	{ cdCmmOpt		:: RawCmmTop
+	, cdNative		:: [NatCmmTop]
+	, cdLiveness		:: [LiveCmmTop]
+	, cdCoalesce		:: [LiveCmmTop]
+	, cdCodeGraphs		:: [([LiveCmmTop], Color.Graph Reg RegClass Reg)]
+	, cdColoredGraph	:: Maybe (Color.Graph Reg RegClass Reg)
+	, cdAlloced		:: [NatCmmTop] }
+
+dchoose dflags opt a b
+	| dopt opt dflags 	= a
+	| otherwise		= b
+
+
+-- | Complete native code generation phase for a single top-level chunk of Cmm.
+--	Unless they're being dumped, intermediate data structures are squashed after
+--	every stage to avoid creating space leaks.
+--
+cmmNativeGen :: DynFlags -> RawCmmTop -> UniqSM (CmmNativeGenDump, Pretty.Doc, [CLabel])
 cmmNativeGen dflags cmm
-   = {-# SCC "fixAssigns"       #-} 
- 	fixAssignsTop cmm	     `thenUs` \ fixed_cmm ->
-     {-# SCC "genericOpt"       #-} 
-	cmmToCmm dflags fixed_cmm           `bind`   \ (cmm, imports) ->
-        (if dopt Opt_D_dump_opt_cmm dflags  -- space leak avoidance
-	   then cmm 
-	   else CmmData Text [])     `bind`   \ ppr_cmm ->
-     {-# SCC "genMachCode"      #-}
-	genMachCode dflags cmm       `thenUs` \ (pre_regalloc, lastMinuteImports) ->
-     {-# SCC "regAlloc"         #-}
-	mapUs regAlloc pre_regalloc `thenUs`   \ with_regs ->
-     {-# SCC "shortcutBranches"   #-}
-        shortcutBranches dflags with_regs `bind` \ shorted -> 
-     {-# SCC "sequenceBlocks"   #-}
-	map sequenceTop shorted        `bind`   \ sequenced ->
-     {-# SCC "x86fp_kludge"     #-}
-	map x86fp_kludge sequenced   `bind`   \ final_mach_code ->
-     {-# SCC "vcat"             #-}
-	Pretty.vcat (map pprNatCmmTop final_mach_code)  `bind`   \ final_sdoc ->
+ = do	
+	--
+ 	fixed_cmm
+	 <- 	{-# SCC "fixAssigns"  #-}
+	 	fixAssignsTop cmm
 
-        returnUs (ppr_cmm, final_sdoc Pretty.$$ Pretty.text "", lastMinuteImports ++ imports)
-     where
-        x86fp_kludge :: NatCmmTop -> NatCmmTop
-        x86fp_kludge top@(CmmData _ _) = top
+	---- cmm to cmm optimisations
+	(cmm, imports, ppr_cmm)
+	 <- (\fixed_cmm
+	 -> {-# SCC "genericOpt"  #-}
+	   do	let (cmm, imports)	= cmmToCmm dflags fixed_cmm
+	   	
+		return	( cmm
+			, imports
+			, dchoose dflags Opt_D_dump_cmm	cmm (CmmData Text []))
+	     ) fixed_cmm
+
+
+	---- generate native code from cmm
+	(native, lastMinuteImports, ppr_native)
+	 <- (\cmm 
+	 -> {-# SCC "genMachCode" #-}
+	   do	(machCode, lastMinuteImports)
+	   		<- genMachCode dflags cmm
+
+	   	return	( machCode
+			, lastMinuteImports
+			, dchoose dflags Opt_D_dump_asm_native machCode [])
+	    ) cmm
+
+
+    	---- tag instructions with register liveness information
+	(withLiveness, ppr_withLiveness)
+	 <- (\native
+	 -> {-# SCC "regLiveness" #-}
+	   do 
+	 	withLiveness	<- mapUs regLiveness native
+
+		return 	( withLiveness
+			, dchoose dflags Opt_D_dump_asm_liveness withLiveness []))
+		native
+
+    	---- allocate registers
+	(alloced, ppr_alloced, ppr_coalesce, ppr_codeGraphs, ppr_coloredGraph)
+	 <- (\withLiveness
+	 -> {-# SCC "regAlloc" #-}
+	   do
+	 	if dopt Opt_RegsGraph dflags
+		 then do
+			-- the regs usable for allocation
+			let alloc_regs	
+				= foldr (\r -> plusUFM_C unionUniqSets
+							$ unitUFM (regClass r) (unitUniqSet r))
+					emptyUFM
+				$ map RealReg allocatableRegs
+
+			-- aggressively coalesce moves between virtual regs
+			coalesced	<- regCoalesce withLiveness
+
+			-- graph coloring register allocation
+			(alloced, codeGraphs)
+				<- Color.regAlloc 
+					alloc_regs
+					(mkUniqSet [0..maxSpillSlots]) 
+					coalesced
+
+			return 	( alloced
+				, dchoose dflags Opt_D_dump_asm_regalloc 	alloced []
+				, dchoose dflags Opt_D_dump_asm_coalesce 	coalesced []
+				, dchoose dflags Opt_D_dump_asm_regalloc_stages	codeGraphs []
+				, dchoose dflags Opt_D_dump_asm_conflicts 	Nothing Nothing)
+
+		 else do
+			-- do linear register allocation
+		 	alloced	<- mapUs regAlloc withLiveness
+			return	( alloced
+				, dchoose dflags Opt_D_dump_asm_regalloc	alloced []
+				, []
+				, []
+				, Nothing )) 
+		withLiveness
+			
+
+	---- shortcut branches
+	let shorted	=
+	 	{-# SCC "shortcutBranches" #-}
+	 	shortcutBranches dflags alloced
+
+	---- sequence blocks
+	let sequenced	=
+	 	{-# SCC "sequenceBlocks" #-}
+	 	map sequenceTop shorted
+
+	---- x86fp_kludge
+	let final_mach_code =
 #if i386_TARGET_ARCH
-        x86fp_kludge top@(CmmProc info lbl params code) = 
-		CmmProc info lbl params (map bb_i386_insert_ffrees code)
-		where
-		  bb_i386_insert_ffrees (BasicBlock id instrs) =
-			BasicBlock id (i386_insert_ffrees instrs)
+	 	{-# SCC "x86fp_kludge" #-}
+	 	map x86fp_kludge sequenced
 #else
-        x86fp_kludge top =  top
+		sequenced
 #endif
+		
+	---- vcat
+	let final_sdoc	= 
+		{-# SCC "vcat" #-}
+		Pretty.vcat (map pprNatCmmTop final_mach_code)
+
+	let dump	=
+		CmmNativeGenDump
+		{ cdCmmOpt		= ppr_cmm
+		, cdNative		= ppr_native
+		, cdLiveness		= ppr_withLiveness
+		, cdCoalesce		= ppr_coalesce
+		, cdCodeGraphs		= ppr_codeGraphs
+		, cdColoredGraph	= ppr_coloredGraph
+		, cdAlloced		= ppr_alloced }
+
+	returnUs (dump, final_sdoc Pretty.$$ Pretty.text "", lastMinuteImports ++ imports)
+
+#if i386_TARGET_ARCH
+x86fp_kludge :: NatCmmTop -> NatCmmTop
+x86fp_kludge top@(CmmData _ _) = top
+x86fp_kludge top@(CmmProc info lbl params code) = 
+	CmmProc info lbl params (map bb_i386_insert_ffrees code)
+	where
+		bb_i386_insert_ffrees (BasicBlock id instrs) =
+			BasicBlock id (i386_insert_ffrees instrs)
+#endif
+
 
 -- -----------------------------------------------------------------------------
 -- Sequencing the basic blocks

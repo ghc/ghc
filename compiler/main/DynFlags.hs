@@ -96,6 +96,12 @@ data DynFlag
    = Opt_D_dump_cmm
    | Opt_D_dump_cps_cmm
    | Opt_D_dump_asm
+   | Opt_D_dump_asm_native
+   | Opt_D_dump_asm_liveness
+   | Opt_D_dump_asm_coalesce
+   | Opt_D_dump_asm_regalloc
+   | Opt_D_dump_asm_regalloc_stages
+   | Opt_D_dump_asm_conflicts
    | Opt_D_dump_cpranal
    | Opt_D_dump_deriv
    | Opt_D_dump_ds
@@ -229,6 +235,7 @@ data DynFlag
    | Opt_DictsCheap
    | Opt_RewriteRules
    | Opt_Vectorise
+   | Opt_RegsGraph
 
    -- misc opts
    | Opt_Cpp
@@ -990,6 +997,13 @@ dynamic_flags = [
   ,  ( "ddump-cmm",         	 setDumpFlag Opt_D_dump_cmm)
   ,  ( "ddump-cps-cmm",        	 setDumpFlag Opt_D_dump_cps_cmm)
   ,  ( "ddump-asm",          	 setDumpFlag Opt_D_dump_asm)
+  ,  ( "ddump-asm-native",       setDumpFlag Opt_D_dump_asm_native)
+  ,  ( "ddump-asm-liveness",     setDumpFlag Opt_D_dump_asm_liveness)
+  ,  ( "ddump-asm-coalesce",     setDumpFlag Opt_D_dump_asm_coalesce)
+  ,  ( "ddump-asm-regalloc",     setDumpFlag Opt_D_dump_asm_regalloc)
+  ,  ( "ddump-asm-conflicts",    setDumpFlag Opt_D_dump_asm_conflicts)
+  ,  ( "ddump-asm-regalloc-stages",
+                                 setDumpFlag Opt_D_dump_asm_regalloc_stages)
   ,  ( "ddump-cpranal",      	 setDumpFlag Opt_D_dump_cpranal)
   ,  ( "ddump-deriv",        	 setDumpFlag Opt_D_dump_deriv)
   ,  ( "ddump-ds",           	 setDumpFlag Opt_D_dump_ds)
@@ -1137,6 +1151,7 @@ fFlags = [
   ( "rewrite-rules",                    Opt_RewriteRules ),
   ( "break-on-exception",               Opt_BreakOnException ),
   ( "vectorise",                        Opt_Vectorise ),
+  ( "regs-graph",                       Opt_RegsGraph),
   -- Deprecated in favour of -XTemplateHaskell:
   ( "th",                               Opt_TemplateHaskell ),
   -- Deprecated in favour of -XForeignFunctionInterface:

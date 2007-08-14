@@ -760,8 +760,8 @@ mkSpillInstr
    -> Int		-- spill slot to use
    -> Instr
 mkSpillInstr reg delta slot
-  = ASSERT(isRealReg reg)
-    let	
+ -- = ASSERT(isRealReg reg)			-- BUGS: used for graph coloring: is this ok?
+  = let	
         off     = spillSlotToOffset slot
     in
 #ifdef alpha_TARGET_ARCH
@@ -805,8 +805,8 @@ mkLoadInstr
    -> Int		-- spill slot to use
    -> Instr
 mkLoadInstr reg delta slot
-  = ASSERT(isRealReg reg)
-    let
+ -- = ASSERT(isRealReg reg)			-- BUGS: used for graph coloring: is this ok?
+  = let
         off     = spillSlotToOffset slot
     in
 #if alpha_TARGET_ARCH
@@ -891,4 +891,5 @@ spillSlotToOffset slot
    = 64 + spillSlotSize * slot
    | otherwise
    = pprPanic "spillSlotToOffset:" 
-              (text "invalid spill location: " <> int slot)
+              (   text "invalid spill location: " <> int slot
+	      $$  text "maxSpillSlots:          " <> int maxSpillSlots)

@@ -13,8 +13,8 @@
 #include "nativeGen/NCG.h"
 
 module PprMach ( 
-	pprNatCmmTop, pprBasicBlock,
-	pprInstr, pprSize, pprUserReg,
+	pprNatCmmTop, pprBasicBlock, pprSectionHeader, pprData,
+	pprInstr, pprSize, pprUserReg
   ) where
 
 
@@ -36,6 +36,7 @@ import Unique		( pprUnique )
 import Pretty
 import FastString
 import qualified Outputable
+import Outputable	( Outputable )
 
 import Data.Array.ST
 import Data.Word	( Word8 )
@@ -798,6 +799,9 @@ pprDataItem lit
 -- -----------------------------------------------------------------------------
 -- pprInstr: print an 'Instr'
 
+instance Outputable Instr where
+    ppr	 instr	= Outputable.docToSDoc $ pprInstr instr
+
 pprInstr :: Instr -> Doc
 
 --pprInstr (COMMENT s) = empty -- nuke 'em
@@ -1207,7 +1211,8 @@ pprSizeRegRegReg name size reg1 reg2 reg3
 
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 
-pprInstr v@(MOV size s@(OpReg src) d@(OpReg dst)) -- hack
+{-									-- BUGS: changed for coloring allocator
+pprInstr v@(MOV size s@(OpReg src) d@(OpReg dst)) -- hack		-- write a pass for this and patch linear allocator with it
   | src == dst
   =
 #if 0 /* #ifdef DEBUG */
@@ -1215,6 +1220,7 @@ pprInstr v@(MOV size s@(OpReg src) d@(OpReg dst)) -- hack
 #else
     empty
 #endif
+-}
 
 pprInstr (MOV size src dst)
   = pprSizeOpOp SLIT("mov") size src dst

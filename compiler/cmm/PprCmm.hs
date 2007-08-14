@@ -33,7 +33,7 @@
 --
 
 module PprCmm ( 	
-	writeCmms, pprCmms, pprCmm, pprStmt, pprExpr
+	writeCmms, pprCmms, pprCmm, pprStmt, pprExpr, pprSection, pprStatic
   ) where
 
 #include "HsVersions.h"
@@ -65,11 +65,15 @@ writeCmms handle cmms = printForC handle (pprCmms cmms)
 instance (Outputable info) => Outputable (GenCmm CmmStatic info CmmStmt) where
     ppr c = pprCmm c
 
-instance (Outputable info) => Outputable (GenCmmTop CmmStatic info CmmStmt) where
+instance (Outputable d, Outputable info, Outputable i)
+	=> Outputable (GenCmmTop d info i) where
     ppr t = pprTop t
 
-instance Outputable CmmBasicBlock where
+instance (Outputable instr) => Outputable (GenBasicBlock instr) where
     ppr b = pprBBlock b
+
+instance Outputable BlockId where
+    ppr id = pprBlockId id
 
 instance Outputable CmmStmt where
     ppr s = pprStmt s
@@ -92,6 +96,8 @@ instance Outputable CmmStatic where
 instance Outputable CmmInfo where
     ppr e = pprInfo e
 
+
+
 -----------------------------------------------------------------------------
 
 pprCmm :: (Outputable info) => GenCmm CmmStatic info CmmStmt -> SDoc
@@ -100,7 +106,9 @@ pprCmm (Cmm tops) = vcat $ intersperse (text "") $ map pprTop tops
 -- --------------------------------------------------------------------------
 -- Top level `procedure' blocks.
 --
-pprTop :: (Outputable info) => GenCmmTop CmmStatic info CmmStmt -> SDoc
+pprTop 	:: (Outputable d, Outputable info, Outputable i)
+	=> GenCmmTop d info i -> SDoc
+
 pprTop (CmmProc info lbl params blocks )
 
   = vcat [ pprCLabel lbl <> parens (commafy $ map ppr params) <+> lbrace
@@ -114,7 +122,7 @@ pprTop (CmmProc info lbl params blocks )
 --      section "data" { ... }
 --
 pprTop (CmmData section ds) = 
-    (hang (pprSection section <+> lbrace) 4 (vcat (map pprStatic ds)))
+    (hang (pprSection section <+> lbrace) 4 (vcat (map ppr ds)))
     $$ rbrace
 
 -- --------------------------------------------------------------------------
@@ -186,7 +194,7 @@ pprUpdateFrame (UpdateFrame expr args) =
 -- --------------------------------------------------------------------------
 -- Basic blocks look like assembly blocks.
 --      lbl: stmt ; stmt ; .. 
-pprBBlock :: CmmBasicBlock -> SDoc
+pprBBlock :: Outputable stmt => GenBasicBlock stmt -> SDoc
 pprBBlock (BasicBlock ident stmts) =
     hang (pprBlockId ident <> colon) 4 (vcat (map ppr stmts))
 
