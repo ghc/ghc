@@ -35,4 +35,5 @@ test('GADT2', expect_fail, compile, [''])
 test('GADT3', expect_fail, compile, [''])
 
 test('Class1', expect_fail, compile, [''])
+test('Class2', normal, compile, [''])
 
