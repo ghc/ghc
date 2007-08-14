@@ -1554,13 +1554,13 @@ stepOverCmd [] = do
     Nothing  -> stepCmd []
     Just loc -> do
        Just mod <- getCurrentBreakModule
-       parent   <- enclosingSubSpan mod loc
-       allTicksRightmost <- sortBy rightmost `fmap` 
+       parent   <- enclosingTickSpan mod loc
+       allTicksRightmost <- (sortBy rightmost . map snd) `fmap` 
                                ticksIn mod parent
        let lastTick = null allTicksRightmost || 
-                      snd(head allTicksRightmost) == loc
+                      head allTicksRightmost == loc
        if not lastTick
-              then doContinue (`lexicalSubSpanOf` parent) GHC.SingleStep
+              then doContinue (`isSubspanOf` parent) GHC.SingleStep
               else doContinue (const True) GHC.SingleStep
 
     where 
@@ -1570,7 +1570,7 @@ stepOverCmd [] = do
  arrived to the last tick in an expression, in which case we must
  step normally to the next tick.
  What we do is:
-  1. Retrieve the enclosing expression block
+  1. Retrieve the enclosing expression block (with a tick)
   2. Retrieve all the ticks there and sort them out by 'rightness'
   3. See if the current tick turned out the first one in the list
 -}
@@ -1585,20 +1585,14 @@ ticksIn mod src = do
                 , srcSpanEnd src   >= srcSpanEnd span
                 ]
 
-enclosingSubSpan :: Module -> SrcSpan -> GHCi SrcSpan
-enclosingSubSpan mod src = do
+enclosingTickSpan :: Module -> SrcSpan -> GHCi SrcSpan
+enclosingTickSpan mod src = do
   ticks <- getTickArray mod
   let line = srcSpanStartLine src
-  ASSERT (inRange (bounds arr) line) do
-  let enclosing_spans = [ t | t@(_,span) <- ticks ! line
-                            , srcSpanEnd span >= srcSpanEnd src]
-  return . snd . head . sortBy leftmost_largest $ enclosing_spans
-          
-lexicalSubSpanOf :: SrcSpan -> SrcSpan -> Bool
-lexicalSubSpanOf src parent 
-    | GHC.srcSpanFile parent /= GHC.srcSpanFile src = False
-    | otherwise = srcSpanStart parent <= srcSpanStart src &&
-                  srcSpanEnd parent >=  srcSpanEnd src
+  ASSERT (inRange (bounds ticks) line) do
+  let enclosing_spans = [ span | (_,span) <- ticks ! line
+                               , srcSpanEnd span >= srcSpanEnd src]
+  return . head . sortBy leftmost_largest $ enclosing_spans
 
 traceCmd :: String -> GHCi ()
 traceCmd []         = doContinue (const True) GHC.RunAndLogSteps
@@ -1765,9 +1759,9 @@ findBreakByLine :: Int -> TickArray -> Maybe (BreakIndex,SrcSpan)
 findBreakByLine line arr
   | not (inRange (bounds arr) line) = Nothing
   | otherwise =
-    listToMaybe (sortBy leftmost_largest  complete)   `mplus`
-    listToMaybe (sortBy leftmost_smallest incomplete) `mplus`
-    listToMaybe (sortBy rightmost ticks)
+    listToMaybe (sortBy (leftmost_largest `on` snd)  complete)   `mplus`
+    listToMaybe (sortBy (leftmost_smallest `on` snd) incomplete) `mplus`
+    listToMaybe (sortBy (rightmost `on` snd) ticks)
   where 
         ticks = arr ! line
 
@@ -1782,8 +1776,8 @@ findBreakByCoord :: Maybe FastString -> (Int,Int) -> TickArray
 findBreakByCoord mb_file (line, col) arr
   | not (inRange (bounds arr) line) = Nothing
   | otherwise =
-    listToMaybe (sortBy rightmost contains) `mplus`
-    listToMaybe (sortBy leftmost_smallest after_here)
+    listToMaybe (sortBy (rightmost `on` snd) contains ++
+                 sortBy (leftmost_smallest `on` snd) after_here)
   where 
         ticks = arr ! line
 
@@ -1798,17 +1792,6 @@ findBreakByCoord mb_file (line, col) arr
         after_here = [ tick | tick@(nm,span) <- ticks,
                               GHC.srcSpanStartLine span == line,
                               GHC.srcSpanStartCol span >= col ]
-
-
-leftmost_smallest  (_,a) (_,b) = a `compare` b
-leftmost_largest   (_,a) (_,b) = (GHC.srcSpanStart a `compare` GHC.srcSpanStart b)
-                                `thenCmp`
-                                 (GHC.srcSpanEnd b `compare` GHC.srcSpanEnd a)
-rightmost (_,a) (_,b) = b `compare` a
-
-spans :: SrcSpan -> (Int,Int) -> Bool
-spans span (l,c) = GHC.srcSpanStart span <= loc && loc <= GHC.srcSpanEnd span
-   where loc = GHC.mkSrcLoc (GHC.srcSpanFile span) l c
 
 -- for now, use ANSI bold on Unixy systems.  On Windows, we add a line
 -- of carets under the active expression instead.  The Windows console

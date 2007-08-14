@@ -26,7 +26,7 @@ module Util (
 	nTimes,
 
 	-- sorting
-	sortLe, sortWith,
+	sortLe, sortWith, on,
 
 	-- transitive closures
 	transitiveClosure,
@@ -457,6 +457,10 @@ sortWith :: Ord b => (a->b) -> [a] -> [a]
 sortWith get_key xs = sortLe le xs
   where
     x `le` y = get_key x < get_key y	
+
+on :: (a -> a -> Ordering) -> (b -> a) -> b -> b -> Ordering
+on cmp sel = \x y -> sel x `cmp` sel y
+
 \end{code}
 
 %************************************************************************

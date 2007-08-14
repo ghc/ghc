@@ -36,7 +36,8 @@ module SrcLoc (
         srcSpanStartLine, srcSpanEndLine, 
         srcSpanStartCol, srcSpanEndCol,
 
-	Located(..), getLoc, unLoc, noLoc, eqLocated, cmpLocated, combineLocs, addCLoc
+	Located(..), getLoc, unLoc, noLoc, eqLocated, cmpLocated, combineLocs, addCLoc,
+        leftmost_smallest, leftmost_largest, rightmost, spans, isSubspanOf
     ) where
 
 #include "HsVersions.h"
@@ -399,4 +400,32 @@ instance Functor Located where
 instance Outputable e => Outputable (Located e) where
   ppr (L span e) =  ppr e
 	-- do we want to dump the span in debugSty mode?    
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Manipulating SrcSpans}
+%*									*
+%************************************************************************
+
+\begin{code}
+leftmost_smallest, leftmost_largest, rightmost :: SrcSpan -> SrcSpan -> Ordering
+rightmost            = flip compare
+leftmost_smallest    = compare 
+leftmost_largest a b = (srcSpanStart a `compare` srcSpanStart b)
+                                `thenCmp`
+                       (srcSpanEnd b `compare` srcSpanEnd a)
+
+
+spans :: SrcSpan -> (Int,Int) -> Bool
+spans span (l,c) = srcSpanStart span <= loc && loc <= srcSpanEnd span
+   where loc = mkSrcLoc (srcSpanFile span) l c
+
+isSubspanOf :: SrcSpan -> SrcSpan -> Bool
+isSubspanOf src parent 
+    | optSrcSpanFileName parent /= optSrcSpanFileName src = False
+    | otherwise = srcSpanStart parent <= srcSpanStart src &&
+                  srcSpanEnd parent   >= srcSpanEnd src
+
 \end{code}
