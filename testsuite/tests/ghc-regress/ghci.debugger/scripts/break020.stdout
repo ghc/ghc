@@ -1,0 +1,55 @@
+Stopped at break020.hs:(9,7)-(14,10)
+_result :: IO ()
+8  
+9  main = [1mdo
+10    line1 (ex1 1)
+11    line2 (ex2 2)
+12    schloss
+13    line2 1
+14    return ()[0m
+15    
+Stopped at break020.hs:10:2-14
+_result :: IO ()
+9  main = do
+10    [1mline1 (ex1 1)[0m
+11    line2 (ex2 2)
+Stopped at break020.hs:11:2-14
+_result :: IO ()
+10    line1 (ex1 1)
+11    [1mline2 (ex2 2)[0m
+12    schloss
+Stopped at break020.hs:12:2-8
+_result :: IO ()
+11    line2 (ex2 2)
+12    [1mschloss[0m
+13    line2 1
+Stopped at break020.hs:13:2-8
+_result :: IO ()
+12    schloss
+13    [1mline2 1[0m
+14    return ()
+Stopped at break020.hs:14:2-10
+_result :: IO ()
+13    line2 1
+14    [1mreturn ()[0m
+15    
+-1  : [1mline2[0m (break020.hs:2:10-18)
+-2  : [1mline2[0m (break020.hs:2:0-18)
+-3  : [1mmain[0m (break020.hs:13:2-8)
+-4  : [1mschloss[0m (break020.hs:7:2-10)
+-5  : [1mline2[0m (break020.hs:2:10-18)
+-6  : [1mline2[0m (break020.hs:2:0-18)
+-7  : [1mschloss[0m (break020.hs:6:2-8)
+-8  : [1mline1[0m (break020.hs:1:10-18)
+-9  : [1mline1[0m (break020.hs:1:0-18)
+-10 : [1mschloss[0m (break020.hs:5:2-8)
+-11 : [1mschloss[0m (break020.hs:(4,10)-(7,10))
+-12 : [1mmain[0m (break020.hs:12:2-8)
+-13 : [1mline2[0m (break020.hs:2:10-18)
+-14 : [1mline2[0m (break020.hs:2:0-18)
+-15 : [1mmain[0m (break020.hs:11:2-14)
+-16 : [1mline1[0m (break020.hs:1:10-18)
+-17 : [1mline1[0m (break020.hs:1:0-18)
+-18 : [1mmain[0m (break020.hs:10:2-14)
+-19 : [1mmain[0m (break020.hs:(9,7)-(14,10))
+<end of history>
