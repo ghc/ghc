@@ -3,8 +3,8 @@ Stopped at <exception thrown>
 _exception :: e
 Stopped at <exception thrown>
 _exception :: e
--1  : ../Test7.hs:2:17-27
--2  : ../Test7.hs:2:7-28
+-1  : [1mmain[0m (../Test7.hs:2:17-27)
+-2  : [1mmain[0m (../Test7.hs:2:7-28)
 <end of history>
 Logged breakpoint at ../Test7.hs:2:17-27
 _result :: a
