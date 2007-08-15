@@ -1652,9 +1652,12 @@ historyCmd arg
         printForUser (vcat(zipWith3 
                              (\x y z -> x <+> y <+> z) 
                              (map text nums) 
-                             (map (ftext . occNameFS . nameOccName) names)
+                             (map (bold . ppr) names)
                              (map (parens . ppr) spans)))
         io $ putStrLn $ if null rest then "<end of history>" else "..."
+
+bold c | do_bold   = text start_bold <> c <> text end_bold
+       | otherwise = c
 
 backCmd :: String -> GHCi ()
 backCmd = noArgs $ do
@@ -1809,8 +1812,8 @@ do_bold = True
 do_bold = False
 #endif
 
-start_bold = BS.pack "\ESC[1m"
-end_bold   = BS.pack "\ESC[0m"
+start_bold = "\ESC[1m"
+end_bold   = "\ESC[0m"
 
 listCmd :: String -> GHCi ()
 listCmd "" = do
@@ -1901,13 +1904,13 @@ listAround span do_highlight = do
           = let (a,r) = BS.splitAt col1 line
                 (b,c) = BS.splitAt (col2-col1) r
             in
-            BS.concat [a,start_bold,b,end_bold,c]
+            BS.concat [a,BS.pack start_bold,b,BS.pack end_bold,c]
           | no == line1
           = let (a,b) = BS.splitAt col1 line in
-            BS.concat [a, start_bold, b]
+            BS.concat [a, BS.pack start_bold, b]
           | no == line2
           = let (a,b) = BS.splitAt col2 line in
-            BS.concat [a, end_bold, b]
+            BS.concat [a, BS.pack end_bold, b]
           | otherwise   = line
 
         highlight_carets no line
