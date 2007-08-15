@@ -38,10 +38,10 @@ endif
 endif
 
 ifeq "$(GhcThreaded)" "YES"
-SRC_LD_OPTS += -threaded
+SRC_HC_OPTS += -threaded
 endif
 ifeq "$(GhcProfiled)" "YES"
-SRC_LD_OPTS += -prof
+SRC_HC_OPTS += -prof
 endif
 
 odir=stage$(stage)
