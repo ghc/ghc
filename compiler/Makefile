@@ -709,9 +709,8 @@ SRC_LD_OPTS += -no-link-chk
 # See comments in $(FPTOOLS_TOP)/utils/ghc-pkg/Makefile for why we use
 # a real binary here rather than a shell script.
 
-INPLACE_C = ghc-inplace.c
 INPLACE_PROG = $(odir)/ghc-inplace$(exeext)
-EXCLUDED_SRCS += $(INPLACE_C)
+EXCLUDED_C_SRCS += ghc-inplace.c
 
 # FPTOOLS_TOP_ABS platform uses backslashes, at least on Cygwin, but that
 # will go wrong when we use it in a Haskell string below.
@@ -719,7 +718,7 @@ TOP_ABS=$(subst \\,/,$(FPTOOLS_TOP_ABS_PLATFORM))
 
 GHC_PATH=$(TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)
 
-$(INPLACE_PROG): $(INPLACE_C)
+$(INPLACE_PROG): ghc-inplace.c
 	$(HC) -cpp -optc-DGHC_PATH=\"$(GHC_PATH)\" -optc-DTOP_ABS=\"$(TOP_ABS)\" $< -o $@
 
 all :: $(INPLACE_PROG)
