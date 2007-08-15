@@ -30,8 +30,7 @@ import NameEnv
 import Id
 import MkId                 ( unwrapFamInstScrut )
 import OccName
-import RdrName              ( RdrName, mkRdrQual )
-import Module               ( mkModuleNameFS )
+import Module               ( Module )
 
 import DsMonad hiding (mapAndUnzipM)
 import DsUtils              ( mkCoreTup, mkCoreTupTy )
@@ -46,23 +45,18 @@ import Outputable
 import FastString
 import Control.Monad        ( liftM, liftM2, zipWithM, mapAndUnzipM )
 
-mkNDPVar :: String -> RdrName
-mkNDPVar s = mkRdrQual nDP_BUILTIN (mkVarOcc s)
-
-mkNDPVarFS :: FastString -> RdrName
-mkNDPVarFS fs = mkRdrQual nDP_BUILTIN (mkVarOccFS fs)
-
-builtin_PAs :: [(Name, RdrName)]
+builtin_PAs :: [(Name, Module, FastString)]
 builtin_PAs = [
                 mk closureTyConName FSLIT("dPA_Clo")
               , mk intTyConName     FSLIT("dPA_Int")
               ]
               ++ tups
   where
-    mk name fs = (name, mkNDPVarFS fs)
+    mk name fs = (name, nDP_INSTANCES, fs)
 
     tups = mk_tup 0 : map mk_tup [2..3]
-    mk_tup n   = (getName $ tupleTyCon Boxed n, mkNDPVar $ "dPA_" ++ show n)
+    mk_tup n   = (getName $ tupleTyCon Boxed n, nDP_INSTANCES,
+                  mkFastString $ "dPA_" ++ show n)
 
 vectorise :: HscEnv -> UniqSupply -> RuleBase -> ModGuts
           -> IO (SimplCount, ModGuts)
@@ -80,7 +74,7 @@ vectorise hsc_env _ _ guts
 vectModule :: ModGuts -> VM ModGuts
 vectModule guts
   = do
-      defTyConRdrPAs builtin_PAs
+      defTyConBuiltinPAs builtin_PAs
       (types', fam_insts, tc_binds) <- vectTypeEnv (mg_types guts)
       
       let fam_inst_env' = extendFamInstEnvList (mg_fam_inst_env guts) fam_insts

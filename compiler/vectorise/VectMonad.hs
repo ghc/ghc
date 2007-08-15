@@ -21,7 +21,7 @@ module VectMonad (
   lookupVar, defGlobalVar,
   lookupTyCon, defTyCon,
   lookupDataCon, defDataCon,
-  lookupTyConPA, defTyConPA, defTyConPAs, defTyConRdrPAs,
+  lookupTyConPA, defTyConPA, defTyConPAs, defTyConBuiltinPAs,
   lookupTyVarPA, defLocalTyVar, defLocalTyVarWithPA, localTyVars,
 
   {-lookupInst,-} lookupFamInst
@@ -41,7 +41,8 @@ import OccName
 import Name
 import NameEnv
 import TysPrim       ( intPrimTy )
-import RdrName
+import Module
+import IfaceEnv
 
 import DsMonad
 import PrelNames
@@ -54,7 +55,7 @@ import Outputable
 import FastString
 import SrcLoc        ( noSrcSpan )
 
-import Control.Monad ( liftM )
+import Control.Monad ( liftM, zipWithM )
 
 data Scope a b = Global a | Local b
 
@@ -154,10 +155,6 @@ data GlobalEnv = GlobalEnv {
 
                 -- Hoisted bindings
                 , global_bindings :: [(Var, CoreExpr)]
-
-                  -- Global Rdr environment (from ModGuts)
-                  --
-                , global_rdr_env :: GlobalRdrEnv
                 }
 
 data LocalEnv = LocalEnv {
@@ -178,9 +175,9 @@ data LocalEnv = LocalEnv {
                }
               
 
-initGlobalEnv :: VectInfo -> (InstEnv, InstEnv) -> FamInstEnvs -> Builtins -> GlobalRdrEnv
+initGlobalEnv :: VectInfo -> (InstEnv, InstEnv) -> FamInstEnvs -> Builtins
               -> GlobalEnv
-initGlobalEnv info instEnvs famInstEnvs bi rdr_env
+initGlobalEnv info instEnvs famInstEnvs bi
   = GlobalEnv {
       global_vars          = mapVarEnv snd $ vectInfoVar info
     , global_exported_vars = emptyVarEnv
@@ -192,7 +189,6 @@ initGlobalEnv info instEnvs famInstEnvs bi rdr_env
     , global_inst_env      = instEnvs
     , global_fam_inst_env  = famInstEnvs
     , global_bindings      = []
-    , global_rdr_env       = rdr_env
     }
 
 setFamInstEnv :: FamInstEnv -> GlobalEnv -> GlobalEnv
@@ -316,20 +312,10 @@ inBind id p
   = do updLEnv $ \env -> env { local_bind_name = occNameFS (getOccName id) }
        p
 
-lookupRdrName :: RdrName -> VM Name
-lookupRdrName rdr_name
-  = do
-      rdr_env <- readGEnv global_rdr_env
-      case lookupGRE_RdrName rdr_name rdr_env of
-        [gre] -> return (gre_name gre)
-        []    -> pprPanic "VectMonad.lookupRdrName: not found" (ppr rdr_name)
-        _     -> pprPanic "VectMonad.lookupRdrName: ambiguous" (ppr rdr_name)
-
-lookupRdrVar :: RdrName -> VM Var
-lookupRdrVar rdr_name
-  = do
-      name <- lookupRdrName rdr_name
-      liftDs (dsLookupGlobalId name)
+lookupExternalVar :: Module -> FastString -> VM Var
+lookupExternalVar mod fs
+  = liftDs
+  $ dsLookupGlobalId =<< lookupOrig mod (mkVarOccFS fs)
 
 cloneName :: (OccName -> OccName) -> Name -> VM Name
 cloneName mk_occ name = liftM make (liftDs newUnique)
@@ -422,15 +408,15 @@ defTyConPAs ps = updGEnv $ \env ->
   env { global_pa_funs = extendNameEnvList (global_pa_funs env)
                                            [(tyConName tc, pa) | (tc, pa) <- ps] }
 
-defTyConRdrPAs :: [(Name, RdrName)] -> VM ()
-defTyConRdrPAs ps
+defTyConBuiltinPAs :: [(Name, Module, FastString)] -> VM ()
+defTyConBuiltinPAs ps
   = do
-      pas <- mapM lookupRdrVar rdr_names
+      pas <- zipWithM lookupExternalVar mods fss
       updGEnv $ \env ->
         env { global_pa_funs = extendNameEnvList (global_pa_funs env)
                                                  (zip tcs pas) }
   where
-    (tcs, rdr_names) = unzip ps
+    (tcs, mods, fss) = unzip3 ps
 
 lookupTyVarPA :: Var -> VM (Maybe CoreExpr)
 lookupTyVarPA tv = readLEnv $ \env -> lookupVarEnv (local_tyvar_pa env) tv 
@@ -525,8 +511,7 @@ initV hsc_env guts info p
         r <- runVM p builtins (initGlobalEnv info
                                              instEnvs
                                              famInstEnvs
-                                             builtins
-                                             (mg_rdr_env guts))
+                                             builtins)
                    emptyLocalEnv
         case r of
           Yes genv _ x -> return $ Just (new_info genv, x)
