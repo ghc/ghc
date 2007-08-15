@@ -5,39 +5,38 @@
 \begin{code}
 module Digraph(
 
-	-- At present the only one with a "nice" external interface
-	stronglyConnComp, stronglyConnCompR, SCC(..), flattenSCC, flattenSCCs,
+        -- At present the only one with a "nice" external interface
+        stronglyConnComp, stronglyConnCompR, SCC(..), flattenSCC, flattenSCCs,
 
-	Graph, Vertex, 
-	graphFromEdges, graphFromEdges', 
-	buildG, transposeG, reverseE, outdegree, indegree,
+        Graph, Vertex,
+        graphFromEdges, graphFromEdges',
+        buildG, transposeG, reverseE, outdegree, indegree,
 
-	Tree(..), Forest,
-	showTree, showForest,
+        Tree(..), Forest,
+        showTree, showForest,
 
-	dfs, dff,
-	topSort,
-	components,
-	scc,
-	back, cross, forward,
-	reachable, path,
-	bcc
-
+        dfs, dff,
+        topSort,
+        components,
+        scc,
+        back, cross, forward,
+        reachable, path,
+        bcc
     ) where
 
 # include "HsVersions.h"
 
 ------------------------------------------------------------------------------
 -- A version of the graph algorithms described in:
--- 
+--
 -- ``Lazy Depth-First Search and Linear Graph Algorithms in Haskell''
 --   by David King and John Launchbury
--- 
+--
 -- Also included is some additional code for printing tree structures ...
 ------------------------------------------------------------------------------
 
 
-import Util	( sortLe )
+import Util        ( sortLe )
 import Outputable
 
 -- Extensions
@@ -57,14 +56,14 @@ import Data.Array.ST  hiding ( indices, bounds )
 
 
 %************************************************************************
-%*									*
-%*	External interface
-%*									*
+%*                                                                      *
+%*      External interface
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 data SCC vertex = AcyclicSCC vertex
-	        | CyclicSCC  [vertex]
+                | CyclicSCC  [vertex]
 
 flattenSCCs :: [SCC a] -> [a]
 flattenSCCs = concatMap flattenSCC
@@ -79,12 +78,12 @@ instance Outputable a => Outputable (SCC a) where
 
 \begin{code}
 stronglyConnComp
-	:: Ord key
-	=> [(node, key, [key])]		-- The graph; its ok for the
-					-- out-list to contain keys which arent
-					-- a vertex key, they are ignored
-	-> [SCC node]	-- Returned in topologically sorted order
-			-- Later components depend on earlier ones, but not vice versa
+        :: Ord key
+        => [(node, key, [key])]         -- The graph; its ok for the
+                                        -- out-list to contain keys which arent
+                                        -- a vertex key, they are ignored
+        -> [SCC node]   -- Returned in topologically sorted order
+                        -- Later components depend on earlier ones, but not vice versa
 
 stronglyConnComp edges
   = map get_node (stronglyConnCompR edges)
@@ -95,30 +94,30 @@ stronglyConnComp edges
 -- The "R" interface is used when you expect to apply SCC to
 -- the (some of) the result of SCC, so you dont want to lose the dependency info
 stronglyConnCompR
-	:: Ord key
-	=> [(node, key, [key])]		-- The graph; its ok for the
-					-- out-list to contain keys which arent
-					-- a vertex key, they are ignored
-	-> [SCC (node, key, [key])]	-- Topologically sorted
+        :: Ord key
+        => [(node, key, [key])]         -- The graph; its ok for the
+                                        -- out-list to contain keys which arent
+                                        -- a vertex key, they are ignored
+        -> [SCC (node, key, [key])]     -- Topologically sorted
 
 stronglyConnCompR [] = []  -- added to avoid creating empty array in graphFromEdges -- SOF
 stronglyConnCompR edges
   = map decode forest
   where
     (graph, vertex_fn) = _scc_ "graphFromEdges" graphFromEdges edges
-    forest	       = _scc_ "Digraph.scc" scc graph
+    forest             = _scc_ "Digraph.scc" scc graph
     decode (Node v []) | mentions_itself v = CyclicSCC [vertex_fn v]
-		       | otherwise	   = AcyclicSCC (vertex_fn v)
+                       | otherwise         = AcyclicSCC (vertex_fn v)
     decode other = CyclicSCC (dec other [])
-		 where
-		   dec (Node v ts) vs = vertex_fn v : foldr dec vs ts
+                 where
+                   dec (Node v ts) vs = vertex_fn v : foldr dec vs ts
     mentions_itself v = v `elem` (graph ! v)
 \end{code}
 
 %************************************************************************
-%*									*
-%*	Graphs
-%*									*
+%*                                                                      *
+%*      Graphs
+%*                                                                      *
 %************************************************************************
 
 
@@ -138,7 +137,7 @@ edges    :: Graph -> [Edge]
 edges g   = [ (v, w) | v <- vertices g, w <- g!v ]
 
 mapT    :: (Vertex -> a -> b) -> Table a -> Table b
-mapT f t = array (bounds t) [ (,) v (f v (t!v)) | v <- indices t ]
+mapT f t = array (bounds t) [ (v, f v (t ! v)) | v <- indices t ]
 
 buildG :: Bounds -> [Edge] -> Graph
 buildG bounds edges = accumArray (flip (:)) [] bounds edges
@@ -159,51 +158,53 @@ indegree  = outdegree . transposeG
 
 
 \begin{code}
-graphFromEdges 
-	:: Ord key
-	=> [(node, key, [key])]
-	-> (Graph, Vertex -> (node, key, [key]))
-graphFromEdges edges = 
-  case graphFromEdges' edges of (graph, vertex_fn, _) -> (graph, vertex_fn) 
+graphFromEdges
+        :: Ord key
+        => [(node, key, [key])]
+        -> (Graph, Vertex -> (node, key, [key]))
+graphFromEdges edges =
+  case graphFromEdges' edges of (graph, vertex_fn, _) -> (graph, vertex_fn)
 
 graphFromEdges'
-	:: Ord key
-	=> [(node, key, [key])]
-	-> (Graph, Vertex -> (node, key, [key]), key -> Maybe Vertex)
+        :: Ord key
+        => [(node, key, [key])]
+        -> (Graph, Vertex -> (node, key, [key]), key -> Maybe Vertex)
 graphFromEdges' edges
   = (graph, \v -> vertex_map ! v, key_vertex)
   where
-    max_v      	    = length edges - 1
+    max_v           = length edges - 1
     bounds          = (0,max_v) :: (Vertex, Vertex)
     sorted_edges    = let
-			 (_,k1,_) `le` (_,k2,_) = case k1 `compare` k2 of { GT -> False; other -> True }
-		      in
-			sortLe le edges
-    edges1	    = zipWith (,) [0..] sorted_edges
+                         (_,k1,_) `le` (_,k2,_) = case k1 `compare` k2 of { GT -> False; other -> True }
+                      in
+                        sortLe le edges
+    edges1          = zipWith (,) [0..] sorted_edges
 
-    graph	    = array bounds [(,) v (mapMaybe key_vertex ks) | (,) v (_,    _, ks) <- edges1]
-    key_map	    = array bounds [(,) v k			   | (,) v (_,    k, _ ) <- edges1]
-    vertex_map	    = array bounds edges1
+    graph           = array bounds [ (v, mapMaybe key_vertex ks)
+                               | (v, (_,    _, ks)) <- edges1]
+    key_map         = array bounds [ (v, k)
+                               | (v, (_,    k, _ )) <- edges1]
+    vertex_map      = array bounds edges1
 
 
     -- key_vertex :: key -> Maybe Vertex
-    -- 	returns Nothing for non-interesting vertices
-    key_vertex k   = find 0 max_v 
-		   where
-		     find a b | a > b 
-			      = Nothing
-		     find a b = case compare k (key_map ! mid) of
-				   LT -> find a (mid-1)
-				   EQ -> Just mid
-				   GT -> find (mid+1) b
-			      where
-			 	mid = (a + b) `div` 2
+    --  returns Nothing for non-interesting vertices
+    key_vertex k   = find 0 max_v
+                   where
+                     find a b | a > b
+                              = Nothing
+                     find a b = case compare k (key_map ! mid) of
+                                   LT -> find a (mid-1)
+                                   EQ -> Just mid
+                                   GT -> find (mid+1) b
+                              where
+                                mid = (a + b) `div` 2
 \end{code}
 
 %************************************************************************
-%*									*
-%*	Trees and forests
-%*									*
+%*                                                                      *
+%*      Trees and forests
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -246,9 +247,9 @@ draw (Node x ts) = grp this (space (length this)) (stLoop ts)
 
 
 %************************************************************************
-%*									*
-%*	Depth first search
-%*									*
+%*                                                                      *
+%*      Depth first search
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -293,9 +294,9 @@ chop m (Node v ts : us)
 
 
 %************************************************************************
-%*									*
-%*	Algorithms
-%*									*
+%*                                                                      *
+%*      Algorithms
+%*                                                                      *
 %************************************************************************
 
 ------------------------------------------------------------
