@@ -464,7 +464,7 @@ mkPrompt = do
                    then return (brackets (ppr (GHC.resumeSpan r)) <> space)
                    else do
                         let hist = GHC.resumeHistory r !! (ix-1)
-                        span <- io $ GHC.getHistorySpan session hist
+                        span <- io$ GHC.getHistorySpan session hist
                         return (brackets (ppr (negate ix) <> char ':' 
                                           <+> ppr span) <> space)
   let
@@ -1647,8 +1647,13 @@ historyCmd arg
         let hist = GHC.resumeHistory r
             (took,rest) = splitAt num hist
         spans <- mapM (io . GHC.getHistorySpan s) took
-        let nums = map (printf "-%-3d:") [(1::Int)..]
-        printForUser (vcat (zipWith (<+>) (map text nums) (map ppr spans)))
+        let nums  = map (printf "-%-3d:") [(1::Int)..]
+        let names = map GHC.historyEnclosingDecl took
+        printForUser (vcat(zipWith3 
+                             (\x y z -> x <+> y <+> z) 
+                             (map text nums) 
+                             (map (ftext . occNameFS . nameOccName) names)
+                             (map (parens . ppr) spans)))
         io $ putStrLn $ if null rest then "<end of history>" else "..."
 
 backCmd :: String -> GHCi ()

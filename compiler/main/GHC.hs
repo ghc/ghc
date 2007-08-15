@@ -84,7 +84,8 @@ module GHC (
         resume,
         Resume(resumeStmt, resumeThreadId, resumeBreakInfo, resumeSpan,
                resumeHistory, resumeHistoryIx),
-        History(historyBreakInfo), getHistorySpan, getHistoryModule,
+        History(historyBreakInfo, historyEnclosingDecl), 
+        GHC.getHistorySpan, getHistoryModule,
         getResumeContext,
         abandon, abandonAll,
         InteractiveEval.back,
@@ -1974,3 +1975,9 @@ findModule' hsc_env mod_name maybe_pkg =
 					text "is not loaded"))
 	    err -> let msg = cannotFindModule dflags mod_name err in
 		   throwDyn (CmdLineError (showSDoc msg))
+
+#ifdef GHCI
+getHistorySpan :: Session -> History -> IO SrcSpan
+getHistorySpan sess h = withSession sess $ \hsc_env -> 
+                          return$ InteractiveEval.getHistorySpan hsc_env h
+#endif

@@ -70,6 +70,7 @@ import BasicTypes
 import Outputable
 
 import Data.Dynamic
+import Data.List (find)
 import Control.Monad
 import Foreign
 import Foreign.C
@@ -129,19 +130,46 @@ isStep _ = True
 data History
    = History {
         historyApStack   :: HValue,
-        historyBreakInfo :: BreakInfo
+        historyBreakInfo :: BreakInfo,
+        historyEnclosingDecl :: Name
+         -- ^^ A cache of the enclosing declaration, for convenience
    }
 
-getHistoryModule :: History -> Module 
+mkHistory :: HscEnv -> HValue -> BreakInfo -> History
+mkHistory hsc_env hval bi = let
+    h    = History hval bi decl
+    decl = findEnclosingDecl hsc_env (getHistoryModule h)
+                                     (getHistorySpan hsc_env h)
+    in h
+
+getHistoryModule :: History -> Module
 getHistoryModule = breakInfo_module . historyBreakInfo
 
-getHistorySpan :: Session -> History -> IO SrcSpan
-getHistorySpan s hist = withSession s $ \hsc_env -> do
-   let inf = historyBreakInfo hist 
+getHistorySpan :: HscEnv -> History -> SrcSpan
+getHistorySpan hsc_env hist =
+   let inf = historyBreakInfo hist
        num = breakInfo_number inf
-   case lookupUFM (hsc_HPT hsc_env) (moduleName (breakInfo_module inf)) of
-       Just hmi -> return (modBreaks_locs (md_modBreaks (hm_details hmi)) ! num)
+   in case lookupUFM (hsc_HPT hsc_env) (moduleName (breakInfo_module inf)) of
+       Just hmi -> modBreaks_locs (md_modBreaks (hm_details hmi)) ! num
        _ -> panic "getHistorySpan"
+
+findEnclosingDecl :: HscEnv -> Module -> SrcSpan -> Name
+findEnclosingDecl hsc_env mod span =
+       case lookupUFM (hsc_HPT hsc_env) (moduleName mod) of
+         Nothing -> panic "findEnclosingDecl"
+         Just hmi -> let
+                globals   = typeEnvIds (md_types (hm_details hmi))
+                Just decl = find (\n -> nameSrcSpan n < span) 
+                                 (reverse $ map idName globals)
+                              --   ^^ assumes md_types is sorted
+              in decl
+
+-- | Find the Module corresponding to a FilePath
+findModuleFromFile :: HscEnv -> FilePath -> Maybe Module
+findModuleFromFile hsc_env fp =
+   listToMaybe $ [ms_mod ms | ms <- hsc_mod_graph hsc_env
+                            , ml_hs_file(ms_location ms) == Just (read fp)]
+
 
 -- | Run a statement in the current interactive context.  Statement
 -- may bind multple values.
@@ -227,7 +255,7 @@ traceRunStatus expr ref bindings final_ids
         if b
            then handle_normally
            else do
-             let history' = consBL (History apStack info) history
+             let history' = mkHistory hsc_env apStack info `consBL` history
                 -- probably better make history strict here, otherwise
                 -- our BoundedList will be pointless.
              evaluate history'
@@ -371,10 +399,11 @@ resume (Session ref) step
                                  return tid)
                              (takeMVar statusMVar)
                                       -- and wait for the result 
-                let hist' = case info of 
-                              Nothing -> fromListBL 50 hist
-                              Just i -> History apStack i `consBL` 
-                                                     fromListBL 50 hist
+                let hist' = 
+                     case info of 
+                       Nothing -> fromListBL 50 hist
+                       Just i -> mkHistory hsc_env apStack i `consBL` 
+                                                        fromListBL 50 hist
                 case step of
                   RunAndLogSteps -> 
                         traceRunStatus expr ref bindings final_ids
@@ -425,7 +454,7 @@ moveHist fn (Session ref) = do
                             resumeBreakInfo = mb_info } ->
                           update_ic apStack mb_info
            else case history !! (new_ix - 1) of 
-                   History apStack info ->
+                   History apStack info _ ->
                           update_ic apStack (Just info)
 
 -- -----------------------------------------------------------------------------
