@@ -709,32 +709,22 @@ SRC_LD_OPTS += -no-link-chk
 # See comments in $(FPTOOLS_TOP)/utils/ghc-pkg/Makefile for why we use
 # a real binary here rather than a shell script.
 
-INPLACE_HS   = $(odir)/ghc-inplace.hs
+INPLACE_C = ghc-inplace.c
 INPLACE_PROG = $(odir)/ghc-inplace$(exeext)
-EXCLUDED_SRCS += $(INPLACE_HS)
+EXCLUDED_SRCS += $(INPLACE_C)
 
 # FPTOOLS_TOP_ABS platform uses backslashes, at least on Cygwin, but that
 # will go wrong when we use it in a Haskell string below.
 TOP_ABS=$(subst \\,/,$(FPTOOLS_TOP_ABS_PLATFORM))
 
-ifeq "$(stage)" "1"
-EnvImport = System.Environment
-GetArgs = getArgs
-else
-EnvImport = GHC.Environment
-GetArgs = getFullArgs
-endif
+GHC_PATH=$(TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)
 
-$(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
-	echo "import System.Cmd; import $(EnvImport); import System.Exit" > $@
-	echo "main = do args <- $(GetArgs); rawSystem \"$(TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)\" (\"-B$(TOP_ABS)\":\"-fhardwire-lib-paths\":args) >>= exitWith" >> $@
-
-$(INPLACE_PROG): $(INPLACE_HS)
-	$(HC) --make $< -o $@
+$(INPLACE_PROG): $(INPLACE_C)
+	$(HC) -cpp -optc-DGHC_PATH=\"$(GHC_PATH)\" -optc-DTOP_ABS=\"$(TOP_ABS)\" $< -o $@
 
 all :: $(INPLACE_PROG)
 
-CLEAN_FILES += $(INPLACE_HS) $(INPLACE_PROG)
+CLEAN_FILES += $(INPLACE_PROG)
 
 ifeq "$(stage)" "1"
 ghc-inplace : $(INPLACE_PROG)
