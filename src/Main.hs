@@ -13,72 +13,69 @@ module Main (main) where
 import Haddock.Html
 import Haddock.Hoogle
 import Haddock.Rename
-import Haddock.Types hiding ( NoLink )
+import Haddock.Types hiding (NoLink)
 import Haddock.Utils
 import Haddock.Version
 import Haddock.InterfaceFile
 import Haddock.Exception
 import Haddock.Utils.GHC
-import Paths_haddock         ( getDataDir )
+import Paths_haddock
 
 
-import Prelude hiding ( catch )
+import Prelude hiding (catch)
 import Control.Exception     
 import Control.Monad
-import Control.Monad.Writer  ( Writer, runWriter, tell )
+import Control.Monad.Writer
 import Control.Arrow
-import Data.Char             ( isSpace )
-import Data.IORef            ( writeIORef )
+import Data.Char
+import Data.IORef
 import Data.Ord
-import Data.List             ( nub, nubBy, (\\), foldl', sortBy, foldl1, init, 
-                               mapAccumL, find, isPrefixOf )
-import Data.Maybe            ( Maybe(..), isJust, isNothing, maybeToList, 
-                               listToMaybe, fromJust, catMaybes )
+import Data.List
+import Data.Maybe
 import Data.Typeable
-import Data.Graph hiding ( flattenSCC )
+import Data.Graph hiding (flattenSCC)
 import Data.Dynamic
-import Data.Foldable         ( foldlM )
-import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), 
-                               ArgDescr(..) )
-import System.Environment    ( getArgs )
+import Data.Foldable (foldlM)
+import System.Console.GetOpt 
+import System.Environment
 import System.Directory
 import System.FilePath
-import System.Cmd            ( system )
+import System.Cmd
 import System.Exit           
 import System.IO
 
 import qualified Data.Map as Map
-import Data.Map              (Map)
+import Data.Map (Map)
 
-import Distribution.InstalledPackageInfo ( InstalledPackageInfo(..) ) 
+import Distribution.InstalledPackageInfo
 import Distribution.Simple.Utils
 
 
 import GHC
 import Outputable
 import SrcLoc
-import Digraph               ( flattenSCC )
+import Digraph
 import Name
-import Module                ( mkModule ) 
+import Module
 import InstEnv
 import Class
 import TypeRep
-import Var hiding ( varName )
+import Var hiding (varName)
 import TyCon
 import PrelNames
 import Bag
 import HscTypes
-import Util                  ( handleDyn )
-import ErrUtils              ( printBagOfErrors )
+import Util (handleDyn)
+import ErrUtils (printBagOfErrors)
 import BasicTypes
 import UniqFM
 
 import FastString
 #define FSLIT(x) (mkFastString# (x#))
 
-import DynFlags hiding ( Option )
-import Packages hiding ( package ) 
-import StaticFlags           ( parseStaticFlags )
+import DynFlags hiding (Option)
+import Packages hiding (package) 
+import StaticFlags
 
 
 --------------------------------------------------------------------------------
