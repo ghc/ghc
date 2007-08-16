@@ -29,7 +29,6 @@ import Data.List             ( sortBy )
 import Data.Maybe            ( fromJust, isJust, mapMaybe, fromMaybe )
 import Foreign.Marshal.Alloc ( allocaBytes )
 import System.IO             ( IOMode(..), hClose, hGetBuf, hPutBuf, openFile )
-import Debug.Trace           ( trace )
 import Data.Map              ( Map )
 import qualified Data.Map as Map hiding ( Map )
 
