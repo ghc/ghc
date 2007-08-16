@@ -23,6 +23,7 @@ import Prelude hiding ( catch )
 import Control.Exception     
 import Control.Monad
 import Control.Monad.Writer  ( Writer, runWriter, tell )
+import Control.Arrow
 import Data.Char             ( isSpace )
 import Data.IORef            ( writeIORef )
 import Data.Ord
@@ -37,7 +38,7 @@ import Data.Foldable         ( foldlM )
 import System.Console.GetOpt ( getOpt, usageInfo, ArgOrder(..), OptDescr(..), 
                                ArgDescr(..) )
 import System.Environment    ( getArgs )
-import System.Directory      ( doesDirectoryExist )
+import System.Directory
 import System.FilePath
 import System.Cmd            ( system )
 import System.Exit           
@@ -66,6 +67,7 @@ import HscTypes
 import Util                  ( handleDyn )
 import ErrUtils              ( printBagOfErrors )
 import BasicTypes
+import UniqFM
 
 import FastString
 #define FSLIT(x) (mkFastString# (x#))
@@ -128,27 +130,44 @@ main = handleTopExceptions $ do
   args <- getArgs
   prog <- getProgramName
 
-  -- parse flags and handle some of them initially
+  -- parse command-line flags and handle some of them initially
   (flags, fileArgs) <- parseHaddockOpts args
   libDir <- handleFlags flags fileArgs
   
   -- initialize GHC 
   restGhcFlags <- tryParseStaticFlags flags
-  (session, dynflags) <- startGHC libDir
-  dynflags' <- parseGhcFlags dynflags restGhcFlags
-  setSessionDynFlags session dynflags'
+  (session, _) <- startGHC libDir
 
-  -- load package data (from .haddock-files), typecheck input files and create 
-  -- the module -> html mapping
-  packages <- getPackages session dynflags' flags
+  -- get the -use-package packages, and expose them to ghc
+  usePackages <- getUsePackages flags session
+
+  -- parse and set the ghc flags
+  dynflags <- parseGhcFlags session restGhcFlags
+  setSessionDynFlags session dynflags
+
+  -- init and get the package dependencies 
+  (_, depPackages) <- initPackages dynflags
+  let depPkgs = map (fromJust . unpackPackageId) depPackages
+
+  -- compute the exposed packages
+  let exposedPackages = [ mkPackageId pkg | pkg <- depPkgs, 
+                          pkgName pkg `elem` usePackages ]
+
+  -- get the .haddock interface file and html path for the exposed packages
+  packages <- getPackages session exposedPackages
+
+  -- load, parse and typecheck the target modules and their dependencies
   modules  <- sortAndCheckModules session fileArgs
+
+  -- update the html references for rendering phase (global variable)
   updateHTMLXRefs packages
 
-  -- combine the doc envs of the external packages into one
+  -- combine the doc envs of the exposed packages into one
   let env = packagesDocEnv packages
 
   -- TODO: continue to break up the run function into parts
   run flags modules env
+
 
 handleFlags flags fileArgs = do
   prog <- getProgramName
@@ -168,6 +187,36 @@ handleFlags flags fileArgs = do
 
   return ghcLibDir
 
+
+-- | Handle the -use-package flags
+-- 
+-- Returns the names of the packages (without version number), if parsing
+-- succeeded.
+--
+-- It would be better to try to get the "exposed" packages from GHC instead.
+-- This would make the -use-package flag unnecessary. But currently it 
+-- seems all you can get from the GHC api is all packages that are linked in 
+-- (i.e the closure of the exposed packages).
+getUsePackages :: [Flag] -> Session -> IO [String]
+getUsePackages flags session = do
+
+  -- get the packages from the commandline flags
+  let packages = [ pkg | Flag_UsePackage pkg <- flags ]
+
+  -- expose these packages 
+  -- (makes "-use-package pkg" equal to "-g '-package pkg'")
+
+  dfs <- getSessionDynFlags session
+  let dfs' = dfs { packageFlags = packageFlags dfs ++ map ExposePackage packages }
+  setSessionDynFlags session dfs'
+
+  -- try to parse these packages into PackageIndentifiers
+
+  mapM (handleParse . unpackPackageId . stringToPackageId) packages
+  where
+    handleParse (Just pkg) = return (pkgName pkg)
+    handleParse Nothing = throwE "Could not parse package identifier"
+
 --------------------------------------------------------------------------------
 -- Flags 
 --------------------------------------------------------------------------------
@@ -178,8 +227,10 @@ tryParseStaticFlags flags = do
   let ghcFlags = [ str | Flag_GhcFlag str <- flags ]
   parseStaticFlags ghcFlags
 
--- | Try to parse and set dynamic GHC flags
-parseGhcFlags dflags ghcFlags = foldlM parseFlag dflags (map words ghcFlags)
+-- | Try to parse dynamic GHC flags
+parseGhcFlags session ghcFlags = do
+  dflags <- getSessionDynFlags session
+  foldlM parseFlag dflags (map words ghcFlags)
   where 
     -- try to parse a flag as either a dynamic or static GHC flag
     parseFlag dynflags ghcFlag = do
@@ -307,15 +358,14 @@ startGHC :: String -> IO (Session, DynFlags)
 startGHC libDir = do
   session <- newSession (Just libDir)
   flags   <- getSessionDynFlags session
-  flags'  <- liftM fst (initPackages flags)
-  let flags'' = dopt_set flags' Opt_Haddock 
-  setSessionDynFlags session flags'' {
+  let flags' = dopt_set flags Opt_Haddock
+  let flags'' = flags' {
       hscTarget = HscNothing,
       ghcMode   = CompManager,
       ghcLink   = NoLink
     }
-  flags''' <- getSessionDynFlags session
-  return (session, flags''')
+  setSessionDynFlags session flags''
+  return (session, flags'')
 
 
 -- | Get the sorted graph of all loaded modules and their dependencies
@@ -763,7 +813,8 @@ parseIfaceOption s =
 	(file, _)        -> ("", file)
 	
 updateHTMLXRefs :: [PackageData] -> IO ()
-updateHTMLXRefs packages = writeIORef html_xrefs_ref (Map.fromList mapping)
+updateHTMLXRefs packages = do
+  writeIORef html_xrefs_ref (Map.fromList mapping)
   where
     mapping = [ (mod, html) | 
                 (PackageData mods _ html) <- packages, mod <- mods ] 
@@ -1070,9 +1121,6 @@ buildGlobalDocEnv modules
 			 n (nameSetMod n modName) env
 	keep_new env n = Map.insert n (nameSetMod n modName) env 
 
-nameSetMod n newMod = mkExternalName (nameUnique n) newMod (nameOccName n)
-                      (nameSrcSpan n)
-
 -- -----------------------------------------------------------------------------
 -- Named documentation
 
@@ -1248,51 +1296,42 @@ getHtml pkgInfo = case haddockHTMLs pkgInfo of
 -- | Get the Haddock interface path for a package
 getIface :: InstalledPackageInfo -> IO FilePath
 getIface pkgInfo = case haddockInterfaces pkgInfo of
-  (path:_) | not (null path) -> do
-    dirExists <- doesDirectoryExist path
-    if dirExists then return path else throwE $
-       "Interface directory " ++ path ++ " does not exist."
+  (file:_) | not (null file) -> do
+    fileExists <- doesFileExist file
+    if fileExists then return file else throwE $
+       "Interface file " ++ file ++ " does not exist."
   _ -> throwE "No Haddock interface installed."
 
 -- | Try to create a PackageData structure for a package
 getPackage :: Session -> InstalledPackageInfo -> IO PackageData 
 getPackage session pkgInfo = do
+
   html <- getHtml pkgInfo
-  iface <- getIface pkgInfo
-  iface <- readInterfaceFile iface
+  ifacePath <- getIface pkgInfo
+  iface <- readInterfaceFile ifacePath
   
-  let modules = packageModules pkgInfo
-
-  -- try to get a ModuleInfo struct for each module
-  mbModInfos <- moduleInfo session modules
-  modInfos <- case mbModInfos of 
-    Just x -> return x
-    Nothing -> throwE "Could not get ModuleInfo for all exposed modules." 
-
-  --let modInfos' = sortPackageModules modInfos
+  let docEnv  = ifDocEnv iface
+      modules = packageModules pkgInfo
 
   return $ PackageData {
     pdModules  = modules,
-    pdDocEnv   = ifDocEnv iface,
+    pdDocEnv   = docEnv,
     pdHtmlPath = html
   } 
        
 -- | Try to create a PackageData for each package in the session except for 
 -- rts. Print a warning on stdout if a PackageData could not be created.
-getPackages :: Session -> DynFlags -> [Flag] -> IO [PackageData]
-getPackages session dynflags flags = do
+getPackages :: Session -> [PackageId] -> IO [PackageData]
+getPackages session packages = do
 
   -- get InstalledPackageInfos for every package in the session
-  pkgInfos <- getPreloadPackagesAnd dynflags []
+  dynflags <- getSessionDynFlags session
+  let pkgInfos = map (getPackageDetails (pkgState dynflags)) packages
 
-  -- return a list of those packages that we could create PackageDatas for 
-  let pkgInfos' = filter notRTS pkgInfos
-  liftM catMaybes $ mapM tryGetPackage pkgInfos'
-
+  -- try to read the installed haddock information (.haddock interface file and
+  -- html path) for the packages and html path
+  liftM catMaybes $ mapM tryGetPackage pkgInfos
   where
-    -- no better way to do this?
-    notRTS p = pkgName (package p) /= packageIdString rtsPackageId  
-
     -- try to get a PackageData, warn if we can't
     tryGetPackage pkgInfo = 
         (getPackage session pkgInfo >>= return . Just)

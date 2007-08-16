@@ -7,6 +7,9 @@ import HsSyn
 import SrcLoc
 import HscTypes
 import Outputable
+import Packages
+import UniqFM
+import Name
 
 getMainDeclBinder :: HsDecl name -> Maybe name
 getMainDeclBinder (TyClD d) = Just (tcdName d)
@@ -24,3 +27,13 @@ getMainDeclBinder _ = Nothing
 --modInfoMod  = mi_module . minf_iface 
 
 trace_ppr x y = trace (showSDoc (ppr x)) y
+
+-- names
+
+nameSetMod n newMod = 
+  mkExternalName (nameUnique n) newMod (nameOccName n) (nameSrcSpan n)
+
+nameSetPkg pkgId n = 
+  mkExternalName (nameUnique n) (mkModule pkgId (moduleName mod)) 
+	               (nameOccName n) (nameSrcSpan n)
+  where mod = nameModule n

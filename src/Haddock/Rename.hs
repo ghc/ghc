@@ -12,6 +12,7 @@ module Haddock.Rename (
 import Haddock.Types
 
 import GHC hiding ( NoLink )
+import Name
 import BasicTypes
 import SrcLoc 
 import Bag ( emptyBag )
@@ -20,6 +21,7 @@ import Data.Map ( Map )
 import qualified Data.Map as Map hiding ( Map )
 import Prelude hiding ( mapM )
 import Data.Traversable ( mapM )
+import Control.Arrow
 
 -- -----------------------------------------------------------------------------
 -- Monad for renaming
@@ -58,14 +60,22 @@ lookupRn and_then name = do
 	(False,maps_to) -> do outRn name; return (and_then maps_to)
 	(True, maps_to) -> return (and_then maps_to)
 
+newtype OrdName = MkOrdName Name
+
+instance Eq OrdName where
+  (MkOrdName a) == (MkOrdName b) = a == b
+
+instance Ord OrdName where
+  (MkOrdName a) `compare` (MkOrdName b) = nameOccName a `compare` nameOccName b
+
 runRnFM :: Map Name Name -> RnM a -> (a,[Name])
 runRnFM env rn = unRn rn lkp 
-  where lkp n = case Map.lookup n env of
-		  Nothing -> (False, NoLink n) 
-		  Just q  -> (True,  Link q)
+  where 
+    lkp n = case Map.lookup (MkOrdName n) ordEnv of
+      Nothing -> (False, NoLink n) 
+      Just (MkOrdName q)  -> (True, Link q)
 
-runRn :: (n -> (Bool,DocName)) -> GenRnM n a -> (a,[n])
-runRn lkp rn = unRn rn lkp
+    ordEnv = Map.fromList . map (MkOrdName *** MkOrdName) . Map.toList $ env
 
 -- -----------------------------------------------------------------------------
 -- Renaming 
