@@ -8,7 +8,6 @@ module Main (main) where
 import Control.Monad
 import Data.List
 import Distribution.PackageDescription
-import Distribution.Setup
 import Distribution.Simple
 import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Utils
