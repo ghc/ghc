@@ -35,6 +35,7 @@ import StaticFlags	( opt_SccProfilingOn, opt_Hpc )
 import Type		( Kind, mkArrowKind, liftedTypeKind, unliftedTypeKind )
 import BasicTypes	( Boxity(..), Fixity(..), FixityDirection(..), IPName(..),
 			  Activation(..), defaultInlineSpec )
+import DynFlags
 import OrdList
 import HaddockParse
 import {-# SOURCE #-} HaddockLex hiding ( Token )
@@ -1295,7 +1296,8 @@ exp10 :: { LHsExpr RdrName }
 	| fexp					{ $1 }
 
 scc_annot :: { Located FastString }
-	: '_scc_' STRING			{ LL $ getSTRING $2 }
+	: '_scc_' STRING			{% (addWarning Opt_WarnDeprecations (getLoc $1) (text "_scc_ is deprecated; use an SCC pragma instead")) >>= \_ ->
+                                   (return $ LL $ getSTRING $2) }
 	| '{-# SCC' STRING '#-}'		{ LL $ getSTRING $2 }
 
 hpc_annot :: { Located (FastString,(Int,Int),(Int,Int)) }

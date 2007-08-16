@@ -28,7 +28,8 @@ module Lexer (
    getMessages,
    popContext, pushCurrentContext, setLastToken, setSrcLoc,
    getLexState, popLexState, pushLexState,
-   extension, standaloneDerivingEnabled, bangPatEnabled
+   extension, standaloneDerivingEnabled, bangPatEnabled,
+   addWarning
   ) where
 
 #include "HsVersions.h"
@@ -1298,8 +1299,8 @@ getCharOrFail =  do
 -- Warnings
 
 warn :: DynFlag -> SDoc -> Action
-warn option warning span _buf _len = do
-    addWarning option (mkWarnMsg span alwaysQualify warning)
+warn option warning srcspan _buf _len = do
+    addWarning option srcspan warning
     lexToken
 
 -- -----------------------------------------------------------------------------
@@ -1581,10 +1582,11 @@ mkPState buf loc flags  =
       b `setBitIf` cond | cond      = bit b
 			| otherwise = 0
 
-addWarning :: DynFlag -> WarnMsg -> P ()
-addWarning option w
+addWarning :: DynFlag -> SrcSpan -> SDoc -> P ()
+addWarning option srcspan warning
  = P $ \s@PState{messages=(ws,es), dflags=d} ->
-       let ws' = if dopt option d then ws `snocBag` w else ws
+       let warning' = mkWarnMsg srcspan alwaysQualify warning
+           ws' = if dopt option d then ws `snocBag` warning' else ws
        in POk s{messages=(ws', es)} ()
 
 getMessages :: PState -> Messages
