@@ -22,29 +22,53 @@ data DocOption
   deriving (Eq, Show)
 
 data ExportItem name
-  = ExportDecl
-      Name                 -- ^ The original name
-      (LHsDecl name)       -- ^ A declaration
-      (Maybe (HsDoc name)) -- ^ Maybe a doc comment
-      [InstHead name]	     -- ^ Instances relevant to this declaration
 
-  | ExportNoDecl           -- ^ An exported entity for which we have no 
-                           -- documentation (perhaps because it resides in
-                           -- another package)
-      Name                 -- ^ The original name
-      name                 -- ^ Where to link to
-      [name]               -- ^ Subordinate names
+  = ExportDecl {		  		
+	
+			-- | The original name
+      expItemName :: Name, 
 
-  | ExportGroup            -- ^ A section heading
-      Int                  -- ^ section level (1, 2, 3, ... )
-      String               -- ^ Section "id" (for hyperlinks)
-      (HsDoc name)         -- ^ Section heading text
+      -- | A declaration
+      expItemDecl :: LHsDecl name, 
+			       
+      -- | Maybe a doc comment
+      expItemMbDoc :: Maybe (HsDoc name),
 
-  | ExportDoc              -- ^ Some documentation
-      (HsDoc name)
+			-- | Instances relevant to this declaration
+      expItemInstances :: [InstHead name]
+	
+	  }	-- ^ An exported declaration 
+		    
+  | ExportNoDecl {
+	    -- | The original name
+      expItemName :: Name,
 
-  | ExportModule           -- ^ A cross-reference to another module
-      Module
+      -- | Where to link to
+      expItemLinkTarget :: name,
+
+      -- | Subordinate names
+      expItemSubs :: [name]
+
+		} -- ^ An exported entity for which we have no 
+      -- documentation (perhaps because it resides in
+      -- another package)
+
+  | ExportGroup { 
+
+      -- | Section level (1, 2, 3, ... )
+      expItemSectionLevel :: Int,
+
+      -- | Section id (for hyperlinks)
+			expItemSectionId :: String,     
+			
+			-- | Section heading text
+			expItemSectionText :: HsDoc name
+
+    } -- ^ A section heading
+
+  | ExportDoc (HsDoc name) -- ^ Some documentation
+
+  | ExportModule Module    -- ^ A cross-reference to another module
 
 type InstHead name = ([HsPred name], name, [HsType name])
 type ModuleMap     = Map Module HaddockModule
