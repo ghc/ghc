@@ -323,17 +323,17 @@ preArr bnds      = tabulate bnds . preorderF
 ------------------------------------------------------------
 
 \begin{code}
---postorder :: Tree a -> [a]
-postorder (Node a ts) = postorderF ts ++ [a]
+postorder :: Tree a -> [a] -> [a]
+postorder (Node a ts) = postorderF ts . (a :)
 
-postorderF   :: Forest a -> [a]
-postorderF ts = concat (map postorder ts)
+postorderF   :: Forest a -> [a] -> [a]
+postorderF ts = foldr (.) id $ map postorder ts
 
-postOrd      :: Graph -> [Vertex]
-postOrd       = postorderF . dff
+postOrd :: Graph -> [Vertex]
+postOrd g = postorderF (dff g) []
 
-topSort      :: Graph -> [Vertex]
-topSort       = reverse . postOrd
+topSort :: Graph -> [Vertex]
+topSort = reverse . postOrd
 \end{code}
 
 
