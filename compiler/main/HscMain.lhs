@@ -671,7 +671,7 @@ hscFileCheck hsc_env mod_summary compileToCore = do {
  	    -- RENAME and TYPECHECK
  	    -------------------
 	  (tc_msgs, maybe_tc_result) 
-		<- _scc_ "Typecheck-Rename" 
+		<- {-# SCC "Typecheck-Rename" #-}
 		   tcRnModule hsc_env (ms_hsc_src mod_summary) 
 			True{-save renamed syntax-}
 			rdr_module
