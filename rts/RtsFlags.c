@@ -684,18 +684,7 @@ error = rtsTrue;
                   }
                   else if (strequal("info",
                                &rts_argv[arg][2])) {
-                      char *s;
-                      printf("RTS info:\n");
-                      printf("RTS from GHC " ProjectVersion "\n");
-                      printf("RTS way " RtsWay "\n");
-                      printf("Host platform " HostPlatform "\n");
-                      printf("Build platform " BuildPlatform "\n");
-                      printf("Target platform " TargetPlatform "\n");
-                      s = strcmp(GhcUnregisterised, "YES") == 0 ? "un" : "";
-                      printf("Compiler is %sregisterised\n", s);
-                      s = strcmp(GhcEnableTablesNextToCode, "YES") == 0
-                        ? "" : "not ";
-                      printf("Tables are %snext to code\n", s);
+                      printRtsInfo();
                       exit(0);
                   }
                   else {

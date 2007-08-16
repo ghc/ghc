@@ -149,13 +149,13 @@ endif
 endif
 
 RtsMessages_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
-RtsFlags_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
-RtsFlags_CC_OPTS += -DRtsWay=\"rts$(_way)\"
-RtsFlags_CC_OPTS += -DHostPlatform=\"$(HOSTPLATFORM)\"
-RtsFlags_CC_OPTS += -DBuildPlatform=\"$(BUILDPLATFORM)\"
-RtsFlags_CC_OPTS += -DTargetPlatform=\"$(TARGETPLATFORM)\"
-RtsFlags_CC_OPTS += -DGhcUnregisterised=\"$(GhcUnregisterised)\"
-RtsFlags_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCode)\"
+RtsUtils_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
+RtsUtils_CC_OPTS += -DRtsWay=\"rts$(_way)\"
+RtsUtils_CC_OPTS += -DHostPlatform=\"$(HOSTPLATFORM)\"
+RtsUtils_CC_OPTS += -DBuildPlatform=\"$(BUILDPLATFORM)\"
+RtsUtils_CC_OPTS += -DTargetPlatform=\"$(TARGETPLATFORM)\"
+RtsUtils_CC_OPTS += -DGhcUnregisterised=\"$(GhcUnregisterised)\"
+RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCode)\"
 
 ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include

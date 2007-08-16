@@ -460,3 +460,23 @@ int genericRaise(int sig) {
         return raise(sig);
 #endif
 }
+
+static void mkRtsInfoPair(char *key, char *val) {
+    /* XXX should check for "s, \s etc in key and val */
+    printf(" ,(\"%s\", \"%s\")\n", key, val);
+}
+
+void printRtsInfo(void) {
+    /* The first entry is just a hack to make it easy to get the
+     * commas right */
+    printf(" [(\"GHC RTS\", \"Yes\")\n");
+    mkRtsInfoPair("GHC version",             ProjectVersion);
+    mkRtsInfoPair("RTS way",                 RtsWay);
+    mkRtsInfoPair("Host platform",           HostPlatform);
+    mkRtsInfoPair("Build platform",          BuildPlatform);
+    mkRtsInfoPair("Target platform",         TargetPlatform);
+    mkRtsInfoPair("Compiler unregisterised", GhcUnregisterised);
+    mkRtsInfoPair("Tables next to code",     GhcEnableTablesNextToCode);
+    printf(" ]\n");
+}
+

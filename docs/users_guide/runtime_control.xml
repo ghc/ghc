@@ -661,6 +661,29 @@ char *ghc_rts_opts = "-H128m -K1m";
     <filename>ghc/compiler/parser/hschooks.c</filename> in a GHC
     source tree.</para>
   </sect2>
+
+  <sect2>
+    <title>Getting information about the RTS</title>
+
+    <indexterm><primary>RTS</primary></indexterm>
+
+    <para>It is possible to ask the RTS to give some information about
+    itself. To do this, use the <option>--info</option> flag, e.g.</para>
+<screen>
+$ ./a.out +RTS --info
+ [("GHC RTS", "Yes")
+ ,("GHC version", "6.7")
+ ,("RTS way", "rts_p")
+ ,("Host platform", "x86_64-unknown-linux")
+ ,("Build platform", "x86_64-unknown-linux")
+ ,("Target platform", "x86_64-unknown-linux")
+ ,("Compiler unregisterised", "NO")
+ ,("Tables next to code", "YES")
+ ]
+</screen>
+    <para>The information is formatted such that it can be read as a
+    of type <literal>[(String, String)]</literal>.</para>
+  </sect2>
 </sect1>
 
 <!-- Emacs stuff:
