@@ -19,4 +19,3 @@ instance D () where
   type T () = Maybe
 
   bar x t = foo t
-
