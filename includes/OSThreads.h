@@ -82,8 +82,11 @@ typedef pthread_key_t   ThreadLocalKey;
 
 #if CMINUSMINUS
 
-#define ACQUIRE_LOCK(mutex) EnterCriticalSection(mutex)
-#define RELEASE_LOCK(mutex) LeaveCriticalSection(mutex)
+/* We jump through a hoop here to get a CCall EnterCriticalSection
+   and LeaveCriticalSection, as that's what C-- wants. */
+
+#define ACQUIRE_LOCK(mutex) CCallEnterCriticalSection(mutex)
+#define RELEASE_LOCK(mutex) CCallLeaveCriticalSection(mutex)
 #define ASSERT_LOCK_HELD(mutex) /* nothing */
 
 #else

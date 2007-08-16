@@ -13,6 +13,7 @@
 #if defined(THREADED_RTS)
 #include "OSThreads.h"
 #include "RtsUtils.h"
+#include <windows.h>
 
 /* For reasons not yet clear, the entire contents of process.h is protected 
  * by __STRICT_ANSI__ not being defined.
@@ -229,6 +230,14 @@ forkOS_createThread ( HsStablePtr entry )
 			   (void*)entry,
 			   0,
 			   (unsigned*)&pId) == 0);
+}
+
+void CCallEnterCriticalSection(LPCRITICAL_SECTION s) {
+    EnterCriticalSection(s);
+}
+
+void CCallLeaveCriticalSection(LPCRITICAL_SECTION s) {
+    LeaveCriticalSection(s);
 }
 
 #else /* !defined(THREADED_RTS) */
