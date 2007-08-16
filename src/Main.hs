@@ -153,10 +153,10 @@ main = handleTopExceptions $ do
   let exposedPackages = [ mkPackageId pkg | pkg <- depPkgs, 
                           pkgName pkg `elem` usePackages ]
 
-  -- get the .haddock interface file and html path for the exposed packages
+  -- get the HaddockPackages
   packages <- getPackages session exposedPackages
 
-  -- load, parse and typecheck the target modules and their dependencies
+  -- typechecking
   modules  <- sortAndCheckModules session fileArgs
 
   -- update the html references for rendering phase (global variable)
