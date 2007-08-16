@@ -1381,17 +1381,17 @@ getPackage session pkgInfo = do
   } 
 
        
--- | Try to create a HaddockPackage for each package in the session except for 
--- rts. Print a warning on stdout if a HaddockPackage could not be created.
+-- | Try to create a HaddockPackage for each package.
+-- Print a warning on stdout if a HaddockPackage could not be created.
 getPackages :: Session -> [PackageId] -> IO [HaddockPackage]
 getPackages session packages = do
 
-  -- get InstalledPackageInfos for every package in the session
+  -- get InstalledPackageInfos for each package
   dynflags <- getSessionDynFlags session
   let pkgInfos = map (getPackageDetails (pkgState dynflags)) packages
 
   -- try to read the installed haddock information (.haddock interface file and
-  -- html path) for the packages and html path
+  -- html path) for the packages
   liftM catMaybes $ mapM tryGetPackage pkgInfos
   where
     -- try to get a HaddockPackage, warn if we can't
