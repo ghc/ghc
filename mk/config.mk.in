@@ -320,6 +320,8 @@ BuildingGranSim=$(subst mg,YES,$(filter mg,$(WAYS)))
 
 HscIfaceFileVersion=6
 
+MakefileDeps=YES
+
 #------------------------------------------------------------------------------
 # Options for Libraries
 

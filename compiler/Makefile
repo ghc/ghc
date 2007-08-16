@@ -204,7 +204,7 @@ endif
 CONFIG_HS 	= main/Config.hs
 boot :: $(CONFIG_HS)
 
-$(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk Makefile
+$(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk
 	@$(RM) -f $(CONFIG_HS)
 	@echo "Creating $(CONFIG_HS) ... "
 	@echo "module Config where" >>$(CONFIG_HS)
@@ -261,7 +261,7 @@ CLEAN_FILES += $(CONFIG_HS)
 
 PLATFORM_H = ghc_boot_platform.h
 
-stage1/$(PLATFORM_H) : stage_dirs $(FPTOOLS_TOP)/mk/config.mk Makefile
+stage1/$(PLATFORM_H) : stage_dirs $(FPTOOLS_TOP)/mk/config.mk
 	@echo "Creating $@..."
 	@$(RM) $@
 	@echo "#ifndef __PLATFORM_H__"  >$@
@@ -307,7 +307,7 @@ endif
 # For stage2 and above, the BUILD platform is the HOST of stage1, and
 # the HOST platform is the TARGET of stage1.  The TARGET remains the same
 # (stage1 is the cross-compiler, not stage2).
-stage2/$(PLATFORM_H) : stage_dirs $(FPTOOLS_TOP)/mk/config.mk Makefile
+stage2/$(PLATFORM_H) : stage_dirs $(FPTOOLS_TOP)/mk/config.mk
 	@echo "Creating $@..."
 	@$(RM) $@
 	@echo "#ifndef __PLATFORM_H__"  >$@
@@ -1003,5 +1003,11 @@ endif
 # The /lib/compat replacement is to workaround a bug in the
 # -optdep--exclude-module flag in GHC 6.4.  It is not required for any
 # other version of GHC, but doesn't do any harm.
+
+ifeq "$(MakefileDeps)" "YES"
+$(CONFIG_HS) : Makefile
+stage1/$(PLATFORM_H) : Makefile
+stage2/$(PLATFORM_H) : Makefile
+endif
 
 -include .depend-$(stage)
