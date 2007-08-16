@@ -6,7 +6,9 @@
 -- Ported to use the GHC API by David Waern during "Summer of Code" 2006
 --
 
+
 module Main (main) where
+
 
 import Haddock.Html
 import Haddock.Hoogle
@@ -18,6 +20,7 @@ import Haddock.InterfaceFile
 import Haddock.Exception
 import Haddock.Utils.GHC
 import Paths_haddock         ( getDataDir )
+
 
 import Prelude hiding ( catch )
 import Control.Exception     
@@ -50,6 +53,7 @@ import Data.Map              (Map)
 import Distribution.InstalledPackageInfo ( InstalledPackageInfo(..) ) 
 import Distribution.Simple.Utils
 
+
 import GHC
 import Outputable
 import SrcLoc
@@ -76,12 +80,15 @@ import DynFlags hiding ( Option )
 import Packages hiding ( package ) 
 import StaticFlags           ( parseStaticFlags )
 
+
 --------------------------------------------------------------------------------
 -- Exception handling
 --------------------------------------------------------------------------------
 
+
 handleTopExceptions = 
   handleNormalExceptions . handleHaddockExceptions . handleGhcExceptions
+
 
 handleNormalExceptions inner =
   handle (\exception -> do
@@ -96,11 +103,13 @@ handleNormalExceptions inner =
         exitFailure
   ) inner
 
+
 handleHaddockExceptions inner = 
   handleDyn (\(e::HaddockException) -> do
     putStrLn $ "haddock: " ++ (show e)
     exitFailure
   ) inner
+
 
 handleGhcExceptions inner = 
   -- compilation errors: messages with locations attached
@@ -121,9 +130,11 @@ handleGhcExceptions inner =
         exitFailure
   ) inner
 
+
 --------------------------------------------------------------------------------
 -- Top-level
 --------------------------------------------------------------------------------
+
 
 main :: IO ()
 main = handleTopExceptions $ do
@@ -217,15 +228,18 @@ getUsePackages flags session = do
     handleParse (Just pkg) = return (pkgName pkg)
     handleParse Nothing = throwE "Could not parse package identifier"
 
---------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
 -- Flags 
---------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+
 
 -- | Filter out the GHC specific flags and try to parse and set them as static 
 -- flags. Return a list of flags that couldn't be parsed. 
 tryParseStaticFlags flags = do
   let ghcFlags = [ str | Flag_GhcFlag str <- flags ]
   parseStaticFlags ghcFlags
+
 
 -- | Try to parse dynamic GHC flags
 parseGhcFlags session ghcFlags = do
@@ -238,6 +252,7 @@ parseGhcFlags session ghcFlags = do
       when (rest == ghcFlag) $
           throwE ("Couldn't parse GHC flag: " ++ (unwords ghcFlag))           
       return dynflags'
+
  
 parseHaddockOpts :: [String] -> IO ([Flag], [String])
 parseHaddockOpts words =
@@ -247,8 +262,10 @@ parseHaddockOpts words =
       prog <- getProgramName
       throwE (concat errors ++ usageInfo (usageHeader prog) (options False))
 
+
 usageHeader :: String -> String
 usageHeader prog = "Usage: " ++ prog ++ " [OPTION...] file...\n"
+
 
 data Flag
   = Flag_CSS String
@@ -282,6 +299,7 @@ data Flag
   | Flag_GhcFlag String
   | Flag_GhcLibDir String
   deriving (Eq)
+
 
 options :: Bool -> [OptDescr Flag]
 options backwardsCompat =
@@ -350,9 +368,11 @@ options backwardsCompat =
   ++ "pass arguments to the flag)")      
    ]
 
+
 byeVersion = 
   bye ("Haddock version " ++ projectVersion ++ 
        ", (c) Simon Marlow 2003; ported to the GHC-API by David Waern 2006\n")
+
 
 startGHC :: String -> IO (Session, DynFlags)
 startGHC libDir = do
@@ -516,12 +536,14 @@ run flags modules extEnv = do
         fs -> let filename = (last fs) in 
               writeInterfaceFile filename iface
 
+
 type CheckedMod = (Module, FilePath, FullyCheckedMod)
 
 type FullyCheckedMod = (ParsedSource, 
                         RenamedSource, 
                         TypecheckedSource, 
                         ModuleInfo)
+
 
 -- | This data structure collects all the information we need about a home 
 -- package module
@@ -537,6 +559,7 @@ data ModuleDataGHC = ModuleDataGHC {
    ghcNamesInScope   :: [Name],
    ghcInstances      :: [Instance]
 }
+
 
 -- | Dig out what we want from the GHC API without altering anything
 moduleDataGHC :: CheckedMod -> ModuleDataGHC 
@@ -556,6 +579,7 @@ moduleDataGHC (mod, file, checkedMod) = ModuleDataGHC {
     HsModule _ _ _ _ _ mbOpts _ _      = unLoc parsed
     (group, _, mbExports, mbDoc, info) = renamed
     (parsed, renamed, _, modInfo)      = checkedMod 
+
 
 -- | Massage the data in ModuleDataGHC to produce something closer to what
 -- we want to render. To do this, we need access to modules before this one
@@ -622,6 +646,7 @@ pass1data modData flags modMap = do
             else opts      
       return opts'
 
+
 -- | Produce a map of HaddockModules with information that is close to 
 -- renderable.  What is lacking after this pass are the renamed export items.
 pass1 :: [ModuleDataGHC] -> [Flag] -> ErrMsgM ModuleMap
@@ -632,9 +657,11 @@ pass1 modules flags = foldM produceAndInsert Map.empty modules
       let key = ghcModule modData
       return (Map.insert key resultMod modMap)
 
+
 sameName (DocEntity _) _ = False
 sameName (DeclEntity _) (DocEntity _) = False
 sameName (DeclEntity a) (DeclEntity b) = a == b
+
 
 -- This map includes everything that can be exported separately,
 -- that means: top declarations, class methods and record selectors
@@ -654,14 +681,18 @@ mkDocMap group = Map.fromList (topDeclDocs ++ classMethDocs ++ recordFieldDocs)
     recordFieldDocs = [ (unLoc lname, doc) | 
                         ConDeclField lname _ (Just (L _ doc)) <- fields ]
 
+
 --------------------------------------------------------------------------------
 -- Source code entities
 --------------------------------------------------------------------------------
 
+
 data Entity = DocEntity (DocDecl Name) | DeclEntity Name
 data LEntity = Located Entity
 
+
 sortByLoc = map unLoc . sortBy (comparing getLoc)
+
 
 -- | Collect all the entities in a class that can be documented. 
 -- The entities are sorted by their SrcLoc.
@@ -675,6 +706,7 @@ collectClassEntities tcd = sortByLoc (docs ++ meths ++ sigs)
     sigs = 
       let sigName = fromJust . sigNameNoLoc 
       in [ L l (DeclEntity (sigName sig)) | L l sig <- tcdSigs tcd ]  
+
 
 -- | Collect all the entities in the source file that can be documented. 
 -- The entities are sorted by their SrcLoc.
@@ -696,9 +728,11 @@ collectEntities group = sortByLoc (docs ++ declarations)
             forName (ForeignImport name _ _) = unLoc name
             forName (ForeignExport name _ _) = unLoc name
 
+
 -- | Collect the docs and attach them to the right name
 collectDocs :: [Entity] -> [(Name, HsDoc Name)]
 collectDocs entities = collect Nothing DocEmpty entities
+
 
 collect :: Maybe Entity -> HsDoc Name -> [Entity] -> [(Name, HsDoc Name)]
 collect d doc_so_far [] =
@@ -721,28 +755,34 @@ collect d doc_so_far (e:es) =
         | sameName d0 e -> collect d doc_so_far es  
         | otherwise -> finishedDoc d0 doc_so_far (collect (Just e) DocEmpty es)
 
+
 finishedDoc :: Entity -> HsDoc Name -> [(Name, HsDoc Name)] -> 
                [(Name, HsDoc Name)]
 finishedDoc d DocEmpty rest = rest
 finishedDoc (DeclEntity name) doc rest = (name, doc) : rest
 finishedDoc _ _ rest = rest
 
---------------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
 -- 
---------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
+
        
 allSubNames :: HsGroup Name -> [Name]
 allSubNames group = 
   concat [ tail (map unLoc (tyClDeclNames tycld)) | L _ tycld <- hs_tyclds group ]
 
+
 mkSubMap :: HsGroup Name -> Map Name [Name]
 mkSubMap group = Map.fromList [ (name, subs) | L _ tycld <- hs_tyclds group,
  let name:subs = map unLoc (tyClDeclNames tycld) ]
+
 
 mkDeclMap :: [Name] -> HsGroup Name -> Map Name (LHsDecl Name) 
 mkDeclMap names group = Map.fromList [ (n,d)  | (n,Just d) <- maybeDecls ]
   where 
   maybeDecls = [ (name, getDeclFromGroup group name) | name <- names ]
+
 
 entityNames :: [Entity] -> [Name]
 entityNames entities = [ name | DeclEntity name <- entities ] 
@@ -759,6 +799,8 @@ getValSig name (ValBindsOut recsAndBinds _) typEnv = case matchingBinds of
     matchesName (L _ bind) = fun_id bind == name
 getValSig _ _ _ = error "getValSig"
 -}
+
+
 getDeclFromGroup :: HsGroup Name -> Name -> Maybe (LHsDecl Name)
 getDeclFromGroup group name = 
   case catMaybes [ getDeclFromVals  (hs_valds  group), 
@@ -805,12 +847,14 @@ getDeclFromGroup group name =
         matching = [ for | for <- lfors, forName (unLoc for) == name ]
         forName (ForeignExport n _ _) = unLoc n
         forName (ForeignImport n _ _) = unLoc n
+
  
 parseIfaceOption :: String -> (FilePath,FilePath)
 parseIfaceOption s = 
   case break (==',') s of
 	(fpath,',':file) -> (fpath,file)
 	(file, _)        -> ("", file)
+
 	
 updateHTMLXRefs :: [HaddockPackage] -> IO ()
 updateHTMLXRefs packages = do
@@ -818,6 +862,7 @@ updateHTMLXRefs packages = do
   where
     mapping = [ (mod, html) | 
                 (HaddockPackage mods _ html) <- packages, mod <- mods ] 
+
 
 getPrologue :: [Flag] -> IO (Maybe (HsDoc RdrName))
 getPrologue flags
@@ -830,8 +875,11 @@ getPrologue flags
 		Right doc -> return (Just doc)
 	_otherwise -> throwE "multiple -p/--prologue options"
 
--- -----------------------------------------------------------------------------
+
+-------------------------------------------------------------------------------
 -- Phase 2
+-------------------------------------------------------------------------------
+
 
 renameModule :: Map Name Name -> HaddockModule -> ErrMsgM HaddockModule
 renameModule renamingEnv mod =
@@ -878,11 +926,10 @@ renameModule renamingEnv mod =
                    hmod_rn_doc_map = rnDocMap,
                    hmod_rn_export_items = renamedExportItems }
 
--- -----------------------------------------------------------------------------
--- Build the list of items that will become the documentation, from the
+
+-- | Build the list of items that will become the documentation, from the
 -- export list.  At this point, the list of ExportItems is in terms of
 -- original names.
-
 mkExportItems
   :: ModuleMap
   -> Module			-- this module
@@ -957,6 +1004,7 @@ mkExportItems mod_map this_mod exported_names exportedDeclMap localDeclMap sub_m
       where
         m = nameModule n
 
+
 fullContentsOfThisModule :: Module -> [Entity] -> Map Name (LHsDecl Name) ->
                             Map Name (HsDoc Name) -> [ExportItem Name]
 fullContentsOfThisModule module_ entities declMap docMap 
@@ -967,11 +1015,11 @@ fullContentsOfThisModule module_ entities declMap docMap
       where mkExport decl = ExportDecl name decl (Map.lookup name docMap) []
     mkExportItem _ = Nothing
 
--- Sometimes the declaration we want to export is not the "main" declaration:
+
+-- | Sometimes the declaration we want to export is not the "main" declaration:
 -- it might be an individual record selector or a class method.  In these
 -- cases we have to extract the required declaration (and somehow cobble 
 -- together a type signature for it...)
- 
 extractDecl :: Name -> Module -> LHsDecl Name -> LHsDecl Name
 extractDecl name mdl decl
   | Just n <- getMainDeclBinder (unLoc decl), n == name = decl
@@ -992,11 +1040,14 @@ extractDecl name mdl decl
   where
     name_and_tyvars d = (unLoc (tcdLName d), hsLTyVarLocNames (tcdTyVars d))
 
+
 toTypeNoLoc :: Located Name -> LHsType Name
 toTypeNoLoc lname = noLoc (HsTyVar (unLoc lname))
 
+
 rmLoc :: Located a -> Located a
 rmLoc a = noLoc (unLoc a)
+
 
 extractClassDecl :: Name -> Module -> [Located Name] -> LSig Name -> LSig Name
 extractClassDecl c mdl tvs0 (L pos (TypeSig lname ltype)) = case ltype of
@@ -1008,6 +1059,7 @@ extractClassDecl c mdl tvs0 (L pos (TypeSig lname ltype)) = case ltype of
     ctxt preds = [noLoc (HsClassP c (map toTypeNoLoc tvs0))] ++ preds  
 
 extractClassDecl _ _ _ d = error $ "extractClassDecl: unexpected decl"
+
 
 extractRecSel :: Name -> Module -> Name -> [Located Name] -> [LConDecl Name]
               -> LSig Name
@@ -1022,17 +1074,15 @@ extractRecSel nm mdl t tvs (L _ con : rest) =
   matching_fields flds = [ f | f@(ConDeclField n _ _) <- flds, (unLoc n) == nm ]   
   data_ty = foldl (\x y -> noLoc (HsAppTy x y)) (noLoc (HsTyVar t)) (map toTypeNoLoc tvs)
 
--- -----------------------------------------------------------------------------
--- Pruning
 
+-- Pruning
 pruneExportItems :: [ExportItem Name] -> [ExportItem Name]
 pruneExportItems items = filter hasDoc items
   where hasDoc (ExportDecl _ _ d _) = isJust d
 	hasDoc _ = True
 
--- -----------------------------------------------------------------------------
--- Gather a list of original names exported from this module
 
+-- | Gather a list of original names exported from this module
 mkVisibleNames :: Module 
              -> ModuleMap  
              -> [Name] 
@@ -1079,11 +1129,13 @@ mkVisibleNames mdl modMap localNames scope subMap maybeExps opts declMap
   
     _ -> return []
 
+
 exportModuleMissingErr this mdl 
   = ["Warning: in export list of " ++ show (moduleString this)
 	 ++ ": module not found: " ++ show (moduleString mdl)]
 
--- for a given entity, find all the names it "owns" (ie. all the
+
+-- | For a given entity, find all the names it "owns" (ie. all the
 -- constructors and field names of a tycon, or all the methods of a
 -- class).
 allSubsOfName :: ModuleMap -> Name -> [Name]
@@ -1093,6 +1145,7 @@ allSubsOfName mod_map name
       Just hmod -> Map.findWithDefault [] name (hmod_sub_map hmod)
       Nothing   -> []
   | otherwise =  error $ "Main.allSubsOfName: unexpected unqual'd name"
+
 
 -- | Build a mapping which for each original name, points to the "best"
 -- place to link to in the documentation.  For the definition of
@@ -1121,7 +1174,7 @@ buildGlobalDocEnv modules
 			 n (nameSetMod n modName) env
 	keep_new env n = Map.insert n (nameSetMod n modName) env 
 
--- -----------------------------------------------------------------------------
+
 -- Named documentation
 
 findNamedDoc :: String -> [Entity] -> ErrMsgM (Maybe (HsDoc Name))
@@ -1134,7 +1187,7 @@ findNamedDoc name entities = search entities
 		   	| otherwise = search rest
 	      search (_other_decl : rest) = search rest
 
--- -----------------------------------------------------------------------------
+
 -- Haddock options embedded in the source file
 
 processOptions_ str = let (opts, msg) = runWriter (processOptions str) 
@@ -1151,6 +1204,7 @@ processOptions str = do
 	| all isSpace this -> return []
 	| otherwise -> do opt <- parseOption this; return (maybeToList opt)
 
+
 parseOption :: String -> ErrMsgM (Maybe DocOption)
 parseOption "hide" = return (Just OptHide)
 parseOption "prune" = return (Just OptPrune)
@@ -1158,9 +1212,11 @@ parseOption "ignore-exports" = return (Just OptIgnoreExports)
 parseOption "not-home" = return (Just OptNotHome)
 parseOption other = do tell ["Unrecognised option: " ++ other]; return Nothing
 
--- simplified type for sorting types, ignoring qualification (not visible
+
+-- | Simplified type for sorting types, ignoring qualification (not visible
 -- in Haddock output) and unifying special tycons with normal ones.
 data SimpleType = SimpleType Name [SimpleType] deriving (Eq,Ord)
+
 
 attachInstances :: [HaddockModule] -> [HaddockModule]
 attachInstances modules = map attach modules
@@ -1176,6 +1232,7 @@ attachInstances modules = map attach modules
                                    Just instheads -> instheads)
         attachExport otherExport = otherExport
 
+
 collectInstances
    :: [HaddockModule]
    -> Map Name [([TyVar], [PredType], Class, [Type])]  -- maps class/type names to instances
@@ -1189,6 +1246,7 @@ collectInstances modules
                        inst <- allInstances ]
     tyInstPairs = [ (tycon, [instanceHead inst]) | inst <- allInstances, 
                     Just tycon <- nub (is_tcs inst) ]
+
 
 instHead :: ([TyVar], [PredType], Class, [Type]) -> ([Int], Name, [SimpleType])
 instHead (_, _, cls, args)
@@ -1211,10 +1269,12 @@ instHead (_, _, cls, args)
     simplify (NoteTy _ t) = simplify t
     simplify _ = error "simplify"
 
+
 -- sortImage f = sortBy (\x y -> compare (f x) (f y))
 sortImage :: Ord b => (a -> b) -> [a] -> [a]
 sortImage f xs = map snd $ sortBy cmp_fst [(f x, x) | x <- xs]
  where cmp_fst (x,_) (y,_) = compare x y
+
 
 funTyConName = mkWiredInName gHC_PRIM
                         (mkOccNameFS tcName FSLIT("(->)"))
@@ -1226,15 +1286,19 @@ funTyConName = mkWiredInName gHC_PRIM
 toHsInstHead :: ([TyVar], [PredType], Class, [Type]) -> InstHead Name
 toHsInstHead (_, preds, cls, ts) = (map toHsPred preds, className cls, map toHsType ts) 
 
+
 --------------------------------------------------------------------------------
 -- Type -> HsType conversion
 --------------------------------------------------------------------------------
+
 
 toHsPred :: PredType -> HsPred Name 
 toHsPred (ClassP cls ts) = HsClassP (className cls) (map toLHsType ts)
 toHsPred (IParam n t) = HsIParam n (toLHsType t)
 
+
 toLHsType = noLoc . toHsType
+
  
 toHsType :: Type -> HsType Name
 toHsType t = case t of 
@@ -1254,11 +1318,12 @@ toHsType t = case t of
     cvForAll vs t = mkExplicitHsForAllTy (tyvarbinders vs) (noLoc []) (toLHsType t)
     tyvarbinders vs = map (noLoc . UserTyVar . tyVarName) vs
 
--- -----------------------------------------------------------------------------
+
 -- A monad which collects error messages
 
 type ErrMsg = String
 type ErrMsgM a = Writer [ErrMsg] a
+
 
 --------------------------------------------------------------------------------
 -- Packages 
@@ -1272,12 +1337,14 @@ data HaddockPackage = HaddockPackage {
   pdHtmlPath :: FilePath
 }
 
+
 -- | Recreate exposed modules from an InstalledPackageInfo
 packageModules :: InstalledPackageInfo -> [Module]
 packageModules pkgInfo = map (mkModule (pkgId pkgInfo)) moduleNames
   where 
     moduleNames = map mkModuleName (exposedModules pkgInfo)
     pkgId = mkPackageId . package 
+
 
 -- | Get the Haddock HTML directory path for a package
 getHtml :: InstalledPackageInfo -> IO FilePath
@@ -1288,6 +1355,7 @@ getHtml pkgInfo = case haddockHTMLs pkgInfo of
        "HTML directory " ++ path ++ " does not exist."
   _ -> throwE "No Haddock documentation installed."
 
+
 -- | Get the Haddock interface path for a package
 getIface :: InstalledPackageInfo -> IO FilePath
 getIface pkgInfo = case haddockInterfaces pkgInfo of
@@ -1296,6 +1364,7 @@ getIface pkgInfo = case haddockInterfaces pkgInfo of
     if fileExists then return file else throwE $
        "Interface file " ++ file ++ " does not exist."
   _ -> throwE "No Haddock interface installed."
+
 
 -- | Try to create a HaddockPackage structure for a package
 getPackage :: Session -> InstalledPackageInfo -> IO HaddockPackage
@@ -1313,6 +1382,7 @@ getPackage session pkgInfo = do
     pdDocEnv   = docEnv,
     pdHtmlPath = html
   } 
+
        
 -- | Try to create a HaddockPackage for each package in the session except for 
 -- rts. Print a warning on stdout if a HaddockPackage could not be created.
@@ -1337,6 +1407,7 @@ getPackages session packages = do
           putStrLn ("   " ++ show e)
           return Nothing
         )
+
 
 -- | Build one big doc env out of a list of packages. If multiple packages 
 -- export the same (original) name, we just pick one of the packages as the 
