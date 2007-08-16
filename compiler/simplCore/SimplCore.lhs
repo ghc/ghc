@@ -137,23 +137,23 @@ doCorePasses hsc_env rb us stats guts (to_do : to_dos)
 
 doCorePass :: CoreToDo -> HscEnv -> UniqSupply -> RuleBase
 	   -> ModGuts -> IO (SimplCount, ModGuts)
-doCorePass (CoreDoSimplify mode sws)   = _scc_ "Simplify"      simplifyPgm mode sws
-doCorePass CoreCSE		       = _scc_ "CommonSubExpr" trBinds  cseProgram
-doCorePass CoreLiberateCase	       = _scc_ "LiberateCase"  liberateCase
-doCorePass CoreDoFloatInwards          = _scc_ "FloatInwards"  trBinds  floatInwards
-doCorePass (CoreDoFloatOutwards f)     = _scc_ "FloatOutwards" trBindsU (floatOutwards f)
-doCorePass CoreDoStaticArgs	       = _scc_ "StaticArgs"    trBinds  doStaticArgs
-doCorePass CoreDoStrictness	       = _scc_ "Stranal"       trBinds  dmdAnalPgm
-doCorePass CoreDoWorkerWrapper         = _scc_ "WorkWrap"      trBindsU wwTopBinds
-doCorePass CoreDoSpecialising          = _scc_ "Specialise"    trBindsU specProgram
-doCorePass CoreDoSpecConstr	       = _scc_ "SpecConstr"    trBindsU specConstrProgram
+doCorePass (CoreDoSimplify mode sws)   = {-# SCC "Simplify" #-}      simplifyPgm mode sws
+doCorePass CoreCSE		       = {-# SCC "CommonSubExpr" #-} trBinds  cseProgram
+doCorePass CoreLiberateCase	       = {-# SCC "LiberateCase" #-}  liberateCase
+doCorePass CoreDoFloatInwards          = {-# SCC "FloatInwards" #-}  trBinds  floatInwards
+doCorePass (CoreDoFloatOutwards f)     = {-# SCC "FloatOutwards" #-} trBindsU (floatOutwards f)
+doCorePass CoreDoStaticArgs	       = {-# SCC "StaticArgs" #-}    trBinds  doStaticArgs
+doCorePass CoreDoStrictness	       = {-# SCC "Stranal" #-}       trBinds  dmdAnalPgm
+doCorePass CoreDoWorkerWrapper         = {-# SCC "WorkWrap" #-}      trBindsU wwTopBinds
+doCorePass CoreDoSpecialising          = {-# SCC "Specialise" #-}    trBindsU specProgram
+doCorePass CoreDoSpecConstr	       = {-# SCC "SpecConstr" #-}    trBindsU specConstrProgram
 doCorePass CoreDoGlomBinds	       = trBinds glomBinds
-doCorePass CoreDoVectorisation         = _scc_ "Vectorise"     vectorise
+doCorePass CoreDoVectorisation         = {-# SCC "Vectorise" #-}     vectorise
 doCorePass CoreDoPrintCore	       = observe printCore
 doCorePass (CoreDoRuleCheck phase pat) = observe (ruleCheck phase pat)
 doCorePass CoreDoNothing	       = observe (\ _ _ -> return ())
 #ifdef OLD_STRICTNESS		       
-doCorePass CoreDoOldStrictness	       = _scc_ "OldStrictness" trBinds doOldStrictness
+doCorePass CoreDoOldStrictness	       = {-# SCC "OldStrictness" #-} trBinds doOldStrictness
 #else
 doCorePass CoreDoOldStrictness	       = panic "CoreDoOldStrictness"
 #endif
@@ -436,7 +436,7 @@ simplifyPgm mode switches hsc_env us imp_rule_base guts
       | let sz = coreBindsSize binds in sz == sz
       = do {
 		-- Occurrence analysis
-	   let { tagged_binds = _scc_ "OccAnal" occurAnalysePgm binds } ;
+	   let { tagged_binds = {-# SCC "OccAnal" #-} occurAnalysePgm binds } ;
 	   dumpIfSet_dyn dflags Opt_D_dump_occur_anal "Occurrence analysis"
 		     (pprCoreBindings tagged_binds);
 
@@ -448,7 +448,7 @@ simplifyPgm mode switches hsc_env us imp_rule_base guts
 	   eps <- hscEPS hsc_env ;
 	   let	{ rule_base' = unionRuleBase imp_rule_base (eps_rule_base eps)
 		; simpl_env  = mkSimplEnv mode sw_chkr 
-		; simpl_binds = _scc_ "SimplTopBinds" 
+		; simpl_binds = {-# SCC "SimplTopBinds" #-} 
 				simplTopBinds simpl_env tagged_binds
 		; fam_envs = (eps_fam_inst_env eps, mg_fam_inst_env guts) } ;
 	   
@@ -485,7 +485,7 @@ simplifyPgm mode switches hsc_env us imp_rule_base guts
 		--
 		-- ToDo: alas, this means that indirection-shorting does not happen at all
 		--	 if the simplifier does nothing (not common, I know, but unsavoury)
-	   let { binds'' = _scc_ "ZapInd" shortOutIndirections binds' } ;
+	   let { binds'' = {-# SCC "ZapInd" #-} shortOutIndirections binds' } ;
 
 		-- Dump the result of this iteration
 	   dumpIfSet_dyn dflags Opt_D_dump_simpl_iterations herald

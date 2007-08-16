@@ -104,8 +104,8 @@ stronglyConnCompR [] = []  -- added to avoid creating empty array in graphFromEd
 stronglyConnCompR edges
   = map decode forest
   where
-    (graph, vertex_fn) = _scc_ "graphFromEdges" graphFromEdges edges
-    forest             = _scc_ "Digraph.scc" scc graph
+    (graph, vertex_fn) = {-# SCC "graphFromEdges" #-} graphFromEdges edges
+    forest             = {-# SCC "Digraph.scc" #-} scc graph
     decode (Node v []) | mentions_itself v = CyclicSCC [vertex_fn v]
                        | otherwise         = AcyclicSCC (vertex_fn v)
     decode other = CyclicSCC (dec other [])

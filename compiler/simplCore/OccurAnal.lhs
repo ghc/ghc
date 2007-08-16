@@ -135,7 +135,7 @@ It isn't easy to do a perfect job in one blow.  Consider
 
 \begin{code}
 occAnalBind env (Rec pairs) body_usage
-  = foldr (_scc_ "occAnalBind.dofinal" do_final_bind) (body_usage, []) sccs
+  = foldr ({-# SCC "occAnalBind.dofinal" #-} do_final_bind) (body_usage, []) sccs
   where
     analysed_pairs :: [Details]
     analysed_pairs  = [ (bndr, rhs_usage, rhs')
@@ -144,12 +144,12 @@ occAnalBind env (Rec pairs) body_usage
 		      ]
 
     sccs :: [SCC (Node Details)]
-    sccs = _scc_ "occAnalBind.scc" stronglyConnCompR edges
+    sccs = {-# SCC "occAnalBind.scc" #-} stronglyConnCompR edges
 
 
     ---- stuff for dependency analysis of binds -------------------------------
     edges :: [Node Details]
-    edges = _scc_ "occAnalBind.assoc"
+    edges = {-# SCC "occAnalBind.assoc" #-}
 	    [ (details, idUnique id, edges_from id rhs_usage)
 	    | details@(id, rhs_usage, rhs) <- analysed_pairs
 	    ]
@@ -164,7 +164,7 @@ occAnalBind env (Rec pairs) body_usage
 	-- which has n**2 cost, and this meant that edges_from alone 
 	-- consumed 10% of total runtime!
     edges_from :: Id -> UsageDetails -> [Unique]
-    edges_from bndr rhs_usage = _scc_ "occAnalBind.edges_from"
+    edges_from bndr rhs_usage = {-# SCC "occAnalBind.edges_from" #-}
 			        keysUFM (addRuleUsage rhs_usage bndr)
 
     ---- Stuff to "re-constitute" bindings from dependency-analysis info ------

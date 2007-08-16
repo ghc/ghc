@@ -314,7 +314,7 @@ mkIface hsc_env maybe_old_iface
 		-- Add version information
                 ; ext_ver_fn = mkParentVerFun hsc_env eps
 		; (new_iface, no_change_at_all, pp_diffs, pp_orphs) 
-			= _scc_ "versioninfo" 
+			= {-# SCC "versioninfo" #-}
 			 addVersionInfo ext_ver_fn maybe_old_iface
                                          intermediate_iface decls
 		}
