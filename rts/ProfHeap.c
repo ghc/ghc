@@ -457,12 +457,8 @@ initHeapProfiling(void)
 	era = 0;
     }
 
-    {   // max_era = 2^LDV_SHIFT
-	nat p;
-	max_era = 1;
-	for (p = 0; p < LDV_SHIFT; p++)
-	    max_era *= 2;
-    }
+    // max_era = 2^LDV_SHIFT
+	max_era = 1 << LDV_SHIFT;
 
     n_censuses = 32;
     censuses = stgMallocBytes(sizeof(Census) * n_censuses, "initHeapProfiling");
