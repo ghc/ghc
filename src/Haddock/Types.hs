@@ -6,12 +6,14 @@
 -- Ported to use the GHC API by David Waern 2006
 -- 
 
+
 module Haddock.Types where
+
 
 import GHC hiding (NoLink)
 import Outputable
-
 import Data.Map
+
 
 data DocOption
   = OptHide           -- ^ This module should not appear in the docs
@@ -21,11 +23,12 @@ data DocOption
                       -- exported by this module.
   deriving (Eq, Show)
 
+
 data ExportItem name
 
   = ExportDecl {		  		
 	
-			-- | The original name
+      -- | The original name
       expItemName :: Name, 
 
       -- | A declaration
@@ -34,13 +37,13 @@ data ExportItem name
       -- | Maybe a doc comment
       expItemMbDoc :: Maybe (HsDoc name),
 
-			-- | Instances relevant to this declaration
+      -- | Instances relevant to this declaration
       expItemInstances :: [InstHead name]
 	
 	  }	-- ^ An exported declaration 
 		    
   | ExportNoDecl {
-	    -- | The original name
+	  -- | The original name
       expItemName :: Name,
 
       -- | Where to link to
@@ -50,8 +53,8 @@ data ExportItem name
       expItemSubs :: [name]
 
 		} -- ^ An exported entity for which we have no 
-      -- documentation (perhaps because it resides in
-      -- another package)
+          -- documentation (perhaps because it resides in
+          -- another package)
 
   | ExportGroup { 
 
@@ -59,10 +62,10 @@ data ExportItem name
       expItemSectionLevel :: Int,
 
       -- | Section id (for hyperlinks)
-			expItemSectionId :: String,     
+      expItemSectionId :: String,     
 			
-			-- | Section heading text
-			expItemSectionText :: HsDoc name
+      -- | Section heading text
+      expItemSectionText :: HsDoc name
 
     } -- ^ A section heading
 
@@ -70,16 +73,20 @@ data ExportItem name
 
   | ExportModule Module    -- ^ A cross-reference to another module
 
+
 type InstHead name = ([HsPred name], name, [HsType name])
 type ModuleMap     = Map Module HaddockModule
 type DocMap        = Map Name (HsDoc DocName)
 type DocEnv        = Map Name Name
 
+
 data DocName = Link Name | NoLink Name
+
 
 instance Outputable DocName where
   ppr (Link   n) = ppr n
   ppr (NoLink n) = ppr n
+
 
 data HaddockModule = HM {
 
@@ -128,6 +135,7 @@ data HaddockModule = HM {
   -- | The instances exported by this module
   hmod_instances          :: [Instance]
 }
+
 
 data DocMarkup id a = Markup {
   markupEmpty         :: a,
