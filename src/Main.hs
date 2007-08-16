@@ -1264,6 +1264,8 @@ type ErrMsgM a = Writer [ErrMsg] a
 -- Packages 
 --------------------------------------------------------------------------------
 
+
+-- | Represents the installed haddock information for a package
 data HaddockPackage = HaddockPackage {
   pdModules  :: [Module],
   pdDocEnv   :: DocEnv,
