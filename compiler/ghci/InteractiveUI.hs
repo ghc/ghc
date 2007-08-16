@@ -186,6 +186,7 @@ helpText =
  "   :sprint [<name> ...]        simplifed version of :print\n" ++
  "   :step                       single-step after stopping at a breakpoint\n"++
  "   :step <expr>                single-step into <expr>\n"++
+ "   :stepover                   single-step without following function applications\n"++
  "   :trace                      trace after stopping at a breakpoint\n"++
  "   :trace <expr>               trace into <expr> (remembers breakpoints for :history)\n"++
 
