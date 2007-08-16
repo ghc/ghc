@@ -812,12 +812,12 @@ parseIfaceOption s =
 	(fpath,',':file) -> (fpath,file)
 	(file, _)        -> ("", file)
 	
-updateHTMLXRefs :: [PackageData] -> IO ()
+updateHTMLXRefs :: [HaddockPackage] -> IO ()
 updateHTMLXRefs packages = do
   writeIORef html_xrefs_ref (Map.fromList mapping)
   where
     mapping = [ (mod, html) | 
-                (PackageData mods _ html) <- packages, mod <- mods ] 
+                (HaddockPackage mods _ html) <- packages, mod <- mods ] 
 
 getPrologue :: [Flag] -> IO (Maybe (HsDoc RdrName))
 getPrologue flags
@@ -1264,7 +1264,7 @@ type ErrMsgM a = Writer [ErrMsg] a
 -- Packages 
 --------------------------------------------------------------------------------
 
-data PackageData = PackageData {
+data HaddockPackage = HaddockPackage {
   pdModules  :: [Module],
   pdDocEnv   :: DocEnv,
   pdHtmlPath :: FilePath
@@ -1273,16 +1273,9 @@ data PackageData = PackageData {
 -- | Recreate exposed modules from an InstalledPackageInfo
 packageModules :: InstalledPackageInfo -> [Module]
 packageModules pkgInfo = map (mkModule (pkgId pkgInfo)) moduleNames
-  where moduleNames = map mkModuleName (exposedModules pkgInfo)
-
-pkgId :: InstalledPackageInfo -> PackageId
-pkgId = mkPackageId . package 
-
--- | For each module in the list, try to retrieve a ModuleInfo structure  
-moduleInfo :: Session -> [Module] -> IO (Maybe [ModuleInfo])
-moduleInfo session modules = do
-  mbModInfo <- mapM (getModuleInfo session) modules
-  return (sequence mbModInfo)
+  where 
+    moduleNames = map mkModuleName (exposedModules pkgInfo)
+    pkgId = mkPackageId . package 
 
 -- | Get the Haddock HTML directory path for a package
 getHtml :: InstalledPackageInfo -> IO FilePath
@@ -1302,8 +1295,8 @@ getIface pkgInfo = case haddockInterfaces pkgInfo of
        "Interface file " ++ file ++ " does not exist."
   _ -> throwE "No Haddock interface installed."
 
--- | Try to create a PackageData structure for a package
-getPackage :: Session -> InstalledPackageInfo -> IO PackageData 
+-- | Try to create a HaddockPackage structure for a package
+getPackage :: Session -> InstalledPackageInfo -> IO HaddockPackage
 getPackage session pkgInfo = do
 
   html <- getHtml pkgInfo
@@ -1313,15 +1306,15 @@ getPackage session pkgInfo = do
   let docEnv  = ifDocEnv iface
       modules = packageModules pkgInfo
 
-  return $ PackageData {
+  return $ HaddockPackage {
     pdModules  = modules,
     pdDocEnv   = docEnv,
     pdHtmlPath = html
   } 
        
--- | Try to create a PackageData for each package in the session except for 
--- rts. Print a warning on stdout if a PackageData could not be created.
-getPackages :: Session -> [PackageId] -> IO [PackageData]
+-- | Try to create a HaddockPackage for each package in the session except for 
+-- rts. Print a warning on stdout if a HaddockPackage could not be created.
+getPackages :: Session -> [PackageId] -> IO [HaddockPackage]
 getPackages session packages = do
 
   -- get InstalledPackageInfos for every package in the session
@@ -1332,7 +1325,7 @@ getPackages session packages = do
   -- html path) for the packages and html path
   liftM catMaybes $ mapM tryGetPackage pkgInfos
   where
-    -- try to get a PackageData, warn if we can't
+    -- try to get a HaddockPackage, warn if we can't
     tryGetPackage pkgInfo = 
         (getPackage session pkgInfo >>= return . Just)
       `catchDyn`
@@ -1346,5 +1339,5 @@ getPackages session packages = do
 -- | Build one big doc env out of a list of packages. If multiple packages 
 -- export the same (original) name, we just pick one of the packages as the 
 -- documentation site.
-packagesDocEnv :: [PackageData] -> DocEnv
+packagesDocEnv :: [HaddockPackage] -> DocEnv
 packagesDocEnv packages = Map.unions (map pdDocEnv packages)
