@@ -94,4 +94,5 @@ other-modules:
 	Haddock.InterfaceFile        
 	Haddock.Exception
 	Haddock.Options
+	Haddock.Typecheck
 	Main

@@ -17,8 +17,9 @@ import Haddock.HH
 import Haddock.HH2
 import Haddock.ModuleTree
 import Haddock.Types
-import Haddock.Utils
 import Haddock.Version
+import Haddock.Utils
+import Haddock.Utils.GHC
 import Haddock.Utils.Html
 import qualified Haddock.Utils.Html as Html
 

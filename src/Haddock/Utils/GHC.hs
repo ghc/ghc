@@ -4,9 +4,12 @@
 -- (c) Simon Marlow 2003
 --
 
+
 module Haddock.Utils.GHC where
 
+
 import Debug.Trace
+import Data.Char
 
 import GHC
 import HsSyn
@@ -16,6 +19,42 @@ import Outputable
 import Packages
 import UniqFM
 import Name
+
+
+-- names
+
+nameOccString = occNameString . nameOccName 
+
+
+nameSetMod n newMod = 
+  mkExternalName (nameUnique n) newMod (nameOccName n) (nameSrcSpan n)
+
+
+nameSetPkg pkgId n = 
+  mkExternalName (nameUnique n) (mkModule pkgId (moduleName mod)) 
+	               (nameOccName n) (nameSrcSpan n)
+  where mod = nameModule n
+
+
+-- modules
+
+
+moduleString :: Module -> String
+moduleString = moduleNameString . moduleName 
+
+
+mkModuleNoPkg :: String -> Module
+mkModuleNoPkg str = mkModule (stringToPackageId "") (mkModuleName str)
+
+
+-- misc
+
+
+-- there should be a better way to check this using the GHC API
+isConSym n = head (nameOccString n) == ':'
+isVarSym n = fstChar /= '_' && not (isConSym n) && (not . isLetter) fstChar
+  where fstChar = head (nameOccString n)
+
 
 getMainDeclBinder :: HsDecl name -> Maybe name
 getMainDeclBinder (TyClD d) = Just (tcdName d)
@@ -28,18 +67,10 @@ getMainDeclBinder (ForD (ForeignImport name _ _)) = Just (unLoc name)
 getMainDeclBinder (ForD (ForeignExport name _ _)) = Nothing
 getMainDeclBinder _ = Nothing
 
+
 -- To keep if if minf_iface is re-introduced
 --modInfoName = moduleName . mi_module . minf_iface
 --modInfoMod  = mi_module . minf_iface 
 
+
 trace_ppr x y = trace (showSDoc (ppr x)) y
-
--- names
-
-nameSetMod n newMod = 
-  mkExternalName (nameUnique n) newMod (nameOccName n) (nameSrcSpan n)
-
-nameSetPkg pkgId n = 
-  mkExternalName (nameUnique n) (mkModule pkgId (moduleName mod)) 
-	               (nameOccName n) (nameSrcSpan n)
-  where mod = nameModule n

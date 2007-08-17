@@ -20,8 +20,7 @@ module Haddock.Utils (
 
   -- * Miscellaneous utilities
   getProgramName, bye, die, dieMsg, noDieMsg, mapSnd, mapMaybeM, escapeStr,
-  isConSym, isVarSym, nameOccString, moduleString, mkModuleNoPkg,
-
+ 
   -- * HTML cross reference mapping
   html_xrefs_ref,
 
@@ -231,18 +230,6 @@ escapeStr = flip escapeString unreserved
 escapeStr = escapeURIString isUnreserved
 #endif
 
--- there should be a better way to check this using the GHC API
-isConSym n = head (nameOccString n) == ':'
-isVarSym n = fstChar /= '_' && not (isConSym n) && (not . isLetter) fstChar
-  where fstChar = head (nameOccString n)
-
-nameOccString = occNameString . nameOccName 
-
-moduleString :: Module -> String
-moduleString = moduleNameString . moduleName 
-
-mkModuleNoPkg :: String -> Module
-mkModuleNoPkg str = mkModule (stringToPackageId "") (mkModuleName str)
 
 -----------------------------------------------------------------------------
 -- HTML cross references

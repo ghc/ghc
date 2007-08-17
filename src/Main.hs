@@ -19,6 +19,7 @@ import Haddock.Version
 import Haddock.InterfaceFile
 import Haddock.Exception
 import Haddock.Options
+import Haddock.Typecheck
 import Haddock.Utils.GHC
 import Paths_haddock
 
@@ -55,7 +56,6 @@ import Distribution.Simple.Utils
 import GHC
 import Outputable
 import SrcLoc
-import Digraph
 import Name
 import Module
 import InstEnv
@@ -68,7 +68,6 @@ import Bag
 import HscTypes
 import Util (handleDyn)
 import ErrUtils (printBagOfErrors)
-import BasicTypes
 import UniqFM
 
 import FastString
@@ -129,9 +128,9 @@ handleGhcExceptions inner =
   ) inner
 
 
---------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 -- Top-level
---------------------------------------------------------------------------------
+-------------------------------------------------------------------------------
 
 
 main :: IO ()
@@ -165,7 +164,7 @@ main = handleTopExceptions $ do
   packages <- getPackages session exposedPackages
 
   -- typechecking
-  modules  <- sortAndCheckModules session fileArgs
+  modules  <- typecheckFiles session fileArgs
 
   -- update the html references for rendering phase (global variable)
   updateHTMLXRefs packages
@@ -175,6 +174,123 @@ main = handleTopExceptions $ do
 
   -- TODO: continue to break up the run function into parts
   run flags modules env
+
+
+startGHC :: String -> IO (Session, DynFlags)
+startGHC libDir = do
+  session <- newSession (Just libDir)
+  flags   <- getSessionDynFlags session
+  let flags' = dopt_set flags Opt_Haddock
+  let flags'' = flags' {
+      hscTarget = HscNothing,
+      ghcMode   = CompManager,
+      ghcLink   = NoLink
+    }
+  setSessionDynFlags session flags''
+  return (session, flags'')
+
+ 
+run :: [Flag] -> [GhcModule] -> Map Name Name -> IO ()
+run flags modules extEnv = do
+  let
+    title = case [str | Flag_Heading str <- flags] of
+		[] -> ""
+		(t:_) -> t
+
+    maybe_source_urls = (listToMaybe [str | Flag_SourceBaseURL   str <- flags]
+                        ,listToMaybe [str | Flag_SourceModuleURL str <- flags]
+                        ,listToMaybe [str | Flag_SourceEntityURL str <- flags])
+
+    maybe_wiki_urls = (listToMaybe [str | Flag_WikiBaseURL   str <- flags]
+                      ,listToMaybe [str | Flag_WikiModuleURL str <- flags]
+                      ,listToMaybe [str | Flag_WikiEntityURL str <- flags])
+
+    verbose = Flag_Verbose `elem` flags
+
+  libdir <- case [str | Flag_Lib str <- flags] of
+		[] -> getDataDir -- provided by Cabal
+		fs -> return (last fs)
+
+  let css_file = case [str | Flag_CSS str <- flags] of
+			[] -> Nothing
+			fs -> Just (last fs)
+
+  odir <- case [str | Flag_OutputDir str <- flags] of
+		[] -> return "."
+		fs -> return (last fs)
+
+  let 
+    maybe_contents_url = 
+      case [url | Flag_UseContents url <- flags] of
+        [] -> Nothing
+        us -> Just (last us)
+
+    maybe_index_url = 
+      case [url | Flag_UseIndex url <- flags] of
+        [] -> Nothing
+        us -> Just (last us)
+
+    maybe_html_help_format =
+      case [hhformat | Flag_HtmlHelp hhformat <- flags] of
+        []      -> Nothing
+        formats -> Just (last formats)
+
+  prologue <- getPrologue flags
+
+  let
+    -- run pass 1 on this data
+    (modMap, messages) = runWriter (pass1 modules flags) 
+
+    haddockMods = catMaybes [ Map.lookup (ghcModule m) modMap | m <- modules ]
+    homeEnv = buildGlobalDocEnv haddockMods
+    env = homeEnv `Map.union` extEnv
+    haddockMods' = attachInstances haddockMods
+    (haddockMods'', messages') = runWriter $ mapM (renameModule env) haddockMods'
+  
+  mapM_ putStrLn messages
+  mapM_ putStrLn messages'
+
+  let 
+    visibleMods = [ m | m <- haddockMods'', OptHide `notElem` (hmod_options m) ]
+    packageName = (Just . packageIdString . modulePackageId . 
+                   hmod_mod . head) visibleMods
+ 
+  when (Flag_GenIndex `elem` flags) $ do
+	ppHtmlIndex odir title packageName maybe_html_help_format
+                maybe_contents_url maybe_source_urls maybe_wiki_urls
+                visibleMods
+	copyHtmlBits odir libdir css_file
+        
+  when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do
+    ppHtmlHelpFiles title packageName visibleMods odir maybe_html_help_format []
+
+  when (Flag_GenContents `elem` flags) $ do
+	ppHtmlContents odir title packageName maybe_html_help_format
+	               maybe_index_url maybe_source_urls maybe_wiki_urls
+	               visibleMods True prologue
+	copyHtmlBits odir libdir css_file
+
+  when (Flag_Html `elem` flags) $ do
+    ppHtml title packageName visibleMods odir
+                prologue maybe_html_help_format
+                maybe_source_urls maybe_wiki_urls
+                maybe_contents_url maybe_index_url
+    copyHtmlBits odir libdir css_file
+
+  let iface = InterfaceFile {
+        ifDocEnv  = homeEnv
+--        ifModules = map hmod2interface visibleMods
+      }
+
+  case [str | Flag_DumpInterface str <- flags] of
+        [] -> return ()
+        fs -> let filename = (last fs) in 
+              writeInterfaceFile filename iface
+
+
+-------------------------------------------------------------------------------
+-- Flags 
+-------------------------------------------------------------------------------
 
 
 handleFlags flags fileArgs = do
@@ -225,11 +341,6 @@ getUsePackages flags session = do
     handleParse Nothing = throwE "Could not parse package identifier"
 
 
--------------------------------------------------------------------------------
--- Flags 
--------------------------------------------------------------------------------
-
-
 -- | Filter out the GHC specific flags and try to parse and set them as static 
 -- flags. Return a list of flags that couldn't be parsed. 
 tryParseStaticFlags flags = do
@@ -255,218 +366,27 @@ byeVersion =
        ", (c) Simon Marlow 2003; ported to the GHC-API by David Waern 2006\n")
 
 
-startGHC :: String -> IO (Session, DynFlags)
-startGHC libDir = do
-  session <- newSession (Just libDir)
-  flags   <- getSessionDynFlags session
-  let flags' = dopt_set flags Opt_Haddock
-  let flags'' = flags' {
-      hscTarget = HscNothing,
-      ghcMode   = CompManager,
-      ghcLink   = NoLink
-    }
-  setSessionDynFlags session flags''
-  return (session, flags'')
+-------------------------------------------------------------------------------
+-- Phase 1
+-------------------------------------------------------------------------------
 
 
--- | Get the sorted graph of all loaded modules and their dependencies
-getSortedModuleGraph :: Session -> IO [(Module, FilePath)]
-getSortedModuleGraph session = do
-  mbModGraph <- depanal session [] True
-  moduleGraph <- case mbModGraph of
-    Just mg -> return mg
-    Nothing -> throwE "Failed to load all modules"
-  let
-    getModFile    = fromJust . ml_hs_file . ms_location
-    sortedGraph   = topSortModuleGraph False moduleGraph Nothing
-    sortedModules = concatMap flattenSCC sortedGraph
-    modsAndFiles  = [ (ms_mod modsum, getModFile modsum) |
-                      modsum <- sortedModules ]
-  return modsAndFiles
-
-
--- TODO: make it handle cleanup
-sortAndCheckModules :: Session -> [FilePath] -> IO [CheckedMod]
-sortAndCheckModules session files = do 
-
-  -- load all argument files
-
-  targets <- mapM (\f -> guessTarget f Nothing) files
-  setTargets session targets 
-
-  -- compute the dependencies and load them as well
-
-  allMods <- getSortedModuleGraph session
-  targets' <- mapM (\(_, f) -> guessTarget f Nothing) allMods
-  setTargets session targets'
-
-  flag <- load session LoadAllTargets
-  when (failed flag) $ 
-    throwE "Failed to load all needed modules"
-
-  -- typecheck the argument modules
-
-  let argMods = filter ((`elem` files) . snd) allMods
-
-  checkedMods <- forM argMods $ \(mod, file) -> do
-    mbMod <- checkModule session (moduleName mod) False
-    case mbMod of
-      Just (CheckedModule a (Just b) (Just c) (Just d) _) 
-        -> return (mod, file, (a,b,c,d))
-      _ -> throwE ("Failed to check module: " ++ moduleString mod)
-
-  return checkedMods
-
-
-run :: [Flag] -> [CheckedMod] -> Map Name Name -> IO ()
-run flags modules extEnv = do
-  let
-    title = case [str | Flag_Heading str <- flags] of
-		[] -> ""
-		(t:_) -> t
-
-    maybe_source_urls = (listToMaybe [str | Flag_SourceBaseURL   str <- flags]
-                        ,listToMaybe [str | Flag_SourceModuleURL str <- flags]
-                        ,listToMaybe [str | Flag_SourceEntityURL str <- flags])
-
-    maybe_wiki_urls = (listToMaybe [str | Flag_WikiBaseURL   str <- flags]
-                      ,listToMaybe [str | Flag_WikiModuleURL str <- flags]
-                      ,listToMaybe [str | Flag_WikiEntityURL str <- flags])
-
-    verbose = Flag_Verbose `elem` flags
-
-  libdir <- case [str | Flag_Lib str <- flags] of
-		[] -> getDataDir -- provided by Cabal
-		fs -> return (last fs)
-
-  let css_file = case [str | Flag_CSS str <- flags] of
-			[] -> Nothing
-			fs -> Just (last fs)
-
-  odir <- case [str | Flag_OutputDir str <- flags] of
-		[] -> return "."
-		fs -> return (last fs)
-
-  let 
-    maybe_contents_url = 
-      case [url | Flag_UseContents url <- flags] of
-        [] -> Nothing
-        us -> Just (last us)
-
-    maybe_index_url = 
-      case [url | Flag_UseIndex url <- flags] of
-        [] -> Nothing
-        us -> Just (last us)
-
-    maybe_html_help_format =
-      case [hhformat | Flag_HtmlHelp hhformat <- flags] of
-        []      -> Nothing
-        formats -> Just (last formats)
-
-  prologue <- getPrologue flags
-
-  let
-    -- collect the data from GHC that we need for each home module
-    ghcModuleData = map moduleDataGHC modules
-    -- run pass 1 on this data
-    (modMap, messages) = runWriter (pass1 ghcModuleData flags) 
-
-    haddockMods = catMaybes [ Map.lookup mod modMap | (mod,_,_) <- modules ]
-    homeEnv = buildGlobalDocEnv haddockMods
-    env = homeEnv `Map.union` extEnv
-    haddockMods' = attachInstances haddockMods
-    (haddockMods'', messages') = runWriter $ mapM (renameModule env) haddockMods'
-  
-  mapM_ putStrLn messages
-  mapM_ putStrLn messages'
-
-  let 
-    visibleMods = [ m | m <- haddockMods'', OptHide `notElem` (hmod_options m) ]
-    packageName = (Just . packageIdString . modulePackageId . 
-                   hmod_mod . head) visibleMods
- 
-  when (Flag_GenIndex `elem` flags) $ do
-	ppHtmlIndex odir title packageName maybe_html_help_format
-                maybe_contents_url maybe_source_urls maybe_wiki_urls
-                visibleMods
-	copyHtmlBits odir libdir css_file
-        
-  when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do
-    ppHtmlHelpFiles title packageName visibleMods odir maybe_html_help_format []
-
-  when (Flag_GenContents `elem` flags) $ do
-	ppHtmlContents odir title packageName maybe_html_help_format
-	               maybe_index_url maybe_source_urls maybe_wiki_urls
-	               visibleMods True prologue
-	copyHtmlBits odir libdir css_file
-
-  when (Flag_Html `elem` flags) $ do
-    ppHtml title packageName visibleMods odir
-                prologue maybe_html_help_format
-                maybe_source_urls maybe_wiki_urls
-                maybe_contents_url maybe_index_url
-    copyHtmlBits odir libdir css_file
-
-  let iface = InterfaceFile {
-        ifDocEnv  = homeEnv
---        ifModules = map hmod2interface visibleMods
-      }
-
-  case [str | Flag_DumpInterface str <- flags] of
-        [] -> return ()
-        fs -> let filename = (last fs) in 
-              writeInterfaceFile filename iface
-
-
-type CheckedMod = (Module, FilePath, FullyCheckedMod)
-
-type FullyCheckedMod = (ParsedSource, 
-                        RenamedSource, 
-                        TypecheckedSource, 
-                        ModuleInfo)
-
-
--- | This data structure collects all the information we need about a home 
--- package module
-data ModuleDataGHC = ModuleDataGHC {
-   ghcModule         :: Module,
-   ghcFilename       :: FilePath,
-   ghcMbDocOpts      :: Maybe String,
-   ghcHaddockModInfo :: HaddockModInfo Name,
-   ghcMbDoc          :: Maybe (HsDoc Name),
-   ghcGroup          :: HsGroup Name,
-   ghcMbExports      :: Maybe [LIE Name],
-   ghcExportedNames  :: [Name],
-   ghcNamesInScope   :: [Name],
-   ghcInstances      :: [Instance]
-}
-
-
--- | Dig out what we want from the GHC API without altering anything
-moduleDataGHC :: CheckedMod -> ModuleDataGHC 
-moduleDataGHC (mod, file, checkedMod) = ModuleDataGHC {
-  ghcModule         = mod,
-  ghcFilename       = file,
-  ghcMbDocOpts      = mbOpts,
-  ghcHaddockModInfo = info,
-  ghcMbDoc          = mbDoc,
-  ghcGroup          = group,
-  ghcMbExports      = mbExports,
-  ghcExportedNames  = modInfoExports modInfo,
-  ghcNamesInScope   = fromJust $ modInfoTopLevelScope modInfo, 
-  ghcInstances      = modInfoInstances modInfo
-}
+-- | Produce a map of HaddockModules with information that is close to 
+-- renderable.  What is lacking after this pass are the renamed export items.
+pass1 :: [GhcModule] -> [Flag] -> ErrMsgM ModuleMap
+pass1 modules flags = foldM produceAndInsert Map.empty modules
   where
-    HsModule _ _ _ _ _ mbOpts _ _      = unLoc parsed
-    (group, _, mbExports, mbDoc, info) = renamed
-    (parsed, renamed, _, modInfo)      = checkedMod 
+    produceAndInsert modMap modData = do
+      resultMod <- pass1data modData flags modMap
+      let key = ghcModule modData
+      return (Map.insert key resultMod modMap)
 
 
--- | Massage the data in ModuleDataGHC to produce something closer to what
+-- | Massage the data in GhcModule to produce something closer to what
 -- we want to render. To do this, we need access to modules before this one
 -- in the topological sort, to which we have already done this conversion. 
 -- That's what's in the ModuleMap.
-pass1data :: ModuleDataGHC -> [Flag] -> ModuleMap -> ErrMsgM HaddockModule
+pass1data :: GhcModule -> [Flag] -> ModuleMap -> ErrMsgM HaddockModule
 pass1data modData flags modMap = do
 
   let mod = ghcModule modData
@@ -526,17 +446,6 @@ pass1data modData flags modMap = do
             then OptHide : opts
             else opts      
       return opts'
-
-
--- | Produce a map of HaddockModules with information that is close to 
--- renderable.  What is lacking after this pass are the renamed export items.
-pass1 :: [ModuleDataGHC] -> [Flag] -> ErrMsgM ModuleMap
-pass1 modules flags = foldM produceAndInsert Map.empty modules
-  where
-    produceAndInsert modMap modData = do
-      resultMod <- pass1data modData flags modMap
-      let key = ghcModule modData
-      return (Map.insert key resultMod modMap)
 
 
 sameName (DocEntity _) _ = False
@@ -608,6 +517,11 @@ collectEntities group = sortByLoc (docs ++ declarations)
           where
             forName (ForeignImport name _ _) = unLoc name
             forName (ForeignExport name _ _) = unLoc name
+
+
+--------------------------------------------------------------------------------
+-- Collect docs
+--------------------------------------------------------------------------------
 
 
 -- | Collect the docs and attach them to the right name
