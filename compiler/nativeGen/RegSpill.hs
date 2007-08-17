@@ -1,7 +1,8 @@
 
 module RegSpill (
 	regSpill,
-	SpillStats(..)
+	SpillStats(..),
+	accSpillLS
 )
 
 where

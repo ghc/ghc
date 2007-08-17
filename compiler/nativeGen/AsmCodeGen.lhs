@@ -23,6 +23,7 @@ import RegAllocLinear
 import RegAllocStats
 import RegLiveness
 import RegCoalesce
+import qualified RegSpill	as Spill
 import qualified RegAllocColor	as Color
 import qualified GraphColor	as Color
 
@@ -42,6 +43,7 @@ import DynFlags
 import StaticFlags	( opt_Static, opt_PIC )
 import Util
 import Config           ( cProjectVersion )
+import Module
 
 import Digraph
 import qualified Pretty
@@ -52,15 +54,13 @@ import UniqSet
 -- DEBUGGING ONLY
 --import OrdList
 
-#ifdef NCG_DEBUG
-import List		( intersperse )
-#endif
-
+import Data.List
 import Data.Int
 import Data.Word
 import Data.Bits
 import Data.Maybe
 import GHC.Exts
+import Control.Monad
 
 {-
 The native-code generator has machine-independent and
@@ -116,8 +116,8 @@ The machine-dependent bits break down as follows:
 -- NB. We *lazilly* compile each block of code for space reasons.
 
 --------------------
-nativeCodeGen :: DynFlags -> [RawCmm] -> UniqSupply -> IO Pretty.Doc
-nativeCodeGen dflags cmms us
+nativeCodeGen :: DynFlags -> Module -> ModLocation -> [RawCmm] -> UniqSupply -> IO Pretty.Doc
+nativeCodeGen dflags mod modLocation cmms us
   = let (res, _) = initUs us $
 	   cgCmm (concat (map add_split cmms))
 
@@ -130,49 +130,7 @@ nativeCodeGen dflags cmms us
     in 
     case res of { (dump, insn_sdoc, imports) -> do
 
-    -- stripe across the outputs for each block so all the information for a
-    --    certain stage is concurrent in the dumps.
-
-    dumpIfSet_dyn dflags 
-    	Opt_D_dump_opt_cmm "Optimised Cmm"
-	(pprCmm $ Cmm $ map cdCmmOpt dump)
-
-    dumpIfSet_dyn dflags 
-    	Opt_D_dump_asm_native   "(asm-native) Native code"
-	(vcat $ map (docToSDoc . pprNatCmmTop)	$ concatMap cdNative dump)
-
-    dumpIfSet_dyn dflags
-    	Opt_D_dump_asm_liveness "(asm-liveness) Liveness info added"
-	(vcat $ map (ppr . cdLiveness) dump)
-
-    dumpIfSet_dyn dflags
-    	Opt_D_dump_asm_coalesce "(asm-coalesce) Register moves coalesced."
-	(vcat $ map (ppr . cdCoalesce) dump)
-
-    dumpIfSet_dyn dflags
-    	Opt_D_dump_asm_regalloc "(asm-regalloc) Registers allocated"
-	(vcat $ map (docToSDoc . pprNatCmmTop) $ concatMap cdAlloced dump)
-
-    -- with the graph coloring allocator, show the result of each build/spill stage
-    --	  for each block in turn.
-    mapM_ (\codeGraphs
-     -> dumpIfSet_dyn dflags
-		Opt_D_dump_asm_regalloc_stages
-			"(asm-regalloc-stages)"
-			(vcat $ map (\(stage, stats) ->
-					 text "-- Stage " <> int stage
-					 $$ ppr stats)
-					(zip [0..] codeGraphs)))
-	$ map cdRegAllocStats dump
-
-    -- Build a global register conflict graph.
-    --	If you want to see the graph for just one basic block then use asm-regalloc-stages instead.
-    dumpIfSet_dyn dflags
-    	Opt_D_dump_asm_conflicts "(asm-conflicts) Register conflict graph"
-		$ Color.dotGraph Color.regDotColor trivColorable
-	 		$ foldl Color.union Color.initGraph
-			$ catMaybes $ map cdColoredGraph dump
-
+    cmmNativeGenDump dflags mod modLocation dump
 
     return (insn_sdoc Pretty.$$ dyld_stubs imports
 
@@ -255,8 +213,8 @@ data CmmNativeGenDump
 	{ cdCmmOpt		:: RawCmmTop
 	, cdNative		:: [NatCmmTop]
 	, cdLiveness		:: [LiveCmmTop]
-	, cdCoalesce		:: [LiveCmmTop]
-	, cdRegAllocStats	:: [RegAllocStats]
+	, cdCoalesce		:: Maybe [LiveCmmTop]
+	, cdRegAllocStats	:: Maybe [RegAllocStats]
 	, cdColoredGraph	:: Maybe (Color.Graph Reg RegClass Reg)
 	, cdAlloced		:: [NatCmmTop] }
 
@@ -264,6 +222,9 @@ dchoose dflags opt a b
 	| dopt opt dflags 	= a
 	| otherwise		= b
 
+dchooses dflags opts a b
+	| or $ map ( (flip dopt) dflags) opts	= a
+	| otherwise		= b
 
 -- | Complete native code generation phase for a single top-level chunk of Cmm.
 --	Unless they're being dumped, intermediate data structures are squashed after
@@ -338,18 +299,21 @@ cmmNativeGen dflags cmm
 					coalesced
 
 			return 	( alloced
-				, dchoose dflags Opt_D_dump_asm_regalloc 	alloced []
-				, dchoose dflags Opt_D_dump_asm_coalesce 	coalesced []
-				, dchoose dflags Opt_D_dump_asm_regalloc_stages	regAllocStats []
-				, dchoose dflags Opt_D_dump_asm_conflicts 	Nothing Nothing)
+				, dchoose  dflags Opt_D_dump_asm_regalloc 	alloced []
+				, dchoose  dflags Opt_D_dump_asm_coalesce 	(Just coalesced)     Nothing
+				, dchooses dflags
+					[ Opt_D_dump_asm_regalloc_stages
+					, Opt_D_drop_asm_stats]
+					(Just regAllocStats) Nothing
+				, dchoose  dflags Opt_D_dump_asm_conflicts 	Nothing Nothing)
 
 		 else do
 			-- do linear register allocation
 		 	alloced	<- mapUs regAlloc withLiveness
 			return	( alloced
 				, dchoose dflags Opt_D_dump_asm_regalloc	alloced []
-				, []
-				, []
+				, Nothing
+				, Nothing
 				, Nothing )) 
 		withLiveness
 			
@@ -400,6 +364,89 @@ x86fp_kludge top@(CmmProc info lbl params code) =
 			BasicBlock id (i386_insert_ffrees instrs)
 #endif
 
+
+-- Dump output of native code generator passes
+-- 	stripe across the outputs for each block so all the information for a
+--	certain stage is concurrent in the dumps.
+--
+cmmNativeGenDump :: DynFlags -> Module -> ModLocation -> [CmmNativeGenDump] -> IO ()
+cmmNativeGenDump dflags mod modLocation dump
+ = do
+
+	dumpIfSet_dyn dflags
+		Opt_D_dump_opt_cmm "Optimised Cmm"
+		(pprCmm $ Cmm $ map cdCmmOpt dump)
+
+	dumpIfSet_dyn dflags
+		Opt_D_dump_asm_native   "(asm-native) Native code"
+		(vcat $ map (docToSDoc . pprNatCmmTop)	$ concatMap cdNative dump)
+
+	dumpIfSet_dyn dflags
+		Opt_D_dump_asm_liveness "(asm-liveness) Liveness info added"
+		(vcat $ map (ppr . cdLiveness) dump)
+
+	dumpIfSet_dyn dflags
+		Opt_D_dump_asm_coalesce "(asm-coalesce) Register moves coalesced."
+		(vcat $ map (ppr . (\(Just c) -> c) . cdCoalesce) dump)
+
+	dumpIfSet_dyn dflags
+		Opt_D_dump_asm_regalloc "(asm-regalloc) Registers allocated"
+		(vcat $ map (docToSDoc . pprNatCmmTop) $ concatMap cdAlloced dump)
+
+	-- with the graph coloring allocator, show the result of each build/spill stage
+	--	  for each block in turn.
+	mapM_ (\codeGraphs
+	 -> dumpIfSet_dyn dflags
+		Opt_D_dump_asm_regalloc_stages "(asm-regalloc-stages)"
+		(vcat $ map (\(stage, stats) ->
+				 text "-- Stage " <> int stage
+				 $$ ppr stats)
+				(zip [0..] codeGraphs)))
+	 $ map ((\(Just c) -> c) . cdRegAllocStats) dump
+
+	-- Build a global register conflict graph.
+	--	If you want to see the graph for just one basic block then use asm-regalloc-stages instead.
+	dumpIfSet_dyn dflags
+		Opt_D_dump_asm_conflicts "(asm-conflicts) Register conflict graph"
+		$ Color.dotGraph Color.regDotColor trivColorable
+		$ foldl Color.union Color.initGraph
+		$ catMaybes $ map cdColoredGraph dump
+
+
+	-- Drop native code gen statistics.
+	--	This is potentially a large amount of information, so we make a new file instead
+	--	of dumping it to stdout.
+	--
+	when (dopt Opt_D_drop_asm_stats dflags)
+	 $ do	-- make the drop file name based on the object file name
+	 	let dropFile	= (init $ ml_obj_file modLocation) ++ "drop-asm-stats"
+
+		-- slurp out the stats from all the spiller stages
+		let spillStats	= [ s	| s@RegAllocStatsSpill{}
+					<- concat [ c | Just c <- map cdRegAllocStats dump]]
+
+		-- build a map of how many spill load/stores were inserted for each vreg
+		let spillLS	= foldl' (plusUFM_C Spill.accSpillLS) emptyUFM
+				$ map (Spill.spillLoadStore . raSpillStats) spillStats
+
+		-- print the count of load/spills as a tuple so we can read back from the file easilly
+		let pprSpillLS :: (Reg, Int, Int) -> SDoc
+		    pprSpillLS	(r, loads, stores) =
+			(parens $ (hcat $ punctuate (text ", ") [doubleQuotes (ppr r), int loads, int stores]))
+
+		-- write out the file
+		let out		= showSDoc
+				(  text "-- (spills-added)"
+				$$ text "--    Spill instructions inserted for each virtual reg."
+				$$ text "--    (reg name, spill loads added, spill stores added)."
+				$$ (vcat $ map pprSpillLS $ eltsUFM spillLS)
+				$$ text "\n")
+
+		writeFile dropFile out
+
+		return ()
+
+	return ()
 
 -- -----------------------------------------------------------------------------
 -- Sequencing the basic blocks
