@@ -893,8 +893,6 @@ checkModule m = do
 
 reloadModule :: String -> GHCi ()
 reloadModule m = do
-  io (revertCAFs)		-- always revert CAFs on reload.
-  discardActiveBreakPoints
   session <- getSession
   doLoad session $ if null m then LoadAllTargets 
                              else LoadUpTo (GHC.mkModuleName m)
