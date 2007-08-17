@@ -421,9 +421,12 @@ cmmNativeGenDump dflags mod modLocation dump
 	 $ do	-- make the drop file name based on the object file name
 	 	let dropFile	= (init $ ml_obj_file modLocation) ++ "drop-asm-stats"
 
+		-- slurp out all the regalloc stats
+		let stats	= concat $ catMaybes $ map cdRegAllocStats dump
+
+		---- Spiller
 		-- slurp out the stats from all the spiller stages
-		let spillStats	= [ s	| s@RegAllocStatsSpill{}
-					<- concat [ c | Just c <- map cdRegAllocStats dump]]
+		let spillStats	= [ s	| s@RegAllocStatsSpill{} <- stats]
 
 		-- build a map of how many spill load/stores were inserted for each vreg
 		let spillLS	= foldl' (plusUFM_C Spill.accSpillLS) emptyUFM
@@ -434,15 +437,28 @@ cmmNativeGenDump dflags mod modLocation dump
 		    pprSpillLS	(r, loads, stores) =
 			(parens $ (hcat $ punctuate (text ", ") [doubleQuotes (ppr r), int loads, int stores]))
 
-		-- write out the file
-		let out		= showSDoc
-				(  text "-- (spills-added)"
-				$$ text "--    Spill instructions inserted for each virtual reg."
-				$$ text "--    (reg name, spill loads added, spill stores added)."
-				$$ (vcat $ map pprSpillLS $ eltsUFM spillLS)
+
+		let outSpill	= ( text "-- (spills-added)"
+				$$  text "--    Spill instructions inserted for each virtual reg."
+				$$  text "--    (reg_name, spill_loads_added, spill_stores_added)."
+				$$  (vcat $ map pprSpillLS $ eltsUFM spillLS)
+				$$  text "\n")
+
+		---- Lifetimes
+		-- slurp out the maps of all the reg lifetimes
+		let lifetimes	= map raLifetimes stats
+		let lifeMap	= foldl' plusUFM emptyUFM $ map raLifetimes stats
+		let lifeBins	= binLifetimeCount lifeMap
+
+		let outLife	= ( text "-- (vreg-population-lifetimes)"
+				$$  text "--   Number of vregs which lived for a certain number of instructions"
+				$$  text "--   (instruction_count, number_of_vregs_that_lived_that_long)"
+				$$ (vcat $ map ppr $ eltsUFM lifeBins)
 				$$ text "\n")
 
-		writeFile dropFile out
+		-- write out the file
+		writeFile dropFile
+			(showSDoc $ vcat [outSpill, outLife])
 
 		return ()
 

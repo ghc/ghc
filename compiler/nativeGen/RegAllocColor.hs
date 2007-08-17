@@ -103,7 +103,8 @@ regAlloc_spin (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
 			RegAllocStatsColored
 			{ raLiveCmm	= code
 			, raGraph	= graph_colored
-			, raPatchedCmm	= code_patched }
+			, raPatchedCmm	= code_patched
+			, raLifetimes	= fmLife }
 
 		return	( code_nat
 			, debug_codeGraphs ++ [stat]
@@ -123,7 +124,8 @@ regAlloc_spin (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
 			RegAllocStatsSpill
 			{ raLiveCmm	= code_spilled
 			, raGraph	= graph_colored
-			, raSpillStats	= spillStats }
+			, raSpillStats	= spillStats
+			, raLifetimes	= fmLife }
 			    	
 		-- try again
 		regAlloc_spin (spinCount + 1) triv regsFree slotsFree' 

@@ -4,7 +4,8 @@
 
 module RegAllocStats (
 	RegAllocStats (..),
-	regDotColor
+	regDotColor,
+	binLifetimeCount
 )
 
 where
@@ -26,13 +27,15 @@ data RegAllocStats
 	= RegAllocStatsSpill
 	{ raLiveCmm	:: [LiveCmmTop]			-- ^ code we tried to allocate regs for
 	, raGraph	:: Color.Graph Reg RegClass Reg	-- ^ the partially colored graph
-	, raSpillStats	:: SpillStats }			-- ^ spiller stats
+	, raSpillStats	:: SpillStats 			-- ^ spiller stats
+	, raLifetimes	:: UniqFM (Reg, Int) }		-- ^ number of instrs each reg lives for
 
 	-- a successful coloring
 	| RegAllocStatsColored
 	{ raLiveCmm	:: [LiveCmmTop]			-- ^ the code we allocated regs for
 	, raGraph	:: Color.Graph Reg RegClass Reg -- ^ the colored graph
-	, raPatchedCmm	:: [LiveCmmTop] }		-- ^ code with register allocation
+	, raPatchedCmm	:: [LiveCmmTop] 		-- ^ code with register allocation
+	, raLifetimes	:: UniqFM (Reg, Int) }		-- ^ number of instrs each reg lives for
 
 
 instance Outputable RegAllocStats where
@@ -64,6 +67,18 @@ instance Outputable RegAllocStats where
 	$$ text "-- Native code after register allocation."
 	$$ ppr (raPatchedCmm s)
 
+
+-----
+binLifetimeCount :: UniqFM (Reg, Int) -> UniqFM (Int, Int)
+binLifetimeCount fm
+ = let	lifes	= map (\l -> (l, (l, 1)))
+ 		$ map snd
+		$ eltsUFM fm
+
+   in	addListToUFM_C
+		(\(l1, c1) (l2, c2) -> (l1, c1 + c2))
+		emptyUFM
+		lifes
 
 -----
 -- Register colors for drawing conflict graphs
