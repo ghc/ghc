@@ -463,8 +463,6 @@ hs_exit_(rtsBool wait_foreign)
     /* free the stable pointer table */
     exitStablePtrTable();
 
-    freeProfiling1();
-
 #if defined(DEBUG)
     /* free the thread label table */
     freeThreadLabelTable();
@@ -479,6 +477,8 @@ hs_exit_(rtsBool wait_foreign)
 #if defined(PROFILING) 
     reportCCSProfiling();
 #endif
+
+    freeProfiling1();
 
     endProfiling();
 
