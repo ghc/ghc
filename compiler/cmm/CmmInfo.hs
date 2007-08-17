@@ -76,73 +76,72 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
       -- | Code without an info table.  Easy.
       CmmNonInfoTable -> [CmmProc [] entry_label arguments blocks]
 
-      -- | A function entry point.
-      CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag
-                   (FunInfo (ptrs, nptrs) srt fun_type fun_arity
-                            pap_bitmap slow_entry) ->
-          mkInfoTableAndCode info_label std_info fun_extra_bits entry_label
-                             arguments blocks
-          where
-            fun_extra_bits =
-               [packHalfWordsCLit fun_type fun_arity] ++
-               case pap_bitmap of
+      CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
+          let info_label = entryLblToInfoLbl entry_label
+              ty_prof' = if tablesNextToCode
+                         then makeRelativeRefTo info_label ty_prof
+                         else                              ty_prof
+              cl_prof' = if tablesNextToCode
+                         then makeRelativeRefTo info_label cl_prof
+                         else                              cl_prof
+          in case type_info of
+          -- | A function entry point.
+          FunInfo (ptrs, nptrs) srt fun_type fun_arity pap_bitmap slow_entry ->
+              mkInfoTableAndCode info_label std_info fun_extra_bits entry_label
+                                 arguments blocks
+            where
+              fun_extra_bits =
+                 [packHalfWordsCLit fun_type fun_arity] ++
+                 case pap_bitmap of
                  ArgGen liveness ->
                      (if null srt_label then [mkIntCLit 0] else srt_label) ++
                      [makeRelativeRefTo info_label $ mkLivenessCLit liveness,
                       makeRelativeRefTo info_label slow_entry]
                  _ -> srt_label
-            std_info = mkStdInfoTable ty_prof cl_prof type_tag srt_bitmap layout
-            info_label = entryLblToInfoLbl entry_label
-            (srt_label, srt_bitmap) = mkSRTLit info_label srt
-            layout = packHalfWordsCLit ptrs nptrs
+              std_info = mkStdInfoTable ty_prof' cl_prof' type_tag srt_bitmap
+                                        layout
+              (srt_label, srt_bitmap) = mkSRTLit info_label srt
+              layout = packHalfWordsCLit ptrs nptrs
 
-      -- | A constructor.
-      CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag
-                   (ConstrInfo (ptrs, nptrs) con_tag descr) ->
-          mkInfoTableAndCode info_label std_info [con_name] entry_label
-                             arguments blocks
-          where
-            std_info = mkStdInfoTable ty_prof cl_prof type_tag con_tag layout
-            info_label = entryLblToInfoLbl entry_label
-            con_name = makeRelativeRefTo info_label descr
-            layout = packHalfWordsCLit ptrs nptrs
+          -- | A constructor.
+          ConstrInfo (ptrs, nptrs) con_tag descr ->
+              mkInfoTableAndCode info_label std_info [con_name] entry_label
+                                 arguments blocks
+              where
+                std_info = mkStdInfoTable ty_prof' cl_prof' type_tag con_tag layout
+                con_name = makeRelativeRefTo info_label descr
+                layout = packHalfWordsCLit ptrs nptrs
 
-      -- | A thunk.
-      CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag
-                   (ThunkInfo (ptrs, nptrs) srt) ->
-          mkInfoTableAndCode info_label std_info srt_label entry_label
-                             arguments blocks
-          where
-            std_info = mkStdInfoTable ty_prof cl_prof type_tag srt_bitmap layout
-            info_label = entryLblToInfoLbl entry_label
-            (srt_label, srt_bitmap) = mkSRTLit info_label srt
-            layout = packHalfWordsCLit ptrs nptrs
+          -- | A thunk.
+          ThunkInfo (ptrs, nptrs) srt ->
+              mkInfoTableAndCode info_label std_info srt_label entry_label
+                                 arguments blocks
+              where
+                std_info = mkStdInfoTable ty_prof' cl_prof' type_tag srt_bitmap layout
+                (srt_label, srt_bitmap) = mkSRTLit info_label srt
+                layout = packHalfWordsCLit ptrs nptrs
 
-      -- | A selector thunk.
-      CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag
-                   (ThunkSelectorInfo offset srt) ->
-          mkInfoTableAndCode info_label std_info [{- no SRT -}] entry_label
-                             arguments blocks
-          where
-            std_info = mkStdInfoTable ty_prof cl_prof type_tag 0 (mkWordCLit offset)
-            info_label = entryLblToInfoLbl entry_label
+          -- | A selector thunk.
+          ThunkSelectorInfo offset srt ->
+              mkInfoTableAndCode info_label std_info [{- no SRT -}] entry_label
+                                 arguments blocks
+              where
+                std_info = mkStdInfoTable ty_prof' cl_prof' type_tag 0 (mkWordCLit offset)
 
-      -- A continuation/return-point.
-      CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag
-                   (ContInfo stack_layout srt) ->
-          liveness_data ++
-          mkInfoTableAndCode info_label std_info srt_label entry_label
-                             arguments blocks
-          where
-            std_info = mkStdInfoTable ty_prof cl_prof maybe_big_type_tag srt_bitmap
-                                      (makeRelativeRefTo info_label liveness_lit)
-            info_label = entryLblToInfoLbl entry_label
-            (liveness_lit, liveness_data, liveness_tag) =
-                mkLiveness uniq stack_layout
-            maybe_big_type_tag = if type_tag == rET_SMALL
-                                 then liveness_tag
-                                 else type_tag
-            (srt_label, srt_bitmap) = mkSRTLit info_label srt
+          -- A continuation/return-point.
+          ContInfo stack_layout srt ->
+              liveness_data ++
+              mkInfoTableAndCode info_label std_info srt_label entry_label
+                                 arguments blocks
+              where
+                std_info = mkStdInfoTable ty_prof' cl_prof' maybe_big_type_tag srt_bitmap
+                                          (makeRelativeRefTo info_label liveness_lit)
+                (liveness_lit, liveness_data, liveness_tag) =
+                    mkLiveness uniq stack_layout
+                maybe_big_type_tag = if type_tag == rET_SMALL
+                                     then liveness_tag
+                                     else type_tag
+                (srt_label, srt_bitmap) = mkSRTLit info_label srt
 
 -- Handle the differences between tables-next-to-code
 -- and not tables-next-to-code

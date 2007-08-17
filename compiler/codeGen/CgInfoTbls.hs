@@ -74,13 +74,11 @@ dataConTagZ con = dataConTag con - fIRST_TAG
 -- Not used for return points.  (The 'smRepClosureTypeInt' call would panic.)
 mkCmmInfo :: ClosureInfo -> FCode CmmInfo
 mkCmmInfo cl_info = do
-  prof <- 
-      if opt_SccProfilingOn 
+  prof <-
+      if opt_SccProfilingOn
       then do ty_descr_lit <- mkStringCLit (closureTypeDescr cl_info)
               cl_descr_lit <- mkStringCLit (closureValDescr cl_info)
-              return $ ProfilingInfo
-                         (makeRelativeRefTo info_lbl ty_descr_lit)
-                         (makeRelativeRefTo info_lbl cl_descr_lit)
+              return $ ProfilingInfo ty_descr_lit cl_descr_lit
       else return $ ProfilingInfo (mkIntCLit 0) (mkIntCLit 0)
 
   case cl_info of
