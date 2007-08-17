@@ -1050,7 +1050,7 @@ dynamic_flags = [
 
 	------ Optimisation flags ------------------------------------------
   ,  ( "O"	, NoArg (upd (setOptLevel 1)))
-  ,  ( "Onot"	, NoArg (upd (setOptLevel 0)))
+  ,  ( "Onot"	, NoArg (upd (setOptLevel 0))) -- deprecated
   ,  ( "O"	, OptIntSuffix (\mb_n -> upd (setOptLevel (mb_n `orElse` 1))))
 		-- If the number is missing, use 1
 
