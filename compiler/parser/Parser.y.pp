@@ -345,6 +345,7 @@ identifier :: { Located RdrName }
 	| qcon				{ $1 }
 	| qvarop			{ $1 }
 	| qconop			{ $1 }
+    | '(' '->' ')'      { LL $ getRdrName funTyCon }
 
 -----------------------------------------------------------------------------
 -- Module Header
