@@ -93,4 +93,5 @@ other-modules:
 	Haddock.Utils.GHC
 	Haddock.InterfaceFile        
 	Haddock.Exception
+	Haddock.Options
 	Main
