@@ -1,6 +1,7 @@
 
 module RegSpill (
-	regSpill
+	regSpill,
+	SpillStats(..)
 )
 
 where
@@ -13,6 +14,7 @@ import MachRegs
 import MachInstrs
 import Cmm
 
+import State
 import Unique
 import UniqFM
 import UniqSet
@@ -36,8 +38,9 @@ regSpill
 	-> UniqSet Int			-- ^ available stack slots
 	-> UniqSet Reg			-- ^ the regs to spill
 	-> UniqSM
-		([LiveCmmTop]		-- ^ code will spill instructions
-		, UniqSet Int)		-- ^ left over slots
+		([LiveCmmTop]		-- code will spill instructions
+		, UniqSet Int		-- left over slots
+		, SpillStats )		-- stats about what happened during spilling
 
 regSpill code slotsFree regs
 
@@ -58,12 +61,13 @@ regSpill code slotsFree regs
 		us	<- getUs
 
 		-- run the spiller on all the blocks
-		let (# code', _ #)	=
-			runSpill (mapM (mapBlockTopM (regSpill_block regSlotMap)) code)
+		let (code', state')	=
+			runState (mapM (mapBlockTopM (regSpill_block regSlotMap)) code)
 				 (initSpillS us)
 
 		return	( code'
-			, minusUniqSet slotsFree (mkUniqSet slots) )
+			, minusUniqSet slotsFree (mkUniqSet slots)
+			, makeSpillStats state')
 
 
 regSpill_block regSlotMap (BasicBlock i instrs)
@@ -133,8 +137,11 @@ spillRead regSlotMap instr reg
 	= do	delta		<- getDelta
 	 	(instr', nReg)	<- patchInstr reg instr
 
-		let pre	 	= [ COMMENT FSLIT("spill read")
+		let pre	 	= [ COMMENT FSLIT("spill load")
 				  , mkLoadInstr nReg delta slot ]
+
+		modify $ \s -> s
+			{ stateSpillLS 	= addToUFM_C accSpillLS (stateSpillLS s) reg (reg, 1, 0) }
 
 	 	return	( instr', (pre, []))
 
@@ -145,8 +152,11 @@ spillWrite regSlotMap instr reg
 	= do	delta		<- getDelta
 	 	(instr', nReg)	<- patchInstr reg instr
 
-		let post	= [ COMMENT FSLIT("spill write")
+		let post	= [ COMMENT FSLIT("spill store")
 				  , mkSpillInstr nReg delta slot ]
+
+		modify $ \s -> s
+			{ stateSpillLS 	= addToUFM_C accSpillLS (stateSpillLS s) reg (reg, 0, 1) }
 
 	 	return	( instr', ([], post))
 
@@ -160,12 +170,16 @@ spillModify regSlotMap instr reg
 		let pre		= [ COMMENT FSLIT("spill mod load")
 				  , mkLoadInstr  nReg delta slot ]
 
-		let post	= [ COMMENT FSLIT("spill mod write")
+		let post	= [ COMMENT FSLIT("spill mod store")
 				  , mkSpillInstr nReg delta slot ]
+
+		modify $ \s -> s
+			{ stateSpillLS 	= addToUFM_C accSpillLS (stateSpillLS s) reg (reg, 1, 1) }
 
 		return	( instr', (pre, post))
 
 	| otherwise	= panic "RegSpill.spillModify: no slot defined for spilled reg"
+
 
 
 -- | rewrite uses of this virtual reg in an instr to use a different virtual reg
@@ -184,50 +198,58 @@ patchReg1 old new instr
    in	patchRegs instr patchF
 
 
--------------------------------------------------------------------------------------------
+------------------------------------------------------
 -- Spiller monad
 
 data SpillS
 	= SpillS
 	{ stateDelta	:: Int
-	, stateUS	:: UniqSupply }
+	, stateUS	:: UniqSupply
+	, stateSpillLS	:: UniqFM (Reg, Int, Int) } -- ^ spilled reg vs number of times vreg was loaded, stored
 
 initSpillS uniqueSupply
 	= SpillS
 	{ stateDelta	= 0
-	, stateUS	= uniqueSupply }
+	, stateUS	= uniqueSupply
+	, stateSpillLS	= emptyUFM }
 
-newtype SpillM a
-	= SpillM
-	{ runSpill :: SpillS  -> (# a, SpillS #) }
-
-instance Monad SpillM where
-    return x	= SpillM $ \s -> (# x, s #)
-
-    m >>= n	= SpillM $ \s ->
-			case runSpill m s of
-			  (# r, s' #)	-> runSpill (n r) s'
+type SpillM a	= State SpillS a
 
 setDelta :: Int -> SpillM ()
 setDelta delta
-	= SpillM $ \s -> (# (), s { stateDelta = delta } #)
+	= modify $ \s -> s { stateDelta = delta }
 
 getDelta  :: SpillM Int
-getDelta = SpillM $ \s -> (# stateDelta s, s #)
+getDelta = gets stateDelta
 
 newUnique :: SpillM Unique
 newUnique
-	= SpillM $ \s
-	-> case splitUniqSupply (stateUS s) of
-		(us1, us2)
-		  -> 	(# uniqFromSupply us1
-		  	, s { stateUS = us2 } #)
+ = do	us	<- gets stateUS
+ 	case splitUniqSupply us of
+	 (us1, us2)
+	  -> do let uniq = uniqFromSupply us1
+	  	modify $ \s -> s { stateUS = us2 }
+		return uniq
 
-mapAccumLM _ s []	= return (s, [])
-mapAccumLM f s (x:xs)
- = do
-	(s1, x')	<- f s x
-	(s2, xs')	<- mapAccumLM f s1 xs
-	return		(s2, x' : xs')
+accSpillLS (r1, l1, s1) (r2, l2, s2)
+	= (r1, l1 + l2, s1 + s2)
 
+
+
+----------------------------------------------------
+-- Spiller stats
+
+data SpillStats
+	= SpillStats
+	{ spillLoadStore	:: UniqFM (Reg, Int, Int) }
+
+makeSpillStats :: SpillS -> SpillStats
+makeSpillStats s
+	= SpillStats
+	{ spillLoadStore	= stateSpillLS s }
+
+instance Outputable SpillStats where
+ ppr s
+ 	= (vcat $ map (\(r, l, s) -> ppr r <+> int l <+> int s)
+			$ eltsUFM (spillLoadStore s))
 

@@ -20,11 +20,10 @@ module RegAllocColor (
 
 where
 
-#include "nativeGen/NCG.h"
-
 import qualified GraphColor	as Color
 import RegLiveness
 import RegSpill
+import RegAllocStats
 import MachRegs
 import MachInstrs
 import RegCoalesce
@@ -56,8 +55,7 @@ regAlloc
 	-> [LiveCmmTop]					-- ^ code annotated with liveness information.
 	-> UniqSM 
 		( [NatCmmTop]				-- ^ code with registers allocated.
-		, [ ( [LiveCmmTop]
-		    , Color.Graph Reg RegClass Reg) ])	-- ^ code and graph for each pass
+		, [RegAllocStats] )			-- ^ stats for each stage of allocation
 		
 regAlloc regsFree slotsFree code
  = do
@@ -100,22 +98,36 @@ regAlloc_spin (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
 	 	let code_patched	= map (patchRegsFromGraph graph_colored) code
 		let code_nat		= map stripLive code_patched
 		
+		-- record what happened in this stage for debugging
+		let stat		=
+			RegAllocStatsColored
+			{ raLiveCmm	= code
+			, raGraph	= graph_colored
+			, raPatchedCmm	= code_patched }
+
 		return	( code_nat
-			, debug_codeGraphs ++ [(code, graph_colored), (code_patched, graph_colored)]
+			, debug_codeGraphs ++ [stat]
 			, graph_colored)
 
 	 else do
 	 	-- spill the uncolored regs
-		(code_spilled, slotsFree')
+		(code_spilled, slotsFree', spillStats)
 			<- regSpill code slotsFree rsSpill
 			
 		-- recalculate liveness
 		let code_nat	= map stripLive code_spilled
 		code_relive	<- mapM regLiveness code_nat
+
+		-- record what happened in this stage for debugging
+		let stat	=
+			RegAllocStatsSpill
+			{ raLiveCmm	= code_spilled
+			, raGraph	= graph_colored
+			, raSpillStats	= spillStats }
 			    	
 		-- try again
 		regAlloc_spin (spinCount + 1) triv regsFree slotsFree' 
-			(debug_codeGraphs ++ [(code, graph_colored)])
+			(debug_codeGraphs ++ [stat])
 			code_relive
 
  
@@ -250,81 +262,6 @@ patchRegsFromGraph graph code
 	
    in	patchEraseLive patchF code
    
-
------
--- Register colors for drawing conflict graphs
---	Keep this out of MachRegs.hs because it's specific to the graph coloring allocator.
-
-
--- reg colors for x86
-#if i386_TARGET_ARCH
-regDotColor :: Reg -> SDoc
-regDotColor reg
- = let	Just	str	= lookupUFM regColors reg
-   in	text str
-
-regColors 
- = listToUFM
- $  	[ (eax,	"#00ff00")
-	, (ebx,	"#0000ff")
-	, (ecx,	"#00ffff")
-	, (edx,	"#0080ff")
-	
-	, (fake0, "#ff00ff")
-	, (fake1, "#ff00aa")
-	, (fake2, "#aa00ff")
-	, (fake3, "#aa00aa")
-	, (fake4, "#ff0055")
-	, (fake5, "#5500ff") ]
-#endif 
-
-
--- reg colors for x86_64 
-#if x86_64_TARGET_ARCH
-regDotColor :: Reg -> SDoc
-regDotColor reg
- = let	Just	str	= lookupUFM regColors reg
-   in	text str
-
-regColors
- = listToUFM
- $	[ (rax, "#00ff00"), (eax, "#00ff00")
-	, (rbx,	"#0000ff"), (ebx, "#0000ff")
-	, (rcx,	"#00ffff"), (ecx, "#00ffff")
-	, (rdx,	"#0080ff"), (edx, "#00ffff")
-	, (r8,  "#00ff80")
-	, (r9,  "#008080")
-	, (r10, "#0040ff")
-	, (r11, "#00ff40")
-	, (r12, "#008040")
-	, (r13, "#004080")
-	, (r14, "#004040")
-	, (r15, "#002080") ]
-	
-	++ zip (map RealReg [16..31]) (repeat "red")
-#endif
-
-
--- reg colors for ppc
-#if powerpc_TARGET_ARCH
-regDotColor :: Reg -> SDoc
-regDotColor reg
- = case regClass reg of
- 	RcInteger	-> text "blue"
-	RcFloat		-> text "red"
-#endif
-
-
-{-
-toX11Color (r, g, b)
- = let	rs	= padL 2 '0' (showHex r "")
- 	gs	= padL 2 '0' (showHex r "")
-	bs	= padL 2 '0' (showHex r "")
-
-	padL n c s
-		= replicate (n - length s) c ++ s
-  in	"#" ++ rs ++ gs ++ bs
--}
 
 plusUFMs_C  :: (elt -> elt -> elt) -> [UniqFM elt] -> UniqFM elt
 plusUFMs_C f maps

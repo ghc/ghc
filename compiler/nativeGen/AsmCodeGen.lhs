@@ -20,6 +20,7 @@ import RegAllocInfo
 import NCGMonad
 import PositionIndependentCode
 import RegAllocLinear
+import RegAllocStats
 import RegLiveness
 import RegCoalesce
 import qualified RegAllocColor	as Color
@@ -158,12 +159,11 @@ nativeCodeGen dflags cmms us
      -> dumpIfSet_dyn dflags
 		Opt_D_dump_asm_regalloc_stages
 			"(asm-regalloc-stages)"
-			(vcat $ map (\(stage, (code, graph)) ->
-					( text "-- Stage " <> int stage
-					  $$ ppr code
-					  $$ Color.dotGraph Color.regDotColor trivColorable graph))
+			(vcat $ map (\(stage, stats) ->
+					 text "-- Stage " <> int stage
+					 $$ ppr stats)
 					(zip [0..] codeGraphs)))
-	$ map cdCodeGraphs dump
+	$ map cdRegAllocStats dump
 
     -- Build a global register conflict graph.
     --	If you want to see the graph for just one basic block then use asm-regalloc-stages instead.
@@ -256,7 +256,7 @@ data CmmNativeGenDump
 	, cdNative		:: [NatCmmTop]
 	, cdLiveness		:: [LiveCmmTop]
 	, cdCoalesce		:: [LiveCmmTop]
-	, cdCodeGraphs		:: [([LiveCmmTop], Color.Graph Reg RegClass Reg)]
+	, cdRegAllocStats	:: [RegAllocStats]
 	, cdColoredGraph	:: Maybe (Color.Graph Reg RegClass Reg)
 	, cdAlloced		:: [NatCmmTop] }
 
@@ -314,7 +314,7 @@ cmmNativeGen dflags cmm
 		native
 
     	---- allocate registers
-	(alloced, ppr_alloced, ppr_coalesce, ppr_codeGraphs, ppr_coloredGraph)
+	(alloced, ppr_alloced, ppr_coalesce, ppr_regAllocStats, ppr_coloredGraph)
 	 <- (\withLiveness
 	 -> {-# SCC "regAlloc" #-}
 	   do
@@ -331,7 +331,7 @@ cmmNativeGen dflags cmm
 			coalesced	<- regCoalesce withLiveness
 
 			-- graph coloring register allocation
-			(alloced, codeGraphs)
+			(alloced, regAllocStats)
 				<- Color.regAlloc 
 					alloc_regs
 					(mkUniqSet [0..maxSpillSlots]) 
@@ -340,7 +340,7 @@ cmmNativeGen dflags cmm
 			return 	( alloced
 				, dchoose dflags Opt_D_dump_asm_regalloc 	alloced []
 				, dchoose dflags Opt_D_dump_asm_coalesce 	coalesced []
-				, dchoose dflags Opt_D_dump_asm_regalloc_stages	codeGraphs []
+				, dchoose dflags Opt_D_dump_asm_regalloc_stages	regAllocStats []
 				, dchoose dflags Opt_D_dump_asm_conflicts 	Nothing Nothing)
 
 		 else do
@@ -384,7 +384,7 @@ cmmNativeGen dflags cmm
 		, cdNative		= ppr_native
 		, cdLiveness		= ppr_withLiveness
 		, cdCoalesce		= ppr_coalesce
-		, cdCodeGraphs		= ppr_codeGraphs
+		, cdRegAllocStats	= ppr_regAllocStats
 		, cdColoredGraph	= ppr_coloredGraph
 		, cdAlloced		= ppr_alloced }
 
