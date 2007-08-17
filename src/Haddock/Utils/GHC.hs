@@ -1,3 +1,9 @@
+--
+-- Haddock - A Haskell Documentation Tool
+--
+-- (c) Simon Marlow 2003
+--
+
 module Haddock.Utils.GHC where
 
 import Debug.Trace

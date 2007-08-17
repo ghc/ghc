@@ -3,8 +3,6 @@
 --
 -- (c) Simon Marlow 2003
 --
--- Ported to use the GHC API by David Waern during "Summer of Code" 2006
---
 
 
 module Haddock.Options (

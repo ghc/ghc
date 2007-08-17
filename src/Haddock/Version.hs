@@ -5,8 +5,8 @@
 --
 
 module Haddock.Version ( 
-	projectName, projectVersion, projectUrl
-   ) where
+  projectName, projectVersion, projectUrl
+) where
 
 import Paths_haddock ( version )
 import Data.Version  ( showVersion )

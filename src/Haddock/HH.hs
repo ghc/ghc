@@ -1,3 +1,9 @@
+--
+-- Haddock - A Haskell Documentation Tool
+--
+-- (c) Simon Marlow 2003
+--
+
 module Haddock.HH(ppHHContents, ppHHIndex, ppHHProject) where
 
 ppHHContents = error "not yet"

@@ -1,3 +1,9 @@
+--
+-- Haddock - A Haskell Documentation Tool
+--
+-- (c) Simon Marlow 2003
+--
+
 module Haddock.ModuleTree ( ModuleTree(..), mkModuleTree ) where
 
 import Haddock.Types ( DocName )

@@ -1,9 +1,17 @@
+--
+-- Haddock - A Haskell Documentation Tool
+--
+-- (c) Simon Marlow 2003
+--
+
+
 module Haddock.InterfaceFile (
   InterfaceFile(..),
   writeInterfaceFile,
   readInterfaceFile,
   hmod2interface
 ) where
+
 
 import Haddock.Types
 import Haddock.Exception

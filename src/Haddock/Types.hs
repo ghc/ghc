@@ -3,8 +3,6 @@
 --
 -- (c) Simon Marlow 2003
 --
--- Ported to use the GHC API by David Waern 2006
--- 
 
 
 module Haddock.Types where
