@@ -433,6 +433,9 @@ endif
 ifeq "$(GhcProfiled)" "YES"
 SRC_LD_OPTS += -prof
 endif
+ifeq "$(GhcDebugged)" "YES"
+SRC_LD_OPTS += -debug
+endif
 
 ALL_DIRS += ghci
 

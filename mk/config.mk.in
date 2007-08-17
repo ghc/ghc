@@ -224,6 +224,7 @@ else
 GhcThreaded=NO
 endif
 GhcProfiled=NO
+GhcDebugged=NO
 
 # Build a compiler that will build *unregisterised* libraries and
 # binaries by default.  Unregisterised code is supposed to compile and
