@@ -1,3 +1,12 @@
+--
+-- Haddock - A Haskell Documentation Tool
+--
+-- (c) Simon Marlow 2003
+--
+-- Ported to use the GHC API by David Waern during "Summer of Code" 2006
+--
+
+
 module Haddock.Options (
   parseHaddockOpts,
   Flag(..),
@@ -14,6 +23,9 @@ getUsage :: IO String
 getUsage = do
   prog <- getProgramName
   return $ usageInfo (usageHeader prog) (options False)
+  where
+    usageHeader :: String -> String
+    usageHeader prog = "Usage: " ++ prog ++ " [OPTION...] file...\n"
 
 
 parseHaddockOpts :: [String] -> IO ([Flag], [String])
@@ -23,10 +35,6 @@ parseHaddockOpts words =
     (_, _, errors)    -> do 
       usage <- getUsage
       throwE (concat errors ++ usage)
-
-
-usageHeader :: String -> String
-usageHeader prog = "Usage: " ++ prog ++ " [OPTION...] file...\n"
 
 
 data Flag

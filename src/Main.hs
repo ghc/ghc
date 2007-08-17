@@ -250,7 +250,6 @@ parseGhcFlags session ghcFlags = do
       return dynflags'
 
  
-
 byeVersion = 
   bye ("Haddock version " ++ projectVersion ++ 
        ", (c) Simon Marlow 2003; ported to the GHC-API by David Waern 2006\n")
@@ -1212,7 +1211,7 @@ type ErrMsgM a = Writer [ErrMsg] a
 --------------------------------------------------------------------------------
 
 
--- | Represents the installed haddock information for a package
+-- | Represents the installed Haddock information of a package
 data HaddockPackage = HaddockPackage {
   pdModules  :: [Module],
   pdDocEnv   :: DocEnv,
