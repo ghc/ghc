@@ -14,6 +14,9 @@ int main(int argc, char **argv) {
     args[0] = GHC_PATH;
     args[1] = "-B" TOP_ABS;
     args[2] = "-fhardwire-lib-paths";
+    if ((argc >= 2) && (strcmp(argv[1], "-v") == 0)) {
+        printf("Using %s %s %s\n", args[0], args[1], args[2]);
+    }
     memcpy(args + 3, argv + 1, sizeof(char *) * (argc - 1));
     args[argc+2] = NULL;
     execv(GHC_PATH, args);
