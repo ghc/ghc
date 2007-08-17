@@ -20,6 +20,7 @@ import Haddock.InterfaceFile
 import Haddock.Exception
 import Haddock.Options
 import Haddock.Typecheck
+import Haddock.Packages
 import Haddock.Utils.GHC
 import Paths_haddock
 
@@ -145,32 +146,23 @@ main = handleTopExceptions $ do
   restGhcFlags <- tryParseStaticFlags flags
   (session, _) <- startGHC libDir
 
-  -- get the -use-package packages, and expose them to ghc
-  usePackages <- getUsePackages flags session
-
   -- parse and set the ghc flags
   dynflags <- parseGhcFlags session restGhcFlags
   setSessionDynFlags session dynflags
 
-  -- init and get the package dependencies 
-  (_, depPackages) <- initPackages dynflags
-  let depPkgs = map (fromJust . unpackPackageId) depPackages
+  -- get the -use-package packages, expose them to GHC,
+  -- and try to load their installed HaddockPackages
+  let usePackages = [ pkg | Flag_UsePackage pkg <- flags ]
+  packages <- initAndReadPackages session usePackages
 
-  -- compute the exposed packages
-  let exposedPackages = [ mkPackageId pkg | pkg <- depPkgs, 
-                          pkgName pkg `elem` usePackages ]
-
-  -- get the HaddockPackages
-  packages <- getPackages session exposedPackages
-
-  -- typechecking
-  modules  <- typecheckFiles session fileArgs
+  -- typecheck argument modules using GHC
+  modules <- typecheckFiles session fileArgs
 
   -- update the html references for rendering phase (global variable)
   updateHTMLXRefs packages
 
-  -- combine the doc envs of the exposed packages into one
-  let env = packagesDocEnv packages
+  -- combine the doc envs of the read packages into one
+  let env = combineDocEnvs packages
 
   -- TODO: continue to break up the run function into parts
   run flags modules env
@@ -309,36 +301,6 @@ handleFlags flags fileArgs = do
     throwE ("-h cannot be used with --gen-index or --gen-contents")
 
   return ghcLibDir
-
-
--- | Handle the -use-package flags
--- 
--- Returns the names of the packages (without version number), if parsing
--- succeeded.
---
--- It would be better to try to get the "exposed" packages from GHC instead.
--- This would make the -use-package flag unnecessary. But currently it 
--- seems all you can get from the GHC api is all packages that are linked in 
--- (i.e the closure of the exposed packages).
-getUsePackages :: [Flag] -> Session -> IO [String]
-getUsePackages flags session = do
-
-  -- get the packages from the commandline flags
-  let packages = [ pkg | Flag_UsePackage pkg <- flags ]
-
-  -- expose these packages 
-  -- (makes "-use-package pkg" equal to "-g '-package pkg'")
-
-  dfs <- getSessionDynFlags session
-  let dfs' = dfs { packageFlags = packageFlags dfs ++ map ExposePackage packages }
-  setSessionDynFlags session dfs'
-
-  -- try to parse these packages into PackageIndentifiers
-
-  mapM (handleParse . unpackPackageId . stringToPackageId) packages
-  where
-    handleParse (Just pkg) = return (pkgName pkg)
-    handleParse Nothing = throwE "Could not parse package identifier"
 
 
 -- | Filter out the GHC specific flags and try to parse and set them as static 
@@ -1118,94 +1080,3 @@ toHsType t = case t of
 
 type ErrMsg = String
 type ErrMsgM a = Writer [ErrMsg] a
-
-
---------------------------------------------------------------------------------
--- Packages 
---------------------------------------------------------------------------------
-
-
--- | Represents the installed Haddock information of a package
-data HaddockPackage = HaddockPackage {
-  pdModules  :: [Module],
-  pdDocEnv   :: DocEnv,
-  pdHtmlPath :: FilePath
-}
-
-
--- | Recreate exposed modules from an InstalledPackageInfo
-packageModules :: InstalledPackageInfo -> [Module]
-packageModules pkgInfo = map (mkModule (pkgId pkgInfo)) moduleNames
-  where 
-    moduleNames = map mkModuleName (exposedModules pkgInfo)
-    pkgId = mkPackageId . package 
-
-
--- | Get the Haddock HTML directory path for a package
-getHtml :: InstalledPackageInfo -> IO FilePath
-getHtml pkgInfo = case haddockHTMLs pkgInfo of 
-  (path:_) | not (null path) -> do
-    dirExists <- doesDirectoryExist path
-    if dirExists then return path else throwE $
-       "HTML directory " ++ path ++ " does not exist."
-  _ -> throwE "No Haddock documentation installed."
-
-
--- | Get the Haddock interface path for a package
-getIface :: InstalledPackageInfo -> IO FilePath
-getIface pkgInfo = case haddockInterfaces pkgInfo of
-  (file:_) | not (null file) -> do
-    fileExists <- doesFileExist file
-    if fileExists then return file else throwE $
-       "Interface file " ++ file ++ " does not exist."
-  _ -> throwE "No Haddock interface installed."
-
-
--- | Try to create a HaddockPackage structure for a package
-getPackage :: Session -> InstalledPackageInfo -> IO HaddockPackage
-getPackage session pkgInfo = do
-
-  html <- getHtml pkgInfo
-  ifacePath <- getIface pkgInfo
-  iface <- readInterfaceFile ifacePath
-  
-  let docEnv  = ifDocEnv iface
-      modules = packageModules pkgInfo
-
-  return $ HaddockPackage {
-    pdModules  = modules,
-    pdDocEnv   = docEnv,
-    pdHtmlPath = html
-  } 
-
-       
--- | Try to create a HaddockPackage for each package.
--- Print a warning on stdout if a HaddockPackage could not be created.
-getPackages :: Session -> [PackageId] -> IO [HaddockPackage]
-getPackages session packages = do
-
-  -- get InstalledPackageInfos for each package
-  dynflags <- getSessionDynFlags session
-  let pkgInfos = map (getPackageDetails (pkgState dynflags)) packages
-
-  -- try to read the installed haddock information (.haddock interface file and
-  -- html path) for the packages
-  liftM catMaybes $ mapM tryGetPackage pkgInfos
-  where
-    -- try to get a HaddockPackage, warn if we can't
-    tryGetPackage pkgInfo = 
-        (getPackage session pkgInfo >>= return . Just)
-      `catchDyn`
-        (\(e::HaddockException) -> do 
-          let pkgName = showPackageId (package pkgInfo)
-          putStrLn ("Warning: Cannot use package " ++ pkgName ++ ":")
-          putStrLn ("   " ++ show e)
-          return Nothing
-        )
-
-
--- | Build one big doc env out of a list of packages. If multiple packages 
--- export the same (original) name, we just pick one of the packages as the 
--- documentation site.
-packagesDocEnv :: [HaddockPackage] -> DocEnv
-packagesDocEnv packages = Map.unions (map pdDocEnv packages)
