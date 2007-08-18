@@ -14,6 +14,7 @@ include $(GHC_COMPAT_DIR)/compat.mk
 # $(GhcHcOpts) because it is linked to the compiler, and hence
 # we must also build with $(GhcHcOpts) here:
 SRC_HC_OPTS += $(GhcHcOpts) $(GhcStage1HcOpts)
+SRC_HC_OPTS += -Wall
 
 binary-dist:
 	$(INSTALL_DIR)                $(BIN_DIST_DIR)/utils/runghc

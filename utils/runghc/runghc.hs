@@ -40,10 +40,8 @@ main :: IO ()
 main = do
     args <- getArgs
     case args of
-        ("-f" : ghc : args) -> do
-            doIt ghc args
-        ('-' : 'f' : ghc) : args -> do
-            doIt (dropWhile isSpace ghc) args
+        "-f" : ghc : args'        -> doIt ghc args'
+        ('-' : 'f' : ghc) : args' -> doIt (dropWhile isSpace ghc) args'
         _ -> do
             mb_ghc <- findExecutable "ghc"
             case mb_ghc of
