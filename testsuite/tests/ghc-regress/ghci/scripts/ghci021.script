@@ -1,0 +1,4 @@
+let f = 'a'
+:r ThisDoesNotExist
+f
+
