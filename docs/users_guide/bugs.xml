@@ -26,12 +26,6 @@
       
       <itemizedlist>
 	<listitem>
-	  <para>The Haskell report specifies that programs may be
-	  written using Unicode.  GHC only accepts the ISO-8859-1
-	  character set at the moment.</para>
-	</listitem>
-
-	<listitem>
 	  <para>Certain lexical rules regarding qualified identifiers
 	  are slightly different in GHC compared to the Haskell
 	  report.  When you have
