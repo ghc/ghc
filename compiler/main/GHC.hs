@@ -273,7 +273,7 @@ import Control.Exception as Exception hiding (handle)
 import Data.IORef
 import System.IO
 import System.IO.Error	( try, isDoesNotExistError )
-import Prelude hiding (init)
+import Prelude hiding (init, catch)
 
 
 -- -----------------------------------------------------------------------------
@@ -539,9 +539,16 @@ load s@(Session ref) how_much
 	-- graph is still retained in the Session.  We can tell which modules
 	-- were successfully loaded by inspecting the Session's HPT.
 	mb_graph <- depanal s [] False
-	case mb_graph of	   
-	   Just mod_graph -> load2 s how_much mod_graph 
+	case mb_graph of
+	   Just mod_graph -> catchingFailure $ load2 s how_much mod_graph
 	   Nothing        -> return Failed
+    where catchingFailure f = f `catch` \e -> do
+              hsc_env <- readIORef ref
+              -- trac #1565 / test ghci021:
+              -- let bindings may explode if we try to use them after
+              -- failing to reload
+              writeIORef ref $! hsc_env{ hsc_IC = emptyInteractiveContext }
+              throw e
 
 load2 s@(Session ref) how_much mod_graph = do
         guessOutputFile s
