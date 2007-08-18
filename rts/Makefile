@@ -148,14 +148,22 @@ LIB_LD_OPTS += $(foreach libdir,$(shell $(GHC_PKG_INPLACE) field rts library-dir
 endif
 endif
 
-RtsMessages_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
-RtsUtils_CC_OPTS += -DProjectVersion=\"$(ProjectVersion)\"
-RtsUtils_CC_OPTS += -DRtsWay=\"rts$(_way)\"
-RtsUtils_CC_OPTS += -DHostPlatform=\"$(HOSTPLATFORM)\"
-RtsUtils_CC_OPTS += -DBuildPlatform=\"$(BUILDPLATFORM)\"
-RtsUtils_CC_OPTS += -DTargetPlatform=\"$(TARGETPLATFORM)\"
-RtsUtils_CC_OPTS += -DGhcUnregisterised=\"$(GhcUnregisterised)\"
-RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=\"$(GhcEnableTablesNextToCode)\"
+ifeq "$(Windows)" "YES"
+# On Windows GHC does its own commandline parsing, so we need extra
+# doublequote protection. Sigh.
+DQ = \\\"
+else
+DQ = \"
+endif
+
+RtsMessages_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
+RtsUtils_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
+RtsUtils_CC_OPTS += -DRtsWay=$(DQ)rts$(_way)$(DQ)
+RtsUtils_CC_OPTS += -DHostPlatform=$(DQ)$(HOSTPLATFORM)$(DQ)
+RtsUtils_CC_OPTS += -DBuildPlatform=$(DQ)$(BUILDPLATFORM)$(DQ)
+RtsUtils_CC_OPTS += -DTargetPlatform=$(DQ)$(TARGETPLATFORM)$(DQ)
+RtsUtils_CC_OPTS += -DGhcUnregisterised=$(DQ)$(GhcUnregisterised)$(DQ)
+RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=$(DQ)$(GhcEnableTablesNextToCode)$(DQ)
 
 ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include
