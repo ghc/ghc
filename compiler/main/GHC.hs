@@ -273,7 +273,7 @@ import Control.Exception as Exception hiding (handle)
 import Data.IORef
 import System.IO
 import System.IO.Error	( try, isDoesNotExistError )
-import Prelude hiding (init, catch)
+import Prelude hiding (init)
 
 
 -- -----------------------------------------------------------------------------
@@ -542,7 +542,7 @@ load s@(Session ref) how_much
 	case mb_graph of
 	   Just mod_graph -> catchingFailure $ load2 s how_much mod_graph
 	   Nothing        -> return Failed
-    where catchingFailure f = f `catch` \e -> do
+    where catchingFailure f = f `Exception.catch` \e -> do
               hsc_env <- readIORef ref
               -- trac #1565 / test ghci021:
               -- let bindings may explode if we try to use them after
