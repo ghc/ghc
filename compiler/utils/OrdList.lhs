@@ -20,8 +20,9 @@ infixl 5  `snocOL`
 infixr 5  `consOL`
 
 data OrdList a
-  = Many [a]
-  | Two (OrdList a) (OrdList a)
+  = Many [a]        -- Invariant: non-empty
+  | Two (OrdList a) -- Invariant: non-empty
+        (OrdList a) -- Invariant: non-empty
   | One  a
   | None
 
@@ -36,14 +37,14 @@ concatOL :: [OrdList a] -> OrdList a
 
 nilOL        = None
 unitOL as    = One as
-snocOL as b  = Two as (One b)
-consOL a  bs = Two (One a) bs
-concatOL aas = foldr Two None aas
+snocOL None b    = One b
+snocOL as   b    = Two as (One b)
+consOL a    None = One a
+consOL a    bs   = Two (One a) bs
+concatOL aas = foldr appOL None aas
 
-isNilOL None        = True
-isNilOL (One _)     = False
-isNilOL (Two as bs) = isNilOL as && isNilOL bs
-isNilOL (Many xs)   = null xs
+isNilOL None = True
+isNilOL _    = False
 
 appOL None bs   = bs
 appOL as   None = as
@@ -77,8 +78,9 @@ fromOL ol
         flat None      rest = rest
         flat (One x)   rest = x:rest
         flat (Two a b) rest = flat a (flat b rest)
-	flat (Many xs) rest = xs ++ rest
+        flat (Many xs) rest = xs ++ rest
 
 toOL :: [a] -> OrdList a
+toOL [] = None
 toOL xs = Many xs
 \end{code}
