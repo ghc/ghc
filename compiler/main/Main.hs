@@ -85,6 +85,8 @@ main =
   -- to find out what version of GHC it's using before package.conf
   -- exists, so starting the session fails.
   case cli_mode of
+    ShowInfo                -> do showInfo
+                                  exitWith ExitSuccess
     ShowSupportedLanguages  -> do showSupportedLanguages
                                   exitWith ExitSuccess
     ShowVersion             -> do showVersion
@@ -296,6 +298,7 @@ verifyOutputFiles dflags = do
 data CmdLineMode
   = ShowUsage               -- ghc -?
   | PrintLibdir             -- ghc --print-libdir
+  | ShowInfo                -- ghc --info
   | ShowSupportedLanguages  -- ghc --supported-languages
   | ShowVersion             -- ghc -V/--version
   | ShowNumVersion          -- ghc --numeric-version
@@ -360,6 +363,7 @@ mode_flags =
   ,  ( "V"	 	 , PassFlag (setMode ShowVersion))
   ,  ( "-version"	 , PassFlag (setMode ShowVersion))
   ,  ( "-numeric-version", PassFlag (setMode ShowNumVersion))
+  ,  ( "-info", PassFlag (setMode ShowInfo))
   ,  ( "-supported-languages", PassFlag (setMode ShowSupportedLanguages))
 
       ------- interfaces ----------------------------------------------------
@@ -448,6 +452,14 @@ showBanner cli_mode dflags = do
        hPutStr stderr cStage
        hPutStr stderr " booted by GHC version "
        hPutStrLn stderr cBooterVersion
+
+-- We print out a Read-friendly string, but a prettier one than the
+-- Show instance gives us
+showInfo :: IO ()
+showInfo = do
+    let sq x = " [" ++ x ++ "\n ]"
+    putStrLn $ sq $ concat $ intersperse "\n ," $ map show compilerInfo
+    exitWith ExitSuccess
 
 showSupportedLanguages :: IO ()
 showSupportedLanguages = do mapM_ putStrLn supportedLanguages

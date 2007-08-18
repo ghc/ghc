@@ -49,6 +49,7 @@ module DynFlags (
 	-- misc stuff
 	machdepCCOpts, picCCOpts,
     supportedLanguages,
+    compilerInfo,
   ) where
 
 #include "HsVersions.h"
@@ -1634,18 +1635,21 @@ picCCOpts dflags
 -- Splitting
 
 can_split :: Bool
-can_split =  
-#if    defined(i386_TARGET_ARCH)     \
-    || defined(x86_64_TARGET_ARCH)   \
-    || defined(alpha_TARGET_ARCH)    \
-    || defined(hppa_TARGET_ARCH)     \
-    || defined(m68k_TARGET_ARCH)     \
-    || defined(mips_TARGET_ARCH)     \
-    || defined(powerpc_TARGET_ARCH)  \
-    || defined(rs6000_TARGET_ARCH)   \
-    || defined(sparc_TARGET_ARCH) 
-   True
-#else
-   False
-#endif
+can_split = cSplitObjs == "YES"
+
+-- -----------------------------------------------------------------------------
+-- Compiler Info
+
+compilerInfo :: [(String, String)]
+compilerInfo = [("Project name",                cProjectName),
+                ("Project version",             cProjectVersion),
+                ("Booter version",              cBooterVersion),
+                ("Stage",                       cStage),
+                ("Interface file version",      cHscIfaceFileVersion),
+                ("Object splitting",            cSplitObjs),
+                ("Have native code generator",  cGhcWithNativeCodeGen),
+                ("Unregisterised",              cGhcUnregisterised),
+                ("Tables next to code",         cGhcEnableTablesNextToCode),
+                ("Win32 DLLs",                  cEnableWin32DLLs),
+                ("Leading underscore",          cLeadingUnderscore)]
 
