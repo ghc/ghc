@@ -28,7 +28,7 @@ test('Records', normal, compile, [''])
 test('NewTyCo', ignore_output, run_command, ['$MAKE NewTyCo'])
 clean(['NewTyCo1.o', 'NewTyCo1.hi', 'NewTyCo2.o', 'NewTyCo2.hi'])
 
-test('Infix', expect_fail, compile, [''])
+test('Infix', normal, compile, [''])
 test('Kind', normal, compile, [''])
 
 test('GADT1', expect_fail, compile, [''])
