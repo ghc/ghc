@@ -9,16 +9,11 @@ description:
     and a large collection of useful libraries ranging from data
     structures to parsing combinators and debugging utilities.
 
-Flag IsGHC {
-    Description: Are we compiling with GHC?
-    Default: True
-}
-
 Library {
     -- This is actually something of a hack, as if we are using
     -- GHC and we don't have an rts package for some reason, we
     -- actually ought to fail.
-    if flag(IsGHC) {
+    if impl(ghc) {
         build-depends: rts
         exposed-modules:
             Data.Generics,
