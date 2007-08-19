@@ -263,10 +263,18 @@ tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
        ; -- (1) kind check the right-hand side of the type equation
        ; k_rhs <- kcCheckHsType (tcdSynRhs decl) resKind
 
+         -- we need at least as many type parameters as the family declaration
+         -- specified 
+       ; let famArity = tyConArity family
+       ; checkTc (length k_typats >= famArity) $ tooFewParmsErr famArity
+
          -- (2) type check type equation
        ; tcTyVarBndrs k_tvs $ \t_tvs -> do {  -- turn kinded into proper tyvars
        ; t_typats <- mappM tcHsKindedType k_typats
        ; t_rhs    <- tcHsKindedType k_rhs
+
+         -- all parameters in excess of the family arity must be variables
+       ; checkTc (all isTyVarTy $ drop famArity t_typats) $ excessParmVarErr
 
          -- (3) check that 
          --     - left-hand side contains no type family applications
@@ -299,7 +307,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 	     k_cons = tcdCons k_decl
 
          -- result kind must be '*' (otherwise, we have too few patterns)
-       ; checkTc (isLiftedTypeKind resKind) $ tooFewParmsErr tc_name
+       ; checkTc (isLiftedTypeKind resKind) $ tooFewParmsErr (tyConArity family)
 
          -- (2) type check indexed data type declaration
        ; tcTyVarBndrs k_tvs $ \t_tvs -> do {  -- turn kinded into proper tyvars
@@ -1252,9 +1260,12 @@ tooManyParmsErr tc_name
   = ptext SLIT("Family instance has too many parameters:") <+> 
     quotes (ppr tc_name)
 
-tooFewParmsErr tc_name
-  = ptext SLIT("Family instance has too few parameters:") <+> 
-    quotes (ppr tc_name)
+tooFewParmsErr arity
+  = ptext SLIT("Family instance has too few parameters; expected") <+> 
+    ppr arity
+
+excessParmVarErr
+  = ptext SLIT("Additional instance parameters must be variables")
 
 badBootFamInstDeclErr = 
   ptext SLIT("Illegal family instance in hs-boot file")

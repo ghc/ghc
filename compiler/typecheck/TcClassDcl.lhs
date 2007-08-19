@@ -733,7 +733,7 @@ tcAddDeclCtxt decl thing_inside
 				 else "data type" ++ maybeInst
 	   | isFamilyDecl decl = "family"
 
-     maybeInst | isFamInstDecl decl = " family"
+     maybeInst | isFamInstDecl decl = " instance"
 	       | otherwise          = ""
 
      ctxt = hsep [ptext SLIT("In the"), text thing, 
