@@ -399,8 +399,10 @@ data TyClDecl name
 			-- instance' decl with explicit kind sig
 
 		tcdCons	  :: [LConDecl name],	 	-- Data constructors
-			-- For data T a = T1 | T2 a          the LConDecls all have ResTyH98
-			-- For data T a where { T1 :: T a }  the LConDecls all have ResTyGADT
+			-- For data T a = T1 | T2 a          
+                        --   the LConDecls all have ResTyH98
+			-- For data T a where { T1 :: T a }  
+                        --   the LConDecls all have ResTyGADT
 
 		tcdDerivs :: Maybe [LHsType name]
 			-- Derivings; Nothing => not specified
@@ -427,9 +429,9 @@ data TyClDecl name
 		tcdSigs    :: [LSig name],		-- Methods' signatures
 		tcdMeths   :: LHsBinds name,		-- Default methods
 		tcdATs	   :: [LTyClDecl name],		-- Associated types; ie
-							--   only 'TyData',
-							--   'TyFunction',
-							--   and 'TySynonym'
+							--   only 'TyFamily' and
+							--   'TySynonym'; the
+                                                        --   latter for defaults
 		tcdDocs    :: [LDocDecl name]		-- Haddock docs
     }
 
