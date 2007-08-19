@@ -1,4 +1,5 @@
 <!ENTITY ghci           SYSTEM "ghci.xml">
+<!ENTITY runghc         SYSTEM "runghc.xml">
 <!ENTITY flags          SYSTEM "flags.xml">
 <!ENTITY license        SYSTEM "license.xml">
 <!ENTITY intro          SYSTEM "intro.xml" >
