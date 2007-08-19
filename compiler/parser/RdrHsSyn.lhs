@@ -413,9 +413,9 @@ checkTyVars tparms = mapM_ chk tparms
 	  parseError l "Type found where type variable expected"
 
 -- Check whether the type arguments in a type synonym head are simply
--- variables.  If not, we have a type equation of a type function and return
--- all patterns.  If yes, we return 'Nothing' as the third component to
--- indicate a vanilla type synonym.
+-- variables.  If not, we have a type family instance and return all patterns.
+-- If yes, we return 'Nothing' as the third component to indicate a vanilla
+-- type synonym. 
 --
 checkSynHdr :: LHsType RdrName 
 	    -> Bool                             -- is type instance?
@@ -442,6 +442,7 @@ checkTyClHdr :: LHsContext RdrName -> LHsType RdrName
 -- etc
 -- With associated types, we can also have non-variable parameters; ie,
 --      T Int [a]
+-- or   Int :++: [a]
 -- The unaltered parameter list is returned in the fourth component of the
 -- result.  Eg, for
 --      T Int [a]
@@ -459,7 +460,7 @@ checkTyClHdr (L l cxt) ty
 				     return (L l tc, tvs, acc)
     go l (HsOpTy t1 ltc@(L _ tc) t2) acc
 	| isRdrTc tc		= do tvs <- extractTyVars (t1:t2:acc)
-				     return (ltc, tvs, acc)
+				     return (ltc, tvs, t1:t2:acc)
     go l (HsParTy ty)    acc    = gol ty acc
     go l (HsAppTy t1 t2) acc    = gol t1 (t2:acc)
     go l other	         acc    = 
