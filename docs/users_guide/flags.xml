@@ -66,6 +66,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>&ndash;&ndash;info</option></entry>
+	      <entry>display information about the compiler</entry>
+	      <entry>mode</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>&ndash;&ndash;version</option></entry>
 	      <entry>display GHC version</entry>
 	      <entry>mode</entry>
