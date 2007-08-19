@@ -20,9 +20,6 @@ Library {
     -- actually ought to fail.
     if flag(IsGHC) {
         build-depends: rts
-        if os(mingw32) {
-            extra-libraries: wsock32, msvcrt, kernel32, user32, shell32
-        }
         exposed-modules:
             Data.Generics,
             Data.Generics.Aliases,
@@ -165,6 +162,9 @@ Library {
     include-dirs: include
     includes:    HsBase.h
     install-includes:    HsBase.h HsBaseConfig.h WCsubst.h dirUtils.h lockFile.h consUtils.h Typeable.h
+    if os(mingw32) {
+        extra-libraries: wsock32, msvcrt, kernel32, user32, shell32
+    }
     extensions:    CPP
     -- XXX is there an extension for using # in varids?
     -- We need to set the package name to base (without a version number)
