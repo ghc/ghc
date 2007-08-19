@@ -17,6 +17,7 @@ import HsTypes
 import BasicTypes
 import HscTypes
 import BuildTyCl
+import TcUnify
 import TcRnMonad
 import TcEnv
 import TcTyDecls
@@ -535,18 +536,15 @@ kcTyClDecl decl@(TyData {})
     kcTyClDeclBody decl	$
       kcDataDecl decl
 
-kcTyClDecl decl@(TyFamily {tcdKind = kind})
-  = kcTyClDeclBody decl $ \ tvs' ->
-      return (decl {tcdTyVars = tvs', 
-		    tcdKind = kind `mplus` Just liftedTypeKind})
-		    -- default result kind is '*'
+kcTyClDecl decl@(TyFamily {})
+  = kcFamilyDecl [] decl      -- the empty list signals a toplevel decl      
 
 kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt, tcdSigs = sigs, tcdATs = ats})
   = kcTyClDeclBody decl	$ \ tvs' ->
     do	{ is_boot <- tcIsHsBoot
 	; ctxt' <- kcHsContext ctxt	
-	; ats'  <- mappM (wrapLocM kcTyClDecl) ats
-	; sigs' <- mappM (wrapLocM kc_sig    ) sigs
+	; ats'  <- mappM (wrapLocM (kcFamilyDecl tvs')) ats
+	; sigs' <- mappM (wrapLocM kc_sig) sigs
 	; return (decl {tcdTyVars = tvs', tcdCtxt = ctxt', tcdSigs = sigs',
 		        tcdATs = ats'}) }
   where
@@ -598,11 +596,15 @@ kcDataDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
         return (ConDecl name expl ex_tvs' ex_ctxt' details' res' Nothing)
 
     kc_con_details (PrefixCon btys) 
-	= do { btys' <- mappM kc_larg_ty btys ; return (PrefixCon btys') }
+	= do { btys' <- mappM kc_larg_ty btys 
+             ; return (PrefixCon btys') }
     kc_con_details (InfixCon bty1 bty2) 
-	= do { bty1' <- kc_larg_ty bty1; bty2' <- kc_larg_ty bty2; return (InfixCon bty1' bty2') }
+	= do { bty1' <- kc_larg_ty bty1
+             ; bty2' <- kc_larg_ty bty2
+             ; return (InfixCon bty1' bty2') }
     kc_con_details (RecCon fields) 
-	= do { fields' <- mappM kc_field fields; return (RecCon fields') }
+	= do { fields' <- mappM kc_field fields
+             ; return (RecCon fields') }
 
     kc_field (ConDeclField fld bty d) = do { bty' <- kc_larg_ty bty
 					   ; return (ConDeclField fld bty' d) }
@@ -613,6 +615,25 @@ kcDataDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
 	-- Can't allow an unlifted type for newtypes, because we're effectively
 	-- going to remove the constructor while coercing it to a lifted type.
 	-- And newtypes can't be bang'd
+
+-- Kind check a family declaration or type family default declaration.
+--
+kcFamilyDecl :: [LHsTyVarBndr Name]  -- tyvars of enclosing class decl if any
+             -> TyClDecl Name -> TcM (TyClDecl Name)
+kcFamilyDecl classTvs decl@(TyFamily {tcdKind = kind})
+  = kcTyClDeclBody decl $ \tvs' ->
+    do { mapM_ unifyClassParmKinds tvs'
+       ; return (decl {tcdTyVars = tvs', 
+		       tcdKind = kind `mplus` Just liftedTypeKind})
+		       -- default result kind is '*'
+       }
+  where
+    unifyClassParmKinds (L _ (KindedTyVar n k))
+      | Just classParmKind <- lookup n classTyKinds = unifyKind k classParmKind
+      | otherwise                                   = return ()
+    classTyKinds = [(n, k) | L _ (KindedTyVar n k) <- classTvs]
+kcFamilyDecl _ decl@(TySynonym {})              -- type family defaults
+  = panic "TcTyClsDecls.kcFamilyDecl: not implemented yet"
 \end{code}
 
 
