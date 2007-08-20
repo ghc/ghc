@@ -5,7 +5,11 @@
 module RegAllocStats (
 	RegAllocStats (..),
 	regDotColor,
-	binLifetimeCount
+
+	pprStatsSpills,
+	pprStatsLifetimes,
+	pprStatsConflict,
+	pprStatsLifeConflict
 )
 
 where
@@ -19,7 +23,9 @@ import MachRegs
 
 import Outputable
 import UniqFM
+import UniqSet
 
+import Data.List
 
 data RegAllocStats
 
@@ -68,7 +74,43 @@ instance Outputable RegAllocStats where
 	$$ ppr (raPatchedCmm s)
 
 
------
+-- | Dump a table of how many spill loads / stores were inserted for each vreg.
+pprStatsSpills
+	:: [RegAllocStats] -> SDoc
+
+pprStatsSpills stats
+ = let	-- slurp out the stats from all the spiller stages
+	spillStats	= [ s	| s@RegAllocStatsSpill{} <- stats]
+
+	-- build a map of how many spill load/stores were inserted for each vreg
+	spillLS		= foldl' (plusUFM_C accSpillLS) emptyUFM
+			$ map (spillLoadStore . raSpillStats) spillStats
+
+	-- print the count of load/spills as a tuple so we can read back from the file easilly
+	pprSpillLS (r, loads, stores)
+	 = (parens $ (hcat $ punctuate (text ", ") [doubleQuotes (ppr r), int loads, int stores]))
+
+
+    in	(  text "-- spills-added"
+	$$ text "--    (reg_name, spill_loads_added, spill_stores_added)."
+	$$ (vcat $ map pprSpillLS $ eltsUFM spillLS)
+	$$ text "\n")
+
+
+
+-- | Dump a table of how long vregs tend to live for.
+pprStatsLifetimes
+	:: [RegAllocStats] -> SDoc
+
+pprStatsLifetimes stats
+ = let	lifeMap		= foldl' plusUFM emptyUFM $ map raLifetimes stats
+	lifeBins	= binLifetimeCount lifeMap
+
+   in	(  text "-- vreg-population-lifetimes"
+	$$ text "--   (instruction_count, number_of_vregs_that_lived_that_long)"
+	$$ (vcat $ map ppr $ eltsUFM lifeBins)
+	$$ text "\n")
+
 binLifetimeCount :: UniqFM (Reg, Int) -> UniqFM (Int, Int)
 binLifetimeCount fm
  = let	lifes	= map (\l -> (l, (l, 1)))
@@ -79,6 +121,46 @@ binLifetimeCount fm
 		(\(l1, c1) (l2, c2) -> (l1, c1 + c2))
 		emptyUFM
 		lifes
+
+
+-- | Dump a table of how many conflicts vregs tend to have.
+pprStatsConflict
+	:: [RegAllocStats] -> SDoc
+
+pprStatsConflict stats
+ = let	confMap	= foldl' (plusUFM_C (\(c1, n1) (c2, n2) -> (c1, n1 + n2)))
+			emptyUFM
+		$ map Color.slurpNodeConflictCount
+		$ map raGraph stats
+
+   in	(  text "-- vreg-conflicts"
+	$$ text "--   (conflict_count, number_of_vregs_that_had_that_many_conflicts)"
+	$$ (vcat $ map ppr $ eltsUFM confMap)
+	$$ text "\n")
+
+
+-- | For every vreg, dump it's how many conflicts it has and its lifetime
+--	good for making a scatter plot.
+pprStatsLifeConflict
+	:: [RegAllocStats] -> Color.Graph Reg RegClass Reg -> SDoc
+
+pprStatsLifeConflict stats graph
+ = let	lifeMap	= foldl' plusUFM emptyUFM $ map raLifetimes stats
+ 	scatter	= map	(\r ->  let Just (_, lifetime)	= lookupUFM lifeMap r
+				    Just node		= Color.lookupNode graph r
+				in parens $ hcat $ punctuate (text ", ")
+					[ doubleQuotes $ ppr $ Color.nodeId node
+					, ppr $ sizeUniqSet (Color.nodeConflicts node)
+					, ppr $ lifetime ])
+		$ map Color.nodeId
+		$ eltsUFM
+		$ Color.graphMap graph
+
+   in 	(  text "-- vreg-conflict-lifetime"
+	$$ text "--   (vreg, vreg_conflicts, vreg_lifetime)"
+	$$ (vcat scatter)
+	$$ text "\n")
+
 
 -----
 -- Register colors for drawing conflict graphs

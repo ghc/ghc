@@ -10,7 +10,8 @@ module GraphOps (
 	addExclusion,	
 	addPreference,
 	setColor,
-	verify
+	verify,
+	slurpNodeConflictCount
 )
 where
 
@@ -273,6 +274,24 @@ verify graph
   in	if isEmptyUniqSet badEdges 
   	 then 	True
 	 else	False
+
+
+-- | Slurp out a map of how many nodes had a certain number of conflict neighbours
+
+slurpNodeConflictCount
+	:: Uniquable k
+	=> Graph k cls color
+	-> UniqFM (Int, Int)	-- ^ (conflict neighbours, num nodes with that many conflicts)
+
+slurpNodeConflictCount graph
+	= addListToUFM_C
+		(\(c1, n1) (c2, n2) -> (c1, n1 + n2))
+		emptyUFM
+	$ map 	(\node
+	 	  -> let count	= sizeUniqSet $ nodeConflicts node
+		     in  (count, (count, 1)))
+	$ eltsUFM
+	$ graphMap graph
 
 
 -- | Set the color of a certain node
