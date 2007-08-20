@@ -1562,7 +1562,7 @@ stepOverCmd [] = do
               then doContinue (`isSubspanOf` parent) GHC.SingleStep
               else doContinue (const True) GHC.SingleStep
 
-    where 
+stepOverCmd expression = stepCmd expression
 
 {- 
  So, the only tricky part in stepOver is detecting that we have 
