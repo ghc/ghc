@@ -1106,10 +1106,12 @@ right :: [a]
 
       <para>Single-stepping is a great way to visualise the execution of your
         program, and it is also a useful tool for identifying the source of a
-        bug.  The concept is simple: single-stepping enables all the
-        breakpoints in the program and executes until the next breakpoint is
-        reached, at which point you can single-step again, or continue
-        normally.  For example:</para>
+        bug. GHCi offers two variants of stepping. Use 
+	<literal>:step</literal>  to enable all the
+        breakpoints in the program, and execute until the next breakpoint is
+        reached. Use <literal>:stepover</literal> to step over function
+	applications, which of course are executed all the same. 
+	For example:</para>
 
 <screen>
 *Main> :step main
@@ -1118,10 +1120,11 @@ _result :: IO ()
 </screen>
 
       <para>The command <literal>:step
-          <replaceable>expr</replaceable></literal> begins the evaluation of
+        <replaceable>expr</replaceable></literal> begins the evaluation of
         <replaceable>expr</replaceable> in single-stepping mode.  If
         <replaceable>expr</replaceable> is ommitted, then it single-steps from
-        the current breakpoint.</para>
+        the current breakpoint. <literal>:stepover</literal> 
+        works similarly.</para>
 
       <para>The <literal>:list</literal> command is particularly useful when
         single-stepping, to see where you currently are:</para>
