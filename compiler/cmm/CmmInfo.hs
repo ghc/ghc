@@ -78,12 +78,8 @@ mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
 
       CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
           let info_label = entryLblToInfoLbl entry_label
-              ty_prof' = if tablesNextToCode
-                         then makeRelativeRefTo info_label ty_prof
-                         else                              ty_prof
-              cl_prof' = if tablesNextToCode
-                         then makeRelativeRefTo info_label cl_prof
-                         else                              cl_prof
+              ty_prof' = makeRelativeRefTo info_label ty_prof
+              cl_prof' = makeRelativeRefTo info_label cl_prof
           in case type_info of
           -- | A function entry point.
           FunInfo (ptrs, nptrs) srt fun_type fun_arity pap_bitmap slow_entry ->
