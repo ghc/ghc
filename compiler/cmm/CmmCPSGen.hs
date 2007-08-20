@@ -194,7 +194,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
 
                         -- A regular Cmm function call
                         FinalCall next (CmmCallee target CmmCallConv)
-                            results arguments _ _ ->
+                            results arguments _ _ _ ->
                                 pack_continuation curr_format cont_format ++
                                 tail_call (curr_stack - cont_stack)
                                               target arguments
@@ -205,7 +205,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
 
                         -- A safe foreign call
                         FinalCall next (CmmCallee target conv)
-                            results arguments _ _ ->
+                            results arguments _ _ _ ->
                                 target_stmts ++
                                 foreignCall call_uniques' (CmmCallee new_target conv)
                                             results arguments
@@ -215,7 +215,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
 
                         -- A safe prim call
                         FinalCall next (CmmPrim target)
-                            results arguments _ _ ->
+                            results arguments _ _ _ ->
                                 foreignCall call_uniques (CmmPrim target)
                                             results arguments
 
@@ -229,12 +229,14 @@ foreignCall uniques call results arguments =
     [CmmCall (CmmCallee suspendThread CCallConv)
 		 [ (id,PtrHint) ]
 		 [ (CmmReg (CmmGlobal BaseReg), PtrHint) ]
-		 CmmUnsafe,
-     CmmCall call results new_args CmmUnsafe,
+		 CmmUnsafe
+                 CmmMayReturn,
+     CmmCall call results new_args CmmUnsafe CmmMayReturn,
      CmmCall (CmmCallee resumeThread CCallConv)
                  [ (new_base, PtrHint) ]
 		 [ (CmmReg (CmmLocal id), PtrHint) ]
-		 CmmUnsafe,
+		 CmmUnsafe
+                 CmmMayReturn,
      -- Assign the result to BaseReg: we
      -- might now have a different Capability!
      CmmAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base))] ++

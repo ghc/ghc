@@ -212,7 +212,7 @@ pprStmt stmt = case stmt of
 
     -- call "ccall" foo(x, y)[r1, r2];
     -- ToDo ppr volatile
-    CmmCall (CmmCallee fn cconv) results args safety ->
+    CmmCall (CmmCallee fn cconv) results args safety ret ->
         hcat [ if null results
                   then empty
                   else parens (commafy $ map ppr results) <>
@@ -220,14 +220,17 @@ pprStmt stmt = case stmt of
                ptext SLIT("call"), space, 
                doubleQuotes(ppr cconv), space,
                target fn, parens  ( commafy $ map ppr args ),
-               brackets (ppr safety), semi ]
+               brackets (ppr safety), 
+               case ret of CmmMayReturn -> empty
+                           CmmNeverReturns -> ptext SLIT(" never returns"),
+               semi ]
         where
             target (CmmLit lit) = pprLit lit
             target fn'          = parens (ppr fn')
 
-    CmmCall (CmmPrim op) results args safety ->
+    CmmCall (CmmPrim op) results args safety ret ->
         pprStmt (CmmCall (CmmCallee (CmmLit lbl) CCallConv)
-                        results args safety)
+                        results args safety ret)
         where
           lbl = CmmLabel (mkForeignLabel (mkFastString (show op)) Nothing False)
 

@@ -73,7 +73,7 @@ emitForeignCall results (CCall (CCallSpec target cconv safety)) args live
   = do vols <- getVolatileRegs live
        srt <- getSRTInfo
        emitForeignCall' safety results
-		(CmmCallee cmm_target cconv) call_args (Just vols) srt
+         (CmmCallee cmm_target cconv) call_args (Just vols) srt CmmMayReturn
   where
       (call_args, cmm_target)
 	= case target of
@@ -104,13 +104,14 @@ emitForeignCall'
 	-> [(CmmExpr,MachHint)] -- arguments
 	-> Maybe [GlobalReg]	-- live vars, in case we need to save them
         -> C_SRT                -- the SRT of the calls continuation
+        -> CmmReturnInfo
 	-> Code
-emitForeignCall' safety results target args vols srt
+emitForeignCall' safety results target args vols srt ret
   | not (playSafe safety) = do
     temp_args <- load_args_into_temps args
     let (caller_save, caller_load) = callerSaveVolatileRegs vols
     stmtsC caller_save
-    stmtC (CmmCall target results temp_args CmmUnsafe)
+    stmtC (CmmCall target results temp_args CmmUnsafe ret)
     stmtsC caller_load
 
   | otherwise = do
@@ -131,12 +132,12 @@ emitForeignCall' safety results target args vols srt
     stmtC (CmmCall (CmmCallee suspendThread CCallConv) 
 			[ (id,PtrHint) ]
 			[ (CmmReg (CmmGlobal BaseReg), PtrHint) ] 
-			CmmUnsafe)
-    stmtC (CmmCall temp_target results temp_args CmmUnsafe)
+			CmmUnsafe ret)
+    stmtC (CmmCall temp_target results temp_args CmmUnsafe ret)
     stmtC (CmmCall (CmmCallee resumeThread CCallConv) 
 			[ (new_base, PtrHint) ]
 			[ (CmmReg (CmmLocal id), PtrHint) ]
-			CmmUnsafe)
+			CmmUnsafe ret)
     -- Assign the result to BaseReg: we
     -- might now have a different Capability!
     stmtC (CmmAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base)))

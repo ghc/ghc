@@ -354,7 +354,7 @@ emitRtsCall' res fun args vols safe = do
             then getSRTInfo >>= (return . CmmSafe)
             else return CmmUnsafe
   stmtsC caller_save
-  stmtC (CmmCall target res args safety)
+  stmtC (CmmCall target res args safety CmmMayReturn)
   stmtsC caller_load
   where
     (caller_save, caller_load) = callerSaveVolatileRegs vols

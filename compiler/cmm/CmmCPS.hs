@@ -355,8 +355,8 @@ continuationMaxStack formats (Continuation _ label _ False blocks) =
           argumentsSize (cmmExprRep . fst) args
       final_arg_size (FinalJump _ args) =
           argumentsSize (cmmExprRep . fst) args
-      final_arg_size (FinalCall next _ _ args _ True) = 0
-      final_arg_size (FinalCall next _ _ args _ False) =
+      final_arg_size (FinalCall next _ _ args _ _ True) = 0
+      final_arg_size (FinalCall next _ _ args _ _ False) =
           -- We have to account for the stack used when we build a frame
           -- for the *next* continuation from *this* continuation
           argumentsSize (cmmExprRep . fst) args +
@@ -369,7 +369,7 @@ continuationMaxStack formats (Continuation _ label _ False blocks) =
 
       stmt_arg_size (CmmJump _ args) =
           argumentsSize (cmmExprRep . fst) args
-      stmt_arg_size (CmmCall _ _ _ (CmmSafe _)) =
+      stmt_arg_size (CmmCall _ _ _ (CmmSafe _) _) =
           panic "Safe call in processFormats"
       stmt_arg_size (CmmReturn _) =
           panic "CmmReturn in processFormats"

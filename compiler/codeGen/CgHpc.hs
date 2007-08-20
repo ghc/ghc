@@ -76,6 +76,7 @@ initHpc this_mod (HpcInfo tickCount hashNo)
                ]
                (Just [])
                NoC_SRT -- No SRT b/c we PlayRisky
+               CmmMayReturn
        }
   where
        mod_alloc = mkFastString "hs_hpc_module"

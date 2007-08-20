@@ -122,7 +122,7 @@ lintCmmStmt (CmmStore l r) = do
   lintCmmExpr l
   lintCmmExpr r
   return ()
-lintCmmStmt (CmmCall _target _res args _) = mapM_ (lintCmmExpr.fst) args
+lintCmmStmt (CmmCall _target _res args _ _) = mapM_ (lintCmmExpr.fst) args
 lintCmmStmt (CmmCondBranch e _id)   = lintCmmExpr e >> checkCond e >> return ()
 lintCmmStmt (CmmSwitch e _branches) = do
   erep <- lintCmmExpr e

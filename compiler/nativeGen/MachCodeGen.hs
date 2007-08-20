@@ -121,7 +121,7 @@ stmtToInstrs stmt = case stmt of
       | otherwise	 -> assignMem_IntCode kind addr src
 	where kind = cmmExprRep src
 
-    CmmCall target result_regs args _
+    CmmCall target result_regs args _ _
        -> genCCall target result_regs args
 
     CmmBranch id	  -> genBranch id
@@ -3206,13 +3206,13 @@ outOfLineFloatOp mop res args
         
       if localRegRep res == F64
         then
-          stmtToInstrs (CmmCall target [(res,FloatHint)] args CmmUnsafe)
+          stmtToInstrs (CmmCall target [(res,FloatHint)] args CmmUnsafe CmmMayReturn)
         else do
           uq <- getUniqueNat
           let 
             tmp = LocalReg uq F64 KindNonPtr
           -- in
-          code1 <- stmtToInstrs (CmmCall target [(tmp,FloatHint)] args CmmUnsafe)
+          code1 <- stmtToInstrs (CmmCall target [(tmp,FloatHint)] args CmmUnsafe CmmMayReturn)
           code2 <- stmtToInstrs (CmmAssign (CmmLocal res) (CmmReg (CmmLocal tmp)))
           return (code1 `appOL` code2)
   where

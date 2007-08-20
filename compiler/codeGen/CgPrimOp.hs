@@ -121,6 +121,7 @@ emitPrimOp [res] ParOp [arg] live
 	[(CmmReg (CmmGlobal BaseReg), PtrHint), (arg,PtrHint)] 
 	(Just vols)
         NoC_SRT -- No SRT b/c we do PlayRisky
+        CmmMayReturn
   where
 	newspark = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("newSpark")))
 
@@ -138,6 +139,7 @@ emitPrimOp [] WriteMutVarOp [mutv,var] live
 		[(CmmReg (CmmGlobal BaseReg), PtrHint), (mutv,PtrHint)]
 		(Just vols)
                 NoC_SRT -- No SRT b/c we do PlayRisky
+                CmmMayReturn
 
 --  #define sizzeofByteArrayzh(r,a) \
 --     r = (((StgArrWords *)(a))->words * sizeof(W_))
@@ -344,6 +346,7 @@ emitPrimOp [res] op args live
 	   [(a,NoHint) | a<-args]  -- ToDo: hints?
 	   (Just vols)
            NoC_SRT -- No SRT b/c we do PlayRisky
+           CmmMayReturn
 
    | Just mop <- translateOp op
    = let stmt = CmmAssign (CmmLocal res) (CmmMachOp mop args) in

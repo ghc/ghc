@@ -339,9 +339,9 @@ stmt	:: { ExtCode }
 	| 'if' bool_expr '{' body '}' else 	
 		{ ifThenElse $2 $4 $6 }
 
-opt_never_returns :: { ReturnInfo }
-        :                               { MayReturn }
-        | 'never' 'returns'             { NeverReturns }
+opt_never_returns :: { CmmReturnInfo }
+        :                               { CmmMayReturn }
+        | 'never' 'returns'             { CmmNeverReturns }
 
 bool_expr :: { ExtFCode BoolExpr }
 	: bool_op			{ $1 }
@@ -873,9 +873,9 @@ foreignCall
 	-> [ExtFCode (CmmExpr,MachHint)]
 	-> Maybe [GlobalReg]
         -> CmmSafety
-        -> ReturnInfo
+        -> CmmReturnInfo
         -> P ExtCode
-foreignCall conv_string results_code expr_code args_code vols safety _ret
+foreignCall conv_string results_code expr_code args_code vols safety ret
   = do  convention <- case conv_string of
           "C" -> return CCallConv
           "C--" -> return CmmCallConv
@@ -887,14 +887,14 @@ foreignCall conv_string results_code expr_code args_code vols safety _ret
 	  --code (stmtC (CmmCall (CmmCallee expr convention) results args safety))
           case convention of
             -- Temporary hack so at least some functions are CmmSafe
-            CmmCallConv -> code (stmtC (CmmCall (CmmCallee expr convention) results args safety))
+            CmmCallConv -> code (stmtC (CmmCall (CmmCallee expr convention) results args safety ret))
             _ -> case safety of
 	      CmmUnsafe ->
                 code (emitForeignCall' PlayRisky results 
-                   (CmmCallee expr convention) args vols NoC_SRT)
+                   (CmmCallee expr convention) args vols NoC_SRT ret)
               CmmSafe srt ->
                 code (emitForeignCall' (PlaySafe unused) results 
-                   (CmmCallee expr convention) args vols NoC_SRT) where
+                   (CmmCallee expr convention) args vols NoC_SRT ret) where
 	        unused = panic "not used by emitForeignCall'"
 
 primCall
@@ -913,10 +913,10 @@ primCall results_code name args_code vols safety
 		case safety of
 		  CmmUnsafe ->
 		    code (emitForeignCall' PlayRisky results
-		      (CmmPrim p) args vols NoC_SRT)
+		      (CmmPrim p) args vols NoC_SRT CmmMayReturn)
 		  CmmSafe srt ->
 		    code (emitForeignCall' (PlaySafe unused) results 
-		      (CmmPrim p) args vols NoC_SRT) where
+		      (CmmPrim p) args vols NoC_SRT CmmMayReturn) where
 		    unused = panic "not used by emitForeignCall'"
 
 doStore :: MachRep -> ExtFCode CmmExpr  -> ExtFCode CmmExpr -> ExtCode

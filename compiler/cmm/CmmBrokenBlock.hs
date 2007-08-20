@@ -143,6 +143,7 @@ data FinalStmt
                                 -- (redundant with ContinuationEntry)
       CmmActuals                -- ^ Arguments to call
       C_SRT                     -- ^ SRT for the continuation's info table
+      CmmReturnInfo             -- ^ Does the function return?
       Bool                      -- ^ True <=> GC block so ignore stack size
 
   | FinalSwitch                 -- ^ Same as a 'CmmSwitch'
@@ -258,7 +259,7 @@ breakBlock gc_block_idents uniques (BasicBlock ident stmts) entry =
 
             -- Detect this special case to remain an inverse of
             -- 'cmmBlockFromBrokenBlock'
-            [CmmCall target results arguments (CmmSafe srt),
+            [CmmCall target results arguments (CmmSafe srt) ret,
              CmmBranch next_id] ->
                 ([cont_info], [block])
                 where
@@ -266,15 +267,15 @@ breakBlock gc_block_idents uniques (BasicBlock ident stmts) entry =
                                ContFormat results srt
                                               (ident `elem` gc_block_idents))
                   block = do_call current_id entry accum_stmts exits next_id
-                                target results arguments srt
+                                target results arguments srt ret
 
             -- Break the block on safe calls (the main job of this function)
-            (CmmCall target results arguments (CmmSafe srt) : stmts) ->
+            (CmmCall target results arguments (CmmSafe srt) ret : stmts) ->
                 (cont_info : cont_infos, block : blocks)
                 where
                   next_id = BlockId $ head uniques
                   block = do_call current_id entry accum_stmts exits next_id
-                                  target results arguments srt
+                                  target results arguments srt ret
 
                   cont_info = (next_id,	-- Entry convention for the 
 					-- continuation of the call
@@ -287,12 +288,12 @@ breakBlock gc_block_idents uniques (BasicBlock ident stmts) entry =
 
             -- Unsafe calls don't need a continuation
             -- but they do need to be expanded
-            (CmmCall target results arguments CmmUnsafe : stmts) ->
+            (CmmCall target results arguments CmmUnsafe ret : stmts) ->
                 breakBlock' remaining_uniques current_id entry exits
                             (accum_stmts ++
                              arg_stmts ++
                              caller_save ++
-                             [CmmCall target results new_args CmmUnsafe] ++
+                             [CmmCall target results new_args CmmUnsafe ret] ++
                              caller_load)
                             stmts
                 where
@@ -309,9 +310,9 @@ breakBlock gc_block_idents uniques (BasicBlock ident stmts) entry =
                             stmts
 
       do_call current_id entry accum_stmts exits next_id
-              target results arguments srt =
+              target results arguments srt ret =
           BrokenBlock current_id entry accum_stmts (next_id:exits)
-                      (FinalCall next_id target results arguments srt
+                      (FinalCall next_id target results arguments srt ret
                                      (current_id `elem` gc_block_idents))
 
       cond_branch_target (CmmCondBranch _ target) = [target]
@@ -350,7 +351,7 @@ adaptBlockToFormat :: [(BlockId, ContFormat)]
 adaptBlockToFormat formats unique
                    block@(BrokenBlock ident entry stmts targets
                                       exit@(FinalCall next target formals
-                                                      actuals srt is_gc)) =
+                                                      actuals srt ret is_gc)) =
     if format_formals == formals &&
        format_srt == srt &&
        format_is_gc == is_gc
@@ -367,7 +368,7 @@ adaptBlockToFormat formats unique
       revised_targets = adaptor_ident : delete next targets
       revised_exit = FinalCall
                        adaptor_ident -- ^ The only part that changed
-                       target formals actuals srt is_gc
+                       target formals actuals srt ret is_gc
 
       adaptor_block = mk_adaptor_block adaptor_ident
                   (ContinuationEntry (map fst formals) srt is_gc)
@@ -401,8 +402,8 @@ cmmBlockFromBrokenBlock (BrokenBlock ident _ stmts _ exit) =
             FinalReturn arguments -> [CmmReturn arguments]
             FinalJump target arguments -> [CmmJump target arguments]
             FinalSwitch expr targets -> [CmmSwitch expr targets]
-            FinalCall branch_target call_target results arguments srt _ ->
-                [CmmCall call_target results arguments (CmmSafe srt),
+            FinalCall branch_target call_target results arguments srt ret _ ->
+                [CmmCall call_target results arguments (CmmSafe srt) ret,
                  CmmBranch branch_target]
 
 -----------------------------------------------------------------------------

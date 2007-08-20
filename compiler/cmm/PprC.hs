@@ -199,7 +199,7 @@ pprStmt stmt = case stmt of
 	where
 	  rep = cmmExprRep src
 
-    CmmCall (CmmCallee fn cconv) results args safety ->
+    CmmCall (CmmCallee fn cconv) results args safety _ret ->
 	-- Controversial: leave this out for now.
 	-- pprUndef fn $$
 
@@ -220,7 +220,7 @@ pprStmt stmt = case stmt of
 	   ptext SLIT("#undef") <+> pprCLabel lbl
 	pprUndef _ = empty
 
-    CmmCall (CmmPrim op) results args safety ->
+    CmmCall (CmmPrim op) results args safety _ret ->
 	pprCall ppr_fn CCallConv results args safety
 	where
     	ppr_fn = pprCallishMachOp_for_C op
@@ -837,7 +837,7 @@ te_Lit _ = return ()
 te_Stmt :: CmmStmt -> TE ()
 te_Stmt (CmmAssign r e)		= te_Reg r >> te_Expr e
 te_Stmt (CmmStore l r)		= te_Expr l >> te_Expr r
-te_Stmt (CmmCall _ rs es _)	= mapM_ (te_temp.fst) rs >>
+te_Stmt (CmmCall _ rs es _ _)	= mapM_ (te_temp.fst) rs >>
 				  mapM_ (te_Expr.fst) es
 te_Stmt (CmmCondBranch e _)	= te_Expr e
 te_Stmt (CmmSwitch e _)		= te_Expr e

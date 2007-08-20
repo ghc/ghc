@@ -170,7 +170,7 @@ cmmStmtLive _ (CmmAssign reg expr) =
               (CmmGlobal _) -> id
 cmmStmtLive _ (CmmStore expr1 expr2) =
     cmmExprLive expr2 . cmmExprLive expr1
-cmmStmtLive _ (CmmCall target results arguments _) =
+cmmStmtLive _ (CmmCall target results arguments _ _) =
     target_liveness .
     foldr ((.) . cmmExprLive) id (map fst arguments) .
     addKilled (mkUniqSet $ cmmHintFormalsToLiveLocals results) where
