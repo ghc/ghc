@@ -41,3 +41,5 @@ test('Class2', normal, compile, [''])
 test('Refl', normal, compile, [''])
 test('Refl2', normal, compile, [''])
 
+test('Rules1', normal, compile, [''])
+
