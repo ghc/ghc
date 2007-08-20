@@ -27,6 +27,7 @@ ifeq "$(GhcThreaded)$(GhcProfiled)" "YESYES"
 $(error Cannot make GHC both threaded and profiled)
 endif
 
+
 #-----------------------------------------------------------------------------
 # Counting source code lines
 
@@ -87,6 +88,16 @@ count :
 
 ifeq "$(stage)" ""
 stage=1
+endif
+
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+ifeq "$(stage)" "1"
+DQ = \"
+else
+DQ = \\\"
+endif
+else
+DQ = \"
 endif
 
 .DUMMY: stage_dir
@@ -727,7 +738,7 @@ INPLACE_EXTRA_FLAGS = -optc-DWINDOWS
 endif
 
 $(INPLACE_PROG): ghc-inplace.c
-	$(HC) -cpp -optc-DGHC_PATH=\"$(GHC_PATH)\" -optc-DTOP_ABS=\"$(TOP_ABS)\" $(INPLACE_EXTRA_FLAGS) $< -o $@
+	$(HC) -cpp -optc-DGHC_PATH=$(DQ)$(GHC_PATH)$(DQ) -optc-DTOP_ABS=$(DQ)$(TOP_ABS)$(DQ) $(INPLACE_EXTRA_FLAGS) $< -o $@
 
 all :: $(INPLACE_PROG)
 
@@ -915,7 +926,7 @@ all :: $(GHC_PROG)
 endif
 endif
 
-$(odir)/main/Config.$(way_)o: SRC_HC_OPTS+=-DSTAGE='"$(stage)"'
+$(odir)/main/Config.$(way_)o: SRC_HC_OPTS+=-DSTAGE=$(DQ)$(stage)$(DQ)
 
 #-----------------------------------------------------------------------------
 # binary-dist
