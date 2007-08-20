@@ -720,10 +720,14 @@ EXCLUDED_C_SRCS += ghc-inplace.c
 # will go wrong when we use it in a Haskell string below.
 TOP_ABS=$(subst \\,/,$(FPTOOLS_TOP_ABS_PLATFORM))
 
-GHC_PATH=$(TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)
+GHC_PATH=$(TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)$(exeext)
+
+ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
+INPLACE_EXTRA_FLAGS = -optc-DWINDOWS
+endif
 
 $(INPLACE_PROG): ghc-inplace.c
-	$(HC) -cpp -optc-DGHC_PATH=\"$(GHC_PATH)\" -optc-DTOP_ABS=\"$(TOP_ABS)\" $< -o $@
+	$(HC) -cpp -optc-DGHC_PATH=\"$(GHC_PATH)\" -optc-DTOP_ABS=\"$(TOP_ABS)\" $(INPLACE_EXTRA_FLAGS) $< -o $@
 
 all :: $(INPLACE_PROG)
 
