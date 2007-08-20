@@ -343,13 +343,13 @@ INFO_TABLE(stg_RBH,1,1,RBH,"RBH","RBH")
 }
 
 INFO_TABLE(stg_RBH_Save_0,0,2,CONSTR,"RBH_Save_0","RBH_Save_0")
-{ foreign "C" barf("RBH_Save_0 object entered!"); }
+{ foreign "C" barf("RBH_Save_0 object entered!") never returns; }
 
 INFO_TABLE(stg_RBH_Save_1,1,1,CONSTR,"RBH_Save_1","RBH_Save_1");
-{ foreign "C" barf("RBH_Save_1 object entered!"); }
+{ foreign "C" barf("RBH_Save_1 object entered!") never returns; }
 
 INFO_TABLE(stg_RBH_Save_2,2,0,CONSTR,"RBH_Save_2","RBH_Save_2");
-{ foreign "C" barf("RBH_Save_2 object entered!"); }
+{ foreign "C" barf("RBH_Save_2 object entered!") never returns; }
 
 #endif /* defined(PAR) || defined(GRAN) */
 
@@ -386,10 +386,10 @@ INFO_TABLE(stg_CAF_BLACKHOLE,0,1,CAF_BLACKHOLE,"CAF_BLACKHOLE","CAF_BLACKHOLE")
 
 #ifdef EAGER_BLACKHOLING
 INFO_TABLE(stg_SE_BLACKHOLE,0,1,SE_BLACKHOLE,"SE_BLACKHOLE","SE_BLACKHOLE")
-{ foreign "C" barf("SE_BLACKHOLE object entered!"); }
+{ foreign "C" barf("SE_BLACKHOLE object entered!") never returns; }
 
 INFO_TABLE(stg_SE_CAF_BLACKHOLE,0,1,SE_CAF_BLACKHOLE,"SE_CAF_BLACKHOLE","SE_CAF_BLACKHOLE")
-{ foreign "C" barf("SE_CAF_BLACKHOLE object entered!"); }
+{ foreign "C" barf("SE_CAF_BLACKHOLE object entered!") never returns; }
 #endif
 
 /* ----------------------------------------------------------------------------
@@ -400,7 +400,7 @@ INFO_TABLE(stg_SE_CAF_BLACKHOLE,0,1,SE_CAF_BLACKHOLE,"SE_CAF_BLACKHOLE","SE_CAF_
    ------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_WHITEHOLE, 0,0, BLACKHOLE, "WHITEHOLE", "WHITEHOLE")
-{ foreign "C" barf("WHITEHOLE object entered!"); }
+{ foreign "C" barf("WHITEHOLE object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    Some static info tables for things that don't get entered, and
@@ -409,7 +409,7 @@ INFO_TABLE(stg_WHITEHOLE, 0,0, BLACKHOLE, "WHITEHOLE", "WHITEHOLE")
    ------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_TSO, 0,0,TSO, "TSO", "TSO")
-{ foreign "C" barf("TSO object entered!"); }
+{ foreign "C" barf("TSO object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    Evacuees are left behind by the garbage collector.  Any attempt to enter
@@ -417,7 +417,7 @@ INFO_TABLE(stg_TSO, 0,0,TSO, "TSO", "TSO")
    ------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_EVACUATED,1,0,EVACUATED,"EVACUATED","EVACUATED")
-{ foreign "C" barf("EVACUATED object entered!"); }
+{ foreign "C" barf("EVACUATED object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    Weak pointers
@@ -428,7 +428,7 @@ INFO_TABLE(stg_EVACUATED,1,0,EVACUATED,"EVACUATED","EVACUATED")
    ------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_WEAK,0,4,WEAK,"WEAK","WEAK")
-{ foreign "C" barf("WEAK object entered!"); }
+{ foreign "C" barf("WEAK object entered!") never returns; }
 
 /*
  * It's important when turning an existing WEAK into a DEAD_WEAK
@@ -437,7 +437,7 @@ INFO_TABLE(stg_WEAK,0,4,WEAK,"WEAK","WEAK")
  * DEAD_WEAK 4 non-pointer fields, the same as WEAK.
  */
 INFO_TABLE_CONSTR(stg_DEAD_WEAK,0,4,0,CONSTR,"DEAD_WEAK","DEAD_WEAK")
-{ foreign "C" barf("DEAD_WEAK object entered!"); }
+{ foreign "C" barf("DEAD_WEAK object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    NO_FINALIZER
@@ -447,7 +447,7 @@ INFO_TABLE_CONSTR(stg_DEAD_WEAK,0,4,0,CONSTR,"DEAD_WEAK","DEAD_WEAK")
    ------------------------------------------------------------------------- */
 
 INFO_TABLE_CONSTR(stg_NO_FINALIZER,0,0,0,CONSTR_NOCAF_STATIC,"NO_FINALIZER","NO_FINALIZER")
-{ foreign "C" barf("NO_FINALIZER object entered!"); }
+{ foreign "C" barf("NO_FINALIZER object entered!") never returns; }
 
 CLOSURE(stg_NO_FINALIZER_closure,stg_NO_FINALIZER);
 
@@ -456,7 +456,7 @@ CLOSURE(stg_NO_FINALIZER_closure,stg_NO_FINALIZER);
    ------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_STABLE_NAME,0,1,STABLE_NAME,"STABLE_NAME","STABLE_NAME")
-{ foreign "C" barf("STABLE_NAME object entered!"); }
+{ foreign "C" barf("STABLE_NAME object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    MVars
@@ -466,44 +466,44 @@ INFO_TABLE(stg_STABLE_NAME,0,1,STABLE_NAME,"STABLE_NAME","STABLE_NAME")
    ------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_FULL_MVAR,3,0,MVAR,"MVAR","MVAR")
-{ foreign "C" barf("FULL_MVAR object entered!"); }
+{ foreign "C" barf("FULL_MVAR object entered!") never returns; }
 
 INFO_TABLE(stg_EMPTY_MVAR,3,0,MVAR,"MVAR","MVAR")
-{ foreign "C" barf("EMPTY_MVAR object entered!"); }
+{ foreign "C" barf("EMPTY_MVAR object entered!") never returns; }
 
 /* -----------------------------------------------------------------------------
    STM
    -------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_TVAR, 0, 0, TVAR, "TVAR", "TVAR")
-{ foreign "C" barf("TVAR object entered!"); }
+{ foreign "C" barf("TVAR object entered!") never returns; }
 
 INFO_TABLE(stg_TVAR_WATCH_QUEUE, 0, 0, TVAR_WATCH_QUEUE, "TVAR_WATCH_QUEUE", "TVAR_WATCH_QUEUE")
-{ foreign "C" barf("TVAR_WATCH_QUEUE object entered!"); }
+{ foreign "C" barf("TVAR_WATCH_QUEUE object entered!") never returns; }
 
 INFO_TABLE(stg_ATOMIC_INVARIANT, 0, 0, ATOMIC_INVARIANT, "ATOMIC_INVARIANT", "ATOMIC_INVARIANT")
-{ foreign "C" barf("ATOMIC_INVARIANT object entered!"); }
+{ foreign "C" barf("ATOMIC_INVARIANT object entered!") never returns; }
 
 INFO_TABLE(stg_INVARIANT_CHECK_QUEUE, 0, 0, INVARIANT_CHECK_QUEUE, "INVARIANT_CHECK_QUEUE", "INVARIANT_CHECK_QUEUE")
-{ foreign "C" barf("INVARIANT_CHECK_QUEUE object entered!"); }
+{ foreign "C" barf("INVARIANT_CHECK_QUEUE object entered!") never returns; }
 
 INFO_TABLE(stg_TREC_CHUNK, 0, 0, TREC_CHUNK, "TREC_CHUNK", "TREC_CHUNK")
-{ foreign "C" barf("TREC_CHUNK object entered!"); }
+{ foreign "C" barf("TREC_CHUNK object entered!") never returns; }
 
 INFO_TABLE(stg_TREC_HEADER, 0, 0, TREC_HEADER, "TREC_HEADER", "TREC_HEADER")
-{ foreign "C" barf("TREC_HEADER object entered!"); }
+{ foreign "C" barf("TREC_HEADER object entered!") never returns; }
 
 INFO_TABLE_CONSTR(stg_END_STM_WATCH_QUEUE,0,0,0,CONSTR_NOCAF_STATIC,"END_STM_WATCH_QUEUE","END_STM_WATCH_QUEUE")
-{ foreign "C" barf("END_STM_WATCH_QUEUE object entered!"); }
+{ foreign "C" barf("END_STM_WATCH_QUEUE object entered!") never returns; }
 
 INFO_TABLE_CONSTR(stg_END_INVARIANT_CHECK_QUEUE,0,0,0,CONSTR_NOCAF_STATIC,"END_INVARIANT_CHECK_QUEUE","END_INVARIANT_CHECK_QUEUE")
-{ foreign "C" barf("END_INVARIANT_CHECK_QUEUE object entered!"); }
+{ foreign "C" barf("END_INVARIANT_CHECK_QUEUE object entered!") never returns; }
 
 INFO_TABLE_CONSTR(stg_END_STM_CHUNK_LIST,0,0,0,CONSTR_NOCAF_STATIC,"END_STM_CHUNK_LIST","END_STM_CHUNK_LIST")
-{ foreign "C" barf("END_STM_CHUNK_LIST object entered!"); }
+{ foreign "C" barf("END_STM_CHUNK_LIST object entered!") never returns; }
 
 INFO_TABLE_CONSTR(stg_NO_TREC,0,0,0,CONSTR_NOCAF_STATIC,"NO_TREC","NO_TREC")
-{ foreign "C" barf("NO_TREC object entered!"); }
+{ foreign "C" barf("NO_TREC object entered!") never returns; }
 
 CLOSURE(stg_END_STM_WATCH_QUEUE_closure,stg_END_STM_WATCH_QUEUE);
 
@@ -521,7 +521,7 @@ CLOSURE(stg_NO_TREC_closure,stg_NO_TREC);
    ------------------------------------------------------------------------- */
 
 INFO_TABLE_CONSTR(stg_END_TSO_QUEUE,0,0,0,CONSTR_NOCAF_STATIC,"END_TSO_QUEUE","END_TSO_QUEUE")
-{ foreign "C" barf("END_TSO_QUEUE object entered!"); }
+{ foreign "C" barf("END_TSO_QUEUE object entered!") never returns; }
 
 CLOSURE(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE);
 
@@ -530,12 +530,12 @@ CLOSURE(stg_END_TSO_QUEUE_closure,stg_END_TSO_QUEUE);
    ------------------------------------------------------------------------- */
 
 INFO_TABLE_CONSTR(stg_END_EXCEPTION_LIST,0,0,0,CONSTR_NOCAF_STATIC,"END_EXCEPTION_LIST","END_EXCEPTION_LIST")
-{ foreign "C" barf("END_EXCEPTION_LIST object entered!"); }
+{ foreign "C" barf("END_EXCEPTION_LIST object entered!") never returns; }
 
 CLOSURE(stg_END_EXCEPTION_LIST_closure,stg_END_EXCEPTION_LIST);
 
 INFO_TABLE(stg_EXCEPTION_CONS,1,1,CONSTR,"EXCEPTION_CONS","EXCEPTION_CONS")
-{ foreign "C" barf("EXCEPTION_CONS object entered!"); }
+{ foreign "C" barf("EXCEPTION_CONS object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    Arrays
@@ -553,28 +553,28 @@ INFO_TABLE(stg_EXCEPTION_CONS,1,1,CONSTR,"EXCEPTION_CONS","EXCEPTION_CONS")
    ------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_ARR_WORDS, 0, 0, ARR_WORDS, "ARR_WORDS", "ARR_WORDS")
-{ foreign "C" barf("ARR_WORDS object entered!"); }
+{ foreign "C" barf("ARR_WORDS object entered!") never returns; }
 
 INFO_TABLE(stg_MUT_ARR_PTRS_CLEAN, 0, 0, MUT_ARR_PTRS_CLEAN, "MUT_ARR_PTRS_CLEAN", "MUT_ARR_PTRS_CLEAN")
-{ foreign "C" barf("MUT_ARR_PTRS_CLEAN object entered!"); }
+{ foreign "C" barf("MUT_ARR_PTRS_CLEAN object entered!") never returns; }
 
 INFO_TABLE(stg_MUT_ARR_PTRS_DIRTY, 0, 0, MUT_ARR_PTRS_DIRTY, "MUT_ARR_PTRS_DIRTY", "MUT_ARR_PTRS_DIRTY")
-{ foreign "C" barf("MUT_ARR_PTRS_DIRTY object entered!"); }
+{ foreign "C" barf("MUT_ARR_PTRS_DIRTY object entered!") never returns; }
 
 INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN, 0, 0, MUT_ARR_PTRS_FROZEN, "MUT_ARR_PTRS_FROZEN", "MUT_ARR_PTRS_FROZEN")
-{ foreign "C" barf("MUT_ARR_PTRS_FROZEN object entered!"); }
+{ foreign "C" barf("MUT_ARR_PTRS_FROZEN object entered!") never returns; }
 
 INFO_TABLE(stg_MUT_ARR_PTRS_FROZEN0, 0, 0, MUT_ARR_PTRS_FROZEN0, "MUT_ARR_PTRS_FROZEN0", "MUT_ARR_PTRS_FROZEN0")
-{ foreign "C" barf("MUT_ARR_PTRS_FROZEN0 object entered!"); }
+{ foreign "C" barf("MUT_ARR_PTRS_FROZEN0 object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    Mutable Variables
    ------------------------------------------------------------------------- */
 
 INFO_TABLE(stg_MUT_VAR_CLEAN, 1, 0, MUT_VAR_CLEAN, "MUT_VAR_CLEAN", "MUT_VAR_CLEAN")
-{ foreign "C" barf("MUT_VAR_CLEAN object entered!"); }
+{ foreign "C" barf("MUT_VAR_CLEAN object entered!") never returns; }
 INFO_TABLE(stg_MUT_VAR_DIRTY, 1, 0, MUT_VAR_DIRTY, "MUT_VAR_DIRTY", "MUT_VAR_DIRTY")
-{ foreign "C" barf("MUT_VAR_DIRTY object entered!"); }
+{ foreign "C" barf("MUT_VAR_DIRTY object entered!") never returns; }
 
 /* ----------------------------------------------------------------------------
    Dummy return closure

@@ -602,7 +602,7 @@ genApply regstatus args =
 
        text "default: {",
        nest 4 (
-         text "foreign \"C\" barf(\"" <> fun_ret_label <> text "\");"
+         text "foreign \"C\" barf(\"" <> fun_ret_label <> text "\") never returns;"
        ),
        text "}"
 	

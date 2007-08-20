@@ -1969,7 +1969,7 @@ waitReadzh_fast
 {
     /* args: R1 */
 #ifdef THREADED_RTS
-    foreign "C" barf("waitRead# on threaded RTS");
+    foreign "C" barf("waitRead# on threaded RTS") never returns;
 #else
 
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
@@ -1986,7 +1986,7 @@ waitWritezh_fast
 {
     /* args: R1 */
 #ifdef THREADED_RTS
-    foreign "C" barf("waitWrite# on threaded RTS");
+    foreign "C" barf("waitWrite# on threaded RTS") never returns;
 #else
 
     ASSERT(StgTSO_why_blocked(CurrentTSO) == NotBlocked::I16);
@@ -2011,7 +2011,7 @@ delayzh_fast
 #endif
 
 #ifdef THREADED_RTS
-    foreign "C" barf("delay# on threaded RTS");
+    foreign "C" barf("delay# on threaded RTS") never returns;
 #else
 
     /* args: R1 (microsecond delay amount) */
@@ -2077,7 +2077,7 @@ asyncReadzh_fast
     CInt reqID;
 
 #ifdef THREADED_RTS
-    foreign "C" barf("asyncRead# on threaded RTS");
+    foreign "C" barf("asyncRead# on threaded RTS") never returns;
 #else
 
     /* args: R1 = fd, R2 = isSock, R3 = len, R4 = buf */
@@ -2105,7 +2105,7 @@ asyncWritezh_fast
     CInt reqID;
 
 #ifdef THREADED_RTS
-    foreign "C" barf("asyncWrite# on threaded RTS");
+    foreign "C" barf("asyncWrite# on threaded RTS") never returns;
 #else
 
     /* args: R1 = fd, R2 = isSock, R3 = len, R4 = buf */
@@ -2133,7 +2133,7 @@ asyncDoProczh_fast
     CInt reqID;
 
 #ifdef THREADED_RTS
-    foreign "C" barf("asyncDoProc# on threaded RTS");
+    foreign "C" barf("asyncDoProc# on threaded RTS") never returns;
 #else
 
     /* args: R1 = proc, R2 = param */

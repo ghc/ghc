@@ -12,6 +12,7 @@ module Cmm (
 	CmmInfo(..), UpdateFrame(..),
         CmmInfoTable(..), ClosureTypeInfo(..), ProfilingInfo(..), ClosureTypeTag,
 	GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts, mapBlockStmts,
+        ReturnInfo(..),
 	CmmStmt(..), CmmActuals, CmmFormal, CmmFormals, CmmHintFormals,
         CmmSafety(..),
 	CmmCallTarget(..),
@@ -139,6 +140,9 @@ data ClosureTypeInfo
   | ContInfo
       [Maybe LocalReg]  -- Forced stack parameters
       C_SRT
+
+data ReturnInfo = MayReturn
+                | NeverReturns
 
 -- TODO: These types may need refinement
 data ProfilingInfo = ProfilingInfo CmmLit CmmLit -- closure_type, closure_desc

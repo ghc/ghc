@@ -103,8 +103,10 @@ import System.Exit
 	'if'		{ L _ (CmmT_if) }
 	'jump'		{ L _ (CmmT_jump) }
 	'foreign'	{ L _ (CmmT_foreign) }
+	'never'		{ L _ (CmmT_never) }
 	'prim'		{ L _ (CmmT_prim) }
 	'return'	{ L _ (CmmT_return) }
+	'returns'	{ L _ (CmmT_returns) }
 	'import'	{ L _ (CmmT_import) }
 	'switch'	{ L _ (CmmT_switch) }
 	'case'		{ L _ (CmmT_case) }
@@ -318,8 +320,8 @@ stmt	:: { ExtCode }
 	-- we tweak the syntax to avoid the conflict.  The later
 	-- option is taken here because the other way would require
 	-- multiple levels of expanding and get unwieldy.
-	| maybe_results 'foreign' STRING expr '(' hint_exprs0 ')' safety vols ';'
-		{% foreignCall $3 $1 $4 $6 $9 $8 }
+	| maybe_results 'foreign' STRING expr '(' hint_exprs0 ')' safety vols opt_never_returns ';'
+		{% foreignCall $3 $1 $4 $6 $9 $8 $10 }
 	| maybe_results 'prim' '%' NAME '(' hint_exprs0 ')' safety vols ';'
 		{% primCall $1 $4 $6 $9 $8 }
 	-- stmt-level macros, stealing syntax from ordinary C-- function calls.
@@ -336,6 +338,10 @@ stmt	:: { ExtCode }
 		{ do e <- sequence $2; stmtEC (CmmReturn e) }
 	| 'if' bool_expr '{' body '}' else 	
 		{ ifThenElse $2 $4 $6 }
+
+opt_never_returns :: { ReturnInfo }
+        :                               { MayReturn }
+        | 'never' 'returns'             { NeverReturns }
 
 bool_expr :: { ExtFCode BoolExpr }
 	: bool_op			{ $1 }
@@ -867,8 +873,9 @@ foreignCall
 	-> [ExtFCode (CmmExpr,MachHint)]
 	-> Maybe [GlobalReg]
         -> CmmSafety
+        -> ReturnInfo
         -> P ExtCode
-foreignCall conv_string results_code expr_code args_code vols safety
+foreignCall conv_string results_code expr_code args_code vols safety _ret
   = do  convention <- case conv_string of
           "C" -> return CCallConv
           "C--" -> return CmmCallConv
