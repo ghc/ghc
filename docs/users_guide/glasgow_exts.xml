@@ -2814,7 +2814,8 @@ So GHC rejects the program.
 (If you add the flag <option>-XIncoherentInstances</option>,
 GHC will instead pick (C), without complaining about 
 the problem of subsequent instantiations.)
-
+</para>
+<para>
 Notice that we gave a type signature to <literal>f</literal>, so GHC had to
 <emphasis>check</emphasis> that <literal>f</literal> has the specified type.  
 Suppose instead we do not give a type signature, asking GHC to <emphasis>infer</emphasis>
