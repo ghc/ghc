@@ -371,51 +371,50 @@ x86fp_kludge top@(CmmProc info lbl params code) =
 cmmNativeGenDump :: DynFlags -> Module -> ModLocation -> [CmmNativeGenDump] -> IO ()
 cmmNativeGenDump dflags mod modLocation dump
  = do
-
 	dumpIfSet_dyn dflags
 		Opt_D_dump_opt_cmm "Optimised Cmm"
 		(pprCmm $ Cmm $ map cdCmmOpt dump)
 
 	dumpIfSet_dyn dflags
-		Opt_D_dump_asm_native   "(asm-native) Native code"
+		Opt_D_dump_asm_native   "Native code"
 		(vcat $ map (docToSDoc . pprNatCmmTop)	$ concatMap cdNative dump)
 
 	dumpIfSet_dyn dflags
-		Opt_D_dump_asm_liveness "(asm-liveness) Liveness info added"
+		Opt_D_dump_asm_liveness "Liveness annotations added"
 		(vcat $ map (ppr . cdLiveness) dump)
 
 	dumpIfSet_dyn dflags
-		Opt_D_dump_asm_coalesce "(asm-coalesce) Register moves coalesced."
-		(vcat $ map (ppr . (\(Just c) -> c) . cdCoalesce) dump)
+		Opt_D_dump_asm_coalesce "Reg-Reg moves coalesced"
+		(vcat $ map (fromMaybe empty . liftM ppr . cdCoalesce) dump)
 
 	dumpIfSet_dyn dflags
-		Opt_D_dump_asm_regalloc "(asm-regalloc) Registers allocated"
+		Opt_D_dump_asm_regalloc "Registers allocated"
 		(vcat $ map (docToSDoc . pprNatCmmTop) $ concatMap cdAlloced dump)
 
 	-- with the graph coloring allocator, show the result of each build/spill stage
 	--	  for each block in turn.
-	mapM_ (\codeGraphs
-	 -> dumpIfSet_dyn dflags
-		Opt_D_dump_asm_regalloc_stages "(asm-regalloc-stages)"
-		(vcat $ map (\(stage, stats) ->
-				 text "-- Stage " <> int stage
-				 $$ ppr stats)
-				(zip [0..] codeGraphs)))
-	 $ map ((\(Just c) -> c) . cdRegAllocStats) dump
-
+	when (dopt Opt_D_dump_asm_regalloc_stages dflags)
+	 $ do	mapM_ (\stats
+			 -> printDump
+			 $  vcat $ map (\(stage, stats) ->
+					 text "-- Stage " <> int stage
+					 $$ ppr stats)
+					(zip [0..] stats))
+		 $ map (fromMaybe [] . cdRegAllocStats) dump
 
 	-- Build a global register conflict graph.
 	--	If you want to see the graph for just one basic block then use asm-regalloc-stages instead.
 	dumpIfSet_dyn dflags
-		Opt_D_dump_asm_conflicts "(asm-conflicts) Register conflict graph"
+		Opt_D_dump_asm_conflicts "Register conflict graph"
 		$ Color.dotGraph Color.regDotColor trivColorable
 		$ foldl Color.union Color.initGraph
 		$ catMaybes $ map cdColoredGraph dump
 
-
-	-- Drop native code gen statistics.
-	--	This is potentially a large amount of information, so we make a new file instead
-	--	of dumping it to stdout.
+	-- Drop native code generator statistics.
+	--	This is potentially a large amount of information, and we want to be able
+	--	to collect it while running nofib. Drop a new file instead of emitting
+	--	it to stdout/stderr.
+	--
 	when (dopt Opt_D_drop_asm_stats dflags)
 	 $ do	-- make the drop file name based on the object file name
 	 	let dropFile	= (init $ ml_obj_file modLocation) ++ "drop-asm-stats"
@@ -434,8 +433,6 @@ cmmNativeGenDump dflags mod modLocation dump
 
 		writeFile dropFile
 			(showSDoc $ vcat [outSpills, outLife, outConflict, outScatter])
-
-		return ()
 
 	return ()
 
