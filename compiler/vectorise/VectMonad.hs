@@ -3,6 +3,7 @@ module VectMonad (
   VM,
 
   noV, tryV, maybeV, traceMaybeV, orElseV, fixV, localV, closedV, initV,
+  liftDs,
   cloneName, cloneId,
   newExportedVar, newLocalVar, newDummyVar, newTyVar,
   

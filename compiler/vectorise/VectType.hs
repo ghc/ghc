@@ -11,6 +11,7 @@ import VectCore
 import HscTypes          ( TypeEnv, extendTypeEnvList, typeEnvTyCons )
 import CoreSyn
 import CoreUtils
+import BuildTyCl
 import DataCon
 import TyCon
 import Type
@@ -135,19 +136,16 @@ vectTyConDecl tc
       name' <- cloneName mkVectTyConOcc name
       rhs'  <- vectAlgTyConRhs (algTyConRhs tc)
 
-      return $ mkAlgTyCon name'
-                          kind
-                          tyvars
-                          []              -- no stupid theta
-                          rhs'
-                          []              -- no selector ids
-                          NoParentTyCon   -- FIXME
-                          rec_flag        -- FIXME: is this ok?
-                          False           -- FIXME: no generics
-                          False           -- not GADT syntax
+      liftDs $ buildAlgTyCon name'
+                             tyvars
+                             []           -- no stupid theta
+                             rhs'
+                             rec_flag     -- FIXME: is this ok?
+                             False        -- FIXME: no generics
+                             False        -- not GADT syntax
+                             Nothing      -- not a family instance
   where
     name   = tyConName tc
-    kind   = tyConKind tc
     tyvars = tyConTyVars tc
     rec_flag = boolToRecFlag (isRecursiveTyCon tc)
 
@@ -171,24 +169,17 @@ vectDataCon dc
       name'    <- cloneName mkVectDataConOcc name
       tycon'   <- vectTyCon tycon
       arg_tys  <- mapM vectType rep_arg_tys
-      wrk_name <- cloneName mkDataConWorkerOcc name'
 
-      let ids      = mkDataConIds (panic "vectDataCon: wrapper id")
-                                  wrk_name
-                                  data_con
-          data_con = mkDataCon name'
-                               False           -- not infix
-                               (map (const NotMarkedStrict) arg_tys)
-                               []              -- no labelled fields
-                               univ_tvs
-                               []              -- no existential tvs for now
-                               []              -- no eq spec for now
-                               []              -- no theta
-                               arg_tys
-                               tycon'
-                               []              -- no stupid theta
-                               ids
-      return data_con
+      liftDs $ buildDataCon name'
+                            False           -- not infix
+                            (map (const NotMarkedStrict) arg_tys)
+                            []              -- no labelled fields
+                            univ_tvs
+                            []              -- no existential tvs for now
+                            []              -- no eq spec for now
+                            []              -- no context
+                            arg_tys
+                            tycon'
   where
     name        = dataConName dc
     univ_tvs    = dataConUnivTyVars dc
@@ -199,43 +190,22 @@ buildPArrayTyCon :: TyCon -> TyCon -> VM TyCon
 buildPArrayTyCon orig_tc vect_tc = fixV $ \repr_tc ->
   do
     name'  <- cloneName mkPArrayTyConOcc orig_name
-    parent <- buildPArrayParentInfo orig_name vect_tc repr_tc
     rhs    <- buildPArrayTyConRhs orig_name vect_tc repr_tc
+    parray <- builtin parrayTyCon
 
-    return $ mkAlgTyCon name'
-                        kind
-                        tyvars
-                        []              -- no stupid theta
-                        rhs
-                        []              -- no selector ids
-                        parent
-                        rec_flag        -- FIXME: is this ok?
-                        False           -- FIXME: no generics
-                        False           -- not GADT syntax
+    liftDs $ buildAlgTyCon name'
+                           tyvars
+                           []          -- no stupid theta
+                           rhs
+                           rec_flag    -- FIXME: is this ok?
+                           False       -- FIXME: no generics
+                           False       -- not GADT syntax
+                           (Just (parray, [mkTyConApp vect_tc (map mkTyVarTy tyvars)]))
   where
     orig_name = tyConName orig_tc
-    name   = tyConName vect_tc
-    kind   = tyConKind vect_tc
     tyvars = tyConTyVars vect_tc
     rec_flag = boolToRecFlag (isRecursiveTyCon vect_tc)
     
-
-buildPArrayParentInfo :: Name -> TyCon -> TyCon -> VM TyConParent
-buildPArrayParentInfo orig_name vect_tc repr_tc
-  = do
-      parray_tc <- builtin parrayTyCon
-      co_name <- cloneName mkInstTyCoOcc (tyConName repr_tc)
-
-      let inst_tys = [mkTyConApp vect_tc (map mkTyVarTy tyvars)]
-
-      return . FamilyTyCon parray_tc inst_tys
-             $ mkFamInstCoercion co_name
-                                 tyvars
-                                 parray_tc
-                                 inst_tys
-                                 repr_tc
-  where
-    tyvars = tyConTyVars vect_tc
 
 buildPArrayTyConRhs :: Name -> TyCon -> TyCon -> VM AlgTyConRhs
 buildPArrayTyConRhs orig_name vect_tc repr_tc
@@ -249,24 +219,17 @@ buildPArrayDataCon orig_name vect_tc repr_tc
       dc_name  <- cloneName mkPArrayDataConOcc orig_name
       shape    <- tyConShape vect_tc
       repr_tys <- mapM mkPArrayType types
-      wrk_name <- cloneName mkDataConWorkerOcc  dc_name
-      wrp_name <- cloneName mkDataConWrapperOcc dc_name
 
-      let ids      = mkDataConIds wrp_name wrk_name data_con
-          data_con = mkDataCon dc_name
-                               False
-                               (shapeStrictness shape ++ map (const NotMarkedStrict) repr_tys)
-                               []
-                               (tyConTyVars vect_tc)
-                               []
-                               []
-                               []
-                               (shapeReprTys shape ++ repr_tys)
-                               repr_tc
-                               []
-                               ids
-
-      return data_con
+      liftDs $ buildDataCon dc_name
+                            False                  -- not infix
+                            (shapeStrictness shape ++ map (const NotMarkedStrict) repr_tys)
+                            []                     -- no field labels
+                            (tyConTyVars vect_tc)
+                            []                     -- no existentials
+                            []                     -- no eq spec
+                            []                     -- no context
+                            (shapeReprTys shape ++ repr_tys)
+                            repr_tc
   where
     types = [ty | dc <- tyConDataCons vect_tc
                 , ty <- dataConRepArgTys dc]
