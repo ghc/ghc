@@ -5,9 +5,6 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
-# hack for ghci-inplace script, see below
-INSTALLING=1
-
 # -----------------------------------------------------------------------------
 # ghci script
 
@@ -47,13 +44,6 @@ all::
 	echo "TOPDIROPT=$(FPTOOLS_TOP_ABS)"                                            >> $(INPLACE_SCRIPT)
 	echo 'exec $$GHCPKGBIN --global-conf $$PKGCONF $${1+"$$@"}'                    >> $(INPLACE_SCRIPT)
 	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
-endif
-
-# don't recurse on 'make install'
-#
-ifeq "$(INSTALLING)" "1"
-all clean distclean maintainer-clean ::
-	$(MAKE) INSTALLING=0 $(MFLAGS) $@
 endif
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
