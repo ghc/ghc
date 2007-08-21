@@ -56,6 +56,7 @@ import SrcLoc
 import UniqSet
 import Constants
 import FastString
+import Config		( cProjectVersion )
 
 -- Standard libraries
 import Control.Monad
@@ -1058,6 +1059,9 @@ loadFrameworks pkg = mapM_ load frameworks
 
 -- Try to find an object file for a given library in the given paths.
 -- If it isn't present, we assume it's a dynamic library.
+#ifndef __PIC__
+-- When the GHC package was not compiled as dynamic library (=__PIC__ not set),
+-- we search for .o libraries first.
 locateOneObj :: [FilePath] -> String -> IO LibrarySpec
 locateOneObj dirs lib
   = do	{ mb_obj_path <- findFile mk_obj_path dirs 
@@ -1066,12 +1070,28 @@ locateOneObj dirs lib
 	    Nothing	  -> 
                 do { mb_lib_path <- findFile mk_dyn_lib_path dirs
                    ; case mb_lib_path of
-                       Just lib_path -> return (DLL (lib ++ "_dyn"))
+                       Just lib_path -> return (DLL (lib ++ "-ghc" ++ cProjectVersion))
                        Nothing       -> return (DLL lib) }}		-- We assume
    where
      mk_obj_path dir = dir `joinFileName` (lib `joinFileExt` "o")
-     mk_dyn_lib_path dir = dir `joinFileName` mkSOName (lib ++ "_dyn")
-
+     mk_dyn_lib_path dir = dir `joinFileName` mkSOName (lib ++ "-ghc" ++ cProjectVersion)
+#else
+-- When the GHC package was compiled as dynamic library (=__PIC__ set),
+-- we search for .so libraries first.
+locateOneObj :: [FilePath] -> String -> IO LibrarySpec
+locateOneObj dirs lib
+  = do	{ mb_lib_path <- findFile mk_dyn_lib_path dirs
+	; case mb_lib_path of
+	    Just lib_path -> return (DLL (lib ++ "-ghc" ++ cProjectVersion))
+	    Nothing	  ->
+                do { mb_obj_path <- findFile mk_obj_path dirs
+                   ; case mb_obj_path of
+                       Just obj_path -> return (Object obj_path)
+                       Nothing       -> return (DLL lib) }}		-- We assume
+   where
+     mk_obj_path dir = dir `joinFileName` (lib `joinFileExt` "o")
+     mk_dyn_lib_path dir = dir `joinFileName` mkSOName (lib ++ "-ghc" ++ cProjectVersion)
+#endif
 
 -- ----------------------------------------------------------------------------
 -- Loading a dyanmic library (dlopen()-ish on Unix, LoadLibrary-ish on Win32)
