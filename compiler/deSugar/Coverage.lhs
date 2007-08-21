@@ -44,6 +44,7 @@ import Trace.Hpc.Util
 
 import BreakArray 
 import Data.HashTable   ( hashString )
+
 \end{code}
 
 
@@ -81,7 +82,7 @@ addCoverageTicksToBinds dflags mod mod_loc tyCons binds = do
                       , inScope      = emptyVarSet
 		      , blackList    = listToFM [ (getSrcSpan (tyConName tyCon),()) 
 		      		       		| tyCon <- tyCons ]
-		       })
+		      , declBlock    = noSrcSpan })
 		   (TT 
 		      { tickBoxCount = 0
 		      , mixEntries   = []
@@ -101,7 +102,7 @@ addCoverageTicksToBinds dflags mod mod_loc tyCons binds = do
      createDirectoryIfMissing True hpc_mod_dir
      modTime <- getModificationTime orig_file
      let entries' = [ (hpcPos, box) 
-                    | (span,_,box) <- entries, hpcPos <- [mkHpcPos span] ]
+                    | (span,_,box,_) <- entries, hpcPos <- [mkHpcPos span] ]
      when (length entries' /= tickBoxCount st) $ do
        panic "the number of .mix entries are inconsistent"
      let hashNo = mixHash orig_file modTime tabStop entries'
@@ -115,13 +116,16 @@ addCoverageTicksToBinds dflags mod mod_loc tyCons binds = do
   breakArray <- newBreakArray $ length entries
 
   let locsTicks = listArray (0,tickBoxCount st-1) 
-                     [ span | (span,_,_) <- entries ]
+                     [ span | (span,_,_,_) <- entries ]
       varsTicks = listArray (0,tickBoxCount st-1) 
-                     [ vars | (_,vars,_) <- entries ]
+                     [ vars | (_,vars,_,_) <- entries ]
+      declsTicks = listArray (0,tickBoxCount st-1) 
+                     [ decls| (_,_,_,decls) <- entries ] 
       modBreaks = emptyModBreaks 
                   { modBreaks_flags = breakArray 
                   , modBreaks_locs  = locsTicks 
                   , modBreaks_vars  = varsTicks
+                  , modBreaks_decls = declsTicks
                   } 
 
   doIfSet_dyn dflags  Opt_D_dump_hpc $ do
@@ -150,7 +154,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
 
   (fvs, mg@(MatchGroup matches' ty)) <- 
         getFreeVars $
-        addPathEntry name $
+        addPathEntry name pos $
         addTickMatchGroup (fun_matches funBind)
 
   blackListed <- isBlackListed pos
@@ -179,7 +183,7 @@ addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do
 -- TODO: Revisit this
 addTickLHsBind (L pos (pat@(PatBind { pat_rhs = rhs }))) = do
   let name = "(...)"
-  rhs' <- addPathEntry name $ addTickGRHSs False rhs
+  rhs' <- addPathEntry name pos $ addTickGRHSs False rhs
 {-
   decl_path <- getPathEntry
   tick_me <- allocTickBox (if null decl_path
@@ -409,10 +413,10 @@ addTickGRHSs isOneOfMany (GRHSs guarded local_binds) = do
     binders = map unLoc (collectLocalBinders local_binds)
 
 addTickGRHS :: Bool -> GRHS Id -> TM (GRHS Id)
-addTickGRHS isOneOfMany (GRHS stmts expr) = do
+addTickGRHS isOneOfMany (GRHS stmts expr@(L pos _)) = do
   (stmts',expr') <- addTickLStmts' (Just $ BinBox $ GuardBinBox) stmts
                         (if opt_Hpc then addTickLHsExprOptAlt isOneOfMany expr
-                                    else addTickLHsExprAlways expr)
+                                    else addPathEntry "" pos $ addTickLHsExprAlways expr)
   return $ GRHS stmts' expr'
 
 addTickLStmts :: (Maybe (Bool -> BoxLabel)) -> [LStmt Id] -> TM [LStmt Id]
@@ -553,6 +557,7 @@ data TickTransEnv = TTE { fileName      :: FastString
 			, declPath     :: [String]
                         , inScope      :: VarSet
 			, blackList   :: FiniteMap SrcSpan ()
+                        , declBlock   :: SrcSpan
 			}
 
 --	deriving Show
@@ -609,8 +614,8 @@ freeVar id = TM $ \ env st ->
                    then ((), unitOccEnv (nameOccName (idName id)) id, st)
                    else ((), noFVs, st)
 
-addPathEntry :: String -> TM a -> TM a
-addPathEntry nm = withEnv (\ env -> env { declPath = declPath env ++ [nm] })
+addPathEntry :: String -> SrcSpan -> TM a -> TM a
+addPathEntry nm src = withEnv (\ env -> env { declPath = declPath env ++ [nm], declBlock = src })
 
 getPathEntry :: TM [String]
 getPathEntry = declPath `liftM` getEnv
@@ -650,8 +655,9 @@ allocTickBox boxLabel pos m | isGoodSrcSpan' pos =
     let c = tickBoxCount st
         ids = occEnvElts fvs
         mes = mixEntries st
-        me = (pos, map (nameOccName.idName) ids, boxLabel)
-    in
+        parentBlock = if declBlock env == noSrcSpan then pos else declBlock env
+        me = (pos, map (nameOccName.idName) ids, boxLabel, parentBlock)
+    in 
     ( L pos (HsTick c ids (L pos e))
     , fvs
     , st {tickBoxCount=c+1,mixEntries=me:mes}
@@ -664,7 +670,8 @@ allocATickBox :: BoxLabel -> SrcSpan -> FreeVars -> TM (Maybe (Int,[Id]))
 allocATickBox boxLabel pos fvs | isGoodSrcSpan' pos = 
   sameFileName pos 
     (return Nothing) $ TM $ \ env st ->
-  let me = (pos, map (nameOccName.idName) ids, boxLabel)
+  let parentBlock = if declBlock env == noSrcSpan then pos else declBlock env
+      me = (pos, map (nameOccName.idName) ids, boxLabel, parentBlock)
       c = tickBoxCount st
       mes = mixEntries st
       ids = occEnvElts fvs
@@ -676,9 +683,10 @@ allocATickBox boxLabel pos fvs = return Nothing
 
 allocBinTickBox :: (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
 allocBinTickBox boxLabel (L pos e) | isGoodSrcSpan' pos = TM $ \ env st ->
-  let meT = (pos,[],boxLabel True)
-      meF = (pos,[],boxLabel False)
-      meE = (pos,[],ExpBox False)
+  let parentBlock = if declBlock env == noSrcSpan then pos else declBlock env
+      meT = (pos,[],boxLabel True, parentBlock)
+      meF = (pos,[],boxLabel False, parentBlock)
+      meE = (pos,[],ExpBox False, parentBlock)
       c = tickBoxCount st
       mes = mixEntries st
   in 
@@ -690,8 +698,7 @@ allocBinTickBox boxLabel (L pos e) | isGoodSrcSpan' pos = TM $ \ env st ->
              , noFVs
              , st {tickBoxCount=c+3 , mixEntries=meF:meT:meE:mes}
              )
-        else
-             ( L pos $ HsTick c [] $ L pos e
+        else ( L pos $ HsTick c [] $ L pos e
              , noFVs
              , st {tickBoxCount=c+1,mixEntries=meE:mes}
              )
@@ -734,7 +741,9 @@ matchesOneOfMany lmatches = sum (map matchCount lmatches) > 1
 
 
 \begin{code}
-type MixEntry_ = (SrcSpan, [OccName], BoxLabel)
+type ParentDecl= SrcSpan
+type TickSpan  = SrcSpan
+type MixEntry_ = (TickSpan, [OccName], BoxLabel, ParentDecl)
 
 -- For the hash value, we hash everything: the file name, 
 --  the timestamp of the original source file, the tab stop,
