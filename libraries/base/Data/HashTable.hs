@@ -189,13 +189,13 @@ golden :: Int32
 golden = -1640531527
 
 -- | A sample (and useful) hash function for Int and Int32,
--- implemented by extracting the uppermost 32 bits of the 64-bit
+-- implemented by extracting the lowermost 32 bits of the
 -- result of multiplying by a 32-bit constant.  The constant is from
 -- Knuth, derived from the golden ratio:
 --
 -- > golden = round ((sqrt 5 - 1) * 2^31) :: Int
 hashInt :: Int -> Int32
-hashInt x = mulHi (fromIntegral x) golden
+hashInt x = fromIntegral x * golden
 
 -- hi 32 bits of a x-bit * 32 bit -> 64-bit multiply
 mulHi :: Int32 -> Int32 -> Int32
@@ -208,7 +208,7 @@ mulHi a b = fromIntegral (r `shiftR` 32)
 --
 -- > hashString = foldl' f 0
 -- >   where f m c = fromIntegral (fromEnum c + 1) * golden + mulHi m golden
--- 
+--
 -- Note that this has not been extensively tested for reasonability,
 -- but Knuth argues that repeated multiplication by the golden ratio
 -- will minimize gaps in the hash space.
