@@ -47,7 +47,7 @@ import Control.Monad        ( liftM, liftM2, zipWithM, mapAndUnzipM )
 
 builtin_PAs :: [(Name, Module, FastString)]
 builtin_PAs = [
-                mk closureTyConName FSLIT("dPA_Clo")
+                (closureTyConName, nDP_CLOSURE, FSLIT("dPA_Clo"))
               , mk intTyConName     FSLIT("dPA_Int")
               ]
               ++ tups
