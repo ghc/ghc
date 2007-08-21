@@ -74,8 +74,8 @@ data Builtins = Builtins {
                 , lengthPAVar      :: Var
                 , replicatePAVar   :: Var
                 , emptyPAVar       :: Var
-                , packPAVar        :: Var
-                , combinePAVar     :: Var
+                -- , packPAVar        :: Var
+                -- , combinePAVar     :: Var
                 , intEqPAVar       :: Var
                 , liftingContext   :: Var
                 }
@@ -95,8 +95,8 @@ initBuiltins
       lengthPAVar      <- dsLookupGlobalId lengthPAName
       replicatePAVar   <- dsLookupGlobalId replicatePAName
       emptyPAVar       <- dsLookupGlobalId emptyPAName
-      packPAVar        <- dsLookupGlobalId packPAName
-      combinePAVar     <- dsLookupGlobalId combinePAName
+      -- packPAVar        <- dsLookupGlobalId packPAName
+      -- combinePAVar     <- dsLookupGlobalId combinePAName
       intEqPAVar       <- dsLookupGlobalId intEqPAName
 
       liftingContext <- liftM (\u -> mkSysLocal FSLIT("lc") u intPrimTy)
@@ -114,8 +114,8 @@ initBuiltins
                , lengthPAVar      = lengthPAVar
                , replicatePAVar   = replicatePAVar
                , emptyPAVar       = emptyPAVar
-               , packPAVar        = packPAVar
-               , combinePAVar     = combinePAVar
+               -- , packPAVar        = packPAVar
+               -- , combinePAVar     = combinePAVar
                , intEqPAVar       = intEqPAVar
                , liftingContext   = liftingContext
                }
