@@ -348,7 +348,6 @@ binary-dist.library.%:
 	  cd $* && \
 	  cp    $*.cabal      $(BIN_DIST_LIBDIR)/$* && \
 	  cp -a dist          $(BIN_DIST_LIBDIR)/$* && \
-	# Euch \
 	  (cp -aL include      $(BIN_DIST_LIBDIR)/$* || :) && \
 	  $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
 	     \( -name "*_split" -o -name "autogen" \) | xargs rm -rf && \
