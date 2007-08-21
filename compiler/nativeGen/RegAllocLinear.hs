@@ -81,7 +81,8 @@ The algorithm is roughly:
 -}
 
 module RegAllocLinear (
-  	regAlloc, 
+  	regAlloc,
+	RegAllocStats
   ) where
 
 #include "HsVersions.h"
@@ -232,24 +233,36 @@ getStackSlotFor fs@(StackMap (freeSlot:stack') reserved) reg =
 -- Allocate registers
 regAlloc 
 	:: LiveCmmTop
-	-> UniqSM NatCmmTop
+	-> UniqSM (NatCmmTop, Maybe RegAllocStats)
 
 regAlloc cmm@(CmmData sec d) 
-	= returnUs $ CmmData sec d
+ 	= return
+		( CmmData sec d
+		, Nothing )
 	
 regAlloc cmm@(CmmProc (LiveInfo info _ _) lbl params [])
-	= returnUs $ CmmProc info lbl params []
+	= return
+		( CmmProc info lbl params []
+		, Nothing )
 	
-regAlloc cmm@(CmmProc (LiveInfo info (Just first_id) block_live) lbl params comps)
- = let 	ann_sccs = map (\b -> case b of 
-				BasicBlock i [b]	-> AcyclicSCC b
-				BasicBlock i bs		-> CyclicSCC  bs)
-		$ comps
+regAlloc cmm@(CmmProc static lbl params comps)
+	| LiveInfo info (Just first_id) block_live	<- static
+	= do	
+ 		-- do register allocation on each component.
+		(final_blocks, stats)
+			<- linearRegAlloc block_live 
+			$ map (\b -> case b of 
+					BasicBlock i [b]	-> AcyclicSCC b
+					BasicBlock i bs		-> CyclicSCC  bs)
+			$ comps
 
-   in	linearRegAlloc block_live ann_sccs `thenUs` \final_blocks ->
+		-- make sure the block that was first in the input list
+		--	stays at the front of the output
+		let ((first':_), rest')
+				= partition ((== first_id) . blockId) final_blocks
 
-	 let 	((first':_), rest')	= partition ((== first_id) . blockId) final_blocks
-	 in	returnUs $ CmmProc info lbl params (first' : rest')
+		return	( CmmProc info lbl params (first' : rest')
+			, Just stats)
 	
 
 
@@ -279,71 +292,82 @@ instance Outputable Loc where
   ppr l = text (show l)
 #endif
 
+
+-- | Do register allocation on some basic blocks.
+--
 linearRegAlloc
-   :: BlockMap RegSet		-- live regs on entry to each basic block
-   -> [SCC LiveBasicBlock]	-- instructions annotated with "deaths"
-   -> UniqSM [NatBasicBlock]
-linearRegAlloc block_live sccs = linearRA_SCCs emptyBlockMap emptyStackMap sccs
-  where
-  linearRA_SCCs
-	:: BlockAssignment
-	-> StackMap
-	-> [SCC LiveBasicBlock]
-	-> UniqSM [NatBasicBlock]
-  linearRA_SCCs block_assig stack [] = returnUs []
-  linearRA_SCCs block_assig stack
-	(AcyclicSCC (BasicBlock id instrs) : sccs) 
-	= getUs `thenUs` \us ->
-	  let
-            (block_assig',stack',(instrs',fixups)) =
-               case lookupUFM block_assig id of
-                    -- no prior info about this block: assume everything is
-                    -- free and the assignment is empty.
-                    Nothing ->
-                        runR block_assig initFreeRegs
-                                    emptyRegMap stack us $
-                            linearRA [] [] instrs
-                    Just (freeregs,assig) ->
-                       runR block_assig freeregs assig stack us $
-                            linearRA [] [] instrs
-	  in
-	  linearRA_SCCs block_assig' stack' sccs `thenUs` \moreBlocks ->
-	  returnUs $ BasicBlock id instrs' : fixups ++ moreBlocks
+	:: BlockMap RegSet		-- ^ live regs on entry to each basic block
+	-> [SCC LiveBasicBlock]		-- ^ instructions annotated with "deaths"
+	-> UniqSM ([NatBasicBlock], RegAllocStats)
 
-  linearRA_SCCs block_assig stack
-	(CyclicSCC blocks : sccs) 
-	= getUs `thenUs` \us ->
-	  let
-            ((block_assig', stack', _), blocks') = mapAccumL processBlock
-                                                       (block_assig, stack, us)
-                                                       ({-reverse-} blocks)
-          in
-	  linearRA_SCCs block_assig' stack' sccs `thenUs` \moreBlocks ->
-	  returnUs $ concat blocks' ++ moreBlocks
-    where
-        processBlock (block_assig, stack, us0) (BasicBlock id instrs)
-          = ((block_assig', stack', us'), BasicBlock id instrs' : fixups)
-          where
-                (us, us') = splitUniqSupply us0
-                (block_assig',stack',(instrs',fixups)) = 
-                   case lookupUFM block_assig id of
-                        -- no prior info about this block: assume everything is
-                        -- free and the assignment is empty.
-                        Nothing -> 
-                           runR block_assig initFreeRegs 
-                                        emptyRegMap stack us $
-                                linearRA [] [] instrs 
-                        Just (freeregs,assig) -> 
-                           runR block_assig freeregs assig stack us $
-                                linearRA [] [] instrs 
+linearRegAlloc block_live sccs
+ = do	us	<- getUs
+ 	let (block_assig', stackMap', stats, blocks) =
+		runR emptyBlockMap initFreeRegs emptyRegMap emptyStackMap us
+			$ linearRA_SCCs block_live [] sccs
 
-  linearRA :: [Instr] -> [NatBasicBlock] -> [LiveInstr]
+	return	(blocks, stats)
+
+linearRA_SCCs block_live blocksAcc []
+	= return $ reverse blocksAcc
+
+linearRA_SCCs block_live blocksAcc (AcyclicSCC block : sccs) 
+ = do	blocks'	<- processBlock block_live block
+	linearRA_SCCs block_live 
+		((reverse blocks') ++ blocksAcc)
+		sccs
+
+linearRA_SCCs block_live blocksAcc (CyclicSCC blocks : sccs) 
+ = do	blockss' <- mapM (processBlock block_live) blocks
+	linearRA_SCCs block_live
+		(reverse (concat blockss') ++ blocksAcc)
+		sccs
+		
+
+-- | Do register allocation on this basic block
+--
+processBlock
+	:: BlockMap RegSet 		-- ^ live regs on entry to each basic block
+	-> LiveBasicBlock 		-- ^ block to do register allocation on
+	-> RegM [NatBasicBlock]		-- ^ block with registers allocated
+
+processBlock block_live (BasicBlock id instrs)
+ = do 	initBlock id
+ 	(instrs', fixups)
+		<- linearRA block_live [] [] instrs
+
+	return	$ BasicBlock id instrs' : fixups
+
+
+-- | Load the freeregs and current reg assignment into the RegM state
+--	for the basic block with this BlockId.
+initBlock :: BlockId -> RegM ()
+initBlock id
+ = do	block_assig	<- getBlockAssigR
+  	case lookupUFM block_assig id of
+	        -- no prior info about this block: assume everything is
+	        -- free and the assignment is empty.
+	 	Nothing
+		 -> do	setFreeRegsR	initFreeRegs
+		 	setAssigR	emptyRegMap
+
+		-- load info about register assignments leading into this block.
+		Just (freeregs, assig)
+		 -> do	setFreeRegsR 	freeregs
+			setAssigR	assig
+
+
+linearRA
+	:: BlockMap RegSet
+	-> [Instr] -> [NatBasicBlock] -> [LiveInstr]
 	-> RegM ([Instr], [NatBasicBlock])
-  linearRA instr_acc fixups [] = 
-    return (reverse instr_acc, fixups)
-  linearRA instr_acc fixups (instr:instrs) = do
-    (instr_acc', new_fixups) <- raInsn block_live instr_acc instr
-    linearRA instr_acc' (new_fixups++fixups) instrs
+
+linearRA block_live instr_acc fixups []
+	= return (reverse instr_acc, fixups)
+
+linearRA block_live instr_acc fixups (instr:instrs)
+ = do	(instr_acc', new_fixups) <- raInsn block_live instr_acc instr
+	linearRA block_live instr_acc' (new_fixups++fixups) instrs
 
 -- -----------------------------------------------------------------------------
 -- Register allocation for a single instruction
@@ -534,8 +558,11 @@ saveClobberedTemps clobbered dying =  do
   clobber assig instrs ((temp,reg):rest)
     = do
 	--ToDo: copy it to another register if possible
-      (spill,slot) <- spillR (RealReg reg) temp
-      clobber (addToUFM assig temp (InBoth reg slot)) (spill: COMMENT FSLIT("spill clobber") : instrs) rest
+	(spill,slot) <- spillR (RealReg reg) temp
+	recordSpill (SpillClobber temp)
+
+	let new_assign	= addToUFM assig temp (InBoth reg slot)
+	clobber new_assign (spill : COMMENT FSLIT("spill clobber") : instrs) rest
 
 clobberRegs :: [RegNo] -> RegM ()
 clobberRegs [] = return () -- common case
@@ -602,7 +629,7 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
 
       	-- case (2): we have a free register
       	  my_reg:_ -> do
-    	    spills'   <- do_load reading loc my_reg spills
+    	    spills'   <- loadTemp reading r loc my_reg spills
 	    let new_loc 
 		 | Just (InMem slot) <- loc, reading = InBoth my_reg slot
 		 | otherwise		             = InReg my_reg
@@ -630,7 +657,7 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
 	     -- just free up its register for use.
 	     -- 
 	     (temp,my_reg,slot):_ -> do
-    	        spills' <- do_load reading loc my_reg spills
+    	        spills' <- loadTemp reading r loc my_reg spills
     	        let	
 	          assig1  = addToUFM assig temp (InMem slot)
 	          assig2  = addToUFM assig1 r (InReg my_reg)
@@ -640,30 +667,55 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
 
 	     -- otherwise, we need to spill a temporary that currently
 	     -- resides in a register.
+
+
 	     [] -> do
-	        let
-	          (temp_to_push_out, my_reg) = myHead "regalloc" candidates2
-	          -- TODO: plenty of room for optimisation in choosing which temp
-	          -- to spill.  We just pick the first one that isn't used in 
-	          -- the current instruction for now.
-	        -- in
-    	        (spill_insn,slot) <- spillR (RealReg my_reg) temp_to_push_out
-    	        let	
-	          assig1  = addToUFM assig temp_to_push_out (InMem slot)
-	          assig2  = addToUFM assig1 r (InReg my_reg)
- 	        -- in
+
+		-- TODO: plenty of room for optimisation in choosing which temp
+	        -- to spill.  We just pick the first one that isn't used in 
+	        -- the current instruction for now.
+
+	        let (temp_to_push_out, my_reg) = myHead "regalloc" candidates2
+
+    	        (spill_insn, slot) <- spillR (RealReg my_reg) temp_to_push_out
+		let spill_store	 = (if reading then id else reverse)
+					[ COMMENT FSLIT("spill alloc") 
+					, spill_insn ]
+
+		-- record that this temp was spilled
+		recordSpill (SpillAlloc temp_to_push_out)
+
+		-- update the register assignment
+    	        let assig1  = addToUFM assig temp_to_push_out	(InMem slot)
+	        let assig2  = addToUFM assig1 r			(InReg my_reg)
 	        setAssigR assig2
-    	        spills' <- do_load reading loc my_reg spills
-    	        allocateRegsAndSpill reading keep 
-			(spill_insn : COMMENT FSLIT("spill alloc") : spills')
+
+		-- if need be, load up a spilled temp into the reg we've just freed up.
+    	        spills' <- loadTemp reading r loc my_reg spills
+
+ 	        allocateRegsAndSpill reading keep
+			(spill_store ++ spills')
 		 	(my_reg:alloc) rs
-  where
-	-- load up a spilled temporary if we need to
-	do_load True (Just (InMem slot)) reg spills = do
-           insn <- loadR (RealReg reg) slot
-	   return (insn : COMMENT FSLIT("spill load") : spills)
-	do_load _ _ _ spills = 
-	   return spills
+
+
+-- | Load up a spilled temporary if we need to.
+loadTemp
+	:: Bool
+	-> Reg 		-- the temp being loaded
+	-> Maybe Loc	-- the current location of this temp
+	-> RegNo	-- the hreg to load the temp into
+	-> [Instr]
+	-> RegM [Instr]
+
+loadTemp True vreg (Just (InMem slot)) hreg spills
+ = do
+ 	insn <- loadR (RealReg hreg) slot
+	recordSpill (SpillLoad $ getUnique vreg)
+	return	$  COMMENT FSLIT("spill load") : insn : spills
+
+loadTemp _ _ _ _ spills =
+   return spills
+
 
 myHead s [] = panic s
 myHead s (x:xs) = x
@@ -687,6 +739,7 @@ joinToTargets
 
 joinToTargets block_live new_blocks instr []
   = return (new_blocks, instr)
+
 joinToTargets block_live new_blocks instr (dest:dests) = do
   block_assig <- getBlockAssigR
   assig <- getAssigR
@@ -694,6 +747,8 @@ joinToTargets block_live new_blocks instr (dest:dests) = do
 	-- adjust the assignment to remove any registers which are not
 	-- live on entry to the destination block.
 	adjusted_assig = filterUFM_Directly still_live assig
+
+	live_set = lookItUp "joinToTargets" block_live dest
 	still_live uniq _ = uniq `elemUniqSet_Directly` live_set
 
 	-- and free up those registers which are now free.
@@ -717,108 +772,143 @@ joinToTargets block_live new_blocks instr (dest:dests) = do
 	  joinToTargets block_live new_blocks instr dests
 
 	Just (freeregs,dest_assig)
+
+	   -- the assignments match
 	   | ufmToList dest_assig == ufmToList adjusted_assig
-	   -> -- ok, the assignments match
-	     joinToTargets block_live new_blocks instr dests
+	   -> joinToTargets block_live new_blocks instr dests
+
+	   -- need fixup code
 	   | otherwise
-	   -> -- need fixup code
-	     do
+	   -> do
 	       delta <- getDeltaR
-	       -- Construct a graph of register/spill movements and
-	       -- untangle it component by component.
-	       -- 
-	       -- We cut some corners by
-	       -- a) not handling cyclic components
-	       -- b) not handling memory-to-memory moves.
-	       --
-	       -- Cyclic components seem to occur only very rarely,
-	       -- and we don't need memory-to-memory moves because we
-	       -- make sure that every temporary always gets its own
-	       -- stack slot.
 	       
-	       let graph = [ node | (vreg, src) <- ufmToList adjusted_assig,
-			     	    node <- mkNodes src vreg ]
+               let graph = makeRegMovementGraph adjusted_assig dest_assig
+	       let sccs  = stronglyConnCompR graph
+	       fixUpInstrs <- mapM (handleComponent delta instr) sccs
 
-	           sccs = stronglyConnCompR graph
-	           
-		   mkNodes src vreg = 
-			expandNode vreg src (lookupWithDefaultUFM_Directly
-                                    	  dest_assig
-                                    	  (panic "RegisterAlloc.joinToTargets")
-                                    	  vreg)
-
-		-- The InBoth handling is a little tricky here.  If
-		-- the destination is InBoth, then we must ensure that
-		-- the value ends up in both locations.  An InBoth
-		-- destination must conflict with an InReg or InMem
-		-- source, so we expand an InBoth destination as
-		-- necessary.  An InBoth source is slightly different:
-		-- we only care about the register that the source value
-		-- is in, so that we can move it to the destinations.
-
-		   expandNode vreg loc@(InReg src) (InBoth dst mem)
-			| src == dst = [(vreg, loc, [InMem mem])]
-			| otherwise  = [(vreg, loc, [InReg dst, InMem mem])]
-		   expandNode vreg loc@(InMem src) (InBoth dst mem)
-			| src == mem = [(vreg, loc, [InReg dst])]
-			| otherwise  = [(vreg, loc, [InReg dst, InMem mem])]
-		   expandNode vreg loc@(InBoth _ src) (InMem dst)
-			| src == dst = [] -- guaranteed to be true
-		   expandNode vreg loc@(InBoth src _) (InReg dst)
-			| src == dst = []
-		   expandNode vreg loc@(InBoth src _) dst
-			= expandNode vreg (InReg src) dst
-		   expandNode vreg src dst
-			| src == dst = []
-			| otherwise  = [(vreg, src, [dst])]
-
-		-- we have eliminated any possibility of single-node cylces
-		-- in expandNode above.
-	           handleComponent (AcyclicSCC (vreg,src,dsts))
-	               = return $ map (makeMove vreg src) dsts
-
-		-- we can not have cycles that involve memory
-		-- locations as source nor as single destination
-		-- because memory locations (stack slots) are
-		-- allocated exclusively for a virtual register and
-		-- therefore can not require a fixup
-	           handleComponent (CyclicSCC ((vreg,src@(InReg sreg),dsts):rest))
-	               = do
-		           spill_id <- getUniqueR
-		           (saveInstr,slot) <- spillR (RealReg sreg) spill_id
-			   remainingFixUps <- mapM handleComponent (stronglyConnCompR rest)
-			   restoreAndFixInstr <- getRestoreMoves dsts slot
-			   return ([instr] ++ concat remainingFixUps ++ restoreAndFixInstr)
-			 where
-			   getRestoreMoves [r@(InReg reg), mem@(InMem _)] slot
-			     = do
-				 restoreToReg <- loadR (RealReg reg) slot
-				 return $ [restoreToReg, makeMove vreg r mem]
-			   getRestoreMoves [InReg reg] slot
-			     = loadR (RealReg reg) slot >>= return . (:[])
-			   getRestoreMoves [InMem _] _ = panic "getRestoreMoves can not handle memory only restores"
-			   getRestoreMoves _ _ = panic "getRestoreMoves unknown case"
-	           handleComponent (CyclicSCC _)
-		       = panic "Register Allocator: handleComponent cyclic"
-	           makeMove vreg (InReg src) (InReg dst)
-	               = mkRegRegMoveInstr (RealReg src) (RealReg dst)
-	     	   makeMove vreg (InMem src) (InReg dst)
-	     	       = mkLoadInstr (RealReg dst) delta src
-	     	   makeMove vreg (InReg src) (InMem dst)
-	     	       = mkSpillInstr (RealReg src) delta dst
-	     	   makeMove vreg src dst
-	     	       = panic $ "makeMove " ++ show vreg ++ " (" ++ show src ++ ") ("
-	     	                 ++ show dst ++ ")"
-	                         ++ " (workaround: use -fviaC)"
-	     
 	       block_id <- getUniqueR
-	       fixUpInstrs <- mapM handleComponent sccs
 	       let block = BasicBlock (BlockId block_id) $
 	               concat fixUpInstrs ++ mkBranchInstr dest
+
 	       let instr' = patchJump instr dest (BlockId block_id)
+
 	       joinToTargets block_live (block : new_blocks) instr' dests
-  where
-	live_set = lookItUp "joinToTargets" block_live dest
+
+
+-- | Construct a graph of register/spill movements.
+--
+-- 	We cut some corners by
+-- 	a) not handling cyclic components
+-- 	b) not handling memory-to-memory moves.
+--
+-- 	Cyclic components seem to occur only very rarely,
+-- 	and we don't need memory-to-memory moves because we
+-- 	make sure that every temporary always gets its own
+-- 	stack slot.
+
+makeRegMovementGraph :: RegMap Loc -> RegMap Loc -> [(Unique, Loc, [Loc])]
+makeRegMovementGraph adjusted_assig dest_assig
+ = let
+ 	mkNodes src vreg
+	 = expandNode vreg src
+	 $ lookupWithDefaultUFM_Directly
+           	dest_assig
+                (panic "RegisterAlloc.joinToTargets")
+		vreg
+
+   in	[ node 	| (vreg, src) <- ufmToList adjusted_assig
+ 		, node <- mkNodes src vreg ]
+
+-- The InBoth handling is a little tricky here.  If
+-- the destination is InBoth, then we must ensure that
+-- the value ends up in both locations.  An InBoth
+-- destination must conflict with an InReg or InMem
+-- source, so we expand an InBoth destination as
+-- necessary.  An InBoth source is slightly different:
+-- we only care about the register that the source value
+-- is in, so that we can move it to the destinations.
+
+expandNode vreg loc@(InReg src) (InBoth dst mem)
+	| src == dst = [(vreg, loc, [InMem mem])]
+	| otherwise  = [(vreg, loc, [InReg dst, InMem mem])]
+
+expandNode vreg loc@(InMem src) (InBoth dst mem)
+	| src == mem = [(vreg, loc, [InReg dst])]
+	| otherwise  = [(vreg, loc, [InReg dst, InMem mem])]
+
+expandNode vreg loc@(InBoth _ src) (InMem dst)
+	| src == dst = [] -- guaranteed to be true
+
+expandNode vreg loc@(InBoth src _) (InReg dst)
+	| src == dst = []
+
+expandNode vreg loc@(InBoth src _) dst
+	= expandNode vreg (InReg src) dst
+
+expandNode vreg src dst
+	| src == dst = []
+	| otherwise  = [(vreg, src, [dst])]
+
+
+-- | Make a move instruction between these two locations so we
+--	can join together allocations for different basic blocks.
+--
+makeMove :: Int -> Unique -> Loc -> Loc -> RegM Instr
+makeMove delta vreg (InReg src) (InReg dst)
+ = do	recordSpill (SpillJoinRR vreg)
+ 	return	$ mkRegRegMoveInstr (RealReg src) (RealReg dst)
+
+makeMove delta vreg (InMem src) (InReg dst)
+ = do	recordSpill (SpillJoinRM vreg)
+ 	return	$ mkLoadInstr (RealReg dst) delta src
+
+makeMove delta vreg (InReg src) (InMem dst)
+ = do	recordSpill (SpillJoinRM vreg)
+	return	$ mkSpillInstr (RealReg src) delta dst
+
+makeMove delta vreg src dst
+	= panic $ "makeMove " ++ show vreg ++ " (" ++ show src ++ ") ("
+		++ show dst ++ ")"
+		++ " (workaround: use -fviaC)"
+
+
+-- we have eliminated any possibility of single-node cylces
+-- in expandNode above.
+handleComponent :: Int -> Instr -> SCC (Unique, Loc, [Loc]) -> RegM [Instr]
+handleComponent delta instr (AcyclicSCC (vreg,src,dsts))
+	 = mapM (makeMove delta vreg src) dsts
+
+-- we can not have cycles that involve memory
+-- locations as source nor as single destination
+-- because memory locations (stack slots) are
+-- allocated exclusively for a virtual register and
+-- therefore can not require a fixup
+handleComponent delta instr (CyclicSCC ((vreg,src@(InReg sreg),dsts):rest))
+ = do
+	spill_id <- getUniqueR
+	(saveInstr,slot) 	<- spillR (RealReg sreg) spill_id
+	remainingFixUps 	<- mapM (handleComponent delta instr) (stronglyConnCompR rest)
+	restoreAndFixInstr 	<- getRestoreMoves dsts slot
+	return ([instr] ++ concat remainingFixUps ++ restoreAndFixInstr)
+
+	where
+	getRestoreMoves [r@(InReg reg), mem@(InMem _)] slot
+	 = do
+		restoreToReg 	<- loadR (RealReg reg) slot
+		moveInstr	<- makeMove delta vreg r mem
+		return $ [COMMENT FSLIT("spill join move"), restoreToReg, moveInstr]
+
+	getRestoreMoves [InReg reg] slot
+		= loadR (RealReg reg) slot >>= return . (:[])
+
+	getRestoreMoves [InMem _] _ 	= panic "getRestoreMoves can not handle memory only restores"
+	getRestoreMoves _ _ 		= panic "getRestoreMoves unknown case"
+
+
+handleComponent delta instr (CyclicSCC _)
+ = panic "Register Allocator: handleComponent cyclic"
+
+
 
 -- -----------------------------------------------------------------------------
 -- The register allocator's monad.  
@@ -835,24 +925,30 @@ data RA_State
 	ra_assig      :: RegMap Loc,	-- assignment of temps to locations
 	ra_delta      :: Int,		-- current stack delta
 	ra_stack      :: StackMap,	-- free stack slots for spilling
-	ra_us         :: UniqSupply     -- unique supply for generating names
+	ra_us         :: UniqSupply,    -- unique supply for generating names
 	                                -- for fixup blocks.
+
+	-- Record why things were spilled, for -ddrop-asm-stats.
+	-- 	Just keep a list here instead of a map of regs -> reasons.
+	-- 	We don't want to slow down the allocator if we're not going to emit the stats.
+	ra_spills     :: [SpillReason]
   }
 
 newtype RegM a = RegM { unReg :: RA_State -> (# RA_State, a #) }
+
 
 instance Monad RegM where
   m >>= k   =  RegM $ \s -> case unReg m s of { (# s, a #) -> unReg (k a) s }
   return a  =  RegM $ \s -> (# s, a #)
 
 runR :: BlockAssignment -> FreeRegs -> RegMap Loc -> StackMap -> UniqSupply
-  -> RegM a -> (BlockAssignment, StackMap, a)
+  -> RegM a -> (BlockAssignment, StackMap, RegAllocStats, a)
 runR block_assig freeregs assig stack us thing =
   case unReg thing (RA_State{ ra_blockassig=block_assig, ra_freeregs=freeregs,
 			ra_assig=assig, ra_delta=0{-???-}, ra_stack=stack,
-			ra_us = us }) of
-	(# RA_State{ ra_blockassig=block_assig, ra_stack=stack' }, returned_thing #)
-		-> (block_assig, stack', returned_thing)
+			ra_us = us, ra_spills = [] }) of
+	(# state'@RA_State{ ra_blockassig=block_assig, ra_stack=stack', ra_spills=spills' }, returned_thing #)
+		-> (block_assig, stack', makeRAStats state', returned_thing)
 
 spillR :: Reg -> Unique -> RegM (Instr, Int)
 spillR reg temp = RegM $ \ s@RA_State{ra_delta=delta, ra_stack=stack} ->
@@ -900,6 +996,55 @@ getUniqueR :: RegM Unique
 getUniqueR = RegM $ \s ->
   case splitUniqSupply (ra_us s) of
     (us1, us2) -> (# s{ra_us = us2}, uniqFromSupply us1 #)
+
+-- | Record that a spill instruction was inserted, for profiling.
+recordSpill :: SpillReason -> RegM ()
+recordSpill spill
+	= RegM $ \s -> (# s { ra_spills = spill : ra_spills s}, () #)
+
+-- -----------------------------------------------------------------------------
+
+-- | Reasons why instructions might be inserted by the spiller.
+--	Used when generating stats for -ddrop-asm-stats.
+--
+data SpillReason
+	= SpillAlloc	!Unique	-- ^ vreg was spilled to a slot so we could use its
+				--	current hreg for another vreg
+	| SpillClobber	!Unique	-- ^ vreg was moved because its hreg was clobbered
+	| SpillLoad	!Unique	-- ^ vreg was loaded from a spill slot
+
+	| SpillJoinRR	!Unique	-- ^ reg-reg move inserted during join to targets
+	| SpillJoinRM	!Unique	-- ^ reg-mem move inserted during join to targets
+
+
+-- | Used to carry interesting stats out of the register allocator.
+data RegAllocStats
+	= RegAllocStats
+	{ ra_spillInstrs	:: UniqFM [Int] }
+
+
+-- | Make register allocator stats from its final state.
+makeRAStats :: RA_State -> RegAllocStats
+makeRAStats state
+	= RegAllocStats
+	{ ra_spillInstrs	= binSpillReasons (ra_spills state) }
+
+
+-- | Build a map of how many times each reg was alloced, clobbered, loaded etc.
+binSpillReasons
+	:: [SpillReason] -> UniqFM [Int]
+
+binSpillReasons reasons
+	= addListToUFM_C
+		(zipWith (+))
+		emptyUFM
+		(map (\reason -> case reason of
+			SpillAlloc r	-> (r, [1, 0, 0, 0, 0])
+			SpillClobber r	-> (r, [0, 1, 0, 0, 0])
+			SpillLoad r	-> (r, [0, 0, 1, 0, 0])
+			SpillJoinRR r	-> (r, [0, 0, 0, 1, 0])
+			SpillJoinRM r	-> (r, [0, 0, 0, 0, 1])) reasons)
+
 
 -- -----------------------------------------------------------------------------
 -- Utils

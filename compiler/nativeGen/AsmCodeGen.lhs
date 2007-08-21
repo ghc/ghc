@@ -19,11 +19,11 @@ import PprMach
 import RegAllocInfo
 import NCGMonad
 import PositionIndependentCode
-import RegAllocLinear
-import RegAllocStats
 import RegLiveness
 import RegCoalesce
+import qualified RegAllocLinear	as Linear
 import qualified RegAllocColor	as Color
+import qualified RegAllocStats	as Color
 import qualified GraphColor	as Color
 
 import Cmm
@@ -213,7 +213,8 @@ data CmmNativeGenDump
 	, cdNative		:: [NatCmmTop]
 	, cdLiveness		:: [LiveCmmTop]
 	, cdCoalesce		:: Maybe [LiveCmmTop]
-	, cdRegAllocStats	:: Maybe [RegAllocStats]
+	, cdRegAllocStats	:: Maybe [Color.RegAllocStats]
+	, cdRegAllocStatsLinear	:: [Linear.RegAllocStats]
 	, cdColoredGraph	:: Maybe (Color.Graph Reg RegClass Reg)
 	, cdAlloced		:: [NatCmmTop] }
 
@@ -228,6 +229,11 @@ dchooses dflags opts a b
 -- | Complete native code generation phase for a single top-level chunk of Cmm.
 --	Unless they're being dumped, intermediate data structures are squashed after
 --	every stage to avoid creating space leaks.
+--
+-- TODO: passing data via CmmNativeDump/squashing structs has become a horrible mess.
+--	 it might be better to forgo trying to keep all the outputs for each
+--	 stage together and just thread IO() through cmmNativeGen so we can dump
+--	 what we want to after each stage.
 --
 cmmNativeGen :: DynFlags -> RawCmmTop -> UniqSM (CmmNativeGenDump, Pretty.Doc, [CLabel])
 cmmNativeGen dflags cmm
@@ -274,7 +280,8 @@ cmmNativeGen dflags cmm
 		native
 
     	---- allocate registers
-	(alloced, ppr_alloced, ppr_coalesce, ppr_regAllocStats, ppr_coloredGraph)
+	(  alloced, ppr_alloced, ppr_coalesce
+	 , ppr_regAllocStats, ppr_regAllocStatsLinear, ppr_coloredGraph)
 	 <- (\withLiveness
 	 -> {-# SCC "regAlloc" #-}
 	   do
@@ -298,21 +305,31 @@ cmmNativeGen dflags cmm
 					coalesced
 
 			return 	( alloced
-				, dchoose  dflags Opt_D_dump_asm_regalloc 	alloced []
-				, dchoose  dflags Opt_D_dump_asm_coalesce 	(Just coalesced)     Nothing
+				, dchoose  dflags Opt_D_dump_asm_regalloc
+					alloced []
+				, dchoose  dflags Opt_D_dump_asm_coalesce
+					(Just coalesced)     Nothing
 				, dchooses dflags
 					[ Opt_D_dump_asm_regalloc_stages
 					, Opt_D_drop_asm_stats]
 					(Just regAllocStats) Nothing
-				, dchoose  dflags Opt_D_dump_asm_conflicts 	Nothing Nothing)
+				, []
+				, dchoose  dflags Opt_D_dump_asm_conflicts
+					Nothing Nothing)
 
 		 else do
 			-- do linear register allocation
-		 	alloced	<- mapUs regAlloc withLiveness
+		 	(alloced, stats)
+				<- liftM unzip
+				$ mapUs Linear.regAlloc withLiveness
+
 			return	( alloced
-				, dchoose dflags Opt_D_dump_asm_regalloc	alloced []
+				, dchoose dflags Opt_D_dump_asm_regalloc
+					alloced []
 				, Nothing
 				, Nothing
+				, dchoose dflags Opt_D_drop_asm_stats
+					(catMaybes stats) []
 				, Nothing )) 
 		withLiveness
 			
@@ -348,6 +365,7 @@ cmmNativeGen dflags cmm
 		, cdLiveness		= ppr_withLiveness
 		, cdCoalesce		= ppr_coalesce
 		, cdRegAllocStats	= ppr_regAllocStats
+		, cdRegAllocStatsLinear	= ppr_regAllocStatsLinear
 		, cdColoredGraph	= ppr_coloredGraph
 		, cdAlloced		= ppr_alloced }
 
@@ -423,13 +441,13 @@ cmmNativeGenDump dflags mod modLocation dump
 		let stats	= concat $ catMaybes $ map cdRegAllocStats dump
 
 		-- build a global conflict graph
-		let graph	= foldl Color.union Color.initGraph $ map raGraph stats
+		let graph	= foldl Color.union Color.initGraph $ map Color.raGraph stats
 
 		-- pretty print the various sections and write out the file.
-		let outSpills	= pprStatsSpills    stats
-		let outLife	= pprStatsLifetimes stats
-		let outConflict	= pprStatsConflict  stats
-		let outScatter	= pprStatsLifeConflict stats graph
+		let outSpills	= Color.pprStatsSpills    stats
+		let outLife	= Color.pprStatsLifetimes stats
+		let outConflict	= Color.pprStatsConflict  stats
+		let outScatter	= Color.pprStatsLifeConflict stats graph
 
 		writeFile dropFile
 			(showSDoc $ vcat [outSpills, outLife, outConflict, outScatter])
