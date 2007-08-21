@@ -217,7 +217,8 @@ genericTyConNames :: [Name]
 genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 
 ndpNames :: [Name]
-ndpNames = [ parrayTyConName, paTyConName, closureTyConName
+ndpNames = [ parrayTyConName, paTyConName, reprTyConName, embedTyConName
+           , closureTyConName
            , mkClosureName, applyClosureName
            , mkClosurePName, applyClosurePName
            , lengthPAName, replicatePAName, emptyPAName, packPAName,
@@ -693,6 +694,8 @@ checkDotnetResName  = varQual  dOTNET FSLIT("checkResult")     checkDotnetResNam
 -- NDP stuff
 parrayTyConName     = tcQual   nDP_PARRAY FSLIT("PArray") parrayTyConKey
 paTyConName         = tcQual   nDP_PARRAY FSLIT("PA")     paTyConKey
+reprTyConName       = tcQual   nDP_PARRAY FSLIT("Repr")   reprTyConKey
+embedTyConName      = tcQual   nDP_PARRAY FSLIT("Embed")  embedTyConKey
 lengthPAName        = varQual  nDP_PARRAY FSLIT("lengthPA")    lengthPAIdKey
 replicatePAName     = varQual  nDP_PARRAY FSLIT("replicatePA") replicatePAIdKey
 emptyPAName         = varQual  nDP_PARRAY FSLIT("emptyPA") emptyPAIdKey
@@ -886,6 +889,8 @@ stringTyConKey				= mkPreludeTyConUnique 134
 parrayTyConKey                          = mkPreludeTyConUnique 135
 closureTyConKey                         = mkPreludeTyConUnique 136
 paTyConKey                              = mkPreludeTyConUnique 137
+reprTyConKey                            = mkPreludeTyConUnique 138
+embedTyConKey                           = mkPreludeTyConUnique 139
 
 
 ---------------- Template Haskell -------------------
