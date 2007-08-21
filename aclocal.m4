@@ -1099,13 +1099,15 @@ AC_MSG_CHECKING(for path to top of build tree)
 dnl This would be
 dnl     make -C utils/pwd clean && make -C utils/pwd
 dnl except we don't want to have to know what make is called. Sigh.
-cd utils/pwd
-rm -f *.o
-rm -f *.hi
-rm -f pwd
-rm -f pwd.exe
-$WithGhc -v0 --make pwd -o pwd
-cd ../..
+if test ! -e utils/pwd/pwd && ! -e utils/pwd/pwd.exe; then
+  cd utils/pwd
+  rm -f *.o
+  rm -f *.hi
+  rm -f pwd
+  rm -f pwd.exe
+  $WithGhc -v0 --make pwd -o pwd
+  cd ../..
+fi
 
 hardtop=`utils/pwd/pwd forwardslash`
 

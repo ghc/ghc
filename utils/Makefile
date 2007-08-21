@@ -3,7 +3,7 @@ include $(TOP)/mk/boilerplate.mk
 
 ifeq "$(DOING_BIN_DIST)" "YES"
 # We're doing a binary-dist, descend into a subset of the dirs.
-SUBDIRS = mkdirhier ghc-pkg hasktags hp2ps hsc2hs parallel prof unlit runghc hpc
+SUBDIRS = mkdirhier ghc-pkg hasktags hp2ps hsc2hs parallel prof unlit runghc hpc pwd
 else
 ifeq "$(BootingFromHc)" "YES"
 SUBDIRS = mkdependC mkdirhier runstdtest genapply genprimopcode ghc-pkg unlit

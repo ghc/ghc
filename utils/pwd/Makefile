@@ -1,18 +1,11 @@
+TOP=../..
+include $(TOP)/mk/boilerplate.mk
 
-# We don't include any of the boilerplate Makefiles as we are used
-# by configure. GHC should be overridden on the command line to the
-# GHC that you want to use.
+HS_PROG=pwd
 
-GHC=ghc
+binary-dist:
+	$(INSTALL_DIR)                      $(BIN_DIST_DIR)/utils/pwd
+	$(INSTALL_DATA)    Makefile         $(BIN_DIST_DIR)/utils/pwd/
+	$(INSTALL_PROGRAM) pwd$(exeext)     $(BIN_DIST_DIR)/utils/pwd/
 
-.PHONY: all clean
-
-all:
-	$(GHC) --make pwd
-
-clean:
-	rm -f *.o
-	rm -f *.hi
-	rm -f pwd
-	rm -f pwd.exe
-
+include $(TOP)/mk/target.mk
