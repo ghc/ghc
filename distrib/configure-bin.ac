@@ -148,7 +148,13 @@ FP_HAVE_GCC
 AC_PROG_CPP
 
 #
-AC_OUTPUT(Makefile-vars)
+dnl ** Check gcc version and flags we need to pass it **
+#
+FP_GCC_EXTRA_FLAGS
+
+#
+AC_CONFIG_FILES(Makefile-vars extra-gcc-opts)
+AC_OUTPUT
 
 echo "****************************************************"
 echo "Configuration done, ready to either 'make install'"

@@ -936,45 +936,47 @@ AC_SUBST([GhcHasReadline], [`echo $fp_cv_ghc_has_readline | sed 'y/yesno/YESNO/'
 ])# FP_GHC_HAS_READLINE
 
 
-# FP_GCC_NEEDS_NO_OMIT_LFPTR
-# --------------------------
+# FP_GCC_EXTRA_FLAGS
+# ------------------
+# Determine which extra flags we need to pass gcc when we invoke it
+# to compile .hc code.
+#
 # Some OSs (Mandrake Linux, in particular) configure GCC with
-# -momit-leaf-frame-pointer on by default. If this is the case, we need to turn
-# it off for mangling to work. The test is currently a bit crude, using only the
-# version number of gcc. Defines HAVE_GCC_MNO_OMIT_LFPTR.
-AC_DEFUN([FP_GCC_NEEDS_NO_OMIT_LFPTR],
+# -momit-leaf-frame-pointer on by default. If this is the case, we
+# need to turn it off for mangling to work. The test is currently a
+# bit crude, using only the version number of gcc.
+# 
+# -fwrapv is needed for gcc to emit well-behaved code in the presence of
+# integer wrap around. (Trac #952)
+#
+# -fno-unit-at-a-time or -fno-toplevel-reoder is necessary to avoid gcc
+# reordering things in the module and confusing the manger and/or splitter.
+# (eg. Trac #1427)
+#
+AC_DEFUN([FP_GCC_EXTRA_FLAGS],
 [AC_REQUIRE([FP_HAVE_GCC])
-AC_CACHE_CHECK([whether gcc needs -mno-omit-leaf-frame-pointer], [fp_cv_gcc_needs_no_omit_lfptr],
-[FP_COMPARE_VERSIONS([$fp_gcc_version], [-ge], [3.2],
-  [fp_cv_gcc_needs_no_omit_lfptr=yes],
-  [fp_cv_gcc_needs_no_omit_lfptr=no])])
-if test "$fp_cv_gcc_needs_no_omit_lfptr" = "yes"; then
-   AC_DEFINE([HAVE_GCC_MNO_OMIT_LFPTR], [1], [Define to 1 if gcc supports -mno-omit-leaf-frame-pointer.])
-fi])# FP_GCC_NEEDS_NO_OMIT_LFPTR
+AC_CACHE_CHECK([for extra options to pass gcc when compiling via C], [fp_cv_gcc_extra_opts],
+[fp_cv_gcc_extra_opts=
+ FP_COMPARE_VERSIONS([$fp_gcc_version], [-ge], [3.4],
+  [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fwrapv"],
+  [])
+ case $TargetPlatform in
+  i386-*|x86_64-*) 
+     FP_COMPARE_VERSIONS([$fp_gcc_version], [-ge], [3.2],
+      [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -mno-omit-leaf-frame-pointer"],
+      [])
+    FP_COMPARE_VERSIONS([$fp_gcc_version], [-ge], [3.4],
+     [FP_COMPARE_VERSIONS([$fp_gcc_version], [-ge], [4.2],
+       [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fno-toplevel-reorder"],
+       [fp_cv_gcc_extra_opts="$fp_cv_gcc_extra_opts -fno-unit-at-a-time"]
+     )],
+     [])
+  ;;
+ esac
+])
+AC_SUBST([GccExtraViaCOpts],$fp_cv_gcc_extra_opts)
+])
 
-# FP_GCC_HAS_NO_UNIT_AT_A_TIME
-# --------------------------
-AC_DEFUN([FP_GCC_HAS_NO_UNIT_AT_A_TIME],
-[AC_REQUIRE([FP_HAVE_GCC])
-AC_CACHE_CHECK([whether gcc has -fno-unit-at-a-time], [fp_cv_gcc_has_no_unit_at_a_time],
-[FP_COMPARE_VERSIONS([$fp_gcc_version], [-ge], [3.4],
-  [fp_cv_gcc_has_no_unit_at_a_time=yes],
-  [fp_cv_gcc_has_no_unit_at_a_time=no])])
-if test "$fp_cv_gcc_has_no_unit_at_a_time" = "yes"; then
-   AC_DEFINE([HAVE_GCC_HAS_NO_UNIT_AT_A_TIME], [1], [Define to 1 if gcc supports -fno-unit-at-a-time.])
-fi])
-
-# FP_GCC_HAS_WRAPV
-# --------------------------
-AC_DEFUN([FP_GCC_HAS_WRAPV],
-[AC_REQUIRE([FP_HAVE_GCC])
-AC_CACHE_CHECK([whether gcc has -fwrapv], [fp_cv_gcc_has_wrapv],
-[FP_COMPARE_VERSIONS([$fp_gcc_version], [-ge], [3.4],
-  [fp_cv_gcc_has_wrapv=yes],
-  [fp_cv_gcc_has_wrapv=no])])
-if test "$fp_cv_gcc_has_wrapv" = "yes"; then
-   AC_DEFINE([HAVE_GCC_HAS_WRAPV], [1], [Define to 1 if gcc supports -fwrapv.])
-fi])
 
 # FP_SETUP_PROJECT_VERSION
 # ---------------------

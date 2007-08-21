@@ -22,6 +22,7 @@ module SysTools (
 	copy,
         copyWithHeader,
 	normalisePath,          -- FilePath -> FilePath
+        getExtraViaCOpts,
 	
 	-- Temporary-file management
 	setTmpDir,
@@ -536,6 +537,10 @@ copyWithHeader dflags purpose maybe_header from to = do
   hPutStr h ls
   hClose h
 
+getExtraViaCOpts :: DynFlags -> IO [String]
+getExtraViaCOpts dflags = do
+  f <- readFile (topDir dflags `joinFileName` "extra-gcc-opts")
+  return (words f)
 \end{code}
 
 %************************************************************************

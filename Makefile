@@ -199,6 +199,11 @@ install ::
 endif
 endif
 
+# Install gcc-extra-opts
+install ::
+	@$(INSTALL_DIR) $(libdir)
+	$(INSTALL_DATA) $(INSTALL_OPTS) extra-gcc-opts $(libdir)
+
 install-docs ::
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS); do \
@@ -262,6 +267,7 @@ BIN_DIST_TOP= distrib/Makefile \
               ANNOUNCE \
               LICENSE \
               install-sh \
+	      extra-gcc-opts.in \
               config.guess \
               config.sub   \
               aclocal.m4

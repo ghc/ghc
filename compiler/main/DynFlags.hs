@@ -1515,6 +1515,18 @@ setOptHpcDir arg  = upd $ \ d -> d{hpcDir = arg}
 -----------------------------------------------------------------------------
 -- Via-C compilation stuff
 
+-- There are some options that we need to pass to gcc when compiling
+-- Haskell code via C, but are only supported by recent versions of
+-- gcc.  The configure script decides which of these options we need,
+-- and puts them in the file "extra-gcc-opts" in $topdir, which is
+-- read before each via-C compilation.  The advantage of having these
+-- in a separate file is that the file can be created at install-time
+-- depending on the available gcc version, and even re-generated  later
+-- if gcc is upgraded.
+--
+-- The options below are not dependent on the version of gcc, only the
+-- platform.
+
 machdepCCOpts :: DynFlags -> ([String], -- flags for all C compilations
 			      [String]) -- for registerised HC compilations
 machdepCCOpts dflags
@@ -1557,20 +1569,6 @@ machdepCCOpts dflags
 --                    , if "mingw32" `isSuffixOf` cTARGETPLATFORM then "-mno-cygwin" else "" 
 		      ],
 		      [ "-fno-defer-pop",
-#ifdef HAVE_GCC_MNO_OMIT_LFPTR
-			-- Some gccs are configured with
-			-- -momit-leaf-frame-pointer on by default, and it
-			-- apparently takes precedence over 
-			-- -fomit-frame-pointer, so we disable it first here.
-			"-mno-omit-leaf-frame-pointer",
-#endif
-#ifdef HAVE_GCC_HAS_NO_UNIT_AT_A_TIME
-		 	"-fno-unit-at-a-time",
-			-- unit-at-a-time doesn't do us any good, and screws
-			-- up -split-objs by moving the split markers around.
-			-- It's only turned on with -O2, but put it here just
-			-- in case someone uses -optc-O2.
-#endif
 			"-fomit-frame-pointer",
 			-- we want -fno-builtin, because when gcc inlines
 			-- built-in functions like memcpy() it tends to
@@ -1589,13 +1587,6 @@ machdepCCOpts dflags
 			-- and get in the way of -split-objs.  Another option
 			-- would be to throw them away in the mangler, but this
 			-- is easier.
-#ifdef HAVE_GCC_HAS_NO_UNIT_AT_A_TIME
-		 "-fno-unit-at-a-time",
-			-- unit-at-a-time doesn't do us any good, and screws
-			-- up -split-objs by moving the split markers around.
-			-- It's only turned on with -O2, but put it here just
-			-- in case someone uses -optc-O2.
-#endif
 		 "-fno-builtin"
 			-- calling builtins like strlen() using the FFI can
 			-- cause gcc to run out of regs, so use the external

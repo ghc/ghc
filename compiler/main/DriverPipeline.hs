@@ -811,6 +811,7 @@ runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
 			      (cmdline_include_paths ++ pkg_include_dirs)
 
 	let (md_c_flags, md_regd_c_flags) = machdepCCOpts dflags
+        gcc_extra_viac_flags <- getExtraViaCOpts dflags
         let pic_c_flags = picCCOpts dflags
 
         let verb = getVerbFlag dflags
@@ -877,6 +878,13 @@ runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
 		       ++ (if hcc && mangle
 		  	     then md_regd_c_flags
 		  	     else [])
+		       ++ (if hcc
+		  	     then if mangle 
+                                     then gcc_extra_viac_flags
+                                     else filter (=="-fwrapv")
+                                                gcc_extra_viac_flags
+                                -- still want -fwrapv even for unreg'd
+		  	     else [])
 		       ++ (if hcc 
 			     then more_hcc_opts
 			     else [])
@@ -886,10 +894,6 @@ runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
 		       ++ split_opt
 		       ++ include_paths
 		       ++ pkg_extra_cc_opts
-#ifdef HAVE_GCC_HAS_WRAPV
-                  -- We need consistent integer overflow (trac #952)
-               ++ ["-fwrapv"]
-#endif
 		       ))
 
 	return (next_phase, dflags, maybe_loc, output_fn)

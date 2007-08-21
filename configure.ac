@@ -876,9 +876,7 @@ dnl     If gcc, make sure it's at least 2.1
 dnl
 FP_HAVE_GCC
 FP_MINGW_GCC
-FP_GCC_NEEDS_NO_OMIT_LFPTR
-FP_GCC_HAS_NO_UNIT_AT_A_TIME
-FP_GCC_HAS_WRAPV
+FP_GCC_EXTRA_FLAGS
 
 dnl ** figure out how to invoke cpp directly (gcc -E is no good)
 AC_PROG_CPP
@@ -1230,6 +1228,6 @@ else
 fi
 AC_SUBST(HavePapi)
 
-AC_CONFIG_FILES([mk/config.mk ghc.spec docs/users_guide/ug-book.xml])
+AC_CONFIG_FILES([mk/config.mk ghc.spec extra-gcc-opts docs/users_guide/ug-book.xml])
 AC_CONFIG_COMMANDS([mk/stamp-h],[echo timestamp > mk/stamp-h])
 AC_OUTPUT
