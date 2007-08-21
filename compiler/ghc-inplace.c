@@ -51,6 +51,7 @@ int run(char *this, char *program, int argc, char** argv) {
 int run(char *this, char *program, int argc, char** argv) {
     TCHAR  programShort[MAX_PATH+1];
     DWORD  dwSize;
+    DWORD  dwExitCode;
     int    i;
     char*  new_cmdline;
     char   *ptr;
@@ -131,7 +132,12 @@ int run(char *this, char *program, int argc, char** argv) {
 
     switch (WaitForSingleObject(pi.hProcess, INFINITE) ) {
         case WAIT_OBJECT_0:
-            return 0;
+            if (GetExitCodeProcess(pi.hProcess, &dwExitCode)) {
+                return dwExitCode;
+            }
+            else {
+                return 1;
+            }
         case WAIT_ABANDONED:
         case WAIT_FAILED:
             /* in the event we get any hard errors, bring the child
