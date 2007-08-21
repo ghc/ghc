@@ -132,7 +132,7 @@ data History
         historyApStack   :: HValue,
         historyBreakInfo :: BreakInfo,
         historyEnclosingDecl :: Name
-         -- ^^ A cache of the enclosing declaration, for convenience
+         -- ^^ A cache of the enclosing top level declaration, for convenience
    }
 
 mkHistory :: HscEnv -> HValue -> BreakInfo -> History
@@ -153,9 +153,10 @@ getHistorySpan hsc_env hist =
        Just hmi -> modBreaks_locs (md_modBreaks (hm_details hmi)) ! num
        _ -> panic "getHistorySpan"
 
+-- | Finds the enclosing top level function name 
 findEnclosingDecl :: HscEnv -> Module -> SrcSpan -> Name
 findEnclosingDecl hsc_env mod span =
-       case lookupUFM (hsc_HPT hsc_env) (moduleName mod) of
+   case lookupUFM (hsc_HPT hsc_env) (moduleName mod) of
          Nothing -> panic "findEnclosingDecl"
          Just hmi -> let
                 globals   = typeEnvIds (md_types (hm_details hmi))

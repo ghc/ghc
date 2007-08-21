@@ -667,7 +667,7 @@ getCurrentBreakModule = do
     (r:rs) -> do
         let ix = GHC.resumeHistoryIx r
         if ix == 0
-           then return (GHC.breakInfo_module `fmap` GHC.resumeBreakInfo r)
+           then return (GHC.breakInfo_module `liftM` GHC.resumeBreakInfo r)
            else do
                 let hist = GHC.resumeHistory r !! (ix-1)
                 return $ Just $ GHC.getHistoryModule  hist
