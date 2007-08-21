@@ -29,6 +29,7 @@ module ErrUtils (
 
 #include "HsVersions.h"
 
+import Module		( ModLocation(..))
 import Bag		( Bag, bagToList, isEmptyBag, emptyBag )
 import SrcLoc		( SrcSpan )
 import Util		( sortLe )
@@ -39,7 +40,8 @@ import StaticFlags	( opt_ErrorSpans )
 
 import System.Exit	( ExitCode(..), exitWith )
 import Data.Dynamic
-
+import Data.List
+import System.IO
 
 -- -----------------------------------------------------------------------------
 -- Basic error messages: just render a message with a source location.
@@ -167,17 +169,15 @@ printBagOfWarnings dflags bag_of_warns
 		LT -> True
 		EQ -> True
 		GT -> False
-\end{code}
 
-\begin{code}
+
+
 ghcExit :: DynFlags -> Int -> IO ()
 ghcExit dflags val
   | val == 0  = exitWith ExitSuccess
   | otherwise = do errorMsg dflags (text "\nCompilation had errors\n\n")
 	           exitWith (ExitFailure val)
-\end{code}
 
-\begin{code}
 doIfSet :: Bool -> IO () -> IO ()
 doIfSet flag action | flag      = action
 		    | otherwise = return ()
@@ -185,9 +185,10 @@ doIfSet flag action | flag      = action
 doIfSet_dyn :: DynFlags -> DynFlag -> IO () -> IO()
 doIfSet_dyn dflags flag action | dopt flag dflags = action
 		               | otherwise        = return ()
-\end{code}
 
-\begin{code}
+-- -----------------------------------------------------------------------------
+-- Dumping
+
 dumpIfSet :: Bool -> String -> SDoc -> IO ()
 dumpIfSet flag hdr doc
   | not flag   = return ()
@@ -197,13 +198,14 @@ dumpIfSet_core :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpIfSet_core dflags flag hdr doc
   | dopt flag dflags
 	|| verbosity dflags >= 4
-	|| dopt Opt_D_verbose_core2core dflags 	= printDump (mkDumpDoc hdr doc)
+	|| dopt Opt_D_verbose_core2core dflags
+  = writeDump dflags flag (mkDumpDoc hdr doc)
   | otherwise                                   = return ()
 
 dumpIfSet_dyn :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
   | dopt flag dflags || verbosity dflags >= 4 
-  = printDump (mkDumpDoc hdr doc)
+  = writeDump dflags flag (mkDumpDoc hdr doc)
   | otherwise
   = return ()
 
@@ -221,6 +223,62 @@ mkDumpDoc hdr doc
 	   text ""]
      where 
         line = text (replicate 20 '=')
+
+
+-- | Write out a dump.
+--	If --dump-to-file is set then this goes to a file.
+--	otherwise emit to stdout.
+writeDump :: DynFlags -> DynFlag -> SDoc -> IO ()
+writeDump dflags dflag doc
+ = do	let mFile	= chooseDumpFile dflags dflag
+ 	case mFile of
+		-- write the dump to a file
+		Just fileName
+		 -> do	handle	<- openFile fileName AppendMode
+		 	hPrintDump handle doc
+		 	hClose handle
+
+		-- write the dump to stdout
+		Nothing
+		 -> do	printDump doc
+
+
+-- | Choose where to put a dump file based on DynFlags
+--
+chooseDumpFile :: DynFlags -> DynFlag -> Maybe String
+chooseDumpFile dflags dflag
+
+	-- dump file location is being forced
+	--	by the --ddump-file-prefix flag.
+ 	| dumpToFile
+	, Just prefix	<- dumpPrefixForce dflags
+	= Just $ prefix ++ (beautifyDumpName dflag)
+
+	-- dump file location chosen by DriverPipeline.runPipeline
+	| dumpToFile
+	, Just prefix	<- dumpPrefix dflags
+	= Just $ prefix ++ (beautifyDumpName dflag)
+
+	-- we haven't got a place to put a dump file.
+	| otherwise
+	= Nothing
+
+	where	dumpToFile = dopt Opt_DumpToFile dflags
+
+
+-- | Build a nice file name from name of a DynFlag constructor
+beautifyDumpName :: DynFlag -> String
+beautifyDumpName dflag
+ = let	str	= show dflag
+ 	cut	= if isPrefixOf "Opt_D_" str
+			 then drop 6 str
+			 else str
+	dash	= map	(\c -> case c of
+				'_'	-> '-'
+				_	-> c)
+			cut
+   in	dash
+
 
 -- -----------------------------------------------------------------------------
 -- Outputting messages from the compiler
@@ -255,4 +313,5 @@ showPass dflags what
 debugTraceMsg :: DynFlags -> Int -> Message -> IO ()
 debugTraceMsg dflags val msg
   = ifVerbose dflags val (log_action dflags SevInfo noSrcSpan defaultDumpStyle msg)
+
 \end{code}

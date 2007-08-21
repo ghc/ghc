@@ -36,7 +36,7 @@ module Outputable (
 	hang, punctuate,
 	speakNth, speakNTimes, speakN, speakNOf, plural,
 
-	printSDoc, printErrs, printDump,
+	printSDoc, printErrs, hPrintDump, printDump,
 	printForC, printForAsm, printForUser,
 	pprCode, mkCodeStyle,
 	showSDoc, showSDocForUser, showSDocDebug, showSDocDump,
@@ -258,9 +258,12 @@ printErrs doc = do Pretty.printDoc PageMode stderr doc
 		   hFlush stderr
 
 printDump :: SDoc -> IO ()
-printDump doc = do
-   Pretty.printDoc PageMode stdout (better_doc defaultDumpStyle)
-   hFlush stdout
+printDump doc = hPrintDump stdout doc
+
+hPrintDump :: Handle -> SDoc -> IO ()
+hPrintDump h doc = do
+   Pretty.printDoc PageMode h (better_doc defaultDumpStyle)
+   hFlush h
  where
    better_doc = doc $$ text ""
 

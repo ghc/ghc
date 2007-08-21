@@ -412,11 +412,15 @@ runPipeline
   -> Maybe ModLocation          -- A ModLocation, if this is a Haskell module
   -> IO (DynFlags, FilePath)	-- (final flags, output filename)
 
-runPipeline stop_phase dflags (input_fn, mb_phase) mb_basename output maybe_loc
+runPipeline stop_phase dflags0 (input_fn, mb_phase) mb_basename output maybe_loc
   = do
-  let (input_basename, suffix) = splitFilename input_fn
+  let
+      (input_basename, suffix) = splitFilename input_fn
       basename | Just b <- mb_basename = b
                | otherwise             = input_basename
+
+      -- Decide where dump files should go based on the pipeline output
+      dflags = dflags0 { dumpPrefix = Just (basename ++ ".") }
 
 	-- If we were given a -x flag, then use that phase to start from
       start_phase = fromMaybe (startPhase suffix) mb_phase

@@ -54,7 +54,7 @@ module DynFlags (
 
 #include "HsVersions.h"
 
-import Module		( Module, mkModuleName, mkModule )
+import Module		( Module, mkModuleName, mkModule, ModLocation )
 import PackageConfig
 import PrelNames	( mAIN )
 #ifdef i386_TARGET_ARCH
@@ -142,11 +142,12 @@ data DynFlag
    | Opt_D_dump_minimal_imports
    | Opt_D_dump_mod_cycles
    | Opt_D_faststring_stats
+   | Opt_DumpToFile			-- Redirect dump output to files instead of stdout.
    | Opt_DoCoreLinting
    | Opt_DoStgLinting
    | Opt_DoCmmLinting
 
-   | Opt_WarnIsError		-- -Werror; makes warnings fatal
+   | Opt_WarnIsError			-- -Werror; makes warnings fatal
    | Opt_WarnDuplicateExports
    | Opt_WarnHiShadows
    | Opt_WarnImplicitPrelude
@@ -264,7 +265,7 @@ data DynFlag
    | Opt_KeepRawSFiles
    | Opt_KeepTmpFiles
 
-   deriving (Eq)
+   deriving (Eq, Show)
  
 data DynFlags = DynFlags {
   ghcMode		:: GhcMode,
@@ -306,6 +307,14 @@ data DynFlags = DynFlags {
 
   outputFile		:: Maybe String,
   outputHi		:: Maybe String,
+
+  -- | This is set by DriverPipeline.runPipeline based on where
+  --	its output is going.
+  dumpPrefix		:: Maybe FilePath,
+
+  -- | Override the dumpPrefix set by runPipeline.
+  --	Set by -ddump-file-prefix
+  dumpPrefixForce	:: Maybe FilePath,
 
   includePaths		:: [String],
   libraryPaths		:: [String],
@@ -466,6 +475,8 @@ defaultDynFlags =
 
 	outputFile		= Nothing,
 	outputHi		= Nothing,
+	dumpPrefix		= Nothing,
+	dumpPrefixForce		= Nothing,
 	includePaths		= [],
 	libraryPaths		= [],
 	frameworkPaths		= [],
@@ -557,6 +568,8 @@ setHcSuf      f d = d{ hcSuf      = f}
 
 setOutputFile f d = d{ outputFile = f}
 setOutputHi   f d = d{ outputHi   = f}
+
+setDumpPrefixForce f d = d { dumpPrefixForce = f}
 
 -- XXX HACK: Prelude> words "'does not' work" ===> ["'does","not'","work"]
 -- Config.hs should really use Option.
@@ -961,6 +974,7 @@ dynamic_flags = [
   ,  ( "hidir"		, HasArg (upd . setHiDir . Just))
   ,  ( "tmpdir"		, HasArg (upd . setTmpDir))
   ,  ( "stubdir"	, HasArg (upd . setStubDir . Just))
+  ,  ( "ddump-file-prefix", HasArg (upd . setDumpPrefixForce . Just))
 
 	------- Keeping temporary files -------------------------------------
      -- These can be singular (think ghc -c) or plural (think ghc --make)
@@ -1052,7 +1066,7 @@ dynamic_flags = [
   ,  ( "ddump-vect",         	 setDumpFlag Opt_D_dump_vect)
   ,  ( "ddump-hpc",         	 setDumpFlag Opt_D_dump_hpc)
   ,  ( "ddump-mod-cycles",     	 setDumpFlag Opt_D_dump_mod_cycles)
-  
+  ,  ( "ddump-to-file",          setDumpFlag Opt_DumpToFile)
   ,  ( "ddump-hi-diffs",         NoArg (setDynFlag Opt_D_dump_hi_diffs))
   ,  ( "dcore-lint",       	 NoArg (setDynFlag Opt_DoCoreLinting))
   ,  ( "dstg-lint",        	 NoArg (setDynFlag Opt_DoStgLinting))
