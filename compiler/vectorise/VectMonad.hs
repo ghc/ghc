@@ -98,9 +98,9 @@ initBuiltins
       preprTyCon   <- dsLookupTyCon preprTyConName
       embedTyCon   <- dsLookupTyCon embedTyConName
       let [embedDataCon] = tyConDataCons embedTyCon
-      crossTyCon   <- dsLookupTyCon crossTyConName
+      crossTyCon   <- dsLookupTyCon ndpCrossTyConName
       let [crossDataCon] = tyConDataCons crossTyCon
-      plusTyCon    <- dsLookupTyCon plusTyConName
+      plusTyCon    <- dsLookupTyCon ndpPlusTyConName
       let [leftDataCon, rightDataCon] = tyConDataCons plusTyCon
       closureTyCon <- dsLookupTyCon closureTyConName
 
