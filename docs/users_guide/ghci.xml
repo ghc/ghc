@@ -1125,9 +1125,48 @@ _result :: IO ()
         <replaceable>expr</replaceable> is ommitted, then it single-steps from
         the current breakpoint. <literal>:stepover</literal> 
         works similarly.</para>
+ 
+      <para>In the current version of the debugger, <literal>:stepover</literal>
+	is limited to work locally in the lexical sense, that is in the context
+	of the current expression body.
+	When you run to the end of the expression, <literal>:stepover</literal>
+	stops working and switches to behave like regular <literal>:step</literal>. 
+	This means 
+	that it will fail to step over the last function application. As a result,
+	currently <literal>:stepover</literal> works great for monadic code, but 
+	interacts less perfectly with pure code. For example, if stopped at the 
+	line 2, on the entire expression 
+	<literal>qsort left ++ [a] ++ qsort right</literal>:</para>
+<screen>
+... [qsort2.hs:2:15-46] *Main> :step
+Stopped at qsort2.hs:2:15-46
 
+... [qsort2.hs:2:15-46] *Main> :list
+2  qsort (a:as) = qsort left ++ [a] ++ qsort right
+</screen>
+       
+      <para> The first <literal>:stepover</literal> will step over the first
+	    <literal>qsort</literal> recursive call, as expected. The second one 
+	    will step over the evaluation of <literal>[a]</literal>, again as
+	    expected. However, the third one has lexically <quote>run out</quote>
+	    of the current expression, and will behave like regular 
+	    <literal>:step</literal>, performing one step of lazy evaluation and
+	    stopping at the next breakpoint. In this case it is indeed the second
+	    recursive application of <literal>qsort</literal>.</para>
+<screen>
+[qsort2.hs:2:36-46] *Main> :stepover
+Warning: no more breakpoints in this function body, switching to :step
+Stopped at qsort2.hs:(1,0)-(3,55)
+
+[qsort2.hs:2:36-46] *Main> :list
+_result :: [a]
+1  qsort [] = []
+2  qsort (a:as) = qsort left ++ [a] ++ qsort right
+3    where (left,right) = (filter (&lt;=a) as, filter (>a) as)
+</screen>
       <para>The <literal>:list</literal> command is particularly useful when
-        single-stepping, to see where you currently are:</para>
+        single-stepping, to see where you currently are, as just shown
+	in the above example.</para>
 
 <screen>
 [qsort.hs:5:7-47] *Main> :list
@@ -1489,6 +1528,10 @@ Just 20
             CAF (e.g. main), stop at a breakpoint, and ask for the value of the
             CAF at the prompt again.</para>
         </listitem>
+	<listitem> <literal>:stepover</literal> only works lexically locally, in the
+	  body of the current expression. As a result, it can be rather impredictable
+	  when used in pure functional code, as opposed to monadic code.
+	</listitem>
 	<listitem><para>
 	  Implicit parameters (see <xref linkend="implicit-parameters"/>) are only available 
 	  at the scope of a breakpoint if there is an explicit type signature.
