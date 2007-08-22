@@ -217,7 +217,7 @@ genericTyConNames :: [Name]
 genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 
 ndpNames :: [Name]
-ndpNames = [ parrayTyConName, paTyConName, preprTyConName, prClassName
+ndpNames = [ parrayTyConName, paTyConName, preprTyConName, prTyConName
            , ndpCrossTyConName, ndpPlusTyConName, embedTyConName
            , closureTyConName
            , mkClosureName, applyClosureName
@@ -696,7 +696,7 @@ checkDotnetResName  = varQual  dOTNET FSLIT("checkResult")     checkDotnetResNam
 parrayTyConName     = tcQual   nDP_PARRAY FSLIT("PArray") parrayTyConKey
 paTyConName         = tcQual   nDP_PARRAY FSLIT("PA")     paTyConKey
 preprTyConName      = tcQual   nDP_PARRAY FSLIT("PRepr")  preprTyConKey
-prClassName         = clsQual  nDP_PARRAY FSLIT("PR")     prClassKey
+prTyConName         = clsQual  nDP_PARRAY FSLIT("PR")     prTyConKey
 ndpCrossTyConName   = tcQual   nDP_PARRAY FSLIT(":*:")    ndpCrossTyConKey
 ndpPlusTyConName    = tcQual   nDP_PARRAY FSLIT(":+:")    ndpPlusTyConKey
 embedTyConName      = tcQual   nDP_PARRAY FSLIT("Embed")  embedTyConKey
@@ -780,8 +780,6 @@ randomClassKey		= mkPreludeClassUnique 31
 randomGenClassKey	= mkPreludeClassUnique 32
 
 isStringClassKey	= mkPreludeClassUnique 33
-
-prClassKey              = mkPreludeClassUnique 34
 \end{code}
 
 %************************************************************************
@@ -899,6 +897,7 @@ preprTyConKey                           = mkPreludeTyConUnique 138
 embedTyConKey                           = mkPreludeTyConUnique 139
 ndpCrossTyConKey                        = mkPreludeTyConUnique 140
 ndpPlusTyConKey                         = mkPreludeTyConUnique 141
+prTyConKey                              = mkPreludeTyConUnique 142
 
 
 ---------------- Template Haskell -------------------
