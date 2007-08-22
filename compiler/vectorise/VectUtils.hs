@@ -29,6 +29,7 @@ import DataCon            ( DataCon, dataConWrapId, dataConTag )
 import Var
 import Id                 ( mkWildId )
 import MkId               ( unwrapFamInstScrut )
+import Name               ( Name )
 import PrelNames
 import TysWiredIn
 import BasicTypes         ( Boxity(..) )
@@ -63,27 +64,36 @@ isAnnTypeArg _              = False
 mkDataConTag :: DataCon -> CoreExpr
 mkDataConTag dc = mkConApp intDataCon [mkIntLitInt $ dataConTag dc]
 
-isClosureTyCon :: TyCon -> Bool
-isClosureTyCon tc = tyConName tc == closureTyConName
+splitUnTy :: String -> Name -> Type -> Type
+splitUnTy s name ty
+  | Just (tc, [ty']) <- splitTyConApp_maybe ty
+  , tyConName tc == name
+  = ty'
+
+  | otherwise = pprPanic s (ppr ty)
+
+splitBinTy :: String -> Name -> Type -> (Type, Type)
+splitBinTy s name ty
+  | Just (tc, [ty1, ty2]) <- splitTyConApp_maybe ty
+  , tyConName tc == name
+  = (ty1, ty2)
+
+  | otherwise = pprPanic s (ppr ty)
+
+splitCrossTy :: Type -> (Type, Type)
+splitCrossTy = splitBinTy "splitCrossTy" ndpCrossTyConName
+
+splitPlusTy :: Type -> (Type, Type)
+splitPlusTy = splitBinTy "splitSumTy" ndpPlusTyConName
+
+splitEmbedTy :: Type -> Type
+splitEmbedTy = splitUnTy "splitEmbedTy" embedTyConName
 
 splitClosureTy :: Type -> (Type, Type)
-splitClosureTy ty
-  | Just (tc, [arg_ty, res_ty]) <- splitTyConApp_maybe ty
-  , isClosureTyCon tc
-  = (arg_ty, res_ty)
-
-  | otherwise = pprPanic "splitClosureTy" (ppr ty)
-
-isPArrayTyCon :: TyCon -> Bool
-isPArrayTyCon tc = tyConName tc == parrayTyConName
+splitClosureTy = splitBinTy "splitClosureTy" closureTyConName
 
 splitPArrayTy :: Type -> Type
-splitPArrayTy ty
-  | Just (tc, [arg_ty]) <- splitTyConApp_maybe ty
-  , isPArrayTyCon tc
-  = arg_ty
-
-  | otherwise = pprPanic "splitPArrayTy" (ppr ty)
+splitPArrayTy = splitUnTy "splitPArrayTy" parrayTyConName
 
 mkBuiltinTyConApp :: (Builtins -> TyCon) -> [Type] -> VM Type
 mkBuiltinTyConApp get_tc tys
