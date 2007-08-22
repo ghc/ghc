@@ -71,7 +71,10 @@ data Builtins = Builtins {
                 , embedTyCon       :: TyCon
                 , embedDataCon     :: DataCon
                 , crossTyCon       :: TyCon
+                , crossDataCon     :: DataCon
                 , plusTyCon        :: TyCon
+                , leftDataCon      :: DataCon
+                , rightDataCon     :: DataCon
                 , closureTyCon     :: TyCon
                 , mkClosureVar     :: Var
                 , applyClosureVar  :: Var
@@ -91,12 +94,14 @@ initBuiltins
   = do
       parrayTyCon  <- dsLookupTyCon parrayTyConName
       paTyCon      <- dsLookupTyCon paTyConName
-      let paDataCon = case tyConDataCons paTyCon of [dc] -> dc
+      let [paDataCon] = tyConDataCons paTyCon
       preprTyCon   <- dsLookupTyCon preprTyConName
       embedTyCon   <- dsLookupTyCon embedTyConName
-      let embedDataCon = case tyConDataCons embedTyCon of [dc] -> dc
+      let [embedDataCon] = tyConDataCons embedTyCon
       crossTyCon   <- dsLookupTyCon crossTyConName
+      let [crossDataCon] = tyConDataCons crossTyCon
       plusTyCon    <- dsLookupTyCon plusTyConName
+      let [leftDataCon, rightDataCon] = tyConDataCons plusTyCon
       closureTyCon <- dsLookupTyCon closureTyConName
 
       mkClosureVar     <- dsLookupGlobalId mkClosureName
@@ -121,7 +126,10 @@ initBuiltins
                , embedTyCon       = embedTyCon
                , embedDataCon     = embedDataCon
                , crossTyCon       = crossTyCon
+               , crossDataCon     = crossDataCon
                , plusTyCon        = plusTyCon
+               , leftDataCon      = leftDataCon
+               , rightDataCon     = rightDataCon
                , closureTyCon     = closureTyCon
                , mkClosureVar     = mkClosureVar
                , applyClosureVar  = applyClosureVar
