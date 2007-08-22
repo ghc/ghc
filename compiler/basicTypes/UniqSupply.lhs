@@ -28,6 +28,13 @@ import Unique
 import GHC.Exts
 import System.IO.Unsafe	( unsafeInterleaveIO )
 
+#if __GLASGOW_HASKELL__ >= 607
+import GHC.IOBase (unsafeDupableInterleaveIO)
+#else
+unsafeDupableInterleaveIO :: IO a -> IO a
+unsafeDupableInterleaveIO = unsafeInterleaveIO
+#endif
+
 w2i x = word2Int# x
 i2w x = int2Word# x
 i2w_s x = (x :: Int#)
@@ -69,7 +76,7 @@ mkSplitUniqSupply (C# c#)
 
 	-- This is one of the most hammered bits in the whole compiler
 	mk_supply#
-	  = unsafeInterleaveIO (
+	  = unsafeDupableInterleaveIO (
 		genSymZh    >>= \ (I# u#) ->
 		mk_supply#  >>= \ s1 ->
 		mk_supply#  >>= \ s2 ->
