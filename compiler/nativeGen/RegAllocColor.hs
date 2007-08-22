@@ -50,12 +50,12 @@ maxSpinCount	= 10
 -- | The top level of the graph coloring register allocator.
 --	
 regAlloc
-	:: UniqFM (UniqSet Reg)				-- ^ the registers we can use for allocation
-	-> UniqSet Int					-- ^ the set of available spill slots.
-	-> [LiveCmmTop]					-- ^ code annotated with liveness information.
+	:: UniqFM (UniqSet Reg)		-- ^ the registers we can use for allocation
+	-> UniqSet Int			-- ^ the set of available spill slots.
+	-> [LiveCmmTop]			-- ^ code annotated with liveness information.
 	-> UniqSM 
-		( [NatCmmTop]				-- ^ code with registers allocated.
-		, [RegAllocStats] )			-- ^ stats for each stage of allocation
+		( [NatCmmTop]		-- ^ code with registers allocated.
+		, [RegAllocStats] )	-- ^ stats for each stage of allocation
 		
 regAlloc regsFree slotsFree code
  = do
@@ -79,8 +79,8 @@ regAlloc_spin (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
  	-- build a conflict graph from the code.
 	graph		<- buildGraph code
 
-	-- build a map of how many instructions each reg lives for
-	--	this lazy, it won't be computed unless we need to spill
+	-- build a map of how many instructions each reg lives for.
+	--	this is lazy, it won't be computed unless we need to spill
 	let fmLife	= plusUFMs_C (\(r1, l1) (r2, l2) -> (r1, l1 + l2))
 			$ map lifetimeCount code
 
@@ -202,7 +202,7 @@ buildGraph code
 
 
 -- | Add some conflict edges to the graph.
---	Conflicts between virtual and real regs are recorded as exlusions.
+--	Conflicts between virtual and real regs are recorded as exclusions.
 --
 graphAddConflictSet 
 	:: UniqSet Reg
@@ -223,7 +223,7 @@ graphAddConflictSet set graph
    in	graph2
 	
 
--- | Add some coalesences edges to the graph
+-- | Add some coalesence edges to the graph
 --	Coalesences between virtual and real regs are recorded as preferences.
 --
 graphAddCoalesce 
