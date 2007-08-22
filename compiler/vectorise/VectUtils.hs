@@ -84,31 +84,41 @@ splitPArrayTy ty
 
   | otherwise = pprPanic "splitPArrayTy" (ppr ty)
 
-mkClosureType :: Type -> Type -> VM Type
-mkClosureType arg_ty res_ty
+mkBuiltinTyConApp :: (Builtins -> TyCon) -> [Type] -> VM Type
+mkBuiltinTyConApp get_tc tys
   = do
-      tc <- builtin closureTyCon
-      return $ mkTyConApp tc [arg_ty, res_ty]
+      tc <- builtin get_tc
+      return $ mkTyConApp tc tys
+
+mkBuiltinTyConApps :: (Builtins -> TyCon) -> [Type] -> Type -> VM Type
+mkBuiltinTyConApps get_tc tys ty
+  = do
+      tc <- builtin get_tc
+      return $ foldr (mk tc) ty tys
+  where
+    mk tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
+
+mkBuiltinTyConApps1 :: (Builtins -> TyCon) -> [Type] -> VM Type
+mkBuiltinTyConApps1 get_tc tys
+  = do
+      tc <- builtin get_tc
+      case tys of
+        [] -> pprPanic "mkBuiltinTyConApps1" (ppr tc)
+        _  -> return $ foldr1 (mk tc) tys
+  where
+    mk tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
+
+mkClosureType :: Type -> Type -> VM Type
+mkClosureType arg_ty res_ty = mkBuiltinTyConApp closureTyCon [arg_ty, res_ty]
 
 mkClosureTypes :: [Type] -> Type -> VM Type
-mkClosureTypes arg_tys res_ty
-  = do
-      tc <- builtin closureTyCon
-      return $ foldr (mk tc) res_ty arg_tys
-  where
-    mk tc arg_ty res_ty = mkTyConApp tc [arg_ty, res_ty]
+mkClosureTypes = mkBuiltinTyConApps closureTyCon
 
 mkPADictType :: Type -> VM Type
-mkPADictType ty
-  = do
-      tc <- builtin paTyCon
-      return $ TyConApp tc [ty]
+mkPADictType ty = mkBuiltinTyConApp paTyCon [ty]
 
 mkPArrayType :: Type -> VM Type
-mkPArrayType ty
-  = do
-      tc <- builtin parrayTyCon
-      return $ TyConApp tc [ty]
+mkPArrayType ty = mkBuiltinTyConApp parrayTyCon [ty]
 
 parrayReprTyCon :: Type -> VM (TyCon, [Type])
 parrayReprTyCon ty = builtin parrayTyCon >>= (`lookupFamInst` [ty])
