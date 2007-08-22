@@ -6,6 +6,7 @@ module RegAllocStats (
 	RegAllocStats (..),
 	regDotColor,
 
+	pprStats,
 	pprStatsSpills,
 	pprStatsLifetimes,
 	pprStatsConflict,
@@ -29,49 +30,64 @@ import Data.List
 
 data RegAllocStats
 
+	-- initial graph
+	= RegAllocStatsStart
+	{ raLiveCmm	:: [LiveCmmTop]			  -- ^ initial code, with liveness
+	, raGraph	:: Color.Graph Reg RegClass Reg  -- ^ the initial, uncolored graph
+	, raLifetimes	:: UniqFM (Reg, Int) } 		  -- ^ number of instrs each reg lives for
+
 	-- a spill stage
-	= RegAllocStatsSpill
-	{ raLiveCmm	:: [LiveCmmTop]			-- ^ code we tried to allocate regs for
-	, raGraph	:: Color.Graph Reg RegClass Reg	-- ^ the partially colored graph
+	| RegAllocStatsSpill
+	{ raGraph	:: Color.Graph Reg RegClass Reg	-- ^ the partially colored graph
 	, raSpillStats	:: SpillStats 			-- ^ spiller stats
-	, raLifetimes	:: UniqFM (Reg, Int) }		-- ^ number of instrs each reg lives for
+	, raLifetimes	:: UniqFM (Reg, Int) 		-- ^ number of instrs each reg lives for
+	, raSpilled	:: [LiveCmmTop] }		-- ^ code with spill instructions added
 
 	-- a successful coloring
 	| RegAllocStatsColored
-	{ raLiveCmm	:: [LiveCmmTop]			-- ^ the code we allocated regs for
-	, raGraph	:: Color.Graph Reg RegClass Reg -- ^ the colored graph
-	, raPatchedCmm	:: [LiveCmmTop] 		-- ^ code with register allocation
-	, raLifetimes	:: UniqFM (Reg, Int) }		-- ^ number of instrs each reg lives for
+	{ raGraph	:: Color.Graph Reg RegClass Reg -- ^ the colored graph
+	, raPatchedCmm	:: [LiveCmmTop] }		-- ^ code after register allocation
 
 
 instance Outputable RegAllocStats where
 
- ppr (s@RegAllocStatsSpill{})
- 	= text "-- Spill"
-
-	$$ text "-- Native code with liveness information."
+ ppr (s@RegAllocStatsStart{})
+ 	=  text "#  Start"
+	$$ text "#  Native code with liveness information."
 	$$ ppr (raLiveCmm s)
-	$$ text " "
-
-	$$ text "-- Register conflict graph."
+	$$ text ""
+	$$ text "#  Initial register conflict graph."
 	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
 
-	$$ text "-- Spill statistics."
+ ppr (s@RegAllocStatsSpill{})
+ 	=  text "#  Spill"
+	$$ text "#  Register conflict graph."
+	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
+	$$ text ""
+	$$ text "#  Spills inserted."
 	$$ ppr (raSpillStats s)
-
+	$$ text ""
+	$$ text "#  Code with spills inserted."
+	$$ (ppr (raSpilled s))
 
  ppr (s@RegAllocStatsColored{})
- 	= text "-- Colored"
-
-	$$ text "-- Native code with liveness information."
-	$$ ppr (raLiveCmm s)
-	$$ text " "
-
-	$$ text "-- Register conflict graph."
+ 	=  text "#  Colored"
+	$$ text "#  Register conflict graph."
 	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
-
-	$$ text "-- Native code after register allocation."
+	$$ text ""
+	$$ text "#  Native code after register allocation."
 	$$ ppr (raPatchedCmm s)
+
+
+-- | Do all the different analysis on this list of RegAllocStats
+pprStats :: [RegAllocStats] -> Color.Graph Reg RegClass Reg -> SDoc
+pprStats stats graph
+ = let 	outSpills	= pprStatsSpills    stats
+	outLife		= pprStatsLifetimes stats
+	outConflict	= pprStatsConflict  stats
+	outScatter	= pprStatsLifeConflict stats graph
+
+  in	vcat [outSpills, outLife, outConflict, outScatter]
 
 
 -- | Dump a table of how many spill loads / stores were inserted for each vreg.
@@ -83,27 +99,37 @@ pprStatsSpills stats
 	spillStats	= [ s	| s@RegAllocStatsSpill{} <- stats]
 
 	-- build a map of how many spill load/stores were inserted for each vreg
-	spillLS		= foldl' (plusUFM_C accSpillLS) emptyUFM
-			$ map (spillLoadStore . raSpillStats) spillStats
+	spillSL		= foldl' (plusUFM_C accSpillSL) emptyUFM
+			$ map (spillStoreLoad . raSpillStats) spillStats
 
 	-- print the count of load/spills as a tuple so we can read back from the file easilly
-	pprSpillLS (r, loads, stores)
+	pprSpillSL (r, loads, stores)
 	 = (parens $ (hcat $ punctuate (text ", ") [doubleQuotes (ppr r), int loads, int stores]))
 
+	-- sum up the total number of spill instructions inserted
+	spillList	= eltsUFM spillSL
+	spillTotal	= foldl' (\(s1, l1) (s2, l2) -> (s1 + s2, l1 + l2))
+				(0, 0)
+			$ map (\(n, s, l) -> (s, l))
+			$ spillList
 
-    in	(  text "-- spills-added"
-	$$ text "--    (reg_name, spill_loads_added, spill_stores_added)."
-	$$ (vcat $ map pprSpillLS $ eltsUFM spillLS)
-	$$ text "\n")
+    in	(  text "-- spills-added-total"
+	$$ text "--    (stores, loads)"
+	$$ (ppr spillTotal)
+	$$ text ""
+    	$$ text "-- spills-added"
+	$$ text "--    (reg_name, stores, loads)"
+	$$ (vcat $ map pprSpillSL $ spillList)
+	$$ text "")
 
 
-
--- | Dump a table of how long vregs tend to live for.
+-- | Dump a table of how long vregs tend to live for in the initial code.
 pprStatsLifetimes
 	:: [RegAllocStats] -> SDoc
 
 pprStatsLifetimes stats
- = let	lifeMap		= foldl' plusUFM emptyUFM $ map raLifetimes stats
+ = let	lifeMap		= foldl' plusUFM emptyUFM
+ 				[ raLifetimes s | s@RegAllocStatsStart{} <- stats ]
 	lifeBins	= binLifetimeCount lifeMap
 
    in	(  text "-- vreg-population-lifetimes"
@@ -123,7 +149,7 @@ binLifetimeCount fm
 		lifes
 
 
--- | Dump a table of how many conflicts vregs tend to have.
+-- | Dump a table of how many conflicts vregs tend to have in the initial code.
 pprStatsConflict
 	:: [RegAllocStats] -> SDoc
 
@@ -131,7 +157,7 @@ pprStatsConflict stats
  = let	confMap	= foldl' (plusUFM_C (\(c1, n1) (c2, n2) -> (c1, n1 + n2)))
 			emptyUFM
 		$ map Color.slurpNodeConflictCount
-		$ map raGraph stats
+			[ raGraph s | s@RegAllocStatsStart{} <- stats ]
 
    in	(  text "-- vreg-conflicts"
 	$$ text "--   (conflict_count, number_of_vregs_that_had_that_many_conflicts)"
@@ -142,10 +168,14 @@ pprStatsConflict stats
 -- | For every vreg, dump it's how many conflicts it has and its lifetime
 --	good for making a scatter plot.
 pprStatsLifeConflict
-	:: [RegAllocStats] -> Color.Graph Reg RegClass Reg -> SDoc
+	:: [RegAllocStats]
+	-> Color.Graph Reg RegClass Reg 	-- ^ global register conflict graph
+	-> SDoc
 
 pprStatsLifeConflict stats graph
- = let	lifeMap	= foldl' plusUFM emptyUFM $ map raLifetimes stats
+ = let	lifeMap	= foldl' plusUFM emptyUFM
+ 			[ raLifetimes s	| s@RegAllocStatsStart{} <- stats ]
+
  	scatter	= map	(\r ->  let Just (_, lifetime)	= lookupUFM lifeMap r
 				    Just node		= Color.lookupNode graph r
 				in parens $ hcat $ punctuate (text ", ")

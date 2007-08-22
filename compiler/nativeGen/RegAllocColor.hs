@@ -63,7 +63,7 @@ regAlloc regsFree slotsFree code
 		<- regAlloc_spin 0 trivColorable regsFree slotsFree [] code
 	
 	return	( code_final
-		, debug_codeGraphs )
+		, reverse debug_codeGraphs )
 
 regAlloc_spin (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code 
  = do
@@ -84,6 +84,16 @@ regAlloc_spin (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
 	let fmLife	= plusUFMs_C (\(r1, l1) (r2, l2) -> (r1, l1 + l2))
 			$ map lifetimeCount code
 
+	-- record startup state
+	let stat1	=
+		if spinCount == 0
+		 then	Just $ RegAllocStatsStart
+		 	{ raLiveCmm	= code
+			, raGraph	= graph
+			, raLifetimes	= fmLife }
+		 else	Nothing
+
+
 	-- the function to choose regs to leave uncolored
 	let spill	= chooseSpill_maxLife fmLife
 	
@@ -101,13 +111,11 @@ regAlloc_spin (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
 		-- record what happened in this stage for debugging
 		let stat		=
 			RegAllocStatsColored
-			{ raLiveCmm	= code
-			, raGraph	= graph_colored
-			, raPatchedCmm	= code_patched
-			, raLifetimes	= fmLife }
+			{ raGraph	= graph_colored
+			, raPatchedCmm	= code_patched }
 
 		return	( code_nat
-			, debug_codeGraphs ++ [stat]
+			, maybeToList stat1 ++ [stat] ++ debug_codeGraphs
 			, graph_colored)
 
 	 else do
@@ -122,14 +130,14 @@ regAlloc_spin (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
 		-- record what happened in this stage for debugging
 		let stat	=
 			RegAllocStatsSpill
-			{ raLiveCmm	= code_spilled
-			, raGraph	= graph_colored
+			{ raGraph	= graph_colored
 			, raSpillStats	= spillStats
-			, raLifetimes	= fmLife }
+			, raLifetimes	= fmLife
+			, raSpilled	= code_spilled }
 			    	
 		-- try again
 		regAlloc_spin (spinCount + 1) triv regsFree slotsFree' 
-			(debug_codeGraphs ++ [stat])
+			(maybeToList stat1 ++ [stat] ++ debug_codeGraphs)
 			code_relive
 
  

@@ -81,7 +81,7 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
 	; stubs_exist <- outputForeignStubs dflags this_mod location foreign_stubs
 	; case hscTarget dflags of {
              HscInterpreted -> return ();
-             HscAsm         -> outputAsm dflags filenm this_mod location flat_abstractC;
+             HscAsm         -> outputAsm dflags filenm flat_abstractC;
              HscC           -> outputC dflags filenm this_mod location 
 				 flat_abstractC stubs_exist pkg_deps
 				 foreign_stubs;
@@ -158,13 +158,13 @@ outputC dflags filenm mod location flat_absC
 %************************************************************************
 
 \begin{code}
-outputAsm dflags filenm this_mod location flat_absC
+outputAsm dflags filenm flat_absC
 
 #ifndef OMIT_NATIVE_CODEGEN
 
   = do ncg_uniqs <- mkSplitUniqSupply 'n'
        ncg_output_d <- {-# SCC "NativeCodeGen" #-}
-			  nativeCodeGen dflags this_mod location flat_absC ncg_uniqs
+			  nativeCodeGen dflags flat_absC ncg_uniqs
        dumpIfSet_dyn dflags Opt_D_dump_asm "Asm code" (docToSDoc ncg_output_d)
        {-# SCC "OutputAsm" #-} doOutput filenm $
 	   \f -> printDoc LeftMode f ncg_output_d

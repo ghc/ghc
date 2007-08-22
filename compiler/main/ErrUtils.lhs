@@ -16,7 +16,7 @@ module ErrUtils (
 
 	ghcExit,
 	doIfSet, doIfSet_dyn, 
-	dumpIfSet, dumpIfSet_core, dumpIfSet_dyn, dumpIfSet_dyn_or, mkDumpDoc,	
+	dumpIfSet, dumpIfSet_core, dumpIfSet_dyn, dumpIfSet_dyn_or, mkDumpDoc, dumpSDoc,
 
 	--  * Messages during compilation
 	putMsg,
@@ -199,13 +199,13 @@ dumpIfSet_core dflags flag hdr doc
   | dopt flag dflags
 	|| verbosity dflags >= 4
 	|| dopt Opt_D_verbose_core2core dflags
-  = writeDump dflags flag (mkDumpDoc hdr doc)
+  = dumpSDoc dflags flag hdr doc
   | otherwise                                   = return ()
 
 dumpIfSet_dyn :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
 dumpIfSet_dyn dflags flag hdr doc
   | dopt flag dflags || verbosity dflags >= 4 
-  = writeDump dflags flag (mkDumpDoc hdr doc)
+  = dumpSDoc dflags flag hdr doc
   | otherwise
   = return ()
 
@@ -228,11 +228,13 @@ mkDumpDoc hdr doc
 -- | Write out a dump.
 --	If --dump-to-file is set then this goes to a file.
 --	otherwise emit to stdout.
-writeDump :: DynFlags -> DynFlag -> SDoc -> IO ()
-writeDump dflags dflag doc
+dumpSDoc :: DynFlags -> DynFlag -> String -> SDoc -> IO ()
+dumpSDoc dflags dflag hdr doc
  = do	let mFile	= chooseDumpFile dflags dflag
  	case mFile of
 		-- write the dump to a file
+		--	don't add the header in this case, we can see what kind
+		--	of dump it is from the filename.
 		Just fileName
 		 -> do	handle	<- openFile fileName AppendMode
 		 	hPrintDump handle doc
@@ -240,7 +242,7 @@ writeDump dflags dflag doc
 
 		-- write the dump to stdout
 		Nothing
-		 -> do	printDump doc
+		 -> do	printDump (mkDumpDoc hdr doc)
 
 
 -- | Choose where to put a dump file based on DynFlags

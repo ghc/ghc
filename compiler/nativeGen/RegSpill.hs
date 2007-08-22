@@ -2,7 +2,7 @@
 module RegSpill (
 	regSpill,
 	SpillStats(..),
-	accSpillLS
+	accSpillSL
 )
 
 where
@@ -142,7 +142,7 @@ spillRead regSlotMap instr reg
 				  , mkLoadInstr nReg delta slot ]
 
 		modify $ \s -> s
-			{ stateSpillLS 	= addToUFM_C accSpillLS (stateSpillLS s) reg (reg, 1, 0) }
+			{ stateSpillSL 	= addToUFM_C accSpillSL (stateSpillSL s) reg (reg, 0, 1) }
 
 	 	return	( instr', (pre, []))
 
@@ -157,7 +157,7 @@ spillWrite regSlotMap instr reg
 				  , mkSpillInstr nReg delta slot ]
 
 		modify $ \s -> s
-			{ stateSpillLS 	= addToUFM_C accSpillLS (stateSpillLS s) reg (reg, 0, 1) }
+			{ stateSpillSL 	= addToUFM_C accSpillSL (stateSpillSL s) reg (reg, 1, 0) }
 
 	 	return	( instr', ([], post))
 
@@ -175,7 +175,7 @@ spillModify regSlotMap instr reg
 				  , mkSpillInstr nReg delta slot ]
 
 		modify $ \s -> s
-			{ stateSpillLS 	= addToUFM_C accSpillLS (stateSpillLS s) reg (reg, 1, 1) }
+			{ stateSpillSL 	= addToUFM_C accSpillSL (stateSpillSL s) reg (reg, 1, 1) }
 
 		return	( instr', (pre, post))
 
@@ -206,13 +206,13 @@ data SpillS
 	= SpillS
 	{ stateDelta	:: Int
 	, stateUS	:: UniqSupply
-	, stateSpillLS	:: UniqFM (Reg, Int, Int) } -- ^ spilled reg vs number of times vreg was loaded, stored
+	, stateSpillSL	:: UniqFM (Reg, Int, Int) } -- ^ spilled reg vs number of times vreg was loaded, stored
 
 initSpillS uniqueSupply
 	= SpillS
 	{ stateDelta	= 0
 	, stateUS	= uniqueSupply
-	, stateSpillLS	= emptyUFM }
+	, stateSpillSL	= emptyUFM }
 
 type SpillM a	= State SpillS a
 
@@ -232,8 +232,8 @@ newUnique
 	  	modify $ \s -> s { stateUS = us2 }
 		return uniq
 
-accSpillLS (r1, l1, s1) (r2, l2, s2)
-	= (r1, l1 + l2, s1 + s2)
+accSpillSL (r1, s1, l1) (r2, s2, l2)
+	= (r1, s1 + s2, l1 + l2)
 
 
 
@@ -242,15 +242,15 @@ accSpillLS (r1, l1, s1) (r2, l2, s2)
 
 data SpillStats
 	= SpillStats
-	{ spillLoadStore	:: UniqFM (Reg, Int, Int) }
+	{ spillStoreLoad	:: UniqFM (Reg, Int, Int) }
 
 makeSpillStats :: SpillS -> SpillStats
 makeSpillStats s
 	= SpillStats
-	{ spillLoadStore	= stateSpillLS s }
+	{ spillStoreLoad	= stateSpillSL s }
 
 instance Outputable SpillStats where
- ppr s
- 	= (vcat $ map (\(r, l, s) -> ppr r <+> int l <+> int s)
-			$ eltsUFM (spillLoadStore s))
+ ppr stats
+ 	= (vcat $ map (\(r, s, l) -> ppr r <+> int s <+> int l)
+			$ eltsUFM (spillStoreLoad stats))
 

@@ -102,7 +102,7 @@ data DynFlag
    | Opt_D_dump_asm_regalloc
    | Opt_D_dump_asm_regalloc_stages
    | Opt_D_dump_asm_conflicts
-   | Opt_D_drop_asm_stats
+   | Opt_D_dump_asm_stats
    | Opt_D_dump_cpranal
    | Opt_D_dump_deriv
    | Opt_D_dump_ds
@@ -142,7 +142,7 @@ data DynFlag
    | Opt_D_dump_minimal_imports
    | Opt_D_dump_mod_cycles
    | Opt_D_faststring_stats
-   | Opt_DumpToFile			-- Redirect dump output to files instead of stdout.
+   | Opt_DumpToFile			-- ^ Append dump output to files instead of stdout.
    | Opt_DoCoreLinting
    | Opt_DoStgLinting
    | Opt_DoCmmLinting
@@ -1028,7 +1028,7 @@ dynamic_flags = [
   ,  ( "ddump-asm-conflicts",    setDumpFlag Opt_D_dump_asm_conflicts)
   ,  ( "ddump-asm-regalloc-stages",
                                  setDumpFlag Opt_D_dump_asm_regalloc_stages)
-  ,  ( "ddrop-asm-stats",        setDumpFlag Opt_D_drop_asm_stats)
+  ,  ( "ddump-asm-stats",        setDumpFlag Opt_D_dump_asm_stats)
   ,  ( "ddump-cpranal",      	 setDumpFlag Opt_D_dump_cpranal)
   ,  ( "ddump-deriv",        	 setDumpFlag Opt_D_dump_deriv)
   ,  ( "ddump-ds",           	 setDumpFlag Opt_D_dump_ds)

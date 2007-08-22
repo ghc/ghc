@@ -82,7 +82,7 @@ The algorithm is roughly:
 
 module RegAllocLinear (
   	regAlloc,
-	RegAllocStats
+	RegAllocStats, pprStats
   ) where
 
 #include "HsVersions.h"
@@ -103,7 +103,7 @@ import Outputable
 #ifndef DEBUG
 import Data.Maybe	( fromJust )
 #endif
-import Data.List	( nub, partition, mapAccumL)
+import Data.List	( nub, partition, mapAccumL, foldl')
 import Control.Monad	( when )
 import Data.Word
 import Data.Bits
@@ -1000,7 +1000,7 @@ getUniqueR = RegM $ \s ->
 -- | Record that a spill instruction was inserted, for profiling.
 recordSpill :: SpillReason -> RegM ()
 recordSpill spill
-	= RegM $ \s -> (# s { ra_spills = spill : ra_spills s}, () #)
+ 	= RegM $ \s -> (# s { ra_spills = spill : ra_spills s}, () #)
 
 -- -----------------------------------------------------------------------------
 
@@ -1044,6 +1044,31 @@ binSpillReasons reasons
 			SpillLoad r	-> (r, [0, 0, 1, 0, 0])
 			SpillJoinRR r	-> (r, [0, 0, 0, 1, 0])
 			SpillJoinRM r	-> (r, [0, 0, 0, 0, 1])) reasons)
+
+
+-- | Pretty print some RegAllocStats
+pprStats :: [RegAllocStats] -> SDoc
+pprStats statss
+ = let	spills		= foldl' (plusUFM_C (zipWith (+)))
+ 				emptyUFM
+			$ map ra_spillInstrs statss
+
+	spillTotals	= foldl' (zipWith (+))
+				[0, 0, 0, 0, 0]
+			$ eltsUFM spills
+
+	pprSpill (reg, spills)
+		= parens $ (hcat $ punctuate (text ", ")  (doubleQuotes (ppr reg) : map ppr spills))
+
+   in	(  text "-- spills-added-total"
+	$$ text "--    (allocs, clobbers, loads, joinRR, joinRM)"
+	$$ (parens $ (hcat $ punctuate (text ", ") (map ppr spillTotals)))
+	$$ text ""
+	$$ text "-- spills-added"
+   	$$ text "--    (reg_name, allocs, clobbers, loads, joinRR, joinRM)"
+	$$ (vcat $ map pprSpill
+   		 $ ufmToList spills)
+	$$ text "")
 
 
 -- -----------------------------------------------------------------------------
