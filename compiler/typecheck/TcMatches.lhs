@@ -48,12 +48,12 @@ is used in error messages.  It checks that all the equations have the
 same number of arguments before using @tcMatches@ to do the work.
 
 \begin{code}
-tcMatchesFun :: Name
+tcMatchesFun :: Name -> Bool
 	     -> MatchGroup Name
 	     -> BoxyRhoType 		-- Expected type of function
 	     -> TcM (HsWrapper, MatchGroup TcId)	-- Returns type of body
 
-tcMatchesFun fun_name matches exp_ty
+tcMatchesFun fun_name inf matches exp_ty
   = do	{  -- Check that they all have the same no of arguments
 	   -- Location is in the monad, set the caller so that 
 	   -- any inter-equation error messages get some vaguely
@@ -76,7 +76,7 @@ tcMatchesFun fun_name matches exp_ty
     doc = ptext SLIT("The equation(s) for") <+> quotes (ppr fun_name)
 	  <+> ptext SLIT("have") <+> speakNOf n_pats (ptext SLIT("argument"))
     n_pats = matchGroupArity matches
-    match_ctxt = MC { mc_what = FunRhs fun_name, mc_body = tcBody }
+    match_ctxt = MC { mc_what = FunRhs fun_name inf, mc_body = tcBody }
 \end{code}
 
 @tcMatchesCase@ doesn't do the argument-count check because the

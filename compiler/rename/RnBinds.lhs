@@ -380,7 +380,7 @@ rnBind sig_fn trim (L loc (FunBind { fun_id = name, fun_infix = inf, fun_matches
 
 	; (matches', fvs) <- bindSigTyVarsFV (sig_fn plain_name) $
 				-- bindSigTyVars tests for Opt_ScopedTyVars
-			     rnMatchGroup (FunRhs plain_name) matches
+			     rnMatchGroup (FunRhs plain_name inf) matches
 
 	; checkPrecMatch inf plain_name matches'
 
@@ -444,12 +444,12 @@ rnMethodBind cls sig_fn gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = 
 	-- type variables.  See comments in RnSource.rnSourceDecl(ClassDecl)
     rn_match sel_name match@(L _ (Match (L _ (TypePat ty) : _) _ _))
 	= extendTyVarEnvFVRn gen_tvs 	$
-	  rnMatch (FunRhs sel_name) match
+	  rnMatch (FunRhs sel_name inf) match
 	where
 	  tvs     = map (rdrNameOcc.unLoc) (extractHsTyRdrTyVars ty)
 	  gen_tvs = [tv | tv <- gen_tyvars, nameOccName tv `elem` tvs] 
 
-    rn_match sel_name match = rnMatch (FunRhs sel_name) match
+    rn_match sel_name match = rnMatch (FunRhs sel_name inf) match
 
 
 -- Can't handle method pattern-bindings which bind multiple methods.

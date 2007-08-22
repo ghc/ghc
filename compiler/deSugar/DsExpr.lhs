@@ -104,8 +104,9 @@ ds_val_bind (NonRecursive, hsbinds) body
 	--	 below.  Then pattern-match would fail.  Urk.)
     putSrcSpanDs loc	$
     case bind of
-      FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn, fun_tick = tick }
-	-> matchWrapper (FunRhs (idName fun)) matches 	 	`thenDs` \ (args, rhs) ->
+      FunBind { fun_id = L _ fun, fun_matches = matches, fun_co_fn = co_fn, 
+		fun_tick = tick, fun_infix = inf }
+	-> matchWrapper (FunRhs (idName fun ) inf) matches 	`thenDs` \ (args, rhs) ->
 	   ASSERT( null args )	-- Functions aren't lifted
 	   ASSERT( isIdHsWrapper co_fn )
            mkOptTickBox tick rhs 				`thenDs` \ rhs' ->

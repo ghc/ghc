@@ -511,7 +511,7 @@ tcMonoBinds [L b_loc (FunBind { fun_id = L nm_loc name, fun_infix = inf,
 	-- e.g.		f = \(x::forall a. a->a) -> <body>
 	-- 	We want to infer a higher-rank type for f
     setSrcSpan b_loc  	$
-    do	{ ((co_fn, matches'), rhs_ty) <- tcInfer (tcMatchesFun name matches)
+    do	{ ((co_fn, matches'), rhs_ty) <- tcInfer (tcMatchesFun name inf matches)
 
 		-- Check for an unboxed tuple type
 		--	f = (# True, False #)
@@ -546,7 +546,7 @@ tcMonoBinds [L b_loc (FunBind { fun_id = L nm_loc name, fun_infix = inf,
 			| (name, tv) <- sig_scoped tc_sig `zip` sig_tvs tc_sig ]
 
 	; (co_fn, matches') <- tcExtendTyVarEnv2 rhs_tvs    $
-		    	       tcMatchesFun mono_name matches mono_ty
+		    	       tcMatchesFun mono_name inf matches mono_ty
 
 	; let fun_bind' = FunBind { fun_id = L nm_loc mono_id, 
 				    fun_infix = inf, fun_matches = matches',
@@ -653,8 +653,8 @@ tcLhs sig_fn other_bind = pprPanic "tcLhs" (ppr other_bind)
 -------------------
 tcRhs :: TcMonoBind -> TcM (HsBind TcId)
 tcRhs (TcFunBind info fun'@(L _ mono_id) inf matches)
-  = do	{ (co_fn, matches') <- tcMatchesFun (idName mono_id) matches 
-				    	    (idType mono_id)
+  = do	{ (co_fn, matches') <- tcMatchesFun (idName mono_id) inf 
+				    	    matches (idType mono_id)
 	; return (FunBind { fun_id = fun', fun_infix = inf, fun_matches = matches',
 			    bind_fvs = placeHolderNames, fun_co_fn = co_fn,
 			    fun_tick = Nothing }) }

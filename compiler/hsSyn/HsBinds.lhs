@@ -242,14 +242,13 @@ ppr_monobind :: OutputableBndr id => HsBind id -> SDoc
 
 ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })      = pprPatBind pat grhss
 ppr_monobind (VarBind { var_id = var, var_rhs = rhs })         = ppr var <+> equals <+> pprExpr (unLoc rhs)
-ppr_monobind (FunBind { fun_id = fun, 
+ppr_monobind (FunBind { fun_id = fun, fun_infix = inf,
 			fun_matches = matches,
 		        fun_tick = tick }) = 
 		           (case tick of 
 			      Nothing -> empty
 			      Just t  -> text "-- tick id = " <> ppr t
-			   ) $$ pprFunBind (unLoc fun) matches
-      -- ToDo: print infix if appropriate
+			   ) $$ pprFunBind (unLoc fun) inf matches
 
 ppr_monobind (AbsBinds { abs_tvs = tyvars, abs_dicts = dictvars, 
 			 abs_exports = exports, abs_binds = val_binds })
@@ -546,3 +545,4 @@ pprPrag :: Outputable id => id -> LPrag -> SDoc
 pprPrag var (L _ (InlinePrag inl))         = ppr inl <+> ppr var
 pprPrag var (L _ (SpecPrag expr ty _ inl)) = pprSpec var ty inl
 \end{code}
+

@@ -23,5 +23,5 @@ pprPatBind :: (OutputableBndr b, OutputableBndr i) =>
 	LPat b -> GRHSs i -> SDoc
 
 pprFunBind :: (OutputableBndr i) => 
-	i -> MatchGroup i -> SDoc
+	i -> Bool -> MatchGroup i -> SDoc
 \end{code}

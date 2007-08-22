@@ -123,8 +123,8 @@ pp_context (DsMatchContext kind _loc) msg rest_of_msg_fun
   where
     (ppr_match, pref)
 	= case kind of
-	     FunRhs fun -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
-	     other	-> (pprMatchContext kind, \ pp -> pp)
+	     FunRhs fun _ -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
+	     other	  -> (pprMatchContext kind, \ pp -> pp)
 
 ppr_pats pats = sep (map ppr pats)
 

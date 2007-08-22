@@ -9,7 +9,7 @@ tcGRHSsPat    :: GRHSs Name
 	      -> BoxyRhoType
 	      -> TcM (GRHSs TcId)
 
-tcMatchesFun :: Name
+tcMatchesFun :: Name -> Bool
 	     -> MatchGroup Name
 	     -> BoxyRhoType
 	     -> TcM (HsWrapper, MatchGroup TcId)
