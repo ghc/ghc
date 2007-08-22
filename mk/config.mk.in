@@ -507,6 +507,7 @@ FPTOOLS_TOP_ABS_PLATFORM = @hardtop_plat@
 BIN_DIST_NAME=ghc-$(ProjectVersion)
 BIN_DIST_TOPDIR=$(FPTOOLS_TOP_ABS)
 BIN_DIST_DIR=$(BIN_DIST_TOPDIR)/$(BIN_DIST_NAME)
+BIN_DIST_TARBALL=$(BIN_DIST_TOPDIR)/$(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.bz2
 
 #
 # Installation directories, we don't use half of these,

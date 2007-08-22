@@ -238,8 +238,6 @@ install-docs ::
 #	binary-dist is a GHC addition for binary distributions
 # 
 
-BIN_DIST_TARBALL=ghc-$(ProjectVersion)-$(TARGETPLATFORM).tar.bz2
-
 binary-dist::
 	-rm -rf $(BIN_DIST_DIR)
 	-$(RM) $(BIN_DIST_DIR).tar.gz
@@ -563,6 +561,9 @@ MAINTAINER_CLEAN_FILES += VERSION
 
 extraclean::
 	$(RM) -rf autom4te.cache
+
+clean distclean ::
+	$(MAKE) -C bindisttest $@
 
 # -----------------------------------------------------------------------------
 
