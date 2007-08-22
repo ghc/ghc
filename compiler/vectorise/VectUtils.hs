@@ -4,6 +4,7 @@ module VectUtils (
   mkDataConTag,
   splitClosureTy,
   mkPlusType, mkPlusTypes, mkCrossType, mkCrossTypes, mkEmbedType,
+  mkPlusAlts, mkCrosses, mkEmbed,
   mkPADictType, mkPArrayType,
   parrayReprTyCon, parrayReprDataCon, mkVScrut,
   paDictArgType, paDictOfType, paDFunType,
@@ -110,11 +111,37 @@ mkBuiltinTyConApps1 get_tc dft tys
   where
     mk tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
 
+mkBuiltinDataConApp :: (Builtins -> DataCon) -> [CoreExpr] -> VM CoreExpr
+mkBuiltinDataConApp get_dc args
+  = do
+      dc <- builtin get_dc
+      return $ mkConApp dc args
+
 mkPlusType :: Type -> Type -> VM Type
 mkPlusType ty1 ty2 = mkBuiltinTyConApp plusTyCon [ty1, ty2]
 
 mkPlusTypes :: Type -> [Type] -> VM Type
 mkPlusTypes = mkBuiltinTyConApps1 plusTyCon
+
+mkPlusAlts :: [CoreExpr] -> VM [CoreExpr]
+mkPlusAlts [] = return []
+mkPlusAlts exprs
+  = do
+      plus_tc  <- builtin plusTyCon
+      left_dc  <- builtin leftDataCon
+      right_dc <- builtin rightDataCon
+
+      let go [expr] = ([expr], exprType expr)
+          go (expr : exprs)
+            | (alts, right_ty) <- go exprs
+            = (mkConApp left_dc [Type left_ty, Type right_ty, expr]
+               : [mkConApp right_dc [Type left_ty, Type right_ty, alt]
+                    | alt <- alts],
+               mkTyConApp plus_tc [left_ty, right_ty])
+            where
+              left_ty = exprType expr
+
+      return . fst $ go exprs
 
 mkCrossType :: Type -> Type -> VM Type
 mkCrossType ty1 ty2 = mkBuiltinTyConApp crossTyCon [ty1, ty2]
@@ -122,8 +149,26 @@ mkCrossType ty1 ty2 = mkBuiltinTyConApp crossTyCon [ty1, ty2]
 mkCrossTypes :: Type -> [Type] -> VM Type
 mkCrossTypes = mkBuiltinTyConApps1 crossTyCon
 
+mkCrosses :: [CoreExpr] -> VM CoreExpr
+mkCrosses [] = return (Var unitDataConId)
+mkCrosses exprs
+  = do
+      cross_tc <- builtin crossTyCon
+      cross_dc <- builtin crossDataCon
+
+      let mk (left, left_ty) (right, right_ty)
+            = (mkConApp   cross_dc [Type left_ty, Type right_ty, left, right],
+               mkTyConApp cross_tc [left_ty, right_ty])
+
+      return . fst
+             $ foldr1 mk [(expr, exprType expr) | expr <- exprs]
+
 mkEmbedType :: Type -> VM Type
 mkEmbedType ty = mkBuiltinTyConApp embedTyCon [ty]
+
+mkEmbed :: CoreExpr -> VM CoreExpr
+mkEmbed expr = mkBuiltinDataConApp embedDataCon
+                                   [Type $ exprType expr, expr]
 
 mkClosureType :: Type -> Type -> VM Type
 mkClosureType arg_ty res_ty = mkBuiltinTyConApp closureTyCon [arg_ty, res_ty]
