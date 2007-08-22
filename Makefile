@@ -283,7 +283,8 @@ binary-dist:: binary-dist-pre
 binary-dist-pre::
 	$(MKDIRHIER) $(BIN_DIST_DIR)/mk
 	echo 'include $$(TOP)/Makefile-vars' >  $(BIN_DIST_DIR)/mk/boilerplate.mk
-	echo 'include $$(TOP)/mk/install.mk' >  $(BIN_DIST_DIR)/mk/target.mk
+	echo 'include $$(TOP)/mk/package.mk' >  $(BIN_DIST_DIR)/mk/target.mk
+	echo 'include $$(TOP)/mk/install.mk' >> $(BIN_DIST_DIR)/mk/target.mk
 	echo 'include $$(TOP)/mk/recurse.mk' >> $(BIN_DIST_DIR)/mk/target.mk
 	echo ''                              >  $(BIN_DIST_DIR)/mk/compat.mk
 	cp mk/package.mk $(BIN_DIST_DIR)/mk/
