@@ -177,7 +177,7 @@ findEnclosingDeclSpanByTick hsc_env mod tick =
          Nothing -> panic "findEnclosingDecl"
          Just hmi -> let
              modbreaks = md_modBreaks (hm_details hmi)
-          in ASSERT (inRange (bounds modBreaks) tick)
+          in ASSERT (inRange (bounds (modBreaks_decls modbreaks)) tick)
              modBreaks_decls modbreaks ! tick
 
 -- | Find the Module corresponding to a FilePath
