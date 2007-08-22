@@ -522,16 +522,9 @@ data ModGuts
 	mg_usages    :: ![Usage],	 -- Version info for what it needed
 
         mg_rdr_env   :: !GlobalRdrEnv,	 -- Top-level lexical environment
-	mg_fix_env   :: !FixityEnv,	 -- Fixity env, for things declared in
-					 --   this module 
 
-	mg_inst_env     :: InstEnv,	 -- Class instance enviroment fro
-					 -- *home-package* modules (including
-					 -- this one); c.f. tcg_inst_env
-	mg_fam_inst_env :: FamInstEnv,	 -- Type-family instance enviroment
-					 -- for *home-package* modules (including
-					 -- this one); c.f. tcg_fam_inst_env
-
+	-- These fields all describe the things **declared in this module**
+	mg_fix_env   :: !FixityEnv,	 -- Fixities
 	mg_types     :: !TypeEnv,
 	mg_insts     :: ![Instance],	 -- Instances 
 	mg_fam_insts :: ![FamInst],	 -- Instances 
@@ -541,7 +534,19 @@ data ModGuts
 	mg_deprecs   :: !Deprecations,	 -- Deprecations declared in the module
 	mg_hpc_info  :: !HpcInfo,        -- info about coverage tick boxes
         mg_modBreaks :: !ModBreaks,
-        mg_vect_info :: !VectInfo        -- Pool of vectorised declarations
+        mg_vect_info :: !VectInfo,        -- Pool of vectorised declarations
+
+	-- The next two fields are unusual, because they give instance
+	-- environments for *all* modules in the home package, including
+	-- this module, rather than for *just* this module.  
+	-- Reason: when looking up an instance we don't want to have to
+	--	  look at each module in the home package in turn
+	mg_inst_env     :: InstEnv,	 -- Class instance enviroment fro
+					 -- *home-package* modules (including
+					 -- this one); c.f. tcg_inst_env
+	mg_fam_inst_env :: FamInstEnv	 -- Type-family instance enviroment
+					 -- for *home-package* modules (including
+					 -- this one); c.f. tcg_fam_inst_env
     }
 
 -- The ModGuts takes on several slightly different forms:
