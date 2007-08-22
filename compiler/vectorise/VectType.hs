@@ -213,13 +213,13 @@ mkSumOfProdRepr tys
 buildPReprTyCon :: TyCon -> TyCon -> VM TyCon
 buildPReprTyCon orig_tc vect_tc
   = do
-      name    <- cloneName mkPReprTyConOcc (tyConName orig_tc)
-      rhs_ty  <- buildPReprRhsTy vect_tc
-      repr_tc <- builtin reprTyCon
+      name     <- cloneName mkPReprTyConOcc (tyConName orig_tc)
+      rhs_ty   <- buildPReprRhsTy vect_tc
+      prepr_tc <- builtin preprTyCon
       liftDs $ buildSynTyCon name
                              tyvars
                              (SynonymTyCon rhs_ty)
-                             (Just $ mk_fam_inst repr_tc vect_tc)
+                             (Just $ mk_fam_inst prepr_tc vect_tc)
   where
     tyvars = tyConTyVars vect_tc
 

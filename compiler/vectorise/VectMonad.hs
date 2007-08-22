@@ -67,7 +67,7 @@ data Builtins = Builtins {
                   parrayTyCon      :: TyCon
                 , paTyCon          :: TyCon
                 , paDataCon        :: DataCon
-                , reprTyCon        :: TyCon
+                , preprTyCon       :: TyCon
                 , embedTyCon       :: TyCon
                 , embedDataCon     :: DataCon
                 , crossTyCon       :: TyCon
@@ -92,7 +92,7 @@ initBuiltins
       parrayTyCon  <- dsLookupTyCon parrayTyConName
       paTyCon      <- dsLookupTyCon paTyConName
       let paDataCon = case tyConDataCons paTyCon of [dc] -> dc
-      reprTyCon    <- dsLookupTyCon reprTyConName
+      preprTyCon   <- dsLookupTyCon preprTyConName
       embedTyCon   <- dsLookupTyCon embedTyConName
       let embedDataCon = case tyConDataCons embedTyCon of [dc] -> dc
       crossTyCon   <- dsLookupTyCon crossTyConName
@@ -117,7 +117,7 @@ initBuiltins
                  parrayTyCon      = parrayTyCon
                , paTyCon          = paTyCon
                , paDataCon        = paDataCon
-               , reprTyCon        = reprTyCon
+               , preprTyCon       = preprTyCon
                , embedTyCon       = embedTyCon
                , embedDataCon     = embedDataCon
                , crossTyCon       = crossTyCon

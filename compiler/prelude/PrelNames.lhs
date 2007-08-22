@@ -217,7 +217,7 @@ genericTyConNames :: [Name]
 genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 
 ndpNames :: [Name]
-ndpNames = [ parrayTyConName, paTyConName, reprTyConName, embedTyConName
+ndpNames = [ parrayTyConName, paTyConName, preprTyConName, embedTyConName
            , closureTyConName
            , mkClosureName, applyClosureName
            , mkClosurePName, applyClosurePName
@@ -694,7 +694,7 @@ checkDotnetResName  = varQual  dOTNET FSLIT("checkResult")     checkDotnetResNam
 -- NDP stuff
 parrayTyConName     = tcQual   nDP_PARRAY FSLIT("PArray") parrayTyConKey
 paTyConName         = tcQual   nDP_PARRAY FSLIT("PA")     paTyConKey
-reprTyConName       = tcQual   nDP_PARRAY FSLIT("Repr")   reprTyConKey
+preprTyConName      = tcQual   nDP_PARRAY FSLIT("PRepr")  preprTyConKey
 embedTyConName      = tcQual   nDP_PARRAY FSLIT("Embed")  embedTyConKey
 lengthPAName        = varQual  nDP_PARRAY FSLIT("lengthPA")    lengthPAIdKey
 replicatePAName     = varQual  nDP_PARRAY FSLIT("replicatePA") replicatePAIdKey
@@ -889,7 +889,7 @@ stringTyConKey				= mkPreludeTyConUnique 134
 parrayTyConKey                          = mkPreludeTyConUnique 135
 closureTyConKey                         = mkPreludeTyConUnique 136
 paTyConKey                              = mkPreludeTyConUnique 137
-reprTyConKey                            = mkPreludeTyConUnique 138
+preprTyConKey                           = mkPreludeTyConUnique 138
 embedTyConKey                           = mkPreludeTyConUnique 139
 
 
