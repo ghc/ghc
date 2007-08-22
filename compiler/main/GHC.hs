@@ -85,7 +85,8 @@ module GHC (
         Resume(resumeStmt, resumeThreadId, resumeBreakInfo, resumeSpan,
                resumeHistory, resumeHistoryIx),
         History(historyBreakInfo, historyEnclosingDecl), 
-        GHC.getHistorySpan, getHistoryModule,
+        GHC.getHistorySpan, getHistoryModule, getHistoryTick,
+        GHC.findEnclosingDeclSpanByTick,
         getResumeContext,
         abandon, abandonAll,
         InteractiveEval.back,
@@ -1987,4 +1988,8 @@ findModule' hsc_env mod_name maybe_pkg =
 getHistorySpan :: Session -> History -> IO SrcSpan
 getHistorySpan sess h = withSession sess $ \hsc_env -> 
                           return$ InteractiveEval.getHistorySpan hsc_env h
+
+findEnclosingDeclSpanByTick :: Session -> Module -> BreakIndex -> IO SrcSpan
+findEnclosingDeclSpanByTick sess m t = withSession sess $ \ hsc_env -> 
+               return$ InteractiveEval.findEnclosingDeclSpanByTick hsc_env m t
 #endif

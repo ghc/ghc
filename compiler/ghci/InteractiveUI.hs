@@ -643,6 +643,21 @@ lookupCommand str = do
      		c:_ -> return (Just c)
 
 
+getCurrentBreakTick :: GHCi (Maybe BreakIndex)
+getCurrentBreakTick = do
+  session <- getSession
+  resumes <- io $ GHC.getResumeContext session
+  case resumes of
+    [] -> return Nothing
+    (r:rs) -> do
+        let ix = GHC.resumeHistoryIx r
+        if ix == 0
+           then return (GHC.breakInfo_number `fmap` GHC.resumeBreakInfo r)
+           else do
+                let hist = GHC.resumeHistory r !! (ix-1)
+                let tick = GHC.getHistoryTick hist
+                return (Just tick)
+
 getCurrentBreakSpan :: GHCi (Maybe SrcSpan)
 getCurrentBreakSpan = do
   session <- getSession
@@ -1549,29 +1564,37 @@ stepCmd expression = do runStmt expression GHC.SingleStep; return ()
 
 stepOverCmd [] = do 
   mb_span <- getCurrentBreakSpan
+  session <- getSession
   case mb_span of
     Nothing  -> stepCmd []
-    Just loc -> do
-       Just mod <- getCurrentBreakModule
-       parent   <- enclosingTickSpan mod loc
+    Just curr_loc -> do
+       Just tick   <- getCurrentBreakTick
+       Just mod    <- getCurrentBreakModule 
+       parent      <- io$ GHC.findEnclosingDeclSpanByTick session mod tick
        allTicksRightmost <- (sortBy rightmost . map snd) `fmap` 
                                ticksIn mod parent
        let lastTick = null allTicksRightmost || 
-                      head allTicksRightmost == loc
+                      head allTicksRightmost == curr_loc
        if not lastTick
-              then doContinue (`isSubspanOf` parent) GHC.SingleStep
-              else doContinue (const True) GHC.SingleStep
+              then let f t = t `isSubspanOf` parent && 
+                             (curr_loc `leftmost_largest` t == LT)
+                   in doContinue f GHC.SingleStep
+              else printForUser (text "Warning: no more breakpoints in this function body, switching to :step") >>
+                   doContinue (const True) GHC.SingleStep
 
 stepOverCmd expression = stepCmd expression
 
 {- 
- So, the only tricky part in stepOver is detecting that we have 
+ The first tricky bit in stepOver is detecting that we have 
  arrived to the last tick in an expression, in which case we must
  step normally to the next tick.
  What we do is:
   1. Retrieve the enclosing expression block (with a tick)
   2. Retrieve all the ticks there and sort them out by 'rightness'
   3. See if the current tick turned out the first one in the list
+
+ The second tricky bit is how to step over recursive calls.
+
 -}
 
 --ticksIn :: Module -> SrcSpan -> GHCi [Tick]
@@ -1583,15 +1606,6 @@ ticksIn mod src = do
                 , srcSpanStart src <= srcSpanStart span
                 , srcSpanEnd src   >= srcSpanEnd span
                 ]
-
-enclosingTickSpan :: Module -> SrcSpan -> GHCi SrcSpan
-enclosingTickSpan mod src = do
-  ticks <- getTickArray mod
-  let line = srcSpanStartLine src
-  ASSERT (inRange (bounds ticks) line) do
-  let enclosing_spans = [ span | (_,span) <- ticks ! line
-                               , srcSpanEnd span >= srcSpanEnd src]
-  return . head . sortBy leftmost_largest $ enclosing_spans
 
 traceCmd :: String -> GHCi ()
 traceCmd []         = doContinue (const True) GHC.RunAndLogSteps

@@ -13,8 +13,10 @@ module InteractiveEval (
         resume,
         abandon, abandonAll,
         getResumeContext,
+        getHistoryTick,
         getHistorySpan,
         getHistoryModule,
+        findEnclosingDeclSpanByTick,
         back, forward,
 	setContext, getContext,	
         nameSetToGlobalRdrEnv,
@@ -142,6 +144,9 @@ mkHistory hsc_env hval bi = let
                                      (getHistorySpan hsc_env h)
     in h
 
+getHistoryTick :: History -> BreakIndex
+getHistoryTick = breakInfo_number . historyBreakInfo 
+
 getHistoryModule :: History -> Module
 getHistoryModule = breakInfo_module . historyBreakInfo
 
@@ -164,6 +169,16 @@ findEnclosingDecl hsc_env mod span =
                                  (reverse $ map idName globals)
                               --   ^^ assumes md_types is sorted
               in decl
+
+-- | Finds the span of the (smallest) function containing this BreakIndex
+findEnclosingDeclSpanByTick :: HscEnv -> Module -> BreakIndex -> SrcSpan
+findEnclosingDeclSpanByTick hsc_env mod tick = 
+   case lookupUFM (hsc_HPT hsc_env) (moduleName mod) of
+         Nothing -> panic "findEnclosingDecl"
+         Just hmi -> let
+             modbreaks = md_modBreaks (hm_details hmi)
+          in ASSERT (inRange (bounds modBreaks) tick)
+             modBreaks_decls modbreaks ! tick
 
 -- | Find the Module corresponding to a FilePath
 findModuleFromFile :: HscEnv -> FilePath -> Maybe Module
