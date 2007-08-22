@@ -3,6 +3,7 @@ module VectUtils (
   collectAnnValBinders,
   mkDataConTag,
   splitClosureTy,
+  mkPlusType, mkPlusTypes, mkCrossType, mkCrossTypes, mkEmbedType,
   mkPADictType, mkPArrayType,
   parrayReprTyCon, parrayReprDataCon, mkVScrut,
   paDictArgType, paDictOfType, paDFunType,
@@ -98,8 +99,9 @@ mkBuiltinTyConApps get_tc tys ty
   where
     mk tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
 
-mkBuiltinTyConApps1 :: (Builtins -> TyCon) -> [Type] -> VM Type
-mkBuiltinTyConApps1 get_tc tys
+mkBuiltinTyConApps1 :: (Builtins -> TyCon) -> Type -> [Type] -> VM Type
+mkBuiltinTyConApps1 get_tc dft [] = return dft
+mkBuiltinTyConApps1 get_tc dft tys
   = do
       tc <- builtin get_tc
       case tys of
@@ -107,6 +109,21 @@ mkBuiltinTyConApps1 get_tc tys
         _  -> return $ foldr1 (mk tc) tys
   where
     mk tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
+
+mkPlusType :: Type -> Type -> VM Type
+mkPlusType ty1 ty2 = mkBuiltinTyConApp plusTyCon [ty1, ty2]
+
+mkPlusTypes :: Type -> [Type] -> VM Type
+mkPlusTypes = mkBuiltinTyConApps1 plusTyCon
+
+mkCrossType :: Type -> Type -> VM Type
+mkCrossType ty1 ty2 = mkBuiltinTyConApp crossTyCon [ty1, ty2]
+
+mkCrossTypes :: Type -> [Type] -> VM Type
+mkCrossTypes = mkBuiltinTyConApps1 crossTyCon
+
+mkEmbedType :: Type -> VM Type
+mkEmbedType ty = mkBuiltinTyConApp embedTyCon [ty]
 
 mkClosureType :: Type -> Type -> VM Type
 mkClosureType arg_ty res_ty = mkBuiltinTyConApp closureTyCon [arg_ty, res_ty]

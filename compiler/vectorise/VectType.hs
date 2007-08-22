@@ -208,23 +208,9 @@ buildPReprRhsTy :: TyCon -> VM Type
 buildPReprRhsTy = buildPReprTy . map dataConRepArgTys . tyConDataCons
 
 buildPReprTy :: [[Type]] -> VM Type
-buildPReprTy [] = panic "mkPRepr"
-buildPReprTy tys
-  = do
-      embed <- builtin embedTyCon
-      plus  <- builtin plusTyCon
-      cross <- builtin crossTyCon
-
-      return . foldr1 (mk_bin plus)
-             . map (mkprod cross)
-             . map (map (mk_un embed))
-             $ tys
-  where
-    mkprod cross []  = unitTy
-    mkprod cross tys = foldr1 (mk_bin cross) tys
-
-    mk_un  tc ty      = mkTyConApp tc [ty]
-    mk_bin tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
+buildPReprTy tys = mkPlusTypes unitTy
+               =<< mapM (mkCrossTypes unitTy)
+               =<< mapM (mapM mkEmbedType) tys
 
 buildPArrayTyCon :: TyCon -> TyCon -> VM TyCon
 buildPArrayTyCon orig_tc vect_tc = fixV $ \repr_tc ->
