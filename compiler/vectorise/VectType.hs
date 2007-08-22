@@ -191,9 +191,25 @@ mk_fam_inst :: TyCon -> TyCon -> (TyCon, [Type])
 mk_fam_inst fam_tc arg_tc
   = (fam_tc, [mkTyConApp arg_tc . mkTyVarTys $ tyConTyVars arg_tc])
 
-mkSumOfProdRepr :: [[Type]] -> VM Type
-mkSumOfProdRepr [] = panic "mkSumOfProdRepr"
-mkSumOfProdRepr tys
+buildPReprTyCon :: TyCon -> TyCon -> VM TyCon
+buildPReprTyCon orig_tc vect_tc
+  = do
+      name     <- cloneName mkPReprTyConOcc (tyConName orig_tc)
+      rhs_ty   <- buildPReprRhsTy vect_tc
+      prepr_tc <- builtin preprTyCon
+      liftDs $ buildSynTyCon name
+                             tyvars
+                             (SynonymTyCon rhs_ty)
+                             (Just $ mk_fam_inst prepr_tc vect_tc)
+  where
+    tyvars = tyConTyVars vect_tc
+
+buildPReprRhsTy :: TyCon -> VM Type
+buildPReprRhsTy = buildPReprTy . map dataConRepArgTys . tyConDataCons
+
+buildPReprTy :: [[Type]] -> VM Type
+buildPReprTy [] = panic "mkPRepr"
+buildPReprTy tys
   = do
       embed <- builtin embedTyCon
       plus  <- builtin plusTyCon
@@ -209,22 +225,6 @@ mkSumOfProdRepr tys
 
     mk_un  tc ty      = mkTyConApp tc [ty]
     mk_bin tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
-
-buildPReprTyCon :: TyCon -> TyCon -> VM TyCon
-buildPReprTyCon orig_tc vect_tc
-  = do
-      name     <- cloneName mkPReprTyConOcc (tyConName orig_tc)
-      rhs_ty   <- buildPReprRhsTy vect_tc
-      prepr_tc <- builtin preprTyCon
-      liftDs $ buildSynTyCon name
-                             tyvars
-                             (SynonymTyCon rhs_ty)
-                             (Just $ mk_fam_inst prepr_tc vect_tc)
-  where
-    tyvars = tyConTyVars vect_tc
-
-buildPReprRhsTy :: TyCon -> VM Type
-buildPReprRhsTy = mkSumOfProdRepr . map dataConRepArgTys . tyConDataCons
 
 buildPArrayTyCon :: TyCon -> TyCon -> VM TyCon
 buildPArrayTyCon orig_tc vect_tc = fixV $ \repr_tc ->
