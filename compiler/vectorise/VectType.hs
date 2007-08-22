@@ -37,7 +37,7 @@ import Digraph           ( SCC(..), stronglyConnComp )
 import Outputable
 
 import Control.Monad  ( liftM, liftM2, zipWithM, zipWithM_ )
-import Data.List      ( inits, tails, zipWith4 )
+import Data.List      ( inits, tails, zipWith4, zipWith5 )
 
 -- ----------------------------------------------------------------------------
 -- Types
@@ -101,8 +101,12 @@ vectTypeEnv env
       parr_tcs <- zipWithM buildPArrayTyCon orig_tcs vect_tcs
       dfuns    <- mapM mkPADFun vect_tcs
       defTyConPAs (zip vect_tcs dfuns)
-      binds    <- sequence (zipWith4 buildTyConBindings orig_tcs vect_tcs parr_tcs dfuns)
-      
+      binds    <- sequence (zipWith5 buildTyConBindings orig_tcs
+                                                        vect_tcs
+                                                        repr_tcs
+                                                        parr_tcs
+                                                        dfuns)
+
       let all_new_tcs = new_tcs ++ repr_tcs ++ parr_tcs
 
       let new_env = extendTypeEnvList env
@@ -195,7 +199,7 @@ buildPReprTyCon :: TyCon -> TyCon -> VM TyCon
 buildPReprTyCon orig_tc vect_tc
   = do
       name     <- cloneName mkPReprTyConOcc (tyConName orig_tc)
-      rhs_ty   <- buildPReprRhsTy vect_tc
+      rhs_ty   <- buildPReprType vect_tc
       prepr_tc <- builtin preprTyCon
       liftDs $ buildSynTyCon name
                              tyvars
@@ -204,13 +208,27 @@ buildPReprTyCon orig_tc vect_tc
   where
     tyvars = tyConTyVars vect_tc
 
-buildPReprRhsTy :: TyCon -> VM Type
-buildPReprRhsTy = buildPReprTy . map dataConRepArgTys . tyConDataCons
+buildPReprType :: TyCon -> VM Type
+buildPReprType = mkPReprType . map dataConRepArgTys . tyConDataCons
 
-buildPReprTy :: [[Type]] -> VM Type
-buildPReprTy tys = mkPlusTypes unitTy
-               =<< mapM (mkCrossTypes unitTy)
-               =<< mapM (mapM mkEmbedType) tys
+buildToPRepr :: Shape -> TyCon -> TyCon -> TyCon -> VM CoreExpr
+buildToPRepr _ vect_tc prepr_tc _
+  = do
+      arg <- newLocalVar FSLIT("x") arg_ty
+      bndrss <- mapM (mapM (newLocalVar FSLIT("x"))) rep_tys
+      (alt_bodies, res_ty) <- mkPReprAlts $ map (map Var) bndrss
+
+      return . Lam arg
+             . wrapFamInstBody prepr_tc var_tys
+             . Case (Var arg) (mkWildId arg_ty) res_ty
+             $ zipWith3 mk_alt data_cons bndrss alt_bodies
+  where
+    var_tys   = mkTyVarTys $ tyConTyVars vect_tc
+    arg_ty    = mkTyConApp vect_tc var_tys
+    data_cons = tyConDataCons vect_tc
+    rep_tys   = map dataConRepArgTys data_cons
+
+    mk_alt data_con bndrs body = (DataAlt data_con, bndrs, body)
 
 buildPArrayTyCon :: TyCon -> TyCon -> VM TyCon
 buildPArrayTyCon orig_tc vect_tc = fixV $ \repr_tc ->
@@ -293,8 +311,9 @@ tyConShape vect_tc
                                                return [e]
                }
 
-buildTyConBindings :: TyCon -> TyCon -> TyCon -> Var -> VM [(Var, CoreExpr)]
-buildTyConBindings orig_tc vect_tc arr_tc dfun
+buildTyConBindings :: TyCon -> TyCon -> TyCon -> TyCon -> Var
+                   -> VM [(Var, CoreExpr)]
+buildTyConBindings orig_tc vect_tc prepr_tc arr_tc dfun
   = do
       shape <- tyConShape vect_tc
       sequence_ (zipWith4 (vectDataConWorker shape vect_tc arr_tc arr_dc)
@@ -302,7 +321,7 @@ buildTyConBindings orig_tc vect_tc arr_tc dfun
                           vect_dcs
                           (inits repr_tys)
                           (tails repr_tys))
-      dict <- buildPADict shape vect_tc arr_tc dfun
+      dict <- buildPADict shape vect_tc prepr_tc arr_tc dfun
       binds <- takeHoisted
       return $ (dfun, dict) : binds
   where
@@ -354,8 +373,8 @@ vectDataConWorker shape vect_tc arr_tc arr_dc orig_dc vect_dc pre (dc_tys : post
                                           ++ map Var args
                                           ++ empty_post
 
-buildPADict :: Shape -> TyCon -> TyCon -> Var -> VM CoreExpr
-buildPADict shape vect_tc arr_tc dfun
+buildPADict :: Shape -> TyCon -> TyCon -> TyCon -> Var -> VM CoreExpr
+buildPADict shape vect_tc prepr_tc arr_tc dfun
   = polyAbstract tvs $ \abstract ->
     do
       meth_binds <- mapM (mk_method shape) paMethods
@@ -372,15 +391,16 @@ buildPADict shape vect_tc arr_tc dfun
     mk_method shape (name, build)
       = localV
       $ do
-          body <- build shape vect_tc arr_tc
+          body <- build shape vect_tc prepr_tc arr_tc
           var  <- newLocalVar name (exprType body)
           return (var, mkInlineMe body)
           
 paMethods = [(FSLIT("lengthPA"),    buildLengthPA),
-             (FSLIT("replicatePA"), buildReplicatePA)]
+             (FSLIT("replicatePA"), buildReplicatePA),
+             (FSLIT("toPRepr"),     buildToPRepr)]
 
-buildLengthPA :: Shape -> TyCon -> TyCon -> VM CoreExpr
-buildLengthPA shape vect_tc arr_tc
+buildLengthPA :: Shape -> TyCon -> TyCon -> TyCon -> VM CoreExpr
+buildLengthPA shape vect_tc _ arr_tc
   = do
       parr_ty <- mkPArrayType (mkTyConApp vect_tc arg_tys)
       arg    <- newLocalVar FSLIT("xs") parr_ty
@@ -428,8 +448,8 @@ buildLengthPA shape vect_tc arr_tc
 --
 --
 
-buildReplicatePA :: Shape -> TyCon -> TyCon -> VM CoreExpr
-buildReplicatePA shape vect_tc arr_tc
+buildReplicatePA :: Shape -> TyCon -> TyCon -> TyCon -> VM CoreExpr
+buildReplicatePA shape vect_tc _ arr_tc
   = do
       len_var <- newLocalVar FSLIT("n") intPrimTy
       val_var <- newLocalVar FSLIT("x") val_ty

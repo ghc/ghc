@@ -3,8 +3,7 @@ module VectUtils (
   collectAnnValBinders,
   mkDataConTag,
   splitClosureTy,
-  mkPlusType, mkPlusTypes, mkCrossType, mkCrossTypes, mkEmbedType,
-  mkPlusAlts, mkCrosses, mkEmbed,
+  mkPReprType, mkPReprAlts,
   mkPADictType, mkPArrayType,
   parrayReprTyCon, parrayReprDataCon, mkVScrut,
   paDictArgType, paDictOfType, paDFunType,
@@ -111,64 +110,66 @@ mkBuiltinTyConApps1 get_tc dft tys
   where
     mk tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
 
-mkBuiltinDataConApp :: (Builtins -> DataCon) -> [CoreExpr] -> VM CoreExpr
-mkBuiltinDataConApp get_dc args
+mkPReprType :: [[Type]] -> VM Type
+mkPReprType [] = return unitTy
+mkPReprType tys
   = do
-      dc <- builtin get_dc
-      return $ mkConApp dc args
+      embed <- builtin embedTyCon
+      cross <- builtin crossTyCon
+      plus  <- builtin plusTyCon
 
-mkPlusType :: Type -> Type -> VM Type
-mkPlusType ty1 ty2 = mkBuiltinTyConApp plusTyCon [ty1, ty2]
+      let mk_embed ty      = mkTyConApp embed [ty]
+          mk_cross ty1 ty2 = mkTyConApp cross [ty1, ty2]
+          mk_plus  ty1 ty2 = mkTyConApp plus  [ty1, ty2]
 
-mkPlusTypes :: Type -> [Type] -> VM Type
-mkPlusTypes = mkBuiltinTyConApps1 plusTyCon
+          mk_tup   []      = unitTy
+          mk_tup   tys     = foldr1 mk_cross tys
 
-mkPlusAlts :: [CoreExpr] -> VM [CoreExpr]
-mkPlusAlts [] = return []
-mkPlusAlts exprs
+          mk_sum   []      = unitTy
+          mk_sum   tys     = foldr1 mk_plus  tys
+
+      return . mk_sum
+             . map (mk_tup . map mk_embed)
+             $ tys
+
+mkPReprAlts :: [[CoreExpr]] -> VM ([CoreExpr], Type)
+mkPReprAlts ess
   = do
+      embed_tc <- builtin embedTyCon
+      embed_dc <- builtin embedDataCon
+      cross_tc <- builtin crossTyCon
+      cross_dc <- builtin crossDataCon
       plus_tc  <- builtin plusTyCon
       left_dc  <- builtin leftDataCon
       right_dc <- builtin rightDataCon
 
-      let go [expr] = ([expr], exprType expr)
-          go (expr : exprs)
-            | (alts, right_ty) <- go exprs
-            = (mkConApp left_dc [Type left_ty, Type right_ty, expr]
-               : [mkConApp right_dc [Type left_ty, Type right_ty, alt]
-                    | alt <- alts],
-               mkTyConApp plus_tc [left_ty, right_ty])
-            where
-              left_ty = exprType expr
+      let mk_embed (expr, ty, pa)
+            = (mkConApp   embed_dc [Type ty, pa, expr],
+               mkTyConApp embed_tc [ty])
 
-      return . fst $ go exprs
+          mk_cross (expr1, ty1) (expr2, ty2)
+            = (mkConApp   cross_dc [Type ty1, Type ty2, expr1, expr2],
+               mkTyConApp cross_tc [ty1, ty2])
 
-mkCrossType :: Type -> Type -> VM Type
-mkCrossType ty1 ty2 = mkBuiltinTyConApp crossTyCon [ty1, ty2]
+          mk_tup [] = (Var unitDataConId, unitTy)
+          mk_tup es = foldr1 mk_cross es
 
-mkCrossTypes :: Type -> [Type] -> VM Type
-mkCrossTypes = mkBuiltinTyConApps1 crossTyCon
-
-mkCrosses :: [CoreExpr] -> VM CoreExpr
-mkCrosses [] = return (Var unitDataConId)
-mkCrosses exprs
-  = do
-      cross_tc <- builtin crossTyCon
-      cross_dc <- builtin crossDataCon
-
-      let mk (left, left_ty) (right, right_ty)
-            = (mkConApp   cross_dc [Type left_ty, Type right_ty, left, right],
-               mkTyConApp cross_tc [left_ty, right_ty])
-
-      return . fst
-             $ foldr1 mk [(expr, exprType expr) | expr <- exprs]
-
-mkEmbedType :: Type -> VM Type
-mkEmbedType ty = mkBuiltinTyConApp embedTyCon [ty]
-
-mkEmbed :: CoreExpr -> VM CoreExpr
-mkEmbed expr = mkBuiltinDataConApp embedDataCon
-                                   [Type $ exprType expr, expr]
+          mk_sum []           = ([Var unitDataConId], unitTy)
+          mk_sum [(expr, ty)] = ([expr], ty)
+          mk_sum ((expr, lty) : es)
+            = let (alts, rty) = mk_sum es
+              in
+              (mkConApp left_dc [Type lty, Type rty, expr]
+                 : [mkConApp right_dc [Type lty, Type rty, alt] | alt <- alts],
+               mkTyConApp plus_tc [lty, rty])
+      
+      liftM (mk_sum . map (mk_tup . map mk_embed))
+            (mapM (mapM init) ess)
+  where
+    init expr = let ty = exprType expr
+                in do
+                     pa <- paDictOfType ty
+                     return (expr, ty, pa)
 
 mkClosureType :: Type -> Type -> VM Type
 mkClosureType arg_ty res_ty = mkBuiltinTyConApp closureTyCon [arg_ty, res_ty]
