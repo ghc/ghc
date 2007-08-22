@@ -35,6 +35,7 @@ import CoreSyn
 import TyCon
 import DataCon
 import Type
+import Class
 import Var
 import VarEnv
 import Id
@@ -68,6 +69,7 @@ data Builtins = Builtins {
                 , paTyCon          :: TyCon
                 , paDataCon        :: DataCon
                 , preprTyCon       :: TyCon
+                , prClass          :: Class
                 , embedTyCon       :: TyCon
                 , embedDataCon     :: DataCon
                 , crossTyCon       :: TyCon
@@ -96,6 +98,7 @@ initBuiltins
       paTyCon      <- dsLookupTyCon paTyConName
       let [paDataCon] = tyConDataCons paTyCon
       preprTyCon   <- dsLookupTyCon preprTyConName
+      prClass      <- dsLookupClass prClassName
       embedTyCon   <- dsLookupTyCon embedTyConName
       let [embedDataCon] = tyConDataCons embedTyCon
       crossTyCon   <- dsLookupTyCon ndpCrossTyConName
@@ -123,6 +126,7 @@ initBuiltins
                , paTyCon          = paTyCon
                , paDataCon        = paDataCon
                , preprTyCon       = preprTyCon
+               , prClass          = prClass
                , embedTyCon       = embedTyCon
                , embedDataCon     = embedDataCon
                , crossTyCon       = crossTyCon
