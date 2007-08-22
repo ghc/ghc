@@ -33,7 +33,9 @@ module OccName (
 	mkSuperDictSelOcc, mkLocalOcc, mkMethodOcc, mkInstTyTcOcc,
 	mkInstTyCoOcc, mkEqPredCoOcc,
         mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc,
-        mkPArrayTyConOcc, mkPArrayDataConOcc, mkPADFunOcc,
+        mkPArrayTyConOcc, mkPArrayDataConOcc,
+        mkPReprTyConOcc,
+        mkPADFunOcc,
 
 	-- ** Deconstruction
 	occNameFS, occNameString, occNameSpace, 
@@ -466,6 +468,7 @@ mkVectDataConOcc   = mk_simple_deriv dataName ":VD_"
 mkVectIsoOcc       = mk_simple_deriv varName  "$VI_"
 mkPArrayTyConOcc   = mk_simple_deriv tcName   ":VP_"
 mkPArrayDataConOcc = mk_simple_deriv dataName ":VPD_"
+mkPReprTyConOcc    = mk_simple_deriv tcName   ":VR_"
 mkPADFunOcc        = mk_simple_deriv varName  "$PA_"
 
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)

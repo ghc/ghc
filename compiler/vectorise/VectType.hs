@@ -26,7 +26,7 @@ import Var               ( Var )
 import Id                ( mkWildId )
 import Name              ( Name, getOccName )
 import NameEnv
-import TysWiredIn        ( intTy, intDataCon )
+import TysWiredIn        ( unitTy, intTy, intDataCon )
 import TysPrim           ( intPrimTy )
 
 import Unique
@@ -97,19 +97,20 @@ vectTypeEnv env
       let orig_tcs = keep_tcs ++ conv_tcs
           vect_tcs  = keep_tcs ++ new_tcs
 
+      repr_tcs <- zipWithM buildPReprTyCon   orig_tcs vect_tcs
       parr_tcs <- zipWithM buildPArrayTyCon orig_tcs vect_tcs
       dfuns    <- mapM mkPADFun vect_tcs
       defTyConPAs (zip vect_tcs dfuns)
       binds    <- sequence (zipWith4 buildTyConBindings orig_tcs vect_tcs parr_tcs dfuns)
       
-      let all_new_tcs = new_tcs ++ parr_tcs
+      let all_new_tcs = new_tcs ++ repr_tcs ++ parr_tcs
 
       let new_env = extendTypeEnvList env
                        (map ATyCon all_new_tcs
                         ++ [ADataCon dc | tc <- all_new_tcs
                                         , dc <- tyConDataCons tc])
 
-      return (new_env, map mkLocalFamInst parr_tcs, concat binds)
+      return (new_env, map mkLocalFamInst (repr_tcs ++ parr_tcs), concat binds)
   where
     tycons = typeEnvTyCons env
     groups = tyConGroups tycons
@@ -186,6 +187,45 @@ vectDataCon dc
     rep_arg_tys = dataConRepArgTys dc
     tycon       = dataConTyCon dc
 
+mk_fam_inst :: TyCon -> TyCon -> (TyCon, [Type])
+mk_fam_inst fam_tc arg_tc
+  = (fam_tc, [mkTyConApp arg_tc . mkTyVarTys $ tyConTyVars arg_tc])
+
+mkSumOfProdRepr :: [[Type]] -> VM Type
+mkSumOfProdRepr [] = panic "mkSumOfProdRepr"
+mkSumOfProdRepr tys
+  = do
+      embed <- builtin embedTyCon
+      plus  <- builtin plusTyCon
+      cross <- builtin crossTyCon
+
+      return . foldr1 (mk_bin plus)
+             . map (mkprod cross)
+             . map (map (mk_un embed))
+             $ tys
+  where
+    mkprod cross []  = unitTy
+    mkprod cross tys = foldr1 (mk_bin cross) tys
+
+    mk_un  tc ty      = mkTyConApp tc [ty]
+    mk_bin tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
+
+buildPReprTyCon :: TyCon -> TyCon -> VM TyCon
+buildPReprTyCon orig_tc vect_tc
+  = do
+      name    <- cloneName mkPReprTyConOcc (tyConName orig_tc)
+      rhs_ty  <- buildPReprRhsTy vect_tc
+      repr_tc <- builtin reprTyCon
+      liftDs $ buildSynTyCon name
+                             tyvars
+                             (SynonymTyCon rhs_ty)
+                             (Just $ mk_fam_inst repr_tc vect_tc)
+  where
+    tyvars = tyConTyVars vect_tc
+
+buildPReprRhsTy :: TyCon -> VM Type
+buildPReprRhsTy = mkSumOfProdRepr . map dataConRepArgTys . tyConDataCons
+
 buildPArrayTyCon :: TyCon -> TyCon -> VM TyCon
 buildPArrayTyCon orig_tc vect_tc = fixV $ \repr_tc ->
   do
@@ -200,7 +240,7 @@ buildPArrayTyCon orig_tc vect_tc = fixV $ \repr_tc ->
                            rec_flag    -- FIXME: is this ok?
                            False       -- FIXME: no generics
                            False       -- not GADT syntax
-                           (Just (parray, [mkTyConApp vect_tc (map mkTyVarTy tyvars)]))
+                           (Just $ mk_fam_inst parray vect_tc)
   where
     orig_name = tyConName orig_tc
     tyvars = tyConTyVars vect_tc
