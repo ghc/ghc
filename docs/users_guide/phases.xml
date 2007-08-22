@@ -113,7 +113,19 @@
         </listitem>
       </varlistentry>
 
-
+      <varlistentry>
+        <term>
+          <option>-pgmwindres</option> <replaceable>cmd</replaceable>
+          <indexterm><primary><option>-pgmwindres</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Use <replaceable>cmd</replaceable> as the
+          program to use for embedding manifests on Windows.  Normally this
+            is the program <literal>windres</literal>, which is supplied with a
+            GHC installation. See <option>-fno-embed-manifest</option> in <xref
+              linkend="options-linker" />.</para>
+        </listitem>
+      </varlistentry>
     </variablelist>
   </sect2>
 
@@ -208,6 +220,18 @@
         <listitem>
           <para>Pass <replaceable>option</replaceable> to the
           dependency generator.</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>
+          <option>-optwindres</option>  <replaceable>option</replaceable>
+          <indexterm><primary><option>-optwindres</option></primary></indexterm>
+        </term>
+        <listitem>
+          <para>Pass <replaceable>option</replaceable> to
+            <literal>windres</literal> when embedding manifests on Windows.
+            See <option>-fno-embed-manifest</option> in <xref
+              linkend="options-linker" />.</para>
         </listitem>
       </varlistentry>
     </variablelist>
@@ -942,6 +966,72 @@ $ cat foo.hspp</screen>
           <para>More details on the use of "bound threads" in the
           threaded runtime can be found in the <ulink
           url="../libraries/base/Control.Concurrent.html"><literal>Control.Concurrent</literal></ulink> module.</para>
+        </listitem>
+      </varlistentry>
+
+      <varlistentry>
+        <term>
+          <option>-fno-gen-manifest</option>
+          <indexterm><primary><option>-fno-gen-manifest</option></primary>
+          </indexterm>
+        </term>
+        <listitem>
+          <para>On Windows, GHC normally generates a
+            <firstterm>manifest</firstterm><indexterm><primary>manifest</primary>
+            </indexterm>file when linking a binary.  The
+            manifest is placed in the file
+            <literal><replaceable>prog</replaceable>.exe.manifest</literal>
+            where <replaceable>prog.exe</replaceable> is the name of the
+            executable.  The manifest file currently serves just one purpose:
+            it disables the "installer detection"<indexterm><primary>installer detection</primary>
+            </indexterm>in Windows Vista that
+            attempts to elevate privileges for executables with certain names
+            (e.g. names containing "install", "setup" or "patch").  Without the
+            manifest file to turn off installer detection, attempting to run an
+            executable that Windows deems to be an installer will return a
+            permission error code to the invoker.  Depending on the invoker,
+            the result might be a dialog box asking the user for elevated
+            permissions, or it might simply be a permission denied
+            error.</para>
+
+          <para>Installer detection can be also turned off globally for the
+            system using the security control panel, but GHC by default
+            generates binaries that don't depend on the user having disabled
+            installer detection.</para>
+          
+          <para>The <option>-fno-gen-manifest</option> disables generation of
+            the manifest file.  One reason to do this would be if you had
+            a manifest file of your own, for example.</para>
+
+          <para>In the future, GHC might use the manifest file for more things,
+            such as supplying the location of dependent DLLs.</para>
+
+          <para><option>-fno-gen-manifest</option> also implies
+            <option>-fno-embed-manifest</option>, see below.</para>
+        </listitem>
+      </varlistentry>
+          
+      <varlistentry>
+        <term>
+          <option>-fno-embed-manifest</option>
+          <indexterm><primary><option>-fno-embed-manifest</option></primary>
+          </indexterm>
+        </term>
+        <listitem>
+          <para>The manifest file that GHC generates when linking a binary on
+            Windows is also embedded in the executable itself, by default.
+            This means that the binary can be distributed without having to
+            supply the manifest file too.  The embedding is done by running
+            <literal>windres</literal><indexterm><primary><literal>windres</literal></primary>
+            </indexterm>; to see exactly what GHC does to embed the manifest,
+            use the <option>-v</option> flag.  A GHC installation comes with
+            its own copy of <literal>windres</literal> for this reason.</para>
+          
+          <para>See also <option>-pgmwindres</option> (<xref
+              linkend="replacing-phases" />) and 
+            <option>-optwindres</option> (<xref
+                                            linkend="forcing-options-through"
+              />).</para>
         </listitem>
       </varlistentry>
     </variablelist>

@@ -1682,6 +1682,18 @@
 	      <entry>static</entry>
 	      <entry>-</entry>
 	    </row>
+	    <row>
+	      <entry><option>-fno-gen-manifest</option></entry>
+	      <entry>Do not generate a manifest file (Windows only)</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-fno-embed-manifest</option></entry>
+	      <entry>Do not embed the manifest in the executable (Windows only)</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
 	  </tbody>
 	</tgroup>
       </informaltable>
@@ -1756,6 +1768,13 @@
 	      <entry><option>-pgmF</option> <replaceable>cmd</replaceable></entry>
 	      <entry>Use <replaceable>cmd</replaceable> as the pre-processor
 	      (with <option>-F</option> only)</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-pgmwindres</option> <replaceable>cmd</replaceable></entry>
+	      <entry>Use <replaceable>cmd</replaceable> as the program for
+                embedding manifests on Windows.</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
@@ -1841,6 +1860,12 @@
 	    <row>
 	      <entry><option>-optdep</option> <replaceable>option</replaceable></entry>
 	      <entry>pass <replaceable>option</replaceable> to the dependency generator</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
+	      <entry><option>-optwindres</option> <replaceable>option</replaceable></entry>
+	      <entry>pass <replaceable>option</replaceable> to <literal>windres</literal>.</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
