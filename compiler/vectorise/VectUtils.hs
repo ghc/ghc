@@ -296,6 +296,8 @@ mkClosureApp (vclo, lclo) (varg, larg)
     (arg_ty, res_ty) = splitClosureTy (exprType vclo)
 
 buildClosures :: [TyVar] -> [VVar] -> [Type] -> Type -> VM VExpr -> VM VExpr
+buildClosures tvs vars [] res_ty mk_body
+  = mk_body
 buildClosures tvs vars [arg_ty] res_ty mk_body
   = buildClosure tvs vars arg_ty res_ty mk_body
 buildClosures tvs vars (arg_ty : arg_tys) res_ty mk_body
