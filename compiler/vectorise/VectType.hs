@@ -209,14 +209,14 @@ buildPReprTyCon orig_tc vect_tc
     tyvars = tyConTyVars vect_tc
 
 buildPReprType :: TyCon -> VM Type
-buildPReprType = mkPReprType . map dataConRepArgTys . tyConDataCons
+buildPReprType = mkPRepr . map dataConRepArgTys . tyConDataCons
 
 buildToPRepr :: Shape -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildToPRepr _ vect_tc prepr_tc _
   = do
       arg <- newLocalVar FSLIT("x") arg_ty
       bndrss <- mapM (mapM (newLocalVar FSLIT("x"))) rep_tys
-      (alt_bodies, res_ty) <- mkPReprAlts $ map (map Var) bndrss
+      (alt_bodies, res_ty) <- mkToPRepr $ map (map Var) bndrss
 
       return . Lam arg
              . wrapFamInstBody prepr_tc var_tys
@@ -229,6 +229,24 @@ buildToPRepr _ vect_tc prepr_tc _
     rep_tys   = map dataConRepArgTys data_cons
 
     mk_alt data_con bndrs body = (DataAlt data_con, bndrs, body)
+
+buildFromPRepr :: Shape -> TyCon -> TyCon -> TyCon -> VM CoreExpr
+buildFromPRepr _ vect_tc prepr_tc _
+  = do
+      arg_ty <- mkPReprType res_ty
+      arg <- newLocalVar FSLIT("x") arg_ty
+      alts <- mapM mk_alt data_cons
+      body <- mkFromPRepr (unwrapFamInstScrut prepr_tc var_tys (Var arg))
+                          res_ty alts
+      return $ Lam arg body
+  where
+    var_tys   = mkTyVarTys $ tyConTyVars vect_tc
+    res_ty    = mkTyConApp vect_tc var_tys
+    data_cons = tyConDataCons vect_tc
+
+    mk_alt dc = do
+                  bndrs <- mapM (newLocalVar FSLIT("x")) $ dataConRepArgTys dc
+                  return (bndrs, mkConApp dc (map Type var_tys ++ map Var bndrs))
 
 buildPArrayTyCon :: TyCon -> TyCon -> VM TyCon
 buildPArrayTyCon orig_tc vect_tc = fixV $ \repr_tc ->
@@ -397,7 +415,8 @@ buildPADict shape vect_tc prepr_tc arr_tc dfun
           
 paMethods = [(FSLIT("lengthPA"),    buildLengthPA),
              (FSLIT("replicatePA"), buildReplicatePA),
-             (FSLIT("toPRepr"),     buildToPRepr)]
+             (FSLIT("toPRepr"),     buildToPRepr),
+             (FSLIT("fromPRepr"),   buildFromPRepr)]
 
 buildLengthPA :: Shape -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildLengthPA shape vect_tc _ arr_tc

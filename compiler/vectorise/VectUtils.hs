@@ -3,8 +3,8 @@ module VectUtils (
   collectAnnValBinders,
   mkDataConTag,
   splitClosureTy,
-  mkPReprType, mkPReprAlts,
-  mkPADictType, mkPArrayType,
+  mkPRepr, mkToPRepr, mkFromPRepr,
+  mkPADictType, mkPArrayType, mkPReprType,
   parrayReprTyCon, parrayReprDataCon, mkVScrut,
   paDictArgType, paDictOfType, paDFunType,
   paMethod, lengthPA, replicatePA, emptyPA, liftPA,
@@ -37,7 +37,7 @@ import BasicTypes         ( Boxity(..) )
 import Outputable
 import FastString
 
-import Control.Monad         ( liftM, zipWithM_ )
+import Control.Monad         ( liftM, liftM2, zipWithM_ )
 
 collectAnnTypeArgs :: AnnExpr b ann -> (AnnExpr b ann, [Type])
 collectAnnTypeArgs expr = go expr []
@@ -120,9 +120,9 @@ mkBuiltinTyConApps1 get_tc dft tys
   where
     mk tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
 
-mkPReprType :: [[Type]] -> VM Type
-mkPReprType [] = return unitTy
-mkPReprType tys
+mkPRepr :: [[Type]] -> VM Type
+mkPRepr [] = return unitTy
+mkPRepr tys
   = do
       embed <- builtin embedTyCon
       cross <- builtin crossTyCon
@@ -142,8 +142,8 @@ mkPReprType tys
              . map (mk_tup . map mk_embed)
              $ tys
 
-mkPReprAlts :: [[CoreExpr]] -> VM ([CoreExpr], Type)
-mkPReprAlts ess
+mkToPRepr :: [[CoreExpr]] -> VM ([CoreExpr], Type)
+mkToPRepr ess
   = do
       embed_tc <- builtin embedTyCon
       embed_dc <- builtin embedDataCon
@@ -181,11 +181,63 @@ mkPReprAlts ess
                      pa <- paDictOfType ty
                      return (expr, ty, pa)
 
+mkFromPRepr :: CoreExpr -> Type -> [([Var], CoreExpr)] -> VM CoreExpr
+mkFromPRepr scrut res_ty alts
+  = do
+      embed_dc <- builtin embedDataCon
+      cross_dc <- builtin crossDataCon
+      left_dc  <- builtin leftDataCon
+      right_dc <- builtin rightDataCon
+      pa_tc    <- builtin paTyCon
+
+      let un_embed expr ty var res
+            = do
+                pa <- newLocalVar FSLIT("pa") (mkTyConApp pa_tc [idType var])
+                return $ Case expr (mkWildId ty) res_ty
+                         [(DataAlt embed_dc, [pa, var], res)]
+
+          un_cross expr ty var1 var2 res
+            = Case expr (mkWildId ty) res_ty
+                [(DataAlt cross_dc, [var1, var2], res)]
+
+          un_tup expr ty []    res = return res
+          un_tup expr ty [var] res = un_embed expr ty var res
+          un_tup expr ty (var : vars) res
+            = do
+                lv <- newLocalVar FSLIT("x") lty
+                rv <- newLocalVar FSLIT("y") rty
+                liftM (un_cross expr ty lv rv)
+                        (un_embed (Var lv) lty var
+                         =<< un_tup (Var rv) rty vars res)
+            where
+              (lty, rty) = splitCrossTy ty
+
+          un_plus expr ty var1 var2 res1 res2
+            = Case expr (mkWildId ty) res_ty
+                [(DataAlt left_dc,  [var1], res1),
+                 (DataAlt right_dc, [var2], res2)]
+
+          un_sum expr ty [(vars, res)] = un_tup expr ty vars res
+          un_sum expr ty ((vars, res) : alts)
+            = do
+                lv <- newLocalVar FSLIT("l") lty
+                rv <- newLocalVar FSLIT("r") rty
+                liftM2 (un_plus expr ty lv rv)
+                         (un_tup (Var lv) lty vars res)
+                         (un_sum (Var rv) rty alts)
+            where
+              (lty, rty) = splitPlusTy ty
+
+      un_sum scrut (exprType scrut) alts
+
 mkClosureType :: Type -> Type -> VM Type
 mkClosureType arg_ty res_ty = mkBuiltinTyConApp closureTyCon [arg_ty, res_ty]
 
 mkClosureTypes :: [Type] -> Type -> VM Type
 mkClosureTypes = mkBuiltinTyConApps closureTyCon
+
+mkPReprType :: Type -> VM Type
+mkPReprType ty = mkBuiltinTyConApp preprTyCon [ty]
 
 mkPADictType :: Type -> VM Type
 mkPADictType ty = mkBuiltinTyConApp paTyCon [ty]
