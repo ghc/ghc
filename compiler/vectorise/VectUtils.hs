@@ -153,9 +153,10 @@ mkToPRepr ess
       left_dc  <- builtin leftDataCon
       right_dc <- builtin rightDataCon
 
-      let mk_embed (expr, ty, pa)
-            = (mkConApp   embed_dc [Type ty, pa, expr],
+      let mk_embed expr
+            = (mkConApp   embed_dc [Type ty, expr],
                mkTyConApp embed_tc [ty])
+            where ty = exprType expr
 
           mk_cross (expr1, ty1) (expr2, ty2)
             = (mkConApp   cross_dc [Type ty1, Type ty2, expr1, expr2],
@@ -172,14 +173,8 @@ mkToPRepr ess
               (mkConApp left_dc [Type lty, Type rty, expr]
                  : [mkConApp right_dc [Type lty, Type rty, alt] | alt <- alts],
                mkTyConApp plus_tc [lty, rty])
-      
-      liftM (mk_sum . map (mk_tup . map mk_embed))
-            (mapM (mapM init) ess)
-  where
-    init expr = let ty = exprType expr
-                in do
-                     pa <- paDictOfType ty
-                     return (expr, ty, pa)
+
+      return . mk_sum $ map (mk_tup . map mk_embed) ess
 
 mkFromPRepr :: CoreExpr -> Type -> [([Var], CoreExpr)] -> VM CoreExpr
 mkFromPRepr scrut res_ty alts
@@ -191,24 +186,22 @@ mkFromPRepr scrut res_ty alts
       pa_tc    <- builtin paTyCon
 
       let un_embed expr ty var res
-            = do
-                pa <- newLocalVar FSLIT("pa") (mkTyConApp pa_tc [idType var])
-                return $ Case expr (mkWildId ty) res_ty
-                         [(DataAlt embed_dc, [pa, var], res)]
+            = Case expr (mkWildId ty) res_ty
+                   [(DataAlt embed_dc, [var], res)]
 
           un_cross expr ty var1 var2 res
             = Case expr (mkWildId ty) res_ty
                 [(DataAlt cross_dc, [var1, var2], res)]
 
           un_tup expr ty []    res = return res
-          un_tup expr ty [var] res = un_embed expr ty var res
+          un_tup expr ty [var] res = return $ un_embed expr ty var res
           un_tup expr ty (var : vars) res
             = do
                 lv <- newLocalVar FSLIT("x") lty
                 rv <- newLocalVar FSLIT("y") rty
-                liftM (un_cross expr ty lv rv)
-                        (un_embed (Var lv) lty var
-                         =<< un_tup (Var rv) rty vars res)
+                liftM (un_cross expr ty lv rv
+                      . un_embed (Var lv) lty var)
+                      (un_tup (Var rv) rty vars res)
             where
               (lty, rty) = splitCrossTy ty
 
