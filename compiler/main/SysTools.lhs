@@ -529,7 +529,8 @@ runWindres dflags args = do
   let (gcc,gcc_args) = pgm_c dflags
       windres        = pgm_windres dflags
   runSomething dflags "Windres" windres 
-        (Option ("--preprocessor=" ++ gcc ++ unwords (map showOpt gcc_args) ++
+        (Option ("--preprocessor=" ++ gcc ++ " " ++
+                                      unwords (map showOpt gcc_args) ++
                  " -E -xc -DRC_INVOKED")
          : args)
         -- we must tell windres where to find gcc: it might not be on PATH
