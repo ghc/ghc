@@ -19,8 +19,10 @@
 -- #hide
 module GHC.Word (
     Word(..), Word8(..), Word16(..), Word32(..), Word64(..),
-    toEnumError, fromEnumError, succError, predError)
-    where
+    toEnumError, fromEnumError, succError, predError,
+    uncheckedShiftL64#,
+    uncheckedShiftRL64#
+    ) where
 
 import Data.Bits
 
@@ -867,6 +869,9 @@ instance Bits Word64 where
 "fromIntegral/a->Word64" fromIntegral = \x -> case fromIntegral x of W# x# -> W64# x#
 "fromIntegral/Word64->a" fromIntegral = \(W64# x#) -> fromIntegral (W# x#)
   #-}
+
+uncheckedShiftL64#  = uncheckedShiftL#
+uncheckedShiftRL64# = uncheckedShiftRL#
 
 #endif
 

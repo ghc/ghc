@@ -17,8 +17,9 @@
 
 -- #hide
 module GHC.Int (
-    Int8(..), Int16(..), Int32(..), Int64(..))
-    where
+    Int8(..), Int16(..), Int32(..), Int64(..),
+    uncheckedIShiftL64#, uncheckedIShiftRA64#
+    ) where
 
 import Data.Bits
 
@@ -29,7 +30,7 @@ import GHC.Num
 import GHC.Real
 import GHC.Read
 import GHC.Arr
-import GHC.Word
+import GHC.Word hiding (uncheckedShiftL64#, uncheckedShiftRL64#)
 import GHC.Show
 
 ------------------------------------------------------------------------
@@ -820,6 +821,8 @@ instance Bits Int64 where
 "fromIntegral/Int64->a" fromIntegral = \(I64# x#) -> fromIntegral (I# x#)
   #-}
 
+uncheckedIShiftL64#  = uncheckedIShiftL#
+uncheckedIShiftRA64# = uncheckedIShiftRA#
 #endif
 
 instance Real Int64 where
