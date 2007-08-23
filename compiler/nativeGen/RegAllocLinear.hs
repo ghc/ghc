@@ -498,7 +498,15 @@ genRaInsn block_live new_instrs instr r_dying w_dying =
     -- (j) free up stack slots for dead spilled regs
     -- TODO (can't be bothered right now)
 
-    return (patched_instr : w_spills ++ reverse r_spills
+    -- erase reg->reg moves where the source and destination are the same.
+    --	If the src temp didn't die in this instr but happened to be allocated
+    --	to the same real reg as the destination, then we can erase the move anyway.
+	squashed_instr	= case isRegRegMove patched_instr of
+				Just (src, dst)
+				 | src == dst	-> []
+				_		-> [patched_instr]
+
+    return (squashed_instr ++ w_spills ++ reverse r_spills
 		 ++ clobber_saves ++ new_instrs,
 	    fixup_blocks)
   }}
