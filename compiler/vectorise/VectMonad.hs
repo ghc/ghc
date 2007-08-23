@@ -47,6 +47,7 @@ import NameEnv
 import TysPrim       ( intPrimTy )
 import Module
 import IfaceEnv
+import IOEnv         ( ioToIOEnv )
 
 import DsMonad
 import PrelNames
@@ -429,22 +430,22 @@ lookupFamInst tycon tys
 initV :: HscEnv -> ModGuts -> VectInfo -> VM a -> IO (Maybe (VectInfo, a))
 initV hsc_env guts info p
   = do
-      eps <- hscEPS hsc_env
-      let famInstEnvs = (eps_fam_inst_env eps, mg_fam_inst_env guts)
-      let instEnvs    = (eps_inst_env     eps, mg_inst_env     guts)
-
       Just r <- initDs hsc_env (mg_module guts)
                                (mg_rdr_env guts)
                                (mg_types guts)
-                               (go instEnvs famInstEnvs)
+                               go
       return r
   where
 
-    go instEnvs famInstEnvs = 
+    go =
       do
-        builtins <- initBuiltins
+        builtins       <- initBuiltins
         builtin_tycons <- initBuiltinTyCons
         builtin_pas    <- initBuiltinPAs
+
+        eps <- ioToIOEnv $ hscEPS hsc_env
+        let famInstEnvs = (eps_fam_inst_env eps, mg_fam_inst_env guts)
+            instEnvs    = (eps_inst_env     eps, mg_inst_env     guts)
 
         let genv = extendTyConsEnv builtin_tycons
                  . extendPAFunsEnv builtin_pas
