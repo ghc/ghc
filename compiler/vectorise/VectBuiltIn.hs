@@ -1,6 +1,6 @@
 module VectBuiltIn (
   Builtins(..),
-  initBuiltins, initBuiltinTyCons, initBuiltinPAs
+  initBuiltins, initBuiltinTyCons, initBuiltinPAs, initBuiltinPRs
 ) where
 
 #include "HsVersions.h"
@@ -124,32 +124,51 @@ initBuiltinTyCons
 builtinTyCons :: [(Name, DsM TyCon)]
 builtinTyCons = [(tyConName funTyCon, dsLookupTyCon closureTyConName)]
 
-initBuiltinPAs :: DsM [(Name, Var)]
-initBuiltinPAs
+initBuiltinDicts :: [(Name, Module, FastString)] -> DsM [(Name, Var)]
+initBuiltinDicts ps
   = do
-      pas <- zipWithM lookupExternalVar mods fss
-      return $ zip tcs pas
+      dicts <- zipWithM lookupExternalVar mods fss
+      return $ zip tcs dicts
   where
-    (tcs, mods, fss) = unzip3 builtinPAs
+    (tcs, mods, fss) = unzip3 ps
+
+initBuiltinPAs = initBuiltinDicts builtinPAs
 
 builtinPAs :: [(Name, Module, FastString)]
 builtinPAs = [
-               mk closureTyConName      nDP_CLOSURE FSLIT("dPA_Clo")
-             , mk (tyConName unitTyCon) nDP_PARRAY  FSLIT("dPA_Unit")
+               mk closureTyConName  nDP_CLOSURE   FSLIT("dPA_Clo")
+             , mk unitTyConName     nDP_PARRAY    FSLIT("dPA_Unit")
 
-             , temporary intTyConName FSLIT("dPA_Int")
+             , mk intTyConName      nDP_INSTANCES FSLIT("dPA_Int")
              ]
              ++ tups
   where
     mk name mod fs = (name, mod, fs)
 
-    temporary name fs = (name, nDP_INSTANCES, fs)
-
     tups = map mk_tup [2..3]
-    mk_tup n = temporary (tyConName $ tupleTyCon Boxed n)
-                         (mkFastString $ "dPA_" ++ show n)
+    mk_tup n = mk (tyConName $ tupleTyCon Boxed n)
+                  nDP_INSTANCES
+                  (mkFastString $ "dPA_" ++ show n)
+
+initBuiltinPRs = initBuiltinDicts builtinPRs
+
+builtinPRs :: [(Name, Module, FastString)]
+builtinPRs = [
+               mk (tyConName unitTyCon) nDP_PARRAY    FSLIT("dPR_Unit")
+             , mk ndpCrossTyConName     nDP_PARRAY    FSLIT("dPR_Cross")
+             , mk ndpPlusTyConName      nDP_PARRAY    FSLIT("dPR_Plus")
+             , mk embedTyConName        nDP_PARRAY    FSLIT("dPR_Embed")
+             , mk closureTyConName      nDP_CLOSURE   FSLIT("dPR_Clo")
+
+               -- temporary
+             , mk intTyConName          nDP_INSTANCES FSLIT("dPR_Int")
+             ]
+  where
+    mk name mod fs = (name, mod, fs)
 
 lookupExternalVar :: Module -> FastString -> DsM Var
 lookupExternalVar mod fs
   = dsLookupGlobalId =<< lookupOrig mod (mkVarOccFS fs)
+
+unitTyConName = tyConName unitTyCon
 

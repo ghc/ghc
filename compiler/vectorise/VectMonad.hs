@@ -454,6 +454,7 @@ initV hsc_env guts info p
         builtins       <- initBuiltins
         builtin_tycons <- initBuiltinTyCons
         builtin_pas    <- initBuiltinPAs
+        builtin_prs    <- initBuiltinPRs
 
         eps <- ioToIOEnv $ hscEPS hsc_env
         let famInstEnvs = (eps_fam_inst_env eps, mg_fam_inst_env guts)
@@ -461,6 +462,7 @@ initV hsc_env guts info p
 
         let genv = extendTyConsEnv builtin_tycons
                  . extendPAFunsEnv builtin_pas
+                 . setPRFunsEnv    builtin_prs
                  $ initGlobalEnv info instEnvs famInstEnvs
 
         r <- runVM p builtins genv emptyLocalEnv
