@@ -74,7 +74,7 @@ all :: libgmp.a
 
 install :: libgmp.a
 
-INSTALL_LIBS += gmpbuild/libgmp.a
+INSTALL_LIBS += libgmp.a
 
 ifeq "$(BUILD_SHARED)" "yes"
 libgmp-3.dll: stamp.gmp.shared
@@ -110,14 +110,13 @@ binary-dist:
 ifneq "$(HaveLibGmp)" "YES"
 ifneq "$(HaveFrameworkGMP)" "YES"
 	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/gmp
-	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/gmp/gmpbuild
 	touch $(BIN_DIST_DIR)/gmp/$(GMP_TARBALL)
 	$(INSTALL_DATA)    Makefile            $(BIN_DIST_DIR)/gmp/
 ifneq "$(INSTALL_PROGS)" ""
-	$(INSTALL_DATA)    $(INSTALL_PROGS)    $(BIN_DIST_DIR)/gmp/gmpbuild/
+	$(INSTALL_DATA)    $(INSTALL_PROGS)    $(BIN_DIST_DIR)/gmp/
 endif
 ifneq "$(INSTALL_LIBS)" ""
-	$(INSTALL_DATA)    $(INSTALL_LIBS)     $(BIN_DIST_DIR)/gmp/gmpbuild/
+	$(INSTALL_DATA)    $(INSTALL_LIBS)     $(BIN_DIST_DIR)/gmp/
 endif
 
 endif
