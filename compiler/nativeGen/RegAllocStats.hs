@@ -176,8 +176,10 @@ pprStatsLifeConflict stats graph
  = let	lifeMap	= foldl' plusUFM emptyUFM
  			[ raLifetimes s	| s@RegAllocStatsStart{} <- stats ]
 
- 	scatter	= map	(\r ->  let Just (_, lifetime)	= lookupUFM lifeMap r
-				    Just node		= Color.lookupNode graph r
+ 	scatter	= map	(\r ->  let lifetime	= case lookupUFM lifeMap r of
+							Just (_, l)	-> l
+							Nothing		-> 0
+				    Just node	= Color.lookupNode graph r
 				in parens $ hcat $ punctuate (text ", ")
 					[ doubleQuotes $ ppr $ Color.nodeId node
 					, ppr $ sizeUniqSet (Color.nodeConflicts node)
