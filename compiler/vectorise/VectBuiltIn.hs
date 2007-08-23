@@ -1,20 +1,30 @@
 module VectBuiltIn (
-  Builtins(..), initBuiltins
+  Builtins(..),
+  initBuiltins, initBuiltinTyCons, initBuiltinPAs
 ) where
 
 #include "HsVersions.h"
 
 import DsMonad
+import IfaceEnv        ( lookupOrig )
 
+import Module          ( Module )
 import DataCon         ( DataCon )
-import TyCon           ( TyCon, tyConDataCons )
+import TyCon           ( TyCon, tyConName, tyConDataCons )
 import Var             ( Var )
 import Id              ( mkSysLocal )
+import Name            ( Name )
+import OccName         ( mkVarOccFS )
 
+import TypeRep         ( funTyCon )
 import TysPrim         ( intPrimTy )
+import TysWiredIn      ( unitTyCon, tupleTyCon, intTyConName )
 import PrelNames
+import BasicTypes      ( Boxity(..) )
 
-import Control.Monad   ( liftM )
+import FastString
+
+import Control.Monad   ( liftM, zipWithM )
 
 data Builtins = Builtins {
                   parrayTyCon      :: TyCon
@@ -103,4 +113,43 @@ initBuiltins
                , liftingContext   = liftingContext
                }
 
+initBuiltinTyCons :: DsM [(Name, TyCon)]
+initBuiltinTyCons
+  = do
+      vects <- sequence vs
+      return (zip origs vects)
+  where
+    (origs, vs) = unzip builtinTyCons
+
+builtinTyCons :: [(Name, DsM TyCon)]
+builtinTyCons = [(tyConName funTyCon, dsLookupTyCon closureTyConName)]
+
+initBuiltinPAs :: DsM [(Name, Var)]
+initBuiltinPAs
+  = do
+      pas <- zipWithM lookupExternalVar mods fss
+      return $ zip tcs pas
+  where
+    (tcs, mods, fss) = unzip3 builtinPAs
+
+builtinPAs :: [(Name, Module, FastString)]
+builtinPAs = [
+               mk closureTyConName      nDP_CLOSURE FSLIT("dPA_Clo")
+             , mk (tyConName unitTyCon) nDP_PARRAY  FSLIT("dPA_Unit")
+
+             , temporary intTyConName FSLIT("dPA_Int")
+             ]
+             ++ tups
+  where
+    mk name mod fs = (name, mod, fs)
+
+    temporary name fs = (name, nDP_INSTANCES, fs)
+
+    tups = map mk_tup [2..3]
+    mk_tup n = temporary (tyConName $ tupleTyCon Boxed n)
+                         (mkFastString $ "dPA_" ++ show n)
+
+lookupExternalVar :: Module -> FastString -> DsM Var
+lookupExternalVar mod fs
+  = dsLookupGlobalId =<< lookupOrig mod (mkVarOccFS fs)
 

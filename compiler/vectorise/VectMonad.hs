@@ -22,7 +22,7 @@ module VectMonad (
   lookupVar, defGlobalVar,
   lookupTyCon, defTyCon,
   lookupDataCon, defDataCon,
-  lookupTyConPA, defTyConPA, defTyConPAs, defTyConBuiltinPAs,
+  lookupTyConPA, defTyConPA, defTyConPAs,
   lookupTyVarPA, defLocalTyVar, defLocalTyVarWithPA, localTyVars,
 
   {-lookupInst,-} lookupFamInst
@@ -119,17 +119,13 @@ data LocalEnv = LocalEnv {
                  -- Local binding name
                , local_bind_name :: FastString
                }
-              
 
-initGlobalEnv :: VectInfo -> (InstEnv, InstEnv) -> FamInstEnvs -> Builtins
-              -> GlobalEnv
-initGlobalEnv info instEnvs famInstEnvs bi
+initGlobalEnv :: VectInfo -> (InstEnv, InstEnv) -> FamInstEnvs -> GlobalEnv
+initGlobalEnv info instEnvs famInstEnvs
   = GlobalEnv {
       global_vars          = mapVarEnv snd $ vectInfoVar info
     , global_exported_vars = emptyVarEnv
-    , global_tycons        = extendNameEnv (mapNameEnv snd (vectInfoTyCon info))
-                                           (tyConName funTyCon) (closureTyCon bi)
-                              
+    , global_tycons        = mapNameEnv snd $ vectInfoTyCon info
     , global_datacons      = mapNameEnv snd $ vectInfoDataCon info
     , global_pa_funs       = mapNameEnv snd $ vectInfoPADFun info
     , global_inst_env      = instEnvs
@@ -142,6 +138,14 @@ setFamInstEnv l_fam_inst genv
   = genv { global_fam_inst_env = (g_fam_inst, l_fam_inst) }
   where
     (g_fam_inst, _) = global_fam_inst_env genv
+
+extendTyConsEnv :: [(Name, TyCon)] -> GlobalEnv -> GlobalEnv
+extendTyConsEnv ps genv
+  = genv { global_tycons = extendNameEnvList (global_tycons genv) ps }
+
+extendPAFunsEnv :: [(Name, Var)] -> GlobalEnv -> GlobalEnv
+extendPAFunsEnv ps genv
+  = genv { global_pa_funs = extendNameEnvList (global_pa_funs genv) ps }
 
 emptyLocalEnv = LocalEnv {
                    local_vars     = emptyVarEnv
@@ -258,11 +262,6 @@ inBind id p
   = do updLEnv $ \env -> env { local_bind_name = occNameFS (getOccName id) }
        p
 
-lookupExternalVar :: Module -> FastString -> VM Var
-lookupExternalVar mod fs
-  = liftDs
-  $ dsLookupGlobalId =<< lookupOrig mod (mkVarOccFS fs)
-
 cloneName :: (OccName -> OccName) -> Name -> VM Name
 cloneName mk_occ name = liftM make (liftDs newUnique)
   where
@@ -354,16 +353,6 @@ defTyConPAs ps = updGEnv $ \env ->
   env { global_pa_funs = extendNameEnvList (global_pa_funs env)
                                            [(tyConName tc, pa) | (tc, pa) <- ps] }
 
-defTyConBuiltinPAs :: [(Name, Module, FastString)] -> VM ()
-defTyConBuiltinPAs ps
-  = do
-      pas <- zipWithM lookupExternalVar mods fss
-      updGEnv $ \env ->
-        env { global_pa_funs = extendNameEnvList (global_pa_funs env)
-                                                 (zip tcs pas) }
-  where
-    (tcs, mods, fss) = unzip3 ps
-
 lookupTyVarPA :: Var -> VM (Maybe CoreExpr)
 lookupTyVarPA tv = readLEnv $ \env -> lookupVarEnv (local_tyvar_pa env) tv 
 
@@ -454,11 +443,14 @@ initV hsc_env guts info p
     go instEnvs famInstEnvs = 
       do
         builtins <- initBuiltins
-        r <- runVM p builtins (initGlobalEnv info
-                                             instEnvs
-                                             famInstEnvs
-                                             builtins)
-                   emptyLocalEnv
+        builtin_tycons <- initBuiltinTyCons
+        builtin_pas    <- initBuiltinPAs
+
+        let genv = extendTyConsEnv builtin_tycons
+                 . extendPAFunsEnv builtin_pas
+                 $ initGlobalEnv info instEnvs famInstEnvs
+
+        r <- runVM p builtins genv emptyLocalEnv
         case r of
           Yes genv _ x -> return $ Just (new_info genv, x)
           No           -> return Nothing

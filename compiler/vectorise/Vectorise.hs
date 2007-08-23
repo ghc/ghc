@@ -45,19 +45,6 @@ import Outputable
 import FastString
 import Control.Monad        ( liftM, liftM2, zipWithM, mapAndUnzipM )
 
-builtin_PAs :: [(Name, Module, FastString)]
-builtin_PAs = [
-                (closureTyConName, nDP_CLOSURE, FSLIT("dPA_Clo"))
-              , mk intTyConName     FSLIT("dPA_Int")
-              ]
-              ++ tups
-  where
-    mk name fs = (name, nDP_INSTANCES, fs)
-
-    tups = mk_tup 0 : map mk_tup [2..3]
-    mk_tup n   = (getName $ tupleTyCon Boxed n, nDP_INSTANCES,
-                  mkFastString $ "dPA_" ++ show n)
-
 vectorise :: HscEnv -> UniqSupply -> RuleBase -> ModGuts
           -> IO (SimplCount, ModGuts)
 vectorise hsc_env _ _ guts
@@ -74,7 +61,6 @@ vectorise hsc_env _ _ guts
 vectModule :: ModGuts -> VM ModGuts
 vectModule guts
   = do
-      defTyConBuiltinPAs builtin_PAs
       (types', fam_insts, tc_binds) <- vectTypeEnv (mg_types guts)
       
       let fam_inst_env' = extendFamInstEnvList (mg_fam_inst_env guts) fam_insts
