@@ -6,7 +6,7 @@ module VectUtils (
   mkPRepr, mkToPRepr, mkFromPRepr,
   mkPADictType, mkPArrayType, mkPReprType,
   parrayReprTyCon, parrayReprDataCon, mkVScrut,
-  prDictOfType,
+  prDictOfType, prCoerce,
   paDictArgType, paDictOfType, paDFunType,
   paMethod, lengthPA, replicatePA, emptyPA, liftPA,
   polyAbstract, polyApply, polyVApply,
@@ -23,6 +23,7 @@ import VectMonad
 import DsUtils
 import CoreSyn
 import CoreUtils
+import Coercion
 import Type
 import TypeRep
 import TyCon
@@ -255,7 +256,6 @@ mkVScrut (ve, le)
       (tc, arg_tys) <- parrayReprTyCon (exprType ve)
       return ((ve, unwrapFamInstScrut tc arg_tys le), tc, arg_tys)
 
-
 prDictOfType :: Type -> VM CoreExpr
 prDictOfType orig_ty
   | Just (tycon, ty_args) <- splitTyConApp_maybe orig_ty
@@ -285,6 +285,17 @@ mkDFunArg ty
     in get_dict arg
 
 mkDFunArg ty = pprPanic "mkDFunArg" (ppr ty)
+
+prCoerce :: TyCon -> [Type] -> CoreExpr -> VM CoreExpr
+prCoerce repr_tc args expr
+  | Just arg_co <- tyConFamilyCoercion_maybe repr_tc
+  = do
+      pr_tc <- builtin prTyCon
+
+      let co = mkAppCoercion (mkTyConApp pr_tc [])
+                             (mkSymCoercion (mkTyConApp arg_co args))
+
+      return $ mkCoerce co expr
 
 paDictArgType :: TyVar -> VM (Maybe Type)
 paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
