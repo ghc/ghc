@@ -115,7 +115,7 @@ regAlloc_spin (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
 			, raPatchedCmm	= code_patched }
 
 		return	( code_nat
-			, maybeToList stat1 ++ [stat] ++ debug_codeGraphs
+			, [stat] ++ maybeToList stat1 ++ debug_codeGraphs
 			, graph_colored)
 
 	 else do
@@ -137,7 +137,7 @@ regAlloc_spin (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
 			    	
 		-- try again
 		regAlloc_spin (spinCount + 1) triv regsFree slotsFree' 
-			(maybeToList stat1 ++ [stat] ++ debug_codeGraphs)
+			([stat] ++ maybeToList stat1 ++ debug_codeGraphs)
 			code_relive
 
  
