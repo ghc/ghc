@@ -3,9 +3,9 @@ module VectUtils (
   collectAnnValBinders,
   mkDataConTag,
   splitClosureTy,
-  mkPRepr, mkToPRepr, mkFromPRepr,
+  mkPRepr, mkToPRepr, mkToArrPRepr, mkFromPRepr, mkFromArrPRepr,
   mkPADictType, mkPArrayType, mkPReprType,
-  parrayReprTyCon, parrayReprDataCon, mkVScrut,
+  parrayCoerce, parrayReprTyCon, parrayReprDataCon, mkVScrut,
   prDictOfType, prCoerce,
   paDictArgType, paDictOfType, paDFunType,
   paMethod, lengthPA, replicatePA, emptyPA, liftPA,
@@ -178,6 +178,43 @@ mkToPRepr ess
 
       return . mk_sum $ map (mk_prod . map mk_embed) ess
 
+mkToArrPRepr :: CoreExpr -> CoreExpr -> [[CoreExpr]] -> VM CoreExpr
+mkToArrPRepr len sel ess
+  = do
+      embed_tc <- builtin embedTyCon
+      (embed_rtc, _) <- parrayReprTyCon (mkTyConApp embed_tc [unitTy])
+      let [embed_rdc] = tyConDataCons embed_rtc
+
+      let mk_sum [(expr, ty)] = return (expr, ty)
+          mk_sum es
+            = do
+                sum_tc <- builtin . sumTyCon $ length es
+                (sum_rtc, _) <- parrayReprTyCon (mkTyConApp sum_tc tys)
+                let [sum_rdc] = tyConDataCons sum_rtc
+
+                return (mkConApp sum_rdc (map Type tys ++ (len : sel : exprs)),
+                        mkTyConApp sum_tc tys)
+            where
+              (exprs, tys) = unzip es
+
+          mk_prod [(expr, ty)] = return (expr, ty)
+          mk_prod es
+            = do
+                prod_tc <- builtin . prodTyCon $ length es
+                (prod_rtc, _) <- parrayReprTyCon (mkTyConApp prod_tc tys)
+                let [prod_rdc] = tyConDataCons prod_rtc
+
+                return (mkConApp prod_rdc (map Type tys ++ (len : exprs)),
+                        mkTyConApp prod_tc tys)
+            where
+              (exprs, tys) = unzip es
+
+          mk_embed expr = (mkConApp embed_rdc [Type ty, expr],
+                           mkTyConApp embed_tc [ty])
+            where ty = splitPArrayTy (exprType expr)
+
+      liftM fst (mk_sum =<< mapM (mk_prod . map mk_embed) ess)
+
 mkFromPRepr :: CoreExpr -> Type -> [([Var], CoreExpr)] -> VM CoreExpr
 mkFromPRepr scrut res_ty alts
   = do
@@ -221,6 +258,11 @@ mkFromPRepr scrut res_ty alts
 
       un_sum scrut (exprType scrut) alts
 
+mkFromArrPRepr :: CoreExpr -> Type -> Var -> Var -> [[Var]] -> CoreExpr
+               -> VM CoreExpr
+mkFromArrPRepr scrut res_ty len sel vars res
+  = return (Var unitDataConId)
+
 mkClosureType :: Type -> Type -> VM Type
 mkClosureType arg_ty res_ty = mkBuiltinTyConApp closureTyCon [arg_ty, res_ty]
 
@@ -235,6 +277,17 @@ mkPADictType ty = mkBuiltinTyConApp paTyCon [ty]
 
 mkPArrayType :: Type -> VM Type
 mkPArrayType ty = mkBuiltinTyConApp parrayTyCon [ty]
+
+parrayCoerce :: TyCon -> [Type] -> CoreExpr -> VM CoreExpr
+parrayCoerce repr_tc args expr
+  | Just arg_co <- tyConFamilyCoercion_maybe repr_tc
+  = do
+      parray <- builtin parrayTyCon
+
+      let co = mkAppCoercion (mkTyConApp parray [])
+                             (mkSymCoercion (mkTyConApp arg_co args))
+
+      return $ mkCoerce co expr
 
 parrayReprTyCon :: Type -> VM (TyCon, [Type])
 parrayReprTyCon ty = builtin parrayTyCon >>= (`lookupFamInst` [ty])

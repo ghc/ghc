@@ -230,6 +230,43 @@ buildToPRepr _ vect_tc prepr_tc _
 
     mk_alt data_con bndrs body = (DataAlt data_con, bndrs, body)
 
+buildToArrPRepr :: Shape -> TyCon -> TyCon -> TyCon -> VM CoreExpr
+buildToArrPRepr _ vect_tc prepr_tc arr_tc
+  = do
+      arg_ty  <- mkPArrayType el_ty
+      rep_tys <- mapM (mapM mkPArrayType) rep_el_tys
+
+      arg     <- newLocalVar FSLIT("xs") arg_ty
+      bndrss  <- mapM (mapM (newLocalVar FSLIT("ys"))) rep_tys
+      len     <- newLocalVar FSLIT("len") intPrimTy
+      sel     <- newLocalVar FSLIT("sel") =<< mkPArrayType intTy
+
+      let add_sel xs | has_selector = sel : xs
+                     | otherwise    = xs
+
+          all_bndrs = len : add_sel (concat bndrss)
+
+      res      <- parrayCoerce prepr_tc var_tys
+                =<< mkToArrPRepr (Var len) (Var sel) (map (map Var) bndrss)
+      res_ty   <- mkPArrayType =<< mkPReprType el_ty
+
+      return . Lam arg
+             $ Case (unwrapFamInstScrut arr_tc var_tys (Var arg))
+                    (mkWildId (mkTyConApp arr_tc var_tys))
+                    res_ty
+                    [(DataAlt arr_dc, all_bndrs, res)]
+  where
+    var_tys    = mkTyVarTys $ tyConTyVars vect_tc
+    el_ty      = mkTyConApp vect_tc var_tys
+    data_cons  = tyConDataCons vect_tc
+    rep_el_tys = map dataConRepArgTys data_cons
+
+    [arr_dc]   = tyConDataCons arr_tc
+
+    has_selector | [_] <- data_cons = False
+                 | otherwise        = True
+
+
 buildFromPRepr :: Shape -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildFromPRepr _ vect_tc prepr_tc _
   = do
@@ -247,6 +284,10 @@ buildFromPRepr _ vect_tc prepr_tc _
     mk_alt dc = do
                   bndrs <- mapM (newLocalVar FSLIT("x")) $ dataConRepArgTys dc
                   return (bndrs, mkConApp dc (map Type var_tys ++ map Var bndrs))
+
+buildFromArrPRepr :: Shape -> TyCon -> TyCon -> TyCon -> VM CoreExpr
+buildFromArrPRepr _ vect_tc prepr_tc arr_tc
+  = mkFromArrPRepr undefined undefined undefined undefined undefined undefined
 
 buildPRDict :: Shape -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildPRDict _ vect_tc prepr_tc _
@@ -420,11 +461,11 @@ buildPADict shape vect_tc prepr_tc arr_tc dfun
           var  <- newLocalVar name (exprType body)
           return (var, mkInlineMe body)
           
-paMethods = [(FSLIT("lengthPA"),    buildLengthPA),
-             (FSLIT("replicatePA"), buildReplicatePA),
-             (FSLIT("toPRepr"),     buildToPRepr),
-             (FSLIT("fromPRepr"),   buildFromPRepr),
-             (FSLIT("dictPRepr"),   buildPRDict)]
+paMethods = [(FSLIT("toPRepr"),      buildToPRepr),
+             (FSLIT("fromPRepr"),    buildFromPRepr),
+             (FSLIT("toArrPRepr"),   buildToArrPRepr),
+             (FSLIT("fromArrPRepr"), buildFromArrPRepr),
+             (FSLIT("dictPRepr"),    buildPRDict)]
 
 buildLengthPA :: Shape -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildLengthPA shape vect_tc _ arr_tc
