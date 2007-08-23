@@ -198,7 +198,7 @@ initSysTools mbMinusB dflags
 		| otherwise    = inplace cGHC_MANGLER_DIR_REL cGHC_MANGLER_PGM
 
               windres_path
-		| am_installed = installed_bin "windres"
+		| am_installed = installed_bin "bin/windres"
 		| otherwise    = "windres"
 
 	; let dflags0 = defaultDynFlags
