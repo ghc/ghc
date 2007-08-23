@@ -23,6 +23,7 @@ module VectMonad (
   lookupTyCon, defTyCon,
   lookupDataCon, defDataCon,
   lookupTyConPA, defTyConPA, defTyConPAs,
+  lookupTyConPR,
   lookupTyVarPA, defLocalTyVar, defLocalTyVarWithPA, localTyVars,
 
   {-lookupInst,-} lookupFamInst
@@ -90,6 +91,9 @@ data GlobalEnv = GlobalEnv {
                   --
                 , global_pa_funs :: NameEnv Var
 
+                  -- Mapping from TyCons to their PR dfuns
+                , global_pr_funs :: NameEnv Var
+
                 -- External package inst-env & home-package inst-env for class
                 -- instances
                 --
@@ -129,6 +133,7 @@ initGlobalEnv info instEnvs famInstEnvs
     , global_tycons        = mapNameEnv snd $ vectInfoTyCon info
     , global_datacons      = mapNameEnv snd $ vectInfoDataCon info
     , global_pa_funs       = mapNameEnv snd $ vectInfoPADFun info
+    , global_pr_funs       = emptyVarEnv
     , global_inst_env      = instEnvs
     , global_fam_inst_env  = famInstEnvs
     , global_bindings      = []
@@ -147,6 +152,10 @@ extendTyConsEnv ps genv
 extendPAFunsEnv :: [(Name, Var)] -> GlobalEnv -> GlobalEnv
 extendPAFunsEnv ps genv
   = genv { global_pa_funs = extendNameEnvList (global_pa_funs genv) ps }
+
+setPRFunsEnv :: [(Name, Var)] -> GlobalEnv -> GlobalEnv
+setPRFunsEnv ps genv
+  = genv { global_pr_funs = mkNameEnv ps }
 
 emptyLocalEnv = LocalEnv {
                    local_vars     = emptyVarEnv
@@ -355,7 +364,10 @@ defTyConPAs ps = updGEnv $ \env ->
                                            [(tyConName tc, pa) | (tc, pa) <- ps] }
 
 lookupTyVarPA :: Var -> VM (Maybe CoreExpr)
-lookupTyVarPA tv = readLEnv $ \env -> lookupVarEnv (local_tyvar_pa env) tv 
+lookupTyVarPA tv = readLEnv $ \env -> lookupVarEnv (local_tyvar_pa env) tv
+
+lookupTyConPR :: TyCon -> VM (Maybe Var)
+lookupTyConPR tc = readGEnv $ \env -> lookupNameEnv (global_pr_funs env) (tyConName tc)
 
 defLocalTyVar :: TyVar -> VM ()
 defLocalTyVar tv = updLEnv $ \env ->
