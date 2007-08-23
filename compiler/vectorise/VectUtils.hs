@@ -6,6 +6,7 @@ module VectUtils (
   mkPRepr, mkToPRepr, mkFromPRepr,
   mkPADictType, mkPArrayType, mkPReprType,
   parrayReprTyCon, parrayReprDataCon, mkVScrut,
+  prDictOfType,
   paDictArgType, paDictOfType, paDFunType,
   paMethod, lengthPA, replicatePA, emptyPA, liftPA,
   polyAbstract, polyApply, polyVApply,
@@ -253,6 +254,37 @@ mkVScrut (ve, le)
   = do
       (tc, arg_tys) <- parrayReprTyCon (exprType ve)
       return ((ve, unwrapFamInstScrut tc arg_tys le), tc, arg_tys)
+
+
+prDictOfType :: Type -> VM CoreExpr
+prDictOfType orig_ty
+  | Just (tycon, ty_args) <- splitTyConApp_maybe orig_ty
+  = do
+      dfun <- traceMaybeV "prDictOfType" (ppr tycon) (lookupTyConPR tycon)
+      prDFunApply (Var dfun) ty_args
+
+prDFunApply :: CoreExpr -> [Type] -> VM CoreExpr
+prDFunApply dfun tys
+  = do
+      args <- mapM mkDFunArg arg_tys
+      return $ mkApps mono_dfun args
+  where
+    mono_dfun    = mkTyApps dfun tys
+    (arg_tys, _) = splitFunTys (exprType mono_dfun)
+
+mkDFunArg :: Type -> VM CoreExpr
+mkDFunArg ty
+  | Just (tycon, [arg]) <- splitTyConApp_maybe ty
+
+  = let name = tyConName tycon
+
+        get_dict | name == paTyConName = paDictOfType
+                 | name == prTyConName = prDictOfType
+                 | otherwise           = pprPanic "mkDFunArg" (ppr ty)
+
+    in get_dict arg
+
+mkDFunArg ty = pprPanic "mkDFunArg" (ppr ty)
 
 paDictArgType :: TyVar -> VM (Maybe Type)
 paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
