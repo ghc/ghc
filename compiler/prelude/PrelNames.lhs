@@ -218,7 +218,7 @@ genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 
 ndpNames :: [Name]
 ndpNames = [ parrayTyConName, paTyConName, preprTyConName, prTyConName
-           , ndpCrossTyConName, ndpPlusTyConName, embedTyConName
+           , embedTyConName
            , closureTyConName
            , mkClosureName, applyClosureName
            , mkClosurePName, applyClosurePName
@@ -276,6 +276,7 @@ rANDOM		= mkBaseModule FSLIT("System.Random")
 gLA_EXTS	= mkBaseModule FSLIT("GHC.Exts")
 
 nDP_PARRAY      = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.PArray")
+nDP_REPR        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Repr")
 nDP_UTILS       = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Utils")
 nDP_CLOSURE     = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Closure")
 nDP_INSTANCES   = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Instances")
@@ -697,9 +698,7 @@ parrayTyConName     = tcQual   nDP_PARRAY FSLIT("PArray") parrayTyConKey
 paTyConName         = tcQual   nDP_PARRAY FSLIT("PA")     paTyConKey
 preprTyConName      = tcQual   nDP_PARRAY FSLIT("PRepr")  preprTyConKey
 prTyConName         = clsQual  nDP_PARRAY FSLIT("PR")     prTyConKey
-ndpCrossTyConName   = tcQual   nDP_PARRAY FSLIT(":*:")    ndpCrossTyConKey
-ndpPlusTyConName    = tcQual   nDP_PARRAY FSLIT(":+:")    ndpPlusTyConKey
-embedTyConName      = tcQual   nDP_PARRAY FSLIT("Embed")  embedTyConKey
+embedTyConName      = tcQual   nDP_REPR   FSLIT("Embed")  embedTyConKey
 lengthPAName        = varQual  nDP_PARRAY FSLIT("lengthPA")    lengthPAIdKey
 replicatePAName     = varQual  nDP_PARRAY FSLIT("replicatePA") replicatePAIdKey
 emptyPAName         = varQual  nDP_PARRAY FSLIT("emptyPA") emptyPAIdKey
@@ -895,9 +894,7 @@ closureTyConKey                         = mkPreludeTyConUnique 136
 paTyConKey                              = mkPreludeTyConUnique 137
 preprTyConKey                           = mkPreludeTyConUnique 138
 embedTyConKey                           = mkPreludeTyConUnique 139
-ndpCrossTyConKey                        = mkPreludeTyConUnique 140
-ndpPlusTyConKey                         = mkPreludeTyConUnique 141
-prTyConKey                              = mkPreludeTyConUnique 142
+prTyConKey                              = mkPreludeTyConUnique 140
 
 
 ---------------- Template Haskell -------------------

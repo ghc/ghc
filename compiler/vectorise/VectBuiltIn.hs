@@ -1,5 +1,5 @@
 module VectBuiltIn (
-  Builtins(..),
+  Builtins(..), sumTyCon, prodTyCon,
   initBuiltins, initBuiltinTyCons, initBuiltinPAs, initBuiltinPRs
 ) where
 
@@ -14,7 +14,7 @@ import TyCon           ( TyCon, tyConName, tyConDataCons )
 import Var             ( Var )
 import Id              ( mkSysLocal )
 import Name            ( Name )
-import OccName         ( mkVarOccFS )
+import OccName         ( mkVarOccFS, mkOccNameFS, tcName )
 
 import TypeRep         ( funTyCon )
 import TysPrim         ( intPrimTy )
@@ -23,8 +23,16 @@ import PrelNames
 import BasicTypes      ( Boxity(..) )
 
 import FastString
+import Outputable
 
+import Data.Array
 import Control.Monad   ( liftM, zipWithM )
+
+mAX_NDP_PROD :: Int
+mAX_NDP_PROD = 3
+
+mAX_NDP_SUM :: Int
+mAX_NDP_SUM = 3
 
 data Builtins = Builtins {
                   parrayTyCon      :: TyCon
@@ -35,11 +43,7 @@ data Builtins = Builtins {
                 , prDataCon        :: DataCon
                 , embedTyCon       :: TyCon
                 , embedDataCon     :: DataCon
-                , crossTyCon       :: TyCon
-                , crossDataCon     :: DataCon
-                , plusTyCon        :: TyCon
-                , leftDataCon      :: DataCon
-                , rightDataCon     :: DataCon
+                , sumTyCons        :: Array Int TyCon
                 , closureTyCon     :: TyCon
                 , mkClosureVar     :: Var
                 , applyClosureVar  :: Var
@@ -54,6 +58,17 @@ data Builtins = Builtins {
                 , liftingContext   :: Var
                 }
 
+sumTyCon :: Int -> Builtins -> TyCon
+sumTyCon n bi
+  | n >= 2 && n <= mAX_NDP_SUM = sumTyCons bi ! n
+  | otherwise = pprPanic "sumTyCon" (ppr n)
+
+prodTyCon :: Int -> Builtins -> TyCon
+prodTyCon n bi
+  | n >= 2 && n <= mAX_NDP_PROD = tupleTyCon Boxed n
+  | otherwise = pprPanic "prodTyCon" (ppr n)
+
+
 initBuiltins :: DsM Builtins
 initBuiltins
   = do
@@ -65,11 +80,12 @@ initBuiltins
       let [prDataCon] = tyConDataCons prTyCon
       embedTyCon   <- dsLookupTyCon embedTyConName
       let [embedDataCon] = tyConDataCons embedTyCon
-      crossTyCon   <- dsLookupTyCon ndpCrossTyConName
-      let [crossDataCon] = tyConDataCons crossTyCon
-      plusTyCon    <- dsLookupTyCon ndpPlusTyConName
-      let [leftDataCon, rightDataCon] = tyConDataCons plusTyCon
       closureTyCon <- dsLookupTyCon closureTyConName
+
+      sum_tcs <- mapM (lookupExternalTyCon nDP_REPR)
+                      [mkFastString ("Sum" ++ show i) | i <- [2..mAX_NDP_SUM]]
+
+      let sumTyCons = listArray (2, mAX_NDP_SUM) sum_tcs
 
       mkClosureVar     <- dsLookupGlobalId mkClosureName
       applyClosureVar  <- dsLookupGlobalId applyClosureName
@@ -94,11 +110,7 @@ initBuiltins
                , prDataCon        = prDataCon
                , embedTyCon       = embedTyCon
                , embedDataCon     = embedDataCon
-               , crossTyCon       = crossTyCon
-               , crossDataCon     = crossDataCon
-               , plusTyCon        = plusTyCon
-               , leftDataCon      = leftDataCon
-               , rightDataCon     = rightDataCon
+               , sumTyCons        = sumTyCons
                , closureTyCon     = closureTyCon
                , mkClosureVar     = mkClosureVar
                , applyClosureVar  = applyClosureVar
@@ -137,7 +149,7 @@ initBuiltinPAs = initBuiltinDicts builtinPAs
 builtinPAs :: [(Name, Module, FastString)]
 builtinPAs = [
                mk closureTyConName  nDP_CLOSURE   FSLIT("dPA_Clo")
-             , mk unitTyConName     nDP_PARRAY    FSLIT("dPA_Unit")
+             , mk unitTyConName     nDP_INSTANCES FSLIT("dPA_Unit")
 
              , mk intTyConName      nDP_INSTANCES FSLIT("dPA_Int")
              ]
@@ -150,25 +162,37 @@ builtinPAs = [
                   nDP_INSTANCES
                   (mkFastString $ "dPA_" ++ show n)
 
-initBuiltinPRs = initBuiltinDicts builtinPRs
+initBuiltinPRs = initBuiltinDicts . builtinPRs
 
-builtinPRs :: [(Name, Module, FastString)]
-builtinPRs = [
-               mk (tyConName unitTyCon) nDP_PARRAY    FSLIT("dPR_Unit")
-             , mk ndpCrossTyConName     nDP_PARRAY    FSLIT("dPR_Cross")
-             , mk ndpPlusTyConName      nDP_PARRAY    FSLIT("dPR_Plus")
-             , mk embedTyConName        nDP_PARRAY    FSLIT("dPR_Embed")
-             , mk closureTyConName      nDP_CLOSURE   FSLIT("dPR_Clo")
+builtinPRs :: Builtins -> [(Name, Module, FastString)]
+builtinPRs bi =
+  [
+    mk (tyConName unitTyCon) nDP_REPR      FSLIT("dPR_Unit")
+  , mk embedTyConName        nDP_REPR      FSLIT("dPR_Embed")
+  , mk closureTyConName      nDP_CLOSURE   FSLIT("dPR_Clo")
 
-               -- temporary
-             , mk intTyConName          nDP_INSTANCES FSLIT("dPR_Int")
-             ]
+    -- temporary
+  , mk intTyConName          nDP_INSTANCES FSLIT("dPR_Int")
+  ]
+
+  ++ map mk_sum  [2..mAX_NDP_SUM]
+  ++ map mk_prod [2..mAX_NDP_PROD]
   where
     mk name mod fs = (name, mod, fs)
+
+    mk_sum n = (tyConName $ sumTyCon n bi, nDP_REPR,
+                mkFastString ("dPR_Sum" ++ show n))
+
+    mk_prod n = (tyConName $ prodTyCon n bi, nDP_REPR,
+                 mkFastString ("dPR_" ++ show n))
 
 lookupExternalVar :: Module -> FastString -> DsM Var
 lookupExternalVar mod fs
   = dsLookupGlobalId =<< lookupOrig mod (mkVarOccFS fs)
+
+lookupExternalTyCon :: Module -> FastString -> DsM TyCon
+lookupExternalTyCon mod fs
+  = dsLookupTyCon =<< lookupOrig mod (mkOccNameFS tcName fs)
 
 unitTyConName = tyConName unitTyCon
 

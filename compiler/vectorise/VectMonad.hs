@@ -7,8 +7,8 @@ module VectMonad (
   cloneName, cloneId,
   newExportedVar, newLocalVar, newDummyVar, newTyVar,
   
-  Builtins(..),
-  builtin,
+  Builtins(..), sumTyCon, prodTyCon,
+  builtin, builtins,
 
   GlobalEnv(..),
   setFamInstEnv,
@@ -240,6 +240,9 @@ liftDs p = VM $ \bi genv lenv -> do { x <- p; return (Yes genv lenv x) }
 builtin :: (Builtins -> a) -> VM a
 builtin f = VM $ \bi genv lenv -> return (Yes genv lenv (f bi))
 
+builtins :: (a -> Builtins -> b) -> VM (a -> b)
+builtins f = VM $ \bi genv lenv -> return (Yes genv lenv (`f` bi))
+
 readGEnv :: (GlobalEnv -> a) -> VM a
 readGEnv f = VM $ \bi genv lenv -> return (Yes genv lenv (f genv))
 
@@ -454,7 +457,7 @@ initV hsc_env guts info p
         builtins       <- initBuiltins
         builtin_tycons <- initBuiltinTyCons
         builtin_pas    <- initBuiltinPAs
-        builtin_prs    <- initBuiltinPRs
+        builtin_prs    <- initBuiltinPRs builtins
 
         eps <- ioToIOEnv $ hscEPS hsc_env
         let famInstEnvs = (eps_fam_inst_env eps, mg_fam_inst_env guts)
