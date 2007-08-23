@@ -16,8 +16,7 @@ module RegArchX86 (
 
 import RegArchBase		(Reg(..), RegSub(..), RegClass(..))
 
-import qualified Data.Set	as Set
-import Data.Set			(Set)
+import UniqSet
 
 -- | Determine the class of a register
 classOfReg :: Reg -> RegClass
@@ -32,22 +31,22 @@ classOfReg reg
 	
 -- | Determine all the regs that make up a certain class.
 --
-regsOfClass :: RegClass -> Set Reg
+regsOfClass :: RegClass -> UniqSet Reg
 regsOfClass c
  = case c of
  	ClassG32	
-	 -> Set.fromList [ Reg ClassG32  i			| i <- [0..7] ]
+	 -> mkUniqSet	  [ Reg ClassG32  i			| i <- [0..7] ]
 
 	ClassG16	
-	 -> Set.fromList [ RegSub SubL16 (Reg ClassG32 i)	| i <- [0..7] ]
+	 -> mkUniqSet     [ RegSub SubL16 (Reg ClassG32 i)	| i <- [0..7] ]
 
 	ClassG8	
-	 -> Set.union
-	 	(Set.fromList [ RegSub SubL8  (Reg ClassG32 i)	| i <- [0..3] ])
-		(Set.fromList [ RegSub SubL8H (Reg ClassG32 i)	| i <- [0..3] ])
+	 -> unionUniqSets
+	 	(mkUniqSet [ RegSub SubL8  (Reg ClassG32 i)	| i <- [0..3] ])
+		(mkUniqSet [ RegSub SubL8H (Reg ClassG32 i)	| i <- [0..3] ])
 			
 	ClassF64	
-	 -> Set.fromList [ Reg ClassF64  i			| i <- [0..5] ]
+	 -> mkUniqSet 	   [ Reg ClassF64  i			| i <- [0..5] ]
 	
 
 -- | Determine the common name of a reg
@@ -72,7 +71,7 @@ regName reg
 
 	
 -- | Which regs alias what other regs
-regAlias :: Reg -> Set Reg
+regAlias :: Reg -> UniqSet Reg
 regAlias reg
  = case reg of
 
@@ -81,11 +80,11 @@ regAlias reg
 	 
 	 -- for eax, ebx, ecx, eds
 	 |  i <= 3		
-	 -> Set.fromList $ [ Reg ClassG32 i, RegSub SubL16 reg, RegSub SubL8 reg, RegSub SubL8H reg ]
+	 -> mkUniqSet $ [ Reg ClassG32 i, RegSub SubL16 reg, RegSub SubL8 reg, RegSub SubL8H reg ]
 	 
 	 -- for esi, edi, esp, ebp
 	 | 4 <= i && i <= 7	
-	 -> Set.fromList $ [ Reg ClassG32 i, RegSub SubL16 reg ]
+	 -> mkUniqSet $ [ Reg ClassG32 i, RegSub SubL16 reg ]
 	
 	
 	-- 16 bit subregs alias the whole reg
@@ -94,14 +93,14 @@ regAlias reg
 	
 	-- 8 bit subregs alias the 32 and 16, but not the other 8 bit subreg
 	RegSub SubL8  r@(Reg ClassG32 i)
-	 -> Set.fromList $ [ r, RegSub SubL16 r, RegSub SubL8 r ]
+	 -> mkUniqSet $ [ r, RegSub SubL16 r, RegSub SubL8 r ]
 
 	RegSub SubL8H r@(Reg ClassG32 i)
-	 -> Set.fromList $ [ r, RegSub SubL16 r, RegSub SubL8H r ]
+	 -> mkUniqSet $ [ r, RegSub SubL16 r, RegSub SubL8H r ]
 	
 	-- fp
 	Reg ClassF64 i	
-	 -> Set.singleton reg
+	 -> unitUniqSet reg
 
 	_ -> error "regAlias: invalid register"
 

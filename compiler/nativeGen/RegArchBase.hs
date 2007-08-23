@@ -24,13 +24,9 @@ module RegArchBase (
 	
 where
 
-
 -----
-import qualified Data.Set	as Set
-import Data.Set			(Set)
-
--- import qualified Data.Map	as Map
--- import Data.Map			(Map)
+import UniqSet
+import Unique
 
 
 -- Some basic register classes.
@@ -45,7 +41,7 @@ data RegClass
 	
 	-- floating point regs
 	| ClassF64	-- 64 bit FPRs
-	deriving (Show, Ord, Eq)
+	deriving (Show, Eq, Enum)
 
 
 -- | A register of some class
@@ -55,8 +51,21 @@ data Reg
 	
 	-- a sub-component of one of the other regs
 	| RegSub RegSub Reg
-	deriving (Show, Ord, Eq)
+	deriving (Show, Eq)
 
+
+-- | so we can put regs in UniqSets
+instance Uniquable Reg where
+	getUnique (Reg c i)
+	 = mkUnique 'R'
+	 $ fromEnum c * 1000 + i
+
+	getUnique (RegSub s (Reg c i))
+	 = mkUnique 'S'
+	 $ fromEnum s * 10000 + fromEnum c * 1000 + i
+
+	getUnique (RegSub s (RegSub c _))
+	  = error "RegArchBase.getUnique: can't have a sub-reg of a sub-reg."
 
 -- | A subcomponent of another register
 data RegSub
@@ -65,7 +74,6 @@ data RegSub
 	| SubL8H	-- second lowest 8 bits
 	deriving (Show, Enum, Ord, Eq)
 	
-
 
 -- | Worst case displacement
 --
@@ -79,26 +87,28 @@ data RegSub
 --	because the compute time is very long..
 
 worst 
-	:: (RegClass 	-> Set Reg)
-	-> (Reg 	-> Set Reg)
+	:: (RegClass 	-> UniqSet Reg)
+	-> (Reg 	-> UniqSet Reg)
 	-> Int -> RegClass -> RegClass -> Int
 
 worst regsOfClass regAlias neighbors classN classC
- = let	regAliasS regs	= unionsS $ Set.map regAlias regs
+ = let	regAliasS regs	= unionManyUniqSets
+ 			$ map regAlias
+			$ uniqSetToList regs
 
 	-- all the regs in classes N, C
  	regsN		= regsOfClass classN
 	regsC		= regsOfClass classC
 	
 	-- all the possible subsets of c which have size < m
-	regsS		= Set.filter (\s -> Set.size s >= 1 && Set.size s <= neighbors)
-			$ powerset regsC
+	regsS		= filter (\s -> sizeUniqSet s >= 1 && sizeUniqSet s <= neighbors)
+			$ powersetLS regsC
 
 	-- for each of the subsets of C, the regs which conflict with posiblities for N
 	regsS_conflict 
-		= Set.map (\s -> Set.intersection regsN (regAliasS s)) regsS
+		= map (\s -> intersectUniqSets regsN (regAliasS s)) regsS
 
-  in	Set.findMax $ Set.map Set.size $ regsS_conflict
+  in	maximum $ map sizeUniqSet $ regsS_conflict
 
 
 -- | For a node N of classN and neighbors of classesC
@@ -107,20 +117,22 @@ worst regsOfClass regAlias neighbors classN classC
 --
 
 bound 
-	:: (RegClass 	-> Set Reg)
-	-> (Reg		-> Set Reg)
+	:: (RegClass 	-> UniqSet Reg)
+	-> (Reg		-> UniqSet Reg)
 	-> RegClass -> [RegClass] -> Int
 
 bound regsOfClass regAlias classN classesC
- = let	regAliasS regs	= unionsS $ Set.map regAlias regs
+ = let	regAliasS regs	= unionManyUniqSets
+ 			$ map regAlias
+			$ uniqSetToList regs
  
  	regsC_aliases
-		= Set.unions 
+		= unionManyUniqSets
 		$ map (regAliasS . regsOfClass) classesC
 
-	overlap	= Set.intersection (regsOfClass classN) regsC_aliases
+	overlap	= intersectUniqSets (regsOfClass classN) regsC_aliases
    
-   in	Set.size overlap
+   in	sizeUniqSet overlap
 
 
 -- | The total squeese on a particular node with a list of neighbors.
@@ -130,8 +142,8 @@ bound regsOfClass regAlias classN classesC
 --	twice, as per the paper.
 --	
 squeese 
-	:: (RegClass	-> Set Reg)
-	-> (Reg		-> Set Reg)
+	:: (RegClass	-> UniqSet Reg)
+	-> (Reg		-> UniqSet Reg)
 	-> RegClass -> [(Int, RegClass)] -> Int
 
 squeese regsOfClass regAlias classN countCs
@@ -139,15 +151,16 @@ squeese regsOfClass regAlias classN countCs
 	
 
 -- | powerset (for lists)
-powersetL :: Ord a => [a] -> [[a]]
+powersetL :: [a] -> [[a]]
 powersetL 	= map concat . mapM (\x -> [[],[x]])
 	
--- | powerset (for sets)
-powerset :: Ord a => Set a -> Set (Set a)
-powerset s	= Set.fromList $ map Set.fromList $ powersetL $ Set.toList s
+-- | powersetLS (list of sets)
+powersetLS :: Uniquable a => UniqSet a -> [UniqSet a]
+powersetLS s	= map mkUniqSet $ powersetL $ uniqSetToList s
 
+{-
 -- | unions (for sets)
 unionsS :: Ord a => Set (Set a) -> Set a
 unionsS	ss 	= Set.unions $ Set.toList ss
-
+-}
 
