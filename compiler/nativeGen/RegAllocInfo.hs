@@ -69,6 +69,8 @@ interesting (RealReg i)       = isFastTrue (freeReg i)
 
 #if alpha_TARGET_ARCH
 regUsage instr = case instr of
+    SPILL  reg slot	-> usage ([reg], [])
+    RELOAD slot reg	-> usage ([], [reg])
     LD B reg addr	-> usage (regAddr addr, [reg, t9])
     LD Bu reg addr	-> usage (regAddr addr, [reg, t9])
 --  LD W reg addr	-> usage (regAddr addr, [reg, t9]) : UNUSED
@@ -226,6 +228,8 @@ regUsage instr = case instr of
 
     COMMENT _		-> noUsage
     DELTA   _           -> noUsage
+    SPILL   reg slot	-> mkRU [reg] []
+    RELOAD  slot reg	-> mkRU []    [reg]
 
     _other		-> panic "regUsage: unrecognised instr"
 
@@ -275,6 +279,9 @@ regUsage instr = case instr of
 #if sparc_TARGET_ARCH
 
 regUsage instr = case instr of
+    SPILL reg slot	-> usage ([reg], [])
+    RELOAD slot reg	-> usage ([], [reg])
+
     LD    sz addr reg  	-> usage (regAddr addr, [reg])
     ST    sz reg addr  	-> usage (reg : regAddr addr, [])
     ADD   x cc r1 ar r2	-> usage (r1 : regRI ar, [r2])
@@ -327,6 +334,9 @@ regUsage instr = case instr of
 #if powerpc_TARGET_ARCH
 
 regUsage instr = case instr of
+    SPILL  reg slot	-> usage ([reg], [])
+    RELOAD slot reg	-> usage ([], [reg])
+
     LD    sz reg addr  	-> usage (regAddr addr, [reg])
     LA    sz reg addr  	-> usage (regAddr addr, [reg])
     ST    sz reg addr  	-> usage (reg : regAddr addr, [])
@@ -471,6 +481,8 @@ patchRegs :: Instr -> (Reg -> Reg) -> Instr
 #if alpha_TARGET_ARCH
 
 patchRegs instr env = case instr of
+    SPILL  reg slot	-> SPILL (env reg) slot
+    RELOAD slot reg	-> RELOAD slot (env reg)
     LD sz reg addr -> LD sz (env reg) (fixAddr addr)
     LDA reg addr -> LDA (env reg) (fixAddr addr)
     LDAH reg addr -> LDAH (env reg) (fixAddr addr)
@@ -604,6 +616,9 @@ patchRegs instr env = case instr of
     NOP			-> instr
     COMMENT _		-> instr
     DELTA _ 		-> instr
+    SPILL  reg slot	-> SPILL (env reg) slot
+    RELOAD slot reg	-> RELOAD slot (env reg)
+
     JXX _ _		-> instr
     JXX_GBL _ _		-> instr
     CLTD _		-> instr
@@ -634,6 +649,8 @@ patchRegs instr env = case instr of
 #if sparc_TARGET_ARCH
 
 patchRegs instr env = case instr of
+    SPILL reg slot	-> SPILL (env reg) slot
+    RELOAD slot reg	-> RELOAD slot (env reg)
     LD    sz addr reg   -> LD sz (fixAddr addr) (env reg)
     ST    sz reg addr   -> ST sz (env reg) (fixAddr addr)
     ADD   x cc r1 ar r2 -> ADD x cc (env r1) (fixRI ar) (env r2)
@@ -677,6 +694,9 @@ patchRegs instr env = case instr of
 #if powerpc_TARGET_ARCH
 
 patchRegs instr env = case instr of
+    SPILL reg slot	-> SPILL (env reg) slot
+    RELOAD slot reg	-> RELOAD slot (env reg)
+
     LD    sz reg addr   -> LD sz (env reg) (fixAddr addr)
     LA    sz reg addr   -> LA sz (env reg) (fixAddr addr)
     ST    sz reg addr   -> ST sz (env reg) (fixAddr addr)

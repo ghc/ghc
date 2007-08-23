@@ -226,6 +226,9 @@ data Instr
   | DELTA   Int                 -- specify current stack offset for
                                 -- benefit of subsequent passes
 
+  | SPILL   Reg Int		-- ^ spill this reg to a stack slot
+  | RELOAD  Int Reg		-- ^ reload this reg from a stack slot
+
 -- -----------------------------------------------------------------------------
 -- Alpha instructions
 

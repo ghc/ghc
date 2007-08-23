@@ -829,6 +829,22 @@ pprInstr (LDATA _ _)
 
 #if alpha_TARGET_ARCH
 
+pprInstr (SPILL reg slot)
+   = hcat [
+   	ptext SLIT("\tSPILL"),
+	char '\t',
+	pprReg reg,
+	comma,
+	ptext SLIT("SLOT") <> parens (int slot)]
+
+pprInstr (RELOAD slot reg)
+   = hcat [
+   	ptext SLIT("\tRELOAD"),
+	char '\t',
+	ptext SLIT("SLOT") <> parens (int slot),
+	comma,
+	pprReg reg]
+
 pprInstr (LD size reg addr)
   = hcat [
 	ptext SLIT("\tld"),
@@ -1221,6 +1237,22 @@ pprInstr v@(MOV size s@(OpReg src) d@(OpReg dst)) -- hack		-- write a pass for t
     empty
 #endif
 -}
+
+pprInstr (SPILL reg slot)
+   = hcat [
+   	ptext SLIT("\tSPILL"),
+	char ' ',
+	pprUserReg reg,
+	comma,
+	ptext SLIT("SLOT") <> parens (int slot)]
+
+pprInstr (RELOAD slot reg)
+   = hcat [
+   	ptext SLIT("\tRELOAD"),
+	char ' ',
+	ptext SLIT("SLOT") <> parens (int slot),
+	comma,
+	pprUserReg reg]
 
 pprInstr (MOV size src dst)
   = pprSizeOpOp SLIT("mov") size src dst
@@ -1783,6 +1815,22 @@ pprCondInstr name cond arg
 -- reads (bytearrays).
 --
 
+pprInstr (SPILL reg slot)
+   = hcat [
+   	ptext SLIT("\tSPILL"),
+	char '\t',
+	pprReg reg,
+	comma,
+	ptext SLIT("SLOT") <> parens (int slot)]
+
+pprInstr (RELOAD slot reg)
+   = hcat [
+   	ptext SLIT("\tRELOAD"),
+	char '\t',
+	ptext SLIT("SLOT") <> parens (int slot),
+	comma,
+	pprReg reg]
+
 -- Translate to the following:
 --    add g1,g2,g1
 --    ld  [g1],%fn
@@ -2057,6 +2105,23 @@ pp_comma_a	  = text ",a"
 -- pprInstr for PowerPC
 
 #if powerpc_TARGET_ARCH
+
+pprInstr (SPILL reg slot)
+   = hcat [
+   	ptext SLIT("\tSPILL"),
+	char '\t',
+	pprReg reg,
+	comma,
+	ptext SLIT("SLOT") <> parens (int slot)]
+
+pprInstr (RELOAD slot reg)
+   = hcat [
+   	ptext SLIT("\tRELOAD"),
+	char '\t',
+	ptext SLIT("SLOT") <> parens (int slot),
+	comma,
+	pprReg reg]
+
 pprInstr (LD sz reg addr) = hcat [
 	char '\t',
 	ptext SLIT("l"),

@@ -17,15 +17,17 @@ module RegLiveness (
 	LiveInfo (..),
 	LiveBasicBlock,
 
-	mapBlockTop,
-	mapBlockTopM,
+	mapBlockTop, 	mapBlockTopM,
+	mapGenBlockTop,	mapGenBlockTopM,
 	stripLive,
+	spillNatBlock,
 	slurpConflicts,
 	lifetimeCount,
 	eraseDeltasLive,
 	patchEraseLive,
 	patchRegsLiveInstr,
 	regLiveness
+
   ) where
 
 #include "HsVersions.h"
@@ -153,6 +155,32 @@ mapBlockCompM f (BasicBlock i blocks)
  	return	$ BasicBlock i blocks'
 
 
+-- map a function across all the basic blocks in this code
+mapGenBlockTop
+	:: (GenBasicBlock i -> GenBasicBlock i)
+	-> (GenCmmTop d h i -> GenCmmTop d h i)
+
+mapGenBlockTop f cmm
+	= evalState (mapGenBlockTopM (\x -> return $ f x) cmm) ()
+
+
+-- | map a function across all the basic blocks in this code (monadic version)
+mapGenBlockTopM
+	:: Monad m
+	=> (GenBasicBlock i -> m (GenBasicBlock i))
+	-> (GenCmmTop d h i -> m (GenCmmTop d h i))
+
+mapGenBlockTopM f cmm@(CmmData{})
+	= return cmm
+
+mapGenBlockTopM f (CmmProc header label params blocks)
+ = do	blocks'	<- mapM f blocks
+ 	return	$ CmmProc header label params blocks'
+
+
+
+
+
 -- | Slurp out the list of register conflicts from this top level thing.
 
 slurpConflicts :: LiveCmmTop -> Bag (UniqSet Reg)
@@ -212,6 +240,30 @@ stripLive live
 	stripComp  (BasicBlock i blocks)	= map stripBlock blocks
 	stripBlock (BasicBlock i instrs)	= BasicBlock i (map stripLI instrs)
 	stripLI    (Instr instr _)		= instr
+
+
+-- | Make real spill instructions out of SPILL, RELOAD pseudos
+
+spillNatBlock :: NatBasicBlock -> NatBasicBlock
+spillNatBlock (BasicBlock i instrs)
+ = 	BasicBlock i instrs'
+ where 	(instrs', _)
+ 		= runState (mapM spillNat instrs) 0
+
+	spillNat instr@(DELTA i)
+	 = do	put i
+	 	return instr
+
+	spillNat (SPILL reg slot)
+	 = do	delta	<- get
+	 	return	$ mkSpillInstr reg delta slot
+
+	spillNat (RELOAD slot reg)
+	 = do	delta	<- get
+	 	return	$ mkLoadInstr reg delta slot
+
+	spillNat instr
+	 =	return instr
 
 
 -- | Slurp out a map of how many times each register was live upon entry to an instruction.

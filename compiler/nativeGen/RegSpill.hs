@@ -75,15 +75,8 @@ regSpill_block regSlotMap (BasicBlock i instrs)
  = do	instrss'	<- mapM (regSpill_instr regSlotMap) instrs
  	return	$ BasicBlock i (concat instrss')
 
-
-regSpill_instr _ 	li@(Instr (DELTA delta) _)
- = do
- 	setDelta delta
-	return [li]
-
 regSpill_instr _	li@(Instr _ Nothing)
  = do	return [li]
-
 
 regSpill_instr regSlotMap
 	(Instr instr (Just live))
@@ -135,49 +128,40 @@ regSpill_instr regSlotMap
 
 spillRead regSlotMap instr reg
 	| Just slot	<- lookupUFM regSlotMap reg
-	= do	delta		<- getDelta
-	 	(instr', nReg)	<- patchInstr reg instr
-
-		let pre	 	= [ COMMENT FSLIT("spill load")
-				  , mkLoadInstr nReg delta slot ]
+	= do 	(instr', nReg)	<- patchInstr reg instr
 
 		modify $ \s -> s
 			{ stateSpillSL 	= addToUFM_C accSpillSL (stateSpillSL s) reg (reg, 0, 1) }
 
-	 	return	( instr', (pre, []))
+	 	return	( instr'
+			, ( [RELOAD slot nReg]
+			  , []) )
 
 	| otherwise	= panic "RegSpill.spillRead: no slot defined for spilled reg"
 
 spillWrite regSlotMap instr reg
 	| Just slot	<- lookupUFM regSlotMap reg
-	= do	delta		<- getDelta
-	 	(instr', nReg)	<- patchInstr reg instr
-
-		let post	= [ COMMENT FSLIT("spill store")
-				  , mkSpillInstr nReg delta slot ]
+	= do 	(instr', nReg)	<- patchInstr reg instr
 
 		modify $ \s -> s
 			{ stateSpillSL 	= addToUFM_C accSpillSL (stateSpillSL s) reg (reg, 1, 0) }
 
-	 	return	( instr', ([], post))
+	 	return	( instr'
+			, ( []
+			  , [SPILL nReg slot]))
 
 	| otherwise	= panic "RegSpill.spillWrite: no slot defined for spilled reg"
 
 spillModify regSlotMap instr reg
 	| Just slot	<- lookupUFM regSlotMap reg
-	= do	delta		<- getDelta
-		(instr', nReg)	<- patchInstr reg instr
-
-		let pre		= [ COMMENT FSLIT("spill mod load")
-				  , mkLoadInstr  nReg delta slot ]
-
-		let post	= [ COMMENT FSLIT("spill mod store")
-				  , mkSpillInstr nReg delta slot ]
+	= do	(instr', nReg)	<- patchInstr reg instr
 
 		modify $ \s -> s
 			{ stateSpillSL 	= addToUFM_C accSpillSL (stateSpillSL s) reg (reg, 1, 1) }
 
-		return	( instr', (pre, post))
+		return	( instr'
+			, ( [RELOAD slot nReg]
+			  , [SPILL nReg slot]))
 
 	| otherwise	= panic "RegSpill.spillModify: no slot defined for spilled reg"
 
@@ -204,24 +188,15 @@ patchReg1 old new instr
 
 data SpillS
 	= SpillS
-	{ stateDelta	:: Int
-	, stateUS	:: UniqSupply
+	{ stateUS	:: UniqSupply
 	, stateSpillSL	:: UniqFM (Reg, Int, Int) } -- ^ spilled reg vs number of times vreg was loaded, stored
 
 initSpillS uniqueSupply
 	= SpillS
-	{ stateDelta	= 0
-	, stateUS	= uniqueSupply
+	{ stateUS	= uniqueSupply
 	, stateSpillSL	= emptyUFM }
 
 type SpillM a	= State SpillS a
-
-setDelta :: Int -> SpillM ()
-setDelta delta
-	= modify $ \s -> s { stateDelta = delta }
-
-getDelta  :: SpillM Int
-getDelta = gets stateDelta
 
 newUnique :: SpillM Unique
 newUnique
@@ -234,7 +209,6 @@ newUnique
 
 accSpillSL (r1, s1, l1) (r2, s2, l2)
 	= (r1, s1 + s2, l1 + l2)
-
 
 
 ----------------------------------------------------

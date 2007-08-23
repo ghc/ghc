@@ -105,8 +105,12 @@ regAlloc_spin (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
 	if isEmptyUniqSet rsSpill
 	 then do
 		-- patch the registers using the info in the graph
+		--	also rewrite SPILL/REALOAD pseudos into real instructions
 	 	let code_patched	= map (patchRegsFromGraph graph_colored) code
-		let code_nat		= map stripLive code_patched
+
+		let spillNatTop		= mapGenBlockTop spillNatBlock
+		let code_nat		= map (spillNatTop . stripLive) code_patched
+
 		
 		-- record what happened in this stage for debugging
 		let stat		=
