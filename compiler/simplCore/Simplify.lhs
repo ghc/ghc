@@ -892,10 +892,10 @@ simplNote env (SCC cc) e cont
 
 -- See notes with SimplMonad.inlineMode
 simplNote env InlineMe e cont
-  | contIsRhsOrArg cont		-- Totally boring continuation; see notes above
+  | Just (inside, outside) <- splitInlineCont cont  -- Boring boring continuation; see notes above
   = do	{ 			-- Don't inline inside an INLINE expression
-	  e' <- simplExpr (setMode inlineMode env) e
-	; rebuild env (mkInlineMe e') cont }
+	  e' <- simplExprC (setMode inlineMode env) e inside
+	; rebuild env (mkInlineMe e') outside }
 
   | otherwise  	-- Dissolve the InlineMe note if there's
 		-- an interesting context of any kind to combine with

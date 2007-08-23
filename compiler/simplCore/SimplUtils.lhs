@@ -15,7 +15,7 @@ module SimplUtils (
 	-- The continuation type
 	SimplCont(..), DupFlag(..), LetRhsFlag(..), 
 	contIsDupable, contResultType, contIsTrivial, contArgs, dropArgs, 
-	countValArgs, countArgs,
+	countValArgs, countArgs, splitInlineCont,
 	mkBoringStop, mkLazyArgStop, mkRhsStop, contIsRhsOrArg,
 	interestingCallContext, interestingArgContext,
 
@@ -42,7 +42,8 @@ import Id
 import Var	( isCoVar )
 import NewDemand
 import SimplMonad
-import Type
+import Type	( Type, funArgTy, mkForAllTys, mkTyVarTys, 
+		  splitTyConApp_maybe, tyConAppArgs )
 import TyCon
 import DataCon
 import Unify	( dataConCannotMatch )
@@ -154,10 +155,11 @@ mkLazyArgStop ty has_rules = Stop ty AnArg (canUpdateInPlace ty || has_rules)
 mkRhsStop :: OutType -> SimplCont
 mkRhsStop ty = Stop ty AnRhs (canUpdateInPlace ty)
 
-contIsRhsOrArg (Stop {})       = True
-contIsRhsOrArg (StrictBind {}) = True
-contIsRhsOrArg (StrictArg {})  = True
-contIsRhsOrArg other	       = False
+-------------------
+contIsRhsOrArg (Stop {})       	 = True
+contIsRhsOrArg (StrictBind {}) 	 = True
+contIsRhsOrArg (StrictArg {})  	 = True
+contIsRhsOrArg other	         = False
 
 -------------------
 contIsDupable :: SimplCont -> Bool
@@ -204,6 +206,26 @@ dropArgs :: Int -> SimplCont -> SimplCont
 dropArgs 0 cont = cont
 dropArgs n (ApplyTo _ _ _ cont) = dropArgs (n-1) cont
 dropArgs n other		= pprPanic "dropArgs" (ppr n <+> ppr other)
+
+--------------------
+splitInlineCont :: SimplCont -> Maybe (SimplCont, SimplCont)
+-- Returns Nothing if the continuation should dissolve an InlineMe Note
+-- Return Just (c1,c2) otherwise, 
+--	where c1 is the continuation to put inside the InlineMe 
+--	and   c2 outside
+
+-- Example: (__inline_me__ (/\a. e)) ty
+--	Here we want to do the beta-redex without dissolving the InlineMe
+-- See test simpl017 (and Trac #1627) for a good example of why this is important
+
+splitInlineCont (ApplyTo dup (Type ty) se c)
+  | Just (c1, c2) <- splitInlineCont c 	        = Just (ApplyTo dup (Type ty) se c1, c2)
+splitInlineCont cont@(Stop ty _ _)       	= Just (mkBoringStop ty, cont)
+splitInlineCont cont@(StrictBind bndr _ _ se _) = Just (mkBoringStop (substTy se (idType bndr)), cont)
+splitInlineCont cont@(StrictArg _ fun_ty _ _)   = Just (mkBoringStop (funArgTy fun_ty), cont)
+splitInlineCont other				= Nothing
+	-- NB: the calculation of the type for mkBoringStop is an annoying
+	--     duplication of the same calucation in mkDupableCont
 \end{code}
 
 
