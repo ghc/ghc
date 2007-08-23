@@ -532,6 +532,7 @@ typedef struct _RtsSymbolVal {
       SymX(hs_perform_gc)			\
       SymX(hs_free_stable_ptr)			\
       SymX(hs_free_fun_ptr)			\
+      SymX(hs_hpc_rootModule)		        \
       SymX(initLinker)				\
       SymX(unpackClosurezh_fast)                \
       SymX(getApStackValzh_fast)                \
