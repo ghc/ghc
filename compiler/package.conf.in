@@ -259,6 +259,7 @@ exposed-modules:
 	Var
 	VarEnv
 	VarSet
+        VectBuiltIn
         VectCore
         VectMonad
         VectType
