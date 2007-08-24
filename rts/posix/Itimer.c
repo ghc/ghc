@@ -233,8 +233,11 @@ lnat
 getourtimeofday(void)
 {
   struct timeval tv;
+  nat interval;
+  interval = RtsFlags.MiscFlags.tickInterval;
+  if (interval == 0) { interval = 50; }
   gettimeofday(&tv, (struct timezone *) NULL);
   	// cast to lnat because nat may be 64 bit when int is only 32 bit
-  return ((lnat)tv.tv_sec * 1000 / RtsFlags.MiscFlags.tickInterval +
-	  (lnat)tv.tv_usec / (RtsFlags.MiscFlags.tickInterval * 1000));
+  return ((lnat)tv.tv_sec * 1000 / interval +
+	  (lnat)tv.tv_usec / (interval * 1000));
 }
