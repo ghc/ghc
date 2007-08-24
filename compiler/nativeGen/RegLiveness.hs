@@ -178,9 +178,6 @@ mapGenBlockTopM f (CmmProc header label params blocks)
  	return	$ CmmProc header label params blocks'
 
 
-
-
-
 -- | Slurp out the list of register conflicts from this top level thing.
 
 slurpConflicts :: LiveCmmTop -> Bag (UniqSet Reg)
@@ -248,22 +245,25 @@ spillNatBlock :: NatBasicBlock -> NatBasicBlock
 spillNatBlock (BasicBlock i instrs)
  = 	BasicBlock i instrs'
  where 	(instrs', _)
- 		= runState (mapM spillNat instrs) 0
+ 		= runState (spillNat [] instrs) 0
 
-	spillNat instr@(DELTA i)
+	spillNat acc []
+	 = 	return (reverse acc)
+
+	spillNat acc (instr@(DELTA i) : instrs)
 	 = do	put i
-	 	return instr
+	 	spillNat acc instrs
 
-	spillNat (SPILL reg slot)
+	spillNat acc (SPILL reg slot : instrs)
 	 = do	delta	<- get
-	 	return	$ mkSpillInstr reg delta slot
+	 	spillNat (mkSpillInstr reg delta slot : acc) instrs
 
-	spillNat (RELOAD slot reg)
+	spillNat acc (RELOAD slot reg : instrs)
 	 = do	delta	<- get
-	 	return	$ mkLoadInstr reg delta slot
+	 	spillNat (mkLoadInstr reg delta slot : acc) instrs
 
-	spillNat instr
-	 =	return instr
+	spillNat acc (instr : instrs)
+	 =	spillNat (instr : acc) instrs
 
 
 -- | Slurp out a map of how many times each register was live upon entry to an instruction.

@@ -21,6 +21,7 @@ import qualified GraphColor as Color
 import RegLiveness
 import RegSpill
 import MachRegs
+import MachInstrs
 
 import Outputable
 import UniqFM
@@ -46,8 +47,8 @@ data RegAllocStats
 	-- a successful coloring
 	| RegAllocStatsColored
 	{ raGraph	:: Color.Graph Reg RegClass Reg -- ^ the colored graph
-	, raPatchedCmm	:: [LiveCmmTop] }		-- ^ code after register allocation
-
+	, raPatchedCmm	:: [LiveCmmTop] 		-- ^ code after register allocation 
+	, raFinalCmm	:: [NatCmmTop] }		-- ^ final code
 
 instance Outputable RegAllocStats where
 
@@ -77,6 +78,10 @@ instance Outputable RegAllocStats where
 	$$ text ""
 	$$ text "#  Native code after register allocation."
 	$$ ppr (raPatchedCmm s)
+	$$ text ""
+	$$ text "#  Final code, after rewriting spill/rewrite pseudo instrs."
+	$$ ppr (raFinalCmm s)
+	$$ text ""
 
 
 -- | Do all the different analysis on this list of RegAllocStats
