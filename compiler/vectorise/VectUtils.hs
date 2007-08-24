@@ -165,29 +165,6 @@ mkTyConRepr vect_tc
     mk_tc_app_maybe Nothing   [ty] = ty
     mk_tc_app_maybe (Just tc) tys  = mkTyConApp tc tys
 
-{-
-mkPRepr :: [[Type]] -> VM Type
-mkPRepr tys
-  = do
-      embed_tc <- builtin embedTyCon
-      sum_tcs  <- builtins sumTyCon
-      prod_tcs <- builtins prodTyCon
-
-      let mk_sum []   = unitTy
-          mk_sum [ty] = ty
-          mk_sum tys  = mkTyConApp (sum_tcs $ length tys) tys
-
-          mk_prod []   = unitTy
-          mk_prod [ty] = ty
-          mk_prod tys  = mkTyConApp (prod_tcs $ length tys) tys
-
-          mk_embed ty = mkTyConApp embed_tc [ty]
-
-      return . mk_sum
-             . map (mk_prod . map mk_embed)
-             $ tys
--}
-
 mkToPRepr :: TyConRepr -> [[CoreExpr]] -> [CoreExpr]
 mkToPRepr (TyConRepr {
              repr_tys         = repr_tys
