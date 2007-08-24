@@ -50,22 +50,23 @@ maxSpinCount	= 10
 -- | The top level of the graph coloring register allocator.
 --	
 regAlloc
-	:: UniqFM (UniqSet Reg)		-- ^ the registers we can use for allocation
+	:: Bool				-- ^ whether to generate RegAllocStats, or not.
+	-> UniqFM (UniqSet Reg)		-- ^ the registers we can use for allocation
 	-> UniqSet Int			-- ^ the set of available spill slots.
 	-> [LiveCmmTop]			-- ^ code annotated with liveness information.
 	-> UniqSM 
 		( [NatCmmTop]		-- ^ code with registers allocated.
 		, [RegAllocStats] )	-- ^ stats for each stage of allocation
 		
-regAlloc regsFree slotsFree code
+regAlloc dump regsFree slotsFree code
  = do
  	(code_final, debug_codeGraphs, graph_final)
-		<- regAlloc_spin 0 trivColorable regsFree slotsFree [] code
+		<- regAlloc_spin dump 0 trivColorable regsFree slotsFree [] code
 	
 	return	( code_final
 		, reverse debug_codeGraphs )
 
-regAlloc_spin (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code 
+regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
  = do
 	-- check that we're not running off down the garden path.
 	when (spinCount > maxSpinCount)
@@ -122,7 +123,9 @@ regAlloc_spin (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
 			, raFinalCmm	= code_final }
 
 		return	( code_nat
-			, [stat] ++ maybeToList stat1 ++ debug_codeGraphs
+			, if dump
+				then [stat] ++ maybeToList stat1 ++ debug_codeGraphs
+				else []
 			, graph_colored)
 
 	 else do
@@ -143,8 +146,10 @@ regAlloc_spin (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
 			, raSpilled	= code_spilled }
 			    	
 		-- try again
-		regAlloc_spin (spinCount + 1) triv regsFree slotsFree' 
-			([stat] ++ maybeToList stat1 ++ debug_codeGraphs)
+		regAlloc_spin dump (spinCount + 1) triv regsFree slotsFree'
+			(if dump
+				then [stat] ++ maybeToList stat1 ++ debug_codeGraphs
+				else [])
 			code_relive
 
  

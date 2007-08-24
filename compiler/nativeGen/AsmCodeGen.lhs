@@ -227,14 +227,24 @@ cmmNativeGen dflags us cmm
 			Opt_D_dump_asm_coalesce "Reg-Reg moves coalesced"
 			(vcat $ map ppr coalesced)
 
+	 	-- if any of these dump flags are turned on we want to hang on to
+		--	intermediate structures in the allocator - otherwise ditch
+		--	them early so we don't end up creating space leaks.
+		let generateRegAllocStats = or
+			[ dopt Opt_D_dump_asm_regalloc_stages dflags
+			, dopt Opt_D_dump_asm_stats dflags
+			, dopt Opt_D_dump_asm_conflicts dflags ]
+
 		-- graph coloring register allocation
 		let ((alloced, regAllocStats), usAlloc)
 			= initUs usCoalesce
 			$ Color.regAlloc
+				generateRegAllocStats
 				alloc_regs
 				(mkUniqSet [0..maxSpillSlots])
 				coalesced
 
+		-- dump out what happened during register allocation
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_regalloc "Registers allocated"
 			(vcat $ map (docToSDoc . pprNatCmmTop) alloced)
