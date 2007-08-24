@@ -250,6 +250,24 @@ buildToPRepr (TyConRepr {
       where
         [dc] = tyConDataCons tc
 
+buildFromPRepr :: TyConRepr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
+buildFromPRepr _ vect_tc prepr_tc _
+  = do
+      arg_ty <- mkPReprType res_ty
+      arg <- newLocalVar FSLIT("x") arg_ty
+      alts <- mapM mk_alt data_cons
+      body <- mkFromPRepr (unwrapFamInstScrut prepr_tc var_tys (Var arg))
+                          res_ty alts
+      return $ Lam arg body
+  where
+    var_tys   = mkTyVarTys $ tyConTyVars vect_tc
+    res_ty    = mkTyConApp vect_tc var_tys
+    data_cons = tyConDataCons vect_tc
+
+    mk_alt dc = do
+                  bndrs <- mapM (newLocalVar FSLIT("x")) $ dataConRepArgTys dc
+                  return (bndrs, mkConApp dc (map Type var_tys ++ map Var bndrs))
+
 buildToArrPRepr :: TyConRepr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildToArrPRepr _ vect_tc prepr_tc arr_tc
   = do
@@ -285,25 +303,6 @@ buildToArrPRepr _ vect_tc prepr_tc arr_tc
 
     has_selector | [_] <- data_cons = False
                  | otherwise        = True
-
-
-buildFromPRepr :: TyConRepr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
-buildFromPRepr _ vect_tc prepr_tc _
-  = do
-      arg_ty <- mkPReprType res_ty
-      arg <- newLocalVar FSLIT("x") arg_ty
-      alts <- mapM mk_alt data_cons
-      body <- mkFromPRepr (unwrapFamInstScrut prepr_tc var_tys (Var arg))
-                          res_ty alts
-      return $ Lam arg body
-  where
-    var_tys   = mkTyVarTys $ tyConTyVars vect_tc
-    res_ty    = mkTyConApp vect_tc var_tys
-    data_cons = tyConDataCons vect_tc
-
-    mk_alt dc = do
-                  bndrs <- mapM (newLocalVar FSLIT("x")) $ dataConRepArgTys dc
-                  return (bndrs, mkConApp dc (map Type var_tys ++ map Var bndrs))
 
 buildFromArrPRepr :: TyConRepr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildFromArrPRepr _ vect_tc prepr_tc arr_tc
