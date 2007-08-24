@@ -41,6 +41,7 @@ import BasicTypes         ( Boxity(..) )
 
 import Outputable
 import FastString
+import Maybes             ( orElse )
 
 import Data.List             ( zipWith4 )
 import Control.Monad         ( liftM, liftM2, zipWithM_ )
@@ -126,13 +127,15 @@ mkBuiltinTyConApps1 get_tc dft tys
     mk tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
 
 data TyConRepr = TyConRepr {
-                   repr_tyvars      :: [TyVar]
-                 , repr_tys         :: [[Type]]
+                   repr_tyvars         :: [TyVar]
+                 , repr_tys            :: [[Type]]
 
-                 , repr_prod_tycons :: [Maybe TyCon]
-                 , repr_prod_tys    :: [Type]
-                 , repr_sum_tycon   :: Maybe TyCon
-                 , repr_type        :: Type
+                 , repr_prod_tycons    :: [Maybe TyCon]
+                 , repr_prod_data_cons :: [Maybe DataCon]
+                 , repr_prod_tys       :: [Type]
+                 , repr_sum_tycon      :: Maybe TyCon
+                 , repr_sum_data_cons  :: [DataCon]
+                 , repr_type           :: Type
                  }
 
 mkTyConRepr :: TyCon -> VM TyConRepr
@@ -143,13 +146,15 @@ mkTyConRepr vect_tc
       sum_tycon   <- mk_tycon sumTyCon prod_tys
 
       return $ TyConRepr {
-                 repr_tyvars      = tyvars
-               , repr_tys         = rep_tys
+                 repr_tyvars         = tyvars
+               , repr_tys            = rep_tys
 
-               , repr_prod_tycons = prod_tycons
-               , repr_prod_tys    = prod_tys
-               , repr_sum_tycon   = sum_tycon
-               , repr_type        = mk_tc_app_maybe sum_tycon prod_tys
+               , repr_prod_tycons    = prod_tycons
+               , repr_prod_data_cons = map (fmap mk_single_datacon) prod_tycons
+               , repr_prod_tys       = prod_tys
+               , repr_sum_tycon      = sum_tycon
+               , repr_sum_data_cons  = fmap tyConDataCons sum_tycon `orElse` []
+               , repr_type           = mk_tc_app_maybe sum_tycon prod_tys
                }
   where
     tyvars = tyConTyVars vect_tc
@@ -160,6 +165,8 @@ mkTyConRepr vect_tc
       | n > 1     = builtin (Just . get_tc n)
       | otherwise = return Nothing
       where n = length tys
+
+    mk_single_datacon tc | [dc] <- tyConDataCons tc = dc
 
     mk_tc_app_maybe Nothing   []   = unitTy
     mk_tc_app_maybe Nothing   [ty] = ty

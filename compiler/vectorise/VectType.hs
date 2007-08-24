@@ -213,11 +213,11 @@ buildPReprType = liftM repr_type . mkTyConRepr
 
 buildToPRepr :: TyConRepr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildToPRepr (TyConRepr {
-                repr_tys         = repr_tys
-              , repr_prod_tycons = prod_tycons
-              , repr_prod_tys    = prod_tys
-              , repr_sum_tycon   = repr_sum_tycon
-              , repr_type        = repr_type
+                repr_tys            = repr_tys
+              , repr_prod_data_cons = prod_data_cons
+              , repr_prod_tys       = prod_tys
+              , repr_sum_data_cons  = sum_data_cons
+              , repr_type           = repr_type
               })
               vect_tc prepr_tc _
   = do
@@ -228,14 +228,11 @@ buildToPRepr (TyConRepr {
              . wrapFamInstBody prepr_tc var_tys
              . Case (Var arg) (mkWildId arg_ty) repr_type
              . mk_alts data_cons vars
-             . zipWith3 mk_prod prod_tycons repr_tys $ map (map Var) vars
+             . zipWith3 mk_prod prod_data_cons repr_tys $ map (map Var) vars
   where
     var_tys   = mkTyVarTys $ tyConTyVars vect_tc
     arg_ty    = mkTyConApp vect_tc var_tys
     data_cons = tyConDataCons vect_tc
-
-    Just sum_tycon = repr_sum_tycon
-    sum_data_cons  = tyConDataCons sum_tycon
 
     mk_alts _    _      []     = [(DEFAULT, [], Var unitDataConId)]
     mk_alts [dc] [vars] [expr] = [(DataAlt dc, vars, expr)]
@@ -246,17 +243,15 @@ buildToPRepr (TyConRepr {
 
     mk_prod _         _   []     = Var unitDataConId
     mk_prod _         _   [expr] = expr
-    mk_prod (Just tc) tys exprs  = mkConApp dc (map Type tys ++ exprs)
-      where
-        [dc] = tyConDataCons tc
+    mk_prod (Just dc) tys exprs  = mkConApp dc (map Type tys ++ exprs)
 
 buildFromPRepr :: TyConRepr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildFromPRepr (TyConRepr {
-                repr_tys         = repr_tys
-              , repr_prod_tycons = prod_tycons
-              , repr_prod_tys    = prod_tys
-              , repr_sum_tycon   = repr_sum_tycon
-              , repr_type        = repr_type
+                repr_tys            = repr_tys
+              , repr_prod_data_cons = prod_data_cons
+              , repr_prod_tys       = prod_tys
+              , repr_sum_data_cons  = sum_data_cons
+              , repr_type           = repr_type
               })
               vect_tc prepr_tc _
   = do
@@ -265,15 +260,13 @@ buildFromPRepr (TyConRepr {
 
       liftM (Lam arg
              . un_sum (unwrapFamInstScrut prepr_tc var_tys (Var arg)))
-            (sequence $ zipWith4 un_prod data_cons prod_tycons prod_tys repr_tys)
+            (sequence
+             $ zipWith4 un_prod data_cons prod_data_cons prod_tys repr_tys)
   where
     var_tys   = mkTyVarTys $ tyConTyVars vect_tc
     ty_args   = map Type var_tys
     res_ty    = mkTyConApp vect_tc var_tys
     data_cons = tyConDataCons vect_tc
-
-    Just sum_tc   = repr_sum_tycon
-    sum_data_cons = tyConDataCons sum_tc
 
     un_prod dc _ _ []
       = do
@@ -284,7 +277,7 @@ buildFromPRepr (TyConRepr {
           var <- newLocalVar FSLIT("x") ty
           return (var, mkConApp dc (ty_args ++ [Var var]))
 
-    un_prod dc (Just prod_tc) prod_ty tys
+    un_prod dc (Just prod_dc) prod_ty tys
       = do
           vars  <- mapM (newLocalVar FSLIT("x")) tys
           pv    <- newLocalVar FSLIT("p") prod_ty
@@ -294,9 +287,6 @@ buildFromPRepr (TyConRepr {
                         [(DataAlt prod_dc, vars, res)]
 
           return (pv, expr)
-      where
-        [prod_dc] = tyConDataCons prod_tc
-
 
     un_sum scrut [(var, expr)] = Let (NonRec var scrut) expr
     un_sum scrut alts
