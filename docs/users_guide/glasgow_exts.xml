@@ -717,9 +717,11 @@ qualifier list has just one element, a boolean expression.
 </title>
 
 <para> The recursive do-notation (also known as mdo-notation) is implemented as described in
-"A recursive do for Haskell",
-Levent Erkok, John Launchbury",
+<ulink url="http://citeseer.ist.psu.edu/erk02recursive.html">A recursive do for Haskell</ulink>,
+by Levent Erkok, John Launchbury,
 Haskell Workshop 2002, pages: 29-37. Pittsburgh, Pennsylvania. 
+This paper is essential reading for anyone making non-trivial use of mdo-notation,
+and we do not repeat it here.
 </para>
 <para>
 The do-notation of Haskell does not allow <emphasis>recursive bindings</emphasis>,
@@ -750,11 +752,18 @@ class Monad m => MonadFix m where
 </programlisting>
 <para>
 The function <literal>mfix</literal>
-dictates how the required recursion operation should be performed. If recursive bindings are required for a monad,
-then that monad must be declared an instance of the <literal>MonadFix</literal> class.
-For details, see the above mentioned reference.
+dictates how the required recursion operation should be performed.  For example, 
+<literal>justOnes</literal> desugars as follows:
+<programlisting>
+justOnes = mfix (\xs' -&gt; do { xs &lt;- Just (1:xs'); return xs }
+</programlisting>
+For full details of the way in which mdo is typechecked and desugared, see 
+the paper <ulink url="http://citeseer.ist.psu.edu/erk02recursive.html">A recursive do for Haskell</ulink>.
+In particular, GHC implements the segmentation technique described in Section 3.2 of the paper.
 </para>
 <para>
+If recursive bindings are required for a monad,
+then that monad must be declared an instance of the <literal>MonadFix</literal> class.
 The following instances of <literal>MonadFix</literal> are automatically provided: List, Maybe, IO. 
 Furthermore, the Control.Monad.ST and Control.Monad.ST.Lazy modules provide the instances of the MonadFix class 
 for Haskell's internal state monad (strict and lazy, respectively).
