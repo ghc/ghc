@@ -478,9 +478,8 @@ hs_exit_(rtsBool wait_foreign)
     reportCCSProfiling();
 #endif
 
-    freeProfiling1();
-
     endProfiling();
+    freeProfiling1();
 
 #ifdef PROFILING
     // Originally, this was in report_ccs_profiling().  Now, retainer
