@@ -528,12 +528,15 @@ runWindres :: DynFlags -> [Option] -> IO ()
 runWindres dflags args = do
   let (gcc,gcc_args) = pgm_c dflags
       windres        = pgm_windres dflags
-  runSomething dflags "Windres" windres 
+  mb_env <- getGccEnv gcc_args
+  runSomethingFiltered dflags id "Windres" windres 
+        -- we must tell windres where to find gcc: it might not be on PATH
         (Option ("--preprocessor=" ++ gcc ++ " " ++
                                       unwords (map showOpt gcc_args) ++
                  " -E -xc -DRC_INVOKED")
          : args)
-        -- we must tell windres where to find gcc: it might not be on PATH
+        -- we must use the PATH workaround here too, since windres invokes gcc
+        mb_env
 
 touch :: DynFlags -> String -> String -> IO ()
 touch dflags purpose arg =
