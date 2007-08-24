@@ -218,7 +218,7 @@ genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 
 ndpNames :: [Name]
 ndpNames = [ parrayTyConName, paTyConName, preprTyConName, prTyConName
-           , embedTyConName
+           , mkPRName
            , closureTyConName
            , mkClosureName, applyClosureName
            , mkClosurePName, applyClosurePName
@@ -698,7 +698,7 @@ parrayTyConName     = tcQual   nDP_PARRAY FSLIT("PArray") parrayTyConKey
 paTyConName         = tcQual   nDP_PARRAY FSLIT("PA")     paTyConKey
 preprTyConName      = tcQual   nDP_PARRAY FSLIT("PRepr")  preprTyConKey
 prTyConName         = clsQual  nDP_PARRAY FSLIT("PR")     prTyConKey
-embedTyConName      = tcQual   nDP_REPR   FSLIT("Embed")  embedTyConKey
+mkPRName            = varQual  nDP_PARRAY FSLIT("mkPR")   mkPRIdKey
 lengthPAName        = varQual  nDP_PARRAY FSLIT("lengthPA")    lengthPAIdKey
 replicatePAName     = varQual  nDP_PARRAY FSLIT("replicatePA") replicatePAIdKey
 emptyPAName         = varQual  nDP_PARRAY FSLIT("emptyPA") emptyPAIdKey
@@ -893,8 +893,7 @@ parrayTyConKey                          = mkPreludeTyConUnique 135
 closureTyConKey                         = mkPreludeTyConUnique 136
 paTyConKey                              = mkPreludeTyConUnique 137
 preprTyConKey                           = mkPreludeTyConUnique 138
-embedTyConKey                           = mkPreludeTyConUnique 139
-prTyConKey                              = mkPreludeTyConUnique 140
+prTyConKey                              = mkPreludeTyConUnique 139
 
 
 ---------------- Template Haskell -------------------
@@ -1088,6 +1087,7 @@ emptyPAIdKey                  = mkPreludeMiscIdUnique 133
 packPAIdKey                   = mkPreludeMiscIdUnique 134
 combinePAIdKey                = mkPreludeMiscIdUnique 135
 intEqPAIdKey                  = mkPreludeMiscIdUnique 136
+mkPRIdKey                     = mkPreludeMiscIdUnique 137
 
 ---------------- Template Haskell -------------------
 --	USES IdUniques 200-399

@@ -94,9 +94,6 @@ splitFixedTyConApp tc ty
 
   | otherwise = pprPanic "splitFixedTyConApp" (ppr tc <+> ppr ty)
 
-splitEmbedTy :: Type -> Type
-splitEmbedTy = splitUnTy "splitEmbedTy" embedTyConName
-
 splitClosureTy :: Type -> (Type, Type)
 splitClosureTy = splitBinTy "splitClosureTy" closureTyConName
 
@@ -132,7 +129,6 @@ data TyConRepr = TyConRepr {
                    repr_tyvars      :: [TyVar]
                  , repr_tys         :: [[Type]]
 
-                 , repr_embed_tys   :: [[Type]]
                  , repr_prod_tycons :: [Maybe TyCon]
                  , repr_prod_tys    :: [Type]
                  , repr_sum_tycon   :: Maybe TyCon
@@ -142,17 +138,15 @@ data TyConRepr = TyConRepr {
 mkTyConRepr :: TyCon -> VM TyConRepr
 mkTyConRepr vect_tc
   = do
-      embed_tys <- mapM (mapM mkEmbedType) rep_tys
       prod_tycons <- mapM (mk_tycon prodTyCon) rep_tys
-      sum_tycon   <- mk_tycon sumTyCon rep_tys
+      let prod_tys = zipWith mk_tc_app_maybe prod_tycons rep_tys
+      sum_tycon   <- mk_tycon sumTyCon prod_tys
 
-      let prod_tys = zipWith mk_tc_app_maybe prod_tycons embed_tys
 
       return $ TyConRepr {
                  repr_tyvars      = tyvars
                , repr_tys         = rep_tys
 
-               , repr_embed_tys   = embed_tys
                , repr_prod_tycons = prod_tycons
                , repr_prod_tys    = prod_tys
                , repr_sum_tycon   = sum_tycon
@@ -198,8 +192,6 @@ mkPRepr tys
 mkToPRepr :: [[CoreExpr]] -> VM ([CoreExpr], Type)
 mkToPRepr ess
   = do
-      embed_tc <- builtin embedTyCon
-      embed_dc <- builtin embedDataCon
       sum_tcs  <- builtins sumTyCon
       prod_tcs <- builtins prodTyCon
 
@@ -212,28 +204,20 @@ mkToPRepr ess
               sum_tc         = sum_tcs (length es)
               mk_alt dc expr = mkConApp dc (map Type tys ++ [expr])
 
-          mk_prod [] = (Var unitDataConId, unitTy)
-          mk_prod [(expr, ty)] = (expr, ty)
-          mk_prod es = (mkConApp prod_dc (map Type tys ++ exprs),
-                        mkTyConApp prod_tc tys)
+          mk_prod []     = (Var unitDataConId, unitTy)
+          mk_prod [expr] = (expr, exprType expr)
+          mk_prod exprs  = (mkConApp prod_dc (map Type tys ++ exprs),
+                            mkTyConApp prod_tc tys)
             where
-              (exprs, tys) = unzip es
-              prod_tc      = prod_tcs (length es)
+              tys          = map exprType exprs
+              prod_tc      = prod_tcs (length exprs)
               [prod_dc]    = tyConDataCons prod_tc
 
-          mk_embed expr = (mkConApp embed_dc [Type ty, expr],
-                           mkTyConApp embed_tc [ty])
-            where ty = exprType expr
-
-      return . mk_sum $ map (mk_prod . map mk_embed) ess
+      return . mk_sum . map mk_prod $ ess
 
 mkToArrPRepr :: CoreExpr -> CoreExpr -> [[CoreExpr]] -> VM CoreExpr
 mkToArrPRepr len sel ess
   = do
-      embed_tc <- builtin embedTyCon
-      (embed_rtc, _) <- parrayReprTyCon (mkTyConApp embed_tc [unitTy])
-      let [embed_rdc] = tyConDataCons embed_rtc
-
       let mk_sum [(expr, ty)] = return (expr, ty)
           mk_sum es
             = do
@@ -246,28 +230,23 @@ mkToArrPRepr len sel ess
             where
               (exprs, tys) = unzip es
 
-          mk_prod [(expr, ty)] = return (expr, ty)
-          mk_prod es
+          mk_prod [expr] = return (expr, splitPArrayTy (exprType expr))
+          mk_prod exprs
             = do
-                prod_tc <- builtin . prodTyCon $ length es
+                prod_tc <- builtin . prodTyCon $ length exprs
                 (prod_rtc, _) <- parrayReprTyCon (mkTyConApp prod_tc tys)
                 let [prod_rdc] = tyConDataCons prod_rtc
 
                 return (mkConApp prod_rdc (map Type tys ++ (len : exprs)),
                         mkTyConApp prod_tc tys)
             where
-              (exprs, tys) = unzip es
+              tys = map (splitPArrayTy . exprType) exprs
 
-          mk_embed expr = (mkConApp embed_rdc [Type ty, expr],
-                           mkTyConApp embed_tc [ty])
-            where ty = splitPArrayTy (exprType expr)
-
-      liftM fst (mk_sum =<< mapM (mk_prod . map mk_embed) ess)
+      liftM fst (mk_sum =<< mapM mk_prod ess)
 
 mkFromPRepr :: CoreExpr -> Type -> [([Var], CoreExpr)] -> VM CoreExpr
 mkFromPRepr scrut res_ty alts
   = do
-      embed_dc <- builtin embedDataCon
       sum_tcs  <- builtins sumTyCon
       prod_tcs <- builtins prodTyCon
 
@@ -288,22 +267,13 @@ mkFromPRepr scrut res_ty alts
               mk_alt dc p body = (DataAlt dc, [p], body)
 
           un_prod expr ty []    r = return r
-          un_prod expr ty [var] r = return $ un_embed expr ty var r
+          un_prod expr ty [var] r = return $ Let (NonRec var expr) r
           un_prod expr ty vars  r
-            = do
-                xs <- mapM (newLocalVar FSLIT("x")) tys
-                let body = foldr (\(e,t,v) r -> un_embed e t v r) r
-                         $ zip3 (map Var xs) tys vars
-                return $ Case expr (mkWildId ty) res_ty
-                         [(DataAlt prod_dc, xs, body)]
+            = return $ Case expr (mkWildId ty) res_ty
+                       [(DataAlt prod_dc, vars, r)]
             where
-              tys       = splitFixedTyConApp prod_tc ty
               prod_tc   = prod_tcs $ length vars
               [prod_dc] = tyConDataCons prod_tc
-
-          un_embed expr ty var r
-            = Case expr (mkWildId ty) res_ty
-                [(DataAlt embed_dc, [var], r)]
 
       un_sum scrut (exprType scrut) alts
 
@@ -311,9 +281,6 @@ mkFromArrPRepr :: CoreExpr -> Type -> Var -> Var -> [[Var]] -> CoreExpr
                -> VM CoreExpr
 mkFromArrPRepr scrut res_ty len sel vars res
   = return (Var unitDataConId)
-
-mkEmbedType :: Type -> VM Type
-mkEmbedType ty = mkBuiltinTyConApp embedTyCon [ty]
 
 mkClosureType :: Type -> Type -> VM Type
 mkClosureType arg_ty res_ty = mkBuiltinTyConApp closureTyCon [arg_ty, res_ty]
@@ -459,6 +426,9 @@ paMethod method ty
       fn   <- builtin method
       dict <- paDictOfType ty
       return $ mkApps (Var fn) [Type ty, dict]
+
+mkPR :: Type -> VM CoreExpr
+mkPR = paMethod mkPRVar
 
 lengthPA :: CoreExpr -> VM CoreExpr
 lengthPA x = liftM (`App` x) (paMethod lengthPAVar ty)

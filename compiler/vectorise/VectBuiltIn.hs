@@ -41,10 +41,9 @@ data Builtins = Builtins {
                 , preprTyCon       :: TyCon
                 , prTyCon          :: TyCon
                 , prDataCon        :: DataCon
-                , embedTyCon       :: TyCon
-                , embedDataCon     :: DataCon
                 , sumTyCons        :: Array Int TyCon
                 , closureTyCon     :: TyCon
+                , mkPRVar          :: Var
                 , mkClosureVar     :: Var
                 , applyClosureVar  :: Var
                 , mkClosurePVar    :: Var
@@ -78,8 +77,6 @@ initBuiltins
       preprTyCon   <- dsLookupTyCon preprTyConName
       prTyCon      <- dsLookupTyCon prTyConName
       let [prDataCon] = tyConDataCons prTyCon
-      embedTyCon   <- dsLookupTyCon embedTyConName
-      let [embedDataCon] = tyConDataCons embedTyCon
       closureTyCon <- dsLookupTyCon closureTyConName
 
       sum_tcs <- mapM (lookupExternalTyCon nDP_REPR)
@@ -87,6 +84,7 @@ initBuiltins
 
       let sumTyCons = listArray (2, mAX_NDP_SUM) sum_tcs
 
+      mkPRVar          <- dsLookupGlobalId mkPRName
       mkClosureVar     <- dsLookupGlobalId mkClosureName
       applyClosureVar  <- dsLookupGlobalId applyClosureName
       mkClosurePVar    <- dsLookupGlobalId mkClosurePName
@@ -108,10 +106,9 @@ initBuiltins
                , preprTyCon       = preprTyCon
                , prTyCon          = prTyCon
                , prDataCon        = prDataCon
-               , embedTyCon       = embedTyCon
-               , embedDataCon     = embedDataCon
                , sumTyCons        = sumTyCons
                , closureTyCon     = closureTyCon
+               , mkPRVar          = mkPRVar
                , mkClosureVar     = mkClosureVar
                , applyClosureVar  = applyClosureVar
                , mkClosurePVar    = mkClosurePVar
@@ -168,7 +165,6 @@ builtinPRs :: Builtins -> [(Name, Module, FastString)]
 builtinPRs bi =
   [
     mk (tyConName unitTyCon) nDP_REPR      FSLIT("dPR_Unit")
-  , mk embedTyConName        nDP_REPR      FSLIT("dPR_Embed")
   , mk closureTyConName      nDP_CLOSURE   FSLIT("dPR_Clo")
 
     -- temporary
