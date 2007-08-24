@@ -223,6 +223,7 @@ cat /dev/null > $DefaultStderrFile
 $PreScriptLines
 $SpixifyLine1
 $TimeCmd /bin/sh -c \'$CachegrindPrefix $ToRun $TimingMagic @PgmArgs < $PgmStdinFile 1> $TmpPrefix/runtest$$.1.raw 2> $TmpPrefix/runtest$$.2.raw 3> $TmpPrefix/runtest$$.3.raw\'
+progexit=\$?
 if [ "$StdoutBinary" = "0" ]; then
     dos2unix < $TmpPrefix/runtest$$.1.raw > $TmpPrefix/runtest$$.1
 else
@@ -234,7 +235,6 @@ else
     cp $TmpPrefix/runtest$$.2.raw $TmpPrefix/runtest$$.2
 fi
 dos2unix < $TmpPrefix/runtest$$.3.raw > $TmpPrefix/runtest$$.3
-progexit=\$?
 if [ \$progexit -eq 0 ] && [ $PgmFail -ne 0 ]; then
     echo $ToRun @PgmArgs \\< $PgmStdinFile
     echo "****" expected a failure, but was successful
