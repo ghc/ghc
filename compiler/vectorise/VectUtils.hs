@@ -4,10 +4,11 @@ module VectUtils (
   mkDataConTag,
   splitClosureTy,
 
+  mkBuiltinCo,
   mkPADictType, mkPArrayType, mkPReprType,
 
-  parrayCoerce, parrayReprTyCon, parrayReprDataCon, mkVScrut,
-  prDFunOfTyCon, prCoerce,
+  parrayReprTyCon, parrayReprDataCon, mkVScrut,
+  prDFunOfTyCon,
   paDictArgType, paDictOfType, paDFunType,
   paMethod, mkPR, lengthPA, replicatePA, emptyPA, liftPA,
   polyAbstract, polyApply, polyVApply,
@@ -139,16 +140,11 @@ mkPADictType ty = mkBuiltinTyConApp paTyCon [ty]
 mkPArrayType :: Type -> VM Type
 mkPArrayType ty = mkBuiltinTyConApp parrayTyCon [ty]
 
-parrayCoerce :: TyCon -> [Type] -> CoreExpr -> VM CoreExpr
-parrayCoerce repr_tc args expr
-  | Just arg_co <- tyConFamilyCoercion_maybe repr_tc
+mkBuiltinCo :: (Builtins -> TyCon) -> VM Coercion
+mkBuiltinCo get_tc
   = do
-      parray <- builtin parrayTyCon
-
-      let co = mkAppCoercion (mkTyConApp parray [])
-                             (mkSymCoercion (mkTyConApp arg_co args))
-
-      return $ mkCoerce co expr
+      tc <- builtin get_tc
+      return $ mkTyConApp tc []
 
 parrayReprTyCon :: Type -> VM (TyCon, [Type])
 parrayReprTyCon ty = builtin parrayTyCon >>= (`lookupFamInst` [ty])
@@ -169,17 +165,6 @@ mkVScrut (ve, le)
 prDFunOfTyCon :: TyCon -> VM CoreExpr
 prDFunOfTyCon tycon
   = liftM Var (traceMaybeV "prDictOfTyCon" (ppr tycon) (lookupTyConPR tycon))
-
-prCoerce :: TyCon -> [Type] -> CoreExpr -> VM CoreExpr
-prCoerce repr_tc args expr
-  | Just arg_co <- tyConFamilyCoercion_maybe repr_tc
-  = do
-      pr_tc <- builtin prTyCon
-
-      let co = mkAppCoercion (mkTyConApp pr_tc [])
-                             (mkSymCoercion (mkTyConApp arg_co args))
-
-      return $ mkCoerce co expr
 
 paDictArgType :: TyVar -> VM (Maybe Type)
 paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)

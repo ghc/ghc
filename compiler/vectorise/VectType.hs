@@ -209,10 +209,12 @@ buildPReprTyCon orig_tc vect_tc
     tyvars = tyConTyVars vect_tc
 
 data TyConRepr = ProdRepr {
-                   repr_prod_arg_tys   :: [Type]
-                 , repr_prod_tycon     :: TyCon
-                 , repr_prod_data_con  :: DataCon
-                 , repr_type           :: Type
+                   repr_prod_arg_tys      :: [Type]
+                 , repr_prod_tycon        :: TyCon
+                 , repr_prod_data_con     :: DataCon
+                 , repr_prod_arr_tycon    :: TyCon
+                 , repr_prod_arr_data_con :: DataCon
+                 , repr_type              :: Type
                  }
                | SumRepr {
                    repr_tys            :: [[Type]]
@@ -245,16 +247,25 @@ mkTyConRepr vect_tc
   | is_product
   = let
       [prod_arg_tys] = repr_tys
+      arity          = length prod_arg_tys
     in
     do
-      prod_tycon <- builtin (prodTyCon $ length prod_arg_tys)
+      prod_tycon <- builtin (prodTyCon arity)
       let [prod_data_con] = tyConDataCons prod_tycon
 
+      (arr_tycon, _) <- parrayReprTyCon
+                      . mkTyConApp prod_tycon
+                      $ replicate arity unitTy
+
+      let [arr_data_con] = tyConDataCons arr_tycon
+
       return $ ProdRepr {
-                 repr_prod_arg_tys  = prod_arg_tys
-               , repr_prod_tycon    = prod_tycon
-               , repr_prod_data_con = prod_data_con
-               , repr_type          = mkTyConApp prod_tycon prod_arg_tys
+                 repr_prod_arg_tys      = prod_arg_tys
+               , repr_prod_tycon        = prod_tycon
+               , repr_prod_data_con     = prod_data_con
+               , repr_prod_arr_tycon    = arr_tycon
+               , repr_prod_arr_data_con = arr_data_con
+               , repr_type              = mkTyConApp prod_tycon prod_arg_tys
                }
 
   | otherwise
@@ -432,22 +443,50 @@ buildFromPRepr (SumRepr {
 
 
 buildToArrPRepr :: TyConRepr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
-{-
-buildToArrPRepr (ProdRepr {
-                   repr_prod_arg_tys  = prod_arg_tys
-                 , repr_prod_data_con = prod_data_con
-                 , repr_type          = repr_type
+buildToArrPRepr repr@(ProdRepr {
+                   repr_prod_arg_tys      = prod_arg_tys
+                 , repr_prod_arr_tycon    = prod_arr_tycon
+                 , repr_prod_arr_data_con = prod_arr_data_con
+                 , repr_type              = repr_type
                  })
-                vect_tc prepr_tc _
+                vect_tc prepr_tc arr_tc
   = do
-      arg_ty  <- mkPArratType el_ty
-      rep_tys <- mapM mkPArrayType prod_arg_tys
+      arg_ty     <- mkPArrayType el_ty
+      shape_tys  <- arrShapeTys repr
+      arr_tys    <- arrReprTys repr
+      res_ty     <- mkPArrayType repr_type
+      rep_el_ty  <- mkPReprType el_ty
 
+      arg        <- newLocalVar FSLIT("xs") arg_ty
+      shape_vars <- mapM (newLocalVar FSLIT("sh")) shape_tys
+      rep_vars   <- mapM (newLocalVar FSLIT("ys")) arr_tys
       
+      let vars = shape_vars ++ rep_vars
+
+      parray_co  <- mkBuiltinCo parrayTyCon
+
+      let res = wrapFamInstBody prod_arr_tycon prod_arg_tys
+              . mkConApp prod_arr_data_con
+              $ map Type prod_arg_tys ++ map Var vars
+
+          Just repr_co = tyConFamilyCoercion_maybe prepr_tc
+          co  = mkAppCoercion parray_co
+              . mkSymCoercion
+              $ mkTyConApp repr_co var_tys
+
+      return . Lam arg
+             . mkCoerce co
+             $ Case (unwrapFamInstScrut arr_tc var_tys (Var arg))
+                    (mkWildId (mkTyConApp arr_tc var_tys))
+                    res_ty
+               [(DataAlt arr_dc, vars, res)]
   where
     var_tys = mkTyVarTys $ tyConTyVars vect_tc
     el_ty   = mkTyConApp vect_tc var_tys
--}
+
+    [arr_dc] = tyConDataCons arr_tc
+
+
 buildToArrPRepr _ _ _ _ = return (Var unitDataConId)
 {-
 buildToArrPRepr _ vect_tc prepr_tc arr_tc
@@ -487,41 +526,95 @@ buildToArrPRepr _ vect_tc prepr_tc arr_tc
 -}
 
 buildFromArrPRepr :: TyConRepr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
+buildFromArrPRepr repr@(ProdRepr {
+                          repr_prod_arg_tys      = prod_arg_tys
+                        , repr_prod_arr_tycon    = prod_arr_tycon
+                        , repr_prod_arr_data_con = prod_arr_data_con
+                        , repr_type              = repr_type
+                        })
+                       vect_tc prepr_tc arr_tc
+  = do
+      rep_el_ty  <- mkPReprType el_ty
+      arg_ty     <- mkPArrayType rep_el_ty
+      shape_tys  <- arrShapeTys repr
+      arr_tys    <- arrReprTys repr
+      res_ty     <- mkPArrayType el_ty
+
+      arg        <- newLocalVar FSLIT("xs") arg_ty
+      shape_vars <- mapM (newLocalVar FSLIT("sh")) shape_tys
+      rep_vars   <- mapM (newLocalVar FSLIT("ys")) arr_tys
+
+      let vars = shape_vars ++ rep_vars
+
+      parray_co  <- mkBuiltinCo parrayTyCon
+
+      let res = wrapFamInstBody arr_tc var_tys
+              . mkConApp arr_dc
+              $ map Type var_tys ++ map Var vars
+
+          Just repr_co = tyConFamilyCoercion_maybe prepr_tc
+          co  = mkAppCoercion parray_co
+              $ mkTyConApp repr_co var_tys
+
+          scrut = unwrapFamInstScrut prod_arr_tycon prod_arg_tys
+                $ mkCoerce co (Var arg)
+
+      return . Lam arg
+             $ Case (scrut)
+                    (mkWildId (mkTyConApp prod_arr_tycon prod_arg_tys))
+                    res_ty
+               [(DataAlt prod_arr_data_con, vars, res)]
+  where
+    var_tys = mkTyVarTys $ tyConTyVars vect_tc
+    el_ty   = mkTyConApp vect_tc var_tys
+
+    [arr_dc] = tyConDataCons arr_tc
 buildFromArrPRepr _ _ _ _ = return (Var unitDataConId)
 
-buildPRDict :: TyConRepr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
-buildPRDict (ProdRepr {
-               repr_prod_arg_tys = prod_arg_tys
-             , repr_prod_tycon   = prod_tycon
-             })
-            vect_tc prepr_tc _
+buildPRDictRepr :: TyConRepr -> VM CoreExpr
+buildPRDictRepr (ProdRepr {
+                   repr_prod_arg_tys = prod_arg_tys
+                 , repr_prod_tycon   = prod_tycon
+                 })
   = do
       prs  <- mapM mkPR prod_arg_tys
       dfun <- prDFunOfTyCon prod_tycon
       return $ dfun `mkTyApps` prod_arg_tys `mkApps` prs
 
-buildPRDict (SumRepr {
-                repr_tys         = repr_tys
-              , repr_prod_tycons = prod_tycons
-              , repr_prod_tys    = prod_tys
-              , repr_sum_tycon   = sum_tycon
-              })
-            vect_tc prepr_tc _
+buildPRDictRepr (SumRepr {
+                   repr_tys         = repr_tys
+                 , repr_prod_tycons = prod_tycons
+                 , repr_prod_tys    = prod_tys
+                 , repr_sum_tycon   = sum_tycon
+                 })
   = do
       prs      <- mapM (mapM mkPR) repr_tys
       prod_prs <- sequence $ zipWith3 mk_prod_pr prod_tycons repr_tys prs
       sum_dfun <- prDFunOfTyCon sum_tycon
-      prCoerce prepr_tc var_tys
-        $ sum_dfun `mkTyApps` prod_tys `mkApps` prod_prs
+      return $ sum_dfun `mkTyApps` prod_tys `mkApps` prod_prs
   where
-    var_tys = mkTyVarTys $ tyConTyVars vect_tc
-
     mk_prod_pr _         _   []   = prDFunOfTyCon unitTyCon
     mk_prod_pr _         _   [pr] = return pr
     mk_prod_pr (Just tc) tys prs
       = do
           dfun <- prDFunOfTyCon tc
           return $ dfun `mkTyApps` tys `mkApps` prs
+
+buildPRDict :: TyConRepr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
+buildPRDict repr vect_tc prepr_tc _
+  = do
+      dict  <- buildPRDictRepr repr
+
+      pr_co <- mkBuiltinCo prTyCon
+      let co = mkAppCoercion pr_co
+             . mkSymCoercion
+             $ mkTyConApp arg_co var_tys
+
+      return $ mkCoerce co dict
+  where
+    var_tys = mkTyVarTys $ tyConTyVars vect_tc
+
+    Just arg_co = tyConFamilyCoercion_maybe prepr_tc
 
 buildPArrayTyCon :: TyCon -> TyCon -> VM TyCon
 buildPArrayTyCon orig_tc vect_tc = fixV $ \repr_tc ->

@@ -67,7 +67,6 @@ prodTyCon n bi
   | n >= 2 && n <= mAX_NDP_PROD = tupleTyCon Boxed n
   | otherwise = pprPanic "prodTyCon" (ppr n)
 
-
 initBuiltins :: DsM Builtins
 initBuiltins
   = do
