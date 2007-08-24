@@ -224,7 +224,7 @@ ndpNames = [ parrayTyConName, paTyConName, preprTyConName, prTyConName
            , mkClosureName, applyClosureName
            , mkClosurePName, applyClosurePName
            , lengthPAName, replicatePAName, emptyPAName, packPAName,
-             combinePAName, intEqPAName ]
+             combinePAName ]
 \end{code}
 
 
@@ -278,7 +278,6 @@ gLA_EXTS	= mkBaseModule FSLIT("GHC.Exts")
 
 nDP_PARRAY      = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.PArray")
 nDP_REPR        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Repr")
-nDP_UTILS       = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Utils")
 nDP_CLOSURE     = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Closure")
 nDP_INSTANCES   = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Instances")
 nDP_UARR        = mkNDPModule FSLIT("Data.Array.Parallel.Unlifted.Flat.UArr")
@@ -707,7 +706,6 @@ replicatePAName     = varQual  nDP_PARRAY FSLIT("replicatePA") replicatePAIdKey
 emptyPAName         = varQual  nDP_PARRAY FSLIT("emptyPA") emptyPAIdKey
 packPAName          = varQual  nDP_PARRAY FSLIT("packPA")  packPAIdKey
 combinePAName       = varQual  nDP_PARRAY FSLIT("combinePA") combinePAIdKey
-intEqPAName         = varQual  nDP_UTILS  FSLIT("intEqPA") intEqPAIdKey
 closureTyConName    = tcQual   nDP_CLOSURE FSLIT(":->")    closureTyConKey
 mkClosureName       = varQual  nDP_CLOSURE FSLIT("mkClosure")  mkClosureIdKey
 applyClosureName    = varQual  nDP_CLOSURE FSLIT("$:")         applyClosureIdKey
@@ -1090,8 +1088,7 @@ replicatePAIdKey              = mkPreludeMiscIdUnique 132
 emptyPAIdKey                  = mkPreludeMiscIdUnique 133
 packPAIdKey                   = mkPreludeMiscIdUnique 134
 combinePAIdKey                = mkPreludeMiscIdUnique 135
-intEqPAIdKey                  = mkPreludeMiscIdUnique 136
-mkPRIdKey                     = mkPreludeMiscIdUnique 137
+mkPRIdKey                     = mkPreludeMiscIdUnique 136
 
 ---------------- Template Haskell -------------------
 --	USES IdUniques 200-399
