@@ -37,6 +37,7 @@ import MkId               ( unwrapFamInstScrut )
 import Name               ( Name )
 import PrelNames
 import TysWiredIn
+import TysPrim            ( intPrimTy )
 import BasicTypes         ( Boxity(..) )
 
 import Outputable
@@ -129,6 +130,8 @@ mkBuiltinTyConApps1 get_tc dft tys
 data TyConRepr = TyConRepr {
                    repr_tyvars         :: [TyVar]
                  , repr_tys            :: [[Type]]
+                 , arr_shape_tys       :: [Type]
+                 , arr_repr_tys        :: [[Type]]
 
                  , repr_prod_tycons    :: [Maybe TyCon]
                  , repr_prod_data_cons :: [Maybe DataCon]
@@ -141,13 +144,17 @@ data TyConRepr = TyConRepr {
 mkTyConRepr :: TyCon -> VM TyConRepr
 mkTyConRepr vect_tc
   = do
-      prod_tycons <- mapM (mk_tycon prodTyCon) rep_tys
+      uarr <- builtin uarrTyCon
+      prod_tycons  <- mapM (mk_tycon prodTyCon) rep_tys
       let prod_tys = zipWith mk_tc_app_maybe prod_tycons rep_tys
-      sum_tycon   <- mk_tycon sumTyCon prod_tys
+      sum_tycon    <- mk_tycon sumTyCon prod_tys
+      arr_repr_tys <- mapM (mapM mkPArrayType . arr_repr_elem_tys) rep_tys
 
       return $ TyConRepr {
                  repr_tyvars         = tyvars
                , repr_tys            = rep_tys
+               , arr_shape_tys       = mk_shape uarr
+               , arr_repr_tys        = arr_repr_tys
 
                , repr_prod_tycons    = prod_tycons
                , repr_prod_data_cons = map (fmap mk_single_datacon) prod_tycons
@@ -161,6 +168,16 @@ mkTyConRepr vect_tc
     data_cons = tyConDataCons vect_tc
     rep_tys   = map dataConRepArgTys data_cons
 
+    is_product | [_] <- data_cons = True
+               | otherwise        = False
+
+    mk_shape uarr = intPrimTy : mk_sel uarr
+
+    mk_sel uarr | is_product = []
+                | otherwise  = [uarr_int, uarr_int]
+      where
+        uarr_int = mkTyConApp uarr [intTy]
+
     mk_tycon get_tc tys
       | n > 1     = builtin (Just . get_tc n)
       | otherwise = return Nothing
@@ -171,6 +188,9 @@ mkTyConRepr vect_tc
     mk_tc_app_maybe Nothing   []   = unitTy
     mk_tc_app_maybe Nothing   [ty] = ty
     mk_tc_app_maybe (Just tc) tys  = mkTyConApp tc tys
+
+    arr_repr_elem_tys []  = [unitTy]
+    arr_repr_elem_tys tys = tys
 
 mkToArrPRepr :: CoreExpr -> CoreExpr -> [[CoreExpr]] -> VM CoreExpr
 mkToArrPRepr len sel ess

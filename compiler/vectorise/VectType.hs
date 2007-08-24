@@ -398,22 +398,20 @@ buildPArrayDataCon :: Name -> TyCon -> TyCon -> VM DataCon
 buildPArrayDataCon orig_name vect_tc repr_tc
   = do
       dc_name  <- cloneName mkPArrayDataConOcc orig_name
-      shape    <- tyConShape vect_tc
-      repr_tys <- mapM mkPArrayType types
+      repr     <- mkTyConRepr vect_tc
+
+      let all_tys = arr_shape_tys repr ++ concat (arr_repr_tys repr)
 
       liftDs $ buildDataCon dc_name
                             False                  -- not infix
-                            (shapeStrictness shape ++ map (const NotMarkedStrict) repr_tys)
+                            (map (const NotMarkedStrict) all_tys)
                             []                     -- no field labels
                             (tyConTyVars vect_tc)
                             []                     -- no existentials
                             []                     -- no eq spec
                             []                     -- no context
-                            (shapeReprTys shape ++ repr_tys)
+                            all_tys
                             repr_tc
-  where
-    types = [ty | dc <- tyConDataCons vect_tc
-                , ty <- dataConRepArgTys dc]
 
 mkPADFun :: TyCon -> VM Var
 mkPADFun vect_tc
