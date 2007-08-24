@@ -142,7 +142,6 @@ mkTyConRepr vect_tc
       let prod_tys = zipWith mk_tc_app_maybe prod_tycons rep_tys
       sum_tycon   <- mk_tycon sumTyCon prod_tys
 
-
       return $ TyConRepr {
                  repr_tyvars      = tyvars
                , repr_tys         = rep_tys
@@ -189,31 +188,30 @@ mkPRepr tys
              $ tys
 -}
 
-mkToPRepr :: [[CoreExpr]] -> VM ([CoreExpr], Type)
-mkToPRepr ess
-  = do
-      sum_tcs  <- builtins sumTyCon
-      prod_tcs <- builtins prodTyCon
+mkToPRepr :: TyConRepr -> [[CoreExpr]] -> [CoreExpr]
+mkToPRepr (TyConRepr {
+             repr_tys         = repr_tys
+           , repr_prod_tycons = prod_tycons
+           , repr_prod_tys    = prod_tys
+           , repr_sum_tycon   = repr_sum_tycon
+           })
+  = mk_sum . zipWith3 mk_prod prod_tycons repr_tys
+  where
+    Just sum_tycon = repr_sum_tycon
 
-      let mk_sum [] = ([Var unitDataConId], unitTy)
-          mk_sum [(expr, ty)] = ([expr], ty)
-          mk_sum es = (zipWith mk_alt (tyConDataCons sum_tc) exprs,
-                       mkTyConApp sum_tc tys)
-            where
-              (exprs, tys)   = unzip es
-              sum_tc         = sum_tcs (length es)
-              mk_alt dc expr = mkConApp dc (map Type tys ++ [expr])
+    mk_sum []     = [Var unitDataConId]
+    mk_sum [expr] = [expr]
+    mk_sum exprs  = zipWith (mk_alt prod_tys) (tyConDataCons sum_tycon) exprs
 
-          mk_prod []     = (Var unitDataConId, unitTy)
-          mk_prod [expr] = (expr, exprType expr)
-          mk_prod exprs  = (mkConApp prod_dc (map Type tys ++ exprs),
-                            mkTyConApp prod_tc tys)
-            where
-              tys          = map exprType exprs
-              prod_tc      = prod_tcs (length exprs)
-              [prod_dc]    = tyConDataCons prod_tc
+    mk_alt tys dc expr = mk_con_app dc tys [expr]
 
-      return . mk_sum . map mk_prod $ ess
+    mk_prod _         _   []     = Var unitDataConId
+    mk_prod _         _   [expr] = expr
+    mk_prod (Just tc) tys exprs  = mk_con_app dc tys exprs
+      where
+        [dc] = tyConDataCons tc
+
+    mk_con_app dc tys exprs = mkConApp dc (map Type tys ++ exprs)
 
 mkToArrPRepr :: CoreExpr -> CoreExpr -> [[CoreExpr]] -> VM CoreExpr
 mkToArrPRepr len sel ess
