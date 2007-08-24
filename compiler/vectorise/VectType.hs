@@ -26,7 +26,7 @@ import Var               ( Var )
 import Id                ( mkWildId )
 import Name              ( Name, getOccName )
 import NameEnv
-import TysWiredIn        ( unitTy, intTy, intDataCon, unitDataConId )
+import TysWiredIn        ( unitTy, unitTyCon, intTy, intDataCon, unitDataConId )
 import TysPrim           ( intPrimTy )
 
 import Unique
@@ -337,11 +337,35 @@ buildFromArrPRepr _ vect_tc prepr_tc arr_tc
   = mkFromArrPRepr undefined undefined undefined undefined undefined undefined
 
 buildPRDict :: TyConRepr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
-buildPRDict _ vect_tc prepr_tc _
-  = prCoerce prepr_tc var_tys
-  =<< prDictOfType (mkTyConApp prepr_tc var_tys)
+buildPRDict (TyConRepr {
+                repr_tys         = repr_tys
+              , repr_prod_tycons = prod_tycons
+              , repr_prod_tys    = prod_tys
+              , repr_sum_tycon   = repr_sum_tycon
+              })
+            vect_tc prepr_tc _
+  = do
+      prs      <- mapM (mapM mkPR) repr_tys
+      prod_prs <- sequence $ zipWith3 mk_prod_pr prod_tycons repr_tys prs
+      sum_pr   <- mk_sum_pr prod_prs
+      prCoerce prepr_tc var_tys sum_pr
   where
     var_tys = mkTyVarTys $ tyConTyVars vect_tc
+
+    Just sum_tycon = repr_sum_tycon
+
+    mk_prod_pr _         _   []   = prDFunOfTyCon unitTyCon
+    mk_prod_pr _         _   [pr] = return pr
+    mk_prod_pr (Just tc) tys prs
+      = do
+          dfun <- prDFunOfTyCon tc
+          return $ dfun `mkTyApps` tys `mkApps` prs
+
+    mk_sum_pr [pr] = return pr
+    mk_sum_pr prs
+      = do
+          dfun <- prDFunOfTyCon sum_tycon
+          return $ dfun `mkTyApps` prod_tys `mkApps` prs
 
 buildPArrayTyCon :: TyCon -> TyCon -> VM TyCon
 buildPArrayTyCon orig_tc vect_tc = fixV $ \repr_tc ->
