@@ -99,6 +99,7 @@ import UniqSet
 import UniqFM
 import UniqSupply
 import Outputable
+import State
 
 #ifndef DEBUG
 import Data.Maybe	( fromJust )
@@ -1054,10 +1055,29 @@ binSpillReasons reasons
 			SpillJoinRM r	-> (r, [0, 0, 0, 0, 1])) reasons)
 
 
+-- | Count reg-reg moves remaining in this code.
+countRegRegMovesNat :: NatCmmTop -> Int
+countRegRegMovesNat cmm
+	= execState (mapGenBlockTopM countBlock cmm) 0
+ where
+ 	countBlock b@(BasicBlock i instrs)
+	 = do	instrs'	<- mapM countInstr instrs
+	 	return	b
+
+	countInstr instr
+		| Just _	<- isRegRegMove instr
+		= do	modify (+ 1)
+			return instr
+
+		| otherwise
+		=	return instr
+
+
 -- | Pretty print some RegAllocStats
-pprStats :: [RegAllocStats] -> SDoc
-pprStats statss
- = let	spills		= foldl' (plusUFM_C (zipWith (+)))
+pprStats :: [NatCmmTop] -> [RegAllocStats] -> SDoc
+pprStats code statss
+ = let	-- sum up all the instrs inserted by the spiller
+ 	spills		= foldl' (plusUFM_C (zipWith (+)))
  				emptyUFM
 			$ map ra_spillInstrs statss
 
@@ -1065,12 +1085,15 @@ pprStats statss
 				[0, 0, 0, 0, 0]
 			$ eltsUFM spills
 
+	-- count how many reg-reg-moves remain in the code
+	moves		= sum $ map countRegRegMovesNat code
+
 	pprSpill (reg, spills)
 		= parens $ (hcat $ punctuate (text ", ")  (doubleQuotes (ppr reg) : map ppr spills))
 
    in	(  text "-- spills-added-total"
-	$$ text "--    (allocs, clobbers, loads, joinRR, joinRM)"
-	$$ (parens $ (hcat $ punctuate (text ", ") (map ppr spillTotals)))
+	$$ text "--    (allocs, clobbers, loads, joinRR, joinRM, reg_reg_moves_remaining)"
+	$$ (parens $ (hcat $ punctuate (text ", ") (map ppr spillTotals ++ [ppr moves])))
 	$$ text ""
 	$$ text "-- spills-added"
    	$$ text "--    (reg_name, allocs, clobbers, loads, joinRR, joinRM)"

@@ -151,7 +151,7 @@ nativeCodeGen dflags cmms us
 	(case catMaybes mLinearStats of
 		[]	-> return ()
 		stats	-> dumpSDoc dflags Opt_D_dump_asm_stats "NCG stats"
-				$ Linear.pprStats (concat stats))
+				$ Linear.pprStats (concat native) (concat stats))
 
 	return	$ makeAsmDoc (concat native) (concat imports)
 
