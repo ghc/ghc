@@ -84,8 +84,7 @@ catchDivZero(struct _EXCEPTION_RECORD*,
    } \
   }
 #else
-#define BEGIN_CATCH /* nothing */
-#define END_CATCH   /* nothing */
+#error Don't know what sort of Windows system this is
 #endif
 
 #endif /* __SEH_EXCN_H__ */

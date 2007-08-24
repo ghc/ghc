@@ -156,6 +156,12 @@ else
 DQ = \"
 endif
 
+# If Main.c is built with optimisation then the SEH exception stuff on
+# Windows gets confused.
+# This has to be in HC rather than CC opts, as otherwise there's a
+# -optc-O2 that comes after it.
+Main_HC_OPTS += -optc-O0
+
 RtsMessages_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
 RtsUtils_CC_OPTS += -DProjectVersion=$(DQ)$(ProjectVersion)$(DQ)
 RtsUtils_CC_OPTS += -DRtsWay=$(DQ)rts$(_way)$(DQ)

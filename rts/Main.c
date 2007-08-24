@@ -16,7 +16,9 @@
 #include "RtsUtils.h"
 #include "Prelude.h"
 #include "Task.h"
-#include "seh_excn.h"
+#if defined(mingw32_HOST_OS)
+#include "win32/seh_excn.h"
+#endif
 #include <stdlib.h>
 
 #ifdef DEBUG
@@ -39,18 +41,20 @@
 
 extern void __stginit_ZCMain(void);
 
+static int progargc;
+static char **progargv;
+
 /* Hack: we assume that we're building a batch-mode system unless 
  * INTERPRETER is set
  */
 #ifndef INTERPRETER /* Hack */
-int main(int argc, char *argv[])
+static void real_main(void)
 {
     int exit_status;
     SchedulerStatus status;
     /* all GranSim/GUM init is done in startupHaskell; sets IAmMainThread! */
 
-    BEGIN_CATCH
-    startupHaskell(argc,argv,__stginit_ZCMain);
+    startupHaskell(progargc,progargv,__stginit_ZCMain);
 
     /* kick off the computation by creating the main thread with a pointer
        to mainIO_closure representing the computation of the overall program;
@@ -135,8 +139,21 @@ int main(int argc, char *argv[])
       barf("main thread completed with invalid status");
     }
     shutdownHaskellAndExit(exit_status);
+}
+int main(int argc, char *argv[])
+{
+    /* We do this dance with argc and argv as otherwise the SEH exception
+       stuff (the BEGIN/END CATCH below) on Windows gets confused */
+    progargc = argc;
+    progargv = argv;
+
+#if defined(mingw32_HOST_OS)
+    BEGIN_CATCH
+#endif
+    real_main();
+#if defined(mingw32_HOST_OS)
     END_CATCH
-    return 0; /* not reached unless a Windows exception happens,
-                 also keeps gcc -Wall happy */
+#endif
+    return 0; /* not reached, but keeps gcc -Wall happy */
 }
 # endif /* BATCH_MODE */
