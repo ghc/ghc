@@ -5,7 +5,7 @@ module VectUtils (
   splitClosureTy,
 
   TyConRepr(..), mkTyConRepr,
-  mkToPRepr, mkToArrPRepr, mkFromPRepr, mkFromArrPRepr,
+  mkToArrPRepr, mkFromPRepr, mkFromArrPRepr,
   mkPADictType, mkPArrayType, mkPReprType,
 
   parrayCoerce, parrayReprTyCon, parrayReprDataCon, mkVScrut,
@@ -164,31 +164,6 @@ mkTyConRepr vect_tc
     mk_tc_app_maybe Nothing   []   = unitTy
     mk_tc_app_maybe Nothing   [ty] = ty
     mk_tc_app_maybe (Just tc) tys  = mkTyConApp tc tys
-
-mkToPRepr :: TyConRepr -> [[CoreExpr]] -> [CoreExpr]
-mkToPRepr (TyConRepr {
-             repr_tys         = repr_tys
-           , repr_prod_tycons = prod_tycons
-           , repr_prod_tys    = prod_tys
-           , repr_sum_tycon   = repr_sum_tycon
-           })
-  = mk_sum . zipWith3 mk_prod prod_tycons repr_tys
-  where
-    Just sum_tycon = repr_sum_tycon
-
-    mk_sum []     = [Var unitDataConId]
-    mk_sum [expr] = [expr]
-    mk_sum exprs  = zipWith (mk_alt prod_tys) (tyConDataCons sum_tycon) exprs
-
-    mk_alt tys dc expr = mk_con_app dc tys [expr]
-
-    mk_prod _         _   []     = Var unitDataConId
-    mk_prod _         _   [expr] = expr
-    mk_prod (Just tc) tys exprs  = mk_con_app dc tys exprs
-      where
-        [dc] = tyConDataCons tc
-
-    mk_con_app dc tys exprs = mkConApp dc (map Type tys ++ exprs)
 
 mkToArrPRepr :: CoreExpr -> CoreExpr -> [[CoreExpr]] -> VM CoreExpr
 mkToArrPRepr len sel ess

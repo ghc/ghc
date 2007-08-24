@@ -26,7 +26,7 @@ import Var               ( Var )
 import Id                ( mkWildId )
 import Name              ( Name, getOccName )
 import NameEnv
-import TysWiredIn        ( unitTy, intTy, intDataCon )
+import TysWiredIn        ( unitTy, intTy, intDataCon, unitDataConId )
 import TysPrim           ( intPrimTy )
 
 import Unique
@@ -212,23 +212,43 @@ buildPReprType :: TyCon -> VM Type
 buildPReprType = liftM repr_type . mkTyConRepr
 
 buildToPRepr :: TyConRepr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
-buildToPRepr repr vect_tc prepr_tc _
+buildToPRepr (TyConRepr {
+                repr_tys         = repr_tys
+              , repr_prod_tycons = prod_tycons
+              , repr_prod_tys    = prod_tys
+              , repr_sum_tycon   = repr_sum_tycon
+              , repr_type        = repr_type
+              })
+              vect_tc prepr_tc _
   = do
-      arg <- newLocalVar FSLIT("x") arg_ty
-      bndrss <- mapM (mapM (newLocalVar FSLIT("x")))
-                     (repr_tys repr)
+      arg  <- newLocalVar FSLIT("x") arg_ty
+      vars <- mapM (mapM (newLocalVar FSLIT("x"))) repr_tys
 
       return . Lam arg
              . wrapFamInstBody prepr_tc var_tys
-             . Case (Var arg) (mkWildId arg_ty) (repr_type repr)
-             . zipWith3 mk_alt data_cons bndrss
-             . mkToPRepr repr $ map (map Var) bndrss
+             . Case (Var arg) (mkWildId arg_ty) repr_type
+             . mk_alts data_cons vars
+             . zipWith3 mk_prod prod_tycons repr_tys $ map (map Var) vars
   where
     var_tys   = mkTyVarTys $ tyConTyVars vect_tc
     arg_ty    = mkTyConApp vect_tc var_tys
     data_cons = tyConDataCons vect_tc
 
-    mk_alt data_con bndrs body = (DataAlt data_con, bndrs, body)
+    Just sum_tycon = repr_sum_tycon
+    sum_datacons   = tyConDataCons sum_tycon
+
+    mk_alts _    _      []     = [(DEFAULT, [], Var unitDataConId)]
+    mk_alts [dc] [vars] [expr] = [(DataAlt dc, vars, expr)]
+    mk_alts dcs  vars   exprs  = zipWith4 mk_alt dcs vars sum_datacons exprs 
+
+    mk_alt dc vars sum_dc expr = (DataAlt dc, vars,
+                                  mkConApp sum_dc (map Type prod_tys ++ [expr]))
+
+    mk_prod _         _   []     = Var unitDataConId
+    mk_prod _         _   [expr] = expr
+    mk_prod (Just tc) tys exprs  = mkConApp dc (map Type tys ++ exprs)
+      where
+        [dc] = tyConDataCons tc
 
 buildToArrPRepr :: TyConRepr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildToArrPRepr _ vect_tc prepr_tc arr_tc
