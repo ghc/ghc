@@ -5,7 +5,7 @@ module VectUtils (
   splitClosureTy,
 
   TyConRepr(..), mkTyConRepr,
-  mkToArrPRepr, mkFromPRepr, mkFromArrPRepr,
+  mkToArrPRepr, mkFromArrPRepr,
   mkPADictType, mkPArrayType, mkPReprType,
 
   parrayCoerce, parrayReprTyCon, parrayReprDataCon, mkVScrut,
@@ -193,39 +193,6 @@ mkToArrPRepr len sel ess
               tys = map (splitPArrayTy . exprType) exprs
 
       liftM fst (mk_sum =<< mapM mk_prod ess)
-
-mkFromPRepr :: CoreExpr -> Type -> [([Var], CoreExpr)] -> VM CoreExpr
-mkFromPRepr scrut res_ty alts
-  = do
-      sum_tcs  <- builtins sumTyCon
-      prod_tcs <- builtins prodTyCon
-
-      let un_sum expr ty [(vars, res)] = un_prod expr ty vars res
-          un_sum expr ty bs
-            = do
-                ps     <- mapM (newLocalVar FSLIT("p")) tys
-                bodies <- sequence
-                        $ zipWith4 un_prod (map Var ps) tys vars rs
-                return . Case expr (mkWildId ty) res_ty
-                       $ zipWith3 mk_alt sum_dcs ps bodies
-            where
-              (vars, rs) = unzip bs
-              tys        = splitFixedTyConApp sum_tc ty
-              sum_tc     = sum_tcs $ length bs
-              sum_dcs    = tyConDataCons sum_tc
-
-              mk_alt dc p body = (DataAlt dc, [p], body)
-
-          un_prod expr ty []    r = return r
-          un_prod expr ty [var] r = return $ Let (NonRec var expr) r
-          un_prod expr ty vars  r
-            = return $ Case expr (mkWildId ty) res_ty
-                       [(DataAlt prod_dc, vars, r)]
-            where
-              prod_tc   = prod_tcs $ length vars
-              [prod_dc] = tyConDataCons prod_tc
-
-      un_sum scrut (exprType scrut) alts
 
 mkFromArrPRepr :: CoreExpr -> Type -> Var -> Var -> [[Var]] -> CoreExpr
                -> VM CoreExpr
