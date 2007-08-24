@@ -46,7 +46,7 @@ if
     grep '\<0 unexpected passes' testlog >/dev/null 2>/dev/null &&
     grep '\<0 unexpected failures' testlog >/dev/null 2>/dev/null ; then
    echo "-------------------------------------------------------------------"
-   echo "Congratulations!  This tree is has passed minimal testing."
+   echo "Congratulations!  This tree has passed minimal testing."
    echo
    echo "NOTE: If you have made changes that may cause failures not tested"
    echo "for by the minimal testing procedure, please do further testing"
