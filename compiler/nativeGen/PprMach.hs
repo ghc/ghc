@@ -1227,17 +1227,6 @@ pprSizeRegRegReg name size reg1 reg2 reg3
 
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 
-{-									-- BUGS: changed for coloring allocator
-pprInstr v@(MOV size s@(OpReg src) d@(OpReg dst)) -- hack		-- write a pass for this and patch linear allocator with it
-  | src == dst
-  =
-#if 0 /* #ifdef DEBUG */
-    (<>) (ptext SLIT("# warning: ")) (pprSizeOpOp SLIT("mov") size s d)
-#else
-    empty
-#endif
--}
-
 pprInstr (SPILL reg slot)
    = hcat [
    	ptext SLIT("\tSPILL"),

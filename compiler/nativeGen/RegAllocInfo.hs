@@ -775,14 +775,12 @@ isRegRegMove _ = Nothing
 -- Generating spill instructions
 
 mkSpillInstr
-   :: Reg		-- register to spill (should be a real)
+   :: Reg		-- register to spill
    -> Int		-- current stack delta
    -> Int		-- spill slot to use
    -> Instr
 mkSpillInstr reg delta slot
- -- = ASSERT(isRealReg reg)			-- BUGS: used for graph coloring: is this ok?
-  = let	
-        off     = spillSlotToOffset slot
+  = let	off     = spillSlotToOffset slot
     in
 #ifdef alpha_TARGET_ARCH
     {-Alpha: spill below the stack pointer (?)-}
@@ -820,14 +818,12 @@ mkSpillInstr reg delta slot
 
 
 mkLoadInstr
-   :: Reg		-- register to load (should be a real)
+   :: Reg		-- register to load
    -> Int		-- current stack delta
    -> Int		-- spill slot to use
    -> Instr
 mkLoadInstr reg delta slot
- -- = ASSERT(isRealReg reg)			-- BUGS: used for graph coloring: is this ok?
-  = let
-        off     = spillSlotToOffset slot
+  = let off     = spillSlotToOffset slot
     in
 #if alpha_TARGET_ARCH
 	 LD  sz dyn (spRel (- (off `div` 8)))
