@@ -160,7 +160,7 @@ SELECTOR_CODE_NOUPD(15)
  * in the compiler that means stg_ap_1 is generated occasionally (ToDo)
  */
 
-INFO_TABLE(stg_ap_1_upd,1,1,THUNK_1_0,"stg_ap_1_upd_info","stg_ap_1_upd_info")
+INFO_TABLE(stg_ap_1_upd,1,0,THUNK_1_0,"stg_ap_1_upd_info","stg_ap_1_upd_info")
 {
   TICK_ENT_DYN_THK();
   STK_CHK_NP(SIZEOF_StgUpdateFrame+WDS(1));
