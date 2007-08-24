@@ -708,7 +708,7 @@
 	    </row>
 	    <row>
 	      <entry><option>-XGADTs</option></entry>
-	      <entry>Enable <link linkend="gadts">generalised algebraic data types</link>.
+	      <entry>Enable <link linkend="gadt">generalised algebraic data types</link>.
 	      </entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoGADTs</option></entry>
