@@ -41,6 +41,7 @@ data Builtins = Builtins {
                 , preprTyCon       :: TyCon
                 , prTyCon          :: TyCon
                 , prDataCon        :: DataCon
+                , uarrTyCon        :: TyCon
                 , sumTyCons        :: Array Int TyCon
                 , closureTyCon     :: TyCon
                 , mkPRVar          :: Var
@@ -76,6 +77,7 @@ initBuiltins
       let [paDataCon] = tyConDataCons paTyCon
       preprTyCon   <- dsLookupTyCon preprTyConName
       prTyCon      <- dsLookupTyCon prTyConName
+      uarrTyCon    <- dsLookupTyCon uarrTyConName
       let [prDataCon] = tyConDataCons prTyCon
       closureTyCon <- dsLookupTyCon closureTyConName
 
@@ -106,6 +108,7 @@ initBuiltins
                , preprTyCon       = preprTyCon
                , prTyCon          = prTyCon
                , prDataCon        = prDataCon
+               , uarrTyCon        = uarrTyCon
                , sumTyCons        = sumTyCons
                , closureTyCon     = closureTyCon
                , mkPRVar          = mkPRVar
