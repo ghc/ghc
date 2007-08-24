@@ -905,7 +905,7 @@ selector_loop:
 #ifdef PROFILING
 	      // For the purposes of LDV profiling, we have destroyed
 	      // the original selector thunk.
-	      SET_INFO(p, info_ptr);
+	      SET_INFO(selectee, info_ptr);
 	      LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(selectee);
 #endif
 	      ((StgInd *)selectee)->indirectee = val;
