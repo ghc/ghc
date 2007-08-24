@@ -54,12 +54,12 @@ doit pref ghcpkg verbosity =
               pd_reg  = pd { library = Just (mkLib (const True)) }
               -- When coying, we need to actually give a concrete
               -- directory to copy to rather than "$topdir"
-              lbi_copy = lbi { prefix = pref }
+              lbi_copy = lbi { installDirTemplates = (installDirTemplates lbi) { prefixDirTemplate = toPathTemplate pref } }
               -- When we run GHC we give it a $topdir that includes the
               -- $compiler/lib/ part of libsubdir, so we only want the
               -- $pkgid part in the package.conf file. This is a bit of
               -- a hack, really.
-              lbi_reg = lbi { libsubdir = "$pkgid" }
+              lbi_reg = lbi { installDirTemplates = (installDirTemplates lbi) { libSubdirTemplate = toPathTemplate "$pkgid" } }
           (copyHook simpleUserHooks) pd_copy lbi_copy userHooks copyFlags
           (regHook simpleUserHooks)  pd_reg  lbi_reg  userHooks registerFlags
           return ()
