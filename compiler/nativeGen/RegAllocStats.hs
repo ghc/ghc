@@ -10,7 +10,9 @@ module RegAllocStats (
 	pprStatsSpills,
 	pprStatsLifetimes,
 	pprStatsConflict,
-	pprStatsLifeConflict
+	pprStatsLifeConflict,
+
+	countSRMs, addSRM
 )
 
 where
@@ -19,13 +21,16 @@ where
 
 import qualified GraphColor as Color
 import RegLiveness
+import RegAllocInfo
 import RegSpill
 import MachRegs
 import MachInstrs
+import Cmm
 
 import Outputable
 import UniqFM
 import UniqSet
+import State
 
 import Data.List
 
@@ -49,7 +54,8 @@ data RegAllocStats
 	{ raGraph	:: Color.Graph Reg RegClass Reg -- ^ the colored graph
 	, raPatched	:: [LiveCmmTop] 		-- ^ code with vregs replaced by hregs
 	, raSpillClean  :: [LiveCmmTop]			-- ^ code with unneeded spill/reloads cleaned out
-	, raFinal	:: [NatCmmTop] }		-- ^ final code
+	, raFinal	:: [NatCmmTop] 			-- ^ final code
+	, raSRMs	:: (Int, Int, Int) }		-- ^ spill/reload/reg-reg moves present in this code
 
 instance Outputable RegAllocStats where
 
@@ -72,7 +78,7 @@ instance Outputable RegAllocStats where
 	$$ text "#  Code with spills inserted."
 	$$ (ppr (raSpilled s))
 
- ppr (s@RegAllocStatsColored{})
+ ppr (s@RegAllocStatsColored { raSRMs = (spills, reloads, moves) })
  	=  text "#  Colored"
 	$$ text "#  Register conflict graph."
 	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
@@ -86,7 +92,11 @@ instance Outputable RegAllocStats where
 	$$ text "#  Final code, after rewriting spill/rewrite pseudo instrs."
 	$$ ppr (raFinal s)
 	$$ text ""
-
+	$$  text "#  Score:"
+	$$ (text "#          spills  inserted: " <> int spills)
+	$$ (text "#          reloads inserted: " <> int reloads)
+	$$ (text "#   reg-reg moves remaining: " <> int moves)
+	$$ text ""
 
 -- | Do all the different analysis on this list of RegAllocStats
 pprStats :: [RegAllocStats] -> Color.Graph Reg RegClass Reg -> SDoc
@@ -104,31 +114,16 @@ pprStatsSpills
 	:: [RegAllocStats] -> SDoc
 
 pprStatsSpills stats
- = let	-- slurp out the stats from all the spiller stages
-	spillStats	= [ s	| s@RegAllocStatsSpill{} <- stats]
+ = let
+	finals	= [ s	| s@RegAllocStatsColored{} <- stats]
 
-	-- build a map of how many spill load/stores were inserted for each vreg
-	spillSL		= foldl' (plusUFM_C accSpillSL) emptyUFM
-			$ map (spillStoreLoad . raSpillStats) spillStats
-
-	-- print the count of load/spills as a tuple so we can read back from the file easilly
-	pprSpillSL (r, loads, stores)
-	 = (parens $ (hcat $ punctuate (text ", ") [doubleQuotes (ppr r), int loads, int stores]))
-
-	-- sum up the total number of spill instructions inserted
-	spillList	= eltsUFM spillSL
-	spillTotal	= foldl' (\(s1, l1) (s2, l2) -> (s1 + s2, l1 + l2))
-				(0, 0)
-			$ map (\(n, s, l) -> (s, l))
-			$ spillList
+	-- sum up how many stores/loads/reg-reg-moves were left in the code
+	total	= foldl' addSRM (0, 0, 0)
+		$ map raSRMs finals
 
     in	(  text "-- spills-added-total"
-	$$ text "--    (stores, loads)"
-	$$ (ppr spillTotal)
-	$$ text ""
-    	$$ text "-- spills-added"
-	$$ text "--    (reg_name, stores, loads)"
-	$$ (vcat $ map pprSpillSL $ spillList)
+	$$ text "--    (stores, loads, reg_reg_moves_remaining)"
+	$$ ppr total
 	$$ text "")
 
 
@@ -202,6 +197,37 @@ pprStatsLifeConflict stats graph
 	$$ (vcat scatter)
 	$$ text "\n")
 
+
+-- | Count spill/reload/reg-reg moves.
+--	Lets us see how well the register allocator has done.
+--
+countSRMs :: LiveCmmTop -> (Int, Int, Int)
+countSRMs cmm
+	= execState (mapBlockTopM countSRM_block cmm) (0, 0, 0)
+
+countSRM_block (BasicBlock i instrs)
+ = do	instrs'	<- mapM countSRM_instr instrs
+ 	return	$ BasicBlock i instrs'
+
+countSRM_instr li@(Instr instr live)
+	| SPILL reg slot	<- instr
+	= do	modify 	$ \(s, r, m)	-> (s + 1, r, m)
+		return li
+
+	| RELOAD slot reg	<- instr
+	= do	modify	$ \(s, r, m)	-> (s, r + 1, m)
+		return li
+
+	| Just _		<- isRegRegMove instr
+	= do	modify	$ \(s, r, m)	-> (s, r, m + 1)
+		return li
+
+	| otherwise
+	=	return li
+
+-- sigh..
+addSRM (s1, r1, m1) (s2, r2, m2)
+	= (s1+s2, r1+r2, m1+m2)
 
 -----
 -- Register colors for drawing conflict graphs

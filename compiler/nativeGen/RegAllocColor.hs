@@ -125,7 +125,8 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 			{ raGraph	= graph_colored
 			, raPatched	= code_patched
 			, raSpillClean	= code_spillclean
-			, raFinal	= code_final }
+			, raFinal	= code_final
+			, raSRMs	= foldl addSRM (0, 0, 0) $ map countSRMs code_spillclean }
 
 		return	( code_final
 			, if dump
