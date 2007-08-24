@@ -227,6 +227,7 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk
 	@echo "cStage                = STAGE" >> $(CONFIG_HS)
 	@echo "cHscIfaceFileVersion  = \"$(HscIfaceFileVersion)\"" >> $(CONFIG_HS)
 	@echo "cSplitObjs            = \"$(SplitObjs)\"" >> $(CONFIG_HS)
+	@echo "cGhcWithInterpreter   = \"$(GhcWithInterpreter)\"" >> $(CONFIG_HS)
 	@echo "cGhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> $(CONFIG_HS)
 	@echo "cGhcUnregisterised    = \"$(GhcUnregisterised)\"" >> $(CONFIG_HS)
 	@echo "cGhcEnableTablesNextToCode = \"$(GhcEnableTablesNextToCode)\"" >> $(CONFIG_HS)
