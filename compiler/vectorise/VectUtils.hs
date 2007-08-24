@@ -3,8 +3,11 @@ module VectUtils (
   collectAnnValBinders,
   mkDataConTag,
   splitClosureTy,
-  mkPRepr, mkToPRepr, mkToArrPRepr, mkFromPRepr, mkFromArrPRepr,
+
+  TyConRepr(..), mkTyConRepr,
+  mkToPRepr, mkToArrPRepr, mkFromPRepr, mkFromArrPRepr,
   mkPADictType, mkPArrayType, mkPReprType,
+
   parrayCoerce, parrayReprTyCon, parrayReprDataCon, mkVScrut,
   prDictOfType, prCoerce,
   paDictArgType, paDictOfType, paDFunType,
@@ -27,7 +30,7 @@ import Coercion
 import Type
 import TypeRep
 import TyCon
-import DataCon            ( DataCon, dataConWrapId, dataConTag )
+import DataCon
 import Var
 import Id                 ( mkWildId )
 import MkId               ( unwrapFamInstScrut )
@@ -125,6 +128,51 @@ mkBuiltinTyConApps1 get_tc dft tys
   where
     mk tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
 
+data TyConRepr = TyConRepr {
+                   repr_tyvars      :: [TyVar]
+                 , repr_tys         :: [[Type]]
+
+                 , repr_embed_tys   :: [[Type]]
+                 , repr_prod_tycons :: [Maybe TyCon]
+                 , repr_prod_tys    :: [Type]
+                 , repr_sum_tycon   :: Maybe TyCon
+                 , repr_type        :: Type
+                 }
+
+mkTyConRepr :: TyCon -> VM TyConRepr
+mkTyConRepr vect_tc
+  = do
+      embed_tys <- mapM (mapM mkEmbedType) rep_tys
+      prod_tycons <- mapM (mk_tycon prodTyCon) rep_tys
+      sum_tycon   <- mk_tycon sumTyCon rep_tys
+
+      let prod_tys = zipWith mk_tc_app_maybe prod_tycons embed_tys
+
+      return $ TyConRepr {
+                 repr_tyvars      = tyvars
+               , repr_tys         = rep_tys
+
+               , repr_embed_tys   = embed_tys
+               , repr_prod_tycons = prod_tycons
+               , repr_prod_tys    = prod_tys
+               , repr_sum_tycon   = sum_tycon
+               , repr_type        = mk_tc_app_maybe sum_tycon prod_tys
+               }
+  where
+    tyvars = tyConTyVars vect_tc
+    data_cons = tyConDataCons vect_tc
+    rep_tys   = map dataConRepArgTys data_cons
+
+    mk_tycon get_tc tys
+      | n > 1     = builtin (Just . get_tc n)
+      | otherwise = return Nothing
+      where n = length tys
+
+    mk_tc_app_maybe Nothing   []   = unitTy
+    mk_tc_app_maybe Nothing   [ty] = ty
+    mk_tc_app_maybe (Just tc) tys  = mkTyConApp tc tys
+
+{-
 mkPRepr :: [[Type]] -> VM Type
 mkPRepr tys
   = do
@@ -145,6 +193,7 @@ mkPRepr tys
       return . mk_sum
              . map (mk_prod . map mk_embed)
              $ tys
+-}
 
 mkToPRepr :: [[CoreExpr]] -> VM ([CoreExpr], Type)
 mkToPRepr ess
@@ -262,6 +311,9 @@ mkFromArrPRepr :: CoreExpr -> Type -> Var -> Var -> [[Var]] -> CoreExpr
                -> VM CoreExpr
 mkFromArrPRepr scrut res_ty len sel vars res
   = return (Var unitDataConId)
+
+mkEmbedType :: Type -> VM Type
+mkEmbedType ty = mkBuiltinTyConApp embedTyCon [ty]
 
 mkClosureType :: Type -> Type -> VM Type
 mkClosureType arg_ty res_ty = mkBuiltinTyConApp closureTyCon [arg_ty, res_ty]

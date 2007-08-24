@@ -209,7 +209,7 @@ buildPReprTyCon orig_tc vect_tc
     tyvars = tyConTyVars vect_tc
 
 buildPReprType :: TyCon -> VM Type
-buildPReprType = mkPRepr . map dataConRepArgTys . tyConDataCons
+buildPReprType = liftM repr_type . mkTyConRepr
 
 buildToPRepr :: Shape -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildToPRepr _ vect_tc prepr_tc _
