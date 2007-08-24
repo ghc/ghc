@@ -23,6 +23,7 @@ where
 import qualified GraphColor	as Color
 import RegLiveness
 import RegSpill
+import RegSpillClean
 import RegAllocStats
 import MachRegs
 import MachInstrs
@@ -108,6 +109,9 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 		-- patch the registers using the info in the graph
 	 	let code_patched	= map (patchRegsFromGraph graph_colored) code
 
+		-- clean out unneeded SPILL/RELOADs
+		let code_spillclean	= map cleanSpills code_patched
+
 		-- strip off liveness information
 		let code_nat		= map stripLive code_patched
 
@@ -119,10 +123,11 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 		let stat		=
 			RegAllocStatsColored
 			{ raGraph	= graph_colored
-			, raPatchedCmm	= code_patched
-			, raFinalCmm	= code_final }
+			, raPatched	= code_patched
+			, raSpillClean	= code_spillclean
+			, raFinal	= code_final }
 
-		return	( code_nat
+		return	( code_final
 			, if dump
 				then [stat] ++ maybeToList stat1 ++ debug_codeGraphs
 				else []

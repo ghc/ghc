@@ -47,8 +47,9 @@ data RegAllocStats
 	-- a successful coloring
 	| RegAllocStatsColored
 	{ raGraph	:: Color.Graph Reg RegClass Reg -- ^ the colored graph
-	, raPatchedCmm	:: [LiveCmmTop] 		-- ^ code after register allocation 
-	, raFinalCmm	:: [NatCmmTop] }		-- ^ final code
+	, raPatched	:: [LiveCmmTop] 		-- ^ code with vregs replaced by hregs
+	, raSpillClean  :: [LiveCmmTop]			-- ^ code with unneeded spill/reloads cleaned out
+	, raFinal	:: [NatCmmTop] }		-- ^ final code
 
 instance Outputable RegAllocStats where
 
@@ -77,10 +78,13 @@ instance Outputable RegAllocStats where
 	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
 	$$ text ""
 	$$ text "#  Native code after register allocation."
-	$$ ppr (raPatchedCmm s)
+	$$ ppr (raPatched s)
+	$$ text ""
+	$$ text "#  Clean out unneeded spill/reloads."
+	$$ ppr (raSpillClean s)
 	$$ text ""
 	$$ text "#  Final code, after rewriting spill/rewrite pseudo instrs."
-	$$ ppr (raFinalCmm s)
+	$$ ppr (raFinal s)
 	$$ text ""
 
 
