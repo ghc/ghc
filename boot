@@ -25,4 +25,6 @@ for dir in . libraries/*; do
 done
 
 # Alas, darcs doesn't handle file permissions, so fix a few of them.
-chmod +x boot darcs-all push-all
+for f in boot darcs-all push-all validate; do
+  test -f $f && chmod +x $f
+done
