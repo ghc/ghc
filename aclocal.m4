@@ -1101,7 +1101,7 @@ AC_MSG_CHECKING(for path to top of build tree)
 dnl This would be
 dnl     make -C utils/pwd clean && make -C utils/pwd
 dnl except we don't want to have to know what make is called. Sigh.
-if test ! -e utils/pwd/pwd && ! -e utils/pwd/pwd.exe; then
+if test ! -f utils/pwd/pwd && test ! -f utils/pwd/pwd.exe; then
   cd utils/pwd
   rm -f *.o
   rm -f *.hi
