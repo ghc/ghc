@@ -462,7 +462,7 @@ SRC_DIST_DIRS += mk docs distrib bindisttest $(filter-out docs distrib,$(SUBDIRS
 SRC_DIST_FILES += \
 	configure.ac config.guess config.sub configure \
 	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
-	ghc.spec.in VERSION
+	ghc.spec.in extra-gcc-opts.in VERSION boot push-all darcs-all
 
 # -----------------------------------------------------------------------------
 # Source distributions
