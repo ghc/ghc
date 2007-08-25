@@ -258,7 +258,11 @@ TICK_VAR(2)
    -------------------------------------------------------------------------- */
 
 #ifdef DEBUG
+#if IN_STG_CODE
+#define IF_DEBUG(c,s)  if (RtsFlags[0].DebugFlags.c) { s; }
+#else
 #define IF_DEBUG(c,s)  if (RtsFlags.DebugFlags.c) { s; }
+#endif
 #else
 #define IF_DEBUG(c,s)  doNothing()
 #endif
