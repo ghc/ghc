@@ -229,6 +229,8 @@ $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk
 	@echo "cSplitObjs            = \"$(SplitObjs)\"" >> $(CONFIG_HS)
 	@echo "cGhcWithInterpreter   = \"$(GhcWithInterpreter)\"" >> $(CONFIG_HS)
 	@echo "cGhcWithNativeCodeGen = \"$(GhcWithNativeCodeGen)\"" >> $(CONFIG_HS)
+	@echo "cGhcWithSMP           = \"$(GhcWithSMP)\"" >> $(CONFIG_HS)
+	@echo "cGhcRTSWays           = \"$(GhcRTSWays)\"" >> $(CONFIG_HS)
 	@echo "cGhcUnregisterised    = \"$(GhcUnregisterised)\"" >> $(CONFIG_HS)
 	@echo "cGhcEnableTablesNextToCode = \"$(GhcEnableTablesNextToCode)\"" >> $(CONFIG_HS)
 	@echo "cLeadingUnderscore    = \"$(LeadingUnderscore)\"" >> $(CONFIG_HS)

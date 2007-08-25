@@ -1685,8 +1685,10 @@ compilerInfo = [("Project name",                cProjectName),
                 ("Have interpreter",            cGhcWithInterpreter),
                 ("Object splitting",            cSplitObjs),
                 ("Have native code generator",  cGhcWithNativeCodeGen),
+                ("Support SMP",                 cGhcWithSMP),
                 ("Unregisterised",              cGhcUnregisterised),
                 ("Tables next to code",         cGhcEnableTablesNextToCode),
                 ("Win32 DLLs",                  cEnableWin32DLLs),
+                ("RTS ways",                    cGhcRTSWays),
                 ("Leading underscore",          cLeadingUnderscore)]
 
