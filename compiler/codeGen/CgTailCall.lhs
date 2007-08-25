@@ -191,7 +191,7 @@ performTailCall fun_info arg_amodes pending_assts
                    -- No, enter the closure.
                    ; enterClosure
                    ; labelC is_constr
-                   ; stmtC (CmmJump (CmmLit (CmmLabel lbl)) [])
+                   ; stmtC (CmmJump (entryCode $ CmmLit (CmmLabel lbl)) [])
                    }
 {-
               -- This is a scrutinee for a case expression
