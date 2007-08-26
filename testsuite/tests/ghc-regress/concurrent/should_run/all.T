@@ -106,7 +106,9 @@ test('conc044', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc045', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc051', normal, compile_and_run, [''])
 
-test('conc057', only_ways(['threaded2']), compile_and_run, ['-O0'])
+test('conc057', compose(only_ways(['threaded2']),
+                        reqlib('parallel')),
+                compile_and_run, ['-O0'])
 
 test('conc058', only_compiler_types(['ghc']), compile_and_run, [''])
 
