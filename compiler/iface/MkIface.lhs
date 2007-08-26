@@ -705,7 +705,7 @@ bump_unless False v = bumpVersion v
 
 \begin{code}
 mkUsageInfo :: HscEnv 
-	    -> ModuleEnv (Module, Bool, SrcSpan)
+	    -> ModuleEnv (Module, [(ModuleName, Bool, SrcSpan)])
 	    -> [(ModuleName, IsBootInterface)]
 	    -> NameSet -> IO [Usage]
 mkUsageInfo hsc_env dir_imp_mods dep_mods used_names
@@ -717,6 +717,12 @@ mkUsageInfo hsc_env dir_imp_mods dep_mods used_names
 	 -- don't get evaluated for a while and we can end up hanging on to
 	 -- the entire collection of Ifaces.
 
+mk_usage_info :: PackageIfaceTable
+              -> HscEnv
+              -> ModuleEnv (Module, [(ModuleName, Bool, SrcSpan)])
+              -> [(ModuleName, IsBootInterface)]
+              -> NameSet
+              -> [Usage]
 mk_usage_info pit hsc_env dir_imp_mods dep_mods used_names
   = mapCatMaybes mkUsage dep_mods
 	-- ToDo: do we need to sort into canonical order?
@@ -739,8 +745,8 @@ mk_usage_info pit hsc_env dir_imp_mods dep_mods used_names
     		     add_item occs _ = occ:occs
     
     depend_on_exports mod = case lookupModuleEnv dir_imp_mods mod of
-    				Just (_,no_imp,_) -> not no_imp
-	    			Nothing		  -> True
+    				Just (_, xs) -> any (\(_, no_imp, _) -> not no_imp) xs
+	    			Nothing		 -> True
     
     -- We want to create a Usage for a home module if 
     --	a) we used something from; has something in used_names

@@ -229,7 +229,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
 			other 		     -> False
 
 	imports   = ImportAvails { 
-			imp_mods     = unitModuleEnv imp_mod (imp_mod, import_all, loc),
+			imp_mods     = unitModuleEnv imp_mod (imp_mod, [(qual_mod_name, import_all, loc)]),
 			imp_orphs    = orphans,
 			imp_finsts   = finsts,
 			imp_dep_mods = mkModDeps dependent_mods,
@@ -759,6 +759,10 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
     kids_env :: NameEnv [Name]	-- Maps a parent to its in-scope children
     kids_env = mkChildEnv (globalRdrEnvElts rdr_env)
 
+    imported_modules = [ qual_name
+                       | (_, xs) <- moduleEnvElts $ imp_mods imports,
+                         (qual_name, _, _) <- xs ]
+
     exports_from_item :: ExportAccum -> LIE RdrName -> RnM ExportAccum
     exports_from_item acc@(ie_names, occs, exports) 
                       (L loc ie@(IEModuleContents mod))
@@ -770,10 +774,14 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
 
 	| otherwise
 	= do { implicit_prelude <- doptM Opt_ImplicitPrelude
-	     ; let gres = filter (isModuleExported implicit_prelude mod) 
-				 (globalRdrEnvElts rdr_env)
+         ; let { exportValid = (mod `elem` imported_modules)
+                            || (moduleName this_mod == mod)
+               ; gres = filter (isModuleExported implicit_prelude mod)
+                               (globalRdrEnvElts rdr_env)
+               }
 
-	     ; warnIf (null gres) (nullModuleExport mod)
+         ; checkErr exportValid (moduleNotImported mod)
+	     ; warnIf (exportValid && null gres) (nullModuleExport mod)
 
 	     ; occs' <- check_occs ie occs (map gre_name gres)
                       -- This check_occs not only finds conflicts
@@ -1110,7 +1118,7 @@ reportUnusedNames export_decls gbl_env
 	-- qualified imports into account.  But it's an improvement.
     add_expall mod acc = addToFM_C plusAvailEnv acc mod emptyAvailEnv
 
-    add_inst_mod (mod,_,_) acc 
+    add_inst_mod (mod, _) acc 
       | mod_name `elemFM` acc = acc	-- We import something already
       | otherwise	      = addToFM acc mod_name emptyAvailEnv
       where
@@ -1120,7 +1128,7 @@ reportUnusedNames export_decls gbl_env
    
     imports = tcg_imports gbl_env
 
-    direct_import_mods :: [(Module, Bool, SrcSpan)]
+    direct_import_mods :: [(Module, [(ModuleName, Bool, SrcSpan)])]
 	-- See the type of the imp_mods for this triple
     direct_import_mods = moduleEnvElts (imp_mods imports)
 
@@ -1129,10 +1137,11 @@ reportUnusedNames export_decls gbl_env
     -- [Note: not 'minimal_imports', because that includes directly-imported
     --	      modules even if we use nothing from them; see notes above]
     --
-    -- BUG WARNING: does not deal correctly with multiple imports of the same module
-    --	 	    becuase direct_import_mods has only one entry per module
+    -- BUG WARNING: this code is generally buggy
     unused_imp_mods :: [(ModuleName, SrcSpan)]
-    unused_imp_mods = [(mod_name,loc) | (mod,no_imp,loc) <- direct_import_mods,
+    unused_imp_mods = [(mod_name,loc)
+                    | (mod, xs) <- direct_import_mods,
+                      (_, no_imp, loc) <- xs,
 		       let mod_name = moduleName mod,
     		       not (mod_name `elemFM` minimal_imports1),
     		       mod /= pRELUDE,
@@ -1353,6 +1362,11 @@ dupModuleExport mod
   = hsep [ptext SLIT("Duplicate"),
 	  quotes (ptext SLIT("Module") <+> ppr mod), 
           ptext SLIT("in export list")]
+
+moduleNotImported :: ModuleName -> SDoc
+moduleNotImported mod
+  = ptext SLIT("The export item `module") <+> ppr mod <>
+    ptext SLIT("' is not imported")
 
 nullModuleExport mod
   = ptext SLIT("The export item `module") <+> ppr mod <> ptext SLIT("' exports nothing")

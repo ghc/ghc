@@ -245,7 +245,7 @@ tcRnImports hsc_env this_mod import_decls
 
 		-- Check type-familily consistency
 	; traceRn (text "rn1: checking family instance consistency")
-	; let { dir_imp_mods = map (\ (mod, _, _) -> mod) 
+	; let { dir_imp_mods = map (\ (mod, _) -> mod) 
 			     . moduleEnvElts 
 			     . imp_mods 
 			     $ imports }

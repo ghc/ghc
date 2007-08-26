@@ -491,8 +491,11 @@ It is used 	* when processing the export list
 \begin{code}
 data ImportAvails 
    = ImportAvails {
-	imp_mods :: ModuleEnv (Module, Bool, SrcSpan),
+	imp_mods :: ModuleEnv (Module, [(ModuleName, Bool, SrcSpan)]),
 		-- Domain is all directly-imported modules
+        -- The ModuleName is what the module was imported as, e.g. in
+        --     import Foo as Bar
+        -- it is Bar.
 		-- Bool means:
 		--   True => import was "import Foo ()"
 		--   False  => import was some other form
@@ -555,12 +558,13 @@ plusImportAvails
   (ImportAvails { imp_mods = mods2,
 		  imp_dep_mods = dmods2, imp_dep_pkgs = dpkgs2,
                   imp_orphs = orphs2, imp_finsts = finsts2 })
-  = ImportAvails { imp_mods     = mods1  `plusModuleEnv` mods2,	
+  = ImportAvails { imp_mods     = plusModuleEnv_C plus_mod mods1 mods2,	
 		   imp_dep_mods = plusUFM_C plus_mod_dep dmods1 dmods2,	
 		   imp_dep_pkgs = dpkgs1 `unionLists` dpkgs2,
 		   imp_orphs    = orphs1 `unionLists` orphs2,
 		   imp_finsts   = finsts1 `unionLists` finsts2 }
   where
+    plus_mod (m1, xs1) (_, xs2) = (m1, xs1 ++ xs2)
     plus_mod_dep (m1, boot1) (m2, boot2) 
 	= WARN( not (m1 == m2), (ppr m1 <+> ppr m2) $$ (ppr boot1 <+> ppr boot2) )
 		-- Check mod-names match
