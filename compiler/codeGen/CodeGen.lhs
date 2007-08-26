@@ -57,14 +57,13 @@ import Panic
 codeGen :: DynFlags
 	-> Module
 	-> [TyCon]
-	-> ForeignStubs
 	-> [Module]		-- directly-imported modules
 	-> CollectedCCs		-- (Local/global) cost-centres needing declaring/registering.
 	-> [(StgBinding,[(Id,[Id])])]	-- Bindings to convert, with SRTs
 	-> HpcInfo
 	-> IO [Cmm]		-- Output
 
-codeGen dflags this_mod data_tycons foreign_stubs imported_mods 
+codeGen dflags this_mod data_tycons imported_mods 
 	cost_centre_info stg_binds hpc_info
   = do	
   { showPass dflags "CodeGen"
@@ -79,7 +78,7 @@ codeGen dflags this_mod data_tycons foreign_stubs imported_mods
 		; cmm_tycons <- mapM cgTyCon data_tycons
 		; cmm_init   <- getCmm (mkModuleInit way cost_centre_info 
 					     this_mod main_mod
-				  	     foreign_stubs imported_mods hpc_info)
+				  	     imported_mods hpc_info)
 		; return (cmm_binds ++ concat cmm_tycons ++ [cmm_init])
 		}
 		-- Put datatype_stuff after code_stuff, because the
@@ -141,11 +140,10 @@ mkModuleInit
 	-> CollectedCCs         -- cost centre info
 	-> Module
 	-> Module		-- name of the Main module
-	-> ForeignStubs
 	-> [Module]
 	-> HpcInfo
 	-> Code
-mkModuleInit way cost_centre_info this_mod main_mod foreign_stubs imported_mods hpc_info
+mkModuleInit way cost_centre_info this_mod main_mod imported_mods hpc_info
   = do	{ -- Allocate the static boolean that records if this
           -- module has been registered already
 	  emitData Data [CmmDataLabel moduleRegdLabel, 

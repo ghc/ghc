@@ -601,7 +601,7 @@ hscCompile cgguts
          ------------------  Code generation ------------------
          abstractC <- {-# SCC "CodeGen" #-}
                       codeGen dflags this_mod data_tycons
-                              foreign_stubs dir_imps cost_centre_info
+                              dir_imps cost_centre_info
                               stg_binds hpc_info
          ------------------  Convert to CPS --------------------
          --continuationC <- cmmCPS dflags abstractC >>= cmmToRawCmm

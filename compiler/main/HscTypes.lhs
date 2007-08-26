@@ -608,8 +608,6 @@ data ForeignStubs = NoStubs
                                         -- 	"foreign exported" functions
 			[FastString] 	-- Headers that need to be included
 				        -- 	into C code generated for this module
-			[Id]		-- Foreign-exported binders
-					-- 	we have to generate code to register these
 
 \end{code}
 

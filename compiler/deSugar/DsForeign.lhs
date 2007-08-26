@@ -40,6 +40,7 @@ import Outputable
 import FastString
 
 import Data.Maybe
+import Data.List
 \end{code}
 
 Desugaring of @foreign@ declarations is naturally split up into
@@ -64,32 +65,31 @@ dsForeigns :: [LForeignDecl Id]
 dsForeigns [] 
   = returnDs (NoStubs, [])
 dsForeigns fos
-  = foldlDs combine (ForeignStubs empty empty [] [], []) fos
- where
-  combine stubs (L loc decl) = putSrcSpanDs loc (combine1 stubs decl)
-
-  combine1 (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
-	   (ForeignImport id _ spec)
+  = do 
+    fives <- mapM do_ldecl fos
+    let
+        (hs, cs, hdrs, idss, bindss) = unzip5 fives
+        fe_ids = concat idss
+        fe_init_code = map foreignExportInitialiser fe_ids
+    --
+    return (ForeignStubs 
+             (vcat hs)
+             (vcat cs $$ vcat fe_init_code)
+             (nub (concat hdrs)),
+           (concat bindss))
+  where
+   do_ldecl (L loc decl) = putSrcSpanDs loc (do_decl decl)
+            
+   do_decl (ForeignImport id _ spec)
     = traceIf (text "fi start" <+> ppr id)	`thenDs` \ _ ->
       dsFImport (unLoc id) spec	                `thenDs` \ (bs, h, c, mbhd) -> 
       traceIf (text "fi end" <+> ppr id)	`thenDs` \ _ ->
-      returnDs (ForeignStubs (h $$ acc_h)
-      			     (c $$ acc_c)
-			     (addH mbhd acc_hdrs)
-			     acc_feb, 
-		bs ++ acc_f)
+      returnDs (h, c, maybeToList mbhd, [], bs)
 
-  combine1 (ForeignStubs acc_h acc_c acc_hdrs acc_feb, acc_f) 
-	   (ForeignExport (L _ id) _ (CExport (CExportStatic ext_nm cconv)))
+   do_decl (ForeignExport (L _ id) _ (CExport (CExportStatic ext_nm cconv)))
     = dsFExport id (idType id) 
 		ext_nm cconv False                 `thenDs` \(h, c, _, _) ->
-      returnDs (ForeignStubs (h $$ acc_h) (c $$ acc_c) acc_hdrs (id:acc_feb), 
-		acc_f)
-
-  addH Nothing  ls = ls
-  addH (Just e) ls
-   | e `elem` ls = ls
-   | otherwise   = e:ls
+      returnDs (h, c, [], [id], [])
 \end{code}
 
 
@@ -505,28 +505,6 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
           Just hs_fn -> text "extern StgClosure " <> ppr hs_fn <> text "_closure" <> semi
 
    
-   -- Initialise foreign exports by registering a stable pointer from an
-   -- __attribute__((constructor)) function.
-   -- The alternative is to do this from stginit functions generated in
-   -- codeGen/CodeGen.lhs; however, stginit functions have a negative impact
-   -- on binary sizes and link times because the static linker will think that
-   -- all modules that are imported directly or indirectly are actually used by
-   -- the program.
-   -- (this is bad for big umbrella modules like Graphics.Rendering.OpenGL)
-
-  initialiser
-     = case maybe_target of
-          Nothing -> empty
-          Just hs_fn ->
-            vcat
-             [ text "static void stginit_export_" <> ppr hs_fn
-                  <> text "() __attribute__((constructor));"
-             , text "static void stginit_export_" <> ppr hs_fn <> text "()"
-             , braces (text "getStablePtr"
-                <> parens (text "(StgPtr) &" <> ppr hs_fn <> text "_closure")
-                <> semi)
-             ]
-
   -- finally, the whole darn thing
   c_bits =
     space $$
@@ -559,8 +537,28 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
      ,   if res_hty_is_unit then empty
             else text "return cret;"
      , rbrace
-     ] $$
-    initialiser
+     ]
+
+
+foreignExportInitialiser :: Id -> SDoc
+foreignExportInitialiser hs_fn =
+   -- Initialise foreign exports by registering a stable pointer from an
+   -- __attribute__((constructor)) function.
+   -- The alternative is to do this from stginit functions generated in
+   -- codeGen/CodeGen.lhs; however, stginit functions have a negative impact
+   -- on binary sizes and link times because the static linker will think that
+   -- all modules that are imported directly or indirectly are actually used by
+   -- the program.
+   -- (this is bad for big umbrella modules like Graphics.Rendering.OpenGL)
+   vcat
+    [ text "static void stginit_export_" <> ppr hs_fn
+         <> text "() __attribute__((constructor));"
+    , text "static void stginit_export_" <> ppr hs_fn <> text "()"
+    , braces (text "getStablePtr"
+       <> parens (text "(StgPtr) &" <> ppr hs_fn <> text "_closure")
+       <> semi)
+    ]
+
 
 -- NB. the calculation here isn't strictly speaking correct.
 -- We have a primitive Haskell type (eg. Int#, Double#), and

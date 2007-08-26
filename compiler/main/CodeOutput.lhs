@@ -124,8 +124,8 @@ outputC dflags filenm mod location flat_absC
        
 	   ffi_decl_headers 
 	      = case foreign_stubs of
-		  NoStubs 		  -> []
-		  ForeignStubs _ _ fdhs _ -> map unpackFS (nub fdhs)
+		  NoStubs 		-> []
+		  ForeignStubs _ _ fdhs -> map unpackFS (nub fdhs)
 			-- Remove duplicates, because distinct foreign import decls
 			-- may cite the same #include.  Order doesn't matter.
 
@@ -217,7 +217,7 @@ outputForeignStubs dflags mod location stubs
 	stub_h_exists <- doesFileExist stub_h
 	return (stub_h_exists, stub_c_exists)
 
-  | ForeignStubs h_code c_code _ _ <- stubs
+  | ForeignStubs h_code c_code _ <- stubs
   = do
 	let
 	    stub_c_output_d = pprCode CStyle c_code
