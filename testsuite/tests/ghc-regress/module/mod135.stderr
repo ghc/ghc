@@ -1,3 +1,2 @@
 
-mod135.hs:2:10:
-    Warning: The export item `module List' exports nothing
+mod135.hs:2:10: The export item `module List' is not imported
