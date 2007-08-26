@@ -21,6 +21,7 @@ import Distribution.Compat.ReadP
 import Distribution.ParseUtils
 import Distribution.Package
 import Distribution.Version
+import System.FilePath
 
 #ifdef USING_COMPAT
 import Compat.Directory ( getAppUserDataDirectory, createDirectoryIfMissing )
@@ -292,7 +293,7 @@ getPkgDatabases modify flags = do
         [] -> do mb_dir <- getExecDir "/bin/ghc-pkg.exe"
                  case mb_dir of
                         Nothing  -> die err_msg
-                        Just dir -> return (dir `joinFileName` "package.conf")
+                        Just dir -> return (dir </> "package.conf")
         fs -> return (last fs)
 
   let global_conf_dir = global_conf ++ ".d"
@@ -310,8 +311,8 @@ getPkgDatabases modify flags = do
 
   let
         subdir = targetARCH ++ '-':targetOS ++ '-':version
-        archdir   = appdir `joinFileName` subdir
-        user_conf = archdir `joinFileName` "package.conf"
+        archdir   = appdir </> subdir
+        user_conf = archdir </> "package.conf"
   user_exists <- doesFileExist user_conf
 
   -- If the user database doesn't exist, and this command isn't a
@@ -327,7 +328,7 @@ getPkgDatabases modify flags = do
                 Right path
                   | last cs == ""  -> init cs ++ sys_databases
                   | otherwise      -> cs
-                  where cs = parseSearchPath path
+                  where cs = splitSearchPath path
 
         -- The "global" database is always the one at the bottom of the stack.
         -- This is the database we modify by default.
@@ -546,7 +547,7 @@ describeField flags pkgid field = do
     Nothing -> die ("unknown field: " ++ field)
     Just fn -> do
         ps <- findPackages db_stack pkgid
-        let top_dir = getFilenameDir (fst (last db_stack))
+        let top_dir = takeDirectory (fst (last db_stack))
         mapM_ (putStrLn . fn) (mungePackagePaths top_dir ps)
 
 mungePackagePaths :: String -> [InstalledPackageInfo] -> [InstalledPackageInfo]
@@ -635,7 +636,7 @@ isBrokenPackage pkg pkg_map = not . null $ missingPackageDeps pkg pkg_map
 writeNewConfig :: FilePath -> [InstalledPackageInfo] -> IO ()
 writeNewConfig filename packages = do
   hPutStr stdout "Writing new package config file... "
-  createDirectoryIfMissing True $ getFilenameDir filename
+  createDirectoryIfMissing True $ takeDirectory filename
   h <- openFile filename WriteMode `catch` \e ->
       if isPermissionError e
       then die (filename ++ ": you don't have permission to modify this file")
@@ -837,7 +838,7 @@ searchEntries path prefix (f:fs)
         ms <- searchEntries path prefix fs
         return (prefix `joinModule` f : ms)
   | looks_like_a_component  =  do
-        ms <- searchDir (path `joinFilename` f) (prefix `joinModule` f)
+        ms <- searchDir (path </> f) (prefix `joinModule` f)
         ms' <- searchEntries path prefix fs
         return (ms ++ ms')
   | otherwise
@@ -1043,81 +1044,3 @@ foreign import stdcall unsafe  "GetModuleFileNameA"
 getExecDir :: String -> IO (Maybe String)
 getExecDir _ = return Nothing
 #endif
-
--- -----------------------------------------------------------------------------
--- FilePath utils
-
--- | The 'joinFileName' function is the opposite of 'splitFileName'.
--- It joins directory and file names to form a complete file path.
---
--- The general rule is:
---
--- > dir `joinFileName` basename == path
--- >   where
--- >     (dir,basename) = splitFileName path
---
--- There might be an exceptions to the rule but in any case the
--- reconstructed path will refer to the same object (file or directory).
--- An example exception is that on Windows some slashes might be converted
--- to backslashes.
-joinFileName :: String -> String -> FilePath
-joinFileName ""  fname = fname
-joinFileName "." fname = fname
-joinFileName dir ""    = dir
-joinFileName dir fname
-  | isPathSeparator (last dir) = dir++fname
-  | otherwise                  = dir++pathSeparator:fname
-
--- | Checks whether the character is a valid path separator for the host
--- platform. The valid character is a 'pathSeparator' but since the Windows
--- operating system also accepts a slash (\"\/\") since DOS 2, the function
--- checks for it on this platform, too.
-isPathSeparator :: Char -> Bool
-isPathSeparator ch = ch == pathSeparator || ch == '/'
-
--- | Provides a platform-specific character used to separate directory levels in
--- a path string that reflects a hierarchical file system organization. The
--- separator is a slash (@\"\/\"@) on Unix and Macintosh, and a backslash
--- (@\"\\\"@) on the Windows operating system.
-pathSeparator :: Char
-#ifdef mingw32_HOST_OS
-pathSeparator = '\\'
-#else
-pathSeparator = '/'
-#endif
-
-getFilenameDir :: FilePath -> FilePath
-getFilenameDir fn = case break isPathSeparator (reverse fn) of
-                        (xs, "") -> "."
-                        (_, sep:ys) -> reverse ys
-
--- | The function splits the given string to substrings
--- using the 'searchPathSeparator'.
-parseSearchPath :: String -> [FilePath]
-parseSearchPath path = split path
-  where
-    split :: String -> [String]
-    split s =
-      case rest' of
-        []     -> [chunk]
-        _:rest -> chunk : split rest
-      where
-        chunk =
-          case chunk' of
-#ifdef mingw32_HOST_OS
-            ('\"':xs@(_:_)) | last xs == '\"' -> init xs
-#endif
-            _                                 -> chunk'
-
-        (chunk', rest') = break (==searchPathSeparator) s
-
--- | A platform-specific character used to separate search path strings
--- in environment variables. The separator is a colon (\":\") on Unix
--- and Macintosh, and a semicolon (\";\") on the Windows operating system.
-searchPathSeparator :: Char
-#if mingw32_HOST_OS || mingw32_TARGET_OS
-searchPathSeparator = ';'
-#else
-searchPathSeparator = ':'
-#endif
-
