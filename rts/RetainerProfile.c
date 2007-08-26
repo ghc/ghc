@@ -1439,7 +1439,7 @@ retainStack( StgClosure *c, retainer c_child_r,
 	    StgFunInfoTable *fun_info;
 	    
 	    retainClosure(ret_fun->fun, c, c_child_r);
-	    fun_info = get_fun_itbl(ret_fun->fun);
+	    fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
 	    
 	    p = (P_)&ret_fun->payload;
 	    switch (fun_info->f.fun_type) {
