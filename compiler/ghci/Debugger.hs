@@ -49,9 +49,9 @@ import GHC.Exts
 -- | The :print & friends commands
 -------------------------------------
 pprintClosureCommand :: Session -> Bool -> Bool -> String -> IO ()
-pprintClosureCommand session bindThings force str = do 
+pprintClosureCommand session bindThings force str = do
   tythings <- (catMaybes . concat) `liftM`
-                 mapM (\w -> GHC.parseName session w >>= 
+                 mapM (\w -> GHC.parseName session w >>=
                                 mapM (GHC.lookupName session))
                       (words str)
   let ids = [id | AnId id <- tythings]
@@ -95,7 +95,7 @@ pprintClosureCommand session bindThings force str = do
      let env_tvs      = ic_tyvars (hsc_IC hsc_env)
          my_tvs       = termTyVars t
          tvs          = env_tvs `minusVarSet` my_tvs
-         tyvarOccName = nameOccName . tyVarName 
+         tyvarOccName = nameOccName . tyVarName
          tidyEnv      = (initTidyOccEnv (map tyvarOccName (varSetElems tvs))
                         , env_tvs `intersectVarSet` my_tvs)
      return$ mapTermType (snd . tidyOpenType tidyEnv) t
@@ -103,13 +103,13 @@ pprintClosureCommand session bindThings force str = do
 -- | Give names, and bind in the interactive environment, to all the suspensions
 --   included (inductively) in a term
 bindSuspensions :: Session -> Term -> IO Term
-bindSuspensions cms@(Session ref) t = do 
+bindSuspensions cms@(Session ref) t = do
       hsc_env <- readIORef ref
       inScope <- GHC.getBindings cms
       let ictxt        = hsc_IC hsc_env
           prefix       = "_t"
           alreadyUsedNames = map (occNameString . nameOccName . getName) inScope
-          availNames   = map ((prefix++) . show) [1..] \\ alreadyUsedNames 
+          availNames   = map ((prefix++) . show) [1..] \\ alreadyUsedNames
       availNames_var  <- newIORef availNames
       (t', stuff)     <- foldTerm (nameSuspensionsAndGetInfos availNames_var) t
       let (names, tys, hvals) = unzip3 stuff
@@ -124,14 +124,14 @@ bindSuspensions cms@(Session ref) t = do
      where
 
 --    Processing suspensions. Give names and recopilate info
-        nameSuspensionsAndGetInfos :: IORef [String] -> 
+        nameSuspensionsAndGetInfos :: IORef [String] ->
                                        TermFold (IO (Term, [(Name,Type,HValue)]))
-        nameSuspensionsAndGetInfos freeNames = TermFold 
+        nameSuspensionsAndGetInfos freeNames = TermFold
                       {
                         fSuspension = doSuspension freeNames
-                      , fTerm = \ty dc v tt -> do 
-                                    tt' <- sequence tt 
-                                    let (terms,names) = unzip tt' 
+                      , fTerm = \ty dc v tt -> do
+                                    tt' <- sequence tt
+                                    let (terms,names) = unzip tt'
                                     return (Term ty dc v terms, concat names)
                       , fPrim    = \ty n ->return (Prim ty n,[])
                       }
@@ -143,43 +143,43 @@ bindSuspensions cms@(Session ref) t = do
 
 
 --  A custom Term printer to enable the use of Show instances
-printTerm cms@(Session ref) = cPprTerm cPpr
+showTerm cms@(Session ref) = cPprTerm cPpr
  where
-  cPpr = \p-> cPprShowable : cPprTermBase p 
+  cPpr = \p-> cPprShowable : cPprTermBase p
   cPprShowable prec t@Term{ty=ty, dc=dc, val=val} = do
     let hasType = isEmptyVarSet (tyVarsOfType ty)  -- redundant
         isEvaled = isFullyEvaluatedTerm t
     if not isEvaled -- || not hasType
      then return Nothing
-     else do 
+     else do
         hsc_env <- readIORef ref
         dflags  <- GHC.getSessionDynFlags cms
         do
            (new_env, bname) <- bindToFreshName hsc_env ty "showme"
            writeIORef ref (new_env)
-           let noop_log _ _ _ _ = return () 
+           let noop_log _ _ _ _ = return ()
                expr = "show " ++ showSDoc (ppr bname)
            GHC.setSessionDynFlags cms dflags{log_action=noop_log}
-           mb_txt <- withExtendedLinkEnv [(bname, val)] 
+           mb_txt <- withExtendedLinkEnv [(bname, val)]
                                          (GHC.compileExpr cms expr)
            let myprec = 10 -- application precedence. TODO Infix constructors
-           case mb_txt of 
-             Just txt_ | txt <- unsafeCoerce# txt_, not (null txt) 
-                       -> return $ Just$ cparen (prec >= myprec && 
-                                                      needsParens txt) 
+           case mb_txt of
+             Just txt_ | txt <- unsafeCoerce# txt_, not (null txt)
+                       -> return $ Just$ cparen (prec >= myprec &&
+                                                      needsParens txt)
                                                 (text txt)
              _  -> return Nothing
-         `finally` do 
+         `finally` do
            writeIORef ref hsc_env
            GHC.setSessionDynFlags cms dflags
   needsParens ('"':txt) = False -- some simple heuristics to see whether parens
                                 -- are redundant in an arbitrary Show output
-  needsParens ('(':txt) = False 
+  needsParens ('(':txt) = False
   needsParens txt = ' ' `elem` txt
 
- 
+
   bindToFreshName hsc_env ty userName = do
-    name <- newGrimName cms userName 
+    name <- newGrimName cms userName
     let ictxt    = hsc_IC hsc_env
         tmp_ids  = ic_tmp_ids ictxt
         id       = mkGlobalId VanillaGlobal name (sigmaType ty) vanillaIdInfo
