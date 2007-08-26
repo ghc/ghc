@@ -10,7 +10,7 @@
 -- 
 -----------------------------------------------------------------------------
 
-module Debugger (pprintClosureCommand) where
+module Debugger (pprintClosureCommand, showTerm) where
 
 import Linker
 import RtClosureInspect
@@ -54,35 +54,40 @@ pprintClosureCommand session bindThings force str = do
                  mapM (\w -> GHC.parseName session w >>= 
                                 mapM (GHC.lookupName session))
                       (words str)
-  substs <- catMaybes `liftM` mapM (go session) 
-                                   [id | AnId id <- tythings]
-  modifySession session $ \hsc_env -> 
-         hsc_env{hsc_IC = foldr (flip substInteractiveContext) 
-                                (hsc_IC hsc_env) 
+  let ids = [id | AnId id <- tythings]
+
+  -- Obtain the terms and the recovered type information
+  (terms, substs) <- unzip `liftM` mapM (go session) ids
+  
+  -- Apply the substitutions obtained after recovering the types
+  modifySession session $ \hsc_env ->
+         hsc_env{hsc_IC = foldr (flip substInteractiveContext)
+                                (hsc_IC hsc_env)
                                 (map skolemiseSubst substs)}
- where 
+  -- Finally, print the Terms
+  unqual  <- GHC.getPrintUnqual session
+  let showSDocForUserOneLine unqual doc =
+               showDocWith LeftMode (doc (mkErrStyle unqual))
+  docterms <- mapM (showTerm session) terms
+  (putStrLn . showSDocForUserOneLine unqual . vcat)
+        (zipWith (\id docterm -> ppr id <+> char '=' <+> docterm)
+                 ids
+                 docterms)
+ where
 
    -- Do the obtainTerm--bindSuspensions-computeSubstitution dance
-   go :: Session -> Id -> IO (Maybe TvSubst)
-   go cms id = do 
-       term_    <- withSession cms $ \hsc_env -> obtainTerm hsc_env force id 
+   go :: Session -> Id -> IO (Term, TvSubst)
+   go cms id = do
+       term_    <- GHC.obtainTerm cms force id
        term     <- tidyTermTyVars cms term_
-       term'    <- if not bindThings then return term 
-                     else bindSuspensions cms term                         
-       showterm <- printTerm cms term'
-       unqual   <- GHC.getPrintUnqual cms
-       let showSDocForUserOneLine unqual doc = 
-               showDocWith LeftMode (doc (mkErrStyle unqual))
-       (putStrLn . showSDocForUserOneLine unqual) 
-                                   (ppr id <+> char '=' <+> showterm)
+       term'    <- if not bindThings then return term
+                     else bindSuspensions cms term                       
      -- Before leaving, we compare the type obtained to see if it's more specific
-     --  Then, we extract a substitution, 
+     --  Then, we extract a substitution,
      --  mapping the old tyvars to the reconstructed types.
        let Just reconstructed_type = termType term
-           mb_subst = computeRTTIsubst (idType id) (reconstructed_type)
-
-       ASSERT2 (isJust mb_subst, ppr reconstructed_type $$ (ppr$ idType id)) 
-        return mb_subst
+           Just subst = computeRTTIsubst (idType id) (reconstructed_type)
+       return (term',subst)
 
    tidyTermTyVars :: Session -> Term -> IO Term
    tidyTermTyVars (Session ref) t = do

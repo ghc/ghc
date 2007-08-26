@@ -94,7 +94,7 @@ module GHC (
         isModuleInterpreted,
 	compileExpr, HValue, dynCompileExpr,
 	lookupName,
-        obtainTerm, obtainTerm1,
+        GHC.obtainTerm, GHC.obtainTerm1, reconstructType,
         modInfoModBreaks,
         ModBreaks(..), BreakIndex,
         BreakInfo(breakInfo_number, breakInfo_module),
@@ -1987,4 +1987,12 @@ findModule' hsc_env mod_name maybe_pkg =
 getHistorySpan :: Session -> History -> IO SrcSpan
 getHistorySpan sess h = withSession sess $ \hsc_env -> 
                           return$ InteractiveEval.getHistorySpan hsc_env h
+
+obtainTerm :: Session -> Bool -> Id -> IO Term
+obtainTerm sess force id = withSession sess $ \hsc_env ->
+                            InteractiveEval.obtainTerm hsc_env force id
+
+obtainTerm1 :: Session -> Bool -> Maybe Type -> a -> IO Term
+obtainTerm1 sess force mb_ty a = withSession sess $ \hsc_env ->
+                               InteractiveEval.obtainTerm1 hsc_env force mb_ty a
 #endif

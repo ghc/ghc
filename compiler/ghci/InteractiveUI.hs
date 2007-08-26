@@ -578,7 +578,8 @@ afterRunStmt pred run_result = do
            pred (GHC.resumeSpan $ head resumes) -> do
                printForUser $ ptext SLIT("Stopped at") <+> 
                        ppr (GHC.resumeSpan $ head resumes)
-               printTypeOfNames session names
+--               printTypeOfNames session names
+               printTypeAndContentOfNames session names
                maybe (return ()) runBreakCmd mb_info
                -- run the command set with ":set stop <cmd>"
                st <- getGHCiState
@@ -594,6 +595,18 @@ afterRunStmt pred run_result = do
   io (when b revertCAFs)
 
   return (case run_result of GHC.RunOk _ -> True; _ -> False)
+
+      where printTypeAndContentOfNames session names = do
+              let namesSorted = sortBy compareNames names
+              tythings <- catMaybes `liftM` 
+                              io (mapM (GHC.lookupName session) names)
+              docs_ty  <- mapM showTyThing tythings
+              terms    <- mapM (io . GHC.obtainTerm session False)
+                               [ id | (AnId id, Just _) <- zip tythings docs_ty]
+              docs_terms <- mapM (io . showTerm session) terms                                   
+              printForUser $ vcat $ zipWith (\ty cts -> ty <> text " = " <> cts)
+                                            (catMaybes docs_ty)
+                                            docs_terms
 
 runBreakCmd :: GHC.BreakInfo -> GHCi ()
 runBreakCmd info = do
@@ -1276,11 +1289,18 @@ showBindings = do
 compareTyThings :: TyThing -> TyThing -> Ordering
 t1 `compareTyThings` t2 = getName t1 `compareNames` getName t2
 
-printTyThing :: TyThing -> GHCi ()
-printTyThing (AnId id) = do
+showTyThing :: TyThing -> GHCi (Maybe SDoc)
+showTyThing (AnId id) = do
   ty' <- cleanType (GHC.idType id)
-  printForUser $ ppr id <> text " :: " <> ppr ty'
-printTyThing _ = return ()
+  return $ Just $ ppr id <> text " :: " <> ppr ty'
+showTyThing _ = return Nothing
+
+printTyThing :: TyThing -> GHCi ()
+printTyThing tyth = do
+  mb_x <- showTyThing tyth
+  case mb_x of
+    Just x  -> printForUser x
+    Nothing -> return ()
 
 -- if -fglasgow-exts is on we show the foralls, otherwise we don't.
 cleanType :: Type -> GHCi Type

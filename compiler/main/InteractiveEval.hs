@@ -29,7 +29,7 @@ module InteractiveEval (
         isModuleInterpreted,
 	compileExpr, dynCompileExpr,
 	lookupName,
-        obtainTerm, obtainTerm1, reconstructType,
+        Term(..), obtainTerm, obtainTerm1, reconstructType,
         skolemiseSubst, skolemiseTy
 #endif
         ) where
