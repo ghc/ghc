@@ -82,7 +82,13 @@ check-packages :
 	    exit 1; \
 	fi
 
-stage1 : check-packages
+ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
+ifneq "$(WhatGccIsCalled)" ""
+GCC_LIB_DEP = stamp.inplace-gcc-lib
+endif
+endif
+
+stage1 : $(GCC_LIB_DEP) check-packages
 	$(MAKE) -C utils/mkdependC boot
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS_BUILD); do \
