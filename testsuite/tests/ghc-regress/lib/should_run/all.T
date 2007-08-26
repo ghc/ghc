@@ -12,7 +12,7 @@ test('tup001',		normal, compile_and_run, [''])
 
 test('addr001',		normal, compile_and_run, [''])
 test('dynamic001', 	skip_if_fast, compile_and_run, [''])
-test('dynamic002', 	skip_if_fast, compile_and_run, [''])
+test('dynamic002', 	skip_if_fast, compile_and_run, ['-package packedstring'])
 test('enum01', 		skip_if_fast, compile_and_run, ['-cpp'])
 test('enum02', 		skip_if_fast, compile_and_run, ['-cpp'])
 test('enum03', 		skip_if_fast, compile_and_run, ['-cpp'])
