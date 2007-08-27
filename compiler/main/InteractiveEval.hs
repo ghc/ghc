@@ -29,7 +29,7 @@ module InteractiveEval (
         isModuleInterpreted,
 	compileExpr, dynCompileExpr,
 	lookupName,
-        Term(..), obtainTerm, obtainTerm1, reconstructType,
+        Term(..), obtainTerm, obtainTerm1, obtainTermB, reconstructType,
         skolemiseSubst, skolemiseTy
 #endif
         ) where
@@ -910,12 +910,17 @@ isModuleInterpreted s mod_summary = withSession s $ \hsc_env ->
 
 obtainTerm1 :: HscEnv -> Bool -> Maybe Type -> a -> IO Term
 obtainTerm1 hsc_env force mb_ty x = 
-              cvObtainTerm hsc_env force mb_ty (unsafeCoerce# x)
+              cvObtainTerm hsc_env maxBound force mb_ty (unsafeCoerce# x)
+
+obtainTermB :: HscEnv -> Int -> Bool -> Id -> IO Term
+obtainTermB hsc_env bound force id =  do
+              hv <- Linker.getHValue hsc_env (varName id) 
+              cvObtainTerm hsc_env bound force (Just$ idType id) hv
 
 obtainTerm :: HscEnv -> Bool -> Id -> IO Term
 obtainTerm hsc_env force id =  do
               hv <- Linker.getHValue hsc_env (varName id) 
-              cvObtainTerm hsc_env force (Just$ idType id) hv
+              cvObtainTerm hsc_env maxBound force (Just$ idType id) hv
 
 -- Uses RTTI to reconstruct the type of an Id, making it less polymorphic
 reconstructType :: HscEnv -> Bool -> Id -> IO (Maybe Type)

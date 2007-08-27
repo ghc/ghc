@@ -8,7 +8,7 @@
 
 module RtClosureInspect(
   
-     cvObtainTerm,       -- :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Term
+     cvObtainTerm,      -- :: HscEnv -> Int -> Bool -> Maybe Type -> HValue -> IO Term
 
      Term(..),
      pprTerm, 
@@ -471,23 +471,25 @@ addConstraint t1 t2  = congruenceNewtypes t1 t2 >>= uncurry unifyType
 		       >> return () -- TOMDO: what about the coercion?
 				    -- we should consider family instances 
 
-
-
 -- Type & Term reconstruction 
-cvObtainTerm :: HscEnv -> Bool -> Maybe Type -> HValue -> IO Term
-cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
+cvObtainTerm :: HscEnv -> Int -> Bool -> Maybe Type -> HValue -> IO Term
+cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
    tv <- newVar argTypeKind
    case mb_ty of
-     Nothing -> go tv tv hval >>= zonkTerm
-     Just ty | isMonomorphic ty -> go ty ty hval >>= zonkTerm
+     Nothing -> go bound tv tv hval >>= zonkTerm
+     Just ty | isMonomorphic ty -> go bound ty ty hval >>= zonkTerm
      Just ty -> do 
               (ty',rev_subst) <- instScheme (sigmaType ty)
               addConstraint tv ty'
-              term <- go tv tv hval >>= zonkTerm
+              term <- go bound tv tv hval >>= zonkTerm
               --restore original Tyvars
               return$ mapTermType (substTy rev_subst) term
     where 
-  go tv ty a = do 
+  go bound _ _ _ | seq bound False = undefined
+  go 0 tv ty a = do
+    clos <- trIO $ getClosureData a
+    return (Suspension (tipe clos) (Just tv) a Nothing)
+  go bound tv ty a = do 
     let monomorphic = not(isTyVarTy tv)   
     -- This ^^^ is a convention. The ancestor tests for
     -- monomorphism and passes a type instead of a tv
@@ -497,9 +499,9 @@ cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
 -- NB. this won't attempt to force a BLACKHOLE.  Even with :force, we never
 -- force blackholes, because it would almost certainly result in deadlock,
 -- and showing the '_' is more useful.
-      t | isThunk t && force -> seq a $ go tv ty a
+      t | isThunk t && force -> seq a $ go (pred bound) tv ty a
 -- We always follow indirections 
-      Indirection _ -> go tv ty $! (ptrs clos ! 0)
+      Indirection _ -> go (pred bound) tv ty $! (ptrs clos ! 0)
  -- The interesting case
       Constr -> do
         Right dcname <- dataConInfoPtrToName (infoPtr clos)
@@ -513,7 +515,7 @@ cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
                        let tag = showSDoc (ppr dcname)
                        vars     <- replicateM (length$ elems$ ptrs clos) 
                                               (newVar (liftedTypeKind))
-                       subTerms <- sequence [appArr (go tv tv) (ptrs clos) i 
+                       subTerms <- sequence [appArr (go (pred bound) tv tv) (ptrs clos) i 
                                               | (i, tv) <- zip [0..] vars]
                        return (Term tv (Left ('<' : tag ++ ">")) a subTerms)
           Just dc -> do 
@@ -536,7 +538,7 @@ cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
                   addConstraint myType signatureType
             subTermsP <- sequence $ drop extra_args 
                                  -- ^^^  all extra arguments are pointed
-                  [ appArr (go tv t) (ptrs clos) i
+                  [ appArr (go (pred bound) tv t) (ptrs clos) i
                    | (i,tv,t) <- zip3 [0..] subTermTvs subTtypesP]
             let unboxeds   = extractUnboxed subTtypesNP clos
                 subTermsNP = map (uncurry Prim) (zip subTtypesNP unboxeds)      
@@ -544,9 +546,10 @@ cvObtainTerm hsc_env force mb_ty hval = runTR hsc_env $ do
                                 (drop extra_args subTtypes)
             return (Term tv (Right dc) a subTerms)
 -- The otherwise case: can be a Thunk,AP,PAP,etc.
-      otherwise -> 
-         return (Suspension (tipe clos) (Just tv) a Nothing)
+      tipe_clos -> 
+         return (Suspension tipe_clos (Just tv) a Nothing)
 
+--  matchSubTypes dc ty | pprTrace "matchSubtypes" (ppr dc <+> ppr ty) False = undefined
   matchSubTypes dc ty
     | Just (_,ty_args) <- splitTyConApp_maybe (repType ty) 
 --     assumption:             ^^^ looks through newtypes 

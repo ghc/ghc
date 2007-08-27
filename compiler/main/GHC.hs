@@ -94,7 +94,7 @@ module GHC (
         isModuleInterpreted,
 	compileExpr, HValue, dynCompileExpr,
 	lookupName,
-        GHC.obtainTerm, GHC.obtainTerm1, reconstructType,
+        GHC.obtainTerm, GHC.obtainTerm1, GHC.obtainTermB, reconstructType,
         modInfoModBreaks,
         ModBreaks(..), BreakIndex,
         BreakInfo(breakInfo_number, breakInfo_module),
@@ -1995,4 +1995,9 @@ obtainTerm sess force id = withSession sess $ \hsc_env ->
 obtainTerm1 :: Session -> Bool -> Maybe Type -> a -> IO Term
 obtainTerm1 sess force mb_ty a = withSession sess $ \hsc_env ->
                                InteractiveEval.obtainTerm1 hsc_env force mb_ty a
+
+obtainTermB :: Session -> Int -> Bool -> Id -> IO Term
+obtainTermB sess bound force id = withSession sess $ \hsc_env ->
+                            InteractiveEval.obtainTermB hsc_env bound force id
+
 #endif

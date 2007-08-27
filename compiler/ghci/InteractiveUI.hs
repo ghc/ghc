@@ -601,7 +601,7 @@ afterRunStmt pred run_result = do
               tythings <- catMaybes `liftM` 
                               io (mapM (GHC.lookupName session) names)
               docs_ty  <- mapM showTyThing tythings
-              terms    <- mapM (io . GHC.obtainTerm session False)
+              terms    <- mapM (io . GHC.obtainTermB session 10 False)
                                [ id | (AnId id, Just _) <- zip tythings docs_ty]
               docs_terms <- mapM (io . showTerm session) terms                                   
               printForUser $ vcat $ zipWith (\ty cts -> ty <> text " = " <> cts)
