@@ -130,7 +130,8 @@ builtin_commands = [
   ("show",	keepGoing showCmd,		False, completeNone),
   ("sprint",    keepGoing sprintCmd,            False, completeIdentifier),
   ("step",      keepGoing stepCmd,              False, completeIdentifier), 
-  ("stepover",  keepGoing stepOverCmd,          False, completeIdentifier), 
+  ("steplocal", keepGoing stepLocalCmd,         False, completeIdentifier), 
+  ("stepmodule",keepGoing stepModuleCmd,        False, completeIdentifier), 
   ("type",	keepGoing typeOfExpr,		False, completeIdentifier),
   ("trace",     keepGoing traceCmd,             False, completeIdentifier), 
   ("undef",     keepGoing undefineMacro,	False, completeMacro),
@@ -186,7 +187,8 @@ helpText =
  "   :sprint [<name> ...]        simplifed version of :print\n" ++
  "   :step                       single-step after stopping at a breakpoint\n"++
  "   :step <expr>                single-step into <expr>\n"++
- "   :stepover                   single-step without following function applications\n"++
+ "   :steplocal                  single-step restricted to the current top level decl.\n"++
+ "   :stepmodule                 single-step restricted to the current module\n"++
  "   :trace                      trace after stopping at a breakpoint\n"++
  "   :trace <expr>               trace into <expr> (remembers breakpoints for :history)\n"++
 
@@ -566,7 +568,7 @@ runStmt stmt step
 --afterRunStmt :: GHC.RunResult -> GHCi Bool
                                  -- False <=> the statement failed to compile
 afterRunStmt _ (GHC.RunException e) = throw e
-afterRunStmt pred run_result = do
+afterRunStmt step_here run_result = do
   session     <- getSession
   resumes <- io $ GHC.getResumeContext session
   case run_result of
@@ -575,7 +577,7 @@ afterRunStmt pred run_result = do
         when show_types $ printTypeOfNames session names
      GHC.RunBreak _ names mb_info 
          | isNothing  mb_info || 
-           pred (GHC.resumeSpan $ head resumes) -> do
+           step_here (GHC.resumeSpan $ head resumes) -> do
                printForUser $ ptext SLIT("Stopped at") <+> 
                        ppr (GHC.resumeSpan $ head resumes)
 --               printTypeOfNames session names
@@ -586,7 +588,7 @@ afterRunStmt pred run_result = do
                enqueueCommands [stop st]
                return ()
          | otherwise -> io(GHC.resume session GHC.SingleStep) >>= 
-                        afterRunStmt pred >> return ()
+                        afterRunStmt step_here >> return ()
      _ -> return ()
 
   flushInterpBuffers
@@ -1567,43 +1569,31 @@ stepCmd :: String -> GHCi ()
 stepCmd []         = doContinue (const True) GHC.SingleStep
 stepCmd expression = do runStmt expression GHC.SingleStep; return ()
 
-stepOverCmd [] = do 
+stepLocalCmd :: String -> GHCi ()
+stepLocalCmd  [] = do 
   mb_span <- getCurrentBreakSpan
   case mb_span of
     Nothing  -> stepCmd []
     Just loc -> do
        Just mod <- getCurrentBreakModule
-       parent   <- enclosingTickSpan mod loc
-       allTicksRightmost <- (sortBy rightmost . map snd) `fmap` 
-                               ticksIn mod parent
-       let lastTick = null allTicksRightmost || 
-                      head allTicksRightmost == loc
-       if not lastTick
-              then doContinue (`isSubspanOf` parent) GHC.SingleStep
-              else doContinue (const True) GHC.SingleStep
+       current_toplevel_decl <- enclosingTickSpan mod loc
+       doContinue (`isSubspanOf` current_toplevel_decl) GHC.SingleStep
 
-stepOverCmd expression = stepCmd expression
+stepLocalCmd expression = stepCmd expression
 
-{- 
- So, the only tricky part in stepOver is detecting that we have 
- arrived to the last tick in an expression, in which case we must
- step normally to the next tick.
- What we do is:
-  1. Retrieve the enclosing expression block (with a tick)
-  2. Retrieve all the ticks there and sort them out by 'rightness'
-  3. See if the current tick turned out the first one in the list
--}
+stepModuleCmd :: String -> GHCi ()
+stepModuleCmd  [] = do 
+  mb_span <- getCurrentBreakSpan
+  case mb_span of
+    Nothing  -> stepCmd []
+    Just loc -> do
+       Just span <- getCurrentBreakSpan
+       let f some_span = optSrcSpanFileName span == optSrcSpanFileName some_span
+       doContinue f GHC.SingleStep
 
---ticksIn :: Module -> SrcSpan -> GHCi [Tick]
-ticksIn mod src = do
-  ticks <- getTickArray mod
-  let lines = [srcSpanStartLine src .. srcSpanEndLine src]
-  return [  t   | line <- lines
-                , t@(_,span) <- ticks ! line
-                , srcSpanStart src <= srcSpanStart span
-                , srcSpanEnd src   >= srcSpanEnd span
-                ]
+stepModuleCmd expression = stepCmd expression
 
+-- | Returns the span of the largest tick containing the srcspan given
 enclosingTickSpan :: Module -> SrcSpan -> GHCi SrcSpan
 enclosingTickSpan mod src = do
   ticks <- getTickArray mod

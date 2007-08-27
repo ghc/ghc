@@ -1109,8 +1109,10 @@ right :: [a]
         bug. GHCi offers two variants of stepping. Use 
 	<literal>:step</literal>  to enable all the
         breakpoints in the program, and execute until the next breakpoint is
-        reached. Use <literal>:stepover</literal> to step over function
-	applications, which of course are executed all the same. 
+        reached. Use <literal>:steplocal</literal> to limit the set
+	of enabled breakpoints to those in the current top level function.
+	Similarly, use <literal>:stepmodule</literal> to single step only on
+	breakpoints contained in the current module.
 	For example:</para>
 
 <screen>
