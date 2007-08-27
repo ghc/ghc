@@ -78,6 +78,7 @@ import GHC.Exts
 import Data.Array
 import Control.Exception as Exception
 import Control.Concurrent
+import Data.List (sortBy)
 import Data.IORef
 import Foreign.StablePtr
 
@@ -131,7 +132,7 @@ data History
    = History {
         historyApStack   :: HValue,
         historyBreakInfo :: BreakInfo,
-        historyEnclosingDecl :: Name
+        historyEnclosingDecl :: Id
          -- ^^ A cache of the enclosing top level declaration, for convenience
    }
 
@@ -154,16 +155,18 @@ getHistorySpan hsc_env hist =
        _ -> panic "getHistorySpan"
 
 -- | Finds the enclosing top level function name 
-findEnclosingDecl :: HscEnv -> Module -> SrcSpan -> Name
+findEnclosingDecl :: HscEnv -> Module -> SrcSpan -> Id
 findEnclosingDecl hsc_env mod span =
    case lookupUFM (hsc_HPT hsc_env) (moduleName mod) of
          Nothing -> panic "findEnclosingDecl"
          Just hmi -> let
-                globals   = typeEnvIds (md_types (hm_details hmi))
-                Just decl = find (\n -> nameSrcSpan n < span) 
-                                 (reverse $ map idName globals)
-                              --   ^^ assumes md_types is sorted
-              in decl
+             globals   = typeEnvIds (md_types (hm_details hmi))
+             Just decl = 
+                 find (\id -> let n = idName id in 
+                               nameSrcSpan n < span && isExternalName n)
+                      (reverse$ sortBy (compare `on` (nameSrcSpan.idName))
+                                       globals)
+           in decl
 
 -- | Find the Module corresponding to a FilePath
 findModuleFromFile :: HscEnv -> FilePath -> Maybe Module
