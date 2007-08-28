@@ -34,7 +34,6 @@ import RegSpillClean
 import RegAllocStats
 import MachRegs
 import MachInstrs
-import RegCoalesce
 import PprMach
 
 import UniqSupply
@@ -214,16 +213,20 @@ buildGraph
 	
 buildGraph code
  = do
- 	-- Add the reg-reg conflicts to the graph
-	let conflictSets	= unionManyBags (map slurpConflicts code)
-	let graph_conflict	= foldrBag graphAddConflictSet Color.initGraph conflictSets
+	-- Slurp out the conflicts and reg->reg moves from this code
+	let (conflictList, moveList) =
+		unzip $ map slurpConflicts code
 
+	let conflictBag		= unionManyBags conflictList
+	let moveBag		= unionManyBags moveList
+
+ 	-- Add the reg-reg conflicts to the graph
+	let graph_conflict	= foldrBag graphAddConflictSet Color.initGraph conflictBag
 
 	-- Add the coalescences edges to the graph.
-	let coalesce		= unionManyBags (map slurpJoinMovs code)
-	let graph_coalesce	= foldrBag graphAddCoalesce graph_conflict coalesce
+	let graph_coalesce	= foldrBag graphAddCoalesce graph_conflict moveBag
 			
-	return	$ graph_coalesce
+	return	graph_coalesce
 
 
 -- | Add some conflict edges to the graph.

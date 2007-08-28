@@ -152,7 +152,7 @@ selectColor colors graph u
 	Just colors_avail
 			= lookupUFM colors (nodeClass node)
 
-	-- colors we can't use because they're already being used
+	-- find colors we can't use because they're already being used
 	--	by a node that conflicts with this one.
 	Just nsConflicts 	
 			= sequence

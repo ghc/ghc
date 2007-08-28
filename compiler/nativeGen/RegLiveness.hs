@@ -184,11 +184,13 @@ mapGenBlockTopM f (CmmProc header label params blocks)
  	return	$ CmmProc header label params blocks'
 
 
--- | Slurp out the list of register conflicts from this top level thing.
-
-slurpConflicts :: LiveCmmTop -> Bag (UniqSet Reg)
+-- | Slurp out the list of register conflicts and reg-reg moves from this top level thing.
+--	Slurping of conflicts and moves is wrapped up together so we don't have
+--	to make two passes over the same code when we want to build the graph.
+--
+slurpConflicts :: LiveCmmTop -> (Bag (UniqSet Reg), Bag (Reg, Reg))
 slurpConflicts live
-	= slurpCmm emptyBag live
+	= slurpCmm (emptyBag, emptyBag) live
 
  where	slurpCmm   rs  CmmData{}		= rs
  	slurpCmm   rs (CmmProc info _ _ blocks)	
@@ -200,12 +202,18 @@ slurpConflicts live
 	slurpBlock info rs (BasicBlock blockId instrs)	
 		| LiveInfo _ _ blockLive	<- info
 		, Just rsLiveEntry		<- lookupUFM blockLive blockId
-		= consBag rsLiveEntry $ slurpLIs rsLiveEntry rs instrs
+		, (conflicts, moves)		<- slurpLIs rsLiveEntry rs instrs
+		= (consBag rsLiveEntry conflicts, moves)
 
-	slurpLIs rsLive rs []				= consBag rsLive rs
+		| otherwise
+		= error "RegLiveness.slurpBlock: bad block"
+
+	slurpLIs rsLive (conflicts, moves) []
+		= (consBag rsLive conflicts, moves)
+
 	slurpLIs rsLive rs (Instr _ Nothing     : lis)	= slurpLIs rsLive rs lis
 		
-	slurpLIs rsLiveEntry rs (li@(Instr _ (Just live)) : lis)
+	slurpLIs rsLiveEntry (conflicts, moves) (li@(Instr instr (Just live)) : lis)
 	 = let
 		-- regs that die because they are read for the last time at the start of an instruction
 		--	are not live across it.
@@ -227,7 +235,14 @@ slurpConflicts live
 		--
 		rsConflicts	= unionUniqSets rsLiveNext rsOrphans
 
-	  in	slurpLIs rsLiveNext (consBag rsConflicts rs) lis
+	  in	case isRegRegMove instr of
+	  	 Just rr	-> slurpLIs rsLiveNext
+		 			( consBag rsConflicts conflicts
+					, consBag rr moves) lis
+
+	  	 Nothing	-> slurpLIs rsLiveNext
+		 			( consBag rsConflicts conflicts
+					, moves) lis
 
 
 -- | Strip away liveness information, yielding NatCmmTop
@@ -248,10 +263,10 @@ stripLive live
 -- | Make real spill instructions out of SPILL, RELOAD pseudos
 
 spillNatBlock :: NatBasicBlock -> NatBasicBlock
-spillNatBlock (BasicBlock i instrs)
+spillNatBlock (BasicBlock i is)
  = 	BasicBlock i instrs'
  where 	(instrs', _)
- 		= runState (spillNat [] instrs) 0
+ 		= runState (spillNat [] is) 0
 
 	spillNat acc []
 	 = 	return (reverse acc)
@@ -292,6 +307,9 @@ lifetimeCount cmm
 		| LiveInfo _ _ blockLive	<- info
 		, Just rsLiveEntry		<- lookupUFM blockLive blockId
 		= countLIs rsLiveEntry fm instrs
+
+		| otherwise
+		= error "RegLiveness.countBlock: bad block"
 		
 	countLIs rsLive fm []				= fm
 	countLIs rsLive fm (Instr _ Nothing : lis)	= countLIs rsLive fm lis
