@@ -1,15 +1,15 @@
 Stopped at dynbrk008.hs:2:0-40
-_result :: [Int]
+_result :: [Int] = _
 Stopped at dynbrk008.hs:2:6-40
-_result :: [Int]
-i :: Int
+_result :: [Int] = _
+i :: Int = 42
 Stopped at dynbrk008.hs:2:17-19
-_result :: [Int]
-i :: Int
+_result :: [Int] = _
+i :: Int = 42
 Stopped at dynbrk008.hs:2:27-29
-_result :: [Int]
-j :: Int
+_result :: [Int] = _
+j :: Int = 42
 Stopped at dynbrk008.hs:2:37-39
-_result :: [Int]
-h :: Int
+_result :: [Int] = _
+h :: Int = 42
 [42]

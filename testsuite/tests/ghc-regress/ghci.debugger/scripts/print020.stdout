@@ -1,6 +1,6 @@
 Breakpoint 0 activated at ../HappyTest.hs:(229,0)-(240,34)
 Stopped at ../HappyTest.hs:(229,0)-(240,34)
-_result :: [Token]
+_result :: [Token] = _
 *** Ignoring breakpoint
 *** Ignoring breakpoint
 *** Ignoring breakpoint

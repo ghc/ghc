@@ -1,6 +1,6 @@
 Breakpoint 0 activated at ../QSort.hs:5:15-50
 Stopped at ../QSort.hs:5:15-50
-_result :: [a]
-a :: a
-left :: [a]
-right :: [a]
+_result :: [a] = _
+a :: a = _
+left :: [a] = _
+right :: [a] = _

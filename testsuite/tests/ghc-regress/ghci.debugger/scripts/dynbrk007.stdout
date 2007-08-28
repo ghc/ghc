@@ -1,11 +1,11 @@
 Stopped at dynbrk007.hs:(2,4)-(6,10)
-_result :: Maybe Int
+_result :: Maybe Int = _
 Stopped at dynbrk007.hs:3:8-15
-_result :: Maybe Int
+_result :: Maybe Int = _
 Stopped at dynbrk007.hs:4:8-15
-_result :: Maybe Integer
+_result :: Maybe Integer = _
 Stopped at dynbrk007.hs:5:8-15
-_result :: Maybe Integer
+_result :: Maybe Integer = _
 Stopped at dynbrk007.hs:6:3-10
-_result :: Maybe Int
-i :: Int
+_result :: Maybe Int = _
+i :: Int = _

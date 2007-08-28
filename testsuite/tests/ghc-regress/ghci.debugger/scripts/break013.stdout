@@ -1,10 +1,10 @@
 Stopped at break013.hs:(1,0)-(4,17)
-_result :: (Bool, Bool, ())
+_result :: (Bool, Bool, ()) = _
 Stopped at break013.hs:1:6-12
-_result :: (Bool, Bool, ())
-a :: Bool
-b :: Bool
-c :: ()
+_result :: (Bool, Bool, ()) = _
+a :: Bool = _
+b :: Bool = _
+c :: () = _
 _result :: (Bool, Bool, ())
 a :: Bool
 b :: Bool

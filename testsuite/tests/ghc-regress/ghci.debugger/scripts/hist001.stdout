@@ -1,6 +1,6 @@
 Breakpoint 0 activated at ../Test3.hs:1:13-14
 [2,3Stopped at ../Test3.hs:1:13-14
-_result :: [a]
+_result :: [a] = _
 -1  : [1mmymap[0m (../Test3.hs:(1,0)-(2,30))
 -2  : [1mmymap[0m (../Test3.hs:2:21-30)
 -3  : [1mmymap[0m (../Test3.hs:2:17-19)

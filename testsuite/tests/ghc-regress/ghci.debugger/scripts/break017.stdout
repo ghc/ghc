@@ -1,5 +1,5 @@
 "Stopped at <exception thrown>
-_exception :: e
+_exception :: e = GHC.IOBase.ErrorCall _
 Logged breakpoint at ../QSort.hs:6:23-37
 _result :: [Char]
 a :: Char

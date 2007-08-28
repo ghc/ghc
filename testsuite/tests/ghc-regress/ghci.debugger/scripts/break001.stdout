@@ -1,15 +1,15 @@
 Breakpoint 0 activated at ../Test2.hs:3:0-8
 Breakpoint 1 activated at ../Test2.hs:5:0-6
 Stopped at ../Test2.hs:3:0-8
-_result :: t
+_result :: t = _
 Stopped at ../Test2.hs:3:6-8
-_result :: t
-x :: t
+_result :: t = _
+x :: t = _
 Stopped at ../Test2.hs:5:0-6
-_result :: t
+_result :: t = _
 Stopped at ../Test2.hs:5:6
-_result :: t
-y :: t
+_result :: t = _
+y :: t = _
 _result :: t
 y :: t
 y = (_t1::t)
