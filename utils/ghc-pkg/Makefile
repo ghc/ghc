@@ -83,7 +83,7 @@ CLEAN_FILES += $(INPLACE_HS) $(INPLACE_PROG)
 ifneq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 LINK = ghc-pkg
 LINK_TARGET = $(LINK)-$(ProjectVersion)
-INSTALLED_SCRIPT=$(bindir)/$(LINK_TARGET)
+INSTALLED_SCRIPT=$(DESTDIR)$(bindir)/$(LINK_TARGET)
 install::
 	$(RM) -f $(INSTALLED_SCRIPT)
 	echo "#!$(SHELL)"                                           >> $(INSTALLED_SCRIPT)

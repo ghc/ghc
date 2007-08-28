@@ -1,5 +1,6 @@
 
 import Distribution.PackageDescription
+import Distribution.Program
 import Distribution.Setup
 import Distribution.Simple
 import Distribution.Simple.Configure
@@ -10,7 +11,7 @@ import System.Environment
 main :: IO ()
 main = do args <- getArgs
           case args of
-              pref : ghcpkg : args' ->
+              pref : ghcpkg : ghcpkgconf : args' ->
                   let verbosity = case args' of
                               [] -> normal
                               ['-':'v':v] ->
@@ -19,12 +20,12 @@ main = do args <- getArgs
                                               _ -> Just v
                                   in flagToVerbosity m
                               _ -> error ("Bad arguments: " ++ show args)
-                  in doit pref ghcpkg verbosity
+                  in doit pref ghcpkg ghcpkgconf verbosity
               _ ->
                   error "Missing arguments"
 
-doit :: FilePath -> FilePath -> Verbosity -> IO ()
-doit pref ghcpkg verbosity =
+doit :: FilePath -> FilePath -> FilePath -> Verbosity -> IO ()
+doit pref ghcpkg ghcpkgconf verbosity =
        do let userHooks = simpleUserHooks
               copyFlags = (emptyCopyFlags NoCopyDest) {
                               copyVerbose = verbosity
@@ -33,11 +34,11 @@ doit pref ghcpkg verbosity =
                                   regUser = MaybeUserGlobal,
                                   regVerbose = verbosity,
                                   regGenScript = False,
-                                  regInPlace = False,
-                                  regWithHcPkg = Just ghcpkg
+                                  regInPlace = False
                               }
           lbi <- getPersistBuildConfig
           let pd = localPkgDescr lbi
+              i = installDirTemplates lbi
               -- XXX This is an almighty hack, shadowing the base
               -- Setup.hs hack
               mkLib filt = case library pd of
@@ -54,12 +55,23 @@ doit pref ghcpkg verbosity =
               pd_reg  = pd { library = Just (mkLib (const True)) }
               -- When coying, we need to actually give a concrete
               -- directory to copy to rather than "$topdir"
-              lbi_copy = lbi { installDirTemplates = (installDirTemplates lbi) { prefixDirTemplate = toPathTemplate pref } }
+              i_copy = i { prefixDirTemplate = toPathTemplate pref }
+              lbi_copy = lbi { installDirTemplates = i_copy }
               -- When we run GHC we give it a $topdir that includes the
               -- $compiler/lib/ part of libsubdir, so we only want the
               -- $pkgid part in the package.conf file. This is a bit of
               -- a hack, really.
-              lbi_reg = lbi { installDirTemplates = (installDirTemplates lbi) { libSubdirTemplate = toPathTemplate "$pkgid" } }
+              progs = withPrograms lbi
+              prog = ConfiguredProgram {
+                         programId = programName ghcPkgProgram,
+                         programVersion = Nothing,
+                         programArgs = ["--global-conf", ghcpkgconf],
+                         programLocation = UserSpecified ghcpkg
+                     }
+              progs' = updateProgram prog progs
+              i_reg = i { libSubdirTemplate = toPathTemplate "$pkgid" }
+              lbi_reg = lbi { installDirTemplates = i_reg,
+                              withPrograms = progs' }
           (copyHook simpleUserHooks) pd_copy lbi_copy userHooks copyFlags
           (regHook simpleUserHooks)  pd_reg  lbi_reg  userHooks registerFlags
           return ()

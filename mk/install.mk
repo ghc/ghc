@@ -73,14 +73,14 @@ endif
 # install links to script drivers.
 #
 install ::
-	@$(INSTALL_DIR) $(bindir)
-	@if ( $(PERL) -e '$$fn="$(bindir)/$(LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
-	   echo "Creating a symbolic link from $(LINK_TARGET) to $(LINK) in $(bindir)"; \
-	   $(RM) $(bindir)/$(LINK); \
-	   $(LN_S) $(LINK_TARGET) $(bindir)/$(LINK); \
+	$(INSTALL_DIR) $(DESTDIR)$(bindir)
+	if ( $(PERL) -e '$$fn="$(DESTDIR)$(bindir)/$(LINK)"; exit ((! -f $$fn || -l $$fn) ? 0 : 1);' ); then \
+	   echo "Creating a symbolic link from $(LINK_TARGET) to $(LINK) in $(DESTDIR)$(bindir)"; \
+	   $(RM) $(DESTDIR)$(bindir)/$(LINK); \
+	   $(LN_S) $(LINK_TARGET) $(DESTDIR)$(bindir)/$(LINK); \
 	 else \
-	   echo "Creating a symbolic link from $(LINK_TARGET) to $(LINK) in $(bindir) failed: \`$(bindir)/$(LINK)' already exists"; \
-	   echo "Perhaps remove \`$(bindir)/$(LINK)' manually?"; \
+	   echo "Creating a symbolic link from $(LINK_TARGET) to $(LINK) in $(DESTDIR)$(bindir) failed: \`$(DESTDIR)$(bindir)/$(LINK)' already exists"; \
+	   echo "Perhaps remove \`$(DESTDIR)$(bindir)/$(LINK)' manually?"; \
 	   exit 1; \
 	 fi;
 
@@ -114,25 +114,27 @@ endif # LINK
 .PHONY: install install-docs installdirs install-strip install-dirs install-docs show-install
 
 show-install :
+	@echo "DESTDIR = $(DESTDIR)"
 	@echo "bindir = $(bindir)"
 	@echo "libdir = $(libdir)"
 	@echo "libexecdir = $(libexecdir)  # by default, same as libdir"
 	@echo "datadir = $(datadir)  # unused for ghc project"
+	@echo "ifacedir = $(ifacedir)"
+	@echo "headerdir = $(headerdir)"
+	@echo "includedir = $(includedir)"
 
 #
 # Sometimes useful to separate out the creation of install directories 
 # from the installation itself.
 #
 install-dirs ::
-	@$(INSTALL_DIR) $(bindir)
-	@$(INSTALL_DIR) $(libdir)
-	@$(INSTALL_DIR) $(libexecdir)
-	@$(INSTALL_DIR) $(datadir)
+	$(INSTALL_DIR) $(DESTDIR)$(bindir)
+	$(INSTALL_DIR) $(DESTDIR)$(libdir)
+	$(INSTALL_DIR) $(DESTDIR)$(libexecdir)
+	$(INSTALL_DIR) $(DESTDIR)$(datadir)
 
 # Better do this first...
-# but we won't for the moment, do it on-demand from
-# within the various install targets instead.
-#install:: install-dirs
+install:: install-dirs
 
 #
 # Setting user/group ownership for the installed entities
@@ -159,12 +161,11 @@ ifneq "$(strip $(INSTALL_PROGS))" ""
 INSTALL_PROGS := $(foreach p, $(INSTALL_PROGS), $(addsuffix $(if $(suffix $(p)),,$(exeext)), $(basename $(p))))
 
 install:: $(INSTALL_PROGS)
-	@$(INSTALL_DIR) $(bindir)
-	@for i in $(INSTALL_PROGS); do \
-		    echo $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(bindir); \
-		    $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(bindir) ;  \
+	$(INSTALL_DIR) $(DESTDIR)$(bindir)
+	for i in $(INSTALL_PROGS); do \
+		    $(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(DESTDIR)$(bindir) ;  \
                     if test "$(darwin_TARGET_OS)" = "1"; then \
-                      sh $(FPTOOLS_TOP)/mk/fix_install_names.sh $(libdir) $(bindir)/$$i ; \
+                      sh $(FPTOOLS_TOP)/mk/fix_install_names.sh $(libdir) $(DESTDIR)$(bindir)/$$i ; \
                     fi ; \
 	done
 endif
@@ -175,45 +176,45 @@ endif
 #
 ifneq "$(strip $(INSTALL_SCRIPTS))" ""
 install:: $(INSTALL_SCRIPTS)
-	@$(INSTALL_DIR) $(bindir)
+	$(INSTALL_DIR) $(DESTDIR)$(bindir)
 	for i in $(INSTALL_SCRIPTS); do \
-		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(bindir); \
+		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(DESTDIR)$(bindir); \
 	done
 endif
 
 ifneq "$(strip $(INSTALL_LIB_SCRIPTS))" ""
 install:: $(INSTALL_LIB_SCRIPTS)
-	@$(INSTALL_DIR) $(libdir)
+	$(INSTALL_DIR) $(DESTDIR)$(libdir)
 	for i in $(INSTALL_LIB_SCRIPTS); do \
-		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(libdir); \
+		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(DESTDIR)$(libdir); \
 	done
 endif
 
 ifneq "$(strip $(INSTALL_LIBEXEC_SCRIPTS))" ""
 install:: $(INSTALL_LIBEXEC_SCRIPTS)
-	@$(INSTALL_DIR) $(libexecdir)
+	$(INSTALL_DIR) $(DESTDIR)$(libexecdir)
 	for i in $(INSTALL_LIBEXEC_SCRIPTS); do \
-		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(libexecdir); \
+		$(INSTALL_SCRIPT) $(INSTALL_OPTS) $$i $(DESTDIR)$(libexecdir); \
 	done
 endif
 
 ifneq "$(strip $(INSTALL_LIBS))" ""
 install:: $(INSTALL_LIBS)
-	@$(INSTALL_DIR) $(libdir)
+	$(INSTALL_DIR) $(DESTDIR)$(libdir)
 	for i in $(INSTALL_LIBS); do \
 		case $$i in \
 		  *.a) \
-		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(libdir); \
-		    $(RANLIB) $(libdir)/`basename $$i` ;; \
+		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(DESTDIR)$(libdir); \
+		    $(RANLIB) $(DESTDIR)$(libdir)/`basename $$i` ;; \
 		  *.dll) \
-		    $(INSTALL_DATA) -s $(INSTALL_OPTS) $$i $(libdir) ;; \
+		    $(INSTALL_DATA) -s $(INSTALL_OPTS) $$i $(DESTDIR)$(libdir) ;; \
 		  *.so) \
-		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i $(libdir) ;; \
+		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i $(DESTDIR)$(libdir) ;; \
 		  *.dylib) \
-		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i $(libdir); \
-		    install_name_tool -id $(libdir)/`basename $$i` $(libdir)/`basename $$i` ;; \
+		    $(INSTALL_SHLIB) $(INSTALL_OPTS) $$i $(DESTDIR)$(libdir); \
+		    install_name_tool -id $(DESTDIR)$(libdir)/`basename $$i` $(DESTDIR)$(libdir)/`basename $$i` ;; \
 		  *) \
-		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(libdir); \
+		    $(INSTALL_DATA) $(INSTALL_OPTS) $$i $(DESTDIR)$(libdir); \
 		esac; \
 	done
 endif
@@ -226,61 +227,61 @@ ifneq "$(strip $(INSTALL_LIBEXECS))" ""
 INSTALL_LIBEXECS := $(foreach p, $(INSTALL_LIBEXECS), $(addsuffix $(subst _,,$(subst __,$(exeext),_$(suffix $(p))_)), $(basename $(p))))
 
 install:: $(INSTALL_LIBEXECS)
-	@$(INSTALL_DIR) $(libexecdir)
+	$(INSTALL_DIR) $(DESTDIR)$(libexecdir)
 	-for i in $(INSTALL_LIBEXECS); do \
-		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(libexecdir); \
+		$(INSTALL_PROGRAM) $(INSTALL_BIN_OPTS) $$i $(DESTDIR)$(libexecdir); \
                 if test "$(darwin_TARGET_OS)" = "1"; then \
-                        sh $(FPTOOLS_TOP)/mk/fix_install_names.sh $(libdir) $(libexecdir)/`basename $$i` ; \
+                        sh $(FPTOOLS_TOP)/mk/fix_install_names.sh $(libdir) $(DESTDIR)$(libexecdir)/`basename $$i` ; \
                 fi ; \
 	done
 endif
 
 ifneq "$(strip $(INSTALL_DATAS))" ""
 install:: $(INSTALL_DATAS)
-	@$(INSTALL_DIR) $(datadir)
+	$(INSTALL_DIR) $(DESTDIR)$(datadir)
 	for i in $(INSTALL_DATAS); do \
-		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir); \
+		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(DESTDIR)$(datadir); \
 	done
 endif
 
 ifneq "$(strip $(INSTALL_HEADERS))" ""
 install:: $(INSTALL_HEADERS)
-	@$(INSTALL_DIR) $(headerdir)
+	$(INSTALL_DIR) $(DESTDIR)$(headerdir)
 	for i in $(INSTALL_HEADERS); do \
-		$(INSTALL_HEADER) $(INSTALL_OPTS) $$i $(headerdir); \
+		$(INSTALL_HEADER) $(INSTALL_OPTS) $$i $(DESTDIR)$(headerdir); \
 	done
 endif
 
 ifneq "$(strip $(INSTALL_IFACES))" ""
 install:: $(INSTALL_IFACES)
-	@$(INSTALL_DIR) $(ifacedir)
+	$(INSTALL_DIR) $(DESTDIR)$(ifacedir)
 	for i in $(INSTALL_IFACES); do \
-		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(ifacedir); \
+		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(DESTDIR)$(ifacedir); \
 	done
 endif
 
 ifneq "$(strip $(INSTALL_IFACES_WITH_DIRS))" ""
 install:: $(INSTALL_IFACES_WITH_DIRS)
-	@$(INSTALL_DIR) $(ifacedir)
+	$(INSTALL_DIR) $(DESTDIR)$(ifacedir)
 	for i in $(INSTALL_IFACES_WITH_DIRS); do \
-		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(ifacedir)/`dirname $$i`; \
+		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(DESTDIR)$(ifacedir)/`dirname $$i`; \
 	done
 endif
 
 ifneq "$(strip $(INSTALL_INCLUDES))" ""
 install:: $(INSTALL_INCLUDES)
-	@$(INSTALL_DIR) $(includedir)
+	$(INSTALL_DIR) $(DESTDIR)$(includedir)
 	for i in $(INSTALL_INCLUDES); do \
-		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(includedir); \
+		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(DESTDIR)$(includedir); \
 	done
 endif
 
 ifneq "$(strip $(INSTALL_DOCS))" ""
 ifneq "$(XMLDocWays)" ""
 install-docs:: $(INSTALL_DOCS)
-	@$(INSTALL_DIR) $(datadir)	
+	$(INSTALL_DIR) $(DESTDIR)$(datadir)
 	for i in $(INSTALL_DOCS); do \
-		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(datadir); \
+		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(DESTDIR)$(datadir); \
 	done
 endif
 endif
@@ -289,21 +290,21 @@ endif
 ifneq "$(strip $(INSTALL_XML_DOC))" ""
 ifneq "$(XMLDocWays)" ""
 install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-chunks,%.html,$(patsubst %.html,%/index.html,.$(i))))
-	@$(INSTALL_DIR) $(datadir)	
-	@for i in $(XMLDocWays); do \
+	$(INSTALL_DIR) $(DESTDIR)$(datadir)
+	for i in $(XMLDocWays); do \
 		if [ $$i = "html" ]; then \
-			$(INSTALL_DIR) $(datadir)/html; \
-			$(INSTALL_DIR) $(datadir)/html/$(INSTALL_XML_DOC); \
-			echo "( cd $(INSTALL_XML_DOC) && $(CP) * $(datadir)/html/$(INSTALL_XML_DOC) )" ; \
-			( cd $(INSTALL_XML_DOC) && $(CP) * $(datadir)/html/$(INSTALL_XML_DOC) ) ; \
+			$(INSTALL_DIR) $(DESTDIR)$(datadir)/html; \
+			$(INSTALL_DIR) $(DESTDIR)$(datadir)/html/$(INSTALL_XML_DOC); \
+			echo "( cd $(INSTALL_XML_DOC) && $(CP) * $(DESTDIR)$(datadir)/html/$(INSTALL_XML_DOC) )" ; \
+			( cd $(INSTALL_XML_DOC) && $(CP) * $(DESTDIR)$(datadir)/html/$(INSTALL_XML_DOC) ) ; \
 		else \
-			$(INSTALL_DIR) $(datadir)/doc; \
-			echo $(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.html-no-chunks/.html/` $(datadir)/doc; \
-			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.html-no-chunks/.html/` $(datadir)/doc; \
+			$(INSTALL_DIR) $(DESTDIR)$(datadir)/doc; \
+			echo $(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.html-no-chunks/.html/` $(DESTDIR)$(datadir)/doc; \
+			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.html-no-chunks/.html/` $(DESTDIR)$(datadir)/doc; \
 		fi; \
 		if [ $$i = "html-no-chunks" ]; then \
-			echo $(CP) $(FPTOOLS_CSS_ABS) $(datadir)/doc; \
-			$(CP) $(FPTOOLS_CSS_ABS) $(datadir)/doc; \
+			echo $(CP) $(FPTOOLS_CSS_ABS) $(DESTDIR)$(datadir)/doc; \
+			$(CP) $(FPTOOLS_CSS_ABS) $(DESTDIR)$(datadir)/doc; \
 		fi \
 	done
 endif
@@ -314,6 +315,6 @@ endif
 #
 ifneq "$(way)" ""
 install-strip::
-	@$(MAKE) EXTRA_INSTALL_OPTS='-s' install                                	
+	$(MAKE) EXTRA_INSTALL_OPTS='-s' install
 endif
 

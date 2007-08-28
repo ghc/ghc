@@ -323,7 +323,7 @@ $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
-	  ../installPackage/installPackage $(prefix) $(bindir)/ghc-pkg; \
+	  ../installPackage/installPackage $(DESTDIR)$(prefix) $(FPTOOLS_TOP_ABS)/$(GHC_PKG_DIR_REL)/ghc-pkg-inplace $(DESTDIR)$(libdir)/package.conf; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%

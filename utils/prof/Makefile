@@ -15,7 +15,7 @@ all::
 	cat ghcprof.prl                                                               >> $(INPLACE_SCRIPT)
 	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
 
-INSTALLED_SCRIPT=$(bindir)/ghcprof
+INSTALLED_SCRIPT=$(DESTDIR)$(bindir)/ghcprof
 install::
 	$(RM) -f $(INSTALLED_SCRIPT)
 	echo '#!$(PERL)'                                >> $(INSTALLED_SCRIPT)
