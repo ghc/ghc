@@ -1,10 +1,11 @@
 
-tcfail179.hs:14:40:
+tcfail179.hs:14:36:
     Couldn't match expected type `s' against inferred type `x'
       `s' is a rigid type variable bound by
 	  the type signature for `run' at tcfail179.hs:12:9
       `x' is a rigid type variable bound by
 	  the constructor `T' at tcfail179.hs:14:13
-    In the second argument of `g', namely `id'
+      Expected type: (s, s, Int)
+      Inferred type: (x, s, Int)
     In the expression: g x id
     In a pattern binding: (x, _, b) = g x id

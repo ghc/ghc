@@ -6,6 +6,6 @@ tcfail103.hs:15:22:
       `t' is a rigid type variable bound by
 	  the type signature for `f' at tcfail103.hs:10:7
       Expected type: STRef s Int
-      Inferred type: STRef t t1
+      Inferred type: STRef t Int
     In the first argument of `readSTRef', namely `v'
     In the expression: readSTRef v

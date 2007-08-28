@@ -2,6 +2,7 @@
 
 module Main where
 
+succeed :: a -> Maybe a
 succeed = return
 
 data V s t where

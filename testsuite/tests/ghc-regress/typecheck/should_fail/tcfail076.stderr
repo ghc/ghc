@@ -1,13 +1,13 @@
 
 tcfail076.hs:18:67:
-    Couldn't match expected type `res' against inferred type `res1'
-      `res' is a rigid type variable bound by
-	    the polymorphic type `forall res. (b -> m res) -> m res'
-	      at tcfail076.hs:18:49
+    Couldn't match expected type `res1' against inferred type `res'
       `res1' is a rigid type variable bound by
-	     the polymorphic type `forall res1. (a -> m res1) -> m res1'
-	       at tcfail076.hs:18:13
-      Expected type: m res
-      Inferred type: m res1
+	     the polymorphic type `forall res1. (b -> m res1) -> m res1'
+	       at tcfail076.hs:18:49
+      `res' is a rigid type variable bound by
+	    the polymorphic type `forall res. (a -> m res) -> m res'
+	      at tcfail076.hs:18:13
+      Expected type: m res1
+      Inferred type: m res
     In the expression: cont a
     In the first argument of `KContT', namely `(\ cont' -> cont a)'

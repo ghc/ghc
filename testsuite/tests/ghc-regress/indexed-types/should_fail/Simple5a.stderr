@@ -5,3 +5,11 @@ Simple5a.hs:31:10:
 	  the type signature for `bar3wrong' at Simple5a.hs:30:16
     In the pattern: D3Int
     In the definition of `bar3wrong': bar3wrong D3Int = 1
+
+Simple5a.hs:31:19:
+    Could not deduce (Num a) from the context ()
+      arising from the literal `1' at Simple5a.hs:31:19
+    Possible fix:
+      add (Num a) to the context of the type signature for `bar3wrong'
+    In the expression: 1
+    In the definition of `bar3wrong': bar3wrong D3Int = 1
