@@ -268,14 +268,6 @@ install:: $(INSTALL_IFACES_WITH_DIRS)
 	done
 endif
 
-ifneq "$(strip $(INSTALL_INCLUDES))" ""
-install:: $(INSTALL_INCLUDES)
-	$(INSTALL_DIR) $(DESTDIR)$(includedir)
-	for i in $(INSTALL_INCLUDES); do \
-		$(INSTALL_DATA) $(INSTALL_OPTS) $$i $(DESTDIR)$(includedir); \
-	done
-endif
-
 ifneq "$(strip $(INSTALL_DOCS))" ""
 ifneq "$(XMLDocWays)" ""
 install-docs:: $(INSTALL_DOCS)
