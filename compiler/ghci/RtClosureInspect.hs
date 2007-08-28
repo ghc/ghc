@@ -468,6 +468,8 @@ instScheme ty | (tvs, rho) <- tcSplitForAllTys ty = liftTcM$ do
 -- do its magic.
 addConstraint :: TcType -> TcType -> TR ()
 addConstraint t1 t2  = congruenceNewtypes t1 t2 >>= uncurry unifyType 
+		       >> return () -- TOMDO: what about the coercion?
+				    -- we should consider family instances 
 
 
 

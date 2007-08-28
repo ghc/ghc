@@ -31,6 +31,7 @@ import TcHsType
 import TysWiredIn
 import TcGadt
 import Type
+import Coercion
 import StaticFlags
 import TyCon
 import DataCon
@@ -59,7 +60,8 @@ tcLetPat :: (Name -> Maybe TcRhoType)
       	 -> TcM (LPat TcId, a)
 tcLetPat sig_fn pat pat_ty thing_inside
   = do	{ let init_state = PS { pat_ctxt = LetPat sig_fn, 
-				pat_reft = emptyRefinement }
+				pat_reft = emptyRefinement,
+				pat_eqs  = False }
 	; (pat', ex_tvs, res) <- tc_lpat pat pat_ty init_state (\ _ -> thing_inside)
 
 	-- Don't know how to deal with pattern-bound existentials yet
@@ -104,11 +106,13 @@ tc_lam_pats :: [(LPat Name,BoxySigmaType)]
        	    -> ((Refinement,BoxyRhoType) -> TcM a)	-- Checker for body, given its result type
        	    -> TcM ([LPat TcId], a)
 tc_lam_pats pat_ty_prs (reft, res_ty) thing_inside 
-  =  do	{ let init_state = PS { pat_ctxt = LamPat, pat_reft = reft }
+  =  do	{ let init_state = PS { pat_ctxt = LamPat, pat_reft = reft, pat_eqs = False }
 
 	; (pats', ex_tvs, res) <- tcMultiple tc_lpat_pr pat_ty_prs init_state $ \ pstate' ->
-				  refineEnvironment (pat_reft pstate') $
-	     			  thing_inside (pat_reft pstate', res_ty)
+				  refineEnvironment (pat_reft pstate') (pat_eqs pstate') $
+				  if (pat_eqs pstate' && (not $ isRigidTy res_ty))
+				     then failWithTc (nonRigidResult res_ty)
+	     			     else thing_inside (pat_reft pstate', res_ty)
 
 	; let tys = map snd pat_ty_prs
 	; tcCheckExistentialPat pats' ex_tvs tys res_ty
@@ -138,7 +142,9 @@ tcCheckExistentialPat pats ex_tvs pat_tys body_ty
 
 data PatState = PS {
 	pat_ctxt :: PatCtxt,
-	pat_reft :: Refinement	-- Binds rigid TcTyVars to their refinements
+	pat_reft :: Refinement,	-- Binds rigid TcTyVars to their refinements
+	pat_eqs  :: Bool        -- <=> there are GADT equational constraints 
+				--     for refinement 
   }
 
 data PatCtxt 
@@ -434,9 +440,15 @@ tc_pat pstate pat_in@(ConPatIn (L con_span con_name) arg_pats) pat_ty thing_insi
 ------------------------
 -- Literal patterns
 tc_pat pstate (LitPat simple_lit) pat_ty thing_inside
-  = do	{ boxyUnify (hsLitType simple_lit) pat_ty
+  = do	{ let lit_ty = hsLitType simple_lit
+	; coi <- boxyUnify lit_ty pat_ty
+			-- coi is of kind: lit_ty ~ pat_ty
 	; res <- thing_inside pstate
-	; returnM (LitPat simple_lit, [], res) }
+	; span <- getSrcSpanM
+			-- pattern coercions have to
+			-- be of kind: pat_ty ~ lit_ty
+			-- hence, sym coi
+	; returnM (wrapPatCoI (mkSymCoI coi) (LitPat simple_lit) pat_ty, [], res) }
 
 ------------------------
 -- Overloaded patterns: n, and n+k
@@ -547,7 +559,7 @@ tcConPat :: PatState -> SrcSpan -> DataCon -> TyCon
 	 -> HsConPatDetails Name -> (PatState -> TcM a)
 	 -> TcM (Pat TcId, [TcTyVar], a)
 tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
-  = do	{ let (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _) = dataConFullSig data_con
+  = do	{ let (univ_tvs, ex_tvs, eq_spec, eq_theta, dict_theta, arg_tys, _) = dataConFullSig data_con
 	      skol_info = PatSkol data_con
 	      origin    = SigOrigin skol_info
 
@@ -558,12 +570,12 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	; let tenv     = zipTopTvSubst (univ_tvs ++ ex_tvs)
 				       (ctxt_res_tys ++ mkTyVarTys ex_tvs')
 	      eq_spec' = substEqSpec tenv eq_spec
-	      theta'   = substTheta  tenv theta
+	      theta'   = substTheta  tenv (eq_theta ++ dict_theta)
 	      arg_tys' = substTys    tenv arg_tys
 
 	; co_vars <- newCoVars eq_spec'	-- Make coercion variables
 	; pstate' <- refineAlt data_con pstate ex_tvs' co_vars pat_ty
-
+	
 	; ((arg_pats', inner_tvs, res), lie_req) <- getLIE $
 		tcConArgs data_con arg_tys' arg_pats pstate' thing_inside
 
@@ -725,6 +737,7 @@ refineAlt :: DataCon		-- For tracing only
 	  -> TcM PatState
 
 refineAlt con pstate ex_tvs [] pat_ty
+  | null $ dataConEqTheta con
   = return pstate	-- Common case: no equational constraints
 
 refineAlt con pstate ex_tvs co_vars pat_ty
@@ -751,7 +764,7 @@ refineAlt con pstate ex_tvs co_vars pat_ty
 	; case gadtRefine (pat_reft pstate) ex_tvs co_vars of {
 	    Failed msg     -> failWithTc (inaccessibleAlt msg) ;
 	    Succeeded reft -> do { traceTc trace_msg
-			  	 ; return (pstate { pat_reft = reft }) }
+			  	 ; return (pstate { pat_reft = reft, pat_eqs = (pat_eqs pstate || not (null $ dataConEqTheta con)) }) }
 	 	    -- DO NOT refine the envt right away, because we 
 		    -- might be inside a lazy pattern.  Instead, refine pstate
 	        where
@@ -965,6 +978,16 @@ nonRigidMatch con
   =  hang (ptext SLIT("GADT pattern match in non-rigid context for") <+> quotes (ppr con))
 	2 (ptext SLIT("Tell GHC HQ if you'd like this to unify the context"))
 
+nonRigidResult res_ty
+  =  hang (ptext SLIT("GADT pattern match with non-rigid result type") <+> quotes (ppr res_ty))
+	2 (ptext SLIT("Tell GHC HQ if you'd like this to unify the context"))
+
 inaccessibleAlt msg
   = hang (ptext SLIT("Inaccessible case alternative:")) 2 msg
+\end{code}
+
+\begin{code}
+wrapPatCoI :: CoercionI -> Pat a -> TcType -> Pat a
+wrapPatCoI IdCo     pat ty = pat
+wrapPatCoI (ACo co) pat ty = CoPat (WpCo co) pat ty
 \end{code}

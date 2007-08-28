@@ -23,6 +23,7 @@ import TcType
 import InstEnv
 import FamInstEnv
 
+import Coercion
 import Var
 import Id
 import VarSet
@@ -177,7 +178,7 @@ initTcRnIf uniq_tag hsc_env gbl_env lcl_env thing_inside
 	; let { env = Env { env_top = hsc_env,
 			    env_us  = us_var,
 			    env_gbl = gbl_env,
-			    env_lcl = lcl_env } }
+			    env_lcl = lcl_env} }
 
 	; runIOEnv env thing_inside
 	}
@@ -1022,5 +1023,3 @@ forkM doc thing_inside
 				   -- pprPanic "forkM" doc
 			Just r  -> r) }
 \end{code}
-
-

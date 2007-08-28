@@ -16,6 +16,8 @@ module TcSimplify (
 
 	tcSimplifyDeriv, tcSimplifyDefault,
 	bindInstsOfLocalFuns, bindIrreds,
+
+        misMatchMsg
     ) where
 
 #include "HsVersions.h"
@@ -31,6 +33,8 @@ import TcGadt
 import TcType
 import TcMType
 import TcIface
+import TcTyFuns
+import TypeRep
 import Var
 import Name
 import NameSet
@@ -44,12 +48,14 @@ import ErrUtils
 import BasicTypes
 import VarSet
 import VarEnv
+import Module
 import FiniteMap
 import Bag
 import Outputable
 import Maybes
 import ListSetOps
 import Util
+import UniqSet
 import SrcLoc
 import DynFlags
 
@@ -702,11 +708,15 @@ tcSimplifyInfer doc tau_tvs wanted
 
 		-- We can't abstract over any remaining unsolved 
 		-- implications so instead just float them outwards. Ugh.
-	; let (q_dicts, implics) = partition isDict irreds3
+	; let (q_dicts0, implics) = partition isAbstractableInst irreds3
 	; loc <- getInstLoc (ImplicOrigin doc)
-	; implic_bind <- bindIrreds loc qtvs2 q_dicts implics
+	; implic_bind <- bindIrreds loc qtvs2 q_dicts0 implics
 
-	; return (qtvs2, q_dicts, binds1 `unionBags` binds2 `unionBags` implic_bind) }
+		-- Prepare equality instances for quantification
+	; let (q_eqs0,q_dicts) = partition isEqInst q_dicts0
+	; q_eqs <- mappM finalizeEqInst q_eqs0
+
+	; return (qtvs2, q_eqs ++ q_dicts, binds1 `unionBags` binds2 `unionBags` implic_bind) }
 	-- NB: when we are done, we might have some bindings, but
 	-- the final qtvs might be empty.  See Note [NO TYVARS] below.
 
@@ -739,6 +749,8 @@ approximateImplications doc want_dict irreds
 	= [ d | let tv_set = mkVarSet tvs
 	      , d <- get_dicts wanteds 
 	      , not (tyVarsOfInst d `intersectsVarSet` tv_set)]
+    get_dict i@(EqInst {}) | want_dict i = [i]
+			   | otherwise   = [] 
     get_dict other = pprPanic "approximateImplications" (ppr other)
 \end{code}
 
@@ -781,7 +793,8 @@ tcSimplifyInferCheck
 		 TcDictBinds)	-- Bindings
 
 tcSimplifyInferCheck loc tau_tvs givens wanteds
-  = do	{ (irreds, binds) <- gentleCheckLoop loc givens wanteds
+  = do	{ traceTc (text "tcSimplifyInferCheck <-" <+> ppr wanteds)
+      	; (irreds, binds) <- gentleCheckLoop loc givens wanteds
 
 	-- Figure out which type variables to quantify over
 	-- You might think it should just be the signature tyvars,
@@ -805,6 +818,7 @@ tcSimplifyInferCheck loc tau_tvs givens wanteds
 		-- Now we are back to normal (c.f. tcSimplCheck)
 	; implic_bind <- bindIrreds loc qtvs' givens irreds
 
+	; traceTc (text "tcSimplifyInferCheck ->" <+> ppr (implic_bind))
 	; return (qtvs', binds `unionBags` implic_bind) }
 \end{code}
 
@@ -887,7 +901,8 @@ tcSimplifyCheck	:: InstLoc
 	 	-> TcM TcDictBinds	-- Bindings
 tcSimplifyCheck loc qtvs givens wanteds 
   = ASSERT( all isTcTyVar qtvs && all isSkolemTyVar qtvs )
-    do	{ (irreds, binds) <- gentleCheckLoop loc givens wanteds
+    do	{ traceTc (text "tcSimplifyCheck")
+      	; (irreds, binds) <- gentleCheckLoop loc givens wanteds
 	; implic_bind <- bindIrreds loc qtvs givens irreds
 	; return (binds `unionBags` implic_bind) }
 
@@ -901,7 +916,8 @@ tcSimplifyCheckPat :: InstLoc
 	 	   -> TcM TcDictBinds	-- Bindings
 tcSimplifyCheckPat loc co_vars reft qtvs givens wanteds
   = ASSERT( all isTcTyVar qtvs && all isSkolemTyVar qtvs )
-    do	{ (irreds, binds) <- gentleCheckLoop loc givens wanteds
+    do	{ traceTc (text "tcSimplifyCheckPat")
+      	; (irreds, binds) <- gentleCheckLoop loc givens wanteds
 	; implic_bind <- bindIrredsR loc qtvs co_vars reft 
 				    givens irreds
 	; return (binds `unionBags` implic_bind) }
@@ -959,31 +975,36 @@ makeImplicationBind :: InstLoc -> [TcTyVar] -> Refinement
 --
 -- This binding must line up the 'rhs' in reduceImplication
 makeImplicationBind loc all_tvs reft
-		    givens 	-- Guaranteed all Dicts
+		    givens 	-- Guaranteed all Dicts (TOMDO: true?)
 		    irreds
  | null irreds			-- If there are no irreds, we are done
  = return ([], emptyBag)
  | otherwise			-- Otherwise we must generate a binding
  = do	{ uniq <- newUnique 
 	; span <- getSrcSpanM
+	; let (eq_givens,dict_givens) = partitionGivenEqInsts givens
+	      eq_tyvar_cos =  map TyVarTy $ uniqSetToList $ tyVarsOfTypes $ map eqInstType eq_givens
 	; let name = mkInternalName uniq (mkVarOcc "ic") span
 	      implic_inst = ImplicInst { tci_name = name, tci_reft = reft,
 					 tci_tyvars = all_tvs, 
-					 tci_given = givens,
+					 tci_given = (eq_givens ++ dict_givens),
 					 tci_wanted = irreds, tci_loc = loc }
-
-	; let n_irreds = length irreds
-	      irred_ids = map instToId irreds
-	      tup_ty = mkTupleTy Boxed n_irreds (map idType irred_ids)
-	      pat = TuplePat (map nlVarPat irred_ids) Boxed tup_ty
+	; let
+		-- only create binder for dict_irreds
+		-- we 
+	      (eq_irreds,dict_irreds) = partitionWantedEqInsts irreds
+              n_dict_irreds = length dict_irreds
+	      dict_irred_ids = map instToId dict_irreds
+	      tup_ty = mkTupleTy Boxed n_dict_irreds (map idType dict_irred_ids)
+	      pat = TuplePat (map nlVarPat dict_irred_ids) Boxed tup_ty
 	      rhs = L span (mkHsWrap co (HsVar (instToId implic_inst)))
-	      co  = mkWpApps (map instToId givens) <.> mkWpTyApps (mkTyVarTys all_tvs)
-	      bind | n_irreds==1 = VarBind (head irred_ids) rhs
-		   | otherwise   = PatBind { pat_lhs = L span pat, 
-				      	     pat_rhs = unguardedGRHSs rhs, 
-				      	     pat_rhs_ty = tup_ty,
-				      	     bind_fvs = placeHolderNames }
-	; -- pprTrace "Make implic inst" (ppr implic_inst) $
+	      co  = mkWpApps (map instToId dict_givens) <.> mkWpTyApps eq_tyvar_cos <.> mkWpTyApps (mkTyVarTys all_tvs)
+	      bind | [dict_irred_id] <- dict_irred_ids  = VarBind dict_irred_id rhs
+		   | otherwise        = PatBind { pat_lhs = L span pat, 
+				                  pat_rhs = unguardedGRHSs rhs, 
+				      	          pat_rhs_ty = tup_ty,
+				      	          bind_fvs = placeHolderNames }
+	; -- pprTrace "Make implic inst" (ppr (implic_inst,irreds,dict_irreds,tup_ty)) $
 	  return ([implic_inst], unitBag (L span bind)) }
 
 -----------------------------------------------------------
@@ -992,7 +1013,9 @@ tryHardCheckLoop :: SDoc
 	     -> TcM ([Inst], TcDictBinds)
 
 tryHardCheckLoop doc wanteds
-  = checkLoop (mkRedEnv doc try_me []) wanteds
+  = do { (irreds,binds,_) <- checkLoop (mkRedEnv doc try_me []) wanteds
+       ; return (irreds,binds)
+       }
   where
     try_me inst = ReduceMe AddSCs
 	-- Here's the try-hard bit
@@ -1004,7 +1027,9 @@ gentleCheckLoop :: InstLoc
 	       -> TcM ([Inst], TcDictBinds)
 
 gentleCheckLoop inst_loc givens wanteds
-  = checkLoop env wanteds
+  = do { (irreds,binds,_) <- checkLoop env wanteds
+       ; return (irreds,binds)
+       }
   where
     env = mkRedEnv (pprInstLoc inst_loc) try_me givens
 
@@ -1042,27 +1067,32 @@ with tryHardCheckLooop.
 -----------------------------------------------------------
 checkLoop :: RedEnv
 	  -> [Inst]			-- Wanted
-	  -> TcM ([Inst], TcDictBinds)
+	  -> TcM ([Inst], TcDictBinds,
+	          [Inst]) 		-- needed givens
 -- Precondition: givens are completely rigid
 -- Postcondition: returned Insts are zonked
 
 checkLoop env wanteds
-  = do { -- Givens are skolems, so no need to zonk them
-	 wanteds' <- mappM zonkInst wanteds
+  = go env wanteds []
+  where go env wanteds needed_givens
+	  = do { -- Givens are skolems, so no need to zonk them
+		 wanteds' <- zonkInsts wanteds
+	
+		; (improved, binds, irreds, more_needed_givens) <- reduceContext env wanteds'
 
-	; (improved, binds, irreds) <- reduceContext env wanteds'
-
-	; if not improved then
- 	     return (irreds, binds)
-	  else do
-
-	-- If improvement did some unification, we go round again.
-	-- We start again with irreds, not wanteds
-	-- Using an instance decl might have introduced a fresh type variable
-	-- which might have been unified, so we'd get an infinite loop
-	-- if we started again with wanteds!  See Note [LOOP]
-	{ (irreds1, binds1) <- checkLoop env irreds
-	; return (irreds1, binds `unionBags` binds1) } }
+		; let all_needed_givens = needed_givens ++ more_needed_givens
+	
+		; if not improved then
+	 	     return (irreds, binds, all_needed_givens)
+		  else do
+	
+		-- If improvement did some unification, we go round again.
+		-- We start again with irreds, not wanteds
+		-- Using an instance decl might have introduced a fresh type variable
+		-- which might have been unified, so we'd get an infinite loop
+		-- if we started again with wanteds!  See Note [LOOP]
+		{ (irreds1, binds1, all_needed_givens1) <- go env irreds all_needed_givens
+		; return (irreds1, binds `unionBags` binds1, all_needed_givens1) } }
 \end{code}
 
 Note [LOOP]
@@ -1135,7 +1165,8 @@ tcSimplifySuperClasses
 	-> [Inst]	-- Wanted
 	-> TcM TcDictBinds
 tcSimplifySuperClasses loc givens sc_wanteds
-  = do	{ (irreds, binds1) <- checkLoop env sc_wanteds
+  = do	{ traceTc (text "tcSimplifySuperClasses")
+	; (irreds,binds1,_) <- checkLoop env sc_wanteds
 	; let (tidy_env, tidy_irreds) = tidyInsts irreds
 	; reportNoInstances tidy_env (Just (loc, givens)) tidy_irreds
 	; return binds1 }
@@ -1262,7 +1293,8 @@ tcSimplifyRestricted 	-- Used for restricted binding groups
 
 tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- Zonk everything in sight
-  = do	{ wanteds' <- mappM zonkInst wanteds
+  = do	{ traceTc (text "tcSimplifyRestricted")
+	; wanteds' <- zonkInsts wanteds
 
    	-- 'ReduceMe': Reduce as far as we can.  Don't stop at
 	-- dicts; the idea is to get rid of as many type
@@ -1274,12 +1306,12 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- HOWEVER, some unification may take place, if we instantiate
 	-- 	    a method Inst with an equality constraint
 	; let env = mkNoImproveRedEnv doc (\i -> ReduceMe AddSCs)
-	; (_imp, _binds, constrained_dicts) <- reduceContext env wanteds'
+	; (_imp, _binds, constrained_dicts, _) <- reduceContext env wanteds'
 
 	-- Next, figure out the tyvars we will quantify over
 	; tau_tvs' <- zonkTcTyVarsAndFV (varSetElems tau_tvs)
 	; gbl_tvs' <- tcGetGlobalTyVars
-	; constrained_dicts' <- mappM zonkInst constrained_dicts
+	; constrained_dicts' <- zonkInsts constrained_dicts
 
 	; let qtvs1 = tau_tvs' `minusVarSet` oclose (fdPredsOfInsts constrained_dicts) gbl_tvs'
 				-- As in tcSimplifyInfer
@@ -1323,7 +1355,7 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 			   (is_nested_group || isDict inst) = Stop
 		          | otherwise  	         = ReduceMe AddSCs
 	      env = mkNoImproveRedEnv doc try_me
-	; (_imp, binds, irreds) <- reduceContext env wanteds'
+	; (_imp, binds, irreds, _) <- reduceContext env wanteds'
 
 	-- See "Notes on implicit parameters, Question 4: top level"
 	; ASSERT( all (isFreeWrtTyVars qtvs) irreds )	-- None should be captured
@@ -1413,7 +1445,7 @@ tcSimplifyRuleLhs wanteds
 				 -- to fromInteger; this looks fragile to me
 	     ; lookup_result <- lookupSimpleInst w'
 	     ; case lookup_result of
-		 GenInst ws' rhs -> go dicts (addBind binds (instToId w) rhs) (ws' ++ ws)
+		 GenInst ws' rhs -> go dicts (addBind binds w rhs) (ws' ++ ws)
 		 NoInstance	 -> pprPanic "tcSimplifyRuleLhs" (ppr w)
 	  }
 \end{code}
@@ -1466,12 +1498,12 @@ tcSimplifyIPs :: [Inst]		-- The implicit parameters bound here
 	-- makes them the same.
 
 tcSimplifyIPs given_ips wanteds
-  = do	{ wanteds'   <- mappM zonkInst wanteds
-	; given_ips' <- mappM zonkInst given_ips
+  = do	{ wanteds'   <- zonkInsts wanteds
+	; given_ips' <- zonkInsts given_ips
 		-- Unusually for checking, we *must* zonk the given_ips
 
 	; let env = mkRedEnv doc try_me given_ips'
-	; (improved, binds, irreds) <- reduceContext env wanteds'
+	; (improved, binds, irreds, _) <- reduceContext env wanteds'
 
 	; if not improved then 
 		ASSERT( all is_free irreds )
@@ -1531,7 +1563,7 @@ bindInstsOfLocalFuns wanteds local_ids
     returnM emptyLHsBinds
 
   | otherwise
-  = do	{ (irreds, binds) <- checkLoop env for_me
+  = do	{ (irreds, binds,_) <- checkLoop env for_me
 	; extendLIEs not_for_me	
 	; extendLIEs irreds
 	; return binds }
@@ -1626,7 +1658,8 @@ reduceContext :: RedEnv
 	      -> [Inst]			-- Wanted
 	      -> TcM (ImprovementDone,
 		      TcDictBinds,	-- Dictionary bindings
-		      [Inst])		-- Irreducible
+		      [Inst],		-- Irreducible
+		      [Inst])		-- Needed givens
 
 reduceContext env wanteds
   = do	{ traceTc (text "reduceContext" <+> (vcat [
@@ -1637,18 +1670,59 @@ reduceContext env wanteds
 	     text "----------------------"
 	     ]))
 
-        -- Build the Avail mapping from "givens"
-	; init_state <- foldlM addGiven emptyAvails (red_givens env)
 
-        -- Do the real work
-	-- Process non-implication constraints first, so that they are
-	-- available to help solving the implication constraints
-	-- 	ToDo: seems a bit inefficient and ad-hoc
-	; let (implics, rest) = partition isImplicInst wanteds
-	; avails <- reduceList env (rest ++ implics) init_state
+	; let givens 			= red_givens env
+	      (given_eqs0,given_dicts0) = partitionGivenEqInsts  givens
+	      (wanted_eqs,wanted_dicts) = partitionWantedEqInsts wanteds
 
-	; let improved = availsImproved avails
-	; (binds, irreds) <- extractResults avails wanteds
+	; -- 1. Normalise the *given* *equality* constraints
+	  (given_eqs,eliminate_skolems) <- normaliseGivens given_eqs0
+
+	; -- 2. Normalise the *given* *dictionary* constraints
+	  --    wrt. the toplevel and given equations
+	  (given_dicts,given_binds) <- normaliseGivenDicts given_eqs given_dicts0
+
+	; -- 3. Solve the *wanted* *equation* constraints
+	  eq_irreds0 <- solveWanteds given_eqs wanted_eqs 
+
+	  -- 4. Normalise the *wanted* equality constraints with respect to each other
+	; eq_irreds <- normaliseWanteds eq_irreds0
+
+--         -- Do the real work
+-- 	-- Process non-implication constraints first, so that they are
+-- 	-- available to help solving the implication constraints
+-- 	-- 	ToDo: seems a bit inefficient and ad-hoc
+-- 	; let (implics, rest) = partition isImplicInst wanteds
+-- 	; avails <- reduceList env (rest ++ implics) init_state
+
+          -- 5. Build the Avail mapping from "given_dicts"
+	; init_state <- foldlM addGiven emptyAvails given_dicts
+
+          -- 6. Solve the *wanted* *dictionary* constraints
+	  --    This may expose some further equational constraints...
+	; wanted_dicts' <- zonkInsts wanted_dicts
+	; avails <- reduceList env wanted_dicts' init_state
+	; (binds, irreds0, needed_givens) <- extractResults avails wanted_dicts'
+	; traceTc (text "reduceContext extractresults" <+> vcat
+			[ppr avails,ppr wanted_dicts',ppr binds,ppr needed_givens])
+
+	; -- 7. Normalise the *wanted* *dictionary* constraints
+	  --    wrt. the toplevel and given equations
+	  (irreds1,normalise_binds1) <- normaliseWantedDicts given_eqs irreds0
+
+	; -- 8. Substitute the wanted *equations* in the wanted *dictionaries*
+	  (irreds,normalise_binds2) <- substEqInDictInsts eq_irreds irreds1
+		
+	; -- 9. eliminate the artificial skolem constants introduced in 1.
+	  eliminate_skolems	
+
+	  -- If there was some FD improvement,
+	  -- or new wanted equations have been exposed,
+	  -- we should have another go at solving.
+	; let improved = availsImproved avails 
+			 || (not $ isEmptyBag normalise_binds1)
+			 || (not $ isEmptyBag normalise_binds2)
+			 || (not $ null $ fst $ partitionGivenEqInsts irreds)
 
 	; traceTc (text "reduceContext end" <+> (vcat [
 	     text "----------------------",
@@ -1659,10 +1733,12 @@ reduceContext env wanteds
 	     text "avails" <+> pprAvails avails,
 	     text "improved =" <+> ppr improved,
 	     text "irreds = " <+> ppr irreds,
+	     text "binds = " <+> ppr binds,
+	     text "needed givens = " <+> ppr needed_givens,
 	     text "----------------------"
 	     ]))
 
-	; return (improved, binds, irreds) }
+	; return (improved, given_binds `unionBags` normalise_binds1 `unionBags` normalise_binds2 `unionBags` binds, irreds ++ eq_irreds, needed_givens) }
 
 tcImproveOne :: Avails -> Inst -> TcM ImprovementDone
 tcImproveOne avails inst
@@ -1724,41 +1800,45 @@ reduceList env@(RedEnv {red_stack = (n,stk)}) wanteds state
 	    go wanteds state }
   where
     go []     state = return state
-    go (w:ws) state = do { state' <- reduce (env {red_stack = (n+1, w:stk)}) w state
+    go (w:ws) state = do { traceTc (text "reduceList " <+> ppr (w:ws) <+> ppr state)
+			 ; state' <- reduce (env {red_stack = (n+1, w:stk)}) w state
 			 ; go ws state' }
 
     -- Base case: we're done!
 reduce env wanted avails
     -- It's the same as an existing inst, or a superclass thereof
   | Just avail <- findAvail avails wanted
-  = returnM avails	
+  = do { traceTc (text "reduce: found " <+> ppr wanted)
+       ; returnM avails	
+       }
 
   | otherwise
-  = case red_try_me env wanted of {
-    ; Stop -> try_simple (addIrred NoSCs)	-- See Note [No superclasses for Stop]
+  = do	{ traceTc (text "reduce" <+> ppr avails <+> ppr wanted)
+	; case red_try_me env wanted of {
+	    Stop -> try_simple (addIrred NoSCs);
+			-- See Note [No superclasses for Stop]
 
-    ; ReduceMe want_scs ->	-- It should be reduced
-	reduceInst env avails wanted      `thenM` \ (avails, lookup_result) ->
-	case lookup_result of
-	    NoInstance ->    -- No such instance!
+	    ReduceMe want_scs -> do	-- It should be reduced
+		{ (avails, lookup_result) <- reduceInst env avails wanted
+		; case lookup_result of
+		    NoInstance -> addIrred want_scs avails wanted
 			     -- Add it and its superclasses
-		    	     addIrred want_scs avails wanted
+		    	     
+		    GenInst [] rhs -> addWanted want_scs avails wanted rhs []
 
-	    GenInst [] rhs -> addWanted want_scs avails wanted rhs []
-
-	    GenInst wanteds' rhs -> do	{ avails1 <- addIrred NoSCs avails wanted
-					; avails2 <- reduceList env wanteds' avails1
-					; addWanted want_scs avails2 wanted rhs wanteds' }
+		    GenInst wanteds' rhs 
+			  -> do	{ avails1 <- addIrred NoSCs avails wanted
+				; avails2 <- reduceList env wanteds' avails1
+				; addWanted want_scs avails2 wanted rhs wanteds' } }
 		-- Temporarily do addIrred *before* the reduceList, 
 		-- which has the effect of adding the thing we are trying
 		-- to prove to the database before trying to prove the things it
 		-- needs.  See note [RECURSIVE DICTIONARIES]
 		-- NB: we must not do an addWanted before, because that adds the
-		--     superclasses too, and thaat can lead to a spurious loop; see
+		--     superclasses too, and that can lead to a spurious loop; see
 		--     the examples in [SUPERCLASS-LOOP]
 		-- So we do an addIrred before, and then overwrite it afterwards with addWanted
-
-    }
+    } }
   where
   	-- First, see if the inst can be reduced to a constant in one step
 	-- Works well for literals (1::Int) and constant dictionaries (d::Num Int)
@@ -1867,6 +1947,31 @@ reduceInst env avails other_inst
 	; return (avails, result) }
 \end{code}
 
+Note [Equational Constraints in Implication Constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An equational constraint is of the form 
+	Given => Wanted 
+where Given and Wanted may contain both equational and dictionary
+constraints. The delay and reduction of these two kinds of constraints
+is distinct:
+
+-) In the generated code, wanted Dictionary constraints are wrapped up in an
+   implication constraint that is created at the code site where the wanted
+   dictionaries can be reduced via a let-binding. This let-bound implication
+   constraint is deconstructed at the use-site of the wanted dictionaries.
+
+-) While the reduction of equational constraints is also delayed, the delay
+   is not manifest in the generated code. The required evidence is generated
+   in the code directly at the use-site. There is no let-binding and deconstruction
+   necessary. The main disadvantage is that we cannot exploit sharing as the
+   same evidence may be generated at multiple use-sites. However, this disadvantage
+   is limited because it only concerns coercions which are erased.
+
+The different treatment is motivated by the different in representation. Dictionary
+constraints require manifest runtime dictionaries, while equations require coercions
+which are types.
+
 \begin{code}
 ---------------------------------------------
 reduceImplication :: RedEnv
@@ -1901,55 +2006,97 @@ Note that
 \begin{code}
 	-- ToDo: should we instantiate tvs?  I think it's not necessary
 	--
-	-- ToDo: what about improvement?  There may be some improvement
-	--	 exposed as a result of the simplifications done by reduceList
-	--	 which are discarded if we back off.  
-	--	 This is almost certainly Wrong, but we'll fix it when dealing
-	--	 better with equality constraints
+	-- Note on coercion variables:
+	--
+	--	The extra given coercion variables are bound at two different sites:
+	--	-) in the creation context of the implication constraint	
+	--		the solved equational constraints use these binders
+	--
+	--	-) at the solving site of the implication constraint
+	--		the solved dictionaries use these binders		
+	--		these binders are generated by reduceImplication
+	--
 reduceImplication env orig_avails reft tvs extra_givens wanteds inst_loc
   = do	{ 	-- Add refined givens, and the extra givens
-	  (refined_red_givens, avails) 
-		<- if isEmptyRefinement reft then return (red_givens env, orig_avails)
-		   else foldlM (addRefinedGiven reft) ([], orig_avails) (red_givens env)
-	; avails <- foldlM addGiven avails extra_givens
+		-- Todo fix this 
+	  (refined_red_givens,refined_avails)
+		<- if isEmptyRefinement reft then return (red_givens env,orig_avails)
+		   else foldlM (addRefinedGiven reft) ([],orig_avails) (red_givens env)
 
 		-- Solve the sub-problem
 	; let try_me inst = ReduceMe AddSCs	-- Note [Freeness and implications]
-	      env' = env { red_givens = refined_red_givens ++ extra_givens
+	      env' = env { red_givens = refined_red_givens ++ extra_givens ++ availsInsts orig_avails
 			 , red_try_me = try_me }
 
 	; traceTc (text "reduceImplication" <+> vcat
 			[ ppr orig_avails,
 			  ppr (red_givens env), ppr extra_givens, 
-			  ppr reft, ppr wanteds, ppr avails ])
-	; avails <- reduceList env' wanteds avails
+			  ppr reft, ppr wanteds])
+	; (irreds,binds,needed_givens0) <- checkLoop env' wanteds
+        ; let needed_givens1 = [ng | ng <- needed_givens0, notElem ng extra_givens]
 
-		-- Extract the results 
 		-- Note [Reducing implication constraints]
-	; (binds, irreds) <- extractResults avails wanteds
-	; let (outer, inner) = partition (isJust . findAvail orig_avails) irreds
+		-- Tom -- update note, put somewhere!
 
 	; traceTc (text "reduceImplication result" <+> vcat
-			[ ppr outer, ppr inner, ppr binds])
+			[ppr irreds, ppr binds, ppr needed_givens1])
+-- 	; avails <- reduceList env' wanteds avails
+-- 
+-- 		-- Extract the binding
+-- 	; (binds, irreds) <- extractResults avails wanteds
+	; (refinement_binds,needed_givens) <- extractLocalResults refined_avails needed_givens1
+	; traceTc (text "reduceImplication local results" <+> vcat
+			[ppr refinement_binds, ppr needed_givens])
+
+	; -- extract superclass binds
+	  --  (sc_binds,_) <- extractResults avails []
+-- 	; traceTc (text "reduceImplication sc_binds" <+> vcat
+--			[ppr sc_binds, ppr avails])
+--  
 
 		-- We always discard the extra avails we've generated;
 		-- but we remember if we have done any (global) improvement
-	; let ret_avails = updateImprovement orig_avails avails
+--	; let ret_avails = avails
+	; let ret_avails = orig_avails
+--	; let ret_avails = updateImprovement orig_avails avails
 
-	; if isEmptyLHsBinds binds && null outer then 	-- No progress
+	; traceTc (text "reduceImplication condition" <+> ppr ((isEmptyLHsBinds binds) || (null irreds)))
+
+--	Porgress is no longer measered by the number of bindings
+--	; if isEmptyLHsBinds binds then 	-- No progress
+	; if (isEmptyLHsBinds binds) && (not $ null irreds) then 
 		return (ret_avails, NoInstance)
 	  else do
-	{ (implic_insts, bind) <- makeImplicationBind inst_loc tvs reft extra_givens inner
+	{ 
+	; (implic_insts, bind) <- makeImplicationBind inst_loc tvs reft extra_givens irreds
+			-- This binding is useless if the recursive simplification
+			-- made no progress; but currently we don't try to optimise that
+			-- case.  After all, we only try hard to reduce at top level, or
+			-- when inferring types.
 
-	; let	dict_ids = map instToId extra_givens
-		co  = mkWpTyLams tvs <.> mkWpLams dict_ids <.> WpLet (binds `unionBags` bind)
+	; let	dict_wanteds = filter (not . isEqInst) wanteds
+		(extra_eq_givens,extra_dict_givens) = partitionGivenEqInsts extra_givens
+		dict_ids = map instToId extra_dict_givens 
+		-- TOMDO: given equational constraints bug!
+		--  we need a different evidence for given
+		--  equations depending on whether we solve
+		--  dictionary constraints or equational constraints
+		eq_tyvars = uniqSetToList $ tyVarsOfTypes $ map eqInstType extra_eq_givens
+		-- dict_ids = map instToId extra_givens
+		co  = mkWpTyLams tvs <.> mkWpTyLams eq_tyvars <.> mkWpLams dict_ids <.> WpLet (binds `unionBags` refinement_binds `unionBags` bind)
 		rhs = mkHsWrap co payload
 	        loc = instLocSpan inst_loc
-		payload | [wanted] <- wanteds = HsVar (instToId wanted)
-			| otherwise = ExplicitTuple (map (L loc . HsVar . instToId) wanteds) Boxed
+		payload | [dict_wanted] <- dict_wanteds = HsVar (instToId dict_wanted)
+			| otherwise = ExplicitTuple (map (L loc . HsVar . instToId) dict_wanteds) Boxed
 
-	; return (ret_avails, GenInst (implic_insts ++ outer) (L loc rhs))
-  } }
+	
+	; traceTc (text "reduceImplication ->"  <+> vcat
+			[ ppr ret_avails,
+			  ppr implic_insts])
+		-- If there are any irreds, we back off and return NoInstance
+	; return (ret_avails, GenInst (implic_insts ++ needed_givens) (L loc rhs))
+  	} 
+    }
 \end{code}
 
 Note [Reducing implication constraints]
@@ -2104,43 +2251,78 @@ dependency analyser can sort them out later
 extractResults :: Avails
 	       -> [Inst]		-- Wanted
 	       -> TcM (	TcDictBinds, 	-- Bindings
-			[Inst])		-- Irreducible ones
+			[Inst],		-- Irreducible ones
+			[Inst])		-- Needed givens, i.e. ones used in the bindings
 
 extractResults (Avails _ avails) wanteds
-  = go avails emptyBag [] wanteds
+  = go avails emptyBag [] [] wanteds
   where
-    go :: AvailEnv -> TcDictBinds -> [Inst] -> [Inst]
-	-> TcM (TcDictBinds, [Inst])
-    go avails binds irreds [] 
-      = returnM (binds, irreds)
+    go :: AvailEnv -> TcDictBinds -> [Inst] -> [Inst] -> [Inst]
+	-> TcM (TcDictBinds, [Inst], [Inst])
+    go avails binds irreds givens [] 
+      = returnM (binds, irreds, givens)
 
-    go avails binds irreds (w:ws)
+    go avails binds irreds givens (w:ws)
       = case findAvailEnv avails w of
 	  Nothing -> pprTrace "Urk: extractResults" (ppr w) $
-		     go avails binds irreds ws
+		     go avails binds irreds givens ws
 
 	  Just (Given id) 
-		| id == w_id -> go avails binds irreds ws 
-		| otherwise  -> go avails (addBind binds w_id (nlHsVar id)) irreds ws
+		| id == w_id -> go avails binds irreds (w:givens) ws 
+		| otherwise  -> go avails (addBind binds w (nlHsVar id)) irreds (update_id w  id:givens) ws
 		-- The sought Id can be one of the givens, via a superclass chain
 		-- and then we definitely don't want to generate an x=x binding!
 
-	  Just IsIrred -> go (add_given avails w) binds (w:irreds) ws
+	  Just IsIrred -> go (add_given avails w) binds (w:irreds) givens ws
 		-- The add_given handles the case where we want (Ord a, Eq a), and we
 		-- don't want to emit *two* Irreds for Ord a, one via the superclass chain
 		-- This showed up in a dupliated Ord constraint in the error message for 
 		--	test tcfail043
 
-	  Just (Rhs rhs ws') -> go (add_given avails w) new_binds irreds (ws' ++ ws)
+	  Just (Rhs rhs ws') -> go (add_given avails w) new_binds irreds givens (ws' ++ ws)
 			     where	
-				new_binds = addBind binds w_id rhs
+				new_binds = addBind binds w rhs
+      where
+	w_id = instToId w	
+	update_id m@(Method{}) id = m {tci_id = id}
+        update_id w            id = w {tci_name = idName id} 
+
+    add_given avails w = extendAvailEnv avails w (Given (instToId w))
+
+extractLocalResults :: Avails
+	       -> [Inst]		-- Wanted
+	       -> TcM (	TcDictBinds, 	-- Bindings
+			[Inst])		-- Needed givens, i.e. ones used in the bindings
+
+extractLocalResults (Avails _ avails) wanteds
+  = go avails emptyBag [] wanteds
+  where
+    go :: AvailEnv -> TcDictBinds -> [Inst] -> [Inst]
+	-> TcM (TcDictBinds, [Inst])
+    go avails binds givens [] 
+      = returnM (binds, givens)
+
+    go avails binds givens (w:ws)
+      = case findAvailEnv avails w of
+	  Nothing -> -- pprTrace "Urk: extractLocalResults" (ppr w) $
+		     go avails binds givens ws
+
+	  Just IsIrred ->
+		     go avails binds givens ws
+
+	  Just (Given id) 
+		| id == w_id -> go avails binds (w:givens) ws 
+		| otherwise  -> go avails binds (w{tci_name=idName id}:givens) ws
+		-- The sought Id can be one of the givens, via a superclass chain
+		-- and then we definitely don't want to generate an x=x binding!
+
+	  Just (Rhs rhs ws') -> go (add_given avails w) new_binds givens (ws' ++ ws)
+			     where	
+				new_binds = addBind binds w rhs
       where
 	w_id = instToId w	
 
     add_given avails w = extendAvailEnv avails w (Given (instToId w))
-	-- Don't add the same binding twice
-
-addBind binds id rhs = binds `unionBags` unitBag (L (getSrcSpan id) (VarBind id rhs))
 \end{code}
 
 
@@ -2186,6 +2368,21 @@ addRefinedGiven reft (refined_givens, avails) given
 	    -- and hopefully the optimiser will spot the duplicated work
   | otherwise
   = return (refined_givens, avails)
+
+addRefinedGiven' :: Refinement -> [Inst] -> Inst -> TcM [Inst]
+addRefinedGiven' reft refined_givens given
+  | isDict given	-- We sometimes have 'given' methods, but they
+			-- are always optional, so we can drop them
+  , let pred = dictPred given
+  , isRefineablePred pred	-- See Note [ImplicInst rigidity]
+  , Just (co, pred) <- refinePred reft pred
+  = do 	{ new_given <- newDictBndr (instLoc given) pred
+	; return (new_given:refined_givens) }
+	    -- ToDo: the superclasses of the original given all exist in Avails 
+	    -- so we could really just cast them, but it's more awkward to do,
+	    -- and hopefully the optimiser will spot the duplicated work
+  | otherwise
+  = return refined_givens 
 \end{code}
 
 Note [ImplicInst rigidity]
@@ -2310,11 +2507,14 @@ tcSimplifyInteractive wanteds
 -- error message generation for the monomorphism restriction
 tc_simplify_top doc interactive wanteds
   = do	{ dflags <- getDOpts
-	; wanteds <- mapM zonkInst wanteds
+  	; wanteds <- zonkInsts wanteds
 	; mapM_ zonkTopTyVar (varSetElems (tyVarsOfInsts wanteds))
 
+	; traceTc (text "tc_simplify_top 0: " <+> ppr wanteds)
 	; (irreds1, binds1) <- tryHardCheckLoop doc1 wanteds
+	; traceTc (text "tc_simplify_top 1: " <+> ppr irreds1)
 	; (irreds2, binds2) <- approximateImplications doc2 (\d -> True) irreds1
+	; traceTc (text "tc_simplify_top 2: " <+> ppr irreds2)
 
 		-- Use the defaulting rules to do extra unification
 		-- NB: irreds2 are already zonked
@@ -2377,7 +2577,7 @@ disambiguate doc interactive dflags insts
   = return (insts, emptyBag)
 
   | null defaultable_groups
-  = do	{ traceTc (text "disambiguate1" <+> vcat [ppr insts, ppr unaries, ppr bad_tvs, ppr defaultable_groups])
+  = do	{ traceTc (text "disambigutate, no defaultable groups" <+> vcat [ppr unaries, ppr insts, ppr bad_tvs, ppr defaultable_groups])
 	; return (insts, emptyBag) }
 
   | otherwise
@@ -2440,7 +2640,7 @@ disambigGroup :: [Type]			-- The default types
 disambigGroup default_tys dicts
   = try_default default_tys
   where
-    (_,_,tyvar) = head dicts	-- Should be non-empty
+    (_,_,tyvar) = ASSERT(not (null dicts)) head dicts	-- Should be non-empty
     classes = [c | (_,c,_) <- dicts]
 
     try_default [] = return ()
@@ -2455,7 +2655,9 @@ disambigGroup default_tys dicts
 
 		-- After this we can't fail
 	   ; warnDefault dicts default_ty
-	   ; unifyType default_ty (mkTyVarTy tyvar) }
+	   ; unifyType default_ty (mkTyVarTy tyvar) 
+	   ; return () -- TOMDO: do something with the coercion
+	   }
 
 
 -----------------------
@@ -2700,14 +2902,17 @@ reportNoInstances tidy_env mb_what insts
   = groupErrs (report_no_instances tidy_env mb_what) insts
 
 report_no_instances tidy_env mb_what insts
-  = do	{ inst_envs <- tcGetInstEnvs
-	; let (implics, insts1)  = partition isImplicInst insts
-	      (insts2, overlaps) = partitionWith (check_overlap inst_envs) insts1
-	; traceTc (text "reportNoInstnces" <+> vcat 
-			[ppr implics, ppr insts1, ppr insts2])
-	; mapM_ complain_implic implics
-	; mapM_ (\doc -> addErrTcM (tidy_env, doc)) overlaps
-	; groupErrs complain_no_inst insts2 }
+  = do { inst_envs <- tcGetInstEnvs
+       ; let (implics, insts1)  = partition isImplicInst insts
+	     (insts2, overlaps) = partitionWith (check_overlap inst_envs) insts1
+             (eqInsts, insts3)  = partition isEqInst insts2
+       ; traceTc (text "reportNoInstances" <+> vcat 
+                       [ppr implics, ppr insts1, ppr insts2])
+       ; mapM_ complain_implic implics
+       ; mapM_ (\doc -> addErrTcM (tidy_env, doc)) overlaps
+       ; groupErrs complain_no_inst insts3 
+       ; mapM_ complain_eq eqInsts
+       }
   where
     complain_no_inst insts = addErrTcM (tidy_env, mk_no_inst_err insts)
 
@@ -2716,6 +2921,13 @@ report_no_instances tidy_env mb_what insts
 			  (Just (tci_loc inst, tci_given inst)) 
 			  (tci_wanted inst)
 
+    complain_eq EqInst {tci_left = lty, tci_right = rty, 
+                        tci_loc = InstLoc _ _ ctxt}
+      = do { (env, msg) <- misMatchMsg lty rty
+           ; setErrCtxt ctxt $
+               failWithTcM (env, msg)
+           }
+
     check_overlap :: (InstEnv,InstEnv) -> Inst -> Either Inst SDoc
 	-- Right msg  => overlap message
 	-- Left  inst => no instance
@@ -2723,9 +2935,9 @@ report_no_instances tidy_env mb_what insts
 	| not (isClassDict wanted) = Left wanted
 	| otherwise
 	= case lookupInstEnv inst_envs clas tys of
-		-- The case of exactly one match and no unifiers means
-		-- a successful lookup.  That can't happen here, becuase
-		-- dicts only end up here if they didn't match in Inst.lookupInst
+		-- The case of exactly one match and no unifiers means a
+		-- successful lookup.  That can't happen here, because dicts
+		-- only end up here if they didn't match in Inst.lookupInst
 #ifdef DEBUG
 		([m],[]) -> pprPanic "reportNoInstance" (ppr wanted)
 #endif
@@ -2868,4 +3080,59 @@ reduceDepthErr n stack
 	  nest 4 (pprStack stack)]
 
 pprStack stack = vcat (map pprInstInFull stack)
+
+-----------------------
+misMatchMsg :: TcType -> TcType -> TcM (TidyEnv, SDoc)
+-- Generate the message when two types fail to match,
+-- going to some trouble to make it helpful.
+-- The argument order is: actual type, expected type
+misMatchMsg ty_act ty_exp
+  = do	{ env0 <- tcInitTidyEnv
+	; (env1, pp_exp, extra_exp) <- ppr_ty env0 ty_exp ty_act
+	; (env2, pp_act, extra_act) <- ppr_ty env1 ty_act ty_exp
+	; return (env2, 
+                  sep [sep [ptext SLIT("Couldn't match expected type") <+> pp_exp, 
+			    nest 7 $
+                              ptext SLIT("against inferred type") <+> pp_act],
+		       nest 2 (extra_exp $$ extra_act)]) }
+
+ppr_ty :: TidyEnv -> TcType -> TcType -> TcM (TidyEnv, SDoc, SDoc)
+ppr_ty env ty other_ty 
+  = do	{ ty' <- zonkTcType ty
+	; let (env1, tidy_ty) = tidyOpenType env ty'
+	; (env2, extra) <- ppr_extra env1 tidy_ty other_ty
+	; return (env2, quotes (ppr tidy_ty), extra) }
+
+-- (ppr_extra env ty other_ty) shows extra info about 'ty'
+ppr_extra env (TyVarTy tv) other_ty
+  | isSkolemTyVar tv || isSigTyVar tv
+  = return (env1, pprSkolTvBinding tv1)
+  where
+    (env1, tv1) = tidySkolemTyVar env tv
+
+ppr_extra env (TyConApp tc1 _) (TyConApp tc2 _) 
+  | getOccName tc1 == getOccName tc2
+  = --	This case helps with messages that would otherwise say
+    --	   Could not match 'T' does not match 'M.T'
+    -- which is not helpful
+    do	{ this_mod <- getModule
+	; return (env, quotes (ppr tc1) <+> ptext SLIT("is defined") <+> mk_mod this_mod) }
+  where
+    tc_mod  = nameModule (getName tc1)
+    tc_pkg  = modulePackageId tc_mod
+    tc2_pkg = modulePackageId (nameModule (getName tc2))
+    mk_mod this_mod 
+	| tc_mod == this_mod = ptext SLIT("in this module")
+
+	| not home_pkg && tc2_pkg /= tc_pkg = pp_pkg
+		-- Suppress the module name if (a) it's from another package
+		--			       (b) other_ty isn't from that same package
+
+	| otherwise = ptext SLIT("in module") <+> quotes (ppr tc_mod) <+> pp_pkg
+	where
+	  home_pkg = tc_pkg == modulePackageId this_mod
+	  pp_pkg | home_pkg  = empty
+		 | otherwise = ptext SLIT("in package") <+> quotes (ppr tc_pkg)
+
+ppr_extra env ty other_ty = return (env, empty)		-- Normal case
 \end{code}

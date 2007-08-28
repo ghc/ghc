@@ -35,6 +35,8 @@ import DataCon
 import Name
 import TyCon
 import Type
+import TypeRep
+import Coercion
 import Var
 import VarSet
 import TysWiredIn
@@ -70,11 +72,12 @@ tcPolyExpr, tcPolyExprNC
 
 tcPolyExpr expr res_ty 	
   = addErrCtxt (exprCtxt (unLoc expr)) $
-    tcPolyExprNC expr res_ty
+    (do {traceTc (text "tcPolyExpr") ; tcPolyExprNC expr res_ty })
 
 tcPolyExprNC expr res_ty 
   | isSigmaTy res_ty
-  = do	{ (gen_fn, expr') <- tcGen res_ty emptyVarSet (\_ -> tcPolyExprNC expr)
+  = do	{ traceTc (text "tcPolyExprNC" <+> ppr res_ty)
+	; (gen_fn, expr') <- tcGen res_ty emptyVarSet (\_ -> tcPolyExprNC expr)
 		-- Note the recursive call to tcPolyExpr, because the
 		-- type may have multiple layers of for-alls
 		-- E.g. forall a. Eq a => forall b. Ord b => ....
@@ -111,7 +114,6 @@ tcInferRho expr	= tcInfer (tcMonoExpr expr)
 \end{code}
 
 
-
 %************************************************************************
 %*									*
 	tcExpr: the main expression typechecker
@@ -122,8 +124,10 @@ tcInferRho expr	= tcInfer (tcMonoExpr expr)
 tcExpr :: HsExpr Name -> BoxyRhoType -> TcM (HsExpr TcId)
 tcExpr (HsVar name)     res_ty = tcId (OccurrenceOf name) name res_ty
 
-tcExpr (HsLit lit) 	res_ty = do { boxyUnify (hsLitType lit) res_ty
-				    ; return (HsLit lit) }
+tcExpr (HsLit lit)	res_ty = do { let lit_ty = hsLitType lit
+				    ; coi <- boxyUnify lit_ty res_ty
+				    ; return $ wrapExprCoI (HsLit lit) coi
+				    }
 
 tcExpr (HsPar expr)     res_ty = do { expr' <- tcMonoExpr expr res_ty
 				    ; return (HsPar expr') }
@@ -167,6 +171,7 @@ tcExpr (HsApp e1 e2) res_ty
     go lfun@(L loc fun) args
 	= do { (fun', args') <- -- addErrCtxt (callCtxt lfun args) $
 				tcApp fun (length args) (tcArgs lfun args) res_ty
+	     ; traceTc (text "tcExpr args': " <+> ppr args')
 	     ; return (unLoc (foldl mkHsApp (L loc fun') args')) }
 
 tcExpr (HsLam match) res_ty
@@ -282,6 +287,18 @@ tcExpr in_expr@(ExplicitList _ exprs) res_ty	-- Non-empty list
 	; return (ExplicitList elt_ty exprs') }
   where
     tc_elt elt_ty expr = tcPolyExpr expr elt_ty
+{- TODO: Version from Tom's original patch.  Unfortunately, we cannot do it this
+   way, but need to teach boxy splitters about match deferral and coercions.
+  = do 	{ elt_tv <- newBoxyTyVar argTypeKind
+	; let elt_ty = TyVarTy elt_tv
+	; coi    <- boxyUnify (mkTyConApp listTyCon [elt_ty]) res_ty
+	-- ; elt_ty <- boxySplitListTy res_ty
+	; exprs' <- mappM (tc_elt elt_ty) exprs
+	; return $ wrapExprCoI (ExplicitList elt_ty exprs') coi  }
+	-- ; return (ExplicitList elt_ty exprs') }
+  where
+    tc_elt elt_ty expr = tcPolyExpr expr elt_ty
+ -}
 
 tcExpr in_expr@(ExplicitPArr _ exprs) res_ty	-- maybe empty
   = do	{ [elt_ty] <- boxySplitTyConApp parrTyCon res_ty
@@ -671,6 +688,7 @@ tcIdApp fun_name n_args arg_checker res_ty
 	-- tcFun work nicely for OpApp and Sections too
 	; fun' <- instFun orig fun res_subst tv_theta_prs
 	; co_fn' <- wrapFunResCoercion (substTys res_subst fun_arg_tys) co_fn
+	; traceTc (text "tcIdApp: " <+> ppr (mkHsWrap co_fn' fun') <+> ppr tv_theta_prs <+> ppr co_fn' <+> ppr fun')
 	; return (mkHsWrap co_fn' fun', args') }
 \end{code}
 
@@ -714,6 +732,7 @@ tcId orig fun_name res_ty
 
 	-- And pack up the results
 	; fun' <- instFun orig fun res_subst tv_theta_prs 
+	; traceTc (text "tcId yields" <+> ppr (mkHsWrap co_fn fun'))
 	; return (mkHsWrap co_fn fun') }
 
 -- 	Note [Push result type in]
@@ -758,27 +777,32 @@ instFun orig fun subst []
 
 instFun orig fun subst tv_theta_prs
   = do 	{ let ty_theta_prs' = map subst_pr tv_theta_prs
-
+	; traceTc (text "instFun" <+> ppr ty_theta_prs')
                 -- Make two ad-hoc checks 
 	; doStupidChecks fun ty_theta_prs'
 
 		-- Now do normal instantiation
-	; go True fun ty_theta_prs' }
+	; result <- go True fun ty_theta_prs' 
+	; traceTc (text "instFun result" <+> ppr result)
+	; return result
+	}
   where
     subst_pr (tvs, theta) 
 	= (substTyVars subst tvs, substTheta subst theta)
 
-    go _ fun [] = return fun
+    go _ fun [] = do {traceTc (text "go _ fun [] returns" <+> ppr fun) ; return fun }
 
     go True (HsVar fun_id) ((tys,theta) : prs)
 	| want_method_inst theta
-	= do { meth_id <- newMethodWithGivenTy orig fun_id tys
+	= do { traceTc (text "go (HsVar fun_id) ((tys,theta) : prs) | want_method_inst theta")
+	     ; meth_id <- newMethodWithGivenTy orig fun_id tys
 	     ; go False (HsVar meth_id) prs }
 		-- Go round with 'False' to prevent further use
 		-- of newMethod: see Note [Multiple instantiation]
 
     go _ fun ((tys, theta) : prs)
 	= do { co_fn <- instCall orig tys theta
+	     ; traceTc (text "go yields co_fn" <+> ppr co_fn)
 	     ; go False (HsWrap co_fn fun) prs }
 
 	-- See Note [No method sharing]
@@ -952,8 +976,11 @@ lookupFun orig id_name
     	    ATcId { tct_id = id, tct_type = ty, tct_co = mb_co, tct_level = lvl }
 		-> do { thLocalId orig id ty lvl
 		      ; case mb_co of
-			  Nothing -> return (HsVar id, ty)	-- Wobbly, or no free vars
-			  Just co -> return (mkHsWrap co (HsVar id), ty) }	
+			  Unrefineable    -> return (HsVar id, ty)
+			  Rigid co        -> return (mkHsWrap co (HsVar id), ty) 	
+			  Wobbly 	  -> traceTc (text "lookupFun" <+> ppr id) >> return (HsVar id, ty)	-- Wobbly, or no free vars
+			  WobblyInvisible -> failWithTc (ppr id_name <+> ptext SLIT(" not in scope because it has a wobbly type (solution: add a type annotation)"))
+		      }
 
     	    other -> failWithTc (ppr other <+> ptext SLIT("used where a value identifer was expected"))
     }
@@ -1179,4 +1206,10 @@ polySpliceErr :: Id -> SDoc
 polySpliceErr id
   = ptext SLIT("Can't splice the polymorphic local variable") <+> quotes (ppr id)
 #endif
+\end{code}
+
+\begin{code}
+wrapExprCoI :: HsExpr a -> CoercionI -> HsExpr a
+wrapExprCoI expr IdCo     = expr
+wrapExprCoI expr (ACo co) = mkHsWrap (WpCo co) expr
 \end{code}

@@ -44,6 +44,7 @@ import TysPrim
 import TysWiredIn
 import PrelRules
 import Type
+import TypeRep
 import TcGadt
 import Coercion
 import TcType
@@ -59,7 +60,7 @@ import PrimOp
 import ForeignCall
 import DataCon
 import Id
-import Var              ( Var, TyVar)
+import Var              ( Var, TyVar, mkCoVar)
 import IdInfo
 import NewDemand
 import DmdAnal
@@ -223,7 +224,7 @@ mkDataConIds wrap_name wkr_name data_con
   = DCIds Nothing wrk_id
   where
     (univ_tvs, ex_tvs, eq_spec, 
-     theta, orig_arg_tys, res_ty) = dataConFullSig data_con
+     eq_theta, dict_theta, orig_arg_tys, res_ty) = dataConFullSig data_con
     tycon = dataConTyCon data_con	-- The representation TyCon (not family)
 
 	----------- Worker (algebraic data types only) --------------
@@ -270,8 +271,11 @@ mkDataConIds wrap_name wkr_name data_con
     nt_work_info = noCafIdInfo		-- The NoCaf-ness is set by noCafIdInfo
 		  `setArityInfo` 1	-- Arity 1
 		  `setUnfoldingInfo`     newtype_unf
-    newtype_unf  = ASSERT( isVanillaDataCon data_con &&
-			   isSingleton orig_arg_tys )
+    newtype_unf  = -- The assertion below is no longer correct:
+		   --   there may be a dict theta rather than a singleton orig_arg_ty
+		   -- ASSERT( isVanillaDataCon data_con &&
+		   --	   isSingleton orig_arg_tys )
+		   --
 	  	   -- No existentials on a newtype, but it can have a context
 	  	   -- e.g. 	newtype Eq a => T a = MkT (...)
 	  	   mkCompulsoryUnfolding $ 
@@ -279,7 +283,11 @@ mkDataConIds wrap_name wkr_name data_con
 	  	   wrapNewTypeBody tycon res_ty_args
                        (Var id_arg1)
 
-    id_arg1 = ASSERT( not (null orig_arg_tys) ) mkTemplateLocal 1 (head orig_arg_tys)
+    id_arg1 = mkTemplateLocal 1 
+		(if null orig_arg_tys
+		    then ASSERT(not (null $ dataConDictTheta data_con)) mkPredTy $ head (dataConDictTheta data_con)
+		    else head orig_arg_tys
+		)
 
 	----------- Wrapper --------------
 	-- We used to include the stupid theta in the wrapper's args
@@ -287,8 +295,9 @@ mkDataConIds wrap_name wkr_name data_con
 	-- extra constraints where necessary.
     wrap_tvs    = (univ_tvs `minusList` map fst eq_spec) ++ ex_tvs
     res_ty_args	= substTyVars (mkTopTvSubst eq_spec) univ_tvs
-    dict_tys = mkPredTys theta
-    wrap_ty  = mkForAllTys wrap_tvs $ mkFunTys dict_tys $
+    eq_tys   = mkPredTys eq_theta
+    dict_tys = mkPredTys dict_theta
+    wrap_ty  = mkForAllTys wrap_tvs $ mkFunTys eq_tys $ mkFunTys dict_tys $
 	       mkFunTys orig_arg_tys $ res_ty
 	-- NB: watch out here if you allow user-written equality 
 	--     constraints in data constructor signatures
@@ -318,6 +327,7 @@ mkDataConIds wrap_name wkr_name data_con
 
     wrap_unf = mkTopUnfolding $ Note InlineMe $
 	      mkLams wrap_tvs $ 
+	      mkLams eq_args $
 	      mkLams dict_args $ mkLams id_args $
 	      foldr mk_case con_app 
 		    (zip (dict_args ++ id_args) all_strict_marks)
@@ -327,11 +337,18 @@ mkDataConIds wrap_name wkr_name data_con
 			  Var wrk_id `mkTyApps`  res_ty_args
 				     `mkVarApps` ex_tvs			
 				     `mkTyApps`  map snd eq_spec	-- Equality evidence 
+				     `mkVarApps` eq_args
 				     `mkVarApps` reverse rep_ids
 
     (dict_args,i2) = mkLocals 1  dict_tys
     (id_args,i3)   = mkLocals i2 orig_arg_tys
     wrap_arity	   = i3-1
+    (eq_args,_)    = mkCoVarLocals i3 eq_tys
+
+    mkCoVarLocals i []     = ([],i)
+    mkCoVarLocals i (x:xs) = let (ys,j) = mkCoVarLocals (i+1) xs
+                                 y      = mkCoVar (mkSysTvName (mkBuiltinUnique i) FSLIT("dc_co")) x
+                             in (y:ys,j)
 
     mk_case 
 	   :: (Id, StrictnessMark)	-- Arg, strictness
@@ -493,7 +510,7 @@ mkRecordSelId tycon field_label
     has_field con     = field_label `elem` dataConFieldLabels con
 
     con1	= ASSERT( not (null data_cons_w_field) ) head data_cons_w_field
-    (univ_tvs, _, eq_spec, _, _, data_ty) = dataConFullSig con1
+    (univ_tvs, _, eq_spec, _, _, _, data_ty) = dataConFullSig con1
 	-- For a data type family, the data_ty (and hence selector_ty) mentions
 	-- only the family TyCon, not the instance TyCon
     data_tv_set	= tyVarsOfType data_ty
@@ -792,7 +809,7 @@ mkDictSelId name clas
 	--	C a -> C a
 	-- for a single-op class (after all, the selector is the identity)
 	-- But it's type must expose the representation of the dictionary
-	-- to gat (say)		C a -> (a -> a)
+	-- to get (say)		C a -> (a -> a)
 
     info = noCafIdInfo
 		`setArityInfo`	    	1
@@ -814,16 +831,24 @@ mkDictSelId name clas
     tycon      = classTyCon clas
     [data_con] = tyConDataCons tycon
     tyvars     = dataConUnivTyVars data_con
-    arg_tys    = ASSERT( isVanillaDataCon data_con ) dataConRepArgTys data_con
+    arg_tys    = {- ASSERT( isVanillaDataCon data_con ) -} dataConRepArgTys data_con
+    eq_theta   = dataConEqTheta	data_con
     the_arg_id = assoc "MkId.mkDictSelId" (map idName (classSelIds clas) `zip` arg_ids) name
 
-    pred	      = mkClassPred clas (mkTyVarTys tyvars)
-    (dict_id:arg_ids) = mkTemplateLocals (mkPredTy pred : arg_tys)
+    pred       = mkClassPred clas (mkTyVarTys tyvars)
+    dict_id    = mkTemplateLocal     1 $ mkPredTy pred
+    (eq_ids,n) = mkCoVarLocals 2 $ mkPredTys eq_theta
+    arg_ids    = mkTemplateLocalsNum n arg_tys
 
-    rhs = mkLams tyvars (Lam dict_id rhs_body)
+    mkCoVarLocals i []     = ([],i)
+    mkCoVarLocals i (x:xs) = let (ys,j) = mkCoVarLocals (i+1) xs
+                                 y      = mkCoVar (mkSysTvName (mkBuiltinUnique i) FSLIT("dc_co")) x
+                             in (y:ys,j)
+
+    rhs = mkLams tyvars  (Lam dict_id   rhs_body)
     rhs_body | isNewTyCon tycon = unwrapNewTypeBody tycon (map mkTyVarTy tyvars) (Var dict_id)
 	     | otherwise	= Case (Var dict_id) dict_id (idType the_arg_id)
-			     	       [(DataAlt data_con, arg_ids, Var the_arg_id)]
+			     	       [(DataAlt data_con, eq_ids ++ arg_ids, Var the_arg_id)]
 \end{code}
 
 

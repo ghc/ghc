@@ -425,7 +425,7 @@ mkMethId origin clas sel_id inst_tys
 	rho_ty	     = ASSERT( length tyvars == length inst_tys )
 		       substTyWith tyvars inst_tys rho
 	(preds,tau)  = tcSplitPhiTy rho_ty
-        first_pred   = head preds
+        first_pred   = ASSERT( not (null preds)) head preds
     in
 	-- The first predicate should be of form (C a b)
 	-- where C is the class in question
@@ -528,7 +528,7 @@ mkDefMethRhs origin clas inst_tys sel_id loc GenDefMeth
 	  -- case we require that the instance decl is for a single-parameter
 	  -- type class with type variable arguments:
 	  --	instance (...) => C (T a b)
-    clas_tyvar    = head (classTyVars clas)
+    clas_tyvar    = ASSERT (not (null (classTyVars clas))) head (classTyVars clas)
     Just tycon	  = maybe_tycon
     maybe_tycon   = case inst_tys of 
 			[ty] -> case tcSplitTyConApp_maybe ty of

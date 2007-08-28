@@ -201,7 +201,8 @@ mkTyVar name kind = ASSERT( not (isCoercionKind kind ) )
 
 mkTcTyVar :: Name -> Kind -> TcTyVarDetails -> TyVar
 mkTcTyVar name kind details
-  = ASSERT( not (isCoercionKind kind) )
+  = -- TOM: no longer valid assertion? 
+    -- ASSERT( not (isCoercionKind kind) )
     TcTyVar {	varName    = name,
 		realUnique = getKey# (nameUnique name),
 		varType  = kind,

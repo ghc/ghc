@@ -58,6 +58,7 @@ module TcType (
   isDoubleTy, isFloatTy, isIntTy, isStringTy,
   isIntegerTy, isBoolTy, isUnitTy, isCharTy,
   isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy, 
+  isOpenSynTyConApp,
 
   ---------------------------------
   -- Misc type manipulators
@@ -161,7 +162,6 @@ import Outputable
 import Data.List
 import Data.IORef
 \end{code}
-
 
 %************************************************************************
 %*									*
@@ -295,12 +295,12 @@ data BoxInfo
 --	b2 is another (currently empty) box.
 
 data MetaDetails
-  = Flexi          -- Flexi type variables unify to become 
-                   -- Indirects.  
+  = Flexi	        -- Flexi type variables unify to become 
+                   	-- Indirects.  
 
-  | Indirect TcType  -- INVARIANT:
-		     --   For a BoxTv, this type must be non-boxy
-                     --   For a TauTv, this type must be a tau-type
+  | Indirect TcType  	-- INVARIANT:
+		     	--   For a BoxTv, this type must be non-boxy
+                     	--   For a TauTv, this type must be a tau-type
 
 -- Generally speaking, SkolemInfo should not contain location info
 -- that is contained in the Name of the tyvar with this SkolemInfo
@@ -386,7 +386,6 @@ mkKindVar u r
 kind_var_occ :: OccName	-- Just one for all KindVars
 			-- They may be jiggled by tidying
 kind_var_occ = mkOccName tvName "k"
-\end{code}
 \end{code}
 
 %************************************************************************
@@ -475,7 +474,7 @@ pprSkolInfo UnkSkol = panic "UnkSkol"
 pprSkolInfo RuntimeUnkSkol = panic "RuntimeUnkSkol"
 
 instance Outputable MetaDetails where
-  ppr Flexi 	    = ptext SLIT("Flexi")
+  ppr Flexi         = ptext SLIT("Flexi")
   ppr (Indirect ty) = ptext SLIT("Indirect") <+> ppr ty
 \end{code}
 
@@ -497,7 +496,7 @@ isTyConableTyVar, isSkolemTyVar, isExistentialTyVar,
   isBoxyTyVar, isMetaTyVar :: TcTyVar -> Bool 
 
 isTyConableTyVar tv	
-	-- True of a meta-type variable tha can be filled in 
+	-- True of a meta-type variable that can be filled in 
 	-- with a type constructor application; in particular,
 	-- not a SigTv
   = ASSERT( isTcTyVar tv) 
@@ -539,14 +538,14 @@ isSigTyVar tv
 
 metaTvRef :: TyVar -> IORef MetaDetails
 metaTvRef tv 
-  = ASSERT( isTcTyVar tv )
+  = ASSERT2( isTcTyVar tv, ppr tv )
     case tcTyVarDetails tv of
 	MetaTv _ ref -> ref
 	other	   -> pprPanic "metaTvRef" (ppr tv)
 
 isFlexi, isIndirect :: MetaDetails -> Bool
-isFlexi Flexi = True
-isFlexi other = False
+isFlexi Flexi 	  = True
+isFlexi other     = False
 
 isIndirect (Indirect _) = True
 isIndirect other        = False
@@ -595,10 +594,10 @@ isRigidTy :: TcType -> Bool
 -- A type is rigid if it has no meta type variables in it
 isRigidTy ty = all isImmutableTyVar (varSetElems (tcTyVarsOfType ty))
 
-isRefineableTy :: TcType -> Bool
+isRefineableTy :: TcType -> (Bool,Bool)
 -- A type should have type refinements applied to it if it has
 -- free type variables, and they are all rigid
-isRefineableTy ty = not (null tc_tvs) && all isImmutableTyVar tc_tvs
+isRefineableTy ty = (null tc_tvs,  all isImmutableTyVar tc_tvs)
 		    where
 		      tc_tvs = varSetElems (tcTyVarsOfType ty)
 
@@ -974,6 +973,15 @@ is_tc :: Unique -> Type -> Bool
 is_tc uniq ty = case tcSplitTyConApp_maybe ty of
 			Just (tc, _) -> uniq == getUnique tc
 			Nothing	     -> False
+\end{code}
+
+\begin{code}
+-- NB: Currently used in places where we have already expanded type synonyms;
+--     hence no 'coreView'.  This could, however, be changed without breaking
+--     any code.
+isOpenSynTyConApp :: TcTauType -> Bool
+isOpenSynTyConApp (TyConApp tc _) = isOpenSynTyCon tc
+isOpenSynTyConApp _other          = False
 \end{code}
 
 

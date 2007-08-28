@@ -20,8 +20,9 @@ module TyCon(
 	isFunTyCon, isUnLiftedTyCon, isProductTyCon, 
 	isAlgTyCon, isDataTyCon, 
 	isNewTyCon, unwrapNewTyCon_maybe, 
-	isSynTyCon, isClosedSynTyCon, 
+	isSynTyCon, isClosedSynTyCon, isOpenSynTyCon,
 	isPrimTyCon, 
+
 	isEnumerationTyCon, isGadtSyntaxTyCon, isOpenTyCon,
 	assocTyConArgPoss_maybe, isTyConAssoc, setTyConArgPoss,
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
@@ -681,6 +682,9 @@ isSynTyCon _		 = False
 --
 isClosedSynTyCon :: TyCon -> Bool
 isClosedSynTyCon tycon = isSynTyCon tycon && not (isOpenTyCon tycon)
+
+isOpenSynTyCon :: TyCon -> Bool
+isOpenSynTyCon tycon = isSynTyCon tycon && isOpenTyCon tycon
 
 isGadtSyntaxTyCon :: TyCon -> Bool
 isGadtSyntaxTyCon (AlgTyCon { algTcGadtSyntax = res }) = res

@@ -12,9 +12,10 @@ module DataCon (
 	dataConRepType, dataConSig, dataConFullSig,
 	dataConName, dataConIdentity, dataConTag, dataConTyCon, dataConUserType,
 	dataConUnivTyVars, dataConExTyVars, dataConAllTyVars, 
-	dataConEqSpec, eqSpecPreds, dataConTheta, dataConStupidTheta, 
+	dataConEqSpec, eqSpecPreds, dataConEqTheta, dataConDictTheta, dataConStupidTheta, 
 	dataConInstArgTys, dataConOrigArgTys, dataConOrigResTy,
-	dataConInstOrigArgTys, dataConRepArgTys, 
+	dataConInstOrigArgTys, dataConInstOrigDictsAndArgTys,
+	dataConRepArgTys, 
 	dataConFieldLabels, dataConFieldType,
 	dataConStrictMarks, dataConExStricts,
 	dataConSourceArity, dataConRepArity,
@@ -48,6 +49,7 @@ import Module
 
 import Data.Char
 import Data.Word
+import Data.List ( partition )
 \end{code}
 
 
@@ -224,11 +226,11 @@ data DataCon
 	--
 	-- 	*** As declared by the user
 	--  data T a where
-	--    MkT :: forall x y. (Ord x) => x -> y -> T (x,y)
+	--    MkT :: forall x y. (x~y,Ord x) => x -> y -> T (x,y)
 
 	-- 	*** As represented internally
 	--  data T a where
-	--    MkT :: forall a. forall x y. (a:=:(x,y), Ord x) => x -> y -> T a
+	--    MkT :: forall a. forall x y. (a:=:(x,y),x~y,Ord x) => x -> y -> T a
 	-- 
 	-- The next six fields express the type of the constructor, in pieces
 	-- e.g.
@@ -236,7 +238,8 @@ data DataCon
 	--	dcUnivTyVars  = [a]
 	--	dcExTyVars    = [x,y]
 	--	dcEqSpec      = [a:=:(x,y)]
-	--	dcTheta       = [Ord x]
+	--	dcEqTheta     = [x~y]	
+	--	dcDictTheta   = [Ord x]
 	--	dcOrigArgTys  = [a,List b]
 	--	dcRepTyCon       = T
 
@@ -244,7 +247,7 @@ data DataCon
 				--	    Its type is of form
 				--	        forall a1..an . t1 -> ... tm -> T a1..an
 				-- 	    No existentials, no coercions, nothing.
-				-- That is: dcExTyVars = dcEqSpec = dcTheta = []
+				-- That is: dcExTyVars = dcEqSpec = dcEqTheta = dcDictTheta = []
 		-- NB 1: newtypes always have a vanilla data con
 		-- NB 2: a vanilla constructor can still be declared in GADT-style 
 		--	 syntax, provided its type looks like the above.
@@ -272,11 +275,14 @@ data DataCon
 		-- Each equality is of the form (a :=: ty), where 'a' is one of 
 		-- the universally quantified type variables
 					
-	dcTheta  :: ThetaType,		-- The context of the constructor
+		-- The next two fields give the type context of the data constructor
+		-- 	(aside from the GADT constraints, 
+		--	 which are given by the dcExpSpec)
 		-- In GADT form, this is *exactly* what the programmer writes, even if
 		-- the context constrains only universally quantified variables
-		--	MkT :: forall a. Eq a => a -> T a
-		-- It may contain user-written equality predicates too
+		--	MkT :: forall a b. (a ~ b, Ord b) => a -> T a b
+	dcEqTheta   :: ThetaType,  -- The *equational* constraints
+	dcDictTheta :: ThetaType,  -- The *type-class and implicit-param* constraints
 
 	dcStupidTheta :: ThetaType,	-- The context of the data type declaration 
 					--	data Eq a => T a = ...
@@ -460,7 +466,7 @@ mkDataCon name declared_infix
 -- so the error is detected properly... it's just that asaertions here
 -- are a little dodgy.
 
-  = ASSERT( not (any isEqPred theta) )
+  = -- ASSERT( not (any isEqPred theta) )
 	-- We don't currently allow any equality predicates on
 	-- a data constructor (apart from the GADT ones in eq_spec)
     con
@@ -470,7 +476,8 @@ mkDataCon name declared_infix
 		  dcVanilla = is_vanilla, dcInfix = declared_infix,
 	  	  dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, 
 		  dcEqSpec = eq_spec, 
-		  dcStupidTheta = stupid_theta, dcTheta = theta,
+		  dcStupidTheta = stupid_theta, 
+		  dcEqTheta = eq_theta, dcDictTheta = dict_theta,
 		  dcOrigArgTys = orig_arg_tys, dcOrigResTy = orig_res_ty,
 		  dcRepTyCon = tycon, 
 		  dcRepArgTys = rep_arg_tys,
@@ -486,9 +493,10 @@ mkDataCon name declared_infix
 	-- The 'arg_stricts' passed to mkDataCon are simply those for the
 	-- source-language arguments.  We add extra ones for the
 	-- dictionary arguments right here.
-    dict_tys     = mkPredTys theta
-    real_arg_tys = dict_tys                      ++ orig_arg_tys
-    real_stricts = map mk_dict_strict_mark theta ++ arg_stricts
+    (eq_theta,dict_theta)  = partition isEqPred theta
+    dict_tys     	   = mkPredTys dict_theta
+    real_arg_tys 	   = dict_tys ++ orig_arg_tys
+    real_stricts 	   = map mk_dict_strict_mark dict_theta ++ arg_stricts
 
 	-- Example
 	--   data instance T (b,c) where 
@@ -497,6 +505,7 @@ mkDataCon name declared_infix
 	-- The representation tycon looks like this:
 	--   data :R7T b c where 
 	--	TI :: forall b1 c1. (b1 ~ c1) => b1 -> :R7T b1 c1
+	-- In this case orig_res_ty = T (e,e)
     orig_res_ty = mkFamilyTyConApp tycon (substTyVars (mkTopTvSubst eq_spec) univ_tvs)
 
 	-- Representation arguments and demands
@@ -506,6 +515,7 @@ mkDataCon name declared_infix
     tag = assoc "mkDataCon" (tyConDataCons tycon `zip` [fIRST_TAG..]) con
     ty  = mkForAllTys univ_tvs $ mkForAllTys ex_tvs $ 
 	  mkFunTys (mkPredTys (eqSpecPreds eq_spec)) $
+	  mkFunTys (mkPredTys eq_theta) $
 		-- NB:	the dict args are already in rep_arg_tys
 		--	because they might be flattened..
 		--	but the equality predicates are not
@@ -548,8 +558,11 @@ dataConAllTyVars (MkData { dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs })
 dataConEqSpec :: DataCon -> [(TyVar,Type)]
 dataConEqSpec = dcEqSpec
 
-dataConTheta :: DataCon -> ThetaType
-dataConTheta = dcTheta
+dataConEqTheta :: DataCon -> ThetaType
+dataConEqTheta = dcEqTheta
+
+dataConDictTheta :: DataCon -> ThetaType
+dataConDictTheta = dcDictTheta
 
 dataConWorkId :: DataCon -> Id
 dataConWorkId dc = case dcIds dc of
@@ -585,7 +598,7 @@ dataConStrictMarks = dcStrictMarks
 dataConExStricts :: DataCon -> [StrictnessMark]
 -- Strictness of *existential* arguments only
 -- Usually empty, so we don't bother to cache this
-dataConExStricts dc = map mk_dict_strict_mark (dcTheta dc)
+dataConExStricts dc = map mk_dict_strict_mark $ dcDictTheta dc
 
 dataConSourceArity :: DataCon -> Arity
 	-- Source-level arity of the data constructor
@@ -608,14 +621,14 @@ dataConRepStrictness dc = dcRepStrictness dc
 
 dataConSig :: DataCon -> ([TyVar], ThetaType, [Type], Type)
 dataConSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
-		    dcTheta  = theta, dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
-  = (univ_tvs ++ ex_tvs, eqSpecPreds eq_spec ++ theta, arg_tys, res_ty)
+		    dcEqTheta  = eq_theta, dcDictTheta = dict_theta, dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
+  = (univ_tvs ++ ex_tvs, eqSpecPreds eq_spec ++ eq_theta ++ dict_theta, arg_tys, res_ty)
 
 dataConFullSig :: DataCon 
-	       -> ([TyVar], [TyVar], [(TyVar,Type)], ThetaType, [Type], Type)
+	       -> ([TyVar], [TyVar], [(TyVar,Type)], ThetaType, ThetaType, [Type], Type)
 dataConFullSig (MkData {dcUnivTyVars = univ_tvs, dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
-			dcTheta  = theta, dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
-  = (univ_tvs, ex_tvs, eq_spec, theta, arg_tys, res_ty)
+			dcEqTheta = eq_theta, dcDictTheta = dict_theta, dcOrigArgTys = arg_tys, dcOrigResTy = res_ty})
+  = (univ_tvs, ex_tvs, eq_spec, eq_theta, dict_theta, arg_tys, res_ty)
 
 dataConOrigResTy :: DataCon -> Type
 dataConOrigResTy dc = dcOrigResTy dc
@@ -633,10 +646,11 @@ dataConUserType :: DataCon -> Type
 -- mentions the family tycon, not the internal one.
 dataConUserType  (MkData { dcUnivTyVars = univ_tvs, 
 			   dcExTyVars = ex_tvs, dcEqSpec = eq_spec,
-			   dcTheta = theta, dcOrigArgTys = arg_tys,
+			   dcEqTheta = eq_theta, dcDictTheta = dict_theta, dcOrigArgTys = arg_tys,
 			   dcOrigResTy = res_ty })
   = mkForAllTys ((univ_tvs `minusList` map fst eq_spec) ++ ex_tvs) $
-    mkFunTys (mkPredTys theta) $
+    mkFunTys (mkPredTys eq_theta) $
+    mkFunTys (mkPredTys dict_theta) $
     mkFunTys arg_tys $
     res_ty
 
@@ -669,6 +683,21 @@ dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
   = ASSERT2( length tyvars == length inst_tys
           , ptext SLIT("dataConInstOrigArgTys") <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
     map (substTyWith tyvars inst_tys) arg_tys
+  where
+    tyvars = univ_tvs ++ ex_tvs
+
+dataConInstOrigDictsAndArgTys 
+	:: DataCon	-- Works for any DataCon
+	-> [Type]	-- Includes existential tyvar args, but NOT
+			-- equality constraints or dicts
+	-> [Type]	-- Returns just the instsantiated dicts and *value* arguments
+dataConInstOrigDictsAndArgTys dc@(MkData {dcOrigArgTys = arg_tys,
+				  dcDictTheta = dicts,       
+			          dcUnivTyVars = univ_tvs, 
+			          dcExTyVars = ex_tvs}) inst_tys
+  = ASSERT2( length tyvars == length inst_tys
+          , ptext SLIT("dataConInstOrigDictsAndArgTys") <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
+    map (substTyWith tyvars inst_tys) (mkPredTys dicts ++ arg_tys)
   where
     tyvars = univ_tvs ++ ex_tvs
 \end{code}

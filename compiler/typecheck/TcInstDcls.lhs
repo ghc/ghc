@@ -29,6 +29,7 @@ import TcSimplify
 import Type
 import Coercion
 import TyCon
+import TypeRep
 import DataCon
 import Class
 import Var
@@ -257,7 +258,9 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
 	-- (This no longer includes the associated types.)
 	; dfun_name <- newDFunName clas inst_tys loc
 	; overlap_flag <- getOverlapFlag
-	; let dfun           = mkDictFunId dfun_name tyvars theta clas inst_tys
+	; let (eq_theta,dict_theta) = partition isEqPred theta
+              theta'         = eq_theta ++ dict_theta
+              dfun           = mkDictFunId dfun_name tyvars theta' clas inst_tys
 	      ispec          = mkLocalInstance dfun overlap_flag
 
 	; return ([InstInfo { iSpec  = ispec, 
@@ -603,20 +606,30 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
 
         -- Instantiate the super-class context with inst_tys
 	sc_theta' = substTheta (zipOpenTvSubst class_tyvars inst_tys') sc_theta
+	(eq_sc_theta',dict_sc_theta')     = partition isEqPred sc_theta'
 	origin	  = SigOrigin rigid_info
+	(eq_dfun_theta',dict_dfun_theta') = partition isEqPred dfun_theta'
     in
 	 -- Create dictionary Ids from the specified instance contexts.
     getInstLoc InstScOrigin				`thenM` \ sc_loc -> 
-    newDictBndrs sc_loc sc_theta'			`thenM` \ sc_dicts ->
+    newDictBndrs sc_loc dict_sc_theta'			`thenM` \ sc_dicts ->
     getInstLoc origin					`thenM` \ inst_loc -> 
-    newDictBndrs inst_loc dfun_theta'			`thenM` \ dfun_arg_dicts ->
+    mkMetaCoVars eq_sc_theta'				`thenM` \ sc_covars ->
+    mkEqInsts eq_sc_theta' (map mkWantedCo sc_covars)	`thenM`	\ wanted_sc_eqs ->
+    mkCoVars eq_dfun_theta'				`thenM` \ dfun_covars ->
+    mkEqInsts eq_dfun_theta' (map mkGivenCo $ mkTyVarTys dfun_covars)	`thenM`	\ dfun_eqs    ->
+    newDictBndrs inst_loc dict_dfun_theta'		`thenM` \ dfun_dicts ->
     newDictBndr inst_loc (mkClassPred clas inst_tys')   `thenM` \ this_dict ->
 		-- Default-method Ids may be mentioned in synthesised RHSs,
 		-- but they'll already be in the environment.
 
 	-- Typecheck the methods
     let		-- These insts are in scope; quite a few, eh?
-	avail_insts = [this_dict] ++ dfun_arg_dicts ++ sc_dicts
+	dfun_insts      = dfun_eqs ++ dfun_dicts
+	wanted_sc_insts = wanted_sc_eqs   ++ sc_dicts
+	given_sc_eqs    = map (updateEqInstCoercion (mkGivenCo . TyVarTy . fromWantedCo "tcInstDecl2") ) wanted_sc_eqs
+	given_sc_insts  = given_sc_eqs   ++ sc_dicts
+	avail_insts     = [this_dict] ++ dfun_insts ++ given_sc_insts
     in
     tcMethods origin clas inst_tyvars' 
 	      dfun_theta' inst_tys' avail_insts 
@@ -624,10 +637,10 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
 
 	-- Figure out bindings for the superclass context
 	-- Don't include this_dict in the 'givens', else
-	-- sc_dicts get bound by just selecting  from this_dict!!
+	-- wanted_sc_insts get bound by just selecting  from this_dict!!
     addErrCtxt superClassCtxt
 	(tcSimplifySuperClasses inst_loc
-			 dfun_arg_dicts sc_dicts)	`thenM` \ sc_binds ->
+			 dfun_insts wanted_sc_insts)	`thenM` \ sc_binds ->
 
 	-- It's possible that the superclass stuff might unified one
 	-- of the inst_tyavars' with something in the envt
@@ -641,8 +654,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
         dict_constr   = classDataCon clas
 	scs_and_meths = map instToId sc_dicts ++ meth_ids
 	this_dict_id  = instToId this_dict
-	inline_prag | null dfun_arg_dicts = []
-		    | otherwise	= [L loc (InlinePrag (Inline AlwaysActive True))]
+	inline_prag | null dfun_insts  = []
+		    | otherwise	       = [L loc (InlinePrag (Inline AlwaysActive True))]
 		-- Always inline the dfun; this is an experimental decision
 		-- because it makes a big performance difference sometimes.
 		-- Often it means we can do the method selection, and then
@@ -655,7 +668,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
 		--	See Note [Inline dfuns] below
 
 	dict_rhs
-	  = mkHsConApp dict_constr inst_tys' (map HsVar scs_and_meths)
+	  = mkHsConApp dict_constr (inst_tys' ++ mkTyVarTys sc_covars)  (map HsVar scs_and_meths)
 		-- We don't produce a binding for the dict_constr; instead we
 		-- rely on the simplifier to unfold this saturated application
 		-- We do this rather than generate an HsCon directly, because
@@ -667,14 +680,31 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
 	all_binds  = dict_bind `consBag` (sc_binds `unionBags` meth_binds)
 
 	main_bind = noLoc $ AbsBinds
-		 	    inst_tyvars'
-		 	    (map instToId dfun_arg_dicts)
-		 	    [(inst_tyvars', dfun_id, this_dict_id, 
-					    inline_prag ++ prags)] 
+		 	    (inst_tyvars' ++ dfun_covars)
+		 	    (map instToId dfun_dicts)
+		 	    [(inst_tyvars' ++ dfun_covars, dfun_id, this_dict_id, inline_prag ++ prags)] 
 		 	    all_binds
     in
     showLIE (text "instance") 		`thenM_`
     returnM (unitBag main_bind)
+
+mkCoVars :: [PredType] -> TcM [TyVar]
+mkCoVars [] = return []
+mkCoVars (pred:preds) = 
+	do { uniq <- newUnique
+	   ; let name = mkSysTvName uniq FSLIT("mkCoVars")
+	   ; let tv = mkCoVar name (PredTy pred)
+	   ; tvs <- mkCoVars preds
+	   ; return (tv:tvs)
+	   }
+
+mkMetaCoVars :: [PredType] -> TcM [TyVar]
+mkMetaCoVars [] = return []
+mkMetaCoVars (EqPred ty1 ty2:preds) = 
+	do { tv <- newMetaTyVar TauTv (mkCoKind ty1 ty2) 	  
+	   ; tvs <- mkMetaCoVars preds
+	   ; return (tv:tvs)
+	   }
 
 
 tcMethods origin clas inst_tyvars' dfun_theta' inst_tys' 

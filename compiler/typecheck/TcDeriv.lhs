@@ -47,8 +47,6 @@ import Util
 import ListSetOps
 import Outputable
 import Bag
-
-import Monad (unless)
 \end{code}
 
 %************************************************************************
@@ -443,24 +441,29 @@ baleOut err = addErrTc err >> returnM (Nothing, Nothing)
 \end{code}
 
 Auxiliary lookup wrapper which requires that looked up family instances are
-not type instances.
+not type instances.  If called with a vanilla tycon, the old type application
+is simply returned.
 
 \begin{code}
 tcLookupFamInstExact :: TyCon -> [Type] -> TcM (TyCon, [Type])
 tcLookupFamInstExact tycon tys
-  = do { result@(rep_tycon, rep_tys) <- tcLookupFamInst tycon tys
-       ; let { tvs		      = map (Type.getTyVar 
-                                               "TcDeriv.tcLookupFamInstExact") 
-					    rep_tys
-	     ; variable_only_subst = all Type.isTyVarTy rep_tys &&
-				     sizeVarSet (mkVarSet tvs) == length tvs
+  | not (isOpenTyCon tycon)
+  = return (tycon, tys)
+  | otherwise
+  = do { maybeFamInst <- tcLookupFamInst tycon tys
+       ; case maybeFamInst of
+           Nothing                     -> famInstNotFound tycon tys False
+           Just famInst@(_, rep_tys)
+             | not variable_only_subst -> famInstNotFound tycon tys True
+             | otherwise               -> return famInst
+             where
+               tvs		    = map (Type.getTyVar 
+                                             "TcDeriv.tcLookupFamInstExact") 
+					  rep_tys
+	       variable_only_subst  = all Type.isTyVarTy rep_tys &&
+				      sizeVarSet (mkVarSet tvs) == length tvs
 					-- renaming may have no repetitions
-             }
-       ; unless variable_only_subst $
-           famInstNotFound tycon tys [result]
-       ; return result
        }
-       
 \end{code}
 
 
@@ -1165,6 +1168,11 @@ badDerivedPred pred
   = vcat [ptext SLIT("Can't derive instances where the instance context mentions"),
 	  ptext SLIT("type variables that are not data type parameters"),
 	  nest 2 (ptext SLIT("Offending constraint:") <+> ppr pred)]
-\end{code}
 
- 
+famInstNotFound tycon tys notExact
+  = failWithTc (msg <+> quotes (pprTypeApp tycon (ppr tycon) tys))
+  where
+    msg = ptext $ if notExact
+		  then SLIT("No family instance exactly matching")
+		  else SLIT("More than one family instance for")
+\end{code}

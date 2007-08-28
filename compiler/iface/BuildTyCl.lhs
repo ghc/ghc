@@ -29,6 +29,9 @@ import TyCon
 import Type
 import Coercion
 
+import TcRnMonad
+import Outputable
+
 import Data.List
 \end{code}
 	
@@ -132,6 +135,7 @@ mkNewTyConRhs tycon_name tycon con
 		          = Just co_tycon
                 	  | otherwise              
                 	  = Nothing
+	; traceIf (text "mkNewTyConRhs" <+> ppr cocon_maybe)
 	; return (NewTyCon { data_con    = con, 
 		       	     nt_rhs      = rhs_ty,
 		       	     nt_etad_rhs = (etad_tvs, etad_rhs),
@@ -145,7 +149,9 @@ mkNewTyConRhs tycon_name tycon con
         -- non-recursive newtypes
     all_coercions = True
     tvs    = tyConTyVars tycon
-    rhs_ty = head (dataConInstOrigArgTys con (mkTyVarTys tvs))
+    rhs_ty = ASSERT(not (null (dataConInstOrigDictsAndArgTys con (mkTyVarTys tvs)))) 
+	     -- head (dataConInstOrigArgTys con (mkTyVarTys tvs))
+	     head (dataConInstOrigDictsAndArgTys con (mkTyVarTys tvs))
 	-- Instantiate the data con with the 
 	-- type variables from the tycon
 	-- NB: a newtype DataCon has no existentials; hence the
@@ -274,44 +280,48 @@ buildClass :: Name -> [TyVar] -> ThetaType
 	   -> TcRnIf m n Class
 
 buildClass class_name tvs sc_theta fds ats sig_stuff tc_isrec
-  = do	{ tycon_name <- newImplicitBinder class_name mkClassTyConOcc
+  = do	{ traceIf (text "buildClass")
+	; tycon_name <- newImplicitBinder class_name mkClassTyConOcc
 	; datacon_name <- newImplicitBinder class_name mkClassDataConOcc
 		-- The class name is the 'parent' for this datacon, not its tycon,
 		-- because one should import the class to get the binding for 
 		-- the datacon
+
+	; fixM (\ rec_clas -> do {	-- Only name generation inside loop
+
+	  let { rec_tycon  = classTyCon rec_clas
+	      ; op_tys	   = [ty | (_,_,ty) <- sig_stuff]
+	      ; op_items   = [ (mkDictSelId op_name rec_clas, dm_info)
+			     | (op_name, dm_info, _) <- sig_stuff ] }
+	  		-- Build the selector id and default method id
+
+	; dict_con <- buildDataCon datacon_name
+				   False 	-- Not declared infix
+				   (map (const NotMarkedStrict) op_tys)
+				   [{- No labelled fields -}]
+				   tvs [{- no existentials -}]
+                                   [{- No GADT equalities -}] sc_theta 
+                                   op_tys
+				   rec_tycon
+
 	; sc_sel_names <- mapM (newImplicitBinder class_name . mkSuperDictSelOcc) 
-				[1..length sc_theta]
-	      -- We number off the superclass selectors, 1, 2, 3 etc so that we 
+				[1..length (dataConDictTheta dict_con)]
+	      -- We number off the Dict superclass selectors, 1, 2, 3 etc so that we 
 	      -- can construct names for the selectors.  Thus
 	      --      class (C a, C b) => D a b where ...
 	      -- gives superclass selectors
 	      --      D_sc1, D_sc2
 	      -- (We used to call them D_C, but now we can have two different
 	      --  superclasses both called C!)
+        ; let sc_sel_ids = [mkDictSelId sc_name rec_clas | sc_name <- sc_sel_names]
 
-	; fixM (\ rec_clas -> do {	-- Only name generation inside loop
-
-	  let { rec_tycon 	   = classTyCon rec_clas
-	      ; op_tys		   = [ty | (_,_,ty) <- sig_stuff]
-	      ; sc_tys		   = mkPredTys sc_theta
-	      ;	dict_component_tys = sc_tys ++ op_tys
-	      ; sc_sel_ids	   = [mkDictSelId sc_name rec_clas | sc_name <- sc_sel_names]
-	      ; op_items = [ (mkDictSelId op_name rec_clas, dm_info)
-			   | (op_name, dm_info, _) <- sig_stuff ] }
-	  		-- Build the selector id and default method id
-
-	; dict_con <- buildDataCon datacon_name
-				   False 	-- Not declared infix
-				   (map (const NotMarkedStrict) dict_component_tys)
-				   [{- No labelled fields -}]
-				   tvs [{- no existentials -}]
-                                   [{- No equalities -}] [{-No context-}] 
-                                   dict_component_tys 
-				   rec_tycon
-
-	; rhs <- case dict_component_tys of
-			    [rep_ty] -> mkNewTyConRhs tycon_name rec_tycon dict_con
-			    other    -> return (mkDataTyConRhs [dict_con])
+		-- Use a newtype if the class constructor has exactly one field:
+		-- i.e. exactly one operation or superclass taken together
+		-- Watch out: the sc_theta includes equality predicates,
+		-- 	      which don't count for this purpose; hence dataConDictTheta
+	; rhs <- if ((length $ dataConDictTheta dict_con) + length sig_stuff) == 1
+		 then mkNewTyConRhs tycon_name rec_tycon dict_con
+		 else return (mkDataTyConRhs [dict_con])
 
 	; let {	clas_kind = mkArrowKinds (map tyVarKind tvs) liftedTypeKind
 
@@ -326,10 +336,13 @@ buildClass class_name tvs sc_theta fds ats sig_stuff tc_isrec
 		-- newtype like a synonym, but that will lead to an infinite
 		-- type]
 	      ; atTyCons = [tycon | ATyCon tycon <- ats]
+
+	      ; result = mkClass class_name tvs fds 
+			         sc_theta sc_sel_ids atTyCons
+				 op_items tycon
 	      }
-	; return (mkClass class_name tvs fds 
-		       sc_theta sc_sel_ids atTyCons op_items
-		       tycon)
+	; traceIf (text "buildClass" <+> ppr tycon) 
+	; return result
 	})}
 \end{code}
 

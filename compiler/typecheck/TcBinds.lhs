@@ -30,6 +30,7 @@ import TcPat
 import TcMType
 import TcType
 import {- Kind parts of -} Type
+import Coercion
 import VarEnv
 import TysPrim
 import Id
@@ -241,7 +242,7 @@ tc_haskell98 top_lvl sig_fn prag_fn rec_flag binds thing_inside
 bindLocalInsts :: TopLevelFlag -> TcM ([LHsBinds TcId], [TcId], a) -> TcM ([LHsBinds TcId], a)
 bindLocalInsts top_lvl thing_inside
   | isTopLevel top_lvl = do { (binds, ids, thing) <- thing_inside; return (binds, thing) }
-  	-- For the top level don't bother will all this bindInstsOfLocalFuns stuff. 
+  	-- For the top level don't bother with all this bindInstsOfLocalFuns stuff. 
 	-- All the top level things are rec'd together anyway, so it's fine to
 	-- leave them to the tcSimplifyTop, and quite a bit faster too
 
@@ -769,7 +770,17 @@ unifyCtxts (sig1 : sigs) 	-- Argument is always non-empty
     unify_ctxt sig@(TcSigInfo { sig_theta = theta })
 	= setSrcSpan (instLocSpan (sig_loc sig)) 	$
 	  addErrCtxt (sigContextsCtxt sig1 sig)		$
-	  unifyTheta theta1 theta
+	  do { cois <- unifyTheta theta1 theta
+	     ; -- Check whether all coercions are identity coercions
+	       -- That can happen if we have, say
+	       -- 	  f :: C [a]   => ...
+	       -- 	  g :: C (F a) => ...
+	       -- where F is a type function and (F a ~ [a])
+	       -- Then unification might succeed with a coercion.  But it's much
+	       -- much simpler to require that such signatures have identical contexts
+	       checkTc (all isIdentityCoercion cois)
+		       (ptext SLIT("Mutually dependent functions have syntactically distinct contexts"))
+	     }
 
 checkSigsTyVars :: [TcTyVar] -> [TcSigInfo] -> TcM [TcTyVar]
 checkSigsTyVars qtvs sigs 

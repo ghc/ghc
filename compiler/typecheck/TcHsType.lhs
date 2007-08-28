@@ -417,10 +417,11 @@ kc_pred pred@(HsClassP cls tys)
        }
 kc_pred pred@(HsEqualP ty1 ty2)
   = do { (ty1', kind1) <- kcHsType ty1
-       ; checkExpectedKind ty1 kind1 liftedTypeKind
+--       ; checkExpectedKind ty1 kind1 liftedTypeKind
        ; (ty2', kind2) <- kcHsType ty2
-       ; checkExpectedKind ty2 kind2 liftedTypeKind
-       ; returnM (HsEqualP ty1 ty2, liftedTypeKind)
+--       ; checkExpectedKind ty2 kind2 liftedTypeKind
+       ; checkExpectedKind ty2 kind2 kind1
+       ; returnM (HsEqualP ty1' ty2', liftedTypeKind)
        }
 
 ---------------------------

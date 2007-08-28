@@ -100,7 +100,7 @@ mkHsDictLet binds expr
 			    val_binds = ValBindsOut [(Recursive, binds)] []
 
 mkHsConApp :: DataCon -> [Type] -> [HsExpr Id] -> LHsExpr Id
--- Used for constructing dictinoary terms etc, so no locations 
+-- Used for constructing dictionary terms etc, so no locations 
 mkHsConApp data_con tys args 
   = foldl mk_app (nlHsTyApp (dataConWrapId data_con) tys) args
   where

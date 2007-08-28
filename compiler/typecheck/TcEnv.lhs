@@ -44,9 +44,6 @@ module TcEnv(
 
 	-- New Ids
 	newLocalName, newDFunName, newFamInstTyConName,
-
-        -- Errors
-        famInstNotFound
   ) where
 
 #include "HsVersions.h"
@@ -58,6 +55,7 @@ import TcRnMonad
 import TcMType
 import TcType
 import TcGadt
+-- import TcSuspension
 import qualified Type
 import Var
 import VarSet
@@ -67,6 +65,8 @@ import InstEnv
 import FamInstEnv
 import DataCon
 import TyCon
+import TypeRep
+import Coercion
 import Class
 import Name
 import PrelNames
@@ -75,6 +75,7 @@ import OccName
 import HscTypes
 import SrcLoc
 import Outputable
+import Maybes
 \end{code}
 
 
@@ -162,7 +163,7 @@ tcLookupLocatedClass = addLocM tcLookupClass
 tcLookupLocatedTyCon :: Located Name -> TcM TyCon
 tcLookupLocatedTyCon = addLocM tcLookupTyCon
 
--- Look up the representation tycon of a family instance.
+-- Look up the instance tycon of a family instance.
 --
 -- The match must be unique - ie, match exactly one instance - but the 
 -- type arguments used for matching may be more specific than those of 
@@ -178,17 +179,18 @@ tcLookupLocatedTyCon = addLocM tcLookupTyCon
 --
 -- which implies that :R42T was declared as 'data instance T [a]'.
 --
-tcLookupFamInst :: TyCon -> [Type] -> TcM (TyCon, [Type])
+tcLookupFamInst :: TyCon -> [Type] -> TcM (Maybe (TyCon, [Type]))
 tcLookupFamInst tycon tys
   | not (isOpenTyCon tycon)
-  = return (tycon, tys)
+  = return Nothing
   | otherwise
   = do { env <- getGblEnv
        ; eps <- getEps
        ; let instEnv = (eps_fam_inst_env eps, tcg_fam_inst_env env)
        ; case lookupFamInstEnv instEnv tycon tys of
-	   [(fam_inst, rep_tys)] -> return (famInstTyCon fam_inst, rep_tys)
-	   other                 -> famInstNotFound tycon tys other
+	   [(fam_inst, rep_tys)] -> return $ Just (famInstTyCon fam_inst, 
+                                                   rep_tys)
+	   other                 -> return Nothing
        }
 \end{code}
 
@@ -378,9 +380,10 @@ tc_extend_local_id_env env th_lvl names_w_ids thing_inside
     extra_env	    = [ (name, ATcId { tct_id = id, 
     				       tct_level = th_lvl,
     				       tct_type = id_ty, 
-    				       tct_co = if isRefineableTy id_ty 
-    						then Just idHsWrapper
-    						else Nothing })
+    				       tct_co = case isRefineableTy id_ty of
+						  (True,_) -> Unrefineable
+						  (_,True) -> Rigid idHsWrapper
+						  _        -> Wobbly})
     		      | (name,id) <- names_w_ids, let id_ty = idType id]
     le'		    = extendNameEnvList (tcl_env env) extra_env
     rdr_env'	    = extendLocalRdrEnv (tcl_rdr env) [name | (name,_) <- names_w_ids]
@@ -445,20 +448,30 @@ find_thing _ _ thing = pprPanic "find_thing" (ppr thing)
 \end{code}
 
 \begin{code}
-refineEnvironment :: Refinement -> TcM a -> TcM a
+refineEnvironment 
+	:: Refinement 
+	-> Bool			-- whether type equations are involved
+	-> TcM a 
+	-> TcM a
 -- I don't think I have to refine the set of global type variables in scope
 -- Reason: the refinement never increases that set
-refineEnvironment reft thing_inside
-  | isEmptyRefinement reft		-- Common case
+refineEnvironment reft otherEquations thing_inside
+  | isEmptyRefinement reft 	-- Common case
+  , not otherEquations
   = thing_inside
   | otherwise
   = do	{ env <- getLclEnv
 	; let le' = mapNameEnv refine (tcl_env env)
  	; setLclEnv (env {tcl_env = le'}) thing_inside }
   where
-    refine elt@(ATcId { tct_co = Just co, tct_type = ty })
+    refine elt@(ATcId { tct_co = Rigid co, tct_type = ty })
 	| Just (co', ty') <- refineType reft ty
-	= elt { tct_co = Just (WpCo co' <.> co), tct_type = ty' }
+	= elt { tct_co = Rigid (WpCo co' <.> co), tct_type = ty' }
+    refine elt@(ATcId { tct_co = Wobbly})
+-- Main new idea: make wobbly things invisible whenever there 
+--		  is a refinement of any sort
+--	| otherEquations
+	= elt { tct_co = WobblyInvisible}
     refine (ATyVar tv ty) 
 	| Just (_, ty') <- refineType reft ty
 	= ATyVar tv ty'	-- Ignore the coercion that refineType returns
@@ -705,11 +718,4 @@ notFound name
 wrongThingErr expected thing name
   = failWithTc (pprTcTyThingCategory thing <+> quotes (ppr name) <+> 
 		ptext SLIT("used as a") <+> text expected)
-
-famInstNotFound tycon tys what
-  = failWithTc (msg <+> quotes (pprTypeApp tycon (ppr tycon) tys))
-  where
-    msg = ptext $ if length what > 1 
-		  then SLIT("More than one family instance for")
-		  else SLIT("No family instance exactly matching")
 \end{code}

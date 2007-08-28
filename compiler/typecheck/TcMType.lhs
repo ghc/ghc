@@ -53,7 +53,6 @@ module TcMType (
   zonkTcKindToKind, zonkTcKind, zonkTopTyVar,
 
   readKindVar, writeKindVar
-
   ) where
 
 #include "HsVersions.h"
@@ -199,7 +198,7 @@ newMetaTyVar :: BoxInfo -> Kind -> TcM TcTyVar
 -- Make a new meta tyvar out of thin air
 newMetaTyVar box_info kind
   = do	{ uniq <- newUnique
- 	; ref <- newMutVar Flexi ;
+ 	; ref <- newMutVar Flexi
 	; let name = mkSysTvName uniq fs 
 	      fs = case box_info of
 			BoxTv   -> FSLIT("t")
@@ -216,7 +215,7 @@ instMetaTyVar :: BoxInfo -> TyVar -> TcM TcTyVar
 -- come from an existing TyVar
 instMetaTyVar box_info tyvar
   = do	{ uniq <- newUnique
- 	; ref <- newMutVar Flexi ;
+ 	; ref <- newMutVar Flexi
 	; let name = setNameUnique (tyVarName tyvar) uniq
 	      kind = tyVarKind tyvar
 	; return (mkTcTyVar name kind (MetaTv box_info ref)) }
@@ -236,7 +235,8 @@ writeMetaTyVar tyvar ty
 
   | otherwise
   = ASSERT( isMetaTyVar tyvar )
-    ASSERT2( k2 `isSubKind` k1, (ppr tyvar <+> ppr k1) $$ (ppr ty <+> ppr k2) )
+    -- TOM: It should also work for coercions
+    -- ASSERT2( k2 `isSubKind` k1, (ppr tyvar <+> ppr k1) $$ (ppr ty <+> ppr k2) )
     do	{ ASSERTM2( do { details <- readMetaTyVar tyvar; return (isFlexi details) }, ppr tyvar )
 	; writeMutVar (metaTvRef tyvar) (Indirect ty) }
   where
@@ -331,7 +331,7 @@ readFilledBox :: BoxyTyVar -> TcM TcType
 readFilledBox box_tv = ASSERT( isBoxyTyVar box_tv )
 		       do { cts <- readMetaTyVar box_tv
 		 	  ; case cts of
-				Flexi 	    -> pprPanic "readFilledBox" (ppr box_tv)
+				Flexi -> pprPanic "readFilledBox" (ppr box_tv)
 				Indirect ty -> return ty }
 
 tcInstBoxyTyVar :: TyVar -> TcM BoxyTyVar
@@ -365,7 +365,7 @@ lookupTcTyVar tyvar
       MetaTv _ ref -> do { meta_details <- readMutVar ref
 			 ; case meta_details of
 			    Indirect ty -> return (IndirectTv ty)
-			    Flexi       -> return (DoneTv details) }
+			    Flexi -> return (DoneTv details) }
   where
     details =  tcTyVarDetails tyvar
 

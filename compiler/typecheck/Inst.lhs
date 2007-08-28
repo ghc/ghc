@@ -29,20 +29,29 @@ module Inst (
 	lookupSimpleInst, LookupInstResult(..), 
 	tcExtendLocalInstEnv, tcGetInstEnvs, getOverlapFlag,
 
+	isAbstractableInst, isEqInst,
 	isDict, isClassDict, isMethod, isImplicInst,
 	isIPDict, isInheritableInst, isMethodOrLit,
 	isTyVarDict, isMethodFor, 
 
 	zonkInst, zonkInsts,
-	instToId, instToVar, instName,
+	instToId, instToVar, instType, instName,
 
-	InstOrigin(..), InstLoc, pprInstLoc
+	InstOrigin(..), InstLoc, pprInstLoc,
+
+	mkWantedCo, mkGivenCo,
+	fromWantedCo, fromGivenCo,
+	eitherEqInst, mkEqInst, mkEqInsts,
+	finalizeEqInst, writeWantedCoercion,
+	eqInstType, updateEqInstCoercion,
+	eqInstCoercion,
+	eqInstLeftTy, eqInstRightTy
     ) where
 
 #include "HsVersions.h"
 
 import {-# SOURCE #-}	TcExpr( tcPolyExpr )
-import {-# SOURCE #-}	TcUnify( unifyType )
+import {-# SOURCE #-}	TcUnify( boxyUnify, unifyType )
 
 import FastString(FastString)
 import HsSyn
@@ -54,6 +63,8 @@ import FunDeps
 import TcMType
 import TcType
 import Type
+import TypeRep
+import Class
 import Unify
 import Module
 import Coercion
@@ -76,8 +87,9 @@ import DynFlags
 import Maybes
 import Util
 import Outputable
-
 import Data.List
+import TypeRep
+import Class
 \end{code}
 
 
@@ -85,10 +97,12 @@ Selection
 ~~~~~~~~~
 \begin{code}
 instName :: Inst -> Name
+instName (EqInst {tci_name = name}) = name
 instName inst = Var.varName (instToVar inst)
 
 instToId :: Inst -> TcId
-instToId inst = ASSERT2( isId id, ppr inst ) id 
+instToId inst = WARN( not (isId id), ppr inst ) 
+	      id 
 	      where
 		id = instToVar inst
 
@@ -103,25 +117,33 @@ instToVar (Dict {tci_name = nm, tci_pred = pred})
 instToVar (ImplicInst {tci_name = nm, tci_tyvars = tvs, tci_given = givens,
 		       tci_wanted = wanteds})
   = mkLocalId nm (mkImplicTy tvs givens wanteds)
+instToVar i@(EqInst {})
+  = eitherEqInst i id (\(TyVarTy covar) -> covar)
 
 instType :: Inst -> Type
-instType (LitInst {tci_ty = ty}) = ty
-instType (Method {tci_id = id}) = idType id
+instType (LitInst {tci_ty = ty})  = ty
+instType (Method {tci_id = id})   = idType id
 instType (Dict {tci_pred = pred}) = mkPredTy pred
 instType imp@(ImplicInst {})      = mkImplicTy (tci_tyvars imp) (tci_given imp)	
 					       (tci_wanted imp)
+-- instType i@(EqInst {tci_co = co}) = eitherEqInst i TyVarTy id
+instType (EqInst {tci_left = ty1, tci_right = ty2}) = mkPredTy (EqPred ty1 ty2)
 
 mkImplicTy tvs givens wanteds	-- The type of an implication constraint
   = ASSERT( all isDict givens )
     -- pprTrace "mkImplicTy" (ppr givens) $
-    mkForAllTys tvs $ 
-    mkPhiTy (map dictPred givens) $
-    if isSingleton wanteds then
-	instType (head wanteds) 
-    else
-	mkTupleTy Boxed (length wanteds) (map instType wanteds)
+    -- See [Equational Constraints in Implication Constraints]
+    let dict_wanteds = filter (not . isEqInst) wanteds
+    in 
+      mkForAllTys tvs $ 
+      mkPhiTy (map dictPred givens) $
+      if isSingleton dict_wanteds then
+  	instType (head dict_wanteds) 
+      else
+  	mkTupleTy Boxed (length dict_wanteds) (map instType dict_wanteds)
 
 dictPred (Dict {tci_pred = pred}) = pred
+dictPred (EqInst {tci_left=ty1,tci_right=ty2}) = EqPred ty1 ty2
 dictPred inst		          = pprPanic "dictPred" (ppr inst)
 
 getDictClassTys (Dict {tci_pred = pred}) = getClassPredTys pred
@@ -138,6 +160,7 @@ fdPredsOfInst (Method {tci_theta = theta})   = theta
 fdPredsOfInst (ImplicInst {tci_given = gs, 
 			   tci_wanted = ws}) = fdPredsOfInsts (gs ++ ws)
 fdPredsOfInst (LitInst {})		     = []
+fdPredsOfInst (EqInst {})		     = []
 
 fdPredsOfInsts :: [Inst] -> [PredType]
 fdPredsOfInsts insts = concatMap fdPredsOfInst insts
@@ -171,6 +194,7 @@ tyVarsOfInst (ImplicInst {tci_tyvars = tvs, tci_given = givens, tci_wanted = wan
     `minusVarSet` mkVarSet tvs
     `unionVarSet` unionVarSets (map varTypeTyVars tvs)
 		-- Remember the free tyvars of a coercion
+tyVarsOfInst (EqInst {tci_left = ty1, tci_right = ty2}) = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
 
 tyVarsOfInsts insts = foldr (unionVarSet . tyVarsOfInst) emptyVarSet insts
 tyVarsOfLIE   lie   = tyVarsOfInsts (lieToList lie)
@@ -179,6 +203,14 @@ tyVarsOfLIE   lie   = tyVarsOfInsts (lieToList lie)
 Predicates
 ~~~~~~~~~~
 \begin{code}
+
+isAbstractableInst :: Inst -> Bool
+isAbstractableInst inst = isDict inst || isEqInst inst
+
+isEqInst :: Inst -> Bool
+isEqInst (EqInst {}) = True
+isEqInst other       = False
+
 isDict :: Inst -> Bool
 isDict (Dict {}) = True
 isDict other	 = False
@@ -233,6 +265,15 @@ newDictBndrs :: InstLoc -> TcThetaType -> TcM [Inst]
 newDictBndrs inst_loc theta = mapM (newDictBndr inst_loc) theta
 
 newDictBndr :: InstLoc -> TcPredType -> TcM Inst
+newDictBndr inst_loc pred@(EqPred ty1 ty2)
+  = do { uniq <- newUnique 
+	; let name = mkPredName uniq inst_loc pred 
+	; return (EqInst {tci_name  = name, 
+			  tci_loc   = inst_loc, 
+			  tci_left  = ty1, 
+			  tci_right = ty2, 
+			  tci_co    = mkGivenCo $ TyVarTy (Var.mkCoVar name (PredTy pred))})
+       }
 newDictBndr inst_loc pred
   = do 	{ uniq <- newUnique 
 	; let name = mkPredName uniq inst_loc pred 
@@ -244,12 +285,11 @@ instCall :: InstOrigin -> [TcType] -> TcThetaType -> TcM HsWrapper
 --	(instCall o tys theta)
 -- (a) Makes fresh dictionaries as necessary for the constraints (theta)
 -- (b) Throws these dictionaries into the LIE
--- (c) Eeturns an HsWrapper ([.] tys dicts)
+-- (c) Returns an HsWrapper ([.] tys dicts)
 
 instCall orig tys theta 
   = do	{ loc <- getInstLoc orig
-	; (dicts, dict_app) <- instCallDicts loc theta
-	; extendLIEs dicts
+	; dict_app <- instCallDicts loc theta
 	; return (dict_app <.> mkWpTyApps tys) }
 
 ----------------
@@ -258,35 +298,47 @@ instStupidTheta :: InstOrigin -> TcThetaType -> TcM ()
 -- Used exclusively for the 'stupid theta' of a data constructor
 instStupidTheta orig theta
   = do	{ loc <- getInstLoc orig
-	; (dicts, _) <- instCallDicts loc theta
-	; extendLIEs dicts }
+	; _co <- instCallDicts loc theta	-- Discard the coercion
+	; return () }
 
 ----------------
-instCallDicts :: InstLoc -> TcThetaType -> TcM ([Inst], HsWrapper)
+instCallDicts :: InstLoc -> TcThetaType -> TcM HsWrapper
+-- Instantiates the TcTheta, puts all constraints thereby generated
+-- into the LIE, and returns a HsWrapper to enclose the call site.
 -- This is the key place where equality predicates 
 -- are unleashed into the world
-instCallDicts loc [] = return ([], idHsWrapper)
+instCallDicts loc [] = return idHsWrapper
+
+-- instCallDicts loc (EqPred ty1 ty2 : preds)
+--   = do  { unifyType ty1 ty2	-- For now, we insist that they unify right away 
+-- 				-- Later on, when we do associated types, 
+-- 				-- unifyType :: Type -> Type -> TcM ([Inst], Coercion)
+-- 	; (dicts, co_fn) <- instCallDicts loc preds
+-- 	; return (dicts, co_fn <.> WpTyApp ty1) }
+-- 	-- We use type application to apply the function to the 
+-- 	-- coercion; here ty1 *is* the appropriate identity coercion
 
 instCallDicts loc (EqPred ty1 ty2 : preds)
-  = do  { unifyType ty1 ty2	-- For now, we insist that they unify right away 
-				-- Later on, when we do associated types, 
-				-- unifyType :: Type -> Type -> TcM ([Inst], Coercion)
-	; (dicts, co_fn) <- instCallDicts loc preds
-	; return (dicts, co_fn <.> WpTyApp ty1) }
-	-- We use type application to apply the function to the 
-	-- coercion; here ty1 *is* the appropriate identity coercion
+  = do  { traceTc (text "instCallDicts" <+> ppr (EqPred ty1 ty2))
+	; coi <- boxyUnify ty1 ty2
+--	; coi <- unifyType ty1 ty2
+	; let co = fromCoI coi ty1
+	; co_fn <- instCallDicts loc preds
+	; return (co_fn <.> WpTyApp co) }
 
 instCallDicts loc (pred : preds)
   = do	{ uniq <- newUnique
 	; let name = mkPredName uniq loc pred 
 	      dict = Dict {tci_name = name, tci_pred = pred, tci_loc = loc}
-	; (dicts, co_fn) <- instCallDicts loc preds
-	; return (dict:dicts, co_fn <.> WpApp (instToId dict)) }
+	; extendLIE dict
+	; co_fn <- instCallDicts loc preds
+	; return (co_fn <.> WpApp (instToId dict)) }
 
 -------------
 cloneDict :: Inst -> TcM Inst
 cloneDict dict@(Dict nm ty loc) = do { uniq <- newUnique
 				     ; return (dict {tci_name = setNameUnique nm uniq}) }
+cloneDict eq@(EqInst {})	= return eq
 cloneDict other = pprPanic "cloneDict" (ppr other)
 
 -- For vanilla implicit parameters, there is only one in scope
@@ -483,6 +535,15 @@ zonkInst implic@(ImplicInst {})
 	; wanteds' <- zonkInsts (tci_wanted implic)
 	; return (implic {tci_given = givens',tci_wanted = wanteds'}) }
 
+zonkInst eqinst@(EqInst {tci_left = ty1, tci_right = ty2})
+  = do { co' <- eitherEqInst eqinst 
+			(\covar -> return (mkWantedCo covar)) 
+			(\co    -> zonkTcType co >>= \coercion -> return (mkGivenCo coercion))
+       ; ty1' <- zonkTcType ty1
+       ; ty2' <- zonkTcType ty2
+       ; return (eqinst {tci_co = co',tci_left=ty1',tci_right=ty2})
+       }
+
 zonkInsts insts = mappM zonkInst insts
 \end{code}
 
@@ -518,6 +579,10 @@ pprInsts insts = brackets (interpp'SP insts)
 
 pprInst, pprInstInFull :: Inst -> SDoc
 -- Debugging: print the evidence :: type
+pprInst i@(EqInst {tci_left = ty1, tci_right = ty2, tci_co = co}) 
+	= eitherEqInst i
+		(\covar -> text "Wanted" <+> ppr (TyVarTy covar) <+> dcolon <+> ppr (EqPred ty1 ty2))
+		(\co    -> text "Given"  <+> ppr co              <+> dcolon <+> ppr (EqPred ty1 ty2))
 pprInst inst = ppr (instName inst) <+> dcolon 
 		<+> (braces (ppr (instType inst)) $$
 		     ifPprDebug implic_stuff)
@@ -525,9 +590,15 @@ pprInst inst = ppr (instName inst) <+> dcolon
     implic_stuff | isImplicInst inst = ppr (tci_reft inst)
 		 | otherwise	     = empty
 
+pprInstInFull inst@(EqInst {}) = pprInst inst
 pprInstInFull inst = sep [quotes (pprInst inst), nest 2 (pprInstArising inst)]
 
 tidyInst :: TidyEnv -> Inst -> Inst
+tidyInst env eq@(EqInst {tci_left = lty, tci_right = rty, tci_co = co}) =
+  eq { tci_left  = tidyType env lty
+     , tci_right = tidyType env rty
+     , tci_co    = either Left (Right . tidyType env) co
+     }
 tidyInst env lit@(LitInst {tci_ty = ty})   = lit {tci_ty = tidyType env ty}
 tidyInst env dict@(Dict {tci_pred = pred}) = dict {tci_pred = tidyPred env pred}
 tidyInst env meth@(Method {tci_tys = tys}) = meth {tci_tys = tidyTypes env tys}
@@ -667,12 +738,14 @@ lookupSimpleInst :: Inst -> TcM LookupInstResult
 -- the LIE.  Instead, any Insts needed by the lookup are returned in
 -- the LookupInstResult, where they can be further processed by tcSimplify
 
+lookupSimpleInst (EqInst {}) = return NoInstance
+
 --------------------- Implications ------------------------
 lookupSimpleInst (ImplicInst {}) = return NoInstance
 
 --------------------- Methods ------------------------
 lookupSimpleInst (Method {tci_oid = id, tci_tys = tys, tci_theta = theta, tci_loc = loc})
-  = do	{ (dicts, dict_app) <- instCallDicts loc theta
+  = do	{ (dict_app, dicts) <- getLIE $ instCallDicts loc theta
 	; let co_fn = dict_app <.> mkWpTyApps tys
 	; return (GenInst dicts (L span $ HsWrap co_fn (HsVar id))) }
   where
@@ -748,7 +821,7 @@ lookupSimpleInst (Dict {tci_pred = pred, tci_loc = loc})
     ; if null theta then
     	returnM (GenInst [] (L src_loc $ HsWrap (mkWpTyApps tys) dfun))
       else do
-    { (dicts, dict_app) <- instCallDicts loc theta
+    { (dict_app, dicts) <- getLIE $ instCallDicts loc theta -- !!!
     ; let co_fn = dict_app <.> mkWpTyApps tys
     ; returnM (GenInst dicts (L src_loc $ HsWrap co_fn dfun))
     }}}}
@@ -876,4 +949,88 @@ syntaxNameCtxt name orig ty tidy_env
 		    nest 2 (ptext SLIT("arising from") <+> pprInstLoc inst_loc)]
     in
     returnM (tidy_env, msg)
+\end{code}
+
+%************************************************************************
+%*									*
+		EqInsts
+%*									*
+%************************************************************************
+
+\begin{code}
+mkGivenCo   :: Coercion -> Either TcTyVar Coercion
+mkGivenCo   =  Right
+
+mkWantedCo  :: TcTyVar  -> Either TcTyVar Coercion
+mkWantedCo  =  Left
+
+fromGivenCo :: Either TcTyVar Coercion -> Coercion
+fromGivenCo (Right co) 	 = co
+fromGivenCo _		 = panic "fromGivenCo: not a wanted coercion"
+
+fromWantedCo :: String -> Either TcTyVar Coercion -> TcTyVar
+fromWantedCo _ (Left covar) = covar
+fromWantedCo msg _	    = panic ("fromWantedCo: not a wanted coercion: " ++ msg)
+
+eitherEqInst 
+	:: Inst 		-- given or wanted EqInst
+	-> (TcTyVar  -> a) 	-- 	result if wanted
+	-> (Coercion -> a) 	--	result if given
+	-> a		
+eitherEqInst (EqInst {tci_co = either_co}) withWanted withGiven
+	= case either_co of
+		Left  covar -> withWanted covar
+		Right co    -> withGiven  co
+
+mkEqInsts :: [PredType] -> [Either TcTyVar Coercion] -> TcM [Inst]
+mkEqInsts preds cos = zipWithM mkEqInst preds cos
+
+mkEqInst :: PredType -> Either TcTyVar Coercion -> TcM Inst
+mkEqInst (EqPred ty1 ty2) co
+	= do { uniq <- newUnique
+	     ; src_span <- getSrcSpanM
+	     ; err_ctxt <- getErrCtxt
+	     ; let loc  = InstLoc EqOrigin src_span err_ctxt
+	           name = mkName uniq src_span
+	           inst = EqInst {tci_left = ty1, tci_right = ty2, tci_co = co, tci_loc = loc, tci_name = name} 
+	     ; return inst
+	     }
+	where mkName uniq src_span = mkInternalName uniq (mkVarOcc "co") src_span
+
+-- type inference:
+--	We want to promote the wanted EqInst to a given EqInst
+--	in the signature context.
+--	This means we have to give the coercion a name
+--	and fill it in as its own name.
+finalizeEqInst 
+	:: Inst			-- wanted
+	-> TcM Inst		-- given
+finalizeEqInst wanted@(EqInst {tci_left = ty1, tci_right = ty2, tci_name = name})
+  	= do { let var = Var.mkCoVar name (PredTy $ EqPred ty1 ty2)
+       	     ; writeWantedCoercion wanted (TyVarTy var)
+	     ; let given = wanted { tci_co = mkGivenCo $ TyVarTy var }
+	     ; return given
+             }
+
+writeWantedCoercion 
+	:: Inst 	-- wanted EqInst
+	-> Coercion 	-- coercion to fill the hole with
+	-> TcM ()	
+writeWantedCoercion wanted co
+  	= do { let cotv = fromWantedCo "writeWantedCoercion" $ tci_co wanted
+	     ; writeMetaTyVar cotv co
+	     }
+
+eqInstType :: Inst -> TcType
+eqInstType inst = eitherEqInst inst mkTyVarTy id
+
+eqInstCoercion :: Inst -> Either TcTyVar Coercion
+eqInstCoercion = tci_co
+
+eqInstLeftTy, eqInstRightTy :: Inst -> TcType
+eqInstLeftTy  = tci_left
+eqInstRightTy = tci_right
+
+updateEqInstCoercion :: (Either TcTyVar Coercion -> Either TcTyVar Coercion) -> Inst -> Inst
+updateEqInstCoercion f inst = inst {tci_co = f $ tci_co inst}
 \end{code}

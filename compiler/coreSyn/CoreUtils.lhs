@@ -664,7 +664,7 @@ dataConRepInstPat   = dataConInstPat dataConRepArgTys (repeat (FSLIT("ipv")))
 dataConRepFSInstPat = dataConInstPat dataConRepArgTys
 dataConOrigInstPat  = dataConInstPat dc_arg_tys       (repeat (FSLIT("ipv")))
   where 
-    dc_arg_tys dc = map mkPredTy (dataConTheta dc) ++ dataConOrigArgTys dc
+    dc_arg_tys dc = map mkPredTy (dataConEqTheta dc) ++ map mkPredTy (dataConDictTheta dc) ++ dataConOrigArgTys dc
 	-- Remember to include the existential dictionaries
 
 dataConInstPat :: (DataCon -> [Type])      -- function used to find arg tys
@@ -680,9 +680,13 @@ dataConInstPat :: (DataCon -> [Type])      -- function used to find arg tys
 --
 --   co_tvs are intended to be used as binders for coercion args and the kinds
 --     of these vars have been instantiated by the inst_tys and the ex_tys
+--     The co_tvs include both GADT equalities (dcEqSpec) and 
+--     programmer-specified equalities (dcEqTheta)
 --
---   arg_ids are indended to be used as binders for value arguments, including
---     dicts, and their types have been instantiated with inst_tys and ex_tys
+--   arg_ids are indended to be used as binders for value arguments, 
+--     and their types have been instantiated with inst_tys and ex_tys
+--     The arg_ids include both dicts (dcDictTheta) and
+--     programmer-specified arguments (after rep-ing) (deRepArgTys)
 --
 -- Example.
 --  The following constructor T1
@@ -702,16 +706,17 @@ dataConInstPat :: (DataCon -> [Type])      -- function used to find arg tys
 --  where the double-primed variables are created with the FastStrings and
 --  Uniques given as fss and us
 dataConInstPat arg_fun fss uniqs con inst_tys 
-  = (ex_bndrs, co_bndrs, id_bndrs)
+  = (ex_bndrs, co_bndrs, arg_ids)
   where 
     univ_tvs = dataConUnivTyVars con
     ex_tvs   = dataConExTyVars con
     arg_tys  = arg_fun con
     eq_spec  = dataConEqSpec con
-    eq_preds = eqSpecPreds eq_spec
+    eq_theta = dataConEqTheta con
+    eq_preds = eqSpecPreds eq_spec ++ eq_theta
 
     n_ex = length ex_tvs
-    n_co = length eq_spec
+    n_co = length eq_preds
 
       -- split the Uniques and FastStrings
     (ex_uniqs, uniqs')   = splitAt n_ex uniqs
@@ -739,7 +744,7 @@ dataConInstPat arg_fun fss uniqs con inst_tys
 
       -- make value vars, instantiating types
     mk_id_var uniq fs ty = mkUserLocal (mkVarOccFS fs) uniq (substTy subst ty) noSrcSpan
-    id_bndrs = zipWith3 mk_id_var id_uniqs id_fss arg_tys
+    arg_ids = zipWith3 mk_id_var id_uniqs id_fss arg_tys
 
 exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
 -- Returns (Just (dc, [x1..xn])) if the argument expression is 

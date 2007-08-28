@@ -1218,7 +1218,7 @@ tyThingToIfaceDecl (ATyCon tycon)
 		    ifConUnivTvs = toIfaceTvBndrs (dataConUnivTyVars data_con),
 		    ifConExTvs   = toIfaceTvBndrs (dataConExTyVars data_con),
 		    ifConEqSpec  = to_eq_spec (dataConEqSpec data_con),
-		    ifConCtxt    = toIfaceContext (dataConTheta data_con),
+		    ifConCtxt    = toIfaceContext (dataConEqTheta data_con ++ dataConDictTheta data_con),
 		    ifConArgTys  = map toIfaceType (dataConOrigArgTys data_con),
 		    ifConFields  = map getOccName 
 				       (dataConFieldLabels data_con),

@@ -22,8 +22,10 @@ module Coercion (
 	isEqPred, mkEqPred, getEqPredTys, isEqPredTy,  
 
 	-- Coercion transformations
+	mkCoercion,
         mkSymCoercion, mkTransCoercion,
-        mkLeftCoercion, mkRightCoercion, mkInstCoercion, mkAppCoercion,
+        mkLeftCoercion, mkRightCoercion, mkRightCoercions,
+	mkInstCoercion, mkAppCoercion,
         mkForAllCoercion, mkFunCoercion, mkInstsCoercion, mkUnsafeCoercion,
         mkNewTypeCoercion, mkFamInstCoercion, mkAppsCoercion,
 
@@ -39,8 +41,8 @@ module Coercion (
 	mkSymCoI, mkTransCoI, 
 	mkTyConAppCoI, mkAppTyCoI, mkFunTyCoI,
 	mkNoteTyCoI, mkForAllTyCoI,
-	fromCoI,
-	mkClassPPredCoI, mkIParamPredCoI, mkEqPredCoI,
+	fromCoI, fromACo,
+	mkClassPPredCoI, mkIParamPredCoI, mkEqPredCoI
 
        ) where 
 
@@ -59,6 +61,9 @@ import Unique
 import BasicTypes
 import Outputable
 
+
+type Coercion     = Type
+type CoercionKind = Kind	-- A CoercionKind is always of form (ty1 :=: ty2)
 
 ------------------------------
 decomposeCo :: Arity -> Coercion -> [Coercion]
@@ -101,9 +106,6 @@ splitCoercionKind_maybe :: Kind -> Maybe (Type, Type)
 splitCoercionKind_maybe co | Just co' <- kindView co = splitCoercionKind_maybe co'
 splitCoercionKind_maybe (PredTy (EqPred ty1 ty2)) = Just (ty1, ty2)
 splitCoercionKind_maybe other = Nothing
-
-type Coercion     = Type
-type CoercionKind = Kind	-- A CoercionKind is always of form (ty1 :=: ty2)
 
 coercionKind :: Coercion -> (Type, Type)
 -- 	c :: (t1 :=: t2)
@@ -226,6 +228,17 @@ mkLeftCoercion co
 mkRightCoercion  co      
   | Just (co1, co2) <- splitAppCoercion_maybe co = co2
   | otherwise = mkCoercion rightCoercionTyCon [co]
+
+mkRightCoercions n co
+  = go n co []
+  where
+    go n co acc 
+       | n > 0
+       = case splitAppCoercion_maybe co of
+          Just (co1,co2) -> go (n-1) co1 (co2:acc)
+          Nothing        -> go (n-1) (mkCoercion leftCoercionTyCon [co]) (mkCoercion rightCoercionTyCon [co]:acc)
+       | otherwise
+       = acc
 
 mkInstCoercion co ty
   | Just (tv,co') <- splitForAllTy_maybe co
@@ -451,7 +464,6 @@ splitNewTypeRepCo_maybe other
 -- CoercionI smart constructors
 --	lifted smart constructors of ordinary coercions
 
-
 \begin{code}
 	-- CoercionI is either 
 	--	(a) proper coercion
@@ -461,6 +473,16 @@ data CoercionI = IdCo | ACo Coercion
 isIdentityCoercion :: CoercionI -> Bool
 isIdentityCoercion IdCo = True
 isIdentityCoercion _    = False
+
+allIdCos :: [CoercionI] -> Bool
+allIdCos = all isIdentityCoercion
+
+zipCoArgs :: [CoercionI] -> [Type] -> [Coercion]
+zipCoArgs cois tys = zipWith fromCoI cois tys
+
+fromCoI :: CoercionI -> Type -> Type
+fromCoI IdCo ty     = ty	-- Identity coercion represented 
+fromCoI (ACo co) ty = co	-- 	by the type itself
 
 mkSymCoI :: CoercionI -> CoercionI
 mkSymCoI IdCo = IdCo
@@ -474,18 +496,9 @@ mkTransCoI aco IdCo = aco
 mkTransCoI (ACo co1) (ACo co2) = ACo $ mkTransCoercion co1 co2
 
 mkTyConAppCoI :: TyCon -> [Type] -> [CoercionI] -> CoercionI
-mkTyConAppCoI tyCon tys cois =
-	let (anyAcon,co_args) = f tys cois
-	in if anyAcon
-		then ACo (TyConApp tyCon co_args)
-		else IdCo
-	where
-		f [] [] = (False,[])
-		f (x:xs) (y:ys) = 
-			let (b,cos) = f xs ys
-			in case y of
-				IdCo   -> (b,x:cos)
-				ACo co -> (True,co:cos)
+mkTyConAppCoI tyCon tys cois
+  | allIdCos cois = IdCo
+  | otherwise	  = ACo (TyConApp tyCon (zipCoArgs cois tys))
 
 mkAppTyCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
 mkAppTyCoI ty1 IdCo ty2 IdCo = IdCo
@@ -505,31 +518,25 @@ mkForAllTyCoI :: TyVar -> CoercionI -> CoercionI
 mkForAllTyCoI _ IdCo = IdCo
 mkForAllTyCoI tv (ACo co) = ACo $ ForAllTy tv co
 
-fromCoI IdCo ty     = ty
-fromCoI (ACo co) ty = co
+fromACo (ACo co) = co
+
 
 mkClassPPredCoI :: Class -> [Type] -> [CoercionI] -> CoercionI
-mkClassPPredCoI cls tys cois =
-	let (anyAcon,co_args) = f tys cois
-	in if anyAcon
-		then ACo $ PredTy $ ClassP cls co_args
-		else IdCo
-	where
-		f [] [] = (False,[])
-		f (x:xs) (y:ys) = 
-			let (b,cos) = f xs ys
-			in case y of
-				IdCo   -> (b,x:cos)
-				ACo co -> (True,co:cos)
+-- mkClassPPredCoI cls tys cois = coi
+--    coi : PredTy (cls tys) ~ predTy (cls (tys `cast` cois))
+mkClassPPredCoI cls tys cois 
+  | allIdCos cois = IdCo
+  | otherwise     = ACo $ PredTy $ ClassP cls (zipCoArgs cois tys)
 
 mkIParamPredCoI :: (IPName Name) -> CoercionI -> CoercionI 
+-- Similar invariant to mkclassPPredCoI
 mkIParamPredCoI ipn IdCo     = IdCo
 mkIParamPredCoI ipn (ACo co) = ACo $ PredTy $ IParam ipn co
 
 mkEqPredCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
+-- Similar invariant to mkclassPPredCoI
 mkEqPredCoI _    IdCo     _   IdCo      = IdCo
 mkEqPredCoI ty1  IdCo     _   (ACo co2) = ACo $ PredTy $ EqPred ty1 co2
 mkEqPredCoI ty1 (ACo co1) ty2 coi2      = ACo $ PredTy $ EqPred co1 (fromCoI coi2 ty2)
-
 \end{code}
 

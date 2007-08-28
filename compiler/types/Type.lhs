@@ -1467,8 +1467,6 @@ isSuperKind other = False
 isKind :: Kind -> Bool
 isKind k = isSuperKind (typeKind k)
 
-
-
 isSubKind :: Kind -> Kind -> Bool
 -- (k1 `isSubKind` k2) checks that k1 <: k2
 isSubKind (TyConApp kc1 []) (TyConApp kc2 []) = kc1 `isSubKindCon` kc2

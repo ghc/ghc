@@ -1,3 +1,30 @@
+Type functions
+~~~~~~~~~~~~~~
+* A Given inst should be a CoVar, not a coercion
+
+* finaliseEqInst should not need to call zonk
+
+* Why do we need fromGivenEqDict?  How could we construct 	
+	a Dict that had an EqPred?
+	newDictBndr should make an EqInst directly
+
+* tc_co should be accessed only inside Inst
+
+* Inst.mkImplicTy needs a commment about filtering out EqInsts
+  How *do* we deal with wanted equalities?
+
+* Inst.instType behaves inconsistently for EqInsts: it should
+  return an EqPred, like the instType' hack in pprDictsTheta
+
+  Consequences: adjust the uses of instType in TcSimplify
+
+* tcDeref* functions are unused, except in tcGenericNormalizeFamInst, when
+  we can equally well use TcMType.lookupTcTyVar
+
+* Coercion.mkEqPredCoI looks very peculiar.
+
+
+
 
 -------------------------
 *** unexpected failure for jtod_circint(opt)
@@ -44,18 +71,6 @@ Cmm parser notes
 
 * If the case binder is dead, and the constr is nullary,
   do we need to assign to Node?
-
-
--------------------------
-* Relation between separate type sigs and pattern type sigs
-f :: forall a. a->a
-f :: b->b = e   -- No: monomorphic
-
-f :: forall a. a->a
-f :: forall a. a->a  -- OK
-
-f :: forall a. [a] -> [a]
-f :: forall b. b->b = e  ???
 
 
 -------------------------------
@@ -117,46 +132,6 @@ completeLazyBind: 	[given a simplified RHS]
     add arity
 
 
-
-Right hand sides and arguments
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-In many ways we want to treat 
-	(a) the right hand side of a let(rec), and 
-	(b) a function argument
-in the same way.  But not always!  In particular, we would
-like to leave these arguments exactly as they are, so they
-will match a RULE more easily.
-	
-	f (g x, h x)	
-	g (+ x)
-
-It's harder to make the rule match if we ANF-ise the constructor,
-or eta-expand the PAP:
-
-	f (let { a = g x; b = h x } in (a,b))
-	g (\y. + x y)
-
-On the other hand if we see the let-defns
-
-	p = (g x, h x)
-	q = + x
-
-then we *do* want to ANF-ise and eta-expand, so that p and q
-can be safely inlined.   
-
-Even floating lets out is a bit dubious.  For let RHS's we float lets
-out if that exposes a value, so that the value can be inlined more vigorously.
-For example
-
-	r = let x = e in (x,x)
-
-Here, if we float the let out we'll expose a nice constructor. We did experiments
-that showed this to be a generally good thing.  But it was a bad thing to float
-lets out unconditionally, because that meant they got allocated more often.
-
-For function arguments, there's less reason to expose a constructor (it won't
-get inlined).  Just possibly it might make a rule match, but I'm pretty skeptical.
-So for the moment we don't float lets out of function arguments either.
 
 
 Eta expansion

@@ -1,0 +1,13 @@
+\begin{code}
+module TcRnTypes where
+
+import IOEnv 
+
+type TcM a = TcRn a
+type TcRn a = TcRnIf TcGblEnv TcLclEnv a
+type TcRnIf a b c = IOEnv (Env a b) c
+
+data Env a b
+data TcGblEnv
+data TcLclEnv
+\end{code}

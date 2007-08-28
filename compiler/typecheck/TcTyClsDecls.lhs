@@ -263,18 +263,16 @@ tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
        ; -- (1) kind check the right-hand side of the type equation
        ; k_rhs <- kcCheckHsType (tcdSynRhs decl) resKind
 
-         -- we need at least as many type parameters as the family declaration
-         -- specified 
+         -- we need the exact same number of type parameters as the family
+         -- declaration 
        ; let famArity = tyConArity family
-       ; checkTc (length k_typats >= famArity) $ tooFewParmsErr famArity
+       ; checkTc (length k_typats == famArity) $ 
+           wrongNumberOfParmsErr famArity
 
          -- (2) type check type equation
        ; tcTyVarBndrs k_tvs $ \t_tvs -> do {  -- turn kinded into proper tyvars
        ; t_typats <- mappM tcHsKindedType k_typats
        ; t_rhs    <- tcHsKindedType k_rhs
-
-         -- all parameters in excess of the family arity must be variables
-       ; checkTc (all isTyVarTy $ drop famArity t_typats) $ excessParmVarErr
 
          -- (3) check that 
          --     - left-hand side contains no type family applications
@@ -337,7 +335,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 	     ; tc_rhs <-
 		 case new_or_data of
 		   DataType -> return (mkDataTyConRhs data_cons)
-		   NewType  -> ASSERT( isSingleton data_cons )
+		   NewType  -> ASSERT( not (null data_cons) )
 			       mkNewTyConRhs rep_tc_name tycon (head data_cons)
 	     ; buildAlgTyCon rep_tc_name t_tvs stupid_theta tc_rhs Recursive
 			     False h98_syntax (Just (family, t_typats))
@@ -754,7 +752,7 @@ tcTyClDecl1 calc_isrec
 	    else case new_or_data of
 		   DataType -> return (mkDataTyConRhs data_cons)
 		   NewType  -> 
-                       ASSERT( isSingleton data_cons )
+                       ASSERT( not (null data_cons) )
                        mkNewTyConRhs tc_name tycon (head data_cons)
 	; buildAlgTyCon tc_name final_tvs stupid_theta tc_rhs is_rec
 	    (want_generic && canDoGenerics data_cons) h98_syntax Nothing
@@ -1074,14 +1072,14 @@ checkNewDataCon con
 		-- One argument
 	; checkTc (null eq_spec) (newtypePredError con)
 		-- Return type is (T a b c)
-	; checkTc (null ex_tvs && null theta) (newtypeExError con)
+	; checkTc (null ex_tvs && null eq_theta && null dict_theta) (newtypeExError con)
 		-- No existentials
 	; checkTc (not (any isMarkedStrict (dataConStrictMarks con))) 
 		  (newtypeStrictError con)
 		-- No strictness
     }
   where
-    (_univ_tvs, ex_tvs, eq_spec, theta, arg_tys, _res_ty) = dataConFullSig con
+    (_univ_tvs, ex_tvs, eq_spec, eq_theta, dict_theta, arg_tys, _res_ty) = dataConFullSig con
 
 -------------------------------
 checkValidClass :: Class -> TcM ()
@@ -1117,6 +1115,7 @@ checkValidClass cls
 		-- The 'tail' removes the initial (C a) from the
 		-- class itself, leaving just the method type
 
+	; traceTc (text "class op type" <+> ppr op_ty <+> ppr tau)
 	; checkValidType (FunSigCtxt op_name) tau
 
 		-- Check that the type mentions at least one of
@@ -1264,8 +1263,9 @@ tooFewParmsErr arity
   = ptext SLIT("Family instance has too few parameters; expected") <+> 
     ppr arity
 
-excessParmVarErr
-  = ptext SLIT("Additional instance parameters must be variables")
+wrongNumberOfParmsErr exp_arity
+  = ptext SLIT("Number of parameters must match family declaration; expected")
+    <+> ppr exp_arity
 
 badBootFamInstDeclErr = 
   ptext SLIT("Illegal family instance in hs-boot file")
