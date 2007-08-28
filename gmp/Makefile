@@ -12,8 +12,6 @@ include $(TOP)/mk/boilerplate.mk
 ifneq "$(HaveLibGmp)" "YES"
 ifneq "$(HaveFrameworkGMP)" "YES"
 
-boot :: stamp.gmp.static
-
 PLATFORM := $(shell echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g')
 
 # 2007-07-05
@@ -39,6 +37,19 @@ ifeq "$(findstring dyn, $(GhcRTSWays))" "dyn"
 BUILD_SHARED=yes
 else
 BUILD_SHARED=no
+endif
+
+boot :: stamp.gmp.static
+all :: libgmp.a
+install :: libgmp.a
+INSTALL_LIBS += libgmp.a
+
+ifeq "$(BUILD_SHARED)" "yes"
+boot :: stamp.gmp.shared
+all :: libgmp-3.dll libgmp.dll.a
+install :: libgmp-3.dll libgmp.dll.a
+INSTALL_LIBS += libgmp.dll.a
+INSTALL_PROGS += libgmp-3.dll
 endif
 
 stamp.gmp.static:
@@ -70,27 +81,12 @@ libgmp.a: stamp.gmp.static
 	$(CP) gmpbuild/.libs/libgmp.a .
 	$(RANLIB) libgmp.a
 
-all :: libgmp.a
-
-install :: libgmp.a
-
-INSTALL_LIBS += libgmp.a
-
-ifeq "$(BUILD_SHARED)" "yes"
 libgmp-3.dll: stamp.gmp.shared
 	$(MAKE) -C gmpbuild-shared MAKEFLAGS=
 	$(CP) gmpbuild-shared/.libs/libgmp-3.dll .
 
 libgmp.dll.a: libgmp-3.dll
 	$(CP) gmpbuild-shared/.libs/libgmp.dll.a .
-
-all :: libgmp-3.dll libgmp.dll.a
-
-install :: libgmp-3.dll libgmp.dll.a
-
-INSTALL_LIBS += libgmp.dll.a
-INSTALL_PROGS += libgmp-3.dll
-endif
 endif
 endif
 
