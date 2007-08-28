@@ -243,6 +243,14 @@ install:: $(INSTALL_DATAS)
 	done
 endif
 
+ifneq "$(strip $(INSTALL_HEADERS))" ""
+install:: $(INSTALL_HEADERS)
+	@$(INSTALL_DIR) $(headerdir)
+	for i in $(INSTALL_HEADERS); do \
+		$(INSTALL_HEADER) $(INSTALL_OPTS) $$i $(headerdir); \
+	done
+endif
+
 ifneq "$(strip $(INSTALL_IFACES))" ""
 install:: $(INSTALL_IFACES)
 	@$(INSTALL_DIR) $(ifacedir)

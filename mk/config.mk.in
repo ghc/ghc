@@ -546,6 +546,8 @@ datadir    = $(datadir0)/ghc-$(ProjectVersion)
 
 endif # Windows
 
+headerdir = $(libdir)/include
+
 # Default place for putting interface files is $(libdir)
 # (overriden for packages in package.mk)
 ifacedir		= $(libdir)
@@ -608,6 +610,7 @@ INSTALL_PROGRAM = $(INSTALL) -m 755
 INSTALL_SCRIPT  = $(INSTALL) -m 755
 INSTALL_SHLIB   = $(INSTALL) -m 755
 INSTALL_DATA    = $(INSTALL) -m 644
+INSTALL_HEADER  = $(INSTALL) -m 644
 INSTALL_MAN     = $(INSTALL) -m 644
 INSTALL_DIR     = $(MKDIRHIER)
 

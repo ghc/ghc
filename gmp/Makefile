@@ -40,8 +40,9 @@ BUILD_SHARED=no
 endif
 
 boot :: stamp.gmp.static
-all :: libgmp.a
-install :: libgmp.a
+all :: gmp.h libgmp.a
+install :: gmp.h libgmp.a
+INSTALL_HEADERS += gmp.h
 INSTALL_LIBS += libgmp.a
 
 ifeq "$(BUILD_SHARED)" "yes"
@@ -75,6 +76,9 @@ stamp.gmp.shared:
 	    CC=$(WhatGccIsCalled) $(SHELL) configure \
 	          --enable-shared=yes --disable-static --host=$(PLATFORM) --build=$(PLATFORM)
 	touch $@
+
+gmp.h: stamp.gmp.static
+	$(CP) gmpbuild/gmp.h .
 
 libgmp.a: stamp.gmp.static
 	$(MAKE) -C gmpbuild MAKEFLAGS=
@@ -113,6 +117,9 @@ ifneq "$(INSTALL_PROGS)" ""
 endif
 ifneq "$(INSTALL_LIBS)" ""
 	$(INSTALL_DATA)    $(INSTALL_LIBS)     $(BIN_DIST_DIR)/gmp/
+endif
+ifneq "$(INSTALL_HEADERS)" ""
+	$(INSTALL_HEADER)  $(INSTALL_HEADERS)  $(BIN_DIST_DIR)/gmp/
 endif
 
 endif
