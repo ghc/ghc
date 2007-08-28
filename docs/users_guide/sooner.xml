@@ -37,20 +37,13 @@ should go here!</para>
           error.)</para>
 
 	  <para>If it says you're using more than 20&percnt; of total
-          time in garbage collecting, then more memory would
-          help.</para>
-
-	  <para>If the heap size is approaching the maximum (64M by
-          default), and you have lots of memory, try increasing the
-          maximum with the
-          <option>-M&lt;size&gt;</option><indexterm><primary>-M&lt;size&gt;
-          option</primary></indexterm> option, e.g.: <command>ghc -c
-          -O -M1024m Foo.hs</command>.</para>
-
-	  <para>Increasing the default allocation area size used by
+          time in garbage collecting, then more memory might
+          help: use the
+          <option>-H&lt;size&gt;</option><indexterm><primary><option>-H</option></primary></indexterm>
+          option.  Increasing the default allocation area size used by
           the compiler's RTS might also help: use the
-          <option>-A&lt;size&gt;</option><indexterm><primary>-A&lt;size&gt;
-          option</primary></indexterm> option.</para>
+          <option>+RTS -A&lt;size&gt; -RTS</option><indexterm><primary>-A&lt;size&gt;
+          RTS option</primary></indexterm> option.</para>
 
 	  <para>If GHC persists in being a bad memory citizen, please
           report it as a bug.</para>
@@ -101,48 +94,13 @@ should go here!</para>
       <varlistentry>
 	<term>GHC compiles some program constructs slowly:</term>
 	<listitem>
-	  <para>Deeply-nested list comprehensions seem to be one such;
-          in the past, very large constant tables were bad,
-          too.</para>
-
 	  <para>We'd rather you reported such behaviour as a bug, so
           that we can try to correct it.</para>
 
-	  <para>The part of the compiler that is occasionally prone to
-          wandering off for a long time is the strictness analyser.
-          You can turn this off individually with
-          <option>-fno-strictness</option>.
-          <indexterm><primary>-fno-strictness
-          anti-option</primary></indexterm></para>
-	  
 	  <para>To figure out which part of the compiler is badly
           behaved, the
           <option>-v2</option><indexterm><primary><option>-v</option></primary>
           </indexterm> option is your friend.</para>
-
-	  <para>If your module has big wads of constant data, GHC may
-          produce a huge basic block that will cause the native-code
-          generator's register allocator to founder.  Bring on
-          <option>-fvia-C</option><indexterm><primary>-fvia-C
-          option</primary></indexterm> (not that GCC will be that
-          quick about it, either).</para>
-	</listitem>
-      </varlistentry>
-      
-      <varlistentry>
-	<term>Explicit <literal>import</literal> declarations:</term>
-	<listitem>
-	  <para>Instead of saying <literal>import Foo</literal>, say
-          <literal>import Foo (...stuff I want...)</literal> You can
-          get GHC to tell you the minimal set of required imports by
-          using the <option>-ddump-minimal-imports</option> option
-          (see <xref linkend="hi-options"/>).</para>
-
-	  <para>Truthfully, the reduction on compilation time will be
-          very small.  However, judicious use of
-          <literal>import</literal> declarations can make a program
-          easier to understand, so it may be a good idea
-          anyway.</para>
 	</listitem>
       </varlistentry>
     </variablelist>
