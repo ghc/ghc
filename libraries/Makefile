@@ -347,6 +347,7 @@ binary-dist.library.%:
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
 	  cp    $*.cabal      $(BIN_DIST_LIBDIR)/$* && \
+	  cp    LICENSE       $(BIN_DIST_LIBDIR)/$* && \
 	  cp -a dist          $(BIN_DIST_LIBDIR)/$* && \
 	  (cp -aL include      $(BIN_DIST_LIBDIR)/$* || :) && \
 	  $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
