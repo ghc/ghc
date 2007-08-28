@@ -35,11 +35,13 @@ import SMRep
 import MachOp
 #endif
 import Name
+import OccName
 import TcType
 import DynFlags
 import Outputable
 import SrcLoc
 import Bag
+import Unique
 \end{code}
 
 \begin{code}
@@ -214,7 +216,17 @@ tcFExport fo@(ForeignExport (L loc nm) hs_ty spec) =
    newUnique			`thenM` \ uniq ->
    getModule			`thenM` \ mod ->
    let
-        gnm  = mkExternalName uniq mod (mkForeignExportOcc (getOccName nm)) loc
+          -- We need to give a name to the new top-level binding that
+          -- is *stable* (i.e. the compiler won't change it later),
+          -- because this name will be referred to by the C code stub.
+          -- Furthermore, the name must be unique (see #1533).  If the
+          -- same function is foreign-exported multiple times, the
+          -- top-level bindings generated must not have the same name.
+          -- Hence we create an External name (doesn't change), and we
+          -- append a Unique to the string right here.
+        uniq_str = showSDoc (pprUnique uniq)
+        occ = mkVarOcc (occNameString (getOccName nm) ++ '_' : uniq_str)
+        gnm  = mkExternalName uniq mod (mkForeignExportOcc occ) loc
 	id   = mkExportedLocalId gnm sig_ty
 	bind = L loc (VarBind id rhs)
    in
