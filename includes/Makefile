@@ -171,19 +171,16 @@ endif
 #
 # Install all header files
 #
-# Hackily set the install destination here:
-#
 # Note: we keep per-platform copies of all the include files
 # (ditto for interface files). This is not *really* needed, but
 # it gives (perhaps) a cleaner binary dist structure..might change.
 #
-override datadir:=$(libdir)/include
-INSTALL_DATAS += $(H_FILES) $(H_CONFIG) $(H_PLATFORM)
+INSTALL_HEADERS += $(H_FILES) $(H_CONFIG) $(H_PLATFORM)
 
 binary-dist:
-	$(INSTALL_DIR)                   $(BIN_DIST_DIR)/includes
-	$(INSTALL_DATA) Makefile         $(BIN_DIST_DIR)/includes/
-	$(INSTALL_DATA) $(INSTALL_DATAS) $(BIN_DIST_DIR)/includes/
+	$(INSTALL_DIR)                     $(BIN_DIST_DIR)/includes
+	$(INSTALL_DATA) Makefile           $(BIN_DIST_DIR)/includes/
+	$(INSTALL_DATA) $(INSTALL_HEADERS) $(BIN_DIST_DIR)/includes/
 
 #
 # `make clean' settings:
