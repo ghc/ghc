@@ -88,7 +88,8 @@ instance Outputable DocName where
   ppr (NoLink n) = ppr n
 
 
--- | Information about a home package module that we get from GHC's typechecker
+-- | This structure holds the module information we get from GHC's 
+-- type checking phase
 data GhcModule = GhcModule {
    ghcModule         :: Module,
    ghcFilename       :: FilePath,
@@ -105,9 +106,8 @@ data GhcModule = GhcModule {
 
 -- | This is the data used to render a Haddock page for a module - it is the 
 -- "interface" of the module. The core of Haddock lies in creating this 
--- structure (see Haddock.Interface).
---
--- The structure also holds intermediate data needed during its creation.
+-- structure (see Haddock.Interface). The structure also holds intermediate
+-- data needed during its creation.
 data Interface = Interface {
 
   -- | A value to identify the module

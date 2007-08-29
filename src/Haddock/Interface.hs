@@ -1,13 +1,12 @@
--------------------------------------------------------------------------------
--- Haddock.Interface
 --
+-- Haddock - A Haskell Documentation Tool
+--
+-- (c) Simon Marlow 2003
+--
+
 -- Here we build the actual module interfaces. By interface we mean the 
 -- information that is used to render a Haddock page for a module. Parts of 
 -- this information is also stored in the interface files.
---
--- The Interface structure holds the interface data as well as 
--- intermediate information needed during its creation.
--------------------------------------------------------------------------------
 
 
 module Haddock.Interface (
