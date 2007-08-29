@@ -640,7 +640,8 @@ cvReconstructType hsc_env force mb_ty hval = runTR_maybe hsc_env $ do
             (signatureType,_) <- instScheme(dataConRepType dc) 
             addConstraint myType signatureType
             return $ [ appArr (\e->(t,e)) (ptrs clos) i
-                       | (i,t) <- drop extra_args $ zip [0..] subTtypes]
+                       | (i,t) <- drop extra_args $ 
+                                     zip [0..] (filter isPointed subTtypes)]
       otherwise -> return []
 
      -- This helper computes the difference between a base type t and the 
