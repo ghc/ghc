@@ -1,4 +1,0 @@
-break 4  - implicit params are not working yet
-print 12 - GADTs
-print 16 - tricky newtypes
-dynbk8   - Coalescing is not perfect :S
