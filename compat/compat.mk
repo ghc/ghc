@@ -22,6 +22,7 @@ endif
 ifeq "$(ghc_ge_607)" "YES"
 SRC_HC_OPTS += -package directory
 SRC_HC_OPTS += -package pretty
+SRC_HC_OPTS += -package containers
 endif
 
 ifeq "$(ghc_ge_603)" "NO"
