@@ -240,9 +240,7 @@ MAIN                     MAIN             0    0.0   0.0    100.0 100.0
     although GHC does keep information about which groups of functions
     called each other recursively, this information isn't displayed in
     the basic time and allocation profile, instead the call-graph is
-    flattened into a tree.  The XML profiling tool (described in <xref
-    linkend="prof-xml-tool"/>) will be able to display real loops in
-    the call-graph.</para>
+    flattened into a tree.</para>
 
     <sect2><title>Inserting cost centres by hand</title>
 
@@ -450,18 +448,6 @@ x = nfib 25
 	  <para>The <option>-P</option> option produces a more
           detailed report containing the actual time and allocation
           data as well.  (Not used much.)</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
-          <option>-px</option>:
-          <indexterm><primary><option>-px</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>The <option>-px</option> option generates profiling
-	  information in the XML format understood by our new
-	  profiling tool, see <xref linkend="prof-xml-tool"/>.</para>
 	</listitem>
       </varlistentry>
 
@@ -958,48 +944,6 @@ x = nfib 25
 	</listitem>
       </itemizedlist>
     </sect2>
-
-  </sect1>
-
-  <sect1 id="prof-xml-tool">
-    <title>Graphical time/allocation profile</title>
-
-    <para>You can view the time and allocation profiling graph of your
-    program graphically, using <command>ghcprof</command>.  This is a
-    new tool with GHC 4.08, and will eventually be the de-facto
-    standard way of viewing GHC profiles<footnote><para>Actually this
-    isn't true any more, we are working on a new tool for
-    displaying heap profiles using Gtk+HS, so
-    <command>ghcprof</command> may go away at some point in the future.</para>
-      </footnote></para>
-
-    <para>To run <command>ghcprof</command>, you need
-    <productname>uDraw(Graph)</productname> installed, which can be
-    obtained from <ulink
-    url="http://www.informatik.uni-bremen.de/uDrawGraph/en/uDrawGraph/uDrawGraph.html"><citetitle>uDraw(Graph)</citetitle></ulink>.  Install one of
-    the binary
-    distributions, and set your
-    <envar>UDG_HOME</envar> environment variable to point to the
-    installation directory.</para>
-
-    <para><command>ghcprof</command> uses an XML-based profiling log
-    format, and you therefore need to run your program with a
-    different option: <option>-px</option>.  The file generated is
-    still called <filename>&lt;prog&gt;.prof</filename>.  To see the
-    profile, run <command>ghcprof</command> like this:</para>
-
-    <indexterm><primary><option>-px</option></primary></indexterm>
-
-<screen>
-$ ghcprof &lt;prog&gt;.prof
-</screen>
-
-    <para>which should pop up a window showing the call-graph of your
-    program in glorious detail.  More information on using
-    <command>ghcprof</command> can be found at <ulink
-    url="http://www.dcs.warwick.ac.uk/people/academic/Stephen.Jarvis/profiler/index.html"><citetitle>The
-    Cost-Centre Stack Profiling Tool for
-    GHC</citetitle></ulink>.</para>
 
   </sect1>
 
