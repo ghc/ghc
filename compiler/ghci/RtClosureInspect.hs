@@ -77,6 +77,9 @@ import Control.Monad
 import Data.Maybe
 import Data.Array.Base
 import Data.List        ( partition )
+import qualified Data.Sequence as Seq
+import Data.Monoid
+import Data.Sequence hiding (null, length, index, take, drop, splitAt, reverse)
 import Foreign
 import System.IO.Unsafe
 
@@ -586,31 +589,31 @@ cvReconstructType hsc_env force mb_ty hval = runTR_maybe hsc_env $ do
    tv <- newVar argTypeKind
    case mb_ty of
      Nothing -> do search (isMonomorphic `fmap` zonkTcType tv)
-                          (uncurry go)  
-                          [(tv, hval)]  
+                          (uncurry go)
+                          (Seq.singleton (tv, hval))
                           max_depth
                    zonkTcType tv  -- TODO untested!
      Just ty | isMonomorphic ty -> return ty
-     Just ty -> do 
-              (ty',rev_subst) <- instScheme (sigmaType ty) 
+     Just ty -> do
+              (ty',rev_subst) <- instScheme (sigmaType ty)
               addConstraint tv ty'
-              search (isMonomorphic `fmap` zonkTcType tv) 
-                     (\(ty,a) -> go ty a) 
-                     [(tv, hval)]
+              search (isMonomorphic `fmap` zonkTcType tv)
+                     (\(ty,a) -> go ty a)
+                     (Seq.singleton (tv, hval))
                      max_depth
               substTy rev_subst `fmap` zonkTcType tv
     where 
 --  search :: m Bool -> ([a] -> [a] -> [a]) -> [a] -> m ()
-  search stop expand [] depth  = return ()
+  search stop expand l depth | Seq.null l = return ()
   search stop expand x 0 = fail$ "Failed to reconstruct a type after " ++
                                 show max_depth ++ " steps"
-  search stop expand (x:xx) d  = unlessM stop $ do 
-    new <- expand x 
-    search stop expand (xx ++ new) $! (pred d)
+  search stop expand l d | x :< xx <- viewl l = unlessM stop $ do
+    new <- expand x
+    search stop expand (xx `mappend` Seq.fromList new) $! (pred d)
 
    -- returns unification tasks,since we are going to want a breadth-first search
   go :: Type -> HValue -> TR [(Type, HValue)]
-  go tv a = do 
+  go tv a = do
     clos <- trIO $ getClosureData a
     case tipe clos of
       Indirection _ -> go tv $! (ptrs clos ! 0)
@@ -618,22 +621,23 @@ cvReconstructType hsc_env force mb_ty hval = runTR_maybe hsc_env $ do
         Right dcname <- dataConInfoPtrToName (infoPtr clos)
         (_,mb_dc)    <- tryTcErrs (tcLookupDataCon dcname)
         case mb_dc of
-          Nothing-> do 
+          Nothing-> do
                      --  TODO: Check this case
-            vars     <- replicateM (length$ elems$ ptrs clos) 
+            vars     <- replicateM (length$ elems$ ptrs clos)
                                    (newVar (liftedTypeKind))
-            subTerms <- sequence [ appArr (go tv) (ptrs clos) i 
+            subTerms <- sequence [ appArr (go tv) (ptrs clos) i
                                    | (i, tv) <- zip [0..] vars]    
             forM [0..length (elems $ ptrs clos)] $ \i -> do
-                        tv <- newVar liftedTypeKind 
+                        tv <- newVar liftedTypeKind
                         return$ appArr (\e->(tv,e)) (ptrs clos) i
 
-          Just dc -> do 
-            let extra_args = length(dataConRepArgTys dc) - 
+          Just dc -> do
+            let extra_args = length(dataConRepArgTys dc) -
                              length(dataConOrigArgTys dc)
             subTtypes <- mapMif (not . isMonomorphic)
                                 (\t -> newVar (typeKind t))
                                 (dataConRepArgTys dc)
+
             -- It is vital for newtype reconstruction that the unification step
             -- is done right here, _before_ the subterms are RTTI reconstructed
             let myType         = mkFunTys subTtypes tv
