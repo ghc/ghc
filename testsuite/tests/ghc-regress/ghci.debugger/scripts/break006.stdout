@@ -2,8 +2,8 @@ Stopped at ../Test3.hs:(1,0)-(2,30)
 _result :: [a] = _
 Stopped at ../Test3.hs:2:17-30
 _result :: [a] = _
-f :: t -> a = _
 x :: t = _
+f :: t -> a = _
 xs :: [t] = [_,_]
 _result :: [a]
 f :: t -> a
