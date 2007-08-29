@@ -626,40 +626,10 @@ mkPADFun :: TyCon -> VM Var
 mkPADFun vect_tc
   = newExportedVar (mkPADFunOcc $ getOccName vect_tc) =<< paDFunType vect_tc
 
-data Shape = Shape {
-               shapeReprTys    :: [Type]
-             , shapeStrictness :: [StrictnessMark]
-             , shapeLength     :: [CoreExpr] -> VM CoreExpr
-             , shapeReplicate  :: CoreExpr -> CoreExpr -> VM [CoreExpr]
-             }
-
-tyConShape :: TyCon -> VM Shape
-tyConShape vect_tc
-  | isProductTyCon vect_tc
-  = return $ Shape {
-                shapeReprTys    = [intPrimTy]
-              , shapeStrictness = [NotMarkedStrict]
-              , shapeLength     = \[len] -> return len
-              , shapeReplicate  = \len _ -> return [len]
-              }
-
-  | otherwise
-  = do
-      repr_ty <- mkPArrayType intTy   -- FIXME: we want to unbox this
-      return $ Shape {
-                 shapeReprTys    = [repr_ty]
-               , shapeStrictness = [MarkedStrict]
-               , shapeLength     = \[sel] -> lengthPA sel
-               , shapeReplicate  = \len n -> do
-                                               e <- replicatePA len n
-                                               return [e]
-               }
-
 buildTyConBindings :: TyCon -> TyCon -> TyCon -> TyCon -> Var
                    -> VM [(Var, CoreExpr)]
 buildTyConBindings orig_tc vect_tc prepr_tc arr_tc dfun
   = do
-      shape <- tyConShape vect_tc
       repr  <- mkRepr vect_tc
       vectDataConWorkers repr orig_tc vect_tc arr_tc
       dict <- buildPADict repr vect_tc prepr_tc arr_tc dfun
@@ -700,7 +670,6 @@ vectDataConWorkers repr orig_tc vect_tc arr_tc
                    (lift_data_con tys (concat pre)
                                       (concat post)
                                       (mkDataConTag con))
-                   
 
     vect_data_con con = return $ mkConApp con ty_args
     lift_data_con tys pre_tys post_tys tag
@@ -708,10 +677,10 @@ vectDataConWorkers repr orig_tc vect_tc arr_tc
           len  <- builtin liftingContext
           args <- mapM (newLocalVar FSLIT("xs"))
                   =<< mapM mkPArrayType tys
-      
+
           shape <- replicateShape repr (Var len) tag
           repr  <- mk_arr_repr (Var len) (map Var args)
-      
+
           pre   <- mapM emptyPA pre_tys
           post  <- mapM emptyPA post_tys
 
@@ -740,48 +709,6 @@ vectDataConWorkers repr orig_tc vect_tc arr_tc
           return (vect_worker, body)
       where
         orig_worker = dataConWorkId data_con
-
-vectDataConWorker :: Shape -> TyCon -> TyCon -> DataCon
-                  -> DataCon -> DataCon -> [[Type]] -> [[Type]]
-                  -> VM ()
-vectDataConWorker shape vect_tc arr_tc arr_dc orig_dc vect_dc pre (dc_tys : post)
-  = do
-      clo <- closedV
-           . inBind orig_worker
-           . polyAbstract tvs $ \abstract ->
-             liftM (abstract . vectorised)
-           $ buildClosures tvs [] dc_tys res_ty (liftM2 (,) mk_vect mk_lift)
-
-      worker <- cloneId mkVectOcc orig_worker (exprType clo)
-      hoistBinding worker clo
-      defGlobalVar orig_worker worker
-      return ()
-  where
-    tvs     = tyConTyVars vect_tc
-    arg_tys = mkTyVarTys tvs
-    res_ty  = mkTyConApp vect_tc arg_tys
-
-    orig_worker = dataConWorkId orig_dc
-
-    mk_vect = return . mkConApp vect_dc $ map Type arg_tys
-    mk_lift = do
-                len     <- newLocalVar FSLIT("n") intPrimTy
-                arr_tys <- mapM mkPArrayType dc_tys
-                args    <- mapM (newLocalVar FSLIT("xs")) arr_tys
-                shapes  <- shapeReplicate shape
-                                          (Var len)
-                                          (mkDataConTag vect_dc)
-
-                empty_pre  <- mapM emptyPA (concat pre)
-                empty_post <- mapM emptyPA (concat post)
-
-                return . mkLams (len : args)
-                       . wrapFamInstBody arr_tc arg_tys
-                       . mkConApp arr_dc
-                       $ map Type arg_tys ++ shapes
-                                          ++ empty_pre
-                                          ++ map Var args
-                                          ++ empty_post
 
 buildPADict :: Repr -> TyCon -> TyCon -> TyCon -> Var -> VM CoreExpr
 buildPADict repr vect_tc prepr_tc arr_tc dfun
