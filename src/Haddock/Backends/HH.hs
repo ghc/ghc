@@ -4,7 +4,7 @@
 -- (c) Simon Marlow 2003
 --
 
-module Haddock.HH(ppHHContents, ppHHIndex, ppHHProject) where
+module Haddock.Backends.HH (ppHHContents, ppHHIndex, ppHHProject) where
 
 ppHHContents = error "not yet"
 ppHHIndex = error "not yet"

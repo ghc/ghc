@@ -7,8 +7,8 @@
 
 module Haddock.Packages (
   HaddockPackage(..),
-  initAndReadPackages,
-  combineDocEnvs
+  getHaddockPackages,
+  combineLinkEnvs
 ) where
 
 
@@ -33,68 +33,22 @@ import Packages
 -- to the html files and the list of modules in the package
 data HaddockPackage = HaddockPackage {
   pdModules  :: [Module],
-  pdDocEnv   :: DocEnv,
+  pdLinkEnv  :: LinkEnv,
   pdHtmlPath :: FilePath
 }
 
 
--- | Expose the list of packages to GHC. Then initialize GHC's package state
--- and get the name of the actually loaded packages matching the supplied 
--- list of packages. The matching packages might be newer versions of the 
--- supplied ones. For each matching package, try to read its installed Haddock
--- information.
---
--- It would be better to try to get the "in scope" packages from GHC instead.
--- This would make the -use-package flag unnecessary. But currently it 
--- seems all you can get from the GHC api is all packages that are linked in 
--- (i.e the closure of the "in scope" packages).
-initAndReadPackages :: Session -> [String] -> IO [HaddockPackage] 
-initAndReadPackages session pkgStrs = do
-
-  -- expose the packages 
-
-  dfs <- getSessionDynFlags session
-  let dfs' = dfs { packageFlags = packageFlags dfs ++ map ExposePackage pkgStrs }
-  setSessionDynFlags session dfs'
-
-  -- try to parse the packages and get their names, without versions
-  pkgNames <- mapM (handleParse . unpackPackageId . stringToPackageId) pkgStrs
-
-  -- init GHC's package state
-  (_, depPackages) <- initPackages dfs'
-
-  -- compute the pkgIds of the loaded packages matching the 
-  -- supplied ones
-  
-  let depPkgs = map (fromJust . unpackPackageId) depPackages      
-      matchingPackages = [ mkPackageId pkg | pkg <- depPkgs, 
-                           pkgName pkg `elem` pkgNames ]
-
-  -- read the Haddock information for the matching packages
-  getPackages session matchingPackages
-  where
-    handleParse (Just pkg) = return (pkgName pkg)
-    handleParse Nothing = throwE "Could not parse package identifier"
-
-
--- | Try to create a HaddockPackage for each package.
--- Print a warning on stdout if a HaddockPackage could not be created.
-getPackages :: Session -> [PackageId] -> IO [HaddockPackage]
-getPackages session packages = do
-
-  -- get InstalledPackageInfos for each package
-  dynflags <- getSessionDynFlags session
-  let pkgInfos = map (getPackageDetails (pkgState dynflags)) packages
-
-  -- try to read the installed haddock information (.haddock interface file and
-  -- html path) for the packages
-  liftM catMaybes $ mapM tryGetPackage pkgInfos
+-- | Try to read the installed Haddock information for the given packages, 
+-- if it exists. Print a warning on stdout if it couldn't be found for a 
+-- package.
+getHaddockPackages :: [InstalledPackageInfo] -> IO [HaddockPackage]
+getHaddockPackages pkgInfos = liftM catMaybes $ mapM tryGetPackage pkgInfos
   where
     -- try to get a HaddockPackage, warn if we can't
     tryGetPackage pkgInfo = 
-        (getPackage session pkgInfo >>= return . Just)
+        (getPackage pkgInfo >>= return . Just)
       `catchDyn`
-        (\(e::HaddockException) -> do 
+        (\(e::HaddockException) -> do
           let pkgName = showPackageId (package pkgInfo)
           putStrLn ("Warning: Cannot use package " ++ pkgName ++ ":")
           putStrLn ("   " ++ show e)
@@ -102,20 +56,17 @@ getPackages session packages = do
         )
 
 
--- | Try to create a HaddockPackage structure for a package
-getPackage :: Session -> InstalledPackageInfo -> IO HaddockPackage
-getPackage session pkgInfo = do
+-- | Try to read a HaddockPackage structure for a package
+getPackage :: InstalledPackageInfo -> IO HaddockPackage
+getPackage pkgInfo = do
 
-  html <- getHtml pkgInfo
+  html      <- getHtml pkgInfo
   ifacePath <- getIface pkgInfo
-  iface <- readInterfaceFile ifacePath
+  iface     <- readInterfaceFile ifacePath
   
-  let docEnv  = ifDocEnv iface
-      modules = packageModules pkgInfo
-
   return $ HaddockPackage {
-    pdModules  = modules,
-    pdDocEnv   = docEnv,
+    pdModules  = packageModules pkgInfo,
+    pdLinkEnv  = ifLinkEnv iface,
     pdHtmlPath = html
   } 
 
@@ -148,8 +99,8 @@ getIface pkgInfo = case haddockInterfaces pkgInfo of
   _ -> throwE "No Haddock interface installed."
 
 
--- | Build one big doc env out of a list of packages. If multiple packages 
+-- | Build one big link env out of a list of packages. If multiple packages 
 -- export the same (original) name, we just pick one of the packages as the 
 -- documentation site.
-combineDocEnvs :: [HaddockPackage] -> DocEnv
-combineDocEnvs packages = Map.unions (map pdDocEnv packages)
+combineLinkEnvs :: [HaddockPackage] -> LinkEnv
+combineLinkEnvs packages = Map.unions (map pdLinkEnv packages)

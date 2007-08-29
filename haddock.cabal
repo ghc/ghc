@@ -23,10 +23,10 @@ ghc-options: -fglasgow-exts
 hs-source-dirs: src
 exposed-modules:
 	Distribution.Haddock
+  Haddock.Types
 other-modules:
   Haddock.InterfaceFile
   Haddock.Exception
-  Haddock.Types
 data-files:
 	html/haddock-DEBUG.css
 	html/haddock.css
@@ -76,23 +76,24 @@ main-is: Main.hs
 extensions: CPP, PatternGuards
 ghc-options: -fglasgow-exts
 other-modules:
-	Haddock.Utils.FastMutInt2
-	Haddock.Utils.BlockTable
-	Haddock.HaddockDB
-	Haddock.DevHelp
-	Haddock.HH
-	Haddock.HH2
-	Haddock.Hoogle
-	Haddock.Utils.Html
-	Haddock.ModuleTree
-	Haddock.Rename
-	Haddock.Types
-	Haddock.Utils
-	Haddock.Version
-	Haddock.Utils.Html
-	Haddock.Utils.GHC
-	Haddock.InterfaceFile        
-	Haddock.Exception
-	Haddock.Options
-	Haddock.Typecheck
-	Main
+  Haddock.Interface.Rename
+  Haddock.Interface.Create
+  Haddock.Utils.FastMutInt2
+  Haddock.Utils.BlockTable
+  Haddock.Utils.Html
+  Haddock.Utils
+  Haddock.Backends.HaddockDB
+  Haddock.Backends.DevHelp
+  Haddock.Backends.HH
+  Haddock.Backends.HH2
+  Haddock.Backends.Hoogle
+  Haddock.ModuleTree
+  Haddock.Types
+  Haddock.Version
+  Haddock.InterfaceFile        
+  Haddock.Exception
+  Haddock.Options
+  Haddock.GHC.Typecheck
+  Haddock.GHC.Utils
+  Haddock.GHC
+  Main

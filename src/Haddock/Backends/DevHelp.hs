@@ -4,7 +4,7 @@
 -- (c) Simon Marlow 2003
 --
 
-module Haddock.DevHelp(ppDevHelpFile) where
+module Haddock.Backends.DevHelp (ppDevHelpFile) where
 
 import Haddock.ModuleTree
 import Haddock.Types

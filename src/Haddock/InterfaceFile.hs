@@ -45,7 +45,7 @@ data InterfaceMod = InterfaceMod {
 }
 
 data InterfaceFile = InterfaceFile {
-  ifDocEnv  :: DocEnv
+  ifLinkEnv  :: LinkEnv
 --  ifModules :: [InterfaceMod]  
 } 
 

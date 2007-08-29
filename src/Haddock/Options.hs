@@ -132,6 +132,5 @@ options backwardsCompat =
     Option [] ["use-package"] (ReqArg Flag_UsePackage "PACKAGE")
 	"the modules being processed depend on PACKAGE",
     Option ['g'] [] (ReqArg Flag_GhcFlag "FLAGS + ARGS")
- 	("send a flag to the Glasgow Haskell Compiler (use quotation to "
-  ++ "pass arguments to the flag)")      
+ 	("send a flag to GHC")
    ]

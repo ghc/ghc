@@ -8,9 +8,11 @@
 module Haddock.Types where
 
 
+import Data.Map
+import Control.Monad.Writer
+
 import GHC hiding (NoLink)
 import Outputable
-import Data.Map
 
 
 data DocOption
@@ -75,7 +77,7 @@ data ExportItem name
 type InstHead name = ([HsPred name], name, [HsType name])
 type ModuleMap     = Map Module HaddockModule
 type DocMap        = Map Name (HsDoc DocName)
-type DocEnv        = Map Name Name
+type LinkEnv       = Map Name Name
 
 
 data DocName = Link Name | NoLink Name
@@ -86,6 +88,26 @@ instance Outputable DocName where
   ppr (NoLink n) = ppr n
 
 
+-- | Information about a home package module that we get from GHC's typechecker
+data GhcModule = GhcModule {
+   ghcModule         :: Module,
+   ghcFilename       :: FilePath,
+   ghcMbDocOpts      :: Maybe String,
+   ghcHaddockModInfo :: HaddockModInfo Name,
+   ghcMbDoc          :: Maybe (HsDoc Name),
+   ghcGroup          :: HsGroup Name,
+   ghcMbExports      :: Maybe [LIE Name],
+   ghcExportedNames  :: [Name],
+   ghcNamesInScope   :: [Name],
+   ghcInstances      :: [Instance]
+}
+
+
+-- | This is the data used to render a Haddock page for a module - it is the 
+-- "interface" of the module. The core of Haddock lies in creating this 
+-- structure (see Haddock.Interface).
+--
+-- The structure also holds intermediate data needed during its creation.
 data HaddockModule = HM {
 
   -- | A value to identify the module
@@ -151,3 +173,9 @@ data DocMarkup id a = Markup {
   markupURL           :: String -> a,
   markupAName         :: String -> a
 }
+
+
+-- A monad which collects error messages
+
+type ErrMsg = String
+type ErrMsgM a = Writer [ErrMsg] a

@@ -5,7 +5,7 @@
 --
 
 
-module Haddock.Utils.GHC where
+module Haddock.GHC.Utils where
 
 
 import Debug.Trace
@@ -45,6 +45,9 @@ moduleString = moduleNameString . moduleName
 
 mkModuleNoPkg :: String -> Module
 mkModuleNoPkg str = mkModule (stringToPackageId "") (mkModuleName str)
+
+
+modulePkgStr = packageIdString . modulePackageId
 
 
 -- misc

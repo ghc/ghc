@@ -4,10 +4,12 @@
 -- (c) Simon Marlow 2003
 --
 
-module Haddock.Rename (
+
+module Haddock.Syntax.Rename (
   runRnFM, -- the monad (instance of Monad)
   renameDoc, renameMaybeDoc, renameExportItems,
 ) where
+
 
 import Haddock.Types
 
@@ -22,6 +24,7 @@ import qualified Data.Map as Map hiding ( Map )
 import Prelude hiding ( mapM )
 import Data.Traversable ( mapM )
 import Control.Arrow
+
 
 -- -----------------------------------------------------------------------------
 -- Monad for renaming

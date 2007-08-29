@@ -7,7 +7,7 @@
 -- Write out Hoogle compatible documentation
 -- http://www.haskell.org/hoogle/
 
-module Haddock.Hoogle ( 
+module Haddock.Backends.Hoogle ( 
 	ppHoogle
   ) where
 

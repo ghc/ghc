@@ -5,15 +5,14 @@
 --
 
 
-module Haddock.Typecheck (
-  GhcModule(..),
+module Haddock.GHC.Typecheck (
   typecheckFiles  
 ) where
 
 
 import Haddock.Exception
 import Haddock.Utils.GHC
-
+import Haddock.Types
 
 import Data.Maybe
 import Control.Monad
@@ -21,22 +20,6 @@ import GHC
 import Digraph
 import BasicTypes
 import SrcLoc
-
-
--- | This data structure collects all the information we want about a home 
--- package module that we can get from GHC's typechecker
-data GhcModule = GhcModule {
-   ghcModule         :: Module,
-   ghcFilename       :: FilePath,
-   ghcMbDocOpts      :: Maybe String,
-   ghcHaddockModInfo :: HaddockModInfo Name,
-   ghcMbDoc          :: Maybe (HsDoc Name),
-   ghcGroup          :: HsGroup Name,
-   ghcMbExports      :: Maybe [LIE Name],
-   ghcExportedNames  :: [Name],
-   ghcNamesInScope   :: [Name],
-   ghcInstances      :: [Instance]
-}
 
 
 typecheckFiles :: Session -> [FilePath] -> IO [GhcModule]

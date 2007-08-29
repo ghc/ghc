@@ -4,17 +4,19 @@
 -- (c) Simon Marlow 2003
 --
 
-module Haddock.Html ( 
-	ppHtml, copyHtmlBits, 
-	ppHtmlIndex, ppHtmlContents,
-	ppHtmlHelpFiles
-  ) where
+
+module Haddock.Backends.Html ( 
+  ppHtml, copyHtmlBits, 
+  ppHtmlIndex, ppHtmlContents,
+  ppHtmlHelpFiles
+) where
+
 
 import Prelude hiding (div)
 
-import Haddock.DevHelp
-import Haddock.HH
-import Haddock.HH2
+import Haddock.Backends.DevHelp
+import Haddock.Backends.HH
+import Haddock.Backends.HH2
 import Haddock.ModuleTree
 import Haddock.Types
 import Haddock.Version
