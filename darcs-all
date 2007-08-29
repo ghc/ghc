@@ -11,14 +11,13 @@ chomp $defaultrepo;
 my $defaultrepo_base;
 my $defaultrepo_lib;
 
-if ($defaultrepo =~ /:\/\//) {		
+if ($defaultrepo =~ /:/) {
     # HTTP or SSH
     $defaultrepo_base = $defaultrepo;
     $defaultrepo_base =~ s#/[^/]+/?$##;
     $defaultrepo_lib = "$defaultrepo_base/packages";
 }
-elsif (($defaultrepo =~ /^\//) or 	# unix
-       ($defaultrepo =~ /^.:/)) {	# windows, e.g. c:
+elsif ($defaultrepo =~ /^\//) {
     # Local filesystem, absolute path (assumes a checked-out tree):
     $defaultrepo_base = $defaultrepo;
     $defaultrepo_lib = "$defaultrepo/libraries";
