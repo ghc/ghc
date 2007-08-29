@@ -33,8 +33,7 @@ import Name
 -- | Turn a topologically sorted list of GhcModules into interfaces. Also
 -- return the home link environment created in the process, and any error
 -- messages.
-createInterfaces :: [GhcModule] -> LinkEnv -> [Flag] -> 
-                    ([Interface], LinkEnv, [ErrMsg])
+createInterfaces :: [GhcModule] -> LinkEnv -> [Flag] -> ([Interface], LinkEnv, [ErrMsg])
 createInterfaces modules extLinks flags = (interfaces, homeLinks, messages)
   where 
     ((interfaces, homeLinks), messages) = runWriter $ do
@@ -57,8 +56,7 @@ createInterfaces' modules flags = do
       return $ Map.insert (hmod_mod interface) interface map
 
  
-renameInterfaces :: [Interface] -> LinkEnv -> 
-                    ErrMsgM ([Interface], LinkEnv)
+renameInterfaces :: [Interface] -> LinkEnv -> ErrMsgM ([Interface], LinkEnv)
 renameInterfaces interfaces externalLinks = do
   let homeLinks = buildHomeLinks interfaces
   let links = homeLinks `Map.union` externalLinks
