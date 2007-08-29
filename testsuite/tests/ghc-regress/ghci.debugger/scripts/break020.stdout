@@ -35,23 +35,3 @@ _result :: IO () = _
 13    in_another_module 0
 14    [1mline2 1[0m
 15    return ()
--1  : [1min_another_module[0m (Break020b.hs:4:22-30)
--2  : [1min_another_module[0m (Break020b.hs:4:0-30)
--3  : [1mmain[0m (break020.hs:13:2-20)
--4  : [1mline2[0m (break020.hs:4:10-18)
--5  : [1mline2[0m (break020.hs:4:0-18)
--6  : [1min_another_decl[0m (break020.hs:7:23-29)
--7  : [1mline1[0m (break020.hs:3:10-18)
--8  : [1mline1[0m (break020.hs:3:0-18)
--9  : [1min_another_decl[0m (break020.hs:6:23-29)
--10 : [1min_another_decl[0m (break020.hs:(6,20)-(7,29))
--11 : [1min_another_decl[0m (break020.hs:(6,0)-(7,29))
--12 : [1mmain[0m (break020.hs:12:2-18)
--13 : [1mline2[0m (break020.hs:4:10-18)
--14 : [1mline2[0m (break020.hs:4:0-18)
--15 : [1mmain[0m (break020.hs:11:2-8)
--16 : [1mline1[0m (break020.hs:3:10-18)
--17 : [1mline1[0m (break020.hs:3:0-18)
--18 : [1mmain[0m (break020.hs:10:2-8)
--19 : [1mmain[0m (break020.hs:(9,7)-(17,1))
-<end of history>
