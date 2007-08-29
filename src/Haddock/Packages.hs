@@ -28,8 +28,8 @@ import Module
 import Packages
 
 
--- | Represents the installed Haddock information for a package.
--- This is basically the contents of the .haddock file, the path
+-- | This structure represents the installed Haddock information for a 
+-- package. This is basically the contents of the .haddock file, the path
 -- to the html files and the list of modules in the package
 data HaddockPackage = HaddockPackage {
   pdModules  :: [Module],

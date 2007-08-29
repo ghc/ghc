@@ -21,8 +21,8 @@ import Haddock.ModuleTree
 import Haddock.Types
 import Haddock.Version
 import Haddock.Utils
-import Haddock.Utils.GHC
 import Haddock.Utils.Html
+import Haddock.GHC.Utils
 import qualified Haddock.Utils.Html as Html
 
 import Control.Exception     ( bracket )
@@ -55,7 +55,7 @@ type WikiURLs = (Maybe String, Maybe String, Maybe String)
 
 ppHtml	:: String
 	-> Maybe String				-- package
-	-> [HaddockModule]
+	-> [Interface]
 	-> FilePath			-- destination directory
 	-> Maybe (GHC.HsDoc GHC.RdrName)    -- prologue text, maybe
 	-> Maybe String		        -- the Html Help format (--html-help)
@@ -93,7 +93,7 @@ ppHtml doctitle maybe_package hmods odir prologue maybe_html_help_format
 ppHtmlHelpFiles	
     :: String                   -- doctitle
     -> Maybe String				-- package
-	-> [HaddockModule]
+	-> [Interface]
 	-> FilePath                 -- destination directory
 	-> Maybe String             -- the Html Help format (--html-help)
 	-> [FilePath]               -- external packages paths
@@ -150,7 +150,7 @@ footer =
 	  toHtml ("version " ++ projectVersion)
 	)
    
-srcButton :: SourceURLs -> Maybe HaddockModule -> HtmlTable
+srcButton :: SourceURLs -> Maybe Interface -> HtmlTable
 srcButton (Just src_base_url, _, _) Nothing =
   topButBox (anchor ! [href src_base_url] << toHtml "Source code")
 
@@ -232,7 +232,7 @@ simpleHeader doctitle maybe_contents_url maybe_index_url
 	contentsButton maybe_contents_url <-> indexButton maybe_index_url
    ))
 
-pageHeader :: String -> HaddockModule -> String
+pageHeader :: String -> Interface -> String
     -> SourceURLs -> WikiURLs
     -> Maybe String -> Maybe String -> HtmlTable
 pageHeader mdl hmod doctitle
@@ -257,7 +257,7 @@ pageHeader mdl hmod doctitle
 	)
     )
 
-moduleInfo :: HaddockModule -> HtmlTable
+moduleInfo :: Interface -> HtmlTable
 moduleInfo hmod = 
    let
       info = hmod_info hmod
@@ -291,7 +291,7 @@ ppHtmlContents
    -> Maybe String
    -> SourceURLs
    -> WikiURLs
-   -> [HaddockModule] -> Bool -> Maybe (GHC.HsDoc GHC.RdrName)
+   -> [Interface] -> Bool -> Maybe (GHC.HsDoc GHC.RdrName)
    -> IO ()
 ppHtmlContents odir doctitle
   maybe_package maybe_html_help_format maybe_index_url
@@ -392,7 +392,7 @@ mkNode ss (Node s leaf pkg short ts) depth id = htmlNode
         (u,id') = mkNode (s:ss) x (depth+1) id
 
 -- The URL for source and wiki links, and the current module
-type LinksInfo = (SourceURLs, WikiURLs, HaddockModule)
+type LinksInfo = (SourceURLs, WikiURLs, Interface)
 
 
 -- ---------------------------------------------------------------------------
@@ -405,7 +405,7 @@ ppHtmlIndex :: FilePath
             -> Maybe String
             -> SourceURLs
             -> WikiURLs
-            -> [HaddockModule] 
+            -> [Interface] 
             -> IO ()
 ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
   maybe_contents_url maybe_source_url maybe_wiki_url modules = do
@@ -524,7 +524,7 @@ ppHtmlModule
 	:: FilePath -> String
 	-> SourceURLs -> WikiURLs
 	-> Maybe String -> Maybe String
-	-> HaddockModule -> IO ()
+	-> Interface -> IO ()
 ppHtmlModule odir doctitle
   maybe_source_url maybe_wiki_url
   maybe_contents_url maybe_index_url hmod = do
@@ -545,7 +545,7 @@ ppHtmlModule odir doctitle
          )
   writeFile (pathJoin [odir, moduleHtmlFile mod]) (renderHtml html)
 
-hmodToHtml :: SourceURLs -> WikiURLs -> HaddockModule -> HtmlTable
+hmodToHtml :: SourceURLs -> WikiURLs -> Interface -> HtmlTable
 hmodToHtml maybe_source_url maybe_wiki_url hmod
   = abovesSep s15 (contents: description: synopsis: maybe_doc_hdr: bdy)
   where

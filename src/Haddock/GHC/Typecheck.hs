@@ -11,8 +11,8 @@ module Haddock.GHC.Typecheck (
 
 
 import Haddock.Exception
-import Haddock.Utils.GHC
 import Haddock.Types
+import Haddock.GHC.Utils
 
 import Data.Maybe
 import Control.Monad

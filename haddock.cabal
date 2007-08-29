@@ -22,9 +22,9 @@ extensions: CPP, PatternGuards
 ghc-options: -fglasgow-exts
 hs-source-dirs: src
 exposed-modules:
-	Distribution.Haddock
-  Haddock.Types
+  Distribution.Haddock
 other-modules:
+  Haddock.Types
   Haddock.InterfaceFile
   Haddock.Exception
 data-files:
@@ -78,6 +78,7 @@ ghc-options: -fglasgow-exts
 other-modules:
   Haddock.Interface.Rename
   Haddock.Interface.Create
+  Haddock.Interface.AttachInstances
   Haddock.Utils.FastMutInt2
   Haddock.Utils.BlockTable
   Haddock.Utils.Html

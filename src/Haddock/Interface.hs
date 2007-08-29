@@ -2,10 +2,10 @@
 -- Haddock.Interface
 --
 -- Here we build the actual module interfaces. By interface we mean the 
--- information which is used to render a Haddock page for a module. Parts of 
+-- information that is used to render a Haddock page for a module. Parts of 
 -- this information is also stored in the interface files.
 --
--- The HaddockModule structure holds the interface data as well as 
+-- The Interface structure holds the interface data as well as 
 -- intermediate information needed during its creation.
 -------------------------------------------------------------------------------
 
@@ -35,7 +35,7 @@ import Name
 -- return the home link environment created in the process, and any error
 -- messages.
 createInterfaces :: [GhcModule] -> LinkEnv -> [Flag] -> 
-                    ([HaddockModule], LinkEnv, [ErrMsg])
+                    ([Interface], LinkEnv, [ErrMsg])
 createInterfaces modules extLinks flags = (interfaces, homeLinks, messages)
   where 
     ((interfaces, homeLinks), messages) = runWriter $ do
@@ -47,7 +47,7 @@ createInterfaces modules extLinks flags = (interfaces, homeLinks, messages)
       renameInterfaces interfaces' extLinks
 
 
-createInterfaces' :: [GhcModule] -> [Flag] -> ErrMsgM [HaddockModule]
+createInterfaces' :: [GhcModule] -> [Flag] -> ErrMsgM [Interface]
 createInterfaces' modules flags = do
   resultMap <- foldM addInterface Map.empty modules
   return (Map.elems resultMap)
@@ -58,13 +58,14 @@ createInterfaces' modules flags = do
       return $ Map.insert (hmod_mod interface) interface map
 
  
-renameInterfaces :: [HaddockModule] -> LinkEnv -> 
-                    ErrMsgM ([HaddockModule], LinkEnv)
+renameInterfaces :: [Interface] -> LinkEnv -> 
+                    ErrMsgM ([Interface], LinkEnv)
 renameInterfaces interfaces externalLinks = do
   let homeLinks = buildHomeLinks interfaces
   let links = homeLinks `Map.union` externalLinks
   interfaces' <- mapM (renameInterface links) interfaces
   return (interfaces', homeLinks)
+
 
 -- | Build a mapping which for each original name, points to the "best"
 -- place to link to in the documentation.  For the definition of
@@ -74,7 +75,7 @@ renameInterfaces interfaces externalLinks = do
 -- 
 -- The interfaces are passed in in topologically sorted order, but we start
 -- by reversing the list so we can do a foldl.
-buildHomeLinks :: [HaddockModule] -> LinkEnv
+buildHomeLinks :: [Interface] -> LinkEnv
 buildHomeLinks modules = foldl upd Map.empty (reverse modules)
   where
     upd old_env mod

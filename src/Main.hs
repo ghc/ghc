@@ -92,7 +92,7 @@ handleGhcExceptions inner =
 
 
 -------------------------------------------------------------------------------
--- Top-level
+-- Top level
 -------------------------------------------------------------------------------
 
 
@@ -142,7 +142,7 @@ main = handleTopExceptions $ do
 
 
 -- | Render the interfaces with whatever backend is specified in the flags 
-render :: [Flag] -> [HaddockModule] -> IO ()
+render :: [Flag] -> [Interface] -> IO ()
 render flags interfaces = do
   let
     title = case [str | Flag_Heading str <- flags] of

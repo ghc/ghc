@@ -18,7 +18,7 @@ import Data.Maybe    ( fromMaybe )
 import qualified Data.Map as Map
 import Text.PrettyPrint
 
-ppDevHelpFile :: FilePath -> String -> Maybe String -> [HaddockModule] -> IO ()
+ppDevHelpFile :: FilePath -> String -> Maybe String -> [Interface] -> IO ()
 ppDevHelpFile odir doctitle maybe_package modules = do
   let devHelpFile = package++".devhelp"
       tree = mkModuleTree True [ (hmod_mod mod, toDescription mod) | mod <- modules ]

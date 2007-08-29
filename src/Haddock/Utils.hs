@@ -61,7 +61,7 @@ import System.IO.Unsafe	 ( unsafePerformIO )
 -- Some Utilities
 
 -- | extract a module's short description.
-toDescription :: HaddockModule -> Maybe (HsDoc Name)
+toDescription :: Interface -> Maybe (HsDoc Name)
 toDescription = hmi_description . hmod_info
 
 -- ---------------------------------------------------------------------------

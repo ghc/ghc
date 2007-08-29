@@ -75,7 +75,7 @@ data ExportItem name
 
 
 type InstHead name = ([HsPred name], name, [HsType name])
-type ModuleMap     = Map Module HaddockModule
+type ModuleMap     = Map Module Interface
 type DocMap        = Map Name (HsDoc DocName)
 type LinkEnv       = Map Name Name
 
@@ -108,7 +108,7 @@ data GhcModule = GhcModule {
 -- structure (see Haddock.Interface).
 --
 -- The structure also holds intermediate data needed during its creation.
-data HaddockModule = HM {
+data Interface = Interface {
 
   -- | A value to identify the module
   hmod_mod                :: Module,
