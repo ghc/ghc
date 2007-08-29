@@ -891,6 +891,7 @@ foreignCall
 foreignCall conv_string results_code expr_code args_code vols safety ret
   = do  convention <- case conv_string of
           "C" -> return CCallConv
+          "stdcall" -> return StdCallConv
           "C--" -> return CmmCallConv
           _ -> fail ("unknown calling convention: " ++ conv_string)
 	return $ do

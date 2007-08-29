@@ -16,8 +16,8 @@
 
 #if CMINUSMINUS
 
-#define ACQUIRE_LOCK(mutex) pthread_mutex_lock(mutex)
-#define RELEASE_LOCK(mutex) pthread_mutex_unlock(mutex)
+#define ACQUIRE_LOCK(mutex) foreign "C" pthread_mutex_lock(mutex)
+#define RELEASE_LOCK(mutex) foreign "C" pthread_mutex_unlock(mutex)
 #define ASSERT_LOCK_HELD(mutex) /* nothing */
 
 #else
@@ -85,8 +85,8 @@ typedef pthread_key_t   ThreadLocalKey;
 /* We jump through a hoop here to get a CCall EnterCriticalSection
    and LeaveCriticalSection, as that's what C-- wants. */
 
-#define ACQUIRE_LOCK(mutex) CCallEnterCriticalSection(mutex)
-#define RELEASE_LOCK(mutex) CCallLeaveCriticalSection(mutex)
+#define ACQUIRE_LOCK(mutex) foreign "stdcall" EnterCriticalSection(mutex)
+#define RELEASE_LOCK(mutex) foreign "stdcall" LeaveCriticalSection(mutex)
 #define ASSERT_LOCK_HELD(mutex) /* nothing */
 
 #else

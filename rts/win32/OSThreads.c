@@ -232,14 +232,6 @@ forkOS_createThread ( HsStablePtr entry )
 			   (unsigned*)&pId) == 0);
 }
 
-void CCallEnterCriticalSection(LPCRITICAL_SECTION s) {
-    EnterCriticalSection(s);
-}
-
-void CCallLeaveCriticalSection(LPCRITICAL_SECTION s) {
-    LeaveCriticalSection(s);
-}
-
 #else /* !defined(THREADED_RTS) */
 
 int

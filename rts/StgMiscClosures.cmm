@@ -304,7 +304,7 @@ INFO_TABLE(stg_BLACKHOLE,0,1,BLACKHOLE,"BLACKHOLE","BLACKHOLE")
     LDV_ENTER(R1);
 
 #if defined(THREADED_RTS)
-    foreign "C" ACQUIRE_LOCK(sched_mutex "ptr");
+    ACQUIRE_LOCK(sched_mutex "ptr");
     // released in stg_block_blackhole_finally
 #endif
 
@@ -369,7 +369,7 @@ INFO_TABLE(stg_CAF_BLACKHOLE,0,1,CAF_BLACKHOLE,"CAF_BLACKHOLE","CAF_BLACKHOLE")
 #endif
 
 #if defined(THREADED_RTS)
-    foreign "C" ACQUIRE_LOCK(sched_mutex "ptr");
+    ACQUIRE_LOCK(sched_mutex "ptr");
     // released in stg_block_blackhole_finally
 #endif
 

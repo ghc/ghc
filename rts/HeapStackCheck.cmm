@@ -873,7 +873,7 @@ stg_block_blackhole_finally
     // The last thing we do is release sched_lock, which is
     // preventing other threads from accessing blackhole_queue and
     // picking up this thread before we are finished with it.
-    foreign "C" RELEASE_LOCK(sched_mutex "ptr");
+    RELEASE_LOCK(sched_mutex "ptr");
 #endif
     jump StgReturn;
 }
