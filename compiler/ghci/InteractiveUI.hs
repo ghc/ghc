@@ -601,7 +601,7 @@ afterRunStmt step_here run_result = do
       where printTypeAndContentOfNames session names = do
               let namesSorted = sortBy compareNames names
               tythings <- catMaybes `liftM` 
-                              io (mapM (GHC.lookupName session) names)
+                              io (mapM (GHC.lookupName session) namesSorted)
               docs_ty  <- mapM showTyThing tythings
               terms    <- mapM (io . GHC.obtainTermB session 10 False)
                                [ id | (AnId id, Just _) <- zip tythings docs_ty]
