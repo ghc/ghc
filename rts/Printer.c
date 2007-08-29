@@ -1064,11 +1064,37 @@ extern void DEBUG_LoadSymbols( char *name STG_UNUSED )
 
 void findPtr(P_ p, int);		/* keep gcc -Wall happy */
 
+int searched = 0;
+
+static int
+findPtrBlocks (StgPtr p, bdescr *bd, StgPtr arr[], int arr_size, int i)
+{
+    StgPtr q, r;
+    for (; bd; bd = bd->link) {
+        searched++;
+        for (q = bd->start; q < bd->free; q++) {
+            if (UNTAG_CLOSURE((StgClosure*)*q) == (StgClosure *)p) {
+                if (i < arr_size) {
+                    r = q;
+                    while (HEAP_ALLOCED((StgPtr)*r) || !LOOKS_LIKE_INFO_PTR(*r) || (P_)*r == NULL) {
+                        r--;
+                    }
+                    debugBelch("%p = ", r);
+                    printClosure((StgClosure *)r);
+                    arr[i++] = r;
+                } else {
+                    return i;
+                }
+            }
+        }
+    }
+    return i;
+}
+
 void
 findPtr(P_ p, int follow)
 {
   nat s, g;
-  P_ q, r;
   bdescr *bd;
 #if defined(__GNUC__)
   const int arr_size = 1024;
@@ -1077,27 +1103,15 @@ findPtr(P_ p, int follow)
 #endif
   StgPtr arr[arr_size];
   int i = 0;
+  searched = 0;
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       for (s = 0; s < generations[g].n_steps; s++) {
 	  bd = generations[g].steps[s].blocks;
-	  for (; bd; bd = bd->link) {
-	      for (q = bd->start; q < bd->free; q++) {
-		  if (*q == (W_)p) {
-		      if (i < arr_size) {
-			  r = q;
-			  while (!LOOKS_LIKE_INFO_PTR(*r) || (P_)*r == NULL) {
-			      r--;
-			  }
-			  debugBelch("%p = ", r);
-			  printClosure((StgClosure *)r);
-			  arr[i++] = r;
-		      } else {
-			  return;
-		      }
-		  }
-	      }
-	  }
+          i = findPtrBlocks(p,bd,arr,arr_size,i);
+	  bd = generations[g].steps[s].large_objects;
+          i = findPtrBlocks(p,bd,arr,arr_size,i);
+          if (i >= arr_size) return;
       }
   }
   if (follow && i == 1) {
