@@ -21,18 +21,13 @@ import IdInfo
 import Name
 import Var hiding ( varName )
 import VarSet
-import VarEnv
 import Name 
 import UniqSupply
-import Type
 import TcType
-import TcGadt
 import GHC
-import GhciMonad
 import InteractiveEval
 import Outputable
 import Pretty                    ( Mode(..), showDocWith )
-import FastString
 import SrcLoc
 
 import Control.Exception
@@ -146,10 +141,8 @@ bindSuspensions cms@(Session ref) t = do
 showTerm cms@(Session ref) = cPprTerm cPpr
  where
   cPpr = \p-> cPprShowable : cPprTermBase p
-  cPprShowable prec t@Term{ty=ty, dc=dc, val=val} = do
-    let hasType = isEmptyVarSet (tyVarsOfType ty)  -- redundant
-        isEvaled = isFullyEvaluatedTerm t
-    if not isEvaled -- || not hasType
+  cPprShowable prec t@Term{ty=ty, dc=dc, val=val} = 
+    if not (isFullyEvaluatedTerm t)
      then return Nothing
      else do
         hsc_env <- readIORef ref

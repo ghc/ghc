@@ -11,6 +11,9 @@ module RtClosureInspect(
      cvObtainTerm,      -- :: HscEnv -> Int -> Bool -> Maybe Type -> HValue -> IO Term
 
      Term(..),
+     isTerm,
+     isSuspension,
+     isPrim,
      pprTerm, 
      cPprTerm, 
      cPprTermBase,
@@ -27,7 +30,12 @@ module RtClosureInspect(
 --     unsafeDeepSeq, 
      cvReconstructType,
      computeRTTIsubst, 
-     sigmaType
+     sigmaType,
+     Closure(..),
+     getClosureData,
+     ClosureType(..),
+     isConstr,
+     isIndirection
  ) where 
 
 #include "HsVersions.h"
@@ -39,7 +47,7 @@ import Linker
 
 import DataCon          
 import Type             
-import TcRnMonad        ( TcM, initTc, initTcPrintErrors, ioToTcRn, 
+import TcRnMonad        ( TcM, initTc, ioToTcRn, 
                           tryTcErrs)
 import TcType
 import TcMType
@@ -69,7 +77,6 @@ import Control.Monad
 import Data.Maybe
 import Data.Array.Base
 import Data.List        ( partition )
-import qualified Data.Sequence as Seq
 import Foreign
 import System.IO.Unsafe
 
