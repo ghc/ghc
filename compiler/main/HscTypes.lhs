@@ -1430,8 +1430,6 @@ data ModBreaks
         -- An array giving the source span of each breakpoint.
    , modBreaks_vars :: !(Array BreakIndex [OccName])
         -- An array giving the names of the free variables at each breakpoint.
-   , modBreaks_decls:: !(Array BreakIndex SrcSpan)
-        -- An array giving the span of the enclosing expression
    }
 
 emptyModBreaks :: ModBreaks
@@ -1440,6 +1438,5 @@ emptyModBreaks = ModBreaks
          -- Todo: can we avoid this? 
    , modBreaks_locs = array (0,-1) []
    , modBreaks_vars = array (0,-1) []
-   , modBreaks_decls= array (0,-1) []
    }
 \end{code}
