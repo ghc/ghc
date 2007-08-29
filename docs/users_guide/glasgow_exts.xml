@@ -769,7 +769,7 @@ Furthermore, the Control.Monad.ST and Control.Monad.ST.Lazy modules provide the 
 for Haskell's internal state monad (strict and lazy, respectively).
 </para>
 <para>
-There are three important points in using the recursive-do notation:
+Here are some important points in using the recursive-do notation:
 <itemizedlist>
 <listitem><para>
 The recursive version of the do-notation uses the keyword <literal>mdo</literal> (rather
@@ -777,7 +777,21 @@ than <literal>do</literal>).
 </para></listitem>
 
 <listitem><para>
-As with other extensions, ghc should be given the flag <literal>-fglasgow-exts</literal>
+It is enabled with the flag <literal>-XRecursiveDo</literal>, which is in turn implied by
+<literal>-fglasgow-exts</literal>.
+</para></listitem>
+
+<listitem><para>
+Unlike ordinary do-notation, but like <literal>let</literal> and <literal>where</literal> bindings,
+name shadowing is not allowed; that is, all the names bound in a single <literal>mdo</literal> must
+be distinct (Section 3.3 of the paper).
+</para></listitem>
+
+<listitem><para>
+Variables bound by a <literal>let</literal> statement in an <literal>mdo</literal>
+are monomorphic in the <literal>mdo</literal> (Section 3.1 of the paper).  However
+GHC breaks the <literal>mdo</literal> into segments to enhance polymorphism,
+and improve termination (Section 3.2 of the paper).
 </para></listitem>
 </itemizedlist>
 </para>
