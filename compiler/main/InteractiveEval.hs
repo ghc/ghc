@@ -168,13 +168,6 @@ findEnclosingDecl hsc_env mod span =
                                        globals)
            in decl
 
--- | Find the Module corresponding to a FilePath
-findModuleFromFile :: HscEnv -> FilePath -> Maybe Module
-findModuleFromFile hsc_env fp =
-   listToMaybe $ [ms_mod ms | ms <- hsc_mod_graph hsc_env
-                            , ml_hs_file(ms_location ms) == Just (read fp)]
-
-
 -- | Run a statement in the current interactive context.  Statement
 -- may bind multple values.
 runStmt :: Session -> String -> SingleStep -> IO RunResult
@@ -519,8 +512,7 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
    -- So that we don't fall over in a heap when this happens, just don't
    -- bind any free variables instead, and we emit a warning.
    mb_hValues <- mapM (getIdValFromApStack apStack) offsets
-   let (filtered_hvs, filtered_ids) = 
-                       unzip [ (hv, id) | (id, Just hv) <- zip ids mb_hValues ]
+   let filtered_ids = [ id | (id, Just hv) <- zip ids mb_hValues ]
    when (any isNothing mb_hValues) $
       debugTraceMsg (hsc_dflags hsc_env) 1 $
 	  text "Warning: _result has been evaluated, some bindings have been lost"
@@ -567,7 +559,7 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
 
 rttiEnvironment :: HscEnv -> IO HscEnv 
 rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
-   let InteractiveContext{ic_tmp_ids=tmp_ids, ic_tyvars = tyvars} = ic
+   let InteractiveContext{ic_tmp_ids=tmp_ids} = ic
        incompletelyTypedIds = 
            [id | id <- tmp_ids
                , not $ null [v | v <- varSetElems$ tyVarsOfType (idType id)
