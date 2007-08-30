@@ -348,8 +348,13 @@ allocNew(nat n) {
     if(rec->base==0) {
         stgFree((void*)rec);
         rec=0;
-        sysErrorBelch(
-            "getMBlocks: VirtualAlloc MEM_RESERVE %d blocks failed", n);
+        if (GetLastError() == ERROR_NOT_ENOUGH_MEMORY) {
+
+            errorBelch("out of memory");
+        } else {
+            sysErrorBelch(
+                "getMBlocks: VirtualAlloc MEM_RESERVE %d blocks failed", n);
+        }
     } else {
 		alloc_rec temp;
 		temp.base=0; temp.size=0; temp.next=allocs;
