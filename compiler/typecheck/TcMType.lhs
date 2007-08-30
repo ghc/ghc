@@ -41,7 +41,7 @@ module TcMType (
   Rank, UserTypeCtxt(..), checkValidType, 
   SourceTyCtxt(..), checkValidTheta, checkFreeness,
   checkValidInstHead, checkValidInstance, checkAmbiguity,
-  checkInstTermination,
+  checkInstTermination, checkValidTypeInst, checkTyFamFreeness,
   arityErr, 
 
   --------------------------------
@@ -1182,7 +1182,7 @@ checkValidInstance tyvars theta clas inst_tys
 
 	-- Check that instance inference will terminate (if we care)
 	-- For Haskell 98 this will already have been done by checkValidTheta,
-    -- but as we may be using other extensions we need to check.
+        -- but as we may be using other extensions we need to check.
 	; unless undecidable_ok $
 	  mapM_ addErrTc (checkInstTermination inst_tys theta)
 	
@@ -1233,7 +1233,101 @@ predUndecErr pred msg = sep [msg,
 nomoreMsg = ptext SLIT("Variable occurs more often in a constraint than in the instance head")
 smallerMsg = ptext SLIT("Constraint is no smaller than the instance head")
 undecidableMsg = ptext SLIT("Use -fallow-undecidable-instances to permit this")
+\end{code}
 
+
+%************************************************************************
+%*									*
+\subsection{Checking type instance well-formedness and termination}
+%*									*
+%************************************************************************
+
+\begin{code}
+-- Check that a "type instance" is well-formed (which includes decidability
+-- unless -fallow-undecidable-instances is given).
+--
+checkValidTypeInst :: [Type] -> Type -> TcM ()
+checkValidTypeInst typats rhs
+  = do { -- left-hand side contains no type family applications
+         -- (vanilla synonyms are fine, though)
+       ; mappM_ checkTyFamFreeness typats
+
+         -- the right-hand side is a tau type
+       ; checkTc (isTauTy rhs) $ 
+	   polyTyErr rhs
+
+         -- we have a decidable instance unless otherwise permitted
+       ; undecidable_ok <- doptM Opt_UndecidableInstances
+       ; unless undecidable_ok $
+	   mapM_ addErrTc (checkFamInst typats (tyFamInsts rhs))
+       }
+
+-- Make sure that each type family instance is 
+--   (1) strictly smaller than the lhs,
+--   (2) mentions no type variable more often than the lhs, and
+--   (3) does not contain any further type family instances.
+--
+checkFamInst :: [Type]                  -- lhs
+             -> [(TyCon, [Type])]       -- type family instances
+             -> [Message]
+checkFamInst lhsTys famInsts
+  = mapCatMaybes check famInsts
+  where
+   size = sizeTypes lhsTys
+   fvs  = fvTypes lhsTys
+   check (tc, tys)
+      | not (all isTyFamFree tys)
+      = Just (famInstUndecErr famInst nestedMsg $$ parens undecidableMsg)
+      | not (null (fvTypes tys \\ fvs))
+      = Just (famInstUndecErr famInst nomoreVarMsg $$ parens undecidableMsg)
+      | size <= sizeTypes tys
+      = Just (famInstUndecErr famInst smallerAppMsg $$ parens undecidableMsg)
+      | otherwise
+      = Nothing
+      where
+        famInst = TyConApp tc tys
+
+-- Ensure that no type family instances occur in a type.
+--
+checkTyFamFreeness :: Type -> TcM ()
+checkTyFamFreeness ty
+  = checkTc (isTyFamFree ty) $
+      tyFamInstInIndexErr ty
+
+-- Check that a type does not contain any type family applications.
+--
+isTyFamFree :: Type -> Bool
+isTyFamFree = null . tyFamInsts
+
+-- Error messages
+
+tyFamInstInIndexErr ty
+  = hang (ptext SLIT("Illegal type family application in type instance") <> 
+         colon) 4 $
+      ppr ty
+
+polyTyErr ty 
+  = hang (ptext SLIT("Illegal polymorphic type in type instance") <> colon) 4 $
+      ppr ty
+
+famInstUndecErr ty msg 
+  = sep [msg, 
+         nest 2 (ptext SLIT("in the type family application:") <+> 
+                 pprType ty)]
+
+nestedMsg     = ptext SLIT("Nested type family application")
+nomoreVarMsg  = ptext SLIT("Variable occurs more often than in instance head")
+smallerAppMsg = ptext SLIT("Application is no smaller than the instance head")
+\end{code}
+
+
+%************************************************************************
+%*									*
+\subsection{Auxiliary functions}
+%*									*
+%************************************************************************
+
+\begin{code}
 -- Free variables of a type, retaining repetitions, and expanding synonyms
 fvType :: Type -> [TyVar]
 fvType ty | Just exp_ty <- tcView ty = fvType exp_ty
@@ -1271,4 +1365,16 @@ sizePred :: PredType -> Int
 sizePred (ClassP _ tys')   = sizeTypes tys'
 sizePred (IParam _ ty)     = sizeType ty
 sizePred (EqPred ty1 ty2)  = sizeType ty1 + sizeType ty2
+
+-- Type family instances occuring in a type after expanding synonyms
+tyFamInsts :: Type -> [(TyCon, [Type])]
+tyFamInsts ty 
+  | Just exp_ty <- tcView ty    = tyFamInsts exp_ty
+tyFamInsts (TyVarTy _)          = []
+tyFamInsts (TyConApp tc tys) 
+  | isOpenSynTyCon tc           = [(tc, tys)]
+  | otherwise                   = concat (map tyFamInsts tys)
+tyFamInsts (FunTy ty1 ty2)      = tyFamInsts ty1 ++ tyFamInsts ty2
+tyFamInsts (AppTy ty1 ty2)      = tyFamInsts ty1 ++ tyFamInsts ty2
+tyFamInsts (ForAllTy _ ty)      = tyFamInsts ty
 \end{code}

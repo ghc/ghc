@@ -275,13 +275,8 @@ tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
        ; t_rhs    <- tcHsKindedType k_rhs
 
          -- (3) check that 
-         --     - left-hand side contains no type family applications
-         --       (vanilla synonyms are fine, though)
-       ; mappM_ checkTyFamFreeness t_typats
-
-         --     - the right-hand side is a tau type
-       ; unless (isTauTy t_rhs) $ 
-	   addErr (polyTyErr t_rhs)
+         --     - check the well-formedness of the instance
+       ; checkValidTypeInst t_typats t_rhs
 
          -- (4) construct representation tycon
        ; rep_tc_name <- newFamInstTyConName tc_name loc
@@ -317,7 +312,8 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 
          -- (3) Check that
          --     - left-hand side contains no type family applications
-         --       (vanilla synonyms are fine, though)
+         --       (vanilla synonyms are fine, though, and we checked for
+         --       foralls earlier)
        ; mappM_ checkTyFamFreeness t_typats
 
 	 --     - we don't use GADT syntax for indexed types
@@ -353,27 +349,6 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 	 h98_syntax = case cons of 	-- All constructors have same shape
 			L _ (ConDecl { con_res = ResTyGADT _ }) : _ -> False
 			other -> True
-
--- Check that a type index does not contain any type family applications
---
--- * Earlier phases have already checked that there are no foralls in the
---   type; we also cannot have PredTys and NoteTys are being skipped by using
---   the core view. 
---
-checkTyFamFreeness :: Type -> TcM ()
-checkTyFamFreeness ty | Just (tycon, tys) <- splitTyConApp_maybe ty
-                      = if isSynTyCon tycon 
-                        then addErr $ tyFamAppInIndexErr ty
-                        else mappM_ checkTyFamFreeness tys
-                          -- splitTyConApp_maybe uses the core view; hence,
-                          -- any synonym tycon must be a family tycon
-
-                      | Just (ty1, ty2) <- splitAppTy_maybe ty
-                      = checkTyFamFreeness ty1 >> checkTyFamFreeness ty2
-
-                      | otherwise          -- only vars remaining
-                      = return ()
-
 
 -- Kind checking of indexed types
 -- -
@@ -1277,15 +1252,6 @@ wrongKindOfFamily family =
     kindOfFamily | isSynTyCon family = ptext SLIT("type synonym")
 		 | isAlgTyCon family = ptext SLIT("data type")
 		 | otherwise = pprPanic "wrongKindOfFamily" (ppr family)
-
-polyTyErr ty 
-  = hang (ptext SLIT("Illegal polymorphic type in type instance") <> colon) 4 $
-      ppr ty
-
-tyFamAppInIndexErr ty
-  = hang (ptext SLIT("Illegal type family application in type instance") <> 
-         colon) 4 $
-      ppr ty
 
 emptyConDeclsErr tycon
   = sep [quotes (ppr tycon) <+> ptext SLIT("has no constructors"),

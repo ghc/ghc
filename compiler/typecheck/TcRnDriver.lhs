@@ -1060,16 +1060,18 @@ tcGhciStmts stmts
 	 } ;
 
 	-- OK, we're ready to typecheck the stmts
-	traceTc (text "tcs 2") ;
+	traceTc (text "TcRnDriver.tcGhciStmts: tc stmts") ;
 	((tc_stmts, ids), lie) <- getLIE $ tc_io_stmts stmts $ \ _ ->
 					   mappM tcLookupId names ;
 					-- Look up the names right in the middle,
 					-- where they will all be in scope
 
 	-- Simplify the context
+	traceTc (text "TcRnDriver.tcGhciStmts: simplify ctxt") ;
 	const_binds <- checkNoErrs (tcSimplifyInteractive lie) ;
 		-- checkNoErrs ensures that the plan fails if context redn fails
 
+	traceTc (text "TcRnDriver.tcGhciStmts: done") ;
 	return (ids, mkHsDictLet const_binds $
 		     noLoc (HsDo DoExpr tc_stmts (mk_return ids) io_ret_ty))
     }
