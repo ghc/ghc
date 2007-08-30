@@ -3,8 +3,8 @@ _result :: (a1, a2 -> a2, (), a -> a -> a) = _
 Stopped at break012.hs:5:9-17
 _result :: (a1, a2 -> a2, (), a -> a -> a) = _
 a :: a1 = _
-c :: () = _
 b :: a3 -> a3 = _
+c :: () = _
 d :: a -> a -> a = _
 a :: a1
 b :: a3 -> a3
