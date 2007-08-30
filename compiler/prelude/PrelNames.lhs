@@ -218,7 +218,7 @@ genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 
 ndpNames :: [Name]
 ndpNames = [ parrayTyConName, paTyConName, preprTyConName, prTyConName
-           , uarrTyConName
+           , parrayIntPrimTyConName
            , mkPRName
            , closureTyConName
            , mkClosureName, applyClosureName
@@ -281,7 +281,6 @@ nDP_REPR        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Repr")
 nDP_CLOSURE     = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Closure")
 nDP_PRIM        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Prim")
 nDP_INSTANCES   = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Instances")
-nDP_UARR        = mkNDPModule FSLIT("Data.Array.Parallel.Unlifted.Flat.UArr")
 
 mAIN	        = mkMainModule_ mAIN_NAME
 rOOT_MAIN	= mkMainModule FSLIT(":Main") -- Root module for initialisation 
@@ -700,7 +699,8 @@ parrayTyConName     = tcQual   nDP_PARRAY FSLIT("PArray") parrayTyConKey
 paTyConName         = tcQual   nDP_PARRAY FSLIT("PA")     paTyConKey
 preprTyConName      = tcQual   nDP_PARRAY FSLIT("PRepr")  preprTyConKey
 prTyConName         = tcQual   nDP_PARRAY FSLIT("PR")     prTyConKey
-uarrTyConName       = tcQual   nDP_UARR   FSLIT("UArr")   uarrTyConKey
+parrayIntPrimTyConName = tcQual nDP_PRIM  FSLIT("PArray_Int#")
+                                                          parrayIntPrimTyConKey
 mkPRName            = varQual  nDP_PARRAY FSLIT("mkPR")   mkPRIdKey
 lengthPAName        = varQual  nDP_PARRAY FSLIT("lengthPA")    lengthPAIdKey
 replicatePAName     = varQual  nDP_PARRAY FSLIT("replicatePA") replicatePAIdKey
@@ -896,7 +896,7 @@ closureTyConKey                         = mkPreludeTyConUnique 136
 paTyConKey                              = mkPreludeTyConUnique 137
 preprTyConKey                           = mkPreludeTyConUnique 138
 prTyConKey                              = mkPreludeTyConUnique 139
-uarrTyConKey                            = mkPreludeTyConUnique 140
+parrayIntPrimTyConKey                   = mkPreludeTyConUnique 140
 
 
 ---------------- Template Haskell -------------------

@@ -288,8 +288,8 @@ reprVars = mapM (mapM (newLocalVar FSLIT("r"))) . reprTys
 arrShapeTys :: Repr -> VM [Type]
 arrShapeTys (SumRepr  {})
   = do
-      uarr <- builtin uarrTyCon
-      return [intPrimTy, mkTyConApp uarr [intTy]]
+      int_arr <- builtin parrayIntPrimTyCon
+      return [intPrimTy, mkTyConApp int_arr [], mkTyConApp int_arr []]
 arrShapeTys repr = return [intPrimTy]
 
 arrShapeVars :: Repr -> VM [Var]
