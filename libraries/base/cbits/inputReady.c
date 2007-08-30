@@ -75,7 +75,8 @@ fdReady(int fd, int write, int msecs, int isSock)
 	    if (rc == ERROR_BROKEN_PIPE) {
 		return 1; // this is probably what we want
 	    }
-	    if (rc != ERROR_INVALID_HANDLE) {
+	    if (rc != ERROR_INVALID_HANDLE && rc != ERROR_INVALID_FUNCTION) {
+                maperrno();
 		return -1;
 	    }
 	}
