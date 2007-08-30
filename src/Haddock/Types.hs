@@ -104,8 +104,8 @@ data GhcModule = GhcModule {
 }
 
 
--- | This is the data used to render a Haddock page for a module - it is the 
--- "interface" of the module. The core of Haddock lies in creating this 
+-- | This is the data structure used to render a Haddock page for a module - it
+-- is the "interface" of the module. The core of Haddock lies in creating this 
 -- structure (see Haddock.Interface). The structure also holds intermediate
 -- data needed during its creation.
 data Interface = Interface {
