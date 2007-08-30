@@ -62,7 +62,7 @@ import System.IO.Unsafe	 ( unsafePerformIO )
 
 -- | extract a module's short description.
 toDescription :: Interface -> Maybe (HsDoc Name)
-toDescription = hmi_description . hmod_info
+toDescription = hmi_description . ifaceInfo
 
 -- ---------------------------------------------------------------------------
 -- Making abstract declarations

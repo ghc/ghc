@@ -9,7 +9,7 @@ module Haddock.InterfaceFile (
   InterfaceFile(..),
   writeInterfaceFile,
   readInterfaceFile,
-  hmod2interface
+  iface2interface
 ) where
 
 
@@ -55,10 +55,10 @@ instance Binary InterfaceFile where
     env <- get bh
     return (InterfaceFile (Map.fromList env))
 
-hmod2interface hmod = InterfaceMod {
-  imModule      = hmod_mod             hmod,
-  imFilename    = hmod_orig_filename   hmod,
-  imExportItems = hmod_rn_export_items hmod
+iface2interface iface = InterfaceMod {
+  imModule      = ifaceMod             iface,
+  imFilename    = ifaceOrigFilename   iface,
+  imExportItems = ifaceRnExportItems iface
 }
   
 binaryInterfaceMagic = 0xD0Cface :: Word32

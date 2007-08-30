@@ -32,9 +32,9 @@ attachInstances :: [Interface] -> [Interface]
 attachInstances modules = map attach modules
   where
     instMap = fmap (map toHsInstHead . sortImage instHead) $ collectInstances modules
-    attach mod = mod { hmod_export_items = newItems }
+    attach mod = mod { ifaceExportItems = newItems }
       where
-        newItems = map attachExport (hmod_export_items mod)
+        newItems = map attachExport (ifaceExportItems mod)
 
         attachExport (ExportDecl n decl doc _) =
           ExportDecl n decl doc (case Map.lookup n instMap of
@@ -56,7 +56,7 @@ collectInstances modules
   = Map.fromListWith (flip (++)) tyInstPairs `Map.union`
     Map.fromListWith (flip (++)) classInstPairs
   where
-    allInstances = concat (map hmod_instances modules)
+    allInstances = concat (map ifaceInstances modules)
     classInstPairs = [ (is_cls inst, [instanceHead inst]) | 
                        inst <- allInstances ]
     tyInstPairs = [ (tycon, [instanceHead inst]) | inst <- allInstances, 

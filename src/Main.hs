@@ -190,8 +190,8 @@ render flags interfaces = do
   prologue <- getPrologue flags
 
   let 
-    visibleMods = [ m | m <- interfaces, OptHide `notElem` (hmod_options m) ]
-    packageName = (Just . modulePkgStr . hmod_mod . head) visibleMods
+    visibleMods = [ m | m <- interfaces, OptHide `notElem` (ifaceOptions m) ]
+    packageName = (Just . modulePkgStr . ifaceMod . head) visibleMods
  
   when (Flag_GenIndex `elem` flags) $ do
 	ppHtmlIndex odir title packageName maybe_html_help_format

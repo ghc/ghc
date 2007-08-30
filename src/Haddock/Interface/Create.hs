@@ -82,22 +82,22 @@ createInterface ghcMod flags modMap = do
       | otherwise = exportItems
  
   return Interface {
-    hmod_mod                = mod,
-    hmod_orig_filename      = ghcFilename ghcMod,
-    hmod_info               = ghcHaddockModInfo ghcMod,
-    hmod_doc                = ghcMbDoc ghcMod,
-    hmod_rn_doc             = Nothing,
-    hmod_options            = opts,
-    hmod_locals             = localNames,
-    hmod_doc_map            = docMap,
-    hmod_rn_doc_map         = Map.empty,
-    hmod_sub_map            = subMap,
-    hmod_export_items       = prunedExportItems,
-    hmod_rn_export_items    = [], 
-    hmod_exports            = ghcExportedNames ghcMod,
-    hmod_visible_exports    = visibleNames, 
-    hmod_exported_decl_map  = expDeclMap,
-    hmod_instances          = ghcInstances ghcMod
+    ifaceMod             = mod,
+    ifaceOrigFilename    = ghcFilename ghcMod,
+    ifaceInfo            = ghcHaddockModInfo ghcMod,
+    ifaceDoc             = ghcMbDoc ghcMod,
+    ifaceRnDoc           = Nothing,
+    ifaceOptions         = opts,
+    ifaceLocals          = localNames,
+    ifaceDocMap          = docMap,
+    ifaceRnDocMap        = Map.empty,
+    ifaceSubMap          = subMap,
+    ifaceExportItems     = prunedExportItems,
+    ifaceRnExportItems   = [], 
+    ifaceExports         = ghcExportedNames ghcMod,
+    ifaceVisibleExports  = visibleNames, 
+    ifaceExportedDeclMap = expDeclMap,
+    ifaceInstances       = ghcInstances ghcMod
   }
 
 
@@ -404,9 +404,9 @@ mkExportItems lookupMod this_mod exported_names exportedDeclMap localDeclMap sub
 	| m == this_mod = return (fullContentsOfThisModule this_mod entities localDeclMap docMap)
 	| otherwise = 
 	   case lookupMod m of
-	     Just hmod
-		| OptHide `elem` hmod_options hmod
-			-> return (hmod_export_items hmod)
+	     Just iface
+		| OptHide `elem` ifaceOptions iface
+			-> return (ifaceExportItems iface)
 		| otherwise -> return [ ExportModule m ]
 	     Nothing -> return [] -- already emitted a warning in visibleNames
 
@@ -416,8 +416,8 @@ mkExportItems lookupMod this_mod exported_names exportedDeclMap localDeclMap sub
 	| m == this_mod = (Map.lookup n exportedDeclMap, Map.lookup n docMap)
 	| otherwise = 
 	   case lookupMod m of
-		Just hmod -> (Map.lookup n (hmod_exported_decl_map hmod), 
-                              Map.lookup n (hmod_doc_map hmod))
+		Just iface -> (Map.lookup n (ifaceExportedDeclMap iface), 
+                      Map.lookup n (ifaceDocMap iface))
 		Nothing -> (Nothing, Nothing)
       where
         m = nameModule n
@@ -539,8 +539,8 @@ mkVisibleNames mdl lookupMod localNames scope subMap maybeExps opts declMap
 	| otherwise -> let m' = mkModule (modulePackageId mdl) m in
 	  case lookupMod m' of
 	    Just mod
-		| OptHide `elem` hmod_options mod ->
-		    return (filter (`elem` scope) (hmod_exports mod))
+		| OptHide `elem` ifaceOptions mod ->
+		    return (filter (`elem` scope) (ifaceExports mod))
 		| otherwise -> return []
 	    Nothing
 		-> tell (exportModuleMissingErr mdl m') >> return []
@@ -560,7 +560,7 @@ allSubsOfName :: LookupMod -> Name -> [Name]
 allSubsOfName lookupMod name 
   | isExternalName name =
     case lookupMod (nameModule name) of
-      Just hmod -> Map.findWithDefault [] name (hmod_sub_map hmod)
+      Just iface -> Map.findWithDefault [] name (ifaceSubMap iface)
       Nothing   -> []
   | otherwise =  error $ "Main.allSubsOfName: unexpected unqual'd name"
 

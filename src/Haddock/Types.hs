@@ -111,35 +111,35 @@ data GhcModule = GhcModule {
 data Interface = Interface {
 
   -- | A value to identify the module
-  hmod_mod                :: Module,
+  ifaceMod             :: Module,
 
   -- | The original filename for this module
-  hmod_orig_filename      :: FilePath,
+  ifaceOrigFilename    :: FilePath,
 
   -- | Textual information about the module 
-  hmod_info               :: HaddockModInfo Name,
+  ifaceInfo            :: HaddockModInfo Name,
 
   -- | The documentation header for this module
-  hmod_doc                :: Maybe (HsDoc Name),
+  ifaceDoc             :: Maybe (HsDoc Name),
 
   -- | The renamed documentation header for this module
-  hmod_rn_doc             :: Maybe (HsDoc DocName),
+  ifaceRnDoc           :: Maybe (HsDoc DocName),
 
   -- | The Haddock options for this module (prune, ignore-exports, etc)
-  hmod_options            :: [DocOption],
+  ifaceOptions         :: [DocOption],
 
-  hmod_exported_decl_map  :: Map Name (LHsDecl Name),
-  hmod_doc_map            :: Map Name (HsDoc Name),  
-  hmod_rn_doc_map         :: Map Name (HsDoc DocName),
+  ifaceExportedDeclMap :: Map Name (LHsDecl Name),
+  ifaceDocMap          :: Map Name (HsDoc Name),  
+  ifaceRnDocMap        :: Map Name (HsDoc DocName),
 
-  hmod_export_items       :: [ExportItem Name],
-  hmod_rn_export_items    :: [ExportItem DocName],
+  ifaceExportItems     :: [ExportItem Name],
+  ifaceRnExportItems   :: [ExportItem DocName],
 
   -- | All the names that are defined in this module
-  hmod_locals             :: [Name],
+  ifaceLocals          :: [Name],
 
   -- | All the names that are exported by this module
-  hmod_exports            :: [Name],
+  ifaceExports         :: [Name],
 
   -- | All the visible names exported by this module
   -- For a name to be visible, it has to:
@@ -148,12 +148,12 @@ data Interface = Interface {
   --   exception that it can't be from another package.
   -- Basically, a visible name is a name that will show up in the documentation
   -- for this module.
-  hmod_visible_exports    :: [Name],
+  ifaceVisibleExports  :: [Name],
 
-  hmod_sub_map            :: Map Name [Name],
+  ifaceSubMap          :: Map Name [Name],
 
   -- | The instances exported by this module
-  hmod_instances          :: [Instance]
+  ifaceInstances       :: [Instance]
 }
 
 

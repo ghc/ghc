@@ -65,30 +65,30 @@ ppHtml	:: String
 	-> Maybe String			-- the index URL (--use-index)
 	-> IO ()
 
-ppHtml doctitle maybe_package hmods odir prologue maybe_html_help_format
+ppHtml doctitle maybe_package ifaces odir prologue maybe_html_help_format
 	maybe_source_url maybe_wiki_url
 	maybe_contents_url maybe_index_url =  do
   let
-	visible_hmods = filter visible hmods
-	visible i = OptHide `notElem` hmod_options i
+	visible_ifaces = filter visible ifaces
+	visible i = OptHide `notElem` ifaceOptions i
 
   when (not (isJust maybe_contents_url)) $ 
     ppHtmlContents odir doctitle maybe_package
         maybe_html_help_format maybe_index_url maybe_source_url maybe_wiki_url
-	visible_hmods
+	visible_ifaces
 	False -- we don't want to display the packages in a single-package contents
 	prologue
 
   when (not (isJust maybe_index_url)) $ 
     ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
-      maybe_contents_url maybe_source_url maybe_wiki_url visible_hmods
+      maybe_contents_url maybe_source_url maybe_wiki_url visible_ifaces
     
   when (not (isJust maybe_contents_url && isJust maybe_index_url)) $ 
-	ppHtmlHelpFiles doctitle maybe_package hmods odir maybe_html_help_format []
+	ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format []
 
   mapM_ (ppHtmlModule odir doctitle
 	   maybe_source_url maybe_wiki_url
-	   maybe_contents_url maybe_index_url) visible_hmods
+	   maybe_contents_url maybe_index_url) visible_ifaces
 
 ppHtmlHelpFiles	
     :: String                   -- doctitle
@@ -98,19 +98,19 @@ ppHtmlHelpFiles
 	-> Maybe String             -- the Html Help format (--html-help)
 	-> [FilePath]               -- external packages paths
 	-> IO ()
-ppHtmlHelpFiles doctitle maybe_package hmods odir maybe_html_help_format pkg_paths =  do
+ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format pkg_paths =  do
   let
-	visible_hmods = filter visible hmods
-	visible i = OptHide `notElem` hmod_options i
+	visible_ifaces = filter visible ifaces
+	visible i = OptHide `notElem` ifaceOptions i
 
   -- Generate index and contents page for Html Help if requested
   case maybe_html_help_format of
     Nothing        -> return ()
-    Just "mshelp"  -> ppHHProject odir doctitle maybe_package visible_hmods pkg_paths
+    Just "mshelp"  -> ppHHProject odir doctitle maybe_package visible_ifaces pkg_paths
     Just "mshelp2" -> do
-		ppHH2Files      odir maybe_package visible_hmods pkg_paths
+		ppHH2Files      odir maybe_package visible_ifaces pkg_paths
 		ppHH2Collection odir doctitle maybe_package
-    Just "devhelp" -> ppDevHelpFile odir doctitle maybe_package visible_hmods
+    Just "devhelp" -> ppDevHelpFile odir doctitle maybe_package visible_ifaces
     Just format    -> fail ("The "++format++" format is not implemented")
 
 copyFile :: FilePath -> FilePath -> IO ()
@@ -154,9 +154,9 @@ srcButton :: SourceURLs -> Maybe Interface -> HtmlTable
 srcButton (Just src_base_url, _, _) Nothing =
   topButBox (anchor ! [href src_base_url] << toHtml "Source code")
 
-srcButton (_, Just src_module_url, _) (Just hmod) =
-  let url = spliceURL (Just $ hmod_orig_filename hmod)
-                      (Just $ hmod_mod hmod) Nothing src_module_url
+srcButton (_, Just src_module_url, _) (Just iface) =
+  let url = spliceURL (Just $ ifaceOrigFilename iface)
+                      (Just $ ifaceMod iface) Nothing src_module_url
    in topButBox (anchor ! [href url] << toHtml "Source code")
 
 srcButton _ _ =
@@ -235,7 +235,7 @@ simpleHeader doctitle maybe_contents_url maybe_index_url
 pageHeader :: String -> Interface -> String
     -> SourceURLs -> WikiURLs
     -> Maybe String -> Maybe String -> HtmlTable
-pageHeader mdl hmod doctitle
+pageHeader mdl iface doctitle
            maybe_source_url maybe_wiki_url
            maybe_contents_url maybe_index_url =
   (tda [theclass "topbar"] << 
@@ -244,8 +244,8 @@ pageHeader mdl hmod doctitle
   	image ! [src "haskell_icon.gif", width "16", height 16, alt " "]
        ) <->
        (tda [theclass "title"] << toHtml doctitle) <->
-	srcButton maybe_source_url (Just hmod) <->
-	wikiButton maybe_wiki_url (Just $ hmod_mod hmod) <->
+	srcButton maybe_source_url (Just iface) <->
+	wikiButton maybe_wiki_url (Just $ ifaceMod iface) <->
 	contentsButton maybe_contents_url <->
 	indexButton maybe_index_url
     )
@@ -253,14 +253,14 @@ pageHeader mdl hmod doctitle
    tda [theclass "modulebar"] <<
 	(vanillaTable << (
 	  (td << font ! [size "6"] << toHtml mdl) <->
-	  moduleInfo hmod
+	  moduleInfo iface
 	)
     )
 
 moduleInfo :: Interface -> HtmlTable
-moduleInfo hmod = 
+moduleInfo iface = 
    let
-      info = hmod_info hmod
+      info = ifaceInfo iface
 
       doOneEntry :: (String, (GHC.HaddockModInfo GHC.Name) -> Maybe String) -> Maybe HtmlTable
       doOneEntry (fieldName,field) = case field info of
@@ -297,7 +297,7 @@ ppHtmlContents odir doctitle
   maybe_package maybe_html_help_format maybe_index_url
   maybe_source_url maybe_wiki_url modules showPkgs prologue = do
   let tree = mkModuleTree showPkgs
-         [(hmod_mod mod, toDescription mod) | mod <- modules]
+         [(ifaceMod mod, toDescription mod) | mod <- modules]
       html = 
 	header 
 		(documentCharacterEncoding +++
@@ -481,11 +481,11 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
   full_index = Map.fromListWith (flip (Map.unionWith (++)))
 		(concat (map getHModIndex modules))
 
-  getHModIndex hmod = 
+  getHModIndex iface = 
     [ (getOccString name, 
-	Map.fromList [(name, [(mdl, name `elem` hmod_visible_exports hmod)])])
-    | name <- hmod_exports hmod ]
-    where mdl = hmod_mod hmod
+	Map.fromList [(name, [(mdl, name `elem` ifaceVisibleExports iface)])])
+    | name <- ifaceExports iface ]
+    where mdl = ifaceMod iface
 
   indexElt :: (String, Map GHC.Name [(Module,Bool)]) -> HtmlTable
   indexElt (str, entities) = 
@@ -527,9 +527,9 @@ ppHtmlModule
 	-> Interface -> IO ()
 ppHtmlModule odir doctitle
   maybe_source_url maybe_wiki_url
-  maybe_contents_url maybe_index_url hmod = do
+  maybe_contents_url maybe_index_url iface = do
   let 
-      mod = hmod_mod hmod
+      mod = ifaceMod iface
       mdl = moduleString mod
       html = 
 	header (documentCharacterEncoding +++
@@ -537,58 +537,60 @@ ppHtmlModule odir doctitle
 		styleSheet +++
 		(script ! [src jsFile, thetype "text/javascript"] $ noHtml)) +++
         body << vanillaTable << (
-	    pageHeader mdl hmod doctitle
+	    pageHeader mdl iface doctitle
 		maybe_source_url maybe_wiki_url
 		maybe_contents_url maybe_index_url </> s15 </>
-	    hmodToHtml maybe_source_url maybe_wiki_url hmod </> s15 </>
+	    ifaceToHtml maybe_source_url maybe_wiki_url iface </> s15 </>
 	    footer
          )
   writeFile (pathJoin [odir, moduleHtmlFile mod]) (renderHtml html)
 
-hmodToHtml :: SourceURLs -> WikiURLs -> Interface -> HtmlTable
-hmodToHtml maybe_source_url maybe_wiki_url hmod
+
+ifaceToHtml :: SourceURLs -> WikiURLs -> Interface -> HtmlTable
+ifaceToHtml maybe_source_url maybe_wiki_url iface
   = abovesSep s15 (contents: description: synopsis: maybe_doc_hdr: bdy)
   where
-        docMap = hmod_rn_doc_map hmod
+    docMap = ifaceRnDocMap iface
  
-	exports = numberSectionHeadings (hmod_rn_export_items hmod)
+    exports = numberSectionHeadings (ifaceRnExportItems iface)
 
-	has_doc (ExportDecl _ _ doc _) = isJust doc
-	has_doc (ExportNoDecl _ _ _) = False
-	has_doc (ExportModule _) = False
-	has_doc _ = True
+    has_doc (ExportDecl _ _ doc _) = isJust doc
+    has_doc (ExportNoDecl _ _ _) = False
+    has_doc (ExportModule _) = False
+    has_doc _ = True
 
-	no_doc_at_all = not (any has_doc exports)
+    no_doc_at_all = not (any has_doc exports)
 
- 	contents = td << vanillaTable << ppModuleContents exports
+    contents = td << vanillaTable << ppModuleContents exports
 
-	description
-          = case hmod_rn_doc hmod of
+    description
+          = case ifaceRnDoc iface of
               Nothing -> Html.emptyTable
               Just doc -> (tda [theclass "section1"] << toHtml "Description") </>
                           docBox (docToHtml doc)
 
 	-- omit the synopsis if there are no documentation annotations at all
-	synopsis
-	  | no_doc_at_all = Html.emptyTable
-	  | otherwise
-	  = (tda [theclass "section1"] << toHtml "Synopsis") </>
-	    s15 </>
+    synopsis
+      | no_doc_at_all = Html.emptyTable
+      | otherwise
+      = (tda [theclass "section1"] << toHtml "Synopsis") </>
+        s15 </>
             (tda [theclass "body"] << vanillaTable <<
-  	        abovesSep s8 (map (processExport True linksInfo docMap)
-			(filter forSummary exports))
-	    )
+            abovesSep s8 (map (processExport True linksInfo docMap)
+            (filter forSummary exports))
+        )
 
 	-- if the documentation doesn't begin with a section header, then
 	-- add one ("Documentation").
-	maybe_doc_hdr
-	    = case exports of		   
-		   [] -> Html.emptyTable
-		   ExportGroup _ _ _ : _ -> Html.emptyTable
-		   _ -> tda [ theclass "section1" ] << toHtml "Documentation"
+    maybe_doc_hdr
+      = case exports of		   
+          [] -> Html.emptyTable
+          ExportGroup _ _ _ : _ -> Html.emptyTable
+          _ -> tda [ theclass "section1" ] << toHtml "Documentation"
 
-	bdy  = map (processExport False linksInfo docMap) exports
-	linksInfo = (maybe_source_url, maybe_wiki_url, hmod)
+    bdy  = map (processExport False linksInfo docMap) exports
+    linksInfo = (maybe_source_url, maybe_wiki_url, iface)
+
 
 ppModuleContents :: [ExportItem DocName] -> HtmlTable
 ppModuleContents exports
@@ -1390,7 +1392,7 @@ declBox html = tda [theclass "decl"] << html
 -- it adds a source and wiki link at the right hand side of the box
 topDeclBox :: LinksInfo -> SrcSpan -> Name -> Html -> HtmlTable
 topDeclBox ((_,_,Nothing), (_,_,Nothing), _) _ _ html = declBox html
-topDeclBox ((_,_,maybe_source_url), (_,_,maybe_wiki_url), hmod)
+topDeclBox ((_,_,maybe_source_url), (_,_,maybe_wiki_url), iface)
            loc name html =
   tda [theclass "topdecl"] <<
   (        table ! [theclass "declbar"] <<
@@ -1413,7 +1415,7 @@ topDeclBox ((_,_,maybe_source_url), (_,_,maybe_wiki_url), hmod)
                                                (Just name) url
                            in anchor ! [href url'] << toHtml "Comments"
   
-        mod = hmod_mod hmod
+        mod = ifaceMod iface
         fname = unpackFS (srcSpanFile loc)
 
 -- a box for displaying an 'argument' (some code which has text to the

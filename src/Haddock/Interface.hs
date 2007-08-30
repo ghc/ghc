@@ -53,7 +53,7 @@ createInterfaces' modules flags = do
     addInterface :: ModuleMap -> GhcModule -> ErrMsgM ModuleMap
     addInterface map mod = do
       interface <- createInterface mod flags map
-      return $ Map.insert (hmod_mod interface) interface map
+      return $ Map.insert (ifaceMod interface) interface map
 
  
 renameInterfaces :: [Interface] -> LinkEnv -> ErrMsgM ([Interface], LinkEnv)
@@ -76,13 +76,13 @@ buildHomeLinks :: [Interface] -> LinkEnv
 buildHomeLinks modules = foldl upd Map.empty (reverse modules)
   where
     upd old_env mod
-      | OptHide    `elem` hmod_options mod = old_env
-      | OptNotHome `elem` hmod_options mod =
+      | OptHide    `elem` ifaceOptions mod = old_env
+      | OptNotHome `elem` ifaceOptions mod =
         foldl' keep_old old_env exported_names
       | otherwise = foldl' keep_new old_env exported_names
       where
-        exported_names = hmod_visible_exports mod
-        modName = hmod_mod mod
+        exported_names = ifaceVisibleExports mod
+        modName = ifaceMod mod
 
         keep_old env n = Map.insertWith (\new old -> old) n
                          (nameSetMod n modName) env

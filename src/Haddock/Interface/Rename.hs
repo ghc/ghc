@@ -34,22 +34,22 @@ renameInterface renamingEnv mod =
   -- first create the local env, where every name exported by this module
   -- is mapped to itself, and everything else comes from the global renaming
   -- env
-  let localEnv = foldl fn renamingEnv (hmod_visible_exports mod)
-        where fn env name = Map.insert name (nameSetMod name (hmod_mod mod)) env
+  let localEnv = foldl fn renamingEnv (ifaceVisibleExports mod)
+        where fn env name = Map.insert name (nameSetMod name (ifaceMod mod)) env
       
-      docs = Map.toList (hmod_doc_map mod)
+      docs = Map.toList (ifaceDocMap mod)
       renameMapElem (k,d) = do d' <- renameDoc d; return (k, d') 
 
       -- rename names in the exported declarations to point to things that
       -- are closer to, or maybe even exported by, the current module.
       (renamedExportItems, missingNames1)
-        = runRnFM localEnv (renameExportItems (hmod_export_items mod))
+        = runRnFM localEnv (renameExportItems (ifaceExportItems mod))
 
       (rnDocMap, missingNames2) 
         = runRnFM localEnv (liftM Map.fromList (mapM renameMapElem docs))
 
       (finalModuleDoc, missingNames3)
-        = runRnFM localEnv (renameMaybeDoc (hmod_doc mod))
+        = runRnFM localEnv (renameMaybeDoc (ifaceDoc mod))
 
       -- combine the missing names and filter out the built-ins, which would
       -- otherwise allways be missing. 
@@ -64,14 +64,14 @@ renameInterface renamingEnv mod =
   in do
     -- report things that we couldn't link to. Only do this for non-hidden
     -- modules.
-    when (OptHide `notElem` hmod_options mod && not (null strings)) $
-	  tell ["Warning: " ++ show (ppr (hmod_mod mod) defaultUserStyle) ++ 
+    when (OptHide `notElem` ifaceOptions mod && not (null strings)) $
+	  tell ["Warning: " ++ show (ppr (ifaceMod mod) defaultUserStyle) ++ 
 		": could not find link destinations for:\n"++
 		"   " ++ concat (map (' ':) strings) ]
 
-    return $ mod { hmod_rn_doc = finalModuleDoc,
-                   hmod_rn_doc_map = rnDocMap,
-                   hmod_rn_export_items = renamedExportItems }
+    return $ mod { ifaceRnDoc = finalModuleDoc,
+                   ifaceRnDocMap = rnDocMap,
+                   ifaceRnExportItems = renamedExportItems }
 
 
 --------------------------------------------------------------------------------

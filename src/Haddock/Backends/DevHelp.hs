@@ -21,7 +21,7 @@ import Text.PrettyPrint
 ppDevHelpFile :: FilePath -> String -> Maybe String -> [Interface] -> IO ()
 ppDevHelpFile odir doctitle maybe_package modules = do
   let devHelpFile = package++".devhelp"
-      tree = mkModuleTree True [ (hmod_mod mod, toDescription mod) | mod <- modules ]
+      tree = mkModuleTree True [ (ifaceMod mod, toDescription mod) | mod <- modules ]
       doc =
         text "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"no\"?>" $$
         (text "<book xmlns=\"http://www.devhelp.net/book\" title=\""<>text doctitle<>
@@ -64,9 +64,9 @@ ppDevHelpFile odir doctitle maybe_package modules = do
     index :: [(Name, [Module])]
     index = Map.toAscList (foldr getModuleIndex Map.empty modules)
 
-    getModuleIndex hmod fm =
-	Map.unionWith (++) (Map.fromListWith (flip (++)) [(name, [mod]) | name <- hmod_exports hmod, nameModule name == mod]) fm
-	where mod = hmod_mod hmod
+    getModuleIndex iface fm =
+	Map.unionWith (++) (Map.fromListWith (flip (++)) [(name, [mod]) | name <- ifaceExports iface, nameModule name == mod]) fm
+	where mod = ifaceMod iface
 
     ppList :: [(Name, [Module])] -> Doc
     ppList [] = empty
