@@ -34,16 +34,23 @@ import Name
 -- return the home link environment created in the process, and any error
 -- messages.
 createInterfaces :: [GhcModule] -> LinkEnv -> [Flag] -> ([Interface], LinkEnv, [ErrMsg])
-createInterfaces modules extLinks flags = (interfaces, homeLinks, messages)
+createInterfaces modules externalLinks flags = (interfaces, homeLinks, messages)
   where 
     ((interfaces, homeLinks), messages) = runWriter $ do
+
       -- part 1, create the interfaces
       interfaces <- createInterfaces' modules flags
+
       -- part 2, attach the instances
       let interfaces' = attachInstances interfaces
+ 
       -- part 3, rename the interfaces
-      renameInterfaces interfaces' extLinks
+      let homeLinks = buildHomeLinks interfaces
+      let links = homeLinks `Map.union` externalLinks
+      interfaces'' <- mapM (renameInterface links) interfaces'
 
+      return (interfaces'', homeLinks)
+  
 
 createInterfaces' :: [GhcModule] -> [Flag] -> ErrMsgM [Interface]
 createInterfaces' modules flags = do
@@ -56,14 +63,6 @@ createInterfaces' modules flags = do
       return $ Map.insert (ifaceMod interface) interface map
 
  
-renameInterfaces :: [Interface] -> LinkEnv -> ErrMsgM ([Interface], LinkEnv)
-renameInterfaces interfaces externalLinks = do
-  let homeLinks = buildHomeLinks interfaces
-  let links = homeLinks `Map.union` externalLinks
-  interfaces' <- mapM (renameInterface links) interfaces
-  return (interfaces', homeLinks)
-
-
 -- | Build a mapping which for each original name, points to the "best"
 -- place to link to in the documentation.  For the definition of
 -- "best", we use "the module nearest the bottom of the dependency
