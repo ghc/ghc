@@ -224,6 +224,8 @@ data Repr = ProdRepr {
             , sum_arr_data_con  :: DataCon
             }
 
+          | IdRepr Type
+
 mkProduct :: [Type] -> VM Repr
 mkProduct tys
   = do
@@ -242,6 +244,10 @@ mkProduct tys
                }
   where
     arity = length tys
+
+mkSubProduct :: [Type] -> VM Repr
+mkSubProduct [ty] = return $ IdRepr ty
+mkSubProduct tys  = mkProduct tys
 
 mkSum :: [Repr] -> VM Repr
 mkSum [repr] = return repr
@@ -268,6 +274,7 @@ reprType (ProdRepr { prod_tycon = tycon, prod_components = tys })
   = mkTyConApp tycon tys
 reprType (SumRepr { sum_tycon = tycon, sum_components = reprs })
   = mkTyConApp tycon (map reprType reprs)
+reprType (IdRepr ty) = ty
 
 arrReprType :: Repr -> VM Type
 arrReprType = mkPArrayType . reprType
@@ -277,7 +284,8 @@ arrShapeTys (SumRepr  {})
   = do
       int_arr <- builtin parrayIntPrimTyCon
       return [intPrimTy, mkTyConApp int_arr [], mkTyConApp int_arr []]
-arrShapeTys repr = return [intPrimTy]
+arrShapeTys (ProdRepr {}) = return [intPrimTy]
+arrShapeTys (IdRepr _)    = return []
 
 arrShapeVars :: Repr -> VM [Var]
 arrShapeVars repr = mapM (newLocalVar FSLIT("sh")) =<< arrShapeTys repr
@@ -289,17 +297,20 @@ replicateShape (SumRepr {})  len tag
       rep <- builtin replicatePAIntPrimVar
       up  <- builtin upToPAIntPrimVar
       return [len, Var rep `mkApps` [len, tag], Var up `App` len]
+replicateShape (IdRepr _) _ _ = return []
 
 arrReprElemTys :: Repr -> [[Type]]
 arrReprElemTys (SumRepr { sum_components = prods })
   = map arrProdElemTys prods
 arrReprElemTys prod@(ProdRepr {})
   = [arrProdElemTys prod]
+arrReprElemTys (IdRepr ty) = [[ty]]
 
 arrProdElemTys (ProdRepr { prod_components = [] })
   = [unitTy]
 arrProdElemTys (ProdRepr { prod_components = tys })
   = tys
+arrProdElemTys (IdRepr ty) = [ty]
 
 arrReprTys :: Repr -> VM [[Type]]
 arrReprTys = mapM (mapM mkPArrayType) . arrReprElemTys
@@ -310,8 +321,10 @@ arrReprVars repr
 
 mkRepr :: TyCon -> VM Repr
 mkRepr vect_tc
-  = mkSum
-  =<< mapM mkProduct (map dataConRepArgTys $ tyConDataCons vect_tc)
+  | [tys] <- rep_tys = mkProduct tys
+  | otherwise        = mkSum =<< mapM mkSubProduct rep_tys
+  where
+    rep_tys = map dataConRepArgTys $ tyConDataCons vect_tc
 
 buildPReprType :: TyCon -> VM Type
 buildPReprType = liftM reprType . mkRepr
@@ -358,6 +371,11 @@ buildToPRepr repr vect_tc prepr_tc _
           vars <- mapM (newLocalVar FSLIT("r")) tys
           return (vars, mkConApp data_con (map Type tys ++ map Var vars))
 
+    prod_alt (IdRepr ty)
+      = do
+          var <- newLocalVar FSLIT("y") ty
+          return ([var], Var var)
+
 buildFromPRepr :: Repr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildFromPRepr repr vect_tc prepr_tc _
   = do
@@ -397,6 +415,9 @@ buildFromPRepr repr vect_tc prepr_tc _
           return $ Case expr (mkWildId (reprType prod)) res_ty
                    [(DataAlt data_con, vars, con `mkVarApps` vars)]
 
+    from_prod (IdRepr _) con expr
+       = return $ con `App` expr
+
 buildToArrPRepr :: Repr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildToArrPRepr repr vect_tc prepr_tc arr_tc
   = do
@@ -435,7 +456,7 @@ buildToArrPRepr repr vect_tc prepr_tc arr_tc
                      , sum_arr_tycon    = tycon
                      , sum_arr_data_con = data_con })
       = do
-          exprs <- zipWithM (to_prod len_var) repr_vars prods
+          exprs <- zipWithM to_prod repr_vars prods
 
           return . wrapFamInstBody tycon tys
                  . mkConApp data_con
@@ -443,16 +464,27 @@ buildToArrPRepr repr vect_tc prepr_tc arr_tc
       where
         tys = map reprType prods
 
-    to_repr [len_var] [repr_vars] prod = to_prod len_var repr_vars prod
-
-    to_prod len_var
-            repr_vars
+    to_repr [len_var]
+            [repr_vars]
             (ProdRepr { prod_components   = tys
                       , prod_arr_tycon    = tycon
                       , prod_arr_data_con = data_con })
-      = return . wrapFamInstBody tycon tys
-               . mkConApp data_con
-               $ map Type tys ++ map Var (len_var : repr_vars)
+       = return . wrapFamInstBody tycon tys
+                . mkConApp data_con
+                $ map Type tys ++ map Var (len_var : repr_vars)
+
+    to_prod repr_vars@(r : _)
+            (ProdRepr { prod_components   = tys
+                      , prod_arr_tycon    = tycon
+                      , prod_arr_data_con = data_con })
+      = do
+          len <- lengthPA (Var r)
+          return . wrapFamInstBody tycon tys
+                 . mkConApp data_con
+                 $ map Type tys ++ len : map Var repr_vars
+
+    to_prod [var] (IdRepr ty)
+      = return (Var var)
 
 buildFromArrPRepr :: Repr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildFromArrPRepr repr vect_tc prepr_tc arr_tc
@@ -531,7 +563,16 @@ buildFromArrPRepr repr vect_tc prepr_tc arr_tc
           return $ Case scrut (mkWildId scrut_ty) res_ty
                    [(DataAlt data_con, shape_vars ++ repr_vars, body)]
 
+    from_prod (IdRepr ty)
+              expr
+              shape_vars
+              [repr_var]
+              res_ty
+              body
+      = return $ Let (NonRec repr_var expr) body
+
 buildPRDictRepr :: Repr -> VM CoreExpr
+buildPRDictRepr (IdRepr ty) = mkPR ty
 buildPRDictRepr (ProdRepr {
                    prod_components = tys
                  , prod_tycon      = tycon
