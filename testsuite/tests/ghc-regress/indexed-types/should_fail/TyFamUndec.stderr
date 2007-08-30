@@ -1,0 +1,18 @@
+
+TyFamUndec.hs:6:0:
+    Variable occurs more often than in instance head
+      in the type family application: T (b, b)
+    (Use -fallow-undecidable-instances to permit this)
+    In the type synonym instance declaration for `T'
+
+TyFamUndec.hs:7:0:
+    Application is no smaller than the instance head
+      in the type family application: T (a, Maybe b)
+    (Use -fallow-undecidable-instances to permit this)
+    In the type synonym instance declaration for `T'
+
+TyFamUndec.hs:8:0:
+    Nested type family application
+      in the type family application: T (a, T b)
+    (Use -fallow-undecidable-instances to permit this)
+    In the type synonym instance declaration for `T'
