@@ -1,6 +1,8 @@
 module VectBuiltIn (
   Builtins(..), sumTyCon, prodTyCon,
-  initBuiltins, initBuiltinTyCons, initBuiltinPAs, initBuiltinPRs
+  initBuiltins, initBuiltinTyCons, initBuiltinPAs, initBuiltinPRs,
+
+  primMethod
 ) where
 
 #include "HsVersions.h"
@@ -13,11 +15,12 @@ import DataCon         ( DataCon )
 import TyCon           ( TyCon, tyConName, tyConDataCons )
 import Var             ( Var )
 import Id              ( mkSysLocal )
-import Name            ( Name )
-import OccName         ( mkVarOccFS, mkOccNameFS, tcName )
+import Name            ( Name, getOccString )
+import NameEnv
+import OccName
 
 import TypeRep         ( funTyCon )
-import TysPrim         ( intPrimTy )
+import TysPrim
 import TysWiredIn      ( unitTyCon, tupleTyCon, intTyConName )
 import PrelNames
 import BasicTypes      ( Boxity(..) )
@@ -191,3 +194,15 @@ lookupExternalTyCon mod fs
 
 unitTyConName = tyConName unitTyCon
 
+
+primMethod :: TyCon -> String -> DsM (Maybe Var)
+primMethod tycon method
+  | Just suffix <- lookupNameEnv prim_ty_cons (tyConName tycon)
+  = liftM Just
+  $ dsLookupGlobalId =<< lookupOrig nDP_PRIM (mkVarOcc $ method ++ suffix)
+
+  | otherwise = return Nothing
+
+prim_ty_cons = mkNameEnv [mk_prim intPrimTyCon]
+  where
+    mk_prim tycon = (tyConName tycon, '_' : getOccString tycon)

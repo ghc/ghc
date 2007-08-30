@@ -221,27 +221,45 @@ paDFunApply dfun tys
       dicts <- mapM paDictOfType tys
       return $ mkApps (mkTyApps dfun tys) dicts
 
-paMethod :: (Builtins -> Var) -> Type -> VM CoreExpr
-paMethod method ty
+type PAMethod = (Builtins -> Var, String)
+
+pa_length    = (lengthPAVar,    "lengthPA")
+pa_replicate = (replicatePAVar, "replicatePA")
+pa_empty     = (emptyPAVar,     "emptyPA")
+
+paMethod :: PAMethod -> Type -> VM CoreExpr
+paMethod (method, name) ty
+  | Just (tycon, []) <- splitTyConApp_maybe ty
+  , isPrimTyCon tycon
+  = do
+      fn <- traceMaybeV "paMethod" (ppr tycon <+> text name)
+          $ lookupPrimMethod tycon name
+      return (Var fn)
+
+paMethod (method, name) ty
   = do
       fn   <- builtin method
       dict <- paDictOfType ty
       return $ mkApps (Var fn) [Type ty, dict]
 
 mkPR :: Type -> VM CoreExpr
-mkPR = paMethod mkPRVar
+mkPR ty
+  = do
+      fn   <- builtin mkPRVar
+      dict <- paDictOfType ty
+      return $ mkApps (Var fn) [Type ty, dict]
 
 lengthPA :: CoreExpr -> VM CoreExpr
-lengthPA x = liftM (`App` x) (paMethod lengthPAVar ty)
+lengthPA x = liftM (`App` x) (paMethod pa_length ty)
   where
     ty = splitPArrayTy (exprType x)
 
 replicatePA :: CoreExpr -> CoreExpr -> VM CoreExpr
 replicatePA len x = liftM (`mkApps` [len,x])
-                          (paMethod replicatePAVar (exprType x))
+                          (paMethod pa_replicate (exprType x))
 
 emptyPA :: Type -> VM CoreExpr
-emptyPA = paMethod emptyPAVar
+emptyPA = paMethod pa_empty
 
 liftPA :: CoreExpr -> VM CoreExpr
 liftPA x

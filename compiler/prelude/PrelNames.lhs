@@ -279,6 +279,7 @@ gLA_EXTS	= mkBaseModule FSLIT("GHC.Exts")
 nDP_PARRAY      = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.PArray")
 nDP_REPR        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Repr")
 nDP_CLOSURE     = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Closure")
+nDP_PRIM        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Prim")
 nDP_INSTANCES   = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Instances")
 nDP_UARR        = mkNDPModule FSLIT("Data.Array.Parallel.Unlifted.Flat.UArr")
 
