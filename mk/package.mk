@@ -303,7 +303,7 @@ CLEAN_FILES += $(PACKAGE).haddock
 %.raw-hs : %.hs
 	$(HC) $(HC_OPTS) -D__HADDOCK__ -E $< -o $@
 
-HTML_INSTALL_DIR = $(datadir)/html/libraries/$(PACKAGE)
+HTML_INSTALL_DIR = $(htmldir)/libraries/html/$(PACKAGE)
 
 install-docs :: $(HTML_DOC)
 	@$(INSTALL_DIR) $(HTML_INSTALL_DIR)

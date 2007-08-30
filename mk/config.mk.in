@@ -504,6 +504,9 @@ FPTOOLS_TOP_ABS		= @hardtop@
 # The platform specific version of 'hardtop'.
 FPTOOLS_TOP_ABS_PLATFORM = @hardtop_plat@
 
+# This gets used in the default docdir
+PACKAGE_TARNAME = @PACKAGE_TARNAME@
+
 BIN_DIST_NAME=ghc-$(ProjectVersion)
 BIN_DIST_TOPDIR=$(FPTOOLS_TOP_ABS)
 BIN_DIST_DIR=$(BIN_DIST_TOPDIR)/$(BIN_DIST_NAME)
@@ -547,6 +550,11 @@ datadir    = $(datadir0)/ghc-$(ProjectVersion)
 endif # Windows
 
 headerdir = $(libdir)/include
+docdir    = @docdir@
+htmldir   = @htmldir@
+dvidir    = @dvidir@
+pdfdir    = @pdfdir@
+psdir     = @psdir@
 
 # Default place for putting interface files is $(libdir)
 # (overriden for packages in package.mk)

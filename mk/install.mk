@@ -278,27 +278,27 @@ install-docs:: $(INSTALL_DOCS)
 endif
 endif
 
-# TODO: The following could be an entry for an Obfuscated Makefile Contest...
 ifneq "$(strip $(INSTALL_XML_DOC))" ""
 ifneq "$(XMLDocWays)" ""
+# TODO: The following could be an entry for an Obfuscated Makefile Contest...
 install-docs:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-chunks,%.html,$(patsubst %.html,%/index.html,.$(i))))
-	$(INSTALL_DIR) $(DESTDIR)$(datadir)
-	for i in $(XMLDocWays); do \
-		if [ $$i = "html" ]; then \
-			$(INSTALL_DIR) $(DESTDIR)$(datadir)/html; \
-			$(INSTALL_DIR) $(DESTDIR)$(datadir)/html/$(INSTALL_XML_DOC); \
-			echo "( cd $(INSTALL_XML_DOC) && $(CP) * $(DESTDIR)$(datadir)/html/$(INSTALL_XML_DOC) )" ; \
-			( cd $(INSTALL_XML_DOC) && $(CP) * $(DESTDIR)$(datadir)/html/$(INSTALL_XML_DOC) ) ; \
-		else \
-			$(INSTALL_DIR) $(DESTDIR)$(datadir)/doc; \
-			echo $(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.html-no-chunks/.html/` $(DESTDIR)$(datadir)/doc; \
-			$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)`echo .$$i | sed s/\.html-no-chunks/.html/` $(DESTDIR)$(datadir)/doc; \
-		fi; \
-		if [ $$i = "html-no-chunks" ]; then \
-			echo $(CP) $(FPTOOLS_CSS_ABS) $(DESTDIR)$(datadir)/doc; \
-			$(CP) $(FPTOOLS_CSS_ABS) $(DESTDIR)$(datadir)/doc; \
-		fi \
-	done
+
+install-docs:: $(foreach i,$(XMLDocWays),install-docs-$i)
+
+install-docs-html:
+	$(INSTALL_DIR) $(DESTDIR)$(htmldir)
+	$(INSTALL_DIR) $(DESTDIR)$(htmldir)/$(INSTALL_XML_DOC)
+	$(INSTALL_DIR) $(DESTDIR)$(htmldir)/$(INSTALL_XML_DOC)/html
+	$(CP) $(INSTALL_XML_DOC)/* $(DESTDIR)$(htmldir)/$(INSTALL_XML_DOC)/html
+
+install-docs-html-no-chunks:
+	$(INSTALL_DIR) $(DESTDIR)$(htmldir)
+	$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC).html $(DESTDIR)$(htmldir)
+	$(CP) $(FPTOOLS_CSS_ABS) $(DESTDIR)$(htmldir)
+
+install-docs-%:
+	$(INSTALL_DIR) $(DESTDIR)$($*dir)
+	$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)$* $(DESTDIR)$($*dir)
 endif
 endif
 

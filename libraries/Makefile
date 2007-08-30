@@ -186,24 +186,22 @@ configure: $(foreach SUBDIR,$(SUBDIRS), \
 # We should depend on %/%.cabal here (and in other rules), but make
 # makes that difficult.
 
-# We explicitly set datadir to "$prefix/share" as, while that is the
-# default on Linux, on Windows it defaults to
-# "C:\\Program Files\\Common Files"
+# We explicitly set datadir to a sensible value, as Cabal (used to?) use
+#     "C:\\Program Files\\Common Files"
+# on Windows
 
 # We also set libsubdir differently on Windows and non-Windows, as on
-# non-Windows the path we deduce is highre up than the path passed to
+# non-Windows the path we deduce is higher up than the path passed to
 # the executable with the shell script on non-Windows. This should
 # probably be tidied up so that we can always pass the same libsubdir.
 ifeq "$(Windows)" "YES"
-DATA_REL_DIR = .
-datadir      = $$prefix
-libsubdir    = $$pkgid
+datadir        = $$prefix
+libsubdir      = $$pkgid
 else
-DATA_REL_DIR = share/ghc
-datadir      = $$prefix/share/ghc
-libsubdir    = $$compiler/lib/$$pkgid
+datadir        = $$prefix/share/ghc
+libsubdir      = $$compiler/lib/$$pkgid
 endif
-DOC_ROOT     = $(prefix)/$(DATA_REL_DIR)/doc/html/
+libraryhtmldir = $(htmldir)/libraries
 
 # We rely on all the CONFIGURE_ARGS being quoted with '...', and there
 # being no 's inside the values.
@@ -219,8 +217,9 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	           $(CONFIGURE_OPTS) \
 	           --prefix='$$topdir' \
 	           --datadir='$(datadir)' \
-	           --datasubdir='.' \
+	           --datasubdir='$$pkgid' \
 	           --libsubdir='$(libsubdir)' \
+	           --docdir='$(libraryhtmldir)' \
 	           --with-compiler=../../compiler/stage1/ghc-inplace$ \
 	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace$ \
 	           --with-hsc2hs=../../utils/hsc2hs/hsc2hs-inplace \
@@ -266,8 +265,6 @@ $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/GNUmakefile):\
 
 .PHONY: doc
 
-DOC_SUBDIRS = $(filter-out haskell98,$(SUBDIRS))
-
 doc: $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR))
 	sh gen_contents_index
 
@@ -303,13 +300,13 @@ endif
 
 install: $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR))
 ifeq "$(HADDOCK_DOCS)" "YES"
-	$(INSTALL_DIR)                              $(DOC_ROOT)
-	$(INSTALL_DATA)   index.html doc-index.html $(DOC_ROOT)
-	$(INSTALL_SCRIPT) gen_contents_index        $(DOC_ROOT)
+	$(INSTALL_DIR)                                      $(libraryhtmldir)/html
+	$(INSTALL_DATA)   index.html doc-index.html         $(libraryhtmldir)/html
+	$(INSTALL_SCRIPT) gen_contents_index                $(libraryhtmldir)/html
 	# Hacks:
-	$(INSTALL_DATA)   $(DOC_ROOT)/base/*.css    $(DOC_ROOT)
-	$(INSTALL_DATA)   $(DOC_ROOT)/base/*.js     $(DOC_ROOT)
-	$(INSTALL_DATA)   $(DOC_ROOT)/base/*.gif    $(DOC_ROOT)
+	$(INSTALL_DATA)   $(libraryhtmldir)/html/base/*.css $(libraryhtmldir)/html
+	$(INSTALL_DATA)   $(libraryhtmldir)/html/base/*.js  $(libraryhtmldir)/html
+	$(INSTALL_DATA)   $(libraryhtmldir)/html/base/*.gif $(libraryhtmldir)/html
 endif
 
 # Cabal doesn't let us ask to install docs only, so do nothing here
