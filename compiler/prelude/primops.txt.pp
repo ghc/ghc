@@ -1773,9 +1773,31 @@ pseudoop   "unsafeCoerce#"
 	used when you want to write a program that you know is well-typed, but where Haskell's
 	type system is not expressive enough to prove that it is well typed.
 
-	The argument to {\tt unsafeCoerce\#} can have unboxed types, although extremely bad
-	things will happen if you coerce a boxed type to an unboxed type.  }
+        The following uses of {\tt unsafeCoerce\#} are supposed to work (i.e. not lead to
+        spurious compile-time or run-time crashes):
 
+         * Casting any lifted type to {\tt Any}
+
+         * Casting {\tt Any} back to the real type
+
+         * Casting an unboxed type to another unboxed type of the same size
+
+         * Casting between two types that have the same runtime representation.  One case is when
+           the two types differ only in "phantom" type parameters, for example
+           {\tt Ptr Int} to {\tt Ptr Float}, or {\tt [Int]} to {\tt [Float]} when the list is 
+           known to be empty.  Also, a {\tt newtype} of a type {\tt T} has the same representation
+           at runtime as {\tt T}.
+
+        Other uses of {\tt unsafeCoerce#} are undefined.
+        }
+
+-- NB. It is tempting to think that casting a value to a type that it doesn't have is safe
+-- as long as you don't "do anything" with the value in its cast form, such as seq on it.  This
+-- isn't the case: the compiler can insert seqs itself, and if these happen at the wrong type,
+-- Bad Things Might Happen.  See bug #1616: in this case we cast a function of type (a,b) -> (a,b)
+-- to () -> () and back again.  The strictness analyser saw that the function was strict, but
+-- the wrapper had type () -> (), and hence the wrapper de-constructed the (), the worker re-constructed
+-- a new (), with the result that the code ended up with "case () of (a,b) -> ...".
 
 ------------------------------------------------------------------------
 ---                                                                  ---
