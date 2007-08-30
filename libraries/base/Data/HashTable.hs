@@ -199,7 +199,9 @@ hashInt32 x = mulHi x golden + x
 -- implemented by extracting the uppermost 32 bits of the 64-bit
 -- result of multiplying by a 33-bit constant.  The constant is from
 -- Knuth, derived from the golden ratio:
+--
 -- > golden = round ((sqrt 5 - 1) * 2^32)
+--
 -- We get good key uniqueness on small inputs
 -- (a problem with previous versions):
 --  (length $ group $ sort $ map hashInt [-32767..65536]) == 65536 + 32768
