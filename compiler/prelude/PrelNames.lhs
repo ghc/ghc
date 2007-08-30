@@ -223,6 +223,7 @@ ndpNames = [ parrayTyConName, paTyConName, preprTyConName, prTyConName
            , closureTyConName
            , mkClosureName, applyClosureName
            , mkClosurePName, applyClosurePName
+           , replicatePAIntPrimName, upToPAIntPrimName
            , lengthPAName, replicatePAName, emptyPAName, packPAName,
              combinePAName ]
 \end{code}
@@ -702,6 +703,9 @@ prTyConName         = tcQual   nDP_PARRAY FSLIT("PR")     prTyConKey
 parrayIntPrimTyConName = tcQual nDP_PRIM  FSLIT("PArray_Int#")
                                                           parrayIntPrimTyConKey
 mkPRName            = varQual  nDP_PARRAY FSLIT("mkPR")   mkPRIdKey
+replicatePAIntPrimName = varQual nDP_PRIM FSLIT("replicatePA_Int#")
+                                                        replicatePAIntPrimIdKey
+upToPAIntPrimName   = varQual  nDP_PRIM   FSLIT("upToPA_Int#") upToPAIntPrimIdKey
 lengthPAName        = varQual  nDP_PARRAY FSLIT("lengthPA")    lengthPAIdKey
 replicatePAName     = varQual  nDP_PARRAY FSLIT("replicatePA") replicatePAIdKey
 emptyPAName         = varQual  nDP_PARRAY FSLIT("emptyPA") emptyPAIdKey
@@ -1090,6 +1094,8 @@ emptyPAIdKey                  = mkPreludeMiscIdUnique 133
 packPAIdKey                   = mkPreludeMiscIdUnique 134
 combinePAIdKey                = mkPreludeMiscIdUnique 135
 mkPRIdKey                     = mkPreludeMiscIdUnique 136
+replicatePAIntPrimIdKey       = mkPreludeMiscIdUnique 137
+upToPAIntPrimIdKey            = mkPreludeMiscIdUnique 138
 
 ---------------- Template Haskell -------------------
 --	USES IdUniques 200-399

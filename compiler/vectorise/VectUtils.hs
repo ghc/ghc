@@ -68,7 +68,7 @@ isAnnTypeArg (_, AnnType t) = True
 isAnnTypeArg _              = False
 
 mkDataConTag :: DataCon -> CoreExpr
-mkDataConTag dc = mkConApp intDataCon [mkIntLitInt $ dataConTag dc]
+mkDataConTag = mkIntLitInt . dataConTag
 
 splitUnTy :: String -> Name -> Type -> Type
 splitUnTy s name ty

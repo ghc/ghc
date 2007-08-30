@@ -53,6 +53,8 @@ data Builtins = Builtins {
                 , applyClosureVar  :: Var
                 , mkClosurePVar    :: Var
                 , applyClosurePVar :: Var
+                , replicatePAIntPrimVar :: Var
+                , upToPAIntPrimVar :: Var
                 , lengthPAVar      :: Var
                 , replicatePAVar   :: Var
                 , emptyPAVar       :: Var
@@ -93,6 +95,8 @@ initBuiltins
       applyClosureVar  <- dsLookupGlobalId applyClosureName
       mkClosurePVar    <- dsLookupGlobalId mkClosurePName
       applyClosurePVar <- dsLookupGlobalId applyClosurePName
+      replicatePAIntPrimVar <- dsLookupGlobalId replicatePAIntPrimName
+      upToPAIntPrimVar <- dsLookupGlobalId upToPAIntPrimName
       lengthPAVar      <- dsLookupGlobalId lengthPAName
       replicatePAVar   <- dsLookupGlobalId replicatePAName
       emptyPAVar       <- dsLookupGlobalId emptyPAName
@@ -117,6 +121,8 @@ initBuiltins
                , applyClosureVar  = applyClosureVar
                , mkClosurePVar    = mkClosurePVar
                , applyClosurePVar = applyClosurePVar
+               , replicatePAIntPrimVar = replicatePAIntPrimVar
+               , upToPAIntPrimVar = upToPAIntPrimVar
                , lengthPAVar      = lengthPAVar
                , replicatePAVar   = replicatePAVar
                , emptyPAVar       = emptyPAVar

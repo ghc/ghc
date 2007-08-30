@@ -297,6 +297,11 @@ arrShapeVars repr = mapM (newLocalVar FSLIT("sh")) =<< arrShapeTys repr
 
 replicateShape :: Repr -> CoreExpr -> CoreExpr -> VM [CoreExpr]
 replicateShape (ProdRepr {}) len _ = return [len]
+replicateShape (SumRepr {})  len tag
+  = do
+      rep <- builtin replicatePAIntPrimVar
+      up  <- builtin upToPAIntPrimVar
+      return [len, Var rep `mkApps` [len, tag], Var up `App` len]
 
 arrReprElemTys :: Repr -> [[Type]]
 arrReprElemTys (SumRepr { sum_components = prods })
