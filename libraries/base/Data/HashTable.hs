@@ -217,7 +217,7 @@ mulHi a b = fromIntegral (r `shiftR` 32)
 -- golden ratio and adding.  The implementation is:
 --
 -- > hashString = foldl' f golden
--- >   where f m c = fromIntegral (fromEnum c) * magic + hashInt32 m
+-- >   where f m c = fromIntegral (ord c) * magic + hashInt32 m
 -- >         magic = 0xdeadbeef
 --
 -- Where hashInt32 works just as hashInt shown above.
@@ -227,7 +227,7 @@ mulHi a b = fromIntegral (r `shiftR` 32)
 -- for combining together multiple keys to form one.
 --
 -- Here we know that individual characters c are often small, and this
--- produces frequent collisions if we use fromEnum c alone.  A
+-- produces frequent collisions if we use ord c alone.  A
 -- particular problem are the shorter low ASCII and ISO-8859-1
 -- character strings.  We pre-multiply by a magic twiddle factor to
 -- obtain a good distribution.  In fact, given the following test:
@@ -236,14 +236,14 @@ mulHi a b = fromIntegral (r `shiftR` 32)
 -- > testp k = (n - ) . length . group . sort . map hs . take n $ ls
 -- >   where ls = [] : [c : l | l <- ls, c <- ['\0'..'\xff']]
 -- >         hs = foldl' f golden
--- >         f m c = fromIntegral (fromEnum c) * k + hashInt32 m
+-- >         f m c = fromIntegral (ord c) * k + hashInt32 m
 -- >         n = 100000
 --
 -- We discover that testp magic = 0.
 
 hashString :: String -> Int32
 hashString = foldl' f golden
-   where f m c = fromIntegral (fromEnum c) * magic + hashInt32 m
+   where f m c = fromIntegral (ord c) * magic + hashInt32 m
          magic = 0xdeadbeef
 
 -- | A prime larger than the maximum hash table size
