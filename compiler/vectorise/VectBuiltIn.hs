@@ -46,6 +46,7 @@ data Builtins = Builtins {
                 , prTyCon          :: TyCon
                 , prDataCon        :: DataCon
                 , parrayIntPrimTyCon :: TyCon
+                , wrapTyCon        :: TyCon
                 , sumTyCons        :: Array Int TyCon
                 , closureTyCon     :: TyCon
                 , mkPRVar          :: Var
@@ -70,7 +71,8 @@ sumTyCon n bi
 
 prodTyCon :: Int -> Builtins -> TyCon
 prodTyCon n bi
-  | n >= 2 && n <= mAX_NDP_PROD = tupleTyCon Boxed n
+  | n == 1                      = wrapTyCon bi
+  | n >= 0 && n <= mAX_NDP_PROD = tupleTyCon Boxed n
   | otherwise = pprPanic "prodTyCon" (ppr n)
 
 initBuiltins :: DsM Builtins
@@ -85,6 +87,7 @@ initBuiltins
       parrayIntPrimTyCon <- dsLookupTyCon parrayIntPrimTyConName
       closureTyCon <- dsLookupTyCon closureTyConName
 
+      wrapTyCon    <- lookupExternalTyCon nDP_REPR FSLIT("Wrap")
       sum_tcs <- mapM (lookupExternalTyCon nDP_REPR)
                       [mkFastString ("Sum" ++ show i) | i <- [2..mAX_NDP_SUM]]
 
@@ -114,6 +117,7 @@ initBuiltins
                , prTyCon          = prTyCon
                , prDataCon        = prDataCon
                , parrayIntPrimTyCon = parrayIntPrimTyCon
+               , wrapTyCon        = wrapTyCon
                , sumTyCons        = sumTyCons
                , closureTyCon     = closureTyCon
                , mkPRVar          = mkPRVar
@@ -174,6 +178,7 @@ builtinPRs :: Builtins -> [(Name, Module, FastString)]
 builtinPRs bi =
   [
     mk (tyConName unitTyCon) nDP_REPR      FSLIT("dPR_Unit")
+  , mk (tyConName $ wrapTyCon bi) nDP_REPR FSLIT("dPR_Wrap")
   , mk closureTyConName      nDP_CLOSURE   FSLIT("dPR_Clo")
 
     -- temporary
