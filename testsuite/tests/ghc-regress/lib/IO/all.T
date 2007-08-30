@@ -79,7 +79,8 @@ clean(['readwrite001.inout'])
 test('readwrite002',
      composes([omit_ways(['ghci']), 
                set_stdin('readwrite002.hs'),
-               expect_broken_if_platform(1198,'i386-unknown-mingw32')]),
+               skip_if_platform('i386-unknown-mingw32') # see #1198
+               ]),
      compile_and_run, ['-cpp'])
 clean(['readwrite002.inout'])
 
