@@ -447,7 +447,7 @@ RTS-&ndash;&ndash;a possible implementation is:
 #include &lt;windows.h&gt;
 #include &lt;Rts.h&gt;
 
-extern void__stginit_Adder(void);
+extern void __stginit_Adder(void);
 
 static char* args[] = { "ghcDll", NULL };
                        /* N.B. argv arrays must end with NULL */
