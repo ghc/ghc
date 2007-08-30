@@ -263,10 +263,6 @@ mkSum reprs
   where
     arity = length reprs
 
-reprProducts :: Repr -> [Repr]
-reprProducts (SumRepr { sum_components = rs }) = rs
-reprProducts repr                              = [repr]
-
 reprType :: Repr -> Type
 reprType (ProdRepr { prod_tycon = tycon, prod_components = tys })
   = mkTyConApp tycon tys
@@ -275,15 +271,6 @@ reprType (SumRepr { sum_tycon = tycon, sum_components = reprs })
 
 arrReprType :: Repr -> VM Type
 arrReprType = mkPArrayType . reprType
-
-reprTys :: Repr -> [[Type]]
-reprTys (SumRepr { sum_components = prods }) = map prodTys prods
-reprTys prod                                 = [prodTys prod]
-
-prodTys (ProdRepr { prod_components = tys }) = tys
-
-reprVars :: Repr -> VM [[Var]]
-reprVars = mapM (mapM (newLocalVar FSLIT("r"))) . reprTys
 
 arrShapeTys :: Repr -> VM [Type]
 arrShapeTys (SumRepr  {})
