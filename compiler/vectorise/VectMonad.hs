@@ -24,7 +24,7 @@ module VectMonad (
   lookupDataCon, defDataCon,
   lookupTyConPA, defTyConPA, defTyConPAs,
   lookupTyConPR,
-  lookupPrimMethod,
+  lookupPrimMethod, lookupPrimPArray,
   lookupTyVarPA, defLocalTyVar, defLocalTyVarWithPA, localTyVars,
 
   {-lookupInst,-} lookupFamInst
@@ -355,8 +355,11 @@ defDataCon :: DataCon -> DataCon -> VM ()
 defDataCon dc dc' = updGEnv $ \env ->
   env { global_datacons = extendNameEnv (global_datacons env) (dataConName dc) dc' }
 
+lookupPrimPArray :: TyCon -> VM (Maybe TyCon)
+lookupPrimPArray = liftDs . primPArray
+
 lookupPrimMethod :: TyCon -> String -> VM (Maybe Var)
-lookupPrimMethod tycon method = liftDs $ primMethod tycon method
+lookupPrimMethod tycon = liftDs . primMethod tycon
 
 lookupTyConPA :: TyCon -> VM (Maybe Var)
 lookupTyConPA tc = readGEnv $ \env -> lookupNameEnv (global_pa_funs env) (tyConName tc)

@@ -100,6 +100,14 @@ splitClosureTy = splitBinTy "splitClosureTy" closureTyConName
 splitPArrayTy :: Type -> Type
 splitPArrayTy = splitUnTy "splitPArrayTy" parrayTyConName
 
+splitPrimTyCon :: Type -> Maybe TyCon
+splitPrimTyCon ty
+  | Just (tycon, []) <- splitTyConApp_maybe ty
+  , isPrimTyCon tycon
+  = Just tycon
+
+  | otherwise = Nothing
+
 mkBuiltinTyConApp :: (Builtins -> TyCon) -> [Type] -> VM Type
 mkBuiltinTyConApp get_tc tys
   = do
@@ -138,6 +146,12 @@ mkPADictType :: Type -> VM Type
 mkPADictType ty = mkBuiltinTyConApp paTyCon [ty]
 
 mkPArrayType :: Type -> VM Type
+mkPArrayType ty
+  | Just tycon <- splitPrimTyCon ty
+  = do
+      arr <- traceMaybeV "mkPArrayType" (ppr tycon)
+           $ lookupPrimPArray tycon
+      return $ mkTyConApp arr []
 mkPArrayType ty = mkBuiltinTyConApp parrayTyCon [ty]
 
 mkBuiltinCo :: (Builtins -> TyCon) -> VM Coercion
@@ -229,8 +243,7 @@ pa_empty     = (emptyPAVar,     "emptyPA")
 
 paMethod :: PAMethod -> Type -> VM CoreExpr
 paMethod (method, name) ty
-  | Just (tycon, []) <- splitTyConApp_maybe ty
-  , isPrimTyCon tycon
+  | Just tycon <- splitPrimTyCon ty
   = do
       fn <- traceMaybeV "paMethod" (ppr tycon <+> text name)
           $ lookupPrimMethod tycon name

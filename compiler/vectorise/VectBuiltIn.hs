@@ -2,7 +2,7 @@ module VectBuiltIn (
   Builtins(..), sumTyCon, prodTyCon,
   initBuiltins, initBuiltinTyCons, initBuiltinPAs, initBuiltinPRs,
 
-  primMethod
+  primMethod, primPArray
 ) where
 
 #include "HsVersions.h"
@@ -20,6 +20,7 @@ import NameEnv
 import OccName
 
 import TypeRep         ( funTyCon )
+import Type            ( Type )
 import TysPrim
 import TysWiredIn      ( unitTyCon, tupleTyCon, intTyConName )
 import PrelNames
@@ -200,6 +201,14 @@ primMethod tycon method
   | Just suffix <- lookupNameEnv prim_ty_cons (tyConName tycon)
   = liftM Just
   $ dsLookupGlobalId =<< lookupOrig nDP_PRIM (mkVarOcc $ method ++ suffix)
+
+  | otherwise = return Nothing
+
+primPArray :: TyCon -> DsM (Maybe TyCon)
+primPArray tycon
+  | Just suffix <- lookupNameEnv prim_ty_cons (tyConName tycon)
+  = liftM Just
+  $ dsLookupTyCon =<< lookupOrig nDP_PRIM (mkOccName tcName $ "PArray" ++ suffix)
 
   | otherwise = return Nothing
 
