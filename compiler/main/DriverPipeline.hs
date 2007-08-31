@@ -1377,7 +1377,6 @@ linkDynLib dflags o_files dep_packages = do
 	  , SysTools.Option "-o"
 	  , SysTools.FileOption "" output_fn
 	  , SysTools.Option "-shared"
-	  , SysTools.Option "-Wl,--export-all-symbols"
 	  , SysTools.FileOption "-Wl,--out-implib=" (output_fn ++ ".a")
 	  ]
 	 ++ map (SysTools.FileOption "") o_files
