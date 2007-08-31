@@ -30,8 +30,8 @@ flags.xml: ../users_guide/flags.xml
 	tail -n +2 $< >> $@
 
 install-docs:: $(MAN_PAGE).$(MAN_SECTION)
-	$(INSTALL_DIR) $(mandir)
-	$(INSTALL_DIR) $(mandir)/man$(MAN_SECTION)
-	$(INSTALL_MAN) $(INSTALL_OPTS) $(MAN_PAGE).$(MAN_SECTION) $(mandir)/man$(MAN_SECTION)
+	$(INSTALL_DIR) $(DESTDIR)$(mandir)
+	$(INSTALL_DIR) $(DESTDIR)$(mandir)/man$(MAN_SECTION)
+	$(INSTALL_MAN) $(INSTALL_OPTS) $(MAN_PAGE).$(MAN_SECTION) $(DESTDIR)$(mandir)/man$(MAN_SECTION)
 
 include $(TOP)/mk/target.mk
