@@ -161,7 +161,10 @@ getHistorySpan hsc_env hist =
        Just hmi -> modBreaks_locs (md_modBreaks (hm_details hmi)) ! num
        _ -> panic "getHistorySpan"
 
--- | Finds the enclosing top level function name 
+{- | Finds the enclosing top level function name -}
+-- ToDo: a better way to do this would be to keep hold of the decl_path computed
+-- by the coverage pass, which gives the list of lexically-enclosing bindings
+-- for each tick.
 findEnclosingDecl :: HscEnv -> Module -> SrcSpan -> Id
 findEnclosingDecl hsc_env mod span =
    case lookupUFM (hsc_HPT hsc_env) (moduleName mod) of
