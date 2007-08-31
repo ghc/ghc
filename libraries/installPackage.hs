@@ -27,7 +27,8 @@ main = do args <- getArgs
 doit :: FilePath -> FilePath -> FilePath -> FilePath -> Verbosity -> IO ()
 doit destdir pref ghcpkg ghcpkgconf verbosity =
        do let userHooks = simpleUserHooks
-              copyFlags = (emptyCopyFlags (CopyTo destdir)) {
+              copyto = if null destdir then NoCopyDest else CopyTo destdir
+              copyFlags = (emptyCopyFlags copyto) {
                               copyVerbose = verbosity
                           }
               registerFlags = emptyRegisterFlags {
