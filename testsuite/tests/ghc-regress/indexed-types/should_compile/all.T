@@ -48,3 +48,4 @@ test('Refl2', expect_fail, compile, [''])
 
 test('Rules1', normal, compile, [''])
 
+test('Numerals', normal, compile, [''])
