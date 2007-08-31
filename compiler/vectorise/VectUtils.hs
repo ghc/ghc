@@ -1,7 +1,7 @@
 module VectUtils (
   collectAnnTypeBinders, collectAnnTypeArgs, isAnnTypeArg,
   collectAnnValBinders,
-  mkDataConTag,
+  mkDataConTag, mkDataConTagLit,
   splitClosureTy,
 
   mkBuiltinCo,
@@ -38,6 +38,7 @@ import PrelNames
 import TysWiredIn
 import TysPrim            ( intPrimTy )
 import BasicTypes         ( Boxity(..) )
+import Literal            ( Literal, mkMachInt )
 
 import Outputable
 import FastString
@@ -66,6 +67,10 @@ collectAnnValBinders expr = go [] expr
 isAnnTypeArg :: AnnExpr b ann -> Bool
 isAnnTypeArg (_, AnnType t) = True
 isAnnTypeArg _              = False
+
+mkDataConTagLit :: DataCon -> Literal
+mkDataConTagLit con
+  = mkMachInt . toInteger $ dataConTag con - fIRST_TAG
 
 mkDataConTag :: DataCon -> CoreExpr
 mkDataConTag con = mkIntLitInt (dataConTag con - fIRST_TAG)
