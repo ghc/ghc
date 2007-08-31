@@ -392,7 +392,7 @@ buildToPRepr repr vect_tc prepr_tc _
                      , sum_tycon      = tycon })
             expr
       = do
-          (vars, bodies) <- mapAndUnzipM prod_alt prods
+          (vars, bodies) <- mapAndUnzipM to_unboxed prods
           return . Case expr (mkWildId (exprType expr)) res_ty
                  $ zipWith4 mk_alt cons vars (tyConDataCons tycon) bodies
       where
@@ -403,22 +403,22 @@ buildToPRepr repr vect_tc prepr_tc _
 
     to_repr prod expr
       = do
-          (vars, body) <- prod_alt prod
+          (vars, body) <- to_unboxed prod
           return $ Case expr (mkWildId (exprType expr)) res_ty
                    [(DataAlt con, vars, body)]
 
-    prod_alt (ProdRepr { prod_components = tys
-                       , prod_data_con   = data_con })
+    to_unboxed (ProdRepr { prod_components = tys
+                         , prod_data_con   = data_con })
       = do
           vars <- mapM (newLocalVar FSLIT("r")) tys
           return (vars, mkConApp data_con (map Type tys ++ map Var vars))
 
-    prod_alt (IdRepr ty)
+    to_unboxed (IdRepr ty)
       = do
           var <- newLocalVar FSLIT("y") ty
           return ([var], Var var)
 
-    prod_alt (VoidRepr { void_bottom = bottom })
+    to_unboxed (VoidRepr { void_bottom = bottom })
       = return ([], bottom)
 
 
@@ -443,17 +443,17 @@ buildFromPRepr repr vect_tc prepr_tc _
               expr
       = do
           vars   <- mapM (newLocalVar FSLIT("x")) (map reprType prods)
-          bodies <- sequence . zipWith3 from_prod prods cons
+          bodies <- sequence . zipWith3 from_unboxed prods cons
                              $ map Var vars
           return . Case expr (mkWildId (reprType repr)) res_ty
                  $ zipWith3 sum_alt (tyConDataCons tycon) vars bodies
       where
         sum_alt data_con var body = (DataAlt data_con, [var], body)
 
-    from_repr repr expr = from_prod repr con expr
+    from_repr repr expr = from_unboxed repr con expr
 
-    from_prod prod@(ProdRepr { prod_components = tys
-                             , prod_data_con   = data_con })
+    from_unboxed prod@(ProdRepr { prod_components = tys
+                                , prod_data_con   = data_con })
               con
               expr
       = do
@@ -461,10 +461,10 @@ buildFromPRepr repr vect_tc prepr_tc _
           return $ Case expr (mkWildId (reprType prod)) res_ty
                    [(DataAlt data_con, vars, con `mkVarApps` vars)]
 
-    from_prod (IdRepr _) con expr
+    from_unboxed (IdRepr _) con expr
        = return $ con `App` expr
 
-    from_prod (VoidRepr {}) con expr
+    from_unboxed (VoidRepr {}) con expr
        = return con
 
 buildToArrPRepr :: Repr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
