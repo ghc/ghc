@@ -20,3 +20,5 @@ test('divbyzero',
      compose(exit_code(136),
              exit_code_if_platform(1, 'i386-unknown-mingw32')),
      compile_and_run, [''])
+
+test('outofmem', exit_code(1), compile_and_run, [''])
