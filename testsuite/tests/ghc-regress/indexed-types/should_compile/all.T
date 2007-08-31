@@ -49,3 +49,20 @@ test('Refl2', expect_fail, compile, [''])
 test('Rules1', normal, compile, [''])
 
 test('Numerals', normal, compile, [''])
+
+test('ColInference', normal, compile, [''])
+test('ColInference2', normal, compile, [''])
+test('ColInference3', normal, compile, [''])
+test('ColInference4', normal, compile, [''])
+test('ColInference5', normal, compile, [''])
+test('ColInference6', normal, compile, [''])
+
+test('ClassEqContext', normal, compile, [''])
+test('ClassEqContext2', normal, compile, [''])
+test('ClassEqContext3', normal, compile, [''])
+
+test('Col', normal, compile, [''])
+test('Col2', normal, compile, [''])
+
+test('ColGivenCheck', normal, compile, [''])
+test('ColGivenCheck2', normal, compile, [''])
