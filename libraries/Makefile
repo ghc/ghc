@@ -338,7 +338,7 @@ binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR))
 	cp    gen_contents_index            $(BIN_DIST_LIBDIR)
 	cp    index.html                    $(BIN_DIST_LIBDIR)
 	cp    doc-index.html                $(BIN_DIST_LIBDIR)
-	cp -a stamp                         $(BIN_DIST_LIBDIR)
+	cp -pR stamp                         $(BIN_DIST_LIBDIR)
 
 $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR)): \
 binary-dist.library.%:
@@ -347,8 +347,8 @@ binary-dist.library.%:
 	  cd $* && \
 	  cp    $*.cabal      $(BIN_DIST_LIBDIR)/$* && \
 	  cp    LICENSE       $(BIN_DIST_LIBDIR)/$* && \
-	  cp -a dist          $(BIN_DIST_LIBDIR)/$* && \
-	  (cp -aL include      $(BIN_DIST_LIBDIR)/$* || :) && \
+	  cp -R dist          $(BIN_DIST_LIBDIR)/$* && \
+	  (cp -RL include      $(BIN_DIST_LIBDIR)/$* || :) && \
 	  $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
 	     \( -name "*_split" -o -name "autogen" \) | xargs rm -rf && \
 	  $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
