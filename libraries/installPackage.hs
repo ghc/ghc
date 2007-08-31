@@ -1,10 +1,10 @@
 
 import Distribution.PackageDescription
-import Distribution.Program
-import Distribution.Setup
 import Distribution.Simple
 import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
+import Distribution.Simple.Program
+import Distribution.Simple.Setup
 import Distribution.Verbosity
 import System.Environment
 
