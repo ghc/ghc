@@ -104,7 +104,6 @@ basicKnownKeyNames :: [Name]
 basicKnownKeyNames
  = genericTyConNames
  ++ typeableClassNames
- ++ ndpNames
  ++ [	-- Type constructors (synonyms especially)
 	ioTyConName, ioDataConName,
 	runMainIOName,
@@ -215,17 +214,6 @@ basicKnownKeyNames
 
 genericTyConNames :: [Name]
 genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
-
-ndpNames :: [Name]
-ndpNames = [ parrayTyConName, paTyConName, preprTyConName, prTyConName
-           , parrayIntPrimTyConName
-           , mkPRName
-           , closureTyConName
-           , mkClosureName, applyClosureName
-           , mkClosurePName, applyClosurePName
-           , replicatePAIntPrimName, upToPAIntPrimName
-           , lengthPAName, replicatePAName, emptyPAName, packPAName,
-             combinePAName ]
 \end{code}
 
 
@@ -277,12 +265,6 @@ aRROW		= mkBaseModule FSLIT("Control.Arrow")
 rANDOM		= mkBaseModule FSLIT("System.Random")
 gLA_EXTS	= mkBaseModule FSLIT("GHC.Exts")
 
-nDP_PARRAY      = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.PArray")
-nDP_REPR        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Repr")
-nDP_CLOSURE     = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Closure")
-nDP_PRIM        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Prim")
-nDP_INSTANCES   = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Instances")
-
 mAIN	        = mkMainModule_ mAIN_NAME
 rOOT_MAIN	= mkMainModule FSLIT(":Main") -- Root module for initialisation 
 
@@ -301,12 +283,6 @@ mkBaseModule m = mkModule basePackageId (mkModuleNameFS m)
 
 mkBaseModule_ :: ModuleName -> Module
 mkBaseModule_ m = mkModule basePackageId m
-
-mkNDPModule :: FastString -> Module
-mkNDPModule m = mkModule ndpPackageId (mkModuleNameFS m)
-
-mkNDPModule_ :: ModuleName -> Module
-mkNDPModule_ m = mkModule ndpPackageId m
 
 mkMainModule :: FastString -> Module
 mkMainModule m = mkModule mainPackageId (mkModuleNameFS m)
@@ -694,28 +670,6 @@ marshalObjectName   = varQual  dOTNET FSLIT("marshalObject") marshalObjectIdKey
 marshalStringName   = varQual  dOTNET FSLIT("marshalString") marshalStringIdKey
 unmarshalStringName = varQual  dOTNET FSLIT("unmarshalString") unmarshalStringIdKey
 checkDotnetResName  = varQual  dOTNET FSLIT("checkResult")     checkDotnetResNameIdKey
-
--- NDP stuff
-parrayTyConName     = tcQual   nDP_PARRAY FSLIT("PArray") parrayTyConKey
-paTyConName         = tcQual   nDP_PARRAY FSLIT("PA")     paTyConKey
-preprTyConName      = tcQual   nDP_PARRAY FSLIT("PRepr")  preprTyConKey
-prTyConName         = tcQual   nDP_PARRAY FSLIT("PR")     prTyConKey
-parrayIntPrimTyConName = tcQual nDP_PRIM  FSLIT("PArray_Int#")
-                                                          parrayIntPrimTyConKey
-mkPRName            = varQual  nDP_PARRAY FSLIT("mkPR")   mkPRIdKey
-replicatePAIntPrimName = varQual nDP_PRIM FSLIT("replicatePA_Int#")
-                                                        replicatePAIntPrimIdKey
-upToPAIntPrimName   = varQual  nDP_PRIM   FSLIT("upToPA_Int#") upToPAIntPrimIdKey
-lengthPAName        = varQual  nDP_PARRAY FSLIT("lengthPA")    lengthPAIdKey
-replicatePAName     = varQual  nDP_PARRAY FSLIT("replicatePA") replicatePAIdKey
-emptyPAName         = varQual  nDP_PARRAY FSLIT("emptyPA") emptyPAIdKey
-packPAName          = varQual  nDP_PARRAY FSLIT("packPA")  packPAIdKey
-combinePAName       = varQual  nDP_PARRAY FSLIT("combinePA") combinePAIdKey
-closureTyConName    = tcQual   nDP_CLOSURE FSLIT(":->")    closureTyConKey
-mkClosureName       = varQual  nDP_CLOSURE FSLIT("mkClosure")  mkClosureIdKey
-applyClosureName    = varQual  nDP_CLOSURE FSLIT("$:")         applyClosureIdKey
-mkClosurePName      = varQual  nDP_CLOSURE FSLIT("mkClosureP") mkClosurePIdKey
-applyClosurePName   = varQual  nDP_CLOSURE FSLIT("$:^")        applyClosurePIdKey
 \end{code}
 
 %************************************************************************
@@ -895,14 +849,6 @@ opaqueTyConKey                          = mkPreludeTyConUnique 133
 
 stringTyConKey				= mkPreludeTyConUnique 134
 
-parrayTyConKey                          = mkPreludeTyConUnique 135
-closureTyConKey                         = mkPreludeTyConUnique 136
-paTyConKey                              = mkPreludeTyConUnique 137
-preprTyConKey                           = mkPreludeTyConUnique 138
-prTyConKey                              = mkPreludeTyConUnique 139
-parrayIntPrimTyConKey                   = mkPreludeTyConUnique 140
-
-
 ---------------- Template Haskell -------------------
 --	USES TyConUniques 100-129
 -----------------------------------------------------
@@ -1081,21 +1027,6 @@ choiceAIdKey	= mkPreludeMiscIdUnique 123 --  |||
 loopAIdKey	= mkPreludeMiscIdUnique 124
 
 fromStringClassOpKey	      = mkPreludeMiscIdUnique 125
-
--- Flattened parallel array functions
-mkClosureIdKey                = mkPreludeMiscIdUnique 126
-applyClosureIdKey             = mkPreludeMiscIdUnique 127
-mkClosurePIdKey               = mkPreludeMiscIdUnique 128
-applyClosurePIdKey            = mkPreludeMiscIdUnique 129
-closurePAIdKey                = mkPreludeMiscIdUnique 130
-lengthPAIdKey                 = mkPreludeMiscIdUnique 131
-replicatePAIdKey              = mkPreludeMiscIdUnique 132
-emptyPAIdKey                  = mkPreludeMiscIdUnique 133
-packPAIdKey                   = mkPreludeMiscIdUnique 134
-combinePAIdKey                = mkPreludeMiscIdUnique 135
-mkPRIdKey                     = mkPreludeMiscIdUnique 136
-replicatePAIntPrimIdKey       = mkPreludeMiscIdUnique 137
-upToPAIntPrimIdKey            = mkPreludeMiscIdUnique 138
 
 ---------------- Template Haskell -------------------
 --	USES IdUniques 200-399

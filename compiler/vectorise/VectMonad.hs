@@ -462,7 +462,7 @@ initV hsc_env guts info p
     go =
       do
         builtins       <- initBuiltins
-        builtin_tycons <- initBuiltinTyCons
+        let builtin_tycons = initBuiltinTyCons builtins
         builtin_pas    <- initBuiltinPAs builtins
         builtin_prs    <- initBuiltinPRs builtins
 

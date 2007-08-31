@@ -585,11 +585,11 @@ buildToArrPRepr repr vect_tc prepr_tc arr_tc
                $ mkConApp data_con [Var len_var, Var repr_var]
 
     to_prod repr_vars@(r : _)
-            (ProdRepr { prod_components   = tys
+            (ProdRepr { prod_components   = tys@(ty : _)
                       , prod_arr_tycon    = tycon
                       , prod_arr_data_con = data_con })
       = do
-          len <- lengthPA (Var r)
+          len <- lengthPA ty (Var r)
           return . wrapFamInstBody tycon tys
                  . mkConApp data_con
                  $ map Type tys ++ len : map Var repr_vars

@@ -2,7 +2,6 @@ module VectUtils (
   collectAnnTypeBinders, collectAnnTypeArgs, isAnnTypeArg,
   collectAnnValBinders,
   mkDataConTag, mkDataConTagLit,
-  splitClosureTy,
 
   mkBuiltinCo,
   mkPADictType, mkPArrayType, mkPReprType,
@@ -74,36 +73,6 @@ mkDataConTagLit con
 
 mkDataConTag :: DataCon -> CoreExpr
 mkDataConTag con = mkIntLitInt (dataConTag con - fIRST_TAG)
-
-splitUnTy :: String -> Name -> Type -> Type
-splitUnTy s name ty
-  | Just (tc, [ty']) <- splitTyConApp_maybe ty
-  , tyConName tc == name
-  = ty'
-
-  | otherwise = pprPanic s (ppr ty)
-
-splitBinTy :: String -> Name -> Type -> (Type, Type)
-splitBinTy s name ty
-  | Just (tc, [ty1, ty2]) <- splitTyConApp_maybe ty
-  , tyConName tc == name
-  = (ty1, ty2)
-
-  | otherwise = pprPanic s (ppr ty)
-
-splitFixedTyConApp :: TyCon -> Type -> [Type]
-splitFixedTyConApp tc ty
-  | Just (tc', tys) <- splitTyConApp_maybe ty
-  , tc == tc'
-  = tys
-
-  | otherwise = pprPanic "splitFixedTyConApp" (ppr tc <+> ppr ty)
-
-splitClosureTy :: Type -> (Type, Type)
-splitClosureTy = splitBinTy "splitClosureTy" closureTyConName
-
-splitPArrayTy :: Type -> Type
-splitPArrayTy = splitUnTy "splitPArrayTy" parrayTyConName
 
 splitPrimTyCon :: Type -> Maybe TyCon
 splitPrimTyCon ty
@@ -267,10 +236,8 @@ mkPR ty
       dict <- paDictOfType ty
       return $ mkApps (Var fn) [Type ty, dict]
 
-lengthPA :: CoreExpr -> VM CoreExpr
-lengthPA x = liftM (`App` x) (paMethod pa_length ty)
-  where
-    ty = splitPArrayTy (exprType x)
+lengthPA :: Type -> CoreExpr -> VM CoreExpr
+lengthPA ty x = liftM (`App` x) (paMethod pa_length ty)
 
 replicatePA :: CoreExpr -> CoreExpr -> VM CoreExpr
 replicatePA len x = liftM (`mkApps` [len,x])
@@ -364,15 +331,13 @@ mkClosure arg_ty res_ty env_ty (vfn,lfn) (venv,lenv)
       return (Var mkv `mkTyApps` [arg_ty, res_ty, env_ty] `mkApps` [dict, vfn, lfn, venv],
               Var mkl `mkTyApps` [arg_ty, res_ty, env_ty] `mkApps` [dict, vfn, lfn, lenv])
 
-mkClosureApp :: VExpr -> VExpr -> VM VExpr
-mkClosureApp (vclo, lclo) (varg, larg)
+mkClosureApp :: Type -> Type -> VExpr -> VExpr -> VM VExpr
+mkClosureApp arg_ty res_ty (vclo, lclo) (varg, larg)
   = do
       vapply <- builtin applyClosureVar
       lapply <- builtin applyClosurePVar
       return (Var vapply `mkTyApps` [arg_ty, res_ty] `mkApps` [vclo, varg],
               Var lapply `mkTyApps` [arg_ty, res_ty] `mkApps` [lclo, larg])
-  where
-    (arg_ty, res_ty) = splitClosureTy (exprType vclo)
 
 buildClosures :: [TyVar] -> [VVar] -> [Type] -> Type -> VM VExpr -> VM VExpr
 buildClosures tvs vars [] res_ty mk_body
@@ -441,7 +406,7 @@ mkLiftEnv :: Var -> [Type] -> [Var] -> VM (CoreExpr, CoreExpr -> CoreExpr -> VM 
 mkLiftEnv lc [ty] [v]
   = return (Var v, \env body ->
                    do
-                     len <- lengthPA (Var v)
+                     len <- lengthPA ty (Var v)
                      return . Let (NonRec v env)
                             $ Case len lc (exprType body) [(DEFAULT, [], body)])
 

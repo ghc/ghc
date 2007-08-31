@@ -211,9 +211,13 @@ vectExpr e@(_, AnnApp _ arg)
 
 vectExpr (_, AnnApp fn arg)
   = do
-      fn'  <- vectExpr fn
-      arg' <- vectExpr arg
-      mkClosureApp fn' arg'
+      arg_ty' <- vectType arg_ty
+      res_ty' <- vectType res_ty
+      fn'     <- vectExpr fn
+      arg'    <- vectExpr arg
+      mkClosureApp arg_ty' res_ty' fn' arg'
+  where
+    (arg_ty, res_ty) = splitFunTy . exprType $ deAnnotate fn
 
 vectExpr (_, AnnCase scrut bndr ty alts)
   | isAlgType scrut_ty
