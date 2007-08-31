@@ -298,15 +298,17 @@ endif
 
 .PHONY: install install-docs install.library.%
 
+DESTlibraryhtmldir = $(DESTDIR)$(libraryhtmldir)/html
+
 install: $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR))
 ifeq "$(HADDOCK_DOCS)" "YES"
-	$(INSTALL_DIR)                                      $(libraryhtmldir)/html
-	$(INSTALL_DATA)   index.html doc-index.html         $(libraryhtmldir)/html
-	$(INSTALL_SCRIPT) gen_contents_index                $(libraryhtmldir)/html
+	$(INSTALL_DIR)                                      $(DESTlibraryhtmldir)
+	$(INSTALL_DATA)   index.html doc-index.html         $(DESTlibraryhtmldir)
+	$(INSTALL_SCRIPT) gen_contents_index                $(DESTlibraryhtmldir)
 	# Hacks:
-	$(INSTALL_DATA)   $(libraryhtmldir)/html/base/*.css $(libraryhtmldir)/html
-	$(INSTALL_DATA)   $(libraryhtmldir)/html/base/*.js  $(libraryhtmldir)/html
-	$(INSTALL_DATA)   $(libraryhtmldir)/html/base/*.gif $(libraryhtmldir)/html
+	$(INSTALL_DATA)   $(DESTlibraryhtmldir)/base/*.css $(DESTlibraryhtmldir)
+	$(INSTALL_DATA)   $(DESTlibraryhtmldir)/base/*.js  $(DESTlibraryhtmldir)
+	$(INSTALL_DATA)   $(DESTlibraryhtmldir)/base/*.gif $(DESTlibraryhtmldir)
 endif
 
 # Cabal doesn't let us ask to install docs only, so do nothing here
@@ -320,7 +322,7 @@ $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
-	  ../installPackage/installPackage $(DESTDIR)$(prefix) $(FPTOOLS_TOP_ABS)/$(GHC_PKG_DIR_REL)/ghc-pkg-inplace $(DESTDIR)$(libdir)/package.conf; \
+	  ../installPackage/installPackage $(DESTDIR) $(prefix) $(FPTOOLS_TOP_ABS)/$(GHC_PKG_DIR_REL)/ghc-pkg-inplace $(DESTDIR)$(libdir)/package.conf; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%

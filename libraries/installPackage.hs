@@ -11,7 +11,7 @@ import System.Environment
 main :: IO ()
 main = do args <- getArgs
           case args of
-              pref : ghcpkg : ghcpkgconf : args' ->
+              destdir : pref : ghcpkg : ghcpkgconf : args' ->
                   let verbosity = case args' of
                               [] -> normal
                               ['-':'v':v] ->
@@ -20,14 +20,14 @@ main = do args <- getArgs
                                               _ -> Just v
                                   in flagToVerbosity m
                               _ -> error ("Bad arguments: " ++ show args)
-                  in doit pref ghcpkg ghcpkgconf verbosity
+                  in doit destdir pref ghcpkg ghcpkgconf verbosity
               _ ->
                   error "Missing arguments"
 
-doit :: FilePath -> FilePath -> FilePath -> Verbosity -> IO ()
-doit pref ghcpkg ghcpkgconf verbosity =
+doit :: FilePath -> FilePath -> FilePath -> FilePath -> Verbosity -> IO ()
+doit destdir pref ghcpkg ghcpkgconf verbosity =
        do let userHooks = simpleUserHooks
-              copyFlags = (emptyCopyFlags NoCopyDest) {
+              copyFlags = (emptyCopyFlags (CopyTo destdir)) {
                               copyVerbose = verbosity
                           }
               registerFlags = emptyRegisterFlags {
