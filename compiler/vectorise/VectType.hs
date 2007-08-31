@@ -226,6 +226,20 @@ data Repr = ProdRepr {
 
           | IdRepr Type
 
+          | VoidRepr {
+              void_tycon        :: TyCon
+            , void_bottom       :: CoreExpr
+            }
+
+mkVoid :: VM Repr
+mkVoid = do
+           tycon <- builtin voidTyCon
+           var   <- builtin voidVar
+           return $ VoidRepr {
+                      void_tycon  = tycon
+                    , void_bottom = Var var
+                    }
+
 mkProduct :: [Type] -> VM Repr
 mkProduct tys
   = do
@@ -246,6 +260,7 @@ mkProduct tys
     arity = length tys
 
 mkSubProduct :: [Type] -> VM Repr
+mkSubProduct []   = mkVoid
 mkSubProduct [ty] = return $ IdRepr ty
 mkSubProduct tys  = mkProduct tys
 
@@ -275,6 +290,7 @@ reprType (ProdRepr { prod_tycon = tycon, prod_components = tys })
 reprType (SumRepr { sum_tycon = tycon, sum_components = reprs })
   = mkTyConApp tycon (map reprType reprs)
 reprType (IdRepr ty) = ty
+reprType (VoidRepr { void_tycon = tycon }) = mkTyConApp tycon []
 
 arrReprType :: Repr -> VM Type
 arrReprType = mkPArrayType . reprType
@@ -286,6 +302,7 @@ arrShapeTys (SumRepr  {})
       return [intPrimTy, mkTyConApp int_arr [], mkTyConApp int_arr []]
 arrShapeTys (ProdRepr {}) = return [intPrimTy]
 arrShapeTys (IdRepr _)    = return []
+arrShapeTys (VoidRepr {}) = return [intPrimTy]
 
 arrShapeVars :: Repr -> VM [Var]
 arrShapeVars repr = mapM (newLocalVar FSLIT("sh")) =<< arrShapeTys repr
@@ -298,22 +315,31 @@ replicateShape (SumRepr {})  len tag
       up  <- builtin upToPAIntPrimVar
       return [len, Var rep `mkApps` [len, tag], Var up `App` len]
 replicateShape (IdRepr _) _ _ = return []
+replicateShape (VoidRepr {}) len _ = return [len]
 
-arrReprElemTys :: Repr -> [[Type]]
+arrReprElemTys :: Repr -> VM [[Type]]
 arrReprElemTys (SumRepr { sum_components = prods })
-  = map arrProdElemTys prods
+  = mapM arrProdElemTys prods
 arrReprElemTys prod@(ProdRepr {})
-  = [arrProdElemTys prod]
-arrReprElemTys (IdRepr ty) = [[ty]]
+  = do
+      tys <- arrProdElemTys prod
+      return [tys]
+arrReprElemTys (IdRepr ty) = return [[ty]]
+arrReprElemTys (VoidRepr { void_tycon = tycon })
+  = return [[mkTyConApp tycon []]]
 
 arrProdElemTys (ProdRepr { prod_components = [] })
-  = [unitTy]
+  = do
+      void <- builtin voidTyCon
+      return [mkTyConApp void []]
 arrProdElemTys (ProdRepr { prod_components = tys })
-  = tys
-arrProdElemTys (IdRepr ty) = [ty]
+  = return tys
+arrProdElemTys (IdRepr ty) = return [ty]
+arrProdElemTys (VoidRepr { void_tycon = tycon })
+  = return [mkTyConApp tycon []]
 
 arrReprTys :: Repr -> VM [[Type]]
-arrReprTys = mapM (mapM mkPArrayType) . arrReprElemTys
+arrReprTys repr = mapM (mapM mkPArrayType) =<< arrReprElemTys repr
 
 arrReprVars :: Repr -> VM [[Var]]
 arrReprVars repr
@@ -376,6 +402,10 @@ buildToPRepr repr vect_tc prepr_tc _
           var <- newLocalVar FSLIT("y") ty
           return ([var], Var var)
 
+    prod_alt (VoidRepr { void_bottom = bottom })
+      = return ([], bottom)
+
+
 buildFromPRepr :: Repr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildFromPRepr repr vect_tc prepr_tc _
   = do
@@ -417,6 +447,9 @@ buildFromPRepr repr vect_tc prepr_tc _
 
     from_prod (IdRepr _) con expr
        = return $ con `App` expr
+
+    from_prod (VoidRepr {}) con expr
+       = return con
 
 buildToArrPRepr :: Repr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildToArrPRepr repr vect_tc prepr_tc arr_tc
@@ -483,8 +516,9 @@ buildToArrPRepr repr vect_tc prepr_tc arr_tc
                  . mkConApp data_con
                  $ map Type tys ++ len : map Var repr_vars
 
-    to_prod [var] (IdRepr ty)
-      = return (Var var)
+    to_prod [var] (IdRepr ty)   = return (Var var)
+    to_prod [var] (VoidRepr {}) = return (Var var)
+
 
 buildFromArrPRepr :: Repr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildFromArrPRepr repr vect_tc prepr_tc arr_tc
@@ -571,7 +605,17 @@ buildFromArrPRepr repr vect_tc prepr_tc arr_tc
               body
       = return $ Let (NonRec repr_var expr) body
 
+    from_prod (VoidRepr {})
+              expr
+              shape_vars
+              [repr_var]
+              res_ty
+              body
+      = return $ Let (NonRec repr_var expr) body
+
 buildPRDictRepr :: Repr -> VM CoreExpr
+buildPRDictRepr (VoidRepr { void_tycon = tycon })
+  = prDFunOfTyCon tycon
 buildPRDictRepr (IdRepr ty) = mkPR ty
 buildPRDictRepr (ProdRepr {
                    prod_components = tys
@@ -679,6 +723,7 @@ vectDataConWorkers :: Repr -> TyCon -> TyCon -> TyCon
                    -> VM ()
 vectDataConWorkers repr orig_tc vect_tc arr_tc
   = do
+      arr_tys <- arrReprElemTys repr
       bs <- sequence
           . zipWith3 def_worker  (tyConDataCons orig_tc) rep_tys
           $ zipWith4 mk_data_con (tyConDataCons vect_tc)
@@ -694,7 +739,6 @@ vectDataConWorkers repr orig_tc vect_tc arr_tc
     res_ty   = mkTyConApp vect_tc var_tys
 
     rep_tys  = map dataConRepArgTys $ tyConDataCons vect_tc
-    arr_tys  = arrReprElemTys repr
 
     [arr_dc] = tyConDataCons arr_tc
 

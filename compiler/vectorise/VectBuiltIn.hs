@@ -46,9 +46,11 @@ data Builtins = Builtins {
                 , prTyCon          :: TyCon
                 , prDataCon        :: DataCon
                 , parrayIntPrimTyCon :: TyCon
+                , voidTyCon        :: TyCon
                 , wrapTyCon        :: TyCon
                 , sumTyCons        :: Array Int TyCon
                 , closureTyCon     :: TyCon
+                , voidVar          :: Var
                 , mkPRVar          :: Var
                 , mkClosureVar     :: Var
                 , applyClosureVar  :: Var
@@ -71,8 +73,9 @@ sumTyCon n bi
 
 prodTyCon :: Int -> Builtins -> TyCon
 prodTyCon n bi
+  | n == 0                      = voidTyCon bi
   | n == 1                      = wrapTyCon bi
-  | n >= 0 && n <= mAX_NDP_PROD = tupleTyCon Boxed n
+  | n >= 2 && n <= mAX_NDP_PROD = tupleTyCon Boxed n
   | otherwise = pprPanic "prodTyCon" (ppr n)
 
 initBuiltins :: DsM Builtins
@@ -87,12 +90,14 @@ initBuiltins
       parrayIntPrimTyCon <- dsLookupTyCon parrayIntPrimTyConName
       closureTyCon <- dsLookupTyCon closureTyConName
 
+      voidTyCon    <- lookupExternalTyCon nDP_REPR FSLIT("Void")
       wrapTyCon    <- lookupExternalTyCon nDP_REPR FSLIT("Wrap")
       sum_tcs <- mapM (lookupExternalTyCon nDP_REPR)
                       [mkFastString ("Sum" ++ show i) | i <- [2..mAX_NDP_SUM]]
 
       let sumTyCons = listArray (2, mAX_NDP_SUM) sum_tcs
 
+      voidVar          <- lookupExternalVar nDP_REPR FSLIT("void")
       mkPRVar          <- dsLookupGlobalId mkPRName
       mkClosureVar     <- dsLookupGlobalId mkClosureName
       applyClosureVar  <- dsLookupGlobalId applyClosureName
@@ -117,9 +122,11 @@ initBuiltins
                , prTyCon          = prTyCon
                , prDataCon        = prDataCon
                , parrayIntPrimTyCon = parrayIntPrimTyCon
+               , voidTyCon        = voidTyCon
                , wrapTyCon        = wrapTyCon
                , sumTyCons        = sumTyCons
                , closureTyCon     = closureTyCon
+               , voidVar          = voidVar
                , mkPRVar          = mkPRVar
                , mkClosureVar     = mkClosureVar
                , applyClosureVar  = applyClosureVar
@@ -154,16 +161,18 @@ initBuiltinDicts ps
   where
     (tcs, mods, fss) = unzip3 ps
 
-initBuiltinPAs = initBuiltinDicts builtinPAs
+initBuiltinPAs = initBuiltinDicts . builtinPAs
 
-builtinPAs :: [(Name, Module, FastString)]
-builtinPAs = [
-               mk closureTyConName  nDP_CLOSURE   FSLIT("dPA_Clo")
-             , mk unitTyConName     nDP_INSTANCES FSLIT("dPA_Unit")
+builtinPAs :: Builtins -> [(Name, Module, FastString)]
+builtinPAs bi
+  = [
+      mk closureTyConName  nDP_CLOSURE       FSLIT("dPA_Clo")
+    , mk (tyConName $ voidTyCon bi) nDP_REPR FSLIT("dPA_Void")
+    , mk unitTyConName     nDP_INSTANCES     FSLIT("dPA_Unit")
 
-             , mk intTyConName      nDP_INSTANCES FSLIT("dPA_Int")
-             ]
-             ++ tups
+    , mk intTyConName      nDP_INSTANCES FSLIT("dPA_Int")
+    ]
+    ++ tups
   where
     mk name mod fs = (name, mod, fs)
 
@@ -178,6 +187,7 @@ builtinPRs :: Builtins -> [(Name, Module, FastString)]
 builtinPRs bi =
   [
     mk (tyConName unitTyCon) nDP_REPR      FSLIT("dPR_Unit")
+  , mk (tyConName $ voidTyCon bi) nDP_REPR FSLIT("dPR_Void")
   , mk (tyConName $ wrapTyCon bi) nDP_REPR FSLIT("dPR_Wrap")
   , mk closureTyConName      nDP_CLOSURE   FSLIT("dPR_Clo")
 

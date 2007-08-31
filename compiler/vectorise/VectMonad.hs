@@ -463,7 +463,7 @@ initV hsc_env guts info p
       do
         builtins       <- initBuiltins
         builtin_tycons <- initBuiltinTyCons
-        builtin_pas    <- initBuiltinPAs
+        builtin_pas    <- initBuiltinPAs builtins
         builtin_prs    <- initBuiltinPRs builtins
 
         eps <- ioToIOEnv $ hscEPS hsc_env
