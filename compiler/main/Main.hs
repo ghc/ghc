@@ -89,6 +89,8 @@ main =
                                   exitWith ExitSuccess
     ShowSupportedLanguages  -> do showSupportedLanguages
                                   exitWith ExitSuccess
+    ShowDocDir              -> do showDocDir
+                                  exitWith ExitSuccess
     ShowVersion             -> do showVersion
                                   exitWith ExitSuccess
     ShowNumVersion          -> do putStrLn cProjectVersion
@@ -164,6 +166,7 @@ main =
     ShowUsage              -> showGhcUsage dflags cli_mode
     PrintLibdir            -> putStrLn (topDir dflags)
     ShowSupportedLanguages -> alreadyHandled
+    ShowDocDir             -> alreadyHandled
     ShowVersion            -> alreadyHandled
     ShowNumVersion         -> alreadyHandled
     ShowInterface f        -> doShowIface dflags f
@@ -298,6 +301,7 @@ verifyOutputFiles dflags = do
 data CmdLineMode
   = ShowUsage               -- ghc -?
   | PrintLibdir             -- ghc --print-libdir
+  | ShowDocDir              -- ghc --print-docdir
   | ShowInfo                -- ghc --info
   | ShowSupportedLanguages  -- ghc --supported-languages
   | ShowVersion             -- ghc -V/--version
@@ -357,13 +361,14 @@ type ModeM a = CmdLineP (CmdLineMode, String, [String]) a
 mode_flags :: [(String, OptKind (CmdLineP (CmdLineMode, String, [String])))]
 mode_flags =
   [  ------- help / version ----------------------------------------------
-     ( "?"    		 , PassFlag (setMode ShowUsage))
-  ,  ( "-help"	 	 , PassFlag (setMode ShowUsage))
-  ,  ( "-print-libdir"   , PassFlag (setMode PrintLibdir))
-  ,  ( "V"	 	 , PassFlag (setMode ShowVersion))
-  ,  ( "-version"	 , PassFlag (setMode ShowVersion))
-  ,  ( "-numeric-version", PassFlag (setMode ShowNumVersion))
-  ,  ( "-info", PassFlag (setMode ShowInfo))
+     ( "?"                   , PassFlag (setMode ShowUsage))
+  ,  ( "-help"               , PassFlag (setMode ShowUsage))
+  ,  ( "-print-libdir"       , PassFlag (setMode PrintLibdir))
+  ,  ( "-print-docdir"       , PassFlag (setMode ShowDocDir))
+  ,  ( "V"                   , PassFlag (setMode ShowVersion))
+  ,  ( "-version"            , PassFlag (setMode ShowVersion))
+  ,  ( "-numeric-version"    , PassFlag (setMode ShowNumVersion))
+  ,  ( "-info"               , PassFlag (setMode ShowInfo))
   ,  ( "-supported-languages", PassFlag (setMode ShowSupportedLanguages))
 
       ------- interfaces ----------------------------------------------------
@@ -464,6 +469,11 @@ showInfo = do
 showSupportedLanguages :: IO ()
 showSupportedLanguages = do mapM_ putStrLn supportedLanguages
                             exitWith ExitSuccess
+
+showDocDir :: IO ()
+showDocDir = do
+  putStrLn cDocDir
+  exitWith ExitSuccess
 
 showVersion :: IO ()
 showVersion = do

@@ -90,6 +90,12 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>&ndash;&ndash;print-docdir</option></entry>
+	      <entry>display GHC documentation directory</entry>
+	      <entry>mode</entry>
+	      <entry>-</entry>
+	    </row>
+	    <row>
 	      <entry><option>-ferror-spans</option></entry>
 	      <entry>output full span in error messages</entry>
 	      <entry>static</entry>
