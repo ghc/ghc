@@ -32,6 +32,7 @@ import TysPrim           ( intPrimTy )
 import Unique
 import UniqFM
 import UniqSet
+import Util              ( singleton )
 import Digraph           ( SCC(..), stronglyConnComp )
 
 import Outputable
@@ -286,6 +287,10 @@ sumRepr reprs
   where
     arity = length reprs
 
+splitSumRepr :: Repr -> [Repr]
+splitSumRepr (SumRepr { sum_components = reprs }) = reprs
+splitSumRepr repr                                 = [repr]
+
 boxRepr :: Repr -> VM Repr
 boxRepr (VoidRepr {}) = boxedProductRepr []
 boxRepr (IdRepr ty)   = boxedProductRepr [ty]
@@ -324,33 +329,38 @@ replicateShape (SumRepr {})  len tag
 replicateShape (IdRepr _) _ _ = return []
 replicateShape (VoidRepr {}) len _ = return [len]
 
-arrReprElemTys :: Repr -> VM [[Type]]
-arrReprElemTys (SumRepr { sum_components = prods })
-  = mapM arrProdElemTys prods
-arrReprElemTys prod@(ProdRepr {})
-  = do
-      tys <- arrProdElemTys prod
-      return [tys]
-arrReprElemTys (IdRepr ty) = return [[ty]]
-arrReprElemTys (VoidRepr { void_tycon = tycon })
-  = return [[mkTyConApp tycon []]]
+emptyArrRepr :: Repr -> VM [CoreExpr]
+emptyArrRepr (SumRepr { sum_components = prods })
+  = liftM concat $ mapM emptyArrRepr prods
+emptyArrRepr (ProdRepr { prod_components = [] })
+  = return [Var unitDataConId]
+emptyArrRepr (ProdRepr { prod_components = tys })
+  = mapM emptyPA tys
+emptyArrRepr (IdRepr ty)
+  = liftM singleton $ emptyPA ty
+emptyArrRepr (VoidRepr { void_tycon = tycon })
+  = liftM singleton $ emptyPA (mkTyConApp tycon [])
 
-arrProdElemTys (ProdRepr { prod_components = [] })
-  = do
-      void <- builtin voidTyCon
-      return [mkTyConApp void []]
-arrProdElemTys (ProdRepr { prod_components = tys })
-  = return tys
-arrProdElemTys (IdRepr ty) = return [ty]
-arrProdElemTys (VoidRepr { void_tycon = tycon })
-  = return [mkTyConApp tycon []]
+arrReprTys :: Repr -> VM [Type]
+arrReprTys (SumRepr { sum_components = reprs })
+  = liftM concat $ mapM arrReprTys reprs
+arrReprTys (ProdRepr { prod_components = [] })
+  = return [unitTy]
+arrReprTys (ProdRepr { prod_components = tys })
+  = mapM mkPArrayType tys
+arrReprTys (IdRepr ty)
+  = liftM singleton $ mkPArrayType ty
+arrReprTys (VoidRepr { void_tycon = tycon })
+  = liftM singleton $ mkPArrayType (mkTyConApp tycon [])
 
-arrReprTys :: Repr -> VM [[Type]]
-arrReprTys repr = mapM (mapM mkPArrayType) =<< arrReprElemTys repr
+arrReprTys' :: Repr -> VM [[Type]]
+arrReprTys' (SumRepr { sum_components = reprs })
+  = mapM arrReprTys reprs
+arrReprTys' repr = liftM singleton $ arrReprTys repr
 
 arrReprVars :: Repr -> VM [[Var]]
 arrReprVars repr
-  = mapM (mapM (newLocalVar FSLIT("rs"))) =<< arrReprTys repr
+  = mapM (mapM (newLocalVar FSLIT("rs"))) =<< arrReprTys' repr
 
 mkRepr :: TyCon -> VM Repr
 mkRepr vect_tc
@@ -692,7 +702,7 @@ buildPArrayDataCon orig_name vect_tc repr_tc
       shape_tys <- arrShapeTys repr
       repr_tys  <- arrReprTys  repr
 
-      let tys = shape_tys ++ concat repr_tys
+      let tys = shape_tys ++ repr_tys
 
       liftDs $ buildDataCon dc_name
                             False                  -- not infix
@@ -729,13 +739,12 @@ vectDataConWorkers :: Repr -> TyCon -> TyCon -> TyCon
                    -> VM ()
 vectDataConWorkers repr orig_tc vect_tc arr_tc
   = do
-      arr_tys <- arrReprElemTys repr
       bs <- sequence
           . zipWith3 def_worker  (tyConDataCons orig_tc) rep_tys
           $ zipWith4 mk_data_con (tyConDataCons vect_tc)
                                  rep_tys
-                                 (inits arr_tys)
-                                 (tail $ tails arr_tys)
+                                 (inits reprs)
+                                 (tail $ tails reprs)
       mapM_ (uncurry hoistBinding) bs
   where
     tyvars   = tyConTyVars vect_tc
@@ -745,17 +754,16 @@ vectDataConWorkers repr orig_tc vect_tc arr_tc
     res_ty   = mkTyConApp vect_tc var_tys
 
     rep_tys  = map dataConRepArgTys $ tyConDataCons vect_tc
+    reprs    = splitSumRepr repr
 
     [arr_dc] = tyConDataCons arr_tc
 
     mk_data_con con tys pre post
       = liftM2 (,) (vect_data_con con)
-                   (lift_data_con tys (concat pre)
-                                      (concat post)
-                                      (mkDataConTag con))
+                   (lift_data_con tys pre post (mkDataConTag con))
 
     vect_data_con con = return $ mkConApp con ty_args
-    lift_data_con tys pre_tys post_tys tag
+    lift_data_con tys pre_reprs post_reprs tag
       = do
           len  <- builtin liftingContext
           args <- mapM (newLocalVar FSLIT("xs"))
@@ -764,8 +772,8 @@ vectDataConWorkers repr orig_tc vect_tc arr_tc
           shape <- replicateShape repr (Var len) tag
           repr  <- mk_arr_repr (Var len) (map Var args)
 
-          pre   <- mapM emptyPA pre_tys
-          post  <- mapM emptyPA post_tys
+          pre   <- liftM concat $ mapM emptyArrRepr pre_reprs
+          post  <- liftM concat $ mapM emptyArrRepr post_reprs
 
           return . mkLams (len : args)
                  . wrapFamInstBody arr_tc var_tys
