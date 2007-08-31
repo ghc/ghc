@@ -550,11 +550,21 @@ datadir    = $(datadir0)/ghc-$(ProjectVersion)
 endif # Windows
 
 headerdir = $(libdir)/include
-docdir    = @docdir@
-htmldir   = @htmldir@
-dvidir    = @dvidir@
-pdfdir    = @pdfdir@
-psdir     = @psdir@
+
+# New autoconf (>= 2.60?) make a configure with --docdir=DIR etc flags.
+# However, in order to support older autoconf's we don't use them.
+
+#docdir    = @docdir@
+#htmldir   = @htmldir@
+#dvidir    = @dvidir@
+#pdfdir    = @pdfdir@
+#psdir     = @psdir@
+
+docdir    = $(datarootdir)/doc/ghc
+htmldir   = $(docdir)
+dvidir    = $(docdir)
+pdfdir    = $(docdir)
+psdir     = $(docdir)
 
 # Default place for putting interface files is $(libdir)
 # (overriden for packages in package.mk)
