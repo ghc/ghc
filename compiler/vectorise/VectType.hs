@@ -231,17 +231,23 @@ data Repr = ProdRepr {
             , void_bottom       :: CoreExpr
             }
 
-mkVoid :: VM Repr
-mkVoid = do
-           tycon <- builtin voidTyCon
-           var   <- builtin voidVar
-           return $ VoidRepr {
-                      void_tycon  = tycon
-                    , void_bottom = Var var
-                    }
+voidRepr :: VM Repr
+voidRepr
+  = do
+      tycon <- builtin voidTyCon
+      var   <- builtin voidVar
+      return $ VoidRepr {
+                 void_tycon  = tycon
+               , void_bottom = Var var
+               }
 
-mkProduct :: [Type] -> VM Repr
-mkProduct tys
+unboxedProductRepr :: [Type] -> VM Repr
+unboxedProductRepr []   = voidRepr
+unboxedProductRepr [ty] = return $ IdRepr ty
+unboxedProductRepr tys  = boxedProductRepr tys
+
+boxedProductRepr :: [Type] -> VM Repr
+boxedProductRepr tys
   = do
       tycon <- builtin (prodTyCon arity)
       let [data_con] = tyConDataCons tycon
@@ -259,14 +265,10 @@ mkProduct tys
   where
     arity = length tys
 
-mkSubProduct :: [Type] -> VM Repr
-mkSubProduct []   = mkVoid
-mkSubProduct [ty] = return $ IdRepr ty
-mkSubProduct tys  = mkProduct tys
-
-mkSum :: [Repr] -> VM Repr
-mkSum [repr] = return repr
-mkSum reprs
+sumRepr :: [Repr] -> VM Repr
+sumRepr []     = voidRepr
+sumRepr [repr] = boxRepr repr
+sumRepr reprs
   = do
       tycon <- builtin (sumTyCon arity)
       (arr_tycon, _) <- parrayReprTyCon
@@ -283,6 +285,11 @@ mkSum reprs
                }
   where
     arity = length reprs
+
+boxRepr :: Repr -> VM Repr
+boxRepr (VoidRepr {}) = boxedProductRepr []
+boxRepr (IdRepr ty)   = boxedProductRepr [ty]
+boxRepr repr          = return repr
 
 reprType :: Repr -> Type
 reprType (ProdRepr { prod_tycon = tycon, prod_components = tys })
@@ -347,8 +354,7 @@ arrReprVars repr
 
 mkRepr :: TyCon -> VM Repr
 mkRepr vect_tc
-  | [tys] <- rep_tys = mkProduct tys
-  | otherwise        = mkSum =<< mapM mkSubProduct rep_tys
+  = sumRepr =<< mapM unboxedProductRepr rep_tys
   where
     rep_tys = map dataConRepArgTys $ tyConDataCons vect_tc
 
