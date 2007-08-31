@@ -69,6 +69,7 @@ import Data.Bits
 import Data.Maybe
 import GHC.Exts
 import Control.Monad
+import System.IO
 
 {-
 The native-code generator has machine-independent and
@@ -121,22 +122,25 @@ The machine-dependent bits break down as follows:
 -- -----------------------------------------------------------------------------
 -- Top-level of the native codegen
 
--- NB. We *lazilly* compile each block of code for space reasons.
-
 --------------------
-nativeCodeGen :: DynFlags -> [RawCmm] -> UniqSupply -> IO Pretty.Doc
-nativeCodeGen dflags cmms us
+nativeCodeGen :: DynFlags -> Handle -> UniqSupply -> [RawCmm] -> IO ()
+nativeCodeGen dflags h us cmms
  = do
-	-- do native code generation on all these cmm things
- 	(us', result)
-		<- mapAccumLM (cmmNativeGen dflags) us
-		$  concat $ map add_split cmms
+	let split_cmms	= concat $ map add_split cmms
 
-	let (native, imports, mColorStats, mLinearStats)
-		= unzip4 result
+ 	(imports, prof)
+		<- cmmNativeGens dflags h us split_cmms [] []
+
+	let (native, colorStats, linearStats)
+		= unzip3 prof
+
+	-- dump native code
+	dumpIfSet_dyn dflags
+		Opt_D_dump_asm "Asm code"
+		(vcat $ map (docToSDoc . pprNatCmmTop) $ concat native)
 
 	-- dump global NCG stats for graph coloring allocator
-	(case concat $ catMaybes mColorStats of
+	(case concat $ catMaybes colorStats of
 	  []	-> return ()
 	  stats	-> do	
 	   	-- build the global register conflict graph
@@ -155,18 +159,52 @@ nativeCodeGen dflags cmms us
 
 
 	-- dump global NCG stats for linear allocator
-	(case catMaybes mLinearStats of
+	(case concat $ catMaybes linearStats of
 		[]	-> return ()
 		stats	-> dumpSDoc dflags Opt_D_dump_asm_stats "NCG stats"
-				$ Linear.pprStats (concat native) (concat stats))
+				$ Linear.pprStats (concat native) stats)
 
-	return	$ makeAsmDoc (concat native) (concat imports)
+	-- write out the imports
+	Pretty.printDoc Pretty.LeftMode h
+		$ makeImportsDoc (concat imports)
 
-	where	add_split (Cmm tops)
-			| dopt Opt_SplitObjs dflags = split_marker : tops
-			| otherwise		    = tops
+	return	()
 
-		split_marker = CmmProc [] mkSplitMarkerLabel [] []
+ where	add_split (Cmm tops)
+		| dopt Opt_SplitObjs dflags = split_marker : tops
+		| otherwise		    = tops
+
+	split_marker = CmmProc [] mkSplitMarkerLabel [] []
+
+
+-- | Do native code generation on all these cmms.
+--
+cmmNativeGens dflags h us [] impAcc profAcc
+	= return (reverse impAcc, reverse profAcc)
+
+cmmNativeGens dflags h us (cmm : cmms) impAcc profAcc
+ = do
+ 	(us', native, imports, colorStats, linearStats)
+		<- cmmNativeGen dflags us cmm
+
+	Pretty.printDoc Pretty.LeftMode h
+		$ {-# SCC "pprNativeCode" #-} Pretty.vcat $ map pprNatCmmTop native
+
+	let lsPprNative =
+		if  dopt Opt_D_dump_asm       dflags
+	         || dopt Opt_D_dump_asm_stats dflags
+			then native
+			else []
+
+	-- force evaulation of imports and lsPprNative to avoid space leak
+	seqString (showSDoc $ vcat $ map ppr imports)
+	 `seq`  lsPprNative
+	 `seq`	cmmNativeGens dflags h us' cmms
+			(imports : impAcc)
+			((lsPprNative, colorStats, linearStats) : profAcc)
+
+ where	seqString []		= ()
+	seqString (x:xs)	= x `seq` seqString xs `seq` ()
 
 
 -- | Complete native code generation phase for a single top-level chunk of Cmm.
@@ -176,29 +214,31 @@ cmmNativeGen
 	:: DynFlags
 	-> UniqSupply
 	-> RawCmmTop
-	-> IO 	( UniqSupply
-		, ( [NatCmmTop]
-		  , [CLabel]
-		  , Maybe [Color.RegAllocStats]
-		  , Maybe [Linear.RegAllocStats]))
+	-> IO	( UniqSupply
+		, [NatCmmTop]
+		, [CLabel]
+		, Maybe [Color.RegAllocStats]
+		, Maybe [Linear.RegAllocStats])
 
 cmmNativeGen dflags us cmm
  = do
 	-- rewrite assignments to global regs
  	let (fixed_cmm, usFix)	=
+		{-# SCC "fixAssignsTop" #-}
 		initUs us $ fixAssignsTop cmm
 
 	-- cmm to cmm optimisations
 	let (opt_cmm, imports) =
+		{-# SCC "cmmToCmm" #-}
 		cmmToCmm dflags fixed_cmm
 
 	dumpIfSet_dyn dflags
 		Opt_D_dump_opt_cmm "Optimised Cmm"
 		(pprCmm $ Cmm [opt_cmm])
 
-
 	-- generate native code from cmm
 	let ((native, lastMinuteImports), usGen) =
+		{-# SCC "genMachCode" #-}
 		initUs usFix $ genMachCode dflags opt_cmm
 
 	dumpIfSet_dyn dflags
@@ -208,6 +248,7 @@ cmmNativeGen dflags us cmm
 
 	-- tag instructions with register liveness information
 	let (withLiveness, usLive) =
+		{-# SCC "regLiveness" #-}
 		initUs usGen $ mapUs regLiveness native
 
 	dumpIfSet_dyn dflags
@@ -228,15 +269,16 @@ cmmNativeGen dflags us cmm
 
 		-- aggressively coalesce moves between virtual regs
 		let (coalesced, usCoalesce)
-			= initUs usLive $ regCoalesce withLiveness
+			= {-# SCC "regCoalesce" #-}
+			  initUs usLive $ regCoalesce withLiveness
 
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_coalesce "Reg-Reg moves coalesced"
 			(vcat $ map ppr coalesced)
 
 	 	-- if any of these dump flags are turned on we want to hang on to
-		--	intermediate structures in the allocator - otherwise ditch
-		--	them early so we don't end up creating space leaks.
+		--	intermediate structures in the allocator - otherwise tell the
+		--	allocator to ditch them early so we don't end up creating space leaks.
 		let generateRegAllocStats = or
 			[ dopt Opt_D_dump_asm_regalloc_stages dflags
 			, dopt Opt_D_dump_asm_stats dflags
@@ -244,8 +286,9 @@ cmmNativeGen dflags us cmm
 
 		-- graph coloring register allocation
 		let ((alloced, regAllocStats), usAlloc)
-			= initUs usCoalesce
-			$ Color.regAlloc
+			= {-# SCC "regAlloc(color)" #-}
+			  initUs usCoalesce
+			  $ Color.regAlloc
 				generateRegAllocStats
 				alloc_regs
 				(mkUniqSet [0..maxSpillSlots])
@@ -263,26 +306,37 @@ cmmNativeGen dflags us cmm
 					$$ ppr stats)
 				$ zip [0..] regAllocStats)
 
-		return	( alloced, usAlloc
-			, if dopt Opt_D_dump_asm_stats dflags
-			   then Just regAllocStats else Nothing
-			, Nothing)
+		let mPprStats =
+			if dopt Opt_D_dump_asm_stats dflags
+			 then Just regAllocStats else Nothing
+
+		-- force evaluation of the Maybe to avoid space leak
+		mPprStats
+		 `seq`	return	( alloced, usAlloc
+				, mPprStats
+				, Nothing)
 
 	  else do
 	  	-- do linear register allocation
 		let ((alloced, regAllocStats), usAlloc) 
-			= initUs usLive
-			$ liftM unzip
-			$ mapUs Linear.regAlloc withLiveness
+			= {-# SCC "regAlloc(linear)" #-}
+  			  initUs usLive
+ 			  $ liftM unzip
+			  $ mapUs Linear.regAlloc withLiveness
 
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_regalloc "Registers allocated"
 			(vcat $ map (docToSDoc . pprNatCmmTop) alloced)
 
-		return	( alloced, usAlloc
-			, Nothing
-			, if dopt Opt_D_dump_asm_stats dflags
-			   then Just (catMaybes regAllocStats) else Nothing)
+		let mPprStats =
+			if dopt Opt_D_dump_asm_stats dflags
+			 then Just (catMaybes regAllocStats) else Nothing
+
+		-- force evaluation of the Maybe to avoid space leak
+		mPprStats
+		 `seq`	return	( alloced, usAlloc
+				, Nothing
+				, mPprStats)
 
 	---- shortcut branches
 	let shorted	=
@@ -304,10 +358,10 @@ cmmNativeGen dflags us cmm
 #endif
 
 	return 	( usAlloc
-		, ( final_mach_code
-		  , lastMinuteImports ++ imports
-		  , ppr_raStatsColor
-		  , ppr_raStatsLinear) )
+		, final_mach_code
+		, lastMinuteImports ++ imports
+		, ppr_raStatsColor
+		, ppr_raStatsLinear)
 
 
 #if i386_TARGET_ARCH
@@ -321,13 +375,11 @@ x86fp_kludge top@(CmmProc info lbl params code) =
 #endif
 
 
--- | Build assembler source file from native code and its imports.
+-- | Build a doc for all the imports.
 --
-makeAsmDoc :: [NatCmmTop] -> [CLabel] -> Pretty.Doc
-makeAsmDoc native imports
- = 	Pretty.vcat (map pprNatCmmTop native)
- 	Pretty.$$ (Pretty.text "")
-	Pretty.$$ dyld_stubs imports
+makeImportsDoc :: [CLabel] -> Pretty.Doc
+makeImportsDoc imports
+ = dyld_stubs imports
 
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
                 -- On recent versions of Darwin, the linker supports
