@@ -335,9 +335,11 @@ binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR))
 	mkdir                               $(BIN_DIST_LIBDIR)/ifBuildable
 	cp 	  ifBuildable/ifBuildable       $(BIN_DIST_LIBDIR)/ifBuildable
 	cp    Makefile                      $(BIN_DIST_LIBDIR)
+ifeq "$(HADDOCK_DOCS)" "YES"
 	cp    gen_contents_index            $(BIN_DIST_LIBDIR)
 	cp    index.html                    $(BIN_DIST_LIBDIR)
 	cp    doc-index.html                $(BIN_DIST_LIBDIR)
+endif
 	cp -pR stamp                         $(BIN_DIST_LIBDIR)
 
 $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR)): \
