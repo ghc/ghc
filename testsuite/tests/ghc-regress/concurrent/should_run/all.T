@@ -50,7 +50,21 @@ test('conc020', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc021', compose(omit_ways(['ghci']), exit_code(1)),
 	compile_and_run, [''])
 test('conc022', only_compiler_types(['ghc']), compile_and_run, [''])
-test('conc023', compose(skip_if_fast,only_compiler_types(['ghc'])), compile_and_run, [''])
+
+# On Windows, the non-threaded RTS creates a real OS thread for each 
+# threadDelay.  conc023 creates 5000 concurrent threadDelays, and the
+# resulting creation of OS threads seems to cause the system to run
+# out of memory sometimes (I'm not sure exactly how/why this happens,
+# but the threaded RTS fixes it).  See #1197.
+if config.platform == 'i386-unknown-mingw32':
+   conc023_ways = only_ways(['threaded1','threaded2'])
+else:
+   conc023_ways = normal
+
+test('conc023', composes([skip_if_fast,
+                          only_compiler_types(['ghc']),
+                          conc023_ways]), compile_and_run, [''])
+
 test('conc024', only_compiler_types(['ghc']), compile_and_run, [''])
 test('conc025', normal, compile_and_run, [''])
 test('conc026', only_compiler_types(['ghc']), compile_and_run, [''])
