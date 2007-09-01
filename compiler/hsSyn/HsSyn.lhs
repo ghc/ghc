@@ -9,6 +9,13 @@ which is declared in the various \tr{Hs*} modules.  This module,
 therefore, is almost nothing but re-exporting.
 
 \begin{code}
+{-# OPTIONS_GHC -w #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and fix
+-- any warnings in the module. See
+--     http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings
+-- for details
+
 module HsSyn (
 	module HsBinds,
 	module HsDecls,

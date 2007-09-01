@@ -5,6 +5,13 @@
 \section[Demand]{@Demand@: the amount of demand on a value}
 
 \begin{code}
+{-# OPTIONS_GHC -w #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and fix
+-- any warnings in the module. See
+--     http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings
+-- for details
+
 module NewDemand(
 	Demand(..), 
 	topDmd, lazyDmd, seqDmd, evalDmd, errDmd, isStrictDmd, 

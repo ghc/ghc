@@ -5,6 +5,13 @@
 ByteCodeGen: Generate machine-code sequences for foreign import
 
 \begin{code}
+{-# OPTIONS_GHC -w #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and fix
+-- any warnings in the module. See
+--     http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings
+-- for details
+
 module ByteCodeFFI ( mkMarshalCode, moan64, newExec ) where
 
 #include "HsVersions.h"

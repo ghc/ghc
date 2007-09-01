@@ -10,6 +10,13 @@ in that the @Rec@/@NonRec@/etc structure is thrown away (whereas at
 lower levels it is preserved with @let@/@letrec@s).
 
 \begin{code}
+{-# OPTIONS_GHC -w #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and fix
+-- any warnings in the module. See
+--     http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings
+-- for details
+
 module DsBinds ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, 
 		 dsCoercion,
 		 AutoScc(..)

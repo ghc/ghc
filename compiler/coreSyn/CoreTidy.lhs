@@ -7,6 +7,13 @@ This module contains "tidying" code for *nested* expressions, bindings, rules.
 The code for *top-level* bindings is in TidyPgm.
 
 \begin{code}
+{-# OPTIONS_GHC -w #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and fix
+-- any warnings in the module. See
+--     http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings
+-- for details
+
 module CoreTidy (
 	tidyExpr, tidyVarOcc, tidyRule, tidyRules 
     ) where

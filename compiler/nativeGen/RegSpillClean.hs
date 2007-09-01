@@ -22,7 +22,14 @@
 --	This also works if the reloads in B1/B2 were spills instead, because
 --	spilling %r1 to a slot makes that slot have the same value as %r1.
 --
---
+
+{-# OPTIONS_GHC -w #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and fix
+-- any warnings in the module. See
+--     http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings
+-- for details
+
 module RegSpillClean (
 	cleanSpills
 )

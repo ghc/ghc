@@ -7,6 +7,13 @@ each let-binding.  At the same time, we figure out which top-level
 bindings have no CAF references, and record the fact in their IdInfo.
 
 \begin{code}
+{-# OPTIONS_GHC -w #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and fix
+-- any warnings in the module. See
+--     http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings
+-- for details
+
 module SRT( computeSRTs ) where
 
 #include "HsVersions.h"

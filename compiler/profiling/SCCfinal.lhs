@@ -23,6 +23,13 @@ This is now a sort-of-normal STG-to-STG pass (WDP 94/06), run by stg2stg.
 * "Distributes" given cost-centres to all as-yet-unmarked RHSs.
 
 \begin{code}
+{-# OPTIONS_GHC -w #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and fix
+-- any warnings in the module. See
+--     http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings
+-- for details
+
 module SCCfinal ( stgMassageForProfiling ) where
 
 #include "HsVersions.h"

@@ -3,6 +3,14 @@
 --	This is a generic graph coloring library, abstracted over the type of
 --	the node keys, nodes and colors.
 --
+
+{-# OPTIONS_GHC -w #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and fix
+-- any warnings in the module. See
+--     http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings
+-- for details
+
 module GraphColor ( 
 	module GraphBase,
 	module GraphOps,
