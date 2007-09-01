@@ -1788,7 +1788,7 @@ pseudoop   "unsafeCoerce#"
            known to be empty.  Also, a {\tt newtype} of a type {\tt T} has the same representation
            at runtime as {\tt T}.
 
-        Other uses of {\tt unsafeCoerce#} are undefined.
+        Other uses of {\tt unsafeCoerce\#} are undefined.
         }
 
 -- NB. It is tempting to think that casting a value to a type that it doesn't have is safe
