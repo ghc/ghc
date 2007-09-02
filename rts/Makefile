@@ -171,6 +171,16 @@ RtsUtils_CC_OPTS += -DTargetPlatform=$(DQ)$(TARGETPLATFORM)$(DQ)
 RtsUtils_CC_OPTS += -DGhcUnregisterised=$(DQ)$(GhcUnregisterised)$(DQ)
 RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=$(DQ)$(GhcEnableTablesNextToCode)$(DQ)
 
+StgCRun_CC_OPTS += -w
+Typeable_CC_OPTS += -w
+RetainerProfile_CC_OPTS += -w
+sm/Compact_CC_OPTS += -w
+# The above warning supression flags are a temporary kludge.
+# While working on this module you are encouraged to remove it and fix
+# any warnings in the module. See
+#     http://hackage.haskell.org/trac/ghc/wiki/WorkingConventions#Warnings
+# for details
+
 ifeq "$(way)" "mp"
 SRC_HC_OPTS += -I$$PVM_ROOT/include
 endif

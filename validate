@@ -11,9 +11,11 @@ if [ -f mk/build.mk ]; then
 fi
 
 # The default is a "quick" build
-echo BuildFlavour=quick >  mk/build.mk
-echo HADDOCK_DOCS=YES   >> mk/build.mk
-cat mk/build.mk.sample  >> mk/build.mk
+echo "BuildFlavour = quick"   >  mk/build.mk
+echo "HADDOCK_DOCS = YES"     >> mk/build.mk
+cat mk/build.mk.sample        >> mk/build.mk
+echo "SRC_HC_OPTS += -Werror" >> mk/build.mk
+echo "SRC_CC_OPTS += -Werror" >> mk/build.mk
 
 # You can override the default validate settings using mk/validate.mk
 # e.g. you could add GhcLibWays=p to test profiling.

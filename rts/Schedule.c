@@ -2577,7 +2577,12 @@ initScheduler(void)
 }
 
 void
-exitScheduler( rtsBool wait_foreign )
+exitScheduler(
+    rtsBool wait_foreign
+#if !defined(THREADED_RTS)
+                         __attribute__((unused))
+#endif
+)
                /* see Capability.c, shutdownCapability() */
 {
     Task *task = NULL;
