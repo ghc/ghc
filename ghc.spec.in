@@ -84,7 +84,7 @@ needed.
 %build
 test -f configure || sh boot
 ./configure --prefix=%{_prefix} --mandir=%{_mandir}
-make %{?jobs:-j%jobs}
+make %{?jobs:-j%jobs} docdir=%{_datadir}/doc/packages/%{name}
 make html
 make -C libraries doc
 ( cd libraries/Cabal && docbook2html doc/Cabal.xml --output doc/Cabal )
@@ -92,7 +92,7 @@ make -C docs/ext-core ps
 make -C docs/storage-mgt ps
 
 %install
-make DESTDIR=${RPM_BUILD_ROOT} install install-docs
+make DESTDIR=${RPM_BUILD_ROOT} docdir=%{_datadir}/doc/packages/%{name} install install-docs
 mv ${RPM_BUILD_ROOT}%{_prefix}/bin/hsc2hs ${RPM_BUILD_ROOT}%{_prefix}/bin/hsc2hs-ghc
 
 # generate the file list for lib/ _excluding_ all files needed for profiling
@@ -149,9 +149,7 @@ fi
 %doc docs/storage-mgt/rp.ps
 %doc docs/storage-mgt/sm.ps
 %doc docs/users_guide/users_guide
-%doc docs/index.html
 %doc libraries/Cabal/doc/Cabal
-%{_datadir}/doc/ghc
 %{_mandir}/man1/ghc.1*
 %{_prefix}/bin/ghc
 %{_prefix}/bin/ghc-%{version}
