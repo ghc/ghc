@@ -1020,7 +1020,10 @@ dieForcible s = die (s ++ " (use --force to override)")
 -- Cut and pasted from ghc/compiler/SysTools
 
 #if defined(mingw32_HOST_OS)
+subst :: Char -> Char -> String -> String
 subst a b ls = map (\ x -> if x == a then b else x) ls
+
+unDosifyPath :: FilePath -> FilePath
 unDosifyPath xs = subst '\\' '/' xs
 
 getExecDir :: String -> IO (Maybe String)
