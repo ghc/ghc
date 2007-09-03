@@ -519,20 +519,20 @@ BIN_DIST_TARBALL=$(BIN_DIST_TOPDIR)/$(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.bz2
 # but since the configure script has them on offer while
 # passing through, we might as well set them.
 
-prefix			= @prefix@
+prefix          := @prefix@
 
 # New autoconf (>= 2.60?) make a configure with a --datarootdir=DIR flag.
 # However, in order to support older autoconf's we don't use it.
 # datarootdir is set lower down instead.
 # datarootdir		= @datarootdir@
 
-exec_prefix		= @exec_prefix@
-bindir			= @bindir@
-datadir0		= @datadir@
-libdir0			= @libdir@
-includedir		= @includedir@
-oldincludedir		= @oldincludedir@
-mandir			= @mandir@
+exec_prefix     := @exec_prefix@
+bindir          := @bindir@
+datadir0        := @datadir@
+libdir0         := @libdir@
+includedir      := @includedir@
+oldincludedir   := @oldincludedir@
+mandir          := @mandir@
 
 ifeq "$(Windows)" "YES"
 
@@ -542,9 +542,9 @@ endif
 
 # Hack: our directory layouts tend to be different on Windows, so
 # hack around configure's bogus assumptions here.
-datarootdir = $(prefix)
-datadir 	= $(prefix)
-libdir		= $(prefix)
+datarootdir := $(prefix)
+datadir     := $(prefix)
+libdir      := $(prefix)
 
 else
 
@@ -552,28 +552,28 @@ else
 # Unix: override libdir and datadir to put ghc-specific stuff in
 # a subdirectory with the version number included.
 #
-datarootdir = $(datadir0)
-datadir     = $(datadir0)/ghc-$(ProjectVersion)
-libdir      = $(libdir0)/ghc-$(ProjectVersion)
+datarootdir := $(datadir0)
+datadir     := $(datadir0)/ghc-$(ProjectVersion)
+libdir      := $(libdir0)/ghc-$(ProjectVersion)
 
 endif # Windows
 
-headerdir = $(libdir)/include
+headerdir := $(libdir)/include
 
 # New autoconf (>= 2.60?) make a configure with --docdir=DIR etc flags.
 # However, in order to support older autoconf's we don't use them.
 
-#docdir    = @docdir@
-#htmldir   = @htmldir@
-#dvidir    = @dvidir@
-#pdfdir    = @pdfdir@
-#psdir     = @psdir@
+#docdir    := @docdir@
+#htmldir   := @htmldir@
+#dvidir    := @dvidir@
+#pdfdir    := @pdfdir@
+#psdir     := @psdir@
 
-docdir    = $(datarootdir)/doc/ghc
-htmldir   = $(docdir)
-dvidir    = $(docdir)
-pdfdir    = $(docdir)
-psdir     = $(docdir)
+docdir    := $(datarootdir)/doc/ghc
+htmldir   := $(docdir)
+dvidir    := $(docdir)
+pdfdir    := $(docdir)
+psdir     := $(docdir)
 
 # Default place for putting interface files is $(libdir)
 # (overriden for packages in package.mk)
