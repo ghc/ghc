@@ -275,10 +275,11 @@ addPreference (u, c) color
 --
 coalesceGraph
 	:: (Uniquable k, Ord k, Eq cls, Outputable k)
-	=>  Graph k cls color
+	=> Triv k cls color
+	-> Graph k cls color
 	-> (Graph k cls color, [(k, k)])
 
-coalesceGraph graph
+coalesceGraph triv graph
  = let
  	-- find all the nodes that have coalescence edges
 	cNodes	= filter (\node -> not $ isEmptyUniqSet (nodeCoalesce node))
@@ -297,7 +298,7 @@ coalesceGraph graph
 	-- do the coalescing, returning the new graph and a list of pairs of keys
 	--	that got coalesced together.
 	(graph', mPairs)
-		= mapAccumL coalesceNodes graph cList
+		= mapAccumL (coalesceNodes False triv) graph cList
 
    in	(graph', catMaybes mPairs)
 
@@ -312,32 +313,33 @@ coalesceGraph graph
 
 coalesceNodes
 	:: (Uniquable k, Ord k, Eq cls, Outputable k)
-	=> Graph k cls color
+	=> Bool			-- ^ If True, coalesce nodes even if this might make the graph
+				--	less colorable (aggressive coalescing)
+	-> Triv  k cls color
+	-> Graph k cls color
 	-> (k, k)		-- ^ keys of the nodes to be coalesced
 	-> (Graph k cls color, Maybe (k, k))
 
-coalesceNodes graph (k1, k2)
+coalesceNodes aggressive triv graph (k1, k2)
 	| (kMin, kMax)	<- if k1 < k2
 				then (k1, k2)
 				else (k2, k1)
 
-	-- nodes must be in the graph
-	, Just nMin	<- lookupNode graph kMin
-	, Just nMax	<- lookupNode graph kMax
+	-- the nodes being coalesced must be in the graph
+	, Just nMin		<- lookupNode graph kMin
+	, Just nMax		<- lookupNode graph kMax
 
-	-- can't coalesce conflicting nodes
+	-- can't coalesce conflicting modes
 	, not $ elementOfUniqSet kMin (nodeConflicts nMax)
 	, not $ elementOfUniqSet kMax (nodeConflicts nMin)
 
-	= coalesceNodes' graph kMin kMax nMin nMax
+	= coalesceNodes_merge aggressive triv graph kMin kMax nMin nMax
 
-
-
-	-- one of the nodes wasn't in the graph anymore
+	-- don't do the coalescing after all
 	| otherwise
 	= (graph, Nothing)
 
-coalesceNodes' graph kMin kMax nMin nMax
+coalesceNodes_merge aggressive triv graph kMin kMax nMin nMax
 
 	-- sanity checks
 	| nodeClass nMin /= nodeClass nMax
@@ -371,9 +373,20 @@ coalesceNodes' graph kMin kMax nMin nMax
 					`delOneFromUniqSet` kMax
 			}
 
-		-- delete the old nodes from the graph and add the new one
-	 	graph'	= addNode kMin node
-	  		$ delNode kMin
+	  in	coalesceNodes_check aggressive triv graph kMin kMax node
+
+coalesceNodes_check aggressive triv graph kMin kMax node
+
+	-- Unless we're coalescing aggressively, if the result node is not trivially
+	--	colorable then don't do the coalescing.
+	| not aggressive
+	, not $ triv (nodeClass node) (nodeConflicts node) (nodeExclusions node)
+	= (graph, Nothing)
+
+	| otherwise
+	= let -- delete the old nodes from the graph and add the new one
+		graph'	= addNode kMin node
+			$ delNode kMin
 			$ delNode kMax
 			$ graph
 

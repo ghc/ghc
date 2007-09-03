@@ -58,7 +58,7 @@ colorGraph colors triv spill graph0
  = let
  	-- do aggressive coalesing on the graph
  	(graph_coalesced, rsCoalesce)
-		= coalesceGraph graph0
+		= coalesceGraph triv graph0
 
  	-- run the scanner to slurp out all the trivially colorable nodes
   	(ksTriv, ksProblems)

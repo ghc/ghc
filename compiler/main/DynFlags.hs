@@ -105,7 +105,6 @@ data DynFlag
    | Opt_D_dump_asm
    | Opt_D_dump_asm_native
    | Opt_D_dump_asm_liveness
-   | Opt_D_dump_asm_coalesce
    | Opt_D_dump_asm_regalloc
    | Opt_D_dump_asm_regalloc_stages
    | Opt_D_dump_asm_conflicts
@@ -1030,9 +1029,8 @@ dynamic_flags = [
   ,  ( "ddump-asm",          	 setDumpFlag Opt_D_dump_asm)
   ,  ( "ddump-asm-native",       setDumpFlag Opt_D_dump_asm_native)
   ,  ( "ddump-asm-liveness",     setDumpFlag Opt_D_dump_asm_liveness)
-  ,  ( "ddump-asm-coalesce",     setDumpFlag Opt_D_dump_asm_coalesce)
-  ,  ( "ddump-asm-regalloc",     setDumpFlag Opt_D_dump_asm_regalloc)
   ,  ( "ddump-asm-conflicts",    setDumpFlag Opt_D_dump_asm_conflicts)
+  ,  ( "ddump-asm-regalloc",     setDumpFlag Opt_D_dump_asm_regalloc)
   ,  ( "ddump-asm-regalloc-stages",
                                  setDumpFlag Opt_D_dump_asm_regalloc_stages)
   ,  ( "ddump-asm-stats",        setDumpFlag Opt_D_dump_asm_stats)

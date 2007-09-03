@@ -268,15 +268,6 @@ cmmNativeGen dflags us cmm
 				emptyUFM
 			$ map RealReg allocatableRegs
 
-		-- aggressively coalesce moves between virtual regs
-		let (coalesced, usCoalesce)
-			= {-# SCC "regCoalesce" #-}
-			  initUs usLive $ regCoalesce withLiveness
-
-		dumpIfSet_dyn dflags
-			Opt_D_dump_asm_coalesce "Reg-Reg moves coalesced"
-			(vcat $ map ppr coalesced)
-
 	 	-- if any of these dump flags are turned on we want to hang on to
 		--	intermediate structures in the allocator - otherwise tell the
 		--	allocator to ditch them early so we don't end up creating space leaks.
@@ -288,12 +279,12 @@ cmmNativeGen dflags us cmm
 		-- graph coloring register allocation
 		let ((alloced, regAllocStats), usAlloc)
 			= {-# SCC "regAlloc(color)" #-}
-			  initUs usCoalesce
+			  initUs usLive
 			  $ Color.regAlloc
 				generateRegAllocStats
 				alloc_regs
 				(mkUniqSet [0..maxSpillSlots])
-				coalesced
+				withLiveness
 
 		-- dump out what happened during register allocation
 		dumpIfSet_dyn dflags
