@@ -53,9 +53,7 @@ TimerProc(PVOID param)
           waitRes = WaitForSingleObject(hStopEvent, ms);
           break;
       case TickerPause:
-          debugBelch("tick: pause");
           waitRes = WaitForSingleObject(hStopEvent, INFINITE);
-          debugBelch("tick: wakeup");
           break;
       case TickerExit:
           /* event has become signalled */
