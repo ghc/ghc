@@ -52,6 +52,7 @@ data RegAllocStats
 	-- a spill stage
 	| RegAllocStatsSpill
 	{ raGraph	:: Color.Graph Reg RegClass Reg	-- ^ the partially colored graph
+	, raCoalesced	:: UniqFM Reg			-- ^ the regs that were coaleced
 	, raSpillStats	:: SpillStats 			-- ^ spiller stats
 	, raLifetimes	:: UniqFM (Reg, Int) 		-- ^ number of instrs each reg lives for
 	, raSpilled	:: [LiveCmmTop] }		-- ^ code with spill instructions added
@@ -59,6 +60,7 @@ data RegAllocStats
 	-- a successful coloring
 	| RegAllocStatsColored
 	{ raGraph	:: Color.Graph Reg RegClass Reg -- ^ the colored graph
+	, raCoalesced	:: UniqFM Reg			-- ^ the regs that were coaleced
 	, raPatched	:: [LiveCmmTop] 		-- ^ code with vregs replaced by hregs
 	, raSpillClean  :: [LiveCmmTop]			-- ^ code with unneeded spill/reloads cleaned out
 	, raFinal	:: [NatCmmTop] 			-- ^ final code
@@ -74,28 +76,49 @@ instance Outputable RegAllocStats where
 	$$ text "#  Initial register conflict graph."
 	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
 
+
  ppr (s@RegAllocStatsSpill{})
  	=  text "#  Spill"
+
 	$$ text "#  Register conflict graph."
 	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
 	$$ text ""
+
+	$$ (if (not $ isNullUFM $ raCoalesced s)
+		then 	text "#  Registers coalesced."
+			$$ (vcat $ map ppr $ ufmToList $ raCoalesced s)
+			$$ text ""
+		else empty)
+
 	$$ text "#  Spills inserted."
 	$$ ppr (raSpillStats s)
 	$$ text ""
+
 	$$ text "#  Code with spills inserted."
 	$$ (ppr (raSpilled s))
 
+
  ppr (s@RegAllocStatsColored { raSRMs = (spills, reloads, moves) })
  	=  text "#  Colored"
+
 	$$ text "#  Register conflict graph."
 	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
 	$$ text ""
+
+	$$ (if (not $ isNullUFM $ raCoalesced s)
+		then 	text "#  Registers coalesced."
+			$$ (vcat $ map ppr $ ufmToList $ raCoalesced s)
+			$$ text ""
+		else empty)
+
 	$$ text "#  Native code after register allocation."
 	$$ ppr (raPatched s)
 	$$ text ""
+
 	$$ text "#  Clean out unneeded spill/reloads."
 	$$ ppr (raSpillClean s)
 	$$ text ""
+
 	$$ text "#  Final code, after rewriting spill/rewrite pseudo instrs."
 	$$ ppr (raFinal s)
 	$$ text ""

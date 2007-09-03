@@ -106,14 +106,22 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 	let spill	= chooseSpill_maxLife fmLife
 	
 	-- try and color the graph 
-	let (graph_colored, rsSpill)	
+	let (graph_colored, rsSpill, rmCoalesce)
 			= Color.colorGraph regsFree triv spill graph
+
+	-- rewrite regs in the code that have been coalesced
+	let patchF reg	= case lookupUFM rmCoalesce reg of
+				Just reg'	-> reg'
+				Nothing		-> reg
+	let code_coalesced
+			= map (patchEraseLive patchF) code
+
 
 	-- see if we've found a coloring
 	if isEmptyUniqSet rsSpill
 	 then do
 		-- patch the registers using the info in the graph
-	 	let code_patched	= map (patchRegsFromGraph graph_colored) code
+	 	let code_patched	= map (patchRegsFromGraph graph_colored) code_coalesced
 
 		-- clean out unneeded SPILL/RELOADs
 		let code_spillclean	= map cleanSpills code_patched
@@ -129,6 +137,7 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 		let stat		=
 			RegAllocStatsColored
 			{ raGraph	= graph_colored
+			, raCoalesced	= rmCoalesce
 			, raPatched	= code_patched
 			, raSpillClean	= code_spillclean
 			, raFinal	= code_final
@@ -143,7 +152,7 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 	 else do
 	 	-- spill the uncolored regs
 		(code_spilled, slotsFree', spillStats)
-			<- regSpill code slotsFree rsSpill
+			<- regSpill code_coalesced slotsFree rsSpill
 			
 		-- recalculate liveness
 		let code_nat	= map stripLive code_spilled
@@ -153,6 +162,7 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 		let stat	=
 			RegAllocStatsSpill
 			{ raGraph	= graph_colored
+			, raCoalesced	= rmCoalesce
 			, raSpillStats	= spillStats
 			, raLifetimes	= fmLife
 			, raSpilled	= code_spilled }

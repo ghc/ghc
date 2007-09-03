@@ -41,25 +41,36 @@ import Data.List
 --	the stack (ie in reverse order) and assigning them colors different to their neighbors.
 --
 colorGraph
-	:: ( Uniquable  k, Uniquable cls,  Uniquable  color, Eq color
+	:: ( Uniquable  k, Uniquable cls,  Uniquable  color
+	   , Eq color, Eq cls, Ord k
 	   , Outputable k, Outputable cls, Outputable color)
 	=> UniqFM (UniqSet color)	-- ^ map of (node class -> set of colors available for this class).
 	-> Triv   k cls color 		-- ^ fn to decide whether a node is trivially colorable.
 	-> (Graph k cls color -> k)	-- ^ fn to choose a node to potentially leave uncolored if nothing is trivially colorable.
 	-> Graph  k cls color 		-- ^ the graph to color.
-	-> ( Graph k cls color 		-- ^ the colored graph.
-	   , UniqSet k )		-- ^ the set of nodes that we couldn't find a color for.
+
+	-> ( Graph k cls color 		-- the colored graph.
+	   , UniqSet k			-- the set of nodes that we couldn't find a color for.
+	   , UniqFM  k )		-- map of regs (r1 -> r2) that were coaleced
+	   				--	 r1 should be replaced by r2 in the source
 
 colorGraph colors triv spill graph0
- = let	-- run the scanner to slurp out all the trivially colorable nodes
-  	(ksTriv, ksProblems)	= colorScan colors triv spill [] emptyUniqSet graph0
+ = let
+ 	-- do aggressive coalesing on the graph
+ 	(graph_coalesced, rsCoalesce)
+		= coalesceGraph graph0
+
+ 	-- run the scanner to slurp out all the trivially colorable nodes
+  	(ksTriv, ksProblems)
+		= colorScan colors triv spill [] emptyUniqSet graph_coalesced
  
 	-- color the trivially colorable nodes
-	(graph1, ksNoTriv)	= assignColors colors graph0 ksTriv
+	(graph_triv, ksNoTriv)
+		= assignColors colors graph_coalesced ksTriv
 
  	-- try and color the problem nodes
-	(graph2, ksNoColor)	= assignColors colors graph1 (uniqSetToList ksProblems)
-	
+	(graph_prob, ksNoColor)	= assignColors colors graph_triv (uniqSetToList ksProblems)
+
 	-- if the trivially colorable nodes didn't color then something is wrong
 	--	with the provided triv function.
    in	if not $ null ksNoTriv
@@ -69,8 +80,10 @@ colorGraph colors triv spill graph0
 			$$ text "ksNoTriv  = " <> ppr ksNoTriv
 			$$ empty
 			$$ dotGraph (\x -> text "white") triv graph1) -}
-	 else	(graph2, mkUniqSet ksNoColor)
-	
+
+	 else	( graph_prob
+	 	, mkUniqSet ksNoColor
+		, listToUFM rsCoalesce)
 	
 colorScan colors triv spill safe prob graph
 
@@ -94,7 +107,6 @@ colorScan colors triv spill safe prob graph
 	= colorScan colors triv spill
 		safe (addOneToUniqSet prob k) (delNode k graph)
 		
-
 
 -- | Try to assign a color to all these nodes.
 

@@ -17,8 +17,10 @@ module GraphOps (
 	addCoalesce,	delCoalesce,	
 	addExclusion,	
 	addPreference,
+	coalesceGraph,
+	coalesceNodes,
 	setColor,
-	verify,
+	validateGraph,
 	slurpNodeConflictCount
 )
 where
@@ -91,11 +93,11 @@ delNode k graph
  = let	Just node	= lookupNode graph k
 
 	-- delete conflict edges from other nodes to this one.
-	graph1		= foldl' (\g k1 -> delConflict k1 k g) graph 
+	graph1		= foldl' (\g k1 -> let Just g' = delConflict k1 k g in g') graph
 			$ uniqSetToList (nodeConflicts node)
 	
 	-- delete coalesce edge from other nodes to this one.
-	graph2		= foldl' (\g k1 -> delCoalesce k1 k g) graph1 
+	graph2		= foldl' (\g k1 -> let Just g' = delCoalesce k1 k g in g') graph1
 			$ uniqSetToList (nodeCoalesce node)
 	
 	-- delete the node
@@ -104,19 +106,24 @@ delNode k graph
   in	graph3
 		
 
--- | Modify a node in the graph
+-- | Modify a node in the graph.
+--	returns Nothing if the node isn't present.
+--
 modNode :: Uniquable k
 	=> (Node k cls color -> Node k cls color) 
-	-> k -> Graph k cls color -> Graph k cls color
+	-> k -> Graph k cls color -> Maybe (Graph k cls color)
 
 modNode f k graph
- = case getNode graph k of
- 	Node{} -> graphMapModify
+ = case lookupNode graph k of
+ 	Just Node{}
+	 -> Just
+	 $  graphMapModify
 		 (\fm	-> let	Just node	= lookupUFM fm k
 			   	node'		= f node
 			   in	addToUFM fm k node') 
 		graph
 
+	Nothing	-> Nothing
 
 -- | Get the size of the graph, O(n)
 size	:: Uniquable k 
@@ -157,10 +164,11 @@ addConflict (u1, c1) (u2, c2)
 
  
 -- | Delete a conflict edge. k1 -> k2
+--	returns Nothing if the node isn't in the graph
 delConflict 
 	:: Uniquable k
 	=> k -> k
-	-> Graph k cls color -> Graph k cls color
+	-> Graph k cls color -> Maybe (Graph k cls color)
 	
 delConflict k1 k2
 	= modNode
@@ -237,7 +245,7 @@ addCoalesce (u1, c1) (u2, c2)
 delCoalesce
 	:: Uniquable k
 	=> k -> k 
-	-> Graph k cls color	-> Graph k cls color
+	-> Graph k cls color	-> Maybe (Graph k cls color)
 
 delCoalesce k1 k2
 	= modNode (\node -> node { nodeCoalesce = delOneFromUniqSet (nodeCoalesce node) k2 })
@@ -260,15 +268,129 @@ addPreference (u, c) color
 		(newNode u c)  { nodePreference = [color] }
 		u
 
-		
--- | Verify the internal structure of a graph
---	all its edges should point to valid nodes
---
-verify 	:: Uniquable k 
-	=> Graph k cls color
-	-> Bool
 
-verify graph
+-- | Do agressive coalescing on this graph.
+--	returns	the new graph and the list of pairs of nodes that got coaleced together.
+--	for each pair, the resulting node will have the least key and be second in the pair.
+--
+coalesceGraph
+	:: (Uniquable k, Ord k, Eq cls, Outputable k)
+	=>  Graph k cls color
+	-> (Graph k cls color, [(k, k)])
+
+coalesceGraph graph
+ = let
+ 	-- find all the nodes that have coalescence edges
+	cNodes	= filter (\node -> not $ isEmptyUniqSet (nodeCoalesce node))
+		$ eltsUFM $ graphMap graph
+
+	-- build a list of pairs of keys for node's we'll try and coalesce
+	--	every pair of nodes will appear twice in this list
+	--	ie [(k1, k2), (k2, k1) ... ]
+	--	This is ok, GrapOps.coalesceNodes handles this and it's convenient for
+	--	build a list of what nodes get coalesced together for later on.
+	--
+	cList	= [ (nodeId node1, k2)
+			| node1	<- cNodes
+			, k2	<- uniqSetToList $ nodeCoalesce node1 ]
+
+	-- do the coalescing, returning the new graph and a list of pairs of keys
+	--	that got coalesced together.
+	(graph', mPairs)
+		= mapAccumL coalesceNodes graph cList
+
+   in	(graph', catMaybes mPairs)
+
+
+-- | Coalesce this pair of nodes unconditionally / agressively.
+--	The resulting node is the one with the least key.
+--
+--	returns: Just 	 the pair of keys if the nodes were coalesced
+--			 the second element of the pair being the least one
+--
+--		 Nothing if either of the nodes weren't in the graph
+
+coalesceNodes
+	:: (Uniquable k, Ord k, Eq cls, Outputable k)
+	=> Graph k cls color
+	-> (k, k)		-- ^ keys of the nodes to be coalesced
+	-> (Graph k cls color, Maybe (k, k))
+
+coalesceNodes graph (k1, k2)
+	| (kMin, kMax)	<- if k1 < k2
+				then (k1, k2)
+				else (k2, k1)
+
+	-- nodes must be in the graph
+	, Just nMin	<- lookupNode graph kMin
+	, Just nMax	<- lookupNode graph kMax
+
+	-- can't coalesce conflicting nodes
+	, not $ elementOfUniqSet kMin (nodeConflicts nMax)
+	, not $ elementOfUniqSet kMax (nodeConflicts nMin)
+
+	= coalesceNodes' graph kMin kMax nMin nMax
+
+
+
+	-- one of the nodes wasn't in the graph anymore
+	| otherwise
+	= (graph, Nothing)
+
+coalesceNodes' graph kMin kMax nMin nMax
+
+	-- sanity checks
+	| nodeClass nMin /= nodeClass nMax
+	= error "GraphOps.coalesceNodes: can't coalesce nodes of different classes."
+
+	| not (isNothing (nodeColor nMin) && isNothing (nodeColor nMax))
+	= error "GraphOps.coalesceNodes: can't coalesce colored nodes."
+
+	---
+	| otherwise
+	= let
+		-- the new node gets all the edges from its two components
+		node	=
+		 Node	{ nodeId		= kMin
+			, nodeClass		= nodeClass nMin
+			, nodeColor		= Nothing
+
+			-- nodes don't conflict with themselves..
+			, nodeConflicts
+				= (unionUniqSets (nodeConflicts nMin) (nodeConflicts nMax))
+					`delOneFromUniqSet` kMin
+					`delOneFromUniqSet` kMax
+
+			, nodeExclusions	= unionUniqSets (nodeExclusions nMin) (nodeExclusions nMax)
+			, nodePreference	= nodePreference nMin ++ nodePreference nMax
+
+			-- nodes don't coalesce with themselves..
+			, nodeCoalesce
+				= (unionUniqSets (nodeCoalesce nMin) (nodeCoalesce nMax))
+					`delOneFromUniqSet` kMin
+					`delOneFromUniqSet` kMax
+			}
+
+		-- delete the old nodes from the graph and add the new one
+	 	graph'	= addNode kMin node
+	  		$ delNode kMin
+			$ delNode kMax
+			$ graph
+
+	  in	(graph', Just (kMax, kMin))
+
+		
+-- | validate the internal structure of a graph
+--	all its edges should point to valid nodes
+--	if they don't then throw an error
+--
+validateGraph
+	:: (Uniquable k, Outputable k)
+	=> SDoc
+	-> Graph k cls color
+	-> Graph k cls color
+
+validateGraph doc graph
  = let	edges	= unionUniqSets
  			(unionManyUniqSets
  				(map nodeConflicts $ eltsUFM $ graphMap graph))
@@ -280,8 +402,12 @@ verify graph
 	badEdges = minusUniqSet edges nodes
 	
   in	if isEmptyUniqSet badEdges 
-  	 then 	True
-	 else	False
+  	 then 	graph
+	 else	pprPanic "GraphOps.validateGraph"
+	 	( text  "-- bad edges"
+		$$ vcat (map ppr $ uniqSetToList badEdges)
+		$$ text "----------------------------"
+		$$ doc)
 
 
 -- | Slurp out a map of how many nodes had a certain number of conflict neighbours
