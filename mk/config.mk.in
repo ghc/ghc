@@ -218,11 +218,6 @@ GhcStage1HcOpts=
 GhcStage2HcOpts=
 GhcStage3HcOpts=
 
-ifneq "$(findstring thr, $(GhcRTSWays))" ""
-GhcThreaded=YES
-else
-GhcThreaded=NO
-endif
 GhcProfiled=NO
 GhcDebugged=NO
 
@@ -360,6 +355,13 @@ endif
 # Defer the check until later by using $(if..), because GhcUnregisterised might
 # be set in build.mk, which hasn't been read yet.
 GhcRTSWays += $(if $(findstring NO, $(GhcUnregisterised)),thr thr_p thr_debug,)
+
+# We can only build GHCi threaded if we have a threaded RTS:
+ifneq "$(findstring thr, $(GhcRTSWays))" ""
+GhcThreaded=YES
+else
+GhcThreaded=NO
+endif
 
 # Option flags to pass to GHC when it's compiling modules in
 # fptools/libraries.  Typically these are things like -O or
