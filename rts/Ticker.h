@@ -2,14 +2,18 @@
  *
  * (c) The GHC Team 2005
  *
- * Ticker interface (implementation is OS-specific)
+ * Interface to the OS-specific implementation of a regular time signal.
  *
  * ---------------------------------------------------------------------------*/
 
 #ifndef TICKER_H
 #define TICKER_H
 
-extern void startTicker( nat ms, TickProc handle_tick );
-extern void stopTicker ( void );
+typedef void (*TickProc)(int);
+
+extern void initTicker  (nat ms, TickProc handle_tick);
+extern void startTicker (void);
+extern void stopTicker  (void);
+extern void exitTicker  (void);
 
 #endif /* TICKER_H */

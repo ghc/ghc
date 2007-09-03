@@ -64,15 +64,21 @@ handle_tick(int unused STG_UNUSED)
                     RtsFlags.MiscFlags.tickInterval;
       break;
   case ACTIVITY_MAYBE_NO:
-      if (ticks_to_gc == 0) break; /* 0 ==> no idle GC */
-      ticks_to_gc--;
       if (ticks_to_gc == 0) {
-	  ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTime /
-                        RtsFlags.MiscFlags.tickInterval;
-	  recent_activity = ACTIVITY_INACTIVE;
-	  blackholes_need_checking = rtsTrue;
-	  /* hack: re-use the blackholes_need_checking flag */
-	  wakeUpRts();
+          /* 0 ==> no idle GC */
+          recent_activity = ACTIVITY_DONE_GC;
+          // disable timer signals (see #1623)
+          stopTimer();
+      } else {
+          ticks_to_gc--;
+          if (ticks_to_gc == 0) {
+              ticks_to_gc = RtsFlags.GcFlags.idleGCDelayTime /
+                  RtsFlags.MiscFlags.tickInterval;
+              recent_activity = ACTIVITY_INACTIVE;
+              blackholes_need_checking = rtsTrue;
+              /* hack: re-use the blackholes_need_checking flag */
+              wakeUpRts();
+          }
       }
       break;
   default:
@@ -82,18 +88,34 @@ handle_tick(int unused STG_UNUSED)
 }
 
 void
+initTimer(void)
+{
+    initProfTimer();
+    if (RtsFlags.MiscFlags.tickInterval != 0) {
+        initTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
+    }
+}
+
+void
 startTimer(void)
 {
-  initProfTimer();
-  if (RtsFlags.MiscFlags.tickInterval != 0) {
-      startTicker(RtsFlags.MiscFlags.tickInterval, handle_tick);
-  }
+    if (RtsFlags.MiscFlags.tickInterval != 0) {
+        startTicker();
+    }
 }
 
 void
 stopTimer(void)
 {
-  if (RtsFlags.MiscFlags.tickInterval != 0) {
-      stopTicker();
-  }
+    if (RtsFlags.MiscFlags.tickInterval != 0) {
+        stopTicker();
+    }
+}
+
+void
+exitTimer(void)
+{
+    if (RtsFlags.MiscFlags.tickInterval != 0) {
+        exitTicker();
+    }
 }

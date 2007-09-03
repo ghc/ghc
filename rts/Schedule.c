@@ -593,7 +593,19 @@ run_thread:
 
     dirtyTSO(t);
 
-    recent_activity = ACTIVITY_YES;
+#if defined(THREADED_RTS)
+    if (recent_activity == ACTIVITY_DONE_GC) {
+        // ACTIVITY_DONE_GC means we turned off the timer signal to
+        // conserve power (see #1623).  Re-enable it here.
+        nat prev;
+        prev = xchg(&recent_activity, ACTIVITY_YES);
+        if (prev == ACTIVITY_DONE_GC) {
+            startTimer();
+        }
+    } else {
+        recent_activity = ACTIVITY_YES;
+    }
+#endif
 
     switch (prev_what_next) {
 	
@@ -974,6 +986,8 @@ scheduleDetectDeadlock (Capability *cap, Task *task)
 	cap = scheduleDoGC (cap, task, rtsTrue/*force  major GC*/);
 
 	recent_activity = ACTIVITY_DONE_GC;
+        // disable timer signals (see #1623)
+        stopTimer();
 	
 	if ( !emptyRunQueue(cap) ) return;
 
@@ -2185,6 +2199,7 @@ forkProcess(HsStablePtr *entry
 
         // On Unix, all timers are reset in the child, so we need to start
         // the timer again.
+        initTimer();
         startTimer();
 
 	cap = rts_evalStableIO(cap, entry, NULL);  // run the action
@@ -2531,6 +2546,7 @@ initScheduler(void)
 
   context_switch = 0;
   sched_state    = SCHED_RUNNING;
+  recent_activity = ACTIVITY_YES;
 
 #if defined(THREADED_RTS)
   /* Initialise the mutex and condition variables used by

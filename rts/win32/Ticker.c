@@ -16,14 +16,15 @@
  *
  */
 
-/* To signal shutdown of the timer service, we use a local
- * event which the timer thread listens to (and stopVirtTimer()
- * signals.)
+/* To signal pause or shutdown of the timer service, we use a local
+ * event which the timer thread listens to.
  */
 static HANDLE hStopEvent = INVALID_HANDLE_VALUE;
 static HANDLE tickThread = INVALID_HANDLE_VALUE;
 
 static TickProc tickProc = NULL;
+
+static enum { TickerGo, TickerPause, TickerExit } ticker_state;
 
 /*
  * Ticking is done by a separate thread which periodically
@@ -44,38 +45,49 @@ TimerProc(PVOID param)
   DWORD waitRes;
   
   /* interpret a < 0 timeout period as 'instantaneous' */ 
- if (ms < 0) ms = 0;
+  if (ms < 0) ms = 0;
 
   while (1) {
-    waitRes = WaitForSingleObject(hStopEvent, ms);
-    
-    switch (waitRes) {
-    case WAIT_OBJECT_0:
-      /* event has become signalled */
-      tickProc = NULL;
-      CloseHandle(hStopEvent);
-      hStopEvent = INVALID_HANDLE_VALUE;
-      return 0;
-    case WAIT_TIMEOUT:
-      /* tick */
-      tickProc(0);
-      break;
-    case WAIT_FAILED: {
-	DWORD dw = GetLastError();
-	fprintf(stderr, "TimerProc: wait failed -- error code: %lu\n", dw); fflush(stderr);
-	break; 
-    }
-    default:
-      fprintf(stderr, "TimerProc: unexpected result %lu\n", waitRes); fflush(stderr);
-      break;
-    }
+      switch (ticker_state) {
+      case TickerGo:
+          waitRes = WaitForSingleObject(hStopEvent, ms);
+          break;
+      case TickerPause:
+          debugBelch("tick: pause");
+          waitRes = WaitForSingleObject(hStopEvent, INFINITE);
+          debugBelch("tick: wakeup");
+          break;
+      case TickerExit:
+          /* event has become signalled */
+          tickProc = NULL;
+          CloseHandle(hStopEvent);
+          hStopEvent = INVALID_HANDLE_VALUE;
+          return 0;
+      }
+      
+      switch (waitRes) {
+      case WAIT_OBJECT_0:
+          /* event has become signalled */
+          ResetEvent(hStopEvent);
+          continue;
+      case WAIT_TIMEOUT:
+          /* tick */
+          tickProc(0);
+          break;
+      case WAIT_FAILED:
+          sysErrorBelch("TimerProc: WaitForSingleObject failed");
+          break; 
+      default:
+          errorBelch("TimerProc: unexpected result %lu\n", waitRes);
+          break;
+      }
   }
   return 0;
 }
 
 
 void
-startTicker(nat ms, TickProc handle_tick)
+initTicker (nat ms, TickProc handle_tick)
 {
   unsigned threadId;
   /* 'hStopEvent' is a manual-reset event that's signalled upon
@@ -86,9 +98,11 @@ startTicker(nat ms, TickProc handle_tick)
 			     FALSE,
 			     NULL);
   if (hStopEvent == INVALID_HANDLE_VALUE) {
-    return 0;
+      sysErrorBelch("CreateEvent");
+      stg_exit(EXIT_FAILURE);
   }
   tickProc = handle_tick;
+  ticker_state = TickerPause;
   tickThread = (HANDLE)(long)_beginthreadex( NULL,
 			       0,
 			       TimerProc,
@@ -103,7 +117,21 @@ startTicker(nat ms, TickProc handle_tick)
 }
 
 void
+startTicker(void)
+{
+    ticker_state = TickerGo;
+    SetEvent(hStopEvent);
+}
+
+void
 stopTicker(void)
+{
+    ticker_state = TickerPause;
+    SetEvent(hStopEvent);
+}
+
+void
+exitTicker(void)
 {
     // We must wait for the ticker thread to terminate, since if we
     // are in a DLL that is about to be unloaded, the ticker thread
@@ -112,6 +140,7 @@ stopTicker(void)
     if (hStopEvent != INVALID_HANDLE_VALUE && 
 	tickThread != INVALID_HANDLE_VALUE) {
 	DWORD exitCode;
+        ticker_state = TickerExit;
 	SetEvent(hStopEvent);
 	while (1) {
 	    WaitForSingleObject(tickThread, 20);

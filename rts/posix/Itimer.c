@@ -127,7 +127,7 @@ install_vtalrm_handler(TickProc handle_tick)
 }
 
 void
-startTicker(nat ms, TickProc handle_tick)
+initTicker (TickProc handle_tick)
 {
     install_vtalrm_handler(handle_tick);
 
@@ -137,21 +137,30 @@ startTicker(nat ms, TickProc handle_tick)
 
 #if defined(USE_TIMER_CREATE)
     {
-        struct itimerspec it;
         struct sigevent ev;
 
         ev.sigev_notify = SIGEV_SIGNAL;
         ev.sigev_signo  = ITIMER_SIGNAL;
+
+        if (timer_create(TIMER_FLAVOUR, &ev, &timer) != 0) {
+            sysErrorBelch("timer_create");
+            stg_exit(EXIT_FAILURE);
+        }
+    }
+#endif
+}
+
+void
+startTicker(nat ms)
+{
+#if defined(USE_TIMER_CREATE)
+    {
+        struct itimerspec it;
         
         it.it_value.tv_sec = ms / 1000;
         it.it_value.tv_nsec = (ms % 1000) * 1000000;
         it.it_interval = it.it_value;
         
-        if (timer_create(TIMER_FLAVOUR, &ev, &timer) != 0) {
-            sysErrorBelch("timer_create");
-            stg_exit(EXIT_FAILURE);
-        }
-
         if (timer_settime(timer, 0, &it, NULL) != 0) {
             sysErrorBelch("timer_settime");
             stg_exit(EXIT_FAILURE);
@@ -199,6 +208,13 @@ stopTicker(void)
         stg_exit(EXIT_FAILURE);
     }
 #endif
+}
+
+void
+exitTicker(void)
+{
+    timer_delete(timer);
+    // ignore errors - we don't really care if it fails.
 }
 
 #if 0

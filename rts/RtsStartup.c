@@ -246,6 +246,7 @@ hs_init(int *argc, char **argv[])
     initProfiling1();
 
     /* start the virtual timer 'subsystem'. */
+    initTimer();
     startTimer();
 
     /* Initialise the stats department */
@@ -409,6 +410,7 @@ hs_exit_(rtsBool wait_foreign)
     
     /* stop the ticker */
     stopTimer();
+    exitTimer();
 
     /* reset the standard file descriptors to blocking mode */
     resetNonBlockingFd(0);
