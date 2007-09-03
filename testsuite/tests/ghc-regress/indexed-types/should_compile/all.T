@@ -69,3 +69,6 @@ test('Col2', normal, compile, [''])
 
 test('ColGivenCheck', normal, compile, [''])
 test('ColGivenCheck2', normal, compile, [''])
+
+test('InstEqContext', expect_fail, compile, [''])
+test('InstEqContext2', normal, compile, [''])
