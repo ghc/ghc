@@ -599,32 +599,38 @@ typedef struct _RtsSymbolVal {
       SymX(rts_getDouble)			\
       SymX(rts_getFloat)			\
       SymX(rts_getInt)				\
+      SymX(rts_getInt8)				\
+      SymX(rts_getInt16)			\
       SymX(rts_getInt32)			\
+      SymX(rts_getInt64)			\
       SymX(rts_getPtr)				\
       SymX(rts_getFunPtr)			\
       SymX(rts_getStablePtr)			\
       SymX(rts_getThreadId)			\
       SymX(rts_getWord)				\
+      SymX(rts_getWord8)			\
+      SymX(rts_getWord16)			\
       SymX(rts_getWord32)			\
+      SymX(rts_getWord64)			\
       SymX(rts_lock)				\
       SymX(rts_mkBool)				\
       SymX(rts_mkChar)				\
       SymX(rts_mkDouble)			\
       SymX(rts_mkFloat)				\
       SymX(rts_mkInt)				\
+      SymX(rts_mkInt8)				\
       SymX(rts_mkInt16)				\
       SymX(rts_mkInt32)				\
       SymX(rts_mkInt64)				\
-      SymX(rts_mkInt8)				\
       SymX(rts_mkPtr)				\
       SymX(rts_mkFunPtr)			\
       SymX(rts_mkStablePtr)			\
       SymX(rts_mkString)			\
       SymX(rts_mkWord)				\
+      SymX(rts_mkWord8)				\
       SymX(rts_mkWord16)			\
       SymX(rts_mkWord32)			\
       SymX(rts_mkWord64)			\
-      SymX(rts_mkWord8)				\
       SymX(rts_unlock)				\
       SymX(rtsSupportsBoundThreads)		\
       SymX(__hscore_get_saved_termios)		\
