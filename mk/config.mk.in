@@ -520,7 +520,12 @@ BIN_DIST_TARBALL=$(BIN_DIST_TOPDIR)/$(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.bz2
 # passing through, we might as well set them.
 
 prefix			= @prefix@
-datarootdir		= @datarootdir@
+
+# New autoconf (>= 2.60?) make a configure with a --datarootdir=DIR flag.
+# However, in order to support older autoconf's we don't use it.
+# datarootdir is set lower down instead.
+# datarootdir		= @datarootdir@
+
 exec_prefix		= @exec_prefix@
 bindir			= @bindir@
 datadir0		= @datadir@
@@ -537,6 +542,7 @@ endif
 
 # Hack: our directory layouts tend to be different on Windows, so
 # hack around configure's bogus assumptions here.
+datarootdir = $(prefix)
 datadir 	= $(prefix)
 libdir		= $(prefix)
 
@@ -546,8 +552,9 @@ else
 # Unix: override libdir and datadir to put ghc-specific stuff in
 # a subdirectory with the version number included.
 #
-libdir     = $(libdir0)/ghc-$(ProjectVersion)
-datadir    = $(datadir0)/ghc-$(ProjectVersion)
+datarootdir = $(datadir0)
+datadir     = $(datadir0)/ghc-$(ProjectVersion)
+libdir      = $(libdir0)/ghc-$(ProjectVersion)
 
 endif # Windows
 
