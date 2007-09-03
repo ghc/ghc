@@ -197,9 +197,10 @@ cmmNativeGens dflags h us (cmm : cmms) impAcc profAcc
 			else []
 
 	-- force evaulation of imports and lsPprNative to avoid space leak
-	seqString (showSDoc $ vcat $ map ppr imports)
-	 `seq`  lsPprNative
-	 `seq`	cmmNativeGens dflags h us' cmms
+	seqString (showSDoc $ vcat $ map ppr imports) `seq` return ()
+	lsPprNative `seq` return ()
+
+	cmmNativeGens dflags h us' cmms
 			(imports : impAcc)
 			((lsPprNative, colorStats, linearStats) : profAcc)
 
@@ -311,10 +312,11 @@ cmmNativeGen dflags us cmm
 			 then Just regAllocStats else Nothing
 
 		-- force evaluation of the Maybe to avoid space leak
-		mPprStats
-		 `seq`	return	( alloced, usAlloc
-				, mPprStats
-				, Nothing)
+		mPprStats `seq` return ()
+
+		return	( alloced, usAlloc
+			, mPprStats
+			, Nothing)
 
 	  else do
 	  	-- do linear register allocation
@@ -333,10 +335,11 @@ cmmNativeGen dflags us cmm
 			 then Just (catMaybes regAllocStats) else Nothing
 
 		-- force evaluation of the Maybe to avoid space leak
-		mPprStats
-		 `seq`	return	( alloced, usAlloc
-				, Nothing
-				, mPprStats)
+		mPprStats `seq` return ()
+
+		return	( alloced, usAlloc
+			, Nothing
+			, mPprStats)
 
 	---- shortcut branches
 	let shorted	=
