@@ -24,7 +24,7 @@
 /* Used to avoid long recursion due to selector thunks
  */
 lnat thunk_selector_depth = 0;
-#define MAX_THUNK_SELECTOR_DEPTH 8
+#define MAX_THUNK_SELECTOR_DEPTH 16
 
 static StgClosure * eval_thunk_selector ( nat field, StgSelector * p );
 
