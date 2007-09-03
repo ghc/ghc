@@ -1,6 +1,6 @@
 /* -----------------------------------------------------------------------------
  *
- * (c) The GHC Team, 1995-1999
+ * (c) The GHC Team, 1995-2007
  *
  * Interval timer for profiling and pre-emptive scheduling.
  *
@@ -95,8 +95,10 @@
 #endif
 
 #if defined(USE_TIMER_CREATE)
-timer_t timer;
+static timer_t timer;
 #endif
+
+static nat itimer_interval = 50;
 
 static
 void
@@ -127,13 +129,15 @@ install_vtalrm_handler(TickProc handle_tick)
 }
 
 void
-initTicker (TickProc handle_tick)
+initTicker (nat ms, TickProc handle_tick)
 {
     install_vtalrm_handler(handle_tick);
 
 #if !defined(THREADED_RTS)
     timestamp = getourtimeofday();
 #endif
+
+    itimer_interval = ms;
 
 #if defined(USE_TIMER_CREATE)
     {
@@ -151,14 +155,14 @@ initTicker (TickProc handle_tick)
 }
 
 void
-startTicker(nat ms)
+startTicker(void)
 {
 #if defined(USE_TIMER_CREATE)
     {
         struct itimerspec it;
         
-        it.it_value.tv_sec = ms / 1000;
-        it.it_value.tv_nsec = (ms % 1000) * 1000000;
+        it.it_value.tv_sec = itimer_interval / 1000;
+        it.it_value.tv_nsec = (itimer_interval % 1000) * 1000000;
         it.it_interval = it.it_value;
         
         if (timer_settime(timer, 0, &it, NULL) != 0) {
@@ -170,8 +174,8 @@ startTicker(nat ms)
     {
         struct itimerval it;
 
-        it.it_value.tv_sec = ms / 1000;
-        it.it_value.tv_usec = (ms % 1000) * 1000;
+        it.it_value.tv_sec = itimer_interval / 1000;
+        it.it_value.tv_usec = (itimer_interval % 1000) * 1000;
         it.it_interval = it.it_value;
         
         if (setitimer(ITIMER_FLAVOUR, &it, NULL) != 0) {
@@ -213,8 +217,10 @@ stopTicker(void)
 void
 exitTicker(void)
 {
+#if defined(USE_TIMER_CREATE)
     timer_delete(timer);
     // ignore errors - we don't really care if it fails.
+#endif
 }
 
 #if 0
