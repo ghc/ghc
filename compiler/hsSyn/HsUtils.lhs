@@ -413,6 +413,22 @@ collectPatBinders.  In a lazy pattern, for example f ~(C x y) = ...,
 we want to generate bindings for x,y but not for dictionaries bound by
 C.  (The type checker ensures they would not be used.)
 
+Desugaring of arrow case expressions needs these bindings (see DsArrows
+and arrowcase1), but SPJ (Jan 2007) says it's safer for it to use its
+own pat-binder-collector:
+
+Here's the problem.  Consider
+
+data T a where
+   C :: Num a => a -> Int -> T a
+
+f ~(C (n+1) m) = (n,m)
+
+Here, the pattern (C (n+1)) binds a hidden dictionary (d::Num a),
+and *also* uses that dictionary to match the (n+1) pattern.  Yet, the
+variables bound by the lazy pattern are n,m, *not* the dictionary d.
+So in mkSelectorBinds in DsUtils, we want just m,n as the variables bound.
+
 \begin{code}
 collectSigTysFromPats :: [InPat name] -> [LHsType name]
 collectSigTysFromPats pats = foldr collect_lpat [] pats

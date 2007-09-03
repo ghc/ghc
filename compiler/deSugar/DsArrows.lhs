@@ -21,7 +21,8 @@ import Match
 import DsUtils
 import DsMonad
 
-import HsSyn
+import HsSyn	hiding (collectPatBinders, collectLocatedPatBinders, collectl,
+			collectPatsBinders, collectLocatedPatsBinders)
 import TcHsSyn
 
 -- NB: The desugarer, which straddles the source and Core worlds, sometimes
@@ -46,7 +47,6 @@ import BasicTypes
 import PrelNames
 import Util
 
-import HsUtils
 import VarSet
 import SrcLoc
 
@@ -1060,4 +1060,66 @@ foldb f xs = foldb f (fold_pairs xs)
     fold_pairs [] = []
     fold_pairs [x] = [x]
     fold_pairs (x1:x2:xs) = f x1 x2:fold_pairs xs
+\end{code}
+
+The following functions to collect value variables from patterns are
+copied from HsUtils, with one change: we also collect the dictionary
+bindings (pat_binds) from ConPatOut.  We need them for cases like
+
+h :: Arrow a => Int -> a (Int,Int) Int
+h x = proc (y,z) -> case compare x y of
+                GT -> returnA -< z+x
+
+The type checker turns the case into
+
+                case compare x y of
+                  GT { p77 = plusInt } -> returnA -< p77 z x
+
+Here p77 is a local binding for the (+) operation.
+
+See comments in HsUtils for why the other version does not include
+these bindings.
+
+\begin{code}
+collectPatBinders :: LPat a -> [a]
+collectPatBinders pat = map unLoc (collectLocatedPatBinders pat)
+
+collectLocatedPatBinders :: LPat a -> [Located a]
+collectLocatedPatBinders pat = collectl pat []
+
+collectPatsBinders :: [LPat a] -> [a]
+collectPatsBinders pats = map unLoc (collectLocatedPatsBinders pats)
+
+collectLocatedPatsBinders :: [LPat a] -> [Located a]
+collectLocatedPatsBinders pats = foldr collectl [] pats
+
+---------------------
+collectl (L l pat) bndrs
+  = go pat
+  where
+    go (VarPat var)               = L l var : bndrs
+    go (VarPatOut var bs)         = L l var : collectHsBindLocatedBinders bs
+                                    ++ bndrs
+    go (WildPat _)                = bndrs
+    go (LazyPat pat)              = collectl pat bndrs
+    go (BangPat pat)              = collectl pat bndrs
+    go (AsPat a pat)              = a : collectl pat bndrs
+    go (ParPat  pat)              = collectl pat bndrs
+
+    go (ListPat pats _)           = foldr collectl bndrs pats
+    go (PArrPat pats _)           = foldr collectl bndrs pats
+    go (TuplePat pats _ _)        = foldr collectl bndrs pats
+
+    go (ConPatIn c ps)            = foldr collectl bndrs (hsConPatArgs ps)
+    go (ConPatOut {pat_args=ps, pat_binds=ds}) =
+                                    collectHsBindLocatedBinders ds
+                                    ++ foldr collectl bndrs (hsConPatArgs ps)
+    go (LitPat _)                 = bndrs
+    go (NPat _ _ _ _)             = bndrs
+    go (NPlusKPat n _ _ _)        = n : bndrs
+
+    go (SigPatIn pat _)           = collectl pat bndrs
+    go (SigPatOut pat _)          = collectl pat bndrs
+    go (TypePat ty)               = bndrs
+    go (CoPat _ pat ty)           = collectl (noLoc pat) bndrs
 \end{code}
