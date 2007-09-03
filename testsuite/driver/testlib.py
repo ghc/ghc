@@ -701,7 +701,8 @@ def simple_run( name, way, prog, args ):
 
    if getTestOpts().ignore_output or (check_stderr_ok(name) and
                                       check_stdout_ok(name) and
-                                      (not check_hp or check_hp_ok(name))):
+                                      (not check_hp or exit_code > 127 or check_hp_ok(name))):
+       # exit_code > 127 probably indicates a crash, so don't try to run hp2ps.
        return 'pass'
    else:
        return 'fail'
