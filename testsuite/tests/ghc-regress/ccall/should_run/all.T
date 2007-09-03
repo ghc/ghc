@@ -98,3 +98,4 @@ test('ffi018', omit_ways(['ghci']), compile_and_run, ['ffi018_c.c'])
 test('ffi018', only_ways(['ghci']), compile_and_run, ['ffi018_c.o'])
 clean(['ffi018_c.o'])
 
+test('ffi019', normal, compile_and_run, [''])
