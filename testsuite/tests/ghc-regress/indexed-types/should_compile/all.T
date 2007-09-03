@@ -48,6 +48,8 @@ test('Refl2', expect_fail, compile, [''])
 
 test('Rules1', normal, compile, [''])
 
+test('RankN1', expect_fail, compile, [''])
+
 test('Numerals', normal, compile, [''])
 
 test('ColInference', normal, compile, [''])
