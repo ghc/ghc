@@ -596,8 +596,9 @@ static void remove_watch_queue_entries_for_trec(Capability *cap,
     StgTVarWatchQueue *pq;
     StgTVarWatchQueue *nq;
     StgTVarWatchQueue *q;
+    StgClosure *saw;
     s = e -> tvar;
-    StgClosure *saw = lock_tvar(trec, s);
+    saw = lock_tvar(trec, s);
     q = (StgTVarWatchQueue *) (e -> new_value);
     TRACE("%p : removing tso=%p from watch queue for tvar=%p", 
 	  trec, 
@@ -943,6 +944,7 @@ StgTRecHeader *stmStartTransaction(Capability *cap,
 
 void stmAbortTransaction(Capability *cap,
                          StgTRecHeader *trec) {
+  StgTRecHeader *et;
   TRACE("%p : stmAbortTransaction", trec);
   ASSERT (trec != NO_TREC);
   ASSERT ((trec -> state == TREC_ACTIVE) || 
@@ -951,7 +953,7 @@ void stmAbortTransaction(Capability *cap,
 
   lock_stm(trec);
 
-  StgTRecHeader *et = trec -> enclosing_trec;
+  et = trec -> enclosing_trec;
   if (et == NO_TREC) {
     // We're a top-level transaction: remove any watch queue entries that
     // we may have.
@@ -1165,13 +1167,13 @@ static void connect_invariant_to_trec(Capability *cap,
 void stmAddInvariantToCheck(Capability *cap, 
 			    StgTRecHeader *trec,
 			    StgClosure *code) {
+  StgAtomicInvariant *invariant;
+  StgInvariantCheckQueue *q;
   TRACE("%p : stmAddInvariantToCheck closure=%p", trec, code);
   ASSERT(trec != NO_TREC);
   ASSERT(trec -> state == TREC_ACTIVE ||
 	 trec -> state == TREC_CONDEMNED);
 
-  StgAtomicInvariant *invariant;
-  StgInvariantCheckQueue *q;
 
   // 1. Allocate an StgAtomicInvariant, set last_execution to NO_TREC
   //    to signal that this is a new invariant in the current atomic block
@@ -1200,6 +1202,7 @@ void stmAddInvariantToCheck(Capability *cap,
  */
 
 StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap, StgTRecHeader *trec) {
+  StgTRecChunk *c;
   TRACE("%p : stmGetInvariantsToCheck, head was %p", 
 	trec,
 	trec -> invariants_to_check);
@@ -1211,7 +1214,7 @@ StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap, StgTRecHeader *
   ASSERT(trec -> enclosing_trec == NO_TREC);
 
   lock_stm(trec);
-  StgTRecChunk *c = trec -> current_chunk;
+  c = trec -> current_chunk;
   while (c != END_STM_CHUNK_LIST) {
     unsigned int i;
     for (i = 0; i < c -> next_entry_idx; i ++) {
@@ -1223,15 +1226,15 @@ StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap, StgTRecHeader *
 	// Pick up any invariants on the TVar being updated
 	// by entry "e"
 
-	TRACE("%p : checking for invariants on %p", trec, s);
 	StgTVarWatchQueue *q;
+	TRACE("%p : checking for invariants on %p", trec, s);
 	for (q = s -> first_watch_queue_entry;
 	     q != END_STM_WATCH_QUEUE;
 	     q = q -> next_queue_entry) {
 	  if (watcher_is_invariant(q)) {
-	    TRACE("%p : Touching invariant %p", trec, q -> closure);
 	    StgBool found = FALSE;
 	    StgInvariantCheckQueue *q2;
+	    TRACE("%p : Touching invariant %p", trec, q -> closure);
 	    for (q2 = trec -> invariants_to_check;
 		 q2 != END_INVARIANT_CHECK_QUEUE;
 		 q2 = q2 -> next_queue_entry) {
@@ -1243,8 +1246,8 @@ StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap, StgTRecHeader *
 	    }
 	    
 	    if (!found) {
-	      TRACE("%p : Not already found %p", trec, q -> closure);
 	      StgInvariantCheckQueue *q3;
+	      TRACE("%p : Not already found %p", trec, q -> closure);
 	      q3 = alloc_stg_invariant_check_queue(cap,
 						   (StgAtomicInvariant*) q -> closure);
 	      q3 -> next_queue_entry = trec -> invariants_to_check;
@@ -1273,6 +1276,8 @@ StgInvariantCheckQueue *stmGetInvariantsToCheck(Capability *cap, StgTRecHeader *
 StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
   int result;
   StgInt64 max_commits_at_start = max_commits;
+  StgBool touched_invariants;
+  StgBool use_read_phase;
 
   TRACE("%p : stmCommitTransaction()", trec);
   ASSERT (trec != NO_TREC);
@@ -1286,7 +1291,7 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
   // touched_invariants is true if we've written to a TVar with invariants 
   // attached to it, or if we're trying to add a new invariant to the system.
 
-  StgBool touched_invariants = (trec -> invariants_to_check != END_INVARIANT_CHECK_QUEUE);
+  touched_invariants = (trec -> invariants_to_check != END_INVARIANT_CHECK_QUEUE);
 
   // If we have touched invariants then (i) lock the invariant, and (ii) add
   // the invariant's read set to our own.  Step (i) is needed to serialize
@@ -1298,18 +1303,20 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
   // invariant from both tvars).
 
   if (touched_invariants) {
-    TRACE("%p : locking invariants", trec);
     StgInvariantCheckQueue *q = trec -> invariants_to_check;
+    TRACE("%p : locking invariants", trec);
     while (q != END_INVARIANT_CHECK_QUEUE) {
+      StgTRecHeader *inv_old_trec;
+      StgAtomicInvariant *inv;
       TRACE("%p : locking invariant %p", trec, q -> invariant);
-      StgAtomicInvariant *inv = q -> invariant;
+      inv = q -> invariant;
       if (!lock_inv(inv)) {
         TRACE("%p : failed to lock %p", trec, inv);
         trec -> state = TREC_CONDEMNED;
         break;
       }
 
-      StgTRecHeader *inv_old_trec = inv -> last_execution;
+      inv_old_trec = inv -> last_execution;
       if (inv_old_trec != NO_TREC) {
 	StgTRecChunk *c = inv_old_trec -> current_chunk;
 	while (c != END_STM_CHUNK_LIST) {
@@ -1336,7 +1343,7 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
   // invariants and TVars are managed by the TVar watch queues which are
   // protected by the TVar's locks.
 
-  StgBool use_read_phase = ((config_use_read_phase) && (!touched_invariants));
+  use_read_phase = ((config_use_read_phase) && (!touched_invariants));
 
   result = validate_and_acquire_ownership(trec, (!use_read_phase), TRUE);
   if (result) {
@@ -1344,12 +1351,13 @@ StgBool stmCommitTransaction(Capability *cap, StgTRecHeader *trec) {
     ASSERT (trec -> state == TREC_ACTIVE);
 
     if (use_read_phase) {
+      StgInt64 max_commits_at_end;
+      StgInt64 max_concurrent_commits;
       TRACE("%p : doing read check", trec);
       result = check_read_only(trec);
       TRACE("%p : read-check %s", trec, result ? "succeeded" : "failed");
 
-      StgInt64 max_commits_at_end = max_commits;
-      StgInt64 max_concurrent_commits;
+      max_commits_at_end = max_commits;
       max_concurrent_commits = ((max_commits_at_end - max_commits_at_start) +
                                 (n_capabilities * TOKEN_BATCH_SIZE));
       if (((max_concurrent_commits >> 32) > 0) || shake()) {

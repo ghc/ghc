@@ -942,10 +942,12 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 	}
 
 	case STOP_FRAME:
+	{
 	    // We've stripped the entire stack, the thread is now dead.
 	    tso->what_next = ThreadKilled;
 	    tso->sp = frame + sizeofW(StgStopFrame);
 	    return;
+	}
 
 	case CATCH_FRAME:
 	    // If we find a CATCH_FRAME, and we've got an exception to raise,
@@ -1017,15 +1019,17 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 	    // whether the transaction is valid or not because its
 	    // possible validity cannot have caused the exception
 	    // and will not be visible after the abort.
-	    debugTrace(DEBUG_stm, 
-		       "found atomically block delivering async exception");
 
+		{
             StgTRecHeader *trec = tso -> trec;
             StgTRecHeader *outer = stmGetEnclosingTRec(trec);
+	    debugTrace(DEBUG_stm, 
+		       "found atomically block delivering async exception");
             stmAbortTransaction(cap, trec);
 	    stmFreeAbortedTRec(cap, trec);
             tso -> trec = outer;
 	    break;
+	    };
 	    
 	default:
 	    break;

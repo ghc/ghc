@@ -199,11 +199,11 @@ GarbageCollect ( rtsBool force_major_gc )
   lnat oldgen_saved_blocks = 0;
   nat g, s, i;
 
-  ACQUIRE_SM_LOCK;
-
 #ifdef PROFILING
   CostCentreStack *prev_CCS;
 #endif
+
+  ACQUIRE_SM_LOCK;
 
   debugTrace(DEBUG_gc, "starting GC");
 

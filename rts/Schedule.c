@@ -3109,10 +3109,10 @@ findRetryFrameHelper (StgTSO *tso)
 	return CATCH_RETRY_FRAME;
       
     case CATCH_STM_FRAME: {
-        debugTrace(DEBUG_stm,
-		   "found CATCH_STM_FRAME at %p during retry", p);
         StgTRecHeader *trec = tso -> trec;
 	StgTRecHeader *outer = stmGetEnclosingTRec(trec);
+        debugTrace(DEBUG_stm,
+		   "found CATCH_STM_FRAME at %p during retry", p);
         debugTrace(DEBUG_stm, "trec=%p outer=%p", trec, outer);
 	stmAbortTransaction(tso -> cap, trec);
 	stmFreeAbortedTRec(tso -> cap, trec);

@@ -864,6 +864,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 	    // we divide the step counter: the 2 low bits indicate
 	    // which field, and the rest of the bits indicate the
 	    // entry number (starting from zero).
+	    TRecEntry *entry;
 	    nat entry_no = se->info.next.step >> 2;
 	    nat field_no = se->info.next.step & 3;
 	    if (entry_no == ((StgTRecChunk *)se->c)->next_entry_idx) {
@@ -871,7 +872,7 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 		popOff();
 		return;
 	    }
-	    TRecEntry *entry = &((StgTRecChunk *)se->c)->entries[entry_no];
+	    entry = &((StgTRecChunk *)se->c)->entries[entry_no];
 	    if (field_no == 0) {
 		*c = (StgClosure *)entry->tvar;
 	    } else if (field_no == 1) {
