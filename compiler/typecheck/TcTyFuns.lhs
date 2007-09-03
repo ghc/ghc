@@ -591,10 +591,11 @@ decompInst i@(EqInst {})
       | con1 /= con2 && not (isOpenSynTyCon con1 || isOpenSynTyCon con2)
         -- not matching data constructors (of any flavour) are bad news
       = do { env0 <- tcInitTidyEnv
-           ; let (env1, tidy_ty1)  =  tidyOpenType env0 ty1
-                 (env2, tidy_ty2)  =  tidyOpenType env1 ty2
-                 extra 	         = sep [ppr tidy_ty1, char '~', ppr tidy_ty2]
-                 msg 		 = ptext SLIT("Couldn't match expected type against inferred type")
+           ; let (env1, tidy_ty1) = tidyOpenType env0 ty1
+                 (env2, tidy_ty2) = tidyOpenType env1 ty2
+                 extra 	          = sep [ppr tidy_ty1, char '~', ppr tidy_ty2]
+                 msg 		  = 
+                   ptext SLIT("Unsolvable equality constraint:")
            ; failWithTcM (env2, hang msg 2 extra)
            }
       where
