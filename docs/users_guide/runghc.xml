@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="iso-8859-1"?>
-<chapter id="ghci">
+<chapter id="runghc">
   <title>Using runghc</title>
   <indexterm><primary>runghc</primary></indexterm>
 
