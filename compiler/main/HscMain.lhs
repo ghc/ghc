@@ -296,67 +296,52 @@ hscMkCompiler norecomp messenger frontend backend
 -- Compilers
 --------------------------------------------------------------
 
---        1         2         3         4         5         6         7         8          9
 -- Compile Haskell, boot and extCore in OneShot mode.
 hscCompileOneShot :: Compiler HscStatus
-hscCompileOneShot = hscCompileHardCode norecompOneShot oneShotMsg hscOneShot (hscConst (HscRecomp False))
+hscCompileOneShot
+   = hscCompiler norecompOneShot oneShotMsg backend boot_backend
+   where
+     backend inp  = hscSimplify inp >>= hscNormalIface >>= hscWriteIface >>= hscOneShot
+     boot_backend inp = hscSimpleIface inp >>= hscWriteIface >> return (HscRecomp False)
 
 -- Compile Haskell, boot and extCore in batch mode.
 hscCompileBatch :: Compiler (HscStatus, ModIface, ModDetails)
-hscCompileBatch = hscCompileHardCode norecompBatch batchMsg hscBatch hscNothing
-
--- Compile to hardcode (C,asm,...). This general structure is shared by OneShot and Batch.
-hscCompileHardCode :: NoRecomp result                                  -- No recomp necessary
-                   -> (Maybe (Int,Int) -> Bool -> Comp ())             -- Message callback
-                   -> ((ModIface, ModDetails, CgGuts) -> Comp result)  -- Compile normal file
-                   -> ((ModIface, ModDetails, ModGuts) -> Comp result) -- Compile boot file
-                   -> Compiler result
-hscCompileHardCode norecomp msg compNormal compBoot hsc_env mod_summary =
-    compiler hsc_env mod_summary
-    where mkComp = hscMkCompiler norecomp msg
-          -- How to compile nonBoot files.
-          nonBootComp inp = hscSimplify inp >>= hscNormalIface >>=
-                            hscWriteIface >>= compNormal
-          -- How to compile boot files.
-          bootComp inp = hscSimpleIface inp >>= hscWriteIface >>= compBoot
-          compiler
-              = case ms_hsc_src mod_summary of
-                ExtCoreFile
-                    -> mkComp hscCoreFrontEnd nonBootComp
-                HsSrcFile
-                    -> mkComp hscFileFrontEnd nonBootComp
-                HsBootFile
-                    -> mkComp hscFileFrontEnd bootComp
+hscCompileBatch
+   = hscCompiler norecompBatch batchMsg backend boot_backend
+   where
+     backend inp  = hscSimplify inp >>= hscNormalIface >>= hscWriteIface >>= hscBatch
+     boot_backend inp = hscSimpleIface inp >>= hscWriteIface >>= hscNothing
 
 -- Type-check Haskell, boot and extCore.
 -- Does it make sense to compile extCore to nothing?
 hscCompileNothing :: Compiler (HscStatus, ModIface, ModDetails)
-hscCompileNothing hsc_env mod_summary
-    = compiler hsc_env mod_summary
-    where mkComp = hscMkCompiler norecompBatch batchMsg
-          pipeline inp = hscSimpleIface inp >>= hscIgnoreIface >>= hscNothing
-          compiler
-              = case ms_hsc_src mod_summary of
-                ExtCoreFile
-                    -> mkComp hscCoreFrontEnd pipeline
-                HsSrcFile
-                    -> mkComp hscFileFrontEnd pipeline
-                HsBootFile
-                    -> mkComp hscFileFrontEnd pipeline
+hscCompileNothing
+   = hscCompiler norecompBatch batchMsg backend backend
+   where
+     backend inp = hscSimpleIface inp >>= hscIgnoreIface >>= hscNothing
 
 -- Compile Haskell, extCore to bytecode.
 hscCompileInteractive :: Compiler (InteractiveStatus, ModIface, ModDetails)
-hscCompileInteractive hsc_env mod_summary =
-    hscMkCompiler norecompInteractive batchMsg
-                  frontend backend
-                  hsc_env mod_summary
-    where backend inp = hscSimplify inp >>= hscNormalIface >>= hscIgnoreIface >>= hscInteractive
-          frontend = case ms_hsc_src mod_summary of
-                       ExtCoreFile -> hscCoreFrontEnd
-                       HsSrcFile   -> hscFileFrontEnd
-                       HsBootFile  -> panic bootErrorMsg
-          bootErrorMsg = "Compiling a HsBootFile to bytecode doesn't make sense. " ++
-                         "Use 'hscCompileBatch' instead."
+hscCompileInteractive
+   = hscCompiler norecompInteractive batchMsg backend boot_backend
+   where
+     backend inp = hscSimplify inp >>= hscNormalIface >>= hscIgnoreIface >>= hscInteractive
+     boot_backend = panic "hscCompileInteractive: can't do boot files here"
+
+hscCompiler
+        :: NoRecomp result                                  -- No recomp necessary
+        -> (Maybe (Int,Int) -> Bool -> Comp ())             -- Message callback
+        -> (ModGuts -> Comp result)  -- Compile normal file
+        -> (ModGuts -> Comp result) -- Compile boot file
+        -> Compiler result
+hscCompiler norecomp msg nonBootComp bootComp hsc_env mod_summary =
+    hscMkCompiler norecomp msg frontend backend hsc_env mod_summary
+    where
+          (frontend,backend)
+              = case ms_hsc_src mod_summary of
+                ExtCoreFile -> (hscCoreFrontEnd, nonBootComp)
+                HsSrcFile   -> (hscFileFrontEnd, nonBootComp)
+                HsBootFile  -> (hscFileFrontEnd, bootComp)
 
 --------------------------------------------------------------
 -- NoRecomp handlers
