@@ -38,7 +38,7 @@ test('tcrun020', normal, compile_and_run, [''])
 # Doesn't work with External Core due to datatype with no constructors
 test('tcrun021', expect_fail_for(['extcore','optextcore']),
      compile_and_run, ['-package containers'])
-test('tcrun022', only_compiler_types(['ghc']), compile_and_run, ['-O -fglasgow-exts'])
+test('tcrun022', compose(omit_ways(['ghci']),only_compiler_types(['ghc'])), compile_and_run, ['-O -fglasgow-exts'])
 test('tcrun023', normal, compile_and_run, ['-O'])
 test('tcrun024', normal, compile_and_run, ['-O'])
 test('tcrun025', normal, multimod_compile_and_run, ['tcrun025',''])
