@@ -73,3 +73,10 @@ test('ColGivenCheck2', normal, compile, [''])
 test('InstEqContext', normal, compile, [''])
 test('InstEqContext2', normal, compile, [''])
 test('InstEqContext3', normal, compile, [''])
+
+test('HO', normal, compile, [''])
+
+test('GivenCheck', normal, compile, [''])
+test('GivenCheckSwap', normal, compile, [''])
+test('GivenCheckDecomp', normal, compile, [''])
+test('GivenCheckTop', normal, compile, [''])
