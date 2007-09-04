@@ -89,6 +89,7 @@ module CLabel (
 	mkRtsApFastLabel,
 
 	mkForeignLabel,
+        addLabelSize,
 
 	mkCCLabel, mkCCSLabel,
 
@@ -363,6 +364,12 @@ mkApEntryLabel upd off		= RtsLabel (RtsApEntry   upd off)
 
 mkForeignLabel :: FastString -> Maybe Int -> Bool -> CLabel
 mkForeignLabel str mb_sz  is_dynamic = ForeignLabel str mb_sz is_dynamic
+
+addLabelSize :: CLabel -> Int -> CLabel
+addLabelSize (ForeignLabel str _ is_dynamic) sz
+  = ForeignLabel str (Just sz) is_dynamic
+addLabelSize label _
+  = label
 
 	-- Cost centres etc.
 
