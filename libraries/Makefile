@@ -272,7 +272,7 @@ $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                %/setup/Setup ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
-	  cd $* && setup/Setup haddock; \
+	  cd $* && setup/Setup haddock --html-location='../$$pkg'; \
 	fi
 
 .PHONY: distclean clean clean.library.%
