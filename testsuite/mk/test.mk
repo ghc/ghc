@@ -112,7 +112,7 @@ RUNTEST_OPTS +=  \
 	-e config.timeout="int($(TIMEOUT)) or config.timeout" \
 	-e config.timeout_prog=\"$(TOP)/timeout/timeout\" \
 	-e config.exeext=\"$(exeext)\" \
-	-e config.top=\"$(TOP)\" \
+	-e config.top=\"$(FPTOOLS_TOP_ABS)/testsuite\" \
 	$(EXTRA_RUNTEST_OPTS)
 
 # HostPlatform_CPP should ideally be TargetPlatform_CPP, but that
