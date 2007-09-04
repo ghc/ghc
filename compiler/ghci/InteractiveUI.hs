@@ -1345,10 +1345,11 @@ completeNone w = return []
 completeWord :: String -> Int -> Int -> IO (Maybe (String, [String]))
 completeWord w start end = do
   line <- Readline.getLineBuffer
-  case w of 
+  let line_words = words (dropWhile isSpace line)
+  case w of
      ':':_ | all isSpace (take (start-1) line) -> wrapCompleter completeCmd w
      _other
-	| Just c <- is_cmd line -> do
+	| ((':':c) : _) <- line_words -> do
 	   maybe_cmd <- lookupCommand c
            let (n,w') = selectWord (words' 0 line)
 	   case maybe_cmd of
@@ -1357,6 +1358,8 @@ completeWord w start end = do
 	     Just (_,_,True,complete) -> let complete' w = do rets <- complete w
                                                               return (map (drop n) rets)
                                          in wrapCompleter complete' w'
+        | ("import" : _) <- line_words ->
+                wrapCompleter completeModule w
 	| otherwise     -> do
 		--printf "complete %s, start = %d, end = %d\n" w start end
 		wrapCompleter completeIdentifier w
@@ -1372,9 +1375,6 @@ completeWord w start end = do
               | offset+length x >= start = (start-offset,take (end-offset) x)
               | otherwise = selectWord xs
 
-is_cmd line 
- | ((':':w) : _) <- words (dropWhile isSpace line) = Just w
- | otherwise = Nothing
 
 completeCmd w = do
   cmds <- readIORef commands
