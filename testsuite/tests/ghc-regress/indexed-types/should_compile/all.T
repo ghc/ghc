@@ -72,3 +72,4 @@ test('ColGivenCheck2', normal, compile, [''])
 
 test('InstEqContext', normal, compile, [''])
 test('InstEqContext2', normal, compile, [''])
+test('InstEqContext3', normal, compile, [''])
