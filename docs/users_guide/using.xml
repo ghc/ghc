@@ -73,10 +73,9 @@ module X where
       maintains internally, so you'll be desperately disappointed if
       you try to glob etc. inside <literal>OPTIONS_GHC</literal>.</para>
 
-      <para>NOTE: the contents of OPTIONS_GHC are prepended to the
-      command-line options, so you <emphasis>do</emphasis> have the
-      ability to override OPTIONS_GHC settings via the command
-      line.</para>
+      <para>NOTE: the contents of OPTIONS_GHC are appended to the
+      command-line options, so options given in the source file
+      override those given on the command-line.</para>
 
       <para>It is not recommended to move all the contents of your
       Makefiles into your source files, but in some circumstances, the
