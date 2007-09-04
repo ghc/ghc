@@ -163,7 +163,8 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
              return (CompOK details iface maybe_old_linkable)
        handleBatch (HscRecomp hasStub, iface, details)
            | isHsBoot src_flavour
-               = do SysTools.touch dflags' "Touching object file"
+               = do when (isObjectTarget hsc_lang) $ -- interpreted reaches here too
+                       SysTools.touch dflags' "Touching object file"
                                    object_filename
                     return (CompOK details iface Nothing)
            | otherwise
@@ -211,13 +212,11 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
                   Just result -> handle result
    -- run the compiler
    case hsc_lang of
-     HscInterpreted | not (isHsBoot src_flavour) -- We can't compile boot files to
-                                                 -- bytecode so don't even try.
-         -> runCompiler hscCompileInteractive handleInterpreted
-     HscNothing
-         -> runCompiler hscCompileNothing handleBatch
-     _other
-         -> runCompiler hscCompileBatch handleBatch
+     HscInterpreted
+      | isHsBoot src_flavour -> runCompiler hscCompileNothing handleBatch
+      | otherwise            -> runCompiler hscCompileInteractive handleInterpreted
+     HscNothing     -> runCompiler hscCompileNothing handleBatch
+     _other         -> runCompiler hscCompileBatch handleBatch
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support)
