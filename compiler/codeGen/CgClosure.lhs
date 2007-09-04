@@ -13,7 +13,7 @@ with {\em closures} on the RHSs of let(rec)s.  See also
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/CodingStyle#Warnings
+--     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
 module CgClosure ( cgTopRhsClosure, 
