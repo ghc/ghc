@@ -165,9 +165,7 @@ odir=stage$(stage)
 
 SRC_HC_OPTS += $(patsubst %, -i$(odir)/%, $(ALL_DIRS))
 
-ifneq "$(stage)" "1"
 SRC_HC_OPTS += -Wall -fno-warn-name-shadowing
-endif
 
 HS_OBJS = $(patsubst %, $(odir)/%, $(addsuffix .$(way_)o,$(basename $(HS_SRCS))))
 C_OBJS = $(patsubst %, $(odir)/%, $(addsuffix .$(way_)o,$(basename $(C_SRCS))))
