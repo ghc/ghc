@@ -576,7 +576,7 @@ decompInst i@(EqInst {})
                         do { cotvs <- zipWithM (\t1 t2 -> 
                                                 newMetaTyVar TauTv 
                                                              (mkCoKind t1 t2)) 
-                                               tys1' tys2'
+                                               tys1 tys2
                            ; let cos = map TyVarTy cotvs
                            ; writeMetaTyVar old_covar (TyConApp con1 cos)
                            ; return $ map mkWantedCo cotvs
@@ -584,9 +584,10 @@ decompInst i@(EqInst {})
                       -- co_i := Con_i old_co
                       (\old_co -> return $ 
                                     map mkGivenCo $
-                                        mkRightCoercions (length tys1') old_co)
-           ; insts <- zipWithM mkEqInst (zipWith EqPred tys1' tys2') cos
-           ; return (insts, not $ null insts)
+                                        mkRightCoercions (length tys1) old_co)
+           ; insts <- zipWithM mkEqInst (zipWith EqPred tys1 tys2) cos
+           ; traceTc (text "decomp identicalHead" <+> ppr insts) 
+           ; return (insts, not $ null insts) 
            }
       | con1 /= con2 && not (isOpenSynTyCon con1 || isOpenSynTyCon con2)
         -- not matching data constructors (of any flavour) are bad news
