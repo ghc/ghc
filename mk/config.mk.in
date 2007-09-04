@@ -357,11 +357,7 @@ endif
 GhcRTSWays += $(if $(findstring NO, $(GhcUnregisterised)),thr thr_p thr_debug,)
 
 # We can only build GHCi threaded if we have a threaded RTS:
-ifneq "$(findstring thr, $(GhcRTSWays))" ""
-GhcThreaded=YES
-else
-GhcThreaded=NO
-endif
+GhcThreaded = $(if $(findstring thr,$(GhcRTSWays)),YES,NO)
 
 # Option flags to pass to GHC when it's compiling modules in
 # fptools/libraries.  Typically these are things like -O or
