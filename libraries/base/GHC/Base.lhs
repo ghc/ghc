@@ -919,13 +919,25 @@ gtInt, geInt, eqInt, neInt, ltInt, leInt :: Int -> Int -> Bool
 "plusDouble x 0.0"   forall x#. (+##) x#    0.0## = x#
 "plusDouble 0.0 x"   forall x#. (+##) 0.0## x#    = x#
 "minusDouble x 0.0"  forall x#. (-##) x#    0.0## = x#
-"minusDouble x x"    forall x#. (-##) x#    x#    = 0.0##
-"timesDouble x 0.0"  forall x#. (*##) x#    0.0## = 0.0##
-"timesDouble 0.0 x"  forall x#. (*##) 0.0## x#    = 0.0##
 "timesDouble x 1.0"  forall x#. (*##) x#    1.0## = x#
 "timesDouble 1.0 x"  forall x#. (*##) 1.0## x#    = x#
 "divideDouble x 1.0" forall x#. (/##) x#    1.0## = x#
   #-}
+
+{-
+We'd like to have more rules, but for example:
+
+This gives wrong answer (0) for NaN - NaN (should be NaN):
+    "minusDouble x x"    forall x#. (-##) x#    x#    = 0.0##
+
+This gives wrong answer (0) for 0 * NaN (should be NaN):
+    "timesDouble 0.0 x"  forall x#. (*##) 0.0## x#    = 0.0##
+
+This gives wrong answer (0) for NaN * 0 (should be NaN):
+    "timesDouble x 0.0"  forall x#. (*##) x#    0.0## = 0.0##
+
+These are tested by num014.
+-}
 
 -- Wrappers for the shift operations.  The uncheckedShift# family are
 -- undefined when the amount being shifted by is greater than the size
