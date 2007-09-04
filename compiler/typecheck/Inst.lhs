@@ -48,7 +48,7 @@ module Inst (
 
 	mkWantedCo, mkGivenCo,
 	fromWantedCo, fromGivenCo,
-	eitherEqInst, mkEqInst, mkEqInsts,
+	eitherEqInst, mkEqInst, mkEqInsts, mkWantedEqInst,
 	finalizeEqInst, writeWantedCoercion,
 	eqInstType, updateEqInstCoercion,
 	eqInstCoercion,
@@ -1003,6 +1003,12 @@ mkEqInst (EqPred ty1 ty2) co
 	     ; return inst
 	     }
 	where mkName uniq src_span = mkInternalName uniq (mkVarOcc "co") src_span
+
+mkWantedEqInst :: PredType -> TcM Inst
+mkWantedEqInst pred@(EqPred ty1 ty2)
+  = do { cotv <- newMetaTyVar TauTv (mkCoKind ty1 ty2)
+       ; mkEqInst pred (Left cotv)
+       }
 
 -- type inference:
 --	We want to promote the wanted EqInst to a given EqInst

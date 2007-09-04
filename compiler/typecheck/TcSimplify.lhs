@@ -1680,7 +1680,11 @@ reduceContext env wanteds
 
 	; let givens 			= red_givens env
 	      (given_eqs0,given_dicts0) = partitionGivenEqInsts  givens
-	      (wanted_eqs,wanted_dicts) = partitionWantedEqInsts wanteds
+	      (wanted_eqs0,wanted_dicts) = partitionWantedEqInsts wanteds
+
+	; wanted_ancestor_eqs <- (mapM wantedAncestorEqualities wanted_dicts >>= \ls -> return (concat ls))
+	; traceTc (text "test wanted SCs" <+> ppr wanted_ancestor_eqs)
+	; let wanted_eqs = wanted_ancestor_eqs ++ wanted_eqs0
 
 	; -- 1. Normalise the *given* *equality* constraints
 	  (given_eqs,eliminate_skolems) <- normaliseGivens given_eqs0
@@ -2476,6 +2480,31 @@ addSCs is_loop avails dict
     is_given sc_dict = case findAvail avails sc_dict of
 			  Just (Given _) -> True	-- Given is cheaper than superclass selection
 			  other		 -> False	
+
+
+wantedAncestorEqualities :: Inst -> TcM [Inst]
+wantedAncestorEqualities dict 
+  | isClassDict dict
+  = mapM mkWantedEqInst $ filter isEqPred $ bagToList $ wantedAncestorEqualities' (dictPred dict) emptyBag
+  | otherwise
+  = return []
+
+wantedAncestorEqualities' :: PredType -> Bag PredType -> Bag PredType
+wantedAncestorEqualities' pred bag
+  = ASSERT( isClassPred pred )
+    let (clas, tys) 		 = getClassPredTys pred 
+        (tyvars, sc_theta, _, _) = classBigSig clas
+        sc_theta' 		 = substTheta (zipTopTvSubst tyvars tys) sc_theta
+        add_sc bag sc_pred
+          | elemBag sc_pred bag  = bag
+	  | not (isEqPred sc_pred)
+            && not (isClassPred sc_pred)
+			         = bag
+	  | isEqPred sc_pred	 = consBag sc_pred bag
+          | otherwise	         = let bag' = consBag sc_pred bag
+				   in wantedAncestorEqualities' sc_pred bag'
+    in foldl add_sc bag sc_theta'
+
 \end{code}
 
 %************************************************************************
