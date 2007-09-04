@@ -1369,8 +1369,14 @@ involves the unfication x = y. It is deferred until we bring into account the
 context x ~ y to establish that it holds.
 
 If available, we defer original types (rather than those where closed type
-synonyms have already been expanded via tcCoreView).  This is as usual, to
+synonyms have already been expanded via tcCoreView).  This is, as usual, to
 improve error messages.
+
+We need to both 'unBox' and zonk deferred types.  We need to unBox as
+functions, such as TcExpr.tcMonoExpr promise to fill boxes in the expected
+type.  We need to zonk as the types go into the kind of the coercion variable
+`cotv' and those are not zonked in Inst.zonkInst.  (Maybe it would be better
+to zonk in zonInst instead.  Would that be sufficient?)
 
 \begin{code}
 defer_unification :: Bool               -- pop innermost context?
@@ -1381,8 +1387,8 @@ defer_unification :: Bool               -- pop innermost context?
 defer_unification outer True ty1 ty2
   = defer_unification outer False ty2 ty1
 defer_unification outer False ty1 ty2
-  = do	{ ty1' <- zonkTcType ty1
- 	; ty2' <- zonkTcType ty2
+  = do	{ ty1' <- unBox ty1 >>= zonkTcType      -- unbox *and* zonk..
+ 	; ty2' <- unBox ty2 >>= zonkTcType      -- ..see preceding note
         ; traceTc $ text "deferring:" <+> ppr ty1 <+> text "~" <+> ppr ty2
 	; cotv <- newMetaTyVar TauTv (mkCoKind ty1' ty2')
 		-- put ty1 ~ ty2 in LIE
