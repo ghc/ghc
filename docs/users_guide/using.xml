@@ -897,6 +897,16 @@ ghc -c Foo.hs</screen>
 	</listitem>
       </varlistentry>
 
+      <varlistentry>
+	<term><option>-Wwarn</option>:</term>
+	<listitem>
+	  <indexterm><primary><option>-Wwarn</option></primary></indexterm>
+	  <para>Warnings are treated only as warnings, not as errors. This is
+	    the default, but can be useful to negate a
+        <option>-Werror</option> flag.</para>
+	</listitem>
+      </varlistentry>
+
     </variablelist>
 
     <para>The full set of warning options is described below.  To turn

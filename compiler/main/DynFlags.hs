@@ -1088,12 +1088,13 @@ dynamic_flags = [
   ,  ( "monly-3-regs", 	NoArg (upd (\s -> s{stolen_x86_regs = 3}) ))
   ,  ( "monly-4-regs", 	NoArg (upd (\s -> s{stolen_x86_regs = 4}) ))
 
-	------ Warning opts -------------------------------------------------
-  ,  ( "W"		, NoArg (mapM_ setDynFlag   minusWOpts)    )
-  ,  ( "Werror"		, NoArg (setDynFlag   	    Opt_WarnIsError) )
-  ,  ( "Wall"		, NoArg (mapM_ setDynFlag   minusWallOpts) )
-  ,  ( "Wnot"		, NoArg (mapM_ unSetDynFlag minusWallOpts) ) /* DEPREC */
-  ,  ( "w"		, NoArg (mapM_ unSetDynFlag minuswRemovesOpts) )
+     ------ Warning opts -------------------------------------------------
+  ,  ( "W"     , NoArg (mapM_ setDynFlag   minusWOpts)    )
+  ,  ( "Werror", NoArg (setDynFlag         Opt_WarnIsError) )
+  ,  ( "Wwarn" , NoArg (unSetDynFlag       Opt_WarnIsError) )
+  ,  ( "Wall"  , NoArg (mapM_ setDynFlag   minusWallOpts) )
+  ,  ( "Wnot"  , NoArg (mapM_ unSetDynFlag minusWallOpts) ) -- DEPRECATED
+  ,  ( "w"     , NoArg (mapM_ unSetDynFlag minuswRemovesOpts) )
 
 	------ Optimisation flags ------------------------------------------
   ,  ( "O"	, NoArg (upd (setOptLevel 1)))
