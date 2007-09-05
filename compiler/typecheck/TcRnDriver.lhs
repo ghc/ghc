@@ -837,16 +837,16 @@ get two defns for 'main' in the interface file!
 #ifdef GHCI
 setInteractiveContext :: HscEnv -> InteractiveContext -> TcRn a -> TcRn a
 setInteractiveContext hsc_env icxt thing_inside 
-  = let 
-	-- Initialise the tcg_inst_env with instances 
-	-- from all home modules.  This mimics the more selective
-	-- call to hptInstances in tcRnModule
-	dfuns = fst (hptInstances hsc_env (\mod -> True))
+  = let -- Initialise the tcg_inst_env with instances from all home modules.  
+        -- This mimics the more selective call to hptInstances in tcRnModule.
+	(home_insts, home_fam_insts) = hptInstances hsc_env (\mod -> True)
     in
     updGblEnv (\env -> env { 
-	tcg_rdr_env  = ic_rn_gbl_env icxt,
-	tcg_inst_env = extendInstEnvList (tcg_inst_env env) dfuns }) $
-
+	tcg_rdr_env      = ic_rn_gbl_env icxt,
+	tcg_inst_env     = extendInstEnvList    (tcg_inst_env env) home_insts,
+	tcg_fam_inst_env = extendFamInstEnvList (tcg_fam_inst_env env) 
+                                                home_fam_insts 
+      }) $
 
     tcExtendGhciEnv (ic_tmp_ids icxt) $
         -- tcExtendGhciEnv does lots: 
