@@ -47,9 +47,9 @@ import __gmpz_com;
 import base_GHCziIOBase_NestedAtomically_closure;
 import pthread_mutex_lock;
 import pthread_mutex_unlock;
+#endif
 import EnterCriticalSection;
 import LeaveCriticalSection;
-#endif
 
 /*-----------------------------------------------------------------------------
   Array Primitives

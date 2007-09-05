@@ -14,11 +14,11 @@
 
 #ifdef __PIC__
 import pthread_mutex_lock;
-import EnterCriticalSection;
-import LeaveCriticalSection;
 import base_GHCziBase_Czh_static_info;
 import base_GHCziBase_Izh_static_info;
 #endif
+import EnterCriticalSection;
+import LeaveCriticalSection;
 
 /* ----------------------------------------------------------------------------
    Support for the bytecode interpreter.
