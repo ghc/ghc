@@ -394,8 +394,8 @@ binary-dist :: tar-binary-dist
 
 .PHONY: tar-binary-dist
 tar-binary-dist:
-	( cd $(BIN_DIST_TOPDIR); tar cf - $(BIN_DIST_NAME) | bzip2 >$(BIN_DIST_TARBALL) )
-	( cd $(BIN_DIST_TOPDIR); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >bin-manifest-$(ProjectVersion) )
+	( cd $(BIN_DIST_TOPDIR_ABS); tar cf - $(BIN_DIST_NAME) | bzip2 >$(BIN_DIST_TARBALL) )
+	( cd $(BIN_DIST_TOPDIR_ABS); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >bin-manifest-$(ProjectVersion) )
 
 PUBLISH_FILES = $(BIN_DIST_TARBALL)
 
@@ -415,7 +415,7 @@ endif
 
 # Upload the distribution and documentation
 ifneq "$(PublishLocation)" ""
-binary-dist :: publish-binary-dist
+publish :: publish-binary-dist
 endif
 
 .PHONY: publish-binary-dist
@@ -427,16 +427,11 @@ publish-binary-dist ::
 	    done \
 	done
 
-ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-# On Windows, we cannot use absoluate pathnames to rsync, because they look
-# like remote pathnames ("c:/foo/bar").  Also, the docs reside in doc/
-# rather than share/, due to prep-bin-dist-mingw.
+# You need to first make binddisttest, and then run
+#     make publish 'prefix=$(BIN_DIST_INST_DIR)'
+# for this to find the right place.
 publish-binary-dist ::
-	$(PublishCp) -r $(FPTOOLS_TOP)/$(BIN_DIST_NAME)/doc/html/* $(PublishLocation)/docs
-else
-publish-binary-dist ::
-	$(PublishCp) -r $(BIN_DIST_DIR)/share/html/* $(PublishLocation)/docs
-endif
+	$(PublishCp) -r $(docdir)/* $(PublishLocation)/docs
 
 binary-dist::
 	@echo "Mechanical and super-natty! Inspect the result and *if* happy; freeze, sell and get some sleep!"

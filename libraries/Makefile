@@ -322,7 +322,7 @@ $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
-	  ../installPackage/installPackage "$(DESTDIR)" $(prefix) $(FPTOOLS_TOP_ABS)/$(GHC_PKG_DIR_REL)/ghc-pkg-inplace $(DESTDIR)$(libdir)/package.conf; \
+	  ../installPackage/installPackage "$(DESTDIR)" $(prefix) $(GHC_PKG_PROG) $(DESTDIR)$(libdir)/package.conf; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%
@@ -350,7 +350,7 @@ binary-dist.library.%:
 	  cp    $*.cabal      $(BIN_DIST_LIBDIR)/$* && \
 	  cp    LICENSE       $(BIN_DIST_LIBDIR)/$* && \
 	  cp -R dist          $(BIN_DIST_LIBDIR)/$* && \
-	  (cp -RL include      $(BIN_DIST_LIBDIR)/$* || :) && \
+	  (cp -RL include      $(BIN_DIST_LIBDIR)/$* || true) && \
 	  $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
 	     \( -name "*_split" -o -name "autogen" \) | xargs rm -rf && \
 	  $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \

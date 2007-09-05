@@ -506,9 +506,13 @@ FPTOOLS_TOP_ABS_PLATFORM = @hardtop_plat@
 PACKAGE_TARNAME = @PACKAGE_TARNAME@
 
 BIN_DIST_NAME=ghc-$(ProjectVersion)
-BIN_DIST_TOPDIR=$(FPTOOLS_TOP_ABS)
-BIN_DIST_DIR=$(BIN_DIST_TOPDIR)/$(BIN_DIST_NAME)
-BIN_DIST_TARBALL=$(BIN_DIST_TOPDIR)/$(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.bz2
+BIN_DIST_TOPDIR_REL=$(FPTOOLS_TOP)
+BIN_DIST_TOPDIR_ABS=$(FPTOOLS_TOP_ABS)
+BIN_DIST_DIR=$(BIN_DIST_TOPDIR_ABS)/$(BIN_DIST_NAME)
+BIN_DIST_TARBALL=$(BIN_DIST_TOPDIR_REL)/$(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.bz2
+
+BIN_DIST_INST_DIR = $(FPTOOLS_TOP_ABS)/bindisttest/installed
+
 
 #
 # Installation directories, we don't use half of these,
@@ -613,6 +617,11 @@ endif
 ifeq "$(strip $(mandir))" ""
 mandir		= $(prefix)/man
 endif
+
+# This is a bit of a lie, as this is a wrapper rather than the program
+# itself. However, it means that we don't have to worry about Windows
+# and non-Windows having different extensions.
+GHC_PKG_PROG = $(FPTOOLS_TOP_ABS)/$(GHC_PKG_DIR_REL)/ghc-pkg-inplace
 
 #-----------------------------------------------------------------------------
 # install configuration
