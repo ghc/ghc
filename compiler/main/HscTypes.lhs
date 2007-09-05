@@ -499,7 +499,6 @@ data ModDetails
         md_insts     :: ![Instance],  -- Dfun-ids for the instances in this module
         md_fam_insts :: ![FamInst],
         md_rules     :: ![CoreRule],  -- Domain may include Ids from other modules
-        md_modBreaks :: !ModBreaks,   -- Breakpoint information for this module 
         md_vect_info :: !VectInfo     -- Vectorisation information
      }
 
@@ -508,7 +507,6 @@ emptyModDetails = ModDetails { md_types = emptyTypeEnv,
 			       md_insts     = [],
 			       md_rules     = [],
 			       md_fam_insts = [],
-                               md_modBreaks = emptyModBreaks,
                                md_vect_info = noVectInfo
                              } 
 
@@ -591,7 +589,8 @@ data CgGuts
 
 	cg_foreign  :: !ForeignStubs,	
 	cg_dep_pkgs :: ![PackageId],	-- Used to generate #includes for C code gen
-        cg_hpc_info :: !HpcInfo         -- info about coverage tick boxes
+        cg_hpc_info :: !HpcInfo,         -- info about coverage tick boxes
+        cg_modBreaks :: !ModBreaks
     }
 
 -----------------------------------
@@ -1386,7 +1385,7 @@ data Unlinked
    = DotO FilePath
    | DotA FilePath
    | DotDLL FilePath
-   | BCOs CompiledByteCode
+   | BCOs CompiledByteCode ModBreaks
 
 #ifndef GHCI
 data CompiledByteCode = NoByteCode
@@ -1397,9 +1396,9 @@ instance Outputable Unlinked where
    ppr (DotA path)   = text "DotA" <+> text path
    ppr (DotDLL path) = text "DotDLL" <+> text path
 #ifdef GHCI
-   ppr (BCOs bcos)   = text "BCOs" <+> ppr bcos
+   ppr (BCOs bcos _)   = text "BCOs" <+> ppr bcos
 #else
-   ppr (BCOs bcos)   = text "No byte code"
+   ppr (BCOs bcos _)   = text "No byte code"
 #endif
 
 isObject (DotO _)   = True
@@ -1414,8 +1413,8 @@ nameOfObject (DotA fn)   = fn
 nameOfObject (DotDLL fn) = fn
 nameOfObject other       = pprPanic "nameOfObject" (ppr other)
 
-byteCodeOfObject (BCOs bc) = bc
-byteCodeOfObject other     = pprPanic "byteCodeOfObject" (ppr other)
+byteCodeOfObject (BCOs bc _) = bc
+byteCodeOfObject other       = pprPanic "byteCodeOfObject" (ppr other)
 \end{code}
 
 %************************************************************************

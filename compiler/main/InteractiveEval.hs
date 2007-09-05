@@ -21,6 +21,7 @@ module InteractiveEval (
         abandon, abandonAll,
         getResumeContext,
         getHistorySpan,
+        getModBreaks,
         getHistoryModule,
         back, forward,
 	setContext, getContext,	
@@ -158,8 +159,16 @@ getHistorySpan hsc_env hist =
    let inf = historyBreakInfo hist
        num = breakInfo_number inf
    in case lookupUFM (hsc_HPT hsc_env) (moduleName (breakInfo_module inf)) of
-       Just hmi -> modBreaks_locs (md_modBreaks (hm_details hmi)) ! num
+       Just hmi -> modBreaks_locs (getModBreaks hmi) ! num
        _ -> panic "getHistorySpan"
+
+getModBreaks :: HomeModInfo -> ModBreaks
+getModBreaks hmi
+  | Just linkable <- hm_linkable hmi, 
+    [BCOs _ modBreaks] <- linkableUnlinked linkable
+  = modBreaks
+  | otherwise
+  = emptyModBreaks -- probably object code
 
 {- | Finds the enclosing top level function name -}
 -- ToDo: a better way to do this would be to keep hold of the decl_path computed
@@ -285,7 +294,7 @@ isBreakEnabled :: HscEnv -> BreakInfo -> IO Bool
 isBreakEnabled hsc_env inf =
    case lookupUFM (hsc_HPT hsc_env) (moduleName (breakInfo_module inf)) of
        Just hmi -> do
-         w <- getBreak (modBreaks_flags (md_modBreaks (hm_details hmi)))
+         w <- getBreak (modBreaks_flags (getModBreaks hmi))
                        (breakInfo_number inf)
          case w of Just n -> return (n /= 0); _other -> return False
        _ ->
@@ -501,9 +510,10 @@ bindLocalsAtBreakpoint hsc_env apStack Nothing = do
 bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
 
    let 
-       mod_name    = moduleName (breakInfo_module info)
-       mod_details = fmap hm_details (lookupUFM (hsc_HPT hsc_env) mod_name)
-       breaks      = md_modBreaks (expectJust "handlRunStatus" mod_details)
+       mod_name  = moduleName (breakInfo_module info)
+       hmi       = expectJust "bindLocalsAtBreakpoint" $ 
+                        lookupUFM (hsc_HPT hsc_env) mod_name
+       breaks    = getModBreaks hmi
        index     = breakInfo_number info
        vars      = breakInfo_vars info
        result_ty = breakInfo_resty info

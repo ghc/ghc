@@ -1877,7 +1877,7 @@ getHomeModuleInfo hsc_env mdl =
 			minf_rdr_env   = mi_globals $! hm_iface hmi,
 			minf_instances = md_insts details
 #ifdef GHCI
-                       ,minf_modBreaks = md_modBreaks details  
+                       ,minf_modBreaks = getModBreaks hmi
 #endif
 			}))
 

@@ -224,7 +224,6 @@ typecheckIface iface
 			      , md_rules     = rules
                               , md_vect_info = vect_info
 			      , md_exports   = exports
-                              , md_modBreaks = emptyModBreaks
 			      }
     }
 \end{code}

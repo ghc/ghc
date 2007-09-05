@@ -189,9 +189,9 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
        handleInterpreted (InteractiveNoRecomp, iface, details)
            = ASSERT (isJust maybe_old_linkable)
              return (CompOK details iface maybe_old_linkable)
-       handleInterpreted (InteractiveRecomp hasStub comp_bc, iface, details)
+       handleInterpreted (InteractiveRecomp hasStub comp_bc modBreaks, iface, details)
            = do stub_unlinked <- getStubLinkable hasStub
-                let hs_unlinked = [BCOs comp_bc]
+                let hs_unlinked = [BCOs comp_bc modBreaks]
                     unlinked_time = ms_hs_date mod_summary
                   -- Why do we use the timestamp of the source file here,
                   -- rather than the current time?  This works better in

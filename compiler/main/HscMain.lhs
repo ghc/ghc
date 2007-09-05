@@ -210,6 +210,7 @@ data InteractiveStatus
     = InteractiveNoRecomp
     | InteractiveRecomp Bool     -- Same as HscStatus
                         CompiledByteCode
+                        ModBreaks
 
 
 -- I want Control.Monad.State! --Lemmih 03/07/2006
@@ -246,7 +247,6 @@ liftIO ioA = Comp $ \s -> do a <- ioA
                              return (a,s)
 
 type NoRecomp result = ModIface -> Comp result
-type FrontEnd core = Comp (Maybe core)
 
 -- FIXME: The old interface and module index are only using in 'batch' and
 --        'interactive' mode. They should be removed from 'oneshot' mode.
@@ -262,8 +262,8 @@ type Compiler result =  HscEnv
 -- then combines the FrontEnd and BackEnd to a working compiler.
 hscMkCompiler :: NoRecomp result         -- What to do when recompilation isn't required.
               -> (Maybe (Int,Int) -> Bool -> Comp ())
-              -> FrontEnd core
-              -> (core -> Comp result)   -- Backend.
+              -> Comp (Maybe ModGuts)       -- Front end
+              -> (ModGuts -> Comp result)   -- Backend.
               -> Compiler result
 hscMkCompiler norecomp messenger frontend backend
               hsc_env mod_summary source_unchanged
@@ -402,7 +402,7 @@ batchMsg mb_mod_index recomp
 -- FrontEnds
 --------------------------------------------------------------
 
-hscCoreFrontEnd :: FrontEnd ModGuts
+hscCoreFrontEnd :: Comp (Maybe ModGuts)
 hscCoreFrontEnd =
     do hsc_env <- gets compHscEnv
        mod_summary <- gets compModSummary
@@ -427,7 +427,7 @@ hscCoreFrontEnd =
                      Just mod_guts -> return (Just mod_guts)         -- No desugaring to do!
 
 	 
-hscFileFrontEnd :: FrontEnd ModGuts
+hscFileFrontEnd :: Comp (Maybe ModGuts)
 hscFileFrontEnd =
     do hsc_env <- gets compHscEnv
        mod_summary <- gets compModSummary
@@ -619,7 +619,8 @@ hscInteractive (iface, details, cgguts)
                      cg_module   = this_mod,
                      cg_binds    = core_binds,
                      cg_tycons   = tycons,
-                     cg_foreign  = foreign_stubs } = cgguts
+                     cg_foreign  = foreign_stubs,
+                     cg_modBreaks = mod_breaks } = cgguts
              dflags = hsc_dflags hsc_env
              location = ms_location mod_summary
              data_tycons = filter isDataTyCon tycons
@@ -632,11 +633,11 @@ hscInteractive (iface, details, cgguts)
          prepd_binds <- {-# SCC "CorePrep" #-}
                         corePrepPgm dflags core_binds data_tycons ;
          -----------------  Generate byte code ------------------
-         comp_bc <- byteCodeGen dflags prepd_binds data_tycons (md_modBreaks details)
+         comp_bc <- byteCodeGen dflags prepd_binds data_tycons mod_breaks
          ------------------ Create f-x-dynamic C-side stuff ---
          (istub_h_exists, istub_c_exists) 
              <- outputForeignStubs dflags this_mod location foreign_stubs
-         return (InteractiveRecomp istub_c_exists comp_bc, iface, details)
+         return (InteractiveRecomp istub_c_exists comp_bc mod_breaks, iface, details)
 #else
     = panic "GHC not compiled with interpreter"
 #endif
@@ -678,7 +679,6 @@ hscFileCheck hsc_env mod_summary compileToCore = do {
 				md_exports   = tcg_exports   tc_result,
 				md_insts     = tcg_insts     tc_result,
 				md_fam_insts = tcg_fam_insts tc_result,
-                                md_modBreaks = emptyModBreaks,      
 				md_rules     = [panic "no rules"],
 				   -- Rules are CoreRules, not the
 				   -- RuleDecls we get out of the typechecker
