@@ -9,18 +9,19 @@ for dir in `cat libraries/core-packages`; do
   fi
 done
 
-# We don't recurse into the library packages with autoreconf anymore, so we
-# have to do this manually. To avoid a strict dependency on autoreconf, we
-# are careful to call autoreconf only when configure does not exist yet or the
-# corresponding configure.ac is newer. This would be dead easy if every shell
-# supported the "-nt" option for "test", but this is not the case. The only
-# portable solution seems to be via find's "-newer" option or to basically give
-# up and replace find with perl:   :-P
+# We don't recurse into the library packages with autoreconf anymore,
+# so we have to do this manually. To avoid a strict dependency on
+# autoreconf, we are careful to call autoreconf only when configure
+# does not exist yet or the corresponding configure.ac/aclocal.m4 is
+# newer. This would be dead easy if every shell supported the "-nt"
+# option for "test", but this is not the case. The only portable
+# solution seems to be via find's "-newer" option or to basically give
+# up and replace find with perl: :-P
 #
 #   perl -e 'print "configure.ac\n" if -M "configure.ac" < -M "configure"'
 for dir in . libraries/*; do
   if test -f $dir/configure.ac; then
-    ( cd $dir ; { test ! -f configure || test -n "`find configure.ac -newer configure`"; } && autoreconf )
+    ( cd $dir ; { test ! -f configure || test -n "`find -L configure.ac -newer configure`" || (test -f aclocal.m4 && test -n "`find -L aclocal.m4 -newer configure`"); } && autoreconf )
   fi
 done
 
