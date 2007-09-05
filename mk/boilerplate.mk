@@ -70,9 +70,14 @@ ifeq "$(BootingFromHc)" "YES"
 include $(TOP)/mk/bootstrap.mk
 endif
 
+ifeq "$(Validating)" "YES"
+include $(TOP)/mk/validate-settings.mk
+-include $(TOP)/mk/validate.mk
+else
 -include $(TOP)/mk/build.mk
 # (Optional) build-specific configuration
 #
+endif
 
 ifndef FAST
 -include .depend

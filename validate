@@ -6,21 +6,6 @@ if [ -f mk/config.mk ]; then
    make distclean
 fi
 
-if [ -f mk/build.mk ]; then
-   mv mk/build.mk mk/build.mk.bak
-fi
-
-# The default is a "quick" build
-echo "BuildFlavour = quick"   >  mk/build.mk
-echo "HADDOCK_DOCS = YES"     >> mk/build.mk
-cat mk/build.mk.sample        >> mk/build.mk
-echo "SRC_HC_OPTS += -Werror" >> mk/build.mk
-echo "SRC_CC_OPTS += -Werror" >> mk/build.mk
-
-# You can override the default validate settings using mk/validate.mk
-# e.g. you could add GhcLibWays=p to test profiling.
-echo '-include $(TOP)/mk/validate.mk' >>mk/build.mk
-
 case $OSTYPE in
   cygwin|msys) config_args=--build=i386-unknown-mingw32
                if [ -f c:/mingw/bin/gcc.exe ]; then
@@ -38,10 +23,10 @@ fi
 sh boot
 ./configure $config_args
 
-make -j$threads
+make Validating=YES -j$threads
 
 # ToDo: use THREADS=$threads, see #1558
-make -C testsuite/tests/ghc-regress fast stage=2 CLEANUP=1 2>&1 | tee testlog
+make Validating=YES -C testsuite/tests/ghc-regress fast stage=2 CLEANUP=1 2>&1 | tee testlog
 
 if
     grep '\<0 caused framework failures' testlog >/dev/null 2>/dev/null &&
