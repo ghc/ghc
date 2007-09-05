@@ -3,7 +3,7 @@
 bindist_abs_root = @hardtop@
 FPTOOLS_TOP_ABS  = @hardtop@
 
-# This Makefile isn't used on Windows, so wel always have ghc-pkg.bin
+# This Makefile isn't used on Windows, so we always have ghc-pkg.bin
 # rather than ghc-pkg.exe.
 GHC_PKG_PROG = $(FPTOOLS_TOP_ABS)/utils/ghc-pkg/ghc-pkg.bin
 
