@@ -8,6 +8,7 @@ test('Simple4', normal, compile, [''])
 test('Simple5', normal, compile, [''])
 test('Simple6', normal, compile, [''])
 test('Simple7', normal, compile, [''])
+test('Simple8', expect_fail, compile, [''])
 
 test('ind1', normal, compile, [''])
 test('ind2', normal, multimod_compile, ['ind2', '-v0'])
