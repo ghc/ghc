@@ -23,6 +23,12 @@ NO_INSTALL_LIBRARY = YES
 # Avoid building the GHCi lib, since we don't need it
 GhcWithInterpreter = NO
 
+# There are lots of warnings in here due to things like modules being
+# imported that, in some versions of GHC, aren't used. Thus we don't
+# give any warnings in here, and therefore validating with -Werror won't
+# make the build fail.
+SRC_HC_OPTS += -w
+
 # Needed so that the libraries can #include relative to this directory.
 INCLUDE_DIRS=-I. -Iinclude
 
