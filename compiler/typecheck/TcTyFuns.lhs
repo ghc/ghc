@@ -526,7 +526,12 @@ swapInst i@(EqInst {})
 		-- we should swap!
 	      go ty1 ty2@(TyConApp tyCon _) 
 					| isOpenSynTyCon tyCon
-					= do { wg_co <- eitherEqInst i
+					= actual_swap ty1 ty2
+	      go ty1@(TyConApp _ _) ty2@(TyVarTy _)
+					= actual_swap ty1 ty2
+	      go _ _			= return (i,False)
+
+	      actual_swap ty1 ty2 = do { wg_co <- eitherEqInst i
 						          -- old_co := sym new_co
 						          (\old_covar ->
 							   do { new_cotv <- newMetaTyVar TauTv (mkCoKind ty2 ty1)
@@ -539,7 +544,6 @@ swapInst i@(EqInst {})
 					     ; new_inst <- mkEqInst (EqPred ty2 ty1) wg_co
 					     ; return (new_inst,True)
 					     }
-	      go _ _			= return (i,False)
 
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 decompInsts :: [Inst] -> TcM ([Inst],Bool)
