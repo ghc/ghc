@@ -322,7 +322,7 @@ $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
-	  ../installPackage/installPackage "$(DESTDIR)" $(prefix) $(GHC_PKG_PROG) $(DESTDIR)$(libdir)/package.conf; \
+	  ../installPackage/installPackage "$(DESTDIR)" $(prefix) $(datadir) $(libraryhtmldir) $(GHC_PKG_PROG) $(DESTDIR)$(libdir)/package.conf; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%

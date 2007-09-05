@@ -17,7 +17,7 @@ endif
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 INSTALL_PROGS    += $(C_PROG)
-GHCII_SCRIPT=$(bindir)/ghcii.sh
+GHCII_SCRIPT=$(DESTDIR)$(bindir)/ghcii.sh
 install::
 	$(RM) -f $(GHCII_SCRIPT)
 	echo "#!$(SHELL)"                                  >> $(GHCII_SCRIPT)

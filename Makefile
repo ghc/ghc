@@ -250,7 +250,7 @@ binary-dist::
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 
 binary-dist::
-	$(MAKE) prefix=$(BIN_DIST_DIR) install
+	$(MAKE) DESTDIR=$(BIN_DIST_DIR) prefix=/. install
 
 binary-dist::
 	cd $(BIN_DIST_DIR) && ../distrib/prep-bin-dist-mingw
