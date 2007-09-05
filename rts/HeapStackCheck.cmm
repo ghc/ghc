@@ -13,8 +13,8 @@
 #include "Cmm.h"
 
 #ifdef __PIC__
-import EnterCriticalSection
-import LeaveCriticalSection
+import EnterCriticalSection;
+import LeaveCriticalSection;
 import pthread_mutex_unlock;
 #endif
 
