@@ -103,6 +103,9 @@ import Unique
 import UniqSet
 import Constants
 import FastTypes
+import UniqFM
+
+import GHC.Exts
 
 #if powerpc_TARGET_ARCH
 import Data.Word	( Word8, Word16, Word32 )
@@ -444,23 +447,29 @@ instance Outputable Reg where
 --	NOTE: 	This only works for arcitectures with just RcInteger and RcDouble
 --		(which are disjoint) ie. x86, x86_64 and ppc
 --
+
+--	BL 2007/09
+--	Doing a nice fold over the UniqSet makes trivColorable use
+--	32% of total compile time and 42% of total alloc when compiling SHA1.lhs from darcs.
+{-
 trivColorable :: RegClass -> UniqSet Reg -> UniqSet Reg -> Bool
 trivColorable classN conflicts exclusions
- = let	
+ = let
+
+	acc :: Reg -> (Int, Int) -> (Int, Int)
 	acc r (cd, cf)	
 	 = case regClass r of
 		RcInteger	-> (cd+1, cf)
 		RcDouble	-> (cd,   cf+1)
 		_		-> panic "MachRegs.trivColorable: reg class not handled"
 
-	tmp		= foldUniqSet acc (0, 0) conflicts
-	(rsD,  rsFP)	= foldUniqSet acc tmp    exclusions
+	tmp			= foldUniqSet acc (0, 0) conflicts
+	(countInt,  countFloat)	= foldUniqSet acc tmp    exclusions
 
-	squeese		= worst rsD  classN RcInteger
-			+ worst rsFP classN RcDouble
+	squeese		= worst countInt   classN RcInteger
+			+ worst countFloat classN RcDouble
 
    in	squeese < allocatableRegsInClass classN
-
 
 -- | Worst case displacement
 --	node N of classN has n neighbors of class C.
@@ -480,6 +489,69 @@ worst n classN classC
 	 -> case classC of
 	 	RcDouble	-> min n (allocatableRegsInClass RcDouble)
 		RcInteger	-> 0
+-}
+
+
+-- The number of allocatable regs is hard coded here so we can do a fast comparision
+-- in trivColorable. It's ok if these numbers are _less_ than the actual number of
+-- free regs, but they can't be more or the register conflict graph won't color.
+--
+-- There is an allocatableRegsInClass :: RegClass -> Int, but doing the unboxing
+-- is too slow for us here.
+--
+-- Compare MachRegs.freeRegs  and MachRegs.h to get these numbers.
+--
+#if i386_TARGET_ARCH
+#define ALLOCATABLE_REGS_INTEGER 3#
+#define ALLOCATABLE_REGS_DOUBLE  6#
+#endif
+
+#if x86_64_TARGET_ARCH
+#define ALLOCATABLE_REGS_INTEGER 5#
+#define ALLOCATABLE_REGS_DOUBLE  2#
+#endif
+
+#if powerpc_TARGET_ARCH
+#define ALLOCATABLE_REGS_INTEGER 16#
+#define ALLOCATABLE_REGS_DOUBLE  26#
+#endif
+
+{-# INLINE regClass      #-}
+trivColorable :: RegClass -> UniqSet Reg -> UniqSet Reg -> Bool
+trivColorable classN conflicts exclusions
+ = {-# SCC "trivColorable" #-}
+   let
+	{-# INLINE   isSqueesed    #-}
+	isSqueesed cI cF ufm
+	  = case ufm of
+		NodeUFM _ _ left right
+		 -> case isSqueesed cI cF right of
+		 	(# s, cI', cF' #)
+			 -> case s of
+			 	False	-> isSqueesed cI' cF' left
+				True	-> (# True, cI', cF' #)
+
+		LeafUFM _ reg
+		 -> case regClass reg of
+		 	RcInteger
+			 -> case cI +# 1# of
+			  	cI' -> (# cI' >=# ALLOCATABLE_REGS_INTEGER, cI', cF #)
+
+			RcDouble
+			 -> case cF +# 1# of
+			 	cF' -> (# cF' >=# ALLOCATABLE_REGS_DOUBLE,  cI, cF' #)
+
+		EmptyUFM
+		 ->	(# False, cI, cF #)
+
+   in case isSqueesed 0# 0# conflicts of
+	(# False, cI', cF' #)
+	 -> case isSqueesed cI' cF' exclusions of
+		(# s, _, _ #)	-> not s
+
+	(# True, _, _ #)
+	 -> False
+
 
 
 -- -----------------------------------------------------------------------------

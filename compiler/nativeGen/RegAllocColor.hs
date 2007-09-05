@@ -79,11 +79,12 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 		$$ text "slotsFree   = " <> ppr (sizeUniqSet slotsFree))
 
  	-- build a conflict graph from the code.
-	graph		<- buildGraph code
+	graph		<- {-# SCC "BuildGraph" #-} buildGraph code
 
 	-- build a map of how many instructions each reg lives for.
 	--	this is lazy, it won't be computed unless we need to spill
-	let fmLife	= plusUFMs_C (\(r1, l1) (_, l2) -> (r1, l1 + l2))
+
+	let fmLife	= {-# SCC "LifetimeCount" #-} plusUFMs_C (\(r1, l1) (_, l2) -> (r1, l1 + l2))
 			$ map lifetimeCount code
 
 	-- record startup state
@@ -101,7 +102,7 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 	
 	-- try and color the graph 
 	let (graph_colored, rsSpill, rmCoalesce)
-			= Color.colorGraph regsFree triv spill graph
+			= {-# SCC "ColorGraph" #-} Color.colorGraph regsFree triv spill graph
 
 	-- rewrite regs in the code that have been coalesced
 	let patchF reg	= case lookupUFM rmCoalesce reg of
@@ -147,7 +148,7 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 	 	-- spill the uncolored regs
 		(code_spilled, slotsFree', spillStats)
 			<- regSpill code_coalesced slotsFree rsSpill
-			
+
 		-- recalculate liveness
 		let code_nat	= map stripLive code_spilled
 		code_relive	<- mapM regLiveness code_nat

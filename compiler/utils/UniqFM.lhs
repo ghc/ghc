@@ -21,7 +21,8 @@ Basically, the things need to be in class @Uniquable@, and we use the
 -- for details
 
 module UniqFM (
-	UniqFM,   -- abstract type
+	UniqFM(..),   	-- abstract type
+			-- (de-abstracted for MachRegs.trivColorable optimisation BL 2007/09)
 
 	emptyUFM,
 	unitUFM,

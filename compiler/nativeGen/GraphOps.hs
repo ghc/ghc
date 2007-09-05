@@ -28,7 +28,6 @@ import UniqFM
 import Data.List	hiding (union)
 import Data.Maybe
 
-
 -- | Lookup a node from the graph.
 lookupNode 
 	:: Uniquable k
@@ -447,6 +446,7 @@ setColor u color
 		u 
 	
 
+{-# INLINE 	adjustWithDefaultUFM #-}
 adjustWithDefaultUFM 
 	:: Uniquable k 
 	=> (a -> a) -> a -> k 
@@ -458,7 +458,7 @@ adjustWithDefaultUFM f def k map
 		map
 		k def
 		
-
+{-# INLINE adjustUFM #-}
 adjustUFM 
 	:: Uniquable k
 	=> (a -> a)

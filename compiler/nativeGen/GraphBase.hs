@@ -82,7 +82,7 @@ data Node k cls color
 	, nodeConflicts		:: UniqSet k
 
 	-- | Colors that cannot be used by this node.
-	, nodeExclusions	:: UniqSet color 	
+	, nodeExclusions	:: UniqSet color
 
 	-- | Colors that this node would prefer to be, in decending order.
 	, nodePreference	:: [color]  

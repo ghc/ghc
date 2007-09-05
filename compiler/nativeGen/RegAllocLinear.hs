@@ -224,6 +224,7 @@ emptyStackMap = StackMap [0..maxSpillSlots] emptyUFM
 getStackSlotFor :: StackMap -> Unique -> (StackMap,Int)
 getStackSlotFor (StackMap [] _) _
 	= panic "RegAllocLinear.getStackSlotFor: out of stack slots"
+
 getStackSlotFor fs@(StackMap (freeSlot:stack') reserved) reg =
     case lookupUFM reserved reg of
     	Just slot -> (fs,slot)
