@@ -873,15 +873,21 @@
 	    </row>
 	    <row>
 	      <entry><option>-XStandaloneDeriving</option></entry>
-	      <entry>Enable standalone deriving.</entry>
+	      <entry>Enable <link linkend="stand-alone-deriving">standalone deriving</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoStandaloneDeriving</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-XDeriveDataTypeable</option></entry>
-	      <entry>Enable deriving for the Data and Typeable classes.</entry>
+	      <entry>Enable <link linkend="deriving-typeable">deriving for the Data and Typeable classes</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoDeriveDataTypeable</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-XGeneralizedNewtypeDeriving</option></entry>
+	      <entry>Enable <link linkend="newtype-deriving">newtype deriving</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoGeneralizedNewtypeDeriving</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-XTypeSynonymInstances</option></entry>
@@ -918,12 +924,6 @@
 	      <entry>Enable <link linkend="functional-dependencies">functional dependencies</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoFunctionalDependencies</option></entry>
-	    </row>
-	    <row>
-	      <entry><option>-XGeneralizedNewtypeDeriving</option></entry>
-	      <entry>Enable <link linkend="newtype-deriving">newtype deriving</link>.</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-XNoGeneralizedNewtypeDeriving</option></entry>
 	    </row>
 	  </tbody>
 	</tgroup>

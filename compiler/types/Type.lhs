@@ -415,8 +415,14 @@ splitNewTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
 splitNewTyConApp_maybe other	      = Nothing
 
 newTyConInstRhs :: TyCon -> [Type] -> Type
-newTyConInstRhs tycon tys =
-    let (tvs, ty) = newTyConRhs tycon in substTyWith tvs tys ty
+-- Unwrap one 'layer' of newtype
+-- Use the eta'd version if possible
+newTyConInstRhs tycon tys 
+    = ASSERT2( equalLength tvs tys1, ppr tycon $$ ppr tys $$ ppr tvs )
+      mkAppTys (substTyWith tvs tys1 ty) tys2
+  where
+    (tvs, ty)    = newTyConEtadRhs tycon
+    (tys1, tys2) = splitAtList tvs tys
 \end{code}
 
 

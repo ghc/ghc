@@ -635,30 +635,20 @@ iDFunId info = instanceDFunId (iSpec info)
 
 data InstBindings
   = VanillaInst 		-- The normal case
-	(LHsBinds Name)		-- Bindings
+	(LHsBinds Name)		-- Bindings for the instance methods
 	[LSig Name]		-- User pragmas recorded for generating 
 				-- specialised instances
 
   | NewTypeDerived              -- Used for deriving instances of newtypes, where the
 				-- witness dictionary is identical to the argument 
 				-- dictionary.  Hence no bindings, no pragmas.
-	(Maybe [PredType])
-		-- Nothing      => The newtype-derived instance involves type variables,
-		--	           and the dfun has a type like df :: forall a. Eq a => Eq (T a)
-		-- Just (r:scs) => The newtype-defined instance has no type variables
-		--		   so the dfun is just a constant, df :: Eq T
-		-- 		   In this case we need to know waht the rep dict, r, and the 
-		--		   superclasses, scs, are.  (In the Nothing case these are in the
-		--		   dict fun's type.)
-		--		   Invariant: these PredTypes have no free variables
-		-- NB: In both cases, the representation dict is the *first* dict.
 
 pprInstInfo info = vcat [ptext SLIT("InstInfo:") <+> ppr (idType (iDFunId info))]
 
 pprInstInfoDetails info = pprInstInfo info $$ nest 2 (details (iBinds info))
   where
-    details (VanillaInst b _)  = pprLHsBinds b
-    details (NewTypeDerived _) = text "Derived from the representation type"
+    details (VanillaInst b _) = pprLHsBinds b
+    details NewTypeDerived    = text "Derived from the representation type"
 
 simpleInstInfoClsTy :: InstInfo -> (Class, Type)
 simpleInstInfoClsTy info = case instanceHead (iSpec info) of

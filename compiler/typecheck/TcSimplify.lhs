@@ -2769,7 +2769,6 @@ tcSimplifyDeriv :: InstOrigin
 	        -> TcM ThetaType	-- Needed
 -- Given  instance (wanted) => C inst_ty 
 -- Simplify 'wanted' as much as possible
--- The inst_ty is needed only for the termination check
 
 tcSimplifyDeriv orig tyvars theta
   = do	{ (tvs, _, tenv) <- tcInstTyVars tyvars
@@ -2779,8 +2778,9 @@ tcSimplifyDeriv orig tyvars theta
 	; wanteds <- newDictBndrsO orig (substTheta tenv theta)
 	; (irreds, _) <- tryHardCheckLoop doc wanteds
 
-	; let (tv_dicts, others) = partition isTyVarDict irreds
+	; let (tv_dicts, others) = partition ok irreds
 	; addNoInstanceErrs others
+	-- See Note [Exotic derived instance contexts] in TcMType
 
 	; let rev_env = zipTopTvSubst tvs (mkTyVarTys tyvars)
 	      simpl_theta = substTheta rev_env (map dictPred tv_dicts)
@@ -2790,49 +2790,10 @@ tcSimplifyDeriv orig tyvars theta
 	; return simpl_theta }
   where
     doc = ptext SLIT("deriving classes for a data type")
+
+    ok dict | isDict dict = validDerivPred (dictPred dict)
+	    | otherwise	  = False
 \end{code}
-
-Note [Exotic derived instance contexts]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-	data T a b c = MkT (Foo a b c) deriving( Eq )
-	instance (C Int a, Eq b, Eq c) => Eq (Foo a b c)
-
-Notice that this instance (just) satisfies the Paterson termination 
-conditions.  Then we *could* derive an instance decl like this:
-
-	instance (C Int a, Eq b, Eq c) => Eq (T a b c) 
-
-even though there is no instance for (C Int a), because there just
-*might* be an instance for, say, (C Int Bool) at a site where we
-need the equality instance for T's.  
-
-However, this seems pretty exotic, and it's quite tricky to allow
-this, and yet give sensible error messages in the (much more common)
-case where we really want that instance decl for C.
-
-So for now we simply require that the derived instance context
-should have only type-variable constraints.
-
-Here is another example:
-	data Fix f = In (f (Fix f)) deriving( Eq )
-Here, if we are prepared to allow -fallow-undecidable-instances we
-could derive the instance
-	instance Eq (f (Fix f)) => Eq (Fix f)
-but this is so delicate that I don't think it should happen inside
-'deriving'. If you want this, write it yourself!
-
-NB: if you want to lift this condition, make sure you still meet the
-termination conditions!  If not, the deriving mechanism generates
-larger and larger constraints.  Example:
-  data Succ a = S a
-  data Seq a = Cons a (Seq (Succ a)) | Nil deriving Show
-
-Note the lack of a Show instance for Succ.  First we'll generate
-  instance (Show (Succ a), Show a) => Show (Seq a)
-and then
-  instance (Show (Succ (Succ a)), Show (Succ a), Show a) => Show (Seq a)
-and so on.  Instead we want to complain of no instance for (Show (Succ a)).
 
 
 @tcSimplifyDefault@ just checks class-type constraints, essentially;

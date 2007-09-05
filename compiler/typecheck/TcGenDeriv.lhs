@@ -19,6 +19,8 @@ This is where we do all the grimy bindings' generation.
 -- for details
 
 module TcGenDeriv (
+	DerivAuxBind(..), DerivAuxBinds, isDupAux,
+
 	gen_Bounded_binds,
 	gen_Enum_binds,
 	gen_Eq_binds,
@@ -28,11 +30,9 @@ module TcGenDeriv (
 	gen_Show_binds,
 	gen_Data_binds,
 	gen_Typeable_binds,
-	gen_tag_n_con_monobind,
+	genAuxBind,
 
-	con2tag_RDR, tag2con_RDR, maxtag_RDR,
-
-	TagThingWanted(..)
+	con2tag_RDR, tag2con_RDR, maxtag_RDR
     ) where
 
 #include "HsVersions.h"
@@ -62,15 +62,26 @@ import Bag
 import Data.List	( partition, intersperse )
 \end{code}
 
-%************************************************************************
-%*									*
-\subsection{Generating code, by derivable class}
-%*									*
-%************************************************************************
+\begin{code}
+type DerivAuxBinds = [DerivAuxBind]
+
+data DerivAuxBind		-- Please add these auxiliary top-level bindings
+  = DerivAuxBind (LHsBind RdrName)
+  | GenCon2Tag TyCon		-- The con2Tag for given TyCon
+  | GenTag2Con TyCon		-- ...ditto tag2Con
+  | GenMaxTag  TyCon		-- ...and maxTag
+
+isDupAux :: DerivAuxBind -> DerivAuxBind -> Bool
+isDupAux (GenCon2Tag tc1) (GenCon2Tag tc2) = tc1==tc2
+isDupAux (GenTag2Con tc1) (GenTag2Con tc2) = tc1==tc2
+isDupAux (GenMaxTag tc1)  (GenMaxTag tc2)  = tc1==tc2
+isDupAux b1               b2               = False
+\end{code}
+
 
 %************************************************************************
 %*									*
-\subsubsection{Generating @Eq@ instance declarations}
+		Eq instances
 %*									*
 %************************************************************************
 
@@ -143,33 +154,36 @@ instance ... Eq (Foo ...) where
 
 
 \begin{code}
-gen_Eq_binds :: TyCon -> LHsBinds RdrName
-
+gen_Eq_binds :: TyCon -> (LHsBinds RdrName, DerivAuxBinds)
 gen_Eq_binds tycon
-  = let
-	tycon_loc = getSrcSpan tycon
-
-        (nullary_cons, nonnullary_cons)
-           | isNewTyCon tycon = ([], tyConDataCons tycon)
-           | otherwise	      = partition isNullarySrcDataCon (tyConDataCons tycon)
-
-	rest
-	  = if (null nullary_cons) then
-		case maybeTyConSingleCon tycon of
-		  Just _ -> []
-		  Nothing -> -- if cons don't match, then False
-		     [([nlWildPat, nlWildPat], false_Expr)]
-	    else -- calc. and compare the tags
-		 [([a_Pat, b_Pat],
-		    untag_Expr tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
-		               (genOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
-    in
-    listToBag [
-      mk_FunBind tycon_loc eq_RDR ((map pats_etc nonnullary_cons) ++ rest),
-      mk_easy_FunBind tycon_loc ne_RDR [a_Pat, b_Pat] (
-	nlHsApp (nlHsVar not_RDR) (nlHsPar (nlHsVarApps eq_RDR [a_RDR, b_RDR])))
-    ]
+  = (method_binds, aux_binds)
   where
+    tycon_loc = getSrcSpan tycon
+
+    (nullary_cons, nonnullary_cons)
+       | isNewTyCon tycon = ([], tyConDataCons tycon)
+       | otherwise	      = partition isNullarySrcDataCon (tyConDataCons tycon)
+
+    no_nullary_cons = null nullary_cons
+
+    rest | no_nullary_cons
+	 = case maybeTyConSingleCon tycon of
+	    	  Just _ -> []
+	    	  Nothing -> -- if cons don't match, then False
+	    	     [([nlWildPat, nlWildPat], false_Expr)]
+	 | otherwise -- calc. and compare the tags
+	 = [([a_Pat, b_Pat],
+    	    untag_Expr tycon [(a_RDR,ah_RDR), (b_RDR,bh_RDR)]
+    	               (genOpApp (nlHsVar ah_RDR) eqInt_RDR (nlHsVar bh_RDR)))]
+
+    aux_binds | no_nullary_cons = []
+	      | otherwise       = [GenCon2Tag tycon]
+
+    method_binds = listToBag [
+			mk_FunBind tycon_loc eq_RDR ((map pats_etc nonnullary_cons) ++ rest),
+			mk_easy_FunBind tycon_loc ne_RDR [a_Pat, b_Pat] (
+			nlHsApp (nlHsVar not_RDR) (nlHsPar (nlHsVarApps eq_RDR [a_RDR, b_RDR])))]
+
     ------------------------------------------------------------------
     pats_etc data_con
       = let
@@ -193,7 +207,7 @@ gen_Eq_binds tycon
 
 %************************************************************************
 %*									*
-\subsubsection{Generating @Ord@ instance declarations}
+	Ord instances
 %*									*
 %************************************************************************
 
@@ -288,14 +302,17 @@ If there is only one constructor in the Data Type we don't need the WildCard Pat
 JJQC-30-Nov-1997
 
 \begin{code}
-gen_Ord_binds :: TyCon -> LHsBinds RdrName
+gen_Ord_binds :: TyCon -> (LHsBinds RdrName, DerivAuxBinds)
 
 gen_Ord_binds tycon
-  = unitBag compare 	-- `AndMonoBinds` compare	
-		-- The default declaration in PrelBase handles this
+  = (unitBag compare, aux_binds)
+ 	-- `AndMonoBinds` compare	
+	-- The default declaration in PrelBase handles this
   where
     tycon_loc = getSrcSpan tycon
     --------------------------------------------------------------------
+    aux_binds | single_con_type = []
+	      | otherwise	= [GenCon2Tag tycon]
 
     compare = L tycon_loc (mkFunBind (L tycon_loc compare_RDR) compare_matches)
     compare_matches = [mkMatch [a_Pat, b_Pat] compare_rhs cmp_eq_binds]
@@ -333,38 +350,37 @@ gen_Ord_binds tycon
 	else
               [([nlWildPat, nlWildPat], default_rhs)])
 
-      where
-	pats_etc data_con
-	  = ([con1_pat, con2_pat],
-	     nested_compare_expr tys_needed as_needed bs_needed)
-	  where
-	    con1_pat = nlConVarPat data_con_RDR as_needed
-	    con2_pat = nlConVarPat data_con_RDR bs_needed
+    default_rhs | null nullary_cons = impossible_Expr	-- Keep desugarer from complaining about
+							-- inexhaustive patterns
+		| otherwise	    = eqTag_Expr	-- Some nullary constructors;
+							-- Tags are equal, no args => return EQ
+    pats_etc data_con
+	= ([con1_pat, con2_pat],
+	   nested_compare_expr tys_needed as_needed bs_needed)
+	where
+	  con1_pat = nlConVarPat data_con_RDR as_needed
+	  con2_pat = nlConVarPat data_con_RDR bs_needed
 
-	    data_con_RDR = getRdrName data_con
-	    con_arity   = length tys_needed
-	    as_needed   = take con_arity as_RDRs
-	    bs_needed   = take con_arity bs_RDRs
-	    tys_needed  = dataConOrigArgTys data_con
+	  data_con_RDR = getRdrName data_con
+	  con_arity   = length tys_needed
+	  as_needed   = take con_arity as_RDRs
+	  bs_needed   = take con_arity bs_RDRs
+	  tys_needed  = dataConOrigArgTys data_con
 
-	    nested_compare_expr [ty] [a] [b]
-	      = careful_compare_Case tycon ty eqTag_Expr (nlHsVar a) (nlHsVar b)
+	  nested_compare_expr [ty] [a] [b]
+	    = careful_compare_Case tycon ty eqTag_Expr (nlHsVar a) (nlHsVar b)
 
-	    nested_compare_expr (ty:tys) (a:as) (b:bs)
-	      = let eq_expr = nested_compare_expr tys as bs
+	  nested_compare_expr (ty:tys) (a:as) (b:bs)
+	    = let eq_expr = nested_compare_expr tys as bs
 		in  careful_compare_Case tycon ty eq_expr (nlHsVar a) (nlHsVar b)
 
-	    nested_compare_expr _ _ _ = panic "nested_compare_expr"	-- Args always equal length
+	  nested_compare_expr _ _ _ = panic "nested_compare_expr"	-- Args always equal length
 
-	default_rhs | null nullary_cons = impossible_Expr	-- Keep desugarer from complaining about
-								-- inexhaustive patterns
-		    | otherwise		= eqTag_Expr		-- Some nullary constructors;
-								-- Tags are equal, no args => return EQ
 \end{code}
 
 %************************************************************************
 %*									*
-\subsubsection{Generating @Enum@ instance declarations}
+	Enum instances
 %*									*
 %************************************************************************
 
@@ -404,18 +420,20 @@ instance ... Enum (Foo ...) where
 For @enumFromTo@ and @enumFromThenTo@, we use the default methods.
 
 \begin{code}
-gen_Enum_binds :: TyCon -> LHsBinds RdrName
-
+gen_Enum_binds :: TyCon -> (LHsBinds RdrName, DerivAuxBinds)
 gen_Enum_binds tycon
-  = listToBag [
-	succ_enum,
-	pred_enum,
-	to_enum,
-	enum_from,
-	enum_from_then,
-	from_enum
-    ]
+  = (method_binds, aux_binds)
   where
+    method_binds = listToBag [
+			succ_enum,
+			pred_enum,
+			to_enum,
+			enum_from,
+			enum_from_then,
+			from_enum
+		    ]
+    aux_binds = [GenCon2Tag tycon, GenTag2Con tycon, GenMaxTag tycon]
+
     tycon_loc = getSrcSpan tycon
     occ_nm    = getOccString tycon
 
@@ -477,17 +495,18 @@ gen_Enum_binds tycon
 
 %************************************************************************
 %*									*
-\subsubsection{Generating @Bounded@ instance declarations}
+	Bounded instances
 %*									*
 %************************************************************************
 
 \begin{code}
+gen_Bounded_binds :: TyCon -> (LHsBinds RdrName, DerivAuxBinds)
 gen_Bounded_binds tycon
-  = if isEnumerationTyCon tycon then
-	listToBag [ min_bound_enum, max_bound_enum ]
-    else
-	ASSERT(isSingleton data_cons)
-	listToBag [ min_bound_1con, max_bound_1con ]
+  | isEnumerationTyCon tycon
+  = (listToBag [ min_bound_enum, max_bound_enum ], [])
+  | otherwise
+  = ASSERT(isSingleton data_cons)
+    (listToBag [ min_bound_1con, max_bound_1con ], [])
   where
     data_cons = tyConDataCons tycon
     tycon_loc = getSrcSpan tycon
@@ -512,7 +531,7 @@ gen_Bounded_binds tycon
 
 %************************************************************************
 %*									*
-\subsubsection{Generating @Ix@ instance declarations}
+	Ix instances
 %*									*
 %************************************************************************
 
@@ -569,12 +588,13 @@ we follow the scheme given in Figure~19 of the Haskell~1.2 report
 (p.~147).
 
 \begin{code}
-gen_Ix_binds :: TyCon -> LHsBinds RdrName
+gen_Ix_binds :: TyCon -> (LHsBinds RdrName, DerivAuxBinds)
 
 gen_Ix_binds tycon
-  = if isEnumerationTyCon tycon
-    then enum_ixes
-    else single_con_ixes
+  | isEnumerationTyCon tycon
+  = (enum_ixes, [GenCon2Tag tycon, GenTag2Con tycon, GenMaxTag tycon])
+  | otherwise
+  = (single_con_ixes, [GenCon2Tag tycon])
   where
     tycon_loc = getSrcSpan tycon
 
@@ -685,7 +705,7 @@ gen_Ix_binds tycon
 
 %************************************************************************
 %*									*
-\subsubsection{Generating @Read@ instance declarations}
+	Read instances
 %*									*
 %************************************************************************
 
@@ -728,10 +748,10 @@ instance Read T where
 
 
 \begin{code}
-gen_Read_binds :: FixityEnv -> TyCon -> LHsBinds RdrName
+gen_Read_binds :: FixityEnv -> TyCon -> (LHsBinds RdrName, DerivAuxBinds)
 
 gen_Read_binds get_fixity tycon
-  = listToBag [read_prec, default_readlist, default_readlistprec]
+  = (listToBag [read_prec, default_readlist, default_readlistprec], [])
   where
     -----------------------------------------------------------------------
     default_readlist 
@@ -853,7 +873,7 @@ gen_Read_binds get_fixity tycon
 
 %************************************************************************
 %*									*
-\subsubsection{Generating @Show@ instance declarations}
+	Show instances
 %*									*
 %************************************************************************
 
@@ -881,10 +901,10 @@ Example
 		    -- the most tightly-binding operator
 
 \begin{code}
-gen_Show_binds :: FixityEnv -> TyCon -> LHsBinds RdrName
+gen_Show_binds :: FixityEnv -> TyCon -> (LHsBinds RdrName, DerivAuxBinds)
 
 gen_Show_binds get_fixity tycon
-  = listToBag [shows_prec, show_list]
+  = (listToBag [shows_prec, show_list], [])
   where
     tycon_loc = getSrcSpan tycon
     -----------------------------------------------------------------------
@@ -1032,7 +1052,7 @@ mk_typeOf_RDR tycon = varQual_RDR tYPEABLE (mkFastString ("typeOf" ++ suffix))
 
 %************************************************************************
 %*									*
-\subsection{Data}
+	Data instances
 %*									*
 %************************************************************************
 
@@ -1065,11 +1085,11 @@ we generate
 gen_Data_binds :: FixityEnv
 	       -> TyCon 
 	       -> (LHsBinds RdrName,	-- The method bindings
-		   LHsBinds RdrName)	-- Auxiliary bindings
+		   DerivAuxBinds)	-- Auxiliary bindings
 gen_Data_binds fix_env tycon
   = (listToBag [gfoldl_bind, gunfold_bind, toCon_bind, dataTypeOf_bind],
 		-- Auxiliary definitions: the data type and constructors
-     datatype_bind `consBag` listToBag (map mk_con_bind data_cons))
+     DerivAuxBind datatype_bind : map mk_con_bind data_cons)
   where
     tycon_loc  = getSrcSpan tycon
     tycon_name = tyConName tycon
@@ -1136,7 +1156,8 @@ gen_Data_binds fix_env tycon
 
 	------------  $cT1 etc
     mk_constr_name con = mkDerivedRdrName (dataConName con) mkDataCOcc
-    mk_con_bind dc = mkVarBind
+    mk_con_bind dc = DerivAuxBind $ 
+		     mkVarBind
                        tycon_loc
                        (mk_constr_name dc) 
 		       (nlHsApps mkConstr_RDR (constr_args dc))
@@ -1183,16 +1204,12 @@ The `tags' here start at zero, hence the @fIRST_TAG@ (currently one)
 fiddling around.
 
 \begin{code}
-data TagThingWanted
-  = GenCon2Tag | GenTag2Con | GenMaxTag
+genAuxBind :: DerivAuxBind -> LHsBind RdrName
 
-gen_tag_n_con_monobind
-    :: ( RdrName,	    -- (proto)Name for the thing in question
-	TyCon,		    -- tycon in question
-	TagThingWanted)
-    -> LHsBind RdrName
+genAuxBind (DerivAuxBind bind) 
+  = bind
 
-gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
+genAuxBind (GenCon2Tag tycon)
   | lots_of_constructors
   = mk_FunBind tycon_loc rdr_name [([], get_tag_rhs)]
 
@@ -1200,6 +1217,7 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
   = mk_FunBind tycon_loc rdr_name (map mk_stuff (tyConDataCons tycon))
 
   where
+    rdr_name = con2tag_RDR tycon
     tycon_loc = getSrcSpan tycon
 
     tvs = map (mkRdrUnqual . getOccName) (tyConTyVars tycon)
@@ -1226,19 +1244,21 @@ gen_tag_n_con_monobind (rdr_name, tycon, GenCon2Tag)
     mk_stuff con = ([nlWildConPat con], 
 		    nlHsLit (HsIntPrim (toInteger ((dataConTag con) - fIRST_TAG))))
 
-gen_tag_n_con_monobind (rdr_name, tycon, GenTag2Con)
+genAuxBind (GenTag2Con tycon)
   = mk_FunBind (getSrcSpan tycon) rdr_name 
 	[([nlConVarPat intDataCon_RDR [a_RDR]], 
 	   noLoc (ExprWithTySig (nlHsApp (nlHsVar tagToEnum_RDR) a_Expr) 
 			 (nlHsTyVar (getRdrName tycon))))]
+  where
+    rdr_name = tag2con_RDR tycon
 
-gen_tag_n_con_monobind (rdr_name, tycon, GenMaxTag)
+genAuxBind (GenMaxTag tycon)
   = mkVarBind (getSrcSpan tycon) rdr_name 
 		  (nlHsApp (nlHsVar intDataCon_RDR) (nlHsLit (HsIntPrim max_tag)))
   where
+    rdr_name = maxtag_RDR tycon
     max_tag =  case (tyConDataCons tycon) of
 		 data_cons -> toInteger ((length data_cons) - fIRST_TAG)
-
 \end{code}
 
 %************************************************************************

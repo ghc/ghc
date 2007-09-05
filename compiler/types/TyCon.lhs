@@ -33,7 +33,7 @@ module TyCon(
 	isEnumerationTyCon, isGadtSyntaxTyCon, isOpenTyCon,
 	assocTyConArgPoss_maybe, isTyConAssoc, setTyConArgPoss,
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
-	isRecursiveTyCon, newTyConRep, newTyConRhs, newTyConCo_maybe,
+	isRecursiveTyCon, newTyConRep, newTyConRhs, newTyConEtadRhs, newTyConCo_maybe,
 	isHiBootTyCon, isSuperKindTyCon,
         isCoercionTyCon_maybe, isCoercionTyCon,
         isImplicitTyCon,
@@ -250,10 +250,12 @@ data AlgTyConRhs
 				--  = the representation type of the tycon
 				-- The free tyvars of this type are the tyConTyVars
       
-        nt_co :: Maybe TyCon,   -- The coercion used to create the newtype
+        nt_co :: Maybe TyCon,   -- A CoercionTyCon used to create the newtype
                                 -- from the representation
-                                -- optional for non-recursive newtypes
+                                -- Optional for non-recursive newtypes
 				-- See Note [Newtype coercions]
+				-- Invariant: arity = #tvs in nt_etad_rhs;
+				--	See Note [Newtype eta]
 
 	nt_etad_rhs :: ([TyVar], Type) ,
 			-- The same again, but this time eta-reduced
@@ -333,7 +335,6 @@ data SynTyConRhs
 
 Note [Newtype coercions]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-
 The NewTyCon field nt_co is a a TyCon (a coercion constructor in fact)
 which is used for coercing from the representation type of the
 newtype, to the newtype itself. For example,
@@ -396,6 +397,14 @@ we get:
 	w2 :: Foo T
 	w2 = w1
 And now Lint complains unless Foo T == Foo [], and that requires T==[]
+
+This point carries over to the newtype coercion, because we need to
+say 
+	w2 = w1 `cast` Foo CoT
+
+so the coercion tycon CoT must have 
+	kind:    T ~ []
+ and	arity:   0
 
 
 Note [Indexed data types] (aka data type families)
@@ -877,6 +886,10 @@ algTyConRhs other = pprPanic "algTyConRhs" (ppr other)
 newTyConRhs :: TyCon -> ([TyVar], Type)
 newTyConRhs (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon { nt_rhs = rhs }}) = (tvs, rhs)
 newTyConRhs tycon = pprPanic "newTyConRhs" (ppr tycon)
+
+newTyConEtadRhs :: TyCon -> ([TyVar], Type)
+newTyConEtadRhs (AlgTyCon {algTcRhs = NewTyCon { nt_etad_rhs = tvs_rhs }}) = tvs_rhs
+newTyConEtadRhs tycon = pprPanic "newTyConEtadRhs" (ppr tycon)
 
 newTyConRep :: TyCon -> ([TyVar], Type)
 newTyConRep (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon { nt_rep = rep }}) = (tvs, rep)

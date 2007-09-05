@@ -403,39 +403,37 @@ tcInstDecls2 tycl_decls inst_decls
 
 The main purpose of @tcInstDecl2@ is to return a @HsBinds@ which defines
 the dictionary function for this instance declaration.	For example
-\begin{verbatim}
+
 	instance Foo a => Foo [a] where
 		op1 x = ...
 		op2 y = ...
-\end{verbatim}
+
 might generate something like
-\begin{verbatim}
+
 	dfun.Foo.List dFoo_a = let op1 x = ...
 				   op2 y = ...
 			       in
 				   Dict [op1, op2]
-\end{verbatim}
 
 HOWEVER, if the instance decl has no context, then it returns a
 bigger @HsBinds@ with declarations for each method.  For example
-\begin{verbatim}
+
 	instance Foo [a] where
 		op1 x = ...
 		op2 y = ...
-\end{verbatim}
+
 might produce
-\begin{verbatim}
+
 	dfun.Foo.List a = Dict [Foo.op1.List a, Foo.op2.List a]
 	const.Foo.op1.List a x = ...
 	const.Foo.op2.List a y = ...
-\end{verbatim}
+
 This group may be mutually recursive, because (for example) there may
 be no method supplied for op2 in which case we'll get
-\begin{verbatim}
-	const.Foo.op2.List a = default.Foo.op2 (dfun.Foo.List a)
-\end{verbatim}
-that is, the default method applied to the dictionary at this type.
 
+	const.Foo.op2.List a = default.Foo.op2 (dfun.Foo.List a)
+
+that is, the default method applied to the dictionary at this type.
 What we actually produce in either case is:
 
 	AbsBinds [a] [dfun_theta_dicts]
@@ -447,7 +445,6 @@ What we actually produce in either case is:
 
 The "maybe" says that we only ask AbsBinds to make global constant methods
 if the dfun_theta is empty.
-
 		
 For an instance declaration, say,
 
@@ -463,8 +460,6 @@ Notice that we pass it the superclass dictionaries at the instance type; this
 is the ``Mark Jones optimisation''.  The stuff before the "=>" here
 is the @dfun_theta@ below.
 
-First comes the easy case of a non-local instance decl.
-
 
 \begin{code}
 tcInstDecl2 :: InstInfo -> TcM (LHsBinds Id)
@@ -473,23 +468,23 @@ tcInstDecl2 :: InstInfo -> TcM (LHsBinds Id)
 ------------------------
 -- Derived newtype instances; surprisingly tricky!
 --
--- In the case of a newtype, things are rather easy
 -- 	class Show a => Foo a b where ...
--- 	newtype T a = MkT (Tree [a]) deriving( Foo Int )
+-- 	newtype N a = MkN (Tree [a]) deriving( Foo Int )
+--
 -- The newtype gives an FC axiom looking like
---	axiom CoT a ::  T a :=: Tree [a]
+--	axiom CoN a ::  N a :=: Tree [a]
 --   (see Note [Newtype coercions] in TyCon for this unusual form of axiom)
 --
 -- So all need is to generate a binding looking like: 
--- 	dfunFooT :: forall a. (Foo Int (Tree [a], Show (T a)) => Foo Int (T a)
---	dfunFooT = /\a. \(ds:Show (T a)) (df:Foo (Tree [a])).
---		  case df `cast` (Foo Int (sym (CoT a))) of
+-- 	dfunFooT :: forall a. (Foo Int (Tree [a], Show (N a)) => Foo Int (N a)
+--	dfunFooT = /\a. \(ds:Show (N a)) (df:Foo (Tree [a])).
+--		  case df `cast` (Foo Int (sym (CoN a))) of
 --		     Foo _ op1 .. opn -> Foo ds op1 .. opn
 --
 -- If there are no superclasses, matters are simpler, because we don't need the case
 -- see Note [Newtype deriving superclasses] in TcDeriv.lhs
 
-tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
+tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived })
   = do	{ let dfun_id      = instanceDFunId ispec 
 	      rigid_info   = InstSkol
 	      origin	   = SigOrigin rigid_info
@@ -497,46 +492,43 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
 	; (tvs, theta, inst_head_ty) <- tcSkolSigType rigid_info inst_ty
 		-- inst_head_ty is a PredType
 
-	; inst_loc <- getInstLoc origin
-	; (rep_dict_id : sc_dict_ids, wrap_fn, sc_binds)
-		<- make_wrapper inst_loc tvs theta mb_preds
-		-- Here, we are relying on the order of dictionary 
-		-- arguments built by NewTypeDerived in TcDeriv; 
-		-- namely, that the rep_dict_id comes first
-	   
         ; let (cls, cls_inst_tys) = tcSplitDFunHead inst_head_ty
-  	      cls_tycon		  = classTyCon cls
-	      the_coercion     	  = make_coercion cls_tycon cls_inst_tys
-              coerced_rep_dict 	  = mkHsWrap the_coercion (HsVar rep_dict_id)
+	      (class_tyvars, sc_theta, _, op_items) = classBigSig cls
+	      cls_tycon = classTyCon cls
+	      sc_theta' = substTheta (zipOpenTvSubst class_tyvars cls_inst_tys) sc_theta
 
-	; body <- make_body cls_tycon cls_inst_tys sc_dict_ids coerced_rep_dict
+	      Just (initial_cls_inst_tys, last_ty) = snocView cls_inst_tys
+	      (nt_tycon, tc_args) = tcSplitTyConApp last_ty	-- Can't fail
+	      rep_ty	          = newTyConInstRhs nt_tycon tc_args
+
+	      rep_pred     = mkClassPred cls (initial_cls_inst_tys ++ [rep_ty])
+				-- In our example, rep_pred is (Foo Int (Tree [a]))
+	      the_coercion = make_coercion cls_tycon initial_cls_inst_tys nt_tycon tc_args
+				-- Coercion of kind (Foo Int (Tree [a]) ~ Foo Int (N a)
               
-        ; return (sc_binds `snocBag` (noLoc $ VarBind dfun_id $ noLoc $ mkHsWrap wrap_fn body)) }
+	; inst_loc   <- getInstLoc origin
+	; sc_loc     <- getInstLoc InstScOrigin
+	; dfun_dicts <- newDictBndrs inst_loc theta
+	; sc_dicts   <- newDictBndrs sc_loc sc_theta'
+	; this_dict  <- newDictBndr inst_loc (mkClassPred cls cls_inst_tys)
+	; rep_dict   <- newDictBndr inst_loc rep_pred
+
+	-- Figure out bindings for the superclass context from dfun_dicts
+	-- Don't include this_dict in the 'givens', else
+	-- wanted_sc_insts get bound by just selecting from this_dict!!
+	; sc_binds <- addErrCtxt superClassCtxt $
+		      tcSimplifySuperClasses inst_loc dfun_dicts (rep_dict:sc_dicts)
+
+ 	; let coerced_rep_dict = mkHsWrap the_coercion (HsVar (instToId rep_dict))
+	 
+	; body <- make_body cls_tycon cls_inst_tys sc_dicts coerced_rep_dict
+	; let dict_bind = noLoc $ VarBind (instToId this_dict) (noLoc body)
+
+	; return (unitBag $ noLoc $
+		  AbsBinds  tvs (map instToId dfun_dicts)
+		 	    [(tvs, dfun_id, instToId this_dict, [])] 
+		 	    (dict_bind `consBag` sc_binds)) }
   where
-
-      -----------------------
-      -- 	make_wrapper
-      -- We distinguish two cases:
-      -- (a) there is no tyvar abstraction in the dfun, so all dicts are constant,
-      --     and the new dict can just be a constant
-      --	(mb_preds = Just preds)
-      -- (b) there are tyvars, so we must make a dict *fun*
-      --	(mb_preds = Nothing)
-      -- See the defn of NewTypeDerived for the meaning of mb_preds
-    make_wrapper inst_loc tvs theta (Just preds)	-- Case (a)
-      = ASSERT( null tvs && null theta )
-	do { dicts <- newDictBndrs inst_loc preds
-	   ; sc_binds <- addErrCtxt superClassCtxt $
-			 tcSimplifySuperClasses inst_loc [] dicts
-		-- Use tcSimplifySuperClasses to avoid creating loops, for the
-		-- same reason as Note [SUPERCLASS-LOOP 1] in TcSimplify
-	   ; return (map instToId dicts, idHsWrapper, sc_binds) }
-
-    make_wrapper inst_loc tvs theta Nothing 	-- Case (b)
-      = do { dicts <- newDictBndrs inst_loc theta
-	   ; let dict_ids = map instToId dicts
-	   ; return (dict_ids, mkWpTyLams tvs <.> mkWpLams dict_ids, emptyBag) }
-
       -----------------------
       -- 	make_coercion
       -- The inst_head looks like (C s1 .. sm (T a1 .. ak))
@@ -546,25 +538,24 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
       -- So we just replace T with CoT, and insert a 'sym'
       -- NB: we know that k will be >= arity of CoT, because the latter fully eta-reduced
 
-    make_coercion cls_tycon cls_inst_tys
-	| Just (all_tys_but_last, last_ty) <- snocView cls_inst_tys
-	, (tycon, tc_args) <- tcSplitTyConApp last_ty	-- Should not fail
-	, Just co_con <- newTyConCo_maybe tycon
+    make_coercion cls_tycon initial_cls_inst_tys nt_tycon tc_args
+	| Just co_con <- newTyConCo_maybe nt_tycon
 	, let co = mkSymCoercion (mkTyConApp co_con tc_args)
-        = WpCo (mkTyConApp cls_tycon (all_tys_but_last ++ [co]))
+        = WpCo (mkTyConApp cls_tycon (initial_cls_inst_tys ++ [co]))
         | otherwise	-- The newtype is transparent; no need for a cast
         = idHsWrapper
 
       -----------------------
-      -- 	make_body
-      -- Two cases; see Note [Newtype deriving superclasses] in TcDeriv.lhs
-      -- (a) no superclasses; then we can just use the coerced dict
-      -- (b) one or more superclasses; then new need to do the unpack/repack
+      --     (make_body C tys scs coreced_rep_dict)
+      --     		returns	
+      --     (case coerced_rep_dict of { C _ ops -> C scs ops })
+      -- But if there are no superclasses, it returns just coerced_rep_dict
+      -- See Note [Newtype deriving superclasses] in TcDeriv.lhs
 	
-    make_body cls_tycon cls_inst_tys sc_dict_ids coerced_rep_dict
-	| null sc_dict_ids		-- Case (a)
+    make_body cls_tycon cls_inst_tys sc_dicts coerced_rep_dict
+	| null sc_dicts		-- Case (a)
 	= return coerced_rep_dict
-	| otherwise 			-- Case (b)
+	| otherwise 		-- Case (b)
  	= do { op_ids		 <- newSysLocalIds FSLIT("op") op_tys
 	     ; dummy_sc_dict_ids <- newSysLocalIds FSLIT("sc") (map idType sc_dict_ids)
 	     ; let the_pat = ConPatOut { pat_con = noLoc cls_data_con, pat_tvs = [],
@@ -582,6 +573,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived mb_preds })
 	     ; return (HsCase (noLoc coerced_rep_dict) $
 		       MatchGroup [the_match] (mkFunTy pat_ty pat_ty)) }
 	where
+	  sc_dict_ids  = map instToId sc_dicts
 	  pat_ty       = mkTyConApp cls_tycon cls_inst_tys
           cls_data_con = head (tyConDataCons cls_tycon)
           cls_arg_tys  = dataConInstArgTys cls_data_con cls_inst_tys 

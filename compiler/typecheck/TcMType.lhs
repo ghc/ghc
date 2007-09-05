@@ -49,7 +49,7 @@ module TcMType (
   SourceTyCtxt(..), checkValidTheta, checkFreeness,
   checkValidInstHead, checkValidInstance, checkAmbiguity,
   checkInstTermination, checkValidTypeInst, checkTyFamFreeness,
-  arityErr, 
+  validDerivPred, arityErr, 
 
   --------------------------------
   -- Zonking
@@ -935,6 +935,7 @@ check_valid_theta ctxt theta
     (_,dups) = removeDups tcCmpPred theta
 
 -------------------------
+check_pred_ty :: DynFlags -> SourceTyCtxt -> PredType -> TcM ()
 check_pred_ty dflags ctxt pred@(ClassP cls tys)
   = do {	-- Class predicates are valid in all contexts
        ; checkTc (arity == n_tys) arity_err
@@ -978,6 +979,7 @@ check_pred_ty dflags SigmaCtxt (IParam _ ty) = check_arg_type ty
 check_pred_ty dflags ctxt sty = failWithTc (badPredTyErr sty)
 
 -------------------------
+check_class_pred_tys :: DynFlags -> SourceTyCtxt -> [Type] -> Bool
 check_class_pred_tys dflags ctxt tys 
   = case ctxt of
 	TypeCtxt      -> True	-- {-# SPECIALISE instance Eq (T Int) #-} is fine
@@ -1245,7 +1247,72 @@ undecidableMsg = ptext SLIT("Use -fallow-undecidable-instances to permit this")
 
 %************************************************************************
 %*									*
-\subsection{Checking type instance well-formedness and termination}
+	Checking the context of a derived instance declaration
+%*									*
+%************************************************************************
+
+Note [Exotic derived instance contexts]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In a 'derived' instance declaration, we *infer* the context.  It's a
+bit unclear what rules we should apply for this; the Haskell report is
+silent.  Obviously, constraints like (Eq a) are fine, but what about
+	data T f a = MkT (f a) deriving( Eq )
+where we'd get an Eq (f a) constraint.  That's probably fine too.
+
+One could go further: consider
+	data T a b c = MkT (Foo a b c) deriving( Eq )
+	instance (C Int a, Eq b, Eq c) => Eq (Foo a b c)
+
+Notice that this instance (just) satisfies the Paterson termination 
+conditions.  Then we *could* derive an instance decl like this:
+
+	instance (C Int a, Eq b, Eq c) => Eq (T a b c) 
+
+even though there is no instance for (C Int a), because there just
+*might* be an instance for, say, (C Int Bool) at a site where we
+need the equality instance for T's.  
+
+However, this seems pretty exotic, and it's quite tricky to allow
+this, and yet give sensible error messages in the (much more common)
+case where we really want that instance decl for C.
+
+So for now we simply require that the derived instance context
+should have only type-variable constraints.
+
+Here is another example:
+	data Fix f = In (f (Fix f)) deriving( Eq )
+Here, if we are prepared to allow -fallow-undecidable-instances we
+could derive the instance
+	instance Eq (f (Fix f)) => Eq (Fix f)
+but this is so delicate that I don't think it should happen inside
+'deriving'. If you want this, write it yourself!
+
+NB: if you want to lift this condition, make sure you still meet the
+termination conditions!  If not, the deriving mechanism generates
+larger and larger constraints.  Example:
+  data Succ a = S a
+  data Seq a = Cons a (Seq (Succ a)) | Nil deriving Show
+
+Note the lack of a Show instance for Succ.  First we'll generate
+  instance (Show (Succ a), Show a) => Show (Seq a)
+and then
+  instance (Show (Succ (Succ a)), Show (Succ a), Show a) => Show (Seq a)
+and so on.  Instead we want to complain of no instance for (Show (Succ a)).
+
+The bottom line
+~~~~~~~~~~~~~~~
+Allow constraints which consist only of type variables, with no repeats.
+
+\begin{code}
+validDerivPred :: PredType -> Bool
+validDerivPred (ClassP cls tys) = hasNoDups fvs && sizeTypes tys == length fvs
+				where fvs = fvTypes tys
+validDerivPred otehr		= False
+\end{code}
+
+%************************************************************************
+%*									*
+	Checking type instance well-formedness and termination
 %*									*
 %************************************************************************
 
