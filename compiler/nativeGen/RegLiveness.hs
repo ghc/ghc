@@ -5,13 +5,7 @@
 -- (c) The University of Glasgow 2004
 --
 -----------------------------------------------------------------------------
-
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
+{-# OPTIONS -fno-warn-missing-signatures #-}
 
 module RegLiveness (
 	RegSet,
@@ -60,9 +54,13 @@ import Data.Maybe
 type RegSet = UniqSet Reg
 
 type RegMap a = UniqFM a
+
+emptyRegMap :: UniqFM a
 emptyRegMap = emptyUFM
 
 type BlockMap a = UniqFM a
+
+emptyBlockMap :: UniqFM a
 emptyBlockMap = emptyUFM
 
 
@@ -149,7 +147,7 @@ mapBlockTopM
 	=> (LiveBasicBlock -> m LiveBasicBlock)
 	-> LiveCmmTop -> m LiveCmmTop
 
-mapBlockTopM f cmm@(CmmData{})
+mapBlockTopM _ cmm@(CmmData{})
 	= return cmm
 
 mapBlockTopM f (CmmProc header label params comps)
@@ -176,7 +174,7 @@ mapGenBlockTopM
 	=> (GenBasicBlock i -> m (GenBasicBlock i))
 	-> (GenCmmTop d h i -> m (GenCmmTop d h i))
 
-mapGenBlockTopM f cmm@(CmmData{})
+mapGenBlockTopM _ cmm@(CmmData{})
 	= return cmm
 
 mapGenBlockTopM f (CmmProc header label params blocks)
@@ -196,7 +194,7 @@ slurpConflicts live
  	slurpCmm   rs (CmmProc info _ _ blocks)	
 		= foldl' (slurpComp info) rs blocks
 
-	slurpComp  info rs (BasicBlock i blocks)	
+	slurpComp  info rs (BasicBlock _ blocks)	
 		= foldl' (slurpBlock info) rs blocks
 
 	slurpBlock info rs (BasicBlock blockId instrs)	
@@ -213,7 +211,7 @@ slurpConflicts live
 
 	slurpLIs rsLive rs (Instr _ Nothing     : lis)	= slurpLIs rsLive rs lis
 		
-	slurpLIs rsLiveEntry (conflicts, moves) (li@(Instr instr (Just live)) : lis)
+	slurpLIs rsLiveEntry (conflicts, moves) (Instr instr (Just live) : lis)
 	 = let
 		-- regs that die because they are read for the last time at the start of an instruction
 		--	are not live across it.
@@ -255,7 +253,7 @@ stripLive live
  	stripCmm (CmmProc (LiveInfo info _ _) label params comps)
 		= CmmProc info label params (concatMap stripComp comps)
 
-	stripComp  (BasicBlock i blocks)	= map stripBlock blocks
+	stripComp  (BasicBlock _ blocks)	= map stripBlock blocks
 	stripBlock (BasicBlock i instrs)	= BasicBlock i (map stripLI instrs)
 	stripLI    (Instr instr _)		= instr
 
@@ -271,7 +269,7 @@ spillNatBlock (BasicBlock i is)
 	spillNat acc []
 	 = 	return (reverse acc)
 
-	spillNat acc (instr@(DELTA i) : instrs)
+	spillNat acc (DELTA i : instrs)
 	 = do	put i
 	 	spillNat acc instrs
 
@@ -300,7 +298,7 @@ lifetimeCount cmm
 	countCmm fm (CmmProc info _ _ blocks)
 		= foldl' (countComp info) fm blocks
 		
-	countComp info fm (BasicBlock i blocks)
+	countComp info fm (BasicBlock _ blocks)
 		= foldl' (countBlock info) fm blocks
 		
  	countBlock info fm (BasicBlock blockId instrs)
@@ -311,7 +309,7 @@ lifetimeCount cmm
 		| otherwise
 		= error "RegLiveness.countBlock: bad block"
 		
-	countLIs rsLive fm []				= fm
+	countLIs _      fm []				= fm
 	countLIs rsLive fm (Instr _ Nothing : lis)	= countLIs rsLive fm lis
 	
 	countLIs rsLiveEntry fm (Instr _ (Just live) : lis)
@@ -357,7 +355,7 @@ patchEraseLive patchF cmm
  where
 	patchCmm cmm@CmmData{}	= cmm
 
-	patchCmm cmm@(CmmProc info label params comps)
+	patchCmm (CmmProc info label params comps)
 	 | LiveInfo static id blockMap	<- info
 	 = let 	patchRegSet set	= mkUniqSet $ map patchF $ uniqSetToList set
 		blockMap'	= mapUFM patchRegSet blockMap
@@ -424,15 +422,15 @@ regLiveness
 	:: NatCmmTop
 	-> UniqSM LiveCmmTop
 
-regLiveness cmm@(CmmData sec d)
-	= returnUs $ CmmData sec d
+regLiveness (CmmData i d)
+	= returnUs $ CmmData i d
 
-regLiveness cmm@(CmmProc info lbl params [])
+regLiveness (CmmProc info lbl params [])
 	= returnUs $ CmmProc
 			(LiveInfo info Nothing emptyUFM)
 			lbl params []
 
-regLiveness cmm@(CmmProc info lbl params blocks@(first:rest))
+regLiveness (CmmProc info lbl params blocks@(first : _))
  = let 	first_id		= blockId first
 	sccs			= sccBlocks blocks
 	(ann_sccs, block_live)	= computeLiveness sccs
@@ -531,7 +529,7 @@ livenessBlock
 	-> NatBasicBlock
 	-> (BlockMap RegSet, LiveBasicBlock)
 
-livenessBlock blockmap block@(BasicBlock block_id instrs)
+livenessBlock blockmap (BasicBlock block_id instrs)
  = let
  	(regsLiveOnEntry, instrs1)
  		= livenessBack emptyUniqSet blockmap [] (reverse instrs)
@@ -550,13 +548,13 @@ livenessForward
 	:: RegSet			-- regs live on this instr
 	-> [LiveInstr] -> [LiveInstr]
 
-livenessForward rsLiveEntry []	= []
+livenessForward _           []	= []
 livenessForward rsLiveEntry (li@(Instr instr mLive) : lis)
 	| Nothing		<- mLive
 	= li : livenessForward rsLiveEntry lis
 
-	| Just live		<- mLive
-	, RU read written	<- regUsage instr
+	| Just live	<- mLive
+	, RU _ written	<- regUsage instr
 	= let
 		-- Regs that are written to but weren't live on entry to this instruction
 		--	are recorded as being born here.
@@ -570,6 +568,8 @@ livenessForward rsLiveEntry (li@(Instr instr mLive) : lis)
 	in Instr instr (Just live { liveBorn = rsBorn })
 		: livenessForward rsLiveNext lis
 
+livenessForward _ _ 		= panic "RegLiveness.livenessForward: no match"
+
 
 -- | Calculate liveness going backwards,
 --	filling in when regs die, and what regs are live across each instruction
@@ -581,17 +581,17 @@ livenessBack
 	-> [Instr]			-- instructions
 	-> (RegSet, [LiveInstr])
 
-livenessBack liveregs blockmap done []  = (liveregs, done)
+livenessBack liveregs _        done []  = (liveregs, done)
 
 livenessBack liveregs blockmap acc (instr : instrs)
  = let	(liveregs', instr')	= liveness1 liveregs blockmap instr
    in	livenessBack liveregs' blockmap (instr' : acc) instrs
 
 -- don't bother tagging comments or deltas with liveness
-liveness1 liveregs blockmap (instr@COMMENT{})
+liveness1 liveregs _   (instr@COMMENT{})
 	= (liveregs, Instr instr Nothing)
 
-liveness1 liveregs blockmap (instr@DELTA{})
+liveness1 liveregs _   (instr@DELTA{})
 	= (liveregs, Instr instr Nothing)
 
 liveness1 liveregs blockmap instr

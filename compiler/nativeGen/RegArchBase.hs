@@ -12,13 +12,6 @@
 --	This code is here because we can test the architecture specific code against it.
 --
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module RegArchBase (
 	RegClass(..),
 	Reg(..),
@@ -71,7 +64,7 @@ instance Uniquable Reg where
 	 = mkUnique 'S'
 	 $ fromEnum s * 10000 + fromEnum c * 1000 + i
 
-	getUnique (RegSub s (RegSub c _))
+	getUnique (RegSub _ (RegSub _ _))
 	  = error "RegArchBase.getUnique: can't have a sub-reg of a sub-reg."
 
 -- | A subcomponent of another register

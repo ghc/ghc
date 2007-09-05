@@ -12,13 +12,7 @@
 --
 --	Colors in graphviz graphs could be nicer.
 --
-
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
+{-# OPTIONS -fno-warn-missing-signatures #-}
 
 module RegAllocColor ( 
 	regAlloc,
@@ -67,7 +61,7 @@ regAlloc
 		
 regAlloc dump regsFree slotsFree code
  = do
- 	(code_final, debug_codeGraphs, graph_final)
+ 	(code_final, debug_codeGraphs, _)
 		<- regAlloc_spin dump 0 trivColorable regsFree slotsFree [] code
 	
 	return	( code_final
@@ -89,7 +83,7 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 
 	-- build a map of how many instructions each reg lives for.
 	--	this is lazy, it won't be computed unless we need to spill
-	let fmLife	= plusUFMs_C (\(r1, l1) (r2, l2) -> (r1, l1 + l2))
+	let fmLife	= plusUFMs_C (\(r1, l1) (_, l2) -> (r1, l1 + l2))
 			$ map lifetimeCount code
 
 	-- record startup state
@@ -270,10 +264,10 @@ graphAddCoalesce
 	-> Color.Graph Reg RegClass Reg
 	
 graphAddCoalesce (r1, r2) graph
-	| RealReg regno <- r1
+	| RealReg _ <- r1
 	= Color.addPreference (regWithClass r2) r1 graph
 	
-	| RealReg regno <- r2
+	| RealReg _ <- r2
 	= Color.addPreference (regWithClass r1) r2 graph
 	
 	| otherwise
@@ -306,7 +300,7 @@ patchRegsFromGraph graph code
 		= pprPanic "patchRegsFromGraph: register mapping failed." 
 			(  text "There is no node in the graph for register " <> ppr reg
 			$$ ppr code
-			$$ Color.dotGraph (\x -> text "white") trivColorable graph)
+			$$ Color.dotGraph (\_ -> text "white") trivColorable graph)
 	
    in	patchEraseLive patchF code
    

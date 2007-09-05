@@ -1,13 +1,5 @@
-
 -- | Register coalescing.
 --
-
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 module RegCoalesce (
 	regCoalesce,
@@ -71,8 +63,8 @@ slurpJoinMovs live
  where	
   	slurpCmm   rs  CmmData{}		= rs
 	slurpCmm   rs (CmmProc _ _ _ blocks)	= foldl' slurpComp  rs blocks
-   	slurpComp  rs (BasicBlock i blocks)	= foldl' slurpBlock rs blocks
-	slurpBlock rs (BasicBlock i instrs)	= foldl' slurpLI    rs instrs
+   	slurpComp  rs (BasicBlock _ blocks)	= foldl' slurpBlock rs blocks
+	slurpBlock rs (BasicBlock _ instrs)	= foldl' slurpLI    rs instrs
 		
 	slurpLI    rs (Instr _	Nothing)	= rs
 	slurpLI    rs (Instr instr (Just live))

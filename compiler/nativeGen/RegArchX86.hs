@@ -6,13 +6,6 @@
 --	See MachRegs.hs for the actual trivColorable function used in GHC.
 --
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module RegArchX86 (
 	classOfReg,
 	regsOfClass,
@@ -30,11 +23,11 @@ import UniqSet
 classOfReg :: Reg -> RegClass
 classOfReg reg
  = case reg of
-	Reg c i		-> c
+	Reg c _		-> c
 	
-	RegSub SubL16 r	-> ClassG16
-	RegSub SubL8  r	-> ClassG8
-	RegSub SubL8H r	-> ClassG8
+	RegSub SubL16 _	-> ClassG16
+	RegSub SubL8  _	-> ClassG8
+	RegSub SubL8H _	-> ClassG8
 
 	
 -- | Determine all the regs that make up a certain class.
@@ -96,18 +89,18 @@ regAlias reg
 	
 	
 	-- 16 bit subregs alias the whole reg
-	RegSub SubL16 r@(Reg ClassG32 i)	
+	RegSub SubL16 r@(Reg ClassG32 _)	
 	 -> 	regAlias r
 	
 	-- 8 bit subregs alias the 32 and 16, but not the other 8 bit subreg
-	RegSub SubL8  r@(Reg ClassG32 i)
+	RegSub SubL8  r@(Reg ClassG32 _)
 	 -> mkUniqSet $ [ r, RegSub SubL16 r, RegSub SubL8 r ]
 
-	RegSub SubL8H r@(Reg ClassG32 i)
+	RegSub SubL8H r@(Reg ClassG32 _)
 	 -> mkUniqSet $ [ r, RegSub SubL16 r, RegSub SubL8H r ]
 	
 	-- fp
-	Reg ClassF64 i	
+	Reg ClassF64 _	
 	 -> unitUniqSet reg
 
 	_ -> error "regAlias: invalid register"

@@ -3,13 +3,7 @@
 --	This is a generic graph coloring library, abstracted over the type of
 --	the node keys, nodes and colors.
 --
-
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
+{-# OPTIONS -fno-warn-missing-signatures #-}
 
 module GraphColor ( 
 	module GraphBase,
@@ -121,7 +115,7 @@ assignColors
 assignColors colors graph ks 
  	= assignColors' colors graph [] ks
 
- where	assignColors' colors graph prob []
+ where	assignColors' _ graph prob []
 		= (graph, prob)
 
 	assignColors' colors graph prob (k:ks)
@@ -189,12 +183,12 @@ selectColor colors graph u
 
 		-- we got one of our preferences, score!
 		| not $ isEmptyUniqSet colors_ok_pref	
-		, c : rest	<- uniqSetToList colors_ok_pref
+		, c : _		<- uniqSetToList colors_ok_pref
 		= Just c
 		
 		-- it wasn't a preference, but it was still ok
 		| not $ isEmptyUniqSet colors_ok
-		, c : rest	<- uniqSetToList colors_ok
+		, c : _		<- uniqSetToList colors_ok
 		= Just c
 		
 		-- leave this node uncolored

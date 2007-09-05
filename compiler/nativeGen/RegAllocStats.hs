@@ -1,13 +1,7 @@
-
 -- Carries interesting info for debugging / profiling of the 
 --	graph coloring register allocator.
-
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
+--
+{-# OPTIONS -fno-warn-missing-signatures #-}
 
 module RegAllocStats (
 	RegAllocStats (..),
@@ -178,7 +172,7 @@ binLifetimeCount fm
 		$ eltsUFM fm
 
    in	addListToUFM_C
-		(\(l1, c1) (l2, c2) -> (l1, c1 + c2))
+		(\(l1, c1) (_, c2) -> (l1, c1 + c2))
 		emptyUFM
 		lifes
 
@@ -188,7 +182,7 @@ pprStatsConflict
 	:: [RegAllocStats] -> SDoc
 
 pprStatsConflict stats
- = let	confMap	= foldl' (plusUFM_C (\(c1, n1) (c2, n2) -> (c1, n1 + n2)))
+ = let	confMap	= foldl' (plusUFM_C (\(c1, n1) (_, n2) -> (c1, n1 + n2)))
 			emptyUFM
 		$ map Color.slurpNodeConflictCount
 			[ raGraph s | s@RegAllocStatsStart{} <- stats ]
@@ -239,12 +233,12 @@ countSRM_block (BasicBlock i instrs)
  = do	instrs'	<- mapM countSRM_instr instrs
  	return	$ BasicBlock i instrs'
 
-countSRM_instr li@(Instr instr live)
-	| SPILL reg slot	<- instr
+countSRM_instr li@(Instr instr _)
+	| SPILL _ _	<- instr
 	= do	modify 	$ \(s, r, m)	-> (s + 1, r, m)
 		return li
 
-	| RELOAD slot reg	<- instr
+	| RELOAD _ _	<- instr
 	= do	modify	$ \(s, r, m)	-> (s, r + 1, m)
 		return li
 

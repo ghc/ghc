@@ -1,13 +1,6 @@
-
 -- | Basic operations on graphs.
 --
-
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
+{-# OPTIONS -fno-warn-missing-signatures #-}
 
 module GraphOps (
 	addNode, 	delNode,	getNode,	lookupNode,	modNode,
@@ -432,7 +425,7 @@ slurpNodeConflictCount
 
 slurpNodeConflictCount graph
 	= addListToUFM_C
-		(\(c1, n1) (c2, n2) -> (c1, n1 + n2))
+		(\(c1, n1) (_, n2) -> (c1, n1 + n2))
 		emptyUFM
 	$ map 	(\node
 	 	  -> let count	= sizeUniqSet $ nodeConflicts node
@@ -461,7 +454,7 @@ adjustWithDefaultUFM
 
 adjustWithDefaultUFM f def k map
 	= addToUFM_C 
-		(\old new -> f old)
+		(\old _ -> f old)
 		map
 		k def
 		

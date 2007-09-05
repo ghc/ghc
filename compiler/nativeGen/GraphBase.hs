@@ -1,11 +1,5 @@
 
 -- | Types for the general graph colorer.
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 module GraphBase (
 	Triv,
@@ -52,6 +46,7 @@ data Graph k cls color
 	  graphMap		:: UniqFM (Node k cls color)  }
 
 -- | An empty graph.	
+initGraph :: Graph k cls color
 initGraph
 	= Graph
 	{ graphMap		= emptyUFM }

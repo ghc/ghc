@@ -1,10 +1,5 @@
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
+{-# OPTIONS -fno-warn-missing-signatures #-}
 
 module RegSpill (
 	regSpill,
@@ -13,8 +8,6 @@ module RegSpill (
 )
 
 where
-
-#include "HsVersions.h"
 
 import RegLiveness
 import RegAllocInfo
@@ -86,7 +79,7 @@ regSpill_instr _	li@(Instr _ Nothing)
  = do	return [li]
 
 regSpill_instr regSlotMap
-	(Instr instr (Just live))
+	(Instr instr (Just _))
  = do
 	-- work out which regs are read and written in this instr
 	let RU rlRead rlWritten	= regUsage instr
@@ -214,7 +207,7 @@ newUnique
 	  	modify $ \s -> s { stateUS = us2 }
 		return uniq
 
-accSpillSL (r1, s1, l1) (r2, s2, l2)
+accSpillSL (r1, s1, l1) (_, s2, l2)
 	= (r1, s1 + s2, l1 + l2)
 
 

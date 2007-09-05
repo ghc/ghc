@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- The register allocator
@@ -12,6 +5,7 @@
 -- (c) The University of Glasgow 2004
 --
 -----------------------------------------------------------------------------
+{-# OPTIONS -fno-warn-missing-signatures #-}
 
 {-
 The algorithm is roughly:
@@ -111,7 +105,7 @@ import State
 #ifndef DEBUG
 import Data.Maybe	( fromJust )
 #endif
-import Data.List	( nub, partition, mapAccumL, foldl')
+import Data.List	( nub, partition, foldl')
 import Control.Monad	( when )
 import Data.Word
 import Data.Bits
@@ -195,7 +189,7 @@ initFreeRegs = foldr releaseReg noFreeRegs allocatableRegs
 
 getFreeRegs :: RegClass -> FreeRegs -> [RegNo]	-- lazilly
 getFreeRegs cls f = go f 0
-  where go 0 m = []
+  where go 0 _ = []
         go n m 
 	  | n .&. 1 /= 0 && regClass (RealReg m) == cls
 	  = m : (go (n `shiftR` 1) $! (m+1))
@@ -228,7 +222,7 @@ emptyStackMap :: StackMap
 emptyStackMap = StackMap [0..maxSpillSlots] emptyUFM
 
 getStackSlotFor :: StackMap -> Unique -> (StackMap,Int)
-getStackSlotFor fs@(StackMap [] reserved) reg
+getStackSlotFor (StackMap [] _) _
 	= panic "RegAllocLinear.getStackSlotFor: out of stack slots"
 getStackSlotFor fs@(StackMap (freeSlot:stack') reserved) reg =
     case lookupUFM reserved reg of
@@ -243,25 +237,25 @@ regAlloc
 	:: LiveCmmTop
 	-> UniqSM (NatCmmTop, Maybe RegAllocStats)
 
-regAlloc cmm@(CmmData sec d) 
+regAlloc (CmmData sec d) 
  	= return
 		( CmmData sec d
 		, Nothing )
 	
-regAlloc cmm@(CmmProc (LiveInfo info _ _) lbl params [])
+regAlloc (CmmProc (LiveInfo info _ _) lbl params [])
 	= return
 		( CmmProc info lbl params []
 		, Nothing )
 	
-regAlloc cmm@(CmmProc static lbl params comps)
+regAlloc (CmmProc static lbl params comps)
 	| LiveInfo info (Just first_id) block_live	<- static
 	= do	
  		-- do register allocation on each component.
 		(final_blocks, stats)
 			<- linearRegAlloc block_live 
 			$ map (\b -> case b of 
-					BasicBlock i [b]	-> AcyclicSCC b
-					BasicBlock i bs		-> CyclicSCC  bs)
+					BasicBlock _ [b]	-> AcyclicSCC b
+					BasicBlock _ bs		-> CyclicSCC  bs)
 			$ comps
 
 		-- make sure the block that was first in the input list
@@ -272,6 +266,9 @@ regAlloc cmm@(CmmProc static lbl params comps)
 		return	( CmmProc info lbl params (first' : rest')
 			, Just stats)
 	
+-- bogus. to make non-exhaustive match warning go away.
+regAlloc (CmmProc _ _ _ _)
+	= panic "RegAllocLinear.regAlloc: no match"
 
 
 -- -----------------------------------------------------------------------------
@@ -310,13 +307,13 @@ linearRegAlloc
 
 linearRegAlloc block_live sccs
  = do	us	<- getUs
- 	let (block_assig', stackMap', stats, blocks) =
+ 	let (_, _, stats, blocks) =
 		runR emptyBlockMap initFreeRegs emptyRegMap emptyStackMap us
 			$ linearRA_SCCs block_live [] sccs
 
 	return	(blocks, stats)
 
-linearRA_SCCs block_live blocksAcc []
+linearRA_SCCs _ blocksAcc []
 	= return $ reverse blocksAcc
 
 linearRA_SCCs block_live blocksAcc (AcyclicSCC block : sccs) 
@@ -370,7 +367,7 @@ linearRA
 	-> [Instr] -> [NatBasicBlock] -> [LiveInstr]
 	-> RegM ([Instr], [NatBasicBlock])
 
-linearRA block_live instr_acc fixups []
+linearRA _          instr_acc fixups []
 	= return (reverse instr_acc, fixups)
 
 linearRA block_live instr_acc fixups (instr:instrs)
@@ -390,10 +387,10 @@ raInsn  :: BlockMap RegSet		-- Live temporaries at each basic block
 	     [NatBasicBlock]		-- extra fixup blocks
 	   )
 
-raInsn block_live new_instrs (Instr instr@(COMMENT _) Nothing)
+raInsn _     new_instrs (Instr (COMMENT _) Nothing)
  = return (new_instrs, [])
 
-raInsn block_live new_instrs (Instr instr@(DELTA n) Nothing)  
+raInsn _     new_instrs (Instr (DELTA n) Nothing)  
  = do
     setDeltaR n
     return (new_instrs, [])
@@ -432,12 +429,12 @@ raInsn block_live new_instrs (Instr instr (Just live))
 	   -}
 	   return (new_instrs, [])
 
-	other -> genRaInsn block_live new_instrs instr 
+	_ -> genRaInsn block_live new_instrs instr 
 			(uniqSetToList $ liveDieRead live) 
 			(uniqSetToList $ liveDieWrite live)
 
 
-raInsn block_live new_instrs li
+raInsn _ _ li
 	= pprPanic "raInsn" (text "no match for:" <> ppr li)
 
 
@@ -527,7 +524,7 @@ releaseRegs regs = do
   free <- getFreeRegsR
   loop assig free regs 
  where
-  loop assig free _ | free `seq` False = undefined
+  loop _     free _ | free `seq` False = undefined
   loop assig free [] = do setAssigR assig; setFreeRegsR free; return ()
   loop assig free (RealReg r : rs) = loop assig (releaseReg r free) rs
   loop assig free (r:rs) = 
@@ -597,7 +594,7 @@ clobberRegs clobbered = do
   clobber assig ((temp, InBoth reg slot) : rest)
 	| reg `elem` clobbered
 	= clobber (addToUFM assig temp (InMem slot)) rest
-  clobber assig (entry:rest)
+  clobber assig (_:rest)
 	= clobber assig rest 
 
 -- -----------------------------------------------------------------------------
@@ -618,7 +615,7 @@ allocateRegsAndSpill
 	-> [Reg]		-- temps to allocate
 	-> RegM ([Instr], [RegNo])
 
-allocateRegsAndSpill reading keep spills alloc []
+allocateRegsAndSpill _       _    spills alloc []
   = return (spills,reverse alloc)
 
 allocateRegsAndSpill reading keep spills alloc (r:rs) = do
@@ -633,7 +630,7 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
   -- InReg, because the memory value is no longer valid.
   -- NB2. This is why we must process written registers here, even if they
   -- are also read by the same instruction.
-     Just (InBoth my_reg mem) -> do
+     Just (InBoth my_reg _) -> do
 	when (not reading) (setAssigR (addToUFM assig r (InReg my_reg)))
    	allocateRegsAndSpill reading keep spills (my_reg:alloc) rs
 
@@ -734,7 +731,7 @@ loadTemp _ _ _ _ spills =
 
 
 myHead s [] = panic s
-myHead s (x:xs) = x
+myHead _ (x:_) = x
 
 -- -----------------------------------------------------------------------------
 -- Joining a jump instruction to its targets
@@ -753,7 +750,7 @@ joinToTargets
 	-> [BlockId]
 	-> RegM ([NatBasicBlock], Instr)
 
-joinToTargets block_live new_blocks instr []
+joinToTargets _          new_blocks instr []
   = return (new_blocks, instr)
 
 joinToTargets block_live new_blocks instr (dest:dests) = do
@@ -787,7 +784,7 @@ joinToTargets block_live new_blocks instr (dest:dests) = do
 				(freeregs',adjusted_assig))
 	  joinToTargets block_live new_blocks instr dests
 
-	Just (freeregs,dest_assig)
+	Just (_, dest_assig)
 
 	   -- the assignments match
 	   | ufmToList dest_assig == ufmToList adjusted_assig
@@ -852,13 +849,13 @@ expandNode vreg loc@(InMem src) (InBoth dst mem)
 	| src == mem = [(vreg, loc, [InReg dst])]
 	| otherwise  = [(vreg, loc, [InReg dst, InMem mem])]
 
-expandNode vreg loc@(InBoth _ src) (InMem dst)
+expandNode _        (InBoth _ src) (InMem dst)
 	| src == dst = [] -- guaranteed to be true
 
-expandNode vreg loc@(InBoth src _) (InReg dst)
+expandNode _        (InBoth src _) (InReg dst)
 	| src == dst = []
 
-expandNode vreg loc@(InBoth src _) dst
+expandNode vreg     (InBoth src _) dst
 	= expandNode vreg (InReg src) dst
 
 expandNode vreg src dst
@@ -870,7 +867,7 @@ expandNode vreg src dst
 --	can join together allocations for different basic blocks.
 --
 makeMove :: Int -> Unique -> Loc -> Loc -> RegM Instr
-makeMove delta vreg (InReg src) (InReg dst)
+makeMove _     vreg (InReg src) (InReg dst)
  = do	recordSpill (SpillJoinRR vreg)
  	return	$ mkRegRegMoveInstr (RealReg src) (RealReg dst)
 
@@ -882,7 +879,7 @@ makeMove delta vreg (InReg src) (InMem dst)
  = do	recordSpill (SpillJoinRM vreg)
 	return	$ mkSpillInstr (RealReg src) delta dst
 
-makeMove delta vreg src dst
+makeMove _     vreg src dst
 	= panic $ "makeMove " ++ show vreg ++ " (" ++ show src ++ ") ("
 		++ show dst ++ ")"
 		++ " (workaround: use -fviaC)"
@@ -891,7 +888,7 @@ makeMove delta vreg src dst
 -- we have eliminated any possibility of single-node cylces
 -- in expandNode above.
 handleComponent :: Int -> Instr -> SCC (Unique, Loc, [Loc]) -> RegM [Instr]
-handleComponent delta instr (AcyclicSCC (vreg,src,dsts))
+handleComponent delta _  (AcyclicSCC (vreg,src,dsts))
 	 = mapM (makeMove delta vreg src) dsts
 
 -- we can not have cycles that involve memory
@@ -899,10 +896,10 @@ handleComponent delta instr (AcyclicSCC (vreg,src,dsts))
 -- because memory locations (stack slots) are
 -- allocated exclusively for a virtual register and
 -- therefore can not require a fixup
-handleComponent delta instr (CyclicSCC ((vreg,src@(InReg sreg),dsts):rest))
+handleComponent delta instr (CyclicSCC ((vreg, (InReg sreg),dsts):rest))
  = do
 	spill_id <- getUniqueR
-	(saveInstr,slot) 	<- spillR (RealReg sreg) spill_id
+	(_, slot) 		<- spillR (RealReg sreg) spill_id
 	remainingFixUps 	<- mapM (handleComponent delta instr) (stronglyConnCompR rest)
 	restoreAndFixInstr 	<- getRestoreMoves dsts slot
 	return ([instr] ++ concat remainingFixUps ++ restoreAndFixInstr)
@@ -921,7 +918,7 @@ handleComponent delta instr (CyclicSCC ((vreg,src@(InReg sreg),dsts):rest))
 	getRestoreMoves _ _ 		= panic "getRestoreMoves unknown case"
 
 
-handleComponent delta instr (CyclicSCC _)
+handleComponent _ _ (CyclicSCC _)
  = panic "Register Allocator: handleComponent cyclic"
 
 
@@ -963,7 +960,7 @@ runR block_assig freeregs assig stack us thing =
   case unReg thing (RA_State{ ra_blockassig=block_assig, ra_freeregs=freeregs,
 			ra_assig=assig, ra_delta=0{-???-}, ra_stack=stack,
 			ra_us = us, ra_spills = [] }) of
-	(# state'@RA_State{ ra_blockassig=block_assig, ra_stack=stack', ra_spills=spills' }, returned_thing #)
+	(# state'@RA_State{ ra_blockassig=block_assig, ra_stack=stack' }, returned_thing #)
 		-> (block_assig, stack', makeRAStats state', returned_thing)
 
 spillR :: Reg -> Unique -> RegM (Instr, Int)
@@ -1067,8 +1064,8 @@ countRegRegMovesNat :: NatCmmTop -> Int
 countRegRegMovesNat cmm
 	= execState (mapGenBlockTopM countBlock cmm) 0
  where
- 	countBlock b@(BasicBlock i instrs)
-	 = do	instrs'	<- mapM countInstr instrs
+ 	countBlock b@(BasicBlock _ instrs)
+	 = do	mapM_ countInstr instrs
 	 	return	b
 
 	countInstr instr

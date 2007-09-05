@@ -23,13 +23,6 @@
 --	spilling %r1 to a slot makes that slot have the same value as %r1.
 --
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module RegSpillClean (
 	cleanSpills
 )
@@ -44,7 +37,6 @@ import Cmm
 import UniqSet
 import UniqFM
 import State
-import Outputable
 
 import Data.Maybe
 import Data.List
@@ -125,10 +117,10 @@ cleanReload
 	-> [LiveInstr] 		-- ^ instrs to clean (in backwards order)
 	-> CleanM [LiveInstr]	-- ^ cleaned instrs  (in forward   order)
 
-cleanReload assoc acc []
+cleanReload _ acc []
 	= return acc
 
-cleanReload assoc acc (li@(Instr instr live) : instrs)
+cleanReload assoc acc (li@(Instr instr _) : instrs)
 
 	| SPILL reg slot	<- instr
 	= let	assoc'	= addAssoc reg slot	-- doing the spill makes reg and slot the same value
@@ -153,13 +145,13 @@ cleanReload assoc acc (li@(Instr instr live) : instrs)
 	    in	cleanReload assoc' (li : acc) instrs
 
 	-- on a jump, remember the reg/slot association.
-	| targets		<- jumpDests instr []
+	| targets	<- jumpDests instr []
 	, not $ null targets
 	= do	mapM_ (accJumpValid assoc) targets
 		cleanReload assoc (li : acc) instrs
 
 	-- writing to a reg changes its value.
-	| RU read written	<- regUsage instr
+	| RU _ written	<- regUsage instr
 	= let assoc'	= foldr deleteAAssoc assoc written
 	  in  cleanReload assoc' (li : acc) instrs
 
@@ -175,11 +167,11 @@ cleanSpill
 	-> [LiveInstr]		-- ^ instrs to clean (in forwards order)
 	-> CleanM [LiveInstr]	-- ^ cleaned instrs  (in backwards order)
 
-cleanSpill unused acc []
+cleanSpill _      acc []
 	= return  acc
 
-cleanSpill unused acc (li@(Instr instr live) : instrs)
-	| SPILL reg slot	<- instr
+cleanSpill unused acc (li@(Instr instr _) : instrs)
+	| SPILL _ slot	<- instr
 	= if elementOfUniqSet slot unused
 
 	   -- we can erase this spill because the slot won't be read until after the next one
@@ -193,7 +185,7 @@ cleanSpill unused acc (li@(Instr instr live) : instrs)
 	   	cleanSpill unused' (li : acc) instrs
 
 	-- if we reload from a slot then it's no longer unused
-	| RELOAD slot reg	<- instr
+	| RELOAD slot _		<- instr
 	, unused'		<- delOneFromUniqSet unused slot
 	= cleanSpill unused' (li : acc) instrs
 
@@ -238,6 +230,7 @@ data CleanS
 	, sCleanedSpillsAcc	:: Int
 	, sCleanedReloadsAcc	:: Int }
 
+initCleanS :: CleanS
 initCleanS
 	= CleanS
 	{ sJumpValid		= emptyUFM

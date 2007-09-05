@@ -1,13 +1,6 @@
 
 -- | Pretty printing of graphs.
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module GraphPpr (
 	dumpGraph,
 	dotGraph
@@ -34,6 +27,10 @@ dumpGraph graph
 	=  text "Graph"
 	$$ (vcat $ map dumpNode $ eltsUFM $ graphMap graph)
 	
+dumpNode 
+	:: (Outputable k, Outputable cls, Outputable color)
+	=> Node k cls color -> SDoc
+
 dumpNode node
  	=  text "Node " <> ppr (nodeId node)
 	$$ text "conflicts " 
@@ -75,6 +72,13 @@ dotGraph colorMap triv graph
 		++ (catMaybes $ snd $ mapAccumL dotNodeEdges emptyUniqSet nodes)
 		++ [ text "}"
 		   , space ])
+	
+
+dotNode :: ( Uniquable k
+	   , Outputable k, Outputable cls, Outputable color)
+	=> (color -> SDoc)
+	-> Triv k cls color
+	-> Node k cls color -> SDoc
 	
 dotNode colorMap triv node
  = let	name	= ppr $ nodeId node
@@ -126,6 +130,13 @@ dotNode colorMap triv node
 --	conflict if the graphviz graph. Traverse over the graph, but make sure
 --	to only print the edges for each node once.
 
+dotNodeEdges 
+	:: ( Uniquable k
+	   , Outputable k, Outputable cls, Outputable color)
+	=> UniqSet k
+	-> Node k cls color
+	-> (UniqSet k, Maybe SDoc)
+
 dotNodeEdges visited node
 	| elementOfUniqSet (nodeId node) visited
 	= ( visited
@@ -148,9 +159,11 @@ dotNodeEdges visited node
 	  in	( addOneToUniqSet visited (nodeId node)
 		, Just out)
 
-dotEdgeConflict u1 u2
-	= doubleQuotes (ppr u1) <> text " -- " <> doubleQuotes (ppr u2) <> text ";"
+	where	dotEdgeConflict u1 u2
+			= doubleQuotes (ppr u1) <> text " -- " <> doubleQuotes (ppr u2) 
+			<> text ";"
 
-dotEdgeCoalesce u1 u2
-	= doubleQuotes (ppr u1) <> text " -- " <> doubleQuotes (ppr u2) <> space <> text "[ style = dashed ];"
+		dotEdgeCoalesce u1 u2
+			= doubleQuotes (ppr u1) <> text " -- " <> doubleQuotes (ppr u2) 
+			<> space <> text "[ style = dashed ];"
 
