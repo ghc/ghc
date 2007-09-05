@@ -278,7 +278,7 @@ cmmNativeGen dflags us cmm
 
 		-- graph coloring register allocation
 		let ((alloced, regAllocStats), usAlloc)
-			= {-# SCC "RegAlloc(color)" #-}
+			= {-# SCC "RegAlloc" #-}
 			  initUs usLive
 			  $ Color.regAlloc
 				generateRegAllocStats
@@ -312,7 +312,7 @@ cmmNativeGen dflags us cmm
 	  else do
 	  	-- do linear register allocation
 		let ((alloced, regAllocStats), usAlloc) 
-			= {-# SCC "RegAlloc(linear)" #-}
+			= {-# SCC "RegAlloc" #-}
   			  initUs usLive
  			  $ liftM unzip
 			  $ mapUs Linear.regAlloc withLiveness

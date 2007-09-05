@@ -56,14 +56,16 @@ colorGraph colors triv spill graph0
 
  	-- run the scanner to slurp out all the trivially colorable nodes
   	(ksTriv, ksProblems)
-		= colorScan colors triv spill [] emptyUniqSet graph_coalesced
+		= colorScan triv spill graph_coalesced
  
 	-- color the trivially colorable nodes
+	--	as the keys were added to the front of the list while they were scanned,
+	--	this colors them in the reverse order they were found, as required by the algorithm.
 	(graph_triv, ksNoTriv)
 		= assignColors colors graph_coalesced ksTriv
 
  	-- try and color the problem nodes
-	(graph_prob, ksNoColor)	= assignColors colors graph_triv (uniqSetToList ksProblems)
+	(graph_prob, ksNoColor)	= assignColors colors graph_triv ksProblems
 
 	-- if the trivially colorable nodes didn't color then something is wrong
 	--	with the provided triv function.
@@ -79,6 +81,90 @@ colorGraph colors triv spill graph0
 	 	, mkUniqSet ksNoColor
 		, listToUFM rsCoalesce)
 	
+
+-- | Scan through the conflict graph separating out trivially colorable and
+--	potentially uncolorable (problem) nodes.
+--
+--	Checking whether a node is trivially colorable or not is a resonably expensive operation,
+--	so after a triv node is found and removed from the graph it's no good to return to the 'start'
+--	of the graph and recheck a bunch of nodes that will probably still be non-trivially colorable.
+--
+--	To ward against this, during each pass through the graph we collect up a list of triv nodes
+--	that were found, and only remove them once we've finished the pass. The more nodes we can delete
+--	at once the more likely it is that nodes we've already checked will become trivially colorable
+--	for the next pass.
+--
+colorScan
+	:: ( Uniquable k, Uniquable cls, Uniquable color)
+	=> Triv k cls color		-- ^ fn to decide whether a node is trivially colorable
+	-> (Graph k cls color -> k)	-- ^ fn to choose a node to potentially leave uncolored if nothing is trivially colorable.
+	-> Graph k cls color		-- ^ the graph to scan
+	-> ([k], [k])			--  triv colorable, problem nodes
+
+
+colorScan triv spill graph
+	= colorScan' triv spill graph
+		[]	[]
+		[]
+		(eltsUFM $ graphMap graph)
+
+-- we've reached the end of the candidates list
+colorScan' triv spill graph
+	ksTriv 	ksTrivFound
+	ksSpill
+	[]
+
+	-- if the graph is empty then we're done
+	| isNullUFM $ graphMap graph
+	= (ksTrivFound ++ ksTriv, ksSpill)
+
+	-- if we haven't found a trivially colorable node then we'll have to
+	--	choose a spill candidate and leave it uncolored
+	| []		<- ksTrivFound
+	, kSpill	<- spill graph			-- choose a spill candiate
+	, graph'	<- delNode kSpill graph		-- remove it from the graph
+	, nsRest'	<- eltsUFM $ graphMap graph'	-- graph has changed, so get new node list
+
+	= colorScan' triv spill graph'
+		ksTriv ksTrivFound
+		(kSpill : ksSpill)
+		nsRest'
+
+	-- we're at the end of the candidates list but we've found some triv nodes
+	--	along the way. We can delete them from the graph and go back for more.
+	| graph'	<- foldr delNode graph ksTrivFound
+	, nsRest'	<- eltsUFM $ graphMap graph'
+
+	= colorScan' triv spill graph'
+		(ksTrivFound ++ ksTriv) []
+		ksSpill
+		nsRest'
+
+-- check if the current node is triv colorable
+colorScan' triv spill graph
+	ksTriv	ksTrivFound
+	ksSpill
+	(node : nsRest)
+
+	-- node is trivially colorable
+	--	add it to the found nodes list and carry on.
+	| k	<- nodeId node
+	, triv (nodeClass node) (nodeConflicts node) (nodeExclusions node)
+
+	= colorScan' triv spill graph
+		ksTriv 	(k : ksTrivFound)
+		ksSpill
+		nsRest
+
+	-- node wasn't trivially colorable, skip over it and look in the rest of the list
+	| otherwise
+	= colorScan' triv spill graph
+		ksTriv ksTrivFound
+		ksSpill
+		nsRest
+
+{- -- This is cute and easy to understand, but too slow.. BL 2007/09
+
 colorScan colors triv spill safe prob graph
 
 	-- empty graphs are easy to color.
@@ -100,7 +186,8 @@ colorScan colors triv spill safe prob graph
 	| k		<- spill graph
 	= colorScan colors triv spill
 		safe (addOneToUniqSet prob k) (delNode k graph)
-		
+-}
+
 
 -- | Try to assign a color to all these nodes.
 

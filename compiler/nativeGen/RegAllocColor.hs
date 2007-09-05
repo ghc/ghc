@@ -35,6 +35,7 @@ import UniqSet
 import UniqFM
 import Bag
 import Outputable
+import Util
 
 import Data.List
 import Data.Maybe
@@ -124,7 +125,7 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 		-- strip off liveness information
 		let code_nat		= map stripLive code_patched
 
-		-- rewrite SPILL/REALOAD pseudos into real instructions
+		-- rewrite SPILL/RELOAD pseudos into real instructions
 		let spillNatTop		= mapGenBlockTop spillNatBlock
 		let code_final		= map spillNatTop code_nat
 		
@@ -138,10 +139,16 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 			, raFinal	= code_final
 			, raSRMs	= foldl addSRM (0, 0, 0) $ map countSRMs code_spillclean }
 
-		return	( code_final
-			, if dump
-				then [stat] ++ maybeToList stat1 ++ debug_codeGraphs
+
+		let statList =
+			if dump	then [stat] ++ maybeToList stat1 ++ debug_codeGraphs
 				else []
+
+		-- space leak avoidance
+		seqList statList $! return ()
+
+		return	( code_final
+			, statList
 			, graph_colored)
 
 	 else do
@@ -162,11 +169,16 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 			, raLifetimes	= fmLife
 			, raSpilled	= code_spilled }
 			    	
-		-- try again
-		regAlloc_spin dump (spinCount + 1) triv regsFree slotsFree'
-			(if dump
+		let statList =
+			if dump
 				then [stat] ++ maybeToList stat1 ++ debug_codeGraphs
-				else [])
+				else []
+
+		-- space leak avoidance
+		seqList statList $! return ()
+
+		regAlloc_spin dump (spinCount + 1) triv regsFree slotsFree'
+			statList
 			code_relive
 
  
@@ -310,3 +322,4 @@ plusUFMs_C  :: (elt -> elt -> elt) -> [UniqFM elt] -> UniqFM elt
 plusUFMs_C f maps
 	= foldl (plusUFM_C f) emptyUFM maps
 	
+
