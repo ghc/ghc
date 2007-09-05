@@ -7,4 +7,4 @@ setTestOpts(f)
 setTestOpts(extra_run_opts('-ignore-dot-ghci'))
 
 
-test('break022', expect_broken(1650), ghci_script, ['break022.script'])
+test('break022', normal, ghci_script, ['break022.script'])
