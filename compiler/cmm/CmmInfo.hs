@@ -78,10 +78,10 @@ cmmToRawCmm cmm = do
 
 mkInfoTable :: Unique -> CmmTop -> [RawCmmTop]
 mkInfoTable uniq (CmmData sec dat) = [CmmData sec dat]
-mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
+mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments (ListGraph blocks)) =
     case info of
       -- | Code without an info table.  Easy.
-      CmmNonInfoTable -> [CmmProc [] entry_label arguments blocks]
+      CmmNonInfoTable -> [CmmProc [] entry_label arguments (ListGraph blocks)]
 
       CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
           let info_label = entryLblToInfoLbl entry_label
@@ -158,7 +158,7 @@ mkInfoTableAndCode :: CLabel
 mkInfoTableAndCode info_lbl std_info extra_bits entry_lbl args blocks
   | tablesNextToCode 	-- Reverse the extra_bits; and emit the top-level proc
   = [CmmProc (map CmmStaticLit (reverse extra_bits ++ std_info))
-             entry_lbl args blocks]
+             entry_lbl args (ListGraph blocks)]
 
   | null blocks -- No actual code; only the info table is significant
   =		-- Use a zero place-holder in place of the 
@@ -167,7 +167,7 @@ mkInfoTableAndCode info_lbl std_info extra_bits entry_lbl args blocks
 
   | otherwise	-- Separately emit info table (with the function entry 
   =		-- point as first entry) and the entry code 
-    [CmmProc [] entry_lbl args blocks,
+    [CmmProc [] entry_lbl args (ListGraph blocks),
      mkDataLits info_lbl (CmmLabel entry_lbl : std_info ++ extra_bits)]
 
 mkSRTLit :: CLabel

@@ -93,7 +93,7 @@ cpsProc uniqSupply proc@(CmmData _ _) = [proc]
 
 -- Empty functions just don't work with the CPS algorithm, but
 -- they don't need the transformation anyway so just output them directly
-cpsProc uniqSupply proc@(CmmProc _ _ _ []) 
+cpsProc uniqSupply proc@(CmmProc _ _ _ (ListGraph []))
   = pprTrace "cpsProc: unexpected empty proc" (ppr proc) [proc]
 
 -- CPS transform for those procs that actually need it
@@ -104,7 +104,7 @@ cpsProc uniqSupply proc@(CmmProc _ _ _ [])
 --   * Now break each block into a bunch of blocks (at call sites); 
 --	all but the first will be ContinuationEntry
 --
-cpsProc uniqSupply (CmmProc info ident params blocks) = cps_procs
+cpsProc uniqSupply (CmmProc info ident params (ListGraph blocks)) = cps_procs
     where
       -- We need to be generating uniques for several things.
       -- We could make this function monadic to handle that

@@ -562,7 +562,7 @@ emitDataLits :: CLabel -> [CmmLit] -> Code
 emitDataLits lbl lits
   = emitData Data (CmmDataLabel lbl : map CmmStaticLit lits)
 
-mkDataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatic info stmt
+mkDataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatic info graph
 -- Emit a data-segment data block
 mkDataLits lbl lits
   = CmmData Data (CmmDataLabel lbl : map CmmStaticLit lits)
@@ -577,7 +577,7 @@ emitRODataLits lbl lits
         needsRelocation (CmmLabelOff _ _) = True
         needsRelocation _                 = False
 
-mkRODataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatic info stmt
+mkRODataLits :: CLabel -> [CmmLit] -> GenCmmTop CmmStatic info graph
 mkRODataLits lbl lits
   = CmmData section (CmmDataLabel lbl : map CmmStaticLit lits)
   where section | any needsRelocation lits = RelocatableReadOnlyData

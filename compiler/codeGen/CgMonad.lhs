@@ -745,7 +745,7 @@ emitData sect lits
 
 emitProc :: CmmInfo -> CLabel -> CmmFormals -> [CmmBasicBlock] -> Code
 emitProc info lbl args blocks
-  = do  { let proc_block = CmmProc info lbl args blocks
+  = do  { let proc_block = CmmProc info lbl args (ListGraph blocks)
 	; state <- getState
 	; setState $ state { cgs_tops = cgs_tops state `snocOL` proc_block } }
 

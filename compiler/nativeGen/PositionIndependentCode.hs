@@ -596,8 +596,8 @@ initializePicBase :: Reg -> [NatCmmTop] -> NatM [NatCmmTop]
 --          call 1f
 --      1:  popl %picReg
 
-initializePicBase picReg (CmmProc info lab params blocks : statics)
-    = return (CmmProc info lab params (b':tail blocks) : statics)
+initializePicBase picReg (CmmProc info lab params (ListGraph blocks) : statics)
+    = return (CmmProc info lab params (ListGraph (b':tail blocks)) : statics)
     where BasicBlock bID insns = head blocks
           b' = BasicBlock bID (FETCHPC picReg : insns)
 
@@ -611,7 +611,7 @@ initializePicBase picReg (CmmProc info lab params blocks : statics)
 -- the (32-bit) offset from our local label to our global offset table
 -- (.LCTOC1 aka gotOffLabel).
 initializePicBase picReg
-    (CmmProc info lab params blocks : statics)
+    (CmmProc info lab params (ListGraph blocks) : statics)
     = do
         gotOffLabel <- getNewLabelNat
         tmp <- getNewRegNat wordRep
@@ -630,7 +630,7 @@ initializePicBase picReg
                                     (AddrRegImm picReg offsetToOffset)
                                : ADD picReg picReg (RIReg tmp)
                                : insns)
-        return (CmmProc info lab params (b' : tail blocks) : gotOffset : statics)
+        return (CmmProc info lab params (ListGraph (b' : tail blocks)) : gotOffset : statics)
 #elif i386_TARGET_ARCH && linux_TARGET_OS
 
 -- We cheat a bit here by defining a pseudo-instruction named FETCHGOT
@@ -640,8 +640,8 @@ initializePicBase picReg
 --              addl __GLOBAL_OFFSET_TABLE__+.-1b, %picReg
 -- (See PprMach.lhs)
 
-initializePicBase picReg (CmmProc info lab params blocks : statics)
-    = return (CmmProc info lab params (b':tail blocks) : statics)
+initializePicBase picReg (CmmProc info lab params (ListGraph blocks) : statics)
+    = return (CmmProc info lab params (ListGraph (b':tail blocks)) : statics)
     where BasicBlock bID insns = head blocks
           b' = BasicBlock bID (FETCHGOT picReg : insns)
 

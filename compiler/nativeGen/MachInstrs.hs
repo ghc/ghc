@@ -59,8 +59,8 @@ import GHC.Exts
 -- Our flavours of the Cmm types
 
 -- Type synonyms for Cmm populated with native code
-type NatCmm        = GenCmm CmmStatic [CmmStatic] Instr
-type NatCmmTop     = GenCmmTop CmmStatic [CmmStatic] Instr
+type NatCmm        = GenCmm CmmStatic [CmmStatic] (ListGraph Instr)
+type NatCmmTop     = GenCmmTop CmmStatic [CmmStatic] (ListGraph Instr)
 type NatBasicBlock = GenBasicBlock Instr
 
 -- -----------------------------------------------------------------------------

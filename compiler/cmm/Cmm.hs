@@ -9,6 +9,7 @@
 module Cmm ( 
 	GenCmm(..), Cmm, RawCmm,
 	GenCmmTop(..), CmmTop, RawCmmTop,
+        ListGraph(..),
 	CmmInfo(..), UpdateFrame(..),
         CmmInfoTable(..), ClosureTypeInfo(..), ProfilingInfo(..), ClosureTypeTag,
 	GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts, mapBlockStmts,
@@ -50,45 +51,45 @@ import Data.Word
 -- GenCmm is abstracted over
 --   d, the type of static data elements in CmmData
 --   h, the static info preceding the code of a CmmProc
---   i, the contents of a basic block within a CmmProc
+--   g, the control-flow graph of a CmmProc
 --
 -- We expect there to be two main instances of this type:
 --   (a) C--, i.e. populated with various C-- constructs
 --		(Cmm and RawCmm below)
 --   (b) Native code, populated with data/instructions
 --
-newtype GenCmm d h i = Cmm [GenCmmTop d h i]
+newtype GenCmm d h g = Cmm [GenCmmTop d h g]
 
 -- | A top-level chunk, abstracted over the type of the contents of
 -- the basic blocks (Cmm or instructions are the likely instantiations).
-data GenCmmTop d h i
+data GenCmmTop d h g
   = CmmProc	-- A procedure
      h	               -- Extra header such as the info table
      CLabel            -- Used to generate both info & entry labels
      CmmFormals        -- Argument locals live on entry (C-- procedure params)
-     [GenBasicBlock i] -- Code, may be empty.  The first block is
-                       -- the entry point, and should be labelled by the code gen
-		       -- with the CLabel.  The order is otherwise initially 
-                       -- unimportant, but at some point the code gen will
-                       -- fix the order.
-
-		       -- The BlockId of the first block does not give rise
-		       -- to a label.  To jump to the first block in a Proc,
-		       -- use the appropriate CLabel.
-
-		       -- BlockIds are only unique within a procedure
+     g                 -- Control-flow graph for the procedure's code
 
   | CmmData 	-- Static data
 	Section 
 	[d]
 
+-- | A control-flow graph represented as a list of extended basic blocks.
+newtype ListGraph i = ListGraph [GenBasicBlock i] 
+   -- ^ Code, may be empty.  The first block is the entry point.  The
+   -- order is otherwise initially unimportant, but at some point the
+   -- code gen will fix the order.
+
+   -- BlockIds must be unique across an entire compilation unit, since
+   -- they are translated to assembly-language labels, which scope
+   -- across a whole compilation unit.
+
 -- | Cmm with the info table as a data type
-type Cmm    = GenCmm    CmmStatic CmmInfo CmmStmt
-type CmmTop = GenCmmTop CmmStatic CmmInfo CmmStmt
+type Cmm    = GenCmm    CmmStatic CmmInfo (ListGraph CmmStmt)
+type CmmTop = GenCmmTop CmmStatic CmmInfo (ListGraph CmmStmt)
 
 -- | Cmm with the info tables converted to a list of 'CmmStatic'
-type RawCmm    = GenCmm    CmmStatic [CmmStatic] CmmStmt
-type RawCmmTop = GenCmmTop CmmStatic [CmmStatic] CmmStmt
+type RawCmm    = GenCmm    CmmStatic [CmmStatic] (ListGraph CmmStmt)
+type RawCmmTop = GenCmmTop CmmStatic [CmmStatic] (ListGraph CmmStmt)
 
 
 -- A basic block containing a single label, at the beginning.

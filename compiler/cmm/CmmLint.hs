@@ -32,10 +32,10 @@ import Control.Monad
 -- -----------------------------------------------------------------------------
 -- Exported entry points:
 
-cmmLint :: GenCmm d h CmmStmt -> Maybe SDoc
+cmmLint :: GenCmm d h (ListGraph CmmStmt) -> Maybe SDoc
 cmmLint (Cmm tops) = runCmmLint $ mapM_ lintCmmTop tops
 
-cmmLintTop :: GenCmmTop d h CmmStmt -> Maybe SDoc
+cmmLintTop :: GenCmmTop d h (ListGraph CmmStmt) -> Maybe SDoc
 cmmLintTop top = runCmmLint $ lintCmmTop top
 
 runCmmLint :: CmmLint a -> Maybe SDoc
@@ -44,7 +44,7 @@ runCmmLint l =
 	Left err -> Just (ptext SLIT("Cmm lint error:") $$ nest 2 err)
 	Right _  -> Nothing
 
-lintCmmTop (CmmProc _ lbl _ blocks)
+lintCmmTop (CmmProc _ lbl _ (ListGraph blocks))
   = addLintInfo (text "in proc " <> pprCLabel lbl) $
 	mapM_ lintCmmBlock blocks
 lintCmmTop _other

@@ -98,7 +98,7 @@ pprC (Cmm tops) = vcat $ intersperse (text "") $ map pprTop tops
 -- top level procs
 -- 
 pprTop :: RawCmmTop -> SDoc
-pprTop (CmmProc info clbl _params blocks) =
+pprTop (CmmProc info clbl _params (ListGraph blocks)) =
     (if not (null info)
         then pprDataExterns info $$
              pprWordArray (entryLblToInfoLbl clbl) info

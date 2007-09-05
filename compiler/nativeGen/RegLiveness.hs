@@ -69,7 +69,7 @@ type LiveCmmTop
 	= GenCmmTop
 		CmmStatic
 		LiveInfo
-		(GenBasicBlock LiveInstr)
+		(ListGraph (GenBasicBlock LiveInstr))
 			-- the "instructions" here are actually more blocks,
 			--	single blocks are acyclic
 			--	multiple blocks are taken to be cyclic.
@@ -150,9 +150,9 @@ mapBlockTopM
 mapBlockTopM _ cmm@(CmmData{})
 	= return cmm
 
-mapBlockTopM f (CmmProc header label params comps)
+mapBlockTopM f (CmmProc header label params (ListGraph comps))
  = do	comps'	<- mapM (mapBlockCompM f) comps
- 	return	$ CmmProc header label params comps'
+ 	return	$ CmmProc header label params (ListGraph comps')
 
 mapBlockCompM f (BasicBlock i blocks)
  = do	blocks'	<- mapM f blocks
@@ -161,8 +161,8 @@ mapBlockCompM f (BasicBlock i blocks)
 
 -- map a function across all the basic blocks in this code
 mapGenBlockTop
-	:: (GenBasicBlock i -> GenBasicBlock i)
-	-> (GenCmmTop d h i -> GenCmmTop d h i)
+	:: (GenBasicBlock             i -> GenBasicBlock            i)
+	-> (GenCmmTop d h (ListGraph i) -> GenCmmTop d h (ListGraph i))
 
 mapGenBlockTop f cmm
 	= evalState (mapGenBlockTopM (\x -> return $ f x) cmm) ()
@@ -171,15 +171,15 @@ mapGenBlockTop f cmm
 -- | map a function across all the basic blocks in this code (monadic version)
 mapGenBlockTopM
 	:: Monad m
-	=> (GenBasicBlock i -> m (GenBasicBlock i))
-	-> (GenCmmTop d h i -> m (GenCmmTop d h i))
+	=> (GenBasicBlock            i  -> m (GenBasicBlock            i))
+	-> (GenCmmTop d h (ListGraph i) -> m (GenCmmTop d h (ListGraph i)))
 
 mapGenBlockTopM _ cmm@(CmmData{})
 	= return cmm
 
-mapGenBlockTopM f (CmmProc header label params blocks)
+mapGenBlockTopM f (CmmProc header label params (ListGraph blocks))
  = do	blocks'	<- mapM f blocks
- 	return	$ CmmProc header label params blocks'
+ 	return	$ CmmProc header label params (ListGraph blocks')
 
 
 -- | Slurp out the list of register conflicts and reg-reg moves from this top level thing.
@@ -191,7 +191,7 @@ slurpConflicts live
 	= slurpCmm (emptyBag, emptyBag) live
 
  where	slurpCmm   rs  CmmData{}		= rs
- 	slurpCmm   rs (CmmProc info _ _ blocks)	
+ 	slurpCmm   rs (CmmProc info _ _ (ListGraph blocks))
 		= foldl' (slurpComp info) rs blocks
 
 	slurpComp  info rs (BasicBlock _ blocks)	
@@ -250,8 +250,8 @@ stripLive live
 	= stripCmm live
 
  where	stripCmm (CmmData sec ds)	= CmmData sec ds
- 	stripCmm (CmmProc (LiveInfo info _ _) label params comps)
-		= CmmProc info label params (concatMap stripComp comps)
+ 	stripCmm (CmmProc (LiveInfo info _ _) label params (ListGraph comps))
+		= CmmProc info label params (ListGraph $ concatMap stripComp comps)
 
 	stripComp  (BasicBlock _ blocks)	= map stripBlock blocks
 	stripBlock (BasicBlock i instrs)	= BasicBlock i (map stripLI instrs)
@@ -295,7 +295,7 @@ lifetimeCount cmm
 	= countCmm emptyUFM cmm
  where
 	countCmm fm  CmmData{}		= fm
-	countCmm fm (CmmProc info _ _ blocks)
+	countCmm fm (CmmProc info _ _ (ListGraph blocks))
 		= foldl' (countComp info) fm blocks
 		
 	countComp info fm (BasicBlock _ blocks)
@@ -355,13 +355,13 @@ patchEraseLive patchF cmm
  where
 	patchCmm cmm@CmmData{}	= cmm
 
-	patchCmm (CmmProc info label params comps)
+	patchCmm (CmmProc info label params (ListGraph comps))
 	 | LiveInfo static id blockMap	<- info
 	 = let 	patchRegSet set	= mkUniqSet $ map patchF $ uniqSetToList set
 		blockMap'	= mapUFM patchRegSet blockMap
 
 		info'		= LiveInfo static id blockMap'
-	   in	CmmProc info' label params $ map patchComp comps
+	   in	CmmProc info' label params $ ListGraph $ map patchComp comps
 
 	patchComp (BasicBlock id blocks)
 		= BasicBlock id $ map patchBlock blocks
@@ -425,12 +425,12 @@ regLiveness
 regLiveness (CmmData i d)
 	= returnUs $ CmmData i d
 
-regLiveness (CmmProc info lbl params [])
+regLiveness (CmmProc info lbl params (ListGraph []))
 	= returnUs $ CmmProc
 			(LiveInfo info Nothing emptyUFM)
-			lbl params []
+			lbl params (ListGraph [])
 
-regLiveness (CmmProc info lbl params blocks@(first : _))
+regLiveness (CmmProc info lbl params (ListGraph blocks@(first : _)))
  = let 	first_id		= blockId first
 	sccs			= sccBlocks blocks
 	(ann_sccs, block_live)	= computeLiveness sccs
@@ -445,7 +445,7 @@ regLiveness (CmmProc info lbl params blocks@(first : _))
 
    in	returnUs $ CmmProc
 			(LiveInfo info (Just first_id) block_live)
-			lbl params liveBlocks
+			lbl params (ListGraph liveBlocks)
 
 
 sccBlocks :: [NatBasicBlock] -> [SCC NatBasicBlock]

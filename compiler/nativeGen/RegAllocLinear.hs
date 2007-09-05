@@ -242,12 +242,12 @@ regAlloc (CmmData sec d)
 		( CmmData sec d
 		, Nothing )
 	
-regAlloc (CmmProc (LiveInfo info _ _) lbl params [])
+regAlloc (CmmProc (LiveInfo info _ _) lbl params (ListGraph []))
 	= return
-		( CmmProc info lbl params []
+		( CmmProc info lbl params (ListGraph [])
 		, Nothing )
 	
-regAlloc (CmmProc static lbl params comps)
+regAlloc (CmmProc static lbl params (ListGraph comps))
 	| LiveInfo info (Just first_id) block_live	<- static
 	= do	
  		-- do register allocation on each component.
@@ -263,7 +263,7 @@ regAlloc (CmmProc static lbl params comps)
 		let ((first':_), rest')
 				= partition ((== first_id) . blockId) final_blocks
 
-		return	( CmmProc info lbl params (first' : rest')
+		return	( CmmProc info lbl params (ListGraph (first' : rest'))
 			, Just stats)
 	
 -- bogus. to make non-exhaustive match warning go away.

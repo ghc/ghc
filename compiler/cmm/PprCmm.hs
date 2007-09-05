@@ -59,7 +59,7 @@ import Data.List
 import System.IO
 import Data.Maybe
 
-pprCmms :: (Outputable info) => [GenCmm CmmStatic info CmmStmt] -> SDoc
+pprCmms :: (Outputable info) => [GenCmm CmmStatic info (ListGraph CmmStmt)] -> SDoc
 pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
         where
           separator = space $$ ptext SLIT("-------------------") $$ space
@@ -69,12 +69,15 @@ writeCmms handle cmms = printForC handle (pprCmms cmms)
 
 -----------------------------------------------------------------------------
 
-instance (Outputable info) => Outputable (GenCmm CmmStatic info CmmStmt) where
+instance (Outputable info) => Outputable (GenCmm CmmStatic info (ListGraph CmmStmt)) where
     ppr c = pprCmm c
 
 instance (Outputable d, Outputable info, Outputable i)
 	=> Outputable (GenCmmTop d info i) where
     ppr t = pprTop t
+
+instance Outputable i => Outputable (ListGraph i) where
+    ppr (ListGraph blocks) = vcat (map ppr blocks)
 
 instance (Outputable instr) => Outputable (GenBasicBlock instr) where
     ppr b = pprBBlock b
@@ -107,20 +110,20 @@ instance Outputable CmmInfo where
 
 -----------------------------------------------------------------------------
 
-pprCmm :: (Outputable info) => GenCmm CmmStatic info CmmStmt -> SDoc
+pprCmm :: (Outputable info) => GenCmm CmmStatic info (ListGraph CmmStmt) -> SDoc
 pprCmm (Cmm tops) = vcat $ intersperse (text "") $ map pprTop tops
 
 -- --------------------------------------------------------------------------
 -- Top level `procedure' blocks.
 --
-pprTop 	:: (Outputable d, Outputable info, Outputable i)
-	=> GenCmmTop d info i -> SDoc
+pprTop 	:: (Outputable d, Outputable info, Outputable g)
+	=> GenCmmTop d info g -> SDoc
 
-pprTop (CmmProc info lbl params blocks )
+pprTop (CmmProc info lbl params graph)
 
   = vcat [ pprCLabel lbl <> parens (commafy $ map ppr params) <+> lbrace
          , nest 8 $ lbrace <+> ppr info $$ rbrace
-         , nest 4 $ vcat (map ppr blocks)
+         , nest 4 $ ppr graph
          , rbrace ]
 
 -- --------------------------------------------------------------------------

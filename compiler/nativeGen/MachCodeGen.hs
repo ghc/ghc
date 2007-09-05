@@ -71,10 +71,10 @@ import Data.Int
 type InstrBlock = OrdList Instr
 
 cmmTopCodeGen :: RawCmmTop -> NatM [NatCmmTop]
-cmmTopCodeGen (CmmProc info lab params blocks) = do
+cmmTopCodeGen (CmmProc info lab params (ListGraph blocks)) = do
   (nat_blocks,statics) <- mapAndUnzipM basicBlockCodeGen blocks
   picBaseMb <- getPicBaseMaybeNat
-  let proc = CmmProc info lab params (concat nat_blocks)
+  let proc = CmmProc info lab params (ListGraph $ concat nat_blocks)
       tops = proc : concat statics
   case picBaseMb of
       Just picBase -> initializePicBase picBase tops

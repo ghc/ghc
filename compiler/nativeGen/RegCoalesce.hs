@@ -61,12 +61,12 @@ slurpJoinMovs :: LiveCmmTop -> Bag (Reg, Reg)
 slurpJoinMovs live
 	= slurpCmm emptyBag live
  where	
-  	slurpCmm   rs  CmmData{}		= rs
-	slurpCmm   rs (CmmProc _ _ _ blocks)	= foldl' slurpComp  rs blocks
-   	slurpComp  rs (BasicBlock _ blocks)	= foldl' slurpBlock rs blocks
-	slurpBlock rs (BasicBlock _ instrs)	= foldl' slurpLI    rs instrs
-		
-	slurpLI    rs (Instr _	Nothing)	= rs
+  	slurpCmm   rs  CmmData{}		         = rs
+	slurpCmm   rs (CmmProc _ _ _ (ListGraph blocks)) = foldl' slurpComp  rs blocks
+   	slurpComp  rs (BasicBlock _ blocks)	         = foldl' slurpBlock rs blocks
+        slurpBlock rs (BasicBlock _ instrs)              = foldl' slurpLI    rs instrs
+                
+        slurpLI    rs (Instr _	Nothing)	         = rs
 	slurpLI    rs (Instr instr (Just live))
 	 	| Just (r1, r2)	<- isRegRegMove instr
 		, elementOfUniqSet r1 $ liveDieRead live

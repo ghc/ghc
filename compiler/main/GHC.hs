@@ -636,7 +636,7 @@ load2 s@(Session ref) how_much mod_graph = do
 	    partial_mg
 		| LoadDependenciesOf _mod <- how_much
 		= ASSERT( case last partial_mg0 of 
-			    AcyclicSCC ms -> ms_mod_name ms == mod; _ -> False )
+			    AcyclicSCC ms -> ms_mod_name ms == _mod; _ -> False )
 		  List.init partial_mg0
 		| otherwise
 		= partial_mg0

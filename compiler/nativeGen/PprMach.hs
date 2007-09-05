@@ -68,9 +68,9 @@ pprNatCmmTop (CmmData section dats) =
   pprSectionHeader section $$ vcat (map pprData dats)
 
  -- special case for split markers:
-pprNatCmmTop (CmmProc [] lbl _ []) = pprLabel lbl
+pprNatCmmTop (CmmProc [] lbl _ (ListGraph [])) = pprLabel lbl
 
-pprNatCmmTop (CmmProc info lbl params blocks) = 
+pprNatCmmTop (CmmProc info lbl params (ListGraph blocks)) = 
   pprSectionHeader Text $$
   (if not (null info)
 	then

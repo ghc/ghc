@@ -88,8 +88,10 @@ continuationToProc :: (WordOff, WordOff, [(CLabel, ContinuationFormat)])
                    -> CmmTop
 continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                    (Continuation info label formals _ blocks) =
-    CmmProc info label formals (concat $ zipWith3 continuationToProc' uniques blocks (True : repeat False))
+    CmmProc info label formals (ListGraph blocks')
     where
+      blocks' = concat $ zipWith3 continuationToProc' uniques blocks
+                         (True : repeat False)
       curr_format = maybe unknown_block id $ lookup label formats
       unknown_block = panic "unknown BlockId in continuationToProc"
       curr_stack = continuation_frame_size curr_format
