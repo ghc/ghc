@@ -19,4 +19,4 @@ pprPatBind :: (Outputable.OutputableBndr b, Outputable.OutputableBndr i) =>
 	HsPat.LPat b -> HsExpr.GRHSs i -> Outputable.SDoc
 
 pprFunBind :: (Outputable.OutputableBndr i) => 
-	i -> HsExpr.MatchGroup i -> Outputable.SDoc
+	i -> GHC.Base.Bool -> HsExpr.MatchGroup i -> Outputable.SDoc
