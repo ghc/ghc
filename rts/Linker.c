@@ -83,7 +83,9 @@
 #  include <mach-o/loader.h>
 #  include <mach-o/nlist.h>
 #  include <mach-o/reloc.h>
+#if !defined(HAVE_DLFCN_H)
 #  include <mach-o/dyld.h>
+#endif
 #if defined(powerpc_HOST_ARCH)
 #  include <mach-o/ppc/reloc.h>
 #endif
@@ -1068,12 +1070,25 @@ lookupSymbol( char *lbl )
 	return dlsym(dl_prog_handle, lbl);
 #	endif
 #       elif defined(OBJFORMAT_MACHO)
+#       if HAVE_DLFCN_H
+        /* On OS X 10.3 and later, we use dlsym instead of the old legacy
+           interface.
+
+           HACK: On OS X, global symbols are prefixed with an underscore.
+                 However, dlsym wants us to omit the leading underscore from the
+                 symbol name. For now, we simply strip it off here (and ONLY
+                 here).
+        */
+        ASSERT(lbl[0] == '_');
+        return dlsym(dl_prog_handle, lbl+1);
+#       else
 	if(NSIsSymbolNameDefined(lbl)) {
 	    NSSymbol symbol = NSLookupAndBindSymbol(lbl);
 	    return NSAddressOfSymbol(symbol);
 	} else {
 	    return NULL;
 	}
+#       endif /* HAVE_DLFCN_H */
 #       elif defined(OBJFORMAT_PEi386)
         OpenedDLL* o_dll;
         void* sym;
