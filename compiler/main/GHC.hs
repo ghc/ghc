@@ -6,13 +6,6 @@
 --
 -- -----------------------------------------------------------------------------
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module GHC (
 	-- * Initialisation
 	Session,
@@ -234,9 +227,7 @@ import Name             hiding ( varName )
 import OccName		( parenSymOcc )
 import InstEnv		( Instance, instanceDFunId, pprInstance, pprInstanceHdr )
 import SrcLoc
-import Desugar
 import CoreSyn
-import TcRnDriver       ( tcRnModule )
 import DriverPipeline
 import DriverPhases	( HscSource(..), Phase(..), isHaskellSrcFilename, startPhase )
 import HeaderInfo	( getImports, getOptions )
@@ -557,6 +548,7 @@ load s@(Session ref) how_much
               writeIORef ref $! hsc_env{ hsc_IC = emptyInteractiveContext }
               throw e
 
+load2 :: Session -> LoadHowMuch -> [ModSummary] -> IO SuccessFlag
 load2 s@(Session ref) how_much mod_graph = do
         guessOutputFile s
 	hsc_env <- readIORef ref
@@ -642,7 +634,7 @@ load2 s@(Session ref) how_much mod_graph = do
 	    -- short of the specified module (unless the specified module
 	    -- is stable).
 	    partial_mg
-		| LoadDependenciesOf mod <- how_much
+		| LoadDependenciesOf _mod <- how_much
 		= ASSERT( case last partial_mg0 of 
 			    AcyclicSCC ms -> ms_mod_name ms == mod; _ -> False )
 		  List.init partial_mg0
@@ -746,7 +738,8 @@ load2 s@(Session ref) how_much mod_graph = do
 -- Finish up after a load.
 
 -- If the link failed, unload everything and return.
-loadFinish all_ok Failed ref hsc_env
+loadFinish :: SuccessFlag -> SuccessFlag -> IORef HscEnv -> HscEnv -> IO SuccessFlag
+loadFinish _all_ok Failed ref hsc_env
   = do unload hsc_env []
        writeIORef ref $! discardProg hsc_env
        return Failed
@@ -768,6 +761,7 @@ discardProg hsc_env
 -- used to fish out the preprocess output files for the purposes of
 -- cleaning up.  The preprocessed file *might* be the same as the
 -- source file, but that doesn't do any harm.
+ppFilesFromSummaries :: [ModSummary] -> [FilePath]
 ppFilesFromSummaries summaries = map ms_hspp_file summaries
 
 -- -----------------------------------------------------------------------------
@@ -810,7 +804,7 @@ type TypecheckedSource = LHsBinds Id
 -- If compileToCore is true, it also desugars the module and returns the 
 -- resulting Core bindings as a component of the CheckedModule.
 checkModule :: Session -> ModuleName -> Bool -> IO (Maybe CheckedModule)
-checkModule session@(Session ref) mod compileToCore = do
+checkModule (Session ref) mod compileToCore = do
 	-- parse & typecheck the module
    hsc_env <- readIORef ref   
    let mg  = hsc_mod_graph hsc_env
@@ -854,8 +848,7 @@ checkModule session@(Session ref) mod compileToCore = do
 -- desugar the module, then returns the resulting list of Core bindings if 
 -- successful. 
 compileToCore :: Session -> FilePath -> IO (Maybe [CoreBind])
-compileToCore session@(Session ref) fn = do
-   hsc_env <- readIORef ref
+compileToCore session fn = do
    -- First, set the target to the desired filename
    target <- guessTarget fn Nothing
    addTarget session target
@@ -865,13 +858,13 @@ compileToCore session@(Session ref) fn = do
    case maybeModGraph of
      Nothing -> return Nothing
      Just modGraph -> do
-       case find ((== fn) . msHsFilePath) modGraph of
-         Just modSummary -> do 
-           -- Now we have the module name;
-           -- parse, typecheck and desugar the module
-           let mod = ms_mod_name modSummary
-           maybeCheckedModule <- checkModule session mod True
-           case maybeCheckedModule of
+        let modSummary = expectJust "compileToCore" $
+                          find ((== fn) . msHsFilePath) modGraph
+        -- Now we have the module name;
+        -- parse, typecheck and desugar the module
+        let mod = ms_mod_name modSummary
+        maybeCheckedModule <- checkModule session mod True
+        case maybeCheckedModule of
              Nothing -> return Nothing 
              Just checkedMod -> return $ coreBinds checkedMod
  -- ---------------------------------------------------------------------------
@@ -884,8 +877,10 @@ unload hsc_env stable_linkables	-- Unload everthing *except* 'stable_linkables'
 	LinkInMemory -> Linker.unload (hsc_dflags hsc_env) stable_linkables
 #else
 	LinkInMemory -> panic "unload: no interpreter"
+                                -- urgh.  avoid warnings:
+                                hsc_env stable_linkables
 #endif
-	other -> return ()
+	_other -> return ()
 
 -- -----------------------------------------------------------------------------
 -- checkStability
@@ -1041,7 +1036,7 @@ findPartiallyCompletedCycles modsDone theGraph
    = chew theGraph
      where
         chew [] = []
-        chew ((AcyclicSCC v):rest) = chew rest    -- acyclic?  not interesting.
+        chew ((AcyclicSCC _):rest) = chew rest    -- acyclic?  not interesting.
         chew ((CyclicSCC vs):rest)
            = let names_in_this_cycle = nub (map ms_mod vs)
                  mods_in_this_cycle  
@@ -1074,17 +1069,18 @@ upsweep
 
 upsweep hsc_env old_hpt stable_mods cleanup mods
    = upsweep' hsc_env old_hpt stable_mods cleanup mods 1 (length mods)
+ where
 
-upsweep' hsc_env old_hpt stable_mods cleanup
+  upsweep' hsc_env _old_hpt _stable_mods _cleanup
      [] _ _
    = return (Succeeded, hsc_env, [])
 
-upsweep' hsc_env old_hpt stable_mods cleanup
+  upsweep' hsc_env _old_hpt _stable_mods _cleanup
      (CyclicSCC ms:_) _ _
    = do fatalErrorMsg (hsc_dflags hsc_env) (cyclicModuleErr ms)
         return (Failed, hsc_env, [])
 
-upsweep' hsc_env old_hpt stable_mods cleanup
+  upsweep' hsc_env old_hpt stable_mods cleanup
      (AcyclicSCC mod:mods) mod_index nmods
    = do -- putStrLn ("UPSWEEP_MOD: hpt = " ++ 
 	--	     show (map (moduleUserString.moduleName.mi_module.hm_iface) 
@@ -1181,11 +1177,11 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
 	    			     iface = hm_iface hm_info
 
 	    compile_it :: Maybe Linkable -> IO (Maybe HomeModInfo)
-	    compile_it  = upsweep_compile hsc_env old_hpt this_mod_name 
+	    compile_it  = upsweep_compile hsc_env
 				summary' mod_index nmods mb_old_iface
 
             compile_it_discard_iface 
-                        = upsweep_compile hsc_env old_hpt this_mod_name 
+                        = upsweep_compile hsc_env
 				summary' mod_index nmods Nothing
 
         in
@@ -1249,10 +1245,9 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
 
 
 -- Run hsc to compile a module
-upsweep_compile hsc_env old_hpt this_mod summary
-                mod_index nmods
-                mb_old_iface
-                mb_old_linkable
+upsweep_compile :: HscEnv -> ModSummary -> Int -> Int
+                -> Maybe ModIface -> Maybe Linkable -> IO (Maybe HomeModInfo)
+upsweep_compile hsc_env summary mod_index nmods mb_old_iface mb_old_linkable
  = do
    compresult <- compile hsc_env summary mb_old_linkable mb_old_iface
                         mod_index nmods
@@ -1385,11 +1380,11 @@ warnUnnecessarySourceImports dflags sccs =
   printBagOfWarnings dflags (listToBag (concat (map (check.flattenSCC) sccs)))
   where check ms =
 	   let mods_in_this_cycle = map ms_mod_name ms in
-	   [ warn m i | m <- ms, i <- ms_srcimps m,
+	   [ warn i | m <- ms, i <- ms_srcimps m,
 			unLoc i `notElem`  mods_in_this_cycle ]
 
-	warn :: ModSummary -> Located ModuleName -> WarnMsg
-	warn ms (L loc mod) = 
+	warn :: Located ModuleName -> WarnMsg
+	warn (L loc mod) = 
 	   mkPlainErrMsg loc
 		(ptext SLIT("Warning: {-# SOURCE #-} unnecessary in import of ")
 		 <+> quotes (ppr mod))
@@ -1589,7 +1584,7 @@ findSummaryBySourceFile summaries file
   = case [ ms | ms <- summaries, HsSrcFile <- [ms_hsc_src ms],
 			         expectJust "findSummaryBySourceFile" (ml_hs_file (ms_location ms)) == file ] of
 	[] -> Nothing
-	(x:xs) -> Just x
+	(x:_) -> Just x
 
 -- Summarise a module, and pick up source and timestamp.
 summariseModule
@@ -1701,6 +1696,7 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
 				    ms_obj_date  = obj_timestamp }))
 
 
+getObjTimestamp :: ModLocation -> Bool -> IO (Maybe ClockTime)
 getObjTimestamp location is_boot
   = if is_boot then return Nothing
 	       else modificationTimeIfExists (ml_obj_file location)
@@ -1714,13 +1710,14 @@ preprocessFile dflags src_fn mb_phase Nothing
 	buf <- hGetStringBuffer hspp_fn
 	return (dflags', hspp_fn, buf)
 
-preprocessFile dflags src_fn mb_phase (Just (buf, time))
+preprocessFile dflags src_fn mb_phase (Just (buf, _time))
   = do
 	-- case we bypass the preprocessing stage?
 	let 
 	    local_opts = getOptions buf src_fn
 	--
-	(dflags', errs) <- parseDynamicFlags dflags (map unLoc local_opts)
+	(dflags', _errs) <- parseDynamicFlags dflags (map unLoc local_opts)
+        -- XXX: shouldn't we be reporting the errors?
 
 	let
 	    needs_preprocessing
@@ -1746,14 +1743,17 @@ noModError :: DynFlags -> SrcSpan -> ModuleName -> FindResult -> IO ab
 noModError dflags loc wanted_mod err
   = throwDyn $ mkPlainErrMsg loc $ cannotFindModule dflags wanted_mod err
 				
+noHsFileErr :: SrcSpan -> String -> a
 noHsFileErr loc path
   = throwDyn $ mkPlainErrMsg loc $ text "Can't find" <+> text path
  
+packageModErr :: ModuleName -> a
 packageModErr mod
   = throwDyn $ mkPlainErrMsg noSrcSpan $
 	text "module" <+> quotes (ppr mod) <+> text "is a package module"
 
 multiRootsErr :: [ModSummary] -> IO ()
+multiRootsErr [] = panic "multiRootsErr"
 multiRootsErr summs@(summ1:_)
   = throwDyn $ mkPlainErrMsg noSrcSpan $
 	text "module" <+> quotes (ppr mod) <+> 
@@ -1841,8 +1841,8 @@ getModuleInfo s mdl = withSession s $ \hsc_env -> do
    -- exist... hence the isHomeModule test here.  (ToDo: reinstate)
 
 getPackageModuleInfo :: HscEnv -> Module -> IO (Maybe ModuleInfo)
-getPackageModuleInfo hsc_env mdl = do
 #ifdef GHCI
+getPackageModuleInfo hsc_env mdl = do
   (_msgs, mb_avails) <- getModuleExports hsc_env mdl
   case mb_avails of
     Nothing -> return Nothing
@@ -1862,10 +1862,12 @@ getPackageModuleInfo hsc_env mdl = do
                         minf_modBreaks = emptyModBreaks  
 		}))
 #else
+getPackageModuleInfo _hsc_env _mdl = do
   -- bogusly different for non-GHCI (ToDo)
   return Nothing
 #endif
 
+getHomeModuleInfo :: HscEnv -> ModuleName -> IO (Maybe ModuleInfo)
 getHomeModuleInfo hsc_env mdl = 
   case lookupUFM (hsc_HPT hsc_env) mdl of
     Nothing  -> return Nothing
@@ -1913,12 +1915,13 @@ modInfoLookupName s minf name = withSession s $ \hsc_env -> do
 			    (hsc_HPT hsc_env) (eps_PTE eps) name
 
 #ifdef GHCI
+modInfoModBreaks :: ModuleInfo -> ModBreaks
 modInfoModBreaks = minf_modBreaks  
 #endif
 
 isDictonaryId :: Id -> Bool
 isDictonaryId id
-  = case tcSplitSigmaTy (idType id) of { (tvs, theta, tau) -> isDictTy tau }
+  = case tcSplitSigmaTy (idType id) of { (_tvs, _theta, tau) -> isDictTy tau }
 
 -- | Looks up a global name: that is, any top-level name in any
 -- visible module.  Unlike 'lookupName', lookupGlobalName does not use
@@ -1970,9 +1973,6 @@ getTokenStream :: Session -> Module -> IO [Located Token]
 -- using the algorithm that is used for an @import@ declaration.
 findModule :: Session -> ModuleName -> Maybe PackageId -> IO Module
 findModule s mod_name maybe_pkg = withSession s $ \hsc_env ->
-  findModule' hsc_env mod_name maybe_pkg
-
-findModule' hsc_env mod_name maybe_pkg =
   let
         dflags = hsc_dflags hsc_env
         hpt    = hsc_HPT hsc_env
