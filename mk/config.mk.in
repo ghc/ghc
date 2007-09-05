@@ -524,7 +524,9 @@ prefix          := @prefix@
 # New autoconf (>= 2.60?) make a configure with a --datarootdir=DIR flag.
 # However, in order to support older autoconf's we don't use it.
 # datarootdir is set lower down instead.
-# datarootdir		= @datarootdir@
+# But, as datadir is defined in terms of datarootdir, we also need to
+# set it to the value (if any) that configure gives it here.
+datarootdir     := @datarootdir@
 
 exec_prefix     := @exec_prefix@
 bindir          := @bindir@
