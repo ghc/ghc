@@ -1121,10 +1121,7 @@ dnl Remove common automounter nonsense
 dnl
 hardtop=`echo $hardtop | sed 's|^/tmp_mnt.*\(/local/.*\)$|\1|' | sed 's|^/tmp_mnt/|/|'`
 
-hardtop_plat="$hardtop"
-
 AC_SUBST(hardtop)
-AC_SUBST(hardtop_plat)
 
 AC_MSG_RESULT(${hardtop})
 

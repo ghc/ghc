@@ -734,18 +734,14 @@ SRC_LD_OPTS += -no-link-chk
 INPLACE_PROG = $(odir)/ghc-inplace$(exeext)
 EXCLUDED_C_SRCS += ghc-inplace.c
 
-# FPTOOLS_TOP_ABS platform uses backslashes, at least on Cygwin, but that
-# will go wrong when we use it in a Haskell string below.
-TOP_ABS=$(subst \\,/,$(FPTOOLS_TOP_ABS_PLATFORM))
-
-GHC_PATH=$(TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)$(exeext)
+GHC_PATH=$(FPTOOLS_TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)$(exeext)
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INPLACE_EXTRA_FLAGS = -optc-DWINDOWS
 endif
 
 $(INPLACE_PROG): ghc-inplace.c
-	$(HC) -cpp -optc-DGHC_PATH=$(DQ)$(GHC_PATH)$(DQ) -optc-DTOP_ABS=$(DQ)$(TOP_ABS)$(DQ) $(INPLACE_EXTRA_FLAGS) $< -o $@
+	$(HC) -cpp -optc-DGHC_PATH=$(DQ)$(GHC_PATH)$(DQ) -optc-DTOP_ABS=$(DQ)$(FPTOOLS_TOP_ABS)$(DQ) $(INPLACE_EXTRA_FLAGS) $< -o $@
 
 all :: $(INPLACE_PROG)
 

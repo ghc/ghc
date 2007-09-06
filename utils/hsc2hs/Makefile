@@ -33,10 +33,6 @@ INPLACE_HS=hsc2hs-inplace.hs
 INPLACE_PROG=hsc2hs-inplace
 EXCLUDED_SRCS+=$(INPLACE_HS)
 
-# FPTOOLS_TOP_ABS platform uses backslashes, at least on Cygwin, but that
-# will go wrong when we use it in a Haskell string below.
-TOP_ABS=$(subst \\,/,$(FPTOOLS_TOP_ABS_PLATFORM))
-
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 extra_flags=$(addprefix --cflag=,$(filter-out -O,$(SRC_CC_OPTS)))
 else
@@ -45,7 +41,7 @@ endif
 
 $(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
 	echo "import System.Cmd; import System.Environment; import System.Exit" > $@
-	echo "main = do args <- getArgs; rawSystem \"$(TOP_ABS)/$(GHC_HSC2HS_DIR_REL)/$(HS_PROG)\" (\"--template=$(TOP_ABS)/$(GHC_HSC2HS_DIR_REL)/template-hsc.h\":\"--cc=$(CC)\":\"--ld=$(CC)\"$(patsubst %,:\"%\",$(extra_flags)):\"--cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt)\":\"-I$(TOP_ABS)/$(GHC_INCLUDE_DIR_REL)\":\"-I$(TOP_ABS)/gmp/gmpbuild\":args) >>= exitWith" >> $@
+	echo "main = do args <- getArgs; rawSystem \"$(FPTOOLS_TOP_ABS)/$(GHC_HSC2HS_DIR_REL)/$(HS_PROG)\" (\"--template=$(FPTOOLS_TOP_ABS)/$(GHC_HSC2HS_DIR_REL)/template-hsc.h\":\"--cc=$(CC)\":\"--ld=$(CC)\"$(patsubst %,:\"%\",$(extra_flags)):\"--cflag=-D__GLASGOW_HASKELL__=$(ProjectVersionInt)\":\"-I$(FPTOOLS_TOP_ABS)/$(GHC_INCLUDE_DIR_REL)\":\"-I$(FPTOOLS_TOP_ABS)/gmp/gmpbuild\":args) >>= exitWith" >> $@
 
 $(INPLACE_PROG): $(INPLACE_HS)
 	$(HC) --make $< -o $@
