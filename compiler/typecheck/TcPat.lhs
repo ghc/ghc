@@ -597,7 +597,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	    (unwrapFamInstScrutinee tycon ctxt_res_tys $
 	       ConPatOut { pat_con = L con_span data_con, 
 			   pat_tvs = ex_tvs' ++ co_vars,
-			   pat_dicts = map instToId dicts, 
+			   pat_dicts = map instToVar dicts, 
 			   pat_binds = dict_binds,
 			   pat_args = arg_pats', pat_ty = pat_ty },
 	     ex_tvs' ++ inner_tvs, res)
