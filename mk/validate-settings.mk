@@ -7,6 +7,7 @@ GhcStage2HcOpts = -Onot -fasm
 GhcLibHcOpts    = -O -fasm
 GhcLibWays      =
 SplitObjs       = NO
-NoFibWays =
-STRIP=:
+NoFibWays       =
+STRIP           = :
+GhcBootLibs     = YES
 
