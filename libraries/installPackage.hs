@@ -5,6 +5,7 @@ import Distribution.Simple.Configure
 import Distribution.Simple.LocalBuildInfo
 import Distribution.Simple.Program
 import Distribution.Simple.Setup
+import Distribution.Simple.Utils
 import Distribution.Verbosity
 import System.Environment
 
@@ -41,7 +42,7 @@ doit destdir pref idatadir idocdir ghcpkg ghcpkgconf verbosity =
                                   regGenScript = False,
                                   regInPlace = False
                               }
-          lbi <- getPersistBuildConfig
+          lbi <- getConfig verbosity
           let pd = localPkgDescr lbi
               i = installDirTemplates lbi
               -- XXX This is an almighty hack, shadowing the base
@@ -83,4 +84,16 @@ doit destdir pref idatadir idocdir ghcpkg ghcpkgconf verbosity =
           (copyHook simpleUserHooks) pd_copy lbi_copy userHooks copyFlags
           (regHook simpleUserHooks)  pd_reg  lbi_reg  userHooks registerFlags
           return ()
+
+-- Get the build info, merging the setup-config and buildinfo files.
+getConfig :: Verbosity -> IO LocalBuildInfo
+getConfig verbosity = do
+    lbi <- getPersistBuildConfig
+    maybe_infoFile <- defaultHookedPackageDesc
+    case maybe_infoFile of
+        Nothing -> return lbi
+        Just infoFile -> do
+            hbi <- readHookedBuildInfo verbosity infoFile
+            return lbi { localPkgDescr = updatePackageDescription hbi (localPkgDescr lbi)}
+
 
