@@ -228,8 +228,6 @@ assignColors colors graph ks
 --	taking into account preferences, neighbors and exclusions.
 --	returns Nothing if no color can be assigned to this node.
 --
---	TODO: avoid using the prefs of the neighbors, if at all possible.
---
 selectColor
 	:: ( Uniquable k, Uniquable cls, Uniquable color, Eq color)
 	=> UniqFM (UniqSet color)	-- ^ map of (node class -> set of colors available for this class).
@@ -257,20 +255,41 @@ selectColor colors graph u
 			$ catMaybes 
 			$ map nodeColor nsConflicts
 	
-	-- colors that are still ok
+	-- the prefs of our neighbors
+	colors_neighbor_prefs
+			= mkUniqSet
+			$ concat $ map nodePreference nsConflicts
+
+	-- colors that are still valid for us
 	colors_ok_ex	= minusUniqSet colors_avail (nodeExclusions node)
 	colors_ok	= minusUniqSet colors_ok_ex colors_conflict
 				
 	-- the colors that we prefer, and are still ok
 	colors_ok_pref	= intersectUniqSets
 				(mkUniqSet $ nodePreference node) colors_ok
-				
+
+	-- the colors that we could choose while being nice to our neighbors
+	colors_ok_nice	= minusUniqSet
+				colors_ok colors_neighbor_prefs
+
+	-- the best of all possible worlds..
+	colors_ok_pref_nice
+			= intersectUniqSets
+				colors_ok_nice colors_ok_pref
+
 	-- make the decision
 	chooseColor
 
-		-- we got one of our preferences, score!
+		-- everyone is happy, yay!
+		| not $ isEmptyUniqSet colors_ok_pref_nice
+		, c : _		<- filter (\x -> elementOfUniqSet x colors_ok_pref_nice)
+					(nodePreference node)
+		= Just c
+
+		-- we've got one of our preferences
 		| not $ isEmptyUniqSet colors_ok_pref	
-		, c : _		<- uniqSetToList colors_ok_pref
+		, c : _		<- filter (\x -> elementOfUniqSet x colors_ok_pref)
+					(nodePreference node)
 		= Just c
 		
 		-- it wasn't a preference, but it was still ok
@@ -278,7 +297,8 @@ selectColor colors graph u
 		, c : _		<- uniqSetToList colors_ok
 		= Just c
 		
-		-- leave this node uncolored
+		-- no colors were available for us this time.
+		--	looks like we're going around the loop again..
 		| otherwise
 		= Nothing
 		
