@@ -9,7 +9,7 @@ test('Simple5', normal, compile, [''])
 test('Simple6', normal, compile, [''])
 test('Simple7', normal, compile, [''])
 test('Simple8', expect_fail, compile, [''])
-test('Simple9', expect_fail, compile, [''])
+test('Simple9', normal, compile, [''])
 test('Simple10', expect_fail, compile, [''])
 
 test('ind1', normal, compile, [''])
