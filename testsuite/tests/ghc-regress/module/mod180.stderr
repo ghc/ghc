@@ -1,0 +1,6 @@
+
+mod180.hs:8:4:
+    Couldn't match expected type `T'
+	   against inferred type `main:Mod180_A.T'
+    In the expression: x
+    In the definition of `z': z = x
