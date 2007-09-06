@@ -585,7 +585,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
                , not $ null [v | v <- varSetElems$ tyVarsOfType (idType id)
                               , isSkolemTyVar v]
                , (occNameFS.nameOccName.idName) id /= result_fs]
-   tys <- reconstructType hsc_env False `mapM` incompletelyTypedIds
+   tys <- reconstructType hsc_env 10 `mapM` incompletelyTypedIds
           -- map termType `fmap` (obtainTerm hsc_env False `mapM` incompletelyTypedIds)
    
    let substs = [computeRTTIsubst ty ty' 
@@ -935,8 +935,8 @@ obtainTerm hsc_env force id =  do
               cvObtainTerm hsc_env maxBound force (Just$ idType id) hv
 
 -- Uses RTTI to reconstruct the type of an Id, making it less polymorphic
-reconstructType :: HscEnv -> Bool -> Id -> IO (Maybe Type)
-reconstructType hsc_env force id = do
+reconstructType :: HscEnv -> Int -> Id -> IO (Maybe Type)
+reconstructType hsc_env bound id = do
               hv <- Linker.getHValue hsc_env (varName id) 
-              cvReconstructType hsc_env force (Just$ idType id) hv
+              cvReconstructType hsc_env bound (Just$ idType id) hv
 #endif /* GHCI */

@@ -10,13 +10,6 @@
 -- 
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Debugger (pprintClosureCommand, showTerm) where
 
 import Linker
@@ -46,7 +39,6 @@ import Data.IORef
 import System.IO
 import GHC.Exts
 
-#include "HsVersions.h"
 -------------------------------------
 -- | The :print & friends commands
 -------------------------------------
@@ -111,7 +103,7 @@ bindSuspensions cms@(Session ref) t = do
       let ictxt        = hsc_IC hsc_env
           prefix       = "_t"
           alreadyUsedNames = map (occNameString . nameOccName . getName) inScope
-          availNames   = map ((prefix++) . show) [1..] \\ alreadyUsedNames
+          availNames   = map ((prefix++) . show) [(1::Int)..] \\ alreadyUsedNames
       availNames_var  <- newIORef availNames
       (t', stuff)     <- foldTerm (nameSuspensionsAndGetInfos availNames_var) t
       let (names, tys, hvals) = unzip3 stuff
@@ -137,19 +129,20 @@ bindSuspensions cms@(Session ref) t = do
                                     return (Term ty dc v terms, concat names)
                       , fPrim    = \ty n ->return (Prim ty n,[])
                       }
-        doSuspension freeNames ct mb_ty hval Nothing = do
+        doSuspension freeNames ct mb_ty hval _name = do
           name <- atomicModifyIORef freeNames (\x->(tail x, head x))
-          n <- newGrimName cms name
+          n <- newGrimName name
           let ty' = fromMaybe (error "unexpected") mb_ty
           return (Suspension ct mb_ty hval (Just n), [(n,ty',hval)])
 
 
 --  A custom Term printer to enable the use of Show instances
+showTerm :: Session -> Term -> IO SDoc
 showTerm cms@(Session ref) = cPprTerm cPpr
  where
   cPpr = \p-> cPprShowable : cPprTermBase p
-  cPprShowable prec t@Term{ty=ty, dc=dc, val=val} = 
-    if not (isFullyEvaluatedTerm t)
+  cPprShowable prec ty _ val tt = 
+    if not (all isFullyEvaluatedTerm tt)
      then return Nothing
      else do
         hsc_env <- readIORef ref
@@ -172,14 +165,14 @@ showTerm cms@(Session ref) = cPprTerm cPpr
          `finally` do
            writeIORef ref hsc_env
            GHC.setSessionDynFlags cms dflags
-  needsParens ('"':txt) = False -- some simple heuristics to see whether parens
+  needsParens ('"':_) = False   -- some simple heuristics to see whether parens
                                 -- are redundant in an arbitrary Show output
-  needsParens ('(':txt) = False
+  needsParens ('(':_) = False
   needsParens txt = ' ' `elem` txt
 
 
   bindToFreshName hsc_env ty userName = do
-    name <- newGrimName cms userName
+    name <- newGrimName userName
     let ictxt    = hsc_IC hsc_env
         tmp_ids  = ic_tmp_ids ictxt
         id       = mkGlobalId VanillaGlobal name (sigmaType ty) vanillaIdInfo
@@ -187,8 +180,8 @@ showTerm cms@(Session ref) = cPprTerm cPpr
     return (hsc_env {hsc_IC = new_ic }, name)
 
 --    Create new uniques and give them sequentially numbered names
---    newGrimName :: Session -> String -> IO Name
-newGrimName cms userName  = do
+newGrimName :: String -> IO Name
+newGrimName userName  = do
     us <- mkSplitUniqSupply 'b'
     let unique  = uniqFromSupply us
         occname = mkOccName varName userName

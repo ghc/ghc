@@ -6,13 +6,6 @@
 --
 -----------------------------------------------------------------------------
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module RtClosureInspect(
   
      cvObtainTerm,      -- :: HscEnv -> Int -> Bool -> Maybe Type -> HValue -> IO Term
@@ -83,6 +76,7 @@ import GHC.Exts
 import Control.Monad
 import Data.Maybe
 import Data.Array.Base
+import Data.Ix
 import Data.List        ( partition )
 import qualified Data.Sequence as Seq
 import Data.Monoid
@@ -169,6 +163,7 @@ instance Outputable ClosureType where
 
 #include "../includes/ClosureTypes.h"
 
+aP_CODE, pAP_CODE :: Int
 aP_CODE = AP
 pAP_CODE = PAP
 #undef AP
@@ -220,9 +215,10 @@ isFullyEvaluated a = do
   case tipe closure of
     Constr -> do are_subs_evaluated <- amapM isFullyEvaluated (ptrs closure)
                  return$ and are_subs_evaluated
-    otherwise -> return False
+    _      -> return False
   where amapM f = sequence . amap' f
 
+amap' :: (t -> b) -> Array Int t -> [b]
 amap' f (Array i0 i _ arr#) = map g [0 .. i - i0]
     where g (I# i#) = case indexArray# arr# i# of
                           (# e #) -> f e
@@ -255,13 +251,15 @@ extractUnboxed tt clos = go tt (nonPtrs clos)
            | (x, rest) <- splitAt ((sizeofType t + wORD_SIZE - 1) `div` wORD_SIZE) xx 
            = x : go tt rest
 
+sizeofTyCon :: TyCon -> Int
 sizeofTyCon = sizeofPrimRep . tyConPrimRep
 
 -----------------------------------
 -- * Traversals for Terms
 -----------------------------------
+type TermProcessor a b = Type -> Either String DataCon -> HValue -> [a] -> b
 
-data TermFold a = TermFold { fTerm :: Type -> Either String DataCon -> HValue -> [a] -> a
+data TermFold a = TermFold { fTerm :: TermProcessor a a
                            , fPrim :: Type -> [Word] -> a
                            , fSuspension :: ClosureType -> Maybe Type -> HValue
                                            -> Maybe Name -> a
@@ -307,10 +305,12 @@ app_prec,cons_prec ::Int
 app_prec = 10
 cons_prec = 5 -- TODO Extract this info from GHC itself
 
+pprTerm :: (Int -> Term -> Maybe SDoc) -> Int -> Term -> SDoc
 pprTerm y p t | Just doc <- pprTermM y p t = doc
+pprTerm _ _ _ = panic "pprTerm"
 
 pprTermM :: Monad m => (Int -> Term -> m SDoc) -> Int -> Term -> m SDoc
-pprTermM y p t@Term{dc=Left dc_tag, subTerms=tt, ty=ty} = do
+pprTermM y p Term{dc=Left dc_tag, subTerms=tt} = do
   tt_docs <- mapM (y app_prec) tt
   return$ cparen (not(null tt) && p >= app_prec) (text dc_tag <+> sep tt_docs)
   
@@ -329,70 +329,81 @@ pprTermM y p t@Term{dc=Right dc, subTerms=tt, ty=ty}
          tt_docs <- mapM (y app_prec) tt
          return$ cparen (p >= app_prec) (ppr dc <+> sep tt_docs)
 
-pprTermM y _ t = pprTermM1 y t
-pprTermM1 _ Prim{value=words, ty=ty} = 
+pprTermM _ _ t = pprTermM1 t
+
+pprTermM1 :: Monad m => Term -> m SDoc
+pprTermM1 Prim{value=words, ty=ty} = 
     return$ text$ repPrim (tyConAppTyCon ty) words
-pprTermM1 y t@Term{} = panic "pprTermM1 - unreachable"
-pprTermM1 _ Suspension{bound_to=Nothing} = return$ char '_'
-pprTermM1 _ Suspension{mb_ty=Just ty, bound_to=Just n}
+pprTermM1 Term{} = panic "pprTermM1 - unreachable"
+pprTermM1 Suspension{bound_to=Nothing} = return$ char '_'
+pprTermM1 Suspension{mb_ty=Just ty, bound_to=Just n}
   | Just _ <- splitFunTy_maybe ty = return$ ptext SLIT("<function>")
   | otherwise = return$ parens$ ppr n <> text "::" <> ppr ty 
+pprTermM1 _ = panic "pprTermM1"
+
+type CustomTermPrinter m = Int -> TermProcessor Term (m (Maybe SDoc))
 
 -- Takes a list of custom printers with a explicit recursion knot and a term, 
 -- and returns the output of the first succesful printer, or the default printer
-cPprTerm :: forall m. Monad m => 
-           ((Int->Term->m SDoc)->[Int->Term->m (Maybe SDoc)]) -> Term -> m SDoc
-cPprTerm custom = go 0 where
-  go prec t@Term{} = do
-    let default_ prec t = Just `liftM` pprTermM go prec t
-        mb_customDocs = [pp prec t | pp <- custom go ++ [default_]]
+cPprTerm :: Monad m => 
+           ((Int->Term->m SDoc)->[CustomTermPrinter m]) -> Term -> m SDoc
+cPprTerm printers_ = go 0 where
+  printers = printers_ go
+  go prec t@(Term ty dc val tt) = do
+    let default_ = Just `liftM` pprTermM go prec t
+        mb_customDocs = [pp prec ty dc val tt | pp <- printers] ++ [default_]
     Just doc <- firstJustM mb_customDocs
     return$ cparen (prec>app_prec+1) doc
-  go _ t = pprTermM1 go t
+  go _ t = pprTermM1 t
   firstJustM (mb:mbs) = mb >>= maybe (firstJustM mbs) (return . Just)
   firstJustM [] = return Nothing
 
 -- Default set of custom printers. Note that the recursion knot is explicit
-cPprTermBase :: Monad m => (Int->Term-> m SDoc)->[Int->Term->m (Maybe SDoc)]
+cPprTermBase :: Monad m => (Int->Term-> m SDoc)->[CustomTermPrinter m]
 cPprTermBase y =
   [ 
-    ifTerm isTupleTy             (\_ -> liftM (parens . hcat . punctuate comma) 
-                                 . mapM (y (-1)) . subTerms)
-  , ifTerm (\t -> isTyCon listTyCon t && subTerms t `lengthIs` 2)
-                                 (\ p Term{subTerms=[h,t]} -> doList p h t)
+    ifTerm isTupleTy             (\ _ _ tt -> 
+                                      liftM (parens . hcat . punctuate comma) 
+                                    . mapM (y (-1))
+                                    $ tt)
+  , ifTerm (\ty tt -> isTyCon listTyCon ty tt && tt `lengthIs` 2)
+                                 (\ p _ [h,t] -> doList p h t)
   , ifTerm (isTyCon intTyCon)    (coerceShow$ \(a::Int)->a)
   , ifTerm (isTyCon charTyCon)   (coerceShow$ \(a::Char)->a)
 --  , ifTerm (isTyCon wordTyCon) (coerceShow$ \(a::Word)->a)
   , ifTerm (isTyCon floatTyCon)  (coerceShow$ \(a::Float)->a)
   , ifTerm (isTyCon doubleTyCon) (coerceShow$ \(a::Double)->a)
   , ifTerm isIntegerTy           (coerceShow$ \(a::Integer)->a)
-  ] 
-     where ifTerm pred f p t@Term{} | pred t = liftM Just (f p t) 
-           ifTerm _    _ _ _                 = return Nothing
-           isIntegerTy Term{ty=ty} = fromMaybe False $ do
+  ]
+     where ifTerm pred f prec ty _ val tt 
+               | pred ty tt = liftM Just (f prec val tt)
+               | otherwise     = return Nothing
+           isIntegerTy ty _ = fromMaybe False $ do
              (tc,_) <- splitTyConApp_maybe ty 
              return (tyConName tc == integerTyConName)
-           isTupleTy Term{ty=ty} = fromMaybe False $ do 
+           isTupleTy ty _  = fromMaybe False $ do 
              (tc,_) <- splitTyConApp_maybe ty 
              return (tc `elem` (fst.unzip.elems) boxedTupleArr)
-           isTyCon a_tc Term{ty=ty} = fromMaybe False $ do 
+           isTyCon a_tc ty _ = fromMaybe False $ do 
              (tc,_) <- splitTyConApp_maybe ty
              return (a_tc == tc)
-           coerceShow f _ = return . text . show . f . unsafeCoerce# . val
+           coerceShow f _ val _ = (return . text . show . f . unsafeCoerce#) val
            --TODO pprinting of list terms is not lazy
            doList p h t = do
                let elems = h : getListTerms t
                    isConsLast = termType(last elems) /= termType h
                print_elems <- mapM (y cons_prec) elems
                return$ if isConsLast
-                     then cparen (p >= cons_prec) . hsep . punctuate (space<>colon) 
-                           $ print_elems
+                     then cparen (p >= cons_prec) 
+                        . hsep 
+                        . punctuate (space<>colon)
+                        $ print_elems
                      else brackets (hcat$ punctuate comma print_elems)
 
                 where Just a /= Just b = not (a `coreEqType` b)
                       _      /=   _    = True
                       getListTerms Term{subTerms=[h,t]} = h : getListTerms t
-                      getListTerms t@Term{subTerms=[]}  = []
+                      getListTerms Term{subTerms=[]}  = []
                       getListTerms t@Suspension{}       = [t]
                       getListTerms t = pprPanic "getListTerms" (ppr t)
 
@@ -474,8 +485,8 @@ newVar = liftTcM . fmap mkTyVarTy . newFlexiTyVar
 -- | Returns the instantiated type scheme ty', and the substitution sigma 
 --   such that sigma(ty') = ty 
 instScheme :: Type -> TR (TcType, TvSubst)
-instScheme ty | (tvs, rho) <- tcSplitForAllTys ty = liftTcM$ do
-   (tvs',theta,ty') <- tcInstType (mapM tcInstTyVar) ty
+instScheme ty | (tvs, _rho) <- tcSplitForAllTys ty = liftTcM$ do
+   (tvs',_theta,ty') <- tcInstType (mapM tcInstTyVar) ty
    return (ty', zipTopTvSubst tvs' (mkTyVarTys tvs))
 
 -- Adds a constraint of the form t1 == t2
@@ -503,7 +514,7 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
               return$ mapTermType (substTy rev_subst) term
     where 
   go bound _ _ _ | seq bound False = undefined
-  go 0 tv ty a = do
+  go 0 tv _ty a = do
     clos <- trIO $ getClosureData a
     return (Suspension (tipe clos) (Just tv) a Nothing)
   go bound tv ty a = do 
@@ -590,9 +601,8 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
 
 
 -- Fast, breadth-first Type reconstruction
-max_depth = 10 :: Int
-cvReconstructType :: HscEnv -> Bool -> Maybe Type -> HValue -> IO (Maybe Type)
-cvReconstructType hsc_env force mb_ty hval = runTR_maybe hsc_env $ do
+cvReconstructType :: HscEnv -> Int -> Maybe Type -> HValue -> IO (Maybe Type)
+cvReconstructType hsc_env max_depth mb_ty hval = runTR_maybe hsc_env $ do
    tv <- newVar argTypeKind
    case mb_ty of
      Nothing -> do search (isMonomorphic `fmap` zonkTcType tv)
@@ -611,12 +621,14 @@ cvReconstructType hsc_env force mb_ty hval = runTR_maybe hsc_env $ do
               substTy rev_subst `fmap` zonkTcType tv
     where 
 --  search :: m Bool -> ([a] -> [a] -> [a]) -> [a] -> m ()
-  search stop expand l depth | Seq.null l = return ()
-  search stop expand x 0 = fail$ "Failed to reconstruct a type after " ++
+  search _ _ _ 0 = fail$ "Failed to reconstruct a type after " ++
                                 show max_depth ++ " steps"
-  search stop expand l d | x :< xx <- viewl l = unlessM stop $ do
-    new <- expand x
-    search stop expand (xx `mappend` Seq.fromList new) $! (pred d)
+  search stop expand l d =
+    case viewl l of 
+      EmptyL  -> return ()
+      x :< xx -> unlessM stop $ do
+                  new <- expand x
+                  search stop expand (xx `mappend` Seq.fromList new) $! (pred d)
 
    -- returns unification tasks,since we are going to want a breadth-first search
   go :: Type -> HValue -> TR [(Type, HValue)]
@@ -630,10 +642,6 @@ cvReconstructType hsc_env force mb_ty hval = runTR_maybe hsc_env $ do
         case mb_dc of
           Nothing-> do
                      --  TODO: Check this case
-            vars     <- replicateM (length$ elems$ ptrs clos)
-                                   (newVar (liftedTypeKind))
-            subTerms <- sequence [ appArr (go tv) (ptrs clos) i
-                                   | (i, tv) <- zip [0..] vars]    
             forM [0..length (elems $ ptrs clos)] $ \i -> do
                         tv <- newVar liftedTypeKind
                         return$ appArr (\e->(tv,e)) (ptrs clos) i
@@ -653,13 +661,14 @@ cvReconstructType hsc_env force mb_ty hval = runTR_maybe hsc_env $ do
             return $ [ appArr (\e->(t,e)) (ptrs clos) i
                        | (i,t) <- drop extra_args $ 
                                      zip [0..] (filter isPointed subTtypes)]
-      otherwise -> return []
+      _ -> return []
 
      -- This helper computes the difference between a base type t and the 
      -- improved rtti_t computed by RTTI
      -- The main difference between RTTI types and their normal counterparts
      --  is that the former are _not_ polymorphic, thus polymorphism must
      --  be stripped. Syntactically, forall's must be stripped
+computeRTTIsubst :: Type -> Type -> Maybe TvSubst
 computeRTTIsubst ty rtti_ty = 
      -- In addition, we strip newtypes too, since the reconstructed type might
      --   not have recovered them all
@@ -705,7 +714,7 @@ congruenceNewtypes lhs rhs
     | Just tv <- getTyVar_maybe lhs 
     = recoverTc (return (lhs,rhs)) $ do  
          Indirect ty_v <- readMetaTyVar tv
-         (lhs1, rhs1) <- congruenceNewtypes ty_v rhs
+         (_lhs1, rhs1) <- congruenceNewtypes ty_v rhs
          return (lhs, rhs1)
 -- FunTy inductive case
     | Just (l1,l2) <- splitFunTy_maybe lhs
@@ -714,8 +723,8 @@ congruenceNewtypes lhs rhs
          (l1',r1') <- congruenceNewtypes l1 r1
          return (mkFunTy l1' l2', mkFunTy r1' r2')
 -- TyconApp Inductive case; this is the interesting bit.
-    | Just (tycon_l, args_l) <- splitNewTyConApp_maybe lhs
-    , Just (tycon_r, args_r) <- splitNewTyConApp_maybe rhs 
+    | Just (tycon_l, _) <- splitNewTyConApp_maybe lhs
+    , Just (tycon_r, _) <- splitNewTyConApp_maybe rhs 
     , tycon_l /= tycon_r 
     = return (lhs, upgrade tycon_l rhs)
 
@@ -727,6 +736,7 @@ congruenceNewtypes lhs rhs
             | ty' <- mkTyConApp new_tycon (map mkTyVarTy $ tyConTyVars new_tycon)
             , Just subst <- tcUnifyTys (const BindMe) [ty] [repType ty']
             = substTy subst ty'
+          upgrade _ _ = panic "congruenceNewtypes.upgrade"
         -- assumes that reptype doesn't touch tyconApp args ^^^
 
 
@@ -734,24 +744,29 @@ congruenceNewtypes lhs rhs
 -- Semantically different to recoverM in TcRnMonad 
 -- recoverM retains the errors in the first action,
 --  whereas recoverTc here does not
+recoverTc :: TcM a -> TcM a -> TcM a
 recoverTc recover thing = do 
   (_,mb_res) <- tryTcErrs thing
   case mb_res of 
     Nothing  -> recover
     Just res -> return res
 
+isMonomorphic :: Type -> Bool
 isMonomorphic ty | (tvs, ty') <- splitForAllTys ty
                  = null tvs && (isEmptyVarSet . tyVarsOfType) ty'
 
 mapMif :: Monad m => (a -> Bool) -> (a -> m a) -> [a] -> m [a]
 mapMif pred f xx = sequence $ mapMif_ pred f xx
-mapMif_ pred f []     = []
-mapMif_ pred f (x:xx) = (if pred x then f x else return x) : mapMif_ pred f xx
+  where
+   mapMif_ _ _ []     = []
+   mapMif_ pred f (x:xx) = (if pred x then f x else return x) : mapMif_ pred f xx
 
+unlessM :: Monad m => m Bool -> m () -> m ()
 unlessM condM acc = condM >>= \c -> unless c acc
 
 -- Strict application of f at index i
-appArr f a@(Array _ _ _ ptrs#) i@(I# i#)
+appArr :: Ix i => (e -> a) -> Array i e -> Int -> a
+appArr f (Array _ _ _ ptrs#) (I# i#)
  = ASSERT (i < length(elems a))
    case indexArray# ptrs# i# of
        (# e #) -> f e
@@ -767,6 +782,7 @@ zonkTerm = foldTerm idTermFoldM {
 
 -- Is this defined elsewhere?
 -- Generalize the type: find all free tyvars and wrap in the appropiate ForAll.
+sigmaType :: Type -> Type
 sigmaType ty = mkForAllTys (varSetElems$ tyVarsOfType (dropForAlls ty)) ty
 
 
