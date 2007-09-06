@@ -37,7 +37,7 @@ doit destdir pref idatadir idocdir ghcpkg ghcpkgconf verbosity =
                               copyVerbose = verbosity
                           }
               registerFlags = emptyRegisterFlags {
-                                  regUser = MaybeUserGlobal,
+                                  regPackageDB = Just GlobalPackageDB,
                                   regVerbose = verbosity,
                                   regGenScript = False,
                                   regInPlace = False

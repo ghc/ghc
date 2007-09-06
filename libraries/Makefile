@@ -223,7 +223,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace$ \
 	           --with-hsc2hs=../../utils/hsc2hs/hsc2hs-inplace \
 	           --with-ld=$(LD) \
-	           --haddock-args="--use-contents=../index.html \
+	           --haddock-options="--use-contents=../index.html \
 	                           --use-index=../doc-index.html" \
 	           $(FLAGGED_CONFIGURE_ARGS) \
 	           --configure-option=--with-cc=$(CC) ) \
