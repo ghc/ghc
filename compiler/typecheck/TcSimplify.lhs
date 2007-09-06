@@ -2379,21 +2379,6 @@ addRefinedGiven reft (refined_givens, avails) given
 	    -- and hopefully the optimiser will spot the duplicated work
   | otherwise
   = return (refined_givens, avails)
-
-addRefinedGiven' :: Refinement -> [Inst] -> Inst -> TcM [Inst]
-addRefinedGiven' reft refined_givens given
-  | isDict given	-- We sometimes have 'given' methods, but they
-			-- are always optional, so we can drop them
-  , let pred = dictPred given
-  , isRefineablePred pred	-- See Note [ImplicInst rigidity]
-  , Just (co, pred) <- refinePred reft pred
-  = do 	{ new_given <- newDictBndr (instLoc given) pred
-	; return (new_given:refined_givens) }
-	    -- ToDo: the superclasses of the original given all exist in Avails 
-	    -- so we could really just cast them, but it's more awkward to do,
-	    -- and hopefully the optimiser will spot the duplicated work
-  | otherwise
-  = return refined_givens 
 \end{code}
 
 Note [ImplicInst rigidity]
