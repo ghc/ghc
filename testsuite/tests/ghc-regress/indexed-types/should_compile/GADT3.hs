@@ -14,7 +14,7 @@ data Nat n where
   Zero :: Nat ZERO
   Succ :: Nat n -> Nat (SUCC n)
 
-type family PLUS n :: * -> *
+type family PLUS m n
 type instance PLUS ZERO n = n
 
 plus_zero :: Nat n -> EQUAL (PLUS ZERO n) n
