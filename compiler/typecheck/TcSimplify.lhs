@@ -2464,7 +2464,8 @@ addSCs is_loop avails dict
   where
     (clas, tys) = getDictClassTys dict
     (tyvars, sc_theta, sc_sels, _) = classBigSig clas
-    sc_theta' = substTheta (zipTopTvSubst tyvars tys) sc_theta
+    sc_theta' = filter (not . isEqPred) $
+                  substTheta (zipTopTvSubst tyvars tys) sc_theta
 
     add_sc avails (sc_dict, sc_sel)
       | is_loop (dictPred sc_dict) = return avails 	-- See Note [SUPERCLASS-LOOP 2]
