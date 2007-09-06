@@ -378,17 +378,18 @@ mkExport top_lvl prag_fn inferred_tvs dict_tys (poly_name, mb_sig, mono_id)
   = do	{ warn_missing_sigs <- doptM Opt_WarnMissingSigs
 	; let warn = isTopLevel top_lvl && warn_missing_sigs
 	; (tvs, poly_id) <- mk_poly_id warn mb_sig
+		-- poly_id has a zonked type
 
-	; poly_id' <- zonkId poly_id
-	; prags <- tcPrags poly_id' (prag_fn poly_name)
+	; prags <- tcPrags poly_id (prag_fn poly_name)
 		-- tcPrags requires a zonked poly_id
 
-	; return (tvs, poly_id', mono_id, prags) }
+	; return (tvs, poly_id, mono_id, prags) }
   where
     poly_ty = mkForAllTys inferred_tvs (mkFunTys dict_tys (idType mono_id))
 
-    mk_poly_id warn Nothing    = do { missingSigWarn warn poly_name poly_ty
-				    ; return (inferred_tvs, mkLocalId poly_name poly_ty) }
+    mk_poly_id warn Nothing    = do { poly_ty' <- zonkTcType poly_ty
+				    ; missingSigWarn warn poly_name poly_ty'
+				    ; return (inferred_tvs, mkLocalId poly_name poly_ty') }
     mk_poly_id warn (Just sig) = do { tvs <- mapM zonk_tv (sig_tvs sig)
 			            ; return (tvs,  sig_id sig) }
 
