@@ -15,6 +15,11 @@ import time
 from testutil import *
 from testglobals import *
 
+# Readline sometimes spews out ANSI escapes for some values of TERM,
+# which result in test failures. Thus set TERM to a nice, simple, safe
+# value.
+os.environ['TERM'] = 'vt100'
+
 global config
 config = getConfig() # get it from testglobals
 
