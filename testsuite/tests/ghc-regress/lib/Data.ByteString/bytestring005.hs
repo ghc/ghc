@@ -150,22 +150,12 @@ integralRandomR  (a,b) g = case randomR (fromIntegral a :: Integer,
                             (x,g) -> (fromIntegral x, g)
 
 instance Arbitrary L.ByteString where
-    arbitrary     = arbitrary >>= return . L.LPS . filter (not. P.null) -- maintain the invariant.
+    arbitrary     = arbitrary >>= return . L.fromChunks . filter (not. P.null) -- maintain the invariant.
     coarbitrary s = coarbitrary (L.unpack s)
 
 instance Arbitrary P.ByteString where
   arbitrary = P.pack `fmap` arbitrary
   coarbitrary s = coarbitrary (P.unpack s)
-
-instance Functor ((->) r) where
-    fmap = (.)
-
-instance Monad ((->) r) where
-    return = const
-    f >>= k = \ r -> k (f r) r
-
-instance Functor ((,) a) where
-    fmap f (x,y) = (x, f y)
 
 ------------------------------------------------------------------------
 --
@@ -227,14 +217,14 @@ instance (NatTrans m n, Model a b) => Model (m a) (n b) where model x = fmap mod
 
 -- In a form more useful for QC testing (and it's lazy)
 checkInvariant :: L.ByteString -> L.ByteString
-checkInvariant (L.LPS lps) = L.LPS (check lps)
-  where check []     = []
-        check (x:xs) | P.null x  = error ("invariant violation: " ++ show lps)
-                     | otherwise = x : check xs
+checkInvariant cs0 = check cs0
+  where check L.Empty        = L.Empty
+        check (L.Chunk c cs)
+	       | P.null c    = error ("invariant violation: " ++ show cs0)
+               | otherwise   = L.Chunk c (check cs)
 
 abstr :: L.ByteString -> P.ByteString
-abstr (L.LPS []) = P.empty
-abstr (L.LPS xs) = P.concat xs
+abstr = P.concat . L.toChunks
 
 -- Some short hand.
 type X = Int
@@ -282,8 +272,8 @@ instance IsNull P.ByteString where isNull = P.null
 --
 
 invariant :: L.ByteString -> Bool
-invariant (L.LPS []) = True
-invariant (L.LPS xs) = all (not . P.null) xs
+invariant L.Empty       = True
+invariant (L.Chunk c cs) = not (P.null c) && invariant cs
 
 prop_invariant = invariant
 
@@ -437,7 +427,7 @@ prop_splitWith f xs = (l1 == l2 || l1 == l2+1) &&
         l1 = fromIntegral (length splits)
         l2 = L.length (L.filter f xs)
 
-prop_joinsplit c xs = L.join (pack [c]) (L.split c xs) == id xs
+prop_joinsplit c xs = L.intercalate (pack [c]) (L.split c xs) == id xs
 
 prop_group xs       = group xs == (map unpack . L.group . pack) xs
 -- prop_groupBy  f xs  = groupBy f xs == (map unpack . L.groupBy f . pack) xs
@@ -570,7 +560,7 @@ prop_splitWithBB f xs = (l1 == l2 || l1 == l2+1) &&
         l1 = length splits
         l2 = P.length (P.filter f xs)
 
-prop_joinsplitBB c xs = P.join (P.pack [c]) (P.split c xs) == xs
+prop_joinsplitBB c xs = P.intercalate (P.pack [c]) (P.split c xs) == xs
 
 -- prop_linessplitBB xs =
 --     (not . C.null) xs ==>
@@ -733,7 +723,7 @@ prop_groupByBB  xs = groupBy (==) xs == (map P.unpack . P.groupBy (==) . P.pack)
 prop_groupBy1BB xs = groupBy (/=) xs == (map P.unpack . P.groupBy (/=) . P.pack) xs
 
 prop_joinBB xs ys = (concat . (intersperse ys) . lines) xs ==
-               (C.unpack $ C.join (C.pack ys) (C.lines (C.pack xs)))
+               (C.unpack $ C.intercalate (C.pack ys) (C.lines (C.pack xs)))
 
 prop_elemIndex1BB xs   = (elemIndex 'X' xs) == (C.elemIndex 'X' (C.pack xs))
 prop_elemIndex2BB xs c = (elemIndex c xs) == (C.elemIndex c (C.pack xs))

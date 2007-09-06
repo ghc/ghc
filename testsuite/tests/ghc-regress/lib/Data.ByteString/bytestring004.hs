@@ -150,22 +150,12 @@ integralRandomR  (a,b) g = case randomR (fromIntegral a :: Integer,
                             (x,g) -> (fromIntegral x, g)
 
 instance Arbitrary L.ByteString where
-    arbitrary     = arbitrary >>= return . L.LPS . filter (not. P.null) -- maintain the invariant.
+    arbitrary     = arbitrary >>= return . L.fromChunks . filter (not. P.null) -- maintain the invariant.
     coarbitrary s = coarbitrary (L.unpack s)
 
 instance Arbitrary P.ByteString where
   arbitrary = P.pack `fmap` arbitrary
   coarbitrary s = coarbitrary (P.unpack s)
-
-instance Functor ((->) r) where
-    fmap = (.)
-
-instance Monad ((->) r) where
-    return = const
-    f >>= k = \ r -> k (f r) r
-
-instance Functor ((,) a) where
-    fmap f (x,y) = (x, f y)
 
 ------------------------------------------------------------------------
 --
@@ -227,14 +217,14 @@ instance (NatTrans m n, Model a b) => Model (m a) (n b) where model x = fmap mod
 
 -- In a form more useful for QC testing (and it's lazy)
 checkInvariant :: L.ByteString -> L.ByteString
-checkInvariant (L.LPS lps) = L.LPS (check lps)
-  where check []     = []
-        check (x:xs) | P.null x  = error ("invariant violation: " ++ show lps)
-                     | otherwise = x : check xs
+checkInvariant cs0 = check cs0
+  where check L.Empty        = L.Empty
+        check (L.Chunk c cs)
+	       | P.null c    = error ("invariant violation: " ++ show cs0)
+               | otherwise   = L.Chunk c (check cs)
 
 abstr :: L.ByteString -> P.ByteString
-abstr (L.LPS []) = P.empty
-abstr (L.LPS xs) = P.concat xs
+abstr = P.concat . L.toChunks
 
 -- Some short hand.
 type X = Int
