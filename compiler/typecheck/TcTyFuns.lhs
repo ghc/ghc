@@ -41,6 +41,7 @@ import SrcLoc	( Located(..) )
 import Maybes
 
 import Data.List
+import Control.Monad (liftM)
 \end{code}
 
 
@@ -227,19 +228,20 @@ normalise_dicts given_eqs dicts is_wanted
 
 %************************************************************************
 %*									*
-\section{Normalisation of Wanteds}
+\section{Normalisation of wanteds constraints}
 %*									*
 %************************************************************************
 
 \begin{code}
 normaliseWanteds :: [Inst] -> TcM [Inst]
 normaliseWanteds insts 
-  = do { traceTc (text "normaliseWanteds" <+> ppr insts)
-       ; result <- eq_rewrite
-		     [ ("(Occurs)",  simple_rewrite_check $ occursCheckInsts)
-		     , ("(ZONK)",    simple_rewrite $ zonkInsts)
+  = do { traceTc (text "normaliseWanteds <-" <+> ppr insts)
+       ; result <- liftM fst $ rewriteToFixedPoint Nothing
+		     [ ("(Occurs)",  noChange  $ occursCheckInsts)
+		     , ("(ZONK)",    dontRerun $ zonkInsts)
 		     , ("(TRIVIAL)", trivialInsts)
-		     , ("(SWAP)",    swapInsts)
+		     -- no `swapInsts'; it messes up error messages and should
+                     -- not be necessary -=chak
 		     , ("(DECOMP)",  decompInsts)
 		     , ("(TOP)",     topInsts)
 		     , ("(SUBST)",   substInsts)
@@ -250,34 +252,34 @@ normaliseWanteds insts
        }
 \end{code}
 
+
 %************************************************************************
 %*									*
-\section{Normalisation of Givens}
+\section{Normalisation of givens constraints}
 %*									*
 %************************************************************************
 
 \begin{code}
+normaliseGivens :: [Inst] -> TcM ([Inst], TcM ())
+normaliseGivens givens
+ = do { traceTc (text "normaliseGivens <-" <+> ppr givens)
+      ; (result, deSkolem) <- 
+          rewriteToFixedPoint (Just ("(SkolemOccurs)", skolemOccurs))
+	    [ ("(Occurs)",  noChange  $ occursCheckInsts)
+	    , ("(ZONK)",    dontRerun $ zonkInsts)
+	    , ("(TRIVIAL)", trivialInsts)
+	    , ("(SWAP)",    swapInsts)
+	    , ("(DECOMP)",  decompInsts)
+	    , ("(TOP)",	    topInsts)
+	    , ("(SUBST)",   substInsts)
+            ] givens
+      ; traceTc (text "normaliseGivens ->" <+> ppr result)
+      ; return (result, deSkolem)
+      }
 
-normaliseGivens :: [Inst] -> TcM ([Inst],TcM ())
-normaliseGivens givens = 
-	do { traceTc (text "normaliseGivens <-" <+> ppr givens)
-	   ; (result,action) <- given_eq_rewrite
-			("(SkolemOccurs)",	skolemOccurs)
-			(return ())
-			[("(Occurs)",	simple_rewrite_check $ occursCheckInsts),
-			 ("(ZONK)",	simple_rewrite $ zonkInsts),
-			 ("(TRIVIAL)",	trivialInsts),
-			 ("(SWAP)",	swapInsts),
-			 ("(DECOMP)",	decompInsts), 
-			 ("(TOP)",	topInsts), 
-			 ("(SUBST)",	substInsts)] 
-			givens
-	   ; traceTc (text "normaliseGivens ->" <+> ppr result)
-	   ; return (result,action)
-	   }
-
-skolemOccurs :: [Inst] -> TcM ([Inst],TcM ())
-skolemOccurs []    = return ([], return ())
+-- An explanation of what this does would be helpful! -=chak
+skolemOccurs :: PrecondRule
+skolemOccurs [] = return ([], return ())
 skolemOccurs (inst@(EqInst {}):insts) 
 	= do { (insts',actions) <- skolemOccurs insts
 	       -- check whether the current inst  co :: ty1 ~ ty2  suffers 
@@ -317,108 +319,122 @@ skolemOccurs (inst@(EqInst {}):insts)
 		go flag	ty 			= False
 \end{code}
 
+
 %************************************************************************
 %*									*
-\section{Solving of Wanteds}
+\section{Solving of wanted constraints with respect to a given set}
 %*									*
 %************************************************************************
 
 \begin{code}
-solveWanteds ::
-	[Inst] -> 	-- givens
-	[Inst] -> 	-- wanteds
-	TcM [Inst]	-- irreducible wanteds
-solveWanteds givens wanteds =
-	do { traceTc (text "solveWanteds <-" <+> ppr wanteds <+> text "with" <+> ppr givens)
-	   ; result <- eq_rewrite
-			[("(Occurs)",	simple_rewrite_check $ occursCheckInsts),
-			 ("(TRIVIAL)",	trivialInsts),
-			 ("(DECOMP)",	decompInsts), 
-			 ("(TOP)",	topInsts), 
-			 ("(GIVEN)",	givenInsts givens), 
-			 ("(UNIFY)",	unifyInsts)]
-			wanteds
-	   ; traceTc (text "solveWanteds ->" <+> ppr result)
-	   ; return result
+solveWanteds :: [Inst]          -- givens
+	     -> [Inst] 	        -- wanteds
+	     -> TcM [Inst]	-- irreducible wanteds
+solveWanteds givens wanteds 
+  = do { traceTc $ text "solveWanteds <-" <+> ppr wanteds <+> text "with" <+> 
+                   ppr givens
+       ; result <- liftM fst $ rewriteToFixedPoint Nothing
+                     [ ("(Occurs)",  noChange $ occursCheckInsts)
+                     , ("(TRIVIAL)", trivialInsts)
+                     , ("(DECOMP)",  decompInsts)
+                     , ("(TOP)",     topInsts)
+                     , ("(GIVEN)",   givenInsts givens)
+                     , ("(UNIFY)",   unifyInsts)
+                     ] wanteds
+       ; traceTc (text "solveWanteds ->" <+> ppr result)
+       ; return result
+       }
+  where
+    -- Use `substInst' with every given on all the wanteds.
+    givenInsts :: [Inst] -> [Inst] -> TcM ([Inst],Bool)		 
+    givenInsts []     wanteds = return (wanteds,False)
+    givenInsts (g:gs) wanteds
+      = do { (wanteds1, changed1) <- givenInsts gs wanteds
+	   ; (wanteds2, changed2) <- substInst g wanteds1
+	   ; return (wanteds2, changed1 || changed2)
 	   }
-
-
-givenInsts :: [Inst] -> [Inst] -> TcM ([Inst],Bool)		 
-givenInsts [] wanteds
-	= return (wanteds,False)
-givenInsts (g:gs) wanteds
-	= do { (wanteds1,changed1) <- givenInsts gs wanteds
-	     ; (wanteds2,changed2) <- substInst g wanteds1
-	     ; return (wanteds2,changed1 || changed2)
-	     }
-
-
-
-	-- fixpoint computation
-	-- of a number of rewrites of equalities
-eq_rewrite :: 
-	[(String,[Inst] -> TcM ([Inst],Bool))] -> 	-- rewrite functions and descriptions
-	[Inst] -> 					-- initial equations
-	TcM [Inst]					-- final   equations (at fixed point)
-eq_rewrite rewrites insts
-	= go rewrites insts
-	where 
-	  go _  []					-- return quickly when there's nothing to be done
-	    = return []
-	  go [] insts 
-	    = return insts
-	  go ((desc,r):rs) insts
-	    = do { (insts',changed) <- r insts 
-		 ; traceTc (text desc <+> ppr insts')
-		 ; if changed
-			then loop insts'
-			else go rs insts'
-	         }
-	  loop = eq_rewrite rewrites
-
-	-- fixpoint computation
-	-- of a number of rewrites of equalities
-given_eq_rewrite :: 
-	
-	(String,[Inst] -> TcM ([Inst],TcM ())) ->
-	(TcM ()) ->
-	[(String,[Inst] -> TcM ([Inst],Bool))] -> 	-- rewrite functions and descriptions
-	[Inst] -> 					-- initial equations
-	TcM ([Inst],TcM ())					-- final   equations (at fixed point)
-given_eq_rewrite p@(desc,start) acc rewrites insts
-	= do { (insts',acc') <- start insts
-	     ; go (acc >> acc') rewrites insts'
-	     }
-	where 
-	  go acc _  []				-- return quickly when there's nothing to be done
-	    = return ([],acc)
-	  go acc [] insts 
-	    = return (insts,acc)
-	  go acc ((desc,r):rs) insts
-	    = do { (insts',changed) <- r insts 
-		 ; traceTc (text desc <+> ppr insts')
-		 ; if changed
-			then loop acc insts'
-			else go acc rs insts'
-	         }
-	  loop acc = given_eq_rewrite p acc rewrites
-
-simple_rewrite ::
-	([Inst] -> TcM [Inst]) ->
-	([Inst] -> TcM ([Inst],Bool))
-simple_rewrite r insts
-	= do { insts' <- r insts
-	     ; return (insts',False)
-	     }
-
-simple_rewrite_check ::
-	([Inst] -> TcM ()) ->
-	([Inst] -> TcM ([Inst],Bool))
-simple_rewrite_check check insts
-	= check insts >> return (insts,False)
-	     
-
 \end{code}
+
+
+%************************************************************************
+%*									*
+\section{Normalisation rules and iterative rule application}
+%*									*
+%************************************************************************
+
+We have four kinds of normalising rewrite rules:
+
+(1) Normalisation rules that rewrite a set of insts and return a flag indicating
+    whether any changes occurred during rewriting that necessitate re-running
+    the current rule set.
+
+(2) Precondition rules that rewrite a set of insts and return a monadic action
+    that reverts the effect of preconditioning.
+
+(3) Idempotent normalisation rules that never require re-running the rule set. 
+
+(4) Checking rule that does not alter the set of insts. 
+
+\begin{code}
+type RewriteRule     = [Inst] -> TcM ([Inst], Bool)   -- rewrite, maybe re-run
+type PrecondRule     = [Inst] -> TcM ([Inst], TcM ()) -- rewrite, revertable
+type IdemRewriteRule = [Inst] -> TcM [Inst]           -- rewrite, don't re-run
+type CheckRule       = [Inst] -> TcM ()               -- check
+
+type NamedRule       = (String, RewriteRule)          -- rule with description
+type NamedPreRule    = (String, PrecondRule)          -- precond with desc
+\end{code}
+
+Templates lifting idempotent and checking rules to full rules (which can be put
+into a rule set).
+
+\begin{code}
+dontRerun :: IdemRewriteRule -> RewriteRule
+dontRerun rule insts = liftM addFalse $ rule insts
+  where
+    addFalse x = (x, False)
+
+noChange :: CheckRule -> RewriteRule
+noChange rule insts = rule insts >> return (insts, False)
+\end{code}
+
+The following function applies a set of rewrite rules until a fixed point is
+reached; i.e., none of the `RewriteRule's require re-running the rule set.
+Optionally, there may be a pre-conditing rule that is applied before any other
+rules are applied and before the rule set is re-run.
+
+The result is the set of rewritten (i.e., normalised) insts and, in case of a
+pre-conditing rule, a monadic action that reverts the effects of
+pre-conditioning - specifically, this is removing introduced skolems.
+
+\begin{code}
+rewriteToFixedPoint :: Maybe NamedPreRule   -- optional preconditioning rule
+                    -> [NamedRule]          -- rule set
+                    -> [Inst]               -- insts to rewrite
+                    -> TcM ([Inst], TcM ())
+rewriteToFixedPoint precondRule rules insts
+  = completeRewrite (return ()) precondRule insts
+  where
+    completeRewrite :: TcM () -> Maybe NamedPreRule -> [Inst] 
+                    -> TcM ([Inst], TcM ())
+    completeRewrite dePrecond (Just (precondName, precond)) insts
+      = do { (insts', dePrecond') <- precond insts
+           ; traceTc $ text precondName <+> ppr insts'
+           ; tryRules dePrecond rules insts'
+           }
+    completeRewrite dePrecond Nothing insts
+      = tryRules dePrecond rules insts
+
+    tryRules dePrecond _                    []    = return ([]   , dePrecond)
+    tryRules dePrecond []                   insts = return (insts, dePrecond)
+    tryRules dePrecond ((name, rule):rules) insts 
+      = do { (insts', rerun) <- rule insts
+           ; traceTc $ text name <+> ppr insts'
+	   ; if rerun then completeRewrite dePrecond precondRule insts'
+		      else tryRules dePrecond rules insts'
+           }
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -468,6 +484,7 @@ swapInsts insts
 	--	g2 : Fd ~ c
 	--	g1 := sym g2
 	--
+        -- This is not all, is it?  Td ~ c is also rewritten to c ~ Td!
 swapInst i@(EqInst {})
 	= go ty1 ty2
 	where
