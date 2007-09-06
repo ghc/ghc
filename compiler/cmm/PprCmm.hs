@@ -39,13 +39,15 @@
 -- A useful example pass over Cmm is in nativeGen/MachCodeGen.hs
 --
 
-module PprCmm ( 	
-	writeCmms, pprCmms, pprCmm, pprStmt, pprExpr, pprSection, pprStatic
-  ) where
+module PprCmm
+    ( writeCmms, pprCmms, pprCmm, pprStmt, pprExpr, pprSection, pprStatic
+    )
+where
 
 #include "HsVersions.h"
 
 import Cmm
+import CmmExpr
 import CmmUtils
 import MachOp
 import CLabel
@@ -59,7 +61,7 @@ import Data.List
 import System.IO
 import Data.Maybe
 
-pprCmms :: (Outputable info) => [GenCmm CmmStatic info (ListGraph CmmStmt)] -> SDoc
+pprCmms :: (Outputable info, Outputable g) => [GenCmm CmmStatic info g] -> SDoc
 pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
         where
           separator = space $$ ptext SLIT("-------------------") $$ space
@@ -69,21 +71,19 @@ writeCmms handle cmms = printForC handle (pprCmms cmms)
 
 -----------------------------------------------------------------------------
 
-instance (Outputable info) => Outputable (GenCmm CmmStatic info (ListGraph CmmStmt)) where
+instance (Outputable info, Outputable g)
+    => Outputable (GenCmm CmmStatic info g) where
     ppr c = pprCmm c
 
 instance (Outputable d, Outputable info, Outputable i)
 	=> Outputable (GenCmmTop d info i) where
     ppr t = pprTop t
 
-instance Outputable i => Outputable (ListGraph i) where
+instance (Outputable instr) => Outputable (ListGraph instr) where
     ppr (ListGraph blocks) = vcat (map ppr blocks)
 
 instance (Outputable instr) => Outputable (GenBasicBlock instr) where
     ppr b = pprBBlock b
-
-instance Outputable BlockId where
-    ppr id = pprBlockId id
 
 instance Outputable CmmStmt where
     ppr s = pprStmt s
@@ -110,16 +110,16 @@ instance Outputable CmmInfo where
 
 -----------------------------------------------------------------------------
 
-pprCmm :: (Outputable info) => GenCmm CmmStatic info (ListGraph CmmStmt) -> SDoc
+pprCmm :: (Outputable info,  Outputable g) => GenCmm CmmStatic info g -> SDoc
 pprCmm (Cmm tops) = vcat $ intersperse (text "") $ map pprTop tops
 
 -- --------------------------------------------------------------------------
 -- Top level `procedure' blocks.
 --
-pprTop 	:: (Outputable d, Outputable info, Outputable g)
-	=> GenCmmTop d info g -> SDoc
+pprTop 	:: (Outputable d, Outputable info, Outputable i)
+	=> GenCmmTop d info i -> SDoc
 
-pprTop (CmmProc info lbl params graph)
+pprTop (CmmProc info lbl params graph )
 
   = vcat [ pprCLabel lbl <> parens (commafy $ map ppr params) <+> lbrace
          , nest 8 $ lbrace <+> ppr info $$ rbrace
@@ -235,7 +235,7 @@ pprStmt stmt = case stmt of
                   then empty
                   else parens (commafy $ map ppr results) <>
                        ptext SLIT(" = "),
-               ptext SLIT("call"), space, 
+               ptext SLIT("foreign"), space, 
                doubleQuotes(ppr cconv), space,
                target fn, parens  ( commafy $ map ppr args ),
                brackets (ppr safety), 
@@ -548,6 +548,7 @@ pprSection s = case s of
     Text              -> section <+> doubleQuotes (ptext SLIT("text"))
     Data              -> section <+> doubleQuotes (ptext SLIT("data"))
     ReadOnlyData      -> section <+> doubleQuotes (ptext SLIT("readonly"))
+    ReadOnlyData16    -> section <+> doubleQuotes (ptext SLIT("readonly16"))
     RelocatableReadOnlyData
                       -> section <+> doubleQuotes (ptext SLIT("relreadonly"))
     UninitialisedData -> section <+> doubleQuotes (ptext SLIT("uninitialised"))

@@ -70,6 +70,10 @@ codeGen :: DynFlags
 	-> HpcInfo
 	-> IO [Cmm]		-- Output
 
+                -- N.B. returning '[Cmm]' and not 'Cmm' here makes it
+                -- possible for object splitting to split up the
+                -- pieces later.
+
 codeGen dflags this_mod data_tycons imported_mods 
 	cost_centre_info stg_binds hpc_info
   = do	

@@ -325,7 +325,8 @@ mkAltLabel      uniq tag	= CaseLabel uniq (CaseAlt tag)
 mkDefaultLabel  uniq 		= CaseLabel uniq CaseDefault
 
 mkStringLitLabel		= StringLitLabel
-mkAsmTempLabel 			= AsmTempLabel
+mkAsmTempLabel :: Uniquable a => a -> CLabel
+mkAsmTempLabel a		= AsmTempLabel (getUnique a)
 
 mkModuleInitLabel :: Module -> String -> CLabel
 mkModuleInitLabel mod way        = ModuleInitLabel mod way

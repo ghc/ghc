@@ -14,7 +14,6 @@ module CmmInfo (
 
 import Cmm
 import CmmUtils
-import PprCmm
 
 import CLabel
 import MachOp
@@ -28,7 +27,6 @@ import SMRep
 
 import Constants
 import StaticFlags
-import DynFlags
 import Unique
 import UniqSupply
 import Panic
@@ -78,10 +76,10 @@ cmmToRawCmm cmm = do
 
 mkInfoTable :: Unique -> CmmTop -> [RawCmmTop]
 mkInfoTable uniq (CmmData sec dat) = [CmmData sec dat]
-mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments (ListGraph blocks)) =
+mkInfoTable uniq (CmmProc (CmmInfo _ _ info) entry_label arguments blocks) =
     case info of
       -- | Code without an info table.  Easy.
-      CmmNonInfoTable -> [CmmProc [] entry_label arguments (ListGraph blocks)]
+      CmmNonInfoTable -> [CmmProc [] entry_label arguments blocks]
 
       CmmInfoTable (ProfilingInfo ty_prof cl_prof) type_tag type_info ->
           let info_label = entryLblToInfoLbl entry_label
@@ -153,21 +151,21 @@ mkInfoTableAndCode :: CLabel
                    -> [CmmLit]
                    -> CLabel
                    -> CmmFormals
-                   -> [CmmBasicBlock]
+                   -> ListGraph CmmStmt
                    -> [RawCmmTop]
 mkInfoTableAndCode info_lbl std_info extra_bits entry_lbl args blocks
   | tablesNextToCode 	-- Reverse the extra_bits; and emit the top-level proc
   = [CmmProc (map CmmStaticLit (reverse extra_bits ++ std_info))
-             entry_lbl args (ListGraph blocks)]
+             entry_lbl args blocks]
 
-  | null blocks -- No actual code; only the info table is significant
+  | ListGraph [] <- blocks -- No code; only the info table is significant
   =		-- Use a zero place-holder in place of the 
 		-- entry-label in the info table
     [mkRODataLits info_lbl (zeroCLit : std_info ++ extra_bits)]
 
   | otherwise	-- Separately emit info table (with the function entry 
   =		-- point as first entry) and the entry code 
-    [CmmProc [] entry_lbl args (ListGraph blocks),
+    [CmmProc [] entry_lbl args blocks,
      mkDataLits info_lbl (CmmLabel entry_lbl : std_info ++ extra_bits)]
 
 mkSRTLit :: CLabel
@@ -277,3 +275,7 @@ mkStdInfoTable type_descr closure_descr cl_type srt_len layout_lit
 	| otherwise	     = []
 
     type_lit = packHalfWordsCLit cl_type srt_len
+
+
+_unused :: FS.FastString -- stops a warning
+_unused = undefined

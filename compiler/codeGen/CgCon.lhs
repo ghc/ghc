@@ -397,6 +397,9 @@ cgTyCon tycon
 	    -- datatype closure table (for enumeration types)
 	    -- to (say) PrelBase_$wTrue_closure, which is defined in code_stuff
             -- Note that the closure pointers are tagged.
+
+            -- XXX comment says to put table after constructor decls, but
+            -- code appears to put it before --- NR 16 Aug 2007
 	; extra <- 
 	   if isEnumerationTyCon tycon then do
 	        tbl <- getCmm (emitRODataLits (mkLocalClosureTableLabel 

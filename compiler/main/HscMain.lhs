@@ -5,13 +5,6 @@
 \section[GHC_Main]{Main driver for Glasgow Haskell compiler}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module HscMain
     ( newHscEnv, hscCmmFile
     , hscFileCheck
@@ -36,7 +29,6 @@ import HsSyn		( Stmt(..), LStmt, LHsType )
 import CodeOutput	( outputForeignStubs )
 import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
 import Linker		( HValue, linkExpr )
-import CoreSyn		( CoreExpr )
 import CoreTidy		( tidyExpr )
 import CorePrep		( corePrepExpr )
 import Flattening	( flattenExpr )
@@ -54,7 +46,7 @@ import VarEnv		( emptyTidyEnv )
 #endif
 
 import Var		( Id )
-import Module		( emptyModuleEnv, ModLocation(..) )
+import Module		( emptyModuleEnv, ModLocation(..), Module )
 import RdrName		( GlobalRdrEnv, RdrName, emptyGlobalRdrEnv )
 import HsSyn		( HsModule, LHsBinds, HsGroup, LIE, LImportDecl, HsDoc,
                           HaddockModInfo )
@@ -72,18 +64,24 @@ import LoadIface	( ifaceStats, initExternalPackageState )
 import PrelInfo		( wiredInThings, basicKnownKeyNames )
 import MkIface		( checkOldIface, mkIface, writeIfaceFile )
 import Desugar          ( deSugar )
-import Flattening       ( flatten )
 import SimplCore        ( core2core )
 import TidyPgm		( tidyProgram, mkBootModDetails )
 import CorePrep		( corePrepPgm )
 import CoreToStg	( coreToStg )
+import StgSyn
+import CostCentre
 import TyCon		( isDataTyCon )
 import Name		( Name, NamedThing(..) )
 import SimplStg		( stg2stg )
 import CodeGen		( codeGen )
+import Cmm              ( Cmm )
 import CmmParse		( parseCmmFile )
 import CmmCPS
+import CmmCPSZ
 import CmmInfo
+import CmmCvt
+import CmmTx
+import CmmContFlowOpt
 import CodeOutput	( codeOutput )
 import NameEnv          ( emptyNameEnv )
 
@@ -99,6 +97,7 @@ import ParserCore
 import ParserCoreUtils
 import FastString
 import UniqFM		( emptyUFM )
+import UniqSupply       ( initUs_ )
 import Bag		( unitBag )
 
 import Control.Monad
@@ -348,7 +347,7 @@ hscCompiler norecomp msg nonBootComp bootComp hsc_env mod_summary =
 --------------------------------------------------------------
 
 norecompOneShot :: NoRecomp HscStatus
-norecompOneShot old_iface
+norecompOneShot _old_iface
     = do hsc_env <- gets compHscEnv
          liftIO $ do
          dumpIfaceStats hsc_env
@@ -361,9 +360,9 @@ norecompInteractive :: NoRecomp (InteractiveStatus, ModIface, ModDetails)
 norecompInteractive = norecompWorker InteractiveNoRecomp True
 
 norecompWorker :: a -> Bool -> NoRecomp (a, ModIface, ModDetails)
-norecompWorker a isInterp old_iface
+norecompWorker a _isInterp old_iface
     = do hsc_env <- gets compHscEnv
-         mod_summary <- gets compModSummary
+         _mod_summary <- gets compModSummary
          liftIO $ do
          new_details <- {-# SCC "tcRnIface" #-}
                         initIfaceCheck hsc_env $
@@ -485,7 +484,7 @@ hscSimplify ds_result
 hscSimpleIface :: ModGuts -> Comp (ModIface, Bool, ModDetails, ModGuts)
 hscSimpleIface ds_result
   = do hsc_env <- gets compHscEnv
-       mod_summary <- gets compModSummary
+       _mod_summary <- gets compModSummary
        maybe_old_iface <- gets compOldIface
        liftIO $ do
        details <- mkBootModDetails hsc_env ds_result
@@ -499,7 +498,7 @@ hscSimpleIface ds_result
 hscNormalIface :: ModGuts -> Comp (ModIface, Bool, ModDetails, CgGuts)
 hscNormalIface simpl_result
   = do hsc_env <- gets compHscEnv
-       mod_summary <- gets compModSummary
+       _mod_summary <- gets compModSummary
        maybe_old_iface <- gets compOldIface
        liftIO $ do
  	    -------------------
@@ -540,12 +539,12 @@ hscWriteIface (iface, no_change, details, a)
          return (iface, details, a)
 
 hscIgnoreIface :: (ModIface, Bool, ModDetails, a) -> Comp (ModIface, ModDetails, a)
-hscIgnoreIface (iface, no_change, details, a)
+hscIgnoreIface (iface, _no_change, details, a)
     = return (iface, details, a)
 
 -- Don't output any code.
 hscNothing :: (ModIface, ModDetails, a) -> Comp (HscStatus, ModIface, ModDetails)
-hscNothing (iface, details, a)
+hscNothing (iface, details, _)
     = return (HscRecomp False, iface, details)
 
 -- Generate code and return both the new ModIface and the ModDetails.
@@ -591,26 +590,32 @@ hscCompile cgguts
              <- {-# SCC "CoreToStg" #-}
                 myCoreToStg dflags this_mod prepd_binds	
          ------------------  Code generation ------------------
-         abstractC <- {-# SCC "CodeGen" #-}
+         cmms <- {-# SCC "CodeGen" #-}
                       codeGen dflags this_mod data_tycons
                               dir_imps cost_centre_info
                               stg_binds hpc_info
-         ------------------  Convert to CPS --------------------
-         --continuationC <- cmmCPS dflags abstractC >>= cmmToRawCmm
-         continuationC <- cmmToRawCmm abstractC
+         --------  Optionally convert to and from zipper ------
+         cmms <-
+             if dopt Opt_ConvertToZipCfgAndBack dflags
+             then mapM (testCmmConversion dflags) cmms
+             else return cmms
+         ------------  Optionally convert to CPS --------------
+         cmms <-
+             if not (dopt Opt_ConvertToZipCfgAndBack dflags) &&
+                dopt Opt_RunCPSZ dflags
+             then cmmCPS dflags cmms
+             else return cmms
          ------------------  Code output -----------------------
-         (stub_h_exists,stub_c_exists)
+         rawcmms <- cmmToRawCmm cmms
+         (_stub_h_exists, stub_c_exists)
              <- codeOutput dflags this_mod location foreign_stubs 
-                dependencies continuationC
+                dependencies rawcmms
          return stub_c_exists
-
-hscConst :: b -> a -> Comp b
-hscConst b a = return b
 
 hscInteractive :: (ModIface, ModDetails, CgGuts)
                -> Comp (InteractiveStatus, ModIface, ModDetails)
-hscInteractive (iface, details, cgguts)
 #ifdef GHCI
+hscInteractive (iface, details, cgguts)
     = do hsc_env <- gets compHscEnv
          mod_summary <- gets compModSummary
          liftIO $ do
@@ -635,11 +640,11 @@ hscInteractive (iface, details, cgguts)
          -----------------  Generate byte code ------------------
          comp_bc <- byteCodeGen dflags prepd_binds data_tycons mod_breaks
          ------------------ Create f-x-dynamic C-side stuff ---
-         (istub_h_exists, istub_c_exists) 
+         (_istub_h_exists, istub_c_exists) 
              <- outputForeignStubs dflags this_mod location foreign_stubs
          return (InteractiveRecomp istub_c_exists comp_bc mod_breaks, iface, details)
 #else
-    = panic "GHC not compiled with interpreter"
+hscInteractive _ = panic "GHC not compiled with interpreter"
 #endif
 
 ------------------------------
@@ -712,7 +717,8 @@ hscCmmFile dflags filename = do
   case maybe_cmm of
     Nothing -> return False
     Just cmm -> do
-        --continuationC <- cmmCPS dflags [cmm] >>= cmmToRawCmm
+        cmm <- testCmmConversion dflags cmm
+        --continuationC <- cmmCPS dflags cmm >>= cmmToRawCmm
         continuationC <- cmmToRawCmm [cmm]
 	codeOutput dflags no_mod no_loc NoStubs [] continuationC
 	return True
@@ -722,6 +728,24 @@ hscCmmFile dflags filename = do
                               ml_hi_file  = panic "hscCmmFile: no hi file",
                               ml_obj_file = panic "hscCmmFile: no obj file" }
 
+testCmmConversion :: DynFlags -> Cmm -> IO Cmm
+testCmmConversion dflags cmm =
+    do showPass dflags "CmmToCmm"
+       dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- pre-conversion" (ppr cmm)
+       --continuationC <- cmmCPS dflags abstractC >>= cmmToRawCmm
+       us <- mkSplitUniqSupply 'C'
+       let cfopts = runTx $ runCmmOpts cmmCfgOptsZ
+       let cvtm = do g <- cmmToZgraph cmm
+                     return $ cfopts g
+       let zgraph = initUs_ us cvtm
+       cps_zgraph <- protoCmmCPSZ dflags zgraph
+       let chosen_graph = if dopt Opt_RunCPSZ dflags then cps_zgraph else zgraph
+       dumpIfSet_dyn dflags Opt_D_dump_cmmz "C-- Zipper Graph" (ppr chosen_graph)
+       showPass dflags "Convert from Z back to Cmm"
+       let cvt = cmmOfZgraph $ cfopts $ chosen_graph
+       dumpIfSet_dyn dflags Opt_D_dump_cvt_cmm "C-- post-conversion" (ppr cvt)
+       return cvt
+       -- return cmm -- don't use the conversion
 
 myParseModule :: DynFlags -> FilePath -> Maybe StringBuffer
               -> IO (Either ErrMsg (Located (HsModule RdrName)))
@@ -758,6 +782,10 @@ myParseModule dflags src_filename maybe_src_buf
 	-- ToDo: free the string buffer later.
       }}
 
+
+myCoreToStg :: DynFlags -> Module -> [CoreBind]
+            -> IO ( [(StgBinding,[(Id,[Id])])]  -- output program
+	          , CollectedCCs) -- cost centre info (declared and used)
 
 myCoreToStg dflags this_mod prepd_binds
  = do 
@@ -853,7 +881,7 @@ hscTcExpr hsc_env expr
 	     Nothing      -> return Nothing ;	-- Parse error
 	     Just (Just (L _ (ExprStmt expr _ _)))
 			-> tcRnExpr hsc_env icontext expr ;
-	     Just other -> do { errorMsg (hsc_dflags hsc_env) (text "not an expression:" <+> quotes (text expr)) ;
+	     Just _ -> do { errorMsg (hsc_dflags hsc_env) (text "not an expression:" <+> quotes (text expr)) ;
 			        return Nothing } ;
       	     } }
 
@@ -991,6 +1019,7 @@ dumpIfaceStats hsc_env
 %************************************************************************
 
 \begin{code}
+showModuleIndex :: Maybe (Int, Int) -> String
 showModuleIndex Nothing = ""
 showModuleIndex (Just (i,n)) = "[" ++ padded ++ " of " ++ n_str ++ "] "
     where

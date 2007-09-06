@@ -22,6 +22,7 @@ module CmmLint (
 import Cmm
 import CLabel
 import MachOp
+import Maybe
 import Outputable
 import PprCmm
 import Unique
@@ -44,15 +45,18 @@ runCmmLint l =
 	Left err -> Just (ptext SLIT("Cmm lint error:") $$ nest 2 err)
 	Right _  -> Nothing
 
+lintCmmTop :: (GenCmmTop h i (ListGraph CmmStmt)) -> CmmLint ()
 lintCmmTop (CmmProc _ lbl _ (ListGraph blocks))
   = addLintInfo (text "in proc " <> pprCLabel lbl) $
-	mapM_ lintCmmBlock blocks
-lintCmmTop _other
+        let labels = foldl (\s b -> extendBlockSet s (blockId b)) emptyBlockSet blocks
+	in  mapM_ (lintCmmBlock labels) blocks
+
+lintCmmTop (CmmData {})
   = return ()
 
-lintCmmBlock (BasicBlock id stmts)
+lintCmmBlock labels (BasicBlock id stmts)
   = addLintInfo (text "in basic block " <> ppr (getUnique id)) $
-	mapM_ lintCmmStmt stmts
+	mapM_ (lintCmmStmt labels) stmts
 
 -- -----------------------------------------------------------------------------
 -- lintCmmExpr
@@ -85,13 +89,13 @@ lintCmmExpr expr =
 cmmCheckMachOp  op args@[CmmReg reg, CmmLit (CmmInt i _)]
   | isWordOffsetReg reg && isOffsetOp op && i `rem` fromIntegral wORD_SIZE /= 0
   = cmmLintDubiousWordOffset (CmmMachOp op args)
-cmmCheckMachOp op [lit@(CmmLit (CmmInt i _)), reg@(CmmReg _)]
+cmmCheckMachOp op [lit@(CmmLit (CmmInt { })), reg@(CmmReg _)]
   = cmmCheckMachOp op [reg, lit]
 cmmCheckMachOp op@(MO_U_Conv from to) args
   | isFloatingRep from || isFloatingRep to
   = cmmLintErr (text "unsigned conversion from/to floating rep: " 
 		<> ppr (CmmMachOp op args))
-cmmCheckMachOp op args
+cmmCheckMachOp op _args
   = return (resultRepOfMachOp op)
 
 isWordOffsetReg (CmmGlobal Sp) = True
@@ -119,25 +123,38 @@ cmmCheckWordAddress _
 notNodeReg (CmmReg reg) | reg == nodeReg = False
 notNodeReg _                             = True
 
-lintCmmStmt :: CmmStmt -> CmmLint ()
-lintCmmStmt stmt@(CmmAssign reg expr) = do
-  erep <- lintCmmExpr expr
-  if (erep == cmmRegRep reg)
-	then return ()
-	else cmmLintAssignErr stmt
-lintCmmStmt (CmmStore l r) = do
-  lintCmmExpr l
-  lintCmmExpr r
-  return ()
-lintCmmStmt (CmmCall _target _res args _ _) = mapM_ (lintCmmExpr.fst) args
-lintCmmStmt (CmmCondBranch e _id)   = lintCmmExpr e >> checkCond e >> return ()
-lintCmmStmt (CmmSwitch e _branches) = do
-  erep <- lintCmmExpr e
-  if (erep == wordRep)
-    then return ()
-    else cmmLintErr (text "switch scrutinee is not a word: " <> ppr e)
-lintCmmStmt (CmmJump e _args)       = lintCmmExpr e >> return ()
-lintCmmStmt _other 		    = return ()
+lintCmmStmt :: BlockSet -> CmmStmt -> CmmLint ()
+lintCmmStmt labels = lint
+    where lint (CmmNop) = return ()
+          lint (CmmComment {}) = return ()
+          lint stmt@(CmmAssign reg expr) = do
+            erep <- lintCmmExpr expr
+            if (erep == cmmRegRep reg)
+                then return ()
+                else cmmLintAssignErr stmt
+          lint (CmmStore l r) = do
+            lintCmmExpr l
+            lintCmmExpr r
+            return ()
+          lint (CmmCall target _res args _ _) =
+              lintTarget target >> mapM_ (lintCmmExpr.fst) args
+          lint (CmmCondBranch e id) = checkTarget id >> lintCmmExpr e >> checkCond e
+          lint (CmmSwitch e branches) = do
+            mapM_ checkTarget $ catMaybes branches
+            erep <- lintCmmExpr e
+            if (erep == wordRep)
+              then return ()
+              else cmmLintErr (text "switch scrutinee is not a word: " <> ppr e)
+          lint (CmmJump e args) = lintCmmExpr e >> mapM_ (lintCmmExpr.fst) args
+          lint (CmmReturn ress) = mapM_ (lintCmmExpr.fst) ress
+          lint (CmmBranch id)    = checkTarget id
+          checkTarget id = if elemBlockSet id labels then return ()
+                           else cmmLintErr (text "Branch to nonexistent id" <+> ppr id)
+
+lintTarget :: CmmCallTarget -> CmmLint ()
+lintTarget (CmmCallee e _) = lintCmmExpr e >> return ()
+lintTarget (CmmPrim {})    = return ()
+
 
 checkCond (CmmMachOp mop _) | isComparisonMachOp mop = return ()
 checkCond expr = cmmLintErr (hang (text "expression is not a conditional:") 2

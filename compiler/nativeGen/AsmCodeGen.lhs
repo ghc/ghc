@@ -35,7 +35,7 @@ import qualified GraphColor	as Color
 
 import Cmm
 import CmmOpt		( cmmMiniInline, cmmMachOpFold )
-import PprCmm		( pprStmt, pprCmms, pprCmm )
+import PprCmm
 import MachOp
 import CLabel
 import State
@@ -43,11 +43,11 @@ import State
 import UniqFM
 import Unique		( Unique, getUnique )
 import UniqSupply
-import FastTypes
 import List		( groupBy, sortBy )
-import ErrUtils		( dumpIfSet_dyn )
 import DynFlags
+#if powerpc_TARGET_ARCH
 import StaticFlags	( opt_Static, opt_PIC )
+#endif
 import Util
 import Config           ( cProjectVersion )
 import Module
@@ -444,6 +444,9 @@ sequenceTop (CmmProc info lbl params (ListGraph blocks)) =
 -- sort this graph.  Then traverse the list: for each block, we first
 -- output the block, then if it has an out edge, we move the
 -- destination of the out edge to the front of the list, and continue.
+
+-- FYI, the classic layout for basic blocks uses postorder DFS; this
+-- algorithm is implemented in cmm/ZipCfg.hs (NR 6 Sep 2007).
 
 sequenceBlocks :: [NatBasicBlock] -> [NatBasicBlock]
 sequenceBlocks [] = []

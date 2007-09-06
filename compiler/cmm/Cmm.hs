@@ -1,3 +1,4 @@
+{-# OPTIONS -Wall -fno-warn-name-shadowing -fno-warn-orphans #-}
 -----------------------------------------------------------------------------
 --
 -- Cmm data types
@@ -6,40 +7,65 @@
 --
 -----------------------------------------------------------------------------
 
+{-# OPTIONS -w #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and fix
+-- any warnings in the module. See
+--     http://hackage.haskell.org/trac/ghc/wiki/CodingStyle#Warnings
+-- for details
+
 module Cmm ( 
 	GenCmm(..), Cmm, RawCmm,
 	GenCmmTop(..), CmmTop, RawCmmTop,
-        ListGraph(..),
+	ListGraph(..),
+        cmmMapGraph, cmmTopMapGraph,
+        cmmMapGraphM, cmmTopMapGraphM,
 	CmmInfo(..), UpdateFrame(..),
         CmmInfoTable(..), ClosureTypeInfo(..), ProfilingInfo(..), ClosureTypeTag,
-	GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts, mapBlockStmts,
+        GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts, mapBlockStmts,
         CmmReturnInfo(..),
 	CmmStmt(..), CmmActuals, CmmFormal, CmmFormals, CmmHintFormals,
         CmmSafety(..),
 	CmmCallTarget(..),
 	CmmStatic(..), Section(..),
-	CmmExpr(..), cmmExprRep, 
+	CmmExpr(..), cmmExprRep, maybeInvertCmmExpr,
 	CmmReg(..), cmmRegRep,
 	CmmLit(..), cmmLitRep,
 	LocalReg(..), localRegRep, localRegGCFollow, Kind(..),
-	BlockId(..), BlockEnv,
+        BlockId(..), freshBlockId,
+        BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, mkBlockEnv,
+        BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet,
 	GlobalReg(..), globalRegRep,
 
 	node, nodeReg, spReg, hpReg, spLimReg
   ) where
 
+-- ^ In order not to do violence to the import structure of the rest
+-- of the compiler, module Cmm re-exports a number of identifiers
+-- defined in 'CmmExpr'
+
 #include "HsVersions.h"
 
+import CmmExpr
 import MachOp
 import CLabel
 import ForeignCall
 import SMRep
 import ClosureInfo
-import Unique
-import UniqFM
+import Outputable
 import FastString
 
 import Data.Word
+
+import ZipCfg (	BlockId(..), freshBlockId
+              , BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, mkBlockEnv
+              , BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet
+              )
+
+-- A [[BlockId]] is a local label.
+-- Local labels must be unique within an entire compilation unit, not
+-- just a single top-level item, because local labels map one-to-one
+-- with assembly-language labels.
 
 -----------------------------------------------------------------------------
 --		Cmm, CmmTop, CmmBasicBlock
@@ -57,6 +83,8 @@ import Data.Word
 --   (a) C--, i.e. populated with various C-- constructs
 --		(Cmm and RawCmm below)
 --   (b) Native code, populated with data/instructions
+--
+-- A second family of instances based on ZipCfg is work in progress.
 --
 newtype GenCmm d h g = Cmm [GenCmmTop d h g]
 
@@ -101,6 +129,9 @@ type RawCmmTop = GenCmmTop CmmStatic [CmmStatic] (ListGraph CmmStmt)
 data GenBasicBlock i = BasicBlock BlockId [i]
 type CmmBasicBlock   = GenBasicBlock CmmStmt
 
+instance UserOfLocalRegs i => UserOfLocalRegs (GenBasicBlock i) where
+    foldRegsUsed f set (BasicBlock _ l) = foldRegsUsed f set l
+
 blockId :: GenBasicBlock i -> BlockId
 -- The branch block id is that of the first block in 
 -- the branch, which is that branch's entry point
@@ -109,8 +140,26 @@ blockId (BasicBlock blk_id _ ) = blk_id
 blockStmts :: GenBasicBlock i -> [i]
 blockStmts (BasicBlock _ stmts) = stmts
 
+
 mapBlockStmts :: (i -> i') -> GenBasicBlock i -> GenBasicBlock i'
 mapBlockStmts f (BasicBlock id bs) = BasicBlock id (map f bs)
+----------------------------------------------------------------
+--   graph maps
+----------------------------------------------------------------
+
+cmmMapGraph    :: (g -> g') -> GenCmm    d h g -> GenCmm    d h g'
+cmmTopMapGraph :: (g -> g') -> GenCmmTop d h g -> GenCmmTop d h g'
+
+cmmMapGraphM    :: Monad m => (String -> g -> m g') -> GenCmm    d h g -> m (GenCmm    d h g')
+cmmTopMapGraphM :: Monad m => (String -> g -> m g') -> GenCmmTop d h g -> m (GenCmmTop d h g')
+
+cmmMapGraph f (Cmm tops) = Cmm $ map (cmmTopMapGraph f) tops
+cmmTopMapGraph f (CmmProc h l args g) = CmmProc h l args (f g)
+cmmTopMapGraph _ (CmmData s ds)       = CmmData s ds
+
+cmmMapGraphM f (Cmm tops) = mapM (cmmTopMapGraphM f) tops >>= return . Cmm
+cmmTopMapGraphM f (CmmProc h l args g) = f (showSDoc $ ppr l) g >>= return . CmmProc h l args
+cmmTopMapGraphM _ (CmmData s ds)       = return $ CmmData s ds
 
 -----------------------------------------------------------------------------
 --     Info Tables
@@ -212,6 +261,28 @@ type CmmHintFormals = [(CmmFormal,MachHint)]
 type CmmFormals     = [CmmFormal]
 data CmmSafety      = CmmUnsafe | CmmSafe C_SRT
 
+-- | enable us to fold used registers over 'CmmActuals' and 'CmmHintFormals'
+instance UserOfLocalRegs a => UserOfLocalRegs (a, MachHint) where
+  foldRegsUsed f set (a, _) = foldRegsUsed f set a
+
+instance UserOfLocalRegs CmmStmt where
+  foldRegsUsed f set s = stmt s set
+    where stmt (CmmNop)                  = id
+          stmt (CmmComment {})           = id
+          stmt (CmmAssign _ e)           = gen e
+          stmt (CmmStore e1 e2)          = gen e1 . gen e2
+          stmt (CmmCall target _ es _ _) = gen target . gen es
+          stmt (CmmBranch _)             = id
+          stmt (CmmCondBranch e _)       = gen e
+          stmt (CmmSwitch e _)           = gen e
+          stmt (CmmJump e es)            = gen e . gen es
+          stmt (CmmReturn es)            = gen es
+          gen a set = foldRegsUsed f set a
+
+instance UserOfLocalRegs CmmCallTarget where
+    foldRegsUsed f set (CmmCallee e _) = foldRegsUsed f set e
+    foldRegsUsed _ set (CmmPrim {})    = set
+
 {-
 Discussion
 ~~~~~~~~~~
@@ -219,6 +290,10 @@ Discussion
 One possible problem with the above type is that the only way to do a
 non-local conditional jump is to encode it as a branch to a block that
 contains a single jump.  This leads to inefficient code in the back end.
+
+[N.B. This problem will go away when we make the transition to the
+'zipper' form of control-flow graph, in which both targets of a
+conditional jump are explicit. ---NR]
 
 One possible way to fix this would be:
 
@@ -265,104 +340,6 @@ data CmmCallTarget
 				-- code by the backend.
 
 -----------------------------------------------------------------------------
---		CmmExpr
--- An expression.  Expressions have no side effects.
------------------------------------------------------------------------------
-
-data CmmExpr
-  = CmmLit CmmLit               -- Literal
-  | CmmLoad CmmExpr MachRep     -- Read memory location
-  | CmmReg CmmReg		-- Contents of register
-  | CmmMachOp MachOp [CmmExpr]  -- Machine operation (+, -, *, etc.)
-  | CmmRegOff CmmReg Int	
-	-- CmmRegOff reg i
-	--        ** is shorthand only, meaning **
-	-- CmmMachOp (MO_S_Add rep (CmmReg reg) (CmmLit (CmmInt i rep)))
-	--	where rep = cmmRegRep reg
-  deriving Eq
-
-data CmmReg 
-  = CmmLocal  LocalReg
-  | CmmGlobal GlobalReg
-  deriving( Eq )
-
--- | Whether a 'LocalReg' is a GC followable pointer
-data Kind = KindPtr | KindNonPtr deriving (Eq)
-
-data LocalReg
-  = LocalReg
-      !Unique   -- ^ Identifier
-      MachRep   -- ^ Type
-      Kind      -- ^ Should the GC follow as a pointer
-
-data CmmLit
-  = CmmInt Integer  MachRep
-	-- Interpretation: the 2's complement representation of the value
-	-- is truncated to the specified size.  This is easier than trying
-	-- to keep the value within range, because we don't know whether
-	-- it will be used as a signed or unsigned value (the MachRep doesn't
-	-- distinguish between signed & unsigned).
-  | CmmFloat  Rational MachRep
-  | CmmLabel    CLabel			-- Address of label
-  | CmmLabelOff CLabel Int		-- Address of label + byte offset
-  
-        -- Due to limitations in the C backend, the following
-        -- MUST ONLY be used inside the info table indicated by label2
-        -- (label2 must be the info label), and label1 must be an
-        -- SRT, a slow entrypoint or a large bitmap (see the Mangler)
-        -- Don't use it at all unless tablesNextToCode.
-        -- It is also used inside the NCG during when generating
-        -- position-independent code. 
-  | CmmLabelDiffOff CLabel CLabel Int   -- label1 - label2 + offset
-  deriving Eq
-
-instance Eq LocalReg where
-  (LocalReg u1 _ _) == (LocalReg u2 _ _) = u1 == u2
-
-instance Uniquable LocalReg where
-  getUnique (LocalReg uniq _ _) = uniq
-
------------------------------------------------------------------------------
---		MachRep
------------------------------------------------------------------------------
-cmmExprRep :: CmmExpr -> MachRep
-cmmExprRep (CmmLit lit)      = cmmLitRep lit
-cmmExprRep (CmmLoad _ rep)   = rep
-cmmExprRep (CmmReg reg)      = cmmRegRep reg
-cmmExprRep (CmmMachOp op _)  = resultRepOfMachOp op
-cmmExprRep (CmmRegOff reg _) = cmmRegRep reg
-
-cmmRegRep :: CmmReg -> MachRep
-cmmRegRep (CmmLocal  reg) 	= localRegRep reg
-cmmRegRep (CmmGlobal reg)	= globalRegRep reg
-
-localRegRep :: LocalReg -> MachRep
-localRegRep (LocalReg _ rep _) = rep
-
-localRegGCFollow :: LocalReg -> Kind
-localRegGCFollow (LocalReg _ _ p) = p
-
-cmmLitRep :: CmmLit -> MachRep
-cmmLitRep (CmmInt _ rep)    = rep
-cmmLitRep (CmmFloat _ rep)  = rep
-cmmLitRep (CmmLabel _)      = wordRep
-cmmLitRep (CmmLabelOff _ _) = wordRep
-cmmLitRep (CmmLabelDiffOff _ _ _) = wordRep
-
------------------------------------------------------------------------------
--- A local label.
-
--- Local labels must be unique within a single compilation unit.
-
-newtype BlockId = BlockId Unique
-  deriving (Eq,Ord)
-
-instance Uniquable BlockId where
-  getUnique (BlockId u) = u
-
-type BlockEnv a = UniqFM {- BlockId -} a
-
------------------------------------------------------------------------------
 --		Static Data
 -----------------------------------------------------------------------------
 
@@ -387,69 +364,3 @@ data CmmStatic
   | CmmString [Word8]
 	-- string of 8-bit values only, not zero terminated.
 
------------------------------------------------------------------------------
---		Global STG registers
------------------------------------------------------------------------------
-
-data GlobalReg
-  -- Argument and return registers
-  = VanillaReg			-- pointers, unboxed ints and chars
-	{-# UNPACK #-} !Int	-- its number
-
-  | FloatReg		-- single-precision floating-point registers
-	{-# UNPACK #-} !Int	-- its number
-
-  | DoubleReg		-- double-precision floating-point registers
-	{-# UNPACK #-} !Int	-- its number
-
-  | LongReg	        -- long int registers (64-bit, really)
-	{-# UNPACK #-} !Int	-- its number
-
-  -- STG registers
-  | Sp			-- Stack ptr; points to last occupied stack location.
-  | SpLim		-- Stack limit
-  | Hp			-- Heap ptr; points to last occupied heap location.
-  | HpLim		-- Heap limit register
-  | CurrentTSO		-- pointer to current thread's TSO
-  | CurrentNursery	-- pointer to allocation area
-  | HpAlloc		-- allocation count for heap check failure
-
-		-- We keep the address of some commonly-called 
-		-- functions in the register table, to keep code
-		-- size down:
-  | GCEnter1		-- stg_gc_enter_1
-  | GCFun		-- stg_gc_fun
-
-  -- Base offset for the register table, used for accessing registers
-  -- which do not have real registers assigned to them.  This register
-  -- will only appear after we have expanded GlobalReg into memory accesses
-  -- (where necessary) in the native code generator.
-  | BaseReg
-
-  -- Base Register for PIC (position-independent code) calculations
-  -- Only used inside the native code generator. It's exact meaning differs
-  -- from platform to platform (see module PositionIndependentCode).
-  | PicBaseReg
-
-  deriving( Eq
-#ifdef DEBUG
-	, Show
-#endif
-	 )
-
--- convenient aliases
-spReg, hpReg, spLimReg, nodeReg :: CmmReg
-spReg = CmmGlobal Sp
-hpReg = CmmGlobal Hp
-spLimReg = CmmGlobal SpLim
-nodeReg = CmmGlobal node
-
-node :: GlobalReg
-node = VanillaReg 1
-
-globalRegRep :: GlobalReg -> MachRep
-globalRegRep (VanillaReg _) 	= wordRep
-globalRegRep (FloatReg _) 	= F32
-globalRegRep (DoubleReg _) 	= F64
-globalRegRep (LongReg _) 	= I64
-globalRegRep _			= wordRep

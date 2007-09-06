@@ -34,7 +34,6 @@ import CgUtils
 import CgTicky
 import ClosureInfo
 import SMRep
-import MachOp
 import Cmm	
 import CmmUtils
 import CLabel
@@ -227,6 +226,7 @@ performTailCall fun_info arg_amodes pending_assts
         where
           --cond1 tag  = cmmULtWord tag lowCons
           -- More efficient than the above?
+{-
           tag_expr   = cmmGetClosureType (CmmReg nodeReg)
           cond1 tag  = cmmEqWord tag (CmmLit (mkIntCLit 0))
           cond2 tag  = cmmUGtWord tag highCons
@@ -234,10 +234,8 @@ performTailCall fun_info arg_amodes pending_assts
             -- CONSTR
           highCons   = CmmLit (mkIntCLit 8)
             -- CONSTR_NOCAF_STATIC (from ClosureType.h)
+-}
 
-
-untagCmmAssign (CmmAssign r cmmExpr) = CmmAssign r (cmmUntag cmmExpr)
-untagCmmAssign stmt                  = stmt
 
 directCall sp lbl args extra_args assts = do
   let
@@ -474,4 +472,10 @@ adjustSpAndHp newRealSp
 	; tickyAllocHeap (vHp - rHp)		-- ...ditto
 	; setRealHp vHp
 	}
+\end{code}
+
+Some things are unused.
+\begin{code}
+_unused :: FS.FastString
+_unused = undefined
 \end{code}

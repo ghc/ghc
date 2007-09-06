@@ -80,9 +80,9 @@ import Id
 import VarEnv
 import OrdList
 import Unique
-import Util
+import Util()
 import UniqSupply
-import FastString
+import FastString()
 import Outputable
 
 import Control.Monad
@@ -241,6 +241,7 @@ flattenCgStmts id stmts =
 	    where (block,blocks) = flatten stmts
 	(CgFork fork_id stmts : ss) -> 
 	   flatten (CgFork fork_id stmts : CgStmt stmt : ss)
+        (CgStmt {} : _) -> panic "CgStmt not seen as ordinary"
 
   flatten (s:ss) = 
 	case s of
@@ -711,7 +712,8 @@ labelC :: BlockId -> Code
 labelC id = emitCgStmt (CgLabel id)
 
 newLabelC :: FCode BlockId
-newLabelC = do { id <- newUnique; return (BlockId id) }
+newLabelC = do { us <- newUniqSupply
+               ; return $ initUs_ us (freshBlockId "LabelC") }
 
 checkedAbsC :: CmmStmt -> Code
 -- Emit code, eliminating no-ops
@@ -758,6 +760,8 @@ emitSimpleProc lbl code
 
 getCmm :: Code -> FCode Cmm
 -- Get all the CmmTops (there should be no stmts)
+-- Return a single Cmm which may be split from other Cmms by
+-- object splitting (at a later stage)
 getCmm code 
   = do	{ state1 <- getState
 	; ((), state2) <- withState code (state1 { cgs_tops  = nilOL })

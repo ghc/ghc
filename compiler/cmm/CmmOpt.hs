@@ -22,6 +22,7 @@ module CmmOpt (
 #include "HsVersions.h"
 
 import Cmm
+import CmmExpr
 import CmmUtils
 import CLabel
 import MachOp
@@ -51,6 +52,10 @@ once.  It works as follows:
 	  (assumes that temporaries are single-assignment)
 	- if we reach the statement that uses it, inline the rhs
 	  and delete the original assignment.
+
+[N.B. In the Quick C-- compiler, this optimization is achieved by a
+ combination of two dataflow passes: forward substitution (peephole
+ optimization) and dead-assignment elimination.  ---NR]
 
 Possible generalisations: here is an example from factorial
 
@@ -85,17 +90,14 @@ To inline _smi:
      its occurrences.
 -}
 
+countUses :: UserOfLocalRegs a => a -> UniqFM Int
+countUses a = foldRegsUsed (\m r -> addToUFM m r (count m r + 1)) emptyUFM a
+  where count m r = lookupWithDefaultUFM m (0::Int) r
+
 cmmMiniInline :: [CmmBasicBlock] -> [CmmBasicBlock]
 cmmMiniInline blocks = map do_inline blocks 
-  where 
-	blockUses (BasicBlock _ stmts)
-	 = foldr (plusUFM_C (+)) emptyUFM (map getStmtUses stmts)
-
-	uses = foldr (plusUFM_C (+)) emptyUFM (map blockUses blocks)
-
-	do_inline (BasicBlock id stmts)
-	 = BasicBlock id (cmmMiniInlineStmts uses stmts)
-
+  where do_inline (BasicBlock id stmts)
+          = BasicBlock id (cmmMiniInlineStmts (countUses blocks) stmts)
 
 cmmMiniInlineStmts :: UniqFM Int -> [CmmStmt] -> [CmmStmt]
 cmmMiniInlineStmts uses [] = []
@@ -117,7 +119,7 @@ cmmMiniInlineStmts uses (stmt:stmts)
 -- and temporaries are single-assignment.
 lookForInline u expr (stmt@(CmmAssign (CmmLocal (LocalReg u' _ _)) rhs) : rest)
   | u /= u' 
-  = case lookupUFM (getExprUses rhs) u of
+  = case lookupUFM (countUses rhs) u of
 	Just 1 -> Just (inlineStmt u expr stmt : rest)
 	_other -> case lookForInline u expr rest of
 		     Nothing    -> Nothing
@@ -126,8 +128,10 @@ lookForInline u expr (stmt@(CmmAssign (CmmLocal (LocalReg u' _ _)) rhs) : rest)
 lookForInline u expr (CmmNop : rest)
   = lookForInline u expr rest
 
+lookForInline _ _ [] = Nothing
+
 lookForInline u expr (stmt:stmts)
-  = case lookupUFM (getStmtUses stmt) u of
+  = case lookupUFM (countUses stmt) u of
 	Just 1 | ok_to_inline -> Just (inlineStmt u expr stmt : stmts)
 	_other -> Nothing
   where
@@ -139,30 +143,6 @@ lookForInline u expr (stmt:stmts)
     ok_to_inline = case stmt of
 		     CmmCall{} -> hasNoGlobalRegs expr
 		     _ -> True
-
--- -----------------------------------------------------------------------------
--- Boring Cmm traversals for collecting usage info and substitutions.
-
-getStmtUses :: CmmStmt -> UniqFM Int
-getStmtUses (CmmAssign _ e) = getExprUses e
-getStmtUses (CmmStore e1 e2) = plusUFM_C (+) (getExprUses e1) (getExprUses e2)
-getStmtUses (CmmCall target _ es _ _)
-   = plusUFM_C (+) (uses target) (getExprsUses (map fst es))
-   where uses (CmmCallee e _) = getExprUses e
-	 uses _ = emptyUFM
-getStmtUses (CmmCondBranch e _) = getExprUses e
-getStmtUses (CmmSwitch e _) = getExprUses e
-getStmtUses (CmmJump e _) = getExprUses e
-getStmtUses _ = emptyUFM
-
-getExprUses :: CmmExpr -> UniqFM Int
-getExprUses (CmmReg (CmmLocal (LocalReg u _ _))) = unitUFM u 1
-getExprUses (CmmRegOff (CmmLocal (LocalReg u _ _)) _) = unitUFM u 1
-getExprUses (CmmLoad e _) = getExprUses e
-getExprUses (CmmMachOp _ es) = getExprsUses es
-getExprUses _other = emptyUFM
-
-getExprsUses es = foldr (plusUFM_C (+)) emptyUFM (map getExprUses es)
 
 inlineStmt :: Unique -> CmmExpr -> CmmStmt -> CmmStmt
 inlineStmt u a (CmmAssign r e) = CmmAssign r (inlineExpr u a e)
@@ -391,15 +371,15 @@ cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt 0 _))]
     	MO_S_Shr r -> x
     	MO_U_Shr r -> x
         MO_Ne    r | isComparisonExpr x -> x
-	MO_Eq    r | Just x' <- maybeInvertConditionalExpr x -> x'
+	MO_Eq    r | Just x' <- maybeInvertCmmExpr x -> x'
 	MO_U_Gt  r | isComparisonExpr x -> x
 	MO_S_Gt  r | isComparisonExpr x -> x
 	MO_U_Lt  r | isComparisonExpr x -> CmmLit (CmmInt 0 wordRep)
 	MO_S_Lt  r | isComparisonExpr x -> CmmLit (CmmInt 0 wordRep)
 	MO_U_Ge  r | isComparisonExpr x -> CmmLit (CmmInt 1 wordRep)
 	MO_S_Ge  r | isComparisonExpr x -> CmmLit (CmmInt 1 wordRep)
-	MO_U_Le  r | Just x' <- maybeInvertConditionalExpr x -> x'
-	MO_S_Le  r | Just x' <- maybeInvertConditionalExpr x -> x'
+	MO_U_Le  r | Just x' <- maybeInvertCmmExpr x -> x'
+	MO_S_Le  r | Just x' <- maybeInvertCmmExpr x -> x'
     	other    -> CmmMachOp mop args
 
 cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt 1 rep))]
@@ -409,10 +389,10 @@ cmmMachOpFold mop args@[x, y@(CmmLit (CmmInt 1 rep))]
     	MO_U_Quot r -> x
     	MO_S_Rem  r -> CmmLit (CmmInt 0 rep)
     	MO_U_Rem  r -> CmmLit (CmmInt 0 rep)
-        MO_Ne    r | Just x' <- maybeInvertConditionalExpr x -> x'
+        MO_Ne    r | Just x' <- maybeInvertCmmExpr x -> x'
 	MO_Eq    r | isComparisonExpr x -> x
-	MO_U_Lt  r | Just x' <- maybeInvertConditionalExpr x -> x'
-	MO_S_Lt  r | Just x' <- maybeInvertConditionalExpr x -> x'
+	MO_U_Lt  r | Just x' <- maybeInvertCmmExpr x -> x'
+	MO_S_Lt  r | Just x' <- maybeInvertCmmExpr x -> x'
 	MO_U_Gt  r | isComparisonExpr x -> CmmLit (CmmInt 0 wordRep)
 	MO_S_Gt  r | isComparisonExpr x -> CmmLit (CmmInt 0 wordRep)
 	MO_U_Le  r | isComparisonExpr x -> CmmLit (CmmInt 1 wordRep)
@@ -565,10 +545,8 @@ isComparisonExpr :: CmmExpr -> Bool
 isComparisonExpr (CmmMachOp op _) = isComparisonMachOp op
 isComparisonExpr _other 	    = False
 
-maybeInvertConditionalExpr :: CmmExpr -> Maybe CmmExpr
-maybeInvertConditionalExpr (CmmMachOp op args) 
-  | Just op' <- maybeInvertComparison op = Just (CmmMachOp op' args)
-maybeInvertConditionalExpr _ = Nothing
-
 isPicReg (CmmReg (CmmGlobal PicBaseReg)) = True
 isPicReg _ = False
+
+_unused :: FS.FastString -- stops a warning
+_unused = undefined

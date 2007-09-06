@@ -91,7 +91,7 @@ import Data.List	( isPrefixOf )
 import Util		( split )
 #endif
 
-import Data.Char	( isUpper, toLower )
+import Data.Char	( isUpper )
 import System.IO        ( hPutStrLn, stderr )
 
 -- -----------------------------------------------------------------------------
@@ -101,10 +101,13 @@ data DynFlag
 
    -- debugging flags
    = Opt_D_dump_cmm
+   | Opt_D_dump_cmmz
    | Opt_D_dump_cps_cmm
+   | Opt_D_dump_cvt_cmm
    | Opt_D_dump_asm
    | Opt_D_dump_asm_native
    | Opt_D_dump_asm_liveness
+   | Opt_D_dump_asm_coalesce
    | Opt_D_dump_asm_regalloc
    | Opt_D_dump_asm_regalloc_stages
    | Opt_D_dump_asm_conflicts
@@ -263,6 +266,8 @@ data DynFlag
    | Opt_BreakOnException
    | Opt_GenManifest
    | Opt_EmbedManifest
+   | Opt_RunCPSZ
+   | Opt_ConvertToZipCfgAndBack
 
    -- keeping stuff
    | Opt_KeepHiDiffs
@@ -1025,12 +1030,15 @@ dynamic_flags = [
   ,  ( "dstg-stats",	NoArg (setDynFlag Opt_StgStats))
 
   ,  ( "ddump-cmm",         	 setDumpFlag Opt_D_dump_cmm)
+  ,  ( "ddump-cmmz",         	 setDumpFlag Opt_D_dump_cmmz)
   ,  ( "ddump-cps-cmm",        	 setDumpFlag Opt_D_dump_cps_cmm)
+  ,  ( "ddump-cvt-cmm",        	 setDumpFlag Opt_D_dump_cvt_cmm)
   ,  ( "ddump-asm",          	 setDumpFlag Opt_D_dump_asm)
   ,  ( "ddump-asm-native",       setDumpFlag Opt_D_dump_asm_native)
   ,  ( "ddump-asm-liveness",     setDumpFlag Opt_D_dump_asm_liveness)
-  ,  ( "ddump-asm-conflicts",    setDumpFlag Opt_D_dump_asm_conflicts)
+  ,  ( "ddump-asm-coalesce",     setDumpFlag Opt_D_dump_asm_coalesce)
   ,  ( "ddump-asm-regalloc",     setDumpFlag Opt_D_dump_asm_regalloc)
+  ,  ( "ddump-asm-conflicts",    setDumpFlag Opt_D_dump_asm_conflicts)
   ,  ( "ddump-asm-regalloc-stages",
                                  setDumpFlag Opt_D_dump_asm_regalloc_stages)
   ,  ( "ddump-asm-stats",        setDumpFlag Opt_D_dump_asm_stats)
@@ -1181,6 +1189,8 @@ fFlags = [
   ( "hpc-no-auto",                      Opt_Hpc_No_Auto ),
   ( "rewrite-rules",                    Opt_RewriteRules ),
   ( "break-on-exception",               Opt_BreakOnException ),
+  ( "run-cps",                          Opt_RunCPSZ ),
+  ( "convert-to-zipper-and-back",       Opt_ConvertToZipCfgAndBack),
   ( "vectorise",                        Opt_Vectorise ),
   ( "regs-graph",                       Opt_RegsGraph),
   -- Deprecated in favour of -XTemplateHaskell:

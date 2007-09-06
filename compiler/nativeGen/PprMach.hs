@@ -72,23 +72,19 @@ pprNatCmmTop (CmmProc [] lbl _ (ListGraph [])) = pprLabel lbl
 
 pprNatCmmTop (CmmProc info lbl params (ListGraph blocks)) = 
   pprSectionHeader Text $$
-  (if not (null info)
-	then
+  (if null info then -- blocks guaranteed not null, so label needed
+       pprLabel lbl
+   else
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
             pprCLabel_asm (mkDeadStripPreventer $ entryLblToInfoLbl lbl)
                 <> char ':' $$
 #endif
-            vcat (map pprData info) $$
-            pprLabel (entryLblToInfoLbl lbl)
-	else empty) $$
-  (case blocks of
-	[] -> empty
-	(BasicBlock _ instrs : rest) -> 
-		(if null info then pprLabel lbl else empty) $$
-		-- the first block doesn't get a label:
-		vcat (map pprInstr instrs) $$
-		vcat (map pprBasicBlock rest)
-  )
+       vcat (map pprData info) $$
+       pprLabel (entryLblToInfoLbl lbl)
+  ) $$
+  vcat (map pprBasicBlock blocks)
+     -- ^ Even the first block gets a label, because with branch-chain
+     -- elimination, it might be the target of a goto.
 #if HAVE_SUBSECTIONS_VIA_SYMBOLS
         -- If we are using the .subsections_via_symbols directive
         -- (available on recent versions of Darwin),
