@@ -1,15 +1,7 @@
 -- | Graph coloring register allocator.
 --
 -- TODO:
---	Live range splitting:
---		At the moment regs that are spilled are spilled for all time, even though
---		we might be able to allocate them a hardreg in different parts of the code.
---
---	As we're aggressively coalescing before register allocation proper we're not currently
---	using the coalescence information present in the graph.
---
 --	The function that choosing the potential spills could be a bit cleverer.
---
 --	Colors in graphviz graphs could be nicer.
 --
 {-# OPTIONS -fno-warn-missing-signatures #-}
@@ -35,7 +27,6 @@ import UniqSet
 import UniqFM
 import Bag
 import Outputable
-import Util
 
 import Data.List
 import Data.Maybe
@@ -81,6 +72,14 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 
  	-- build a conflict graph from the code.
 	graph		<- {-# SCC "BuildGraph" #-} buildGraph code
+
+	-- VERY IMPORTANT:
+	--	We really do want the graph to be fully evaluated _before_ we start coloring.
+	--	If we don't do this now then when the call to Color.colorGraph forces bits of it,
+	--	the heap will be filled with half evaluated pieces of graph and zillions of apply thunks.
+	--
+	seqGraph graph `seq` return ()
+
 
 	-- build a map of how many instructions each reg lives for.
 	--	this is lazy, it won't be computed unless we need to spill
@@ -137,7 +136,7 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 			, raPatched	= code_patched
 			, raSpillClean	= code_spillclean
 			, raFinal	= code_final
-			, raSRMs	= foldl addSRM (0, 0, 0) $ map countSRMs code_spillclean }
+			, raSRMs	= foldl' addSRM (0, 0, 0) $ map countSRMs code_spillclean }
 
 
 		let statList =
@@ -145,7 +144,7 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 				else []
 
 		-- space leak avoidance
-		seqList statList $! return ()
+		seqList statList `seq` return ()
 
 		return	( code_final
 			, statList
@@ -175,7 +174,7 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 				else []
 
 		-- space leak avoidance
-		seqList statList $! return ()
+		seqList statList `seq` return ()
 
 		regAlloc_spin dump (spinCount + 1) triv regsFree slotsFree'
 			statList
@@ -320,6 +319,63 @@ patchRegsFromGraph graph code
 
 plusUFMs_C  :: (elt -> elt -> elt) -> [UniqFM elt] -> UniqFM elt
 plusUFMs_C f maps
-	= foldl (plusUFM_C f) emptyUFM maps
-	
+	= foldl' (plusUFM_C f) emptyUFM maps
+
+
+-----
+-- for when laziness just isn't what you wanted...
+--
+seqGraph :: Color.Graph Reg RegClass Reg -> ()
+seqGraph graph		= seqNodes (eltsUFM (Color.graphMap graph))
+
+seqNodes :: [Color.Node Reg RegClass Reg] -> ()
+seqNodes ns
+ = case ns of
+ 	[]		-> ()
+	(n : ns)	-> seqNode n `seq` seqNodes ns
+
+seqNode :: Color.Node Reg RegClass Reg -> ()
+seqNode node
+	=     seqReg      (Color.nodeId node)
+	`seq` seqRegClass (Color.nodeClass node)
+	`seq` seqMaybeReg (Color.nodeColor node)
+	`seq` (seqRegList (uniqSetToList (Color.nodeConflicts node)))
+	`seq` (seqRegList (uniqSetToList (Color.nodeExclusions node)))
+	`seq` (seqRegList (Color.nodePreference node))
+	`seq` (seqRegList (uniqSetToList (Color.nodeCoalesce node)))
+
+seqReg :: Reg -> ()
+seqReg reg
+ = case reg of
+ 	RealReg _	-> ()
+	VirtualRegI _	-> ()
+	VirtualRegHi _	-> ()
+	VirtualRegF _	-> ()
+	VirtualRegD _	-> ()
+
+seqRegClass :: RegClass -> ()
+seqRegClass c
+ = case c of
+ 	RcInteger	-> ()
+	RcFloat		-> ()
+	RcDouble	-> ()
+
+seqMaybeReg :: Maybe Reg -> ()
+seqMaybeReg mr
+ = case mr of
+ 	Nothing		-> ()
+	Just r		-> seqReg r
+
+seqRegList :: [Reg] -> ()
+seqRegList rs
+ = case rs of
+ 	[]		-> ()
+	(r : rs)	-> seqReg r `seq` seqRegList rs
+
+seqList :: [a] -> ()
+seqList ls
+ = case ls of
+ 	[]		-> ()
+	(r : rs)	-> r `seq` seqList rs
+
 

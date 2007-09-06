@@ -78,7 +78,7 @@ colorGraph colors triv spill graph0
 			$$ dotGraph (\x -> text "white") triv graph1) -}
 
 	 else	( graph_prob
-	 	, mkUniqSet ksNoColor
+		, mkUniqSet ksNoColor
 		, listToUFM rsCoalesce)
 	
 

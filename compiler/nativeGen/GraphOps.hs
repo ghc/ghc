@@ -187,13 +187,13 @@ addConflicts conflicts getClass
 
 	| otherwise
 	= graphMapModify
-	$ (\fm -> foldr	(\u -> addConflictSet1 u getClass conflicts) fm
+	$ (\fm -> foldl' (\g u  -> addConflictSet1 u getClass conflicts g) fm
 		$ uniqSetToList conflicts)
 
 
 addConflictSet1 u getClass set 
- = let	set'	= delOneFromUniqSet set u
-   in	adjustWithDefaultUFM 
+ = case delOneFromUniqSet set u of
+    set' -> adjustWithDefaultUFM
 		(\node -> node 			{ nodeConflicts = unionUniqSets set' (nodeConflicts node) } )
 		(newNode u (getClass u))	{ nodeConflicts = set' }
 		u
@@ -468,5 +468,4 @@ adjustUFM f k map
  = case lookupUFM map k of
  	Nothing	-> map
 	Just a	-> addToUFM map k (f a)
-	
 
