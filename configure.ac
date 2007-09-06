@@ -1066,6 +1066,13 @@ fi
 dnl ** check for more functions
 dnl ** The following have been verified to be used in ghc/, but might be used somewhere else, too.
 AC_CHECK_FUNCS([getclock getrusage gettimeofday setitimer siginterrupt sysconf times ctime_r])
+dnl ** On OS X 10.4 (at least), time.h doesn't declare ctime_r if
+dnl ** _POSIX_C_SOURCE is defined
+AC_CHECK_DECLS([ctime_r], , ,
+[#define _POSIX_SOURCE 1
+#define _POSIX_C_SOURCE 199506L
+#include <time.h>])
+
 dnl ** For ghc/rts/gmp:
 AC_CHECK_FUNCS([getpagesize])
 

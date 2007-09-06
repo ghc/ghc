@@ -18,6 +18,13 @@
 #include <time.h>
 #endif
 
+/* HACK: On Mac OS X 10.4 (at least), time.h doesn't declare ctime_r with
+ *       _POSIX_C_SOURCE. If this is the case, we declare it ourselves.
+ */
+#if HAVE_CTIME_R && !HAVE_DECL_CTIME_R
+extern char *ctime_r(const time_t *, char *);
+#endif
+
 #ifdef HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
