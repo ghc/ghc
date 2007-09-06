@@ -76,6 +76,7 @@ import System.Exit	( exitWith, ExitCode(..) )
 import System.Directory
 import System.IO
 import System.IO.Error as IO
+import System.IO.Unsafe
 import Data.Char
 import Data.Dynamic
 import Data.Array
@@ -1817,18 +1818,18 @@ findBreakByCoord mb_file (line, col) arr
                               GHC.srcSpanStartLine span == line,
                               GHC.srcSpanStartCol span >= col ]
 
--- for now, use ANSI bold on Unixy systems.  On Windows, we add a line
--- of carets under the active expression instead.  The Windows console
--- doesn't support ANSI escape sequences, and most Unix terminals
--- (including xterm) do, so this is a reasonable guess until we have a
--- proper termcap/terminfo library.
-#if !defined(mingw32_TARGET_OS)
-do_bold = True
-#else
-do_bold = False
-#endif
+-- For now, use ANSI bold on terminals that we know support it.
+-- Otherwise, we add a line of carets under the active expression instead.
+-- In particular, on Windows and when running the testsuite (which sets
+-- TERM to vt100 for other reasons) we get carets.
+-- We really ought to use a proper termcap/terminfo library.
+do_bold :: Bool
+do_bold = unsafePerformIO (System.Environment.getEnv "TERM") `elem`
+          ["xterm", "linux"]
 
+start_bold :: String
 start_bold = "\ESC[1m"
+end_bold :: String
 end_bold   = "\ESC[0m"
 
 listCmd :: String -> GHCi ()
