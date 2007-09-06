@@ -201,7 +201,7 @@ pprPackagePrefix p mod = getPprStyle doc
           if p == mainPackageId 
                 then empty -- never qualify the main package in code
                 else ftext (zEncodeFS (packageIdFS p)) <> char '_'
-       | Just pkg <- qualModule sty mod = ftext (packageIdFS pkg) <> char ':'
+       | qualModule sty mod = ftext (packageIdFS (modulePackageId mod)) <> char ':'
                 -- the PrintUnqualified tells us which modules have to
                 -- be qualified with package names
        | otherwise = empty

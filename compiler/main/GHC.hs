@@ -57,12 +57,12 @@ module GHC (
 	getModuleInfo,
 	modInfoTyThings,
 	modInfoTopLevelScope,
-	modInfoPrintUnqualified,
-	modInfoExports,
+        modInfoExports,
 	modInfoInstances,
 	modInfoIsExportedName,
 	modInfoLookupName,
 	lookupGlobalName,
+        mkPrintUnqualifiedForModule,
 
 	-- * Printing
 	PrintUnqualified, alwaysQualify,
@@ -1809,7 +1809,8 @@ getBindings s = withSession s $ \hsc_env ->
    return filtered
 
 getPrintUnqual :: Session -> IO PrintUnqualified
-getPrintUnqual s = withSession s (return . icPrintUnqual . hsc_IC)
+getPrintUnqual s = withSession s $ \hsc_env ->
+  return (icPrintUnqual (hsc_dflags hsc_env) (hsc_IC hsc_env))
 
 -- | Container for information about a 'Module'.
 data ModuleInfo = ModuleInfo {
@@ -1902,8 +1903,9 @@ modInfoInstances = minf_instances
 modInfoIsExportedName :: ModuleInfo -> Name -> Bool
 modInfoIsExportedName minf name = elemNameSet name (minf_exports minf)
 
-modInfoPrintUnqualified :: ModuleInfo -> Maybe PrintUnqualified
-modInfoPrintUnqualified minf = fmap mkPrintUnqualified (minf_rdr_env minf)
+mkPrintUnqualifiedForModule :: Session -> ModuleInfo -> IO (Maybe PrintUnqualified)
+mkPrintUnqualifiedForModule s minf = withSession s $ \hsc_env -> do
+  return (fmap (mkPrintUnqualified (hsc_dflags hsc_env)) (minf_rdr_env minf))
 
 modInfoLookupName :: Session -> ModuleInfo -> Name -> IO (Maybe TyThing)
 modInfoLookupName s minf name = withSession s $ \hsc_env -> do

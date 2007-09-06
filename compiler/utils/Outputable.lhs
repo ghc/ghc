@@ -19,7 +19,7 @@ module Outputable (
 
 	BindingSite(..),
 
-	PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify,
+	PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify, QualifyName(..),
 	getPprStyle, withPprStyle, withPprStyleDoc, 
 	pprDeeper, pprDeeperList, pprSetDepth,
 	codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
@@ -121,26 +121,36 @@ data Depth = AllTheWay
 -- as @Exception.catch@, this fuction will return @Just "Exception"@.
 -- Note that the return value is a ModuleName, not a Module, because
 -- in source code, names are qualified by ModuleNames.
-type QualifyName = Module -> OccName -> Maybe ModuleName
+type QueryQualifyName = Module -> OccName -> QualifyName
+
+data QualifyName                        -- given P:M.T
+        = NameUnqual                    -- refer to it as "T"
+        | NameQual ModuleName           -- refer to it as "X.T" for the supplied X
+        | NameNotInScope1               
+                -- it is not in scope at all, but M.T is not bound in the current
+                -- scope, so we can refer to it as "M.T"
+        | NameNotInScope2
+                -- it is not in scope at all, and M.T is already bound in the
+                -- current scope, so we must refer to it as "P:M.T"
+
 
 -- | For a given module, we need to know whether to print it with
--- a package name to disambiguate it, and if so which package name should
--- we use.
-type QualifyModule = Module -> Maybe PackageId
+-- a package name to disambiguate it.
+type QueryQualifyModule = Module -> Bool
 
-type PrintUnqualified = (QualifyName, QualifyModule)
+type PrintUnqualified = (QueryQualifyName, QueryQualifyModule)
 
-alwaysQualifyNames :: QualifyName
-alwaysQualifyNames m n = Just (moduleName m)
+alwaysQualifyNames :: QueryQualifyName
+alwaysQualifyNames m n = NameQual (moduleName m)
 
-neverQualifyNames :: QualifyName
-neverQualifyNames m n = Nothing
+neverQualifyNames :: QueryQualifyName
+neverQualifyNames m n = NameUnqual
 
-alwaysQualifyModules :: QualifyModule
-alwaysQualifyModules m = Just (modulePackageId m)
+alwaysQualifyModules :: QueryQualifyModule
+alwaysQualifyModules m = True
 
-neverQualifyModules :: QualifyModule
-neverQualifyModules m = Nothing
+neverQualifyModules :: QueryQualifyModule
+neverQualifyModules m = False
 
 alwaysQualify = (alwaysQualifyNames, alwaysQualifyModules)
 neverQualify  = (neverQualifyNames,  neverQualifyModules)
@@ -217,13 +227,13 @@ getPprStyle df sty = df sty sty
 \end{code}
 
 \begin{code}
-qualName :: PprStyle -> QualifyName
+qualName :: PprStyle -> QueryQualifyName
 qualName (PprUser (qual_name,_) _) m n = qual_name m n
-qualName other		           m n = Just (moduleName m)
+qualName other		           m n = NameQual (moduleName m)
 
-qualModule :: PprStyle -> QualifyModule
+qualModule :: PprStyle -> QueryQualifyModule
 qualModule (PprUser (_,qual_mod) _) m = qual_mod m
-qualModule other                    m = Just (modulePackageId m)
+qualModule other                    m = True
 
 codeStyle :: PprStyle -> Bool
 codeStyle (PprCode _)	  = True

@@ -170,14 +170,14 @@ initDs  :: HscEnv
 
 initDs hsc_env mod rdr_env type_env thing_inside
   = do 	{ msg_var <- newIORef (emptyBag, emptyBag)
-        ; (ds_gbl_env, ds_lcl_env) <- mkDsEnvs mod rdr_env type_env msg_var
+	; let dflags = hsc_dflags hsc_env
+        ; (ds_gbl_env, ds_lcl_env) <- mkDsEnvs dflags mod rdr_env type_env msg_var
 
 	; either_res <- initTcRnIf 'd' hsc_env ds_gbl_env ds_lcl_env $
 		        tryM thing_inside	-- Catch exceptions (= errors during desugaring)
 
 	-- Display any errors and warnings 
 	-- Note: if -Werror is used, we don't signal an error here.
-	; let dflags = hsc_dflags hsc_env
 	; msgs <- readIORef msg_var
         ; printErrorsAndWarnings dflags msgs 
 
@@ -196,20 +196,21 @@ initDsTc thing_inside
   = do	{ this_mod <- getModule
 	; tcg_env  <- getGblEnv
 	; msg_var  <- getErrsVar
+        ; dflags   <- getDOpts
 	; let type_env = tcg_type_env tcg_env
 	      rdr_env  = tcg_rdr_env tcg_env
-        ; ds_envs <- ioToIOEnv$ mkDsEnvs this_mod rdr_env type_env msg_var
+        ; ds_envs <- ioToIOEnv$ mkDsEnvs dflags this_mod rdr_env type_env msg_var
 	; setEnvs ds_envs thing_inside }
 
-mkDsEnvs :: Module -> GlobalRdrEnv -> TypeEnv -> IORef Messages -> IO (DsGblEnv, DsLclEnv)
-mkDsEnvs mod rdr_env type_env msg_var
+mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> IORef Messages -> IO (DsGblEnv, DsLclEnv)
+mkDsEnvs dflags mod rdr_env type_env msg_var
   = do 
        sites_var <- newIORef []
        let     if_genv = IfGblEnv { if_rec_types = Just (mod, return type_env) }
                if_lenv = mkIfLclEnv mod (ptext SLIT("GHC error in desugarer lookup in") <+> ppr mod)
                gbl_env = DsGblEnv { ds_mod = mod, 
     			            ds_if_env = (if_genv, if_lenv),
-    			            ds_unqual = mkPrintUnqualified rdr_env,
+    			            ds_unqual = mkPrintUnqualified dflags rdr_env,
     			            ds_msgs = msg_var}
                lcl_env = DsLclEnv { ds_meta = emptyNameEnv, 
 			            ds_loc = noSrcSpan }

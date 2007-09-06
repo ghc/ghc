@@ -1254,8 +1254,9 @@ printMinimalImports imps
    mod_ies  <-  initIfaceTcRn $ mappM to_ies (fmToList imps) ;
    this_mod <- getModule ;
    rdr_env  <- getGlobalRdrEnv ;
+   dflags   <- getDOpts ;
    ioToTcRn (do { h <- openFile (mkFilename this_mod) WriteMode ;
-		  printForUser h (mkPrintUnqualified rdr_env) 
+		  printForUser h (mkPrintUnqualified dflags rdr_env) 
 				 (vcat (map ppr_mod_ie mod_ies)) })
    }
   where

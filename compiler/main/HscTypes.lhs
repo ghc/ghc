@@ -85,9 +85,7 @@ import ByteCodeAsm	( CompiledByteCode )
 import {-# SOURCE #-}  InteractiveEval ( Resume )
 #endif
 
-import RdrName		( GlobalRdrEnv, emptyGlobalRdrEnv, GlobalRdrElt(..), 
-                          mkRdrUnqual, ImpDeclSpec(..), Provenance(..),
-                          ImportSpec(..), lookupGlobalRdrEnv, lookupGRE_RdrName )
+import RdrName
 import Name		( Name, NamedThing, getName, nameOccName, nameModule )
 import NameEnv
 import NameSet	
@@ -108,7 +106,7 @@ import Class		( Class, classSelIds, classATs, classTyCon )
 import TyCon
 import DataCon		( DataCon, dataConImplicitIds )
 import PrelNames	( gHC_PRIM )
-import Packages		( PackageId )
+import Packages hiding ( Version(..) )
 import DynFlags		( DynFlags(..), isOneShot, HscTarget (..) )
 import DriverPhases	( HscSource(..), isHsBoot, hscSourceString, Phase )
 import BasicTypes	( Version, initialVersion, IPName, 
@@ -124,6 +122,7 @@ import UniqFM		( lookupUFM, eltsUFM, emptyUFM )
 import UniqSupply	( UniqSupply )
 import FastString	( FastString )
 import StringBuffer	( StringBuffer )
+import Util
 
 import System.Time	( ClockTime )
 import Data.IORef
@@ -691,8 +690,8 @@ emptyInteractiveContext
 #endif
                        }
 
-icPrintUnqual :: InteractiveContext -> PrintUnqualified
-icPrintUnqual ictxt = mkPrintUnqualified (ic_rn_gbl_env ictxt)
+icPrintUnqual :: DynFlags -> InteractiveContext -> PrintUnqualified
+icPrintUnqual dflags ictxt = mkPrintUnqualified dflags (ic_rn_gbl_env ictxt)
 
 
 extendInteractiveContext
@@ -729,20 +728,44 @@ substInteractiveContext ictxt@InteractiveContext{ic_tmp_ids=ids} subst =
 %*									*
 %************************************************************************
 
+Deciding how to print names is pretty tricky.  We are given a name
+P:M.T, where P is the package name, M is the defining module, and T is
+the occurrence name, and we have to decide in which form to display
+the name given a GlobalRdrEnv describing the current scope.
+
+Ideally we want to display the name in the form in which it is in
+scope.  However, the name might not be in scope at all, and that's
+where it gets tricky.  Here are the cases:
+
+ 1. T   uniquely maps to  P:M.T                         --->  "T"
+ 2. there is an X for which X.T uniquely maps to  P:M.T --->  "X.T"
+ 3. there is no binding for "M.T"                       --->  "M.T"
+ 4. otherwise                                           --->  "P:M.T"
+
+3 and 4 apply when P:M.T is not in scope.  In these cases we want to
+refer to the name as "M.T", but "M.T" might mean something else in the
+current scope (e.g. if there's an "import X as M"), so to avoid
+confusion we avoid using "M.T" if there's already a binding for it.
+
+There's one further subtlety: if the module M cannot be imported
+because it is not exposed by any package, then we must refer to it as
+"P:M".  This is handled by the qual_mod component of PrintUnqualified.
+
 \begin{code}
-mkPrintUnqualified :: GlobalRdrEnv -> PrintUnqualified
-mkPrintUnqualified env = (qual_name, qual_mod)
+mkPrintUnqualified :: DynFlags -> GlobalRdrEnv -> PrintUnqualified
+mkPrintUnqualified dflags env = (qual_name, qual_mod)
   where
   qual_name mod occ	-- The (mod,occ) pair is the original name of the thing
-        | [gre] <- unqual_gres, right_name gre = Nothing
+        | [gre] <- unqual_gres, right_name gre = NameUnqual
 		-- If there's a unique entity that's in scope unqualified with 'occ'
 		-- AND that entity is the right one, then we can use the unqualified name
 
-        | [gre] <- qual_gres = Just (get_qual_mod (gre_prov gre))
+        | [gre] <- qual_gres = NameQual (get_qual_mod (gre_prov gre))
 
-        | null qual_gres = Just (moduleName mod)
-                -- it isn't in scope at all, this probably shouldn't happen,
-                -- but we'll qualify it by the original module anyway.
+        | null qual_gres = 
+              if null (lookupGRE_RdrName (mkRdrQual (moduleName mod) occ) env)
+                   then NameNotInScope1
+                   else NameNotInScope2
 
 	| otherwise = panic "mkPrintUnqualified"
       where
@@ -754,7 +777,22 @@ mkPrintUnqualified env = (qual_name, qual_mod)
 	get_qual_mod LocalDef      = moduleName mod
 	get_qual_mod (Imported is) = ASSERT( not (null is) ) is_as (is_decl (head is))
 
-  qual_mod mod = Nothing       -- For now, we never qualify module names with their packages
+    -- we can mention a module P:M without the P: qualifier iff
+    -- "import M" would resolve unambiguously to P:M.  (if P is the
+    -- current package we can just assume it is unqualified).
+
+  qual_mod mod
+     | modulePackageId mod == thisPackage dflags = False
+
+     | [pkgconfig] <- [pkg | (pkg,exposed_module) <- lookup, 
+                             exposed pkg && exposed_module],
+       packageConfigId pkgconfig == modulePackageId mod
+        -- this says: we are given a module P:M, is there just one exposed package
+        -- that exposes a module M, and is it package P?
+     = False
+
+     | otherwise = True
+     where lookup = lookupModuleInAllPackages dflags (moduleName mod)
 \end{code}
 
 

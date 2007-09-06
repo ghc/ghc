@@ -367,9 +367,13 @@ pprExternal sty uniq mod occ is_wired is_builtin
 		 		 pprUnique uniq])
   | BuiltInSyntax <- is_builtin  = ppr_occ_name occ
 	-- never qualify builtin syntax
-  | Just mod <- qualName sty mod occ = ppr mod <> dot <> ppr_occ_name occ
-        -- the PrintUnqualified tells us how to qualify this Name, if at all
+  | NameQual modname <- qual_name = ppr modname <> dot <> ppr_occ_name occ
+        -- see HscTypes.mkPrintUnqualified and Outputable.QualifyName:
+  | NameNotInScope1 <- qual_name  = ppr mod <> dot <> ppr_occ_name occ
+  | NameNotInScope2 <- qual_name  = ppr (modulePackageId mod) <> char ':' <>
+                                    ppr (moduleName mod) <> dot <> ppr_occ_name occ
   | otherwise		          = ppr_occ_name occ
+  where qual_name = qualName sty mod occ
 
 pprInternal sty uniq occ
   | codeStyle sty  = pprUnique uniq

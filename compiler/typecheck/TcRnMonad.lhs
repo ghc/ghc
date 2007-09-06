@@ -369,7 +369,8 @@ traceOptTcRn flag doc = ifOptM flag $ do
 
 dumpTcRn :: SDoc -> TcRn ()
 dumpTcRn doc = do { rdr_env <- getGlobalRdrEnv ;
-		    ioToTcRn (printForUser stderr (mkPrintUnqualified rdr_env) doc) }
+                    dflags <- getDOpts ;
+		    ioToTcRn (printForUser stderr (mkPrintUnqualified dflags rdr_env) doc) }
 
 dumpOptTcRn :: DynFlag -> SDoc -> TcRn ()
 dumpOptTcRn flag doc = ifOptM flag (dumpTcRn doc)
@@ -475,7 +476,8 @@ addLongErrAt loc msg extra
   = do { traceTc (ptext SLIT("Adding error:") <+> (mkLocMessage loc (msg $$ extra))) ;	
 	 errs_var <- getErrsVar ;
 	 rdr_env <- getGlobalRdrEnv ;
-	 let { err = mkLongErrMsg loc (mkPrintUnqualified rdr_env) msg extra } ;
+         dflags <- getDOpts ;
+	 let { err = mkLongErrMsg loc (mkPrintUnqualified dflags rdr_env) msg extra } ;
 	 (warns, errs) <- readMutVar errs_var ;
   	 writeMutVar errs_var (warns, errs `snocBag` err) }
 
@@ -491,7 +493,8 @@ addReportAt :: SrcSpan -> Message -> TcRn ()
 addReportAt loc msg
   = do { errs_var <- getErrsVar ;
 	 rdr_env <- getGlobalRdrEnv ;
-	 let { warn = mkWarnMsg loc (mkPrintUnqualified rdr_env) msg } ;
+         dflags <- getDOpts ;
+	 let { warn = mkWarnMsg loc (mkPrintUnqualified dflags rdr_env) msg } ;
 	 (warns, errs) <- readMutVar errs_var ;
   	 writeMutVar errs_var (warns `snocBag` warn, errs) }
 

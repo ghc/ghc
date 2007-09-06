@@ -3085,51 +3085,28 @@ misMatchMsg :: TcType -> TcType -> TcM (TidyEnv, SDoc)
 -- The argument order is: actual type, expected type
 misMatchMsg ty_act ty_exp
   = do	{ env0 <- tcInitTidyEnv
-	; (env1, pp_exp, extra_exp) <- ppr_ty env0 ty_exp ty_act
-	; (env2, pp_act, extra_act) <- ppr_ty env1 ty_act ty_exp
+        ; ty_exp <- zonkTcType ty_exp
+        ; ty_act <- zonkTcType ty_act
+	; (env1, pp_exp, extra_exp) <- ppr_ty env0 ty_exp
+	; (env2, pp_act, extra_act) <- ppr_ty env1 ty_act
 	; return (env2, 
                   sep [sep [ptext SLIT("Couldn't match expected type") <+> pp_exp, 
 			    nest 7 $
                               ptext SLIT("against inferred type") <+> pp_act],
 		       nest 2 (extra_exp $$ extra_act)]) }
 
-ppr_ty :: TidyEnv -> TcType -> TcType -> TcM (TidyEnv, SDoc, SDoc)
-ppr_ty env ty other_ty 
-  = do	{ ty' <- zonkTcType ty
-	; let (env1, tidy_ty) = tidyOpenType env ty'
-	; (env2, extra) <- ppr_extra env1 tidy_ty other_ty
+ppr_ty :: TidyEnv -> TcType -> TcM (TidyEnv, SDoc, SDoc)
+ppr_ty env ty
+  = do	{ let (env1, tidy_ty) = tidyOpenType env ty
+	; (env2, extra) <- ppr_extra env1 tidy_ty
 	; return (env2, quotes (ppr tidy_ty), extra) }
 
--- (ppr_extra env ty other_ty) shows extra info about 'ty'
-ppr_extra env (TyVarTy tv) other_ty
+-- (ppr_extra env ty) shows extra info about 'ty'
+ppr_extra env (TyVarTy tv)
   | isSkolemTyVar tv || isSigTyVar tv
   = return (env1, pprSkolTvBinding tv1)
   where
     (env1, tv1) = tidySkolemTyVar env tv
 
-ppr_extra env (TyConApp tc1 _) (TyConApp tc2 _) 
-  | getOccName tc1 == getOccName tc2
-  = --	This case helps with messages that would otherwise say
-    --	   Could not match 'T' does not match 'M.T'
-    -- which is not helpful
-    do	{ this_mod <- getModule
-	; return (env, quotes (ppr tc1) <+> ptext SLIT("is defined") <+> mk_mod this_mod) }
-  where
-    tc_mod  = nameModule (getName tc1)
-    tc_pkg  = modulePackageId tc_mod
-    tc2_pkg = modulePackageId (nameModule (getName tc2))
-    mk_mod this_mod 
-	| tc_mod == this_mod = ptext SLIT("in this module")
-
-	| not home_pkg && tc2_pkg /= tc_pkg = pp_pkg
-		-- Suppress the module name if (a) it's from another package
-		--			       (b) other_ty isn't from that same package
-
-	| otherwise = ptext SLIT("in module") <+> quotes (ppr tc_mod) <+> pp_pkg
-	where
-	  home_pkg = tc_pkg == modulePackageId this_mod
-	  pp_pkg | home_pkg  = empty
-		 | otherwise = ptext SLIT("in package") <+> quotes (ppr tc_pkg)
-
-ppr_extra env ty other_ty = return (env, empty)		-- Normal case
+ppr_extra env ty = return (env, empty)		-- Normal case
 \end{code}

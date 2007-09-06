@@ -25,6 +25,7 @@ import Util
 import Name (nameOccName)
 import OccName (pprOccName)
 
+import Data.Maybe
 import Control.Exception
 import Data.List
 import Control.Monad
@@ -69,11 +70,13 @@ createTagsFile session tagskind tagFile = do
                                 ++ GHC.moduleNameString (GHC.moduleName m)
                                 ++ "' is not interpreted"))
         mbModInfo <- GHC.getModuleInfo session m
-        let unqual 
-	      | Just modinfo <- mbModInfo,
-		Just unqual <- GHC.modInfoPrintUnqualified modinfo = unqual
-	      | otherwise = GHC.alwaysQualify
-
+        unqual <-
+          case mbModInfo of
+             Just minf -> do
+                mb_print_unqual <- GHC.mkPrintUnqualifiedForModule session minf
+                return (fromMaybe GHC.alwaysQualify mb_print_unqual)
+             Nothing ->
+                return GHC.alwaysQualify
         case mbModInfo of 
           Just modInfo -> return $! listTags unqual modInfo 
           _            -> return []
