@@ -858,8 +858,8 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 
 	; let
 	    -- The WpLet binds any Insts which came out of the simplification.
-		dict_ids = map instToId dicts
-		co_fn = mkWpTyLams tvs' <.> mkWpLams dict_ids <.> WpLet inst_binds
+	    dict_vars = map instToVar dicts
+	    co_fn = mkWpTyLams tvs' <.> mkWpLams dict_vars <.> WpLet inst_binds
 	; returnM (co_fn, result) }
   where
     free_tvs = tyVarsOfType expected_ty `unionVarSet` extra_tvs

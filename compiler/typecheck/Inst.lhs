@@ -979,11 +979,10 @@ fromWantedCo :: String -> Either TcTyVar Coercion -> TcTyVar
 fromWantedCo _ (Left covar) = covar
 fromWantedCo msg _	    = panic ("fromWantedCo: not a wanted coercion: " ++ msg)
 
-eitherEqInst 
-	:: Inst 		-- given or wanted EqInst
-	-> (TcTyVar  -> a) 	-- 	result if wanted
-	-> (Coercion -> a) 	--	result if given
-	-> a		
+eitherEqInst :: Inst 	            -- given or wanted EqInst
+	     -> (TcTyVar  -> a)     -- 	result if wanted
+	     -> (Coercion -> a)     --	result if given
+	     -> a		
 eitherEqInst (EqInst {tci_co = either_co}) withWanted withGiven
 	= case either_co of
 		Left  covar -> withWanted covar

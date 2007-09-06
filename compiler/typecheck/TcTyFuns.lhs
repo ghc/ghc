@@ -8,9 +8,6 @@
 -- for details
 
 module TcTyFuns(
-	finalizeEqInst,
-	partitionWantedEqInsts, partitionGivenEqInsts,
-
 	tcNormalizeFamInst,
 
 	normaliseGivens, normaliseGivenDicts, 
@@ -44,49 +41,6 @@ import SrcLoc	( Located(..) )
 import Maybes
 
 import Data.List
-\end{code}
-
-%************************************************************************
-%*									*
-\section{Eq Insts}
-%*									*
-%************************************************************************
-
-%************************************************************************
-%*									*
-\section{Utility Code}
-%*									*
-%************************************************************************
-
-\begin{code}
-partitionWantedEqInsts 
-	:: [Inst] 		-- wanted insts
-	-> ([Inst],[Inst])	-- (wanted equations,wanted dicts)
-partitionWantedEqInsts = partitionEqInsts True
-
-partitionGivenEqInsts 
-	:: [Inst] 		-- given insts
-	-> ([Inst],[Inst])	-- (given equations,given dicts)
-partitionGivenEqInsts = partitionEqInsts False
-
-
-partitionEqInsts 
-	:: Bool			-- <=> wanted
-	-> [Inst] 		-- insts
-	-> ([Inst],[Inst])	-- (equations,dicts)
-partitionEqInsts wanted [] 
-	= ([],[])
-partitionEqInsts wanted (i:is)
-	| isEqInst i
-	= (i:es,ds)
-	| otherwise
-	= (es,i:ds)
-	where (es,ds) = partitionEqInsts wanted is
-
-isEqDict :: Inst -> Bool
-isEqDict (Dict {tci_pred = EqPred _ _}) = True
-isEqDict _				= False
-
 \end{code}
 
 
@@ -503,8 +457,10 @@ trivialInsts (i@(EqInst {}):is)
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 swapInsts :: [Inst] -> TcM ([Inst],Bool)
 -- All the inputs and outputs are equalities
-swapInsts insts = mapAndUnzipM swapInst insts >>= \(insts',changeds) -> return (insts',or changeds)
-		  
+swapInsts insts 
+  = do { (insts', changeds) <- mapAndUnzipM swapInst insts
+       ; return (insts', or changeds)
+       }
 
 	-- (Swap)
 	-- 	g1 : c ~ Fd

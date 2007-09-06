@@ -635,6 +635,17 @@ In addition to the basic Haskell variants of 'Inst's, they can now also
 represent implication constraints 'forall tvs. (reft, given) => wanted'
 and equality constraints 'co :: ty1 ~ ty2'.
 
+NB: Equalities occur in two flavours:
+
+  (1) Dict {tci_pred = EqPred ty1 ty2}
+  (2) EqInst {tci_left = ty1, tci_right = ty2, tci_co = coe}
+
+The former arises from equalities in contexts, whereas the latter is used
+whenever the type checker introduces an equality (e.g., during deferring
+unification).
+
+I am not convinced that this duplication is necessary or useful! -=chak
+
 \begin{code}
 data Inst
   = Dict {

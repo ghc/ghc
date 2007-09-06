@@ -989,17 +989,15 @@ makeImplicationBind loc all_tvs reft
  | otherwise			-- Otherwise we must generate a binding
  = do	{ uniq <- newUnique 
 	; span <- getSrcSpanM
-	; let (eq_givens,dict_givens) = partitionGivenEqInsts givens
+	; let (eq_givens, dict_givens) = partition isEqInst givens
 	      eq_tyvar_cos =  map TyVarTy $ uniqSetToList $ tyVarsOfTypes $ map eqInstType eq_givens
 	; let name = mkInternalName uniq (mkVarOcc "ic") span
 	      implic_inst = ImplicInst { tci_name = name, tci_reft = reft,
 					 tci_tyvars = all_tvs, 
 					 tci_given = (eq_givens ++ dict_givens),
 					 tci_wanted = irreds, tci_loc = loc }
-	; let
-		-- only create binder for dict_irreds
-		-- we 
-	      (eq_irreds,dict_irreds) = partitionWantedEqInsts irreds
+	; let   -- only create binder for dict_irreds
+	      (eq_irreds, dict_irreds) = partition isEqInst irreds
               n_dict_irreds = length dict_irreds
 	      dict_irred_ids = map instToId dict_irreds
 	      tup_ty = mkTupleTy Boxed n_dict_irreds (map idType dict_irred_ids)
@@ -1653,12 +1651,25 @@ data WantSCs = NoSCs | AddSCs	-- Tells whether we should add the superclasses
 	-- Note [SUPER-CLASS LOOP 1]
 \end{code}
 
+
 %************************************************************************
 %*									*
 \subsection[reduce]{@reduce@}
 %*									*
 %************************************************************************
 
+Note [Ancestor Equalities]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+During context reduction, we add to the wanted equalities also those
+equalities that (transitively) occur in superclass contexts of wanted
+class constraints.  Consider the following code
+
+  class a ~ Int => C a
+  instance C Int
+
+If (C a) is wanted, we want to add (a ~ Int), which will be discharged by
+substituting Int for a.  Hence, we ultimately want (C Int), which we
+discharge with the explicit instance.
 
 \begin{code}
 reduceContext :: RedEnv
@@ -1677,34 +1688,31 @@ reduceContext env wanteds
 	     text "----------------------"
 	     ]))
 
+	; let givens 		 	  = red_givens env
+	      (given_eqs0, given_dicts0)  = partition isEqInst givens
+	      (wanted_eqs0, wanted_dicts) = partition isEqInst wanteds
 
-	; let givens 			= red_givens env
-	      (given_eqs0,given_dicts0) = partitionGivenEqInsts  givens
-	      (wanted_eqs0,wanted_dicts) = partitionWantedEqInsts wanteds
+          -- We want to add as wanted equalities those that (transitively) 
+          -- occur in superclass contexts of wanted class constraints.
+          -- See Note [Ancestor Equalities]
+	; ancestor_eqs <- ancestorEqualities wanted_dicts
+        ; let wanted_eqs = wanted_eqs0 ++ ancestor_eqs
+	; traceTc $ text "reduceContext: ancestor eqs" <+> ppr ancestor_eqs
 
-	; wanted_ancestor_eqs <- (mapM wantedAncestorEqualities wanted_dicts >>= \ls -> return (concat ls))
-	; traceTc (text "test wanted SCs" <+> ppr wanted_ancestor_eqs)
-	; let wanted_eqs = wanted_ancestor_eqs ++ wanted_eqs0
+	  -- 1. Normalise the *given* *equality* constraints
+	; (given_eqs, eliminate_skolems) <- normaliseGivens given_eqs0
 
-	; -- 1. Normalise the *given* *equality* constraints
-	  (given_eqs,eliminate_skolems) <- normaliseGivens given_eqs0
-
-	; -- 2. Normalise the *given* *dictionary* constraints
+	  -- 2. Normalise the *given* *dictionary* constraints
 	  --    wrt. the toplevel and given equations
-	  (given_dicts,given_binds) <- normaliseGivenDicts given_eqs given_dicts0
+	; (given_dicts, given_binds) <- normaliseGivenDicts given_eqs 
+                                                            given_dicts0
 
-	; -- 3. Solve the *wanted* *equation* constraints
-	  eq_irreds0 <- solveWanteds given_eqs wanted_eqs 
+	  -- 3. Solve the *wanted* *equation* constraints
+	; eq_irreds0 <- solveWanteds given_eqs wanted_eqs 
 
-	  -- 4. Normalise the *wanted* equality constraints with respect to each other
+	  -- 4. Normalise the *wanted* equality constraints with respect to
+	  --    each other 
 	; eq_irreds <- normaliseWanteds eq_irreds0
-
---         -- Do the real work
--- 	-- Process non-implication constraints first, so that they are
--- 	-- available to help solving the implication constraints
--- 	-- 	ToDo: seems a bit inefficient and ad-hoc
--- 	; let (implics, rest) = partition isImplicInst wanteds
--- 	; avails <- reduceList env (rest ++ implics) init_state
 
           -- 5. Build the Avail mapping from "given_dicts"
 	; init_state <- foldlM addGiven emptyAvails given_dicts
@@ -1714,18 +1722,18 @@ reduceContext env wanteds
 	; wanted_dicts' <- zonkInsts wanted_dicts
 	; avails <- reduceList env wanted_dicts' init_state
 	; (binds, irreds0, needed_givens) <- extractResults avails wanted_dicts'
-	; traceTc (text "reduceContext extractresults" <+> vcat
-			[ppr avails,ppr wanted_dicts',ppr binds,ppr needed_givens])
+	; traceTc $ text "reduceContext extractresults" <+> vcat
+		      [ppr avails,ppr wanted_dicts',ppr binds,ppr needed_givens]
 
-	; -- 7. Normalise the *wanted* *dictionary* constraints
+	  -- 7. Normalise the *wanted* *dictionary* constraints
 	  --    wrt. the toplevel and given equations
-	  (irreds1,normalise_binds1) <- normaliseWantedDicts given_eqs irreds0
+	; (irreds1,normalise_binds1) <- normaliseWantedDicts given_eqs irreds0
 
-	; -- 8. Substitute the wanted *equations* in the wanted *dictionaries*
-	  (irreds,normalise_binds2) <- substEqInDictInsts eq_irreds irreds1
+	  -- 8. Substitute the wanted *equations* in the wanted *dictionaries*
+	; (irreds,normalise_binds2) <- substEqInDictInsts eq_irreds irreds1
 		
-	; -- 9. eliminate the artificial skolem constants introduced in 1.
-	  eliminate_skolems	
+	  -- 9. eliminate the artificial skolem constants introduced in 1.
+	; eliminate_skolems	
 
 	  -- If there was some FD improvement,
 	  -- or new wanted equations have been exposed,
@@ -1733,7 +1741,7 @@ reduceContext env wanteds
 	; let improved = availsImproved avails 
 			 || (not $ isEmptyBag normalise_binds1)
 			 || (not $ isEmptyBag normalise_binds2)
-			 || (not $ null $ fst $ partitionGivenEqInsts irreds)
+			 || (any isEqInst irreds)
 
 	; traceTc (text "reduceContext end" <+> (vcat [
 	     text "----------------------",
@@ -1749,7 +1757,13 @@ reduceContext env wanteds
 	     text "----------------------"
 	     ]))
 
-	; return (improved, given_binds `unionBags` normalise_binds1 `unionBags` normalise_binds2 `unionBags` binds, irreds ++ eq_irreds, needed_givens) }
+	; return (improved, 
+                  given_binds `unionBags` normalise_binds1 
+                              `unionBags` normalise_binds2 
+                              `unionBags` binds, 
+                  irreds ++ eq_irreds, 
+                  needed_givens) 
+        }
 
 tcImproveOne :: Avails -> Inst -> TcM ImprovementDone
 tcImproveOne avails inst
@@ -2086,7 +2100,7 @@ reduceImplication env orig_avails reft tvs extra_givens wanteds inst_loc
 			-- when inferring types.
 
 	; let	dict_wanteds = filter (not . isEqInst) wanteds
-		(extra_eq_givens,extra_dict_givens) = partitionGivenEqInsts extra_givens
+		(extra_eq_givens, extra_dict_givens) = partition isEqInst extra_givens
 		dict_ids = map instToId extra_dict_givens 
 		-- TOMDO: given equational constraints bug!
 		--  we need a different evidence for given
@@ -2417,7 +2431,7 @@ addAvailAndSCs want_scs avails inst avail
   where
     is_loop pred = any (`tcEqType` mkPredTy pred) dep_tys
 			-- Note: this compares by *type*, not by Unique
-    deps         = findAllDeps (unitVarSet (instToId inst)) avail
+    deps         = findAllDeps (unitVarSet (instToVar inst)) avail
     dep_tys	 = map idType (varSetElems deps)
 
     findAllDeps :: IdSet -> AvailHow -> IdSet
@@ -2459,38 +2473,40 @@ addSCs is_loop avails dict
 					; addSCs is_loop avails' sc_dict }
       where
 	sc_sel_rhs = L (instSpan dict) (HsWrap co_fn (HsVar sc_sel))
-	co_fn	   = WpApp (instToId dict) <.> mkWpTyApps tys
+	co_fn	   = WpApp (instToVar dict) <.> mkWpTyApps tys
 
     is_given :: Inst -> Bool
     is_given sc_dict = case findAvail avails sc_dict of
 			  Just (Given _) -> True	-- Given is cheaper than superclass selection
 			  other		 -> False	
 
-
-wantedAncestorEqualities :: Inst -> TcM [Inst]
-wantedAncestorEqualities dict 
-  | isClassDict dict
-  = mapM mkWantedEqInst $ filter isEqPred $ bagToList $ wantedAncestorEqualities' (dictPred dict) emptyBag
-  | otherwise
-  = return []
-
-wantedAncestorEqualities' :: PredType -> Bag PredType -> Bag PredType
-wantedAncestorEqualities' pred bag
-  = ASSERT( isClassPred pred )
-    let (clas, tys) 		 = getClassPredTys pred 
+-- From the a set of insts obtain all equalities that (transitively) occur in
+-- superclass contexts of class constraints (aka the ancestor equalities). 
+--
+ancestorEqualities :: [Inst] -> TcM [Inst]
+ancestorEqualities
+  =   mapM mkWantedEqInst               -- turn only equality predicates..
+    . filter isEqPred                   -- ..into wanted equality insts
+    . bagToList 
+    . addAEsToBag emptyBag              -- collect the superclass constraints..
+    . map dictPred                      -- ..of all predicates in a bag
+    . filter isClassDict
+  where
+    addAEsToBag :: Bag PredType -> [PredType] -> Bag PredType
+    addAEsToBag bag []           = bag
+    addAEsToBag bag (pred:preds)
+      | pred `elemBag` bag = addAEsToBag bag         preds
+      | isEqPred pred      = addAEsToBag bagWithPred preds
+      | isClassPred pred   = addAEsToBag bagWithPred predsWithSCs
+      | otherwise          = addAEsToBag bag         preds
+      where
+        bagWithPred  = bag `snocBag` pred
+        predsWithSCs = preds ++ substTheta (zipTopTvSubst tyvars tys) sc_theta
+        --
         (tyvars, sc_theta, _, _) = classBigSig clas
-        sc_theta' 		 = substTheta (zipTopTvSubst tyvars tys) sc_theta
-        add_sc bag sc_pred
-          | elemBag sc_pred bag  = bag
-	  | not (isEqPred sc_pred)
-            && not (isClassPred sc_pred)
-			         = bag
-	  | isEqPred sc_pred	 = consBag sc_pred bag
-          | otherwise	         = let bag' = consBag sc_pred bag
-				   in wantedAncestorEqualities' sc_pred bag'
-    in foldl add_sc bag sc_theta'
-
+        (clas, tys) 		 = getClassPredTys pred 
 \end{code}
+
 
 %************************************************************************
 %*									*
