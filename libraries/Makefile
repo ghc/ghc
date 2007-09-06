@@ -88,6 +88,8 @@ space=$(empty) $(empty)
 
 # -----------------------------------------------------------------------------
 
+libraryhtmldir = $(htmldir)/libraries
+
 ifneq "$(DOING_BIN_DIST)" "YES"
 
 CONFIGURE_OPTS =
@@ -195,13 +197,10 @@ configure: $(foreach SUBDIR,$(SUBDIRS), \
 # the executable with the shell script on non-Windows. This should
 # probably be tidied up so that we can always pass the same libsubdir.
 ifeq "$(Windows)" "YES"
-datadir        = $$prefix
 libsubdir      = $$pkgid
 else
-datadir        = $$prefix/share/ghc
 libsubdir      = $$compiler/lib/$$pkgid
 endif
-libraryhtmldir = $(htmldir)/libraries
 
 # We rely on all the CONFIGURE_ARGS being quoted with '...', and there
 # being no 's inside the values.
