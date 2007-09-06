@@ -42,6 +42,7 @@
 #include <windows.h>
 #endif
 #if darwin_HOST_OS
+#include <mach/mach.h>
 #include <mach/vm_map.h>
 #endif
 
@@ -200,7 +201,7 @@ my_mmap (void *addr, lnat size)
 	errorBelch("memory allocation failed (requested %lu bytes)", size);
 	stg_exit(EXIT_FAILURE);
     } else {
-	vm_protect(mach_task_self(),ret,size,FALSE,VM_PROT_READ|VM_PROT_WRITE);
+	vm_protect(mach_task_self(),(vm_address_t)ret,size,FALSE,VM_PROT_READ|VM_PROT_WRITE);
     }
 #else
     ret = mmap(addr, size, PROT_READ | PROT_WRITE | PROT_EXEC, 
