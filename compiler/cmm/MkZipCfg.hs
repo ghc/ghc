@@ -1,17 +1,22 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS -Wall -fno-warn-name-shadowing #-}
 module MkZipCfg
-    ( AGraph, (<*>), emptyAGraph, withFreshLabel
+    ( AGraph, (<*>), emptyAGraph, withFreshLabel, withUnique
     , mkMiddle, mkMiddles, mkLast, mkZTail, mkBranch, mkLabel, mkIfThenElse, mkWhileDo
+    , mkBlock
     , emptyGraph, graphOfMiddles, graphOfZTail
     , lgraphOfAGraph, graphOfAGraph, labelAGraph
     )
 where
 
-import Outputable
-import Prelude hiding (zip, unzip, last)
-import UniqSupply
 import ZipCfg
+
+import Outputable
+import Unique
+import UniqSupply
+
+import Prelude hiding (zip, unzip, last)
+
 
 -------------------------------------------------------------------------
 --     GENERIC ZIPPER-BASED CONTROL-FLOW GRAPH (CONSTRUCTOR VIEW)      --
@@ -163,6 +168,26 @@ mkLast      :: (Outputable m, Outputable l, LastNode l) =>
 -- | This function provides access to fresh labels without requiring
 -- clients to be programmed monadically.
 withFreshLabel :: String -> (BlockId -> AGraph m l) -> AGraph m l
+withUnique     :: (Unique -> AGraph m l) -> AGraph m l
+
+
+mkBlock :: AGraph m l -> AGraph m l
+-- ^ 
+-- The argument is an AGraph that has an 
+-- empty entry sequence and no exit sequence.
+-- The result is a new AGraph that has an empty entry sequence
+-- connected to an empty exit sequence, with the original graph
+-- sitting to the side out-of-line.
+--
+-- Example:  mkMiddle (x = 3)
+--           <*> mkBlock (mkLabel L <*> ...stuff...)
+--           <*> mkMiddle (y = x)
+-- Control will flow directly from x=3 to y=x;
+-- the block starting with L is "on the side".
+--
+-- N.B. algebraically for any g, g'   g <*> mkBlock g' == mkBlock g' <*> g
+
+
 
 -- below for convenience
 mkMiddles ::                                             [m]       -> AGraph m l
@@ -260,6 +285,13 @@ withFreshLabel name ofId = AGraph f
   where f g = do id <- freshBlockId name
                  let AGraph f' = ofId id
                  f' g
+
+withUnique ofU = AGraph f
+  where f g = do u <- getUniqueUs
+                 let AGraph f' = ofU u
+                 f' g
+
+mkBlock = undefined
 
 mkIfThenElse cbranch tbranch fbranch = 
     withFreshLabel "end of if"     $ \endif ->
