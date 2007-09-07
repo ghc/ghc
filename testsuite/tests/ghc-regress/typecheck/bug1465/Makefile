@@ -17,6 +17,7 @@ bug1465:
 	$(MAKE) clean 1>clean.out 2>clean.out
 	$(MAKE) prep  1>prep.out 2>prep.out
 	$(TEST_HC) -c C.hs || exit 0
+	$(MAKE) clean 1>>clean.out 2>>clean.out
 
 prep:
 	for i in v1 v2; do \
