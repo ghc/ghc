@@ -1112,7 +1112,7 @@ pprStats code statss
 
 #ifdef DEBUG
 my_fromJust s p Nothing  = pprPanic ("fromJust: " ++ s) p
-my_fromJust s p (Just x) = x
+my_fromJust _ _ (Just x) = x
 #else
 my_fromJust _ _ = fromJust
 #endif
