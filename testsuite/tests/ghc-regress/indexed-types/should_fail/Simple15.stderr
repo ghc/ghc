@@ -1,0 +1,5 @@
+
+Simple15.hs:5:0:
+    Illegal polymorphic or qualified type: (a ~ b) => t
+    In the type signature for `foo':
+      foo :: (a, b) -> ((a ~ b) => t) -> (a, b)
