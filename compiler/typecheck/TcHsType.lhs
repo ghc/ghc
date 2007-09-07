@@ -341,8 +341,12 @@ kc_hs_type ty@(HsAppTy ty1 ty2)
     split (L _ (HsAppTy f a)) as = split f (a:as)
     split f       	      as = (f,as)
     mk_app fun arg = HsAppTy (noLoc fun) arg	-- Add noLocs for inner nodes of
-						-- the application; they are never used
-    
+						-- the application; they are
+						-- never used 
+
+kc_hs_type ty@(HsPredTy (HsEqualP _ _))
+  = wrongEqualityErr
+
 kc_hs_type (HsPredTy pred)
   = kcHsPred pred		`thenM` \ pred' ->
     returnM (HsPredTy pred', liftedTypeKind)
@@ -856,5 +860,8 @@ dupInScope n n' ty
   = hang (ptext SLIT("The scoped type variables") <+> quotes (ppr n) <+> ptext SLIT("and") <+> quotes (ppr n'))
        2 (vcat [ptext SLIT("are bound to the same type (variable)"),
 		ptext SLIT("Distinct scoped type variables must be distinct")])
+
+wrongEqualityErr
+  = failWithTc (text "Equality predicate used as a type")
 \end{code}
 
