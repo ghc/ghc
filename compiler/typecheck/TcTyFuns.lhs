@@ -1,13 +1,6 @@
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
-module TcTyFuns(
+module TcTyFuns (
 	tcNormalizeFamInst,
 
 	normaliseGivens, normaliseGivenDicts, 
@@ -26,15 +19,13 @@ import HsSyn
 import TcRnMonad
 import TcEnv
 import Inst
-import FamInstEnv
 import TcType
 import TcMType
 import Coercion
 import TypeRep	( Type(..) )
 import TyCon
-import Var	( mkCoVar, isTcTyVar )
+import Var	( isTcTyVar )
 import Type
-import HscTypes	( ExternalPackageState(..) )
 import Bag
 import Outputable
 import SrcLoc	( Located(..) )
@@ -68,13 +59,15 @@ tcUnfoldSynFamInst (TyConApp tycon tys)
   | not (isOpenSynTyCon tycon)     -- unfold *only* _synonym_ family instances
   = return Nothing
   | otherwise
-  = do { -- we only use the indexing arguments for matching, not the additional ones
-	 maybeFamInst <- tcLookupFamInst tycon idxTys
+  = do { -- we only use the indexing arguments for matching, 
+         -- not the additional ones
+       ; maybeFamInst <- tcLookupFamInst tycon idxTys
        ; case maybeFamInst of
            Nothing                -> return Nothing
-           Just (rep_tc, rep_tys) -> return $ Just (mkTyConApp rep_tc (rep_tys ++ restTys),
-		                                    mkTyConApp coe_tc (rep_tys ++ restTys))
+           Just (rep_tc, rep_tys) -> return $ Just (mkTyConApp rep_tc tys',
+		                                    mkTyConApp coe_tc tys')
              where
+               tys'   = rep_tys ++ restTys
                coe_tc = expectJust "TcTyFun.tcUnfoldSynFamInst" 
                                    (tyConFamilyCoercion_maybe rep_tc)
        }
@@ -120,7 +113,7 @@ tcGenericNormalizeFamInst :: (TcType -> TcM (Maybe (TcType,Coercion)))
 	                   -> TcM (CoercionI, Type)	-- (coercion, new type)
 tcGenericNormalizeFamInst fun ty
   | Just ty' <- tcView ty = tcGenericNormalizeFamInst fun ty' 
-tcGenericNormalizeFamInst fun ty@(TyConApp tyCon tys)
+tcGenericNormalizeFamInst fun (TyConApp tyCon tys)
   = do	{ (cois, ntys) <- mapAndUnzipM (tcGenericNormalizeFamInst fun) tys
 	; let tycon_coi = mkTyConAppCoI tyCon ntys cois
 	; maybe_ty_co <- fun (TyConApp tyCon ntys)      -- use normalised args!
@@ -136,21 +129,21 @@ tcGenericNormalizeFamInst fun ty@(TyConApp tyCon tys)
 	    -- we do not do anything
 	    Nothing -> return (tycon_coi, TyConApp tyCon ntys)
 	}
-tcGenericNormalizeFamInst fun ty@(AppTy ty1 ty2)
+tcGenericNormalizeFamInst fun (AppTy ty1 ty2)
   = do	{ (coi1,nty1) <- tcGenericNormalizeFamInst fun ty1
 	; (coi2,nty2) <- tcGenericNormalizeFamInst fun ty2
 	; return (mkAppTyCoI nty1 coi1 nty2 coi2, AppTy nty1 nty2)
 	}
-tcGenericNormalizeFamInst fun ty@(FunTy ty1 ty2)
+tcGenericNormalizeFamInst fun (FunTy ty1 ty2)
   = do	{ (coi1,nty1) <- tcGenericNormalizeFamInst fun ty1
 	; (coi2,nty2) <- tcGenericNormalizeFamInst fun ty2
 	; return (mkFunTyCoI nty1 coi1 nty2 coi2, FunTy nty1 nty2)
 	}
-tcGenericNormalizeFamInst fun ty@(ForAllTy tyvar ty1)
+tcGenericNormalizeFamInst fun (ForAllTy tyvar ty1)
   = do 	{ (coi,nty1) <- tcGenericNormalizeFamInst fun ty1
 	; return (mkForAllTyCoI tyvar coi,ForAllTy tyvar nty1)
 	}
-tcGenericNormalizeFamInst fun ty@(NoteTy note ty1)
+tcGenericNormalizeFamInst fun (NoteTy note ty1)
   = do	{ (coi,nty1) <- tcGenericNormalizeFamInst fun ty1
 	; return (mkNoteTyCoI note coi,NoteTy note nty1)
 	}
@@ -320,7 +313,8 @@ skolemOccurs (inst@(EqInst {}):insts)
 		go flag (TyConApp con tys)	= or $ map (check (isOpenSynTyCon con || flag)) tys
 		go flag (FunTy arg res)	= or $ map (check flag) [arg,res]
 		go flag (AppTy fun arg)		= or $ map (check flag) [fun,arg]
-		go flag	ty 			= False
+		go _    _ 			= False
+skolemOccurs _ = panic "TcTyFuns.skolemOccurs: not EqInst"
 \end{code}
 
 
@@ -424,7 +418,7 @@ rewriteToFixedPoint precondRule rules insts
     completeRewrite dePrecond (Just (precondName, precond)) insts
       = do { (insts', dePrecond') <- precond insts
            ; traceTc $ text precondName <+> ppr insts'
-           ; tryRules dePrecond rules insts'
+           ; tryRules (dePrecond >> dePrecond') rules insts'
            }
     completeRewrite dePrecond Nothing insts
       = tryRules dePrecond rules insts
@@ -455,9 +449,7 @@ Rewrite schemata applied by way of eq_rewrite and friends.
 	--		>-->
 	--	g1 := t
 	--
-trivialInsts :: 
-	[Inst] 	-> 		-- equations
-	TcM ([Inst],Bool)	-- remaining equations, any changes?
+trivialInsts :: RewriteRule
 trivialInsts []
 	= return ([],False)
 trivialInsts (i@(EqInst {}):is)
@@ -473,9 +465,10 @@ trivialInsts (i@(EqInst {}):is)
 	where
 	   ty1 = eqInstLeftTy i
 	   ty2 = eqInstRightTy i
+trivialInsts _ = panic "TcTyFuns.trivialInsts: not EqInst"
 
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-swapInsts :: [Inst] -> TcM ([Inst],Bool)
+swapInsts :: RewriteRule
 -- All the inputs and outputs are equalities
 swapInsts insts 
   = do { (insts', changeds) <- mapAndUnzipM swapInst insts
@@ -489,6 +482,7 @@ swapInsts insts
 	--	g1 := sym g2
 	--
         -- This is not all, is it?  Td ~ c is also rewritten to c ~ Td!
+swapInst :: Inst -> TcM (Inst, Bool)
 swapInst i@(EqInst {})
 	= go ty1 ty2
 	where
@@ -521,9 +515,10 @@ swapInst i@(EqInst {})
 					     ; new_inst <- mkEqInst (EqPred ty2 ty1) wg_co
 					     ; return (new_inst,True)
 					     }
+swapInst _ = panic "TcTyFuns.swapInst: not EqInst"
 
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-decompInsts :: [Inst] -> TcM ([Inst],Bool)
+decompInsts :: RewriteRule
 decompInsts insts = do { (insts,bs) <- mapAndUnzipM decompInst insts
 		       ; return (concat insts,or bs)
 		       }
@@ -581,16 +576,17 @@ decompInst i@(EqInst {})
            ; failWithTcM (env2, hang msg 2 extra)
            }
       where
-        n                = tyConArity con1
-        (idxTys1, tys1') = splitAt n tys1
-        (idxTys2, tys2') = splitAt n tys2
-        identicalHead    = not (isOpenSynTyCon con1) ||
-                           idxTys1 `tcEqTypes` idxTys2
+        n             = tyConArity con1
+        (idxTys1, _)  = splitAt n tys1
+        (idxTys2, _)  = splitAt n tys2
+        identicalHead = not (isOpenSynTyCon con1) ||
+                        idxTys1 `tcEqTypes` idxTys2
 
     go _ _ = return ([i], False)
+decompInst _ = panic "TcTyFuns.decompInst: not EqInst"
 
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-topInsts :: [Inst] -> TcM ([Inst],Bool)
+topInsts :: RewriteRule
 topInsts insts 
 	=  do { (insts,bs) <- mapAndUnzipM topInst insts
 	      ; return (insts,or bs)
@@ -627,11 +623,13 @@ topInst i@(EqInst {})
 	where
 	      ty1 = eqInstLeftTy i
 	      ty2 = eqInstRightTy i
+topInst _ = panic "TcTyFuns.topInsts: not EqInst"
 
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-substInsts :: [Inst] -> TcM ([Inst],Bool)
+substInsts :: RewriteRule
 substInsts insts = substInstsWorker insts []
 
+substInstsWorker :: [Inst] -> [Inst] -> TcM ([Inst],Bool)
 substInstsWorker [] acc 
 	= return (acc,False)
 substInstsWorker (i:is) acc 
@@ -650,7 +648,8 @@ substInstsWorker (i:is) acc
 	--		>-->
 	--	g2 : s1{t} ~ s2{t}
 	--	g1 := s1{g} * g2  * sym s2{g}		<=> 	g2 := sym s1{g} * g1 * s2{g}
-substInst inst [] 
+substInst :: Inst -> [Inst] -> TcM ([Inst], Bool)
+substInst _inst [] 
 	= return ([],False)
 substInst inst@(EqInst {tci_left = pattern, tci_right = target}) (i@(EqInst {tci_left = ty1, tci_right = ty2}):is)			
 	= do { (is',changed) <- substInst inst is
@@ -678,10 +677,10 @@ substInst inst@(EqInst {tci_left = pattern, tci_right = target}) (i@(EqInst {tci
 	where fun ty = return $ if tcEqType pattern ty then Just (target,coercion) else Nothing
 
 	      coercion = eitherEqInst inst TyVarTy id
+substInst _ _ = panic "TcTyFuns.substInst: not EqInst"
+
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-unifyInsts 
-	:: [Inst] 		-- wanted equations
-	-> TcM ([Inst],Bool)
+unifyInsts :: RewriteRule
 unifyInsts insts 
 	= do { (insts',changeds) <- mapAndUnzipM unifyInst insts
 	     ; return (concat insts',or changeds)
@@ -694,6 +693,7 @@ unifyInsts insts
 	--	g     := t
 	--
 	--  TOMDO: you should only do this for certain `meta' type variables
+unifyInst :: Inst -> TcM ([Inst], Bool)
 unifyInst i@(EqInst {tci_left = ty1, tci_right = ty2})
 	| TyVarTy tv1 <- ty1, isMetaTyVar tv1 	= go ty2 tv1
 	| TyVarTy tv2 <- ty2, isMetaTyVar tv2	= go ty1 tv2 	
@@ -704,9 +704,10 @@ unifyInst i@(EqInst {tci_left = ty1, tci_right = ty2})
 		     ; writeMetaTyVar cotv ty	--	g     := t
 	             ; return ([],True)
 		     }
+unifyInst _ = panic "TcTyFuns.unifyInst: not EqInst"
 
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-occursCheckInsts :: [Inst] -> TcM ()
+occursCheckInsts :: CheckRule
 occursCheckInsts insts = mappM_ occursCheckInst insts
 
 
@@ -716,7 +717,7 @@ occursCheckInsts insts = mappM_ occursCheckInst insts
 	--	fail
 	--
 occursCheckInst :: Inst -> TcM () 
-occursCheckInst i@(EqInst {tci_left = ty1, tci_right = ty2})
+occursCheckInst (EqInst {tci_left = ty1, tci_right = ty2})
 	= go ty2 
 	where
 		check ty = if ty `tcEqType` ty1
@@ -735,6 +736,7 @@ occursCheckInst i@(EqInst {tci_left = ty1, tci_right = ty2})
 					     ; failWithTcM (env2, hang msg 2 extra)
 					     }
 					where msg = ptext SLIT("Occurs check: cannot construct the infinite type")
+occursCheckInst _ = panic "TcTyFuns.occursCheckInst: not eqInst"
 \end{code}
 
 Normalises a set of dictionaries relative to a set of given equalities (which
@@ -810,8 +812,7 @@ genericNormaliseInsts isWanted fun insts
        }
   where
     normaliseOneInst isWanted fun
-	             dict@(Dict {tci_name = name,
-                                 tci_pred = pred,
+	             dict@(Dict {tci_pred = pred,
                                  tci_loc  = loc})
       = do { traceTc (text "genericNormaliseInst 1")
 	   ; (coi, pred') <- fun pred
@@ -845,13 +846,15 @@ genericNormaliseInsts isWanted fun insts
 	   }
 	
 	-- TOMDO: treat other insts appropriately
-    normaliseOneInst isWanted fun inst
+    normaliseOneInst _isWanted _fun inst
       = do { inst' <- zonkInst inst
 	   ; return (inst', emptyBag)
 	   }
 
+addBind :: Bag (LHsBind TcId) -> Inst -> LHsExpr TcId -> Bag (LHsBind TcId)
 addBind binds inst rhs = binds `unionBags` mkBind inst rhs
 
+mkBind :: Inst -> LHsExpr TcId -> Bag (LHsBind TcId)
 mkBind inst rhs = unitBag (L (instSpan inst) 
 			  (VarBind (instToId inst) rhs))
 \end{code}
