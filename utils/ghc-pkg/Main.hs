@@ -99,6 +99,7 @@ data Flag
   | FlagAutoGHCiLibs
   | FlagDefinedName String String
   | FlagSimpleOutput
+  | FlagNamesOnly
   deriving Eq
 
 flags :: [OptDescr Flag]
@@ -124,7 +125,9 @@ flags = [
   Option ['V'] ["version"] (NoArg FlagVersion)
         "output version information and exit",
   Option [] ["simple-output"] (NoArg FlagSimpleOutput)
-        "print output in easy-to-parse format for some commands"
+        "print output in easy-to-parse format for some commands",
+  Option [] ["names-only"] (NoArg FlagNamesOnly)
+        "only print package names, not versions; can only be used with list --simple-output"
   ]
  where
   toDefined str =
@@ -491,7 +494,9 @@ listPackages flags mPackageName = do
                    where doc = text (showPackageId (package p))
 
         show_simple db_stack = do
-          let pkgs = map showPackageId $ sortBy compPkgIdVer $
+          let showPkg = if FlagNamesOnly `elem` flags then pkgName
+                                                      else showPackageId
+              pkgs = map showPkg $ sortBy compPkgIdVer $
                           map package (concatMap snd db_stack)
           when (null pkgs) $ die "no matches"
           hPutStrLn stdout $ concat $ intersperse " " pkgs
