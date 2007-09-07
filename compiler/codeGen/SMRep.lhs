@@ -119,8 +119,10 @@ entry to the garbage collector.
 \begin{code}
 data CgRep 
   = VoidArg 	-- Void
-  | PtrArg 	-- Word-sized Ptr
+  | PtrArg 	-- Word-sized heap pointer, followed
+		-- by the garbage collector
   | NonPtrArg 	-- Word-sized non-pointer
+		-- (including addresses not followed by GC)
   | LongArg	-- 64-bit non-pointer
   | FloatArg 	-- 32-bit float
   | DoubleArg 	-- 64-bit float
