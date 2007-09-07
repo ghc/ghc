@@ -92,7 +92,7 @@ import MachRegs
 import MachInstrs
 import RegAllocInfo
 import RegLiveness
-import Cmm
+import Cmm hiding (RegSet)
 
 import Digraph
 import Unique		( Uniquable(getUnique), Unique )

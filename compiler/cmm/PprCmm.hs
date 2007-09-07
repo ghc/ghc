@@ -512,10 +512,10 @@ pprReg r
 pprLocalReg :: LocalReg -> SDoc
 pprLocalReg (LocalReg uniq rep follow) 
     = hcat [ char '_', ppr uniq, ty ] where
-  ty = if rep == wordRep && follow == KindNonPtr
+  ty = if rep == wordRep && follow == GCKindNonPtr
                 then empty
                 else dcolon <> ptr <> ppr rep
-  ptr = if follow == KindNonPtr
+  ptr = if follow == GCKindNonPtr
                 then empty
                 else doubleQuotes (text "ptr")
 

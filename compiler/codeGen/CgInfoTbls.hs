@@ -64,7 +64,7 @@ import Outputable
 -- representation as a list of 'CmmAddr' is handled later
 -- in the pipeline by 'cmmToRawCmm'.
 
-emitClosureCodeAndInfoTable :: ClosureInfo -> CmmFormals -> CgStmts -> Code
+emitClosureCodeAndInfoTable :: ClosureInfo -> CmmFormalsWithoutKinds -> CgStmts -> Code
 emitClosureCodeAndInfoTable cl_info args body
  = do	{ blks <- cgStmtsToBlocks body
         ; info <- mkCmmInfo cl_info
@@ -239,8 +239,8 @@ stack_layout ((off, bind):binds) sizeW | off == sizeW - 1 =
     unique = getUnique (cgIdInfoId bind)
     machRep = argMachRep (cgIdInfoArgRep bind)
     kind = if isFollowableArg (cgIdInfoArgRep bind)
-           then KindPtr
-           else KindNonPtr
+           then GCKindPtr
+           else GCKindNonPtr
 stack_layout binds@((off, _):_) sizeW | otherwise =
   Nothing : (stack_layout binds (sizeW - 1))
 
@@ -266,8 +266,8 @@ stack_layout offsets sizeW = result
         unique = getUnique (cgIdInfoId x)
         machRep = argMachrep (cgIdInfoArgRep bind)
         kind = if isFollowableArg (cgIdInfoArgRep bind)
-           then KindPtr
-           else KindNonPtr
+           then GCKindPtr
+           else GCKindNonPtr
 -}
 
 emitAlgReturnTarget
@@ -427,7 +427,7 @@ funInfoTable info_ptr
 emitInfoTableAndCode 
 	:: CLabel 		-- Label of entry or ret
 	-> CmmInfo 		-- ...the info table
-	-> CmmFormals		-- ...args
+	-> CmmFormalsWithoutKinds		-- ...args
 	-> [CmmBasicBlock]	-- ...and body
 	-> Code
 

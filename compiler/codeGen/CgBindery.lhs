@@ -450,8 +450,8 @@ bindNewToTemp id
     uniq     = getUnique id
     temp_reg = LocalReg uniq (argMachRep (idCgRep id)) kind
     kind     = if isFollowableArg (idCgRep id)
-               then KindPtr
-               else KindNonPtr
+               then GCKindPtr
+               else GCKindNonPtr
     lf_info  = mkLFArgument id	-- Always used of things we
 				-- know nothing about
 

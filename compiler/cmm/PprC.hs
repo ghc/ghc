@@ -237,7 +237,7 @@ pprStmt stmt = case stmt of
     CmmJump lbl _params      -> mkJMP_(pprExpr lbl) <> semi
     CmmSwitch arg ids        -> pprSwitch arg ids
 
-pprCFunType :: CCallConv -> CmmHintFormals -> CmmActuals -> SDoc
+pprCFunType :: CCallConv -> CmmFormals -> CmmActuals -> SDoc
 pprCFunType cconv ress args
   = hcat [
 	res_type ress,
@@ -727,7 +727,7 @@ pprLocalReg (LocalReg uniq _ _) = char '_' <> ppr uniq
 -- -----------------------------------------------------------------------------
 -- Foreign Calls
 
-pprCall :: SDoc -> CCallConv -> CmmHintFormals -> CmmActuals -> CmmSafety
+pprCall :: SDoc -> CCallConv -> CmmFormals -> CmmActuals -> CmmSafety
 	-> SDoc
 
 pprCall ppr_fn cconv results args _

@@ -50,7 +50,7 @@ import Control.Monad
 -- Code generation for Foreign Calls
 
 cgForeignCall
-	:: CmmHintFormals	-- where to put the results
+	:: CmmFormals	-- where to put the results
 	-> ForeignCall		-- the op
 	-> [StgArg]		-- arguments
 	-> StgLiveVars	-- live vars, in case we need to save them
@@ -70,7 +70,7 @@ cgForeignCall results fcall stg_args live
 
 
 emitForeignCall
-	:: CmmHintFormals	-- where to put the results
+	:: CmmFormals	-- where to put the results
 	-> ForeignCall		-- the op
 	-> [(CmmExpr,MachHint)] -- arguments
 	-> StgLiveVars	-- live vars, in case we need to save them
@@ -106,7 +106,7 @@ emitForeignCall _ (DNCall _) _ _
 -- alternative entry point, used by CmmParse
 emitForeignCall'
 	:: Safety
-	-> CmmHintFormals	-- where to put the results
+	-> CmmFormals	-- where to put the results
 	-> CmmCallTarget	-- the op
 	-> [(CmmExpr,MachHint)] -- arguments
 	-> Maybe [GlobalReg]	-- live vars, in case we need to save them
@@ -122,7 +122,7 @@ emitForeignCall' safety results target args vols srt ret
     stmtsC caller_load
 
   | otherwise = do
-    -- Both 'id' and 'new_base' are KindNonPtr because they're
+    -- Both 'id' and 'new_base' are GCKindNonPtr because they're
     -- RTS only objects and are not subject to garbage collection
     id <- newNonPtrTemp wordRep
     new_base <- newNonPtrTemp (cmmRegRep (CmmGlobal BaseReg))

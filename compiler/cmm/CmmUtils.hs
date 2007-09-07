@@ -209,4 +209,4 @@ maybeAssignTemp :: [Unique] -> CmmExpr -> ([Unique], [CmmStmt], CmmExpr)
 maybeAssignTemp uniques e
     | hasNoGlobalRegs e = (uniques, [], e)
     | otherwise         = (tail uniques, [CmmAssign local e], CmmReg local)
-    where local = CmmLocal (LocalReg (head uniques) (cmmExprRep e) KindNonPtr)
+    where local = CmmLocal (LocalReg (head uniques) (cmmExprRep e) GCKindNonPtr)

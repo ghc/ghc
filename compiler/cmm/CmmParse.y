@@ -209,7 +209,7 @@ lits	:: { [ExtFCode CmmExpr] }
 
 cmmproc :: { ExtCode }
 -- TODO: add real SRT/info tables to parsed Cmm
-	: info maybe_formals maybe_gc_block maybe_frame '{' body '}'
+	: info maybe_formals_without_kinds maybe_gc_block maybe_frame '{' body '}'
 		{ do ((entry_ret_label, info, live, formals, gc_block, frame), stmts) <-
 		       getCgStmtsEC' $ loopDecls $ do {
 		         (entry_ret_label, info, live) <- $1;
@@ -221,12 +221,12 @@ cmmproc :: { ExtCode }
 		     blks <- code (cgStmtsToBlocks stmts)
 		     code (emitInfoTableAndCode entry_ret_label (CmmInfo gc_block frame info) formals blks) }
 
-	| info maybe_formals ';'
+	| info maybe_formals_without_kinds ';'
 		{ do (entry_ret_label, info, live) <- $1;
 		     formals <- sequence $2;
 		     code (emitInfoTableAndCode entry_ret_label (CmmInfo Nothing Nothing info) formals []) }
 
-	| NAME maybe_formals maybe_gc_block maybe_frame '{' body '}'
+	| NAME maybe_formals_without_kinds maybe_gc_block maybe_frame '{' body '}'
 		{ do ((formals, gc_block, frame), stmts) <-
 			getCgStmtsEC' $ loopDecls $ do {
 		          formals <- sequence $2;
@@ -298,7 +298,7 @@ info	:: { ExtFCode (CLabel, CmmInfoTable, [Maybe LocalReg]) }
 				     (ContInfo [] NoC_SRT),
 			[]) }
 
-	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals0 ')'
+	| 'INFO_TABLE_RET' '(' NAME ',' INT ',' formals_without_kinds0 ')'
 		-- closure type, live regs
 		{ do live <- sequence (map (liftM Just) $7)
 		     return (mkRtsRetLabelFS $3,
@@ -313,7 +313,7 @@ body	:: { ExtCode }
 
 decl	:: { ExtCode }
 	: type names ';'		{ mapM_ (newLocal defaultKind $1) $2 }
-	| STRING type names ';'		{% do k <- parseKind $1;
+	| STRING type names ';'		{% do k <- parseGCKind $1;
 					      return $ mapM_ (newLocal k $2) $3 }
 
 	| 'import' names ';'		{ mapM_ newImport $2 }
@@ -340,9 +340,9 @@ stmt	:: { ExtCode }
 	-- we tweak the syntax to avoid the conflict.  The later
 	-- option is taken here because the other way would require
 	-- multiple levels of expanding and get unwieldy.
-	| maybe_results 'foreign' STRING expr '(' hint_exprs0 ')' safety vols opt_never_returns ';'
+	| maybe_results 'foreign' STRING expr '(' cmm_kind_exprs0 ')' safety vols opt_never_returns ';'
 		{% foreignCall $3 $1 $4 $6 $9 $8 $10 }
-	| maybe_results 'prim' '%' NAME '(' hint_exprs0 ')' safety vols ';'
+	| maybe_results 'prim' '%' NAME '(' cmm_kind_exprs0 ')' safety vols ';'
 		{% primCall $1 $4 $6 $9 $8 }
 	-- stmt-level macros, stealing syntax from ordinary C-- function calls.
 	-- Perhaps we ought to use the %%-form?
@@ -456,21 +456,21 @@ maybe_ty :: { MachRep }
 	: {- empty -}			{ wordRep }
 	| '::' type			{ $2 }
 
-maybe_actuals :: { [ExtFCode (CmmExpr, MachHint)] }
+maybe_actuals :: { [ExtFCode CmmActual] }
 	: {- empty -}		{ [] }
-	| '(' hint_exprs0 ')'	{ $2 }
+	| '(' cmm_kind_exprs0 ')'	{ $2 }
 
-hint_exprs0 :: { [ExtFCode (CmmExpr, MachHint)] }
+cmm_kind_exprs0 :: { [ExtFCode CmmActual] }
 	: {- empty -}			{ [] }
-	| hint_exprs			{ $1 }
+	| cmm_kind_exprs			{ $1 }
 
-hint_exprs :: { [ExtFCode (CmmExpr, MachHint)] }
-	: hint_expr			{ [$1] }
-	| hint_expr ',' hint_exprs	{ $1 : $3 }
+cmm_kind_exprs :: { [ExtFCode CmmActual] }
+	: cmm_kind_expr			{ [$1] }
+	| cmm_kind_expr ',' cmm_kind_exprs	{ $1 : $3 }
 
-hint_expr :: { ExtFCode (CmmExpr, MachHint) }
-	: expr				{ do e <- $1; return (e, inferHint e) }
-	| expr STRING			{% do h <- parseHint $2;
+cmm_kind_expr :: { ExtFCode CmmActual }
+	: expr				{ do e <- $1; return (e, inferCmmKind e) }
+	| expr STRING			{% do h <- parseCmmKind $2;
 					      return $ do
 						e <- $1; return (e,h) }
 
@@ -486,18 +486,18 @@ reg	:: { ExtFCode CmmExpr }
 	: NAME			{ lookupName $1 }
 	| GLOBALREG		{ return (CmmReg (CmmGlobal $1)) }
 
-maybe_results :: { [ExtFCode (CmmFormal, MachHint)] }
+maybe_results :: { [ExtFCode CmmFormal] }
 	: {- empty -}		{ [] }
-	| '(' hint_lregs ')' '='	{ $2 }
+	| '(' cmm_formals ')' '='	{ $2 }
 
-hint_lregs :: { [ExtFCode (CmmFormal, MachHint)] }
-	: hint_lreg			{ [$1] }
-	| hint_lreg ','			{ [$1] }
-	| hint_lreg ',' hint_lregs	{ $1 : $3 }
+cmm_formals :: { [ExtFCode CmmFormal] }
+	: cmm_formal			{ [$1] }
+	| cmm_formal ','			{ [$1] }
+	| cmm_formal ',' cmm_formals	{ $1 : $3 }
 
-hint_lreg :: { ExtFCode (CmmFormal, MachHint) }
-	: local_lreg			{ do e <- $1; return (e, inferHint (CmmReg (CmmLocal e))) }
-	| STRING local_lreg		{% do h <- parseHint $1;
+cmm_formal :: { ExtFCode CmmFormal }
+	: local_lreg			{ do e <- $1; return (e, inferCmmKind (CmmReg (CmmLocal e))) }
+	| STRING local_lreg		{% do h <- parseCmmKind $1;
 					      return $ do
 						e <- $2; return (e,h) }
 
@@ -516,22 +516,22 @@ lreg	:: { ExtFCode CmmReg }
 					other -> pprPanic "CmmParse:" (ftext $1 <> text " not a register") }
 	| GLOBALREG		{ return (CmmGlobal $1) }
 
-maybe_formals :: { [ExtFCode LocalReg] }
+maybe_formals_without_kinds :: { [ExtFCode LocalReg] }
 	: {- empty -}		{ [] }
-	| '(' formals0 ')'	{ $2 }
+	| '(' formals_without_kinds0 ')'	{ $2 }
 
-formals0 :: { [ExtFCode LocalReg] }
+formals_without_kinds0 :: { [ExtFCode LocalReg] }
 	: {- empty -}		{ [] }
-	| formals		{ $1 }
+	| formals_without_kinds		{ $1 }
 
-formals :: { [ExtFCode LocalReg] }
-	: formal ','		{ [$1] }
-	| formal		{ [$1] }
-	| formal ',' formals	{ $1 : $3 }
+formals_without_kinds :: { [ExtFCode LocalReg] }
+	: formal_without_kind ','		{ [$1] }
+	| formal_without_kind		{ [$1] }
+	| formal_without_kind ',' formals_without_kinds	{ $1 : $3 }
 
-formal :: { ExtFCode LocalReg }
+formal_without_kind :: { ExtFCode LocalReg }
 	: type NAME		{ newLocal defaultKind $1 $2 }
-	| STRING type NAME	{% do k <- parseKind $1;
+	| STRING type NAME	{% do k <- parseGCKind $1;
 				     return $ newLocal k $2 $3 }
 
 maybe_frame :: { ExtFCode (Maybe UpdateFrame) }
@@ -682,24 +682,24 @@ parseSafety "safe"   = return (CmmSafe NoC_SRT)
 parseSafety "unsafe" = return CmmUnsafe
 parseSafety str      = fail ("unrecognised safety: " ++ str)
 
-parseHint :: String -> P MachHint
-parseHint "ptr"    = return PtrHint
-parseHint "signed" = return SignedHint
-parseHint "float"  = return FloatHint
-parseHint str      = fail ("unrecognised hint: " ++ str)
+parseCmmKind :: String -> P CmmKind
+parseCmmKind "ptr"    = return PtrHint
+parseCmmKind "signed" = return SignedHint
+parseCmmKind "float"  = return FloatHint
+parseCmmKind str      = fail ("unrecognised hint: " ++ str)
 
-parseKind :: String -> P Kind
-parseKind "ptr"    = return KindPtr
-parseKind str      = fail ("unrecognized kin: " ++ str)
+parseGCKind :: String -> P GCKind
+parseGCKind "ptr"    = return GCKindPtr
+parseGCKind str      = fail ("unrecognized kin: " ++ str)
 
-defaultKind :: Kind
-defaultKind = KindNonPtr
+defaultKind :: GCKind
+defaultKind = GCKindNonPtr
 
 -- labels are always pointers, so we might as well infer the hint
-inferHint :: CmmExpr -> MachHint
-inferHint (CmmLit (CmmLabel _)) = PtrHint
-inferHint (CmmReg (CmmGlobal g)) | isPtrGlobalReg g = PtrHint
-inferHint _ = NoHint
+inferCmmKind :: CmmExpr -> CmmKind
+inferCmmKind (CmmLit (CmmLabel _)) = PtrHint
+inferCmmKind (CmmReg (CmmGlobal g)) | isPtrGlobalReg g = PtrHint
+inferCmmKind _ = NoHint
 
 isPtrGlobalReg Sp		= True
 isPtrGlobalReg SpLim		= True
@@ -812,7 +812,7 @@ addVarDecl var expr = EC $ \e s -> return ((var, Var expr):s, ())
 addLabel :: FastString -> BlockId -> ExtCode
 addLabel name block_id = EC $ \e s -> return ((name, Label block_id):s, ())
 
-newLocal :: Kind -> MachRep -> FastString -> ExtFCode LocalReg
+newLocal :: GCKind -> MachRep -> FastString -> ExtFCode LocalReg
 newLocal kind ty name = do
    u <- code newUnique
    let reg = LocalReg u ty kind
@@ -888,9 +888,9 @@ staticClosure cl_label info payload
 
 foreignCall
 	:: String
-	-> [ExtFCode (CmmFormal,MachHint)]
+	-> [ExtFCode CmmFormal]
 	-> ExtFCode CmmExpr
-	-> [ExtFCode (CmmExpr,MachHint)]
+	-> [ExtFCode CmmActual]
 	-> Maybe [GlobalReg]
         -> CmmSafety
         -> CmmReturnInfo
@@ -919,9 +919,9 @@ foreignCall conv_string results_code expr_code args_code vols safety ret
 	        unused = panic "not used by emitForeignCall'"
 
 primCall
-	:: [ExtFCode (CmmFormal,MachHint)]
+	:: [ExtFCode CmmFormal]
 	-> FastString
-	-> [ExtFCode (CmmExpr,MachHint)]
+	-> [ExtFCode CmmActual]
 	-> Maybe [GlobalReg]
         -> CmmSafety
         -> P ExtCode

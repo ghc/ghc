@@ -5,7 +5,7 @@
 -- (c) The University of Glasgow 2004
 --
 -----------------------------------------------------------------------------
-{-# OPTIONS -fno-warn-missing-signatures #-}
+{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
 
 module RegLiveness (
 	RegSet,
@@ -36,7 +36,7 @@ import MachRegs
 import MachInstrs
 import PprMach
 import RegAllocInfo
-import Cmm
+import Cmm hiding (RegSet)
 
 import Digraph
 import Outputable
@@ -154,6 +154,7 @@ mapBlockTopM f (CmmProc header label params (ListGraph comps))
  = do	comps'	<- mapM (mapBlockCompM f) comps
  	return	$ CmmProc header label params (ListGraph comps')
 
+mapBlockCompM :: Monad m => (a -> m a') -> (GenBasicBlock a) -> m (GenBasicBlock a')
 mapBlockCompM f (BasicBlock i blocks)
  = do	blocks'	<- mapM f blocks
  	return	$ BasicBlock i blocks'
@@ -588,6 +589,7 @@ livenessBack liveregs blockmap acc (instr : instrs)
    in	livenessBack liveregs' blockmap (instr' : acc) instrs
 
 -- don't bother tagging comments or deltas with liveness
+liveness1 :: RegSet -> BlockMap RegSet -> Instr -> (RegSet, LiveInstr)
 liveness1 liveregs _   (instr@COMMENT{})
 	= (liveregs, Instr instr Nothing)
 

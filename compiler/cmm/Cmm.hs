@@ -20,25 +20,16 @@ module Cmm (
         CmmInfoTable(..), ClosureTypeInfo(..), ProfilingInfo(..), ClosureTypeTag,
         GenBasicBlock(..), CmmBasicBlock, blockId, blockStmts, mapBlockStmts,
         CmmReturnInfo(..),
-	CmmStmt(..), CmmActuals, CmmFormal, CmmFormals, CmmHintFormals,
+	CmmStmt(..), CmmActual, CmmActuals, CmmFormal, CmmFormals, CmmKind,
+        CmmFormalsWithoutKinds, CmmFormalWithoutKind,
         CmmSafety(..),
 	CmmCallTarget(..),
 	CmmStatic(..), Section(..),
-	CmmExpr(..), cmmExprRep, maybeInvertCmmExpr,
-	CmmReg(..), cmmRegRep,
-	CmmLit(..), cmmLitRep,
-	LocalReg(..), localRegRep, localRegGCFollow, Kind(..),
+        module CmmExpr,
         BlockId(..), freshBlockId,
         BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, mkBlockEnv,
         BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet,
-	GlobalReg(..), globalRegRep,
-
-	node, nodeReg, spReg, hpReg, spLimReg
   ) where
-
--- ^ In order not to do violence to the import structure of the rest
--- of the compiler, module Cmm re-exports a number of identifiers
--- defined in 'CmmExpr'
 
 #include "HsVersions.h"
 
@@ -90,7 +81,8 @@ data GenCmmTop d h g
   = CmmProc	-- A procedure
      h	               -- Extra header such as the info table
      CLabel            -- Used to generate both info & entry labels
-     CmmFormals        -- Argument locals live on entry (C-- procedure params)
+     CmmFormalsWithoutKinds -- Argument locals live on entry (C-- procedure params)
+                       -- XXX Odd that there are no kinds, but there you are ---NR
      g                 -- Control-flow graph for the procedure's code
 
   | CmmData 	-- Static data
@@ -229,7 +221,7 @@ data CmmStmt
 
   | CmmCall	 		 -- A call (forign, native or primitive), with 
      CmmCallTarget
-     CmmHintFormals		 -- zero or more results
+     CmmFormals		 -- zero or more results
      CmmActuals			 -- zero or more arguments
      CmmSafety			 -- whether to build a continuation
      CmmReturnInfo
@@ -250,15 +242,18 @@ data CmmStmt
   | CmmReturn            -- Return from a native C-- function,
       CmmActuals         -- with these return values.
 
-type CmmActual      = CmmExpr
-type CmmActuals     = [(CmmActual,MachHint)]
-type CmmFormal      = LocalReg
-type CmmHintFormals = [(CmmFormal,MachHint)]
-type CmmFormals     = [CmmFormal]
+type CmmKind   = MachHint
+type CmmActual = (CmmExpr, CmmKind)
+type CmmFormal = (LocalReg,CmmKind)
+type CmmActuals = [CmmActual]
+type CmmFormals = [CmmFormal]
+type CmmFormalWithoutKind   = LocalReg
+type CmmFormalsWithoutKinds = [CmmFormalWithoutKind]
+
 data CmmSafety      = CmmUnsafe | CmmSafe C_SRT
 
--- | enable us to fold used registers over 'CmmActuals' and 'CmmHintFormals'
-instance UserOfLocalRegs a => UserOfLocalRegs (a, MachHint) where
+-- | enable us to fold used registers over 'CmmActuals' and 'CmmFormals'
+instance UserOfLocalRegs a => UserOfLocalRegs (a, CmmKind) where
   foldRegsUsed f set (a, _) = foldRegsUsed f set a
 
 instance UserOfLocalRegs CmmStmt where

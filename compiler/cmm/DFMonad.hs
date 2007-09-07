@@ -1,6 +1,6 @@
 {-# OPTIONS -Wall -fno-warn-name-shadowing #-}
 module DFMonad
-    ( Txlimit
+    ( OptimizationFuel
     , DFTx, runDFTx, lastTxPass, txDecrement, txRemaining, txExhausted
 
     , DataflowLattice(..)
@@ -72,7 +72,7 @@ data DFAState f = DFAState { df_facts :: BlockEnv f
                            , df_facts_change :: ChangeFlag
                            }
 
-data DFTxState = DFTxState { df_txlimit :: Txlimit, df_lastpass :: String }
+data DFTxState = DFTxState { df_txlimit :: OptimizationFuel, df_lastpass :: String }
 
 data DFState f = DFState { df_uniqs :: UniqSupply
                          , df_rewritten :: ChangeFlag
@@ -96,7 +96,7 @@ liftTx (DFTx f) = DFM f'
     where f' _ s = let (a, txs) = f (df_txstate s)
                    in  (a, s {df_txstate = txs})
 
-newtype Txlimit = Txlimit Int
+newtype OptimizationFuel = OptimizationFuel Int
   deriving (Ord, Eq, Num, Show, Bounded)
 
 initDFAState :: DFAState f
@@ -108,7 +108,7 @@ runDFA lattice (DFA f) = fst $ f lattice initDFAState
 -- XXX DFTx really needs to be in IO, so we can dump programs in
 -- intermediate states of optimization ---NR
 
-runDFTx :: Txlimit -> DFTx a -> a  --- should only be called once per program!
+runDFTx :: OptimizationFuel -> DFTx a -> a  --- should only be called once per program!
 runDFTx lim (DFTx f) = fst $ f $ DFTxState lim "<none>"
 
 lastTxPass :: DFTx String
@@ -125,11 +125,11 @@ txExhausted :: DFTx Bool
 txExhausted = DFTx f
     where f s = (df_txlimit s <= 0, s)
 
-txRemaining :: DFTx Txlimit
+txRemaining :: DFTx OptimizationFuel
 txRemaining = DFTx f
     where f s = (df_txlimit s, s)
 
-txDecrement :: String -> Txlimit -> Txlimit -> DFTx ()
+txDecrement :: String -> OptimizationFuel -> OptimizationFuel -> DFTx ()
 txDecrement optimizer old new = DFTx f
     where f s = ((), s { df_txlimit = lim s, df_lastpass = optimizer })
           lim s = if old == df_txlimit s then new
@@ -283,5 +283,5 @@ f4sep [] = fsep []
 f4sep (d:ds) = fsep (d : map (nest 4) ds)
 
 
-_I_am_abstract :: Int -> Txlimit
-_I_am_abstract = Txlimit -- prevents a warning about Txlimit being unused
+_I_am_abstract :: Int -> OptimizationFuel
+_I_am_abstract = OptimizationFuel -- prevents warning: OptimizationFuel unused

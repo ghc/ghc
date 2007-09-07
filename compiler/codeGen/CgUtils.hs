@@ -350,7 +350,7 @@ emitRtsCallWithResult res hint fun args safe
 
 -- Make a call to an RTS C procedure
 emitRtsCall'
-   :: CmmHintFormals
+   :: CmmFormals
    -> LitString
    -> [(CmmExpr,MachHint)]
    -> Maybe [GlobalReg]
@@ -623,10 +623,10 @@ assignPtrTemp e
 			    ; return (CmmReg (CmmLocal reg)) }
 
 newNonPtrTemp :: MachRep -> FCode LocalReg
-newNonPtrTemp rep = do { uniq <- newUnique; return (LocalReg uniq rep KindNonPtr) }
+newNonPtrTemp rep = do { uniq <- newUnique; return (LocalReg uniq rep GCKindNonPtr) }
 
 newPtrTemp :: MachRep -> FCode LocalReg
-newPtrTemp rep = do { uniq <- newUnique; return (LocalReg uniq rep KindPtr) }
+newPtrTemp rep = do { uniq <- newUnique; return (LocalReg uniq rep GCKindPtr) }
 
 
 -------------------------------------------------------------------------

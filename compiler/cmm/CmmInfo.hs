@@ -150,7 +150,7 @@ mkInfoTableAndCode :: CLabel
                    -> [CmmLit]
                    -> [CmmLit]
                    -> CLabel
-                   -> CmmFormals
+                   -> CmmFormalsWithoutKinds
                    -> ListGraph CmmStmt
                    -> [RawCmmTop]
 mkInfoTableAndCode info_lbl std_info extra_bits entry_lbl args blocks
@@ -222,8 +222,8 @@ mkLiveness uniq live =
     is_non_ptr Nothing = True
     is_non_ptr (Just reg) =
         case localRegGCFollow reg of
-          KindNonPtr -> True
-          KindPtr -> False
+          GCKindNonPtr -> True
+          GCKindPtr -> False
 
     bits :: [Bool]
     bits = mkBits live

@@ -2969,7 +2969,7 @@ genCondJump id bool = do
 
 genCCall
     :: CmmCallTarget		-- function to call
-    -> CmmHintFormals		-- where to put the result
+    -> CmmFormals		-- where to put the result
     -> CmmActuals		-- arguments (of mixed type)
     -> NatM InstrBlock
 
@@ -3203,7 +3203,7 @@ genCCall target dest_regs args = do
 
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 
-outOfLineFloatOp :: CallishMachOp -> CmmFormal -> CmmActuals
+outOfLineFloatOp :: CallishMachOp -> CmmFormalWithoutKind -> CmmActuals
   -> NatM InstrBlock
 outOfLineFloatOp mop res args
   = do
@@ -3217,7 +3217,7 @@ outOfLineFloatOp mop res args
         else do
           uq <- getUniqueNat
           let 
-            tmp = LocalReg uq F64 KindNonPtr
+            tmp = LocalReg uq F64 GCKindNonPtr
           -- in
           code1 <- stmtToInstrs (CmmCall target [(tmp,FloatHint)] args CmmUnsafe CmmMayReturn)
           code2 <- stmtToInstrs (CmmAssign (CmmLocal res) (CmmReg (CmmLocal tmp)))

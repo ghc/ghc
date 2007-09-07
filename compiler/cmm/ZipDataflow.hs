@@ -72,7 +72,7 @@ For example, [['i]] might be equal to a fact, or it might be a tuple
 of which one element is a fact.
 \item
 Type parameter [['o]] is an output, or possibly a function from
-[[txlimit]] to an output
+[[fuel]] to an output
 \end{itemize}
 Backward analyses compute [[in]] facts (facts on inedges). 
 <<exported types for backward analyses>>=
@@ -97,7 +97,7 @@ type BAnalysis                 m l a = BComputation m l a a
 type BTransformation           m l a = BComputation m l a (Maybe (UniqSM (Graph m l)))
 type BFunctionalTransformation m l a = BComputation m l a (Maybe         (Graph m l))
 
-type BPass          m l a = BComputation m l a (Txlimit -> DFM a (Answer m l a))
+type BPass          m l a = BComputation m l a (OptimizationFuel -> DFM a (Answer m l a))
 type BUnlimitedPass m l a = BComputation m l a (           DFM a (Answer m l a))
 
 {-
@@ -132,8 +132,8 @@ type FAnalysis m l a       = FComputation m l a a (LastOutFacts a)
 type FTransformation m l a = FComputation m l a (Maybe (UniqSM (Graph m l)))
                                                 (Maybe (UniqSM (Graph m l)))
 type FPass m l a           = FComputation m l a
-                                (Txlimit -> DFM a (Answer m l a))
-                                (Txlimit -> DFM a (Answer m l (LastOutFacts a)))
+                                (OptimizationFuel -> DFM a (Answer m l a))
+                                (OptimizationFuel -> DFM a (Answer m l (LastOutFacts a)))
 
 type FUnlimitedPass m l a  = FComputation m l a
                                 (DFM a (Answer m l a))
@@ -338,10 +338,10 @@ fold_edge_facts_with_nodes_b fl fm ff comp graph env z =
 -- To do this, we need a locally modified computation that allows an
 -- ``exit fact'' to flow into the exit node.
 
-comp_with_exit_b :: BComputation m l i (Txlimit -> DFM f (Answer m l o)) -> o ->
-                    BComputation m l i (Txlimit -> DFM f (Answer m l o))
+comp_with_exit_b :: BComputation m l i (OptimizationFuel -> DFM f (Answer m l o)) -> o ->
+                    BComputation m l i (OptimizationFuel -> DFM f (Answer m l o))
 comp_with_exit_b comp exit_fact =
-    comp { bc_exit_in = \_txlim -> return $ Dataflow $ exit_fact }
+    comp { bc_exit_in = \_fuel -> return $ Dataflow $ exit_fact }
 
 -- | Given this function, we can now solve a graph simply by doing a
 -- backward analysis on the modified computation.  Note we have to be
@@ -353,50 +353,50 @@ comp_with_exit_b comp exit_fact =
 
 solve_graph_b ::
     forall m l a . (DebugNodes m l, Outputable a) =>
-                   BPass m l a -> Txlimit -> G.LGraph m l -> a -> DFM a (Txlimit, a)
-solve_graph_b comp txlim graph exit_fact =
-    general_backward (comp_with_exit_b comp exit_fact) txlim graph
+                   BPass m l a -> OptimizationFuel -> G.LGraph m l -> a -> DFM a (OptimizationFuel, a)
+solve_graph_b comp fuel graph exit_fact =
+    general_backward (comp_with_exit_b comp exit_fact) fuel graph
   where
-    general_backward :: BPass m l a -> Txlimit -> G.LGraph m l -> DFM a (Txlimit, a)
-    general_backward comp txlim graph = 
-      let set_block_fact :: Txlimit -> G.Block m l -> DFM a Txlimit
-          set_block_fact txlim b =
-              do { (txlim, block_in) <-
+    general_backward :: BPass m l a -> OptimizationFuel -> G.LGraph m l -> DFM a (OptimizationFuel, a)
+    general_backward comp fuel graph = 
+      let set_block_fact :: OptimizationFuel -> G.Block m l -> DFM a OptimizationFuel
+          set_block_fact fuel b =
+              do { (fuel, block_in) <-
                         let (h, l) = G.goto_end (G.unzip b) in
-                            factsEnv >>= \env -> last_in comp env l txlim >>= \x ->
+                            factsEnv >>= \env -> last_in comp env l fuel >>= \x ->
                               case x of
-                                Dataflow a -> head_in txlim h a
+                                Dataflow a -> head_in fuel h a
                                 Rewrite g ->
                                   do { bot <- botFact
                                      ; g <- lgraphOfGraph g
-                                     ; (txlim, a) <- subAnalysis' $
-                                                     solve_graph_b comp (txlim-1) g bot
-                                     ; head_in txlim h a }
+                                     ; (fuel, a) <- subAnalysis' $
+                                                     solve_graph_b comp (fuel-1) g bot
+                                     ; head_in fuel h a }
                  ; my_trace "result of" (text (bc_name comp) <+>
                    text "on" <+> ppr (G.blockId b) <+> text "is" <+> ppr block_in) $
                    setFact (G.blockId b) block_in
-                 ; return txlim
+                 ; return fuel
                  }
-          head_in txlim (G.ZHead h m) out = 
-              bc_middle_in comp out m txlim >>= \x -> case x of
-                Dataflow a -> head_in txlim h a
+          head_in fuel (G.ZHead h m) out = 
+              bc_middle_in comp out m fuel >>= \x -> case x of
+                Dataflow a -> head_in fuel h a
                 Rewrite g ->
                   do { g <- lgraphOfGraph g
-                     ; (txlim, a) <- subAnalysis' $ solve_graph_b comp (txlim-1) g out 
+                     ; (fuel, a) <- subAnalysis' $ solve_graph_b comp (fuel-1) g out 
                      ; my_trace "Rewrote middle node" (f4sep [ppr m, text "to", ppr g]) $
-                       head_in txlim h a }
-          head_in txlim (G.ZFirst id) out =
-              bc_first_in comp out id txlim >>= \x -> case x of
-                Dataflow a -> return (txlim, a)
+                       head_in fuel h a }
+          head_in fuel (G.ZFirst id) out =
+              bc_first_in comp out id fuel >>= \x -> case x of
+                Dataflow a -> return (fuel, a)
                 Rewrite g -> do { g <- lgraphOfGraph g
-                                ; subAnalysis' $ solve_graph_b comp (txlim-1) g out }
+                                ; subAnalysis' $ solve_graph_b comp (fuel-1) g out }
 
-      in do { txlim <-
-                  run "backward" (bc_name comp) (return ()) set_block_fact txlim blocks
+      in do { fuel <-
+                  run "backward" (bc_name comp) (return ()) set_block_fact fuel blocks
             ; a <- getFact (G.gr_entry graph)
             ; facts <- allFacts
             ; my_trace "Solution to graph after pass 1 is" (pprFacts graph facts a) $
-              return (txlim, a) }
+              return (fuel, a) }
                
     blocks = reverse (G.postorder_dfs graph)
     pprFacts g env a = (ppr a <+> text "with") $$ vcat (pprLgraph g : map pprFact (ufmToList env))
@@ -424,76 +424,76 @@ The tail is in final form; the head is still to be rewritten.
 
 solve_and_rewrite_b ::
   forall m l a. (DebugNodes m l, Outputable a) =>
-         BPass m l a -> Txlimit -> LGraph m l -> a -> DFM a (Txlimit, a, LGraph m l)
+         BPass m l a -> OptimizationFuel -> LGraph m l -> a -> DFM a (OptimizationFuel, a, LGraph m l)
 
-solve_and_rewrite_b comp txlim graph exit_fact =
-  do { (_, a) <- solve_graph_b comp txlim graph exit_fact -- pass 1
+solve_and_rewrite_b comp fuel graph exit_fact =
+  do { (_, a) <- solve_graph_b comp fuel graph exit_fact -- pass 1
      ; facts <- allFacts
-     ; (txlim, g) <-                                           -- pass 2
+     ; (fuel, g) <-                                           -- pass 2
        my_trace "Solution to graph after pass 1 is" (pprFacts graph facts) $
-           backward_rewrite (comp_with_exit_b comp exit_fact) txlim graph 
+           backward_rewrite (comp_with_exit_b comp exit_fact) fuel graph 
      ; facts <- allFacts
      ; my_trace "Rewritten graph after pass 2 is" (pprFacts g facts) $
-       return (txlim, a, g) }
+       return (fuel, a, g) }
   where
     pprFacts g env = vcat (pprLgraph g : map pprFact (ufmToList env))
     pprFact (id, a) = hang (ppr id <> colon) 4 (ppr a)
     eid = G.gr_entry graph
-    backward_rewrite comp txlim graph =
-      rewrite_blocks comp txlim emptyBlockEnv $ reverse (G.postorder_dfs graph)
+    backward_rewrite comp fuel graph =
+      rewrite_blocks comp fuel emptyBlockEnv $ reverse (G.postorder_dfs graph)
     rewrite_blocks ::
-      BPass m l a -> Txlimit ->
-      BlockEnv (Block m l) -> [Block m l] -> DFM a (Txlimit,G.LGraph m l)
-    rewrite_blocks _comp txlim rewritten [] = return (txlim, G.LGraph eid rewritten)
-    rewrite_blocks  comp txlim rewritten (b:bs) =
-      let rewrite_next_block txlim =
+      BPass m l a -> OptimizationFuel ->
+      BlockEnv (Block m l) -> [Block m l] -> DFM a (OptimizationFuel,G.LGraph m l)
+    rewrite_blocks _comp fuel rewritten [] = return (fuel, G.LGraph eid rewritten)
+    rewrite_blocks  comp fuel rewritten (b:bs) =
+      let rewrite_next_block fuel =
             let (h, l) = G.goto_end (G.unzip b) in
-            factsEnv >>= \env -> last_in comp env l txlim >>= \x -> case x of
-              Dataflow a -> propagate txlim h a (G.ZLast l) rewritten
+            factsEnv >>= \env -> last_in comp env l fuel >>= \x -> case x of
+              Dataflow a -> propagate fuel h a (G.ZLast l) rewritten
               Rewrite g ->  -- see Note [Rewriting labelled LGraphs]
                 do { bot <- botFact
                    ; g <- lgraphOfGraph g
-                   ; (txlim, a, g') <- solve_and_rewrite_b comp (txlim-1) g bot
+                   ; (fuel, a, g') <- solve_and_rewrite_b comp (fuel-1) g bot
                    ; let G.Graph t new_blocks = G.remove_entry_label g'
                    ; markGraphRewritten
                    ; let rewritten' = plusUFM new_blocks rewritten
                    ; -- continue at entry of g
-                     propagate txlim h a t rewritten'
+                     propagate fuel h a t rewritten'
                    } 
-          propagate :: Txlimit -> G.ZHead m -> a -> G.ZTail m l ->
-                       BlockEnv (Block m l) -> DFM a (Txlimit, G.LGraph m l)
-          propagate txlim (G.ZHead h m) out tail rewritten =
-              bc_middle_in comp out m txlim >>= \x -> case x of
-                Dataflow a -> propagate txlim h a (G.ZTail m tail) rewritten
+          propagate :: OptimizationFuel -> G.ZHead m -> a -> G.ZTail m l ->
+                       BlockEnv (Block m l) -> DFM a (OptimizationFuel, G.LGraph m l)
+          propagate fuel (G.ZHead h m) out tail rewritten =
+              bc_middle_in comp out m fuel >>= \x -> case x of
+                Dataflow a -> propagate fuel h a (G.ZTail m tail) rewritten
                 Rewrite g ->
                   do { g <- lgraphOfGraph g
-                     ; (txlim, a, g') <- solve_and_rewrite_b comp (txlim-1) g out
+                     ; (fuel, a, g') <- solve_and_rewrite_b comp (fuel-1) g out
                      ; markGraphRewritten
                      ; let (t, g'') = G.splice_tail g' tail 
                      ; let rewritten' = plusUFM (G.gr_blocks g'') rewritten
                      ; my_trace "Rewrote middle node" (f4sep [ppr m, text "to", ppr g]) $
-                       propagate txlim h a t rewritten' }
-          propagate txlim h@(G.ZFirst id) out tail rewritten =
-              bc_first_in comp out id txlim >>= \x -> case x of
+                       propagate fuel h a t rewritten' }
+          propagate fuel h@(G.ZFirst id) out tail rewritten =
+              bc_first_in comp out id fuel >>= \x -> case x of
                 Dataflow a ->
                   let b = G.Block id tail in
                   do { checkFactMatch id a
-                     ; rewrite_blocks comp txlim (extendBlockEnv rewritten id b) bs }
+                     ; rewrite_blocks comp fuel (extendBlockEnv rewritten id b) bs }
                 Rewrite fg ->
                   do { g <- lgraphOfGraph fg
-                     ; (txlim, a, g') <- solve_and_rewrite_b comp (txlim-1) g out
+                     ; (fuel, a, g') <- solve_and_rewrite_b comp (fuel-1) g out
                      ; markGraphRewritten
                      ; let (t, g'') = G.splice_tail g' tail 
                      ; let rewritten' = plusUFM (G.gr_blocks g'') rewritten
                      ; my_trace "Rewrote label " (f4sep [ppr id, text "to", ppr g]) $
-                       propagate txlim h a t rewritten' }
-      in rewrite_next_block txlim 
+                       propagate fuel h a t rewritten' }
+      in rewrite_next_block fuel 
 
 b_rewrite comp g =
-  do { txlim <- liftTx txRemaining
+  do { fuel <- liftTx txRemaining
      ; bot <- botFact
-     ; (txlim', _, gc) <- solve_and_rewrite_b comp txlim g bot
-     ; liftTx $ txDecrement (bc_name comp) txlim txlim'
+     ; (fuel', _, gc) <- solve_and_rewrite_b comp fuel g bot
+     ; liftTx $ txDecrement (bc_name comp) fuel fuel'
      ; return gc
      }
 
@@ -507,15 +507,15 @@ let debug s (f, comp) =
   let pr = Printf.eprintf in
   let fact dir node a = pr "%s %s for %s = %s\n" f.fact_name dir node (s a) in
   let rewr node g = pr "%s rewrites %s to <not-shown>\n" comp.name node in
-  let wrap f nodestring node txlim =
-    let answer = f node txlim in
+  let wrap f nodestring node fuel =
+    let answer = f node fuel in
     let () = match answer with
     | Dataflow a -> fact "in " (nodestring node) a
     | Rewrite g  -> rewr (nodestring node) g in
     answer in
-  let wrapout f nodestring out node txlim =
+  let wrapout f nodestring out node fuel =
     fact "out" (nodestring node) out;
-    wrap (f out) nodestring node txlim in
+    wrap (f out) nodestring node fuel in
   let last_in = wrap comp.last_in (RS.rtl << G.last_instr) in
   let middle_in = wrapout comp.middle_in (RS.rtl << G.mid_instr) in
   let first_in  =
@@ -528,39 +528,39 @@ anal_b comp = comp { bc_last_in   = wrap2 $ bc_last_in   comp
                    , bc_exit_in   = wrap0 $ bc_exit_in   comp
                    , bc_middle_in = wrap2 $ bc_middle_in comp
                    , bc_first_in  = wrap2 $ bc_first_in  comp }
-  where wrap2 f out node _txlim = return $ Dataflow (f out node)
-        wrap0 fact       _txlim = return $ Dataflow fact
+  where wrap2 f out node _fuel = return $ Dataflow (f out node)
+        wrap0 fact       _fuel = return $ Dataflow fact
 
 ignore_transactions_b comp =
     comp { bc_last_in   = wrap2 $ bc_last_in   comp
          , bc_exit_in   = wrap0 $ bc_exit_in   comp
          , bc_middle_in = wrap2 $ bc_middle_in comp
          , bc_first_in  = wrap2 $ bc_first_in  comp }
-  where wrap2 f out node _txlim = f out node
-        wrap0 fact       _txlim = fact
+  where wrap2 f out node _fuel = f out node
+        wrap0 fact       _fuel = fact
 
-answer' :: (b -> DFM f (Graph m l)) -> Txlimit -> Maybe b -> a -> DFM f (Answer m l a)
-answer' lift txlim r a = 
-    case r of Just gc | txlim > 0 -> do { g <- lift gc; return $ Rewrite g }
+answer' :: (b -> DFM f (Graph m l)) -> OptimizationFuel -> Maybe b -> a -> DFM f (Answer m l a)
+answer' lift fuel r a = 
+    case r of Just gc | fuel > 0 -> do { g <- lift gc; return $ Rewrite g }
               _ -> return $ Dataflow a
 
 unlimited_answer'
-    :: (b -> DFM f (Graph m l)) -> Txlimit -> Maybe b -> a -> DFM f (Answer m l a)
-unlimited_answer' lift _txlim r a =
+    :: (b -> DFM f (Graph m l)) -> OptimizationFuel -> Maybe b -> a -> DFM f (Answer m l a)
+unlimited_answer' lift _fuel r a =
     case r of Just gc -> do { g <- lift gc; return $ Rewrite g }
               _ -> return $ Dataflow a
 
-combine_a_t_with :: (Txlimit -> Maybe b -> a -> DFM a (Answer m l a)) ->
+combine_a_t_with :: (OptimizationFuel -> Maybe b -> a -> DFM a (Answer m l a)) ->
                     BAnalysis m l a -> BComputation m l a (Maybe b) ->
                     BPass m l a
 combine_a_t_with answer anal tx =
- let last_in env l txlim =
-       answer txlim (bc_last_in tx env l) (bc_last_in anal env l)
-     exit_in txlim = answer txlim (bc_exit_in tx) (bc_exit_in anal)
-     middle_in out m txlim =
-       answer txlim (bc_middle_in tx out m) (bc_middle_in anal out m) 
-     first_in out f txlim =
-       answer txlim (bc_first_in tx out f) (bc_first_in anal out f) 
+ let last_in env l fuel =
+       answer fuel (bc_last_in tx env l) (bc_last_in anal env l)
+     exit_in fuel = answer fuel (bc_exit_in tx) (bc_exit_in anal)
+     middle_in out m fuel =
+       answer fuel (bc_middle_in tx out m) (bc_middle_in anal out m) 
+     first_in out f fuel =
+       answer fuel (bc_first_in tx out f) (bc_first_in anal out f) 
  in BComp { bc_name = concat [bc_name anal, " and ", bc_name tx]
           , bc_last_in = last_in, bc_middle_in = middle_in
           , bc_first_in = first_in, bc_exit_in = exit_in }
@@ -607,25 +607,24 @@ last_outs comp i (G.LastOther l) = fc_last_outs comp i l
 
 comp_with_exit_f :: FPass m l a -> BlockId -> FPass m l a
 comp_with_exit_f comp exit_fact_id = comp { fc_exit_outs = exit_outs } 
-    where exit_outs in' _txlimit =
-              return $ Dataflow $ LastOutFacts [(exit_fact_id, in')]
+    where exit_outs in' _fuel = return $ Dataflow $ LastOutFacts [(exit_fact_id, in')]
 
 -- | Given [[comp_with_exit_f]], we can now solve a graph simply by doing a
 -- forward analysis on the modified computation.
 solve_graph_f ::
     forall m l a . (DebugNodes m l, Outputable a) =>
-                   FPass m l a -> Txlimit -> G.LGraph m l -> a ->
-                   DFM a (Txlimit, a, LastOutFacts a)
-solve_graph_f comp txlim g in_fact =
+                   FPass m l a -> OptimizationFuel -> G.LGraph m l -> a ->
+                   DFM a (OptimizationFuel, a, LastOutFacts a)
+solve_graph_f comp fuel g in_fact =
   do { exit_fact_id <- freshBlockId "proxy for exit node"
-     ; txlim <- general_forward (comp_with_exit_f comp exit_fact_id) txlim in_fact g
+     ; fuel <- general_forward (comp_with_exit_f comp exit_fact_id) fuel in_fact g
      ; a <- getFact exit_fact_id
      ; outs <- lastOutFacts
      ; forgetFact exit_fact_id -- close space leak
-     ; return (txlim, a, LastOutFacts outs) }
+     ; return (fuel, a, LastOutFacts outs) }
   where
-    general_forward :: FPass m l a -> Txlimit -> a -> G.LGraph m l -> DFM a Txlimit
-    general_forward comp txlim entry_fact graph =
+    general_forward :: FPass m l a -> OptimizationFuel -> a -> G.LGraph m l -> DFM a OptimizationFuel
+    general_forward comp fuel entry_fact graph =
       let blocks = G.postorder_dfs g
           is_local id = isJust $ lookupBlockEnv (G.gr_blocks g) id
           set_or_save :: LastOutFacts a -> DFM a ()
@@ -634,37 +633,37 @@ solve_graph_f comp txlim g in_fact =
             if is_local id then setFact id a else addLastOutFact (id, a)
           set_entry = setFact (G.gr_entry graph) entry_fact
 
-          set_successor_facts txlim b =
-            let set_tail_facts txlim in' (G.ZTail m t) =
+          set_successor_facts fuel b =
+            let set_tail_facts fuel in' (G.ZTail m t) =
                   my_trace "Solving middle node" (ppr m) $
-                  fc_middle_out comp in' m txlim >>= \ x -> case x of
-                    Dataflow a -> set_tail_facts txlim a t
+                  fc_middle_out comp in' m fuel >>= \ x -> case x of
+                    Dataflow a -> set_tail_facts fuel a t
                     Rewrite g -> 
                       do g <- lgraphOfGraph g
-                         (txlim, out, last_outs) <- subAnalysis' $
-                                         solve_graph_f comp (txlim-1) g in'
+                         (fuel, out, last_outs) <- subAnalysis' $
+                                         solve_graph_f comp (fuel-1) g in'
                          set_or_save last_outs
-                         set_tail_facts txlim out t
-                set_tail_facts txlim in' (G.ZLast l) =
-                  last_outs comp in' l txlim >>= \x -> case x of
-                    Dataflow outs -> do { set_or_save outs; return txlim }
+                         set_tail_facts fuel out t
+                set_tail_facts fuel in' (G.ZLast l) =
+                  last_outs comp in' l fuel >>= \x -> case x of
+                    Dataflow outs -> do { set_or_save outs; return fuel }
                     Rewrite g ->
                       do g <- lgraphOfGraph g
-                         (txlim, _, last_outs) <- subAnalysis' $
-                                         solve_graph_f comp (txlim-1) g in'
+                         (fuel, _, last_outs) <- subAnalysis' $
+                                         solve_graph_f comp (fuel-1) g in'
                          set_or_save last_outs
-                         return txlim
+                         return fuel
                 G.Block id t = b
             in  do idfact <- getFact id
-                   infact <- fc_first_out comp idfact id txlim
-                   case infact of Dataflow a -> set_tail_facts txlim a t
+                   infact <- fc_first_out comp idfact id fuel
+                   case infact of Dataflow a -> set_tail_facts fuel a t
                                   Rewrite g ->
                                     do g <- lgraphOfGraph g
-                                       (txlim, out, last_outs) <- subAnalysis' $
-                                           solve_graph_f comp (txlim-1) g idfact
+                                       (fuel, out, last_outs) <- subAnalysis' $
+                                           solve_graph_f comp (fuel-1) g idfact
                                        set_or_save last_outs
-                                       set_tail_facts txlim out t
-      in run "forward" (fc_name comp) set_entry set_successor_facts txlim blocks
+                                       set_tail_facts fuel out t
+      in run "forward" (fc_name comp) set_entry set_successor_facts fuel blocks
 
 
 
@@ -679,20 +678,20 @@ The tail is in final form; the head is still to be rewritten.
 -}
 solve_and_rewrite_f ::
   forall m l a . (DebugNodes m l, Outputable a) =>
-         FPass m l a -> Txlimit -> LGraph m l -> a -> DFM a (Txlimit, a, LGraph m l)
-solve_and_rewrite_f comp txlim graph in_fact =
-  do solve_graph_f comp txlim graph in_fact                   -- pass 1
+         FPass m l a -> OptimizationFuel -> LGraph m l -> a -> DFM a (OptimizationFuel, a, LGraph m l)
+solve_and_rewrite_f comp fuel graph in_fact =
+  do solve_graph_f comp fuel graph in_fact                   -- pass 1
      exit_id    <- freshBlockId "proxy for exit node"
-     (txlim, g) <- forward_rewrite (comp_with_exit_f comp exit_id) txlim graph in_fact
+     (fuel, g) <- forward_rewrite (comp_with_exit_f comp exit_id) fuel graph in_fact
      exit_fact  <- getFact exit_id
-     return (txlim, exit_fact, g)
+     return (fuel, exit_fact, g)
 
 forward_rewrite ::
   forall m l a . (DebugNodes m l, Outputable a) =>
-         FPass m l a -> Txlimit -> G.LGraph m l -> a -> DFM a (Txlimit, G.LGraph m l)
-forward_rewrite comp txlim graph entry_fact =
+         FPass m l a -> OptimizationFuel -> G.LGraph m l -> a -> DFM a (OptimizationFuel, G.LGraph m l)
+forward_rewrite comp fuel graph entry_fact =
   do setFact eid entry_fact
-     rewrite_blocks txlim emptyBlockEnv (G.postorder_dfs graph) 
+     rewrite_blocks fuel emptyBlockEnv (G.postorder_dfs graph) 
   where
     eid = G.gr_entry graph
     is_local id = isJust $ lookupBlockEnv (G.gr_blocks graph) id
@@ -703,51 +702,51 @@ forward_rewrite comp txlim graph entry_fact =
         else panic "set fact outside graph during rewriting pass?!"
 
     rewrite_blocks ::
-      Txlimit -> BlockEnv (Block m l) -> [Block m l] -> DFM a (Txlimit, LGraph m l)
-    rewrite_blocks txlim rewritten [] = return (txlim, G.LGraph eid rewritten)
-    rewrite_blocks txlim rewritten (G.Block id t : bs) = 
+      OptimizationFuel -> BlockEnv (Block m l) -> [Block m l] -> DFM a (OptimizationFuel, LGraph m l)
+    rewrite_blocks fuel rewritten [] = return (fuel, G.LGraph eid rewritten)
+    rewrite_blocks fuel rewritten (G.Block id t : bs) = 
         do id_fact <- getFact id
-           first_out <- fc_first_out comp id_fact id txlim
+           first_out <- fc_first_out comp id_fact id fuel
            case first_out of
-             Dataflow a -> propagate txlim (G.ZFirst id) a t rewritten bs
+             Dataflow a -> propagate fuel (G.ZFirst id) a t rewritten bs
              Rewrite fg -> do { markGraphRewritten
-                              ; rewrite_blocks (txlim-1) rewritten
+                              ; rewrite_blocks (fuel-1) rewritten
                                 (G.postorder_dfs (labelGraph id fg) ++ bs) }
-    propagate :: Txlimit -> G.ZHead m -> a -> G.ZTail m l -> BlockEnv (G.Block m l) ->
-                 [G.Block m l] -> DFM a (Txlimit, G.LGraph m l)
-    propagate txlim h in' (G.ZTail m t) rewritten bs = 
+    propagate :: OptimizationFuel -> G.ZHead m -> a -> G.ZTail m l -> BlockEnv (G.Block m l) ->
+                 [G.Block m l] -> DFM a (OptimizationFuel, G.LGraph m l)
+    propagate fuel h in' (G.ZTail m t) rewritten bs = 
         my_trace "Rewriting middle node" (ppr m) $
-        do fc_middle_out comp in' m txlim >>= \x -> case x of
-             Dataflow a -> propagate txlim (G.ZHead h m) a t rewritten bs
+        do fc_middle_out comp in' m fuel >>= \x -> case x of
+             Dataflow a -> propagate fuel (G.ZHead h m) a t rewritten bs
              Rewrite g ->
                my_trace "Rewriting middle node...\n" empty $
                do g <- lgraphOfGraph g
-                  (txlim, a, g) <- solve_and_rewrite_f comp (txlim-1) g in' 
+                  (fuel, a, g) <- solve_and_rewrite_f comp (fuel-1) g in' 
                   markGraphRewritten
                   my_trace "Rewrite of middle node completed\n" empty $
                      let (g', h') = G.splice_head h g in
-                     propagate txlim h' a t (plusUFM (G.gr_blocks g') rewritten) bs
-    propagate txlim h in' (G.ZLast l) rewritten bs = 
-        do last_outs comp in' l txlim >>= \x -> case x of
+                     propagate fuel h' a t (plusUFM (G.gr_blocks g') rewritten) bs
+    propagate fuel h in' (G.ZLast l) rewritten bs = 
+        do last_outs comp in' l fuel >>= \x -> case x of
              Dataflow outs ->
                do set_or_save outs
                   let b = G.zip (G.ZBlock h (G.ZLast l))
-                  rewrite_blocks txlim (G.insertBlock b rewritten) bs
+                  rewrite_blocks fuel (G.insertBlock b rewritten) bs
              Rewrite g ->
                 -- could test here that [[exits g = exits (G.Entry, G.ZLast l)]]
                 {- if Debug.on "rewrite-last" then 
                       Printf.eprintf "ZLast node %s rewritten to:\n"
                         (RS.rtl (G.last_instr l)); -}
                 do g <- lgraphOfGraph g
-                   (txlim, _, g) <- solve_and_rewrite_f comp (txlim-1) g in' 
+                   (fuel, _, g) <- solve_and_rewrite_f comp (fuel-1) g in' 
                    markGraphRewritten
                    let g' = G.splice_head_only h g
-                   rewrite_blocks txlim (plusUFM (G.gr_blocks g') rewritten) bs
+                   rewrite_blocks fuel (plusUFM (G.gr_blocks g') rewritten) bs
 
 f_rewrite comp entry_fact g =
-  do { txlim <- liftTx txRemaining
-     ; (txlim', _, gc) <- solve_and_rewrite_f comp txlim g entry_fact
-     ; liftTx $ txDecrement (fc_name comp) txlim txlim'
+  do { fuel <- liftTx txRemaining
+     ; (fuel', _, gc) <- solve_and_rewrite_f comp fuel g entry_fact
+     ; liftTx $ txDecrement (fc_name comp) fuel fuel'
      ; return gc
      }
 
@@ -761,9 +760,9 @@ let debug s (f, comp) =
   let setter dir node run_sets set =
     run_sets (fun u a -> pr "%s %s for %s = %s\n" f.fact_name dir node (s a); set u a) in
   let rewr node g = pr "%s rewrites %s to <not-shown>\n" comp.name node in
-  let wrap f nodestring wrap_answer in' node txlim =
+  let wrap f nodestring wrap_answer in' node fuel =
     fact "in " (nodestring node) in';
-    wrap_answer (nodestring node) (f in' node txlim)
+    wrap_answer (nodestring node) (f in' node fuel)
   and wrap_fact n answer =
     let () = match answer with
     | Dataflow a -> fact "out" n a
@@ -783,20 +782,20 @@ anal_f comp = comp { fc_first_out  = wrap2 $ fc_first_out  comp
                    , fc_last_outs  = wrap2 $ fc_last_outs  comp
                    , fc_exit_outs  = wrap1 $ fc_exit_outs  comp
                    }
-  where wrap2 f out node _txlim = return $ Dataflow (f out node)
-        wrap1 f fact     _txlim = return $ Dataflow (f fact)
+  where wrap2 f out node _fuel = return $ Dataflow (f out node)
+        wrap1 f fact     _fuel = return $ Dataflow (f fact)
 
 
 a_t_f anal tx =
  let answer = answer' liftUSM
-     first_out in' id txlim =
-         answer txlim (fc_first_out tx in' id) (fc_first_out anal in' id)
-     middle_out in' m txlim =
-         answer txlim (fc_middle_out tx in' m) (fc_middle_out anal in' m)
-     last_outs in' l txlim = 
-         answer txlim (fc_last_outs tx in' l) (fc_last_outs anal in' l)
-     exit_outs in' txlim = undefined
-         answer txlim (fc_exit_outs tx in') (fc_exit_outs anal in')
+     first_out in' id fuel =
+         answer fuel (fc_first_out tx in' id) (fc_first_out anal in' id)
+     middle_out in' m fuel =
+         answer fuel (fc_middle_out tx in' m) (fc_middle_out anal in' m)
+     last_outs in' l fuel = 
+         answer fuel (fc_last_outs tx in' l) (fc_last_outs anal in' l)
+     exit_outs in' fuel = undefined
+         answer fuel (fc_exit_outs tx in') (fc_exit_outs anal in')
  in  FComp { fc_name = concat [fc_name anal, " and ", fc_name tx]
            , fc_last_outs = last_outs, fc_middle_out = middle_out
            , fc_first_out = first_out, fc_exit_outs = exit_outs }

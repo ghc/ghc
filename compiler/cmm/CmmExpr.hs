@@ -4,7 +4,7 @@ module CmmExpr
     ( CmmExpr(..), cmmExprRep, maybeInvertCmmExpr
     , CmmReg(..), cmmRegRep
     , CmmLit(..), cmmLitRep
-    , LocalReg(..), localRegRep, localRegGCFollow, Kind(..)
+    , LocalReg(..), localRegRep, localRegGCFollow, GCKind(..)
     , GlobalReg(..), globalRegRep, spReg, hpReg, spLimReg, nodeReg, node
     , UserOfLocalRegs, foldRegsUsed
     , RegSet, emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
@@ -79,13 +79,13 @@ maybeInvertCmmExpr _ = Nothing
 -----------------------------------------------------------------------------
 
 -- | Whether a 'LocalReg' is a GC followable pointer
-data Kind = KindPtr | KindNonPtr deriving (Eq)
+data GCKind = GCKindPtr | GCKindNonPtr deriving (Eq)
 
 data LocalReg
   = LocalReg
       !Unique   -- ^ Identifier
       MachRep   -- ^ Type
-      Kind      -- ^ Should the GC follow as a pointer
+      GCKind      -- ^ Should the GC follow as a pointer
 
 -- | Sets of local registers
 
@@ -152,7 +152,7 @@ localRegRep :: LocalReg -> MachRep
 localRegRep (LocalReg _ rep _) = rep
 
 
-localRegGCFollow :: LocalReg -> Kind
+localRegGCFollow :: LocalReg -> GCKind
 localRegGCFollow (LocalReg _ _ p) = p
 
 cmmLitRep :: CmmLit -> MachRep

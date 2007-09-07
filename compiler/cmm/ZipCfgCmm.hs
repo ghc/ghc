@@ -12,7 +12,7 @@ where
 
 import CmmExpr
 import Cmm ( GenCmm(..), GenCmmTop(..), CmmStatic, CmmInfo
-           , CmmCallTarget(..), CmmActuals, CmmFormals, CmmHintFormals
+           , CmmCallTarget(..), CmmActuals, CmmFormalsWithoutKinds, CmmFormals
            , CmmStmt(CmmJump, CmmSwitch, CmmReturn) -- imported in order to call ppr
            )
 import PprCmm()
@@ -37,8 +37,8 @@ type CmmTopZ   = GenCmmTop CmmStatic CmmInfo CmmGraph
 mkNop        :: CmmAGraph
 mkAssign     :: CmmReg  -> CmmExpr -> CmmAGraph
 mkStore      :: CmmExpr -> CmmExpr -> CmmAGraph
-mkCall       :: CmmCallTarget -> CmmHintFormals -> CmmActuals -> C_SRT -> CmmAGraph
-mkUnsafeCall :: CmmCallTarget -> CmmHintFormals -> CmmActuals -> CmmAGraph
+mkCall       :: CmmCallTarget -> CmmFormals -> CmmActuals -> C_SRT -> CmmAGraph
+mkUnsafeCall :: CmmCallTarget -> CmmFormals -> CmmActuals -> CmmAGraph
 mkFinalCall  :: CmmCallTarget -> CmmActuals -> CmmAGraph -- never returns
 mkJump       :: CmmExpr -> CmmActuals -> CmmAGraph
 mkCbranch    :: CmmExpr -> BlockId -> BlockId -> CmmAGraph
@@ -57,11 +57,11 @@ mkCmmWhileDo    :: CmmExpr -> CmmAGraph -> CmmAGraph
 mkCmmIfThenElse e = mkIfThenElse (mkCbranch e)
 mkCmmWhileDo    e = mkWhileDo    (mkCbranch e)
 
-mkCopyIn     :: Convention -> CmmHintFormals -> C_SRT -> CmmAGraph
-mkCopyOut    :: Convention -> CmmHintFormals -> CmmAGraph
+mkCopyIn     :: Convention -> CmmFormals -> C_SRT -> CmmAGraph
+mkCopyOut    :: Convention -> CmmFormals -> CmmAGraph
 
   -- ^ XXX: Simon or Simon thinks maybe the hints are being abused and
-  -- we should have CmmFormals here, but for now it is CmmHintFormals
+  -- we should have CmmFormalsWithoutKinds here, but for now it is CmmFormals
   -- for consistency with the rest of the back end ---NR
 
 mkComment fs = mkMiddle (MidComment fs)
@@ -77,15 +77,15 @@ data Middle
 
   | MidUnsafeCall                -- An "unsafe" foreign call;
      CmmCallTarget               -- just a fat machine instructoin
-     CmmHintFormals              -- zero or more results
+     CmmFormals              -- zero or more results
      CmmActuals                  -- zero or more arguments
 
   | CopyIn    -- Move parameters or results from conventional locations to registers
               -- Note [CopyIn invariant]
         Convention 
-        CmmHintFormals      
+        CmmFormals      
         C_SRT           -- Static things kept alive by this block
-  | CopyOut Convention CmmHintFormals 
+  | CopyOut Convention CmmFormals 
 
 data Last
   = LastReturn CmmActuals          -- Return from a function,
@@ -94,7 +94,7 @@ data Last
   | LastJump   CmmExpr CmmActuals
         -- Tail call to another procedure
 
-  | LastBranch BlockId CmmFormals
+  | LastBranch BlockId CmmFormalsWithoutKinds
         -- To another block in the same procedure
         -- The parameters are unused at present.
 

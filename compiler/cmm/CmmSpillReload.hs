@@ -107,15 +107,7 @@ middleDualLiveness live m@(Reload regs) =
     where live' = DualLive { on_stack = on_stack live `plusRegSet` regs
                            , in_regs = in_regs live `minusRegSet` regs }
 
-middleDualLiveness live (NotSpillOrReload m) = middle m live
-  where middle (MidNop)                         = id 
-        middle (MidComment {})                  = id 
-        middle (MidAssign (CmmLocal reg') expr) = changeRegs (gen expr . kill reg')
-        middle (MidAssign (CmmGlobal _) expr)   = changeRegs (gen expr) 
-        middle (MidStore addr rval)             = changeRegs (gen addr . gen rval) 
-        middle (MidUnsafeCall _ ress args)      = changeRegs (gen args . kill ress) 
-        middle (CopyIn  _ formals _)            = changeRegs (kill formals)
-        middle (CopyOut _ formals)              = changeRegs (gen  formals)
+middleDualLiveness live (NotSpillOrReload m) = changeRegs (middleLiveness m) live
 
 lastDualLiveness :: (BlockId -> DualLive) -> Last -> DualLive
 lastDualLiveness env l = last l
@@ -194,6 +186,37 @@ spillAndReloadComments (Reload regs) = show_regs "Reload" regs
 
 show_regs :: String -> RegSet -> Middle
 show_regs s regs = MidComment $ mkFastString $ showSDoc $ ppr_regs s regs
+
+
+----------------------------------------------------------------
+--- sinking reloads
+
+{-
+
+-- The idea is to compute at each point the set of registers such that
+-- on every path to the point, the register is defined by a Reload
+-- instruction.  Then, if a use appears at such a point, we can safely
+-- insert a Reload right before the use.  Finally, we can eliminate
+-- the early reloads along with other dead assignments.
+
+data AvailRegs = UniverseMinus RegSet
+               | AvailRegs     RegSet
+
+availRegsLattice :: DataflowLattice AvailRegs
+availRegsLattice =
+      DataflowLattice "register gotten from reloads" empty add False
+    where empty = DualLive emptyRegSet emptyRegSet
+          -- | compute in the Tx monad to track whether anything has changed
+          add new old = do stack <- add1 (on_stack new) (on_stack old)
+                           regs  <- add1 (in_regs new)  (in_regs old)
+                           return $ DualLive stack regs
+          add1 = fact_add_to liveLattice
+
+
+
+
+-}
+
 
 
 ---------------------

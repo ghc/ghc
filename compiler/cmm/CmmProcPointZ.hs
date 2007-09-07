@@ -204,14 +204,14 @@ algorithm would be just as good, so that's what we do.
 
 -}
 
-data Protocol = Protocol Convention CmmHintFormals
+data Protocol = Protocol Convention CmmFormals
   deriving Eq
 
 -- | Function 'optimize_calls' chooses protocols only for those proc
 -- points that are relevant to the optimization explained above.
 -- The others are assigned by 'add_unassigned', which is not yet clever.
 
-addProcPointProtocols :: ProcPointSet -> CmmFormals -> CmmGraph -> CmmGraph
+addProcPointProtocols :: ProcPointSet -> CmmFormalsWithoutKinds -> CmmGraph -> CmmGraph
 addProcPointProtocols procPoints formals g =
        snd $ add_unassigned procPoints $ optimize_calls g
     where optimize_calls g =  -- see Note [Separate Adams optimization]

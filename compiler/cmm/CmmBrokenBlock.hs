@@ -71,11 +71,11 @@ data BlockEntryInfo
   = FunctionEntry		-- ^ Block is the beginning of a function
       CmmInfo                   -- ^ Function header info
       CLabel                    -- ^ The function name
-      CmmFormals                -- ^ Aguments to function
+      CmmFormalsWithoutKinds                -- ^ Aguments to function
 		-- Only the formal parameters are live 
 
   | ContinuationEntry 		-- ^ Return point of a function call
-      CmmFormals                -- ^ return values (argument to continuation)
+      CmmFormalsWithoutKinds                -- ^ return values (argument to continuation)
       C_SRT                     -- ^ SRT for the continuation's info table
       Bool                      -- ^ True <=> GC block so ignore stack size
 		-- Live variables, other than 
@@ -122,7 +122,7 @@ f2(x, y) { // ProcPointEntry
 -}
 
 data ContFormat = ContFormat
-      CmmHintFormals            -- ^ return values (argument to continuation)
+      CmmFormals            -- ^ return values (argument to continuation)
       C_SRT                     -- ^ SRT for the continuation's info table
       Bool                      -- ^ True <=> GC block so ignore stack size
   deriving (Eq)
@@ -146,7 +146,7 @@ data FinalStmt
       BlockId                   -- ^ Target of the 'CmmGoto'
                                 -- (must be a 'ContinuationEntry')
       CmmCallTarget             -- ^ The function to call
-      CmmHintFormals                -- ^ Results from call
+      CmmFormals                -- ^ Results from call
                                 -- (redundant with ContinuationEntry)
       CmmActuals                -- ^ Arguments to call
       C_SRT                     -- ^ SRT for the continuation's info table
@@ -190,7 +190,7 @@ breakProc ::
                                 -- to create names of the new blocks with
     -> CmmInfo                  -- ^ Info table for the procedure
     -> CLabel                   -- ^ Name of the procedure
-    -> CmmFormals               -- ^ Parameters of the procedure
+    -> CmmFormalsWithoutKinds               -- ^ Parameters of the procedure
     -> [CmmBasicBlock]          -- ^ Blocks of the procecure
                                 -- (First block is the entry block)
     -> [BrokenBlock]
@@ -382,7 +382,7 @@ adaptBlockToFormat formats unique
                   next format_formals
       adaptor_ident = BlockId unique
 
-      mk_adaptor_block :: BlockId -> BlockEntryInfo -> BlockId -> CmmHintFormals -> BrokenBlock
+      mk_adaptor_block :: BlockId -> BlockEntryInfo -> BlockId -> CmmFormals -> BrokenBlock
       mk_adaptor_block ident entry next formals =
           BrokenBlock ident entry [] [next] exit
               where

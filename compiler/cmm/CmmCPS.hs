@@ -117,7 +117,7 @@ cpsProc uniqSupply (CmmProc info ident params (ListGraph blocks)) = cps_procs
        block_uniques = uniques
       proc_uniques = map (map (map uniqsFromSupply . listSplitUniqSupply) . listSplitUniqSupply) $ listSplitUniqSupply uniqSupply2
 
-      stack_use = CmmLocal (LocalReg stack_use_unique (cmmRegRep spReg) KindPtr)
+      stack_use = CmmLocal (LocalReg stack_use_unique (cmmRegRep spReg) GCKindPtr)
       stack_check_block_id = BlockId stack_check_block_unique
       stack_check_block = make_stack_check stack_check_block_id info stack_use (blockId $ head blocks)
 
@@ -170,7 +170,7 @@ cpsProc uniqSupply (CmmProc info ident params (ListGraph blocks)) = cps_procs
       -- This is an association list instead of a UniqFM because
       -- CLabel's don't have a 'Uniqueable' instance.
       formats :: [(CLabel,              -- key
-                   (CmmFormals,         -- arguments
+                   (CmmFormalsWithoutKinds,         -- arguments
                     Maybe CLabel,       -- label in top slot
                     [Maybe LocalReg]))] -- slots
       formats = selectContinuationFormat live continuations
@@ -276,7 +276,7 @@ gatherBlocksIntoContinuation live proc_points blocks start =
 
 selectContinuationFormat :: BlockEnv CmmLive
                   -> [Continuation (Either C_SRT CmmInfo)]
-                  -> [(CLabel, (CmmFormals, Maybe CLabel, [Maybe LocalReg]))]
+                  -> [(CLabel, (CmmFormalsWithoutKinds, Maybe CLabel, [Maybe LocalReg]))]
 selectContinuationFormat live continuations =
     map (\c -> (continuationLabel c, selectContinuationFormat' c)) continuations
     where
@@ -300,7 +300,7 @@ selectContinuationFormat live continuations =
 
       unknown_block = panic "unknown BlockId in selectContinuationFormat"
 
-processFormats :: [(CLabel, (CmmFormals, Maybe CLabel, [Maybe LocalReg]))]
+processFormats :: [(CLabel, (CmmFormalsWithoutKinds, Maybe CLabel, [Maybe LocalReg]))]
                -> Maybe UpdateFrame
                -> [Continuation (Either C_SRT CmmInfo)]
                -> (WordOff, WordOff, [(CLabel, ContinuationFormat)])

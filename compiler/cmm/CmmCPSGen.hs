@@ -57,7 +57,7 @@ data Continuation info =
      info              -- Left <=> Continuation created by the CPS
                        -- Right <=> Function or Proc point
      CLabel            -- Used to generate both info & entry labels
-     CmmFormals        -- Argument locals live on entry (C-- procedure params)
+     CmmFormalsWithoutKinds        -- Argument locals live on entry (C-- procedure params)
      Bool              -- ^ True <=> GC block so ignore stack size
      [BrokenBlock]     -- Code, may be empty.  The first block is
                        -- the entry point.  The order is otherwise initially 
@@ -70,7 +70,7 @@ data Continuation info =
 
 data ContinuationFormat
     = ContinuationFormat {
-        continuation_formals :: CmmFormals,
+        continuation_formals :: CmmFormalsWithoutKinds,
         continuation_label :: Maybe CLabel,	-- The label occupying the top slot
         continuation_frame_size :: WordOff,	-- Total frame size in words (not including arguments)
         continuation_stack :: [Maybe LocalReg]	-- local reg offsets from stack top
@@ -230,7 +230,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
 
 formal_to_actual reg = (CmmReg (CmmLocal reg), NoHint)
 
-foreignCall :: [Unique] -> CmmCallTarget -> CmmHintFormals -> CmmActuals -> [CmmStmt]
+foreignCall :: [Unique] -> CmmCallTarget -> CmmFormals -> CmmActuals -> [CmmStmt]
 foreignCall uniques call results arguments =
     arg_stmts ++
     saveThreadState ++
@@ -257,8 +257,8 @@ foreignCall uniques call results arguments =
           loadArgsIntoTemps argument_uniques arguments
       (caller_save, caller_load) =
           callerSaveVolatileRegs (Just [{-only system regs-}])
-      new_base = LocalReg base_unique (cmmRegRep (CmmGlobal BaseReg)) KindNonPtr
-      id = LocalReg id_unique wordRep KindNonPtr
+      new_base = LocalReg base_unique (cmmRegRep (CmmGlobal BaseReg)) GCKindNonPtr
+      id = LocalReg id_unique wordRep GCKindNonPtr
       tso_unique : base_unique : id_unique : argument_uniques = uniques
 
 -- -----------------------------------------------------------------------------
@@ -299,7 +299,7 @@ loadThreadState tso_unique =
   then [CmmStore curCCSAddr 
 	(CmmLoad (cmmOffset (CmmReg (CmmLocal tso)) tso_CCCS) wordRep)]
   else []
-  where tso = LocalReg tso_unique wordRep KindNonPtr -- TODO FIXME NOW
+  where tso = LocalReg tso_unique wordRep GCKindNonPtr -- TODO FIXME NOW
 
 
 openNursery = [
