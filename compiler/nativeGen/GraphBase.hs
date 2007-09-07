@@ -16,6 +16,7 @@ where
 import UniqSet
 import UniqFM
 
+
 -- | A fn to check if a node is trivially colorable
 --	For graphs who's color classes are disjoint then a node is 'trivially colorable'
 --	when it has less neighbors and exclusions than available colors for that node.
@@ -44,6 +45,7 @@ data Graph k cls color
 	= Graph { 
 	-- | All active nodes in the graph.
 	  graphMap		:: UniqFM (Node k cls color)  }
+
 
 -- | An empty graph.	
 initGraph :: Graph k cls color
@@ -102,6 +104,7 @@ newNode k cls
 	, nodeExclusions	= emptyUniqSet
 	, nodePreference	= [] 
 	, nodeCoalesce		= emptyUniqSet }
+
 
 
 

@@ -246,7 +246,8 @@ data DynFlag
    | Opt_DictsCheap
    | Opt_RewriteRules
    | Opt_Vectorise
-   | Opt_RegsGraph
+   | Opt_RegsGraph			-- do graph coloring register allocation
+   | Opt_RegsIterative			-- do iterative coalescing graph coloring register allocation
 
    -- misc opts
    | Opt_Cpp
@@ -1195,6 +1196,7 @@ fFlags = [
   ( "convert-to-zipper-and-back",       Opt_ConvertToZipCfgAndBack),
   ( "vectorise",                        Opt_Vectorise ),
   ( "regs-graph",                       Opt_RegsGraph),
+  ( "regs-iterative",                   Opt_RegsIterative),
   -- Deprecated in favour of -XTemplateHaskell:
   ( "th",                               Opt_TemplateHaskell ),
   -- Deprecated in favour of -XForeignFunctionInterface:

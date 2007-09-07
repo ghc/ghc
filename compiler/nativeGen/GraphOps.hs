@@ -1,5 +1,7 @@
 -- | Basic operations on graphs.
 --
+--	TODO: refine coalescing crieteria
+
 {-# OPTIONS -fno-warn-missing-signatures #-}
 
 module GraphOps (
@@ -10,8 +12,9 @@ module GraphOps (
 	addCoalesce,	delCoalesce,	
 	addExclusion,	
 	addPreference,
-	coalesceGraph,
-	coalesceNodes,
+	coalesceNodes,	coalesceGraph,
+	freezeNode,	freezeOneInGraph, freezeAllInGraph,
+	scanGraph,
 	setColor,
 	validateGraph,
 	slurpNodeConflictCount
@@ -117,6 +120,7 @@ modNode f k graph
 
 	Nothing	-> Nothing
 
+
 -- | Get the size of the graph, O(n)
 size	:: Uniquable k 
 	=> Graph k cls color -> Int
@@ -132,8 +136,6 @@ union	:: Uniquable k
 union	graph1 graph2
 	= Graph 
 	{ graphMap		= plusUFM (graphMap graph1) (graphMap graph2) }
-	 
-	
 
 
 -- | Add a conflict between nodes to the graph, creating the nodes required.
@@ -267,11 +269,16 @@ addPreference (u, c) color
 --
 coalesceGraph
 	:: (Uniquable k, Ord k, Eq cls, Outputable k)
-	=> Triv k cls color
+	=> Bool			-- ^ If True, coalesce nodes even if this might make the graph
+				--	less colorable (aggressive coalescing)
+	-> Triv k cls color
 	-> Graph k cls color
 	-> (Graph k cls color, [(k, k)])
 
-coalesceGraph triv graph
+coalesceGraph aggressive triv graph
+	= coalesceGraph' aggressive triv graph []
+
+coalesceGraph' aggressive triv graph kkPairsAcc
  = let
  	-- find all the nodes that have coalescence edges
 	cNodes	= filter (\node -> not $ isEmptyUniqSet (nodeCoalesce node))
@@ -290,9 +297,12 @@ coalesceGraph triv graph
 	-- do the coalescing, returning the new graph and a list of pairs of keys
 	--	that got coalesced together.
 	(graph', mPairs)
-		= mapAccumL (coalesceNodes False triv) graph cList
+		= mapAccumL (coalesceNodes aggressive triv) graph cList
 
-   in	(graph', catMaybes mPairs)
+	-- keep running until there are no more coalesces can be found
+   in	case catMaybes mPairs of
+	 []	-> (graph', kkPairsAcc)
+	 pairs	-> coalesceGraph' aggressive triv graph' (pairs ++ kkPairsAcc)
 
 
 -- | Coalesce this pair of nodes unconditionally / agressively.
@@ -318,8 +328,8 @@ coalesceNodes aggressive triv graph (k1, k2)
 				else (k2, k1)
 
 	-- the nodes being coalesced must be in the graph
-	, Just nMin		<- lookupNode graph kMin
-	, Just nMax		<- lookupNode graph kMax
+	, Just nMin	<- lookupNode graph kMin
+	, Just nMax	<- lookupNode graph kMax
 
 	-- can't coalesce conflicting modes
 	, not $ elementOfUniqSet kMin (nodeConflicts nMax)
@@ -384,7 +394,107 @@ coalesceNodes_check aggressive triv graph kMin kMax node
 
 	  in	(graph', Just (kMax, kMin))
 
-		
+
+-- | Freeze a node
+--	This is for the iterative coalescer.
+--	By freezing a node we give up on ever coalescing it.
+--	Move all its coalesce edges into the frozen set - and update
+--	back edges from other nodes.
+--
+freezeNode
+	:: Uniquable k
+	=> k			-- ^ key of the node to freeze
+	-> Graph k cls color	-- ^ the graph
+	-> Graph k cls color	-- ^ graph with that node frozen
+
+freezeNode k
+  = graphMapModify
+  $ \fm ->
+    let
+    	-- freeze all the edges in the node to be frozen
+    	Just node = lookupUFM fm k
+	node'	= node
+		{ nodeCoalesce		= emptyUniqSet }
+
+	fm1	= addToUFM fm k node'
+
+	-- update back edges pointing to this node
+	freezeEdge k node
+	 = if elementOfUniqSet k (nodeCoalesce node)
+	 	then node
+			{ nodeCoalesce		= delOneFromUniqSet (nodeCoalesce node) k }
+		else	panic "GraphOps.freezeNode: edge to freeze wasn't in the coalesce set"
+
+	fm2	= foldUniqSet (adjustUFM (freezeEdge k)) fm1
+	   		$ nodeCoalesce node
+
+    in	fm2
+
+
+-- | Freeze one node in the graph
+--	This if for the iterative coalescer.
+--	Look for a move related node of low degree and freeze it.
+--
+--	We probably don't need to scan the whole graph looking for the node of absolute
+--	lowest degree. Just sample the first few and choose the one with the lowest 
+--	degree out of those. Also, we don't make any distinction between conflicts of different
+--	classes.. this is just a heuristic, after all.
+--
+--	IDEA:	freezing a node might free it up for Simplify.. would be good to check for triv
+--		right here, and add it to a worklist if known triv/non-move nodes.
+--
+freezeOneInGraph
+	:: (Uniquable k, Outputable k)
+	=> Graph k cls color
+	-> ( Graph k cls color		-- the new graph
+	   , Bool )			-- whether we found a node to freeze
+
+freezeOneInGraph graph
+ = let	compareNodeDegree n1 n2
+		= compare (sizeUniqSet $ nodeConflicts n1) (sizeUniqSet $ nodeConflicts n2)
+
+	candidates
+		= sortBy compareNodeDegree
+		$ take 5	-- 5 isn't special, it's just a small number.
+		$ scanGraph (\node -> not $ isEmptyUniqSet (nodeCoalesce node)) graph
+
+   in	case candidates of
+
+	 -- there wasn't anything available to freeze
+   	 []	-> (graph, False)
+
+	 -- we found something to freeze
+	 (n : _)
+	  -> ( freezeNode (nodeId n) graph
+	     , True)
+
+
+-- | Freeze all the nodes in the graph
+--	for debugging the iterative allocator.
+--
+freezeAllInGraph
+	:: (Uniquable k, Outputable k)
+	=> Graph k cls color
+	-> Graph k cls color
+
+freezeAllInGraph graph
+	= foldr freezeNode graph
+   		$ map nodeId
+		$ eltsUFM $ graphMap graph
+
+
+-- | Find all the nodes in the graph that meet some criteria
+--
+scanGraph
+	:: Uniquable k
+	=> (Node k cls color -> Bool)
+	-> Graph k cls color
+	-> [Node k cls color]
+
+scanGraph match graph
+	= filter match $ eltsUFM $ graphMap graph
+
+
 -- | validate the internal structure of a graph
 --	all its edges should point to valid nodes
 --	if they don't then throw an error
@@ -396,12 +506,10 @@ validateGraph
 	-> Graph k cls color
 
 validateGraph doc graph
- = let	edges	= unionUniqSets
- 			(unionManyUniqSets
- 				(map nodeConflicts $ eltsUFM $ graphMap graph))
-			(unionManyUniqSets
-				(map nodeCoalesce  $ eltsUFM $ graphMap graph))
-				
+ = let	edges	= unionManyUniqSets
+ 			(  (map nodeConflicts       $ eltsUFM $ graphMap graph)
+			++ (map nodeCoalesce        $ eltsUFM $ graphMap graph))
+
 	nodes	= mkUniqSet $ map nodeId $ eltsUFM $ graphMap graph
 	
 	badEdges = minusUniqSet edges nodes

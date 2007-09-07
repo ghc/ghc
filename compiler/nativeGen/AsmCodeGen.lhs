@@ -196,9 +196,9 @@ cmmNativeGens dflags h us (cmm : cmms) impAcc profAcc
 			then native
 			else []
 
-	-- force evaulation of imports and lsPprNative to avoid space leak
+	-- force evaulation all this stuff to avoid space leaks
 	seqString (showSDoc $ vcat $ map ppr imports) `seq` return ()
-	lsPprNative `seq` return ()
+	lsPprNative 	`seq` return ()
 
 	cmmNativeGens dflags h us' cmms
 			(imports : impAcc)
@@ -214,15 +214,16 @@ cmmNativeGens dflags h us (cmm : cmms) impAcc profAcc
 cmmNativeGen 
 	:: DynFlags
 	-> UniqSupply
-	-> RawCmmTop
+	-> RawCmmTop				-- ^ the cmm to generate code for
 	-> IO	( UniqSupply
-		, [NatCmmTop]
-		, [CLabel]
-		, Maybe [Color.RegAllocStats]
-		, Maybe [Linear.RegAllocStats])
+		, [NatCmmTop]			-- native code
+		, [CLabel]			-- things imported by this cmm
+		, Maybe [Color.RegAllocStats]	-- stats for the coloring register allocator
+		, Maybe [Linear.RegAllocStats])	-- stats for the linear register allocators
 
 cmmNativeGen dflags us cmm
  = do
+
 	-- rewrite assignments to global regs
  	let (fixed_cmm, usFix)	=
 		{-# SCC "fixAssignsTop" #-}
@@ -259,7 +260,8 @@ cmmNativeGen dflags us cmm
 		
 	-- allocate registers
 	(alloced, usAlloc, ppr_raStatsColor, ppr_raStatsLinear) <-
-	 if dopt Opt_RegsGraph dflags
+	 if ( dopt Opt_RegsGraph dflags
+	   || dopt Opt_RegsIterative dflags)
 	  then do
 	  	-- the regs usable for allocation
 		let alloc_regs
@@ -268,20 +270,12 @@ cmmNativeGen dflags us cmm
 				emptyUFM
 			$ map RealReg allocatableRegs
 
-	 	-- if any of these dump flags are turned on we want to hang on to
-		--	intermediate structures in the allocator - otherwise tell the
-		--	allocator to ditch them early so we don't end up creating space leaks.
-		let generateRegAllocStats = or
-			[ dopt Opt_D_dump_asm_regalloc_stages dflags
-			, dopt Opt_D_dump_asm_stats dflags
-			, dopt Opt_D_dump_asm_conflicts dflags ]
-
 		-- graph coloring register allocation
 		let ((alloced, regAllocStats), usAlloc)
 			= {-# SCC "RegAlloc" #-}
 			  initUs usLive
 			  $ Color.regAlloc
-				generateRegAllocStats
+				dflags
 				alloc_regs
 				(mkUniqSet [0..maxSpillSlots])
 				withLiveness
@@ -294,7 +288,7 @@ cmmNativeGen dflags us cmm
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_regalloc_stages "Build/spill stages"
 			(vcat 	$ map (\(stage, stats)
-					-> text "-- Stage " <> int stage
+					-> text " Stage " <> int stage
 					$$ ppr stats)
 				$ zip [0..] regAllocStats)
 

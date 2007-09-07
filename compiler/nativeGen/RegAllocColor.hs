@@ -27,6 +27,7 @@ import UniqSet
 import UniqFM
 import Bag
 import Outputable
+import DynFlags
 
 import Data.List
 import Data.Maybe
@@ -43,7 +44,7 @@ maxSpinCount	= 10
 -- | The top level of the graph coloring register allocator.
 --	
 regAlloc
-	:: Bool				-- ^ whether to generate RegAllocStats, or not.
+	:: DynFlags
 	-> UniqFM (UniqSet Reg)		-- ^ the registers we can use for allocation
 	-> UniqSet Int			-- ^ the set of available spill slots.
 	-> [LiveCmmTop]			-- ^ code annotated with liveness information.
@@ -51,16 +52,25 @@ regAlloc
 		( [NatCmmTop]		-- ^ code with registers allocated.
 		, [RegAllocStats] )	-- ^ stats for each stage of allocation
 		
-regAlloc dump regsFree slotsFree code
+regAlloc dflags regsFree slotsFree code
  = do
  	(code_final, debug_codeGraphs, _)
-		<- regAlloc_spin dump 0 trivColorable regsFree slotsFree [] code
+		<- regAlloc_spin dflags 0 trivColorable regsFree slotsFree [] code
 	
 	return	( code_final
 		, reverse debug_codeGraphs )
 
-regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
+regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
  = do
+ 	-- if any of these dump flags are turned on we want to hang on to
+	--	intermediate structures in the allocator - otherwise tell the
+	--	allocator to ditch them early so we don't end up creating space leaks.
+	let dump = or
+		[ dopt Opt_D_dump_asm_regalloc_stages dflags
+		, dopt Opt_D_dump_asm_stats dflags
+		, dopt Opt_D_dump_asm_conflicts dflags ]
+
+
 	-- check that we're not running off down the garden path.
 	when (spinCount > maxSpinCount)
 	 $ pprPanic "regAlloc_spin: max build/spill cycle count exceeded."
@@ -102,7 +112,10 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 	
 	-- try and color the graph 
 	let (graph_colored, rsSpill, rmCoalesce)
-			= {-# SCC "ColorGraph" #-} Color.colorGraph regsFree triv spill graph
+			= {-# SCC "ColorGraph" #-}
+			   Color.colorGraph
+			    	(dopt Opt_RegsIterative dflags)
+			    	regsFree triv spill graph
 
 	-- rewrite regs in the code that have been coalesced
 	let patchF reg	= case lookupUFM rmCoalesce reg of
@@ -176,7 +189,7 @@ regAlloc_spin dump (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs c
 		-- space leak avoidance
 		seqList statList `seq` return ()
 
-		regAlloc_spin dump (spinCount + 1) triv regsFree slotsFree'
+		regAlloc_spin dflags (spinCount + 1) triv regsFree slotsFree'
 			statList
 			code_relive
 

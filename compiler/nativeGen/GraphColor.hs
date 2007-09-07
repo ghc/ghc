@@ -38,7 +38,8 @@ colorGraph
 	:: ( Uniquable  k, Uniquable cls,  Uniquable  color
 	   , Eq color, Eq cls, Ord k
 	   , Outputable k, Outputable cls, Outputable color)
-	=> UniqFM (UniqSet color)	-- ^ map of (node class -> set of colors available for this class).
+	=> Bool				-- ^ whether to do iterative coalescing
+	-> UniqFM (UniqSet color)	-- ^ map of (node class -> set of colors available for this class).
 	-> Triv   k cls color 		-- ^ fn to decide whether a node is trivially colorable.
 	-> (Graph k cls color -> k)	-- ^ fn to choose a node to potentially leave uncolored if nothing is trivially colorable.
 	-> Graph  k cls color 		-- ^ the graph to color.
@@ -48,27 +49,42 @@ colorGraph
 	   , UniqFM  k )		-- map of regs (r1 -> r2) that were coaleced
 	   				--	 r1 should be replaced by r2 in the source
 
-colorGraph colors triv spill graph0
+colorGraph iterative colors triv spill graph0
  = let
- 	-- do aggressive coalesing on the graph
- 	(graph_coalesced, rsCoalesce)
-		= coalesceGraph triv graph0
+	-- if we're not doing iterative coalescing, then just do a single coalescing
+	--	pass at the front. This won't be as good but should still eat up a
+	--	lot of the reg-reg moves.
+	(graph_coalesced, kksCoalesce1)
+		= if not iterative
+			then coalesceGraph False triv graph0
+			else (graph0, [])
 
  	-- run the scanner to slurp out all the trivially colorable nodes
-  	(ksTriv, ksProblems)
-		= colorScan triv spill graph_coalesced
+	--	(and do coalescing if iterative coalescing is enabled)
+  	(ksTriv, ksProblems, kksCoalesce2)
+		= colorScan iterative triv spill graph_coalesced
+
+ 	-- If iterative coalescing is enabled, the scanner will coalesce the graph as does its business.
+	--	We need to apply all the coalescences found by the scanner to the original
+	--	graph before doing assignColors.
+	(graph_scan_coalesced, _)
+		= mapAccumL (coalesceNodes False triv) graph_coalesced kksCoalesce2
  
 	-- color the trivially colorable nodes
-	--	as the keys were added to the front of the list while they were scanned,
-	--	this colors them in the reverse order they were found, as required by the algorithm.
+	--	during scanning, keys of triv nodes were added to the front of the list as they were found
+	--	this colors them in the reverse order, as required by the algorithm.
 	(graph_triv, ksNoTriv)
-		= assignColors colors graph_coalesced ksTriv
+		= assignColors colors graph_scan_coalesced ksTriv
 
  	-- try and color the problem nodes
-	(graph_prob, ksNoColor)	= assignColors colors graph_triv ksProblems
+	-- 	problem nodes are the ones that were left uncolored because they weren't triv.
+	--	theres a change we can color them here anyway.
+	(graph_prob, ksNoColor)
+		= assignColors colors graph_triv ksProblems
 
-	-- if the trivially colorable nodes didn't color then something is wrong
+	-- if the trivially colorable nodes didn't color then something is probably wrong
 	--	with the provided triv function.
+        --
    in	if not $ null ksNoTriv
    	 then	pprPanic "colorGraph: trivially colorable nodes didn't color!" empty
 {-	 		(  empty
@@ -78,8 +94,10 @@ colorGraph colors triv spill graph0
 			$$ dotGraph (\x -> text "white") triv graph1) -}
 
 	 else	( graph_prob
-		, mkUniqSet ksNoColor
-		, listToUFM rsCoalesce)
+		, mkUniqSet ksNoColor	-- the nodes that didn't color (spills)
+		, if iterative
+			then (listToUFM kksCoalesce2)
+			else (listToUFM kksCoalesce1))
 	
 
 -- | Scan through the conflict graph separating out trivially colorable and
@@ -94,100 +112,99 @@ colorGraph colors triv spill graph0
 --	at once the more likely it is that nodes we've already checked will become trivially colorable
 --	for the next pass.
 --
+--	TODO: 	add work lists to finding triv nodes is easier.
+--		If we've just scanned the graph, and removed triv nodes, then the only
+--		nodes that we need to rescan are the ones we've removed edges from.
+
 colorScan
-	:: ( Uniquable k, Uniquable cls, Uniquable color)
-	=> Triv k cls color		-- ^ fn to decide whether a node is trivially colorable
+	:: ( Uniquable k, Uniquable cls, Uniquable color
+	   , Ord k, 	  Eq cls
+	   , Outputable k, Outputable color)
+	=> Bool				-- ^ whether to do iterative coalescing
+	-> Triv k cls color		-- ^ fn to decide whether a node is trivially colorable
 	-> (Graph k cls color -> k)	-- ^ fn to choose a node to potentially leave uncolored if nothing is trivially colorable.
 	-> Graph k cls color		-- ^ the graph to scan
-	-> ([k], [k])			--  triv colorable, problem nodes
 
+	-> ([k], [k], [(k, k)])		--  triv colorable nodes, problem nodes, pairs of nodes to coalesce
 
-colorScan triv spill graph
-	= colorScan' triv spill graph
-		[]	[]
-		[]
-		(eltsUFM $ graphMap graph)
+colorScan iterative triv spill graph
+	= colorScan_spin iterative triv spill graph [] [] []
 
--- we've reached the end of the candidates list
-colorScan' triv spill graph
-	ksTriv 	ksTrivFound
-	ksSpill
-	[]
+colorScan_spin iterative triv spill graph
+	ksTriv ksSpill kksCoalesce
 
 	-- if the graph is empty then we're done
 	| isNullUFM $ graphMap graph
-	= (ksTrivFound ++ ksTriv, ksSpill)
+	= (ksTriv, ksSpill, kksCoalesce)
 
-	-- if we haven't found a trivially colorable node then we'll have to
-	--	choose a spill candidate and leave it uncolored
-	| []		<- ksTrivFound
-	, kSpill	<- spill graph			-- choose a spill candiate
-	, graph'	<- delNode kSpill graph		-- remove it from the graph
-	, nsRest'	<- eltsUFM $ graphMap graph'	-- graph has changed, so get new node list
+	-- Simplify:
+	--	Look for trivially colorable nodes.
+	--	If we can find some then remove them from the graph and go back for more.
+	--
+	| nsTrivFound@(_:_)
+		<-  scanGraph	(\node -> triv 	(nodeClass node) (nodeConflicts node) (nodeExclusions node)
 
-	= colorScan' triv spill graph'
-		ksTriv ksTrivFound
-		(kSpill : ksSpill)
-		nsRest'
+				  -- for iterative coalescing we only want non-move related
+				  --	nodes here
+				  && (not iterative || isEmptyUniqSet (nodeCoalesce node)))
+			$ graph
 
-	-- we're at the end of the candidates list but we've found some triv nodes
-	--	along the way. We can delete them from the graph and go back for more.
-	| graph'	<- foldr delNode graph ksTrivFound
-	, nsRest'	<- eltsUFM $ graphMap graph'
-
-	= colorScan' triv spill graph'
-		(ksTrivFound ++ ksTriv) []
+	, ksTrivFound	<- map nodeId nsTrivFound
+	, graph3	<- foldr delNode graph ksTrivFound
+	= colorScan_spin iterative triv spill graph3
+		(ksTrivFound ++ ksTriv)
 		ksSpill
-		nsRest'
+		kksCoalesce
 
--- check if the current node is triv colorable
-colorScan' triv spill graph
-	ksTriv	ksTrivFound
-	ksSpill
-	(node : nsRest)
+	-- Coalesce:
+	-- 	If we're doing iterative coalescing and no triv nodes are avaliable
+	--	then it's type for a coalescing pass.
+	| iterative
+	= case coalesceGraph False triv graph of
 
-	-- node is trivially colorable
-	--	add it to the found nodes list and carry on.
-	| k	<- nodeId node
-	, triv (nodeClass node) (nodeConflicts node) (nodeExclusions node)
+		-- we were able to coalesce something
+		--	go back and see if this frees up more nodes to be trivially colorable.
+		(graph2, kksCoalesceFound @(_:_))
+		 -> colorScan_spin iterative triv spill graph2
+			ksTriv ksSpill (kksCoalesceFound ++ kksCoalesce)
 
-	= colorScan' triv spill graph
-		ksTriv 	(k : ksTrivFound)
-		ksSpill
-		nsRest
+		-- Freeze:
+		-- nothing could be coalesced (or was triv),
+		--	time to choose a node to freeze and give up on ever coalescing it.
+		(graph2, [])
+		 -> case freezeOneInGraph graph2 of
 
-	-- node wasn't trivially colorable, skip over it and look in the rest of the list
+			-- we were able to freeze something
+			--	hopefully this will free up something for Simplify
+			(graph3, True)
+			 -> colorScan_spin iterative triv spill graph3
+			 	ksTriv ksSpill kksCoalesce
+
+		 	-- we couldn't find something to freeze either
+			--	time for a spill
+		 	(graph3, False)
+			 -> colorScan_spill iterative triv spill graph3
+			 	ksTriv ksSpill kksCoalesce
+
+	-- spill time
 	| otherwise
-	= colorScan' triv spill graph
-		ksTriv ksTrivFound
-		ksSpill
-		nsRest
+	= colorScan_spill iterative triv spill graph
+		ksTriv ksSpill kksCoalesce
 
-{- -- This is cute and easy to understand, but too slow.. BL 2007/09
 
-colorScan colors triv spill safe prob graph
+-- Select:
+-- we couldn't find any triv nodes or things to freeze or coalesce,
+--	and the graph isn't empty yet.. We'll have to choose a spill
+--	candidate and leave it uncolored.
+--
+colorScan_spill iterative triv spill graph
+	ksTriv ksSpill kksCoalesce
 
-	-- empty graphs are easy to color.
-	| isNullUFM $ graphMap graph
- 	= (safe, prob)
+ = let	kSpill	= spill graph
+ 	graph'	= delNode kSpill graph
+   in	colorScan_spin iterative triv spill graph'
+   		ksTriv (kSpill : ksSpill) kksCoalesce
 	
-	-- Try and find a trivially colorable node.
-	| Just node	<- find (\node -> triv 	(nodeClass node) 
-						(nodeConflicts node)
-						(nodeExclusions node))
-				$ eltsUFM $ graphMap graph
-	, k		<- nodeId node
-	= colorScan colors triv spill
-		(k : safe) prob (delNode k graph)
-	
-	-- There was no trivially colorable node,
-	--	Choose one to potentially leave uncolored. We /might/ be able to find
-	--	a color for this later on, but no guarantees.
-	| k		<- spill graph
-	= colorScan colors triv spill
-		safe (addOneToUniqSet prob k) (delNode k graph)
--}
-
 
 -- | Try to assign a color to all these nodes.
 
