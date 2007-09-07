@@ -1,0 +1,18 @@
+Left exception :: Main.MyException
+Stopped at <exception thrown>
+_exception :: e = DynException _
+*** Exception: (unknown)
+Stopped at <exception thrown>
+_exception :: e = DynException (Data.Dynamic.Dynamic (Data.Typeable.TypeRep (Data.Typeable.Key 2898)
+									    (Data.Typeable.TyCon (Data.Typeable.Key 2898)
+												 ('M' : _ : _))
+									    [])
+						     _)
+*** Exception: (unknown)
+Stopped at <exception thrown>
+_exception :: e = DynException (Data.Dynamic.Dynamic (Data.Typeable.TypeRep (Data.Typeable.Key 2898)
+									    (Data.Typeable.TyCon (Data.Typeable.Key 2898)
+												 ('M' : 'a' : 'i' : 'n' : '.' : _ : _))
+									    [])
+						     _)
+Left exception :: Main.MyException

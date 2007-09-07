@@ -1,0 +1,8 @@
+-- :abandon in an exception breakpoint can lead to ghci freezing 
+:set -XDeriveDataTypeable
+:l break024
+:set -fbreak-on-exception
+exception_uncaught
+:abandon
+exception_caught
+:co
