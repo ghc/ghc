@@ -36,7 +36,7 @@ liveLattice = DataflowLattice "live LocalReg's" emptyUniqSet add False
 type BlockEntryLiveness = BlockEnv CmmLive
 
 -----------------------------------------------------------------------------
--- | Calculated liveness info for a list of 'CmmBasicBlock'
+-- | Calculated liveness info for a CmmGraph
 -----------------------------------------------------------------------------
 cmmLivenessZ :: CmmGraph -> BlockEntryLiveness
 cmmLivenessZ g = env

@@ -7,10 +7,13 @@ module CmmSpillReload
   , insertSpillsAndReloads  --- XXX todo check live-in at entry against formals
   , dualLivenessWithInsertion
   , spillAndReloadComments
+
+  , availRegsLattice
+  , cmmAvailableReloads
   )
 where
 import CmmExpr
-import CmmTx()
+import CmmTx
 import CmmLiveZ
 import DFMonad
 import FastString
@@ -191,8 +194,6 @@ show_regs s regs = MidComment $ mkFastString $ showSDoc $ ppr_regs s regs
 ----------------------------------------------------------------
 --- sinking reloads
 
-{-
-
 -- The idea is to compute at each point the set of registers such that
 -- on every path to the point, the register is defined by a Reload
 -- instruction.  Then, if a use appears at such a point, we can safely
@@ -202,21 +203,69 @@ show_regs s regs = MidComment $ mkFastString $ showSDoc $ ppr_regs s regs
 data AvailRegs = UniverseMinus RegSet
                | AvailRegs     RegSet
 
+
 availRegsLattice :: DataflowLattice AvailRegs
-availRegsLattice =
-      DataflowLattice "register gotten from reloads" empty add False
-    where empty = DualLive emptyRegSet emptyRegSet
+availRegsLattice = DataflowLattice "register gotten from reloads" empty add True
+    where empty = UniverseMinus emptyRegSet
           -- | compute in the Tx monad to track whether anything has changed
-          add new old = do stack <- add1 (on_stack new) (on_stack old)
-                           regs  <- add1 (in_regs new)  (in_regs old)
-                           return $ DualLive stack regs
-          add1 = fact_add_to liveLattice
+          add new old =
+            let join = interAvail new old in
+            if join `smallerAvail` old then aTx join else noTx join
 
 
+interAvail :: AvailRegs -> AvailRegs -> AvailRegs
+interAvail (UniverseMinus s) (UniverseMinus s') = UniverseMinus (s `plusRegSet`  s')
+interAvail (AvailRegs     s) (AvailRegs     s') = AvailRegs (s `timesRegSet` s')
+interAvail (AvailRegs     s) (UniverseMinus s') = AvailRegs (s  `minusRegSet` s')
+interAvail (UniverseMinus s) (AvailRegs     s') = AvailRegs (s' `minusRegSet` s )
+
+smallerAvail :: AvailRegs -> AvailRegs -> Bool
+smallerAvail (AvailRegs     _) (UniverseMinus _)  = True
+smallerAvail (UniverseMinus _) (AvailRegs     _)  = False
+smallerAvail (AvailRegs     s) (AvailRegs    s')  = sizeUniqSet s < sizeUniqSet s'
+smallerAvail (UniverseMinus s) (UniverseMinus s') = sizeUniqSet s > sizeUniqSet s'
+
+extendAvail :: AvailRegs -> LocalReg -> AvailRegs
+extendAvail (UniverseMinus s) r = UniverseMinus (deleteFromRegSet s r)
+extendAvail (AvailRegs     s) r = AvailRegs (extendRegSet s r)
+
+deleteFromAvail :: AvailRegs -> LocalReg -> AvailRegs
+deleteFromAvail (UniverseMinus s) r = UniverseMinus (extendRegSet s r)
+deleteFromAvail (AvailRegs     s) r = AvailRegs (deleteFromRegSet s r)
+
+cmmAvailableReloads :: LGraph M Last -> BlockEnv AvailRegs
+cmmAvailableReloads g = env
+    where env = runDFA availRegsLattice $
+                do run_f_anal transfer (fact_bot availRegsLattice) g
+                   allFacts
+          transfer :: FAnalysis M Last AvailRegs
+          transfer = FComp "available-reloads analysis" first middle last exit
+          exit _ = LastOutFacts []
+          first avail _ = avail
+          middle       = flip middleAvail
+          last         = lastAvail
 
 
--}
+-- | The transfer equations use the traditional 'gen' and 'kill'
+-- notations, which should be familiar from the dragon book.
+agen, akill :: UserOfLocalRegs a => a -> AvailRegs -> AvailRegs
+agen  a live = foldRegsUsed extendAvail     live a
+akill a live = foldRegsUsed deleteFromAvail live a
 
+middleAvail :: M -> AvailRegs -> AvailRegs
+middleAvail (Spill _) = id
+middleAvail (Reload regs) = agen regs
+middleAvail (NotSpillOrReload m) = middle m
+  where middle (MidNop)                        = id
+        middle (MidComment {})                 = id
+        middle (MidAssign lhs _expr)           = akill lhs
+        middle (MidStore {})                   = id
+        middle (MidUnsafeCall _tgt ress _args) = akill ress
+        middle (CopyIn _ formals _)            = akill formals
+        middle (CopyOut {})                    = id
+
+lastAvail :: AvailRegs -> Last -> LastOutFacts AvailRegs
+lastAvail avail l = LastOutFacts $ map (\id -> (id, avail)) $ succs l
 
 
 ---------------------
@@ -245,6 +294,10 @@ instance Outputable DualLive where
                          else (ppr_regs "live in regs =" regs),
                          if isEmptyUniqSet stack then PP.empty
                          else (ppr_regs "live on stack =" stack)]
+
+instance Outputable AvailRegs where
+  ppr (UniverseMinus s) = ppr_regs "available = all but" s
+  ppr (AvailRegs     s) = ppr_regs "available = " s
 
 my_trace :: String -> SDoc -> a -> a
 my_trace = if False then pprTrace else \_ _ a -> a

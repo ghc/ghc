@@ -8,7 +8,7 @@ module CmmExpr
     , GlobalReg(..), globalRegRep, spReg, hpReg, spLimReg, nodeReg, node
     , UserOfLocalRegs, foldRegsUsed
     , RegSet, emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
-            , plusRegSet, minusRegSet
+            , plusRegSet, minusRegSet, timesRegSet
     )
 where
 
@@ -95,7 +95,7 @@ elemRegSet              :: LocalReg -> RegSet -> Bool
 extendRegSet            :: RegSet -> LocalReg -> RegSet
 deleteFromRegSet        :: RegSet -> LocalReg -> RegSet
 mkRegSet                :: [LocalReg] -> RegSet
-minusRegSet, plusRegSet :: RegSet -> RegSet -> RegSet
+minusRegSet, plusRegSet, timesRegSet :: RegSet -> RegSet -> RegSet
 
 emptyRegSet      = emptyUniqSet
 elemRegSet       = elementOfUniqSet
@@ -104,6 +104,7 @@ deleteFromRegSet = delOneFromUniqSet
 mkRegSet         = mkUniqSet
 minusRegSet      = minusUniqSet
 plusRegSet       = unionUniqSets
+timesRegSet      = intersectUniqSets
 
 -----------------------------------------------------------------------------
 --    Register-use information for expressions and other types 
@@ -118,6 +119,9 @@ instance UserOfLocalRegs CmmReg where
 
 instance UserOfLocalRegs LocalReg where
     foldRegsUsed f z r = f z r
+
+instance UserOfLocalRegs RegSet where
+    foldRegsUsed f = foldUniqSet (flip f)
 
 instance UserOfLocalRegs CmmExpr where
   foldRegsUsed f z e = expr z e
