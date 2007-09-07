@@ -43,11 +43,13 @@ name = Util.global (value) :: IORef (ty); \
 #define ASSERTM(mbool) do { bool <- mbool; ASSERT(bool) return () }
 #define ASSERTM2(mbool,msg) do { bool <- mbool; ASSERT2(bool,msg) return () }
 #else
-#define ASSERT(e)      if False then error "ASSERT"  else
-#define ASSERT2(e,msg) if False then error "ASSERT2" else
-#define ASSERTM(e)
-#define ASSERTM2(e,msg)
-#define WARN(e,msg)    if False then error "WARN"    else
+-- We have to actually use all the variables we are given or we may get
+-- unused variable warnings when DEBUG is off.
+#define ASSERT(e)      if False && (not (e)) then panic "ASSERT" else
+#define ASSERT2(e,msg) if False && (not (e)) then pprPanic "ASSERT2" (msg) else
+#define ASSERTM(e)       do { let { _mbool = (e) } }
+#define ASSERTM2(e,msg)  do { let { _mbool = (e) }; when False (panic "ASSERTM2") }
+#define WARN(e,msg)    if False && (e) then pprPanic "WARN" msg else
 #endif
 
 -- This #ifndef lets us switch off the "import FastString"
