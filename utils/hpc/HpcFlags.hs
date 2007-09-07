@@ -110,6 +110,7 @@ postInvertOpt = noArg "post-invert" "invert output; ticked becomes unticked, unt
 							      $ \ f -> f { funTotals = True }  
 -------------------------------------------------------------------------------
 
+readMixWithFlags :: Flags -> TixModule -> IO Mix
 readMixWithFlags flags mod = readMix [ dir ++  "/" ++ hpcDir flags
                                      | dir <- srcDirs flags 
                                      ] mod

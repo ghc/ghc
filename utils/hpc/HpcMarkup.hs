@@ -143,7 +143,7 @@ genHtmlFromMod dest_dir flags tix theFunTotals invertOutput = do
   let theHsPath = srcDirs flags
   let modName0 = tixModuleName tix 
 
-  (Mix origFile _ mixHash tabStop mix') <- readMixWithFlags flags modName0
+  (Mix origFile _ mixHash tabStop mix') <- readMixWithFlags flags tix
 
   let arr_tix :: Array Int Integer
       arr_tix = listArray (0,length (tixModuleTixs tix) - 1)

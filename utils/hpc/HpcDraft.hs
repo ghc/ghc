@@ -59,7 +59,7 @@ makeDraft hpcflags tix = do
       hash = tixModuleHash tix
       tixs = tixModuleTixs tix
 
-  mix@(Mix filepath timestamp hash tabstop entries) <- readMixWithFlags hpcflags mod
+  mix@(Mix filepath timestamp hash tabstop entries) <- readMixWithFlags hpcflags tix
 
   let forest = createMixEntryDom 
               [ (span,(box,v > 0))

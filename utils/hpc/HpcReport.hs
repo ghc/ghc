@@ -8,7 +8,7 @@ module HpcReport (report_plugin) where
 import System.Exit
 import Prelude hiding (exp)
 import System(getArgs)
-import List(sort,intersperse)
+import List(sort,intersperse,sortBy)
 import HpcFlags
 import Trace.Hpc.Mix
 import Trace.Hpc.Tix
@@ -150,17 +150,17 @@ single (TopLevelBox _) = True
 single (LocalBox _) = True
 single (BinBox {}) = False
 
-modInfo :: Flags -> Bool -> (String,[Integer]) -> IO ModInfo
-modInfo hpcflags qualDecList (moduleName,tickCounts) = do
-  Mix _ _ _ _ mes <- readMixWithFlags hpcflags moduleName
+modInfo :: Flags -> Bool -> TixModule -> IO ModInfo
+modInfo hpcflags qualDecList tix@(TixModule moduleName _ _ tickCounts) = do
+  Mix _ _ _ _ mes <- readMixWithFlags hpcflags tix
   return (q (accumCounts (zip (map snd mes) tickCounts) miZero))
   where
   q mi = if qualDecList then mi{decPaths = map (moduleName:) (decPaths mi)}
          else mi
 
-modReport :: Flags -> (String,[Integer]) -> IO ()
-modReport hpcflags (moduleName,tickCounts) = do
-  mi <- modInfo hpcflags False (moduleName,tickCounts)
+modReport :: Flags -> TixModule -> IO ()
+modReport hpcflags tix@(TixModule moduleName _ _ tickCounts) = do
+  mi <- modInfo hpcflags False tix
   if xmlOutput hpcflags 
     then putStrLn $ "  <module name = " ++ show moduleName  ++ ">"
     else putStrLn ("-----<module "++moduleName++">-----")
@@ -221,20 +221,21 @@ report_main hpcflags (progName:mods) = do
   case tix of
     Just (Tix tickCounts) ->
     	   makeReport hpcflags1 progName 
-	   	      [(m,tcs) 
-	   	      | TixModule m _h _ tcs <- tickCounts
+		    $ sortBy (\ mod1 mod2 -> tixModuleName mod1 `compare` tixModuleName mod2)
+	   	    $ [ tix
+	   	      | tix@(TixModule m _h _ tcs) <- tickCounts
 		      , allowModule hpcflags1 m 
 		      ]
     Nothing -> hpcError report_plugin  $ "unable to find tix file for:" ++ progName
 report_main hpcflags [] = 
         hpcError report_plugin $ "no .tix file or executable name specified" 
 
-makeReport :: Flags -> String -> [(String,[Integer])] -> IO ()
+makeReport :: Flags -> String -> [TixModule] -> IO ()
 makeReport hpcflags progName modTcs | xmlOutput hpcflags = do
   putStrLn $ "<?xml version=\"1.0\" encoding=\"UTF-8\"?>"
   putStrLn $ "<coverage name=" ++ show progName ++ ">"
   if perModule hpcflags 
-    then mapM_ (modReport hpcflags) (sort modTcs)
+    then mapM_ (modReport hpcflags) modTcs
     else return ()
   mis <- mapM (modInfo hpcflags True) modTcs
   putStrLn $ "  <summary>"
@@ -243,7 +244,7 @@ makeReport hpcflags progName modTcs | xmlOutput hpcflags = do
   putStrLn $ "</coverage>"
 makeReport hpcflags _ modTcs =
   if perModule hpcflags then
-    mapM_ (modReport hpcflags) (sort modTcs)
+    mapM_ (modReport hpcflags) modTcs
   else do
     mis <- mapM (modInfo hpcflags True) modTcs
     printModInfo hpcflags (foldr miPlus miZero mis)

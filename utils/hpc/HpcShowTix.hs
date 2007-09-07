@@ -38,7 +38,7 @@ showtix_main flags (prog:modNames) = do
     Nothing -> hpcError showtix_plugin $ "could not read .tix file : "  ++ prog
     Just (Tix tixs) -> do
        tixs_mixs <- sequence
-               [ do mix <- readMixWithFlags hpcflags1 (tixModuleName tix) 
+               [ do mix <- readMixWithFlags hpcflags1 tix
                     return $ (tix,mix)
                | tix <- tixs
 	       , allowModule hpcflags1 (tixModuleName tix)
