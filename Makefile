@@ -430,8 +430,19 @@ publish-binary-dist ::
 # You need to first make binddisttest, and then run
 #     make publish 'prefix=$(BIN_DIST_INST_DIR)'
 # for this to find the right place.
+
+# We assume that Windows means Cygwin, as we can't just use docdir
+# unchanged or rsync (really SSH?) thinks that c:/foo means /foo on
+# the machine c.
+
+ifeq "$(Windows)" "YES"
+PUBLISH_DOCDIR = $(shell cygpath --unix $(docdir))
+else
+PUBLISH_DOCDIR = $(docdir)
+endif
+
 publish-binary-dist ::
-	$(PublishCp) -r $(docdir)/* $(PublishLocation)/docs
+	$(PublishCp) -r $(PUBLISH_DOCDIR)/* $(PublishLocation)/docs
 
 binary-dist::
 	@echo "Mechanical and super-natty! Inspect the result and *if* happy; freeze, sell and get some sleep!"
