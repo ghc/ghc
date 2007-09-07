@@ -153,7 +153,7 @@ See also Note [Ambiguity] in TcSimplify
 \begin{code}
 grow :: [PredType] -> TyVarSet -> TyVarSet
 grow preds fixed_tvs 
-  | null preds = real_fixed_tvs
+  | null preds = fixed_tvs
   | otherwise  = loop real_fixed_tvs
   where
 	-- Add the implicit parameters; 
