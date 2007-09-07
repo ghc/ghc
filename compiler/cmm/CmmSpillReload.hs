@@ -265,6 +265,7 @@ middleAvail (NotSpillOrReload m) = middle m
         middle (CopyOut {})                    = id
 
 lastAvail :: AvailRegs -> Last -> LastOutFacts AvailRegs
+lastAvail _ (LastCall _ _ (Just k)) = LastOutFacts [(k, AvailRegs emptyRegSet)]
 lastAvail avail l = LastOutFacts $ map (\id -> (id, avail)) $ succs l
 
 
