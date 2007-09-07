@@ -206,11 +206,7 @@ data GlobalReg
   -- from platform to platform (see module PositionIndependentCode).
   | PicBaseReg
 
-  deriving( Eq
-#ifdef DEBUG
-	, Show
-#endif
-	 )
+  deriving( Eq , Show )
 
 -- convenient aliases
 spReg, hpReg, spLimReg, nodeReg :: CmmReg
