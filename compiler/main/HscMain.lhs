@@ -594,17 +594,9 @@ hscCompile cgguts
                       codeGen dflags this_mod data_tycons
                               dir_imps cost_centre_info
                               stg_binds hpc_info
-         --------  Optionally convert to and from zipper ------
-         cmms <-
-             if dopt Opt_ConvertToZipCfgAndBack dflags
-             then mapM (testCmmConversion dflags) cmms
-             else return cmms
-         ------------  Optionally convert to CPS --------------
-         cmms <-
-             if not (dopt Opt_ConvertToZipCfgAndBack dflags) &&
-                dopt Opt_RunCPSZ dflags
-             then cmmCPS dflags cmms
-             else return cmms
+         --- Optionally run experimental Cmm transformations ---
+         cmms <- optionallyConvertAndOrCPS dflags cmms
+                 -- ^ unless certain dflags are on, the identity function
          ------------------  Code output -----------------------
          rawcmms <- cmmToRawCmm cmms
          (_stub_h_exists, stub_c_exists)
@@ -717,16 +709,29 @@ hscCmmFile dflags filename = do
   case maybe_cmm of
     Nothing -> return False
     Just cmm -> do
-        cmm <- testCmmConversion dflags cmm
-        --continuationC <- cmmCPS dflags cmm >>= cmmToRawCmm
-        continuationC <- cmmToRawCmm [cmm]
-	codeOutput dflags no_mod no_loc NoStubs [] continuationC
+        cmms <- optionallyConvertAndOrCPS dflags [cmm]
+        rawCmms <- cmmToRawCmm cmms
+	codeOutput dflags no_mod no_loc NoStubs [] rawCmms
 	return True
   where
 	no_mod = panic "hscCmmFile: no_mod"
 	no_loc = ModLocation{ ml_hs_file  = Just filename,
                               ml_hi_file  = panic "hscCmmFile: no hi file",
                               ml_obj_file = panic "hscCmmFile: no obj file" }
+
+optionallyConvertAndOrCPS :: DynFlags -> [Cmm] -> IO [Cmm]
+optionallyConvertAndOrCPS dflags cmms =
+    do   --------  Optionally convert to and from zipper ------
+       cmms <- if dopt Opt_ConvertToZipCfgAndBack dflags
+               then mapM (testCmmConversion dflags) cmms
+               else return cmms
+         ---------  Optionally convert to CPS (MDA) -----------
+       cmms <- if not (dopt Opt_ConvertToZipCfgAndBack dflags) &&
+                  dopt Opt_RunCPSZ dflags
+               then cmmCPS dflags cmms
+               else return cmms
+       return cmms
+
 
 testCmmConversion :: DynFlags -> Cmm -> IO Cmm
 testCmmConversion dflags cmm =
