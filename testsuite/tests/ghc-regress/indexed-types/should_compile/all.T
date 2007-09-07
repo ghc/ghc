@@ -11,6 +11,8 @@ test('Simple7', normal, compile, [''])
 test('Simple8', expect_fail, compile, [''])
 test('Simple9', normal, compile, [''])
 test('Simple10', expect_fail, compile, [''])
+test('Simple11', expect_fail, compile, [''])
+test('Simple12', expect_fail, compile, [''])
 
 test('ind1', normal, compile, [''])
 test('ind2', normal, multimod_compile, ['ind2', '-v0'])
