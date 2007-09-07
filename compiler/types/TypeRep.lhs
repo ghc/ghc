@@ -501,14 +501,22 @@ ppr_type p (FunTy ty1 ty2)
 ppr_forall_type :: Prec -> Type -> SDoc
 ppr_forall_type p ty
   = maybeParen p FunPrec $
-    sep [pprForAll tvs, pprThetaArrow ctxt, pprType tau]
+    sep [pprForAll tvs, pprThetaArrow (ctxt1 ++ ctxt2), pprType tau]
   where
-    (tvs,  rho) = split1 [] ty
-    (ctxt, tau) = split2 [] rho
+    (tvs, ctxt1, rho) = split1 [] [] ty
+    (ctxt2, tau)      = split2 [] rho
 
-    split1 tvs (ForAllTy tv ty) = split1 (tv:tvs) ty
-    split1 tvs (NoteTy _ ty)    = split1 tvs ty
-    split1 tvs ty		= (reverse tvs, ty)
+    -- We need to be extra careful here as equality constraints will occur as
+    -- type variables with an equality kind.  So, while collecting quantified
+    -- variables, we separate the coercion variables out and turn them into
+    -- equality predicates.
+    split1 tvs eqs (ForAllTy tv ty) 
+      | isCoVar tv               = split1 tvs (eq:eqs) ty
+      | otherwise                = split1 (tv:tvs) eqs ty
+      where
+        PredTy eq = tyVarKind tv
+    split1 tvs eqs (NoteTy _ ty) = split1 tvs eqs ty
+    split1 tvs eqs ty		 = (reverse tvs, reverse eqs, ty)
  
     split2 ps (NoteTy _ arg 	-- Rather a disgusting case
 	       `FunTy` res) 	      = split2 ps (arg `FunTy` res)

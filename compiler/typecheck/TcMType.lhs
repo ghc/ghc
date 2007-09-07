@@ -1071,10 +1071,13 @@ checkFreeness forall_tyvars theta
     complain pred    = addErrTc (freeErr pred)
 
 freeErr pred
-  = sep [ptext SLIT("All of the type variables in the constraint") <+> quotes (pprPred pred) <+>
-		   ptext SLIT("are already in scope"),
-	 nest 4 (ptext SLIT("(at least one must be universally quantified here)"))
-    ]
+  = sep [ ptext SLIT("All of the type variables in the constraint") <+> 
+          quotes (pprPred pred)
+	, ptext SLIT("are already in scope") <+>
+          ptext SLIT("(at least one must be universally quantified here)")
+	, nest 4 $
+            ptext SLIT("(Use -XFlexibleContexts to lift this restriction)")
+        ]
 \end{code}
 
 \begin{code}
@@ -1085,7 +1088,7 @@ checkThetaCtxt ctxt theta
 badPredTyErr sty = ptext SLIT("Illegal constraint") <+> pprPred sty
 eqPredTyErr  sty = ptext SLIT("Illegal equational constraint") <+> pprPred sty
 		   $$
-		   parens (ptext SLIT("Use -ftype-families to permit this"))
+		   parens (ptext SLIT("Use -XTypeFamilies to permit this"))
 predTyVarErr pred  = sep [ptext SLIT("Non type-variable argument"),
 			  nest 2 (ptext SLIT("in the constraint:") <+> pprPred pred)]
 dupPredWarn dups   = ptext SLIT("Duplicate constraint(s):") <+> pprWithCommas pprPred (map head dups)
