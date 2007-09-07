@@ -179,7 +179,7 @@ getClosureData a =
                ptrsList = Array 0 (elems - 1) elems ptrs
                nptrs_data = [W# (indexWordArray# nptrs i)
                               | I# i <- [0.. fromIntegral (BCI.nptrs itbl)] ]
-           ASSERT(fromIntegral elems >= 0) return ()
+           ASSERT(elems >= 0) return ()
            ptrsList `seq` 
             return (Closure tipe (Ptr iptr) itbl ptrsList nptrs_data)
 
@@ -766,7 +766,7 @@ unlessM condM acc = condM >>= \c -> unless c acc
 
 -- Strict application of f at index i
 appArr :: Ix i => (e -> a) -> Array i e -> Int -> a
-appArr f (Array _ _ _ ptrs#) (I# i#)
+appArr f a@(Array _ _ _ ptrs#) i@(I# i#)
  = ASSERT (i < length(elems a))
    case indexArray# ptrs# i# of
        (# e #) -> f e
