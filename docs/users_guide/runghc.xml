@@ -6,7 +6,7 @@
   <para>runghc allows you to run Haskell programs without first having
   to compile them.</para>
 
-  <sect1 id="ghci-introduction">
+  <sect1 id="runghc-introduction">
     <title>Flags</title>
 
     <para>The runghc commandline looks like:</para>
