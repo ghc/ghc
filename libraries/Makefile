@@ -343,8 +343,8 @@ endif
 
 $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR)): \
 binary-dist.library.%:
-	$(MKDIRHIER) $(BIN_DIST_LIBDIR)/$*
 	if ifBuildable/ifBuildable $*; then \
+	  $(MKDIRHIER) $(BIN_DIST_LIBDIR)/$* \
 	  cd $* && \
 	  cp    $*.cabal      $(BIN_DIST_LIBDIR)/$* && \
 	  cp    LICENSE       $(BIN_DIST_LIBDIR)/$* && \
