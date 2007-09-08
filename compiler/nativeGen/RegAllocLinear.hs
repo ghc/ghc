@@ -102,11 +102,9 @@ import UniqSupply
 import Outputable
 import State
 
-#ifndef DEBUG
-import Data.Maybe	( fromJust )
-#endif
-import Data.List	( nub, partition, foldl')
-import Control.Monad	( when )
+import Data.Maybe
+import Data.List
+import Control.Monad
 import Data.Word
 import Data.Bits
 
@@ -293,10 +291,8 @@ save it in a spill location, but mark it as InBoth because the current
 instruction might still want to read it.
 -}
 
-#ifdef DEBUG
 instance Outputable Loc where
   ppr l = text (show l)
-#endif
 
 
 -- | Do register allocation on some basic blocks.

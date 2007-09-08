@@ -215,7 +215,6 @@ coreTopBindToStg this_pkg env body_fvs (Rec pairs)
     ASSERT2(consistentCafInfo (head binders) bind, ppr binders)
     (env', fvs' `unionFVInfo` body_fvs, bind)
 
-#ifdef DEBUG
 -- Assertion helper: this checks that the CafInfo on the Id matches
 -- what CoreToStg has figured out about the binding's SRT.  The
 -- CafInfo will be exact in all cases except when CorePrep has
@@ -230,7 +229,6 @@ consistentCafInfo id bind
 	exact = id_marked_caffy == binding_is_caffy
 	id_marked_caffy  = mayHaveCafRefs (idCafInfo id)
 	binding_is_caffy = stgBindHasCafRefs bind
-#endif
 \end{code}
 
 \begin{code}
@@ -1074,7 +1072,6 @@ plusFVInfo (id1,hb1,info1) (id2,hb2,info2)
   = ASSERT (id1 == id2 && hb1 `check_eq_how_bound` hb2)
     (id1, hb1, combineStgBinderInfo info1 info2)
 
-#ifdef DEBUG
 -- The HowBound info for a variable in the FVInfo should be consistent
 check_eq_how_bound ImportBound 	      ImportBound 	 = True
 check_eq_how_bound LambdaBound 	      LambdaBound 	 = True
@@ -1084,7 +1081,6 @@ check_eq_how_bound hb1		      hb2		 = False
 check_eq_li (NestedLet _) (NestedLet _) = True
 check_eq_li TopLet        TopLet        = True
 check_eq_li li1 	  li2		= False
-#endif
 \end{code}
 
 Misc.

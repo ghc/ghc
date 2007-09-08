@@ -48,8 +48,9 @@ name = Util.global (value) :: IORef (ty); \
 #define ASSERT(e)      if False && (not (e)) then panic "ASSERT" else
 #define ASSERT2(e,msg) if False && (not (e)) then pprPanic "ASSERT2" (msg) else
 #define ASSERTM(e)       do { let { _mbool = (e) } }
-#define ASSERTM2(e,msg)  do { let { _mbool = (e) }; when False (panic "ASSERTM2") }
-#define WARN(e,msg)    if False && (e) then pprPanic "WARN" msg else
+-- Here we deliberately don't use when as Control.Monad might not be imported
+#define ASSERTM2(e,msg)  do { let { _mbool = (e) }; if False then panic "ASSERTM2" else return () }
+#define WARN(e,msg)    if False && (e) then pprPanic "WARN" (msg) else
 #endif
 
 -- This #ifndef lets us switch off the "import FastString"

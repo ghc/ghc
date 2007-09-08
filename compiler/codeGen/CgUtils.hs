@@ -74,9 +74,7 @@ import Util
 import DynFlags
 import FastString
 import PackageConfig
-#ifdef DEBUG
 import Outputable
-#endif
 
 import Data.Char
 import Data.Bits

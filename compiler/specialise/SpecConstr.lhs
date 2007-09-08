@@ -1249,12 +1249,10 @@ samePat (vs1, as1) (vs2, as2)
 
     same e1 e2 = WARN( bad e1 || bad e2, ppr e1 $$ ppr e2) 
 		 False 	-- Let, lambda, case should not occur
-#ifdef DEBUG
     bad (Case {}) = True
     bad (Let {})  = True
     bad (Lam {})  = True
     bad other	  = False
-#endif
 \end{code}
 
 Note [Ignore type differences]

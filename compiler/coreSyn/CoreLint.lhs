@@ -44,11 +44,7 @@ import BasicTypes
 import StaticFlags
 import DynFlags
 import Outputable
-
-#ifdef DEBUG
-import Util             ( notNull )
-#endif
-
+import Util
 import Data.Maybe
 \end{code}
 

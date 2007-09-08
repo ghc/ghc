@@ -562,10 +562,8 @@ load2 s@(Session ref) how_much mod_graph = do
 	-- (see msDeps)
         let all_home_mods = [ms_mod_name s 
 			    | s <- mod_graph, not (isBootSummary s)]
-#ifdef DEBUG
 	    bad_boot_mods = [s 	      | s <- mod_graph, isBootSummary s,
 					not (ms_mod_name s `elem` all_home_mods)]
-#endif
 	ASSERT( null bad_boot_mods ) return ()
 
         -- mg2_with_srcimps drops the hi-boot nodes, returning a 

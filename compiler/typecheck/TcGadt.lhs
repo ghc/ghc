@@ -39,11 +39,8 @@ import Maybes
 import Control.Monad
 import Outputable
 import TcType
-
-#ifdef DEBUG
 import Unique
 import UniqFM
-#endif
 \end{code}
 
 
@@ -261,7 +258,6 @@ tryToBind tv_set tv | tv `elemVarSet` tv_set = BindMe
 %************************************************************************
 
 \begin{code}
-#ifdef DEBUG
 badReftElts :: InternalReft -> [(Unique, (Coercion,Type))]
 -- Return the BAD elements of the refinement
 -- Should be empty; used in asserions only
@@ -274,7 +270,6 @@ badReftElts env
 		     | otherwise = False
 	where
 	  (ty1,ty2) = coercionKind co
-#endif
 
 emptyInternalReft :: InternalReft
 emptyInternalReft = emptyVarEnv

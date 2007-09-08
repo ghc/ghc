@@ -47,9 +47,7 @@ import {-# SOURCE #-}	TypeRep( Type, Kind )
 import {-# SOURCE #-}	TcType( TcTyVarDetails, pprTcTyVarDetails )
 import {-# SOURCE #-}	IdInfo( GlobalIdDetails, notGlobalId, 
                                 IdInfo, seqIdInfo )
-#ifdef DEBUG
 import {-# SOURCE #-}	TypeRep( isCoercionKind )
-#endif
 
 import Name hiding (varName)
 import Unique

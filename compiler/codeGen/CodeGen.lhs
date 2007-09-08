@@ -54,10 +54,7 @@ import OccName
 import TyCon
 import Module
 import ErrUtils
-
-#ifdef DEBUG
 import Panic
-#endif
 \end{code}
 
 \begin{code}

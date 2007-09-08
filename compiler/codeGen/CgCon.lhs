@@ -51,9 +51,7 @@ import Type
 import PrelInfo
 import Outputable
 import ListSetOps
-#ifdef DEBUG
-import Util             ( lengthIs )
-#endif
+import Util
 \end{code}
 
 
