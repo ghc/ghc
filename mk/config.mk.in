@@ -512,11 +512,32 @@ BIN_DIST_TARBALL=$(BIN_DIST_TOPDIR_REL)/$(BIN_DIST_NAME)-$(TARGETPLATFORM).tar.b
 
 BIN_DIST_INST_DIR = $(FPTOOLS_TOP_ABS)/bindisttest/installed
 
-
+# Definition of installation directories, we don't use half of these, but since
+# the configure script has them on offer while passing through, we might as well
+# set them. Note that we have to be careful, because the GNU coding standards
+# have changed a bit over the course of time, and autoconf development reflects
+# this.
 #
-# Installation directories, we don't use half of these,
-# but since the configure script has them on offer while
-# passing through, we might as well set them.
+# A little bit of history regarding autoconf and GNU coding standards, use this
+# as a cheat-sheet for the stuff below:
+#
+# variable    | default < 2.60     | default >= 2.60
+# ------------+--------------------+--------------------------------------
+# exec_prefix | ${prefix}          | ${prefix}
+# libdir      | ${exec_prefix}/lib | ${exec_prefix}/lib
+# datarootdir | NONE!              | ${prefix}/share
+# datadir     | ${prefix}/share    | ${datarootdir}
+# infodir     | ${prefix}/info     | ${datarootdir}/info
+# mandir      | ${prefix}/man      | ${datarootdir}/man
+# docdir      | NONE!              | ${datarootdir}/doc/${PACKAGE_TARNAME}
+# htmldir     | NONE!              | ${docdir}
+# dvidir      | NONE!              | ${docdir}
+# pdfdir      | NONE!              | ${docdir}
+# psdir       | NONE!              | ${docdir}
+#
+# NOTE: The default e.g. ${docdir} above means that autoconf substitutes the
+# string "${docdir}", not the value of docdir! This is crucial for the GNU
+# coding standards.
 
 prefix          := @prefix@
 
