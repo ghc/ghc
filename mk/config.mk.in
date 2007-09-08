@@ -553,7 +553,6 @@ bindir          := @bindir@
 datadir0        := @datadir@
 libdir0         := @libdir@
 includedir      := @includedir@
-oldincludedir   := @oldincludedir@
 mandir          := @mandir@
 
 ifeq "$(Windows)" "YES"
@@ -630,9 +629,6 @@ libdir		= $(exec_prefix)/lib
 endif
 ifeq "$(strip $(includedir))" ""
 includedir	= $(prefix)/include
-endif
-ifeq "$(strip $(oldincludedir))" ""
-oldincludedir	= /usr/include
 endif
 ifeq "$(strip $(mandir))" ""
 mandir		= $(prefix)/man
