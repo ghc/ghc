@@ -16,6 +16,8 @@ type Map key elt = Map.FiniteMap key elt
 
 lookup = flip Map.lookupFM
 fromList = Map.listToFM 
+fromListWith f xs = Map.addListToFM_C f Map.emptyFM xs
+toList = Map.fmToList
 
 #else
 
