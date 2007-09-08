@@ -3,7 +3,7 @@
 module MkZipCfg
     ( AGraph, (<*>), emptyAGraph, withFreshLabel, withUnique
     , mkMiddle, mkMiddles, mkLast, mkZTail, mkBranch, mkLabel, mkIfThenElse, mkWhileDo
-    , mkBlock
+    , outOfLine
     , emptyGraph, graphOfMiddles, graphOfZTail
     , lgraphOfAGraph, graphOfAGraph, labelAGraph
     )
@@ -13,6 +13,7 @@ import ZipCfg
 
 import Outputable
 import Unique
+import UniqFM
 import UniqSupply
 
 import Prelude hiding (zip, unzip, last)
@@ -171,21 +172,21 @@ withFreshLabel :: String -> (BlockId -> AGraph m l) -> AGraph m l
 withUnique     :: (Unique -> AGraph m l) -> AGraph m l
 
 
-mkBlock :: AGraph m l -> AGraph m l
--- ^ 
--- The argument is an AGraph that has an 
+outOfLine :: (LastNode l, Outputable m, Outputable l)
+          => AGraph m l -> AGraph m l
+-- ^ The argument is an AGraph that has an 
 -- empty entry sequence and no exit sequence.
 -- The result is a new AGraph that has an empty entry sequence
 -- connected to an empty exit sequence, with the original graph
 -- sitting to the side out-of-line.
 --
 -- Example:  mkMiddle (x = 3)
---           <*> mkBlock (mkLabel L <*> ...stuff...)
+--           <*> outOfLine (mkLabel L <*> ...stuff...)
 --           <*> mkMiddle (y = x)
 -- Control will flow directly from x=3 to y=x;
 -- the block starting with L is "on the side".
 --
--- N.B. algebraically for any g, g'   g <*> mkBlock g' == mkBlock g' <*> g
+-- N.B. algebraically forall g g' : g <*> outOfLine g' == outOfLine g' <*> g
 
 
 
@@ -291,7 +292,12 @@ withUnique ofU = AGraph f
                  let AGraph f' = ofU u
                  f' g
 
-mkBlock = undefined
+outOfLine (AGraph f) = AGraph f'
+    where f' (Graph tail' blocks') =
+            do Graph emptyEntrance blocks <- f emptyGraph
+               note_this_code_becomes_unreachable emptyEntrance
+               return $ Graph tail' (blocks `plusUFM` blocks')
+                                                       
 
 mkIfThenElse cbranch tbranch fbranch = 
     withFreshLabel "end of if"     $ \endif ->
