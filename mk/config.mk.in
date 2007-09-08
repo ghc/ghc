@@ -557,10 +557,6 @@ mandir          := @mandir@
 
 ifeq "$(Windows)" "YES"
 
-ifeq "$(strip $(prefix))" ""
-prefix		= /c/ghc
-endif
-
 # Hack: our directory layouts tend to be different on Windows, so
 # hack around configure's bogus assumptions here.
 datarootdir := $(prefix)
@@ -569,10 +565,8 @@ libdir      := $(prefix)
 
 else
 
-#
 # Unix: override libdir and datadir to put ghc-specific stuff in
 # a subdirectory with the version number included.
-#
 datarootdir := $(datadir0)
 datadir     := $(datadir0)/ghc-$(ProjectVersion)
 libdir      := $(libdir0)/ghc-$(ProjectVersion)
@@ -600,39 +594,11 @@ psdir     := $(docdir)
 # (overriden for packages in package.mk)
 ifacedir		= $(libdir)
 
-# 
-# Default values for most of the above are only set if
-# they weren't configured to anything in particular
-# via the configure script. (i.e., we make no assumption
-# that the autoconf-generated script will assign defaults
-# to all of the above).
-#
-ifeq "$(strip $(exec_prefix))" ""
-exec_prefix		= $(prefix)
-endif
-ifeq "$(strip $(bindir))" ""
-bindir			= $(exec_prefix)/bin
-endif
-
-#
 # NOTE: by intention, libexecdir and libdir point to 
 # the same place.
 #  => Only way to override this is to set libexecdir= on the command line.
 #     (NOTE: configure script setting is ignored).
 libexecdir		= $(libdir)
-
-ifeq "$(strip $(datadir))" ""
-datadir		= $(prefix)/share
-endif
-ifeq "$(strip $(libdir))" ""
-libdir		= $(exec_prefix)/lib
-endif
-ifeq "$(strip $(includedir))" ""
-includedir	= $(prefix)/include
-endif
-ifeq "$(strip $(mandir))" ""
-mandir		= $(prefix)/man
-endif
 
 # This is a bit of a lie, as this is a wrapper rather than the program
 # itself. However, it means that we don't have to worry about Windows
