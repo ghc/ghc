@@ -31,7 +31,7 @@ import HpcLexer
 	'}'		{ SYM '}' }
 	int		{ INT $$ }
 	string		{ STR $$ }
-	cat		{ STR $$ }
+	cat		{ CAT $$ }
 %%
 
 Spec    :: { Spec }

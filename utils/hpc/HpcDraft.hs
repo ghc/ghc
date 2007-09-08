@@ -59,7 +59,7 @@ makeDraft hpcflags tix = do
       hash = tixModuleHash tix
       tixs = tixModuleTixs tix
 
-  mix@(Mix filepath timestamp hash tabstop entries) <- readMixWithFlags hpcflags tix
+  mix@(Mix filepath timestamp hash tabstop entries) <- readMixWithFlags hpcflags (Right tix)
 
   let forest = createMixEntryDom 
               [ (span,(box,v > 0))
@@ -71,7 +71,7 @@ makeDraft hpcflags tix = do
 
   let non_ticked = findNotTickedFromList forest
 
-  hs  <- readFileFromPath filepath (srcDirs hpcflags)
+  hs  <- readFileFromPath (hpcError draft_plugin) filepath (srcDirs hpcflags)
 
   let hsMap :: Map.Map Int String
       hsMap = Map.fromList (zip [1..] $ lines hs)
@@ -136,14 +136,3 @@ findNotTickedFromTree (Node (pos,[]) children) = findNotTickedFromList children
 findNotTickedFromList :: [MixEntryDom [(BoxLabel,Bool)]] -> [PleaseTick]
 findNotTickedFromList = concatMap findNotTickedFromTree
 
-readFileFromPath :: String -> [String] -> IO String
-readFileFromPath filename@('/':_) _ = readFile filename
-readFileFromPath filename path0 = readTheFile path0
-  where
-        readTheFile :: [String] -> IO String
-        readTheFile [] = error $ "could not find " ++ show filename 
-                                 ++ " in path " ++ show path0
-        readTheFile (dir:dirs) = 
-                catch (do str <- readFile (dir ++ "/" ++ filename) 
-                          return str) 
-                      (\ _ -> readTheFile dirs)

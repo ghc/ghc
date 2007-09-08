@@ -2,6 +2,7 @@ module HpcUtils where
 
 import Trace.Hpc.Util
 import qualified HpcMap as Map
+import HpcFlags
 
 -- turns \n into ' '
 -- | grab's the text behind a HpcPos; 
@@ -18,3 +19,14 @@ grabHpcPos hsMap span =
                            Nothing -> error $ "bad line number : " ++ show n
                   ) [l1..l2]
 
+
+readFileFromPath :: (String -> IO String) -> String -> [String] -> IO String
+readFileFromPath err filename@('/':_) _ = readFile filename
+readFileFromPath err filename path0 = readTheFile path0
+  where
+	readTheFile [] = err $ "could not find " ++ show filename 
+			         ++ " in path " ++ show path0
+	readTheFile (dir:dirs) = 
+		catch (do str <- readFile (dir ++ "/" ++ filename) 
+			  return str) 
+		      (\ _ -> readTheFile dirs)

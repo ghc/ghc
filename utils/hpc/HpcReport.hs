@@ -152,7 +152,7 @@ single (BinBox {}) = False
 
 modInfo :: Flags -> Bool -> TixModule -> IO ModInfo
 modInfo hpcflags qualDecList tix@(TixModule moduleName _ _ tickCounts) = do
-  Mix _ _ _ _ mes <- readMixWithFlags hpcflags tix
+  Mix _ _ _ _ mes <- readMixWithFlags hpcflags (Right tix)
   return (q (accumCounts (zip (map snd mes) tickCounts) miZero))
   where
   q mi = if qualDecList then mi{decPaths = map (moduleName:) (decPaths mi)}

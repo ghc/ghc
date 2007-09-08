@@ -90,7 +90,7 @@ hooks' = [ (name hook,hook) | hook <- hooks ]
 
 help_plugin = Plugin { name = "help"
 		   , usage = "[<HPC_COMMAND>]"
-		   , summary = "Display help for hpc or a single command."
+		   , summary = "Display help for hpc or a single command"
 		   , options = help_options
 		   , implementation = help_main
 		   , init_flags = default_flags
@@ -122,7 +122,7 @@ version_plugin = Plugin { name = "version"
 		   , final_flags = default_final_flags
 		   }
 
-version_main _ _ = putStrLn $ "hpc tools, version 0.5-dev"
+version_main _ _ = putStrLn $ "hpc tools, version 0.6"
 
 
 ------------------------------------------------------------------------------

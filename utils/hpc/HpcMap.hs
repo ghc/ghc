@@ -9,7 +9,7 @@ import qualified Data.Map as Map
 
 lookup :: Ord key => key -> Map key elt -> Maybe elt
 fromList :: Ord key => [(key,elt)] -> Map key elt
-
+fromListWith :: Ord k => (a -> a -> a) -> [(k, a)] -> Map k a
 
 #if __GLASGOW_HASKELL__ < 604
 type Map key elt = Map.FiniteMap key elt
@@ -23,5 +23,7 @@ type Map key elt = Map.Map key elt
 
 lookup = Map.lookup
 fromList = Map.fromList
+toList   = Map.toList
+fromListWith = Map.fromListWith
 
 #endif

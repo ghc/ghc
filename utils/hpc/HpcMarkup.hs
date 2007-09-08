@@ -10,6 +10,7 @@ import Trace.Hpc.Tix
 import Trace.Hpc.Util
 
 import HpcFlags
+import HpcUtils
 
 import System.Environment
 import System.Directory
@@ -143,7 +144,7 @@ genHtmlFromMod dest_dir flags tix theFunTotals invertOutput = do
   let theHsPath = srcDirs flags
   let modName0 = tixModuleName tix 
 
-  (Mix origFile _ mixHash tabStop mix') <- readMixWithFlags flags tix
+  (Mix origFile _ mixHash tabStop mix') <- readMixWithFlags flags (Right tix)
 
   let arr_tix :: Array Int Integer
       arr_tix = listArray (0,length (tixModuleTixs tix) - 1)
@@ -206,7 +207,7 @@ genHtmlFromMod dest_dir flags tix theFunTotals invertOutput = do
                   }
 
   -- add prefix to modName argument
-  content <- readFileFromPath origFile theHsPath
+  content <- readFileFromPath (hpcError markup_plugin) origFile theHsPath
 
   let content' = markup tabStop info content
   let show' = reverse . take 5 . (++ "       ") . reverse . show
@@ -450,17 +451,3 @@ red    = "#f20913"
 green  = "#60de51"
 yellow = "yellow"
 
-------------------------------------------------------------------------------
-
-readFileFromPath :: String -> [String] -> IO String
-readFileFromPath filename@('/':_) _ = readFile filename
-readFileFromPath filename path0 = readTheFile path0
-  where
-	readTheFile :: [String] -> IO String
-	readTheFile [] = hpcError markup_plugin
-	                     $ "could not find " ++ show filename 
-			         ++ " in path " ++ show path0
-	readTheFile (dir:dirs) = 
-		catch (do str <- readFile (dir ++ "/" ++ filename) 
-			  return str) 
-		      (\ _ -> readTheFile dirs)
