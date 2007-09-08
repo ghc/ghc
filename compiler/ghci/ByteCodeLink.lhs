@@ -34,10 +34,7 @@ import Module
 import PackageConfig
 import FastString
 import Panic
-
-#ifdef DEBUG
 import Outputable
-#endif
 
 -- Standard libraries
 import GHC.Word		( Word(..) )
