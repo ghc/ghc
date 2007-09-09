@@ -81,6 +81,7 @@ LINK = ghc-pkg
 LINK_TARGET = $(LINK)-$(ProjectVersion)
 INSTALLED_SCRIPT=$(DESTDIR)$(bindir)/$(LINK_TARGET)
 install::
+	$(INSTALL_DIR) $(DESTDIR)$(bindir)
 	$(RM) -f $(INSTALLED_SCRIPT)
 	echo "#!$(SHELL)"                                           >> $(INSTALLED_SCRIPT)
 	echo "GHCPKGBIN=$(libexecdir)/$(HS_PROG)"                   >> $(INSTALLED_SCRIPT)

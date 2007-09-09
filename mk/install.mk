@@ -111,7 +111,7 @@ endif # LINK
 # friends can be overridden from their original settings in mk/config.mk.in
 # || mk/build.mk
 #
-.PHONY: install install-docs installdirs install-strip install-dirs install-docs show-install
+.PHONY: install install-docs installdirs install-strip install-docs show-install
 
 show-install :
 	@echo "DESTDIR = $(DESTDIR)"
@@ -122,19 +122,6 @@ show-install :
 	@echo "ifacedir = $(ifacedir)"
 	@echo "headerdir = $(headerdir)"
 	@echo "includedir = $(includedir)"
-
-#
-# Sometimes useful to separate out the creation of install directories 
-# from the installation itself.
-#
-install-dirs ::
-	$(INSTALL_DIR) $(DESTDIR)$(bindir)
-	$(INSTALL_DIR) $(DESTDIR)$(libdir)
-	$(INSTALL_DIR) $(DESTDIR)$(libexecdir)
-	$(INSTALL_DIR) $(DESTDIR)$(datadir)
-
-# Better do this first...
-install:: install-dirs
 
 #
 # Setting user/group ownership for the installed entities
