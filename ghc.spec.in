@@ -84,15 +84,24 @@ needed.
 %build
 test -f configure || sh boot
 ./configure --prefix=%{_prefix} --mandir=%{_mandir}
-make %{?jobs:-j%jobs} docdir=%{_datadir}/doc/packages/%{name}
+make %{?jobs:-j%jobs}
 make html
-make -C libraries doc
+# Alas, we don't pass make options/arguments down to "libraries", so let's redo make here...
+make -C libraries HADDOCK_DOCS=YES
 ( cd libraries/Cabal && docbook2html doc/Cabal.xml --output doc/Cabal )
 make -C docs/ext-core ps
 make -C docs/storage-mgt ps
 
 %install
-make DESTDIR=${RPM_BUILD_ROOT} docdir=%{_datadir}/doc/packages/%{name} install install-docs
+# This is a cruel hack: There seems to be no way to install the Haddock
+# documentation into the build directory, because DESTDIR is alway prepended.
+# Furthermore, rpm removes the target documentation directory before the doc
+# macros are processed. Therefore we have to copy things back into safety... :-P
+# The right thing would be being able to install directly into the build tree.
+make DESTDIR=${RPM_BUILD_ROOT} docdir=%{_datadir}/doc/packages/%{name} HADDOCK_DOCS=YES install install-docs
+mkdir html-docs
+cp -a ${RPM_BUILD_ROOT}%{_datadir}/doc/packages/%{name}/{index.html,libraries} html-docs
+# Use version-less hsc2hs out of the way, we use update-alternatives.
 mv ${RPM_BUILD_ROOT}%{_prefix}/bin/hsc2hs ${RPM_BUILD_ROOT}%{_prefix}/bin/hsc2hs-ghc
 
 # generate the file list for lib/ _excluding_ all files needed for profiling
@@ -150,6 +159,7 @@ fi
 %doc docs/storage-mgt/sm.ps
 %doc docs/users_guide/users_guide
 %doc libraries/Cabal/doc/Cabal
+%doc html-docs/*
 %{_mandir}/man1/ghc.1*
 %{_prefix}/bin/ghc
 %{_prefix}/bin/ghc-%{version}
