@@ -1,7 +1,7 @@
 
 include Makefile-vars
 
-.PHONY: in-place mk-version-symlinks install-dirs install
+.PHONY: in-place mk-version-symlinks install
 
 in-place ::
 	@if test -x "./post-inplace-script" ; then \
