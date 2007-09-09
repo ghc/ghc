@@ -91,8 +91,6 @@ space=$(empty) $(empty)
 
 # -----------------------------------------------------------------------------
 
-libraryhtmldir = $(htmldir)/libraries
-
 ifneq "$(DOING_BIN_DIST)" "YES"
 
 CONFIGURE_OPTS =
@@ -219,9 +217,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	           $(CONFIGURE_OPTS) \
 	           --prefix='$$topdir' \
 	           --datadir='$(datadir)' \
-	           --datasubdir='$$pkgid' \
 	           --libsubdir='$(libsubdir)' \
-	           --docdir='$(libraryhtmldir)' \
 	           --with-compiler=../../compiler/stage1/ghc-inplace$ \
 	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace$ \
 	           --with-hsc2hs=../../utils/hsc2hs/hsc2hs-inplace \
@@ -300,17 +296,17 @@ endif
 
 .PHONY: install install-docs install.library.%
 
-DESTlibraryhtmldir = $(DESTDIR)$(libraryhtmldir)/html
+libraryhtmldir = $(htmldir)/libraries
 
 install: $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR))
 ifeq "$(HADDOCK_DOCS)" "YES"
-	$(INSTALL_DIR)                                      $(DESTlibraryhtmldir)
-	$(INSTALL_DATA)   index.html doc-index.html         $(DESTlibraryhtmldir)
-	$(INSTALL_SCRIPT) gen_contents_index                $(DESTlibraryhtmldir)
+	$(INSTALL_DIR)                                           $(DESTDIR)$(libraryhtmldir)
+	$(INSTALL_DATA)   index.html doc-index.html              $(DESTDIR)$(libraryhtmldir)
+	$(INSTALL_SCRIPT) gen_contents_index                     $(DESTDIR)$(libraryhtmldir)
 	# Hacks:
-	$(INSTALL_DATA)   $(DESTlibraryhtmldir)/base/*.css $(DESTlibraryhtmldir)
-	$(INSTALL_DATA)   $(DESTlibraryhtmldir)/base/*.js  $(DESTlibraryhtmldir)
-	$(INSTALL_DATA)   $(DESTlibraryhtmldir)/base/*.gif $(DESTlibraryhtmldir)
+	$(INSTALL_DATA)   $(DESTDIR)$(libraryhtmldir)/base/*.css $(DESTDIR)$(libraryhtmldir)
+	$(INSTALL_DATA)   $(DESTDIR)$(libraryhtmldir)/base/*.js  $(DESTDIR)$(libraryhtmldir)
+	$(INSTALL_DATA)   $(DESTDIR)$(libraryhtmldir)/base/*.gif $(DESTDIR)$(libraryhtmldir)
 endif
 
 # Cabal doesn't let us ask to install docs only, so do nothing here
@@ -324,7 +320,7 @@ $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
-	  ../installPackage/installPackage "$(DESTDIR)" "$(prefix)" "$(datadir)" "$(libraryhtmldir)" "$(GHC_PKG_PROG)" "$(DESTDIR)$(libdir)/package.conf" ; \
+	  ../installPackage/installPackage "$(DESTDIR)" "$(prefix)" "$(datadir)" "$(libraryhtmldir)/$*" "$(libraryhtmldir)" "$(GHC_PKG_PROG)" "$(DESTDIR)$(libdir)/package.conf" ; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%

@@ -13,7 +13,7 @@ main :: IO ()
 main
   = do args <- getArgs
        case args of
-           destdir : pref : idatadir : idocdir : ghcpkg : ghcpkgconf : args' ->
+           destdir : pref : idatadir : idocdir : ihtmldir : ghcpkg : ghcpkgconf : args' ->
                let verbosity = case args' of
                            [] -> normal
                            ['-':'v':v] ->
@@ -22,15 +22,15 @@ main
                                            _ -> Just v
                                in flagToVerbosity m
                            _ -> error ("Bad arguments: " ++ show args)
-               in doit destdir pref idatadir idocdir ghcpkg ghcpkgconf
+               in doit destdir pref idatadir idocdir ihtmldir ghcpkg ghcpkgconf
                        verbosity
            _ ->
                error "Missing arguments"
 
-doit :: FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
+doit :: FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
      -> Verbosity
      -> IO ()
-doit destdir pref idatadir idocdir ghcpkg ghcpkgconf verbosity =
+doit destdir pref idatadir idocdir ihtmldir ghcpkg ghcpkgconf verbosity =
        do let userHooks = simpleUserHooks
               copyto = if null destdir then NoCopyDest else CopyTo destdir
               copyFlags = (emptyCopyFlags copyto) {
@@ -63,7 +63,8 @@ doit destdir pref idatadir idocdir ghcpkg ghcpkgconf verbosity =
               -- directory to copy to rather than "$topdir"
               i_copy = i { prefixDirTemplate = toPathTemplate pref,
                            dataDirTemplate   = toPathTemplate idatadir,
-                           docDirTemplate    = toPathTemplate idocdir
+                           docDirTemplate    = toPathTemplate idocdir,
+                           htmlDirTemplate   = toPathTemplate ihtmldir
                          }
               lbi_copy = lbi { installDirTemplates = i_copy }
               -- When we run GHC we give it a $topdir that includes the
