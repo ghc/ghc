@@ -49,6 +49,7 @@ test('GADT10', expect_fail, compile, [''])
 
 test('Class1', normal, compile, [''])
 test('Class2', normal, compile, [''])
+test('Class3', expect_fail, compile, [''])
 
 test('Refl', normal, compile, [''])
 test('Refl2', expect_fail, compile, [''])
