@@ -1181,12 +1181,10 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
 	    			     iface = hm_iface hm_info
 
 	    compile_it :: Maybe Linkable -> IO (Maybe HomeModInfo)
-	    compile_it  = upsweep_compile hsc_env
-				summary' mod_index nmods mb_old_iface
+	    compile_it  = compile hsc_env summary' mod_index nmods mb_old_iface
 
             compile_it_discard_iface 
-                        = upsweep_compile hsc_env
-				summary' mod_index nmods Nothing
+                        = compile hsc_env summary' mod_index nmods Nothing
 
         in
 	case target of
@@ -1247,27 +1245,6 @@ upsweep_mod hsc_env old_hpt (stable_obj, stable_bco) summary mod_index nmods
 	    _otherwise ->
 		  compile_it Nothing
 
-
--- Run hsc to compile a module
-upsweep_compile :: HscEnv -> ModSummary -> Int -> Int
-                -> Maybe ModIface -> Maybe Linkable -> IO (Maybe HomeModInfo)
-upsweep_compile hsc_env summary mod_index nmods mb_old_iface mb_old_linkable
- = do
-   compresult <- compile hsc_env summary mb_old_linkable mb_old_iface
-                        mod_index nmods
-
-   case compresult of
-        -- Compilation failed.  Compile may still have updated the PCS, tho.
-        CompErrs -> return Nothing
-
-	-- Compilation "succeeded", and may or may not have returned a new
-	-- linkable (depending on whether compilation was actually performed
-	-- or not).
-	CompOK new_details new_iface new_linkable
-              -> do let new_info = HomeModInfo { hm_iface = new_iface,
-						 hm_details = new_details,
-						 hm_linkable = new_linkable }
-                    return (Just new_info)
 
 
 -- Filter modules in the HPT

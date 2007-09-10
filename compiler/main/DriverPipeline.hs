@@ -23,7 +23,7 @@ module DriverPipeline (
 
 	-- Interfaces for the compilation manager (interpreted/batch-mode)
    preprocess, 
-   compile, CompResult(..), 
+   compile,
    link, 
 
   ) where
@@ -93,36 +93,25 @@ preprocess dflags (filename, mb_phase) =
 -- NB.  No old interface can also mean that the source has changed.
 
 compile :: HscEnv
-	-> ModSummary
-	-> Maybe Linkable	-- Just linkable <=> source unchanged
-        -> Maybe ModIface       -- Old interface, if available
-        -> Int -> Int
-        -> IO CompResult
+        -> ModSummary                   -- summary for module being compiled
+        -> Int -> Int                   -- module N of M
+        -> Maybe ModIface               -- old interface, if we have one
+        -> Maybe Linkable               -- old linkable, if we have one
+        -> IO (Maybe HomeModInfo)       -- the complete HomeModInfo, if successful
 
-data CompResult
-   = CompOK   ModDetails 	-- New details
-              ModIface		-- New iface
-              (Maybe Linkable)	-- a Maybe, for the same reasons as hm_linkable
-
-   | CompErrs 
-
-
-compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do 
-
-   let dflags0     = ms_hspp_opts mod_summary
-       this_mod    = ms_mod mod_summary
-       src_flavour = ms_hsc_src mod_summary
+compile hsc_env summary mod_index nmods mb_old_iface maybe_old_linkable
+ = do
+   let dflags0     = ms_hspp_opts summary
+       this_mod    = ms_mod summary
+       src_flavour = ms_hsc_src summary
 
        have_object 
 	       | Just l <- maybe_old_linkable, isObjectLinkable l = True
 	       | otherwise = False
 
-   -- FIXME: We need to know whether or not we're recompiling the file. Move this to HscMain?
-   --showPass dflags0 ("Compiling " ++ showModMsg have_object mod_summary)
-
-   let location	  = ms_location mod_summary
+   let location	  = ms_location summary
    let input_fn   = expectJust "compile:hs" (ml_hs_file location) 
-   let input_fnpp = ms_hspp_file mod_summary
+   let input_fnpp = ms_hspp_file summary
 
    debugTraceMsg dflags0 2 (text "compile: input file" <+> text input_fnpp)
 
@@ -158,21 +147,23 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
            = do stub_o <- compileStub dflags' this_mod location
                 return [ DotO stub_o ]
 
-       handleBatch (HscNoRecomp, iface, details)
+       handleBatch HscNoRecomp
            = ASSERT (isJust maybe_old_linkable)
-             return (CompOK details iface maybe_old_linkable)
-       handleBatch (HscRecomp hasStub, iface, details)
+             return maybe_old_linkable
+
+       handleBatch (HscRecomp hasStub)
            | isHsBoot src_flavour
                = do when (isObjectTarget hsc_lang) $ -- interpreted reaches here too
                        SysTools.touch dflags' "Touching object file"
                                    object_filename
-                    return (CompOK details iface Nothing)
+                    return maybe_old_linkable
+
            | otherwise
                = do stub_unlinked <- getStubLinkable hasStub
                     (hs_unlinked, unlinked_time) <-
                         case hsc_lang of
                           HscNothing
-                            -> return ([], ms_hs_date mod_summary)
+                            -> return ([], ms_hs_date summary)
                           -- We're in --make mode: finish the compilation pipeline.
                           _other
                             -> do runPipeline StopLn dflags (output_fn,Nothing)
@@ -184,15 +175,15 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
                                   return ([DotO object_filename], o_time)
                     let linkable = LM unlinked_time this_mod
 			           (hs_unlinked ++ stub_unlinked)
-                    return (CompOK details iface (Just linkable))
+                    return (Just linkable)
 
-       handleInterpreted (InteractiveNoRecomp, iface, details)
+       handleInterpreted InteractiveNoRecomp
            = ASSERT (isJust maybe_old_linkable)
-             return (CompOK details iface maybe_old_linkable)
-       handleInterpreted (InteractiveRecomp hasStub comp_bc modBreaks, iface, details)
+             return maybe_old_linkable
+       handleInterpreted (InteractiveRecomp hasStub comp_bc modBreaks)
            = do stub_unlinked <- getStubLinkable hasStub
                 let hs_unlinked = [BCOs comp_bc modBreaks]
-                    unlinked_time = ms_hs_date mod_summary
+                    unlinked_time = ms_hs_date summary
                   -- Why do we use the timestamp of the source file here,
                   -- rather than the current time?  This works better in
                   -- the case where the local clock is out of sync
@@ -201,22 +192,31 @@ compile hsc_env mod_summary maybe_old_linkable old_iface mod_index nmods = do
                   -- be out of date.
                 let linkable = LM unlinked_time this_mod
                                (hs_unlinked ++ stub_unlinked)
-                return (CompOK details iface (Just linkable))
+                return (Just linkable)
 
-   let runCompiler compiler handle
-           = do mbResult <- compiler hsc_env' mod_summary
-                                     source_unchanged old_iface
+   let -- runCompiler :: Compiler result -> (result -> Maybe Linkable)
+       --            -> IO (Maybe HomeModInfo)
+       runCompiler compiler handle
+           = do mbResult <- compiler hsc_env' summary source_unchanged mb_old_iface
                                      (Just (mod_index, nmods))
                 case mbResult of
-                  Nothing     -> return CompErrs
-                  Just result -> handle result
+                  Nothing -> return Nothing
+                  Just (result, iface, details) -> do
+                        linkable <- handle result
+                        return (Just HomeModInfo{ hm_details  = details,
+                                                  hm_iface    = iface,
+                                                  hm_linkable = linkable })
    -- run the compiler
    case hsc_lang of
-     HscInterpreted
-      | isHsBoot src_flavour -> runCompiler hscCompileNothing handleBatch
-      | otherwise            -> runCompiler hscCompileInteractive handleInterpreted
-     HscNothing     -> runCompiler hscCompileNothing handleBatch
-     _other         -> runCompiler hscCompileBatch handleBatch
+      HscInterpreted
+        | isHsBoot src_flavour -> 
+                runCompiler hscCompileNothing handleBatch
+        | otherwise -> 
+                runCompiler hscCompileInteractive handleInterpreted
+      HscNothing -> 
+                runCompiler hscCompileNothing handleBatch
+      _other -> 
+                runCompiler hscCompileBatch handleBatch
 
 -----------------------------------------------------------------------------
 -- stub .h and .c files (for foreign export support)
