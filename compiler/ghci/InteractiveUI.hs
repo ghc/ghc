@@ -1896,10 +1896,10 @@ listAround span do_highlight = do
           line_nos = [ fst_line .. ]
 
           highlighted | do_highlight = zipWith highlight line_nos these_lines
-                      | otherwise   = these_lines
+                      | otherwise    = [\p -> BS.concat[p,l] | l <- these_lines]
 
           bs_line_nos = [ BS.pack (show l ++ "  ") | l <- line_nos ]
-          prefixed = zipWith BS.append bs_line_nos highlighted
+          prefixed = zipWith ($) highlighted bs_line_nos
       --
       BS.putStrLn (BS.join (BS.pack "\n") prefixed)
   where
@@ -1916,30 +1916,31 @@ listAround span do_highlight = do
         highlight | do_bold   = highlight_bold
                   | otherwise = highlight_carets
 
-        highlight_bold no line
+        highlight_bold no line prefix
           | no == line1 && no == line2
           = let (a,r) = BS.splitAt col1 line
                 (b,c) = BS.splitAt (col2-col1) r
             in
-            BS.concat [a,BS.pack start_bold,b,BS.pack end_bold,c]
+            BS.concat [prefix, a,BS.pack start_bold,b,BS.pack end_bold,c]
           | no == line1
           = let (a,b) = BS.splitAt col1 line in
-            BS.concat [a, BS.pack start_bold, b]
+            BS.concat [prefix, a, BS.pack start_bold, b]
           | no == line2
           = let (a,b) = BS.splitAt col2 line in
-            BS.concat [a, BS.pack end_bold, b]
-          | otherwise   = line
+            BS.concat [prefix, a, BS.pack end_bold, b]
+          | otherwise   = BS.concat [prefix, line]
 
-        highlight_carets no line
+        highlight_carets no line prefix
           | no == line1 && no == line2
-          = BS.concat [line, nl, indent, BS.replicate col1 ' ',
+          = BS.concat [prefix, line, nl, indent, BS.replicate col1 ' ',
                                          BS.replicate (col2-col1) '^']
           | no == line1
-          = BS.concat [line, nl, indent, BS.replicate col1 ' ',
-                                         BS.replicate (BS.length line-col1) '^']
+          = BS.concat [indent, BS.replicate (col1 - 2) ' ', BS.pack "vv", nl, 
+                                         prefix, line]
           | no == line2
-          = BS.concat [line, nl, indent, BS.replicate col2 '^']
-          | otherwise   = line
+          = BS.concat [prefix, line, nl, indent, BS.replicate col2 ' ',
+                                         BS.pack "^^"]
+          | otherwise   = BS.concat [prefix, line]
          where
            indent = BS.pack ("  " ++ replicate (length (show no)) ' ')
            nl = BS.singleton '\n'
