@@ -291,6 +291,10 @@ else
 GhcEnableTablesNextToCode=YES
 endif
 
+# When building bindists we set this to yes so that the binaries are as
+# portable as possible.
+BeConservative = NO
+
 #
 # Building various ways?
 # (right now, empty if not).

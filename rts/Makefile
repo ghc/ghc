@@ -35,6 +35,10 @@ GhcRtsHcOpts=
 GhcRtsCcOpts=-g -O0
 endif
 
+ifeq "$(BeConservative)" "YES"
+GhcRtsCcOpts += -DBE_CONSERVATIVE
+endif
+
 # -----------------------------------------------------------------------------
 
 # There's nothing for Haddock here...

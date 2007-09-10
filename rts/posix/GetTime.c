@@ -134,7 +134,7 @@ Ticks getThreadCPUTime(void)
     }
     return ((usec * TICKS_PER_SECOND) / 1000000);
 
-#elif defined(HAVE_CLOCK_GETTIME) && defined (_POSIX_THREAD_CPUTIME) && defined(CLOCK_THREAD_CPUTIME_ID) && defined(HAVE_SYSCONF)
+#elif !defined(BE_CONSERVATIVE) && defined(HAVE_CLOCK_GETTIME) && defined (_POSIX_THREAD_CPUTIME) && defined(CLOCK_THREAD_CPUTIME_ID) && defined(HAVE_SYSCONF)
     if (sysconf(_POSIX_THREAD_CPUTIME) != -1) {
         // clock_gettime() gives us per-thread CPU time.  It isn't
         // reliable on Linux, but it's the best we have.
