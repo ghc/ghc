@@ -1,1 +1,1 @@
-data (->) a b 	-- <wired into compiler>
+data (->) a b 	-- Defined in GHC.Prim
