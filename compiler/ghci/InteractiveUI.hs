@@ -1941,7 +1941,7 @@ listAround span do_highlight = do
           = BS.concat [line, nl, indent, BS.replicate col2 '^']
           | otherwise   = line
          where
-           indent = BS.pack "   "
+           indent = BS.pack ("  " ++ replicate (length (show no)) ' ')
            nl = BS.singleton '\n'
 
 -- --------------------------------------------------------------------------
