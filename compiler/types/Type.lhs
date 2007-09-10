@@ -74,6 +74,9 @@ module Type (
 	tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
 	typeKind, addFreeTyVars,
 
+        -- Type families
+        tyFamInsts,
+
 	-- Tidying up for printing
 	tidyType,      tidyTypes,
 	tidyOpenType,  tidyOpenTypes,
@@ -84,7 +87,7 @@ module Type (
 
 	-- Comparison
 	coreEqType, tcEqType, tcEqTypes, tcCmpType, tcCmpTypes, 
-	tcEqPred, tcCmpPred, tcEqTypeX, 
+	tcEqPred, tcCmpPred, tcEqTypeX, tcPartOfType, tcPartOfPred,
 
 	-- Seq
 	seqType, seqTypes,
@@ -709,6 +712,28 @@ addFreeTyVars ty			     = NoteTy (FTVNote (tyVarsOfType ty)) ty
 
 %************************************************************************
 %*									*
+\subsection{Type families}
+%*									*
+%************************************************************************
+
+Type family instances occuring in a type after expanding synonyms.
+
+\begin{code}
+tyFamInsts :: Type -> [(TyCon, [Type])]
+tyFamInsts ty 
+  | Just exp_ty <- tcView ty    = tyFamInsts exp_ty
+tyFamInsts (TyVarTy _)          = []
+tyFamInsts (TyConApp tc tys) 
+  | isOpenSynTyCon tc           = [(tc, tys)]
+  | otherwise                   = concat (map tyFamInsts tys)
+tyFamInsts (FunTy ty1 ty2)      = tyFamInsts ty1 ++ tyFamInsts ty2
+tyFamInsts (AppTy ty1 ty2)      = tyFamInsts ty1 ++ tyFamInsts ty2
+tyFamInsts (ForAllTy _ ty)      = tyFamInsts ty
+\end{code}
+
+
+%************************************************************************
+%*									*
 \subsection{TidyType}
 %*									*
 %************************************************************************
@@ -972,6 +997,27 @@ tcCmpPred p1 p2 = cmpPred p1 p2
 
 tcEqTypeX :: RnEnv2 -> Type -> Type -> Bool
 tcEqTypeX env t1 t2 = isEqual $ cmpTypeX env t1 t2
+\end{code}
+
+Checks whether the second argument is a subterm of the first.  (We don't care
+about binders, as we are only interested in syntactic subterms.)
+
+\begin{code}
+tcPartOfType :: Type -> Type -> Bool
+tcPartOfType t1              t2 = tcEqType t1 t2
+tcPartOfType t1              t2 
+  | Just t2' <- tcView t2       = tcPartOfType t1 t2'
+tcPartOfType t1 (ForAllTy _ t2) = tcPartOfType t1 t2
+tcPartOfType t1 (AppTy s2 t2)   = tcPartOfType t1 s2 || tcPartOfType t1 t2
+tcPartOfType t1 (FunTy s2 t2)   = tcPartOfType t1 s2 || tcPartOfType t1 t2
+tcPartOfType t1 (PredTy p2)     = tcPartOfPred t1 p2
+tcPartOfType t1 (TyConApp _ ts) = any (tcPartOfType t1) ts
+tcPartOfType t1 (NoteTy _ t2)   = tcPartOfType t1 t2
+
+tcPartOfPred :: Type -> PredType -> Bool
+tcPartOfPred t1 (IParam _ t2)  = tcPartOfType t1 t2
+tcPartOfPred t1 (ClassP _ ts)  = any (tcPartOfType t1) ts
+tcPartOfPred t1 (EqPred s2 t2) = tcPartOfType t1 s2 || tcPartOfType t1 t2
 \end{code}
 
 Now here comes the real worker

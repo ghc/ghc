@@ -1442,16 +1442,4 @@ sizePred :: PredType -> Int
 sizePred (ClassP _ tys')   = sizeTypes tys'
 sizePred (IParam _ ty)     = sizeType ty
 sizePred (EqPred ty1 ty2)  = sizeType ty1 + sizeType ty2
-
--- Type family instances occuring in a type after expanding synonyms
-tyFamInsts :: Type -> [(TyCon, [Type])]
-tyFamInsts ty 
-  | Just exp_ty <- tcView ty    = tyFamInsts exp_ty
-tyFamInsts (TyVarTy _)          = []
-tyFamInsts (TyConApp tc tys) 
-  | isOpenSynTyCon tc           = [(tc, tys)]
-  | otherwise                   = concat (map tyFamInsts tys)
-tyFamInsts (FunTy ty1 ty2)      = tyFamInsts ty1 ++ tyFamInsts ty2
-tyFamInsts (AppTy ty1 ty2)      = tyFamInsts ty1 ++ tyFamInsts ty2
-tyFamInsts (ForAllTy _ ty)      = tyFamInsts ty
 \end{code}

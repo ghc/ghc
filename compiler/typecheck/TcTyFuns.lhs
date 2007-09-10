@@ -84,11 +84,26 @@ possible (ie, we treat family instances as a TRS).  Also zonk meta variables.
 	then   co : ty ~ ty'
 
 \begin{code}
-tcNormalizeFamInst :: Type -> TcM (CoercionI, Type)
+tcNormalizeFamInst :: TcType -> TcM (CoercionI, TcType)
 tcNormalizeFamInst = tcGenericNormalizeFamInst tcUnfoldSynFamInst
 
 tcNormalizeFamInstPred :: TcPredType -> TcM (CoercionI, TcPredType)
 tcNormalizeFamInstPred = tcGenericNormalizeFamInstPred tcUnfoldSynFamInst
+\end{code}
+
+Normalise a type relative to the rewrite rule implied by one EqInst.
+
+\begin{code}
+tcEqInstNormalizeFamInst :: Inst -> TcType -> TcM (CoercionI, Type)
+tcEqInstNormalizeFamInst inst = ASSERT( isEqInst inst )
+                                tcGenericNormalizeFamInst matchInst
+  where
+    pat = eqInstLeftTy  inst
+    rhs = eqInstRightTy inst
+    co  = eitherEqInst  inst TyVarTy id
+    --
+    matchInst ty | pat `tcEqType` ty = return $ Just (rhs, co)
+                 | otherwise         = return $ Nothing
 \end{code}
 
 Generic normalisation of 'Type's and 'PredType's; ie, walk the type term and
@@ -107,10 +122,10 @@ unfolded closed type synonyms (by way of tcCoreView).  In the interest of
 good error messages, callers should discard ty' in favour of ty in this case.
 
 \begin{code}
-tcGenericNormalizeFamInst :: (TcType -> TcM (Maybe (TcType,Coercion))) 	
+tcGenericNormalizeFamInst :: (TcType -> TcM (Maybe (TcType, Coercion))) 	
                              -- what to do with type functions and tyvars
 	                   -> TcType  			-- old type
-	                   -> TcM (CoercionI, Type)	-- (coercion, new type)
+	                   -> TcM (CoercionI, TcType)	-- (coercion, new type)
 tcGenericNormalizeFamInst fun ty
   | Just ty' <- tcView ty = tcGenericNormalizeFamInst fun ty' 
 tcGenericNormalizeFamInst fun (TyConApp tyCon tys)
@@ -273,48 +288,99 @@ normaliseGivens givens
       ; traceTc (text "normaliseGivens ->" <+> ppr result)
       ; return (result, deSkolem)
       }
+\end{code}
 
--- An explanation of what this does would be helpful! -=chak
+
+This is an (attempt at, yet unproven, an) *unflattened* version of
+the SubstL-Ev completion rule.
+
+The above rule is essential to catch non-terminating
+rules that cannot be oriented properly, like
+
+     F a ~ [G (F a)]
+ or even
+     a ~ [G a]
+
+The left-to-right orientiation is not suitable because it does not
+terminate.
+The right-to-left orientation is not suitable because it 
+does not have a type-function on the left. This is undesirable because
+it would hide information. E.g. assume 
+	instance C [x]
+then rewriting C [G (F a)] to C (F a) is bad because we cannot now
+see that the C [x] instance applies.
+
+The rule also caters for badly-oriented rules of the form:
+     F a ~ G (F a)
+for which other solutions are possible, but this one will do too.
+
+It's behavior is:
+  co : ty1 ~ ty2{F ty1}
+     >-->
+  co         : ty1 ~ ty2{b}
+  sym (F co) : F ty2{b} ~ b
+ 	where b is a fresh skolem variable
+
+We also return an action (b := ty1) which is used to eliminate b 
+after the dust of normalisation with the completed rewrite system
+has settled.
+
+A subtle point of this transformation is that both coercions in the results
+are strictly speaking incorrect.  However, they are correct again after the
+action {B := ty1} has removed the skolem again.  This happens immediately
+after constraint entailment has been checked; ie, code outside of the
+simplification and entailment checking framework will never see these
+temporarily incorrect coercions.
+
+NB: We perform this transformation for multiple occurences of ty1 under one
+    or multiple family applications on the left-hand side at once (ie, the
+    rule doesn't need to be applied multiple times at a single inst).  As a 
+    result we can get two or more insts back.
+
+\begin{code}
 skolemOccurs :: PrecondRule
-skolemOccurs [] = return ([], return ())
-skolemOccurs (inst@(EqInst {}):insts) 
-	= do { (insts',actions) <- skolemOccurs insts
-	       -- check whether the current inst  co :: ty1 ~ ty2  suffers 
-	       -- from the occurs check issue: F ty1 \in ty2
-	      ; let occurs = go False ty2
-	      ; if occurs
-                  then 
-	 	      -- if it does generate two new coercions:
-		      do { skolem_var <- newMetaTyVar TauTv (typeKind ty1)
-			 ; let skolem_ty = TyVarTy skolem_var
-		      --    ty1    :: ty1 ~ b
-			 ; inst1 <- mkEqInst (EqPred ty1 skolem_ty) (mkGivenCo ty1)
-		      --    sym co :: ty2 ~ b
-			 ; inst2 <- mkEqInst (EqPred ty2 skolem_ty) (mkGivenCo $ fromACo $ mkSymCoI $ ACo $ fromGivenCo co)
-		      -- to replace the old one
-		      -- the corresponding action is
-		      --    b := ty1
-			 ; let action = writeMetaTyVar skolem_var ty1
-	     	         ; return (inst1:inst2:insts', action >> actions)
-		         }
-		  else 
-	     	      return (inst:insts', actions)
-	     }
-	where 
-		ty1 = eqInstLeftTy inst
-		ty2 = eqInstRightTy inst
-		co  = eqInstCoercion inst
-		check :: Bool -> TcType -> Bool
-		check flag ty 
-			= if flag && ty1 `tcEqType` ty
-				then True
-				else go flag ty		
+skolemOccurs insts
+  = do { (instss, undoSkolems) <- mapAndUnzipM oneSkolemOccurs insts
+       ; return (concat instss, sequence_ undoSkolems)
+       }
+  where
+    oneSkolemOccurs inst
+      | null tysToLiftOut 
+      = return ([inst], return ())
+      | otherwise
+      = do { skTvs <- mapM (newMetaTyVar TauTv . typeKind) tysToLiftOut
+           ; let skTvs_tysTLO   = zip skTvs tysToLiftOut
+                 insertSkolems = return . replace skTvs_tysTLO
+           ; (_, ty2') <- tcGenericNormalizeFamInst insertSkolems ty2
+           ; inst' <- mkEqInst (EqPred ty1 ty2') co
+           ; (insts, undoSk) <- mapAndUnzipM (mkSkolemInst inst') skTvs_tysTLO
+           ; return (inst':insts, sequence_ undoSk)
+           }
+      where
+        ty1 = eqInstLeftTy   inst
+        ty2 = eqInstRightTy  inst
+        co  = eqInstCoercion inst
 
-		go flag (TyConApp con tys)	= or $ map (check (isOpenSynTyCon con || flag)) tys
-		go flag (FunTy arg res)	= or $ map (check flag) [arg,res]
-		go flag (AppTy fun arg)		= or $ map (check flag) [fun,arg]
-		go _    _ 			= False
-skolemOccurs _ = panic "TcTyFuns.skolemOccurs: not EqInst"
+        -- all subtypes that are (1) type family instances and (2) contain the
+        -- lhs type as part of the type arguments of the type family constructor
+        tysToLiftOut = ASSERT( isEqInst inst )
+                       [mkTyConApp tc tys | (tc, tys) <- tyFamInsts ty2
+                                          , any (ty1 `tcPartOfType`) tys]
+
+        replace :: [(TcTyVar, Type)] -> Type -> Maybe (Type, Coercion)
+        replace []                   _  = Nothing
+        replace ((skTv, tyTLO):rest) ty 
+          | tyTLO `tcEqType` ty         = Just (mkTyVarTy skTv, undefined)
+          | otherwise                   = replace rest ty
+
+        -- create the EqInst for the equality determining the skolem and a
+        -- TcM action undoing the skolem introduction
+        mkSkolemInst inst' (skTv, tyTLO)
+          = do { (co, tyLiftedOut) <- tcEqInstNormalizeFamInst inst' tyTLO
+               ; inst <- mkEqInst (EqPred tyLiftedOut (mkTyVarTy skTv)) 
+                                  (mkGivenCo $ mkSymCoercion (fromACo co))
+               ; return (inst, writeMetaTyVar skTv tyTLO) 
+               }
 \end{code}
 
 
@@ -476,12 +542,18 @@ swapInsts insts
        }
 
 	-- (Swap)
-	-- 	g1 : c ~ Fd
+	-- 	g1 : c ~ F d
 	--		>-->
-	--	g2 : Fd ~ c
+	--	g2 : F d ~ c
 	--	g1 := sym g2
+	--		where c isn't a function call
+        --  and
 	--
-        -- This is not all, is it?  Td ~ c is also rewritten to c ~ Td!
+	-- 	g1 : c ~ a
+	--		>-->
+	--	g2 : a ~ c
+	--	g1 := sym g2
+	--		where c isn't a function call or other variable
 swapInst :: Inst -> TcM (Inst, Bool)
 swapInst i@(EqInst {})
 	= go ty1 ty2
@@ -639,6 +711,12 @@ substInstsWorker (i:is) acc
 		  then return ((i:is'),True)
                   else substInstsWorker is (i:acc)
 	     }
+	| (TyVarTy _) <- tci_left i
+	= do { (is',change) <- substInst i (acc ++ is)
+	     ; if change 
+		  then return ((i:is'),True)
+                  else substInstsWorker is (i:acc)
+	     }
 	| otherwise
 	= substInstsWorker is (i:acc)
 		
@@ -649,12 +727,11 @@ substInstsWorker (i:is) acc
 	--	g2 : s1{t} ~ s2{t}
 	--	g1 := s1{g} * g2  * sym s2{g}		<=> 	g2 := sym s1{g} * g1 * s2{g}
 substInst :: Inst -> [Inst] -> TcM ([Inst], Bool)
-substInst _inst [] 
-	= return ([],False)
-substInst inst@(EqInst {tci_left = pattern, tci_right = target}) (i@(EqInst {tci_left = ty1, tci_right = ty2}):is)			
+substInst _inst [] = return ([],False)
+substInst inst (i@(EqInst {tci_left = ty1, tci_right = ty2}):is)
 	= do { (is',changed) <- substInst inst is
-	     ; (coi1,ty1')   <- tcGenericNormalizeFamInst fun ty1
-	     ; (coi2,ty2')   <- tcGenericNormalizeFamInst fun ty2
+	     ; (coi1,ty1')   <- normalise ty1
+	     ; (coi2,ty2')   <- normalise ty2
 	     ; case (coi1,coi2) of
 		(IdCo,IdCo) -> 
 		  return (i:is',changed)
@@ -674,9 +751,8 @@ substInst inst@(EqInst {tci_left = pattern, tci_right = target}) (i@(EqInst {tci
 		     ; return (new_inst:is',True)
 		     }
 	     }
-	where fun ty = return $ if tcEqType pattern ty then Just (target,coercion) else Nothing
-
-	      coercion = eitherEqInst inst TyVarTy id
+	where 
+          normalise = tcEqInstNormalizeFamInst inst
 substInst _ _ = panic "TcTyFuns.substInst: not EqInst"
 
 -- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

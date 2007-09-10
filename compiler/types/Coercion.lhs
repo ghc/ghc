@@ -371,7 +371,10 @@ transCoercionTyCon =
   where
     composeCoercionKindsOf (co1:co2:rest)
       = ASSERT( null rest )
-        WARN( not (r1 `coreEqType` a2), text "Strange! Type mismatch in trans coercion, probably a bug")
+        WARN( not (r1 `coreEqType` a2), 
+              text "Strange! Type mismatch in trans coercion, probably a bug"
+              $$
+              ppr r1 <+> text "=/=" <+> ppr a2)
         (a1, r2)
       where
         (a1, r1) = coercionKind co1
