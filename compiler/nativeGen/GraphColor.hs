@@ -67,8 +67,12 @@ colorGraph iterative colors triv spill graph0
  	-- If iterative coalescing is enabled, the scanner will coalesce the graph as does its business.
 	--	We need to apply all the coalescences found by the scanner to the original
 	--	graph before doing assignColors.
+	--
+	--	Because we've got the whole, non-pruned graph here we turn on aggressive coalecing
+	--	to force all the (conservative) coalescences found during scanning.
+	--
 	(graph_scan_coalesced, _)
-		= mapAccumL (coalesceNodes False triv) graph_coalesced kksCoalesce2
+		= mapAccumL (coalesceNodes True triv) graph_coalesced kksCoalesce2
  
 	-- color the trivially colorable nodes
 	--	during scanning, keys of triv nodes were added to the front of the list as they were found
