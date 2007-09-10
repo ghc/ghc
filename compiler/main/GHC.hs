@@ -206,10 +206,12 @@ import Linker           ( HValue )
 import ByteCodeInstr
 import BreakArray
 import NameSet
-import TcRnDriver
 import InteractiveEval
+import TcRnDriver
 #endif
 
+import TcIface
+import TcRnMonad        ( initIfaceCheck )
 import Packages
 import NameSet
 import RdrName
@@ -1065,20 +1067,21 @@ upsweep
            HscEnv,		-- With an updated HPT
            [ModSummary])	-- Mods which succeeded
 
-upsweep hsc_env old_hpt stable_mods cleanup mods
-   = upsweep' hsc_env old_hpt stable_mods cleanup mods 1 (length mods)
+upsweep hsc_env old_hpt stable_mods cleanup sccs = do
+   (res, hsc_env, done) <- upsweep' hsc_env old_hpt [] sccs 1 (length sccs)
+   return (res, hsc_env, reverse done)
  where
 
-  upsweep' hsc_env _old_hpt _stable_mods _cleanup
+  upsweep' hsc_env _old_hpt done
      [] _ _
-   = return (Succeeded, hsc_env, [])
+   = return (Succeeded, hsc_env, done)
 
-  upsweep' hsc_env _old_hpt _stable_mods _cleanup
+  upsweep' hsc_env _old_hpt done
      (CyclicSCC ms:_) _ _
    = do fatalErrorMsg (hsc_dflags hsc_env) (cyclicModuleErr ms)
-        return (Failed, hsc_env, [])
+        return (Failed, hsc_env, done)
 
-  upsweep' hsc_env old_hpt stable_mods cleanup
+  upsweep' hsc_env old_hpt done
      (AcyclicSCC mod:mods) mod_index nmods
    = do -- putStrLn ("UPSWEEP_MOD: hpt = " ++ 
 	--	     show (map (moduleUserString.moduleName.mi_module.hm_iface) 
@@ -1092,26 +1095,29 @@ upsweep hsc_env old_hpt stable_mods cleanup mods
         case mb_mod_info of
 	    Nothing -> return (Failed, hsc_env, [])
 	    Just mod_info -> do 
-		{ let this_mod = ms_mod_name mod
+		let this_mod = ms_mod_name mod
 
 			-- Add new info to hsc_env
-		      hpt1     = addToUFM (hsc_HPT hsc_env) this_mod mod_info
-		      hsc_env1 = hsc_env { hsc_HPT = hpt1 }
+		    hpt1     = addToUFM (hsc_HPT hsc_env) this_mod mod_info
+		    hsc_env1 = hsc_env { hsc_HPT = hpt1 }
 
 			-- Space-saving: delete the old HPT entry
 			-- for mod BUT if mod is a hs-boot
 			-- node, don't delete it.  For the
 			-- interface, the HPT entry is probaby for the
 			-- main Haskell source file.  Deleting it
-			-- would force .. (what?? --SDM)
-		      old_hpt1 | isBootSummary mod = old_hpt
-			       | otherwise = delFromUFM old_hpt this_mod
+			-- would force the real module to be recompiled
+                        -- every time.
+		    old_hpt1 | isBootSummary mod = old_hpt
+			     | otherwise = delFromUFM old_hpt this_mod
 
-		; (restOK, hsc_env2, modOKs) 
-			<- upsweep' hsc_env1 old_hpt1 stable_mods cleanup 
-				mods (mod_index+1) nmods
-		; return (restOK, hsc_env2, mod:modOKs)
-		}
+                    done' = mod:done
+
+                        -- fixup our HomePackageTable after we've finished compiling
+                        -- a mutually-recursive loop.  See reTypecheckLoop, below.
+                hsc_env2 <- reTypecheckLoop hsc_env1 mod done'
+
+		upsweep' hsc_env2 old_hpt1 done' mods (mod_index+1) nmods
 
 
 -- Compile a single module.  Always produce a Linkable for it if 
@@ -1271,6 +1277,83 @@ retainInTopLevelEnvs keep_these hpt
 		 | mod <- keep_these
 		 , let mb_mod_info = lookupUFM hpt mod
 		 , isJust mb_mod_info ]
+
+-- ---------------------------------------------------------------------------
+-- Typecheck module loops
+
+{-
+See bug #930.  This code fixes a long-standing bug in --make.  The
+problem is that when compiling the modules *inside* a loop, a data
+type that is only defined at the top of the loop looks opaque; but
+after the loop is done, the structure of the data type becomes
+apparent.
+
+The difficulty is then that two different bits of code have
+different notions of what the data type looks like.
+
+The idea is that after we compile a module which also has an .hs-boot
+file, we re-generate the ModDetails for each of the modules that
+depends on the .hs-boot file, so that everyone points to the proper
+TyCons, Ids etc. defined by the real module, not the boot module.
+Fortunately re-generating a ModDetails from a ModIface is easy: the
+function TcIface.typecheckIface does exactly that.
+
+Picking the modules to re-typecheck is slightly tricky.  Starting from
+the module graph consisting of the modules that have already been
+compiled, we reverse the edges (so they point from the imported module
+to the importing module), and depth-first-search from the .hs-boot
+node.  This gives us all the modules that depend transitively on the
+.hs-boot module, and those are exactly the modules that we need to
+re-typecheck.
+
+Following this fix, GHC can compile itself with --make -O2.
+-}
+
+reTypecheckLoop :: HscEnv -> ModSummary -> ModuleGraph -> IO HscEnv
+reTypecheckLoop hsc_env ms graph
+  | not (isBootSummary ms) && 
+    any (\m -> ms_mod m == this_mod && isBootSummary m) graph
+  = do
+        let mss = reachableBackwards (ms_mod_name ms) graph
+            non_boot = filter (not.isBootSummary) mss
+        debugTraceMsg (hsc_dflags hsc_env) 2 $
+           text "Re-typechecking loop: " <> ppr (map ms_mod_name non_boot)
+        typecheckLoop hsc_env (map ms_mod_name non_boot)
+  | otherwise
+  = return hsc_env
+ where
+  this_mod = ms_mod ms
+
+typecheckLoop :: HscEnv -> [ModuleName] -> IO HscEnv
+typecheckLoop hsc_env mods = do
+  new_hpt <-
+    fixIO $ \new_hpt -> do
+      let new_hsc_env = hsc_env{ hsc_HPT = new_hpt }
+      mds <- initIfaceCheck new_hsc_env $ 
+                mapM (typecheckIface . hm_iface) hmis
+      let new_hpt = addListToUFM old_hpt 
+                        (zip mods [ hmi{ hm_details = details }
+                                  | (hmi,details) <- zip hmis mds ])
+      return new_hpt
+  return hsc_env{ hsc_HPT = new_hpt }
+  where
+    old_hpt = hsc_HPT hsc_env
+    hmis    = map (expectJust "typecheckLoop" . lookupUFM old_hpt) mods
+
+reachableBackwards :: ModuleName -> [ModSummary] -> [ModSummary]
+reachableBackwards mod summaries
+  = [ ms | (ms,_,_) <- map vertex_fn nodes_we_want ]
+  where          
+        -- all the nodes reachable by traversing the edges backwards
+        -- from the root node:
+        nodes_we_want = reachable (transposeG graph) root
+
+        -- the rest just sets up the graph:
+	(nodes, lookup_key) = moduleGraphNodes False summaries
+	(graph, vertex_fn, key_fn) = graphFromEdges' nodes
+	root 
+	  | Just key <- lookup_key HsBootFile mod, Just v <- key_fn key = v
+	  | otherwise = panic "reachableBackwards"
 
 -- ---------------------------------------------------------------------------
 -- Topological sort of the module graph

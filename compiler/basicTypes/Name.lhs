@@ -30,7 +30,7 @@ module Name (
 	tidyNameOcc, 
 	hashName, localiseName,
 
-	nameSrcLoc, nameSrcSpan,
+	nameSrcLoc, nameSrcSpan, pprNameLoc,
 
 	isSystemName, isInternalName, isExternalName,
 	isTyVarName, isTyConName, isWiredInName, isBuiltInSyntax,
@@ -401,6 +401,13 @@ ppr_occ_name occ = ftext (occNameFS occ)
 -- In code style, we Z-encode the strings.  The results of Z-encoding each FastString are
 -- cached behind the scenes in the FastString implementation.
 ppr_z_occ_name occ = ftext (zEncodeFS (occNameFS occ))
+
+-- Prints "Defined at <loc>" or "Defined in <mod>" information for a Name.
+pprNameLoc :: Name -> SDoc
+pprNameLoc name
+  | isGoodSrcSpan loc = pprDefnLoc loc
+  | otherwise         = ptext SLIT("Defined in ") <> ppr (nameModule name)
+  where loc = nameSrcSpan name
 \end{code}
 
 %************************************************************************

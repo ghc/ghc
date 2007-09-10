@@ -343,9 +343,9 @@ loadDecl :: Bool		    -- Don't load pragmas into the decl pool
 loadDecl ignore_prags mod (_version, decl)
   = do 	{ 	-- Populate the name cache with final versions of all 
 		-- the names associated with the decl
-	  main_name      <- mk_new_bndr mod (ifName decl)
+	  main_name      <- lookupOrig mod (ifName decl)
 --        ; traceIf (text "Loading decl for " <> ppr main_name)
-	; implicit_names <- mapM (mk_new_bndr mod) (ifaceDeclSubBndrs decl)
+	; implicit_names <- mapM (lookupOrig mod) (ifaceDeclSubBndrs decl)
 
 	-- Typecheck the thing, lazily
 	-- NB. Firstly, the laziness is there in case we never need the
@@ -390,15 +390,6 @@ loadDecl ignore_prags mod (_version, decl)
 		-- as the TyThings.  That way we can extend the PTE without poking the
 		-- thunks
   where
-	-- mk_new_bndr allocates in the name cache the final canonical
-	-- name for the thing, with the correct 
-	--	* parent
-	--	* location
-	-- imported name, to fix the module correctly in the cache
-    mk_new_bndr mod occ 
-	= newGlobalBinder mod occ (importedSrcSpan (moduleNameFS (moduleName mod)))
-			-- ToDo: qualify with the package name if necessary
-
     doc = ptext SLIT("Declaration for") <+> ppr (ifName decl)
 
 bumpDeclStats :: Name -> IfL ()		-- Record that one more declaration has actually been used

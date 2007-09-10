@@ -141,7 +141,7 @@ pprInstance :: Instance -> SDoc
 -- Prints the Instance as an instance declaration
 pprInstance ispec@(Instance { is_flag = flag })
   = hang (pprInstanceHdr ispec)
-	2 (ptext SLIT("--") <+> (pprDefnLoc (getSrcSpan ispec)))
+	2 (ptext SLIT("--") <+> pprNameLoc (getName ispec))
 
 -- * pprInstanceHdr is used in VStudio to populate the ClassView tree
 pprInstanceHdr :: Instance -> SDoc

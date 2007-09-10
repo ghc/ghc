@@ -17,7 +17,6 @@ module SrcLoc (
 	noSrcLoc, 		-- "I'm sorry, I haven't a clue"
 	advanceSrcLoc,
 
-	importedSrcLoc,		-- Unknown place in an interface
 	generatedSrcLoc,	-- Code generated within the compiler
 	interactiveSrcLoc,	-- Code from an interactive session
 
@@ -29,7 +28,6 @@ module SrcLoc (
 	SrcSpan,		-- Abstract
 	noSrcSpan, 
 	wiredInSrcSpan,		-- Something wired into the compiler
-	importedSrcSpan,	-- Unknown place in an interface
 	mkGeneralSrcSpan, 
 	isGoodSrcSpan, isOneLineSpan,
 	mkSrcSpan, srcLocSpan,
@@ -70,15 +68,8 @@ data SrcLoc
 		-- Don't ask me why lines start at 1 and columns start at
 		-- zero.  That's just the way it is, so there.  --SDM
 
-  | ImportedLoc	FastString	-- Module name
-
   | UnhelpfulLoc FastString	-- Just a general indication
 \end{code}
-
-Note that an entity might be imported via more than one route, and
-there could be more than one ``definition point'' --- in two or more
-\tr{.hi} files.	 We deemed it probably-unworthwhile to cater for this
-rare case.
 
 %************************************************************************
 %*									*
@@ -95,9 +86,6 @@ interactiveSrcLoc = UnhelpfulLoc FSLIT("<interactive session>")
 
 mkGeneralSrcLoc :: FastString -> SrcLoc
 mkGeneralSrcLoc = UnhelpfulLoc 
-
-importedSrcLoc :: FastString -> SrcLoc
-importedSrcLoc mod_name = ImportedLoc mod_name
 
 isGoodSrcLoc (SrcLoc _ _ _) = True
 isGoodSrcLoc other          = False
@@ -139,10 +127,6 @@ instance Ord SrcLoc where
 cmpSrcLoc (UnhelpfulLoc s1) (UnhelpfulLoc s2) = s1 `compare` s2
 cmpSrcLoc (UnhelpfulLoc _)  other      	      = LT
 
-cmpSrcLoc (ImportedLoc _)  (UnhelpfulLoc _)  = GT
-cmpSrcLoc (ImportedLoc m1) (ImportedLoc m2)  = m1 `compare` m2
-cmpSrcLoc (ImportedLoc _)  other	     = LT
-
 cmpSrcLoc (SrcLoc s1 l1 c1) (SrcLoc s2 l2 c2)      
   = (s1 `compare` s2) `thenCmp` (l1 `compare` l2) `thenCmp` (c1 `compare` c2)
 cmpSrcLoc (SrcLoc _ _ _) other = GT
@@ -159,7 +143,6 @@ instance Outputable SrcLoc where
 	   hcat [text "{-# LINE ", int src_line, space,
 		 char '\"', ftext src_path, text " #-}"]
 
-    ppr (ImportedLoc mod) = ptext SLIT("Defined in") <+> ftext mod
     ppr (UnhelpfulLoc s)  = ftext s
 \end{code}
 
@@ -202,8 +185,6 @@ data SrcSpan
 	  srcSpanCol      :: !Int
 	}
 
-  | ImportedSpan FastString	-- Module name
-
   | UnhelpfulSpan FastString	-- Just a general indication
 				-- also used to indicate an empty span
 
@@ -217,7 +198,6 @@ instance Ord SrcSpan where
 
 noSrcSpan      = UnhelpfulSpan FSLIT("<no location info>")
 wiredInSrcSpan = UnhelpfulSpan FSLIT("<wired into compiler>")
-importedSrcSpan = ImportedSpan
 
 mkGeneralSrcSpan :: FastString -> SrcSpan
 mkGeneralSrcSpan = UnhelpfulSpan
@@ -242,7 +222,7 @@ isOneLineSpan s
 
 --------------------------------------------------------
 -- Don't export these four;
--- they panic on Imported, Unhelpful.
+-- they panic on Unhelpful.
 -- They are for internal use only
 -- Urk!  Some are needed for Lexer.x; see comment in export list
 
@@ -267,13 +247,11 @@ srcSpanEndCol SrcSpanPoint{ srcSpanCol=c } = c
 srcSpanEndCol _ = panic "SrcLoc.srcSpanEndCol"
 --------------------------------------------------------
 
-srcSpanStart (ImportedSpan str) = ImportedLoc str
 srcSpanStart (UnhelpfulSpan str) = UnhelpfulLoc str
 srcSpanStart s = mkSrcLoc (srcSpanFile s) 
 			  (srcSpanStartLine s)
 		 	  (srcSpanStartCol s)
 
-srcSpanEnd (ImportedSpan str) = ImportedLoc str
 srcSpanEnd (UnhelpfulSpan str) = UnhelpfulLoc str
 srcSpanEnd s = 
   mkSrcLoc (srcSpanFile s) 
@@ -281,14 +259,11 @@ srcSpanEnd s =
  	   (srcSpanEndCol s)
 
 srcLocSpan :: SrcLoc -> SrcSpan
-srcLocSpan (ImportedLoc str)  = ImportedSpan str
 srcLocSpan (UnhelpfulLoc str) = UnhelpfulSpan str
 srcLocSpan (SrcLoc file line col) = SrcSpanPoint file line col
 
 mkSrcSpan :: SrcLoc -> SrcLoc -> SrcSpan
-mkSrcSpan (ImportedLoc str) _  = ImportedSpan str
 mkSrcSpan (UnhelpfulLoc str) _ = UnhelpfulSpan str
-mkSrcSpan _ (ImportedLoc str)  = ImportedSpan str
 mkSrcSpan _ (UnhelpfulLoc str) = UnhelpfulSpan str
 mkSrcSpan loc1 loc2
   | line1 == line2 = if col1 == col2
@@ -304,9 +279,7 @@ mkSrcSpan loc1 loc2
 
 combineSrcSpans	:: SrcSpan -> SrcSpan -> SrcSpan
 -- Assumes the 'file' part is the same in both
-combineSrcSpans	(ImportedSpan str) _  = ImportedSpan str
 combineSrcSpans	(UnhelpfulSpan str) r = r -- this seems more useful
-combineSrcSpans	_ (ImportedSpan str)  = ImportedSpan str
 combineSrcSpans	l (UnhelpfulSpan str) = l
 combineSrcSpans	start end 
  = case line1 `compare` line2 of
@@ -324,7 +297,7 @@ combineSrcSpans	start end
 	file  = srcSpanFile start
 
 pprDefnLoc :: SrcSpan -> SDoc
--- "defined at ..." or "imported from ..."
+-- "defined at ..."
 pprDefnLoc loc
   | isGoodSrcSpan loc = ptext SLIT("Defined at") <+> ppr loc
   | otherwise	      = ppr loc
@@ -364,7 +337,6 @@ pprUserSpan (SrcSpanPoint src_path line col)
 	   char ':', int col
 	 ]
 
-pprUserSpan (ImportedSpan mod) = ptext SLIT("Defined in") <+> ftext mod
 pprUserSpan (UnhelpfulSpan s)  = ftext s
 \end{code}
 

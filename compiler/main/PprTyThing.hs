@@ -30,6 +30,7 @@ import TyCon	( tyConFamInst_maybe )
 import Type	( pprTypeApp )
 import GHC	( TyThing(..), SrcSpan )
 import Var
+import Name
 import Outputable
 
 -- -----------------------------------------------------------------------------
@@ -44,7 +45,7 @@ type PrintExplicitForalls = Bool
 pprTyThingLoc :: PrintExplicitForalls -> TyThing -> SDoc
 pprTyThingLoc pefas tyThing 
   = showWithLoc loc (pprTyThing pefas tyThing)
-  where loc = GHC.nameSrcSpan (GHC.getName tyThing)
+  where loc = pprNameLoc (GHC.getName tyThing)
 
 -- | Pretty-prints a 'TyThing'.
 pprTyThing :: PrintExplicitForalls -> TyThing -> SDoc
@@ -57,7 +58,7 @@ pprTyThing pefas (AClass cls)       = pprClass      pefas cls
 pprTyThingInContextLoc :: PrintExplicitForalls -> TyThing -> SDoc
 pprTyThingInContextLoc pefas tyThing
   = showWithLoc loc (pprTyThingInContext pefas tyThing)
-  where loc = GHC.nameSrcSpan (GHC.getName tyThing)
+  where loc = pprNameLoc (GHC.getName tyThing)
 
 -- | Pretty-prints a 'TyThing' in context: that is, if the entity
 -- is a data constructor, record selector, or class method, then 
@@ -241,9 +242,9 @@ add_bars (c:cs)  = sep ((equals <+> c) : map (char '|' <+>) cs)
 ppr_bndr :: GHC.NamedThing a => a -> SDoc
 ppr_bndr a = GHC.pprParenSymName a
 
-showWithLoc :: SrcSpan -> SDoc -> SDoc
+showWithLoc :: SDoc -> SDoc -> SDoc
 showWithLoc loc doc 
-    = hang doc 2 (char '\t' <> comment <+> GHC.pprDefnLoc loc)
+    = hang doc 2 (char '\t' <> comment <+> loc)
 		-- The tab tries to make them line up a bit
   where
     comment = ptext SLIT("--")
