@@ -1,7 +1,3 @@
-{-# OPTIONS -fno-warn-name-shadowing -w #-}
--- We'd like to use -fno-warn-orphans rather than -w, but old compilers
--- don't understand it so building stage1 fails.
-
 -----------------------------------------------------------------------------
 --
 -- Cmm data types

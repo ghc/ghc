@@ -1,6 +1,5 @@
-{-# OPTIONS -Wall -fno-warn-name-shadowing -fno-warn-orphans #-}
 
-module PprCmmZ 
+module PprCmmZ
     ( pprCmmGraph
     )
 where
