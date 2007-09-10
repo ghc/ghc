@@ -37,6 +37,11 @@ endif
 
 # -----------------------------------------------------------------------------
 
+# There's nothing for Haddock here...
+override HADDOCK_DOCS = NO
+
+# -----------------------------------------------------------------------------
+
 # Tells the build system not to add various Haskellish options to $(SRC_HC_OPTS)
 NON_HS_PACKAGE = YES
 
