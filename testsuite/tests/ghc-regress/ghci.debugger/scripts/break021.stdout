@@ -1,7 +1,8 @@
 Stopped at break020.hs:(9,7)-(17,1)
 _result :: IO () = _
 8  
-9  main = [1mdo
+        vv
+9  main = do
 10    line1 0
 11    line2 0
 12    in_another_decl 0
@@ -9,106 +10,129 @@ _result :: IO () = _
 14    line2 1
 15    return ()
 16    
-17    [0m
+17    
+      ^^
 Stopped at break020.hs:10:2-8
 _result :: IO () = _
 9  main = do
-10    [1mline1 0[0m
+10    line1 0
+      ^^^^^^^
 11    line2 0
 Stopped at break020.hs:3:0-18
 _result :: IO () = _
 2  
-3  [1mline1 _ = return ()[0m
+3  line1 _ = return ()
+   ^^^^^^^^^^^^^^^^^^^
 4  line2 _ = return ()
 Stopped at break020.hs:3:10-18
 _result :: IO () = _
 2  
-3  line1 _ = [1mreturn ()[0m
+3  line1 _ = return ()
+             ^^^^^^^^^
 4  line2 _ = return ()
 Stopped at break020.hs:11:2-8
 _result :: IO () = _
 10    line1 0
-11    [1mline2 0[0m
+11    line2 0
+      ^^^^^^^
 12    in_another_decl 0
 Stopped at break020.hs:4:0-18
 _result :: IO () = _
 3  line1 _ = return ()
-4  [1mline2 _ = return ()[0m
+4  line2 _ = return ()
+   ^^^^^^^^^^^^^^^^^^^
 5  
 Stopped at break020.hs:4:10-18
 _result :: IO () = _
 3  line1 _ = return ()
-4  line2 _ = [1mreturn ()[0m
+4  line2 _ = return ()
+             ^^^^^^^^^
 5  
 Stopped at break020.hs:12:2-18
 _result :: IO () = _
 11    line2 0
-12    [1min_another_decl 0[0m
+12    in_another_decl 0
+      ^^^^^^^^^^^^^^^^^
 13    in_another_module 0
 Stopped at break020.hs:(6,0)-(7,29)
 _result :: t1 () = _
 5  
-6  [1min_another_decl _ = do line1 0
-7                         line2 0[0m
+   vv
+6  in_another_decl _ = do line1 0
+7                         line2 0
+                                 ^^
 8  
 Stopped at break020.hs:(6,20)-(7,29)
 _result :: t1 () = _
 5  
-6  in_another_decl _ = [1mdo line1 0
-7                         line2 0[0m
+                     vv
+6  in_another_decl _ = do line1 0
+7                         line2 0
+                                 ^^
 8  
 Stopped at break020.hs:6:23-29
 _result :: t1 () = _
 5  
-6  in_another_decl _ = do [1mline1 0[0m
+6  in_another_decl _ = do line1 0
+                          ^^^^^^^
 7                         line2 0
 Stopped at break020.hs:3:0-18
 _result :: t1 () = _
 2  
-3  [1mline1 _ = return ()[0m
+3  line1 _ = return ()
+   ^^^^^^^^^^^^^^^^^^^
 4  line2 _ = return ()
 Stopped at break020.hs:3:10-18
 _result :: t1 () = _
 2  
-3  line1 _ = [1mreturn ()[0m
+3  line1 _ = return ()
+             ^^^^^^^^^
 4  line2 _ = return ()
 Stopped at break020.hs:7:23-29
 _result :: t1 () = _
 6  in_another_decl _ = do line1 0
-7                         [1mline2 0[0m
+7                         line2 0
+                          ^^^^^^^
 8  
 Stopped at break020.hs:4:0-18
 _result :: t1 () = _
 3  line1 _ = return ()
-4  [1mline2 _ = return ()[0m
+4  line2 _ = return ()
+   ^^^^^^^^^^^^^^^^^^^
 5  
 Stopped at break020.hs:4:10-18
 _result :: t1 () = _
 3  line1 _ = return ()
-4  line2 _ = [1mreturn ()[0m
+4  line2 _ = return ()
+             ^^^^^^^^^
 5  
 Stopped at break020.hs:13:2-20
 _result :: IO () = _
 12    in_another_decl 0
-13    [1min_another_module 0[0m
+13    in_another_module 0
+      ^^^^^^^^^^^^^^^^^^^
 14    line2 1
 Stopped at break020.hs:14:2-8
 _result :: IO () = _
 13    in_another_module 0
-14    [1mline2 1[0m
+14    line2 1
+      ^^^^^^^
 15    return ()
 Stopped at break020.hs:4:0-18
 _result :: IO () = _
 3  line1 _ = return ()
-4  [1mline2 _ = return ()[0m
+4  line2 _ = return ()
+   ^^^^^^^^^^^^^^^^^^^
 5  
 Stopped at break020.hs:4:10-18
 _result :: IO () = _
 3  line1 _ = return ()
-4  line2 _ = [1mreturn ()[0m
+4  line2 _ = return ()
+             ^^^^^^^^^
 5  
 Stopped at break020.hs:15:2-10
 _result :: IO () = _
 14    line2 1
-15    [1mreturn ()[0m
+15    return ()
+      ^^^^^^^^^
 16    
