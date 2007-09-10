@@ -256,41 +256,6 @@ type Compiler result =  HscEnv
                      -> Maybe (Int,Int)     -- Just (i,n) <=> module i of n (for msgs)
                      -> IO (Maybe result)
 
-
--- This functions checks if recompilation is necessary and
--- then combines the FrontEnd and BackEnd to a working compiler.
-hscMkCompiler :: NoRecomp result         -- What to do when recompilation isn't required.
-              -> (Maybe (Int,Int) -> Bool -> Comp ())
-              -> Comp (Maybe ModGuts)       -- Front end
-              -> (ModGuts -> Comp result)   -- Backend.
-              -> Compiler result
-hscMkCompiler norecomp messenger frontend backend
-              hsc_env mod_summary source_unchanged
-              mbOldIface mbModIndex
-    = flip evalComp (CompState hsc_env mod_summary mbOldIface) $
-      do (recomp_reqd, mbCheckedIface)
-             <- {-# SCC "checkOldIface" #-}
-                liftIO $ checkOldIface hsc_env mod_summary
-                              source_unchanged mbOldIface
-	 -- save the interface that comes back from checkOldIface.
-	 -- In one-shot mode we don't have the old iface until this
-	 -- point, when checkOldIface reads it from the disk.
-	 modify (\s -> s{ compOldIface = mbCheckedIface })
-         case mbCheckedIface of 
-           Just iface | not recomp_reqd
-               -> do messenger mbModIndex False
-                     result <- norecomp iface
-                     return (Just result)
-           _otherwise
-               -> do messenger mbModIndex True
-                     mbCore <- frontend
-                     case mbCore of
-                       Nothing
-                           -> return Nothing
-                       Just core
-                           -> do result <- backend core
-                                 return (Just result)
-
 --------------------------------------------------------------
 -- Compilers
 --------------------------------------------------------------
@@ -333,9 +298,34 @@ hscCompiler
         -> (ModGuts -> Comp result)  -- Compile normal file
         -> (ModGuts -> Comp result) -- Compile boot file
         -> Compiler result
-hscCompiler norecomp msg nonBootComp bootComp hsc_env mod_summary =
-    hscMkCompiler norecomp msg frontend backend hsc_env mod_summary
+hscCompiler norecomp messenger nonBootComp bootComp hsc_env mod_summary 
+            source_unchanged mbOldIface mbModIndex
+    = flip evalComp (CompState hsc_env mod_summary mbOldIface) $
+      do (recomp_reqd, mbCheckedIface)
+             <- {-# SCC "checkOldIface" #-}
+                liftIO $ checkOldIface hsc_env mod_summary
+                              source_unchanged mbOldIface
+	 -- save the interface that comes back from checkOldIface.
+	 -- In one-shot mode we don't have the old iface until this
+	 -- point, when checkOldIface reads it from the disk.
+	 modify (\s -> s{ compOldIface = mbCheckedIface })
+         case mbCheckedIface of 
+           Just iface | not recomp_reqd
+               -> do messenger mbModIndex False
+                     result <- norecomp iface
+                     return (Just result)
+           _otherwise
+               -> do messenger mbModIndex True
+                     mb_modguts <- frontend
+                     case mb_modguts of
+                       Nothing
+                           -> return Nothing
+                       Just core
+                           -> do result <- backend core
+                                 return (Just result)
     where
+          frontend :: Comp (Maybe ModGuts)       -- Front end
+          -- backend  :: (ModGuts -> Comp result)   -- Backend.
           (frontend,backend)
               = case ms_hsc_src mod_summary of
                 ExtCoreFile -> (hscCoreFrontEnd, nonBootComp)
