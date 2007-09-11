@@ -157,7 +157,6 @@ AC_CONFIG_FILES(Makefile-vars extra-gcc-opts)
 AC_OUTPUT
 
 echo "****************************************************"
-echo "Configuration done, ready to either 'make install'"
-echo "or 'make in-place'."
+echo "Configuration done, ready to 'make install'"
 echo "(see README and INSTALL files for more info.)"
 echo "****************************************************"

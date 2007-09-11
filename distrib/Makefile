@@ -3,14 +3,15 @@ include Makefile-vars
 
 .PHONY: in-place mk-version-symlinks install
 
-in-place ::
-	@if test -x "./post-inplace-script" ; then \
-		echo "Running project-specific post-inplace script ..." ; \
-		./post-inplace-script $(platform) `pwd` \
-			$(package)-$(version); \
-		echo "Done" ; \
-	fi
-	@echo "Finished configuring..to use, add `pwd`/bin/$(platform) to your PATH."
+# This has bitrotted:
+#in-place ::
+#	@if test -x "./post-inplace-script" ; then \
+#		echo "Running project-specific post-inplace script ..." ; \
+#		./post-inplace-script $(platform) `pwd` \
+#			$(package)-$(version); \
+#		echo "Done" ; \
+#	fi
+#	@echo "Finished configuring..to use, add `pwd`/bin/$(platform) to your PATH."
 
 install ::
 	$(INSTALL_DIR) $(bindir)
