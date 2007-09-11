@@ -283,7 +283,10 @@ slurpReloadCoalesce live
 		-- add an edge betwen the this reg and the last one stored into the slot
 		| RELOAD slot reg	<- instr
 		= case lookupUFM slotMap slot of
-			Just reg2	-> (slotMap, Just (reg, reg2))
+			Just reg2
+			 | reg /= reg2	-> (slotMap, Just (reg, reg2))
+			 | otherwise	-> (slotMap, Nothing)
+
 			Nothing		-> (slotMap, Nothing)
 
 		| otherwise

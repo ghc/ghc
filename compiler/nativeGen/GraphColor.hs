@@ -154,7 +154,10 @@ colorScan_spin iterative triv spill graph
 			$ graph
 
 	, ksTrivFound	<- map nodeId nsTrivFound
-	, graph3	<- foldr delNode graph ksTrivFound
+	, graph3	<- foldr (\k g -> let Just g' = delNode k g
+	   				  in  g')
+				graph ksTrivFound
+
 	= colorScan_spin iterative triv spill graph3
 		(ksTrivFound ++ ksTriv)
 		ksSpill
@@ -204,8 +207,8 @@ colorScan_spin iterative triv spill graph
 colorScan_spill iterative triv spill graph
 	ksTriv ksSpill kksCoalesce
 
- = let	kSpill	= spill graph
- 	graph'	= delNode kSpill graph
+ = let	kSpill		= spill graph
+ 	Just graph'	= delNode kSpill graph
    in	colorScan_spin iterative triv spill graph'
    		ksTriv (kSpill : ksSpill) kksCoalesce
 	

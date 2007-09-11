@@ -78,28 +78,28 @@ addNode k node graph
   	{ graphMap	= addToUFM map_coalesce k node}
 		
 
-
 -- | Delete a node and all its edges from the graph.
---	Throws an error if it's not there.
-delNode :: Uniquable k
-	=> k -> Graph k cls color -> Graph k cls color
+delNode :: (Uniquable k, Outputable k)
+	=> k -> Graph k cls color -> Maybe (Graph k cls color)
 
 delNode k graph
- = let	Just node	= lookupNode graph k
-
-	-- delete conflict edges from other nodes to this one.
-	graph1		= foldl' (\g k1 -> let Just g' = delConflict k1 k g in g') graph
+	| Just node	<- lookupNode graph k
+	= let	-- delete conflict edges from other nodes to this one.
+		graph1	= foldl' (\g k1 -> let Just g' = delConflict k1 k g in g') graph
 			$ uniqSetToList (nodeConflicts node)
 	
-	-- delete coalesce edge from other nodes to this one.
-	graph2		= foldl' (\g k1 -> let Just g' = delCoalesce k1 k g in g') graph1
+		-- delete coalesce edge from other nodes to this one.
+		graph2	= foldl' (\g k1 -> let Just g' = delCoalesce k1 k g in g') graph1
 			$ uniqSetToList (nodeCoalesce node)
 	
-	-- delete the node
-	graph3		= graphMapModify (\fm -> delFromUFM fm k) graph2
+		-- delete the node
+		graph3	= graphMapModify (\fm -> delFromUFM fm k) graph2
 	
-  in	graph3
+	  in	Just graph3
 		
+	| otherwise
+	= Nothing
+
 
 -- | Modify a node in the graph.
 --	returns Nothing if the node isn't present.
@@ -350,6 +350,9 @@ coalesceNodes_merge aggressive triv graph kMin kMax nMin nMax
 	| not (isNothing (nodeColor nMin) && isNothing (nodeColor nMax))
 	= error "GraphOps.coalesceNodes: can't coalesce colored nodes."
 
+	| nodeId nMin == nodeId nMax
+	= error "GraphOps.coalesceNodes: can't coalesce the same node."
+
 	---
 	| otherwise
 	= let
@@ -387,12 +390,11 @@ coalesceNodes_check aggressive triv graph kMin kMax node
 
 	| otherwise
 	= let -- delete the old nodes from the graph and add the new one
-		graph'	= addNode kMin node
-			$ delNode kMin
-			$ delNode kMax
-			$ graph
+		Just graph1	= delNode kMax graph
+		Just graph2	= delNode kMin graph1
+		graph3		= addNode kMin node graph2
 
-	  in	(graph', Just (kMax, kMin))
+	  in	(graph3, Just (kMax, kMin))
 
 
 -- | Freeze a node
