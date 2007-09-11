@@ -36,12 +36,12 @@ import Cmm
 
 import UniqSet
 import UniqFM
+import Unique
 import State
+import Outputable
 
 import Data.Maybe
 import Data.List
-
-type Slot	= Int
 
 -- | Clean out unneeded spill/reloads from this top level thing.
 cleanSpills :: LiveCmmTop -> LiveCmmTop
@@ -112,7 +112,7 @@ cleanBlock (BasicBlock id instrs)
 --	  then we don't need to do the reload.
 --
 cleanReload
-	:: Assoc Reg Slot 	-- ^ a reg and slot are associated when they have the same value.
+	:: Assoc Store	 	-- ^ two store locations are associated if they have the same value
 	-> [LiveInstr]		-- ^ acc
 	-> [LiveInstr] 		-- ^ instrs to clean (in backwards order)
 	-> CleanM [LiveInstr]	-- ^ cleaned instrs  (in forward   order)
@@ -120,31 +120,62 @@ cleanReload
 cleanReload _ acc []
 	= return acc
 
+-- write out live range joins via spill slots to just a spill and a reg-reg move
+--	hopefully the spill will be also be cleaned in the next pass
+--
+cleanReload assoc acc (Instr i1 live1 : Instr i2 _ : instrs)
+
+	| SPILL  reg1  slot1	<- i1
+	, RELOAD slot2 reg2	<- i2
+	, slot1 == slot2
+	= do
+		modify $ \s -> s { sCleanedReloadsAcc = sCleanedReloadsAcc s + 1 }
+		cleanReload assoc acc
+			(Instr i1 live1 : Instr (mkRegRegMoveInstr reg1 reg2) Nothing : instrs)
+
+
+cleanReload assoc acc (li@(Instr i1 _) : instrs)
+	| Just (r1, r2)	<- isRegRegMove i1
+	= if r1 == r2
+		-- erase any left over nop reg reg moves while we're here
+		--	this will also catch any nop moves that the "write out live range joins" case above
+		--	happens to add
+		then cleanReload assoc acc instrs
+
+		-- if r1 has the same value as some slots and we copy r1 to r2,
+		--	then r2 is now associated with those slots instead
+		else do	let assoc'	= addAssoc (SReg r1) (SReg r2)
+					$ delAssoc (SReg r2)
+					$ assoc
+
+			cleanReload assoc' (li : acc) instrs
+
+
 cleanReload assoc acc (li@(Instr instr _) : instrs)
 
 	| SPILL reg slot	<- instr
-	= let	assoc'	= addAssoc reg slot	-- doing the spill makes reg and slot the same value
-			$ deleteBAssoc slot 	-- slot value changes on spill
+	= let	assoc'	= addAssoc (SReg reg)  (SSlot slot)	-- doing the spill makes reg and slot the same value
+			$ delAssoc (SSlot slot) 		-- slot value changes on spill
 			$ assoc
 	  in	cleanReload assoc' (li : acc) instrs
 
 	| RELOAD slot reg	<- instr
-	= if elemAssoc reg slot assoc
+	= if elemAssoc (SSlot slot) (SReg reg) assoc
 
-           -- reg and slot had the same value before reload
-	   --	we don't need the reload.
+           -- if the reg and slot had the same value before reload
+	   --	then we don't need the reload.
 	   then	do
 		modify $ \s -> s { sCleanedReloadsAcc = sCleanedReloadsAcc s + 1 }
 	   	cleanReload assoc acc instrs
 
 	   -- reg and slot had different values before reload
 	   else
-	    let assoc'	= addAssoc reg slot	-- doing the reload makes reg and slot the same value
-			$ deleteAAssoc reg	-- reg value changes on reload
+	    let assoc'	= addAssoc (SReg reg)  (SSlot slot)	-- doing the reload makes reg and slot the same value
+			$ delAssoc (SReg reg)			-- reg value changes on reload
 			$ assoc
 	    in	cleanReload assoc' (li : acc) instrs
 
-	-- on a jump, remember the reg/slot association.
+	-- remember the association over a jump
 	| targets	<- jumpDests instr []
 	, not $ null targets
 	= do	mapM_ (accJumpValid assoc) targets
@@ -152,7 +183,7 @@ cleanReload assoc acc (li@(Instr instr _) : instrs)
 
 	-- writing to a reg changes its value.
 	| RU _ written	<- regUsage instr
-	= let assoc'	= foldr deleteAAssoc assoc written
+	= let assoc'	= foldr delAssoc assoc (map SReg $ nub written)
 	  in  cleanReload assoc' (li : acc) instrs
 
 
@@ -162,7 +193,7 @@ cleanReload assoc acc (li@(Instr instr _) : instrs)
 --	 then the slot was never read and we don't need the spill.
 
 cleanSpill
-	:: UniqSet Int 		-- ^ slots that have been spilled, but not reload from
+	:: UniqSet Int 		-- ^ slots that have been spilled, but not reloaded from
 	-> [LiveInstr]		-- ^ acc
 	-> [LiveInstr]		-- ^ instrs to clean (in forwards order)
 	-> CleanM [LiveInstr]	-- ^ cleaned instrs  (in backwards order)
@@ -196,8 +227,7 @@ cleanSpill unused acc (li@(Instr instr _) : instrs)
 
 -- collateJoinPoints:
 --
--- | Look at information about what regs were valid across jumps and work out
---	whether it's safe to avoid reloads after join points.
+-- | combine the associations from all the inward control flow edges.
 --
 collateJoinPoints :: CleanM ()
 collateJoinPoints
@@ -205,7 +235,7 @@ collateJoinPoints
  	{ sJumpValid	= mapUFM intersects (sJumpValidAcc s)
 	, sJumpValidAcc	= emptyUFM }
 
-intersects :: [Assoc Reg Slot]	-> Assoc Reg Slot
+intersects :: [Assoc Store]	-> Assoc Store
 intersects []		= emptyAssoc
 intersects assocs	= foldl1' intersectAssoc assocs
 
@@ -216,12 +246,12 @@ type CleanM = State CleanS
 data CleanS
 	= CleanS
 	{ -- regs which are valid at the start of each block.
-	  sJumpValid		:: UniqFM (Assoc Reg Slot)
+	  sJumpValid		:: UniqFM (Assoc Store)
 
  	  -- collecting up what regs were valid across each jump.
 	  --	in the next pass we can collate these and write the results
 	  --	to sJumpValid.
-	, sJumpValidAcc		:: UniqFM [Assoc Reg Slot]
+	, sJumpValidAcc		:: UniqFM [Assoc Store]
 
 	  -- spills/reloads cleaned each pass (latest at front)
 	, sCleanedCount		:: [(Int, Int)]
@@ -242,71 +272,127 @@ initCleanS
 	, sCleanedReloadsAcc	= 0 }
 
 
--- | Remember that these regs were valid before a jump to this block
-accJumpValid :: Assoc Reg Slot -> BlockId -> CleanM ()
-accJumpValid regs target
+-- | Remember the associations before a jump
+accJumpValid :: Assoc Store -> BlockId -> CleanM ()
+accJumpValid assocs target
  	= modify $ \s -> s {
 		sJumpValidAcc = addToUFM_C (++)
 					(sJumpValidAcc s)
 					target
-					[regs] }
+					[assocs] }
+
+--------------
+-- A store location can be a stack slot or a register
+--
+data Store
+	= SSlot Int
+	| SReg  Reg
+
+-- spill cleaning is only done once all virtuals have been allocated to realRegs
+--
+instance Uniquable Store where
+    getUnique (SReg  r)
+	| RealReg i	<- r
+	= mkUnique 'R' i
+
+	| otherwise
+	= error "RegSpillClean.getUnique: found virtual reg during spill clean, only real regs expected."
+
+    getUnique (SSlot i)			= mkUnique 'S' i
+
+instance Outputable Store where
+	ppr (SSlot i)	= text "slot" <> int i
+	ppr (SReg  r)	= ppr r
 
 
 --------------
--- An association table / many to many mapping.
---	TODO: 	implement this better than a simple association list.
---		two maps of sets, one for each direction would be better
+-- Association graphs.
+--	In the spill cleaner, two store locations are associated if they are known
+--	to hold the same value.
 --
-data Assoc a b
-	= Assoc
-	{ aList	:: [(a, b)] }
+type Assoc a	= UniqFM (UniqSet a)
 
 -- | an empty association
-emptyAssoc :: Assoc a b
-emptyAssoc = Assoc { aList = [] }
+emptyAssoc :: Assoc a
+emptyAssoc	= emptyUFM
 
 
--- | add an association to the table.
-addAssoc
-	:: (Eq a, Eq b)
-	=> a -> b -> Assoc a b -> Assoc a b
+-- | add an association between these two things
+addAssoc :: Uniquable a
+	 => a -> a -> Assoc a -> Assoc a
 
-addAssoc a b m	= m { aList = (a, b) : aList m }
+addAssoc a b m
+ = let	m1	= addToUFM_C unionUniqSets m  a (unitUniqSet b)
+ 	m2	= addToUFM_C unionUniqSets m1 b (unitUniqSet a)
+   in	m2
+
+
+-- | delete all associations to a node
+delAssoc :: (Outputable a, Uniquable a)
+ 	 => a -> Assoc a -> Assoc a
+
+delAssoc a m
+	| Just aSet	<- lookupUFM  m a
+	, m1		<- delFromUFM m a
+	= foldUniqSet (\x m -> delAssoc1 x a m) m1 aSet
+
+	| otherwise	= m
+
+
+-- | delete a single association edge (a -> b)
+delAssoc1 :: Uniquable a
+	=> a -> a -> Assoc a -> Assoc a
+
+delAssoc1 a b m
+	| Just aSet	<- lookupUFM m a
+	= addToUFM m a (delOneFromUniqSet aSet b)
+
+	| otherwise	= m
 
 
 -- | check if these two things are associated
-elemAssoc
-	:: (Eq a, Eq b)
-	=> a -> b -> Assoc a b -> Bool
-elemAssoc a b m	= elem (a, b) $ aList m
+elemAssoc :: (Outputable a, Uniquable a)
+	  => a -> a -> Assoc a -> Bool
 
+elemAssoc a b m
+	= elementOfUniqSet b (closeAssoc a m)
 
--- | delete all associations with this A element
-deleteAAssoc
-	:: Eq a
-	=> a -> Assoc a b -> Assoc a b
+-- | find the refl. trans. closure of the association from this point
+closeAssoc :: (Outputable a, Uniquable a)
+	=> a -> Assoc a -> UniqSet a
 
-deleteAAssoc x m
-	= m { aList = [ (a, b)	| (a, b) <- aList m
-				, a /= x ] }
+closeAssoc a assoc
+ = 	closeAssoc' assoc emptyUniqSet (unitUniqSet a)
+ where
+	closeAssoc' assoc visited toVisit
+	 = case uniqSetToList toVisit of
 
+		-- nothing else to visit, we're done
+	 	[]	-> visited
 
--- | delete all associations with this B element
-deleteBAssoc
-	:: Eq b
-	=> b -> Assoc a b -> Assoc a b
+		(x:_)
 
-deleteBAssoc x m
-	= m { aList = [ (a, b) 	| (a, b) <- aList m
-				, b /= x ] }
+		 -- we've already seen this node
+		 |  elementOfUniqSet x visited
+		 -> closeAssoc' assoc visited (delOneFromUniqSet toVisit x)
 
+		 -- haven't seen this node before,
+		 --	remember to visit all its neighbors
+		 |  otherwise
+		 -> let neighbors
+		 	 = case lookupUFM assoc x of
+				Nothing		-> emptyUniqSet
+				Just set	-> set
 
--- | intersect two associations
+		   in closeAssoc' assoc
+			(addOneToUniqSet visited x)
+			(unionUniqSets   toVisit neighbors)
+
+-- | intersect
 intersectAssoc
-	:: (Eq a, Eq b)
-	=> Assoc a b -> Assoc a b -> Assoc a b
+	:: Uniquable a
+	=> Assoc a -> Assoc a -> Assoc a
 
-intersectAssoc a1 a2
-	= emptyAssoc
-	{ aList	= intersect (aList a1) (aList a2) }
+intersectAssoc a b
+ 	= intersectUFM_C (intersectUniqSets) a b
 

@@ -135,7 +135,7 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 		let code_spillclean	= map cleanSpills code_patched
 
 		-- strip off liveness information
-		let code_nat		= map stripLive code_patched
+		let code_nat		= map stripLive code_spillclean
 
 		-- rewrite SPILL/RELOAD pseudos into real instructions
 		let spillNatTop		= mapGenBlockTop spillNatBlock
