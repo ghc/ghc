@@ -1335,9 +1335,13 @@ a :: a
         <literal>:trace</literal> and <literal>:history</literal> to establish
         the context.  However, <literal>head</literal> is in a library and
         we can't set a breakpoint on it directly.  For this reason, GHCi
-        provides the flag <literal>-fbreak-on-exception</literal> which causes
-        the evaluator to stop when an exception is thrown, just as it does when
-        a breakpoint is hit.  This is only really useful in conjunction with
+        provides the flags <literal>-fbreak-on-exception</literal> which causes
+        the evaluator to stop when an exception is thrown, and <literal>
+	-fbreak-on-error</literal>, which works similarly but stops only on 
+	uncaught exceptions. When stopping at an exception, GHCi will act 
+	just as it does when a breakpoint is hit, with the deviation that it
+	will not show you any source code location. Due to this, these 
+	commands are only really useful in conjunction with
         <literal>:trace</literal>, in order to log the steps leading up to the
         exception.  For example:</para>
 

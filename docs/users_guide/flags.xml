@@ -503,6 +503,18 @@
 	      <entry>-</entry>
 	    </row>
 	    <row>
+	      <entry><option>-fbreak-on-exception</option></entry>
+	      <entry><link linkend="ghci-debugger-exceptions">Break on any exception thrown</link></entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-break-on-exception</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-fbreak-on-error</option></entry>
+	      <entry><link linkend="ghci-debugger-exceptions">Break on uncaught exceptions and errors</link></entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-break-on-error</option></entry>
+	    </row>
+	    <row>
 	      <entry><option>-fno-print-bind-result</option></entry>
 	      <entry><link linkend="ghci-stmts">Turn off printing of binding results in GHCi</link></entry>
 	      <entry>dynamic</entry>
