@@ -23,7 +23,7 @@ import Var hiding ( varName )
 import VarSet
 import Name 
 import UniqSupply
-import TcType
+import Type
 import GHC
 import InteractiveEval
 import Outputable
@@ -138,10 +138,11 @@ bindSuspensions cms@(Session ref) t = do
 
 --  A custom Term printer to enable the use of Show instances
 showTerm :: Session -> Term -> IO SDoc
-showTerm cms@(Session ref) = cPprTerm cPpr
+showTerm cms@(Session ref) term = do
+    cPprExtended <- cPprTermExtended cms
+    cPprTerm (liftM2 (++) cPprShowable cPprExtended) term
  where
-  cPpr = \p-> cPprShowable : cPprTermBase p
-  cPprShowable prec ty _ val tt = 
+  cPprShowable _y = [\prec ty _ val tt ->
     if not (all isFullyEvaluatedTerm tt)
      then return Nothing
      else do
@@ -164,7 +165,7 @@ showTerm cms@(Session ref) = cPprTerm cPpr
              _  -> return Nothing
          `finally` do
            writeIORef ref hsc_env
-           GHC.setSessionDynFlags cms dflags
+           GHC.setSessionDynFlags cms dflags]
   needsParens ('"':_) = False   -- some simple heuristics to see whether parens
                                 -- are redundant in an arbitrary Show output
   needsParens ('(':_) = False
@@ -178,6 +179,27 @@ showTerm cms@(Session ref) = cPprTerm cPpr
         id       = mkGlobalId VanillaGlobal name (sigmaType ty) vanillaIdInfo
         new_ic   = ictxt { ic_tmp_ids = id : tmp_ids }
     return (hsc_env {hsc_IC = new_ic }, name)
+
+{- | A custom Term printer to handle some types that 
+     we may not want to show, such as Data.Typeable.TypeRep -}
+cPprTermExtended :: Monad m => Session -> IO (CustomTermPrinter m)
+cPprTermExtended session = liftM22 (++) (return cPprTermBase) extended
+  where 
+   extended = do
+     [typerep_name]        <- parseName session "Data.Typeable.TypeRep"
+     Just (ATyCon typerep) <- lookupName session typerep_name 
+
+     return (\_y -> 
+        [ ifType (isTyCon typerep) (\_val _prec -> return (text "<typerep>")) ])
+
+   ifType pred f prec ty _ val _tt
+      | pred ty   = Just `liftM` f prec val
+      | otherwise = return Nothing
+   isTyCon a_tc ty = fromMaybe False $ do 
+             (tc,_) <- splitTyConApp_maybe ty
+             return (a_tc == tc)
+   liftM22 f x y = do x' <- x; y' <- y
+                      return$ do x'' <- x';y'' <- y';return (f x'' y'')
 
 --    Create new uniques and give them sequentially numbered names
 newGrimName :: String -> IO Name
