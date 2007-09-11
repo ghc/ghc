@@ -25,7 +25,7 @@ module ZipCfg
     -- the following functions might one day be useful and can be found
     -- either below or in ZipCfgExtras:
     , entry, exit, focus, focusp, unfocus
-    , ht_to_first, ht_to_last, 
+    , ht_to_block, ht_to_last, 
     , splice_focus_entry, splice_focus_exit
     , fold_fwd_block, foldM_fwd_block
     -}
@@ -33,13 +33,17 @@ module ZipCfg
     )
 where
 
+#include "HsVersions.h"
+
 import Outputable hiding (empty)
 import Panic
-import Prelude hiding (zip, unzip, last)
 import Unique
 import UniqFM
 import UniqSet
 import UniqSupply
+
+import Maybe
+import Prelude hiding (zip, unzip, last)
 
 -------------------------------------------------------------------------
 --               GENERIC ZIPPER-BASED CONTROL-FLOW GRAPH               --
@@ -105,7 +109,7 @@ invariant or cost model.
     translation, as well as layout.
 
     Like any graph, an LGraph still has a distinguished entry point, 
-    which you can discover using 'gr_entry'.
+    which you can discover using 'lg_entry'.
 
   * An FGraph is an LGraph with the *focus* on one particular edge.  The
     primary advantage of this representation is that it provides
@@ -121,8 +125,8 @@ fourth representation that is asymptotically optimal for such construction.
 
 --------------- Representation --------------------
 
--- | A basic block is a [[first]] node, followed by zero or more [[middle]]
--- nodes, followed by a [[last]] node.
+-- | A basic block is a 'first' node, followed by zero or more 'middle'
+-- nodes, followed by a 'last' node.
 
 -- eventually this module should probably replace the original Cmm, but for
 -- now we leave it to dynamic invariants what can be found where
@@ -144,39 +148,40 @@ data Block m l = Block BlockId (ZTail m l)
 
 data Graph m l = Graph (ZTail m l) (BlockEnv (Block m l))
 
-data LGraph m l = LGraph  { gr_entry  :: BlockId
-                          , gr_blocks :: BlockEnv (Block m l) }
+data LGraph m l = LGraph  { lg_entry  :: BlockId
+                          , lg_blocks :: BlockEnv (Block m l) }
 
 -- | And now the zipper.  The focus is between the head and tail.
--- Notice we cannot ever focus on an inter-block edge.
+-- We cannot ever focus on an inter-block edge.
 data ZBlock m l = ZBlock (ZHead m) (ZTail m l)
-data FGraph m l = FGraph { zg_entry  :: BlockId
-                         , zg_focus  :: ZBlock m l
-                         , zg_others :: BlockEnv (Block m l) }
-                    -- Invariant: the block represented by 'zg_focus' is *not*
-                    -- in the map 'zg_others'
+data FGraph m l = FGraph { fg_entry  :: BlockId
+                         , fg_focus  :: ZBlock m l
+                         , fg_others :: BlockEnv (Block m l) }
+                    -- Invariant: the block represented by 'fg_focus' is *not*
+                    -- in the map 'fg_others'
 
 ----  Utility functions ---
 
 blockId   :: Block  m l -> BlockId
-zip       :: ZBlock m l -> Block m l
-unzip     :: Block m l  -> ZBlock m l
+zip       :: ZBlock m l -> Block  m l
+unzip     :: Block  m l -> ZBlock m l
 
-last     :: ZBlock m l -> ZLast l
-goto_end :: ZBlock m l -> (ZHead m, ZLast l)
+last      :: ZBlock m l -> ZLast l
+goto_end  :: ZBlock m l -> (ZHead m, ZLast l)
 
 tailOfLast :: l -> ZTail m l
 
--- | Some ways to combine parts:
-ht_to_first :: ZHead m -> ZTail m l -> Block m l -- was (ZFirst, ZTail)
-ht_to_last  :: ZHead m -> ZTail m l -> (ZHead m, ZLast l)
+-- | Take a head and tail and go to beginning or end.  The asymmetry
+-- in the types and names is a bit unfortunate, but 'Block m l' is
+-- effectively '(BlockId, ZTail m l)' and is accepted in many more places.
 
-zipht       :: ZHead m -> ZTail m l -> Block m l
+ht_to_block, zipht :: ZHead m -> ZTail m l -> Block m l
+ht_to_last         :: ZHead m -> ZTail m l -> (ZHead m, ZLast l)
 
 -- | We can splice a single-entry, single-exit LGraph onto a head or a tail.
--- For a head, we have a head~[[h]] followed by a LGraph~[[g]].
--- The entry node of~[[g]] gets joined to~[[h]], forming the entry into
--- the new LGraph.  The exit of~[[g]] becomes the new head.
+-- For a head, we have a head 'h' followed by a LGraph 'g'.
+-- The entry node of 'g' gets joined to 'h', forming the entry into
+-- the new LGraph.  The exit of 'g' becomes the new head.
 -- For both arguments and results, the order of values is the order of
 -- control flow: before splicing, the head flows into the LGraph; after
 -- splicing, the LGraph flows into the head.
@@ -184,8 +189,8 @@ zipht       :: ZHead m -> ZTail m l -> Block m l
 -- (In order to maintain the order-means-control-flow convention, the
 -- orders are reversed.)
 
-splice_head :: ZHead m   -> LGraph m l -> (LGraph m l, ZHead m)
-splice_tail :: LGraph m l -> ZTail m l -> (ZTail m l, LGraph m l)
+splice_head :: ZHead m    -> LGraph m l -> (LGraph m l, ZHead  m)
+splice_tail :: LGraph m l -> ZTail  m l -> (ZTail  m l, LGraph m l)
 
 -- | We can also splice a single-entry, no-exit LGraph into a head.
 splice_head_only :: ZHead m -> LGraph m l -> LGraph m l
@@ -194,53 +199,70 @@ splice_head_only :: ZHead m -> LGraph m l -> LGraph m l
 -- it, leaving a Graph:
 remove_entry_label :: LGraph m l -> Graph m l
 
+-- | Conversion to and from the environment form is convenient.  For
+-- layout or dataflow, however, one will want to use 'postorder_dfs'
+-- in order to get the blocks in an order that relates to the control
+-- flow in the procedure.
 of_block_list :: BlockId -> [Block m l] -> LGraph m l  -- N log N
 to_block_list :: LGraph m l -> [Block m l]  -- N log N
 
--- | Traversal: [[postorder_dfs]] returns a list of blocks reachable from
--- the entry node.
--- The postorder depth-first-search order means the list is in roughly
--- first-to-last order, as suitable for use in a forward dataflow problem.
+-- | Traversal: 'postorder_dfs' returns a list of blocks reachable
+-- from the entry node.  The postorder depth-first-search order means
+-- the list is in roughly first-to-last order, as suitable for use in
+-- a forward dataflow problem.  For a backward problem, simply reverse
+-- the list.  ('postorder_dfs' is sufficiently trick to implement that
+-- one doesn't want to try and maintain both forward and backward
+-- versions.)
 
 postorder_dfs :: LastNode l => LGraph m l -> [Block m l]
 
--- | For layout, we fold over pairs of [[Block m l]] and [[Maybe BlockId]] 
--- in layout order.  The [[BlockId]], if any, identifies the block that
--- will be the layout successor of the current block.  This may be
--- useful to help an emitter omit the final [[goto]] of a block that
--- flows directly to its layout successor.
+-- | For layout, we fold over pairs of 'Block m l' and 'Maybe BlockId'
+-- in layout order.  The 'Maybe BlockId', if present, identifies the
+-- block that will be the layout successor of the current block.  This
+-- may be useful to help an emitter omit the final 'goto' of a block
+-- that flows directly to its layout successor.
 fold_layout ::
     LastNode l => (Block m l -> Maybe BlockId -> a -> a) -> a -> LGraph m l-> a
 
--- | We can also fold and iterate over blocks.
+-- | We can also fold over blocks in an unspecified order.  The
+-- 'ZipCfgExtras' module provides a monadic version, which we
+-- haven't needed (else it would be here).
 fold_blocks :: (Block m l -> a -> a) -> a -> LGraph m l -> a
 
 map_nodes :: (BlockId -> BlockId) -> (m -> m') -> (l -> l') -> LGraph m l -> LGraph m' l'
    -- mapping includes the entry id!
-translate :: (m -> UniqSM (LGraph m' l')) -> (l -> UniqSM (LGraph m' l')) ->
-             LGraph m l -> UniqSM (LGraph m' l')
+
+-- | These translation functions are speculative.  I hope eventually
+-- they will be used in the native-code back ends ---NR
+translate :: (m          -> UniqSM (LGraph m' l')) ->
+             (l          -> UniqSM (LGraph m' l')) ->
+             (LGraph m l -> UniqSM (LGraph m' l'))
 
 {-
+-- | It's possible that another form of translation would be more suitable:
 translateA :: (m -> Agraph m' l') -> (l -> AGraph m' l') -> LGraph m l -> LGraph m' l'
 -}
 
 ------------------- Last nodes
 
--- | We can't make a graph out of just any old 'last node' type.  A
--- last node has to be able to find its successors, and we need to
--- be able to create and identify unconditional branches.  We put
--- these capabilities in a type class.
+-- | We can't make a graph out of just any old 'last node' type.  A last node
+-- has to be able to find its successors, and we need to be able to create and
+-- identify unconditional branches.  We put these capabilities in a type class.
+-- Moreover, the property of having successors is also shared by 'Block's and
+-- 'ZTails', so it is useful to have that property in a type class of its own.
 
 class HavingSuccessors b where
-  succs :: b -> [BlockId]
-  fold_succs :: (BlockId -> a -> a) -> b -> a -> a
+    succs :: b -> [BlockId]
+    fold_succs :: (BlockId -> a -> a) -> b -> a -> a
 
-  fold_succs add l z = foldr add z $ succs l
+    fold_succs add l z = foldr add z $ succs l
 
 class HavingSuccessors l => LastNode l where
-  mkBranchNode :: BlockId -> l
-  isBranchNode :: l -> Bool
-  branchNodeTarget :: l -> BlockId  -- panics if not branch node
+    mkBranchNode     :: BlockId -> l
+    isBranchNode     :: l -> Bool
+    branchNodeTarget :: l -> BlockId  -- panics if not branch node
+      -- ^ N.B. This interface seems to make for more congenial clients than a
+      -- single function of type 'l -> Maybe BlockId'
 
 instance HavingSuccessors l => HavingSuccessors (ZLast l) where
     succs LastExit = []
@@ -264,35 +286,46 @@ instance LastNode l => HavingSuccessors (Block m l) where
 
 -- ================ IMPLEMENTATION ================--
 
+----- block manipulations
+
 blockId (Block id _) = id
+
+-- | The string argument was originally helpful in debugging the Quick C--
+-- compiler, so I have kept it here even though at present it is thrown away at
+-- this spot---there's no reason a BlockId couldn't one day carry a string.
+
+freshBlockId :: String -> UniqSM BlockId
+freshBlockId _ = do { u <- getUniqueUs; return $ BlockId u }
 
 -- | Convert block between forms.
 -- These functions are tail-recursive, so we can go as deep as we like
 -- without fear of stack overflow.  
 
-ht_to_first head tail = case head of
+ht_to_block head tail = case head of
   ZFirst id -> Block id tail
-  ZHead h m -> ht_to_first h (ZTail m tail) 
+  ZHead h m -> ht_to_block h (ZTail m tail) 
+
+ht_to_last head (ZLast l)   = (head, l)
+ht_to_last head (ZTail m t) = ht_to_last (ZHead head m) t 
+
+zipht            h t  = ht_to_block h t
+zip      (ZBlock h t) = ht_to_block h t
+goto_end (ZBlock h t) = ht_to_last  h t
+
+unzip (Block id t) = ZBlock (ZFirst id) t
 
 head_id :: ZHead m -> BlockId
 head_id (ZFirst id) = id
 head_id (ZHead h _) = head_id h
 
-zip (ZBlock h t) = ht_to_first h t
-
-ht_to_last head (ZLast l)   = (head, l)
-ht_to_last head (ZTail m t) = ht_to_last (ZHead head m) t 
-
-goto_end (ZBlock h t) = ht_to_last h t
-
-tailOfLast l = ZLast (LastOther l)
-
-zipht = ht_to_first
-unzip (Block id t) = ZBlock (ZFirst id) t
-
 last (ZBlock _ t) = lastt t
   where lastt (ZLast l) = l
         lastt (ZTail _ t) = lastt t
+
+tailOfLast l = ZLast (LastOther l) -- ^ tedious to write in every client
+
+
+------------------ simple graph manipulations
 
 focus :: BlockId -> LGraph m l -> FGraph m l -- focus on edge out of node with id 
 focus id (LGraph entry blocks) =
@@ -300,6 +333,10 @@ focus id (LGraph entry blocks) =
       Just b -> FGraph entry (unzip b) (delFromUFM blocks id)
       Nothing -> panic "asked for nonexistent block in flow graph"
 
+entry   :: LGraph m l -> FGraph m l         -- focus on edge out of entry node 
+entry g@(LGraph eid _) = focus eid g
+
+-- | pull out a block satisfying the predicate, if any
 splitp_blocks :: (Block m l -> Bool) -> BlockEnv (Block m l) ->
                  Maybe (Block m l, BlockEnv (Block m l))
 splitp_blocks p blocks = lift $ foldUFM scan (Nothing, emptyBlockEnv) blocks 
@@ -311,42 +348,42 @@ splitp_blocks p blocks = lift $ foldUFM scan (Nothing, emptyBlockEnv) blocks
           lift (Nothing, _) = Nothing
           lift (Just b, bs) = Just (b, bs)
 
-is_exit :: Block m l -> Bool
-is_exit b = case last (unzip b) of { LastExit -> True; _ -> False }
-
 -- | 'insertBlock' should not be used to *replace* an existing block
 -- but only to insert a new one
 insertBlock :: Block m l -> BlockEnv (Block m l) -> BlockEnv (Block m l)
 insertBlock b bs =
-    case lookupBlockEnv bs id of
-      Nothing -> extendBlockEnv bs id b
-      Just _ -> panic ("duplicate labels " ++ show id ++ " in ZipCfg graph")
+      ASSERT (isNothing $ lookupBlockEnv bs id)
+      extendBlockEnv bs id b
     where id = blockId b
 
-check_single_exit :: LGraph l m -> a -> a
-check_single_exit g =
-  let check block found = case last (unzip block) of
-                            LastExit -> if found then panic "graph has multiple exits"
-                                        else True
-                            _ -> found
-  in if not (foldUFM check False (gr_blocks g)) then
-         panic "graph does not have an exit"
-     else
-         \a -> a
+-- | Used in assertions; tells if a graph has exactly one exit
+single_exit :: LGraph l m -> Bool
+single_exit g = foldUFM check 0 (lg_blocks g) == 1
+    where check block count = case last (unzip block) of
+                                LastExit -> count + (1 :: Int)
+                                _ -> count
 
-freshBlockId :: String -> UniqSM BlockId
-freshBlockId _ = do { u <- getUniqueUs; return $ BlockId u }
+------------------ graph traversals
 
-entry   :: LGraph m l -> FGraph m l         -- focus on edge out of entry node 
-entry g@(LGraph eid _) = focus eid g
-
-
+-- | This is the most important traversal over this data structure.  It drops
+-- unreachable code and puts blocks in an order that is good for solving forward
+-- dataflow problems quickly.  The reverse order is good for solving backward
+-- dataflow problems quickly.  The forward order is also reasonably good for
+-- emitting instructions, except that it will not usually exploit Forrest
+-- Baskett's trick of eliminating the unconditional branch from a loop.  For
+-- that you would need a more serious analysis, probably based on dominators, to
+-- identify loop headers.
+--
+-- The ubiquity of 'postorder_dfs' is one reason for the ubiquity of the 'LGraph'
+-- representation, when for most purposes the plain 'Graph' representation is
+-- more mathematically elegant (but results in more complicated code).
 
 postorder_dfs g@(LGraph _ blocks) =
   let FGraph _ eblock _ = entry g
   in  vnode (zip eblock) (\acc _visited -> acc) [] emptyBlockSet
   where
-    -- vnode :: Block m l -> ([Block m l] -> BlockSet -> a) -> [Block m l] -> BlockSet ->a
+    -- vnode ::
+    --    Block m l -> ([Block m l] -> BlockSet -> a) -> [Block m l] -> BlockSet -> a
     vnode block@(Block id _) cont acc visited =
         if elemBlockSet id visited then
             cont acc visited
@@ -362,6 +399,11 @@ postorder_dfs g@(LGraph _ blocks) =
                       Just b -> b : rst
                       Nothing -> rst
 
+
+-- | Slightly more complicated than the usual fold because we want to tell block
+-- 'b1' what its inline successor is going to be, so that if 'b1' ends with
+-- 'goto b2', the goto can be omitted.
+
 fold_layout f z g@(LGraph eid _) = fold (postorder_dfs g) z
   where fold blocks z =
             case blocks of [] -> z
@@ -371,7 +413,7 @@ fold_layout f z g@(LGraph eid _) = fold (postorder_dfs g) z
             if id == eid then panic "entry as successor"
             else Just id
 
-fold_blocks f z (LGraph _ blocks) = foldUFM f z blocks
+-- | The rest of the traversals are straightforward
 
 map_nodes idm middle last (LGraph eid blocks) = LGraph (idm eid) (mapUFM block blocks)
     where block (Block id t) = Block (idm id) (tail t)
@@ -379,17 +421,17 @@ map_nodes idm middle last (LGraph eid blocks) = LGraph (idm eid) (mapUFM block b
           tail (ZLast LastExit) = ZLast LastExit
           tail (ZLast (LastOther l)) = ZLast (LastOther (last l))
 
+fold_blocks f z (LGraph _ blocks) = foldUFM f z blocks
+
 of_block_list e blocks = LGraph e $ foldr insertBlock emptyBlockEnv blocks 
 to_block_list (LGraph _ blocks) = eltsUFM blocks
 
-{-
-\paragraph{Splicing support}
 
-We want to be able to scrutinize a single-entry, single-exit LGraph for
-splicing purposes. 
-There are two useful cases: the LGraph is a single block or it isn't.
-We use continuation-passing style.
--}
+
+
+-- We want to be able to scrutinize a single-entry, single-exit 'LGraph' for
+-- splicing purposes.  There are two useful cases: the 'LGraph' is a single block
+-- or it isn't.  We use continuation-passing style.
 
 prepare_for_splicing ::
   LGraph m l -> (ZTail m l -> a) -> (ZTail m l -> ZHead m -> BlockEnv (Block m l) -> a)
@@ -409,29 +451,30 @@ prepare_for_splicing g single multi =
               case gl of LastExit -> multi etail gh gblocks
                          _ -> panic "exit is not exit?!"
 
-splice_head head g =
-  check_single_exit g $
-  let eid = head_id head
-      splice_one_block tail' =
-          case ht_to_last head tail' of
-            (head, LastExit) -> (LGraph eid emptyBlockEnv, head)
-            _ -> panic "spliced LGraph without exit" 
-      splice_many_blocks entry exit others =
-          (LGraph eid (insertBlock (zipht head entry) others), exit)
-  in  prepare_for_splicing g splice_one_block splice_many_blocks
+is_exit :: Block m l -> Bool
+is_exit b = case last (unzip b) of { LastExit -> True; _ -> False }
+
+splice_head head g = 
+  ASSERT (single_exit g) prepare_for_splicing g splice_one_block splice_many_blocks
+   where eid = head_id head
+         splice_one_block tail' =
+             case ht_to_last head tail' of
+               (head, LastExit) -> (LGraph eid emptyBlockEnv, head)
+               _ -> panic "spliced LGraph without exit" 
+         splice_many_blocks entry exit others =
+             (LGraph eid (insertBlock (zipht head entry) others), exit)
 
 splice_tail g tail =
-  check_single_exit g $
-  let splice_one_block tail' =  -- return tail' .. tail 
-        case ht_to_last (ZFirst (gr_entry g)) tail' of
-          (head', LastExit) ->
-              case ht_to_first head' tail of
-                 Block id t | id == gr_entry g -> (t, LGraph id emptyBlockEnv)
-                 _ -> panic "entry in; garbage out"
-          _ -> panic "spliced single block without Exit" 
-      splice_many_blocks entry exit others =
-         (entry, LGraph (gr_entry g) (insertBlock (zipht exit tail) others))
-  in  prepare_for_splicing g splice_one_block splice_many_blocks
+  ASSERT (single_exit g) prepare_for_splicing g splice_one_block splice_many_blocks
+    where splice_one_block tail' =  -- return tail' .. tail 
+            case ht_to_last (ZFirst (lg_entry g)) tail' of
+              (head', LastExit) ->
+                  case ht_to_block head' tail of
+                     Block id t | id == lg_entry g -> (t, LGraph id emptyBlockEnv)
+                     _ -> panic "entry in; garbage out"
+              _ -> panic "spliced single block without Exit" 
+          splice_many_blocks entry exit others =
+              (entry, LGraph (lg_entry g) (insertBlock (zipht exit tail) others))
 
 splice_head_only head g =
   let FGraph eid gentry gblocks = entry g
@@ -462,10 +505,10 @@ translate txm txl (LGraph eid blocks) =
       txtail h (ZTail m t) blocks' =
         do m' <- txm m 
            let (g, h') = splice_head h m' 
-           txtail h' t (plusUFM (gr_blocks g) blocks')
+           txtail h' t (plusUFM (lg_blocks g) blocks')
       txtail h (ZLast (LastOther l)) blocks' =
         do l' <- txl l
-           return $ plusUFM (gr_blocks (splice_head_only h l')) blocks'
+           return $ plusUFM (lg_blocks (splice_head_only h l')) blocks'
       txtail h (ZLast LastExit) blocks' =
         return $ insertBlock (zipht h (ZLast LastExit)) blocks'
 
@@ -515,12 +558,14 @@ mkBlockSet :: [BlockId] -> BlockSet
 mkBlockSet = mkUniqSet
 
 ----------------------------------------------------------------
+---- Prettyprinting
+----------------------------------------------------------------
+
 -- putting this code in PprCmmZ leads to circular imports :-(
 
 instance (Outputable m, Outputable l) => Outputable (ZTail m l) where
     ppr = pprTail
 
--- | 'pprTail' is used for debugging only
 pprTail :: (Outputable m, Outputable l) => ZTail m l -> SDoc 
 pprTail (ZTail m t) = ppr m $$ ppr t
 pprTail (ZLast LastExit) = text "<exit>"
@@ -530,3 +575,6 @@ pprLgraph :: (Outputable m, Outputable l, LastNode l) => LGraph m l -> SDoc
 pprLgraph g = text "{" $$ nest 2 (vcat $ map pprBlock blocks) $$ text "}"
     where pprBlock (Block id tail) = ppr id <> colon $$ ppr tail
           blocks = postorder_dfs g
+
+_unused :: FS.FastString
+_unused = undefined

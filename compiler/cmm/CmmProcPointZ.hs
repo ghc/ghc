@@ -122,7 +122,7 @@ forward = FComp "proc-point reachability" first middle last exit
                 
 minimalProcPointSet :: CmmGraph -> ProcPointSet
 minimalProcPointSet g = extendPPSet g (postorder_dfs g) entryPoint
-    where entryPoint = unitUniqSet (gr_entry g)
+    where entryPoint = unitUniqSet (lg_entry g)
 
 extendPPSet :: CmmGraph -> [CmmBlock] -> ProcPointSet -> ProcPointSet
 extendPPSet g blocks procPoints =
@@ -217,7 +217,7 @@ addProcPointProtocols procPoints formals g =
     where optimize_calls g =  -- see Note [Separate Adams optimization]
               let (protos, blocks') =
                       fold_blocks maybe_add_call (init_protocols, emptyBlockEnv) g
-                  g' = LGraph (gr_entry g) (add_CopyIns protos blocks')
+                  g' = LGraph (lg_entry g) (add_CopyIns protos blocks')
               in  (protos, runTx removeUnreachableBlocksZ g')
           maybe_add_call :: CmmBlock -> (BlockEnv Protocol, BlockEnv CmmBlock)
                          -> (BlockEnv Protocol, BlockEnv CmmBlock)
@@ -243,7 +243,7 @@ addProcPointProtocols procPoints formals g =
           jumpsToProcPoint :: BlockId -> Maybe BlockId
           -- ^ Tells whether the named block is just a jump to a proc point
           jumpsToProcPoint id =
-              let (Block _ t) = lookupBlockEnv (gr_blocks g) id `orElse`
+              let (Block _ t) = lookupBlockEnv (lg_blocks g) id `orElse`
                                 panic "jump out of graph"
               in case t of
                    ZTail (CopyIn {}) (ZLast (LastOther (LastBranch pee [])))
@@ -253,7 +253,7 @@ addProcPointProtocols procPoints formals g =
           maybe_add_proto :: CmmBlock -> BlockEnv Protocol -> BlockEnv Protocol
           maybe_add_proto (Block id (ZTail (CopyIn c fs _srt) _)) env =
               extendBlockEnv env id (Protocol c fs)
-          maybe_add_proto (Block id _) env | id == gr_entry g =
+          maybe_add_proto (Block id _) env | id == lg_entry g =
               extendBlockEnv env id (Protocol (Argument CmmCallConv) hinted_formals)
           maybe_add_proto _ env = env
           hinted_formals = map (\x -> (x, NoHint)) formals
@@ -280,7 +280,7 @@ pass_live_vars_as_args procPoints (protos, g) = (protos', g')
                                     -- panic ("no liveness at block " ++ show id)
                              formals = map (\x->(x,NoHint)) $ uniqSetToList live
                          in  extendBlockEnv protos id (Protocol Local formals)
-        g' = g { gr_blocks = add_CopyIns protos' (gr_blocks g) }
+        g' = g { lg_blocks = add_CopyIns protos' (lg_blocks g) }
 
 
 -- | Add a CopyIn node to each block that has a protocol but lacks the

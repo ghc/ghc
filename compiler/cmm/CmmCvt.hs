@@ -78,7 +78,7 @@ ofZgraph g = ListGraph $ swallow blocks
           mid m@(CopyIn {})   = pcomment (ppr m <+> text "(proc point)")
           pcomment p = scomment $ showSDoc p
           block' id prev'
-              | id == G.gr_entry g = BasicBlock id $ extend_entry    (reverse prev')
+              | id == G.lg_entry g = BasicBlock id $ extend_entry    (reverse prev')
               | otherwise          = BasicBlock id $ extend_block id (reverse prev')
           last id prev' l n =
               let endblock stmt = block' id (stmt : prev') : swallow n in

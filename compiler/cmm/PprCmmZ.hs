@@ -31,7 +31,7 @@ pprCmmGraphLikeCmm g = vcat (swallow blocks)
           mid m@(G.CopyIn {}) = ppr m <+> text "(proc point)"
           mid m = ppr m
           block' id prev'
-              | id == Z.gr_entry g, entry_has_no_pred =
+              | id == Z.lg_entry g, entry_has_no_pred =
                             vcat (text "<entry>" : reverse prev')
               | otherwise = hang (ppr id <> colon) 4 (vcat (reverse prev'))
           last id prev' l n =
@@ -88,7 +88,7 @@ pprCmmGraphLikeCmm g = vcat (swallow blocks)
                                 endblock (ppr $ CmmBranch id')
 -}
           preds = zipPreds g
-          entry_has_no_pred = case Z.lookupBlockEnv preds (Z.gr_entry g) of
+          entry_has_no_pred = case Z.lookupBlockEnv preds (Z.lg_entry g) of
                                 Nothing -> True
                                 Just s -> isEmptyUniqSet s
           single_preds =

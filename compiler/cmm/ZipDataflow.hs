@@ -393,7 +393,7 @@ solve_graph_b comp fuel graph exit_fact =
 
       in do { fuel <-
                   run "backward" (bc_name comp) (return ()) set_block_fact fuel blocks
-            ; a <- getFact (G.gr_entry graph)
+            ; a <- getFact (G.lg_entry graph)
             ; facts <- allFacts
             ; my_trace "Solution to graph after pass 1 is" (pprFacts graph facts a) $
               return (fuel, a) }
@@ -438,7 +438,7 @@ solve_and_rewrite_b comp fuel graph exit_fact =
   where
     pprFacts g env = vcat (pprLgraph g : map pprFact (ufmToList env))
     pprFact (id, a) = hang (ppr id <> colon) 4 (ppr a)
-    eid = G.gr_entry graph
+    eid = G.lg_entry graph
     backward_rewrite comp fuel graph =
       rewrite_blocks comp fuel emptyBlockEnv $ reverse (G.postorder_dfs graph)
     -- rewrite_blocks ::
@@ -470,7 +470,7 @@ solve_and_rewrite_b comp fuel graph exit_fact =
                      ; (fuel, a, g') <- solve_and_rewrite_b comp (fuel-1) g out
                      ; markGraphRewritten
                      ; let (t, g'') = G.splice_tail g' tail 
-                     ; let rewritten' = plusUFM (G.gr_blocks g'') rewritten
+                     ; let rewritten' = plusUFM (G.lg_blocks g'') rewritten
                      ; my_trace "Rewrote middle node" (f4sep [ppr m, text "to", ppr g]) $
                        propagate fuel h a t rewritten' }
           propagate fuel h@(G.ZFirst id) out tail rewritten =
@@ -484,7 +484,7 @@ solve_and_rewrite_b comp fuel graph exit_fact =
                      ; (fuel, a, g') <- solve_and_rewrite_b comp (fuel-1) g out
                      ; markGraphRewritten
                      ; let (t, g'') = G.splice_tail g' tail 
-                     ; let rewritten' = plusUFM (G.gr_blocks g'') rewritten
+                     ; let rewritten' = plusUFM (G.lg_blocks g'') rewritten
                      ; my_trace "Rewrote label " (f4sep [ppr id, text "to", ppr g]) $
                        propagate fuel h a t rewritten' }
       in rewrite_next_block fuel 
@@ -583,7 +583,7 @@ my_trace :: String -> SDoc -> a -> a
 my_trace = if dump_things then pprTrace else \_ _ a -> a
 
 run_f_anal comp entry_fact graph = refine_f_anal comp graph set_entry
-  where set_entry = setFact (G.gr_entry graph) entry_fact
+  where set_entry = setFact (G.lg_entry graph) entry_fact
 
 refine_f_anal comp graph initial =
     run "forward" (fc_name comp) initial set_successor_facts () blocks
@@ -591,7 +591,7 @@ refine_f_anal comp graph initial =
         set_successor_facts () (G.Block id t) =
           let forward in' (G.ZTail m t) = forward (fc_middle_out comp in' m) t
               forward in' (G.ZLast l)   = setEdgeFacts (last_outs comp in' l) 
-              _blockname = if id == G.gr_entry graph then "<entry>" else show id
+              _blockname = if id == G.lg_entry graph then "<entry>" else show id
           in  getFact id >>= \a -> forward (fc_first_out comp a id) t
         setEdgeFacts (LastOutFacts fs) = mapM_ setEdgeFact fs
         setEdgeFact (id, a) = setFact id a
@@ -626,12 +626,12 @@ solve_graph_f comp fuel g in_fact =
     -- general_forward :: FPass m l a -> OptimizationFuel -> a -> G.LGraph m l -> DFM a OptimizationFuel
     general_forward comp fuel entry_fact graph =
       let blocks = G.postorder_dfs g
-          is_local id = isJust $ lookupBlockEnv (G.gr_blocks g) id
+          is_local id = isJust $ lookupBlockEnv (G.lg_blocks g) id
           -- set_or_save :: LastOutFacts a -> DFM a ()
           set_or_save (LastOutFacts l) = mapM_ set_or_save_one l
           set_or_save_one (id, a) =
             if is_local id then setFact id a else addLastOutFact (id, a)
-          set_entry = setFact (G.gr_entry graph) entry_fact
+          set_entry = setFact (G.lg_entry graph) entry_fact
 
           set_successor_facts fuel b =
             let set_tail_facts fuel in' (G.ZTail m t) =
@@ -695,8 +695,8 @@ forward_rewrite comp fuel graph entry_fact =
   do setFact eid entry_fact
      rewrite_blocks fuel emptyBlockEnv (G.postorder_dfs graph) 
   where
-    eid = G.gr_entry graph
-    is_local id = isJust $ lookupBlockEnv (G.gr_blocks graph) id
+    eid = G.lg_entry graph
+    is_local id = isJust $ lookupBlockEnv (G.lg_blocks graph) id
     -- set_or_save :: LastOutFacts a -> DFM a ()
     set_or_save (LastOutFacts l) = mapM_ set_or_save_one l
     set_or_save_one (id, a) =
@@ -727,7 +727,7 @@ forward_rewrite comp fuel graph entry_fact =
                   markGraphRewritten
                   my_trace "Rewrite of middle node completed\n" empty $
                      let (g', h') = G.splice_head h g in
-                     propagate fuel h' a t (plusUFM (G.gr_blocks g') rewritten) bs
+                     propagate fuel h' a t (plusUFM (G.lg_blocks g') rewritten) bs
     propagate fuel h in' (G.ZLast l) rewritten bs = 
         do last_outs comp in' l fuel >>= \x -> case x of
              Dataflow outs ->
@@ -743,7 +743,7 @@ forward_rewrite comp fuel graph entry_fact =
                    (fuel, _, g) <- solve_and_rewrite_f comp (fuel-1) g in' 
                    markGraphRewritten
                    let g' = G.splice_head_only h g
-                   rewrite_blocks fuel (plusUFM (G.gr_blocks g') rewritten) bs
+                   rewrite_blocks fuel (plusUFM (G.lg_blocks g') rewritten) bs
 
 f_rewrite comp entry_fact g =
   do { fuel <- liftTx txRemaining
