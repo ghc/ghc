@@ -315,7 +315,7 @@ foreign import ccall "&rts_breakpoint_io_action"
 -- thread.  ToDo: we might want a way to continue even if the target
 -- thread doesn't die when it receives the exception... "this thread
 -- is not responding".
--- sandboxIO :: MVar Status -> IO [HValue] -> IO Status
+sandboxIO :: DynFlags -> MVar Status -> IO [HValue] -> IO Status
 sandboxIO dflags statusMVar thing = 
   withInterruptsSentTo 
         (forkIO (do res <- Exception.try (rethrow dflags thing)
@@ -330,7 +330,7 @@ sandboxIO dflags statusMVar thing =
 -- to :continue twice, which looks strange).  So if the exception is
 -- not "Interrupted", we unset the exception flag before throwing.
 --
--- rethrow :: IO a -> IO a
+rethrow :: DynFlags -> IO a -> IO a
 rethrow dflags io = Exception.catch io $ \e -> do -- NB. not catchDyn
                 case e of
                    -- If -fbreak-on-error, we break unconditionally,
