@@ -211,7 +211,7 @@ runStmt (Session ref) expr step
               withBreakAction (isStep step) dflags' breakMVar statusMVar $ do
 
               let thing_to_run = unsafeCoerce# hval :: IO [HValue]
-              status <- sandboxIO statusMVar thing_to_run
+              status <- sandboxIO dflags' statusMVar thing_to_run
               
               let ic = hsc_IC hsc_env
                   bindings = (ic_tmp_ids ic, ic_tyvars ic)
@@ -315,10 +315,10 @@ foreign import ccall "&rts_breakpoint_io_action"
 -- thread.  ToDo: we might want a way to continue even if the target
 -- thread doesn't die when it receives the exception... "this thread
 -- is not responding".
-sandboxIO :: MVar Status -> IO [HValue] -> IO Status
-sandboxIO statusMVar thing = 
+-- sandboxIO :: MVar Status -> IO [HValue] -> IO Status
+sandboxIO dflags statusMVar thing = 
   withInterruptsSentTo 
-        (forkIO (do res <- Exception.try (rethrow thing)
+        (forkIO (do res <- Exception.try (rethrow dflags thing)
                     putMVar statusMVar (Complete res)))
         (takeMVar statusMVar)
 
@@ -330,12 +330,24 @@ sandboxIO statusMVar thing =
 -- to :continue twice, which looks strange).  So if the exception is
 -- not "Interrupted", we unset the exception flag before throwing.
 --
-rethrow :: IO a -> IO a
-rethrow io = Exception.catch io $ \e -> -- NB. not catchDyn
+-- rethrow :: IO a -> IO a
+rethrow dflags io = Exception.catch io $ \e -> do -- NB. not catchDyn
                 case e of
+                   -- If -fbreak-on-error, we break unconditionally,
+                   --  but with care of not breaking twice 
+                   _ | dopt Opt_BreakOnError dflags && 
+                       not(dopt Opt_BreakOnException dflags)
+                        -> poke exceptionFlag 1
+
+                   -- If it is an "Interrupted" exception, we allow
+                   --  a possible break by way of -fbreak-on-exception
                    DynException d | Just Interrupted <- fromDynamic d
-                        -> Exception.throwIO e
-                   _ -> do poke exceptionFlag 0; Exception.throwIO e
+                        -> return ()
+
+                   -- In any other case, we don't want to break
+                   _    -> poke exceptionFlag 0
+
+                Exception.throwIO e
 
 
 withInterruptsSentTo :: IO ThreadId -> IO r -> IO r

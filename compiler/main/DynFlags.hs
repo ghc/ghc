@@ -264,6 +264,7 @@ data DynFlag
    | Opt_Haddock
    | Opt_Hpc_No_Auto
    | Opt_BreakOnException
+   | Opt_BreakOnError
    | Opt_GenManifest
    | Opt_EmbedManifest
    | Opt_RunCPSZ
@@ -1189,6 +1190,7 @@ fFlags = [
   ( "hpc-no-auto",                      Opt_Hpc_No_Auto ),
   ( "rewrite-rules",                    Opt_RewriteRules ),
   ( "break-on-exception",               Opt_BreakOnException ),
+  ( "break-on-error",                   Opt_BreakOnError ),
   ( "run-cps",                          Opt_RunCPSZ ),
   ( "convert-to-zipper-and-back",       Opt_ConvertToZipCfgAndBack),
   ( "vectorise",                        Opt_Vectorise ),
