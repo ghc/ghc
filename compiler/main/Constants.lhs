@@ -110,6 +110,13 @@ returning to the scheduler.
 rESERVED_STACK_WORDS = (RESERVED_STACK_WORDS :: Int)
 \end{code}
 
+Continuations that need more than this amount of stack should do their
+own stack check (see bug #1466).
+
+\begin{code}
+aP_STACK_SPLIM = (AP_STACK_SPLIM :: Int)
+\end{code}
+
 Size of a word, in bytes
 
 \begin{code}

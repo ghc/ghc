@@ -178,17 +178,19 @@ mkProtoBCO nm instrs_ordlist origin arity bitmap_size bitmap is_ret mallocd_bloc
         -- (hopefully rare) cases when the (overestimated) stack use
         -- exceeds iNTERP_STACK_CHECK_THRESH.
         maybe_with_stack_check
-	   | is_ret = peep_d
-		-- don't do stack checks at return points;
+	   | is_ret && stack_usage < aP_STACK_SPLIM = peep_d
+		-- don't do stack checks at return points,
 		-- everything is aggregated up to the top BCO
-		-- (which must be a function)
-           | stack_overest >= iNTERP_STACK_CHECK_THRESH
-           = STKCHECK stack_overest : peep_d
+		-- (which must be a function).
+                -- That is, unless the stack usage is >= AP_STACK_SPLIM,
+                -- see bug #1466.
+           | stack_usage >= iNTERP_STACK_CHECK_THRESH
+           = STKCHECK stack_usage : peep_d
            | otherwise
            = peep_d	-- the supposedly common case
              
         -- We assume that this sum doesn't wrap
-        stack_overest = sum (map bciStackUse peep_d)
+        stack_usage = sum (map bciStackUse peep_d)
 
         -- Merge local pushes
         peep_d = peep (fromOL instrs_ordlist)
