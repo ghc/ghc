@@ -19,16 +19,19 @@ module PprTyThing (
 	pprTyThingInContext,
 	pprTyThingLoc,
 	pprTyThingInContextLoc,
-	pprTyThingHdr
+	pprTyThingHdr,
+  	pprTypeForUser
   ) where
 
 #include "HsVersions.h"
 
 import qualified GHC
 
+import GHC	( TyThing(..) )
 import TyCon	( tyConFamInst_maybe )
-import Type	( pprTypeApp )
-import GHC	( TyThing(..), SrcSpan )
+import Type	( TyThing(..), tidyTopType, pprTypeApp )
+import TcType	( tcMultiSplitSigmaTy, mkPhiTy )
+import SrcLoc	( SrcSpan )
 import Var
 import Name
 import Outputable
@@ -98,7 +101,7 @@ pprTyConHdr pefas tyCon
       | otherwise             = empty
 
 pprDataConSig pefas dataCon =
-  ppr_bndr dataCon <+> dcolon <+> pprType pefas (GHC.dataConType dataCon)
+  ppr_bndr dataCon <+> dcolon <+> pprTypeForUser pefas (GHC.dataConType dataCon)
 
 pprClassHdr pefas cls =
   let (tyVars, funDeps) = GHC.classTvsFds cls
@@ -122,21 +125,33 @@ pprRecordSelector pefas id
 
 pprId :: PrintExplicitForalls -> Var -> SDoc
 pprId pefas ident
-  = hang (ppr_bndr ident <+> dcolon) 2 
-	(pprType pefas (GHC.idType ident))
+  = hang (ppr_bndr ident <+> dcolon)
+	 2 (pprTypeForUser pefas (GHC.idType ident))
 
-pprType :: PrintExplicitForalls -> GHC.Type -> SDoc
-pprType True  ty = ppr ty
-pprType False ty = ppr (GHC.dropForAlls ty)
+pprTypeForUser :: PrintExplicitForalls -> GHC.Type -> SDoc
+-- We do two things here.
+-- a) We tidy the type, regardless
+-- b) If PrintExplicitForAlls is True, we discard the foralls
+-- 	but we do so `deeply'
+-- Prime example: a class op might have type
+--	forall a. C a => forall b. Ord b => stuff
+-- Then we want to display
+--	(C a, Ord b) => stuff
+pprTypeForUser print_foralls ty 
+  | print_foralls = ppr tidy_ty
+  | otherwise     = ppr (mkPhiTy [p | (_tvs, ps) <- ctxt, p <- ps] ty')
+  where
+    tidy_ty     = tidyTopType ty
+    (ctxt, ty') = tcMultiSplitSigmaTy tidy_ty
 
 pprTyCon pefas tyCon
   | GHC.isSynTyCon tyCon
   = if GHC.isOpenTyCon tyCon
     then pprTyConHdr pefas tyCon <+> dcolon <+> 
-	 pprType pefas (GHC.synTyConResKind tyCon)
+	 pprTypeForUser pefas (GHC.synTyConResKind tyCon)
     else 
       let rhs_type = GHC.synTyConType tyCon
-      in hang (pprTyConHdr pefas tyCon <+> equals) 2 (pprType pefas rhs_type)
+      in hang (pprTyConHdr pefas tyCon <+> equals) 2 (pprTypeForUser pefas rhs_type)
   | otherwise
   = pprAlgTyCon pefas tyCon (const True) (const True)
 
@@ -209,21 +224,31 @@ pprClass pefas cls
   where
 	methods = GHC.classMethods cls
 
-pprClassOneMethod pefas cls this_one = 
-  hang (pprClassHdr pefas cls <+> ptext SLIT("where"))
-	2 (vcat (ppr_trim show_meth methods))
+pprClassOneMethod pefas cls this_one
+  = hang (pprClassHdr pefas cls <+> ptext SLIT("where"))
+	 2 (vcat (ppr_trim show_meth methods))
   where
 	methods = GHC.classMethods cls
 	show_meth id | id == this_one = Just (pprClassMethod pefas id)
 		     | otherwise      = Nothing
 
-pprClassMethod pefas id =
-  hang (ppr_bndr id <+> dcolon) 2 (pprType pefas (classOpType id))
+pprClassMethod pefas id
+  = hang (ppr_bndr id <+> dcolon) 2 (pprTypeForUser pefas op_ty)
   where
   -- Here's the magic incantation to strip off the dictionary
   -- from the class op type.  Stolen from IfaceSyn.tyThingToIfaceDecl.
-  classOpType id = GHC.funResultTy rho_ty
-     where (_sel_tyvars, rho_ty) = GHC.splitForAllTys (GHC.idType id)
+  --
+  -- It's important to tidy it *before* splitting it up, so that if 
+  -- we have	class C a b where
+  --	          op :: forall a. a -> b
+  -- then the inner forall on op gets renamed to a1, and we print
+  -- (when dropping foralls)
+  --		class C a b where
+  --		  op :: a1 -> b
+
+  tidy_sel_ty = tidyTopType (GHC.idType id)
+  (_sel_tyvars, rho_ty) = GHC.splitForAllTys tidy_sel_ty
+  op_ty = GHC.funResultTy rho_ty
 
 ppr_trim :: (a -> Maybe SDoc) -> [a] -> [SDoc]
 ppr_trim show xs

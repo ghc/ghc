@@ -154,8 +154,8 @@ module GHC (
 	instanceDFunId, pprInstance, pprInstanceHdr,
 
 	-- ** Types and Kinds
-	Type, dropForAlls, splitForAllTys, funResultTy, 
-	pprParendType, pprTypeApp,
+	Type, splitForAllTys, funResultTy, 
+	pprParendType, pprTypeApp, 
 	Kind,
 	PredType,
 	ThetaType, pprThetaArrow,

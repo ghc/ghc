@@ -26,12 +26,12 @@ import qualified GHC
 import GHC              ( Session, LoadHowMuch(..), Target(..),  TargetId(..),
                           Type, Module, ModuleName, TyThing(..), Phase,
                           BreakIndex, SrcSpan, Resume, SingleStep )
+import PprTyThing
 import DynFlags
 import Packages
 import PackageConfig
 import UniqFM
 import HscTypes		( implicitTyThings )
-import PprTyThing
 import Outputable       hiding (printForUser)
 import Module           -- for ModuleEnv
 import Name
@@ -610,12 +610,13 @@ afterRunStmt step_here run_result = do
               let namesSorted = sortBy compareNames names
               tythings <- catMaybes `liftM` 
                               io (mapM (GHC.lookupName session) namesSorted)
-              docs_ty  <- mapM showTyThing tythings
-              terms    <- mapM (io . GHC.obtainTermB session 10 False)
-                               [ id | (AnId id, Just _) <- zip tythings docs_ty]
+	      let ids = [id | AnId id <- tythings]
+              terms <- mapM (io . GHC.obtainTermB session 10 False) ids
               docs_terms <- mapM (io . showTerm session) terms                                   
-              printForUser $ vcat $ zipWith (\ty cts -> ty <> text " = " <> cts)
-                                            (catMaybes docs_ty)
+	      dflags <- getDynFlags
+	      let pefas = dopt Opt_PrintExplicitForalls dflags
+              printForUser $ vcat $ zipWith (\ty cts -> ty <+> equals <+> cts)
+                                            (map (pprTyThing pefas . AnId) ids)
                                             docs_terms
 
 runBreakCmd :: GHC.BreakInfo -> GHCi ()
@@ -991,8 +992,10 @@ typeOfExpr str
        maybe_ty <- io (GHC.exprType cms str)
        case maybe_ty of
 	  Nothing -> return ()
-	  Just ty -> do ty' <- cleanType ty
-                        printForUser $ text str <> text " :: " <> ppr ty'
+	  Just ty -> do dflags <- getDynFlags
+		        let pefas = dopt Opt_PrintExplicitForalls dflags
+                        printForUser $ text str <+> dcolon
+					<+> pprTypeForUser pefas ty
 
 kindOfType :: String -> GHCi ()
 kindOfType str 
@@ -1000,7 +1003,7 @@ kindOfType str
        maybe_ty <- io (GHC.typeKind cms str)
        case maybe_ty of
 	  Nothing    -> return ()
-	  Just ty    -> printForUser $ text str <> text " :: " <> ppr ty
+	  Just ty    -> printForUser $ text str <+> dcolon <+> ppr ty
           
 quit :: String -> GHCi Bool
 quit _ = return True
@@ -1299,26 +1302,10 @@ showBindings = do
 compareTyThings :: TyThing -> TyThing -> Ordering
 t1 `compareTyThings` t2 = getName t1 `compareNames` getName t2
 
-showTyThing :: TyThing -> GHCi (Maybe SDoc)
-showTyThing (AnId id) = do
-  ty' <- cleanType (GHC.idType id)
-  return $ Just $ ppr id <> text " :: " <> ppr ty'
-showTyThing _ = return Nothing
-
 printTyThing :: TyThing -> GHCi ()
-printTyThing tyth = do
-  mb_x <- showTyThing tyth
-  case mb_x of
-    Just x  -> printForUser x
-    Nothing -> return ()
-
--- if -fglasgow-exts is on we show the foralls, otherwise we don't.
-cleanType :: Type -> GHCi Type
-cleanType ty = do
-  dflags <- getDynFlags
-  if dopt Opt_PrintExplicitForalls dflags 
-	then return ty
-	else return $! GHC.dropForAlls ty
+printTyThing tyth = do dflags <- getDynFlags
+                       let pefas = dopt Opt_PrintExplicitForalls dflags
+		       printForUser (pprTyThing pefas tyth)
 
 showBkptTable :: GHCi ()
 showBkptTable = do
