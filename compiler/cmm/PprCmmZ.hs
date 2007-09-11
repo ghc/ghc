@@ -1,6 +1,6 @@
 
 module PprCmmZ
-    ( pprCmmGraph
+    ( pprCmmGraphLikeCmm
     )
 where
 
@@ -12,21 +12,14 @@ import PprCmm()
 import Outputable
 import qualified ZipCfgCmm as G
 import qualified ZipCfg as Z
-import qualified ZipDataflow as DF
 import CmmZipUtil
 
 import UniqSet
 import FastString
 
 ----------------------------------------------------------------
-instance DF.DebugNodes G.Middle G.Last
-
-
-instance Outputable G.CmmGraph where
-    ppr = pprCmmGraph
-
-pprCmmGraph :: G.CmmGraph -> SDoc
-pprCmmGraph g = vcat (swallow blocks)
+pprCmmGraphLikeCmm :: G.CmmGraph -> SDoc
+pprCmmGraphLikeCmm g = vcat (swallow blocks)
     where blocks = Z.postorder_dfs g
           swallow :: [G.CmmBlock] -> [SDoc]
           swallow [] = []
@@ -108,4 +101,5 @@ pprCmmGraph g = vcat (swallow blocks)
                                     else single
               in  Z.fold_blocks add Z.emptyBlockSet g
           unique_pred id = Z.elemBlockSet id single_preds
+
 

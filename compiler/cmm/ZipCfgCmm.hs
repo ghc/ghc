@@ -207,8 +207,18 @@ instance Outputable Last where
 instance Outputable Convention where
     ppr = pprConvention
 
+instance DF.DebugNodes Middle Last
+
+instance Outputable CmmGraph where
+    ppr = pprCmmGraphAsRep
+
+pprCmmGraphAsRep :: CmmGraph -> SDoc
+pprCmmGraphAsRep g = vcat (map ppr_block blocks)
+    where blocks = postorder_dfs g
+          ppr_block (Block id tail) = hang (ppr id <> colon) 4 (ppr tail)
+
 pprMiddle :: Middle -> SDoc    
-pprMiddle stmt = case stmt of
+pprMiddle stmt = (case stmt of
 
     MidNop -> semi
 
@@ -252,6 +262,15 @@ pprMiddle stmt = case stmt of
         pprMiddle (MidUnsafeCall (CmmCallee (CmmLit lbl) CCallConv) results args)
         where
           lbl = CmmLabel (mkForeignLabel (mkFastString (show op)) Nothing False)
+  ) <+> text "//" <+>
+  case stmt of
+    MidNop {} -> text "MidNop"
+    CopyIn {} -> text "CopyIn"
+    CopyOut {} -> text "CopyOut"
+    MidComment {} -> text "MidComment"
+    MidAssign {} -> text "MidAssign"
+    MidStore {} -> text "MidStore"
+    MidUnsafeCall {} -> text "MidUnsafeCall"
 
 
 pprHinted :: Outputable a => (a, MachHint) -> SDoc
@@ -260,12 +279,25 @@ pprHinted (a, PtrHint)    = doubleQuotes (text "address") <+> ppr a
 pprHinted (a, SignedHint) = doubleQuotes (text "signed")  <+> ppr a
 pprHinted (a, FloatHint)  = doubleQuotes (text "float")   <+> ppr a
 
+pprLast :: Last -> SDoc    
+pprLast stmt = (case stmt of
     LastBranch ident args     -> genBranchWithArgs ident args
     LastCondBranch expr t f   -> genFullCondBranch expr t f
     LastJump expr params      -> ppr $ CmmJump expr params
-    LastReturn params         -> ppr $ CmmReturn params
+    LastReturn results        -> hcat [ ptext SLIT("return"), space
+                                      , parens ( commafy $ map pprHinted results )
+                                      , semi ]
     LastSwitch arg ids        -> ppr $ CmmSwitch arg ids
     LastCall tgt params k     -> genCall tgt params k
+  ) <+> text "//" <+>
+  case stmt of
+    LastBranch {} -> text "LastBranch"
+    LastCondBranch {} -> text "LastCondBranch"
+    LastJump {} -> text "LastJump"
+    LastReturn {} -> text "LastReturn"
+    LastSwitch {} -> text "LastSwitch"
+    LastCall {} -> text "LastCall"
+
 
 genCall :: CmmCallTarget -> CmmActuals -> Maybe BlockId -> SDoc
 genCall (CmmCallee fn cconv) args k =
