@@ -157,12 +157,7 @@ instance Outputable Convention where
 instance DF.DebugNodes Middle Last
 
 instance Outputable CmmGraph where
-    ppr = pprCmmGraphAsRep
-
-pprCmmGraphAsRep :: CmmGraph -> SDoc
-pprCmmGraphAsRep g = vcat (map ppr_block blocks)
-    where blocks = postorder_dfs g
-          ppr_block (Block id tail) = hang (ppr id <> colon) 4 (ppr tail)
+    ppr = pprLgraph
 
 pprMiddle :: Middle -> SDoc    
 pprMiddle stmt = (case stmt of

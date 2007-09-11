@@ -9,22 +9,30 @@ module ZipCfg
     , LastNode, mkBranchNode, isBranchNode, branchNodeTarget
 
         -- Observers and transformers
-    , entry, exit, focus, focusp, unfocus
-    , blockId, zip, unzip, last, goto_end, ht_to_first, ht_to_last, zipht
-    , tailOfLast
-    , splice_head, splice_tail, splice_head_only, splice_focus_entry
-                 , splice_focus_exit, remove_entry_label
+    , blockId, zip, unzip, last, goto_end, zipht, tailOfLast
+    , remove_entry_label
+    , splice_tail, splice_head, splice_head_only
     , of_block_list, to_block_list
+    , map_nodes
     , postorder_dfs
-    , fold_layout, fold_blocks
-    , fold_fwd_block, foldM_fwd_block
-    , map_nodes, translate
+    , fold_layout
+    , fold_blocks
+    , translate
 
     , pprLgraph
+
+    {-
+    -- the following functions might one day be useful and can be found
+    -- either below or in ZipCfgExtras:
+    , entry, exit, focus, focusp, unfocus
+    , ht_to_first, ht_to_last, 
+    , splice_focus_entry, splice_focus_exit
+    , fold_fwd_block, foldM_fwd_block
+    -}
+
     )
 where
 
-import Maybes
 import Outputable hiding (empty)
 import Panic
 import Prelude hiding (zip, unzip, last)
@@ -110,21 +118,6 @@ construction of large graphs.  A separate module, 'MkZipCfg', provides a
 fourth representation that is asymptotically optimal for such construction.
     
 -}
-
-entry   :: LGraph m l -> FGraph m l         -- focus on edge out of entry node 
-exit    :: LGraph m l -> FGraph m l         -- focus on edge into default exit node 
-                                            -- (fails if there isn't one)
-focus   :: BlockId -> LGraph m l -> FGraph m l -- focus on edge out of node with id 
-focusp  :: (Block m l -> Bool) -> LGraph m l -> Maybe (FGraph m l)
-                                      -- focus on start of block satisfying predicate
-unfocus :: FGraph m l -> LGraph m l            -- lose focus 
-
--- | We can insert a single-entry, single-exit subgraph at
--- the current focus.
--- The new focus can be at either the entry edge or the exit edge.
-
-splice_focus_entry :: FGraph m l -> LGraph m l -> FGraph m l
-splice_focus_exit  :: FGraph m l -> LGraph m l -> FGraph m l
 
 --------------- Representation --------------------
 
@@ -269,18 +262,6 @@ instance LastNode l => HavingSuccessors (Block m l) where
     succs b = succs (unzip b)
 
 
-------------------- Observing nodes
-
--- | Fold from first to last
-fold_fwd_block ::
-  (BlockId -> a -> a) -> (m -> a -> a) -> (ZLast l -> a -> a) ->
-  Block m l -> a -> a
-
--- | iterate from first to last
-foldM_fwd_block ::
-  Monad m => (BlockId -> a -> m a) -> (mid -> a -> m a) -> (ZLast l -> a -> m a) ->
-             Block mid l -> a -> m a
-
 -- ================ IMPLEMENTATION ================--
 
 blockId (Block id _) = id
@@ -313,13 +294,11 @@ last (ZBlock _ t) = lastt t
   where lastt (ZLast l) = l
         lastt (ZTail _ t) = lastt t
 
+focus :: BlockId -> LGraph m l -> FGraph m l -- focus on edge out of node with id 
 focus id (LGraph entry blocks) =
     case lookupBlockEnv blocks id of
       Just b -> FGraph entry (unzip b) (delFromUFM blocks id)
       Nothing -> panic "asked for nonexistent block in flow graph"
-
-focusp p (LGraph entry blocks) =
-    fmap (\(b, bs) -> FGraph entry (unzip b) bs) (splitp_blocks p blocks)
 
 splitp_blocks :: (Block m l -> Bool) -> BlockEnv (Block m l) ->
                  Maybe (Block m l, BlockEnv (Block m l))
@@ -332,12 +311,6 @@ splitp_blocks p blocks = lift $ foldUFM scan (Nothing, emptyBlockEnv) blocks
           lift (Nothing, _) = Nothing
           lift (Just b, bs) = Just (b, bs)
 
-entry g@(LGraph eid _) = focus eid g
-
-exit g@(LGraph eid _) = FGraph eid (ZBlock h (ZLast l)) others
-    where FGraph _ b others = focusp is_exit g `orElse` panic "no exit in flow graph"
-          (h, l) = goto_end b
-
 is_exit :: Block m l -> Bool
 is_exit b = case last (unzip b) of { LastExit -> True; _ -> False }
 
@@ -349,8 +322,6 @@ insertBlock b bs =
       Nothing -> extendBlockEnv bs id b
       Just _ -> panic ("duplicate labels " ++ show id ++ " in ZipCfg graph")
     where id = blockId b
-
-unfocus (FGraph e bz bs) = LGraph e (insertBlock (zip bz) bs)
 
 check_single_exit :: LGraph l m -> a -> a
 check_single_exit g =
@@ -365,6 +336,11 @@ check_single_exit g =
 
 freshBlockId :: String -> UniqSM BlockId
 freshBlockId _ = do { u <- getUniqueUs; return $ BlockId u }
+
+entry   :: LGraph m l -> FGraph m l         -- focus on edge out of entry node 
+entry g@(LGraph eid _) = focus eid g
+
+
 
 postorder_dfs g@(LGraph _ blocks) =
   let FGraph _ eblock _ = entry g
@@ -394,14 +370,6 @@ fold_layout f z g@(LGraph eid _) = fold (postorder_dfs g) z
         nextlabel (Block id _) =
             if id == eid then panic "entry as successor"
             else Just id
-
-fold_fwd_block first middle last (Block id t) z = tail t (first id z)
-    where tail (ZTail m t) z = tail t (middle m z)
-          tail (ZLast l)   z = last l z
-
-foldM_fwd_block first middle last (Block id t) z = do { z <- first id z; tail t z }
-    where tail (ZTail m t) z = do { z <- middle m z; tail t z }
-          tail (ZLast l)   z = last l z
 
 fold_blocks f z (LGraph _ blocks) = foldUFM f z blocks
 
@@ -464,14 +432,6 @@ splice_tail g tail =
       splice_many_blocks entry exit others =
          (entry, LGraph (gr_entry g) (insertBlock (zipht exit tail) others))
   in  prepare_for_splicing g splice_one_block splice_many_blocks
-
-splice_focus_entry (FGraph eid (ZBlock head tail) blocks) g =
-  let (tail', g') = splice_tail g tail in
-  FGraph eid (ZBlock head tail') (plusUFM (gr_blocks g') blocks)
-
-splice_focus_exit (FGraph eid (ZBlock head tail) blocks) g =
-  let (g', head') = splice_head head g in
-  FGraph eid (ZBlock head' tail) (plusUFM (gr_blocks g') blocks)
 
 splice_head_only head g =
   let FGraph eid gentry gblocks = entry g
