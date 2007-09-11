@@ -254,8 +254,6 @@ slurpConflicts live
 --	If we can arrange that v1 and v2 are allocated to the same hreg it's more likely
 --	the spill/reload instrs can be cleaned and replaced by a nop reg-reg move.
 --
--- 	TODO: This only works intra-block at the momement. It's be nice to join up the mappings
---	      across blocks also.
 --
 slurpReloadCoalesce :: LiveCmmTop -> Bag (Reg, Reg)
 slurpReloadCoalesce live
@@ -265,32 +263,80 @@ slurpReloadCoalesce live
  	slurpCmm cs (CmmProc _ _ _ (ListGraph blocks))
 		= foldl' slurpComp cs blocks
 
-	slurpComp  cs (BasicBlock _ blocks)
-		= foldl' slurpBlock cs blocks
+	slurpComp  cs comp
+	 = let	(moveBags, _)	= runState (slurpCompM comp) emptyUFM
+	   in	unionManyBags (cs : moveBags)
 
-	slurpBlock cs (BasicBlock _ instrs)
-	 = let	(_, mMoves)	= mapAccumL slurpLI emptyUFM instrs
-	   in	unionBags cs (listToBag $ catMaybes mMoves)
+	slurpCompM (BasicBlock _ blocks)
+	 = do	-- run the analysis once to record the mapping across jumps.
+	 	mapM_	(slurpBlock False) blocks
 
-	slurpLI :: UniqFM Reg -> LiveInstr -> (UniqFM Reg, Maybe (Reg, Reg))
+		-- run it a second time while using the information from the last pass.
+		--	We /could/ run this many more times to deal with graphical control
+		--	flow and propagating info across multiple jumps, but it's probably
+		--	not worth the trouble.
+		mapM	(slurpBlock True) blocks
+
+	slurpBlock propagate (BasicBlock blockId instrs)
+	 = do	-- grab the slot map for entry to this block
+	 	slotMap		<- if propagate
+					then getSlotMap blockId
+					else return emptyUFM
+
+	 	(_, mMoves)	<- mapAccumLM slurpLI slotMap instrs
+	   	return $ listToBag $ catMaybes mMoves
+
+	slurpLI :: UniqFM Reg 				-- current slotMap
+		-> LiveInstr
+		-> State (UniqFM [UniqFM Reg]) 		-- blockId -> [slot -> reg]
+							-- 	for tracking slotMaps across jumps
+
+			 ( UniqFM Reg			-- new slotMap
+			 , Maybe (Reg, Reg))		-- maybe a new coalesce edge
+
 	slurpLI slotMap (Instr instr _)
 
 		-- remember what reg was stored into the slot
 		| SPILL reg slot	<- instr
 		, slotMap'		<- addToUFM slotMap slot reg
-		= (slotMap', Nothing)
+		= return (slotMap', Nothing)
 
 		-- add an edge betwen the this reg and the last one stored into the slot
 		| RELOAD slot reg	<- instr
 		= case lookupUFM slotMap slot of
 			Just reg2
-			 | reg /= reg2	-> (slotMap, Just (reg, reg2))
-			 | otherwise	-> (slotMap, Nothing)
+			 | reg /= reg2	-> return (slotMap, Just (reg, reg2))
+			 | otherwise	-> return (slotMap, Nothing)
 
-			Nothing		-> (slotMap, Nothing)
+			Nothing		-> return (slotMap, Nothing)
+
+		-- if we hit a jump, remember the current slotMap
+		| targets	<- jumpDests instr []
+		, not $ null targets
+		= do	mapM_	(accSlotMap slotMap) targets
+			return	(slotMap, Nothing)
 
 		| otherwise
-		= (slotMap, Nothing)
+		= return (slotMap, Nothing)
+
+	-- record a slotmap for an in edge to this block
+	accSlotMap slotMap blockId
+		= modify (\s -> addToUFM_C (++) s blockId [slotMap])
+
+	-- work out the slot map on entry to this block
+	--	if we have slot maps for multiple in-edges then we need to merge them.
+	getSlotMap blockId
+	 = do	map		<- get
+	 	let slotMaps	= fromMaybe [] (lookupUFM map blockId)
+		return		$ foldr mergeSlotMaps emptyUFM slotMaps
+
+	mergeSlotMaps :: UniqFM Reg -> UniqFM Reg -> UniqFM Reg
+	mergeSlotMaps map1 map2
+		= listToUFM
+		$ [ (k, r1)	| (k, r1)	<- ufmToList map1
+				, case lookupUFM map2 k of
+					Nothing	-> False
+					Just r2	-> r1 == r2 ]
 
 
 -- | Strip away liveness information, yielding NatCmmTop

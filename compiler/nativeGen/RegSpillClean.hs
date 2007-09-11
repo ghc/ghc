@@ -101,7 +101,7 @@ cleanBlock (BasicBlock id instrs)
 				Just assoc	-> assoc
 				Nothing		-> emptyAssoc
 
- 	instrs_reload	<- cleanReload assoc        [] instrs
+ 	instrs_reload	<- cleanFwd    assoc        [] instrs
  	instrs_spill	<- cleanSpill  emptyUniqSet [] instrs_reload
 	return	$ BasicBlock id instrs_spill
 
@@ -111,36 +111,36 @@ cleanBlock (BasicBlock id instrs)
 --	  On a reload, if we know a reg already has the same value as a slot
 --	  then we don't need to do the reload.
 --
-cleanReload
+cleanFwd
 	:: Assoc Store	 	-- ^ two store locations are associated if they have the same value
 	-> [LiveInstr]		-- ^ acc
 	-> [LiveInstr] 		-- ^ instrs to clean (in backwards order)
 	-> CleanM [LiveInstr]	-- ^ cleaned instrs  (in forward   order)
 
-cleanReload _ acc []
+cleanFwd _ acc []
 	= return acc
 
 -- write out live range joins via spill slots to just a spill and a reg-reg move
 --	hopefully the spill will be also be cleaned in the next pass
 --
-cleanReload assoc acc (Instr i1 live1 : Instr i2 _ : instrs)
+cleanFwd assoc acc (Instr i1 live1 : Instr i2 _ : instrs)
 
 	| SPILL  reg1  slot1	<- i1
 	, RELOAD slot2 reg2	<- i2
 	, slot1 == slot2
 	= do
 		modify $ \s -> s { sCleanedReloadsAcc = sCleanedReloadsAcc s + 1 }
-		cleanReload assoc acc
+		cleanFwd assoc acc
 			(Instr i1 live1 : Instr (mkRegRegMoveInstr reg1 reg2) Nothing : instrs)
 
 
-cleanReload assoc acc (li@(Instr i1 _) : instrs)
+cleanFwd assoc acc (li@(Instr i1 _) : instrs)
 	| Just (r1, r2)	<- isRegRegMove i1
 	= if r1 == r2
 		-- erase any left over nop reg reg moves while we're here
 		--	this will also catch any nop moves that the "write out live range joins" case above
 		--	happens to add
-		then cleanReload assoc acc instrs
+		then cleanFwd assoc acc instrs
 
 		-- if r1 has the same value as some slots and we copy r1 to r2,
 		--	then r2 is now associated with those slots instead
@@ -148,43 +148,69 @@ cleanReload assoc acc (li@(Instr i1 _) : instrs)
 					$ delAssoc (SReg r2)
 					$ assoc
 
-			cleanReload assoc' (li : acc) instrs
+			cleanFwd assoc' (li : acc) instrs
 
 
-cleanReload assoc acc (li@(Instr instr _) : instrs)
+cleanFwd assoc acc (li@(Instr instr _) : instrs)
 
 	| SPILL reg slot	<- instr
 	= let	assoc'	= addAssoc (SReg reg)  (SSlot slot)	-- doing the spill makes reg and slot the same value
 			$ delAssoc (SSlot slot) 		-- slot value changes on spill
 			$ assoc
-	  in	cleanReload assoc' (li : acc) instrs
+	  in	cleanFwd assoc' (li : acc) instrs
 
-	| RELOAD slot reg	<- instr
-	= if elemAssoc (SSlot slot) (SReg reg) assoc
-
-           -- if the reg and slot had the same value before reload
-	   --	then we don't need the reload.
-	   then	do
-		modify $ \s -> s { sCleanedReloadsAcc = sCleanedReloadsAcc s + 1 }
-	   	cleanReload assoc acc instrs
-
-	   -- reg and slot had different values before reload
-	   else
-	    let assoc'	= addAssoc (SReg reg)  (SSlot slot)	-- doing the reload makes reg and slot the same value
-			$ delAssoc (SReg reg)			-- reg value changes on reload
-			$ assoc
-	    in	cleanReload assoc' (li : acc) instrs
+	-- clean a reload instr
+	| RELOAD{}		<- instr
+	= do	(assoc', mli)	<- cleanReload assoc li
+		case mli of
+			Nothing		-> cleanFwd assoc' acc 		instrs
+			Just li'	-> cleanFwd assoc' (li' : acc)	instrs
 
 	-- remember the association over a jump
 	| targets	<- jumpDests instr []
 	, not $ null targets
 	= do	mapM_ (accJumpValid assoc) targets
-		cleanReload assoc (li : acc) instrs
+		cleanFwd assoc (li : acc) instrs
 
 	-- writing to a reg changes its value.
 	| RU _ written	<- regUsage instr
 	= let assoc'	= foldr delAssoc assoc (map SReg $ nub written)
-	  in  cleanReload assoc' (li : acc) instrs
+	  in  cleanFwd assoc' (li : acc) instrs
+
+
+-- | Try and rewrite a reload instruction to something more pleasing
+--
+cleanReload :: Assoc Store -> LiveInstr -> CleanM (Assoc Store, Maybe LiveInstr)
+cleanReload assoc li@(Instr (RELOAD slot reg) _)
+
+	-- if the reg we're reloading already has the same value as the slot
+	--	then we can erase the instruction outright
+	| elemAssoc (SSlot slot) (SReg reg) assoc
+	= do 	modify 	$ \s -> s { sCleanedReloadsAcc = sCleanedReloadsAcc s + 1 }
+	   	return	(assoc, Nothing)
+
+	-- if we can find another reg with the same value as this slot then
+	--	do a move instead of a reload.
+	| Just reg2	<- findRegOfSlot assoc slot
+	= do	modify $ \s -> s { sCleanedReloadsAcc = sCleanedReloadsAcc s + 1 }
+
+		let assoc'	= addAssoc (SReg reg) (SReg reg2)
+				$ delAssoc (SReg reg)
+				$ assoc
+
+		return	(assoc', Just $ Instr (mkRegRegMoveInstr reg2 reg) Nothing)
+
+	-- gotta keep this instr
+	--	update the association
+	| otherwise
+	= do	let assoc'	= addAssoc (SReg reg)  (SSlot slot)	-- doing the reload makes reg and slot the same value
+				$ delAssoc (SReg reg)			-- reg value changes on reload
+				$ assoc
+
+	    	return	(assoc', Just li)
+
+cleanReload _ _
+	= panic "RegSpillClean.cleanReload: unhandled instr"
 
 
 -- | Clean out unneeded spill instructions.
@@ -240,6 +266,16 @@ intersects []		= emptyAssoc
 intersects assocs	= foldl1' intersectAssoc assocs
 
 
+-- | See if we have a reg with the same value as this slot in the association table.
+findRegOfSlot :: Assoc Store -> Int -> Maybe Reg
+findRegOfSlot assoc slot
+	| close			<- closeAssoc (SSlot slot) assoc
+	, Just (SReg reg)	<- find isStoreReg $ uniqSetToList close
+	= Just reg
+
+	| otherwise
+	= Nothing
+
 
 ---------------
 type CleanM = State CleanS
@@ -287,6 +323,13 @@ accJumpValid assocs target
 data Store
 	= SSlot Int
 	| SReg  Reg
+
+-- | Check if this is a reg store
+isStoreReg :: Store -> Bool
+isStoreReg ss
+ = case ss of
+ 	SSlot _	-> False
+	SReg  _	-> True
 
 -- spill cleaning is only done once all virtuals have been allocated to realRegs
 --
