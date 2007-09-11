@@ -321,11 +321,16 @@ mkWhileDo cbranch body =
 note_this_code_becomes_unreachable ::
     (Monad m, LastNode l, Outputable middle, Outputable l) => ZTail middle l -> m ()
 
+#ifdef DEBUG
 note_this_code_becomes_unreachable = u
     where u (ZLast LastExit)                       = return ()
           u (ZLast (LastOther l)) | isBranchNode l = return ()
                                     -- Note [Branch follows branch]
           u tail = fail ("unreachable code: " ++ showSDoc (ppr tail))
+#else
+note_this_code_becomes_unreachable = return ()
+#endif
+
 {-
 Note [Branch follows branch]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
