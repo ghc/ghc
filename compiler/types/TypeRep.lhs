@@ -23,7 +23,7 @@ module TypeRep (
 
 	-- Pretty-printing
 	pprType, pprParendType, pprTypeApp,
-	pprTyThingCategory, 
+	pprTyThing, pprTyThingCategory, 
 	pprPred, pprTheta, pprForAll, pprThetaArrow, pprClassPred,
 
 	-- Kinds
@@ -292,8 +292,11 @@ data TyThing = AnId     Id
 	     | ATyCon   TyCon
 	     | AClass   Class
 
-instance Outputable TyThing where
-  ppr thing = pprTyThingCategory thing <+> quotes (ppr (getName thing))
+instance Outputable TyThing where 
+  ppr = pprTyThing
+
+pprTyThing :: TyThing -> SDoc
+pprTyThing thing = pprTyThingCategory thing <+> quotes (ppr (getName thing))
 
 pprTyThingCategory :: TyThing -> SDoc
 pprTyThingCategory (ATyCon _) 	= ptext SLIT("Type constructor")

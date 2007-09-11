@@ -908,16 +908,16 @@ lookupType dflags hpt pte name
 
 \begin{code}
 tyThingTyCon (ATyCon tc) = tc
-tyThingTyCon other	 = pprPanic "tyThingTyCon" (ppr other)
+tyThingTyCon other	 = pprPanic "tyThingTyCon" (pprTyThing other)
 
 tyThingClass (AClass cls) = cls
-tyThingClass other	  = pprPanic "tyThingClass" (ppr other)
+tyThingClass other	  = pprPanic "tyThingClass" (pprTyThing other)
 
 tyThingDataCon (ADataCon dc) = dc
-tyThingDataCon other	     = pprPanic "tyThingDataCon" (ppr other)
+tyThingDataCon other	     = pprPanic "tyThingDataCon" (pprTyThing other)
 
 tyThingId (AnId id) = id
-tyThingId other     = pprPanic "tyThingId" (ppr other)
+tyThingId other     = pprPanic "tyThingId" (pprTyThing other)
 \end{code}
 
 %************************************************************************

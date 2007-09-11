@@ -470,7 +470,7 @@ data RefinementVisibility
 					-- GADT refinement
 
 instance Outputable TcTyThing where	-- Debugging only
-   ppr (AGlobal g)      = ppr g
+   ppr (AGlobal g)      = pprTyThing g
    ppr elt@(ATcId {})   = text "Identifier" <> 
 			  ifPprDebug (brackets (ppr (tct_id elt) <> dcolon <> ppr (tct_type elt) <> comma
 				 <+> ppr (tct_level elt) <+> ppr (tct_co elt)))

@@ -105,7 +105,7 @@ module Type (
 	substPred, substTyVar, substTyVars, substTyVarBndr, deShadowTy, lookupTyVar,
 
 	-- Pretty-printing
-	pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprForAll,
+	pprType, pprParendType, pprTypeApp, pprTyThingCategory, pprTyThing, pprForAll,
 	pprPred, pprTheta, pprThetaArrow, pprClassPred, pprKind, pprParendKind
     ) where
 
