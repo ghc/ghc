@@ -1971,7 +1971,7 @@ exactly as you would in an ordinary instance declaration.
 (In contrast the context is inferred in a <literal>deriving</literal> clause 
 attached to a data type declaration.) These <literal>deriving instance</literal>
 rules obey the same rules concerning form and termination as ordinary instance declarations,
-controlled by the same flags; see <link linkend="instance-decls"/>. </para>
+controlled by the same flags; see <xref linkend="instance-decls"/>. </para>
 
 <para>The stand-alone syntax is generalised for newtypes in exactly the same
 way that ordinary <literal>deriving</literal> clauses are generalised (<xref linkend="newtype-deriving"/>).
@@ -4322,24 +4322,27 @@ Template Meta-programming for Haskell</ulink>" (Proc Haskell Workshop 2002).
 <para>
 There is a Wiki page about
 Template Haskell at <ulink url="http://haskell.org/haskellwiki/Template_Haskell">
-http://www.haskell.org/th/</ulink>, and that is the best place to look for
+http://www.haskell.org/haskellwiki/Template_Haskell</ulink>, and that is the best place to look for
 further details.
 You may also 
 consult the <ulink
 url="http://www.haskell.org/ghc/docs/latest/html/libraries/index.html">online
 Haskell library reference material</ulink> 
-(search for the type ExpQ).
-[Temporary: many changes to the original design are described in 
-      <ulink url="http://research.microsoft.com/~simonpj/tmp/notes2.ps">"http://research.microsoft.com/~simonpj/tmp/notes2.ps"</ulink>.
-Not all of these changes are in GHC 6.6.]
+(look for module <literal>Language.Haskell.TH</literal>).
+Many changes to the original design are described in 
+      <ulink url="http://research.microsoft.com/~simonpj/papers/meta-haskell/notes2.ps">
+Notes on Template Haskell version 2</ulink>.
+Not all of these changes are in GHC, however.
 </para>
 
-<para> The first example from that paper is set out below as a worked example to help get you started. 
+<para> The first example from that paper is set out below (<xref linkend="th-example"/>) 
+as a worked example to help get you started. 
 </para>
 
 <para>
-The documentation here describes the realisation in GHC.  (It's rather sketchy just now;
-Tim Sheard is going to expand it.)
+The documentation here describes the realisation of Template Haskell in GHC.  It is not detailed enough to 
+understand Template Haskell; see the <ulink url="http://haskell.org/haskellwiki/Template_Haskell">
+Wiki page</ulink>.
 </para>
 
     <sect2>
@@ -4365,41 +4368,47 @@ Tim Sheard is going to expand it.)
 		  <itemizedlist>
 		    <listitem><para> an expression; the spliced expression must
 		    have type <literal>Q Exp</literal></para></listitem>
-		    <listitem><para> a list of top-level declarations; ; the spliced expression must have type <literal>Q [Dec]</literal></para></listitem>
-		    <listitem><para> [Planned, but not implemented yet.] a
-		    type; the spliced expression must have type <literal>Q Typ</literal>.</para></listitem>
+		    <listitem><para> a list of top-level declarations; the spliced expression must have type <literal>Q [Dec]</literal></para></listitem>
 		    </itemizedlist>
-	   (Note that the syntax for a declaration splice uses "<literal>$</literal>" not "<literal>splice</literal>" as in
-	the paper. Also the type of the enclosed expression must be  <literal>Q [Dec]</literal>, not  <literal>[Q Dec]</literal>
-	as in the paper.)
-		</para></listitem>
+		</para>
+	    Inside a splice you can can only call functions defined in imported modules,
+	not functions defined elsewhere in the same module.</listitem>
 
 
 	      <listitem><para>
 		  A expression quotation is written in Oxford brackets, thus:
 		  <itemizedlist>
 		    <listitem><para> <literal>[| ... |]</literal>, where the "..." is an expression; 
-                             the quotation has type <literal>Expr</literal>.</para></listitem>
+                             the quotation has type <literal>Q Exp</literal>.</para></listitem>
 		    <listitem><para> <literal>[d| ... |]</literal>, where the "..." is a list of top-level declarations;
                              the quotation has type <literal>Q [Dec]</literal>.</para></listitem>
 		    <listitem><para> <literal>[t| ... |]</literal>, where the "..." is a type;
-                             the quotation has type <literal>Type</literal>.</para></listitem>
+                             the quotation has type <literal>Q Typ</literal>.</para></listitem>
 		  </itemizedlist></para></listitem>
 
 	      <listitem><para>
-		  Reification is written thus:
+		  A name can be quoted with either one or two prefix single quotes:
 		  <itemizedlist>
-		    <listitem><para> <literal>reifyDecl T</literal>, where <literal>T</literal> is a type constructor; this expression
-		      has type <literal>Dec</literal>. </para></listitem>
-		    <listitem><para> <literal>reifyDecl C</literal>, where <literal>C</literal> is a class; has type <literal>Dec</literal>.</para></listitem>
-		    <listitem><para> <literal>reifyType f</literal>, where <literal>f</literal> is an identifier; has type <literal>Typ</literal>.</para></listitem>
-		    <listitem><para> Still to come: fixities </para></listitem>
-		    
-		  </itemizedlist></para>
+		    <listitem><para> <literal>'f</literal> has type <literal>Name</literal>, and names the function <literal>f</literal>.
+		  Similarly <literal>'C</literal> has type <literal>Name</literal> and names the data constructor <literal>C</literal>.
+		  In general <literal>'</literal><replaceable>thing</replaceable> interprets <replaceable>thing</replaceable> in an expression context.
+		     </para></listitem> 
+		    <listitem><para> <literal>''T</literal> has type <literal>Name</literal>, and names the type constructor  <literal>T</literal>.
+		  That is, <literal>''</literal><replaceable>thing</replaceable> interprets <replaceable>thing</replaceable> in a type context.
+		     </para></listitem> 
+		  </itemizedlist>
+	          These <literal>Names</literal> can be used to construct Template Haskell expressions, patterns, delarations etc.  They
+	          may also be given as an argument to the <literal>reify</literal> function.
+	         </para>
 		</listitem>
 
 		  
 	</itemizedlist>
+(Compared to the original paper, there are many differnces of detail.
+The syntax for a declaration splice uses "<literal>$</literal>" not "<literal>splice</literal>".
+The type of the enclosed expression must be  <literal>Q [Dec]</literal>, not  <literal>[Q Dec]</literal>.
+Type splices are not implemented, and neither are pattern splices or quotations.
+
 </sect2>
 
 <sect2>  <title> Using Template Haskell </title>
@@ -4442,7 +4451,7 @@ Tim Sheard is going to expand it.)
 </para>
 </sect2>
  
-<sect2>  <title> A Template Haskell Worked Example </title>
+<sect2 id="th-example">  <title> A Template Haskell Worked Example </title>
 <para>To help you get over the confidence barrier, try out this skeletal worked example.
   First cut and paste the two modules below into "Main.hs" and "Printf.hs":</para>
 
@@ -4482,15 +4491,15 @@ parse s   = [ L s ]
 -- Generate Haskell source code from a parsed representation
 -- of the format string.  This code will be spliced into
 -- the module which calls "pr", at compile time.
-gen :: [Format] -> ExpQ
+gen :: [Format] -> Q Exp
 gen [D]   = [| \n -> show n |]
 gen [S]   = [| \s -> s |]
 gen [L s] = stringE s
 
 -- Here we generate the Haskell code for the splice
 -- from an input format string.
-pr :: String -> ExpQ
-pr s      = gen (parse s)
+pr :: String -> Q Exp
+pr s = gen (parse s)
 </programlisting>
 
 <para>Now run the compiler (here we are a Cygwin prompt on Windows):
