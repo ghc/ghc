@@ -656,7 +656,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 			          ; return (Nothing, mkModuleName m, [], []) }
 
 		other -> do { buf <- hGetStringBuffer input_fn
-			    ; (src_imps,imps,L _ mod_name) <- getImports dflags buf input_fn
+			    ; (src_imps,imps,L _ mod_name) <- getImports dflags buf input_fn (basename `joinFileExt` suff)
 			    ; return (Just buf, mod_name, imps, src_imps) }
 
   -- Build a ModLocation to pass to hscMain.

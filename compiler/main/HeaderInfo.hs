@@ -15,7 +15,7 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module HeaderInfo ( getImportsFromFile, getImports
+module HeaderInfo ( getImports
                   , getOptionsFromFile, getOptions
                   , optionsErrorMsgs ) where
 
@@ -56,18 +56,9 @@ import IOExts                   ( openFileEx, IOModeEx(..) )
 openBinaryFile fp mode = openFileEx fp (BinaryMode mode)
 #endif
 
--- getImportsFromFile is careful to close the file afterwards, otherwise
--- we can end up with a large number of open handles before the garbage
--- collector gets around to closing them.
-getImportsFromFile :: DynFlags -> FilePath
-   -> IO ([Located ModuleName], [Located ModuleName], Located ModuleName)
-getImportsFromFile dflags filename = do
-  buf <- hGetStringBuffer filename
-  getImports dflags buf filename
-
-getImports :: DynFlags -> StringBuffer -> FilePath
+getImports :: DynFlags -> StringBuffer -> FilePath -> FilePath
     -> IO ([Located ModuleName], [Located ModuleName], Located ModuleName)
-getImports dflags buf filename = do
+getImports dflags buf filename source_filename = do
   let loc  = mkSrcLoc (mkFastString filename) 1 0
   case unP parseHeader (mkPState buf loc dflags) of
 	PFailed span err -> parseError span err
@@ -78,7 +69,8 @@ getImports dflags buf filename = do
 	  case rdr_module of
 	    L _ (HsModule mb_mod _ imps _ _ _ _ _) ->
 	      let
-		mod = mb_mod `orElse` L (srcLocSpan loc) mAIN_NAME
+                main_loc = mkSrcLoc (mkFastString source_filename) 1 0
+		mod = mb_mod `orElse` L (srcLocSpan main_loc) mAIN_NAME
 	        (src_idecls, ord_idecls) = partition isSourceIdecl (map unLoc imps)
 		source_imps   = map getImpMod src_idecls	
 		ordinary_imps = filter ((/= moduleName gHC_PRIM) . unLoc) 
