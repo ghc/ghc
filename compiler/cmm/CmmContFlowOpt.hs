@@ -8,7 +8,7 @@ where
 import Cmm
 import CmmTx
 import qualified ZipCfg as G
-import ZipCfgCmm
+import ZipCfgCmmRep
 import Maybes
 import Util
 import UniqFM

@@ -6,8 +6,8 @@ module CmmCvt
 where
 import Cmm
 import CmmExpr
-import ZipCfgCmm
-import MkZipCfg 
+import MkZipCfgCmm hiding (CmmGraph)
+import ZipCfgCmmRep -- imported for reverse conversion
 import CmmZipUtil
 import FastString
 import Outputable
@@ -39,7 +39,7 @@ toZgraph fun_name g@(ListGraph (BasicBlock id ss : other_blocks)) =
         mkStmts (CmmCall f res args CmmUnsafe CmmMayReturn : ss) =
                       mkUnsafeCall f res args     <*> mkStmts ss
         mkStmts (CmmCondBranch e l : fbranch) =
-            mkIfThenElse (mkCbranch e) (mkBranch l) (mkStmts fbranch)
+            mkCmmIfThenElse e (mkBranch l) (mkStmts fbranch)
         mkStmts (last : []) = mkLast last
         mkStmts []          = bad "fell off end"
         mkStmts (_ : _ : _) = bad "last node not at end"

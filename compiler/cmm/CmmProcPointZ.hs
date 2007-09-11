@@ -22,7 +22,7 @@ import Panic
 import UniqFM
 import UniqSet
 import ZipCfg
-import ZipCfgCmm 
+import ZipCfgCmmRep
 import ZipDataflow
 
 -- Compute a minimal set of proc points for a control-flow graph.

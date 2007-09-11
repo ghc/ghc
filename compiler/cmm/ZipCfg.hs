@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS -Wall -fno-warn-name-shadowing #-}
 module ZipCfg
     ( BlockId(..), freshBlockId
@@ -67,7 +66,7 @@ or during optimization (see module 'ZipDataflow').
 
 A graph is parameterized over the types of middle and last nodes.  Each of
 these types will typically be instantiated with a subset of C-- statements
-(see module 'ZipCfgCmm') or a subset of machine instructions (yet to be
+(see module 'ZipCfgCmmRep') or a subset of machine instructions (yet to be
 implemented as of August 2007).
 
 
@@ -210,7 +209,7 @@ to_block_list :: LGraph m l -> [Block m l]  -- N log N
 -- The postorder depth-first-search order means the list is in roughly
 -- first-to-last order, as suitable for use in a forward dataflow problem.
 
-postorder_dfs :: forall m l . LastNode l => LGraph m l -> [Block m l]
+postorder_dfs :: LastNode l => LGraph m l -> [Block m l]
 
 -- | For layout, we fold over pairs of [[Block m l]] and [[Maybe BlockId]] 
 -- in layout order.  The [[BlockId]], if any, identifies the block that
@@ -225,13 +224,11 @@ fold_blocks :: (Block m l -> a -> a) -> a -> LGraph m l -> a
 
 map_nodes :: (BlockId -> BlockId) -> (m -> m') -> (l -> l') -> LGraph m l -> LGraph m' l'
    -- mapping includes the entry id!
-translate :: forall m l m' l' .
-             (m -> UniqSM (LGraph m' l')) -> (l -> UniqSM (LGraph m' l')) ->
+translate :: (m -> UniqSM (LGraph m' l')) -> (l -> UniqSM (LGraph m' l')) ->
              LGraph m l -> UniqSM (LGraph m' l')
 
 {-
-translateA :: forall m l m' l' .
-              (m -> Agraph m' l') -> (l -> AGraph m' l') -> LGraph m l -> LGraph m' l'
+translateA :: (m -> Agraph m' l') -> (l -> AGraph m' l') -> LGraph m l -> LGraph m' l'
 -}
 
 ------------------- Last nodes
@@ -373,7 +370,7 @@ postorder_dfs g@(LGraph _ blocks) =
   let FGraph _ eblock _ = entry g
   in  vnode (zip eblock) (\acc _visited -> acc) [] emptyBlockSet
   where
-    vnode :: Block m l -> ([Block m l] -> BlockSet -> a) -> [Block m l] -> BlockSet ->a
+    -- vnode :: Block m l -> ([Block m l] -> BlockSet -> a) -> [Block m l] -> BlockSet ->a
     vnode block@(Block id _) cont acc visited =
         if elemBlockSet id visited then
             cont acc visited
@@ -495,13 +492,13 @@ translate txm txl (LGraph eid blocks) =
     do blocks' <- foldUFM txblock (return emptyBlockEnv) blocks
        return $ LGraph eid blocks'
     where
-      txblock ::
-        Block m l -> UniqSM (BlockEnv (Block m' l')) -> UniqSM (BlockEnv (Block m' l'))
+      -- txblock ::
+      -- Block m l -> UniqSM (BlockEnv (Block m' l')) -> UniqSM (BlockEnv (Block m' l'))
       txblock (Block id t) expanded =
         do blocks' <- expanded
            txtail (ZFirst id) t blocks'
-      txtail :: ZHead m' -> ZTail m l -> BlockEnv (Block m' l') ->
-                UniqSM (BlockEnv (Block m' l'))
+      -- txtail :: ZHead m' -> ZTail m l -> BlockEnv (Block m' l') ->
+      --           UniqSM (BlockEnv (Block m' l'))
       txtail h (ZTail m t) blocks' =
         do m' <- txm m 
            let (g, h') = splice_head h m' 

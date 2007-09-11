@@ -1,10 +1,12 @@
 {-# OPTIONS -Wall -fno-warn-name-shadowing #-}
-module ZipCfgCmm
-  ( mkNop, mkAssign, mkStore, mkCall, mkUnsafeCall, mkFinalCall
-         , mkJump, mkCbranch, mkSwitch, mkReturn, mkComment, mkCmmIfThenElse
-         , mkCmmWhileDo
-  , mkCopyIn, mkCopyOut
-  , CmmZ, CmmTopZ, CmmGraph, CmmBlock, CmmAGraph, Middle(..), Last(..), Convention(..)
+
+-- This module is pure representation and should be imported only by
+-- clients that need to manipulate representation and know what
+-- they're doing.  Clients that need to create flow graphs should
+-- instead import MkZipCfgCmm.
+
+module ZipCfgCmmRep
+  ( CmmZ, CmmTopZ, CmmGraph, CmmBlock, CmmAGraph, Middle(..), Last(..), Convention(..)
   )
 where
 
@@ -36,38 +38,6 @@ type CmmAGraph = AGraph Middle Last
 type CmmBlock  = Block  Middle Last
 type CmmZ      = GenCmm    CmmStatic CmmInfo CmmGraph
 type CmmTopZ   = GenCmmTop CmmStatic CmmInfo CmmGraph
-
-mkNop        :: CmmAGraph
-mkAssign     :: CmmReg  -> CmmExpr -> CmmAGraph
-mkStore      :: CmmExpr -> CmmExpr -> CmmAGraph
-mkCall       :: CmmCallTarget -> CmmFormals -> CmmActuals -> C_SRT -> CmmAGraph
-mkUnsafeCall :: CmmCallTarget -> CmmFormals -> CmmActuals -> CmmAGraph
-mkFinalCall  :: CmmCallTarget -> CmmActuals -> CmmAGraph -- never returns
-mkJump       :: CmmExpr -> CmmActuals -> CmmAGraph
-mkCbranch    :: CmmExpr -> BlockId -> BlockId -> CmmAGraph
-mkSwitch     :: CmmExpr -> [Maybe BlockId] -> CmmAGraph
-mkReturn     :: CmmActuals -> CmmAGraph
-mkComment    :: FastString -> CmmAGraph
-
--- Not to be forgotten, but exported by MkZipCfg:
---mkBranch      :: BlockId -> CmmAGraph
---mkLabel       :: BlockId -> CmmAGraph
-mkCmmIfThenElse :: CmmExpr -> CmmAGraph -> CmmAGraph -> CmmAGraph
-mkCmmWhileDo    :: CmmExpr -> CmmAGraph -> CmmAGraph 
-
---------------------------------------------------------------------------
-
-mkCmmIfThenElse e = mkIfThenElse (mkCbranch e)
-mkCmmWhileDo    e = mkWhileDo    (mkCbranch e)
-
-mkCopyIn     :: Convention -> CmmFormals -> C_SRT -> CmmAGraph
-mkCopyOut    :: Convention -> CmmFormals -> CmmAGraph
-
-  -- ^ XXX: Simon or Simon thinks maybe the hints are being abused and
-  -- we should have CmmFormalsWithoutKinds here, but for now it is CmmFormals
-  -- for consistency with the rest of the back end ---NR
-
-mkComment fs = mkMiddle (MidComment fs)
 
 data Middle
   = MidNop
@@ -141,29 +111,6 @@ placement of CopyIn a dynamic invariant.  This change will complicate
 the dataflow fact for the proc-point calculation, but it should make
 things easier in many other respects.  
 -}
-
-
--- ================ IMPLEMENTATION ================--
-
-mkNop                     = mkMiddle $ MidNop
-mkAssign l r              = mkMiddle $ MidAssign l r
-mkStore  l r              = mkMiddle $ MidStore  l r
-mkCopyIn  conv args srt   = mkMiddle $ CopyIn  conv args srt
-mkCopyOut conv args       = mkMiddle $ CopyOut conv args 
-
-mkJump e args             = mkLast   $ LastJump e args
-mkCbranch pred ifso ifnot = mkLast   $ LastCondBranch pred ifso ifnot
-mkReturn actuals          = mkLast   $ LastReturn actuals
-mkSwitch e tbl            = mkLast   $ LastSwitch e tbl
-
-mkUnsafeCall tgt results actuals = mkMiddle $ MidUnsafeCall tgt results actuals
-mkFinalCall  tgt actuals         = mkLast   $ LastCall      tgt actuals Nothing
-
-mkCall tgt results actuals srt =
-  withFreshLabel "call successor" $ \k ->
-    mkLast (LastCall tgt actuals (Just k)) <*>
-    mkLabel k <*>
-    mkCopyIn (Result CmmCallConv) results srt
 
 instance HavingSuccessors Last where
     succs = cmmSuccs

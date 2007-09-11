@@ -25,7 +25,7 @@ import Panic
 import PprCmm()
 import UniqSet
 import ZipCfg
-import ZipCfgCmm
+import ZipCfgCmmRep
 import ZipDataflow
 
 -- The point of this module is to insert spills and reloads to

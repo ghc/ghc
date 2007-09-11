@@ -19,7 +19,7 @@ import Outputable
 import PprCmmZ()
 import UniqSupply
 import ZipCfg hiding (zip, unzip)
-import ZipCfgCmm
+import ZipCfgCmmRep
 import ZipDataflow
 
 -----------------------------------------------------------------------------

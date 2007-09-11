@@ -16,7 +16,7 @@ import PprCmm()
 import PprCmmZ()
 import UniqSet
 import ZipDataflow
-import ZipCfgCmm
+import ZipCfgCmmRep
 
 -----------------------------------------------------------------------------
 -- Calculating what variables are live on entry to a basic block

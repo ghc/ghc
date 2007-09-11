@@ -10,7 +10,7 @@ import Cmm
 import CmmExpr
 import PprCmm()
 import Outputable
-import qualified ZipCfgCmm as G
+import qualified ZipCfgCmmRep as G
 import qualified ZipCfg as Z
 import CmmZipUtil
 

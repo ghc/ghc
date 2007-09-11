@@ -1,5 +1,5 @@
 {-# OPTIONS -Wall -fno-warn-name-shadowing #-}
-{-# LANGUAGE ScopedTypeVariables, MultiParamTypeClasses #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 module ZipDataflow
   ( Answer(..)
   , BComputation(..), BAnalysis, BTransformation, BFunctionalTransformation
@@ -177,9 +177,9 @@ It's possible we could make these things more regular.
 
 -- | The analysis functions set properties on unique IDs.
 
-run_b_anal :: forall m l a . (DebugNodes m l, LastNode l, Outputable a) =>
+run_b_anal :: (DebugNodes m l, LastNode l, Outputable a) =>
               BAnalysis m l a ->      LGraph m l -> DFA a ()
-run_f_anal :: forall m l a . (DebugNodes m l, LastNode l, Outputable a) =>
+run_f_anal :: (DebugNodes m l, LastNode l, Outputable a) =>
               FAnalysis m l a -> a -> LGraph m l -> DFA a ()
                               -- ^ extra parameter is the entry fact
 
@@ -208,10 +208,10 @@ fold_edge_facts_with_nodes_b :: LastNode l
 
 class (Outputable m, Outputable l, LastNode l, Outputable (LGraph m l)) => DebugNodes m l
 
-refine_f_anal :: forall m l a . (DebugNodes m l, LastNode l, Outputable a) =>
+refine_f_anal :: (DebugNodes m l, LastNode l, Outputable a) =>
         FAnalysis m l a -> LGraph m l -> DFA a () -> DFA a ()
 
-refine_b_anal :: forall m l a . (DebugNodes m l, LastNode l, Outputable a) =>
+refine_b_anal :: (DebugNodes m l, LastNode l, Outputable a) =>
         BAnalysis m l a -> LGraph m l -> DFA a () -> DFA a ()
 
 b_rewrite :: (DebugNodes m l, Outputable a) =>
@@ -352,14 +352,14 @@ comp_with_exit_b comp exit_fact =
 -- Rewrite should always use exactly one of these monadic operations.
 
 solve_graph_b ::
-    forall m l a . (DebugNodes m l, Outputable a) =>
-                   BPass m l a -> OptimizationFuel -> G.LGraph m l -> a -> DFM a (OptimizationFuel, a)
+    (DebugNodes m l, Outputable a) =>
+    BPass m l a -> OptimizationFuel -> G.LGraph m l -> a -> DFM a (OptimizationFuel, a)
 solve_graph_b comp fuel graph exit_fact =
     general_backward (comp_with_exit_b comp exit_fact) fuel graph
   where
-    general_backward :: BPass m l a -> OptimizationFuel -> G.LGraph m l -> DFM a (OptimizationFuel, a)
+    -- general_backward :: BPass m l a -> OptimizationFuel -> G.LGraph m l -> DFM a (OptimizationFuel, a)
     general_backward comp fuel graph = 
-      let set_block_fact :: OptimizationFuel -> G.Block m l -> DFM a OptimizationFuel
+      let -- set_block_fact :: OptimizationFuel -> G.Block m l -> DFM a OptimizationFuel
           set_block_fact fuel b =
               do { (fuel, block_in) <-
                         let (h, l) = G.goto_end (G.unzip b) in
@@ -423,8 +423,8 @@ The tail is in final form; the head is still to be rewritten.
 -}
 
 solve_and_rewrite_b ::
-  forall m l a. (DebugNodes m l, Outputable a) =>
-         BPass m l a -> OptimizationFuel -> LGraph m l -> a -> DFM a (OptimizationFuel, a, LGraph m l)
+  (DebugNodes m l, Outputable a) =>
+  BPass m l a -> OptimizationFuel -> LGraph m l -> a -> DFM a (OptimizationFuel, a, LGraph m l)
 
 solve_and_rewrite_b comp fuel graph exit_fact =
   do { (_, a) <- solve_graph_b comp fuel graph exit_fact -- pass 1
@@ -441,9 +441,9 @@ solve_and_rewrite_b comp fuel graph exit_fact =
     eid = G.gr_entry graph
     backward_rewrite comp fuel graph =
       rewrite_blocks comp fuel emptyBlockEnv $ reverse (G.postorder_dfs graph)
-    rewrite_blocks ::
-      BPass m l a -> OptimizationFuel ->
-      BlockEnv (Block m l) -> [Block m l] -> DFM a (OptimizationFuel,G.LGraph m l)
+    -- rewrite_blocks ::
+    --   BPass m l a -> OptimizationFuel ->
+    --   BlockEnv (Block m l) -> [Block m l] -> DFM a (OptimizationFuel,G.LGraph m l)
     rewrite_blocks _comp fuel rewritten [] = return (fuel, G.LGraph eid rewritten)
     rewrite_blocks  comp fuel rewritten (b:bs) =
       let rewrite_next_block fuel =
@@ -460,8 +460,8 @@ solve_and_rewrite_b comp fuel graph exit_fact =
                    ; -- continue at entry of g
                      propagate fuel h a t rewritten'
                    } 
-          propagate :: OptimizationFuel -> G.ZHead m -> a -> G.ZTail m l ->
-                       BlockEnv (Block m l) -> DFM a (OptimizationFuel, G.LGraph m l)
+          -- propagate :: OptimizationFuel -> G.ZHead m -> a -> G.ZTail m l ->
+          --              BlockEnv (Block m l) -> DFM a (OptimizationFuel, G.LGraph m l)
           propagate fuel (G.ZHead h m) out tail rewritten =
               bc_middle_in comp out m fuel >>= \x -> case x of
                 Dataflow a -> propagate fuel h a (G.ZTail m tail) rewritten
@@ -612,9 +612,9 @@ comp_with_exit_f comp exit_fact_id = comp { fc_exit_outs = exit_outs }
 -- | Given [[comp_with_exit_f]], we can now solve a graph simply by doing a
 -- forward analysis on the modified computation.
 solve_graph_f ::
-    forall m l a . (DebugNodes m l, Outputable a) =>
-                   FPass m l a -> OptimizationFuel -> G.LGraph m l -> a ->
-                   DFM a (OptimizationFuel, a, LastOutFacts a)
+    (DebugNodes m l, Outputable a) =>
+    FPass m l a -> OptimizationFuel -> G.LGraph m l -> a ->
+    DFM a (OptimizationFuel, a, LastOutFacts a)
 solve_graph_f comp fuel g in_fact =
   do { exit_fact_id <- freshBlockId "proxy for exit node"
      ; fuel <- general_forward (comp_with_exit_f comp exit_fact_id) fuel in_fact g
@@ -623,11 +623,11 @@ solve_graph_f comp fuel g in_fact =
      ; forgetFact exit_fact_id -- close space leak
      ; return (fuel, a, LastOutFacts outs) }
   where
-    general_forward :: FPass m l a -> OptimizationFuel -> a -> G.LGraph m l -> DFM a OptimizationFuel
+    -- general_forward :: FPass m l a -> OptimizationFuel -> a -> G.LGraph m l -> DFM a OptimizationFuel
     general_forward comp fuel entry_fact graph =
       let blocks = G.postorder_dfs g
           is_local id = isJust $ lookupBlockEnv (G.gr_blocks g) id
-          set_or_save :: LastOutFacts a -> DFM a ()
+          -- set_or_save :: LastOutFacts a -> DFM a ()
           set_or_save (LastOutFacts l) = mapM_ set_or_save_one l
           set_or_save_one (id, a) =
             if is_local id then setFact id a else addLastOutFact (id, a)
@@ -677,8 +677,9 @@ between a head and tail.
 The tail is in final form; the head is still to be rewritten.
 -}
 solve_and_rewrite_f ::
-  forall m l a . (DebugNodes m l, Outputable a) =>
-         FPass m l a -> OptimizationFuel -> LGraph m l -> a -> DFM a (OptimizationFuel, a, LGraph m l)
+  (DebugNodes m l, Outputable a) =>
+  FPass m l a -> OptimizationFuel -> LGraph m l -> a ->
+  DFM a (OptimizationFuel, a, LGraph m l)
 solve_and_rewrite_f comp fuel graph in_fact =
   do solve_graph_f comp fuel graph in_fact                   -- pass 1
      exit_id    <- freshBlockId "proxy for exit node"
@@ -687,22 +688,23 @@ solve_and_rewrite_f comp fuel graph in_fact =
      return (fuel, exit_fact, g)
 
 forward_rewrite ::
-  forall m l a . (DebugNodes m l, Outputable a) =>
-         FPass m l a -> OptimizationFuel -> G.LGraph m l -> a -> DFM a (OptimizationFuel, G.LGraph m l)
+  (DebugNodes m l, Outputable a) =>
+  FPass m l a -> OptimizationFuel -> G.LGraph m l -> a ->
+  DFM a (OptimizationFuel, G.LGraph m l)
 forward_rewrite comp fuel graph entry_fact =
   do setFact eid entry_fact
      rewrite_blocks fuel emptyBlockEnv (G.postorder_dfs graph) 
   where
     eid = G.gr_entry graph
     is_local id = isJust $ lookupBlockEnv (G.gr_blocks graph) id
-    set_or_save :: LastOutFacts a -> DFM a ()
+    -- set_or_save :: LastOutFacts a -> DFM a ()
     set_or_save (LastOutFacts l) = mapM_ set_or_save_one l
     set_or_save_one (id, a) =
         if is_local id then checkFactMatch id a
         else panic "set fact outside graph during rewriting pass?!"
 
-    rewrite_blocks ::
-      OptimizationFuel -> BlockEnv (Block m l) -> [Block m l] -> DFM a (OptimizationFuel, LGraph m l)
+    -- rewrite_blocks ::
+    --   OptimizationFuel -> BlockEnv (Block m l) -> [Block m l] -> DFM a (OptimizationFuel, LGraph m l)
     rewrite_blocks fuel rewritten [] = return (fuel, G.LGraph eid rewritten)
     rewrite_blocks fuel rewritten (G.Block id t : bs) = 
         do id_fact <- getFact id
@@ -712,8 +714,8 @@ forward_rewrite comp fuel graph entry_fact =
              Rewrite fg -> do { markGraphRewritten
                               ; rewrite_blocks (fuel-1) rewritten
                                 (G.postorder_dfs (labelGraph id fg) ++ bs) }
-    propagate :: OptimizationFuel -> G.ZHead m -> a -> G.ZTail m l -> BlockEnv (G.Block m l) ->
-                 [G.Block m l] -> DFM a (OptimizationFuel, G.LGraph m l)
+    -- propagate :: OptimizationFuel -> G.ZHead m -> a -> G.ZTail m l -> BlockEnv (G.Block m l) ->
+    --             [G.Block m l] -> DFM a (OptimizationFuel, G.LGraph m l)
     propagate fuel h in' (G.ZTail m t) rewritten bs = 
         my_trace "Rewriting middle node" (ppr m) $
         do fc_middle_out comp in' m fuel >>= \x -> case x of

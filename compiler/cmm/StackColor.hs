@@ -9,7 +9,7 @@ import DFMonad
 import qualified GraphOps
 import MachOp
 import ZipCfg
-import ZipCfgCmm
+import ZipCfgCmmRep
 import ZipDataflow
 
 import Maybes

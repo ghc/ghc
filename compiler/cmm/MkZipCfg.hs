@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS -Wall -fno-warn-name-shadowing #-}
 module MkZipCfg
     ( AGraph, (<*>), emptyAGraph, withFreshLabel, withUnique
