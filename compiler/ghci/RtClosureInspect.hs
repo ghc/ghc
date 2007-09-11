@@ -17,6 +17,7 @@ module RtClosureInspect(
      pprTerm, 
      cPprTerm, 
      cPprTermBase,
+     CustomTermPrinter,
      termType,
      foldTerm, 
      TermFold(..), 
@@ -297,6 +298,7 @@ termTyVars = foldTerm TermFold {
                           maybe emptyVarEnv tyVarsOfType mb_ty,
             fPrim       = \ _ _ -> emptyVarEnv }
     where concatVarEnv = foldr plusVarEnv emptyVarEnv
+
 ----------------------------------
 -- Pretty printing of terms
 ----------------------------------
@@ -341,12 +343,32 @@ pprTermM1 Suspension{mb_ty=Just ty, bound_to=Just n}
   | otherwise = return$ parens$ ppr n <> text "::" <> ppr ty 
 pprTermM1 _ = panic "pprTermM1"
 
-type CustomTermPrinter m = Int -> TermProcessor Term (m (Maybe SDoc))
+-------------------------------------------------------
+-- Custom Term Pretty Printers
+-------------------------------------------------------
+
+-- We can want to customize the representation of a 
+--  term depending on its type. 
+-- However, note that custom printers have to work with
+--  type representations, instead of directly with types.
+-- We cannot use type classes here, unless we employ some 
+--  typerep trickery (e.g. Weirich's RepLib tricks),
+--  which I didn't. Therefore, this code replicates a lot
+--  of what type classes provide for free.
+
+-- Concretely a custom term printer takes an explicit
+--  recursion knot, and produces a list of Term Processors,
+--  which additionally need a precedence value to
+--  either produce a SDoc or fail (and they do this in some monad m).
+
+type Precedence          = Int
+type RecursionKnot m     = Int-> Term -> m SDoc
+type CustomTermPrinter m = RecursionKnot m
+                         -> [Precedence -> TermProcessor Term (m (Maybe SDoc))]
 
 -- Takes a list of custom printers with a explicit recursion knot and a term, 
 -- and returns the output of the first succesful printer, or the default printer
-cPprTerm :: Monad m => 
-           ((Int->Term->m SDoc)->[CustomTermPrinter m]) -> Term -> m SDoc
+cPprTerm :: Monad m => CustomTermPrinter m -> Term -> m SDoc
 cPprTerm printers_ = go 0 where
   printers = printers_ go
   go prec t@(Term ty dc val tt) = do
@@ -359,7 +381,7 @@ cPprTerm printers_ = go 0 where
   firstJustM [] = return Nothing
 
 -- Default set of custom printers. Note that the recursion knot is explicit
-cPprTermBase :: Monad m => (Int->Term-> m SDoc)->[CustomTermPrinter m]
+cPprTermBase :: Monad m => CustomTermPrinter m
 cPprTermBase y =
   [ 
     ifTerm isTupleTy             (\ _ _ tt -> 

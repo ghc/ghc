@@ -138,10 +138,9 @@ bindSuspensions cms@(Session ref) t = do
 
 --  A custom Term printer to enable the use of Show instances
 showTerm :: Session -> Term -> IO SDoc
-showTerm cms@(Session ref) = cPprTerm cPpr
+showTerm cms@(Session ref) = cPprTerm (liftM2 (++) cPprShowable cPprTermBase)
  where
-  cPpr = \p-> cPprShowable : cPprTermBase p
-  cPprShowable prec ty _ val tt = 
+  cPprShowable _y = [\prec ty _ val tt ->
     if not (all isFullyEvaluatedTerm tt)
      then return Nothing
      else do
@@ -164,7 +163,7 @@ showTerm cms@(Session ref) = cPprTerm cPpr
              _  -> return Nothing
          `finally` do
            writeIORef ref hsc_env
-           GHC.setSessionDynFlags cms dflags
+           GHC.setSessionDynFlags cms dflags]
   needsParens ('"':_) = False   -- some simple heuristics to see whether parens
                                 -- are redundant in an arbitrary Show output
   needsParens ('(':_) = False
