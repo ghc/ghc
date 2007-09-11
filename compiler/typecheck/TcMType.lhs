@@ -47,7 +47,7 @@ module TcMType (
   -- Checking type validity
   Rank, UserTypeCtxt(..), checkValidType, 
   SourceTyCtxt(..), checkValidTheta, checkFreeness,
-  checkValidInstHead, checkValidInstance, checkAmbiguity,
+  checkValidInstHead, checkValidInstance, 
   checkInstTermination, checkValidTypeInst, checkTyFamFreeness,
   validDerivPred, arityErr, 
 
@@ -1030,6 +1030,7 @@ If the list of tv_names is empty, we have a monotype, and then we
 don't need to check for ambiguity either, because the test can't fail
 (see is_ambig).
 
+
 \begin{code}
 checkAmbiguity :: [TyVar] -> ThetaType -> TyVarSet -> TcM ()
 checkAmbiguity forall_tyvars theta tau_tyvars
@@ -1038,11 +1039,7 @@ checkAmbiguity forall_tyvars theta tau_tyvars
     complain pred     = addErrTc (ambigErr pred)
     extended_tau_vars = grow theta tau_tyvars
 
-	-- Only a *class* predicate can give rise to ambiguity
-	-- An *implicit parameter* cannot.  For example:
-	--	foo :: (?x :: [a]) => Int
-	--	foo = length ?x
-	-- is fine.  The call site will suppply a particular 'x'
+	-- See Note [Implicit parameters and ambiguity] in TcSimplify
     is_ambig pred     = isClassPred  pred &&
 			any ambig_var (varSetElems (tyVarsOfPred pred))
 

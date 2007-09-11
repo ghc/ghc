@@ -411,14 +411,19 @@ over implicit parameters. See the predicate isFreeWhenInferring.
 
 Note [Implicit parameters and ambiguity] 
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-What type should we infer for this?
-	f x = (show ?y, x::Int)
-Since we must quantify over the ?y, the most plausible type is
-	f :: (Show a, ?y::a) => Int -> (String, Int)
-But notice that the type of the RHS is (String,Int), with no type 
-varibables mentioned at all!  The type of f looks ambiguous.  But
-it isn't, because at a call site we might have
-	let ?y = 5::Int in f 7
+Only a *class* predicate can give rise to ambiguity
+An *implicit parameter* cannot.  For example:
+	foo :: (?x :: [a]) => Int
+	foo = length ?x
+is fine.  The call site will suppply a particular 'x'
+
+Furthermore, the type variables fixed by an implicit parameter
+propagate to the others.  E.g.
+	foo :: (Show a, ?x::[a]) => Int
+	foo = show (?x++?x)
+The type of foo looks ambiguous.  But it isn't, because at a call site
+we might have
+	let ?x = 5::Int in foo
 and all is well.  In effect, implicit parameters are, well, parameters,
 so we can take their type variables into account as part of the
 "tau-tvs" stuff.  This is done in the function 'FunDeps.grow'.
