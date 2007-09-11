@@ -295,8 +295,14 @@ genJump expr args =
                     CmmLoad (CmmReg _) _ -> pprExpr expr 
                     _ -> parens (pprExpr expr)
          , space
-         , parens  ( commafy $ map ppr args )
+         , parens  ( commafy $ map pprHinted args )
          , semi ]
+
+pprHinted :: Outputable a => (a, MachHint) -> SDoc
+pprHinted (a, NoHint)     = ppr a
+pprHinted (a, PtrHint)    = quotes(text "address") <+> ppr a
+pprHinted (a, SignedHint) = quotes(text "signed")  <+> ppr a
+pprHinted (a, FloatHint)  = quotes(text "float")   <+> ppr a
 
 -- --------------------------------------------------------------------------
 -- Return from a function. [1], Section 6.8.2 of version 1.128

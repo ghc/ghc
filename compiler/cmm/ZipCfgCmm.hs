@@ -13,7 +13,7 @@ where
 import CmmExpr
 import Cmm ( GenCmm(..), GenCmmTop(..), CmmStatic, CmmInfo
            , CmmCallTarget(..), CmmActuals, CmmFormalsWithoutKinds, CmmFormals
-           , CmmStmt(CmmJump, CmmSwitch, CmmReturn) -- imported in order to call ppr
+           , CmmStmt(CmmJump, CmmSwitch) -- imported in order to call ppr
            )
 import PprCmm()
 
@@ -21,12 +21,15 @@ import CLabel
 import ClosureInfo
 import FastString
 import ForeignCall
+import MachOp
+import qualified ZipDataflow as DF
+import ZipCfg 
+import MkZipCfg
+
 import Maybes
 import Outputable hiding (empty)
 import qualified Outputable as PP
 import Prelude hiding (zip, unzip, last)
-import ZipCfg 
-import MkZipCfg
 
 type CmmGraph  = LGraph Middle Last
 type CmmAGraph = AGraph Middle Last
@@ -211,13 +214,13 @@ pprMiddle stmt = case stmt of
 
     CopyIn conv args _ ->
         if null args then ptext SLIT("empty CopyIn")
-        else commafy (map ppr args) <+> equals <+>
+        else commafy (map pprHinted args) <+> equals <+>
              ptext SLIT("foreign") <+> doubleQuotes(ppr conv) <+> ptext SLIT("...")
 
     CopyOut conv args ->
         if null args then PP.empty
         else ptext SLIT("CopyOut") <+> doubleQuotes(ppr conv) <+>
-             parens (commafy (map ppr args))
+             parens (commafy (map pprHinted args))
 
     --  // text
     MidComment s -> text "//" <+> ftext s
@@ -251,8 +254,11 @@ pprMiddle stmt = case stmt of
           lbl = CmmLabel (mkForeignLabel (mkFastString (show op)) Nothing False)
 
 
-pprLast :: Last -> SDoc    
-pprLast stmt = case stmt of
+pprHinted :: Outputable a => (a, MachHint) -> SDoc
+pprHinted (a, NoHint)     = ppr a
+pprHinted (a, PtrHint)    = doubleQuotes (text "address") <+> ppr a
+pprHinted (a, SignedHint) = doubleQuotes (text "signed")  <+> ppr a
+pprHinted (a, FloatHint)  = doubleQuotes (text "float")   <+> ppr a
 
     LastBranch ident args     -> genBranchWithArgs ident args
     LastCondBranch expr t f   -> genFullCondBranch expr t f
@@ -263,18 +269,18 @@ pprLast stmt = case stmt of
 
 genCall :: CmmCallTarget -> CmmActuals -> Maybe BlockId -> SDoc
 genCall (CmmCallee fn cconv) args k =
-        hcat [ ptext SLIT("foreign"), space, 
-               doubleQuotes(ppr cconv), space,
-               target fn, parens  ( commafy $ map ppr args ),
-               case k of Nothing -> ptext SLIT("never returns")
-                         Just k -> ptext SLIT("returns to") <+> ppr k,
-               semi ]
+        hcat [ ptext SLIT("foreign"), space
+             , doubleQuotes(ppr cconv), space
+             , target fn, parens  ( commafy $ map pprHinted args ), space
+             , case k of Nothing -> ptext SLIT("never returns")
+                         Just k -> ptext SLIT("returns to") <+> ppr k
+             , semi ]
         where
             target t@(CmmLit _) = ppr t
             target fn'          = parens (ppr fn')
 
 genCall (CmmPrim op) args k =
-    hcat [ text "%", text (show op), parens  ( commafy $ map ppr args ),
+    hcat [ text "%", text (show op), parens  ( commafy $ map pprHinted args ),
            ptext SLIT("returns to"), space, ppr k,
            semi ]
 
