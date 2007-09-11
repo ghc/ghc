@@ -91,6 +91,22 @@ space=$(empty) $(empty)
 
 # -----------------------------------------------------------------------------
 
+docdir := $(docdir)/libraries/$$pkgid
+ifeq "$(Windows)" "YES"
+# On Windows we want to make moveable bindists, but we need to tell
+# ghc-pkg where the haddock docs are. Therefore we completely ignore
+# where the user tells us to put the haddock documentation and put it
+# somewhere whose relative location we know. When installing we need
+# to give Cabal a real path, though.
+htmldir_configure = $$topdir/doc/libraries/$$pkgid
+htmldir_install   = $(prefix)/doc/libraries/$$pkgid
+else
+# On non-Windows we can just give absolute paths all the time, and
+# thus obey the htmldir that we are given.
+htmldir_configure = $(htmldir)/libraries/$$pkgid
+htmldir_install   = $(htmldir_configure)
+endif
+
 ifneq "$(DOING_BIN_DIST)" "YES"
 
 CONFIGURE_OPTS =
@@ -216,6 +232,8 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	( cd $* && setup/Setup configure \
 	           $(CONFIGURE_OPTS) \
 	           --prefix='$$topdir' \
+			   --docdir='$(docdir)' \
+			   --htmldir='$(htmldir_configure)' \
 	           --datadir='$(datadir)' \
 	           --libsubdir='$(libsubdir)' \
 	           --with-compiler=../../compiler/stage1/ghc-inplace$ \
@@ -296,17 +314,15 @@ endif
 
 .PHONY: install install-docs install.library.%
 
-libraryhtmldir = $(htmldir)/libraries
-
 install: $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR))
 ifeq "$(HADDOCK_DOCS)" "YES"
-	$(INSTALL_DIR)                                           $(DESTDIR)$(libraryhtmldir)
-	$(INSTALL_DATA)   index.html doc-index.html              $(DESTDIR)$(libraryhtmldir)
-	$(INSTALL_SCRIPT) gen_contents_index                     $(DESTDIR)$(libraryhtmldir)
+	$(INSTALL_DIR)                                            $(DESTDIR)$(htmldir_install)
+	$(INSTALL_DATA)   index.html doc-index.html               $(DESTDIR)$(htmldir_install)
+	$(INSTALL_SCRIPT) gen_contents_index                      $(DESTDIR)$(htmldir_install)
 	# Hacks:
-	$(INSTALL_DATA)   $(DESTDIR)$(libraryhtmldir)/base/*.css $(DESTDIR)$(libraryhtmldir)
-	$(INSTALL_DATA)   $(DESTDIR)$(libraryhtmldir)/base/*.js  $(DESTDIR)$(libraryhtmldir)
-	$(INSTALL_DATA)   $(DESTDIR)$(libraryhtmldir)/base/*.gif $(DESTDIR)$(libraryhtmldir)
+	$(INSTALL_DATA)   $(DESTDIR)$(htmldir_install)/base/*.css $(DESTDIR)$(htmldir_install)
+	$(INSTALL_DATA)   $(DESTDIR)$(htmldir_install)/base/*.js  $(DESTDIR)$(htmldir_install)
+	$(INSTALL_DATA)   $(DESTDIR)$(htmldir_install)/base/*.gif $(DESTDIR)$(htmldir_install)
 endif
 
 # Cabal doesn't let us ask to install docs only, so do nothing here
@@ -316,11 +332,15 @@ install-docs:
 # Ideally this would depend on a stamp/build.library.%, but if it does
 # then we can't change the libraries and then just rerun make.
 # Thus if you install without building then it will just break.
+
+# prefix and (on Windows) htmldir use $topdir when configuring, so we
+# need to tell installPackage the real path to use when installing.
+
 $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
-	  ../installPackage/installPackage "$(DESTDIR)" "$(prefix)" "$(datadir)" "$(libraryhtmldir)/$*" "$(libraryhtmldir)" "$(GHC_PKG_PROG)" "$(DESTDIR)$(libdir)/package.conf" ; \
+	  ../installPackage/installPackage '$(DESTDIR)' '$(prefix)' '$(htmldir_install)' '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' ; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%
