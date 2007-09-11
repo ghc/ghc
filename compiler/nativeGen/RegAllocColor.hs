@@ -119,7 +119,7 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 
 	-- rewrite regs in the code that have been coalesced
 	let patchF reg	= case lookupUFM rmCoalesce reg of
-				Just reg'	-> reg'
+				Just reg'	-> patchF reg'
 				Nothing		-> reg
 	let code_coalesced
 			= map (patchEraseLive patchF) code
@@ -246,16 +246,18 @@ buildGraph code
 	let (conflictList, moveList) =
 		unzip $ map slurpConflicts code
 
-	let conflictBag		= unionManyBags conflictList
-	let moveBag		= unionManyBags moveList
+	-- Slurp out the spill/reload coalesces
+	let moveList2		= map slurpReloadCoalesce code
 
  	-- Add the reg-reg conflicts to the graph
+	let conflictBag		= unionManyBags conflictList
 	let graph_conflict	= foldrBag graphAddConflictSet Color.initGraph conflictBag
 
 	-- Add the coalescences edges to the graph.
+	let moveBag		= unionBags (unionManyBags moveList2) (unionManyBags moveList)
 	let graph_coalesce	= foldrBag graphAddCoalesce graph_conflict moveBag
 			
-	return	graph_coalesce
+	return	$ Color.validateGraph (text "urk") graph_coalesce
 
 
 -- | Add some conflict edges to the graph.
@@ -326,7 +328,7 @@ patchRegsFromGraph graph code
 			(  text "There is no node in the graph for register " <> ppr reg
 			$$ ppr code
 			$$ Color.dotGraph (\_ -> text "white") trivColorable graph)
-	
+
    in	patchEraseLive patchF code
    
 

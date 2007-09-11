@@ -22,6 +22,7 @@ module RegLiveness (
 	stripLive,
 	spillNatBlock,
 	slurpConflicts,
+	slurpReloadCoalesce,
 	lifetimeCount,
 	eraseDeltasLive,
 	patchEraseLive,
@@ -242,6 +243,51 @@ slurpConflicts live
 	  	 Nothing	-> slurpLIs rsLiveNext
 		 			( consBag rsConflicts conflicts
 					, moves) lis
+
+
+-- | For spill/reloads
+--
+--	SPILL  v1, slot1
+--	...
+--	RELOAD slot1, v2
+--
+--	If we can arrange that v1 and v2 are allocated to the same hreg it's more likely
+--	the spill/reload instrs can be cleaned and replaced by a nop reg-reg move.
+--
+-- 	TODO: This only works intra-block at the momement. It's be nice to join up the mappings
+--	      across blocks also.
+--
+slurpReloadCoalesce :: LiveCmmTop -> Bag (Reg, Reg)
+slurpReloadCoalesce live
+	= slurpCmm emptyBag live
+
+ where	slurpCmm cs CmmData{}	= cs
+ 	slurpCmm cs (CmmProc _ _ _ (ListGraph blocks))
+		= foldl' slurpComp cs blocks
+
+	slurpComp  cs (BasicBlock _ blocks)
+		= foldl' slurpBlock cs blocks
+
+	slurpBlock cs (BasicBlock _ instrs)
+	 = let	(_, mMoves)	= mapAccumL slurpLI emptyUFM instrs
+	   in	unionBags cs (listToBag $ catMaybes mMoves)
+
+	slurpLI :: UniqFM Reg -> LiveInstr -> (UniqFM Reg, Maybe (Reg, Reg))
+	slurpLI slotMap (Instr instr _)
+
+		-- remember what reg was stored into the slot
+		| SPILL reg slot	<- instr
+		, slotMap'		<- addToUFM slotMap slot reg
+		= (slotMap', Nothing)
+
+		-- add an edge betwen the this reg and the last one stored into the slot
+		| RELOAD slot reg	<- instr
+		= case lookupUFM slotMap slot of
+			Just reg2	-> (slotMap, Just (reg, reg2))
+			Nothing		-> (slotMap, Nothing)
+
+		| otherwise
+		= (slotMap, Nothing)
 
 
 -- | Strip away liveness information, yielding NatCmmTop
