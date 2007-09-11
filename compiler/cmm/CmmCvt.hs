@@ -27,7 +27,7 @@ cmmOfZgraph = cmmMapGraph  ofZgraph
 
 toZgraph :: String -> ListGraph CmmStmt -> UniqSM CmmGraph
 toZgraph _ (ListGraph []) = lgraphOfAGraph emptyAGraph
-toZgraph fun_name (ListGraph (BasicBlock id ss : other_blocks)) = 
+toZgraph fun_name g@(ListGraph (BasicBlock id ss : other_blocks)) = 
            labelAGraph id $ mkStmts ss <*> foldr addBlock emptyAGraph other_blocks
   where addBlock (BasicBlock id ss) g = mkLabel id   <*> mkStmts ss <*> g
         mkStmts (CmmNop        : ss)  = mkNop        <*> mkStmts ss 
@@ -43,8 +43,7 @@ toZgraph fun_name (ListGraph (BasicBlock id ss : other_blocks)) =
         mkStmts (last : []) = mkLast last
         mkStmts []          = bad "fell off end"
         mkStmts (_ : _ : _) = bad "last node not at end"
-        bad msg = panic (msg {- ++ " in block " ++ showSDoc (ppr b) -}
-                            ++ " in function " ++ fun_name)
+        bad msg = pprPanic (msg ++ " in function " ++ fun_name) (ppr g)
         mkLast (CmmCall f  []     args _ CmmNeverReturns) = mkFinalCall f args
         mkLast (CmmSwitch scrutinee table) = mkSwitch scrutinee table
         mkLast (CmmJump tgt args)          = mkJump tgt args
