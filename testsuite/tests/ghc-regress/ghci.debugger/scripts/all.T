@@ -53,7 +53,7 @@ test('break019', normal, ghci_script, ['break019.script'])
 test('break020', normal, ghci_script, ['break020.script'])
 test('break021', normal, ghci_script, ['break021.script'])
 test('break024', normal, ghci_script, ['break024.script'])
-test('break025', expect_broken(1669), ghci_script, ['break025.script'])
+test('break025', expect_broken(1681), ghci_script, ['break025.script'])
 
 test('dynbrk001', normal, ghci_script, ['dynbrk001.script'])
 test('dynbrk002', normal, ghci_script, ['dynbrk002.script'])
