@@ -151,7 +151,7 @@ extendPPSet g blocks procPoints =
                   -- more proc points than b and is not already a proc
                   -- point.  If found, it can become a proc point.
                   newId succ_id = not (elemBlockSet succ_id procPoints') &&
-                                  nreached id > my_nreached 
+                                  nreached succ_id > my_nreached
               in  listToMaybe $ filter newId $ succs b
                                     
 
@@ -246,7 +246,7 @@ addProcPointProtocols procPoints formals g =
               let (Block _ t) = lookupBlockEnv (gr_blocks g) id `orElse`
                                 panic "jump out of graph"
               in case t of
-                   ZTail (CopyOut {}) (ZLast (LastOther (LastBranch pee [])))
+                   ZTail (CopyIn {}) (ZLast (LastOther (LastBranch pee [])))
                        | elemBlockSet pee procPoints -> Just pee
                    _ -> Nothing
           init_protocols = fold_blocks maybe_add_proto emptyBlockEnv g
