@@ -29,8 +29,7 @@ import ZipCfg
 import MkZipCfg
 
 import Maybes
-import Outputable hiding (empty)
-import qualified Outputable as PP
+import Outputable
 import Prelude hiding (zip, unzip, last)
 
 type CmmGraph  = LGraph Middle Last
@@ -159,6 +158,13 @@ instance DF.DebugNodes Middle Last
 instance Outputable CmmGraph where
     ppr = pprLgraph
 
+debugPpr :: Bool
+#ifdef DEBUG 
+debugPpr = True
+#else
+debubPpr = False
+#endif
+
 pprMiddle :: Middle -> SDoc    
 pprMiddle stmt = (case stmt of
 
@@ -170,7 +176,7 @@ pprMiddle stmt = (case stmt of
              ptext SLIT("foreign") <+> doubleQuotes(ppr conv) <+> ptext SLIT("...")
 
     CopyOut conv args ->
-        if null args then PP.empty
+        if null args then empty
         else ptext SLIT("CopyOut") <+> doubleQuotes(ppr conv) <+>
              parens (commafy (map pprHinted args))
 
@@ -189,7 +195,7 @@ pprMiddle stmt = (case stmt of
     -- ToDo ppr volatile
     MidUnsafeCall (CmmCallee fn cconv) results args ->
         hcat [ if null results
-                  then PP.empty
+                  then empty
                   else parens (commafy $ map ppr results) <>
                        ptext SLIT(" = "),
                ptext SLIT("call"), space, 
@@ -204,15 +210,17 @@ pprMiddle stmt = (case stmt of
         pprMiddle (MidUnsafeCall (CmmCallee (CmmLit lbl) CCallConv) results args)
         where
           lbl = CmmLabel (mkForeignLabel (mkFastString (show op)) Nothing False)
-  ) <+> text "//" <+>
-  case stmt of
-    MidNop {} -> text "MidNop"
-    CopyIn {} -> text "CopyIn"
-    CopyOut {} -> text "CopyOut"
-    MidComment {} -> text "MidComment"
-    MidAssign {} -> text "MidAssign"
-    MidStore {} -> text "MidStore"
-    MidUnsafeCall {} -> text "MidUnsafeCall"
+  ) <>
+  if debugPpr then empty
+  else text " //" <+>
+       case stmt of
+         MidNop {}     -> text "MidNop"
+         CopyIn {}     -> text "CopyIn"
+         CopyOut {}    -> text "CopyOut"
+         MidComment {} -> text "MidComment"
+         MidAssign {}  -> text "MidAssign"
+         MidStore {}   -> text "MidStore"
+         MidUnsafeCall {} -> text "MidUnsafeCall"
 
 
 pprHinted :: Outputable a => (a, MachHint) -> SDoc
@@ -231,15 +239,16 @@ pprLast stmt = (case stmt of
                                       , semi ]
     LastSwitch arg ids        -> ppr $ CmmSwitch arg ids
     LastCall tgt params k     -> genCall tgt params k
-  ) <+> text "//" <+>
-  case stmt of
-    LastBranch {} -> text "LastBranch"
-    LastCondBranch {} -> text "LastCondBranch"
-    LastJump {} -> text "LastJump"
-    LastReturn {} -> text "LastReturn"
-    LastSwitch {} -> text "LastSwitch"
-    LastCall {} -> text "LastCall"
-
+  ) <>
+  if debugPpr then empty
+  else text " //" <+>
+       case stmt of
+         LastBranch {} -> text "LastBranch"
+         LastCondBranch {} -> text "LastCondBranch"
+         LastJump {} -> text "LastJump"
+         LastReturn {} -> text "LastReturn"
+         LastSwitch {} -> text "LastSwitch"
+         LastCall {} -> text "LastCall"
 
 genCall :: CmmCallTarget -> CmmActuals -> Maybe BlockId -> SDoc
 genCall (CmmCallee fn cconv) args k =
