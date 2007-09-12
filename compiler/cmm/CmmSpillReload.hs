@@ -113,9 +113,9 @@ middleDualLiveness live (NotSpillOrReload m) = changeRegs (middleLiveness m) liv
 
 lastDualLiveness :: (BlockId -> DualLive) -> Last -> DualLive
 lastDualLiveness env l = last l
-  where last (LastReturn ress)       = changeRegs (gen ress) empty
-        last (LastJump e args)       = changeRegs (gen e . gen args) empty
-        last (LastBranch id args)    = changeRegs (gen args) $ env id
+  where last (LastReturn)            = empty
+        last (LastJump e)            = changeRegs (gen e) empty
+        last (LastBranch id)         = env id
         last (LastCall tgt Nothing)  = changeRegs (gen tgt) empty
         last (LastCall tgt (Just k)) = 
             -- nothing can be live in registers at this point

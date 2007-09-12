@@ -85,7 +85,7 @@ branchChainElimZ g@(G.LGraph eid _)
     lookup id = G.lookupBlockEnv env id `orElse` id 
 
 isLoneBranchZ :: CmmBlock -> Either (G.BlockId, G.BlockId) CmmBlock
-isLoneBranchZ (G.Block id (G.ZLast (G.LastOther (LastBranch target []))))
+isLoneBranchZ (G.Block id (G.ZLast (G.LastOther (LastBranch target))))
     | id /= target  = Left (id,target)
 isLoneBranchZ other = Right other
    -- ^ An infinite loop is not a link in a branch chain!
@@ -94,7 +94,7 @@ replaceLabelsZ :: BlockEnv G.BlockId -> CmmGraph -> CmmGraph
 replaceLabelsZ env = replace_eid . G.map_nodes id id last
   where
     replace_eid (G.LGraph eid blocks) = G.LGraph (lookup eid) blocks
-    last (LastBranch id args)         = LastBranch (lookup id) args
+    last (LastBranch id)              = LastBranch (lookup id)
     last (LastCondBranch e ti fi)     = LastCondBranch e (lookup ti) (lookup fi)
     last (LastSwitch e tbl)           = LastSwitch e (map (fmap lookup) tbl)
     last (LastCall tgt (Just id))     = LastCall tgt (Just $ lookup id) 

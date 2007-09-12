@@ -246,7 +246,7 @@ addProcPointProtocols procPoints formals g =
               let (Block _ t) = lookupBlockEnv (lg_blocks g) id `orElse`
                                 panic "jump out of graph"
               in case t of
-                   ZTail (CopyIn {}) (ZLast (LastOther (LastBranch pee [])))
+                   ZTail (CopyIn {}) (ZLast (LastOther (LastBranch pee)))
                        | elemBlockSet pee procPoints -> Just pee
                    _ -> Nothing
           init_protocols = fold_blocks maybe_add_proto emptyBlockEnv g

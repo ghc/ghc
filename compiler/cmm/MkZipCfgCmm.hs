@@ -69,12 +69,17 @@ mkComment fs              = mkMiddle $ MidComment fs
 mkAssign l r              = mkMiddle $ MidAssign l r
 mkStore  l r              = mkMiddle $ MidStore  l r
 
-mkJump e args             = mkLast   $ LastJump e args
 mkCbranch pred ifso ifnot = mkLast   $ LastCondBranch pred ifso ifnot
-mkReturn actuals          = mkLast   $ LastReturn actuals
 mkSwitch e tbl            = mkLast   $ LastSwitch e tbl
 
 mkUnsafeCall tgt results actuals = mkMiddle $ MidUnsafeCall tgt results actuals
+
+cmmArgConv, cmmResConv :: Convention
+cmmArgConv = ConventionStandard CmmCallConv Arguments
+cmmResConv = ConventionStandard CmmCallConv Arguments
+
+mkJump e actuals = mkMiddle (CopyOut cmmArgConv actuals) <*> mkLast (LastJump e)
+mkReturn actuals = mkMiddle (CopyOut cmmResConv actuals) <*> mkLast LastReturn
 
 mkFinalCall  f conv actuals =
     mkMiddle (CopyOut (ConventionStandard conv Arguments) actuals) <*>

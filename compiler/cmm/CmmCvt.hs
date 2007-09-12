@@ -95,8 +95,7 @@ ofZgraph g = ListGraph $ swallow blocks
           last id prev' out l n =
             let endblock stmt = block' id (stmt : prev') : swallow n in
             case l of
-              LastBranch _ (_:_) -> panic "unrepresentable branch"
-              LastBranch tgt [] ->
+              LastBranch tgt ->
                   case n of
                     G.Block id' t : bs
                         | tgt == id', unique_pred id' 
@@ -116,8 +115,8 @@ ofZgraph g = ListGraph $ swallow blocks
                                  tail id (CmmCondBranch e'   fid : prev') Nothing t bs
                     _ -> let instrs' = CmmBranch fid : CmmCondBranch expr tid : prev'
                          in block' id instrs' : swallow n
-              LastJump expr params -> endblock $ CmmJump expr params 
-              LastReturn params    -> endblock $ CmmReturn params
+              LastJump expr        -> endblock $ with_out out $ CmmJump expr
+              LastReturn           -> endblock $ with_out out $ CmmReturn 
               LastSwitch arg ids   -> endblock $ CmmSwitch arg $ ids
               LastCall e cont
                   | Just (conv, args) <- out
@@ -137,6 +136,8 @@ ofZgraph g = ListGraph $ swallow blocks
                             in  tail id (delayed : call : prev') Nothing t bs
                          | otherwise -> panic "unrepairable call"
                   | otherwise -> panic "call with no CopyOut"
+          with_out (Just (_conv, actuals)) f = f actuals
+          with_out Nothing f = pprPanic "unrepairable data flow to" (ppr $ f [])
           findCopyIn (G.ZTail (CopyIn _ ress srt) _) = (ress, srt)
           findCopyIn (G.ZTail _ t) = findCopyIn t
           findCopyIn (G.ZLast _) = panic "missing CopyIn after call"

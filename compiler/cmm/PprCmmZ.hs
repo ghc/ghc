@@ -47,13 +47,12 @@ pprCmmGraphLikeCmm g = vcat (swallow blocks)
           last id prev' out l n =
               let endblock stmt = block' id (stmt : prev') : swallow n in
               case l of
-                G.LastBranch tgt [] ->
+                G.LastBranch tgt ->
                     case n of
                       Z.Block id' t : bs
                           | tgt == id', unique_pred id' 
                           -> tail id prev' out t bs  -- optimize out redundant labels
                       _ -> endblock (ppr $ CmmBranch tgt)
-                l@(G.LastBranch {}) -> endblock $ with_out out l
                 l@(G.LastCondBranch expr tid fid) ->
                   let ft id = text "// fall through to " <> ppr id in
                   case n of
@@ -123,6 +122,8 @@ with_out (Just (conv, args)) l = last l
                     case k of Nothing -> ptext SLIT(" never returns")
                               Just _ -> empty,
                     semi ]
+          last (G.LastReturn) = ppr (CmmReturn args)
+          last (G.LastJump e) = ppr (CmmJump e args)
           last l = ppr (G.CopyOut conv args) $$ ppr l
           ppr_target (CmmLit lit) = pprLit lit
           ppr_target fn'          = parens (ppr fn')
