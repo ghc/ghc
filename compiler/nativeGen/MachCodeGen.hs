@@ -3896,7 +3896,8 @@ genSwitch expr ids
             op = OpAddr (AddrBaseIndex (EABaseReg tableReg)
                                        (EAIndex reg wORD_SIZE) (ImmInt 0))
 
-#if x86_64_TARGET_ARCH && darwin_TARGET_OS
+#if x86_64_TARGET_ARCH
+#if darwin_TARGET_OS
     -- on Mac OS X/x86_64, put the jump table in the text section
     -- to work around a limitation of the linker.
     -- ld64 is unable to handle the relocations for
@@ -3908,6 +3909,23 @@ genSwitch expr ids
                             JMP_TBL (OpReg tableReg) [ id | Just id <- ids ],
                             LDATA Text (CmmDataLabel lbl : jumpTable)
                     ]
+#else
+    -- HACK: On x86_64 binutils<2.17 is only able to generate PC32
+    -- relocations, hence we only get 32-bit offsets in the jump
+    -- table. As these offsets are always negative we need to properly
+    -- sign extend them to 64-bit. This hack should be removed in
+    -- conjunction with the hack in PprMach.hs/pprDataItem once
+    -- binutils 2.17 is standard.
+            code = e_code `appOL` t_code `appOL` toOL [
+			    LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
+			    MOVSxL I32
+				   (OpAddr (AddrBaseIndex (EABaseReg tableReg)
+							  (EAIndex reg wORD_SIZE) (ImmInt 0)))
+				   (OpReg reg),
+			    ADD wordRep (OpReg reg) (OpReg tableReg),
+			    JMP_TBL (OpReg tableReg) [ id | Just id <- ids ]
+		   ]
+#endif
 #else
             code = e_code `appOL` t_code `appOL` toOL [
                             LDATA ReadOnlyData (CmmDataLabel lbl : jumpTable),
