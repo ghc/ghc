@@ -102,8 +102,6 @@ import System.IO.Unsafe
 
 data Term = Term { ty        :: Type 
                  , dc        :: Either String DataCon
-                               -- The heap datacon. If ty is a newtype,
-                               -- this is NOT the newtype datacon.
                                -- Empty if the datacon aint exported by the .hi
                                -- (private constructors in -O0 libraries)
                  , val       :: HValue 
@@ -117,14 +115,19 @@ data Term = Term { ty        :: Type
                        , val      :: HValue
                        , bound_to :: Maybe Name   -- Useful for printing
                        }
+          | NewtypeWrap{ ty           :: Type
+                       , dc           :: Either String DataCon
+                       , wrapped_term :: Term }
 
-isTerm, isSuspension, isPrim :: Term -> Bool
+isTerm, isSuspension, isPrim, isNewtypeWrap :: Term -> Bool
 isTerm Term{} = True
 isTerm   _    = False
 isSuspension Suspension{} = True
 isSuspension      _       = False
 isPrim Prim{} = True
 isPrim   _    = False
+isNewtypeWrap NewtypeWrap{} = True
+isNewtypeWrap _             = False
 
 termType :: Term -> Maybe Type
 termType t@(Suspension {}) = mb_ty t
@@ -132,8 +135,9 @@ termType t = Just$ ty t
 
 isFullyEvaluatedTerm :: Term -> Bool
 isFullyEvaluatedTerm Term {subTerms=tt} = all isFullyEvaluatedTerm tt
-isFullyEvaluatedTerm Suspension {}      = False
 isFullyEvaluatedTerm Prim {}            = True
+isFullyEvaluatedTerm NewtypeWrap{wrapped_term=t} = isFullyEvaluatedTerm t
+isFullyEvaluatedTerm _                  = False
 
 instance Outputable (Term) where
  ppr = head . cPprTerm cPprTermBase
@@ -264,31 +268,37 @@ data TermFold a = TermFold { fTerm :: TermProcessor a a
                            , fPrim :: Type -> [Word] -> a
                            , fSuspension :: ClosureType -> Maybe Type -> HValue
                                            -> Maybe Name -> a
+                           , fNewtypeWrap :: Type -> Either String DataCon
+                                            -> a -> a
                            }
 
 foldTerm :: TermFold a -> Term -> a
 foldTerm tf (Term ty dc v tt) = fTerm tf ty dc v (map (foldTerm tf) tt)
 foldTerm tf (Prim ty    v   ) = fPrim tf ty v
 foldTerm tf (Suspension ct ty v b) = fSuspension tf ct ty v b
+foldTerm tf (NewtypeWrap ty dc t)  = fNewtypeWrap tf ty dc (foldTerm tf t)
 
 idTermFold :: TermFold Term
 idTermFold = TermFold {
               fTerm = Term,
               fPrim = Prim,
-              fSuspension = Suspension
+              fSuspension  = Suspension,
+              fNewtypeWrap = NewtypeWrap
                       }
 idTermFoldM :: Monad m => TermFold (m Term)
 idTermFoldM = TermFold {
               fTerm       = \ty dc v tt -> sequence tt >>= return . Term ty dc v,
               fPrim       = (return.). Prim,
-              fSuspension = (((return.).).). Suspension
+              fSuspension = (((return.).).). Suspension,
+              fNewtypeWrap= \ty dc t -> NewtypeWrap ty dc `liftM` t
                        }
 
 mapTermType :: (Type -> Type) -> Term -> Term
 mapTermType f = foldTerm idTermFold {
           fTerm       = \ty dc hval tt -> Term (f ty) dc hval tt,
           fSuspension = \ct mb_ty hval n ->
-                          Suspension ct (fmap f mb_ty) hval n }
+                          Suspension ct (fmap f mb_ty) hval n,
+          fNewtypeWrap= \ty dc t -> NewtypeWrap (f ty) dc t}
 
 termTyVars :: Term -> TyVarSet
 termTyVars = foldTerm TermFold {
@@ -296,7 +306,8 @@ termTyVars = foldTerm TermFold {
                           tyVarsOfType ty `plusVarEnv` concatVarEnv tt,
             fSuspension = \_ mb_ty _ _ -> 
                           maybe emptyVarEnv tyVarsOfType mb_ty,
-            fPrim       = \ _ _ -> emptyVarEnv }
+            fPrim       = \ _ _ -> emptyVarEnv,
+            fNewtypeWrap= \ty _ t -> tyVarsOfType ty `plusVarEnv` t}
     where concatVarEnv = foldr plusVarEnv emptyVarEnv
 
 ----------------------------------
@@ -311,25 +322,23 @@ pprTerm :: (Int -> Term -> Maybe SDoc) -> Int -> Term -> SDoc
 pprTerm y p t | Just doc <- pprTermM y p t = doc
 pprTerm _ _ _ = panic "pprTerm"
 
-pprTermM :: Monad m => (Int -> Term -> m SDoc) -> Int -> Term -> m SDoc
+pprTermM, pprNewtypeWrap :: Monad m => 
+                           (Int -> Term -> m SDoc) -> Int -> Term -> m SDoc
 pprTermM y p Term{dc=Left dc_tag, subTerms=tt} = do
   tt_docs <- mapM (y app_prec) tt
   return$ cparen (not(null tt) && p >= app_prec) (text dc_tag <+> sep tt_docs)
   
-pprTermM y p t@Term{dc=Right dc, subTerms=tt, ty=ty} 
+pprTermM y p Term{dc=Right dc, subTerms=tt} 
 {-  | dataConIsInfix dc, (t1:t2:tt') <- tt  --TODO fixity
   = parens (pprTerm1 True t1 <+> ppr dc <+> pprTerm1 True ppr t2) 
     <+> hsep (map (pprTerm1 True) tt) 
 -} -- TODO Printing infix constructors properly
   | null tt   = return$ ppr dc
-  | Just (tc,_) <- splitNewTyConApp_maybe ty
-  , isNewTyCon tc
-  , Just new_dc <- maybeTyConSingleCon tc = do 
-         real_value <- y 10 t{ty=repType ty}
-         return$ cparen (p >= app_prec) (ppr new_dc <+> real_value)
   | otherwise = do
          tt_docs <- mapM (y app_prec) tt
          return$ cparen (p >= app_prec) (ppr dc <+> sep tt_docs)
+
+pprTermM y p t@NewtypeWrap{} = pprNewtypeWrap y p t
 
 pprTermM _ _ t = pprTermM1 t
 
@@ -342,6 +351,14 @@ pprTermM1 Suspension{mb_ty=Just ty, bound_to=Just n}
   | Just _ <- splitFunTy_maybe ty = return$ ptext SLIT("<function>")
   | otherwise = return$ parens$ ppr n <> text "::" <> ppr ty 
 pprTermM1 _ = panic "pprTermM1"
+
+pprNewtypeWrap y p NewtypeWrap{ty=ty, wrapped_term=t} 
+  | Just (tc,_) <- splitNewTyConApp_maybe ty
+  , ASSERT(isNewTyCon tc) True
+  , Just new_dc <- maybeTyConSingleCon tc = do 
+         real_term <- y 10 t
+         return$ cparen (p >= app_prec) (ppr new_dc <+> real_term)
+pprNewtypeWrap _ _ _ = panic "pprNewtypeWrap"
 
 -------------------------------------------------------
 -- Custom Term Pretty Printers
@@ -362,57 +379,60 @@ pprTermM1 _ = panic "pprTermM1"
 --  either produce a SDoc or fail (and they do this in some monad m).
 
 type Precedence          = Int
-type RecursionKnot m     = Int-> Term -> m SDoc
+type RecursionKnot m     = Precedence -> Term -> m SDoc
 type CustomTermPrinter m = RecursionKnot m
-                         -> [Precedence -> TermProcessor Term (m (Maybe SDoc))]
+                         -> [Precedence -> Term -> (m (Maybe SDoc))]
 
 -- Takes a list of custom printers with a explicit recursion knot and a term, 
 -- and returns the output of the first succesful printer, or the default printer
 cPprTerm :: Monad m => CustomTermPrinter m -> Term -> m SDoc
 cPprTerm printers_ = go 0 where
   printers = printers_ go
-  go prec t@(Term ty dc val tt) = do
+  go prec t | isTerm t || isNewtypeWrap t = do
     let default_ = Just `liftM` pprTermM go prec t
-        mb_customDocs = [pp prec ty dc val tt | pp <- printers] ++ [default_]
+        mb_customDocs = [pp prec t | pp <- printers] ++ [default_]
     Just doc <- firstJustM mb_customDocs
     return$ cparen (prec>app_prec+1) doc
   go _ t = pprTermM1 t
+
   firstJustM (mb:mbs) = mb >>= maybe (firstJustM mbs) (return . Just)
   firstJustM [] = return Nothing
 
 -- Default set of custom printers. Note that the recursion knot is explicit
 cPprTermBase :: Monad m => CustomTermPrinter m
 cPprTermBase y =
-  [ 
-    ifTerm isTupleTy             (\ _ _ tt -> 
-                                      liftM (parens . hcat . punctuate comma) 
-                                    . mapM (y (-1))
-                                    $ tt)
-  , ifTerm (\ty tt -> isTyCon listTyCon ty tt && tt `lengthIs` 2)
-                                 (\ p _ [h,t] -> doList p h t)
-  , ifTerm (isTyCon intTyCon)    (coerceShow$ \(a::Int)->a)
-  , ifTerm (isTyCon charTyCon)   (coerceShow$ \(a::Char)->a)
---  , ifTerm (isTyCon wordTyCon) (coerceShow$ \(a::Word)->a)
-  , ifTerm (isTyCon floatTyCon)  (coerceShow$ \(a::Float)->a)
-  , ifTerm (isTyCon doubleTyCon) (coerceShow$ \(a::Double)->a)
-  , ifTerm isIntegerTy           (coerceShow$ \(a::Integer)->a)
+  [ ifTerm (isTupleTy.ty) (\_p -> liftM (parens . hcat . punctuate comma) 
+                                      . mapM (y (-1))
+                                      . subTerms)
+  , ifTerm (\t -> isTyCon listTyCon (ty t) && subTerms t `lengthIs` 2)
+           (\ p Term{subTerms=[h,t]} -> doList p h t)
+  , ifTerm (isTyCon intTyCon    . ty) (coerceShow$ \(a::Int)->a)
+  , ifTerm (isTyCon charTyCon   . ty) (coerceShow$ \(a::Char)->a)
+  , ifTerm (isTyCon floatTyCon  . ty) (coerceShow$ \(a::Float)->a)
+  , ifTerm (isTyCon doubleTyCon . ty) (coerceShow$ \(a::Double)->a)
+  , ifTerm (isIntegerTy         . ty) (coerceShow$ \(a::Integer)->a)
   ]
-     where ifTerm pred f prec ty _ val tt 
-               | pred ty tt = liftM Just (f prec val tt)
-               | otherwise     = return Nothing
-           isIntegerTy ty _ = fromMaybe False $ do
+     where ifTerm pred f prec t@Term{}
+               | pred t    = Just `liftM` f prec t
+           ifTerm _ _ _ _  = return Nothing
+
+           isIntegerTy ty  = fromMaybe False $ do
              (tc,_) <- splitTyConApp_maybe ty 
              return (tyConName tc == integerTyConName)
-           isTupleTy ty _  = fromMaybe False $ do 
+
+           isTupleTy ty    = fromMaybe False $ do 
              (tc,_) <- splitTyConApp_maybe ty 
              return (tc `elem` (fst.unzip.elems) boxedTupleArr)
-           isTyCon a_tc ty _ = fromMaybe False $ do 
+
+           isTyCon a_tc ty = fromMaybe False $ do 
              (tc,_) <- splitTyConApp_maybe ty
              return (a_tc == tc)
-           coerceShow f _ val _ = (return . text . show . f . unsafeCoerce#) val
+
+           coerceShow f _p = return . text . show . f . unsafeCoerce# . val
+
            --TODO pprinting of list terms is not lazy
            doList p h t = do
-               let elems = h : getListTerms t
+               let elems      = h : getListTerms t
                    isConsLast = termType(last elems) /= termType h
                print_elems <- mapM (y cons_prec) elems
                return$ if isConsLast
@@ -526,14 +546,18 @@ cvObtainTerm :: HscEnv -> Int -> Bool -> Maybe Type -> HValue -> IO Term
 cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
    tv <- newVar argTypeKind
    case mb_ty of
-     Nothing -> go bound tv tv hval >>= zonkTerm
-     Just ty | isMonomorphic ty -> go bound ty ty hval >>= zonkTerm
+     Nothing ->      go bound tv tv hval 
+                >>= zonkTerm 
+                >>= return . expandNewtypes
+     Just ty | isMonomorphic ty ->     go bound ty ty hval 
+                                   >>= zonkTerm
+                                   >>= return . expandNewtypes
      Just ty -> do 
               (ty',rev_subst) <- instScheme (sigmaType ty)
               addConstraint tv ty'
               term <- go bound tv tv hval >>= zonkTerm
               --restore original Tyvars
-              return$ mapTermType (substTy rev_subst) term
+              return$ expandNewtypes $ mapTermType (substTy rev_subst) term
     where 
   go bound _ _ _ | seq bound False = undefined
   go 0 tv _ty a = do
@@ -599,7 +623,6 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
       tipe_clos -> 
          return (Suspension tipe_clos (Just tv) a Nothing)
 
---  matchSubTypes dc ty | pprTrace "matchSubtypes" (ppr dc <+> ppr ty) False = undefined
   matchSubTypes dc ty
     | Just (_,ty_args) <- splitTyConApp_maybe (repType ty) 
 --     assumption:             ^^^ looks through newtypes 
@@ -619,7 +642,19 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
                            , ptext SLIT("reOrderTerms") $$ 
                                        (ppr pointed $$ ppr unpointed))
                     head unpointed : reOrderTerms pointed (tail unpointed) tys
+  
+  expandNewtypes t@Term{ ty=ty, subTerms=tt }
+   | Just (tc, args) <- splitNewTyConApp_maybe ty
+   , isNewTyCon tc
+   , wrapped_type    <- newTyConInstRhs tc args
+   , Just dc         <- maybeTyConSingleCon tc
+   , t'              <- expandNewtypes t{ ty = wrapped_type
+                                        , subTerms = map expandNewtypes tt }
+   = NewtypeWrap ty (Right dc) t'
 
+   | otherwise = t{ subTerms = map expandNewtypes tt }
+
+  expandNewtypes t = t
 
 
 -- Fast, breadth-first Type reconstruction
@@ -799,7 +834,9 @@ zonkTerm = foldTerm idTermFoldM {
                                      zonkTcType ty    >>= \ty' ->
                                      return (Term ty' dc v tt)
              ,fSuspension = \ct ty v b -> fmapMMaybe zonkTcType ty >>= \ty ->
-                                          return (Suspension ct ty v b)}  
+                                          return (Suspension ct ty v b)
+             ,fNewtypeWrap= \ty dc t -> 
+                   return NewtypeWrap `ap` zonkTcType ty `ap` return dc `ap` t}
 
 
 -- Is this defined elsewhere?

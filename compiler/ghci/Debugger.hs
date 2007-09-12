@@ -129,6 +129,10 @@ bindSuspensions cms@(Session ref) t = do
                                     let (terms,names) = unzip tt'
                                     return (Term ty dc v terms, concat names)
                       , fPrim    = \ty n ->return (Prim ty n,[])
+                      , fNewtypeWrap  = 
+                                \ty dc t -> do 
+                                    (term, names) <- t
+                                    return (NewtypeWrap ty dc term, names)
                       }
         doSuspension freeNames ct mb_ty hval _name = do
           name <- atomicModifyIORef freeNames (\x->(tail x, head x))
@@ -142,11 +146,11 @@ showTerm :: Session -> Term -> IO SDoc
 showTerm cms@(Session ref) term = do
     dflags       <- GHC.getSessionDynFlags cms
     if dopt Opt_PrintEvldWithShow dflags
-       then cPprTerm (liftM2 (++) cPprShowable cPprTermBase) term
+       then cPprTerm (liftM2 (++) (\_y->[cPprShowable]) cPprTermBase) term
        else cPprTerm cPprTermBase term
  where
-  cPprShowable _y = [\prec ty _ val tt ->
-    if not (all isFullyEvaluatedTerm tt)
+  cPprShowable prec t@Term{ty=ty, val=val} =
+    if not (isFullyEvaluatedTerm t)
      then return Nothing
      else do
         hsc_env <- readIORef ref
@@ -168,7 +172,11 @@ showTerm cms@(Session ref) term = do
              _  -> return Nothing
          `finally` do
            writeIORef ref hsc_env
-           GHC.setSessionDynFlags cms dflags]
+           GHC.setSessionDynFlags cms dflags
+  cPprShowable prec NewtypeWrap{ty=new_ty,wrapped_term=t} = 
+      cPprShowable prec t{ty=new_ty}
+  cPprShowable _ _ = panic "cPprShowable - unreachable"
+
   needsParens ('"':_) = False   -- some simple heuristics to see whether parens
                                 -- are redundant in an arbitrary Show output
   needsParens ('(':_) = False
