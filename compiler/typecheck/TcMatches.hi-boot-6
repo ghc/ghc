@@ -5,6 +5,7 @@ tcGRHSsPat    :: HsExpr.GRHSs Name.Name
 	      -> TcRnTypes.TcM (HsExpr.GRHSs TcRnTypes.TcId)
 
 tcMatchesFun :: Name.Name
+             -> GHC.Base.Bool
 	     -> HsExpr.MatchGroup Name.Name
 	     -> TcType.BoxyRhoType
 	     -> TcRnTypes.TcM (HsBinds.HsWrapper, HsExpr.MatchGroup TcRnTypes.TcId)
