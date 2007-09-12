@@ -41,9 +41,9 @@ type CmmTopZ   = GenCmmTop CmmStatic CmmInfo CmmGraph
 mkNop        :: CmmAGraph
 mkAssign     :: CmmReg  -> CmmExpr -> CmmAGraph
 mkStore      :: CmmExpr -> CmmExpr -> CmmAGraph
-mkCall       :: CmmCallTarget -> CmmFormals -> CmmActuals -> C_SRT -> CmmAGraph
+mkCall       :: CmmExpr -> CCallConv -> CmmFormals -> CmmActuals -> C_SRT -> CmmAGraph
 mkUnsafeCall :: CmmCallTarget -> CmmFormals -> CmmActuals -> CmmAGraph
-mkFinalCall  :: CmmCallTarget -> CmmActuals -> CmmAGraph -- never returns
+mkFinalCall  :: CmmExpr -> CCallConv -> CmmActuals -> CmmAGraph -- never returns
 mkJump       :: CmmExpr -> CmmActuals -> CmmAGraph
 mkCbranch    :: CmmExpr -> BlockId -> BlockId -> CmmAGraph
 mkSwitch     :: CmmExpr -> [Maybe BlockId] -> CmmAGraph
@@ -75,10 +75,14 @@ mkReturn actuals          = mkLast   $ LastReturn actuals
 mkSwitch e tbl            = mkLast   $ LastSwitch e tbl
 
 mkUnsafeCall tgt results actuals = mkMiddle $ MidUnsafeCall tgt results actuals
-mkFinalCall  tgt actuals         = mkLast   $ LastCall      tgt actuals Nothing
 
-mkCall tgt results actuals srt =
-  withFreshLabel "call successor" $ \k ->
-    mkLast (LastCall tgt actuals (Just k)) <*>
-    mkLabel k <*>
-    mkMiddle (CopyIn (Result CmmCallConv) results srt)
+mkFinalCall  f conv actuals =
+    mkMiddle (CopyOut (ConventionStandard conv Arguments) actuals) <*>
+    mkLast   (LastCall f Nothing)
+
+mkCall f conv results actuals srt = 
+    withFreshLabel "call successor" $ \k ->
+      mkMiddle (CopyOut (ConventionStandard conv Arguments) actuals) <*>
+      mkLast (LastCall f (Just k)) <*>
+      mkLabel k <*>
+      mkMiddle (CopyIn (ConventionStandard conv Results) results srt)

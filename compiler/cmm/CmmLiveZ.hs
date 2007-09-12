@@ -67,10 +67,10 @@ middleLiveness m = middle m
 
 lastLiveness :: Last -> (BlockId -> CmmLive) -> CmmLive
 lastLiveness l env = last l
-  where last (LastReturn ress)             = gen ress emptyUniqSet
-        last (LastJump e args)             = gen e $ gen args emptyUniqSet
-        last (LastBranch id args)          = gen args $ env id
-        last (LastCall tgt args (Just k))  = gen tgt $ gen args $ env k
-        last (LastCall tgt args Nothing)   = gen tgt $ gen args $ emptyUniqSet
-        last (LastCondBranch e t f)        = gen e $ unionUniqSets (env t) (env f)
+  where last (LastReturn ress)       = gen ress emptyUniqSet
+        last (LastJump e args)       = gen e $ gen args emptyUniqSet
+        last (LastBranch id args)    = gen args $ env id
+        last (LastCall tgt (Just k)) = gen tgt $ env k
+        last (LastCall tgt Nothing)  = gen tgt $ emptyUniqSet
+        last (LastCondBranch e t f)  = gen e $ unionUniqSets (env t) (env f)
         last (LastSwitch e tbl) = gen e $ unionManyUniqSets $ map env (catMaybes tbl)

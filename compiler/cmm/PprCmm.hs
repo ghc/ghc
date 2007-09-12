@@ -40,7 +40,7 @@
 --
 
 module PprCmm
-    ( writeCmms, pprCmms, pprCmm, pprStmt, pprExpr, pprSection, pprStatic
+    ( writeCmms, pprCmms, pprCmm, pprStmt, pprExpr, pprSection, pprStatic, pprLit
     )
 where
 
@@ -572,4 +572,3 @@ pprBlockId b = ppr $ getUnique b
 
 commafy :: [SDoc] -> SDoc
 commafy xs = hsep $ punctuate comma xs
-

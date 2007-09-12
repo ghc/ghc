@@ -93,12 +93,12 @@ isLoneBranchZ other = Right other
 replaceLabelsZ :: BlockEnv G.BlockId -> CmmGraph -> CmmGraph
 replaceLabelsZ env = replace_eid . G.map_nodes id id last
   where
-    replace_eid (G.LGraph eid blocks)   = G.LGraph (lookup eid) blocks
-    last (LastBranch id args)          = LastBranch (lookup id) args
-    last (LastCondBranch e ti fi)      = LastCondBranch e (lookup ti) (lookup fi)
-    last (LastSwitch e tbl)            = LastSwitch e (map (fmap lookup) tbl)
-    last (LastCall tgt args (Just id)) = LastCall tgt args (Just $ lookup id) 
-    last exit_jump_return              = exit_jump_return
+    replace_eid (G.LGraph eid blocks) = G.LGraph (lookup eid) blocks
+    last (LastBranch id args)         = LastBranch (lookup id) args
+    last (LastCondBranch e ti fi)     = LastCondBranch e (lookup ti) (lookup fi)
+    last (LastSwitch e tbl)           = LastSwitch e (map (fmap lookup) tbl)
+    last (LastCall tgt (Just id))     = LastCall tgt (Just $ lookup id) 
+    last exit_jump_return             = exit_jump_return
     lookup id = G.lookupBlockEnv env id `orElse` id 
 ----------------------------------------------------------------
 mkClosureBlockEnv :: [(BlockId, BlockId)] -> BlockEnv BlockId

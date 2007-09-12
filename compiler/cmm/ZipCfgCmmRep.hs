@@ -7,6 +7,7 @@
 
 module ZipCfgCmmRep
   ( CmmZ, CmmTopZ, CmmGraph, CmmBlock, CmmAGraph, Middle(..), Last(..), Convention(..)
+  , ValueDirection(..)
   )
 where
 
@@ -49,15 +50,17 @@ data Middle
 
   | MidUnsafeCall                -- An "unsafe" foreign call;
      CmmCallTarget               -- just a fat machine instructoin
-     CmmFormals              -- zero or more results
+     CmmFormals                  -- zero or more results
      CmmActuals                  -- zero or more arguments
 
   | CopyIn    -- Move parameters or results from conventional locations to registers
               -- Note [CopyIn invariant]
         Convention 
-        CmmFormals      
+        CmmFormals      -- eventually [CmmKind] will be used only for foreign
+                        -- calls and will migrate into 'Convention' (helping to
+                        -- drain "the swamp")
         C_SRT           -- Static things kept alive by this block
-  | CopyOut Convention CmmFormals 
+  | CopyOut Convention CmmActuals
 
 data Last
   = LastReturn CmmActuals          -- Return from a function,
@@ -71,8 +74,7 @@ data Last
         -- The parameters are unused at present.
 
   | LastCall {                   -- A call (native or safe foreign)
-        cml_target :: CmmCallTarget,
-        cml_actual :: CmmActuals,        -- Zero or more arguments
+        cml_target :: CmmExpr,   -- never a CmmPrim to a CallishMachOp!
         cml_next   :: Maybe BlockId }  -- BlockId of continuation, if call returns
 
   | LastCondBranch {            -- conditional branch
@@ -87,18 +89,19 @@ data Last
         -- Undefined outside range, and when there's a Nothing
 
 data Convention
-  = Argument CCallConv  -- Used for function formal params
-  | Result CCallConv    -- Used for function results
-
-  | Local       -- Used for control transfers within a (pre-CPS) procedure
+  = ConventionStandard CCallConv ValueDirection
+  | ConventionPrivate
+                -- Used for control transfers within a (pre-CPS) procedure
                 -- All jump sites known, never pushed on the stack (hence no SRT)
                 -- You can choose whatever calling convention
                 -- you please (provided you make sure
                 -- all the call sites agree)!
   deriving Eq
 
--- ^ In a complete LGraph for a procedure, the [[Exit]] node should not
--- appear, but it is useful in a subgraph (e.g., replacement for a node).
+data ValueDirection = Arguments | Results
+  -- Arguments go with procedure definitions, jumps, and arguments to calls
+  -- Results go with returns and with results of calls.
+  deriving Eq
 
 {-
 Note [CopyIn invariant]
@@ -123,20 +126,20 @@ instance LastNode Last where
     branchNodeTarget _ = panic "asked for target of non-branch"
 
 cmmSuccs :: Last -> [BlockId]
-cmmSuccs (LastReturn {})          = []
-cmmSuccs (LastJump {})            = [] 
-cmmSuccs (LastBranch id _)        = [id]
-cmmSuccs (LastCall _ _ (Just id)) = [id]
-cmmSuccs (LastCall _ _ Nothing)   = []
-cmmSuccs (LastCondBranch _ t f)   = [f, t]  -- meets layout constraint
-cmmSuccs (LastSwitch _ edges)     = catMaybes edges
+cmmSuccs (LastReturn {})        = []
+cmmSuccs (LastJump {})          = [] 
+cmmSuccs (LastBranch id _)      = [id]
+cmmSuccs (LastCall _ (Just id)) = [id]
+cmmSuccs (LastCall _ Nothing)   = []
+cmmSuccs (LastCondBranch _ t f) = [f, t]  -- meets layout constraint
+cmmSuccs (LastSwitch _ edges)   = catMaybes edges
 
 fold_cmm_succs :: (BlockId -> a -> a) -> Last -> a -> a
 fold_cmm_succs _f (LastReturn {})          z = z
 fold_cmm_succs _f (LastJump {})            z = z
 fold_cmm_succs  f (LastBranch id _)        z = f id z
-fold_cmm_succs  f (LastCall _ _ (Just id)) z = f id z
-fold_cmm_succs _f (LastCall _ _ Nothing)   z = z
+fold_cmm_succs  f (LastCall _ (Just id))   z = f id z
+fold_cmm_succs _f (LastCall _ Nothing)     z = z
 fold_cmm_succs  f (LastCondBranch _ te fe) z = f te (f fe z)
 fold_cmm_succs  f (LastSwitch _ edges)     z = foldl (flip f) z $ catMaybes edges
 
@@ -159,11 +162,7 @@ instance Outputable CmmGraph where
     ppr = pprLgraph
 
 debugPpr :: Bool
-#ifdef DEBUG 
-debugPpr = True
-#else
-debugPpr = False
-#endif
+debugPpr = debugIsOn
 
 pprMiddle :: Middle -> SDoc    
 pprMiddle stmt = (case stmt of
@@ -238,7 +237,7 @@ pprLast stmt = (case stmt of
                                       , parens ( commafy $ map pprHinted results )
                                       , semi ]
     LastSwitch arg ids        -> ppr $ CmmSwitch arg ids
-    LastCall tgt params k     -> genCall tgt params k
+    LastCall tgt k            -> genBareCall tgt k
   ) <>
   if debugPpr then empty
   else text " //" <+>
@@ -250,22 +249,17 @@ pprLast stmt = (case stmt of
          LastSwitch {} -> text "LastSwitch"
          LastCall {} -> text "LastCall"
 
-genCall :: CmmCallTarget -> CmmActuals -> Maybe BlockId -> SDoc
-genCall (CmmCallee fn cconv) args k =
+genBareCall :: CmmExpr -> Maybe BlockId -> SDoc
+genBareCall fn k =
         hcat [ ptext SLIT("foreign"), space
-             , doubleQuotes(ppr cconv), space
-             , target fn, parens  ( commafy $ map pprHinted args ), space
+             , doubleQuotes(ptext SLIT("<convention from CopyOut>")), space
+             , target fn, parens  ( ptext SLIT("<parameters from CopyOut>") ), space
              , case k of Nothing -> ptext SLIT("never returns")
                          Just k -> ptext SLIT("returns to") <+> ppr k
              , semi ]
         where
             target t@(CmmLit _) = ppr t
             target fn'          = parens (ppr fn')
-
-genCall (CmmPrim op) args k =
-    hcat [ text "%", text (show op), parens  ( commafy $ map pprHinted args ),
-           ptext SLIT("returns to"), space, ppr k,
-           semi ]
 
 genBranchWithArgs :: (Outputable id, Outputable arg) => id -> [arg] -> SDoc
 genBranchWithArgs ident [] = ptext SLIT("goto") <+> ppr ident <> semi
@@ -283,9 +277,8 @@ genFullCondBranch expr t f =
          ]
 
 pprConvention :: Convention -> SDoc
-pprConvention (Argument c) = ppr c
-pprConvention (Result c) = ppr c
-pprConvention Local = text "<local>"
+pprConvention (ConventionStandard c _) = ppr c
+pprConvention (ConventionPrivate {}  ) = text "<private-convention>"
 
 commafy :: [SDoc] -> SDoc
 commafy xs = hsep $ punctuate comma xs

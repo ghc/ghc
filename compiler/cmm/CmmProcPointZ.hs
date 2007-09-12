@@ -116,7 +116,7 @@ forward = FComp "proc-point reachability" first middle last exit
     where first ProcPoint id = ReachedBy $ unitUniqSet id
           first  x _ = x
           middle x _ = x
-          last _ (LastCall _ _ (Just id)) = LastOutFacts [(id, ProcPoint)]
+          last _ (LastCall _ (Just id)) = LastOutFacts [(id, ProcPoint)]
           last x l = LastOutFacts $ map (\id -> (id, x)) (succs l)
           exit _   = LastOutFacts []
                 
@@ -226,11 +226,11 @@ addProcPointProtocols procPoints formals g =
           -- redirect the call (cf 'newblock') and set the protocol if necessary
           maybe_add_call block (protos, blocks) =
               case goto_end $ unzip block of
-                (h, LastOther (LastCall tgt args (Just k)))
+                (h, LastOther (LastCall tgt (Just k)))
                     | Just proto <- lookupBlockEnv protos k,
                       Just pee <- jumpsToProcPoint k
                     -> let newblock =
-                               zipht h (tailOfLast (LastCall tgt args (Just pee)))
+                               zipht h (tailOfLast (LastCall tgt (Just pee)))
                            changed_blocks   = insertBlock newblock blocks
                            unchanged_blocks = insertBlock block    blocks
                        in case lookupBlockEnv protos pee of
@@ -254,9 +254,10 @@ addProcPointProtocols procPoints formals g =
           maybe_add_proto (Block id (ZTail (CopyIn c fs _srt) _)) env =
               extendBlockEnv env id (Protocol c fs)
           maybe_add_proto (Block id _) env | id == lg_entry g =
-              extendBlockEnv env id (Protocol (Argument CmmCallConv) hinted_formals)
+              extendBlockEnv env id (Protocol stdArgConvention hinted_formals)
           maybe_add_proto _ env = env
           hinted_formals = map (\x -> (x, NoHint)) formals
+          stdArgConvention = ConventionStandard CmmCallConv Arguments
 
 -- | For now, following a suggestion by Ben Lippmeier, we pass all
 -- live variables as arguments, hoping that a clever register
@@ -279,7 +280,7 @@ pass_live_vars_as_args procPoints (protos, g) = (protos', g')
                                     emptyRegSet -- XXX there's a bug lurking!
                                     -- panic ("no liveness at block " ++ show id)
                              formals = map (\x->(x,NoHint)) $ uniqSetToList live
-                         in  extendBlockEnv protos id (Protocol Local formals)
+                         in  extendBlockEnv protos id (Protocol ConventionPrivate formals)
         g' = g { lg_blocks = add_CopyIns protos' (lg_blocks g) }
 
 

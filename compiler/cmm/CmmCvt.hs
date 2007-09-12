@@ -4,19 +4,23 @@
 module CmmCvt
   ( cmmToZgraph, cmmOfZgraph )
 where
+
 import Cmm
 import CmmExpr
 import MkZipCfgCmm hiding (CmmGraph)
 import ZipCfgCmmRep -- imported for reverse conversion
 import CmmZipUtil
+import PprCmm()
+import PprCmmZ()
+import qualified ZipCfg as G
+
 import FastString
 import Outputable
 import Panic
-import PprCmm()
-import PprCmmZ()
 import UniqSet
 import UniqSupply
-import qualified ZipCfg as G
+
+import Maybe
 
 cmmToZgraph :: GenCmm d h (ListGraph CmmStmt) -> UniqSM (GenCmm d h CmmGraph)
 cmmOfZgraph :: GenCmm d h (CmmGraph)          ->         GenCmm d h (ListGraph CmmStmt)
@@ -34,8 +38,10 @@ toZgraph fun_name g@(ListGraph (BasicBlock id ss : other_blocks)) =
         mkStmts (CmmComment s  : ss)  = mkComment s  <*> mkStmts ss
         mkStmts (CmmAssign l r : ss)  = mkAssign l r <*> mkStmts ss
         mkStmts (CmmStore  l r : ss)  = mkStore  l r <*> mkStmts ss
-        mkStmts (CmmCall f res args (CmmSafe srt) CmmMayReturn : ss) =
-                      mkCall       f res args srt <*> mkStmts ss 
+        mkStmts (CmmCall (CmmCallee f conv) res args (CmmSafe srt) CmmMayReturn : ss) =
+                      mkCall       f conv res args srt <*> mkStmts ss 
+        mkStmts (CmmCall (CmmPrim {}) _ _ (CmmSafe _) _ : _) =
+            panic "safe call to a primitive CmmPrim CallishMachOp"
         mkStmts (CmmCall f res args CmmUnsafe CmmMayReturn : ss) =
                       mkUnsafeCall f res args     <*> mkStmts ss
         mkStmts (CmmCondBranch e l : fbranch) =
@@ -44,7 +50,10 @@ toZgraph fun_name g@(ListGraph (BasicBlock id ss : other_blocks)) =
         mkStmts []          = bad "fell off end"
         mkStmts (_ : _ : _) = bad "last node not at end"
         bad msg = pprPanic (msg ++ " in function " ++ fun_name) (ppr g)
-        mkLast (CmmCall f  []     args _ CmmNeverReturns) = mkFinalCall f args
+        mkLast (CmmCall (CmmCallee f conv) []     args _ CmmNeverReturns) =
+            mkFinalCall f conv args
+        mkLast (CmmCall (CmmPrim {}) _ _ _ CmmNeverReturns) =
+            panic "Call to CmmPrim never returns?!"
         mkLast (CmmSwitch scrutinee table) = mkSwitch scrutinee table
         mkLast (CmmJump tgt args)          = mkJump tgt args
         mkLast (CmmReturn ress)            = mkReturn ress
@@ -65,10 +74,14 @@ ofZgraph g = ListGraph $ swallow blocks
           cscomm = "Call successors are" ++
                    (concat $ map (\id -> " " ++ show id) $ uniqSetToList call_succs)
           swallow [] = []
-          swallow (G.Block id t : rest) = tail id [] t rest
-          tail id prev' (G.ZTail m t)            rest = tail id (mid m : prev') t rest
-          tail id prev' (G.ZLast G.LastExit)     rest = exit id prev' rest
-          tail id prev' (G.ZLast (G.LastOther l))rest = last id prev' l rest
+          swallow (G.Block id t : rest) = tail id [] Nothing t rest
+          tail id prev' out (G.ZTail (CopyOut conv actuals) t) rest =
+              case out of
+                Nothing -> tail id prev' (Just (conv, actuals)) t rest
+                Just _ -> panic "multiple CopyOut nodes in one basic block"
+          tail id prev' out (G.ZTail m t) rest = tail id (mid m : prev') out t rest
+          tail id prev' out (G.ZLast G.LastExit)      rest = exit id prev' out rest
+          tail id prev' out (G.ZLast (G.LastOther l)) rest = last id prev' out l rest
           mid (MidNop)        = CmmNop
           mid (MidComment s)  = CmmComment s
           mid (MidAssign l r) = CmmAssign l r
@@ -80,53 +93,65 @@ ofZgraph g = ListGraph $ swallow blocks
           block' id prev'
               | id == G.lg_entry g = BasicBlock id $ extend_entry    (reverse prev')
               | otherwise          = BasicBlock id $ extend_block id (reverse prev')
-          last id prev' l n =
-              let endblock stmt = block' id (stmt : prev') : swallow n in
-              case l of
-                LastBranch _ (_:_) -> panic "unrepresentable branch"
-                LastBranch tgt [] ->
-                    case n of
-                      G.Block id' t : bs
-                          | tgt == id', unique_pred id' 
-                          -> tail id prev' t bs  -- optimize out redundant labels
-                      _ -> endblock (CmmBranch tgt)
-                LastCondBranch expr tid fid ->
+          last id prev' out l n =
+            let endblock stmt = block' id (stmt : prev') : swallow n in
+            case l of
+              LastBranch _ (_:_) -> panic "unrepresentable branch"
+              LastBranch tgt [] ->
+                  case n of
+                    G.Block id' t : bs
+                        | tgt == id', unique_pred id' 
+                        -> tail id prev' out t bs -- optimize out redundant labels
+                    _ -> if isNothing out then endblock (CmmBranch tgt)
+                         else pprPanic "can't convert LGraph with pending CopyOut"
+                                  (ppr g)
+              LastCondBranch expr tid fid ->
+                if isJust out then pprPanic "CopyOut before conditional branch" (ppr g)
+                else
                   case n of
                     G.Block id' t : bs
                       | id' == fid, unique_pred id' ->
-                                      tail id (CmmCondBranch expr tid : prev') t bs
+                                 tail id (CmmCondBranch expr tid : prev') Nothing t bs
                       | id' == tid, unique_pred id',
                         Just e' <- maybeInvertCmmExpr expr ->
-                                      tail id (CmmCondBranch e'   fid : prev') t bs
+                                 tail id (CmmCondBranch e'   fid : prev') Nothing t bs
                     _ -> let instrs' = CmmBranch fid : CmmCondBranch expr tid : prev'
                          in block' id instrs' : swallow n
-                LastJump expr params -> endblock $ CmmJump expr params 
-                LastReturn params    -> endblock $ CmmReturn params
-                LastSwitch arg ids   -> endblock $ CmmSwitch arg $ ids
-                LastCall tgt args Nothing ->
-                    endblock $ CmmCall tgt [] args CmmUnsafe CmmNeverReturns
-                LastCall tgt args (Just k)
-                   | G.Block id' (G.ZTail (CopyIn _ ress srt) t) : bs <- n,
-                     id' == k, unique_pred k ->
-                         let call = CmmCall tgt ress args (CmmSafe srt) CmmMayReturn
-                         in  tail id (call : prev') t bs
-                   | G.Block id' t : bs <- n, id' == k, unique_pred k ->
-                         let (ress, srt) = findCopyIn t
-                             call = CmmCall tgt ress args (CmmSafe srt) CmmMayReturn
-                             delayed = scomment "delayed CopyIn follows previous call"
-                         in  tail id (delayed : call : prev') t bs
-                   | otherwise -> panic "unrepairable call"
+              LastJump expr params -> endblock $ CmmJump expr params 
+              LastReturn params    -> endblock $ CmmReturn params
+              LastSwitch arg ids   -> endblock $ CmmSwitch arg $ ids
+              LastCall e cont
+                  | Just (conv, args) <- out
+                  -> let tgt = CmmCallee e (conv_to_cconv conv) in
+                     case cont of
+                       Nothing ->
+                           endblock $ CmmCall tgt [] args CmmUnsafe CmmNeverReturns
+                       Just k
+                         | G.Block id' (G.ZTail (CopyIn _ ress srt) t) : bs <- n,
+                           id' == k, unique_pred k
+                         -> let call = CmmCall tgt ress args (CmmSafe srt) CmmMayReturn
+                            in  tail id (call : prev') Nothing t bs
+                         | G.Block id' t : bs <- n, id' == k, unique_pred k
+                         -> let (ress, srt) = findCopyIn t
+                                call = CmmCall tgt ress args (CmmSafe srt) CmmMayReturn
+                                delayed = scomment "delayed CopyIn follows prev. call"
+                            in  tail id (delayed : call : prev') Nothing t bs
+                         | otherwise -> panic "unrepairable call"
+                  | otherwise -> panic "call with no CopyOut"
           findCopyIn (G.ZTail (CopyIn _ ress srt) _) = (ress, srt)
           findCopyIn (G.ZTail _ t) = findCopyIn t
           findCopyIn (G.ZLast _) = panic "missing CopyIn after call"
-          exit id prev' n = -- highly irregular (assertion violation?)
+          exit id prev' out n = -- highly irregular (assertion violation?)
               let endblock stmt = block' id (stmt : prev') : swallow n in
               case n of [] -> endblock (scomment "procedure falls off end")
                         G.Block id' t : bs -> 
                             if unique_pred id' then
-                                tail id (scomment "went thru exit" : prev') t bs 
+                                tail id (scomment "went thru exit" : prev') out t bs 
                             else
                                 endblock (CmmBranch id')
+          conv_to_cconv (ConventionStandard c _) = c
+          conv_to_cconv (ConventionPrivate {}) =
+              panic "tried to convert private calling convention back to Cmm"
           preds = zipPreds g
           single_preds =
               let add b single =
@@ -141,7 +166,7 @@ ofZgraph g = ListGraph $ swallow blocks
           call_succs = 
               let add b succs =
                       case G.last (G.unzip b) of
-                        G.LastOther (LastCall _ _ (Just id)) -> extendBlockSet succs id
+                        G.LastOther (LastCall _ (Just id)) -> extendBlockSet succs id
                         _ -> succs
               in  G.fold_blocks add emptyBlockSet g
           _is_call_succ id = elemBlockSet id call_succs

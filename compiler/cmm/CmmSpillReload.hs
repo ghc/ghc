@@ -114,16 +114,16 @@ middleDualLiveness live (NotSpillOrReload m) = changeRegs (middleLiveness m) liv
 
 lastDualLiveness :: (BlockId -> DualLive) -> Last -> DualLive
 lastDualLiveness env l = last l
-  where last (LastReturn ress)            = changeRegs (gen ress) empty
-        last (LastJump e args)            = changeRegs (gen e . gen args) empty
-        last (LastBranch id args)         = changeRegs (gen args) $ env id
-        last (LastCall tgt args Nothing)  = changeRegs (gen tgt. gen args) empty
-        last (LastCall tgt args (Just k)) = 
+  where last (LastReturn ress)       = changeRegs (gen ress) empty
+        last (LastJump e args)       = changeRegs (gen e . gen args) empty
+        last (LastBranch id args)    = changeRegs (gen args) $ env id
+        last (LastCall tgt Nothing)  = changeRegs (gen tgt) empty
+        last (LastCall tgt (Just k)) = 
             -- nothing can be live in registers at this point
             -- only 'formals' can be in regs at this point
             let live = env k in
             if  isEmptyUniqSet (in_regs live) then
-                DualLive (on_stack live) (gen tgt $ gen args emptyRegSet)
+                DualLive (on_stack live) (gen tgt emptyRegSet)
             else
                 panic "live values in registers at call continuation"
         last (LastCondBranch e t f) = changeRegs (gen e) $ dualUnion (env t) (env f)
@@ -265,7 +265,7 @@ middleAvail (NotSpillOrReload m) = middle m
         middle (CopyOut {})                    = id
 
 lastAvail :: AvailRegs -> Last -> LastOutFacts AvailRegs
-lastAvail _ (LastCall _ _ (Just k)) = LastOutFacts [(k, AvailRegs emptyRegSet)]
+lastAvail _ (LastCall _ (Just k)) = LastOutFacts [(k, AvailRegs emptyRegSet)]
 lastAvail avail l = LastOutFacts $ map (\id -> (id, avail)) $ succs l
 
 
