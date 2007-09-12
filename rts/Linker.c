@@ -730,6 +730,7 @@ typedef struct _RtsSymbolVal {
       SymX(rts_breakpoint_io_action)		\
       SymX(rts_stop_next_breakpoint)		\
       SymX(rts_stop_on_exception)		\
+      SymX(stopTimer)				\
       RTS_USER_SIGNALS_SYMBOLS
 
 #ifdef SUPPORT_LONG_LONGS
