@@ -58,4 +58,6 @@ SRC_HC_OPTS += -fforce-recomp
 # can't rely on GHC's recompilation checking here, because it won't spot 
 # changes in the ghc package.
 
+WAYS=$(GhcCompilerWays)
+
 include $(TOP)/mk/target.mk

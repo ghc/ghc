@@ -21,6 +21,11 @@ TOP = ..
 #
 UseGhcForCc = YES
 
+# We don't want to compile stage1 in multiple ways
+ifeq "$(findstring $(stage), 2 3)" ""
+WAYS=
+endif
+
 include $(TOP)/mk/boilerplate.mk
 
 ifeq "$(GhcThreaded)$(GhcProfiled)" "YESYES"
@@ -178,7 +183,7 @@ C_OBJS = $(patsubst %, $(odir)/%, $(addsuffix .$(way_)o,$(basename $(C_SRCS))))
 # Our standard cleaning rules don't know that we're doing our output
 # into $(odir), so we have to augment CLEAN_FILES appropriateliy.
 
-CLEAN_FILES += $(odir)/*/*.hi $(odir)/*/*.hi-boot $(odir)/*/*.o-boot
+CLEAN_FILES += $(odir)/*/*.$(way_)hi $(odir)/*/*.$(way_)hi-boot $(odir)/*/*.$(way_)o-boot
 
 ifeq "$(UsingHsBoot)" "YES"
 CLEAN_FILES += $(odir)/*/*.hi-boot $(odir)/*/*.o-boot
@@ -199,14 +204,10 @@ endif
 # be to do `env PATH=$(PATH) make ghc' to minimise the environment. (or the
 # equivalent of `env' if it doesn't exist locally).
 #
-ifneq "$(way)" "dll"
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 GHC_PROG=$(odir)/ghc$(_way)-$(ProjectVersion)
 else
 GHC_PROG=$(odir)/ghc$(_way)
-endif
-else
-GHC_PROG=$(odir)/ghc-$(ProjectVersion)
 endif
 
 ifeq "$(stage)" "1"
@@ -736,7 +737,7 @@ SRC_LD_OPTS += -no-link-chk
 # See comments in $(FPTOOLS_TOP)/utils/ghc-pkg/Makefile for why we use
 # a real binary here rather than a shell script.
 
-INPLACE_PROG = $(odir)/ghc-inplace$(exeext)
+INPLACE_PROG = $(odir)/ghc-inplace$(_way)$(exeext)
 EXCLUDED_C_SRCS += ghc-inplace.c
 
 GHC_PATH=$(FPTOOLS_TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)$(exeext)
@@ -840,9 +841,7 @@ PACKAGE_CPP_OPTS += -DPKG_DEPENDS='$(PKG_DEPENDS)'
 PACKAGE_CPP_OPTS += -DSTAGE='"$(stage)"'
 
 # Omit Main from the library, the client will want to plug their own Main in
-LIBOBJS = $(filter-out $(odir)/main/Main.o   $(odir)/parser/hschooks.o     \
-                       $(odir)/main/Main.p_o $(odir)/parser/hschooks.p_o,  \
-                       $(OBJS))
+LIBOBJS = $(filter-out $(odir)/main/Main.$(way_)o $(odir)/parser/hschooks.$(way_)o, $(OBJS))
 
 # disable splitting: it won't really help with GHC, and the specialised
 # build system for compiler/ isn't set up to handle it.
@@ -878,24 +877,6 @@ NO_SET_HC = YES
 # configuration.  Yeuch... maybe one day this will all be done more cleanly.
 STAMP_PKG_CONF = $(GHC_DRIVER_DIR)/stamp-pkg-conf-$(PACKAGE)
 
-ifeq "$(GhcBuildDylibs)" "YES"
-ifeq "$(darwin_TARGET_OS)" "1"
-GhcLibraryName=libHS$(PACKAGE)$(_way)_dyn.dylib
-else
-GhcLibraryName=libHS$(PACKAGE)$(_way)_dyn.so
-endif
-else
-GhcLibraryName=libHS$(PACKAGE)$(_way).a
-endif
-
-ifneq "$(DOING_BIN_DIST)" "YES"
-$(GHC_PROG) : $(GhcLibraryName) main/Main.hs
-	$(RM) package.conf.inplace
-	$(RM) $(STAMP_PKG_CONF)
-	$(MAKE) $(STAMP_PKG_CONF)
-	$(MAKE) -f Makefile.ghcbin $(MFLAGS) HS_PROG=$(GHC_PROG) $@
-endif
-
 # Propagate standard targets to Makefile.ghcbin
 docs runtests $(BOOT_TARGET) TAGS clean distclean mostlyclean maintainer-clean $(INSTALL_TARGET) $(INSTALL_DOCS_TARGET) html chm HxS ps dvi txt::
 	$(MAKE) -f Makefile.ghcbin $(MFLAGS) $@
@@ -929,12 +910,23 @@ TAGS_HS_SRCS = parser/Parser.y.pp $(filter-out $(DERIVED_SRCS) main/Config.hs pa
 include $(TOP)/mk/target.mk
 
 ifeq "$(BUILD_GHC_PACKAGE)" "YES"
-ifeq "$(way)" ""
 all :: $(GHC_PROG)
-endif
 endif
 
 $(odir)/main/Config.$(way_)o: SRC_HC_OPTS+=-DSTAGE=$(DQ)$(stage)$(DQ)
+
+ifneq "$(findstring $(stage), 2 3)" ""
+$(warning LIBRARY is $(LIBRARY))
+
+ifneq "$(DOING_BIN_DIST)" "YES"
+$(GHC_PROG) : $(LIBRARY) main/Main.hs
+	$(RM) package.conf.inplace
+	$(RM) $(STAMP_PKG_CONF)
+	$(MAKE) way="" $(STAMP_PKG_CONF)
+	$(MAKE) -f Makefile.ghcbin $(MFLAGS) HS_PROG=$(GHC_PROG) $@
+endif
+endif
+
 
 #-----------------------------------------------------------------------------
 # binary-dist
