@@ -7,13 +7,6 @@ Outputable: defines classes for pretty-printing and forcing, both
 forms of ``output.''
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Outputable (
 	Outputable(..), OutputableBndr(..),	-- Class
 
@@ -58,13 +51,15 @@ module Outputable (
 #include "HsVersions.h"
 
 
-import {-# SOURCE #-} 	Module( Module, modulePackageId, 
+import {-# SOURCE #-} 	Module( Module, 
                                 ModuleName, moduleName )
 import {-# SOURCE #-} 	OccName( OccName )
 
 import StaticFlags	( opt_PprStyle_Debug, opt_PprUserLength )
 import PackageConfig	( PackageId, packageIdString )
 import FastString
+import FastTypes
+import GHC.Ptr
 import qualified Pretty
 import Pretty		( Doc, Mode(..) )
 import Panic
@@ -141,19 +136,24 @@ type QueryQualifyModule = Module -> Bool
 type PrintUnqualified = (QueryQualifyName, QueryQualifyModule)
 
 alwaysQualifyNames :: QueryQualifyName
-alwaysQualifyNames m n = NameQual (moduleName m)
+alwaysQualifyNames m _ = NameQual (moduleName m)
 
 neverQualifyNames :: QueryQualifyName
-neverQualifyNames m n = NameUnqual
+neverQualifyNames _ _ = NameUnqual
 
 alwaysQualifyModules :: QueryQualifyModule
-alwaysQualifyModules m = True
+alwaysQualifyModules _ = True
 
 neverQualifyModules :: QueryQualifyModule
-neverQualifyModules m = False
+neverQualifyModules _ = False
 
+type QueryQualifies = (QueryQualifyName, QueryQualifyModule)
+
+alwaysQualify, neverQualify :: QueryQualifies
 alwaysQualify = (alwaysQualifyNames, alwaysQualifyModules)
 neverQualify  = (neverQualifyNames,  neverQualifyModules)
+
+defaultUserStyle, defaultDumpStyle :: PprStyle
 
 defaultUserStyle = mkUserStyle alwaysQualify AllTheWay
 
@@ -172,6 +172,7 @@ defaultErrStyle
   | opt_PprStyle_Debug   = mkUserStyle alwaysQualify AllTheWay
   | otherwise            = mkUserStyle alwaysQualify (PartWay opt_PprUserLength)
 
+mkUserStyle :: QueryQualifies -> Depth -> PprStyle
 mkUserStyle unqual depth
    | opt_PprStyle_Debug = PprDebug
    | otherwise          = PprUser unqual depth
@@ -195,13 +196,13 @@ code (either C or assembly), or generating interface files.
 type SDoc = PprStyle -> Doc
 
 withPprStyle :: PprStyle -> SDoc -> SDoc
-withPprStyle sty d sty' = d sty
+withPprStyle sty d _sty' = d sty
 
 withPprStyleDoc :: PprStyle -> SDoc -> Doc
 withPprStyleDoc sty d = d sty
 
 pprDeeper :: SDoc -> SDoc
-pprDeeper d (PprUser q (PartWay 0)) = Pretty.text "..."
+pprDeeper _ (PprUser _ (PartWay 0)) = Pretty.text "..."
 pprDeeper d (PprUser q (PartWay n)) = d (PprUser q (PartWay (n-1)))
 pprDeeper d other_sty        	    = d other_sty
 
@@ -211,7 +212,7 @@ pprDeeperList f ds (PprUser q (PartWay n))
   | n==0      = Pretty.text "..."
   | otherwise = f (go 0 ds) (PprUser q (PartWay (n-1)))
   where
-    go i [] = []
+    go _ [] = []
     go i (d:ds) | i >= n    = [text "...."]
 		| otherwise = d : go (i+1) ds
 
@@ -219,8 +220,8 @@ pprDeeperList f ds other_sty
   = f ds other_sty
 
 pprSetDepth :: Int -> SDoc -> SDoc
-pprSetDepth n d (PprUser q _) = d (PprUser q (PartWay n))
-pprSetDepth n d other_sty     = d other_sty
+pprSetDepth  n d (PprUser q _) = d (PprUser q (PartWay n))
+pprSetDepth _n d other_sty     = d other_sty
 
 getPprStyle :: (PprStyle -> SDoc) -> SDoc
 getPprStyle df sty = df sty sty
@@ -228,12 +229,12 @@ getPprStyle df sty = df sty sty
 
 \begin{code}
 qualName :: PprStyle -> QueryQualifyName
-qualName (PprUser (qual_name,_) _) m n = qual_name m n
-qualName other		           m n = NameQual (moduleName m)
+qualName (PprUser (qual_name,_) _) m  n = qual_name m n
+qualName _other		           m _n = NameQual (moduleName m)
 
 qualModule :: PprStyle -> QueryQualifyModule
-qualModule (PprUser (_,qual_mod) _) m = qual_mod m
-qualModule other                    m = True
+qualModule (PprUser (_,qual_mod) _)  m = qual_mod m
+qualModule _other                   _m = True
 
 codeStyle :: PprStyle -> Bool
 codeStyle (PprCode _)	  = True
@@ -241,23 +242,23 @@ codeStyle _		  = False
 
 asmStyle :: PprStyle -> Bool
 asmStyle (PprCode AsmStyle)  = True
-asmStyle other               = False
+asmStyle _other              = False
 
 dumpStyle :: PprStyle -> Bool
 dumpStyle PprDump = True
-dumpStyle other   = False
+dumpStyle _other  = False
 
 debugStyle :: PprStyle -> Bool
 debugStyle PprDebug	  = True
-debugStyle other	  = False
+debugStyle _other	  = False
 
 userStyle ::  PprStyle -> Bool
 userStyle (PprUser _ _) = True
-userStyle other         = False
+userStyle _other        = False
 
 ifPprDebug :: SDoc -> SDoc	  -- Empty for non-debug style
 ifPprDebug d sty@PprDebug = d sty
-ifPprDebug d sty	  = Pretty.empty
+ifPprDebug _ _  	  = Pretty.empty
 \end{code}
 
 \begin{code}
@@ -327,22 +328,37 @@ showSDocDebug d = show (d PprDebug)
 docToSDoc :: Doc -> SDoc
 docToSDoc d = \_ -> d
 
-empty sty      = Pretty.empty
-text s sty     = Pretty.text s
-char c sty     = Pretty.char c
-ftext s sty    = Pretty.ftext s
-ptext s sty    = Pretty.ptext s
-int n sty      = Pretty.int n
-integer n sty  = Pretty.integer n
-float n sty    = Pretty.float n
-double n sty   = Pretty.double n
-rational n sty = Pretty.rational n
+empty    :: SDoc
+text     :: String     -> SDoc
+char     :: Char       -> SDoc
+ftext    :: FastString -> SDoc
+ptext    :: Ptr t      -> SDoc
+int      :: Int        -> SDoc
+integer  :: Integer    -> SDoc
+float    :: Float      -> SDoc
+double   :: Double     -> SDoc
+rational :: Rational   -> SDoc
+
+empty _sty      = Pretty.empty
+text s _sty     = Pretty.text s
+char c _sty     = Pretty.char c
+ftext s _sty    = Pretty.ftext s
+ptext s _sty    = Pretty.ptext s
+int n _sty      = Pretty.int n
+integer n _sty  = Pretty.integer n
+float n _sty    = Pretty.float n
+double n _sty   = Pretty.double n
+rational n _sty = Pretty.rational n
+
+parens, braces, brackets, quotes, doubleQuotes, angleBrackets :: SDoc -> SDoc
 
 parens d sty       = Pretty.parens (d sty)
 braces d sty       = Pretty.braces (d sty)
 brackets d sty     = Pretty.brackets (d sty)
 doubleQuotes d sty = Pretty.doubleQuotes (d sty)
 angleBrackets d    = char '<' <> d <> char '>'
+
+cparen :: Bool -> SDoc -> SDoc
 
 cparen b d sty       = Pretty.cparen b (d sty)
 
@@ -351,31 +367,40 @@ cparen b d sty       = Pretty.cparen b (d sty)
 -- so that we don't get `foo''.  Instead we just have foo'.
 quotes d sty = case show pp_d of
 		 ('\'' : _) -> pp_d
-		 other	    -> Pretty.quotes pp_d
+		 _other	    -> Pretty.quotes pp_d
 	     where
 	       pp_d = d sty
 
-semi sty   = Pretty.semi
-comma sty  = Pretty.comma
-colon sty  = Pretty.colon
-equals sty = Pretty.equals
-space sty  = Pretty.space
-lparen sty = Pretty.lparen
-rparen sty = Pretty.rparen
-lbrack sty = Pretty.lbrack
-rbrack sty = Pretty.rbrack
-lbrace sty = Pretty.lbrace
-rbrace sty = Pretty.rbrace
-dcolon sty = Pretty.ptext SLIT("::")
-arrow  sty = Pretty.ptext SLIT("->")
-underscore = char '_'
-dot	   = char '.'
+semi, comma, colon, equals, space, dcolon, arrow, underscore, dot :: SDoc
+lparen, rparen, lbrack, rbrack, lbrace, rbrace :: SDoc
+
+semi _sty   = Pretty.semi
+comma _sty  = Pretty.comma
+colon _sty  = Pretty.colon
+equals _sty = Pretty.equals
+space _sty  = Pretty.space
+dcolon _sty = Pretty.ptext SLIT("::")
+arrow  _sty = Pretty.ptext SLIT("->")
+underscore  = char '_'
+dot	    = char '.'
+lparen _sty = Pretty.lparen
+rparen _sty = Pretty.rparen
+lbrack _sty = Pretty.lbrack
+rbrack _sty = Pretty.rbrack
+lbrace _sty = Pretty.lbrace
+rbrace _sty = Pretty.rbrace
+
+nest :: Int -> SDoc -> SDoc
+(<>), (<+>), ($$), ($+$) :: SDoc -> SDoc -> SDoc
 
 nest n d sty    = Pretty.nest n (d sty)
 (<>) d1 d2 sty  = (Pretty.<>)  (d1 sty) (d2 sty)
 (<+>) d1 d2 sty = (Pretty.<+>) (d1 sty) (d2 sty)
 ($$) d1 d2 sty  = (Pretty.$$)  (d1 sty) (d2 sty)
 ($+$) d1 d2 sty = (Pretty.$+$) (d1 sty) (d2 sty)
+
+hcat, hsep, vcat, sep, cat, fsep, fcat :: [SDoc] -> SDoc
+
 
 hcat ds sty = Pretty.hcat [d sty | d <- ds]
 hsep ds sty = Pretty.hsep [d sty | d <- ds]
@@ -385,10 +410,12 @@ cat ds sty  = Pretty.cat  [d sty | d <- ds]
 fsep ds sty = Pretty.fsep [d sty | d <- ds]
 fcat ds sty = Pretty.fcat [d sty | d <- ds]
 
+hang :: SDoc -> Int -> SDoc -> SDoc
+
 hang d1 n d2 sty   = Pretty.hang (d1 sty) n (d2 sty)
 
 punctuate :: SDoc -> [SDoc] -> [SDoc]
-punctuate p []     = []
+punctuate _ []     = []
 punctuate p (d:ds) = go d ds
 		   where
 		     go d [] = [d]
@@ -474,7 +501,7 @@ data BindingSite = LambdaBind | CaseBind | LetBind
 
 class Outputable a => OutputableBndr a where
    pprBndr :: BindingSite -> a -> SDoc
-   pprBndr b x = ppr x
+   pprBndr _b x = ppr x
 \end{code}
 
 
@@ -567,8 +594,9 @@ speakNTimes t | t == 1 	   = ptext SLIT("once")
               | t == 2 	   = ptext SLIT("twice")
               | otherwise  = speakN t <+> ptext SLIT("times")
 
-plural [x] = empty
-plural xs  = char 's'
+plural :: [a] -> SDoc
+plural [_] = empty  -- a bit frightening, but there you are
+plural _   = char 's'
 \end{code}
 
 
@@ -587,6 +615,7 @@ pprPgmError = pprAndThen pgmError	-- Throw an exn saying "bug in pgm being compi
 					--	(used for unusual pgm errors)
 pprTrace    = pprAndThen trace
 
+pprPanic# :: String -> SDoc -> FastInt
 pprPanic# heading pretty_msg = panic# (show (doc PprDebug))
 			     where
 			       doc = text heading <+> pretty_msg
@@ -606,8 +635,8 @@ assertPprPanic file line msg
 		    msg]
 
 warnPprTrace :: Bool -> String -> Int -> SDoc -> a -> a
-warnPprTrace False file line msg x = x
-warnPprTrace True  file line msg x
+warnPprTrace False _file _line _msg x = x
+warnPprTrace True   file  line  msg x
   = trace (show (doc PprDebug)) x
   where
     doc = sep [hsep [text "WARNING: file", text file, text "line", int line],
