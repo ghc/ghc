@@ -300,7 +300,7 @@ clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
 	$(RM) -rf bootstrapping.*
 	$(RM) -rf ifBuildable
 	$(RM) -rf installPackage
-	$(RM) -f libraries.txt index.html doc-index.html doc-index-*.html
+	$(RM) -f libraries.txt index.html doc-index.html doc-index*.html
 
 $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR)): \
 clean.library.%:
@@ -317,7 +317,7 @@ endif
 install: $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR))
 ifeq "$(HADDOCK_DOCS)" "YES"
 	$(INSTALL_DIR)                                              $(DESTDIR)$(htmldir_install)
-	$(INSTALL_DATA)   index.html doc-index.html                 $(DESTDIR)$(htmldir_install)
+	$(INSTALL_DATA)   index.html doc-index*.html                $(DESTDIR)$(htmldir_install)
 	$(INSTALL_SCRIPT) gen_contents_index                        $(DESTDIR)$(htmldir_install)
 	# Hacks:
 	$(INSTALL_DATA)   $(DESTDIR)$(htmldir_install)/base-*/*.css $(DESTDIR)$(htmldir_install)
@@ -356,7 +356,7 @@ binary-dist: $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR))
 ifeq "$(HADDOCK_DOCS)" "YES"
 	cp    gen_contents_index            $(BIN_DIST_LIBDIR)
 	cp    index.html                    $(BIN_DIST_LIBDIR)
-	cp    doc-index.html                $(BIN_DIST_LIBDIR)
+	cp    doc-index*.html               $(BIN_DIST_LIBDIR)
 endif
 	cp -pR stamp                         $(BIN_DIST_LIBDIR)
 
