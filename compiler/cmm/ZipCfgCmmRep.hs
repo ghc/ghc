@@ -162,7 +162,7 @@ debugPpr :: Bool
 #ifdef DEBUG 
 debugPpr = True
 #else
-debubPpr = False
+debugPpr = False
 #endif
 
 pprMiddle :: Middle -> SDoc    
