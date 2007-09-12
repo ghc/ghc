@@ -1330,8 +1330,10 @@ maybeCreateManifest dflags exe_filename = do
   rc_obj_filename <- newTempName dflags (objectSuf dflags)
 
   writeFile rc_filename $
-      "1 24 MOVEABLE PURE \"" ++ manifest_filename ++ "\"\n"
+      "1 24 MOVEABLE PURE " ++ show manifest_filename ++ "\n"
         -- magic numbers :-)
+        -- show is a bit hackish above, but we need to esacpe the
+        -- backslashes in the path.
 
   let wr_opts = getOpts dflags opt_windres
   runWindres dflags $ map SysTools.Option $
