@@ -13,6 +13,8 @@ my $ignore_failure = 0;
 my $checked_out = 0;
 # --core-only says we only want to push corelibs, not extralibs
 my $core_only = 0;
+# --push or --pull?
+my $push_pull = "push";
 
 sub message {
     if ($verbose) {
@@ -32,7 +34,7 @@ sub darcs {
 }
 
 sub darcs_push {
-    darcs ("push", "--no-set-default", @_);
+    darcs ($push_pull, "--no-set-default", @_);
 }
 
 sub pushall {
@@ -83,6 +85,12 @@ sub main {
             }
             elsif ($arg eq "--core-only") {
                 $core_only = 1;
+            }
+            elsif ($arg eq "--push") {
+                $push_pull = "push";
+            }
+            elsif ($arg eq "--pull") {
+                $push_pull = "pull";
             }
             else {
                 $reporoot = $arg;
