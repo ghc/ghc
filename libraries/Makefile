@@ -316,13 +316,13 @@ endif
 
 install: $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR))
 ifeq "$(HADDOCK_DOCS)" "YES"
-	$(INSTALL_DIR)                                            $(DESTDIR)$(htmldir_install)
-	$(INSTALL_DATA)   index.html doc-index.html               $(DESTDIR)$(htmldir_install)
-	$(INSTALL_SCRIPT) gen_contents_index                      $(DESTDIR)$(htmldir_install)
+	$(INSTALL_DIR)                                              $(DESTDIR)$(htmldir_install)
+	$(INSTALL_DATA)   index.html doc-index.html                 $(DESTDIR)$(htmldir_install)
+	$(INSTALL_SCRIPT) gen_contents_index                        $(DESTDIR)$(htmldir_install)
 	# Hacks:
-	$(INSTALL_DATA)   $(DESTDIR)$(htmldir_install)/base/*.css $(DESTDIR)$(htmldir_install)
-	$(INSTALL_DATA)   $(DESTDIR)$(htmldir_install)/base/*.js  $(DESTDIR)$(htmldir_install)
-	$(INSTALL_DATA)   $(DESTDIR)$(htmldir_install)/base/*.gif $(DESTDIR)$(htmldir_install)
+	$(INSTALL_DATA)   $(DESTDIR)$(htmldir_install)/base-*/*.css $(DESTDIR)$(htmldir_install)
+	$(INSTALL_DATA)   $(DESTDIR)$(htmldir_install)/base-*/*.js  $(DESTDIR)$(htmldir_install)
+	$(INSTALL_DATA)   $(DESTDIR)$(htmldir_install)/base-*/*.gif $(DESTDIR)$(htmldir_install)
 endif
 
 # Cabal doesn't let us ask to install docs only, so do nothing here
