@@ -25,6 +25,7 @@ import Name
 import UniqSupply
 import TcType
 import GHC
+import DynFlags
 import InteractiveEval
 import Outputable
 import Pretty                    ( Mode(..), showDocWith )
@@ -138,7 +139,11 @@ bindSuspensions cms@(Session ref) t = do
 
 --  A custom Term printer to enable the use of Show instances
 showTerm :: Session -> Term -> IO SDoc
-showTerm cms@(Session ref) = cPprTerm (liftM2 (++) cPprShowable cPprTermBase)
+showTerm cms@(Session ref) term = do
+    dflags       <- GHC.getSessionDynFlags cms
+    if dopt Opt_PrintEvldWithShow dflags
+       then cPprTerm (liftM2 (++) cPprShowable cPprTermBase) term
+       else cPprTerm cPprTermBase term
  where
   cPprShowable _y = [\prec ty _ val tt ->
     if not (all isFullyEvaluatedTerm tt)

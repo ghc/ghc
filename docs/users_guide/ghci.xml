@@ -929,6 +929,7 @@ right :: [a]
         <literal>left</literal>:</para>
 
 <screen>
+[qsort.hs:2:15-46] *Main> :set -fprint-evld-with-show
 [qsort.hs:2:15-46] *Main> :print left
 left = (_t1::[a])
 </screen>
@@ -947,6 +948,13 @@ left = (_t1::[a])
         binds each thunk to a fresh variable beginning with an
         underscore, in this case
         <literal>_t1</literal>.</para>
+
+      <para>The flag <literal>-fprint-evld-with-show</literal> instructs
+      <literal>:print</literal> to reuse
+      available <literal>Show</literal> instances when possible. This happens
+      only when the contents of the variable being inspected 
+      are completely evaluated.</para>
+
 
       <para>If we aren't concerned about preserving the evaluatedness of a
         variable, we can use <literal>:force</literal> instead of
@@ -1016,6 +1024,7 @@ right :: [a]
 
       <para>The execution continued at the point it previously stopped, and has
         now stopped at the breakpoint for a second time.</para>
+
 
       <sect3 id="setting-breakpoints">
         <title>Setting breakpoints</title>

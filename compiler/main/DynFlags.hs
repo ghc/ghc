@@ -266,6 +266,7 @@ data DynFlag
    | Opt_Hpc_No_Auto
    | Opt_BreakOnException
    | Opt_BreakOnError
+   | Opt_PrintEvldWithShow
    | Opt_GenManifest
    | Opt_EmbedManifest
    | Opt_RunCPSZ
@@ -1192,6 +1193,7 @@ fFlags = [
   ( "rewrite-rules",                    Opt_RewriteRules ),
   ( "break-on-exception",               Opt_BreakOnException ),
   ( "break-on-error",                   Opt_BreakOnError ),
+  ( "print-evld-with-show",             Opt_PrintEvldWithShow ),
   ( "run-cps",                          Opt_RunCPSZ ),
   ( "convert-to-zipper-and-back",       Opt_ConvertToZipCfgAndBack),
   ( "vectorise",                        Opt_Vectorise ),

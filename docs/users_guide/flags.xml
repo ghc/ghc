@@ -515,6 +515,12 @@
 	      <entry><option>-fno-break-on-error</option></entry>
 	    </row>
 	    <row>
+	      <entry><option>-fprint-evld-with-show</option></entry>
+	      <entry><link linkend="breakpoints">Enable usage of Show instances in <literal>:print</literal></link></entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-fno-print-evld-with-show</option></entry>
+	    </row>	    
+	    <row>
 	      <entry><option>-fno-print-bind-result</option></entry>
 	      <entry><link linkend="ghci-stmts">Turn off printing of binding results in GHCi</link></entry>
 	      <entry>dynamic</entry>
