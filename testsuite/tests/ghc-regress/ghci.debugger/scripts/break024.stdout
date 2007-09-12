@@ -1,10 +1,10 @@
-Left exception :: Main.MyException
+Left user error (error)
 Stopped at <exception thrown>
-_exception :: e = DynException _
-*** Exception: (unknown)
+_exception :: e = user error (error)
+*** Exception: user error (error)
 Stopped at <exception thrown>
-_exception :: e = DynException (Data.Dynamic.Dynamic <typerep> _)
-*** Exception: (unknown)
+_exception :: e = user error (error)
+*** Exception: user error (error)
 Stopped at <exception thrown>
-_exception :: e = DynException (Data.Dynamic.Dynamic <typerep> _)
-Left exception :: Main.MyException
+_exception :: e = user error (error)
+Left user error (error)
