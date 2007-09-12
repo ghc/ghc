@@ -51,11 +51,11 @@ exit g@(LGraph eid _) = FGraph eid (ZBlock h (ZLast l)) others
 
 splice_focus_entry (FGraph eid (ZBlock head tail) blocks) g =
   let (tail', g') = splice_tail g tail in
-  FGraph eid (ZBlock head tail') (plusUFM (gr_blocks g') blocks)
+  FGraph eid (ZBlock head tail') (plusUFM (lg_blocks g') blocks)
 
 splice_focus_exit (FGraph eid (ZBlock head tail) blocks) g =
   let (g', head') = splice_head head g in
-  FGraph eid (ZBlock head' tail) (plusUFM (gr_blocks g') blocks)
+  FGraph eid (ZBlock head' tail) (plusUFM (lg_blocks g') blocks)
 
 -- | Fold from first to last
 fold_fwd_block ::
