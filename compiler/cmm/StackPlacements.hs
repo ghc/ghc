@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
+
 module StackPlacements
   ( SlotSet, allStackSlots  -- the infinite set of stack slots
   , SlotClass(..), slotClassBits, stackSlot32, stackSlot64, stackSlot128

@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module ZipCfg
     ( BlockId(..), freshBlockId
     , BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, insertBlock, mkBlockEnv

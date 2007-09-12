@@ -1,5 +1,4 @@
 {-# LANGUAGE PatternGuards #-}
-{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
 
 module CmmCvt
   ( cmmToZgraph, cmmOfZgraph )

@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
+
 {-# LANGUAGE MultiParamTypeClasses #-}
 module ZipDataflow
   ( Answer(..)

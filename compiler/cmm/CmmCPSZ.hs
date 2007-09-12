@@ -1,4 +1,3 @@
-{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
 
 module CmmCPSZ (
   -- | Converts C-- with full proceedures and parameters

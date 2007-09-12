@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
+
 module CmmContFlowOpt
     ( runCmmOpts, cmmCfgOpts, cmmCfgOptsZ
     , branchChainElimZ, removeUnreachableBlocksZ

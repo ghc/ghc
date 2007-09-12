@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
+
 module DFMonad
     ( OptimizationFuel
     , DFTx, runDFTx, lastTxPass, txDecrement, txRemaining, txExhausted

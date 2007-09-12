@@ -1,10 +1,10 @@
-{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
-module CmmZipUtil 
+
+module CmmZipUtil
   ( zipPreds
   )
 where
 import Prelude hiding (last, unzip)
-import ZipCfg 
+import ZipCfg
 import Maybes
 
 -- | Compute the predecessors of each *reachable* block

@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
+
 module CmmLiveZ
     ( CmmLive
     , cmmLivenessZ

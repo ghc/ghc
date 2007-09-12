@@ -1,4 +1,4 @@
-{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
+
 
 -- This module is pure representation and should be imported only by
 -- clients that need to manipulate representation and know what

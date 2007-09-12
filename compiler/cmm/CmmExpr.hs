@@ -1,4 +1,3 @@
-{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
 
 module CmmExpr
     ( CmmExpr(..), cmmExprRep, maybeInvertCmmExpr
