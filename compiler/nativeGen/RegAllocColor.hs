@@ -18,6 +18,7 @@ import RegLiveness
 import RegSpill
 import RegSpillClean
 import RegAllocStats
+-- import RegCoalesce
 import MachRegs
 import MachInstrs
 import PprMach
@@ -70,7 +71,6 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 		, dopt Opt_D_dump_asm_stats dflags
 		, dopt Opt_D_dump_asm_conflicts dflags ]
 
-
 	-- check that we're not running off down the garden path.
 	when (spinCount > maxSpinCount)
 	 $ pprPanic "regAlloc_spin: max build/spill cycle count exceeded."
@@ -80,8 +80,21 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 						$ uniqSetToList $ unionManyUniqSets $ eltsUFM regsFree)
 		$$ text "slotsFree   = " <> ppr (sizeUniqSet slotsFree))
 
+
+	-- Brig's algorithm does reckless coalescing for all but the first allocation stage
+	--	Doing this seems to reduce the number of reg-reg moves, but at the cost-
+	--	of creating more spills. Probably better just to stick with conservative 
+	--	coalescing in Color.colorGraph for now.
+	--
+	{- code_coalesced1	<- if (spinCount > 0) 
+				then regCoalesce code
+				else return code -}
+
+	let code_coalesced1	= code
+
+
  	-- build a conflict graph from the code.
-	graph		<- {-# SCC "BuildGraph" #-} buildGraph code
+	graph		<- {-# SCC "BuildGraph" #-} buildGraph code_coalesced1
 
 	-- VERY IMPORTANT:
 	--	We really do want the graph to be fully evaluated _before_ we start coloring.
@@ -95,7 +108,7 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 	--	this is lazy, it won't be computed unless we need to spill
 
 	let fmLife	= {-# SCC "LifetimeCount" #-} plusUFMs_C (\(r1, l1) (_, l2) -> (r1, l1 + l2))
-			$ map lifetimeCount code
+			$ map lifetimeCount code_coalesced1
 
 	-- record startup state
 	let stat1	=
@@ -115,21 +128,22 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 			= {-# SCC "ColorGraph" #-}
 			   Color.colorGraph
 			    	(dopt Opt_RegsIterative dflags)
+				spinCount
 			    	regsFree triv spill graph
 
 	-- rewrite regs in the code that have been coalesced
 	let patchF reg	= case lookupUFM rmCoalesce reg of
 				Just reg'	-> patchF reg'
 				Nothing		-> reg
-	let code_coalesced
-			= map (patchEraseLive patchF) code
+	let code_coalesced2
+			= map (patchEraseLive patchF) code_coalesced1
 
 
 	-- see if we've found a coloring
 	if isEmptyUniqSet rsSpill
 	 then do
 		-- patch the registers using the info in the graph
-	 	let code_patched	= map (patchRegsFromGraph graph_colored) code_coalesced
+	 	let code_patched	= map (patchRegsFromGraph graph_colored) code_coalesced2
 
 		-- clean out unneeded SPILL/RELOADs
 		let code_spillclean	= map cleanSpills code_patched
@@ -166,7 +180,7 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 	 else do
 	 	-- spill the uncolored regs
 		(code_spilled, slotsFree', spillStats)
-			<- regSpill code_coalesced slotsFree rsSpill
+			<- regSpill code_coalesced2 slotsFree rsSpill
 
 		-- recalculate liveness
 		let code_nat	= map stripLive code_spilled
@@ -257,7 +271,7 @@ buildGraph code
 	let moveBag		= unionBags (unionManyBags moveList2) (unionManyBags moveList)
 	let graph_coalesce	= foldrBag graphAddCoalesce graph_conflict moveBag
 			
-	return	$ Color.validateGraph (text "urk") graph_coalesce
+	return	graph_coalesce
 
 
 -- | Add some conflict edges to the graph.

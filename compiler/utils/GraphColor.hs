@@ -39,6 +39,7 @@ colorGraph
 	   , Eq color, Eq cls, Ord k
 	   , Outputable k, Outputable cls, Outputable color)
 	=> Bool				-- ^ whether to do iterative coalescing
+	-> Int				-- ^ how many times coloring has been called so far
 	-> UniqFM (UniqSet color)	-- ^ map of (node class -> set of colors available for this class).
 	-> Triv   k cls color 		-- ^ fn to decide whether a node is trivially colorable.
 	-> (Graph k cls color -> k)	-- ^ fn to choose a node to potentially leave uncolored if nothing is trivially colorable.
@@ -49,11 +50,10 @@ colorGraph
 	   , UniqFM  k )		-- map of regs (r1 -> r2) that were coaleced
 	   				--	 r1 should be replaced by r2 in the source
 
-colorGraph iterative colors triv spill graph0
+colorGraph iterative spinCount colors triv spill graph0
  = let
-	-- if we're not doing iterative coalescing, then just do a single coalescing
-	--	pass at the front. This won't be as good but should still eat up a
-	--	lot of the reg-reg moves.
+	-- If we're not doing iterative coalescing then just do a conservative
+	--	coalescing stage at the front.
 	(graph_coalesced, kksCoalesce1)
 		= if not iterative
 			then coalesceGraph False triv graph0
@@ -154,23 +154,23 @@ colorScan_spin iterative triv spill graph
 			$ graph
 
 	, ksTrivFound	<- map nodeId nsTrivFound
-	, graph3	<- foldr (\k g -> let Just g' = delNode k g
+	, graph2	<- foldr (\k g -> let Just g' = delNode k g
 	   				  in  g')
 				graph ksTrivFound
 
-	= colorScan_spin iterative triv spill graph3
+	= colorScan_spin iterative triv spill graph2
 		(ksTrivFound ++ ksTriv)
 		ksSpill
 		kksCoalesce
 
 	-- Coalesce:
 	-- 	If we're doing iterative coalescing and no triv nodes are avaliable
-	--	then it's type for a coalescing pass.
+	--	then it's time for a coalescing pass.
 	| iterative
 	= case coalesceGraph False triv graph of
 
 		-- we were able to coalesce something
-		--	go back and see if this frees up more nodes to be trivially colorable.
+		--	go back to Simplify and see if this frees up more nodes to be trivially colorable.
 		(graph2, kksCoalesceFound @(_:_))
 		 -> colorScan_spin iterative triv spill graph2
 			ksTriv ksSpill (kksCoalesceFound ++ kksCoalesce)
