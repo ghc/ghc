@@ -20,6 +20,7 @@ module Util (
 	mapFst, mapSnd,
 	mapAndUnzip, mapAndUnzip3,
 	nOfThem, filterOut, partitionWith, splitEithers,
+        foldl1',
 
 	lengthExceeds, lengthIs, lengthAtLeast, 
 	listLengthCmp, atLength, equalLength, compareLength,
@@ -88,8 +89,8 @@ module Util (
 
 import FastTypes
 
-#ifdef DEBUG
-import Panic		( panic, trace )
+#if defined(DEBUG) || __GLASGOW_HASKELL__ < 604
+import Panic
 #endif
 
 import Control.Exception ( Exception(..), finally, catchDyn, throw )
@@ -98,11 +99,10 @@ import Data.Dynamic	( Typeable )
 import Data.IORef	( IORef, newIORef )
 import System.IO.Unsafe	( unsafePerformIO )
 import Data.IORef	( readIORef, writeIORef )
+import Data.List        hiding (group)
 
 import qualified Data.List as List ( elem )
-#ifndef DEBUG
-import Data.List		( zipWith4 )
-#else
+#ifdef DEBUG
 import qualified Data.List as List ( notElem )
 #endif
 
@@ -361,6 +361,16 @@ isn'tIn msg x ys
 		         x `List.notElem` (y:ys)
       | otherwise      =  x /= y && notElem (i +# _ILIT(1)) x ys
 # endif /* DEBUG */
+\end{code}
+
+foldl1' was added in GHC 6.4
+
+\begin{code}
+#if __GLASGOW_HASKELL__ < 604
+foldl1'                  :: (a -> a -> a) -> [a] -> a
+foldl1' f (x:xs)         =  foldl' f x xs
+foldl1' _ []             =  panic "foldl1'"
+#endif
 \end{code}
 
 %************************************************************************

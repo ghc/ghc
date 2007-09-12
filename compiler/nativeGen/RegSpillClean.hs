@@ -39,9 +39,10 @@ import UniqFM
 import Unique
 import State
 import Outputable
+import Util
 
 import Data.Maybe
-import Data.List
+import Data.List        ( nub )
 
 -- | Clean out unneeded spill/reloads from this top level thing.
 cleanSpills :: LiveCmmTop -> LiveCmmTop
