@@ -37,12 +37,14 @@ name = Util.global (value) :: IORef (ty); \
 #define COMMA ,
 
 #ifdef DEBUG
+#define debugIsOn True
 #define ASSERT(e) if (not (e)) then (assertPanic __FILE__ __LINE__) else
 #define ASSERT2(e,msg) if (not (e)) then (assertPprPanic __FILE__ __LINE__ (msg)) else
 #define WARN( e, msg ) (warnPprTrace (e) __FILE__ __LINE__ (msg))
 #define ASSERTM(mbool) do { bool <- mbool; ASSERT(bool) return () }
 #define ASSERTM2(mbool,msg) do { bool <- mbool; ASSERT2(bool,msg) return () }
 #else
+#define debugIsOn False
 -- We have to actually use all the variables we are given or we may get
 -- unused variable warnings when DEBUG is off.
 #define ASSERT(e)      if False && (not (e)) then panic "ASSERT" else
