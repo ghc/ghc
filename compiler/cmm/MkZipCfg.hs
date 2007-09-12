@@ -327,7 +327,7 @@ note_this_code_becomes_unreachable = u
                                     -- Note [Branch follows branch]
           u tail = fail ("unreachable code: " ++ showSDoc (ppr tail))
 #else
-note_this_code_becomes_unreachable = return ()
+note_this_code_becomes_unreachable _ = return ()
 #endif
 
 {-
