@@ -42,7 +42,7 @@ import Outputable
 import Util
 
 import Data.Maybe
-import Data.List        ( nub )
+import Data.List        ( find, nub )
 
 -- | Clean out unneeded spill/reloads from this top level thing.
 cleanSpills :: LiveCmmTop -> LiveCmmTop
