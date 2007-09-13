@@ -11,12 +11,13 @@ import Cmm
 import CmmExpr
 import CmmTx
 import DFMonad
-import Maybes
 import PprCmm()
 import PprCmmZ()
-import UniqSet
 import ZipDataflow
 import ZipCfgCmmRep
+
+import Maybes
+import UniqSet
 
 -----------------------------------------------------------------------------
 -- Calculating what variables are live on entry to a basic block
@@ -40,10 +41,8 @@ type BlockEntryLiveness = BlockEnv CmmLive
 -----------------------------------------------------------------------------
 cmmLivenessZ :: CmmGraph -> BlockEntryLiveness
 cmmLivenessZ g = env
-    where env = runDFA liveLattice $
-                do run_b_anal transfer g
-                   allFacts
-          transfer = BComp "liveness analysis" exit last middle first
+    where env = runDFA liveLattice $ do { run_b_anal transfer g; allFacts }
+          transfer     = BComp "liveness analysis" exit last middle first
           exit         = emptyUniqSet
           first live _ = live
           middle       = flip middleLiveness
@@ -63,7 +62,7 @@ middleLiveness m = middle m
         middle (MidStore addr rval)          = gen addr . gen rval
         middle (MidUnsafeCall tgt ress args) = gen tgt . gen args . kill ress
         middle (CopyIn _ formals _)          = kill formals
-        middle (CopyOut _ formals)           = gen formals
+        middle (CopyOut _ actuals)           = gen actuals
 
 lastLiveness :: Last -> (BlockId -> CmmLive) -> CmmLive
 lastLiveness l env = last l
