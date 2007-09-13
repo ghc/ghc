@@ -95,7 +95,10 @@ test('ffi017', normal, compile_and_run, [''])
 # There's a dependency between these next two lines as the ghci way needs
 # the .o file the other ways make
 test('ffi018', omit_ways(['ghci']), compile_and_run, ['ffi018_c.c'])
-test('ffi018', only_ways(['ghci']), compile_and_run, ['ffi018_c.o'])
 clean(['ffi018_c.o'])
+
+runCmd('$MAKE --no-print-directory ffi018_ghci_setup')
+test('ffi018', only_ways(['ghci']), compile_and_run, ['ffi018_ghci_c.o'])
+clean(['ffi018_ghci_c.o'])
 
 test('ffi019', normal, compile_and_run, [''])
