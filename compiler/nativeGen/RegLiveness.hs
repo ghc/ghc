@@ -23,7 +23,6 @@ module RegLiveness (
 	spillNatBlock,
 	slurpConflicts,
 	slurpReloadCoalesce,
-	lifetimeCount,
 	eraseDeltasLive,
 	patchEraseLive,
 	patchRegsLiveInstr,
@@ -380,48 +379,6 @@ spillNatBlock (BasicBlock i is)
 	spillNat acc (instr : instrs)
 	 =	spillNat (instr : acc) instrs
 
-
--- | Slurp out a map of how many times each register was live upon entry to an instruction.
-
-lifetimeCount
-	:: LiveCmmTop
-	-> UniqFM (Reg, Int)	-- ^ reg -> (reg, count)
-
-lifetimeCount cmm
-	= countCmm emptyUFM cmm
- where
-	countCmm fm  CmmData{}		= fm
-	countCmm fm (CmmProc info _ _ (ListGraph blocks))
-		= foldl' (countComp info) fm blocks
-		
-	countComp info fm (BasicBlock _ blocks)
-		= foldl' (countBlock info) fm blocks
-		
- 	countBlock info fm (BasicBlock blockId instrs)
-		| LiveInfo _ _ blockLive	<- info
-		, Just rsLiveEntry		<- lookupUFM blockLive blockId
-		= countLIs rsLiveEntry fm instrs
-
-		| otherwise
-		= error "RegLiveness.countBlock: bad block"
-		
-	countLIs _      fm []				= fm
-	countLIs rsLive fm (Instr _ Nothing : lis)	= countLIs rsLive fm lis
-	
-	countLIs rsLiveEntry fm (Instr _ (Just live) : lis)
-	 = let
-	 	rsLiveAcross	= rsLiveEntry `minusUniqSet` (liveDieRead live)
-
-	 	rsLiveNext 	= (rsLiveAcross `unionUniqSets` (liveBorn     live))
-					         `minusUniqSet` (liveDieWrite live)
-
-		add r fm	= addToUFM_C
-					(\(r1, l1) (_, l2) -> (r1, l1 + l2))
-					fm r (r, 1)
-
-		fm'		= foldUniqSet add fm rsLiveEntry
-	   in	countLIs rsLiveNext fm' lis
-	   
 
 -- | Erase Delta instructions.
 

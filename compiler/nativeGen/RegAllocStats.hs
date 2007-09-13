@@ -24,6 +24,7 @@ import qualified GraphColor as Color
 import RegLiveness
 import RegAllocInfo
 import RegSpill
+import RegSpillCost
 import MachRegs
 import MachInstrs
 import Cmm
@@ -40,15 +41,15 @@ data RegAllocStats
 	-- initial graph
 	= RegAllocStatsStart
 	{ raLiveCmm	:: [LiveCmmTop]			  -- ^ initial code, with liveness
-	, raGraph	:: Color.Graph Reg RegClass Reg  -- ^ the initial, uncolored graph
-	, raLifetimes	:: UniqFM (Reg, Int) } 		  -- ^ number of instrs each reg lives for
+	, raGraph	:: Color.Graph Reg RegClass Reg   -- ^ the initial, uncolored graph
+	, raSpillCosts	:: SpillCostInfo } 		  -- ^ information to help choose which regs to spill
 
 	-- a spill stage
 	| RegAllocStatsSpill
 	{ raGraph	:: Color.Graph Reg RegClass Reg	-- ^ the partially colored graph
 	, raCoalesced	:: UniqFM Reg			-- ^ the regs that were coaleced
 	, raSpillStats	:: SpillStats 			-- ^ spiller stats
-	, raLifetimes	:: UniqFM (Reg, Int) 		-- ^ number of instrs each reg lives for
+	, raSpillCosts	:: SpillCostInfo 		-- ^ number of instrs each reg lives for
 	, raSpilled	:: [LiveCmmTop] }		-- ^ code with spill instructions added
 
 	-- a successful coloring
@@ -83,6 +84,10 @@ instance Outputable RegAllocStats where
 			$$ (vcat $ map ppr $ ufmToList $ raCoalesced s)
 			$$ text ""
 		else empty)
+
+	$$ text "#  Spill costs.  reg uses defs lifetime degree cost"
+	$$ vcat (map (pprSpillCostRecord (raGraph s)) $ eltsUFM $ raSpillCosts s)
+	$$ text ""
 
 	$$ text "#  Spills inserted."
 	$$ ppr (raSpillStats s)
@@ -156,9 +161,11 @@ pprStatsLifetimes
 	:: [RegAllocStats] -> SDoc
 
 pprStatsLifetimes stats
- = let	lifeMap		= foldl' plusUFM emptyUFM
- 				[ raLifetimes s | s@RegAllocStatsStart{} <- stats ]
-	lifeBins	= binLifetimeCount lifeMap
+ = let	info		= foldl' plusSpillCostInfo zeroSpillCostInfo
+ 				[ raSpillCosts s
+					| s@RegAllocStatsStart{} <- stats ]
+
+	lifeBins	= binLifetimeCount $ lifeMapFromSpillCostInfo info
 
    in	(  text "-- vreg-population-lifetimes"
 	$$ text "--   (instruction_count, number_of_vregs_that_lived_that_long)"
@@ -201,8 +208,9 @@ pprStatsLifeConflict
 	-> SDoc
 
 pprStatsLifeConflict stats graph
- = let	lifeMap	= foldl' plusUFM emptyUFM
- 			[ raLifetimes s	| s@RegAllocStatsStart{} <- stats ]
+ = let	lifeMap	= lifeMapFromSpillCostInfo
+ 		$ foldl' plusSpillCostInfo zeroSpillCostInfo
+		$ [ raSpillCosts s | s@RegAllocStatsStart{} <- stats ]
 
  	scatter	= map	(\r ->  let lifetime	= case lookupUFM lifeMap r of
 							Just (_, l)	-> l

@@ -44,6 +44,7 @@ module MachRegs (
 
 	-- * Machine-dependent register-related stuff
         allocatableRegs, argRegs, allArgRegs, callClobberedRegs,
+	allocatableRegsInClass,
 	freeReg,
 	spRel,
 

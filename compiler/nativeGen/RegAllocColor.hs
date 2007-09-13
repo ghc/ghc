@@ -17,6 +17,7 @@ import qualified GraphColor	as Color
 import RegLiveness
 import RegSpill
 import RegSpillClean
+import RegSpillCost
 import RegAllocStats
 -- import RegCoalesce
 import MachRegs
@@ -92,7 +93,6 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 
 	let code_coalesced1	= code
 
-
  	-- build a conflict graph from the code.
 	graph		<- {-# SCC "BuildGraph" #-} buildGraph code_coalesced1
 
@@ -104,11 +104,13 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 	seqGraph graph `seq` return ()
 
 
-	-- build a map of how many instructions each reg lives for.
-	--	this is lazy, it won't be computed unless we need to spill
+	-- build a map of the cost of spilling each instruction
+	--	this will only actually be computed if we have to spill something.
+	let spillCosts	= foldl' plusSpillCostInfo zeroSpillCostInfo
+			$ map slurpSpillCostInfo code_coalesced1
 
-	let fmLife	= {-# SCC "LifetimeCount" #-} plusUFMs_C (\(r1, l1) (_, l2) -> (r1, l1 + l2))
-			$ map lifetimeCount code_coalesced1
+	-- the function to choose regs to leave uncolored
+	let spill	= chooseSpill spillCosts
 
 	-- record startup state
 	let stat1	=
@@ -116,12 +118,8 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 		 then	Just $ RegAllocStatsStart
 		 	{ raLiveCmm	= code
 			, raGraph	= graph
-			, raLifetimes	= fmLife }
+			, raSpillCosts	= spillCosts }
 		 else	Nothing
-
-
-	-- the function to choose regs to leave uncolored
-	let spill	= chooseSpill_maxLife fmLife
 	
 	-- try and color the graph 
 	let (graph_colored, rsSpill, rmCoalesce)
@@ -177,6 +175,7 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 			, statList
 			, graph_colored)
 
+	 -- we couldn't find a coloring, time to spill something
 	 else do
 	 	-- spill the uncolored regs
 		(code_spilled, slotsFree', spillStats)
@@ -192,7 +191,7 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 			{ raGraph	= graph_colored
 			, raCoalesced	= rmCoalesce
 			, raSpillStats	= spillStats
-			, raLifetimes	= fmLife
+			, raSpillCosts	= spillCosts
 			, raSpilled	= code_spilled }
 			    	
 		let statList =
@@ -207,46 +206,7 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 			statList
 			code_relive
 
- 
------
--- Simple maxconflicts isn't always good, because we
---	can naievely end up spilling vregs that only live for one or two instrs.
---	
-{-
-chooseSpill_maxConflicts
-	:: Color.Graph Reg RegClass Reg
-	-> Reg
-	
-chooseSpill_maxConflicts graph
- = let	node	= maximumBy 
- 			(\n1 n2 -> compare 
- 				(sizeUniqSet $ Color.nodeConflicts n1) 
-				(sizeUniqSet $ Color.nodeConflicts n2))
- 		$ eltsUFM $ Color.graphMap graph
-		
-   in	Color.nodeId node
--} 
-   
------
-chooseSpill_maxLife
-	:: UniqFM (Reg, Int)
-	-> Color.Graph Reg RegClass Reg
-	-> Reg
 
-chooseSpill_maxLife life graph
- = let	node	= maximumBy (\n1 n2 -> compare (getLife n1) (getLife n2))
-		$ eltsUFM $ Color.graphMap graph
-
-	-- Orphan vregs die in the same instruction they are born in.
-	--	They will be in the graph, but not in the liveness map.
-	--	Their liveness is 0.
-	getLife n
-	 = case lookupUFM life (Color.nodeId n) of
-	 	Just (_, l)	-> l
-		Nothing		-> 0
-
-   in	Color.nodeId node
-   
 
 -- | Build a graph from the liveness and coalesce information in this code.
 
@@ -345,11 +305,6 @@ patchRegsFromGraph graph code
 
    in	patchEraseLive patchF code
    
-
-plusUFMs_C  :: (elt -> elt -> elt) -> [UniqFM elt] -> UniqFM elt
-plusUFMs_C f maps
-	= foldl' (plusUFM_C f) emptyUFM maps
-
 
 -----
 -- for when laziness just isn't what you wanted...
