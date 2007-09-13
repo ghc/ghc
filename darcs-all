@@ -31,7 +31,7 @@ else {
     die "Couldn't work out defaultrepo";
 }
 
-my $verbose = 1;
+my $verbose = 2;
 my $ignore_failure = 0;
 
 # --extra says we grab the extra libs with 'get'.  It has no effect on
@@ -43,13 +43,15 @@ my $nofib = 0;
 my $testsuite = 0;
 
 sub message {
-    if ($verbose) {
+    if ($verbose >= 2) {
         print "@_\n";
     }
 }
 
 sub warning {
-    print "warning: @_\n";
+    if ($verbose >= 1) {
+        print "warning: @_\n";
+    }
 }
 
 sub darcs {
@@ -132,6 +134,9 @@ sub main {
         # We handle -q here as well as lower down as we need to skip over it
         # if it comes before the darcs command
         if ($arg eq "-q") {
+            $verbose = 1;
+        }
+        elsif ($arg eq "-s") {
             $verbose = 0;
         }
         elsif ($arg eq "--extra") {
@@ -146,7 +151,7 @@ sub main {
         else {
             unshift @_, $arg;
             if (grep /^-q$/, @_) {
-                $verbose = 0;
+                $verbose = 1;
             }
             last;
         }
