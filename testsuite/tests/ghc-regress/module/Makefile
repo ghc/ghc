@@ -13,17 +13,17 @@ mod144::
 	$(TEST_HC) -c Mod144_A.hs
 	$(TEST_HC) -c mod144.hs || echo "exit($$?)" 1>&2
 
-mod146::
-	rm -f Mod145_A.o Mod145_A.hi mod146.o mod146.hi mod146
-	$(TEST_HC) -c Mod145_A.hs
-	$(TEST_HC) -c mod146.hs || echo "exit($$?)" 1>&2
-
 # These tests share some source files, so to avoid clashing when
 # using multiple threads we direct the outputs to different files
 # depending on the test name.
 AUX_O  = $@_o
 AUX_HI = $@_hi
 AUX_OPTS = -osuf $(AUX_O) -hisuf $(AUX_HI)
+
+mod146::
+	rm -f Mod145_A.$(AUX_O) Mod145_A.$(AUX_HI) mod146.$(AUX_O) mod146.$(AUX_HI) mod146
+	$(TEST_HC) $(AUX_OPTS) -c Mod145_A.hs
+	$(TEST_HC) $(AUX_OPTS) -c mod146.hs || echo "exit($$?)" 1>&2
 
 mod158::
 	rm -f Mod157_*.$(AUX_O) Mod157_*.$(AUX_HI)

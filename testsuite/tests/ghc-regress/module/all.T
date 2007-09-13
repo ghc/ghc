@@ -238,7 +238,8 @@ test('mod144', extra_clean(['Mod144_A.hi', 'Mod144_A.o']),
 test('mod145', extra_clean(['Mod145_A.hi', 'Mod145_A.o']),
      multimod_compile_fail, ['mod145', '-v0'])
 
-test('mod146', extra_clean(['Mod145_A.hi', 'Mod145_A.o']),
+test('mod146', 
+     extra_clean(['Mod145_A.mod146_hi', 'Mod145_A.mod146_o', 'mod146.mod146_o', 'mod146.mod146_hi']),
      run_command, ['$MAKE -s --no-print-directory mod146'])
 
 test('mod147', extra_clean(['Mod147_A.hi', 'Mod147_A.o']),
