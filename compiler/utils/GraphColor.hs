@@ -39,7 +39,6 @@ colorGraph
 	   , Eq color, Eq cls, Ord k
 	   , Outputable k, Outputable cls, Outputable color)
 	=> Bool				-- ^ whether to do iterative coalescing
-	-> Int				-- ^ how many times coloring has been called so far
 	-> UniqFM (UniqSet color)	-- ^ map of (node class -> set of colors available for this class).
 	-> Triv   k cls color 		-- ^ fn to decide whether a node is trivially colorable.
 	-> (Graph k cls color -> k)	-- ^ fn to choose a node to potentially leave uncolored if nothing is trivially colorable.
@@ -50,7 +49,7 @@ colorGraph
 	   , UniqFM  k )		-- map of regs (r1 -> r2) that were coaleced
 	   				--	 r1 should be replaced by r2 in the source
 
-colorGraph iterative spinCount colors triv spill graph0
+colorGraph iterative colors triv spill graph0
  = let
 	-- If we're not doing iterative coalescing then just do a conservative
 	--	coalescing stage at the front.

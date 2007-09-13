@@ -126,7 +126,6 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 			= {-# SCC "ColorGraph" #-}
 			   Color.colorGraph
 			    	(dopt Opt_RegsIterative dflags)
-				spinCount
 			    	regsFree triv spill graph
 
 	-- rewrite regs in the code that have been coalesced
