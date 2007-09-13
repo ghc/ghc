@@ -15,4 +15,5 @@ main = do
  print $ (".hs" `isSuffixOf` fp2) && "one_suffix" `isPrefixOf` (takeFileName fp2)
  (fp3,h3) <- openTempFile tmpDir "two_suffixes.hs.blah"
  print $ (".blah" `isSuffixOf` fp3) && "two_suffixes.hs" `isPrefixOf` (takeFileName fp3)
- mapM_ removeFile [fp1, fp2, fp3]
+ mapM_ hClose [h0, h1, h2, h3]
+ mapM_ removeFile [fp0, fp1, fp2, fp3]
