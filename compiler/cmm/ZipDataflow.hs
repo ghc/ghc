@@ -460,8 +460,12 @@ solve_and_rewrite_b comp fuel graph exit_fact =
                    ; -- continue at entry of g
                      propagate fuel h a t rewritten'
                    } 
-          -- propagate :: OptimizationFuel -> G.ZHead m -> a -> G.ZTail m l ->
-          --              BlockEnv (Block m l) -> DFM a (OptimizationFuel, G.LGraph m l)
+          -- propagate :: OptimizationFuel
+	  --	       -> G.ZHead m		-- Part of current block yet to be rewritten
+	  --	       -> a			-- Fact on edge between head and tail
+	  --	       -> G.ZTail m l		-- Part of current block already rewritten
+          --           -> BlockEnv (Block m l)	-- These blocks have been rewritten
+	  --	       -> DFM a (OptimizationFuel, G.LGraph m l)
           propagate fuel (G.ZHead h m) out tail rewritten =
               bc_middle_in comp out m fuel >>= \x -> case x of
                 Dataflow a -> propagate fuel h a (G.ZTail m tail) rewritten

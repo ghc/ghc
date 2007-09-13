@@ -1,6 +1,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module ZipCfg
-    ( BlockId(..), freshBlockId
+    ( 	-- These data types and names are carefully thought out
+      BlockId(..), freshBlockId		-- ToDo: BlockId should be abstract,
+					--	 but it isn't yet
     , BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, insertBlock, mkBlockEnv
     , BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet, mkBlockSet
     , Graph(..), LGraph(..), FGraph(..)
@@ -9,6 +11,7 @@ module ZipCfg
     , LastNode, mkBranchNode, isBranchNode, branchNodeTarget
 
         -- Observers and transformers
+	-- (open to renaming suggestions here)
     , blockId, zip, unzip, last, goto_end, zipht, tailOfLast
     , remove_entry_label
     , splice_tail, splice_head, splice_head_only
@@ -82,7 +85,8 @@ these types will typically be instantiated with a subset of C-- statements
 implemented as of August 2007).
 
 
-
+Note [Kinds of Graphs]
+~~~~~~~~~~~~~~~~~~~~~~
 This module exposes three representations of graphs.  In order of
 increasing complexity, they are:
 
@@ -143,13 +147,14 @@ data ZHead m   = ZFirst BlockId  | ZHead (ZHead m) m
 data ZTail m l = ZLast (ZLast l) | ZTail m (ZTail m l)
     -- ZTail is a sequence of middle nodes followed by a last node
 
--- | Blocks and flow graphs
+-- | Blocks and flow graphs; see Note [Kinds of graphs]
 data Block m l = Block BlockId (ZTail m l)
 
 data Graph m l = Graph (ZTail m l) (BlockEnv (Block m l))
 
 data LGraph m l = LGraph  { lg_entry  :: BlockId
                           , lg_blocks :: BlockEnv (Block m l) }
+	-- Invariant: lg_entry is in domain( lg_blocks )
 
 -- | And now the zipper.  The focus is between the head and tail.
 -- We cannot ever focus on an inter-block edge.
@@ -161,6 +166,11 @@ data FGraph m l = FGraph { fg_entry  :: BlockId
                     -- in the map 'fg_others'
 
 ----  Utility functions ---
+
+-- | The string argument to 'freshBlockId' was originally helpful in debugging the Quick C--
+-- compiler, so I have kept it here even though at present it is thrown away at
+-- this spot---there's no reason a BlockId couldn't one day carry a string.
+freshBlockId :: String -> UniqSM BlockId
 
 blockId   :: Block  m l -> BlockId
 zip       :: ZBlock m l -> Block  m l
@@ -188,6 +198,24 @@ ht_to_last         :: ZHead m -> ZTail m l -> (ZHead m, ZLast l)
 -- Splicing a tail is the dual operation.
 -- (In order to maintain the order-means-control-flow convention, the
 -- orders are reversed.)
+--
+-- For example, assume
+--	head = [L: x:=0]
+--	grph = (M, [M: <stuff>,
+--		    <blocks>,
+--                  N: y:=x; LastExit])
+--	tail = [return (y,x)]
+--
+-- Then 	splice_head head grph
+--		= ((L, [L: x:=0; goto M,
+--			M: <stuff>,
+--			<blocks>])
+--		   , N: y:=x)
+--
+-- Then 	splice_tail grph tail
+--		= ( <stuff>
+--		  , (???, [<blocks>,
+--			   N: y:=x; return (y,x)])
 
 splice_head :: ZHead m    -> LGraph m l -> (LGraph m l, ZHead  m)
 splice_tail :: LGraph m l -> ZTail  m l -> (ZTail  m l, LGraph m l)
@@ -207,10 +235,16 @@ of_block_list :: BlockId -> [Block m l] -> LGraph m l  -- N log N
 to_block_list :: LGraph m l -> [Block m l]  -- N log N
 
 -- | Traversal: 'postorder_dfs' returns a list of blocks reachable
--- from the entry node.  The postorder depth-first-search order means
--- the list is in roughly first-to-last order, as suitable for use in
+-- from the entry node.  This list has the following property:
+--
+--	Say a "back reference" exists if one of a block's
+--	control-flow successors precedes it in the output list
+--
+--	Then there are as few back references as possible
+--
+-- The output is suitable for use in
 -- a forward dataflow problem.  For a backward problem, simply reverse
--- the list.  ('postorder_dfs' is sufficiently trick to implement that
+-- the list.  ('postorder_dfs' is sufficiently tricky to implement that
 -- one doesn't want to try and maintain both forward and backward
 -- versions.)
 
@@ -221,6 +255,12 @@ postorder_dfs :: LastNode l => LGraph m l -> [Block m l]
 -- block that will be the layout successor of the current block.  This
 -- may be useful to help an emitter omit the final 'goto' of a block
 -- that flows directly to its layout successor.
+--
+-- For example: fold_layout f z [ L1:B1, L2:B2, L3:B3 ]
+--		= z <$> f (L1:B1) (Just L2)
+--		    <$> f (L2:B2) (Just L3)
+--		    <$> f (L3:B3) Nothing
+-- where a <$> f = f a
 fold_layout ::
     LastNode l => (Block m l -> Maybe BlockId -> a -> a) -> a -> LGraph m l-> a
 
@@ -290,11 +330,6 @@ instance LastNode l => HavingSuccessors (Block m l) where
 
 blockId (Block id _) = id
 
--- | The string argument was originally helpful in debugging the Quick C--
--- compiler, so I have kept it here even though at present it is thrown away at
--- this spot---there's no reason a BlockId couldn't one day carry a string.
-
-freshBlockId :: String -> UniqSM BlockId
 freshBlockId _ = do { u <- getUniqueUs; return $ BlockId u }
 
 -- | Convert block between forms.
@@ -377,7 +412,15 @@ single_exit g = foldUFM check 0 (lg_blocks g) == 1
 -- The ubiquity of 'postorder_dfs' is one reason for the ubiquity of the 'LGraph'
 -- representation, when for most purposes the plain 'Graph' representation is
 -- more mathematically elegant (but results in more complicated code).
+--
+-- Here's an easy way to go wrong!  Consider
+--	A -> [B,C]
+--	B -> D
+--	C -> D
+-- Then ordinary dfs would give [A,B,D,C] which has a back ref from C to D.
+-- Better to geot [A,B,C,D]
 
+-- postorder_dfs :: LastNode l => LGraph m l -> [Block m l]
 postorder_dfs g@(LGraph _ blocks) =
   let FGraph _ eblock _ = entry g
   in  vnode (zip eblock) (\acc _visited -> acc) [] emptyBlockSet

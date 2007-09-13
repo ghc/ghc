@@ -43,7 +43,8 @@ mkAssign     :: CmmReg  -> CmmExpr -> CmmAGraph
 mkStore      :: CmmExpr -> CmmExpr -> CmmAGraph
 mkCall       :: CmmExpr -> CCallConv -> CmmFormals -> CmmActuals -> C_SRT -> CmmAGraph
 mkUnsafeCall :: CmmCallTarget -> CmmFormals -> CmmActuals -> CmmAGraph
-mkFinalCall  :: CmmExpr -> CCallConv -> CmmActuals -> CmmAGraph -- never returns
+mkFinalCall  :: CmmExpr -> CCallConv -> CmmActuals -> CmmAGraph
+		 -- Never returns; like exit() or barf()
 mkJump       :: CmmExpr -> CmmActuals -> CmmAGraph
 mkCbranch    :: CmmExpr -> BlockId -> BlockId -> CmmAGraph
 mkSwitch     :: CmmExpr -> [Maybe BlockId] -> CmmAGraph

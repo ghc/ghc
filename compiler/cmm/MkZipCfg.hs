@@ -197,6 +197,13 @@ mkBranch  :: (Outputable m, Outputable l, LastNode l) => BlockId   -> AGraph m l
 -- | For the structured control-flow constructs, a condition is
 -- represented as a function that takes as arguments the labels to
 -- goto on truth or falsehood.
+--
+--	mkIfThenElse mk_cond then else
+--	= (mk_cond L1 L2) <*> L1: then <*> goto J
+--		          <*> L2: else <*> goto J
+--	  <*> J:
+--
+-- where L1, L2, J are fresh
 
 mkIfThenElse :: (Outputable m, Outputable l, LastNode l)
                 => (BlockId -> BlockId -> AGraph m l) -- branch condition

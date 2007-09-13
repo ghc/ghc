@@ -84,7 +84,7 @@ data Last
 
   | LastJump CmmExpr    -- Tail call to another procedure; args in a CopyOut node
 
-  | LastCall {                   -- A call (native or safe foreign)
+  | LastCall {                   -- A call (native or safe foreign); args in CopyOut node
         cml_target :: CmmExpr,   -- never a CmmPrim to a CallishMachOp!
         cml_cont   :: Maybe BlockId }  -- BlockId of continuation, if call returns
 
