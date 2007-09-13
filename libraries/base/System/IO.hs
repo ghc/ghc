@@ -421,7 +421,7 @@ hSetBinaryMode _ _ = return ()
 -- The created file isn\'t deleted automatically, so you need to delete it manually.
 openTempFile :: FilePath   -- ^ Directory in which to create the file
              -> String     -- ^ File name template. If the template is \"foo.ext\" then
-                           -- the create file will be \"fooXXX.ext\" where XXX is some
+                           -- the created file will be \"fooXXX.ext\" where XXX is some
                            -- random number.
              -> IO (FilePath, Handle)
 openTempFile tmp_dir template = openTempFile' "openTempFile" tmp_dir template False
@@ -438,9 +438,19 @@ openTempFile' loc tmp_dir template binary = do
     -- We split off the last extension, so we can use .foo.ext files
     -- for temporary files (hidden on Unix OSes). Unfortunately we're
     -- below filepath in the hierarchy here.
-    (prefix,suffix) = case break (== '.') $ reverse template of
-                          (rev_suffix, rev_prefix) ->
-                              (reverse rev_prefix, reverse rev_suffix)
+    (prefix,suffix) = 
+       case break (== '.') $ reverse template of
+         -- First case: template contains no '.'s. Just re-reverse it.
+         (rev_suffix, "")       -> (reverse rev_suffix, "")
+         -- Second case: template contains at least one '.'. Strip the
+         -- dot from the prefix and prepend it to the suffix (if we don't
+         -- do this, the unique number will get added after the '.' and
+         -- thus be part of the extension, which is wrong.)
+         (rev_suffix, '.':rest) -> (reverse rest, '.':reverse rev_suffix)
+         -- Otherwise, something is wrong, because (break (== '.')) should
+         -- always return a pair with either the empty string or a string
+         -- beginning with '.' as the second component.
+         _                      -> error "bug in System.IO.openTempFile"
 
     oflags1 = rw_flags .|. o_EXCL
 
