@@ -9,8 +9,8 @@ include $(TOP)/mk/test.mk
 # which emits GHC's exit code to stderr so the test driver can compare it.
 
 mod144::
-	rm -f Mod143_A.o Mod143_A.hi mod144.o mod144.hi mod144
-	$(TEST_HC) -c Mod143_A.hs
+	rm -f Mod144_A.o Mod144_A.hi mod144.o mod144.hi mod144
+	$(TEST_HC) -c Mod144_A.hs
 	$(TEST_HC) -c mod144.hs || echo "exit($$?)" 1>&2
 
 mod146::
