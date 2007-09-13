@@ -92,7 +92,7 @@ space=$(empty) $(empty)
 # -----------------------------------------------------------------------------
 
 docdir := $(docdir)/libraries/$$pkgid
-ifeq "$(Windows)" "YES"
+ifeq "$(RelocatableBuild)" "YES"
 # On Windows we want to make moveable bindists, but we need to tell
 # ghc-pkg where the haddock docs are. Therefore we completely ignore
 # where the user tells us to put the haddock documentation and put it

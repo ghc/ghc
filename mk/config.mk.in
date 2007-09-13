@@ -291,6 +291,14 @@ else
 GhcEnableTablesNextToCode=YES
 endif
 
+# On Windows we normally want to make a relocatable bindist, to we
+# ignore flags like libdir
+ifeq "$(Windows)" "YES"
+RelocatableBuild = YES
+else
+RelocatableBuild = NO
+endif
+
 # When building bindists we set this to yes so that the binaries are as
 # portable as possible.
 BeConservative = NO
