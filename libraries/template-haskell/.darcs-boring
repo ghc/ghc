@@ -1,0 +1,5 @@
+^dist(/|$)
+^setup(/|$)
+^GNUmakefile$
+^Makefile.local$
+^.depend(.bak)?$
