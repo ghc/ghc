@@ -209,16 +209,6 @@ configure: $(foreach SUBDIR,$(SUBDIRS), \
 #     "C:\\Program Files\\Common Files"
 # on Windows
 
-# We also set libsubdir differently on Windows and non-Windows, as on
-# non-Windows the path we deduce is higher up than the path passed to
-# the executable with the shell script on non-Windows. This should
-# probably be tidied up so that we can always pass the same libsubdir.
-ifeq "$(Windows)" "YES"
-libsubdir      = $$pkgid
-else
-libsubdir      = $$compiler/lib/$$pkgid
-endif
-
 # We rely on all the CONFIGURE_ARGS being quoted with '...', and there
 # being no 's inside the values.
 FLAGGED_CONFIGURE_ARGS = $(subst $(space)',\
@@ -234,7 +224,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	           --prefix='$$topdir' \
 	           --bindir='$(bindir)' \
 	           --libdir='$(libdir)' \
-	           --libsubdir='$(libsubdir)' \
+	           --libsubdir='$$pkgid' \
 	           --libexecdir='$(libexecdir)' \
 	           --datadir='$(datadir)' \
 	           --docdir='$(docdir)' \
