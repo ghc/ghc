@@ -232,8 +232,16 @@ def extra_run_opts( val ):
 def _extra_run_opts( opts, v ):
     opts.extra_run_opts = v
 
+# -----
+
 def no_clean( opts ):
     opts.cleanup = '';
+
+def extra_clean( files ):
+    return lambda opts, v=files: _extra_clean(opts, v);
+
+def _extra_clean( opts, v ):
+    opts.clean_files = v
 
 # -----
 
@@ -408,6 +416,8 @@ def test_common_work (name, opts, func, args):
                '.interp.stderr.normalised', '.interp.stdout.normalised',
                '.hi', '.o', '.prof', '.exe.prof', '.hc', '_stub.h', '_stub.c',
                '_stub.o', '.hp', '.exe.hp', '.ps', '.aux', '.hcr']))
+
+    clean(getTestOpts().clean_files)
 
 def clean(names):
     clean_full_paths(map (lambda name: in_testdir(name), names))

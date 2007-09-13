@@ -138,10 +138,10 @@ class TestOptions:
        self.extra_ways = []
 
        # the result we normally expect for this test
-       self.expect = 'pass';
+       self.expect = 'pass'
 
        # override the expected result for certain ways
-       self.expect_fail_for = [];
+       self.expect_fail_for = []
 
        # the stdin file that this test will use (empty for <name>.stdin)
        self.stdin = ''
@@ -166,6 +166,9 @@ class TestOptions:
 
        # should we clean up after ourselves?
        self.cleanup = ''
+
+       # extra files to clean afterward
+       self.clean_files = []
 
        # should we run this test alone, i.e. not run it in parallel with
        # any other threads
