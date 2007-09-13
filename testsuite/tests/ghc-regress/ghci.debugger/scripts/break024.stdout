@@ -1,10 +1,22 @@
 Left user error (error)
 Stopped at <exception thrown>
-_exception :: e = user error (error)
+_exception :: e = IOException (GHC.IOBase.IOError Nothing
+						  GHC.IOBase.UserError
+						  []
+						  ['e','r','r','o','r']
+						  Nothing)
 *** Exception: user error (error)
 Stopped at <exception thrown>
-_exception :: e = user error (error)
+_exception :: e = IOException (GHC.IOBase.IOError Nothing
+						  GHC.IOBase.UserError
+						  []
+						  ['e','r','r','o','r']
+						  Nothing)
 *** Exception: user error (error)
 Stopped at <exception thrown>
-_exception :: e = user error (error)
+_exception :: e = IOException (GHC.IOBase.IOError Nothing
+						  GHC.IOBase.UserError
+						  []
+						  ['e','r','r','o','r']
+						  Nothing)
 Left user error (error)

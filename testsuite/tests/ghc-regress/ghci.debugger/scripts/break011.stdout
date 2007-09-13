@@ -16,7 +16,7 @@ _result :: a
 Stopped at <exception thrown>
 _exception :: e
 already at the beginning of the history
-_exception = foo
+_exception = ErrorCall ['f','o','o']
 _exception :: Exception
 _result :: a
 *** Exception: foo

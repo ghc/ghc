@@ -2,5 +2,5 @@ Just 1.2
 f = Just 1.2
 i = Just 10
 'a'
-s = 'a'
-s = 'a'
+s = S1 'a' 'b' 'c'
+s = S1 'a' 'b' 'c'
