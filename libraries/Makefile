@@ -232,12 +232,15 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	( cd $* && setup/Setup configure \
 	           $(CONFIGURE_OPTS) \
 	           --prefix='$$topdir' \
-			   --docdir='$(docdir)' \
-			   --htmldir='$(htmldir_configure)' \
-	           --datadir='$(datadir)' \
+	           --bindir='$(bindir)' \
+	           --libdir='$(libdir)' \
 	           --libsubdir='$(libsubdir)' \
-	           --with-compiler=../../compiler/stage1/ghc-inplace$ \
-	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace$ \
+	           --libexecdir='$(libexecdir)' \
+	           --datadir='$(datadir)' \
+	           --docdir='$(docdir)' \
+	           --htmldir='$(htmldir_configure)' \
+	           --with-compiler=../../compiler/stage1/ghc-inplace \
+	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace \
 	           --with-hsc2hs=../../utils/hsc2hs/hsc2hs-inplace \
 	           --with-ld=$(LD) \
 	           --haddock-options="--use-contents=../index.html \
@@ -336,11 +339,14 @@ install-docs:
 # prefix and (on Windows) htmldir use $topdir when configuring, so we
 # need to tell installPackage the real path to use when installing.
 
+# We also need to pass all the other directories in, as they can be
+# overridden when installing a bindist.
+
 $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
-	  ../installPackage/installPackage '$(DESTDIR)' '$(prefix)' '$(htmldir_install)' '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' ; \
+	  ../installPackage/installPackage '$(DESTDIR)' '$(prefix)' '$(bindir)' '$(libdir)' '$(libexecdir)' '$(datadir)' '$(docdir)' '$(htmldir_install)' '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' ; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%
