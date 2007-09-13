@@ -11,21 +11,23 @@ module CmmSpillReload
   , cmmAvailableReloads
   )
 where
+
 import CmmExpr
 import CmmTx
 import CmmLiveZ
 import DFMonad
-import FastString
-import Maybe
 import MkZipCfg
-import Outputable hiding (empty)
-import qualified Outputable as PP
-import Panic
 import PprCmm()
-import UniqSet
 import ZipCfg
 import ZipCfgCmmRep
 import ZipDataflow
+
+import FastString
+import Maybe
+import Outputable hiding (empty)
+import qualified Outputable as PP
+import Panic
+import UniqSet
 
 -- The point of this module is to insert spills and reloads to
 -- establish the invariant that at a call (or at any proc point with
@@ -78,7 +80,6 @@ dualLiveLattice =
 dualLivenessWithInsertion :: BPass M Last DualLive
 dualLivenessWithInsertion = a_ft_b_unlimited dualLiveness insertSpillsAndReloads
 
-
 dualLiveness :: BAnalysis M Last DualLive
 dualLiveness = BComp "dual liveness" exit last middle first
     where exit   = empty
@@ -93,21 +94,17 @@ dualLiveness = BComp "dual liveness" exit last middle first
             -- this pass again
 
 middleDualLiveness :: DualLive -> M -> DualLive
-middleDualLiveness live m@(Spill regs) =
+middleDualLiveness live (Spill regs) = live'
     -- live-in on-stack requirements are satisfied;
     -- live-out in-regs obligations are created
-      my_trace "before" (f4sep [ppr m, text "liveness is", ppr live']) $
-      live'
     where live' = DualLive { on_stack = on_stack live `minusRegSet` regs
-                           , in_regs = in_regs live `plusRegSet` regs }
+                           , in_regs  = in_regs  live `plusRegSet`  regs }
 
-middleDualLiveness live m@(Reload regs) =
+middleDualLiveness live (Reload regs) = live'
     -- live-in in-regs requirements are satisfied;
     -- live-out on-stack obligations are created
-      my_trace "before" (f4sep [ppr m, text "liveness is", ppr live']) $
-      live'
-    where live' = DualLive { on_stack = on_stack live `plusRegSet` regs
-                           , in_regs = in_regs live `minusRegSet` regs }
+    where live' = DualLive { on_stack = on_stack live `plusRegSet`  regs
+                           , in_regs  = in_regs  live `minusRegSet` regs }
 
 middleDualLiveness live (NotSpillOrReload m) = changeRegs (middleLiveness m) live
 
@@ -119,7 +116,6 @@ lastDualLiveness env l = last l
         last (LastCall tgt Nothing)  = changeRegs (gen tgt) empty
         last (LastCall tgt (Just k)) = 
             -- nothing can be live in registers at this point
-            -- only 'formals' can be in regs at this point
             let live = env k in
             if  isEmptyUniqSet (in_regs live) then
                 DualLive (on_stack live) (gen tgt emptyRegSet)
