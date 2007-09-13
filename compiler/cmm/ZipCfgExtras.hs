@@ -16,8 +16,6 @@ import Maybes
 import Panic
 import ZipCfg
 
-import UniqFM
-
 import Prelude hiding (zip, unzip, last)
 
 
@@ -31,12 +29,14 @@ unfocus :: FGraph m l -> LGraph m l            -- lose focus
 -- the current focus.
 -- The new focus can be at either the entry edge or the exit edge.
 
+{-
 splice_focus_entry :: FGraph m l -> LGraph m l -> FGraph m l
 splice_focus_exit  :: FGraph m l -> LGraph m l -> FGraph m l
+-}
 
 _unused :: ()
 _unused = all `seq` ()
-    where all = ( exit, focusp, unfocus, splice_focus_entry, splice_focus_exit
+    where all = ( exit, focusp, unfocus {- , splice_focus_entry, splice_focus_exit -}
                 , fold_fwd_block, foldM_fwd_block (\_ a -> Just a)
                 )
 
@@ -49,6 +49,8 @@ exit g@(LGraph eid _) = FGraph eid (ZBlock h (ZLast l)) others
     where FGraph _ b others = focusp is_exit g `orElse` panic "no exit in flow graph"
           (h, l) = goto_end b
 
+
+{-
 splice_focus_entry (FGraph eid (ZBlock head tail) blocks) g =
   let (tail', g') = splice_tail g tail in
   FGraph eid (ZBlock head tail') (plusUFM (lg_blocks g') blocks)
@@ -56,6 +58,7 @@ splice_focus_entry (FGraph eid (ZBlock head tail) blocks) g =
 splice_focus_exit (FGraph eid (ZBlock head tail) blocks) g =
   let (g', head') = splice_head head g in
   FGraph eid (ZBlock head' tail) (plusUFM (lg_blocks g') blocks)
+-}
 
 -- | Fold from first to last
 fold_fwd_block ::

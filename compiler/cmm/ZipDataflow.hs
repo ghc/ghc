@@ -1,4 +1,3 @@
-
 {-# LANGUAGE MultiParamTypeClasses #-}
 module ZipDataflow
   ( Answer(..)
@@ -368,9 +367,8 @@ solve_graph_b comp fuel graph exit_fact =
                                 Dataflow a -> head_in fuel h a
                                 Rewrite g ->
                                   do { bot <- botFact
-                                     ; g <- lgraphOfGraph g
                                      ; (fuel, a) <- subAnalysis' $
-                                                     solve_graph_b comp (fuel-1) g bot
+                                                    solve_graph_b_g comp (fuel-1) g bot
                                      ; head_in fuel h a }
                  ; my_trace "result of" (text (bc_name comp) <+>
                    text "on" <+> ppr (G.blockId b) <+> text "is" <+> ppr block_in) $
@@ -381,15 +379,14 @@ solve_graph_b comp fuel graph exit_fact =
               bc_middle_in comp out m fuel >>= \x -> case x of
                 Dataflow a -> head_in fuel h a
                 Rewrite g ->
-                  do { g <- lgraphOfGraph g
-                     ; (fuel, a) <- subAnalysis' $ solve_graph_b comp (fuel-1) g out 
-                     ; my_trace "Rewrote middle node" (f4sep [ppr m, text "to", ppr g]) $
+                  do { (fuel, a) <- subAnalysis' $ solve_graph_b_g comp (fuel-1) g out 
+                     ; my_trace "Rewrote middle node"
+                                    (f4sep [ppr m, text "to", pprGraph g]) $
                        head_in fuel h a }
           head_in fuel (G.ZFirst id) out =
               bc_first_in comp out id fuel >>= \x -> case x of
                 Dataflow a -> return (fuel, a)
-                Rewrite g -> do { g <- lgraphOfGraph g
-                                ; subAnalysis' $ solve_graph_b comp (fuel-1) g out }
+                Rewrite g -> do { subAnalysis' $ solve_graph_b_g comp (fuel-1) g out }
 
       in do { fuel <-
                   run "backward" (bc_name comp) (return ()) set_block_fact fuel blocks
@@ -402,6 +399,12 @@ solve_graph_b comp fuel graph exit_fact =
     pprFacts g env a = (ppr a <+> text "with") $$ vcat (pprLgraph g : map pprFact (ufmToList env))
     pprFact (id, a) = hang (ppr id <> colon) 4 (ppr a)
 
+solve_graph_b_g ::
+    (DebugNodes m l, Outputable a) =>
+    BPass m l a -> OptimizationFuel -> G.Graph m l -> a -> DFM a (OptimizationFuel, a)
+solve_graph_b_g comp fuel graph exit_fact =
+  do { g <- lgraphOfGraph graph ; solve_graph_b comp fuel g exit_fact }
+
 
 lgraphOfGraph :: G.Graph m l -> DFM f (G.LGraph m l)
 lgraphOfGraph g =
@@ -410,6 +413,16 @@ lgraphOfGraph g =
 
 labelGraph :: BlockId -> G.Graph m l -> G.LGraph m l
 labelGraph id (Graph tail blocks) = LGraph id (insertBlock (Block id tail) blocks)
+
+-- | We can remove the entry label of an LGraph and remove
+-- it, leaving a Graph.  Notice that this operation is NOT SAFE if a 
+-- block within the LGraph branches to the entry point.  It should
+-- be used only to complement 'lgraphOfGraph' above.
+
+remove_entry_label :: LGraph m l -> Graph m l
+remove_entry_label g =
+    let FGraph e (ZBlock (ZFirst id tail)) others = entry g
+    in  ASSERT (id == e) Graph tail others
 
 {-
 We solve and rewrite in two passes: the first pass iterates to a fixed
@@ -425,6 +438,10 @@ The tail is in final form; the head is still to be rewritten.
 solve_and_rewrite_b ::
   (DebugNodes m l, Outputable a) =>
   BPass m l a -> OptimizationFuel -> LGraph m l -> a -> DFM a (OptimizationFuel, a, LGraph m l)
+solve_and_rewrite_b_graph ::
+  (DebugNodes m l, Outputable a) =>
+  BPass m l a -> OptimizationFuel -> Graph m l -> a -> DFM a (OptimizationFuel, a, Graph m l)
+
 
 solve_and_rewrite_b comp fuel graph exit_fact =
   do { (_, a) <- solve_graph_b comp fuel graph exit_fact -- pass 1
@@ -450,48 +467,61 @@ solve_and_rewrite_b comp fuel graph exit_fact =
             let (h, l) = G.goto_end (G.unzip b) in
             factsEnv >>= \env -> last_in comp env l fuel >>= \x -> case x of
               Dataflow a -> propagate fuel h a (G.ZLast l) rewritten
-              Rewrite g ->  -- see Note [Rewriting labelled LGraphs]
-                do { bot <- botFact
-                   ; g <- lgraphOfGraph g
-                   ; (fuel, a, g') <- solve_and_rewrite_b comp (fuel-1) g bot
-                   ; let G.Graph t new_blocks = G.remove_entry_label g'
-                   ; markGraphRewritten
-                   ; let rewritten' = plusUFM new_blocks rewritten
-                   ; -- continue at entry of g
-                     propagate fuel h a t rewritten'
+              Rewrite g ->
+                do { markGraphRewritten
+                   ; bot <- botFact
+                   ; (fuel, a, g') <- solve_and_rewrite_b_graph comp (fuel-1) g bot
+                   ; let G.Graph t new_blocks = g'
+                   ; let rewritten' = new_blocks `plusUFM` rewritten
+                   ; propagate fuel h a t rewritten' -- continue at entry of g'
                    } 
-          -- propagate :: OptimizationFuel
-	  --	       -> G.ZHead m		-- Part of current block yet to be rewritten
-	  --	       -> a			-- Fact on edge between head and tail
-	  --	       -> G.ZTail m l		-- Part of current block already rewritten
-          --           -> BlockEnv (Block m l)	-- These blocks have been rewritten
-	  --	       -> DFM a (OptimizationFuel, G.LGraph m l)
+          -- propagate :: OptimizationFuel -- Number of rewrites permitted
+          --           -> G.ZHead m        -- Part of current block yet to be rewritten
+          --           -> a                -- Fact on edge between head and tail
+          --           -> G.ZTail m l      -- Part of current block already rewritten
+          --           -> BlockEnv (Block m l)  -- Blocks already rewritten
+          --           -> DFM a (OptimizationFuel, G.LGraph m l)
           propagate fuel (G.ZHead h m) out tail rewritten =
               bc_middle_in comp out m fuel >>= \x -> case x of
                 Dataflow a -> propagate fuel h a (G.ZTail m tail) rewritten
                 Rewrite g ->
-                  do { g <- lgraphOfGraph g
-                     ; (fuel, a, g') <- solve_and_rewrite_b comp (fuel-1) g out
-                     ; markGraphRewritten
-                     ; let (t, g'') = G.splice_tail g' tail 
-                     ; let rewritten' = plusUFM (G.lg_blocks g'') rewritten
-                     ; my_trace "Rewrote middle node" (f4sep [ppr m, text "to", ppr g]) $
-                       propagate fuel h a t rewritten' }
+                  do { markGraphRewritten
+                     ; (fuel, a, g') <- solve_and_rewrite_b_graph comp (fuel-1) g out
+                     ; let G.Graph t newblocks = G.splice_tail g' tail
+                     ; my_trace "Rewrote middle node"
+                                             (f4sep [ppr m, text "to", pprGraph g']) $
+                       propagate fuel h a t (newblocks `plusUFM` rewritten) }
           propagate fuel h@(G.ZFirst id) out tail rewritten =
               bc_first_in comp out id fuel >>= \x -> case x of
                 Dataflow a ->
                   let b = G.Block id tail in
                   do { checkFactMatch id a
                      ; rewrite_blocks comp fuel (extendBlockEnv rewritten id b) bs }
-                Rewrite fg ->
-                  do { g <- lgraphOfGraph fg
-                     ; (fuel, a, g') <- solve_and_rewrite_b comp (fuel-1) g out
-                     ; markGraphRewritten
-                     ; let (t, g'') = G.splice_tail g' tail 
-                     ; let rewritten' = plusUFM (G.lg_blocks g'') rewritten
-                     ; my_trace "Rewrote label " (f4sep [ppr id, text "to", ppr g]) $
-                       propagate fuel h a t rewritten' }
+                Rewrite g ->
+                  do { markGraphRewritten
+                     ; (fuel, a, g') <- solve_and_rewrite_b_graph comp (fuel-1) g out
+                     ; let G.Graph t newblocks = G.splice_tail g' tail 
+                     ; my_trace "Rewrote label " (f4sep [ppr id,text "to",pprGraph g])$
+                       propagate fuel h a t (newblocks `plusUFM` rewritten) }
       in rewrite_next_block fuel 
+
+{- Note [Rewriting labelled LGraphs]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's hugely annoying that we get in an LGraph and in order to solve it
+we have to slap on a new label which we then immediately strip off.
+But the alternative is to have all the iterative solvers work on
+Graphs, and then suddenly instead of a single case (ZBlock) every
+solver has to deal with two cases (ZBlock and ZTail).  So until
+somebody comes along who is smart enough to do this and still leave
+the code understandable for mortals, it stays as it is.
+
+(One part of the solution will be postorder_dfs_from_except.)
+-}
+
+solve_and_rewrite_b_graph comp fuel graph exit_fact =
+    do g <- lgraphOfGraph graph
+       (fuel, a, g') <- solve_and_rewrite_b comp fuel g exit_fact
+       return (fuel, a, remove_entry_label g')
 
 b_rewrite comp g =
   do { fuel <- liftTx txRemaining
@@ -643,18 +673,16 @@ solve_graph_f comp fuel g in_fact =
                   fc_middle_out comp in' m fuel >>= \ x -> case x of
                     Dataflow a -> set_tail_facts fuel a t
                     Rewrite g -> 
-                      do g <- lgraphOfGraph g
-                         (fuel, out, last_outs) <- subAnalysis' $
-                                         solve_graph_f comp (fuel-1) g in'
+                      do (fuel, out, last_outs) <-
+                             subAnalysis' $ solve_graph_f_g comp (fuel-1) g in'
                          set_or_save last_outs
                          set_tail_facts fuel out t
                 set_tail_facts fuel in' (G.ZLast l) =
                   last_outs comp in' l fuel >>= \x -> case x of
                     Dataflow outs -> do { set_or_save outs; return fuel }
                     Rewrite g ->
-                      do g <- lgraphOfGraph g
-                         (fuel, _, last_outs) <- subAnalysis' $
-                                         solve_graph_f comp (fuel-1) g in'
+                      do (fuel, _, last_outs) <-
+                             subAnalysis' $ solve_graph_f_g comp (fuel-1) g in'
                          set_or_save last_outs
                          return fuel
                 G.Block id t = b
@@ -662,13 +690,18 @@ solve_graph_f comp fuel g in_fact =
                    infact <- fc_first_out comp idfact id fuel
                    case infact of Dataflow a -> set_tail_facts fuel a t
                                   Rewrite g ->
-                                    do g <- lgraphOfGraph g
-                                       (fuel, out, last_outs) <- subAnalysis' $
-                                           solve_graph_f comp (fuel-1) g idfact
+                                    do (fuel, out, last_outs) <- subAnalysis' $
+                                           solve_graph_f_g comp (fuel-1) g idfact
                                        set_or_save last_outs
                                        set_tail_facts fuel out t
       in run "forward" (fc_name comp) set_entry set_successor_facts fuel blocks
 
+solve_graph_f_g ::
+    (DebugNodes m l, Outputable a) =>
+    FPass m l a -> OptimizationFuel -> G.Graph m l -> a -> 
+    DFM a (OptimizationFuel, a, LastOutFacts a)
+solve_graph_f_g comp fuel graph in_fact =
+  do { g <- lgraphOfGraph graph ; solve_graph_f comp fuel g in_fact }
 
 
 {-
@@ -690,6 +723,15 @@ solve_and_rewrite_f comp fuel graph in_fact =
      (fuel, g) <- forward_rewrite (comp_with_exit_f comp exit_id) fuel graph in_fact
      exit_fact  <- getFact exit_id
      return (fuel, exit_fact, g)
+
+solve_and_rewrite_f_graph ::
+  (DebugNodes m l, Outputable a) =>
+  FPass m l a -> OptimizationFuel -> Graph m l -> a ->
+  DFM a (OptimizationFuel, a, Graph m l)
+solve_and_rewrite_f_graph comp fuel graph in_fact =
+    do g <- lgraphOfGraph graph
+       (fuel, a, g') <- solve_and_rewrite_f comp fuel g in_fact
+       return (fuel, a, remove_entry_label g')
 
 forward_rewrite ::
   (DebugNodes m l, Outputable a) =>
@@ -715,9 +757,9 @@ forward_rewrite comp fuel graph entry_fact =
            first_out <- fc_first_out comp id_fact id fuel
            case first_out of
              Dataflow a -> propagate fuel (G.ZFirst id) a t rewritten bs
-             Rewrite fg -> do { markGraphRewritten
+             Rewrite g  -> do { markGraphRewritten
                               ; rewrite_blocks (fuel-1) rewritten
-                                (G.postorder_dfs (labelGraph id fg) ++ bs) }
+                                (G.postorder_dfs (labelGraph id g) ++ bs) }
     -- propagate :: OptimizationFuel -> G.ZHead m -> a -> G.ZTail m l -> BlockEnv (G.Block m l) ->
     --             [G.Block m l] -> DFM a (OptimizationFuel, G.LGraph m l)
     propagate fuel h in' (G.ZTail m t) rewritten bs = 
@@ -725,13 +767,10 @@ forward_rewrite comp fuel graph entry_fact =
         do fc_middle_out comp in' m fuel >>= \x -> case x of
              Dataflow a -> propagate fuel (G.ZHead h m) a t rewritten bs
              Rewrite g ->
-               my_trace "Rewriting middle node...\n" empty $
-               do g <- lgraphOfGraph g
-                  (fuel, a, g) <- solve_and_rewrite_f comp (fuel-1) g in' 
-                  markGraphRewritten
-                  my_trace "Rewrite of middle node completed\n" empty $
-                     let (g', h') = G.splice_head h g in
-                     propagate fuel h' a t (plusUFM (G.lg_blocks g') rewritten) bs
+               do markGraphRewritten
+                  (fuel, a, g) <- solve_and_rewrite_f_graph comp (fuel-1) g in' 
+                  let (blocks, h') = G.splice_head' h g
+                  propagate fuel h' a t (blocks `plusUFM` rewritten) bs
     propagate fuel h in' (G.ZLast l) rewritten bs = 
         do last_outs comp in' l fuel >>= \x -> case x of
              Dataflow outs ->
@@ -739,15 +778,10 @@ forward_rewrite comp fuel graph entry_fact =
                   let b = G.zip (G.ZBlock h (G.ZLast l))
                   rewrite_blocks fuel (G.insertBlock b rewritten) bs
              Rewrite g ->
-                -- could test here that [[exits g = exits (G.Entry, G.ZLast l)]]
-                {- if Debug.on "rewrite-last" then 
-                      Printf.eprintf "ZLast node %s rewritten to:\n"
-                        (RS.rtl (G.last_instr l)); -}
-                do g <- lgraphOfGraph g
-                   (fuel, _, g) <- solve_and_rewrite_f comp (fuel-1) g in' 
-                   markGraphRewritten
-                   let g' = G.splice_head_only h g
-                   rewrite_blocks fuel (plusUFM (G.lg_blocks g') rewritten) bs
+                do markGraphRewritten
+                   (fuel, _, g) <- solve_and_rewrite_f_graph comp (fuel-1) g in' 
+                   let g' = G.splice_head_only' h g
+                   rewrite_blocks fuel (G.lg_blocks g' `plusUFM` rewritten) bs
 
 f_rewrite comp entry_fact g =
   do { fuel <- liftTx txRemaining
@@ -806,22 +840,6 @@ a_t_f anal tx =
            , fc_last_outs = last_outs, fc_middle_out = middle_out
            , fc_first_out = first_out, fc_exit_outs = exit_outs }
 
-
-{- Note [Rewriting labelled LGraphs]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-It's hugely annoying that we get in an LGraph and in order to solve it
-we have to slap on a new label which we then immediately strip off.
-But the alternative is to have all the iterative solvers work on
-Graphs, and then suddenly instead of a single case (ZBlock) every
-solver has to deal with two cases (ZBlock and ZTail).  So until
-somebody comes along who is smart enough to do this and still leave
-the code understandable for mortals, it stays as it is.
-
-(A good place to start changing things would be to figure out what is
-the analogue of postorder_dfs for Graphs, and to figure out what
-higher-order functions would do for dealing with the resulting
-sequences of *things*.)
--}
 
 f4sep :: [SDoc] -> SDoc
 f4sep [] = fsep []

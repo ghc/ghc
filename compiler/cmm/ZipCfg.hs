@@ -14,15 +14,15 @@ module ZipCfg
 	-- (open to renaming suggestions here)
     , blockId, zip, unzip, last, goto_end, zipht, tailOfLast
     , remove_entry_label
-    , splice_tail, splice_head, splice_head_only
+    , splice_tail, splice_head, splice_head_only', splice_head'
     , of_block_list, to_block_list
     , map_nodes
-    , postorder_dfs
+    , postorder_dfs, postorder_dfs_from, postorder_dfs_from_except
     , fold_layout
     , fold_blocks
     , translate
 
-    , pprLgraph
+    , pprLgraph, pprGraph
 
     {-
     -- the following functions might one day be useful and can be found
@@ -150,7 +150,7 @@ data ZTail m l = ZLast (ZLast l) | ZTail m (ZTail m l)
 -- | Blocks and flow graphs; see Note [Kinds of graphs]
 data Block m l = Block BlockId (ZTail m l)
 
-data Graph m l = Graph (ZTail m l) (BlockEnv (Block m l))
+data Graph m l = Graph { g_entry :: (ZTail m l), g_blocks :: (BlockEnv (Block m l)) }
 
 data LGraph m l = LGraph  { lg_entry  :: BlockId
                           , lg_blocks :: BlockEnv (Block m l) }
@@ -217,15 +217,16 @@ ht_to_last         :: ZHead m -> ZTail m l -> (ZHead m, ZLast l)
 --		  , (???, [<blocks>,
 --			   N: y:=x; return (y,x)])
 
-splice_head :: ZHead m    -> LGraph m l -> (LGraph m l, ZHead  m)
-splice_tail :: LGraph m l -> ZTail  m l -> (ZTail  m l, LGraph m l)
+splice_head  :: ZHead m    -> LGraph m l -> (LGraph m l, ZHead  m)
+splice_head' :: ZHead m -> Graph m l -> (BlockEnv (Block m l), ZHead m)
+splice_tail  :: Graph m l -> ZTail  m l -> Graph m l
 
--- | We can also splice a single-entry, no-exit LGraph into a head.
+-- | We can also splice a single-entry, no-exit Graph into a head.
 splice_head_only :: ZHead m -> LGraph m l -> LGraph m l
+splice_head_only' :: ZHead m -> Graph m l -> LGraph m l
 
--- | Finally, we can remove the entry label of an LGraph and remove
--- it, leaving a Graph:
-remove_entry_label :: LGraph m l -> Graph m l
+
+-- | A safe operation 
 
 -- | Conversion to and from the environment form is convenient.  For
 -- layout or dataflow, however, one will want to use 'postorder_dfs'
@@ -323,6 +324,10 @@ instance LastNode l => HavingSuccessors (ZBlock m l) where
 instance LastNode l => HavingSuccessors (Block m l) where
     succs b = succs (unzip b)
 
+instance LastNode l => HavingSuccessors (ZTail m l) where
+    succs b = succs (lastTail b)
+
+
 
 -- ================ IMPLEMENTATION ================--
 
@@ -353,9 +358,11 @@ head_id :: ZHead m -> BlockId
 head_id (ZFirst id) = id
 head_id (ZHead h _) = head_id h
 
-last (ZBlock _ t) = lastt t
-  where lastt (ZLast l) = l
-        lastt (ZTail _ t) = lastt t
+last (ZBlock _ t) = lastTail t
+
+lastTail :: ZTail m l -> ZLast l
+lastTail (ZLast l) = l
+lastTail (ZTail _ t) = lastTail t
 
 tailOfLast l = ZLast (LastOther l) -- ^ tedious to write in every client
 
@@ -398,6 +405,13 @@ single_exit g = foldUFM check 0 (lg_blocks g) == 1
                                 LastExit -> count + (1 :: Int)
                                 _ -> count
 
+-- | Used in assertions; tells if a graph has exactly one exit
+single_exitg :: Graph l m -> Bool
+single_exitg (Graph tail blocks) = foldUFM add (exit_count (lastTail tail)) blocks == 1
+    where add block count = count + exit_count (last (unzip block))
+          exit_count LastExit = 1 :: Int
+          exit_count _        = 0
+
 ------------------ graph traversals
 
 -- | This is the most important traversal over this data structure.  It drops
@@ -420,8 +434,9 @@ single_exit g = foldUFM check 0 (lg_blocks g) == 1
 -- Then ordinary dfs would give [A,B,D,C] which has a back ref from C to D.
 -- Better to geot [A,B,C,D]
 
--- postorder_dfs :: LastNode l => LGraph m l -> [Block m l]
-postorder_dfs g@(LGraph _ blocks) =
+
+postorder_dfs' :: LastNode l => LGraph m l -> [Block m l]
+postorder_dfs' g@(LGraph _ blocks) =
   let FGraph _ eblock _ = entry g
   in  vnode (zip eblock) (\acc _visited -> acc) [] emptyBlockSet
   where
@@ -435,6 +450,39 @@ postorder_dfs g@(LGraph _ blocks) =
     vchildren block bs cont acc visited =
         let next children acc visited =
                 case children of []     -> cont (block : acc) visited
+                                 (b:bs) -> vnode b (next bs) acc visited
+        in next bs acc visited
+    get_children block = foldl add_id [] (succs block)
+    add_id rst id = case lookupBlockEnv blocks id of
+                      Just b -> b : rst
+                      Nothing -> rst
+
+postorder_dfs g@(LGraph _ blockenv) =
+    let FGraph id eblock _ = entry g
+        dfs1 = zip eblock :
+               postorder_dfs_from_except blockenv eblock (unitUniqSet id)
+        dfs2 = postorder_dfs' g
+    in  ASSERT (map blockId dfs1 == map blockId dfs2) dfs2
+
+postorder_dfs_from
+    :: (HavingSuccessors b, LastNode l) => BlockEnv (Block m l) -> b -> [Block m l]
+postorder_dfs_from blocks b = postorder_dfs_from_except blocks b emptyBlockSet
+
+postorder_dfs_from_except :: forall b m l . (HavingSuccessors b, LastNode l) => BlockEnv (Block m l) -> b -> BlockSet -> [Block m l]
+postorder_dfs_from_except blocks b visited =
+  vchildren (get_children b) (\acc _visited -> acc) [] visited
+  where
+    -- vnode ::
+    --    Block m l -> ([Block m l] -> BlockSet -> a) -> [Block m l] -> BlockSet -> a
+    vnode block@(Block id _) cont acc visited =
+        if elemBlockSet id visited then
+            cont acc visited
+        else
+            let cont' acc visited = cont (block:acc) visited in
+            vchildren (get_children block) cont' acc (extendBlockSet visited id)
+    vchildren bs cont acc visited =
+        let next children acc visited =
+                case children of []     -> cont acc visited
                                  (b:bs) -> vnode b (next bs) acc visited
         in next bs acc visited
     get_children block = foldl add_id [] (succs block)
@@ -494,6 +542,22 @@ prepare_for_splicing g single multi =
               case gl of LastExit -> multi etail gh gblocks
                          _ -> panic "exit is not exit?!"
 
+prepare_for_splicing' ::
+  Graph m l -> (ZTail m l -> a) -> (ZTail m l -> ZHead m -> BlockEnv (Block m l) -> a)
+  -> a
+prepare_for_splicing' (Graph etail gblocks) single multi =
+   if isNullUFM gblocks then
+       case lastTail etail of
+         LastExit -> single etail
+         _ -> panic "bad single block"
+   else
+     case splitp_blocks is_exit gblocks of
+       Nothing -> panic "Can't find an exit block"
+       Just (gexit, gblocks) ->
+            let (gh, gl) = goto_end $ unzip gexit in
+            case gl of LastExit -> multi etail gh gblocks
+                       _ -> panic "exit is not exit?!"
+
 is_exit :: Block m l -> Bool
 is_exit b = case last (unzip b) of { LastExit -> True; _ -> False }
 
@@ -507,8 +571,28 @@ splice_head head g =
          splice_many_blocks entry exit others =
              (LGraph eid (insertBlock (zipht head entry) others), exit)
 
+splice_head' head g = 
+  ASSERT (single_exitg g) prepare_for_splicing' g splice_one_block splice_many_blocks
+   where splice_one_block tail' = 
+             case ht_to_last head tail' of
+               (head, LastExit) -> (emptyBlockEnv, head)
+               _ -> panic "spliced LGraph without exit" 
+         splice_many_blocks entry exit others =
+             (insertBlock (zipht head entry) others, exit)
+
+-- splice_tail :: Graph m l -> ZTail m l -> Graph m l
 splice_tail g tail =
-  ASSERT (single_exit g) prepare_for_splicing g splice_one_block splice_many_blocks
+  ASSERT (single_exitg g) prepare_for_splicing' g splice_one_block splice_many_blocks
+    where splice_one_block tail' = Graph (tail' `append_tails` tail) emptyBlockEnv
+          append_tails (ZLast LastExit) tail = tail
+          append_tails (ZLast _) _ = panic "spliced single block without LastExit"
+          append_tails (ZTail m t) tail = ZTail m (append_tails t tail)
+          splice_many_blocks entry exit others =
+              Graph entry (insertBlock (zipht exit tail) others)
+
+{-
+splice_tail g tail =
+  AS SERT (single_exit g) prepare_for_splicing g splice_one_block splice_many_blocks
     where splice_one_block tail' =  -- return tail' .. tail 
             case ht_to_last (ZFirst (lg_entry g)) tail' of
               (head', LastExit) ->
@@ -518,6 +602,7 @@ splice_tail g tail =
               _ -> panic "spliced single block without Exit" 
           splice_many_blocks entry exit others =
               (entry, LGraph (lg_entry g) (insertBlock (zipht exit tail) others))
+-}
 
 splice_head_only head g =
   let FGraph eid gentry gblocks = entry g
@@ -525,12 +610,10 @@ splice_head_only head g =
        ZBlock (ZFirst _) tail -> LGraph eid (insertBlock (zipht head tail) gblocks)
        _ -> panic "entry not at start of block?!"
 
-remove_entry_label g =
-    let FGraph e eblock others = entry g
-    in case eblock of
-         ZBlock (ZFirst id) tail
-             | id == e -> Graph tail others
-         _ -> panic "id doesn't match on entry block"
+splice_head_only' head (Graph tail gblocks) =
+  let eblock = zipht head tail in
+  LGraph (blockId eblock) (insertBlock eblock gblocks)
+
 
 --- Translation
 
@@ -618,6 +701,12 @@ pprLgraph :: (Outputable m, Outputable l, LastNode l) => LGraph m l -> SDoc
 pprLgraph g = text "{" $$ nest 2 (vcat $ map pprBlock blocks) $$ text "}"
     where pprBlock (Block id tail) = ppr id <> colon $$ ppr tail
           blocks = postorder_dfs g
+
+pprGraph :: (Outputable m, Outputable l, LastNode l) => Graph m l -> SDoc
+pprGraph (Graph tail blockenv) =
+        text "{" $$ nest 2 (ppr tail $$ (vcat $ map pprBlock blocks)) $$ text "}"
+    where pprBlock (Block id tail) = ppr id <> colon $$ ppr tail
+          blocks = postorder_dfs_from blockenv tail
 
 _unused :: FS.FastString
 _unused = undefined
