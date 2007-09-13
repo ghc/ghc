@@ -336,7 +336,7 @@ $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
-	  ../installPackage/installPackage '$(DESTDIR)' '$(prefix)' '$(bindir)' '$(libdir)' '$(libexecdir)' '$(datadir)' '$(docdir)' '$(htmldir_install)' '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' ; \
+	  ../installPackage/installPackage '$(DESTDIR)' '$(prefix)' '$(bindir)' '$(libdir)' '$(libexecdir)' '$(datadir)' '$(docdir)' '$(htmldir_install)' '$(htmldir_configure)' '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' ; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%

@@ -13,8 +13,8 @@ main :: IO ()
 main
   = do args <- getArgs
        case args of
-           destdir : pref : ibindir : ilibdir : ilibexecdir
-                   : idatadir : idocdir : ihtmldir
+           destdir : ipref : ibindir : ilibdir : ilibexecdir
+                   : idatadir : idocdir : ihtmldir_copy : ihtmldir_reg
                    : ghcpkg : ghcpkgconf : args' ->
                let verbosity = case args' of
                            [] -> normal
@@ -24,18 +24,20 @@ main
                                            _ -> Just v
                                in flagToVerbosity m
                            _ -> error ("Bad arguments: " ++ show args)
-               in doit destdir pref ibindir ilibdir ilibexecdir idatadir
-                       idocdir ihtmldir
+               in doit destdir ipref ibindir ilibdir
+                       ilibexecdir idatadir idocdir
+                       ihtmldir_copy ihtmldir_reg
                        ghcpkg ghcpkgconf verbosity
            _ ->
                error "Missing arguments"
 
 doit :: FilePath -> FilePath -> FilePath -> FilePath -> FilePath
      -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
+     -> FilePath
      -> Verbosity
      -> IO ()
-doit destdir pref ibindir ilibdir ilibexecdir idatadir idocdir
-     ihtmldir ghcpkg ghcpkgconf verbosity =
+doit destdir ipref ibindir ilibdir ilibexecdir idatadir idocdir
+     ihtmldir_copy ihtmldir_reg ghcpkg ghcpkgconf verbosity =
        do let userHooks = simpleUserHooks
               copyto = if null destdir then NoCopyDest else CopyTo destdir
               copyFlags = (emptyCopyFlags copyto) {
@@ -66,13 +68,13 @@ doit destdir pref ibindir ilibdir ilibexecdir idatadir idocdir
               pd_reg  = pd { library = Just (mkLib (const True)) }
               -- When coying, we need to actually give a concrete
               -- directory to copy to rather than "$topdir"
-              i_copy = i { prefixDirTemplate  = toPathTemplate pref,
+              i_copy = i { prefixDirTemplate  = toPathTemplate ipref,
                            binDirTemplate     = toPathTemplate ibindir,
                            libDirTemplate     = toPathTemplate ilibdir,
                            libexecDirTemplate = toPathTemplate ilibexecdir,
                            dataDirTemplate    = toPathTemplate idatadir,
                            docDirTemplate     = toPathTemplate idocdir,
-                           htmlDirTemplate    = toPathTemplate ihtmldir
+                           htmlDirTemplate    = toPathTemplate ihtmldir_copy
                          }
               lbi_copy = lbi { installDirTemplates = i_copy }
               -- When we run GHC we give it a $topdir that includes the
@@ -87,7 +89,14 @@ doit destdir pref ibindir ilibdir ilibexecdir idatadir idocdir
                          programLocation = UserSpecified ghcpkg
                      }
               progs' = updateProgram prog progs
-              i_reg = i { libSubdirTemplate = toPathTemplate "$pkgid" }
+              i_reg = i { prefixDirTemplate  = toPathTemplate ipref,
+                          binDirTemplate     = toPathTemplate ibindir,
+                          libDirTemplate     = toPathTemplate ilibdir,
+                          libexecDirTemplate = toPathTemplate ilibexecdir,
+                          dataDirTemplate    = toPathTemplate idatadir,
+                          docDirTemplate     = toPathTemplate idocdir,
+                          htmlDirTemplate    = toPathTemplate ihtmldir_reg
+                        }
               lbi_reg = lbi { installDirTemplates = i_reg,
                               withPrograms = progs' }
           (copyHook simpleUserHooks) pd_copy lbi_copy userHooks copyFlags
