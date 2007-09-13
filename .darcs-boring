@@ -24,6 +24,7 @@
 ^testsuite(/|$)
 # bindists
 ^ghc-
+^bin-manifest-
 #Packages:
 ^libraries/Cabal(/|$)
 ^libraries/ALUT(/|$)
@@ -77,6 +78,18 @@
 # Other library bits that get generated:
 ^libraries/bootstrapping\.
 ^libraries/stamp/
+^libraries/ifBuildable(/|$)
+^libraries/installPackage(/|$)
+^libraries/index.html
+^libraries/doc-index.*\.html
+^libraries/haddock-util.js
+^libraries/haddock.css
+^libraries/haskell_icon.gif
+^libraries/minus.gif
+^libraries/plus.gif
+^libraries/libraries.txt
+# It's often useful to have somewhere in the build tree to install to
+^inst(/|$)
 # Boring file regexps:
 \.hi$
 \.hi-boot$
@@ -130,6 +143,8 @@
 ^compiler/parser/Parser.hs$
 ^compiler/parser/Lexer.hs$
 ^compiler/parser/ParserCore.hs$
+^compiler/parser/HaddockLex.hs
+^compiler/parser/HaddockParse.hs
 ^compiler/prelude/primops.txt$
 ^compiler/stage1
 ^compiler/stage2
@@ -148,3 +163,49 @@ package.conf.installed$
 (^|/)configure$
 ^ghc.spec$
 ^docs/users_guide/ug-book.xml$
+^extra-gcc-opts
+# ignore scripts like push-monk
+^push-*
+# Common log file names; testlog is made by validate
+^testlog
+^log*
+^utils/genapply/genapply
+^utils/genprimopcode/Lexer.hs
+^utils/genprimopcode/Parser.hs
+^utils/genprimopcode/genprimopcode
+^utils/ghc-pkg/Version.hs
+^utils/ghc-pkg/ghc-pkg-inplace
+^utils/ghc-pkg/ghc-pkg-inplace.hs
+^utils/ghc-pkg/ghc-pkg.bin
+^utils/hasktags/hasktags
+^utils/hp2ps/hp2ps
+^utils/hpc/HpcParser.hs
+^utils/hpc/hpc
+^utils/hsc2hs/hsc2hs-bin
+^utils/hsc2hs/hsc2hs-inplace
+^utils/hsc2hs/hsc2hs-inplace.hs
+^utils/lndir/lndir
+^utils/mkdependC/mkdependC
+^utils/mkdirhier/mkdirhier
+^utils/prof/cgprof/cgprof
+^utils/prof/ghcprof-inplace
+^utils/pwd/pwd
+^utils/runghc/runghc
+^utils/runstdtest/runstdtest
+^utils/unlit/unlit
+^driver/ghci/ghc-pkg-inplace
+^driver/mangler/ghc-asm
+^driver/mangler/ghc-asm.prl
+^driver/package.conf
+^driver/package.conf.inplace.old
+^driver/split/ghc-split
+^driver/split/ghc-split.prl
+^driver/stamp-pkg-conf-ghc
+^driver/stamp-pkg-conf-rts
+^includes/DerivedConstants.h
+^includes/GHCConstants.h
+^includes/ghcautoconf.h
+^includes/ghcplatform.h
+^includes/mkDerivedConstantsHdr
+^includes/mkGHCConstants
+
