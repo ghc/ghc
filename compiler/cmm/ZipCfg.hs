@@ -23,6 +23,8 @@ module ZipCfg
 
     , pprLgraph, pprGraph
 
+    , entry -- exported for the convenience of ZipDataflow, at least for now
+
     {-
     -- the following functions might one day be useful and can be found
     -- either below or in ZipCfgExtras:
