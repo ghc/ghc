@@ -2137,16 +2137,31 @@ forkProcess(HsStablePtr *entry
     // ToDo: for SMP, we should probably acquire *all* the capabilities
     cap = rts_lock();
     
+    // no funny business: hold locks while we fork, otherwise if some
+    // other thread is holding a lock when the fork happens, the data
+    // structure protected by the lock will forever be in an
+    // inconsistent state in the child.  See also #1391.
+    ACQUIRE_LOCK(&sched_mutex);
+    ACQUIRE_LOCK(&cap->lock);
+
     pid = fork();
     
     if (pid) { // parent
 	
+        RELEASE_LOCK(&sched_mutex);
+        RELEASE_LOCK(&cap->lock);
+
 	// just return the pid
 	rts_unlock(cap);
 	return pid;
 	
     } else { // child
 	
+#if defined(THREADED_RTS)
+        initMutex(&sched_mutex);
+        initMutex(&cap->lock);
+#endif
+
 	// Now, all OS threads except the thread that forked are
 	// stopped.  We need to stop all Haskell threads, including
 	// those involved in foreign calls.  Also we need to delete
