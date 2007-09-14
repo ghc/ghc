@@ -13,7 +13,6 @@ module ZipCfg
         -- Observers and transformers
 	-- (open to renaming suggestions here)
     , blockId, zip, unzip, last, goto_end, zipht, tailOfLast
-    , remove_entry_label
     , splice_tail, splice_head, splice_head_only', splice_head'
     , of_block_list, to_block_list
     , map_nodes
