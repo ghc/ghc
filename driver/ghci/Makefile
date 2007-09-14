@@ -36,7 +36,7 @@ install::
 endif
 
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
-INPLACE_SCRIPT=ghc-pkg-inplace
+INPLACE_SCRIPT=ghci-inplace
 all::
 	$(RM) -f $(INPLACE_SCRIPT)
 	echo "#!$(SHELL)"                                                              >> $(INPLACE_SCRIPT)
