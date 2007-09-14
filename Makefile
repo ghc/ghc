@@ -562,7 +562,7 @@ hc-file-bundle :
 CLEAN_FILES += hc-files-to-go *-hc.tar.gz
 
 DIST_CLEAN_FILES += config.cache config.status mk/config.h mk/stamp-h \
-	ghc.spec docs/users_guide/ug-book.xml
+	ghc.spec docs/users_guide/ug-book.xml extra-gcc-opts
 
 # don't clean config.mk: it's needed when cleaning stuff later on
 LATE_DIST_CLEAN_FILES += mk/config.mk 
@@ -575,6 +575,7 @@ extraclean::
 
 clean distclean ::
 	$(MAKE) -C bindisttest $@
+	test -d testsuite && $(MAKE) -C testsuite $@
 
 # -----------------------------------------------------------------------------
 
