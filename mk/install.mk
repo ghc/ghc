@@ -285,7 +285,7 @@ install-docs-html-no-chunks:
 
 install-docs-%:
 	$(INSTALL_DIR) $(DESTDIR)$($*dir)
-	$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC)$* $(DESTDIR)$($*dir)
+	$(INSTALL_DATA) $(INSTALL_OPTS) $(INSTALL_XML_DOC).$* $(DESTDIR)$($*dir)
 endif
 endif
 
