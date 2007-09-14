@@ -248,6 +248,7 @@ test('tc232', reqlib('mtl'), compile, [''])
 test('tc233', normal, compile, [''])
 test('tc234', normal, compile, [''])
 test('tc235', normal, compile, [''])
+test('tc236', normal, compile, [''])
 
 test('faxen', normal, compile, [''])
 
