@@ -129,7 +129,7 @@ nativeCodeGen dflags h us cmms
 	let split_cmms	= concat $ map add_split cmms
 
  	(imports, prof)
-		<- cmmNativeGens dflags h us split_cmms [] []
+		<- cmmNativeGens dflags h us split_cmms [] [] 0
 
 	let (native, colorStats, linearStats)
 		= unzip3 prof
@@ -179,13 +179,13 @@ nativeCodeGen dflags h us cmms
 
 -- | Do native code generation on all these cmms.
 --
-cmmNativeGens dflags h us [] impAcc profAcc
+cmmNativeGens dflags h us [] impAcc profAcc count
 	= return (reverse impAcc, reverse profAcc)
 
-cmmNativeGens dflags h us (cmm : cmms) impAcc profAcc
+cmmNativeGens dflags h us (cmm : cmms) impAcc profAcc count
  = do
  	(us', native, imports, colorStats, linearStats)
-		<- cmmNativeGen dflags us cmm
+		<- cmmNativeGen dflags us cmm count
 
 	Pretty.printDoc Pretty.LeftMode h
 		$ {-# SCC "pprNativeCode" #-} Pretty.vcat $ map pprNatCmmTop native
@@ -196,13 +196,18 @@ cmmNativeGens dflags h us (cmm : cmms) impAcc profAcc
 			then native
 			else []
 
+	let count'	= count + 1;
+
+
 	-- force evaulation all this stuff to avoid space leaks
 	seqString (showSDoc $ vcat $ map ppr imports) `seq` return ()
 	lsPprNative 	`seq` return ()
+	count'		`seq` return ()
 
 	cmmNativeGens dflags h us' cmms
 			(imports : impAcc)
 			((lsPprNative, colorStats, linearStats) : profAcc)
+			count'
 
  where	seqString []		= ()
 	seqString (x:xs)	= x `seq` seqString xs `seq` ()
@@ -215,13 +220,14 @@ cmmNativeGen
 	:: DynFlags
 	-> UniqSupply
 	-> RawCmmTop				-- ^ the cmm to generate code for
+	-> Int					-- ^ sequence number of this top thing
 	-> IO	( UniqSupply
 		, [NatCmmTop]			-- native code
 		, [CLabel]			-- things imported by this cmm
 		, Maybe [Color.RegAllocStats]	-- stats for the coloring register allocator
 		, Maybe [Linear.RegAllocStats])	-- stats for the linear register allocators
 
-cmmNativeGen dflags us cmm
+cmmNativeGen dflags us cmm count
  = do
 
 	-- rewrite assignments to global regs
@@ -288,7 +294,8 @@ cmmNativeGen dflags us cmm
 		dumpIfSet_dyn dflags
 			Opt_D_dump_asm_regalloc_stages "Build/spill stages"
 			(vcat 	$ map (\(stage, stats)
-					-> text " Stage " <> int stage
+					-> text "# --------------------------"
+					$$ text "#  cmm " <> int count <> text " Stage " <> int stage
 					$$ ppr stats)
 				$ zip [0..] regAllocStats)
 
