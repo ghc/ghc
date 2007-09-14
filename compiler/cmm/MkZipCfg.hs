@@ -17,6 +17,7 @@ import UniqSupply
 
 import Prelude hiding (zip, unzip, last)
 
+#include "HsVersions.h"
 
 -------------------------------------------------------------------------
 --     GENERIC ZIPPER-BASED CONTROL-FLOW GRAPH (CONSTRUCTOR VIEW)      --
@@ -327,15 +328,11 @@ mkWhileDo cbranch body =
 note_this_code_becomes_unreachable ::
     (Monad m, LastNode l, Outputable middle, Outputable l) => ZTail middle l -> m ()
 
-#ifdef DEBUG
-note_this_code_becomes_unreachable = u
+note_this_code_becomes_unreachable = if debugIsOn then u else \_ -> return ()
     where u (ZLast LastExit)                       = return ()
           u (ZLast (LastOther l)) | isBranchNode l = return ()
                                     -- Note [Branch follows branch]
           u tail = fail ("unreachable code: " ++ showSDoc (ppr tail))
-#else
-note_this_code_becomes_unreachable _ = return ()
-#endif
 
 {-
 Note [Branch follows branch]
@@ -347,3 +344,6 @@ giving it a label, and start a new one that branches to that label.
 Emitting a Branch at this point is fine: 
        goto L1; L2: ...stuff... 
 -}
+
+_unused :: FS.FastString
+_unused = undefined
