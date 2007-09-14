@@ -31,8 +31,8 @@ int main(int argc, char **argv) {
         fprintf(stderr, "Malloc failed\n");
         exit(1);
     }
-    args[0] = GHC_PATH;
-    args[1] = "-B" TOP_ABS;
+    args[0] = "GHC_PATH"; /* Gets replaced by sed */
+    args[1] = "-BTOP_ABS"; /* Gets replaced by sed */
     args[2] = "-fhardwire-lib-paths";
     if ((argc >= 2) && (strcmp(argv[1], "-v") == 0)) {
         printf("Using %s %s %s\n", args[0], args[1], args[2]);
@@ -40,7 +40,10 @@ int main(int argc, char **argv) {
     }
     memcpy(args + 3, argv + 1, sizeof(char *) * (argc - 1));
     args[argc+2] = NULL;
-    return run(argv[0], GHC_PATH, argc + 2, args);
+    return run(argv[0],
+               "GHC_PATH", /* Gets replaced by sed */
+               argc + 2,
+               args);
 }
 
 #ifndef WINDOWS

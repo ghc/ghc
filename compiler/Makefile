@@ -737,6 +737,7 @@ SRC_LD_OPTS += -no-link-chk
 # See comments in $(FPTOOLS_TOP)/utils/ghc-pkg/Makefile for why we use
 # a real binary here rather than a shell script.
 
+INPLACE_SRC  = $(odir)/ghc-inplace.c
 INPLACE_PROG = $(odir)/ghc-inplace$(_way)$(exeext)
 EXCLUDED_C_SRCS += ghc-inplace.c
 
@@ -746,8 +747,11 @@ ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INPLACE_EXTRA_FLAGS = -optc-DWINDOWS
 endif
 
-$(INPLACE_PROG): ghc-inplace.c
-	$(HC) -cpp -optc-DGHC_PATH=$(DQ)$(GHC_PATH)$(DQ) -optc-DTOP_ABS=$(DQ)$(FPTOOLS_TOP_ABS)$(DQ) $(INPLACE_EXTRA_FLAGS) $< -o $@
+$(INPLACE_SRC): ghc-inplace.c
+	$(SED) -e "s@GHC_PATH@$(GHC_PATH)@g" -e "s@TOP_ABS@$(FPTOOLS_TOP_ABS)@g" < $< > $@
+
+$(INPLACE_PROG): $(INPLACE_SRC)
+	$(HC) -cpp $(INPLACE_EXTRA_FLAGS) $< -o $@
 
 all :: $(INPLACE_PROG)
 
