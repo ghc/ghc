@@ -1,4 +1,4 @@
--- Returns exitcode 0 if the given package is buildable or is a core package,
+-- Returns exitcode 0 if the given package is buildable or is a boot package,
 -- and 1 otherwise.
 
 module Main (main) where
@@ -31,5 +31,5 @@ doit package
 
 getMustBeBuildablePackages :: IO [String]
 getMustBeBuildablePackages
- = do xs <- readFile "../core-packages"
+ = do xs <- readFile "../boot-packages"
       return $ filter ("readline" /=) $ lines xs

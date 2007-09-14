@@ -1,8 +1,8 @@
 #! /bin/sh
 set -e
 
-# Check that we have all core packages.
-for dir in `cat libraries/core-packages`
+# Check that we have all boot packages.
+for dir in `cat libraries/boot-packages`
 do
     if test ! -d libraries/$dir
     then

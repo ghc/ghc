@@ -11,8 +11,8 @@ my $ignore_failure = 0;
 
 # --checked-out says we are pushing to a checked out tree
 my $checked_out = 0;
-# --core-only says we only want to push corelibs, not extralibs
-my $core_only = 0;
+# --boot-only says we only want to push bootlibs, not extralibs
+my $boot_only = 0;
 # --push or --pull?
 my $push_pull = "push";
 
@@ -49,9 +49,9 @@ sub pushall {
             message "== $dir not present or not a repository; skipping";
         }
     }
-    my $library_lists = $core_only
-                      ? "libraries/core-packages"
-                      : "libraries/core-packages libraries/extra-packages";
+    my $library_lists = $boot_only
+                      ? "libraries/boot-packages"
+                      : "libraries/boot-packages libraries/extra-packages";
     for my $pkg (`cat $library_lists`) {
         chomp $pkg;
         $dir = "libraries/$pkg";
@@ -83,8 +83,8 @@ sub main {
             elsif ($arg eq "--checked-out") {
                 $checked_out = 1;
             }
-            elsif ($arg eq "--core-only") {
-                $core_only = 1;
+            elsif ($arg eq "--boot-only") {
+                $boot_only = 1;
             }
             elsif ($arg eq "--push") {
                 $push_pull = "push";

@@ -71,7 +71,7 @@ sub darcsall {
             message "== $dir not present or not a repository; skipping";
         }
     }
-    for my $pkg (`cat libraries/core-packages libraries/extra-packages`) {
+    for my $pkg (`cat libraries/boot-packages libraries/extra-packages`) {
         chomp $pkg;
         if (-d "libraries/$pkg") {
             darcs (@_, "--repodir", "libraries/$pkg");
@@ -112,10 +112,10 @@ sub darcsget {
 
     my @packages;
     if ($extra) {
-        @packages = `cat core-packages extra-packages`;
+        @packages = `cat boot-packages extra-packages`;
     }
     else {
-        @packages = `cat core-packages`;
+        @packages = `cat boot-packages`;
     }
 
     for my $pkg (@packages) {

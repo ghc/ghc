@@ -66,10 +66,10 @@ endif
 
 SUBDIRS = gmp includes compat utils driver docs rts libraries compiler
 
-# Sanity check that all the core libraries are in the tree, to catch
+# Sanity check that all the boot libraries are in the tree, to catch
 # failure to run darcs-all.
 check-packages :
-	@for d in `cat libraries/core-packages`; do \
+	@for d in `cat libraries/boot-packages`; do \
 	  if test ! -d libraries/$$d; then \
 	     echo "Looks like you're missing libraries/$$d,"; \
 	     echo "maybe you haven't done './darcs-all get'?"; \

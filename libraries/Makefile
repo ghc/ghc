@@ -240,7 +240,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	      && touch $@ || touch $*/unbuildable
 # We don't touch $@ if configure failed as we would prefer to try
 # configuring it next time round, rather than assuming it'll still fail.
-# This is particularly important for corelibs, where failure means the
+# This is particularly important for bootlibs, where failure means the
 # build dies!
 
 # Build the library using 'make'

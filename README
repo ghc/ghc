@@ -27,7 +27,7 @@ There are two ways to get a source tree:
       ghc-<version>-src-extralibs.tar.bz2
 
   You only need the first one, which contains GHC itself and
-  the "core" libraries.
+  the "boot" libraries.
 
   The extralibs package contains a bunch of optional libraries.  If
   you want, you can unpack this over the top of your source tree, and
@@ -52,7 +52,7 @@ There are two ways to get a source tree:
      $ chmod +x darcs-all
      $ ./darcs-all get
 
-  This grabs the "core" packages by default.  To get the full set of
+  This grabs the "boot" packages by default.  To get the full set of
   packages, instead say
 
      $ ./darcs-all --extra get
