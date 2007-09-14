@@ -55,7 +55,7 @@ colorGraph iterative colors triv spill graph0
 	--	coalescing stage at the front.
 	(graph_coalesced, kksCoalesce1)
 		= if not iterative
-			then coalesceGraph False triv graph0
+			then coalesceGraph True triv graph0
 			else (graph0, [])
 
  	-- run the scanner to slurp out all the trivially colorable nodes

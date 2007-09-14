@@ -132,7 +132,7 @@ chooseSpill
 	-> Reg
 
 chooseSpill info graph
- = let	cost	= spillCost info graph
+ = let	cost	= spillCost_length info graph
  	node	= minimumBy (\n1 n2 -> compare (cost $ nodeId n1) (cost $ nodeId n2))
 		$ eltsUFM $ graphMap graph
 
@@ -177,14 +177,14 @@ chooseSpill info graph
 --  Without live range splitting, its's better to spill from the outside in so set the cost of very
 --	long live ranges to zero
 --
-
-spillCost
+{-
+spillCost_chaitin
 	:: SpillCostInfo
 	-> Graph Reg RegClass Reg
 	-> Reg
 	-> Float
 
-spillCost info graph reg
+spillCost_chaitin info graph reg
 	-- Spilling a live range that only lives for 1 instruction isn't going to help
 	--	us at all - and we definately want to avoid trying to re-spill previously
 	--	inserted spill code.
@@ -200,6 +200,21 @@ spillCost info graph reg
 	| otherwise	= fromIntegral (uses + defs) / fromIntegral (nodeDegree graph reg)
 	where (_, defs, uses, lifetime)
 		= fromMaybe (reg, 0, 0, 0) $ lookupUFM info reg
+-}
+
+-- Just spill the longest live range.
+spillCost_length
+	:: SpillCostInfo
+	-> Graph Reg RegClass Reg
+	-> Reg
+	-> Float
+
+spillCost_length info _ reg
+	| lifetime <= 1		= 1/0
+	| otherwise		= 1 / fromIntegral lifetime
+	where (_, _, _, lifetime)
+		= fromMaybe (reg, 0, 0, 0) $ lookupUFM info reg
+
 
 
 lifeMapFromSpillCostInfo :: SpillCostInfo -> UniqFM (Reg, Int)
