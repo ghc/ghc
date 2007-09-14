@@ -77,24 +77,36 @@ exposed-modules: Network.BSD,
 	  <indexterm><primary><option>-package</option></primary></indexterm>
 	</term>
 	<listitem>
-	  <para>This option causes the installed package <replaceable>P</replaceable> to be
-	    exposed.  The package <replaceable>P</replaceable> can be specified
-	    in full with its version number
-	    (e.g. <literal>network-1.0</literal>) or the version number can be
-	    omitted if there is only one version of the package
-	    installed.</para>
-
-	  <para>If there are multiple versions of <replaceable>P</replaceable>
-	    installed, then all other versions will become hidden.</para>
+	  <para>This option causes the installed
+	    package <replaceable>P</replaceable> to be exposed.  The
+	    package <replaceable>P</replaceable> can be specified in
+	    full with its version number
+	    (e.g. <literal>network-1.0</literal>) or the version
+	    number can be omitted if there is only one version of the
+	    package installed. If there are multiple versions
+	    of <replaceable>P</replaceable> installed, then all other
+	    versions will become hidden.</para>
 
 	  <para>The <option>-package <replaceable>P</replaceable></option>
-	    option also causes package <replaceable>P</replaceable> to be
-	    linked into the resulting executable.  In
-	    <option>&ndash;&ndash;make</option> mode and GHCi, the compiler 
-	    normally determines which packages are required by the current
-	    Haskell modules, and links only those.  In batch mode however, the
-	    dependency information isn't available, and explicit
-	    <option>-package</option> options must be given when linking.</para>
+	    option also causes package <replaceable>P</replaceable> to
+	    be linked into the resulting executable or shared
+	    object. Whether a packages' library is linked statically
+	    or dynamically is controlled by the flag
+	    pair <option>-static</option>/<option>-dynamic</option>.</para>
+
+	  <para>In <option>&ndash;&ndash;make</option> mode
+	    and <option>&ndash;&ndash;interactive</option> mode (see
+	    <xref linkend="modes" />), the compiler normally
+	    determines which packages are required by the current
+	    Haskell modules, and links only those.  In batch mode
+	    however, the dependency information isn't available, and
+	    explicit
+	    <option>-package</option> options must be given when linking. The one other time you might need to use
+	    <option>-package</option> to force linking a package is
+	    when the package does not contain any Haskell modules (it
+	    might contain a C library only, for example).  In that
+	    case, GHC will never discover a dependency on it, so it
+	    has to be mentioned explicitly.</para>
 
 	  <para>For example, to link a program consisting of objects
 	    <filename>Foo.o</filename> and <filename>Main.o</filename>, where
@@ -106,18 +118,7 @@ exposed-modules: Network.BSD,
 	    The same flag is necessary even if we compiled the modules from
 	    source, because GHC still reckons it's in batch mode: 
 
-<screen>$ ghc -o myprog Foo.hs Main.hs -package network</screen>
-
-	    In <literal>--make</literal> and <literal>--interactive</literal>
-	    modes (<xref linkend="modes" />), however, GHC figures out the
-	    packages required for linking without further assistance.</para>
-
-	  <para>The one other time you might need to use
-	    <option>-package</option> to force linking a package is when the
-	    package does not contain any Haskell modules (it might contain a C
-	    library only, for example).  In that case, GHC
-	    will never discover a dependency on it, so it has to be mentioned
-	    explicitly.</para>
+<screen>$ ghc -o myprog Foo.hs Main.hs -package network</screen></para>
 	</listitem>
       </varlistentry>
       
@@ -348,65 +349,84 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
       lot of configuration, then you might have to fall back to the low-level
       mechanisms, so a few hints for those brave souls follow.</para>
     
-    <itemizedlist>
-      <listitem>
-	<para>You need to build an "installed package info" file for
-	  passing to <literal>ghc-pkg</literal> when installing your
-	  package.  The contents of this file are described in <xref
-	    linkend="installed-pkg-info" />.</para>
-      </listitem>
-      
-      <listitem>
-	<para>The Haskell code in a package may be built into one or
-	  more archive libraries
-	  (e.g. <filename>libHSfoo.a</filename>), or a single DLL on
-	  Windows (e.g. <filename>HSfoo.dll</filename>).  The
-	  restriction to a single DLL on Windows is because the
-	  package system is used to tell the compiler when it should
-	  make an inter-DLL call rather than an intra-DLL call
-	  (inter-DLL calls require an extra
-	  indirection). <emphasis>Building packages as DLLs doesn't
-	  work at the moment; see <xref linkend="win32-dlls-create"/>
-	  for the gory details.</emphasis>
-	  </para>
+    <para>You need to build an "installed package info" file for
+      passing to <literal>ghc-pkg</literal> when installing your
+      package.  The contents of this file are described in
+      <xref linkend="installed-pkg-info" />.</para>
 
-	<para>Building a static library is done by using the
+    <para>The Haskell code in a package may be built into one or more
+      archive libraries (e.g. <filename>libHSfoo.a</filename>), or a
+      single shared object
+      (e.g. <filename>libHSfoo.dll/.so/.dylib</filename>).  The
+      restriction to a single shared object is because the package
+      system is used to tell the compiler when it should make an
+      inter-shared-object call rather than an intra-shared-object-call
+      call (inter-shared-object calls require an extra
+      indirection).</para>
+    <itemizedlist>
+      <listitem><para>Building a static library is done by using the
 	  <literal>ar</literal> tool, like so:</para>
 
-<screen>ar cqs libHSfoo.a A.o B.o C.o ...</screen>
+<screen>ar cqs libHSfoo-1.0.a A.o B.o C.o ...</screen>
 
-	<para>where <filename>A.o</filename>,
-	  <filename>B.o</filename> and so on are the compiled Haskell
-	  modules, and <filename>libHSfoo.a</filename> is the library
-	  you wish to create.  The syntax may differ slightly on your
-	  system, so check the documentation if you run into
-	  difficulties.</para>
-
-	<para>Versions of the Haskell libraries for use with GHCi
-	  may also be included: GHCi cannot load <literal>.a</literal>
-	  files directly, instead it will look for an object file
+	  <para>where <filename>A.o</filename>,
+	    <filename>B.o</filename> and so on are the compiled Haskell
+	    modules, and <filename>libHSfoo.a</filename> is the library you
+	    wish to create.  The syntax may differ slightly on your system,
+	    so check the documentation if you run into difficulties.</para>
+      </listitem>
+      <listitem>
+	<para>Versions of the Haskell libraries for use with GHCi may also
+	  abe included: GHCi cannot load <literal>.a</literal> files
+	  directly, instead it will look for an object file
 	  called <filename>HSfoo.o</filename> and load that.  On some
-	  systems, the <literal>ghc-pkg</literal> tool can
-	  automatically build the GHCi version of each library, see
-	  <xref linkend="package-management"/>.  To build these
-	  libraries by hand from the <literal>.a</literal> archive, it
-	  is possible to use GNU <command>ld</command> as
-	  follows:</para>
+	  systems, the <literal>ghc-pkg</literal> tool can automatically
+	  build the GHCi version of each library, see
+	  <xref linkend="package-management"/>.  To build these libraries
+	  by hand from the <literal>.a</literal> archive, it is possible
+	  to use GNU <command>ld</command> as follows:</para>
 
 <screen>ld -r &ndash;&ndash;whole-archive -o HSfoo.o libHSfoo.a</screen>
 
 	<para>(replace
-          <literal>&ndash;&ndash;whole-archive</literal> with
-          <literal>&ndash;all_load</literal> on MacOS X)</para>
-	
-	  <para>GHC does not maintain detailed cross-package
-          dependency information.  It does remember which modules in
-          other packages the current module depends on, but not which
-          things within those imported things.</para>
+	  <literal>&ndash;&ndash;whole-archive</literal> with
+	  <literal>&ndash;all_load</literal> on MacOS X)</para>
+      </listitem>
+      <listitem>
+	<para>When building the package as shared object, GHC wraps
+	  out the underlying linker so that the user gets a common
+	  interface to all shared object variants that are supported
+	  by GHC (DLLs, ELF DSOs, and Mac OS dylibs). The shared
+	  object must be named in specific way for two reasons: (1)
+	  the name must contain the GHC compiler version, so that two
+	  library variants don't collide that are compiled by
+	  different versions of GHC and that therefore are most likely
+	  incompatible with respect to calling conventions, (2) it
+	  must be different from the static name otherwise we would
+	  not be able to control the linker as precisely as necessary
+	  to make
+	  the <option>-static</option>/<option>-dynamic</option> flags
+	  work, see <xref linkend="options-linker" />.</para>
+
+<screen>ghc -shared libHSfoo-1.0-ghc<replaceable>GHCVersion</replaceable>.so A.o B.o C.o</screen>
+	<para>Using GHC's version number in the shared object name
+	  allows different library versions compiled by different GHC
+	  versions to be installed in standard system locations,
+	  e.g. under *nix /usr/lib. To obtain the version number of
+	  GHC invoke <literal>ghc --numeric-version</literal> and use
+	  its output in place
+	  of <replaceable>GHCVersion</replaceable>. See also
+	  <xref linkend="options-codegen" /> on how object files must
+	  be prepared for shared object linking.</para>
       </listitem>
     </itemizedlist>
+
+     <para>GHC does not maintain detailed cross-package dependency
+       information.  It does remember which modules in other packages
+       the current module depends on, but not which things within
+       those imported things.</para>
     
-      <para>To compile a module which is to be part of a new package,
+     <para>To compile a module which is to be part of a new package,
       use the <literal>-package-name</literal> option (<xref linkend="using-packages"/>).
       Failure to use the <literal>-package-name</literal> option
       when compiling a package will probably result in disaster, but
@@ -416,8 +436,8 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
       same as the package name stored in the <literal>.hi</literal>
       file.</para>
 
-    <para>It is worth noting that on Windows, when each package
-      is built as a DLL, since a reference to a DLL costs an extra
+    <para>It is worth noting with shared objects, when each package
+      is built as a single shared object file, since a reference to a shared object costs an extra
       indirection, intra-package references are cheaper than
       inter-package references. Of course, this applies to the
       <filename>main</filename> package as well.</para>
