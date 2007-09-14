@@ -15,6 +15,8 @@ all::
 	cat ghcprof.prl                                                               >> $(INPLACE_SCRIPT)
 	$(EXECUTABLE_FILE) $(INPLACE_SCRIPT)
 
+CLEAN_FILES += ghcprof-inplace
+
 INSTALLED_SCRIPT=$(DESTDIR)$(bindir)/ghcprof
 install::
 	$(RM) -f $(INSTALLED_SCRIPT)
