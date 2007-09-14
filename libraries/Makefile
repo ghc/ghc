@@ -295,6 +295,9 @@ clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
 	$(RM) -rf installPackage
 	$(RM) -f libraries.txt index.html doc-index.html doc-index*.html
 
+distclean:
+	$(RM) $(foreach lib, $(SUBDIRS), $(lib)/.depend $(lib)/.depend.bak)
+
 $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR)): \
 clean.library.%:
 	$(RM) -f stamp/configure.library.*.$* $*/unbuildable
