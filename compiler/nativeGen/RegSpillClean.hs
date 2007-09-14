@@ -22,6 +22,7 @@
 --	This also works if the reloads in B1/B2 were spills instead, because
 --	spilling %r1 to a slot makes that slot have the same value as %r1.
 --
+{- OPTIONS -fno-warn-missing-signatures #-}
 
 module RegSpillClean (
 	cleanSpills
@@ -43,6 +44,10 @@ import Util
 
 import Data.Maybe
 import Data.List        ( find, nub )
+
+--
+type Slot = Int
+
 
 -- | Clean out unneeded spill/reloads from this top level thing.
 cleanSpills :: LiveCmmTop -> LiveCmmTop
@@ -69,9 +74,11 @@ cleanSpin spinCount code
  	-- init count of cleaned spills/reloads
 	modify $ \s -> s
 		{ sCleanedSpillsAcc	= 0
-		, sCleanedReloadsAcc	= 0 }
+		, sCleanedReloadsAcc	= 0
+		, sReloadedBy		= emptyUFM }
 
- 	code'	<- mapBlockTopM cleanBlock code
+ 	code_forward	<- mapBlockTopM cleanBlockForward  code
+	code_backward	<- mapBlockTopM cleanBlockBackward code_forward
 
 	-- During the cleaning of each block we collected information about what regs
 	--	were valid across each jump. Based on this, work out whether it will be
@@ -91,20 +98,29 @@ cleanSpin spinCount code
 	   then return code
 
 	-- otherwise go around again
-	   else cleanSpin (spinCount + 1) code'
+	   else cleanSpin (spinCount + 1) code_backward
 
 
 -- | Clean one basic block
-cleanBlock :: LiveBasicBlock -> CleanM LiveBasicBlock
-cleanBlock (BasicBlock id instrs)
- = do	jumpValid	<- gets sJumpValid
- 	let assoc	= case lookupUFM jumpValid id of
+cleanBlockForward :: LiveBasicBlock -> CleanM LiveBasicBlock
+cleanBlockForward (BasicBlock blockId instrs)
+ = do
+ 	-- see if we have a valid association for the entry to this block
+ 	jumpValid	<- gets sJumpValid
+ 	let assoc	= case lookupUFM jumpValid blockId of
 				Just assoc	-> assoc
 				Nothing		-> emptyAssoc
 
- 	instrs_reload	<- cleanFwd    assoc        [] instrs
- 	instrs_spill	<- cleanSpill  emptyUniqSet [] instrs_reload
-	return	$ BasicBlock id instrs_spill
+ 	instrs_reload	<- cleanForward    blockId assoc [] instrs
+	return	$ BasicBlock blockId instrs_reload
+
+
+cleanBlockBackward :: LiveBasicBlock -> CleanM LiveBasicBlock
+cleanBlockBackward (BasicBlock blockId instrs)
+ = do	instrs_spill	<- cleanBackward  emptyUniqSet  [] instrs
+	return	$ BasicBlock blockId instrs_spill
+
+
 
 
 -- | Clean out unneeded reload instructions.
@@ -112,36 +128,37 @@ cleanBlock (BasicBlock id instrs)
 --	  On a reload, if we know a reg already has the same value as a slot
 --	  then we don't need to do the reload.
 --
-cleanFwd
-	:: Assoc Store	 	-- ^ two store locations are associated if they have the same value
+cleanForward
+	:: BlockId		-- ^ the block that we're currently in
+	-> Assoc Store	 	-- ^ two store locations are associated if they have the same value
 	-> [LiveInstr]		-- ^ acc
 	-> [LiveInstr] 		-- ^ instrs to clean (in backwards order)
 	-> CleanM [LiveInstr]	-- ^ cleaned instrs  (in forward   order)
 
-cleanFwd _ acc []
+cleanForward _ _ acc []
 	= return acc
 
 -- write out live range joins via spill slots to just a spill and a reg-reg move
 --	hopefully the spill will be also be cleaned in the next pass
 --
-cleanFwd assoc acc (Instr i1 live1 : Instr i2 _ : instrs)
+cleanForward blockId assoc acc (Instr i1 live1 : Instr i2 _ : instrs)
 
 	| SPILL  reg1  slot1	<- i1
 	, RELOAD slot2 reg2	<- i2
 	, slot1 == slot2
 	= do
 		modify $ \s -> s { sCleanedReloadsAcc = sCleanedReloadsAcc s + 1 }
-		cleanFwd assoc acc
+		cleanForward blockId assoc acc
 			(Instr i1 live1 : Instr (mkRegRegMoveInstr reg1 reg2) Nothing : instrs)
 
 
-cleanFwd assoc acc (li@(Instr i1 _) : instrs)
+cleanForward blockId assoc acc (li@(Instr i1 _) : instrs)
 	| Just (r1, r2)	<- isRegRegMove i1
 	= if r1 == r2
 		-- erase any left over nop reg reg moves while we're here
 		--	this will also catch any nop moves that the "write out live range joins" case above
 		--	happens to add
-		then cleanFwd assoc acc instrs
+		then cleanForward blockId assoc acc instrs
 
 		-- if r1 has the same value as some slots and we copy r1 to r2,
 		--	then r2 is now associated with those slots instead
@@ -149,40 +166,41 @@ cleanFwd assoc acc (li@(Instr i1 _) : instrs)
 					$ delAssoc (SReg r2)
 					$ assoc
 
-			cleanFwd assoc' (li : acc) instrs
+			cleanForward blockId assoc' (li : acc) instrs
 
 
-cleanFwd assoc acc (li@(Instr instr _) : instrs)
+cleanForward blockId assoc acc (li@(Instr instr _) : instrs)
 
+	-- update association due to the spill
 	| SPILL reg slot	<- instr
-	= let	assoc'	= addAssoc (SReg reg)  (SSlot slot)	-- doing the spill makes reg and slot the same value
-			$ delAssoc (SSlot slot) 		-- slot value changes on spill
+	= let	assoc'	= addAssoc (SReg reg)  (SSlot slot)
+			$ delAssoc (SSlot slot)
 			$ assoc
-	  in	cleanFwd assoc' (li : acc) instrs
+	  in	cleanForward blockId assoc' (li : acc) instrs
 
 	-- clean a reload instr
 	| RELOAD{}		<- instr
-	= do	(assoc', mli)	<- cleanReload assoc li
+	= do	(assoc', mli)	<- cleanReload blockId assoc li
 		case mli of
-			Nothing		-> cleanFwd assoc' acc 		instrs
-			Just li'	-> cleanFwd assoc' (li' : acc)	instrs
+		 Nothing	-> cleanForward blockId assoc' acc 		instrs
+		 Just li'	-> cleanForward blockId assoc' (li' : acc)	instrs
 
 	-- remember the association over a jump
 	| targets	<- jumpDests instr []
 	, not $ null targets
 	= do	mapM_ (accJumpValid assoc) targets
-		cleanFwd assoc (li : acc) instrs
+		cleanForward blockId assoc (li : acc) instrs
 
 	-- writing to a reg changes its value.
 	| RU _ written	<- regUsage instr
 	= let assoc'	= foldr delAssoc assoc (map SReg $ nub written)
-	  in  cleanFwd assoc' (li : acc) instrs
+	  in  cleanForward blockId assoc' (li : acc) instrs
 
 
 -- | Try and rewrite a reload instruction to something more pleasing
 --
-cleanReload :: Assoc Store -> LiveInstr -> CleanM (Assoc Store, Maybe LiveInstr)
-cleanReload assoc li@(Instr (RELOAD slot reg) _)
+cleanReload :: BlockId -> Assoc Store -> LiveInstr -> CleanM (Assoc Store, Maybe LiveInstr)
+cleanReload blockId assoc li@(Instr (RELOAD slot reg) _)
 
 	-- if the reg we're reloading already has the same value as the slot
 	--	then we can erase the instruction outright
@@ -202,54 +220,91 @@ cleanReload assoc li@(Instr (RELOAD slot reg) _)
 		return	(assoc', Just $ Instr (mkRegRegMoveInstr reg2 reg) Nothing)
 
 	-- gotta keep this instr
-	--	update the association
 	| otherwise
-	= do	let assoc'	= addAssoc (SReg reg)  (SSlot slot)	-- doing the reload makes reg and slot the same value
+	= do	-- update the association
+		let assoc'	= addAssoc (SReg reg)  (SSlot slot)	-- doing the reload makes reg and slot the same value
 				$ delAssoc (SReg reg)			-- reg value changes on reload
 				$ assoc
 
+		-- remember that this block reloads from this slot
+		accBlockReloadsSlot blockId slot
+
 	    	return	(assoc', Just li)
 
-cleanReload _ _
+cleanReload _ _ _
 	= panic "RegSpillClean.cleanReload: unhandled instr"
 
 
 -- | Clean out unneeded spill instructions.
---	Walking backwards across the code.
+--
 --	 If there were no reloads from a slot between a spill and the last one
 --	 then the slot was never read and we don't need the spill.
-
-cleanSpill
+--
+--	SPILL   r0 -> s1
+--	RELOAD  s1 -> r2
+--	SPILL   r3 -> s1	<--- don't need this spill
+--	SPILL   r4 -> s1
+--	RELOAD  s1 -> r5
+--
+--	Maintain a set of
+--		"slots which were spilled to but not reloaded from yet"
+--
+--	Walking backwards across the code:
+--	 a) On a reload from a slot, remove it from the set.
+--
+--	 a) On a spill from a slot
+--		If the slot is in set then we can erase the spill,
+--			because it won't be reloaded from until after the next spill.
+--
+--		otherwise
+--			keep the spill and add the slot to the set
+--
+-- TODO: This is mostly inter-block
+--	 we should really be updating the noReloads set as we cross jumps also.
+--
+cleanBackward
 	:: UniqSet Int 		-- ^ slots that have been spilled, but not reloaded from
 	-> [LiveInstr]		-- ^ acc
 	-> [LiveInstr]		-- ^ instrs to clean (in forwards order)
 	-> CleanM [LiveInstr]	-- ^ cleaned instrs  (in backwards order)
 
-cleanSpill _      acc []
+
+cleanBackward noReloads acc lis
+ = do	reloadedBy	<- gets sReloadedBy
+ 	cleanBackward' reloadedBy noReloads acc lis
+
+cleanBackward' _ _      acc []
 	= return  acc
 
-cleanSpill unused acc (li@(Instr instr _) : instrs)
+cleanBackward' reloadedBy noReloads acc (li@(Instr instr _) : instrs)
+
+	-- if nothing ever reloads from this slot then we don't need the spill
 	| SPILL _ slot	<- instr
-	= if elementOfUniqSet slot unused
+	, Nothing	<- lookupUFM reloadedBy (SSlot slot)
+	= do	modify $ \s -> s { sCleanedSpillsAcc = sCleanedSpillsAcc s + 1 }
+		cleanBackward noReloads acc instrs
+
+	| SPILL _ slot	<- instr
+	= if elementOfUniqSet slot noReloads
 
 	   -- we can erase this spill because the slot won't be read until after the next one
 	   then do
 		modify $ \s -> s { sCleanedSpillsAcc = sCleanedSpillsAcc s + 1 }
-	   	cleanSpill unused acc instrs
+	   	cleanBackward noReloads acc instrs
 
 	   else do
-		-- slots start off unused
-		let unused'	= addOneToUniqSet unused slot
-	   	cleanSpill unused' (li : acc) instrs
+		-- this slot is being spilled to, but we haven't seen any reloads yet.
+		let noReloads'	= addOneToUniqSet noReloads slot
+	   	cleanBackward noReloads' (li : acc) instrs
 
 	-- if we reload from a slot then it's no longer unused
 	| RELOAD slot _		<- instr
-	, unused'		<- delOneFromUniqSet unused slot
-	= cleanSpill unused' (li : acc) instrs
+	, noReloads'		<- delOneFromUniqSet noReloads slot
+	= cleanBackward noReloads' (li : acc) instrs
 
 	-- some other instruction
 	| otherwise
-	= cleanSpill unused (li : acc) instrs
+	= cleanBackward noReloads (li : acc) instrs
 
 
 -- collateJoinPoints:
@@ -290,6 +345,11 @@ data CleanS
 	  --	to sJumpValid.
 	, sJumpValidAcc		:: UniqFM [Assoc Store]
 
+	  -- map of (slot -> blocks which reload from this slot)
+	  --	used to decide if whether slot spilled to will ever be
+	  --	reloaded from on this path.
+	, sReloadedBy		:: UniqFM [BlockId]
+
 	  -- spills/reloads cleaned each pass (latest at front)
 	, sCleanedCount		:: [(Int, Int)]
 
@@ -303,6 +363,8 @@ initCleanS
 	{ sJumpValid		= emptyUFM
 	, sJumpValidAcc		= emptyUFM
 
+	, sReloadedBy		= emptyUFM
+
 	, sCleanedCount		= []
 
 	, sCleanedSpillsAcc	= 0
@@ -312,11 +374,21 @@ initCleanS
 -- | Remember the associations before a jump
 accJumpValid :: Assoc Store -> BlockId -> CleanM ()
 accJumpValid assocs target
- 	= modify $ \s -> s {
-		sJumpValidAcc = addToUFM_C (++)
-					(sJumpValidAcc s)
-					target
-					[assocs] }
+ = modify $ \s -> s {
+	sJumpValidAcc = addToUFM_C (++)
+				(sJumpValidAcc s)
+				target
+				[assocs] }
+
+
+accBlockReloadsSlot :: BlockId -> Slot -> CleanM ()
+accBlockReloadsSlot blockId slot
+ = modify $ \s -> s {
+ 	sReloadedBy = addToUFM_C (++)
+				(sReloadedBy s)
+				(SSlot slot)
+				[blockId] }
+
 
 --------------
 -- A store location can be a stack slot or a register
