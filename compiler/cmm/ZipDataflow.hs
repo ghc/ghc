@@ -28,6 +28,8 @@ import UniqSupply
 import Control.Monad
 import Maybe
 
+#include "HsVersions.h"
+
 {-
 
 \section{A very polymorphic infrastructure for dataflow problems}
@@ -421,7 +423,7 @@ labelGraph id (Graph tail blocks) = LGraph id (insertBlock (Block id tail) block
 
 remove_entry_label :: LGraph m l -> Graph m l
 remove_entry_label g =
-    let FGraph e (ZBlock (ZFirst id tail)) others = entry g
+    let FGraph e (ZBlock (ZFirst id) tail) others = entry g
     in  ASSERT (id == e) Graph tail others
 
 {-
@@ -857,3 +859,7 @@ subAnalysis' m =
          return a }
   where pprFacts env = nest 2 $ vcat $ map pprFact $ ufmToList env
         pprFact (id, a) = hang (ppr id <> colon) 4 (ppr a)
+
+
+_unused :: FS.FastString
+_unused = undefined
