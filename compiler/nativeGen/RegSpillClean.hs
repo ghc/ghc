@@ -22,7 +22,7 @@
 --	This also works if the reloads in B1/B2 were spills instead, because
 --	spilling %r1 to a slot makes that slot have the same value as %r1.
 --
-{- OPTIONS -fno-warn-missing-signatures #-}
+{-# OPTIONS -fno-warn-missing-signatures #-}
 
 module RegSpillClean (
 	cleanSpills
