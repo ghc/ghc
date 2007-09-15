@@ -1455,7 +1455,8 @@ tcSimplifyRuleLhs wanteds
 				 -- to fromInteger; this looks fragile to me
 	     ; lookup_result <- lookupSimpleInst w'
 	     ; case lookup_result of
-		 GenInst ws' rhs -> go dicts (addBind binds w rhs) (ws' ++ ws)
+		 GenInst ws' rhs -> 
+                   go dicts (addInstToDictBind binds w rhs) (ws' ++ ws)
 		 NoInstance	 -> pprPanic "tcSimplifyRuleLhs" (ppr w)
 	  }
 \end{code}
@@ -1705,7 +1706,7 @@ reduceContext env wanteds
 	; traceTc $ text "reduceContext: ancestor eqs" <+> ppr ancestor_eqs
 
 	  -- 1. Normalise the *given* *equality* constraints
-	; (given_eqs, eliminate_skolems) <- normaliseGivens given_eqs0
+	; (given_eqs, eliminate_skolems) <- normaliseGivenEqs given_eqs0
 
 	  -- 2. Normalise the *given* *dictionary* constraints
 	  --    wrt. the toplevel and given equations
@@ -1713,11 +1714,11 @@ reduceContext env wanteds
                                                             given_dicts0
 
 	  -- 3. Solve the *wanted* *equation* constraints
-	; eq_irreds0 <- solveWanteds given_eqs wanted_eqs 
+	; eq_irreds0 <- solveWantedEqs given_eqs wanted_eqs 
 
 	  -- 4. Normalise the *wanted* equality constraints with respect to
 	  --    each other 
-	; eq_irreds <- normaliseWanteds eq_irreds0
+	; eq_irreds <- normaliseWantedEqs eq_irreds0
 
           -- 5. Build the Avail mapping from "given_dicts"
 	; init_state <- foldlM addGiven emptyAvails given_dicts
@@ -2299,7 +2300,9 @@ extractResults (Avails _ avails) wanteds
 
 	  Just (Given id) 
 		| id == w_id -> go avails binds irreds (w:givens) ws 
-		| otherwise  -> go avails (addBind binds w (nlHsVar id)) irreds (update_id w  id:givens) ws
+		| otherwise  -> 
+                  go avails (addInstToDictBind binds w (nlHsVar id)) irreds 
+                     (update_id w  id:givens) ws
 		-- The sought Id can be one of the givens, via a superclass chain
 		-- and then we definitely don't want to generate an x=x binding!
 
@@ -2311,7 +2314,7 @@ extractResults (Avails _ avails) wanteds
 
 	  Just (Rhs rhs ws') -> go (add_given avails w) new_binds irreds givens (ws' ++ ws)
 			     where	
-				new_binds = addBind binds w rhs
+				new_binds = addInstToDictBind binds w rhs
       where
 	w_id = instToId w	
 	update_id m@(Method{}) id = m {tci_id = id}
@@ -2348,7 +2351,7 @@ extractLocalResults (Avails _ avails) wanteds
 
 	  Just (Rhs rhs ws') -> go (add_given avails w) new_binds givens (ws' ++ ws)
 			     where	
-				new_binds = addBind binds w rhs
+				new_binds = addInstToDictBind binds w rhs
       where
 	w_id = instToId w	
 
@@ -2449,6 +2452,7 @@ addAvailAndSCs want_scs avails inst avail
 
     find_all :: IdSet -> Inst -> IdSet
     find_all so_far kid
+      | isEqInst kid                       = so_far
       | kid_id `elemVarSet` so_far	   = so_far
       | Just avail <- findAvail avails kid = findAllDeps so_far' avail
       | otherwise			   = so_far'
@@ -2915,7 +2919,7 @@ report_no_instances tidy_env mb_what insts
        ; mapM_ complain_implic implics
        ; mapM_ (\doc -> addErrTcM (tidy_env, doc)) overlaps
        ; groupErrs complain_no_inst insts3 
-       ; mapM_ complain_eq eqInsts
+       ; mapM_ eqInstMisMatch eqInsts
        }
   where
     complain_no_inst insts = addErrTcM (tidy_env, mk_no_inst_err insts)
@@ -2924,13 +2928,6 @@ report_no_instances tidy_env mb_what insts
       = reportNoInstances tidy_env 
 			  (Just (tci_loc inst, tci_given inst)) 
 			  (tci_wanted inst)
-
-    complain_eq EqInst {tci_left = lty, tci_right = rty, 
-                        tci_loc = InstLoc _ _ ctxt}
-      = do { (env, msg) <- misMatchMsg lty rty
-           ; setErrCtxt ctxt $
-               failWithTcM (env, msg)
-           }
 
     check_overlap :: (InstEnv,InstEnv) -> Inst -> Either Inst SDoc
 	-- Right msg  => overlap message
@@ -3084,36 +3081,4 @@ reduceDepthErr n stack
 	  nest 4 (pprStack stack)]
 
 pprStack stack = vcat (map pprInstInFull stack)
-
------------------------
-misMatchMsg :: TcType -> TcType -> TcM (TidyEnv, SDoc)
--- Generate the message when two types fail to match,
--- going to some trouble to make it helpful.
--- The argument order is: actual type, expected type
-misMatchMsg ty_act ty_exp
-  = do	{ env0 <- tcInitTidyEnv
-        ; ty_exp <- zonkTcType ty_exp
-        ; ty_act <- zonkTcType ty_act
-	; (env1, pp_exp, extra_exp) <- ppr_ty env0 ty_exp
-	; (env2, pp_act, extra_act) <- ppr_ty env1 ty_act
-	; return (env2, 
-                  sep [sep [ptext SLIT("Couldn't match expected type") <+> pp_exp, 
-			    nest 7 $
-                              ptext SLIT("against inferred type") <+> pp_act],
-		       nest 2 (extra_exp $$ extra_act)]) }
-
-ppr_ty :: TidyEnv -> TcType -> TcM (TidyEnv, SDoc, SDoc)
-ppr_ty env ty
-  = do	{ let (env1, tidy_ty) = tidyOpenType env ty
-	; (env2, extra) <- ppr_extra env1 tidy_ty
-	; return (env2, quotes (ppr tidy_ty), extra) }
-
--- (ppr_extra env ty) shows extra info about 'ty'
-ppr_extra env (TyVarTy tv)
-  | isSkolemTyVar tv || isSigTyVar tv
-  = return (env1, pprSkolTvBinding tv1)
-  where
-    (env1, tv1) = tidySkolemTyVar env tv
-
-ppr_extra env ty = return (env, empty)		-- Normal case
 \end{code}

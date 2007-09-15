@@ -42,7 +42,8 @@ module Inst (
 	isTyVarDict, isMethodFor, 
 
 	zonkInst, zonkInsts,
-	instToId, instToVar, instType, instName,
+	instToId, instToVar, instType, instName, instToDictBind,
+	addInstToDictBind,
 
 	InstOrigin(..), InstLoc, pprInstLoc,
 
@@ -91,6 +92,7 @@ import PrelNames
 import BasicTypes
 import SrcLoc
 import DynFlags
+import Bag
 import Maybes
 import Util
 import Outputable
@@ -205,6 +207,15 @@ tyVarsOfInst (EqInst {tci_left = ty1, tci_right = ty2}) = tyVarsOfType ty1 `unio
 
 tyVarsOfInsts insts = foldr (unionVarSet . tyVarsOfInst) emptyVarSet insts
 tyVarsOfLIE   lie   = tyVarsOfInsts (lieToList lie)
+
+
+--------------------------
+instToDictBind :: Inst -> LHsExpr TcId -> TcDictBinds
+instToDictBind inst rhs 
+  = unitBag (L (instSpan inst) (VarBind (instToId inst) rhs))
+
+addInstToDictBind :: TcDictBinds -> Inst -> LHsExpr TcId -> TcDictBinds
+addInstToDictBind binds inst rhs = binds `unionBags` instToDictBind inst rhs
 \end{code}
 
 Predicates
@@ -1005,7 +1016,7 @@ mkEqInst (EqPred ty1 ty2) co
 
 mkWantedEqInst :: PredType -> TcM Inst
 mkWantedEqInst pred@(EqPred ty1 ty2)
-  = do { cotv <- newMetaTyVar TauTv (mkCoKind ty1 ty2)
+  = do { cotv <- newMetaCoVar ty1 ty2
        ; mkEqInst pred (Left cotv)
        }
 

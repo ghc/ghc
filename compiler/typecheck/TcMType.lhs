@@ -34,14 +34,14 @@ module TcMType (
 
   --------------------------------
   -- Creating new coercion variables
-  newCoVars,
+  newCoVars, newMetaCoVar,
 
   --------------------------------
   -- Instantiation
   tcInstTyVar, tcInstType, tcInstTyVars, tcInstBoxyTyVar,
   tcInstSigTyVars, zonkSigTyVar,
   tcInstSkolTyVar, tcInstSkolTyVars, tcInstSkolType, 
-  tcSkolSigType, tcSkolSigTyVars,
+  tcSkolSigType, tcSkolSigTyVars, occurCheckErr,
 
   --------------------------------
   -- Checking type validity
@@ -49,7 +49,8 @@ module TcMType (
   SourceTyCtxt(..), checkValidTheta, checkFreeness,
   checkValidInstHead, checkValidInstance, 
   checkInstTermination, checkValidTypeInst, checkTyFamFreeness,
-  validDerivPred, arityErr, 
+  checkUpdateMeta, updateMeta, checkTauTvUpdate, fillBoxWithTau, unifyKindCtxt,
+  unifyKindMisMatch, validDerivPred, arityErr, notMonoType, notMonoArgs,
 
   --------------------------------
   -- Zonking
@@ -124,6 +125,186 @@ tcInstType inst_tyvars ty
 
 %************************************************************************
 %*									*
+	Updating tau types
+%*									*
+%************************************************************************
+
+Can't be in TcUnify, as we also need it in TcTyFuns.
+
+\begin{code}
+type SwapFlag = Bool
+	-- False <=> the two args are (actual, expected) respectively
+	-- True  <=> the two args are (expected, actual) respectively
+
+checkUpdateMeta :: SwapFlag
+	        -> TcTyVar -> IORef MetaDetails -> TcType -> TcM ()
+-- Update tv1, which is flexi; occurs check is alrady done
+-- The 'check' version does a kind check too
+-- We do a sub-kind check here: we might unify (a b) with (c d) 
+--	where b::*->* and d::*; this should fail
+
+checkUpdateMeta swapped tv1 ref1 ty2
+  = do	{ checkKinds swapped tv1 ty2
+	; updateMeta tv1 ref1 ty2 }
+
+updateMeta :: TcTyVar -> IORef MetaDetails -> TcType -> TcM ()
+updateMeta tv1 ref1 ty2
+  = ASSERT( isMetaTyVar tv1 )
+    ASSERT( isBoxyTyVar tv1 || isTauTy ty2 )
+    do	{ ASSERTM2( do { details <- readMetaTyVar tv1; return (isFlexi details) }, ppr tv1 )
+	; traceTc (text "updateMeta" <+> ppr tv1 <+> text ":=" <+> ppr ty2)
+	; writeMutVar ref1 (Indirect ty2) 
+	}
+
+----------------
+checkKinds swapped tv1 ty2
+-- We're about to unify a type variable tv1 with a non-tyvar-type ty2.
+-- ty2 has been zonked at this stage, which ensures that
+-- its kind has as much boxity information visible as possible.
+  | tk2 `isSubKind` tk1 = returnM ()
+
+  | otherwise
+	-- Either the kinds aren't compatible
+	--	(can happen if we unify (a b) with (c d))
+	-- or we are unifying a lifted type variable with an
+	-- 	unlifted type: e.g.  (id 3#) is illegal
+  = addErrCtxtM (unifyKindCtxt swapped tv1 ty2)	$
+    unifyKindMisMatch k1 k2
+  where
+    (k1,k2) | swapped   = (tk2,tk1)
+	    | otherwise = (tk1,tk2)
+    tk1 = tyVarKind tv1
+    tk2 = typeKind ty2
+
+----------------
+checkTauTvUpdate :: TcTyVar -> TcType -> TcM TcType
+--    (checkTauTvUpdate tv ty)
+-- We are about to update the TauTv tv with ty.
+-- Check (a) that tv doesn't occur in ty (occurs check)
+--	 (b) that ty is a monotype
+-- Furthermore, in the interest of (b), if you find an
+-- empty box (BoxTv that is Flexi), fill it in with a TauTv
+-- 
+-- Returns the (non-boxy) type to update the type variable with, or fails
+
+checkTauTvUpdate orig_tv orig_ty
+  = go orig_ty
+  where
+    go (TyConApp tc tys)
+	| isSynTyCon tc  = go_syn tc tys
+	| otherwise	 = do { tys' <- mappM go tys; return (TyConApp tc tys') }
+    go (NoteTy _ ty2) 	 = go ty2	-- Discard free-tyvar annotations
+    go (PredTy p)	 = do { p' <- go_pred p; return (PredTy p') }
+    go (FunTy arg res)   = do { arg' <- go arg; res' <- go res; return (FunTy arg' res') }
+    go (AppTy fun arg)	 = do { fun' <- go fun; arg' <- go arg; return (mkAppTy fun' arg') }
+		-- NB the mkAppTy; we might have instantiated a
+		-- type variable to a type constructor, so we need
+		-- to pull the TyConApp to the top.
+    go (ForAllTy tv ty) = notMonoType orig_ty		-- (b)
+
+    go (TyVarTy tv)
+	| orig_tv == tv = occurCheck tv                 -- (a)
+	| isTcTyVar tv  = go_tyvar tv (tcTyVarDetails tv)
+	| otherwise     = return (TyVarTy tv)
+		 -- Ordinary (non Tc) tyvars
+		 -- occur inside quantified types
+
+    go_pred (ClassP c tys) = do { tys' <- mapM go tys; return (ClassP c tys') }
+    go_pred (IParam n ty)  = do { ty' <- go ty;        return (IParam n ty') }
+    go_pred (EqPred t1 t2) = do { t1' <- go t1; t2' <- go t2; return (EqPred t1' t2') }
+
+    go_tyvar tv (SkolemTv _) = return (TyVarTy tv)
+    go_tyvar tv (MetaTv box ref)
+	= do { cts <- readMutVar ref
+	     ; case cts of
+		  Indirect ty -> go ty 
+		  Flexi -> case box of
+				BoxTv -> fillBoxWithTau tv ref
+				other -> return (TyVarTy tv)
+	     }
+
+	-- go_syn is called for synonyms only
+	-- See Note [Type synonyms and the occur check]
+    go_syn tc tys
+	| not (isTauTyCon tc)
+	= notMonoType orig_ty	-- (b) again
+	| otherwise
+	= do { (msgs, mb_tys') <- tryTc (mapM go tys)
+	     ; case mb_tys' of
+		Just tys' -> return (TyConApp tc tys')
+				-- Retain the synonym (the common case)
+		Nothing | isOpenTyCon tc
+			  -> notMonoArgs (TyConApp tc tys)
+				-- Synonym families must have monotype args
+			| otherwise
+			  -> go (expectJust "checkTauTvUpdate" 
+					(tcView (TyConApp tc tys)))
+				-- Try again, expanding the synonym
+	     }
+
+    occurCheck tv = occurCheckErr (mkTyVarTy tv) orig_ty
+
+fillBoxWithTau :: BoxyTyVar -> IORef MetaDetails -> TcM TcType
+-- (fillBoxWithTau tv ref) fills ref with a freshly allocated 
+--  tau-type meta-variable, whose print-name is the same as tv
+-- Choosing the same name is good: when we instantiate a function
+-- we allocate boxy tyvars with the same print-name as the quantified
+-- tyvar; and then we often fill the box with a tau-tyvar, and again
+-- we want to choose the same name.
+fillBoxWithTau tv ref 
+  = do	{ tv' <- tcInstTyVar tv		-- Do not gratuitously forget
+	; let tau = mkTyVarTy tv'	-- name of the type variable
+	; writeMutVar ref (Indirect tau)
+	; return tau }
+\end{code}
+
+Error mesages in case of kind mismatch.
+
+\begin{code}
+unifyKindMisMatch ty1 ty2
+  = zonkTcKind ty1	`thenM` \ ty1' ->
+    zonkTcKind ty2	`thenM` \ ty2' ->
+    let
+	msg = hang (ptext SLIT("Couldn't match kind"))
+		   2 (sep [quotes (ppr ty1'), 
+			   ptext SLIT("against"), 
+			   quotes (ppr ty2')])
+    in
+    failWithTc msg
+
+unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 inferred
+	-- tv1 and ty2 are zonked already
+  = returnM msg
+  where
+    msg = (env2, ptext SLIT("When matching the kinds of") <+> 
+		 sep [quotes pp_expected <+> ptext SLIT("and"), quotes pp_actual])
+
+    (pp_expected, pp_actual) | swapped   = (pp2, pp1)
+		             | otherwise = (pp1, pp2)
+    (env1, tv1') = tidyOpenTyVar tidy_env tv1
+    (env2, ty2') = tidyOpenType  env1 ty2
+    pp1 = ppr tv1' <+> dcolon <+> ppr (tyVarKind tv1)
+    pp2 = ppr ty2' <+> dcolon <+> ppr (typeKind ty2)
+\end{code}
+
+Error message for failure due to an occurs check.
+
+\begin{code}
+occurCheckErr :: TcType -> TcType -> TcM a
+occurCheckErr ty containingTy
+  = do	{ env0 <- tcInitTidyEnv
+	; ty'           <- zonkTcType ty
+	; containingTy' <- zonkTcType containingTy
+	; let (env1, tidy_ty1) = tidyOpenType env0 ty'
+	      (env2, tidy_ty2) = tidyOpenType env1 containingTy'
+	      extra = sep [ppr tidy_ty1, char '=', ppr tidy_ty2]
+	; failWithTcM (env2, hang msg 2 extra) }
+  where
+    msg = ptext SLIT("Occurs check: cannot construct the infinite type:")
+\end{code}
+
+%************************************************************************
+%*									*
 	Kind variables
 %*									*
 %************************************************************************
@@ -135,6 +316,9 @@ newCoVars spec
 	; return [ mkCoVar (mkSysTvName uniq FSLIT("co"))
 			   (mkCoKind ty1 ty2)
 		 | ((ty1,ty2), uniq) <- spec `zip` uniqsFromSupply us] }
+
+newMetaCoVar :: TcType -> TcType -> TcM TcTyVar
+newMetaCoVar ty1 ty2 = newMetaTyVar TauTv (mkCoKind ty1 ty2)
 
 newKindVar :: TcM TcKind
 newKindVar = do	{ uniq <- newUnique
@@ -886,7 +1070,6 @@ kindErr kind       = ptext SLIT("Expecting an ordinary type, but found a type of
 \end{code}
 
 
-
 %************************************************************************
 %*									*
 \subsection{Checking a theta or source type}
@@ -1097,6 +1280,21 @@ arityErr kind name n m
 	n_arguments | n == 0 = ptext SLIT("no arguments")
 		    | n == 1 = ptext SLIT("1 argument")
 		    | True   = hsep [int n, ptext SLIT("arguments")]
+
+-----------------
+notMonoType ty
+  = do	{ ty' <- zonkTcType ty
+	; env0 <- tcInitTidyEnv
+	; let (env1, tidy_ty) = tidyOpenType env0 ty'
+	      msg = ptext SLIT("Cannot match a monotype with") <+> quotes (ppr tidy_ty)
+	; failWithTcM (env1, msg) }
+
+notMonoArgs ty
+  = do	{ ty' <- zonkTcType ty
+	; env0 <- tcInitTidyEnv
+	; let (env1, tidy_ty) = tidyOpenType env0 ty'
+	      msg = ptext SLIT("Arguments of type synonym families must be monotypes") <+> quotes (ppr tidy_ty)
+	; failWithTcM (env1, msg) }
 \end{code}
 
 

@@ -1004,9 +1004,11 @@ about binders, as we are only interested in syntactic subterms.)
 
 \begin{code}
 tcPartOfType :: Type -> Type -> Bool
-tcPartOfType t1              t2 = tcEqType t1 t2
+tcPartOfType t1              t2 
+  | tcEqType t1 t2              = True
 tcPartOfType t1              t2 
   | Just t2' <- tcView t2       = tcPartOfType t1 t2'
+tcPartOfType _  (TyVarTy _)     = False
 tcPartOfType t1 (ForAllTy _ t2) = tcPartOfType t1 t2
 tcPartOfType t1 (AppTy s2 t2)   = tcPartOfType t1 s2 || tcPartOfType t1 t2
 tcPartOfType t1 (FunTy s2 t2)   = tcPartOfType t1 s2 || tcPartOfType t1 t2

@@ -22,7 +22,7 @@ module TcUnify (
   unifyType, unifyTypeList, unifyTheta,
   unifyKind, unifyKinds, unifyFunKind, 
   checkExpectedKind, 
-  preSubType, boxyMatchTypes,
+  preSubType, boxyMatchTypes, 
 
   --------------------------------
   -- Holes
@@ -1126,9 +1126,9 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
         -- need to defer unification by generating a wanted equality constraint.
     go1 outer ty1 ty2
       | ty1_is_fun || ty2_is_fun
-      = do { (coi1, ty1') <- if ty1_is_fun then tcNormalizeFamInst ty1 
+      = do { (coi1, ty1') <- if ty1_is_fun then tcNormaliseFamInst ty1 
                                            else return (IdCo, ty1)
-	   ; (coi2, ty2') <- if ty2_is_fun then tcNormalizeFamInst ty2 
+	   ; (coi2, ty2') <- if ty2_is_fun then tcNormaliseFamInst ty2 
                                            else return (IdCo, ty2)
 	   ; coi <- if isOpenSynTyConApp ty1' || isOpenSynTyConApp ty2'
 		    then do { -- One type family app can't be reduced yet
@@ -1329,7 +1329,7 @@ uUnfilledVar outer swapped tv1 details1 ps_ty2 non_var_ty2
       | isOpenSynTyConApp non_var_ty2
       =           -- 'non_var_ty2's outermost constructor is a type family,
                   -- which we may may be able to normalise
-        do { (coi2, ty2') <- tcNormalizeFamInst non_var_ty2
+        do { (coi2, ty2') <- tcNormaliseFamInst non_var_ty2
            ; case coi2 of
 	       IdCo   ->   -- no progress, but maybe after other instantiations
 		         defer_unification outer swapped (TyVarTy tv1) ps_ty2
@@ -1390,7 +1390,7 @@ defer_unification outer False ty1 ty2
   = do	{ ty1' <- unBox ty1 >>= zonkTcType      -- unbox *and* zonk..
  	; ty2' <- unBox ty2 >>= zonkTcType      -- ..see preceding note
         ; traceTc $ text "deferring:" <+> ppr ty1 <+> text "~" <+> ppr ty2
-	; cotv <- newMetaTyVar TauTv (mkCoKind ty1' ty2')
+	; cotv <- newMetaCoVar ty1' ty2'
 		-- put ty1 ~ ty2 in LIE
 		-- Left means "wanted"
 	; inst <- (if outer then popErrCtxt else id) $
@@ -1503,126 +1503,6 @@ uUnfilledVars outer swapped tv1 (MetaTv info1 ref1) tv2 (MetaTv info2 ref2)
 	-- Try to update sys-y type variables in preference to ones
 	-- gotten (say) by instantiating a polymorphic function with
 	-- a user-written type sig
-	
-----------------
-checkUpdateMeta :: SwapFlag
-	        -> TcTyVar -> IORef MetaDetails -> TcType -> TcM ()
--- Update tv1, which is flexi; occurs check is alrady done
--- The 'check' version does a kind check too
--- We do a sub-kind check here: we might unify (a b) with (c d) 
---	where b::*->* and d::*; this should fail
-
-checkUpdateMeta swapped tv1 ref1 ty2
-  = do	{ checkKinds swapped tv1 ty2
-	; updateMeta tv1 ref1 ty2 }
-
-updateMeta :: TcTyVar -> IORef MetaDetails -> TcType -> TcM ()
-updateMeta tv1 ref1 ty2
-  = ASSERT( isMetaTyVar tv1 )
-    ASSERT( isBoxyTyVar tv1 || isTauTy ty2 )
-    do	{ ASSERTM2( do { details <- readMetaTyVar tv1; return (isFlexi details) }, ppr tv1 )
-	; traceTc (text "updateMeta" <+> ppr tv1 <+> text ":=" <+> ppr ty2)
-	; writeMutVar ref1 (Indirect ty2) 
-	}
-
-----------------
-checkKinds swapped tv1 ty2
--- We're about to unify a type variable tv1 with a non-tyvar-type ty2.
--- ty2 has been zonked at this stage, which ensures that
--- its kind has as much boxity information visible as possible.
-  | tk2 `isSubKind` tk1 = returnM ()
-
-  | otherwise
-	-- Either the kinds aren't compatible
-	--	(can happen if we unify (a b) with (c d))
-	-- or we are unifying a lifted type variable with an
-	-- 	unlifted type: e.g.  (id 3#) is illegal
-  = addErrCtxtM (unifyKindCtxt swapped tv1 ty2)	$
-    unifyKindMisMatch k1 k2
-  where
-    (k1,k2) | swapped   = (tk2,tk1)
-	    | otherwise = (tk1,tk2)
-    tk1 = tyVarKind tv1
-    tk2 = typeKind ty2
-
-----------------
-checkTauTvUpdate :: TcTyVar -> TcType -> TcM TcType
---    (checkTauTvUpdate tv ty)
--- We are about to update the TauTv tv with ty.
--- Check (a) that tv doesn't occur in ty (occurs check)
---	 (b) that ty is a monotype
--- Furthermore, in the interest of (b), if you find an
--- empty box (BoxTv that is Flexi), fill it in with a TauTv
--- 
--- Returns the (non-boxy) type to update the type variable with, or fails
-
-checkTauTvUpdate orig_tv orig_ty
-  = go orig_ty
-  where
-    go (TyConApp tc tys)
-	| isSynTyCon tc  = go_syn tc tys
-	| otherwise	 = do { tys' <- mappM go tys; return (TyConApp tc tys') }
-    go (NoteTy _ ty2) 	 = go ty2	-- Discard free-tyvar annotations
-    go (PredTy p)	 = do { p' <- go_pred p; return (PredTy p') }
-    go (FunTy arg res)   = do { arg' <- go arg; res' <- go res; return (FunTy arg' res') }
-    go (AppTy fun arg)	 = do { fun' <- go fun; arg' <- go arg; return (mkAppTy fun' arg') }
-		-- NB the mkAppTy; we might have instantiated a
-		-- type variable to a type constructor, so we need
-		-- to pull the TyConApp to the top.
-    go (ForAllTy tv ty) = notMonoType orig_ty		-- (b)
-
-    go (TyVarTy tv)
-	| orig_tv == tv = occurCheck tv orig_ty		-- (a)
-	| isTcTyVar tv  = go_tyvar tv (tcTyVarDetails tv)
-	| otherwise     = return (TyVarTy tv)
-		 -- Ordinary (non Tc) tyvars
-		 -- occur inside quantified types
-
-    go_pred (ClassP c tys) = do { tys' <- mapM go tys; return (ClassP c tys') }
-    go_pred (IParam n ty)  = do { ty' <- go ty;        return (IParam n ty') }
-    go_pred (EqPred t1 t2) = do { t1' <- go t1; t2' <- go t2; return (EqPred t1' t2') }
-
-    go_tyvar tv (SkolemTv _) = return (TyVarTy tv)
-    go_tyvar tv (MetaTv box ref)
-	= do { cts <- readMutVar ref
-	     ; case cts of
-		  Indirect ty -> go ty 
-		  Flexi -> case box of
-				BoxTv -> fillBoxWithTau tv ref
-				other -> return (TyVarTy tv)
-	     }
-
-	-- go_syn is called for synonyms only
-	-- See Note [Type synonyms and the occur check]
-    go_syn tc tys
-	| not (isTauTyCon tc)
-	= notMonoType orig_ty	-- (b) again
-	| otherwise
-	= do { (msgs, mb_tys') <- tryTc (mapM go tys)
-	     ; case mb_tys' of
-		Just tys' -> return (TyConApp tc tys')
-				-- Retain the synonym (the common case)
-		Nothing | isOpenTyCon tc
-			  -> notMonoArgs (TyConApp tc tys)
-				-- Synonym families must have monotype args
-			| otherwise
-			  -> go (expectJust "checkTauTvUpdate" 
-					(tcView (TyConApp tc tys)))
-				-- Try again, expanding the synonym
-	     }
-
-fillBoxWithTau :: BoxyTyVar -> IORef MetaDetails -> TcM TcType
--- (fillBoxWithTau tv ref) fills ref with a freshly allocated 
---  tau-type meta-variable, whose print-name is the same as tv
--- Choosing the same name is good: when we instantiate a function
--- we allocate boxy tyvars with the same print-name as the quantified
--- tyvar; and then we often fill the box with a tau-tyvar, and again
--- we want to choose the same name.
-fillBoxWithTau tv ref 
-  = do	{ tv' <- tcInstTyVar tv		-- Do not gratuitously forget
-	; let tau = mkTyVarTy tv'	-- name of the type variable
-	; writeMutVar ref (Indirect tau)
-	; return tau }
 \end{code}
 
 Note [Type synonyms and the occur check]
@@ -1782,21 +1662,7 @@ unifyForAllCtxt tvs phi1 phi2 env
     msg = vcat [ptext SLIT("When matching") <+> quotes (ppr (mkForAllTys tvs' phi1')),
 	        ptext SLIT("          and") <+> quotes (ppr (mkForAllTys tvs' phi2'))]
 
-------------------
-unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 inferred
-	-- tv1 and ty2 are zonked already
-  = returnM msg
-  where
-    msg = (env2, ptext SLIT("When matching the kinds of") <+> 
-		 sep [quotes pp_expected <+> ptext SLIT("and"), quotes pp_actual])
-
-    (pp_expected, pp_actual) | swapped   = (pp2, pp1)
-		             | otherwise = (pp1, pp2)
-    (env1, tv1') = tidyOpenTyVar tidy_env tv1
-    (env2, ty2') = tidyOpenType  env1 ty2
-    pp1 = ppr tv1' <+> dcolon <+> ppr (tyVarKind tv1)
-    pp2 = ppr ty2' <+> dcolon <+> ppr (typeKind ty2)
-
+-----------------------
 unifyMisMatch outer swapped ty1 ty2
   = do	{ (env, msg) <- if swapped then misMatchMsg ty2 ty1
 				   else misMatchMsg ty1 ty2
@@ -1805,31 +1671,6 @@ unifyMisMatch outer swapped ty1 ty2
 	; if outer then popErrCtxt (failWithTcM (env, msg))
 	  	   else failWithTcM (env, msg)
 	} 
-
------------------------
-notMonoType ty
-  = do	{ ty' <- zonkTcType ty
-	; env0 <- tcInitTidyEnv
-	; let (env1, tidy_ty) = tidyOpenType env0 ty'
-	      msg = ptext SLIT("Cannot match a monotype with") <+> quotes (ppr tidy_ty)
-	; failWithTcM (env1, msg) }
-
-notMonoArgs ty
-  = do	{ ty' <- zonkTcType ty
-	; env0 <- tcInitTidyEnv
-	; let (env1, tidy_ty) = tidyOpenType env0 ty'
-	      msg = ptext SLIT("Arguments of synonym family must be monotypes") <+> quotes (ppr tidy_ty)
-	; failWithTcM (env1, msg) }
-
-occurCheck tyvar ty
-  = do	{ env0 <- tcInitTidyEnv
-	; ty'  <- zonkTcType ty
-	; let (env1, tidy_tyvar) = tidyOpenTyVar env0 tyvar
-	      (env2, tidy_ty)    = tidyOpenType  env1 ty'
-	      extra = sep [ppr tidy_tyvar, char '=', ppr tidy_ty]
-	; failWithTcM (env2, hang msg 2 extra) }
-  where
-    msg = ptext SLIT("Occurs check: cannot construct the infinite type:")
 \end{code}
 
 
@@ -1929,17 +1770,6 @@ kindSimpleKind orig_swapped orig_kind
 kindOccurCheckErr tyvar ty
   = hang (ptext SLIT("Occurs check: cannot construct the infinite kind:"))
        2 (sep [ppr tyvar, char '=', ppr ty])
-
-unifyKindMisMatch ty1 ty2
-  = zonkTcKind ty1	`thenM` \ ty1' ->
-    zonkTcKind ty2	`thenM` \ ty2' ->
-    let
-	msg = hang (ptext SLIT("Couldn't match kind"))
-		   2 (sep [quotes (ppr ty1'), 
-			   ptext SLIT("against"), 
-			   quotes (ppr ty2')])
-    in
-    failWithTc msg
 \end{code}
 
 \begin{code}

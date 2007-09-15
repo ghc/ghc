@@ -1,36 +1,44 @@
+Normalisation of type terms relative to type instances as well as
+normalisation and entailment checking of equality constraints.
 
 \begin{code}
 module TcTyFuns (
-	tcNormalizeFamInst,
+	tcNormaliseFamInst,
 
-	normaliseGivens, normaliseGivenDicts, 
-	normaliseWanteds, normaliseWantedDicts,
-	solveWanteds,
+	normaliseGivenEqs, normaliseGivenDicts, 
+	normaliseWantedEqs, normaliseWantedDicts,
+	solveWantedEqs,
 	substEqInDictInsts,
 	
-	addBind 		-- should not be here
+        -- errors
+        eqInstMisMatch, misMatchMsg,
   ) where
 
 
 #include "HsVersions.h"
 
-import HsSyn
-
+--friends
 import TcRnMonad
 import TcEnv
 import Inst
 import TcType
 import TcMType
+
+-- GHC
 import Coercion
-import TypeRep	( Type(..) )
-import TyCon
-import Var	( isTcTyVar )
 import Type
+import TypeRep 	( Type(..) )
+import TyCon
+import HsSyn
+import VarEnv
+import Var
+import Name
 import Bag
 import Outputable
 import SrcLoc	( Located(..) )
 import Maybes
 
+-- standard
 import Data.List
 import Control.Monad (liftM)
 \end{code}
@@ -80,37 +88,49 @@ tcUnfoldSynFamInst _other = return Nothing
 Normalise 'Type's and 'PredType's by unfolding type family applications where
 possible (ie, we treat family instances as a TRS).  Also zonk meta variables.
 
-	tcNormalizeFamInst ty = (co, ty')
+	tcNormaliseFamInst ty = (co, ty')
 	then   co : ty ~ ty'
 
 \begin{code}
-tcNormalizeFamInst :: TcType -> TcM (CoercionI, TcType)
-tcNormalizeFamInst = tcGenericNormalizeFamInst tcUnfoldSynFamInst
+tcNormaliseFamInst :: TcType -> TcM (CoercionI, TcType)
+tcNormaliseFamInst = tcGenericNormaliseFamInst tcUnfoldSynFamInst
 
-tcNormalizeFamInstPred :: TcPredType -> TcM (CoercionI, TcPredType)
-tcNormalizeFamInstPred = tcGenericNormalizeFamInstPred tcUnfoldSynFamInst
+tcNormaliseFamInstPred :: TcPredType -> TcM (CoercionI, TcPredType)
+tcNormaliseFamInstPred = tcGenericNormaliseFamInstPred tcUnfoldSynFamInst
 \end{code}
 
-Normalise a type relative to the rewrite rule implied by one EqInst.
+Normalise a type relative to the rewrite rule implied by one EqInst or an
+already unpacked EqInst (ie, an equality rewrite rule).
 
 \begin{code}
-tcEqInstNormalizeFamInst :: Inst -> TcType -> TcM (CoercionI, Type)
-tcEqInstNormalizeFamInst inst = ASSERT( isEqInst inst )
-                                tcGenericNormalizeFamInst matchInst
+-- Rewrite by EqInst
+tcEqInstNormaliseFamInst :: Inst -> TcType -> TcM (CoercionI, Type)
+tcEqInstNormaliseFamInst inst = 
+  ASSERT( isEqInst inst )
+  tcEqRuleNormaliseFamInst (pat, rhs, co)
   where
     pat = eqInstLeftTy  inst
     rhs = eqInstRightTy inst
-    co  = eitherEqInst  inst TyVarTy id
-    --
-    matchInst ty | pat `tcEqType` ty = return $ Just (rhs, co)
-                 | otherwise         = return $ Nothing
+    co  = eqInstType    inst
+
+-- Rewrite by equality rewrite rule
+tcEqRuleNormaliseFamInst :: (TcType,   -- rewrite rule lhs
+                             TcType,   -- rewrite rule rhs
+                             TcType)   -- coercion witnessing the rewrite rule
+                          -> TcType    -- type to rewrite
+                          -> TcM (CoercionI, Type)
+tcEqRuleNormaliseFamInst (pat, rhs, co) ty
+  = tcGenericNormaliseFamInst matchEqRule ty
+  where
+    matchEqRule sty | pat `tcEqType` sty = return $ Just (rhs, co)
+                    | otherwise          = return $ Nothing
 \end{code}
 
 Generic normalisation of 'Type's and 'PredType's; ie, walk the type term and
 apply the normalisation function gives as the first argument to every TyConApp
 and every TyVarTy subterm.
 
-	tcGenericNormalizeFamInst fun ty = (co, ty')
+	tcGenericNormaliseFamInst fun ty = (co, ty')
 	then   co : ty ~ ty'
 
 This function is (by way of using smart constructors) careful to ensure that
@@ -122,49 +142,49 @@ unfolded closed type synonyms (by way of tcCoreView).  In the interest of
 good error messages, callers should discard ty' in favour of ty in this case.
 
 \begin{code}
-tcGenericNormalizeFamInst :: (TcType -> TcM (Maybe (TcType, Coercion))) 	
+tcGenericNormaliseFamInst :: (TcType -> TcM (Maybe (TcType, Coercion))) 	
                              -- what to do with type functions and tyvars
 	                   -> TcType  			-- old type
 	                   -> TcM (CoercionI, TcType)	-- (coercion, new type)
-tcGenericNormalizeFamInst fun ty
-  | Just ty' <- tcView ty = tcGenericNormalizeFamInst fun ty' 
-tcGenericNormalizeFamInst fun (TyConApp tyCon tys)
-  = do	{ (cois, ntys) <- mapAndUnzipM (tcGenericNormalizeFamInst fun) tys
+tcGenericNormaliseFamInst fun ty
+  | Just ty' <- tcView ty = tcGenericNormaliseFamInst fun ty' 
+tcGenericNormaliseFamInst fun (TyConApp tyCon tys)
+  = do	{ (cois, ntys) <- mapAndUnzipM (tcGenericNormaliseFamInst fun) tys
 	; let tycon_coi = mkTyConAppCoI tyCon ntys cois
-	; maybe_ty_co <- fun (TyConApp tyCon ntys)      -- use normalised args!
+	; maybe_ty_co <- fun (mkTyConApp tyCon ntys)     -- use normalised args!
 	; case maybe_ty_co of
 	    -- a matching family instance exists
 	    Just (ty', co) ->
 	      do { let first_coi = mkTransCoI tycon_coi (ACo co)
-		 ; (rest_coi, nty) <- tcGenericNormalizeFamInst fun ty'
+		 ; (rest_coi, nty) <- tcGenericNormaliseFamInst fun ty'
 		 ; let fix_coi = mkTransCoI first_coi rest_coi
 	   	 ; return (fix_coi, nty)
 		 }
 	    -- no matching family instance exists
 	    -- we do not do anything
-	    Nothing -> return (tycon_coi, TyConApp tyCon ntys)
+	    Nothing -> return (tycon_coi, mkTyConApp tyCon ntys)
 	}
-tcGenericNormalizeFamInst fun (AppTy ty1 ty2)
-  = do	{ (coi1,nty1) <- tcGenericNormalizeFamInst fun ty1
-	; (coi2,nty2) <- tcGenericNormalizeFamInst fun ty2
-	; return (mkAppTyCoI nty1 coi1 nty2 coi2, AppTy nty1 nty2)
+tcGenericNormaliseFamInst fun (AppTy ty1 ty2)
+  = do	{ (coi1,nty1) <- tcGenericNormaliseFamInst fun ty1
+	; (coi2,nty2) <- tcGenericNormaliseFamInst fun ty2
+	; return (mkAppTyCoI nty1 coi1 nty2 coi2, mkAppTy nty1 nty2)
 	}
-tcGenericNormalizeFamInst fun (FunTy ty1 ty2)
-  = do	{ (coi1,nty1) <- tcGenericNormalizeFamInst fun ty1
-	; (coi2,nty2) <- tcGenericNormalizeFamInst fun ty2
-	; return (mkFunTyCoI nty1 coi1 nty2 coi2, FunTy nty1 nty2)
+tcGenericNormaliseFamInst fun (FunTy ty1 ty2)
+  = do	{ (coi1,nty1) <- tcGenericNormaliseFamInst fun ty1
+	; (coi2,nty2) <- tcGenericNormaliseFamInst fun ty2
+	; return (mkFunTyCoI nty1 coi1 nty2 coi2, mkFunTy nty1 nty2)
 	}
-tcGenericNormalizeFamInst fun (ForAllTy tyvar ty1)
-  = do 	{ (coi,nty1) <- tcGenericNormalizeFamInst fun ty1
-	; return (mkForAllTyCoI tyvar coi,ForAllTy tyvar nty1)
+tcGenericNormaliseFamInst fun (ForAllTy tyvar ty1)
+  = do 	{ (coi,nty1) <- tcGenericNormaliseFamInst fun ty1
+	; return (mkForAllTyCoI tyvar coi, mkForAllTy tyvar nty1)
 	}
-tcGenericNormalizeFamInst fun (NoteTy note ty1)
-  = do	{ (coi,nty1) <- tcGenericNormalizeFamInst fun ty1
-	; return (mkNoteTyCoI note coi,NoteTy note nty1)
+tcGenericNormaliseFamInst fun (NoteTy note ty1)
+  = do	{ (coi,nty1) <- tcGenericNormaliseFamInst fun ty1
+	; return (mkNoteTyCoI note coi, NoteTy note nty1)
 	}
-tcGenericNormalizeFamInst fun ty@(TyVarTy tv)
+tcGenericNormaliseFamInst fun ty@(TyVarTy tv)
   | isTcTyVar tv
-  = do	{ traceTc (text "tcGenericNormalizeFamInst" <+> ppr ty)
+  = do	{ traceTc (text "tcGenericNormaliseFamInst" <+> ppr ty)
 	; res <- lookupTcTyVar tv
 	; case res of
 	    DoneTv _ -> 
@@ -172,41 +192,130 @@ tcGenericNormalizeFamInst fun ty@(TyVarTy tv)
 		 ; case maybe_ty' of
 		     Nothing	     -> return (IdCo, ty)
 		     Just (ty', co1) -> 
-                       do { (coi2, ty'') <- tcGenericNormalizeFamInst fun ty'
+                       do { (coi2, ty'') <- tcGenericNormaliseFamInst fun ty'
 			  ; return (ACo co1 `mkTransCoI` coi2, ty'') 
 			  }
 		 }
-	    IndirectTv ty' -> tcGenericNormalizeFamInst fun ty' 
+	    IndirectTv ty' -> tcGenericNormaliseFamInst fun ty' 
 	}
   | otherwise
   = return (IdCo, ty)
-tcGenericNormalizeFamInst fun (PredTy predty)
-  = do 	{ (coi, pred') <- tcGenericNormalizeFamInstPred fun predty
+tcGenericNormaliseFamInst fun (PredTy predty)
+  = do 	{ (coi, pred') <- tcGenericNormaliseFamInstPred fun predty
 	; return (coi, PredTy pred') }
 
 ---------------------------------
-tcGenericNormalizeFamInstPred :: (TcType -> TcM (Maybe (TcType,Coercion)))
+tcGenericNormaliseFamInstPred :: (TcType -> TcM (Maybe (TcType,Coercion)))
 	                      -> TcPredType
 	                      -> TcM (CoercionI, TcPredType)
 
-tcGenericNormalizeFamInstPred fun (ClassP cls tys) 
-  = do { (cois, tys')<- mapAndUnzipM (tcGenericNormalizeFamInst fun) tys
+tcGenericNormaliseFamInstPred fun (ClassP cls tys) 
+  = do { (cois, tys')<- mapAndUnzipM (tcGenericNormaliseFamInst fun) tys
        ; return (mkClassPPredCoI cls tys' cois, ClassP cls tys')
        }
-tcGenericNormalizeFamInstPred fun (IParam ipn ty) 
-  = do { (coi, ty') <- tcGenericNormalizeFamInst fun ty
+tcGenericNormaliseFamInstPred fun (IParam ipn ty) 
+  = do { (coi, ty') <- tcGenericNormaliseFamInst fun ty
        ; return $ (mkIParamPredCoI ipn coi, IParam ipn ty')
        }
-tcGenericNormalizeFamInstPred fun (EqPred ty1 ty2) 
-  = do { (coi1, ty1') <- tcGenericNormalizeFamInst fun ty1
-       ; (coi2, ty2') <- tcGenericNormalizeFamInst fun ty2
+tcGenericNormaliseFamInstPred fun (EqPred ty1 ty2) 
+  = do { (coi1, ty1') <- tcGenericNormaliseFamInst fun ty1
+       ; (coi2, ty2') <- tcGenericNormaliseFamInst fun ty2
        ; return (mkEqPredCoI ty1' coi1 ty2' coi2, EqPred ty1' ty2') }
 \end{code}
 
 
 %************************************************************************
 %*									*
-\section{Normalisation of Given Dictionaries}
+\section{Normalisation of equality constraints}
+%*									*
+%************************************************************************
+
+Note [Inconsistencies in equality constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We guarantee that we raise an error if we discover any inconsistencies (i.e.,
+equalities that if presented to the unifer in TcUnify would result in an
+error) during normalisation of wanted constraints.  This is especially so that
+we don't solve wanted constraints under an inconsistent given set.  In
+particular, we don't want to permit signatures, such as
+
+  bad :: (Int ~ Bool => Int) -> a -> a
+
+\begin{code}
+normaliseGivenEqs :: [Inst] -> TcM ([Inst], TcM ())
+normaliseGivenEqs givens
+ = do { traceTc (text "normaliseGivenEqs <-" <+> ppr givens)
+      ; (result, deSkolem) <- 
+          rewriteToFixedPoint (Just ("(SkolemOccurs)", skolemOccurs))
+	    [ ("(ZONK)",    dontRerun $ zonkInsts)
+	    , ("(TRIVIAL)", dontRerun $ trivialRule)
+	    , ("(DECOMP)",  decompRule)
+	    , ("(TOP)",	    topRule)
+	    , ("(SUBST)",   substRule)                   -- incl. occurs check
+            ] givens
+      ; traceTc (text "normaliseGivenEqs ->" <+> ppr result)
+      ; return (result, deSkolem)
+      }
+\end{code}
+
+\begin{code}
+normaliseWantedEqs :: [Inst] -> TcM [Inst]
+normaliseWantedEqs insts 
+  = do { traceTc (text "normaliseWantedEqs <-" <+> ppr insts)
+       ; result <- liftM fst $ rewriteToFixedPoint Nothing
+		     [ ("(ZONK)",    dontRerun $ zonkInsts)
+		     , ("(TRIVIAL)", dontRerun $ trivialRule)
+		     , ("(DECOMP)",  decompRule)
+		     , ("(TOP)",     topRule)
+		     , ("(UNIFY)",   unifyMetaRule)      -- incl. occurs check
+		     , ("(SUBST)",   substRule)          -- incl. occurs check
+                     ] insts
+       ; traceTc (text "normaliseWantedEqs ->" <+> ppr result)
+       ; return result
+       }
+\end{code}
+
+
+%************************************************************************
+%*									*
+\section{Solving of wanted constraints with respect to a given set}
+%*									*
+%************************************************************************
+
+The set of given equalities must have been normalised already.
+
+\begin{code}
+solveWantedEqs :: [Inst]        -- givens
+	     -> [Inst] 	        -- wanteds
+	     -> TcM [Inst]	-- irreducible wanteds
+solveWantedEqs givens wanteds 
+  = do { traceTc $ text "solveWantedEqs <-" <+> ppr wanteds <+> text "with" <+> 
+                   ppr givens
+       ; result <- liftM fst $ rewriteToFixedPoint Nothing
+                     [ ("(ZONK)",    dontRerun $ zonkInsts)
+                     , ("(TRIVIAL)", dontRerun $ trivialRule)
+                     , ("(DECOMP)",  decompRule)
+                     , ("(TOP)",     topRule)
+                     , ("(GIVEN)",   substGivens givens) -- incl. occurs check
+                     , ("(UNIFY)",   unifyMetaRule)      -- incl. occurs check
+                     ] wanteds
+       ; traceTc (text "solveWantedEqs ->" <+> ppr result)
+       ; return result
+       }
+  where
+    -- Use `substInst' with every given on all the wanteds.
+    substGivens :: [Inst] -> [Inst] -> TcM ([Inst], Bool)		 
+    substGivens []     wanteds = return (wanteds, False)
+    substGivens (g:gs) wanteds
+      = do { (wanteds1, changed1) <- substGivens gs wanteds
+	   ; (wanteds2, changed2) <- substInst g wanteds1
+	   ; return (wanteds2, changed1 || changed2)
+	   }
+\end{code}
+
+
+%************************************************************************
+%*									*
+\section{Normalisation of non-equality dictionaries}
 %*									*
 %************************************************************************
 
@@ -226,7 +335,7 @@ normalise_dicts
 			-- Fals <=> they are given
 	-> TcM ([Inst],TcDictBinds)
 normalise_dicts given_eqs dicts is_wanted
-  = do	{ traceTc $ text "normaliseGivenDicts <-" <+> ppr dicts <+> 
+  = do	{ traceTc $ text "normalise???Dicts <-" <+> ppr dicts <+> 
                     text "with" <+> ppr given_eqs
 	; (dicts0, binds0)  <- normaliseInsts is_wanted dicts
 	; (dicts1, binds1)  <- substEqInDictInsts given_eqs dicts0
@@ -240,86 +349,129 @@ normalise_dicts given_eqs dicts is_wanted
 
 %************************************************************************
 %*									*
-\section{Normalisation of wanteds constraints}
+\section{Normalisation rules and iterative rule application}
 %*									*
 %************************************************************************
 
+We have three kinds of normalising rewrite rules:
+
+(1) Normalisation rules that rewrite a set of insts and return a flag indicating
+    whether any changes occurred during rewriting that necessitate re-running
+    the current rule set.
+
+(2) Precondition rules that rewrite a set of insts and return a monadic action
+    that reverts the effect of preconditioning.
+
+(3) Idempotent normalisation rules that never require re-running the rule set. 
+
 \begin{code}
-normaliseWanteds :: [Inst] -> TcM [Inst]
-normaliseWanteds insts 
-  = do { traceTc (text "normaliseWanteds <-" <+> ppr insts)
-       ; result <- liftM fst $ rewriteToFixedPoint Nothing
-		     [ ("(Occurs)",  noChange  $ occursCheckInsts)
-		     , ("(ZONK)",    dontRerun $ zonkInsts)
-		     , ("(TRIVIAL)", trivialInsts)
-		     -- no `swapInsts'; it messes up error messages and should
-                     -- not be necessary -=chak
-		     , ("(DECOMP)",  decompInsts)
-		     , ("(TOP)",     topInsts)
-		     , ("(SUBST)",   substInsts)
-		     , ("(UNIFY)",   unifyInsts)
-                     ] insts
-       ; traceTc (text "normaliseWanteds ->" <+> ppr result)
-       ; return result
-       }
+type RewriteRule     = [Inst] -> TcM ([Inst], Bool)   -- rewrite, maybe re-run
+type PrecondRule     = [Inst] -> TcM ([Inst], TcM ()) -- rewrite, revertable
+type IdemRewriteRule = [Inst] -> TcM [Inst]           -- rewrite, don't re-run
+
+type NamedRule       = (String, RewriteRule)          -- rule with description
+type NamedPreRule    = (String, PrecondRule)          -- precond with desc
+\end{code}
+
+Template lifting idempotent rules to full rules (which can be put into a rule
+set).
+
+\begin{code}
+dontRerun :: IdemRewriteRule -> RewriteRule
+dontRerun rule insts = liftM addFalse $ rule insts
+  where
+    addFalse x = (x, False)
+\end{code}
+
+The following function applies a set of rewrite rules until a fixed point is
+reached; i.e., none of the `RewriteRule's require re-running the rule set.
+Optionally, there may be a pre-conditing rule that is applied before any other
+rules are applied and before the rule set is re-run.
+
+The result is the set of rewritten (i.e., normalised) insts and, in case of a
+pre-conditing rule, a monadic action that reverts the effects of
+pre-conditioning - specifically, this is removing introduced skolems.
+
+\begin{code}
+rewriteToFixedPoint :: Maybe NamedPreRule   -- optional preconditioning rule
+                    -> [NamedRule]          -- rule set
+                    -> [Inst]               -- insts to rewrite
+                    -> TcM ([Inst], TcM ())
+rewriteToFixedPoint precondRule rules insts
+  = completeRewrite (return ()) precondRule insts
+  where
+    completeRewrite :: TcM () -> Maybe NamedPreRule -> [Inst] 
+                    -> TcM ([Inst], TcM ())
+    completeRewrite dePrecond (Just (precondName, precond)) insts
+      = do { traceTc $ text precondName <+> text " <- " <+> ppr insts
+           ; (insts', dePrecond') <- precond insts
+           ; traceTc $ text precondName <+> text " -> " <+> ppr insts'
+           ; tryRules (dePrecond >> dePrecond') rules insts'
+           }
+    completeRewrite dePrecond Nothing insts
+      = tryRules dePrecond rules insts
+
+    tryRules dePrecond _                    []    = return ([]   , dePrecond)
+    tryRules dePrecond []                   insts = return (insts, dePrecond)
+    tryRules dePrecond ((name, rule):rules) insts 
+      = do { traceTc $ text name <+> text " <- " <+> ppr insts
+           ; (insts', rerun) <- rule insts
+           ; traceTc $ text name <+> text " -> " <+> ppr insts'
+	   ; if rerun then completeRewrite dePrecond precondRule insts'
+		      else tryRules dePrecond rules insts'
+           }
 \end{code}
 
 
 %************************************************************************
 %*									*
-\section{Normalisation of givens constraints}
+\section{Different forms of Inst rewrite rules}
 %*									*
 %************************************************************************
 
-\begin{code}
-normaliseGivens :: [Inst] -> TcM ([Inst], TcM ())
-normaliseGivens givens
- = do { traceTc (text "normaliseGivens <-" <+> ppr givens)
-      ; (result, deSkolem) <- 
-          rewriteToFixedPoint (Just ("(SkolemOccurs)", skolemOccurs))
-	    [ ("(Occurs)",  noChange  $ occursCheckInsts)
-	    , ("(ZONK)",    dontRerun $ zonkInsts)
-	    , ("(TRIVIAL)", trivialInsts)
-	    , ("(SWAP)",    swapInsts)
-	    , ("(DECOMP)",  decompInsts)
-	    , ("(TOP)",	    topInsts)
-	    , ("(SUBST)",   substInsts)
-            ] givens
-      ; traceTc (text "normaliseGivens ->" <+> ppr result)
-      ; return (result, deSkolem)
-      }
-\end{code}
+Splitting of non-terminating given constraints: skolemOccurs
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This is a preconditioning rule exclusively applied to given constraints.
+Moreover, its rewriting is only temporary, as it is undone by way of
+side-effecting mutable type variables after simplification and constraint
+entailment has been completed.
 
-
-This is an (attempt at, yet unproven, an) *unflattened* version of
+This version is an (attempt at, yet unproven, an) *unflattened* version of
 the SubstL-Ev completion rule.
 
-The above rule is essential to catch non-terminating
-rules that cannot be oriented properly, like
+The above rule is essential to catch non-terminating rules that cannot be
+oriented properly, like 
 
      F a ~ [G (F a)]
  or even
      a ~ [G a]
 
 The left-to-right orientiation is not suitable because it does not
-terminate.
-The right-to-left orientation is not suitable because it 
+terminate. The right-to-left orientation is not suitable because it 
 does not have a type-function on the left. This is undesirable because
 it would hide information. E.g. assume 
+
 	instance C [x]
+
 then rewriting C [G (F a)] to C (F a) is bad because we cannot now
 see that the C [x] instance applies.
 
 The rule also caters for badly-oriented rules of the form:
+
      F a ~ G (F a)
+
 for which other solutions are possible, but this one will do too.
 
 It's behavior is:
+
   co : ty1 ~ ty2{F ty1}
      >-->
   co         : ty1 ~ ty2{b}
   sym (F co) : F ty2{b} ~ b
  	where b is a fresh skolem variable
+
+We also cater for the symmetric situation *if* the rule cannot be used as a
+left-to-right rewrite rule.
 
 We also return an action (b := ty1) which is used to eliminate b 
 after the dust of normalisation with the completed rewrite system
@@ -345,481 +497,533 @@ skolemOccurs insts
        }
   where
     oneSkolemOccurs inst
-      | null tysToLiftOut 
-      = return ([inst], return ())
-      | otherwise
-      = do { skTvs <- mapM (newMetaTyVar TauTv . typeKind) tysToLiftOut
-           ; let skTvs_tysTLO   = zip skTvs tysToLiftOut
-                 insertSkolems = return . replace skTvs_tysTLO
-           ; (_, ty2') <- tcGenericNormalizeFamInst insertSkolems ty2
-           ; inst' <- mkEqInst (EqPred ty1 ty2') co
-           ; (insts, undoSk) <- mapAndUnzipM (mkSkolemInst inst') skTvs_tysTLO
-           ; return (inst':insts, sequence_ undoSk)
-           }
+      = ASSERT( isEqInst inst )
+        isRewriteRule (eqInstLeftTy inst) (eqInstRightTy inst)
       where
-        ty1 = eqInstLeftTy   inst
-        ty2 = eqInstRightTy  inst
-        co  = eqInstCoercion inst
 
-        -- all subtypes that are (1) type family instances and (2) contain the
-        -- lhs type as part of the type arguments of the type family constructor
-        tysToLiftOut = ASSERT( isEqInst inst )
-                       [mkTyConApp tc tys | (tc, tys) <- tyFamInsts ty2
-                                          , any (ty1 `tcPartOfType`) tys]
+        -- look through synonyms
+        isRewriteRule ty1 ty2 | Just ty1' <- tcView ty1 = isRewriteRule ty1' ty2
+        isRewriteRule ty1 ty2 | Just ty2' <- tcView ty2 = isRewriteRule ty1 ty2'
 
-        replace :: [(TcTyVar, Type)] -> Type -> Maybe (Type, Coercion)
-        replace []                   _  = Nothing
-        replace ((skTv, tyTLO):rest) ty 
-          | tyTLO `tcEqType` ty         = Just (mkTyVarTy skTv, undefined)
-          | otherwise                   = replace rest ty
+        -- left-to-right rule with type family head
+        isRewriteRule ty1@(TyConApp con _) ty2
+          | isOpenSynTyCon con
+          = breakRecursion ty1 ty2 False    -- not swapped
 
-        -- create the EqInst for the equality determining the skolem and a
-        -- TcM action undoing the skolem introduction
-        mkSkolemInst inst' (skTv, tyTLO)
-          = do { (co, tyLiftedOut) <- tcEqInstNormalizeFamInst inst' tyTLO
-               ; inst <- mkEqInst (EqPred tyLiftedOut (mkTyVarTy skTv)) 
-                                  (mkGivenCo $ mkSymCoercion (fromACo co))
-               ; return (inst, writeMetaTyVar skTv tyTLO) 
+        -- left-to-right rule with type variable head
+        isRewriteRule ty1@(TyVarTy _) ty2
+          = breakRecursion ty1 ty2 False    -- not swapped
+
+        -- right-to-left rule with type family head
+        isRewriteRule ty1 ty2@(TyConApp con _)
+          | isOpenSynTyCon con
+          = breakRecursion ty2 ty1 True     -- swapped
+
+        -- right-to-left rule with type variable head
+        isRewriteRule ty1 ty2@(TyVarTy _)
+          = breakRecursion ty2 ty1 True     -- swapped
+
+        -- this equality is not a rewrite rule => ignore
+        isRewriteRule _ _ = return ([inst], return ())
+
+
+        breakRecursion pat body swapped
+          | null tysToLiftOut 
+          = return ([inst], return ())
+          | otherwise
+          = do { skTvs <- mapM (newMetaTyVar TauTv . typeKind) tysToLiftOut
+               ; let skTvs_tysTLO   = zip skTvs tysToLiftOut
+                     insertSkolems = return . replace skTvs_tysTLO
+               ; (_, body') <- tcGenericNormaliseFamInst insertSkolems body
+               ; inst' <- if swapped then mkEqInst (EqPred body' pat) co
+                                     else mkEqInst (EqPred pat body') co
+                                     -- ensure to reconstruct the inst in the
+                                     -- original orientation
+               ; (insts, undoSk) <- mapAndUnzipM (mkSkolemInst inst') 
+                                                 skTvs_tysTLO
+               ; return (inst':insts, sequence_ undoSk)
+               }
+          where
+            co  = eqInstCoercion inst
+
+            -- all subtypes that are (1) type family instances and (2) contain
+            -- the lhs type as part of the type arguments of the type family
+            -- constructor 
+            tysToLiftOut = [mkTyConApp tc tys | (tc, tys) <- tyFamInsts body
+                                              , any (pat `tcPartOfType`) tys]
+
+            replace :: [(TcTyVar, Type)] -> Type -> Maybe (Type, Coercion)
+            replace []                   _  = Nothing
+            replace ((skTv, tyTLO):rest) ty 
+              | tyTLO `tcEqType` ty         = Just (mkTyVarTy skTv, undefined)
+              | otherwise                   = replace rest ty
+
+            -- create the EqInst for the equality determining the skolem and a
+            -- TcM action undoing the skolem introduction
+            mkSkolemInst inst' (skTv, tyTLO)
+              = do { (co, tyLiftedOut) <- tcEqInstNormaliseFamInst inst' tyTLO
+                   ; inst <- mkEqInst (EqPred tyLiftedOut (mkTyVarTy skTv)) 
+                                      (mkGivenCo $ mkSymCoercion (fromACo co))
+                   ; return (inst, writeMetaTyVar skTv tyTLO) 
+                   }
+\end{code}
+
+
+Removal of trivial equalities: trivialRule
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The following rules exploits the reflexivity of equality:
+
+  (Trivial)
+    g1 : t ~ t
+      >-->
+    g1 := t
+
+\begin{code}
+trivialRule :: IdemRewriteRule
+trivialRule insts 
+  = liftM catMaybes $ mappM trivial insts
+  where
+    trivial inst
+      | ASSERT( isEqInst inst )
+        ty1 `tcEqType` ty2
+      = do { eitherEqInst inst
+	       (\cotv -> writeMetaTyVar cotv ty1) 
+	       (\_    -> return ())
+	   ; return Nothing
+	   }
+      | otherwise
+      = return $ Just inst
+      where
+	 ty1 = eqInstLeftTy  inst
+	 ty2 = eqInstRightTy inst
+\end{code}
+
+
+Decomposition of data type constructors: decompRule
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Whenever, the same *data* constructors occurs on both sides of an equality, we
+can decompose as in standard unification.
+
+  (Decomp)
+    g1 : T cs ~ T ds
+      >-->
+    g21 : c1 ~ d1, ..., g2n : cn ~ dn
+    g1 := T g2s
+
+Works also for the case where T is actually an application of a type family
+constructor to a set of types, provided the applications on both sides of the
+~ are identical; see also Note [OpenSynTyCon app] in TcUnify.
+
+We guarantee to raise an error for any inconsistent equalities; 
+cf Note [Inconsistencies in equality constraints].
+
+\begin{code}
+decompRule :: RewriteRule
+decompRule insts 
+  = do { (insts, changed) <- mapAndUnzipM decomp insts
+       ; return (concat insts, or changed)
+       }
+  where
+    decomp inst
+      = ASSERT( isEqInst inst )
+        go (eqInstLeftTy inst) (eqInstRightTy inst)
+      where
+        go ty1 ty2		
+          | Just ty1' <- tcView ty1 = go ty1' ty2 
+          | Just ty2' <- tcView ty2 = go ty1 ty2' 
+
+        go (TyConApp con1 tys1) (TyConApp con2 tys2)
+          | con1 == con2 && identicalHead
+          = mkArgInsts (mkTyConApp con1) tys1 tys2
+
+          | con1 /= con2 && not (isOpenSynTyCon con1 || isOpenSynTyCon con2)
+            -- not matching data constructors (of any flavour) are bad news
+          = eqInstMisMatch inst
+          where
+            n             = tyConArity con1
+            (idxTys1, _)  = splitAt n tys1
+            (idxTys2, _)  = splitAt n tys2
+            identicalHead = not (isOpenSynTyCon con1) ||
+                            idxTys1 `tcEqTypes` idxTys2
+
+        go (FunTy fun1 arg1) (FunTy fun2 arg2)
+          = mkArgInsts (\[funCo, argCo] -> mkFunTy funCo argCo) [fun1, arg1]
+                                                                [fun2, arg2]
+
+	-- Applications need a bit of care!
+	-- They can match FunTy and TyConApp, so use splitAppTy_maybe
+        go (AppTy s1 t1) ty2
+          | Just (s2, t2) <- tcSplitAppTy_maybe ty2
+          = mkArgInsts (\[s, t] -> mkAppTy s t) [s1, t1] [s2, t2]
+
+        -- Symmetric case
+        go ty1 (AppTy s2 t2)
+          | Just (s1, t1) <- tcSplitAppTy_maybe ty1
+          = mkArgInsts (\[s, t] -> mkAppTy s t) [s1, t1] [s2, t2]
+
+        -- We already covered all the consistent cases of rigid types on both
+        -- sides; so, if we see two rigid types here, we discovered an
+        -- inconsistency. 
+        go ty1 ty2 
+          | isRigid ty1 && isRigid ty2
+          = eqInstMisMatch inst
+
+        -- We can neither assert consistency nor inconsistency => defer
+        go _ _ = return ([inst], False)
+
+        isRigid (TyConApp con _) = not (isOpenSynTyCon con)
+        isRigid (FunTy _ _)      = True
+        isRigid (AppTy _ _)      = True
+        isRigid _                = False
+
+        -- Create insts for matching argument positions (ie, the bit after
+        -- '>-->' in the rule description above)
+        mkArgInsts con tys1 tys2
+          = do { cos <- eitherEqInst inst
+                          -- old_co := Con1 cos
+                          (\old_covar ->
+                            do { cotvs <- zipWithM newMetaCoVar tys1 tys2
+                               ; let cos = map mkTyVarTy cotvs
+                               ; writeMetaTyVar old_covar (con cos)
+                               ; return $ map mkWantedCo cotvs
+                               })
+                          -- co_i := Con_i old_co
+                          (\old_co -> 
+                            return $ map mkGivenCo $
+                                         mkRightCoercions (length tys1) old_co)
+               ; insts <- zipWithM mkEqInst (zipWith EqPred tys1 tys2) cos
+               ; traceTc (text "decomp identicalHead" <+> ppr insts) 
+               ; return (insts, not $ null insts) 
                }
 \end{code}
 
 
-%************************************************************************
-%*									*
-\section{Solving of wanted constraints with respect to a given set}
-%*									*
-%************************************************************************
+Rewriting with type instances: topRule
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We use (toplevel) type instances to normalise both sides of equalities.
+
+  (Top)
+    g1 : t ~ s
+      >--> co1 :: t ~ t' / co2 :: s ~ s'
+    g2 : t' ~ s'
+    g1 := co1 * g2 * sym co2
 
 \begin{code}
-solveWanteds :: [Inst]          -- givens
-	     -> [Inst] 	        -- wanteds
-	     -> TcM [Inst]	-- irreducible wanteds
-solveWanteds givens wanteds 
-  = do { traceTc $ text "solveWanteds <-" <+> ppr wanteds <+> text "with" <+> 
-                   ppr givens
-       ; result <- liftM fst $ rewriteToFixedPoint Nothing
-                     [ ("(Occurs)",  noChange $ occursCheckInsts)
-                     , ("(TRIVIAL)", trivialInsts)
-                     , ("(DECOMP)",  decompInsts)
-                     , ("(TOP)",     topInsts)
-                     , ("(GIVEN)",   givenInsts givens)
-                     , ("(UNIFY)",   unifyInsts)
-                     ] wanteds
-       ; traceTc (text "solveWanteds ->" <+> ppr result)
-       ; return result
-       }
+topRule :: RewriteRule
+topRule insts 
+  =  do { (insts, changed) <- mapAndUnzipM top insts
+	; return (insts, or changed)
+	}
   where
-    -- Use `substInst' with every given on all the wanteds.
-    givenInsts :: [Inst] -> [Inst] -> TcM ([Inst],Bool)		 
-    givenInsts []     wanteds = return (wanteds,False)
-    givenInsts (g:gs) wanteds
-      = do { (wanteds1, changed1) <- givenInsts gs wanteds
-	   ; (wanteds2, changed2) <- substInst g wanteds1
-	   ; return (wanteds2, changed1 || changed2)
-	   }
-\end{code}
-
-
-%************************************************************************
-%*									*
-\section{Normalisation rules and iterative rule application}
-%*									*
-%************************************************************************
-
-We have four kinds of normalising rewrite rules:
-
-(1) Normalisation rules that rewrite a set of insts and return a flag indicating
-    whether any changes occurred during rewriting that necessitate re-running
-    the current rule set.
-
-(2) Precondition rules that rewrite a set of insts and return a monadic action
-    that reverts the effect of preconditioning.
-
-(3) Idempotent normalisation rules that never require re-running the rule set. 
-
-(4) Checking rule that does not alter the set of insts. 
-
-\begin{code}
-type RewriteRule     = [Inst] -> TcM ([Inst], Bool)   -- rewrite, maybe re-run
-type PrecondRule     = [Inst] -> TcM ([Inst], TcM ()) -- rewrite, revertable
-type IdemRewriteRule = [Inst] -> TcM [Inst]           -- rewrite, don't re-run
-type CheckRule       = [Inst] -> TcM ()               -- check
-
-type NamedRule       = (String, RewriteRule)          -- rule with description
-type NamedPreRule    = (String, PrecondRule)          -- precond with desc
-\end{code}
-
-Templates lifting idempotent and checking rules to full rules (which can be put
-into a rule set).
-
-\begin{code}
-dontRerun :: IdemRewriteRule -> RewriteRule
-dontRerun rule insts = liftM addFalse $ rule insts
-  where
-    addFalse x = (x, False)
-
-noChange :: CheckRule -> RewriteRule
-noChange rule insts = rule insts >> return (insts, False)
-\end{code}
-
-The following function applies a set of rewrite rules until a fixed point is
-reached; i.e., none of the `RewriteRule's require re-running the rule set.
-Optionally, there may be a pre-conditing rule that is applied before any other
-rules are applied and before the rule set is re-run.
-
-The result is the set of rewritten (i.e., normalised) insts and, in case of a
-pre-conditing rule, a monadic action that reverts the effects of
-pre-conditioning - specifically, this is removing introduced skolems.
-
-\begin{code}
-rewriteToFixedPoint :: Maybe NamedPreRule   -- optional preconditioning rule
-                    -> [NamedRule]          -- rule set
-                    -> [Inst]               -- insts to rewrite
-                    -> TcM ([Inst], TcM ())
-rewriteToFixedPoint precondRule rules insts
-  = completeRewrite (return ()) precondRule insts
-  where
-    completeRewrite :: TcM () -> Maybe NamedPreRule -> [Inst] 
-                    -> TcM ([Inst], TcM ())
-    completeRewrite dePrecond (Just (precondName, precond)) insts
-      = do { (insts', dePrecond') <- precond insts
-           ; traceTc $ text precondName <+> ppr insts'
-           ; tryRules (dePrecond >> dePrecond') rules insts'
-           }
-    completeRewrite dePrecond Nothing insts
-      = tryRules dePrecond rules insts
-
-    tryRules dePrecond _                    []    = return ([]   , dePrecond)
-    tryRules dePrecond []                   insts = return (insts, dePrecond)
-    tryRules dePrecond ((name, rule):rules) insts 
-      = do { (insts', rerun) <- rule insts
-           ; traceTc $ text name <+> ppr insts'
-	   ; if rerun then completeRewrite dePrecond precondRule insts'
-		      else tryRules dePrecond rules insts'
-           }
-\end{code}
-
-
-%************************************************************************
-%*									*
-\section{Different forms of Inst rewritings}
-%*									*
-%************************************************************************
-
-Rewrite schemata applied by way of eq_rewrite and friends.
-
-\begin{code}
-
-	-- (Trivial)
-	--	g1 : t ~ t
-	--		>-->
-	--	g1 := t
-	--
-trivialInsts :: RewriteRule
-trivialInsts []
-	= return ([],False)
-trivialInsts (i@(EqInst {}):is)
-	= do { (is',changed)<- trivialInsts is
-	     ; if tcEqType ty1 ty2
-		  then do { eitherEqInst i 
-				(\covar -> writeMetaTyVar covar ty1) 
-			        (\_     -> return ())
-			  ; return (is',True)
-			  }
-		  else return (i:is',changed)
+    top inst
+      = ASSERT( isEqInst inst )
+        do { (coi1, ty1') <- tcNormaliseFamInst ty1
+	   ; (coi2, ty2') <- tcNormaliseFamInst ty2
+	   ; case (coi1, coi2) of
+	       (IdCo, IdCo) -> return (inst, False)
+	       _            -> 
+                 do { wg_co <- 
+                       eitherEqInst inst
+                         -- old_co = co1 * new_co * sym co2
+                         (\old_covar ->
+                           do { new_cotv <- newMetaCoVar ty1' ty2'
+                              ; let new_co  = mkTyVarTy new_cotv
+                                    old_coi = coi1 `mkTransCoI` 
+                                              ACo new_co `mkTransCoI` 
+                                              (mkSymCoI coi2)
+                              ; writeMetaTyVar old_covar (fromACo old_coi)
+                              ; return $ mkWantedCo new_cotv
+                              })
+                         -- new_co = sym co1 * old_co * co2
+                         (\old_co -> 
+                           return $ 
+                             mkGivenCo $ 
+                               fromACo $ 
+                                 mkSymCoI coi1 `mkTransCoI` 
+                                 ACo old_co `mkTransCoI` coi2)	
+                   ; new_inst <- mkEqInst (EqPred ty1' ty2') wg_co 
+                   ; return (new_inst, True)
+                   }
 	     }
-	where
-	   ty1 = eqInstLeftTy i
-	   ty2 = eqInstRightTy i
-trivialInsts _ = panic "TcTyFuns.trivialInsts: not EqInst"
+      where
+        ty1 = eqInstLeftTy  inst
+	ty2 = eqInstRightTy inst
+\end{code}
 
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-swapInsts :: RewriteRule
--- All the inputs and outputs are equalities
-swapInsts insts 
-  = do { (insts', changeds) <- mapAndUnzipM swapInst insts
-       ; return (insts', or changeds)
-       }
 
-	-- (Swap)
-	-- 	g1 : c ~ F d
-	--		>-->
-	--	g2 : F d ~ c
-	--	g1 := sym g2
-	--		where c isn't a function call
-        --  and
-	--
-	-- 	g1 : c ~ a
-	--		>-->
-	--	g2 : a ~ c
-	--	g1 := sym g2
-	--		where c isn't a function call or other variable
-swapInst :: Inst -> TcM (Inst, Bool)
-swapInst i@(EqInst {})
-	= go ty1 ty2
-	where
-	      ty1 = eqInstLeftTy i
-	      ty2 = eqInstRightTy i
-              go ty1 ty2		| Just ty1' <- tcView ty1 
-		     			= go ty1' ty2 
-              go ty1 ty2		| Just ty2' <- tcView ty2
-		     			= go ty1 ty2' 
-	      go (TyConApp tyCon _) _	| isOpenSynTyCon tyCon
-					= return (i,False)
-		-- we should swap!
-	      go ty1 ty2@(TyConApp tyCon _) 
-					| isOpenSynTyCon tyCon
-					= actual_swap ty1 ty2
-	      go ty1@(TyConApp _ _) ty2@(TyVarTy _)
-					= actual_swap ty1 ty2
-	      go _ _			= return (i,False)
+Rewriting with equalities: substRule
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+From a set of insts, use all insts that can be read as rewrite rules to
+rewrite the types in all other insts.
 
-	      actual_swap ty1 ty2 = do { wg_co <- eitherEqInst i
-						          -- old_co := sym new_co
-						          (\old_covar ->
-							   do { new_cotv <- newMetaTyVar TauTv (mkCoKind ty2 ty1)
-						              ; let new_co = TyVarTy new_cotv
-							      ; writeMetaTyVar old_covar (mkCoercion symCoercionTyCon [new_co])
-							      ; return $ mkWantedCo new_cotv
-							      })
-						          -- new_co := sym old_co
-					   	          (\old_co -> return $ mkGivenCo $ mkCoercion symCoercionTyCon [old_co])
-					     ; new_inst <- mkEqInst (EqPred ty2 ty1) wg_co
-					     ; return (new_inst,True)
-					     }
-swapInst _ = panic "TcTyFuns.swapInst: not EqInst"
+  (Subst)
+    g : F c ~ t,
+    forall g1 : s1{F c} ~ s2{F c}
+      >-->
+    g2 : s1{t} ~ s2{t}
+    g1 := s1{g} * g2  * sym s2{g}  <=>  g2 := sym s1{g} * g1 * s2{g}
 
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-decompInsts :: RewriteRule
-decompInsts insts = do { (insts,bs) <- mapAndUnzipM decompInst insts
-		       ; return (concat insts,or bs)
-		       }
+Alternatively, the rewrite rule may have the form (g : a ~ t).
 
-	-- (Decomp)
-	-- 	g1 : T cs ~ T ds
-	--		>-->
-	--	g21 : c1 ~ d1, ..., g2n : cn ~ dn
-	--	g1 := T g2s
-	--
-	--  Works also for the case where T is actually an application of a 
-        --  type family constructor to a set of types, provided the 
-        --  applications on both sides of the ~ are identical;
-        --  see also Note [OpenSynTyCon app] in TcUnify
-	--
-decompInst :: Inst -> TcM ([Inst],Bool)
-decompInst i@(EqInst {})
-  = go ty1 ty2
-  where 
-    ty1 = eqInstLeftTy i
-    ty2 = eqInstRightTy i
-    go ty1 ty2		
-      | Just ty1' <- tcView ty1 = go ty1' ty2 
-      | Just ty2' <- tcView ty2 = go ty1 ty2' 
+To avoid having to swap rules of the form (g : t ~ F c) and (g : t ~ a),
+where t is neither a variable nor a type family application, we use them for
+rewriting from right-to-left.  However, it is crucial to only apply rules
+from right-to-left if they cannot be used left-to-right.
 
-    go ty1@(TyConApp con1 tys1) ty2@(TyConApp con2 tys2)
-      | con1 == con2 && identicalHead
-      = do { cos <- eitherEqInst i
-                      -- old_co := Con1 cos
-                      (\old_covar ->
-                        do { cotvs <- zipWithM (\t1 t2 -> 
-                                                newMetaTyVar TauTv 
-                                                             (mkCoKind t1 t2)) 
-                                               tys1 tys2
-                           ; let cos = map TyVarTy cotvs
-                           ; writeMetaTyVar old_covar (TyConApp con1 cos)
-                           ; return $ map mkWantedCo cotvs
-                           })
-                      -- co_i := Con_i old_co
-                      (\old_co -> return $ 
-                                    map mkGivenCo $
-                                        mkRightCoercions (length tys1) old_co)
-           ; insts <- zipWithM mkEqInst (zipWith EqPred tys1 tys2) cos
-           ; traceTc (text "decomp identicalHead" <+> ppr insts) 
-           ; return (insts, not $ null insts) 
-           }
-      | con1 /= con2 && not (isOpenSynTyCon con1 || isOpenSynTyCon con2)
-        -- not matching data constructors (of any flavour) are bad news
-      = do { env0 <- tcInitTidyEnv
-           ; let (env1, tidy_ty1) = tidyOpenType env0 ty1
-                 (env2, tidy_ty2) = tidyOpenType env1 ty2
-                 extra 	          = sep [ppr tidy_ty1, char '~', ppr tidy_ty2]
-                 msg 		  = 
-                   ptext SLIT("Unsolvable equality constraint:")
-           ; failWithTcM (env2, hang msg 2 extra)
+The workhorse is substInst, which performs an occurs check before actually
+using an equality for rewriting.  If the type pattern occurs in the type we
+substitute for the pattern, normalisation would diverge.
+
+\begin{code}
+substRule :: RewriteRule
+substRule insts = tryAllInsts insts []
+  where
+    -- for every inst check whether it can be used to rewrite the others
+    -- (we make an effort to keep the insts in order; it makes debugging
+    -- easier)
+    tryAllInsts []           triedInsts = return (reverse triedInsts, False)
+    tryAllInsts (inst:insts) triedInsts
+      = do { (insts', changed) <- substInst inst (reverse triedInsts ++ insts)
+           ; if changed then return (insertAt (length triedInsts) inst insts',
+                                     True)
+                        else tryAllInsts insts (inst:triedInsts)
            }
       where
-        n             = tyConArity con1
-        (idxTys1, _)  = splitAt n tys1
-        (idxTys2, _)  = splitAt n tys2
-        identicalHead = not (isOpenSynTyCon con1) ||
-                        idxTys1 `tcEqTypes` idxTys2
+        insertAt n x xs = let (xs1, xs2) = splitAt n xs
+                          in xs1 ++ [x] ++ xs2
 
-    go _ _ = return ([i], False)
-decompInst _ = panic "TcTyFuns.decompInst: not EqInst"
-
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-topInsts :: RewriteRule
-topInsts insts 
-	=  do { (insts,bs) <- mapAndUnzipM topInst insts
-	      ; return (insts,or bs)
-	      }
-
-	-- (Top)
-	-- 	g1 : t ~ s
-	--		>--> co1 :: t ~ t' / co2 :: s ~ s'
-	--	g2 : t' ~ s'
-	--	g1 := co1 * g2 * sym co2
-topInst :: Inst -> TcM (Inst,Bool)
-topInst i@(EqInst {})
-	= do { (coi1,ty1') <- tcNormalizeFamInst ty1
-	     ; (coi2,ty2') <- tcNormalizeFamInst ty2
-	     ; case (coi1,coi2) of
-		(IdCo,IdCo) -> 
-		  return (i,False)
-		_           -> 
-		 do { wg_co <- eitherEqInst i
-			         -- old_co = co1 * new_co * sym co2
-			         (\old_covar ->
-                                  do { new_cotv <- newMetaTyVar TauTv (mkCoKind ty1 ty2)
-			             ; let new_co = TyVarTy new_cotv
-				     ; let old_coi = coi1 `mkTransCoI` ACo new_co `mkTransCoI` (mkSymCoI coi2)
-				     ; writeMetaTyVar old_covar (fromACo old_coi)
-			             ; return $ mkWantedCo new_cotv
-				     })
-				 -- new_co = sym co1 * old_co * co2
-			         (\old_co -> return $ mkGivenCo $ fromACo $ mkSymCoI coi1 `mkTransCoI` ACo old_co `mkTransCoI` coi2)	
-		    ; new_inst <- mkEqInst (EqPred ty1' ty2') wg_co 
-		    ; return (new_inst,True)
-		    }
-	     }
-	where
-	      ty1 = eqInstLeftTy i
-	      ty2 = eqInstRightTy i
-topInst _ = panic "TcTyFuns.topInsts: not EqInst"
-
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-substInsts :: RewriteRule
-substInsts insts = substInstsWorker insts []
-
-substInstsWorker :: [Inst] -> [Inst] -> TcM ([Inst],Bool)
-substInstsWorker [] acc 
-	= return (acc,False)
-substInstsWorker (i:is) acc 
-	| (TyConApp con _) <- tci_left i, isOpenSynTyCon con
-	= do { (is',change) <- substInst i (acc ++ is)
-	     ; if change 
-		  then return ((i:is'),True)
-                  else substInstsWorker is (i:acc)
-	     }
-	| (TyVarTy _) <- tci_left i
-	= do { (is',change) <- substInst i (acc ++ is)
-	     ; if change 
-		  then return ((i:is'),True)
-                  else substInstsWorker is (i:acc)
-	     }
-	| otherwise
-	= substInstsWorker is (i:acc)
-		
-	-- (Subst)
-	--	g : F c ~ t,
-	--	forall g1 : s1{F c} ~ s2{F c}
-	--		>-->
-	--	g2 : s1{t} ~ s2{t}
-	--	g1 := s1{g} * g2  * sym s2{g}		<=> 	g2 := sym s1{g} * g1 * s2{g}
+-- Use the given inst as a rewrite rule to normalise the insts in the second
+-- argument.  Don't do anything if the inst cannot be used as a rewrite rule,
+-- but do apply it right-to-left, if possible, and if it cannot be used
+-- left-to-right. 
+--
 substInst :: Inst -> [Inst] -> TcM ([Inst], Bool)
-substInst _inst [] = return ([],False)
-substInst inst (i@(EqInst {tci_left = ty1, tci_right = ty2}):is)
-	= do { (is',changed) <- substInst inst is
-	     ; (coi1,ty1')   <- normalise ty1
-	     ; (coi2,ty2')   <- normalise ty2
-	     ; case (coi1,coi2) of
-		(IdCo,IdCo) -> 
-		  return (i:is',changed)
-		_           -> 
-		  do { gw_co <- eitherEqInst i
-			          -- old_co := co1 * new_co * sym co2
-			          (\old_covar ->
-				   do { new_cotv <- newMetaTyVar TauTv (mkCoKind ty1' ty2')
-			              ; let new_co = TyVarTy new_cotv
-				      ; let old_coi = coi1 `mkTransCoI` ACo new_co `mkTransCoI` (mkSymCoI coi2)
-				      ; writeMetaTyVar old_covar (fromACo old_coi)
-			              ; return $ mkWantedCo new_cotv
-				      })
-			          -- new_co := sym co1 * old_co * co2
-			          (\old_co -> return $ mkGivenCo $ fromACo $ (mkSymCoI coi1) `mkTransCoI` ACo old_co `mkTransCoI` coi2)
+substInst inst insts
+  = ASSERT( isEqInst inst )
+    go (eqInstLeftTy inst) (eqInstRightTy inst) (eqInstType inst)
+  where
+    -- look through synonyms
+    go ty1 ty2 co | Just ty1' <- tcView ty1 = go ty1' ty2 co
+    go ty1 ty2 co | Just ty2' <- tcView ty2 = go ty1 ty2' co
+
+    -- rewrite type family applications
+    go ty1@(TyConApp con _) ty2 co 
+      | isOpenSynTyCon con
+      = substEquality (ty1, ty2, co) insts
+
+    -- rewrite skolems
+    go ty1@(TyVarTy tv) ty2 co 
+      | isSkolemTyVar tv
+      = substEquality (ty1, ty2, co) insts
+
+    -- rewrite type family applications from right-to-left, only after
+    -- having checked whether we can work left-to-right
+    go ty1 ty2@(TyConApp con _) co 
+      | isOpenSynTyCon con
+      = substEquality (ty2, ty1, mkSymCoercion co) insts
+
+    -- rewrite skolems from right-to-left, only after having checked
+    -- whether we can work left-to-right 
+    go ty1 ty2@(TyVarTy tv) co 
+      | isSkolemTyVar tv
+      = substEquality (ty2, ty1, mkSymCoercion co) insts
+
+    go _ _ _ = return (insts, False)
+
+    substEquality :: (TcType,   -- rewrite rule lhs
+                      TcType,   -- rewrite rule rhs
+                      TcType)   -- coercion witnessing the rewrite rule
+                  -> [Inst]     -- insts to rewrite
+                  -> TcM ([Inst], Bool)
+    substEquality eqRule@(pat, rhs, _) insts
+      | pat `tcPartOfType` rhs      -- occurs check!
+      = occurCheckErr pat rhs
+      | otherwise
+      = do { (insts', changed) <- mapAndUnzipM substOne insts
+           ; return (insts', or changed)
+           }
+      where
+        substOne inst
+          = ASSERT( isEqInst inst )
+            do { (coi1, ty1') <- tcEqRuleNormaliseFamInst eqRule ty1
+	       ; (coi2, ty2') <- tcEqRuleNormaliseFamInst eqRule ty2
+	       ; case (coi1, coi2) of
+		(IdCo, IdCo) -> return (inst, False)
+		_            -> 
+		  do { gw_co <- 
+                         eitherEqInst inst
+			   -- old_co := co1 * new_co * sym co2
+			   (\old_covar ->
+			     do { new_cotv <- newMetaCoVar ty1' ty2'
+			        ; let new_co  = mkTyVarTy new_cotv
+				      old_coi = coi1 `mkTransCoI` 
+                                                ACo new_co `mkTransCoI` 
+                                                (mkSymCoI coi2)
+				; writeMetaTyVar old_covar (fromACo old_coi)
+			        ; return $ mkWantedCo new_cotv
+				})
+			   -- new_co := sym co1 * old_co * co2
+			   (\old_co -> 
+                             return $ 
+                               mkGivenCo $ 
+                                 fromACo $ 
+                                   mkSymCoI coi1 `mkTransCoI` 
+                                   ACo old_co `mkTransCoI` coi2)
 	             ; new_inst <- mkEqInst (EqPred ty1' ty2') gw_co
-		     ; return (new_inst:is',True)
+		     ; return (new_inst, True)
 		     }
-	     }
-	where 
-          normalise = tcEqInstNormalizeFamInst inst
-substInst _ _ = panic "TcTyFuns.substInst: not EqInst"
-
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-unifyInsts :: RewriteRule
-unifyInsts insts 
-	= do { (insts',changeds) <- mapAndUnzipM unifyInst insts
-	     ; return (concat insts',or changeds)
-	     }
-
-	-- (UnifyMeta)
-	--	g : alpha ~ t
-	--		>-->
-	--	alpha := t
-	--	g     := t
-	--
-	--  TOMDO: you should only do this for certain `meta' type variables
-unifyInst :: Inst -> TcM ([Inst], Bool)
-unifyInst i@(EqInst {tci_left = ty1, tci_right = ty2})
-	| TyVarTy tv1 <- ty1, isMetaTyVar tv1 	= go ty2 tv1
-	| TyVarTy tv2 <- ty2, isMetaTyVar tv2	= go ty1 tv2 	
-	| otherwise				= return ([i],False) 
-	where go ty tv
-		= do { let cotv = fromWantedCo "unifyInst" $ eqInstCoercion i
-		     ; writeMetaTyVar tv   ty	--	alpha := t
-		     ; writeMetaTyVar cotv ty	--	g     := t
-	             ; return ([],True)
-		     }
-unifyInst _ = panic "TcTyFuns.unifyInst: not EqInst"
-
--- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-occursCheckInsts :: CheckRule
-occursCheckInsts insts = mappM_ occursCheckInst insts
-
-
-	-- (OccursCheck)
-	--	t ~ s[T t]
-	--		>-->
-	--	fail
-	--
-occursCheckInst :: Inst -> TcM () 
-occursCheckInst (EqInst {tci_left = ty1, tci_right = ty2})
-	= go ty2 
-	where
-		check ty = if ty `tcEqType` ty1
-			      then occursError 
-			      else go ty
-
-		go (TyConApp con tys)	= if isOpenSynTyCon con then return () else mappM_ check tys
-		go (FunTy arg res)	= mappM_ check [arg,res]
-		go (AppTy fun arg)	= mappM_ check [fun,arg]
-		go _			= return ()
-
-		occursError 		= do { env0 <- tcInitTidyEnv
-					     ; let (env1, tidy_ty1)  =  tidyOpenType env0 ty1
-					           (env2, tidy_ty2)  =  tidyOpenType env1 ty2
-					           extra = sep [ppr tidy_ty1, char '~', ppr tidy_ty2]
-					     ; failWithTcM (env2, hang msg 2 extra)
-					     }
-					where msg = ptext SLIT("Occurs check: cannot construct the infinite type")
-occursCheckInst _ = panic "TcTyFuns.occursCheckInst: not eqInst"
+	       }
+	  where 
+            ty1 = eqInstLeftTy  inst
+            ty2 = eqInstRightTy inst
 \end{code}
+
+
+Instantiate meta variables: unifyMetaRule
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If an equality equates a meta type variable with a type, we simply instantiate
+the meta variable.
+
+  (UnifyMeta)
+    g : alpha ~ t
+      >-->
+    alpha := t
+    g     := t
+
+Meta variables can only appear in wanted constraints, and this rule should
+only be applied to wanted constraints.  We also know that t definitely is
+distinct from alpha (as the trivialRule) has been run on the insts beforehand.
+
+NB: We cannot assume that meta tyvars are empty.  They may have been updated
+by another inst in the currently processed wanted list.  We need to be very
+careful when updateing type variables (see TcUnify.uUnfilledVar), but at least
+we know that we have no boxes.  It's unclear that it would be an advantage to
+common up the code in TcUnify and the code below.  Firstly, we don't want
+calls to TcUnify.defer_unification here, and secondly, TcUnify import the
+current module, so we would have to move everything here (Yuk!) or to
+TcMType.  Besides, the code here is much simpler due to the lack of boxes.
+
+\begin{code}
+unifyMetaRule :: RewriteRule
+unifyMetaRule insts 
+  = do { (insts', changed) <- mapAndUnzipM unifyMeta insts
+       ; return (concat insts', or changed)
+       }
+  where
+    unifyMeta inst
+      = ASSERT( isEqInst inst )
+        go (eqInstLeftTy inst) (eqInstRightTy inst)
+           (fromWantedCo "unifyMetaRule" $ eqInstCoercion inst)
+      where
+        go ty1 ty2 cotv
+          | Just ty1' <- tcView ty1 = go ty1' ty2 cotv
+          | Just ty2' <- tcView ty2 = go ty1 ty2' cotv
+
+          | TyVarTy tv1 <- ty1
+          , isMetaTyVar tv1         = do { lookupTV <- lookupTcTyVar tv1
+                                         ; uMeta False tv1 lookupTV ty2 cotv
+                                         }
+          | TyVarTy tv2 <- ty2
+          , isMetaTyVar tv2         = do { lookupTV <- lookupTcTyVar tv2
+                                         ; uMeta True tv2 lookupTV ty1 cotv
+                                         }
+          | otherwise               = return ([inst], False) 
+
+        -- meta variable has been filled already
+        -- => ignore this inst (we'll come around again, after zonking)
+        uMeta _swapped _tv (IndirectTv _) _ty _cotv
+          = return ([inst], False)
+
+        -- signature skolem meets non-variable type
+        -- => cannot update!
+        uMeta _swapped _tv (DoneTv (MetaTv (SigTv _) _)) ty _cotv
+          | not $ isTyVarTy ty
+          = return ([inst], False)
+
+        -- type variable meets type variable
+        -- => check that tv2 hasn't been updated yet and choose which to update
+	uMeta swapped tv1 (DoneTv details1) (TyVarTy tv2) cotv
+	  = do { lookupTV2 <- lookupTcTyVar tv2
+               ; case lookupTV2 of
+                   IndirectTv ty  -> uMeta swapped tv1 (DoneTv details1) ty cotv
+                   DoneTv details2 -> 
+                     uMetaVar swapped tv1 details1 tv2 details2 cotv
+	       }
+
+        -- updatable meta variable meets non-variable type
+        -- => occurs check, monotype check, and kinds match check, then update
+	uMeta swapped tv (DoneTv (MetaTv _ ref)) ty cotv
+	  = do { ty' <- checkTauTvUpdate tv ty       -- occurs + monotype check
+	       ; checkUpdateMeta swapped tv ref ty'  -- update meta var
+	       ; writeMetaTyVar cotv ty'             -- update the co var
+	       ; return ([], True)
+	       }
+
+        uMeta _ _ _ _ _ = panic "uMeta"
+
+        -- meta variable meets skolem 
+        -- => just update
+        uMetaVar swapped tv1 (MetaTv _ ref) tv2 (SkolemTv _) cotv
+          = do { checkUpdateMeta swapped tv1 ref (mkTyVarTy tv2)
+	       ; writeMetaTyVar cotv (mkTyVarTy tv2)
+	       ; return ([], True)
+	       }
+
+        -- meta variable meets meta variable 
+        -- => be clever about which of the two to update 
+        --   (from TcUnify.uUnfilledVars minus boxy stuff)
+        uMetaVar swapped tv1 (MetaTv info1 ref1) tv2 (MetaTv info2 ref2) cotv
+          = do { case (info1, info2) of
+                   -- Avoid SigTvs if poss
+                   (SigTv _, _      ) | k1_sub_k2 -> update_tv2
+                   (_,       SigTv _) | k2_sub_k1 -> update_tv1
+
+                   (_,   _) | k1_sub_k2 -> if k2_sub_k1 && nicer_to_update_tv1
+                                           then update_tv1 	-- Same kinds
+                                           else update_tv2
+                            | k2_sub_k1 -> update_tv1
+                            | otherwise -> kind_err
+              -- Update the variable with least kind info
+              -- See notes on type inference in Kind.lhs
+              -- The "nicer to" part only applies if the two kinds are the same,
+              -- so we can choose which to do.
+
+	       ; writeMetaTyVar cotv (mkTyVarTy tv2)
+	       ; return ([], True)
+               }
+          where
+                -- Kinds should be guaranteed ok at this point
+            update_tv1 = updateMeta tv1 ref1 (mkTyVarTy tv2)
+            update_tv2 = updateMeta tv2 ref2 (mkTyVarTy tv1)
+
+            kind_err = addErrCtxtM (unifyKindCtxt swapped tv1 (mkTyVarTy tv2)) $
+                       unifyKindMisMatch k1 k2
+
+            k1 = tyVarKind tv1
+            k2 = tyVarKind tv2
+            k1_sub_k2 = k1 `isSubKind` k2
+            k2_sub_k1 = k2 `isSubKind` k1
+
+            nicer_to_update_tv1 = isSystemName (Var.varName tv1)
+                -- Try to update sys-y type variables in preference to ones
+                -- gotten (say) by instantiating a polymorphic function with
+                -- a user-written type sig 
+
+        uMetaVar _ _ _ _ _ _ = panic "uMetaVar"
+\end{code}
+
+
+%************************************************************************
+%*									*
+\section{Normalisation of Insts}
+%*									*
+%************************************************************************
 
 Normalises a set of dictionaries relative to a set of given equalities (which
 are interpreted as rewrite rules).  We only consider given equalities of the
 form
 
-  F ts ~ t
+  F ts ~ t    or    a ~ t
 
 where F is a type family.
 
@@ -827,39 +1031,35 @@ where F is a type family.
 substEqInDictInsts :: [Inst]    -- given equalities (used as rewrite rules)
                    -> [Inst]    -- dictinaries to be normalised
                    -> TcM ([Inst], TcDictBinds)
-substEqInDictInsts eq_insts insts 
-  = do { traceTc (text "substEqInDictInst <-" <+> ppr insts)
-       ; result <- foldlM rewriteWithOneEquality (insts, emptyBag) eq_insts
-       ; traceTc (text "substEqInDictInst ->" <+> ppr result)
-       ; return result
+substEqInDictInsts eqInsts dictInsts 
+  = do { traceTc (text "substEqInDictInst <-" <+> ppr dictInsts)
+       ; dictInsts' <- 
+           foldlM rewriteWithOneEquality (dictInsts, emptyBag) eqInsts
+       ; traceTc (text "substEqInDictInst ->" <+> ppr dictInsts')
+       ; return dictInsts'
        }
   where
-      -- (1) Given equality of form 'F ts ~ t': use for rewriting
-    rewriteWithOneEquality (insts, dictBinds)
-                           inst@(EqInst {tci_left  = pattern, 
-                                         tci_right = target})
-      | isOpenSynTyConApp pattern
-      = do { (insts', moreDictBinds) <- genericNormaliseInsts True {- wanted -}
-                                                              applyThisEq insts
-           ; return (insts', dictBinds `unionBags` moreDictBinds)
+      -- (1) Given equality of form 'F ts ~ t' or 'a ~ t': use for rewriting
+    rewriteWithOneEquality (dictInsts, dictBinds)
+                           eqInst@(EqInst {tci_left  = pattern, 
+                                           tci_right = target})
+      | isOpenSynTyConApp pattern || isTyVarTy pattern
+      = do { (dictInsts', moreDictBinds) <- 
+               genericNormaliseInsts True {- wanted -} applyThisEq dictInsts
+           ; return (dictInsts', dictBinds `unionBags` moreDictBinds)
            }
       where
-        applyThisEq = tcGenericNormalizeFamInstPred (return . matchResult)
+        applyThisEq = tcGenericNormaliseFamInstPred (return . matchResult)
 
         -- rewrite in case of an exact match
-        matchResult ty | tcEqType pattern ty = Just (target, eqInstType inst)
+        matchResult ty | tcEqType pattern ty = Just (target, eqInstType eqInst)
                        | otherwise           = Nothing
 
       -- (2) Given equality has the wrong form: ignore
-    rewriteWithOneEquality (insts, dictBinds) _not_a_rewrite_rule
-      = return (insts, dictBinds)
+    rewriteWithOneEquality (dictInsts, dictBinds) _not_a_rewrite_rule
+      = return (dictInsts, dictBinds)
 \end{code}
 
-%************************************************************************
-%*									*
-	Normalisation of Insts
-%*									*
-%************************************************************************
 
 Take a bunch of Insts (not EqInsts), and normalise them wrt the top-level
 type-function equations, where
@@ -870,18 +1070,23 @@ If 'is_wanted'
   = True,  (binds + norm_insts) defines insts       (wanteds)
   = False, (binds + insts)      defines norm_insts  (givens)
 
+Ie, in the case of normalising wanted dictionaries, we use the normalised
+dictionaries to define the originally wanted ones.  However, in the case of
+given dictionaries, we use the originally given ones to define the normalised
+ones. 
+
 \begin{code}
 normaliseInsts :: Bool   	  		-- True <=> wanted insts
 	       -> [Inst] 			-- wanted or given insts 
-	       -> TcM ([Inst], TcDictBinds) 	-- normalized insts and bindings
+	       -> TcM ([Inst], TcDictBinds) 	-- normalised insts and bindings
 normaliseInsts isWanted insts 
-  = genericNormaliseInsts isWanted tcNormalizeFamInstPred insts
+  = genericNormaliseInsts isWanted tcNormaliseFamInstPred insts
 
 genericNormaliseInsts  :: Bool          	    -- True <=> wanted insts
 	               -> (TcPredType -> TcM (CoercionI, TcPredType))  
                                                     -- how to normalise
 	               -> [Inst]      		    -- wanted or given insts 
-	               -> TcM ([Inst], TcDictBinds) -- normalized insts & binds
+	               -> TcM ([Inst], TcDictBinds) -- normalised insts & binds
 genericNormaliseInsts isWanted fun insts
   = do { (insts', binds) <- mapAndUnzipM (normaliseOneInst isWanted fun) insts
        ; return (insts', unionManyBags binds)
@@ -890,12 +1095,14 @@ genericNormaliseInsts isWanted fun insts
     normaliseOneInst isWanted fun
 	             dict@(Dict {tci_pred = pred,
                                  tci_loc  = loc})
-      = do { traceTc (text "genericNormaliseInst 1")
+      = do { traceTc $ text "genericNormaliseInst <-" <+> ppr dict
 	   ; (coi, pred') <- fun pred
-   	   ; traceTc (text "genericNormaliseInst 2")
 
 	   ; case coi of
-	       IdCo   -> return (dict, emptyBag)
+	       IdCo   -> 
+                 do { traceTc $ text "genericNormaliseInst ->" <+> ppr dict
+                    ; return (dict, emptyBag)
+                    }
                          -- don't use pred' in this case; otherwise, we get
                          -- more unfolded closed type synonyms in error messages
 	       ACo co -> 
@@ -906,31 +1113,82 @@ genericNormaliseInsts isWanted fun insts
 		    ; let (target_dict, source_dict, st_co) 
 			    | isWanted  = (dict,  dict', mkSymCoercion co)
 			    | otherwise = (dict', dict,  co)
-			      -- if isWanted
-			      -- 	co :: dict ~ dict'
-			      -- 	hence dict = dict' `cast` sym co
-			      -- else
-			      -- 	co :: dict ~ dict'
-			      -- 	hence dict' = dict `cast` co
+			      -- we have
+                              --   co :: dict ~ dict'
+			      -- hence, if isWanted
+			      -- 	  dict  = dict' `cast` sym co
+			      --        else
+			      -- 	  dict' = dict  `cast` co
 		          expr      = HsVar $ instToId source_dict
 		          cast_expr = HsWrap (WpCo st_co) expr
 			  rhs       = L (instLocSpan loc) cast_expr
-			  binds     = mkBind target_dict rhs
+			  binds     = instToDictBind target_dict rhs
 		      -- return the new inst
-		    ; return (dict', binds)
+		    ; traceTc $ text "genericNormaliseInst ->" <+> ppr dict'
+                    ; return (dict', binds)
 		    }
 	   }
 	
-	-- TOMDO: treat other insts appropriately
+	-- TOMDO: What do we have to do about ImplicInst, Method, and LitInst??
     normaliseOneInst _isWanted _fun inst
       = do { inst' <- zonkInst inst
 	   ; return (inst', emptyBag)
 	   }
+\end{code}
 
-addBind :: Bag (LHsBind TcId) -> Inst -> LHsExpr TcId -> Bag (LHsBind TcId)
-addBind binds inst rhs = binds `unionBags` mkBind inst rhs
 
-mkBind :: Inst -> LHsExpr TcId -> Bag (LHsBind TcId)
-mkBind inst rhs = unitBag (L (instSpan inst) 
-			  (VarBind (instToId inst) rhs))
+%************************************************************************
+%*									*
+\section{Errors}
+%*									*
+%************************************************************************
+
+The infamous couldn't match expected type soandso against inferred type
+somethingdifferent message.
+
+\begin{code}
+eqInstMisMatch :: Inst -> TcM a
+eqInstMisMatch inst
+  = ASSERT( isEqInst inst )
+    do { (env, msg) <- misMatchMsg ty_act ty_exp
+       ; setErrCtxt ctxt $
+           failWithTcM (env, msg)
+       }
+  where
+    ty_act           = eqInstLeftTy  inst
+    ty_exp           = eqInstRightTy inst
+    InstLoc _ _ ctxt = instLoc       inst
+
+-----------------------
+misMatchMsg :: TcType -> TcType -> TcM (TidyEnv, SDoc)
+-- Generate the message when two types fail to match,
+-- going to some trouble to make it helpful.
+-- The argument order is: actual type, expected type
+misMatchMsg ty_act ty_exp
+  = do	{ env0 <- tcInitTidyEnv
+        ; ty_exp <- zonkTcType ty_exp
+        ; ty_act <- zonkTcType ty_act
+	; (env1, pp_exp, extra_exp) <- ppr_ty env0 ty_exp
+	; (env2, pp_act, extra_act) <- ppr_ty env1 ty_act
+	; return (env2, 
+                  sep [sep [ptext SLIT("Couldn't match expected type") <+> pp_exp, 
+			    nest 7 $
+                              ptext SLIT("against inferred type") <+> pp_act],
+		       nest 2 (extra_exp $$ extra_act)]) }
+
+ppr_ty :: TidyEnv -> TcType -> TcM (TidyEnv, SDoc, SDoc)
+ppr_ty env ty
+  = do	{ let (env1, tidy_ty) = tidyOpenType env ty
+	; (env2, extra) <- ppr_extra env1 tidy_ty
+	; return (env2, quotes (ppr tidy_ty), extra) }
+
+-- (ppr_extra env ty) shows extra info about 'ty'
+ppr_extra :: TidyEnv -> Type -> TcM (TidyEnv, SDoc)
+ppr_extra env (TyVarTy tv)
+  | isSkolemTyVar tv || isSigTyVar tv
+  = return (env1, pprSkolTvBinding tv1)
+  where
+    (env1, tv1) = tidySkolemTyVar env tv
+
+ppr_extra env _ty = return (env, empty)		-- Normal case
 \end{code}

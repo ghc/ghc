@@ -688,23 +688,16 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
     returnM (unitBag main_bind)
 
 mkCoVars :: [PredType] -> TcM [TyVar]
-mkCoVars [] = return []
-mkCoVars (pred:preds) = 
-	do { uniq <- newUnique
-	   ; let name = mkSysTvName uniq FSLIT("mkCoVars")
-	   ; let tv = mkCoVar name (PredTy pred)
-	   ; tvs <- mkCoVars preds
-	   ; return (tv:tvs)
-	   }
+mkCoVars = newCoVars . map unEqPred
+  where
+    unEqPred (EqPred ty1 ty2) = (ty1, ty2)
+    unEqPred _                = panic "TcInstDcls.mkCoVars"
 
 mkMetaCoVars :: [PredType] -> TcM [TyVar]
-mkMetaCoVars [] = return []
-mkMetaCoVars (EqPred ty1 ty2:preds) = 
-	do { tv <- newMetaTyVar TauTv (mkCoKind ty1 ty2) 	  
-	   ; tvs <- mkMetaCoVars preds
-	   ; return (tv:tvs)
-	   }
-
+mkMetaCoVars = mappM eqPredToCoVar
+  where
+    eqPredToCoVar (EqPred ty1 ty2) = newMetaCoVar ty1 ty2
+    eqPredToCoVar _                = panic "TcInstDcls.mkMetaCoVars"
 
 tcMethods origin clas inst_tyvars' dfun_theta' inst_tys' 
 	  avail_insts op_items monobinds uprags
