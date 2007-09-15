@@ -1,8 +1,4 @@
 
-tcfail145.hs:9:5:
-    Couldn't match expected type `a' against inferred type `[a]' `a'
-    When matching `forall a. [a] -> [a]'
-              and `forall a. a -> a'
-      Expected type: forall a1. a1 -> a1
-      Inferred type: forall a1. [a1] -> [a1]
-    In the pattern: f :: forall a. [a] -> [a]
+tcfail145.hs:9:0:
+    Occurs check: cannot construct the infinite type: a = [a]
+    When generalising the type(s) for `foo'
