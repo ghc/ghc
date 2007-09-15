@@ -430,41 +430,12 @@ single_exitg (Graph tail blocks) = foldUFM add (exit_count (lastTail tail)) bloc
 -- Better to geot [A,B,C,D]
 
 
-postorder_dfs' :: LastNode l => LGraph m l -> [Block m l]
-postorder_dfs' g@(LGraph _ blocks) =
-  let FGraph _ eblock _ = entry g
-  in  vnode (zip eblock) (\acc _visited -> acc) [] emptyBlockSet
-  where
-    -- vnode ::
-    --    Block m l -> ([Block m l] -> BlockSet -> a) -> [Block m l] -> BlockSet -> a
-    vnode block@(Block id _) cont acc visited =
-        if elemBlockSet id visited then
-            cont acc visited
-        else
-            vchildren block (get_children block) cont acc (extendBlockSet visited id)
-    vchildren block bs cont acc visited =
-        let next children acc visited =
-                case children of []     -> cont (block : acc) visited
-                                 (b:bs) -> vnode b (next bs) acc visited
-        in next bs acc visited
-    get_children block = foldl add_id [] (succs block)
-    add_id rst id = case lookupBlockEnv blocks id of
-                      Just b -> b : rst
-                      Nothing -> rst
-
 postorder_dfs g@(LGraph _ blockenv) =
-    let FGraph id eblock _ = entry g
-        dfs1 = zip eblock :
-               postorder_dfs_from_except blockenv eblock (unitUniqSet id)
-        dfs2 = postorder_dfs' g
---    in  ASSERT (map blockId dfs1 == map blockId dfs2) dfs2
-    in  if (map blockId dfs1 == map blockId dfs2) then dfs2 else panic "inconsistent DFS"
+    let FGraph id eblock _ = entry g in
+     zip eblock : postorder_dfs_from_except blockenv eblock (unitUniqSet id)
 
-postorder_dfs_from
-    :: (HavingSuccessors b, LastNode l) => BlockEnv (Block m l) -> b -> [Block m l]
-postorder_dfs_from blocks b = postorder_dfs_from_except blocks b emptyBlockSet
-
-postorder_dfs_from_except :: forall b m l . (HavingSuccessors b, LastNode l) => BlockEnv (Block m l) -> b -> BlockSet -> [Block m l]
+postorder_dfs_from_except :: (HavingSuccessors b, LastNode l)
+                          => BlockEnv (Block m l) -> b -> BlockSet -> [Block m l]
 postorder_dfs_from_except blocks b visited =
   vchildren (get_children b) (\acc _visited -> acc) [] visited
   where
@@ -485,6 +456,11 @@ postorder_dfs_from_except blocks b visited =
     add_id rst id = case lookupBlockEnv blocks id of
                       Just b -> b : rst
                       Nothing -> rst
+
+postorder_dfs_from
+    :: (HavingSuccessors b, LastNode l) => BlockEnv (Block m l) -> b -> [Block m l]
+postorder_dfs_from blocks b = postorder_dfs_from_except blocks b emptyBlockSet
+
 
 
 -- | Slightly more complicated than the usual fold because we want to tell block
