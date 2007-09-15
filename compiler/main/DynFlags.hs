@@ -102,6 +102,7 @@ data DynFlag
    -- debugging flags
    = Opt_D_dump_cmm
    | Opt_D_dump_cmmz
+   | Opt_D_dump_cmmz_pretty
    | Opt_D_dump_cps_cmm
    | Opt_D_dump_cvt_cmm
    | Opt_D_dump_asm
@@ -1034,6 +1035,7 @@ dynamic_flags = [
 
   ,  ( "ddump-cmm",         	 setDumpFlag Opt_D_dump_cmm)
   ,  ( "ddump-cmmz",         	 setDumpFlag Opt_D_dump_cmmz)
+  ,  ( "ddump-cmmz-pretty",      setDumpFlag Opt_D_dump_cmmz_pretty)
   ,  ( "ddump-cps-cmm",        	 setDumpFlag Opt_D_dump_cps_cmm)
   ,  ( "ddump-cvt-cmm",        	 setDumpFlag Opt_D_dump_cvt_cmm)
   ,  ( "ddump-asm",          	 setDumpFlag Opt_D_dump_asm)
