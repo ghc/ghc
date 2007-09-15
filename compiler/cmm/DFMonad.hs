@@ -24,7 +24,7 @@ import Maybes
 import PprCmm()
 import UniqFM
 import UniqSupply
-import ZipCfg hiding (freshBlockId)
+import ZipCfg
 import qualified ZipCfg as G
 
 import Outputable
@@ -247,7 +247,7 @@ markGraphRewritten = DFM f
     where f _ s = ((), s {df_rewritten = SomeChange})
 
 freshBlockId :: String -> DFM f BlockId
-freshBlockId s = liftUSM $ G.freshBlockId s
+freshBlockId _s = liftUSM $ getUniqueUs >>= return . BlockId
 
 liftUSM :: UniqSM a -> DFM f a
 liftUSM uc = DFM f

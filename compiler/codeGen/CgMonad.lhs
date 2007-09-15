@@ -712,8 +712,8 @@ labelC :: BlockId -> Code
 labelC id = emitCgStmt (CgLabel id)
 
 newLabelC :: FCode BlockId
-newLabelC = do { us <- newUniqSupply
-               ; return $ initUs_ us (freshBlockId "LabelC") }
+newLabelC = do { u <- newUnique
+               ; return $ BlockId u }
 
 checkedAbsC :: CmmStmt -> Code
 -- Emit code, eliminating no-ops

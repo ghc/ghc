@@ -350,5 +350,14 @@ Emitting a Branch at this point is fine:
        goto L1; L2: ...stuff... 
 -}
 
+
+-- | The string argument to 'freshBlockId' was originally helpful in debugging
+-- the Quick C-- compiler, so I have kept it here even though at present it is
+-- thrown away at this spot---there's no reason a BlockId couldn't one day carry
+-- a string.  
+
+freshBlockId :: String -> UniqSM BlockId
+freshBlockId _ = do { u <- getUniqueUs; return $ BlockId u }
+
 _unused :: FS.FastString
 _unused = undefined

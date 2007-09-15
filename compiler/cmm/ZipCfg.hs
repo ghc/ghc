@@ -1,8 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module ZipCfg
     ( 	-- These data types and names are carefully thought out
-      BlockId(..), freshBlockId		-- ToDo: BlockId should be abstract,
-					--	 but it isn't yet
+      BlockId(..) 	-- ToDo: BlockId should be abstract, but it isn't yet
     , BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, insertBlock, mkBlockEnv
     , BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet, mkBlockSet
     , Graph(..), LGraph(..), FGraph(..)
@@ -44,7 +43,6 @@ import Panic
 import Unique
 import UniqFM
 import UniqSet
-import UniqSupply
 
 import Maybe
 import Prelude hiding (zip, unzip, last)
@@ -100,13 +98,13 @@ increasing complexity, they are:
 There are three types because each type offers a slightly different
 invariant or cost model.  
 
-  * The distinguished entry of a Graph has no label.  Because labels must
-    be unique, acquiring one requires a monadic operation ('freshBlockId').
-    The primary advantage of the Graph representation is that we can build
-    a small Graph purely functionally, without entering a monad.  For
-    example, during optimization we can easily rewrite a single middle
-    node into a Graph containing a sequence of two middle nodes followed by
-    LastExit.
+  * The distinguished entry of a Graph has no label.  Because labels must be
+    unique, acquiring one requires a supply of Unique labels (BlockId's).
+    The primary advantage of the Graph representation is that we can build a
+    small Graph purely functionally, without needing a fresh BlockId or
+    Unique.  For example, during optimization we can easily rewrite a single
+    middle node into a Graph containing a sequence of two middle nodes
+    followed by LastExit.
 
   * In an LGraph, every basic block is labelled.  The primary advantage of
     this representation is its simplicity: each basic block can be treated
@@ -167,11 +165,6 @@ data FGraph m l = FGraph { fg_entry  :: BlockId
                     -- in the map 'fg_others'
 
 ----  Utility functions ---
-
--- | The string argument to 'freshBlockId' was originally helpful in debugging the Quick C--
--- compiler, so I have kept it here even though at present it is thrown away at
--- this spot---there's no reason a BlockId couldn't one day carry a string.
-freshBlockId :: String -> UniqSM BlockId
 
 blockId   :: Block  m l -> BlockId
 zip       :: ZBlock m l -> Block  m l
@@ -335,8 +328,6 @@ instance LastNode l => HavingSuccessors (ZTail m l) where
 ----- block manipulations
 
 blockId (Block id _) = id
-
-freshBlockId _ = do { u <- getUniqueUs; return $ BlockId u }
 
 -- | Convert block between forms.
 -- These functions are tail-recursive, so we can go as deep as we like

@@ -22,7 +22,7 @@ module Cmm (
 	CmmCallTarget(..),
 	CmmStatic(..), Section(..),
         module CmmExpr,
-        BlockId(..), freshBlockId,
+        BlockId(..), 
         BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, mkBlockEnv,
         BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet,
   ) where
@@ -40,7 +40,7 @@ import FastString
 
 import Data.Word
 
-import ZipCfg (	BlockId(..), freshBlockId
+import ZipCfg (	BlockId(..)
               , BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, mkBlockEnv
               , BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet
               )

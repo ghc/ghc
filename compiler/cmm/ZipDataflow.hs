@@ -17,7 +17,7 @@ where
 
 import CmmTx
 import DFMonad
-import ZipCfg hiding (freshBlockId) -- use version from DFMonad
+import ZipCfg
 import qualified ZipCfg as G
 
 import Outputable
