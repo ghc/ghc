@@ -43,8 +43,12 @@ cpsTop (CmmProc h l args g) =
     let procPoints = minimalProcPointSet (runTx cmmCfgOptsZ g)
         g' = addProcPointProtocols procPoints args g
         g'' = map_nodes id NotSpillOrReload id g'
-    in do us <- getUs
-          let g = runDFM us dualLiveLattice $ b_rewrite dualLivenessWithInsertion g''
-        --  let igraph = buildIGraph
-          return $ do g' <- g >>= return . map_nodes id spillAndReloadComments id
-                      return $ CmmProc h l args g'
+    in do g <- dual_rewrite dualLivenessWithInsertion g''
+          g <- return (g >>= insertLateReloads)
+          u <- getUs
+          let g' = g >>= (initUs_ u . dual_rewrite removeDeadAssignmentsAndReloads)
+          return $ do g <- g' >>= return . map_nodes id spillAndReloadComments id
+                      return $ CmmProc h l args g
+  where dual_rewrite pass g =
+            do us <- getUs
+               return $ runDFM us dualLiveLattice $ b_rewrite pass g

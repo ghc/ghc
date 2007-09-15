@@ -9,6 +9,8 @@ module CmmSpillReload
 
   , availRegsLattice
   , cmmAvailableReloads
+  , insertLateReloads
+  , removeDeadAssignmentsAndReloads
   )
 where
 
@@ -23,11 +25,14 @@ import ZipCfgCmmRep
 import ZipDataflow
 
 import FastString
-import Maybe
+import Maybes
 import Outputable hiding (empty)
 import qualified Outputable as PP
 import Panic
 import UniqSet
+
+import Maybe
+import Prelude hiding (zip)
 
 -- The point of this module is to insert spills and reloads to
 -- establish the invariant that at a call (or at any proc point with
@@ -228,6 +233,10 @@ deleteFromAvail :: AvailRegs -> LocalReg -> AvailRegs
 deleteFromAvail (UniverseMinus s) r = UniverseMinus (extendRegSet s r)
 deleteFromAvail (AvailRegs     s) r = AvailRegs (deleteFromRegSet s r)
 
+elemAvail :: AvailRegs -> LocalReg -> Bool
+elemAvail (UniverseMinus s) r = not $ elemRegSet r s
+elemAvail (AvailRegs     s) r = elemRegSet r s
+
 cmmAvailableReloads :: LGraph M Last -> BlockEnv AvailRegs
 cmmAvailableReloads g = env
     where env = runDFA availRegsLattice $
@@ -262,6 +271,57 @@ lastAvail :: AvailRegs -> Last -> LastOutFacts AvailRegs
 lastAvail _ (LastCall _ (Just k)) = LastOutFacts [(k, AvailRegs emptyRegSet)]
 lastAvail avail l = LastOutFacts $ map (\id -> (id, avail)) $ succs l
 
+insertLateReloads :: LGraph M Last -> DFTx (LGraph M Last)
+insertLateReloads g = mapM_blocks insertM g
+    where env = cmmAvailableReloads g
+          avail id = lookupBlockEnv env id `orElse` AvailRegs emptyRegSet
+          insertM b = functionalDFTx "late reloads" (insert b)
+          insert (Block id tail) fuel = propagate (ZFirst id) (avail id) tail fuel
+          propagate h avail (ZTail m t) fuel =
+              let (h', fuel') = maybe_add_reload h avail m fuel in
+              propagate (ZHead h' m) (middleAvail m avail) t fuel'
+          propagate h avail (ZLast l) fuel =
+              let (h', fuel') = maybe_add_reload h avail l fuel in
+              (zipht h' (ZLast l), fuel')
+          maybe_add_reload h avail node fuel =
+              let used = foldRegsUsed
+                         (\u r -> if elemAvail avail r then extendRegSet u r else u)
+                         emptyRegSet node
+              in  if fuel == 0 || isEmptyUniqSet used then (h, fuel)
+                  else (ZHead h (Reload used), fuel-1)
+
+
+removeDeadAssignmentsAndReloads :: BPass M Last DualLive
+removeDeadAssignmentsAndReloads = a_ft_b dualLiveness remove_deads
+    where remove_deads = BComp "dead-assignment & -reload elim" exit last middle first
+          exit   = Nothing
+          last   = \_ _ -> Nothing
+          middle = middleRemoveDeads
+          first _ _ = Nothing
+
+middleRemoveDeads :: DualLive -> M -> Maybe (Graph M Last)
+middleRemoveDeads _ (Spill _)  = Nothing
+middleRemoveDeads live (Reload s) =
+    if sizeUniqSet worth_reloading < sizeUniqSet s then
+        Just $ if isEmptyUniqSet worth_reloading then emptyGraph
+               else graphOfMiddles [Reload worth_reloading]
+    else
+        Nothing
+  where worth_reloading = intersectUniqSets s (in_regs live)
+middleRemoveDeads live (NotSpillOrReload m) = middle m 
+  where middle (MidAssign (CmmLocal reg') _)
+               | not (reg' `elemRegSet` in_regs live) = Just emptyGraph
+        middle _ = Nothing
+                      
+
+
+---------------------
+-- register usage
+
+instance UserOfLocalRegs m => UserOfLocalRegs (ExtendWithSpills m) where
+    foldRegsUsed  f z (Spill  regs) = foldRegsUsed f z regs
+    foldRegsUsed _f z (Reload _)    = z
+    foldRegsUsed  f z (NotSpillOrReload m) = foldRegsUsed f z m
 
 ---------------------
 -- prettyprinting
@@ -291,8 +351,10 @@ instance Outputable DualLive where
                          else (ppr_regs "live on stack =" stack)]
 
 instance Outputable AvailRegs where
-  ppr (UniverseMinus s) = ppr_regs "available = all but" s
-  ppr (AvailRegs     s) = ppr_regs "available = " s
+  ppr (UniverseMinus s) = if isEmptyUniqSet s then text "<everything available>"
+                          else ppr_regs "available = all but" s
+  ppr (AvailRegs     s) = if isEmptyUniqSet s then text "<nothing available>"
+                          else ppr_regs "available = " s
 
 my_trace :: String -> SDoc -> a -> a
 my_trace = if False then pprTrace else \_ _ a -> a
