@@ -267,6 +267,8 @@ fold_blocks :: (Block m l -> a -> a) -> a -> LGraph m l -> a
 map_nodes :: (BlockId -> BlockId) -> (m -> m') -> (l -> l') -> LGraph m l -> LGraph m' l'
    -- mapping includes the entry id!
 
+map_blocks :: (Block m l -> Block m' l') -> LGraph m' l' -> LGraph m' l'
+
 -- | These translation functions are speculative.  I hope eventually
 -- they will be used in the native-code back ends ---NR
 translate :: (m          -> UniqSM (LGraph m' l')) ->
@@ -498,6 +500,8 @@ fold_layout f z g@(LGraph eid _) = fold (postorder_dfs g) z
             else Just id
 
 -- | The rest of the traversals are straightforward
+
+map_blocks f (LGraph eid blocks) = LGraph eid (mapUFM f blocks)
 
 map_nodes idm middle last (LGraph eid blocks) = LGraph (idm eid) (mapUFM block blocks)
     where block (Block id t) = Block (idm id) (tail t)
