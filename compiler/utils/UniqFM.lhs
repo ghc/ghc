@@ -13,13 +13,7 @@ Basically, the things need to be in class @Uniquable@, and we use the
 (A similar thing to @UniqSet@, as opposed to @Set@.)
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
+{-# OPTIONS -Wall -fno-warn-name-shadowing #-}
 module UniqFM (
 	UniqFM(..),   	-- abstract type
 			-- (de-abstracted for MachRegs.trivColorable optimisation BL 2007/09)
@@ -42,7 +36,7 @@ module UniqFM (
 	intersectsUFM,
 	intersectUFM,
 	intersectUFM_C,
-	foldUFM,
+	foldUFM, foldUFM_Directly,
 	mapUFM,
 	elemUFM, elemUFM_Directly,
 	filterUFM, filterUFM_Directly,
@@ -85,6 +79,7 @@ listToUFM_Directly
 
 addToUFM	:: Uniquable key => UniqFM elt -> key -> elt  -> UniqFM elt
 addListToUFM	:: Uniquable key => UniqFM elt -> [(key,elt)] -> UniqFM elt
+addListToUFM_Directly :: UniqFM elt -> [(Unique,elt)] -> UniqFM elt
 addToUFM_Directly
 		:: UniqFM elt -> Unique -> elt -> UniqFM elt
 
@@ -121,6 +116,7 @@ intersectUFM_C	:: (elt1 -> elt2 -> elt3)
 intersectsUFM	:: UniqFM elt1 -> UniqFM elt2 -> Bool
 
 foldUFM		:: (elt -> a -> a) -> a -> UniqFM elt -> a
+foldUFM_Directly:: (Unique -> elt -> a -> a) -> a -> UniqFM elt -> a
 mapUFM		:: (elt1 -> elt2) -> UniqFM elt1 -> UniqFM elt2
 filterUFM	:: (elt -> Bool) -> UniqFM elt -> UniqFM elt
 filterUFM_Directly :: (Unique -> elt -> Bool) -> UniqFM elt -> UniqFM elt
@@ -278,6 +274,7 @@ addListToUFM_C combiner fm key_elt_pairs
  = foldl (\ fm (k, e) -> insert_ele combiner fm (getKey# (getUnique k)) e)
 	 fm key_elt_pairs
 
+addListToUFM_directly_C :: (elt -> elt -> elt) -> UniqFM elt -> [(Unique,elt)] -> UniqFM elt
 addListToUFM_directly_C combiner fm uniq_elt_pairs
  = foldl (\ fm (k, e) -> insert_ele combiner fm (getKey# k) e)
 	 fm uniq_elt_pairs
@@ -291,6 +288,7 @@ delListFromUFM fm lst = foldl delFromUFM fm lst
 delFromUFM          fm key = delete fm (getKey# (getUnique key))
 delFromUFM_Directly fm u   = delete fm (getKey# u)
 
+delete :: UniqFM a -> Int# -> UniqFM a
 delete EmptyUFM _   = EmptyUFM
 delete fm       key = del_ele fm
   where
@@ -300,7 +298,7 @@ delete fm       key = del_ele fm
       | j ==# key	= EmptyUFM
       | otherwise	= lf	-- no delete!
 
-    del_ele nd@(NodeUFM j p t1 t2)
+    del_ele (NodeUFM j p t1 t2)
       | j ># key
       = mkSLNodeUFM (NodeUFMData j p) (del_ele t1) t2
       | otherwise
@@ -314,8 +312,8 @@ Now ways of adding two UniqFM's together.
 \begin{code}
 plusUFM tr1 tr2 = plusUFM_C use_snd tr1 tr2
 
-plusUFM_C f EmptyUFM tr	= tr
-plusUFM_C f tr EmptyUFM	= tr
+plusUFM_C _ EmptyUFM tr	= tr
+plusUFM_C _ tr EmptyUFM	= tr
 plusUFM_C f fm1 fm2	= mix_trees fm1 fm2
     where
 	mix_trees (LeafUFM i a) t2 = insert_ele (flip f) t2 i a
@@ -398,10 +396,10 @@ minusUFM fm1 fm2     = minus_trees fm1 fm2
 	--
 	-- Notice the asymetry of subtraction
 	--
-	minus_trees lf@(LeafUFM i a) t2 =
+	minus_trees lf@(LeafUFM i _a) t2 =
 		case lookUp t2 i of
 		  Nothing -> lf
-		  Just b -> EmptyUFM
+		  Just _ -> EmptyUFM
 
 	minus_trees t1 (LeafUFM i _) = delete t1 i
 
@@ -420,7 +418,7 @@ minusUFM fm1 fm2     = minus_trees fm1 fm2
 		--
 		-- Fast, Ehh !
 		--
-	  minus_branches (NewRoot nd _) = left_t
+	  minus_branches (NewRoot _ _) = left_t
 
 		-- Now, if j == j':
 		--
@@ -466,8 +464,8 @@ And taking the intersection of two UniqFM's.
 intersectUFM  t1 t2 = intersectUFM_C use_snd t1 t2
 intersectsUFM t1 t2 = isNullUFM (intersectUFM_C (\ _ _ -> error "urk") t1 t2)
 
-intersectUFM_C f EmptyUFM _ = EmptyUFM
-intersectUFM_C f _ EmptyUFM = EmptyUFM
+intersectUFM_C _ EmptyUFM _ = EmptyUFM
+intersectUFM_C _ _ EmptyUFM = EmptyUFM
 intersectUFM_C f fm1 fm2    = intersect_trees fm1 fm2
     where
 	intersect_trees (LeafUFM i a) t2 =
@@ -494,7 +492,7 @@ intersectUFM_C f fm1 fm2    = intersect_trees fm1 fm2
 		--
 		-- Fast, Ehh !
 		--
-	  intersect_branches (NewRoot nd _) = EmptyUFM
+	  intersect_branches (NewRoot _nd _) = EmptyUFM
 
 		-- Now, if j == j':
 		--
@@ -525,7 +523,7 @@ intersectUFM_C f fm1 fm2    = intersect_trees fm1 fm2
 	  intersect_branches (RightRoot Rightt)
 	    = intersect_trees left_t t2'
 
-	intersect_trees x y = panic ("EmptyUFM found when intersecting trees")
+	intersect_trees _ _ = panic ("EmptyUFM found when intersecting trees")
 \end{code}
 
 Now the usual set of `collection' operators, like map, fold, etc.
@@ -533,20 +531,20 @@ Now the usual set of `collection' operators, like map, fold, etc.
 \begin{code}
 foldUFM f a (NodeUFM _ _ t1 t2) = foldUFM f (foldUFM f a t2) t1
 foldUFM f a (LeafUFM _ obj)     = f obj a
-foldUFM f a EmptyUFM	        = a
+foldUFM _ a EmptyUFM	        = a
 \end{code}
 
 \begin{code}
-mapUFM fn EmptyUFM    = EmptyUFM
-mapUFM fn fm	      = map_tree fn fm
+mapUFM _fn EmptyUFM   = EmptyUFM
+mapUFM  fn fm	      = map_tree fn fm
 
-filterUFM fn EmptyUFM = EmptyUFM
-filterUFM fn fm	      = filter_tree pred fm
+filterUFM _fn EmptyUFM = EmptyUFM
+filterUFM  fn fm       = filter_tree pred fm
 	where
-	  pred (i::FastInt) e = fn e
+	  pred (_::FastInt) e = fn e
 
-filterUFM_Directly fn EmptyUFM = EmptyUFM
-filterUFM_Directly fn fm       = filter_tree pred fm
+filterUFM_Directly _fn EmptyUFM = EmptyUFM
+filterUFM_Directly  fn fm       = filter_tree pred fm
 	where
 	  pred i e = fn (mkUniqueGrimily (iBox i)) e
 \end{code}
@@ -591,6 +589,7 @@ lookupWithDefaultUFM_Directly fm deflt key
       Nothing  -> deflt
       Just elt -> elt
 
+lookUp :: UniqFM a -> Int# -> Maybe a
 lookUp EmptyUFM _   = Nothing
 lookUp fm i	    = lookup_tree fm
   where
@@ -599,7 +598,7 @@ lookUp fm i	    = lookup_tree fm
 	lookup_tree (LeafUFM j b)
 	  | j ==# i	= Just b
 	  | otherwise	= Nothing
-	lookup_tree (NodeUFM j p t1 t2)
+	lookup_tree (NodeUFM j _ t1 t2)
 	  | j ># i	= lookup_tree t1
 	  | otherwise	= lookup_tree t2
 
@@ -609,15 +608,15 @@ lookUp fm i	    = lookup_tree fm
 folds are *wonderful* things.
 
 \begin{code}
-eltsUFM fm = foldUFM (:) [] fm
+eltsUFM   fm = foldUFM (:) [] fm
+keysUFM   fm = foldUFM_Directly (\u _ l -> u      : l) [] fm
+ufmToList fm = foldUFM_Directly (\u e l -> (u, e) : l) [] fm
+foldUFM_Directly f = fold_tree (\iu e a -> f (mkUniqueGrimily (iBox iu)) e a)
 
-ufmToList fm = fold_tree (\ iu elt rest -> (mkUniqueGrimily (iBox iu), elt) : rest) [] fm
-
-keysUFM fm = fold_tree (\ iu elt rest -> mkUniqueGrimily (iBox iu) : rest) [] fm
-
+fold_tree :: (FastInt -> elt -> a -> a) -> a -> UniqFM elt -> a
 fold_tree f a (NodeUFM _ _ t1 t2) = fold_tree f (fold_tree f a t2) t1
 fold_tree f a (LeafUFM iu obj)    = f iu obj a
-fold_tree f a EmptyUFM		  = a
+fold_tree _ a EmptyUFM		  = a
 \end{code}
 
 %************************************************************************
@@ -643,18 +642,21 @@ mkLeafUFM i a	  = LeafUFM i a
 
 -- The *ONLY* ways of building a NodeUFM.
 
-mkSSNodeUFM (NodeUFMData j p) EmptyUFM t2 = t2
-mkSSNodeUFM (NodeUFMData j p) t1 EmptyUFM = t1
+mkSSNodeUFM, mkSLNodeUFM, mkLSNodeUFM, mkLLNodeUFM ::
+    NodeUFMData -> UniqFM a -> UniqFM a -> UniqFM a
+
+mkSSNodeUFM (NodeUFMData _ _) EmptyUFM t2 = t2
+mkSSNodeUFM (NodeUFMData _ _) t1 EmptyUFM = t1
 mkSSNodeUFM (NodeUFMData j p) t1 t2
   = ASSERT(correctNodeUFM (iBox j) (iBox p) t1 t2)
     NodeUFM j p t1 t2
 
-mkSLNodeUFM (NodeUFMData j p) EmptyUFM t2 = t2
+mkSLNodeUFM (NodeUFMData _ _) EmptyUFM t2 = t2
 mkSLNodeUFM (NodeUFMData j p) t1 t2
   = ASSERT(correctNodeUFM (iBox j) (iBox p) t1 t2)
     NodeUFM j p t1 t2
 
-mkLSNodeUFM (NodeUFMData j p) t1 EmptyUFM = t1
+mkLSNodeUFM (NodeUFMData _ _) t1 EmptyUFM = t1
 mkLSNodeUFM (NodeUFMData j p) t1 t2
   = ASSERT(correctNodeUFM (iBox j) (iBox p) t1 t2)
     NodeUFM j p t1 t2
@@ -691,9 +693,9 @@ insert_ele
 	-> a
 	-> UniqFM a
 
-insert_ele f EmptyUFM i new = mkLeafUFM i new
+insert_ele _f EmptyUFM i new = mkLeafUFM i new
 
-insert_ele f (LeafUFM j old) i new
+insert_ele  f (LeafUFM j old) i new
   | j ># i =
 	  mkLLNodeUFM (getCommonNodeUFMData
 			  (indexToRoot i)
@@ -730,23 +732,24 @@ insert_ele f n@(NodeUFM j p t1 t2) i a
 
 
 \begin{code}
+map_tree :: (a -> b) -> UniqFM a -> UniqFM b
 map_tree f (NodeUFM j p t1 t2)
   = mkLLNodeUFM (NodeUFMData j p) (map_tree f t1) (map_tree f t2)
 	-- NB. lazy! we know the tree is well-formed.
 map_tree f (LeafUFM i obj)
   = mkLeafUFM i (f obj)
-map_tree f _ = panic "map_tree failed"
+map_tree _ _ = panic "map_tree failed"
 \end{code}
 
 \begin{code}
 filter_tree :: (FastInt -> a -> Bool) -> UniqFM a -> UniqFM a
-filter_tree f nd@(NodeUFM j p t1 t2)
+filter_tree f (NodeUFM j p t1 t2)
   = mkSSNodeUFM (NodeUFMData j p) (filter_tree f t1) (filter_tree f t2)
 
 filter_tree f lf@(LeafUFM i obj)
   | f i obj = lf
   | otherwise = EmptyUFM
-filter_tree f _ = panic "filter_tree failed"
+filter_tree _ _ = panic "filter_tree failed"
 \end{code}
 
 %************************************************************************
@@ -810,11 +813,11 @@ getCommonNodeUFMData (NodeUFMData i p) (NodeUFMData i2 p2)
 
 ask_about_common_ancestor :: NodeUFMData -> NodeUFMData -> CommonRoot
 
-ask_about_common_ancestor x@(NodeUFMData j p) y@(NodeUFMData j2 p2)
+ask_about_common_ancestor x@(NodeUFMData j _p) y@(NodeUFMData j2 _p2)
   | j ==# j2 = SameRoot
   | otherwise
   = case getCommonNodeUFMData x y of
-      nd@(NodeUFMData j3 p3)
+      nd@(NodeUFMData j3 _p3)
 	| j3 ==# j  -> LeftRoot (decideSide (j ># j2))
 	| j3 ==# j2 -> RightRoot (decideSide (j <# j2))
 	| otherwise   -> NewRoot nd (j ># j2)
@@ -847,5 +850,10 @@ shiftR_ n p = n `quot` (2 ^ p)
 
 \begin{code}
 use_snd :: a -> b -> b
-use_snd a b = b
+use_snd _ b = b
+\end{code}
+
+\begin{code}
+_unused :: FS.FastString
+_unused = undefined
 \end{code}
