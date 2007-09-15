@@ -463,7 +463,8 @@ postorder_dfs g@(LGraph _ blockenv) =
         dfs1 = zip eblock :
                postorder_dfs_from_except blockenv eblock (unitUniqSet id)
         dfs2 = postorder_dfs' g
-    in  ASSERT (map blockId dfs1 == map blockId dfs2) dfs2
+--    in  ASSERT (map blockId dfs1 == map blockId dfs2) dfs2
+    in  if (map blockId dfs1 == map blockId dfs2) then dfs2 else panic "inconsistent DFS"
 
 postorder_dfs_from
     :: (HavingSuccessors b, LastNode l) => BlockEnv (Block m l) -> b -> [Block m l]
