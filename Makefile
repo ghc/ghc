@@ -575,7 +575,7 @@ extraclean::
 
 clean distclean ::
 	$(MAKE) -C bindisttest $@
-	test -d testsuite && $(MAKE) -C testsuite $@
+	if test -d testsuite; then $(MAKE) -C testsuite $@; fi
 
 # -----------------------------------------------------------------------------
 
