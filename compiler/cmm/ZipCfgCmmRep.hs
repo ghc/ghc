@@ -151,6 +151,32 @@ fold_cmm_succs _f (LastCall _ Nothing)     z = z
 fold_cmm_succs  f (LastCondBranch _ te fe) z = f te (f fe z)
 fold_cmm_succs  f (LastSwitch _ edges)     z = foldl (flip f) z $ catMaybes edges
 
+----------------------------------------------------------------------
+----- Instance declarations for register use
+
+instance UserOfLocalRegs Middle where
+    foldRegsUsed f z m = middle m
+      where middle (MidComment {})                = z
+            middle (MidAssign _lhs expr)          = foldRegsUsed f z expr
+            middle (MidStore addr rval)           = foldRegsUsed f (foldRegsUsed f z addr) rval
+            middle (MidUnsafeCall tgt _ress args) = foldRegsUsed f (foldRegsUsed f z tgt) args
+            middle (CopyIn _ _formals _)          = z
+            middle (CopyOut _ actuals)            = foldRegsUsed f z actuals
+--            fold = foldRegsUsed
+
+instance UserOfLocalRegs Last where
+    foldRegsUsed f z m = last m
+      where last (LastReturn)           = z
+            last (LastJump e)           = foldRegsUsed f z e
+            last (LastBranch _id)       = z
+            last (LastCall tgt _)       = foldRegsUsed f z tgt
+            last (LastCondBranch e _ _) = foldRegsUsed f z e
+            last (LastSwitch e _tbl)    = foldRegsUsed f z e
+
+instance UserOfLocalRegs (ZLast Last) where
+    foldRegsUsed  f z (LastOther l) = foldRegsUsed f z l
+    foldRegsUsed _f z LastExit      = z
+
 
 ----------------------------------------------------------------------
 ----- Instance declarations for prettyprinting (avoids recursive imports)
