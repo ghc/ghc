@@ -81,7 +81,6 @@ ofZgraph g = ListGraph $ swallow blocks
           tail id prev' out (G.ZTail m t) rest = tail id (mid m : prev') out t rest
           tail id prev' out (G.ZLast G.LastExit)      rest = exit id prev' out rest
           tail id prev' out (G.ZLast (G.LastOther l)) rest = last id prev' out l rest
-          mid (MidNop)        = CmmNop
           mid (MidComment s)  = CmmComment s
           mid (MidAssign l r) = CmmAssign l r
           mid (MidStore  l r) = CmmStore  l r
