@@ -13,7 +13,7 @@ module ZipCfg
     , blockId, zip, unzip, last, goto_end, zipht, tailOfLast
     , splice_tail, splice_head, splice_head_only', splice_head'
     , of_block_list, to_block_list
-    , map_blocks, map_nodes
+    , map_blocks, map_nodes, mapM_blocks
     , postorder_dfs, postorder_dfs_from, postorder_dfs_from_except
     , fold_layout
     , fold_blocks
@@ -266,7 +266,9 @@ fold_blocks :: (Block m l -> a -> a) -> a -> LGraph m l -> a
 map_nodes :: (BlockId -> BlockId) -> (m -> m') -> (l -> l') -> LGraph m l -> LGraph m' l'
    -- mapping includes the entry id!
 
-map_blocks :: (Block m l -> Block m' l') -> LGraph m l -> LGraph m' l'
+map_blocks  :: (Block m l -> Block m' l') -> LGraph m l -> LGraph m' l'
+mapM_blocks :: Monad mm
+            => (Block m l -> mm (Block m' l')) -> LGraph m l -> mm (LGraph m' l')
 
 -- | These translation functions are speculative.  I hope eventually
 -- they will be used in the native-code back ends ---NR
@@ -484,6 +486,14 @@ map_nodes idm middle last (LGraph eid blocks) = LGraph (idm eid) (mapUFM block b
           tail (ZTail m t) = ZTail (middle m) (tail t)
           tail (ZLast LastExit) = ZLast LastExit
           tail (ZLast (LastOther l)) = ZLast (LastOther (last l))
+
+
+mapM_blocks f (LGraph eid blocks) = blocks' >>= return . LGraph eid 
+    where blocks' =
+            foldUFM (\b mblocks -> do { blocks <- mblocks
+                                      ; b <- f b
+                                      ; return $ insertBlock b blocks })
+                    (return emptyBlockEnv) blocks
 
 fold_blocks f z (LGraph _ blocks) = foldUFM f z blocks
 
