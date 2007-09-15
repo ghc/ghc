@@ -43,8 +43,7 @@ type CmmZ      = GenCmm    CmmStatic CmmInfo CmmGraph
 type CmmTopZ   = GenCmmTop CmmStatic CmmInfo CmmGraph
 
 data Middle
-  = MidNop
-  | MidComment FastString
+  = MidComment FastString
 
   | MidAssign CmmReg CmmExpr     -- Assign to register
 
@@ -176,8 +175,6 @@ debugPpr = debugIsOn
 pprMiddle :: Middle -> SDoc    
 pprMiddle stmt = (case stmt of
 
-    MidNop -> semi
-
     CopyIn conv args _ ->
         if null args then ptext SLIT("empty CopyIn")
         else commafy (map pprHinted args) <+> equals <+>
@@ -221,7 +218,6 @@ pprMiddle stmt = (case stmt of
   if debugPpr then empty
   else text " //" <+>
        case stmt of
-         MidNop {}     -> text "MidNop"
          CopyIn {}     -> text "CopyIn"
          CopyOut {}    -> text "CopyOut"
          MidComment {} -> text "MidComment"

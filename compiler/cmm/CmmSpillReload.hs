@@ -251,8 +251,7 @@ middleAvail :: M -> AvailRegs -> AvailRegs
 middleAvail (Spill _) = id
 middleAvail (Reload regs) = agen regs
 middleAvail (NotSpillOrReload m) = middle m
-  where middle (MidNop)                        = id
-        middle (MidComment {})                 = id
+  where middle (MidComment {})                 = id
         middle (MidAssign lhs _expr)           = akill lhs
         middle (MidStore {})                   = id
         middle (MidUnsafeCall _tgt ress _args) = akill ress

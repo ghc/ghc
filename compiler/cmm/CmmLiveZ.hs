@@ -56,8 +56,7 @@ kill a live = foldRegsUsed delOneFromUniqSet live a
 
 middleLiveness :: Middle -> CmmLive -> CmmLive
 middleLiveness m = middle m
-  where middle (MidNop)                      = id
-        middle (MidComment {})               = id
+  where middle (MidComment {})               = id
         middle (MidAssign lhs expr)          = gen expr . kill lhs
         middle (MidStore addr rval)          = gen addr . gen rval
         middle (MidUnsafeCall tgt ress args) = gen tgt . gen args . kill ress

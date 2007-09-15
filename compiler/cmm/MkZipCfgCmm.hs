@@ -78,7 +78,7 @@ mkCmmWhileDo    e = mkWhileDo    (mkCbranch e)
 
 -- ================ IMPLEMENTATION ================--
 
-mkNop                     = mkMiddle $ MidNop
+mkNop                     = emptyAgraph
 mkComment fs              = mkMiddle $ MidComment fs
 mkAssign l r              = mkMiddle $ MidAssign l r
 mkStore  l r              = mkMiddle $ MidStore  l r
