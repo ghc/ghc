@@ -2,6 +2,7 @@
 module DFMonad
     ( OptimizationFuel
     , DFTx, runDFTx, lastTxPass, txDecrement, txRemaining, txExhausted
+    , functionalDFTx
 
     , DataflowLattice(..)
     , DataflowAnalysis
@@ -107,6 +108,11 @@ runDFA lattice (DFA f) = fst $ f lattice initDFAState
 
 -- XXX DFTx really needs to be in IO, so we can dump programs in
 -- intermediate states of optimization ---NR
+
+functionalDFTx :: String -> (OptimizationFuel -> (a, OptimizationFuel)) -> DFTx a
+functionalDFTx name pass = DFTx f
+    where f s = let (a, fuel) = pass (df_txlimit s)
+                in  (a, DFTxState fuel name)
 
 runDFTx :: OptimizationFuel -> DFTx a -> a  --- should only be called once per program!
 runDFTx lim (DFTx f) = fst $ f $ DFTxState lim "<none>"
