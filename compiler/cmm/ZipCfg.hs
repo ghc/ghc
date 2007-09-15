@@ -1,4 +1,3 @@
-{-# LANGUAGE ScopedTypeVariables #-}
 module ZipCfg
     ( 	-- These data types and names are carefully thought out
       BlockId(..) 	-- ToDo: BlockId should be abstract, but it isn't yet
