@@ -13,7 +13,7 @@ module ZipCfg
     , blockId, zip, unzip, last, goto_end, zipht, tailOfLast
     , splice_tail, splice_head, splice_head_only', splice_head'
     , of_block_list, to_block_list
-    , map_nodes
+    , map_blocks, map_nodes
     , postorder_dfs, postorder_dfs_from, postorder_dfs_from_except
     , fold_layout
     , fold_blocks
@@ -266,7 +266,7 @@ fold_blocks :: (Block m l -> a -> a) -> a -> LGraph m l -> a
 map_nodes :: (BlockId -> BlockId) -> (m -> m') -> (l -> l') -> LGraph m l -> LGraph m' l'
    -- mapping includes the entry id!
 
-map_blocks :: (Block m l -> Block m' l') -> LGraph m' l' -> LGraph m' l'
+map_blocks :: (Block m l -> Block m' l') -> LGraph m l -> LGraph m' l'
 
 -- | These translation functions are speculative.  I hope eventually
 -- they will be used in the native-code back ends ---NR
