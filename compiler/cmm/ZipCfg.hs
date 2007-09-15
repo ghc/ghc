@@ -271,9 +271,10 @@ map_blocks :: (Block m l -> Block m' l') -> LGraph m' l' -> LGraph m' l'
 
 -- | These translation functions are speculative.  I hope eventually
 -- they will be used in the native-code back ends ---NR
-translate :: (m          -> UniqSM (LGraph m' l')) ->
-             (l          -> UniqSM (LGraph m' l')) ->
-             (LGraph m l -> UniqSM (LGraph m' l'))
+translate :: Monad tm =>
+             (m          -> tm (LGraph m' l')) ->
+             (l          -> tm (LGraph m' l')) ->
+             (LGraph m l -> tm (LGraph m' l'))
 
 {-
 -- | It's possible that another form of translation would be more suitable:
@@ -619,12 +620,12 @@ translate txm txl (LGraph eid blocks) =
        return $ LGraph eid blocks'
     where
       -- txblock ::
-      -- Block m l -> UniqSM (BlockEnv (Block m' l')) -> UniqSM (BlockEnv (Block m' l'))
+      -- Block m l -> tm (BlockEnv (Block m' l')) -> tm (BlockEnv (Block m' l'))
       txblock (Block id t) expanded =
         do blocks' <- expanded
            txtail (ZFirst id) t blocks'
       -- txtail :: ZHead m' -> ZTail m l -> BlockEnv (Block m' l') ->
-      --           UniqSM (BlockEnv (Block m' l'))
+      --           tm (BlockEnv (Block m' l'))
       txtail h (ZTail m t) blocks' =
         do m' <- txm m 
            let (g, h') = splice_head h m' 
