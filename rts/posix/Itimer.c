@@ -42,6 +42,8 @@
 # include <signal.h>
 #endif
 
+#include <string.h>
+
 /* Major bogosity:
  * 
  * In the threaded RTS, we can't set the virtual timer because the
@@ -142,6 +144,9 @@ initTicker (nat ms, TickProc handle_tick)
 #if defined(USE_TIMER_CREATE)
     {
         struct sigevent ev;
+
+	// Keep programs like valgrind happy
+	memset(&ev, 0, sizeof(ev));
 
         ev.sigev_notify = SIGEV_SIGNAL;
         ev.sigev_signo  = ITIMER_SIGNAL;
