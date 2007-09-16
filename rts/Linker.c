@@ -2903,8 +2903,12 @@ ocVerifyImage_ELF ( ObjectCode* oc )
 #ifdef EM_X86_64
       case EM_X86_64: IF_DEBUG(linker,debugBelch( "x86_64" )); break;
 #endif
+#ifdef EM_AMD64
+      case EM_AMD64: IF_DEBUG(linker,debugBelch( "amd64" )); break;
+#endif
       default:       IF_DEBUG(linker,debugBelch( "unknown" ));
-                     errorBelch("%s: unknown architecture", oc->fileName);
+                     errorBelch("%s: unknown architecture (e_machine == %d)"
+                                , oc->fileName, ehdr->e_machine);
                      return 0;
    }
 
