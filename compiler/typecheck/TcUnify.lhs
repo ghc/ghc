@@ -1318,12 +1318,10 @@ uUnfilledVar outer swapped tv1 details1 ps_ty2 (TyVarTy tv2)
 uUnfilledVar outer swapped tv1 details1 ps_ty2 non_var_ty2
   =     -- ty2 is not a type variable
     case details1 of	
-	MetaTv (SigTv _) _ -> rigid_variable
-	MetaTv info ref1   -> 
-          do { uMetaVar swapped tv1 info ref1 ps_ty2 non_var_ty2 
-             ; return IdCo
-             }
-	SkolemTv _         -> rigid_variable
+      MetaTv (SigTv _) _ -> rigid_variable
+      MetaTv info ref1   -> 
+        uMetaVar outer swapped tv1 info ref1 ps_ty2 non_var_ty2 
+      SkolemTv _         -> rigid_variable
   where
     rigid_variable 
       | isOpenSynTyConApp non_var_ty2
@@ -1399,14 +1397,15 @@ defer_unification outer False ty1 ty2
 	; return $ ACo $ TyVarTy cotv  }
 
 ----------------
-uMetaVar :: SwapFlag
+uMetaVar :: Bool               -- pop innermost context?
+         -> SwapFlag
 	 -> TcTyVar -> BoxInfo -> IORef MetaDetails
 	 -> TcType -> TcType
-	 -> TcM ()
+	 -> TcM CoercionI
 -- tv1 is an un-filled-in meta type variable (maybe boxy, maybe tau)
 -- ty2 is not a type variable
 
-uMetaVar swapped tv1 BoxTv ref1 ps_ty2 non_var_ty2
+uMetaVar outer swapped tv1 BoxTv ref1 ps_ty2 non_var_ty2
   = 	-- tv1 is a BoxTv.  So we must unbox ty2, to ensure
 	-- that any boxes in ty2 are filled with monotypes
 	-- 
@@ -1422,11 +1421,21 @@ uMetaVar swapped tv1 BoxTv ref1 ps_ty2 non_var_ty2
 			   return ()	-- This really should *not* happen
 	    Flexi -> return ()
 #endif
-	; checkUpdateMeta swapped tv1 ref1 final_ty }
+	; checkUpdateMeta swapped tv1 ref1 final_ty
+        ; return IdCo
+        }
 
-uMetaVar swapped tv1 info1 ref1 ps_ty2 non_var_ty2
-  = do	{ final_ty <- checkTauTvUpdate tv1 ps_ty2	-- Occurs check + monotype check
-	; checkUpdateMeta swapped tv1 ref1 final_ty }
+uMetaVar outer swapped tv1 info1 ref1 ps_ty2 non_var_ty2
+  = do	{ -- Occurs check + monotype check
+        ; mb_final_ty <- checkTauTvUpdate tv1 ps_ty2
+        ; case mb_final_ty of
+            Nothing       ->    -- tv1 occured in type family parameter
+              defer_unification outer swapped (mkTyVarTy tv1) ps_ty2
+            Just final_ty -> 
+              do { checkUpdateMeta swapped tv1 ref1 final_ty 
+                 ; return IdCo
+                 }
+        }
 
 ----------------
 uUnfilledVars :: Outer
@@ -1504,26 +1513,6 @@ uUnfilledVars outer swapped tv1 (MetaTv info1 ref1) tv2 (MetaTv info2 ref2)
 	-- gotten (say) by instantiating a polymorphic function with
 	-- a user-written type sig
 \end{code}
-
-Note [Type synonyms and the occur check]
-~~~~~~~~~~~~~~~~~~~~
-Basically we want to update     tv1 := ps_ty2
-because ps_ty2 has type-synonym info, which improves later error messages
-
-But consider 
-	type A a = ()
-
-	f :: (A a -> a -> ()) -> ()
-	f = \ _ -> ()
-
-	x :: ()
-	x = f (\ x p -> p x)
-
-In the application (p x), we try to match "t" with "A t".  If we go
-ahead and bind t to A t (= ps_ty2), we'll lead the type checker into 
-an infinite loop later.
-But we should not reject the program, because A t = ().
-Rather, we should bind t to () (= non_var_ty2).
 
 \begin{code}
 refineBox :: TcType -> TcM TcType

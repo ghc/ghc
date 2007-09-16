@@ -177,7 +177,7 @@ checkKinds swapped tv1 ty2
     tk2 = typeKind ty2
 
 ----------------
-checkTauTvUpdate :: TcTyVar -> TcType -> TcM TcType
+checkTauTvUpdate :: TcTyVar -> TcType -> TcM (Maybe TcType)
 --    (checkTauTvUpdate tv ty)
 -- We are about to update the TauTv tv with ty.
 -- Check (a) that tv doesn't occur in ty (occurs check)
@@ -185,42 +185,79 @@ checkTauTvUpdate :: TcTyVar -> TcType -> TcM TcType
 -- Furthermore, in the interest of (b), if you find an
 -- empty box (BoxTv that is Flexi), fill it in with a TauTv
 -- 
--- Returns the (non-boxy) type to update the type variable with, or fails
+-- We have three possible outcomes:
+-- (1) Return the (non-boxy) type to update the type variable with, 
+--     [we know the update is ok!]
+-- (2) return Nothing, or 
+--     [we cannot tell whether the update is ok right now]
+-- (3) fails.
+--     [the update is definitely invalid]
+-- We return Nothing in case the tv occurs in ty *under* a type family
+-- application.  In this case, we must not update tv (to avoid a cyclic type
+-- term), but we also cannot fail claiming an infinite type.  Given
+--   type family F a
+--   type instance F Int = Int
+-- consider
+--   a ~ F a
+-- This is perfectly reasonable, if we later get a ~ Int.
 
 checkTauTvUpdate orig_tv orig_ty
-  = go orig_ty
+  = do { result <- go orig_ty
+       ; case result of 
+           Right ty    -> return $ Just ty
+           Left  True  -> return $ Nothing
+           Left  False -> occurCheckErr (mkTyVarTy orig_tv) orig_ty
+       }
   where
+    go :: TcType -> TcM (Either Bool TcType)
+    -- go returns
+    --   Right ty    if everything is fine
+    --   Left True   if orig_tv occurs in orig_ty, but under a type family app
+    --   Left False  if orig_tv occurs in orig_ty (with no type family app)
+    -- It fails if it encounters a forall type, except as an argument for a
+    -- closed type synonym that expands to a tau type.
     go (TyConApp tc tys)
 	| isSynTyCon tc  = go_syn tc tys
-	| otherwise	 = do { tys' <- mappM go tys; return (TyConApp tc tys') }
+	| otherwise	 = do { tys' <- mappM go tys
+                              ; return $ occurs (TyConApp tc) tys' }
     go (NoteTy _ ty2) 	 = go ty2	-- Discard free-tyvar annotations
-    go (PredTy p)	 = do { p' <- go_pred p; return (PredTy p') }
-    go (FunTy arg res)   = do { arg' <- go arg; res' <- go res; return (FunTy arg' res') }
-    go (AppTy fun arg)	 = do { fun' <- go fun; arg' <- go arg; return (mkAppTy fun' arg') }
+    go (PredTy p)	 = do { p' <- go_pred p
+                              ; return $ occurs1 PredTy p' }
+    go (FunTy arg res)   = do { arg' <- go arg
+                              ; res' <- go res
+                              ; return $ occurs2 FunTy arg' res' }
+    go (AppTy fun arg)	 = do { fun' <- go fun
+                              ; arg' <- go arg
+                              ; return $ occurs2 mkAppTy fun' arg' }
 		-- NB the mkAppTy; we might have instantiated a
 		-- type variable to a type constructor, so we need
 		-- to pull the TyConApp to the top.
     go (ForAllTy tv ty) = notMonoType orig_ty		-- (b)
 
     go (TyVarTy tv)
-	| orig_tv == tv = occurCheck tv                 -- (a)
+	| orig_tv == tv = return $ Left False           -- (a)
 	| isTcTyVar tv  = go_tyvar tv (tcTyVarDetails tv)
-	| otherwise     = return (TyVarTy tv)
+	| otherwise     = return $ Right (TyVarTy tv)
 		 -- Ordinary (non Tc) tyvars
 		 -- occur inside quantified types
 
-    go_pred (ClassP c tys) = do { tys' <- mapM go tys; return (ClassP c tys') }
-    go_pred (IParam n ty)  = do { ty' <- go ty;        return (IParam n ty') }
-    go_pred (EqPred t1 t2) = do { t1' <- go t1; t2' <- go t2; return (EqPred t1' t2') }
+    go_pred (ClassP c tys) = do { tys' <- mapM go tys
+                                ; return $ occurs (ClassP c) tys' }
+    go_pred (IParam n ty)  = do { ty' <- go ty
+                                ; return $ occurs1 (IParam n) ty' }
+    go_pred (EqPred t1 t2) = do { t1' <- go t1
+                                ; t2' <- go t2
+                                ; return $ occurs2 EqPred t1' t2' }
 
-    go_tyvar tv (SkolemTv _) = return (TyVarTy tv)
+    go_tyvar tv (SkolemTv _) = return $ Right (TyVarTy tv)
     go_tyvar tv (MetaTv box ref)
 	= do { cts <- readMutVar ref
 	     ; case cts of
 		  Indirect ty -> go ty 
 		  Flexi -> case box of
-				BoxTv -> fillBoxWithTau tv ref
-				other -> return (TyVarTy tv)
+				BoxTv -> do { ty <- fillBoxWithTau tv ref
+                                            ; return $ Right ty }
+				other -> return $ Right (TyVarTy tv)
 	     }
 
 	-- go_syn is called for synonyms only
@@ -231,18 +268,40 @@ checkTauTvUpdate orig_tv orig_ty
 	| otherwise
 	= do { (msgs, mb_tys') <- tryTc (mapM go tys)
 	     ; case mb_tys' of
-		Just tys' -> return (TyConApp tc tys')
-				-- Retain the synonym (the common case)
-		Nothing | isOpenTyCon tc
-			  -> notMonoArgs (TyConApp tc tys)
-				-- Synonym families must have monotype args
-			| otherwise
-			  -> go (expectJust "checkTauTvUpdate" 
-					(tcView (TyConApp tc tys)))
-				-- Try again, expanding the synonym
+
+                -- we had a type error => forall in type parameters
+		Nothing 
+                  | isOpenTyCon tc -> notMonoArgs (TyConApp tc tys)
+		        -- Synonym families must have monotype args
+		  | otherwise      -> go (expectJust "checkTauTvUpdate(1)" 
+					    (tcView (TyConApp tc tys)))
+		        -- Try again, expanding the synonym
+
+                -- no type error, but need to test whether occurs check happend
+		Just tys' -> 
+                  case occurs id tys' of
+                    Left _ 
+                      | isOpenTyCon tc -> return $ Left True
+                        -- Variable occured under type family application
+                      | otherwise      -> go (expectJust "checkTauTvUpdate(2)" 
+					       (tcView (TyConApp tc tys)))
+		        -- Try again, expanding the synonym
+                    Right raw_tys'     -> return $ Right (TyConApp tc raw_tys')
+		        -- Retain the synonym (the common case)
 	     }
 
-    occurCheck tv = occurCheckErr (mkTyVarTy tv) orig_ty
+    -- Left results (= occurrence of orig_ty) dominate and
+    -- (Left False) (= fatal occurrence) dominates over (Left True)
+    occurs :: ([a] -> b) -> [Either Bool a] -> Either Bool b
+    occurs c = either Left (Right . c) . foldr combine (Right [])
+      where
+        combine (Left famInst1) (Left famInst2) = Left (famInst1 && famInst2)
+        combine (Right _      ) (Left famInst)  = Left famInst
+        combine (Left famInst)  (Right _)       = Left famInst
+        combine (Right arg)     (Right args)    = Right (arg:args)
+
+    occurs1 c x   = occurs (\[x']     -> c x')    [x]
+    occurs2 c x y = occurs (\[x', y'] -> c x' y') [x, y]
 
 fillBoxWithTau :: BoxyTyVar -> IORef MetaDetails -> TcM TcType
 -- (fillBoxWithTau tv ref) fills ref with a freshly allocated 
@@ -257,6 +316,28 @@ fillBoxWithTau tv ref
 	; writeMutVar ref (Indirect tau)
 	; return tau }
 \end{code}
+
+Note [Type synonyms and the occur check]
+~~~~~~~~~~~~~~~~~~~~
+Basically we want to update     tv1 := ps_ty2
+because ps_ty2 has type-synonym info, which improves later error messages
+
+But consider 
+	type A a = ()
+
+	f :: (A a -> a -> ()) -> ()
+	f = \ _ -> ()
+
+	x :: ()
+	x = f (\ x p -> p x)
+
+In the application (p x), we try to match "t" with "A t".  If we go
+ahead and bind t to A t (= ps_ty2), we'll lead the type checker into 
+an infinite loop later.
+But we should not reject the program, because A t = ().
+Rather, we should bind t to () (= non_var_ty2).
+
+--------------
 
 Error mesages in case of kind mismatch.
 

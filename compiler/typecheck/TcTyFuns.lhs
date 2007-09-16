@@ -953,10 +953,14 @@ unifyMetaRule insts
         -- updatable meta variable meets non-variable type
         -- => occurs check, monotype check, and kinds match check, then update
 	uMeta swapped tv (DoneTv (MetaTv _ ref)) ty cotv
-	  = do { ty' <- checkTauTvUpdate tv ty       -- occurs + monotype check
-	       ; checkUpdateMeta swapped tv ref ty'  -- update meta var
-	       ; writeMetaTyVar cotv ty'             -- update the co var
-	       ; return ([], True)
+	  = do { mb_ty' <- checkTauTvUpdate tv ty    -- occurs + monotype check
+               ; case mb_ty' of
+                   Nothing  -> return ([inst], False)  -- tv occurs in faminst
+                   Just ty' ->
+                     do { checkUpdateMeta swapped tv ref ty'  -- update meta var
+	                ; writeMetaTyVar cotv ty'             -- update co var
+	                ; return ([], True)
+                        }
 	       }
 
         uMeta _ _ _ _ _ = panic "uMeta"
