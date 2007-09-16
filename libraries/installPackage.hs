@@ -85,7 +85,7 @@ doit destdir ipref ibindir ilibdir ilibexecdir idatadir idocdir
               prog = ConfiguredProgram {
                          programId = programName ghcPkgProgram,
                          programVersion = Nothing,
-                         programArgs = ["--global-conf", ghcpkgconf],
+                         programArgs = ["--force", "--global-conf", ghcpkgconf],
                          programLocation = UserSpecified ghcpkg
                      }
               progs' = updateProgram prog progs
