@@ -1288,11 +1288,18 @@ loadObj( char *path )
    /* Link objects into the lower 2Gb on x86_64.  GHC assumes the
     * small memory model on this architecture (see gcc docs,
     * -mcmodel=small).
+    *
+    * MAP_32BIT not available on OpenBSD/amd64
     */
-#ifdef x86_64_HOST_ARCH
+#if defined(x86_64_HOST_ARCH) && defined(MAP_32BIT)
 #define EXTRA_MAP_FLAGS MAP_32BIT
 #else
 #define EXTRA_MAP_FLAGS 0
+#endif
+
+   /* MAP_ANONYMOUS is MAP_ANON on some systems, e.g. OpenBSD */
+#if !defined(MAP_ANONYMOUS) && defined(MAP_ANON)
+#define MAP_ANONYMOUS MAP_ANON
 #endif
 
    oc->image = mmap(map_addr, n, PROT_EXEC|PROT_READ|PROT_WRITE,
@@ -2558,9 +2565,6 @@ ocResolve_PEi386 ( ObjectCode* oc )
 
 #if !defined(openbsd_HOST_OS)
 #  include <elf.h>
-#  ifndef R_X86_64_PC64     /* If elf.h doesn't define it */
-#    define R_X86_64_PC64 24
-#  endif
 #else
 /* openbsd elf has things in different places, with diff names */
 #  include <elf_abi.h>
@@ -2568,6 +2572,11 @@ ocResolve_PEi386 ( ObjectCode* oc )
 #  define R_386_32    RELOC_32
 #  define R_386_PC32  RELOC_PC32
 #endif
+
+/* If elf.h doesn't define it */
+#  ifndef R_X86_64_PC64     
+#    define R_X86_64_PC64 24
+#  endif
 
 /*
  * Define a set of types which can be used for both ELF32 and ELF64
@@ -2766,7 +2775,7 @@ x86_64_high_symbol( char *lbl, void *addr )
 	x86_64_bounce_buffer = 
 	    mmap(NULL, X86_64_BB_SIZE * sizeof(x86_64_bounce), 
 		 PROT_EXEC|PROT_READ|PROT_WRITE, 
-		 MAP_PRIVATE|MAP_32BIT|MAP_ANONYMOUS, -1, 0);
+		 MAP_PRIVATE|EXTRA_MAP_FLAGS|MAP_ANONYMOUS, -1, 0);
 	if (x86_64_bounce_buffer == MAP_FAILED) {
 	    barf("x86_64_high_symbol: mmap failed");
 	}
