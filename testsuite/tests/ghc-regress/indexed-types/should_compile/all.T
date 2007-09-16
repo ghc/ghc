@@ -12,7 +12,7 @@ test('Simple8', expect_fail, compile, [''])
 test('Simple9', normal, compile, [''])
 test('Simple10', expect_fail, compile, [''])
 test('Simple11', expect_fail, compile, [''])
-test('Simple12', expect_fail, compile, [''])
+test('Simple12', normal, compile, [''])
 test('Simple13', normal, compile, [''])
 test('Simple14', expect_fail, compile, [''])
 
