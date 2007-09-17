@@ -1,7 +1,5 @@
 -- | Basic operations on graphs.
 --
---	TODO: refine coalescing crieteria
-
 {-# OPTIONS -fno-warn-missing-signatures #-}
 
 module GraphOps (

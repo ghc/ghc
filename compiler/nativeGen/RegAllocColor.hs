@@ -1,8 +1,6 @@
 -- | Graph coloring register allocator.
 --
--- TODO:
---	The function that choosing the potential spills could be a bit cleverer.
---	Colors in graphviz graphs could be nicer.
+-- TODO: The colors in graphviz graphs for x86_64 and ppc could be nicer.
 --
 {-# OPTIONS -fno-warn-missing-signatures #-}
 
@@ -81,20 +79,8 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 						$ uniqSetToList $ unionManyUniqSets $ eltsUFM regsFree)
 		$$ text "slotsFree   = " <> ppr (sizeUniqSet slotsFree))
 
-
-	-- Brig's algorithm does reckless coalescing for all but the first allocation stage
-	--	Doing this seems to reduce the number of reg-reg moves, but at the cost-
-	--	of creating more spills. Probably better just to stick with conservative 
-	--	coalescing in Color.colorGraph for now.
-	--
-	{- code_coalesced1	<- if (spinCount > 0) 
-				then regCoalesce code
-				else return code -}
-
-	let code_coalesced1	= code
-
  	-- build a conflict graph from the code.
-	graph		<- {-# SCC "BuildGraph" #-} buildGraph code_coalesced1
+	graph		<- {-# SCC "BuildGraph" #-} buildGraph code
 
 	-- VERY IMPORTANT:
 	--	We really do want the graph to be fully evaluated _before_ we start coloring.
@@ -107,7 +93,7 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 	-- build a map of the cost of spilling each instruction
 	--	this will only actually be computed if we have to spill something.
 	let spillCosts	= foldl' plusSpillCostInfo zeroSpillCostInfo
-			$ map slurpSpillCostInfo code_coalesced1
+			$ map slurpSpillCostInfo code
 
 	-- the function to choose regs to leave uncolored
 	let spill	= chooseSpill spillCosts
@@ -126,14 +112,15 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 			= {-# SCC "ColorGraph" #-}
 			   Color.colorGraph
 			    	(dopt Opt_RegsIterative dflags)
+				spinCount
 			    	regsFree triv spill graph
 
 	-- rewrite regs in the code that have been coalesced
 	let patchF reg	= case lookupUFM rmCoalesce reg of
 				Just reg'	-> patchF reg'
 				Nothing		-> reg
-	let code_coalesced2
-			= map (patchEraseLive patchF) code_coalesced1
+	let code_coalesced
+			= map (patchEraseLive patchF) code
 
 
 	-- see if we've found a coloring
@@ -148,7 +135,7 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 				else graph_colored
 
 		-- patch the registers using the info in the graph
-	 	let code_patched	= map (patchRegsFromGraph graph_colored_lint) code_coalesced2
+	 	let code_patched	= map (patchRegsFromGraph graph_colored_lint) code_coalesced
 
 		-- clean out unneeded SPILL/RELOADs
 		let code_spillclean	= map cleanSpills code_patched
@@ -195,7 +182,7 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 
 	 	-- spill the uncolored regs
 		(code_spilled, slotsFree', spillStats)
-			<- regSpill code_coalesced2 slotsFree rsSpill
+			<- regSpill code_coalesced slotsFree rsSpill
 
 		-- recalculate liveness
 		let code_nat	= map stripLive code_spilled
