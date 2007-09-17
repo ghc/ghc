@@ -54,7 +54,8 @@ data RegAllocStats
 
 	-- a successful coloring
 	| RegAllocStatsColored
-	{ raGraph	:: Color.Graph Reg RegClass Reg -- ^ the colored graph
+	{ raGraph	 :: Color.Graph Reg RegClass Reg -- ^ the uncolored graph
+	, raGraphColored :: Color.Graph Reg RegClass Reg -- ^ the coalesced and colored graph
 	, raCoalesced	:: UniqFM Reg			-- ^ the regs that were coaleced
 	, raPatched	:: [LiveCmmTop] 		-- ^ code with vregs replaced by hregs
 	, raSpillClean  :: [LiveCmmTop]			-- ^ code with unneeded spill/reloads cleaned out
@@ -100,8 +101,12 @@ instance Outputable RegAllocStats where
  ppr (s@RegAllocStatsColored { raSRMs = (spills, reloads, moves) })
  	=  text "#  Colored"
 
-	$$ text "#  Register conflict graph."
+	$$ text "#  Register conflict graph (initial)."
 	$$ Color.dotGraph regDotColor trivColorable (raGraph s)
+	$$ text ""
+
+	$$ text "#  Register conflict graph (colored)."
+	$$ Color.dotGraph regDotColor trivColorable (raGraphColored s)
 	$$ text ""
 
 	$$ (if (not $ isNullUFM $ raCoalesced s)

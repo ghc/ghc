@@ -138,7 +138,7 @@ colorScan_spin iterative triv spill graph
 
 	-- if the graph is empty then we're done
 	| isNullUFM $ graphMap graph
-	= (ksTriv, ksSpill, kksCoalesce)
+	= (ksTriv, ksSpill, reverse kksCoalesce)
 
 	-- Simplify:
 	--	Look for trivially colorable nodes.
@@ -172,7 +172,7 @@ colorScan_spin iterative triv spill graph
 		--	go back to Simplify and see if this frees up more nodes to be trivially colorable.
 		(graph2, kksCoalesceFound @(_:_))
 		 -> colorScan_spin iterative triv spill graph2
-			ksTriv ksSpill (kksCoalesceFound ++ kksCoalesce)
+			ksTriv ksSpill (reverse kksCoalesceFound ++ kksCoalesce)
 
 		-- Freeze:
 		-- nothing could be coalesced (or was triv),

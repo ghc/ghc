@@ -273,7 +273,9 @@ coalesceGraph
 				--	less colorable (aggressive coalescing)
 	-> Triv k cls color
 	-> Graph k cls color
-	-> (Graph k cls color, [(k, k)])
+	-> ( Graph k cls color
+	   , [(k, k)])		-- pairs of nodes that were coalesced, in the order that the
+	   			--	coalescing was applied.
 
 coalesceGraph aggressive triv graph
 	= coalesceGraph' aggressive triv graph []
@@ -301,8 +303,8 @@ coalesceGraph' aggressive triv graph kkPairsAcc
 
 	-- keep running until there are no more coalesces can be found
    in	case catMaybes mPairs of
-	 []	-> (graph', kkPairsAcc)
-	 pairs	-> coalesceGraph' aggressive triv graph' (pairs ++ kkPairsAcc)
+	 []	-> (graph', reverse kkPairsAcc)
+	 pairs	-> coalesceGraph' aggressive triv graph' (reverse pairs ++ kkPairsAcc)
 
 
 -- | Coalesce this pair of nodes unconditionally / agressively.

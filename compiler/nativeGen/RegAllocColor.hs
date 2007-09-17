@@ -163,12 +163,13 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 		-- record what happened in this stage for debugging
 		let stat		=
 			RegAllocStatsColored
-			{ raGraph	= graph_colored_lint
-			, raCoalesced	= rmCoalesce
-			, raPatched	= code_patched
-			, raSpillClean	= code_spillclean
-			, raFinal	= code_final
-			, raSRMs	= foldl' addSRM (0, 0, 0) $ map countSRMs code_spillclean }
+			{ raGraph		= graph
+			, raGraphColored	= graph_colored_lint
+			, raCoalesced		= rmCoalesce
+			, raPatched		= code_patched
+			, raSpillClean		= code_spillclean
+			, raFinal		= code_final
+			, raSRMs		= foldl' addSRM (0, 0, 0) $ map countSRMs code_spillclean }
 
 
 		let statList =
