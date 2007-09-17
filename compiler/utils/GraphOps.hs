@@ -499,30 +499,76 @@ scanGraph match graph
 
 -- | validate the internal structure of a graph
 --	all its edges should point to valid nodes
---	if they don't then throw an error
+--	If they don't then throw an error
 --
 validateGraph
-	:: (Uniquable k, Outputable k)
-	=> SDoc
-	-> Graph k cls color
-	-> Graph k cls color
+	:: (Uniquable k, Outputable k, Eq color)
+	=> SDoc				-- ^ extra debugging info to display on error
+	-> Bool				-- ^ whether this graph is supposed to be colored.
+	-> Graph k cls color		-- ^ graph to validate
+	-> Graph k cls color		-- ^ validated graph
 
-validateGraph doc graph
- = let	edges	= unionManyUniqSets
- 			(  (map nodeConflicts       $ eltsUFM $ graphMap graph)
-			++ (map nodeCoalesce        $ eltsUFM $ graphMap graph))
+validateGraph doc isColored graph
 
-	nodes	= mkUniqSet $ map nodeId $ eltsUFM $ graphMap graph
-	
-	badEdges = minusUniqSet edges nodes
-	
-  in	if isEmptyUniqSet badEdges 
-  	 then 	graph
-	 else	pprPanic "GraphOps.validateGraph"
-	 	( text  "-- bad edges"
-		$$ vcat (map ppr $ uniqSetToList badEdges)
-		$$ text "----------------------------"
+	-- Check that all edges point to valid nodes.
+  	| edges		<- unionManyUniqSets
+ 				(  (map nodeConflicts       $ eltsUFM $ graphMap graph)
+				++ (map nodeCoalesce        $ eltsUFM $ graphMap graph))
+
+	, nodes		<- mkUniqSet $ map nodeId $ eltsUFM $ graphMap graph
+	, badEdges 	<- minusUniqSet edges nodes
+	, not $ isEmptyUniqSet badEdges
+	= pprPanic "GraphOps.validateGraph"
+		(  text "Graph has edges that point to non-existant nodes"
+		$$ text "  bad edges: " <> vcat (map ppr $ uniqSetToList badEdges)
+		$$ doc )
+
+	-- Check that no conflicting nodes have the same color
+	| badNodes	<- filter (not . (checkNode graph))
+			$ eltsUFM $ graphMap graph
+	, not $ null badNodes
+	= pprPanic "GraphOps.validateGraph"
+		(  text "Node has same color as one of it's conflicts"
+		$$ text "  bad nodes: " <> hcat (map (ppr . nodeId) badNodes)
 		$$ doc)
+
+	-- If this is supposed to be a colored graph,
+	--	check that all nodes have a color.
+	| isColored
+	, badNodes	<- filter (\n -> isNothing $ nodeColor n)
+			$  eltsUFM $ graphMap graph
+	, not $ null badNodes
+	= pprPanic "GraphOps.validateGraph"
+		(  text "Supposably colored graph has uncolored nodes."
+		$$ text "  uncolored nodes: " <> hcat (map (ppr . nodeId) badNodes)
+		$$ doc )
+
+
+	-- graph looks ok
+	| otherwise
+	= graph
+
+
+-- | If this node is colored, check that all the nodes which
+--	conflict with it have different colors.
+checkNode
+	:: (Uniquable k, Eq color)
+	=> Graph k cls color
+	-> Node  k cls color
+	-> Bool			-- ^ True if this node is ok
+	
+checkNode graph node
+	| Just color		<- nodeColor node
+	, Just neighbors	<- sequence $ map (lookupNode graph)
+				$  uniqSetToList $ nodeConflicts node
+
+	, neighbourColors	<- catMaybes $ map nodeColor neighbors
+	, elem color neighbourColors
+	= False
+	
+	| otherwise
+	= True
+
 
 
 -- | Slurp out a map of how many nodes had a certain number of conflict neighbours

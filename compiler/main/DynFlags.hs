@@ -156,6 +156,7 @@ data DynFlag
    | Opt_DoCoreLinting
    | Opt_DoStgLinting
    | Opt_DoCmmLinting
+   | Opt_DoAsmLinting
 
    | Opt_WarnIsError			-- -Werror; makes warnings fatal
    | Opt_WarnDuplicateExports
@@ -1089,6 +1090,7 @@ dynamic_flags = [
   ,  ( "dcore-lint",       	 NoArg (setDynFlag Opt_DoCoreLinting))
   ,  ( "dstg-lint",        	 NoArg (setDynFlag Opt_DoStgLinting))
   ,  ( "dcmm-lint",		 NoArg (setDynFlag Opt_DoCmmLinting))
+  ,  ( "dasm-lint",              NoArg (setDynFlag Opt_DoAsmLinting))
   ,  ( "dshow-passes",           NoArg (do setDynFlag Opt_ForceRecomp
 				           setVerbosity (Just 2)) )
   ,  ( "dfaststring-stats",	 NoArg (setDynFlag Opt_D_faststring_stats))

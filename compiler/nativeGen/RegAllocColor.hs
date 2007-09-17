@@ -139,8 +139,16 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 	-- see if we've found a coloring
 	if isEmptyUniqSet rsSpill
 	 then do
+		-- if -fasm-lint is turned on then validate the graph
+		let graph_colored_lint	=
+			if dopt Opt_DoAsmLinting dflags
+				then Color.validateGraph (text "")
+					True 	-- require all nodes to be colored
+					graph_colored
+				else graph_colored
+
 		-- patch the registers using the info in the graph
-	 	let code_patched	= map (patchRegsFromGraph graph_colored) code_coalesced2
+	 	let code_patched	= map (patchRegsFromGraph graph_colored_lint) code_coalesced2
 
 		-- clean out unneeded SPILL/RELOADs
 		let code_spillclean	= map cleanSpills code_patched
@@ -155,7 +163,7 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 		-- record what happened in this stage for debugging
 		let stat		=
 			RegAllocStatsColored
-			{ raGraph	= graph_colored
+			{ raGraph	= graph_colored_lint
 			, raCoalesced	= rmCoalesce
 			, raPatched	= code_patched
 			, raSpillClean	= code_spillclean
@@ -172,10 +180,18 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 
 		return	( code_final
 			, statList
-			, graph_colored)
+			, graph_colored_lint)
 
 	 -- we couldn't find a coloring, time to spill something
 	 else do
+		-- if -fasm-lint is turned on then validate the graph
+		let graph_colored_lint	=
+			if dopt Opt_DoAsmLinting dflags
+				then Color.validateGraph (text "")
+					False 	-- don't require nodes to be colored
+					graph_colored
+				else graph_colored
+
 	 	-- spill the uncolored regs
 		(code_spilled, slotsFree', spillStats)
 			<- regSpill code_coalesced2 slotsFree rsSpill
@@ -187,7 +203,7 @@ regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs
 		-- record what happened in this stage for debugging
 		let stat	=
 			RegAllocStatsSpill
-			{ raGraph	= graph_colored
+			{ raGraph	= graph_colored_lint
 			, raCoalesced	= rmCoalesce
 			, raSpillStats	= spillStats
 			, raSpillCosts	= spillCosts
