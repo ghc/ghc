@@ -39,9 +39,6 @@ int totalTixes = 0;		// total number of tix boxes.
 
 static char *tixFilename;
 
-void hs_hpc_read(char *filename);
-void hs_hpc_write(char *filename);
-
 static void failure(char *msg) {
   debugTrace(DEBUG_hpc,"hpc failure: %s\n",msg);
   fprintf(stderr,"Hpc failure: %s\n",msg);
@@ -326,41 +323,6 @@ exitHpc(void) {
 
   FILE *f = fopen(tixFilename,"w");
   writeTix(f);
-}
-
-void hs_hpc_read(char *filename) {
-  HpcModuleInfo *orig_modules = 0, *tmpModule, *tmpOrigModule;
-  int i;
-
-  orig_modules = modules;
-  modules = 0;
-  if (init_open(fopen(filename,"r"))) {
-    readTix();
-    // Now we copy across the arrays. O(n^2), but works
-    for(tmpModule = modules;
-	tmpModule != 0;
-	tmpModule = tmpModule->next) {
-
-      for(tmpOrigModule = orig_modules;
-	  tmpOrigModule != 0;
-	  tmpOrigModule = tmpOrigModule->next) {
-	if (!strcmp(tmpModule->modName,tmpOrigModule->modName)) {    
-	  assert(tmpModule->tixArr != 0);		
-	  assert(tmpOrigModule->tixArr != 0);		
-	  assert(tmpModule->tickCount == tmpOrigModule->tickCount);
-	  for(i=0;i < tmpModule->tickCount;i++) {
-	    tmpOrigModule->tixArr[i] = tmpModule->tixArr[i];
-	  }
-	  tmpModule->tixArr = tmpOrigModule->tixArr;
-	  break;
-	}
-      }
-    }
-  }
-}
-
-void hs_hpc_write(char *filename) {
-  writeTix(fopen(filename,"w"));
 }
 
 //////////////////////////////////////////////////////////////////////////////
