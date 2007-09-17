@@ -741,6 +741,8 @@ INPLACE_SRC  = $(odir)/ghc-inplace.c
 INPLACE_PROG = $(odir)/ghc-inplace$(_way)$(exeext)
 EXCLUDED_C_SRCS += ghc-inplace.c
 
+CLEAN_FILES += $(INPLACE_SRC)
+
 GHC_PATH=$(FPTOOLS_TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)$(exeext)
 
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
