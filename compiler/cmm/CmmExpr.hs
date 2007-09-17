@@ -5,7 +5,7 @@ module CmmExpr
     , CmmLit(..), cmmLitRep
     , LocalReg(..), localRegRep, localRegGCFollow, GCKind(..)
     , GlobalReg(..), globalRegRep, spReg, hpReg, spLimReg, nodeReg, node
-    , UserOfLocalRegs, foldRegsUsed
+    , UserOfLocalRegs, foldRegsUsed, filterRegsUsed
     , RegSet, emptyRegSet, elemRegSet, extendRegSet, deleteFromRegSet, mkRegSet
             , plusRegSet, minusRegSet, timesRegSet
     )
@@ -111,6 +111,11 @@ timesRegSet      = intersectUniqSets
 
 class UserOfLocalRegs a where
   foldRegsUsed :: (b -> LocalReg -> b) -> b -> a -> b
+
+filterRegsUsed :: UserOfLocalRegs e => (LocalReg -> Bool) -> e -> RegSet
+filterRegsUsed p e =
+    foldRegsUsed (\regs r -> if p r then extendRegSet regs r else regs)
+                 emptyRegSet e
 
 instance UserOfLocalRegs CmmReg where
     foldRegsUsed f z (CmmLocal reg) = f z reg
