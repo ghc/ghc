@@ -1006,7 +1006,10 @@ appPrecedence = fromIntegral maxPrecedence + 1
 getPrecedence :: FixityEnv -> Name -> Integer
 getPrecedence get_fixity nm 
    = case lookupFixity get_fixity nm of
-        Fixity x _ -> fromIntegral x
+        Fixity x _assoc -> fromIntegral x
+	  -- NB: the Report says that associativity is not taken 
+  	  --     into account for either Read or Show; hence we 
+	  --     ignore associativity here
 \end{code}
 
 
