@@ -262,6 +262,7 @@ middleAvail (NotSpillOrReload m) = middle m
         middle (MidAssign lhs _expr)           = akill lhs
         middle (MidStore {})                   = id
         middle (MidUnsafeCall _tgt ress _args) = akill ress
+        middle (MidAddToContext {})             = id
         middle (CopyIn _ formals _)            = akill formals
         middle (CopyOut {})                    = id
 

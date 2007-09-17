@@ -8,7 +8,7 @@
 module MkZipCfgCmm
   ( mkNop, mkAssign, mkStore, mkCall, mkCmmCall, mkUnsafeCall, mkFinalCall
          , mkJump, mkCbranch, mkSwitch, mkReturn, mkComment, mkCmmIfThenElse
-         , mkCmmWhileDo
+         , mkCmmWhileDo, mkAddToContext
   , (<*>), sequence, mkLabel, mkBranch
   , emptyAGraph, withFreshLabel, withUnique, outOfLine
   , lgraphOfAGraph, graphOfAGraph, labelAGraph
@@ -55,6 +55,9 @@ mkUnsafeCall :: CmmCallTarget -> CmmFormals -> CmmActuals -> CmmAGraph
 mkFinalCall  :: CmmExpr -> CCallConv -> CmmActuals -> CmmAGraph
 		 -- Never returns; like exit() or barf()
 
+---------- Context manipulation ('return via')
+mkAddToContext :: CmmExpr -> [CmmExpr] -> CmmAGraph
+
 ---------- Control transfer
 mkJump       	:: CmmExpr -> CmmActuals -> CmmAGraph
 mkCbranch    	:: CmmExpr -> BlockId -> BlockId -> CmmAGraph
@@ -87,6 +90,7 @@ mkCbranch pred ifso ifnot = mkLast   $ LastCondBranch pred ifso ifnot
 mkSwitch e tbl            = mkLast   $ LastSwitch e tbl
 
 mkUnsafeCall tgt results actuals = mkMiddle $ MidUnsafeCall tgt results actuals
+mkAddToContext ra actuals         = mkMiddle $ MidAddToContext ra actuals
 
 cmmArgConv, cmmResConv :: Convention
 cmmArgConv = ConventionStandard CmmCallConv Arguments

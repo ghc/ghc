@@ -85,8 +85,9 @@ ofZgraph g = ListGraph $ swallow blocks
           mid (MidAssign l r) = CmmAssign l r
           mid (MidStore  l r) = CmmStore  l r
           mid (MidUnsafeCall f ress args) = CmmCall f ress args CmmUnsafe CmmMayReturn
-          mid m@(CopyOut {})  = pcomment (ppr m)
-          mid m@(CopyIn {})   = pcomment (ppr m <+> text "(proc point)")
+          mid m@(MidAddToContext {}) = pcomment (ppr m)
+          mid m@(CopyOut {})         = pcomment (ppr m)
+          mid m@(CopyIn {})          = pcomment (ppr m <+> text "(proc point)")
           pcomment p = scomment $ showSDoc p
           block' id prev'
               | id == G.lg_entry g = BasicBlock id $ extend_entry    (reverse prev')

@@ -55,6 +55,14 @@ data Middle
      CmmFormals                  -- zero or more results
      CmmActuals                  -- zero or more arguments
 
+  | MidAddToContext              -- push a frame on the stack;
+                                 -- I will return to this frame
+     CmmExpr                     -- The frame's return address; it must be
+                                 -- preceded by an info table that describes the
+                                 -- live variables.
+     [CmmExpr]                   -- The frame's live variables, to go on the 
+                                 -- stack with the first one at the young end
+
   | CopyIn    -- Move incoming parameters or results from conventional
               -- locations to registers.  Note [CopyIn invariant]
         Convention 
@@ -157,12 +165,13 @@ fold_cmm_succs  f (LastSwitch _ edges)     z = foldl (flip f) z $ catMaybes edge
 instance UserOfLocalRegs Middle where
     foldRegsUsed f z m = middle m
       where middle (MidComment {})                = z
-            middle (MidAssign _lhs expr)          = foldRegsUsed f z expr
-            middle (MidStore addr rval)           = foldRegsUsed f (foldRegsUsed f z addr) rval
-            middle (MidUnsafeCall tgt _ress args) = foldRegsUsed f (foldRegsUsed f z tgt) args
+            middle (MidAssign _lhs expr)          = fold f z expr
+            middle (MidStore addr rval)           = fold f (fold f z addr) rval
+            middle (MidUnsafeCall tgt _ress args) = fold f (fold f z tgt) args
+            middle (MidAddToContext ra args)      = fold f (fold f z ra) args
             middle (CopyIn _ _formals _)          = z
-            middle (CopyOut _ actuals)            = foldRegsUsed f z actuals
---            fold = foldRegsUsed
+            middle (CopyOut _ actuals)            = fold f z actuals
+            fold f z m = foldRegsUsed f z m  -- avoid monomorphism restriction
 
 instance UserOfLocalRegs Last where
     foldRegsUsed f z m = last m
@@ -230,16 +239,18 @@ pprMiddle stmt = (case stmt of
                        ptext SLIT(" = "),
                ptext SLIT("call"), space, 
                doubleQuotes(ppr cconv), space,
-               target fn, parens  ( commafy $ map ppr args ),
+               ppr_target fn, parens  ( commafy $ map ppr args ),
                semi ]
-        where
-            target t@(CmmLit _) = ppr t
-            target fn'          = parens (ppr fn')
 
     MidUnsafeCall (CmmPrim op) results args ->
         pprMiddle (MidUnsafeCall (CmmCallee (CmmLit lbl) CCallConv) results args)
         where
           lbl = CmmLabel (mkForeignLabel (mkFastString (show op)) Nothing False)
+
+    MidAddToContext ra args ->
+        hcat [ ptext SLIT("return via ")
+             , ppr_target ra, parens (commafy $ map ppr args), semi ]
+
   ) <>
   if debugPpr then empty
   else text " //" <+>
@@ -249,7 +260,13 @@ pprMiddle stmt = (case stmt of
          MidComment {} -> text "MidComment"
          MidAssign {}  -> text "MidAssign"
          MidStore {}   -> text "MidStore"
-         MidUnsafeCall {} -> text "MidUnsafeCall"
+         MidUnsafeCall  {} -> text "MidUnsafeCall"
+         MidAddToContext {} -> text "MidAddToContext"
+
+
+ppr_target :: CmmExpr -> SDoc
+ppr_target t@(CmmLit _) = ppr t
+ppr_target fn'          = parens (ppr fn')
 
 
 pprHinted :: Outputable a => (a, MachHint) -> SDoc
