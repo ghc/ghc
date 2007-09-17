@@ -652,7 +652,7 @@ data Exception
   | BlockedIndefinitely
 	-- ^The current thread was waiting to retry an atomic memory transaction
 	-- that could never become possible to complete because there are no other
-	-- threads referring to any of teh TVars involved.
+	-- threads referring to any of the TVars involved.
   | NestedAtomically
 	-- ^The runtime detected an attempt to nest one STM transaction
 	-- inside another one, presumably due to the use of 
