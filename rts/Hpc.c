@@ -23,6 +23,8 @@
  */
 
 static int hpc_inited = 0;		// Have you started this component?
+static pid_t hpc_pid = 0;		// pid of this process at hpc-boot time.
+					// Only this pid will read or write .tix file(s).
 static FILE *tixFile;			// file being read/written
 static int tix_ch;			// current char
 
@@ -167,6 +169,7 @@ static void hpc_init(void) {
     return;
   }
   hpc_inited = 1;
+  hpc_pid    = getpid();
 
   tixFilename = (char *) malloc(strlen(prog_name) + 6);
   sprintf(tixFilename, "%s.tix", prog_name);
@@ -321,8 +324,14 @@ exitHpc(void) {
     return;
   }
 
-  FILE *f = fopen(tixFilename,"w");
-  writeTix(f);
+  // Only write the tix file if you are the original process.
+  // Any sub-process from use of fork from inside Haskell will
+  // not clober the .tix file.
+
+  if (hpc_pid == getpid()) {
+    FILE *f = fopen(tixFilename,"w");
+    writeTix(f);
+  }
 }
 
 //////////////////////////////////////////////////////////////////////////////
