@@ -150,35 +150,33 @@ insertSpillsAndReloads = BComp "CPS spiller" exit last middle first
 middleInsertSpillsAndReloads :: DualLive -> M -> Maybe (Graph M Last)
 middleInsertSpillsAndReloads _ (Spill _)  = Nothing
 middleInsertSpillsAndReloads _ (Reload _) = Nothing
-middleInsertSpillsAndReloads live (NotSpillOrReload m) = middle m 
-  where middle (MidAssign (CmmLocal reg') _) = 
-            if reg' `elemRegSet` on_stack live then -- must spill
-                my_trace "Spilling" (f4sep [text "spill" <+> ppr reg',
+middleInsertSpillsAndReloads live m@(NotSpillOrReload nsr) = middle nsr
+  where middle (MidAssign (CmmLocal reg) _) = 
+            if reg `elemRegSet` on_stack live then -- must spill
+                my_trace "Spilling" (f4sep [text "spill" <+> ppr reg,
                                             text "after", ppr m]) $
-                Just $ graphOfMiddles [NotSpillOrReload m, Spill $ mkRegSet [reg']]
+                Just $ graphOfMiddles [m, Spill $ mkRegSet [reg]]
             else
                 Nothing
         middle (CopyIn _ formals _) = 
             -- only 'formals' can be in regs at this point
             let regs' = kill formals (in_regs live) -- live in regs; must reload
                 is_stack_var r = elemRegSet r (on_stack live)
-                needs_spilling = -- a formal that is expected on the stack; must spill
-                   foldRegsUsed (\rs r -> if is_stack_var r then extendRegSet rs r
-                                          else rs) emptyRegSet formals
+                needs_spilling = filterRegsUsed is_stack_var formals
+                   -- a formal that is expected on the stack; must spill
             in  if isEmptyUniqSet regs' && isEmptyUniqSet needs_spilling then
                     Nothing
                 else
-                    let reload = if isEmptyUniqSet regs' then []
-                                 else [Reload regs']
-                        spill_reload = if isEmptyUniqSet needs_spilling then reload
-                                       else Spill needs_spilling : reload
-                        middles = NotSpillOrReload m : spill_reload
+                    let code  = if isEmptyUniqSet regs' then []
+                                else Reload regs' : []
+                        code' = if isEmptyUniqSet needs_spilling then code
+                                else Spill needs_spilling : code
                     in
                     my_trace "At CopyIn" (f4sep [text "Triggered by ", ppr live,
                                                  ppr (Reload regs' :: M),
                                                  ppr (Spill needs_spilling :: M),
                                                  text "after", ppr m]) $
-                    Just $ graphOfMiddles middles
+                    Just $ graphOfMiddles (m : code')
         middle _ = Nothing
                       
 -- | For conversion back to vanilla C--
@@ -284,11 +282,24 @@ insertLateReloads g = mapM_blocks insertM g
               let (h', fuel') = maybe_add_reload h avail l fuel in
               (zipht h' (ZLast l), fuel')
           maybe_add_reload h avail node fuel =
-              let used = foldRegsUsed
-                         (\u r -> if elemAvail avail r then extendRegSet u r else u)
-                         emptyRegSet node
+              let used = filterRegsUsed (elemAvail avail) node
               in  if fuel == 0 || isEmptyUniqSet used then (h, fuel)
                   else (ZHead h (Reload used), fuel-1)
+
+
+_lateReloadsWithoutFuel :: LGraph M Last -> LGraph M Last
+_lateReloadsWithoutFuel g = map_blocks insert g
+    where env = cmmAvailableReloads g
+          avail id = lookupBlockEnv env id `orElse` AvailRegs emptyRegSet
+          insert (Block id tail) = propagate (ZFirst id) (avail id) tail
+          propagate h avail (ZTail m t) =
+            propagate (ZHead (maybe_add_reload h avail m) m) (middleAvail m avail) t 
+          propagate h avail (ZLast l) =
+            zipht (maybe_add_reload h avail l) (ZLast l)
+          maybe_add_reload h avail node =
+              let used = filterRegsUsed (elemAvail avail) node
+              in  if isEmptyUniqSet used then h
+                  else ZHead h (Reload used)
 
 
 removeDeadAssignmentsAndReloads :: BPass M Last DualLive

@@ -298,8 +298,7 @@ refine_b_anal comp graph initial =
     set_block_fact () b@(G.Block id _) =              
       let (h, l) = G.goto_end (G.unzip b) in
       do  env <- factsEnv
-          let block_in = head_in h (last_in comp env l) -- 'in' fact for the block
-          setFact id block_in 
+          setFact id $ head_in h (last_in comp env l) -- 'in' fact for the block
     head_in (G.ZHead h m) out = head_in h (bc_middle_in comp out m)
     head_in (G.ZFirst id) out = bc_first_in comp out id
 
