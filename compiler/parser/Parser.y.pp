@@ -971,7 +971,7 @@ gentypedoc :: { LHsType RdrName }
 
 ctypedoc  :: { LHsType RdrName }
         : 'forall' tv_bndrs '.' ctypedoc { LL $ mkExplicitHsForAllTy $2 (noLoc []) $4 }
-        | context '=>' gentypedoc        { LL $ mkImplicitHsForAllTy   $1 $3 }
+        | context '=>' ctypedoc          { LL $ mkImplicitHsForAllTy   $1 $3 }
 	-- A type of form (context => type) is an *implicit* HsForAllTy
 	| gentypedoc			 { $1 }
 	
