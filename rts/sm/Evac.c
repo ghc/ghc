@@ -26,7 +26,7 @@
 lnat thunk_selector_depth = 0;
 #define MAX_THUNK_SELECTOR_DEPTH 16
 
-static StgClosure * eval_thunk_selector ( nat field, StgSelector * p );
+static StgClosure * eval_thunk_selector (StgSelector * p, rtsBool);
 
 STATIC_INLINE void 
 upd_evacuee(StgClosure *p, StgClosure *dest)
@@ -523,52 +523,7 @@ loop:
     return copyPart(q,BLACKHOLE_sizeW(),sizeofW(StgHeader),stp);
 
   case THUNK_SELECTOR:
-    {
-	StgClosure *p;
-	const StgInfoTable *info_ptr;
-
-	if (thunk_selector_depth > MAX_THUNK_SELECTOR_DEPTH) {
-	    return copy(q,THUNK_SELECTOR_sizeW(),stp);
-	}
-
-	// stashed away for LDV profiling, see below
-	info_ptr = q->header.info;
-
-	p = eval_thunk_selector(info->layout.selector_offset,
-				(StgSelector *)q);
-
-	if (p == NULL) {
-	    return copy(q,THUNK_SELECTOR_sizeW(),stp);
-	} else {
-	    StgClosure *val;
-	    // q is still BLACKHOLE'd.
-	    thunk_selector_depth++;
-	    val = evacuate(p);
-	    thunk_selector_depth--;
-
-#ifdef PROFILING
-	    // For the purposes of LDV profiling, we have destroyed
-	    // the original selector thunk.
-	    SET_INFO(q, info_ptr);
-	    LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(q);
-#endif
-
-	    // Update the THUNK_SELECTOR with an indirection to the
-	    // EVACUATED closure now at p.  Why do this rather than
-	    // upd_evacuee(q,p)?  Because we have an invariant that an
-	    // EVACUATED closure always points to an object in the
-	    // same or an older generation (required by the short-cut
-	    // test in the EVACUATED case, below).
-	    SET_INFO(q, &stg_IND_info);
-	    ((StgInd *)q)->indirectee = p;
-
-	    // For the purposes of LDV profiling, we have created an
-	    // indirection.
-	    LDV_RECORD_CREATE(q);
-
-	    return val;
-	}
-    }
+    return eval_thunk_selector((StgSelector *)q, rtsTrue);
 
   case IND:
   case IND_OLDGEN:
@@ -691,99 +646,85 @@ loop:
   barf("evacuate");
 }
 
+static void
+unchain_thunk_selectors(StgSelector *p, StgClosure *val)
+{
+    StgSelector *prev;
+
+    prev = NULL;
+    while (p)
+    {
+        ASSERT(p->header.info == &stg_BLACKHOLE_info);
+        prev = (StgSelector*)((StgClosure *)p)->payload[0];
+
+        // Update the THUNK_SELECTOR with an indirection to the
+        // EVACUATED closure now at p.  Why do this rather than
+        // upd_evacuee(q,p)?  Because we have an invariant that an
+        // EVACUATED closure always points to an object in the
+        // same or an older generation (required by the short-cut
+        // test in the EVACUATED case, below).
+        SET_INFO(p, &stg_IND_info);
+        ((StgInd *)p)->indirectee = val;
+
+        // For the purposes of LDV profiling, we have created an
+        // indirection.
+        LDV_RECORD_CREATE(p);
+
+        p = prev;
+    }
+}
+
 /* -----------------------------------------------------------------------------
    Evaluate a THUNK_SELECTOR if possible.
 
-   returns: NULL if we couldn't evaluate this THUNK_SELECTOR, or
-   a closure pointer if we evaluated it and this is the result.  Note
-   that "evaluating" the THUNK_SELECTOR doesn't necessarily mean
-   reducing it to HNF, just that we have eliminated the selection.
-   The result might be another thunk, or even another THUNK_SELECTOR.
+   p points to a THUNK_SELECTOR that we want to evaluate.  The
+   result of "evaluating" it will be evacuated and a pointer to the
+   to-space closure will be returned.
 
-   If the return value is non-NULL, the original selector thunk has
-   been BLACKHOLE'd, and should be updated with an indirection or a
-   forwarding pointer.  If the return value is NULL, then the selector
-   thunk is unchanged.
-
-   ***
-   ToDo: the treatment of THUNK_SELECTORS could be improved in the
-   following way (from a suggestion by Ian Lynagh):
-
-   We can have a chain like this:
-
-      sel_0 --> (a,b)
-                 |
-                 |-----> sel_0 --> (a,b)
-                                    |
-                                    |-----> sel_0 --> ...
-
-   and the depth limit means we don't go all the way to the end of the
-   chain, which results in a space leak.  This affects the recursive
-   call to evacuate() in the THUNK_SELECTOR case in evacuate(): *not*
-   the recursive call to eval_thunk_selector() in
-   eval_thunk_selector().
-
-   We could eliminate the depth bound in this case, in the following
-   way:
-
-      - traverse the chain once to discover the *value* of the 
-        THUNK_SELECTOR.  Mark all THUNK_SELECTORS that we
-        visit on the way as having been visited already (somehow).
-
-      - in a second pass, traverse the chain again updating all
-        THUNK_SEELCTORS that we find on the way with indirections to
-        the value.
-
-      - if we encounter a "marked" THUNK_SELECTOR in a normal 
-        evacuate(), we konw it can't be updated so just evac it.
-
-   Program that illustrates the problem:
-
-	foo [] = ([], [])
-	foo (x:xs) = let (ys, zs) = foo xs
-	             in if x >= 0 then (x:ys, zs) else (ys, x:zs)
-
-	main = bar [1..(100000000::Int)]
-	bar xs = (\(ys, zs) -> print ys >> print zs) (foo xs)
-
+   If the THUNK_SELECTOR could not be evaluated (its selectee is still
+   a THUNK, for example), then the THUNK_SELECTOR itself will be
+   evacuated.
    -------------------------------------------------------------------------- */
 
-static inline rtsBool
-is_to_space ( StgClosure *p )
-{
-    bdescr *bd;
-
-    bd = Bdescr((StgPtr)p);
-    if (HEAP_ALLOCED(p) &&
-	((bd->flags & BF_EVACUATED) 
-	 || ((bd->flags & BF_COMPACTED) &&
-	     is_marked((P_)p,bd)))) {
-	return rtsTrue;
-    } else {
-	return rtsFalse;
-    }
-}    
-
 static StgClosure *
-eval_thunk_selector( nat field, StgSelector * p )
+eval_thunk_selector (StgSelector * p, rtsBool evac)
 {
+    nat field;
     StgInfoTable *info;
     const StgInfoTable *info_ptr;
     StgClosure *selectee;
+    StgSelector *prev_thunk_selector;
+    bdescr *bd;
+    StgClosure *val;
     
+    prev_thunk_selector = NULL;
+    // this is a chain of THUNK_SELECTORs that we are going to update
+    // to point to the value of the current THUNK_SELECTOR.  Each
+    // closure on the chain is a BLACKHOLE, and points to the next in the
+    // chain with payload[0].
+
+selector_chain:
+
     // The selectee might be a constructor closure,
     // so we untag the pointer.
     selectee = UNTAG_CLOSURE(p->selectee);
 
     // Save the real info pointer (NOTE: not the same as get_itbl()).
     info_ptr = p->header.info;
+    field = get_itbl(p)->layout.selector_offset;
 
-    // If the THUNK_SELECTOR is in a generation that we are not
-    // collecting, then bail out early.  We won't be able to save any
-    // space in any case, and updating with an indirection is trickier
-    // in an old gen.
-    if (Bdescr((StgPtr)p)->gen_no > N) {
-	return NULL;
+    // If the THUNK_SELECTOR is in to-space or in a generation that we
+    // are not collecting, then bail out early.  We won't be able to
+    // save any space in any case, and updating with an indirection is
+    // trickier in an old gen.
+    bd = Bdescr((StgPtr)p);
+    if (HEAP_ALLOCED(p) &&
+	((bd->gen_no > N)
+         || (bd->flags & BF_EVACUATED) 
+	 || ((bd->flags & BF_COMPACTED) &&
+	     is_marked((P_)p,bd)))) {
+        unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
+        return (StgClosure *)p;
     }
 
     // BLACKHOLE the selector thunk, since it is now under evaluation.
@@ -792,38 +733,12 @@ eval_thunk_selector( nat field, StgSelector * p )
     SET_INFO(p,&stg_BLACKHOLE_info);
 
 selector_loop:
-
-    // We don't want to end up in to-space, because this causes
-    // problems when the GC later tries to evacuate the result of
-    // eval_thunk_selector().  There are various ways this could
-    // happen:
-    //
-    // 1. following an IND_STATIC
-    //
-    // 2. when the old generation is compacted, the mark phase updates
-    //    from-space pointers to be to-space pointers, and we can't
-    //    reliably tell which we're following (eg. from an IND_STATIC).
-    // 
-    // 3. compacting GC again: if we're looking at a constructor in
-    //    the compacted generation, it might point directly to objects
-    //    in to-space.  We must bale out here, otherwise doing the selection
-    //    will result in a to-space pointer being returned.
-    //
-    //  (1) is dealt with using a BF_EVACUATED test on the
-    //  selectee. (2) and (3): we can tell if we're looking at an
-    //  object in the compacted generation that might point to
-    //  to-space objects by testing that (a) it is BF_COMPACTED, (b)
-    //  the compacted generation is being collected, and (c) the
-    //  object is marked.  Only a marked object may have pointers that
-    //  point to to-space objects, because that happens when
-    //  scavenging.
-    //
-    //  The to-space test is now embodied in the in_to_space() inline
-    //  function, as it is re-used below.
-    //
-    if (is_to_space(selectee)) {
-	goto bale_out;
-    }
+    // selectee now points to the closure that we're trying to select
+    // a field from.  It may or may not be in to-space: we try not to
+    // end up in to-space, but it's impractical to avoid it in
+    // general.  The compacting GC scatters to-space pointers in
+    // from-space during marking, for example.  We rely on the property
+    // that evacuate() doesn't mind if it gets passed a to-space pointer.
 
     info = get_itbl(selectee);
     switch (info->type) {
@@ -835,90 +750,101 @@ selector_loop:
       case CONSTR_0_2:
       case CONSTR_STATIC:
       case CONSTR_NOCAF_STATIC:
-	  // check that the size is in range 
-	  ASSERT(field <  (StgWord32)(info->layout.payload.ptrs + 
-				      info->layout.payload.nptrs));
+          {
+              // check that the size is in range 
+              ASSERT(field <  (StgWord32)(info->layout.payload.ptrs + 
+                                          info->layout.payload.nptrs));
 	  
-	  // Select the right field from the constructor, and check
-	  // that the result isn't in to-space.  It might be in
-	  // to-space if, for example, this constructor contains
-	  // pointers to younger-gen objects (and is on the mut-once
-	  // list).
-	  //
-	  { 
-	      StgClosure *q;
-	      q = selectee->payload[field];
-	      if (is_to_space(UNTAG_CLOSURE(q))) {
-		  goto bale_out;
-	      } else {
-		  return q;
-	      }
-	  }
+              // Select the right field from the constructor
+              val = selectee->payload[field];
+              
+#ifdef PROFILING
+              // For the purposes of LDV profiling, we have destroyed
+              // the original selector thunk, p.
+              SET_INFO(p, info_ptr);
+              LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC((StgClosure *)p);
+              SET_INFO(p, &stg_BLACKHOLE_info);
+#endif
+
+              // the closure in val is now the "value" of the
+              // THUNK_SELECTOR in p.  However, val may itself be a
+              // THUNK_SELECTOR, in which case we want to continue
+              // evaluating until we find the real value, and then
+              // update the whole chain to point to the value.
+          val_loop:
+              info = get_itbl(UNTAG_CLOSURE(val));
+              switch (info->type) {
+              case IND:
+              case IND_PERM:
+              case IND_OLDGEN:
+              case IND_OLDGEN_PERM:
+              case IND_STATIC:
+                  val = ((StgInd *)val)->indirectee;
+                  goto val_loop;
+              case THUNK_SELECTOR:
+                  ((StgClosure*)p)->payload[0] = (StgClosure *)prev_thunk_selector;
+                  prev_thunk_selector = p;
+                  p = (StgSelector*)val;
+                  goto selector_chain;
+              default:
+                  ((StgClosure*)p)->payload[0] = (StgClosure *)prev_thunk_selector;
+                  prev_thunk_selector = p;
+
+                  if (evac) val = evacuate(val);
+                  // evacuate() cannot recurse through
+                  // eval_thunk_selector(), because we know val is not
+                  // a THUNK_SELECTOR.
+                  unchain_thunk_selectors(prev_thunk_selector, val);
+                  return val;
+              }
+          }
 
       case IND:
       case IND_PERM:
       case IND_OLDGEN:
       case IND_OLDGEN_PERM:
       case IND_STATIC:
-	// Again, we might need to untag a constructor.
-	selectee = UNTAG_CLOSURE( ((StgInd *)selectee)->indirectee );
+          // Again, we might need to untag a constructor.
+          selectee = UNTAG_CLOSURE( ((StgInd *)selectee)->indirectee );
 	  goto selector_loop;
 
       case EVACUATED:
 	  // We don't follow pointers into to-space; the constructor
 	  // has already been evacuated, so we won't save any space
 	  // leaks by evaluating this selector thunk anyhow.
-	  break;
+	  goto bale_out;
 
       case THUNK_SELECTOR:
       {
 	  StgClosure *val;
 
-	  // check that we don't recurse too much, re-using the
-	  // depth bound also used in evacuate().
-	  if (thunk_selector_depth >= MAX_THUNK_SELECTOR_DEPTH) {
-	      break;
-	  }
-
 	  // we don't update THUNK_SELECTORS in the compacted
 	  // generation, because compaction does not remove the INDs
-	  // that result, this causes confusion later.
+	  // that result, this causes confusion later
+	  // (scavenge_mark_stack doesn't deal with IND).
 	  if (Bdescr((P_)selectee)->flags && BF_COMPACTED) {
-	      break;
+	      goto bale_out;
+	  }
+
+          // recursively evaluate this selector.  We don't want to
+          // recurse indefinitely, so we impose a depth bound.
+	  if (thunk_selector_depth >= MAX_THUNK_SELECTOR_DEPTH) {
+	      goto bale_out;
 	  }
 
 	  thunk_selector_depth++;
-
-	  val = eval_thunk_selector(info->layout.selector_offset, 
-				    (StgSelector *)selectee);
-
+          // rtsFalse says "don't evacuate the result".  It will,
+          // however, update any THUNK_SELECTORs that are evaluated
+          // along the way.
+	  val = eval_thunk_selector((StgSelector *)selectee, rtsFalse);
 	  thunk_selector_depth--;
 
-	  if (val == NULL) { 
-	      break;
-	  } else {
-	      // We evaluated this selector thunk, so update it with
-	      // an indirection.  NOTE: we don't use UPD_IND here,
-	      // because we are guaranteed that p is in a generation
-	      // that we are collecting, and we never want to put the
-	      // indirection on a mutable list.
-#ifdef PROFILING
-	      // For the purposes of LDV profiling, we have destroyed
-	      // the original selector thunk.
-	      SET_INFO(selectee, info_ptr);
-	      LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(selectee);
-#endif
-	      ((StgInd *)selectee)->indirectee = val;
-	      SET_INFO(selectee,&stg_IND_info);
+          // did we actually manage to evaluate it?
+          if (val == selectee) goto bale_out;
 
-	      // For the purposes of LDV profiling, we have created an
-	      // indirection.
-	      LDV_RECORD_CREATE(selectee);
-
-	      // Of course this pointer might be tagged
-	      selectee = UNTAG_CLOSURE(val);
-	      goto selector_loop;
-	  }
+          // Of course this pointer might be tagged...
+          selectee = UNTAG_CLOSURE(val);
+          goto selector_loop;
       }
 
       case AP:
@@ -935,7 +861,7 @@ selector_loop:
       case SE_BLACKHOLE:
       case BLACKHOLE:
 	  // not evaluated yet 
-	  break;
+	  goto bale_out;
     
       default:
 	barf("eval_thunk_selector: strange selectee %d",
@@ -943,9 +869,16 @@ selector_loop:
     }
 
 bale_out:
-    // We didn't manage to evaluate this thunk; restore the old info pointer
+    // We didn't manage to evaluate this thunk; restore the old info
+    // pointer.  But don't forget: we still need to evacuate the thunk itself.
     SET_INFO(p, info_ptr);
-    return NULL;
+    if (evac) {
+        val = copy((StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->step->to);
+    } else {
+        val = (StgClosure *)p;
+    }
+    unchain_thunk_selectors(prev_thunk_selector, val);
+    return val;
 }
 
 /* -----------------------------------------------------------------------------
