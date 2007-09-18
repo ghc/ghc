@@ -91,20 +91,31 @@ space=$(empty) $(empty)
 
 # -----------------------------------------------------------------------------
 
-docdir := $(docdir)/libraries/$$pkgid
 ifeq "$(RelocatableBuild)" "YES"
 # On Windows we want to make moveable bindists, but we need to tell
 # ghc-pkg where the haddock docs are. Therefore we completely ignore
 # where the user tells us to put the haddock documentation and put it
 # somewhere whose relative location we know. When installing we need
 # to give Cabal a real path, though.
-htmldir_configure = $$topdir/doc/libraries/$$pkgid
-htmldir_install   = $(prefix)/doc/libraries/$$pkgid
+iprefix     = $$topdir
+ibindir     = $$topdir
+ilibdir     = $$topdir
+ilibexecdir = $$topdir
+idatadir    = $$topdir
+idocdir     = $$topdir/doc/libraries/$$pkgid
+ihtmldir    = $$topdir/doc/libraries/$$pkgid
+html_installed_root = $(prefix)/doc/libraries
 else
 # On non-Windows we can just give absolute paths all the time, and
 # thus obey the htmldir that we are given.
-htmldir_configure = $(htmldir)/libraries/$$pkgid
-htmldir_install   = $(htmldir_configure)
+iprefix     = $(prefix)
+ibindir     = $(bindir)
+ilibdir     = $(libdir)
+ilibexecdir = $(libexecdir)
+idatadir    = $(datadir)
+idocdir     = $(docdir)/libraries/$$pkgid
+ihtmldir    = $(htmldir)/libraries/$$pkgid
+html_installed_root = $(ihtmldir)
 endif
 
 ifneq "$(DOING_BIN_DIST)" "YES"
@@ -205,9 +216,8 @@ configure: $(foreach SUBDIR,$(SUBDIRS), \
 # We should depend on %/%.cabal here (and in other rules), but make
 # makes that difficult.
 
-# We explicitly set datadir to a sensible value, as Cabal (used to?) use
-#     "C:\\Program Files\\Common Files"
-# on Windows
+# We put non-existant paths in when configuring, as we require that
+# builds don't depend on these paths when making bindists.
 
 # We rely on all the CONFIGURE_ARGS being quoted with '...', and there
 # being no 's inside the values.
@@ -221,14 +231,14 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	-$(RM) -f stamp/configure.library.*.$* $*/unbuildable
 	( cd $* && setup/Setup configure \
 	           $(CONFIGURE_OPTS) \
-	           --prefix='$$topdir' \
-	           --bindir='$(bindir)' \
-	           --libdir='$(libdir)/lib' \
+	           --prefix=/NONEXISTANT \
+	           --bindir=/NONEXISTANT \
+	           --libdir=/NONEXISTANT \
 	           --libsubdir='$$pkgid' \
-	           --libexecdir='$(libexecdir)' \
-	           --datadir='$(datadir)' \
-	           --docdir='$(docdir)' \
-	           --htmldir='$(htmldir_configure)' \
+	           --libexecdir=/NONEXISTANT \
+	           --datadir=/NONEXISTANT \
+	           --docdir=/NONEXISTANT \
+	           --htmldir=/NONEXISTANT \
 	           --with-compiler=../../compiler/stage1/ghc-inplace \
 	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace \
 	           --with-hsc2hs=../../utils/hsc2hs/hsc2hs-inplace \
@@ -312,13 +322,13 @@ endif
 
 install: $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR))
 ifeq "$(HADDOCK_DOCS)" "YES"
-	$(INSTALL_DIR)                                              $(DESTDIR)$(htmldir_install)
-	$(INSTALL_DATA)   index.html doc-index*.html                $(DESTDIR)$(htmldir_install)
-	$(INSTALL_SCRIPT) gen_contents_index                        $(DESTDIR)$(htmldir_install)
+	$(INSTALL_DIR)                                                     $(DESTDIR)$(html_installed_root)
+	$(INSTALL_DATA)   index.html doc-index*.html                       $(DESTDIR)$(html_installed_root)
+	$(INSTALL_SCRIPT) gen_contents_index                               $(DESTDIR)$(html_installed_root)
 	# Hacks:
-	$(INSTALL_DATA)   $(DESTDIR)$(htmldir_install)/base-*/*.css $(DESTDIR)$(htmldir_install)
-	$(INSTALL_DATA)   $(DESTDIR)$(htmldir_install)/base-*/*.js  $(DESTDIR)$(htmldir_install)
-	$(INSTALL_DATA)   $(DESTDIR)$(htmldir_install)/base-*/*.gif $(DESTDIR)$(htmldir_install)
+	$(INSTALL_DATA)   $(DESTDIR)$(html_installed_root)/base-*/*.css $(DESTDIR)$(html_installed_root)
+	$(INSTALL_DATA)   $(DESTDIR)$(html_installed_root)/base-*/*.js  $(DESTDIR)$(html_installed_root)
+	$(INSTALL_DATA)   $(DESTDIR)$(html_installed_root)/base-*/*.gif $(DESTDIR)$(html_installed_root)
 endif
 
 # Cabal doesn't let us ask to install docs only, so do nothing here
@@ -339,7 +349,7 @@ $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
-	  ../installPackage/installPackage '$(DESTDIR)' '$(prefix)' '$(bindir)' '$(libdir)/lib' '$(libexecdir)' '$(datadir)' '$(docdir)' '$(htmldir_install)' '$(htmldir_configure)' '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' ; \
+	  ../installPackage/installPackage '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' ; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%

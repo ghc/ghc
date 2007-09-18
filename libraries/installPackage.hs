@@ -13,9 +13,10 @@ main :: IO ()
 main
   = do args <- getArgs
        case args of
-           destdir : ipref : ibindir : ilibdir : ilibexecdir
-                   : idatadir : idocdir : ihtmldir_copy : ihtmldir_reg
-                   : ghcpkg : ghcpkgconf : args' ->
+           ghcpkg : ghcpkgconf : destdir : topdir :
+                    iprefix : ibindir : ilibdir : ilibexecdir :
+                    idatadir : idocdir : ihtmldir :
+                    args' ->
                let verbosity = case args' of
                            [] -> normal
                            ['-':'v':v] ->
@@ -24,20 +25,18 @@ main
                                            _ -> Just v
                                in flagToVerbosity m
                            _ -> error ("Bad arguments: " ++ show args)
-               in doit destdir ipref ibindir ilibdir
-                       ilibexecdir idatadir idocdir
-                       ihtmldir_copy ihtmldir_reg
-                       ghcpkg ghcpkgconf verbosity
+               in doit verbosity ghcpkg ghcpkgconf destdir topdir
+                       iprefix ibindir ilibdir ilibexecdir idatadir
+                       idocdir ihtmldir
            _ ->
                error "Missing arguments"
 
-doit :: FilePath -> FilePath -> FilePath -> FilePath -> FilePath
+doit :: Verbosity -> FilePath -> FilePath -> FilePath -> FilePath
      -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
-     -> FilePath
-     -> Verbosity
+     -> FilePath -> FilePath
      -> IO ()
-doit destdir ipref ibindir ilibdir ilibexecdir idatadir idocdir
-     ihtmldir_copy ihtmldir_reg ghcpkg ghcpkgconf verbosity =
+doit verbosity ghcpkg ghcpkgconf destdir topdir
+     iprefix ibindir ilibdir ilibexecdir idatadir idocdir ihtmldir =
        do let userHooks = simpleUserHooks
               copyto = if null destdir then NoCopyDest else CopyTo destdir
               copyFlags = (emptyCopyFlags copyto) {
@@ -68,13 +67,14 @@ doit destdir ipref ibindir ilibdir ilibexecdir idatadir idocdir
               pd_reg  = pd { library = Just (mkLib (const True)) }
               -- When coying, we need to actually give a concrete
               -- directory to copy to rather than "$topdir"
-              i_copy = i { prefixDirTemplate  = toPathTemplate ipref,
-                           binDirTemplate     = toPathTemplate ibindir,
-                           libDirTemplate     = toPathTemplate ilibdir,
-                           libexecDirTemplate = toPathTemplate ilibexecdir,
-                           dataDirTemplate    = toPathTemplate idatadir,
-                           docDirTemplate     = toPathTemplate idocdir,
-                           htmlDirTemplate    = toPathTemplate ihtmldir_copy
+              toPathTemplate' = toPathTemplate . replaceTopdir topdir
+              i_copy = i { prefixDirTemplate  = toPathTemplate' iprefix,
+                           binDirTemplate     = toPathTemplate' ibindir,
+                           libDirTemplate     = toPathTemplate' ilibdir,
+                           libexecDirTemplate = toPathTemplate' ilibexecdir,
+                           dataDirTemplate    = toPathTemplate' idatadir,
+                           docDirTemplate     = toPathTemplate' idocdir,
+                           htmlDirTemplate    = toPathTemplate' ihtmldir
                          }
               lbi_copy = lbi { installDirTemplates = i_copy }
               -- When we run GHC we give it a $topdir that includes the
@@ -89,19 +89,23 @@ doit destdir ipref ibindir ilibdir ilibexecdir idatadir idocdir
                          programLocation = UserSpecified ghcpkg
                      }
               progs' = updateProgram prog progs
-              i_reg = i { prefixDirTemplate  = toPathTemplate ipref,
+              i_reg = i { prefixDirTemplate  = toPathTemplate iprefix,
                           binDirTemplate     = toPathTemplate ibindir,
                           libDirTemplate     = toPathTemplate ilibdir,
                           libexecDirTemplate = toPathTemplate ilibexecdir,
                           dataDirTemplate    = toPathTemplate idatadir,
                           docDirTemplate     = toPathTemplate idocdir,
-                          htmlDirTemplate    = toPathTemplate ihtmldir_reg
+                          htmlDirTemplate    = toPathTemplate ihtmldir
                         }
               lbi_reg = lbi { installDirTemplates = i_reg,
                               withPrograms = progs' }
           (copyHook simpleUserHooks) pd_copy lbi_copy userHooks copyFlags
           (regHook simpleUserHooks)  pd_reg  lbi_reg  userHooks registerFlags
           return ()
+
+replaceTopdir :: FilePath -> FilePath -> FilePath
+replaceTopdir topdir ('$':'t':'o':'p':'d':'i':'r':p) = topdir ++ p
+replaceTopdir _ p = p
 
 -- Get the build info, merging the setup-config and buildinfo files.
 getConfig :: Verbosity -> IO LocalBuildInfo
