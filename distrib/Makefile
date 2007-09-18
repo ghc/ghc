@@ -25,6 +25,7 @@ install::
 	$(MAKE) -C rts       install DOING_BIN_DIST=YES
 	$(MAKE) -C libraries install DOING_BIN_DIST=YES
 	$(MAKE) -C compiler  install DOING_BIN_DIST=YES
+	$(INSTALL_DATA) $(INSTALL_OPTS) extra-gcc-opts $(libdir)
 
 install :: install-docs postinstall denounce
 
