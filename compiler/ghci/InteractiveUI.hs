@@ -1811,8 +1811,9 @@ findBreakByCoord mb_file (line, col) arr
 -- TERM to vt100 for other reasons) we get carets.
 -- We really ought to use a proper termcap/terminfo library.
 do_bold :: Bool
-do_bold = unsafePerformIO (System.Environment.getEnv "TERM") `elem`
-          ["xterm", "linux"]
+do_bold = unsafePerformIO mTerm `elem` ["xterm", "linux"]
+    where mTerm = System.Environment.getEnv "TERM"
+                  `Exception.catch` \e -> return "TERM not set"
 
 start_bold :: String
 start_bold = "\ESC[1m"
