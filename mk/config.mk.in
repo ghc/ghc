@@ -569,6 +569,12 @@ datarootdir := $(prefix)
 datadir     := $(prefix)
 libdir      := $(prefix)
 
+docdir    := $(prefix)/doc
+htmldir   := $(docdir)
+dvidir    := $(docdir)
+pdfdir    := $(docdir)
+psdir     := $(docdir)
+
 else
 
 # Unix: override libdir and datadir to put ghc-specific stuff in
@@ -576,10 +582,6 @@ else
 datarootdir := $(datadir0)
 datadir     := $(datadir0)/ghc-$(ProjectVersion)
 libdir      := $(libdir0)/ghc-$(ProjectVersion)
-
-endif # Windows
-
-headerdir := $(libdir)/include
 
 # New autoconf (>= 2.60?) make a configure with --docdir=DIR etc flags.
 # However, in order to support older autoconf's we don't use them.
@@ -595,6 +597,10 @@ htmldir   := $(docdir)
 dvidir    := $(docdir)
 pdfdir    := $(docdir)
 psdir     := $(docdir)
+
+endif # Windows
+
+headerdir := $(libdir)/include
 
 # Default place for putting interface files is $(libdir)
 # (overriden for packages in package.mk)
