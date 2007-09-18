@@ -150,6 +150,7 @@
 ^compiler/stage2
 ^compiler/stage3
 ^mk/build.mk$
+^mk/validate.mk$
 ^mk/config.h.in$
 ^mk/config.h$
 ^mk/config.mk$
