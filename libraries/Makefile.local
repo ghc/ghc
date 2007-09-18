@@ -1,15 +1,15 @@
 # Local GHC-build-tree customization for Cabal makefiles.  We want to build
-# libraries using flags that the user has put in build.mk.
+# libraries using flags that the user has put in build.mk/validate.mk.
 
 # Careful here: including boilerplate.mk breaks things, because paths.mk and
 # opts.mk overrides some of the variable settings in the Cabal Makefile, so
-# we just include config.mk and build.mk.
+# we just include config.mk and custom-settings.mk.
 TOP=../..
 SAVE_GHC := $(GHC)
 SAVE_AR  := $(AR)
 SAVE_LD  := $(LD)
 include $(TOP)/mk/config.mk
--include $(TOP)/mk/build.mk
+include $(TOP)/mk/custom-settings.mk
 GHC := $(SAVE_GHC)
 AR  := $(SAVE_AR)
 LD  := $(SAVE_LD)
