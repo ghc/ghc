@@ -561,7 +561,7 @@ libdir0         := @libdir@
 includedir      := @includedir@
 mandir          := @mandir@
 
-ifeq "$(Windows)" "YES"
+ifeq "$(RelocatableBuild)" "YES"
 
 # Hack: our directory layouts tend to be different on Windows, so
 # hack around configure's bogus assumptions here.
