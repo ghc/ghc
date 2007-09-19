@@ -96,8 +96,6 @@ main =
                                   exitWith ExitSuccess
     ShowSupportedLanguages  -> do showSupportedLanguages
                                   exitWith ExitSuccess
-    ShowDocDir              -> do showDocDir
-                                  exitWith ExitSuccess
     ShowVersion             -> do showVersion
                                   exitWith ExitSuccess
     ShowNumVersion          -> do putStrLn cProjectVersion
@@ -173,7 +171,7 @@ main =
     ShowUsage              -> showGhcUsage dflags cli_mode
     PrintLibdir            -> putStrLn (topDir dflags)
     ShowSupportedLanguages -> alreadyHandled
-    ShowDocDir             -> alreadyHandled
+    ShowDocDir             -> showDocDir (topDir dflags)
     ShowVersion            -> alreadyHandled
     ShowNumVersion         -> alreadyHandled
     ShowInterface f        -> doShowIface dflags f
@@ -477,10 +475,11 @@ showSupportedLanguages :: IO ()
 showSupportedLanguages = do mapM_ putStrLn supportedLanguages
                             exitWith ExitSuccess
 
-showDocDir :: IO ()
-showDocDir = do
-  putStrLn cDocDir
-  exitWith ExitSuccess
+showDocDir :: FilePath -> IO ()
+showDocDir topdir = putStrLn docDir
+    where docDir = if cRelocatableBuild
+                   then topdir ++ "/doc"
+                   else cDocDir
 
 showVersion :: IO ()
 showVersion = do
