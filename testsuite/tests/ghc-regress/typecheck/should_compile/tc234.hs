@@ -1,5 +1,5 @@
 
-{-# OPTIONS_GHC -XPartiallyAppliedClosedTypeSynonyms #-}
+{-# OPTIONS_GHC -XLiberalTypeSynonyms #-}
 
 module ShouldCompile where
 
