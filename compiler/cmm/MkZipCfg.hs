@@ -1,6 +1,6 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 module MkZipCfg
-    ( AGraph, (<*>), sequence
+    ( AGraph, (<*>), catAGraphs
     , emptyAGraph, withFreshLabel, withUnique
     , mkMiddle, mkMiddles, mkLast, mkZTail, mkBranch, mkLabel, mkIfThenElse, mkWhileDo
     , outOfLine
@@ -16,7 +16,7 @@ import Unique
 import UniqFM
 import UniqSupply
 
-import Prelude hiding (zip, unzip, last, sequence)
+import Prelude hiding (zip, unzip, last)
 
 #include "HsVersions.h"
 
@@ -154,7 +154,7 @@ representation is agnostic on this point.)
 infixr 3 <*>
 (<*>) :: AGraph m l -> AGraph m l -> AGraph m l
 
-sequence :: [AGraph m l] -> AGraph m l
+catAGraphs :: [AGraph m l] -> AGraph m l
 
 -- | A graph is built up by splicing together graphs each containing a
 -- single node (where a label is considered a 'first' node.  The empty
@@ -250,7 +250,7 @@ newtype AGraph m l = AGraph (Graph m l -> UniqSM (Graph m l))
 AGraph f1 <*> AGraph f2 = AGraph f 
     where f g = f2 g >>= f1 -- note right associativity
 
-sequence = foldr (<*>) emptyAGraph
+catAGraphs = foldr (<*>) emptyAGraph
 
 emptyAGraph = AGraph return
 

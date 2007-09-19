@@ -7,9 +7,10 @@
 
 module MkZipCfgCmm
   ( mkNop, mkAssign, mkStore, mkCall, mkCmmCall, mkUnsafeCall, mkFinalCall
-         , mkJump, mkCbranch, mkSwitch, mkReturn, mkComment, mkCmmIfThenElse
-         , mkCmmWhileDo, mkAddToContext
-  , (<*>), sequence, mkLabel, mkBranch
+         , mkJump, mkCbranch, mkSwitch, mkReturn, mkComment 
+	 , mkCmmIfThenElse, mkCmmIfThen, mkCmmWhileDo
+	 , mkAddToContext
+  , (<*>), catAGraphs, mkLabel, mkBranch
   , emptyAGraph, withFreshLabel, withUnique, outOfLine
   , lgraphOfAGraph, graphOfAGraph, labelAGraph
   , CmmZ, CmmTopZ, CmmGraph, CmmBlock, CmmAGraph, Middle, Last, Convention(..)
@@ -31,7 +32,6 @@ import FastString
 import ForeignCall
 import ZipCfg 
 import MkZipCfg
-import Prelude hiding( sequence )
 
 type CmmGraph  = LGraph Middle Last
 type CmmAGraph = AGraph Middle Last
@@ -63,7 +63,9 @@ mkJump       	:: CmmExpr -> CmmActuals -> CmmAGraph
 mkCbranch    	:: CmmExpr -> BlockId -> BlockId -> CmmAGraph
 mkSwitch     	:: CmmExpr -> [Maybe BlockId] -> CmmAGraph
 mkReturn     	:: CmmActuals -> CmmAGraph
+
 mkCmmIfThenElse :: CmmExpr -> CmmAGraph -> CmmAGraph -> CmmAGraph
+mkCmmIfThen     :: CmmExpr -> CmmAGraph -> CmmAGraph
 mkCmmWhileDo    :: CmmExpr -> CmmAGraph -> CmmAGraph 
 
 -- Not to be forgotten, but exported by MkZipCfg:
@@ -75,8 +77,16 @@ mkCmmWhileDo    :: CmmExpr -> CmmAGraph -> CmmAGraph
 
 --------------------------------------------------------------------------
 
+mkCmmWhileDo    e = mkWhileDo (mkCbranch e)
 mkCmmIfThenElse e = mkIfThenElse (mkCbranch e)
-mkCmmWhileDo    e = mkWhileDo    (mkCbranch e)
+
+mkCmmIfThen e tbranch
+  = withFreshLabel "end of if"     $ \endif ->
+    withFreshLabel "start of then" $ \tid ->
+    mkCbranch e tid endif <*>
+    mkLabel tid <*> tbranch <*> mkBranch endif <*>
+    mkLabel endif
+
 
 
 -- ================ IMPLEMENTATION ================--

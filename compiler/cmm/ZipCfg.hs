@@ -1,6 +1,6 @@
 module ZipCfg
     ( 	-- These data types and names are carefully thought out
-      BlockId(..) 	-- ToDo: BlockId should be abstract, but it isn't yet
+      BlockId(..), mkBlockId 	-- ToDo: BlockId should be abstract, but it isn't yet
     , BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, insertBlock, mkBlockEnv
     , BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet, mkBlockSet
     , Graph(..), LGraph(..), FGraph(..)
@@ -638,6 +638,9 @@ newtype BlockId = BlockId Unique
 
 instance Uniquable BlockId where
   getUnique (BlockId u) = u
+
+mkBlockId :: Unique -> BlockId
+mkBlockId uniq = BlockId uniq
 
 instance Show BlockId where
   show (BlockId u) = show u

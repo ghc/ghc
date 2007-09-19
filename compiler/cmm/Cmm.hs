@@ -21,8 +21,8 @@ module Cmm (
         CmmSafety(..),
 	CmmCallTarget(..),
 	CmmStatic(..), Section(..),
-        module CmmExpr,
-        BlockId(..), 
+
+        BlockId(..), mkBlockId,
         BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, mkBlockEnv,
         BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet,
   ) where
@@ -40,7 +40,7 @@ import FastString
 
 import Data.Word
 
-import ZipCfg (	BlockId(..)
+import ZipCfg (	BlockId(..), mkBlockId
               , BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, mkBlockEnv
               , BlockSet, emptyBlockSet, elemBlockSet, extendBlockSet
               )
