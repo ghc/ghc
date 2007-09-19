@@ -281,10 +281,12 @@ repSplitAppTy_maybe :: Type -> Maybe (Type,Type)
 -- Does the AppTy split, but assumes that any view stuff is already done
 repSplitAppTy_maybe (FunTy ty1 ty2)   = Just (TyConApp funTyCon [ty1], ty2)
 repSplitAppTy_maybe (AppTy ty1 ty2)   = Just (ty1, ty2)
-repSplitAppTy_maybe (TyConApp tc tys) = case snocView tys of
-						Just (tys', ty') -> Just (TyConApp tc tys', ty')
-						Nothing		 -> Nothing
-repSplitAppTy_maybe other = Nothing
+repSplitAppTy_maybe (TyConApp tc tys) 
+  | not (isOpenSynTyCon tc) || length tys > tyConArity tc 
+  = case snocView tys of       -- never create unsaturated type family apps
+      Just (tys', ty') -> Just (TyConApp tc tys', ty')
+      Nothing	       -> Nothing
+repSplitAppTy_maybe _other = Nothing
 -------------
 splitAppTy :: Type -> (Type, Type)
 splitAppTy ty = case splitAppTy_maybe ty of
@@ -297,7 +299,13 @@ splitAppTys ty = split ty ty []
   where
     split orig_ty ty args | Just ty' <- coreView ty = split orig_ty ty' args
     split orig_ty (AppTy ty arg)        args = split ty ty (arg:args)
-    split orig_ty (TyConApp tc tc_args) args = (TyConApp tc [], tc_args ++ args)
+    split orig_ty (TyConApp tc tc_args) args 
+      = let -- keep type families saturated
+            n | isOpenSynTyCon tc = tyConArity tc
+              | otherwise         = 0
+            (tc_args1, tc_args2)  = splitAt n tc_args
+        in
+        (TyConApp tc tc_args1, tc_args2 ++ args)
     split orig_ty (FunTy ty1 ty2)       args = ASSERT( null args )
 					       (TyConApp funTyCon [], [ty1,ty2])
     split orig_ty ty		        args = (orig_ty, args)
