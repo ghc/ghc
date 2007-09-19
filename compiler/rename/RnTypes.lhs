@@ -822,7 +822,7 @@ bogusCharError c
 
 patSigErr ty
   =  (ptext SLIT("Illegal signature in pattern:") <+> ppr ty)
-	$$ nest 4 (ptext SLIT("Use -XPatternSigs to permit it"))
+	$$ nest 4 (ptext SLIT("Use -XPatternSignatures to permit it"))
 
 dupFieldErr str dup
   = hsep [ptext SLIT("duplicate field name"), 
