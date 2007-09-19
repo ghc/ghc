@@ -6,3 +6,6 @@ module ShouldCompile where
 
 f :: forall a. (Num a) => forall b. (Ord b) => a -> b -> b -> a
 f x y z = if y>z then x+1 else x
+
+g :: (Num a) => (Ord b) => a -> b -> b -> a
+g x y z = if y>z then x+1 else x
