@@ -506,6 +506,7 @@ dist ::
 	  && for i in $(SRC_DIST_DIRS); do mkdir $$i; (cd $$i && lndir $(FPTOOLS_TOP_ABS)/$$i ); done \
 	  && for i in $(SRC_DIST_FILES); do $(LN_S) $(FPTOOLS_TOP_ABS)/$$i .; done \
 	  && $(MAKE) distclean \
+	  && $(CP) $(FPTOOLS_TOP_ABS)/libraries/haskell-src/dist/build/Language/Haskell/Parser.hs libraries/haskell-src/Language/Haskell/ \
 	  && $(RM) -rf compiler/stage[123] mk/build.mk \
 	  && $(FIND) $(SRC_DIST_DIRS) \( -name _darcs -o -name SRC -o -name "autom4te*" -o -name "*~" -o -name ".cvsignore" -o -name "\#*" -o -name ".\#*" -o -name "log" -o -name "*-SAVE" -o -name "*.orig" -o -name "*.rej" \) -print | xargs $(RM) -rf \
 	)
