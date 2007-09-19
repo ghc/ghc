@@ -1095,34 +1095,26 @@ check_tau_type rank ubx_tup (NoteTy other_note ty)
   = check_tau_type rank ubx_tup ty
 
 check_tau_type rank ubx_tup ty@(TyConApp tc tys)
-  | isSynTyCon tc	
-  = do	{ 	-- It's OK to have an *over-applied* type synonym
+  | isSynTyCon tc
+  = do	{ 	-- Check that the synonym has enough args
+		-- This applies eqaually to open and closed synonyms
+	 	-- It's OK to have an *over-applied* type synonym
 		--	data Tree a b = ...
 		--	type Foo a = Tree [a]
 		--	f :: Foo a b -> ...
-	; case tcView ty of
-	     Just ty' -> check_tau_type rank ubx_tup ty' -- Check expansion
-	     Nothing -> unless (isOpenTyCon tc           -- No expansion if open
-			        && tyConArity tc <= length tys) $
-		          failWithTc arity_msg
+ 	  checkTc (tyConArity tc <= length tys) arity_msg
 
-	; ok <- doptM Opt_PartiallyAppliedClosedTypeSynonyms
-	; if ok && not (isOpenTyCon tc) then
-	-- Don't check the type arguments of *closed* synonyms.
-	-- This allows us to instantiate a synonym defn with a 
-	-- for-all type, or with a partially-applied type synonym.
-	-- 	e.g.   type T a b = a
-	--	       type S m   = m ()
-	--	       f :: S (T Int)
-	-- Here, T is partially applied, so it's illegal in H98.
-	-- But if you expand S first, then T we get just 
-	--	       f :: Int
-	-- which is fine.
-		returnM ()
-	  else
+	-- See Note [Liberal type synonyms]
+	; liberal <- doptM Opt_LiberalTypeSynonyms
+	; if not liberal then
 		-- For H98, do check the type args
 		mappM_ check_arg_type tys
-	}
+
+	  else	-- In the liberal case, expand then check
+	  case tcView ty of   
+	     Just ty' -> check_tau_type rank ubx_tup ty' 
+	     Nothing -> pprPanic "check_tau_type" (ppr ty)
+    }
     
   | isUnboxedTupleTyCon tc
   = doptM Opt_UnboxedTuples `thenM` \ ub_tuples_allowed ->
@@ -1149,6 +1141,34 @@ unliftedArgErr  ty = ptext SLIT("Illegal unlifted type argument:") <+> ppr ty
 ubxArgTyErr     ty = ptext SLIT("Illegal unboxed tuple type as function argument:") <+> ppr ty
 kindErr kind       = ptext SLIT("Expecting an ordinary type, but found a type of kind") <+> ppr kind
 \end{code}
+
+Note [Liberal type synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If -XLiberalTypeSynonyms is on, expand closed type synonyms *before*
+doing validity checking.  This allows us to instantiate a synonym defn
+with a for-all type, or with a partially-applied type synonym.
+	e.g.   type T a b = a
+	       type S m   = m ()
+	       f :: S (T Int)
+Here, T is partially applied, so it's illegal in H98.  But if you
+expand S first, then T we get just
+	       f :: Int
+which is fine.
+
+IMPORTANT: suppose T is a type synonym.  Then we must do validity
+checking on an appliation (T ty1 ty2)
+
+	*either* before expansion (i.e. check ty1, ty2)
+	*or* after expansion (i.e. expand T ty1 ty2, and then check)
+	BUT NOT BOTH
+
+If we do both, we get exponential behaviour!!
+
+  data TIACons1 i r c = c i ::: r c
+  type TIACons2 t x = TIACons1 t (TIACons1 t x)
+  type TIACons3 t x = TIACons2 t (TIACons1 t x)
+  type TIACons4 t x = TIACons2 t (TIACons2 t x)
+  type TIACons7 t x = TIACons4 t (TIACons3 t x)
 
 
 %************************************************************************

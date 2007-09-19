@@ -818,10 +818,10 @@
 	      <entry><option>-XNoUnliftedFFITypes</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-XPartiallyAppliedClosedTypeSynonyms</option></entry>
-	      <entry>Enable partially applied type synonyms.</entry>
+	      <entry><option>-XLiberalTypeSynonyms</option></entry>
+	      <entry>Enable <link linkend="type-synonyms">liberalised type synonyms</link>.</entry>
 	      <entry>dynamic</entry>
-	      <entry><option>-XNoPartiallyAppliedClosedTypeSynonyms</option></entry>
+	      <entry><option>-XNoLiberalTypeSynonyms</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-XNoRank2Types</option></entry>
