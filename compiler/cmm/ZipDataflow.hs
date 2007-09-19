@@ -59,26 +59,49 @@ data Answer m l a = Dataflow a | Rewrite (Graph m l)
 
 {-
 
-\subsection {Descriptions of dataflow passes}
+============== Descriptions of dataflow passes} ================
 
-\paragraph{Passes for backward dataflow problems}
+------ Passes for backward dataflow problemsa
 
 The computation of a fact is the basis of a dataflow pass.
-A~computation takes not one but two type parameters:
-\begin{itemize}
-\item
-Type parameter [['i]] is an input, from which it should be possible to
-derived a dataflow fact of interest.
-For example, [['i]] might be equal to a fact, or it might be a tuple
-of which one element is a fact.
-\item
-Type parameter [['o]] is an output, or possibly a function from
-[[fuel]] to an output
-\end{itemize}
-Backward analyses compute [[in]] facts (facts on inedges). 
-<<exported types for backward analyses>>=
+A computation takes *four* type parameters:
 
+  * 'middle' and 'last' are the types of the middle
+    and last nodes of the graph over which the dataflow
+    solution is being computed
+
+  * 'input' is an input, from which it should be possible to
+     derive a dataflow fact of interest.  For example, 'input' might
+     be equal to a fact, or it might be a tuple of which one element
+     is a fact.
+
+  * 'output' is an output, or possibly a function from 'fuel' to an
+    output
+
+A computation is interesting for any pair of 'middle' and 'last' type
+parameters that can form a reasonable graph.  But it is not useful to
+instantiate 'input' and 'output' arbitrarily.  Rather, only certain
+combinations of instances are likely to be useful, such as those shown
+below.
+
+Backward analyses compute *in* facts (facts on inedges). 
 -}
+
+-- A dataflow pass requires a name and a transfer function for each of
+-- four kinds of nodes: 
+--	first (the BlockId), 
+--	middle
+--	last 
+--	LastExit  
+
+-- A 'BComputation' describes a complete backward dataflow pass, as a
+-- record of transfer functions.  Because the analysis works
+-- back-to-front, we write the exit node at the beginning.
+-- 
+-- So there is
+--	an 'input' for each out-edge of the node
+--		(hence (BlockId -> input) for bc_last_in)
+--	an 'output' for the in-edge of the node
 
 data BComputation middle last input output = BComp
    { bc_name      :: String
@@ -93,13 +116,17 @@ data BComputation middle last input output = BComp
 --     * A pure transformation computes no facts but only changes the graph.
 --     * A fully general pass both computes a fact and rewrites the graph,
 --       respecting the current transaction limit.
-
+--
 type BAnalysis                 m l a = BComputation m l a a
 type BTransformation           m l a = BComputation m l a (Maybe (UniqSM (Graph m l)))
 type BFunctionalTransformation m l a = BComputation m l a (Maybe         (Graph m l))
+	-- ToDo: consider replacing UniqSM (Graph l m) with (AGraph m l)
 
 type BPass          m l a = BComputation m l a (OptimizationFuel -> DFM a (Answer m l a))
-type BUnlimitedPass m l a = BComputation m l a (           DFM a (Answer m l a))
+type BUnlimitedPass m l a = BComputation m l a (                    DFM a (Answer m l a))
+
+	-- (DFM a t) maintains the (BlockId -> a) map
+	-- ToDo: overlap with bc_last_in??
 
 {-
 \paragraph{Passes for forward dataflow problems}
