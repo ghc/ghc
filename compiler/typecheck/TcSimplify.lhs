@@ -1085,10 +1085,11 @@ checkLoop :: RedEnv
 checkLoop env wanteds
   = go env wanteds []
   where go env wanteds needed_givens
-	  = do { -- Givens are skolems, so no need to zonk them
-		 wanteds' <- zonkInsts wanteds
+	  = do {  -- We do need to zonk the givens; cf Note [Zonking RedEnv]
+                ; env'     <- zonkRedEnv env
+		; wanteds' <- zonkInsts  wanteds
 	
-		; (improved, binds, irreds, more_needed_givens) <- reduceContext env wanteds'
+		; (improved, binds, irreds, more_needed_givens) <- reduceContext env' wanteds'
 
 		; let all_needed_givens = needed_givens ++ more_needed_givens
 	
@@ -1101,9 +1102,43 @@ checkLoop env wanteds
 		-- Using an instance decl might have introduced a fresh type variable
 		-- which might have been unified, so we'd get an infinite loop
 		-- if we started again with wanteds!  See Note [LOOP]
-		{ (irreds1, binds1, all_needed_givens1) <- go env irreds all_needed_givens
+		{ (irreds1, binds1, all_needed_givens1) <- go env' irreds all_needed_givens
 		; return (irreds1, binds `unionBags` binds1, all_needed_givens1) } }
 \end{code}
+
+Note [Zonking RedEnv]
+~~~~~~~~~~~~~~~~~~~~~
+It might appear as if the givens in RedEnv are always rigid, but that is not
+necessarily the case for programs involving higher-rank types that have class
+contexts constraining the higher-rank variables.  An example from tc237 in the
+testsuite is
+
+  class Modular s a | s -> a
+
+  wim ::  forall a w. Integral a 
+                        => a -> (forall s. Modular s a => M s w) -> w
+  wim i k = error "urk"
+
+  test5  ::  (Modular s a, Integral a) => M s a
+  test5  =   error "urk"
+
+  test4   =   wim 4 test4'
+
+Notice how the variable 'a' of (Modular s a) in the rank-2 type of wim is
+quantified further outside.  When type checking test4, we have to check
+whether the signature of test5 is an instance of 
+
+  (forall s. Modular s a => M s w)
+
+Consequently, we will get (Modular s t_a), where t_a is a TauTv into the
+givens. 
+
+Given the FD of Modular in this example, class improvement will instantiate
+t_a to 'a', where 'a' is the skolem from test5's signatures (due to the
+Modular s a predicate in that signature).  If we don't zonk (Modular s t_a) in
+the givens, we will get into a loop as improveOne uses the unification engine
+TcGadt.tcUnifyTys, which doesn't know about mutable type variables.
+
 
 Note [LOOP]
 ~~~~~~~~~~~
@@ -1655,6 +1690,12 @@ data WantSCs = NoSCs | AddSCs	-- Tells whether we should add the superclasses
 				-- of a predicate when adding it to the avails
 	-- The reason for this flag is entirely the super-class loop problem
 	-- Note [SUPER-CLASS LOOP 1]
+
+zonkRedEnv :: RedEnv -> TcM RedEnv
+zonkRedEnv env 
+  = do { givens' <- mappM zonkInst (red_givens env)
+       ; return $ env {red_givens = givens'}
+       }
 \end{code}
 
 
