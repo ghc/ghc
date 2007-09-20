@@ -60,16 +60,6 @@
 
 	    <varlistentry>
 	      <term>
-	        <option>-ddump-tc</option>:
-                <indexterm><primary><option>-ddump-tc</option></primary></indexterm>
-	      </term>
-	      <listitem>
-		<para>typechecker output</para>
-	      </listitem>
-	    </varlistentry>
-
-	    <varlistentry>
-	      <term>
 	        <option>-ddump-splices</option>:
                 <indexterm><primary><option>-ddump-splices</option></primary></indexterm>
 	      </term>
