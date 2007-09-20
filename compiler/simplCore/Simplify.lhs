@@ -422,6 +422,8 @@ That's what the 'go' loop in prepareRhs does
 prepareRhs :: SimplEnv -> OutExpr -> SimplM (SimplEnv, OutExpr)
 -- Adds new floats to the env iff that allows us to return a good RHS
 prepareRhs env (Cast rhs co)	-- Note [Float coercions]
+  | (ty1, ty2) <- coercionKind co	-- Do *not* do this if rhs has an unlifted type
+  , not (isUnLiftedType ty1)		-- see Note [Float coercions (unlifted)]
   = do	{ (env', rhs') <- makeTrivial env rhs
 	; return (env', Cast rhs' co) }
 
@@ -473,6 +475,22 @@ and lead to further optimisation.  Example:
           go 0 = 0
           go n = case x of { T m -> go (n-m) }
 		-- This case should optimise
+
+Note [Float coercions (unlifted)]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+BUT don't do [Float coercions] if 'e' has an unlifted type. 
+This *can* happen:
+
+     foo :: Int = (error (# Int,Int #) "urk") 
+		  `cast` CoUnsafe (# Int,Int #) Int
+
+If do the makeTrivial thing to the error call, we'll get
+    foo = case error (# Int,Int #) "urk" of v -> v `cast` ...
+But 'v' isn't in scope!  
+
+These strange casts can happen as a result of case-of-case
+	bar = case (case x of { T -> (# 2,3 #); F -> error "urk" }) of
+		(# p,q #) -> p+q
 
 
 \begin{code}
