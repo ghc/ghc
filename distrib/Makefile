@@ -15,7 +15,6 @@ include Makefile-vars
 
 install ::
 	$(INSTALL_DIR) $(bindir)
-	(cd lib/$(platform); find . -type d -exec sh -c '$(INSTALL_DIR) $$0 $(libdir)/$$0' {} \; )
 	(cd share; find . -type d -exec sh -c '$(INSTALL_DIR) $(datadir)/$$0' {} \; )
 
 install::
