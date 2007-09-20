@@ -1,5 +1,9 @@
 {-# LANGUAGE RankNTypes, MultiParamTypeClasses, FunctionalDependencies #-}
 
+-- This one caught a bug in the implementation of functional
+-- dependencies, where improvement must happen when 
+-- checking the call in 'test4'
+
 module ShouldCompile where
 
 newtype M s a = M a       
