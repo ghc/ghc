@@ -139,7 +139,7 @@ all :: stamp.inplace-gcc-lib
 stamp.inplace-gcc-lib:
 	$(RM) -r compiler/gcc-lib
 	mkdir compiler/gcc-lib
-	cp $(GccDir)ld.exe compiler/gcc-lib
+	cp $(LD) compiler/gcc-lib
 	touch $@
 
 clean ::
