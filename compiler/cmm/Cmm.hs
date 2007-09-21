@@ -21,6 +21,7 @@ module Cmm (
         CmmSafety(..),
 	CmmCallTarget(..),
 	CmmStatic(..), Section(..),
+        module CmmExpr,
 
         BlockId(..), mkBlockId,
         BlockEnv, emptyBlockEnv, lookupBlockEnv, extendBlockEnv, mkBlockEnv,

@@ -10,6 +10,7 @@ module CmmSpillReload
   , availRegsLattice
   , cmmAvailableReloads
   , insertLateReloads
+  , insertLateReloads'
   , removeDeadAssignmentsAndReloads
   )
 where
@@ -22,7 +23,7 @@ import MkZipCfg
 import PprCmm()
 import ZipCfg
 import ZipCfgCmmRep
-import ZipDataflow
+import ZipDataflow0
 
 import FastString
 import Maybes
@@ -30,6 +31,7 @@ import Outputable hiding (empty)
 import qualified Outputable as PP
 import Panic
 import UniqSet
+import UniqSupply
 
 import Maybe
 import Prelude hiding (zip)
@@ -238,14 +240,15 @@ elemAvail (AvailRegs     s) r = elemRegSet r s
 cmmAvailableReloads :: LGraph M Last -> BlockEnv AvailRegs
 cmmAvailableReloads g = env
     where env = runDFA availRegsLattice $
-                do run_f_anal transfer (fact_bot availRegsLattice) g
+                do run_f_anal avail_reloads_transfer (fact_bot availRegsLattice) g
                    allFacts
-          transfer :: FAnalysis M Last AvailRegs
-          transfer = FComp "available-reloads analysis" first middle last exit
-          exit _ = LastOutFacts []
-          first avail _ = avail
-          middle       = flip middleAvail
-          last         = lastAvail
+
+avail_reloads_transfer :: FAnalysis M Last AvailRegs
+avail_reloads_transfer = FComp "available-reloads analysis" first middle last exit
+  where exit avail    = avail
+        first avail _ = avail
+        middle        = flip middleAvail
+        last          = lastAvail
 
 
 -- | The transfer equations use the traditional 'gen' and 'kill'
@@ -270,11 +273,11 @@ lastAvail :: AvailRegs -> Last -> LastOutFacts AvailRegs
 lastAvail _ (LastCall _ (Just k)) = LastOutFacts [(k, AvailRegs emptyRegSet)]
 lastAvail avail l = LastOutFacts $ map (\id -> (id, avail)) $ succs l
 
-insertLateReloads :: LGraph M Last -> DFTx (LGraph M Last)
+insertLateReloads :: LGraph M Last -> FuelMonad (LGraph M Last)
 insertLateReloads g = mapM_blocks insertM g
     where env = cmmAvailableReloads g
           avail id = lookupBlockEnv env id `orElse` AvailRegs emptyRegSet
-          insertM b = functionalDFTx "late reloads" (insert b)
+          insertM b = fuelConsumingPass "late reloads" (insert b)
           insert (Block id tail) fuel = propagate (ZFirst id) (avail id) tail fuel
           propagate h avail (ZTail m t) fuel =
               let (h', fuel') = maybe_add_reload h avail m fuel in
@@ -284,9 +287,23 @@ insertLateReloads g = mapM_blocks insertM g
               (zipht h' (ZLast l), fuel')
           maybe_add_reload h avail node fuel =
               let used = filterRegsUsed (elemAvail avail) node
-              in  if fuel == 0 || isEmptyUniqSet used then (h, fuel)
-                  else (ZHead h (Reload used), fuel-1)
+              in  if not (canRewriteWithFuel fuel) || isEmptyUniqSet used then (h,fuel)
+                  else (ZHead h (Reload used), oneLessFuel fuel)
 
+insertLateReloads' :: UniqSupply -> (Graph M Last) -> FuelMonad (Graph M Last)
+insertLateReloads' us g = 
+    runDFM us availRegsLattice $
+    f_shallow_rewrite avail_reloads_transfer insert bot g
+  where bot = fact_bot availRegsLattice
+        insert = null_f_ft { fc_middle_out = middle, fc_last_outs = last }
+        middle :: AvailRegs -> M -> Maybe (Graph M Last)
+        last   :: AvailRegs -> Last -> Maybe (Graph M Last)
+        middle avail m = maybe_reload_before avail m (ZTail m (ZLast LastExit))
+        last avail l   = maybe_reload_before avail l (ZLast (LastOther l))
+        maybe_reload_before avail node tail =
+            let used = filterRegsUsed (elemAvail avail) node
+            in  if isEmptyUniqSet used then Nothing
+                else Just $ graphOfZTail $ ZTail (Reload used) tail
 
 _lateReloadsWithoutFuel :: LGraph M Last -> LGraph M Last
 _lateReloadsWithoutFuel g = map_blocks insert g

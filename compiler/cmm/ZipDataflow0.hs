@@ -1,16 +1,18 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
-module ZipDataflow
+module ZipDataflow0
   ( Answer(..)
   , BComputation(..), BAnalysis, BTransformation, BFunctionalTransformation
         , BPass, BUnlimitedPass
-  , FComputation(..), FAnalysis, FTransformation, FPass, FUnlimitedPass
+  , FComputation(..), FAnalysis, FTransformation, FFunctionalTransformation
+        , FPass, FUnlimitedPass
   , LastOutFacts(..)
   , DebugNodes
   , anal_b, a_t_b, a_ft_b, a_ft_b_unlimited, ignore_transactions_b
   , anal_f, a_t_f 
+  , null_f_ft, null_b_ft
   , run_b_anal, run_f_anal
   , refine_f_anal, refine_b_anal, fold_edge_facts_b, fold_edge_facts_with_nodes_b
-  , b_rewrite, f_rewrite
+  , b_rewrite, f_rewrite, b_shallow_rewrite, f_shallow_rewrite
   , solve_graph_b, solve_graph_f
   )
 where
@@ -145,7 +147,7 @@ data FComputation middle last input outmid outlast = FComp
  , fc_first_out  :: input -> BlockId   -> outmid
  , fc_middle_out :: input -> middle    -> outmid
  , fc_last_outs  :: input -> last      -> outlast
- , fc_exit_outs  :: input              -> outlast
+ , fc_exit_out   :: input              -> outmid
  } 
 
 -- | The notions of analysis, pass, and transformation are analogous to the
@@ -159,6 +161,11 @@ newtype LastOutFacts a = LastOutFacts [(BlockId, a)]
 type FAnalysis m l a       = FComputation m l a a (LastOutFacts a)
 type FTransformation m l a = FComputation m l a (Maybe (UniqSM (Graph m l)))
                                                 (Maybe (UniqSM (Graph m l)))
+type FFunctionalTransformation m l a =
+                             FComputation m l a (Maybe (Graph m l))
+                                                (Maybe (Graph m l))
+	-- ToDo: consider replacing UniqSM (Graph l m) with (AGraph m l)
+
 type FPass m l a           = FComputation m l a
                                 (OptimizationFuel -> DFM a (Answer m l a))
                                 (OptimizationFuel -> DFM a (Answer m l (LastOutFacts a)))
@@ -176,6 +183,9 @@ composing analyses, transformations, and passes.
 We can make an analysis pass, or we can 
 combine a related analysis and transformation into a full pass.
 -}
+
+null_b_ft :: BFunctionalTransformation m l a
+null_f_ft :: FFunctionalTransformation m l a
 
 anal_b :: BAnalysis m l a -> BPass m l a
 a_t_b  :: BAnalysis m l a -> BTransformation           m l a -> BPass m l a
@@ -247,6 +257,19 @@ b_rewrite :: (DebugNodes m l, Outputable a) =>
 f_rewrite :: (DebugNodes m l, LastNode l, Outputable m, Outputable a) =>
              FPass m l a -> a -> LGraph m l -> DFM a (LGraph m l)
                     -- ^ extra parameter is the entry fact
+
+b_shallow_rewrite
+    :: (DebugNodes m l, Outputable a)
+    => BAnalysis m l a -> BFunctionalTransformation m l a ->
+       Graph m l -> DFM a (Graph m l)
+
+b_shallow_rewrite = error "unimp"
+
+f_shallow_rewrite
+    :: (DebugNodes m l, Outputable a)
+    => FAnalysis m l a -> FFunctionalTransformation m l a ->
+       a -> Graph m l -> DFM a (Graph m l)
+
 
 -- | If the solution to a problem is already sitting in a monad, we
 -- should be able to take a short cut and just rewrite it in one pass.
@@ -396,7 +419,7 @@ solve_graph_b comp fuel graph exit_fact =
                                 Rewrite g ->
                                   do { bot <- botFact
                                      ; (fuel, a) <- subAnalysis' $
-                                                    solve_graph_b_g comp (fuel-1) g bot
+                                         solve_graph_b_g comp (oneLessFuel fuel) g bot
                                      ; head_in fuel h a }
                  ; my_trace "result of" (text (bc_name comp) <+>
                    text "on" <+> ppr (G.blockId b) <+> text "is" <+> ppr block_in) $
@@ -407,14 +430,14 @@ solve_graph_b comp fuel graph exit_fact =
               bc_middle_in comp out m fuel >>= \x -> case x of
                 Dataflow a -> head_in fuel h a
                 Rewrite g ->
-                  do { (fuel, a) <- subAnalysis' $ solve_graph_b_g comp (fuel-1) g out 
+                  do { (fuel, a) <- subAnalysis' $ solve_graph_b_g comp (oneLessFuel fuel) g out 
                      ; my_trace "Rewrote middle node"
                                     (f4sep [ppr m, text "to", pprGraph g]) $
                        head_in fuel h a }
           head_in fuel (G.ZFirst id) out =
               bc_first_in comp out id fuel >>= \x -> case x of
                 Dataflow a -> return (fuel, a)
-                Rewrite g -> do { subAnalysis' $ solve_graph_b_g comp (fuel-1) g out }
+                Rewrite g -> do { subAnalysis' $ solve_graph_b_g comp (oneLessFuel fuel) g out }
 
       in do { fuel <-
                   run "backward" (bc_name comp) (return ()) set_block_fact fuel blocks
@@ -498,7 +521,7 @@ solve_and_rewrite_b comp fuel graph exit_fact =
               Rewrite g ->
                 do { markGraphRewritten
                    ; bot <- botFact
-                   ; (fuel, a, g') <- solve_and_rewrite_b_graph comp (fuel-1) g bot
+                   ; (fuel, a, g') <- solve_and_rewrite_b_graph comp (oneLessFuel fuel) g bot
                    ; let G.Graph t new_blocks = g'
                    ; let rewritten' = new_blocks `plusUFM` rewritten
                    ; propagate fuel h a t rewritten' -- continue at entry of g'
@@ -514,7 +537,7 @@ solve_and_rewrite_b comp fuel graph exit_fact =
                 Dataflow a -> propagate fuel h a (G.ZTail m tail) rewritten
                 Rewrite g ->
                   do { markGraphRewritten
-                     ; (fuel, a, g') <- solve_and_rewrite_b_graph comp (fuel-1) g out
+                     ; (fuel, a, g') <- solve_and_rewrite_b_graph comp (oneLessFuel fuel) g out
                      ; let G.Graph t newblocks = G.splice_tail g' tail
                      ; my_trace "Rewrote middle node"
                                              (f4sep [ppr m, text "to", pprGraph g']) $
@@ -527,7 +550,7 @@ solve_and_rewrite_b comp fuel graph exit_fact =
                      ; rewrite_blocks comp fuel (extendBlockEnv rewritten id b) bs }
                 Rewrite g ->
                   do { markGraphRewritten
-                     ; (fuel, a, g') <- solve_and_rewrite_b_graph comp (fuel-1) g out
+                     ; (fuel, a, g') <- solve_and_rewrite_b_graph comp (oneLessFuel fuel) g out
                      ; let G.Graph t newblocks = G.splice_tail g' tail 
                      ; my_trace "Rewrote label " (f4sep [ppr id,text "to",pprGraph g])$
                        propagate fuel h a t (newblocks `plusUFM` rewritten) }
@@ -551,11 +574,11 @@ solve_and_rewrite_b_graph comp fuel graph exit_fact =
        (fuel, a, g') <- solve_and_rewrite_b comp fuel g exit_fact
        return (fuel, a, remove_entry_label g')
 
-b_rewrite comp g =
-  do { fuel <- liftTx txRemaining
+b_rewrite comp g = 
+  do { fuel <- fuelRemaining
      ; bot <- botFact
      ; (fuel', _, gc) <- solve_and_rewrite_b comp fuel g bot
-     ; liftTx $ txDecrement (bc_name comp) fuel fuel'
+     ; fuelDecrement (bc_name comp) fuel fuel'
      ; return gc
      }
 
@@ -603,7 +626,8 @@ ignore_transactions_b comp =
 
 answer' :: (b -> DFM f (Graph m l)) -> OptimizationFuel -> Maybe b -> a -> DFM f (Answer m l a)
 answer' lift fuel r a = 
-    case r of Just gc | fuel > 0 -> do { g <- lift gc; return $ Rewrite g }
+    case r of Just gc | canRewriteWithFuel fuel
+                          -> do { g <- lift gc; return $ Rewrite g }
               _ -> return $ Dataflow a
 
 unlimited_answer'
@@ -652,24 +676,20 @@ refine_f_anal comp graph initial =
   where blocks = G.postorder_dfs graph
         set_successor_facts () (G.Block id t) =
           let forward in' (G.ZTail m t) = forward (fc_middle_out comp in' m) t
-              forward in' (G.ZLast l)   = setEdgeFacts (last_outs comp in' l) 
+              forward in' (G.ZLast l)   = last_outs setEdgeFacts comp in' l
               _blockname = if id == G.lg_entry graph then "<entry>" else show id
           in  getFact id >>= \a -> forward (fc_first_out comp a id) t
         setEdgeFacts (LastOutFacts fs) = mapM_ setEdgeFact fs
         setEdgeFact (id, a) = setFact id a
 
-last_outs :: FComputation m l i om ol -> i -> G.ZLast l -> ol
-last_outs comp i (G.LastExit)    = fc_exit_outs comp i
-last_outs comp i (G.LastOther l) = fc_last_outs comp i l
+last_outs :: (DataflowAnalysis df, Outputable a) => (LastOutFacts a -> df a ()) -> FComputation m l i a (LastOutFacts a) -> i -> G.ZLast l -> df a ()
+last_outs _do_last_outs comp i (G.LastExit) = setExitFact (fc_exit_out comp i)
+last_outs  do_last_outs comp i (G.LastOther l) = do_last_outs $ fc_last_outs comp i l
 
--- | In the general case we solve a graph in the context of a larger subgraph.
--- To do this, we need a locally modified computation that allows an
--- ``exit fact'' to flow out of the exit node.  We pass in a fresh BlockId 
--- to which the exit fact can flow
+last_rewrite :: FComputation m l i a a -> i -> G.ZLast l -> a
+last_rewrite comp i (G.LastExit)    = fc_exit_out  comp i
+last_rewrite comp i (G.LastOther l) = fc_last_outs comp i l
 
-comp_with_exit_f :: FPass m l a -> BlockId -> FPass m l a
-comp_with_exit_f comp exit_fact_id = comp { fc_exit_outs = exit_outs } 
-    where exit_outs in' _fuel = return $ Dataflow $ LastOutFacts [(exit_fact_id, in')]
 
 -- | Given [[comp_with_exit_f]], we can now solve a graph simply by doing a
 -- forward analysis on the modified computation.
@@ -678,15 +698,13 @@ solve_graph_f ::
     FPass m l a -> OptimizationFuel -> G.LGraph m l -> a ->
     DFM a (OptimizationFuel, a, LastOutFacts a)
 solve_graph_f comp fuel g in_fact =
-  do { exit_fact_id <- freshBlockId "proxy for exit node"
-     ; fuel <- general_forward (comp_with_exit_f comp exit_fact_id) fuel in_fact g
-     ; a <- getFact exit_fact_id
+  do { fuel <- general_forward fuel in_fact g
+     ; a <- getExitFact
      ; outs <- lastOutFacts
-     ; forgetFact exit_fact_id -- close space leak
-     ; return (fuel, a, LastOutFacts outs) }
+     ; return (fuel, a, outs) }
   where
     -- general_forward :: FPass m l a -> OptimizationFuel -> a -> G.LGraph m l -> DFM a OptimizationFuel
-    general_forward comp fuel entry_fact graph =
+    general_forward fuel entry_fact graph =
       let blocks = G.postorder_dfs g
           is_local id = isJust $ lookupBlockEnv (G.lg_blocks g) id
           -- set_or_save :: LastOutFacts a -> DFM a ()
@@ -702,15 +720,19 @@ solve_graph_f comp fuel g in_fact =
                     Dataflow a -> set_tail_facts fuel a t
                     Rewrite g -> 
                       do (fuel, out, last_outs) <-
-                             subAnalysis' $ solve_graph_f_g comp (fuel-1) g in'
+                             subAnalysis' $ solve_graph_f_g comp (oneLessFuel fuel) g in'
                          set_or_save last_outs
                          set_tail_facts fuel out t
-                set_tail_facts fuel in' (G.ZLast l) =
-                  last_outs comp in' l fuel >>= \x -> case x of
+                set_tail_facts fuel in' (G.ZLast LastExit) =
+                  fc_exit_out comp in' fuel >>= \x -> case x of
+                    Dataflow a -> do { setExitFact a; return fuel }
+                    Rewrite _g -> error "rewriting exit node not implemented"
+                set_tail_facts fuel in' (G.ZLast (G.LastOther l)) =
+                  fc_last_outs comp in' l fuel >>= \x -> case x of
                     Dataflow outs -> do { set_or_save outs; return fuel }
                     Rewrite g ->
                       do (fuel, _, last_outs) <-
-                             subAnalysis' $ solve_graph_f_g comp (fuel-1) g in'
+                             subAnalysis' $ solve_graph_f_g comp (oneLessFuel fuel) g in'
                          set_or_save last_outs
                          return fuel
                 G.Block id t = b
@@ -719,7 +741,7 @@ solve_graph_f comp fuel g in_fact =
                    case infact of Dataflow a -> set_tail_facts fuel a t
                                   Rewrite g ->
                                     do (fuel, out, last_outs) <- subAnalysis' $
-                                           solve_graph_f_g comp (fuel-1) g idfact
+                                           solve_graph_f_g comp (oneLessFuel fuel) g idfact
                                        set_or_save last_outs
                                        set_tail_facts fuel out t
       in run "forward" (fc_name comp) set_entry set_successor_facts fuel blocks
@@ -747,10 +769,179 @@ solve_and_rewrite_f ::
   DFM a (OptimizationFuel, a, LGraph m l)
 solve_and_rewrite_f comp fuel graph in_fact =
   do solve_graph_f comp fuel graph in_fact                   -- pass 1
-     exit_id    <- freshBlockId "proxy for exit node"
-     (fuel, g) <- forward_rewrite (comp_with_exit_f comp exit_id) fuel graph in_fact
-     exit_fact  <- getFact exit_id
+     (fuel, g) <- forward_rewrite comp fuel graph in_fact
+     exit_fact  <- getExitFact   --- XXX should drop this; it's in the monad
      return (fuel, exit_fact, g)
+
+f_shallow_rewrite anal ftx in_fact g =
+    do { fuel <- fuelRemaining
+       ; solve_shallow_graph_f (return ()) anal ftx in_fact g fuel
+       ; id <- freshBlockId "temporary entry id"
+       ; (blocks, fuel') <-
+           forward_rewrite_gen don't_rewrite anal ftx (ZFirst id) in_fact g fuel
+       ; fuelDecrement (fc_name ftx) fuel fuel'
+       ; return (remove_entry_label (LGraph id blocks))
+       }
+  where don't_rewrite finish g fuel = finish >>= \b -> return (b, g, fuel)
+
+
+shallow_tail_solve_f
+    :: (DebugNodes m l, Outputable a)
+    => DFM a b   -- final action and result after solving this tail
+    -> FAnalysis m l a -> FFunctionalTransformation m l a
+    -> (BlockId -> Bool) -- local blocks
+    -> a -> ZTail m l -> OptimizationFuel -> DFM a (b, OptimizationFuel)
+shallow_tail_solve_f finish anal ftx is_local in' (G.ZTail m t) fuel =
+  my_trace "Solving middle node" (ppr m) $
+  case maybeRewriteWithFuel fuel $ fc_middle_out ftx in' m of
+    Just g -> do out <- subAnalysis' $ liftAnal $ 
+                        anal_f_general getExitFact anal in' g
+                 shallow_tail_solve_f finish anal ftx is_local out t (oneLessFuel fuel)
+    Nothing -> shallow_tail_solve_f finish anal ftx is_local
+               (fc_middle_out anal in' m) t fuel
+shallow_tail_solve_f finish anal ftx is_local in' (G.ZLast (G.LastOther l)) fuel =
+  case maybeRewriteWithFuel fuel $ fc_last_outs ftx in' l of
+    Just g  -> do { last_outs <-
+                       subAnalysis' $ liftAnal $ anal_f_general lastOutFacts anal in' g
+                  ; set_or_save last_outs
+                  ; b <- finish
+                  ; return (b, oneLessFuel fuel) }
+    Nothing -> do { set_or_save (fc_last_outs anal in' l)
+                  ; b <- finish
+                  ; return (b, fuel) }
+  where set_or_save = mk_set_or_save is_local
+shallow_tail_solve_f finish anal ftx _is_local in' (G.ZLast LastExit) fuel =
+  case maybeRewriteWithFuel fuel $ fc_exit_out ftx in' of
+    Just g  -> do { a <-
+                       subAnalysis' $ liftAnal $ anal_f_general getExitFact anal in' g
+                  ; setExitFact a
+                  ; b <- finish
+                  ; return (b, oneLessFuel fuel) }
+    Nothing -> do { setExitFact $ fc_exit_out anal in'
+                  ; b <- finish
+                  ; return (b, fuel) }
+
+anal_f_general :: (DebugNodes m l, Outputable a)
+               => DFA a b -> FAnalysis m l a -> a -> Graph m l -> DFA a b
+anal_f_general finish anal in_fact (Graph entry blockenv) =
+    general_forward in_fact
+  where
+    is_local id = isJust $ lookupBlockEnv blockenv id
+    set_or_save = mk_set_or_save is_local
+    anal_tail = gen_tail_anal_f set_or_save anal
+    blocks = G.postorder_dfs_from blockenv entry
+    general_forward in_fact =
+      do { let setup = anal_tail in_fact entry -- sufficient to do once
+         ; let set_successor_facts () (Block id tail) =
+                do { idfact <- getFact id
+                   ; anal_tail (fc_first_out anal idfact id) tail }
+         ; run "forward" (fc_name anal) setup set_successor_facts () blocks 
+         ; finish
+         }
+
+gen_tail_anal_f :: (Outputable a) =>
+    (LastOutFacts a -> DFA a ()) -> FAnalysis m l a -> a -> ZTail m l -> DFA a ()
+gen_tail_anal_f do_last_outs anal a tail = propagate a tail
+    where propagate a (ZTail m t) = propagate (fc_middle_out anal a m) t
+          propagate a (ZLast LastExit) = setExitFact (fc_exit_out anal a)
+          propagate a (ZLast (LastOther l)) = do_last_outs $ fc_last_outs anal a l
+
+
+solve_shallow_graph_f ::
+    (DebugNodes m l, Outputable a) =>
+    DFM a b -> 
+    FAnalysis m l a -> FFunctionalTransformation m l a -> a -> G.Graph m l
+                    -> OptimizationFuel -> DFM a (b, OptimizationFuel)
+solve_shallow_graph_f finish anal ftx in_fact (Graph entry blockenv) fuel =
+  do { fuel <- general_forward in_fact fuel
+     ; b <- finish
+     ; return (b, fuel) }
+  where
+    is_local id = isJust $ lookupBlockEnv blockenv id
+    set_or_save = mk_set_or_save is_local
+    solve_tail = shallow_tail_solve_f lastOutFacts anal ftx is_local
+    blocks = G.postorder_dfs_from blockenv entry
+    name = concat [fc_name anal, " and ", fc_name ftx]
+    general_forward in_fact fuel =
+      do { (last_outs, fuel) <- solve_tail in_fact entry fuel
+         ; set_or_save last_outs                                    
+         ; let set_successor_facts fuel (Block id tail) =
+                do { idfact <- getFact id
+                   ; (last_outs, fuel) <-
+                       case maybeRewriteWithFuel fuel $ fc_first_out ftx idfact id of
+                         Nothing -> solve_tail idfact tail fuel
+                         Just g ->
+                           do outfact <-
+                                  subAnalysis' $ liftAnal $
+                                               anal_f_general getExitFact anal idfact g
+                              solve_tail outfact tail (oneLessFuel fuel)
+                   ; set_or_save last_outs
+                   ; return fuel }
+        ; run "forward" name (return ()) set_successor_facts fuel blocks }
+
+mk_set_or_save :: (DataflowAnalysis df, Monad (df a), Outputable a) =>
+                  (BlockId -> Bool) -> LastOutFacts a -> df a ()
+mk_set_or_save is_local (LastOutFacts l) = mapM_ set_or_save_one l
+    where set_or_save_one (id, a) =
+              if is_local id then setFact id a else addLastOutFact (id, a)
+
+lastOutFacts :: (DataflowAnalysis m, Monad (m f)) => m f (LastOutFacts f)
+lastOutFacts = bareLastOutFacts >>= return . LastOutFacts
+
+
+fwd_rew_tail_gen :: (DebugNodes m l, Outputable a) =>
+    (forall b . DFM a b -> Graph m l -> OptimizationFuel -> DFM a (b, Graph m l, OptimizationFuel)) ->
+    FAnalysis m l a -> FFunctionalTransformation m l a -> ZHead m -> a -> ZTail m l
+     -> BlockEnv (Block m l)
+     -> OptimizationFuel -> DFM a (BlockEnv (Block m l), OptimizationFuel)
+fwd_rew_tail_gen recursive_rewrite anal ftx head in_fact tail rewritten fuel =
+    propagate head in_fact tail rewritten fuel
+   where
+    propagate h in' (G.ZTail m t) rewritten fuel = 
+      my_trace "Rewriting middle node" (ppr m) $
+      case maybeRewriteWithFuel fuel $ fc_middle_out ftx in' m of
+        Nothing -> propagate (G.ZHead h m) (fc_middle_out anal in' m) t rewritten fuel
+        Just g -> do markGraphRewritten
+                     (a, g, fuel) <- recursive_rewrite getExitFact g fuel
+                     let (blocks, h') = G.splice_head' h g
+                     propagate h' a t (blocks `plusUFM` rewritten) fuel
+    propagate h in' (G.ZLast l) rewritten fuel = 
+      case maybeRewriteWithFuel fuel $ last_rewrite ftx in' l of
+        Nothing -> -- can throw away facts because this is the rewriting phase
+                   return (insertBlock (zipht h (G.ZLast l)) rewritten, fuel)
+        Just g -> do markGraphRewritten
+                     ((), g, fuel) <- recursive_rewrite (return ()) g fuel
+                     let g' = G.splice_head_only' h g
+                     return (G.lg_blocks g' `plusUFM` rewritten, fuel)
+
+forward_rewrite_gen ::
+    (DebugNodes m l, Outputable a) =>
+    (forall b . DFM a b -> Graph m l -> OptimizationFuel -> DFM a (b, Graph m l, OptimizationFuel)) ->
+    FAnalysis m l a -> FFunctionalTransformation m l a -> ZHead m -> a -> Graph m l
+                    -> OptimizationFuel -> DFM a (BlockEnv (Block m l), OptimizationFuel)
+forward_rewrite_gen recursive_rewrite anal ftx head a (Graph entry blockenv) fuel =
+  do (rewritten, fuel) <- rewrite_tail head a entry emptyBlockEnv fuel
+     rewrite_blocks (G.postorder_dfs_from blockenv entry) rewritten fuel
+  where
+    -- need to build in some checking for consistency of facts
+    rewrite_tail = fwd_rew_tail_gen recursive_rewrite anal ftx
+    rewrite_blocks [] rewritten fuel = return (rewritten, fuel)
+    rewrite_blocks (G.Block id t : bs) rewritten fuel =
+        do id_fact <- getFact id
+           case maybeRewriteWithFuel fuel $ fc_first_out ftx id_fact id of
+             Nothing -> do { (rewritten, fuel) <-
+                                 rewrite_tail (ZFirst id) id_fact t rewritten fuel
+                           ; rewrite_blocks bs rewritten fuel }
+             Just g  -> do { (outfact, g, fuel) <- recursive_rewrite getExitFact g fuel
+                           ; let (blocks, h) = splice_head' (ZFirst id) g
+                           ; (rewritten, fuel) <-
+                             rewrite_tail h outfact t (blocks `plusUFM` rewritten) fuel
+                           ; rewrite_blocks bs rewritten fuel }
+
+
+
+
+
 
 solve_and_rewrite_f_graph ::
   (DebugNodes m l, Outputable a) =>
@@ -786,7 +977,7 @@ forward_rewrite comp fuel graph entry_fact =
            case first_out of
              Dataflow a -> propagate fuel (G.ZFirst id) a t rewritten bs
              Rewrite g  -> do { markGraphRewritten
-                              ; rewrite_blocks (fuel-1) rewritten
+                              ; rewrite_blocks (oneLessFuel fuel) rewritten
                                 (G.postorder_dfs (labelGraph id g) ++ bs) }
     -- propagate :: OptimizationFuel -> G.ZHead m -> a -> G.ZTail m l -> BlockEnv (G.Block m l) ->
     --             [G.Block m l] -> DFM a (OptimizationFuel, G.LGraph m l)
@@ -796,25 +987,36 @@ forward_rewrite comp fuel graph entry_fact =
              Dataflow a -> propagate fuel (G.ZHead h m) a t rewritten bs
              Rewrite g ->
                do markGraphRewritten
-                  (fuel, a, g) <- solve_and_rewrite_f_graph comp (fuel-1) g in' 
+                  (fuel, a, g) <- solve_and_rewrite_f_graph comp (oneLessFuel fuel) g in' 
                   let (blocks, h') = G.splice_head' h g
                   propagate fuel h' a t (blocks `plusUFM` rewritten) bs
-    propagate fuel h in' (G.ZLast l) rewritten bs = 
-        do last_outs comp in' l fuel >>= \x -> case x of
-             Dataflow outs ->
-               do set_or_save outs
-                  let b = G.zip (G.ZBlock h (G.ZLast l))
+    propagate fuel h in' t@(G.ZLast G.LastExit) rewritten bs = 
+        do fc_exit_out comp in' fuel >>= \x -> case x of
+             Dataflow a ->
+               do setExitFact a
+                  let b = G.zipht h t
                   rewrite_blocks fuel (G.insertBlock b rewritten) bs
              Rewrite g ->
                 do markGraphRewritten
-                   (fuel, _, g) <- solve_and_rewrite_f_graph comp (fuel-1) g in' 
+                   (fuel, _, g) <- solve_and_rewrite_f_graph comp (oneLessFuel fuel) g in' 
+                   let g' = G.splice_head_only' h g
+                   rewrite_blocks fuel (G.lg_blocks g' `plusUFM` rewritten) bs
+    propagate fuel h in' t@(G.ZLast (G.LastOther l)) rewritten bs = 
+        do fc_last_outs comp in' l fuel >>= \x -> case x of
+             Dataflow outs ->
+               do set_or_save outs
+                  let b = G.zipht h t
+                  rewrite_blocks fuel (G.insertBlock b rewritten) bs
+             Rewrite g ->
+                do markGraphRewritten
+                   (fuel, _, g) <- solve_and_rewrite_f_graph comp (oneLessFuel fuel) g in' 
                    let g' = G.splice_head_only' h g
                    rewrite_blocks fuel (G.lg_blocks g' `plusUFM` rewritten) bs
 
 f_rewrite comp entry_fact g =
-  do { fuel <- liftTx txRemaining
+  do { fuel <- fuelRemaining
      ; (fuel', _, gc) <- solve_and_rewrite_f comp fuel g entry_fact
-     ; liftTx $ txDecrement (fc_name comp) fuel fuel'
+     ; fuelDecrement (fc_name comp) fuel fuel'
      ; return gc
      }
 
@@ -848,7 +1050,7 @@ let debug s (f, comp) =
 anal_f comp = comp { fc_first_out  = wrap2 $ fc_first_out  comp 
                    , fc_middle_out = wrap2 $ fc_middle_out comp
                    , fc_last_outs  = wrap2 $ fc_last_outs  comp
-                   , fc_exit_outs  = wrap1 $ fc_exit_outs  comp
+                   , fc_exit_out   = wrap1 $ fc_exit_out   comp
                    }
   where wrap2 f out node _fuel = return $ Dataflow (f out node)
         wrap1 f fact     _fuel = return $ Dataflow (f fact)
@@ -862,11 +1064,11 @@ a_t_f anal tx =
          answer fuel (fc_middle_out tx in' m) (fc_middle_out anal in' m)
      last_outs in' l fuel = 
          answer fuel (fc_last_outs tx in' l) (fc_last_outs anal in' l)
-     exit_outs in' fuel = undefined
-         answer fuel (fc_exit_outs tx in') (fc_exit_outs anal in')
+     exit_out in' fuel = undefined
+         answer fuel (fc_exit_out tx in') (fc_exit_out anal in')
  in  FComp { fc_name = concat [fc_name anal, " and ", fc_name tx]
            , fc_last_outs = last_outs, fc_middle_out = middle_out
-           , fc_first_out = first_out, fc_exit_outs = exit_outs }
+           , fc_first_out = first_out, fc_exit_out = exit_out }
 
 
 f4sep :: [SDoc] -> SDoc
@@ -889,3 +1091,10 @@ subAnalysis' m =
 
 _unused :: FS.FastString
 _unused = undefined
+
+null_b_ft = BComp "do nothing" Nothing no2 no2 no2
+    where no2 _ _ = Nothing
+
+null_f_ft = FComp "do nothing" no2 no2 no2 (\_ -> Nothing)
+    where no2 _ _ = Nothing
+

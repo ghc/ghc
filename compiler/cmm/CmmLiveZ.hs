@@ -13,7 +13,7 @@ import CmmTx
 import DFMonad
 import PprCmm()
 import PprCmmZ()
-import ZipDataflow
+import ZipDataflow0
 import ZipCfgCmmRep
 
 import Maybes

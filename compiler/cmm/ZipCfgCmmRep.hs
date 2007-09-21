@@ -25,7 +25,7 @@ import ClosureInfo
 import FastString
 import ForeignCall
 import MachOp
-import qualified ZipDataflow as DF
+import qualified ZipDataflow0 as DF
 import ZipCfg 
 import MkZipCfg
 

@@ -21,7 +21,7 @@ module ZipCfg
 
     , pprLgraph, pprGraph
 
-    , entry -- exported for the convenience of ZipDataflow, at least for now
+    , entry -- exported for the convenience of ZipDataflow0, at least for now
 
     {-
     -- the following functions might one day be useful and can be found
@@ -75,7 +75,7 @@ the data constructor 'LastExit'.  A graph may contain at most one
 'LastExit' node, and a graph representing a full procedure should not
 contain any 'LastExit' nodes.  'LastExit' nodes are used only to splice
 graphs together, either during graph construction (see module 'MkZipCfg')
-or during optimization (see module 'ZipDataflow').
+or during optimization (see module 'ZipDataflow0').
 
 A graph is parameterized over the types of middle and last nodes.  Each of
 these types will typically be instantiated with a subset of C-- statements

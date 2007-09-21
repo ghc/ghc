@@ -23,7 +23,7 @@ import UniqFM
 import UniqSet
 import ZipCfg
 import ZipCfgCmmRep
-import ZipDataflow
+import ZipDataflow0
 
 -- Compute a minimal set of proc points for a control-flow graph.
 
@@ -118,7 +118,7 @@ forward = FComp "proc-point reachability" first middle last exit
           middle x _ = x
           last _ (LastCall _ (Just id)) = LastOutFacts [(id, ProcPoint)]
           last x l = LastOutFacts $ map (\id -> (id, x)) (succs l)
-          exit _   = LastOutFacts []
+          exit x   = x
                 
 minimalProcPointSet :: CmmGraph -> ProcPointSet
 minimalProcPointSet g = extendPPSet g (postorder_dfs g) entryPoint

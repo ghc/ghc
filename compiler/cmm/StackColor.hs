@@ -10,7 +10,7 @@ import qualified GraphOps
 import MachOp
 import ZipCfg
 import ZipCfgCmmRep
-import ZipDataflow
+import ZipDataflow0
 
 import Maybes
 import Panic
