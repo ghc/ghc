@@ -266,6 +266,60 @@ def _skip_if_platform( opts, plat ):
 	
 # ---
 
+def expect_broken_if_compiler_ge( bug, compiler, version ):
+   return lambda opts, c=compiler, v=version: \
+                 _expect_fail_if_compiler_ge(opts, c, v)
+
+def expect_fail_if_compiler_ge( compiler, version ):
+   return lambda opts, c=compiler, v=version: \
+                 _expect_fail_if_compiler_ge(opts, c, v)
+
+def _expect_fail_if_compiler_ge( opts, compiler, version ):
+    if config.compiler_type == compiler and \
+       version_ge(config.compiler_version, version):
+        opts.expect = 'fail'
+
+def expect_broken_if_compiler_gt( bug, compiler, version ):
+   return lambda opts, c=compiler, v=version: \
+                 _expect_fail_if_compiler_gt(opts, c, v)
+
+def expect_fail_if_compiler_gt( compiler, version ):
+   return lambda opts, c=compiler, v=version: \
+                 _expect_fail_if_compiler_gt(opts, c, v)
+
+def _expect_fail_if_compiler_gt( opts, compiler, version ):
+    if config.compiler_type == compiler and \
+       version_gt(config.compiler_version, version):
+        opts.expect = 'fail'
+
+def expect_broken_if_compiler_le( bug, compiler, version ):
+   return lambda opts, c=compiler, v=version: \
+                 _expect_fail_if_compiler_le(opts, c, v)
+
+def expect_fail_if_compiler_le( compiler, version ):
+   return lambda opts, c=compiler, v=version: \
+                 _expect_fail_if_compiler_le(opts, c, v)
+
+def _expect_fail_if_compiler_le( opts, compiler, version ):
+    if config.compiler_type == compiler and \
+       version_le(config.compiler_version, version):
+        opts.expect = 'fail'
+
+def expect_broken_if_compiler_lt( bug, compiler, version ):
+   return lambda opts, c=compiler, v=version: \
+                 _expect_fail_if_compiler_lt(opts, c, v)
+
+def expect_fail_if_compiler_lt( compiler, version ):
+   return lambda opts, c=compiler, v=version: \
+                 _expect_fail_if_compiler_lt(opts, c, v)
+
+def _expect_fail_if_compiler_lt( opts, compiler, version ):
+    if config.compiler_type == compiler and \
+       version_lt(config.compiler_version, version):
+        opts.expect = 'fail'
+
+# ---
+
 def skip_if_tag( tag ):
    return lambda opts, t=tag: _skip_if_tag(opts, t)
 
