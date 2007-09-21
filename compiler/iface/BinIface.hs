@@ -1,14 +1,14 @@
--- 
---  (c) The University of Glasgow 2002-2006
--- 
--- Binary interface file support.
-
 {-# OPTIONS -w #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
+
+-- 
+--  (c) The University of Glasgow 2002-2006
+-- 
+-- Binary interface file support.
 
 module BinIface ( writeBinIface, readBinIface, v_IgnoreHiWay ) where
 

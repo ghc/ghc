@@ -1,7 +1,7 @@
+{-# OPTIONS -fno-warn-missing-signatures #-}
 -- Carries interesting info for debugging / profiling of the 
 --	graph coloring register allocator.
 --
-{-# OPTIONS -fno-warn-missing-signatures #-}
 
 module RegAllocStats (
 	RegAllocStats (..),

@@ -1,3 +1,10 @@
+{-# OPTIONS -w #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and fix
+-- any warnings in the module. See
+--     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
+-- for details
+
 -----------------------------------------------------------------------------
 --  $Id: DriverPhases.hs,v 1.38 2005/05/17 11:01:59 simonmar Exp $
 --
@@ -6,13 +13,6 @@
 -- (c) The University of Glasgow 2002
 --
 -----------------------------------------------------------------------------
-
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 module DriverPhases (
    HscSource(..), isHsBoot, hscSourceString,

@@ -1,3 +1,4 @@
+{-# OPTIONS -fno-warn-missing-signatures #-}
 -----------------------------------------------------------------------------
 --
 -- The register allocator
@@ -5,7 +6,6 @@
 -- (c) The University of Glasgow 2004
 --
 -----------------------------------------------------------------------------
-{-# OPTIONS -fno-warn-missing-signatures #-}
 
 {-
 The algorithm is roughly:

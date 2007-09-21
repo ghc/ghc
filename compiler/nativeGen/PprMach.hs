@@ -1,3 +1,10 @@
+{-# OPTIONS -w #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and fix
+-- any warnings in the module. See
+--     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
+-- for details
+
 -----------------------------------------------------------------------------
 --
 -- Pretty-printing assembly language
@@ -9,13 +16,6 @@
 -- We start with the @pprXXX@s with some cross-platform commonality
 -- (e.g., 'pprReg'); we conclude with the no-commonality monster,
 -- 'pprInstr'.
-
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 #include "nativeGen/NCG.h"
 

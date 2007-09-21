@@ -1,6 +1,6 @@
+{-# OPTIONS -fno-warn-missing-signatures #-}
 -- | Basic operations on graphs.
 --
-{-# OPTIONS -fno-warn-missing-signatures #-}
 
 module GraphOps (
 	addNode, 	delNode,	getNode,	lookupNode,	modNode,

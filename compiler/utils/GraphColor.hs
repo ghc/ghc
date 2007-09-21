@@ -1,9 +1,9 @@
+{-# OPTIONS -fno-warn-missing-signatures #-}
 
 -- | Graph Coloring.
 --	This is a generic graph coloring library, abstracted over the type of
 --	the node keys, nodes and colors.
 --
-{-# OPTIONS -fno-warn-missing-signatures #-}
 
 module GraphColor ( 
 	module GraphBase,

@@ -1,3 +1,10 @@
+{-# OPTIONS -w #-}
+-- The above warning supression flag is a temporary kludge.
+-- While working on this module you are encouraged to remove it and fix
+-- any warnings in the module. See
+--     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
+-- for details
+
 --
 -- (c) The University of Glasgow 2003-2006
 -- 
@@ -5,13 +12,6 @@
 -- Functions for constructing bitmaps, which are used in various
 -- places in generated code (stack frame liveness masks, function
 -- argument liveness masks, SRT bitmaps).
-
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 module Bitmap ( 
 	Bitmap, mkBitmap,
