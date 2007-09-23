@@ -102,8 +102,8 @@ ibindir     = $$topdir
 ilibdir     = $$topdir
 ilibexecdir = $$topdir
 idatadir    = $$topdir
-idocdir     = $$topdir/doc/libraries/$$pkgid
-ihtmldir    = $$topdir/doc/libraries/$$pkgid
+idocdir     = $$topdir/doc/libraries/$$pkg
+ihtmldir    = $$topdir/doc/libraries/$$pkg
 html_installed_root = $(prefix)/doc/libraries
 else
 # On non-Windows we can just give absolute paths all the time, and
@@ -113,8 +113,8 @@ ibindir     = $(bindir)
 ilibdir     = $(libdir)
 ilibexecdir = $(libexecdir)
 idatadir    = $(datadir)
-idocdir     = $(docdir)/libraries/$$pkgid
-ihtmldir    = $(htmldir)/libraries/$$pkgid
+idocdir     = $(docdir)/libraries/$$pkg
+ihtmldir    = $(htmldir)/libraries/$$pkg
 html_installed_root = $(ihtmldir)
 endif
 
@@ -326,9 +326,9 @@ ifeq "$(HADDOCK_DOCS)" "YES"
 	$(INSTALL_DATA)   index.html doc-index*.html                       $(DESTDIR)$(html_installed_root)
 	$(INSTALL_SCRIPT) gen_contents_index                               $(DESTDIR)$(html_installed_root)
 	# Hacks:
-	$(INSTALL_DATA)   $(DESTDIR)$(html_installed_root)/base-*/*.css $(DESTDIR)$(html_installed_root)
-	$(INSTALL_DATA)   $(DESTDIR)$(html_installed_root)/base-*/*.js  $(DESTDIR)$(html_installed_root)
-	$(INSTALL_DATA)   $(DESTDIR)$(html_installed_root)/base-*/*.gif $(DESTDIR)$(html_installed_root)
+	$(INSTALL_DATA)   $(DESTDIR)$(html_installed_root)/base*/*.css $(DESTDIR)$(html_installed_root)
+	$(INSTALL_DATA)   $(DESTDIR)$(html_installed_root)/base*/*.js  $(DESTDIR)$(html_installed_root)
+	$(INSTALL_DATA)   $(DESTDIR)$(html_installed_root)/base*/*.gif $(DESTDIR)$(html_installed_root)
 endif
 
 # Cabal doesn't let us ask to install docs only, so do nothing here
