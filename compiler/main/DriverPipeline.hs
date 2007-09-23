@@ -253,10 +253,10 @@ compileStub dflags mod location = do
 -- ---------------------------------------------------------------------------
 -- Link
 
-link :: GhcLink			-- interactive or batch
-     -> DynFlags		-- dynamic flags
-     -> Bool			-- attempt linking in batch mode?
-     -> HomePackageTable	-- what to link
+link :: GhcLink                 -- interactive or batch
+     -> DynFlags                -- dynamic flags
+     -> Bool                    -- attempt linking in batch mode?
+     -> HomePackageTable        -- what to link
      -> IO SuccessFlag
 
 -- For the moment, in the batch linker, we don't bother to tell doLink
@@ -269,7 +269,7 @@ link :: GhcLink			-- interactive or batch
 #ifdef GHCI
 link LinkInMemory dflags batch_attempt_linking hpt
     = do -- Not Linking...(demand linker will do the job)
-	 return Succeeded
+         return Succeeded
 #endif
 
 link NoLink dflags batch_attempt_linking hpt
@@ -277,62 +277,62 @@ link NoLink dflags batch_attempt_linking hpt
 
 link LinkBinary dflags batch_attempt_linking hpt
    | batch_attempt_linking
-   = do 
-	let 
-	    home_mod_infos = eltsUFM hpt
+   = do
+        let
+            home_mod_infos = eltsUFM hpt
 
-	    -- the packages we depend on
-	    pkg_deps  = concatMap (dep_pkgs . mi_deps . hm_iface) home_mod_infos
+            -- the packages we depend on
+            pkg_deps  = concatMap (dep_pkgs . mi_deps . hm_iface) home_mod_infos
 
-	    -- the linkables to link
-	    linkables = map (expectJust "link".hm_linkable) home_mod_infos
+            -- the linkables to link
+            linkables = map (expectJust "link".hm_linkable) home_mod_infos
 
         debugTraceMsg dflags 3 (text "link: linkables are ..." $$ vcat (map ppr linkables))
 
-	-- check for the -no-link flag
-	if isNoLink (ghcLink dflags)
-	  then do debugTraceMsg dflags 3 (text "link(batch): linking omitted (-c flag given).")
-	          return Succeeded
-	  else do
+        -- check for the -no-link flag
+        if isNoLink (ghcLink dflags)
+          then do debugTraceMsg dflags 3 (text "link(batch): linking omitted (-c flag given).")
+                  return Succeeded
+          else do
 
-	let getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
-	    obj_files = concatMap getOfiles linkables
+        let getOfiles (LM _ _ us) = map nameOfObject (filter isObject us)
+            obj_files = concatMap getOfiles linkables
 
-	    exe_file = exeFileName dflags
+            exe_file = exeFileName dflags
 
-	-- if the modification time on the executable is later than the
-	-- modification times on all of the objects, then omit linking
-	-- (unless the -no-recomp flag was given).
-	e_exe_time <- IO.try $ getModificationTime exe_file
-	let linking_needed 
-		| Left _  <- e_exe_time = True
-		| Right t <- e_exe_time = 
-			any (t <) (map linkableTime linkables)
+        -- if the modification time on the executable is later than the
+        -- modification times on all of the objects, then omit linking
+        -- (unless the -no-recomp flag was given).
+        e_exe_time <- IO.try $ getModificationTime exe_file
+        let linking_needed
+                | Left _  <- e_exe_time = True
+                | Right t <- e_exe_time =
+                        any (t <) (map linkableTime linkables)
 
-	if not (dopt Opt_ForceRecomp dflags) && not linking_needed
-	   then do debugTraceMsg dflags 2 (text exe_file <+> ptext SLIT("is up to date, linking not required."))
-		   return Succeeded
-	   else do
+        if not (dopt Opt_ForceRecomp dflags) && not linking_needed
+           then do debugTraceMsg dflags 2 (text exe_file <+> ptext SLIT("is up to date, linking not required."))
+                   return Succeeded
+           else do
 
-	debugTraceMsg dflags 1 (ptext SLIT("Linking") <+> text exe_file
-				 <+> text "...")
+        debugTraceMsg dflags 1 (ptext SLIT("Linking") <+> text exe_file
+                                 <+> text "...")
 
-	-- Don't showPass in Batch mode; doLink will do that for us.
-	let link = case ghcLink dflags of
-	        LinkBinary  -> linkBinary
-	        LinkDynLib  -> linkDynLib
-	link dflags obj_files pkg_deps
+        -- Don't showPass in Batch mode; doLink will do that for us.
+        let link = case ghcLink dflags of
+                LinkBinary  -> linkBinary
+                LinkDynLib  -> linkDynLib
+        link dflags obj_files pkg_deps
 
         debugTraceMsg dflags 3 (text "link: done")
 
-	-- linkBinary only returns if it succeeds
+        -- linkBinary only returns if it succeeds
         return Succeeded
 
    | otherwise
    = do debugTraceMsg dflags 3 (text "link(batch): upsweep (partially) failed OR" $$
                                 text "   Main.main not exported; not linking.")
         return Succeeded
-      
+
 -- -----------------------------------------------------------------------------
 -- Compile files in one-shot mode.
 
