@@ -1,8 +1,9 @@
 
 include Makefile-vars
 
-.PHONY: in-place mk-version-symlinks install
+.PHONY: mk-version-symlinks install
 
+#.PHONY: in-place
 # This has bitrotted:
 #in-place ::
 #	@if test -x "./post-inplace-script" ; then \
