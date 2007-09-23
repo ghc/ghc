@@ -102,8 +102,8 @@ ibindir     = $$topdir
 ilibdir     = $$topdir
 ilibexecdir = $$topdir
 idatadir    = $$topdir
-idocdir     = $$topdir/doc/libraries/$$pkg
-ihtmldir    = $$topdir/doc/libraries/$$pkg
+idocdir     = $$topdir/doc/libraries/$$pkgid
+ihtmldir    = $$topdir/doc/libraries/$$pkgid
 html_installed_root = $(prefix)/doc/libraries
 else
 # On non-Windows we can just give absolute paths all the time, and
@@ -113,8 +113,8 @@ ibindir     = $(bindir)
 ilibdir     = $(libdir)
 ilibexecdir = $(libexecdir)
 idatadir    = $(datadir)
-idocdir     = $(docdir)/libraries/$$pkg
-ihtmldir    = $(htmldir)/libraries/$$pkg
+idocdir     = $(docdir)/libraries/$$pkgid
+ihtmldir    = $(htmldir)/libraries/$$pkgid
 html_installed_root = $(ihtmldir)
 endif
 
@@ -291,7 +291,7 @@ $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                %/setup/Setup ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
-	  cd $* && setup/Setup haddock --html-location='../$$pkg'; \
+	  cd $* && setup/Setup haddock --html-location='../$$pkgid'; \
 	fi
 
 .PHONY: distclean clean clean.library.%
