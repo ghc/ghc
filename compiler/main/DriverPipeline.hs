@@ -304,10 +304,13 @@ link LinkBinary dflags batch_attempt_linking hpt
         -- modification times on all of the objects, then omit linking
         -- (unless the -no-recomp flag was given).
         e_exe_time <- IO.try $ getModificationTime exe_file
-        let linking_needed
+        extra_ld_inputs <- readIORef v_Ld_inputs
+        extra_times <- mapM (IO.try . getModificationTime) extra_ld_inputs
+        let other_times = map linkableTime linkables
+                       ++ [ t' | Right t' <- extra_times ]
+            linking_needed
                 | Left _  <- e_exe_time = True
-                | Right t <- e_exe_time =
-                        any (t <) (map linkableTime linkables)
+                | Right t <- e_exe_time = any (t <) other_times
 
         if not (dopt Opt_ForceRecomp dflags) && not linking_needed
            then do debugTraceMsg dflags 2 (text exe_file <+> ptext SLIT("is up to date, linking not required."))
