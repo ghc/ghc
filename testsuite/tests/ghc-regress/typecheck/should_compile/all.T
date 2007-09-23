@@ -248,7 +248,7 @@ test('tc232', reqlib('mtl'), compile, [''])
 test('tc233', normal, compile, [''])
 test('tc234', normal, compile, [''])
 test('tc235', normal, compile, [''])
-test('tc236', normal, compile, [''])
+test('tc236', expect_fail_if_compiler_lt('ghc', '6.9'), compile, [''])
 test('tc237', normal, compile, [''])
 test('tc238', normal, compile, [''])
 
