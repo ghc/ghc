@@ -1536,14 +1536,17 @@ setUpConsole = do
 	-- similarly for characters we write to the console.
 	--
 	-- At the moment, GHCi pretends all input is Latin-1.  In the
-	-- future we should support UTF-8, but for now we set the code pages
-	-- to Latin-1.
+	-- future we should support UTF-8, but for now we set the code
+	-- pages to Latin-1.  Doing it this way does lead to problems,
+	-- however: see bug #1649.
 	--
 	-- It seems you have to set the font in the console window to
 	-- a Unicode font in order for output to work properly,
 	-- otherwise non-ASCII characters are mapped wrongly.  sigh.
 	-- (see MSDN for SetConsoleOutputCP()).
 	--
+        -- This call has been known to hang on some machines, see bug #1483
+        --
 	setConsoleCP 28591       -- ISO Latin-1
 	setConsoleOutputCP 28591 -- ISO Latin-1
 #endif
