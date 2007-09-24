@@ -1,7 +1,7 @@
 
 tcfail067.hs:12:15:
     Could not deduce (Ord a) from the context ()
-      arising from a use of `SubRange' at tcfail067.hs:12:15-43
+      arising from a use of `SubRange' at tcfail067.hs:12:15-22
     Possible fix:
       add (Ord a) to the context of
 	the type signature for `subRangeValue'
@@ -11,7 +11,7 @@ tcfail067.hs:12:15:
 
 tcfail067.hs:15:10:
     Could not deduce (Ord a) from the context ()
-      arising from a use of `SubRange' at tcfail067.hs:15:10-25
+      arising from a use of `SubRange' at tcfail067.hs:15:10-17
     Possible fix:
       add (Ord a) to the context of the type signature for `subRange'
     In the pattern: SubRange r value
@@ -19,7 +19,7 @@ tcfail067.hs:15:10:
 
 tcfail067.hs:46:11:
     Could not deduce (Ord a) from the context (Show a)
-      arising from a use of `SubRange' at tcfail067.hs:46:11-39
+      arising from a use of `SubRange' at tcfail067.hs:46:11-18
     Possible fix:
       add (Ord a) to the context of the type signature for `showRange'
     In the pattern: SubRange (lower, upper) value

@@ -1,5 +1,5 @@
 
-tcfail124.hs:6:7:
+tcfail124.hs:6:8:
     Couldn't match expected type `forall a. (Eq a) => [a]'
 	   against inferred type `[a]'
     In the pattern: x : _
@@ -11,7 +11,7 @@ tcfail124.hs:9:3:
     In the pattern: [x]
     In the definition of `f2': f2 [x] = x
 
-tcfail124.hs:12:4:
+tcfail124.hs:12:5:
     Couldn't match expected type `forall a. (Eq a) => [a]'
 	   against inferred type `[a]'
     In the pattern: x : []
