@@ -789,7 +789,7 @@
 	    </row>
 	    <row>
 	      <entry><option>-XKindSignatures</option></entry>
-	      <entry>Enable kind signatures.</entry>
+	      <entry>Enable <link linkend="kinding">kind signatures</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoKindSignatures</option></entry>
 	    </row>
