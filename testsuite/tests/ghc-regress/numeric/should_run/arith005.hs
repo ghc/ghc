@@ -16,36 +16,45 @@ main =
     , 'H' : show ((map floor float_list) :: [Integer])
     , 'I' : show ((map floor double_list) :: [Int])
     , 'J' : show ((map floor double_list) :: [Integer])
-    , 'K' : show ((map truncate float_list) :: [Int])
-    , 'L' : show ((map truncate float_list) :: [Integer])
-    , 'M' : show ((map truncate double_list) :: [Int])
-    , 'N' : show ((map truncate double_list) :: [Integer])
-{-
-    , show ((map round float_list) :: [Int])
--}
+    , 'K' : show ((map truncate small_float_list) :: [Int])
+    , 'L' : show ((map truncate small_float_list) :: [Integer])
+    , 'M' : show ((map truncate small_double_list) :: [Int])
+    , 'N' : show ((map truncate small_double_list) :: [Integer])
+    , 'n' : show ((map round float_list) :: [Int])
     , 'O' : show ((map round float_list) :: [Integer])
     , 'P' : show ((map round double_list) :: [Int])
     , 'Q' : show ((map round double_list) :: [Integer])
     , 'R' : show ((map properFraction float_list) :: [(Int,Float)])
     , 'S' : show ((map properFraction float_list) :: [(Integer,Float)])
     , 'T' : show (head ((map properFraction double_list) :: [(Int,Double)]))
-{-
-    , show ((map properFraction double_list) :: [(Integer,Double)])
--}
+    , 'U' : show ((map properFraction double_list) :: [(Integer,Double)])
     ]
   where
-    float_list :: [Float]
-    float_list = [
+        -- these fit into an Int when truncated.  Truncation when the
+        -- result does not fit into the target is undefined - not explicitly
+        -- so in Haskell 98, but that's the interpretation we've taken in GHC.
+        -- See bug #1254
+    small_float_list :: [Float]
+    small_float_list = [
 	0.0, -0.0, 1.1, 2.8, 3.5, 4.5, -1.0000000001, -2.9999995,
 	-3.50000000001, -4.49999999999, 1000012.0, 123.456, 100.25,
-	102.5, 0.0012, -0.00000012, 1.7e4, -1.7e-4, 0.15e-6, pi,
+	102.5, 0.0012, -0.00000012, 1.7e4, -1.7e-4, 0.15e-6, pi
+      ]
+
+    float_list :: [Float]
+    float_list = small_float_list ++ [
 	1.18088e+11, 	1.2111e+14 
       ]
 
-    double_list :: [Double]
-    double_list = [
+        -- these fit into an Int
+    small_double_list :: [Double]
+    small_double_list = [
 	0.0, -0.0, 1.1, 2.8, 3.5, 4.5, -1.0000000001, -2.9999995,
 	-3.50000000001, -4.49999999999, 1000012.0, 123.456, 100.25,
-	102.5, 0.0012, -0.00000012, 1.7e4, -1.7e-4, 0.15e-6, pi,
+	102.5, 0.0012, -0.00000012, 1.7e4, -1.7e-4, 0.15e-6, pi
+      ]
+
+    double_list :: [Double]
+    double_list = small_double_list ++ [
 	1.18088e+11, 	1.2111e+14 
       ]
