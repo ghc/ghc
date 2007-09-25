@@ -713,18 +713,29 @@ selector_chain:
     info_ptr = p->header.info;
     field = get_itbl(p)->layout.selector_offset;
 
-    // If the THUNK_SELECTOR is in to-space or in a generation that we
-    // are not collecting, then bail out early.  We won't be able to
-    // save any space in any case, and updating with an indirection is
-    // trickier in an old gen.
     bd = Bdescr((StgPtr)p);
-    if (HEAP_ALLOCED(p) &&
-	((bd->gen_no > N)
-         || (bd->flags & BF_EVACUATED) 
-	 || ((bd->flags & BF_COMPACTED) &&
-	     is_marked((P_)p,bd)))) {
-        unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
-        return (StgClosure *)p;
+    if (HEAP_ALLOCED(p)) {
+        // If the THUNK_SELECTOR is in to-space or in a generation that we
+        // are not collecting, then bale out early.  We won't be able to
+        // save any space in any case, and updating with an indirection is
+        // trickier in a non-collected gen: we would have to update the
+        // mutable list.
+        if ((bd->gen_no > N) || (bd->flags & BF_EVACUATED)) {
+            unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
+            return (StgClosure *)p;
+        }
+        // we don't update THUNK_SELECTORS in the compacted
+        // generation, because compaction does not remove the INDs
+        // that result, this causes confusion later
+        // (scavenge_mark_stack doesn't deal with IND).  BEWARE!  This
+        // bit is very tricky to get right.  If you make changes
+        // around here, test by compiling stage 3 with +RTS -c -RTS.
+        if (bd->flags & BF_COMPACTED) {
+            // must call evacuate() to mark this closure if evac==rtsTrue
+            if (evac) p = (StgSelector *)evacuate((StgClosure *)p);
+            unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
+            return (StgClosure *)p;
+        }
     }
 
     // BLACKHOLE the selector thunk, since it is now under evaluation.
@@ -817,14 +828,6 @@ selector_loop:
       case THUNK_SELECTOR:
       {
 	  StgClosure *val;
-
-	  // we don't update THUNK_SELECTORS in the compacted
-	  // generation, because compaction does not remove the INDs
-	  // that result, this causes confusion later
-	  // (scavenge_mark_stack doesn't deal with IND).
-	  if (Bdescr((P_)selectee)->flags && BF_COMPACTED) {
-	      goto bale_out;
-	  }
 
           // recursively evaluate this selector.  We don't want to
           // recurse indefinitely, so we impose a depth bound.
