@@ -20,7 +20,8 @@ test('Simple16', normal, compile, [''])
 test('Simple17', expect_fail, compile, [''])
 
 test('ind1', normal, compile, [''])
-test('ind2', normal, multimod_compile, ['ind2', '-v0'])
+test('ind2', expect_fail_ways_if_compiler_lt('ghc','6.9',['profc','profasm']),
+             multimod_compile, ['ind2', '-v0'])
 test('impexp', normal, multimod_compile, 
      ['Imp', '-Wnot -no-hs-main -no-link'])
 clean(['Ind2_help.hi', 'Ind2_help.o', 'Exp.hi', 'Imp.o'])
