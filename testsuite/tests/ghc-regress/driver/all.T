@@ -116,3 +116,5 @@ cleanall()
 test('driver200', ignore_output, run_command, ['$MAKE test200'])
 cleanall()
 
+test('pragma001', expect_broken(1736), compile, [''])
+
