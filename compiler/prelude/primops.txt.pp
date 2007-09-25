@@ -545,6 +545,10 @@ primop   DoubleDivOp   "/##"   Dyadic
 primop   DoubleNegOp   "negateDouble#"  Monadic   Double# -> Double#
 
 primop   Double2IntOp   "double2Int#"          GenPrimOp  Double# -> Int#
+   {Truncates a {\tt Double#} value to the nearest {\tt Int#}.
+    Results are undefined if the truncation if truncation yields
+    a value outside the range of {\tt Int#}.}
+
 primop   Double2FloatOp   "double2Float#" GenPrimOp Double# -> Float#
 
 primop   DoubleExpOp   "expDouble#"      Monadic
@@ -652,6 +656,9 @@ primop   FloatDivOp   "divideFloat#"      Dyadic
 primop   FloatNegOp   "negateFloat#"      Monadic    Float# -> Float#
 
 primop   Float2IntOp   "float2Int#"      GenPrimOp  Float# -> Int#
+   {Truncates a {\tt Float#} value to the nearest {\tt Int#}.
+    Results are undefined if the truncation if truncation yields
+    a value outside the range of {\tt Int#}.}
 
 primop   FloatExpOp   "expFloat#"      Monadic          
    Float# -> Float#
