@@ -527,7 +527,11 @@ mkPackageState dflags orig_pkg_db preload0 this_package = do
       -- add base & rts to the preload packages
       basicLinkedPackages = filter (flip elemUFM pkg_db)
 				 [basePackageId,rtsPackageId]
-      preload2 = nub (basicLinkedPackages ++ map mkPackageId preload1)
+      -- but in any case remove the current package from the set of
+      -- preloaded packages so that base/rts does not end up in the
+      -- set up preloaded package when we are just building it
+      preload2 = nub (filter (/= new_this_pkg)
+		             (basicLinkedPackages ++ map mkPackageId preload1))
 
   -- Close the preload packages with their dependencies
   dep_preload <- closeDeps pkg_db (zip preload2 (repeat Nothing))
