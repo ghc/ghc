@@ -137,16 +137,18 @@ test026:
 	test -f d1/P/Q$(OBJSUFFIX)
 
 # test stub generation
+# -fvia-C, because we want to check that the .hc file can #include the stub.h
 test027:
 	@$(RM) B/F.hi B/F$(OBJSUFFIX) B/F_stub.c B/F_stub.h
-	@$(TEST_HC) -c B/F.hs
+	@$(TEST_HC) -c B/F.hs -fvia-C
 	test -f B/F_stub.c
 	test -f B/F_stub.h
 
 # test -stubdir
+# -fvia-C, because we want to check that the .hc file can #include the stub.h
 test028:
 	@$(RM) B/F.hi B/F$(OBJSUFFIX) stub/B/F_stub.c stub/B/F_stub.h
-	@$(TEST_HC) -c B/F.hs -stubdir stub
+	@$(TEST_HC) -c B/F.hs -stubdir stub -fvia-C
 	test -f stub/B/F_stub.c
 	test -f stub/B/F_stub.h
 
