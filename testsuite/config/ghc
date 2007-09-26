@@ -53,7 +53,7 @@ config.way_flags = {
 	'optasm'     : ['-O -fasm'],
 	'profc'      : ['-O -prof -auto-all -fvia-C'],
 	'profasm'    : ['-O -prof -auto-all -fasm'],
-	'ghci'       : ['--interactive', '-v0'],
+	'ghci'       : ['--interactive', '-v0', '-ignore-dot-ghci'],
 	'extcore'    : ['-fext-core'],
 	'optextcore' : ['-O -fext-core'],
 	'threaded1'  : ['-threaded', '-debug'],
