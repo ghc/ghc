@@ -468,7 +468,7 @@ mkStubPaths
   :: DynFlags
   -> ModuleName
   -> ModLocation
-  -> (FilePath,FilePath)
+  -> (FilePath,FilePath,FilePath)
 
 mkStubPaths dflags mod location
   = let
@@ -483,9 +483,23 @@ mkStubPaths dflags mod location
 			| otherwise           = src_basename
 
 		stub_basename = stub_basename0 ++ "_stub"
+
+                -- this is the filename we're going to use when
+                -- #including the stub_h file from the .hc file.
+                -- Without -stubdir, we just #include the basename
+                -- (eg. for a module A.B, we #include "B_stub.h"),
+                -- relying on the fact that we add an implicit -I flag
+                -- for the directory in which the source file resides
+                -- (see DriverPipeline.hs).  With -stubdir, we
+                -- #include "A/B.h", assuming that the user has added
+                -- -I<dir> along with -stubdir <dir>.
+                include_basename
+                        | Just _ <- stubdir = mod_basename 
+                        | otherwise         = filenameOf mod_basename
      in
         (stub_basename `joinFileExt` "c",
-	 stub_basename `joinFileExt` "h")
+	 stub_basename `joinFileExt` "h",
+         (include_basename ++ "_stub") `joinFileExt` "h")
 	-- the _stub.o filename is derived from the ml_obj_file.
 
 -- -----------------------------------------------------------------------------

@@ -243,7 +243,7 @@ compileStub dflags mod location = do
 	    stub_o = o_base ++ "_stub" `joinFileExt` o_ext
 
 	-- compile the _stub.c file w/ gcc
-	let (stub_c,_) = mkStubPaths dflags (moduleName mod) location
+	let (stub_c,_,_) = mkStubPaths dflags (moduleName mod) location
 	runPipeline StopLn dflags (stub_c,Nothing)  Nothing
 		(SpecificFile stub_o) Nothing{-no ModLocation-}
 
@@ -644,7 +644,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
  = do	-- normal Hsc mode, not mkdependHS
 
   -- we add the current directory (i.e. the directory in which
-  -- the .hs files resides) to the import path, since this is
+  -- the .hs files resides) to the include path, since this is
   -- what gcc does, and it's probably what you want.
 	let current_dir = directoryOf basename
 	

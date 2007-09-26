@@ -151,10 +151,10 @@ outputC dflags filenm mod location flat_absC
 	  hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
 	  hPutStr h cc_injects
 	  when stub_h_exists $ 
-	     hPutStrLn h ("#include \"" ++ (filenameOf stub_h) ++ "\"")
+	     hPutStrLn h ("#include \"" ++ inc_stub_h ++ "\"")
 	  writeCs dflags h flat_absC
   where
-    (_, stub_h) = mkStubPaths dflags (moduleName mod) location
+    (_, _, inc_stub_h) = mkStubPaths dflags (moduleName mod) location
 \end{code}
 
 
@@ -265,7 +265,7 @@ outputForeignStubs dflags mod location stubs
 
         return (stub_h_file_exists, stub_c_file_exists)
   where
-   (stub_c, stub_h) = mkStubPaths dflags (moduleName mod) location
+   (stub_c, stub_h, _) = mkStubPaths dflags (moduleName mod) location
 
 cplusplus_hdr = "#ifdef __cplusplus\nextern \"C\" {\n#endif\n"
 cplusplus_ftr = "#ifdef __cplusplus\n}\n#endif\n"

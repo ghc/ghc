@@ -574,9 +574,11 @@ getVerbFlag dflags
   | verbosity dflags >= 3  = "-v" 
   | otherwise =  ""
 
-setObjectDir  f d = d{ objectDir  = f}
-setHiDir      f d = d{ hiDir      = f}
-setStubDir    f d = d{ stubDir    = f}
+setObjectDir  f d = d{ objectDir  = Just f}
+setHiDir      f d = d{ hiDir      = Just f}
+setStubDir    f d = d{ stubDir    = Just f, includePaths = f : includePaths d }
+  -- -stubdir D adds an implicit -I D, so that gcc can find the _stub.h file
+  -- #included from the .hc file when compiling with -fvia-C.
 
 setObjectSuf  f d = d{ objectSuf  = f}
 setHiSuf      f d = d{ hiSuf      = f}
@@ -981,15 +983,15 @@ dynamic_flags = [
   ,  ( "framework"	, HasArg (upd . addCmdlineFramework) )
 
 	------- Output Redirection ------------------------------------------
-  ,  ( "odir"		, HasArg (upd . setObjectDir  . Just))
+  ,  ( "odir"		, HasArg (upd . setObjectDir))
   ,  ( "o"		, SepArg (upd . setOutputFile . Just))
   ,  ( "ohi"		, HasArg (upd . setOutputHi   . Just ))
   ,  ( "osuf"		, HasArg (upd . setObjectSuf))
   ,  ( "hcsuf"		, HasArg (upd . setHcSuf))
   ,  ( "hisuf"		, HasArg (upd . setHiSuf))
-  ,  ( "hidir"		, HasArg (upd . setHiDir . Just))
+  ,  ( "hidir"		, HasArg (upd . setHiDir))
   ,  ( "tmpdir"		, HasArg (upd . setTmpDir))
-  ,  ( "stubdir"	, HasArg (upd . setStubDir . Just))
+  ,  ( "stubdir"	, HasArg (upd . setStubDir))
   ,  ( "ddump-file-prefix", HasArg (upd . setDumpPrefixForce . Just))
 
 	------- Keeping temporary files -------------------------------------
