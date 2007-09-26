@@ -44,8 +44,7 @@ test('Kind', normal, compile, [''])
 
 test('GADT1', expect_fail, compile, [''])
 test('GADT2', normal, compile, [''])
-test('GADT3', expect_fail_ways_if_compiler_lt('ghc','6.9',['normal','optc']),
-     compile, [''])
+test('GADT3', expect_broken_for(1738, ['normal','optc']), compile, [''])
 test('GADT4', expect_fail, compile, [''])
 test('GADT5', expect_fail, compile, [''])
 test('GADT6', expect_fail, compile, [''])
