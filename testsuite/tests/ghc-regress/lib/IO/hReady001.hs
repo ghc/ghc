@@ -13,5 +13,6 @@ main = do
 #ifdef i386_unknown_mingw32
  hSetBinaryMode h True
 #endif
+ hReady h >>= print
  hSeek h SeekFromEnd 0
  hReady h >>= print
