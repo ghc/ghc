@@ -14,6 +14,11 @@ ifneq "$(HaveFrameworkGMP)" "YES"
 
 PLATFORM := $(shell echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g')
 
+# 2007-09-26
+#     set -o igncr 
+# is not a valid command on non-Cygwin-systems.
+# Let it fail silently instead of aborting the build.
+#
 # 2007-07-05
 # We do
 #     set -o igncr; export SHELLOPTS
@@ -58,7 +63,7 @@ stamp.gmp.static:
 	$(TAR) -zxf $(GMP_TARBALL)
 	mv $(GMP_DIR) gmpbuild
 	chmod +x ln
-	set -o igncr; export SHELLOPTS; \
+	(set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
 	    export PATH=`pwd`:$$PATH; \
 	    cd gmpbuild && \
 	    CC=$(WhatGccIsCalled) $(SHELL) configure \
@@ -70,7 +75,7 @@ stamp.gmp.shared:
 	$(TAR) -zxf $(GMP_TARBALL)
 	mv $(GMP_DIR) gmpbuild-shared
 	chmod +x ln
-	set -o igncr; export SHELLOPTS; \
+	(set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
 	    export PATH=`pwd`:$$PATH; \
 	    cd gmpbuild-shared && \
 	    CC=$(WhatGccIsCalled) $(SHELL) configure \
