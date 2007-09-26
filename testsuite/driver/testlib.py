@@ -318,6 +318,19 @@ def _expect_fail_if_compiler_lt( opts, compiler, version ):
        version_lt(config.compiler_version, version):
         opts.expect = 'fail'
 
+def expect_broken_ways_if_compiler_lt( bug, compiler, version, ways ):
+   return lambda opts, c=compiler, v=version, w=ways: \
+                 _expect_fail_ways_if_compiler_lt(opts, c, v, w)
+
+def expect_fail_ways_if_compiler_lt( compiler, version, ways ):
+   return lambda opts, c=compiler, v=version, w=ways: \
+                 _expect_fail_ways_if_compiler_lt(opts, c, v, w)
+
+def _expect_fail_ways_if_compiler_lt( opts, compiler, version, ways ):
+    if config.compiler_type == compiler and \
+       version_lt(config.compiler_version, version):
+        opts.expect_fail_for = ways
+
 # ---
 
 def skip_if_tag( tag ):
