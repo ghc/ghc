@@ -1433,7 +1433,7 @@
 	    </row>
 	    <row>
 	      <entry><option>-hpcdir dir</option></entry>
-	      <entry>Directory to deposit .mix files during compilation</entry>
+	      <entry>Directory to deposit .mix files during compilation (default is .hpc)</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-</option></entry>
 	    </row>

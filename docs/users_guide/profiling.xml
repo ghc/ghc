@@ -1260,26 +1260,25 @@ to re-read its input file:
       never actually been invoked.  GHC has an option for generating
       instrumented code that records code coverage as part of the
       <ulink url="http://www.haskell.org/hpc">Haskell Program Coverage
-      </ulink>(HPC) toolkit.  HPC tools can be used to render the
-      outputed code coverage infomation into human understandable
-      format.  
-   </para>
+      </ulink>(HPC) toolkit, which is included with GHC. HPC tools can
+      be used to render the generated code coverage information into
+      human understandable format.  </para>
 
     <para>
-      HPC provides coverage information of two kinds: source coverage
-      and boolean-control coverage. Source coverage is the extent to
-      which every part of the program was used, measured at three
-      different levels: declarations (both top-level and local),
-      alternatives (among several equations or case branches) and
-      expressions (at every level).  Boolean coverage is the extent to
-      which each of the values True and False is obtained in every
-      syntactic boolean context (ie. guard, condition, qualifier).
-    </para>
+      Correctly instrumented code provides coverage information of two
+      kinds: source coverage and boolean-control coverage. Source
+      coverage is the extent to which every part of the program was
+      used, measured at three different levels: declarations (both
+      top-level and local), alternatives (among several equations or
+      case branches) and expressions (at every level).  Boolean
+      coverage is the extent to which each of the values True and
+      False is obtained in every syntactic boolean context (ie. guard,
+      condition, qualifier).  </para>
 
     <para>
-      HPC displays both kinds of information in two different ways:
-      textual reports with summary statistics (hpc-report) and sources
-      with color mark-up (hpc-markup).  For boolean coverage, there
+      HPC displays both kinds of information in two primary ways:
+      textual reports with summary statistics (hpc report) and sources
+      with color mark-up (hpc markup).  For boolean coverage, there
       are four possible outcomes for each guard, condition or
       qualifier: both True and False values occur; only True; only
       False; never evaluated. In hpc-markup output, highlighting with
@@ -1291,10 +1290,9 @@ to re-read its input file:
    <sect2><title>A small example: Reciprocation</title>
 
     <para>
-     For an example we have a program which computes exact decimal
+     For an example we have a program, called Recip.hs, which computes exact decimal
      representations of reciprocals, with recurring parts indicated in
-     brackets.  We first build an instrumented version using the
-     hpc-build script. Assuming the source file is Recip.hs.
+     brackets.
     </para>
 <programlisting>
 reciprocal :: Int -> (String, Int)
@@ -1329,23 +1327,23 @@ main = do
   main
 </programlisting>
 
-`    <para>The HPC intrumentation is enabled using the -fhpc flag.
+    <para>The HPC instrumentation is enabled using the -fhpc flag.
     </para>
 
 <screen>
 $ ghc -fhpc Recip.hs --make 
 </screen>
     <para>HPC index (.mix) files are placed placed in .hpc subdirectory. These can be considered like
-    the .hi files for HPC. They contain information about what parts of the haskell each modules.
+    the .hi files for HPC. 
    </para>
 <screen>
 $ ./Recip
 1/3
 = 0.(3)
 </screen>
-    <para>Now for a textual summary of coverage:</para>
+    <para>We can generate a textual summary of coverage:</para>
 <screen>
-$ hpc-report Recip
+$ hpc report Recip
  80% expressions used (81/101)
  12% boolean coverage (1/8)
       14% guards (1/7), 3 always True, 
@@ -1357,17 +1355,177 @@ $ hpc-report Recip
 100% local declarations used (9/9)
 100% top-level declarations used (5/5)
 </screen>
-    <para>Finally, we generate a marked-up version of the source.</para>
+    <para>We can also generate a marked-up version of the source.</para>
 <screen>
-$ hpc-markup Recip
+$ hpc markup Recip
 writing Recip.hs.html
 </screen>
-<figure>
-       <title>Recip.hs.html</title>
-       <graphic fileref="images/Recip.png"></graphic>
-    </figure>
+    <para>
+		This generates one file per Haskell module, and 4 index files,
+		hpc_index.html, hpc_index_alt.html, hpc_index_exp.html,
+		hpc_index_fun.html.
+	</para>
+     </sect2> 
 
-    </sect2> 
+     <sect2><title>Options for instrumenting code for coverage</title>
+	<para>
+		Turning on code coverage is easy, use the -fhpc flag. 
+		Instrumented and non-instrumented can be freely mixed.
+		When compiling the Main module GHC automatically detects when there
+		is an hpc compiled file, and adds the correct initialization code.
+	</para>
+
+     </sect2>
+
+     <sect2><title>The hpc toolkit</title>
+
+      <para>
+      The hpc toolkit uses a cvs/svn/darcs-like interface, where a
+      single binary contains many function units.</para> 
+<screen>
+$ hpc 
+Usage: hpc COMMAND ...
+
+Commands:
+  help        Display help for hpc or a single command
+Reporting Coverage:
+  report      Output textual report about program coverage
+  markup      Markup Haskell source with program coverage
+Processing Coverage files:
+  combine     Combine multiple .tix files in a single .tix files
+Coverage Overlays:
+  overlay     Generate a .tix file from an overlay file
+  draft       Generate draft overlay that provides 100% coverage
+Others:
+  show        Show .tix file in readable, verbose format
+  version     Display version for hpc
+</screen>
+
+     <para>In general, these options act on .tix file after an
+     instrumented binary has generated it, which hpc acting as a
+     conduit between the raw .tix file, and the more detailed reports
+     produced. 
+	</para>
+	  
+	<para>
+		The hpc tool assumes you are in the top-level directory of
+		the location where you built your application, and the .tix
+		file is in the same top-level directory. You can use the
+		flag --srcdir to use hpc for any other directory, and use
+		--srcdir multiple times to analyse programs compiled from
+		difference locations, as is typical for packages.
+	</para>
+	  
+	<para>
+	We now explain in more details the major modes of hpc.
+     </para>
+
+       <sect3><title>hpc report</title>
+		<para>hpc report gives a textual report of coverage. By default,
+			all modules and packages are considered in generating report,
+			unless include or exclude are used. The report is a summary
+			unless the --per-module flag is used. The --xml-output option
+			allows for tools to use hpc to glean coverage. 
+		</para>	
+<screen>
+$ hpc help report
+Usage: hpc report [OPTION] .. &lt;TIX_FILE&gt; [&lt;MODULE&gt; [&lt;MODULE&gt; ..]]
+
+Options:
+
+    --per-module                  show module level detail
+    --decl-list                   show unused decls
+    --exclude=[PACKAGE:][MODULE]  exclude MODULE and/or PACKAGE
+    --include=[PACKAGE:][MODULE]  include MODULE and/or PACKAGE
+    --srcdir=DIR                  path to source directory of .hs files
+                                  multi-use of srcdir possible
+    --hpcdir=DIR                  sub-directory that contains .mix files
+                                  default .hpc [rarely used]
+    --xml-output                  show output in XML
+</screen>
+       </sect3>
+       <sect3><title>hpc markup</title>
+		<para>hpc markup marks up source files into colored html.
+		</para>
+<screen>
+% hpc help markup
+Usage: hpc markup [OPTION] .. &lt;TIX_FILE&gt; [&lt;MODULE&gt; [&lt;MODULE&gt; ..]]
+
+Options:
+
+    --exclude=[PACKAGE:][MODULE]  exclude MODULE and/or PACKAGE
+    --include=[PACKAGE:][MODULE]  include MODULE and/or PACKAGE
+    --srcdir=DIR                  path to source directory of .hs files
+                                  multi-use of srcdir possible
+    --hpcdir=DIR                  sub-directory that contains .mix files
+                                  default .hpc [rarely used]
+    --fun-entry-count             show top-level function entry counts
+    --highlight-covered           highlight covered code, rather that code gaps
+    --destdir=DIR                 path to write output to
+</screen>
+
+       </sect3>
+       <sect3><title>hpc combine</title>
+		<para>hpc combine is the swiss army knife of hpc. Typically, combine is used
+		 to  add .tix files together to get the combined total coverage. However, it can
+		 also be used to take the difference between .tix files, to subtract one
+		.tix file from another, and to zero the .tix files. hpc combine does not
+		change the original .tix file; it generates a new .tix file. 
+		</para>
+<screen>
+hpc help combine
+Usage: hpc combine [OPTION] .. &lt;TIX_FILE&gt; [&lt;TIX_FILE&gt; [&lt;TIX_FILE&gt; ..]]
+
+Options:
+
+    --exclude=[PACKAGE:][MODULE]  exclude MODULE and/or PACKAGE
+    --include=[PACKAGE:][MODULE]  include MODULE and/or PACKAGE
+    --output=FILE                 output FILE
+    --combine=FUNCTION            combine .tix files with join function, default = ADD
+                                  FUNCTION = ADD | DIFF | SUB | ZERO
+    --post-invert                 invert output; ticked becomes unticked, unticked becomes ticked
+</screen>
+       </sect3>
+       <sect3><title>hpc overlay and hpc draft</title>
+		<para>
+			Overlays are an experimental feature of HPC, a textual description
+			of coverage. hpc draft is used to generate a draft overlay from a .tix file,
+			and hpc overlay generates a .tix files from an overlay.
+		</para>
+<screen>
+% hpc help overlay
+Usage: hpc overlay [OPTION] .. &lt;OVERLAY_FILE&gt; [&lt;OVERLAY_FILE&gt; [...]]
+
+Options:
+
+    --srcdir=DIR   path to source directory of .hs files
+                   multi-use of srcdir possible
+    --hpcdir=DIR   sub-directory that contains .mix files
+                   default .hpc [rarely used]
+    --output=FILE  output FILE
+% hpc help draft  
+Usage: hpc draft [OPTION] .. &lt;TIX_FILE&gt;
+
+Options:
+
+    --exclude=[PACKAGE:][MODULE]  exclude MODULE and/or PACKAGE
+    --include=[PACKAGE:][MODULE]  include MODULE and/or PACKAGE
+    --srcdir=DIR                  path to source directory of .hs files
+                                  multi-use of srcdir possible
+    --hpcdir=DIR                  sub-directory that contains .mix files
+                                  default .hpc [rarely used]
+    --output=FILE                 output FILE
+</screen>
+      </sect3>
+     </sect2>
+     <sect2><title>Caveats and Shortcomings of Haskell Program Coverage</title>
+	  <para>
+		HPC does not attempt to lock the .tix file, so multiple concurrently running
+		binaries in the same directory will exhibit a race condition. There is no way
+		to change the name of the .tix file generated, apart from renaming the binary.
+		HPC does not work with GHCi.
+  	  </para>
+    </sect2>
   </sect1>
 
   <sect1 id="ticky-ticky">
