@@ -29,4 +29,4 @@ test('ghci018', expect_broken(1201), ghci_script, ['ghci018.script'])
 test('ghci019', normal, ghci_script, ['ghci019.script'])
 test('ghci020', normal, ghci_script, ['ghci020.script'])
 test('ghci021', normal, ghci_script, ['ghci021.script'])
-
+test('ghci022', normal, ghci_script, ['ghci022.script'])
