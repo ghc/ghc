@@ -933,10 +933,9 @@ doLoad session howmuch = do
 afterLoad ok session = do
   io (revertCAFs)  -- always revert CAFs on load.
   discardTickArrays
-  graph <- io (GHC.getModuleGraph session)
-  graph' <- filterM (io . GHC.isLoaded session . GHC.ms_mod_name) graph
-  setContextAfterLoad session graph'
-  modulesLoadedMsg ok (map GHC.ms_mod_name graph')
+  loaded_mods <- getLoadedModules session
+  setContextAfterLoad session loaded_mods
+  modulesLoadedMsg ok (map GHC.ms_mod_name loaded_mods)
 
 setContextAfterLoad session [] = do
   prel_mod <- getPrelude
@@ -1287,10 +1286,15 @@ showCmd str = do
 
 showModules = do
   session <- getSession
-  let show_one ms = do m <- io (GHC.showModule session ms)
-		       io (putStrLn m)
+  loaded_mods <- getLoadedModules session
+        -- we want *loaded* modules only, see #1734
+  let show_one ms = do m <- io (GHC.showModule session ms); io (putStrLn m)
+  mapM_ show_one loaded_mods
+
+getLoadedModules :: GHC.Session -> GHCi [GHC.ModSummary]
+getLoadedModules session = do
   graph <- io (GHC.getModuleGraph session)
-  mapM_ show_one graph
+  filterM (io . GHC.isLoaded session . GHC.ms_mod_name) graph
 
 showBindings = do
   s <- getSession
