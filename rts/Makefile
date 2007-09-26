@@ -133,7 +133,7 @@ SRC_CC_OPTS += $(WARNING_OPTS)
 SRC_CC_OPTS += $(STANDARD_OPTS)
 
 SRC_CC_OPTS += $(GhcRtsCcOpts)
-SRC_HC_OPTS += $(GhcRtsHcOpts) -package-name rts
+SRC_HC_OPTS += $(GhcRtsHcOpts) $(STANDARD_OPTS) -package-name rts
 
 ifneq "$(GhcWithSMP)" "YES"
 SRC_CC_OPTS += -DNOSMP
