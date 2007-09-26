@@ -97,7 +97,7 @@ test('ffi017', normal, compile_and_run, [''])
 test('ffi018', omit_ways(['ghci']), compile_and_run, ['ffi018_c.c'])
 clean(['ffi018_c.o'])
 
-runCmd('$MAKE --no-print-directory -C ' + in_testdir('') + ' ffi018_ghci_setup')
+runCmd('$MAKE --no-print-directory -C ' + getTestDir() + ' ffi018_ghci_setup')
 test('ffi018', only_ways(['ghci']), compile_and_run, ['ffi018_ghci_c.o'])
 clean(['ffi018_ghci_c.o'])
 
