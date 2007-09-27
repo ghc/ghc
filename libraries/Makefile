@@ -115,7 +115,7 @@ ilibexecdir = $(libexecdir)
 idatadir    = $(datadir)
 idocdir     = $(docdir)/libraries/$$pkgid
 ihtmldir    = $(htmldir)/libraries/$$pkgid
-html_installed_root = $(ihtmldir)
+html_installed_root = $(htmldir)/libraries
 endif
 
 ifneq "$(DOING_BIN_DIST)" "YES"
