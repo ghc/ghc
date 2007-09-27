@@ -495,7 +495,7 @@ mkStubPaths dflags mod location
                 -- -I<dir> along with -stubdir <dir>.
                 include_basename
                         | Just _ <- stubdir = mod_basename 
-                        | otherwise         = filenameOf mod_basename
+                        | otherwise         = filenameOf src_basename
      in
         (stub_basename `joinFileExt` "c",
 	 stub_basename `joinFileExt` "h",
