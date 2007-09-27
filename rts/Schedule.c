@@ -2143,6 +2143,7 @@ forkProcess(HsStablePtr *entry
     // inconsistent state in the child.  See also #1391.
     ACQUIRE_LOCK(&sched_mutex);
     ACQUIRE_LOCK(&cap->lock);
+    ACQUIRE_LOCK(&cap->running_task->lock);
 
     pid = fork();
     
@@ -2150,6 +2151,7 @@ forkProcess(HsStablePtr *entry
 	
         RELEASE_LOCK(&sched_mutex);
         RELEASE_LOCK(&cap->lock);
+        RELEASE_LOCK(&cap->running_task->lock);
 
 	// just return the pid
 	rts_unlock(cap);
@@ -2160,6 +2162,7 @@ forkProcess(HsStablePtr *entry
 #if defined(THREADED_RTS)
         initMutex(&sched_mutex);
         initMutex(&cap->lock);
+        initMutex(&cap->running_task->lock);
 #endif
 
 	// Now, all OS threads except the thread that forked are
