@@ -141,11 +141,15 @@ awaitEvent(rtsBool wait)
       for(tso = blocked_queue_hd; tso != END_TSO_QUEUE; tso = next) {
 	next = tso->link;
 
+      /* On FreeBSD FD_SETSIZE is unsigned. Cast it to signed int
+       * in order to switch off the 'comparison between signed and
+       * unsigned error message
+       */
 	switch (tso->why_blocked) {
 	case BlockedOnRead:
 	  { 
 	    int fd = tso->block_info.fd;
-	    if (fd >= FD_SETSIZE) {
+	    if (fd >= (int)FD_SETSIZE) {
 		barf("awaitEvent: descriptor out of range");
 	    }
 	    maxfd = (fd > maxfd) ? fd : maxfd;
@@ -156,7 +160,7 @@ awaitEvent(rtsBool wait)
 	case BlockedOnWrite:
 	  { 
 	    int fd = tso->block_info.fd;
-	    if (fd >= FD_SETSIZE) {
+	    if (fd >= (int)FD_SETSIZE) {
 		barf("awaitEvent: descriptor out of range");
 	    }
 	    maxfd = (fd > maxfd) ? fd : maxfd;
