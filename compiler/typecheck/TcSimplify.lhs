@@ -1872,7 +1872,7 @@ reduceList env@(RedEnv {red_stack = (n,stk)}) wanteds state
 	    go wanteds state }
   where
     go []     state = return state
-    go (w:ws) state = do { traceTc (text "reduceList " <+> ppr (w:ws) <+> ppr state)
+    go (w:ws) state = do { traceTc (text "reduceList " <+> (ppr (w:ws) $$ ppr state))
 			 ; state' <- reduce (env {red_stack = (n+1, w:stk)}) w state
 			 ; go ws state' }
 
@@ -2174,7 +2174,8 @@ reduceImplication env orig_avails reft tvs extra_givens wanteds inst_loc
 Note [Reducing implication constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Suppose we are trying to simplify
-	(Ord a, forall b. C a b => (W [a] b, D c b))
+	( do: Ord a, 
+	  ic: (forall b. C a b => (W [a] b, D c b)) )
 where
 	instance (C a b, Ord a) => W [a] b
 When solving the implication constraint, we'll start with
@@ -2182,16 +2183,26 @@ When solving the implication constraint, we'll start with
 in the Avails.  Then we add (C a b -> Given) and solve. Extracting
 the results gives us a binding for the (W [a] b), with an Irred of 
 (Ord a, D c b).  Now, the (Ord a) comes from "outside" the implication,
-but the (D d b) is from "inside".  So we want to generate a Rhs binding
+but the (D d b) is from "inside".  So we want to generate a GenInst
 like this
 
-	ic = /\b \dc:C a b). (df a b dc do, ic' b dc)
-	   depending on
-		do :: Ord a
-		ic' :: forall b. C a b => D c b
+   ic = GenInst 
+	   [ do  :: Ord a,
+	     ic' :: forall b. C a b => D c b]
+	   (/\b \(dc:C a b). (df a b dc do, ic' b dc))
 
-The 'depending on' part of the Rhs is important, because it drives
-the extractResults code.
+The first arg of GenInst gives the free dictionary variables of the
+second argument -- the "needed givens".  And that list in turn is
+vital because it's used to determine what other dicts must be solved.
+This very list ends up in the second field of the Rhs, and drives
+extractResults.
+
+The need for this field is why we have to return "needed givens"
+from extractResults, reduceContext, checkLoop, and so on.
+
+NB: the "needed givens" in a GenInst or Rhs, may contain two dicts
+with the same type but different Ids, e.g. [d12 :: Eq a, d81 :: Eq a]
+That says we must generate a binding for both d12 and d81.
 
 The "inside" and "outside" distinction is what's going on with 'inner' and
 'outer' in reduceImplication
@@ -2325,6 +2336,8 @@ extractResults :: Avails
 	       -> TcM (	TcDictBinds, 	-- Bindings
 			[Inst],		-- Irreducible ones
 			[Inst])		-- Needed givens, i.e. ones used in the bindings
+				-- Postcondition: needed-givens = free vars( binds ) \ irreds
+				-- Note [Reducing implication constraints]
 
 extractResults (Avails _ avails) wanteds
   = go avails emptyBag [] [] wanteds
