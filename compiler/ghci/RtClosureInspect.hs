@@ -46,23 +46,24 @@ import qualified ByteCodeItbls as BCI( StgInfoTable(..) )
 import HscTypes         ( HscEnv )
 import Linker
 
-import DataCon          
-import Type             
-import TcRnMonad        ( TcM, initTc, ioToTcRn, 
-                          tryTcErrs)
+import DataCon
+import Type
+import Var
+import TcRnMonad        ( TcM, initTc, ioToTcRn,
+                          tryTcErrs, traceTc)
 import TcType
 import TcMType
 import TcUnify
 import TcGadt
 import TcEnv
 import DriverPhases
-import TyCon		
-import Name 
+import TyCon
+import Name
 import VarEnv
 import Util
 import VarSet
 
-import TysPrim		
+import TysPrim
 import PrelNames
 import TysWiredIn
 
@@ -515,6 +516,9 @@ runTR hsc_env c = do
 runTR_maybe :: HscEnv -> TR a -> IO (Maybe a)
 runTR_maybe hsc_env = fmap snd . initTc hsc_env HsSrcFile False iNTERACTIVE
 
+traceTR :: SDoc -> TR ()
+traceTR = liftTcM . traceTc
+
 trIO :: IO a -> TR a 
 trIO = liftTcM . ioToTcRn
 
@@ -678,8 +682,8 @@ cvReconstructType hsc_env max_depth mb_ty hval = runTR_maybe hsc_env $ do
               substTy rev_subst `fmap` zonkTcType tv
     where 
 --  search :: m Bool -> ([a] -> [a] -> [a]) -> [a] -> m ()
-  search _ _ _ 0 = fail$ "Failed to reconstruct a type after " ++
-                                show max_depth ++ " steps"
+  search _ _ _ 0 = traceTR (text "Failed to reconstruct a type after " <>
+                                int max_depth <> text " steps")
   search stop expand l d =
     case viewl l of 
       EmptyL  -> return ()
@@ -762,10 +766,12 @@ computeRTTIsubst ty rtti_ty =
    Note that it is very tricky to make this 'rewriting'
  work with the unification implemented by TcM, where
  substitutions are 'inlined'. The order in which 
- constraints are unified is vital for this (or I am 
- using TcM wrongly).
+ constraints are unified is vital for this.
+   This is a simple form of residuation, the technique of 
+ delaying unification steps until enough information
+ is available.
 -}
-congruenceNewtypes ::  TcType -> TcType -> TcM (TcType,TcType)
+congruenceNewtypes ::  TcType -> TcType -> TR (TcType,TcType)
 congruenceNewtypes lhs rhs 
  -- TyVar lhs inductive case
     | Just tv <- getTyVar_maybe lhs 
@@ -783,18 +789,20 @@ congruenceNewtypes lhs rhs
     | Just (tycon_l, _) <- splitNewTyConApp_maybe lhs
     , Just (tycon_r, _) <- splitNewTyConApp_maybe rhs 
     , tycon_l /= tycon_r 
-    = return (lhs, upgrade tycon_l rhs)
+    = do rhs' <- upgrade tycon_l rhs
+         return (lhs, rhs')
 
     | otherwise = return (lhs,rhs)
 
-    where upgrade :: TyCon -> Type -> Type
+    where upgrade :: TyCon -> Type -> TR Type
           upgrade new_tycon ty
-            | not (isNewTyCon new_tycon) = ty 
-            | ty' <- mkTyConApp new_tycon (map mkTyVarTy $ tyConTyVars new_tycon)
-            , Just subst <- tcUnifyTys (const BindMe) [ty] [repType ty']
-            = substTy subst ty'
-          upgrade _ _ = panic "congruenceNewtypes.upgrade"
-        -- assumes that reptype doesn't touch tyconApp args ^^^
+            | not (isNewTyCon new_tycon) = return ty 
+            | otherwise = do 
+               vars <- mapM (newVar . tyVarKind) (tyConTyVars new_tycon)
+               let ty' = mkTyConApp new_tycon vars
+               liftTcM (unifyType ty (repType ty'))
+        -- assumes that reptype doesn't ^^^^ touch tyconApp args 
+               return ty'
 
 
 --------------------------------------------------------------------------------
