@@ -946,13 +946,13 @@ typedef
 static OpenedDLL* opened_dlls = NULL;
 #endif
 
-char *
+const char *
 addDLL( char *dll_name )
 {
 #  if defined(OBJFORMAT_ELF) || defined(OBJFORMAT_MACHO)
    /* ------------------- ELF DLL loader ------------------- */
    void *hdl;
-   char *errmsg;
+   const char *errmsg;
 
    initLinker();
 

@@ -31,7 +31,7 @@ HsInt loadObj( char *path );
 HsInt resolveObjs( void );
 
 /* load a dynamic library */
-char *addDLL( char* dll_name );
+const char *addDLL( char* dll_name );
 
 extern void markRootPtrTable(void (*)(StgClosure **));
 
