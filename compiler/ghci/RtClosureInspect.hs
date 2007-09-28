@@ -587,7 +587,7 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
 -- and showing the '_' is more useful.
       t | isThunk t && force -> seq a $ go (pred bound) tv ty a
 -- We always follow indirections 
-      Indirection _ -> go (pred bound) tv ty $! (ptrs clos ! 0)
+      Indirection _ -> go bound tv ty $! (ptrs clos ! 0)
  -- The interesting case
       Constr -> do
         Right dcname <- dataConInfoPtrToName (infoPtr clos)
