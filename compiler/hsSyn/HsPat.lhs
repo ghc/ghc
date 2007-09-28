@@ -19,7 +19,7 @@ module HsPat (
 	HsConPatDetails, hsConPatArgs, 
 	HsRecFields(..), HsRecField(..), hsRecFields,
 
-	mkPrefixConPat, mkCharLitPat, mkNilPat, mkCoPat,
+	mkPrefixConPat, mkCharLitPat, mkNilPat, mkCoPat, mkCoPatCoI,
 
 	isBangHsBind,	
 	patsAreAllCons, isConPat, isSigPat, isWildPat,
@@ -37,6 +37,7 @@ import HsLit
 import HsTypes
 import BasicTypes
 -- others:
+import Coercion
 import PprCore		( {- instance OutputableBndr TyVar -} )
 import TysWiredIn
 import Var
@@ -292,10 +293,14 @@ mkNilPat ty = mkPrefixConPat nilDataCon [] ty
 mkCharLitPat :: Char -> OutPat id
 mkCharLitPat c = mkPrefixConPat charDataCon [noLoc $ LitPat (HsCharPrim c)] charTy
 
-mkCoPat :: HsWrapper -> OutPat id -> Type -> OutPat id
-mkCoPat co lpat@(L loc pat) ty
-  | isIdHsWrapper co = lpat
-  | otherwise = L loc (CoPat co pat ty)
+mkCoPat :: HsWrapper -> Pat id -> Type -> Pat id
+mkCoPat co pat ty
+  | isIdHsWrapper co = pat
+  | otherwise        = CoPat co pat ty
+
+mkCoPatCoI :: CoercionI -> Pat id -> Type -> Pat id
+mkCoPatCoI IdCo     pat ty = pat
+mkCoPatCoI (ACo co) pat ty = mkCoPat (WpCo co) pat ty
 \end{code}
 
 

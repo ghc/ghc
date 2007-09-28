@@ -31,6 +31,7 @@ import TcGadt
 import TcPat
 import TcUnify
 import TcRnMonad
+import Coercion
 import Inst
 import Name
 import TysWiredIn
@@ -52,16 +53,18 @@ import Util
 \begin{code}
 tcProc :: InPat Name -> LHsCmdTop Name		-- proc pat -> expr
        -> BoxyRhoType				-- Expected type of whole proc expression
-       -> TcM (OutPat TcId, LHsCmdTop TcId)
+       -> TcM (OutPat TcId, LHsCmdTop TcId, CoercionI)
 
 tcProc pat cmd exp_ty
   = newArrowScope $
-    do	{ (exp_ty1, res_ty) <- boxySplitAppTy exp_ty 
-	; (arr_ty, arg_ty)  <- boxySplitAppTy exp_ty1
+    do	{ ((exp_ty1, res_ty), coi) <- boxySplitAppTy exp_ty 
+	; ((arr_ty, arg_ty), coi1) <- boxySplitAppTy exp_ty1
 	; let cmd_env = CmdEnv { cmd_arr = arr_ty }
 	; (pat', cmd') <- tcLamPat pat arg_ty (emptyRefinement, res_ty) $
 			  tcCmdTop cmd_env cmd []
-	; return (pat', cmd') }
+        ; let res_coi = mkTransCoI coi (mkAppTyCoI exp_ty1 coi1 res_ty IdCo)
+	; return (pat', cmd', res_coi) 
+        }
 \end{code}
 
 

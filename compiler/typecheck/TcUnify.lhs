@@ -28,7 +28,7 @@ module TcUnify (
   -- Holes
   tcInfer, subFunTys, unBox, refineBox, refineBoxToTau, withBox, 
   boxyUnify, boxyUnifyList, zapToMonotype,
-  boxySplitListTy, boxySplitTyConApp, boxySplitAppTy,
+  boxySplitListTy, boxySplitPArrTy, boxySplitTyConApp, boxySplitAppTy,
   wrapFunResCoercion
   ) where
 
@@ -191,8 +191,9 @@ subFunTys error_herald n_pats res_ty thing_inside
 ----------------------
 boxySplitTyConApp :: TyCon			-- T :: k1 -> ... -> kn -> *
 	          -> BoxyRhoType 		-- Expected type (T a b c)
-		  -> TcM [BoxySigmaType]	-- Element types, a b c
-  -- It's used for wired-in tycons, so we call checkWiredInTyCOn
+		  -> TcM ([BoxySigmaType],	-- Element types, a b c
+                          CoercionI)
+  -- It's used for wired-in tycons, so we call checkWiredInTyCon
   -- Precondition: never called with FunTyCon
   -- Precondition: input type :: *
 
@@ -203,14 +204,26 @@ boxySplitTyConApp tc orig_ty
     loop n_req args_so_far ty 
       | Just ty' <- tcView ty = loop n_req args_so_far ty'
 
-    loop n_req args_so_far (TyConApp tycon args)
+    loop n_req args_so_far ty@(TyConApp tycon args)
       | tc == tycon
       = ASSERT( n_req == length args) 	-- ty::*
-	return (args ++ args_so_far)
+	return (args ++ args_so_far, IdCo)
+
+      | isOpenSynTyCon tycon        -- try to normalise type family application
+      = do { (coi1, ty') <- tcNormaliseFamInst ty
+           ; case coi1 of
+	       IdCo   -> defer    -- no progress, but maybe solvable => defer
+               ACo _  ->          -- progress: so lets try again
+        	 do { (args, coi2) <- loop n_req args_so_far ty'
+		    ; return $ (args, coi2 `mkTransCoI` mkSymCoI coi1)
+		    }
+           }
 
     loop n_req args_so_far (AppTy fun arg)
       | n_req > 0
-      = loop (n_req - 1) (arg:args_so_far) fun
+      = do { (args, coi) <- loop (n_req - 1) (arg:args_so_far) fun
+           ; return (args, mkAppTyCoI fun coi arg IdCo)
+           }
 
     loop n_req args_so_far (TyVarTy tv)
       | isTyConableTyVar tv
@@ -219,23 +232,42 @@ boxySplitTyConApp tc orig_ty
 	   ; case cts of
 	       Indirect ty -> loop n_req args_so_far ty
 	       Flexi       -> do { arg_tys <- withMetaTvs tv arg_kinds mk_res_ty
-				 ; return (arg_tys ++ args_so_far) }
-	}
+				 ; return (arg_tys ++ args_so_far, IdCo) }
+	   }
+      | otherwise             -- defer as tyvar may be refined by equalities
+      = defer
       where
-	mk_res_ty arg_tys' = mkTyConApp tc arg_tys'
 	(arg_kinds, res_kind) = splitKindFunTysN n_req (tyConKind tc)
 
-    loop _ _ _ = boxySplitFailure (mkTyConApp tc (mkTyVarTys (tyConTyVars tc))) orig_ty
+    loop _ _ _ = boxySplitFailure (mkTyConApp tc (mkTyVarTys (tyConTyVars tc)))
+                                  orig_ty
+
+    -- defer splitting by generating an equality constraint
+    defer = boxySplitDefer arg_kinds mk_res_ty orig_ty
+      where
+        (arg_kinds, _) = splitKindFunTys (tyConKind tc)
+
+    -- apply splitted tycon to arguments
+    mk_res_ty = mkTyConApp tc
 
 ----------------------
-boxySplitListTy :: BoxyRhoType -> TcM BoxySigmaType	-- Special case for lists
-boxySplitListTy exp_ty = do { [elt_ty] <- boxySplitTyConApp listTyCon exp_ty
-			    ; return elt_ty }
+boxySplitListTy :: BoxyRhoType -> TcM (BoxySigmaType, CoercionI)
+-- Special case for lists
+boxySplitListTy exp_ty 
+ = do { ([elt_ty], coi) <- boxySplitTyConApp listTyCon exp_ty
+      ; return (elt_ty, coi) }
 
+----------------------
+boxySplitPArrTy :: BoxyRhoType -> TcM (BoxySigmaType, CoercionI)
+-- Special case for parrs
+boxySplitPArrTy exp_ty 
+  = do { ([elt_ty], coi) <- boxySplitTyConApp parrTyCon exp_ty
+       ; return (elt_ty, coi) }
 
 ----------------------
 boxySplitAppTy :: BoxyRhoType				-- Type to split: m a
-	       -> TcM (BoxySigmaType, BoxySigmaType)	-- Returns m, a
+	       -> TcM ((BoxySigmaType, BoxySigmaType),	-- Returns m, a
+                       CoercionI)
 -- If the incoming type is a mutable type variable of kind k, then 
 -- boxySplitAppTy returns a new type variable (m: * -> k); note the *.
 -- If the incoming type is boxy, then so are the result types; and vice versa
@@ -248,18 +280,29 @@ boxySplitAppTy orig_ty
 
     loop ty 
       | Just (fun_ty, arg_ty) <- tcSplitAppTy_maybe ty
-      = return (fun_ty, arg_ty)
+      = return ((fun_ty, arg_ty), IdCo)
+
+    loop ty@(TyConApp tycon args)
+      | isOpenSynTyCon tycon        -- try to normalise type family application
+      = do { (coi1, ty') <- tcNormaliseFamInst ty
+           ; case coi1 of
+	       IdCo   -> defer    -- no progress, but maybe solvable => defer
+               ACo co ->          -- progress: so lets try again
+        	 do { (args, coi2) <- loop ty'
+		    ; return $ (args, coi2 `mkTransCoI` mkSymCoI coi1)
+		    }
+           }
 
     loop (TyVarTy tv)
       | isTyConableTyVar tv
       = do { cts <- readMetaTyVar tv
 	   ; case cts of
 	       Indirect ty -> loop ty
-	       Flexi -> do { [fun_ty,arg_ty] <- withMetaTvs tv kinds mk_res_ty
-				 ; return (fun_ty, arg_ty) } }
+	       Flexi -> do { [fun_ty, arg_ty] <- withMetaTvs tv kinds mk_res_ty
+			   ; return ((fun_ty, arg_ty), IdCo) } }
+      | otherwise             -- defer as tyvar may be refined by equalities
+      = defer
       where
-        mk_res_ty [fun_ty', arg_ty'] = mkAppTy fun_ty' arg_ty'
-	mk_res_ty other = panic "TcUnify.mk_res_ty2"
 	tv_kind = tyVarKind tv
 	kinds = [mkArrowKind liftedTypeKind (defaultKind tv_kind),
 					 	-- m :: * -> k
@@ -271,11 +314,36 @@ boxySplitAppTy orig_ty
 	
     loop _ = boxySplitFailure (mkAppTy alphaTy betaTy) orig_ty
 
+    -- defer splitting by generating an equality constraint
+    defer = do { ([ty1, ty2], coi) <- boxySplitDefer arg_kinds mk_res_ty orig_ty
+               ; return ((ty1, ty2), coi)
+               }
+      where
+	orig_kind = typeKind orig_ty
+	arg_kinds = [mkArrowKind liftedTypeKind (defaultKind orig_kind),
+					 	-- m :: * -> k
+		     liftedTypeKind]		-- arg type :: *
+ 
+    -- build type application
+    mk_res_ty [fun_ty', arg_ty'] = mkAppTy fun_ty' arg_ty'
+    mk_res_ty _other             = panic "TcUnify.mk_res_ty2"
+
 ------------------
 boxySplitFailure actual_ty expected_ty
   = unifyMisMatch False False actual_ty expected_ty
 	-- "outer" is False, so we don't pop the context
 	-- which is what we want since we have not pushed one!
+
+------------------
+boxySplitDefer :: [Kind]                   -- kinds of required arguments
+               -> ([TcType] -> TcTauType)  -- construct lhs from argument tyvars
+               -> BoxyRhoType              -- type to split
+               -> TcM ([TcType], CoercionI)
+boxySplitDefer kinds mkTy orig_ty
+  = do { tau_tys <- mapM newFlexiTyVarTy kinds
+       ; coi <- defer_unification False False (mkTy tau_tys) orig_ty
+       ; return (tau_tys, coi)
+       }
 \end{code}
 
 

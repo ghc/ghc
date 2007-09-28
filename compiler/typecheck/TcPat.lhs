@@ -408,20 +408,21 @@ tc_pat pstate pat@(TypePat ty) pat_ty thing_inside
 ------------------------
 -- Lists, tuples, arrays
 tc_pat pstate (ListPat pats _) pat_ty thing_inside
-  = do	{ elt_ty <- boxySplitListTy pat_ty
+  = do	{ (elt_ty, coi) <- boxySplitListTy pat_ty
 	; (pats', pats_tvs, res) <- tcMultiple (\p -> tc_lpat p elt_ty)
 					 	pats pstate thing_inside
- 	; return (ListPat pats' elt_ty, pats_tvs, res) }
+ 	; return (mkCoPatCoI coi (ListPat pats' elt_ty) pat_ty, pats_tvs, res) }
 
 tc_pat pstate (PArrPat pats _) pat_ty thing_inside
-  = do	{ [elt_ty] <- boxySplitTyConApp parrTyCon pat_ty
+  = do	{ (elt_ty, coi) <- boxySplitPArrTy pat_ty
 	; (pats', pats_tvs, res) <- tcMultiple (\p -> tc_lpat p elt_ty)
 						pats pstate thing_inside 
-	; ifM (null pats) (zapToMonotype pat_ty)	-- c.f. ExplicitPArr in TcExpr
-	; return (PArrPat pats' elt_ty, pats_tvs, res) }
+	; ifM (null pats) (zapToMonotype pat_ty)  -- c.f. ExplicitPArr in TcExpr
+	; return (mkCoPatCoI coi (PArrPat pats' elt_ty) pat_ty, pats_tvs, res) }
 
 tc_pat pstate (TuplePat pats boxity _) pat_ty thing_inside
-  = do	{ arg_tys <- boxySplitTyConApp (tupleTyCon boxity (length pats)) pat_ty
+  = do	{ let tc = tupleTyCon boxity (length pats)
+        ; (arg_tys, coi) <- boxySplitTyConApp tc pat_ty
 	; (pats', pats_tvs, res) <- tcMultiple tc_lpat_pr (pats `zip` arg_tys)
 					       pstate thing_inside
 
@@ -429,13 +430,17 @@ tc_pat pstate (TuplePat pats boxity _) pat_ty thing_inside
 	-- so that we can experiment with lazy tuple-matching.
 	-- This is a pretty odd place to make the switch, but
 	-- it was easy to do.
-	; let unmangled_result = TuplePat pats' boxity pat_ty
+	; let pat_ty'          = mkTyConApp tc arg_tys
+                                     -- pat_ty /= pat_ty iff coi /= IdCo
+              unmangled_result = TuplePat pats' boxity pat_ty'
 	      possibly_mangled_result
-	        | opt_IrrefutableTuples && isBoxed boxity = LazyPat (noLoc unmangled_result)
-	        | otherwise			          = unmangled_result
+	        | opt_IrrefutableTuples && 
+                  isBoxed boxity            = LazyPat (noLoc unmangled_result)
+	        | otherwise		    = unmangled_result
 
- 	; ASSERT( length arg_tys == length pats )	-- Syntactically enforced
-	  return (possibly_mangled_result, pats_tvs, res) }
+ 	; ASSERT( length arg_tys == length pats )      -- Syntactically enforced
+	  return (mkCoPatCoI coi possibly_mangled_result pat_ty, pats_tvs, res) 
+        }
 
 ------------------------
 -- Data constructors
@@ -455,7 +460,8 @@ tc_pat pstate (LitPat simple_lit) pat_ty thing_inside
 			-- pattern coercions have to
 			-- be of kind: pat_ty ~ lit_ty
 			-- hence, sym coi
-	; returnM (wrapPatCoI (mkSymCoI coi) (LitPat simple_lit) pat_ty, [], res) }
+	; returnM (mkCoPatCoI (mkSymCoI coi) (LitPat simple_lit) pat_ty, 
+                   [], res) }
 
 ------------------------
 -- Overloaded patterns: n, and n+k
@@ -571,7 +577,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	      origin    = SigOrigin skol_info
 
 	  -- Instantiate the constructor type variables [a->ty]
-	; ctxt_res_tys <- boxySplitTyConAppWithFamily tycon pat_ty
+	; (ctxt_res_tys, coi) <- boxySplitTyConAppWithFamily tycon pat_ty
 	; ex_tvs' <- tcInstSkolTyVars skol_info ex_tvs	-- Get location from monad,
 							-- not from ex_tvs
 	; let tenv     = zipTopTvSubst (univ_tvs ++ ex_tvs)
@@ -593,13 +599,16 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 
 	; addDataConStupidTheta data_con ctxt_res_tys
 
-	; return
-	    (unwrapFamInstScrutinee tycon ctxt_res_tys $
-	       ConPatOut { pat_con = L con_span data_con, 
-			   pat_tvs = ex_tvs' ++ co_vars,
-			   pat_dicts = map instToVar dicts, 
-			   pat_binds = dict_binds,
-			   pat_args = arg_pats', pat_ty = pat_ty },
+        ; let pat_ty' = mkTyConApp tycon ctxt_res_tys
+                                     -- pat_ty /= pat_ty iff coi /= IdCo
+              res_pat = ConPatOut { pat_con = L con_span data_con, 
+			            pat_tvs = ex_tvs' ++ co_vars,
+			            pat_dicts = map instToVar dicts, 
+			            pat_binds = dict_binds,
+			            pat_args = arg_pats', pat_ty = pat_ty' }
+	; return 
+	    (mkCoPatCoI coi
+               (unwrapFamInstScrutinee tycon ctxt_res_tys res_pat) pat_ty,
 	     ex_tvs' ++ inner_tvs, res)
 	}
   where
@@ -610,10 +619,10 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
       case tyConFamInst_maybe tycon of
         Nothing                   -> boxySplitTyConApp tycon pat_ty
 	Just (fam_tycon, instTys) -> 
-	  do { scrutinee_arg_tys <- boxySplitTyConApp fam_tycon pat_ty
+	  do { (scrutinee_arg_tys, coi) <- boxySplitTyConApp fam_tycon pat_ty
 	     ; (_, freshTvs, subst) <- tcInstTyVars (tyConTyVars tycon)
 	     ; boxyUnifyList (substTys subst instTys) scrutinee_arg_tys
-	     ; return freshTvs
+	     ; return (freshTvs, coi)
 	     }
       where
         traceMsg = sep [ text "tcConPat:boxySplitTyConAppWithFamily:" <+>
@@ -991,10 +1000,4 @@ nonRigidResult res_ty
 
 inaccessibleAlt msg
   = hang (ptext SLIT("Inaccessible case alternative:")) 2 msg
-\end{code}
-
-\begin{code}
-wrapPatCoI :: CoercionI -> Pat a -> TcType -> Pat a
-wrapPatCoI IdCo     pat ty = pat
-wrapPatCoI (ACo co) pat ty = CoPat (WpCo co) pat ty
 \end{code}

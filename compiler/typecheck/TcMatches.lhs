@@ -222,29 +222,31 @@ tcDoStmts :: HsStmtContext Name
 	  -> BoxyRhoType
 	  -> TcM (HsExpr TcId)		-- Returns a HsDo
 tcDoStmts ListComp stmts body res_ty
-  = do	{ elt_ty <- boxySplitListTy res_ty
+  = do	{ (elt_ty, coi) <- boxySplitListTy res_ty
 	; (stmts', body') <- tcStmts ListComp (tcLcStmt listTyCon) stmts 
 				     (emptyRefinement,elt_ty) $
 			     tcBody body
-	; return (HsDo ListComp stmts' body' (mkListTy elt_ty)) }
+	; return $ mkHsWrapCoI coi 
+                     (HsDo ListComp stmts' body' (mkListTy elt_ty)) }
 
 tcDoStmts PArrComp stmts body res_ty
-  = do	{ [elt_ty] <- boxySplitTyConApp parrTyCon res_ty
+  = do	{ (elt_ty, coi) <- boxySplitPArrTy res_ty
 	; (stmts', body') <- tcStmts PArrComp (tcLcStmt parrTyCon) stmts 
 				     (emptyRefinement, elt_ty) $
 			     tcBody body
-	; return (HsDo PArrComp stmts' body' (mkPArrTy elt_ty)) }
+	; return $ mkHsWrapCoI coi 
+                     (HsDo PArrComp stmts' body' (mkPArrTy elt_ty)) }
 
 tcDoStmts DoExpr stmts body res_ty
-  = do	{ (m_ty, elt_ty) <- boxySplitAppTy res_ty
+  = do	{ ((m_ty, elt_ty), coi) <- boxySplitAppTy res_ty
 	; let res_ty' = mkAppTy m_ty elt_ty	-- The boxySplit consumes res_ty
 	; (stmts', body') <- tcStmts DoExpr (tcDoStmt m_ty) stmts 
 				     (emptyRefinement, res_ty') $
 			     tcBody body
-	; return (HsDo DoExpr stmts' body' res_ty') }
+	; return $ mkHsWrapCoI coi (HsDo DoExpr stmts' body' res_ty') }
 
 tcDoStmts ctxt@(MDoExpr _) stmts body res_ty
-  = do	{ (m_ty, elt_ty) <- boxySplitAppTy res_ty
+  = do	{ ((m_ty, elt_ty), coi) <- boxySplitAppTy res_ty
  	; let res_ty' = mkAppTy m_ty elt_ty	-- The boxySplit consumes res_ty
 	      tc_rhs rhs = withBox liftedTypeKind $ \ pat_ty ->
 			   tcMonoExpr rhs (mkAppTy m_ty pat_ty)
@@ -255,7 +257,9 @@ tcDoStmts ctxt@(MDoExpr _) stmts body res_ty
 
 	; let names = [mfixName, bindMName, thenMName, returnMName, failMName]
 	; insts <- mapM (newMethodFromName DoOrigin m_ty) names
-	; return (HsDo (MDoExpr (names `zip` insts)) stmts' body' res_ty') }
+	; return $ 
+            mkHsWrapCoI coi 
+              (HsDo (MDoExpr (names `zip` insts)) stmts' body' res_ty') }
 
 tcDoStmts ctxt stmts body res_ty = pprPanic "tcDoStmts" (pprStmtContext ctxt)
 

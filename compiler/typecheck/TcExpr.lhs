@@ -133,7 +133,7 @@ tcExpr (HsVar name)     res_ty = tcId (OccurrenceOf name) name res_ty
 
 tcExpr (HsLit lit)	res_ty = do { let lit_ty = hsLitType lit
 				    ; coi <- boxyUnify lit_ty res_ty
-				    ; return $ wrapExprCoI (HsLit lit) coi
+				    ; return $ mkHsWrapCoI coi (HsLit lit)
 				    }
 
 tcExpr (HsPar expr)     res_ty = do { expr' <- tcMonoExpr expr res_ty
@@ -289,33 +289,21 @@ tcExpr (HsDo do_or_lc stmts body _) res_ty
   = tcDoStmts do_or_lc stmts body res_ty
 
 tcExpr in_expr@(ExplicitList _ exprs) res_ty	-- Non-empty list
-  = do 	{ elt_ty <- boxySplitListTy res_ty
+  = do 	{ (elt_ty, coi) <- boxySplitListTy res_ty
 	; exprs' <- mappM (tc_elt elt_ty) exprs
-	; return (ExplicitList elt_ty exprs') }
+	; return $ mkHsWrapCoI coi (ExplicitList elt_ty exprs') }
   where
     tc_elt elt_ty expr = tcPolyExpr expr elt_ty
-{- TODO: Version from Tom's original patch.  Unfortunately, we cannot do it this
-   way, but need to teach boxy splitters about match deferral and coercions.
-  = do 	{ elt_tv <- newBoxyTyVar argTypeKind
-	; let elt_ty = TyVarTy elt_tv
-	; coi    <- boxyUnify (mkTyConApp listTyCon [elt_ty]) res_ty
-	-- ; elt_ty <- boxySplitListTy res_ty
-	; exprs' <- mappM (tc_elt elt_ty) exprs
-	; return $ wrapExprCoI (ExplicitList elt_ty exprs') coi  }
-	-- ; return (ExplicitList elt_ty exprs') }
-  where
-    tc_elt elt_ty expr = tcPolyExpr expr elt_ty
- -}
 
 tcExpr in_expr@(ExplicitPArr _ exprs) res_ty	-- maybe empty
-  = do	{ [elt_ty] <- boxySplitTyConApp parrTyCon res_ty
+  = do	{ (elt_ty, coi) <- boxySplitPArrTy res_ty
     	; exprs' <- mappM (tc_elt elt_ty) exprs	
 	; ifM (null exprs) (zapToMonotype elt_ty)
 		-- If there are no expressions in the comprehension
 		-- we must still fill in the box
 		-- (Not needed for [] and () becuase they happen
 		--  to parse as data constructors.)
-	; return (ExplicitPArr elt_ty exprs') }
+	; return $ mkHsWrapCoI coi (ExplicitPArr elt_ty exprs') }
   where
     tc_elt elt_ty expr = tcPolyExpr expr elt_ty
 
@@ -335,8 +323,8 @@ tcExpr (ExplicitTuple exprs boxity) res_ty
 	; return (mkHsWrap co_fn (ExplicitTuple exprs' boxity)) }
 
 tcExpr (HsProc pat cmd) res_ty
-  = do	{ (pat', cmd') <- tcProc pat cmd res_ty
-	; return (HsProc pat' cmd') }
+  = do	{ (pat', cmd', coi) <- tcProc pat cmd res_ty
+	; return $ mkHsWrapCoI coi (HsProc pat' cmd') }
 
 tcExpr e@(HsArrApp _ _ _ _ _) _
   = failWithTc (vcat [ptext SLIT("The arrow command"), nest 2 (ppr e), 
@@ -527,54 +515,58 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
 
 \begin{code}
 tcExpr (ArithSeq _ seq@(From expr)) res_ty
-  = do	{ elt_ty <- boxySplitListTy res_ty
+  = do	{ (elt_ty, coi) <- boxySplitListTy res_ty
 	; expr' <- tcPolyExpr expr elt_ty
 	; enum_from <- newMethodFromName (ArithSeqOrigin seq) 
 			      elt_ty enumFromName
-	; return (ArithSeq (HsVar enum_from) (From expr')) }
+	; return $ mkHsWrapCoI coi (ArithSeq (HsVar enum_from) (From expr')) }
 
 tcExpr in_expr@(ArithSeq _ seq@(FromThen expr1 expr2)) res_ty
-  = do	{ elt_ty <- boxySplitListTy res_ty
+  = do	{ (elt_ty, coi) <- boxySplitListTy res_ty
 	; expr1' <- tcPolyExpr expr1 elt_ty
 	; expr2' <- tcPolyExpr expr2 elt_ty
 	; enum_from_then <- newMethodFromName (ArithSeqOrigin seq) 
 			      elt_ty enumFromThenName
-	; return (ArithSeq (HsVar enum_from_then) (FromThen expr1' expr2')) }
-
+	; return $ mkHsWrapCoI coi 
+                    (ArithSeq (HsVar enum_from_then) (FromThen expr1' expr2')) }
 
 tcExpr in_expr@(ArithSeq _ seq@(FromTo expr1 expr2)) res_ty
-  = do	{ elt_ty <- boxySplitListTy res_ty
+  = do	{ (elt_ty, coi) <- boxySplitListTy res_ty
 	; expr1' <- tcPolyExpr expr1 elt_ty
 	; expr2' <- tcPolyExpr expr2 elt_ty
 	; enum_from_to <- newMethodFromName (ArithSeqOrigin seq) 
 		  	      elt_ty enumFromToName
-	; return (ArithSeq (HsVar enum_from_to) (FromTo expr1' expr2')) }
+	; return $ mkHsWrapCoI coi 
+                     (ArithSeq (HsVar enum_from_to) (FromTo expr1' expr2')) }
 
 tcExpr in_expr@(ArithSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
-  = do	{ elt_ty <- boxySplitListTy res_ty
+  = do	{ (elt_ty, coi) <- boxySplitListTy res_ty
 	; expr1' <- tcPolyExpr expr1 elt_ty
 	; expr2' <- tcPolyExpr expr2 elt_ty
 	; expr3' <- tcPolyExpr expr3 elt_ty
 	; eft <- newMethodFromName (ArithSeqOrigin seq) 
 		      elt_ty enumFromThenToName
-	; return (ArithSeq (HsVar eft) (FromThenTo expr1' expr2' expr3')) }
+	; return $ mkHsWrapCoI coi 
+                     (ArithSeq (HsVar eft) (FromThenTo expr1' expr2' expr3')) }
 
 tcExpr in_expr@(PArrSeq _ seq@(FromTo expr1 expr2)) res_ty
-  = do	{ [elt_ty] <- boxySplitTyConApp parrTyCon res_ty
+  = do	{ (elt_ty, coi) <- boxySplitPArrTy res_ty
 	; expr1' <- tcPolyExpr expr1 elt_ty
 	; expr2' <- tcPolyExpr expr2 elt_ty
 	; enum_from_to <- newMethodFromName (PArrSeqOrigin seq) 
 				      elt_ty enumFromToPName
-	; return (PArrSeq (HsVar enum_from_to) (FromTo expr1' expr2')) }
+	; return $ mkHsWrapCoI coi 
+                     (PArrSeq (HsVar enum_from_to) (FromTo expr1' expr2')) }
 
 tcExpr in_expr@(PArrSeq _ seq@(FromThenTo expr1 expr2 expr3)) res_ty
-  = do	{ [elt_ty] <- boxySplitTyConApp parrTyCon res_ty
+  = do	{ (elt_ty, coi) <- boxySplitPArrTy res_ty
 	; expr1' <- tcPolyExpr expr1 elt_ty
 	; expr2' <- tcPolyExpr expr2 elt_ty
 	; expr3' <- tcPolyExpr expr3 elt_ty
 	; eft <- newMethodFromName (PArrSeqOrigin seq)
 		      elt_ty enumFromThenToPName
-	; return (PArrSeq (HsVar eft) (FromThenTo expr1' expr2' expr3')) }
+	; return $ mkHsWrapCoI coi 
+                     (PArrSeq (HsVar eft) (FromThenTo expr1' expr2' expr3')) }
 
 tcExpr (PArrSeq _ _) _ 
   = panic "TcExpr.tcMonoExpr: Infinite parallel array!"
@@ -1213,10 +1205,4 @@ polySpliceErr :: Id -> SDoc
 polySpliceErr id
   = ptext SLIT("Can't splice the polymorphic local variable") <+> quotes (ppr id)
 #endif
-\end{code}
-
-\begin{code}
-wrapExprCoI :: HsExpr a -> CoercionI -> HsExpr a
-wrapExprCoI expr IdCo     = expr
-wrapExprCoI expr (ACo co) = mkHsWrap (WpCo co) expr
 \end{code}

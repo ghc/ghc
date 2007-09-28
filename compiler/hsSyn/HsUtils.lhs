@@ -32,6 +32,7 @@ import HsLit
 
 import RdrName
 import Var
+import Coercion
 import Type
 import DataCon
 import Name
@@ -88,6 +89,10 @@ mkLHsWrap co_fn (L loc e) = L loc (mkHsWrap co_fn e)
 mkHsWrap :: HsWrapper -> HsExpr id -> HsExpr id
 mkHsWrap co_fn e | isIdHsWrapper co_fn = e
 		 | otherwise	      = HsWrap co_fn e
+
+mkHsWrapCoI :: CoercionI -> HsExpr id -> HsExpr id
+mkHsWrapCoI IdCo     e = e
+mkHsWrapCoI (ACo co) e = mkHsWrap (WpCo co) e
 
 mkHsLam :: [LPat id] -> LHsExpr id -> LHsExpr id
 mkHsLam pats body = mkHsPar (L (getLoc body) (HsLam matches))
