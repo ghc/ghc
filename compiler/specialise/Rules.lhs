@@ -595,11 +595,8 @@ match menv subst (Type ty1) (Type ty2)
   = match_ty menv subst ty1 ty2
 
 match menv subst (Cast e1 co1) (Cast e2 co2)
-  | (from1, to1) <- coercionKind co1
-  , (from2, to2) <- coercionKind co2
-  = do	{ subst1 <- match_ty menv subst  to1   to2
-	; subst2 <- match_ty menv subst1 from1 from2
-	; match menv subst2 e1 e2 }
+  = do	{ subst1 <- match_ty menv subst co1 co2
+	; match menv subst1 e1 e2 }
 
 {-	REMOVING OLD CODE: I think that the above handling for let is 
 			   better than the stuff here, which looks 
@@ -646,6 +643,8 @@ match_var menv subst@(tv_subst, id_subst, binds) v1 e2
 
 		| otherwise	-- No renaming to do on e2, because no free var
 				-- of e2 is in the rnEnvR of the envt
+		-- Note [Matching variable types]
+		-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 		-- However, we must match the *types*; e.g.
 		--   forall (c::Char->Int) (x::Char). 
 		--	f (c x) = "RULE FIRED"

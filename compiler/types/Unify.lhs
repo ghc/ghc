@@ -26,6 +26,7 @@ import Var
 import VarEnv
 import VarSet
 import Type
+import Coercion
 import TyCon
 import DataCon
 import TypeRep
@@ -149,7 +150,7 @@ match :: MatchEnv	-- For the most part this is pushed downwards
 -- it respects NewTypes and PredType
 
 match menv subst ty1 ty2 | Just ty1' <- tcView ty1 = match menv subst ty1' ty2
-			  | Just ty2' <- tcView ty2 = match menv subst ty1 ty2'
+			 | Just ty2' <- tcView ty2 = match menv subst ty1 ty2'
 
 match menv subst (TyVarTy tv1) ty2
   | tv1' `elemVarSet` me_tmpls menv
@@ -157,10 +158,9 @@ match menv subst (TyVarTy tv1) ty2
 	Nothing 	-- No existing binding
 	    | any (inRnEnvR rn_env) (varSetElems (tyVarsOfType ty2))
 	    -> Nothing	-- Occurs check
-	    | not (typeKind ty2 `isSubKind` tyVarKind tv1)
-	    -> Nothing	-- Kind mis-match
-	    | otherwise
-	    -> Just (extendVarEnv subst tv1' ty2)
+	    | otherwise	
+	    -> do { subst1 <- match_kind menv subst tv1 ty2
+		  ; return (extendVarEnv subst tv1' ty2) }
 
 	Just ty1' 	-- There is an existing binding; check whether ty2 matches it
 	    | tcEqTypeX (nukeRnEnvL rn_env) ty1' ty2
@@ -198,6 +198,33 @@ match menv subst (AppTy ty1a ty1b) ty2
 
 match menv subst ty1 ty2
   = Nothing
+
+--------------
+match_kind :: MatchEnv -> TvSubstEnv -> TyVar -> Type -> Maybe TvSubstEnv
+-- Match the kind of the template tyvar with the kind of Type
+-- Note [Matching kinds]
+match_kind menv subst tv ty
+  | isCoVar tv = do { let (ty1,ty2) = splitCoercionKind (tyVarKind tv)
+			  (ty3,ty4) = coercionKind ty
+		    ; subst1 <- match menv subst ty1 ty3
+		    ; match menv subst1 ty2 ty4 }
+  | otherwise  = if typeKind ty `isSubKind` tyVarKind tv
+		 then Just subst
+		 else Nothing
+
+-- Note [Matching kinds]
+-- ~~~~~~~~~~~~~~~~~~~~~
+-- For ordinary type variables, we don't want (m a) to match (n b) 
+-- if say (a::*) and (b::*->*).  This is just a yes/no issue. 
+--
+-- For coercion kinds matters are more complicated.  If we have a 
+-- coercion template variable co::a~[b], where a,b are presumably also
+-- template type variables, then we must match co's kind against the 
+-- kind of the actual argument, so as to give bindings to a,b.  
+--
+-- In fact I have no example in mind that *requires* this kind-matching
+-- to instantiate template type variables, but it seems like the right
+-- thing to do.  C.f. Note [Matching variable types] in Rules.lhs
 
 --------------
 match_tys menv subst tys1 tys2 = match_list (match menv) subst tys1 tys2

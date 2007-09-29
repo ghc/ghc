@@ -27,11 +27,11 @@ import CoreTidy		( tidyRules )
 import PprCore		( pprRules )
 import WwLib		( mkWorkerArgs )
 import DataCon		( dataConRepArity, dataConUnivTyVars )
-import Type		( Type, tyConAppArgs )
-import Coercion		( coercionKind )
+import Coercion	
+import Type		hiding( substTy )
 import Id		( Id, idName, idType, isDataConWorkId_maybe, idArity,
 			  mkUserLocal, mkSysLocal, idUnfolding, isLocalId )
-import Var		( Var )
+import Var
 import VarEnv
 import VarSet
 import Name
@@ -1107,10 +1107,15 @@ argToPat in_scope val_env (Let _ arg) arg_occ
 
 argToPat in_scope val_env (Cast arg co) arg_occ
   = do	{ (interesting, arg') <- argToPat in_scope val_env arg arg_occ
-	; if interesting then 
-		return (interesting, Cast arg' co)
-	  else 
-		wildCardPat (snd (coercionKind co)) }
+	; let (ty1,ty2) = coercionKind co
+	; if not interesting then 
+		wildCardPat ty2
+	  else do
+	{ -- Make a wild-card pattern for the coercion
+	  uniq <- getUniqueUs
+	; let co_name = mkSysTvName uniq FSLIT("sg")
+	      co_var = mkCoVar co_name (mkCoKind ty1 ty2)
+	; return (interesting, Cast arg' (mkTyVarTy co_var)) } }
 
 {-	Disabling lambda specialisation for now
 	It's fragile, and the spec_loop can be infinite
