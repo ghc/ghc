@@ -1,41 +1,42 @@
-build-type: Simple
-name: haddock
-version: 2.0
-license: BSD3
-license-file: LICENSE
-copyright: (c) Simon Marlow, David Waern
-author: Simon Marlow, David Waern
-maintainer: David Waern <davve@dtek.chalmers.se>
-stability: stable
-homepage: http://www.haskell.org/haddock/
-synopsis: Haddock is a documentation-generation tool for Haskell libraries
-build-depends: base,
-               haskell98,
-               mtl,
-               ghc>=6.8,
-               Cabal,
-               filepath,
-               network,
-               process,
-               directory,
-               pretty,
-               containers,
-               array
-extensions: CPP, PatternGuards
-ghc-options: -fglasgow-exts
-hs-source-dirs: src
-exposed-modules:
-  Distribution.Haddock
+build-type:           Simple
+name:                 haddock
+version:              2.0
+license:              BSD3
+license-file:         LICENSE
+copyright:            (c) Simon Marlow, David Waern
+author:               Simon Marlow, David Waern
+maintainer:           David Waern <davve@dtek.chalmers.se>
+stability:            stable
+homepage:             http://www.haskell.org/haddock/
+synopsis:             Haddock is a documentation-generation tool for Haskell
+                      libraries
+build-depends:
+  base,
+  haskell98,
+  mtl,
+  ghc>=6.8,
+  Cabal,
+  filepath,
+  network,
+  process,
+  directory,
+  pretty,
+  containers,
+  array
+extensions:           CPP, PatternGuards
+ghc-options:          -fglasgow-exts
+hs-source-dirs:       src
+exposed-modules:      Distribution.Haddock
 other-modules:
   Haddock.Types
   Haddock.InterfaceFile
   Haddock.Exception
 data-files:
-	html/haddock-DEBUG.css
-	html/haddock.css
-	html/haddock.js
-	html/haskell_icon.gif
-	html/minus.gif
+  html/haddock-DEBUG.css
+  html/haddock.css
+  html/haddock.js
+  html/haskell_icon.gif
+  html/minus.gif
 	html/plus.gif
 extra-source-files:
 	CHANGES
@@ -73,11 +74,11 @@ extra-source-files:
 	haskell.vim
 	src/haddock.sh
 
-executable: haddock
-hs-source-dirs: src
-main-is: Main.hs
-extensions: CPP, PatternGuards
-ghc-options: -fglasgow-exts
+executable:           haddock
+hs-source-dirs:       src
+main-is:              Main.hs
+extensions:           CPP, PatternGuards
+ghc-options:          -fglasgow-exts
 other-modules:
   Haddock.Interface.Rename
   Haddock.Interface.Create
