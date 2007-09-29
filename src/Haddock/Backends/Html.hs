@@ -1110,13 +1110,34 @@ ppDataHeader summary decl
     (if tcdND decl == NewType then keyword "newtype" else keyword "data") <+> 
     -- context
     ppLContext (tcdCtxt decl) <+>
-    -- T a b c ..., or a :+: b  
-    (if isConSym name 
-      then ppName (tyvars!!0) <+> ppBinder summary name <+> ppName (tyvars!!1)
-      else ppBinder summary name <+> hsep (map ppName tyvars))
+    -- T a b c ..., or a :+: b
+    ppDataHead summary (orig $ tcdLName decl) (tyvarNames $ tcdTyVars decl)
+
+
+-- | data context => ... =
+--                    ^ Print this part of a data/newtype declaration
+ppDataHead :: Bool -> Name -> [Name] -> Html
+ppDataHead summary name tyvars
+
+  -- (a :+: b) c d
+  | isConSym name && length tyvars > 2 = parens first2 <+> rest
+
+  -- a :+: b
+  | isConSym name = first2
+
+  -- Would like a case for:
+  --       a `O` b
+  -- and  (a `O` b) c
+  -- but GHC doesn't keep this information
+
+  -- T a b c
+  | otherwise = ppBinder summary name <+> hsep (map ppName tyvars)
+
   where 
-    tyvars = tyvarNames $ tcdTyVars decl
-    name = orig $ tcdLName decl
+    first2        = ppName a <+> ppBinder summary name <+> ppName b
+    rest          = hsep $ map ppName restTypes
+    a:b:restTypes = tyvars
+
 
 -- ----------------------------------------------------------------------------
 -- Types and contexts
