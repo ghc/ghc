@@ -587,7 +587,9 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	      arg_tys' = substTys    tenv arg_tys
 
 	; co_vars <- newCoVars eq_spec'	-- Make coercion variables
+        ; traceTc (text "tcConPat: refineAlt")
 	; pstate' <- refineAlt data_con pstate ex_tvs' co_vars pat_ty
+        ; traceTc (text "tcConPat: refineAlt done!")
 	
 	; ((arg_pats', inner_tvs, res), lie_req) <- getLIE $
 		tcConArgs data_con arg_tys' arg_pats pstate' thing_inside

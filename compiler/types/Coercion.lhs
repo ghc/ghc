@@ -404,6 +404,9 @@ splitCoercionKindOf co
   , Just (ty_fun1, ty_arg1) <- splitAppTy_maybe ty1
   , Just (ty_fun2, ty_arg2) <- splitAppTy_maybe ty2
   = ((ty_fun1, ty_fun2),(ty_arg1, ty_arg2))
+splitCoercionKindOf co 
+  = pprPanic "Coercion.splitCoercionKindOf" 
+             (ppr co $$ ppr (coercionKindPredTy co))
 
 instCoercionTyCon 
   =  mkCoercionTyCon instCoercionTyConName 2 instCoercionKind

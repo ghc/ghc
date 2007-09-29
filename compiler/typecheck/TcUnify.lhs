@@ -211,6 +211,8 @@ boxySplitTyConApp tc orig_ty
 
       | isOpenSynTyCon tycon        -- try to normalise type family application
       = do { (coi1, ty') <- tcNormaliseFamInst ty
+           ; traceTc $ text "boxySplitTyConApp:" <+> 
+                       ppr ty <+> text "==>" <+> ppr ty'
            ; case coi1 of
 	       IdCo   -> defer    -- no progress, but maybe solvable => defer
                ACo _  ->          -- progress: so lets try again
