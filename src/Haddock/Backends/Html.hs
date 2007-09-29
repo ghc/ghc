@@ -1287,7 +1287,7 @@ ppBinder True nm = linkedAnchor (anchorNameStr nm) << ppBinder' nm
 ppBinder False nm = linkTarget nm +++ bold << ppBinder' nm
 
 ppBinder' :: Name -> Html
-ppBinder' name 
+ppBinder' name
   | isNameVarSym name = parens $ toHtml (getOccString name)
   | otherwise = toHtml (getOccString name)             
 
