@@ -1125,10 +1125,10 @@ ppDataHead :: Bool -> Name -> [Name] -> Html
 ppDataHead summary name tyvars
 
   -- (a :+: b) c d
-  | isConSym name && length tyvars > 2 = parens first2 <+> rest
+  | isNameSymOcc name && length tyvars > 2 = parens first2 <+> rest
 
   -- a :+: b
-  | isConSym name = first2
+  | isNameSymOcc name = first2
 
   -- Would like a case for:
   --       a `O` b
