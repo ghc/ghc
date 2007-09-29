@@ -716,7 +716,7 @@ ppSig summary links loc mbDoc (TypeSig lname ltype)
   do_args leader t
     = argBox (leader <+> ppType t) <-> rdocBox (noHtml)
 
-ppTyVars tvs = map ppName (tyvarNames tvs)
+ppTyVars tvs = ppTyNames (tyvarNames tvs)
 
 tyvarNames = map f 
   where f x = let NoLink n = hsTyVarName (unLoc x) in n
@@ -736,6 +736,15 @@ ppLType (L _ t) = ppType t
 
 ppTypeSig :: Bool -> Name -> (HsType DocName) -> Html
 ppTypeSig summary nm ty = ppBinder summary nm <+> dcolon <+> ppType ty
+
+
+ppTyName name
+  | isNameSym name = parens (ppName name)
+  | otherwise = ppName name
+
+
+ppTyNames = map ppTyName
+
 
 --------------------------------------------------------------------------------
 -- Contexts 
@@ -1136,11 +1145,11 @@ ppDataHead summary name tyvars
   -- but GHC doesn't keep this information
 
   -- T a b c
-  | otherwise = ppBinder summary name <+> hsep (map ppName tyvars)
+  | otherwise = ppBinder summary name <+> hsep (ppTyNames tyvars) 
 
   where 
-    first2        = ppName a <+> ppBinder summary name <+> ppName b
-    rest          = hsep $ map ppName restTypes
+    first2        = ppTyName a <+> ppBinder summary name <+> ppTyName b
+    rest          = hsep $ ppTyNames restTypes
     a:b:restTypes = tyvars
 
 
