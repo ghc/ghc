@@ -1125,10 +1125,10 @@ ppDataHead :: Bool -> Name -> [Name] -> Html
 ppDataHead summary name tyvars
 
   -- (a :+: b) c d
-  | isNameSymOcc name && length tyvars > 2 = parens first2 <+> rest
+  | isNameConSym name && length tyvars > 2 = parens first2 <+> rest
 
   -- a :+: b
-  | isNameSymOcc name = first2
+  | isNameConSym name = first2
 
   -- Would like a case for:
   --       a `O` b
@@ -1243,7 +1243,7 @@ ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2)
   = maybeParen ctxt_prec pREC_OP $
     ppr_mono_lty pREC_OP ty1 <+> ppr_op <+> ppr_mono_lty pREC_OP ty2
   where
-    ppr_op = if not (isNameSymOcc name) then quote (ppLDocName op) else ppLDocName op
+    ppr_op = if not (isNameConSym name) then quote (ppLDocName op) else ppLDocName op
     name = lDocLinkName op
 
 ppr_mono_ty ctxt_prec (HsParTy ty)
@@ -1288,7 +1288,7 @@ ppBinder False nm = linkTarget nm +++ bold << ppBinder' nm
 
 ppBinder' :: Name -> Html
 ppBinder' name 
-  | isVarSym name = parens $ toHtml (getOccString name)
+  | isNameVarSym name = parens $ toHtml (getOccString name)
   | otherwise = toHtml (getOccString name)             
 
 linkId :: Module -> Maybe Name -> Html -> Html

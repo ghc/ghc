@@ -52,13 +52,10 @@ modulePkgStr = packageIdString . modulePackageId
 
 -- misc
 
-isNameSymOcc = isSymOcc . nameOccName
 
-
--- there should be a better way to check this using the GHC API
-isConSym n = head (nameOccString n) == ':'
-isVarSym n = fstChar /= '_' && not (isConSym n) && (not . isLetter) fstChar
-  where fstChar = head (nameOccString n)
+isNameSym = isSymOcc . nameOccName
+isNameVarSym = isLexVarSym . occNameFS . nameOccName 
+isNameConSym = isLexConSym . occNameFS . nameOccName 
 
 
 getMainDeclBinder :: HsDecl name -> Maybe name
