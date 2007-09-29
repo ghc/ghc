@@ -1243,7 +1243,7 @@ ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2)
   = maybeParen ctxt_prec pREC_OP $
     ppr_mono_lty pREC_OP ty1 <+> ppr_op <+> ppr_mono_lty pREC_OP ty2
   where
-    ppr_op = if not (isNameConSym name) then quote (ppLDocName op) else ppLDocName op
+    ppr_op = if not (isNameSym name) then quote (ppLDocName op) else ppLDocName op
     name = lDocLinkName op
 
 ppr_mono_ty ctxt_prec (HsParTy ty)

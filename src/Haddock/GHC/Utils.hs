@@ -53,7 +53,7 @@ modulePkgStr = packageIdString . modulePackageId
 -- misc
 
 
-isNameSym = isSymOcc . nameOccName
+isNameSym n  = isNameVarSym n || isNameConSym n
 isNameVarSym = isLexVarSym . occNameFS . nameOccName 
 isNameConSym = isLexConSym . occNameFS . nameOccName 
 
