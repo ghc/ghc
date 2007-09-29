@@ -1097,7 +1097,7 @@ check_tau_type rank ubx_tup (NoteTy other_note ty)
 check_tau_type rank ubx_tup ty@(TyConApp tc tys)
   | isSynTyCon tc
   = do	{ 	-- Check that the synonym has enough args
-		-- This applies eqaually to open and closed synonyms
+		-- This applies equally to open and closed synonyms
 	 	-- It's OK to have an *over-applied* type synonym
 		--	data Tree a b = ...
 		--	type Foo a = Tree [a]
@@ -1106,14 +1106,14 @@ check_tau_type rank ubx_tup ty@(TyConApp tc tys)
 
 	-- See Note [Liberal type synonyms]
 	; liberal <- doptM Opt_LiberalTypeSynonyms
-	; if not liberal then
-		-- For H98, do check the type args
+	; if not liberal || isOpenSynTyCon tc then
+		-- For H98 and synonym families, do check the type args
 		mappM_ check_arg_type tys
 
-	  else	-- In the liberal case, expand then check
+	  else	-- In the liberal case (only for closed syns), expand then check
 	  case tcView ty of   
 	     Just ty' -> check_tau_type rank ubx_tup ty' 
-	     Nothing -> pprPanic "check_tau_type" (ppr ty)
+	     Nothing  -> pprPanic "check_tau_type" (ppr ty)
     }
     
   | isUnboxedTupleTyCon tc
