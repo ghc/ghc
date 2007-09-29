@@ -814,7 +814,7 @@ tcExpandTyCon_maybe, coreExpandTyCon_maybe
 		  Type,			-- Body type (not yet substituted)
 		  [Type])		-- Leftover args
 
--- For the *typechecker* view, we expand synonyms only
+-- For the *typechecker* view, we expand (closed) synonyms only
 tcExpandTyCon_maybe (SynTyCon {tyConTyVars = tvs, 
 			       synTcRhs = SynonymTyCon rhs }) tys
    = expand tvs rhs tys
