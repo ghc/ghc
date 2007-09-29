@@ -52,6 +52,8 @@ modulePkgStr = packageIdString . modulePackageId
 
 -- misc
 
+isNameSymOcc = isSymOcc . nameOccName
+
 
 -- there should be a better way to check this using the GHC API
 isConSym n = head (nameOccString n) == ':'

@@ -864,6 +864,11 @@ ppAsst n ts = ppDocName n <+> hsep (map ppParendType ts)
 orig (L _ (NoLink name)) = name
 orig _ = error "orig"
 
+
+lDocLinkName (L _ (NoLink name)) = name
+lDocLinkName (L _ (Link   name)) = name
+
+
 -- TODO: print contexts
 ppShortDataDecl :: Bool -> LinksInfo -> SrcSpan -> 
                    Maybe (HsDoc DocName) -> TyClDecl DocName -> Html
@@ -1236,7 +1241,10 @@ ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
 
 ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2)
   = maybeParen ctxt_prec pREC_OP $
-    ppr_mono_lty pREC_OP ty1 <+> ppLDocName op <+> ppr_mono_lty pREC_OP ty2
+    ppr_mono_lty pREC_OP ty1 <+> ppr_op <+> ppr_mono_lty pREC_OP ty2
+  where
+    ppr_op = if not (isNameSymOcc name) then quote (ppLDocName op) else ppLDocName op
+    name = lDocLinkName op
 
 ppr_mono_ty ctxt_prec (HsParTy ty)
   = parens (ppr_mono_lty pREC_TOP ty)
@@ -1370,6 +1378,11 @@ char c = toHtml [c]
 
 empty :: Html
 empty  = noHtml
+
+
+quote :: Html -> Html
+quote h = char '`' +++ h +++ '`'
+
 
 parens, brackets, braces :: Html -> Html
 parens h        = char '(' +++ h +++ char ')'
