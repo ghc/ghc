@@ -757,7 +757,7 @@ exprIsConApp_maybe :: CoreExpr -> Maybe (DataCon, [CoreExpr])
 -- Returns (Just (dc, [x1..xn])) if the argument expression is 
 -- a constructor application of the form (dc x1 .. xn)
 exprIsConApp_maybe (Cast expr co)
-  =     -- Here we do the PushC reduction rule as described in the FC paper
+  =     -- Here we do the KPush reduction rule as described in the FC paper
     case exprIsConApp_maybe expr of {
 	Nothing 	   -> Nothing ;
 	Just (dc, dc_args) -> 
@@ -787,17 +787,20 @@ exprIsConApp_maybe (Cast expr co)
     let
 	tc_arity = tyConArity from_tc
 
-        (univ_args, rest1)  = splitAt tc_arity dc_args
-        (ex_args, rest2)    = splitAt n_ex_tvs rest1
-	(co_args, val_args) = splitAt n_cos rest2
+        (univ_args, rest1)        = splitAt tc_arity dc_args
+        (ex_args, rest2)          = splitAt n_ex_tvs rest1
+	(co_args_spec, rest3)     = splitAt n_cos_spec rest2
+	(co_args_theta, val_args) = splitAt n_cos_theta rest3
 
         arg_tys 	    = dataConRepArgTys dc
 	dc_univ_tyvars	    = dataConUnivTyVars dc
         dc_ex_tyvars        = dataConExTyVars dc
 	dc_eq_spec	    = dataConEqSpec dc
+        dc_eq_theta         = dataConEqTheta dc
         dc_tyvars           = dc_univ_tyvars ++ dc_ex_tyvars
         n_ex_tvs            = length dc_ex_tyvars
-	n_cos		    = length dc_eq_spec
+	n_cos_spec	    = length dc_eq_spec
+	n_cos_theta	    = length dc_eq_theta
 
 	-- Make the "theta" from Fig 3 of the paper
         gammas              = decomposeCo tc_arity co
@@ -805,10 +808,15 @@ exprIsConApp_maybe (Cast expr co)
         theta               = zipOpenTvSubst dc_tyvars new_tys
 
           -- First we cast the existential coercion arguments
-        cast_co (tv,ty) (Type co) = Type $ mkSymCoercion (substTyVar theta tv)
-					   `mkTransCoercion` co
-					   `mkTransCoercion` (substTy theta ty)
-        new_co_args = zipWith cast_co dc_eq_spec co_args
+        cast_co_spec (tv, ty) co 
+          = cast_co_theta (mkEqPred (mkTyVarTy tv, ty)) co
+        cast_co_theta eqPred (Type co) 
+          | (ty1, ty2) <- getEqPredTys eqPred
+          = Type $ mkSymCoercion (substTy theta ty1)
+		   `mkTransCoercion` co
+		   `mkTransCoercion` (substTy theta ty2)
+        new_co_args = zipWith cast_co_spec  dc_eq_spec  co_args_spec ++
+                      zipWith cast_co_theta dc_eq_theta co_args_theta
   
           -- ...and now value arguments
 	new_val_args = zipWith cast_arg arg_tys val_args

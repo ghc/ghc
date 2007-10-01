@@ -1680,25 +1680,27 @@ knownAlt env scrut args bndr (DataAlt dc, bs, rhs) cont
 	; env <- simplNonRecX env bndr bndr_rhs
 	; -- pprTrace "knownCon2" (ppr bs $$ ppr rhs $$ ppr (seIdSubst env)) $
 	  simplExprF env rhs cont }
+  where
+    -- Ugh!
+    bind_args env dead_bndr [] _  = return env
 
--- Ugh!
-bind_args env dead_bndr [] _  = return env
+    bind_args env dead_bndr (b:bs) (Type ty : args)
+      = ASSERT( isTyVar b )
+        bind_args (extendTvSubst env b ty) dead_bndr bs args
 
-bind_args env dead_bndr (b:bs) (Type ty : args)
-  = ASSERT( isTyVar b )
-    bind_args (extendTvSubst env b ty) dead_bndr bs args
-    
-bind_args env dead_bndr (b:bs) (arg : args)
-  = ASSERT( isId b )
-    do	{ let b' = if dead_bndr then b else zapOccInfo b
-		-- Note that the binder might be "dead", because it doesn't occur 
-		-- in the RHS; and simplNonRecX may therefore discard it via postInlineUnconditionally
-		-- Nevertheless we must keep it if the case-binder is alive, because it may
-		-- be used in the con_app.  See Note [zapOccInfo]
-	; env <- simplNonRecX env b' arg
-	; bind_args env dead_bndr bs args }
+    bind_args env dead_bndr (b:bs) (arg : args)
+      = ASSERT( isId b )
+        do	{ let b' = if dead_bndr then b else zapOccInfo b
+                    -- Note that the binder might be "dead", because it doesn't occur 
+                    -- in the RHS; and simplNonRecX may therefore discard it via postInlineUnconditionally
+                    -- Nevertheless we must keep it if the case-binder is alive, because it may
+                    -- be used in the con_app.  See Note [zapOccInfo]
+            ; env <- simplNonRecX env b' arg
+            ; bind_args env dead_bndr bs args }
 
-bind_args _ _ _ _ = panic "bind_args"
+    bind_args _ _ _ _ = 
+      pprPanic "bind_args" $ ppr dc $$ ppr bs $$ ppr args $$ 
+                             text "scrut:" <+> ppr scrut
 \end{code}
 
 
