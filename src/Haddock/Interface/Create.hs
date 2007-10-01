@@ -40,9 +40,6 @@ import FastString
 #define FSLIT(x) (mkFastString# (x#))
 
 
-type LookupMod = (Module -> Maybe Interface)
-
-
 -- | Process the data in the GhcModule to produce an interface.
 -- To do this, we need access to already processed modules in the topological
 -- sort. That's what's in the module map.
@@ -64,13 +61,12 @@ createInterface ghcMod flags modMap = do
       localDeclMap = mkDeclMap entityNames_ group
       docMap       = mkDocMap group 
       ignoreExps   = Flag_IgnoreAllExports `elem` flags
-      lookupMod m  = Map.lookup mod modMap
 
-  visibleNames <- mkVisibleNames mod lookupMod localNames 
+  visibleNames <- mkVisibleNames mod modMap localNames 
                                  (ghcNamesInScope ghcMod) 
                                  subMap exports opts localDeclMap 
 
-  exportItems <- mkExportItems lookupMod mod (ghcExportedNames ghcMod)
+  exportItems <- mkExportItems modMap mod (ghcExportedNames ghcMod)
                                expDeclMap localDeclMap subMap entities 
                                opts exports ignoreExps docMap 
 
@@ -349,7 +345,7 @@ getDeclFromGroup group name =
 -- export list.  At this point, the list of ExportItems is in terms of
 -- original names.
 mkExportItems
-  :: LookupMod
+  :: ModuleMap
   -> Module			-- this module
   -> [Name]			-- exported names (orig)
   -> Map Name (LHsDecl Name) -- maps exported names to declarations
@@ -362,7 +358,7 @@ mkExportItems
   -> Map Name (HsDoc Name)
   -> ErrMsgM [ExportItem Name]
 
-mkExportItems lookupMod this_mod exported_names exportedDeclMap localDeclMap sub_map entities
+mkExportItems modMap this_mod exported_names exportedDeclMap localDeclMap sub_map entities
               opts maybe_exps ignore_all_exports docMap
   | isNothing maybe_exps || ignore_all_exports || OptIgnoreExports `elem` opts
     = everything_local_exported
@@ -398,12 +394,12 @@ mkExportItems lookupMod this_mod exported_names exportedDeclMap localDeclMap sub
               mdl = nameModule t
 	      subs = filter (`elem` exported_names) all_subs
               all_subs | mdl == this_mod = Map.findWithDefault [] t sub_map
-		       | otherwise       = allSubsOfName lookupMod t
+		       | otherwise       = allSubsOfName modMap t
 
     fullContentsOf m  
 	| m == this_mod = return (fullContentsOfThisModule this_mod entities localDeclMap docMap)
 	| otherwise = 
-	   case lookupMod m of
+	   case Map.lookup m modMap of
 	     Just iface
 		| OptHide `elem` ifaceOptions iface
 			-> return (ifaceExportItems iface)
@@ -415,7 +411,7 @@ mkExportItems lookupMod this_mod exported_names exportedDeclMap localDeclMap sub
     findDecl n 
 	| m == this_mod = (Map.lookup n exportedDeclMap, Map.lookup n docMap)
 	| otherwise = 
-	   case lookupMod m of
+	   case Map.lookup m modMap of
 		Just iface -> (Map.lookup n (ifaceExportedDeclMap iface), 
                       Map.lookup n (ifaceDocMap iface))
 		Nothing -> (Nothing, Nothing)
@@ -502,7 +498,7 @@ pruneExportItems items = filter hasDoc items
 
 -- | Gather a list of original names exported from this module
 mkVisibleNames :: Module 
-             -> LookupMod
+             -> ModuleMap
              -> [Name] 
              -> [Name]
              -> Map Name [Name]
@@ -511,7 +507,7 @@ mkVisibleNames :: Module
              -> Map Name (LHsDecl Name)
              -> ErrMsgM [Name]
 
-mkVisibleNames mdl lookupMod localNames scope subMap maybeExps opts declMap 
+mkVisibleNames mdl modMap localNames scope subMap maybeExps opts declMap 
   -- if no export list, just return all local names 
   | Nothing <- maybeExps         = return (filter hasDecl localNames)
   | OptIgnoreExports `elem` opts = return localNames
@@ -520,7 +516,7 @@ mkVisibleNames mdl lookupMod localNames scope subMap maybeExps opts declMap
       return $ filter isNotPackageName (concat visibleNames)
  where
   hasDecl name = isJust (Map.lookup name declMap)
-  isNotPackageName name = nameMod == mdl || isJust (lookupMod nameMod)
+  isNotPackageName name = nameMod == mdl || isJust (Map.lookup nameMod modMap)
     where nameMod = nameModule name
 
   extract e = 
@@ -530,14 +526,14 @@ mkVisibleNames mdl lookupMod localNames scope subMap maybeExps opts declMap
     IEThingAll t -> return (t : all_subs)
 	 where
 	      all_subs | nameModule t == mdl = Map.findWithDefault [] t subMap
-		       | otherwise = allSubsOfName lookupMod t
+		       | otherwise = allSubsOfName modMap t
 
     IEThingWith t cs -> return (t : cs)
 	
     IEModuleContents m
 	| mkModule (modulePackageId mdl) m == mdl -> return localNames 
 	| otherwise -> let m' = mkModule (modulePackageId mdl) m in
-	  case lookupMod m' of
+	  case Map.lookup m' modMap of
 	    Just mod
 		| OptHide `elem` ifaceOptions mod ->
 		    return (filter (`elem` scope) (ifaceExports mod))
@@ -556,10 +552,10 @@ exportModuleMissingErr this mdl
 -- | For a given entity, find all the names it "owns" (ie. all the
 -- constructors and field names of a tycon, or all the methods of a
 -- class).
-allSubsOfName :: LookupMod -> Name -> [Name]
-allSubsOfName lookupMod name 
+allSubsOfName :: ModuleMap -> Name -> [Name]
+allSubsOfName modMap name 
   | isExternalName name =
-    case lookupMod (nameModule name) of
+    case Map.lookup (nameModule name) modMap of
       Just iface -> Map.findWithDefault [] name (ifaceSubMap iface)
       Nothing   -> []
   | otherwise =  error $ "Main.allSubsOfName: unexpected unqual'd name"
