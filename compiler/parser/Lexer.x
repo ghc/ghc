@@ -257,7 +257,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   "{-#" $whitechar* (CORE|core)		{ token ITcore_prag }
   "{-#" $whitechar* (UNPACK|unpack)	{ token ITunpack_prag }
 
-  "{-#" $whitechar* (DOCOPTIONS|docoptions)
+  "{-#" $whitechar* (DOC_OPTIONS|doc_options)
   / { ifExtension haddockEnabled }     { lex_string_prag ITdocOptions }
 
  "{-#"                                 { nested_comment lexToken }
