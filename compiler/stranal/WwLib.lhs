@@ -4,13 +4,6 @@
 \section[WwLib]{A library for the ``worker/wrapper'' back-end to the strictness analyser}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module WwLib ( mkWwBodies, mkWWstr, mkWorkerArgs ) where
 
 #include "HsVersions.h"
@@ -22,7 +15,7 @@ import Id		( Id, idType, mkSysLocal, idNewDemandInfo, setIdNewDemandInfo,
                           setIdInfo
 			)
 import IdInfo		( vanillaIdInfo )
-import DataCon		( deepSplitProductType_maybe, deepSplitProductType )
+import DataCon
 import NewDemand	( Demand(..), DmdResult(..), Demands(..) ) 
 import MkId		( realWorldPrimId, voidArgId, mkRuntimeErrorApp, rUNTIME_ERROR_ID,
                           mkUnpackCase, mkProductBox )
@@ -32,6 +25,7 @@ import Coercion         ( mkSymCoercion, splitNewTypeRepCo_maybe )
 import BasicTypes	( Boxity(..) )
 import Var              ( Var, isId )
 import UniqSupply	( returnUs, thenUs, getUniquesUs, UniqSM )
+import Unique
 import Util		( zipWithEqual, notNull )
 import Outputable
 import List		( zipWith4 )
@@ -285,6 +279,7 @@ mkWWargs fun_ty demands one_shots
 applyToVars :: [Var] -> CoreExpr -> CoreExpr
 applyToVars vars fn = mkVarApps fn vars
 
+mk_wrap_arg :: Unique -> Type -> NewDemand.Demand -> Bool -> Id
 mk_wrap_arg uniq ty dmd one_shot 
   = set_one_shot one_shot (setIdNewDemandInfo (mkSysLocal FSLIT("w") uniq ty) dmd)
   where
@@ -310,11 +305,6 @@ mkWWstr :: [Var]				-- Wrapper args; have their demand info on them
 		   CoreExpr -> CoreExpr)	-- Worker body, lacking the original body of the function,
 						-- and lacking its lambdas.
 						-- This fn does the reboxing
-
-----------------------
-nop_fn body = body
-
-----------------------
 mkWWstr []
   = returnUs ([], nop_fn, nop_fn)
 
@@ -323,14 +313,13 @@ mkWWstr (arg : args)
     mkWWstr args		`thenUs` \ (args2, wrap_fn2, work_fn2) ->
     returnUs (args1 ++ args2, wrap_fn1 . wrap_fn2, work_fn1 . work_fn2)
 
-
 ----------------------
 -- mkWWstr_one wrap_arg = (work_args, wrap_fn, work_fn)
 --   *  wrap_fn assumes wrap_arg is in scope,
 --	  brings into scope work_args (via cases)
 --   * work_fn assumes work_args are in scope, a
 --	  brings into scope wrap_arg (via lets)
-
+mkWWstr_one :: Var -> UniqSM ([Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
 mkWWstr_one arg
   | isTyVar arg
   = returnUs ([arg],  nop_fn, nop_fn)
@@ -383,7 +372,7 @@ mkWWstr_one arg
 		-- during simplification, so for now I've just nuked this whole case
 			
 	-- Other cases
-      other_demand -> returnUs ([arg], nop_fn, nop_fn)
+      _other_demand -> returnUs ([arg], nop_fn, nop_fn)
 
   where
 	-- If the wrapper argument is a one-shot lambda, then
@@ -393,6 +382,10 @@ mkWWstr_one arg
 
     set_one_shot | isOneShotLambda arg = setOneShotLambda
 		 | otherwise	       = \x -> x
+
+----------------------
+nop_fn :: CoreExpr -> CoreExpr
+nop_fn body = body
 \end{code}
 
 
@@ -460,7 +453,7 @@ mkWWcpr body_ty RetCPR
       n_con_args  = length con_arg_tys
       con_arg_ty1 = head con_arg_tys
 
-mkWWcpr body_ty other		-- No CPR info
+mkWWcpr body_ty _other		-- No CPR info
     = returnUs (id, id, body_ty)
 
 -- If the original function looked like
@@ -473,7 +466,7 @@ mkWWcpr body_ty other		-- No CPR info
 --
 -- This transform doesn't move work or allocation
 -- from one cost centre to another
-
+workerCase :: Id -> CoreExpr -> [Id] -> DataCon -> CoreExpr -> CoreExpr
 workerCase bndr (Note (SCC cc) e) args con body = Note (SCC cc) (mkUnpackCase bndr e args con body)
 workerCase bndr e args con body = mkUnpackCase bndr e args con body
 \end{code}
@@ -487,6 +480,7 @@ workerCase bndr e args con body = mkUnpackCase bndr e args con body
 
 
 \begin{code}
+mk_absent_let :: Id -> CoreExpr -> CoreExpr
 mk_absent_let arg body
   | not (isUnLiftedType arg_ty)
   = Let (NonRec arg abs_rhs) body
@@ -497,6 +491,7 @@ mk_absent_let arg body
     abs_rhs = mkRuntimeErrorApp rUNTIME_ERROR_ID arg_ty msg
     msg     = "Oops!  Entered absent arg " ++ showSDocDebug (ppr arg <+> ppr (idType arg))
 
+mk_seq_case :: Id -> CoreExpr -> CoreExpr
 mk_seq_case arg body = Case (Var arg) (sanitiseCaseBndr arg) (exprType body) [(DEFAULT, [], body)]
 
 sanitiseCaseBndr :: Id -> Id
@@ -510,5 +505,6 @@ sanitiseCaseBndr :: Id -> Id
 -- like		(x+y) `seq` ....
 sanitiseCaseBndr id = id `setIdInfo` vanillaIdInfo
 
+mk_ww_local :: Unique -> Type -> Id
 mk_ww_local uniq ty = mkSysLocal FSLIT("ww") uniq ty
 \end{code}
