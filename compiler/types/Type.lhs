@@ -67,8 +67,8 @@ module Type (
 	newTyConInstRhs,
 
 	-- Lifting and boxity
-	isUnLiftedType, isUnboxedTupleType, isAlgType, isPrimitiveType,
-	isStrictType, isStrictPred, 
+	isUnLiftedType, isUnboxedTupleType, isAlgType, isClosedAlgType,
+	isPrimitiveType, isStrictType, isStrictPred, 
 
 	-- Free variables
 	tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
@@ -861,10 +861,19 @@ isUnboxedTupleType ty = case splitTyConApp_maybe ty of
 
 -- Should only be applied to *types*; hence the assert
 isAlgType :: Type -> Bool
-isAlgType ty = case splitTyConApp_maybe ty of
-			Just (tc, ty_args) -> ASSERT( ty_args `lengthIs` tyConArity tc )
-					      isAlgTyCon tc
-			other		   -> False
+isAlgType ty 
+  = case splitTyConApp_maybe ty of
+      Just (tc, ty_args) -> ASSERT( ty_args `lengthIs` tyConArity tc )
+			    isAlgTyCon tc
+      _other	         -> False
+
+-- Should only be applied to *types*; hence the assert
+isClosedAlgType :: Type -> Bool
+isClosedAlgType ty
+  = case splitTyConApp_maybe ty of
+      Just (tc, ty_args) -> ASSERT( ty_args `lengthIs` tyConArity tc )
+			    isAlgTyCon tc && not (isOpenTyCon tc)
+      _other	         -> False
 \end{code}
 
 @isStrictType@ computes whether an argument (or let RHS) should

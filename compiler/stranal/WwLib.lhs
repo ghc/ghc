@@ -27,9 +27,7 @@ import NewDemand	( Demand(..), DmdResult(..), Demands(..) )
 import MkId		( realWorldPrimId, voidArgId, mkRuntimeErrorApp, rUNTIME_ERROR_ID,
                           mkUnpackCase, mkProductBox )
 import TysWiredIn	( tupleCon )
-import Type		( Type, isUnLiftedType, mkFunTys,
-			  splitForAllTys, splitFunTys, isAlgType
-			)
+import Type
 import Coercion         ( mkSymCoercion, splitNewTypeRepCo_maybe )
 import BasicTypes	( Boxity(..) )
 import Var              ( Var, isId )
@@ -422,8 +420,9 @@ mkWWcpr :: Type                              -- function body type
 		   Type)			-- Type of worker's body 
 
 mkWWcpr body_ty RetCPR
-    | not (isAlgType body_ty)
-    = WARN( True, text "mkWWcpr: non-algebraic body type" <+> ppr body_ty )
+    | not (isClosedAlgType body_ty)
+    = WARN( True, 
+            text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
       returnUs (id, id, body_ty)
 
     | n_con_args == 1 && isUnLiftedType con_arg_ty1
