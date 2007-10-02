@@ -107,28 +107,13 @@ createInterface ghcMod flags modMap = do
 mkDocOpts :: Maybe String -> [Flag] -> Module -> ErrMsgM [DocOption]
 mkDocOpts mbOpts flags mod = do
   opts <- case mbOpts of 
-    Just opts -> processOptions opts
+    Just opts -> case words $ replace ',' ' ' opts of
+      [] -> tell ["No option supplied to DOC_OPTION/doc_option"] >> return []
+      xs -> liftM catMaybes (mapM parseOption xs)
     Nothing -> return []
-  let opts' = if Flag_HideModule (moduleString mod) `elem` flags 
-                then OptHide : opts
-                else opts      
-  return opts'
-
-
-processOptions_ str = let (opts, msg) = runWriter (processOptions str) 
-                      in print msg >> return opts 
-
-
-processOptions :: String -> ErrMsgM [DocOption]
-processOptions str = do
-  case break (== ',') str of
-    (this, ',':rest) -> do
-	  opt <- parseOption this
-	  opts <- processOptions rest
-	  return (maybeToList opt ++ opts)
-    (this, _)
-	  | all isSpace this -> return []
-	  | otherwise -> do opt <- parseOption this; return (maybeToList opt)
+  if Flag_HideModule (moduleString mod) `elem` flags 
+    then return $ OptHide : opts
+    else return opts
 
 
 parseOption :: String -> ErrMsgM (Maybe DocOption)

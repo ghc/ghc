@@ -28,6 +28,9 @@ module Haddock.Utils (
   markup, 
   idMarkup,
 
+  -- * List utilities
+  replace,
+
   -- * Binary extras
 --  FormatVersion, mkFormatVersion  
  ) where
@@ -248,6 +251,15 @@ html_xrefs_ref = unsafePerformIO (newIORef (error "module_map"))
 {-# NOINLINE html_xrefs #-}
 html_xrefs :: Map Module FilePath
 html_xrefs = unsafePerformIO (readIORef html_xrefs_ref)
+
+
+-----------------------------------------------------------------------------
+-- List utils
+-----------------------------------------------------------------------------
+
+
+replace a b xs = map (\x -> if x == a then b else x) xs 
+
 
 -----------------------------------------------------------------------------
 -- put here temporarily
