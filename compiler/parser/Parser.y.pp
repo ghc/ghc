@@ -1859,7 +1859,7 @@ docsection :: { Located (n, HsDoc RdrName) }
       Right doc -> return (L1 (n, doc)) } }
 
 docoptions :: { String }
-  : DOCOPTIONS { getDOCOPTIONS $1 }
+  : DOCOPTIONS '#-}' { getDOCOPTIONS $1 }
 
 moduleheader :: { (HaddockModInfo RdrName, Maybe (HsDoc RdrName)) }                                    
         : DOCNEXT {% let string = getDOCNEXT $1 in
