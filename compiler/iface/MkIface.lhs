@@ -847,7 +847,8 @@ mkIfaceExports exports
 		-- Usually just one, but see Note [Original module]
 
 	add_for_mod env mod
-	    = add_one env mod (AvailTC tc_occ names_from_mod)
+	    = add_one env mod (AvailTC tc_occ (sort names_from_mod))
+              -- NB. sort the children, we need a canonical order
 	    where
 	      names_from_mod = [nameOccName n | n <- ns, nameModule n == mod]
 \end{code}
