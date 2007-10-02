@@ -1016,7 +1016,7 @@ ppConstrHdr :: HsExplicitForAll -> [Name] -> HsContext DocName -> Html
 ppConstrHdr forall tvs ctxt
  = (if null tvs then noHtml else ppForall)
    +++
-   (if null ctxt then noHtml else ppContext ctxt <+> toHtml "=> ")
+   (if null ctxt then noHtml else ppContextNoArrow ctxt <+> toHtml "=> ")
   where
     ppForall = case forall of 
       Explicit -> keyword "forall" <+> hsep (map ppName tvs) <+> toHtml ". "
