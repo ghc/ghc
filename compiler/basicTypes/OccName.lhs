@@ -376,7 +376,7 @@ isDataOcc other		       = False
 isSymOcc (OccName DataName s)  = isLexConSym s
 isSymOcc (OccName TcClsName s) = isLexConSym s
 isSymOcc (OccName VarName s)   = isLexSym s
-isSymOcc other		       = False
+isSymOcc (OccName TvName s)    = isLexSym s
 
 parenSymOcc :: OccName -> SDoc -> SDoc
 -- Wrap parens around an operator
