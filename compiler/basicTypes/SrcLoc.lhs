@@ -3,13 +3,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module SrcLoc (
 	SrcLoc,			-- Abstract
 
@@ -79,7 +72,10 @@ data SrcLoc
 
 Things to make 'em:
 \begin{code}
+mkSrcLoc :: FastString -> Int -> Int -> SrcLoc
 mkSrcLoc x line col = SrcLoc x line col
+
+noSrcLoc, generatedSrcLoc, interactiveSrcLoc :: SrcLoc
 noSrcLoc	  = UnhelpfulLoc FSLIT("<no location info>")
 generatedSrcLoc   = UnhelpfulLoc FSLIT("<compiler-generated code>")
 interactiveSrcLoc = UnhelpfulLoc FSLIT("<interactive session>")
@@ -87,23 +83,24 @@ interactiveSrcLoc = UnhelpfulLoc FSLIT("<interactive session>")
 mkGeneralSrcLoc :: FastString -> SrcLoc
 mkGeneralSrcLoc = UnhelpfulLoc 
 
+isGoodSrcLoc :: SrcLoc -> Bool
 isGoodSrcLoc (SrcLoc _ _ _) = True
-isGoodSrcLoc other          = False
+isGoodSrcLoc _other         = False
 
 srcLocFile :: SrcLoc -> FastString
 srcLocFile (SrcLoc fname _ _) = fname
-srcLocFile other	      = FSLIT("<unknown file")
+srcLocFile _other	      = FSLIT("<unknown file")
 
 srcLocLine :: SrcLoc -> Int
-srcLocLine (SrcLoc _ l c) = l
-srcLocLine other	  = panic "srcLocLine: unknown line"
+srcLocLine (SrcLoc _ l _) = l
+srcLocLine _other	  = panic "srcLocLine: unknown line"
 
 srcLocCol :: SrcLoc -> Int
-srcLocCol (SrcLoc _ l c) = c
-srcLocCol other	  = panic "srcLocCol: unknown col"
+srcLocCol (SrcLoc _ _ c) = c
+srcLocCol _other         = panic "srcLocCol: unknown col"
 
 advanceSrcLoc :: SrcLoc -> Char -> SrcLoc
-advanceSrcLoc (SrcLoc f l c) '\n' = SrcLoc f  (l + 1) 0
+advanceSrcLoc (SrcLoc f l _) '\n' = SrcLoc f  (l + 1) 0
 advanceSrcLoc (SrcLoc f l c) _    = SrcLoc f  l (c + 1)
 advanceSrcLoc loc	     _	  = loc	-- Better than nothing
 \end{code}
@@ -118,18 +115,19 @@ advanceSrcLoc loc	     _	  = loc	-- Better than nothing
 -- SrcLoc is an instance of Ord so that we can sort error messages easily
 instance Eq SrcLoc where
   loc1 == loc2 = case loc1 `cmpSrcLoc` loc2 of
-		   EQ    -> True
-		   other -> False
+		   EQ     -> True
+		   _other -> False
 
 instance Ord SrcLoc where
   compare = cmpSrcLoc
-
+   
+cmpSrcLoc :: SrcLoc -> SrcLoc -> Ordering
 cmpSrcLoc (UnhelpfulLoc s1) (UnhelpfulLoc s2) = s1 `compare` s2
-cmpSrcLoc (UnhelpfulLoc _)  other      	      = LT
+cmpSrcLoc (UnhelpfulLoc _)  _other            = LT
 
 cmpSrcLoc (SrcLoc s1 l1 c1) (SrcLoc s2 l2 c2)      
   = (s1 `compare` s2) `thenCmp` (l1 `compare` l2) `thenCmp` (c1 `compare` c2)
-cmpSrcLoc (SrcLoc _ _ _) other = GT
+cmpSrcLoc (SrcLoc _ _ _) _other = GT
 
 instance Outputable SrcLoc where
     ppr (SrcLoc src_path src_line src_col)
@@ -196,12 +194,14 @@ instance Ord SrcSpan where
      (srcSpanStart a `compare` srcSpanStart b) `thenCmp` 
      (srcSpanEnd   a `compare` srcSpanEnd   b)
 
+noSrcSpan, wiredInSrcSpan :: SrcSpan
 noSrcSpan      = UnhelpfulSpan FSLIT("<no location info>")
 wiredInSrcSpan = UnhelpfulSpan FSLIT("<wired into compiler>")
 
 mkGeneralSrcSpan :: FastString -> SrcSpan
 mkGeneralSrcSpan = UnhelpfulSpan
 
+isGoodSrcSpan :: SrcSpan -> Bool
 isGoodSrcSpan SrcSpanOneLine{} = True
 isGoodSrcSpan SrcSpanMultiLine{} = True
 isGoodSrcSpan SrcSpanPoint{} = True
@@ -226,6 +226,9 @@ isOneLineSpan s
 -- They are for internal use only
 -- Urk!  Some are needed for Lexer.x; see comment in export list
 
+srcSpanStartLine, srcSpanEndLine, srcSpanStartCol, srcSpanEndCol
+  :: SrcSpan -> Int
+
 srcSpanStartLine SrcSpanOneLine{ srcSpanLine=l } = l
 srcSpanStartLine SrcSpanMultiLine{ srcSpanSLine=l } = l
 srcSpanStartLine SrcSpanPoint{ srcSpanLine=l } = l
@@ -246,6 +249,8 @@ srcSpanEndCol SrcSpanMultiLine{ srcSpanECol=c } = c
 srcSpanEndCol SrcSpanPoint{ srcSpanCol=c } = c
 srcSpanEndCol _ = panic "SrcLoc.srcSpanEndCol"
 --------------------------------------------------------
+
+srcSpanStart, srcSpanEnd :: SrcSpan -> SrcLoc
 
 srcSpanStart (UnhelpfulSpan str) = UnhelpfulLoc str
 srcSpanStart s = mkSrcLoc (srcSpanFile s) 
@@ -279,8 +284,8 @@ mkSrcSpan loc1 loc2
 
 combineSrcSpans	:: SrcSpan -> SrcSpan -> SrcSpan
 -- Assumes the 'file' part is the same in both
-combineSrcSpans	(UnhelpfulSpan str) r = r -- this seems more useful
-combineSrcSpans	l (UnhelpfulSpan str) = l
+combineSrcSpans	(UnhelpfulSpan _) r = r -- this seems more useful
+combineSrcSpans	l (UnhelpfulSpan _) = l
 combineSrcSpans	start end 
  = case line1 `compare` line2 of
      EQ -> case col1 `compare` col2 of
@@ -312,6 +317,7 @@ instance Outputable SrcSpan where
 		 char '\"', ftext (srcSpanFile span), text " #-}"]
 
 
+pprUserSpan :: SrcSpan -> SDoc
 pprUserSpan (SrcSpanOneLine src_path line start_col end_col)
   = hcat [ ftext src_path, char ':', 
 	   int line,
@@ -377,7 +383,7 @@ instance Functor Located where
   fmap f (L l e) = L l (f e)
 
 instance Outputable e => Outputable (Located e) where
-  ppr (L span e) =  ppr e
+  ppr (L _ e) =  ppr e
 	-- do we want to dump the span in debugSty mode?    
 \end{code}
 
