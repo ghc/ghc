@@ -1448,7 +1448,7 @@ getCommonPrefix (s:ss) = foldl common s ss
 
 allExposedModules :: DynFlags -> [ModuleName]
 allExposedModules dflags 
- = map GHC.mkModuleName (concat (map exposedModules (filter exposed (eltsUFM pkg_db))))
+ = concat (map exposedModules (filter exposed (eltsUFM pkg_db)))
  where
   pkg_db = pkgIdMap (pkgState dflags)
 #else

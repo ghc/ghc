@@ -12,6 +12,7 @@ module ParsePkgConf( loadPackageConfig ) where
 
 import PackageConfig
 import Lexer
+import Module
 import DynFlags
 import FastString
 import StringBuffer
@@ -82,27 +83,27 @@ field	:: { PackageConfig -> PackageConfig }
 		-- another case of license
 
 	| VARID '=' strlist		
-		{\p -> case unpackFS $1 of
-		        "exposedModules"    -> p{exposedModules    = $3}
-		        "hiddenModules"     -> p{hiddenModules     = $3}
-		        "importDirs"        -> p{importDirs        = $3}
-		        "libraryDirs"       -> p{libraryDirs       = $3}
-		        "hsLibraries"       -> p{hsLibraries       = $3}
-		        "extraLibraries"    -> p{extraLibraries    = $3}
-		        "extraGHCiLibraries"-> p{extraGHCiLibraries= $3}
-		        "includeDirs"       -> p{includeDirs       = $3}
-		        "includes"          -> p{includes          = $3}
-		        "hugsOptions"       -> p{hugsOptions       = $3}
-		        "ccOptions"         -> p{ccOptions         = $3}
-		        "ldOptions"         -> p{ldOptions         = $3}
-		        "frameworkDirs"     -> p{frameworkDirs     = $3}
-		        "frameworks"        -> p{frameworks        = $3}
-		        "haddockInterfaces" -> p{haddockInterfaces = $3}
-		        "haddockHTMLs"      -> p{haddockHTMLs      = $3}
-		        "depends"     	    -> p{depends = []}
-				-- empty list only, non-empty handled below
-			other -> p
-		}
+	{\p -> case unpackFS $1 of
+	        "exposedModules"    -> p{exposedModules    = map mkModuleNameFS $3}
+	        "hiddenModules"     -> p{hiddenModules     = map mkModuleNameFS $3}
+	        "importDirs"        -> p{importDirs        = map unpackFS $3}
+	        "libraryDirs"       -> p{libraryDirs       = map unpackFS $3}
+	        "hsLibraries"       -> p{hsLibraries       = map unpackFS $3}
+	        "extraLibraries"    -> p{extraLibraries    = map unpackFS $3}
+	        "extraGHCiLibraries"-> p{extraGHCiLibraries= map unpackFS $3}
+	        "includeDirs"       -> p{includeDirs       = map unpackFS $3}
+	        "includes"          -> p{includes          = map unpackFS $3}
+	        "hugsOptions"       -> p{hugsOptions       = map unpackFS $3}
+	        "ccOptions"         -> p{ccOptions         = map unpackFS $3}
+	        "ldOptions"         -> p{ldOptions         = map unpackFS $3}
+	        "frameworkDirs"     -> p{frameworkDirs     = map unpackFS $3}
+	        "frameworks"        -> p{frameworks        = map unpackFS $3}
+	        "haddockInterfaces" -> p{haddockInterfaces = map unpackFS $3}
+	        "haddockHTMLs"      -> p{haddockHTMLs      = map unpackFS $3}
+	        "depends"     	    -> p{depends = []}
+			-- empty list only, non-empty handled below
+		other -> p
+	}
 
 	| VARID '=' pkgidlist
 		{% case unpackFS $1 of
@@ -117,7 +118,8 @@ pkgid	:: { PackageIdentifier }
 
 version :: { Version }
 	: CONID '{' VARID '=' intlist ',' VARID '=' strlist '}'
-			{ Version{ versionBranch=$5, versionTags=$9 } }
+			{ Version{ versionBranch=$5, 
+                                   versionTags=map unpackFS $9 } }
 
 pkgidlist :: { [PackageIdentifier] }
 	: '[' pkgids ']'		{ $2 }
@@ -135,13 +137,13 @@ ints	:: { [Int] }
 	: INT				{ [ fromIntegral $1 ] }
 	| INT ',' ints			{ fromIntegral $1 : $3 }
 
-strlist :: { [String] }
+strlist :: { [FastString] }
         : '[' ']'			{ [] }
 	| '[' strs ']'			{ $2 }
 
-strs	:: { [String] }
-	: STRING			{ [ unpackFS $1 ] }
-	| STRING ',' strs 		{ unpackFS $1 : $3 }
+strs	:: { [FastString] }
+	: STRING			{ [ $1 ] }
+	| STRING ',' strs 		{ $1 : $3 }
 
 {
 happyError :: P a

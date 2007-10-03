@@ -51,12 +51,10 @@ module Outputable (
 #include "HsVersions.h"
 
 
-import {-# SOURCE #-} 	Module( Module, 
-                                ModuleName, moduleName )
+import {-# SOURCE #-} 	Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-} 	OccName( OccName )
 
 import StaticFlags	( opt_PprStyle_Debug, opt_PprUserLength )
-import PackageConfig	( PackageId, packageIdString )
 import FastString
 import FastTypes
 import GHC.Ptr
@@ -477,9 +475,6 @@ instance (Outputable a, Outputable b, Outputable c, Outputable d) =>
 instance Outputable FastString where
     ppr fs = ftext fs		-- Prints an unadorned string,
 				-- no double quotes or anything
-
-instance Outputable PackageId where
-   ppr pid = text (packageIdString pid)
 \end{code}
 
 

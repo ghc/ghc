@@ -244,7 +244,6 @@ import Module
 import UniqFM
 import UniqSet
 import Unique
-import PackageConfig
 import FiniteMap
 import Panic
 import Digraph

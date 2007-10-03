@@ -30,8 +30,7 @@ import TypeRep         ( funTyCon )
 import Type            ( Type )
 import TysPrim
 import TysWiredIn      ( unitTyCon, tupleTyCon, intTyConName )
-import Module          ( Module, mkModule, mkModuleNameFS )
-import PackageConfig   ( ndpPackageId )
+import Module
 import BasicTypes      ( Boxity(..) )
 
 import FastString

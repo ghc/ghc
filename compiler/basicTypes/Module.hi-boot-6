@@ -1,6 +1,7 @@
 module Module where
 data Module
 data ModuleName
+data PackageId
 moduleName :: Module -> ModuleName
-modulePackageId :: Module -> PackageConfig.PackageId
-
+modulePackageId :: Module -> PackageId
+packageIdString :: PackageId -> GHC.Base.String

@@ -66,7 +66,6 @@ import Unique
 import Panic
 import UniqFM
 import FastMutInt
-import PackageConfig
 
 import Foreign
 import Data.Array.IO
@@ -666,10 +665,6 @@ getFS bh = do
 		go (n+1)
   --
   go 0
-
-instance Binary PackageId where
-  put_ bh pid = put_ bh (packageIdFS pid)
-  get bh = do { fs <- get bh; return (fsToPackageId fs) }
 
 instance Binary FastString where
   put_ bh f@(FastString id l _ fp _) =

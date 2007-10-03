@@ -56,8 +56,7 @@ module PrelNames (
 
 #include "HsVersions.h"
 
-import PackageConfig
-import Module	  ( Module, ModuleName, mkModule, mkModuleNameFS )
+import Module
 import OccName	  ( dataName, tcName, clsName, varName, mkOccNameFS,
 		    mkVarOccFS )
 import RdrName	  ( RdrName, nameRdrName, mkOrig, rdrNameOcc, mkUnqual )

@@ -36,7 +36,7 @@ import Name		( getOccName, isExternalName, nameOccName )
 import OccName		( occNameString, occNameFS )
 import BasicTypes       ( Arity )
 import StaticFlags	( opt_RuntimeTypes )
-import PackageConfig	( PackageId )
+import Module
 import Outputable
 
 infixr 9 `thenLne`

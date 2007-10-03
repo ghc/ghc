@@ -36,12 +36,11 @@ module SCCfinal ( stgMassageForProfiling ) where
 
 import StgSyn
 
-import PackageConfig	( PackageId )
 import StaticFlags	( opt_AutoSccsOnIndividualCafs )
 import CostCentre	-- lots of things
 import Id
 import Name
-import Module		( Module )
+import Module
 import UniqSupply	( splitUniqSupply, UniqSupply )
 #ifdef PROF_DO_BOXING
 import UniqSupply	( uniqFromSupply )

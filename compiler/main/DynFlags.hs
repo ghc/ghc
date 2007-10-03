@@ -61,7 +61,7 @@ module DynFlags (
 
 #include "HsVersions.h"
 
-import Module		( Module, mkModuleName, mkModule, ModLocation )
+import Module
 import PackageConfig
 import PrelNames	( mAIN )
 #ifdef i386_TARGET_ARCH
@@ -381,7 +381,7 @@ data DynFlags = DynFlags {
   -- Package state
   -- NB. do not modify this field, it is calculated by 
   -- Packages.initPackages and Packages.updatePackages.
-  pkgDatabase           :: Maybe (UniqFM InstalledPackageInfo),
+  pkgDatabase           :: Maybe (UniqFM PackageConfig),
   pkgState		:: PackageState,
 
   -- hsc dynamic flags

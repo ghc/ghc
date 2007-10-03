@@ -55,6 +55,7 @@ import SrcLoc
 import VarSet
 import VarEnv
 import Name
+import Module
 #if mingw32_TARGET_OS
 import Packages
 #endif
@@ -70,7 +71,6 @@ import TyCon
 import TysWiredIn
 import CostCentre
 import BasicTypes
-import PackageConfig
 import Unique
 import Outputable
 import DynFlags

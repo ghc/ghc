@@ -58,7 +58,6 @@ module Unique (
 #include "HsVersions.h"
 
 import BasicTypes
-import PackageConfig
 import FastString
 import Outputable
 
@@ -154,9 +153,6 @@ x `hasKey` k	= getUnique x == k
 
 instance Uniquable FastString where
  getUnique fs = mkUniqueGrimily (I# (uniqueOfFS fs))
-
-instance Uniquable PackageId where
- getUnique pid = getUnique (packageIdFS pid)
 
 instance Uniquable Int where
  getUnique i = mkUniqueGrimily i

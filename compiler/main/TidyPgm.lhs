@@ -47,11 +47,10 @@ import TyCon		( TyCon, makeTyConAbstract, tyConDataCons, isNewTyCon,
 			  newTyConRep, tyConSelIds, isAlgTyCon,
 			  isEnumerationTyCon, isOpenTyCon )
 import Class		( classSelIds )
-import Module		( Module )
+import Module
 import HscTypes
 import Maybes		( orElse, mapCatMaybes )
 import ErrUtils		( showPass, dumpIfSet_core )
-import PackageConfig	( PackageId )
 import UniqSupply	( splitUniqSupply, uniqFromSupply )
 import Outputable
 import FastTypes  hiding ( fastOr )

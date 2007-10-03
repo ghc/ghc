@@ -4,13 +4,6 @@
 \section[Finder]{Module Finder}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Finder (
     flushFinderCaches,
     FindResult(..),
@@ -530,7 +523,7 @@ findObjectLinkableMaybe mod locn
 findObjectLinkable :: Module -> FilePath -> ClockTime -> IO Linkable
 findObjectLinkable mod obj_fn obj_time = do
   let stub_fn = case splitFilename3 obj_fn of
-			(dir, base, ext) -> dir ++ "/" ++ base ++ "_stub.o"
+			(dir, base, _ext) -> dir ++ "/" ++ base ++ "_stub.o"
   stub_exist <- doesFileExist stub_fn
   if stub_exist
 	then return (LM obj_time mod [DotO obj_fn, DotO stub_fn])

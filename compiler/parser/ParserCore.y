@@ -20,7 +20,6 @@ import Type ( Kind,
             )
 import Name( Name, nameOccName, nameModule, mkExternalName )
 import Module
-import PackageConfig	( mainPackageId, stringToPackageId )
 import ParserCoreUtils
 import LexCore
 import Literal

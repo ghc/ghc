@@ -9,13 +9,6 @@ These are Uniquable, hence we can build FiniteMaps with Modules as
 the keys.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Module 
     (
 	-- * The ModuleName type
@@ -25,6 +18,21 @@ module Module
 	moduleNameString,
 	mkModuleName,
 	mkModuleNameFS,
+
+        -- * The PackageId type
+        PackageId,
+        fsToPackageId,
+        packageIdFS,
+        stringToPackageId,
+        packageIdString,
+
+	-- * Wired-in PackageIds
+	basePackageId,
+	rtsPackageId,
+	haskell98PackageId,
+	thPackageId,
+        ndpPackageId,
+	mainPackageId,
 
 	-- * The Module type
 	Module,
@@ -55,10 +63,10 @@ module Module
 
 #include "HsVersions.h"
 import Outputable
+import qualified Pretty
 import Unique
 import FiniteMap
 import UniqFM
-import PackageConfig
 import FastString
 import Binary
 \end{code}
@@ -188,12 +196,16 @@ instance Binary Module where
   put_ bh (Module p n) = put_ bh p >> put_ bh n
   get bh = do p <- get bh; n <- get bh; return (Module p n)
 
+instance Uniquable PackageId where
+ getUnique pid = getUnique (packageIdFS pid)
+
 mkModule :: PackageId -> ModuleName -> Module
 mkModule = Module
 
 pprModule :: Module -> SDoc
 pprModule mod@(Module p n)  = pprPackagePrefix p mod <> pprModuleName n
 
+pprPackagePrefix :: PackageId -> Module -> PprStyle -> Pretty.Doc
 pprPackagePrefix p mod = getPprStyle doc
  where
    doc sty
@@ -205,6 +217,70 @@ pprPackagePrefix p mod = getPprStyle doc
                 -- the PrintUnqualified tells us which modules have to
                 -- be qualified with package names
        | otherwise = empty
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection{PackageId}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+newtype PackageId = PId FastString deriving( Eq, Ord )  -- includes the version
+    -- here to avoid module loops with PackageConfig
+
+instance Outputable PackageId where
+   ppr pid = text (packageIdString pid)
+
+instance Binary PackageId where
+  put_ bh pid = put_ bh (packageIdFS pid)
+  get bh = do { fs <- get bh; return (fsToPackageId fs) }
+
+fsToPackageId :: FastString -> PackageId
+fsToPackageId = PId
+
+packageIdFS :: PackageId -> FastString
+packageIdFS (PId fs) = fs
+
+stringToPackageId :: String -> PackageId
+stringToPackageId = fsToPackageId . mkFastString
+
+packageIdString :: PackageId -> String
+packageIdString = unpackFS . packageIdFS
+
+
+-- -----------------------------------------------------------------------------
+-- Package Ids that are wired in
+
+-- Certain packages are "known" to the compiler, in that we know about certain
+-- entities that reside in these packages, and the compiler needs to 
+-- declare static Modules and Names that refer to these packages.  Hence
+-- the wired-in packages can't include version numbers, since we don't want
+-- to bake the version numbers of these packages into GHC.
+--
+-- So here's the plan.  Wired-in packages are still versioned as
+-- normal in the packages database, and you can still have multiple
+-- versions of them installed.  However, for each invocation of GHC,
+-- only a single instance of each wired-in package will be recognised
+-- (the desired one is selected via -package/-hide-package), and GHC
+-- will use the unversioned PackageId below when referring to it,
+-- including in .hi files and object file symbols.  Unselected
+-- versions of wired-in packages will be ignored, as will any other
+-- package that depends directly or indirectly on it (much as if you
+-- had used -ignore-package).
+
+basePackageId, rtsPackageId, haskell98PackageId, 
+  thPackageId, ndpPackageId, mainPackageId  :: PackageId
+basePackageId      = fsToPackageId FSLIT("base")
+rtsPackageId	   = fsToPackageId FSLIT("rts")
+haskell98PackageId = fsToPackageId FSLIT("haskell98")
+thPackageId        = fsToPackageId FSLIT("template-haskell")
+ndpPackageId       = fsToPackageId FSLIT("ndp")
+
+-- This is the package Id for the program.  It is the default package
+-- Id if you don't specify a package name.  We don't add this prefix
+-- to symbol name, since there can be only one main package per program.
+mainPackageId	   = fsToPackageId FSLIT("main")
 \end{code}
 
 %************************************************************************

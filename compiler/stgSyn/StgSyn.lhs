@@ -59,7 +59,6 @@ import Var		( isId )
 import Id		( Id, idName, idType, idCafInfo )
 import IdInfo		( mayHaveCafRefs )
 import Packages		( isDllName )
-import PackageConfig	( PackageId )
 import Literal		( Literal, literalType )
 import ForeignCall	( ForeignCall )
 import DataCon		( DataCon, dataConName )
@@ -74,7 +73,7 @@ import UniqSet		( isEmptyUniqSet, uniqSetToList, UniqSet )
 import Unique		( Unique )
 import Bitmap
 import StaticFlags	( opt_SccProfilingOn )
-import Module		( Module, pprModule )
+import Module
 \end{code}
 
 %************************************************************************

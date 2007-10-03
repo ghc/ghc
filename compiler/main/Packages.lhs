@@ -557,12 +557,12 @@ mkModuleMap pkg_db = foldr extend_modmap emptyUFM pkgids
         
 	extend_modmap pkgid modmap =
 		addListToUFM_C (++) modmap 
-		    [(m, [(pkg, m `elem` exposed_mods)]) | m <- all_mods]
+		   ([(m, [(pkg, True)])  | m <- exposed_mods] ++
+		    [(m, [(pkg, False)]) | m <- hidden_mods])
 	  where
 		pkg = expectJust "mkModuleMap" (lookupPackage pkg_db pkgid)
-	        exposed_mods = map mkModuleName (exposedModules pkg)
-	        hidden_mods  = map mkModuleName (hiddenModules pkg)
-		all_mods = exposed_mods ++ hidden_mods
+	        exposed_mods = exposedModules pkg
+	        hidden_mods  = hiddenModules pkg
 
 pprPkg :: PackageConfig -> SDoc
 pprPkg p = text (showPackageId (package p))
@@ -704,5 +704,10 @@ dumpPackages :: DynFlags -> IO ()
 dumpPackages dflags
   = do  let pkg_map = pkgIdMap (pkgState dflags)
 	putMsg dflags $
-	      vcat (map (text.showInstalledPackageInfo) (eltsUFM pkg_map))
+	      vcat (map (text.showInstalledPackageInfo.to_ipi) (eltsUFM pkg_map))
+ where
+  to_ipi pkgconf@InstalledPackageInfo_{ exposedModules = e,
+                                        hiddenModules = h } = 
+    pkgconf{ exposedModules = map moduleNameString e,
+             hiddenModules  = map moduleNameString h }
 \end{code}

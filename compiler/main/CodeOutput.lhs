@@ -30,7 +30,6 @@ import Finder		( mkStubPaths )
 import PprC		( writeCs )
 import CmmLint		( cmmLint )
 import Packages
-import PackageConfig	( rtsPackageId )
 import Util
 import FastString	( unpackFS )
 import Cmm		( RawCmm )
@@ -40,7 +39,7 @@ import DynFlags
 import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
 import Pretty		( Mode(..), printDoc )
-import Module		( Module, ModLocation(..), moduleName )
+import Module
 import List		( nub )
 import Maybes		( firstJust )
 
