@@ -531,8 +531,8 @@ mkForAllTyCoI :: TyVar -> CoercionI -> CoercionI
 mkForAllTyCoI _ IdCo = IdCo
 mkForAllTyCoI tv (ACo co) = ACo $ ForAllTy tv co
 
+fromACo :: CoercionI -> Coercion
 fromACo (ACo co) = co
-
 
 mkClassPPredCoI :: Class -> [Type] -> [CoercionI] -> CoercionI
 -- mkClassPPredCoI cls tys cois = coi

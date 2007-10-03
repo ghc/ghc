@@ -99,27 +99,72 @@ tcNormaliseFamInstPred :: TcPredType -> TcM (CoercionI, TcPredType)
 tcNormaliseFamInstPred = tcGenericNormaliseFamInstPred tcUnfoldSynFamInst
 \end{code}
 
-Normalise a type relative to the rewrite rule implied by one EqInst or an
-already unpacked EqInst (ie, an equality rewrite rule).
+An elementary rewrite is a properly oriented equality with associated coercion
+that has one of the following two forms:
+
+(1) co :: F t1..tn ~ t
+(2) co :: a ~ t         , where t /= F t1..tn
+
+The following functions takes an equality instance and turns it into an
+elementary rewrite if possible.
+
+\begin{code}
+data Rewrite = Rewrite TcType           -- lhs of rewrite rule
+                       TcType           -- rhs of rewrite rule
+                       TcType           -- coercion witnessing the rewrite rule
+
+eqInstToRewrite :: Inst -> Maybe Rewrite
+eqInstToRewrite inst
+  = ASSERT( isEqInst inst )
+    go (eqInstLeftTy inst) (eqInstRightTy inst) (eqInstType inst)
+  where
+    -- look through synonyms
+    go ty1 ty2 co | Just ty1' <- tcView ty1 = go ty1' ty2 co
+    go ty1 ty2 co | Just ty2' <- tcView ty2 = go ty1 ty2' co
+
+    -- rewrite type family applications
+    go ty1@(TyConApp con _) ty2 co 
+      | isOpenSynTyCon con
+      = Just $ Rewrite ty1 ty2 co
+
+    -- rewrite skolems
+    go ty1@(TyVarTy tv) ty2 co 
+      | isSkolemTyVar tv
+      = Just $ Rewrite ty1 ty2 co
+
+    -- rewrite type family applications from right-to-left, only after
+    -- having checked whether we can work left-to-right
+    go ty1 ty2@(TyConApp con _) co 
+      | isOpenSynTyCon con
+      = Just $ Rewrite ty2 ty1 (mkSymCoercion co)
+
+    -- rewrite skolems from right-to-left, only after having checked
+    -- whether we can work left-to-right 
+    go ty1 ty2@(TyVarTy tv) co 
+      | isSkolemTyVar tv
+      = Just $ Rewrite ty2 ty1 (mkSymCoercion co)
+
+    go _ _ _ = Nothing
+\end{code}
+
+Normalise a type relative to an elementary rewrite implied by an EqInst or an
+explicitly given elementary rewrite.
 
 \begin{code}
 -- Rewrite by EqInst
-tcEqInstNormaliseFamInst :: Inst -> TcType -> TcM (CoercionI, Type)
-tcEqInstNormaliseFamInst inst = 
-  ASSERT( isEqInst inst )
-  tcEqRuleNormaliseFamInst (pat, rhs, co)
-  where
-    pat = eqInstLeftTy  inst
-    rhs = eqInstRightTy inst
-    co  = eqInstType    inst
+--   Precondition: the EqInst passes the occurs check
+tcEqInstNormaliseFamInst :: Inst -> TcType -> TcM (CoercionI, TcType)
+tcEqInstNormaliseFamInst inst ty
+  = case eqInstToRewrite inst of
+      Just rewrite -> tcEqRuleNormaliseFamInst rewrite ty
+      Nothing      -> return (IdCo, ty)
 
 -- Rewrite by equality rewrite rule
-tcEqRuleNormaliseFamInst :: (TcType,   -- rewrite rule lhs
-                             TcType,   -- rewrite rule rhs
-                             TcType)   -- coercion witnessing the rewrite rule
-                          -> TcType    -- type to rewrite
-                          -> TcM (CoercionI, Type)
-tcEqRuleNormaliseFamInst (pat, rhs, co) ty
+tcEqRuleNormaliseFamInst :: Rewrite                     -- elementary rewrite
+                         -> TcType                      -- type to rewrite
+                         -> TcM (CoercionI,             -- witnessing coercion
+                                 TcType)                -- rewritten type
+tcEqRuleNormaliseFamInst (Rewrite pat rhs co) ty
   = tcGenericNormaliseFamInst matchEqRule ty
   where
     matchEqRule sty | pat `tcEqType` sty = return $ Just (rhs, co)
@@ -526,12 +571,13 @@ skolemOccurs insts
         -- this equality is not a rewrite rule => ignore
         isRewriteRule _ _ = return ([inst], return ())
 
-
+        ------------------
         breakRecursion pat body swapped
           | null tysToLiftOut 
           = return ([inst], return ())
           | otherwise
-          = do { skTvs <- mapM (newMetaTyVar TauTv . typeKind) tysToLiftOut
+          = do { traceTc $ text "oneSkolemOccurs[TLO]:" <+> ppr tysToLiftOut
+               ; skTvs <- mapM (newMetaTyVar TauTv . typeKind) tysToLiftOut
                ; let skTvs_tysTLO   = zip skTvs tysToLiftOut
                      insertSkolems = return . replace skTvs_tysTLO
                ; (_, body') <- tcGenericNormaliseFamInst insertSkolems body
@@ -539,6 +585,7 @@ skolemOccurs insts
                                      else mkEqInst (EqPred pat body') co
                                      -- ensure to reconstruct the inst in the
                                      -- original orientation
+               ; traceTc $ text "oneSkolemOccurs[inst']:" <+> ppr inst'
                ; (insts, undoSk) <- mapAndUnzipM (mkSkolemInst inst') 
                                                  skTvs_tysTLO
                ; return (inst':insts, sequence_ undoSk)
@@ -564,6 +611,7 @@ skolemOccurs insts
               = do { (co, tyLiftedOut) <- tcEqInstNormaliseFamInst inst' tyTLO
                    ; inst <- mkEqInst (EqPred tyLiftedOut (mkTyVarTy skTv)) 
                                       (mkGivenCo $ mkSymCoercion (fromACo co))
+                                      -- co /= IdCo due to construction of inst'
                    ; return (inst, writeMetaTyVar skTv tyTLO) 
                    }
 \end{code}
@@ -799,43 +847,14 @@ substRule insts = tryAllInsts insts []
 --
 substInst :: Inst -> [Inst] -> TcM ([Inst], Bool)
 substInst inst insts
-  = ASSERT( isEqInst inst )
-    go (eqInstLeftTy inst) (eqInstRightTy inst) (eqInstType inst)
+  = case eqInstToRewrite inst of
+      Just rewrite -> substEquality rewrite insts
+      Nothing      -> return (insts, False)
   where
-    -- look through synonyms
-    go ty1 ty2 co | Just ty1' <- tcView ty1 = go ty1' ty2 co
-    go ty1 ty2 co | Just ty2' <- tcView ty2 = go ty1 ty2' co
-
-    -- rewrite type family applications
-    go ty1@(TyConApp con _) ty2 co 
-      | isOpenSynTyCon con
-      = substEquality (ty1, ty2, co) insts
-
-    -- rewrite skolems
-    go ty1@(TyVarTy tv) ty2 co 
-      | isSkolemTyVar tv
-      = substEquality (ty1, ty2, co) insts
-
-    -- rewrite type family applications from right-to-left, only after
-    -- having checked whether we can work left-to-right
-    go ty1 ty2@(TyConApp con _) co 
-      | isOpenSynTyCon con
-      = substEquality (ty2, ty1, mkSymCoercion co) insts
-
-    -- rewrite skolems from right-to-left, only after having checked
-    -- whether we can work left-to-right 
-    go ty1 ty2@(TyVarTy tv) co 
-      | isSkolemTyVar tv
-      = substEquality (ty2, ty1, mkSymCoercion co) insts
-
-    go _ _ _ = return (insts, False)
-
-    substEquality :: (TcType,   -- rewrite rule lhs
-                      TcType,   -- rewrite rule rhs
-                      TcType)   -- coercion witnessing the rewrite rule
-                  -> [Inst]     -- insts to rewrite
+    substEquality :: Rewrite            -- elementary rewrite
+                  -> [Inst]             -- insts to rewrite
                   -> TcM ([Inst], Bool)
-    substEquality eqRule@(pat, rhs, _) insts
+    substEquality eqRule@(Rewrite pat rhs _) insts
       | pat `tcPartOfType` rhs      -- occurs check!
       = occurCheckErr pat rhs
       | otherwise
