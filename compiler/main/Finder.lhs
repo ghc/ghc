@@ -87,16 +87,25 @@ flushModLocationCache this_pkg ref = do
   where is_ext mod _ | modulePackageId mod /= this_pkg = True
 		     | otherwise = False
 
+addToFinderCache :: IORef FinderCache -> ModuleName -> FindResult -> IO ()
 addToFinderCache       ref key val = modifyIORef ref $ \c -> addToUFM c key val
+
+addToModLocationCache :: IORef ModLocationCache -> Module -> ModLocation -> IO ()
 addToModLocationCache  ref key val = modifyIORef ref $ \c -> addToFM c key val
 
+removeFromFinderCache :: IORef FinderCache -> ModuleName -> IO ()
 removeFromFinderCache      ref key = modifyIORef ref $ \c -> delFromUFM c key
+
+removeFromModLocationCache :: IORef ModLocationCache -> Module -> IO ()
 removeFromModLocationCache ref key = modifyIORef ref $ \c -> delFromFM c key
 
+lookupFinderCache :: IORef FinderCache -> ModuleName -> IO (Maybe FindResult)
 lookupFinderCache ref key = do 
    c <- readIORef ref
    return $! lookupUFM c key
 
+lookupModLocationCache :: IORef ModLocationCache -> Module
+                       -> IO (Maybe ModLocation)
 lookupModLocationCache ref key = do
    c <- readIORef ref
    return $! lookupFM c key
@@ -148,6 +157,7 @@ findExactModule hsc_env mod =
 -- -----------------------------------------------------------------------------
 -- Helpers
 
+orIfNotFound :: IO FindResult -> IO FindResult -> IO FindResult
 this `orIfNotFound` or_this = do
   res <- this
   case res of
@@ -273,6 +283,7 @@ findPackageModule hsc_env mod = do
      Nothing -> return (NoPackage pkg_id)
      Just pkg_conf -> findPackageModule_ hsc_env mod pkg_conf
       
+findPackageModule_ :: HscEnv -> Module -> PackageConfig -> IO FindResult
 findPackageModule_ hsc_env mod pkg_conf = 
   modLocationCache hsc_env mod $
 
@@ -528,8 +539,8 @@ findObjectLinkable mod obj_fn obj_time = do
 -- -----------------------------------------------------------------------------
 -- Utils
 
+dots_to_slashes :: String -> String
 dots_to_slashes = map (\c -> if c == '.' then '/' else c)
-
 
 -- -----------------------------------------------------------------------------
 -- Error messages
@@ -540,7 +551,8 @@ cannotFindModule = cantFindErr SLIT("Could not find module")
 cannotFindInterface  :: DynFlags -> ModuleName -> FindResult -> SDoc
 cannotFindInterface = cantFindErr SLIT("Failed to load interface for")
 
-cantFindErr cannot_find dflags mod_name (FoundMultiple pkgs)
+cantFindErr :: LitString -> DynFlags -> ModuleName -> FindResult -> SDoc
+cantFindErr cannot_find _dflags mod_name (FoundMultiple pkgs)
   = hang (ptext cannot_find <+> quotes (ppr mod_name) <> colon) 2 (
        sep [ptext SLIT("it was found in multiple packages:"),
 		hsep (map (text.packageIdString) pkgs)]
