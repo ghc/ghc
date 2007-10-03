@@ -5,13 +5,6 @@
 \section[DataCon]{@DataCon@: Data Constructors}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module DataCon (
 	DataCon, DataConIds(..),
 	ConTag, fIRST_TAG,
@@ -51,7 +44,6 @@ import ListSetOps
 import Util
 import Maybes
 import FastString
-import PackageConfig
 import Module
 
 import Data.Char
@@ -532,6 +524,7 @@ mkDataCon name declared_infix
 eqSpecPreds :: [(TyVar,Type)] -> ThetaType
 eqSpecPreds spec = [ mkEqPred (mkTyVarTy tv, ty) | (tv,ty) <- spec ]
 
+mk_dict_strict_mark :: PredType -> StrictnessMark
 mk_dict_strict_mark pred | isStrictPred pred = MarkedStrict
 		         | otherwise	     = NotMarkedStrict
 \end{code}
@@ -615,6 +608,7 @@ dataConSourceArity dc = length (dcOrigArgTys dc)
 -- {\em representation} of the data constructor.  This may be more than appear
 -- in the source code; the extra ones are the existentially quantified
 -- dictionaries
+dataConRepArity :: DataCon -> Int
 dataConRepArity (MkData {dcRepArgTys = arg_tys}) = length arg_tys
 
 isNullarySrcDataCon, isNullaryRepDataCon :: DataCon -> Bool
@@ -791,14 +785,16 @@ splitProductType_maybe ty
 	   where
 	      data_con = ASSERT( not (null (tyConDataCons tycon)) ) 
 			 head (tyConDataCons tycon)
-	other -> Nothing
+	_other -> Nothing
 
+splitProductType :: String -> Type -> (TyCon, [Type], DataCon, [Type])
 splitProductType str ty
   = case splitProductType_maybe ty of
 	Just stuff -> stuff
 	Nothing    -> pprPanic (str ++ ": not a product") (pprType ty)
 
 
+deepSplitProductType_maybe :: Type -> Maybe (TyCon, [Type], DataCon, [Type])
 deepSplitProductType_maybe ty
   = do { (res@(tycon, tycon_args, _, _)) <- splitProductType_maybe ty
        ; let {result 
@@ -811,6 +807,7 @@ deepSplitProductType_maybe ty
        ; result
        }
           
+deepSplitProductType :: String -> Type -> (TyCon, [Type], DataCon, [Type])
 deepSplitProductType str ty 
   = case deepSplitProductType_maybe ty of
       Just stuff -> stuff
