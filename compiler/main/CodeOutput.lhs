@@ -4,13 +4,6 @@
 \section{Code output phase}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CodeOutput( codeOutput, outputForeignStubs ) where
 
 #include "HsVersions.h"
@@ -38,7 +31,6 @@ import DynFlags
 
 import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
-import Pretty		( Mode(..), printDoc )
 import Module
 import List		( nub )
 import Maybes		( firstJust )
@@ -97,6 +89,7 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
 #else
                                panic "Java support not compiled into this ghc";
 #endif
+             HscNothing     -> panic "codeOutput: HscNothing"
 	  }
 	; return stubs_exist
 	}
@@ -113,6 +106,14 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 %************************************************************************
 
 \begin{code}
+outputC :: DynFlags
+        -> FilePath -> Module -> ModLocation
+        -> [RawCmm]
+        -> (Bool, Bool)
+        -> [PackageId]
+        -> ForeignStubs
+        -> IO ()
+
 outputC dflags filenm mod location flat_absC 
 	(stub_h_exists, _) packages foreign_stubs
   = do 
@@ -164,6 +165,7 @@ outputC dflags filenm mod location flat_absC
 %************************************************************************
 
 \begin{code}
+outputAsm :: DynFlags -> FilePath -> [RawCmm] -> IO ()
 outputAsm dflags filenm flat_absC
 
 #ifndef OMIT_NATIVE_CODEGEN
@@ -215,15 +217,15 @@ outputForeignStubs :: DynFlags -> Module -> ModLocation -> ForeignStubs
 		   -> IO (Bool, 	-- Header file created
 			  Bool)		-- C file created
 outputForeignStubs dflags mod location stubs
-  | NoStubs <- stubs = do
+ = case stubs of
+   NoStubs -> do
 	-- When compiling External Core files, may need to use stub
 	-- files from a previous compilation
 	stub_c_exists <- doesFileExist stub_c
 	stub_h_exists <- doesFileExist stub_h
 	return (stub_h_exists, stub_c_exists)
 
-  | ForeignStubs h_code c_code _ <- stubs
-  = do
+   ForeignStubs h_code c_code _ -> do
 	let
 	    stub_c_output_d = pprCode CStyle c_code
 	    stub_c_output_w = showSDoc stub_c_output_d
@@ -266,13 +268,15 @@ outputForeignStubs dflags mod location stubs
   where
    (stub_c, stub_h, _) = mkStubPaths dflags (moduleName mod) location
 
-cplusplus_hdr = "#ifdef __cplusplus\nextern \"C\" {\n#endif\n"
-cplusplus_ftr = "#ifdef __cplusplus\n}\n#endif\n"
+   cplusplus_hdr = "#ifdef __cplusplus\nextern \"C\" {\n#endif\n"
+   cplusplus_ftr = "#ifdef __cplusplus\n}\n#endif\n"
+
 
 -- Don't use doOutput for dumping the f. export stubs
 -- since it is more than likely that the stubs file will
 -- turn out to be empty, in which case no file should be created.
-outputForeignStubs_help fname ""      header footer = return False
+outputForeignStubs_help :: FilePath -> String -> String -> String -> IO Bool
+outputForeignStubs_help _fname ""      _header _footer = return False
 outputForeignStubs_help fname doc_str header footer
    = do writeFile fname (header ++ doc_str ++ '\n':footer ++ "\n")
         return True
