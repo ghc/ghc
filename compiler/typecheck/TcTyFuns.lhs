@@ -113,7 +113,8 @@ data Rewrite = Rewrite TcType           -- lhs of rewrite rule
                        TcType           -- rhs of rewrite rule
                        TcType           -- coercion witnessing the rewrite rule
 
-eqInstToRewrite :: Inst -> Maybe Rewrite
+eqInstToRewrite :: Inst -> Maybe (Rewrite, Bool)
+                                           -- True iff rewrite swapped equality
 eqInstToRewrite inst
   = ASSERT( isEqInst inst )
     go (eqInstLeftTy inst) (eqInstRightTy inst) (eqInstType inst)
@@ -122,28 +123,29 @@ eqInstToRewrite inst
     go ty1 ty2 co | Just ty1' <- tcView ty1 = go ty1' ty2 co
     go ty1 ty2 co | Just ty2' <- tcView ty2 = go ty1 ty2' co
 
-    -- rewrite type family applications
+    -- left-to-right rule with type family head
     go ty1@(TyConApp con _) ty2 co 
       | isOpenSynTyCon con
-      = Just $ Rewrite ty1 ty2 co
+      = Just (Rewrite ty1 ty2 co, False)                     -- not swapped
 
-    -- rewrite skolems
+    -- left-to-right rule with type variable head
     go ty1@(TyVarTy tv) ty2 co 
       | isSkolemTyVar tv
-      = Just $ Rewrite ty1 ty2 co
+      = Just (Rewrite ty1 ty2 co, False)                     -- not swapped
 
-    -- rewrite type family applications from right-to-left, only after
+    -- right-to-left rule with type family head, only after
     -- having checked whether we can work left-to-right
     go ty1 ty2@(TyConApp con _) co 
       | isOpenSynTyCon con
-      = Just $ Rewrite ty2 ty1 (mkSymCoercion co)
+      = Just (Rewrite ty2 ty1 (mkSymCoercion co), True)      -- swapped
 
-    -- rewrite skolems from right-to-left, only after having checked
-    -- whether we can work left-to-right 
+    -- right-to-left rule with type variable head, only after 
+    -- having checked whether we can work left-to-right 
     go ty1 ty2@(TyVarTy tv) co 
       | isSkolemTyVar tv
-      = Just $ Rewrite ty2 ty1 (mkSymCoercion co)
+      = Just (Rewrite ty2 ty1 (mkSymCoercion co), True)      -- swapped
 
+    -- this equality is not a rewrite rule => ignore
     go _ _ _ = Nothing
 \end{code}
 
@@ -156,8 +158,8 @@ explicitly given elementary rewrite.
 tcEqInstNormaliseFamInst :: Inst -> TcType -> TcM (CoercionI, TcType)
 tcEqInstNormaliseFamInst inst ty
   = case eqInstToRewrite inst of
-      Just rewrite -> tcEqRuleNormaliseFamInst rewrite ty
-      Nothing      -> return (IdCo, ty)
+      Just (rewrite, _) -> tcEqRuleNormaliseFamInst rewrite ty
+      Nothing           -> return (IdCo, ty)
 
 -- Rewrite by equality rewrite rule
 tcEqRuleNormaliseFamInst :: Rewrite                     -- elementary rewrite
@@ -543,38 +545,19 @@ skolemOccurs insts
   where
     oneSkolemOccurs inst
       = ASSERT( isEqInst inst )
-        isRewriteRule (eqInstLeftTy inst) (eqInstRightTy inst)
+        case eqInstToRewrite inst of
+          Just (rewrite, swapped) -> breakRecursion rewrite swapped
+          Nothing                 -> return ([inst], return ())
       where
+        -- inst is an elementary rewrite rule, check whether we need to break
+        -- it up
+        breakRecursion (Rewrite pat body _) swapped
 
-        -- look through synonyms
-        isRewriteRule ty1 ty2 | Just ty1' <- tcView ty1 = isRewriteRule ty1' ty2
-        isRewriteRule ty1 ty2 | Just ty2' <- tcView ty2 = isRewriteRule ty1 ty2'
-
-        -- left-to-right rule with type family head
-        isRewriteRule ty1@(TyConApp con _) ty2
-          | isOpenSynTyCon con
-          = breakRecursion ty1 ty2 False    -- not swapped
-
-        -- left-to-right rule with type variable head
-        isRewriteRule ty1@(TyVarTy _) ty2
-          = breakRecursion ty1 ty2 False    -- not swapped
-
-        -- right-to-left rule with type family head
-        isRewriteRule ty1 ty2@(TyConApp con _)
-          | isOpenSynTyCon con
-          = breakRecursion ty2 ty1 True     -- swapped
-
-        -- right-to-left rule with type variable head
-        isRewriteRule ty1 ty2@(TyVarTy _)
-          = breakRecursion ty2 ty1 True     -- swapped
-
-        -- this equality is not a rewrite rule => ignore
-        isRewriteRule _ _ = return ([inst], return ())
-
-        ------------------
-        breakRecursion pat body swapped
+          -- skolemOccurs does not apply, leave as is
           | null tysToLiftOut 
           = return ([inst], return ())
+
+          -- recursive occurence of pat in body under a type family application
           | otherwise
           = do { traceTc $ text "oneSkolemOccurs[TLO]:" <+> ppr tysToLiftOut
                ; skTvs <- mapM (newMetaTyVar TauTv . typeKind) tysToLiftOut
@@ -848,8 +831,8 @@ substRule insts = tryAllInsts insts []
 substInst :: Inst -> [Inst] -> TcM ([Inst], Bool)
 substInst inst insts
   = case eqInstToRewrite inst of
-      Just rewrite -> substEquality rewrite insts
-      Nothing      -> return (insts, False)
+      Just (rewrite, _) -> substEquality rewrite insts
+      Nothing           -> return (insts, False)
   where
     substEquality :: Rewrite            -- elementary rewrite
                   -> [Inst]             -- insts to rewrite
