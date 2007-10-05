@@ -327,6 +327,7 @@ regDotColor reg
  = case regClass reg of
  	RcInteger	-> text "blue"
 	RcFloat		-> text "red"
+	RcDouble	-> text "green"
 #endif
 
 
