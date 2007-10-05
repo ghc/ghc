@@ -19,7 +19,7 @@ test('simpl015', only_ways(['opt']), compile, [''])
 test('simpl016', normal, compile, [''])
 test('simpl017', normal, compile, [''])
 test('simpl018', normal, compile, [''])
-test('simpl019', normal, compile, [''])
+test('simpl019', expect_broken(1737), compile, [''])
 
 test('spec001', skip_if_fast, compile, [''])
 test('spec002', normal, compile, [''])
