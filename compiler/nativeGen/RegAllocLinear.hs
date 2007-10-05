@@ -155,8 +155,9 @@ getFreeRegs :: RegClass -> FreeRegs -> [RegNo]	-- lazilly
 getFreeRegs cls (FreeRegs g f)
     | RcDouble <- cls = go f (0x80000000) 63
     | RcInteger <- cls = go g (0x80000000) 31
+    | otherwise = pprPanic "RegAllocLinear.getFreeRegs: Bad cls" (ppr cls)
     where
-        go x 0 i = []
+        go _ 0 _ = []
         go x m i | x .&. m /= 0 = i : (go x (m `shiftR` 1) $! i-1)
                  | otherwise    = go x (m `shiftR` 1) $! i-1
 
