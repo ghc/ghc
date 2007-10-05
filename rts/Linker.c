@@ -4249,7 +4249,7 @@ static int relocateSection(
 #ifdef powerpc_HOST_ARCH
                             // In the .o file, this should be a relative jump to NULL
                             // and we'll change it to a relative jump to the symbol
-                        ASSERT(-word == reloc->r_address);
+                        ASSERT(word + reloc->r_address == 0);
                         jumpIsland = (unsigned long)
                                         &makeSymbolExtra(oc,
                                                          reloc->r_symbolnum,
