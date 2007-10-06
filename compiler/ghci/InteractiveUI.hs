@@ -19,7 +19,7 @@ import Debugger
 import qualified GHC
 import GHC              ( Session, LoadHowMuch(..), Target(..),  TargetId(..),
                           Module, ModuleName, TyThing(..), Phase,
-                          BreakIndex, SrcSpan, Resume, SingleStep )
+                          BreakIndex, SrcSpan, Resume, SingleStep, Id )
 import PprTyThing
 import DynFlags
 
@@ -631,7 +631,11 @@ afterRunStmt step_here run_result = do
                printForUser $ ptext SLIT("Stopped at") <+> 
                        ppr (GHC.resumeSpan $ head resumes)
 --               printTypeOfNames session names
-               printTypeAndContentOfNames session names
+               let namesSorted = sortBy compareNames names
+               tythings <- catMaybes `liftM` 
+                              io (mapM (GHC.lookupName session) namesSorted)
+
+               printTypeAndContents session [id | AnId id <- tythings]
                maybe (return ()) runBreakCmd mb_info
                -- run the command set with ":set stop <cmd>"
                st <- getGHCiState
@@ -647,19 +651,6 @@ afterRunStmt step_here run_result = do
   io (when b revertCAFs)
 
   return (case run_result of GHC.RunOk _ -> True; _ -> False)
-
-      where printTypeAndContentOfNames session names = do
-              let namesSorted = sortBy compareNames names
-              tythings <- catMaybes `liftM` 
-                              io (mapM (GHC.lookupName session) namesSorted)
-	      let ids = [id | AnId id <- tythings]
-              terms <- mapM (io . GHC.obtainTermB session 10 False) ids
-              docs_terms <- mapM (io . showTerm session) terms                                   
-	      dflags <- getDynFlags
-	      let pefas = dopt Opt_PrintExplicitForalls dflags
-              printForUser $ vcat $ zipWith (\ty cts -> ty <+> equals <+> cts)
-                                            (map (pprTyThing pefas . AnId) ids)
-                                            docs_terms
 
 runBreakCmd :: GHC.BreakInfo -> GHCi ()
 runBreakCmd info = do
@@ -687,6 +678,17 @@ printTypeOfName session n
         case maybe_tything of
             Nothing    -> return ()
             Just thing -> printTyThing thing
+
+printTypeAndContents :: Session -> [Id] -> GHCi ()
+printTypeAndContents session ids = do
+              terms <- mapM (io . GHC.obtainTermB session 10 False) ids
+              docs_terms <- mapM (io . showTerm session) terms                                   
+	      dflags <- getDynFlags
+	      let pefas = dopt Opt_PrintExplicitForalls dflags
+              printForUser $ vcat $ zipWith (\ty cts -> ty <+> equals <+> cts)
+                                            (map (pprTyThing pefas . AnId) ids)
+                                            docs_terms
+
 
 specialCommand :: String -> GHCi Bool
 specialCommand ('!':str) = shellEscape (dropWhile isSpace str)
@@ -1453,8 +1455,7 @@ showBindings :: GHCi ()
 showBindings = do
   s <- getSession
   bindings <- io (GHC.getBindings s)
-  mapM_ printTyThing $ sortBy compareTyThings bindings
-  return ()
+  printTypeAndContents s [ id | AnId id <- sortBy compareTyThings bindings]
 
 compareTyThings :: TyThing -> TyThing -> Ordering
 t1 `compareTyThings` t2 = getName t1 `compareNames` getName t2
