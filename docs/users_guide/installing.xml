@@ -63,7 +63,7 @@ Binary distributions come in &ldquo;bundles,&rdquo; called
 <para>
 <screen>
 % cd /your/scratch/space
-% bunnzip2 &#60; ghc-<replaceable>version</replaceable>-<replaceable>platform</replaceable>.tar.bz2 | tar xvf -</screen>
+% bunzip2 &#60; ghc-<replaceable>version</replaceable>-<replaceable>platform</replaceable>.tar.bz2 | tar xvf -</screen>
 </para>
 
 <para>

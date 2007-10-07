@@ -2032,7 +2032,7 @@
 	    </row>
 	    <row>
 	      <entry><option>-ddump-hpc</option></entry>
-	      <entry>Dump after intrumentation for program coverage</entry>
+	      <entry>Dump after instrumentation for program coverage</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>
@@ -2098,7 +2098,7 @@
 	    </row>
 	    <row>
 	      <entry><option>-ddump-splices</option></entry>
-	      <entry>Dump TH splided expressions, and what they evaluate to</entry>
+	      <entry>Dump TH spliced expressions, and what they evaluate to</entry>
 	      <entry>dynamic</entry>
 	      <entry>-</entry>
 	    </row>

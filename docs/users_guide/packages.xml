@@ -631,7 +631,7 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
 	    databases.  Additionally, <replaceable>file</replaceable> will
 	    also be the database modified by a <literal>register</literal>,
 	    <literal>unregister</literal>, <literal>expose</literal> or
-	    <literal>hide</literal> command, unless it is overriden by a later
+	    <literal>hide</literal> command, unless it is overridden by a later
 	    <option>--package-conf</option>, <option>--user</option> or
 	    <option>--global</option> option.</para>
 	</listitem>

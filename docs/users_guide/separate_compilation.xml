@@ -703,7 +703,7 @@ module B where
 Here <filename>A</filename> imports <filename>B</filename>, but <filename>B</filename> imports
 <filename>A</filename> with a <literal>{-# SOURCE #-}</literal> pragma, which breaks the
 circular dependency.  For every module <filename>A.hs</filename> that is <literal>{-# SOURCE #-}</literal>-imported
-in this way there must exist a souce file <literal>A.hs-boot</literal>.  This file contains an abbreviated
+in this way there must exist a source file <literal>A.hs-boot</literal>.  This file contains an abbreviated
 version of <filename>A.hs</filename>, thus:
 <programlisting>
 module A where
@@ -1040,7 +1040,7 @@ ghc -M -optdep-f -optdep.depend ...
 	  <varlistentry>
 	    <term><option>-v2</option></term>
 	    <listitem>
-	      <para>Print a full list of the module depenencies to stdout.
+	      <para>Print a full list of the module dependencies to stdout.
 	            (This is the standard verbosity flag, so the list will
 	      also be displayed with <option>-v3</option> and
 	      <option>-v4</option>;

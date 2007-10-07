@@ -55,7 +55,7 @@ the <option>-fglasgow-exts</option><indexterm><primary><option>-fglasgow-exts</o
 </para>
 <para>The Haskell FFI already specifies that arguments and results of
 foreign imports and exports will be automatically unwrapped if they are 
-newtypes (Section 3.2 of the FFI addendum).  GHC extends the FFI by automatically unnwrapping any newtypes that
+newtypes (Section 3.2 of the FFI addendum).  GHC extends the FFI by automatically unwrapping any newtypes that
 wrap the IO monad itself.
 More precisely, wherever the FFI specification requires an IO type, GHC will
 accept any newtype-wrapping of an IO type.  For example, these declarations are
@@ -300,10 +300,10 @@ int main(int argc, char *argv[])
  }
 </programlisting>
 
-        <para>The intialisation routine, <literal>mylib_init</literal>, calls
+        <para>The initialisation routine, <literal>mylib_init</literal>, calls
           <literal>hs_init()</literal> and <literal>hs_add_root()</literal> as
           normal to initialise the Haskell runtime, and the corresponding
-          deinitialisation funtion <literal>mylib_end()</literal> calls
+          deinitialisation function <literal>mylib_end()</literal> calls
           <literal>hs_exit()</literal> to shut down the runtime.</para>
       </sect3>
 

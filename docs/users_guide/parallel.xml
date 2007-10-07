@@ -5,7 +5,7 @@
   </indexterm>
 
   <para>GHC implements some major extensions to Haskell to support 
-  concurrent and parallel programming.  Let us first etablish terminology:
+  concurrent and parallel programming.  Let us first establish terminology:
   <itemizedlist>
 	<listitem><para><emphasis>Parallelism</emphasis> means running
 	  a Haskell program on multiple processors, with the goal of improving

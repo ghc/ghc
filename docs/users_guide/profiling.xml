@@ -1256,7 +1256,7 @@ to re-read its input file:
     <indexterm><primary>hpc</primary></indexterm>
 
     <para>
-      Code coverage tools allow a programer to determine what parts of
+      Code coverage tools allow a programmer to determine what parts of
       their code have been actually executed, and which parts have
       never actually been invoked.  GHC has an option for generating
       instrumented code that records code coverage as part of the

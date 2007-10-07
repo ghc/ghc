@@ -110,7 +110,7 @@
          increase the resolution of the time profiler.</para>
 
          <para>Using a value of zero disables the RTS clock
-         completetly, and has the effect of disabling timers that
+         completely, and has the effect of disabling timers that
          depend on it: the context switch timer and the heap profiling
          timer.  Context switches will still happen, but
          deterministically and at a rate much faster than normal.

@@ -133,7 +133,7 @@
     <title>Forcing options to a particular phase</title>
     <indexterm><primary>forcing GHC-phase options</primary></indexterm>
 
-    <para>Options can be forced through to a particlar compilation
+    <para>Options can be forced through to a particular compilation
     phase, using the following flags:</para>
 
     <variablelist>
@@ -412,7 +412,7 @@ $ cat foo.hspp</screen>
       <listitem>
         <para>This symbol is defined when pre-processing Haskell
           (input) and pre-processing C (GHC output).  Since GHC from
-          verion 4.00 now supports concurrent haskell by default,
+          version 4.00 now supports concurrent haskell by default,
           this symbol is always defined.</para>
         </listitem>
       </varlistentry>

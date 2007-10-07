@@ -638,7 +638,7 @@ ghc -c Foo.hs</screen>
 	<title>Overriding the default behaviour for a file</title>
 
 	<para>As described above, the way in which a file is processed by GHC
-	  depends on its suffix.  This behaviour can be overriden using the
+	  depends on its suffix.  This behaviour can be overridden using the
 	  <option>-x</option> option:</para>
 
 	<variablelist>
@@ -1130,7 +1130,7 @@ f foo = foo { x = 6 }
 	  
 	  <para>This option causes a warning to be emitted whenever the 
 	    module contains an "orphan" instance declaration or rewrite rule.
-	    An instance declartion is an orphan if it appears in a module in
+	    An instance declaration is an orphan if it appears in a module in
 	    which neither the class nor the type being instanced are declared
 	    in the same module.  A rule is an orphan if it is a rule for a
 	    function declared in another module.  A module containing any
@@ -1722,7 +1722,7 @@ f "2"    = 2
       is also possible to obtain performance improvements with parallelism
       on programs that do not use concurrency.  This section describes how to
       use GHC to compile and run parallel programs, in <xref
-	linkend="lang-parallel" /> we desribe the language features that affect
+	linkend="lang-parallel" /> we describe the language features that affect
     parallelism.</para>
     
     <sect2 id="parallel-options">

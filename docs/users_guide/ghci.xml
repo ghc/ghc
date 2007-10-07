@@ -393,9 +393,9 @@ Prelude>
 	      <literal>Show</literal></para>
 	  </listitem>
 	</itemizedlist>
-      The automatic printing of binding results can be supressed with
+      The automatic printing of binding results can be suppressed with
       <option>:set -fno-print-bind-result</option> (this does not
-      supress printing the result of non-binding statements).
+      suppress printing the result of non-binding statements).
       <indexterm><primary><option>-fno-print-bind-result</option></primary></indexterm><indexterm><primary><option>-fprint-bind-result</option></primary></indexterm>.
       You might want to do this to prevent the result of binding
       statements from being fully evaluated by the act of printing
@@ -1133,7 +1133,7 @@ _result :: IO ()
       <para>The command <literal>:step
         <replaceable>expr</replaceable></literal> begins the evaluation of
         <replaceable>expr</replaceable> in single-stepping mode.  If
-        <replaceable>expr</replaceable> is ommitted, then it single-steps from
+        <replaceable>expr</replaceable> is omitted, then it single-steps from
         the current breakpoint. <literal>:stepover</literal> 
         works similarly.</para>
 
@@ -1760,7 +1760,7 @@ $ ghci -lm
 	  <para>Generates a &ldquo;tags&rdquo; file for Vi-style editors
 	    (<literal>:ctags</literal>) or
         Emacs-style editors (<literal>:etags</literal>).  If
-	    no filename is specified, the defaulit <filename>tags</filename> or
+	    no filename is specified, the default <filename>tags</filename> or
 	    <filename>TAGS</filename> is
 	    used, respectively.  Tags for all the functions, constructors and
 	    types in the currently loaded modules are created.  All modules must
