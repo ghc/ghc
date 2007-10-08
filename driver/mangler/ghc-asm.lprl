@@ -1284,7 +1284,7 @@ sub mangle_asm {
 	    # toss all prologue stuff, except for loading gp, and the ..ng address
 	    unless ($c =~ /\.ent.*\n\$.*\.\.ng:/m) {
 		if (($p, $r) = split(/^\t\.prologue/m, $c)) {
-                    use vars '$junk'; # Unused?
+                    # use vars '$junk'; # Unused?
 		    if (($keep, $junk) = split(/\.\.ng:/m, $p)) {
 			$keep =~ s/^\t\.frame.*\n/\t.frame \$30,0,\$26,0\n/m;
 			$keep =~ s/^\t\.(mask|fmask).*\n//gm;
@@ -1861,7 +1861,7 @@ sub print_doctored {
 
 \begin{code}
 sub init_FUNNY_THINGS {
-    use vars '%KNOWN_FUNNY_THING'; # Unused?
+    # use vars '%KNOWN_FUNNY_THING'; # Unused?
     %KNOWN_FUNNY_THING = (
 	# example
 	# "${T_US}stg_.*{T_POST_LBL}", 1,  
@@ -1877,7 +1877,7 @@ right after the table itself.  (The code pasting is done elsewhere.)
 
 \begin{code}
 sub rev_tbl {
-    use vars '$discard1';   # Unused?
+    # use vars '$discard1';   # Unused?
     local($symb, $tbl, $discard1) = @_;
 
     return ($tbl) if ($TargetPlatform =~ /^ia64-/m);
