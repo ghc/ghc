@@ -91,7 +91,7 @@ import Data.List	( isPrefixOf )
 import Util		( split )
 #endif
 
-import Data.Char	( isUpper )
+import Data.Char
 import System.IO        ( hPutStrLn, stderr )
 
 -- -----------------------------------------------------------------------------
@@ -1445,15 +1445,16 @@ setOptLevel n dflags
 
 setMainIs :: String -> DynP ()
 setMainIs arg
-  | not (null main_fn)		-- The arg looked like "Foo.baz"
+  | not (null main_fn) && isLower (head main_fn)
+     -- The arg looked like "Foo.Bar.baz"
   = upd $ \d -> d{ mainFunIs = Just main_fn,
-	  	   mainModIs = mkModule mainPackageId (mkModuleName main_mod) }
+	           mainModIs = mkModule mainPackageId (mkModuleName main_mod) }
 
-  | isUpper (head main_mod)	-- The arg looked like "Foo"
-  = upd $ \d -> d{ mainModIs = mkModule mainPackageId (mkModuleName main_mod) }
+  | isUpper (head arg)	-- The arg looked like "Foo" or "Foo.Bar"
+  = upd $ \d -> d{ mainModIs = mkModule mainPackageId (mkModuleName arg) }
   
   | otherwise			-- The arg looked like "baz"
-  = upd $ \d -> d{ mainFunIs = Just main_mod }
+  = upd $ \d -> d{ mainFunIs = Just arg }
   where
     (main_mod, main_fn) = splitLongestPrefix arg (== '.')
 
