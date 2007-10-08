@@ -307,8 +307,8 @@ loadInterface doc_str mod from
 
 badDepMsg mod 
   = hang (ptext SLIT("Interface file inconsistency:"))
-       2 (sep [ptext SLIT("home-package module") <+> quotes (ppr mod) <+> ptext SLIT("is mentioned is needed,"), 
-	       ptext SLIT("but is not among the dependencies of interfaces directly imported by the module being compiled")])
+       2 (sep [ptext SLIT("home-package module") <+> quotes (ppr mod) <+> ptext SLIT("is needed,"), 
+	       ptext SLIT("but is not listed in the dependencies of the interfaces directly imported by the module being compiled")])
 
 -----------------------------------------------------
 --	Loading type/class/value decls
