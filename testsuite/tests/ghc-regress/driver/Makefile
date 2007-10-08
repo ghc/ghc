@@ -314,6 +314,16 @@ test062.3:
 	echo "module Main (hello) where { hello = putStrLn \"ok\" }" >Hello.hs
 	$(TEST_HC) --make -main-is hello Hello.hs -o hello
 	./hello
+test062.4:
+	@$(RM) B/Hello.hs B/Hello.hi B/Hello$(OBJSUFFIX) B/Hello.hc hello
+	echo "module B.Hello (hello) where { hello = putStrLn \"ok\" }" >B/Hello.hs
+	$(TEST_HC) --make -main-is B.Hello.hello B/Hello.hs -o hello
+	./hello
+test062.5:
+	@$(RM) B/Hello.hs B/Hello.hi B/Hello$(OBJSUFFIX) Hello.hc hello
+	echo "module B.Hello (main) where { main = putStrLn \"ok\" }" >B/Hello.hs
+	$(TEST_HC) --make -main-is B.Hello B/Hello.hs -o hello
+	./hello
 
 # Test that -i deletes the list of search paths.
 # The compilation will fail, but we ignore the failure and just

@@ -6,6 +6,7 @@ def cleanall():
            'B/F.hi', 'B/F.o', 'B/F_stub.c', 'B/F_stub.h', 'B/F_stub.o',
            'F.hi', 'F.o', 'F_stub.c', 'F_stub.h', 'F_stub.o',
            'Hello.hi', 'Hello.hs', 'Hello.o',
+           'B/Hello.hi', 'B/Hello.hs', 'B/Hello.o',
            'd1/P/Q.hi', 'd1/P/Q.o', 'd2/R/S.hi', 'd2/R/S.o',
            'depend', 'depend.bak', 'hello'])
 
@@ -89,6 +90,10 @@ cleanall()
 test('driver062.2', ignore_output, run_command, ['$MAKE test062.2'])
 cleanall()
 test('driver062.3', ignore_output, run_command, ['$MAKE test062.3'])
+cleanall()
+test('driver062.4', ignore_output, run_command, ['$MAKE test062.4'])
+cleanall()
+test('driver062.5', ignore_output, run_command, ['$MAKE test062.5'])
 cleanall()
 
 test('driver063', normal, run_command, ['$MAKE -s --no-print-directory test063'])
