@@ -2202,6 +2202,9 @@ forkProcess(HsStablePtr *entry
 	ACQUIRE_LOCK(&sched_mutex);
 	for (task = all_tasks; task != NULL; task=task->all_link) {
 	    if (task != cap->running_task) {
+#if defined(THREADED_RTS)
+                initMutex(&task->lock); // see #1391
+#endif
 		discardTask(task);
 	    }
 	}
