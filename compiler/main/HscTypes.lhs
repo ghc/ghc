@@ -4,13 +4,6 @@
 \section[HscTypes]{Types for the per-module compiler}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module HscTypes ( 
 	-- * Sessions and compilation state
 	Session(..), withSession, modifySession, 
@@ -122,7 +115,6 @@ import UniqFM		( lookupUFM, eltsUFM, emptyUFM )
 import UniqSupply	( UniqSupply )
 import FastString	( FastString )
 import StringBuffer	( StringBuffer )
-import Util
 
 import System.Time	( ClockTime )
 import Data.IORef
@@ -238,6 +230,7 @@ pprTarget (Target id _) = pprTargetId id
 instance Outputable Target where
     ppr = pprTarget
 
+pprTargetId :: TargetId -> SDoc
 pprTargetId (TargetModule m) = ppr m
 pprTargetId (TargetFile f _) = text f
 
@@ -250,7 +243,10 @@ type HomePackageTable  = ModuleNameEnv HomeModInfo
 type PackageIfaceTable = ModuleEnv ModIface
 	-- Domain = modules in the imported packages
 
+emptyHomePackageTable :: HomePackageTable
 emptyHomePackageTable  = emptyUFM
+
+emptyPackageIfaceTable :: PackageIfaceTable
 emptyPackageIfaceTable = emptyModuleEnv
 
 data HomeModInfo 
@@ -501,6 +497,7 @@ data ModDetails
         md_vect_info :: !VectInfo     -- Vectorisation information
      }
 
+emptyModDetails :: ModDetails
 emptyModDetails = ModDetails { md_types = emptyTypeEnv,
 			       md_exports = [],
 			       md_insts     = [],
@@ -679,6 +676,7 @@ data InteractiveContext
     }
 
 
+emptyInteractiveContext :: InteractiveContext
 emptyInteractiveContext
   = InteractiveContext { ic_toplev_scope = [],
 			 ic_exports = [],
@@ -806,7 +804,7 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
 implicitTyThings :: TyThing -> [TyThing]
 -- If you change this, make sure you change LoadIface.ifaceDeclSubBndrs in sync
 
-implicitTyThings (AnId id)   = []
+implicitTyThings (AnId _)   = []
 
 	-- For type constructors, add the data cons (and their extras),
 	-- and the selectors and generic-programming Ids too
@@ -840,10 +838,12 @@ isImplicitTyThing (AClass   _)  = False
 isImplicitTyThing (ATyCon   tc) = isImplicitTyCon tc
 
 	-- For newtypes and indexed data types, add the implicit coercion tycon
+implicitCoTyCon :: TyCon -> [TyThing]
 implicitCoTyCon tc 
   = map ATyCon . catMaybes $ [newTyConCo_maybe tc, 
 			      tyConFamilyCoercion_maybe tc]
 
+extras_plus :: TyThing -> [TyThing]
 extras_plus thing = thing : implicitTyThings thing
 
 extendTypeEnvWithIds :: TypeEnv -> [Id] -> TypeEnv
@@ -907,15 +907,19 @@ lookupType dflags hpt pte name
 \end{code}
 
 \begin{code}
+tyThingTyCon :: TyThing -> TyCon
 tyThingTyCon (ATyCon tc) = tc
 tyThingTyCon other	 = pprPanic "tyThingTyCon" (pprTyThing other)
 
+tyThingClass :: TyThing -> Class
 tyThingClass (AClass cls) = cls
 tyThingClass other	  = pprPanic "tyThingClass" (pprTyThing other)
 
+tyThingDataCon :: TyThing -> DataCon
 tyThingDataCon (ADataCon dc) = dc
 tyThingDataCon other	     = pprPanic "tyThingDataCon" (pprTyThing other)
 
+tyThingId :: TyThing -> Id
 tyThingId (AnId id) = id
 tyThingId other     = pprPanic "tyThingId" (pprTyThing other)
 \end{code}
@@ -943,7 +947,7 @@ mkIfaceVerCache pairs
           add_imp bndr env = extendOccEnv env bndr (decl_name, v)
 
 emptyIfaceVerCache :: OccName -> Maybe (OccName, Version)
-emptyIfaceVerCache occ = Nothing
+emptyIfaceVerCache _occ = Nothing
 
 ------------------ Deprecations -------------------------
 data Deprecs a
@@ -961,18 +965,18 @@ type Deprecations = Deprecs (NameEnv (OccName,DeprecTxt))
 	-- deprecation appears.
 
 mkIfaceDepCache:: IfaceDeprecs -> Name -> Maybe DeprecTxt
-mkIfaceDepCache NoDeprecs     	  = \n -> Nothing
-mkIfaceDepCache (DeprecAll t) 	  = \n -> Just t
+mkIfaceDepCache NoDeprecs     	  = \_ -> Nothing
+mkIfaceDepCache (DeprecAll t) 	  = \_ -> Just t
 mkIfaceDepCache (DeprecSome pairs) = lookupOccEnv (mkOccEnv pairs) . nameOccName
 
 emptyIfaceDepCache :: Name -> Maybe DeprecTxt
-emptyIfaceDepCache n = Nothing
+emptyIfaceDepCache _ = Nothing
 
 plusDeprecs :: Deprecations -> Deprecations -> Deprecations
 plusDeprecs d NoDeprecs = d
 plusDeprecs NoDeprecs d = d
-plusDeprecs d (DeprecAll t) = DeprecAll t
-plusDeprecs (DeprecAll t) d = DeprecAll t
+plusDeprecs _ (DeprecAll t) = DeprecAll t
+plusDeprecs (DeprecAll t) _ = DeprecAll t
 plusDeprecs (DeprecSome v1) (DeprecSome v2) = DeprecSome (v1 `plusNameEnv` v2)
 \end{code}
 
@@ -1008,7 +1012,7 @@ availName (AvailTC n _) = n
 
 availNames :: GenAvailInfo name -> [name]
 availNames (Avail n)      = [n]
-availNames (AvailTC n ns) = ns
+availNames (AvailTC _ ns) = ns
 
 instance Outputable n => Outputable (GenAvailInfo n) where
    ppr = pprAvail
@@ -1026,7 +1030,7 @@ mkIfaceFixCache pairs
    env = mkOccEnv pairs
 
 emptyIfaceFixCache :: OccName -> Fixity
-emptyIfaceFixCache n = defaultFixity
+emptyIfaceFixCache _ = defaultFixity
 
 -- This fixity environment is for source code only
 type FixityEnv = NameEnv FixItem
@@ -1426,7 +1430,7 @@ data Unlinked
    | BCOs CompiledByteCode ModBreaks
 
 #ifndef GHCI
-data CompiledByteCode = NoByteCode
+data CompiledByteCode
 #endif
 
 instance Outputable Unlinked where
@@ -1434,23 +1438,27 @@ instance Outputable Unlinked where
    ppr (DotA path)   = text "DotA" <+> text path
    ppr (DotDLL path) = text "DotDLL" <+> text path
 #ifdef GHCI
-   ppr (BCOs bcos _)   = text "BCOs" <+> ppr bcos
+   ppr (BCOs bcos _) = text "BCOs" <+> ppr bcos
 #else
-   ppr (BCOs bcos _)   = text "No byte code"
+   ppr (BCOs _ _)    = text "No byte code"
 #endif
 
+isObject :: Unlinked -> Bool
 isObject (DotO _)   = True
 isObject (DotA _)   = True
 isObject (DotDLL _) = True
 isObject _          = False
 
+isInterpretable :: Unlinked -> Bool
 isInterpretable = not . isObject
 
+nameOfObject :: Unlinked -> FilePath
 nameOfObject (DotO fn)   = fn
 nameOfObject (DotA fn)   = fn
 nameOfObject (DotDLL fn) = fn
 nameOfObject other       = pprPanic "nameOfObject" (ppr other)
 
+byteCodeOfObject :: Unlinked -> CompiledByteCode
 byteCodeOfObject (BCOs bc _) = bc
 byteCodeOfObject other       = pprPanic "byteCodeOfObject" (ppr other)
 \end{code}
