@@ -1,0 +1,7 @@
+This is a little output test suit for Haddock. To add a test: 
+
+ 1 Create a module and add it to a new directory or an appropriate existing one
+ 2 Run runtests.hs (giving it the lib dir to GHC).
+   You should now have output/<dir>/<modulename>.html but the test will always
+   pass since there is no reference output to compare with
+ 3 To add reference output, you can copy <modulename>.html to <modulename>.html.ref

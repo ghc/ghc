@@ -1,0 +1,3134 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!--Rendered using the Haskell Html Library v0.2-->
+<HTML
+><HEAD
+><META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8"
+><TITLE
+>Test</TITLE
+><LINK HREF="haddock.css" REL="stylesheet" TYPE="text/css"
+><SCRIPT SRC="haddock.js" TYPE="text/javascript"
+></SCRIPT
+></HEAD
+><BODY
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="topbar"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD
+><IMG SRC="haskell_icon.gif" WIDTH="16" HEIGHT="16" ALT=" "
+></TD
+><TD CLASS="title"
+></TD
+><TD CLASS="topbut"
+><A HREF="index.html"
+>Contents</A
+></TD
+><TD CLASS="topbut"
+><A HREF="doc-index.html"
+>Index</A
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="modulebar"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD
+><FONT SIZE="6"
+>Test</FONT
+></TD
+><TD ALIGN="right"
+><TABLE CLASS="narrow" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="infohead"
+>Portability</TD
+><TD CLASS="infoval"
+>portable</TD
+></TR
+><TR
+><TD CLASS="infohead"
+>Stability</TD
+><TD CLASS="infoval"
+>provisional</TD
+></TR
+><TR
+><TD CLASS="infohead"
+>Maintainer</TD
+><TD CLASS="infoval"
+>libraries@haskell.org</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="section4"
+><B
+>Contents</B
+></TD
+></TR
+><TR
+><TD
+><DL
+><DT
+><A HREF="#1"
+>Type declarations
+</A
+></DT
+><DD
+><DL
+><DT
+><A HREF="#2"
+>Data types
+</A
+></DT
+><DT
+><A HREF="#3"
+>Records
+</A
+></DT
+></DL
+></DD
+><DT
+><A HREF="#4"
+>Class declarations
+</A
+></DT
+><DT
+><A HREF="#5"
+>Function types
+</A
+></DT
+><DT
+><A HREF="#6"
+>Auxiliary stuff
+</A
+></DT
+><DT
+><A HREF="#7"
+>A hidden module
+</A
+></DT
+><DT
+><A HREF="#8"
+>A visible module
+</A
+></DT
+><DT
+><A HREF="#9"
+>Existential / Universal types
+</A
+></DT
+><DT
+><A HREF="#10"
+>Type signatures with argument docs
+</A
+></DT
+><DT
+><A HREF="#11"
+>A section
+</A
+></DT
+><DD
+><DL
+><DT
+><A HREF="#12"
+>A subsection 
+</A
+></DT
+></DL
+></DD
+></DL
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+>Description</TD
+></TR
+><TR
+><TD CLASS="doc"
+>This module illustrates &amp; tests most of the features of Haddock.
+ Testing references from the description: <TT
+><A HREF="Test.html#t%3AT"
+>T</A
+></TT
+>, <TT
+><A HREF="Test.html#v%3Af"
+>f</A
+></TT
+>, <TT
+><A HREF="Test.html#v%3Ag"
+>g</A
+></TT
+>, <TT
+><A HREF="Visible.html#v%3Avisible"
+>visible</A
+></TT
+>.
+</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+>Synopsis</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A HREF="#t%3AT"
+>T</A
+> a b </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>= <A HREF="#v%3AA"
+>A</A
+> Int Maybe Float</TD
+></TR
+><TR
+><TD CLASS="decl"
+>| <A HREF="#v%3AB"
+>B</A
+> (<A HREF="Test.html#t%3AT"
+>T</A
+> a b, <A HREF="Test.html#t%3AT"
+>T</A
+> Int Float)</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A HREF="#t%3AT2"
+>T2</A
+> a b</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A HREF="#t%3AT3"
+>T3</A
+> a b </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>= <A HREF="#v%3AA1"
+>A1</A
+> a</TD
+></TR
+><TR
+><TD CLASS="decl"
+>| <A HREF="#v%3AB1"
+>B1</A
+> b</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A HREF="#t%3AT4"
+>T4</A
+> a b </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>= <A HREF="#v%3AA2"
+>A2</A
+> a</TD
+></TR
+><TR
+><TD CLASS="decl"
+>| <A HREF="#v%3AB2"
+>B2</A
+> b</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A HREF="#t%3AT5"
+>T5</A
+> a b </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>= <A HREF="#v%3AA3"
+>A3</A
+> a</TD
+></TR
+><TR
+><TD CLASS="decl"
+>| <A HREF="#v%3AB3"
+>B3</A
+> b</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A HREF="#t%3AT6"
+>T6</A
+>  </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>= <A HREF="#v%3AA4"
+>A4</A
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+>| <A HREF="#v%3AB4"
+>B4</A
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+>| <A HREF="#v%3AC4"
+>C4</A
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>newtype</SPAN
+>  <A HREF="#t%3AN1"
+>N1</A
+> a = <A HREF="#v%3AN1"
+>N1</A
+> a</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>newtype</SPAN
+>  <A HREF="#t%3AN2"
+>N2</A
+> a b = <A HREF="#v%3AN2"
+>N2</A
+> {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3An"
+>n</A
+> :: a b</TD
+></TR
+></TABLE
+>}</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>newtype</SPAN
+>  <A HREF="#t%3AN3"
+>N3</A
+> a b = <A HREF="#v%3AN3"
+>N3</A
+> {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3An3"
+>n3</A
+> :: a b</TD
+></TR
+></TABLE
+>}</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A HREF="#t%3AN4"
+>N4</A
+> a b</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>newtype</SPAN
+>  <A HREF="#t%3AN5"
+>N5</A
+> a b = <A HREF="#v%3AN5"
+>N5</A
+> {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3An5"
+>n5</A
+> :: a b</TD
+></TR
+></TABLE
+>}</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>newtype</SPAN
+>  <A HREF="#t%3AN6"
+>N6</A
+> a b = <A HREF="#v%3AN6"
+>N6</A
+> {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3An6"
+>n6</A
+> :: a b</TD
+></TR
+></TABLE
+>}</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>newtype</SPAN
+>  <A HREF="#t%3AN7"
+>N7</A
+> a b = <A HREF="#v%3AN7"
+>N7</A
+> {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3An7"
+>n7</A
+> :: a b</TD
+></TR
+></TABLE
+>}</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A HREF="#t%3AR"
+>R</A
+>  </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>= <A HREF="#v%3AC1"
+>C1</A
+> {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3Ap"
+>p</A
+> :: Int</TD
+></TR
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3Aq"
+>q</A
+> :: <SPAN CLASS="keyword"
+>forall</SPAN
+> a.  a -&gt; a</TD
+></TR
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3Ar"
+>r</A
+> :: Int</TD
+></TR
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3As"
+>s</A
+> :: Int</TD
+></TR
+></TABLE
+>}</TD
+></TR
+><TR
+><TD CLASS="decl"
+>| <A HREF="#v%3AC2"
+>C2</A
+> {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3At"
+>t</A
+> :: T1 -&gt; (<A HREF="Test.html#t%3AT2"
+>T2</A
+> Int Int) -&gt; (<A HREF="Test.html#t%3AT3"
+>T3</A
+> Bool Bool) -&gt; (<A HREF="Test.html#t%3AT4"
+>T4</A
+> Float Float) -&gt; <A HREF="Test.html#t%3AT5"
+>T5</A
+> () ()</TD
+></TR
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3Au"
+>u</A
+> :: Int</TD
+></TR
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3Av"
+>v</A
+> :: Int</TD
+></TR
+></TABLE
+>}</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A HREF="#t%3AR1"
+>R1</A
+>  = <A HREF="#v%3AC3"
+>C3</A
+> {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3As1"
+>s1</A
+> :: Int</TD
+></TR
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3As2"
+>s2</A
+> :: Int</TD
+></TR
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3As3"
+>s3</A
+> :: Int</TD
+></TR
+></TABLE
+>}</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Ap"
+>p</A
+> :: <A HREF="Test.html#t%3AR"
+>R</A
+> -&gt; Int</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Aq"
+>q</A
+> :: <A HREF="Test.html#t%3AR"
+>R</A
+> -&gt; <SPAN CLASS="keyword"
+>forall</SPAN
+> a.  a -&gt; a</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Au"
+>u</A
+> :: <A HREF="Test.html#t%3AR"
+>R</A
+> -&gt; Int</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A HREF="Test.html#t%3AD"
+>D</A
+> a =&gt; <A HREF="#t%3AC"
+>C</A
+> a  <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Aa"
+>a</A
+> :: IO a</TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Ab"
+>b</A
+> :: [a]</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A HREF="#t%3AD"
+>D</A
+> a  <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Ad"
+>d</A
+> ::  <A HREF="Test.html#t%3AT"
+>T</A
+> a b</TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Ae"
+>e</A
+> :: (a, a)</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A HREF="#t%3AE"
+>E</A
+> a </TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A HREF="#t%3AF"
+>F</A
+> a  <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Aff"
+>ff</A
+> :: a</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Aa"
+>a</A
+> :: <A HREF="Test.html#t%3AC"
+>C</A
+> a =&gt; IO a</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Af"
+>f</A
+> :: <A HREF="Test.html#t%3AC"
+>C</A
+> a =&gt; a -&gt; Int</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Ag"
+>g</A
+> :: Int -&gt; IO CInt</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Ahidden"
+>hidden</A
+> :: Int -&gt; Int</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+>module <A HREF="Visible.html"
+>Visible</A
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A HREF="#t%3AEx"
+>Ex</A
+> a </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>= <SPAN CLASS="keyword"
+>forall</SPAN
+> b . <A HREF="Test.html#t%3AC"
+>C</A
+> b =&gt; <A HREF="#v%3AEx1"
+>Ex1</A
+> b</TD
+></TR
+><TR
+><TD CLASS="decl"
+>| <SPAN CLASS="keyword"
+>forall</SPAN
+> b . <A HREF="#v%3AEx2"
+>Ex2</A
+> b</TD
+></TR
+><TR
+><TD CLASS="decl"
+>| <SPAN CLASS="keyword"
+>forall</SPAN
+> b . <A HREF="Test.html#t%3AC"
+>C</A
+> a =&gt; <A HREF="#v%3AEx3"
+>Ex3</A
+> b</TD
+></TR
+><TR
+><TD CLASS="decl"
+>| <A HREF="#v%3AEx4"
+>Ex4</A
+> <SPAN CLASS="keyword"
+>forall</SPAN
+> a.  a -&gt; a</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Ak"
+>k</A
+> :: <A HREF="Test.html#t%3AT"
+>T</A
+> () () -&gt; <A HREF="Test.html#t%3AT2"
+>T2</A
+> Int Int -&gt; <A HREF="Test.html#t%3AT3"
+>T3</A
+> Bool Bool -&gt; <A HREF="Test.html#t%3AT4"
+>T4</A
+> Float Float -&gt; <A HREF="Test.html#t%3AT5"
+>T5</A
+> () () -&gt; IO ()</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Al"
+>l</A
+> :: (Int, Int, Float) -&gt; Int</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Am"
+>m</A
+> :: <A HREF="Test.html#t%3AR"
+>R</A
+> -&gt; <A HREF="Test.html#t%3AN1"
+>N1</A
+> () -&gt; IO Int</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Ao"
+>o</A
+> :: Float -&gt; IO Float</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Af%27"
+>f'</A
+> :: Int</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+><A NAME="1"
+>Type declarations
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section2"
+><A NAME="2"
+>Data types
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t%3AT"
+></A
+><B
+>T</B
+> a b </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>This comment applies to the <EM
+>following</EM
+> declaration
+ and it continues until the next non-comment line
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AA"
+></A
+><B
+>A</B
+> Int Maybe Float</TD
+><TD CLASS="rdoc"
+>This comment describes the <TT
+><A HREF="Test.html#v%3AA"
+>A</A
+></TT
+> constructor
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AB"
+></A
+><B
+>B</B
+> (<A HREF="Test.html#t%3AT"
+>T</A
+> a b, <A HREF="Test.html#t%3AT"
+>T</A
+> Int Float)</TD
+><TD CLASS="rdoc"
+>This comment describes the <TT
+><A HREF="Test.html#v%3AB"
+>B</A
+></TT
+> constructor
+</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t%3AT2"
+></A
+><B
+>T2</B
+> a b </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>An abstract data declaration
+</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t%3AT3"
+></A
+><B
+>T3</B
+> a b </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>A data declaration with no documentation annotations on the constructors
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AA1"
+></A
+><B
+>A1</B
+> a</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AB1"
+></A
+><B
+>B1</B
+> b</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t%3AT4"
+></A
+><B
+>T4</B
+> a b </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AA2"
+></A
+><B
+>A2</B
+> a</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AB2"
+></A
+><B
+>B2</B
+> b</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t%3AT5"
+></A
+><B
+>T5</B
+> a b </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AA3"
+></A
+><B
+>A3</B
+> a</TD
+><TD CLASS="rdoc"
+>documents <TT
+><A HREF="Test.html#v%3AA3"
+>A3</A
+></TT
+>
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AB3"
+></A
+><B
+>B3</B
+> b</TD
+><TD CLASS="rdoc"
+>documents <TT
+><A HREF="Test.html#v%3AB3"
+>B3</A
+></TT
+>
+</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t%3AT6"
+></A
+><B
+>T6</B
+>  </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>Testing alternative comment styles
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AA4"
+></A
+><B
+>A4</B
+></TD
+><TD CLASS="rdoc"
+>This is the doc for <TT
+><A HREF="Test.html#v%3AA4"
+>A4</A
+></TT
+>
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AB4"
+></A
+><B
+>B4</B
+></TD
+><TD CLASS="rdoc"
+>This is the doc for <TT
+><A HREF="Test.html#v%3AB4"
+>B4</A
+></TT
+>
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AC4"
+></A
+><B
+>C4</B
+></TD
+><TD CLASS="rdoc"
+>This is the doc for <TT
+><A HREF="Test.html#v%3AC4"
+>C4</A
+></TT
+>
+</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>newtype</SPAN
+>  <A NAME="t%3AN1"
+></A
+><B
+>N1</B
+> a </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>A newtype
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AN1"
+></A
+><B
+>N1</B
+> a</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>newtype</SPAN
+>  <A NAME="t%3AN2"
+></A
+><B
+>N2</B
+> a b </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>A newtype with a fieldname
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="5" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AN2"
+></A
+><B
+>N2</B
+></TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="body" COLSPAN="2"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3An"
+></A
+><B
+>n</B
+> :: a b</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>newtype</SPAN
+>  <A NAME="t%3AN3"
+></A
+><B
+>N3</B
+> a b </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>A newtype with a fieldname, documentation on the field
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="5" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AN3"
+></A
+><B
+>N3</B
+></TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="body" COLSPAN="2"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3An3"
+></A
+><B
+>n3</B
+> :: a b</TD
+><TD CLASS="rdoc"
+>this is the <TT
+><A HREF="Test.html#v%3An3"
+>n3</A
+></TT
+> field 
+</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t%3AN4"
+></A
+><B
+>N4</B
+> a b </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>An abstract newtype - we show this one as data rather than newtype because
+ the difference isn't visible to the programmer for an abstract type.
+</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>newtype</SPAN
+>  <A NAME="t%3AN5"
+></A
+><B
+>N5</B
+> a b </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="5" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AN5"
+></A
+><B
+>N5</B
+></TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="body" COLSPAN="2"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3An5"
+></A
+><B
+>n5</B
+> :: a b</TD
+><TD CLASS="rdoc"
+>no docs on the datatype or the constructor
+</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>newtype</SPAN
+>  <A NAME="t%3AN6"
+></A
+><B
+>N6</B
+> a b </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="5" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AN6"
+></A
+><B
+>N6</B
+></TD
+><TD CLASS="rdoc"
+>docs on the constructor only
+</TD
+></TR
+><TR
+><TD CLASS="body" COLSPAN="2"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3An6"
+></A
+><B
+>n6</B
+> :: a b</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>newtype</SPAN
+>  <A NAME="t%3AN7"
+></A
+><B
+>N7</B
+> a b </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>docs on the newtype and the constructor
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="5" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AN7"
+></A
+><B
+>N7</B
+></TD
+><TD CLASS="rdoc"
+>The <TT
+><A HREF="Test.html#t%3AN7"
+>N7</A
+></TT
+> constructor
+</TD
+></TR
+><TR
+><TD CLASS="body" COLSPAN="2"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3An7"
+></A
+><B
+>n7</B
+> :: a b</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section2"
+><A NAME="3"
+>Records
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t%3AR"
+></A
+><B
+>R</B
+>  </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>This is the documentation for the <TT
+><A HREF="Test.html#t%3AR"
+>R</A
+></TT
+> record, which has four fields,
+ <TT
+><A HREF="Test.html#v%3Ap"
+>p</A
+></TT
+>, <TT
+><A HREF="Test.html#v%3Aq"
+>q</A
+></TT
+>, <TT
+><A HREF="Test.html#v%3Ar"
+>r</A
+></TT
+>, and <TT
+><A HREF="Test.html#v%3As"
+>s</A
+></TT
+>.
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="5" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AC1"
+></A
+><B
+>C1</B
+></TD
+><TD CLASS="rdoc"
+>This is the <TT
+><A HREF="Test.html#v%3AC1"
+>C1</A
+></TT
+> record constructor, with the following fields:
+</TD
+></TR
+><TR
+><TD CLASS="body" COLSPAN="2"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3Ap"
+></A
+><B
+>p</B
+> :: Int</TD
+><TD CLASS="rdoc"
+>This comment applies to the <TT
+><A HREF="Test.html#v%3Ap"
+>p</A
+></TT
+> field
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3Aq"
+></A
+><B
+>q</B
+> :: <SPAN CLASS="keyword"
+>forall</SPAN
+> a.  a -&gt; a</TD
+><TD CLASS="rdoc"
+>This comment applies to the <TT
+><A HREF="Test.html#v%3Aq"
+>q</A
+></TT
+> field
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3Ar"
+></A
+><B
+>r</B
+> :: Int</TD
+><TD CLASS="rdoc"
+>This comment applies to both <TT
+><A HREF="Test.html#v%3Ar"
+>r</A
+></TT
+> and <TT
+><A HREF="Test.html#v%3As"
+>s</A
+></TT
+>
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3As"
+></A
+><B
+>s</B
+> :: Int</TD
+><TD CLASS="rdoc"
+>This comment applies to both <TT
+><A HREF="Test.html#v%3Ar"
+>r</A
+></TT
+> and <TT
+><A HREF="Test.html#v%3As"
+>s</A
+></TT
+>
+</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AC2"
+></A
+><B
+>C2</B
+></TD
+><TD CLASS="rdoc"
+>This is the <TT
+><A HREF="Test.html#v%3AC2"
+>C2</A
+></TT
+> record constructor, also with some fields:
+</TD
+></TR
+><TR
+><TD CLASS="body" COLSPAN="2"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3At"
+></A
+><B
+>t</B
+> :: T1 -&gt; (<A HREF="Test.html#t%3AT2"
+>T2</A
+> Int Int) -&gt; (<A HREF="Test.html#t%3AT3"
+>T3</A
+> Bool Bool) -&gt; (<A HREF="Test.html#t%3AT4"
+>T4</A
+> Float Float) -&gt; <A HREF="Test.html#t%3AT5"
+>T5</A
+> () ()</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3Au"
+></A
+><B
+>u</B
+> :: Int</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3Av"
+></A
+><B
+>v</B
+> :: Int</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t%3AR1"
+></A
+><B
+>R1</B
+>  </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>Testing different record commenting styles
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="5" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AC3"
+></A
+><B
+>C3</B
+></TD
+><TD CLASS="rdoc"
+>This is the <TT
+><A HREF="Test.html#v%3AC3"
+>C3</A
+></TT
+> record constructor
+</TD
+></TR
+><TR
+><TD CLASS="body" COLSPAN="2"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3As1"
+></A
+><B
+>s1</B
+> :: Int</TD
+><TD CLASS="rdoc"
+>The <TT
+><A HREF="Test.html#v%3As1"
+>s1</A
+></TT
+> record selector
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3As2"
+></A
+><B
+>s2</B
+> :: Int</TD
+><TD CLASS="rdoc"
+>The <TT
+><A HREF="Test.html#v%3As2"
+>s2</A
+></TT
+> record selector
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3As3"
+></A
+><B
+>s3</B
+> :: Int</TD
+><TD CLASS="rdoc"
+>The <TT
+><A HREF="Test.html#v%3As3"
+>s3</A
+></TT
+> record selector
+</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+>test that we can export record selectors on their own:
+</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Ap"
+></A
+><B
+>p</B
+> :: <A HREF="Test.html#t%3AR"
+>R</A
+> -&gt; Int</TD
+></TR
+><TR
+><TD CLASS="doc"
+>This comment applies to the <TT
+><A HREF="Test.html#v%3Ap"
+>p</A
+></TT
+> field
+</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Aq"
+></A
+><B
+>q</B
+> :: <A HREF="Test.html#t%3AR"
+>R</A
+> -&gt; <SPAN CLASS="keyword"
+>forall</SPAN
+> a.  a -&gt; a</TD
+></TR
+><TR
+><TD CLASS="doc"
+>This comment applies to the <TT
+><A HREF="Test.html#v%3Aq"
+>q</A
+></TT
+> field
+</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Au"
+></A
+><B
+>u</B
+> :: <A HREF="Test.html#t%3AR"
+>R</A
+> -&gt; Int</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+><A NAME="4"
+>Class declarations
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A HREF="Test.html#t%3AD"
+>D</A
+> a =&gt; <A NAME="t%3AC"
+></A
+><B
+>C</B
+> a  <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>This comment applies to the <EM
+>previous</EM
+> declaration (the <TT
+><A HREF="Test.html#t%3AC"
+>C</A
+></TT
+> class)
+</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+>Methods</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Aa"
+></A
+><B
+>a</B
+> :: IO a</TD
+></TR
+><TR
+><TD CLASS="doc"
+>this is a description of the <TT
+><A HREF="Test.html#v%3Aa"
+>a</A
+></TT
+> method
+</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Ab"
+></A
+><B
+>b</B
+> :: [a]</TD
+></TR
+><TR
+><TD CLASS="doc"
+>this is a description of the <TT
+><A HREF="Test.html#v%3Ab"
+>b</A
+></TT
+> method
+</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A NAME="t%3AD"
+></A
+><B
+>D</B
+> a  <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>This is a class declaration with no separate docs for the methods
+</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+>Methods</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Ad"
+></A
+><B
+>d</B
+> ::  <A HREF="Test.html#t%3AT"
+>T</A
+> a b</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Ae"
+></A
+><B
+>e</B
+> :: (a, a)</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+><IMG SRC="minus.gif" CLASS="coll" ONCLICK="toggle(this,'i:D')" ALT="show/hide"
+> Instances</TD
+></TR
+><TR
+><TD CLASS="body"
+><DIV ID="i:D" STYLE="display:block;"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A HREF="Test.html#t%3AD"
+>D</A
+> Float</TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="Test.html#t%3AD"
+>D</A
+> Int</TD
+></TR
+></TABLE
+></DIV
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A NAME="t%3AE"
+></A
+><B
+>E</B
+> a </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>This is a class declaration with no methods (or no methods exported)
+</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A NAME="t%3AF"
+></A
+><B
+>F</B
+> a  <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+>Methods</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Aff"
+></A
+><B
+>ff</B
+> :: a</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+>Test that we can export a class method on its own:
+</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Aa"
+></A
+><B
+>a</B
+> :: <A HREF="Test.html#t%3AC"
+>C</A
+> a =&gt; IO a</TD
+></TR
+><TR
+><TD CLASS="doc"
+>this is a description of the <TT
+><A HREF="Test.html#v%3Aa"
+>a</A
+></TT
+> method
+</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+><A NAME="5"
+>Function types
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Af"
+></A
+><B
+>f</B
+> :: <A HREF="Test.html#t%3AC"
+>C</A
+> a =&gt; a -&gt; Int</TD
+></TR
+><TR
+><TD CLASS="doc"
+><P
+>In a comment string we can refer to identifiers in scope with
+single quotes like this: <TT
+><A HREF="Test.html#t%3AT"
+>T</A
+></TT
+>, and we can refer to modules by
+using double quotes: <A HREF="Foo.html"
+>Foo</A
+>.  We can add emphasis <EM
+>like this</EM
+>.
+</P
+><UL
+><LI
+> This is a bulleted list
+</LI
+><LI
+> This is the next item (different kind of bullet)
+</LI
+></UL
+><OL
+><LI
+> This is an ordered list
+</LI
+></OL
+><P
+>2. This is the next item (different kind of bullet)
+</P
+><PRE
+>
+     This is a block of code, which can include other markup: <TT
+><A HREF="Test.html#t%3AR"
+>R</A
+></TT
+>
+     formatting
+               is
+                 significant
+</PRE
+><PRE
+> this is another block of code
+</PRE
+><P
+>We can also include URLs in documentation: <A HREF="http://www.haskell.org/"
+>http://www.haskell.org/</A
+>.
+</P
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Ag"
+></A
+><B
+>g</B
+> :: Int -&gt; IO CInt</TD
+></TR
+><TR
+><TD CLASS="doc"
+>we can export foreign declarations too
+</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+><A NAME="6"
+>Auxiliary stuff
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+><P
+>This is some documentation that is attached to a name ($aux1)
+ rather than a source declaration.  The documentation may be
+ referred to in the export list using its name.
+</P
+><PRE
+> code block in named doc </PRE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+>This is some documentation that is attached to a name ($aux2)
+</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+><PRE
+> code block on its own in named doc </PRE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+><PRE
+> code block on its own in named doc (after newline) </PRE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+><P
+>a nested, named doc comment
+</P
+><P
+>with a paragraph,
+</P
+><PRE
+> and a code block </PRE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+><PRE
+>test
+test1
+</PRE
+><PRE
+> test2
+  test3
+</PRE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+><PRE
+>
+test1
+test2
+</PRE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+><PRE
+>test3
+test4
+</PRE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+><PRE
+>
+test1
+test2
+</PRE
+><PRE
+>test3
+test4
+</PRE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+><PRE
+>test3
+test4
+</PRE
+><PRE
+>
+test1
+test2
+</PRE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+><P
+>aux11:
+</P
+><PRE
+>test3
+test4
+</PRE
+><PRE
+>
+test1
+test2
+</PRE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+><PRE
+> foo
+</PRE
+><PRE
+> bar
+</PRE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+><P
+>This is some inline documentation in the export list
+</P
+><PRE
+> a code block using bird-tracks
+ each line must begin with &gt; (which isn't significant unless it
+ is at the beginning of the line).
+</PRE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+><A NAME="7"
+>A hidden module
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Ahidden"
+></A
+><B
+>hidden</B
+> :: Int -&gt; Int</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+><A NAME="8"
+>A visible module
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+>module <A HREF="Visible.html"
+>Visible</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+>nested-style doc comments 
+</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+><A NAME="9"
+>Existential / Universal types
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t%3AEx"
+></A
+><B
+>Ex</B
+> a </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>A data-type using existential/universal types
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><SPAN CLASS="keyword"
+>forall</SPAN
+> b . <A HREF="Test.html#t%3AC"
+>C</A
+> b =&gt; <A NAME="v%3AEx1"
+></A
+><B
+>Ex1</B
+> b</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="arg"
+><SPAN CLASS="keyword"
+>forall</SPAN
+> b . <A NAME="v%3AEx2"
+></A
+><B
+>Ex2</B
+> b</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="arg"
+><SPAN CLASS="keyword"
+>forall</SPAN
+> b . <A HREF="Test.html#t%3AC"
+>C</A
+> a =&gt; <A NAME="v%3AEx3"
+></A
+><B
+>Ex3</B
+> b</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AEx4"
+></A
+><B
+>Ex4</B
+> <SPAN CLASS="keyword"
+>forall</SPAN
+> a.  a -&gt; a</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+><A NAME="10"
+>Type signatures with argument docs
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Ak"
+></A
+><B
+>k</B
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+>:: <A HREF="Test.html#t%3AT"
+>T</A
+> () ()</TD
+><TD CLASS="rdoc"
+>This argument has type <TT
+><A HREF="Test.html#t%3AT"
+>T</A
+></TT
+>
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+>-&gt; <A HREF="Test.html#t%3AT2"
+>T2</A
+> Int Int</TD
+><TD CLASS="rdoc"
+>This argument has type 'T2 Int Int'
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+>-&gt; <A HREF="Test.html#t%3AT3"
+>T3</A
+> Bool Bool -&gt; <A HREF="Test.html#t%3AT4"
+>T4</A
+> Float Float</TD
+><TD CLASS="rdoc"
+>This argument has type <TT
+>T3 Bool Bool -&gt; T4 Float Float</TT
+>
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+>-&gt; <A HREF="Test.html#t%3AT5"
+>T5</A
+> () ()</TD
+><TD CLASS="rdoc"
+>This argument has a very long description that should
+ hopefully cause some wrapping to happen when it is finally
+ rendered by Haddock in the generated HTML page.
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+>-&gt; IO ()</TD
+><TD CLASS="rdoc"
+>This is the result type
+</TD
+></TR
+><TR
+><TD CLASS="ndoc" COLSPAN="2"
+>This is a function with documentation for each argument
+</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Al"
+></A
+><B
+>l</B
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+>:: (Int, Int, Float)</TD
+><TD CLASS="rdoc"
+>takes a triple
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+>-&gt; Int</TD
+><TD CLASS="rdoc"
+>returns an <TT
+>Int</TT
+>
+</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Am"
+></A
+><B
+>m</B
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+>:: <A HREF="Test.html#t%3AR"
+>R</A
+></TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="arg"
+>-&gt; <A HREF="Test.html#t%3AN1"
+>N1</A
+> ()</TD
+><TD CLASS="rdoc"
+>one of the arguments
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+>-&gt; IO Int</TD
+><TD CLASS="rdoc"
+>and the return value
+</TD
+></TR
+><TR
+><TD CLASS="ndoc" COLSPAN="2"
+>This function has some arg docs 
+</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Ao"
+></A
+><B
+>o</B
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+>:: Float</TD
+><TD CLASS="rdoc"
+>The input float
+</TD
+></TR
+><TR
+><TD CLASS="arg"
+>-&gt; IO Float</TD
+><TD CLASS="rdoc"
+>The output float
+</TD
+></TR
+><TR
+><TD CLASS="ndoc" COLSPAN="2"
+>A foreign import with argument docs
+</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+><A NAME="11"
+>A section
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section2"
+><A NAME="12"
+>A subsection 
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="doc"
+><PRE
+> a literal line
+</PRE
+><P
+>$ a non <EM
+>literal</EM
+> line $
+</P
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Af%27"
+></A
+><B
+>f'</B
+> :: Int</TD
+></TR
+><TR
+><TD CLASS="doc"
+>a function with a prime can be referred to as <TT
+><A HREF="Test.html#v%3Af%27"
+>f'</A
+></TT
+> 
+ but f' doesn't get link'd 'f\''
+</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="botbar"
+>Produced by <A HREF="http://www.haskell.org/haddock/"
+>Haddock</A
+> version 2.0</TD
+></TR
+></TABLE
+></BODY
+></HTML
+>

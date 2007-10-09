@@ -1,0 +1,451 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!--Rendered using the Haskell Html Library v0.2-->
+<HTML
+><HEAD
+><META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8"
+><TITLE
+>Hash</TITLE
+><LINK HREF="haddock.css" REL="stylesheet" TYPE="text/css"
+><SCRIPT SRC="haddock.js" TYPE="text/javascript"
+></SCRIPT
+></HEAD
+><BODY
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="topbar"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD
+><IMG SRC="haskell_icon.gif" WIDTH="16" HEIGHT="16" ALT=" "
+></TD
+><TD CLASS="title"
+></TD
+><TD CLASS="topbut"
+><A HREF="index.html"
+>Contents</A
+></TD
+><TD CLASS="topbut"
+><A HREF="doc-index.html"
+>Index</A
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="modulebar"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD
+><FONT SIZE="6"
+>Hash</FONT
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="section4"
+><B
+>Contents</B
+></TD
+></TR
+><TR
+><TD
+><DL
+><DT
+><A HREF="#1"
+>The <TT
+>HashTable</TT
+> type
+</A
+></DT
+><DD
+><DL
+><DT
+><A HREF="#2"
+>Operations on <TT
+>HashTable</TT
+>s
+</A
+></DT
+></DL
+></DD
+><DT
+><A HREF="#3"
+>The <TT
+>Hash</TT
+> class
+</A
+></DT
+></DL
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+>Description</TD
+></TR
+><TR
+><TD CLASS="doc"
+>Implementation of fixed-size hash tables, with a type 
+  class for constructing hash values for structured types.
+</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+>Synopsis</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A HREF="#t%3AHashTable"
+>HashTable</A
+> key val</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Anew"
+>new</A
+> :: (Eq key, <A HREF="Hash.html#t%3AHash"
+>Hash</A
+> key) =&gt; Int -&gt; IO (<A HREF="Hash.html#t%3AHashTable"
+>HashTable</A
+> key val)</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Ainsert"
+>insert</A
+> :: (Eq key, <A HREF="Hash.html#t%3AHash"
+>Hash</A
+> key) =&gt; key -&gt; val -&gt; IO ()</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Alookup"
+>lookup</A
+> :: <A HREF="Hash.html#t%3AHash"
+>Hash</A
+> key =&gt; key -&gt; IO (Maybe val)</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A HREF="#t%3AHash"
+>Hash</A
+> a  <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Ahash"
+>hash</A
+> :: a -&gt; Int</TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+><A NAME="1"
+>The <TT
+>HashTable</TT
+> type
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t%3AHashTable"
+></A
+><B
+>HashTable</B
+> key val </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>A hash table with keys of type <TT
+>key</TT
+> and values of type <TT
+>val</TT
+>.
+ The type <TT
+>key</TT
+> should be an instance of <TT
+>Eq</TT
+>.
+</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section2"
+><A NAME="2"
+>Operations on <TT
+>HashTable</TT
+>s
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Anew"
+></A
+><B
+>new</B
+> :: (Eq key, <A HREF="Hash.html#t%3AHash"
+>Hash</A
+> key) =&gt; Int -&gt; IO (<A HREF="Hash.html#t%3AHashTable"
+>HashTable</A
+> key val)</TD
+></TR
+><TR
+><TD CLASS="doc"
+>Builds a new hash table with a given size
+</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Ainsert"
+></A
+><B
+>insert</B
+> :: (Eq key, <A HREF="Hash.html#t%3AHash"
+>Hash</A
+> key) =&gt; key -&gt; val -&gt; IO ()</TD
+></TR
+><TR
+><TD CLASS="doc"
+>Inserts a new element into the hash table
+</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Alookup"
+></A
+><B
+>lookup</B
+> :: <A HREF="Hash.html#t%3AHash"
+>Hash</A
+> key =&gt; key -&gt; IO (Maybe val)</TD
+></TR
+><TR
+><TD CLASS="doc"
+>Looks up a key in the hash table, returns <TT
+><TT
+>Just</TT
+> val</TT
+> if the key
+ was found, or <TT
+>Nothing</TT
+> otherwise.
+</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+><A NAME="3"
+>The <TT
+>Hash</TT
+> class
+</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+> <A NAME="t%3AHash"
+></A
+><B
+>Hash</B
+> a  <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>A class of types which can be hashed.
+</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+>Methods</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A NAME="v%3Ahash"
+></A
+><B
+>hash</B
+> :: a -&gt; Int</TD
+></TR
+><TR
+><TD CLASS="doc"
+>hashes the value of type <TT
+>a</TT
+> into an <TT
+>Int</TT
+>
+</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+><IMG SRC="minus.gif" CLASS="coll" ONCLICK="toggle(this,'i:Hash')" ALT="show/hide"
+> Instances</TD
+></TR
+><TR
+><TD CLASS="body"
+><DIV ID="i:Hash" STYLE="display:block;"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A HREF="Hash.html#t%3AHash"
+>Hash</A
+> Float</TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="Hash.html#t%3AHash"
+>Hash</A
+> Int</TD
+></TR
+><TR
+><TD CLASS="decl"
+>(<A HREF="Hash.html#t%3AHash"
+>Hash</A
+> a, <A HREF="Hash.html#t%3AHash"
+>Hash</A
+> b) =&gt; <A HREF="Hash.html#t%3AHash"
+>Hash</A
+> ((,) a b)</TD
+></TR
+></TABLE
+></DIV
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="botbar"
+>Produced by <A HREF="http://www.haskell.org/haddock/"
+>Haddock</A
+> version 2.0</TD
+></TR
+></TABLE
+></BODY
+></HTML
+>
