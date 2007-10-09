@@ -1335,7 +1335,7 @@ toIfaceIdInfo id_info
 
     ------------  Worker  --------------
     work_info   = workerInfo id_info
-    has_worker  = case work_info of { HasWorker _ _ -> True; other -> False }
+    has_worker  = workerExists work_info
     wrkr_hsinfo = case work_info of
 		    HasWorker work_id wrap_arity -> 
 			Just (HsWorker ((idName work_id)) wrap_arity)
