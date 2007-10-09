@@ -64,6 +64,7 @@ import ByteCodeInstr
 import Linker
 import DynFlags
 import Unique
+import UniqSupply
 import Module
 import Panic
 import UniqFM
@@ -582,7 +583,13 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
   where
    mkNewId :: OccName -> Id -> IO Id
    mkNewId occ id = do
-     let uniq = idUnique id
+     us <- mkSplitUniqSupply 'I'
+        -- we need a fresh Unique for each Id we bind, because the linker
+        -- state is single-threaded and otherwise we'd spam old bindings
+        -- whenever we stop at a breakpoint.  The InteractveContext is properly
+        -- saved/restored, but not the linker state.  See #1743, test break026.
+     let 
+         uniq = uniqFromSupply us
          loc = nameSrcSpan (idName id)
          name = mkInternalName uniq occ loc
          ty = idType id
