@@ -159,7 +159,6 @@ static_flags = [
 
 	------- ways --------------------------------------------------------
   ,  ( "prof"		, NoArg (addWay WayProf) )
-  ,  ( "unreg"		, NoArg (addWay WayUnreg) )
   ,  ( "ticky"		, NoArg (addWay WayTicky) )
   ,  ( "parallel"	, NoArg (addWay WayPar) )
   ,  ( "gransim"	, NoArg (addWay WayGran) )
@@ -455,7 +454,6 @@ data WayName
   = WayThreaded
   | WayDebug
   | WayProf
-  | WayUnreg
   | WayTicky
   | WayPar
   | WayGran
@@ -492,7 +490,6 @@ allowed_combination way = and [ x `allowedWith` y
 	_ `allowedWith` WayDebug		= True
 	WayDebug `allowedWith` _		= True
 
-	WayProf `allowedWith` WayUnreg		= True
 	WayProf `allowedWith` WayNDP		= True
 	_ `allowedWith` _ 			= False
 
@@ -561,9 +558,6 @@ way_details =
     (WayTicky, Way  "t" True "Ticky-ticky Profiling"  
 	[ "-DTICKY_TICKY"
 	, "-optc-DTICKY_TICKY" ]),
-
-    (WayUnreg, Way  "u" False "Unregisterised" 
-	unregFlags ),
 
     -- optl's below to tell linker where to find the PVM library -- HWL
     (WayPar, Way  "mp" False "Parallel" 

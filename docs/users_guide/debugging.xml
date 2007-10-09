@@ -601,21 +601,9 @@ Main.skip2{-r1L6-} =
     of platform-specific code that needs to be written in order to get
     unregisterised compilation going is usually fairly small.</para>
 
-    <variablelist>
-      <varlistentry>
-	<term>
-          <option>-unreg</option>:
-          <indexterm><primary><option>-unreg</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Compile via vanilla ANSI C only, turning off
-	  platform-specific optimisations.  NOTE: in order to use
-	  <option>-unreg</option>, you need to have a set of libraries
-	  (including the RTS) built for unregisterised compilation.
-	  This amounts to building GHC with way "u" enabled.</para>
-	</listitem>
-      </varlistentry>
-    </variablelist>
+   <para>Unregisterised compilation cannot be selected at
+   compile-time; you have to build GHC with the appropriate options
+   set.  Consult the GHC Building Guide for details.</para>
   </sect2>
 
 </sect1>
