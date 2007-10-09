@@ -28,6 +28,7 @@ module GHC.Conc
 	-- * Forking and suchlike
 	, forkIO	-- :: IO a -> IO ThreadId
 	, forkOnIO	-- :: Int -> IO a -> IO ThreadId
+        , numCapabilities -- :: Int
 	, childHandler  -- :: Exception -> IO ()
 	, myThreadId 	-- :: IO ThreadId
 	, killThread	-- :: ThreadId -> IO ()
@@ -189,6 +190,17 @@ forkOnIO (I# cpu) action = IO $ \ s ->
    case (forkOn# cpu action_plus s) of (# s1, id #) -> (# s1, ThreadId id #)
  where
   action_plus = catchException action childHandler
+
+-- | the value passed to the @+RTS -N@ flag.  This is the number of
+-- Haskell threads that can run truly simultaneously at any given
+-- time, and is typically set to the number of physical CPU cores on
+-- the machine.
+numCapabilities :: Int
+numCapabilities = unsafePerformIO $  do 
+                    n <- peek n_capabilities
+                    return (fromIntegral n)
+
+foreign import ccall "&n_capabilities" n_capabilities :: Ptr CInt
 
 childHandler :: Exception -> IO ()
 childHandler err = catchException (real_handler err) childHandler
