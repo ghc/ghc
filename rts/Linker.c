@@ -731,6 +731,7 @@ typedef struct _RtsSymbolVal {
       SymX(rts_stop_next_breakpoint)		\
       SymX(rts_stop_on_exception)		\
       SymX(stopTimer)				\
+      SymX(n_capabilities)			\
       RTS_USER_SIGNALS_SYMBOLS
 
 #ifdef SUPPORT_LONG_LONGS
