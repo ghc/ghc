@@ -27,11 +27,8 @@ module OccurAnal (
 import CoreSyn
 import CoreFVs		( idRuleVars )
 import CoreUtils	( exprIsTrivial, isDefaultAlt )
-import Id		( isDataConWorkId, isOneShotBndr, setOneShotLambda, 
-			  idOccInfo, setIdOccInfo, isLocalId,
-			  isExportedId, idArity, idHasRules,
-			  idUnique, Id
-			)
+import Id
+import IdInfo
 import BasicTypes	( OccInfo(..), isOneOcc, InterestingCxt )
 
 import VarSet
@@ -302,6 +299,9 @@ reOrderCycle bndrs (bind : binds)
 	  
     score :: Node Details -> Int	-- Higher score => less likely to be picked as loop breaker
     score ((bndr, _, rhs), _, _)
+        | workerExists (idWorkerInfo bndr)      = 10
+                -- Note [Worker inline loop]
+
 	| exprIsTrivial rhs 	   = 4	-- Practically certain to be inlined
 		-- Used to have also: && not (isExportedId bndr)
 		-- But I found this sometimes cost an extra iteration when we have
@@ -315,10 +315,11 @@ reOrderCycle bndrs (bind : binds)
 		-- Also vital to avoid risk of divergence:
 		-- Note [Recursive rules]
 
-	| inlineCandidate bndr rhs = 2	-- Likely to be inlined
-		-- Note [Inline candidates]
+	| is_con_app rhs = 2	-- Data types help with cases
+                -- Note [conapp]
 
-	| is_con_app rhs = 1	-- Data types help with cases
+	| inlineCandidate bndr rhs = 1	-- Likely to be inlined
+		-- Note [Inline candidates]
 
 	| otherwise = 0
 
@@ -326,7 +327,11 @@ reOrderCycle bndrs (bind : binds)
     inlineCandidate id (Note InlineMe _) = True
     inlineCandidate id rhs	         = isOneOcc (idOccInfo id)
 
-	-- Real example (the Enum Ordering instance from PrelBase):
+        -- Note [conapp]
+        --
+        -- It's really really important to inline dictionaries.  Real
+        -- example (the Enum Ordering instance from GHC.Base):
+        --
 	--	rec	f = \ x -> case d of (p,q,r) -> p x
 	--		g = \ x -> case d of (p,q,r) -> q x
 	--		d = (v, f, g)
@@ -335,6 +340,8 @@ reOrderCycle bndrs (bind : binds)
 	-- On the other hand we *could* simplify those case expressions if
 	-- we didn't stupidly choose d as the loop breaker.
 	-- But we won't because constructor args are marked "Many".
+        -- Inlining dictionaries is really essential to unravelling
+        -- the loops in static numeric dictionaries, see GHC.Float.
 
 	-- Cheap and cheerful; the simplifer moves casts out of the way
 	-- The lambda case is important to spot x = /\a. C (f a)
@@ -361,24 +368,24 @@ makeLoopBreaker bndrs rhs_usg bndr
     rules_only = bndrs `intersectsUFM` rhs_usg
 \end{code}
 
-Note [Inline candidates]
+Note [Worker inline loop]
 ~~~~~~~~~~~~~~~~~~~~~~~~
-At one point I gave is_con_app a higher score than inline-candidate,
-on the grounds that "it's *really* helpful if dictionaries get inlined fast".
-However a nofib run revealed no change if they were swapped so that 
-inline-candidate has the higher score.  And it's important that it does,
-else you can get a bad worker-wrapper split thus:
+Never choose a wrapper as the loop breaker!  Because
+wrappers get auto-generated inlinings when importing, and
+that can lead to an infinite inlining loop.  For example:
   rec {
 	$wfoo x = ....foo x....
 	
 	{-loop brk-} foo x = ...$wfoo x...
   }
-But we *want* the wrapper to be inlined!  If it isn't, the interface
-file sees the unfolding for $wfoo, and sees that foo is strict (and
-hence it gets an auto-generated wrapper.  Result: an infinite inlining
-in the importing scope.  So be a bit careful if you change this.  A
-good example is Tree.repTree in nofib/spectral/minimax.  If is_con_app
-has the higher score, then compiling Game.hs goes into an infinite loop.
+
+The interface file sees the unfolding for $wfoo, and sees that foo is
+strict (and hence it gets an auto-generated wrapper).  Result: an
+infinite inlining in the importing scope.  So be a bit careful if you
+change this.  A good example is Tree.repTree in
+nofib/spectral/minimax. If the repTree wrapper is chosen as the loop
+breaker then compiling Game.hs goes into an infinite loop (this
+happened when we gave is_con_app a lower score than inline candidates).
 
 Note [Recursive rules]
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -396,7 +403,7 @@ But if we choose 'f' as the loop breaker, we may get an infinite loop:
 	- fs is inlined (say it's small)
 	- now there's another opportunity to apply the RULE
 
-So it's very important to choose the RULE-variable as the loop breaker.
+So it's very important not to choose the RULE-variable as the loop breaker.
 This showed up when compiling Control.Concurrent.Chan.getChanContents.
 
 Note [Closure conversion]
