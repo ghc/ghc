@@ -350,7 +350,6 @@ endif
 #   thr_p       : threaded profiled
 #   debug       : debugging (compile with -g for the C compiler, and -DDEBUG)
 #   debug_p     : debugging profiled
-#   debug_u     : debugging unregisterised
 #   thr_debug   : debugging threaded
 #   thr_debug_p : debugging threaded profiled
 #   t		: ticky-ticky profiling
@@ -1138,11 +1137,11 @@ HADDOCK			= @HaddockCmd@
 #
 # The ways currently defined.
 #
-ALL_WAYS=p t u s mp mg a b c d e f g h i j k l m n o A B
+ALL_WAYS=p t s mp mg a b c d e f g h i j k l m n o A B
 USER_WAYS=a b c d e f g h j k l m n o A B
 
 #
-# The following ways currently have treated specially, p u t mg,
+# The following ways currently have treated specially, p t mg,
 # as the driver script treats these guys specially and needs to carefully be told
 # about the options for these. Hence, we hide the required command line options
 # for these in the driver, as this is the only place they are needed.
@@ -1160,10 +1159,6 @@ WAY_p_HC_OPTS= -prof
 # Way 't':
 WAY_t_NAME=ticky-ticky profiling
 WAY_t_HC_OPTS= -ticky
-
-# Way `u':
-WAY_u_NAME=unregisterized (using portable C only)
-WAY_u_HC_OPTS=-unreg
 
 # Way `mp': 
 WAY_mp_NAME=parallel
@@ -1192,10 +1187,6 @@ WAY_debug_HC_OPTS=-optc-DDEBUG
 # Way 'debug_p':
 WAY_debug_p_NAME=debug profiled
 WAY_debug_p_HC_OPTS=-optc-DDEBUG -prof
-
-# Way 'debug_u':
-WAY_debug_u_NAME=debug unregisterised
-WAY_debug_u_HC_OPTS=-optc-DDEBUG -unreg
 
 # Way 'debug_t':
 WAY_debug_t_NAME=debug ticky-ticky profiling
