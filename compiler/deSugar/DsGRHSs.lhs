@@ -105,10 +105,8 @@ matchGuards [] ctx rhs rhs_ty
 	-- NB:	The success of this clause depends on the typechecker not
 	-- 	wrapping the 'otherwise' in empty HsTyApp or HsWrap constructors
 	--	If it does, you'll get bogus overlap warnings
-matchGuards (ExprStmt (L _ (HsVar v)) _ _ : stmts) ctx rhs rhs_ty
-  |  v `hasKey` otherwiseIdKey
-  || v `hasKey` getUnique trueDataConId	
-	-- trueDataConId doesn't have the same unique as trueDataCon
+matchGuards (ExprStmt e _ _ : stmts) ctx rhs rhs_ty
+  | isTrueLHsExpr e
   = matchGuards stmts ctx rhs rhs_ty
 
 matchGuards (ExprStmt expr _ _ : stmts) ctx rhs rhs_ty
@@ -128,6 +126,19 @@ matchGuards (BindStmt pat bind_rhs _ _ : stmts) ctx rhs rhs_ty
   = matchGuards stmts ctx rhs rhs_ty	`thenDs` \ match_result ->
     dsLExpr bind_rhs			`thenDs` \ core_rhs ->
     matchSinglePat core_rhs ctx pat rhs_ty match_result
+
+isTrueLHsExpr :: LHsExpr Id -> Bool
+-- Returns True if we're sure that the expression is True
+-- I.e.   * 'True' datacon
+--	  * 'otherwise' Id
+--	  * Trivial wappings of these
+isTrueLHsExpr (L _ (HsVar v)) =  v `hasKey` otherwiseIdKey
+			      || v `hasKey` getUnique trueDataConId	
+	-- trueDataConId doesn't have the same unique as trueDataCon
+isTrueLHsExpr (L _ (HsTick    _ _ e)) = isTrueLHsExpr e
+isTrueLHsExpr (L _ (HsBinTick _ _ e)) = isTrueLHsExpr e
+isTrueLHsExpr (L _ (HsPar e))         = isTrueLHsExpr e
+isTrueLHsExpr other = False
 \end{code}
 
 Should {\em fail} if @e@ returns @D@
