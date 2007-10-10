@@ -2890,7 +2890,7 @@ tcSimplifyDefault theta
     if null irreds then
 	returnM ()
     else
-	failM
+	traceTc (ptext SLIT("tcSimplifyDefault failing")) >> failM
   where
     doc = ptext SLIT("default declaration")
 \end{code}
