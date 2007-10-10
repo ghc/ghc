@@ -15,14 +15,14 @@ module RnNames (
 	rnImports, importsFromLocalDecls,
 	rnExports,
 	getLocalDeclBinders, extendRdrEnvRn,
-	reportUnusedNames, finishDeprecations
+	reportUnusedNames, finishDeprecations,
     ) where
 
 #include "HsVersions.h"
 
 import DynFlags
 import HsSyn		( IE(..), ieName, ImportDecl(..), LImportDecl,
-			  ForeignDecl(..), HsGroup(..), HsValBinds(..),
+			  ForeignDecl(..), HsGroup(..), HsValBindsLR(..),
 			  Sig(..), collectHsBindLocatedBinders, tyClDeclNames,
 			  instDeclATs, isFamInstDecl,
 			  LIE )
@@ -36,6 +36,7 @@ import PrelNames
 import Module
 import Name
 import NameEnv
+import UniqFM
 import NameSet
 import OccName
 import HscTypes
@@ -45,7 +46,7 @@ import Maybes
 import SrcLoc
 import FiniteMap
 import ErrUtils
-import BasicTypes	( DeprecTxt )
+import BasicTypes	( DeprecTxt, Fixity )
 import DriverPhases	( isHsBoot )
 import Util
 import ListSetOps
@@ -273,36 +274,82 @@ From the top-level declarations of this module produce
 	* the ImportAvails
 created by its bindings.  
 	
-Complain about duplicate bindings
-
 \begin{code}
-importsFromLocalDecls :: HsGroup RdrName -> RnM TcGblEnv
-importsFromLocalDecls group
+-- Bool determines shadowing:
+--    true: names in the group should shadow other UnQuals
+--          with the same OccName (used in Template Haskell)
+--    false: duplicates should be reported as an error
+--
+-- The UniqFM (OccName -> FixItem) associates a Name's OccName's
+-- FastString with a fixity declaration (that needs the actual OccName
+-- to be plugged in).  This fixity must be brought into scope when such
+-- a Name is.
+importsFromLocalDecls :: Bool -> HsGroup RdrName -> UniqFM (Located Fixity) -> RnM TcGblEnv
+importsFromLocalDecls shadowP group fixities
   = do	{ gbl_env  <- getGblEnv
 
 	; avails <- getLocalDeclBinders gbl_env group
 
-	; rdr_env' <- extendRdrEnvRn (tcg_rdr_env gbl_env) avails
+	; (rdr_env', fix_env') <- extendRdrEnvRn shadowP (tcg_rdr_env gbl_env,
+                                                          tcg_fix_env gbl_env)
+                                     avails fixities
 
         ; traceRn (text "local avails: " <> ppr avails)
 
-	; returnM (gbl_env { tcg_rdr_env = rdr_env' })
+	; returnM (gbl_env { tcg_rdr_env = rdr_env',
+                             tcg_fix_env = fix_env'})
 	}
 
-extendRdrEnvRn :: GlobalRdrEnv -> [AvailInfo] -> RnM GlobalRdrEnv
+-- Bool determines shadowing as in importsFromLocalDecls.
+-- UniqFM FixItem is the same as in importsFromLocalDecls.
+--
 -- Add the new locally-bound names one by one, checking for duplicates as
 -- we do so.  Remember that in Template Haskell the duplicates
--- might *already be* in the GlobalRdrEnv from higher up the module
-extendRdrEnvRn rdr_env avails
-  = foldlM add_local rdr_env (gresFromAvails LocalDef avails)
-  where
-    add_local rdr_env gre
-	| gres <- lookupGlobalRdrEnv rdr_env (nameOccName (gre_name gre))
-	, (dup_gre:_) <- filter isLocalGRE gres	-- Check for existing *local* defns
-	= do { addDupDeclErr (gre_name dup_gre) (gre_name gre)
-	     ; return rdr_env }
-	| otherwise
-	= return (extendGlobalRdrEnv rdr_env gre)
+-- might *already be* in the GlobalRdrEnv from higher up the module.
+--
+-- Also update the FixityEnv with the fixities for the names brought into scope.
+--
+-- Note that the return values are the extensions of the two inputs,
+-- not the extras relative to them.  
+extendRdrEnvRn :: Bool -> (GlobalRdrEnv, NameEnv FixItem)  
+                  -> [AvailInfo] -> UniqFM (Located Fixity) -> RnM (GlobalRdrEnv, NameEnv FixItem)
+extendRdrEnvRn shadowP (rdr_env, fix_env) avails fixities = 
+    let --  if there is a fixity decl for the gre,
+        --  add it to the fixity env
+        extendFixEnv env gre = 
+            let name = gre_name gre 
+                occ = nameOccName name
+                curKey = occNameFS occ in
+            case lookupUFM fixities curKey of
+              Nothing -> env
+              Just (L _ fi) -> extendNameEnv env name (FixItem occ fi)
+
+        (rdr_env_to_extend, extender) = 
+            if shadowP 
+            then -- when shadowing is on, 
+                 -- (1) we need to remove the existing Unquals for the
+                 --     names we're extending the env with
+                 -- (2) but extending the env is simple
+                let names = concatMap availNames avails
+                    new_occs = map nameOccName names
+                    trimmed_rdr_env = hideSomeUnquals rdr_env new_occs
+                in 
+                  (trimmed_rdr_env, 
+                   \(cur_rdr_env, cur_fix_env) -> \gre -> 
+                      return (extendGlobalRdrEnv cur_rdr_env gre,
+                              extendFixEnv cur_fix_env gre))
+            else -- when shadowing is off,
+                 -- (1) we don't munge the incoming env
+                 -- (2) but we need to check for dups when extending
+                 (rdr_env, 
+                  \(cur_rdr_env, cur_fix_env) -> \gre -> 
+                    let gres = lookupGlobalRdrEnv cur_rdr_env (nameOccName (gre_name gre)) 
+                    in case filter isLocalGRE gres of -- Check for existing *local* defns 
+                         dup_gre:_ -> do { addDupDeclErr (gre_name dup_gre) (gre_name gre)
+	                                  ; return (cur_rdr_env, cur_fix_env) }
+                         [] -> return (extendGlobalRdrEnv cur_rdr_env gre,
+                                      extendFixEnv cur_fix_env gre))
+    in foldlM extender (rdr_env_to_extend, fix_env) (gresFromAvails LocalDef avails)
 \end{code}
 
 @getLocalDeclBinders@ returns the names for an @HsDecl@.  It's
@@ -322,11 +369,13 @@ raising a duplicate declaration error.  So, we make a new name for it, but
 don't return it in the 'AvailInfo'.
 
 \begin{code}
+-- Note: this function does NOT get the binders of the ValBinds that
+-- will be bound during renaming
 getLocalDeclBinders :: TcGblEnv -> HsGroup RdrName -> RnM [AvailInfo]
 getLocalDeclBinders gbl_env (HsGroup {hs_valds = ValBindsIn val_decls val_sigs,
-				      hs_tyclds = tycl_decls, 
-				      hs_instds = inst_decls,
-				      hs_fords = foreign_decls })
+				         hs_tyclds = tycl_decls, 
+				         hs_instds = inst_decls,
+				         hs_fords = foreign_decls })
   = do	{ tc_names_s <- mappM new_tc tycl_decls
 	; at_names_s <- mappM inst_ats inst_decls
 	; val_names  <- mappM new_simple val_bndrs
@@ -334,18 +383,17 @@ getLocalDeclBinders gbl_env (HsGroup {hs_valds = ValBindsIn val_decls val_sigs,
   where
     mod        = tcg_mod gbl_env
     is_hs_boot = isHsBoot (tcg_src gbl_env) ;
-    val_bndrs | is_hs_boot = sig_hs_bndrs
-	      | otherwise  = for_hs_bndrs ++ val_hs_bndrs
-	-- In a hs-boot file, the value binders come from the
-	--  *signatures*, and there should be no foreign binders 
+
+    for_hs_bndrs = [nm | L _ (ForeignImport nm _ _) <- foreign_decls]
+
+    -- In a hs-boot file, the value binders come from the
+    --  *signatures*, and there should be no foreign binders 
+    val_bndrs | is_hs_boot = [nm | L _ (TypeSig nm _) <- val_sigs]
+              | otherwise  = for_hs_bndrs
 
     new_simple rdr_name = do
         nm <- newTopSrcBinder mod rdr_name
         return (Avail nm)
-
-    sig_hs_bndrs = [nm | L _ (TypeSig nm _) <- val_sigs]
-    val_hs_bndrs = collectHsBindLocatedBinders val_decls
-    for_hs_bndrs = [nm | L _ (ForeignImport nm _ _) <- foreign_decls]
 
     new_tc tc_decl 
       | isFamInstDecl (unLoc tc_decl)

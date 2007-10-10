@@ -132,7 +132,7 @@ mkHsFractional f       = HsFractional f  noSyntaxExpr
 mkHsIsString   s       = HsIsString   s  noSyntaxExpr
 mkHsDo ctxt stmts body = HsDo ctxt stmts body placeHolderType
 
-mkNPat lit neg     = NPat lit neg noSyntaxExpr placeHolderType
+mkNPat lit neg     = NPat lit neg noSyntaxExpr
 mkNPlusKPat id lit = NPlusKPat id lit noSyntaxExpr noSyntaxExpr
 
 mkExprStmt expr	    = ExprStmt expr noSyntaxExpr placeHolderType
@@ -294,18 +294,18 @@ where
 it should return [x, y, f, a, b] (remember, order important).
 
 \begin{code}
-collectLocalBinders :: HsLocalBinds name -> [Located name]
+collectLocalBinders :: HsLocalBindsLR idL idR -> [Located idL]
 collectLocalBinders (HsValBinds val_binds) = collectHsValBinders val_binds
 collectLocalBinders (HsIPBinds _)   = []
 collectLocalBinders EmptyLocalBinds = []
 
-collectHsValBinders :: HsValBinds name -> [Located name]
+collectHsValBinders :: HsValBindsLR idL idR -> [Located idL]
 collectHsValBinders (ValBindsIn binds sigs)  = collectHsBindLocatedBinders binds
 collectHsValBinders (ValBindsOut binds sigs) = foldr collect_one [] binds
   where
    collect_one (_,binds) acc = foldrBag (collectAcc . unLoc) acc binds
 
-collectAcc :: HsBind name -> [Located name] -> [Located name]
+collectAcc :: HsBindLR idL idR -> [Located idL] -> [Located idL]
 collectAcc (PatBind { pat_lhs = p }) acc = collectLocatedPatBinders p ++ acc
 collectAcc (FunBind { fun_id = f })  acc    = f : acc
 collectAcc (VarBind { var_id = f })  acc    = noLoc f : acc
@@ -316,10 +316,10 @@ collectAcc (AbsBinds { abs_exports = dbinds, abs_binds = binds }) acc
 	-- The only time we collect binders from a typechecked 
 	-- binding (hence see AbsBinds) is in zonking in TcHsSyn
 
-collectHsBindBinders :: LHsBinds name -> [name]
+collectHsBindBinders :: LHsBindsLR idL idR -> [idL]
 collectHsBindBinders binds = map unLoc (collectHsBindLocatedBinders binds)
 
-collectHsBindLocatedBinders :: LHsBinds name -> [Located name]
+collectHsBindLocatedBinders :: LHsBindsLR idL idR -> [Located idL]
 collectHsBindLocatedBinders binds = foldrBag (collectAcc . unLoc) [] binds
 \end{code}
 
@@ -331,16 +331,16 @@ collectHsBindLocatedBinders binds = foldrBag (collectAcc . unLoc) [] binds
 %************************************************************************
 
 \begin{code}
-collectLStmtsBinders :: OutputableBndr id => [LStmt id] -> [Located id]
+collectLStmtsBinders :: [LStmtLR idL idR] -> [Located idL]
 collectLStmtsBinders = concatMap collectLStmtBinders
 
-collectStmtsBinders :: OutputableBndr id => [Stmt id] -> [Located id]
+collectStmtsBinders :: [StmtLR idL idR] -> [Located idL]
 collectStmtsBinders = concatMap collectStmtBinders
 
-collectLStmtBinders :: OutputableBndr id => LStmt id -> [Located id]
+collectLStmtBinders :: LStmtLR idL idR -> [Located idL]
 collectLStmtBinders = collectStmtBinders . unLoc
 
-collectStmtBinders :: OutputableBndr id => Stmt id -> [Located id]
+collectStmtBinders :: StmtLR idL idR -> [Located idL]
   -- Id Binders for a Stmt... [but what about pattern-sig type vars]?
 collectStmtBinders (BindStmt pat _ _ _) = collectLocatedPatBinders pat
 collectStmtBinders (LetStmt binds)      = collectLocalBinders binds
@@ -348,7 +348,6 @@ collectStmtBinders (ExprStmt _ _ _)     = []
 collectStmtBinders (ParStmt xs)         = collectLStmtsBinders
                                         $ concatMap fst xs
 collectStmtBinders (RecStmt ss _ _ _ _) = collectLStmtsBinders ss
-collectStmtBinders s                    = pprPanic "collectStmtBinders" (ppr s)
 \end{code}
 
 
@@ -389,6 +388,7 @@ collectl (L l pat) bndrs
     go (LazyPat pat)     	  = collectl pat bndrs
     go (BangPat pat)     	  = collectl pat bndrs
     go (AsPat a pat)     	  = a : collectl pat bndrs
+    go (ViewPat exp pat _)     = collectl pat bndrs
     go (ParPat  pat)     	  = collectl pat bndrs
 				  
     go (ListPat pats _)    	  = foldr collectl bndrs pats
@@ -399,7 +399,7 @@ collectl (L l pat) bndrs
     go (ConPatOut {pat_args=ps})  = foldr collectl bndrs (hsConPatArgs ps)
 	-- See Note [Dictionary binders in ConPatOut]
     go (LitPat _)	      	  = bndrs
-    go (NPat _ _ _ _)		  = bndrs
+    go (NPat _ _ _)		  = bndrs
     go (NPlusKPat n _ _ _)        = n : bndrs
  				  
     go (SigPatIn pat _)	 	  = collectl pat bndrs

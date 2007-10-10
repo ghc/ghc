@@ -28,13 +28,13 @@ module HsPat (
 
 #include "HsVersions.h"
 
-
-import {-# SOURCE #-} HsExpr		( SyntaxExpr )
+import {-# SOURCE #-} HsExpr		(SyntaxExpr, LHsExpr, pprLExpr)
 
 -- friends:
 import HsBinds
 import HsLit
 import HsTypes
+import HsDoc
 import BasicTypes
 -- others:
 import Coercion
@@ -67,7 +67,7 @@ data Pat id
   | LazyPat	(LPat id)		-- Lazy pattern
   | AsPat	(Located id) (LPat id)  -- As pattern
   | ParPat      (LPat id)		-- Parenthesised pattern
-  | BangPat	(LPat id)		-- Bang patterng
+  | BangPat	(LPat id)		-- Bang pattern
 
 	------------ Lists, tuples, arrays ---------------
   | ListPat	[LPat id]		-- Syntactic list
@@ -105,6 +105,13 @@ data Pat id
 	pat_ty	  :: Type   		-- The type of the pattern
     }
 
+	------------ View patterns ---------------
+  | ViewPat       (LHsExpr id)      
+                  (LPat id)
+                  PostTcType        -- The overall type of the pattern
+                                    -- (= the argument type of the view function)
+                                    -- for hsPatType.
+
 	------------ Literal and n+k patterns ---------------
   | LitPat	    HsLit		-- Used for *non-overloaded* literal patterns:
 					-- Int#, Char#, Int, Char, String, etc.
@@ -113,7 +120,6 @@ data Pat id
 		    (Maybe (SyntaxExpr id))	-- Just (Name of 'negate') for negative
 						-- patterns, Nothing otherwise
 		    (SyntaxExpr id)		-- Equality checker, of type t->t->Bool
-		    PostTcType			-- Type of the pattern
 
   | NPlusKPat	    (Located id)	-- n+k pattern
 		    (HsOverLit id)	-- It'll always be an HsIntegral
@@ -220,6 +226,7 @@ pprPat (WildPat _)	  = char '_'
 pprPat (LazyPat pat)      = char '~' <> ppr pat
 pprPat (BangPat pat)      = char '!' <> ppr pat
 pprPat (AsPat name pat)   = parens (hcat [ppr name, char '@', ppr pat])
+pprPat (ViewPat expr pat _)   = parens (hcat [pprLExpr expr, text " -> ", ppr pat])
 pprPat (ParPat pat)	  = parens (ppr pat)
 pprPat (ListPat pats _)     = brackets (interpp'SP pats)
 pprPat (PArrPat pats _)     = pabrackets (interpp'SP pats)
@@ -236,8 +243,8 @@ pprPat (ConPatOut { pat_con = con, pat_tvs = tvs, pat_dicts = dicts,
     else pprUserCon con details
 
 pprPat (LitPat s)	      = ppr s
-pprPat (NPat l Nothing  _ _)  = ppr l
-pprPat (NPat l (Just _) _ _)  = char '-' <> ppr l
+pprPat (NPat l Nothing  _)  = ppr l
+pprPat (NPat l (Just _) _)  = char '-' <> ppr l
 pprPat (NPlusKPat n k _ _)    = hcat [ppr n, char '+', ppr k]
 pprPat (TypePat ty)	      = ptext SLIT("{|") <> ppr ty <> ptext SLIT("|}")
 pprPat (CoPat co pat _)	      = parens (pprHsWrapper (ppr pat) co)
@@ -357,7 +364,7 @@ patsAreAllLits pat_list = all isLitPat pat_list
 
 isLitPat (AsPat _ pat)	        = isLitPat (unLoc pat)
 isLitPat (LitPat _)	        = True
-isLitPat (NPat _ _ _ _)	        = True
+isLitPat (NPat _ _ _)	        = True
 isLitPat (NPlusKPat _ _ _ _)    = True
 isLitPat other		        = False
 
@@ -367,7 +374,12 @@ isBangHsBind (PatBind { pat_lhs = L _ (BangPat p) }) = True
 isBangHsBind bind				     = False
 
 isIrrefutableHsPat :: LPat id -> Bool
--- This function returns False if it's in doubt; specifically
+-- (isIrrefutableHsPat p) is true if matching against p cannot fail,
+-- in the sense of falling through to the next pattern.
+--	(NB: this is not quite the same as the (silly) defn
+--	in 3.17.2 of the Haskell 98 report.)
+-- 
+-- isIrrefutableHsPat returns False if it's in doubt; specifically
 -- on a ConPatIn it doesn't know the size of the constructor family
 -- But if it returns True, the pattern is definitely irrefutable
 isIrrefutableHsPat pat
@@ -383,6 +395,7 @@ isIrrefutableHsPat pat
     go1 (CoPat _ pat _)     = go1 pat
     go1 (ParPat pat)        = go pat
     go1 (AsPat _ pat)       = go pat
+    go1 (ViewPat _ pat _)   = go pat
     go1 (SigPatIn pat _)    = go pat
     go1 (SigPatOut pat _)   = go pat
     go1 (TuplePat pats _ _) = all go pats
@@ -395,7 +408,7 @@ isIrrefutableHsPat pat
 	&& all go (hsConPatArgs details)
 
     go1 (LitPat _) 	   = False
-    go1 (NPat _ _ _ _)	   = False
+    go1 (NPat _ _ _)	   = False
     go1 (NPlusKPat _ _ _ _) = False
 
     go1 (TypePat _)   = panic "isIrrefutableHsPat: type pattern"

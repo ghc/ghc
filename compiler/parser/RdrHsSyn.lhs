@@ -653,7 +653,7 @@ checkAPat loc e = case e of
    -- Overloaded numeric patterns (e.g. f 0 x = x)
    -- Negation is recorded separately, so that the literal is zero or +ve
    -- NB. Negative *primitive* literals are already handled by the lexer
-   HsOverLit pos_lit            -> return (mkNPat pos_lit Nothing)
+   HsOverLit pos_lit          -> return (mkNPat pos_lit Nothing)
    NegApp (L _ (HsOverLit pos_lit)) _ 
 			-> return (mkNPat pos_lit (Just noSyntaxExpr))
    
@@ -665,6 +665,8 @@ checkAPat loc e = case e of
 
    ELazyPat e	      -> checkLPat e >>= (return . LazyPat)
    EAsPat n e	      -> checkLPat e >>= (return . AsPat n)
+   -- view pattern is well-formed if the pattern is
+   EViewPat expr patE -> checkLPat patE >>= (return . (\p -> ViewPat expr p placeHolderType))
    ExprWithTySig e t  -> checkLPat e >>= \e ->
    			 -- Pattern signatures are parsed as sigtypes,
    			 -- but they aren't explicit forall points.  Hence
@@ -677,7 +679,7 @@ checkAPat loc e = case e of
    
    -- n+k patterns
    OpApp (L nloc (HsVar n)) (L _ (HsVar plus)) _ 
-	(L _ (HsOverLit lit@(HsIntegral _ _)))
+	(L _ (HsOverLit lit@(HsIntegral _ _ _)))
    		      | plus == plus_RDR
    		      -> return (mkNPlusKPat (L nloc n) lit)
    

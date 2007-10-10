@@ -13,6 +13,9 @@ data GRHSs a
 type LHsExpr a = Located (HsExpr a)
 type SyntaxExpr a = HsExpr a
 
+pprLExpr :: (OutputableBndr i) => 
+	LHsExpr i -> SDoc
+
 pprExpr :: (OutputableBndr i) => 
 	HsExpr i -> SDoc
 
@@ -22,6 +25,6 @@ pprSplice :: (OutputableBndr i) =>
 pprPatBind :: (OutputableBndr b, OutputableBndr i) => 
 	LPat b -> GRHSs i -> SDoc
 
-pprFunBind :: (OutputableBndr i) => 
-	i -> Bool -> MatchGroup i -> SDoc
+pprFunBind :: (OutputableBndr idL, OutputableBndr idR) => 
+	idL -> Bool -> MatchGroup idR -> SDoc
 \end{code}

@@ -87,15 +87,20 @@ differently, as follows.
 
 Note [Data Constructor Naming]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Each data constructor C has two, and possibly three, Names associated with it:
+Each data constructor C has two, and possibly up to four, Names associated with it:
 
-			     OccName	Name space	Used for
+			     OccName	Name space	Name of
   ---------------------------------------------------------------------------
-  * The "source data con" 	C	DataName	The DataCon itself
-  * The "real data con"		C	VarName		Its worker Id
-  * The "wrapper data con"	$WC	VarName		Wrapper Id (optional)
+  * The "data con itself" 	C	DataName	DataCon
+  * The "worker data con"	C	VarName		Id (the worker)
+  * The "wrapper data con"	$WC	VarName		Id (the wrapper)
+  * The "newtype coercion"      :CoT    TcClsName	TyCon
+ 
+EVERY data constructor (incl for newtypes) has the former two (the
+data con itself, and its worker.  But only some data constructors have a
+wrapper (see Note [The need for a wrapper]).
 
-Each of these three has a distinct Unique.  The "source data con" name
+Each of these three has a distinct Unique.  The "data con itself" name
 appears in the output of the renamer, and names the Haskell-source
 data constructor.  The type checker translates it into either the wrapper Id
 (if it exists) or worker Id (otherwise).
@@ -129,6 +134,8 @@ The "wrapper Id", $WC, goes as follows
   nothing for the wrapper to do.  That is, if its defn would be
 	$wC = C
 
+Note [The need for a wrapper]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Why might the wrapper have anything to do?  Two reasons:
 
 * Unboxing strict fields (with -funbox-strict-fields)
@@ -152,6 +159,8 @@ Why might the wrapper have anything to do?  Two reasons:
   The third argument is a coerion
 	[a] :: [a]:=:[a]
 
+INVARIANT: the dictionary constructor for a class
+	   never has a wrapper.
 
 
 A note about the stupid context

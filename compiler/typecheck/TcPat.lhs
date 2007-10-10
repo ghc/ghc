@@ -18,7 +18,7 @@ module TcPat ( tcLetPat, tcLamPat, tcLamPats, tcOverloadedLit,
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-}	TcExpr( tcSyntaxOp )
+import {-# SOURCE #-}	TcExpr( tcSyntaxOp, tcInferRho)
 
 import HsSyn
 import TcHsSyn
@@ -63,7 +63,7 @@ import FastString
 \begin{code}
 tcLetPat :: (Name -> Maybe TcRhoType)
       	 -> LPat Name -> BoxySigmaType 
-      	 -> TcM a
+     	 -> TcM a
       	 -> TcM (LPat TcId, a)
 tcLetPat sig_fn pat pat_ty thing_inside
   = do	{ let init_state = PS { pat_ctxt = LetPat sig_fn, 
@@ -210,6 +210,7 @@ bindInstsOfPatId id thing_inside
 -------------------
 unBoxPatBndrType  ty name = unBoxArgType ty (ptext SLIT("The variable") <+> quotes (ppr name))
 unBoxWildCardType ty      = unBoxArgType ty (ptext SLIT("A wild-card pattern"))
+unBoxViewPatType  ty pat  = unBoxArgType ty (ptext SLIT("The view pattern") <+> ppr pat)
 
 unBoxArgType :: BoxyType -> SDoc -> TcM TcType
 -- In addition to calling unbox, unBoxArgType ensures that the type is of ArgTypeKind; 
@@ -312,11 +313,12 @@ tc_lpat (L span pat) pat_ty pstate thing_inside
 
 --------------------
 tc_pat	:: PatState
-	-> Pat Name -> BoxySigmaType	-- Fully refined result type
-	-> (PatState -> TcM a)	-- Thing inside
-	-> TcM (Pat TcId, 	-- Translated pattern
-		[TcTyVar], 	-- Existential binders
-		a)		-- Result of thing inside
+        -> Pat Name 
+        -> BoxySigmaType	-- Fully refined result type
+        -> (PatState -> TcM a)	-- Thing inside
+        -> TcM (Pat TcId, 	-- Translated pattern
+                [TcTyVar], 	-- Existential binders
+                a)		-- Result of thing inside
 
 tc_pat pstate (VarPat name) pat_ty thing_inside
   = do	{ id <- tcPatBndr pstate name pat_ty
@@ -394,6 +396,32 @@ tc_pat pstate (AsPat (L nm_loc name) pat) pat_ty thing_inside
 	    -- If you fix it, don't forget the bindInstsOfPatIds!
 	; return (AsPat (L nm_loc bndr_id) pat', tvs, res) }
 
+tc_pat pstate (orig@(ViewPat expr pat _)) overall_pat_ty thing_inside 
+  = do	{ -- morally, expr must have type
+         -- `forall a1...aN. OPT' -> B` 
+         -- where overall_pat_ty is an instance of OPT'.
+         -- Here, we infer a rho type for it,
+         -- which replaces the leading foralls and constraints
+         -- with fresh unification variables.
+         (expr',expr'_inferred) <- tcInferRho expr
+         -- next, we check that expr is coercible to `overall_pat_ty -> pat_ty`
+       ; let expr'_expected = \ pat_ty -> (mkFunTy overall_pat_ty pat_ty)
+         -- tcSubExp: expected first, offered second
+         -- returns coercion
+         -- 
+         -- NOTE: this forces pat_ty to be a monotype (because we use a unification 
+         -- variable to find it).  this means that in an example like
+         -- (view -> f)    where view :: _ -> forall b. b
+         -- we will only be able to use view at one instantation in the
+         -- rest of the view
+	; (expr_coerc, pat_ty) <- tcInfer (\ pat_ty -> tcSubExp (expr'_expected pat_ty) expr'_inferred)
+         -- pattern must have pat_ty
+       ; (pat', tvs, res) <- tc_lpat pat pat_ty pstate thing_inside
+         -- this should get zonked later on, but we unBox it here
+         -- so that we do the same checks as above
+	; annotation_ty <- unBoxViewPatType overall_pat_ty orig        
+	; return (ViewPat (mkLHsWrap expr_coerc expr') pat' annotation_ty, tvs, res) }
+
 -- Type signatures in patterns
 -- See Note [Pattern coercions] below
 tc_pat pstate (SigPatIn pat sig_ty) pat_ty thing_inside
@@ -465,7 +493,7 @@ tc_pat pstate (LitPat simple_lit) pat_ty thing_inside
 
 ------------------------
 -- Overloaded patterns: n, and n+k
-tc_pat pstate pat@(NPat over_lit mb_neg eq _) pat_ty thing_inside
+tc_pat pstate pat@(NPat over_lit mb_neg eq) pat_ty thing_inside
   = do	{ let orig = LiteralOrigin over_lit
 	; lit'    <- tcOverloadedLit orig over_lit pat_ty
 	; eq'     <- tcSyntaxOp orig eq (mkFunTys [pat_ty, pat_ty] boolTy)
@@ -476,7 +504,7 @@ tc_pat pstate pat@(NPat over_lit mb_neg eq _) pat_ty thing_inside
  			    do { neg' <- tcSyntaxOp orig neg (mkFunTy pat_ty pat_ty)
 			       ; return (Just neg') }
 	; res <- thing_inside pstate
-	; returnM (NPat lit' mb_neg' eq' pat_ty, [], res) }
+	; returnM (NPat lit' mb_neg' eq', [], res) }
 
 tc_pat pstate pat@(NPlusKPat (L nm_loc name) lit ge minus) pat_ty thing_inside
   = do	{ bndr_id <- setSrcSpan nm_loc (tcPatBndr pstate name pat_ty)
@@ -811,7 +839,7 @@ tcOverloadedLit :: InstOrigin
 		 -> HsOverLit Name
 		 -> BoxyRhoType
 		 -> TcM (HsOverLit TcId)
-tcOverloadedLit orig lit@(HsIntegral i fi) res_ty
+tcOverloadedLit orig lit@(HsIntegral i fi _) res_ty
   | not (fi `isHsVar` fromIntegerName)	-- Do not generate a LitInst for rebindable syntax.  
 	-- Reason: If we do, tcSimplify will call lookupInst, which
 	--	   will call tcSyntaxName, which does unification, 
@@ -819,16 +847,16 @@ tcOverloadedLit orig lit@(HsIntegral i fi) res_ty
 	-- ToDo: noLoc sadness
   = do	{ integer_ty <- tcMetaTy integerTyConName
 	; fi' <- tcSyntaxOp orig fi (mkFunTy integer_ty res_ty)
-	; return (HsIntegral i (HsApp (noLoc fi') (nlHsLit (HsInteger i integer_ty)))) }
+	; return (HsIntegral i (HsApp (noLoc fi') (nlHsLit (HsInteger i integer_ty))) res_ty) }
 
   | Just expr <- shortCutIntLit i res_ty 
-  = return (HsIntegral i expr)
+  = return (HsIntegral i expr res_ty)
 
   | otherwise
   = do 	{ expr <- newLitInst orig lit res_ty
-	; return (HsIntegral i expr) }
+	; return (HsIntegral i expr res_ty) }
 
-tcOverloadedLit orig lit@(HsFractional r fr) res_ty
+tcOverloadedLit orig lit@(HsFractional r fr _) res_ty
   | not (fr `isHsVar` fromRationalName)	-- c.f. HsIntegral case
   = do	{ rat_ty <- tcMetaTy rationalTyConName
 	; fr' <- tcSyntaxOp orig fr (mkFunTy rat_ty res_ty)
@@ -836,27 +864,27 @@ tcOverloadedLit orig lit@(HsFractional r fr) res_ty
 	 	-- we're instantiating an overloaded function here,
 	 	-- whereas res_ty might be openTypeKind. This was a bug in 6.2.2
 		-- However this'll be picked up by tcSyntaxOp if necessary
-	; return (HsFractional r (HsApp (noLoc fr') (nlHsLit (HsRat r rat_ty)))) }
+	; return (HsFractional r (HsApp (noLoc fr') (nlHsLit (HsRat r rat_ty))) res_ty) }
 
   | Just expr <- shortCutFracLit r res_ty 
-  = return (HsFractional r expr)
+  = return (HsFractional r expr res_ty)
 
   | otherwise
   = do 	{ expr <- newLitInst orig lit res_ty
-	; return (HsFractional r expr) }
+	; return (HsFractional r expr res_ty) }
 
-tcOverloadedLit orig lit@(HsIsString s fr) res_ty
+tcOverloadedLit orig lit@(HsIsString s fr _) res_ty
   | not (fr `isHsVar` fromStringName)	-- c.f. HsIntegral case
   = do	{ str_ty <- tcMetaTy stringTyConName
 	; fr' <- tcSyntaxOp orig fr (mkFunTy str_ty res_ty)
-	; return (HsIsString s (HsApp (noLoc fr') (nlHsLit (HsString s)))) }
+	; return (HsIsString s (HsApp (noLoc fr') (nlHsLit (HsString s))) res_ty) }
 
   | Just expr <- shortCutStringLit s res_ty 
-  = return (HsIsString s expr)
+  = return (HsIsString s expr res_ty)
 
   | otherwise
   = do 	{ expr <- newLitInst orig lit res_ty
-	; return (HsIsString s expr) }
+	; return (HsIsString s expr res_ty) }
 
 newLitInst :: InstOrigin -> HsOverLit Name -> BoxyRhoType -> TcM (HsExpr TcId)
 newLitInst orig lit res_ty	-- Make a LitInst

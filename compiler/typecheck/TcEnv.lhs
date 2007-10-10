@@ -110,7 +110,7 @@ tcLookupGlobal name
   = do	{ env <- getGblEnv
 	
 		-- Try local envt
-	; case lookupNameEnv (tcg_type_env env) name of {
+	; case lookupNameEnv (tcg_type_env env) name of { 
 		Just thing -> return thing ;
 		Nothing	   -> do 
 	 
@@ -123,12 +123,12 @@ tcLookupGlobal name
 
 		-- Should it have been in the local envt?
 	{ case nameModule_maybe name of
-		Nothing -> notFound name	-- Internal names can happen in GHCi
+		Nothing -> notFound name env -- Internal names can happen in GHCi
 
 		Just mod | mod == tcg_mod env 	-- Names from this module 
-			 -> notFound name	-- should be in tcg_type_env
+			 -> notFound name env -- should be in tcg_type_env
 			 | mod == thFAKE	-- Names bound in TH declaration brackets
-			 -> notFound name	-- should be in tcg_env
+			 -> notFound name env -- should be in tcg_env
 			 | otherwise
 		         -> tcImportDecl name	-- Go find it in an interface
 	}}}}}
@@ -708,9 +708,11 @@ pprBinders :: [Name] -> SDoc
 pprBinders [bndr] = quotes (ppr bndr)
 pprBinders bndrs  = pprWithCommas ppr bndrs
 
-notFound name 
-  = failWithTc (ptext SLIT("GHC internal error:") <+> quotes (ppr name) <+> 
-		ptext SLIT("is not in scope"))
+notFound name env
+  = failWithTc (vcat[ptext SLIT("GHC internal error:") <+> quotes (ppr name) <+> 
+                     ptext SLIT("is not in scope during type checking, but it passed the renamer"),
+                     ptext SLIT("tcg_type_env of environment:") <+> ppr (tcg_type_env env)]
+                    )
 
 wrongThingErr expected thing name
   = failWithTc (pprTcTyThingCategory thing <+> quotes (ppr name) <+> 

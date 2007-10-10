@@ -265,7 +265,7 @@ mkIface hsc_env maybe_old_iface
 --	put exactly the info into the TypeEnv that we want
 --	to expose in the interface
 
-  = do	{ eps <- hscEPS hsc_env
+  = do	{eps <- hscEPS hsc_env
 	; let	{ entities = typeEnvElts type_env ;
                   decls  = [ tyThingToIfaceDecl entity
 			   | entity <- entities,
@@ -277,8 +277,8 @@ mkIface hsc_env maybe_old_iface
 			     nameIsLocalOrFrom this_mod name  ]
 				-- Sigh: see Note [Root-main Id] in TcRnDriver
 
-		; fixities    = [(occ,fix) | FixItem occ fix _ <- nameEnvElts fix_env]
-		; deprecs     = mkIfaceDeprec src_deprecs
+		; fixities    = [(occ,fix) | FixItem occ fix <- nameEnvElts fix_env]
+		; deprecs     = src_deprecs
 		; iface_rules = map (coreRuleToIfaceRule this_mod) rules
 		; iface_insts = map instanceToIfaceInst insts
 		; iface_fam_insts = map famInstToIfaceFamInst fam_insts
@@ -319,7 +319,7 @@ mkIface hsc_env maybe_old_iface
 			mi_fix_fn = mkIfaceFixCache fixities }
 
 		-- Add version information
-                ; ext_ver_fn = mkParentVerFun hsc_env eps
+              ; ext_ver_fn = mkParentVerFun hsc_env eps
 		; (new_iface, no_change_at_all, pp_diffs, pp_orphs) 
 			= {-# SCC "versioninfo" #-}
 			 addVersionInfo ext_ver_fn maybe_old_iface
@@ -689,12 +689,6 @@ mkOrphMap get_key decls
 	| Just occ <- get_key d
 	= (extendOccEnv_C (\ ds _ -> d:ds) non_orphs occ [d], orphs)
 	| otherwise = (non_orphs, d:orphs)
-
-----------------------
-mkIfaceDeprec :: Deprecations -> IfaceDeprecs
-mkIfaceDeprec NoDeprecs        = NoDeprecs
-mkIfaceDeprec (DeprecAll t)    = DeprecAll t
-mkIfaceDeprec (DeprecSome env) = DeprecSome (sortLe (<=) (nameEnvElts env))
 
 ----------------------
 bump_unless :: Bool -> Version -> Version

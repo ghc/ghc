@@ -16,7 +16,7 @@
 module DsMonad (
 	DsM, mappM, mapAndUnzipM,
 	initDs, initDsTc, returnDs, thenDs, listDs, fixDs, mapAndUnzipDs, 
-	foldlDs, foldrDs,
+	foldlDs, foldrDs, ifOptDs,
 
 	newTyVarsDs, newLocalName,
 	duplicateLocalDs, newSysLocalDs, newSysLocalsDs, newUniqueId,
@@ -130,7 +130,7 @@ listDs   = sequenceM
 foldlDs  = foldlM
 foldrDs  = foldrM
 mapAndUnzipDs = mapAndUnzipM
-
+ifOptDs   = ifOptM
 
 type DsWarning = (SrcSpan, SDoc)
 	-- Not quite the same as a WarnMsg, we have an SDoc here 

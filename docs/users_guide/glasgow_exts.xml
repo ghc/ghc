@@ -710,6 +710,202 @@ qualifier list has just one element, a boolean expression.
 </para>
 </sect2>
 
+    <!-- ===================== View patterns ===================  -->
+
+<sect2 id="view-patterns">
+<title>View patterns
+</title>
+
+<para>
+View patterns are enabled by the flag <literal>-XViewPatterns</literal>.
+More information and examples of view patterns can be found on the
+<ulink url="http://hackage.haskell.org/trac/ghc/wiki/ViewPatterns">Wiki
+page</ulink>.
+</para>
+
+<para>
+View patterns are somewhat like pattern guards that can be nested inside
+of other patterns.  They are a convenient way of pattern-matching
+against values of abstract types. For example, in a programming language
+implementation, we might represent the syntax of the types of the
+language as follows:
+
+<programlisting>
+type Typ
+ 
+data TypView = Unit
+             | Arrow Typ Typ
+
+view :: Type -> TypeView
+
+-- additional operations for constructing Typ's ...
+</programlisting>
+
+The representation of Typ is held abstract, permitting implementations
+to use a fancy representation (e.g., hash-consing to managage sharing).
+
+Without view patterns, using this signature a little inconvenient: 
+<programlisting>
+size :: Typ -> Integer
+size t = case view t of
+  Unit -> 1
+  Arrow t1 t2 -> size t1 + size t2
+</programlisting>
+
+It is necessary to iterate the case, rather than using an equational
+function definition. And the situation is even worse when the matching
+against <literal>t</literal> is buried deep inside another pattern.
+</para>
+
+<para>
+View patterns permit calling the view function inside the pattern and
+matching against the result: 
+<programlisting>
+size (view -> Unit) = 1
+size (view -> Arrow t1 t2) = size t1 + size t2
+</programlisting>
+
+That is, we add a new form of pattern, written
+<replaceable>expression</replaceable> <literal>-></literal>
+<replaceable>pattern</replaceable> that means "apply the expression to
+whatever we're trying to match against, and then match the result of
+that application against the pattern". The expression can be any Haskell
+expression of function type, and view patterns can be used wherever
+patterns are used.
+</para>
+
+<para>
+The semantics of a pattern <literal>(</literal>
+<replaceable>exp</replaceable> <literal>-></literal>
+<replaceable>pat</replaceable> <literal>)</literal> are as follows:
+
+<itemizedlist>
+
+<listitem> Scoping:
+
+<para>The variables bound by the view pattern are the variables bound by
+<replaceable>pat</replaceable>.
+</para>
+
+<para>
+Any variables in <replaceable>exp</replaceable> are bound occurrences,
+but variables bound "to the left" in a pattern are in scope.  This
+feature permits, for example, one argument to a function to be used in
+the view of another argument.  For example, the function
+<literal>clunky</literal> from <xref linkend="pattern-guards" /> can be
+written using view patterns as follows:
+
+<programlisting>
+clunky env (lookup env -> Just val1) (lookup env -> Just val2) = val1 + val2
+...other equations for clunky...
+</programlisting>
+</para>
+
+<para>
+More precisely, the scoping rules are: 
+<itemizedlist>
+<listitem>
+<para>
+In a single pattern, variables bound by patterns to the left of a view
+pattern expression are in scope. For example:
+<programlisting>
+example :: Maybe ((String -> Integer,Integer), String) -> Bool
+example Just ((f,_), f -> 4) = True
+</programlisting>
+
+Additionally, in function definitions, variables bound by matching earlier curried
+arguments may be used in view pattern expressions in later arguments:
+<programlisting>
+example :: (String -> Integer) -> String -> Bool
+example f (f -> 4) = True
+</programlisting>
+That is, the scoping is the same as it would be if the curried arguments
+were collected into a tuple.  
+</para>
+</listitem>
+
+<listitem>
+<para>
+In mutually recursive bindings, such as <literal>let</literal>,
+<literal>where</literal>, or the top level, view patterns in one
+declaration may not mention variables bound by other declarations.  That
+is, each declaration must be self-contained.  For example, the following
+program is not allowed:
+<programlisting>
+let {(x -> y) = e1 ;
+     (y -> x) = e2 } in x
+</programlisting>
+
+(We may lift this
+restriction in the future; the only cost is that type checking patterns
+would get a little more complicated.)  
+
+
+</para>
+</listitem>
+</itemizedlist>
+
+</para>
+</listitem>
+
+<listitem><para> Typing: If <replaceable>exp</replaceable> has type
+<replaceable>T1</replaceable> <literal>-></literal>
+<replaceable>T2</replaceable> and <replaceable>pat</replaceable> matches
+a <replaceable>T2</replaceable>, then the whole view pattern matches a
+<replaceable>T1</replaceable>.
+</para></listitem>
+
+<listitem><para> Matching: To the equations in Section 3.17.3 of the
+<ulink url="http://www.haskell.org/onlinereport/">Haskell 98
+Report</ulink>, add the following:
+<programlisting>
+case v of { (e -> p) -> e1 ; _ -> e2 } 
+ = 
+case (e v) of { p -> e1 ; _ -> e2 }
+</programlisting>
+That is, to match a variable <replaceable>v</replaceable> against a pattern
+<literal>(</literal> <replaceable>exp</replaceable>
+<literal>-></literal> <replaceable>pat</replaceable>
+<literal>)</literal>, evaluate <literal>(</literal>
+<replaceable>exp</replaceable> <replaceable> v</replaceable>
+<literal>)</literal> and match the result against
+<replaceable>pat</replaceable>.  
+</para></listitem>
+
+<listitem><para> Efficiency: When the same view function is applied in
+multiple branches of a function definition or a case expression (e.g.,
+in <literal>size</literal> above), GHC makes an attempt to collect these
+applications into a single nested case expression, so that the view
+function is only applied once.  Pattern compilation in GHC follows the
+matrix algorithm described in Chapter 4 of <ulink
+url="http://research.microsoft.com/~simonpj/Papers/slpj-book-1987/">The
+Implementation of Functional Programming Languages</ulink>.  When the
+top rows of the first column of a matrix are all view patterns with the
+"same" expression, these patterns are transformed into a single nested
+case.  This includes, for example, adjacent view patterns that line up
+in a tuple, as in
+<programlisting>
+f ((view -> A, p1), p2) = e1
+f ((view -> B, p3), p4) = e2
+</programlisting>
+</para>
+
+<para> The current notion of when two view pattern expressions are "the
+same" is very restricted: it is not even full syntactic equality.
+However, it does include variables, literals, applications, and tuples;
+e.g., two instances of <literal>view ("hi", "there")</literal> will be
+collected.  However, the current implementation does not compare up to
+alpha-equivalence, so two instances of <literal>(x, view x ->
+y)</literal> will not be coalesced.
+</para>
+
+</listitem>
+
+</itemizedlist>
+</para>
+
+</sect2>
+
     <!-- ===================== Recursive do-notation ===================  -->
 
 <sect2 id="mdo-notation">
@@ -863,9 +1059,10 @@ This name is not supported by GHC.
 
   </sect2>
 
+   <!-- ===================== REBINDABLE SYNTAX ===================  -->
+
 <sect2 id="rebindable-syntax">
 <title>Rebindable syntax</title>
-
 
       <para>GHC allows most kinds of built-in syntax to be rebound by
       the user, to facilitate replacing the <literal>Prelude</literal>
@@ -1020,6 +1217,170 @@ This reduces the clutter of qualified names when you import two
 records from different modules that use the same field name.
 </para>
 </sect2>
+
+    <!-- ===================== Record puns ===================  -->
+
+<sect2 id="record-puns">
+<title>Record puns
+</title>
+
+<para>
+Record puns are enabled by the flag <literal>-XRecordPuns</literal>.
+</para>
+
+<para>
+When using records, it is common to write a pattern that binds a
+variable with the same name as a record field, such as:
+
+<programlisting>
+data C = C {a :: Int}
+f (C {a = a}) = a
+</programlisting>
+</para>
+
+<para>
+Record punning permits the variable name to be elided, so one can simply
+write
+
+<programlisting>
+f (C {a}) = a
+</programlisting>
+
+to mean the same pattern as above.  That is, in a record pattern, the
+pattern <literal>a</literal> expands into the pattern <literal>a =
+a</literal> for the same name <literal>a</literal>.  
+</para>
+
+<para>
+Note that puns and other patterns can be mixed in the same record:
+<programlisting>
+data C = C {a :: Int, b :: Int}
+f (C {a, b = 4}) = a
+</programlisting>
+and that puns can be used wherever record patterns occur (e.g. in
+<literal>let</literal> bindings or at the top-level).  
+</para>
+
+<para>
+Record punning can also be used in an expression, writing, for example,
+<programlisting>
+let a = 1 in C {a}
+</programlisting>
+instead of 
+<programlisting>
+let a = 1 in C {a = a}
+</programlisting>
+
+Note that this expansion is purely syntactic, so the record pun
+expression refers to the nearest enclosing variable that is spelled the
+same as the field name.
+</para>
+
+</sect2>
+
+    <!-- ===================== Record wildcards ===================  -->
+
+<sect2 id="record-wildcards">
+<title>Record wildcards
+</title>
+
+<para>
+Record wildcards are enabled by the flag <literal>-XRecordWildCards</literal>.
+</para>
+
+<para>
+For records with many fields, it can be tiresome to write out each field
+individually in a record pattern, as in
+<programlisting>
+data C = C {a :: Int, b :: Int, c :: Int, d :: Int}
+f (C {a = 1, b = b, c = c, d = d}) = b + c + d
+</programlisting>
+</para>
+
+<para>
+Record wildcard syntax permits a (<literal>..</literal>) in a record
+pattern, where each elided field <literal>f</literal> is replaced by the
+pattern <literal>f = f</literal>.  For example, the above pattern can be
+written as
+<programlisting>
+f (C {a = 1, ..}) = b + c + d
+</programlisting>
+</para>
+
+<para>
+Note that wildcards can be mixed with other patterns, including puns
+(<xref linkend="record-puns"/>); for example, in a pattern <literal>C {a
+= 1, b, ..})</literal>.  Additionally, record wildcards can be used
+wherever record patterns occur, including in <literal>let</literal>
+bindings and at the top-level.  For example, the top-level binding
+<programlisting>
+C {a = 1, ..} = e
+</programlisting>
+defines <literal>b</literal>, <literal>c</literal>, and
+<literal>d</literal>.
+</para>
+
+<para>
+Record wildcards can also be used in expressions, writing, for example,
+
+<programlisting>
+let {a = 1; b = 2; c = 3; d = 4} in C {..}
+</programlisting>
+
+in place of
+
+<programlisting>
+let {a = 1; b = 2; c = 3; d = 4} in C {a=a, b=b, c=c, d=d}
+</programlisting>
+
+Note that this expansion is purely syntactic, so the record wildcard
+expression refers to the nearest enclosing variables that are spelled
+the same as the omitted field names.
+</para>
+
+</sect2>
+
+    <!-- ===================== Local fixity declarations ===================  -->
+
+<sect2 id="local-fixity-declarations">
+<title>Local Fixity Declarations
+</title>
+
+<para>A careful reading of the Haskell 98 Report reveals that fixity
+declarations (<literal>infix</literal>, <literal>infixl</literal>, and
+<literal>infixr</literal>) are permitted to appear inside local bindings
+such those introduced by <literal>let</literal> and
+<literal>where</literal>.  However, the Haskell Report does not specify
+the semantics of such bindings very precisely.
+</para>
+
+<para>In GHC, a fixity declaration may accompany a local binding:
+<programlisting>
+let f = ...
+    infixr 3 `f`
+in 
+    ...
+</programlisting>
+and the fixity declaration applies wherever the binding is in scope.
+For example, in a <literal>let</literal>, it applies in the right-hand
+sides of other <literal>let</literal>-bindings and the body of the
+<literal>let</literal>C. Or, in recursive <literal>do</literal>
+expressions (<xref linkend="mdo-notation"/>), the local fixity
+declarations of aA <literal>let</literal> statement scope over other
+statements in the group, just as the bound name does.
+</para>
+
+Moreover, a local fixity declatation *must* accompany a local binding of
+that name: it is not possible to revise the fixity of name bound
+elsewhere, as in
+<programlisting>
+let infixr 9 $ in ...
+</programlisting>
+
+Because local fixity declarations are technically Haskell 98, no flag is
+necessary to enable them.
+</sect2>
+
 </sect1>
 
 

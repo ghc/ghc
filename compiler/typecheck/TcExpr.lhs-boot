@@ -24,4 +24,5 @@ tcSyntaxOp ::
        -> HsExpr Name
        -> TcType
        -> TcM (HsExpr TcId)
+
 \end{code}

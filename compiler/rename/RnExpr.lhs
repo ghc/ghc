@@ -24,16 +24,18 @@ module RnExpr (
 #include "HsVersions.h"
 
 import RnSource  ( rnSrcDecls, rnSplice, checkTH ) 
-import RnBinds	 ( rnLocalBindsAndThen, rnValBinds,
-		   rnMatchGroup, trimWith ) 
+import RnBinds   ( rnLocalBindsAndThen, rnValBindsLHS, rnValBindsRHS,
+                   rnMatchGroup, makeMiniFixityEnv) 
 import HsSyn
 import TcRnMonad
 import RnEnv
 import HscTypes         ( availNames )
 import RnNames		( getLocalDeclBinders, extendRdrEnvRn )
-import RnTypes		( rnHsTypeFVs, rnLPat, rnOverLit, rnPatsAndThen, rnLit,
-			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec, 
-			  rnHsRecFields, checkTupSize )
+import RnTypes		( rnHsTypeFVs, 
+			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec)
+import RnPat          (rnOverLit, rnPatsAndThen_LocalRightwards, rnPat_LocalRec, localNameMaker, 
+                       rnLit,
+			 rnHsRecFields_Con, rnHsRecFields_Update, checkTupSize)
 import DynFlags		( DynFlag(..) )
 import BasicTypes	( FixityDirection(..) )
 import SrcLoc           ( SrcSpan )
@@ -43,6 +45,7 @@ import PrelNames	( thFAKE, hasKey, assertIdKey, assertErrorName,
 
 import Name		( Name, nameOccName, nameIsLocalOrFrom )
 import NameSet
+import UniqFM
 import RdrName		( RdrName, extendLocalRdrEnv, lookupLocalRdrEnv, hideSomeUnquals )
 import LoadIface	( loadInterfaceForName )
 import UniqFM		( isNullUFM )
@@ -114,7 +117,7 @@ rnExpr (HsLit lit@(HsString s))
   = do {
          opt_OverloadedStrings <- doptM Opt_OverloadedStrings
        ; if opt_OverloadedStrings then
-            rnExpr (HsOverLit (mkHsIsString s))
+            rnExpr (HsOverLit (mkHsIsString s placeHolderType))
 	 else -- Same as below
 	    rnLit lit		`thenM_`
             returnM (HsLit lit, emptyFVs)
@@ -228,14 +231,13 @@ rnExpr e@(ExplicitTuple exps boxity)
 
 rnExpr (RecordCon con_id _ rbinds)
   = do	{ conname <- lookupLocatedOccRn con_id
-	; (rbinds', fvRbinds) <- rnHsRecFields "construction" (Just conname) 
-						rnLExpr HsVar rbinds
+	; (rbinds', fvRbinds) <- rnHsRecFields_Con conname rnLExpr rbinds
 	; return (RecordCon conname noPostTcExpr rbinds', 
 		  fvRbinds `addOneFV` unLoc conname) }
 
 rnExpr (RecordUpd expr rbinds _ _ _)
   = do	{ (expr', fvExpr) <- rnLExpr expr
-	; (rbinds', fvRbinds) <- rnHsRecFields "update" Nothing rnLExpr HsVar rbinds
+	; (rbinds', fvRbinds) <- rnHsRecFields_Update rnLExpr rbinds
 	; return (RecordUpd expr' rbinds' [] [] [], 
 		  fvExpr `plusFV` fvRbinds) }
 
@@ -287,7 +289,7 @@ rnExpr e@(ELazyPat {}) = patSynErr e
 \begin{code}
 rnExpr (HsProc pat body)
   = newArrowScope $
-    rnPatsAndThen ProcExpr [pat] $ \ [pat'] ->
+    rnPatsAndThen_LocalRightwards ProcExpr [pat] $ \ ([pat'],_) ->
     rnCmdTop body	         `thenM` \ (body',fvBody) ->
     returnM (HsProc pat' body', fvBody)
 
@@ -527,46 +529,41 @@ rnBracket (VarBr n) = do { name <- lookupOccRn n
 
 rnBracket (ExpBr e) = do { (e', fvs) <- rnLExpr e
 			 ; return (ExpBr e', fvs) }
-rnBracket (PatBr p) = do { (p', fvs) <- rnLPat p
-			 ; return (PatBr p', fvs) }
+
+rnBracket (PatBr p) = do { addErr (ptext SLIT("Tempate Haskell pattern brackets are not supported yet"));
+                           failM }
+
 rnBracket (TypBr t) = do { (t', fvs) <- rnHsTypeFVs doc t
 			 ; return (TypBr t', fvs) }
 		    where
 		      doc = ptext SLIT("In a Template-Haskell quoted type")
 rnBracket (DecBr group) 
-  = do 	{ gbl_env  <- getGblEnv
+  = do { gbl_env  <- getGblEnv
 
-	; let gbl_env1 = gbl_env { tcg_mod = thFAKE }
-	-- Note the thFAKE.  The top-level names from the bracketed 
-	-- declarations will go into the name cache, and we don't want them to 
-	-- confuse the Names for the current module.  
-	-- By using a pretend module, thFAKE, we keep them safely out of the way.
+	; let new_gbl_env = gbl_env { -- Set the module to thFAKE.  The top-level names from the bracketed 
+	                              -- declarations will go into the name cache, and we don't want them to 
+	                              -- confuse the Names for the current module.  
+	                              -- By using a pretend module, thFAKE, we keep them safely out of the way.
+                                     tcg_mod = thFAKE,
+                        
+                                     -- The emptyDUs is so that we just collect uses for this group alone
+                                     -- in the call to rnSrcDecls below
+                                     tcg_dus = emptyDUs }
+       ; setGblEnv new_gbl_env $ do {
 
-	; avails <- getLocalDeclBinders gbl_env1 group
-        ; let names = concatMap availNames avails
-
-	; let new_occs = map nameOccName names
-	      trimmed_rdr_env = hideSomeUnquals (tcg_rdr_env gbl_env) new_occs
-
-	; rdr_env' <- extendRdrEnvRn trimmed_rdr_env avails
 	-- In this situation we want to *shadow* top-level bindings.
 	--	foo = 1
-	--	bar = [d| foo = 1|]
+	--	bar = [d| foo = 1 |]
 	-- If we don't shadow, we'll get an ambiguity complaint when we do 
 	-- a lookupTopBndrRn (which uses lookupGreLocalRn) on the binder of the 'foo'
 	--
 	-- Furthermore, arguably if the splice does define foo, that should hide
 	-- any foo's further out
 	--
-	-- The shadowing is acheived by the call to hideSomeUnquals, which removes
-	-- the unqualified bindings of things defined by the bracket
+	-- The shadowing is acheived by calling rnSrcDecls with True as the shadowing flag
+       ; (tcg_env, group') <- rnSrcDecls True group       
 
-	; setGblEnv (gbl_env { tcg_rdr_env = rdr_env',
-			       tcg_dus = emptyDUs }) $ do
-		-- The emptyDUs is so that we just collect uses for this group alone
-
-	{ (tcg_env, group') <- rnSrcDecls group
-		-- Discard the tcg_env; it contains only extra info about fixity
+       -- Discard the tcg_env; it contains only extra info about fixity
 	; return (DecBr group', allUses (tcg_dus tcg_env)) } }
 \end{code}
 
@@ -599,7 +596,8 @@ rnNormalStmts ctxt (L loc stmt : stmts) thing_inside
 		<- rnStmt ctxt stmt 	$
 		   rnNormalStmts ctxt stmts thing_inside
 	; return (((L loc stmt' : stmts'), thing), fvs) }
-    
+
+
 rnStmt :: HsStmtContext Name -> Stmt RdrName
        -> RnM (thing, FreeVars)
        -> RnM ((Stmt Name, thing), FreeVars)
@@ -616,11 +614,11 @@ rnStmt ctxt (BindStmt pat expr _ _) thing_inside
 		-- The binders do not scope over the expression
 	; (bind_op, fvs1) <- lookupSyntaxName bindMName
 	; (fail_op, fvs2) <- lookupSyntaxName failMName
-	; rnPatsAndThen (StmtCtxt ctxt) [pat] $ \ [pat'] -> do
+	; rnPatsAndThen_LocalRightwards (StmtCtxt ctxt) [pat] $ \ ([pat'],_) -> do
 	{ (thing, fvs3) <- thing_inside
 	; return ((BindStmt pat' expr' bind_op fail_op, thing),
 		  fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }}
-	-- fv_expr shouldn't really be filtered by the rnPatsAndThen
+       -- fv_expr shouldn't really be filtered by the rnPatsAndThen
 	-- but it does not matter because the names are unique
 
 rnStmt ctxt (LetStmt binds) thing_inside
@@ -636,8 +634,8 @@ rnStmt ctxt (LetStmt binds) thing_inside
     ok _	       _	     = True
 
 rnStmt ctxt (RecStmt rec_stmts _ _ _ _) thing_inside
-  = bindLocatedLocalsRn doc (collectLStmtsBinders rec_stmts)	$ \ bndrs ->
-    rn_rec_stmts bndrs rec_stmts	`thenM` \ segs ->
+  = 
+    rn_rec_stmts_and_then rec_stmts	$ \ segs ->
     thing_inside 			`thenM` \ (thing, fvs) ->
     let
 	segs_w_fwd_refs     	 = addFwdRefs segs
@@ -723,38 +721,37 @@ type Segment stmts = (Defs,
 
 
 ----------------------------------------------------
+
 rnMDoStmts :: [LStmt RdrName]
 	   -> RnM (thing, FreeVars)
 	   -> RnM (([LStmt Name], thing), FreeVars)	
 rnMDoStmts stmts thing_inside
-  = 	-- Step1: bring all the binders of the mdo into scope
-	-- Remember that this also removes the binders from the
-	-- finally-returned free-vars
-    bindLocatedLocalsRn doc (collectLStmtsBinders stmts)	$ \ bndrs ->
-    do	{ 
-	-- Step 2: Rename each individual stmt, making a
-	--	   singleton segment.  At this stage the FwdRefs field
-	--	   isn't finished: it's empty for all except a BindStmt
-	--	   for which it's the fwd refs within the bind itself
-	-- 	   (This set may not be empty, because we're in a recursive 
-	--	    context.)
-	  segs <- rn_rec_stmts bndrs stmts
+  =    -- Step1: Bring all the binders of the mdo into scope
+	-- (Remember that this also removes the binders from the
+	-- finally-returned free-vars.)
+   	-- And rename each individual stmt, making a
+	-- singleton segment.  At this stage the FwdRefs field
+	-- isn't finished: it's empty for all except a BindStmt
+	-- for which it's the fwd refs within the bind itself
+	-- (This set may not be empty, because we're in a recursive 
+	-- context.)
+     rn_rec_stmts_and_then stmts $ \ segs -> do {
 
 	; (thing, fvs_later) <- thing_inside
 
 	; let
-	-- Step 3: Fill in the fwd refs.
+	-- Step 2: Fill in the fwd refs.
 	-- 	   The segments are all singletons, but their fwd-ref
 	--	   field mentions all the things used by the segment
 	--	   that are bound after their use
 	    segs_w_fwd_refs = addFwdRefs segs
 
-	-- Step 4: Group together the segments to make bigger segments
+	-- Step 3: Group together the segments to make bigger segments
 	--	   Invariant: in the result, no segment uses a variable
 	--	   	      bound in a later segment
 	    grouped_segs = glomSegments segs_w_fwd_refs
 
-	-- Step 5: Turn the segments into Stmts
+	-- Step 4: Turn the segments into Stmts
 	--	   Use RecStmt when and only when there are fwd refs
 	--	   Also gather up the uses from the end towards the
 	--	   start, so we can tell the RecStmt which things are
@@ -766,25 +763,112 @@ rnMDoStmts stmts thing_inside
     doc = text "In a recursive mdo-expression"
 
 ---------------------------------------------
-rn_rec_stmts :: [Name] -> [LStmt RdrName] -> RnM [Segment (LStmt Name)]
-rn_rec_stmts bndrs stmts = mappM (rn_rec_stmt bndrs) stmts	`thenM` \ segs_s ->
-		   	   returnM (concat segs_s)
 
-----------------------------------------------------
-rn_rec_stmt :: [Name] -> LStmt RdrName -> RnM [Segment (LStmt Name)]
+-- wrapper that does both the left- and right-hand sides
+rn_rec_stmts_and_then :: [LStmt RdrName]
+                         -- assumes that the FreeVars returned includes
+                         -- the FreeVars of the Segments
+                      -> ([Segment (LStmt Name)] -> RnM (a, FreeVars))
+                      -> RnM (a, FreeVars)
+rn_rec_stmts_and_then s cont = do
+  -- (A) make the mini fixity env for all of the stmts
+  fix_env <- makeMiniFixityEnv (collectRecStmtsFixities s)
+
+  -- (B) do the LHSes
+  new_lhs_and_fv <- rn_rec_stmts_lhs fix_env s
+
+  --    bring them and their fixities into scope
+  let bound_names = map unLoc $ collectLStmtsBinders (map fst new_lhs_and_fv)
+  bindLocalNamesFV_WithFixities bound_names fix_env $ do
+
+  -- (C) do the right-hand-sides and thing-inside
+  segs <- rn_rec_stmts bound_names new_lhs_and_fv
+  (result, result_fvs) <- cont segs
+  
+  -- (D) warn about unusued binders                    
+  let unused_bndrs = [ b | b <- bound_names, not (b `elemNameSet` result_fvs)]
+  warnUnusedLocalBinds unused_bndrs
+
+  -- (E) return
+  return (result, result_fvs)
+
+
+-- get all the fixity decls in any Let stmt
+collectRecStmtsFixities l = 
+    foldr (\ s -> \acc -> case s of 
+                            (L loc (LetStmt (HsValBinds (ValBindsIn _ sigs)))) -> 
+                                foldr (\ sig -> \ acc -> case sig of 
+                                                           (L loc (FixSig s)) -> (L loc s) : acc
+                                                           _ -> acc) acc sigs
+                            _ -> acc) [] l
+                             
+-- left-hand sides
+
+rn_rec_stmt_lhs :: UniqFM (Located Fixity) -- mini fixity env for the names we're about to bind
+                                           -- these fixities need to be brought into scope with the names
+                -> LStmt RdrName
+                   -- rename LHS, and return its FVs
+                   -- Warning: we will only need the FreeVars below in the case of a BindStmt,
+                   -- so we don't bother to compute it accurately in the other cases
+                -> RnM [(LStmtLR Name RdrName, FreeVars)]
+
+rn_rec_stmt_lhs fix_env (L loc (ExprStmt expr a b)) = return [(L loc (ExprStmt expr a b), 
+                                                       -- this is actually correct
+                                                       emptyFVs)]
+
+rn_rec_stmt_lhs fix_env (L loc (BindStmt pat expr a b)) 
+  = do 
+      -- should the ctxt be MDo instead?
+      (pat', fv_pat) <- rnPat_LocalRec fix_env pat 
+      return [(L loc (BindStmt pat' expr a b),
+               fv_pat)]
+
+rn_rec_stmt_lhs fix_env (L loc (LetStmt binds@(HsIPBinds _)))
+  = do	{ addErr (badIpBinds (ptext SLIT("an mdo expression")) binds)
+	; failM }
+
+rn_rec_stmt_lhs fix_env (L loc (LetStmt (HsValBinds binds))) 
+    = do binds' <- rnValBindsLHS fix_env binds
+         return [(L loc (LetStmt (HsValBinds binds')),
+                 -- Warning: this is bogus; see function invariant
+                 emptyFVs
+                 )]
+
+rn_rec_stmt_lhs fix_env (L loc (RecStmt stmts _ _ _ _))	-- Flatten Rec inside Rec
+    = rn_rec_stmts_lhs fix_env stmts
+
+rn_rec_stmt_lhs _ stmt@(L _ (ParStmt _))	-- Syntactically illegal in mdo
+  = pprPanic "rn_rec_stmt" (ppr stmt)
+
+rn_rec_stmts_lhs :: UniqFM (Located Fixity) -- mini fixity env for the names we're about to bind
+                                            -- these fixities need to be brought into scope with the names
+                 -> [LStmt RdrName] 
+                 -> RnM [(LStmtLR Name RdrName, FreeVars)]
+rn_rec_stmts_lhs fix_env stmts = 
+    let boundNames = collectLStmtsBinders stmts
+        doc = text "In a recursive mdo-expression"
+    in do
+     -- First do error checking: we need to check for dups here because we
+     -- don't bind all of the variables from the Stmt at once
+     -- with bindLocatedLocals.
+     checkDupNames doc boundNames
+     mappM (rn_rec_stmt_lhs fix_env) stmts `thenM` \ ls -> returnM (concat ls)
+
+
+-- right-hand-sides
+
+rn_rec_stmt :: [Name] -> LStmtLR Name RdrName -> FreeVars -> RnM [Segment (LStmt Name)]
 	-- Rename a Stmt that is inside a RecStmt (or mdo)
 	-- Assumes all binders are already in scope
 	-- Turns each stmt into a singleton Stmt
-
-rn_rec_stmt all_bndrs (L loc (ExprStmt expr _ _))
-  = rnLExpr expr 		`thenM` \ (expr', fvs) ->
+rn_rec_stmt all_bndrs (L loc (ExprStmt expr _ _)) _
+  = rnLExpr expr `thenM` \ (expr', fvs) ->
     lookupSyntaxName thenMName	`thenM` \ (then_op, fvs1) ->
     returnM [(emptyNameSet, fvs `plusFV` fvs1, emptyNameSet,
 	      L loc (ExprStmt expr' then_op placeHolderType))]
 
-rn_rec_stmt all_bndrs (L loc (BindStmt pat expr _ _))
+rn_rec_stmt all_bndrs (L loc (BindStmt pat' expr _ _)) fv_pat
   = rnLExpr expr		`thenM` \ (expr', fv_expr) ->
-    rnLPat pat			`thenM` \ (pat', fv_pat) ->
     lookupSyntaxName bindMName	`thenM` \ (bind_op, fvs1) ->
     lookupSyntaxName failMName	`thenM` \ (fail_op, fvs2) ->
     let
@@ -794,20 +878,27 @@ rn_rec_stmt all_bndrs (L loc (BindStmt pat expr _ _))
     returnM [(bndrs, fvs, bndrs `intersectNameSet` fvs,
 	      L loc (BindStmt pat' expr' bind_op fail_op))]
 
-rn_rec_stmt all_bndrs (L loc (LetStmt binds@(HsIPBinds _)))
+rn_rec_stmt all_bndrs (L loc (LetStmt binds@(HsIPBinds _))) _
   = do	{ addErr (badIpBinds (ptext SLIT("an mdo expression")) binds)
 	; failM }
 
-rn_rec_stmt all_bndrs (L loc (LetStmt (HsValBinds binds)))
-  = rnValBinds (trimWith all_bndrs) binds	`thenM` \ (binds', du_binds) ->
-    returnM [(duDefs du_binds, duUses du_binds, 
-	      emptyNameSet, L loc (LetStmt (HsValBinds binds')))]
+rn_rec_stmt all_bndrs (L loc (LetStmt (HsValBinds binds'))) _ = do 
+  (binds', du_binds) <- 
+      -- fixities and unused are handled above in rn_rec_stmts_and_then
+      rnValBindsRHS all_bndrs binds'
+  returnM [(duDefs du_binds, duUses du_binds, 
+	    emptyNameSet, L loc (LetStmt (HsValBinds binds')))]
 
-rn_rec_stmt all_bndrs (L loc (RecStmt stmts _ _ _ _))	-- Flatten Rec inside Rec
-  = rn_rec_stmts all_bndrs stmts
+-- no RecStmt case becuase they get flattened above when doing the LHSes
+rn_rec_stmt all_bndrs stmt@(L loc (RecStmt stmts _ _ _ _)) _	
+  = pprPanic "rn_rec_stmt: RecStmt" (ppr stmt)
 
-rn_rec_stmt all_bndrs stmt@(L _ (ParStmt _))	-- Syntactically illegal in mdo
-  = pprPanic "rn_rec_stmt" (ppr stmt)
+rn_rec_stmt all_bndrs stmt@(L _ (ParStmt _)) _	-- Syntactically illegal in mdo
+  = pprPanic "rn_rec_stmt: ParStmt" (ppr stmt)
+
+rn_rec_stmts :: [Name] -> [(LStmtLR Name RdrName, FreeVars)] -> RnM [Segment (LStmt Name)]
+rn_rec_stmts bndrs stmts = mappM (uncurry (rn_rec_stmt bndrs)) stmts	`thenM` \ segs_s ->
+		   	   returnM (concat segs_s)
 
 ---------------------------------------------
 addFwdRefs :: [Segment a] -> [Segment a]

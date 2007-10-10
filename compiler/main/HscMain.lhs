@@ -25,7 +25,7 @@ module HscMain
 #include "HsVersions.h"
 
 #ifdef GHCI
-import HsSyn		( Stmt(..), LStmt, LHsType )
+import HsSyn		( StmtLR(..), LStmt, LHsType )
 import CodeOutput	( outputForeignStubs )
 import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
 import Linker		( HValue, linkExpr )

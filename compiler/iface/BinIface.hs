@@ -428,7 +428,7 @@ instance Binary Usage where
 			usg_exports = exps, usg_entities = ents,
 			usg_rules = rules })
 
-instance Binary a => Binary (Deprecs a) where
+instance Binary Deprecations where
     put_ bh NoDeprecs     = putByte bh 0
     put_ bh (DeprecAll t) = do
 	    putByte bh 1

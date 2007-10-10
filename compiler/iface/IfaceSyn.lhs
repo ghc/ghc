@@ -338,13 +338,70 @@ ifaceDeclSubBndrs :: IfaceDecl -> [OccName]
 -- Deeply revolting, because it has to predict what gets bound,
 -- especially the question of whether there's a wrapper for a datacon
 
+-- N.B. the set of names returned here *must* match the set of
+-- TyThings returned by HscTypes.implicitTyThings, in the sense that
+-- TyThing.getOccName should define a bijection between the two lists.
+-- This invariant is used in LoadIface.loadDecl (see note [Tricky iface loop])
+-- The order of the list does not matter.
+ifaceDeclSubBndrs IfaceData {ifCons = IfAbstractTyCon}  = []
+
+-- Newtype
+ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
+                              ifCons = IfNewTyCon (
+                                        IfCon { ifConOcc = con_occ, 
+                                                ifConFields = fields
+					          }),
+                              ifFamInst = famInst}) 
+  = -- fields (names of selectors)
+    fields ++ 
+    -- implicit coerion and (possibly) family instance coercion
+    (mkNewTyCoOcc tc_occ) : (famInstCo famInst tc_occ) ++
+    -- data constructor and worker (newtypes don't have a wrapper)
+    [con_occ, mkDataConWorkerOcc con_occ]
+
+
+ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
+			      ifCons = IfDataTyCon cons, 
+			      ifFamInst = famInst})
+  = -- fields (names of selectors) 
+    nub (concatMap ifConFields cons) 	-- Eliminate duplicate fields
+    -- (possibly) family instance coercion;
+    -- there is no implicit coercion for non-newtypes
+    ++ famInstCo famInst tc_occ
+    -- for each data constructor in order,
+    --    data constructor, worker, and (possibly) wrapper
+    ++ concatMap dc_occs cons
+  where
+    dc_occs con_decl
+	| has_wrapper = [con_occ, work_occ, wrap_occ]
+	| otherwise   = [con_occ, work_occ]
+	where
+	  con_occ  = ifConOcc con_decl			-- DataCon namespace
+	  wrap_occ = mkDataConWrapperOcc con_occ	-- Id namespace
+	  work_occ = mkDataConWorkerOcc con_occ		-- Id namespace
+	  strs     = ifConStricts con_decl
+	  has_wrapper = any isMarkedStrict strs	-- See MkId.mkDataConIds (sigh)
+			|| not (null . ifConEqSpec $ con_decl)
+			|| isJust famInst
+		-- ToDo: may miss strictness in existential dicts
+
 ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_occ, 
 			       ifSigs = sigs, ifATs = ats })
-  = co_occs ++
-    [tc_occ, dc_occ, dcww_occ] ++
-    [op | IfaceClassOp op  _ _ <- sigs] ++
+  = -- dictionary datatype:
+    --   type constructor
+    tc_occ : 
+    --   (possibly) newtype coercion
+    co_occs ++
+    --    data constructor (DataCon namespace)
+    --    data worker (Id namespace)
+    --    no wrapper (class dictionaries never have a wrapper)
+    [dc_occ, dcww_occ] ++
+    -- associated types
     [ifName at | at <- ats ] ++
-    [mkSuperDictSelOcc n cls_occ | n <- [1..n_ctxt]] 
+    -- superclass selectors
+    [mkSuperDictSelOcc n cls_occ | n <- [1..n_ctxt]] ++
+    -- operation selectors
+    [op | IfaceClassOp op  _ _ <- sigs]
   where
     n_ctxt = length sc_ctxt
     n_sigs = length sigs
@@ -352,41 +409,8 @@ ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_occ,
     dc_occ  = mkClassDataConOcc cls_occ	
     co_occs | is_newtype = [mkNewTyCoOcc tc_occ]
 	    | otherwise  = []
-    dcww_occ -- | is_newtype = mkDataConWrapperOcc dc_occ	-- Newtypes have wrapper but no worker
-	     | otherwise  = mkDataConWorkerOcc dc_occ	-- Otherwise worker but no wrapper
+    dcww_occ = mkDataConWorkerOcc dc_occ
     is_newtype = n_sigs + n_ctxt == 1			-- Sigh 
-
-ifaceDeclSubBndrs IfaceData {ifCons = IfAbstractTyCon}
-  = []
--- Newtype
-ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
-			      ifCons = IfNewTyCon (
-				         IfCon { ifConOcc = con_occ, 
-							   ifConFields = fields
-							 }),
-			      ifFamInst = famInst}) 
-  = fields ++ [con_occ, mkDataConWorkerOcc con_occ, mkNewTyCoOcc tc_occ]
-    ++ famInstCo famInst tc_occ
-
-ifaceDeclSubBndrs (IfaceData {ifName = tc_occ,
-			      ifCons = IfDataTyCon cons, 
-			      ifFamInst = famInst})
-  = nub (concatMap ifConFields cons) 	-- Eliminate duplicate fields
-    ++ concatMap dc_occs cons
-    ++ famInstCo famInst tc_occ
-  where
-    dc_occs con_decl
-	| has_wrapper = [con_occ, work_occ, wrap_occ]
-	| otherwise   = [con_occ, work_occ]
-	where
-	  con_occ = ifConOcc con_decl
-	  strs    = ifConStricts con_decl
-	  wrap_occ = mkDataConWrapperOcc con_occ
-	  work_occ = mkDataConWorkerOcc con_occ
-	  has_wrapper = any isMarkedStrict strs	-- See MkId.mkDataConIds (sigh)
-			|| not (null . ifConEqSpec $ con_decl)
-			|| isJust famInst
-		-- ToDo: may miss strictness in existential dicts
 
 ifaceDeclSubBndrs _other = []
 

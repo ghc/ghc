@@ -94,7 +94,8 @@ noSyntaxTable = []
 data HsExpr id
   = HsVar	id		-- variable
   | HsIPVar	(IPName id)	-- implicit parameter
-  | HsOverLit	(HsOverLit id)	-- Overloaded literals
+  | HsOverLit	(HsOverLit id) -- Overloaded literals
+
   | HsLit	HsLit		-- Simple (non-overloaded) literals
 
   | HsLam	(MatchGroup  id)	-- Currently always a single match
@@ -259,6 +260,9 @@ data HsExpr id
   | EAsPat	(Located id)	-- as pattern
 		(LHsExpr id)
 
+  | EViewPat	(LHsExpr id)	-- view pattern
+		(LHsExpr id)
+
   | ELazyPat	(LHsExpr id) -- ~ pattern
 
   | HsType      (LHsType id)     -- Explicit type argument; e.g  f {| Int |} x y
@@ -305,13 +309,14 @@ isQuietHsExpr (HsApp _ _) = True
 isQuietHsExpr (OpApp _ _ _ _) = True
 isQuietHsExpr _ = False
 
-pprBinds :: OutputableBndr id => HsLocalBinds id -> SDoc
+pprBinds :: (OutputableBndr idL, OutputableBndr idR) => HsLocalBindsLR idL idR -> SDoc
 pprBinds b = pprDeeper (ppr b)
 
 -----------------------
 ppr_lexpr :: OutputableBndr id => LHsExpr id -> SDoc
 ppr_lexpr e = ppr_expr (unLoc e)
 
+ppr_expr :: OutputableBndr id => HsExpr id -> SDoc
 ppr_expr (HsVar v)	 = pprHsVar v
 ppr_expr (HsIPVar v)     = ppr v
 ppr_expr (HsLit lit)     = ppr lit
@@ -353,7 +358,7 @@ ppr_expr (SectionL expr op)
 
     pp_prefixly = hang (hsep [text " \\ x_ ->", ppr op])
 		       4 (hsep [pp_expr, ptext SLIT("x_ )")])
-    pp_infixly v = parens (sep [pp_expr, pprInfix v])
+    pp_infixly v = (sep [pp_expr, pprInfix v])
 
 ppr_expr (SectionR op expr)
   = case unLoc op of
@@ -365,14 +370,14 @@ ppr_expr (SectionR op expr)
     pp_prefixly = hang (hsep [text "( \\ x_ ->", ppr op, ptext SLIT("x_")])
 		       4 ((<>) pp_expr rparen)
     pp_infixly v
-      = parens (sep [pprInfix v, pp_expr])
+      = (sep [pprInfix v, pp_expr])
 
-ppr_expr (HsLam matches) 
-  = pprMatches LambdaExpr matches
+ppr_expr (HsLam matches :: HsExpr id) 
+  = pprMatches (LambdaExpr :: HsMatchContext id) matches
 
-ppr_expr (HsCase expr matches)
+ppr_expr (HsCase expr matches :: HsExpr id)
   = sep [ sep [ptext SLIT("case"), nest 4 (ppr expr), ptext SLIT("of")],
-	    nest 2 (pprMatches CaseAlt matches) ]
+	    nest 2 (pprMatches (CaseAlt :: HsMatchContext id) matches) ]
 
 ppr_expr (HsIf e1 e2 e3)
   = sep [hsep [ptext SLIT("if"), nest 2 (ppr e1), ptext SLIT("then")],
@@ -675,22 +680,22 @@ data GRHS id = GRHS [LStmt id]		-- Guards
 We know the list must have at least one @Match@ in it.
 
 \begin{code}
-pprMatches :: (OutputableBndr id) => HsMatchContext id -> MatchGroup id -> SDoc
+pprMatches :: (OutputableBndr idL, OutputableBndr idR) => HsMatchContext idL -> MatchGroup idR -> SDoc
 pprMatches ctxt (MatchGroup matches ty) = vcat (map (pprMatch ctxt) (map unLoc matches))
                                           -- Don't print the type; it's only 
                                           -- a place-holder before typechecking
 
 -- Exported to HsBinds, which can't see the defn of HsMatchContext
-pprFunBind :: (OutputableBndr id) => id -> Bool -> MatchGroup id -> SDoc
+pprFunBind :: (OutputableBndr idL, OutputableBndr idR) => idL -> Bool -> MatchGroup idR -> SDoc
 pprFunBind fun inf matches = pprMatches (FunRhs fun inf) matches
 
 -- Exported to HsBinds, which can't see the defn of HsMatchContext
 pprPatBind :: (OutputableBndr bndr, OutputableBndr id)
 	   => LPat bndr -> GRHSs id -> SDoc
-pprPatBind pat grhss = sep [ppr pat, nest 4 (pprGRHSs PatBindRhs grhss)]
+pprPatBind pat (grhss :: GRHSs id) = sep [ppr pat, nest 4 (pprGRHSs (PatBindRhs :: HsMatchContext id) grhss)]
 
 
-pprMatch :: OutputableBndr id => HsMatchContext id -> Match id -> SDoc
+pprMatch :: (OutputableBndr idL, OutputableBndr idR) => HsMatchContext idL -> Match idR -> SDoc
 pprMatch ctxt (Match pats maybe_ty grhss)
   = herald <+> sep [sep (map ppr other_pats), 
 		    ppr_maybe_ty, 
@@ -721,13 +726,13 @@ pprMatch ctxt (Match pats maybe_ty grhss)
 			Nothing -> empty
 
 
-pprGRHSs :: OutputableBndr id => HsMatchContext id -> GRHSs id -> SDoc
+pprGRHSs :: (OutputableBndr idL, OutputableBndr idR) => HsMatchContext idL -> GRHSs idR -> SDoc
 pprGRHSs ctxt (GRHSs grhss binds)
   = vcat (map (pprGRHS ctxt . unLoc) grhss)
  $$ if isEmptyLocalBinds binds then empty
                                else text "where" $$ nest 4 (pprBinds binds)
 
-pprGRHS :: OutputableBndr id => HsMatchContext id -> GRHS id -> SDoc
+pprGRHS :: (OutputableBndr idL, OutputableBndr idR) => HsMatchContext idL -> GRHS idR -> SDoc
 
 pprGRHS ctxt (GRHS [] expr)
  =  pp_rhs ctxt expr
@@ -745,35 +750,38 @@ pp_rhs ctxt rhs = matchSeparator ctxt <+> pprDeeper (ppr rhs)
 %************************************************************************
 
 \begin{code}
-type LStmt id = Located (Stmt id)
+type LStmt id = Located (StmtLR id id)
+type LStmtLR idL idR = Located (StmtLR idL idR)
+
+type Stmt id = StmtLR id id
 
 -- The SyntaxExprs in here are used *only* for do-notation, which
 -- has rebindable syntax.  Otherwise they are unused.
-data Stmt id
-  = BindStmt	(LPat id)		
-		(LHsExpr id) 
-		(SyntaxExpr id)		-- The (>>=) operator
-		(SyntaxExpr id)		-- The fail operator 
+data StmtLR idL idR
+  = BindStmt	(LPat idL)		
+		(LHsExpr idR) 
+		(SyntaxExpr idR)		-- The (>>=) operator
+		(SyntaxExpr idR)		-- The fail operator 
 		-- The fail operator is noSyntaxExpr 
 		-- if the pattern match can't fail
 
-  | ExprStmt	(LHsExpr id)
-		(SyntaxExpr id)		-- The (>>) operator
+  | ExprStmt	(LHsExpr idR)
+		(SyntaxExpr idR)		-- The (>>) operator
 		PostTcType		-- Element type of the RHS (used for arrows)
 
-  | LetStmt	(HsLocalBinds id)	
+  | LetStmt	(HsLocalBindsLR idL idR)	
 
 	-- ParStmts only occur in a list comprehension
-  | ParStmt	[([LStmt id], [id])]	-- After renaming, the ids are the binders
-					-- bound by the stmts and used subsequently
+  | ParStmt	[([LStmt idL], [idR])] -- After renaming, the ids are the binders
+					 -- bound by the stmts and used subsequently
 
 	-- Recursive statement (see Note [RecStmt] below)
-  | RecStmt  [LStmt id] 
+  | RecStmt  [LStmtLR idL idR] 
 		--- The next two fields are only valid after renaming
-	     [id] 	-- The ids are a subset of the variables bound by the stmts
+	     [idR] 	-- The ids are a subset of the variables bound by the stmts
 	     	 	-- that are used in stmts that follow the RecStmt
 
-	     [id]	-- Ditto, but these variables are the "recursive" ones, that 
+	     [idR]	-- Ditto, but these variables are the "recursive" ones, that 
 			-- are used before they are bound in the stmts of the RecStmt
 			-- From a type-checking point of view, these ones have to be monomorphic
 
@@ -783,7 +791,7 @@ data Stmt id
 				-- should be returned by the recursion.  They may not quite be the
 				-- Ids themselves, because the Id may be *polymorphic*, but
 				-- the returned thing has to be *monomorphic*.
-	     (DictBinds id)	-- Method bindings of Ids bound by the RecStmt,
+	     (DictBinds idR)	-- Method bindings of Ids bound by the RecStmt,
 				-- and used afterwards
 \end{code}
 
@@ -837,9 +845,10 @@ have the same Name.
 
 
 \begin{code}
-instance OutputableBndr id => Outputable (Stmt id) where
+instance (OutputableBndr idL, OutputableBndr idR) => Outputable (StmtLR idL idR) where
     ppr stmt = pprStmt stmt
 
+pprStmt :: (OutputableBndr idL, OutputableBndr idR) => (StmtLR idL idR) -> SDoc
 pprStmt (BindStmt pat expr _ _)	  = hsep [ppr pat, ptext SLIT("<-"), ppr expr]
 pprStmt (LetStmt binds)       	  = hsep [ptext SLIT("let"), pprBinds binds]
 pprStmt (ExprStmt expr _ _)   	  = ppr expr

@@ -16,17 +16,9 @@ module RnTypes (
 	rnHsType, rnLHsType, rnLHsTypes, rnContext,
 	rnHsSigType, rnHsTypeFVs,
 
-	-- Patterns and literals
-	rnLPat, rnPatsAndThen,		-- Here because it's not part 
-	rnLit, rnOverLit, 		-- of any mutual recursion	
-	rnHsRecFields,
-
 	-- Precence related stuff
-	mkOpAppRn, mkNegAppRn, mkOpFormRn, 
-	checkPrecMatch, checkSectionPrec, 
-	
-	-- Error messages
-	patSigErr, checkTupSize
+	mkOpAppRn, mkNegAppRn, mkOpFormRn, mkConOpPatRn,
+	checkPrecMatch, checkSectionPrec
   ) where
 
 import DynFlags
@@ -41,7 +33,7 @@ import RnEnv		( lookupOccRn, lookupBndrRn, lookupSyntaxName,
 			  lookupLocatedGlobalOccRn, bindTyVarsRn, 
 			  lookupFixityRn, lookupTyFixityRn, lookupConstructorFields,
 			  lookupRecordBndr, mapFvRn, warnUnusedMatches,
-			  newIPNameRn, bindPatSigTyVarsFV, bindLocatedLocalsFV )
+			  newIPNameRn, bindPatSigTyVarsFV)
 import TcRnMonad
 import RdrName
 import PrelNames	( eqClassName, integralClassName, geName, eqName,
@@ -225,6 +217,39 @@ rnForAll doc exp forall_tyvars ctxt ty
     returnM (HsForAllTy exp new_tyvars new_ctxt new_ty)
 	-- Retain the same implicit/explicit flag as before
 	-- so that we can later print it correctly
+\end{code}
+
+%*********************************************************
+%*							*
+\subsection{Contexts and predicates}
+%*							*
+%*********************************************************
+
+\begin{code}
+rnContext :: SDoc -> LHsContext RdrName -> RnM (LHsContext Name)
+rnContext doc = wrapLocM (rnContext' doc)
+
+rnContext' :: SDoc -> HsContext RdrName -> RnM (HsContext Name)
+rnContext' doc ctxt = mappM (rnLPred doc) ctxt
+
+rnLPred :: SDoc -> LHsPred RdrName -> RnM (LHsPred Name)
+rnLPred doc  = wrapLocM (rnPred doc)
+
+rnPred doc (HsClassP clas tys)
+  = do { clas_name <- lookupOccRn clas
+       ; tys' <- rnLHsTypes doc tys
+       ; returnM (HsClassP clas_name tys')
+       }
+rnPred doc (HsEqualP ty1 ty2)
+  = do { ty1' <- rnLHsType doc ty1
+       ; ty2' <- rnLHsType doc ty2
+       ; returnM (HsEqualP ty1' ty2')
+       }
+rnPred doc (HsIParam n ty)
+  = do { name <- newIPNameRn n
+       ; ty' <- rnLHsType doc ty
+       ; returnM (HsIParam name ty')
+       }
 \end{code}
 
 
@@ -495,317 +520,11 @@ ppr_opfix (pp_op, fixity) = pp_op <+> brackets (ppr fixity)
 
 %*********************************************************
 %*							*
-\subsection{Contexts and predicates}
-%*							*
-%*********************************************************
-
-\begin{code}
-rnContext :: SDoc -> LHsContext RdrName -> RnM (LHsContext Name)
-rnContext doc = wrapLocM (rnContext' doc)
-
-rnContext' :: SDoc -> HsContext RdrName -> RnM (HsContext Name)
-rnContext' doc ctxt = mappM (rnLPred doc) ctxt
-
-rnLPred :: SDoc -> LHsPred RdrName -> RnM (LHsPred Name)
-rnLPred doc  = wrapLocM (rnPred doc)
-
-rnPred doc (HsClassP clas tys)
-  = do { clas_name <- lookupOccRn clas
-       ; tys' <- rnLHsTypes doc tys
-       ; returnM (HsClassP clas_name tys')
-       }
-rnPred doc (HsEqualP ty1 ty2)
-  = do { ty1' <- rnLHsType doc ty1
-       ; ty2' <- rnLHsType doc ty2
-       ; returnM (HsEqualP ty1' ty2')
-       }
-rnPred doc (HsIParam n ty)
-  = do { name <- newIPNameRn n
-       ; ty' <- rnLHsType doc ty
-       ; returnM (HsIParam name ty')
-       }
-\end{code}
-
-
-*********************************************************
-*							*
-\subsection{Patterns}
-*							*
-*********************************************************
-
-\begin{code}
-rnPatsAndThen :: HsMatchContext Name
-	      -> [LPat RdrName] 
-	      -> ([LPat Name] -> RnM (a, FreeVars))
-	      -> RnM (a, FreeVars)
--- Bring into scope all the binders and type variables
--- bound by the patterns; then rename the patterns; then
--- do the thing inside.
---
--- Note that we do a single bindLocalsRn for all the
--- matches together, so that we spot the repeated variable in
---	f x x = 1
-
-rnPatsAndThen ctxt pats thing_inside
-  = bindPatSigTyVarsFV pat_sig_tys 	$
-    bindLocatedLocalsFV doc_pat bndrs	$ \ new_bndrs ->
-    rnLPats pats			`thenM` \ (pats', pat_fvs) ->
-    thing_inside pats'			`thenM` \ (res, res_fvs) ->
-    let
-	unused_binders = filter (not . (`elemNameSet` res_fvs)) new_bndrs
-    in
-    warnUnusedMatches unused_binders   `thenM_`
-    returnM (res, res_fvs `plusFV` pat_fvs)
-  where
-    pat_sig_tys = collectSigTysFromPats pats
-    bndrs 	= collectLocatedPatsBinders pats
-    doc_pat     = ptext SLIT("In") <+> pprMatchContext ctxt
-
-rnLPats :: [LPat RdrName] -> RnM ([LPat Name], FreeVars)
-rnLPats ps = mapFvRn rnLPat ps
-
-rnLPat :: LPat RdrName -> RnM (LPat Name, FreeVars)
-rnLPat = wrapLocFstM rnPat
-
--- -----------------------------------------------------------------------------
--- rnPat
-
-rnPat :: Pat RdrName -> RnM (Pat Name, FreeVars)
-
-rnPat (WildPat _) = returnM (WildPat placeHolderType, emptyFVs)
-
-rnPat (VarPat name)
-  = lookupBndrRn  name			`thenM` \ vname ->
-    returnM (VarPat vname, emptyFVs)
-
-rnPat (SigPatIn pat ty)
-  = doptM Opt_PatternSignatures `thenM` \ patsigs ->
-    
-    if patsigs
-    then rnLPat pat		`thenM` \ (pat', fvs1) ->
-         rnHsTypeFVs doc ty	`thenM` \ (ty',  fvs2) ->
-         returnM (SigPatIn pat' ty', fvs1 `plusFV` fvs2)
-
-    else addErr (patSigErr ty)	`thenM_`
-         rnPat (unLoc pat) -- XXX shouldn't throw away the loc
-  where
-    doc = text "In a pattern type-signature"
-    
-rnPat (LitPat lit@(HsString s))
-  = do { ovlStr <- doptM Opt_OverloadedStrings
-       ; if ovlStr then rnPat (mkNPat (mkHsIsString s) Nothing)
-         else do { rnLit lit; return (LitPat lit, emptyFVs) } }  -- Same as below
-rnPat (LitPat lit) 
-  = rnLit lit 	`thenM_` 
-    returnM (LitPat lit, emptyFVs) 
-
-rnPat (NPat lit mb_neg eq _) 
-  = rnOverLit lit			`thenM` \ (lit', fvs1) ->
-    (case mb_neg of
-	Nothing -> returnM (Nothing, emptyFVs)
-	Just _  -> lookupSyntaxName negateName	`thenM` \ (neg, fvs) ->
-		   returnM (Just neg, fvs)
-    )					`thenM` \ (mb_neg', fvs2) ->
-    lookupSyntaxName eqName		`thenM` \ (eq', fvs3) -> 
-    returnM (NPat lit' mb_neg' eq' placeHolderType, 
-	      fvs1 `plusFV` fvs2 `plusFV` fvs3)	
-	-- Needed to find equality on pattern
-
-rnPat (NPlusKPat name lit _ _)
-  = rnOverLit lit			`thenM` \ (lit', fvs1) ->
-    lookupLocatedBndrRn name		`thenM` \ name' ->
-    lookupSyntaxName minusName		`thenM` \ (minus, fvs2) ->
-    lookupSyntaxName geName		`thenM` \ (ge, fvs3) ->
-    returnM (NPlusKPat name' lit' ge minus,
-	     fvs1 `plusFV` fvs2 `plusFV` fvs3)
-	-- The Report says that n+k patterns must be in Integral
-
-rnPat (LazyPat pat)
-  = rnLPat pat		`thenM` \ (pat', fvs) ->
-    returnM (LazyPat pat', fvs)
-
-rnPat (BangPat pat)
-  = rnLPat pat		`thenM` \ (pat', fvs) ->
-    returnM (BangPat pat', fvs)
-
-rnPat (AsPat name pat)
-  = rnLPat pat			`thenM` \ (pat', fvs) ->
-    lookupLocatedBndrRn name	`thenM` \ vname ->
-    returnM (AsPat vname pat', fvs)
-
-rnPat (ConPatIn con stuff) = rnConPat con stuff
-
-rnPat (ParPat pat)
-  = rnLPat pat		`thenM` \ (pat', fvs) ->
-    returnM (ParPat pat', fvs)
-
-rnPat (ListPat pats _)
-  = rnLPats pats			`thenM` \ (patslist, fvs) ->
-    returnM (ListPat patslist placeHolderType, fvs)
-
-rnPat (PArrPat pats _)
-  = rnLPats pats			`thenM` \ (patslist, fvs) ->
-    returnM (PArrPat patslist placeHolderType, 
-	      fvs `plusFV` implicit_fvs)
-  where
-    implicit_fvs = mkFVs [lengthPName, indexPName]
-
-rnPat (TuplePat pats boxed _)
-  = checkTupSize (length pats)	`thenM_`
-    rnLPats pats			`thenM` \ (patslist, fvs) ->
-    returnM (TuplePat patslist boxed placeHolderType, fvs)
-
-rnPat (TypePat name) =
-    rnHsTypeFVs (text "In a type pattern") name	`thenM` \ (name', fvs) ->
-    returnM (TypePat name', fvs)
-
--- -----------------------------------------------------------------------------
--- rnConPat
-
-rnConPat :: Located RdrName -> HsConPatDetails RdrName -> RnM (Pat Name, FreeVars)
-rnConPat con (PrefixCon pats)
-  = do	{ con' <- lookupLocatedOccRn con
-	; (pats', fvs) <- rnLPats pats
-	; return (ConPatIn con' (PrefixCon pats'), fvs `addOneFV` unLoc con') }
-
-rnConPat con (RecCon rpats)
-  = do	{ con' <- lookupLocatedOccRn con
-	; (rpats', fvs) <- rnHsRecFields "pattern" (Just con') rnLPat VarPat rpats
-	; return (ConPatIn con' (RecCon rpats'), fvs `addOneFV` unLoc con') }
-
-rnConPat con (InfixCon pat1 pat2)
-  = do	{ con' <- lookupLocatedOccRn con
-	; (pat1', fvs1) <- rnLPat pat1
-	; (pat2', fvs2) <- rnLPat pat2
-	; fixity 	<- lookupFixityRn (unLoc con')
-	; pat' <- mkConOpPatRn con' fixity pat1' pat2'
-	; return (pat', fvs1 `plusFV` fvs2 `addOneFV` unLoc con') }
-
--- -----------------------------------------------------------------------------
-rnHsRecFields :: String	-- "pattern" or "construction" or "update"
-	      -> Maybe (Located Name)
-	      -> (Located a -> RnM (Located b, FreeVars))
-	      -> (RdrName -> a)			-- How to fill in ".."
-	      -> HsRecFields RdrName (Located a)
-              -> RnM (HsRecFields Name (Located b), FreeVars)
--- Haddock comments for record fields are renamed to Nothing here
-rnHsRecFields str mb_con rn_thing mk_rhs (HsRecFields fields dd)
-  = do	{ mappM_ field_dup_err dup_fields
-	; pun_flag <- doptM Opt_RecordPuns
-	; (fields1, fvs1) <- mapFvRn (rn_rpat pun_flag) fields
-	; case dd of
-	    Nothing -> return (HsRecFields fields1 dd, fvs1)
-	    Just n  -> ASSERT( n == length fields ) do
-	{ dd_flag <- doptM Opt_RecordWildCards
-	; checkErr dd_flag (needFlagDotDot str)
-
-	; let fld_names1 = map (unLoc . hsRecFieldId) fields1
-	; (fields2, fvs2) <- dot_dot_fields fld_names1 mb_con
-
-	; return (HsRecFields (fields1 ++ fields2) dd, fvs1 `plusFV` fvs2) } }
-  where
-    (_, dup_fields) = removeDups compare (map (unLoc . hsRecFieldId) fields)
-
-    field_dup_err dups = addErr (dupFieldErr str (head dups))
-
-    rn_rpat pun_ok (HsRecField field pat pun)
-      = do { fieldname   <- lookupRecordBndr mb_con field
-	   ; checkErr (not pun || pun_ok) (badPun field)
-	   ; (pat', fvs) <- rn_thing pat
-	   ; return (HsRecField fieldname pat' pun, 
-		     fvs `addOneFV` unLoc fieldname) }
-
-    dot_dot_fields fs Nothing = do { addErr (badDotDot str) 
-				   ; return ([], emptyFVs) }
-
-	-- Compute the extra fields to be filled in by the dot-dot notation
-    dot_dot_fields fs (Just con)
-	= do { con_fields <- lookupConstructorFields (unLoc con)
-	     ; let missing_fields = con_fields `minusList` fs
-	     ; loc <- getSrcSpanM	-- Rather approximate
-	     ; (rhss, fvs_s) <- mapAndUnzipM rn_thing 
-				  [ L loc (mk_rhs (mkRdrUnqual (getOccName f)))
-				  | f <- missing_fields ]
-	     ; let new_fs = [ HsRecField (L loc f) r False
-			    | (f, r) <- missing_fields `zip` rhss ]
-	     ; return (new_fs, plusFVs fvs_s) }
-
-needFlagDotDot str = vcat [ptext SLIT("Illegal `..' in record") <+> text str,
-			  ptext SLIT("Use -frecord-dot-dot to permit this")]
-
-badDotDot str = ptext SLIT("You cannot use `..' in record") <+> text str
-
-badPun fld = vcat [ptext SLIT("Illegal use of punning for field") <+> quotes (ppr fld),
-		   ptext SLIT("Use -frecord-puns to permit this")]
-\end{code}
-
-
-%************************************************************************
-%*									*
-\subsubsection{Literals}
-%*									*
-%************************************************************************
-
-When literals occur we have to make sure
-that the types and classes they involve
-are made available.
-
-\begin{code}
-rnLit :: HsLit -> RnM ()
-rnLit (HsChar c) = checkErr (inCharRange c) (bogusCharError c)
-rnLit other	 = returnM ()
-
-rnOverLit (HsIntegral i _)
-  = lookupSyntaxName fromIntegerName	`thenM` \ (from_integer_name, fvs) ->
-    if inIntRange i then
-	returnM (HsIntegral i from_integer_name, fvs)
-    else let
-	extra_fvs = mkFVs [plusIntegerName, timesIntegerName]
-	-- Big integer literals are built, using + and *, 
-	-- out of small integers (DsUtils.mkIntegerLit)
-	-- [NB: plusInteger, timesInteger aren't rebindable... 
-	--	they are used to construct the argument to fromInteger, 
-	--	which is the rebindable one.]
-    in
-    returnM (HsIntegral i from_integer_name, fvs `plusFV` extra_fvs)
-
-rnOverLit (HsFractional i _)
-  = lookupSyntaxName fromRationalName		`thenM` \ (from_rat_name, fvs) ->
-    let
-	extra_fvs = mkFVs [ratioDataConName, plusIntegerName, timesIntegerName]
-	-- We have to make sure that the Ratio type is imported with
-	-- its constructor, because literals of type Ratio t are
-	-- built with that constructor.
-	-- The Rational type is needed too, but that will come in
-	-- as part of the type for fromRational.
-	-- The plus/times integer operations may be needed to construct the numerator
-	-- and denominator (see DsUtils.mkIntegerLit)
-    in
-    returnM (HsFractional i from_rat_name, fvs `plusFV` extra_fvs)
-
-rnOverLit (HsIsString s _)
-  = lookupSyntaxName fromStringName	`thenM` \ (from_string_name, fvs) ->
-	returnM (HsIsString s from_string_name, fvs)
-\end{code}
-
-
-
-%*********************************************************
-%*							*
 \subsection{Errors}
 %*							*
 %*********************************************************
 
 \begin{code}
-checkTupSize :: Int -> RnM ()
-checkTupSize tup_size
-  | tup_size <= mAX_TUPLE_SIZE 
-  = returnM ()
-  | otherwise		       
-  = addErr (sep [ptext SLIT("A") <+> int tup_size <> ptext SLIT("-tuple is too large for GHC"),
-		 nest 2 (parens (ptext SLIT("max size is") <+> int mAX_TUPLE_SIZE)),
-		 nest 2 (ptext SLIT("Workaround: use nested tuples or define a data type"))])
-
 forAllWarn doc ty (L loc tyvar)
   = ifOptM Opt_WarnUnusedMatches 	$
     addWarnAt loc (sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),
@@ -816,16 +535,4 @@ forAllWarn doc ty (L loc tyvar)
 opTyErr op ty 
   = hang (ptext SLIT("Illegal operator") <+> quotes (ppr op) <+> ptext SLIT("in type") <+> quotes (ppr ty))
 	 2 (parens (ptext SLIT("Use -XTypeOperators to allow operators in types")))
-
-bogusCharError c
-  = ptext SLIT("character literal out of range: '\\") <> char c  <> char '\''
-
-patSigErr ty
-  =  (ptext SLIT("Illegal signature in pattern:") <+> ppr ty)
-	$$ nest 4 (ptext SLIT("Use -XPatternSignatures to permit it"))
-
-dupFieldErr str dup
-  = hsep [ptext SLIT("duplicate field name"), 
-          quotes (ppr dup),
-	  ptext SLIT("in record"), text str]
 \end{code}

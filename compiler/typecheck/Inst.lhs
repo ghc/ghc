@@ -776,7 +776,7 @@ lookupSimpleInst (Method {tci_oid = id, tci_tys = tys, tci_theta = theta, tci_lo
 -- [Same shortcut as in newOverloadedLit, but we
 --  may have done some unification by now] 		
 
-lookupSimpleInst (LitInst {tci_lit = HsIntegral i from_integer_name, tci_ty = ty, tci_loc = loc})
+lookupSimpleInst (LitInst {tci_lit = HsIntegral i from_integer_name _, tci_ty = ty, tci_loc = loc})
   | Just expr <- shortCutIntLit i ty
   = returnM (GenInst [] (noLoc expr))
   | otherwise
@@ -788,7 +788,7 @@ lookupSimpleInst (LitInst {tci_lit = HsIntegral i from_integer_name, tci_ty = ty
 		     (mkHsApp (L (instLocSpan loc)
 			   	 (HsVar (instToId method_inst))) integer_lit))
 
-lookupSimpleInst (LitInst {tci_lit = HsFractional f from_rat_name, tci_ty = ty, tci_loc = loc})
+lookupSimpleInst (LitInst {tci_lit = HsFractional f from_rat_name _, tci_ty = ty, tci_loc = loc})
   | Just expr <- shortCutFracLit f ty
   = returnM (GenInst [] (noLoc expr))
 
@@ -800,7 +800,7 @@ lookupSimpleInst (LitInst {tci_lit = HsFractional f from_rat_name, tci_ty = ty, 
     returnM (GenInst [method_inst] (mkHsApp (L (instLocSpan loc) 
 					       (HsVar (instToId method_inst))) rat_lit))
 
-lookupSimpleInst (LitInst {tci_lit = HsIsString s from_string_name, tci_ty = ty, tci_loc = loc})
+lookupSimpleInst (LitInst {tci_lit = HsIsString s from_string_name _, tci_ty = ty, tci_loc = loc})
   | Just expr <- shortCutStringLit s ty
   = returnM (GenInst [] (noLoc expr))
   | otherwise

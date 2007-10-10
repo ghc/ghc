@@ -34,8 +34,6 @@ module HscTypes (
 	ModIface(..), mkIfaceDepCache, mkIfaceVerCache, mkIfaceFixCache,
 	emptyIfaceDepCache,
 
-	Deprecs(..), IfaceDeprecs,
-
 	FixityEnv, FixItem(..), lookupFixity, emptyFixityEnv,
 
 	implicitTyThings, isImplicitTyThing,
@@ -53,7 +51,7 @@ module HscTypes (
 	GenAvailInfo(..), AvailInfo, RdrAvailInfo, 
 	IfaceExport,
 
-	Deprecations, DeprecTxt, plusDeprecs,
+	Deprecations(..), DeprecTxt, plusDeprecs,
 
 	PackageInstEnv, PackageRuleBase,
 
@@ -434,7 +432,7 @@ data ModIface
 		-- NOT STRICT!  we read this field lazily from the interface file
 
 		-- Deprecations
-	mi_deprecs  :: IfaceDeprecs,
+	mi_deprecs  :: Deprecations,
 		-- NOT STRICT!  we read this field lazily from the interface file
 
 		-- Type, class and variable declarations
@@ -801,31 +799,62 @@ mkPrintUnqualified dflags env = (qual_name, qual_mod)
 %************************************************************************
 
 \begin{code}
+-- N.B. the set of TyThings returned here *must* match the set of
+-- names returned by LoadIface.ifaceDeclSubBndrs, in the sense that
+-- TyThing.getOccName should define a bijection between the two lists.
+-- This invariant is used in LoadIface.loadDecl (see note [Tricky iface loop])
+-- The order of the list does not matter.
 implicitTyThings :: TyThing -> [TyThing]
--- If you change this, make sure you change LoadIface.ifaceDeclSubBndrs in sync
+
+-- For data and newtype declarations:
+implicitTyThings (ATyCon tc) = 
+    -- fields (names of selectors)
+    map AnId (tyConSelIds tc) ++ 
+    -- (possibly) implicit coercion and family coercion
+    --   depending on whether it's a newtype or a family instance or both
+    implicitCoTyCon tc ++
+    -- for each data constructor in order,
+    --   the contructor, worker, and (possibly) wrapper
+    concatMap (extras_plus . ADataCon) (tyConDataCons tc)
+		     
+implicitTyThings (AClass cl) 
+  = -- dictionary datatype:
+    --    [extras_plus:]
+    --      type constructor 
+    --    [recursive call:]
+    --      (possibly) newtype coercion; definitely no family coercion here
+    --      data constructor
+    --      worker
+    --      (no wrapper by invariant)
+    extras_plus (ATyCon (classTyCon cl)) ++
+    -- associated types 
+    --    No extras_plus (recursive call) for the classATs, because they
+    --    are only the family decls; they have no implicit things
+    map ATyCon (classATs cl) ++
+    -- superclass and operation selectors
+    map AnId (classSelIds cl)
+
+implicitTyThings (ADataCon dc) = 
+    -- For data cons add the worker and (possibly) wrapper
+    map AnId (dataConImplicitIds dc)
 
 implicitTyThings (AnId _)   = []
 
-	-- For type constructors, add the data cons (and their extras),
-	-- and the selectors and generic-programming Ids too
-	--
-	-- Newtypes don't have a worker Id, so don't generate that?
-implicitTyThings (ATyCon tc) = implicitCoTyCon tc ++
-			       map AnId (tyConSelIds tc) ++ 
-			       concatMap (extras_plus . ADataCon) 
-					 (tyConDataCons tc)
-		     
-	-- For classes, add the class selector Ids, and assoicated TyCons
-	-- and the class TyCon too (and its extras)
-implicitTyThings (AClass cl) 
-  = map AnId (classSelIds cl) ++
-    map ATyCon (classATs cl) ++
-	-- No extras_plus for the classATs, because they
-	-- are only the family decls; they have no implicit things
-    extras_plus (ATyCon (classTyCon cl))
+-- add a thing and recursive call
+extras_plus :: TyThing -> [TyThing]
+extras_plus thing = thing : implicitTyThings thing
 
-	-- For data cons add the worker and wrapper (if any)
-implicitTyThings (ADataCon dc) = map AnId (dataConImplicitIds dc)
+-- For newtypes and indexed data types (and both),
+-- add the implicit coercion tycon
+implicitCoTyCon :: TyCon -> [TyThing]
+implicitCoTyCon tc 
+  = map ATyCon . catMaybes $ [-- Just if newtype, Nothing if not
+                              newTyConCo_maybe tc, 
+                              -- Just if family instance, Nothing if not
+			        tyConFamilyCoercion_maybe tc] 
+
+-- sortByOcc = sortBy (\ x -> \ y -> getOccName x < getOccName y)
+
 
 -- | returns 'True' if there should be no interface-file declaration
 -- for this thing on its own: either it is built-in, or it is part
@@ -836,15 +865,6 @@ isImplicitTyThing (ADataCon _)  = True
 isImplicitTyThing (AnId     id) = isImplicitId id
 isImplicitTyThing (AClass   _)  = False
 isImplicitTyThing (ATyCon   tc) = isImplicitTyCon tc
-
-	-- For newtypes and indexed data types, add the implicit coercion tycon
-implicitCoTyCon :: TyCon -> [TyThing]
-implicitCoTyCon tc 
-  = map ATyCon . catMaybes $ [newTyConCo_maybe tc, 
-			      tyConFamilyCoercion_maybe tc]
-
-extras_plus :: TyThing -> [TyThing]
-extras_plus thing = thing : implicitTyThings thing
 
 extendTypeEnvWithIds :: TypeEnv -> [Id] -> TypeEnv
 extendTypeEnvWithIds env ids
@@ -950,21 +970,33 @@ emptyIfaceVerCache :: OccName -> Maybe (OccName, Version)
 emptyIfaceVerCache _occ = Nothing
 
 ------------------ Deprecations -------------------------
-data Deprecs a
+data Deprecations
   = NoDeprecs
-  | DeprecAll DeprecTxt	-- Whole module deprecated
-  | DeprecSome a	-- Some specific things deprecated
+  | DeprecAll DeprecTxt	        -- Whole module deprecated
+  | DeprecSome [(OccName,DeprecTxt)] -- Some specific things deprecated
+     -- Only an OccName is needed because
+     --    (1) a deprecation always applies to a binding
+     --        defined in the module in which the deprecation appears.
+     --    (2) deprecations are only reported outside the defining module.
+     --        this is important because, otherwise, if we saw something like
+     --
+     --        {-# DEPRECATED f "" #-}
+     --        f = ...
+     --        h = f
+     --        g = let f = undefined in f
+     --
+     --        we'd need more information than an OccName to know to say something
+     --        about the use of f in h but not the use of the locally bound f in g
+     --
+     --        however, because we only report about deprecations from the outside,
+     --        and a module can only export one value called f,
+     --        an OccName suffices.
+     --
+     --        this is in contrast with fixity declarations, where we need to map
+     --        a Name to its fixity declaration.
   deriving( Eq )
 
-type IfaceDeprecs = Deprecs [(OccName,DeprecTxt)]
-type Deprecations = Deprecs (NameEnv (OccName,DeprecTxt))
-	-- Keep the OccName so we can flatten the NameEnv to
-	-- get an IfaceDeprecs from a Deprecations
-	-- Only an OccName is needed, because a deprecation always
-	-- applies to things defined in the module in which the
-	-- deprecation appears.
-
-mkIfaceDepCache:: IfaceDeprecs -> Name -> Maybe DeprecTxt
+mkIfaceDepCache :: Deprecations -> Name -> Maybe DeprecTxt
 mkIfaceDepCache NoDeprecs     	  = \_ -> Nothing
 mkIfaceDepCache (DeprecAll t) 	  = \_ -> Just t
 mkIfaceDepCache (DeprecSome pairs) = lookupOccEnv (mkOccEnv pairs) . nameOccName
@@ -977,7 +1009,7 @@ plusDeprecs d NoDeprecs = d
 plusDeprecs NoDeprecs d = d
 plusDeprecs _ (DeprecAll t) = DeprecAll t
 plusDeprecs (DeprecAll t) _ = DeprecAll t
-plusDeprecs (DeprecSome v1) (DeprecSome v2) = DeprecSome (v1 `plusNameEnv` v2)
+plusDeprecs (DeprecSome v1) (DeprecSome v2) = DeprecSome (v1 ++ v2)
 \end{code}
 
 
@@ -1036,18 +1068,18 @@ emptyIfaceFixCache _ = defaultFixity
 type FixityEnv = NameEnv FixItem
 
 -- We keep the OccName in the range so that we can generate an interface from it
-data FixItem = FixItem OccName Fixity SrcSpan
+data FixItem = FixItem OccName Fixity
 
 instance Outputable FixItem where
-  ppr (FixItem occ fix loc) = ppr fix <+> ppr occ <+> parens (ppr loc)
+  ppr (FixItem occ fix) = ppr fix <+> ppr occ
 
 emptyFixityEnv :: FixityEnv
 emptyFixityEnv = emptyNameEnv
 
 lookupFixity :: FixityEnv -> Name -> Fixity
 lookupFixity env n = case lookupNameEnv env n of
-			Just (FixItem _ fix _) -> fix
-			Nothing	      	       -> defaultFixity
+			Just (FixItem _ fix) -> fix
+			Nothing	      	-> defaultFixity
 \end{code}
 
 

@@ -1,4 +1,4 @@
-%
+\%
 % (c) The University of Glasgow 2006
 % (c) The AQUA Project, Glasgow University, 1998
 %
@@ -498,20 +498,37 @@ gotten by appying the eq_spec to the univ_tvs of the data con.
 mkRecordSelId :: TyCon -> FieldLabel -> Id
 mkRecordSelId tycon field_label
 	-- Assumes that all fields with the same field label have the same type
-  | is_naughty = naughty_id
-  | otherwise  = sel_id
+  = sel_id
   where
-    is_naughty = not (tyVarsOfType field_ty `subVarSet` data_tv_set)
-    sel_id_details = RecordSelId { sel_tycon = tycon, sel_label = field_label, sel_naughty = is_naughty }
-	-- For a data type family, the tycon is the *instance* TyCon
+    -- Because this function gets called by implicitTyThings, we need to
+    -- produce the OccName of the Id without doing any suspend type checks.
+    -- (see the note [Tricky iface loop]).
+    -- A suspended type-check is sometimes necessary to compute field_ty,
+    -- so we need to make sure that we suspend anything that depends on field_ty.
 
-    -- Escapist case here for naughty constructors
-    -- We give it no IdInfo, and a type of forall a.a (never looked at)
-    naughty_id = mkGlobalId sel_id_details field_label forall_a_a noCafIdInfo
+    -- the overall result
+    sel_id = mkGlobalId sel_id_details field_label theType theInfo
+                             
+    -- check whether the type is naughty: this thunk does not get forced
+    -- until the type is actually needed
+    field_ty	= dataConFieldType con1 field_label
+    is_naughty = not (tyVarsOfType field_ty `subVarSet` data_tv_set)  
+
+    -- it's important that this doesn't force the if
+    (theType, theInfo) = if is_naughty 
+                         -- Escapist case here for naughty constructors
+                         -- We give it no IdInfo, and a type of forall a.a (never looked at)
+                         then (forall_a_a, noCafIdInfo) 
+                         -- otherwise do the real case
+                         else (selector_ty, info)
+
+    sel_id_details = RecordSelId { sel_tycon = tycon, sel_label = field_label, sel_naughty = is_naughty }
+    -- For a data type family, the tycon is the *instance* TyCon
+
+    -- for naughty case
     forall_a_a = mkForAllTy alphaTyVar (mkTyVarTy alphaTyVar)
 
-    -- Normal case starts here
-    sel_id = mkGlobalId sel_id_details field_label selector_ty info
+    -- real case starts here:
     data_cons  	      = tyConDataCons tycon	
     data_cons_w_field = filter has_field data_cons	-- Can't be empty!
     has_field con     = field_label `elem` dataConFieldLabels con
@@ -522,7 +539,6 @@ mkRecordSelId tycon field_label
 	-- only the family TyCon, not the instance TyCon
     data_tv_set	= tyVarsOfType data_ty
     data_tvs	= varSetElems data_tv_set
-    field_ty	= dataConFieldType con1 field_label
     
 	-- *Very* tiresomely, the selectors are (unnecessarily!) overloaded over
 	-- just the dictionaries in the types of the constructors that contain

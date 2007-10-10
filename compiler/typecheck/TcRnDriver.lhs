@@ -170,8 +170,9 @@ tcRnModule hsc_env hsc_src save_rn_syntax
 	tcg_env <- finishDeprecations (hsc_dflags hsc_env) mod_deprec tcg_env ;
 
 		-- Process the export list
+       traceRn (text "rn4a: before exports");
 	tcg_env <- rnExports (isJust maybe_mod) export_ies tcg_env ;
-	traceRn (text "rn4") ;
+	traceRn (text "rn4b: after exportss") ;
 
 	-- Compare the hi-boot iface (if any) with the real thing
 	-- Must be done after processing the exports
@@ -282,9 +283,15 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
    let { ldecls  = map noLoc decls } ;
 
-	-- Deal with the type declarations; first bring their stuff
-	-- into scope, then rname them, then type check them
-   tcg_env  <- importsFromLocalDecls (mkFakeGroup ldecls) ;
+       -- bring the type and class decls into scope
+       -- ToDo: check that this doesn't need to extract the val binds.
+       --       It seems that only the type and class decls need to be in scope below because
+       --          (a) tcTyAndClassDecls doesn't need the val binds, and 
+       --          (b) tcExtCoreBindings doesn't need anything
+       --              (in fact, it might not even need to be in the scope of
+       --               this tcg_env at all)
+   tcg_env  <- importsFromLocalDecls False (mkFakeGroup ldecls) 
+               emptyUFM {- no fixity decls -} ;
 
    setGblEnv tcg_env $ do {
 
@@ -632,17 +639,11 @@ monad; it augments it and returns the new TcGblEnv.
 ------------------------------------------------
 rnTopSrcDecls :: HsGroup RdrName -> TcM (TcGblEnv, HsGroup Name)
 rnTopSrcDecls group
- = do { 	-- Bring top level binders into scope
-	tcg_env <- importsFromLocalDecls group ;
-	setGblEnv tcg_env $ do {
-
-	failIfErrsM ;	-- No point in continuing if (say) we have duplicate declarations
-
-		-- Rename the source decls
-	(tcg_env, rn_decls) <- rnSrcDecls group ;
+ = do { -- Rename the source decls (with no shadowing; error on duplicates)
+	(tcg_env, rn_decls) <- rnSrcDecls False group ;
 	failIfErrsM ;
 
-		-- save the renamed syntax, if we want it
+        -- save the renamed syntax, if we want it
 	let { tcg_env'
 	        | Just grp <- tcg_rn_decls tcg_env
 	          = tcg_env{ tcg_rn_decls = Just (appendGroups grp rn_decls) }
@@ -653,7 +654,7 @@ rnTopSrcDecls group
 	rnDump (ppr rn_decls) ;
 
 	return (tcg_env', rn_decls)
-   }}
+   }
 
 ------------------------------------------------
 tcTopSrcDecls :: ModDetails -> HsGroup Name -> TcM (TcGblEnv, TcLclEnv)

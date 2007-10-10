@@ -12,8 +12,7 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module TcExpr ( tcPolyExpr, tcPolyExprNC, 
-		tcMonoExpr, tcInferRho, tcSyntaxOp ) where
+module TcExpr ( tcPolyExpr, tcPolyExprNC, tcMonoExpr, tcInferRho, tcSyntaxOp) where
 
 #include "HsVersions.h"
 

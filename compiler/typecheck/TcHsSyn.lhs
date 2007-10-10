@@ -85,12 +85,13 @@ hsPatType (BangPat pat)		    = hsLPatType pat
 hsPatType (LazyPat pat)		    = hsLPatType pat
 hsPatType (LitPat lit)		    = hsLitType lit
 hsPatType (AsPat var pat)	    = idType (unLoc var)
+hsPatType (ViewPat expr pat ty)     = ty
 hsPatType (ListPat _ ty)	    = mkListTy ty
 hsPatType (PArrPat _ ty)	    = mkPArrTy ty
 hsPatType (TuplePat pats box ty)    = ty
 hsPatType (ConPatOut{ pat_ty = ty })= ty
 hsPatType (SigPatOut pat ty)	    = ty
-hsPatType (NPat lit _ _ ty)	    = ty
+hsPatType (NPat lit _ _)	    = overLitType lit
 hsPatType (NPlusKPat id _ _ _)      = idType (unLoc id)
 hsPatType (CoPat _ _ ty)	    = ty
 
@@ -561,12 +562,17 @@ zonkDo env do_or_lc      = do_or_lc
 
 -------------------------------------------------------------------------
 zonkOverLit :: ZonkEnv -> HsOverLit TcId -> TcM (HsOverLit Id)
-zonkOverLit env (HsIntegral i e)
-  = do	{ e' <- zonkExpr env e; return (HsIntegral i e') }
-zonkOverLit env (HsFractional r e)
-  = do	{ e' <- zonkExpr env e; return (HsFractional r e') }
-zonkOverLit env (HsIsString s e)
-  = do	{ e' <- zonkExpr env e; return (HsIsString s e') }
+zonkOverLit env ol = 
+    let 
+        zonkedStuff = do ty' <- zonkTcTypeToType env (overLitType ol)
+                         e' <- zonkExpr env (overLitExpr ol)
+                         return (e', ty')
+        ru f (x, y) = return (f x y)
+    in
+      case ol of 
+        (HsIntegral i _ _)   -> ru (HsIntegral i) =<< zonkedStuff
+        (HsFractional r _ _) -> ru (HsFractional r) =<< zonkedStuff
+        (HsIsString s _ _)   -> ru (HsIsString s) =<< zonkedStuff
 
 -------------------------------------------------------------------------
 zonkArithSeq :: ZonkEnv -> ArithSeqInfo TcId -> TcM (ArithSeqInfo Id)
@@ -705,6 +711,11 @@ zonk_pat env (AsPat (L loc v) pat)
 	; (env', pat') <- zonkPat (extendZonkEnv1 env v') pat
  	; return (env', AsPat (L loc v') pat') }
 
+zonk_pat env (ViewPat expr pat ty)
+  = do	{ expr' <- zonkLExpr env expr
+	; (env', pat') <- zonkPat env pat
+ 	; return (env', ViewPat expr' pat' ty) }
+
 zonk_pat env (ListPat pats ty)
   = do	{ ty' <- zonkTcTypeToType env ty
 	; (env', pats') <- zonkPats env pats
@@ -737,15 +748,14 @@ zonk_pat env (SigPatOut pat ty)
 	; (env', pat') <- zonkPat env pat
 	; return (env', SigPatOut pat' ty') }
 
-zonk_pat env (NPat lit mb_neg eq_expr ty)
+zonk_pat env (NPat lit mb_neg eq_expr)
   = do	{ lit' <- zonkOverLit env lit
  	; mb_neg' <- case mb_neg of
 			Nothing  -> return Nothing
 			Just neg -> do { neg' <- zonkExpr env neg
 				       ; return (Just neg') }
  	; eq_expr' <- zonkExpr env eq_expr
-	; ty' <- zonkTcTypeToType env ty
-	; return (env, NPat lit' mb_neg' eq_expr' ty') }
+	; return (env, NPat lit' mb_neg' eq_expr') }
 
 zonk_pat env (NPlusKPat (L loc n) lit e1 e2)
   = do	{ n' <- zonkIdBndr env n

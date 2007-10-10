@@ -426,9 +426,9 @@ cvtpair (PatG gs,rhs)    = do { gs' <- cvtStmts gs; rhs' <- cvtl rhs
 			      ; returnL $ GRHS gs' rhs' }
 
 cvtOverLit :: Lit -> CvtM (HsOverLit RdrName)
-cvtOverLit (IntegerL i)  = do { force i; return $ mkHsIntegral i }
-cvtOverLit (RationalL r) = do { force r; return $ mkHsFractional r }
-cvtOverLit (StringL s)   = do { let { s' = mkFastString s }; force s'; return $ mkHsIsString s' }
+cvtOverLit (IntegerL i)  = do { force i; return $ mkHsIntegral i placeHolderType}
+cvtOverLit (RationalL r) = do { force r; return $ mkHsFractional r placeHolderType}
+cvtOverLit (StringL s)   = do { let { s' = mkFastString s }; force s'; return $ mkHsIsString s' placeHolderType }
 -- An Integer is like an an (overloaded) '3' in a Haskell source program
 -- Similarly 3.5 for fractionals
 

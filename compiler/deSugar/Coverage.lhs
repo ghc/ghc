@@ -637,7 +637,7 @@ bindLocals :: [Id] -> TM a -> TM a
 bindLocals new_ids (TM m)
   = TM $ \ env st -> 
                  case m env{ inScope = inScope env `extendVarSetList` new_ids } st of
-                   (r, fv, st') -> (r, fv `delListFromUFM` occs, st')
+                   (r, fv, st') -> (r, fv `delListFromOccEnv` occs, st')
   where occs = [ nameOccName (idName id) | id <- new_ids ] 
 
 isBlackListed :: SrcSpan -> TM Bool

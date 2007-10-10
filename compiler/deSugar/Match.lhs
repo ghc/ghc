@@ -17,6 +17,8 @@ module Match ( match, matchEquations, matchWrapper, matchSimply, matchSinglePat 
 
 #include "HsVersions.h"
 
+import {-#SOURCE#-} DsExpr (dsLExpr)
+
 import DynFlags
 import HsSyn		
 import TcHsSyn
@@ -274,8 +276,13 @@ match vars@(v:_) ty eqns
 	  (aux_binds, tidy_eqns) <- mapAndUnzipM (tidyEqnInfo v) eqns
 
 		-- Group the equations and match each group in turn
-	; match_results <- mapM match_group (groupEquations tidy_eqns)
 
+       ; let grouped = (groupEquations tidy_eqns)
+
+         -- print the view patterns that are commoned up to help debug
+       ; ifOptDs Opt_D_dump_view_pattern_commoning (debug grouped)
+
+	; match_results <- mapM match_group grouped
 	; return (adjustMatchResult (foldr1 (.) aux_binds) $
 		  foldr1 combineMatchResults match_results) }
   where
@@ -284,14 +291,30 @@ match vars@(v:_) ty eqns
 
     match_group :: [(PatGroup,EquationInfo)] -> DsM MatchResult
     match_group eqns@((group,_) : _)
-      = case group of
-	  PgAny     -> matchVariables  vars ty (dropGroup eqns)
-	  PgCon _   -> matchConFamily  vars ty (subGroups eqns)
-	  PgLit _   -> matchLiterals   vars ty (subGroups eqns)
-	  PgN lit   -> matchNPats      vars ty (subGroups eqns)
-	  PgNpK lit -> matchNPlusKPats vars ty (dropGroup eqns)
-	  PgBang    -> matchBangs      vars ty (dropGroup eqns)
-	  PgCo _    -> matchCoercion   vars ty (dropGroup eqns)
+        = case group of
+            PgAny      -> matchVariables  vars ty (dropGroup eqns)
+            PgCon _    -> matchConFamily  vars ty (subGroups eqns)
+            PgLit _    -> matchLiterals   vars ty (subGroups eqns)
+            PgN lit    -> matchNPats      vars ty (subGroups eqns)
+            PgNpK lit  -> matchNPlusKPats vars ty (dropGroup eqns)
+            PgBang     -> matchBangs      vars ty (dropGroup eqns)
+            PgCo _     -> matchCoercion   vars ty (dropGroup eqns)
+            PgView _ _ -> matchView       vars ty (dropGroup eqns)
+
+    -- FIXME: we should also warn about view patterns that should be
+    -- commoned up but are not
+
+    -- print some stuff to see what's getting grouped
+    -- use -dppr-debug to see the resolution of overloaded lits
+    debug eqns = 
+        let gs = map (\group -> foldr (\ (p,_) -> \acc -> 
+                                           case p of PgView e _ -> e:acc 
+                                                     _ -> acc) [] group) eqns
+            maybeWarn [] = return ()
+            maybeWarn l = warnDs (vcat l)
+        in 
+          maybeWarn $ (map (\g -> text "Putting these view expressions into the same case:" <+> (ppr g))
+                       (filter (not . null) gs))
 
 matchVariables :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 -- Real true variables, just like in matchVar, SLPJ p 94
@@ -300,23 +323,40 @@ matchVariables (var:vars) ty eqns = match vars ty (shiftEqns eqns)
 
 matchBangs :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 matchBangs (var:vars) ty eqns
-  = do	{ match_result <- match (var:vars) ty (map shift eqns)
+  = do	{ match_result <- match (var:vars) ty (map decomposeFirst_Bang eqns)
 	; return (mkEvalMatchResult var ty match_result) }
-  where
-    shift eqn@(EqnInfo { eqn_pats = BangPat pat : pats })
-	= eqn { eqn_pats = unLoc pat : pats }
 
 matchCoercion :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 -- Apply the coercion to the match variable and then match that
-matchCoercion (var:vars) ty (eqn1:eqns)
+matchCoercion (var:vars) ty (eqns@(eqn1:_))
   = do	{ let CoPat co pat _ = firstPat eqn1
 	; var' <- newUniqueId (idName var) (hsPatType pat)
-	; match_result <- match (var':vars) ty (map shift (eqn1:eqns))
+	; match_result <- match (var':vars) ty (map decomposeFirst_Coercion eqns)
 	; rhs <- dsCoercion co (return (Var var))
 	; return (mkCoLetMatchResult (NonRec var' rhs) match_result) }
-  where
-    shift eqn@(EqnInfo { eqn_pats = CoPat _ pat _ : pats })
-	= eqn { eqn_pats = pat : pats }
+
+matchView :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
+-- Apply the view function to the match variable and then match that
+matchView (var:vars) ty (eqns@(eqn1:_))
+  = do	{ -- we could pass in the expr from the PgView,
+         -- but this needs to extract the pat anyway 
+         -- to figure out the type of the fresh variable
+         let ViewPat viewExpr (L _ pat) _ = firstPat eqn1
+         -- do the rest of the compilation 
+	; var' <- newUniqueId (idName var) (hsPatType pat)
+	; match_result <- match (var':vars) ty (map decomposeFirst_View eqns)
+         -- compile the view expressions
+       ; viewExpr' <- dsLExpr viewExpr
+	; return (mkViewMatchResult var' viewExpr' var match_result) }
+
+-- decompose the first pattern and leave the rest alone
+decomposeFirstPat extractpat (eqn@(EqnInfo { eqn_pats = pat : pats }))
+	= eqn { eqn_pats = extractpat pat : pats}
+
+decomposeFirst_Coercion = decomposeFirstPat (\ (CoPat _ pat _) -> pat)
+decomposeFirst_Bang     = decomposeFirstPat (\ (BangPat pat  ) -> unLoc pat)
+decomposeFirst_View     = decomposeFirstPat (\ (ViewPat _ pat _) -> unLoc pat)
+
 \end{code}
 
 %************************************************************************
@@ -459,8 +499,8 @@ tidy1 v (LitPat lit)
   = returnDs (idDsWrapper, tidyLitPat lit)
 
 -- NPats: we *might* be able to replace these w/ a simpler form
-tidy1 v (NPat lit mb_neg eq lit_ty)
-  = returnDs (idDsWrapper, tidyNPat lit mb_neg eq lit_ty)
+tidy1 v (NPat lit mb_neg eq)
+  = returnDs (idDsWrapper, tidyNPat lit mb_neg eq)
 
 -- Everything else goes through unchanged...
 
@@ -710,7 +750,9 @@ data PatGroup
   | PgBang		-- Bang patterns
   | PgCo Type		-- Coercion patterns; the type is the type
 			--	of the pattern *inside*
-
+  | PgView (LHsExpr Id) -- view pattern (e -> p):
+                        -- the LHsExpr is the expression e
+           Type         -- the Type is the type of p (equivalently, the result type of e)
 
 groupEquations :: [EquationInfo] -> [[(PatGroup, EquationInfo)]]
 -- If the result is of form [g1, g2, g3], 
@@ -750,16 +792,102 @@ sameGroup (PgCo	t1)  (PgCo t2)  = t1 `coreEqType` t2
 	-- enclosed pattern is the same. The patterns outside the CoPat
 	-- always have the same type, so this boils down to saying that
 	-- the two coercions are identical.
+sameGroup (PgView e1 t1) (PgView e2 t2) = viewLExprEq (e1,t1) (e2,t2) 
+       -- ViewPats are in the same gorup iff the expressions
+       -- are "equal"---conservatively, we use syntactic equality
 sameGroup _          _          = False
- 
+
+-- an approximation of syntactic equality used for determining when view
+-- exprs are in the same group.
+-- this function can always safely return false;
+-- but doing so will result in the application of the view function being repeated.
+--
+-- currently: compare applications of literals and variables
+--            and anything else that we can do without involving other
+--            HsSyn types in the recursion
+--
+-- NB we can't assume that the two view expressions have the same type.  Consider
+--   f (e1 -> True) = ...
+--   f (e2 -> "hi") = ...
+viewLExprEq :: (LHsExpr Id,Type) -> (LHsExpr Id,Type) -> Bool
+viewLExprEq (e1,t1) (e2,t2) = 
+    let 
+        -- short name for recursive call on unLoc
+        lexp e e' = exp (unLoc e) (unLoc e')
+
+        -- check that two lists have the same length
+        -- and that they match up pairwise
+        lexps [] [] = True
+        lexps [] (_:_) = False
+        lexps (_:_) [] = False
+        lexps (x:xs) (y:ys) = lexp x y && lexps xs ys
+
+        -- conservative, in that it demands that wrappers be
+        -- syntactically identical and doesn't look under binders
+        --
+        -- coarser notions of equality are possible
+        -- (e.g., reassociating compositions,
+        --        equating different ways of writing a coercion)
+        wrap WpHole WpHole = True
+        wrap (WpCompose w1 w2) (WpCompose w1' w2') = wrap w1 w1' && wrap w2 w2'
+        wrap (WpCo c) (WpCo c') = tcEqType c c'
+        wrap (WpApp d) (WpApp d') = d == d'
+        wrap (WpTyApp t) (WpTyApp t') = tcEqType t t'
+        -- Enhancement: could implement equality for more wrappers
+        --   if it seems useful (lams and lets)
+        wrap _ _ = False
+
+        -- real comparison is on HsExpr's
+        -- strip parens 
+        exp (HsPar (L _ e)) e'   = exp e e'
+        exp e (HsPar (L _ e'))   = exp e e'
+        -- because the expressions do not necessarily have the same type,
+        -- we have to compare the wrappers
+        exp (HsWrap h e) (HsWrap h' e') = wrap h h' && exp e e'
+        exp (HsVar i) (HsVar i') =  i == i' 
+        -- the instance for IPName derives using the id, so this works if the
+        -- above does
+        exp (HsIPVar i) (HsIPVar i') = i == i' 
+        exp (HsOverLit l) (HsOverLit l') = 
+            -- overloaded lits are equal if they have the same type
+            -- and the data is the same.
+            -- this is coarser than comparing the SyntaxExpr's in l and l',
+            -- which resolve the overloading (e.g., fromInteger 1),
+            -- because these expressions get written as a bunch of different variables
+            -- (presumably to improve sharing)
+            tcEqType (overLitType l) (overLitType l') && l == l'
+        -- comparing the constants seems right
+        exp (HsLit l) (HsLit l') = l == l'
+        exp (HsApp e1 e2) (HsApp e1' e2') = lexp e1 e1' && lexp e2 e2'
+        -- the fixities have been straightened out by now, so it's safe
+        -- to ignore them?
+        exp (OpApp l o _ ri) (OpApp l' o' _ ri') = 
+            lexp l l' && lexp o o' && lexp ri ri'
+        exp (NegApp e n) (NegApp e' n') = lexp e e' && exp n n'
+        exp (SectionL e1 e2) (SectionL e1' e2') = 
+            lexp e1 e1' && lexp e2 e2'
+        exp (SectionR e1 e2) (SectionR e1' e2') = 
+            lexp e1 e1' && lexp e2 e2'
+        exp (HsIf e e1 e2) (HsIf e' e1' e2') =
+            lexp e e' && lexp e1 e1' && lexp e2 e2'
+        exp (ExplicitList _ ls) (ExplicitList _ ls') = lexps ls ls'
+        exp (ExplicitPArr _ ls) (ExplicitPArr _ ls') = lexps ls ls'
+        exp (ExplicitTuple ls _) (ExplicitTuple ls' _) = lexps ls ls'
+        -- Enhancement: could implement equality for more expressions
+        --   if it seems useful
+        exp _ _  = False
+    in
+      lexp e1 e2
+
 patGroup :: Pat Id -> PatGroup
 patGroup (WildPat {})       	      = PgAny
 patGroup (BangPat {})       	      = PgBang  
 patGroup (ConPatOut { pat_con = dc }) = PgCon (unLoc dc)
 patGroup (LitPat lit)		      = PgLit (hsLitKey lit)
-patGroup (NPat olit mb_neg _ _)	      = PgN   (hsOverLitKey olit (isJust mb_neg))
+patGroup (NPat olit mb_neg _)	      = PgN   (hsOverLitKey olit (isJust mb_neg))
 patGroup (NPlusKPat _ olit _ _)	      = PgNpK (hsOverLitKey olit False)
-patGroup (CoPat _ p _)		      = PgCo  (hsPatType p)	-- Type of inner pattern
+patGroup (CoPat _ p _)		      = PgCo  (hsPatType p)	-- Type of innelexp pattern
+patGroup (ViewPat expr p _)               = PgView expr (hsPatType (unLoc p))
 patGroup pat = pprPanic "patGroup" (ppr pat)
 \end{code}
 

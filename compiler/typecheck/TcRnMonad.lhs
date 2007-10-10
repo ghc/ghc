@@ -44,6 +44,7 @@ import Bag
 import Outputable
 import UniqSupply
 import Unique
+import UniqFM
 import DynFlags
 import StaticFlags
 import FastString
@@ -916,8 +917,8 @@ setLocalRdrEnv rdr_env thing_inside
 mkIfLclEnv :: Module -> SDoc -> IfLclEnv
 mkIfLclEnv mod loc = IfLclEnv { if_mod     = mod,
 			        if_loc     = loc,
-			        if_tv_env  = emptyOccEnv,
-			        if_id_env  = emptyOccEnv }
+			        if_tv_env  = emptyUFM,
+			        if_id_env  = emptyUFM }
 
 initIfaceTcRn :: IfG a -> TcRn a
 initIfaceTcRn thing_inside

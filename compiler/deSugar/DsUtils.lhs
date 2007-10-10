@@ -25,7 +25,7 @@ module DsUtils (
 	cantFailMatchResult, alwaysFailMatchResult,
 	extractMatchResult, combineMatchResults, 
 	adjustMatchResult,  adjustMatchResultDs,
-	mkCoLetMatchResult, mkGuardedMatchResult, 
+	mkCoLetMatchResult, mkViewMatchResult, mkGuardedMatchResult, 
 	matchCanFail, mkEvalMatchResult,
 	mkCoPrimCaseMatchResult, mkCoAlgCaseMatchResult,
 	wrapBind, wrapBinds,
@@ -318,6 +318,12 @@ seqVar var body = Case (Var var) var (exprType body)
 
 mkCoLetMatchResult :: CoreBind -> MatchResult -> MatchResult
 mkCoLetMatchResult bind = adjustMatchResult (mkDsLet bind)
+
+-- (mkViewMatchResult var' viewExpr var mr) makes the expression
+-- let var' = viewExpr var in mr
+mkViewMatchResult :: Id -> CoreExpr -> Id -> MatchResult -> MatchResult
+mkViewMatchResult var' viewExpr var = 
+    adjustMatchResult (mkDsLet (NonRec var' (mkDsApp viewExpr (Var var))))
 
 mkEvalMatchResult :: Id -> Type -> MatchResult -> MatchResult
 mkEvalMatchResult var ty

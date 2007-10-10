@@ -790,7 +790,7 @@ repLambda (L _ (Match ps _ (GRHSs [L _ (GRHS [] e)] EmptyLocalBinds)))
 		do { xs <- repLPs ps; body <- repLE e; repLam xs body })
       ; wrapGenSyns ss lam }
 
-repLambda (L _ m) = notHandled "Guarded labmdas" (pprMatch LambdaExpr m)
+repLambda (L _ m) = notHandled "Guarded labmdas" (pprMatch (LambdaExpr :: HsMatchContext Name) m)
 
   
 -----------------------------------------------------------------------------
@@ -831,8 +831,8 @@ repP (ConPatIn dc details)
                                 p2' <- repLP p2;
                                 repPinfix p1' con_str p2' }
    }
-repP (NPat l Nothing _ _)  = do { a <- repOverloadedLiteral l; repPlit a }
-repP p@(NPat l (Just _) _ _) = notHandled "Negative overloaded patterns" (ppr p)
+repP (NPat l Nothing _)  = do { a <- repOverloadedLiteral l; repPlit a }
+repP p@(NPat l (Just _) _) = notHandled "Negative overloaded patterns" (ppr p)
 repP p@(SigPatIn {})  = notHandled "Type signatures in patterns" (ppr p)
 	-- The problem is to do with scoped type variables.
 	-- To implement them, we have to implement the scoping rules
@@ -1277,9 +1277,9 @@ mk_string s   = do string_ty <- lookupType stringTyConName
                    return $ HsString s
 
 repOverloadedLiteral :: HsOverLit Name -> DsM (Core TH.Lit)
-repOverloadedLiteral (HsIntegral i _)   = do { lit <- mk_integer  i; repLiteral lit }
-repOverloadedLiteral (HsFractional f _) = do { lit <- mk_rational f; repLiteral lit }
-repOverloadedLiteral (HsIsString s _)   = do { lit <- mk_string   s; repLiteral lit }
+repOverloadedLiteral (HsIntegral i _ _)   = do { lit <- mk_integer  i; repLiteral lit }
+repOverloadedLiteral (HsFractional f _ _) = do { lit <- mk_rational f; repLiteral lit }
+repOverloadedLiteral (HsIsString s _ _)   = do { lit <- mk_string   s; repLiteral lit }
 	-- The type Rational will be in the environment, becuase 
 	-- the smart constructor 'TH.Syntax.rationalL' uses it in its type,
 	-- and rationalL is sucked in when any TH stuff is used

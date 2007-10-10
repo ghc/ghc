@@ -141,7 +141,7 @@ initGlobalEnv info instEnvs famInstEnvs
     , global_tycons        = mapNameEnv snd $ vectInfoTyCon info
     , global_datacons      = mapNameEnv snd $ vectInfoDataCon info
     , global_pa_funs       = mapNameEnv snd $ vectInfoPADFun info
-    , global_pr_funs       = emptyVarEnv
+    , global_pr_funs       = emptyNameEnv
     , global_inst_env      = instEnvs
     , global_fam_inst_env  = famInstEnvs
     , global_bindings      = []

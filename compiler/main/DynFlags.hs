@@ -151,6 +151,7 @@ data DynFlag
    | Opt_D_dump_hi_diffs
    | Opt_D_dump_minimal_imports
    | Opt_D_dump_mod_cycles
+   | Opt_D_dump_view_pattern_commoning
    | Opt_D_faststring_stats
    | Opt_DumpToFile			-- ^ Append dump output to files instead of stdout.
    | Opt_DoCoreLinting
@@ -203,6 +204,7 @@ data DynFlag
    | Opt_DisambiguateRecordFields
    | Opt_RecordWildCards
    | Opt_RecordPuns
+   | Opt_ViewPatterns
    | Opt_GADTs
    | Opt_RelaxedPolyRec
    | Opt_StandaloneDeriving
@@ -1087,6 +1089,7 @@ dynamic_flags = [
   ,  ( "ddump-vect",         	 setDumpFlag Opt_D_dump_vect)
   ,  ( "ddump-hpc",         	 setDumpFlag Opt_D_dump_hpc)
   ,  ( "ddump-mod-cycles",     	 setDumpFlag Opt_D_dump_mod_cycles)
+  ,  ( "ddump-view-pattern-commoning", setDumpFlag Opt_D_dump_view_pattern_commoning)
   ,  ( "ddump-to-file",          setDumpFlag Opt_DumpToFile)
   ,  ( "ddump-hi-diffs",         NoArg (setDynFlag Opt_D_dump_hi_diffs))
   ,  ( "dcore-lint",       	 NoArg (setDynFlag Opt_DoCoreLinting))
@@ -1275,6 +1278,7 @@ xFlags = [
   ( "DisambiguateRecordFields",         Opt_DisambiguateRecordFields ),
   ( "OverloadedStrings",                Opt_OverloadedStrings ),
   ( "GADTs",                            Opt_GADTs ),
+  ( "ViewPatterns",                     Opt_ViewPatterns),
   ( "TypeFamilies",                     Opt_TypeFamilies ),
   ( "BangPatterns",                     Opt_BangPatterns ),
   -- On by default:

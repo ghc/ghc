@@ -1,4 +1,4 @@
-%
+\%
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-2006
 %
 \section[RnEnv]{Environment manipulation for the renamer monad}
@@ -13,25 +13,25 @@
 
 module RnEnv ( 
 	newTopSrcBinder, lookupFamInstDeclBndr,
-	lookupLocatedBndrRn, lookupBndrRn, 
-	lookupLocatedTopBndrRn, lookupTopBndrRn,
+	lookupLocatedBndrRn, lookupBndrRn, lookupBndrRn_maybe,
+	lookupLocatedTopBndrRn, lookupTopBndrRn, lookupBndrRn_maybe,
 	lookupLocatedOccRn, lookupOccRn, 
 	lookupLocatedGlobalOccRn, lookupGlobalOccRn,
 	lookupLocalDataTcNames, lookupSrcOcc_maybe,
 	lookupFixityRn, lookupTyFixityRn, lookupLocatedSigOccRn, 
 	lookupInstDeclBndr, lookupRecordBndr, lookupConstructorFields,
 	lookupSyntaxName, lookupSyntaxTable, lookupImportedName,
-	lookupGreRn, lookupGreRn_maybe,
+	lookupGreRn, lookupGreLocalRn, lookupGreRn_maybe,
 	getLookupOccRn,
 
 	newLocalsRn, newIPNameRn,
-	bindLocalNames, bindLocalNamesFV,
+	bindLocalNames, bindLocalNamesFV, bindLocalNamesFV_WithFixities,
 	bindLocatedLocalsFV, bindLocatedLocalsRn,
 	bindSigTyVarsFV, bindPatSigTyVars, bindPatSigTyVarsFV,
 	bindTyVarsRn, extendTyVarEnvFVRn,
 	bindLocalFixities,
 
-	checkDupNames, mapFvRn,
+	checkDupNames, checkShadowing, mapFvRn, mapFvRnCPS,
 	warnUnusedMatches, warnUnusedModules, warnUnusedImports, 
 	warnUnusedTopBinds, warnUnusedLocalBinds,
 	dataTcOccs, unknownNameErr,
@@ -56,20 +56,21 @@ import RdrName		( RdrName, isQual, isUnqual, isOrig_maybe,
 			  Provenance(..), pprNameProvenance,
 			  importSpecLoc, importSpecModule
 			)
-import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity )
+import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity)
 import TcEnv		( tcLookupDataCon )
 import TcRnMonad
 import Name		( Name, nameIsLocalOrFrom, mkInternalName, isWiredInName,
 			  nameSrcLoc, nameOccName, nameModule, isExternalName )
 import NameSet
 import NameEnv
+import UniqFM
 import DataCon		( dataConFieldLabels )
 import OccName		( tcName, isDataOcc, pprNonVarNameSpace, occNameSpace,
-			  reportIfUnused )
+			  reportIfUnused, occNameFS )
 import Module		( Module, ModuleName )
 import PrelNames	( mkUnboundName, rOOT_MAIN, iNTERACTIVE, consDataConKey, hasKey )
 import UniqSupply
-import BasicTypes	( IPName, mapIPName )
+import BasicTypes	( IPName, mapIPName, Fixity )
 import SrcLoc		( SrcSpan, srcSpanStart, Located(..), eqLocated, unLoc,
 			  srcLocSpan, getLoc, combineSrcSpans, isOneLineSpan )
 import Outputable
@@ -79,6 +80,7 @@ import ListSetOps	( removeDups )
 import List		( nubBy )
 import Monad		( when )
 import DynFlags
+import FastString
 \end{code}
 
 %*********************************************************
@@ -150,17 +152,31 @@ lookupLocatedBndrRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedBndrRn = wrapLocM lookupBndrRn
 
 lookupBndrRn :: RdrName -> RnM Name
+lookupBndrRn n = do nopt <- lookupBndrRn_maybe n
+                    case nopt of 
+                      Just n' -> return n'
+                      Nothing -> do traceRn $ text "lookupTopBndrRn"
+                                    unboundName n
+
+lookupTopBndrRn :: RdrName -> RnM Name
+lookupTopBndrRn n = do nopt <- lookupTopBndrRn_maybe n
+                       case nopt of 
+                         Just n' -> return n'
+                         Nothing -> do traceRn $ text "lookupTopBndrRn"
+                                       unboundName n
+
+lookupBndrRn_maybe :: RdrName -> RnM (Maybe Name)
 -- NOTE: assumes that the SrcSpan of the binder has already been setSrcSpan'd
-lookupBndrRn rdr_name
+lookupBndrRn_maybe rdr_name
   = getLocalRdrEnv		`thenM` \ local_env ->
     case lookupLocalRdrEnv local_env rdr_name of 
-	  Just name -> returnM name
-	  Nothing   -> lookupTopBndrRn rdr_name
+	  Just name -> returnM (Just name)
+	  Nothing   -> lookupTopBndrRn_maybe rdr_name
 
 lookupLocatedTopBndrRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedTopBndrRn = wrapLocM lookupTopBndrRn
 
-lookupTopBndrRn :: RdrName -> RnM Name
+lookupTopBndrRn_maybe :: RdrName -> RnM (Maybe Name)
 -- Look up a top-level source-code binder.   We may be looking up an unqualified 'f',
 -- and there may be several imported 'f's too, which must not confuse us.
 -- For example, this is OK:
@@ -177,24 +193,23 @@ lookupTopBndrRn :: RdrName -> RnM Name
 -- The Haskell parser checks for the illegal qualified name in Haskell 
 -- source files, so we don't need to do so here.
 
-lookupTopBndrRn rdr_name
+lookupTopBndrRn_maybe rdr_name
   | Just name <- isExact_maybe rdr_name
-  = returnM name
+  = returnM (Just name)
 
   | Just (rdr_mod, rdr_occ) <- isOrig_maybe rdr_name	
 	-- This deals with the case of derived bindings, where
 	-- we don't bother to call newTopSrcBinder first
 	-- We assume there is no "parent" name
   = do	{ loc <- getSrcSpanM
-	; newGlobalBinder rdr_mod rdr_occ loc }
+        ; n <- newGlobalBinder rdr_mod rdr_occ loc 
+        ; return (Just n)}
 
   | otherwise
   = do	{ mb_gre <- lookupGreLocalRn rdr_name
 	; case mb_gre of
-		Nothing  -> do
-			      traceRn $ text "lookupTopBndrRn"
-			      unboundName rdr_name
-		Just gre -> returnM (gre_name gre) }
+		Nothing  -> returnM Nothing
+		Just gre -> returnM (Just $ gre_name gre) }
 	      
 -- lookupLocatedSigOccRn is used for type signatures and pragmas
 -- Is this valid?
@@ -281,7 +296,7 @@ lookupConstructorFields con_name
 	; if nameIsLocalOrFrom this_mod con_name then
 	  do { field_env <- getRecFieldEnv
 	     ; return (lookupNameEnv field_env con_name `orElse` []) }
-	  else
+	  else 
 	  do { con <- tcLookupDataCon con_name
 	     ; return (dataConFieldLabels con) } }
 
@@ -510,24 +525,54 @@ lookupLocalDataTcNames rdr_name
   | otherwise
   = do	{ mb_gres <- mapM lookupGreLocalRn (dataTcOccs rdr_name)
 	; case [gre_name gre | Just gre <- mb_gres] of
-	    [] -> do { addErr (unknownNameErr rdr_name)
-		     ; return [] }
+	    [] -> do { 
+                      -- run for error reporting
+                    ; unboundName rdr_name
+		      ; return [] }
 	    names -> return names
     }
 
 --------------------------------
-bindLocalFixities :: [FixitySig RdrName] -> RnM a -> RnM a
--- Used for nested fixity decls
+bindLocalFixities :: [FixitySig RdrName] -> (UniqFM (Located Fixity) -> RnM a) -> RnM a
+-- Used for nested fixity decls:
+--   bind the names that are in scope already;
+--   pass the rest to the continuation for later
+--      as a FastString->(Located Fixity) map
+--
 -- No need to worry about type constructors here,
--- Should check for duplicates but we don't
+-- Should check for duplicates?
 bindLocalFixities fixes thing_inside
-  | null fixes = thing_inside
-  | otherwise  = mappM rn_sig fixes	`thenM` \ new_bit ->
-		 extendFixityEnv new_bit thing_inside
+  | null fixes = thing_inside emptyUFM
+  | otherwise  = do ls <- mappM rn_sig fixes
+                    let (now, later) = nowAndLater ls
+                    extendFixityEnv now $ thing_inside later
   where
-    rn_sig (FixitySig lv@(L loc v) fix)
-	= addLocM lookupBndrRn lv	`thenM` \ new_v ->
-	  returnM (new_v, (FixItem (rdrNameOcc v) fix loc))
+    rn_sig (FixitySig lv@(L loc v) fix) = do
+      vopt <- lookupBndrRn_maybe v
+      case vopt of 
+        Just new_v -> returnM (Left (new_v, (FixItem (rdrNameOcc v) fix)))
+        Nothing -> returnM (Right (occNameFS $ rdrNameOcc v, (L loc fix)))
+
+    nowAndLater (ls :: [Either (Name, FixItem) (FastString, Located Fixity)]) = 
+        foldr (\ cur -> \ (now, later) ->
+                        case cur of 
+                          Left (n, f) -> ((n, f) : now, later)
+                          Right (fs, f) -> (now, addToUFM later fs f))
+              ([], emptyUFM) ls
+
+-- Used for nested fixity decls to bind names along with their fixities.
+-- the fixities are given as a UFM from an OccName's FastString to a fixity decl
+bindLocalNamesFV_WithFixities :: [Name] -> UniqFM (Located Fixity) -> RnM (a, FreeVars) -> RnM (a, FreeVars)
+bindLocalNamesFV_WithFixities names fixities cont = 
+    -- find the names that have fixity decls
+    let boundFixities = foldr 
+                        (\ name -> \ acc -> 
+                         -- check whether this name has a fixity decl
+                          case lookupUFM fixities (occNameFS (nameOccName name)) of
+                               Just (L _ fix) -> (name, FixItem (nameOccName name) fix) : acc
+                               Nothing -> acc) [] names in
+    -- bind the names; extend the fixity env; do the thing inside
+    bindLocalNamesFV names (extendFixityEnv boundFixities cont)
 \end{code}
 
 --------------------------------
@@ -547,13 +592,13 @@ lookupFixity is a bit strange.
 \begin{code}
 lookupFixityRn :: Name -> RnM Fixity
 lookupFixityRn name
-  = getModule				`thenM` \ this_mod ->
+  = getModule				`thenM` \ this_mod -> 
     if nameIsLocalOrFrom this_mod name
-    then	-- It's defined in this module
-	getFixityEnv		`thenM` \ local_fix_env ->
-	traceRn (text "lookupFixityRn" <+> (ppr name $$ ppr local_fix_env)) `thenM_`
-	returnM (lookupFixity local_fix_env name)
-
+    then do	-- It's defined in this module
+      local_fix_env <- getFixityEnv		
+      traceRn (text "lookupFixityRn: looking up name in local environment:" <+> 
+               vcat [ppr name, ppr local_fix_env])
+      return $ lookupFixity local_fix_env name
     else	-- It's imported
       -- For imported names, we have to get their fixities by doing a
       -- loadInterfaceForName, and consulting the Ifaces that comes back
@@ -571,8 +616,11 @@ lookupFixityRn name
       --
       -- loadInterfaceForName will find B.hi even if B is a hidden module,
       -- and that's what we want.
-        loadInterfaceForName doc name	`thenM` \ iface ->
-	returnM (mi_fix_fn iface (nameOccName name))
+        loadInterfaceForName doc name	`thenM` \ iface -> do {
+          traceRn (text "lookupFixityRn: looking up name in iface cache and found:" <+> 
+                   vcat [ppr name, ppr $ mi_fix_fn iface (nameOccName name)]);
+	   returnM (mi_fix_fn iface (nameOccName name))
+                                                           }
   where
     doc = ptext SLIT("Checking fixity for") <+> ppr name
 
@@ -708,7 +756,6 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
     setLocalRdrEnv (extendLocalRdrEnv local_env names)
 		   (enclosed_scope names)
 
-
 bindLocalNames :: [Name] -> RnM a -> RnM a
 bindLocalNames names enclosed_scope
   = getLocalRdrEnv 		`thenM` \ name_env ->
@@ -724,8 +771,8 @@ bindLocalNamesFV names enclosed_scope
 -------------------------------------
 	-- binLocalsFVRn is the same as bindLocalsRn
 	-- except that it deals with free vars
-bindLocatedLocalsFV :: SDoc -> [Located RdrName] -> ([Name] -> RnM (a,FreeVars))
-  -> RnM (a, FreeVars)
+bindLocatedLocalsFV :: SDoc -> [Located RdrName] 
+                    -> ([Name] -> RnM (a,FreeVars)) -> RnM (a, FreeVars)
 bindLocatedLocalsFV doc rdr_names enclosed_scope
   = bindLocatedLocalsRn doc rdr_names	$ \ names ->
     enclosed_scope names		`thenM` \ (thing, fvs) ->
@@ -826,6 +873,20 @@ mapFvRn f xs = mappM f xs	`thenM` \ stuff ->
 		  (ys, fvs_s) = unzip stuff
 	       in
 	       returnM (ys, plusFVs fvs_s)
+
+-- because some of the rename functions are CPSed:
+-- maps the function across the list from left to right; 
+-- collects all the free vars into one set
+mapFvRnCPS :: (a -> ((b,FreeVars) -> RnM (c, FreeVars)) -> RnM(c, FreeVars)) 
+           -> [a] 
+           -> (([b],FreeVars) -> RnM (c, FreeVars))
+           -> RnM (c, FreeVars)
+
+mapFvRnCPS _ [] cont = cont ([], emptyFVs)
+
+mapFvRnCPS f (h:t) cont = f h $ \ (h',hfv) -> 
+                          mapFvRnCPS f t $ \ (t',tfv) ->
+                              cont (h':t', hfv `plusFV` tfv)
 \end{code}
 
 

@@ -1,4 +1,4 @@
-%
+
 % (c) The University of Glasgow 2006
 % (c) The GRASP Project, Glasgow University, 1992-2002
 %
@@ -152,7 +152,7 @@ data TcGblEnv
 		-- (Ids defined in this module start in the local envt, 
 		--  though they move to the global envt during zonking)
 
-	tcg_type_env_var :: TcRef TypeEnv,	
+	tcg_type_env_var :: TcRef TypeEnv,
 		-- Used only to initialise the interface-file
 		-- typechecker in initIfaceTcRn, so that it can see stuff
 		-- bound in this module when dealing with hi-boot recursions

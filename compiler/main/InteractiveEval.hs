@@ -441,7 +441,6 @@ resume (Session ref) step
                         handleRunStatus expr ref bindings final_ids
                                         breakMVar statusMVar status hist'
 
-
 back :: Session -> IO ([Name], Int, SrcSpan)
 back  = moveHist (+1)
 

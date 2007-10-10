@@ -23,27 +23,31 @@ import {-# SOURCE #-} RnExpr( rnLExpr )
 
 import HsSyn
 import RdrName		( RdrName, isRdrDataCon, elemLocalRdrEnv, 
-			  globalRdrEnvElts, GlobalRdrElt(..), isLocalGRE )
+			  globalRdrEnvElts, GlobalRdrElt(..), isLocalGRE, rdrNameOcc )
 import RdrHsSyn		( extractGenericPatTyVars, extractHsRhoRdrTyVars )
 import RnHsSyn
 import RnTypes		( rnLHsType, rnLHsTypes, rnHsSigType, rnHsTypeFVs, rnContext )
-import RnBinds		( rnTopBinds, rnMethodBinds, renameSigs, mkSigTvFn )
+import RnBinds		( rnTopBindsLHS, rnTopBindsRHS, rnMethodBinds, renameSigs, mkSigTvFn,
+                                makeMiniFixityEnv)
 import RnEnv		( lookupLocalDataTcNames,
 			  lookupLocatedTopBndrRn, lookupLocatedOccRn,
 			  lookupOccRn, newLocalsRn, 
 			  bindLocatedLocalsFV, bindPatSigTyVarsFV,
 			  bindTyVarsRn, extendTyVarEnvFVRn,
-			  bindLocalNames, checkDupNames, mapFvRn
+			  bindLocalNames, checkDupNames, mapFvRn, lookupGreLocalRn,
 			)
+import RnNames       (importsFromLocalDecls, extendRdrEnvRn)
+import HscTypes      (GenAvailInfo(..))
 import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
 import TcRnMonad
 
-import HscTypes		( FixityEnv, FixItem(..), Deprecations, Deprecs(..), plusDeprecs )
+import HscTypes		( FixityEnv, FixItem(..), Deprecations(..), plusDeprecs )
 import Class		( FunDep )
 import Name		( Name, nameOccName )
 import NameSet
 import NameEnv
-import OccName		( occEnvElts )
+import UniqFM
+import OccName 
 import Outputable
 import SrcLoc		( Located(..), unLoc, noLoc )
 import DynFlags	( DynFlag(..) )
@@ -51,6 +55,8 @@ import Maybes		( seqMaybe )
 import Maybe            ( isNothing )
 import Monad		( liftM, when )
 import BasicTypes       ( Boxity(..) )
+
+import ListSetOps    (findDupsEq, mkLookupFun)
 \end{code}
 
 @rnSourceDecl@ `renames' declarations.
@@ -70,85 +76,134 @@ Checks the @(..)@ etc constraints in the export list.
 
 
 \begin{code}
-rnSrcDecls :: HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
+-- brings the binders of the group into scope in the appropriate places;
+-- does NOT assume that anything is in scope already
+--
+-- the Bool determines whether (True) names in the group shadow existing
+-- Unquals in the global environment (used in Template Haskell) or
+-- (False) whether duplicates are reported as an error
+rnSrcDecls :: Bool -> HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
 
-rnSrcDecls (HsGroup { hs_valds  = val_decls,
-		      hs_tyclds = tycl_decls,
-		      hs_instds = inst_decls,
-                      hs_derivds = deriv_decls,
-		      hs_fixds  = fix_decls,
-		      hs_depds  = deprec_decls,
-		      hs_fords  = foreign_decls,
-		      hs_defds  = default_decls,
-		      hs_ruleds = rule_decls,
-          hs_docs   = docs })
+rnSrcDecls shadowP group@(HsGroup {hs_valds  = val_decls,
+                                   hs_tyclds = tycl_decls,
+                                   hs_instds = inst_decls,
+                                   hs_derivds = deriv_decls,
+                                   hs_fixds  = fix_decls,
+                                   hs_depds  = deprec_decls,
+                                   hs_fords  = foreign_decls,
+                                   hs_defds  = default_decls,
+                                   hs_ruleds = rule_decls,
+                                   hs_docs   = docs })
+ = do {
+   -- (A) Process the fixity declarations, creating a mapping from
+   --     FastStrings to FixItems.
+   --     Also checks for duplcates.
+   local_fix_env <- makeMiniFixityEnv fix_decls;
 
- = do {		-- Deal with deprecations (returns only the extra deprecations)
-	deprecs <- rnSrcDeprecDecls deprec_decls ;
-	updGblEnv (\gbl -> gbl { tcg_deprecs = tcg_deprecs gbl `plusDeprecs` deprecs })
-		  $ do {
+   -- (B) Bring top level binders (and their fixities) into scope,
+   --     except for the value bindings, which get brought in below.
+   inNewEnv (importsFromLocalDecls shadowP group local_fix_env) $ \ tcg_env -> do {
 
-		-- Deal with top-level fixity decls 
-		-- (returns the total new fixity env)
-        rn_fix_decls <- rnSrcFixityDecls fix_decls ;
-	tcg_env      <- extendGblFixityEnv rn_fix_decls ;
-	setGblEnv tcg_env $ do {
+   failIfErrsM ; -- No point in continuing if (say) we have duplicate declarations
 
-		-- Rename type and class decls
-		-- You might think that we could build proper def/use information
-		-- for type and class declarations, but they can be involved
-		-- in mutual recursion across modules, and we only do the SCC
-		-- analysis for them in the type checker.
-		-- So we content ourselves with gathering uses only; that
-		-- means we'll only report a declaration as unused if it isn't
-		-- mentioned at all.  Ah well.
-	traceRn (text "Start rnTyClDecls") ;
-	(rn_tycl_decls,    src_fvs1) <- rnList rnTyClDecl tycl_decls ;
+   -- (C) Extract the mapping from data constructors to field names and
+   --     extend the record field env.
+   --     This depends on the data constructors and field names being in
+   --     scope from (B) above
+   inNewEnv (extendRecordFieldEnv tycl_decls) $ \ tcg_env -> do {
 
-		-- Extract the mapping from data constructors to field names
-	tcg_env <- extendRecordFieldEnv rn_tycl_decls ;
-	setGblEnv tcg_env $ do {
+   -- (D) Rename the left-hand sides of the value bindings.
+   --     This depends on everything from (B) being in scope,
+   --     and on (C) for resolving record wild cards.
+   --     It uses the fixity env from (A) to bind fixities for view patterns.
+   new_lhs <- rnTopBindsLHS local_fix_env val_decls ;
+   -- bind the LHSes (and their fixities) in the global rdr environment
+   let { lhs_binders = map unLoc $ collectHsValBinders new_lhs;
+         lhs_avails = map Avail lhs_binders
+       } ;
+   inNewEnv (extendRdrEnvRn shadowP (tcg_rdr_env tcg_env, tcg_fix_env tcg_env)
+                             lhs_avails local_fix_env
+              >>= \ (new_rdr_env, new_fix_env) -> 
+                         return (tcg_env { tcg_rdr_env = new_rdr_env,
+                                           tcg_fix_env = new_fix_env
+                                         })) $ \tcg_env -> do {
 
-		-- Value declarations
-	traceRn (text "Start rnmono") ;
-	(rn_val_decls, bind_dus) <- rnTopBinds val_decls ;
-	traceRn (text "finish rnmono" <+> ppr rn_val_decls) ;
+   --  Now everything is in scope, as the remaining renaming assumes.
 
-		-- Other decls
-	(rn_inst_decls,    src_fvs2) <- rnList rnSrcInstDecl   inst_decls ;
-	(rn_rule_decls,    src_fvs3) <- rnList rnHsRuleDecl    rule_decls ;
-	(rn_foreign_decls, src_fvs4) <- rnList rnHsForeignDecl foreign_decls ;
-	(rn_default_decls, src_fvs5) <- rnList rnDefaultDecl   default_decls ;
-	(rn_deriv_decls,   src_fvs6) <- rnList rnSrcDerivDecl  deriv_decls ;
+   -- (E) Rename type and class decls
+   --     (note that value LHSes need to be in scope for default methods)
+   --
+   -- You might think that we could build proper def/use information
+   -- for type and class declarations, but they can be involved
+   -- in mutual recursion across modules, and we only do the SCC
+   -- analysis for them in the type checker.
+   -- So we content ourselves with gathering uses only; that
+   -- means we'll only report a declaration as unused if it isn't
+   -- mentioned at all.  Ah well.
+   traceRn (text "Start rnTyClDecls") ;
+   (rn_tycl_decls, src_fvs1) <- rnList rnTyClDecl tycl_decls ;
 
-  -- Haddock docs; no free vars
-	rn_docs <- mapM (wrapLocM rnDocDecl) docs ;
+   -- (F) Rename Value declarations right-hand sides
+   traceRn (text "Start rnmono") ;
+   (rn_val_decls, bind_dus) <- rnTopBindsRHS lhs_binders new_lhs ;
+   traceRn (text "finish rnmono" <+> ppr rn_val_decls) ;
 
-	let {
-	   rn_group = HsGroup { hs_valds  = rn_val_decls,
+   -- (G) Rename Fixity and deprecations
+   
+   -- rename fixity declarations and error if we try to
+   -- fix something from another module (duplicates were checked in (A))
+   rn_fix_decls                 <- rnSrcFixityDecls fix_decls ;
+   -- rename deprec decls;
+   -- check for duplicates and ensure that deprecated things are defined locally
+   -- at the moment, we don't keep these around past renaming
+   rn_deprecs <- rnSrcDeprecDecls deprec_decls ;
+
+   -- (H) Rename Everything else
+
+   (rn_inst_decls,    src_fvs2) <- rnList rnSrcInstDecl   inst_decls ;
+   (rn_rule_decls,    src_fvs3) <- rnList rnHsRuleDecl    rule_decls ;
+   (rn_foreign_decls, src_fvs4) <- rnList rnHsForeignDecl foreign_decls ;
+   (rn_default_decls, src_fvs5) <- rnList rnDefaultDecl   default_decls ;
+   (rn_deriv_decls,   src_fvs6) <- rnList rnSrcDerivDecl  deriv_decls ;
+      -- Haddock docs; no free vars
+   rn_docs <- mapM (wrapLocM rnDocDecl) docs ;
+
+   -- (I) Compute the results and return
+   let {rn_group = HsGroup { hs_valds  = rn_val_decls,
 			    	hs_tyclds = rn_tycl_decls,
 			    	hs_instds = rn_inst_decls,
-                                hs_derivds = rn_deriv_decls,
+                             hs_derivds = rn_deriv_decls,
 			    	hs_fixds  = rn_fix_decls,
-			    	hs_depds  = [],
+			    	hs_depds  = [], -- deprecs are returned in the tcg_env (see below)
+                                             -- not in the HsGroup
 			    	hs_fords  = rn_foreign_decls,
 			    	hs_defds  = rn_default_decls,
 			    	hs_ruleds = rn_rule_decls,
-            hs_docs   = rn_docs } ;
+                             hs_docs   = rn_docs } ;
 
-	   other_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs6, src_fvs3, 
-				src_fvs4, src_fvs5] ;
-	   src_dus = bind_dus `plusDU` usesOnly other_fvs 
+	other_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs6, src_fvs3, 
+			     src_fvs4, src_fvs5] ;
+	src_dus = bind_dus `plusDU` usesOnly other_fvs;
 		-- Note: src_dus will contain *uses* for locally-defined types
 		-- and classes, but no *defs* for them.  (Because rnTyClDecl 
 		-- returns only the uses.)  This is a little 
 		-- surprising but it doesn't actually matter at all.
-	} ;
 
-	traceRn (text "finish rnSrc" <+> ppr rn_group) ;
-	traceRn (text "finish Dus" <+> ppr src_dus ) ;
-	return (tcg_env `addTcgDUs` src_dus, rn_group)
-    }}}}
+       final_tcg_env = let tcg_env' = (tcg_env `addTcgDUs` src_dus)
+                       in -- we return the deprecs in the env, not in the HsGroup above
+                         tcg_env' { tcg_deprecs = tcg_deprecs tcg_env' `plusDeprecs` rn_deprecs };
+       } ;
+
+   traceRn (text "finish rnSrc" <+> ppr rn_group) ;
+   traceRn (text "finish Dus" <+> ppr src_dus ) ;
+   return (final_tcg_env , rn_group)
+                    }}}}
+
+-- some utils because we do this a bunch above
+-- compute and install the new env
+inNewEnv :: TcM TcGblEnv -> (TcGblEnv -> TcM a) -> TcM a
+inNewEnv env cont = do e <- env
+                       setGblEnv e $ cont e
 
 rnTyClDecls :: [LTyClDecl RdrName] -> RnM [LTyClDecl Name]
 -- Used for external core
@@ -194,8 +249,9 @@ rnDocDecl (DocGroup lev doc) = do
 
 \begin{code}
 rnSrcFixityDecls :: [LFixitySig RdrName] -> RnM [LFixitySig Name]
--- First rename the fixity decls, so we can put
--- the renamed decls in the renamed syntax tre
+-- Rename the fixity decls, so we can put
+-- the renamed decls in the renamed syntax tree
+-- Errors if the thing being fixed is not defined locally.
 rnSrcFixityDecls fix_decls
   = do fix_decls <- mapM rn_decl fix_decls
        return (concat fix_decls)
@@ -207,36 +263,10 @@ rnSrcFixityDecls fix_decls
 	-- add both to the fixity env
     rn_decl (L loc (FixitySig (L name_loc rdr_name) fixity))
       = setSrcSpan name_loc $
+                    -- this lookup will fail if the definition isn't local
         do names <- lookupLocalDataTcNames rdr_name
            return [ L loc (FixitySig (L name_loc name) fixity)
-                  | name <- names ]
-
-extendGblFixityEnv :: [LFixitySig Name] -> RnM TcGblEnv
--- Extend the global envt with fixity decls, checking for duplicate decls
-extendGblFixityEnv decls
-  = do	{ env <- getGblEnv
-	; fix_env' <- foldlM add_one (tcg_fix_env env) decls
-	; return (env { tcg_fix_env = fix_env' }) }
-  where
-    add_one fix_env (L loc (FixitySig (L name_loc name) fixity))
-	| Just (FixItem _ _ loc') <- lookupNameEnv fix_env name
-	= do { setSrcSpan loc $
-	       addLocErr (L name_loc name) (dupFixityDecl loc')
-    	     ; return fix_env }
-	| otherwise
-	= return (extendNameEnv fix_env name fix_item)
-      where 
-	fix_item = FixItem (nameOccName name) fixity loc
-
-pprFixEnv :: FixityEnv -> SDoc
-pprFixEnv env 
-  = pprWithCommas (\ (FixItem n f _) -> ppr f <+> ppr n)
-		  (nameEnvElts env)
-
-dupFixityDecl loc rdr_name
-  = vcat [ptext SLIT("Multiple fixity declarations for") <+> quotes (ppr rdr_name),
-	  ptext SLIT("also at ") <+> ppr loc
-	]
+                    | name <- names ]
 \end{code}
 
 
@@ -246,22 +276,39 @@ dupFixityDecl loc rdr_name
 %*							 *
 %*********************************************************
 
-For deprecations, all we do is check that the names are in scope.
+Check that the deprecated names are defined, are defined locally, and
+that there are no duplicate deprecations.
+
 It's only imported deprecations, dealt with in RnIfaces, that we
 gather them together.
 
 \begin{code}
+-- checks that the deprecations are defined locally, and that there are no duplicates
 rnSrcDeprecDecls :: [LDeprecDecl RdrName] -> RnM Deprecations
 rnSrcDeprecDecls [] 
   = returnM NoDeprecs
 
-rnSrcDeprecDecls decls
-  = mappM (addLocM rn_deprec) decls	`thenM` \ pairs_s ->
-    returnM (DeprecSome (mkNameEnv (concat pairs_s)))
+rnSrcDeprecDecls decls 
+  = do { -- check for duplicates
+       ; mappM_ (\ (lrdr:lrdr':_) -> addLocErr lrdr (dupDeprecDecl lrdr')) deprec_rdr_dups
+       ; mappM (addLocM rn_deprec) decls	`thenM` \ pairs_s ->
+         returnM (DeprecSome ((concat pairs_s))) }
  where
    rn_deprec (Deprecation rdr_name txt)
+       -- ensures that the names are defined locally
      = lookupLocalDataTcNames rdr_name	`thenM` \ names ->
-       returnM [(name, (nameOccName name, txt)) | name <- names]
+       returnM [(nameOccName name, txt) | name <- names]
+   
+   -- look for duplicates among the OccNames;
+   -- we check that the names are defined above
+   -- invt: the lists returned by findDupsEq always have at least two elements
+   deprec_rdr_dups = findDupsEq (\ x -> \ y -> rdrNameOcc (unLoc x) == rdrNameOcc (unLoc y))
+                     (map (\ (L loc (Deprecation rdr_name _)) -> L loc rdr_name) decls)
+               
+dupDeprecDecl (L loc _) rdr_name
+  = vcat [ptext SLIT("Multiple deprecation declarations for") <+> quotes (ppr rdr_name),
+          ptext SLIT("also at ") <+> ppr loc]
+
 \end{code}
 
 %*********************************************************
@@ -886,19 +933,30 @@ badDataCon name
 Get the mapping from constructors to fields for this module.
 It's convenient to do this after the data type decls have been renamed
 \begin{code}
-extendRecordFieldEnv :: [LTyClDecl Name] -> TcM TcGblEnv
+extendRecordFieldEnv :: [LTyClDecl RdrName] -> TcM TcGblEnv
 extendRecordFieldEnv decls 
   = do	{ tcg_env <- getGblEnv
-	; let field_env' = foldr get (tcg_field_env tcg_env) decls
+	; field_env' <- foldrM get (tcg_field_env tcg_env) decls
 	; return (tcg_env { tcg_field_env = field_env' }) }
   where
-    get (L _ (TyData { tcdCons = cons })) env = foldr get_con env cons
-    get other 			    	  env = env
+    -- we want to lookup:
+    --  (a) a datatype constructor
+    --  (b) a record field
+    -- knowing that they're from this module.
+    -- lookupLocatedTopBndrRn does this, because it does a lookupGreLocalRn,
+    -- which keeps only the local ones.
+    lookup x = do { x' <- lookupLocatedTopBndrRn x
+                    ; return $ unLoc x'}
+
+    get (L _ (TyData { tcdCons = cons })) env = foldrM get_con env cons
+    get other 		             env = return env
 
     get_con (L _ (ConDecl { con_name = con, con_details = RecCon flds })) env
-	= extendNameEnv env (unLoc con) (map (unLoc . cd_fld_name) flds)
+	= do { con' <- lookup con
+            ; flds' <- mappM lookup (map cd_fld_name flds)
+            ; return $ extendNameEnv env con' flds' }
     get_con other env
-	= env
+	= return env
 \end{code}
 
 %*********************************************************

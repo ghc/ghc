@@ -206,7 +206,7 @@ tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats maybe_rhs_sig g
   where
     n_pats     = length pats
     stk'       = drop n_pats cmd_stk
-    match_ctxt = LambdaExpr 	-- Maybe KappaExpr?
+    match_ctxt = (LambdaExpr :: HsMatchContext Name)	-- Maybe KappaExpr?
     pg_ctxt    = PatGuard match_ctxt
 
     tc_grhss (GRHSs grhss binds) res_ty

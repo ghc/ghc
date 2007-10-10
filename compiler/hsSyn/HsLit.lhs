@@ -16,7 +16,8 @@ module HsLit where
 
 #include "HsVersions.h"
 
-import {-# SOURCE #-} HsExpr( SyntaxExpr )
+import {-# SOURCE #-} HsExpr( SyntaxExpr, pprExpr )
+import HsTypes (PostTcType)
 import Type	( Type )
 import Outputable
 import FastString
@@ -61,34 +62,48 @@ instance Eq HsLit where
   lit1		    == lit2		 = False
 
 data HsOverLit id 	-- An overloaded literal
-  = HsIntegral	 Integer  (SyntaxExpr id)	-- Integer-looking literals;
-  | HsFractional Rational (SyntaxExpr id)	-- Frac-looking literals
-  | HsIsString   FastString (SyntaxExpr id)	-- String-looking literals
+  = HsIntegral   Integer    (SyntaxExpr id)  PostTcType	-- Integer-looking literals;
+  | HsFractional Rational   (SyntaxExpr id)  PostTcType	-- Frac-looking literals
+  | HsIsString   FastString (SyntaxExpr id)  PostTcType	-- String-looking literals
   -- Before type checking, the SyntaxExpr is 'fromInteger' or 'fromRational'
   -- After type checking, it is (fromInteger 3) or lit_78; that is,
   -- the expression that should replace the literal.
   -- This is unusual, because we're replacing 'fromInteger' with a call 
   -- to fromInteger.  Reason: it allows commoning up of the fromInteger
   -- calls, which wouldn't be possible if the desguarar made the application
+  --
+  -- The PostTcType in each branch records the type the overload literal is
+  -- found to have.
+
+overLitExpr :: HsOverLit id -> SyntaxExpr id
+overLitExpr (HsIntegral _ e _) = e
+overLitExpr (HsFractional _ e _) = e
+overLitExpr (HsIsString _ e _) = e
+
+overLitType :: HsOverLit id -> PostTcType
+overLitType (HsIntegral _ _ t) = t
+overLitType (HsFractional _ _ t) = t
+overLitType (HsIsString _ _ t) = t
+
 
 -- Comparison operations are needed when grouping literals
 -- for compiling pattern-matching (module MatchLit)
 instance Eq (HsOverLit id) where
-  (HsIntegral i1 _)   == (HsIntegral i2 _)   = i1 == i2
-  (HsFractional f1 _) == (HsFractional f2 _) = f1 == f2
-  (HsIsString s1 _)   == (HsIsString s2 _)   = s1 == s2
+  (HsIntegral i1 _ _)   == (HsIntegral i2 _ _)   = i1 == i2
+  (HsFractional f1 _ _) == (HsFractional f2 _ _) = f1 == f2
+  (HsIsString s1 _ _)   == (HsIsString s2 _ _)   = s1 == s2
   l1		      == l2		     = False
 
 instance Ord (HsOverLit id) where
-  compare (HsIntegral i1 _)   (HsIntegral i2 _)   = i1 `compare` i2
-  compare (HsIntegral _ _)    (HsFractional _ _)  = LT
-  compare (HsIntegral _ _)    (HsIsString _ _)    = LT
-  compare (HsFractional f1 _) (HsFractional f2 _) = f1 `compare` f2
-  compare (HsFractional f1 _) (HsIntegral _ _)    = GT
-  compare (HsFractional f1 _) (HsIsString _ _)    = LT
-  compare (HsIsString s1 _)   (HsIsString s2 _)   = s1 `compare` s2
-  compare (HsIsString s1 _)   (HsIntegral _ _)    = GT
-  compare (HsIsString s1 _)   (HsFractional _ _)  = GT
+  compare (HsIntegral i1 _ _)   (HsIntegral i2 _ _)   = i1 `compare` i2
+  compare (HsIntegral _ _ _)    (HsFractional _ _ _)  = LT
+  compare (HsIntegral _ _ _)    (HsIsString _ _ _)    = LT
+  compare (HsFractional f1 _ _) (HsFractional f2 _ _) = f1 `compare` f2
+  compare (HsFractional f1 _ _) (HsIntegral _ _ _)    = GT
+  compare (HsFractional f1 _ _) (HsIsString _ _ _)    = LT
+  compare (HsIsString s1 _ _)   (HsIsString s2 _ _)   = s1 `compare` s2
+  compare (HsIsString s1 _ _)   (HsIntegral _ _ _)    = GT
+  compare (HsIsString s1 _ _)   (HsFractional _ _ _)  = GT
 \end{code}
 
 \begin{code}
@@ -105,8 +120,9 @@ instance Outputable HsLit where
     ppr (HsDoublePrim d) = rational d <> text "##"
     ppr (HsIntPrim i)	 = integer i  <> char '#'
 
-instance Outputable (HsOverLit id) where
-  ppr (HsIntegral i _)   = integer i
-  ppr (HsFractional f _) = rational f
-  ppr (HsIsString s _)   = pprHsString s
+-- in debug mode, print the expression that it's resolved to, too
+instance OutputableBndr id => Outputable (HsOverLit id) where
+  ppr (HsIntegral i e _)   = integer i <+> (ifPprDebug (parens (pprExpr e)))
+  ppr (HsFractional f e _) = rational f <+> (ifPprDebug (parens (pprExpr e)))
+  ppr (HsIsString s e _)   = pprHsString s <+> (ifPprDebug (parens (pprExpr e)))
 \end{code}

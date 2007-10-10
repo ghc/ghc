@@ -1115,7 +1115,7 @@ collectl (L l pat) bndrs
                                     collectHsBindLocatedBinders ds
                                     ++ foldr collectl bndrs (hsConPatArgs ps)
     go (LitPat _)                 = bndrs
-    go (NPat _ _ _ _)             = bndrs
+    go (NPat _ _ _)               = bndrs
     go (NPlusKPat n _ _ _)        = n : bndrs
 
     go (SigPatIn pat _)           = collectl pat bndrs

@@ -90,9 +90,9 @@ dsLit (HsRat r ty)
 dsOverLit :: HsOverLit Id -> DsM CoreExpr
 -- Post-typechecker, the SyntaxExpr field of an OverLit contains 
 -- (an expression for) the literal value itself
-dsOverLit (HsIntegral   _ lit) = dsExpr lit
-dsOverLit (HsFractional _ lit) = dsExpr lit
-dsOverLit (HsIsString   _ lit) = dsExpr lit
+dsOverLit (HsIntegral   _ lit _) = dsExpr lit
+dsOverLit (HsFractional _ lit _) = dsExpr lit
+dsOverLit (HsIsString   _ lit _) = dsExpr lit
 \end{code}
 
 \begin{code}
@@ -111,11 +111,11 @@ hsLitKey (HsString s)	   = MachStr    s
 
 hsOverLitKey :: HsOverLit a -> Bool -> Literal
 -- Ditto for HsOverLit; the boolean indicates to negate
-hsOverLitKey (HsIntegral i _) False   = MachInt i
-hsOverLitKey (HsIntegral i _) True    = MachInt (-i)
-hsOverLitKey (HsFractional r _) False = MachFloat r
-hsOverLitKey (HsFractional r _) True  = MachFloat (-r)
-hsOverLitKey (HsIsString s _)  False  = MachStr s
+hsOverLitKey (HsIntegral i _ _) False   = MachInt i
+hsOverLitKey (HsIntegral i _ _) True    = MachInt (-i)
+hsOverLitKey (HsFractional r _ _) False = MachFloat r
+hsOverLitKey (HsFractional r _ _) True  = MachFloat (-r)
+hsOverLitKey (HsIsString s _ _)  False  = MachStr s
 -- negated string should never happen
 \end{code}
 
@@ -142,36 +142,36 @@ tidyLitPat (HsString s)
 tidyLitPat lit = LitPat lit
 
 ----------------
-tidyNPat :: HsOverLit Id -> Maybe (SyntaxExpr Id) -> SyntaxExpr Id
-	 -> Type -> Pat Id
-tidyNPat over_lit mb_neg eq lit_ty
-  | isIntTy    lit_ty = mk_con_pat intDataCon    (HsIntPrim int_val)
-  | isFloatTy  lit_ty = mk_con_pat floatDataCon  (HsFloatPrim  rat_val)
-  | isDoubleTy lit_ty = mk_con_pat doubleDataCon (HsDoublePrim rat_val)
+tidyNPat :: HsOverLit Id -> Maybe (SyntaxExpr Id) -> SyntaxExpr Id -> Pat Id
+tidyNPat over_lit mb_neg eq 
+  | isIntTy    (overLitType over_lit) = mk_con_pat intDataCon    (HsIntPrim int_val)
+  | isFloatTy  (overLitType over_lit) = mk_con_pat floatDataCon  (HsFloatPrim  rat_val)
+  | isDoubleTy (overLitType over_lit) = mk_con_pat doubleDataCon (HsDoublePrim rat_val)
 --  | isStringTy lit_ty = mk_con_pat stringDataCon (HsStringPrim str_val)
-  | otherwise	      = NPat over_lit mb_neg eq lit_ty
+  | otherwise	      = NPat over_lit mb_neg eq
   where
     mk_con_pat :: DataCon -> HsLit -> Pat Id
-    mk_con_pat con lit = unLoc (mkPrefixConPat con [noLoc $ LitPat lit] lit_ty)
+    mk_con_pat con lit = unLoc (mkPrefixConPat con [noLoc $ LitPat lit] (overLitType over_lit))
+
     neg_lit = case (mb_neg, over_lit) of
 		(Nothing, 	       _)   -> over_lit
-		(Just _,  HsIntegral i s)   -> HsIntegral   (-i) s
-		(Just _,  HsFractional f s) -> HsFractional (-f) s
+		(Just _,  HsIntegral i s ty)   -> HsIntegral   (-i) s ty
+		(Just _,  HsFractional f s ty) -> HsFractional (-f) s ty
 			     
     int_val :: Integer
     int_val = case neg_lit of
-		HsIntegral   i _ -> i
-		HsFractional f _ -> panic "tidyNPat"
+		HsIntegral   i _ _ -> i
+		HsFractional f _ _ -> panic "tidyNPat"
 	
     rat_val :: Rational
     rat_val = case neg_lit of
-		HsIntegral   i _ -> fromInteger i
-		HsFractional f _ -> f
+		HsIntegral   i _ _ -> fromInteger i
+		HsFractional f _ _ -> f
 	
     str_val :: FastString
     str_val = case neg_lit of
-		HsIsString   s _ -> s
-		_                -> error "tidyNPat"
+		HsIsString   s _ _ -> s
+		_                  -> error "tidyNPat"
 \end{code}
 
 
@@ -232,7 +232,7 @@ matchNPats vars ty groups
 	; return (foldr1 combineMatchResults match_results) }
 
 matchOneNPat (var:vars) ty (eqn1:eqns)	-- All for the same literal
-  = do	{ let NPat lit mb_neg eq_chk _ = firstPat eqn1
+  = do	{ let NPat lit mb_neg eq_chk = firstPat eqn1
 	; lit_expr <- dsOverLit lit
 	; neg_lit <- case mb_neg of
 			    Nothing -> return lit_expr

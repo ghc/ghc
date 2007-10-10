@@ -56,13 +56,14 @@ module OccName (
 	OccEnv, emptyOccEnv, unitOccEnv, extendOccEnv, mapOccEnv,
 	lookupOccEnv, mkOccEnv, mkOccEnv_C, extendOccEnvList, elemOccEnv,
 	occEnvElts, foldOccEnv, plusOccEnv, plusOccEnv_C, extendOccEnv_C,
+        filterOccEnv, delListFromOccEnv, delFromOccEnv,
 
 	-- The OccSet type
 	OccSet, emptyOccSet, unitOccSet, mkOccSet, extendOccSet, 
 	extendOccSetList,
 	unionOccSets, unionManyOccSets, minusOccSet, elemOccSet, occSetElts, 
 	foldOccSet, isEmptyOccSet, intersectOccSet, intersectsOccSet,
-
+                  
 	-- Tidying up
 	TidyOccEnv, emptyTidyOccEnv, tidyOccName, initTidyOccEnv,
 
@@ -262,7 +263,7 @@ instance Uniquable OccName where
 		TvName    -> 'v'
 		TcClsName -> 't'
 
-type OccEnv a = UniqFM a
+newtype OccEnv a = A (UniqFM a)
 
 emptyOccEnv :: OccEnv a
 unitOccEnv  :: OccName -> a -> OccEnv a
@@ -278,22 +279,30 @@ extendOccEnv_C :: (a->a->a) -> OccEnv a -> OccName -> a -> OccEnv a
 plusOccEnv     :: OccEnv a -> OccEnv a -> OccEnv a
 plusOccEnv_C   :: (a->a->a) -> OccEnv a -> OccEnv a -> OccEnv a
 mapOccEnv      :: (a->b) -> OccEnv a -> OccEnv b
+delFromOccEnv 	   :: OccEnv a -> OccName -> OccEnv a
+delListFromOccEnv :: OccEnv a -> [OccName] -> OccEnv a
+filterOccEnv	   :: (elt -> Bool) -> OccEnv elt -> OccEnv elt
 
-emptyOccEnv  	 = emptyUFM
-unitOccEnv   	 = unitUFM
-extendOccEnv 	 = addToUFM
-extendOccEnvList = addListToUFM
-lookupOccEnv 	 = lookupUFM
-mkOccEnv         = listToUFM
-elemOccEnv	 = elemUFM
-foldOccEnv	 = foldUFM
-occEnvElts 	 = eltsUFM
-plusOccEnv	 = plusUFM
-plusOccEnv_C	 = plusUFM_C
-extendOccEnv_C   = addToUFM_C
-mapOccEnv	 = mapUFM
+emptyOccEnv  	 = A emptyUFM
+unitOccEnv x y = A $ unitUFM x y 
+extendOccEnv (A x) y z = A $ addToUFM x y z
+extendOccEnvList (A x) l = A $ addListToUFM x l
+lookupOccEnv (A x) y = lookupUFM x y
+mkOccEnv     l    = A $ listToUFM l
+elemOccEnv x (A y) 	 = elemUFM x y
+foldOccEnv a b (A c)	 = foldUFM a b c 
+occEnvElts (A x)	 = eltsUFM x
+plusOccEnv (A x) (A y)	 = A $ plusUFM x y 
+plusOccEnv_C f (A x) (A y)	 = A $ plusUFM_C f x y 
+extendOccEnv_C f (A x) y z   = A $ addToUFM_C f x y z
+mapOccEnv f (A x)	 = A $ mapUFM f x
+mkOccEnv_C comb l = A $ addListToUFM_C comb emptyUFM l
+delFromOccEnv (A x) y    = A $ delFromUFM x y
+delListFromOccEnv (A x) y  = A $ delListFromUFM x y
+filterOccEnv x (A y)       = A $ filterUFM x y
 
-mkOccEnv_C comb l = addListToUFM_C comb emptyOccEnv l
+instance Outputable a => Outputable (OccEnv a) where
+    ppr (A x) = ppr x
 
 type OccSet = UniqFM OccName
 

@@ -46,20 +46,29 @@ import Bag
 Global bindings (where clauses)
 
 \begin{code}
-data HsLocalBinds id	-- Bindings in a 'let' expression
-			-- or a 'where' clause
-  = HsValBinds (HsValBinds id)
-  | HsIPBinds  (HsIPBinds id)
+-- During renaming, we need bindings where the left-hand sides
+-- have been renamed but the the right-hand sides have not.
+-- the ...LR datatypes are parametrized by two id types,
+-- one for the left and one for the right.
+-- Other than during renaming, these will be the same.
 
+type HsLocalBinds id = HsLocalBindsLR id id
+
+data HsLocalBindsLR idL idR	-- Bindings in a 'let' expression
+			       -- or a 'where' clause
+  = HsValBinds (HsValBindsLR idL idR)
+  | HsIPBinds  (HsIPBinds idR)
   | EmptyLocalBinds
 
-data HsValBinds id	-- Value bindings (not implicit parameters)
-  = ValBindsIn  			-- Before typechecking
-	(LHsBinds id) [LSig id]		-- Not dependency analysed
+type HsValBinds id = HsValBindsLR id id
+
+data HsValBindsLR idL idR  -- Value bindings (not implicit parameters)
+  = ValBindsIn             -- Before typechecking
+	(LHsBindsLR idL idR) [LSig idR]	-- Not dependency analysed
 					-- Recursive by default
 
-  | ValBindsOut				-- After renaming
-	[(RecFlag, LHsBinds id)]	-- Dependency analysed, later bindings 
+  | ValBindsOut		       -- After renaming
+	[(RecFlag, LHsBinds idL)]	-- Dependency analysed, later bindings 
                                         -- in the list may depend on earlier
                                         -- ones.
 	[LSig Name]
@@ -67,8 +76,12 @@ data HsValBinds id	-- Value bindings (not implicit parameters)
 type LHsBinds id  = Bag (LHsBind id)
 type DictBinds id = LHsBinds id		-- Used for dictionary or method bindings
 type LHsBind  id  = Located (HsBind id)
+type HsBind id = HsBindLR id id
 
-data HsBind id
+type LHsBindLR idL idR = Located (HsBindLR idL idR)
+type LHsBindsLR idL idR = Bag (LHsBindLR idL idR)
+
+data HsBindLR idL idR
   = FunBind {	-- FunBind is used for both functions 	f x = e
 		-- and variables			f = \x -> e
 -- Reason 1: Special case for type inference: see TcBinds.tcMonoBinds
@@ -80,11 +93,11 @@ data HsBind id
 -- parses as a pattern binding, just like
 --			(f :: a -> a) = ... 
 
-	fun_id :: Located id,
+	fun_id :: Located idL,
 
 	fun_infix :: Bool,	-- True => infix declaration
 
-	fun_matches :: MatchGroup id,	-- The payload
+	fun_matches :: MatchGroup idR,	-- The payload
 
 	fun_co_fn :: HsWrapper,	-- Coercion from the type of the MatchGroup to the type of
 				-- the Id.  Example:
@@ -102,27 +115,30 @@ data HsBind id
 				-- Before renaming, and after typechecking, 
 				-- the field is unused; it's just an error thunk
 
-        fun_tick :: Maybe (Int,[id])   -- This is the (optional) module-local tick number. 
+        fun_tick :: Maybe (Int,[idR])   -- This is the (optional) module-local tick number. 
     }
 
   | PatBind {	-- The pattern is never a simple variable;
 		-- That case is done by FunBind
-	pat_lhs    :: LPat id,
-	pat_rhs    :: GRHSs id,
+	pat_lhs    :: LPat idL,
+	pat_rhs    :: GRHSs idR,
 	pat_rhs_ty :: PostTcType,	-- Type of the GRHSs
 	bind_fvs   :: NameSet		-- Same as for FunBind
     }
 
   | VarBind {	-- Dictionary binding and suchlike 
-	var_id :: id,		-- All VarBinds are introduced by the type checker
-	var_rhs :: LHsExpr id	-- Located only for consistency
+	var_id :: idL,		-- All VarBinds are introduced by the type checker
+	var_rhs :: LHsExpr idR	-- Located only for consistency
     }
 
   | AbsBinds {					-- Binds abstraction; TRANSLATION
-	abs_tvs     :: [TyVar],  
+       abs_tvs     :: [TyVar],  
 	abs_dicts   :: [DictId],
-	abs_exports :: [([TyVar], id, id, [LPrag])],	-- (tvs, poly_id, mono_id, prags)
-	abs_binds   :: LHsBinds id		-- The dictionary bindings and typechecked user bindings
+       -- AbsBinds only gets used when idL = idR after renaming,
+       -- but these need to be idL's for the collect... code in HsUtil to have
+       -- the right type
+	abs_exports :: [([TyVar], idL, idL, [LPrag])],	-- (tvs, poly_id, mono_id, prags)
+	abs_binds   :: LHsBinds idL		-- The dictionary bindings and typechecked user bindings
 						-- mixed up together; you can tell the dict bindings because
 						-- they are all VarBinds
     }
@@ -145,12 +161,12 @@ placeHolderNames :: NameSet
 placeHolderNames = panic "placeHolderNames"
 
 ------------
-instance OutputableBndr id => Outputable (HsLocalBinds id) where
+instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsLocalBindsLR idL idR) where
   ppr (HsValBinds bs) = ppr bs
   ppr (HsIPBinds bs)  = ppr bs
   ppr EmptyLocalBinds = empty
 
-instance OutputableBndr id => Outputable (HsValBinds id) where
+instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsValBindsLR idL idR) where
   ppr (ValBindsIn binds sigs)
    = pprValBindsForUser binds sigs
 
@@ -169,44 +185,44 @@ instance OutputableBndr id => Outputable (HsValBinds id) where
 -- 'where' include a list of HsBindGroups and we don't want
 -- several groups of bindings each with braces around.
 -- Sort by location before printing
-pprValBindsForUser :: (OutputableBndr id1, OutputableBndr id2)
-		   => LHsBinds id1 -> [LSig id2] -> SDoc
+pprValBindsForUser :: (OutputableBndr idL, OutputableBndr idR, OutputableBndr id2)
+		   => LHsBindsLR idL idR -> [LSig id2] -> SDoc
 pprValBindsForUser binds sigs
   = pprDeeperList vcat (map snd (sort_by_loc decls))
   where
 
     decls :: [(SrcSpan, SDoc)]
     decls = [(loc, ppr sig)  | L loc sig <- sigs] ++
-    	    [(loc, ppr bind) | L loc bind <- bagToList binds]
+    	     [(loc, ppr bind) | L loc bind <- bagToList binds]
 
     sort_by_loc decls = sortLe (\(l1,_) (l2,_) -> l1 <= l2) decls
 
-pprLHsBinds :: OutputableBndr id => LHsBinds id -> SDoc
+pprLHsBinds :: (OutputableBndr idL, OutputableBndr idR) => LHsBindsLR idL idR -> SDoc
 pprLHsBinds binds 
   | isEmptyLHsBinds binds = empty
   | otherwise = lbrace <+> pprDeeperList vcat (map ppr (bagToList binds)) <+> rbrace
 
 ------------
-emptyLocalBinds :: HsLocalBinds a
+emptyLocalBinds :: HsLocalBindsLR a b
 emptyLocalBinds = EmptyLocalBinds
 
-isEmptyLocalBinds :: HsLocalBinds a -> Bool
+isEmptyLocalBinds :: HsLocalBindsLR a b -> Bool
 isEmptyLocalBinds (HsValBinds ds) = isEmptyValBinds ds
 isEmptyLocalBinds (HsIPBinds ds)  = isEmptyIPBinds ds
 isEmptyLocalBinds EmptyLocalBinds = True
 
-isEmptyValBinds :: HsValBinds a -> Bool
+isEmptyValBinds :: HsValBindsLR a b -> Bool
 isEmptyValBinds (ValBindsIn ds sigs)  = isEmptyLHsBinds ds && null sigs
 isEmptyValBinds (ValBindsOut ds sigs) = null ds && null sigs
 
-emptyValBindsIn, emptyValBindsOut :: HsValBinds a
+emptyValBindsIn, emptyValBindsOut :: HsValBindsLR a b
 emptyValBindsIn  = ValBindsIn emptyBag []
 emptyValBindsOut = ValBindsOut []      []
 
-emptyLHsBinds :: LHsBinds id
+emptyLHsBinds :: LHsBindsLR idL idR
 emptyLHsBinds = emptyBag
 
-isEmptyLHsBinds :: LHsBinds id -> Bool
+isEmptyLHsBinds :: LHsBindsLR idL idR -> Bool
 isEmptyLHsBinds = isEmptyBag
 
 ------------
@@ -242,10 +258,10 @@ So the desugarer tries to do a better job:
 				       in (fm,gm)
 
 \begin{code}
-instance OutputableBndr id => Outputable (HsBind id) where
+instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsBindLR idL idR) where
     ppr mbind = ppr_monobind mbind
 
-ppr_monobind :: OutputableBndr id => HsBind id -> SDoc
+ppr_monobind :: (OutputableBndr idL, OutputableBndr idR) => HsBindLR idL idR -> SDoc
 
 ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })      = pprPatBind pat grhss
 ppr_monobind (VarBind { var_id = var, var_rhs = rhs })         = ppr var <+> equals <+> pprExpr (unLoc rhs)
@@ -339,14 +355,20 @@ instance Outputable HsWrapper where
   ppr co_fn = pprHsWrapper (ptext SLIT("<>")) co_fn
 
 pprHsWrapper :: SDoc -> HsWrapper -> SDoc
-pprHsWrapper it WpHole = it
-pprHsWrapper it (WpCompose f1 f2) = pprHsWrapper (pprHsWrapper it f2) f1
-pprHsWrapper it (WpCo co)     = sep [it, nest 2 (ptext SLIT("`cast`") <+> pprParendType co)]
-pprHsWrapper it (WpApp id)    = sep [it, nest 2 (ppr id)]
-pprHsWrapper it (WpTyApp ty)  = sep [it, ptext SLIT("@") <+> pprParendType ty]
-pprHsWrapper it (WpLam id)    = sep [ptext SLIT("\\") <> pprBndr LambdaBind id <> dot, it]
-pprHsWrapper it (WpTyLam tv)  = sep [ptext SLIT("/\\") <> pprBndr LambdaBind tv <> dot, it]
-pprHsWrapper it (WpLet binds) = sep [ptext SLIT("let") <+> braces (ppr binds), it]
+pprHsWrapper it wrap = 
+    let 
+        help it WpHole            = it
+        help it (WpCompose f1 f2) = help (help it f2) f1
+        help it (WpCo co)     = sep [it, nest 2 (ptext SLIT("`cast`") <+> pprParendType co)]
+        help it (WpApp id)    = sep [it, nest 2 (ppr id)]
+        help it (WpTyApp ty)  = sep [it, ptext SLIT("@") <+> pprParendType ty]
+        help it (WpLam id)    = sep [ptext SLIT("\\") <> pprBndr LambdaBind id <> dot, it]
+        help it (WpTyLam tv)  = sep [ptext SLIT("/\\") <> pprBndr LambdaBind tv <> dot, it]
+        help it (WpLet binds) = sep [ptext SLIT("let") <+> braces (ppr binds), it]
+    in
+      -- in debug mode, print the wrapper
+      -- otherwise just print what's inside
+      getPprStyle (\ s -> if debugStyle s then (help it wrap) else it)
 
 (<.>) :: HsWrapper -> HsWrapper -> HsWrapper
 WpHole <.> c = c

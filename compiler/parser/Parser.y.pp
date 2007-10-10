@@ -1327,7 +1327,7 @@ fexp 	:: { LHsExpr RdrName }
 aexp	:: { LHsExpr RdrName }
 	: qvar '@' aexp			{ LL $ EAsPat $1 $3 }
 	| '~' aexp			{ LL $ ELazyPat $2 }
-	| aexp1				{ $1 }
+	| aexp1			{ $1 }
 
 aexp1	:: { LHsExpr RdrName }
         : aexp1 '{' fbinds '}' 	{% do { r <- mkRecConstrOrUpdate $1 (comb2 $2 $4) $3
@@ -1348,16 +1348,18 @@ aexp2	:: { LHsExpr RdrName }
 	| literal			{ L1 (HsLit   $! unLoc $1) }
 -- This will enable overloaded strings permanently.  Normally the renamer turns HsString
 -- into HsOverLit when -foverloaded-strings is on.
---	| STRING			{ L1 (HsOverLit $! mkHsIsString (getSTRING $1)) }
-	| INTEGER			{ L1 (HsOverLit $! mkHsIntegral (getINTEGER $1)) }
-	| RATIONAL			{ L1 (HsOverLit $! mkHsFractional (getRATIONAL $1)) }
-	| '(' exp ')'			{ LL (HsPar $2) }
+--	| STRING			{ sL (getLoc $1) (HsOverLit $! mkHsIsString (getSTRING $1) placeHolderType) }
+	| INTEGER			{ sL (getLoc $1) (HsOverLit $! mkHsIntegral (getINTEGER $1) placeHolderType) }
+	| RATIONAL			{ sL (getLoc $1) (HsOverLit $! mkHsFractional (getRATIONAL $1) placeHolderType) }
+        -- N.B.: sections get parsed by these next two productions.
+        -- This allows you to write, e.g., '(+ 3, 4 -)', which isn't correct Haskell98
+        -- (you'd have to write '((+ 3), (4 -))')
+        -- but the less cluttered version fell out of having texps.
+	| '(' texp ')'			{ LL (HsPar $2) }
 	| '(' texp ',' texps ')'	{ LL $ ExplicitTuple ($2 : reverse $4) Boxed }
 	| '(#' texps '#)'		{ LL $ ExplicitTuple (reverse $2)      Unboxed }
 	| '[' list ']'                  { LL (unLoc $2) }
 	| '[:' parr ':]'                { LL (unLoc $2) }
-	| '(' infixexp qop ')'		{ LL $ SectionL $2 $3 }
-	| '(' qopm infixexp ')'		{ LL $ SectionR $2 $3 }
 	| '_'				{ L1 EWildPat }
 	
 	-- Template Haskell Extension
@@ -1395,11 +1397,17 @@ cvtopdecls0 :: { [LHsDecl RdrName] }
 	: {- empty -}		{ [] }
 	| cvtopdecls		{ $1 }
 
+-- tuple expressions: things that can appear unparenthesized as long as they're
+-- inside parens or delimitted by commas
 texp :: { LHsExpr RdrName }
 	: exp				{ $1 }
-	| qopm infixexp			{ LL $ SectionR $1 $2 }
-	-- The second production is really here only for bang patterns
-	-- but 
+	-- Technically, this should only be used for bang patterns,
+       -- but we can be a little more liberal here and avoid parens
+       -- inside tuples
+       | infixexp qop 	{ LL $ SectionL $1 $2 }
+	| qopm infixexp       { LL $ SectionR $1 $2 }
+       -- view patterns get parenthesized above
+	| exp '->' exp   { LL $ EViewPat $1 $3 }
 
 texps :: { [LHsExpr RdrName] }
 	: texps ',' texp		{ $3 : $1 }

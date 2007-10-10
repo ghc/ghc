@@ -216,7 +216,9 @@ check' qs
    | literals     = split_by_literals qs
    | constructors = split_by_constructor qs
    | only_vars    = first_column_only_vars qs
-   | otherwise    = pprPanic "Check.check': Not implemented :-(" (ppr first_pats)
+-- FIXME: hack to get view patterns through for now
+   | otherwise    = ([([],[])],emptyUniqSet)
+-- pprPanic "Check.check': Not implemented :-(" (ppr first_pats)
   where
      -- Note: RecPats will have been simplified to ConPats
      --       at this stage.
@@ -430,9 +432,9 @@ get_lit :: Pat id -> Maybe HsLit
 -- It doesn't matter which one, because they will only be compared
 -- with other HsLits gotten in the same way
 get_lit (LitPat lit)			 = Just lit
-get_lit (NPat (HsIntegral i   _) mb _ _) = Just (HsIntPrim   (mb_neg mb i))
-get_lit (NPat (HsFractional f _) mb _ _) = Just (HsFloatPrim (mb_neg mb f))
-get_lit (NPat (HsIsString s   _)  _ _ _) = Just (HsStringPrim s)
+get_lit (NPat (HsIntegral i   _ _) mb _) = Just (HsIntPrim   (mb_neg mb i))
+get_lit (NPat (HsFractional f _ _) mb _) = Just (HsFloatPrim (mb_neg mb f))
+get_lit (NPat (HsIsString s   _ _)  _ _) = Just (HsStringPrim s)
 get_lit other_pat			 = Nothing
 
 mb_neg :: Num a => Maybe b -> a -> a
@@ -484,7 +486,7 @@ is_con _              = False
 
 is_lit :: Pat Id -> Bool
 is_lit (LitPat _)      = True
-is_lit (NPat _ _ _ _)  = True
+is_lit (NPat _ _ _)  = True
 is_lit _               = False
 
 is_var :: Pat Id -> Bool
@@ -610,6 +612,7 @@ has_nplusk_pat :: Pat Id -> Bool
 has_nplusk_pat (NPlusKPat _ _ _ _) 	     = True
 has_nplusk_pat (ParPat p)  	   	     = has_nplusk_lpat p
 has_nplusk_pat (AsPat _ p) 	   	     = has_nplusk_lpat p
+has_nplusk_pat (ViewPat _ p _)           = has_nplusk_lpat p
 has_nplusk_pat (SigPatOut p _ )    	     = has_nplusk_lpat p
 has_nplusk_pat (ListPat ps _)  	   	     = any has_nplusk_lpat ps
 has_nplusk_pat (TuplePat ps _ _)   	     = any has_nplusk_lpat ps
@@ -631,6 +634,9 @@ simplify_pat (LazyPat p)      = WildPat (hsLPatType p)	-- For overlap and exhaus
 							-- purposes, a ~pat is like a wildcard
 simplify_pat (BangPat p)      = unLoc (simplify_lpat p)
 simplify_pat (AsPat id p)     = unLoc (simplify_lpat p)
+
+simplify_pat (ViewPat expr p ty)     = ViewPat expr (simplify_lpat p) ty
+
 simplify_pat (SigPatOut p _)  = unLoc (simplify_lpat p)	-- I'm not sure this is right
 
 simplify_pat pat@(ConPatOut { pat_con = L loc id, pat_args = ps })
@@ -665,7 +671,7 @@ simplify_pat pat@(LitPat (HsString s)) =
     mk_char_lit c = mkPrefixConPat charDataCon [nlLitPat (HsCharPrim c)] charTy
 
 simplify_pat (LitPat lit)		 = tidyLitPat lit 
-simplify_pat (NPat lit mb_neg eq lit_ty) = tidyNPat lit mb_neg eq lit_ty
+simplify_pat (NPat lit mb_neg eq) = tidyNPat lit mb_neg eq
 
 simplify_pat (NPlusKPat id hslit hsexpr1 hsexpr2)
    = WildPat (idType (unLoc id))
