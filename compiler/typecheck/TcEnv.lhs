@@ -553,12 +553,12 @@ thLevel (Brack l _ _) = l
 
 
 checkWellStaged :: SDoc		-- What the stage check is for
-		-> ThLevel 	-- Binding level
+		-> ThLevel 	-- Binding level (increases inside brackets)
 	        -> ThStage	-- Use stage
 		-> TcM ()	-- Fail if badly staged, adding an error
 checkWellStaged pp_thing bind_lvl use_stage
-  | bind_lvl <= use_lvl 	-- OK!
-  = returnM ()	
+  | use_lvl >= bind_lvl 	-- OK! Used later than bound
+  = returnM ()			-- E.g.  \x -> [| $(f x) |]
 
   | bind_lvl == topLevel	-- GHC restriction on top level splices
   = failWithTc $ 
@@ -566,7 +566,7 @@ checkWellStaged pp_thing bind_lvl use_stage
 	 nest 2 (ptext SLIT("is used in a top-level splice, and must be imported, not defined locally"))]
 
   | otherwise			-- Badly staged
-  = failWithTc $ 
+  = failWithTc $ 		-- E.g.  \x -> $(f x)
     ptext SLIT("Stage error:") <+> pp_thing <+> 
 	hsep   [ptext SLIT("is bound at stage") <+> ppr bind_lvl,
 		ptext SLIT("but used at stage") <+> ppr use_lvl]
