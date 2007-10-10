@@ -22,9 +22,13 @@ import GHC              ( Session, LoadHowMuch(..), Target(..),  TargetId(..),
                           BreakIndex, SrcSpan, Resume, SingleStep )
 import PprTyThing
 import DynFlags
+
+#ifdef USE_READLINE
 import Packages
 import PackageConfig
 import UniqFM
+#endif
+
 import HscTypes		( implicitTyThings )
 import Outputable       hiding (printForUser)
 import Module           -- for ModuleEnv
@@ -83,7 +87,9 @@ import GHC.IOBase	( IOErrorType(InvalidArgument) )
 
 import Data.IORef	( IORef, readIORef, writeIORef )
 
+#ifdef USE_READLINE
 import System.Posix.Internals ( setNonBlockingFD )
+#endif
 
 -----------------------------------------------------------------------------
 
@@ -1347,6 +1353,11 @@ showContext = do
 completeNone :: String -> IO [String]
 completeNone _w = return []
 
+completeMacro, completeIdentifier, completeModule,
+    completeHomeModule, completeSetOptions, completeFilename,
+    completeHomeModuleOrFile 
+    :: String -> IO [String]
+
 #ifdef USE_READLINE
 completeWord :: String -> Int -> Int -> IO (Maybe (String, [String]))
 completeWord w start end = do
@@ -1381,12 +1392,7 @@ completeWord w start end = do
               | offset+length x >= start = (start-offset,take (end-offset) x)
               | otherwise = selectWord xs
 
-
-completeCmd, completeMacro, completeIdentifier, completeModule,
-    completeHomeModule, completeSetOptions, completeFilename,
-    completeHomeModuleOrFile 
-    :: String -> IO [String]
-
+completeCmd :: String -> IO [String]
 completeCmd w = do
   cmds <- readIORef commands
   return (filter (w `isPrefixOf`) (map (':':) (map cmdName cmds)))
@@ -1452,7 +1458,6 @@ allExposedModules dflags
  where
   pkg_db = pkgIdMap (pkgState dflags)
 #else
-completeCmd        = completeNone
 completeMacro      = completeNone
 completeIdentifier = completeNone
 completeModule     = completeNone
@@ -1460,7 +1465,6 @@ completeHomeModule = completeNone
 completeSetOptions = completeNone
 completeFilename   = completeNone
 completeHomeModuleOrFile=completeNone
-completeBkpt       = completeNone
 #endif
 
 -- ---------------------------------------------------------------------------
