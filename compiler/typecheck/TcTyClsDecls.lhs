@@ -247,7 +247,7 @@ tcFamInstDecl (L loc decl)
     recoverM (returnM Nothing)		        $
     setSrcSpan loc				$
     tcAddDeclCtxt decl				$
-    do { -- type families require -ftype-families and can't be in an
+    do { -- type families require -XTypeFamilies and can't be in an
 	 -- hs-boot file
        ; type_families <- doptM Opt_TypeFamilies
        ; is_boot  <- tcIsHsBoot	  -- Are we compiling an hs-boot file?
@@ -666,14 +666,14 @@ tcTyClDecl1 _calc_isrec
   { traceTc (text "type family: " <+> ppr tc_name) 
   ; idx_tys <- doptM Opt_TypeFamilies
 
-	-- Check that we don't use families without -ftype-families
+	-- Check that we don't use families without -XTypeFamilies
   ; checkTc idx_tys $ badFamInstDecl tc_name
 
   ; tycon <- buildSynTyCon tc_name tvs' (OpenSynTyCon kind Nothing) Nothing
   ; return [ATyCon tycon]
   }
 
-  -- "newtype family" or "data family" declaration
+  -- "data family" declaration
 tcTyClDecl1 _calc_isrec 
   (TyFamily {tcdFlavour = DataFamily, 
 	     tcdLName = L _ tc_name, tcdTyVars = tvs, tcdKind = mb_kind})
@@ -684,7 +684,7 @@ tcTyClDecl1 _calc_isrec
 
   ; idx_tys <- doptM Opt_TypeFamilies
 
-	-- Check that we don't use families without -ftype-families
+	-- Check that we don't use families without -XTypeFamilies
   ; checkTc idx_tys $ badFamInstDecl tc_name
 
   ; tycon <- buildAlgTyCon tc_name final_tvs [] 
@@ -693,6 +693,7 @@ tcTyClDecl1 _calc_isrec
   }
 
   -- "newtype" and "data"
+  -- NB: not used for newtype/data instances (whether associated or not)
 tcTyClDecl1 calc_isrec
   (TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdTyVars = tvs,
 	   tcdLName = L _ tc_name, tcdKindSig = mb_ksig, tcdCons = cons})
@@ -755,6 +756,8 @@ tcTyClDecl1 calc_isrec
   { ctxt' <- tcHsKindedContext ctxt
   ; fds' <- mappM (addLocM tc_fundep) fundeps
   ; atss <- mappM (addLocM (tcTyClDecl1 (const Recursive))) ats
+            -- NB: 'ats' only contains "type family" and "data family"
+            --     declarations as well as type family defaults
   ; let ats' = zipWith setTyThingPoss atss (map (tcdTyVars . unLoc) ats)
   ; sig_stuff <- tcClassSigs class_name sigs meths
   ; clas <- fixM (\ clas ->
