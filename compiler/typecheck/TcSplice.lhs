@@ -61,6 +61,7 @@ import Outputable
 import Unique
 import DynFlags
 import PackageConfig
+import Maybe
 import BasicTypes
 import Panic
 import FastString
@@ -71,6 +72,7 @@ import qualified Language.Haskell.TH.Syntax as TH
 
 import GHC.Exts		( unsafeCoerce#, Int#, Int(..) )
 import Control.Monad	( liftM )
+import qualified Control.Exception  as Exception( userErrors )
 \end{code}
 
 
@@ -394,6 +396,7 @@ runMeta convert expr
 	    Right hval -> do
 
 	{ 	-- Coerce it to Q t, and run it
+
 		-- Running might fail if it throws an exception of any kind (hence tryAllM)
 		-- including, say, a pattern-match exception in the code we are running
 		--
@@ -401,22 +404,57 @@ runMeta convert expr
 		-- exception-cacthing thing so that if there are any lurking 
 		-- exceptions in the data structure returned by hval, we'll
 		-- encounter them inside the try
-          either_th_syn <- tryAllM $ tryM $ TH.runQ $ unsafeCoerce# hval
-        ; case either_th_syn of
-            Left exn             -> failWithTc (mk_msg "run" exn)
-            Right (Left exn)     -> failM  -- Error already in Tc monad
-            Right (Right th_syn) -> do
-        { either_hs_syn <- tryAllM $ return $! convert (getLoc expr) th_syn
-        ; case either_hs_syn of
-            Left exn             -> failWithTc (mk_msg "interpret result of" exn)
-            Right (Left err)     -> do { addErrTc err; failM }
-            Right (Right hs_syn) -> return hs_syn
-        }}}}
+		--
+		-- See Note [Exceptions in TH] 
+	  either_tval <- tryAllM $ do
+		{ th_syn <- TH.runQ (unsafeCoerce# hval)
+		; case convert (getLoc expr) th_syn of
+		    Left err     -> failWithTc err
+		    Right hs_syn -> return hs_syn }
+
+	; case either_tval of
+	    Right v -> return v
+	    Left exn | Just s <- Exception.userErrors exn
+		     , s == "IOEnv failure" 
+		     -> failM	-- Error already in Tc monad
+		     | otherwise -> failWithTc (mk_msg "run" exn)	-- Exception
+        }}}
   where
     mk_msg s exn = vcat [text "Exception when trying to" <+> text s <+> text "compile-time code:",
 			 nest 2 (text (Panic.showException exn)),
 			 nest 2 (text "Code:" <+> ppr expr)]
 \end{code}
+
+Note [Exceptions in TH]
+~~~~~~~~~~~~~~~~~~~~~~~
+Supppose we have something like this 
+	$( f 4 )
+where
+	f :: Int -> Q [Dec]
+	f n | n>3       = fail "Too many declarations"
+	    | otherwise = ...
+
+The 'fail' is a user-generated failure, and should be displayed as a
+perfectly ordinary compiler error message, not a panic or anything
+like that.  Here's how it's processed:
+
+  * 'fail' is the monad fail.  The monad instance for Q in TH.Syntax
+    effectively transforms (fail s) to 
+	qReport True s >> fail
+    where 'qReport' comes from the Quasi class and fail from its monad
+    superclass.
+
+  * The TcM monad is an instance of Quasi (see TcSplice), and it implements
+    (qReport True s) by using addErr to add an error message to the bag of errors.
+    The 'fail' in TcM raises a UserError, with the uninteresting string
+	"IOEnv failure"
+
+  * So, when running a splice, we catch all exceptions; then for 
+	- a UserError "IOEnv failure", we assume the error is already 
+		in the error-bag (above)
+	- other errors, we add an error to the bag
+    and then fail
+
 
 To call runQ in the Tc monad, we need to make TcM an instance of Quasi:
 
