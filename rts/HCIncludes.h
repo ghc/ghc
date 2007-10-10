@@ -1,4 +1,5 @@
 /* includes for compiling .cmm files via-C */
+#include "Stg.h"
 #include "Rts.h"
 #include "RtsFlags.h"
 #include "RtsUtils.h"
