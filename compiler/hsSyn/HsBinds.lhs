@@ -341,11 +341,11 @@ instance Outputable HsWrapper where
 pprHsWrapper :: SDoc -> HsWrapper -> SDoc
 pprHsWrapper it WpHole = it
 pprHsWrapper it (WpCompose f1 f2) = pprHsWrapper (pprHsWrapper it f2) f1
-pprHsWrapper it (WpCo co)     = it <+> ptext SLIT("`cast`") <+> pprParendType co
-pprHsWrapper it (WpApp id)    = it <+> ppr id
-pprHsWrapper it (WpTyApp ty)  = it <+> ptext SLIT("@") <+> pprParendType ty
-pprHsWrapper it (WpLam id)    = ptext SLIT("\\") <> pprBndr LambdaBind id <> dot <+> it
-pprHsWrapper it (WpTyLam tv)  = ptext SLIT("/\\") <> pprBndr LambdaBind tv <> dot <+> it
+pprHsWrapper it (WpCo co)     = sep [it, nest 2 (ptext SLIT("`cast`") <+> pprParendType co)]
+pprHsWrapper it (WpApp id)    = sep [it, nest 2 (ppr id)]
+pprHsWrapper it (WpTyApp ty)  = sep [it, ptext SLIT("@") <+> pprParendType ty]
+pprHsWrapper it (WpLam id)    = sep [ptext SLIT("\\") <> pprBndr LambdaBind id <> dot, it]
+pprHsWrapper it (WpTyLam tv)  = sep [ptext SLIT("/\\") <> pprBndr LambdaBind tv <> dot, it]
 pprHsWrapper it (WpLet binds) = sep [ptext SLIT("let") <+> braces (ppr binds), it]
 
 (<.>) :: HsWrapper -> HsWrapper -> HsWrapper
