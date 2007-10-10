@@ -141,18 +141,31 @@ tcBracket brack res_ty
     }
 
 tc_bracket :: HsBracket Name -> TcM TcType
-tc_bracket (VarBr v) 
-  = tcMetaTy nameTyConName 	-- Result type is Var (not Q-monadic)
+tc_bracket (VarBr name) 	-- Note [Quoting names]
+  = do	{ thing <- tcLookup name
+	; case thing of
+    	    AGlobal _ -> return ()
+    	    ATcId { tct_level = bind_lvl }
+		| isExternalName name	-- C.f isExternalName case of
+		-> keepAliveTc name 	--     TcExpr.thBrackId
+		| otherwise
+		-> do { use_stage <- getStage
+		      ; checkTc (thLevel use_stage == bind_lvl)
+				(quotedNameStageErr name) }
+	    other -> pprPanic "th_bracket" (ppr name)
+
+	; tcMetaTy nameTyConName 	-- Result type is Var (not Q-monadic)
+	}
 
 tc_bracket (ExpBr expr) 
-  = newFlexiTyVarTy liftedTypeKind	`thenM` \ any_ty ->
-    tcMonoExpr expr any_ty		`thenM_`
-    tcMetaTy expQTyConName
+  = do	{ any_ty <- newFlexiTyVarTy liftedTypeKind
+	; tcMonoExpr expr any_ty
+	; tcMetaTy expQTyConName }
 	-- Result type is Expr (= Q Exp)
 
 tc_bracket (TypBr typ) 
-  = tcHsSigType ExprSigCtxt typ		`thenM_`
-    tcMetaTy typeQTyConName
+  = do	{ tcHsSigType ExprSigCtxt typ
+	; tcMetaTy typeQTyConName }
 	-- Result type is Type (= Q Typ)
 
 tc_bracket (DecBr decls)
@@ -168,8 +181,25 @@ tc_bracket (DecBr decls)
 
 tc_bracket (PatBr _)
   = failWithTc (ptext SLIT("Tempate Haskell pattern brackets are not supported yet"))
+
+quotedNameStageErr v 
+  = sep [ ptext SLIT("Stage error: the non-top-level quoted name") <+> ppr (VarBr v)
+	, ptext SLIT("must be used at the same stage at which is is bound")]
 \end{code}
 
+Note [Quoting names]
+~~~~~~~~~~~~~~~~~~~~
+A quoted name is a bit like a quoted expression, except that we have no 
+cross-stage lifting (c.f. TcExpr.thBrackId).  Examples:
+
+  f 'map	-- OK; also for top-level defns of this module
+
+  \x. f 'x	-- Not ok (whereas \x. f [| x |] might have been ok, by
+		--				 cross-stage lifting
+
+  \y. [| \x. $(f 'y) |]	-- Not ok (same reason)
+
+  [| \x. $(f 'x) |]	-- OK
 
 %************************************************************************
 %*									*
