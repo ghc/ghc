@@ -1,0 +1,3 @@
+Stopped at <exception thrown>
+_exception :: e = GHC.IOBase.ErrorCall ('a' : _)
+()
