@@ -781,7 +781,7 @@ with 'given' implications.
 
 So our best approximation is to make (D [a]) part of the inferred
 context, so we can use that to discharge the implication. Hence
-the strange function get_dictsin approximateImplications.
+the strange function get_dicts in approximateImplications.
 
 The common cases are more clear-cut, when we have things like
 	forall a. C a => C b
@@ -1047,6 +1047,16 @@ gentleCheckLoop inst_loc givens wanteds
 		| otherwise	     = Stop
 	-- When checking against a given signature 
 	-- we MUST be very gentle: Note [Check gently]
+
+gentleInferLoop :: SDoc -> [Inst]
+	        -> TcM ([Inst], TcDictBinds)
+gentleInferLoop doc wanteds
+  = do 	{ (irreds, binds, _) <- checkLoop env wanteds
+	; return (irreds, binds) }
+  where
+    env = mkRedEnv doc try_me []
+    try_me inst | isMethodOrLit inst = ReduceMe AddSCs
+		| otherwise	     = Stop
 \end{code}
 
 Note [Check gently]
@@ -1064,7 +1074,7 @@ Inside the pattern match, which binds (a:*, x:a), we know that
 Hence we have a dictionary for Show [a] available; and indeed we 
 need it.  We are going to build an implication contraint
 	forall a. (b~[a]) => Show [a]
-Later, we will solve this constraint using the knowledg e(Show b)
+Later, we will solve this constraint using the knowledge (Show b)
 	
 But we MUST NOT reduce (Show [a]) to (Show a), else the whole
 thing becomes insoluble.  So we simplify gently (get rid of literals
@@ -1609,12 +1619,11 @@ bindInstsOfLocalFuns wanteds local_ids
     returnM emptyLHsBinds
 
   | otherwise
-  = do	{ (irreds, binds,_) <- checkLoop env for_me
+  = do	{ (irreds, binds) <- gentleInferLoop doc for_me
 	; extendLIEs not_for_me	
 	; extendLIEs irreds
 	; return binds }
   where
-    env = mkRedEnv doc try_me []
     doc		     = text "bindInsts" <+> ppr local_ids
     overloaded_ids   = filter is_overloaded local_ids
     is_overloaded id = isOverloadedTy (idType id)
@@ -1623,8 +1632,6 @@ bindInstsOfLocalFuns wanteds local_ids
     overloaded_set = mkVarSet overloaded_ids	-- There can occasionally be a lot of them
 						-- so it's worth building a set, so that
 						-- lookup (in isMethodFor) is faster
-    try_me inst | isMethod inst = ReduceMe NoSCs
-		| otherwise	= Stop
 \end{code}
 
 
@@ -1644,6 +1651,8 @@ data RedEnv
 	   , red_givens :: [Inst]		-- All guaranteed rigid
 						-- Always dicts
 						-- but see Note [Rigidity]
+	   , red_reft :: Refinement		-- The refinement to apply to the 'givens'
+						-- You should think of it as 'given equalities'
 	   , red_stack  :: (Int, [Inst])	-- Recursion stack (for err msg)
 						-- See Note [RedStack]
   }
@@ -1665,14 +1674,17 @@ data RedEnv
 mkRedEnv :: SDoc -> (Inst -> WhatToDo) -> [Inst] -> RedEnv
 mkRedEnv doc try_me givens
   = RedEnv { red_doc = doc, red_try_me = try_me,
-	     red_givens = givens, red_stack = (0,[]),
+	     red_givens = givens, 
+	     red_reft = emptyRefinement,
+	     red_stack = (0,[]),
 	     red_improve = True }	
 
 mkNoImproveRedEnv :: SDoc -> (Inst -> WhatToDo) -> RedEnv
 -- Do not do improvement; no givens
 mkNoImproveRedEnv doc try_me
   = RedEnv { red_doc = doc, red_try_me = try_me,
-	     red_givens = [], red_stack = (0,[]),
+	     red_givens = [], red_reft = emptyRefinement,
+	     red_stack = (0,[]),
 	     red_improve = True }	
 
 data WhatToDo
@@ -1735,6 +1747,7 @@ reduceContext env wanteds
 	     text "----------------------"
 	     ]))
 
+
 	; let givens 		 	  = red_givens env
 	      (given_eqs0, given_dicts0)  = partition isEqInst givens
 	      (wanted_eqs0, wanted_dicts) = partition isEqInst wanteds
@@ -1762,7 +1775,12 @@ reduceContext env wanteds
 	; eq_irreds <- normaliseWantedEqs eq_irreds0
 
           -- 5. Build the Avail mapping from "given_dicts"
+	  --    Add dicts refined by the current type refinement
 	; init_state <- foldlM addGiven emptyAvails given_dicts
+	; let reft = red_reft env
+	; init_state <- if isEmptyRefinement reft then return init_state
+			else foldlM (addRefinedGiven reft)
+				    init_state given_dicts
 
           -- 6. Solve the *wanted* *dictionary* constraints
 	  --    This may expose some further equational constraints...
@@ -1859,7 +1877,8 @@ The main context-reduction function is @reduce@.  Here's its game plan.
 \begin{code}
 reduceList :: RedEnv -> [Inst] -> Avails -> TcM Avails
 reduceList env@(RedEnv {red_stack = (n,stk)}) wanteds state
-  = do 	{ dopts <- getDOpts
+  = do 	{ traceTc (text "reduceList " <+> (ppr wanteds $$ ppr state))
+	; dopts <- getDOpts
 #ifdef DEBUG
 	; if n > 8 then
 		dumpTcRn (hang (ptext SLIT("Interesting! Context reduction stack depth") <+> int n) 
@@ -1872,8 +1891,7 @@ reduceList env@(RedEnv {red_stack = (n,stk)}) wanteds state
 	    go wanteds state }
   where
     go []     state = return state
-    go (w:ws) state = do { traceTc (text "reduceList " <+> (ppr (w:ws) $$ ppr state))
-			 ; state' <- reduce (env {red_stack = (n+1, w:stk)}) w state
+    go (w:ws) state = do { state' <- reduce (env {red_stack = (n+1, w:stk)}) w state
 			 ; go ws state' }
 
     -- Base case: we're done!
@@ -1885,7 +1903,7 @@ reduce env wanted avails
        }
 
   | otherwise
-  = do	{ traceTc (text "reduce" <+> ppr avails <+> ppr wanted)
+  = do	{ traceTc (text "reduce" <+> ppr wanted $$ ppr avails)
 	; case red_try_me env wanted of {
 	    Stop -> try_simple (addIrred NoSCs);
 			-- See Note [No superclasses for Stop]
@@ -2010,9 +2028,10 @@ contributing clauses.
 \begin{code}
 ---------------------------------------------
 reduceInst :: RedEnv -> Avails -> Inst -> TcM (Avails, LookupInstResult)
-reduceInst env avails (ImplicInst { tci_tyvars = tvs, tci_reft = reft, tci_loc = loc,
+reduceInst env avails (ImplicInst { tci_name = name,
+				    tci_tyvars = tvs, tci_reft = reft, tci_loc = loc,
 				    tci_given = extra_givens, tci_wanted = wanteds })
-  = reduceImplication env avails reft tvs extra_givens wanteds loc
+  = reduceImplication env avails name reft tvs extra_givens wanteds loc
 
 reduceInst env avails other_inst
   = do	{ result <- lookupSimpleInst other_inst
@@ -2022,7 +2041,7 @@ reduceInst env avails other_inst
 Note [Equational Constraints in Implication Constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-An equational constraint is of the form 
+An implication constraint is of the form 
 	Given => Wanted 
 where Given and Wanted may contain both equational and dictionary
 constraints. The delay and reduction of these two kinds of constraints
@@ -2048,6 +2067,7 @@ which are types.
 ---------------------------------------------
 reduceImplication :: RedEnv
 		 -> Avails
+		 -> Name
 		 -> Refinement	-- May refine the givens; often empty
 		 -> [TcTyVar]	-- Quantified type variables; all skolems
 		 -> [Inst]	-- Extra givens; all rigid
@@ -2088,16 +2108,21 @@ Note that
 	--		the solved dictionaries use these binders		
 	--		these binders are generated by reduceImplication
 	--
-reduceImplication env orig_avails reft tvs extra_givens wanteds inst_loc
+reduceImplication env orig_avails name reft tvs extra_givens wanteds inst_loc
   = do	{ 	-- Add refined givens, and the extra givens
 		-- Todo fix this 
-	  (refined_red_givens,refined_avails)
-		<- if isEmptyRefinement reft then return (red_givens env,orig_avails)
-		   else foldlM (addRefinedGiven reft) ([],orig_avails) (red_givens env)
+--	  (refined_red_givens,refined_avails)
+--		<- if isEmptyRefinement reft then return (red_givens env,orig_avails)
+--		   else foldlM (addRefinedGiven reft) ([],orig_avails) (red_givens env)
+--	Commented out SLPJ Sept 07; see comment with extractLocalResults below
+	  let refined_red_givens = []
 
 		-- Solve the sub-problem
 	; let try_me inst = ReduceMe AddSCs	-- Note [Freeness and implications]
-	      env' = env { red_givens = refined_red_givens ++ extra_givens ++ availsInsts orig_avails
+	      env' = env { red_givens = extra_givens ++ availsInsts orig_avails
+			 , red_reft = reft
+			 , red_doc = sep [ptext SLIT("reduceImplication for") <+> ppr name,
+					  nest 2 (parens $ ptext SLIT("within") <+> red_doc env)]
 			 , red_try_me = try_me }
 
 	; traceTc (text "reduceImplication" <+> vcat
@@ -2105,20 +2130,23 @@ reduceImplication env orig_avails reft tvs extra_givens wanteds inst_loc
 			  ppr (red_givens env), ppr extra_givens, 
 			  ppr reft, ppr wanteds])
 	; (irreds,binds,needed_givens0) <- checkLoop env' wanteds
-        ; let needed_givens1 = [ng | ng <- needed_givens0, notElem ng extra_givens]
+	; let   (extra_eq_givens, extra_dict_givens) = partition isEqInst extra_givens
+			-- SLPJ Sept 07: I think this is bogus; currently
+			-- there are no Eqinsts in extra_givens
+		dict_ids = map instToId extra_dict_givens 
+
+		-- needed_givens0 is the free vars of the bindings
+		-- Remove the ones we are going to lambda-bind
+		-- Use the actual dictionary identity *not* equality on Insts
+		-- (Mind you, it should make no difference here.)
+        ; let needed_givens = [ng | ng <- needed_givens0
+				   , instToVar ng `notElem` dict_ids]
 
 		-- Note [Reducing implication constraints]
 		-- Tom -- update note, put somewhere!
 
 	; traceTc (text "reduceImplication result" <+> vcat
-			[ppr irreds, ppr binds, ppr needed_givens1])
--- 	; avails <- reduceList env' wanteds avails
--- 
--- 		-- Extract the binding
--- 	; (binds, irreds) <- extractResults avails wanteds
-	; (refinement_binds,needed_givens) <- extractLocalResults refined_avails needed_givens1
-	; traceTc (text "reduceImplication local results" <+> vcat
-			[ppr refinement_binds, ppr needed_givens])
+			[ppr irreds, ppr binds, ppr needed_givens])
 
 	; -- extract superclass binds
 	  --  (sc_binds,_) <- extractResults avails []
@@ -2132,9 +2160,12 @@ reduceImplication env orig_avails reft tvs extra_givens wanteds inst_loc
 	; let ret_avails = orig_avails
 --	; let ret_avails = updateImprovement orig_avails avails
 
+	-- SLPJ Sept 07: what if improvement happened inside the checkLoop?
+	-- Then we must iterate the outer loop too!
+
 	; traceTc (text "reduceImplication condition" <+> ppr ((isEmptyLHsBinds binds) || (null irreds)))
 
---	Porgress is no longer measered by the number of bindings
+--	Progress is no longer measered by the number of bindings
 --	; if isEmptyLHsBinds binds then 	-- No progress
 	; if (isEmptyLHsBinds binds) && (not $ null irreds) then 
 		return (ret_avails, NoInstance)
@@ -2147,24 +2178,26 @@ reduceImplication env orig_avails reft tvs extra_givens wanteds inst_loc
 			-- when inferring types.
 
 	; let	dict_wanteds = filter (not . isEqInst) wanteds
-		(extra_eq_givens, extra_dict_givens) = partition isEqInst extra_givens
-		dict_ids = map instToId extra_dict_givens 
 		-- TOMDO: given equational constraints bug!
 		--  we need a different evidence for given
 		--  equations depending on whether we solve
 		--  dictionary constraints or equational constraints
+
 		eq_tyvars = uniqSetToList $ tyVarsOfTypes $ map eqInstType extra_eq_givens
+			-- SLPJ Sept07: this looks Utterly Wrong to me, but I think
+			--	        that current extra_givens has no EqInsts, so
+			--		it makes no difference
 		-- dict_ids = map instToId extra_givens
-		co  = mkWpTyLams tvs <.> mkWpTyLams eq_tyvars <.> mkWpLams dict_ids <.> WpLet (binds `unionBags` refinement_binds `unionBags` bind)
+		co  = mkWpTyLams tvs <.> mkWpTyLams eq_tyvars <.> mkWpLams dict_ids <.> WpLet (binds `unionBags` bind)
 		rhs = mkHsWrap co payload
 	        loc = instLocSpan inst_loc
 		payload | [dict_wanted] <- dict_wanteds = HsVar (instToId dict_wanted)
 			| otherwise = ExplicitTuple (map (L loc . HsVar . instToId) dict_wanteds) Boxed
 
 	
-	; traceTc (text "reduceImplication ->"  <+> vcat
-			[ ppr ret_avails,
-			  ppr implic_insts])
+	; traceTc (vcat [text "reduceImplication" <+> ppr name,
+			 ppr implic_insts,
+			 text "->" <+> sep [ppr needed_givens, ppr rhs]])
 		-- If there are any irreds, we back off and return NoInstance
 	; return (ret_avails, GenInst (implic_insts ++ needed_givens) (L loc rhs))
   	} 
@@ -2266,7 +2299,7 @@ data AvailHow
   = IsIrred 		-- Used for irreducible dictionaries,
 			-- which are going to be lambda bound
 
-  | Given TcId 		-- Used for dictionaries for which we have a binding
+  | Given Inst 		-- Used for dictionaries for which we have a binding
 			-- e.g. those "given" in a signature
 
   | Rhs 		-- Used when there is a RHS
@@ -2278,8 +2311,9 @@ instance Outputable Avails where
 
 pprAvails (Avails imp avails)
   = vcat [ ptext SLIT("Avails") <> (if imp then ptext SLIT("[improved]") else empty)
-	 , nest 2 (vcat [sep [ppr inst, nest 2 (equals <+> ppr avail)]
-			| (inst,avail) <- fmToList avails ])]
+	 , nest 2 $ braces $ 
+	   vcat [ sep [ppr inst, nest 2 (equals <+> ppr avail)]
+		| (inst,avail) <- fmToList avails ]]
 
 instance Outputable AvailHow where
     ppr = pprAvail
@@ -2288,7 +2322,8 @@ instance Outputable AvailHow where
 pprAvail :: AvailHow -> SDoc
 pprAvail IsIrred	= text "Irred"
 pprAvail (Given x)   	= text "Given" <+> ppr x
-pprAvail (Rhs rhs bs)   = text "Rhs" <+> sep [ppr rhs, braces (ppr bs)]
+pprAvail (Rhs rhs bs)   = sep [text "Rhs" <+> ppr bs,
+			       nest 2 (ppr rhs)]
 
 -------------------------
 extendAvailEnv :: AvailEnv -> Inst -> AvailHow -> AvailEnv
@@ -2336,8 +2371,9 @@ extractResults :: Avails
 	       -> TcM (	TcDictBinds, 	-- Bindings
 			[Inst],		-- Irreducible ones
 			[Inst])		-- Needed givens, i.e. ones used in the bindings
-				-- Postcondition: needed-givens = free vars( binds ) \ irreds
-				-- Note [Reducing implication constraints]
+			-- Postcondition: needed-givens = free vars( binds ) \ irreds
+			--		  needed-gives is subset of Givens in incoming Avails
+			-- Note [Reducing implication constraints]
 
 extractResults (Avails _ avails) wanteds
   = go avails emptyBag [] [] wanteds
@@ -2352,64 +2388,42 @@ extractResults (Avails _ avails) wanteds
 	  Nothing -> pprTrace "Urk: extractResults" (ppr w) $
 		     go avails binds irreds givens ws
 
-	  Just (Given id) 
-		| id == w_id -> go avails binds irreds (w:givens) ws 
-		| otherwise  -> 
-                  go avails (addInstToDictBind binds w (nlHsVar id)) irreds 
-                     (update_id w  id:givens) ws
-		-- The sought Id can be one of the givens, via a superclass chain
-		-- and then we definitely don't want to generate an x=x binding!
+	  Just (Given g) -> go (avails_with g g_id)
+			       (add_triv_bind g_id)
+			       irreds (g:givens) ws 
+			-- avail_with g ensures that we don't emit the
+			-- same given twice into needed-givens
+		where
+		  g_id = instToId g
 
-	  Just IsIrred -> go (add_given avails w) binds (w:irreds) givens ws
-		-- The add_given handles the case where we want (Ord a, Eq a), and we
+	  Just IsIrred -> go (avails_with w w_id) binds (w:irreds) givens ws
+
+		-- The avails_with_w handles the case where we want (Ord a, Eq a), and we
 		-- don't want to emit *two* Irreds for Ord a, one via the superclass chain
 		-- This showed up in a dupliated Ord constraint in the error message for 
 		--	test tcfail043
+		-- More generally, we don't want to emit two irreds with 
+		-- the same type
 
-	  Just (Rhs rhs ws') -> go (add_given avails w) new_binds irreds givens (ws' ++ ws)
-			     where	
-				new_binds = addInstToDictBind binds w rhs
-      where
-	w_id = instToId w	
-	update_id m@(Method{}) id = m {tci_id = id}
-        update_id w            id = w {tci_name = idName id} 
+	  Just (Rhs rhs@(L _ (HsVar g_id)) ws') 
+		-> go avails (add_triv_bind g_id) irreds givens (ws' ++ ws)
 
-    add_given avails w = extendAvailEnv avails w (Given (instToId w))
-
-extractLocalResults :: Avails
-	       -> [Inst]		-- Wanted
-	       -> TcM (	TcDictBinds, 	-- Bindings
-			[Inst])		-- Needed givens, i.e. ones used in the bindings
-
-extractLocalResults (Avails _ avails) wanteds
-  = go avails emptyBag [] wanteds
-  where
-    go :: AvailEnv -> TcDictBinds -> [Inst] -> [Inst]
-	-> TcM (TcDictBinds, [Inst])
-    go avails binds givens [] 
-      = returnM (binds, givens)
-
-    go avails binds givens (w:ws)
-      = case findAvailEnv avails w of
-	  Nothing -> -- pprTrace "Urk: extractLocalResults" (ppr w) $
-		     go avails binds givens ws
-
-	  Just IsIrred ->
-		     go avails binds givens ws
-
-	  Just (Given id) 
-		| id == w_id -> go avails binds (w:givens) ws 
-		| otherwise  -> go avails binds (w{tci_name=idName id}:givens) ws
-		-- The sought Id can be one of the givens, via a superclass chain
-		-- and then we definitely don't want to generate an x=x binding!
-
-	  Just (Rhs rhs ws') -> go (add_given avails w) new_binds givens (ws' ++ ws)
-			     where	
-				new_binds = addInstToDictBind binds w rhs
+	  Just (Rhs rhs ws') 
+		-> go (avails_with w w_id) (add_bind rhs)
+		      irreds givens (ws' ++ ws)
+	  -- The avails-with w replaces a complex RHS with a simple one
+	  -- for the benefit of subsequent lookups
       where
 	w_id = instToId w	
 
-    add_given avails w = extendAvailEnv avails w (Given (instToId w))
+	add_triv_bind rhs_id | rhs_id == w_id = binds
+			     | otherwise = add_bind (nlHsVar rhs_id)
+		-- The sought Id can be one of the givens, via a
+		-- superclass chain and then we definitely don't 
+		-- want to generate an x=x binding!
+
+	add_bind rhs = addInstToDictBind binds w rhs
+        avails_with w w_id = extendAvailEnv avails w (Rhs (nlHsVar w_id) [])
 \end{code}
 
 
@@ -2431,15 +2445,15 @@ addWanted want_scs avails wanted rhs_expr wanteds
     avail = Rhs rhs_expr wanteds
 
 addGiven :: Avails -> Inst -> TcM Avails
-addGiven avails given = addAvailAndSCs AddSCs avails given (Given (instToId given))
+addGiven avails given = addAvailAndSCs AddSCs avails given (Given given)
 	-- Always add superclasses for 'givens'
 	--
 	-- No ASSERT( not (given `elemAvails` avails) ) because in an instance
 	-- decl for Ord t we can add both Ord t and Eq t as 'givens', 
 	-- so the assert isn't true
 
-addRefinedGiven :: Refinement -> ([Inst], Avails) -> Inst -> TcM ([Inst], Avails)
-addRefinedGiven reft (refined_givens, avails) given
+addRefinedGiven :: Refinement -> Avails -> Inst -> TcM Avails
+addRefinedGiven reft avails given
   | isDict given	-- We sometimes have 'given' methods, but they
 			-- are always optional, so we can drop them
   , let pred = dictPred given
@@ -2448,13 +2462,12 @@ addRefinedGiven reft (refined_givens, avails) given
   = do 	{ new_given <- newDictBndr (instLoc given) pred
 	; let rhs = L (instSpan given) $
 		    HsWrap (WpCo co) (HsVar (instToId given))
-	; avails <- addAvailAndSCs AddSCs avails new_given (Rhs rhs [given])
-	; return (new_given:refined_givens, avails) }
+	; addAvailAndSCs AddSCs avails new_given (Rhs rhs [given]) }
 	    -- ToDo: the superclasses of the original given all exist in Avails 
 	    -- so we could really just cast them, but it's more awkward to do,
 	    -- and hopefully the optimiser will spot the duplicated work
   | otherwise
-  = return (refined_givens, avails)
+  = return avails
 \end{code}
 
 Note [ImplicInst rigidity]
@@ -2516,7 +2529,7 @@ addAvailAndSCs want_scs avails inst avail
 
 addSCs :: (TcPredType -> Bool) -> Avails -> Inst -> TcM Avails
 	-- Add all the superclasses of the Inst to Avails
-	-- The first param says "dont do this because the original thing
+	-- The first param says "don't do this because the original thing
 	--	depends on this one, so you'd build a loop"
 	-- Invariant: the Inst is already in Avails.
 
@@ -2613,6 +2626,7 @@ tc_simplify_top doc interactive wanteds
 
 	; traceTc (text "tc_simplify_top 0: " <+> ppr wanteds)
 	; (irreds1, binds1) <- tryHardCheckLoop doc1 wanteds
+--	; (irreds1, binds1) <- gentleInferLoop doc1 wanteds
 	; traceTc (text "tc_simplify_top 1: " <+> ppr irreds1)
 	; (irreds2, binds2) <- approximateImplications doc2 (\d -> True) irreds1
 	; traceTc (text "tc_simplify_top 2: " <+> ppr irreds2)
