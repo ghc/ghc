@@ -294,7 +294,7 @@ option on all the Haskell modules that make up your application.
 
 <para>
 <indexterm><primary>Creating a Win32 DLL</primary></indexterm>
-<indexterm><primary>&ndash;&ndash;mk-dll</primary></indexterm>
+<indexterm><primary>&ndash;&ndash;shared</primary></indexterm>
 Sealing up your Haskell library inside a DLL is straightforward;
 compile up the object files that make up the library, and then build
 the DLL by issuing a command of the form:
@@ -302,12 +302,12 @@ the DLL by issuing a command of the form:
 
 <para>
 <screen>
-ghc &ndash;&ndash;mk-dll -o foo.dll bar.o baz.o wibble.a -lfooble
+ghc &ndash;&ndash;shared -o foo.dll bar.o baz.o wibble.a -lfooble
 </screen>
 </para>
 
 <para>
-By feeding the ghc compiler driver the option <option>&ndash;&ndash;mk-dll</option>, it
+By feeding the ghc compiler driver the option <option>&ndash;&ndash;shared</option>, it
 will build a DLL rather than produce an executable. The DLL will
 consist of all the object files and archives given on the command
 line.
@@ -347,12 +347,12 @@ you compile into a DLL must have a common root.
 <listitem>
 <para>
 By default, the entry points of all the object files will be exported from
-the DLL when using <option>&ndash;&ndash;mk-dll</option>. Should you want to constrain
+the DLL when using <option>&ndash;&ndash;shared</option>. Should you want to constrain
 this, you can specify the <emphasis>module definition file</emphasis> to use
 on the command line as follows:
 
 <screen>
-ghc &ndash;&ndash;mk-dll -o .... -optdll&ndash;&ndash;def -optdllMyDef.def
+ghc &ndash;&ndash;shared -o .... MyDef.def
 </screen>
 
 See Microsoft documentation for details, but a module definition file
@@ -371,22 +371,22 @@ EXPORTS
 
 <listitem>
 <para>
-In addition to creating a DLL, the <option>&ndash;&ndash;mk-dll</option> option also
+In addition to creating a DLL, the <option>&ndash;&ndash;shared</option> option also
 creates an import library. The import library name is derived from the
 name of the DLL, as follows:
 
 <programlisting>
-DLL: HScool.dll  ==&#62; import lib: libHScool_imp.a
+DLL: HScool.dll  ==&#62; import lib: libHScool.dll.a
 </programlisting>
 
 The naming scheme may look a bit weird, but it has the purpose of allowing
 the co-existence of import libraries with ordinary static libraries (e.g.,
 <filename>libHSfoo.a</filename> and
-<filename>libHSfoo&lowbar;imp.a</filename>.
+<filename>libHSfoo.dll.a</filename>.
 
 Additionally, when the compiler driver is linking in non-static mode, it
 will rewrite occurrence of <option>-lHSfoo</option> on the command line to
-<option>-lHSfoo&lowbar;imp</option>. By doing this for you, switching from
+<option>-lHSfoo.dll</option>. By doing this for you, switching from
 non-static to static linking is simply a question of adding
 <option>-static</option> to your command line.
 
@@ -485,7 +485,7 @@ ghc -c dllMain.c
 Construct the DLL:
 
 <screen>
-ghc &ndash;&ndash;mk-dll -o adder.dll adder.o adder_stub.o dllMain.o
+ghc &ndash;&ndash;shared -o adder.dll adder.o adder_stub.o dllMain.o
 </screen>
 
 </para>
