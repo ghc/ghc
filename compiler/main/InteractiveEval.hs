@@ -209,10 +209,10 @@ runStmt (Session ref) expr step
 	   Nothing -> return RunFailed
 	   Just (ids, hval) -> do
 
-              withBreakAction (isStep step) dflags' breakMVar statusMVar $ do
-
-              let thing_to_run = unsafeCoerce# hval :: IO [HValue]
-              status <- sandboxIO dflags' statusMVar thing_to_run
+              status <- 
+                withBreakAction (isStep step) dflags' breakMVar statusMVar $ do
+                      let thing_to_run = unsafeCoerce# hval :: IO [HValue]
+                      sandboxIO dflags' statusMVar thing_to_run
               
               let ic = hsc_IC hsc_env
                   bindings = (ic_tmp_ids ic, ic_tyvars ic)
