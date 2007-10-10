@@ -278,6 +278,7 @@ mkBits findLabel st proto_insns
 
                SLIDE     n by     -> instr3 st bci_SLIDE n by
                ALLOC_AP  n        -> instr2 st bci_ALLOC_AP n
+               ALLOC_AP_NOUPD n   -> instr2 st bci_ALLOC_AP_NOUPD n
                ALLOC_PAP arity n  -> instr3 st bci_ALLOC_PAP arity n
                MKAP      off sz   -> instr3 st bci_MKAP off sz
                MKPAP     off sz   -> instr3 st bci_MKPAP off sz
@@ -439,6 +440,7 @@ instrSize16s instr
 	PUSH_APPLY_PPPPPP{}	-> 1
         SLIDE{}			-> 3
         ALLOC_AP{}		-> 2
+        ALLOC_AP_NOUPD{}	-> 2
         ALLOC_PAP{}		-> 3
         MKAP{}			-> 3
         MKPAP{}			-> 3

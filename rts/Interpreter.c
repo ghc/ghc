@@ -1049,6 +1049,17 @@ run_BCO:
 	    goto nextInsn;
 	}
 
+	case bci_ALLOC_AP_NOUPD: {
+	    StgAP* ap; 
+	    int n_payload = BCO_NEXT;
+	    ap = (StgAP*)allocate(AP_sizeW(n_payload));
+	    Sp[-1] = (W_)ap;
+	    ap->n_args = n_payload;
+	    SET_HDR(ap, &stg_AP_NOUPD_info, CCS_SYSTEM/*ToDo*/)
+	    Sp --;
+	    goto nextInsn;
+	}
+
 	case bci_ALLOC_PAP: {
 	    StgPAP* pap; 
 	    int arity = BCO_NEXT;
@@ -1370,7 +1381,7 @@ run_BCO:
 	    // Errors
 	default: 
 	    barf("interpretBCO: unknown or unimplemented opcode %d",
-                 (int)BCO_NEXT);
+                 (int)(bci & 0xFF));
 
 	} /* switch on opcode */
     }

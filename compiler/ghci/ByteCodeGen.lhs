@@ -427,8 +427,14 @@ schemeE d s p (AnnLet binds (_,body))
               return (push_code `appOL` more_push_code)
 
          alloc_code = toOL (zipWith mkAlloc sizes arities)
-	   where mkAlloc sz 0     = ALLOC_AP sz
+	   where mkAlloc sz 0
+                    | is_tick     = ALLOC_AP_NOUPD sz
+                    | otherwise   = ALLOC_AP sz
 		 mkAlloc sz arity = ALLOC_PAP arity sz
+
+         is_tick = case binds of 
+                     AnnNonRec id _ -> occNameFS (getOccName id) == tickFS
+                     _other -> False
 
 	 compile_bind d' fvs x rhs size arity off = do
 		bco <- schemeR fvs (x,rhs)
@@ -1519,5 +1525,7 @@ newUnique = BcM $
 newId :: Type -> BcM Id
 newId ty = do 
     uniq <- newUnique
-    return $ mkSysLocal FSLIT("ticked") uniq ty
+    return $ mkSysLocal tickFS uniq ty
+
+tickFS = FSLIT("ticked")
 \end{code}

@@ -104,8 +104,9 @@ data BCInstr
    | SLIDE     Int{-this many-} Int{-down by this much-}
 
    -- To do with the heap
-   | ALLOC_AP  !Int	-- make an AP with this many payload words
-   | ALLOC_PAP !Int !Int	-- make a PAP with this arity / payload words
+   | ALLOC_AP  !Int	 -- make an AP with this many payload words
+   | ALLOC_AP_NOUPD !Int -- make an AP_NOUPD with this many payload words
+   | ALLOC_PAP !Int !Int -- make a PAP with this arity / payload words
    | MKAP      !Int{-ptr to AP is this far down stack-} !Int{-# words-}
    | MKPAP     !Int{-ptr to PAP is this far down stack-} !Int{-# words-}
    | UNPACK    !Int	-- unpack N words from t.o.s Constr
@@ -202,6 +203,7 @@ instance Outputable BCInstr where
 
    ppr (SLIDE n d)           = text "SLIDE   " <+> int n <+> int d
    ppr (ALLOC_AP sz)         = text "ALLOC_AP   " <+> int sz
+   ppr (ALLOC_AP_NOUPD sz)   = text "ALLOC_AP_NOUPD   " <+> int sz
    ppr (ALLOC_PAP arity sz)  = text "ALLOC_PAP   " <+> int arity <+> int sz
    ppr (MKAP offset sz)      = text "MKAP    " <+> int sz <+> text "words," 
                                                <+> int offset <+> text "stkoff"
@@ -266,6 +268,7 @@ bciStackUse PUSH_APPLY_PPPP{}	  = 1
 bciStackUse PUSH_APPLY_PPPPP{}	  = 1
 bciStackUse PUSH_APPLY_PPPPPP{}	  = 1
 bciStackUse ALLOC_AP{}            = 1
+bciStackUse ALLOC_AP_NOUPD{}      = 1
 bciStackUse ALLOC_PAP{}           = 1
 bciStackUse (UNPACK sz)           = sz
 bciStackUse LABEL{}       	  = 0
