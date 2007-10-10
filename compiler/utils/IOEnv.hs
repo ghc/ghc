@@ -99,7 +99,9 @@ fixM f = IOEnv (\ env -> fixIO (\ r -> unIOEnv (f r) env))
 
 ---------------------------
 tryM :: IOEnv env r -> IOEnv env (Either Exception r)
--- Reflect UserError exceptions into IOEnv monad
+-- Reflect UserError exceptions (only) into IOEnv monad
+-- Other exceptions are not caught; they are simply propagated as exns
+--
 -- The idea is that errors in the program being compiled will give rise
 -- to UserErrors.  But, say, pattern-match failures in GHC itself should
 -- not be caught here, else they'll be reported as errors in the program 
