@@ -1,0 +1,10 @@
+
+TH_runIO.hs:12:8:
+    Exception when trying to run compile-time code:
+      user error (hi)
+      Code: let
+	      fail = fail @ IO $dMonad
+	      $dMonad = GHC.IOBase.$f16
+	    in runIO @ Exp (fail @ Exp "hi")
+    In the expression: $[splice](runIO (fail "hi"))
+    In the definition of `foo': foo = $[splice](runIO (fail "hi"))
