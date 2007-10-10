@@ -875,7 +875,7 @@ instance OutputableBndr id => Outputable (HsSplice id) where
   ppr = pprSplice
 
 pprSplice :: OutputableBndr id => HsSplice id -> SDoc
-pprSplice (HsSplice n e) = char '$' <> brackets (ppr n) <> pprParendExpr e
+pprSplice (HsSplice n e) = char '$' <> ifPprDebug (brackets (ppr n)) <> pprParendExpr e
 
 
 data HsBracket id = ExpBr (LHsExpr id)		-- [|  expr  |]
