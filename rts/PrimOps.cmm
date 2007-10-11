@@ -1445,7 +1445,7 @@ isEmptyMVarzh_fast
 {
     /* args: R1 = MVar closure */
 
-    if (GET_INFO(R1) == stg_EMPTY_MVAR_info) {
+    if (StgMVar_value(R1) == stg_END_TSO_QUEUE_closure) {
 	RET_N(1);
     } else {
 	RET_N(0);
@@ -1460,7 +1460,8 @@ newMVarzh_fast
     ALLOC_PRIM ( SIZEOF_StgMVar, NO_PTRS, newMVarzh_fast );
   
     mvar = Hp - SIZEOF_StgMVar + WDS(1);
-    SET_HDR(mvar,stg_EMPTY_MVAR_info,W_[CCCS]);
+    SET_HDR(mvar,stg_MVAR_DIRTY_info,W_[CCCS]);
+        // MVARs start dirty: generation 0 has no mutable list
     StgMVar_head(mvar)  = stg_END_TSO_QUEUE_closure;
     StgMVar_tail(mvar)  = stg_END_TSO_QUEUE_closure;
     StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
@@ -1495,11 +1496,15 @@ takeMVarzh_fast
 #else
     info = GET_INFO(mvar);
 #endif
+        
+    if (info == stg_MVAR_CLEAN_info) {
+        foreign "C" dirty_MVAR(BaseReg "ptr", mvar);
+    }
 
     /* If the MVar is empty, put ourselves on its blocking queue,
      * and wait until we're woken up.
      */
-    if (info == stg_EMPTY_MVAR_info) {
+    if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_head(mvar) = CurrentTSO;
 	} else {
@@ -1543,7 +1548,9 @@ takeMVarzh_fast
       }
 
 #if defined(THREADED_RTS)
-      unlockClosure(mvar, stg_FULL_MVAR_info);
+      unlockClosure(mvar, stg_MVAR_DIRTY_info);
+#else
+      SET_INFO(mvar,stg_MVAR_DIRTY_info);
 #endif
       RET_P(val);
   } 
@@ -1553,9 +1560,9 @@ takeMVarzh_fast
       StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
  
 #if defined(THREADED_RTS)
-      unlockClosure(mvar, stg_EMPTY_MVAR_info);
+      unlockClosure(mvar, stg_MVAR_DIRTY_info);
 #else
-      SET_INFO(mvar,stg_EMPTY_MVAR_info);
+      SET_INFO(mvar,stg_MVAR_DIRTY_info);
 #endif
 
       RET_P(val);
@@ -1577,14 +1584,18 @@ tryTakeMVarzh_fast
     info = GET_INFO(mvar);
 #endif
 
-    if (info == stg_EMPTY_MVAR_info) {
+    if (StgMVar_value(mvar) == stg_END_TSO_QUEUE_closure) {
 #if defined(THREADED_RTS)
-        unlockClosure(mvar, stg_EMPTY_MVAR_info);
+        unlockClosure(mvar, info);
 #endif
 	/* HACK: we need a pointer to pass back, 
 	 * so we abuse NO_FINALIZER_closure
 	 */
 	RET_NP(0, stg_NO_FINALIZER_closure);
+    }
+
+    if (info == stg_MVAR_CLEAN_info) {
+        foreign "C" dirty_MVAR(BaseReg "ptr", mvar);
     }
 
     /* we got the value... */
@@ -1616,7 +1627,9 @@ tryTakeMVarzh_fast
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
 	}
 #if defined(THREADED_RTS)
-        unlockClosure(mvar, stg_FULL_MVAR_info);
+        unlockClosure(mvar, stg_MVAR_DIRTY_info);
+#else
+        SET_INFO(mvar,stg_MVAR_DIRTY_info);
 #endif
     }
     else 
@@ -1624,9 +1637,9 @@ tryTakeMVarzh_fast
 	/* No further putMVars, MVar is now empty */
 	StgMVar_value(mvar) = stg_END_TSO_QUEUE_closure;
 #if defined(THREADED_RTS)
-    	unlockClosure(mvar, stg_EMPTY_MVAR_info);
+    	unlockClosure(mvar, stg_MVAR_DIRTY_info);
 #else
-	SET_INFO(mvar,stg_EMPTY_MVAR_info);
+	SET_INFO(mvar,stg_MVAR_DIRTY_info);
 #endif
     }
     
@@ -1647,7 +1660,11 @@ putMVarzh_fast
     info = GET_INFO(mvar);
 #endif
 
-    if (info == stg_FULL_MVAR_info) {
+    if (info == stg_MVAR_CLEAN_info) {
+        foreign "C" dirty_MVAR(BaseReg "ptr", mvar);
+    }
+
+    if (StgMVar_value(mvar) != stg_END_TSO_QUEUE_closure) {
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_head(mvar) = CurrentTSO;
 	} else {
@@ -1686,7 +1703,9 @@ putMVarzh_fast
 	}
 
 #if defined(THREADED_RTS)
-    	unlockClosure(mvar, stg_EMPTY_MVAR_info);
+    	unlockClosure(mvar, stg_MVAR_DIRTY_info);
+#else
+        SET_INFO(mvar,stg_MVAR_DIRTY_info);
 #endif
 	jump %ENTRY_CODE(Sp(0));
     }
@@ -1696,9 +1715,9 @@ putMVarzh_fast
 	StgMVar_value(mvar) = R2;
 
 #if defined(THREADED_RTS)
-    	unlockClosure(mvar, stg_FULL_MVAR_info);
+    	unlockClosure(mvar, stg_MVAR_DIRTY_info);
 #else
-	SET_INFO(mvar,stg_FULL_MVAR_info);
+	SET_INFO(mvar,stg_MVAR_DIRTY_info);
 #endif
 	jump %ENTRY_CODE(Sp(0));
     }
@@ -1720,13 +1739,17 @@ tryPutMVarzh_fast
     info = GET_INFO(mvar);
 #endif
 
-    if (info == stg_FULL_MVAR_info) {
+    if (StgMVar_value(mvar) != stg_END_TSO_QUEUE_closure) {
 #if defined(THREADED_RTS)
-    	unlockClosure(mvar, stg_FULL_MVAR_info);
+    	unlockClosure(mvar, info);
 #endif
 	RET_N(0);
     }
   
+    if (info == stg_MVAR_CLEAN_info) {
+        foreign "C" dirty_MVAR(BaseReg "ptr", mvar);
+    }
+
     if (StgMVar_head(mvar) != stg_END_TSO_QUEUE_closure) {
 
 	/* There are takeMVar(s) waiting: wake up the first one
@@ -1752,7 +1775,9 @@ tryPutMVarzh_fast
 	}
 
 #if defined(THREADED_RTS)
-    	unlockClosure(mvar, stg_EMPTY_MVAR_info);
+    	unlockClosure(mvar, stg_MVAR_DIRTY_info);
+#else
+        SET_INFO(mvar,stg_MVAR_DIRTY_info);
 #endif
     }
     else
@@ -1761,9 +1786,9 @@ tryPutMVarzh_fast
 	StgMVar_value(mvar) = R2;
 
 #if defined(THREADED_RTS)
-    	unlockClosure(mvar, stg_FULL_MVAR_info);
+    	unlockClosure(mvar, stg_MVAR_DIRTY_info);
 #else
-	SET_INFO(mvar,stg_FULL_MVAR_info);
+	SET_INFO(mvar,stg_MVAR_DIRTY_info);
 #endif
     }
     

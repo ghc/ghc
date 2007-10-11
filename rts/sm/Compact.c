@@ -644,7 +644,8 @@ thread_obj (StgInfoTable *info, StgPtr p)
 	return p + sizeofW(StgWeak);
     }
     
-    case MVAR:
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
     { 
 	StgMVar *mvar = (StgMVar *)p;
 	thread_(&mvar->head);

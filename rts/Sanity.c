@@ -256,7 +256,8 @@ checkClosure( StgClosure* p )
     info = get_itbl(p);
     switch (info->type) {
 
-    case MVAR:
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
       { 
 	StgMVar *mvar = (StgMVar *)p;
 	ASSERT(LOOKS_LIKE_CLOSURE_PTR(mvar->head));

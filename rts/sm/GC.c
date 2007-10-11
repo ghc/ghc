@@ -124,6 +124,7 @@ static lnat g0s0_pcnt_kept = 30; // percentage of g0s0 live at last minor GC
 #ifdef DEBUG
 nat mutlist_MUTVARS,
     mutlist_MUTARRS,
+    mutlist_MVARS,
     mutlist_OTHERS;
 #endif
 
@@ -637,9 +638,9 @@ GarbageCollect ( rtsBool force_major_gc )
 	copied +=  mut_list_size;
 
 	debugTrace(DEBUG_gc,
-		   "mut_list_size: %lu (%d vars, %d arrays, %d others)",
+		   "mut_list_size: %lu (%d vars, %d arrays, %d MVARs, %d others)",
 		   (unsigned long)(mut_list_size * sizeof(W_)),
-		   mutlist_MUTVARS, mutlist_MUTARRS, mutlist_OTHERS);
+		   mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS);
     }
 
     for (s = 0; s < generations[g].n_steps; s++) {

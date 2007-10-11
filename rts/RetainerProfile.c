@@ -491,7 +491,8 @@ push( StgClosure *c, retainer c_child_r, StgClosure **first_child )
 
 	// three children (fixed), no SRT
 	// need to push a stackElement
-    case MVAR:
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
 	// head must be TSO and the head of a linked list of TSOs.
 	// Shoule it be a child? Seems to be yes.
 	*first_child = (StgClosure *)((StgMVar *)c)->head;
@@ -804,7 +805,8 @@ pop( StgClosure **c, StgClosure **cp, retainer *r )
 
 	    // three children (fixed), no SRT
 	    // need to push a stackElement
-	case MVAR:
+        case MVAR_CLEAN:
+        case MVAR_DIRTY:
 	    if (se->info.next.step == 2) {
 		*c = (StgClosure *)((StgMVar *)se->c)->tail;
 		se->info.next.step++;             // move to the next step
@@ -1057,7 +1059,8 @@ isRetainer( StgClosure *c )
     case TSO:
 
 	// mutable objects
-    case MVAR:
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY:
     case MUT_ARR_PTRS_CLEAN:

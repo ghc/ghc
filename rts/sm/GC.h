@@ -36,7 +36,7 @@ extern lnat new_blocks;		 // blocks allocated during this GC
 extern lnat new_scavd_blocks;	 // ditto, but depth-first blocks
 
 #ifdef DEBUG
-extern nat mutlist_MUTVARS, mutlist_MUTARRS, mutlist_OTHERS;
+extern nat mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS;
 #endif
 
 StgClosure * isAlive(StgClosure *p);

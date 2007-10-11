@@ -293,15 +293,23 @@ scavenge(step *stp)
     q = p;
     switch (info->type) {
 
-    case MVAR:
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
     { 
+	rtsBool saved_eager_promotion = eager_promotion;
+
 	StgMVar *mvar = ((StgMVar *)p);
-	evac_gen = 0;
+	eager_promotion = rtsFalse;
 	mvar->head = (StgTSO *)evacuate((StgClosure *)mvar->head);
 	mvar->tail = (StgTSO *)evacuate((StgClosure *)mvar->tail);
 	mvar->value = evacuate((StgClosure *)mvar->value);
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable.
+	eager_promotion = saved_eager_promotion;
+
+	if (failed_to_evac) {
+	    mvar->header.info = &stg_MVAR_DIRTY_info;
+	} else {
+	    mvar->header.info = &stg_MVAR_CLEAN_info;
+	}
 	p += sizeofW(StgMVar);
 	break;
     }
@@ -696,17 +704,25 @@ linear_scan:
 	q = p;
 	switch (info->type) {
 	    
-	case MVAR:
-	{
-	    StgMVar *mvar = ((StgMVar *)p);
-	    evac_gen = 0;
-	    mvar->head = (StgTSO *)evacuate((StgClosure *)mvar->head);
-	    mvar->tail = (StgTSO *)evacuate((StgClosure *)mvar->tail);
-	    mvar->value = evacuate((StgClosure *)mvar->value);
-	    evac_gen = saved_evac_gen;
-	    failed_to_evac = rtsTrue; // mutable.
-	    break;
-	}
+        case MVAR_CLEAN:
+        case MVAR_DIRTY:
+        { 
+            rtsBool saved_eager_promotion = eager_promotion;
+            
+            StgMVar *mvar = ((StgMVar *)p);
+            eager_promotion = rtsFalse;
+            mvar->head = (StgTSO *)evacuate((StgClosure *)mvar->head);
+            mvar->tail = (StgTSO *)evacuate((StgClosure *)mvar->tail);
+            mvar->value = evacuate((StgClosure *)mvar->value);
+            eager_promotion = saved_eager_promotion;
+            
+            if (failed_to_evac) {
+                mvar->header.info = &stg_MVAR_DIRTY_info;
+            } else {
+                mvar->header.info = &stg_MVAR_CLEAN_info;
+            }
+            break;
+        }
 
 	case FUN_2_0:
 	    scavenge_fun_srt(info);
@@ -1074,15 +1090,23 @@ scavenge_one(StgPtr p)
     
     switch (info->type) {
 	
-    case MVAR:
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
     { 
+	rtsBool saved_eager_promotion = eager_promotion;
+
 	StgMVar *mvar = ((StgMVar *)p);
-	evac_gen = 0;
+	eager_promotion = rtsFalse;
 	mvar->head = (StgTSO *)evacuate((StgClosure *)mvar->head);
 	mvar->tail = (StgTSO *)evacuate((StgClosure *)mvar->tail);
 	mvar->value = evacuate((StgClosure *)mvar->value);
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable.
+	eager_promotion = saved_eager_promotion;
+
+	if (failed_to_evac) {
+	    mvar->header.info = &stg_MVAR_DIRTY_info;
+	} else {
+	    mvar->header.info = &stg_MVAR_CLEAN_info;
+	}
 	break;
     }
 
@@ -1409,6 +1433,10 @@ scavenge_mutable_list(generation *gen)
 	    case MUT_ARR_PTRS_FROZEN:
 	    case MUT_ARR_PTRS_FROZEN0:
 		mutlist_MUTARRS++; break;
+	    case MVAR_CLEAN:
+		barf("MVAR_CLEAN on mutable list");
+	    case MVAR_DIRTY:
+		mutlist_MVARS++; break;
 	    default:
 		mutlist_OTHERS++; break;
 	    }

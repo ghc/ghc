@@ -282,7 +282,13 @@ check_target:
 
 	// ASSUMPTION: tso->block_info must always point to a
 	// closure.  In the threaded RTS it does.
-	if (get_itbl(mvar)->type != MVAR) goto retry;
+        switch (get_itbl(mvar)->type) {
+        case MVAR_CLEAN:
+        case MVAR_DIRTY:
+            break;
+        default:
+            goto retry;
+        }
 
 	info = lockClosure((StgClosure *)mvar);
 

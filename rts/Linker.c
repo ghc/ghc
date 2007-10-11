@@ -646,7 +646,8 @@ typedef struct _RtsSymbolVal {
       SymX(stg_CAF_BLACKHOLE_info)		\
       SymX(awakenBlockedQueue)			\
       SymX(stg_CHARLIKE_closure)		\
-      SymX(stg_EMPTY_MVAR_info)			\
+      SymX(stg_MVAR_CLEAN_info)			\
+      SymX(stg_MVAR_DIRTY_info)			\
       SymX(stg_IND_STATIC_info)			\
       SymX(stg_INTLIKE_closure)			\
       SymX(stg_MUT_ARR_PTRS_DIRTY_info)		\

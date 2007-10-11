@@ -124,5 +124,8 @@ extern void performMajorGC(void);
 extern HsInt64 getAllocations( void );
 extern void revertCAFs( void );
 extern void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
+extern void dirty_MVAR(StgRegTable *reg, StgClosure *p);
+
+extern void dirty_TSO(StgClosure *tso);
 
 #endif /*  RTSEXTERNAL_H */

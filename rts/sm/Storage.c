@@ -781,12 +781,15 @@ allocatePinned( nat n )
 }
 
 /* -----------------------------------------------------------------------------
+   Write Barriers
+   -------------------------------------------------------------------------- */
+
+/*
    This is the write barrier for MUT_VARs, a.k.a. IORefs.  A
    MUT_VAR_CLEAN object is not on the mutable list; a MUT_VAR_DIRTY
    is.  When written to, a MUT_VAR_CLEAN turns into a MUT_VAR_DIRTY
    and is put on the mutable list.
-   -------------------------------------------------------------------------- */
-
+*/
 void
 dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
 {
@@ -797,6 +800,23 @@ dirty_MUT_VAR(StgRegTable *reg, StgClosure *p)
 	bd = Bdescr((StgPtr)p);
 	if (bd->gen_no > 0) recordMutableCap(p,cap,bd->gen_no);
     }
+}
+
+/*
+   This is the write barrier for MVARs.  An MVAR_CLEAN objects is not
+   on the mutable list; a MVAR_DIRTY is.  When written to, a
+   MVAR_CLEAN turns into a MVAR_DIRTY and is put on the mutable list.
+   The check for MVAR_CLEAN is inlined at the call site for speed,
+   this really does make a difference on concurrency-heavy benchmarks
+   such as Chaneneos and cheap-concurrency.
+*/
+void
+dirty_MVAR(StgRegTable *reg, StgClosure *p)
+{
+    Capability *cap = regTableToCapability(reg);
+    bdescr *bd;
+    bd = Bdescr((StgPtr)p);
+    if (bd->gen_no > 0) recordMutableCap(p,cap,bd->gen_no);
 }
 
 /* -----------------------------------------------------------------------------

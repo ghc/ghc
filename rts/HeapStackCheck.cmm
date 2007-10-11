@@ -827,7 +827,9 @@ INFO_TABLE_RET( stg_block_takemvar, RET_SMALL, "ptr" W_ unused )
 stg_block_takemvar_finally
 {
 #ifdef THREADED_RTS
-    unlockClosure(R3, stg_EMPTY_MVAR_info);
+    unlockClosure(R3, stg_MVAR_DIRTY_info);
+#else
+    SET_INFO(R3, stg_MVAR_DIRTY_info);
 #endif
     jump StgReturn;
 }
@@ -853,7 +855,9 @@ INFO_TABLE_RET( stg_block_putmvar, RET_SMALL, "ptr" W_ unused1, "ptr" W_ unused2
 stg_block_putmvar_finally
 {
 #ifdef THREADED_RTS
-    unlockClosure(R3, stg_FULL_MVAR_info);
+    unlockClosure(R3, stg_MVAR_DIRTY_info);
+#else
+    SET_INFO(R3, stg_MVAR_DIRTY_info);
 #endif
     jump StgReturn;
 }

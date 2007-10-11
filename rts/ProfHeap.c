@@ -146,7 +146,8 @@ static char *type_names[] = {
     "BLACKHOLE",
     "SE_BLACKHOLE",
     "SE_CAF_BLACKHOLE",
-    "MVAR",
+    "MVAR_CLEAN",
+    "MVAR_DIRTY",
     "ARR_WORDS",
     "MUT_ARR_PTRS_CLEAN",
     "MUT_ARR_PTRS_DIRTY",
@@ -974,7 +975,8 @@ heapCensusChain( Census *census, bdescr *bd )
 		size = bco_sizeW((StgBCO *)p);
 		break;
 
-	    case MVAR:
+            case MVAR_CLEAN:
+            case MVAR_DIRTY:
 	    case WEAK:
 	    case STABLE_NAME:
 	    case MUT_VAR_CLEAN:

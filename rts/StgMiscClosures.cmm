@@ -467,11 +467,11 @@ INFO_TABLE(stg_STABLE_NAME,0,1,STABLE_NAME,"STABLE_NAME","STABLE_NAME")
    and entry code for each type.
    ------------------------------------------------------------------------- */
 
-INFO_TABLE(stg_FULL_MVAR,3,0,MVAR,"MVAR","MVAR")
-{ foreign "C" barf("FULL_MVAR object entered!") never returns; }
+INFO_TABLE(stg_MVAR_CLEAN,3,0,MVAR_CLEAN,"MVAR","MVAR")
+{ foreign "C" barf("MVAR object entered!") never returns; }
 
-INFO_TABLE(stg_EMPTY_MVAR,3,0,MVAR,"MVAR","MVAR")
-{ foreign "C" barf("EMPTY_MVAR object entered!") never returns; }
+INFO_TABLE(stg_MVAR_DIRTY,3,0,MVAR_DIRTY,"MVAR","MVAR")
+{ foreign "C" barf("MVAR object entered!") never returns; }
 
 /* -----------------------------------------------------------------------------
    STM

@@ -340,7 +340,8 @@ printClosure( StgClosure *obj )
 	debugBelch("MUT_ARR_PTRS_FROZEN(size=%lu)\n", (lnat)((StgMutArrPtrs *)obj)->ptrs);
 	break;
 
-    case MVAR:
+    case MVAR_CLEAN:
+    case MVAR_DIRTY:
         {
 	  StgMVar* mv = (StgMVar*)obj;
 	  debugBelch("MVAR(head=%p, tail=%p, value=%p)\n", mv->head, mv->tail, mv->value);
