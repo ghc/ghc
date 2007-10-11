@@ -1276,6 +1276,7 @@ legalFFITyCon tc
 marshalableTyCon dflags tc
   =  (dopt Opt_UnliftedFFITypes dflags 
       && isUnLiftedTyCon tc
+      && not (isUnboxedTupleTyCon tc)
       && case tyConPrimRep tc of	-- Note [Marshalling VoidRep]
 	   VoidRep -> False
 	   other   -> True)
