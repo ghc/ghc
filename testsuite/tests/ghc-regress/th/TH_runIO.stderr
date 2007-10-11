@@ -6,5 +6,5 @@ TH_runIO.hs:12:8:
 	      fail = fail @ IO $dMonad
 	      $dMonad = GHC.IOBase.$f16
 	    in runIO @ Exp (fail @ Exp "hi")
-    In the expression: $[splice](runIO (fail "hi"))
-    In the definition of `foo': foo = $[splice](runIO (fail "hi"))
+    In the expression: $(runIO (fail "hi"))
+    In the definition of `foo': foo = $(runIO (fail "hi"))
