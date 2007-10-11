@@ -261,7 +261,8 @@ MAIN                     MAIN             0    0.0   0.0    100.0 100.0
       in the profiling output, and
       <literal>&lt;expression&gt;</literal> is any Haskell
       expression.  An <literal>SCC</literal> annotation extends as
-      far to the right as possible when parsing.</para>
+      far to the right as possible when parsing. (SCC stands for "Set
+      Cost Centre").</para>
 
     </sect2>
 
