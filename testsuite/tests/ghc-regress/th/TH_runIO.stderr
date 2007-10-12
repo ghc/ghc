@@ -3,8 +3,9 @@ TH_runIO.hs:12:8:
     Exception when trying to run compile-time code:
       user error (hi)
       Code: let
-	      fail = fail @ IO $dMonad
+	      fail = fail
 	      $dMonad = GHC.IOBase.$f16
-	    in runIO @ Exp (fail @ Exp "hi")
+	    in runIO (fail "hi")
     In the expression: $(runIO (fail "hi"))
     In the definition of `foo': foo = $(runIO (fail "hi"))
+
