@@ -1046,10 +1046,10 @@ isAlive(StgClosure *p)
   while (1) {
     /* The tag and the pointer are split, to be merged later when needed. */
     tag = GET_CLOSURE_TAG(p);
-    p = UNTAG_CLOSURE(p);
+    q = UNTAG_CLOSURE(p);
 
-    ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
-    info = get_itbl(p);
+    ASSERT(LOOKS_LIKE_CLOSURE_PTR(q));
+    info = get_itbl(q);
 
     // ignore static closures 
     //
@@ -1057,19 +1057,19 @@ isAlive(StgClosure *p)
     // Problem here is that we sometimes don't set the link field, eg.
     // for static closures with an empty SRT or CONSTR_STATIC_NOCAFs.
     //
-    if (!HEAP_ALLOCED(p)) {
-	return TAG_CLOSURE(tag,p);
+    if (!HEAP_ALLOCED(q)) {
+	return p;
     }
 
     // ignore closures in generations that we're not collecting. 
-    bd = Bdescr((P_)p);
+    bd = Bdescr((P_)q);
     if (bd->gen_no > N) {
-	return TAG_CLOSURE(tag,p);
+	return p;
     }
 
     // if it's a pointer into to-space, then we're done
     if (bd->flags & BF_EVACUATED) {
-	return TAG_CLOSURE(tag,p);
+	return p;
     }
 
     // large objects use the evacuated flag
@@ -1078,8 +1078,8 @@ isAlive(StgClosure *p)
     }
 
     // check the mark bit for compacted steps
-    if ((bd->flags & BF_COMPACTED) && is_marked((P_)p,bd)) {
-	return TAG_CLOSURE(tag,p);
+    if ((bd->flags & BF_COMPACTED) && is_marked((P_)q,bd)) {
+	return p;
     }
 
     switch (info->type) {
@@ -1090,16 +1090,16 @@ isAlive(StgClosure *p)
     case IND_OLDGEN:		// rely on compatible layout with StgInd 
     case IND_OLDGEN_PERM:
       // follow indirections 
-      p = ((StgInd *)p)->indirectee;
+      p = ((StgInd *)q)->indirectee;
       continue;
 
     case EVACUATED:
       // alive! 
-      return ((StgEvacuated *)p)->evacuee;
+      return ((StgEvacuated *)q)->evacuee;
 
     case TSO:
-      if (((StgTSO *)p)->what_next == ThreadRelocated) {
-	p = (StgClosure *)((StgTSO *)p)->link;
+      if (((StgTSO *)q)->what_next == ThreadRelocated) {
+	p = (StgClosure *)((StgTSO *)q)->link;
 	continue;
       } 
       return NULL;
