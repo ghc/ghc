@@ -1786,7 +1786,7 @@ reduceContext env wanteds
 	  --    This may expose some further equational constraints...
 	; wanted_dicts' <- zonkInsts wanted_dicts
 	; avails <- reduceList env wanted_dicts' init_state
-	; (binds, irreds0, needed_givens) <- extractResults avails wanted_dicts'
+	; let (binds, irreds0, needed_givens) = extractResults avails wanted_dicts'
 	; traceTc $ text "reduceContext extractresults" <+> vcat
 		      [ppr avails,ppr wanted_dicts',ppr binds,ppr needed_givens]
 
@@ -2366,64 +2366,56 @@ We assume that they'll be wrapped in a big Rec, so that the
 dependency analyser can sort them out later
 
 \begin{code}
+type DoneEnv = FiniteMap Inst [Id]
+-- Tracks which things we have evidence for
+
 extractResults :: Avails
 	       -> [Inst]		-- Wanted
-	       -> TcM (	TcDictBinds, 	-- Bindings
-			[Inst],		-- Irreducible ones
-			[Inst])		-- Needed givens, i.e. ones used in the bindings
+	       -> (TcDictBinds, 	-- Bindings
+		   [Inst],		-- Irreducible ones
+		   [Inst])		-- Needed givens, i.e. ones used in the bindings
 			-- Postcondition: needed-givens = free vars( binds ) \ irreds
 			--		  needed-gives is subset of Givens in incoming Avails
 			-- Note [Reducing implication constraints]
 
 extractResults (Avails _ avails) wanteds
-  = go avails emptyBag [] [] wanteds
+  = go emptyBag [] [] emptyFM wanteds
   where
-    go :: AvailEnv -> TcDictBinds -> [Inst] -> [Inst] -> [Inst]
-	-> TcM (TcDictBinds, [Inst], [Inst])
-    go avails binds irreds givens [] 
-      = returnM (binds, irreds, givens)
+    go	:: TcDictBinds 	-- Bindings for dicts
+	-> [Inst]	-- Irreds
+	-> [Inst]	-- Needed givens
+	-> DoneEnv	-- Has an entry for each inst in the above three sets
+	-> [Inst]	-- Wanted
+	-> (TcDictBinds, [Inst], [Inst])
+    go binds irreds givens done [] 
+      = (binds, irreds, givens)
 
-    go avails binds irreds givens (w:ws)
+    go binds irreds givens done (w:ws)
+      | Just done_ids@(done_id : rest_done_ids) <- lookupFM done w
+      = if w_id `elem` done_ids then
+	   go binds irreds givens done ws
+	else
+	   go (add_bind (nlHsVar done_id)) irreds givens 
+	      (addToFM done w (done_id : w_id : rest_done_ids)) ws
+
+      | otherwise	-- Not yet done
       = case findAvailEnv avails w of
 	  Nothing -> pprTrace "Urk: extractResults" (ppr w) $
-		     go avails binds irreds givens ws
+		     go binds irreds givens done ws
 
-	  Just (Given g) -> go (avails_with g g_id)
-			       (add_triv_bind g_id)
-			       irreds (g:givens) ws 
-			-- avail_with g ensures that we don't emit the
-			-- same given twice into needed-givens
+	  Just IsIrred -> go binds (w:irreds) givens done' ws
+
+	  Just (Rhs rhs ws') -> go (add_bind rhs) irreds givens done' (ws' ++ ws)
+
+	  Just (Given g) -> go binds' irreds (g:givens) (addToFM done w [g_id]) ws 
 		where
 		  g_id = instToId g
-
-	  Just IsIrred -> go (avails_with w w_id) binds (w:irreds) givens ws
-
-		-- The avails_with_w handles the case where we want (Ord a, Eq a), and we
-		-- don't want to emit *two* Irreds for Ord a, one via the superclass chain
-		-- This showed up in a dupliated Ord constraint in the error message for 
-		--	test tcfail043
-		-- More generally, we don't want to emit two irreds with 
-		-- the same type
-
-	  Just (Rhs rhs@(L _ (HsVar g_id)) ws') 
-		-> go avails (add_triv_bind g_id) irreds givens (ws' ++ ws)
-
-	  Just (Rhs rhs ws') 
-		-> go (avails_with w w_id) (add_bind rhs)
-		      irreds givens (ws' ++ ws)
-	  -- The avails-with w replaces a complex RHS with a simple one
-	  -- for the benefit of subsequent lookups
+		  binds' | w_id == g_id = binds
+			 | otherwise    = add_bind (nlHsVar g_id)
       where
-	w_id = instToId w	
-
-	add_triv_bind rhs_id | rhs_id == w_id = binds
-			     | otherwise = add_bind (nlHsVar rhs_id)
-		-- The sought Id can be one of the givens, via a
-		-- superclass chain and then we definitely don't 
-		-- want to generate an x=x binding!
-
+	w_id  = instToId w	
+	done' = addToFM done w [w_id]
 	add_bind rhs = addInstToDictBind binds w rhs
-        avails_with w w_id = extendAvailEnv avails w (Rhs (nlHsVar w_id) [])
 \end{code}
 
 
