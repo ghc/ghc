@@ -1151,13 +1151,6 @@ heapCensus( void )
 #endif
 
   // Traverse the heap, collecting the census info
-
-  // First the small_alloc_list: we have to fix the free pointer at
-  // the end by calling tidyAllocatedLists() first.
-  tidyAllocateLists();
-  heapCensusChain( census, small_alloc_list );
-
-  // Now traverse the heap in each generation/step.
   if (RtsFlags.GcFlags.generations == 1) {
       heapCensusChain( census, g0s0->blocks );
   } else {

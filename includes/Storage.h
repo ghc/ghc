@@ -114,9 +114,13 @@ extern void freeStorage(void);
 /* -----------------------------------------------------------------------------
    Generic allocation
 
-   StgPtr allocate(nat n)       Allocates a chunk of contiguous store
-   				n words long, returning a pointer to
-				the first word.  Always succeeds.
+   StgPtr allocateInGen(generation *g, nat n)
+                                Allocates a chunk of contiguous store
+   				n words long in generation g,
+   				returning a pointer to the first word.
+   				Always succeeds.
+				
+   StgPtr allocate(nat n)       Equaivalent to allocateInGen(g0)
 				
    StgPtr allocateLocal(Capability *cap, nat n)
                                 Allocates memory from the nursery in
@@ -150,6 +154,7 @@ extern void freeStorage(void);
    -------------------------------------------------------------------------- */
 
 extern StgPtr  allocate        ( nat n );
+extern StgPtr  allocateInGen   ( generation *g, nat n );
 extern StgPtr  allocateLocal   ( Capability *cap, nat n );
 extern StgPtr  allocatePinned  ( nat n );
 extern lnat    allocatedBytes  ( void );
@@ -476,7 +481,6 @@ extern void     allocNurseries       ( void );
 extern void     resetNurseries       ( void );
 extern void     resizeNurseries      ( nat blocks );
 extern void     resizeNurseriesFixed ( nat blocks );
-extern void     tidyAllocateLists    ( void );
 extern lnat     countNurseryBlocks   ( void );
 
 /* -----------------------------------------------------------------------------

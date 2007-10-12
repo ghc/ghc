@@ -40,13 +40,9 @@ StgClosure    *caf_list         = NULL;
 StgClosure    *revertible_caf_list = NULL;
 rtsBool       keepCAFs;
 
-bdescr *small_alloc_list;	/* allocate()d small objects */
 bdescr *pinned_object_block;    /* allocate pinned objects into this block */
 nat alloc_blocks;		/* number of allocate()d blocks since GC */
 nat alloc_blocks_lim;		/* approximate limit on alloc_blocks */
-
-StgPtr alloc_Hp    = NULL;	/* next free byte in small_alloc_list */
-StgPtr alloc_HpLim = NULL;	/* end of block at small_alloc_list   */
 
 generation *generations = NULL;	/* all the generations */
 generation *g0		= NULL; /* generation 0, for convenience */
@@ -190,12 +186,11 @@ initStorage( void )
 
 #ifdef THREADED_RTS
   n_nurseries = n_capabilities;
-  nurseries = stgMallocBytes (n_nurseries * sizeof(struct step_),
-			      "initStorage: nurseries");
 #else
   n_nurseries = 1;
-  nurseries = g0->steps; // just share nurseries[0] with g0s0
-#endif  
+#endif
+  nurseries = stgMallocBytes (n_nurseries * sizeof(struct step_),
+			      "initStorage: nurseries");
 
   /* Initialise all steps */
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
@@ -204,11 +199,9 @@ initStorage( void )
     }
   }
   
-#ifdef THREADED_RTS
   for (s = 0; s < n_nurseries; s++) {
       initStep(&nurseries[s], 0, s);
   }
-#endif
   
   /* Set up the destination pointers in each younger gen. step */
   for (g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
@@ -219,11 +212,9 @@ initStorage( void )
   }
   oldest_gen->steps[0].to = &oldest_gen->steps[0];
   
-#ifdef THREADED_RTS
   for (s = 0; s < n_nurseries; s++) {
       nurseries[s].to = generations[0].steps[0].to;
   }
-#endif
   
   /* The oldest generation has one step. */
   if (RtsFlags.GcFlags.compact) {
@@ -234,24 +225,15 @@ initStorage( void )
       }
   }
 
-#ifdef THREADED_RTS
-  if (RtsFlags.GcFlags.generations == 1) {
-      errorBelch("-G1 is incompatible with -threaded");
-      stg_exit(EXIT_FAILURE);
-  }
-#endif
-
-  /* generation 0 is special: that's the nursery */
   generations[0].max_blocks = 0;
+  g0s0 = &generations[0].steps[0];
 
-  /* G0S0: the allocation area.  Policy: keep the allocation area
+  /* The allocation area.  Policy: keep the allocation area
    * small to begin with, even if we have a large suggested heap
    * size.  Reason: we're going to do a major collection first, and we
    * don't want it to be a big one.  This vague idea is borne out by 
    * rigorous experimental evidence.
    */
-  g0s0 = &generations[0].steps[0];
-
   allocNurseries();
 
   weak_ptr_list = NULL;
@@ -259,7 +241,6 @@ initStorage( void )
   revertible_caf_list = NULL;
    
   /* initialise the allocate() interface */
-  small_alloc_list = NULL;
   alloc_blocks = 0;
   alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
 
@@ -289,8 +270,8 @@ freeStorage (void)
 #if defined(THREADED_RTS)
     closeMutex(&sm_mutex);
     closeMutex(&atomic_modify_mutvar_mutex);
-    stgFree(nurseries);
 #endif
+    stgFree(nurseries);
 }
 
 /* -----------------------------------------------------------------------------
@@ -559,57 +540,67 @@ resizeNurseries (nat blocks)
 /* -----------------------------------------------------------------------------
    The allocate() interface
 
-   allocate(n) always succeeds, and returns a chunk of memory n words
-   long.  n can be larger than the size of a block if necessary, in
-   which case a contiguous block group will be allocated.
+   allocateInGen() function allocates memory directly into a specific
+   generation.  It always succeeds, and returns a chunk of memory n
+   words long.  n can be larger than the size of a block if necessary,
+   in which case a contiguous block group will be allocated.
+
+   allocate(n) is equivalent to allocateInGen(g0).
    -------------------------------------------------------------------------- */
 
 StgPtr
-allocate( nat n )
+allocateInGen (generation *g, nat n)
 {
+    step *stp;
     bdescr *bd;
-    StgPtr p;
+    StgPtr ret;
 
     ACQUIRE_SM_LOCK;
-
+    
     TICK_ALLOC_HEAP_NOCTR(n);
     CCS_ALLOC(CCCS,n);
 
-    /* big allocation (>LARGE_OBJECT_THRESHOLD) */
-    /* ToDo: allocate directly into generation 1 */
-    if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
+    stp = &g->steps[0];
+
+    if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_))
+    {
 	nat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
 	bd = allocGroup(req_blocks);
-	dbl_link_onto(bd, &g0s0->large_objects);
-	g0s0->n_large_blocks += bd->blocks; // might be larger than req_blocks
-	bd->gen_no  = 0;
-	bd->step = g0s0;
+	dbl_link_onto(bd, &stp->large_objects);
+	stp->n_large_blocks += bd->blocks; // might be larger than req_blocks
+	bd->gen_no  = g->no;
+	bd->step = stp;
 	bd->flags = BF_LARGE;
 	bd->free = bd->start + n;
-	alloc_blocks += req_blocks;
-	RELEASE_SM_LOCK;
-	return bd->start;
-	
-	/* small allocation (<LARGE_OBJECT_THRESHOLD) */
-    } else if (small_alloc_list == NULL || alloc_Hp + n > alloc_HpLim) {
-	if (small_alloc_list) {
-	    small_alloc_list->free = alloc_Hp;
-	}
-	bd = allocBlock();
-	bd->link = small_alloc_list;
-	small_alloc_list = bd;
-	bd->gen_no = 0;
-	bd->step = g0s0;
-	bd->flags = 0;
-	alloc_Hp = bd->start;
-	alloc_HpLim = bd->start + BLOCK_SIZE_W;
-	alloc_blocks++;
+	ret = bd->start;
     }
-    
-    p = alloc_Hp;
-    alloc_Hp += n;
+    else
+    {
+        // small allocation (<LARGE_OBJECT_THRESHOLD) */
+        bd = stp->blocks;
+	if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
+            bd = allocBlock();
+            bd->gen_no = g->no;
+            bd->step = stp;
+            bd->flags = 0;
+            bd->link = stp->blocks;
+            stp->blocks = bd;
+            stp->n_blocks++;
+            alloc_blocks++;
+        }
+        ret = bd->free;
+        bd->free += n;
+    }
+
     RELEASE_SM_LOCK;
-    return p;
+
+    return ret;
+}
+
+StgPtr
+allocate (nat n)
+{
+    return allocateInGen(g0,n);
 }
 
 lnat
@@ -617,23 +608,13 @@ allocatedBytes( void )
 {
     lnat allocated;
 
-    allocated = alloc_blocks * BLOCK_SIZE_W - (alloc_HpLim - alloc_Hp);
+    allocated = alloc_blocks * BLOCK_SIZE_W;
     if (pinned_object_block != NULL) {
 	allocated -= (pinned_object_block->start + BLOCK_SIZE_W) - 
 	    pinned_object_block->free;
     }
 	
     return allocated;
-}
-
-void
-tidyAllocateLists (void)
-{
-    if (small_alloc_list != NULL) {
-	ASSERT(alloc_Hp >= small_alloc_list->start && 
-	       alloc_Hp <= small_alloc_list->start + BLOCK_SIZE);
-	small_alloc_list->free = alloc_Hp;
-    }
 }
 
 /* -----------------------------------------------------------------------------
@@ -655,60 +636,46 @@ allocateLocal (Capability *cap, nat n)
     bdescr *bd;
     StgPtr p;
 
+    if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
+        return allocateInGen(g0,n);
+    }
+
+    /* small allocation (<LARGE_OBJECT_THRESHOLD) */
+
     TICK_ALLOC_HEAP_NOCTR(n);
     CCS_ALLOC(CCCS,n);
     
-    /* big allocation (>LARGE_OBJECT_THRESHOLD) */
-    /* ToDo: allocate directly into generation 1 */
-    if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_)) {
-	nat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
-	ACQUIRE_SM_LOCK;
-	bd = allocGroup(req_blocks);
-	dbl_link_onto(bd, &g0s0->large_objects);
-	g0s0->n_large_blocks += bd->blocks; // might be larger than req_blocks
-	bd->gen_no  = 0;
-	bd->step = g0s0;
-	bd->flags = BF_LARGE;
-	bd->free = bd->start + n;
-	alloc_blocks += req_blocks;
-	RELEASE_SM_LOCK;
-	return bd->start;
-	
-	/* small allocation (<LARGE_OBJECT_THRESHOLD) */
-    } else {
-
-	bd = cap->r.rCurrentAlloc;
-	if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
-
-	    // The CurrentAlloc block is full, we need to find another
-	    // one.  First, we try taking the next block from the
-	    // nursery:
-	    bd = cap->r.rCurrentNursery->link;
-
-	    if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
-		// The nursery is empty, or the next block is already
-		// full: allocate a fresh block (we can't fail here).
-		ACQUIRE_SM_LOCK;
-		bd = allocBlock();
-		cap->r.rNursery->n_blocks++;
-		RELEASE_SM_LOCK;
-		bd->gen_no = 0;
-		bd->step = cap->r.rNursery;
-		bd->flags = 0;
-                alloc_blocks++;
-	    } else {
-		// we have a block in the nursery: take it and put
-		// it at the *front* of the nursery list, and use it
-		// to allocate() from.
-		cap->r.rCurrentNursery->link = bd->link;
-		if (bd->link != NULL) {
-		    bd->link->u.back = cap->r.rCurrentNursery;
-		}
-	    }
-	    dbl_link_onto(bd, &cap->r.rNursery->blocks);
-	    cap->r.rCurrentAlloc = bd;
-	    IF_DEBUG(sanity, checkNurserySanity(cap->r.rNursery));
-	}
+    bd = cap->r.rCurrentAlloc;
+    if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
+        
+        // The CurrentAlloc block is full, we need to find another
+        // one.  First, we try taking the next block from the
+        // nursery:
+        bd = cap->r.rCurrentNursery->link;
+        
+        if (bd == NULL || bd->free + n > bd->start + BLOCK_SIZE_W) {
+            // The nursery is empty, or the next block is already
+            // full: allocate a fresh block (we can't fail here).
+            ACQUIRE_SM_LOCK;
+            bd = allocBlock();
+            cap->r.rNursery->n_blocks++;
+            RELEASE_SM_LOCK;
+            bd->gen_no = 0;
+            bd->step = cap->r.rNursery;
+            bd->flags = 0;
+            alloc_blocks++;
+        } else {
+            // we have a block in the nursery: take it and put
+            // it at the *front* of the nursery list, and use it
+            // to allocate() from.
+            cap->r.rCurrentNursery->link = bd->link;
+            if (bd->link != NULL) {
+                bd->link->u.back = cap->r.rCurrentNursery;
+            }
+        }
+        dbl_link_onto(bd, &cap->r.rNursery->blocks);
+        cap->r.rCurrentAlloc = bd;
+        IF_DEBUG(sanity, checkNurserySanity(cap->r.rNursery));
     }
     p = bd->free;
     bd->free += n;
@@ -1140,7 +1107,7 @@ memInventory(void)
   nat g, s, i;
   step *stp;
   lnat gen_blocks[RtsFlags.GcFlags.generations];
-  lnat nursery_blocks, allocate_blocks, retainer_blocks,
+  lnat nursery_blocks, retainer_blocks,
        arena_blocks, exec_blocks;
   lnat live_blocks = 0, free_blocks = 0;
 
@@ -1153,11 +1120,6 @@ memInventory(void)
       }	  
       gen_blocks[g] += countAllocdBlocks(generations[g].mut_list);
       for (s = 0; s < generations[g].n_steps; s++) {
-#if !defined(THREADED_RTS)
-	  // We put pinned object blocks in g0s0, so better count
-	  // blocks there too.
-	  if (g==0 && s==0) continue;
-#endif
 	  stp = &generations[g].steps[s];
 	  gen_blocks[g] += stepBlocks(stp);
       }
@@ -1167,9 +1129,6 @@ memInventory(void)
   for (i = 0; i < n_nurseries; i++) {
       nursery_blocks += stepBlocks(&nurseries[i]);
   }
-
-  /* any blocks held by allocate() */
-  allocate_blocks = countAllocdBlocks(small_alloc_list);
 
   retainer_blocks = 0;
 #ifdef PROFILING
@@ -1191,7 +1150,7 @@ memInventory(void)
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
       live_blocks += gen_blocks[g];
   }
-  live_blocks += nursery_blocks + allocate_blocks
+  live_blocks += nursery_blocks + 
                + retainer_blocks + arena_blocks + exec_blocks;
 
   if (live_blocks + free_blocks != mblocks_allocated * BLOCKS_PER_MBLOCK)
@@ -1201,7 +1160,6 @@ memInventory(void)
 	  debugBelch("  gen %d blocks : %4lu\n", g, gen_blocks[g]);
       }
       debugBelch("  nursery      : %4lu\n", nursery_blocks);
-      debugBelch("  allocate()   : %4lu\n", allocate_blocks);
       debugBelch("  retainer     : %4lu\n", retainer_blocks);
       debugBelch("  arena blocks : %4lu\n", arena_blocks);
       debugBelch("  exec         : %4lu\n", exec_blocks);

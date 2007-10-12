@@ -247,7 +247,7 @@ processSmallObjectPoolForDead( void )
     bdescr *bd;
     StgPtr p;
 
-    bd = small_alloc_list;
+    bd = g0s0->blocks;
 
     // first block
     if (bd == NULL)

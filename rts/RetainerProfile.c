@@ -2170,7 +2170,7 @@ smallObjectPoolCheck(void)
     StgPtr p;
     static nat costSum, size;
 
-    bd = small_alloc_list;
+    bd = g0s0->blocks;
     costSum = 0;
 
     // first block

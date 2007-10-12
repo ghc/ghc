@@ -109,11 +109,6 @@ rtsBool eager_promotion;
  */
 rtsBool failed_to_evac;
 
-/* Saved nursery (used for 2-space collector only)
- */
-static bdescr *saved_nursery;
-static nat saved_n_blocks;
-  
 /* Data used for allocation area sizing.
  */
 lnat new_blocks;		 // blocks allocated during this GC 
@@ -273,17 +268,6 @@ GarbageCollect ( rtsBool force_major_gc )
    */
   static_objects = END_OF_STATIC_LIST;
   scavenged_static_objects = END_OF_STATIC_LIST;
-
-  /* Save the nursery if we're doing a two-space collection.
-   * g0s0->blocks will be used for to-space, so we need to get the
-   * nursery out of the way.
-   */
-  if (RtsFlags.GcFlags.generations == 1) {
-      saved_nursery = g0s0->blocks;
-      saved_n_blocks = g0s0->n_blocks;
-      g0s0->blocks = NULL;
-      g0s0->n_blocks = 0;
-  }
 
   /* Keep a count of how many new blocks we allocated during this GC
    * (used for resizing the allocation area, later).
@@ -663,7 +647,7 @@ GarbageCollect ( rtsBool force_major_gc )
 	 * the collected steps (except the allocation area).  These
 	 * freed blocks will probaby be quickly recycled.
 	 */
-	if (!(g == 0 && s == 0)) {
+	if (!(g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1)) {
 	    if (stp->is_compacted) {
 		// for a compacted step, just shift the new to-space
 		// onto the front of the now-compacted existing blocks.
@@ -817,13 +801,14 @@ GarbageCollect ( rtsBool force_major_gc )
   /* Free the small objects allocated via allocate(), since this will
    * all have been copied into G0S1 now.  
    */
-  if (small_alloc_list != NULL) {
-    freeChain(small_alloc_list);
+  if (RtsFlags.GcFlags.generations > 1) {
+      if (g0s0->blocks != NULL) {
+          freeChain(g0s0->blocks);
+          g0s0->blocks = NULL;
+      }
+      g0s0->n_blocks = 0;
   }
-  small_alloc_list = NULL;
   alloc_blocks = 0;
-  alloc_Hp = NULL;
-  alloc_HpLim = NULL;
   alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
 
   // Start a new pinned_object_block
@@ -853,17 +838,6 @@ GarbageCollect ( rtsBool force_major_gc )
   if (RtsFlags.GcFlags.generations == 1) {
     nat blocks;
     
-    if (g0s0->old_blocks != NULL) {
-      freeChain(g0s0->old_blocks);
-    }
-    for (bd = g0s0->blocks; bd != NULL; bd = bd->link) {
-      bd->flags = 0;	// now from-space 
-    }
-    g0s0->old_blocks = g0s0->blocks;
-    g0s0->n_old_blocks = g0s0->n_blocks;
-    g0s0->blocks = saved_nursery;
-    g0s0->n_blocks = saved_n_blocks;
-
     /* For a two-space collector, we need to resize the nursery. */
     
     /* set up a new nursery.  Allocate a nursery size based on a
@@ -880,7 +854,7 @@ GarbageCollect ( rtsBool force_major_gc )
      * performance we get from 3L bytes, reducing to the same
      * performance at 2L bytes.
      */
-    blocks = g0s0->n_old_blocks;
+    blocks = g0s0->n_blocks;
 
     if ( RtsFlags.GcFlags.maxHeapSize != 0 &&
 	 blocks * RtsFlags.GcFlags.oldGenFactor * 2 > 
@@ -1042,6 +1016,7 @@ isAlive(StgClosure *p)
   const StgInfoTable *info;
   bdescr *bd;
   StgWord tag;
+  StgClosure *q;
 
   while (1) {
     /* The tag and the pointer are split, to be merged later when needed. */
