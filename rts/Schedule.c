@@ -2837,7 +2837,7 @@ threadStackOverflow(Capability *cap, StgTSO *tso)
 	     "increasing stack size from %ld words to %d.",
 	     (long)tso->stack_size, new_stack_size);
 
-  dest = (StgTSO *)allocate(new_tso_size);
+  dest = (StgTSO *)allocateLocal(cap,new_tso_size);
   TICK_ALLOC_TSO(new_stack_size,0);
 
   /* copy the TSO block and the old stack into the new area */
