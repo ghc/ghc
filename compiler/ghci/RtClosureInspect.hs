@@ -649,11 +649,11 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
    | isPointed ty = ASSERT2(not(null pointed)
                             , ptext SLIT("reOrderTerms") $$ 
                                         (ppr pointed $$ ppr unpointed))
-                    head pointed : reOrderTerms (tail pointed) unpointed tys
+                    let (t:tt) = pointed in t : reOrderTerms tt unpointed tys
    | otherwise    = ASSERT2(not(null unpointed)
                            , ptext SLIT("reOrderTerms") $$ 
                                        (ppr pointed $$ ppr unpointed))
-                    head unpointed : reOrderTerms pointed (tail unpointed) tys
+                    let (t:tt) = unpointed in t : reOrderTerms pointed tt tys
   
   expandNewtypes t@Term{ ty=ty, subTerms=tt }
    | Just (tc, args) <- splitNewTyConApp_maybe ty
