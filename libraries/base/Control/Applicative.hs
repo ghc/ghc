@@ -39,8 +39,9 @@ module Control.Applicative (
 import Prelude
 #endif
 
+import Control.Compositor
 import Control.Arrow
-	(Arrow(arr, (>>>), (&&&)), ArrowZero(zeroArrow), ArrowPlus((<+>)))
+	(Arrow(arr, (&&&)), ArrowZero(zeroArrow), ArrowPlus((<+>)))
 import Control.Monad (liftM, ap, MonadPlus(..))
 import Control.Monad.Instances ()
 import Data.Monoid (Monoid(..))

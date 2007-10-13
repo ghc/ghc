@@ -25,7 +25,7 @@ module Control.Arrow (
 		returnA,
 		(^>>), (>>^),
 		-- ** Right-to-left variants
-		(<<<), (<<^), (^<<),
+		(<<^), (^<<),
 		-- * Monoid operations
 		ArrowZero(..), ArrowPlus(..),
 		-- * Conditionals
@@ -40,21 +40,22 @@ import Prelude
 
 import Control.Monad
 import Control.Monad.Fix
+import Control.Compositor
 
 infixr 5 <+>
 infixr 3 ***
 infixr 3 &&&
 infixr 2 +++
 infixr 2 |||
-infixr 1 >>>, ^>>, >>^
-infixr 1 <<<, ^<<, <<^
+infixr 1 ^>>, >>^
+infixr 1 ^<<, <<^
 
 -- | The basic arrow class.
 --   Any instance must define either 'arr' or 'pure' (which are synonyms),
---   as well as '>>>' and 'first'.  The other combinators have sensible
+--   as well as 'first'.  The other combinators have sensible
 --   default definitions, which may be overridden for efficiency.
 
-class Arrow a where
+class Compositor a => Arrow a where
 
 	-- | Lift a function to an arrow: you must define either this
 	--   or 'pure'.
@@ -64,9 +65,6 @@ class Arrow a where
 	-- | A synonym for 'arr': you must define one or other of them.
 	pure :: (b -> c) -> a b c
 	pure = arr
-
-	-- | Left-to-right composition of arrows.
-	(>>>) :: a b c -> a c d -> a b d
 
 	-- | Send the first component of the input through the argument
 	--   arrow, and copy the rest unchanged to the output.
@@ -97,6 +95,8 @@ class Arrow a where
 	f &&& g = arr (\b -> (b,b)) >>> f *** g
 
 {-# RULES
+"identity"
+		arr id = identity
 "compose/arr"	forall f g .
 		arr f >>> arr g = arr (f >>> g)
 "first/arr"	forall f .
@@ -117,7 +117,6 @@ class Arrow a where
 
 instance Arrow (->) where
 	arr f = f
-	f >>> g = g . f
 	first f = f *** id
 	second f = id *** f
 --	(f *** g) ~(x,y) = (f x, g y)
@@ -128,9 +127,12 @@ instance Arrow (->) where
 
 newtype Kleisli m a b = Kleisli { runKleisli :: a -> m b }
 
+instance Monad m => Compositor (Kleisli m) where
+	identity = Kleisli return
+	Kleisli f >>> Kleisli g = Kleisli (\b -> f b >>= g)
+
 instance Monad m => Arrow (Kleisli m) where
 	arr f = Kleisli (return . f)
-	Kleisli f >>> Kleisli g = Kleisli (\b -> f b >>= g)
 	first (Kleisli f) = Kleisli (\ ~(b,d) -> f b >>= \c -> return (c,d))
 	second (Kleisli f) = Kleisli (\ ~(d,b) -> f b >>= \c -> return (d,c))
 
@@ -146,10 +148,6 @@ f ^>> a = arr f >>> a
 -- | Postcomposition with a pure function.
 (>>^) :: Arrow a => a b c -> (c -> d) -> a b d
 a >>^ f = a >>> arr f
-
--- | Right-to-left composition, for a better fit with arrow notation.
-(<<<) :: Arrow a => a c d -> a b c -> a b d
-f <<< g = g >>> f
 
 -- | Precomposition with a pure function (right-to-left variant).
 (<<^) :: Arrow a => a c d -> (b -> c) -> a b d
