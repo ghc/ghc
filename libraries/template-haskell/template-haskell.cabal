@@ -4,7 +4,7 @@ license:	BSD3
 license-file:	LICENSE
 maintainer:	libraries@haskell.org
 description:
-	XXX write or steal me
+    Facilities for manipulating Haskell source code using Template Haskell.
 build-depends: base, pretty, packedstring, containers
 exposed-modules:
 	Language.Haskell.TH.Syntax,
