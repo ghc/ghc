@@ -25,8 +25,9 @@ data Flags = Flags
   , funTotals           :: Bool
   , altHighlight        :: Bool
 
-  , combineFun          :: CombineFun
-  , postInvert		:: Bool
+  , combineFun          :: CombineFun	-- tick-wise combine
+  , postFun		:: PostFun	-- 
+  , mergeModule		:: MergeFun	-- module-wise merge
   }
 
 default_flags = Flags
@@ -45,8 +46,10 @@ default_flags = Flags
   , altHighlight        = False
 
   , combineFun          = ADD
-  , postInvert		= False
+  , postFun             = ID
+  , mergeModule		= INTERSECTION
   }
+
 
 -- We do this after reading flags, because the defaults
 -- depends on if specific flags we used.
@@ -98,16 +101,27 @@ altHighlightOpt
 	      = noArg "highlight-covered" "highlight covered code, rather that code gaps"
 							      $ \ f -> f { altHighlight = True }  
 
-combineFunOpt = anArg "combine" 
+combineFunOpt = anArg "function" 
 	      	      "combine .tix files with join function, default = ADD" "FUNCTION"
 	      $ \ a f -> case reads (map toUpper a) of
 	      	          [(c,"")] -> f { combineFun = c }
 			  _ -> error $ "no such combine function : " ++ a
 combineFunOptInfo = infoArg 
-		  $ "FUNCTION = " ++ foldr1 (\ a b -> a ++ " | " ++ b) (map fst combineFuns)
+		  $ "FUNCTION = " ++ foldr1 (\ a b -> a ++ " | " ++ b) (map fst foldFuns)
 
-postInvertOpt = noArg "post-invert" "invert output; ticked becomes unticked, unticked becomes ticked"
-							      $ \ f -> f { funTotals = True }  
+mapFunOpt = anArg "function"
+	      	      "apply function to .tix files, default = ID" "FUNCTION"
+	      $ \ a f -> case reads (map toUpper a) of
+	      	          [(c,"")] -> f { postFun = c }
+			  _ -> error $ "no such combine function : " ++ a
+mapFunOptInfo = infoArg 
+		  $ "FUNCTION = " ++ foldr1 (\ a b -> a ++ " | " ++ b) (map fst postFuns)
+
+unionModuleOpt = noArg "union"
+	      	      "use the union of the module namespace (default is intersection)"
+	      $ \ f -> f { mergeModule = UNION }
+
+
 -------------------------------------------------------------------------------
 
 readMixWithFlags :: Flags -> Either String TixModule -> IO Mix
@@ -121,6 +135,7 @@ command_usage plugin =
   putStrLn $
 				       "Usage: hpc " ++ (name plugin) ++ " " ++ 
 				        (usage plugin) ++
+				        "\n" ++ summary plugin ++ "\n" ++
 				        if null (options plugin [])
 				        then ""
   	                                else usageInfo "\n\nOptions:\n" (options plugin [])
@@ -178,9 +193,42 @@ filterTix flags (Tix tixs) =
 ------------------------------------------------------------------------------
 -- HpcCombine specifics 
 
-data CombineFun = ADD | DIFF | SUB | ZERO
+data CombineFun = ADD | DIFF | SUB 
      deriving (Eq,Show, Read, Enum)
 
-combineFuns = [ (show comb,comb) 
-	      | comb <- [ADD .. ZERO]
-	      ]
+theCombineFun :: CombineFun -> Integer -> Integer -> Integer
+theCombineFun fn = case fn of
+      	    ADD  -> \ l r -> l + r
+            SUB  -> \ l r -> max 0 (l - r)
+	    DIFF -> \ g b -> if g > 0 then 0 else min 1 b
+
+foldFuns :: [ (String,CombineFun) ]
+foldFuns = [ (show comb,comb) 
+	   | comb <- [ADD .. SUB]
+	   ]
+
+data PostFun = ID | INV | ZERO
+     deriving (Eq,Show, Read, Enum)
+
+thePostFun :: PostFun -> Integer -> Integer
+thePostFun ID   x = x
+thePostFun INV  0 = 1
+thePostFun INV  n = 0
+thePostFun ZERO x = 0
+
+postFuns = [ (show pos,pos) 
+	     | pos <- [INV .. ZERO]
+	   ]
+
+
+data MergeFun = INTERSECTION | UNION
+     deriving (Eq,Show, Read, Enum)
+
+theMergeFun :: (Ord a) => MergeFun -> Set.Set a -> Set.Set a -> Set.Set a
+theMergeFun INTERSECTION = Set.intersection
+theMergeFun UNION        = Set.union
+
+mergeFuns = [ (show pos,pos) 
+	     | pos <- [INTERSECTION,UNION]
+	   ]
+

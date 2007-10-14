@@ -28,7 +28,7 @@ helpList =
     help       = ["help"]
     reporting  = ["report","markup"]
     overlays   = ["overlay","draft"]
-    processing = ["combine"]
+    processing = ["sum","combine","map"]
     other     = [ name hook
     	        | hook <- hooks
 		, name hook `notElem` 
@@ -77,7 +77,9 @@ main = do
 hooks = [ help_plugin
         , report_plugin 
 	, markup_plugin
+	, sum_plugin
 	, combine_plugin
+	, map_plugin
 	, showtix_plugin
 	, overlay_plugin
 	, draft_plugin
