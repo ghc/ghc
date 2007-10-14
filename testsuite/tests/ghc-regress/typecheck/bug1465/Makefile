@@ -5,7 +5,8 @@ include $(TOP)/mk/test.mk
 PKG=bug1465
 
 clean:
-	rm -f v1/setup v2/setup
+	rm -f v1/setup v1/Setup.o v1/Setup.hi
+	rm -f v2/setup v2/Setup.o v2/Setup.hi
 	rm -rf v1/dist v2/dist
 	rm -f *.o *.hi
 	rm -f clean.out prep.out
