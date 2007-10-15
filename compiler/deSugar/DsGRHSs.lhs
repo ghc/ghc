@@ -106,9 +106,9 @@ matchGuards [] ctx rhs rhs_ty
 	-- 	wrapping the 'otherwise' in empty HsTyApp or HsWrap constructors
 	--	If it does, you'll get bogus overlap warnings
 matchGuards (ExprStmt e _ _ : stmts) ctx rhs rhs_ty
-  | isTrueLHsExpr e
-  = matchGuards stmts ctx rhs rhs_ty
-
+  | Just addTicks <- isTrueLHsExpr e
+  = matchGuards stmts ctx rhs rhs_ty	`thenDs` \ match_result ->
+    returnDs (adjustMatchResultDs addTicks match_result)
 matchGuards (ExprStmt expr _ _ : stmts) ctx rhs rhs_ty
   = matchGuards stmts ctx rhs rhs_ty	`thenDs` \ match_result ->
     dsLExpr expr			`thenDs` \ pred_expr ->
@@ -127,18 +127,30 @@ matchGuards (BindStmt pat bind_rhs _ _ : stmts) ctx rhs rhs_ty
     dsLExpr bind_rhs			`thenDs` \ core_rhs ->
     matchSinglePat core_rhs ctx pat rhs_ty match_result
 
-isTrueLHsExpr :: LHsExpr Id -> Bool
--- Returns True if we're sure that the expression is True
+isTrueLHsExpr :: LHsExpr Id -> Maybe (CoreExpr -> DsM CoreExpr)
+
+-- Returns Just {..} if we're sure that the expression is True
 -- I.e.   * 'True' datacon
 --	  * 'otherwise' Id
 --	  * Trivial wappings of these
-isTrueLHsExpr (L _ (HsVar v)) =  v `hasKey` otherwiseIdKey
+-- The arguments to Just are any HsTicks that we have found,
+-- because we still want to tick then, even it they are aways evaluted.
+isTrueLHsExpr (L _ (HsVar v)) |  v `hasKey` otherwiseIdKey
 			      || v `hasKey` getUnique trueDataConId	
+                                      = Just returnDs
 	-- trueDataConId doesn't have the same unique as trueDataCon
-isTrueLHsExpr (L _ (HsTick    _ _ e)) = isTrueLHsExpr e
-isTrueLHsExpr (L _ (HsBinTick _ _ e)) = isTrueLHsExpr e
+isTrueLHsExpr (L loc (HsTick    ix frees e)) 
+    | Just ticks <- isTrueLHsExpr e   = Just (\ e1 -> 
+			     ticks e1 `thenDs` \ e2 -> 
+			     mkTickBox ix frees e2)
+   -- This encodes that the result is constant True for Hpc tick purposes;
+   -- which is specifically what isTrueLHsExpr is trying to find out.
+isTrueLHsExpr (L loc (HsBinTick ixT _ e))
+    | Just ticks <- isTrueLHsExpr e   = Just (\ e1 -> 
+			     ticks e1 `thenDs` \ e2 -> 
+			     mkTickBox ixT [] e2)
 isTrueLHsExpr (L _ (HsPar e))         = isTrueLHsExpr e
-isTrueLHsExpr other = False
+isTrueLHsExpr other = Nothing
 \end{code}
 
 Should {\em fail} if @e@ returns @D@
