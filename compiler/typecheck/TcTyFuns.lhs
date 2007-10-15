@@ -103,7 +103,11 @@ An elementary rewrite is a properly oriented equality with associated coercion
 that has one of the following two forms:
 
 (1) co :: F t1..tn ~ t
-(2) co :: a ~ t         , where t /= F t1..tn
+(2) co :: a ~ t         , where t /= F t1..tn and a is a skolem tyvar
+
+NB: We do *not* use equalities of the form a ~ t where a is a meta tyvar as a
+reqrite rule.  Instead, such equalities are solved by unification.  This is
+essential; cf Note [skolemOccurs loop].
 
 The following functions takes an equality instance and turns it into an
 elementary rewrite if possible.
@@ -491,7 +495,7 @@ oriented properly, like
 
      F a ~ [G (F a)]
  or even
-     a ~ [G a]
+     a ~ [G a]          , where a is a skolem tyvar
 
 The left-to-right orientiation is not suitable because it does not
 terminate. The right-to-left orientation is not suitable because it 
@@ -536,6 +540,45 @@ NB: We perform this transformation for multiple occurences of ty1 under one
     rule doesn't need to be applied multiple times at a single inst).  As a 
     result we can get two or more insts back.
 
+Note [skolemOccurs loop]
+~~~~~~~~~~~~~~~~~~~~~~~~
+You might think that under
+
+  type family F a 
+  type instance F [a] = [F a]
+
+a signature such as
+
+  foo :: (F [a] ~ a) => a
+
+will get us into a loop.  However, this is *not* the case.  Here is why:
+
+    F [a<sk>] ~ a<sk>
+
+    -->(TOP)
+
+    [F a<sk>] ~ a<sk>
+
+    -->(SkolemOccurs)
+
+    [b<tau>] ~ a<sk>
+    F [b<tau>] ~ b<tau>   , with b := F a
+
+    -->(TOP)
+
+    [b<tau>] ~ a<sk>
+    [F b<tau>] ~ b<tau>   , with b := F a
+
+At this point (SkolemOccurs) does *not* apply anymore, as 
+
+  [F b<tau>] ~ b<tau>
+
+is not used as a rewrite rule.  The variable b<tau> is not a skolem (cf
+eqInstToRewrite). 
+
+(The regression test indexed-types/should_compile/Simple20 checks that the
+described property of the system does not change.)
+
 \begin{code}
 skolemOccurs :: PrecondRule
 skolemOccurs insts
@@ -555,7 +598,9 @@ skolemOccurs insts
 
           -- skolemOccurs does not apply, leave as is
           | null tysToLiftOut 
-          = return ([inst], return ())
+          = do { traceTc $ text "oneSkolemOccurs: no tys to lift out"
+               ; return ([inst], return ())
+               }
 
           -- recursive occurence of pat in body under a type family application
           | otherwise
