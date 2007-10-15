@@ -247,22 +247,7 @@ processSmallObjectPoolForDead( void )
     bdescr *bd;
     StgPtr p;
 
-    bd = g0s0->blocks;
-
-    // first block
-    if (bd == NULL)
-	return;
-
-    p = bd->start;
-    while (p < alloc_Hp) {
-	p += processHeapClosureForDead((StgClosure *)p);
-	while (p < alloc_Hp && !*p)     // skip slop
-	    p++;
-    }
-    ASSERT(p == alloc_Hp);
-
-    bd = bd->link;
-    while (bd != NULL) {
+    for (bd = g0s0->blocks; bd != NULL; bd = bd->link) {
 	p = bd->start;
 	while (p < bd->free) {
 	    p += processHeapClosureForDead((StgClosure *)p);
@@ -270,7 +255,6 @@ processSmallObjectPoolForDead( void )
 		p++;
 	}
 	ASSERT(p == bd->free);
-	bd = bd->link;
     }
 }
 
