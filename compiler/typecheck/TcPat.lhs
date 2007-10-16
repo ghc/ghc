@@ -601,21 +601,42 @@ tcConPat :: PatState -> SrcSpan -> DataCon -> TyCon
 	 -> TcM (Pat TcId, [TcTyVar], a)
 tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
   = do	{ let (univ_tvs, ex_tvs, eq_spec, eq_theta, dict_theta, arg_tys, _) = dataConFullSig data_con
-	      skol_info = PatSkol data_con
-	      origin    = SigOrigin skol_info
+	      skol_info  = PatSkol data_con
+	      origin     = SigOrigin skol_info
+	      full_theta = eq_theta ++ dict_theta
 
 	  -- Instantiate the constructor type variables [a->ty]
+	  -- This may involve doing a family-instance coercion, and building a wrapper
 	; (ctxt_res_tys, coi) <- boxySplitTyConAppWithFamily tycon pat_ty
+	; let pat_ty' = mkTyConApp tycon ctxt_res_tys
+                                     -- pat_ty /= pat_ty iff coi /= IdCo
+              wrap_res_pat res_pat
+		= mkCoPatCoI coi (unwrapFamInstScrutinee tycon ctxt_res_tys res_pat) pat_ty
+
+	  -- Add the stupid theta
+	; addDataConStupidTheta data_con ctxt_res_tys
+
 	; ex_tvs' <- tcInstSkolTyVars skol_info ex_tvs	-- Get location from monad,
 							-- not from ex_tvs
 	; let tenv     = zipTopTvSubst (univ_tvs ++ ex_tvs)
 				       (ctxt_res_tys ++ mkTyVarTys ex_tvs')
-	      eq_spec' = substEqSpec tenv eq_spec
-	      theta'   = substTheta  tenv (eq_theta ++ dict_theta)
-	      arg_tys' = substTys    tenv arg_tys
+	      arg_tys' = substTys tenv arg_tys
 
+	; if null ex_tvs && null eq_spec && null full_theta
+	  then do { 	-- The common case; no class bindings etc (see Note [Arrows and patterns])
+		    (arg_pats', inner_tvs, res) <- tcConArgs data_con arg_tys' 
+							       arg_pats pstate thing_inside
+		  ; let res_pat = ConPatOut { pat_con = L con_span data_con, 
+			            	      pat_tvs = [], pat_dicts = [], pat_binds = emptyLHsBinds,
+					      pat_args = arg_pats', pat_ty = pat_ty' }
+
+		    ; return (wrap_res_pat res_pat, inner_tvs, res) }
+
+	  else do 	-- The general case, with existential, and local equality constraints
+	{ let eq_spec' = substEqSpec tenv eq_spec
+	      theta'   = substTheta  tenv full_theta
 	; co_vars <- newCoVars eq_spec'	-- Make coercion variables
-        ; traceTc (text "tcConPat: refineAlt")
+	; traceTc (text "tcConPat: refineAlt")
 	; pstate' <- refineAlt data_con pstate ex_tvs' co_vars pat_ty
         ; traceTc (text "tcConPat: refineAlt done!")
 	
@@ -625,22 +646,15 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	; loc <- getInstLoc origin
 	; dicts <- newDictBndrs loc theta'
 	; dict_binds <- tcSimplifyCheckPat loc co_vars (pat_reft pstate') 
-					   ex_tvs' dicts lie_req
+			   ex_tvs' dicts lie_req
 
-	; addDataConStupidTheta data_con ctxt_res_tys
-
-        ; let pat_ty' = mkTyConApp tycon ctxt_res_tys
-                                     -- pat_ty /= pat_ty iff coi /= IdCo
-              res_pat = ConPatOut { pat_con = L con_span data_con, 
+        ; let res_pat = ConPatOut { pat_con = L con_span data_con, 
 			            pat_tvs = ex_tvs' ++ co_vars,
 			            pat_dicts = map instToVar dicts, 
 			            pat_binds = dict_binds,
 			            pat_args = arg_pats', pat_ty = pat_ty' }
-	; return 
-	    (mkCoPatCoI coi
-               (unwrapFamInstScrutinee tycon ctxt_res_tys res_pat) pat_ty,
-	     ex_tvs' ++ inner_tvs, res)
-	}
+	; return (wrap_res_pat res_pat, ex_tvs' ++ inner_tvs, res)
+	} }
   where
     -- Split against the family tycon if the pattern constructor 
     -- belongs to a family instance tycon.
@@ -766,6 +780,30 @@ addDataConStupidTheta data_con inst_tys
     tenv = zipTopTvSubst (dataConUnivTyVars data_con) inst_tys
     inst_theta = substTheta tenv stupid_theta
 \end{code}
+
+Note [Arrows and patterns]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+(Oct 07) Arrow noation has the odd property that it involves "holes in the scope". 
+For example:
+  expr :: Arrow a => a () Int
+  expr = proc (y,z) -> do
+          x <- term -< y
+          expr' -< x
+
+Here the 'proc (y,z)' binding scopes over the arrow tails but not the
+arrow body (e.g 'term').  As things stand (bogusly) all the
+constraints from the proc body are gathered together, so constraints
+from 'term' will be seen by the tcPat for (y,z).  But we must *not*
+bind constraints from 'term' here, becuase the desugarer will not make
+these bindings scope over 'term'.
+
+The Right Thing is not to confuse these constraints together. But for
+now the Easy Thing is to ensure that we do not have existential or
+GADT constraints in a 'proc', and to short-cut the constraint
+simplification for such vanilla patterns so that it binds no
+constraints. Hence the 'fast path' in tcConPat; but it's also a good
+plan for ordinary vanilla patterns to bypass the constraint
+simplification step.
 
 
 %************************************************************************
