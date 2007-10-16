@@ -475,6 +475,7 @@ data PrimRep
   | AddrRep		-- a pointer, but not to a Haskell value
   | FloatRep
   | DoubleRep
+  deriving( Eq )
 
 -- Size of a PrimRep, in bytes
 sizeofPrimRep :: PrimRep -> Int

@@ -563,9 +563,15 @@ coreToStgArgs (arg : args)	-- Non-type argument
     let
 	arg_ty = exprType arg
 	stg_arg_ty = stgArgType stg_arg
+	bad_args = (isUnLiftedType arg_ty && not (isUnLiftedType stg_arg_ty)) 
+		|| (typePrimRep arg_ty /= typePrimRep stg_arg_ty)
+	-- In GHCi we coerce an argument of type BCO# (unlifted) to HValue (lifted), 
+	-- and pass it to a function expecting an HValue (arg_ty).  This is ok because
+	-- we can treat an unlifted value as lifted.  But the other way round 
+	-- we complain.
+	-- We also want to check if a pointer is cast to a non-ptr etc
     in
-    WARN( isUnLiftedType arg_ty /= isUnLiftedType stg_arg_ty, 
-	  ptext SLIT("Dangerous-looking argument. Probable cause: bad unsafeCoerce#") $$ ppr arg)
+    WARN( bad_args, ptext SLIT("Dangerous-looking argument. Probable cause: bad unsafeCoerce#") $$ ppr arg )
     returnLne (stg_arg : stg_args, fvs)
 
 
