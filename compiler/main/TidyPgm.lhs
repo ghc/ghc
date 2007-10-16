@@ -717,9 +717,10 @@ tidyTopPair ext_ids rhs_tidy_env caf_info name' (bndr, rhs)
     bndr'   = mkVanillaGlobal name' ty' idinfo'
     ty'	    = tidyTopType (idType bndr)
     rhs'    = tidyExpr rhs_tidy_env rhs
+    idinfo  = idInfo bndr
     idinfo' = tidyTopIdInfo rhs_tidy_env (isJust maybe_external)
-			    (idInfo bndr) unfold_info arity
-			    caf_info
+			    idinfo unfold_info worker_info
+			    arity caf_info
 
     -- Expose an unfolding if ext_ids tells us to
     -- Remember that ext_ids maps an Id to a Bool: 
@@ -728,6 +729,7 @@ tidyTopPair ext_ids rhs_tidy_env caf_info name' (bndr, rhs)
     show_unfold = maybe_external `orElse` False
     unfold_info | show_unfold = mkTopUnfolding rhs'
 		| otherwise   = noUnfolding
+    worker_info = tidyWorker rhs_tidy_env show_unfold (workerInfo idinfo)
 
     -- Usually the Id will have an accurate arity on it, because
     -- the simplifier has just run, but not always. 
@@ -751,7 +753,7 @@ tidyTopPair ext_ids rhs_tidy_env caf_info name' (bndr, rhs)
 -- 	unfoldings, which are inside Ids imported by GHCi. Ditto RULES.
 --	CoreToStg makes use of this when constructing SRTs.
 
-tidyTopIdInfo tidy_env is_external idinfo unfold_info arity caf_info
+tidyTopIdInfo tidy_env is_external idinfo unfold_info worker_info arity caf_info
   | not is_external	-- For internal Ids (not externally visible)
   = vanillaIdInfo	-- we only need enough info for code generation
 			-- Arity and strictness info are enough;
@@ -767,17 +769,27 @@ tidyTopIdInfo tidy_env is_external idinfo unfold_info arity caf_info
 	`setAllStrictnessInfo` newStrictnessInfo idinfo
 	`setInlinePragInfo`    inlinePragInfo idinfo
 	`setUnfoldingInfo`     unfold_info
-	`setWorkerInfo`	       tidyWorker tidy_env (workerInfo idinfo)
+	`setWorkerInfo`	       worker_info
 		-- NB: we throw away the Rules
 		-- They have already been extracted by findExternalRules
 
 
 
 ------------  Worker  --------------
-tidyWorker tidy_env (HasWorker work_id wrap_arity) 
-  = HasWorker (tidyVarOcc tidy_env work_id) wrap_arity
-tidyWorker tidy_env other
+tidyWorker tidy_env show_unfold NoWorker
   = NoWorker
+tidyWorker tidy_env show_unfold (HasWorker work_id wrap_arity) 
+  | show_unfold = HasWorker (tidyVarOcc tidy_env work_id) wrap_arity
+  | otherwise   = WARN( True, ppr work_id ) NoWorker
+    -- NB: do *not* expose the worker if show_unfold is off,
+    --     because that means this thing is a loop breaker or
+    --     marked NOINLINE or something like that
+    -- This is important: if you expose the worker for a loop-breaker
+    -- then you can make the simplifier go into an infinite loop, because
+    -- in effect the unfolding is exposed.  See Trac #1709
+    -- 
+    -- Mind you, it probably should not be w/w'd in the first place; 
+    -- hence the WARN
 \end{code}
 
 %************************************************************************
