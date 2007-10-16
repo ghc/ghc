@@ -417,11 +417,6 @@ createAdjustor(int cconv, StgStablePtr hptr,
   38: .quad 0  # aligned on 8-byte boundary
     */
 
-    /* we assume the small code model (gcc -mcmmodel=small) where
-     * all symbols are <2^32, so hence wptr should fit into 32 bits.
-     */
-    ASSERT(((long)wptr >> 32) == 0);
-
     {  
 	int i = 0;
 	char *c;
