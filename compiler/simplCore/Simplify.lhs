@@ -1025,7 +1025,7 @@ completeCall env var cont
 	    Just unfolding  	-- There is an inlining!
 	      ->  do { tick (UnfoldingDone var)
 		     ; (if dopt Opt_D_dump_inlinings dflags then
-			   pprTrace "Inlining done" (vcat [
+			   pprTrace ("Inlining done" ++ showSDoc (ppr var)) (vcat [
 				text "Before:" <+> ppr var <+> sep (map pprParendExpr args),
 				text "Inlined fn: " <+> nest 2 (ppr unfolding),
 				text "Cont:  " <+> ppr call_cont])
