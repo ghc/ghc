@@ -99,10 +99,15 @@ libgmp.dll.a: libgmp-3.dll
 endif
 endif
 
+# GMP takes a long time to build, but changes rarely.  Hence we don't
+# bother cleaning it before validating, because that adds a
+# significant overhead to validation.
+ifeq "$(Validating)" "NO"
 clean distclean maintainer-clean ::
 	$(RM) -f stamp.gmp.static stamp.gmp.shared
 	$(RM) -rf gmpbuild
 	$(RM) -rf gmpbuild-shared
+endif
 
 #-----------------------------------------------------------------------------
 #
