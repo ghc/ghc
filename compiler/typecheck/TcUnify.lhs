@@ -128,7 +128,8 @@ subFunTys error_herald n_pats res_ty thing_inside
 
     loop n args_so_far res_ty
 	| isSigmaTy res_ty 	-- Do this before checking n==0, because we 
-				-- guarantee to return a BoxyRhoType, not a BoxySigmaType
+				-- guarantee to return a BoxyRhoType, not a 
+                                -- BoxySigmaType
 	= do { (gen_fn, (co_fn, res)) <- tcGen res_ty emptyVarSet $ \ _ res_ty' ->
 					 loop n args_so_far res_ty'
 	     ; return (gen_fn <.> co_fn, res) }
@@ -142,18 +143,31 @@ subFunTys error_herald n_pats res_ty thing_inside
 	     ; co_fn' <- wrapFunResCoercion [arg_ty] co_fn
 	     ; return (co_fn', res) }
 
+        -- Try to normalise synonym families and defer if that's not possible
+    loop n args_so_far ty@(TyConApp tc tys)
+        | isOpenSynTyCon tc
+        = do { (coi1, ty') <- tcNormaliseFamInst ty
+             ; case coi1 of
+	         IdCo   -> defer    -- no progress, but maybe solvable => defer
+                 ACo _  ->          -- progress: so lets try again
+        	   do { (co_fn, res) <- loop n args_so_far ty'
+		      ; return $ (co_fn <.> coiToHsWrapper (mkSymCoI coi1), res)
+		      }
+             }
+
 	-- res_ty might have a type variable at the head, such as (a b c),
 	-- in which case we must fill in with (->).  Simplest thing to do
 	-- is to use boxyUnify, but we catch failure and generate our own
 	-- error message on failure
     loop n args_so_far res_ty@(AppTy _ _)
 	= do { [arg_ty',res_ty'] <- newBoxyTyVarTys [argTypeKind, openTypeKind]
-	     ; (_, mb_coi) <- tryTcErrs $ boxyUnify res_ty (FunTy arg_ty' res_ty')
+	     ; (_, mb_coi) <- tryTcErrs $ 
+                                boxyUnify res_ty (FunTy arg_ty' res_ty')
 	     ; if isNothing mb_coi then bale_out args_so_far
-	       else do { case expectJust "subFunTys" mb_coi of
-				IdCo -> return ()
-				ACo co -> traceTc (text "you're dropping a coercion: " <+> ppr co)
-		       ; loop n args_so_far (FunTy arg_ty' res_ty') 
+	       else do { let coi = expectJust "subFunTys" mb_coi
+		       ; (co_fn, res) <- loop n args_so_far (FunTy arg_ty' 
+                                                                   res_ty')
+                       ; return (co_fn <.> coiToHsWrapper coi, res)
 		       }
 	     }
 
@@ -162,9 +176,13 @@ subFunTys error_herald n_pats res_ty thing_inside
 	= do { cts <- readMetaTyVar tv 
 	     ; case cts of
 		 Indirect ty -> loop n args_so_far ty
-		 Flexi -> do { (res_ty:arg_tys) <- withMetaTvs tv kinds mk_res_ty
-			     ; res <- thing_inside (reverse args_so_far ++ arg_tys) res_ty
-			     ; return (idHsWrapper, res) } }
+		 Flexi -> 
+                   do { (res_ty:arg_tys) <- withMetaTvs tv kinds mk_res_ty
+		      ; res <- thing_inside (reverse args_so_far ++ arg_tys) 
+                                            res_ty
+		      ; return (idHsWrapper, res) } }
+        | otherwise             -- defer as tyvar may be refined by equalities
+        = defer
 	where
 	  mk_res_ty (res_ty' : arg_tys') = mkFunTys arg_tys' res_ty'
 	  mk_res_ty [] = panic "TcUnify.mk_res_ty1"
@@ -173,6 +191,18 @@ subFunTys error_herald n_pats res_ty thing_inside
 		-- but not an unboxed tuple.
 
     loop n args_so_far res_ty = bale_out args_so_far
+
+         -- build a template type a1 -> ... -> an -> b and defer an equality
+         -- between that template and the expected result type res_ty; then,
+         -- use the template to type the thing_inside
+    defer
+      = do { arg_tys <- newFlexiTyVarTys n_pats argTypeKind
+           ; res_ty' <- newFlexiTyVarTy openTypeKind
+           ; let fun_ty = mkFunTys arg_tys res_ty'
+           ; coi <- defer_unification False False fun_ty res_ty
+           ; res <- thing_inside arg_tys res_ty'
+           ; return (coiToHsWrapper coi, res)
+           }
 
     bale_out args_so_far 
 	= do { env0 <- tcInitTidyEnv
@@ -719,9 +749,7 @@ tc_sub1 sub_ctxt act_sty (TyVarTy tv) exp_ib exp_sty exp_ty
 	; traceTc (case coi of 
 			IdCo   -> text "tc_sub1 (Rule SBOXY) IdCo"
 			ACo co -> text "tc_sub1 (Rule SBOXY) ACo" <+> ppr co)
-	; return $ case coi of
-			IdCo   -> idHsWrapper 
-			ACo co -> WpCo co
+	; return $ coiToHsWrapper coi
 	}
 
 -----------------------------------
@@ -833,9 +861,7 @@ tc_sub1 sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
 defer_to_boxy_matching sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
   = do	{ coi <- addSubCtxt sub_ctxt act_sty exp_sty $
 	  u_tys outer False act_sty actual_ty exp_ib exp_sty expected_ty
-	; return $ case coi of
-			IdCo   -> idHsWrapper 
-			ACo co -> WpCo co
+	; return $ coiToHsWrapper coi
 	}
   where
     outer = case sub_ctxt of		-- Ugh
