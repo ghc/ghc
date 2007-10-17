@@ -8,8 +8,6 @@
 module Haddock.GHC (
   startGhc,
   loadPackages,
-  tryParseStaticFlags,
-  parseGhcFlags,
   module Haddock.GHC.Typecheck,
   module Haddock.GHC.Utils
 ) where
@@ -32,18 +30,20 @@ import StaticFlags
 
 -- | Start a GHC session with the -haddock flag set. Also turn off 
 -- compilation and linking.  
-startGhc :: String -> IO (Session, DynFlags)
-startGhc libDir = do
-  session <- newSession (Just libDir)
-  flags   <- getSessionDynFlags session
-  let flags' = dopt_set flags Opt_Haddock
-  let flags'' = flags' {
+startGhc :: String -> [String] -> IO (Session, DynFlags)
+startGhc libDir flags = do
+  restFlags <- parseStaticFlags flags
+  session   <- newSession (Just libDir)
+  dynflags  <- getSessionDynFlags session
+  let dynflags' = dopt_set dynflags Opt_Haddock
+  let dynflags'' = dynflags' {
       hscTarget = HscNothing,
       ghcMode   = CompManager,
       ghcLink   = NoLink
     }
-  setSessionDynFlags session flags''
-  return (session, flags'')
+  dynflags''' <- parseGhcFlags dynflags'' restFlags flags
+  setSessionDynFlags session dynflags'''
+  return (session, dynflags''')
 
 
 -- | Expose the list of packages to GHC. Then initialize GHC's package state
@@ -88,21 +88,9 @@ loadPackages session pkgStrs = do
     handleParse Nothing = throwE "Could not parse package identifier"
 
 
--- | Filter out the GHC specific flags and try to parse and set them as static 
--- flags. Return a list of flags that couldn't be parsed. 
-tryParseStaticFlags flags = do
-  let ghcFlags = [ str | Flag_GhcFlag str <- flags ]
-  parseStaticFlags ghcFlags
-
-
 -- | Try to parse dynamic GHC flags
-parseGhcFlags session ghcFlags = do
-  dflags <- getSessionDynFlags session
-  foldlM parseFlag dflags (map words ghcFlags)
-  where 
-    -- try to parse a flag as either a dynamic or static GHC flag
-    parseFlag dynflags ghcFlag = do
-      (dynflags', rest) <- parseDynamicFlags dynflags ghcFlag
-      when (rest == ghcFlag) $
-          throwE ("Couldn't parse GHC flag: " ++ (unwords ghcFlag))           
-      return dynflags'
+parseGhcFlags dynflags flags origFlags = do
+  (dynflags', rest) <- parseDynamicFlags dynflags flags
+  if not (null rest)
+    then throwE ("Couldn't parse GHC options: " ++ (unwords origFlags))
+    else return dynflags'

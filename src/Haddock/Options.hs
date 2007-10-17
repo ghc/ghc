@@ -8,7 +8,8 @@
 module Haddock.Options (
   parseHaddockOpts,
   Flag(..),
-  getUsage
+  getUsage,
+  makeGhcFlags
 ) where
 
 
@@ -33,6 +34,10 @@ parseHaddockOpts words =
     (_, _, errors)    -> do 
       usage <- getUsage
       throwE (concat errors ++ usage)
+
+
+makeGhcFlags :: [Flag] -> [String]
+makeGhcFlags flags = [ option | Flag_OptGhc option <- flags ]
 
 
 data Flag
@@ -64,7 +69,7 @@ data Flag
   | Flag_IgnoreAllExports
   | Flag_HideModule String
   | Flag_UsePackage String
-  | Flag_GhcFlag String
+  | Flag_OptGhc String
   | Flag_GhcLibDir String
   deriving (Eq)
 
@@ -131,6 +136,6 @@ options backwardsCompat =
 	"behave as if MODULE has the hide attribute",
     Option [] ["use-package"] (ReqArg Flag_UsePackage "PACKAGE")
 	"the modules being processed depend on PACKAGE",
-    Option ['g'] [] (ReqArg Flag_GhcFlag "FLAGS + ARGS")
- 	("send a flag to GHC")
+    Option [] ["optghc"] (ReqArg Flag_OptGhc "OPTION")
+ 	"Forward option to GHC"
    ]

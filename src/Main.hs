@@ -104,13 +104,9 @@ main = handleTopExceptions $ do
   (flags, fileArgs) <- parseHaddockOpts args
   libDir <- handleEasyFlags flags fileArgs
   
-  -- initialize GHC 
-  restGhcFlags <- tryParseStaticFlags flags
-  (session, _) <- startGhc libDir
-
-  -- parse and set the GHC flags
-  dynflags <- parseGhcFlags session restGhcFlags
-  setSessionDynFlags session dynflags
+  -- initialize GHC
+  let ghcFlags = makeGhcFlags flags
+  (session, dynflags) <- startGhc libDir ghcFlags
 
   -- get the -use-package packages, load them in GHC,
   -- and try to get the corresponding installed HaddockPackages
