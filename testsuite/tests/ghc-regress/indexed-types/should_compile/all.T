@@ -96,3 +96,5 @@ test('GivenCheck', normal, compile, [''])
 test('GivenCheckSwap', normal, compile, [''])
 test('GivenCheckDecomp', normal, compile, [''])
 test('GivenCheckTop', normal, compile, [''])
+
+test('Gentle', normal, compile, [''])
