@@ -909,14 +909,28 @@ foreignCall conv_string results_code expr_code args_code vols safety ret
           case convention of
             -- Temporary hack so at least some functions are CmmSafe
             CmmCallConv -> code (stmtC (CmmCall (CmmCallee expr convention) results args safety ret))
-            _ -> case safety of
+            _ ->
+              let expr' = adjCallTarget convention expr args in
+              case safety of
 	      CmmUnsafe ->
                 code (emitForeignCall' PlayRisky results 
-                   (CmmCallee expr convention) args vols NoC_SRT ret)
+                   (CmmCallee expr' convention) args vols NoC_SRT ret)
               CmmSafe srt ->
                 code (emitForeignCall' (PlaySafe unused) results 
-                   (CmmCallee expr convention) args vols NoC_SRT ret) where
+                   (CmmCallee expr' convention) args vols NoC_SRT ret) where
 	        unused = panic "not used by emitForeignCall'"
+
+adjCallTarget :: CCallConv -> CmmExpr -> [(CmmExpr,MachHint)] -> CmmExpr
+#ifdef mingw32_TARGET_OS
+-- On Windows, we have to add the '@N' suffix to the label when making
+-- a call with the stdcall calling convention.
+adjCallTarget StdCallConv (CmmLit (CmmLabel lbl)) args
+  = CmmLit (CmmLabel (addLabelSize lbl (sum (map size args))))
+  where size (e,_) = max wORD_SIZE (machRepByteWidth (cmmExprRep e))
+                 -- c.f. CgForeignCall.emitForeignCall
+#endif
+adjCallTarget _ expr _
+  = expr
 
 primCall
 	:: [ExtFCode CmmFormal]
