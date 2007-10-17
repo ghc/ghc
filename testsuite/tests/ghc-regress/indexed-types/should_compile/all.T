@@ -21,6 +21,7 @@ test('Simple17', expect_fail, compile, [''])
 test('Simple18', normal, compile, [''])
 test('Simple19', normal, compile, [''])
 test('Simple20', normal, compile, [''])
+test('Simple21', normal, compile, [''])
 test('Simple22', normal, compile, [''])
 test('Simple23', normal, compile, [''])
 
