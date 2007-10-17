@@ -9,6 +9,9 @@ type LHsExpr a = SrcLoc.Located (HsExpr a)
 type SyntaxExpr a = HsExpr a
 type PostTcExpr = HsExpr Var.Id
 
+pprLExpr :: (Outputable.OutputableBndr i) => 
+	LHsExpr i -> Outputable.SDoc
+
 pprExpr :: (Outputable.OutputableBndr i) => 
 	HsExpr.HsExpr i -> Outputable.SDoc
 
@@ -18,5 +21,5 @@ pprSplice :: (Outputable.OutputableBndr i) =>
 pprPatBind :: (Outputable.OutputableBndr b, Outputable.OutputableBndr i) => 
 	HsPat.LPat b -> HsExpr.GRHSs i -> Outputable.SDoc
 
-pprFunBind :: (Outputable.OutputableBndr i) => 
-	i -> GHC.Base.Bool -> HsExpr.MatchGroup i -> Outputable.SDoc
+pprFunBind :: (Outputable.OutputableBndr idL, Outputable.OutputableBndr idR) => 
+	idL -> GHC.Base.Bool -> HsExpr.MatchGroup idR -> Outputable.SDoc
