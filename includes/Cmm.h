@@ -571,9 +571,13 @@
   W_[free] = p;								\
   bdescr_free(__bd) = free + WDS(1);
 
-#define recordMutable(p, regs)						\
-      W_ __p;								\
-      __p = p;								\
-      recordMutableCap(__p, TO_W_(bdescr_gen_no(Bdescr(__p))), regs)
+#define recordMutable(p, regs)                                  \
+      W_ __p;                                                   \
+      W_ __bd;                                                  \
+      W_ __gen;                                                 \
+      __p = p;                                                  \
+      __bd = Bdescr(__p);                                       \
+      __gen = TO_W_(bdescr_gen_no(__bd));                       \
+      if (__gen > 0) { recordMutableCap(__p, __gen, regs); }
 
 #endif /* CMM_H */
