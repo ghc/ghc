@@ -425,10 +425,11 @@ interactiveLoop is_tty show_prompt =
 -- the same directory while a process is running.
 
 checkPerms :: String -> IO Bool
-checkPerms name =
 #ifdef mingw32_HOST_OS
+checkPerms _ =
   return True
 #else
+checkPerms name =
   Util.handle (\_ -> return False) $ do
      st <- getFileStatus name
      me <- getRealUserID
