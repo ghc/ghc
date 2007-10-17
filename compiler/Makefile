@@ -754,11 +754,9 @@ ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INPLACE_EXTRA_FLAGS = -optc-DWINDOWS
 endif
 
-$(INPLACE_SRC): ghc-inplace.c
-	$(SED) -e "s@GHC_PATH@$(GHC_PATH)@g" -e "s@TOP_ABS@$(FPTOOLS_TOP_ABS)@g" < $< > $@
-
-$(INPLACE_PROG): $(INPLACE_SRC)
-	$(HC) -cpp $(INPLACE_EXTRA_FLAGS) $< -o $@
+$(INPLACE_PROG): ghc-inplace.c
+	$(SED) -e "s@GHC_PATH@$(GHC_PATH)@g" -e "s@TOP_ABS@$(FPTOOLS_TOP_ABS)@g" < $< > $(INPLACE_SRC)
+	$(HC) -cpp $(INPLACE_EXTRA_FLAGS) $(INPLACE_SRC) -o $@
 
 all :: $(INPLACE_PROG)
 
