@@ -17,39 +17,6 @@
 
 #if defined(_MSC_VER) || defined(__MINGW32__) || defined(_WIN32)
 #include <windows.h>
-
-static
-int
-toErrno(DWORD rc)
-{
-    switch (rc) {
-    case ERROR_FILE_NOT_FOUND:    return ENOENT;
-    case ERROR_PATH_NOT_FOUND:    return ENOENT;
-    case ERROR_TOO_MANY_OPEN_FILES: return EMFILE;
-    case ERROR_ACCESS_DENIED:     return EACCES;
-    case ERROR_INVALID_HANDLE:    return EBADF; /* kinda sorta */
-    case ERROR_NOT_ENOUGH_MEMORY: return ENOMEM;
-    case ERROR_INVALID_ACCESS:    return EINVAL;
-    case ERROR_INVALID_DATA:      return EINVAL;
-    case ERROR_OUTOFMEMORY:       return ENOMEM;
-    case ERROR_SHARING_VIOLATION: return EACCES;
-    case ERROR_LOCK_VIOLATION:    return EACCES;
-    case ERROR_ALREADY_EXISTS:    return EEXIST;
-    case ERROR_BUSY:              return EBUSY;
-    case ERROR_BROKEN_PIPE:       return EPIPE;
-    case ERROR_PIPE_CONNECTED:    return EBUSY;
-    case ERROR_PIPE_LISTENING:    return EBUSY;
-    case ERROR_NOT_CONNECTED:     return EINVAL;
-
-    case ERROR_NOT_OWNER:         return EPERM;
-    case ERROR_DIRECTORY:         return ENOTDIR;
-    case ERROR_FILE_INVALID:      return EACCES;
-    case ERROR_FILE_EXISTS:       return EEXIST;
-
-    default:
-	return rc;
-    }
-}
 #endif
 
 
@@ -129,7 +96,7 @@ __hscore_renameFile( char *src, char *dest)
     /* Failed...it could be because the target already existed. */
     if ( !GetFileAttributes(dest) ) {
 	/* No, it's not there - just fail. */
-	errno = toErrno(GetLastError());
+	maperrno();
 	return (-1);
     }
 
@@ -137,7 +104,7 @@ __hscore_renameFile( char *src, char *dest)
 	OSVERSIONINFO ovi;
 	ovi.dwOSVersionInfoSize = sizeof(ovi);
 	if ( !GetVersionEx(&ovi) ) {
-	    errno = toErrno(GetLastError()); 
+	    maperrno();
 	    return (-1);
 	}
 	forNT = ((ovi.dwPlatformId & VER_PLATFORM_WIN32_NT) != 0);
@@ -148,7 +115,7 @@ __hscore_renameFile( char *src, char *dest)
 	if ( MoveFileExA(src, dest, MOVEFILE_REPLACE_EXISTING) ) {
 	    return 0;
 	} else {
-	    errno = toErrno(GetLastError()); 
+	    maperrno();
 	    return (-1);
 	}
     }
@@ -159,11 +126,11 @@ __hscore_renameFile( char *src, char *dest)
 	if (MoveFileA(src,dest)) {
 	    return 0;
 	} else {
-	    errno = toErrno(GetLastError());
+	    maperrno();
 	    return (-1);
 	}
     } else {
-	errno = toErrno(GetLastError());
+	maperrno();
 	return (-1);
     }
 #else
