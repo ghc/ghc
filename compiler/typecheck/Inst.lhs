@@ -99,6 +99,8 @@ import Outputable
 import Data.List
 import TypeRep
 import Class
+
+import Control.Monad ( liftM )
 \end{code}
 
 
@@ -555,11 +557,11 @@ zonkInst implic@(ImplicInst {})
 
 zonkInst eqinst@(EqInst {tci_left = ty1, tci_right = ty2})
   = do { co' <- eitherEqInst eqinst 
-			(\covar -> return (mkWantedCo covar)) 
-			(\co    -> zonkTcType co >>= \coercion -> return (mkGivenCo coercion))
+		  (\covar -> return (mkWantedCo covar)) 
+		  (\co    -> liftM mkGivenCo $ zonkTcType co)
        ; ty1' <- zonkTcType ty1
        ; ty2' <- zonkTcType ty2
-       ; return (eqinst {tci_co = co',tci_left=ty1',tci_right=ty2})
+       ; return (eqinst {tci_co = co', tci_left= ty1', tci_right = ty2' })
        }
 
 zonkInsts insts = mappM zonkInst insts
