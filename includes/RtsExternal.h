@@ -73,13 +73,13 @@ extern void*  createAdjustor(int cconv, StgStablePtr hptr, StgFunPtr wptr,
 extern void   freeHaskellFunctionPtr(void* ptr);
 
 /* Hpc stuff */
-extern int hs_hpc_module(char *modName,int modCount,int modHashNo,StgWord64 *tixArr);
+extern int hs_hpc_module(char *modName,unsigned int modCount,unsigned int modHashNo,StgWord64 *tixArr);
 // Simple linked list of modules
 typedef struct _HpcModuleInfo {
   char *modName;		// name of module
-  int tickCount;		// number of ticks
-  int tickOffset;		// offset into a single large .tix Array
-  int hashNo;			// Hash number for this module's mix info
+  unsigned int tickCount;	// number of ticks
+  unsigned int tickOffset;	// offset into a single large .tix Array
+  unsigned int hashNo;		// Hash number for this module's mix info
   StgWord64 *tixArr;		// tix Array; local for this module
   struct _HpcModuleInfo *next;
 } HpcModuleInfo;

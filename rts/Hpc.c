@@ -101,7 +101,7 @@ static StgWord64 expectWord64(void) {
 
 static void
 readTix(void) {
-  int i;
+  unsigned int i;
   HpcModuleInfo *tmpModule;
 
   totalTixes = 0;
@@ -186,11 +186,11 @@ static void hpc_init(void) {
 
 int
 hs_hpc_module(char *modName,
-	      int modCount,
-	      int modHashNo,
+	      unsigned int modCount,
+	      unsigned int modHashNo,
 	      StgWord64 *tixArr) {
   HpcModuleInfo *tmpModule, *lastModule;
-  int i;
+  unsigned int i;
   int offset = 0;
   
   debugTrace(DEBUG_hpc,"hs_hpc_module(%s,%d)",modName,modCount);
@@ -266,7 +266,7 @@ startupHpc(void) {
 static void
 writeTix(FILE *f) {
   HpcModuleInfo *tmpModule;  
-  int i, inner_comma, outer_comma;
+  unsigned int i, inner_comma, outer_comma;
 
   outer_comma = 0;
 
