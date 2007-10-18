@@ -22,6 +22,7 @@ test('Simple18', normal, compile, [''])
 test('Simple19', normal, compile, [''])
 test('Simple20', normal, compile, [''])
 test('Simple22', normal, compile, [''])
+test('Simple23', normal, compile, [''])
 
 test('ind1', normal, compile, [''])
 test('ind2', expect_fail_ways_if_compiler_lt('ghc','6.9',['profc','profasm']),
