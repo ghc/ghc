@@ -140,8 +140,8 @@ endif
 
 BOOTSTRAP_LIBS = Cabal filepath
 BOOTSTRAP_STAMPS = $(addprefix stamp/bootstrapping.,$(BOOTSTRAP_LIBS))
-BOOTSTRAP_INC_1_UP = $(addprefix -i../bootstrapping.,$(BOOTSTRAP_LIBS))
-BOOTSTRAP_INC_2_UP = $(addprefix -i../../bootstrapping.,$(BOOTSTRAP_LIBS))
+BOOTSTRAP_INC_1_UP = -DCABAL_VERSION=1,3 $(addprefix -i../bootstrapping.,$(BOOTSTRAP_LIBS))
+BOOTSTRAP_INC_2_UP = -DCABAL_VERSION=1,3 $(addprefix -i../../bootstrapping.,$(BOOTSTRAP_LIBS))
 
 .PHONY: subdirs
 
