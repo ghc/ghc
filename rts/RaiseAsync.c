@@ -17,6 +17,7 @@
 #include "Updates.h"
 #include "STM.h"
 #include "Sanity.h"
+#include "Profiling.h"
 #if defined(mingw32_HOST_OS)
 #include "win32/IOManager.h"
 #endif
@@ -852,6 +853,18 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
     debugTrace(DEBUG_sched,
 	       "raising exception in thread %ld.", (long)tso->id);
     
+#if defined(PROFILING)
+    /* 
+     * Debugging tool: on raising an  exception, show where we are.
+     * See also Exception.cmm:raisezh_fast.
+     * This wasn't done for asynchronous exceptions originally; see #1450 
+     */
+    if (RtsFlags.ProfFlags.showCCSOnException)
+    {
+        fprintCCS_stderr(tso->prof.CCCS);
+    }
+#endif
+
     // mark it dirty; we're about to change its stack.
     dirtyTSO(tso);
 
