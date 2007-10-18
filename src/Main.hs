@@ -10,7 +10,6 @@
 module Main (main) where
 
 
-import Haddock.Packages
 import Haddock.Backends.Html
 import Haddock.Backends.Hoogle
 import Haddock.Interface
@@ -108,21 +107,14 @@ main = handleTopExceptions $ do
   let ghcFlags = getGhcFlags flags
   (session, dynflags) <- startGhc libDir ghcFlags
 
-  -- get the -use-package packages, load them in GHC,
-  -- and try to get the corresponding installed HaddockPackages
-  let usePackages = [ pkg | Flag_UsePackage pkg <- flags ]
-  pkgInfos <- loadPackages session usePackages
-  packages'' <- getHaddockPackages pkgInfos
-
   -- get packages via --read-interface
-  packages' <- getHaddockPackages' (getIfacePairs flags)
-  let packages = packages'' ++ packages'
+  packages <- readInterfaceFiles (getIfacePairs flags)
 
   -- typecheck argument modules using GHC
   modules <- typecheckFiles session fileArgs
 
   -- combine the link envs of the external packages into one
-  let extLinks = combineLinkEnvs packages
+  let extLinks = Map.unions (map (ifLinkEnv . fst) packages)
 
   -- create the interfaces -- this is the core part of Haddock
   let (interfaces, homeLinks, messages) = createInterfaces modules extLinks flags
@@ -217,8 +209,25 @@ render flags interfaces = do
 
 
 -------------------------------------------------------------------------------
--- Misc
+-- Reading and dumping interface files
 -------------------------------------------------------------------------------
+
+
+readInterfaceFiles :: [(FilePath, FilePath)] -> IO [(InterfaceFile, FilePath)]
+readInterfaceFiles pairs = do
+  mbPackages <- mapM tryReadIface pairs
+  return (catMaybes mbPackages)
+  where
+    -- try to read an interface, warn if we can't
+    tryReadIface (html, iface) = do
+      eIface <- readInterfaceFile iface
+      case eIface of
+        Left err -> do
+          putStrLn ("Warning: Cannot read " ++ iface ++ ":")
+          putStrLn ("   " ++ show err)
+          putStrLn "Skipping this interface."
+          return Nothing
+        Right iface -> return $ Just (iface, html)
 
 
 dumpInterfaceFile :: [Module] -> LinkEnv -> [Flag] -> IO ()
@@ -231,6 +240,11 @@ dumpInterfaceFile modules homeLinks flags =
         ifModules = modules,
         ifLinkEnv = homeLinks
       }
+
+
+-------------------------------------------------------------------------------
+-- Misc
+-------------------------------------------------------------------------------
 
 
 handleEasyFlags flags fileArgs = do
@@ -255,12 +269,11 @@ handleEasyFlags flags fileArgs = do
       ", (c) Simon Marlow 2003; ported to the GHC-API by David Waern 2006\n"
 
 
-updateHTMLXRefs :: [HaddockPackage] -> IO ()
+updateHTMLXRefs :: [(InterfaceFile, FilePath)] -> IO ()
 updateHTMLXRefs packages = do
   writeIORef html_xrefs_ref (Map.fromList mapping)
   where
-    mapping = [ (mod, html) | 
-                (HaddockPackage mods _ html) <- packages, mod <- mods ] 
+    mapping = [(mod, html) | (iface, html) <- packages, mod <- ifModules iface] 
 
 
 getPrologue :: [Flag] -> IO (Maybe (HsDoc RdrName))

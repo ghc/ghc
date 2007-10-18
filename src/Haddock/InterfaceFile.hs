@@ -114,47 +114,51 @@ writeInterfaceFile filename iface = do
 	-- snd send the result to the file
   writeBinMem bh filename
   return ()
+
     
-readInterfaceFile :: FilePath -> IO InterfaceFile
+readInterfaceFile :: FilePath -> IO (Either String InterfaceFile)
 readInterfaceFile filename = do
   bh <- readBinMem filename
 
-  magic <- get bh
-  when (magic /= binaryInterfaceMagic) $ throwE $
-    "Magic number mismatch: couldn't load interface file: " ++ filename
-
+  magic   <- get bh
   version <- get bh
-  when (version /= binaryInterfaceVersion) $ throwE $
-    "Interface file is of wrong version: " ++ filename
 
-  -- get the dictionary
-  dict_p <- get bh
-  data_p <- tellBin bh		
-  seekBin bh dict_p
-  dict <- getDictionary bh
-  seekBin bh data_p		
+  case () of
+    _ | magic /= binaryInterfaceMagic -> return . Left $
+      "Magic number mismatch: couldn't load interface file: " ++ filename
+      | version /= binaryInterfaceVersion -> return . Left $
+      "Interface file is of wrong version: " ++ filename
+      | otherwise -> do
 
-  -- initialise the user-data field of bh
-  ud <- newReadState dict
-  bh <- return (setUserData bh ud)
+      -- get the dictionary
+      dict_p <- get bh
+      data_p <- tellBin bh		
+      seekBin bh dict_p
+      dict <- getDictionary bh
+      seekBin bh data_p		
+
+      -- initialise the user-data field of bh
+      ud <- newReadState dict
+      bh <- return (setUserData bh ud)
 	
-  -- get the symbol table
-  symtab_p <- get bh
-  data_p   <- tellBin bh
-  seekBin bh symtab_p
-  -- (construct an empty name cache)
-  u  <- mkSplitUniqSupply 'a' -- ??
-  let nc = initNameCache u []
-  (_, symtab) <- getSymbolTable bh nc
-  seekBin bh data_p
+      -- get the symbol table
+      symtab_p <- get bh
+      data_p   <- tellBin bh
+      seekBin bh symtab_p
+      -- (construct an empty name cache)
+      u  <- mkSplitUniqSupply 'a' -- ??
+      let nc = initNameCache u []
+      (_, symtab) <- getSymbolTable bh nc
+      seekBin bh data_p
 
-  -- set the symbol table
-  let ud = getUserData bh
-  bh <- return $! setUserData bh ud{ud_symtab = symtab}
+      -- set the symbol table
+      let ud = getUserData bh
+      bh <- return $! setUserData bh ud{ud_symtab = symtab}
 
-  -- load the actual data
-  iface <- get bh
-  return iface
+      -- load the actual data
+      iface <- get bh
+      return (Right iface)
+
 
 -------------------------------------------------------------------------------
 -- Symbol table
