@@ -663,7 +663,9 @@ allocateLocal (Capability *cap, nat n)
             bd->gen_no = 0;
             bd->step = cap->r.rNursery;
             bd->flags = 0;
-            alloc_blocks++;
+            // NO: alloc_blocks++;
+            // calcAllocated() uses the size of the nursery, and we've
+            // already bumpted nursery->n_blocks above.
         } else {
             // we have a block in the nursery: take it and put
             // it at the *front* of the nursery list, and use it
