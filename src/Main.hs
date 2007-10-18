@@ -104,11 +104,10 @@ main = handleTopExceptions $ do
   libDir <- handleEasyFlags flags fileArgs
   
   -- initialize GHC
-  let ghcFlags = getGhcFlags flags
-  (session, dynflags) <- startGhc libDir ghcFlags
+  (session, dynflags) <- startGhc libDir (ghcFlags flags)
 
   -- get packages via --read-interface
-  packages <- readInterfaceFiles (getIfacePairs flags)
+  packages <- readInterfaceFiles (ifacePairs flags)
 
   -- typecheck argument modules using GHC
   modules <- typecheckFiles session fileArgs

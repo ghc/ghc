@@ -9,8 +9,8 @@ module Haddock.Options (
   parseHaddockOpts,
   Flag(..),
   getUsage,
-  getGhcFlags,
-  getIfacePairs
+  ghcFlags,
+  ifacePairs
 ) where
 
 
@@ -37,12 +37,12 @@ parseHaddockOpts words =
       throwE (concat errors ++ usage)
 
 
-getGhcFlags :: [Flag] -> [String]
-getGhcFlags flags = [ option | Flag_OptGhc option <- flags ]
+ghcFlags :: [Flag] -> [String]
+ghcFlags flags = [ option | Flag_OptGhc option <- flags ]
 
 
-getIfacePairs :: [Flag] -> [(FilePath, FilePath)]
-getIfacePairs flags = [ parseIfaceOption s | Flag_ReadInterface s <- flags ]
+ifacePairs :: [Flag] -> [(FilePath, FilePath)]
+ifacePairs flags = [ parseIfaceOption s | Flag_ReadInterface s <- flags ]
 
 
 parseIfaceOption :: String -> (FilePath, FilePath)
