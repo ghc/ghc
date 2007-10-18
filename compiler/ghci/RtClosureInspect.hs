@@ -179,7 +179,15 @@ getClosureData :: a -> IO Closure
 getClosureData a =
    case unpackClosure# a of 
      (# iptr, ptrs, nptrs #) -> do
+#ifndef GHCI_TABLES_NEXT_TO_CODE
+           -- the info pointer we get back from unpackClosure# is to the
+           -- beginning of the standard info table, but the Storable instance
+           -- for info tables takes into account the extra entry pointer
+           -- when !tablesNextToCode, so we must adjust here:
+           itbl <- peek (Ptr iptr `plusPtr` negate wORD_SIZE)
+#else
            itbl <- peek (Ptr iptr)
+#endif
            let tipe = readCType (BCI.tipe itbl)
                elems = fromIntegral (BCI.ptrs itbl)
                ptrsList = Array 0 (elems - 1) elems ptrs
