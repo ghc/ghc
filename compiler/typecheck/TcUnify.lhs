@@ -148,7 +148,8 @@ subFunTys error_herald n_pats res_ty thing_inside
         | isOpenSynTyCon tc
         = do { (coi1, ty') <- tcNormaliseFamInst ty
              ; case coi1 of
-	         IdCo   -> defer    -- no progress, but maybe solvable => defer
+	         IdCo   -> defer n args_so_far ty
+                                    -- no progress, but maybe solvable => defer
                  ACo _  ->          -- progress: so lets try again
         	   do { (co_fn, res) <- loop n args_so_far ty'
 		      ; return $ (co_fn <.> coiToHsWrapper (mkSymCoI coi1), res)
@@ -171,7 +172,7 @@ subFunTys error_herald n_pats res_ty thing_inside
 		       }
 	     }
 
-    loop n args_so_far (TyVarTy tv)
+    loop n args_so_far ty@(TyVarTy tv)
         | isTyConableTyVar tv
 	= do { cts <- readMetaTyVar tv 
 	     ; case cts of
@@ -182,7 +183,7 @@ subFunTys error_herald n_pats res_ty thing_inside
                                             res_ty
 		      ; return (idHsWrapper, res) } }
         | otherwise             -- defer as tyvar may be refined by equalities
-        = defer
+        = defer n args_so_far ty
 	where
 	  mk_res_ty (res_ty' : arg_tys') = mkFunTys arg_tys' res_ty'
 	  mk_res_ty [] = panic "TcUnify.mk_res_ty1"
@@ -195,12 +196,12 @@ subFunTys error_herald n_pats res_ty thing_inside
          -- build a template type a1 -> ... -> an -> b and defer an equality
          -- between that template and the expected result type res_ty; then,
          -- use the template to type the thing_inside
-    defer
-      = do { arg_tys <- newFlexiTyVarTys n_pats argTypeKind
+    defer n args_so_far ty
+      = do { arg_tys <- newFlexiTyVarTys n argTypeKind
            ; res_ty' <- newFlexiTyVarTy openTypeKind
            ; let fun_ty = mkFunTys arg_tys res_ty'
-           ; coi <- defer_unification False False fun_ty res_ty
-           ; res <- thing_inside arg_tys res_ty'
+           ; coi <- defer_unification False False fun_ty ty
+           ; res <- thing_inside (reverse args_so_far ++ arg_tys) res_ty'
            ; return (coiToHsWrapper coi, res)
            }
 
