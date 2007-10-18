@@ -107,7 +107,7 @@ ObjectCode *objects = NULL;	/* initially empty */
 static int ocVerifyImage_ELF    ( ObjectCode* oc );
 static int ocGetNames_ELF       ( ObjectCode* oc );
 static int ocResolve_ELF        ( ObjectCode* oc );
-#if defined(powerpc_HOST_ARCH)
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
 static int ocAllocateSymbolExtras_ELF ( ObjectCode* oc );
 #endif
 #elif defined(OBJFORMAT_PEi386)
@@ -128,9 +128,30 @@ static void machoInitSymbolsWithoutUnderscore( void );
 #endif
 #endif
 
-#if defined(x86_64_HOST_ARCH) && defined(OBJFORMAT_ELF)
-static void*x86_64_high_symbol( char *lbl, void *addr );
-#endif
+/* on x86_64 we have a problem with relocating symbol references in
+ * code that was compiled without -fPIC.  By default, the small memory
+ * model is used, which assumes that symbol references can fit in a
+ * 32-bit slot.  The system dynamic linker makes this work for
+ * references to shared libraries by either (a) allocating a jump
+ * table slot for code references, or (b) moving the symbol at load
+ * time (and copying its contents, if necessary) for data references.
+ *
+ * We unfortunately can't tell whether symbol references are to code
+ * or data.  So for now we assume they are code (the vast majority
+ * are), and allocate jump-table slots.  Unfortunately this will
+ * SILENTLY generate crashing code for data references.  This hack is
+ * enabled by X86_64_ELF_NONPIC_HACK.
+ * 
+ * One workaround is to use shared Haskell libraries.  This is
+ * coming.  Another workaround is to keep the static libraries but
+ * compile them with -fPIC, because that will generate PIC references
+ * to data which can be relocated.  The PIC code is still too green to
+ * do this systematically, though.
+ *
+ * See bug #781
+ * See thread http://www.haskell.org/pipermail/cvs-ghc/2007-September/038458.html
+ */
+#define X86_64_ELF_NONPIC_HACK 1
 
 /* -----------------------------------------------------------------------------
  * Built-in symbols from the RTS
@@ -1059,19 +1080,7 @@ lookupSymbol( char *lbl )
 
     if (val == NULL) {
 #       if defined(OBJFORMAT_ELF)
-#	if defined(x86_64_HOST_ARCH)
-	val = dlsym(dl_prog_handle, lbl);
-	if (val >= (void *)0x80000000) {
-	    void *new_val;
-	    new_val = x86_64_high_symbol(lbl, val);
-	    IF_DEBUG(linker,debugBelch("lookupSymbol: relocating out of range symbol: %s = %p, now %p\n", lbl, val, new_val));
-	    return new_val;
-	} else {
-	    return val;
-	}
-#	else
 	return dlsym(dl_prog_handle, lbl);
-#	endif
 #       elif defined(OBJFORMAT_MACHO)
 #       if HAVE_DLFCN_H
         /* On OS X 10.3 and later, we use dlsym instead of the old legacy
@@ -1350,7 +1359,7 @@ loadObj( char *path )
 #  if defined(OBJFORMAT_MACHO) && (defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH))
    r = ocAllocateSymbolExtras_MachO ( oc );
    if (!r) { return r; }
-#  elif defined(OBJFORMAT_ELF) && defined(powerpc_HOST_ARCH)
+#  elif defined(OBJFORMAT_ELF) && (defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH))
    r = ocAllocateSymbolExtras_ELF ( oc );
    if (!r) { return r; }
 #endif
@@ -1532,8 +1541,7 @@ static void addSection ( ObjectCode* oc, SectionKind kind,
  * them right next to the object code itself.
  */
 
-#if defined(powerpc_HOST_ARCH) || (defined(x86_64_HOST_ARCH) \
-                                    && defined(darwin_TARGET_OS))
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
 
 /*
   ocAllocateSymbolExtras
@@ -1560,9 +1568,11 @@ static int ocAllocateSymbolExtras( ObjectCode* oc, int count, int first )
   int pagesize, n, m;
 #endif
   int aligned;
+#ifndef USE_MMAP
   int misalignment = 0;
-#if darwin_HOST_OS
+#ifdef darwin_HOST_OS
   misalignment = oc->misalignment;
+#endif
 #endif
 
   if( count > 0 )
@@ -2744,64 +2754,6 @@ PLTSize(void)
 #endif
 
 
-#if x86_64_HOST_ARCH
-// On x86_64, 32-bit relocations are often used, which requires that
-// we can resolve a symbol to a 32-bit offset.  However, shared
-// libraries are placed outside the 2Gb area, which leaves us with a
-// problem when we need to give a 32-bit offset to a symbol in a
-// shared library.
-// 
-// For a function symbol, we can allocate a bounce sequence inside the
-// 2Gb area and resolve the symbol to this.  The bounce sequence is
-// simply a long jump instruction to the real location of the symbol.
-//
-// For data references, we're screwed.
-//
-typedef struct {
-    unsigned char jmp[8];  /* 6 byte instruction: jmpq *0x00000002(%rip) */
-    void *addr;
-} x86_64_bounce;
-
-#define X86_64_BB_SIZE 1024
-
-static x86_64_bounce *x86_64_bounce_buffer = NULL;
-static nat x86_64_bb_next_off;
-
-static void*
-x86_64_high_symbol( char *lbl, void *addr )
-{
-    x86_64_bounce *bounce;
-
-    if ( x86_64_bounce_buffer == NULL || 
-	 x86_64_bb_next_off >= X86_64_BB_SIZE ) {
-	x86_64_bounce_buffer = 
-	    mmap(NULL, X86_64_BB_SIZE * sizeof(x86_64_bounce), 
-		 PROT_EXEC|PROT_READ|PROT_WRITE, 
-		 MAP_PRIVATE|EXTRA_MAP_FLAGS|MAP_ANONYMOUS, -1, 0);
-	if (x86_64_bounce_buffer == MAP_FAILED) {
-	    barf("x86_64_high_symbol: mmap failed");
-	}
-	x86_64_bb_next_off = 0;
-    }
-    bounce = &x86_64_bounce_buffer[x86_64_bb_next_off];
-    bounce->jmp[0] = 0xff;
-    bounce->jmp[1] = 0x25;
-    bounce->jmp[2] = 0x02;
-    bounce->jmp[3] = 0x00;
-    bounce->jmp[4] = 0x00;
-    bounce->jmp[5] = 0x00;
-    bounce->addr = addr;
-    x86_64_bb_next_off++;
-
-    IF_DEBUG(linker, debugBelch("x86_64: allocated bounce entry for %s->%p at %p\n",
-				lbl, addr, bounce));
-
-    insertStrHashTable(symhash, lbl, bounce);
-    return bounce;
-}
-#endif
-
-
 /*
  * Generic ELF functions
  */
@@ -3517,9 +3469,15 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
       {
 	  StgInt64 off = value - P;
 	  if (off >= 0x7fffffffL || off < -0x80000000L) {
-	      barf("R_X86_64_PC32 relocation out of range: %s = %p",
-		   symbol, off);
-	  }
+#if X86_64_ELF_NONPIC_HACK
+	      StgInt64 pltAddress = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
+                                                -> jumpIsland;
+              off = pltAddress + A - P;
+#else
+              barf("R_X86_64_PC32 relocation out of range: %s = %p\nRecompile %s with -fPIC.",
+                   symbol, off, oc->fileName );
+#endif
+          }
 	  *(Elf64_Word *)P = (Elf64_Word)off;
 	  break;
       }
@@ -3533,19 +3491,51 @@ do_Elf_Rela_relocations ( ObjectCode* oc, char* ehdrC,
 
       case R_X86_64_32:
 	  if (value >= 0x7fffffffL) {
-	      barf("R_X86_64_32 relocation out of range: %s = %p\n",
-		   symbol, value);
-	  }
+#if X86_64_ELF_NONPIC_HACK	      
+              StgInt64 pltAddress = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
+                                                -> jumpIsland;
+              value = pltAddress + A;
+#else
+              barf("R_X86_64_32 relocation out of range: %s = %p\nRecompile %s with -fPIC.",
+		   symbol, value, oc->fileName );
+#endif
+          }
 	  *(Elf64_Word *)P = (Elf64_Word)value;
 	  break;
 
       case R_X86_64_32S:
 	  if ((StgInt64)value > 0x7fffffffL || (StgInt64)value < -0x80000000L) {
-	      barf("R_X86_64_32S relocation out of range: %s = %p\n",
-		   symbol, value);
+#if X86_64_ELF_NONPIC_HACK	      
+              StgInt64 pltAddress = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
+                                                -> jumpIsland;
+              value = pltAddress + A;
+#else
+              barf("R_X86_64_32S relocation out of range: %s = %p\nRecompile %s with -fPIC.",
+		   symbol, value, oc->fileName );
+#endif
 	  }
 	  *(Elf64_Sword *)P = (Elf64_Sword)value;
 	  break;
+	  
+      case R_X86_64_GOTPCREL:
+      {
+          StgInt64 gotAddress = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)->addr;
+	  StgInt64 off = gotAddress + A - P;
+	  *(Elf64_Word *)P = (Elf64_Word)off;
+	  break;
+      }
+      
+      case R_X86_64_PLT32:
+      {
+	  StgInt64 off = value - P;
+	  if (off >= 0x7fffffffL || off < -0x80000000L) {
+              StgInt64 pltAddress = (StgInt64) &makeSymbolExtra(oc, ELF_R_SYM(info), S)
+                                                    -> jumpIsland;
+              off = pltAddress + A - P;
+	  }
+	  *(Elf64_Word *)P = (Elf64_Word)off;
+	  break;
+      }
 #endif
 
          default:
@@ -3698,10 +3688,10 @@ ia64_reloc_pcrel21(Elf_Addr target, Elf_Addr value, ObjectCode *oc)
 #endif /* ia64 */
 
 /*
- * PowerPC ELF specifics
+ * PowerPC & X86_64 ELF specifics
  */
 
-#ifdef powerpc_HOST_ARCH
+#if defined(powerpc_HOST_ARCH) || defined(x86_64_HOST_ARCH)
 
 static int ocAllocateSymbolExtras_ELF( ObjectCode *oc )
 {
@@ -3725,7 +3715,7 @@ static int ocAllocateSymbolExtras_ELF( ObjectCode *oc )
   if( shdr[i].sh_entsize != sizeof( Elf_Sym ) )
   {
     errorBelch( "The entry size (%d) of the symtab isn't %d\n",
-      shdr[i].sh_entsize, sizeof( Elf_Sym ) );
+      (int) shdr[i].sh_entsize, (int) sizeof( Elf_Sym ) );
     
     return 0;
   }
