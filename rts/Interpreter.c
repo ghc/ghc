@@ -847,15 +847,20 @@ run_BCO:
                   // in a reasonable state for the GC and so that
                   // execution of this BCO can continue when we resume
                   ioAction = (StgClosure *) deRefStablePtr (rts_breakpoint_io_action);
-                  Sp -= 8;
-                  Sp[7] = (W_)obj;   
-                  Sp[6] = (W_)&stg_apply_interp_info;
+                  Sp -= 9;
+                  Sp[8] = (W_)obj;   
+                  Sp[7] = (W_)&stg_apply_interp_info;
+                  Sp[6] = (W_)&stg_noforceIO_info;     // see [unreg] below
                   Sp[5] = (W_)new_aps;                 // the AP_STACK
                   Sp[4] = (W_)BCO_PTR(arg3_freeVars);  // the info about local vars of the breakpoint
                   Sp[3] = (W_)False_closure;            // True <=> a breakpoint
                   Sp[2] = (W_)&stg_ap_pppv_info;
                   Sp[1] = (W_)ioAction;                // apply the IO action to its two arguments above
                   Sp[0] = (W_)&stg_enter_info;         // get ready to run the IO action
+                  // Note [unreg]: in unregisterised mode, the return
+                  // convention for IO is different.  The
+                  // stg_noForceIO_info stack frame is necessary to
+                  // account for this difference.
 
                   // set the flag in the TSO to say that we are now
                   // stopping at a breakpoint so that when we resume
