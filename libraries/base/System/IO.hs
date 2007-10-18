@@ -478,7 +478,15 @@ openTempFile' loc tmp_dir template binary = do
 	 return (filepath, h)
       where
         filename        = prefix ++ show x ++ suffix
-        filepath        = tmp_dir ++ [pathSeparator] ++ filename
+        filepath        = tmp_dir `combine` filename
+
+        -- XXX bits copied from System.FilePath, since that's not available here
+        combine a b
+                  | null b = a
+                  | null a = b
+                  | last a == pathSeparator = a ++ b
+                  | otherwise = a ++ [pathSeparator] ++ b
+
 #if __HUGS__
         fdToHandle fd   = openFd (fromIntegral fd) False ReadWriteMode binary
 #endif
