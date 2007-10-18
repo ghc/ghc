@@ -430,14 +430,15 @@ retry_pop_stack:
             // be per-thread.
             W_[rts_stop_on_exception] = 0;
             ("ptr" ioAction) = foreign "C" deRefStablePtr (W_[rts_breakpoint_io_action] "ptr") [];
-            Sp = Sp - WDS(6);
-            Sp(5) = exception;
-            Sp(4) = stg_raise_ret_info;
+            Sp = Sp - WDS(7);
+            Sp(6) = exception;
+            Sp(5) = stg_raise_ret_info;
+            Sp(4) = stg_noforceIO_info;    // required for unregisterised
             Sp(3) = exception;             // the AP_STACK
             Sp(2) = base_GHCziBase_True_closure; // dummy breakpoint info
             Sp(1) = base_GHCziBase_True_closure; // True <=> a breakpoint
             R1 = ioAction;
-            jump stg_ap_pppv_info;
+            jump RET_LBL(stg_ap_pppv);
         }
     }
 
