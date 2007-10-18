@@ -5,6 +5,7 @@ license-file:	LICENSE
 maintainer:	libraries@haskell.org
 description:
     Facilities for manipulating Haskell source code using Template Haskell.
+build-type: Simple
 build-depends: base, pretty, packedstring, containers
 exposed-modules:
 	Language.Haskell.TH.Syntax,
