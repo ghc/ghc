@@ -8,6 +8,7 @@
 module Haddock.Packages (
   HaddockPackage(..),
   getHaddockPackages,
+  getHaddockPackages',
   combineLinkEnvs
 ) where
 
@@ -15,6 +16,7 @@ module Haddock.Packages (
 import Haddock.Types
 import Haddock.Exception
 import Haddock.InterfaceFile
+import qualified Distribution.Haddock as D
 
 import Data.Maybe
 import qualified Data.Map as Map
@@ -36,6 +38,24 @@ data HaddockPackage = HaddockPackage {
   pdLinkEnv  :: LinkEnv,
   pdHtmlPath :: FilePath
 }
+
+
+getHaddockPackages' :: [(FilePath, FilePath)] -> IO [HaddockPackage]
+getHaddockPackages' pairs = do
+  mbPackages <- mapM tryReadIface pairs
+  return (catMaybes mbPackages)
+  where
+    -- try to get a HaddockPackage, warn if we can't
+    tryReadIface (html, iface) = do
+      eIface <- D.readInterfaceFile iface
+      case eIface of
+        Left err -> do
+          putStrLn ("Warning: Cannot read " ++ iface ++ ":")
+          putStrLn ("   " ++ show err)
+          putStrLn "Skipping this interface."
+          return Nothing
+        Right iface -> return $ Just $
+                       HaddockPackage (ifModules iface) (ifLinkEnv iface) html
 
 
 -- | Try to read the installed Haddock information for the given packages, 
@@ -65,7 +85,7 @@ getPackage pkgInfo = do
   iface     <- readInterfaceFile ifacePath
   
   return $ HaddockPackage {
-    pdModules  = packageModules pkgInfo,
+    pdModules  = ifModules iface,
     pdLinkEnv  = ifLinkEnv iface,
     pdHtmlPath = html
   } 

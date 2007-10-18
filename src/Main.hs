@@ -105,14 +105,18 @@ main = handleTopExceptions $ do
   libDir <- handleEasyFlags flags fileArgs
   
   -- initialize GHC
-  let ghcFlags = makeGhcFlags flags
+  let ghcFlags = getGhcFlags flags
   (session, dynflags) <- startGhc libDir ghcFlags
 
   -- get the -use-package packages, load them in GHC,
   -- and try to get the corresponding installed HaddockPackages
   let usePackages = [ pkg | Flag_UsePackage pkg <- flags ]
   pkgInfos <- loadPackages session usePackages
-  packages <- getHaddockPackages pkgInfos 
+  packages'' <- getHaddockPackages pkgInfos
+
+  -- get packages via --read-interface
+  packages' <- getHaddockPackages' (getIfacePairs flags)
+  let packages = packages'' ++ packages'
 
   -- typecheck argument modules using GHC
   modules <- typecheckFiles session fileArgs
@@ -129,7 +133,7 @@ main = handleTopExceptions $ do
   render flags interfaces
 
   -- last but not least, dump the interface file!
-  dumpInterfaceFile homeLinks flags
+  dumpInterfaceFile (map ghcModule modules) homeLinks flags
 
 
 -------------------------------------------------------------------------------
@@ -217,14 +221,15 @@ render flags interfaces = do
 -------------------------------------------------------------------------------
 
 
-dumpInterfaceFile :: LinkEnv -> [Flag] -> IO ()
-dumpInterfaceFile homeLinks flags = 
+dumpInterfaceFile :: [Module] -> LinkEnv -> [Flag] -> IO ()
+dumpInterfaceFile modules homeLinks flags = 
   case [str | Flag_DumpInterface str <- flags] of
     [] -> return ()
     fs -> let filename = last fs in writeInterfaceFile filename ifaceFile
   where 
     ifaceFile = InterfaceFile {
-        ifLinkEnv  = homeLinks
+        ifModules = modules,
+        ifLinkEnv = homeLinks
       }
 
 

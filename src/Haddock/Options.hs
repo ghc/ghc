@@ -9,7 +9,8 @@ module Haddock.Options (
   parseHaddockOpts,
   Flag(..),
   getUsage,
-  makeGhcFlags
+  getGhcFlags,
+  getIfacePairs
 ) where
 
 
@@ -36,14 +37,26 @@ parseHaddockOpts words =
       throwE (concat errors ++ usage)
 
 
-makeGhcFlags :: [Flag] -> [String]
-makeGhcFlags flags = [ option | Flag_OptGhc option <- flags ]
+getGhcFlags :: [Flag] -> [String]
+getGhcFlags flags = [ option | Flag_OptGhc option <- flags ]
+
+
+getIfacePairs :: [Flag] -> [(FilePath, FilePath)]
+getIfacePairs flags = [ parseIfaceOption s | Flag_ReadInterface s <- flags ]
+
+
+parseIfaceOption :: String -> (FilePath, FilePath)
+parseIfaceOption s = 
+  case break (==',') s of
+	(fpath,',':file) -> (fpath, file)
+	(file, _)        -> ("", file)
 
 
 data Flag
   = Flag_CSS String
   | Flag_Debug
 --  | Flag_DocBook
+  | Flag_ReadInterface String
   | Flag_DumpInterface String
   | Flag_Heading String
   | Flag_Html
@@ -83,6 +96,8 @@ options backwardsCompat =
 	"directory in which to put the output files",
    Option ['l']  ["lib"]         (ReqArg Flag_Lib "DIR") 
 	"location of Haddock's auxiliary files",
+   Option ['i'] ["read-interface"] (ReqArg Flag_ReadInterface "FILE")
+	"read an interface from FILE",
    Option ['D']  ["dump-interface"] (ReqArg Flag_DumpInterface "FILE") 
   "interface file name",
 --    Option ['S']  ["docbook"]  (NoArg Flag_DocBook)

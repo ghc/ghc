@@ -45,15 +45,19 @@ data InterfaceMod = InterfaceMod {
 }
 
 data InterfaceFile = InterfaceFile {
-  ifLinkEnv  :: LinkEnv
---  ifModules :: [InterfaceMod]  
+  ifLinkEnv :: LinkEnv,
+  ifModules :: [Module]  
 } 
 
 instance Binary InterfaceFile where
-  put_ bh (InterfaceFile x) = put_ bh (Map.toList x)
-  get  bh = do
-    env <- get bh
-    return (InterfaceFile (Map.fromList env))
+  put_ bh (InterfaceFile env mods) = do
+    put_ bh (Map.toList env)
+    put_ bh mods
+
+  get bh = do
+    env  <- get bh
+    mods <- get bh
+    return (InterfaceFile (Map.fromList env) mods)
 
 iface2interface iface = InterfaceMod {
   imModule      = ifaceMod             iface,
