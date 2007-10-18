@@ -1498,7 +1498,7 @@ takeMVarzh_fast
 #endif
         
     if (info == stg_MVAR_CLEAN_info) {
-        foreign "C" dirty_MVAR(BaseReg "ptr", mvar);
+        foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr");
     }
 
     /* If the MVar is empty, put ourselves on its blocking queue,
@@ -1595,7 +1595,7 @@ tryTakeMVarzh_fast
     }
 
     if (info == stg_MVAR_CLEAN_info) {
-        foreign "C" dirty_MVAR(BaseReg "ptr", mvar);
+        foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr");
     }
 
     /* we got the value... */
@@ -1661,7 +1661,7 @@ putMVarzh_fast
 #endif
 
     if (info == stg_MVAR_CLEAN_info) {
-        foreign "C" dirty_MVAR(BaseReg "ptr", mvar);
+        foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr");
     }
 
     if (StgMVar_value(mvar) != stg_END_TSO_QUEUE_closure) {
@@ -1747,7 +1747,7 @@ tryPutMVarzh_fast
     }
   
     if (info == stg_MVAR_CLEAN_info) {
-        foreign "C" dirty_MVAR(BaseReg "ptr", mvar);
+        foreign "C" dirty_MVAR(BaseReg "ptr", mvar "ptr");
     }
 
     if (StgMVar_head(mvar) != stg_END_TSO_QUEUE_closure) {
