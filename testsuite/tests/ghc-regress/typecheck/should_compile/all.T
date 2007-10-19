@@ -141,7 +141,7 @@ test('tc135', only_compiler_types(['ghc']), compile, [''])
 test('tc136', normal, compile, [''])
 test('tc137', normal, compile, [''])
 test('tc140', normal, compile, [''])
-test('tc141', normal, compile_fail, [''])
+test('tc141', namebase_if_compiler_lt('ghc','6.9', 'tc141-6.8'), compile_fail, [''])
 test('tc142', normal, compile, [''])
 test('tc143', normal, compile, [''])
 test('tc144', omit_compiler_types(['hugs']), compile, [''])	# Hugs loops

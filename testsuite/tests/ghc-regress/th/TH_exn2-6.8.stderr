@@ -1,0 +1,13 @@
+
+TH_exn2.hs:1:0:
+    Exception when trying to run compile-time code:
+      Prelude.tail: empty list
+      Code: let
+	      >>= = (>>=) @ Language.Haskell.TH.Syntax.Q $dMonad
+	      $dMonad = $dMonad
+	      return = return @ Language.Haskell.TH.Syntax.Q $dMonad
+	      ....
+	    in
+	      do ds <- [d| |]
+		 return @ [Language.Haskell.TH.Syntax.Dec]
+		   (tail @ Language.Haskell.TH.Syntax.Dec ds)

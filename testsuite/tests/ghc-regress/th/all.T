@@ -65,10 +65,10 @@ test('TH_where', normal, compile_and_run, [''])
 
 test('TH_spliceInst', normal, compile, ['-v0'])
 
-test('TH_exn1', normal, compile_fail, ['-v0'])
+test('TH_exn1', namebase_if_compiler_lt('ghc','6.9', 'TH_exn1-6.8'), compile_fail, ['-v0'])
 
 test('TH_dupdecl', normal, compile_fail, ['-v0'])
-test('TH_exn2', normal, compile_fail, ['-v0'])
+test('TH_exn2', namebase_if_compiler_lt('ghc','6.9', 'TH_exn2-6.8'), compile_fail, ['-v0'])
 
 test('TH_recover', normal, compile_and_run, [''])
 test('TH_dataD1', normal, compile_fail, ['-v0'])
@@ -76,4 +76,4 @@ test('TH_dataD1', normal, compile_fail, ['-v0'])
 test('TH_ppr1', normal, compile_and_run, ['-fglasgow-exts'])
 
 test('TH_fail', normal, compile_fail, ['-v0'])
-test('TH_runIO', normal, compile_fail, ['-v0'])
+test('TH_runIO', namebase_if_compiler_lt('ghc','6.9', 'TH_runIO-6.8'), compile_fail, ['-v0'])
