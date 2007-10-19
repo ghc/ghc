@@ -2904,8 +2904,7 @@ ocVerifyImage_ELF ( ObjectCode* oc )
       case EM_PPC:   IF_DEBUG(linker,debugBelch( "powerpc32" )); break;
 #ifdef EM_X86_64
       case EM_X86_64: IF_DEBUG(linker,debugBelch( "x86_64" )); break;
-#endif
-#ifdef EM_AMD64
+#elif defined(EM_AMD64)
       case EM_AMD64: IF_DEBUG(linker,debugBelch( "amd64" )); break;
 #endif
       default:       IF_DEBUG(linker,debugBelch( "unknown" ));
