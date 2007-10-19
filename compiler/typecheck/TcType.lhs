@@ -38,7 +38,7 @@ module TcType (
   isImmutableTyVar, isSkolemTyVar, isMetaTyVar, isBoxyTyVar, 
   isSigTyVar, isExistentialTyVar,  isTyConableTyVar,
   metaTvRef, 
-  isFlexi, isIndirect, 
+  isFlexi, isIndirect, isRuntimeUnk, isUnk,
 
   --------------------------------
   -- Builders
@@ -556,6 +556,16 @@ isFlexi other     = False
 
 isIndirect (Indirect _) = True
 isIndirect other        = False
+
+isRuntimeUnk :: TyVar -> Bool
+isRuntimeUnk x | isTcTyVar x
+               , SkolemTv RuntimeUnkSkol <- tcTyVarDetails x = True
+               | otherwise = False
+
+isUnk :: TyVar -> Bool
+isUnk x | isTcTyVar x
+        , SkolemTv UnkSkol <- tcTyVarDetails x = True
+        | otherwise = False
 \end{code}
 
 

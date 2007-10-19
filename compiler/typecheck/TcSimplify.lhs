@@ -3110,11 +3110,6 @@ mkMonomorphismMsg tidy_env inst_tvs
 		nest 2 (vcat docs),
 		monomorphism_fix dflags]
 
-isRuntimeUnk :: TyVar -> Bool
-isRuntimeUnk x | isTcTyVar x
-               , SkolemTv RuntimeUnkSkol <- tcTyVarDetails x = True
-               | otherwise = False
-
 monomorphism_fix :: DynFlags -> SDoc
 monomorphism_fix dflags
   = ptext SLIT("Probable fix:") <+> vcat

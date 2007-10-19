@@ -756,17 +756,17 @@ zonkTopTyVar tv
     k = tyVarKind tv
     default_k = defaultKind k
 
-zonkQuantifiedTyVars :: [TcTyVar] -> TcM [TyVar]
+zonkQuantifiedTyVars :: [TcTyVar] -> TcM [TcTyVar]
 zonkQuantifiedTyVars = mappM zonkQuantifiedTyVar
 
-zonkQuantifiedTyVar :: TcTyVar -> TcM TyVar
+zonkQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
 -- zonkQuantifiedTyVar is applied to the a TcTyVar when quantifying over it.
 --
 -- The quantified type variables often include meta type variables
 -- we want to freeze them into ordinary type variables, and
 -- default their kind (e.g. from OpenTypeKind to TypeKind)
 -- 			-- see notes with Kind.defaultKind
--- The meta tyvar is updated to point to the new regular TyVar.  Now any 
+-- The meta tyvar is updated to point to the new skolem TyVar.  Now any 
 -- bound occurences of the original type variable will get zonked to 
 -- the immutable version.
 --
@@ -780,9 +780,11 @@ zonkQuantifiedTyVar tv
   | otherwise	-- It's a meta-type-variable
   = do	{ details <- readMetaTyVar tv
 
-	-- Create the new, frozen, regular type variable
+	-- Create the new, frozen, skolem type variable
+        -- We zonk to a skolem, not to a regular TcVar
+        -- See Note [Zonking to Skolem]
 	; let final_kind = defaultKind (tyVarKind tv)
-	      final_tv   = mkTyVar (tyVarName tv) final_kind
+	      final_tv   = mkSkolTyVar (tyVarName tv) final_kind UnkSkol
 
 	-- Bind the meta tyvar to the new tyvar
 	; case details of
@@ -797,8 +799,8 @@ zonkQuantifiedTyVar tv
 	; return final_tv }
 \end{code}
 
-[Silly Type Synonyms]
-
+Note [Silly Type Synonyms]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
 Consider this:
 	type C u a = u	-- Note 'a' unused
 
@@ -831,6 +833,37 @@ Consider this:
 
 All very silly.   I think its harmless to ignore the problem.  We'll end up with
 a /\a in the final result but all the occurrences of a will be zonked to ()
+
+Note [Zonking to Skolem]
+~~~~~~~~~~~~~~~~~~~~~~~~
+We used to zonk quantified type variables to regular TyVars.  However, this
+leads to problems.  Consider this program from the regression test suite:
+
+  eval :: Int -> String -> String -> String
+  eval 0 root actual = evalRHS 0 root actual
+
+  evalRHS :: Int -> a
+  evalRHS 0 root actual = eval 0 root actual
+
+It leads to the deferral of an equality
+
+  (String -> String -> String) ~ a
+
+which is propagated up to the toplevel (see TcSimplify.tcSimplifyInferCheck).
+In the meantime `a' is zonked and quantified to form `evalRHS's signature.
+This has the *side effect* of also zonking the `a' in the deferred equality
+(which at this point is being handed around wrapped in an implication
+constraint).
+
+Finally, the equality (with the zonked `a') will be handed back to the
+simplifier by TcRnDriver.tcRnSrcDecls calling TcSimplify.tcSimplifyTop.
+If we zonk `a' with a regular type variable, we will have this regular type
+variable now floating around in the simplifier, which in many places assumes to
+only see proper TcTyVars.
+
+We can avoid this problem by zonking with a skolem.  The skolem is rigid
+(which we requirefor a quantified variable), but is still a TcTyVar that the
+simplifier knows how to deal with.
 
 
 %************************************************************************

@@ -1236,7 +1236,7 @@ ppr_ty env ty
 -- (ppr_extra env ty) shows extra info about 'ty'
 ppr_extra :: TidyEnv -> Type -> TcM (TidyEnv, SDoc)
 ppr_extra env (TyVarTy tv)
-  | isTcTyVar tv && (isSkolemTyVar tv || isSigTyVar tv)
+  | isTcTyVar tv && (isSkolemTyVar tv || isSigTyVar tv) && not (isUnk tv)
   = return (env1, pprSkolTvBinding tv1)
   where
     (env1, tv1) = tidySkolemTyVar env tv

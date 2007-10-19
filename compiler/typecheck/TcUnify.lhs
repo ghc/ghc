@@ -200,7 +200,10 @@ subFunTys error_herald n_pats res_ty thing_inside
       = do { arg_tys <- newFlexiTyVarTys n argTypeKind
            ; res_ty' <- newFlexiTyVarTy openTypeKind
            ; let fun_ty = mkFunTys arg_tys res_ty'
-           ; coi <- defer_unification False False fun_ty ty
+                 err    = error_herald <> comma $$
+                          text "which does not match its type"
+           ; coi <- addErrCtxt err $
+                      defer_unification False False fun_ty ty
            ; res <- thing_inside (reverse args_so_far ++ arg_tys) res_ty'
            ; return (coiToHsWrapper coi, res)
            }
