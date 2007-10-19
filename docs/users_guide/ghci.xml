@@ -1680,17 +1680,20 @@ $ ghci -lm
 
       <varlistentry>
 	<term>
-          <literal>:browse</literal> <optional><literal>*</literal></optional><replaceable>module</replaceable> ...
+          <literal>:browse</literal> <optional><optional><literal>*</literal></optional><replaceable>module</replaceable></optional> ...
           <indexterm><primary><literal>:browse</literal></primary></indexterm>
         </term>
 	<listitem>
 	  <para>Displays the identifiers defined by the module
 	  <replaceable>module</replaceable>, which must be either
-	  loaded into GHCi or be a member of a package.  If the
-	  <literal>*</literal> symbol is placed before the module
-	  name, then <emphasis>all</emphasis> the identifiers defined
-	  in <replaceable>module</replaceable> are shown; otherwise
-	  the list is limited to the exports of
+	  loaded into GHCi or be a member of a package.  If
+	  <replaceable>module</replaceable> is omitted, the most
+	  recently-loaded module is used.</para>
+
+          <para>If the <literal>*</literal> symbol is placed before
+	  the module name, then <emphasis>all</emphasis> the
+	  identifiers in scope in <replaceable>module</replaceable> are
+	  shown; otherwise the list is limited to the exports of
 	  <replaceable>module</replaceable>.  The
 	  <literal>*</literal>-form is only available for modules
 	  which are interpreted; for compiled modules (including

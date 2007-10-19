@@ -164,7 +164,7 @@ helpText =
  "\n" ++
  "   <statement>                 evaluate/run <statement>\n" ++
  "   :add <filename> ...         add module(s) to the current target set\n" ++
- "   :browse [*]<module>         display the names defined by <module>\n" ++
+ "   :browse [[*]<module>]       display the names defined by <module>\n" ++
  "   :cd <dir>                   change directory to <dir>\n" ++
  "   :cmd <expr>                 run the commands returned by <expr>::IO String\n" ++
  "   :ctags [<file>]             create tags file for Vi (default: \"tags\")\n" ++
@@ -1025,16 +1025,27 @@ shellEscape str = io (system str >> return False)
 browseCmd :: String -> GHCi ()
 browseCmd m = 
   case words m of
-    ['*':m] | looksLikeModuleName m -> browseModule m False
-    [m]     | looksLikeModuleName m -> browseModule m True
+    ['*':s] | looksLikeModuleName s -> do 
+        m <-  wantInterpretedModule s
+        browseModule m False
+    [s] | looksLikeModuleName s -> do
+        m <- lookupModule s
+        browseModule m True
+    [] -> do
+        s <- getSession
+        (as,bs) <- io $ GHC.getContext s
+                -- Guess which module the user wants to browse.  Pick
+                -- modules that are interpreted first.  The most
+                -- recently-added module occurs last, it seems.
+        case (as,bs) of
+          (as@(_:_), _)   -> browseModule (last as) True
+          ([],  bs@(_:_)) -> browseModule (last bs) True
+          ([],  [])  -> throwDyn (CmdLineError ":browse: no current module")
     _ -> throwDyn (CmdLineError "syntax:  :browse <module>")
 
-browseModule :: String -> Bool -> GHCi ()
-browseModule m exports_only = do
+browseModule :: Module -> Bool -> GHCi ()
+browseModule modl exports_only = do
   s <- getSession
-  modl <- if exports_only then lookupModule m
-                          else wantInterpretedModule m
-
   -- Temporarily set the context to the module we're interested in,
   -- just so we can get an appropriate PrintUnqualified
   (as,bs) <- io (GHC.getContext s)
@@ -1046,7 +1057,8 @@ browseModule m exports_only = do
 
   mb_mod_info <- io $ GHC.getModuleInfo s modl
   case mb_mod_info of
-    Nothing -> throwDyn (CmdLineError ("unknown module: " ++ m))
+    Nothing -> throwDyn (CmdLineError ("unknown module: " ++
+                                GHC.moduleNameString (GHC.moduleName modl)))
     Just mod_info -> do
         let names
 	       | exports_only = GHC.modInfoExports mod_info
