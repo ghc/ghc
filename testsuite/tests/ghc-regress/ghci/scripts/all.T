@@ -30,3 +30,5 @@ test('ghci019', normal, ghci_script, ['ghci019.script'])
 test('ghci020', normal, ghci_script, ['ghci020.script'])
 test('ghci021', normal, ghci_script, ['ghci021.script'])
 test('ghci022', normal, ghci_script, ['ghci022.script'])
+
+test('ghci026', normal, ghci_script, ['ghci026.script'])

@@ -1,0 +1,6 @@
+import Data.Maybe
+:browse
+:l ../prog002/A1.hs
+:browse
+:add ../prog002/B.hs
+:browse
