@@ -31,6 +31,8 @@ import Char
 import StaticFlags
 import PackageConfig 
 
+import Data.Word
+
 cgTickBox :: Module -> Int -> Code
 cgTickBox mod n = do
        let tick_box = (cmmIndex I64
@@ -77,8 +79,8 @@ initHpc this_mod (HpcInfo tickCount hashNo)
                   CCallConv
                )
                [ (mkLblExpr mkHpcModuleNameLabel,PtrHint)
-               , (CmmLit $ mkIntCLit tickCount,NoHint)
-               , (CmmLit $ mkIntCLit hashNo,NoHint)
+               , (word32 tickCount, NoHint)
+               , (word32 hashNo,    NoHint)
                , (CmmLit $ CmmLabel $ mkHpcTicksLabel $ this_mod,PtrHint)
                ]
                (Just [])
@@ -86,5 +88,6 @@ initHpc this_mod (HpcInfo tickCount hashNo)
                CmmMayReturn
        }
   where
+       word32 i = CmmLit (CmmInt (fromIntegral (fromIntegral i :: Word32)) I32)
        mod_alloc = mkFastString "hs_hpc_module"
 
