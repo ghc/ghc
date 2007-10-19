@@ -125,6 +125,10 @@ def getTestRun():
 class TestOptions:
    def __init__(self):
 
+       # if not None then we look for namebase.stderr etc rather than
+       # using the test name
+       self.namebase = None;
+
        # skip this test?
        self.skip = 0;
 

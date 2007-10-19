@@ -331,6 +331,15 @@ def _expect_fail_ways_if_compiler_lt( opts, compiler, version, ways ):
        version_lt(config.compiler_version, version):
         opts.expect_fail_for = ways
 
+def namebase_if_compiler_lt( compiler, version, namebase ):
+   return lambda opts, c=compiler, v=version, nb=namebase: \
+                 _namebase_if_compiler_lt(opts, c, v, nb)
+
+def _namebase_if_compiler_lt( opts, compiler, version, namebase ):
+    if config.compiler_type == compiler and \
+       version_lt(config.compiler_version, version):
+        opts.namebase = namebase
+
 # ---
 
 def skip_if_tag( tag ):
@@ -632,7 +641,12 @@ def do_compile( name, way, should_fail, top_mod, extra_hc_opts ):
     # of whether we expected the compilation to fail or not (successful
     # compilations may generate warnings).
 
-    (platform_specific, expected_stderr_file) = platform_wordsize_qualify(name, 'stderr')
+    if getTestOpts().namebase == None:
+        namebase = name
+    else:
+        namebase = getTestOpts().namebase
+
+    (platform_specific, expected_stderr_file) = platform_wordsize_qualify(namebase, 'stderr')
     actual_stderr_file = qualify(name, 'comp.stderr')
 
     if not compare_outputs('stderr', normalise_errmsg, normalise_whitespace, \
@@ -994,8 +1008,13 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
 # Utils
 
 def check_stdout_ok( name ):
+   if getTestOpts().namebase == None:
+       namebase = name
+   else:
+       namebase = getTestOpts().namebase
+
    actual_stdout_file   = qualify(name, 'run.stdout')
-   (platform_specific, expected_stdout_file) = platform_wordsize_qualify(name, 'stdout')
+   (platform_specific, expected_stdout_file) = platform_wordsize_qualify(namebase, 'stdout')
 
    def norm(str):
       if platform_specific:
@@ -1011,8 +1030,13 @@ def dump_stdout( name ):
    print read_no_crs(qualify(name, 'run.stdout'))
 
 def check_stderr_ok( name ):
+   if getTestOpts().namebase == None:
+       namebase = name
+   else:
+       namebase = getTestOpts().namebase
+
    actual_stderr_file   = qualify(name, 'run.stderr')
-   (platform_specific, expected_stderr_file) = platform_wordsize_qualify(name, 'stderr')
+   (platform_specific, expected_stderr_file) = platform_wordsize_qualify(namebase, 'stderr')
 
    def norm(str):
       if platform_specific:
