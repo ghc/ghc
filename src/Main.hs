@@ -249,8 +249,9 @@ dumpInterfaceFile modules homeLinks flags =
 handleEasyFlags flags fileArgs = do
   usage <- getUsage
 
-  when (Flag_Help    `elem` flags) (bye usage)
-  when (Flag_Version `elem` flags) byeVersion
+  when (Flag_Help       `elem` flags) (bye usage)
+  when (Flag_Version    `elem` flags) byeVersion
+  when (Flag_GhcVersion `elem` flags) byeGhcVersion
   when (null fileArgs) (bye usage)
 
   let ghcLibDir = case [ dir | Flag_GhcLibDir dir <- flags ] of
@@ -266,6 +267,9 @@ handleEasyFlags flags fileArgs = do
     byeVersion = bye $
       "Haddock version " ++ projectVersion ++ 
       ", (c) Simon Marlow 2003; ported to the GHC-API by David Waern 2006\n"
+
+    byeGhcVersion = bye $ 
+      (fromJust $ lookup "Project version" $ compilerInfo) ++ "\n"
 
 
 updateHTMLXRefs :: [(InterfaceFile, FilePath)] -> IO ()

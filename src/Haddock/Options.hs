@@ -84,6 +84,7 @@ data Flag
   | Flag_UsePackage String
   | Flag_OptGhc String
   | Flag_GhcLibDir String
+  | Flag_GhcVersion
   deriving (Eq)
 
 
@@ -152,5 +153,7 @@ options backwardsCompat =
     Option [] ["use-package"] (ReqArg Flag_UsePackage "PACKAGE")
 	"the modules being processed depend on PACKAGE",
     Option [] ["optghc"] (ReqArg Flag_OptGhc "OPTION")
- 	"Forward option to GHC"
+ 	"Forward option to GHC",
+    Option []  ["ghc-version"]  (NoArg Flag_GhcVersion)
+	"output GHC version in numeric format"
    ]
