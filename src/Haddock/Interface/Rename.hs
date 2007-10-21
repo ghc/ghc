@@ -114,6 +114,12 @@ lookupRn and_then name = do
 	(False,maps_to) -> do outRn name; return (and_then maps_to)
 	(True, maps_to) -> return (and_then maps_to)
 
+
+--------------------------------------------------------------------------------
+-- Looking up names
+--------------------------------------------------------------------------------
+
+
 newtype OrdName = MkOrdName Name
 
 instance Eq OrdName where
