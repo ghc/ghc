@@ -10,6 +10,7 @@ module Haddock.GHC.Utils where
 
 import Debug.Trace
 import Data.Char
+import qualified Data.Map as Map
 
 import GHC
 import HsSyn
@@ -50,6 +51,13 @@ mkModuleNoPkg str = mkModule (stringToPackageId "") (mkModuleName str)
 modulePkgStr = packageIdString . modulePackageId
 
 
+-- Instances
+
+
+instance (Outputable a, Outputable b) => Outputable (Map.Map a b) where
+  ppr m = ppr (Map.toList m)
+
+
 -- misc
 
 
@@ -73,6 +81,9 @@ getMainDeclBinder _ = Nothing
 -- To keep if if minf_iface is re-introduced
 --modInfoName = moduleName . mi_module . minf_iface
 --modInfoMod  = mi_module . minf_iface 
+
+pretty :: Outputable a => a -> String
+pretty x = show (ppr x defaultUserStyle)
 
 
 trace_ppr x y = trace (showSDoc (ppr x)) y
