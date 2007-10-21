@@ -17,6 +17,7 @@ import BasicTypes
 import SrcLoc 
 import Bag (emptyBag)
 import Outputable
+import Util (thenCmp)
 
 import Data.List
 import Data.Map (Map)
@@ -59,7 +60,7 @@ renameInterface renamingEnv mod =
       -- filter out certain built in type constructors using their string 
       -- representation. TODO: use the Name constants from the GHC API.
       strings = filter (`notElem` ["()", "[]", "(->)"]) 
-                (map (showSDoc . ppr) missingNames) 
+                (map pretty missingNames)
      
   in do
     -- report things that we couldn't link to. Only do this for non-hidden
@@ -116,19 +117,27 @@ lookupRn and_then name = do
 newtype OrdName = MkOrdName Name
 
 instance Eq OrdName where
-  (MkOrdName a) == (MkOrdName b) = a == b
+  (MkOrdName a) == (MkOrdName b) = compare a b == EQ
 
 instance Ord OrdName where
-  (MkOrdName a) `compare` (MkOrdName b) = nameOccName a `compare` nameOccName b
+  (MkOrdName a) `compare` (MkOrdName b) =
+    case (nameModule_maybe a, nameModule_maybe b) of
+      (Just modA, Just modB) ->
+        (modA `compare` modB) `thenCmp` (getOccName a `compare` getOccName b)
+      (Nothing, Nothing) -> getOccName a `compare` getOccName b
+      _ -> LT
+
+instance Outputable OrdName where
+  ppr (MkOrdName x) = ppr (nameOccName x)
 
 runRnFM :: LinkEnv -> RnM a -> (a,[Name])
 runRnFM env rn = unRn rn lkp 
   where 
     lkp n = case Map.lookup (MkOrdName n) ordEnv of
       Nothing -> (False, NoLink n) 
-      Just (MkOrdName q)  -> (True, Link q)
+      Just q  -> (True, Link q)
 
-    ordEnv = Map.fromList . map (MkOrdName *** MkOrdName) . Map.toList $ env
+    ordEnv = Map.fromList . map (MkOrdName *** id) . Map.toList $ env
 
 
 --------------------------------------------------------------------------------
