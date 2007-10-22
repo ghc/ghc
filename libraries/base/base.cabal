@@ -8,9 +8,12 @@ description:
     This package contains the Prelude and its support libraries,
     and a large collection of useful libraries ranging from data
     structures to parsing combinators and debugging utilities.
+cabal-version:  >=1.2
+build-type: Custom
 extra-tmp-files:
                 config.log config.status autom4te.cache
-                include/HsBaseConfig.h GHC/Prim.hs GHC/PrimopWrappers.hs
+                include/HsBaseConfig.h
+
 
 Library {
     -- This is actually something of a hack, as if we are using
@@ -160,7 +163,7 @@ Library {
     include-dirs: include
     includes:    HsBase.h
     install-includes:    HsBase.h HsBaseConfig.h WCsubst.h dirUtils.h lockFile.h consUtils.h Typeable.h
-    if os(mingw32) {
+    if os(windows) {
         extra-libraries: wsock32, msvcrt, kernel32, user32, shell32
     }
     extensions:    CPP
@@ -170,4 +173,3 @@ Library {
     ghc-options: -fglasgow-exts -package-name base
     nhc98-options: -H4M -K3M
 }
-
