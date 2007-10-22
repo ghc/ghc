@@ -69,14 +69,15 @@ SUBDIRS = gmp includes compat utils driver docs rts libraries compiler
 # Sanity check that all the boot libraries are in the tree, to catch
 # failure to run darcs-all.
 check-packages :
-	@for d in `cat libraries/boot-packages`; do \
+	@ds=`cat libraries/boot-packages`;\
+	for d in $$ds; do \
 	  if test ! -d libraries/$$d; then \
 	     echo "Looks like you're missing libraries/$$d,"; \
 	     echo "maybe you haven't done './darcs-all get'?"; \
 	     exit 1; \
 	  fi \
 	done
-	@if test ! -e libraries/base/configure; then \
+	@if test ! -f libraries/base/configure; then \
 	    echo "Looks like you're missing base's configure script."; \
 	    echo "Did you run 'sh boot' at the top level?"; \
 	    exit 1; \
