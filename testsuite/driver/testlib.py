@@ -604,7 +604,7 @@ def ghci_script( name, way, script ):
     cmd = "HC='" + config.compiler + "' " + \
           "HC_OPTS='" + join(flags,' ') + "' " + \
           "'" + config.compiler + "'" + \
-          ' --interactive -v0 -ignore-dot-ghci' + \
+          ' --interactive -v0 -ignore-dot-ghci ' + \
           join(flags,' ')
 
     getTestOpts().stdin = script
