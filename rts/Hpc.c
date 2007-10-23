@@ -186,8 +186,8 @@ static void hpc_init(void) {
 
 int
 hs_hpc_module(char *modName,
-	      unsigned int modCount,
-	      unsigned int modHashNo,
+	      StgWord32 modCount,
+	      StgWord32 modHashNo,
 	      StgWord64 *tixArr) {
   HpcModuleInfo *tmpModule, *lastModule;
   unsigned int i;
@@ -284,8 +284,8 @@ writeTix(FILE *f) {
     }
     fprintf(f," TixModule \"%s\" %u %u [",
 	   tmpModule->modName,
-	    tmpModule->hashNo,
-	    tmpModule->tickCount);
+	    (nat)tmpModule->hashNo,
+	    (nat)tmpModule->tickCount);
     debugTrace(DEBUG_hpc,"%s: %u (offset=%u) (hash=%u)\n",
 	       tmpModule->modName,
 	       tmpModule->tickCount,
