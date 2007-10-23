@@ -419,6 +419,19 @@ hSetBinaryMode _ _ = return ()
 #ifndef __NHC__
 -- | The function creates a temporary file in ReadWrite mode.
 -- The created file isn\'t deleted automatically, so you need to delete it manually.
+--
+-- The file is creates with permissions such that only the current
+-- user can read/write it.
+--
+-- With some exceptions (see below), the file will be created securely
+-- in the sense that an attacker should not be able to cause
+-- openTempFile to overwrite another file on the filesystem using your
+-- credentials, by putting symbolic links (on Unix) in the place where
+-- the temporary file is to be created.  On Unix the @O_CREAT@ and
+-- @O_EXCL@ flags are used to prevent this attack, but note that
+-- @O_EXCL@ is sometimes not supported on NFS filesystems, so if you
+-- rely on this behaviour it is best to use local filesystems only.
+--
 openTempFile :: FilePath   -- ^ Directory in which to create the file
              -> String     -- ^ File name template. If the template is \"foo.ext\" then
                            -- the created file will be \"fooXXX.ext\" where XXX is some
@@ -462,7 +475,7 @@ openTempFile' loc tmp_dir template binary = do
 
     findTempName x = do
       fd <- withCString filepath $ \ f ->
-              c_open f oflags 0o666
+              c_open f oflags 0o600
       if fd < 0 
        then do
          errno <- getErrno
