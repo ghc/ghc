@@ -193,7 +193,7 @@ hs_hpc_module(char *modName,
   unsigned int i;
   int offset = 0;
   
-  debugTrace(DEBUG_hpc,"hs_hpc_module(%s,%d)",modName,modCount);
+  debugTrace(DEBUG_hpc,"hs_hpc_module(%s,%d)",modName,(nat)modCount);
 
   hpc_init();
 
@@ -288,9 +288,9 @@ writeTix(FILE *f) {
 	    (nat)tmpModule->tickCount);
     debugTrace(DEBUG_hpc,"%s: %u (offset=%u) (hash=%u)\n",
 	       tmpModule->modName,
-	       tmpModule->tickCount,
-	       tmpModule->hashNo,
-	       tmpModule->tickOffset);
+	       (nat)tmpModule->tickCount,
+	       (nat)tmpModule->hashNo,
+	       (nat)tmpModule->tickOffset);
 
     inner_comma = 0;
     for(i = 0;i < tmpModule->tickCount;i++) {
