@@ -1,7 +1,7 @@
 
 include Makefile-vars
 
-.PHONY: mk-version-symlinks install
+.PHONY: install postinstall denounce show-install-setup
 
 #.PHONY: in-place
 # This has bitrotted:
@@ -16,20 +16,18 @@ include Makefile-vars
 
 install ::
 	$(INSTALL_DIR) $(bindir)
-	(cd share; find . -type d -exec sh -c '$(INSTALL_DIR) $(datadir)/$$0' {} \; )
 
 install::
-	$(MAKE) -C includes  install DOING_BIN_DIST=YES
-	$(MAKE) -C driver    install DOING_BIN_DIST=YES
-	$(MAKE) -C utils     install DOING_BIN_DIST=YES
-	$(MAKE) -C rts       install DOING_BIN_DIST=YES
-	$(MAKE) -C libraries install DOING_BIN_DIST=YES
-	$(MAKE) -C compiler  install DOING_BIN_DIST=YES
+	$(MAKE) -C includes  install      DOING_BIN_DIST=YES
+	$(MAKE) -C driver    install      DOING_BIN_DIST=YES
+	$(MAKE) -C utils     install      DOING_BIN_DIST=YES
+	$(MAKE) -C rts       install      DOING_BIN_DIST=YES
+	$(MAKE) -C libraries install      DOING_BIN_DIST=YES
+	$(MAKE) -C compiler  install      DOING_BIN_DIST=YES
+	$(MAKE) -C docs      install-docs DOING_BIN_DIST=YES
 	$(INSTALL_DATA) $(INSTALL_OPTS) extra-gcc-opts $(libdir)
 
-install :: install-docs postinstall denounce
-
-.PHONY: postinstall denounce
+install :: postinstall denounce
 
 denounce:
 	@echo
@@ -59,21 +57,4 @@ show-install-setup:
 	@echo "bindir  = $(bindir)"
 	@echo "libdir  = $(libdir) (libdir  = $(libdir))"
 	@echo "datadir = $(datadir) (datadir = $(datadir))"
-
-#
-# Documentation targets: install-docs.
-#
-
-.PHONY: show-install-setup install-docs install-dirs-docs
-
-install-docs : install-dirs-docs
-	if test -d share/html ; then $(CP) -r share/html/* $(htmldir) ; fi
-	set -e; for i in share/*.ps; do \
-		if test -f "$$i"; then \
-		      $(CP) $$i $(psdir) ; \
-		fi \
-	done
-
-install-dirs-docs:
-	$(INSTALL_DIR) $(htmldir) 
 

@@ -18,6 +18,8 @@ platform    = @TargetPlatform@
 prefix      = @prefix@
 exec_prefix = @exec_prefix@
 
+mandir      = $(datarootdir)/man
+
 headerdir   = $(libdir)/include
 
 # default

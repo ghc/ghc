@@ -271,7 +271,7 @@ BIN_DIST_TOP= distrib/Makefile \
               ANNOUNCE \
               LICENSE \
               install-sh \
-	      extra-gcc-opts.in \
+              extra-gcc-opts.in \
               config.guess \
               config.sub   \
               aclocal.m4
@@ -294,17 +294,19 @@ binary-dist-pre::
 	cp mk/package.mk $(BIN_DIST_DIR)/mk/
 	cp mk/install.mk $(BIN_DIST_DIR)/mk/
 	cp mk/recurse.mk $(BIN_DIST_DIR)/mk/
+	cp mk/fptools.css $(BIN_DIST_DIR)/mk/
 	$(MKDIRHIER) $(BIN_DIST_DIR)/lib/$(TARGETPLATFORM)
 	$(MKDIRHIER) $(BIN_DIST_DIR)/share
 
 binary-dist::
-	$(MAKE) -C gmp      binary-dist DOING_BIN_DIST=YES
-	$(MAKE) -C includes binary-dist DOING_BIN_DIST=YES
-	$(MAKE) -C compiler binary-dist DOING_BIN_DIST=YES $(INSTALL_STAGE)
-	# XXX $(MAKE) -C docs     binary-dist DOING_BIN_DIST=YES
-	$(MAKE) -C rts      binary-dist DOING_BIN_DIST=YES
-	$(MAKE) -C driver   binary-dist DOING_BIN_DIST=YES
-	$(MAKE) -C utils    binary-dist DOING_BIN_DIST=YES
+	$(MAKE) -C gmp       binary-dist DOING_BIN_DIST=YES
+	$(MAKE) -C includes  binary-dist DOING_BIN_DIST=YES
+	$(MAKE) -C compiler  binary-dist DOING_BIN_DIST=YES $(INSTALL_STAGE)
+	$(MAKE) -C rts       binary-dist DOING_BIN_DIST=YES
+	$(MAKE) -C driver    binary-dist DOING_BIN_DIST=YES
+	$(MAKE) -C utils     binary-dist DOING_BIN_DIST=YES
+	$(MAKE) -C docs      binary-dist DOING_BIN_DIST=YES
+	$(MAKE) -C libraries binary-dist DOING_BIN_DIST=YES
 
 VARFILE=$(BIN_DIST_DIR)/Makefile-vars.in
 
@@ -325,69 +327,11 @@ binary-dist::
 	echo "GhcWithInterpreter = $(GhcWithInterpreter)"            >> $(VARFILE)
 	echo "GhcHasReadline = $(GhcHasReadline)"                    >> $(VARFILE)
 	echo "BootingFromHc = $(BootingFromHc)"                      >> $(VARFILE)
+	echo "XMLDocWays = $(XMLDocWays)"                            >> $(VARFILE)
 	cat distrib/Makefile-bin-vars.in                             >> $(VARFILE)
 	@echo "Generating a shippable configure script.."
 	$(MV) $(BIN_DIST_DIR)/configure-bin.ac $(BIN_DIST_DIR)/configure.ac
 	( cd $(BIN_DIST_DIR); autoreconf )
-
-#
-# binary dist'ing the documentation.  
-# The default documentation to build/install is given below; overrideable
-# via build.mk or the 'make' command-line.
-#
-# If BINDIST_DOC_WAYS is set, use that
-# If XMLDocWays is set, use that
-# Otherwise, figure out what we can build based on configure results
-
-ifndef BINDIST_DOC_WAYS
-
-ifneq "$(XMLDocWays)" ""
-BINDIST_DOC_WAYS = $(XMLDocWays)
-else
-ifneq "$(XSLTPROC)" ""
-BINDIST_DOC_WAYS = html
-ifneq "$(FOP)" ""
-BINDIST_DOC_WAYS += ps pdf
-else
-ifneq "$(PDFXMLTEX)" ""
-BINDIST_DOC_WAYS += pdf
-endif
-ifneq "$(XMLTEX)" ""
-ifneq "$(DVIPS)" ""
-BINDIST_DOC_WAYS += ps
-endif # DVIPS
-endif # XMLTEX
-endif # FOP
-endif # XSLTPROC
-endif # XMLDocWays
-
-endif # BINDIST_DOC_WAYS
-
-ifneq "$(DIR_DOCBOOK_XSL)" ""
-.PHONY: binary-dist-doc-%
-
-BINARY_DIST_DOC_RULES=$(foreach d,$(BinDistDirs),binary-dist-doc-$d)
-
-binary-dist :: $(BINARY_DIST_DOC_RULES)
-
-$(BINARY_DIST_DOC_RULES): binary-dist-doc-%:
-	$(MAKE) -C $* $(MFLAGS) $(BINDIST_DOC_WAYS)
-	$(MAKE) -C $* $(MFLAGS) install-docs \
-			MAKING_BIN_DIST=1 \
-	        XMLDocWays="$(BINDIST_DOC_WAYS)" \
-	        prefix=$(BIN_DIST_DIR) \
-	        exec_prefix=$(BIN_DIST_DIR) \
-	        bindir=$(BIN_DIST_DIR)/bin/$(TARGETPLATFORM) \
-	        libdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
-	        libexecdir=$(BIN_DIST_DIR)/lib/$(TARGETPLATFORM) \
-	        datadir=$(BIN_DIST_DIR)/share
-endif
-
-.PHONY: binary-dist-doc-%
-
-binary-dist::
-	$(MAKE) -C libraries binary-dist
-
 endif
 
 # Tar up the distribution and build a manifest

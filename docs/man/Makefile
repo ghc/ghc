@@ -12,6 +12,8 @@ MAN_SECTION = 1
 
 CLEAN_FILES += $(MAN_PAGE).$(MAN_SECTION) flags.xsl flags.xml
 
+ifneq "$(DOING_BIN_DIST)" "YES"
+
 $(MAN_PAGE).$(MAN_SECTION): flags.xsl flags.xml
 	$(XSLTPROC) $(XSLTPROC_OPTS) flags.xsl flags.xml > $@
 
@@ -29,9 +31,16 @@ flags.xml: ../users_guide/flags.xml
 	                       <!ENTITY rdquo  \"'\">]>" >> $@
 	tail -n +2 $< >> $@
 
+endif
+
 install-docs:: $(MAN_PAGE).$(MAN_SECTION)
 	$(INSTALL_DIR) $(DESTDIR)$(mandir)
 	$(INSTALL_DIR) $(DESTDIR)$(mandir)/man$(MAN_SECTION)
 	$(INSTALL_MAN) $(INSTALL_OPTS) $(MAN_PAGE).$(MAN_SECTION) $(DESTDIR)$(mandir)/man$(MAN_SECTION)
+
+binary-dist:: $(MAN_PAGE).$(MAN_SECTION)
+	$(MKDIRHIER) $(BIN_DIST_DIR)/docs/man
+	cp Makefile                   $(BIN_DIST_DIR)/docs/man/
+	cp $(MAN_PAGE).$(MAN_SECTION) $(BIN_DIST_DIR)/docs/man/
 
 include $(TOP)/mk/target.mk
