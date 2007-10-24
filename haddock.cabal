@@ -101,4 +101,3 @@ other-modules:
   Haddock.GHC.Typecheck
   Haddock.GHC.Utils
   Haddock.GHC
-  Main
