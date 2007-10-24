@@ -22,3 +22,6 @@ test('divbyzero',
      compile_and_run, [''])
 
 test('outofmem', exit_code(1), compile_and_run, [''])
+test('outofmem2', compose(exit_code(251), 
+                  extra_run_opts('+RTS -M5m -RTS')),
+                  compile_and_run, [''])
