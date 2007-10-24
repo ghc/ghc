@@ -446,7 +446,7 @@ endif
 
 ifeq "$(GhcWithInterpreter) $(bootstrapped)" "YES YES"
 
-# Yes, include the interepreter, readline, and Template Haskell extensions
+# Yes, include the interepreter and Template Haskell extensions
 SRC_HC_OPTS += -DGHCI -package template-haskell
 PKG_DEPENDS += template-haskell
 
