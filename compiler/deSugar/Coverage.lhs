@@ -195,12 +195,8 @@ addTickLHsBind (L pos (pat@(PatBind { pat_rhs = rhs }))) = do
 -}			   
   return $ L pos $ pat { pat_rhs = rhs' }
 
-{- only internal stuff, not from source, uses VarBind, so we ignore it.
-addTickLHsBind (VarBind var_id var_rhs) = do
-  var_rhs' <- addTickLHsExpr var_rhs  
-  return $ VarBind var_id var_rhs'
--}
-addTickLHsBind other = return other
+-- Only internal stuff, not from source, uses VarBind, so we ignore it.
+addTickLHsBind var_bind@(L _ (VarBind {})) = return var_bind
 
 -- Add a tick to the expression no matter what it is.  There is one exception:
 -- for the debugger, if the expression is a 'let', then we don't want to add
