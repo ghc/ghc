@@ -864,8 +864,14 @@ GhcLibWays = $(GhcCompilerWays)
 # override $(GhcLibHcOpts): we want GhcStage2HcOpts to take precedence
 GhcLibHcOpts =
 
+ifeq "$(DOING_BIN_DIST)" "YES"
+# This is derived from the sources when we are in a source tree, but we
+# don't have any sources in a bindist, so we have to shortcut it
+HS_IFACES := $(wildcard stage$(stage)/*/*.hi)
+else
 # override default definition of HS_IFACES so we can add $(odir)
 HS_IFACES   = $(addsuffix .$(way_)hi,$(basename $(HS_OBJS)))
+endif
 
 # Haddock can't handle recursive modules currently, so we disable it for now.
 override HADDOCK_DOCS = NO
@@ -939,12 +945,6 @@ endif
 
 #-----------------------------------------------------------------------------
 # binary-dist
-
-ifeq "$(DOING_BIN_DIST)" "YES"
-# This is derived from the sources when we are in a source tree, but we
-# don't have any sources in a bindist, so we have to shortcut it
-HS_IFACES := $(wildcard stage$(stage)/*/*.hi)
-endif
 
 binary-dist:
 	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/compiler
