@@ -565,6 +565,14 @@ allocateInGen (generation *g, nat n)
     if (n >= LARGE_OBJECT_THRESHOLD/sizeof(W_))
     {
 	nat req_blocks =  (lnat)BLOCK_ROUND_UP(n*sizeof(W_)) / BLOCK_SIZE;
+
+        // Attempting to allocate an object larger than maxHeapSize
+        // should definitely be disallowed.  (bug #1791)
+        if (RtsFlags.GcFlags.maxHeapSize > 0 && 
+            req_blocks >= RtsFlags.GcFlags.maxHeapSize) {
+            heapOverflow();
+        }
+
 	bd = allocGroup(req_blocks);
 	dbl_link_onto(bd, &stp->large_objects);
 	stp->n_large_blocks += bd->blocks; // might be larger than req_blocks
