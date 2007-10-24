@@ -248,20 +248,20 @@ mkFunBind fn ms = FunBind { fun_id = fn, fun_infix = False, fun_matches = mkMatc
 			    fun_tick = Nothing }
 
 
-mkVarBind :: SrcSpan -> RdrName -> LHsExpr RdrName -> LHsBind RdrName
+mkVarBind :: SrcSpan -> id -> LHsExpr id -> LHsBind id
 mkVarBind loc var rhs = mk_easy_FunBind loc var [] rhs
 
 ------------
-mk_easy_FunBind :: SrcSpan -> RdrName -> [LPat RdrName]
-		-> LHsExpr RdrName -> LHsBind RdrName
+mk_easy_FunBind :: SrcSpan -> id -> [LPat id]
+		-> LHsExpr id -> LHsBind id
 
 mk_easy_FunBind loc fun pats expr
   = L loc $ mkFunBind (L loc fun) [mkMatch pats expr emptyLocalBinds]
 
 ------------
-mk_FunBind :: SrcSpan -> RdrName
-	   -> [([LPat RdrName], LHsExpr RdrName)]
-	   -> LHsBind RdrName
+mk_FunBind :: SrcSpan -> id
+	   -> [([LPat id], LHsExpr id)]
+	   -> LHsBind id
 
 mk_FunBind loc fun [] = panic "TcGenDeriv:mk_FunBind"
 mk_FunBind loc fun pats_and_exprs
