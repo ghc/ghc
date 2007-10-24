@@ -421,7 +421,7 @@ hSetBinaryMode _ _ = return ()
 -- The created file isn\'t deleted automatically, so you need to delete it manually.
 --
 -- The file is creates with permissions such that only the current
--- user can read/write it.
+-- user can read\/write it.
 --
 -- With some exceptions (see below), the file will be created securely
 -- in the sense that an attacker should not be able to cause
