@@ -368,6 +368,10 @@ ifeq "$(HADDOCK_DOCS)" "YES"
 	cp    doc-index*.html               $(BIN_DIST_LIBDIR)
 endif
 	cp -pR stamp                         $(BIN_DIST_LIBDIR)
+	# This gets used in the compiler directory to see if GHC should
+	# depend on the readline package or not
+	$(MKDIRHIER) $(BIN_DIST_LIBDIR)/readline
+	cp    readline/config.mk            $(BIN_DIST_LIBDIR)/readline
 
 $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR)): \
 binary-dist.library.%:

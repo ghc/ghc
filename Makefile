@@ -330,6 +330,7 @@ binary-dist::
 	echo "GhcHasReadline = $(GhcHasReadline)"                    >> $(VARFILE)
 	echo "BootingFromHc = $(BootingFromHc)"                      >> $(VARFILE)
 	echo "XMLDocWays = $(XMLDocWays)"                            >> $(VARFILE)
+	echo "TARGETPLATFORM = $(TARGETPLATFORM)"                    >> $(VARFILE)
 	cat distrib/Makefile-bin-vars.in                             >> $(VARFILE)
 	@echo "Generating a shippable configure script.."
 	$(MV) $(BIN_DIST_DIR)/configure-bin.ac $(BIN_DIST_DIR)/configure.ac
