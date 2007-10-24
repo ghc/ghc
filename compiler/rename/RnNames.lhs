@@ -1375,7 +1375,7 @@ exportItemErr export_item
 
 typeItemErr name wherestr
   = sep [ ptext SLIT("Using 'type' tag on") <+> quotes (ppr name) <+> wherestr,
-	  ptext SLIT("Use -ftype-families to enable this extension") ]
+	  ptext SLIT("Use -XTypeFamilies to enable this extension") ]
 
 exportClashErr :: GlobalRdrEnv -> Name -> Name -> IE RdrName -> IE RdrName
                -> Message
