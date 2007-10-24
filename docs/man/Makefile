@@ -14,6 +14,8 @@ CLEAN_FILES += $(MAN_PAGE).$(MAN_SECTION) flags.xsl flags.xml
 
 ifneq "$(DOING_BIN_DIST)" "YES"
 
+all:: $(MAN_PAGE).$(MAN_SECTION)
+
 $(MAN_PAGE).$(MAN_SECTION): flags.xsl flags.xml
 	$(XSLTPROC) $(XSLTPROC_OPTS) flags.xsl flags.xml > $@
 
