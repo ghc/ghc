@@ -1114,7 +1114,7 @@ expandField :: HsFieldDecl -> [HsFieldDecl]
 expandField (HsFieldDecl ns ty doc) = [ HsFieldDecl [n] ty doc | n <- ns ]
 -}
 
--- | Print the LHS of a data/newtype declaration.
+-- | Print the LHS of a data\/newtype declaration.
 -- Currently doesn't handle 'data instance' decls or kind signatures
 ppDataHeader :: Bool -> TyClDecl DocName -> Html
 ppDataHeader summary decl 
@@ -1129,7 +1129,7 @@ ppDataHeader summary decl
 
 
 -- | data context => ... =
---                    ^ Print this part of a data/newtype declaration
+--                    ^ Print this part of a data\/newtype declaration
 ppDataHead :: Bool -> Name -> [Name] -> Html
 ppDataHead summary name tyvars
 

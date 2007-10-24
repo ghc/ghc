@@ -1,19 +1,19 @@
------------------------------------------------------------------------------
--- 
--- Module      :  Text.Html.BlockTable
--- Copyright   :  (c) Andy Gill, and the Oregon Graduate Institute of 
---		  Science and Technology, 1999-2001
--- License     :  BSD-style (see the file libraries/core/LICENSE)
--- 
--- Maintainer  :  Andy Gill <andy@galconn.com>
--- Stability   :  experimental
--- Portability :  portable
---
--- $Id: BlockTable.hs,v 1.2 2002/07/24 09:42:18 simonmar Exp $
---
--- An Html combinator library
---
------------------------------------------------------------------------------
+{- | 
+
+  Module      :  Text.Html.BlockTable
+  Copyright   :  (c) Andy Gill, and the Oregon Graduate Institute of 
+                 Science and Technology, 1999-2001
+  License     :  BSD-style (see the file libraries/core/LICENSE)
+ 
+  Maintainer  :  Andy Gill <andy@galconn.com>
+  Stability   :  experimental
+  Portability :  portable
+
+  $Id: BlockTable.hs,v 1.2 2002/07/24 09:42:18 simonmar Exp $
+
+  An Html combinator library
+
+-}
 
 module Haddock.Utils.BlockTable (
 
