@@ -31,4 +31,4 @@ test('ghci020', normal, ghci_script, ['ghci020.script'])
 test('ghci021', normal, ghci_script, ['ghci021.script'])
 test('ghci022', normal, ghci_script, ['ghci022.script'])
 
-test('ghci026', normal, ghci_script, ['ghci026.script'])
+test('ghci026', namebase_if_compiler_lt('ghc','6.9', 'ghci026-6.8'), ghci_script, ['ghci026.script'])
