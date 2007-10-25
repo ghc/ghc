@@ -21,6 +21,8 @@ import Digraph
 import BasicTypes
 import SrcLoc
 
+import Data.List
+
 
 typecheckFiles :: Session -> [FilePath] -> IO [GhcModule]
 typecheckFiles session files = do
@@ -60,13 +62,14 @@ sortAndCheckModules session files = do
   -- load all argument files
 
   targets <- mapM (\f -> guessTarget f Nothing) files
-  setTargets session targets 
+  setTargets session targets
 
   -- compute the dependencies and load them as well
 
-  allMods <- getSortedModuleGraph session
-  targets' <- mapM (\(_, f) -> guessTarget f Nothing) allMods
-  setTargets session targets'
+  allMods0 <- getSortedModuleGraph session
+  let allMods = nub $ filter (not . ("-boot" `isSuffixOf`) . snd) allMods0
+  setTargets session [Target (TargetModule $ moduleName m) Nothing
+                       | (m, _) <- allMods ]
 
   flag <- load session LoadAllTargets
   when (failed flag) $ 
