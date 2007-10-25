@@ -2,12 +2,34 @@
 
 set -e
 
-if [ -e base/dist ]
-then
-    HADDOCK_FILES=`ls -1 */dist/doc/html/*/*.haddock | sort`
-else
+HADDOCK_ARGS=
+NAMES=
+
+case $* in
+--inplace)
+    GHC_PKG=../utils/ghc-pkg/ghc-pkg-inplace
+    for DIR in */
+    do
+        NAME=${DIR%/}
+        HADDOCK_FILE=$NAME/dist/doc/html/$NAME/$NAME.haddock
+        if [ -f $HADDOCK_FILE ]
+        then
+            FULLNAME=$NAME-`$GHC_PKG field $NAME version | sed 's#^version: *##'` 
+            HADDOCK_ARGS="$HADDOCK_ARGS --read-interface=$FULLNAME,$HADDOCK_FILE"
+            NAMES="$NAMES $NAME"
+        fi
+    done
+    ;;
+*)
     HADDOCK_FILES=`ls -1 */*.haddock | sort`
-fi
+    for HADDOCK_FILE in $HADDOCK_FILES
+    do
+        NAME=`echo "$HADDOCK_FILE" | sed "s#/.*##"`
+        HADDOCK_ARGS="$HADDOCK_ARGS --read-interface=$NAME,$HADDOCK_FILE"
+        NAMES="$NAMES $NAME"
+    done
+    ;;
+esac
 
 # Automagically create the prologue for the combined index via a
 # header, the package prologues (in alphabetical order of the
@@ -16,15 +38,13 @@ fi
     cat libraries-header.txt
     echo
     # Hack to find out if we're in a build tree or installed docs
-    for HADDOCK_FILE in $HADDOCK_FILES
+    for NAME in $NAMES
     do
-        NAME=`echo "$HADDOCK_FILE" | sed "s#/.*##"`
         if [ "$NAME" != haskell98 ]
         then
             echo "[@${NAME}@]"
             grep -v '^ *$$' "$NAME"/prologue.txt
             echo
-            HADDOCK_ARGS="$HADDOCK_ARGS --read-interface=$NAME,$HADDOCK_FILE"
         fi
     done
     cat libraries-footer.txt

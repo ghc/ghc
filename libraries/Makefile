@@ -285,7 +285,7 @@ $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/GNUmakefile):\
 .PHONY: doc
 
 doc: $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR))
-	sh gen_contents_index
+	sh gen_contents_index --inplace
 
 $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
