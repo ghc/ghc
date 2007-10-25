@@ -1393,7 +1393,9 @@ Reporting Coverage:
   report      Output textual report about program coverage
   markup      Markup Haskell source with program coverage
 Processing Coverage files:
-  combine     Combine multiple .tix files in a single .tix files
+  sum         Sum multiple .tix files in a single .tix file
+  combine     Combine two .tix files in a single .tix file
+  map         Map a function over a single .tix file
 Coverage Overlays:
   overlay     Generate a .tix file from an overlay file
   draft       Generate draft overlay that provides 100% coverage
@@ -1449,7 +1451,7 @@ Options:
 		<para>hpc markup marks up source files into colored html.
 		</para>
 <screen>
-% hpc help markup
+$ hpc help markup
 Usage: hpc markup [OPTION] .. &lt;TIX_FILE&gt; [&lt;MODULE&gt; [&lt;MODULE&gt; ..]]
 
 Options:
@@ -1466,25 +1468,61 @@ Options:
 </screen>
 
        </sect3>
-       <sect3><title>hpc combine</title>
-		<para>hpc combine is the swiss army knife of hpc. Typically, combine is used
-		 to  add .tix files together to get the combined total coverage. However, it can
-		 also be used to take the difference between .tix files, to subtract one
-		.tix file from another, and to zero the .tix files. hpc combine does not
-		change the original .tix file; it generates a new .tix file. 
+       <sect3><title>hpc sum</title>
+		<para>hpc sum adds together any number of .tix files into a single 
+		.tix file. hpc sum does not change the original .tix file; it generates a new .tix file. 
 		</para>
 <screen>
-hpc help combine
-Usage: hpc combine [OPTION] .. &lt;TIX_FILE&gt; [&lt;TIX_FILE&gt; [&lt;TIX_FILE&gt; ..]]
+$ hpc help sum
+Usage: hpc sum [OPTION] .. &lt;TIX_FILE&gt; [&lt;TIX_FILE&gt; [&lt;TIX_FILE&gt; ..]]
+Sum multiple .tix files in a single .tix file
 
 Options:
 
     --exclude=[PACKAGE:][MODULE]  exclude MODULE and/or PACKAGE
     --include=[PACKAGE:][MODULE]  include MODULE and/or PACKAGE
     --output=FILE                 output FILE
-    --combine=FUNCTION            combine .tix files with join function, default = ADD
-                                  FUNCTION = ADD | DIFF | SUB | ZERO
-    --post-invert                 invert output; ticked becomes unticked, unticked becomes ticked
+    --union                       use the union of the module namespace (default is intersection)
+</screen>
+       </sect3>
+       <sect3><title>hpc combine</title>
+		<para>hpc combine is the swiss army knife of hpc. It can be 
+		 used to take the difference between .tix files, to subtract one
+		.tix file from another, or to add two .tix files. hpc combine does not
+		change the original .tix file; it generates a new .tix file. 
+		</para>
+<screen>
+$ hpc help combine
+Usage: hpc combine [OPTION] .. &lt;TIX_FILE&gt; &lt;TIX_FILE&gt;
+Combine two .tix files in a single .tix file
+
+Options:
+
+    --exclude=[PACKAGE:][MODULE]  exclude MODULE and/or PACKAGE
+    --include=[PACKAGE:][MODULE]  include MODULE and/or PACKAGE
+    --output=FILE                 output FILE
+    --function=FUNCTION           combine .tix files with join function, default = ADD
+                                  FUNCTION = ADD | DIFF | SUB
+    --union                       use the union of the module namespace (default is intersection)
+</screen>
+       </sect3>
+       <sect3><title>hpc map</title>
+		<para>hpc map inverts or zeros a .tix file. hpc map does not
+		change the original .tix file; it generates a new .tix file. 
+		</para>
+<screen>
+$ hpc help map
+Usage: hpc map [OPTION] .. &lt;TIX_FILE&gt; 
+Map a function over a single .tix file
+
+Options:
+
+    --exclude=[PACKAGE:][MODULE]  exclude MODULE and/or PACKAGE
+    --include=[PACKAGE:][MODULE]  include MODULE and/or PACKAGE
+    --output=FILE                 output FILE
+    --function=FUNCTION           apply function to .tix files, default = ID
+                                  FUNCTION = ID | INV | ZERO
+    --union                       use the union of the module namespace (default is intersection)
 </screen>
        </sect3>
        <sect3><title>hpc overlay and hpc draft</title>
