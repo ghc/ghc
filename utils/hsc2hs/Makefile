@@ -54,7 +54,7 @@ ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 INSTALL_PROGS    += $(HS_PROG)
 else
 INSTALL_LIBEXECS += $(HS_PROG)
-LINK = hsc2hs
+LINK = hsc2hs-ghc
 LINK_TARGET = $(LINK)-$(ProjectVersion)
 INSTALLED_SCRIPT=$(DESTDIR)$(bindir)/$(LINK_TARGET)
 install::
@@ -66,6 +66,11 @@ install::
 	echo "HSC2HS_EXTRA="               >> $(INSTALLED_SCRIPT)
 	cat hsc2hs.sh                      >> $(INSTALLED_SCRIPT)
 	$(EXECUTABLE_FILE) $(INSTALLED_SCRIPT)
+
+ifneq "$(NO_INSTALL_HSC2HS)" "YES"
+install::
+	$(CP) $(INSTALLED_SCRIPT) $(DESTDIR)/$(bindir)/hsc2hs
+endif
 endif
 
 # -----------------------------------------------------------------------------

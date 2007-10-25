@@ -641,6 +641,19 @@ INSTALL_HEADER  = $(INSTALL) -m 644
 INSTALL_MAN     = $(INSTALL) -m 644
 INSTALL_DIR     = $(MKDIRHIER)
 
+#
+# runhaskell and hsc2hs are special, in that other compilers besides
+# GHC might provide them.  Systems with a package manager often come
+# with tools to manage this kind of clash, e.g. RPM's
+# update-alternatives.  When building a distribution for such a system,
+# we recommend setting both of the following to 'YES'.
+#
+# NO_INSTALL_RUNHASKELL = YES
+# NO_INSTALL_HSC2HS     = YES
+#
+# NB. we use negative tests here because for binary-distributions we cannot
+# test build-time variables at install-time, so they must default to on.
+
 # -----------------------------------------------------------------------------
 # Utilities programs: flags 
 

@@ -84,6 +84,12 @@ needed.
 %build
 test -f configure || sh boot
 ./configure --prefix=%{_prefix} --mandir=%{_mandir}
+
+# Don't install these tools, we'll use update-alternatives below.
+touch mk/build.mk
+echo "NO_INSTALL_RUNHASKELL=YES" >>mk/build.mk
+echo "NO_INSTALL_HSC2HS=YES" >>mk/build.mk
+
 make %{?jobs:-j%jobs}
 make html
 # Alas, we don't pass make options/arguments down to "libraries", so let's redo make here...

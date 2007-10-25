@@ -16,9 +16,22 @@ include $(GHC_COMPAT_DIR)/compat.mk
 SRC_HC_OPTS += $(GhcHcOpts) $(GhcStage1HcOpts)
 SRC_HC_OPTS += -Wall
 
-binary-dist:
+RUNHASKELL_PROG = runhaskell$(exeext)
+all :: $(RUNHASKELL_PROG)
+
+$(RUNHASKELL_PROG) : $(HS_PROG)
+	$(CP) $< $(RUNHASKELL_PROG)
+
+CLEAN_FILES += $(RUNHASKELL_PROG)
+
+ifneq "$(NO_INSTALL_RUNHASKELL)" "YES"
+INSTALL_PROGS += $(RUNHASKELL_PROG)
+endif
+
+binary-dist::
 	$(INSTALL_DIR)                $(BIN_DIST_DIR)/utils/runghc
 	$(INSTALL_DATA)    Makefile   $(BIN_DIST_DIR)/utils/runghc/
 	$(INSTALL_PROGRAM) $(HS_PROG) $(BIN_DIST_DIR)/utils/runghc/
+	$(INSTALL_PROGRAM) $(RUNHASKELL_PROG) $(BIN_DIST_DIR)/utils/runghc/
 
 include $(TOP)/mk/target.mk
