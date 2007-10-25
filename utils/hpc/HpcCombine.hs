@@ -57,7 +57,7 @@ map_options
 	. unionModuleOpt 
 
 map_plugin = Plugin { name = "map"
-	      	       , usage = "[OPTION] .. <TIX_FILE> [<TIX_FILE> [<TIX_FILE> ..]]" 
+	      	       , usage = "[OPTION] .. <TIX_FILE> "
 		       , options = map_options 
 		       , summary = "Map a function over a single .tix file"
 		       , implementation = map_main

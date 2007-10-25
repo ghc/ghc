@@ -217,7 +217,7 @@ thePostFun INV  n = 0
 thePostFun ZERO x = 0
 
 postFuns = [ (show pos,pos) 
-	     | pos <- [INV .. ZERO]
+	     | pos <- [ID .. ZERO]
 	   ]
 
 
