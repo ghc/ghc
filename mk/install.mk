@@ -279,8 +279,7 @@ install-docs:: $(foreach i,$(XMLDocWays),install-docs-$i)
 install-docs-html:
 	$(INSTALL_DIR) $(DESTDIR)$(htmldir)
 	$(INSTALL_DIR) $(DESTDIR)$(htmldir)/$(INSTALL_XML_DOC)
-	$(INSTALL_DIR) $(DESTDIR)$(htmldir)/$(INSTALL_XML_DOC)/html
-	$(CP) $(INSTALL_XML_DOC)/* $(DESTDIR)$(htmldir)/$(INSTALL_XML_DOC)/html
+	$(CP) $(INSTALL_XML_DOC)/* $(DESTDIR)$(htmldir)/$(INSTALL_XML_DOC)
 
 install-docs-html-no-chunks:
 	$(INSTALL_DIR) $(DESTDIR)$(htmldir)
