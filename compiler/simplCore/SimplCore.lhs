@@ -429,7 +429,7 @@ simplifyPgm mode switches hsc_env us imp_rule_base guts
 	    if  max_iterations > 2 then
 		hPutStr stderr ("NOTE: Simplifier still going after " ++ 
 				show max_iterations ++ 
-			    	" iterations; bailing out.  Size = " ++ show (coreBindsSize binds) )
+			    	" iterations; bailing out.  Size = " ++ show (coreBindsSize binds) ++ "\n" )
 	    else 
 		return ();
 #endif
