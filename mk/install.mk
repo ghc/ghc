@@ -266,9 +266,13 @@ endif
 endif
 
 ifneq "$(strip $(INSTALL_XML_DOC))" ""
+ifeq "$(DOC_SUBDIR)" ""
+DOC_SUBDIR=docs/$(XML_DOC)
+endif
+
 binary-dist::
-	$(MKDIRHIER) $(BIN_DIST_DIR)/docs/$(XML_DOC)
-	$(CP) Makefile $(BIN_DIST_DIR)/docs/$(XML_DOC)
+	$(MKDIRHIER) $(BIN_DIST_DIR)/$(DOC_SUBDIR)
+	$(CP) Makefile $(BIN_DIST_DIR)/$(DOC_SUBDIR)
 
 ifneq "$(XMLDocWays)" ""
 # TODO: The following could be an entry for an Obfuscated Makefile Contest...
@@ -295,13 +299,13 @@ binary-dist:: $(foreach i,$(XMLDocWays),$(INSTALL_XML_DOC)$(patsubst %.html-no-c
 binary-dist:: $(foreach i,$(XMLDocWays),binary-dist-docs-$i)
 
 binary-dist-docs-html:
-	$(CP) -r $(INSTALL_XML_DOC) $(BIN_DIST_DIR)/docs/$(XML_DOC)/
+	$(CP) -r $(INSTALL_XML_DOC) $(BIN_DIST_DIR)/$(DOC_SUBDIR)
 
 binary-dist-docs-html-no-chunks:
-	$(CP) $(INSTALL_XML_DOC).html $(BIN_DIST_DIR)/docs/$(XML_DOC)/
+	$(CP) $(INSTALL_XML_DOC).html $(BIN_DIST_DIR)/$(DOC_SUBDIR)/
 
 binary-dist-docs-%:
-	$(CP) $(INSTALL_XML_DOC).$* $(BIN_DIST_DIR)/docs/$(XML_DOC)/
+	$(CP) $(INSTALL_XML_DOC).$* $(BIN_DIST_DIR)/$(DOC_SUBDIR)/
 endif
 endif
 

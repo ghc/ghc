@@ -64,7 +64,7 @@ else
 SUBDIRS_BUILD = gmp includes compat utils driver docs compiler rts
 endif
 
-SUBDIRS = gmp includes compat utils driver docs rts libraries compiler
+SUBDIRS = gmp includes compat utils driver docs rts libraries compiler libraries/Cabal/doc
 
 # Sanity check that all the boot libraries are in the tree, to catch
 # failure to run darcs-all.
@@ -309,6 +309,7 @@ binary-dist::
 	$(MAKE) -C utils     binary-dist DOING_BIN_DIST=YES
 	$(MAKE) -C docs      binary-dist DOING_BIN_DIST=YES
 	$(MAKE) -C libraries binary-dist DOING_BIN_DIST=YES
+	$(MAKE) -C libraries/Cabal/doc binary-dist DOING_BIN_DIST=YES
 
 VARFILE=$(BIN_DIST_DIR)/Makefile-vars.in
 
@@ -419,7 +420,7 @@ SRC_DIST_DIR=$(shell pwd)/$(SRC_DIST_NAME)
 #
 # Files to include in source distributions
 #
-SRC_DIST_DIRS += mk docs distrib bindisttest $(filter-out docs distrib,$(SUBDIRS))
+SRC_DIST_DIRS += mk docs distrib bindisttest $(filter-out docs distrib libraries/Cabal/doc,$(SUBDIRS))
 SRC_DIST_FILES += \
 	configure.ac config.guess config.sub configure \
 	aclocal.m4 README ANNOUNCE HACKING LICENSE Makefile install-sh \
