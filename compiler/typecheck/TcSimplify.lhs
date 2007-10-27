@@ -22,7 +22,7 @@ module TcSimplify (
 	tcSimplifyBracket, tcSimplifyCheckPat,
 
 	tcSimplifyDeriv, tcSimplifyDefault,
-	bindInstsOfLocalFuns, bindIrreds,
+	bindInstsOfLocalFuns, 
 
         misMatchMsg
     ) where
@@ -998,7 +998,10 @@ makeImplicationBind loc all_tvs reft
  = do	{ uniq <- newUnique 
 	; span <- getSrcSpanM
 	; let (eq_givens, dict_givens) = partition isEqInst givens
-	      eq_tyvar_cos =  map TyVarTy $ uniqSetToList $ tyVarsOfTypes $ map eqInstType eq_givens
+	      eq_tyvar_cos = mkTyVarTys (varSetElems $ tyVarsOfTypes $ map eqInstType eq_givens)
+		-- Urgh! See line 2187 or thereabouts.  I believe that all these
+		-- 'givens' must be a simple CoVar.  This MUST be cleaned up.
+
 	; let name = mkInternalName uniq (mkVarOcc "ic") span
 	      implic_inst = ImplicInst { tci_name = name, tci_reft = reft,
 					 tci_tyvars = all_tvs, 
@@ -1751,14 +1754,14 @@ reduceContext env wanteds
 	     ]))
 
 
-	; let givens 		 	  = red_givens env
-	      (given_eqs0, given_dicts0)  = partition isEqInst givens
-	      (wanted_eqs0, wanted_dicts) = partition isEqInst wanteds
+	; let givens 		 	   = red_givens env
+	      (given_eqs0, given_dicts0)   = partition isEqInst givens
+	      (wanted_eqs0, wanted_dicts0) = partition isEqInst wanteds
 
           -- We want to add as wanted equalities those that (transitively) 
           -- occur in superclass contexts of wanted class constraints.
           -- See Note [Ancestor Equalities]
-	; ancestor_eqs <- ancestorEqualities wanted_dicts
+	; ancestor_eqs <- ancestorEqualities wanted_dicts0
         ; let wanted_eqs = wanted_eqs0 ++ ancestor_eqs
 	; traceTc $ text "reduceContext: ancestor eqs" <+> ppr ancestor_eqs
 
@@ -1767,35 +1770,44 @@ reduceContext env wanteds
 
 	  -- 2. Normalise the *given* *dictionary* constraints
 	  --    wrt. the toplevel and given equations
-	; (given_dicts, given_binds) <- normaliseGivenDicts given_eqs 
+	; (given_dicts, given_binds) <- normaliseGivenDicts given_eqs
                                                             given_dicts0
 
+          -- 5. Build the Avail mapping from "given_dicts"
+	  --    Add dicts refined by the current type refinement
+	; (init_state, extra_givens) <- getLIE $ do 
+		{ init_state <- foldlM addGiven emptyAvails given_dicts
+		; let reft = red_reft env
+		; if isEmptyRefinement reft then return init_state
+		  else foldlM (addRefinedGiven reft)
+				    init_state given_dicts }
+
+	-- *** ToDo: what to do with the "extra_givens"?  For the
+	-- moment I'm simply discarding them, which is probably wrong
+
+	  -- 7. Normalise the *wanted* *dictionary* constraints
+	  --    wrt. the toplevel and given equations
+	  -- NB: normalisation includes zonking as part of what it does
+	  --     so it's important to do it after any unifications
+	  --     that happened as a result of the addGivens
+	; (wanted_dicts,normalise_binds1) <- normaliseWantedDicts given_eqs wanted_dicts0
+
+          -- 6. Solve the *wanted* *dictionary* constraints
+	  --    This may expose some further equational constraints...
+	; (avails, extra_eqs) <- getLIE (reduceList env wanted_dicts init_state)
+	; let (binds, irreds1, needed_givens) = extractResults avails wanted_dicts
+	; traceTc $ text "reduceContext extractresults" <+> vcat
+		      [ppr avails,ppr wanted_dicts,ppr binds,ppr needed_givens]
+
+	-- *** ToDo: what to do with the "extra_eqs"?  For the
+	-- moment I'm simply discarding them, which is probably wrong
+
 	  -- 3. Solve the *wanted* *equation* constraints
-	; eq_irreds0 <- solveWantedEqs given_eqs wanted_eqs 
+	; eq_irreds0 <- solveWantedEqs given_eqs wanted_eqs
 
 	  -- 4. Normalise the *wanted* equality constraints with respect to
 	  --    each other 
 	; eq_irreds <- normaliseWantedEqs eq_irreds0
-
-          -- 5. Build the Avail mapping from "given_dicts"
-	  --    Add dicts refined by the current type refinement
-	; init_state <- foldlM addGiven emptyAvails given_dicts
-	; let reft = red_reft env
-	; init_state <- if isEmptyRefinement reft then return init_state
-			else foldlM (addRefinedGiven reft)
-				    init_state given_dicts
-
-          -- 6. Solve the *wanted* *dictionary* constraints
-	  --    This may expose some further equational constraints...
-	; wanted_dicts' <- zonkInsts wanted_dicts
-	; avails <- reduceList env wanted_dicts' init_state
-	; let (binds, irreds0, needed_givens) = extractResults avails wanted_dicts'
-	; traceTc $ text "reduceContext extractresults" <+> vcat
-		      [ppr avails,ppr wanted_dicts',ppr binds,ppr needed_givens]
-
-	  -- 7. Normalise the *wanted* *dictionary* constraints
-	  --    wrt. the toplevel and given equations
-	; (irreds1,normalise_binds1) <- normaliseWantedDicts given_eqs irreds0
 
 	  -- 8. Substitute the wanted *equations* in the wanted *dictionaries*
 	; (irreds,normalise_binds2) <- substEqInDictInsts eq_irreds irreds1
@@ -1803,19 +1815,34 @@ reduceContext env wanteds
 	  -- 9. eliminate the artificial skolem constants introduced in 1.
 	; eliminate_skolems	
 
-	  -- If there was some FD improvement,
-	  -- or new wanted equations have been exposed,
-	  -- we should have another go at solving.
-	; let improved = availsImproved avails 
-			 || (not $ isEmptyBag normalise_binds1)
-			 || (not $ isEmptyBag normalise_binds2)
-			 || (any isEqInst irreds)
+	  -- Figure out whether we should go round again
+  	  -- My current plan is to see if any of the mutable tyvars in
+	  -- givens or irreds has been filled in by improvement.  
+	  -- If so, there is merit in going around again, because
+	  -- we may make further progress
+	  -- 
+	  -- ToDo: is it only mutable stuff?  We may have exposed new
+	  --	   equality constraints and should probably go round again
+	  --	   then as well.  But currently we are dropping them on the
+	  --	   floor anyway.
+
+	; let all_irreds = irreds ++ eq_irreds
+	; improved <- anyM isFilledMetaTyVar $ varSetElems $
+		      tyVarsOfInsts (givens ++ all_irreds)
+
+	-- The old plan (fragile)
+	-- improveed   = availsImproved avails 
+	--		 || (not $ isEmptyBag normalise_binds1)
+	--		 || (not $ isEmptyBag normalise_binds2)
+	--		 || (any isEqInst irreds)
 
 	; traceTc (text "reduceContext end" <+> (vcat [
 	     text "----------------------",
 	     red_doc env,
-	     text "given" <+> ppr (red_givens env),
+	     text "given" <+> ppr givens,
+	     text "given_eqs" <+> ppr given_eqs,
 	     text "wanted" <+> ppr wanteds,
+	     text "wanted_dicts" <+> ppr wanted_dicts,
 	     text "----",
 	     text "avails" <+> pprAvails avails,
 	     text "improved =" <+> ppr improved,
@@ -1829,7 +1856,7 @@ reduceContext env wanteds
                   given_binds `unionBags` normalise_binds1 
                               `unionBags` normalise_binds2 
                               `unionBags` binds, 
-                  irreds ++ eq_irreds, 
+                  all_irreds,
                   needed_givens) 
         }
 
@@ -2169,12 +2196,11 @@ reduceImplication env orig_avails name reft tvs extra_givens wanteds inst_loc
 	; traceTc (text "reduceImplication condition" <+> ppr ((isEmptyLHsBinds binds) || (null irreds)))
 
 --	Progress is no longer measered by the number of bindings
---	; if isEmptyLHsBinds binds then 	-- No progress
-	; if (isEmptyLHsBinds binds) && (not $ null irreds) then 
+	; if (isEmptyLHsBinds binds) && (not $ null irreds) then 	-- No progress
+		-- If there are any irreds, we back off and return NoInstance
 		return (ret_avails, NoInstance)
 	  else do
-	{ 
-	; (implic_insts, bind) <- makeImplicationBind inst_loc tvs reft extra_givens irreds
+	{ (implic_insts, bind) <- makeImplicationBind inst_loc tvs reft extra_givens irreds
 			-- This binding is useless if the recursive simplification
 			-- made no progress; but currently we don't try to optimise that
 			-- case.  After all, we only try hard to reduce at top level, or
@@ -2186,7 +2212,7 @@ reduceImplication env orig_avails name reft tvs extra_givens wanteds inst_loc
 		--  equations depending on whether we solve
 		--  dictionary constraints or equational constraints
 
-		eq_tyvars = uniqSetToList $ tyVarsOfTypes $ map eqInstType extra_eq_givens
+		eq_tyvars = varSetElems $ tyVarsOfTypes $ map eqInstType extra_eq_givens
 			-- SLPJ Sept07: this looks Utterly Wrong to me, but I think
 			--	        that current extra_givens has no EqInsts, so
 			--		it makes no difference
@@ -2201,7 +2227,6 @@ reduceImplication env orig_avails name reft tvs extra_givens wanteds inst_loc
 	; traceTc (vcat [text "reduceImplication" <+> ppr name,
 			 ppr implic_insts,
 			 text "->" <+> sep [ppr needed_givens, ppr rhs]])
-		-- If there are any irreds, we back off and return NoInstance
 	; return (ret_avails, GenInst (implic_insts ++ needed_givens) (L loc rhs))
   	} 
     }

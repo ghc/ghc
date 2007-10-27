@@ -26,7 +26,8 @@ module TcMType (
   newFlexiTyVarTys,		-- Int -> Kind -> TcM [TcType]
   newKindVar, newKindVars, 
   lookupTcTyVar, LookupTyVarResult(..),
-  newMetaTyVar, readMetaTyVar, writeMetaTyVar, 
+
+  newMetaTyVar, readMetaTyVar, writeMetaTyVar, isFilledMetaTyVar,
 
   --------------------------------
   -- Boxy type variables
@@ -39,7 +40,7 @@ module TcMType (
   --------------------------------
   -- Instantiation
   tcInstTyVar, tcInstType, tcInstTyVars, tcInstBoxyTyVar,
-  tcInstSigTyVars, zonkSigTyVar,
+  tcInstSigTyVars,
   tcInstSkolTyVar, tcInstSkolTyVars, tcInstSkolType, 
   tcSkolSigType, tcSkolSigTyVars, occurCheckErr,
 
@@ -55,7 +56,7 @@ module TcMType (
   --------------------------------
   -- Zonking
   zonkType, zonkTcPredType, 
-  zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, 
+  zonkTcTyVar, zonkTcTyVars, zonkTcTyVarsAndFV, zonkSigTyVar,
   zonkQuantifiedTyVar, zonkQuantifiedTyVars,
   zonkTcType, zonkTcTypes, zonkTcClassConstraints, zonkTcThetaType,
   zonkTcKindToKind, zonkTcKind, zonkTopTyVar,
@@ -495,6 +496,15 @@ instMetaTyVar box_info tyvar
 readMetaTyVar :: TyVar -> TcM MetaDetails
 readMetaTyVar tyvar = ASSERT2( isMetaTyVar tyvar, ppr tyvar )
 		      readMutVar (metaTvRef tyvar)
+
+isFilledMetaTyVar :: TyVar -> TcM Bool
+-- True of a filled-in (Indirect) meta type variable
+isFilledMetaTyVar tv
+  | not (isTcTyVar tv) = return False
+  | MetaTv _ ref <- tcTyVarDetails tv
+  = do 	{ details <- readMutVar ref
+	; return (isIndirect details) }
+  | otherwise = return False
 
 writeMetaTyVar :: TcTyVar -> TcType -> TcM ()
 #ifndef DEBUG
