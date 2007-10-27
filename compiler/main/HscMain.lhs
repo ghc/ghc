@@ -193,7 +193,7 @@ data HscChecked
         -- typechecked
         (Maybe (LHsBinds Id, GlobalRdrEnv, ModDetails))
         -- desugared
-        (Maybe [CoreBind])
+        (Maybe CoreModule)
 
 -- Status of a compilation to hard-code or nothing.
 data HscStatus
@@ -689,7 +689,11 @@ hscFileCheck hsc_env mod_summary compileToCore = do {
 				   (Just (tcg_binds tc_result,
 					  tcg_rdr_env tc_result,
 					  md))
-                                   (fmap mg_binds maybeModGuts)))
+                                   (fmap (\ mg ->
+                                            (CoreModule { cm_module = mg_module mg,
+                                                          cm_types  = mg_types mg,
+                                                          cm_binds  = mg_binds mg}))
+                                    maybeModGuts)))
 	}}}}
 
 

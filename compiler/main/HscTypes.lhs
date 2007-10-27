@@ -13,7 +13,7 @@ module HscTypes (
 	ModuleGraph, emptyMG,
 
 	ModDetails(..),	emptyModDetails,
-	ModGuts(..), CgGuts(..), ModImports(..), ForeignStubs(..),
+	ModGuts(..), CoreModule(..), CgGuts(..), ModImports(..), ForeignStubs(..),
 
 	ModSummary(..), ms_mod_name, showModMsg, isBootSummary,
 	msHsFilePath, msHiFilePath, msObjFilePath, 
@@ -547,6 +547,22 @@ data ModGuts
 					 -- for *home-package* modules (including
 					 -- this one); c.f. tcg_fam_inst_env
     }
+
+-- A CoreModule consists of just the fields of a ModGuts that are needed for
+-- the compileToCoreModule interface.
+data CoreModule
+  = CoreModule {
+      -- Module name
+      cm_module   :: !Module,
+      -- Type environment for types declared in this module
+      cm_types    :: !TypeEnv,
+      -- Declarations
+      cm_binds    :: [CoreBind]
+    }
+
+instance Outputable CoreModule where
+   ppr (CoreModule {cm_module = mn, cm_types = te, cm_binds = cb}) =
+      text "%module" <+> ppr mn <+> ppr te $$ vcat (map ppr cb)
 
 -- The ModGuts takes on several slightly different forms:
 --

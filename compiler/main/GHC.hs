@@ -41,7 +41,7 @@ module GHC (
 	workingDirectoryChanged,
 	checkModule, CheckedModule(..),
 	TypecheckedSource, ParsedSource, RenamedSource,
-        compileToCore,
+        compileToCore, compileToCoreModule,
 
 	-- * Parsing Haddock comments
 	parseHaddockComment,
@@ -771,7 +771,7 @@ data CheckedModule =
 		  renamedSource     :: Maybe RenamedSource,
 		  typecheckedSource :: Maybe TypecheckedSource,
 		  checkedModuleInfo :: Maybe ModuleInfo,
-                  coreBinds         :: Maybe [CoreBind]
+                  coreModule        :: Maybe CoreModule
 	        }
 	-- ToDo: improvements that could be made here:
 	--  if the module succeeded renaming but not typechecking,
@@ -821,7 +821,7 @@ checkModule (Session ref) mod compileToCore = do
 					renamedSource = renamed,
 					typecheckedSource = Nothing,
 					checkedModuleInfo = Nothing,
-                                        coreBinds = Nothing }))
+                                        coreModule = Nothing }))
              Just (HscChecked parsed renamed
 			   (Just (tc_binds, rdr_env, details))
                            maybeCoreBinds) -> do
@@ -840,14 +840,15 @@ checkModule (Session ref) mod compileToCore = do
 					renamedSource = renamed,
 					typecheckedSource = Just tc_binds,
 					checkedModuleInfo = Just minf,
-                                        coreBinds = maybeCoreBinds}))
+                                        coreModule = maybeCoreBinds}))
 
 -- | This is the way to get access to the Core bindings corresponding
 -- to a module. 'compileToCore' invokes 'checkModule' to parse, typecheck, and
--- desugar the module, then returns the resulting list of Core bindings if 
--- successful. 
-compileToCore :: Session -> FilePath -> IO (Maybe [CoreBind])
-compileToCore session fn = do
+-- desugar the module, then returns the resulting Core module (consisting of
+-- the module name, type declarations, and function declarations) if
+-- successful.
+compileToCoreModule :: Session -> FilePath -> IO (Maybe CoreModule)
+compileToCoreModule session fn = do
    -- First, set the target to the desired filename
    target <- guessTarget fn Nothing
    addTarget session target
@@ -857,16 +858,26 @@ compileToCore session fn = do
    case maybeModGraph of
      Nothing -> return Nothing
      Just modGraph -> do
-        let modSummary = expectJust "compileToCore" $
-                          find ((== fn) . msHsFilePath) modGraph
-        -- Now we have the module name;
-        -- parse, typecheck and desugar the module
-        let mod = ms_mod_name modSummary
-        maybeCheckedModule <- checkModule session mod True
-        case maybeCheckedModule of
+       case find ((== fn) . msHsFilePath) modGraph of
+         Just modSummary -> do 
+           -- Now we have the module name;
+           -- parse, typecheck and desugar the module
+           let mod = ms_mod_name modSummary
+           maybeCheckedModule <- checkModule session mod True
+           case maybeCheckedModule of
              Nothing -> return Nothing 
-             Just checkedMod -> return $ coreBinds checkedMod
- -- ---------------------------------------------------------------------------
+             Just checkedMod -> return $ coreModule checkedMod
+         Nothing -> panic "compileToCoreModule: target FilePath not found in\
+                           module dependency graph"
+
+-- | Provided for backwards-compatibility: compileToCore returns just the Core
+-- bindings, but for most purposes, you probably want to call
+-- compileToCoreModule.
+compileToCore :: Session -> FilePath -> IO (Maybe [CoreBind])
+compileToCore session fn = do
+   maybeCoreModule <- compileToCoreModule session fn
+   return $ fmap cm_binds maybeCoreModule
+-- ---------------------------------------------------------------------------
 -- Unloading
 
 unload :: HscEnv -> [Linkable] -> IO ()
