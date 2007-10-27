@@ -2,8 +2,11 @@ More type functions
 ~~~~~~~~~~~~~~~~~~~
 * Allow {tv = TYPE ty) as a non-rec binding in Core
 * Use this to make equality constraints more uniform
+* Can a Dict can contain an EqPred?  
+  How does that differ from an EqInst?
 * Make DictBinds into Core
 
+* In zonking, do we need to zonk the kinds of coercion variables?
 
 Type functions
 ~~~~~~~~~~~~~~
