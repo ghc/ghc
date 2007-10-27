@@ -106,8 +106,9 @@ applyNameMaker (NM f) x = f x
 --  (2) whether the scope of the names is entirely given in a continuation
 --      (e.g., in a case or lambda, but not in a let or at the top-level,
 --       because of the way mutually recursive bindings are handled)
---  (3) whether the type signatures can bind variables
---      (for unpacking existential type vars in data constructors)
+--  (3) whether the a type signature in the pattern can bind 
+--	lexically-scoped type variables (for unpacking existential 
+--	type vars in data constructors)
 --  (4) whether we do duplicate and unused variable checking
 --  (5) whether there are fixity declarations associated with the names
 --      bound by the patterns that need to be brought into scope with them.
@@ -117,7 +118,7 @@ applyNameMaker (NM f) x = f x
 
 -- entry point 1:
 -- binds local names; the scope of the bindings is entirely in the thing_inside
---   allows type sigs to bind vars
+--   allows type sigs to bind type vars
 --   local namemaker
 --   unused and duplicate checking
 --   no fixities
@@ -164,7 +165,8 @@ rnPatsAndThen_LocalRightwards ctxt pats thing_inside =
 
 -- entry point 2:
 -- binds local names; in a recursive scope that involves other bound vars
---   allows type sigs to bind vars
+--	e.g let { (x, Just y) = e1; ... } in ...
+--   does NOT allows type sig to bind type vars
 --   local namemaker
 --   no unused and duplicate checking
 --   fixities might be coming in
@@ -177,7 +179,6 @@ rnPat_LocalRec :: UniqFM (Located Fixity) -- mini fixity env for the names we're
                        FreeVars)
 
 rnPat_LocalRec fix_env pat = 
-    bindPatSigTyVarsFV (collectSigTysFromPats [pat]) $ 
     rnLPatsAndThen localNameMaker fix_env [pat]	       $ \ ([pat'], pat_fvs) ->
         return (pat', pat_fvs)
 
