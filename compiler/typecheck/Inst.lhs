@@ -141,7 +141,7 @@ instType imp@(ImplicInst {})      = mkImplicTy (tci_tyvars imp) (tci_given imp)
 instType (EqInst {tci_left = ty1, tci_right = ty2}) = mkPredTy (EqPred ty1 ty2)
 
 mkImplicTy tvs givens wanteds	-- The type of an implication constraint
-  = ASSERT( all isDict givens )
+  = ASSERT( all isAbstractableInst givens )
     -- pprTrace "mkImplicTy" (ppr givens) $
     -- See [Equational Constraints in Implication Constraints]
     let dict_wanteds = filter (not . isEqInst) wanteds

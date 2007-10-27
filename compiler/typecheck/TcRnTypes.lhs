@@ -661,7 +661,7 @@ data Inst
 				    -- Includes coercion variables
 				    --   mentioned in tci_reft
 	tci_reft   :: Refinement,
-	tci_given  :: [Inst],	    -- Only Dicts
+	tci_given  :: [Inst],	    -- Only Dicts and EqInsts
 				    --   (no Methods, LitInsts, ImplicInsts)
 	tci_wanted :: [Inst],	    -- Only Dicts and ImplicInsts
 				    --   (no Methods or LitInsts)
