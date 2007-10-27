@@ -25,6 +25,14 @@ PACKAGE = rts
 
 HC=$(GHC_INPLACE)
 
+
+# Setting _way here is a nasty hack to make sure we get libHSrts*.a etc
+# rather than just libHSrts.a when we are making and installing
+# bindists.
+ifeq "$(DOING_BIN_DIST)" "YES"
+_way = *
+endif
+
 # -----------------------------------------------------------------------------
 # RTS ways
 

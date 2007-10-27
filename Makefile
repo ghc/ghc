@@ -302,9 +302,7 @@ binary-dist::
 	$(MAKE) -C gmp       binary-dist DOING_BIN_DIST=YES
 	$(MAKE) -C includes  binary-dist DOING_BIN_DIST=YES
 	$(MAKE) -C compiler  binary-dist DOING_BIN_DIST=YES $(INSTALL_STAGE)
-	# Setting _way here is a nasty hack to make sure we get
-	# libHSrts*.a etc rather than just libHSrts.a
-	$(MAKE) -C rts       binary-dist DOING_BIN_DIST=YES _way='*'
+	$(MAKE) -C rts       binary-dist DOING_BIN_DIST=YES
 	$(MAKE) -C driver    binary-dist DOING_BIN_DIST=YES
 	$(MAKE) -C utils     binary-dist DOING_BIN_DIST=YES
 	$(MAKE) -C docs      binary-dist DOING_BIN_DIST=YES
