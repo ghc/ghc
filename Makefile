@@ -252,6 +252,7 @@ ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 
 binary-dist::
 	$(MAKE) prefix=$(BIN_DIST_DIR) install
+	$(MAKE) prefix=$(BIN_DIST_DIR) install-docs
 
 binary-dist::
 	cd $(BIN_DIST_DIR) && ../distrib/prep-bin-dist-mingw
