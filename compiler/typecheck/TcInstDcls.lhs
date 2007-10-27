@@ -525,7 +525,7 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived })
 	; let dict_bind = noLoc $ VarBind (instToId this_dict) (noLoc body)
 
 	; return (unitBag $ noLoc $
-		  AbsBinds  tvs (map instToId dfun_dicts)
+		  AbsBinds  tvs (map instToVar dfun_dicts)
 		 	    [(tvs, dfun_id, instToId this_dict, [])] 
 		 	    (dict_bind `consBag` sc_binds)) }
   where

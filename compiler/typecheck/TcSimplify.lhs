@@ -950,8 +950,10 @@ bindIrredsR loc qtvs co_vars reft givens irreds
   | null irreds
   = return emptyBag
   | otherwise
-  = do	{ let givens' = filter isDict givens
-		-- The givens can include methods
+  = do	{ let givens' = filter isAbstractableInst givens
+		-- The givens can (redundantly) include methods
+		-- We want to retain both EqInsts and Dicts
+		-- There should be no implicadtion constraints
 		-- See Note [Pruning the givens in an implication constraint]
 
 	   -- If there are no 'givens' *and* the refinement is empty
@@ -987,7 +989,8 @@ makeImplicationBind :: InstLoc -> [TcTyVar] -> Refinement
 --
 -- This binding must line up the 'rhs' in reduceImplication
 makeImplicationBind loc all_tvs reft
-		    givens 	-- Guaranteed all Dicts (TOMDO: true?)
+		    givens 	-- Guaranteed all Dicts
+				-- or EqInsts
 		    irreds
  | null irreds			-- If there are no irreds, we are done
  = return ([], emptyBag)

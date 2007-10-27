@@ -194,6 +194,13 @@ zonkIdBndr env id
 zonkIdBndrs :: ZonkEnv -> [TcId] -> TcM [Id]
 zonkIdBndrs env ids = mappM (zonkIdBndr env) ids
 
+zonkDictBndrs :: ZonkEnv -> [Var] -> TcM [Var]
+-- "Dictionary" binders can be coercion variables or dictionary variables
+zonkDictBndrs env ids = mappM (zonkDictBndr env) ids
+
+zonkDictBndr env var | isTyVar var = return var
+		     | otherwise   = zonkIdBndr env var
+
 zonkTopBndrs :: [TcId] -> TcM [Id]
 zonkTopBndrs ids = zonkIdBndrs emptyZonkEnv ids
 \end{code}
@@ -287,7 +294,7 @@ zonk_bind env bind@(FunBind { fun_id = var, fun_matches = ms, fun_co_fn = co_fn 
 zonk_bind env (AbsBinds { abs_tvs = tyvars, abs_dicts = dicts, 
 			  abs_exports = exports, abs_binds = val_binds })
   = ASSERT( all isImmutableTyVar tyvars )
-    zonkIdBndrs env dicts		`thenM` \ new_dicts ->
+    zonkDictBndrs env dicts			`thenM` \ new_dicts ->
     fixM (\ ~(new_val_binds, _) ->
 	let
 	  env1 = extendZonkEnv env new_dicts

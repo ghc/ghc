@@ -42,7 +42,7 @@ import VarEnv
 import TysPrim
 import Id
 import IdInfo
-import Var ( TyVar )
+import Var ( TyVar, varType )
 import Name
 import NameSet
 import NameEnv
@@ -344,15 +344,15 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
 	   generalise dflags top_lvl bind_list sig_fn mono_bind_infos lie_req
 
 	-- BUILD THE POLYMORPHIC RESULT IDs
-  ; let dict_ids = map instToId dicts
-  ; exports <- mapM (mkExport top_lvl prag_fn tyvars_to_gen (map idType dict_ids))
+  ; let dict_vars = map instToVar dicts	-- May include equality constraints
+  ; exports <- mapM (mkExport top_lvl prag_fn tyvars_to_gen (map varType dict_vars))
 		    mono_bind_infos
 
   ; let	poly_ids = [poly_id | (_, poly_id, _, _) <- exports]
   ; traceTc (text "binding:" <+> ppr (poly_ids `zip` map idType poly_ids))
 
   ; let abs_bind = L loc $ AbsBinds tyvars_to_gen
-	 		            dict_ids exports
+	 		            dict_vars exports
 	 		    	    (dict_binds `unionBags` binds')
 
   ; return ([unitBag abs_bind], poly_ids)	-- poly_ids are guaranteed zonked by mkExport
