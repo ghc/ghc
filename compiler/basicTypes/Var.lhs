@@ -231,10 +231,11 @@ setCoVarName   = setVarName
 
 mkCoVar :: Name -> Kind -> CoVar
 mkCoVar name kind = ASSERT( isCoercionKind kind )
-		    TyVar { varName    = name
-			  , realUnique = getKey# (nameUnique name)
-			  , varType  = kind
-                          , isCoercionVar    = True
+		    TyVar { varName    	  = name
+			  , realUnique 	  = getKey# (nameUnique name)
+			  , varType    	  = kind	
+				-- varType is always PredTy (EqPred t1 t2)
+                          , isCoercionVar = True
 			}
 
 mkWildCoVar :: Kind -> TyVar
