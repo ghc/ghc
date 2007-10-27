@@ -331,6 +331,8 @@ binary-dist::
 	echo "GhcHasReadline = $(GhcHasReadline)"                    >> $(VARFILE)
 	echo "BootingFromHc = $(BootingFromHc)"                      >> $(VARFILE)
 	echo "XMLDocWays = $(XMLDocWays)"                            >> $(VARFILE)
+	# We won't actually use xsltproc, but we need to know if it's "" or not
+	echo "XSLTPROC = $(XSLTPROC)"                                >> $(VARFILE)
 	echo "TARGETPLATFORM = $(TARGETPLATFORM)"                    >> $(VARFILE)
 	echo "HADDOCK_DOCS = $(HADDOCK_DOCS)"                        >> $(VARFILE)
 

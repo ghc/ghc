@@ -1,6 +1,8 @@
 TOP = ../..
 include $(TOP)/mk/boilerplate.mk
 
+ifneq "$(strip $(XSLTPROC))" ""
+
 # The commands which should be mentioned in the man page
 GHC_COMMANDS = ghc ghci
 
@@ -40,9 +42,13 @@ install-docs:: $(MAN_PAGE).$(MAN_SECTION)
 	$(INSTALL_DIR) $(DESTDIR)$(mandir)/man$(MAN_SECTION)
 	$(INSTALL_MAN) $(INSTALL_OPTS) $(MAN_PAGE).$(MAN_SECTION) $(DESTDIR)$(mandir)/man$(MAN_SECTION)
 
+endif
+
 binary-dist:: $(MAN_PAGE).$(MAN_SECTION)
 	$(MKDIRHIER) $(BIN_DIST_DIR)/docs/man
 	cp Makefile                   $(BIN_DIST_DIR)/docs/man/
+ifneq "$(strip $(XSLTPROC))" ""
 	cp $(MAN_PAGE).$(MAN_SECTION) $(BIN_DIST_DIR)/docs/man/
+endif
 
 include $(TOP)/mk/target.mk
