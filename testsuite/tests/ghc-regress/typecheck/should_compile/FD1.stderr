@@ -1,0 +1,7 @@
+
+FD1.hs:12:0:
+    Couldn't match expected type `a' against inferred type `Int -> Int'
+      `a' is a rigid type variable bound by
+	  the type signature for `plus' at FD1.hs:11:11
+    The equation(s) for `plus' have two arguments,
+    which does not match its type
