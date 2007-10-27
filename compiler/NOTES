@@ -1,3 +1,10 @@
+More type functions
+~~~~~~~~~~~~~~~~~~~
+* Allow {tv = TYPE ty) as a non-rec binding in Core
+* Use this to make equality constraints more uniform
+* Make DictBinds into Core
+
+
 Type functions
 ~~~~~~~~~~~~~~
 * A Given inst should be a CoVar, not a coercion
