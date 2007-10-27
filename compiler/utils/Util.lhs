@@ -14,8 +14,6 @@
 
 module Util (
 
-    foldl1',
-
 	-- general list processing
 	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
         zipLazy, stretchZipWith,
@@ -117,15 +115,6 @@ import Data.Ratio	( (%) )
 import System.Time	( ClockTime )
 
 infixr 9 `thenCmp`
-\end{code}
-
-\begin{code}
-#if __GLASGOW_HASKELL__ < 603
--- foldl1' was introduce in GHC 6.4
-foldl1'                  :: (a -> a -> a) -> [a] -> a
-foldl1' f (x:xs)         =  foldl' f x xs
-foldl1' _ []             =  errorEmptyList "foldl1'"
-#endif
 \end{code}
 
 %************************************************************************
