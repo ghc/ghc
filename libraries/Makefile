@@ -382,6 +382,7 @@ binary-dist.library.%:
 	  cp    $*.cabal      $(BIN_DIST_LIBDIR)/$* && \
 	  cp    LICENSE       $(BIN_DIST_LIBDIR)/$* && \
 	  cp -R dist          $(BIN_DIST_LIBDIR)/$* && \
+	  $(FIND) . -name "*.buildinfo" -exec cp {} $(BIN_DIST_LIBDIR)/$* \; && \
 	  (cp -RL include      $(BIN_DIST_LIBDIR)/$* || true) && \
 	  $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
 	     \( -name "*_split" -o -name "autogen" \) | xargs rm -rf && \
