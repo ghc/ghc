@@ -457,7 +457,7 @@ pprSkolTvBinding tv
     ppr_details (MetaTv (SigTv info) _) = ppr_skol info
     ppr_details (SkolemTv info)		= ppr_skol info
 
-    ppr_skol UnkSkol	    = empty	-- Unhelpful; omit
+    ppr_skol UnkSkol	    = ptext SLIT("is an unknown type variable")	-- Unhelpful
     ppr_skol RuntimeUnkSkol = ptext SLIT("is an unknown runtime type")
     ppr_skol info           = sep [ptext SLIT("is a rigid type variable bound by"),
 				   sep [pprSkolInfo info, 
