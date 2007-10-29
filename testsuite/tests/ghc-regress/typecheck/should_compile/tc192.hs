@@ -4,6 +4,8 @@
 
 module Test where
 
+import Prelude hiding (id,(.))
+import Control.Category
 import Control.Arrow
 
 -- For readability, I use infix notation for arrow types.  I'd prefer the
