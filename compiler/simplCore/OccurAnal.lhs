@@ -38,7 +38,7 @@ import Maybes		( orElse )
 import Digraph		( stronglyConnCompR, SCC(..) )
 import PrelNames	( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique		( Unique )
-import UniqFM		( keysUFM, intersectsUFM )  
+import UniqFM		( keysUFM, intersectsUFM, intersectUFM_C, foldUFM_Directly )  
 import Util		( mapAndUnzip )
 import Outputable
 
@@ -95,38 +95,36 @@ occAnalBind env (NonRec binder rhs) body_usage
   = (body_usage, [])
 
   | otherwise			-- It's mentioned in the body
-  = (body_usage' +++ addRuleUsage rhs_usage binder,	-- Note [RulesOnly]
+  = (body_usage' +++ addRuleUsage rhs_usage binder,	-- Note [Rules are extra RHSs]
      [NonRec tagged_binder rhs'])
   where
     (body_usage', tagged_binder) = tagBinder body_usage binder
     (rhs_usage, rhs')		 = occAnalRhs env tagged_binder rhs
 \end{code}
 
+Note [Dead code]
+~~~~~~~~~~~~~~~~
 Dropping dead code for recursive bindings is done in a very simple way:
 
 	the entire set of bindings is dropped if none of its binders are
 	mentioned in its body; otherwise none are.
 
 This seems to miss an obvious improvement.
-@
+
 	letrec  f = ...g...
 		g = ...f...
 	in
 	...g...
-
 ===>
-
 	letrec f = ...g...
 	       g = ...(...g...)...
 	in
 	...g...
-@
 
-Now @f@ is unused. But dependency analysis will sort this out into a
-@letrec@ for @g@ and a @let@ for @f@, and then @f@ will get dropped.
-It isn't easy to do a perfect job in one blow.  Consider
+Now 'f' is unused! But it's OK!  Dependency analysis will sort this
+out into a letrec for 'g' and a 'let' for 'f', and then 'f' will get
+dropped.  It isn't easy to do a perfect job in one blow.  Consider
 
-@
 	letrec f = ...g...
 	       g = ...h...
 	       h = ...k...
@@ -134,29 +132,180 @@ It isn't easy to do a perfect job in one blow.  Consider
 	       m = ...m...
 	in
 	...m...
-@
+
+
+Note [Loop breaking and RULES]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Loop breaking is surprisingly subtle.  First read the section 4 of 
+"Secrets of the GHC inliner".  This describes our basic plan.
+
+However things are made quite a bit more complicated by RULES.  Remember
+
+  * Note [Rules are extra RHSs]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    A RULE for 'f' is like an extra RHS for 'f'. That way the "parent"
+    keeps the specialised "children" alive.  If the parent dies
+    (because it isn't referenced any more), then the children will die
+    too (unless they are already referenced directly).
+
+    To that end, we build a Rec group for each cyclic strongly
+    connected component,
+	*treating f's rules as extra RHSs for 'f'*.
+ 
+    So in Example [eftInt], eftInt and eftIntFB will be put in the
+    same Rec, even though their 'main' RHSs are both non-recursive.
+
+  * Note [Rules are visible in their own rec group]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    We want the rules for 'f' to be visible in f's right-hand side.
+    And we'd like them to be visible in other function in f's Rec
+    group.  E.g. in Example [Specialisation rules] we want f' rule
+    to be visible in both f's RHS, and fs's RHS.
+
+    This means that we must simplify the RULEs first, before looking
+    at any of the definitions.  This is done by Simplify.simplRecBind,
+    when it calls addLetIdInfo.
+
+  * Note [Choosing loop breakers]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    We avoid infinite inlinings by choosing loop breakers, and
+    ensuring that a loop breaker cuts each loop.  But what is a
+    "loop"?  In particular, a RULES is like an equation for 'f' that
+    is *always* inlined if it are applicable.  We do *not* disable
+    rules for loop-breakers.  It's up to whoever makes the rules to
+    make sure that the rules themselves alwasys terminate.  See Note
+    [Rules for recursive functions] in Simplify.lhs
+
+    Hence, if 
+	f's RHS mentions g, and
+	g has a RULE that mentions h, and
+	h has a RULE that mentions f
+
+    then we *must* choose f to be a loop breaker.  In general, take the
+    free variables of f's RHS, and augment it with all the variables
+    reachable by RULES from those starting points.  That is the whole
+    reason for computing rule_fv_env in occAnalBind.  (Of course we
+    only consider free vars that are also binders in this Rec group.)
+
+    Note that in Example [eftInt], *neither* eftInt *nor* eftIntFB is
+    chosen as a loop breaker, because their RHSs don't mention each other.
+    And indeed both can be inlined safely.
+
+    Note that the edges of the graph we use for computing loop breakers
+    are not the same as the edges we use for computing the Rec blocks.
+    That's why we compute 
+	rec_edges	   for the Rec block analysis
+	loop_breaker_edges for the loop breaker analysis
+
+
+  * Note [Weak loop breakers]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
+    There is a last nasty wrinkle.  Suppose we have
+
+	Rec { f = f_rhs
+              RULE f [] = g
+            
+	      h = h_rhs
+              g = h 
+	      ...more...
+        }
+
+    Remmber that we simplify the RULES before any RHS (see Note
+    [Rules are visible in their own rec group] above).
+
+    So we must *not* postInlineUnconditinoally 'g', even though
+    its RHS turns out to be trivial.  (I'm assuming that 'g' is
+    not choosen as a loop breaker.)
+
+    We "solve" this by making g a "weak" or "rules-only" loop breaker,
+    with OccInfo = IAmLoopBreaker True.  A normal "strong" loop breaker
+    has IAmLoopBreaker False.  So
+
+				Inline	postInlineUnconditinoally
+	IAmLoopBreaker False	no	no
+	IAmLoopBreaker True	yes	no
+	other			yes 	yes
+
+    The **sole** reason for this kind of loop breaker is so that
+    postInlineUnconditioanlly does not fire.  Ugh.
+
+
+Example [eftInt]
+~~~~~~~~~~~~~~~
+Example (from GHC.Enum):
+
+  eftInt :: Int# -> Int# -> [Int]
+  eftInt x y = ...(non-recursive)...
+
+  {-# INLINE [0] eftIntFB #-}
+  eftIntFB :: (Int -> r -> r) -> r -> Int# -> Int# -> r
+  eftIntFB c n x y = ...(non-recursive)...
+
+  {-# RULES
+  "eftInt"  [~1] forall x y. eftInt x y = build (\ c n -> eftIntFB c n x y)
+  "eftIntList"  [1] eftIntFB  (:) [] = eftInt
+   #-}
+
+Example [Specialisation rules]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider this group, which is typical of what SpecConstr builds:
+
+   fs a = ....f (C a)....
+   f  x = ....f (C a)....
+   {-# RULE f (C a) = fs a #-}
+
+So 'f' and 'fs' are in the same Rec group (since f refers to fs via its RULE).
+
+But watch out!  If 'fs' is not chosen as a loop breaker, we may get an infinite loop:
+	- the RULE is applied in f's RHS (see Note [Self-recursive rules] in Simplify
+	- fs is inlined (say it's small)
+	- now there's another opportunity to apply the RULE
+
+This showed up when compiling Control.Concurrent.Chan.getChanContents.
 
 
 \begin{code}
 occAnalBind env (Rec pairs) body_usage
-  = foldr ({-# SCC "occAnalBind.dofinal" #-} do_final_bind) (body_usage, []) sccs
+  | not (any (`usedIn` body_usage) bndrs)	-- NB: look at body_usage, not total_usage
+  = (body_usage, [])				-- Dead code
+  | otherwise
+  = (final_usage, map ({-# SCC "occAnalBind.dofinal" #-} do_final_bind) sccs)
   where
-    analysed_pairs :: [Details]
-    analysed_pairs  = [ (bndr, rhs_usage, rhs')
-		      | (bndr, rhs) <- pairs,
-			let (rhs_usage, rhs') = occAnalRhs env bndr rhs
-		      ]
+    bndrs    = map fst pairs
+    bndr_set = mkVarSet bndrs
 
-    sccs :: [SCC (Node Details)]
-    sccs = {-# SCC "occAnalBind.scc" #-} stronglyConnCompR edges
+	---------------------------------------
+	-- See Note [Loop breaking]
+	---------------------------------------
 
+    -------------Dependency analysis ------------------------------
+    occ_anald :: [(Id, (UsageDetails, CoreExpr))]
+	-- The UsageDetails here are strictly those arising from the RHS
+	-- *not* from any rules in the Id
+    occ_anald = [(bndr, occAnalRhs env bndr rhs) | (bndr,rhs) <- pairs]
+
+    total_usage        = foldl add_usage body_usage occ_anald
+    add_usage body_usage (bndr, (rhs_usage, _))
+	= body_usage +++ addRuleUsage rhs_usage bndr
+
+    (final_usage, tagged_bndrs) = tagBinders total_usage bndrs
+    final_bndrs | no_rules  = tagged_bndrs
+		| otherwise = map tag_rule_var tagged_bndrs
+    tag_rule_var bndr | bndr `elemVarSet` all_rule_fvs = makeLoopBreaker True bndr
+	    	      | otherwise		       = bndr
 
     ---- stuff for dependency analysis of binds -------------------------------
-    edges :: [Node Details]
-    edges = {-# SCC "occAnalBind.assoc" #-}
-	    [ (details, idUnique id, edges_from id rhs_usage)
-	    | details@(id, rhs_usage, rhs) <- analysed_pairs
-	    ]
+    sccs :: [SCC (Node Details)]
+    sccs = {-# SCC "occAnalBind.scc" #-} stronglyConnCompR rec_edges
+
+    rec_edges :: [Node Details]	-- The binders are tagged with correct occ-info
+    rec_edges = {-# SCC "occAnalBind.assoc" #-} zipWith make_node final_bndrs occ_anald
+    make_node tagged_bndr (_bndr, (rhs_usage, rhs))
+	= ((tagged_bndr, rhs, rhs_fvs), idUnique tagged_bndr, out_edges)
+	where
+	  rhs_fvs = intersectUFM_C (\b _ -> b) bndr_set rhs_usage
+	  out_edges = keysUFM (rhs_fvs `unionVarSet` idRuleVars tagged_bndr)
+	
 
 	-- (a -> b) means a mentions b
 	-- Given the usage details (a UFM that gives occ info for each free var of
@@ -167,55 +316,53 @@ occAnalBind env (Rec pairs) body_usage
 	--		 maybeToBool (lookupVarEnv rhs_usage bndr)]
 	-- which has n**2 cost, and this meant that edges_from alone 
 	-- consumed 10% of total runtime!
-    edges_from :: Id -> UsageDetails -> [Unique]
-    edges_from bndr rhs_usage = {-# SCC "occAnalBind.edges_from" #-}
-			        keysUFM (addRuleUsage rhs_usage bndr)
 
     ---- Stuff to "re-constitute" bindings from dependency-analysis info ------
+    do_final_bind (AcyclicSCC ((bndr, rhs, _), _, _)) = NonRec bndr rhs
+    do_final_bind (CyclicSCC cycle)
+	| no_rules  = Rec (reOrderCycle cycle)
+	| otherwise = Rec (concatMap reOrderRec (stronglyConnCompR loop_breaker_edges))
+	where	-- See Note [Loop breaking for reason for looop_breker_edges]
+	  loop_breaker_edges = map mk_node cycle
+	  mk_node (details@(bndr, rhs, rhs_fvs), k, _) = (details, k, new_ks)
+		where
+		  new_ks = keysUFM (extendFvs rule_fv_env rhs_fvs rhs_fvs)
 
-	-- Non-recursive SCC
-    do_final_bind (AcyclicSCC ((bndr, rhs_usage, rhs'), _, _)) (body_usage, binds_so_far)
-      | not (bndr `usedIn` body_usage)
-      = (body_usage, binds_so_far)			-- Dead code
-      | otherwise
-      = (body_usage' +++ addRuleUsage rhs_usage bndr, new_bind : binds_so_far)	
-      where
-	(body_usage', tagged_bndr) = tagBinder body_usage bndr
-	new_bind		   = NonRec tagged_bndr rhs'
+	
+    ------------------------------------
+    rule_fv_env :: IdEnv IdSet	-- Variables from this group mentioned in RHS of rules
+				-- Domain is *subset* of bound vars (others have no rule fvs)
+    rule_fv_env = rule_loop init_rule_fvs
 
-	-- Recursive SCC
-    do_final_bind (CyclicSCC cycle) (body_usage, binds_so_far)
-      | not (any (`usedIn` body_usage) bndrs)		-- NB: look at body_usage, not total_usage
-      = (body_usage, binds_so_far)			-- Dead code
-      | otherwise					-- If any is used, they all are
-      = (final_usage, final_bind : binds_so_far)
-      where
-	details			       = [details | (details, _, _) <- cycle]
-	bndrs			       = [bndr | (bndr, _, _) <- details]
-	bndr_usages		       = [addRuleUsage rhs_usage bndr | (bndr, rhs_usage, _) <- details]
-	total_usage		       = foldr (+++) body_usage bndr_usages
-	(final_usage, tagged_cycle) = mapAccumL tag_bind total_usage cycle
-	tag_bind usg ((bndr,rhs_usg,rhs),k,ks) = (usg', ((bndr',rhs_usg,rhs),k,ks))
-					   where
-					     (usg', bndr') = tagBinder usg bndr
-	final_bind = Rec (reOrderCycle (mkVarSet bndrs) tagged_cycle)
+    no_rules      = null init_rule_fvs
+    all_rule_fvs  = foldr (unionVarSet . snd) emptyVarSet init_rule_fvs
+    init_rule_fvs = [(b, rule_fvs)
+		    | b <- bndrs 
+		    , let rule_fvs = idRuleVars b `intersectVarSet` bndr_set
+		    , not (isEmptyVarSet rule_fvs)]
 
-{-	An alternative; rebuild the edges.  No semantic difference, but perf might change
+    rule_loop :: [(Id,IdSet)] -> IdEnv IdSet	-- Finds fixpoint
+    rule_loop fv_list 
+	| no_change = env
+	| otherwise = rule_loop new_fv_list
+	where
+	  env = mkVarEnv init_rule_fvs
+	  (no_change, new_fv_list) = mapAccumL bump True fv_list
+	  bump no_change (b,fvs) 
+		| new_fvs `subVarSet` fvs = (no_change, (b,fvs))
+		| otherwise		  = (False,     (b,new_fvs `unionVarSet` fvs))
+		where
+		  new_fvs = extendFvs env emptyVarSet fvs
 
-	-- Hopefully 'bndrs' is a relatively small group now
-	-- Now get ready for the loop-breaking phase
-	-- We've done dead-code elimination already, so no worries about un-referenced binders
-	keys = map idUnique bndrs
- 	mk_node tagged_bndr (_, rhs_usage, rhs')
-	  = ((tagged_bndr, rhs'), idUnique tagged_bndr, used) 
-	  where
-	    used = [key | key <- keys, used_outside_rule rhs_usage key ]
-
-	used_outside_rule usage uniq = case lookupUFM_Directly usage uniq of
-						Nothing		-> False
-						Just RulesOnly	-> False	-- Ignore rules
-						other		-> True
--}
+extendFvs :: IdEnv IdSet -> IdSet -> IdSet -> IdSet
+-- (extendFVs env fvs s) returns (fvs `union` env(s))
+extendFvs env fvs id_set
+  = foldUFM_Directly add fvs id_set
+  where
+    add uniq _ fvs 
+	= case lookupVarEnv_Directly env uniq  of
+	    Just fvs' -> fvs' `unionVarSet` fvs
+	    Nothing   -> fvs
 \end{code}
 
 @reOrderRec@ is applied to the list of (binder,rhs) pairs for a cyclic
@@ -255,33 +402,34 @@ Perhaps something cleverer would suffice.
 \begin{code}
 type Node details = (details, Unique, [Unique])	-- The Ints are gotten from the Unique,
 						-- which is gotten from the Id.
-type Details	  = (Id, UsageDetails, CoreExpr)
+type Details = (Id, 		-- Binder
+		CoreExpr,	-- RHS
+		IdSet)		-- RHS free vars (*not* include rules)
 
-reOrderRec :: IdSet 	-- Binders of this group
-	   -> SCC (Node Details)
+reOrderRec :: SCC (Node Details)
 	   -> [(Id,CoreExpr)]
 -- Sorted into a plausible order.  Enough of the Ids have
 --	IAmALoopBreaker pragmas that there are no loops left.
-reOrderRec bndrs (AcyclicSCC ((bndr, _, rhs), _, _)) = [(bndr, rhs)]
-reOrderRec bndrs (CyclicSCC cycle)  		     = reOrderCycle bndrs cycle
+reOrderRec (AcyclicSCC ((bndr, rhs, _), _, _)) = [(bndr, rhs)]
+reOrderRec (CyclicSCC cycle)  		       = reOrderCycle cycle
 
-reOrderCycle :: IdSet -> [Node Details] -> [(Id,CoreExpr)]
-reOrderCycle bndrs []
+reOrderCycle :: [Node Details] -> [(Id,CoreExpr)]
+reOrderCycle []
   = panic "reOrderCycle"
-reOrderCycle bndrs [bind]	-- Common case of simple self-recursion
-  = [(makeLoopBreaker bndrs rhs_usg bndr, rhs)]
+reOrderCycle [bind]	-- Common case of simple self-recursion
+  = [(makeLoopBreaker False bndr, rhs)]
   where
-    ((bndr, rhs_usg, rhs), _, _) = bind
+    ((bndr, rhs, _), _, _) = bind
 
-reOrderCycle bndrs (bind : binds)
+reOrderCycle (bind : binds)
   = 	-- Choose a loop breaker, mark it no-inline,
 	-- do SCC analysis on the rest, and recursively sort them out
-    concatMap (reOrderRec bndrs) (stronglyConnCompR unchosen) ++
-    [(makeLoopBreaker bndrs rhs_usg bndr, rhs)]
+    concatMap reOrderRec (stronglyConnCompR unchosen) ++
+    [(makeLoopBreaker False bndr, rhs)]
 
   where
     (chosen_bind, unchosen) = choose_loop_breaker bind (score bind) [] binds
-    (bndr, rhs_usg, rhs)  = chosen_bind
+    (bndr, rhs, _)  = chosen_bind
 
 	-- This loop looks for the bind with the lowest score
 	-- to pick as the loop  breaker.  The rest accumulate in 
@@ -298,7 +446,7 @@ reOrderCycle bndrs (bind : binds)
 	  sc = score bind
 	  
     score :: Node Details -> Int	-- Higher score => less likely to be picked as loop breaker
-    score ((bndr, _, rhs), _, _)
+    score ((bndr, rhs, _), _, _)
         | workerExists (idWorkerInfo bndr)      = 10
                 -- Note [Worker inline loop]
 
@@ -309,12 +457,6 @@ reOrderCycle bndrs (bind : binds)
 		-- where df is the exported dictionary. Then df makes a really
 		-- bad choice for loop breaker
 	  
-	| idHasRules bndr = 3
-		-- Avoid things with specialisations; we'd like
-		-- to take advantage of them in the subsequent bindings
-		-- Also vital to avoid risk of divergence:
-		-- Note [Recursive rules]
-
 	| is_con_app rhs = 2	-- Data types help with cases
                 -- Note [conapp]
 
@@ -357,15 +499,10 @@ reOrderCycle bndrs (bind : binds)
     is_con_app (Note _ e) = is_con_app e
     is_con_app other      = False
 
-makeLoopBreaker :: VarSet		-- Binders of this group
-		-> UsageDetails		-- Usage of this rhs (neglecting rules)
-		-> Id -> Id
--- Set the loop-breaker flag, recording whether the thing occurs only in 
--- the RHS of a RULE (in this recursive group)
-makeLoopBreaker bndrs rhs_usg bndr
-  = setIdOccInfo bndr (IAmALoopBreaker rules_only)
-  where
-    rules_only = bndrs `intersectsUFM` rhs_usg
+makeLoopBreaker :: Bool -> Id -> Id
+-- Set the loop-breaker flag
+-- See Note [Weak loop breakers]
+makeLoopBreaker weak bndr = setIdOccInfo bndr (IAmALoopBreaker weak)
 \end{code}
 
 Note [Worker inline loop]
@@ -386,25 +523,6 @@ change this.  A good example is Tree.repTree in
 nofib/spectral/minimax. If the repTree wrapper is chosen as the loop
 breaker then compiling Game.hs goes into an infinite loop (this
 happened when we gave is_con_app a lower score than inline candidates).
-
-Note [Recursive rules]
-~~~~~~~~~~~~~~~~~~~~~~
-Consider this group, which is typical of what SpecConstr builds:
-
-   fs a = ....f (C a)....
-   f  x = ....f (C a)....
-   {-# RULE f (C a) = fs a #-}
-
-So 'f' and 'fs' are mutually recursive.  If we choose 'fs' as the loop breaker,
-all is well; the RULE is applied, and 'fs' becomes self-recursive.
-
-But if we choose 'f' as the loop breaker, we may get an infinite loop:
-	- the RULE is applied in f's RHS (see Note [Self-recursive rules] in Simplify
-	- fs is inlined (say it's small)
-	- now there's another opportunity to apply the RULE
-
-So it's very important not to choose the RULE-variable as the loop breaker.
-This showed up when compiling Control.Concurrent.Chan.getChanContents.
 
 Note [Closure conversion]
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -472,39 +590,9 @@ occAnalRhs env id rhs
 			    other		   -> False
 \end{code}
 
-Note [RulesOnly]
-~~~~~~~~~~~~~~~~~~
-If the binder has RULES inside it then we count the specialised Ids as
-"extra rhs's".  That way the "parent" keeps the specialised "children"
-alive.  If the parent dies (because it isn't referenced any more),
-then the children will die too unless they are already referenced
-directly.
-
-That's the basic idea.  However in a recursive situation we want to be a bit
-cleverer. Example (from GHC.Enum):
-
-  eftInt :: Int# -> Int# -> [Int]
-  eftInt x y = ...(non-recursive)...
-
-  {-# INLINE [0] eftIntFB #-}
-  eftIntFB :: (Int -> r -> r) -> r -> Int# -> Int# -> r
-  eftIntFB c n x y = ...(non-recursive)...
-
-  {-# RULES
-  "eftInt"  [~1] forall x y. eftInt x y = build (\ c n -> eftIntFB c n x y)
-  "eftIntList"  [1] eftIntFB  (:) [] = eftInt
-   #-}
-
-The two look mutually recursive only because of their RULES; we don't want 
-that to inhibit inlining!
-
-So when we identify a LoopBreaker, we mark it to say whether it only mentions 
-the other binders in its recursive group in a RULE.  If so, we can inline it,
-because doing so will not expose new occurrences of binders in its group.
 
 
 \begin{code}
-
 addRuleUsage :: UsageDetails -> Id -> UsageDetails
 -- Add the usage from RULES in Id to the usage
 addRuleUsage usage id

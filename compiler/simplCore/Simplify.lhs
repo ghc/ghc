@@ -39,6 +39,7 @@ import PrelInfo		( realWorldPrimId )
 import BasicTypes	( TopLevelFlag(..), isTopLevel, 
 			  RecFlag(..), isNonRuleLoopBreaker )
 import Maybes		( orElse )
+import Data.List	( mapAccumL )
 import Outputable
 import Util
 \end{code}
@@ -234,8 +235,10 @@ simplTopBinds env binds
     trace True  bind = pprTrace "SimplBind" (ppr (bindersOf bind))
     trace False bind = \x -> x
 
-    simpl_bind env (NonRec b r) = simplRecOrTopPair env TopLevel b r
-    simpl_bind env (Rec pairs)  = simplRecBind      env TopLevel pairs
+    simpl_bind env (Rec pairs)  = simplRecBind      env  TopLevel pairs
+    simpl_bind env (NonRec b r) = simplRecOrTopPair env' TopLevel b b' r
+	where
+	  (env', b') = addLetIdInfo env b (lookupRecBndr env b)
 \end{code}
 
 
@@ -253,15 +256,22 @@ simplRecBind :: SimplEnv -> TopLevelFlag
 	     -> [(InId, InExpr)]
 	     -> SimplM SimplEnv
 simplRecBind env top_lvl pairs
-  = do	{ env' <- go (zapFloats env) pairs
+  = do	{ let (env_with_info, triples) = mapAccumL add_info env pairs
+	; env' <- go (zapFloats env_with_info) triples
 	; return (env `addRecFloats` env') }
 	-- addFloats adds the floats from env', 
 	-- *and* updates env with the in-scope set from env'
   where
+    add_info :: SimplEnv -> (InBndr,InExpr) -> (SimplEnv, (InBndr, OutBndr, InExpr))
+	-- Substitute in IdInfo, agument envt
+    add_info env (bndr, rhs) = (env, (bndr, bndr', rhs))
+	where
+	  (env', bndr') = addLetIdInfo env bndr (lookupRecBndr env bndr)
+
     go env [] = return env
 	
-    go env ((bndr, rhs) : pairs)
-	= do { env <- simplRecOrTopPair env top_lvl bndr rhs
+    go env ((old_bndr, new_bndr, rhs) : pairs)
+	= do { env <- simplRecOrTopPair env top_lvl old_bndr new_bndr rhs
 	     ; go env pairs }
 \end{code}
 
@@ -274,18 +284,16 @@ It assumes the binder has already been simplified, but not its IdInfo.
 \begin{code}
 simplRecOrTopPair :: SimplEnv
 	     	  -> TopLevelFlag
-	     	  -> InId -> InExpr	-- Binder and rhs
+	     	  -> InId -> OutBndr -> InExpr	-- Binder and rhs
 	     	  -> SimplM SimplEnv	-- Returns an env that includes the binding
 
-simplRecOrTopPair env top_lvl bndr rhs
-  | preInlineUnconditionally env top_lvl bndr rhs  	-- Check for unconditional inline
-  = do	{ tick (PreInlineUnconditionally bndr)
-	; return (extendIdSubst env bndr (mkContEx env rhs)) }
+simplRecOrTopPair env top_lvl old_bndr new_bndr rhs
+  | preInlineUnconditionally env top_lvl old_bndr rhs  	-- Check for unconditional inline
+  = do	{ tick (PreInlineUnconditionally old_bndr)
+	; return (extendIdSubst env old_bndr (mkContEx env rhs)) }
 
   | otherwise
-  = do	{ let bndr' = lookupRecBndr env bndr
-	      (env', bndr'') = addLetIdInfo env bndr bndr'
-	; simplLazyBind env' top_lvl Recursive bndr bndr'' rhs env' }
+  = simplLazyBind env top_lvl Recursive old_bndr new_bndr rhs env 
 	-- May not actually be recursive, but it doesn't matter
 \end{code}
 
@@ -896,9 +904,10 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
 		     (StrictBind bndr bndrs body env cont) }
 
   | otherwise
-  = do	{ (env, bndr') <- simplNonRecBndr env bndr
-	; env <- simplLazyBind env NotTopLevel NonRecursive bndr bndr' rhs rhs_se
-	; simplLam env bndrs body cont }
+  = do	{ (env1, bndr1) <- simplNonRecBndr env bndr
+	; let (env2, bndr2) = addLetIdInfo env1 bndr bndr1
+	; env3 <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
+	; simplLam env3 bndrs body cont }
 \end{code}
 
 
@@ -977,8 +986,8 @@ completeCall env var cont
 	-- the wrapper didn't occur for things that have specialisations till a 
 	-- later phase, so but now we just try RULES first
 	--
-	-- Note [Self-recursive rules]
-	-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	-- Note [Rules for recursive functions]
+	-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 	-- You might think that we shouldn't apply rules for a loop breaker: 
 	-- doing so might give rise to an infinite loop, because a RULE is
 	-- rather like an extra equation for the function:

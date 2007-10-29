@@ -607,29 +607,26 @@ simplRecBndrs env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) ids
 	; seqIds ids1 `seq` return env1 }
 
 ---------------
-substLetIdBndr :: SimplEnv -> InBndr 	-- Env and binder to transform
+substLetIdBndr :: SimplEnv 	
+	       -> InBndr 	-- Env and binder to transform
 	       -> (SimplEnv, OutBndr)
 -- C.f. substIdBndr above
 -- Clone Id if necessary, substitute its type
--- Return an Id with its fragile info zapped
---	namely, any info that depends on free variables
--- 	[addLetIdInfo, below, will restore its IdInfo]
---	We want to retain robust info, especially arity and demand info,
---	so that they are available to occurrences that occur in an
---	earlier binding of a letrec
--- Augment the subtitution 
---	if the unique changed, *or* 
---	if there's interesting occurrence info
+-- Return an Id with its 
+--	UnfoldingInfo zapped
+--	Rules, etc, substitutd with rec_subst
+--	Robust info, retained especially arity and demand info,
+--	   so that they are available to occurrences that occur in an
+--	   earlier binding of a letrec
+-- Augment the subtitution  if the unique changed
 
-substLetIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) old_id
+substLetIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) 
+	       old_id
   = (env { seInScope = in_scope `extendInScopeSet` new_id, 
 	   seIdSubst = new_subst }, new_id)
   where
     id1	   = uniqAway in_scope old_id
     id2    = substIdType env id1
-
-    -- We want to get rid of any info that's dependent on free variables,
-    -- but keep other info (like the arity).
     new_id = zapFragileIdInfo id2
 
 	-- Extend the substitution if the unique has changed,
@@ -699,14 +696,13 @@ when substituting in h's RULE.
 \begin{code}
 addLetIdInfo :: SimplEnv -> InBndr -> OutBndr -> (SimplEnv, OutBndr)
 addLetIdInfo env in_id out_id
-  = (modifyInScope env out_id final_id, final_id)
+  = case substIdInfo subst (idInfo in_id) of
+	Nothing       -> (env, out_id)
+	Just new_info -> (modifyInScope env out_id final_id, final_id)
+		  where
+		      final_id = out_id `setIdInfo` new_info
   where
-    final_id = out_id `setIdInfo` new_info
     subst = mkCoreSubst env
-    old_info = idInfo in_id
-    new_info = case substIdInfo subst old_info of
-	 	  Nothing       -> old_info
-		  Just new_info -> new_info
 
 substIdInfo :: CoreSubst.Subst -> IdInfo -> Maybe IdInfo
 -- Substitute the 

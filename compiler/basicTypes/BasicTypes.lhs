@@ -385,10 +385,8 @@ data OccInfo
 
   | IAmALoopBreaker	-- Used by the occurrence analyser to mark loop-breakers
 			-- in a group of recursive definitions
-	!RulesOnly	-- True <=> This loop breaker mentions the other binders
-			--	    in its recursive group only in its RULES, not
-			--	    in its rhs
-			--  See OccurAnal Note [RulesOnly]
+	!RulesOnly	-- True <=> This is a weak or rules-only loop breaker
+			--  See OccurAnal Note [Weak loop breakers]
 
 type RulesOnly = Bool
 \end{code}
