@@ -1,29 +1,6 @@
 
-tc141.hs:11:11:
-    A pattern type signature cannot bind scoped type variables `a'
-      unless the pattern has a rigid type context
-    In the pattern: p :: a
-    In the pattern: (p :: a, q :: a)
-    In a pattern binding: (p :: a, q :: a) = x
+tc141.hs:11:14: Not in scope: type variable `a'
 
-tc141.hs:13:12:
-    A pattern type signature cannot bind scoped type variables `a'
-      unless the pattern has a rigid type context
-    In the pattern: y :: a
-    In a pattern binding: y :: a = a
-    In the expression:
-	let y :: a = a in
-	let
-	  v :: a
-	  v = b
-	in v
+tc141.hs:11:19: Not in scope: type variable `a'
 
-tc141.hs:15:6:
-    Inferred type is less polymorphic than expected
-      Quantified type variable `a' is mentioned in the environment:
-	b :: a (bound at tc141.hs:13:4)
-    When trying to generalise the type inferred for `v'
-      Signature type:     forall a. a
-      Type to generalise: a
-    In the type signature for `v'
-    When generalising the type(s) for `v'
+tc141.hs:13:15: Not in scope: type variable `a'
