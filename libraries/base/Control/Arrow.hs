@@ -36,11 +36,11 @@ module Control.Arrow (
 		ArrowLoop(..)
 	) where
 
-import Prelude
+import Prelude hiding (id,(.))
 
 import Control.Monad
 import Control.Monad.Fix
-import Control.Compositor
+import Control.Category
 
 infixr 5 <+>
 infixr 3 ***
@@ -55,7 +55,7 @@ infixr 1 ^<<, <<^
 --   as well as 'first'.  The other combinators have sensible
 --   default definitions, which may be overridden for efficiency.
 
-class Compositor a => Arrow a where
+class Category a => Arrow a where
 
 	-- | Lift a function to an arrow: you must define either this
 	--   or 'pure'.
@@ -96,9 +96,9 @@ class Compositor a => Arrow a where
 
 {-# RULES
 "identity"
-		arr id = identity
+		arr id = id
 "compose/arr"	forall f g .
-		arr f >>> arr g = arr (f >>> g)
+		(arr f) . (arr g) = arr (f . g)
 "first/arr"	forall f .
 		first (arr f) = arr (first f)
 "second/arr"	forall f .
@@ -108,9 +108,9 @@ class Compositor a => Arrow a where
 "fanout/arr"	forall f g .
 		arr f &&& arr g = arr (f &&& g)
 "compose/first"	forall f g .
-		first f >>> first g = first (f >>> g)
+		(first f) . (first g) = first (f . g)
 "compose/second" forall f g .
-		second f >>> second g = second (f >>> g)
+		(second f) . (second g) = second (f . g)
  #-}
 
 -- Ordinary functions are arrows.
@@ -127,9 +127,9 @@ instance Arrow (->) where
 
 newtype Kleisli m a b = Kleisli { runKleisli :: a -> m b }
 
-instance Monad m => Compositor (Kleisli m) where
-	identity = Kleisli return
-	Kleisli f >>> Kleisli g = Kleisli (\b -> f b >>= g)
+instance Monad m => Category (Kleisli m) where
+	id = Kleisli return
+	(Kleisli f) . (Kleisli g) = Kleisli (\b -> g b >>= f)
 
 instance Monad m => Arrow (Kleisli m) where
 	arr f = Kleisli (return . f)
