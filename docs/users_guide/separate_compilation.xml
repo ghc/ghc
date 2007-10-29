@@ -595,9 +595,9 @@ $ ghc -c parse/Foo.hs parse/Bar.hs gurgle/Bumble.hs -odir `arch`
             <indexterm><primary><option>--show-iface</option></primary></indexterm>
           </term>
 	  <listitem>
-	    <para>Where <replaceable>file</replaceable> is the name of
+	    <para>where <replaceable>file</replaceable> is the name of
 	    an interface file, dumps the contents of that interface in
-	    a human-readable (ish) format.</para>
+	    a human-readable (ish) format. See <xref linkend="modes"/>.</para>
 	  </listitem>
 	</varlistentry>
       </variablelist>
@@ -1184,8 +1184,31 @@ and GHC has no other reason for visiting the module.  Example:
     class C a where ...
 </programlisting>
 Here, neither D nor T is declared in module Orphan.
-We call such modules &ldquo;orphan modules&rdquo;,
-defined thus:</para>
+We call such modules &ldquo;orphan modules&rdquo;.
+GHC identifies orphan modules, and visits the interface file of
+every orphan module below the module being compiled.  This is usually
+wasted work, but there is no avoiding it.  You should therefore do
+your best to have as few orphan modules as possible.
+</para>
+<para>
+Functional dependencies complicate matters.  Suppose we have:
+<programlisting>
+  module B where
+    instance E T Int where ...
+    data T = ...
+</programlisting>
+Is this an orphan module?  Apparently not, because <literal>T</literal>
+is declared in the same module.  But suppose class <literal>E</literal> had a
+functional dependency:
+<programlisting>
+  module Lib where
+    class E x y | y -> x where ...
+</programlisting>
+Then in some importing module M, the constraint <literal>(E a Int)</literal> should be "improved" by setting
+<literal>a = Int</literal>, <emphasis>even though there is no explicit mention
+of <literal>T</literal> in M</emphasis>.</para>
+
+These considerations lead to the following definition of an orphan module:
 <itemizedlist>
   <listitem> <para> An <emphasis>orphan module</emphasis>
   <indexterm><primary>orphan module</primary></indexterm>
@@ -1193,12 +1216,21 @@ defined thus:</para>
   least one <emphasis>orphan rule</emphasis>.</para> </listitem>
 
   <listitem><para> An instance declaration in a module M is an <emphasis>orphan instance</emphasis> if
-  <indexterm><primary>orphan instance</primary></indexterm>
-  none of the type constructors
-  or classes mentioned in the instance head (the part after the &ldquo;<literal>=&gt;</literal>&rdquo;) are declared
-  in M.</para>
-
-  <para> Only the instance head counts.  In the example above, it is not good enough for C's declaration
+  <indexterm><primary>orphan instance</primary></indexterm> 
+<itemizedlist> 
+<listitem><para>
+  The class of the instance declaration is not declared in M, and
+</para></listitem>
+<listitem>
+<para> <emphasis>Either</emphasis> the class has no functional dependencies, and none of the type constructors
+	in the instance head is declared in M; <emphasis>or</emphasis> there
+	is a functional dependency for which none of the type constructors mentioned
+	in the <emphasis>non-determined</emphasis> part of the instance head is defined in M.
+	</para></listitem>
+  </itemizedlist>
+  </para>
+  <para> Only the instance head  (the part after the &ldquo;<literal>=&gt;</literal>&rdquo;)
+  counts.  In the example above, it is not good enough for C's declaration
   to be in module A; it must be the declaration of D or T.</para>
   </listitem>
 
@@ -1210,16 +1242,11 @@ defined thus:</para>
  </itemizedlist>
 
 
-<para> GHC identifies orphan modules, and visits the interface file of
-every orphan module below the module being compiled.  This is usually
-wasted work, but there is no avoiding it.  You should therefore do
-your best to have as few orphan modules as possible.
 
-</para>
-
-<para> You can identify an orphan module by looking in its interface
+<para>GHC will warn you if you are creating an orphan module, if you add `-fwarn-orphan-modules`.
+You can identify an orphan module by looking in its interface
 file, <filename>M.hi</filename>, using the
-<option>--show-iface</option>.  If there is a &ldquo;!&rdquo; on the
+<link linkend="modes"><option>--show-iface</option> mode</link>.  If there is a <literal>[orphan module]</literal> on the
 first line, GHC considers it an orphan module.
 </para>
 </sect2>

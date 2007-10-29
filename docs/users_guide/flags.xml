@@ -434,11 +434,7 @@
 	    </row>
 	    <row>
 	      <entry><option>--show-iface</option> <replaceable>file</replaceable></entry>
-	      <entry>Read the interface in
-	      <replaceable>file</replaceable> and dump it as text to
-	      <literal>stdout</literal>.</entry>
-	      <entry>mode</entry>
-	      <entry>-</entry>
+	      <entry>See <xref linkend="modes"/>.</entry>
 	    </row>
 	  </tbody>
 	</tgroup>
@@ -1062,8 +1058,8 @@
 
 	  <row>
 	    <entry><option>-fwarn-orphans</option></entry>
-	    <entry>warn when the module contains "orphan" instance declarations
-	    or rewrite rules</entry>
+	    <entry>warn when the module contains <link linkend="orphan-modules">orphan instance declarations
+	    or rewrite rules</link></entry>
 	    <entry>dynamic</entry>
 	    <entry><option>-fno-warn-orphans</option></entry>
 	  </row>

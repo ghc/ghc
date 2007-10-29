@@ -342,6 +342,20 @@ module X where
       <varlistentry>
 	<term>
           <cmdsynopsis>
+            <command>ghc --show-iface <replaceable>file</replaceable></command>
+          </cmdsynopsis>
+          <indexterm><primary><option>&ndash;&ndash;--show-iface</option></primary></indexterm>
+        </term>
+	<listitem>
+	      <para>Read the interface in
+	      <replaceable>file</replaceable> and dump it as text to
+	      <literal>stdout</literal>. For example <literal>ghc --show-iface M.hi</literal>.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <cmdsynopsis>
             <command>ghc --supported-languages</command>
           </cmdsynopsis>
           <indexterm><primary><option>&ndash;&ndash;supported-languages</option></primary></indexterm>
