@@ -60,30 +60,13 @@ Example
 Better code, because 'a' is  free inside the inner letrec, rather
 than needing projection from v.
 
-Other examples we'd like to catch with this kind of transformation
+Note that this deals with *free variables*.  SpecConstr deals with
+*arguments* that are of known form.  E.g.
 
 	last []     = error 
 	last (x:[]) = x
 	last (x:xs) = last xs
 
-We'd like to avoid the redundant pattern match, transforming to
-
-	last [] = error
-	last (x:[]) = x
-	last (x:(y:ys)) = last' y ys
-		where
-		  last' y []     = y
-		  last' _ (y:ys) = last' y ys
-
-	(is this necessarily an improvement)
-
-Similarly drop:
-
-	drop n [] = []
-	drop 0 xs = xs
-	drop n (x:xs) = drop (n-1) xs
-
-Would like to pass n along unboxed.
 	
 Note [Scrutinee with cast]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -266,7 +249,38 @@ libCaseId env v
   where
     rec_id_level = lookupLevel env v
     free_scruts  = freeScruts env rec_id_level
+
+freeScruts :: LibCaseEnv
+	   -> LibCaseLevel 	-- Level of the recursive Id
+	   -> [Id]		-- Ids that are scrutinised between the binding
+				-- of the recursive Id and here
+freeScruts env rec_bind_lvl
+  = [v | (v,scrut_bind_lvl) <- lc_scruts env
+       , scrut_bind_lvl <= rec_bind_lvl]
+	-- Note [When to specialise]
 \end{code}
+
+Note [When to specialise]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider
+  f = \x. letrec g = \y. case x of
+			   True  -> ... (f a) ...
+			   False -> ... (g b) ...
+
+We get the following levels
+	  f  0
+	  x  1
+	  g  1
+	  y  2  
+
+Then 'x' is being scrutinised at a deeper level than its binding, so
+it's added to lc_sruts:  [(x,1)]  
+
+We do *not* want to specialise the call to 'f', becuase 'x' is not free 
+in 'f'.  So here the bind-level of 'x' (=1) is not <= the bind-level of 'f' (=0).
+
+We *do* want to specialise the call to 'g', because 'x' is free in g.
+Here the bind-level of 'x' (=1) is <= the bind-level of 'g' (=1).
 
 
 %************************************************************************
@@ -304,7 +318,7 @@ addScrutedVar env@(LibCaseEnv { lc_lvl = lvl, lc_lvl_env = lvl_env,
 
   | otherwise = env
   where
-    scruts'  = (scrut_var, lvl) : scruts
+    scruts'  = (scrut_var, bind_lvl) : scruts
     bind_lvl = case lookupVarEnv lvl_env scrut_var of
 		 Just lvl -> lvl
 		 Nothing  -> topLevel
@@ -317,13 +331,6 @@ lookupLevel env id
   = case lookupVarEnv (lc_lvl_env env) id of
       Just lvl -> lvl
       Nothing  -> topLevel
-
-freeScruts :: LibCaseEnv
-	   -> LibCaseLevel 	-- Level of the recursive Id
-	   -> [Id]		-- Ids that are scrutinised between the binding
-				-- of the recursive Id and here
-freeScruts env rec_bind_lvl
-  = [v | (v,scrut_lvl) <- lc_scruts env, scrut_lvl > rec_bind_lvl]
 \end{code}
 
 %************************************************************************
@@ -347,25 +354,25 @@ data LibCaseEnv
 				-- (passed in from cmd-line args)
 
 	lc_lvl :: LibCaseLevel,	-- Current level
+		-- The level is incremented when (and only when) going
+		-- inside the RHS of a (sufficiently small) recursive
+		-- function.
 
 	lc_lvl_env :: IdEnv LibCaseLevel,  
-			-- Binds all non-top-level in-scope Ids
-			-- (top-level and imported things have
-			-- a level of zero)
+		-- Binds all non-top-level in-scope Ids (top-level and
+		-- imported things have a level of zero)
 
 	lc_rec_env :: IdEnv CoreBind, 
-			-- Binds *only* recursively defined ids, 
-			-- to their own binding group,
-			-- and *only* in their own RHSs
+		-- Binds *only* recursively defined ids, to their own
+		-- binding group, and *only* in their own RHSs
 
 	lc_scruts :: [(Id,LibCaseLevel)]
-     			-- Each of these Ids was scrutinised by an
-			-- enclosing case expression, with the
-			-- specified number of enclosing
-			-- recursive bindings; furthermore,
-			-- the Id is bound at a lower level
-			-- than the case expression.  The order is
-			-- insignificant; it's a bag really
+     		-- Each of these Ids was scrutinised by an enclosing
+		-- case expression, at a level deeper than its binding
+		-- level.  The LibCaseLevel recorded here is the *binding
+		-- level* of the scrutinised Id.
+		-- 
+		-- The order is insignificant; it's a bag really
 	}
 
 initEnv :: DynFlags -> LibCaseEnv
