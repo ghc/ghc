@@ -326,9 +326,9 @@ ifeq "$(HADDOCK_DOCS)" "YES"
 	$(INSTALL_DATA)   index.html doc-index*.html                       $(DESTDIR)$(html_installed_root)
 	$(INSTALL_SCRIPT) gen_contents_index                               $(DESTDIR)$(html_installed_root)
 	# Hacks:
-	$(INSTALL_DATA)   $(DESTDIR)$(html_installed_root)/base*/*.css $(DESTDIR)$(html_installed_root)
-	$(INSTALL_DATA)   $(DESTDIR)$(html_installed_root)/base*/*.js  $(DESTDIR)$(html_installed_root)
-	$(INSTALL_DATA)   $(DESTDIR)$(html_installed_root)/base*/*.gif $(DESTDIR)$(html_installed_root)
+	$(INSTALL_DATA)   base/dist/doc/html/*/*.css $(DESTDIR)$(html_installed_root)
+	$(INSTALL_DATA)   base/dist/doc/html/*/*.js $(DESTDIR)$(html_installed_root)
+	$(INSTALL_DATA)   base/dist/doc/html/*/*.gif $(DESTDIR)$(html_installed_root)
 endif
 
 # Cabal doesn't let us ask to install docs only, so do nothing here
