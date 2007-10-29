@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-implicit-prelude #-}
+{-# OPTIONS_GHC -fno-implicit-prelude -funbox-strict-fields #-}
 
 -----------------------------------------------------------------------------
 -- |

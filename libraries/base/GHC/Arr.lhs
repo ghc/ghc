@@ -1,5 +1,5 @@
 \begin{code}
-{-# OPTIONS_GHC -fno-implicit-prelude -fno-bang-patterns #-}
+{-# OPTIONS_GHC -fno-implicit-prelude -fno-bang-patterns -funbox-strict-fields #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Arr

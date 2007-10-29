@@ -1,4 +1,4 @@
-{-# OPTIONS_GHC -fno-implicit-prelude -fallow-overlapping-instances #-}
+{-# OPTIONS_GHC -fno-implicit-prelude -fallow-overlapping-instances -funbox-strict-fields #-}
 
 -- The -fallow-overlapping-instances flag allows the user to over-ride
 -- the instances for Typeable given here.  In particular, we provide an instance
