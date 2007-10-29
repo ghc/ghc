@@ -556,7 +556,7 @@ describeField flags pkgid field = do
         mapM_ (putStrLn . fn) (mungePackagePaths top_dir ps)
 
 mungePackagePaths :: String -> [InstalledPackageInfo] -> [InstalledPackageInfo]
--- Replace the string "$topdir" at the beginning of a path
+-- Replace the strings "$topdir" and "$httptopdir" at the beginning of a path
 -- with the current topdir (obtained from the -B option).
 mungePackagePaths top_dir ps = map munge_pkg ps
   where
@@ -571,8 +571,11 @@ mungePackagePaths top_dir ps = map munge_pkg ps
   munge_paths = map munge_path
 
   munge_path p
-          | Just p' <- maybePrefixMatch "$topdir" p = top_dir ++ p'
-          | otherwise                               = p
+   | Just p' <- maybePrefixMatch "$topdir"     p =            top_dir ++ p'
+   | Just p' <- maybePrefixMatch "$httptopdir" p = toHttpPath top_dir ++ p'
+   | otherwise                               = p
+
+  toHttpPath p = "file:///" ++ p
 
 maybePrefixMatch :: String -> String -> Maybe String
 maybePrefixMatch []    rest = Just rest
@@ -753,8 +756,9 @@ checkDuplicates db_stack pkg update = do
 
 checkDir :: Force -> String -> IO ()
 checkDir force d
- | "$topdir" `isPrefixOf` d = return ()
-        -- can't check this, because we don't know what $topdir is
+ | "$topdir"     `isPrefixOf` d = return ()
+ | "$httptopdir" `isPrefixOf` d = return ()
+        -- can't check these, because we don't know what $(http)topdir is
  | otherwise = do
    there <- doesDirectoryExist d
    when (not there)
@@ -790,7 +794,8 @@ checkHSLib dirs auto_ghci_libs force lib = do
 
 doesLibExistIn :: String -> String -> IO Bool
 doesLibExistIn lib d
- | "$topdir" `isPrefixOf` d = return True
+ | "$topdir"     `isPrefixOf` d = return True
+ | "$httptopdir" `isPrefixOf` d = return True
  | otherwise                = doesFileExist (d ++ '/':lib)
 
 checkGHCiLib :: [String] -> String -> String -> String -> Bool -> IO ()
