@@ -64,15 +64,6 @@ StgWord raiseExceptionHelper (StgRegTable *reg, StgTSO *tso, StgClosure *excepti
 /* findRetryFrameHelper */
 StgWord findRetryFrameHelper (StgTSO *tso);
 
-/* GetRoots(evac_fn f)
- *
- * Call f() for each root known to the scheduler.
- *
- * Called from STG :  NO
- * Locks assumed   :  ????
- */
-void GetRoots(evac_fn);
-
 /* workerStart()
  * 
  * Entry point for a new worker task.

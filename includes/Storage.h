@@ -186,8 +186,7 @@ extern void freeExec (void *p);
 				'get_roots' is called to find all the 
 				roots that the system knows about.
 
-   StgClosure 			Called by get_roots on each root.	
-   MarkRoot(StgClosure *p)	Returns the new location of the root.
+
    -------------------------------------------------------------------------- */
 
 extern void GarbageCollect(rtsBool force_major_gc);
@@ -495,6 +494,7 @@ typedef void (*evac_fn)(StgClosure **);
 extern void         threadPaused ( Capability *cap, StgTSO * );
 extern StgClosure * isAlive      ( StgClosure *p );
 extern void         markCAFs     ( evac_fn evac );
+extern void         GetRoots     ( evac_fn evac );
 
 /* -----------------------------------------------------------------------------
    Stats 'n' DEBUG stuff

@@ -1000,6 +1000,85 @@ GarbageCollect ( rtsBool force_major_gc )
   RELEASE_SM_LOCK;
 }
 
+/* ---------------------------------------------------------------------------
+   Where are the roots that we know about?
+
+        - all the threads on the runnable queue
+        - all the threads on the blocked queue
+        - all the threads on the sleeping queue
+	- all the thread currently executing a _ccall_GC
+        - all the "main threads"
+     
+   ------------------------------------------------------------------------ */
+
+/* This has to be protected either by the scheduler monitor, or by the
+	garbage collection monitor (probably the latter).
+	KH @ 25/10/99
+*/
+
+void
+GetRoots( evac_fn evac )
+{
+    nat i;
+    Capability *cap;
+    Task *task;
+
+#if defined(GRAN)
+    for (i=0; i<=RtsFlags.GranFlags.proc; i++) {
+	if ((run_queue_hds[i] != END_TSO_QUEUE) && ((run_queue_hds[i] != NULL)))
+	    evac((StgClosure **)&run_queue_hds[i]);
+	if ((run_queue_tls[i] != END_TSO_QUEUE) && ((run_queue_tls[i] != NULL)))
+	    evac((StgClosure **)&run_queue_tls[i]);
+	
+	if ((blocked_queue_hds[i] != END_TSO_QUEUE) && ((blocked_queue_hds[i] != NULL)))
+	    evac((StgClosure **)&blocked_queue_hds[i]);
+	if ((blocked_queue_tls[i] != END_TSO_QUEUE) && ((blocked_queue_tls[i] != NULL)))
+	    evac((StgClosure **)&blocked_queue_tls[i]);
+	if ((ccalling_threadss[i] != END_TSO_QUEUE) && ((ccalling_threadss[i] != NULL)))
+	    evac((StgClosure **)&ccalling_threads[i]);
+    }
+
+    markEventQueue();
+
+#else /* !GRAN */
+
+    for (i = 0; i < n_capabilities; i++) {
+	cap = &capabilities[i];
+	evac((StgClosure **)(void *)&cap->run_queue_hd);
+	evac((StgClosure **)(void *)&cap->run_queue_tl);
+#if defined(THREADED_RTS)
+	evac((StgClosure **)(void *)&cap->wakeup_queue_hd);
+	evac((StgClosure **)(void *)&cap->wakeup_queue_tl);
+#endif
+	for (task = cap->suspended_ccalling_tasks; task != NULL; 
+	     task=task->next) {
+	    debugTrace(DEBUG_sched,
+		       "evac'ing suspended TSO %lu", (unsigned long)task->suspended_tso->id);
+	    evac((StgClosure **)(void *)&task->suspended_tso);
+	}
+
+    }
+    
+
+#if !defined(THREADED_RTS)
+    evac((StgClosure **)(void *)&blocked_queue_hd);
+    evac((StgClosure **)(void *)&blocked_queue_tl);
+    evac((StgClosure **)(void *)&sleeping_queue);
+#endif 
+#endif
+
+    // evac((StgClosure **)&blackhole_queue);
+
+#if defined(THREADED_RTS) || defined(PARALLEL_HASKELL) || defined(GRAN)
+    markSparkQueue(evac);
+#endif
+    
+#if defined(RTS_USER_SIGNALS)
+    // mark the signal handlers (signals should be already blocked)
+    markSignalHandlers(evac);
+#endif
+}
+
 /* -----------------------------------------------------------------------------
    isAlive determines whether the given closure is still alive (after
    a garbage collection) or not.  It returns the new address of the
