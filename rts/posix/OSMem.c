@@ -93,7 +93,7 @@ my_mmap (void *addr, lnat size)
     // Let's just use the underlying Mach Microkernel calls directly,
     // they're much nicer.
     
-    kern_return_t err;
+    kern_return_t err = 0;
     ret = addr;
     if(addr)	// try to allocate at adress
 	err = vm_allocate(mach_task_self(),(vm_address_t*) &ret, size, FALSE);
