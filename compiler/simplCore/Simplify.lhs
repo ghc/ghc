@@ -238,7 +238,7 @@ simplTopBinds env binds
     simpl_bind env (Rec pairs)  = simplRecBind      env  TopLevel pairs
     simpl_bind env (NonRec b r) = simplRecOrTopPair env' TopLevel b b' r
 	where
-	  (env', b') = addLetIdInfo env b (lookupRecBndr env b)
+	  (env', b') = addBndrRules env b (lookupRecBndr env b)
 \end{code}
 
 
@@ -256,17 +256,17 @@ simplRecBind :: SimplEnv -> TopLevelFlag
 	     -> [(InId, InExpr)]
 	     -> SimplM SimplEnv
 simplRecBind env top_lvl pairs
-  = do	{ let (env_with_info, triples) = mapAccumL add_info env pairs
+  = do	{ let (env_with_info, triples) = mapAccumL add_rules env pairs
 	; env' <- go (zapFloats env_with_info) triples
 	; return (env `addRecFloats` env') }
 	-- addFloats adds the floats from env', 
 	-- *and* updates env with the in-scope set from env'
   where
-    add_info :: SimplEnv -> (InBndr,InExpr) -> (SimplEnv, (InBndr, OutBndr, InExpr))
-	-- Substitute in IdInfo, agument envt
-    add_info env (bndr, rhs) = (env, (bndr, bndr', rhs))
+    add_rules :: SimplEnv -> (InBndr,InExpr) -> (SimplEnv, (InBndr, OutBndr, InExpr))
+	-- Add the (substituted) rules to the binder
+    add_rules env (bndr, rhs) = (env, (bndr, bndr', rhs))
 	where
-	  (env', bndr') = addLetIdInfo env bndr (lookupRecBndr env bndr)
+	  (env', bndr') = addBndrRules env bndr (lookupRecBndr env bndr)
 
     go env [] = return env
 	
@@ -586,6 +586,8 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
 	-- (for example) be no longer strictly demanded.
 	-- The solution here is a bit ad hoc...
  	info_w_unf = new_bndr_info `setUnfoldingInfo` unfolding
+				   `setWorkerInfo`    worker_info
+
         final_info | loop_breaker		= new_bndr_info
 		   | isEvaldUnfolding unfolding = zapDemandInfo info_w_unf `orElse` info_w_unf
 		   | otherwise			= info_w_unf
@@ -599,6 +601,7 @@ completeBind env top_lvl old_bndr new_bndr new_rhs
     return (addNonRec env final_id new_rhs)
   where 
     unfolding    = mkUnfolding (isTopLevel top_lvl) new_rhs
+    worker_info  = substWorker env (workerInfo old_info)
     loop_breaker = isNonRuleLoopBreaker occ_info
     old_info     = idInfo old_bndr
     occ_info     = occInfo old_info
@@ -905,7 +908,7 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
 
   | otherwise
   = do	{ (env1, bndr1) <- simplNonRecBndr env bndr
-	; let (env2, bndr2) = addLetIdInfo env1 bndr bndr1
+	; let (env2, bndr2) = addBndrRules env1 bndr bndr1
 	; env3 <- simplLazyBind env2 NotTopLevel NonRecursive bndr bndr2 rhs rhs_se
 	; simplLam env3 bndrs body cont }
 \end{code}

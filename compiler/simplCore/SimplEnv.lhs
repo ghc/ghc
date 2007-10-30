@@ -35,8 +35,8 @@ module SimplEnv (
 	SimplSR(..), mkContEx, substId, lookupRecBndr,
 
 	simplNonRecBndr, simplRecBndrs, simplLamBndr, simplLamBndrs, 
- 	simplBinder, simplBinders, addLetIdInfo,
-	substExpr, substTy, 
+ 	simplBinder, simplBinders, addBndrRules,
+	substExpr, substWorker, substTy, 
 
 	-- Floats
   	Floats, emptyFloats, isEmptyFloats, addNonRec, addFloats, extendFloats,
@@ -528,41 +528,55 @@ simplLamBndr env bndr
     (env', id1) = substIdBndr env bndr
     id2 = id1 `setIdUnfolding` substUnfolding env old_unf
 
---------------
-substIdBndr :: SimplEnv -> Id 	-- Substitition and Id to transform
-	    -> (SimplEnv, Id)	-- Transformed pair
+---------------
+simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
+-- A non-recursive let binder
+simplNonRecBndr env id
+  = do	{ let (env1, id1) = substIdBndr env id
+	; seqId id1 `seq` return (env1, id1) }
 
--- Returns with:
---	* Unique changed if necessary
+---------------
+simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
+-- Recursive let binders
+simplRecBndrs env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) ids
+  = do	{ let (env1, ids1) = mapAccumL substIdBndr env ids
+	; seqIds ids1 `seq` return env1 }
+
+---------------
+substIdBndr :: SimplEnv 	
+	    -> InBndr 	-- Env and binder to transform
+	    -> (SimplEnv, OutBndr)
+-- Clone Id if necessary, substitute its type
+-- Return an Id with its 
 --	* Type substituted
--- 	* Unfolding zapped
---	* Rules, worker, lbvar info all substituted 
---	* Fragile occurrence info zapped
---	* The in-scope set extended with the returned Id
---	* The substitution extended with a DoneId if unique changed
---	  In this case, the var in the DoneId is the same as the
---	  var returned
+--	* UnfoldingInfo, Rules, WorkerInfo zapped
+-- 	* Fragile OccInfo (only) zapped: Note [Robust OccInfo]
+--	* Robust info, retained especially arity and demand info,
+--	   so that they are available to occurrences that occur in an
+--	   earlier binding of a letrec
 --
--- Exactly like CoreSubst.substIdBndr, except that the type of id_subst differs
+-- For the robust info, see Note [Arity robustness]
+--
+-- Augment the substitution  if the unique changed
+-- Extend the in-scope set with the new Id
+--
+-- Similar to CoreSubst.substIdBndr, except that 
+--	the type of id_subst differs
+--	all fragile info is zapped
 
-substIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst})
-	    old_id
-  = (env { seInScope = in_scope `extendInScopeSet` new_id,
+substIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) 
+	       old_id
+  = (env { seInScope = in_scope `extendInScopeSet` new_id, 
 	   seIdSubst = new_subst }, new_id)
   where
-	-- id1 is cloned if necessary
-    id1 = uniqAway in_scope old_id
+    id1	   = uniqAway in_scope old_id
+    id2    = substIdType env id1
+    new_id = zapFragileIdInfo id2	-- Zaps rules, worker-info, unfolding
+					-- and fragile OccInfo
 
-	-- id2 has its type zapped
-    id2 = substIdType env id1
-
-	-- new_id has the final IdInfo
-    subst  = mkCoreSubst env
-    new_id = maybeModifyIdInfo (substIdInfo subst (idInfo old_id)) id2
-
-	-- Extend the substitution if the unique has changed
+	-- Extend the substitution if the unique has changed,
+	-- or there's some useful occurrence information
 	-- See the notes with substTyVarBndr for the delSubstEnv
-	-- Also see Note [Extending the Subst] in CoreSubst
     new_subst | new_id /= old_id
 	      = extendVarEnv id_subst old_id (DoneId new_id)
 	      | otherwise 
@@ -584,78 +598,12 @@ seqIds []       = ()
 seqIds (id:ids) = seqId id `seq` seqIds ids
 \end{code}
 
-%************************************************************************
-%*									*
-		Let bindings
-%*									*
-%************************************************************************
 
-Simplifying let binders
+Note [Arity robustness]
 ~~~~~~~~~~~~~~~~~~~~~~~
-Rename the binders if necessary, 
-
-\begin{code}
-simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
-simplNonRecBndr env id
-  = do	{ let (env1, id1) = substLetIdBndr env id
-	; seqId id1 `seq` return (env1, id1) }
-
----------------
-simplRecBndrs :: SimplEnv -> [InBndr] -> SimplM SimplEnv
-simplRecBndrs env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) ids
-  = do	{ let (env1, ids1) = mapAccumL substLetIdBndr env ids
-	; seqIds ids1 `seq` return env1 }
-
----------------
-substLetIdBndr :: SimplEnv 	
-	       -> InBndr 	-- Env and binder to transform
-	       -> (SimplEnv, OutBndr)
--- C.f. substIdBndr above
--- Clone Id if necessary, substitute its type
--- Return an Id with its 
---	UnfoldingInfo zapped
---	Rules, etc, substitutd with rec_subst
---	Robust info, retained especially arity and demand info,
---	   so that they are available to occurrences that occur in an
---	   earlier binding of a letrec
--- Augment the subtitution  if the unique changed
-
-substLetIdBndr env@(SimplEnv { seInScope = in_scope, seIdSubst = id_subst }) 
-	       old_id
-  = (env { seInScope = in_scope `extendInScopeSet` new_id, 
-	   seIdSubst = new_subst }, new_id)
-  where
-    id1	   = uniqAway in_scope old_id
-    id2    = substIdType env id1
-    new_id = zapFragileIdInfo id2
-
-	-- Extend the substitution if the unique has changed,
-	-- or there's some useful occurrence information
-	-- See the notes with substTyVarBndr for the delSubstEnv
-    new_subst | new_id /= old_id
-	      = extendVarEnv id_subst old_id (DoneId new_id)
-	      | otherwise 
-	      = delVarEnv id_subst old_id
-\end{code}
-
-Note [Add IdInfo back onto a let-bound Id]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-We must transfer the IdInfo of the original binder to the new binder.
-This is crucial, to preserve
-	strictness
-	rules
-	worker info
-etc.  To do this we must apply the current substitution, 
-which incorporates earlier substitutions in this very letrec group.
-
-NB 1. We do this *before* processing the RHS of the binder, so that
-its substituted rules are visible in its own RHS.
-This is important.  Manuel found cases where he really, really
-wanted a RULE for a recursive function to apply in that function's
-own right-hand side.
-
-NB 2: ARITY.  We *do* transfer the arity.  This is important, so that
-the arity of an Id is visible in its own RHS.  For example:
+We *do* transfer the arity from from the in_id of a let binding to the
+out_id.  This is important, so that the arity of an Id is visible in
+its own RHS.  For example:
 	f = \x. ....g (\y. f y)....
 We can eta-reduce the arg to g, becuase f is a value.  But that 
 needs to be visible.  
@@ -679,60 +627,36 @@ I'm not worried about it.  Another idea is to ensure that f's arity
 never decreases; its arity started as 1, and we should never eta-reduce
 below that.
 
-NB 3: OccInfo.  It's important that we *do* transer the loop-breaker
-OccInfo, because that's what stops the Id getting inlined infinitely,
-in the body of the letrec.
 
-NB 4: does no harm for non-recursive bindings
+Note [Robust OccInfo]
+~~~~~~~~~~~~~~~~~~~~~
+It's important that we *do* retain the loop-breaker OccInfo, because
+that's what stops the Id getting inlined infinitely, in the body of
+the letrec.
 
-NB 5: we can't do the addLetIdInfo part before *all* the RHSs because
-	rec { f = g
-	      h = ...
-		RULE h Int = f
-	}
-Here, we'll do postInlineUnconditionally on f, and we must "see" that 
-when substituting in h's RULE.  
+
+Note [Rules in a letrec]
+~~~~~~~~~~~~~~~~~~~~~~~~
+After creating fresh binders for the binders of a letrec, we
+substitute the RULES and add them back onto the binders; this is done
+*before* processing any of the RHSs.  This is important.  Manuel found
+cases where he really, really wanted a RULE for a recursive function
+to apply in that function's own right-hand side.
+
+See Note [Loop breaking and RULES] in OccAnal.
+
 
 \begin{code}
-addLetIdInfo :: SimplEnv -> InBndr -> OutBndr -> (SimplEnv, OutBndr)
-addLetIdInfo env in_id out_id
-  = case substIdInfo subst (idInfo in_id) of
-	Nothing       -> (env, out_id)
-	Just new_info -> (modifyInScope env out_id final_id, final_id)
-		  where
-		      final_id = out_id `setIdInfo` new_info
+addBndrRules :: SimplEnv -> InBndr -> OutBndr -> (SimplEnv, OutBndr)
+-- Rules are added back in to to hte bin
+addBndrRules env in_id out_id
+  | isEmptySpecInfo old_rules = (env, out_id)
+  | otherwise = (modifyInScope env out_id final_id, final_id)
   where
-    subst = mkCoreSubst env
-
-substIdInfo :: CoreSubst.Subst -> IdInfo -> Maybe IdInfo
--- Substitute the 
---	rules
---	worker info
--- Zap the unfolding 
--- Keep only 'robust' OccInfo
---	     arity
--- 
--- Seq'ing on the returned IdInfo is enough to cause all the 
--- substitutions to happen completely
-
-substIdInfo subst info
-  | nothing_to_do = Nothing
-  | otherwise     = Just (info `setOccInfo`    	  (if keep_occ then old_occ else NoOccInfo)
-			       `setSpecInfo`   	  CoreSubst.substSpec   subst old_rules
-			       `setWorkerInfo` 	  CoreSubst.substWorker subst old_wrkr
-			       `setUnfoldingInfo` noUnfolding)
-			-- setSpecInfo does a seq
-			-- setWorkerInfo does a seq
-  where
-    nothing_to_do = keep_occ && 
-		    isEmptySpecInfo old_rules &&
-		    not (workerExists old_wrkr) &&
-		    not (hasUnfolding (unfoldingInfo info))
-    
-    keep_occ  = not (isFragileOcc old_occ)
-    old_occ   = occInfo info
-    old_rules = specInfo info
-    old_wrkr  = workerInfo info
+    subst     = mkCoreSubst env
+    old_rules = idSpecialisation in_id
+    new_rules = CoreSubst.substSpec subst old_rules
+    final_id  = out_id `setIdSpecialisation` new_rules
 
 ------------------
 substIdType :: SimplEnv -> Id -> Id
@@ -746,10 +670,16 @@ substIdType env@(SimplEnv { seInScope = in_scope,  seTvSubst = tv_env}) id
     old_ty = idType id
 
 ------------------
+substUnfolding :: SimplEnv -> Unfolding -> Unfolding
 substUnfolding env NoUnfolding     	       = NoUnfolding
 substUnfolding env (OtherCon cons) 	       = OtherCon cons
 substUnfolding env (CompulsoryUnfolding rhs)   = CompulsoryUnfolding (substExpr env rhs)
 substUnfolding env (CoreUnfolding rhs t v w g) = CoreUnfolding (substExpr env rhs) t v w g
+
+------------------
+substWorker :: SimplEnv -> WorkerInfo -> WorkerInfo
+substWorker env NoWorker = NoWorker
+substWorker env wkr_info = CoreSubst.substWorker (mkCoreSubst env) wkr_info
 \end{code}
 
 

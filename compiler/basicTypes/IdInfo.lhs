@@ -724,9 +724,13 @@ zapDemandInfo info@(IdInfo {newDemandInfo = dmd})
 \begin{code}
 zapFragileInfo :: IdInfo -> Maybe IdInfo
 -- Zap info that depends on free variables
-zapFragileInfo info = Just (info `setSpecInfo` emptySpecInfo
-				 `setWorkerInfo` NoWorker
-                                 `setUnfoldingInfo` NoUnfolding)
+zapFragileInfo info 
+  = Just (info `setSpecInfo` emptySpecInfo
+	       `setWorkerInfo` NoWorker
+               `setUnfoldingInfo` NoUnfolding
+	       `setOccInfo` if isFragileOcc occ then NoOccInfo else occ)
+  where
+    occ = occInfo info
 \end{code}
 
 %************************************************************************
