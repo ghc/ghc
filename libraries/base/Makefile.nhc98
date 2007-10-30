@@ -21,7 +21,7 @@ SRCS	= \
 	Data/Function.hs \
 	Control/Monad.hs Control/Monad/Fix.hs Control/Monad/Instances.hs \
 	Control/Arrow.hs Control/Applicative.hs \
-	Control/Exception.hs \
+	Control/Exception.hs Control/Category.hs \
 	Debug/Trace.hs \
 	NHC/SizedTypes.hs NHC/PosixTypes.hsc \
 	System/IO.hs System/IO/Error.hs System/IO/Unsafe.hs \
