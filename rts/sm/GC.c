@@ -121,6 +121,10 @@ nat mutlist_MUTVARS,
 gc_thread *gc_threads = NULL;
 // gc_thread *gct = NULL;  // this thread's gct TODO: make thread-local
 
+// Number of threads running in *this* GC.  Affects how many
+// step->todos[] lists we have to look in to find work.
+nat n_gc_threads;
+
 // For stats:
 long copied;        // *words* copied & scavenged during this GC
 
@@ -182,7 +186,6 @@ GarbageCollect ( rtsBool force_major_gc )
   step *stp;
   lnat live, allocated;
   lnat oldgen_saved_blocks = 0;
-  nat n_threads; // number of threads participating in GC
   gc_thread *saved_gct;
   nat g, s, t;
 
@@ -249,12 +252,12 @@ GarbageCollect ( rtsBool force_major_gc )
    */
 #if defined(THREADED_RTS)
   if (N == 0) {
-      n_threads = 1;
+      n_gc_threads = 1;
   } else {
-      n_threads = RtsFlags.ParFlags.gcThreads;
+      n_gc_threads = RtsFlags.ParFlags.gcThreads;
   }
 #else
-  n_threads = 1;
+  n_gc_threads = 1;
 #endif
 
 #ifdef RTS_GTK_FRONTPANEL
@@ -279,12 +282,12 @@ GarbageCollect ( rtsBool force_major_gc )
 
   // Initialise all the generations/steps that we're collecting.
   for (g = 0; g <= N; g++) {
-      init_collected_gen(g,n_threads);
+      init_collected_gen(g,n_gc_threads);
   }
   
   // Initialise all the generations/steps that we're *not* collecting.
   for (g = N+1; g < RtsFlags.GcFlags.generations; g++) {
-      init_uncollected_gen(g,n_threads);
+      init_uncollected_gen(g,n_gc_threads);
   }
 
   /* Allocate a mark stack if we're doing a major collection.
@@ -299,14 +302,14 @@ GarbageCollect ( rtsBool force_major_gc )
   }
 
   // Initialise all our gc_thread structures
-  for (t = 0; t < n_threads; t++) {
+  for (t = 0; t < n_gc_threads; t++) {
       init_gc_thread(&gc_threads[t]);
   }
 
   // the main thread is running: this prevents any other threads from
   // exiting prematurely, so we can start them now.
   inc_running();
-  wakeup_gc_threads(n_threads);
+  wakeup_gc_threads(n_gc_threads);
 
   // Initialise stats
   copied = 0;
@@ -418,7 +421,7 @@ GarbageCollect ( rtsBool force_major_gc )
       step_workspace *ws;
       bdescr *prev;
 
-      for (t = 0; t < n_threads; t++) {
+      for (t = 0; t < n_gc_threads; t++) {
 	  thr = &gc_threads[t];
 
 	  for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
