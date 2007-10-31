@@ -137,8 +137,8 @@ traverseWeakPtrList(void)
 	      if (new != NULL) {
 		  w->key = new;
 		  // evacuate the value and finalizer 
-		  w->value = evacuate(w->value);
-		  w->finalizer = evacuate(w->finalizer);
+		  evacuate(&w->value);
+		  evacuate(&w->finalizer);
 		  // remove this weak ptr from the old_weak_ptr list 
 		  *last_w = w->link;
 		  // and put it on the new weak ptr list 
@@ -169,7 +169,7 @@ traverseWeakPtrList(void)
        */
       if (flag == rtsFalse) {
 	  for (w = old_weak_ptr_list; w; w = w->link) {
-	      w->finalizer = evacuate(w->finalizer);
+	      evacuate(&w->finalizer);
 	  }
 
 	  // Next, move to the WeakThreads stage after fully
@@ -241,7 +241,8 @@ traverseWeakPtrList(void)
 	  StgTSO *t, *tmp, *next;
 	  for (t = old_all_threads; t != END_TSO_QUEUE; t = next) {
 	      next = t->global_link;
-	      tmp = (StgTSO *)evacuate((StgClosure *)t);
+	      tmp = t;
+	      evacuate((StgClosure **)&tmp);
 	      tmp->global_link = resurrected_threads;
 	      resurrected_threads = tmp;
 	  }
@@ -301,7 +302,8 @@ traverseBlackholeQueue (void)
                     continue;
                 }
             }
-            t = (StgTSO *)evacuate((StgClosure *)t);
+            tmp = t;
+            evacuate((StgClosure **)&tmp);
             if (prev) prev->link = t;
             flag = rtsTrue;
 	}
@@ -324,14 +326,15 @@ traverseBlackholeQueue (void)
 void
 markWeakPtrList ( void )
 {
-  StgWeak *w, **last_w;
+  StgWeak *w, **last_w, *tmp;
 
   last_w = &weak_ptr_list;
   for (w = weak_ptr_list; w; w = w->link) {
       // w might be WEAK, EVACUATED, or DEAD_WEAK (actually CON_STATIC) here
       ASSERT(w->header.info == &stg_DEAD_WEAK_info 
 	     || get_itbl(w)->type == WEAK || get_itbl(w)->type == EVACUATED);
-      w = (StgWeak *)evacuate((StgClosure *)w);
+      tmp = w;
+      evacuate((StgClosure **)&tmp);
       *last_w = w;
       last_w = &(w->link);
   }

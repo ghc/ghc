@@ -183,8 +183,11 @@ GarbageCollect ( rtsBool force_major_gc )
   lnat live, allocated;
   lnat oldgen_saved_blocks = 0;
   nat n_threads; // number of threads participating in GC
-
+  gc_thread *saved_gct;
   nat g, s, t;
+
+  // necessary if we stole a callee-saves register for gct:
+  saved_gct = gct;
 
 #ifdef PROFILING
   CostCentreStack *prev_CCS;
@@ -679,6 +682,8 @@ GarbageCollect ( rtsBool force_major_gc )
 #endif
 
   RELEASE_SM_LOCK;
+
+  gct = saved_gct;
 }
 
 /* ---------------------------------------------------------------------------
@@ -1295,7 +1300,7 @@ init_gc_thread (gc_thread *t)
 static void
 mark_root(StgClosure **root)
 {
-  *root = evacuate(*root);
+  evacuate(root);
 }
 
 /* -----------------------------------------------------------------------------

@@ -50,7 +50,7 @@ scavenge_large_srt_bitmap( StgLargeSRT *large_srt )
     p      = (StgClosure **)large_srt->srt;
     for (i = 0; i < size; ) {
 	if ((bitmap & 1) != 0) {
-	    evacuate(*p);
+	    evacuate(p);
 	}
 	i++;
 	p++;
@@ -93,12 +93,12 @@ scavenge_srt (StgClosure **srt, nat srt_bitmap)
 	  // If the SRT entry hasn't got bit 0 set, the SRT entry points to a
 	  // closure that's fixed at link-time, and no extra magic is required.
 	  if ( (unsigned long)(*srt) & 0x1 ) {
-	      evacuate(*stgCast(StgClosure**,(stgCast(unsigned long, *srt) & ~0x1)));
+	      evacuate(stgCast(StgClosure**,(stgCast(unsigned long, *srt) & ~0x1)));
 	  } else {
-	      evacuate(*p);
+	      evacuate(p);
 	  }
 #else
-	  evacuate(*p);
+	  evacuate(p);
 #endif
       }
       p++;
@@ -140,20 +140,19 @@ scavengeTSO (StgTSO *tso)
 	|| tso->why_blocked == BlockedOnBlackHole
 	|| tso->why_blocked == BlockedOnException
 	) {
-	tso->block_info.closure = evacuate(tso->block_info.closure);
+	evacuate(&tso->block_info.closure);
     }
-    tso->blocked_exceptions = 
-	(StgTSO *)evacuate((StgClosure *)tso->blocked_exceptions);
+    evacuate((StgClosure **)&tso->blocked_exceptions);
     
     // We don't always chase the link field: TSOs on the blackhole
     // queue are not automatically alive, so the link field is a
     // "weak" pointer in that case.
     if (tso->why_blocked != BlockedOnBlackHole) {
-	tso->link = (StgTSO *)evacuate((StgClosure *)tso->link);
+	evacuate((StgClosure **)&tso->link);
     }
 
     // scavange current transaction record
-    tso->trec = (StgTRecHeader *)evacuate((StgClosure *)tso->trec);
+    evacuate((StgClosure **)&tso->trec);
     
     // scavenge this thread's stack 
     scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
@@ -188,7 +187,7 @@ scavenge_arg_block (StgFunInfoTable *fun_info, StgClosure **args)
     small_bitmap:
 	while (size > 0) {
 	    if ((bitmap & 1) == 0) {
-		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+		evacuate((StgClosure **)p);
 	    }
 	    p++;
 	    bitmap = bitmap >> 1;
@@ -227,7 +226,7 @@ scavenge_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
     small_bitmap:
 	while (size > 0) {
 	    if ((bitmap & 1) == 0) {
-		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+		evacuate((StgClosure **)p);
 	    }
 	    p++;
 	    bitmap = bitmap >> 1;
@@ -241,14 +240,14 @@ scavenge_PAP_payload (StgClosure *fun, StgClosure **payload, StgWord size)
 STATIC_INLINE StgPtr
 scavenge_PAP (StgPAP *pap)
 {
-    pap->fun = evacuate(pap->fun);
+    evacuate(&pap->fun);
     return scavenge_PAP_payload (pap->fun, pap->payload, pap->n_args);
 }
 
 STATIC_INLINE StgPtr
 scavenge_AP (StgAP *ap)
 {
-    ap->fun = evacuate(ap->fun);
+    evacuate(&ap->fun);
     return scavenge_PAP_payload (ap->fun, ap->payload, ap->n_args);
 }
 
@@ -300,9 +299,9 @@ scavenge_block (bdescr *bd, StgPtr scan)
 
 	StgMVar *mvar = ((StgMVar *)p);
 	gct->eager_promotion = rtsFalse;
-	mvar->head = (StgTSO *)evacuate((StgClosure *)mvar->head);
-	mvar->tail = (StgTSO *)evacuate((StgClosure *)mvar->tail);
-	mvar->value = evacuate((StgClosure *)mvar->value);
+	evacuate((StgClosure **)&mvar->head);
+	evacuate((StgClosure **)&mvar->tail);
+	evacuate((StgClosure **)&mvar->value);
 	gct->eager_promotion = saved_eager_promotion;
 
 	if (gct->failed_to_evac) {
@@ -316,34 +315,34 @@ scavenge_block (bdescr *bd, StgPtr scan)
 
     case FUN_2_0:
 	scavenge_fun_srt(info);
-	((StgClosure *)p)->payload[1] = evacuate(((StgClosure *)p)->payload[1]);
-	((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
+	evacuate(&((StgClosure *)p)->payload[1]);
+	evacuate(&((StgClosure *)p)->payload[0]);
 	p += sizeofW(StgHeader) + 2;
 	break;
 
     case THUNK_2_0:
 	scavenge_thunk_srt(info);
-	((StgThunk *)p)->payload[1] = evacuate(((StgThunk *)p)->payload[1]);
-	((StgThunk *)p)->payload[0] = evacuate(((StgThunk *)p)->payload[0]);
+	evacuate(&((StgThunk *)p)->payload[1]);
+	evacuate(&((StgThunk *)p)->payload[0]);
 	p += sizeofW(StgThunk) + 2;
 	break;
 
     case CONSTR_2_0:
-	((StgClosure *)p)->payload[1] = evacuate(((StgClosure *)p)->payload[1]);
-	((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
+	evacuate(&((StgClosure *)p)->payload[1]);
+	evacuate(&((StgClosure *)p)->payload[0]);
 	p += sizeofW(StgHeader) + 2;
 	break;
 	
     case THUNK_1_0:
 	scavenge_thunk_srt(info);
-	((StgThunk *)p)->payload[0] = evacuate(((StgThunk *)p)->payload[0]);
+	evacuate(&((StgThunk *)p)->payload[0]);
 	p += sizeofW(StgThunk) + 1;
 	break;
 	
     case FUN_1_0:
 	scavenge_fun_srt(info);
     case CONSTR_1_0:
-	((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
+	evacuate(&((StgClosure *)p)->payload[0]);
 	p += sizeofW(StgHeader) + 1;
 	break;
 	
@@ -371,14 +370,14 @@ scavenge_block (bdescr *bd, StgPtr scan)
 	
     case THUNK_1_1:
 	scavenge_thunk_srt(info);
-	((StgThunk *)p)->payload[0] = evacuate(((StgThunk *)p)->payload[0]);
+	evacuate(&((StgThunk *)p)->payload[0]);
 	p += sizeofW(StgThunk) + 2;
 	break;
 
     case FUN_1_1:
 	scavenge_fun_srt(info);
     case CONSTR_1_1:
-	((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
+	evacuate(&((StgClosure *)p)->payload[0]);
 	p += sizeofW(StgHeader) + 2;
 	break;
 	
@@ -393,7 +392,7 @@ scavenge_block (bdescr *bd, StgPtr scan)
 	scavenge_thunk_srt(info);
 	end = (P_)((StgThunk *)p)->payload + info->layout.payload.ptrs;
 	for (p = (P_)((StgThunk *)p)->payload; p < end; p++) {
-	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+	    evacuate((StgClosure **)p);
 	}
 	p += info->layout.payload.nptrs;
 	break;
@@ -408,7 +407,7 @@ scavenge_block (bdescr *bd, StgPtr scan)
 
 	end = (P_)((StgClosure *)p)->payload + info->layout.payload.ptrs;
 	for (p = (P_)((StgClosure *)p)->payload; p < end; p++) {
-	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+	    evacuate((StgClosure **)p);
 	}
 	p += info->layout.payload.nptrs;
 	break;
@@ -416,9 +415,9 @@ scavenge_block (bdescr *bd, StgPtr scan)
 
     case BCO: {
 	StgBCO *bco = (StgBCO *)p;
-	bco->instrs = (StgArrWords *)evacuate((StgClosure *)bco->instrs);
-	bco->literals = (StgArrWords *)evacuate((StgClosure *)bco->literals);
-	bco->ptrs = (StgMutArrPtrs *)evacuate((StgClosure *)bco->ptrs);
+	evacuate((StgClosure **)&bco->instrs);
+	evacuate((StgClosure **)&bco->literals);
+	evacuate((StgClosure **)&bco->ptrs);
 	p += bco_sizeW(bco);
 	break;
     }
@@ -441,7 +440,7 @@ scavenge_block (bdescr *bd, StgPtr scan)
       }
 	// fall through 
     case IND_OLDGEN_PERM:
-	((StgInd *)p)->indirectee = evacuate(((StgInd *)p)->indirectee);
+	evacuate(&((StgInd *)p)->indirectee);
 	p += sizeofW(StgInd);
 	break;
 
@@ -450,7 +449,7 @@ scavenge_block (bdescr *bd, StgPtr scan)
 	rtsBool saved_eager_promotion = gct->eager_promotion;
 
 	gct->eager_promotion = rtsFalse;
-	((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
+	evacuate(&((StgMutVar *)p)->var);
 	gct->eager_promotion = saved_eager_promotion;
 
 	if (gct->failed_to_evac) {
@@ -472,7 +471,7 @@ scavenge_block (bdescr *bd, StgPtr scan)
     case THUNK_SELECTOR:
     { 
 	StgSelector *s = (StgSelector *)p;
-	s->selectee = evacuate(s->selectee);
+	evacuate(&s->selectee);
 	p += THUNK_SELECTOR_sizeW();
 	break;
     }
@@ -482,7 +481,7 @@ scavenge_block (bdescr *bd, StgPtr scan)
     {
 	StgAP_STACK *ap = (StgAP_STACK *)p;
 
-	ap->fun = evacuate(ap->fun);
+	evacuate(&ap->fun);
 	scavenge_stack((StgPtr)ap->payload, (StgPtr)ap->payload + ap->size);
 	p = (StgPtr)ap->payload + ap->size;
 	break;
@@ -516,7 +515,7 @@ scavenge_block (bdescr *bd, StgPtr scan)
 	gct->eager_promotion = rtsFalse;
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+	    evacuate((StgClosure **)p);
 	}
 	gct->eager_promotion = saved_eager;
 
@@ -538,7 +537,7 @@ scavenge_block (bdescr *bd, StgPtr scan)
 
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+	    evacuate((StgClosure **)p);
 	}
 
 	// If we're going to put this object on the mutable list, then
@@ -575,9 +574,9 @@ scavenge_block (bdescr *bd, StgPtr scan)
       {
 	StgTVarWatchQueue *wq = ((StgTVarWatchQueue *) p);
 	gct->evac_gen = 0;
-	wq->closure = (StgClosure*)evacuate((StgClosure*)wq->closure);
-	wq->next_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)wq->next_queue_entry);
-	wq->prev_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)wq->prev_queue_entry);
+	evacuate((StgClosure **)&wq->closure);
+	evacuate((StgClosure **)&wq->next_queue_entry);
+	evacuate((StgClosure **)&wq->prev_queue_entry);
 	gct->evac_gen = saved_evac_gen;
 	gct->failed_to_evac = rtsTrue; // mutable
 	p += sizeofW(StgTVarWatchQueue);
@@ -588,8 +587,8 @@ scavenge_block (bdescr *bd, StgPtr scan)
       {
 	StgTVar *tvar = ((StgTVar *) p);
 	gct->evac_gen = 0;
-	tvar->current_value = evacuate((StgClosure*)tvar->current_value);
-	tvar->first_watch_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)tvar->first_watch_queue_entry);
+	evacuate((StgClosure **)&tvar->current_value);
+	evacuate((StgClosure **)&tvar->first_watch_queue_entry);
 	gct->evac_gen = saved_evac_gen;
 	gct->failed_to_evac = rtsTrue; // mutable
 	p += sizeofW(StgTVar);
@@ -600,9 +599,9 @@ scavenge_block (bdescr *bd, StgPtr scan)
       {
         StgTRecHeader *trec = ((StgTRecHeader *) p);
         gct->evac_gen = 0;
-	trec->enclosing_trec = (StgTRecHeader *)evacuate((StgClosure*)trec->enclosing_trec);
-	trec->current_chunk = (StgTRecChunk *)evacuate((StgClosure*)trec->current_chunk);
-	trec->invariants_to_check = (StgInvariantCheckQueue *)evacuate((StgClosure*)trec->invariants_to_check);
+	evacuate((StgClosure **)&trec->enclosing_trec);
+	evacuate((StgClosure **)&trec->current_chunk);
+	evacuate((StgClosure **)&trec->invariants_to_check);
 	gct->evac_gen = saved_evac_gen;
 	gct->failed_to_evac = rtsTrue; // mutable
 	p += sizeofW(StgTRecHeader);
@@ -615,11 +614,11 @@ scavenge_block (bdescr *bd, StgPtr scan)
 	StgTRecChunk *tc = ((StgTRecChunk *) p);
 	TRecEntry *e = &(tc -> entries[0]);
 	gct->evac_gen = 0;
-	tc->prev_chunk = (StgTRecChunk *)evacuate((StgClosure*)tc->prev_chunk);
+	evacuate((StgClosure **)&tc->prev_chunk);
 	for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
-	  e->tvar = (StgTVar *)evacuate((StgClosure*)e->tvar);
-	  e->expected_value = evacuate((StgClosure*)e->expected_value);
-	  e->new_value = evacuate((StgClosure*)e->new_value);
+	  evacuate((StgClosure **)&e->tvar);
+	  evacuate((StgClosure **)&e->expected_value);
+	  evacuate((StgClosure **)&e->new_value);
 	}
 	gct->evac_gen = saved_evac_gen;
 	gct->failed_to_evac = rtsTrue; // mutable
@@ -631,8 +630,8 @@ scavenge_block (bdescr *bd, StgPtr scan)
       {
         StgAtomicInvariant *invariant = ((StgAtomicInvariant *) p);
         gct->evac_gen = 0;
-	invariant->code = (StgClosure *)evacuate(invariant->code);
-	invariant->last_execution = (StgTRecHeader *)evacuate((StgClosure*)invariant->last_execution);
+	evacuate(&invariant->code);
+	evacuate((StgClosure **)&invariant->last_execution);
 	gct->evac_gen = saved_evac_gen;
 	gct->failed_to_evac = rtsTrue; // mutable
 	p += sizeofW(StgAtomicInvariant);
@@ -643,9 +642,9 @@ scavenge_block (bdescr *bd, StgPtr scan)
       {
         StgInvariantCheckQueue *queue = ((StgInvariantCheckQueue *) p);
         gct->evac_gen = 0;
-	queue->invariant = (StgAtomicInvariant *)evacuate((StgClosure*)queue->invariant);
-	queue->my_execution = (StgTRecHeader *)evacuate((StgClosure*)queue->my_execution);
-	queue->next_queue_entry = (StgInvariantCheckQueue *)evacuate((StgClosure*)queue->next_queue_entry);
+	evacuate((StgClosure **)&queue->invariant);
+	evacuate((StgClosure **)&queue->my_execution);
+	evacuate((StgClosure **)&queue->next_queue_entry);
 	gct->evac_gen = saved_evac_gen;
 	gct->failed_to_evac = rtsTrue; // mutable
 	p += sizeofW(StgInvariantCheckQueue);
@@ -710,9 +709,9 @@ linear_scan:
             
             StgMVar *mvar = ((StgMVar *)p);
             gct->eager_promotion = rtsFalse;
-            mvar->head = (StgTSO *)evacuate((StgClosure *)mvar->head);
-            mvar->tail = (StgTSO *)evacuate((StgClosure *)mvar->tail);
-            mvar->value = evacuate((StgClosure *)mvar->value);
+            evacuate((StgClosure **)&mvar->head);
+            evacuate((StgClosure **)&mvar->tail);
+            evacuate((StgClosure **)&mvar->value);
             gct->eager_promotion = saved_eager_promotion;
             
             if (gct->failed_to_evac) {
@@ -725,36 +724,36 @@ linear_scan:
 
 	case FUN_2_0:
 	    scavenge_fun_srt(info);
-	    ((StgClosure *)p)->payload[1] = evacuate(((StgClosure *)p)->payload[1]);
-	    ((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
+	    evacuate(&((StgClosure *)p)->payload[1]);
+	    evacuate(&((StgClosure *)p)->payload[0]);
 	    break;
 
 	case THUNK_2_0:
 	    scavenge_thunk_srt(info);
-	    ((StgThunk *)p)->payload[1] = evacuate(((StgThunk *)p)->payload[1]);
-	    ((StgThunk *)p)->payload[0] = evacuate(((StgThunk *)p)->payload[0]);
+	    evacuate(&((StgThunk *)p)->payload[1]);
+	    evacuate(&((StgThunk *)p)->payload[0]);
 	    break;
 
 	case CONSTR_2_0:
-	    ((StgClosure *)p)->payload[1] = evacuate(((StgClosure *)p)->payload[1]);
-	    ((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
+	    evacuate(&((StgClosure *)p)->payload[1]);
+	    evacuate(&((StgClosure *)p)->payload[0]);
 	    break;
 	
 	case FUN_1_0:
 	case FUN_1_1:
 	    scavenge_fun_srt(info);
-	    ((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
+	    evacuate(&((StgClosure *)p)->payload[0]);
 	    break;
 
 	case THUNK_1_0:
 	case THUNK_1_1:
 	    scavenge_thunk_srt(info);
-	    ((StgThunk *)p)->payload[0] = evacuate(((StgThunk *)p)->payload[0]);
+	    evacuate(&((StgThunk *)p)->payload[0]);
 	    break;
 
 	case CONSTR_1_0:
 	case CONSTR_1_1:
-	    ((StgClosure *)p)->payload[0] = evacuate(((StgClosure *)p)->payload[0]);
+	    evacuate(&((StgClosure *)p)->payload[0]);
 	    break;
 	
 	case FUN_0_1:
@@ -782,7 +781,7 @@ linear_scan:
 	    scavenge_thunk_srt(info);
 	    end = (P_)((StgThunk *)p)->payload + info->layout.payload.ptrs;
 	    for (p = (P_)((StgThunk *)p)->payload; p < end; p++) {
-		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+		evacuate((StgClosure **)p);
 	    }
 	    break;
 	}
@@ -796,16 +795,16 @@ linear_scan:
 	    
 	    end = (P_)((StgClosure *)p)->payload + info->layout.payload.ptrs;
 	    for (p = (P_)((StgClosure *)p)->payload; p < end; p++) {
-		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+		evacuate((StgClosure **)p);
 	    }
 	    break;
 	}
 
 	case BCO: {
 	    StgBCO *bco = (StgBCO *)p;
-	    bco->instrs = (StgArrWords *)evacuate((StgClosure *)bco->instrs);
-	    bco->literals = (StgArrWords *)evacuate((StgClosure *)bco->literals);
-	    bco->ptrs = (StgMutArrPtrs *)evacuate((StgClosure *)bco->ptrs);
+	    evacuate((StgClosure **)&bco->instrs);
+	    evacuate((StgClosure **)&bco->literals);
+	    evacuate((StgClosure **)&bco->ptrs);
 	    break;
 	}
 
@@ -817,8 +816,7 @@ linear_scan:
 
 	case IND_OLDGEN:
 	case IND_OLDGEN_PERM:
-	    ((StgInd *)p)->indirectee = 
-		evacuate(((StgInd *)p)->indirectee);
+	    evacuate(&((StgInd *)p)->indirectee);
 	    break;
 
 	case MUT_VAR_CLEAN:
@@ -826,7 +824,7 @@ linear_scan:
 	    rtsBool saved_eager_promotion = gct->eager_promotion;
 	    
 	    gct->eager_promotion = rtsFalse;
-	    ((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
+	    evacuate(&((StgMutVar *)p)->var);
 	    gct->eager_promotion = saved_eager_promotion;
 	    
 	    if (gct->failed_to_evac) {
@@ -847,7 +845,7 @@ linear_scan:
 	case THUNK_SELECTOR:
 	{ 
 	    StgSelector *s = (StgSelector *)p;
-	    s->selectee = evacuate(s->selectee);
+	    evacuate(&s->selectee);
 	    break;
 	}
 
@@ -856,7 +854,7 @@ linear_scan:
 	{
 	    StgAP_STACK *ap = (StgAP_STACK *)p;
 	    
-	    ap->fun = evacuate(ap->fun);
+	    evacuate(&ap->fun);
 	    scavenge_stack((StgPtr)ap->payload, (StgPtr)ap->payload + ap->size);
 	    break;
 	}
@@ -884,7 +882,7 @@ linear_scan:
 	    gct->eager_promotion = rtsFalse;
 	    next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	    for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+		evacuate((StgClosure **)p);
 	    }
 	    gct->eager_promotion = saved_eager;
 
@@ -906,7 +904,7 @@ linear_scan:
 	    
 	    next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	    for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+		evacuate((StgClosure **)p);
 	    }
 
 	    // If we're going to put this object on the mutable list, then
@@ -942,9 +940,9 @@ linear_scan:
 	  {
 	    StgTVarWatchQueue *wq = ((StgTVarWatchQueue *) p);
 	    gct->evac_gen = 0;
-            wq->closure = (StgClosure*)evacuate((StgClosure*)wq->closure);
-	    wq->next_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)wq->next_queue_entry);
-	    wq->prev_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)wq->prev_queue_entry);
+            evacuate((StgClosure **)&wq->closure);
+	    evacuate((StgClosure **)&wq->next_queue_entry);
+	    evacuate((StgClosure **)&wq->prev_queue_entry);
 	    gct->evac_gen = saved_evac_gen;
 	    gct->failed_to_evac = rtsTrue; // mutable
 	    break;
@@ -954,8 +952,8 @@ linear_scan:
 	  {
 	    StgTVar *tvar = ((StgTVar *) p);
 	    gct->evac_gen = 0;
-	    tvar->current_value = evacuate((StgClosure*)tvar->current_value);
-	    tvar->first_watch_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)tvar->first_watch_queue_entry);
+	    evacuate((StgClosure **)&tvar->current_value);
+	    evacuate((StgClosure **)&tvar->first_watch_queue_entry);
 	    gct->evac_gen = saved_evac_gen;
 	    gct->failed_to_evac = rtsTrue; // mutable
 	    break;
@@ -967,11 +965,11 @@ linear_scan:
 	    StgTRecChunk *tc = ((StgTRecChunk *) p);
 	    TRecEntry *e = &(tc -> entries[0]);
 	    gct->evac_gen = 0;
-	    tc->prev_chunk = (StgTRecChunk *)evacuate((StgClosure*)tc->prev_chunk);
+	    evacuate((StgClosure **)&tc->prev_chunk);
 	    for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
-	      e->tvar = (StgTVar *)evacuate((StgClosure*)e->tvar);
-	      e->expected_value = evacuate((StgClosure*)e->expected_value);
-	      e->new_value = evacuate((StgClosure*)e->new_value);
+	      evacuate((StgClosure **)&e->tvar);
+	      evacuate((StgClosure **)&e->expected_value);
+	      evacuate((StgClosure **)&e->new_value);
 	    }
 	    gct->evac_gen = saved_evac_gen;
 	    gct->failed_to_evac = rtsTrue; // mutable
@@ -982,9 +980,9 @@ linear_scan:
 	  {
 	    StgTRecHeader *trec = ((StgTRecHeader *) p);
 	    gct->evac_gen = 0;
-	    trec->enclosing_trec = (StgTRecHeader *)evacuate((StgClosure*)trec->enclosing_trec);
-	    trec->current_chunk = (StgTRecChunk *)evacuate((StgClosure*)trec->current_chunk);
-  	    trec->invariants_to_check = (StgInvariantCheckQueue *)evacuate((StgClosure*)trec->invariants_to_check);
+	    evacuate((StgClosure **)&trec->enclosing_trec);
+	    evacuate((StgClosure **)&trec->current_chunk);
+  	    evacuate((StgClosure **)&trec->invariants_to_check);
 	    gct->evac_gen = saved_evac_gen;
 	    gct->failed_to_evac = rtsTrue; // mutable
 	    break;
@@ -994,8 +992,8 @@ linear_scan:
           {
             StgAtomicInvariant *invariant = ((StgAtomicInvariant *) p);
             gct->evac_gen = 0;
-	    invariant->code = (StgClosure *)evacuate(invariant->code);
-    	    invariant->last_execution = (StgTRecHeader *)evacuate((StgClosure*)invariant->last_execution);
+	    evacuate(&invariant->code);
+    	    evacuate((StgClosure **)&invariant->last_execution);
 	    gct->evac_gen = saved_evac_gen;
 	    gct->failed_to_evac = rtsTrue; // mutable
             break;
@@ -1005,9 +1003,9 @@ linear_scan:
           {
             StgInvariantCheckQueue *queue = ((StgInvariantCheckQueue *) p);
             gct->evac_gen = 0;
-    	    queue->invariant = (StgAtomicInvariant *)evacuate((StgClosure*)queue->invariant);
-	    queue->my_execution = (StgTRecHeader *)evacuate((StgClosure*)queue->my_execution);
-            queue->next_queue_entry = (StgInvariantCheckQueue *)evacuate((StgClosure*)queue->next_queue_entry);
+    	    evacuate((StgClosure **)&queue->invariant);
+	    evacuate((StgClosure **)&queue->my_execution);
+            evacuate((StgClosure **)&queue->next_queue_entry);
 	    gct->evac_gen = saved_evac_gen;
 	    gct->failed_to_evac = rtsTrue; // mutable
             break;
@@ -1096,9 +1094,9 @@ scavenge_one(StgPtr p)
 
 	StgMVar *mvar = ((StgMVar *)p);
 	gct->eager_promotion = rtsFalse;
-	mvar->head = (StgTSO *)evacuate((StgClosure *)mvar->head);
-	mvar->tail = (StgTSO *)evacuate((StgClosure *)mvar->tail);
-	mvar->value = evacuate((StgClosure *)mvar->value);
+	evacuate((StgClosure **)&mvar->head);
+	evacuate((StgClosure **)&mvar->tail);
+	evacuate((StgClosure **)&mvar->value);
 	gct->eager_promotion = saved_eager_promotion;
 
 	if (gct->failed_to_evac) {
@@ -1120,7 +1118,7 @@ scavenge_one(StgPtr p)
 	
 	end = (StgPtr)((StgThunk *)p)->payload + info->layout.payload.ptrs;
 	for (q = (StgPtr)((StgThunk *)p)->payload; q < end; q++) {
-	    *q = (StgWord)(StgPtr)evacuate((StgClosure *)*q);
+	    evacuate((StgClosure **)q);
 	}
 	break;
     }
@@ -1144,7 +1142,7 @@ scavenge_one(StgPtr p)
 	
 	end = (StgPtr)((StgClosure *)p)->payload + info->layout.payload.ptrs;
 	for (q = (StgPtr)((StgClosure *)p)->payload; q < end; q++) {
-	    *q = (StgWord)(StgPtr)evacuate((StgClosure *)*q);
+	    evacuate((StgClosure **)q);
 	}
 	break;
     }
@@ -1155,7 +1153,7 @@ scavenge_one(StgPtr p)
 	rtsBool saved_eager_promotion = gct->eager_promotion;
 
 	gct->eager_promotion = rtsFalse;
-	((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
+	evacuate(&((StgMutVar *)p)->var);
 	gct->eager_promotion = saved_eager_promotion;
 
 	if (gct->failed_to_evac) {
@@ -1175,7 +1173,7 @@ scavenge_one(StgPtr p)
     case THUNK_SELECTOR:
     { 
 	StgSelector *s = (StgSelector *)p;
-	s->selectee = evacuate(s->selectee);
+	evacuate(&s->selectee);
 	break;
     }
     
@@ -1183,7 +1181,7 @@ scavenge_one(StgPtr p)
     {
 	StgAP_STACK *ap = (StgAP_STACK *)p;
 
-	ap->fun = evacuate(ap->fun);
+	evacuate(&ap->fun);
 	scavenge_stack((StgPtr)ap->payload, (StgPtr)ap->payload + ap->size);
 	p = (StgPtr)ap->payload + ap->size;
 	break;
@@ -1216,7 +1214,7 @@ scavenge_one(StgPtr p)
 	q = p;
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+	    evacuate((StgClosure **)p);
 	}
 	gct->eager_promotion = saved_eager;
 
@@ -1238,7 +1236,7 @@ scavenge_one(StgPtr p)
       
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
-	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+	    evacuate((StgClosure **)p);
 	}
 
 	// If we're going to put this object on the mutable list, then
@@ -1274,9 +1272,9 @@ scavenge_one(StgPtr p)
       {
 	StgTVarWatchQueue *wq = ((StgTVarWatchQueue *) p);
 	gct->evac_gen = 0;
-        wq->closure = (StgClosure*)evacuate((StgClosure*)wq->closure);
-        wq->next_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)wq->next_queue_entry);
-        wq->prev_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)wq->prev_queue_entry);
+        evacuate((StgClosure **)&wq->closure);
+        evacuate((StgClosure **)&wq->next_queue_entry);
+        evacuate((StgClosure **)&wq->prev_queue_entry);
 	gct->evac_gen = saved_evac_gen;
 	gct->failed_to_evac = rtsTrue; // mutable
 	break;
@@ -1286,8 +1284,8 @@ scavenge_one(StgPtr p)
       {
 	StgTVar *tvar = ((StgTVar *) p);
 	gct->evac_gen = 0;
-	tvar->current_value = evacuate((StgClosure*)tvar->current_value);
-        tvar->first_watch_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)tvar->first_watch_queue_entry);
+	evacuate((StgClosure **)&tvar->current_value);
+        evacuate((StgClosure **)&tvar->first_watch_queue_entry);
 	gct->evac_gen = saved_evac_gen;
 	gct->failed_to_evac = rtsTrue; // mutable
 	break;
@@ -1297,9 +1295,9 @@ scavenge_one(StgPtr p)
       {
         StgTRecHeader *trec = ((StgTRecHeader *) p);
         gct->evac_gen = 0;
-	trec->enclosing_trec = (StgTRecHeader *)evacuate((StgClosure*)trec->enclosing_trec);
-	trec->current_chunk = (StgTRecChunk *)evacuate((StgClosure*)trec->current_chunk);
-        trec->invariants_to_check = (StgInvariantCheckQueue *)evacuate((StgClosure*)trec->invariants_to_check);
+	evacuate((StgClosure **)&trec->enclosing_trec);
+	evacuate((StgClosure **)&trec->current_chunk);
+        evacuate((StgClosure **)&trec->invariants_to_check);
 	gct->evac_gen = saved_evac_gen;
 	gct->failed_to_evac = rtsTrue; // mutable
         break;
@@ -1311,11 +1309,11 @@ scavenge_one(StgPtr p)
 	StgTRecChunk *tc = ((StgTRecChunk *) p);
 	TRecEntry *e = &(tc -> entries[0]);
 	gct->evac_gen = 0;
-	tc->prev_chunk = (StgTRecChunk *)evacuate((StgClosure*)tc->prev_chunk);
+	evacuate((StgClosure **)&tc->prev_chunk);
 	for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
-	  e->tvar = (StgTVar *)evacuate((StgClosure*)e->tvar);
-	  e->expected_value = evacuate((StgClosure*)e->expected_value);
-	  e->new_value = evacuate((StgClosure*)e->new_value);
+	  evacuate((StgClosure **)&e->tvar);
+	  evacuate((StgClosure **)&e->expected_value);
+	  evacuate((StgClosure **)&e->new_value);
 	}
 	gct->evac_gen = saved_evac_gen;
 	gct->failed_to_evac = rtsTrue; // mutable
@@ -1326,8 +1324,8 @@ scavenge_one(StgPtr p)
     {
       StgAtomicInvariant *invariant = ((StgAtomicInvariant *) p);
       gct->evac_gen = 0;
-      invariant->code = (StgClosure *)evacuate(invariant->code);
-      invariant->last_execution = (StgTRecHeader *)evacuate((StgClosure*)invariant->last_execution);
+      evacuate(&invariant->code);
+      evacuate((StgClosure **)&invariant->last_execution);
       gct->evac_gen = saved_evac_gen;
       gct->failed_to_evac = rtsTrue; // mutable
       break;
@@ -1337,9 +1335,9 @@ scavenge_one(StgPtr p)
     {
       StgInvariantCheckQueue *queue = ((StgInvariantCheckQueue *) p);
       gct->evac_gen = 0;
-      queue->invariant = (StgAtomicInvariant *)evacuate((StgClosure*)queue->invariant);
-      queue->my_execution = (StgTRecHeader *)evacuate((StgClosure*)queue->my_execution);
-      queue->next_queue_entry = (StgInvariantCheckQueue *)evacuate((StgClosure*)queue->next_queue_entry);
+      evacuate((StgClosure **)&queue->invariant);
+      evacuate((StgClosure **)&queue->my_execution);
+      evacuate((StgClosure **)&queue->next_queue_entry);
       gct->evac_gen = saved_evac_gen;
       gct->failed_to_evac = rtsTrue; // mutable
       break;
@@ -1360,7 +1358,7 @@ scavenge_one(StgPtr p)
 	if (HEAP_ALLOCED(q) && Bdescr((StgPtr)q)->flags & BF_EVACUATED) {
 	    break;
 	}
-	((StgInd *)p)->indirectee = evacuate(q);
+	evacuate(&((StgInd *)p)->indirectee);
     }
 
 #if 0 && defined(DEBUG)
@@ -1460,7 +1458,7 @@ scavenge_mutable_list(generation *gen)
 		    // we don't want to have to mark a TSO dirty just
 		    // because we put it on a different queue.
 		    if (tso->why_blocked != BlockedOnBlackHole) {
-			tso->link = (StgTSO *)evacuate((StgClosure *)tso->link);
+			evacuate((StgClosure **)&tso->link);
 		    }
 		    recordMutableGen_GC((StgClosure *)p,gen);
 		    continue;
@@ -1540,7 +1538,7 @@ scavenge_static(void)
     case IND_STATIC:
       {
 	StgInd *ind = (StgInd *)p;
-	ind->indirectee = evacuate(ind->indirectee);
+	evacuate(&ind->indirectee);
 
 	/* might fail to evacuate it, in which case we have to pop it
 	 * back on the mutable list of the oldest generation.  We
@@ -1569,7 +1567,7 @@ scavenge_static(void)
 	next = (P_)p->payload + info->layout.payload.ptrs;
 	// evacuate the pointers 
 	for (q = (P_)p->payload; q < next; q++) {
-	    *q = (StgWord)(StgPtr)evacuate((StgClosure *)*q);
+	    evacuate((StgClosure **)q);
 	}
 	break;
       }
@@ -1596,7 +1594,7 @@ scavenge_large_bitmap( StgPtr p, StgLargeBitmap *large_bitmap, nat size )
     bitmap = large_bitmap->bitmap[b];
     for (i = 0; i < size; ) {
 	if ((bitmap & 1) == 0) {
-	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+	    evacuate((StgClosure **)p);
 	}
 	i++;
 	p++;
@@ -1614,7 +1612,7 @@ scavenge_small_bitmap (StgPtr p, nat size, StgWord bitmap)
 {
     while (size > 0) {
 	if ((bitmap & 1) == 0) {
-	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+	    evacuate((StgClosure **)p);
 	}
 	p++;
 	bitmap = bitmap >> 1;
@@ -1679,8 +1677,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	    ((StgUpdateFrame *)p)->updatee->header.info = 
 		(StgInfoTable *)&stg_IND_OLDGEN_PERM_info;
         }            
-	((StgUpdateFrame *)p)->updatee 
-	    = evacuate(((StgUpdateFrame *)p)->updatee);
+	evacuate(&((StgUpdateFrame *)p)->updatee);
 	p += sizeofW(StgUpdateFrame);
 	continue;
     }
@@ -1709,7 +1706,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	nat size;
 
 	p++;
-	*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+	evacuate((StgClosure **)p);
 	bco = (StgBCO *)*p;
 	p++;
 	size = BCO_BITMAP_SIZE(bco);
@@ -1751,7 +1748,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	
 	// follow the ptr words
 	for (size = RET_DYN_PTRS(dyn); size > 0; size--) {
-	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
+	    evacuate((StgClosure **)p);
 	    p++;
 	}
 	continue;
@@ -1762,7 +1759,7 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	StgRetFun *ret_fun = (StgRetFun *)p;
 	StgFunInfoTable *fun_info;
 
-	ret_fun->fun = evacuate(ret_fun->fun);
+	evacuate(&ret_fun->fun);
  	fun_info = get_fun_itbl(UNTAG_CLOSURE(ret_fun->fun));
 	p = scavenge_arg_block(fun_info, ret_fun->payload);
 	goto follow_srt;

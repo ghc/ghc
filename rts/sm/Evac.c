@@ -25,7 +25,7 @@
  */
 #define MAX_THUNK_SELECTOR_DEPTH 16
 
-static StgClosure * eval_thunk_selector (StgSelector * p, rtsBool);
+static void eval_thunk_selector (StgClosure **q, StgSelector * p, rtsBool);
 
 STATIC_INLINE StgPtr
 alloc_for_copy (nat size, step *stp)
@@ -99,12 +99,12 @@ alloc_for_copy_noscav (nat size, step *stp)
     return to;
 }
   
-STATIC_INLINE StgClosure *
-copy_tag(StgClosure *src, nat size, step *stp,StgWord tag)
+STATIC_INLINE void
+copy_tag(StgClosure **p, StgClosure *src, nat size, step *stp,StgWord tag)
 {
-  StgPtr to, from;
-  nat i;
-  StgWord info;
+    StgPtr to, tagged_to, from;
+    nat i;
+    StgWord info;
 
 #ifdef THREADED_RTS
     do {
@@ -121,6 +121,8 @@ copy_tag(StgClosure *src, nat size, step *stp,StgWord tag)
 #endif
 
     to = alloc_for_copy(size,stp);
+    tagged_to = (StgPtr)TAG_CLOSURE(tag,(StgClosure*)to);
+    *p = (StgClosure *)tagged_to;
     
     TICK_GC_WORDS_COPIED(size);
 
@@ -130,14 +132,14 @@ copy_tag(StgClosure *src, nat size, step *stp,StgWord tag)
 	to[i] = from[i];
     }
     
+    ((StgEvacuated*)from)->evacuee = (StgClosure *)tagged_to;
+
     // retag pointer before updating EVACUATE closure and returning
-    to = (StgPtr)TAG_CLOSURE(tag,(StgClosure*)to);
 
 //  if (to+size+2 < bd->start + BLOCK_SIZE_W) {
 //      __builtin_prefetch(to + size + 2, 1);
 //  }
 
-    ((StgEvacuated*)from)->evacuee = (StgClosure *)to;
 #ifdef THREADED_RTS
     write_barrier();
     ((StgEvacuated*)from)->header.info = &stg_EVACUATED_info;
@@ -148,17 +150,16 @@ copy_tag(StgClosure *src, nat size, step *stp,StgWord tag)
     // the profiler can guess the position of the next object later.
     SET_EVACUAEE_FOR_LDV(from, size);
 #endif
-    return (StgClosure *)to;
 }
   
 
 // Same as copy() above, except the object will be allocated in memory
 // that will not be scavenged.  Used for object that have no pointer
 // fields.
-STATIC_INLINE StgClosure *
-copy_noscav_tag(StgClosure *src, nat size, step *stp, StgWord tag)
+STATIC_INLINE void
+copy_noscav_tag(StgClosure **p, StgClosure *src, nat size, step *stp, StgWord tag)
 {
-    StgPtr to, from;
+    StgPtr to, tagged_to, from;
     nat i;
     StgWord info;
 
@@ -176,6 +177,8 @@ copy_noscav_tag(StgClosure *src, nat size, step *stp, StgWord tag)
 #endif
     
     to = alloc_for_copy_noscav(size,stp);
+    tagged_to = (StgPtr)TAG_CLOSURE(tag,(StgClosure*)to);
+    *p = (StgClosure *)tagged_to;
 
     TICK_GC_WORDS_COPIED(size);
     
@@ -185,10 +188,8 @@ copy_noscav_tag(StgClosure *src, nat size, step *stp, StgWord tag)
 	to[i] = from[i];
     }
 
-    // retag pointer before updating EVACUATE closure and returning
-    to = (StgPtr)TAG_CLOSURE(tag,(StgClosure*)to);
+    ((StgEvacuated*)from)->evacuee = (StgClosure *)tagged_to;
 
-    ((StgEvacuated*)from)->evacuee = (StgClosure *)to;
 #ifdef THREADED_RTS
     write_barrier();
     ((StgEvacuated*)from)->header.info = &stg_EVACUATED_info;
@@ -199,7 +200,6 @@ copy_noscav_tag(StgClosure *src, nat size, step *stp, StgWord tag)
     // the profiler can guess the position of the next object later.
     SET_EVACUAEE_FOR_LDV(from, size);
 #endif
-    return (StgClosure *)to;
 }
 
 
@@ -207,8 +207,8 @@ copy_noscav_tag(StgClosure *src, nat size, step *stp, StgWord tag)
  * pointer of an object, but reserve some padding after it.  This is
  * used to optimise evacuation of BLACKHOLEs.
  */
-static StgClosure *
-copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
+static void
+copyPart(StgClosure **p, StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
 {
     StgPtr to, from;
     nat i;
@@ -228,6 +228,7 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
 #endif
     
     to = alloc_for_copy(size_to_reserve, stp);
+    *p = (StgClosure *)to;
 
     TICK_GC_WORDS_COPIED(size_to_copy);
 
@@ -251,21 +252,20 @@ copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
     if (size_to_reserve - size_to_copy > 0)
 	LDV_FILL_SLOP(to + size_to_copy - 1, (int)(size_to_reserve - size_to_copy)); 
 #endif
-    return (StgClosure *)to;
 }
 
 
 /* Copy wrappers that don't tag the closure after copying */
-STATIC_INLINE StgClosure *
-copy(StgClosure *src, nat size, step *stp)
+STATIC_INLINE void
+copy(StgClosure **p, StgClosure *src, nat size, step *stp)
 {
-    return copy_tag(src,size,stp,0);
+    copy_tag(p,src,size,stp,0);
 }
 
-STATIC_INLINE StgClosure *
-copy_noscav(StgClosure *src, nat size, step *stp)
+STATIC_INLINE void
+copy_noscav(StgClosure **p, StgClosure *src, nat size, step *stp)
 {
-    return copy_noscav_tag(src,size,stp,0);
+    copy_noscav_tag(p,src,size,stp,0);
 }
 
 /* -----------------------------------------------------------------------------
@@ -378,13 +378,16 @@ evacuate_large(StgPtr p)
    extra reads/writes than we save.
    -------------------------------------------------------------------------- */
 
-REGPARM1 StgClosure *
-evacuate(StgClosure *q)
+REGPARM1 void
+evacuate(StgClosure **p)
 {
   bdescr *bd = NULL;
   step *stp;
+  StgClosure *q;
   const StgInfoTable *info;
   StgWord tag;
+
+  q = *p;
 
 loop:
   /* The tag and the pointer are split, to be merged after evacing */
@@ -395,7 +398,7 @@ loop:
 
   if (!HEAP_ALLOCED(q)) {
 
-      if (!major_gc) return TAG_CLOSURE(tag,q);
+      if (!major_gc) return;
 
       info = get_itbl(q);
       switch (info->type) {
@@ -410,7 +413,7 @@ loop:
 	      }
 	      RELEASE_SPIN_LOCK(&static_objects_sync);
 	  }
-	  return q;
+	  return;
 	  
       case FUN_STATIC:
 	  if (info->srt_bitmap != 0 &&
@@ -422,7 +425,7 @@ loop:
 	      }
 	      RELEASE_SPIN_LOCK(&static_objects_sync);
 	  }
-	  return q;
+	  return;
 	  
       case IND_STATIC:
 	  /* If q->saved_info != NULL, then it's a revertible CAF - it'll be
@@ -437,7 +440,7 @@ loop:
 	      }
 	      RELEASE_SPIN_LOCK(&static_objects_sync);
 	  }
-	  return q;
+	  return;
 	  
       case CONSTR_STATIC:
 	  if (*STATIC_LINK(info,(StgClosure *)q) == NULL) {
@@ -451,13 +454,13 @@ loop:
 	        /* I am assuming that static_objects pointers are not
 		 * written to other objects, and thus, no need to retag. */
 	  }
-	  return TAG_CLOSURE(tag,q);
+          return;
 	  
       case CONSTR_NOCAF_STATIC:
 	  /* no need to put these on the static linked list, they don't need
 	   * to be scavenged.
 	   */
-	  return TAG_CLOSURE(tag,q);
+	  return;
 	  
       default:
 	  barf("evacuate(static): strange closure type %d", (int)(info->type));
@@ -477,7 +480,7 @@ loop:
 	  gct->failed_to_evac = rtsTrue;
 	  TICK_GC_FAILED_PROMOTION();
       }
-      return TAG_CLOSURE(tag,q);
+      return;
   }
 
   if ((bd->flags & (BF_LARGE | BF_COMPACTED | BF_EVACUATED)) != 0) {
@@ -492,7 +495,7 @@ loop:
 	      gct->failed_to_evac = rtsTrue;
 	      TICK_GC_FAILED_PROMOTION();
 	  }
-	  return TAG_CLOSURE(tag,q);
+	  return;
       }
 
       /* evacuate large objects by re-linking them onto a different list.
@@ -502,10 +505,11 @@ loop:
 	  if (info->type == TSO && 
 	      ((StgTSO *)q)->what_next == ThreadRelocated) {
 	      q = (StgClosure *)((StgTSO *)q)->link;
+              *p = q;
 	      goto loop;
 	  }
 	  evacuate_large((P_)q);
-	  return TAG_CLOSURE(tag,q);
+	  return;
       }
       
       /* If the object is in a step that we're compacting, then we
@@ -520,7 +524,7 @@ loop:
 	      }
 	      push_mark_stack((P_)q);
 	  }
-	  return TAG_CLOSURE(tag,q);
+	  return;
       }
   }
       
@@ -537,7 +541,8 @@ loop:
   case MUT_VAR_DIRTY:
   case MVAR_CLEAN:
   case MVAR_DIRTY:
-      return copy(q,sizeW_fromITBL(info),stp);
+      copy(p,q,sizeW_fromITBL(info),stp);
+      return;
 
   case CONSTR_0_1:
   { 
@@ -545,28 +550,32 @@ loop:
       if (q->header.info == Czh_con_info &&
 	  // unsigned, so always true:  (StgChar)w >= MIN_CHARLIKE &&  
 	  (StgChar)w <= MAX_CHARLIKE) {
-	  return TAG_CLOSURE(tag,
-			     (StgClosure *)CHARLIKE_CLOSURE((StgChar)w)
-			     );
+	  *p =  TAG_CLOSURE(tag,
+                            (StgClosure *)CHARLIKE_CLOSURE((StgChar)w)
+			   );
       }
       if (q->header.info == Izh_con_info &&
 	  (StgInt)w >= MIN_INTLIKE && (StgInt)w <= MAX_INTLIKE) {
-	  return TAG_CLOSURE(tag,
+	  *p = TAG_CLOSURE(tag,
 			     (StgClosure *)INTLIKE_CLOSURE((StgInt)w)
 			     );
       }
-      // else
-      return copy_noscav_tag(q,sizeofW(StgHeader)+1,stp,tag);
+      else {
+          copy_noscav_tag(p,q,sizeofW(StgHeader)+1,stp,tag);
+      }
+      return;
   }
 
   case FUN_0_1:
   case FUN_1_0:
   case CONSTR_1_0:
-    return copy_tag(q,sizeofW(StgHeader)+1,stp,tag);
+      copy_tag(p,q,sizeofW(StgHeader)+1,stp,tag);
+      return;
 
   case THUNK_1_0:
   case THUNK_0_1:
-    return copy(q,sizeofW(StgThunk)+1,stp);
+      copy(p,q,sizeofW(StgThunk)+1,stp);
+      return;
 
   case THUNK_1_1:
   case THUNK_2_0:
@@ -578,20 +587,24 @@ loop:
       stp = bd->step;
     }
 #endif
-    return copy(q,sizeofW(StgThunk)+2,stp);
+    copy(p,q,sizeofW(StgThunk)+2,stp);
+    return;
 
   case FUN_1_1:
   case FUN_2_0:
   case FUN_0_2:
   case CONSTR_1_1:
   case CONSTR_2_0:
-    return copy_tag(q,sizeofW(StgHeader)+2,stp,tag);
+      copy_tag(p,q,sizeofW(StgHeader)+2,stp,tag);
+      return;
 
   case CONSTR_0_2:
-    return copy_noscav_tag(q,sizeofW(StgHeader)+2,stp,tag);
+      copy_noscav_tag(p,q,sizeofW(StgHeader)+2,stp,tag);
+      return;
 
   case THUNK:
-    return copy(q,thunk_sizeW_fromITBL(info),stp);
+      copy(p,q,thunk_sizeW_fromITBL(info),stp);
+      return;
 
   case FUN:
   case IND_PERM:
@@ -599,24 +612,29 @@ loop:
   case WEAK:
   case STABLE_NAME:
   case CONSTR:
-    return copy_tag(q,sizeW_fromITBL(info),stp,tag);
+      copy_tag(p,q,sizeW_fromITBL(info),stp,tag);
+      return;
 
   case BCO:
-    return copy(q,bco_sizeW((StgBCO *)q),stp);
+      copy(p,q,bco_sizeW((StgBCO *)q),stp);
+      return;
 
   case CAF_BLACKHOLE:
   case SE_CAF_BLACKHOLE:
   case SE_BLACKHOLE:
   case BLACKHOLE:
-    return copyPart(q,BLACKHOLE_sizeW(),sizeofW(StgHeader),stp);
+      copyPart(p,q,BLACKHOLE_sizeW(),sizeofW(StgHeader),stp);
+      return;
 
   case THUNK_SELECTOR:
-    return eval_thunk_selector((StgSelector *)q, rtsTrue);
+      eval_thunk_selector(p, (StgSelector *)q, rtsTrue);
+      return;
 
   case IND:
   case IND_OLDGEN:
     // follow chains of indirections, don't evacuate them 
     q = ((StgInd*)q)->indirectee;
+    *p = q;
     goto loop;
 
   case RET_BCO:
@@ -633,13 +651,16 @@ loop:
     barf("evacuate: stack frame at %p\n", q);
 
   case PAP:
-      return copy(q,pap_sizeW((StgPAP*)q),stp);
+      copy(p,q,pap_sizeW((StgPAP*)q),stp);
+      return;
 
   case AP:
-      return copy(q,ap_sizeW((StgAP*)q),stp);
+      copy(p,q,ap_sizeW((StgAP*)q),stp);
+      return;
 
   case AP_STACK:
-      return copy(q,ap_stack_sizeW((StgAP_STACK*)q),stp);
+      copy(p,q,ap_stack_sizeW((StgAP_STACK*)q),stp);
+      return;
 
   case EVACUATED:
     /* Already evacuated, just return the forwarding address.
@@ -658,25 +679,30 @@ loop:
      * current object would be evacuated to, so we only do the full
      * check if stp is too low.
      */
-    if (gct->evac_gen > 0 && stp->gen_no < gct->evac_gen) {  // optimisation 
-      StgClosure *p = ((StgEvacuated*)q)->evacuee;
-      if (HEAP_ALLOCED(p) && Bdescr((P_)p)->gen_no < gct->evac_gen) {
-	gct->failed_to_evac = rtsTrue;
-	TICK_GC_FAILED_PROMOTION();
+  {
+      StgClosure *e = ((StgEvacuated*)q)->evacuee;
+      *p = e;
+      if (gct->evac_gen > 0 && stp->gen_no < gct->evac_gen) {  // optimisation 
+	  if (HEAP_ALLOCED(e) && Bdescr((P_)e)->gen_no < gct->evac_gen) {
+	      gct->failed_to_evac = rtsTrue;
+	      TICK_GC_FAILED_PROMOTION();
+	  }
       }
-    }
-    return ((StgEvacuated*)q)->evacuee;
+      return;
+  }
 
   case ARR_WORDS:
       // just copy the block 
-      return copy_noscav(q,arr_words_sizeW((StgArrWords *)q),stp);
+      copy_noscav(p,q,arr_words_sizeW((StgArrWords *)q),stp);
+      return;
 
   case MUT_ARR_PTRS_CLEAN:
   case MUT_ARR_PTRS_DIRTY:
   case MUT_ARR_PTRS_FROZEN:
   case MUT_ARR_PTRS_FROZEN0:
       // just copy the block 
-      return copy(q,mut_arr_ptrs_sizeW((StgMutArrPtrs *)q),stp);
+      copy(p,q,mut_arr_ptrs_sizeW((StgMutArrPtrs *)q),stp);
+      return;
 
   case TSO:
     {
@@ -686,6 +712,7 @@ loop:
        */
       if (tso->what_next == ThreadRelocated) {
 	q = (StgClosure *)tso->link;
+	*p = q;
 	goto loop;
       }
 
@@ -694,38 +721,42 @@ loop:
        */
       {
 	  StgTSO *new_tso;
-	  StgPtr p, q;
+	  StgPtr r, s;
 
-	  new_tso = (StgTSO *)copyPart((StgClosure *)tso,
-				       tso_sizeW(tso),
-				       sizeofW(StgTSO), stp);
+	  copyPart(p,(StgClosure *)tso, tso_sizeW(tso), sizeofW(StgTSO), stp);
+	  new_tso = (StgTSO *)*p;
 	  move_TSO(tso, new_tso);
-	  for (p = tso->sp, q = new_tso->sp;
-	       p < tso->stack+tso->stack_size;) {
-	      *q++ = *p++;
+	  for (r = tso->sp, s = new_tso->sp;
+	       r < tso->stack+tso->stack_size;) {
+	      *s++ = *r++;
 	  }
-	  
-	  return (StgClosure *)new_tso;
+	  return;
       }
     }
 
   case TREC_HEADER: 
-    return copy(q,sizeofW(StgTRecHeader),stp);
+      copy(p,q,sizeofW(StgTRecHeader),stp);
+      return;
 
   case TVAR_WATCH_QUEUE:
-    return copy(q,sizeofW(StgTVarWatchQueue),stp);
+      copy(p,q,sizeofW(StgTVarWatchQueue),stp);
+      return;
 
   case TVAR:
-    return copy(q,sizeofW(StgTVar),stp);
+      copy(p,q,sizeofW(StgTVar),stp);
+      return;
     
   case TREC_CHUNK:
-    return copy(q,sizeofW(StgTRecChunk),stp);
+      copy(p,q,sizeofW(StgTRecChunk),stp);
+      return;
 
   case ATOMIC_INVARIANT:
-    return copy(q,sizeofW(StgAtomicInvariant),stp);
+      copy(p,q,sizeofW(StgAtomicInvariant),stp);
+      return;
 
   case INVARIANT_CHECK_QUEUE:
-    return copy(q,sizeofW(StgInvariantCheckQueue),stp);
+      copy(p,q,sizeofW(StgInvariantCheckQueue),stp);
+      return;
 
   default:
     barf("evacuate: strange closure type %d", (int)(info->type));
@@ -774,8 +805,9 @@ unchain_thunk_selectors(StgSelector *p, StgClosure *val)
    evacuated.
    -------------------------------------------------------------------------- */
 
-static StgClosure *
-eval_thunk_selector (StgSelector * p, rtsBool evac)
+static void
+eval_thunk_selector (StgClosure **q, StgSelector * p, rtsBool evac)
+                 // NB. for legacy reasons, p & q are swapped around :(
 {
     nat field;
     StgInfoTable *info;
@@ -810,7 +842,8 @@ selector_chain:
         // mutable list.
         if ((bd->gen_no > N) || (bd->flags & BF_EVACUATED)) {
             unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
-            return (StgClosure *)p;
+            *q = (StgClosure *)p;
+            return;
         }
         // we don't update THUNK_SELECTORS in the compacted
         // generation, because compaction does not remove the INDs
@@ -820,9 +853,10 @@ selector_chain:
         // around here, test by compiling stage 3 with +RTS -c -RTS.
         if (bd->flags & BF_COMPACTED) {
             // must call evacuate() to mark this closure if evac==rtsTrue
-            if (evac) p = (StgSelector *)evacuate((StgClosure *)p);
+            *q = (StgClosure *)p;
+            if (evac) evacuate(q);
             unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
-            return (StgClosure *)p;
+            return;
         }
     }
 
@@ -889,12 +923,14 @@ selector_loop:
                   ((StgClosure*)p)->payload[0] = (StgClosure *)prev_thunk_selector;
                   prev_thunk_selector = p;
 
-                  if (evac) val = evacuate(val);
+                  *q = val;
+                  if (evac) evacuate(q);
+                  val = *q;
                   // evacuate() cannot recurse through
                   // eval_thunk_selector(), because we know val is not
                   // a THUNK_SELECTOR.
                   unchain_thunk_selectors(prev_thunk_selector, val);
-                  return val;
+                  return;
               }
           }
 
@@ -927,7 +963,7 @@ selector_loop:
           // rtsFalse says "don't evacuate the result".  It will,
           // however, update any THUNK_SELECTORs that are evaluated
           // along the way.
-	  val = eval_thunk_selector((StgSelector *)selectee, rtsFalse);
+	  eval_thunk_selector(&val, (StgSelector*)selectee, rtsFalse);
 	  gct->thunk_selector_depth--;
 
           // did we actually manage to evaluate it?
@@ -964,12 +1000,13 @@ bale_out:
     // pointer.  But don't forget: we still need to evacuate the thunk itself.
     SET_INFO(p, info_ptr);
     if (evac) {
-        val = copy((StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->step->to);
+        copy(&val,(StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->step->to);
     } else {
         val = (StgClosure *)p;
     }
+    *q = val;
     unchain_thunk_selectors(prev_thunk_selector, val);
-    return val;
+    return;
 }
 
 /* -----------------------------------------------------------------------------
