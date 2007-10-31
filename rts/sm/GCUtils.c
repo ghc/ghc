@@ -82,11 +82,9 @@ push_scan_block (bdescr *bd, step_workspace *ws)
     // update stats: this is a block that has been copied & scavenged
     copied += bd->free - bd->start;
 
-    // put the scan block *second* in ws->scavd_list.  The first block
-    // in this list is for evacuating objects that don't need to be
-    // scavenged.
-    bd->link = ws->scavd_list->link;
-    ws->scavd_list->link = bd;
+    // put the scan block on the ws->scavd_list.
+    bd->link = ws->scavd_list;
+    ws->scavd_list = bd;
     ws->n_scavd_blocks ++;
 
     IF_DEBUG(sanity, 
@@ -126,36 +124,6 @@ gc_alloc_todo_block (step_workspace *ws)
     }
 	
     ws->todo_bd = bd;
-
-    return bd;
-}
-
-bdescr *
-gc_alloc_scavd_block (step_workspace *ws)
-{
-    bdescr *bd;
-
-    bd = allocBlock_sync();
-
-    bd->gen_no = ws->stp->gen_no;
-    bd->step = ws->stp;
-
-    // blocks in to-space in generations up to and including N
-    // get the BF_EVACUATED flag.
-    if (ws->stp->gen_no <= N) {
-	bd->flags = BF_EVACUATED;
-    } else {
-	bd->flags = 0;
-    }
-
-    // update stats: this is a block that has been copied only
-    if (ws->scavd_list != NULL) {
-	scavd_copied += ws->scavd_list->free - ws->scavd_list->start;
-    }
-
-    bd->link = ws->scavd_list;
-    ws->scavd_list = bd;
-    ws->n_scavd_blocks++;
 
     return bd;
 }

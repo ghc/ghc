@@ -122,7 +122,6 @@ gc_thread *gc_threads = NULL;
 
 // For stats:
 long copied;        // *words* copied & scavenged during this GC
-long scavd_copied;  // *words* copied only during this GC
 
 #ifdef THREADED_RTS
 SpinLock recordMutableGen_sync;
@@ -310,7 +309,6 @@ GarbageCollect ( rtsBool force_major_gc )
 
   // Initialise stats
   copied = 0;
-  scavd_copied = 0;
 
   // this is the main thread
   gct = &gc_threads[0];
@@ -433,10 +431,6 @@ GarbageCollect ( rtsBool force_major_gc )
 
 		  // Push the final block
 		  if (ws->scan_bd) { push_scan_block(ws->scan_bd, ws); }
-
-		  // update stats: we haven't counted the block at the
-		  // front of the scavd_list yet.
-		  scavd_copied += ws->scavd_list->free - ws->scavd_list->start;
 
 		  ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks);
 
@@ -672,7 +666,7 @@ GarbageCollect ( rtsBool force_major_gc )
 #endif
 
   // ok, GC over: tell the stats department what happened. 
-  stat_endGC(allocated, live, copied, scavd_copied, N);
+  stat_endGC(allocated, live, copied, N);
 
 #if defined(RTS_USER_SIGNALS)
   if (RtsFlags.MiscFlags.install_signal_handlers) {
@@ -1182,12 +1176,8 @@ init_collected_gen (nat g, nat n_threads)
 	    ws->buffer_todo_bd = NULL;
 	    gc_alloc_todo_block(ws);
 
-	    // allocate a block for "already scavenged" objects.  This goes
-	    // on the front of the stp->blocks list, so it won't be
-	    // traversed by the scavenging sweep.
 	    ws->scavd_list = NULL;
 	    ws->n_scavd_blocks = 0;
-	    gc_alloc_scavd_block(ws);
 	}
     }
 }
@@ -1220,6 +1210,9 @@ init_uncollected_gen (nat g, nat threads)
 	    ws->buffer_todo_bd = NULL;
 	    ws->todo_large_objects = NULL;
 
+	    ws->scavd_list = NULL;
+	    ws->n_scavd_blocks = 0;
+
 	    // If the block at the head of the list in this generation
 	    // is less than 3/4 full, then use it as a todo block.
 	    if (isPartiallyFull(stp->blocks))
@@ -1244,25 +1237,6 @@ init_uncollected_gen (nat g, nat threads)
 		ws->scan = NULL;
 		ws->todo_bd = NULL;
 		gc_alloc_todo_block(ws);
-	    }
-
-	    // Do the same trick for the scavd block
-	    if (isPartiallyFull(stp->blocks))
-	    {
-		ws->scavd_list = stp->blocks;
-		stp->blocks = stp->blocks->link;
-		stp->n_blocks -= 1;
-		ws->scavd_list->link = NULL;
-		ws->n_scavd_blocks = 1;
-		// subtract the contents of this block from the stats,
-		// because we'll count the whole block later.
-		scavd_copied -= ws->scavd_list->free - ws->scavd_list->start;
-	    }
-	    else
-	    {
-		ws->scavd_list = NULL;
-		ws->n_scavd_blocks = 0;
-		gc_alloc_scavd_block(ws);
 	    }
 	}
     }

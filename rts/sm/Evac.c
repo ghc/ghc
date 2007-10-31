@@ -63,42 +63,6 @@ alloc_for_copy (nat size, step *stp)
     return to;
 }
   
-STATIC_INLINE StgPtr
-alloc_for_copy_noscav (nat size, step *stp)
-{
-    StgPtr to;
-    step_workspace *ws;
-    bdescr *bd;
-
-    /* Find out where we're going, using the handy "to" pointer in 
-     * the step of the source object.  If it turns out we need to
-     * evacuate to an older generation, adjust it here (see comment
-     * by evacuate()).
-     */
-    if (stp < gct->evac_step) {
-	if (gct->eager_promotion) {
-	    stp = gct->evac_step;
-	} else {
-	    gct->failed_to_evac = rtsTrue;
-	}
-    }
-    
-    ws = &gct->steps[stp->gen_no][stp->no];
-    
-    /* chain a new block onto the to-space for the destination step if
-     * necessary.
-     */
-    bd = ws->scavd_list;
-    to = bd->free;
-    if (to + size >= bd->start + BLOCK_SIZE_W) {
-	bd = gc_alloc_scavd_block(ws);
-	to = bd->free;
-    }
-    bd->free = to + size;
-
-    return to;
-}
-  
 STATIC_INLINE void
 copy_tag(StgClosure **p, StgClosure *src, nat size, step *stp,StgWord tag)
 {
@@ -152,57 +116,6 @@ copy_tag(StgClosure **p, StgClosure *src, nat size, step *stp,StgWord tag)
 #endif
 }
   
-
-// Same as copy() above, except the object will be allocated in memory
-// that will not be scavenged.  Used for object that have no pointer
-// fields.
-STATIC_INLINE void
-copy_noscav_tag(StgClosure **p, StgClosure *src, nat size, step *stp, StgWord tag)
-{
-    StgPtr to, tagged_to, from;
-    nat i;
-    StgWord info;
-
-#ifdef THREADED_RTS
-    do {
-	info = xchg((StgPtr)&src->header.info, (W_)&stg_WHITEHOLE_info);
-    } while (info == (W_)&stg_WHITEHOLE_info);
-    if (info == (W_)&stg_EVACUATED_info) {
-	src->header.info = (const StgInfoTable *)info;
-	return evacuate(p); // does the failed_to_evac stuff
-    }
-#else
-    info = (W_)src->header.info;
-    src->header.info = &stg_EVACUATED_info;
-#endif
-
-    to = alloc_for_copy_noscav(size,stp);
-    tagged_to = (StgPtr)TAG_CLOSURE(tag,(StgClosure*)to);
-    *p = (StgClosure *)tagged_to;
-
-    TICK_GC_WORDS_COPIED(size);
-    
-    from = (StgPtr)src;
-    to[0] = info;
-    for (i = 1; i < size; i++) { // unroll for small i
-	to[i] = from[i];
-    }
-
-    ((StgEvacuated*)from)->evacuee = (StgClosure *)tagged_to;
-
-#ifdef THREADED_RTS
-    write_barrier();
-    ((StgEvacuated*)from)->header.info = &stg_EVACUATED_info;
-#endif
-    
-#ifdef PROFILING
-    // We store the size of the just evacuated object in the LDV word so that
-    // the profiler can guess the position of the next object later.
-    SET_EVACUAEE_FOR_LDV(from, size);
-#endif
-}
-
-
 /* Special version of copy() for when we only want to copy the info
  * pointer of an object, but reserve some padding after it.  This is
  * used to optimise evacuation of BLACKHOLEs.
@@ -226,7 +139,7 @@ copyPart(StgClosure **p, StgClosure *src, nat size_to_reserve, nat size_to_copy,
     info = (W_)src->header.info;
     src->header.info = &stg_EVACUATED_info;
 #endif
-    
+
     to = alloc_for_copy(size_to_reserve, stp);
     *p = (StgClosure *)to;
 
@@ -260,12 +173,6 @@ STATIC_INLINE void
 copy(StgClosure **p, StgClosure *src, nat size, step *stp)
 {
     copy_tag(p,src,size,stp,0);
-}
-
-STATIC_INLINE void
-copy_noscav(StgClosure **p, StgClosure *src, nat size, step *stp)
-{
-    copy_noscav_tag(p,src,size,stp,0);
 }
 
 /* -----------------------------------------------------------------------------
@@ -561,7 +468,7 @@ loop:
 			     );
       }
       else {
-          copy_noscav_tag(p,q,sizeofW(StgHeader)+1,stp,tag);
+          copy_tag(p,q,sizeofW(StgHeader)+1,stp,tag);
       }
       return;
   }
@@ -599,7 +506,7 @@ loop:
       return;
 
   case CONSTR_0_2:
-      copy_noscav_tag(p,q,sizeofW(StgHeader)+2,stp,tag);
+      copy_tag(p,q,sizeofW(StgHeader)+2,stp,tag);
       return;
 
   case THUNK:
@@ -693,7 +600,7 @@ loop:
 
   case ARR_WORDS:
       // just copy the block 
-      copy_noscav(p,q,arr_words_sizeW((StgArrWords *)q),stp);
+      copy(p,q,arr_words_sizeW((StgArrWords *)q),stp);
       return;
 
   case MUT_ARR_PTRS_CLEAN:

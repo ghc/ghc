@@ -88,11 +88,7 @@ typedef struct step_workspace_ {
     // where large objects to be scavenged go
     bdescr *     todo_large_objects;
 
-    // Objects that need not be, or have already been, scavenged.  The
-    // block at the front of the list is special: objects that don't
-    // need to be scavenged are copied directly to this block.
-    // Completed scan blocks also go on this list; but we put them
-    // after the head block.
+    // Objects that need not be, or have already been, scavenged.
     bdescr *     scavd_list;
     lnat         n_scavd_blocks;     // count of blocks in this list
 

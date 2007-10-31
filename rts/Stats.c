@@ -41,7 +41,6 @@ static Ticks ExitElapsedTime  = 0;
 
 static ullong GC_tot_alloc        = 0;
 static ullong GC_tot_copied       = 0;
-static ullong GC_tot_scavd_copied = 0;
 
 static Ticks GC_start_time = 0,  GC_tot_time  = 0;  /* User GC Time */
 static Ticks GCe_start_time = 0, GCe_tot_time = 0;  /* Elapsed GC time */
@@ -288,8 +287,7 @@ stat_startGC(void)
    -------------------------------------------------------------------------- */
 
 void
-stat_endGC (lnat alloc, lnat live, lnat copied, 
-	    lnat scavd_copied, lnat gen)
+stat_endGC (lnat alloc, lnat live, lnat copied, lnat gen)
 {
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
 	Ticks time, etime, gc_time, gc_etime;
@@ -302,7 +300,7 @@ stat_endGC (lnat alloc, lnat live, lnat copied,
 	    nat faults = getPageFaults();
 	    
 	    statsPrintf("%9ld %9ld %9ld",
-		    alloc*sizeof(W_), (copied+scavd_copied)*sizeof(W_), 
+		    alloc*sizeof(W_), copied*sizeof(W_), 
 			live*sizeof(W_));
 	    statsPrintf(" %5.2f %5.2f %7.2f %7.2f %4ld %4ld  (Gen: %2ld)\n", 
 		    TICK_TO_DBL(gc_time),
@@ -320,7 +318,6 @@ stat_endGC (lnat alloc, lnat live, lnat copied,
 	GC_coll_times[gen] += gc_time;
 
 	GC_tot_copied += (ullong) copied;
-	GC_tot_scavd_copied += (ullong) scavd_copied;
 	GC_tot_alloc  += (ullong) alloc;
 	GC_tot_time   += gc_time;
 	GCe_tot_time  += gc_etime;
@@ -522,12 +519,8 @@ stat_exit(int alloc)
 
 	    ullong_format_string(GC_tot_copied*sizeof(W_), 
 				 temp, rtsTrue/*commas*/);
-	    statsPrintf("%11s bytes copied during GC (scavenged)\n", temp);
+	    statsPrintf("%11s bytes copied during GC\n", temp);
 
-	    ullong_format_string(GC_tot_scavd_copied*sizeof(W_), 
-				 temp, rtsTrue/*commas*/);
-	    statsPrintf("%11s bytes copied during GC (not scavenged)\n", temp);
-  
 	    if ( ResidencySamples > 0 ) {
 		ullong_format_string(MaxResidency*sizeof(W_), 
 				     temp, rtsTrue/*commas*/);
