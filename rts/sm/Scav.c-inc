@@ -42,6 +42,7 @@ scavenge_block (bdescr *bd, StgPtr scan)
   StgPtr p, q;
   StgInfoTable *info;
   step *saved_evac_step;
+  rtsBool saved_eager_promotion;
 
   p = scan;
   
@@ -50,6 +51,7 @@ scavenge_block (bdescr *bd, StgPtr scan)
 
   gct->evac_step = bd->step;
   saved_evac_step = gct->evac_step;
+  saved_eager_promotion = gct->eager_promotion;
   gct->failed_to_evac = rtsFalse;
 
   // we might be evacuating into the very object that we're
@@ -68,8 +70,6 @@ scavenge_block (bdescr *bd, StgPtr scan)
     case MVAR_CLEAN:
     case MVAR_DIRTY:
     { 
-	rtsBool saved_eager_promotion = gct->eager_promotion;
-
 	StgMVar *mvar = ((StgMVar *)p);
 	gct->eager_promotion = rtsFalse;
 	evacuate((StgClosure **)&mvar->head);
@@ -242,9 +242,7 @@ scavenge_block (bdescr *bd, StgPtr scan)
 	break;
 
     case MUT_VAR_CLEAN:
-    case MUT_VAR_DIRTY: {
-	rtsBool saved_eager_promotion = gct->eager_promotion;
-
+    case MUT_VAR_DIRTY:
 	gct->eager_promotion = rtsFalse;
 	evacuate(&((StgMutVar *)p)->var);
 	gct->eager_promotion = saved_eager_promotion;
@@ -256,7 +254,6 @@ scavenge_block (bdescr *bd, StgPtr scan)
 	}
 	p += sizeofW(StgMutVar);
 	break;
-    }
 
     case CAF_BLACKHOLE:
     case SE_CAF_BLACKHOLE:
@@ -302,19 +299,17 @@ scavenge_block (bdescr *bd, StgPtr scan)
 	// follow everything 
     {
 	StgPtr next;
-	rtsBool saved_eager;
 
 	// We don't eagerly promote objects pointed to by a mutable
 	// array, but if we find the array only points to objects in
 	// the same or an older generation, we mark it "clean" and
 	// avoid traversing it during minor GCs.
-	saved_eager = gct->eager_promotion;
 	gct->eager_promotion = rtsFalse;
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
 	    evacuate((StgClosure **)p);
 	}
-	gct->eager_promotion = saved_eager;
+	gct->eager_promotion = saved_eager_promotion;
 
 	if (gct->failed_to_evac) {
 	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
@@ -350,11 +345,10 @@ scavenge_block (bdescr *bd, StgPtr scan)
     case TSO:
     { 
 	StgTSO *tso = (StgTSO *)p;
-	rtsBool saved_eager = gct->eager_promotion;
 
 	gct->eager_promotion = rtsFalse;
 	scavengeTSO(tso);
-	gct->eager_promotion = saved_eager;
+	gct->eager_promotion = saved_eager_promotion;
 
 	if (gct->failed_to_evac) {
 	    tso->flags |= TSO_DIRTY;
