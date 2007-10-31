@@ -103,6 +103,7 @@ initStorage( void )
 {
   nat g, s;
   generation *gen;
+  step *step_arr;
 
   if (generations != NULL) {
       // multi-init protection
@@ -146,6 +147,15 @@ initStorage( void )
 					     * sizeof(struct generation_),
 					     "initStorage: gens");
 
+  /* allocate all the steps into an array.  It is important that we do
+     it this way, because we need the invariant that two step pointers
+     can be directly compared to see which is the oldest.
+     Remember that the last generation has only one step. */
+  step_arr = stgMallocBytes(sizeof(struct step_) 
+			    * (1 + ((RtsFlags.GcFlags.generations - 1)
+				    * RtsFlags.GcFlags.steps)),
+			    "initStorage: steps");
+
   /* Initialise all generations */
   for(g = 0; g < RtsFlags.GcFlags.generations; g++) {
     gen = &generations[g];
@@ -166,21 +176,19 @@ initStorage( void )
 
     /* Oldest generation: one step */
     oldest_gen->n_steps = 1;
-    oldest_gen->steps = 
-      stgMallocBytes(1 * sizeof(struct step_), "initStorage: last step");
+    oldest_gen->steps   = step_arr + (RtsFlags.GcFlags.generations - 1)
+	                              * RtsFlags.GcFlags.steps;
 
     /* set up all except the oldest generation with 2 steps */
     for(g = 0; g < RtsFlags.GcFlags.generations-1; g++) {
       generations[g].n_steps = RtsFlags.GcFlags.steps;
-      generations[g].steps  = 
-	stgMallocBytes (RtsFlags.GcFlags.steps * sizeof(struct step_),
-			"initStorage: steps");
+      generations[g].steps   = step_arr + g * RtsFlags.GcFlags.steps;
     }
     
   } else {
     /* single generation, i.e. a two-space collector */
     g0->n_steps = 1;
-    g0->steps = stgMallocBytes (sizeof(struct step_), "initStorage: steps");
+    g0->steps   = step_arr;
   }
 
 #ifdef THREADED_RTS
@@ -264,10 +272,7 @@ exitStorage (void)
 void
 freeStorage (void)
 {
-    nat g;
-
-    for(g = 0; g < RtsFlags.GcFlags.generations; g++)
-      stgFree(generations[g].steps);
+    stgFree(g0s0); // frees all the steps
     stgFree(generations);
     freeAllMBlocks();
 #if defined(THREADED_RTS)

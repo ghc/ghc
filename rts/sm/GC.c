@@ -335,11 +335,11 @@ GarbageCollect ( rtsBool force_major_gc )
   }
 
   // follow roots from the CAF list (used by GHCi)
-  gct->evac_gen = 0;
+  gct->evac_step = 0;
   markCAFs(mark_root);
 
   // follow all the roots that the application knows about.
-  gct->evac_gen = 0;
+  gct->evac_step = 0;
   GetRoots(mark_root);
 
   // Mark the weak pointer list, and prepare to detect dead weak pointers.
@@ -1287,7 +1287,7 @@ init_uncollected_gen (nat g, nat threads)
 static void
 init_gc_thread (gc_thread *t)
 {
-    t->evac_gen = 0;
+    t->evac_step = 0;
     t->failed_to_evac = rtsFalse;
     t->eager_promotion = rtsTrue;
     t->thunk_selector_depth = 0;

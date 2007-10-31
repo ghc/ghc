@@ -39,9 +39,9 @@ alloc_for_copy (nat size, step *stp)
      * evacuate to an older generation, adjust it here (see comment
      * by evacuate()).
      */
-    if (stp->gen_no < gct->evac_gen) {
+    if (stp < gct->evac_step) {
 	if (gct->eager_promotion) {
-	    stp = &generations[gct->evac_gen].steps[0];
+	    stp = gct->evac_step;
 	} else {
 	    gct->failed_to_evac = rtsTrue;
 	}
@@ -75,9 +75,9 @@ alloc_for_copy_noscav (nat size, step *stp)
      * evacuate to an older generation, adjust it here (see comment
      * by evacuate()).
      */
-    if (stp->gen_no < gct->evac_gen) {
+    if (stp < gct->evac_step) {
 	if (gct->eager_promotion) {
-	    stp = &generations[gct->evac_gen].steps[0];
+	    stp = gct->evac_step;
 	} else {
 	    gct->failed_to_evac = rtsTrue;
 	}
@@ -113,7 +113,7 @@ copy_tag(StgClosure **p, StgClosure *src, nat size, step *stp,StgWord tag)
     } while (info == (W_)&stg_WHITEHOLE_info);
     if (info == (W_)&stg_EVACUATED_info) {
 	src->header.info = (const StgInfoTable *)info;
-	return evacuate(src); // does the failed_to_evac stuff
+	return evacuate(p); // does the failed_to_evac stuff
     }
 #else
     info = (W_)src->header.info;
@@ -169,13 +169,13 @@ copy_noscav_tag(StgClosure **p, StgClosure *src, nat size, step *stp, StgWord ta
     } while (info == (W_)&stg_WHITEHOLE_info);
     if (info == (W_)&stg_EVACUATED_info) {
 	src->header.info = (const StgInfoTable *)info;
-	return evacuate(src); // does the failed_to_evac stuff
+	return evacuate(p); // does the failed_to_evac stuff
     }
 #else
     info = (W_)src->header.info;
     src->header.info = &stg_EVACUATED_info;
 #endif
-    
+
     to = alloc_for_copy_noscav(size,stp);
     tagged_to = (StgPtr)TAG_CLOSURE(tag,(StgClosure*)to);
     *p = (StgClosure *)tagged_to;
@@ -220,7 +220,7 @@ copyPart(StgClosure **p, StgClosure *src, nat size_to_reserve, nat size_to_copy,
     } while (info == (W_)&stg_WHITEHOLE_info);
     if (info == (W_)&stg_EVACUATED_info) {
 	src->header.info = (const StgInfoTable *)info;
-	return evacuate(src); // does the failed_to_evac stuff
+	return evacuate(p); // does the failed_to_evac stuff
     }
 #else
     info = (W_)src->header.info;
@@ -296,7 +296,7 @@ evacuate_large(StgPtr p)
     /* Don't forget to set the gct->failed_to_evac flag if we didn't get
      * the desired destination (see comments in evacuate()).
      */
-    if (bd->gen_no < gct->evac_gen) {
+    if (bd->step < gct->evac_step) {
       gct->failed_to_evac = rtsTrue;
       TICK_GC_FAILED_PROMOTION();
     }
@@ -320,9 +320,9 @@ evacuate_large(StgPtr p)
   /* link it on to the evacuated large object list of the destination step
    */
   stp = bd->step->to;
-  if (stp->gen_no < gct->evac_gen) {
+  if (stp < gct->evac_step) {
       if (gct->eager_promotion) {
-	  stp = &generations[gct->evac_gen].steps[0];
+	  stp = gct->evac_step;
       } else {
 	  gct->failed_to_evac = rtsTrue;
       }
@@ -342,22 +342,22 @@ evacuate_large(StgPtr p)
    This is called (eventually) for every live object in the system.
 
    The caller to evacuate specifies a desired generation in the
-   gct->evac_gen thread-lock variable.  The following conditions apply to
+   gct->evac_step thread-local variable.  The following conditions apply to
    evacuating an object which resides in generation M when we're
    collecting up to generation N
 
-   if  M >= gct->evac_gen 
+   if  M >= gct->evac_step 
            if  M > N     do nothing
 	   else          evac to step->to
 
-   if  M < gct->evac_gen      evac to gct->evac_gen, step 0
+   if  M < gct->evac_step      evac to gct->evac_step, step 0
 
    if the object is already evacuated, then we check which generation
    it now resides in.
 
-   if  M >= gct->evac_gen     do nothing
-   if  M <  gct->evac_gen     set gct->failed_to_evac flag to indicate that we
-                         didn't manage to evacuate this object into gct->evac_gen.
+   if  M >= gct->evac_step     do nothing
+   if  M <  gct->evac_step     set gct->failed_to_evac flag to indicate that we
+                         didn't manage to evacuate this object into gct->evac_step.
 
 
    OPTIMISATION NOTES:
@@ -472,10 +472,10 @@ loop:
   if (bd->gen_no > N) {
       /* Can't evacuate this object, because it's in a generation
        * older than the ones we're collecting.  Let's hope that it's
-       * in gct->evac_gen or older, or we will have to arrange to track
+       * in gct->evac_step or older, or we will have to arrange to track
        * this pointer using the mutable list.
        */
-      if (bd->gen_no < gct->evac_gen) {
+      if (bd->step < gct->evac_step) {
 	  // nope 
 	  gct->failed_to_evac = rtsTrue;
 	  TICK_GC_FAILED_PROMOTION();
@@ -491,7 +491,7 @@ loop:
        * object twice, for example).
        */
       if (bd->flags & BF_EVACUATED) {
-	  if (bd->gen_no < gct->evac_gen) {
+	  if (bd->step < gct->evac_step) {
 	      gct->failed_to_evac = rtsTrue;
 	      TICK_GC_FAILED_PROMOTION();
 	  }
@@ -664,7 +664,7 @@ loop:
 
   case EVACUATED:
     /* Already evacuated, just return the forwarding address.
-     * HOWEVER: if the requested destination generation (gct->evac_gen) is
+     * HOWEVER: if the requested destination generation (gct->evac_step) is
      * older than the actual generation (because the object was
      * already evacuated to a younger generation) then we have to
      * set the gct->failed_to_evac flag to indicate that we couldn't 
@@ -682,8 +682,8 @@ loop:
   {
       StgClosure *e = ((StgEvacuated*)q)->evacuee;
       *p = e;
-      if (gct->evac_gen > 0 && stp->gen_no < gct->evac_gen) {  // optimisation 
-	  if (HEAP_ALLOCED(e) && Bdescr((P_)e)->gen_no < gct->evac_gen) {
+      if (stp < gct->evac_step) {  // optimisation 
+	  if (HEAP_ALLOCED(e) && Bdescr((P_)e)->step < gct->evac_step) {
 	      gct->failed_to_evac = rtsTrue;
 	      TICK_GC_FAILED_PROMOTION();
 	  }
