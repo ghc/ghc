@@ -23,7 +23,7 @@
 #endif
 
 STATIC_INLINE void
-copy_tag(StgClosure **p, StgClosure *src, nat size, step *stp)
+copy_tag(StgClosure **p, StgClosure *src, nat size, step *stp, StgWord tag)
 {
     StgPtr to, tagged_to, from;
     nat i;
