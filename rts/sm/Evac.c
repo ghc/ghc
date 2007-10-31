@@ -401,7 +401,8 @@ loop:
       switch (info->type) {
 
       case THUNK_STATIC:
-	  if (info->srt_bitmap != 0) {
+	  if (info->srt_bitmap != 0 &&
+	      *THUNK_STATIC_LINK((StgClosure *)q) == NULL) {
 	      ACQUIRE_SPIN_LOCK(&static_objects_sync);
 	      if (*THUNK_STATIC_LINK((StgClosure *)q) == NULL) {
 		  *THUNK_STATIC_LINK((StgClosure *)q) = static_objects;
@@ -412,7 +413,8 @@ loop:
 	  return q;
 	  
       case FUN_STATIC:
-	  if (info->srt_bitmap != 0) {
+	  if (info->srt_bitmap != 0 &&
+	      *FUN_STATIC_LINK((StgClosure *)q) == NULL) {
 	      ACQUIRE_SPIN_LOCK(&static_objects_sync);
 	      if (*FUN_STATIC_LINK((StgClosure *)q) == NULL) {
 		  *FUN_STATIC_LINK((StgClosure *)q) = static_objects;
