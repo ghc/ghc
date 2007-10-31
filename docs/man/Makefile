@@ -33,7 +33,8 @@ flags.xml: ../users_guide/flags.xml
 	echo "<!DOCTYPE sect1 [<!ENTITY ndash  \"-\"> \
 	                       <!ENTITY ldquo  \"\`\"> \
 	                       <!ENTITY rdquo  \"'\">]>" >> $@
-	tail -n +2 $< >> $@
+	# "sed 1d" == "tail -n +2", but Solaris apparently rejects the latter
+	sed 1d $< >> $@
 
 endif
 
