@@ -27,6 +27,7 @@
 #define REGPARM1
 #endif
 
-REGPARM1 void evacuate (StgClosure **p);
+REGPARM1 void evacuate  (StgClosure **p);
+REGPARM1 void evacuate0 (StgClosure **p);
 
 extern lnat thunk_selector_depth;
