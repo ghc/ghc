@@ -167,28 +167,8 @@ hs_init(int *argc, char **argv[])
     argv++; argc--;
 #endif
 
-    /* Initialise the performance tracking library */
 #ifdef USE_PAPI
-    {
-	int ver;
-	if ((ver = PAPI_library_init(PAPI_VER_CURRENT)) != PAPI_VER_CURRENT) {
-	    if (ver > 0) {
-		errorBelch("PAPI_library_init: wrong version: %x", ver);
-		stg_exit(EXIT_FAILURE);
-	    } else {
-		sysErrorBelch("PAPI_library_init");
-		stg_exit(EXIT_FAILURE);
-	    }
-	}
-    }
-#ifdef THREADED_RTS
-    {
-	int err;
-	if ((err = PAPI_thread_init(osThreadId)) < 0) {
-	    barf("PAPI_thread_init: %d",err);
-	}
-    }
-#endif
+    papi_init();
 #endif
 
     /* Set the RTS flags to default values. */

@@ -171,8 +171,6 @@ stat_endInit(void)
 	InitElapsedTime = elapsed - ElapsedTimeStart;
     }
 #if USE_PAPI
-    papi_init_eventsets();
-
     /* We start counting events for the mutator
      * when garbage collection starts
      * we switch to the GC event set. */
@@ -606,16 +604,7 @@ stat_exit(int alloc)
             */
 
 #if USE_PAPI
-	    /* PAPI reporting, should put somewhere else?
-	     * Note that the cycles are counted _after_ the initialization of the RTS -- AR */
-
-	    statsPrintf("  -- CPU Mutator counters --\n");
-	    papi_mut_cycles();
-	    papi_report(MutatorCounters);
-
-	    statsPrintf("\n  -- CPU GC counters --\n");
-	    papi_gc_cycles();
-	    papi_report(GCCounters);
+            papi_stats_report();
 #endif
 	}
 

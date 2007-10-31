@@ -40,6 +40,7 @@
 #include "RetainerProfile.h"
 #include "RaiseAsync.h"
 #include "Sparks.h"
+#include "Papi.h"
 
 #include "GC.h"
 #include "Compact.h"
@@ -873,6 +874,10 @@ alloc_gc_thread (gc_thread *t, int n)
 
     init_gc_thread(t);
     
+#ifdef USE_PAPI
+    t->papi_events = -1;
+#endif
+
     t->steps = stgMallocBytes(RtsFlags.GcFlags.generations * 
 				sizeof(step_workspace *), 
 				"initialise_gc_thread");
@@ -1011,7 +1016,20 @@ gc_thread_mainloop (void)
 	gct->wakeup = rtsFalse;
 	if (gct->exit) break;
 
+#ifdef USE_PAPI
+        // start performance counters in this thread...
+        if (gct->papi_events == -1) {
+            papi_init_eventset(&gct->papi_events);
+        }
+        papi_thread_start_gc_count(gct->papi_events);
+#endif
+
 	gc_thread_work();
+
+#ifdef USE_PAPI
+        // count events in this thread towards the GC totals
+        papi_thread_stop_gc_count(gct->papi_events);
+#endif
     }
 }	
 #endif

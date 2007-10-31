@@ -142,6 +142,10 @@ typedef struct gc_thread_ {
 
     lnat thunk_selector_depth;     // ummm.... not used as of now
 
+#ifdef USE_PAPI
+    int papi_events;
+#endif
+    
 } gc_thread;
 
 extern nat N;
