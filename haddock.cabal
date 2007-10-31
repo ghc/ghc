@@ -78,7 +78,7 @@ executable:           haddock
 hs-source-dirs:       src
 main-is:              Main.hs
 extensions:           CPP, PatternGuards
-ghc-options:          -fglasgow-exts
+ghc-options:          -fglasgow-exts -funbox-strict-fields -O2 -fasm
 other-modules:
   Haddock.Interface.Rename
   Haddock.Interface.Create
