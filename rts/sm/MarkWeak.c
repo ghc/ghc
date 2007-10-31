@@ -109,7 +109,7 @@ traverseWeakPtrList(void)
       /* doesn't matter where we evacuate values/finalizers to, since
        * these pointers are treated as roots (iff the keys are alive).
        */
-      evac_gen = 0;
+      gct->evac_gen = 0;
       
       last_w = &old_weak_ptr_list;
       for (w = old_weak_ptr_list; w != NULL; w = next_w) {

@@ -390,7 +390,7 @@ sm/Compact_HC_OPTS += -optc-finline-limit=2500
 # use a variety of types to represent closure pointers (StgPtr,
 # StgClosure, StgMVar, etc.), and without -fno-strict-aliasing gcc is
 # allowed to assume that these pointers do not alias.  eg. without
-# this flag we get problems in GC.c:copy() with gcc 3.4.3, the
+# this flag we get problems in sm/Evac.c:copy() with gcc 3.4.3, the
 # upd_evacee() assigments get moved before the object copy.
 SRC_CC_OPTS += -fno-strict-aliasing
 

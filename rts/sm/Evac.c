@@ -23,7 +23,6 @@
 
 /* Used to avoid long recursion due to selector thunks
  */
-lnat thunk_selector_depth = 0;
 #define MAX_THUNK_SELECTOR_DEPTH 16
 
 static StgClosure * eval_thunk_selector (StgSelector * p, rtsBool);
@@ -43,10 +42,8 @@ copy_tag(StgClosure *src, nat size, step *stp,StgWord tag)
 {
   StgPtr to, from;
   nat i;
-#ifdef PROFILING
-  // @LDV profiling
-  nat size_org = size;
-#endif
+  step_workspace *ws;
+  bdescr *bd;
 
   TICK_GC_WORDS_COPIED(size);
   /* Find out where we're going, using the handy "to" pointer in 
@@ -54,24 +51,28 @@ copy_tag(StgClosure *src, nat size, step *stp,StgWord tag)
    * evacuate to an older generation, adjust it here (see comment
    * by evacuate()).
    */
-  if (stp->gen_no < evac_gen) {
-      if (eager_promotion) {
-	  stp = &generations[evac_gen].steps[0];
+  if (stp->gen_no < gct->evac_gen) {
+      if (gct->eager_promotion) {
+	  stp = &generations[gct->evac_gen].steps[0];
       } else {
-	  failed_to_evac = rtsTrue;
+	  gct->failed_to_evac = rtsTrue;
       }
   }
+
+  ws = &gct->steps[stp->gen_no][stp->no];
 
   /* chain a new block onto the to-space for the destination step if
    * necessary.
    */
-  if (stp->hp + size >= stp->hpLim) {
-    gc_alloc_block(stp);
+  bd = ws->todo_bd;
+  to = bd->free;
+  if (to + size >= bd->start + BLOCK_SIZE_W) {
+      bd = gc_alloc_todo_block(ws);
+      to = bd->free;
   }
 
-  to = stp->hp;
   from = (StgPtr)src;
-  stp->hp = to + size;
+  bd->free = to + size;
   for (i = 0; i < size; i++) { // unroll for small i
       to[i] = from[i];
   }
@@ -84,7 +85,7 @@ copy_tag(StgClosure *src, nat size, step *stp,StgWord tag)
 #ifdef PROFILING
   // We store the size of the just evacuated object in the LDV word so that
   // the profiler can guess the position of the next object later.
-  SET_EVACUAEE_FOR_LDV(from, size_org);
+  SET_EVACUAEE_FOR_LDV(from, size);
 #endif
   return (StgClosure *)to;
 }
@@ -97,10 +98,8 @@ copy_noscav_tag(StgClosure *src, nat size, step *stp, StgWord tag)
 {
   StgPtr to, from;
   nat i;
-#ifdef PROFILING
-  // @LDV profiling
-  nat size_org = size;
-#endif
+  step_workspace *ws;
+  bdescr *bd;
 
   TICK_GC_WORDS_COPIED(size);
   /* Find out where we're going, using the handy "to" pointer in 
@@ -108,24 +107,28 @@ copy_noscav_tag(StgClosure *src, nat size, step *stp, StgWord tag)
    * evacuate to an older generation, adjust it here (see comment
    * by evacuate()).
    */
-  if (stp->gen_no < evac_gen) {
-      if (eager_promotion) {
-	  stp = &generations[evac_gen].steps[0];
+  if (stp->gen_no < gct->evac_gen) {
+      if (gct->eager_promotion) {
+	  stp = &generations[gct->evac_gen].steps[0];
       } else {
-	  failed_to_evac = rtsTrue;
+	  gct->failed_to_evac = rtsTrue;
       }
   }
+
+  ws = &gct->steps[stp->gen_no][stp->no];
 
   /* chain a new block onto the to-space for the destination step if
    * necessary.
    */
-  if (stp->scavd_hp + size >= stp->scavd_hpLim) {
-    gc_alloc_scavd_block(stp);
+  bd = ws->scavd_list;
+  to = bd->free;
+  if (to + size >= bd->start + BLOCK_SIZE_W) {
+      bd = gc_alloc_scavd_block(ws);
+      to = bd->free;
   }
 
-  to = stp->scavd_hp;
   from = (StgPtr)src;
-  stp->scavd_hp = to + size;
+  bd->free = to + size;
   for (i = 0; i < size; i++) { // unroll for small i
       to[i] = from[i];
   }
@@ -138,57 +141,59 @@ copy_noscav_tag(StgClosure *src, nat size, step *stp, StgWord tag)
 #ifdef PROFILING
   // We store the size of the just evacuated object in the LDV word so that
   // the profiler can guess the position of the next object later.
-  SET_EVACUAEE_FOR_LDV(from, size_org);
+  SET_EVACUAEE_FOR_LDV(from, size);
 #endif
   return (StgClosure *)to;
 }
+
 
 /* Special version of copy() for when we only want to copy the info
  * pointer of an object, but reserve some padding after it.  This is
  * used to optimise evacuation of BLACKHOLEs.
  */
-
-
 static StgClosure *
 copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
 {
-  P_ dest, to, from;
-#ifdef PROFILING
-  // @LDV profiling
-  nat size_to_copy_org = size_to_copy;
-#endif
+  StgPtr to, from;
+  nat i;
+  step_workspace *ws;
+  bdescr *bd;
 
   TICK_GC_WORDS_COPIED(size_to_copy);
-  if (stp->gen_no < evac_gen) {
-      if (eager_promotion) {
-	  stp = &generations[evac_gen].steps[0];
+  if (stp->gen_no < gct->evac_gen) {
+      if (gct->eager_promotion) {
+	  stp = &generations[gct->evac_gen].steps[0];
       } else {
-	  failed_to_evac = rtsTrue;
+	  gct->failed_to_evac = rtsTrue;
       }
   }
 
-  if (stp->hp + size_to_reserve >= stp->hpLim) {
-    gc_alloc_block(stp);
+  ws = &gct->steps[stp->gen_no][stp->no];
+
+  bd = ws->todo_bd;
+  to = bd->free;
+  if (to + size_to_reserve >= bd->start + BLOCK_SIZE_W) {
+      bd = gc_alloc_todo_block(ws);
+      to = bd->free;
   }
 
-  for(to = stp->hp, from = (P_)src; size_to_copy>0; --size_to_copy) {
-    *to++ = *from++;
+  from = (StgPtr)src;
+  bd->free = to + size_to_reserve;
+  for (i = 0; i < size_to_copy; i++) { // unroll for small i
+      to[i] = from[i];
   }
   
-  dest = stp->hp;
-  stp->hp += size_to_reserve;
-  upd_evacuee(src,(StgClosure *)dest);
+  upd_evacuee((StgClosure *)from,(StgClosure *)to);
+
 #ifdef PROFILING
   // We store the size of the just evacuated object in the LDV word so that
   // the profiler can guess the position of the next object later.
-  // size_to_copy_org is wrong because the closure already occupies size_to_reserve
-  // words.
-  SET_EVACUAEE_FOR_LDV(src, size_to_reserve);
+  SET_EVACUAEE_FOR_LDV(from, size_to_reserve);
   // fill the slop
-  if (size_to_reserve - size_to_copy_org > 0)
-    LDV_FILL_SLOP(stp->hp - 1, (int)(size_to_reserve - size_to_copy_org)); 
+  if (size_to_reserve - size_to_copy > 0)
+    LDV_FILL_SLOP(to + size_to_copy - 1, (int)(size_to_reserve - size_to_copy)); 
 #endif
-  return (StgClosure *)dest;
+  return (StgClosure *)to;
 }
 
 
@@ -222,6 +227,7 @@ evacuate_large(StgPtr p)
 {
   bdescr *bd = Bdescr(p);
   step *stp;
+  step_workspace *ws;
 
   // object must be at the beginning of the block (or be a ByteArray)
   ASSERT(get_itbl((StgClosure *)p)->type == ARR_WORDS ||
@@ -229,17 +235,19 @@ evacuate_large(StgPtr p)
 
   // already evacuated? 
   if (bd->flags & BF_EVACUATED) { 
-    /* Don't forget to set the failed_to_evac flag if we didn't get
+    /* Don't forget to set the gct->failed_to_evac flag if we didn't get
      * the desired destination (see comments in evacuate()).
      */
-    if (bd->gen_no < evac_gen) {
-      failed_to_evac = rtsTrue;
+    if (bd->gen_no < gct->evac_gen) {
+      gct->failed_to_evac = rtsTrue;
       TICK_GC_FAILED_PROMOTION();
     }
     return;
   }
 
   stp = bd->step;
+
+  ACQUIRE_SPIN_LOCK(&stp->sync_large_objects);
   // remove from large_object list 
   if (bd->u.back) {
     bd->u.back->link = bd->link;
@@ -249,22 +257,24 @@ evacuate_large(StgPtr p)
   if (bd->link) {
     bd->link->u.back = bd->u.back;
   }
+  RELEASE_SPIN_LOCK(&stp->sync_large_objects);
   
   /* link it on to the evacuated large object list of the destination step
    */
   stp = bd->step->to;
-  if (stp->gen_no < evac_gen) {
-      if (eager_promotion) {
-	  stp = &generations[evac_gen].steps[0];
+  if (stp->gen_no < gct->evac_gen) {
+      if (gct->eager_promotion) {
+	  stp = &generations[gct->evac_gen].steps[0];
       } else {
-	  failed_to_evac = rtsTrue;
+	  gct->failed_to_evac = rtsTrue;
       }
   }
 
+  ws = &gct->steps[stp->gen_no][stp->no];
   bd->step = stp;
   bd->gen_no = stp->gen_no;
-  bd->link = stp->new_large_objects;
-  stp->new_large_objects = bd;
+  bd->link = ws->todo_large_objects;
+  ws->todo_large_objects = bd;
   bd->flags |= BF_EVACUATED;
 }
 
@@ -274,22 +284,22 @@ evacuate_large(StgPtr p)
    This is called (eventually) for every live object in the system.
 
    The caller to evacuate specifies a desired generation in the
-   evac_gen global variable.  The following conditions apply to
+   gct->evac_gen thread-lock variable.  The following conditions apply to
    evacuating an object which resides in generation M when we're
    collecting up to generation N
 
-   if  M >= evac_gen 
+   if  M >= gct->evac_gen 
            if  M > N     do nothing
 	   else          evac to step->to
 
-   if  M < evac_gen      evac to evac_gen, step 0
+   if  M < gct->evac_gen      evac to gct->evac_gen, step 0
 
    if the object is already evacuated, then we check which generation
    it now resides in.
 
-   if  M >= evac_gen     do nothing
-   if  M <  evac_gen     set failed_to_evac flag to indicate that we
-                         didn't manage to evacuate this object into evac_gen.
+   if  M >= gct->evac_gen     do nothing
+   if  M <  gct->evac_gen     set gct->failed_to_evac flag to indicate that we
+                         didn't manage to evacuate this object into gct->evac_gen.
 
 
    OPTIMISATION NOTES:
@@ -385,12 +395,12 @@ loop:
   if (bd->gen_no > N) {
       /* Can't evacuate this object, because it's in a generation
        * older than the ones we're collecting.  Let's hope that it's
-       * in evac_gen or older, or we will have to arrange to track
+       * in gct->evac_gen or older, or we will have to arrange to track
        * this pointer using the mutable list.
        */
-      if (bd->gen_no < evac_gen) {
+      if (bd->gen_no < gct->evac_gen) {
 	  // nope 
-	  failed_to_evac = rtsTrue;
+	  gct->failed_to_evac = rtsTrue;
 	  TICK_GC_FAILED_PROMOTION();
       }
       return TAG_CLOSURE(tag,q);
@@ -404,8 +414,8 @@ loop:
        * object twice, for example).
        */
       if (bd->flags & BF_EVACUATED) {
-	  if (bd->gen_no < evac_gen) {
-	      failed_to_evac = rtsTrue;
+	  if (bd->gen_no < gct->evac_gen) {
+	      gct->failed_to_evac = rtsTrue;
 	      TICK_GC_FAILED_PROMOTION();
 	  }
 	  return TAG_CLOSURE(tag,q);
@@ -556,10 +566,10 @@ loop:
 
   case EVACUATED:
     /* Already evacuated, just return the forwarding address.
-     * HOWEVER: if the requested destination generation (evac_gen) is
+     * HOWEVER: if the requested destination generation (gct->evac_gen) is
      * older than the actual generation (because the object was
      * already evacuated to a younger generation) then we have to
-     * set the failed_to_evac flag to indicate that we couldn't 
+     * set the gct->failed_to_evac flag to indicate that we couldn't 
      * manage to promote the object to the desired generation.
      */
     /* 
@@ -571,10 +581,10 @@ loop:
      * current object would be evacuated to, so we only do the full
      * check if stp is too low.
      */
-    if (evac_gen > 0 && stp->gen_no < evac_gen) {  // optimisation 
+    if (gct->evac_gen > 0 && stp->gen_no < gct->evac_gen) {  // optimisation 
       StgClosure *p = ((StgEvacuated*)q)->evacuee;
-      if (HEAP_ALLOCED(p) && Bdescr((P_)p)->gen_no < evac_gen) {
-	failed_to_evac = rtsTrue;
+      if (HEAP_ALLOCED(p) && Bdescr((P_)p)->gen_no < gct->evac_gen) {
+	gct->failed_to_evac = rtsTrue;
 	TICK_GC_FAILED_PROMOTION();
       }
     }
@@ -832,16 +842,16 @@ selector_loop:
 
           // recursively evaluate this selector.  We don't want to
           // recurse indefinitely, so we impose a depth bound.
-	  if (thunk_selector_depth >= MAX_THUNK_SELECTOR_DEPTH) {
+	  if (gct->thunk_selector_depth >= MAX_THUNK_SELECTOR_DEPTH) {
 	      goto bale_out;
 	  }
 
-	  thunk_selector_depth++;
+	  gct->thunk_selector_depth++;
           // rtsFalse says "don't evacuate the result".  It will,
           // however, update any THUNK_SELECTORs that are evaluated
           // along the way.
 	  val = eval_thunk_selector((StgSelector *)selectee, rtsFalse);
-	  thunk_selector_depth--;
+	  gct->thunk_selector_depth--;
 
           // did we actually manage to evaluate it?
           if (val == selectee) goto bale_out;

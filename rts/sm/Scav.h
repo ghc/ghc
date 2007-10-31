@@ -11,8 +11,5 @@
  *
  * ---------------------------------------------------------------------------*/
 
-void scavenge                ( step * );
-void scavenge_mark_stack     ( void );
-void scavenge_large          ( step * );
-void scavenge_static         ( void );
-void scavenge_mutable_list   ( generation *g );
+void scavenge_loop (void);
+void scavenge_mutable_list (generation *g);

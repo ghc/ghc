@@ -29,6 +29,8 @@
 #include "RetainerProfile.h"	// for counting memory blocks (memInventory)
 #include "OSMem.h"
 #include "Trace.h"
+#include "GC.h"
+#include "GCUtils.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -84,20 +86,16 @@ initStep (step *stp, int g, int s)
     stp->n_old_blocks = 0;
     stp->gen = &generations[g];
     stp->gen_no = g;
-    stp->hp = NULL;
-    stp->hpLim = NULL;
-    stp->hp_bd = NULL;
-    stp->scavd_hp = NULL;
-    stp->scavd_hpLim = NULL;
-    stp->scan = NULL;
-    stp->scan_bd = NULL;
     stp->large_objects = NULL;
     stp->n_large_blocks = 0;
-    stp->new_large_objects = NULL;
     stp->scavenged_large_objects = NULL;
     stp->n_scavenged_large_blocks = 0;
     stp->is_compacted = 0;
     stp->bitmap = NULL;
+#ifdef THREADED_RTS
+    initSpinLock(&stp->sync_todo);
+    initSpinLock(&stp->sync_large_objects);
+#endif
 }
 
 void
@@ -247,6 +245,10 @@ initStorage( void )
 
   /* Tell GNU multi-precision pkg about our custom alloc functions */
   mp_set_memory_functions(stgAllocForGMP, stgReallocForGMP, stgDeallocForGMP);
+
+#ifdef THREADED_RTS
+  initSpinLock(&gc_alloc_block_sync);
+#endif
 
   IF_DEBUG(gc, statDescribeGens());
 

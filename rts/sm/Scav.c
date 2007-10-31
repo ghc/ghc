@@ -12,21 +12,27 @@
  * ---------------------------------------------------------------------------*/
 
 #include "Rts.h"
+#include "RtsFlags.h"
 #include "Storage.h"
 #include "MBlock.h"
 #include "GC.h"
+#include "GCUtils.h"
 #include "Compact.h"
 #include "Evac.h"
 #include "Scav.h"
 #include "Apply.h"
 #include "Trace.h"
 #include "LdvProfile.h"
+#include "Sanity.h"
 
 static void scavenge_stack (StgPtr p, StgPtr stack_end);
 
 static void scavenge_large_bitmap (StgPtr p, 
 				   StgLargeBitmap *large_bitmap, 
 				   nat size );
+
+static void scavenge_block (bdescr *bd, StgPtr scan);
+
 
 /* Similar to scavenge_large_bitmap(), but we don't write back the
  * pointers we get back from evacuate().
@@ -247,48 +253,42 @@ scavenge_AP (StgAP *ap)
 }
 
 /* -----------------------------------------------------------------------------
-   Scavenge a given step until there are no more objects in this step
-   to scavenge.
+   Scavenge a block from the given scan pointer up to bd->free.
 
    evac_gen is set by the caller to be either zero (for a step in a
    generation < N) or G where G is the generation of the step being
    scavenged.  
 
    We sometimes temporarily change evac_gen back to zero if we're
-   scavenging a mutable object where early promotion isn't such a good
+   scavenging a mutable object where eager promotion isn't such a good
    idea.  
    -------------------------------------------------------------------------- */
 
-void
-scavenge(step *stp)
+static void
+scavenge_block (bdescr *bd, StgPtr scan)
 {
   StgPtr p, q;
   StgInfoTable *info;
-  bdescr *bd;
-  nat saved_evac_gen = evac_gen;
+  nat saved_evac_gen;
 
-  p = stp->scan;
-  bd = stp->scan_bd;
+  p = scan;
+  
+  debugTrace(DEBUG_gc, "scavenging block %p (gen %d, step %d) @ %p",
+	     bd->start, bd->gen_no, bd->step->no, scan);
 
-  failed_to_evac = rtsFalse;
+  gct->evac_gen = bd->gen_no;
+  saved_evac_gen = gct->evac_gen;
+  gct->failed_to_evac = rtsFalse;
 
-  /* scavenge phase - standard breadth-first scavenging of the
-   * evacuated objects 
-   */
-
-  while (bd != stp->hp_bd || p < stp->hp) {
-
-    // If we're at the end of this block, move on to the next block 
-    if (bd != stp->hp_bd && p == bd->free) {
-      bd = bd->link;
-      p = bd->start;
-      continue;
-    }
+  // we might be evacuating into the very object that we're
+  // scavenging, so we have to check the real bd->free pointer each
+  // time around the loop.
+  while (p < bd->free) {
 
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl((StgClosure *)p);
     
-    ASSERT(thunk_selector_depth == 0);
+    ASSERT(gct->thunk_selector_depth == 0);
 
     q = p;
     switch (info->type) {
@@ -296,16 +296,16 @@ scavenge(step *stp)
     case MVAR_CLEAN:
     case MVAR_DIRTY:
     { 
-	rtsBool saved_eager_promotion = eager_promotion;
+	rtsBool saved_eager_promotion = gct->eager_promotion;
 
 	StgMVar *mvar = ((StgMVar *)p);
-	eager_promotion = rtsFalse;
+	gct->eager_promotion = rtsFalse;
 	mvar->head = (StgTSO *)evacuate((StgClosure *)mvar->head);
 	mvar->tail = (StgTSO *)evacuate((StgClosure *)mvar->tail);
 	mvar->value = evacuate((StgClosure *)mvar->value);
-	eager_promotion = saved_eager_promotion;
+	gct->eager_promotion = saved_eager_promotion;
 
-	if (failed_to_evac) {
+	if (gct->failed_to_evac) {
 	    mvar->header.info = &stg_MVAR_DIRTY_info;
 	} else {
 	    mvar->header.info = &stg_MVAR_CLEAN_info;
@@ -424,7 +424,7 @@ scavenge(step *stp)
     }
 
     case IND_PERM:
-      if (stp->gen->no != 0) {
+      if (bd->gen_no != 0) {
 #ifdef PROFILING
         // @LDV profiling
         // No need to call LDV_recordDead_FILL_SLOP_DYNAMIC() because an 
@@ -447,13 +447,13 @@ scavenge(step *stp)
 
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY: {
-	rtsBool saved_eager_promotion = eager_promotion;
+	rtsBool saved_eager_promotion = gct->eager_promotion;
 
-	eager_promotion = rtsFalse;
+	gct->eager_promotion = rtsFalse;
 	((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
-	eager_promotion = saved_eager_promotion;
+	gct->eager_promotion = saved_eager_promotion;
 
-	if (failed_to_evac) {
+	if (gct->failed_to_evac) {
 	    ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
 	} else {
 	    ((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;
@@ -512,21 +512,21 @@ scavenge(step *stp)
 	// array, but if we find the array only points to objects in
 	// the same or an older generation, we mark it "clean" and
 	// avoid traversing it during minor GCs.
-	saved_eager = eager_promotion;
-	eager_promotion = rtsFalse;
+	saved_eager = gct->eager_promotion;
+	gct->eager_promotion = rtsFalse;
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
 	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	}
-	eager_promotion = saved_eager;
+	gct->eager_promotion = saved_eager;
 
-	if (failed_to_evac) {
+	if (gct->failed_to_evac) {
 	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
 	} else {
 	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
 	}
 
-	failed_to_evac = rtsTrue; // always put it on the mutable list.
+	gct->failed_to_evac = rtsTrue; // always put it on the mutable list.
 	break;
     }
 
@@ -543,7 +543,7 @@ scavenge(step *stp)
 
 	// If we're going to put this object on the mutable list, then
 	// set its info ptr to MUT_ARR_PTRS_FROZEN0 to indicate that.
-	if (failed_to_evac) {
+	if (gct->failed_to_evac) {
 	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN0_info;
 	} else {
 	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_info;
@@ -554,19 +554,19 @@ scavenge(step *stp)
     case TSO:
     { 
 	StgTSO *tso = (StgTSO *)p;
-	rtsBool saved_eager = eager_promotion;
+	rtsBool saved_eager = gct->eager_promotion;
 
-	eager_promotion = rtsFalse;
+	gct->eager_promotion = rtsFalse;
 	scavengeTSO(tso);
-	eager_promotion = saved_eager;
+	gct->eager_promotion = saved_eager;
 
-	if (failed_to_evac) {
+	if (gct->failed_to_evac) {
 	    tso->flags |= TSO_DIRTY;
 	} else {
 	    tso->flags &= ~TSO_DIRTY;
 	}
 
-	failed_to_evac = rtsTrue; // always on the mutable list
+	gct->failed_to_evac = rtsTrue; // always on the mutable list
 	p += tso_sizeW(tso);
 	break;
     }
@@ -574,12 +574,12 @@ scavenge(step *stp)
     case TVAR_WATCH_QUEUE:
       {
 	StgTVarWatchQueue *wq = ((StgTVarWatchQueue *) p);
-	evac_gen = 0;
+	gct->evac_gen = 0;
 	wq->closure = (StgClosure*)evacuate((StgClosure*)wq->closure);
 	wq->next_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)wq->next_queue_entry);
 	wq->prev_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)wq->prev_queue_entry);
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable
+	gct->evac_gen = saved_evac_gen;
+	gct->failed_to_evac = rtsTrue; // mutable
 	p += sizeofW(StgTVarWatchQueue);
 	break;
       }
@@ -587,11 +587,11 @@ scavenge(step *stp)
     case TVAR:
       {
 	StgTVar *tvar = ((StgTVar *) p);
-	evac_gen = 0;
+	gct->evac_gen = 0;
 	tvar->current_value = evacuate((StgClosure*)tvar->current_value);
 	tvar->first_watch_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)tvar->first_watch_queue_entry);
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable
+	gct->evac_gen = saved_evac_gen;
+	gct->failed_to_evac = rtsTrue; // mutable
 	p += sizeofW(StgTVar);
 	break;
       }
@@ -599,12 +599,12 @@ scavenge(step *stp)
     case TREC_HEADER:
       {
         StgTRecHeader *trec = ((StgTRecHeader *) p);
-        evac_gen = 0;
+        gct->evac_gen = 0;
 	trec->enclosing_trec = (StgTRecHeader *)evacuate((StgClosure*)trec->enclosing_trec);
 	trec->current_chunk = (StgTRecChunk *)evacuate((StgClosure*)trec->current_chunk);
 	trec->invariants_to_check = (StgInvariantCheckQueue *)evacuate((StgClosure*)trec->invariants_to_check);
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable
+	gct->evac_gen = saved_evac_gen;
+	gct->failed_to_evac = rtsTrue; // mutable
 	p += sizeofW(StgTRecHeader);
         break;
       }
@@ -614,15 +614,15 @@ scavenge(step *stp)
 	StgWord i;
 	StgTRecChunk *tc = ((StgTRecChunk *) p);
 	TRecEntry *e = &(tc -> entries[0]);
-	evac_gen = 0;
+	gct->evac_gen = 0;
 	tc->prev_chunk = (StgTRecChunk *)evacuate((StgClosure*)tc->prev_chunk);
 	for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
 	  e->tvar = (StgTVar *)evacuate((StgClosure*)e->tvar);
 	  e->expected_value = evacuate((StgClosure*)e->expected_value);
 	  e->new_value = evacuate((StgClosure*)e->new_value);
 	}
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable
+	gct->evac_gen = saved_evac_gen;
+	gct->failed_to_evac = rtsTrue; // mutable
 	p += sizeofW(StgTRecChunk);
 	break;
       }
@@ -630,11 +630,11 @@ scavenge(step *stp)
     case ATOMIC_INVARIANT:
       {
         StgAtomicInvariant *invariant = ((StgAtomicInvariant *) p);
-        evac_gen = 0;
+        gct->evac_gen = 0;
 	invariant->code = (StgClosure *)evacuate(invariant->code);
 	invariant->last_execution = (StgTRecHeader *)evacuate((StgClosure*)invariant->last_execution);
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable
+	gct->evac_gen = saved_evac_gen;
+	gct->failed_to_evac = rtsTrue; // mutable
 	p += sizeofW(StgAtomicInvariant);
         break;
       }
@@ -642,12 +642,12 @@ scavenge(step *stp)
     case INVARIANT_CHECK_QUEUE:
       {
         StgInvariantCheckQueue *queue = ((StgInvariantCheckQueue *) p);
-        evac_gen = 0;
+        gct->evac_gen = 0;
 	queue->invariant = (StgAtomicInvariant *)evacuate((StgClosure*)queue->invariant);
 	queue->my_execution = (StgTRecHeader *)evacuate((StgClosure*)queue->my_execution);
 	queue->next_queue_entry = (StgInvariantCheckQueue *)evacuate((StgClosure*)queue->next_queue_entry);
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable
+	gct->evac_gen = saved_evac_gen;
+	gct->failed_to_evac = rtsTrue; // mutable
 	p += sizeofW(StgInvariantCheckQueue);
         break;
       }
@@ -664,16 +664,15 @@ scavenge(step *stp)
      * Case (b) arises if we didn't manage to promote everything that
      * the current object points to into the current generation.
      */
-    if (failed_to_evac) {
-	failed_to_evac = rtsFalse;
-	if (stp->gen_no > 0) {
-	    recordMutableGen((StgClosure *)q, stp->gen);
+    if (gct->failed_to_evac) {
+	gct->failed_to_evac = rtsFalse;
+	if (bd->gen_no > 0) {
+	    recordMutableGen_GC((StgClosure *)q, &generations[bd->gen_no]);
 	}
     }
   }
 
-  stp->scan_bd = bd;
-  stp->scan = p;
+  debugTrace(DEBUG_gc, "   scavenged %ld bytes", (bd->free - scan) * sizeof(W_));
 }    
 
 /* -----------------------------------------------------------------------------
@@ -684,15 +683,15 @@ scavenge(step *stp)
         doesn't need to advance the pointer on to the next object.
    -------------------------------------------------------------------------- */
 
-void
+static void
 scavenge_mark_stack(void)
 {
     StgPtr p, q;
     StgInfoTable *info;
     nat saved_evac_gen;
 
-    evac_gen = oldest_gen->no;
-    saved_evac_gen = evac_gen;
+    gct->evac_gen = oldest_gen->no;
+    saved_evac_gen = gct->evac_gen;
 
 linear_scan:
     while (!mark_stack_empty()) {
@@ -707,16 +706,16 @@ linear_scan:
         case MVAR_CLEAN:
         case MVAR_DIRTY:
         { 
-            rtsBool saved_eager_promotion = eager_promotion;
+            rtsBool saved_eager_promotion = gct->eager_promotion;
             
             StgMVar *mvar = ((StgMVar *)p);
-            eager_promotion = rtsFalse;
+            gct->eager_promotion = rtsFalse;
             mvar->head = (StgTSO *)evacuate((StgClosure *)mvar->head);
             mvar->tail = (StgTSO *)evacuate((StgClosure *)mvar->tail);
             mvar->value = evacuate((StgClosure *)mvar->value);
-            eager_promotion = saved_eager_promotion;
+            gct->eager_promotion = saved_eager_promotion;
             
-            if (failed_to_evac) {
+            if (gct->failed_to_evac) {
                 mvar->header.info = &stg_MVAR_DIRTY_info;
             } else {
                 mvar->header.info = &stg_MVAR_CLEAN_info;
@@ -824,13 +823,13 @@ linear_scan:
 
 	case MUT_VAR_CLEAN:
 	case MUT_VAR_DIRTY: {
-	    rtsBool saved_eager_promotion = eager_promotion;
+	    rtsBool saved_eager_promotion = gct->eager_promotion;
 	    
-	    eager_promotion = rtsFalse;
+	    gct->eager_promotion = rtsFalse;
 	    ((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
-	    eager_promotion = saved_eager_promotion;
+	    gct->eager_promotion = saved_eager_promotion;
 	    
-	    if (failed_to_evac) {
+	    if (gct->failed_to_evac) {
 		((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
 	    } else {
 		((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;
@@ -881,21 +880,21 @@ linear_scan:
 	    // array, but if we find the array only points to objects in
 	    // the same or an older generation, we mark it "clean" and
 	    // avoid traversing it during minor GCs.
-	    saved_eager = eager_promotion;
-	    eager_promotion = rtsFalse;
+	    saved_eager = gct->eager_promotion;
+	    gct->eager_promotion = rtsFalse;
 	    next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	    for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
 		*p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	    }
-	    eager_promotion = saved_eager;
+	    gct->eager_promotion = saved_eager;
 
-	    if (failed_to_evac) {
+	    if (gct->failed_to_evac) {
 		((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
 	    } else {
 		((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
 	    }
 
-	    failed_to_evac = rtsTrue; // mutable anyhow.
+	    gct->failed_to_evac = rtsTrue; // mutable anyhow.
 	    break;
 	}
 
@@ -912,7 +911,7 @@ linear_scan:
 
 	    // If we're going to put this object on the mutable list, then
 	    // set its info ptr to MUT_ARR_PTRS_FROZEN0 to indicate that.
-	    if (failed_to_evac) {
+	    if (gct->failed_to_evac) {
 		((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN0_info;
 	    } else {
 		((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_info;
@@ -923,42 +922,42 @@ linear_scan:
 	case TSO:
 	{ 
 	    StgTSO *tso = (StgTSO *)p;
-	    rtsBool saved_eager = eager_promotion;
+	    rtsBool saved_eager = gct->eager_promotion;
 
-	    eager_promotion = rtsFalse;
+	    gct->eager_promotion = rtsFalse;
 	    scavengeTSO(tso);
-	    eager_promotion = saved_eager;
+	    gct->eager_promotion = saved_eager;
 	    
-	    if (failed_to_evac) {
+	    if (gct->failed_to_evac) {
 		tso->flags |= TSO_DIRTY;
 	    } else {
 		tso->flags &= ~TSO_DIRTY;
 	    }
 	    
-	    failed_to_evac = rtsTrue; // always on the mutable list
+	    gct->failed_to_evac = rtsTrue; // always on the mutable list
 	    break;
 	}
 
 	case TVAR_WATCH_QUEUE:
 	  {
 	    StgTVarWatchQueue *wq = ((StgTVarWatchQueue *) p);
-	    evac_gen = 0;
+	    gct->evac_gen = 0;
             wq->closure = (StgClosure*)evacuate((StgClosure*)wq->closure);
 	    wq->next_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)wq->next_queue_entry);
 	    wq->prev_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)wq->prev_queue_entry);
-	    evac_gen = saved_evac_gen;
-	    failed_to_evac = rtsTrue; // mutable
+	    gct->evac_gen = saved_evac_gen;
+	    gct->failed_to_evac = rtsTrue; // mutable
 	    break;
 	  }
 	  
 	case TVAR:
 	  {
 	    StgTVar *tvar = ((StgTVar *) p);
-	    evac_gen = 0;
+	    gct->evac_gen = 0;
 	    tvar->current_value = evacuate((StgClosure*)tvar->current_value);
 	    tvar->first_watch_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)tvar->first_watch_queue_entry);
-	    evac_gen = saved_evac_gen;
-	    failed_to_evac = rtsTrue; // mutable
+	    gct->evac_gen = saved_evac_gen;
+	    gct->failed_to_evac = rtsTrue; // mutable
 	    break;
 	  }
 	  
@@ -967,50 +966,50 @@ linear_scan:
 	    StgWord i;
 	    StgTRecChunk *tc = ((StgTRecChunk *) p);
 	    TRecEntry *e = &(tc -> entries[0]);
-	    evac_gen = 0;
+	    gct->evac_gen = 0;
 	    tc->prev_chunk = (StgTRecChunk *)evacuate((StgClosure*)tc->prev_chunk);
 	    for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
 	      e->tvar = (StgTVar *)evacuate((StgClosure*)e->tvar);
 	      e->expected_value = evacuate((StgClosure*)e->expected_value);
 	      e->new_value = evacuate((StgClosure*)e->new_value);
 	    }
-	    evac_gen = saved_evac_gen;
-	    failed_to_evac = rtsTrue; // mutable
+	    gct->evac_gen = saved_evac_gen;
+	    gct->failed_to_evac = rtsTrue; // mutable
 	    break;
 	  }
 
 	case TREC_HEADER:
 	  {
 	    StgTRecHeader *trec = ((StgTRecHeader *) p);
-	    evac_gen = 0;
+	    gct->evac_gen = 0;
 	    trec->enclosing_trec = (StgTRecHeader *)evacuate((StgClosure*)trec->enclosing_trec);
 	    trec->current_chunk = (StgTRecChunk *)evacuate((StgClosure*)trec->current_chunk);
   	    trec->invariants_to_check = (StgInvariantCheckQueue *)evacuate((StgClosure*)trec->invariants_to_check);
-	    evac_gen = saved_evac_gen;
-	    failed_to_evac = rtsTrue; // mutable
+	    gct->evac_gen = saved_evac_gen;
+	    gct->failed_to_evac = rtsTrue; // mutable
 	    break;
 	  }
 
         case ATOMIC_INVARIANT:
           {
             StgAtomicInvariant *invariant = ((StgAtomicInvariant *) p);
-            evac_gen = 0;
+            gct->evac_gen = 0;
 	    invariant->code = (StgClosure *)evacuate(invariant->code);
     	    invariant->last_execution = (StgTRecHeader *)evacuate((StgClosure*)invariant->last_execution);
-	    evac_gen = saved_evac_gen;
-	    failed_to_evac = rtsTrue; // mutable
+	    gct->evac_gen = saved_evac_gen;
+	    gct->failed_to_evac = rtsTrue; // mutable
             break;
           }
 
         case INVARIANT_CHECK_QUEUE:
           {
             StgInvariantCheckQueue *queue = ((StgInvariantCheckQueue *) p);
-            evac_gen = 0;
+            gct->evac_gen = 0;
     	    queue->invariant = (StgAtomicInvariant *)evacuate((StgClosure*)queue->invariant);
 	    queue->my_execution = (StgTRecHeader *)evacuate((StgClosure*)queue->my_execution);
             queue->next_queue_entry = (StgInvariantCheckQueue *)evacuate((StgClosure*)queue->next_queue_entry);
-	    evac_gen = saved_evac_gen;
-	    failed_to_evac = rtsTrue; // mutable
+	    gct->evac_gen = saved_evac_gen;
+	    gct->failed_to_evac = rtsTrue; // mutable
             break;
           }
 
@@ -1019,10 +1018,10 @@ linear_scan:
 		 info->type, p);
 	}
 
-	if (failed_to_evac) {
-	    failed_to_evac = rtsFalse;
-	    if (evac_gen > 0) {
-		recordMutableGen((StgClosure *)q, &generations[evac_gen]);
+	if (gct->failed_to_evac) {
+	    gct->failed_to_evac = rtsFalse;
+	    if (gct->evac_gen > 0) {
+		recordMutableGen_GC((StgClosure *)q, &generations[gct->evac_gen]);
 	    }
 	}
 	
@@ -1082,7 +1081,7 @@ static rtsBool
 scavenge_one(StgPtr p)
 {
     const StgInfoTable *info;
-    nat saved_evac_gen = evac_gen;
+    nat saved_evac_gen = gct->evac_gen;
     rtsBool no_luck;
     
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
@@ -1093,16 +1092,16 @@ scavenge_one(StgPtr p)
     case MVAR_CLEAN:
     case MVAR_DIRTY:
     { 
-	rtsBool saved_eager_promotion = eager_promotion;
+	rtsBool saved_eager_promotion = gct->eager_promotion;
 
 	StgMVar *mvar = ((StgMVar *)p);
-	eager_promotion = rtsFalse;
+	gct->eager_promotion = rtsFalse;
 	mvar->head = (StgTSO *)evacuate((StgClosure *)mvar->head);
 	mvar->tail = (StgTSO *)evacuate((StgClosure *)mvar->tail);
 	mvar->value = evacuate((StgClosure *)mvar->value);
-	eager_promotion = saved_eager_promotion;
+	gct->eager_promotion = saved_eager_promotion;
 
-	if (failed_to_evac) {
+	if (gct->failed_to_evac) {
 	    mvar->header.info = &stg_MVAR_DIRTY_info;
 	} else {
 	    mvar->header.info = &stg_MVAR_CLEAN_info;
@@ -1153,13 +1152,13 @@ scavenge_one(StgPtr p)
     case MUT_VAR_CLEAN:
     case MUT_VAR_DIRTY: {
 	StgPtr q = p;
-	rtsBool saved_eager_promotion = eager_promotion;
+	rtsBool saved_eager_promotion = gct->eager_promotion;
 
-	eager_promotion = rtsFalse;
+	gct->eager_promotion = rtsFalse;
 	((StgMutVar *)p)->var = evacuate(((StgMutVar *)p)->var);
-	eager_promotion = saved_eager_promotion;
+	gct->eager_promotion = saved_eager_promotion;
 
-	if (failed_to_evac) {
+	if (gct->failed_to_evac) {
 	    ((StgClosure *)q)->header.info = &stg_MUT_VAR_DIRTY_info;
 	} else {
 	    ((StgClosure *)q)->header.info = &stg_MUT_VAR_CLEAN_info;
@@ -1212,22 +1211,22 @@ scavenge_one(StgPtr p)
 	// array, but if we find the array only points to objects in
 	// the same or an older generation, we mark it "clean" and
 	// avoid traversing it during minor GCs.
-	saved_eager = eager_promotion;
-	eager_promotion = rtsFalse;
+	saved_eager = gct->eager_promotion;
+	gct->eager_promotion = rtsFalse;
 	q = p;
 	next = p + mut_arr_ptrs_sizeW((StgMutArrPtrs*)p);
 	for (p = (P_)((StgMutArrPtrs *)p)->payload; p < next; p++) {
 	    *p = (StgWord)(StgPtr)evacuate((StgClosure *)*p);
 	}
-	eager_promotion = saved_eager;
+	gct->eager_promotion = saved_eager;
 
-	if (failed_to_evac) {
+	if (gct->failed_to_evac) {
 	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_DIRTY_info;
 	} else {
 	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_CLEAN_info;
 	}
 
-	failed_to_evac = rtsTrue;
+	gct->failed_to_evac = rtsTrue;
 	break;
     }
 
@@ -1244,7 +1243,7 @@ scavenge_one(StgPtr p)
 
 	// If we're going to put this object on the mutable list, then
 	// set its info ptr to MUT_ARR_PTRS_FROZEN0 to indicate that.
-	if (failed_to_evac) {
+	if (gct->failed_to_evac) {
 	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN0_info;
 	} else {
 	    ((StgClosure *)q)->header.info = &stg_MUT_ARR_PTRS_FROZEN_info;
@@ -1255,54 +1254,54 @@ scavenge_one(StgPtr p)
     case TSO:
     {
 	StgTSO *tso = (StgTSO *)p;
-	rtsBool saved_eager = eager_promotion;
+	rtsBool saved_eager = gct->eager_promotion;
 
-	eager_promotion = rtsFalse;
+	gct->eager_promotion = rtsFalse;
 	scavengeTSO(tso);
-	eager_promotion = saved_eager;
+	gct->eager_promotion = saved_eager;
 
-	if (failed_to_evac) {
+	if (gct->failed_to_evac) {
 	    tso->flags |= TSO_DIRTY;
 	} else {
 	    tso->flags &= ~TSO_DIRTY;
 	}
 
-	failed_to_evac = rtsTrue; // always on the mutable list
+	gct->failed_to_evac = rtsTrue; // always on the mutable list
 	break;
     }
   
     case TVAR_WATCH_QUEUE:
       {
 	StgTVarWatchQueue *wq = ((StgTVarWatchQueue *) p);
-	evac_gen = 0;
+	gct->evac_gen = 0;
         wq->closure = (StgClosure*)evacuate((StgClosure*)wq->closure);
         wq->next_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)wq->next_queue_entry);
         wq->prev_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)wq->prev_queue_entry);
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable
+	gct->evac_gen = saved_evac_gen;
+	gct->failed_to_evac = rtsTrue; // mutable
 	break;
       }
 
     case TVAR:
       {
 	StgTVar *tvar = ((StgTVar *) p);
-	evac_gen = 0;
+	gct->evac_gen = 0;
 	tvar->current_value = evacuate((StgClosure*)tvar->current_value);
         tvar->first_watch_queue_entry = (StgTVarWatchQueue *)evacuate((StgClosure*)tvar->first_watch_queue_entry);
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable
+	gct->evac_gen = saved_evac_gen;
+	gct->failed_to_evac = rtsTrue; // mutable
 	break;
       }
 
     case TREC_HEADER:
       {
         StgTRecHeader *trec = ((StgTRecHeader *) p);
-        evac_gen = 0;
+        gct->evac_gen = 0;
 	trec->enclosing_trec = (StgTRecHeader *)evacuate((StgClosure*)trec->enclosing_trec);
 	trec->current_chunk = (StgTRecChunk *)evacuate((StgClosure*)trec->current_chunk);
         trec->invariants_to_check = (StgInvariantCheckQueue *)evacuate((StgClosure*)trec->invariants_to_check);
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable
+	gct->evac_gen = saved_evac_gen;
+	gct->failed_to_evac = rtsTrue; // mutable
         break;
       }
 
@@ -1311,38 +1310,38 @@ scavenge_one(StgPtr p)
 	StgWord i;
 	StgTRecChunk *tc = ((StgTRecChunk *) p);
 	TRecEntry *e = &(tc -> entries[0]);
-	evac_gen = 0;
+	gct->evac_gen = 0;
 	tc->prev_chunk = (StgTRecChunk *)evacuate((StgClosure*)tc->prev_chunk);
 	for (i = 0; i < tc -> next_entry_idx; i ++, e++ ) {
 	  e->tvar = (StgTVar *)evacuate((StgClosure*)e->tvar);
 	  e->expected_value = evacuate((StgClosure*)e->expected_value);
 	  e->new_value = evacuate((StgClosure*)e->new_value);
 	}
-	evac_gen = saved_evac_gen;
-	failed_to_evac = rtsTrue; // mutable
+	gct->evac_gen = saved_evac_gen;
+	gct->failed_to_evac = rtsTrue; // mutable
 	break;
       }
 
     case ATOMIC_INVARIANT:
     {
       StgAtomicInvariant *invariant = ((StgAtomicInvariant *) p);
-      evac_gen = 0;
+      gct->evac_gen = 0;
       invariant->code = (StgClosure *)evacuate(invariant->code);
       invariant->last_execution = (StgTRecHeader *)evacuate((StgClosure*)invariant->last_execution);
-      evac_gen = saved_evac_gen;
-      failed_to_evac = rtsTrue; // mutable
+      gct->evac_gen = saved_evac_gen;
+      gct->failed_to_evac = rtsTrue; // mutable
       break;
     }
 
     case INVARIANT_CHECK_QUEUE:
     {
       StgInvariantCheckQueue *queue = ((StgInvariantCheckQueue *) p);
-      evac_gen = 0;
+      gct->evac_gen = 0;
       queue->invariant = (StgAtomicInvariant *)evacuate((StgClosure*)queue->invariant);
       queue->my_execution = (StgTRecHeader *)evacuate((StgClosure*)queue->my_execution);
       queue->next_queue_entry = (StgInvariantCheckQueue *)evacuate((StgClosure*)queue->next_queue_entry);
-      evac_gen = saved_evac_gen;
-      failed_to_evac = rtsTrue; // mutable
+      gct->evac_gen = saved_evac_gen;
+      gct->failed_to_evac = rtsTrue; // mutable
       break;
     }
 
@@ -1395,8 +1394,8 @@ scavenge_one(StgPtr p)
 	barf("scavenge_one: strange object %d", (int)(info->type));
     }    
 
-    no_luck = failed_to_evac;
-    failed_to_evac = rtsFalse;
+    no_luck = gct->failed_to_evac;
+    gct->failed_to_evac = rtsFalse;
     return (no_luck);
 }
 
@@ -1416,7 +1415,7 @@ scavenge_mutable_list(generation *gen)
 
     bd = gen->saved_mut_list;
 
-    evac_gen = gen->no;
+    gct->evac_gen = gen->no;
     for (; bd != NULL; bd = bd->link) {
 	for (q = bd->start; q < bd->free; q++) {
 	    p = (StgPtr)*q;
@@ -1451,7 +1450,7 @@ scavenge_mutable_list(generation *gen)
 	    //
 	    switch (get_itbl((StgClosure *)p)->type) {
 	    case MUT_ARR_PTRS_CLEAN:
-		recordMutableGen((StgClosure *)p,gen);
+		recordMutableGen_GC((StgClosure *)p,gen);
 		continue;
 	    case TSO: {
 		StgTSO *tso = (StgTSO *)p;
@@ -1463,7 +1462,7 @@ scavenge_mutable_list(generation *gen)
 		    if (tso->why_blocked != BlockedOnBlackHole) {
 			tso->link = (StgTSO *)evacuate((StgClosure *)tso->link);
 		    }
-		    recordMutableGen((StgClosure *)p,gen);
+		    recordMutableGen_GC((StgClosure *)p,gen);
 		    continue;
 		}
 	    }
@@ -1474,7 +1473,7 @@ scavenge_mutable_list(generation *gen)
 	    if (scavenge_one(p)) {
 		// didn't manage to promote everything, so put the
 		// object back on the list.
-		recordMutableGen((StgClosure *)p,gen);
+		recordMutableGen_GC((StgClosure *)p,gen);
 	    }
 	}
     }
@@ -1492,7 +1491,7 @@ scavenge_mutable_list(generation *gen)
    remove non-mutable objects from the mutable list at this point.
    -------------------------------------------------------------------------- */
 
-void
+static void
 scavenge_static(void)
 {
   StgClosure* p = static_objects;
@@ -1500,7 +1499,7 @@ scavenge_static(void)
 
   /* Always evacuate straight to the oldest generation for static
    * objects */
-  evac_gen = oldest_gen->no;
+  gct->evac_gen = oldest_gen->no;
 
   /* keep going until we've scavenged all the objects on the linked
      list... */
@@ -1533,9 +1532,9 @@ scavenge_static(void)
 	 * leave it *on* the scavenged_static_objects list, though,
 	 * in case we visit this object again.
 	 */
-	if (failed_to_evac) {
-	  failed_to_evac = rtsFalse;
-	  recordMutableGen((StgClosure *)p,oldest_gen);
+	if (gct->failed_to_evac) {
+	  gct->failed_to_evac = rtsFalse;
+	  recordMutableGen_GC((StgClosure *)p,oldest_gen);
 	}
 	break;
       }
@@ -1564,7 +1563,7 @@ scavenge_static(void)
       barf("scavenge_static: strange closure %d", (int)(info->type));
     }
 
-    ASSERT(failed_to_evac == rtsFalse);
+    ASSERT(gct->failed_to_evac == rtsFalse);
 
     /* get the next static object from the list.  Remember, there might
      * be more stuff on this list now that we've done some evacuating!
@@ -1775,33 +1774,176 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
   be zero.
   --------------------------------------------------------------------------- */
 
-void
-scavenge_large(step *stp)
+static void
+scavenge_large (step_workspace *ws)
 {
-  bdescr *bd;
-  StgPtr p;
+    bdescr *bd;
+    StgPtr p;
 
-  bd = stp->new_large_objects;
+    gct->evac_gen = ws->stp->gen_no;
 
-  for (; bd != NULL; bd = stp->new_large_objects) {
-
-    /* take this object *off* the large objects list and put it on
-     * the scavenged large objects list.  This is so that we can
-     * treat new_large_objects as a stack and push new objects on
-     * the front when evacuating.
-     */
-    stp->new_large_objects = bd->link;
-    dbl_link_onto(bd, &stp->scavenged_large_objects);
-
-    // update the block count in this step.
-    stp->n_scavenged_large_blocks += bd->blocks;
-
-    p = bd->start;
-    if (scavenge_one(p)) {
-	if (stp->gen_no > 0) {
-	    recordMutableGen((StgClosure *)p, stp->gen);
+    bd = ws->todo_large_objects;
+    
+    for (; bd != NULL; bd = ws->todo_large_objects) {
+	
+	// take this object *off* the large objects list and put it on
+	// the scavenged large objects list.  This is so that we can
+	// treat new_large_objects as a stack and push new objects on
+	// the front when evacuating.
+	ws->todo_large_objects = bd->link;
+	
+	ACQUIRE_SPIN_LOCK(&ws->stp->sync_large_objects);
+	dbl_link_onto(bd, &ws->stp->scavenged_large_objects);
+	ws->stp->n_scavenged_large_blocks += bd->blocks;
+	RELEASE_SPIN_LOCK(&ws->stp->sync_large_objects);
+	
+	p = bd->start;
+	if (scavenge_one(p)) {
+	    if (ws->stp->gen_no > 0) {
+		recordMutableGen_GC((StgClosure *)p, ws->stp->gen);
+	    }
 	}
     }
-  }
 }
 
+/* ----------------------------------------------------------------------------
+   Find the oldest full block to scavenge, and scavenge it.
+   ------------------------------------------------------------------------- */
+
+static rtsBool
+scavenge_find_global_work (void)
+{
+    bdescr *bd;
+    int g, s;
+    rtsBool flag;
+    step_workspace *ws;
+
+    flag = rtsFalse;
+    for (g = RtsFlags.GcFlags.generations; --g >= 0; ) {
+	for (s = generations[g].n_steps; --s >= 0; ) {
+	    if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
+		continue; 
+	    }
+	    ws = &gct->steps[g][s];
+
+	    // If we have any large objects to scavenge, do them now.
+	    if (ws->todo_large_objects) {
+		scavenge_large(ws);
+		flag = rtsTrue;
+	    }
+
+	    if ((bd = grab_todo_block(ws)) != NULL) {
+		// no need to assign this to ws->scan_bd, we're going
+		// to scavenge the whole thing and then push it on
+		// our scavd list.  This saves pushing out the
+		// scan_bd block, which might be partial.
+		scavenge_block(bd, bd->start);
+		push_scan_block(bd, ws);
+		return rtsTrue;
+	    }
+
+	    if (flag) return rtsTrue;
+	}
+    }
+    return rtsFalse;
+}
+
+/* ----------------------------------------------------------------------------
+   Look for local work to do.
+
+   We can have outstanding scavenging to do if, for any of the workspaces,
+
+     - the scan block is the same as the todo block, and new objects
+       have been evacuated to the todo block.
+
+     - the scan block *was* the same as the todo block, but the todo
+       block filled up and a new one has been allocated.
+   ------------------------------------------------------------------------- */
+
+static rtsBool
+scavenge_find_local_work (void)
+{
+    int g, s;
+    step_workspace *ws;
+    rtsBool flag;
+
+    flag = rtsFalse;
+    for (g = RtsFlags.GcFlags.generations; --g >= 0; ) {
+	for (s = generations[g].n_steps; --s >= 0; ) {
+	    if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
+		continue; 
+	    }
+	    ws = &gct->steps[g][s];
+
+	    // If we have a todo block and no scan block, start
+	    // scanning the todo block.
+	    if (ws->scan_bd == NULL && ws->todo_bd != NULL)
+	    {
+		ws->scan_bd = ws->todo_bd;
+		ws->scan = ws->scan_bd->start;
+	    }
+
+	    // If we have a scan block with some work to do,
+	    // scavenge everything up to the free pointer.
+	    if (ws->scan != NULL && ws->scan < ws->scan_bd->free)
+	    {
+		scavenge_block(ws->scan_bd, ws->scan);
+		ws->scan = ws->scan_bd->free;
+		flag = rtsTrue;
+	    }
+
+	    if (ws->scan_bd != NULL && ws->scan == ws->scan_bd->free
+		&& ws->scan_bd != ws->todo_bd)
+	    {
+		// we're not going to evac any more objects into
+		// this block, so push it now.
+		push_scan_block(ws->scan_bd, ws);
+		ws->scan_bd = NULL;
+		ws->scan = NULL;
+                // we might be able to scan the todo block now.  But
+                // don't do it right away: there might be full blocks
+		// waiting to be scanned as a result of scavenge_block above.
+		flag = rtsTrue; 
+	    }
+
+	    if (flag) return rtsTrue;
+	}
+    }
+    return rtsFalse;
+}
+
+/* ----------------------------------------------------------------------------
+   Scavenge until we can't find anything more to scavenge.
+   ------------------------------------------------------------------------- */
+
+void
+scavenge_loop(void)
+{
+    rtsBool work_to_do;
+
+loop:
+    work_to_do = rtsFalse;
+
+    // scavenge static objects 
+    if (major_gc && static_objects != END_OF_STATIC_LIST) {
+	IF_DEBUG(sanity, checkStaticObjects(static_objects));
+	scavenge_static();
+    }
+    
+    // scavenge objects in compacted generation
+    if (mark_stack_overflowed || oldgen_scan_bd != NULL ||
+	(mark_stack_bdescr != NULL && !mark_stack_empty())) {
+	scavenge_mark_stack();
+	work_to_do = rtsTrue;
+    }
+    
+    // Order is important here: we want to deal in full blocks as
+    // much as possible, so go for global work in preference to
+    // local work.  Only if all the global work has been exhausted
+    // do we start scavenging the fragments of blocks in the local
+    // workspaces.
+    if (scavenge_find_global_work()) goto loop;
+    if (scavenge_find_local_work())  goto loop;
+    
+    if (work_to_do) goto loop;
+}

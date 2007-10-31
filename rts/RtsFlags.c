@@ -212,6 +212,7 @@ void initRtsFlagsDefaults(void)
     RtsFlags.ParFlags.nNodes	        = 1;
     RtsFlags.ParFlags.migrate           = rtsTrue;
     RtsFlags.ParFlags.wakeupMigrate     = rtsFalse;
+    RtsFlags.ParFlags.gcThreads         = 1;
 #endif
 
 #ifdef PAR
@@ -445,6 +446,7 @@ usage_text[] = {
 #endif /* DEBUG */
 #if defined(THREADED_RTS) && !defined(NOSMP)
 "  -N<n>     Use <n> OS threads (default: 1)",
+"  -g<n>     Use <n> OS threads for GC (default: 1)",
 "  -qm       Don't automatically migrate threads between CPUs",
 "  -qw       Migrate a thread to the current CPU when it is woken up",
 #endif
@@ -1115,6 +1117,18 @@ error = rtsTrue;
 		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
 		    if (RtsFlags.ParFlags.nNodes <= 0) {
 		      errorBelch("bad value for -N");
+		      error = rtsTrue;
+		    }
+		}
+		) break;
+
+	      case 'g':
+		THREADED_BUILD_ONLY(
+		if (rts_argv[arg][2] != '\0') {
+		    RtsFlags.ParFlags.gcThreads
+		      = strtol(rts_argv[arg]+2, (char **) NULL, 10);
+		    if (RtsFlags.ParFlags.nNodes <= 0) {
+		      errorBelch("bad value for -g");
 		      error = rtsTrue;
 		    }
 #if defined(PROFILING)

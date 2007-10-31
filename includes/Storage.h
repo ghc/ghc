@@ -11,6 +11,7 @@
 
 #include <stddef.h>
 #include "OSThreads.h"
+#include "SMP.h"
 
 /* -----------------------------------------------------------------------------
  * Generational GC
@@ -52,49 +53,58 @@
  * ------------------------------------------------------------------------- */
 
 typedef struct step_ {
-  unsigned int         no;		/* step number */
-  bdescr *             blocks;		/* blocks in this step */
-  unsigned int         n_blocks;	/* number of blocks */
-  struct step_ *       to;		/* destination step for live objects */
-  struct generation_ * gen;		/* generation this step belongs to */
-  unsigned int         gen_no;          /* generation number (cached) */
-  bdescr *             large_objects;	/* large objects (doubly linked) */
-  unsigned int         n_large_blocks;  /* no. of blocks used by large objs */
-  int                  is_compacted;	/* compact this step? (old gen only) */
+    unsigned int         no;		// step number
+    int                  is_compacted;	// compact this step? (old gen only)
 
-  /* During GC, if we are collecting this step, blocks and n_blocks
-   * are copied into the following two fields.  After GC, these blocks
-   * are freed. */
-  bdescr *     old_blocks;	        /* bdescr of first from-space block */
-  unsigned int n_old_blocks;		/* number of blocks in from-space */
+    struct generation_ * gen;		// generation this step belongs to
+    unsigned int         gen_no;        // generation number (cached)
 
-  /* temporary use during GC: */
-  StgPtr       hp;			/* next free locn in to-space */
-  StgPtr       hpLim;			/* end of current to-space block */
-  bdescr *     hp_bd;			/* bdescr of current to-space block */
-  StgPtr       scavd_hp;		/* ... same as above, but already */
-  StgPtr       scavd_hpLim;		/*     scavenged.  */
-  bdescr *     scan_bd;			/* block currently being scanned */
-  StgPtr       scan;			/* scan pointer in current block */
-  bdescr *     new_large_objects;    	/* large objects collected so far */
-  bdescr *     scavenged_large_objects; /* live large objs after GC (d-link) */
-  unsigned int n_scavenged_large_blocks;/* size of above */
-  bdescr *     bitmap;  		/* bitmap for compacting collection */
+    bdescr *             blocks;	// blocks in this step
+    unsigned int         n_blocks;	// number of blocks
+
+    struct step_ *       to;		// destination step for live objects
+
+    bdescr *             large_objects;	 // large objects (doubly linked)
+    unsigned int         n_large_blocks; // no. of blocks used by large objs
+
+    // ------------------------------------
+    // Fields below are used during GC only
+
+    // During GC, if we are collecting this step, blocks and n_blocks
+    // are copied into the following two fields.  After GC, these blocks
+    // are freed.
+    bdescr *     old_blocks;	        // bdescr of first from-space block
+    unsigned int n_old_blocks;		// number of blocks in from-space
+    
+    bdescr *     todos;		        // blocks waiting to be scavenged
+    unsigned int n_todos;               // count of above
+
+#if defined(THREADED_RTS)
+    SpinLock     sync_todo;             // lock for todos
+    SpinLock     sync_large_objects;    // lock for large_objects
+                                        //    and scavenged_large_objects
+#endif
+
+    bdescr *     scavenged_large_objects;  // live large objs after GC (d-link)
+    unsigned int n_scavenged_large_blocks; // size (not count) of above
+
+    bdescr *     bitmap;  		// bitmap for compacting collection
 } step;
 
+
 typedef struct generation_ {
-  unsigned int   no;			/* generation number */
-  step *         steps;			/* steps */
-  unsigned int   n_steps;		/* number of steps */
-  unsigned int   max_blocks;		/* max blocks in step 0 */
-  bdescr        *mut_list;      	/* mut objects in this gen (not G0)*/
+    unsigned int   no;			// generation number
+    step *         steps;		// steps
+    unsigned int   n_steps;		// number of steps
+    unsigned int   max_blocks;		// max blocks in step 0
+    bdescr        *mut_list;      	// mut objects in this gen (not G0)
+    
+    // stats information
+    unsigned int collections;
+    unsigned int failed_promotions;
 
-  /* temporary use during GC: */
-  bdescr        *saved_mut_list;
-
-  /* stats information */
-  unsigned int collections;
-  unsigned int failed_promotions;
+    // temporary use during GC:
+    bdescr        *saved_mut_list;
 } generation;
 
 extern generation * RTS_VAR(generations);
@@ -214,6 +224,7 @@ extern void GarbageCollect(rtsBool force_major_gc);
 #if defined(THREADED_RTS)
 extern Mutex sm_mutex;
 extern Mutex atomic_modify_mutvar_mutex;
+extern SpinLock recordMutableGen_sync;
 #endif
 
 #if defined(THREADED_RTS)
@@ -249,6 +260,14 @@ recordMutableGenLock(StgClosure *p, generation *gen)
     ACQUIRE_SM_LOCK;
     recordMutableGen(p,gen);
     RELEASE_SM_LOCK;
+}
+
+INLINE_HEADER void
+recordMutableGen_GC(StgClosure *p, generation *gen)
+{
+    ACQUIRE_SPIN_LOCK(&recordMutableGen_sync);
+    recordMutableGen(p,gen);
+    RELEASE_SPIN_LOCK(&recordMutableGen_sync);
 }
 
 INLINE_HEADER void
