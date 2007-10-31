@@ -1494,7 +1494,7 @@ scavenge_mutable_list(generation *gen)
 static void
 scavenge_static(void)
 {
-  StgClosure* p = static_objects;
+  StgClosure* p;
   const StgInfoTable *info;
 
   /* Always evacuate straight to the oldest generation for static
@@ -1503,13 +1503,26 @@ scavenge_static(void)
 
   /* keep going until we've scavenged all the objects on the linked
      list... */
-  while (p != END_OF_STATIC_LIST) {
 
+  while (1) {
+      
+    ACQUIRE_SPIN_LOCK(&static_objects_sync);
+    
+    /* get the next static object from the list.  Remember, there might
+     * be more stuff on this list after each evacuation...
+     * (static_objects is a global)
+     */
+    p = static_objects;
+    if (p == END_OF_STATIC_LIST) {
+    	  RELEASE_SPIN_LOCK(&static_objects_sync);
+    	  break;
+    }
+    
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl(p);
     /*
-    if (info->type==RBH)
-      info = REVERT_INFOPTR(info); // if it's an RBH, look at the orig closure
+    	if (info->type==RBH)
+    	info = REVERT_INFOPTR(info); // if it's an RBH, look at the orig closure
     */
     // make sure the info pointer is into text space 
     
@@ -1519,6 +1532,8 @@ scavenge_static(void)
     static_objects = *STATIC_LINK(info,p);
     *STATIC_LINK(info,p) = scavenged_static_objects;
     scavenged_static_objects = p;
+    
+    RELEASE_SPIN_LOCK(&static_objects_sync);
     
     switch (info -> type) {
       
@@ -1564,12 +1579,6 @@ scavenge_static(void)
     }
 
     ASSERT(gct->failed_to_evac == rtsFalse);
-
-    /* get the next static object from the list.  Remember, there might
-     * be more stuff on this list now that we've done some evacuating!
-     * (static_objects is a global)
-     */
-    p = static_objects;
   }
 }
 
@@ -1947,3 +1956,39 @@ loop:
     
     if (work_to_do) goto loop;
 }
+
+rtsBool
+any_work (void)
+{
+    int g, s;
+    step_workspace *ws;
+
+    write_barrier();
+
+    // scavenge static objects 
+    if (major_gc && static_objects != END_OF_STATIC_LIST) {
+	return rtsTrue;
+    }
+    
+    // scavenge objects in compacted generation
+    if (mark_stack_overflowed || oldgen_scan_bd != NULL ||
+	(mark_stack_bdescr != NULL && !mark_stack_empty())) {
+	return rtsTrue;
+    }
+    
+    // Check for global work in any step.  We don't need to check for
+    // local work, because we have already exited scavenge_loop(),
+    // which means there is no local work for this thread.
+    for (g = RtsFlags.GcFlags.generations; --g >= 0; ) {
+	for (s = generations[g].n_steps; --s >= 0; ) {
+	    if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
+		continue; 
+	    }
+	    ws = &gct->steps[g][s];
+	    if (ws->todo_large_objects) return rtsTrue;
+	    if (ws->stp->todos) return rtsTrue;
+	}
+    }
+
+    return rtsFalse;
+}    

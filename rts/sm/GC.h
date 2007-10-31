@@ -110,6 +110,10 @@ typedef struct step_workspace_ {
 typedef struct gc_thread_ {
 #ifdef THREADED_RTS
     OSThreadId id;                 // The OS thread that this struct belongs to
+    Mutex      wake_mutex;
+    Condition  wake_cond;          // So we can go to sleep between GCs
+    rtsBool    wakeup;
+    rtsBool    exit;
 #endif
     nat thread_index;              // a zero based index identifying the thread
 
@@ -148,7 +152,8 @@ extern nat N;
 extern rtsBool major_gc;
 
 extern gc_thread *gc_threads;
-extern gc_thread *gct;  // this thread's gct TODO: make thread-local
+register gc_thread *gct __asm__("%rbx");
+// extern gc_thread *gct;  // this thread's gct TODO: make thread-local
 
 extern StgClosure* static_objects;
 extern StgClosure* scavenged_static_objects;
@@ -164,6 +169,10 @@ extern StgPtr  oldgen_scan;
 
 extern long copied;
 extern long scavd_copied;
+
+#ifdef THREADED_RTS
+extern SpinLock static_objects_sync;
+#endif
 
 #ifdef DEBUG
 extern nat mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS;

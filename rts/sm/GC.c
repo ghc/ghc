@@ -47,6 +47,7 @@
 #include "Scav.h"
 #include "GCUtils.h"
 #include "MarkWeak.h"
+#include "Sparks.h"
 
 #include <string.h> // for memset()
 
@@ -117,11 +118,15 @@ nat mutlist_MUTVARS,
 /* Thread-local data for each GC thread
  */
 gc_thread *gc_threads = NULL;
-gc_thread *gct = NULL;  // this thread's gct TODO: make thread-local
+// gc_thread *gct = NULL;  // this thread's gct TODO: make thread-local
 
 // For stats:
 long copied;        // *words* copied & scavenged during this GC
 long scavd_copied;  // *words* copied only during this GC
+
+#ifdef THREADED_RTS
+SpinLock recordMutableGen_sync;
+#endif
 
 /* -----------------------------------------------------------------------------
    Static function declarations
@@ -137,6 +142,11 @@ static void init_gc_thread          (gc_thread *t);
 static void update_task_list        (void);
 static void resize_generations      (void);
 static void resize_nursery          (void);
+static void start_gc_threads        (void);
+static void gc_thread_work          (void);
+static nat  inc_running             (void);
+static nat  dec_running             (void);
+static void wakeup_gc_threads       (nat n_threads);
 
 #if 0 && defined(DEBUG)
 static void gcCAFs                  (void);
@@ -227,6 +237,10 @@ GarbageCollect ( rtsBool force_major_gc )
    */
   alloc_gc_threads();
 
+  /* Start threads, so they can be spinning up while we finish initialisation.
+   */
+  start_gc_threads();
+
   /* How many threads will be participating in this GC?
    * We don't try to parallelise minor GC.
    */
@@ -253,8 +267,11 @@ GarbageCollect ( rtsBool force_major_gc )
    */
   static_objects = END_OF_STATIC_LIST;
   scavenged_static_objects = END_OF_STATIC_LIST;
+
 #ifdef THREADED_RTS
   initSpinLock(&static_objects_sync);
+  initSpinLock(&recordMutableGen_sync);
+  initSpinLock(&gc_alloc_block_sync);
 #endif
 
   // Initialise all the generations/steps that we're collecting.
@@ -283,12 +300,16 @@ GarbageCollect ( rtsBool force_major_gc )
       init_gc_thread(&gc_threads[t]);
   }
 
+  // the main thread is running: this prevents any other threads from
+  // exiting prematurely, so we can start them now.
+  inc_running();
+  wakeup_gc_threads(n_threads);
+
   // Initialise stats
   copied = 0;
   scavd_copied = 0;
 
-  // start threads etc.
-  // For now, we just have one thread, and set gct to gc_threads[0]
+  // this is the main thread
   gct = &gc_threads[0];
 
   /* -----------------------------------------------------------------------
@@ -329,25 +350,28 @@ GarbageCollect ( rtsBool force_major_gc )
    * Repeatedly scavenge all the areas we know about until there's no
    * more scavenging to be done.
    */
-  { 
-    rtsBool flag;
-  loop:
-    flag = rtsFalse;
+  for (;;)
+  {
+      gc_thread_work();
+      // The other threads are now stopped.  We might recurse back to
+      // here, but from now on this is the only thread.
+      
+      // if any blackholes are alive, make the threads that wait on
+      // them alive too.
+      if (traverseBlackholeQueue()) {
+	  inc_running(); 
+	  continue;
+      }
+  
+      // must be last...  invariant is that everything is fully
+      // scavenged at this point.
+      if (traverseWeakPtrList()) { // returns rtsTrue if evaced something 
+	  inc_running();
+	  continue;
+      }
 
-    scavenge_loop();
-
-    // if any blackholes are alive, make the threads that wait on
-    // them alive too.
-    if (traverseBlackholeQueue())
-	flag = rtsTrue;
-
-    if (flag) { goto loop; }
-
-    // must be last...  invariant is that everything is fully
-    // scavenged at this point.
-    if (traverseWeakPtrList()) { // returns rtsTrue if evaced something 
-      goto loop;
-    }
+      // If we get to here, there's really nothing left to do.
+      break;
   }
 
   // Update pointers from the Task list
@@ -400,7 +424,8 @@ GarbageCollect ( rtsBool force_major_gc )
 		  ws = &thr->steps[g][s];
 		  if (g==0 && s==0) continue;
 
-		  ASSERT( ws->scan_bd == ws->todo_bd );
+		  // Not true?
+		  // ASSERT( ws->scan_bd == ws->todo_bd );
 		  ASSERT( ws->scan_bd ? ws->scan == ws->scan_bd->free : 1 );
 
 		  // Push the final block
@@ -679,25 +704,6 @@ GetRoots( evac_fn evac )
     Capability *cap;
     Task *task;
 
-#if defined(GRAN)
-    for (i=0; i<=RtsFlags.GranFlags.proc; i++) {
-	if ((run_queue_hds[i] != END_TSO_QUEUE) && ((run_queue_hds[i] != NULL)))
-	    evac((StgClosure **)&run_queue_hds[i]);
-	if ((run_queue_tls[i] != END_TSO_QUEUE) && ((run_queue_tls[i] != NULL)))
-	    evac((StgClosure **)&run_queue_tls[i]);
-	
-	if ((blocked_queue_hds[i] != END_TSO_QUEUE) && ((blocked_queue_hds[i] != NULL)))
-	    evac((StgClosure **)&blocked_queue_hds[i]);
-	if ((blocked_queue_tls[i] != END_TSO_QUEUE) && ((blocked_queue_tls[i] != NULL)))
-	    evac((StgClosure **)&blocked_queue_tls[i]);
-	if ((ccalling_threadss[i] != END_TSO_QUEUE) && ((ccalling_threadss[i] != NULL)))
-	    evac((StgClosure **)&ccalling_threads[i]);
-    }
-
-    markEventQueue();
-
-#else /* !GRAN */
-
     for (i = 0; i < n_capabilities; i++) {
 	cap = &capabilities[i];
 	evac((StgClosure **)(void *)&cap->run_queue_hd);
@@ -715,17 +721,15 @@ GetRoots( evac_fn evac )
 
     }
     
-
 #if !defined(THREADED_RTS)
     evac((StgClosure **)(void *)&blocked_queue_hd);
     evac((StgClosure **)(void *)&blocked_queue_tl);
     evac((StgClosure **)(void *)&sleeping_queue);
 #endif 
-#endif
 
     // evac((StgClosure **)&blackhole_queue);
 
-#if defined(THREADED_RTS) || defined(PARALLEL_HASKELL) || defined(GRAN)
+#if defined(THREADED_RTS)
     markSparkQueue(evac);
 #endif
     
@@ -856,6 +860,14 @@ alloc_gc_thread (gc_thread *t, int n)
     nat g, s;
     step_workspace *ws;
 
+#ifdef THREADED_RTS
+    t->id = 0;
+    initCondition(&t->wake_cond);
+    initMutex(&t->wake_mutex);
+    t->wakeup = rtsFalse;
+    t->exit   = rtsFalse;
+#endif
+
     t->thread_index = n;
     t->free_blocks = NULL;
     t->gc_count = 0;
@@ -897,7 +909,6 @@ alloc_gc_threads (void)
     if (gc_threads == NULL) {
 #if defined(THREADED_RTS)
         nat i;
-
 	gc_threads = stgMallocBytes (RtsFlags.ParFlags.gcThreads * 
 				     sizeof(gc_thread), 
 				     "alloc_gc_threads");
@@ -912,6 +923,146 @@ alloc_gc_threads (void)
 	alloc_gc_thread(gc_threads, 0);
 #endif
     }
+}
+
+/* ----------------------------------------------------------------------------
+   Start GC threads
+   ------------------------------------------------------------------------- */
+
+static nat gc_running_threads;
+
+#if defined(THREADED_RTS)
+static Mutex gc_running_mutex;
+#endif
+
+static nat
+inc_running (void)
+{
+    nat n_running;
+    ACQUIRE_LOCK(&gc_running_mutex);
+    n_running = ++gc_running_threads;
+    RELEASE_LOCK(&gc_running_mutex);
+    return n_running;
+}
+
+static nat
+dec_running (void)
+{
+    nat n_running;
+    ACQUIRE_LOCK(&gc_running_mutex);
+    n_running = --gc_running_threads;
+    RELEASE_LOCK(&gc_running_mutex);
+    return n_running;
+}
+
+//
+// gc_thread_work(): Scavenge until there's no work left to do and all
+// the running threads are idle.
+//
+static void
+gc_thread_work (void)
+{
+    nat r;
+	
+    debugTrace(DEBUG_gc, "GC thread %d working", gct->thread_index);
+
+    // gc_running_threads has already been incremented for us; either
+    // this is the main thread and we incremented it inside
+    // GarbageCollect(), or this is a worker thread and the main
+    // thread bumped gc_running_threads before waking us up.
+
+loop:
+    scavenge_loop();
+    // scavenge_loop() only exits when there's no work to do
+    r = dec_running();
+    
+    debugTrace(DEBUG_gc, "GC thread %d idle (%d still running)", 
+	       gct->thread_index, r);
+
+    while (gc_running_threads != 0) {
+	if (any_work()) {
+	    inc_running();
+	    goto loop;
+	}
+	// any_work() does not remove the work from the queue, it
+	// just checks for the presence of work.  If we find any,
+	// then we increment gc_running_threads and go back to 
+	// scavenge_loop() to perform any pending work.
+    }
+    
+    // All threads are now stopped
+    debugTrace(DEBUG_gc, "GC thread %d finished.", gct->thread_index);
+}
+
+
+#if defined(THREADED_RTS)
+static void
+gc_thread_mainloop (void)
+{
+    while (!gct->exit) {
+
+	// Wait until we're told to wake up
+	ACQUIRE_LOCK(&gct->wake_mutex);
+	while (!gct->wakeup) {
+	    debugTrace(DEBUG_gc, "GC thread %d standing by...", 
+		       gct->thread_index);
+	    waitCondition(&gct->wake_cond, &gct->wake_mutex);
+	}
+	RELEASE_LOCK(&gct->wake_mutex);
+	gct->wakeup = rtsFalse;
+	if (gct->exit) break;
+
+	gc_thread_work();
+    }
+}	
+#endif
+
+#if defined(THREADED_RTS)
+static void
+gc_thread_entry (gc_thread *my_gct)
+{
+    gct = my_gct;
+    debugTrace(DEBUG_gc, "GC thread %d starting...", gct->thread_index);
+    gct->id = osThreadId();
+    gc_thread_mainloop();
+}
+#endif
+
+static void
+start_gc_threads (void)
+{
+#if defined(THREADED_RTS)
+    nat i;
+    OSThreadId id;
+    static rtsBool done = rtsFalse;
+
+    gc_running_threads = 0;
+    initMutex(&gc_running_mutex);
+
+    if (!done) {
+	// Start from 1: the main thread is 0
+	for (i = 1; i < RtsFlags.ParFlags.gcThreads; i++) {
+	    createOSThread(&id, (OSThreadProc*)&gc_thread_entry, 
+			   &gc_threads[i]);
+	}
+	done = rtsTrue;
+    }
+#endif
+}
+
+static void
+wakeup_gc_threads (nat n_threads USED_IF_THREADS)
+{
+#if defined(THREADED_RTS)
+    nat i;
+    for (i=1; i < n_threads; i++) {
+	inc_running();
+	ACQUIRE_LOCK(&gc_threads[i].wake_mutex);
+	gc_threads[i].wakeup = rtsTrue;
+	signalCondition(&gc_threads[i].wake_cond);
+	RELEASE_LOCK(&gc_threads[i].wake_mutex);
+    }
+#endif
 }
 
 /* ----------------------------------------------------------------------------

@@ -310,7 +310,8 @@ allocGroup (nat n)
 {
     bdescr *bd, *rem;
 
-    ASSERT_SM_LOCK();
+    // Todo: not true in multithreaded GC, where we use allocBlock_sync().
+    // ASSERT_SM_LOCK();
 
     if (n == 0) barf("allocGroup: requested zero blocks");
     
@@ -439,7 +440,8 @@ freeGroup(bdescr *p)
 {
   nat p_on_free_list = 0;
 
-  ASSERT_SM_LOCK();
+  // Todo: not true in multithreaded GC
+  // ASSERT_SM_LOCK();
 
   ASSERT(p->free != (P_)-1);
 

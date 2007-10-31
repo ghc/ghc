@@ -93,6 +93,7 @@
 #define ATOMICALLY_FRAME        69
 #define CATCH_RETRY_FRAME       70
 #define CATCH_STM_FRAME         71
-#define N_CLOSURE_TYPES         72
+#define WHITEHOLE               72
+#define N_CLOSURE_TYPES         73
 
 #endif /* CLOSURETYPES_H */

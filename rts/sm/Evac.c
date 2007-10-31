@@ -27,68 +27,130 @@
 
 static StgClosure * eval_thunk_selector (StgSelector * p, rtsBool);
 
-STATIC_INLINE void 
-upd_evacuee(StgClosure *p, StgClosure *dest)
+STATIC_INLINE StgPtr
+alloc_for_copy (nat size, step *stp)
 {
-    // not true: (ToDo: perhaps it should be)
-    // ASSERT(Bdescr((P_)dest)->flags & BF_EVACUATED);
-    SET_INFO(p, &stg_EVACUATED_info);
-    ((StgEvacuated *)p)->evacuee = dest;
+    StgPtr to;
+    step_workspace *ws;
+    bdescr *bd;
+
+    /* Find out where we're going, using the handy "to" pointer in 
+     * the step of the source object.  If it turns out we need to
+     * evacuate to an older generation, adjust it here (see comment
+     * by evacuate()).
+     */
+    if (stp->gen_no < gct->evac_gen) {
+	if (gct->eager_promotion) {
+	    stp = &generations[gct->evac_gen].steps[0];
+	} else {
+	    gct->failed_to_evac = rtsTrue;
+	}
+    }
+    
+    ws = &gct->steps[stp->gen_no][stp->no];
+    
+    /* chain a new block onto the to-space for the destination step if
+     * necessary.
+     */
+    bd = ws->todo_bd;
+    to = bd->free;
+    if (to + size >= bd->start + BLOCK_SIZE_W) {
+	bd = gc_alloc_todo_block(ws);
+	to = bd->free;
+    }
+    bd->free = to + size;
+
+    return to;
 }
+  
+STATIC_INLINE StgPtr
+alloc_for_copy_noscav (nat size, step *stp)
+{
+    StgPtr to;
+    step_workspace *ws;
+    bdescr *bd;
 
+    /* Find out where we're going, using the handy "to" pointer in 
+     * the step of the source object.  If it turns out we need to
+     * evacuate to an older generation, adjust it here (see comment
+     * by evacuate()).
+     */
+    if (stp->gen_no < gct->evac_gen) {
+	if (gct->eager_promotion) {
+	    stp = &generations[gct->evac_gen].steps[0];
+	} else {
+	    gct->failed_to_evac = rtsTrue;
+	}
+    }
+    
+    ws = &gct->steps[stp->gen_no][stp->no];
+    
+    /* chain a new block onto the to-space for the destination step if
+     * necessary.
+     */
+    bd = ws->scavd_list;
+    to = bd->free;
+    if (to + size >= bd->start + BLOCK_SIZE_W) {
+	bd = gc_alloc_scavd_block(ws);
+	to = bd->free;
+    }
+    bd->free = to + size;
 
+    return to;
+}
+  
 STATIC_INLINE StgClosure *
 copy_tag(StgClosure *src, nat size, step *stp,StgWord tag)
 {
   StgPtr to, from;
   nat i;
-  step_workspace *ws;
-  bdescr *bd;
+  StgWord info;
 
-  TICK_GC_WORDS_COPIED(size);
-  /* Find out where we're going, using the handy "to" pointer in 
-   * the step of the source object.  If it turns out we need to
-   * evacuate to an older generation, adjust it here (see comment
-   * by evacuate()).
-   */
-  if (stp->gen_no < gct->evac_gen) {
-      if (gct->eager_promotion) {
-	  stp = &generations[gct->evac_gen].steps[0];
-      } else {
-	  gct->failed_to_evac = rtsTrue;
-      }
-  }
+#ifdef THREADED_RTS
+    do {
+	info = xchg((StgPtr)&src->header.info, (W_)&stg_WHITEHOLE_info);
+	// so..  what is it?
+    } while (info == (W_)&stg_WHITEHOLE_info);
+    if (info == (W_)&stg_EVACUATED_info) {
+	src->header.info = (const StgInfoTable *)info;
+	return evacuate(src); // does the failed_to_evac stuff
+    }
+#else
+    info = (W_)src->header.info;
+    src->header.info = &stg_EVACUATED_info;
+#endif
 
-  ws = &gct->steps[stp->gen_no][stp->no];
+    to = alloc_for_copy(size,stp);
+    
+    TICK_GC_WORDS_COPIED(size);
 
-  /* chain a new block onto the to-space for the destination step if
-   * necessary.
-   */
-  bd = ws->todo_bd;
-  to = bd->free;
-  if (to + size >= bd->start + BLOCK_SIZE_W) {
-      bd = gc_alloc_todo_block(ws);
-      to = bd->free;
-  }
+    from = (StgPtr)src;
+    to[0] = info;
+    for (i = 1; i < size; i++) { // unroll for small i
+	to[i] = from[i];
+    }
+    
+    // retag pointer before updating EVACUATE closure and returning
+    to = (StgPtr)TAG_CLOSURE(tag,(StgClosure*)to);
 
-  from = (StgPtr)src;
-  bd->free = to + size;
-  for (i = 0; i < size; i++) { // unroll for small i
-      to[i] = from[i];
-  }
+//  if (to+size+2 < bd->start + BLOCK_SIZE_W) {
+//      __builtin_prefetch(to + size + 2, 1);
+//  }
 
-  /* retag pointer before updating EVACUATE closure and returning */
-  to = (StgPtr)TAG_CLOSURE(tag,(StgClosure*)to);
-
-  upd_evacuee((StgClosure *)from,(StgClosure *)to);
+    ((StgEvacuated*)from)->evacuee = (StgClosure *)to;
+#ifdef THREADED_RTS
+    write_barrier();
+    ((StgEvacuated*)from)->header.info = &stg_EVACUATED_info;
+#endif
 
 #ifdef PROFILING
-  // We store the size of the just evacuated object in the LDV word so that
-  // the profiler can guess the position of the next object later.
-  SET_EVACUAEE_FOR_LDV(from, size);
+    // We store the size of the just evacuated object in the LDV word so that
+    // the profiler can guess the position of the next object later.
+    SET_EVACUAEE_FOR_LDV(from, size);
 #endif
-  return (StgClosure *)to;
+    return (StgClosure *)to;
 }
+  
 
 // Same as copy() above, except the object will be allocated in memory
 // that will not be scavenged.  Used for object that have no pointer
@@ -96,54 +158,48 @@ copy_tag(StgClosure *src, nat size, step *stp,StgWord tag)
 STATIC_INLINE StgClosure *
 copy_noscav_tag(StgClosure *src, nat size, step *stp, StgWord tag)
 {
-  StgPtr to, from;
-  nat i;
-  step_workspace *ws;
-  bdescr *bd;
+    StgPtr to, from;
+    nat i;
+    StgWord info;
 
-  TICK_GC_WORDS_COPIED(size);
-  /* Find out where we're going, using the handy "to" pointer in 
-   * the step of the source object.  If it turns out we need to
-   * evacuate to an older generation, adjust it here (see comment
-   * by evacuate()).
-   */
-  if (stp->gen_no < gct->evac_gen) {
-      if (gct->eager_promotion) {
-	  stp = &generations[gct->evac_gen].steps[0];
-      } else {
-	  gct->failed_to_evac = rtsTrue;
-      }
-  }
-
-  ws = &gct->steps[stp->gen_no][stp->no];
-
-  /* chain a new block onto the to-space for the destination step if
-   * necessary.
-   */
-  bd = ws->scavd_list;
-  to = bd->free;
-  if (to + size >= bd->start + BLOCK_SIZE_W) {
-      bd = gc_alloc_scavd_block(ws);
-      to = bd->free;
-  }
-
-  from = (StgPtr)src;
-  bd->free = to + size;
-  for (i = 0; i < size; i++) { // unroll for small i
-      to[i] = from[i];
-  }
-
-  /* retag pointer before updating EVACUATE closure and returning */
-  to = (StgPtr)TAG_CLOSURE(tag,(StgClosure*)to);
-
-  upd_evacuee((StgClosure *)from,(StgClosure *)to);
-
-#ifdef PROFILING
-  // We store the size of the just evacuated object in the LDV word so that
-  // the profiler can guess the position of the next object later.
-  SET_EVACUAEE_FOR_LDV(from, size);
+#ifdef THREADED_RTS
+    do {
+	info = xchg((StgPtr)&src->header.info, (W_)&stg_WHITEHOLE_info);
+    } while (info == (W_)&stg_WHITEHOLE_info);
+    if (info == (W_)&stg_EVACUATED_info) {
+	src->header.info = (const StgInfoTable *)info;
+	return evacuate(src); // does the failed_to_evac stuff
+    }
+#else
+    info = (W_)src->header.info;
+    src->header.info = &stg_EVACUATED_info;
 #endif
-  return (StgClosure *)to;
+    
+    to = alloc_for_copy_noscav(size,stp);
+
+    TICK_GC_WORDS_COPIED(size);
+    
+    from = (StgPtr)src;
+    to[0] = info;
+    for (i = 1; i < size; i++) { // unroll for small i
+	to[i] = from[i];
+    }
+
+    // retag pointer before updating EVACUATE closure and returning
+    to = (StgPtr)TAG_CLOSURE(tag,(StgClosure*)to);
+
+    ((StgEvacuated*)from)->evacuee = (StgClosure *)to;
+#ifdef THREADED_RTS
+    write_barrier();
+    ((StgEvacuated*)from)->header.info = &stg_EVACUATED_info;
+#endif
+    
+#ifdef PROFILING
+    // We store the size of the just evacuated object in the LDV word so that
+    // the profiler can guess the position of the next object later.
+    SET_EVACUAEE_FOR_LDV(from, size);
+#endif
+    return (StgClosure *)to;
 }
 
 
@@ -154,46 +210,48 @@ copy_noscav_tag(StgClosure *src, nat size, step *stp, StgWord tag)
 static StgClosure *
 copyPart(StgClosure *src, nat size_to_reserve, nat size_to_copy, step *stp)
 {
-  StgPtr to, from;
-  nat i;
-  step_workspace *ws;
-  bdescr *bd;
-
-  TICK_GC_WORDS_COPIED(size_to_copy);
-  if (stp->gen_no < gct->evac_gen) {
-      if (gct->eager_promotion) {
-	  stp = &generations[gct->evac_gen].steps[0];
-      } else {
-	  gct->failed_to_evac = rtsTrue;
-      }
-  }
-
-  ws = &gct->steps[stp->gen_no][stp->no];
-
-  bd = ws->todo_bd;
-  to = bd->free;
-  if (to + size_to_reserve >= bd->start + BLOCK_SIZE_W) {
-      bd = gc_alloc_todo_block(ws);
-      to = bd->free;
-  }
-
-  from = (StgPtr)src;
-  bd->free = to + size_to_reserve;
-  for (i = 0; i < size_to_copy; i++) { // unroll for small i
-      to[i] = from[i];
-  }
-  
-  upd_evacuee((StgClosure *)from,(StgClosure *)to);
-
-#ifdef PROFILING
-  // We store the size of the just evacuated object in the LDV word so that
-  // the profiler can guess the position of the next object later.
-  SET_EVACUAEE_FOR_LDV(from, size_to_reserve);
-  // fill the slop
-  if (size_to_reserve - size_to_copy > 0)
-    LDV_FILL_SLOP(to + size_to_copy - 1, (int)(size_to_reserve - size_to_copy)); 
+    StgPtr to, from;
+    nat i;
+    StgWord info;
+    
+#ifdef THREADED_RTS
+    do {
+	info = xchg((StgPtr)&src->header.info, (W_)&stg_WHITEHOLE_info);
+    } while (info == (W_)&stg_WHITEHOLE_info);
+    if (info == (W_)&stg_EVACUATED_info) {
+	src->header.info = (const StgInfoTable *)info;
+	return evacuate(src); // does the failed_to_evac stuff
+    }
+#else
+    info = (W_)src->header.info;
+    src->header.info = &stg_EVACUATED_info;
 #endif
-  return (StgClosure *)to;
+    
+    to = alloc_for_copy(size_to_reserve, stp);
+
+    TICK_GC_WORDS_COPIED(size_to_copy);
+
+    from = (StgPtr)src;
+    to[0] = info;
+    for (i = 1; i < size_to_copy; i++) { // unroll for small i
+	to[i] = from[i];
+    }
+    
+    ((StgEvacuated*)from)->evacuee = (StgClosure *)to;
+#ifdef THREADED_RTS
+    write_barrier();
+    ((StgEvacuated*)from)->header.info = &stg_EVACUATED_info;
+#endif
+    
+#ifdef PROFILING
+    // We store the size of the just evacuated object in the LDV word so that
+    // the profiler can guess the position of the next object later.
+    SET_EVACUAEE_FOR_LDV(from, size_to_reserve);
+    // fill the slop
+    if (size_to_reserve - size_to_copy > 0)
+	LDV_FILL_SLOP(to + size_to_copy - 1, (int)(size_to_reserve - size_to_copy)); 
+#endif
+    return (StgClosure *)to;
 }
 
 
@@ -343,18 +401,24 @@ loop:
       switch (info->type) {
 
       case THUNK_STATIC:
-	  if (info->srt_bitmap != 0 && 
-	      *THUNK_STATIC_LINK((StgClosure *)q) == NULL) {
-	      *THUNK_STATIC_LINK((StgClosure *)q) = static_objects;
-	      static_objects = (StgClosure *)q;
+	  if (info->srt_bitmap != 0) {
+	      ACQUIRE_SPIN_LOCK(&static_objects_sync);
+	      if (*THUNK_STATIC_LINK((StgClosure *)q) == NULL) {
+		  *THUNK_STATIC_LINK((StgClosure *)q) = static_objects;
+		  static_objects = (StgClosure *)q;
+	      }
+	      RELEASE_SPIN_LOCK(&static_objects_sync);
 	  }
 	  return q;
 	  
       case FUN_STATIC:
-	  if (info->srt_bitmap != 0 && 
-	      *FUN_STATIC_LINK((StgClosure *)q) == NULL) {
-	      *FUN_STATIC_LINK((StgClosure *)q) = static_objects;
-	      static_objects = (StgClosure *)q;
+	  if (info->srt_bitmap != 0) {
+	      ACQUIRE_SPIN_LOCK(&static_objects_sync);
+	      if (*FUN_STATIC_LINK((StgClosure *)q) == NULL) {
+		  *FUN_STATIC_LINK((StgClosure *)q) = static_objects;
+		  static_objects = (StgClosure *)q;
+	      }
+	      RELEASE_SPIN_LOCK(&static_objects_sync);
 	  }
 	  return q;
 	  
@@ -363,17 +427,25 @@ loop:
 	   * on the CAF list, so don't do anything with it here (we'll
 	   * scavenge it later).
 	   */
-	  if (((StgIndStatic *)q)->saved_info == NULL
-	      && *IND_STATIC_LINK((StgClosure *)q) == NULL) {
-	      *IND_STATIC_LINK((StgClosure *)q) = static_objects;
-	      static_objects = (StgClosure *)q;
+	  if (((StgIndStatic *)q)->saved_info == NULL) {
+	      ACQUIRE_SPIN_LOCK(&static_objects_sync);
+	      if (*IND_STATIC_LINK((StgClosure *)q) == NULL) {
+		  *IND_STATIC_LINK((StgClosure *)q) = static_objects;
+		  static_objects = (StgClosure *)q;
+	      }
+	      RELEASE_SPIN_LOCK(&static_objects_sync);
 	  }
 	  return q;
 	  
       case CONSTR_STATIC:
 	  if (*STATIC_LINK(info,(StgClosure *)q) == NULL) {
-	      *STATIC_LINK(info,(StgClosure *)q) = static_objects;
-	      static_objects = (StgClosure *)q;
+	      ACQUIRE_SPIN_LOCK(&static_objects_sync);
+	      // re-test, after acquiring lock
+	      if (*STATIC_LINK(info,(StgClosure *)q) == NULL) {
+		  *STATIC_LINK(info,(StgClosure *)q) = static_objects;
+		  static_objects = (StgClosure *)q;
+	      }
+	      RELEASE_SPIN_LOCK(&static_objects_sync);
 	        /* I am assuming that static_objects pointers are not
 		 * written to other objects, and thus, no need to retag. */
 	  }
@@ -455,6 +527,9 @@ loop:
   info = get_itbl(q);
   
   switch (info->type) {
+
+  case WHITEHOLE:
+      goto loop;
 
   case MUT_VAR_CLEAN:
   case MUT_VAR_DIRTY:

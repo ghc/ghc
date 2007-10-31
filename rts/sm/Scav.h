@@ -11,5 +11,6 @@
  *
  * ---------------------------------------------------------------------------*/
 
-void scavenge_loop (void);
-void scavenge_mutable_list (generation *g);
+void    scavenge_loop (void);
+rtsBool any_work (void);
+void    scavenge_mutable_list (generation *g);

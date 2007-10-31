@@ -97,9 +97,10 @@ StgWord16 closure_flags[] = {
 /* TREC_HEADER          = */ (          _NS|         _MUT|_UPT           ),
 /* ATOMICALLY_FRAME     = */ (     _BTM                                  ),
 /* CATCH_RETRY_FRAME    = */ (     _BTM                                  ),
-/* CATCH_STM_FRAME      = */ (     _BTM                                  )
+/* CATCH_STM_FRAME      = */ (     _BTM                                  ),
+/* WHITEHOLE		= */ ( 0                                         )
 };
 
-#if N_CLOSURE_TYPES != 72
+#if N_CLOSURE_TYPES != 73
 #error Closure types changed: update ClosureFlags.c!
 #endif
