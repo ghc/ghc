@@ -304,6 +304,7 @@ clean: $(foreach SUBDIR,$(SUBDIRS),clean.library.$(SUBDIR))
 	$(RM) -rf ifBuildable
 	$(RM) -rf installPackage
 	$(RM) -f libraries.txt index.html doc-index.html doc-index*.html
+	$(RM) -f haddock* *.gif
 
 distclean:
 	$(RM) $(foreach lib, $(SUBDIRS), $(lib)/.depend $(lib)/.depend.bak)
