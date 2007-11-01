@@ -322,7 +322,6 @@ incorrect.
  DOCPREV	{ L _ (ITdocCommentPrev _) }
  DOCNAMED	{ L _ (ITdocCommentNamed _) }
  DOCSECTION	{ L _ (ITdocSection _ _) }
- DOCOPTIONS	{ L _ (ITdocOptions _) }
 
 -- Template Haskell 
 '[|'            { L _ ITopenExpQuote  }       
@@ -365,22 +364,19 @@ identifier :: { Located RdrName }
 -- know what they are doing. :-)
 
 module 	:: { Located (HsModule RdrName) }
- 	: optdoc 'module' modid maybemoddeprec maybeexports 'where' body 
-		{% fileSrcSpan >>= \ loc -> case $1 of { (opt, info, doc) -> 
-		   return (L loc (HsModule (Just $3) $5 (fst $7) (snd $7) $4 
-                          opt info doc) )}}
+ 	: maybedocheader 'module' modid maybemoddeprec maybeexports 'where' body
+		{% fileSrcSpan >>= \ loc -> case $1 of { (info, doc) ->
+		   return (L loc (HsModule (Just $3) $5 (fst $7) (snd $7) $4
+                          info doc) )}}
         | body2
 		{% fileSrcSpan >>= \ loc ->
-		   return (L loc (HsModule Nothing Nothing 
-                          (fst $1) (snd $1) Nothing Nothing emptyHaddockModInfo 
+		   return (L loc (HsModule Nothing Nothing
+                          (fst $1) (snd $1) Nothing emptyHaddockModInfo
                           Nothing)) }
 
-optdoc :: { (Maybe String, HaddockModInfo RdrName, Maybe (HsDoc RdrName)) }                             
-        : moduleheader            { (Nothing, fst $1, snd $1) }
-        | docoptions              { (Just $1, emptyHaddockModInfo, Nothing)} 
-        | docoptions moduleheader { (Just $1, fst $2, snd $2) } 
-        | moduleheader docoptions { (Just $2, fst $1, snd $1) } 
-        | {- empty -}             { (Nothing, emptyHaddockModInfo, Nothing) }  
+maybedocheader :: { (HaddockModInfo RdrName, Maybe (HsDoc RdrName)) }
+        : moduleheader            { (fst $1, snd $1) }
+        | {- empty -}             { (emptyHaddockModInfo, Nothing) }
 
 missing_module_keyword :: { () }
 	: {- empty -}				{% pushCurrentContext }
@@ -409,14 +405,14 @@ cvtopdecls :: { [LHsDecl RdrName] }
 -- Module declaration & imports only
 
 header 	:: { Located (HsModule RdrName) }
- 	: optdoc 'module' modid maybemoddeprec maybeexports 'where' header_body
-		{% fileSrcSpan >>= \ loc -> case $1 of { (opt, info, doc) -> 
-		   return (L loc (HsModule (Just $3) $5 $7 [] $4 
-                   opt info doc))}}
+ 	: maybedocheader 'module' modid maybemoddeprec maybeexports 'where' header_body
+		{% fileSrcSpan >>= \ loc -> case $1 of { (info, doc) ->
+		   return (L loc (HsModule (Just $3) $5 $7 [] $4
+                   info doc))}}
 	| missing_module_keyword importdecls
 		{% fileSrcSpan >>= \ loc ->
-		   return (L loc (HsModule Nothing Nothing $2 [] Nothing 
-                   Nothing emptyHaddockModInfo Nothing)) }
+		   return (L loc (HsModule Nothing Nothing $2 [] Nothing
+                   emptyHaddockModInfo Nothing)) }
 
 header_body :: { [LImportDecl RdrName] }
 	:  '{'            importdecls		{ $2 }
@@ -1866,9 +1862,6 @@ docsection :: { Located (n, HsDoc RdrName) }
       Left  err -> parseError (getLoc $1) err;
       Right doc -> return (L1 (n, doc)) } }
 
-docoptions :: { String }
-  : DOCOPTIONS '#-}' { getDOCOPTIONS $1 }
-
 moduleheader :: { (HaddockModInfo RdrName, Maybe (HsDoc RdrName)) }                                    
         : DOCNEXT {% let string = getDOCNEXT $1 in
                case parseModuleHeader string of {                       
@@ -1918,7 +1911,6 @@ getDOCNEXT (L _ (ITdocCommentNext x)) = x
 getDOCPREV (L _ (ITdocCommentPrev x)) = x
 getDOCNAMED (L _ (ITdocCommentNamed x)) = x
 getDOCSECTION (L _ (ITdocSection n x)) = (n, x)
-getDOCOPTIONS (L _ (ITdocOptions x)) = x
 
 -- Utilities for combining source spans
 comb2 :: Located a -> Located b -> SrcSpan

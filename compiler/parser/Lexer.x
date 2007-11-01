@@ -149,7 +149,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- space followed by a Haddock comment symbol (docsym) (in which case we'd
 -- have a Haddock comment). The rules then munch the rest of the line.
 
-"-- " ~$docsym .* ;
+"-- " ~[$docsym \#] .* ;
 "--" [^$symbol : \ ] .* ;
 
 -- Next, match Haddock comments if no -haddock flag
@@ -257,9 +257,6 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   "{-#" $whitechar* (CORE|core)		{ token ITcore_prag }
   "{-#" $whitechar* (UNPACK|unpack)	{ token ITunpack_prag }
 
-  "{-#" $whitechar* (DOC_OPTIONS|doc_options)
-  / { ifExtension haddockEnabled }     { lex_string_prag ITdocOptions }
-
  "{-#"                                 { nested_comment lexToken }
 
   -- ToDo: should only be valid inside a pragma:
@@ -267,11 +264,18 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 }
 
 <option_prags> {
-  "{-#" $whitechar* (OPTIONS|options)   { lex_string_prag IToptions_prag }
-  "{-#" $whitechar* (OPTIONS_GHC|options_ghc)
+  "{-#"  $whitechar* (OPTIONS|options)   { lex_string_prag IToptions_prag }
+  "{-#"  $whitechar* (OPTIONS_GHC|options_ghc)
                                         { lex_string_prag IToptions_prag }
-  "{-#" $whitechar* (LANGUAGE|language) { token ITlanguage_prag }
-  "{-#" $whitechar* (INCLUDE|include)   { lex_string_prag ITinclude_prag }
+  "{-#"  $whitechar* (OPTIONS_HADDOCK|options_haddock)
+                                         { lex_string_prag ITdocOptions }
+  "-- #"                                 { multiline_doc_comment }
+  "{-#"  $whitechar* (LANGUAGE|language) { token ITlanguage_prag }
+  "{-#"  $whitechar* (INCLUDE|include)   { lex_string_prag ITinclude_prag }
+}
+
+<0> {
+  "-- #" .* ;
 }
 
 <0,option_prags> {
@@ -284,8 +288,8 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 -- Haddock comments
 
 <0> {
-  "-- " $docsym    / { ifExtension haddockEnabled } { multiline_doc_comment }
-  "{-" \ ? $docsym / { ifExtension haddockEnabled } { nested_doc_comment }
+  "-- " $docsym      / { ifExtension haddockEnabled } { multiline_doc_comment }
+  "{-" \ ? $docsym   / { ifExtension haddockEnabled } { nested_doc_comment }
 }
 
 -- "special" symbols
@@ -555,6 +559,7 @@ data Token
   | ITdocCommentNamed String     -- something beginning '-- $'
   | ITdocSection      Int String -- a section heading
   | ITdocOptions      String     -- doc options (prune, ignore-exports, etc)
+  | ITdocOptionsOld   String     -- doc options declared "-- # ..."-style
 
 #ifdef DEBUG
   deriving Show -- debugging
@@ -819,7 +824,8 @@ withLexedDocType lexDocComment = do
     '|' -> lexDocComment input ITdocCommentNext False
     '^' -> lexDocComment input ITdocCommentPrev False
     '$' -> lexDocComment input ITdocCommentNamed False
-    '*' -> lexDocSection 1 input 
+    '*' -> lexDocSection 1 input
+    '#' -> lexDocComment input ITdocOptionsOld False
  where 
     lexDocSection n input = case alexGetChar input of 
       Just ('*', input) -> lexDocSection (n+1) input

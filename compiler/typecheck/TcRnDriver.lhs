@@ -125,7 +125,7 @@ tcRnModule :: HscEnv
 
 tcRnModule hsc_env hsc_src save_rn_syntax
 	 (L loc (HsModule maybe_mod export_ies 
-			  import_decls local_decls mod_deprec _ 
+			  import_decls local_decls mod_deprec
 			  module_info maybe_doc))
  = do { showPass (hsc_dflags hsc_env) "Renamer/typechecker" ;
 

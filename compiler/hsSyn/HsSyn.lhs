@@ -70,7 +70,6 @@ data HsModule name
 				-- often empty, downstream.
 	[LHsDecl name]		-- Type, class, value, and interface signature decls
 	(Maybe DeprecTxt)	-- reason/explanation for deprecation of this module
-	(Maybe String)          -- Haddock options, declared with the {-# DOCOPTIONS ... #-} pragma
 	(HaddockModInfo name)   -- Haddock module info
 	(Maybe (HsDoc name))    -- Haddock module description
 
@@ -105,10 +104,10 @@ instance Outputable Char where
 instance (OutputableBndr name)
 	=> Outputable (HsModule name) where
 
-    ppr (HsModule Nothing _ imports decls _ _ _ mbDoc)
+    ppr (HsModule Nothing _ imports decls _ _ mbDoc)
       = pp_mb mbDoc $$ pp_nonnull imports $$ pp_nonnull decls
 
-    ppr (HsModule (Just name) exports imports decls deprec opts _ mbDoc)
+    ppr (HsModule (Just name) exports imports decls deprec _ mbDoc)
       = vcat [
 	    pp_mb mbDoc,
 	    case exports of

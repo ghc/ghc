@@ -267,6 +267,7 @@ data DynFlag
    | Opt_HideAllPackages
    | Opt_PrintBindResult
    | Opt_Haddock
+   | Opt_HaddockOptions
    | Opt_Hpc_No_Auto
    | Opt_BreakOnException
    | Opt_BreakOnError
@@ -390,7 +391,9 @@ data DynFlags = DynFlags {
   flags      		:: [DynFlag],
   
   -- message output
-  log_action            :: Severity -> SrcSpan -> PprStyle -> Message -> IO ()
+  log_action            :: Severity -> SrcSpan -> PprStyle -> Message -> IO (),
+
+  haddockOptions :: Maybe String
  }
 
 data HscTarget
@@ -519,6 +522,7 @@ defaultDynFlags =
 	packageFlags		= [],
         pkgDatabase             = Nothing,
         pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
+  haddockOptions = Nothing,
 	flags = [ 
     	    Opt_ReadUserPackageConf,
     
@@ -616,6 +620,8 @@ addOptdep f d = d{ opt_dep = f : opt_dep d}
 addOptwindres f d = d{ opt_windres = f : opt_windres d}
 
 addCmdlineFramework f d = d{ cmdlineFrameworks = f : cmdlineFrameworks d}
+
+addHaddockOpts f d = d{ haddockOptions = Just f}
 
 -- -----------------------------------------------------------------------------
 -- Command-line options
@@ -1011,6 +1017,7 @@ dynamic_flags = [
   ,  ( "no-hs-main"     , NoArg (setDynFlag Opt_NoHsMain))
   ,  ( "main-is"   	, SepArg setMainIs )
   ,  ( "haddock"	, NoArg (setDynFlag Opt_Haddock) )
+  ,  ( "haddock-opts"   , HasArg (upd . addHaddockOpts))
   ,  ( "hpcdir"		, SepArg setOptHpcDir )
 
 	------- recompilation checker (DEPRECATED, use -fforce-recomp) -----

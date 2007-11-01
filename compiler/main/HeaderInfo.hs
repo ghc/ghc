@@ -67,7 +67,7 @@ getImports dflags buf filename source_filename = do
           printErrorsAndWarnings dflags ms
           when (errorsFound dflags ms) $ exitWith (ExitFailure 1)
 	  case rdr_module of
-	    L _ (HsModule mb_mod _ imps _ _ _ _ _) ->
+	    L _ (HsModule mb_mod _ imps _ _ _ _) ->
 	      let
                 main_loc = mkSrcLoc (mkFastString source_filename) 1 0
 		mod = mb_mod `orElse` L (srcLocSpan main_loc) mAIN_NAME
@@ -146,6 +146,15 @@ getOptions' buf filename
               , ITclose_prag       <- getToken close
               = map (L (getLoc open)) ["-#include",removeSpaces str] `combine`
                 parseToks xs
+          parseToks (open:close:xs)
+              | ITdocOptions str <- getToken open
+              , ITclose_prag     <- getToken close
+              = map (L (getLoc open)) ["-haddock-opts", removeSpaces str]
+                `combine` parseToks xs
+          parseToks (open:xs)
+              | ITdocOptionsOld str <- getToken open
+              = map (L (getLoc open)) ["-haddock-opts", removeSpaces str]
+                `combine` parseToks xs
           parseToks (open:xs)
               | ITlanguage_prag <- getToken open
               = parseLanguage xs
