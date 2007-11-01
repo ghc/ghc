@@ -1,11 +1,13 @@
-{-# OPTIONS -fglasgow-exts -farrows #-}
+{-# OPTIONS -fglasgow-exts -farrows -cpp #-}
 
 -- Test infix type notation and arrow notation
 
 module Test where
 
+#if __GLASGOW_HASKELL__  > 608
 import Prelude hiding (id,(.))
 import Control.Category
+#endif
 import Control.Arrow
 
 -- For readability, I use infix notation for arrow types.  I'd prefer the
