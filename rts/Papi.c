@@ -145,15 +145,15 @@ init_countable_events(void)
 
 static char temp[BIG_STRING_LEN];
 
-void
-papi_mut_cycles()
+static void
+papi_mut_cycles(void)
 {
     ullong_format_string(mutator_cycles,temp,rtsTrue/*commas*/); 
     statsPrintf("  (MUT_CYCLES)  : %s\n",temp);
 }
 
-void
-papi_gc_cycles()
+static void
+papi_gc_cycles(void)
 {
     ullong_format_string(gc_cycles,temp,rtsTrue/*commas*/); 
     statsPrintf("  (GC_CYCLES)  : %s\n",temp);
