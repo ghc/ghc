@@ -277,9 +277,23 @@ endif
 # Add PAPI library if needed
 
 ifeq "$(GhcRtsWithPapi)" "YES"
+
 SRC_HC_OPTS		+= -optc-DUSE_PAPI
 PACKAGE_CPP_OPTS	+= -DUSE_PAPI
+
+PACKAGE_CPP_OPTS += -DPAPI_INCLUDE_DIR=$(PapiIncludeDir)
+PACKAGE_CPP_OPTS += -DPAPI_LIB_DIR=$(PapiLibDir)
+
+ifneq "$(PapiIncludeDir)" ""
+SRC_HC_OPTS += -I$(PapiIncludeDir)
+SRC_CC_OPTS += -I$(PapiIncludeDir)
+SRC_HSC2HS_OPTS += -I$(PapiIncludeDir)
 endif
+ifneq "$(PapiLibDirs)" ""
+SRC_LD_OPTS += -L$(PapiLibDirs)
+endif
+
+endif # GhcRtsWithPapi==YES
 
 #-----------------------------------------------------------------------------
 # make depend setup

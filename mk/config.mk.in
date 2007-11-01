@@ -468,7 +468,8 @@ GhcRtsWithFrontPanel = NO
 # Include support for CPU performance counters via the PAPI library in the RTS?
 # (PAPI: http://icl.cs.utk.edu/papi/)
 GhcRtsWithPapi = NO
-HavePapi = @HavePapi@
+PapiLibDir=
+PapiIncludeDir=
 
 ################################################################################
 #

@@ -15,13 +15,13 @@ hidden-modules:
 import-dirs:
 
 #ifdef INSTALLING
-library-dirs:		LIB_DIR GMP_LIB_DIRS
+library-dirs:		LIB_DIR GMP_LIB_DIRS PAPI_LIB_DIR
 # ifdef mingw32_HOST_OS
 			, LIB_DIR"/gcc-lib"
 			/* force the dist-provided gcc-lib/ into scope. */
 # endif
 #else /* !INSTALLING */
-library-dirs:		FPTOOLS_TOP_ABS"/rts" GMP_LIB_DIRS
+library-dirs:		FPTOOLS_TOP_ABS"/rts" GMP_LIB_DIRS PAPI_LIB_DIR
 # if !defined(HAVE_LIBGMP) && !defined(HAVE_FRAMEWORK_GMP)
 			, FPTOOLS_TOP_ABS"/gmp"
 # endif
@@ -60,7 +60,7 @@ extra-libraries:		"m"		/* for ldexp() */
 #endif
 
 #ifdef INSTALLING
-include-dirs:		INCLUDE_DIR GMP_INCLUDE_DIRS
+include-dirs:		INCLUDE_DIR GMP_INCLUDE_DIRS PAPI_INCLUDE_DIR
 # ifdef mingw32_HOST_OS
 			, INCLUDE_DIR"/mingw"
 # endif
