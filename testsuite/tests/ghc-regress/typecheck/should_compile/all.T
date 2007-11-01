@@ -252,7 +252,7 @@ test('tc236', expect_fail_if_compiler_lt('ghc', '6.9'), compile, [''])
 test('tc237', normal, compile, [''])
 test('tc238', normal, compile, [''])
 
-test('FD1', normal, compile_fail, [''])
+test('FD1', namebase_if_compiler_lt('ghc','6.9', 'FD1-6.8'), compile_fail, [''])
 test('FD2', normal, compile_fail, [''])
 test('FD3', normal, compile_fail, [''])
 test('FD4', normal, compile, [''])
