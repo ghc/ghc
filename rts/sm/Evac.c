@@ -239,7 +239,7 @@ selector_chain:
     // In threaded mode, we'll use WHITEHOLE to lock the selector
     // thunk while we evaluate it.
     {
-	info_ptr = (StgInfoTable *)xchg((StgPtr)&p->header.info, (W_)&stg_WHITEHOLE_info);
+	info_ptr = xchg((StgPtr)&p->header.info, (W_)&stg_WHITEHOLE_info);
 	if (info_ptr == (W_)&stg_WHITEHOLE_info) {
             do {
                 info_ptr = xchg((StgPtr)&p->header.info, (W_)&stg_WHITEHOLE_info);
