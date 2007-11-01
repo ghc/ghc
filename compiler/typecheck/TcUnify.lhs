@@ -1753,13 +1753,9 @@ unifyForAllCtxt tvs phi1 phi2 env
 
 -----------------------
 unifyMisMatch outer swapped ty1 ty2
-  = do	{ (env, msg) <- if swapped then misMatchMsg ty2 ty1
-				   else misMatchMsg ty1 ty2
-
-	-- This is the whole point of the 'outer' stuff
-	; if outer then popErrCtxt (failWithTcM (env, msg))
-	  	   else failWithTcM (env, msg)
-	} 
+  | swapped   = unifyMisMatch outer False ty2 ty1
+  | outer     = popErrCtxt $ unifyMisMatch False swapped ty1 ty2  -- This is the whole point of the 'outer' stuff
+  | otherwise = failWithMisMatch ty1 ty2
 \end{code}
 
 

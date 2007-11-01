@@ -2934,11 +2934,10 @@ groupErrs :: ([Inst] -> TcM ())	-- Deal with one group
 -- We want to report them together in error messages
 
 groupErrs report_err [] 
-  = returnM ()
+  = return ()
 groupErrs report_err (inst:insts) 
-  = do_one (inst:friends)		`thenM_`
-    groupErrs report_err others
-
+  = do	{ do_one (inst:friends)
+	; groupErrs report_err others }
   where
 	-- (It may seem a bit crude to compare the error messages,
 	--  but it makes sure that we combine just what the user sees,
@@ -3003,11 +3002,11 @@ report_no_instances tidy_env mb_what insts
 	     (insts2, overlaps) = partitionWith (check_overlap inst_envs) insts1
              (eqInsts, insts3)  = partition isEqInst insts2
        ; traceTc (text "reportNoInstances" <+> vcat 
-                       [ppr implics, ppr insts1, ppr insts2])
+                       [ppr insts, ppr implics, ppr insts1, ppr insts2])
        ; mapM_ complain_implic implics
        ; mapM_ (\doc -> addErrTcM (tidy_env, doc)) overlaps
        ; groupErrs complain_no_inst insts3 
-       ; mapM_ eqInstMisMatch eqInsts
+       ; mapM_ (addErrTcM . mk_eq_err) eqInsts
        }
   where
     complain_no_inst insts = addErrTcM (tidy_env, mk_no_inst_err insts)
@@ -3052,6 +3051,9 @@ report_no_instances tidy_env mb_what insts
 			      ptext SLIT("when compiling the other instance declarations")])]
       where
     	ispecs = [ispec | (ispec, _) <- matches]
+
+    mk_eq_err :: Inst -> (TidyEnv, SDoc)
+    mk_eq_err inst = misMatchMsg tidy_env (eqInstTys inst)
 
     mk_no_inst_err insts
       | null insts = empty

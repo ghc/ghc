@@ -11,7 +11,7 @@ module TcTyFuns (
 	substEqInDictInsts,
 	
         -- errors
-        eqInstMisMatch, misMatchMsg,
+        misMatchMsg, failWithMisMatch
   ) where
 
 
@@ -121,8 +121,10 @@ eqInstToRewrite :: Inst -> Maybe (Rewrite, Bool)
                                            -- True iff rewrite swapped equality
 eqInstToRewrite inst
   = ASSERT( isEqInst inst )
-    go (eqInstLeftTy inst) (eqInstRightTy inst) (eqInstType inst)
+    go ty1 ty2 (eqInstType inst)
   where
+    (ty1,ty2) = eqInstTys inst
+
     -- look through synonyms
     go ty1 ty2 co | Just ty1' <- tcView ty1 = go ty1' ty2 co
     go ty1 ty2 co | Just ty2' <- tcView ty2 = go ty1 ty2' co
@@ -670,8 +672,7 @@ trivialRule insts
       | otherwise
       = return $ Just inst
       where
-	 ty1 = eqInstLeftTy  inst
-	 ty2 = eqInstRightTy inst
+	 (ty1,ty2) = eqInstTys inst
 \end{code}
 
 
@@ -702,8 +703,9 @@ decompRule insts
   where
     decomp inst
       = ASSERT( isEqInst inst )
-        go (eqInstLeftTy inst) (eqInstRightTy inst)
+        go ty1 ty2
       where
+	(ty1,ty2) = eqInstTys inst
         go ty1 ty2		
           | Just ty1' <- tcView ty1 = go ty1' ty2 
           | Just ty2' <- tcView ty2 = go ty1 ty2' 
@@ -822,8 +824,7 @@ topRule insts
                    }
 	     }
       where
-        ty1 = eqInstLeftTy  inst
-	ty2 = eqInstRightTy inst
+        (ty1,ty2) = eqInstTys inst
 \end{code}
 
 
@@ -921,8 +922,7 @@ substInst inst insts
 		     }
 	       }
 	  where 
-            ty1 = eqInstLeftTy  inst
-            ty2 = eqInstRightTy inst
+            (ty1,ty2) = eqInstTys inst
 \end{code}
 
 
@@ -959,9 +959,10 @@ unifyMetaRule insts
   where
     unifyMeta inst
       = ASSERT( isEqInst inst )
-        go (eqInstLeftTy inst) (eqInstRightTy inst)
+        go ty1 ty2
            (fromWantedCo "unifyMetaRule" $ eqInstCoercion inst)
       where
+	(ty1,ty2) = eqInstTys inst
         go ty1 ty2 cotv
           | Just ty1' <- tcView ty1 = go ty1' ty2 cotv
           | Just ty2' <- tcView ty2 = go ty1 ty2' cotv
@@ -1201,45 +1202,49 @@ somethingdifferent message.
 eqInstMisMatch :: Inst -> TcM a
 eqInstMisMatch inst
   = ASSERT( isEqInst inst )
-    do { (env, msg) <- misMatchMsg ty_act ty_exp
-       ; setErrCtxt ctxt $
-           failWithTcM (env, msg)
-       }
+    setErrCtxt ctxt $ failWithMisMatch ty_act ty_exp
   where
-    ty_act           = eqInstLeftTy  inst
-    ty_exp           = eqInstRightTy inst
-    InstLoc _ _ ctxt = instLoc       inst
+    (ty_act, ty_exp) = eqInstTys inst
+    InstLoc _ _ ctxt = instLoc   inst
 
 -----------------------
-misMatchMsg :: TcType -> TcType -> TcM (TidyEnv, SDoc)
+failWithMisMatch :: TcType -> TcType -> TcM a
 -- Generate the message when two types fail to match,
 -- going to some trouble to make it helpful.
 -- The argument order is: actual type, expected type
-misMatchMsg ty_act ty_exp
+failWithMisMatch ty_act ty_exp
   = do	{ env0 <- tcInitTidyEnv
         ; ty_exp <- zonkTcType ty_exp
         ; ty_act <- zonkTcType ty_act
-	; (env1, pp_exp, extra_exp) <- ppr_ty env0 ty_exp
-	; (env2, pp_act, extra_act) <- ppr_ty env1 ty_act
-	; return (env2, 
-                  sep [sep [ptext SLIT("Couldn't match expected type") <+> pp_exp, 
-			    nest 7 $
+        ; failWithTcM (misMatchMsg env0 (ty_act, ty_exp))
+	}
+
+misMatchMsg :: TidyEnv -> (TcType, TcType) -> (TidyEnv, SDoc)
+misMatchMsg env0 (ty_act, ty_exp)
+  = let (env1, pp_exp, extra_exp) = ppr_ty env0 ty_exp
+	(env2, pp_act, extra_act) = ppr_ty env1 ty_act
+        msg = sep [sep [ptext SLIT("Couldn't match expected type") <+> pp_exp, 
+			nest 7 $
                               ptext SLIT("against inferred type") <+> pp_act],
-		       nest 2 (extra_exp $$ extra_act)]) }
+		   nest 2 (extra_exp $$ extra_act)]
+    in
+    (env2, msg)
 
-ppr_ty :: TidyEnv -> TcType -> TcM (TidyEnv, SDoc, SDoc)
-ppr_ty env ty
-  = do	{ let (env1, tidy_ty) = tidyOpenType env ty
-	; (env2, extra) <- ppr_extra env1 tidy_ty
-	; return (env2, quotes (ppr tidy_ty), extra) }
-
--- (ppr_extra env ty) shows extra info about 'ty'
-ppr_extra :: TidyEnv -> Type -> TcM (TidyEnv, SDoc)
-ppr_extra env (TyVarTy tv)
-  | isTcTyVar tv && (isSkolemTyVar tv || isSigTyVar tv) && not (isUnk tv)
-  = return (env1, pprSkolTvBinding tv1)
   where
-    (env1, tv1) = tidySkolemTyVar env tv
+    ppr_ty :: TidyEnv -> TcType -> (TidyEnv, SDoc, SDoc)
+    ppr_ty env ty
+      = let (env1, tidy_ty) = tidyOpenType env ty
+    	    (env2, extra)  = ppr_extra env1 tidy_ty
+    	in
+	(env2, quotes (ppr tidy_ty), extra)
 
-ppr_extra env _ty = return (env, empty)		-- Normal case
+    -- (ppr_extra env ty) shows extra info about 'ty'
+    ppr_extra :: TidyEnv -> Type -> (TidyEnv, SDoc)
+    ppr_extra env (TyVarTy tv)
+      | isTcTyVar tv && (isSkolemTyVar tv || isSigTyVar tv) && not (isUnk tv)
+      = (env1, pprSkolTvBinding tv1)
+      where
+        (env1, tv1) = tidySkolemTyVar env tv
+
+    ppr_extra env _ty = (env, empty)		-- Normal case
 \end{code}

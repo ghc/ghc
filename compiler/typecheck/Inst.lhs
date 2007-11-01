@@ -52,8 +52,7 @@ module Inst (
 	eitherEqInst, mkEqInst, mkEqInsts, mkWantedEqInst,
 	finalizeEqInst, writeWantedCoercion,
 	eqInstType, updateEqInstCoercion,
-	eqInstCoercion,
-	eqInstLeftTy, eqInstRightTy
+	eqInstCoercion,	eqInstTys
     ) where
 
 #include "HsVersions.h"
@@ -1052,9 +1051,8 @@ eqInstType inst = eitherEqInst inst mkTyVarTy id
 eqInstCoercion :: Inst -> Either TcTyVar Coercion
 eqInstCoercion = tci_co
 
-eqInstLeftTy, eqInstRightTy :: Inst -> TcType
-eqInstLeftTy  = tci_left
-eqInstRightTy = tci_right
+eqInstTys :: Inst -> (TcType, TcType)
+eqInstTys inst = (tci_left inst, tci_right inst)
 
 updateEqInstCoercion :: (Either TcTyVar Coercion -> Either TcTyVar Coercion) -> Inst -> Inst
 updateEqInstCoercion f inst = inst {tci_co = f $ tci_co inst}
