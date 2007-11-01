@@ -462,5 +462,6 @@ scavenge_block (bdescr *bd, StgPtr scan)
     }
   }
 
-  debugTrace(DEBUG_gc, "   scavenged %ld bytes", (bd->free - scan) * sizeof(W_));
+  debugTrace(DEBUG_gc, "   scavenged %ld bytes",
+             (unsigned long)((bd->free - scan) * sizeof(W_)));
 }
