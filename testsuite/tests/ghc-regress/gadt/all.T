@@ -64,6 +64,8 @@ test('data2', normal, compile, [''])
 test('termination', normal, compile, [''])
 test('set', normal, compile, [''])
 
+test('scoped', expect_broken(1823), compile, [''])
+
 
 # New ones from Dimitrios
 
