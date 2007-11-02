@@ -34,6 +34,7 @@ Library {
             GHC.Base,
             GHC.Conc,
             GHC.ConsoleHandler,
+            GHC.Desugar,
             GHC.Dotnet,
             GHC.Enum,
             GHC.Environment,
