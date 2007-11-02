@@ -412,7 +412,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
 	  f32 = mov_f32_xmm0_rbpoff 0
 	  f64 = mov_f64_xmm0_rbpoff 0
 
--- ######### x86_64 machine code:
+--    ######### x86_64 machine code:
 
 --   0:   48 89 fd                mov    %rdi,%rbp
 --   3:   48 8b bd 78 56 34 12    mov    0x12345678(%rbp),%rdi
