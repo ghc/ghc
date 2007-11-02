@@ -140,8 +140,12 @@ indeed type families).  I think.
 tcTyAndClassDecls :: ModDetails -> [LTyClDecl Name]
    	           -> TcM TcGblEnv 	-- Input env extended by types and classes 
 					-- and their implicit Ids,DataCons
+-- Fails if there are any errors
+
 tcTyAndClassDecls boot_details allDecls
-  = do	{       -- Omit instances of type families; they are handled together
+  = checkNoErrs $ 	-- The code recovers internally, but if anything gave rise to
+			-- an error we'd better stop now, to avoid a cascade
+    do	{       -- Omit instances of type families; they are handled together
 		-- with the *heads* of class instances
         ; let decls = filter (not . isFamInstDecl . unLoc) allDecls
 

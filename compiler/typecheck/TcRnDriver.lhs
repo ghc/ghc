@@ -295,15 +295,14 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
    setGblEnv tcg_env $ do {
 
-   rn_decls <- rnTyClDecls ldecls ;
-   failIfErrsM ;
+   rn_decls <- checkNoErrs $ rnTyClDecls ldecls ;
 
 	-- Dump trace of renaming part
    rnDump (ppr rn_decls) ;
 
 	-- Typecheck them all together so that
 	-- any mutually recursive types are done right
-   tcg_env <- checkNoErrs (tcTyAndClassDecls emptyModDetails rn_decls) ;
+   tcg_env <- tcTyAndClassDecls emptyModDetails rn_decls ;
 	-- Make the new type env available to stuff slurped from interface files
 
    setGblEnv tcg_env $ do {
@@ -392,6 +391,10 @@ tcRnSrcDecls boot_iface decls
 		         tcg_rules = rules, tcg_fords = fords } = tcg_env
 	    ; all_binds = binds `unionBags` inst_binds } ;
 
+	failIfErrsM ;	-- Don't zonk if there have been errors
+			-- It's a waste of time; and we may get debug warnings
+			-- about strangely-typed TyCons!
+
 	(bind_ids, binds', fords', rules') <- zonkTopDecls all_binds rules fords ;
 
 	let { final_type_env = extendTypeEnvWithIds type_env bind_ids
@@ -411,8 +414,8 @@ tc_rn_src_decls boot_details ds
 		-- If ds is [] we get ([], Nothing)
 
 	-- Deal with decls up to, but not including, the first splice
-	(tcg_env, rn_decls) <- checkNoErrs $ rnTopSrcDecls first_group ;
-		-- checkNoErrs: stop if renaming fails
+	(tcg_env, rn_decls) <- rnTopSrcDecls first_group ;
+		-- rnTopSrcDecls fails if there are any errors
 
 	(tcg_env, tcl_env) <- setGblEnv tcg_env $ 
 			      tcTopSrcDecls boot_details rn_decls ;
@@ -470,7 +473,7 @@ tcRnHsBootDecls decls
 		-- Typecheck type/class decls
 	; traceTc (text "Tc2")
 	; let tycl_decls = hs_tyclds rn_group
-	; tcg_env <- checkNoErrs (tcTyAndClassDecls emptyModDetails tycl_decls)
+	; tcg_env <- tcTyAndClassDecls emptyModDetails tycl_decls
 	; setGblEnv tcg_env	$ do {
 
 		-- Typecheck instance decls
@@ -638,10 +641,10 @@ monad; it augments it and returns the new TcGblEnv.
 \begin{code}
 ------------------------------------------------
 rnTopSrcDecls :: HsGroup RdrName -> TcM (TcGblEnv, HsGroup Name)
+-- Fails if there are any errors
 rnTopSrcDecls group
  = do { -- Rename the source decls (with no shadowing; error on duplicates)
-	(tcg_env, rn_decls) <- rnSrcDecls False group ;
-	failIfErrsM ;
+	(tcg_env, rn_decls) <- checkNoErrs $ rnSrcDecls False group ;
 
         -- save the renamed syntax, if we want it
 	let { tcg_env'
@@ -670,9 +673,8 @@ tcTopSrcDecls boot_details
 		-- The latter come in via tycl_decls
         traceTc (text "Tc2") ;
 
-	tcg_env <- checkNoErrs (tcTyAndClassDecls boot_details tycl_decls) ;
-	-- tcTyAndClassDecls recovers internally, but if anything gave rise to
-	-- an error we'd better stop now, to avoid a cascade
+	tcg_env <- tcTyAndClassDecls boot_details tycl_decls ;
+		-- If there are any errors, tcTyAndClassDecls fails here
 	
 	-- Make these type and class decls available to stuff slurped from interface files
 	writeMutVar (tcg_type_env_var tcg_env) (tcg_type_env tcg_env) ;
