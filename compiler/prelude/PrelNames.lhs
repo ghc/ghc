@@ -268,6 +268,7 @@ gHC_WORD	= mkBaseModule FSLIT("GHC.Word")
 mONAD		= mkBaseModule FSLIT("Control.Monad")
 mONAD_FIX	= mkBaseModule FSLIT("Control.Monad.Fix")
 aRROW		= mkBaseModule FSLIT("Control.Arrow")
+gHC_DESUGAR     = mkBaseModule FSLIT("GHC.Desugar")
 rANDOM		= mkBaseModule FSLIT("System.Random")
 gLA_EXTS	= mkBaseModule FSLIT("GHC.Exts")
 
@@ -655,7 +656,7 @@ mfixName	   = methName mONAD_FIX FSLIT("mfix") mfixIdKey
 
 -- Arrow notation
 arrAName	   = varQual aRROW FSLIT("arr")	  arrAIdKey
-composeAName	   = varQual aRROW FSLIT(">>>")	  composeAIdKey
+composeAName	   = varQual gHC_DESUGAR FSLIT(">>>") composeAIdKey
 firstAName	   = varQual aRROW FSLIT("first") firstAIdKey
 appAName	   = varQual aRROW FSLIT("app")	  appAIdKey
 choiceAName	   = varQual aRROW FSLIT("|||")	  choiceAIdKey
