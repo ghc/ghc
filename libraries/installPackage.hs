@@ -105,6 +105,8 @@ doit verbosity ghcpkg ghcpkgconf destdir topdir
 
 replaceTopdir :: FilePath -> FilePath -> FilePath
 replaceTopdir topdir ('$':'t':'o':'p':'d':'i':'r':p) = topdir ++ p
+replaceTopdir topdir ('$':'h':'t':'t':'p':'t':'o':'p':'d':'i':'r':p)
+    = topdir ++ p
 replaceTopdir _ p = p
 
 -- Get the build info, merging the setup-config and buildinfo files.
