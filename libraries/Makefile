@@ -103,7 +103,7 @@ ilibdir     = $$topdir
 ilibexecdir = $$topdir
 idatadir    = $$topdir
 idocdir     = $$topdir/doc/libraries/$$pkgid
-ihtmldir    = $$topdir/doc/libraries/$$pkgid
+ihtmldir    = $$httptopdir/doc/libraries/$$pkgid
 html_installed_root = $(prefix)/doc/libraries
 else
 # On non-Windows we can just give absolute paths all the time, and

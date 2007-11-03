@@ -268,8 +268,11 @@ mungePackagePaths top_dir ps = map munge_pkg ps
   munge_paths = map munge_path
 
   munge_path p 
-	  | Just p' <- maybePrefixMatch "$topdir" p = top_dir ++ p'
+	  | Just p' <- maybePrefixMatch "$topdir"     p =            top_dir ++ p'
+	  | Just p' <- maybePrefixMatch "$httptopdir" p = toHttpPath top_dir ++ p'
 	  | otherwise				    = p
+
+  toHttpPath p = "file:///" ++ p
 
 
 -- -----------------------------------------------------------------------------
