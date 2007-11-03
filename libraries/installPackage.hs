@@ -15,7 +15,7 @@ main
        case args of
            ghcpkg : ghcpkgconf : destdir : topdir :
                     iprefix : ibindir : ilibdir : ilibexecdir :
-                    idatadir : idocdir : ihtmldir :
+                    idatadir : idocdir : ihtmldir : iinterfacedir :
                     args' ->
                let verbosity = case args' of
                            [] -> normal
@@ -27,16 +27,17 @@ main
                            _ -> error ("Bad arguments: " ++ show args)
                in doit verbosity ghcpkg ghcpkgconf destdir topdir
                        iprefix ibindir ilibdir ilibexecdir idatadir
-                       idocdir ihtmldir
+                       idocdir ihtmldir iinterfacedir
            _ ->
                error "Missing arguments"
 
 doit :: Verbosity -> FilePath -> FilePath -> FilePath -> FilePath
      -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
-     -> FilePath -> FilePath
+     -> FilePath -> FilePath -> FilePath
      -> IO ()
 doit verbosity ghcpkg ghcpkgconf destdir topdir
-     iprefix ibindir ilibdir ilibexecdir idatadir idocdir ihtmldir =
+     iprefix ibindir ilibdir ilibexecdir idatadir
+     idocdir ihtmldir iinterfacedir =
        do let userHooks = simpleUserHooks
               copyto = if null destdir then NoCopyDest else CopyTo destdir
               copyFlags = (emptyCopyFlags copyto) {
@@ -68,13 +69,14 @@ doit verbosity ghcpkg ghcpkgconf destdir topdir
               -- When coying, we need to actually give a concrete
               -- directory to copy to rather than "$topdir"
               toPathTemplate' = toPathTemplate . replaceTopdir topdir
-              i_copy = i { prefixDirTemplate  = toPathTemplate' iprefix,
-                           binDirTemplate     = toPathTemplate' ibindir,
-                           libDirTemplate     = toPathTemplate' ilibdir,
-                           libexecDirTemplate = toPathTemplate' ilibexecdir,
-                           dataDirTemplate    = toPathTemplate' idatadir,
-                           docDirTemplate     = toPathTemplate' idocdir,
-                           htmlDirTemplate    = toPathTemplate' ihtmldir
+              i_copy = i { prefixDirTemplate    = toPathTemplate' iprefix,
+                           binDirTemplate       = toPathTemplate' ibindir,
+                           libDirTemplate       = toPathTemplate' ilibdir,
+                           libexecDirTemplate   = toPathTemplate' ilibexecdir,
+                           dataDirTemplate      = toPathTemplate' idatadir,
+                           docDirTemplate       = toPathTemplate' idocdir,
+                           htmlDirTemplate      = toPathTemplate' ihtmldir,
+                           interfaceDirTemplate = toPathTemplate' iinterfacedir
                          }
               lbi_copy = lbi { installDirTemplates = i_copy }
               -- When we run GHC we give it a $topdir that includes the
@@ -89,13 +91,14 @@ doit verbosity ghcpkg ghcpkgconf destdir topdir
                          programLocation = UserSpecified ghcpkg
                      }
               progs' = updateProgram prog progs
-              i_reg = i { prefixDirTemplate  = toPathTemplate iprefix,
-                          binDirTemplate     = toPathTemplate ibindir,
-                          libDirTemplate     = toPathTemplate ilibdir,
-                          libexecDirTemplate = toPathTemplate ilibexecdir,
-                          dataDirTemplate    = toPathTemplate idatadir,
-                          docDirTemplate     = toPathTemplate idocdir,
-                          htmlDirTemplate    = toPathTemplate ihtmldir
+              i_reg = i { prefixDirTemplate    = toPathTemplate iprefix,
+                          binDirTemplate       = toPathTemplate ibindir,
+                          libDirTemplate       = toPathTemplate ilibdir,
+                          libexecDirTemplate   = toPathTemplate ilibexecdir,
+                          dataDirTemplate      = toPathTemplate idatadir,
+                          docDirTemplate       = toPathTemplate idocdir,
+                          htmlDirTemplate      = toPathTemplate ihtmldir,
+                          interfaceDirTemplate = toPathTemplate iinterfacedir
                         }
               lbi_reg = lbi { installDirTemplates = i_reg,
                               withPrograms = progs' }

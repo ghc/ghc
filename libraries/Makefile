@@ -97,24 +97,26 @@ ifeq "$(RelocatableBuild)" "YES"
 # where the user tells us to put the haddock documentation and put it
 # somewhere whose relative location we know. When installing we need
 # to give Cabal a real path, though.
-iprefix     = $$topdir
-ibindir     = $$topdir
-ilibdir     = $$topdir
-ilibexecdir = $$topdir
-idatadir    = $$topdir
-idocdir     = $$topdir/doc/libraries/$$pkgid
-ihtmldir    = $$httptopdir/doc/libraries/$$pkgid
+iprefix             = $$topdir
+ibindir             = $$topdir
+ilibdir             = $$topdir
+ilibexecdir         = $$topdir
+idatadir            = $$topdir
+idocdir             = $$topdir/doc/libraries/$$pkgid
+iinterfacedir       = $$topdir/doc/libraries/$$pkgid
+ihtmldir            = $$httptopdir/doc/libraries/$$pkgid
 html_installed_root = $(prefix)/doc/libraries
 else
 # On non-Windows we can just give absolute paths all the time, and
 # thus obey the htmldir that we are given.
-iprefix     = $(prefix)
-ibindir     = $(bindir)
-ilibdir     = $(libdir)
-ilibexecdir = $(libexecdir)
-idatadir    = $(datadir)
-idocdir     = $(docdir)/libraries/$$pkgid
-ihtmldir    = $(htmldir)/libraries/$$pkgid
+iprefix             = $(prefix)
+ibindir             = $(bindir)
+ilibdir             = $(libdir)
+ilibexecdir         = $(libexecdir)
+idatadir            = $(datadir)
+idocdir             = $(docdir)/libraries/$$pkgid
+iinterfacedir       = $(htmldir)/libraries/$$pkgid
+ihtmldir            = $(htmldir)/libraries/$$pkgid
 html_installed_root = $(htmldir)/libraries
 endif
 
@@ -238,6 +240,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	           --libexecdir=/NONEXISTANT \
 	           --datadir=/NONEXISTANT \
 	           --docdir=/NONEXISTANT \
+			   --interfacedir=/NONEXISTANT \
 	           --htmldir=/NONEXISTANT \
 	           --with-compiler=../../compiler/stage1/ghc-inplace \
 	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace \
@@ -350,7 +353,7 @@ $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
-	  ../installPackage/installPackage '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' ; \
+	  ../installPackage/installPackage '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(iinterfacedir)' ; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%
