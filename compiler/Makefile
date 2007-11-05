@@ -929,7 +929,7 @@ WRONG_GHCTAGS_HS_SRCS = $(filter-out $(DERIVED_SRCS) main/Config.hs parser/Parse
 
 GHCTAGS_HS_SRCS = $(HS_SRCS)
 GHCTAGS_HC_OPTS = $(patsubst -i$(odir)/%, -i%, $(HC_OPTS))
-
+GHCTAGS_HC_OPTS += -DSTAGE='"$(stage)"'
 
 #------------------------------------------------------------
 # 			Tags
@@ -943,8 +943,8 @@ ghctags :: $(GHCTAGS_HS_SRCS) $(TAGS_C_SRCS)
 	@echo SOURCES ARE "$(GHCTAGS_HS_SRCS)"
 	: ifneq "$(GHCTAGS_HS_SRCS)" ""
 	@echo TIME TO ROCK AND ROLL
-	# $(GHCTAGS) -- $(MKDEPENDHS_OPTS) $(filter-out -split-objs, $(MKDEPENDHS_HC_OPTS)) -- $(GHCTAGS_HS_SRCS)
-	$(GHCTAGS) -- $(GHCTAGS_HC_OPTS) -- $(GHCTAGS_HS_SRCS)
+	# $(GHCTAGS_INPLACE) -- $(MKDEPENDHS_OPTS) $(filter-out -split-objs, $(MKDEPENDHS_HC_OPTS)) -- $(GHCTAGS_HS_SRCS)
+	$(GHCTAGS_INPLACE) -- $(GHCTAGS_HC_OPTS) -- $(GHCTAGS_HS_SRCS)
 	: endif
 ifneq "$(TAGS_C_SRCS)" ""
 	etags -a $(TAGS_C_SRCS)
