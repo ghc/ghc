@@ -75,6 +75,53 @@ import Control.Monad	( liftM )
 import qualified Control.Exception  as Exception( userErrors )
 \end{code}
 
+Note [Template Haskell levels]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+* Imported things are impLevel (= 0)
+* Variables are bound at the "current level"
+* The current level starts off at topLevel (= 1)
+* The level is decremented by splicing $(..)
+	       incremented by brackets [| |]
+	       incremented by name-quoting 'f
+
+When a variable is used, we compare 
+	bind:  binding level, and
+	use:   current level at usage site
+
+  Generally
+	bind > use	Always error (bound later than used)
+			[| \x -> $(f x) |]
+			
+	bind = use	Always OK (bound same stage as used)
+			[| \x -> $(f [| x |]) |]
+
+	bind < use	Inside brackets, it depends
+			Inside splice, OK
+			Inside neither, OK
+
+  For (bind < use) inside brackets, there are three cases:
+    - Imported things	OK	f = [| map |]
+    - Top-level things	OK	g = [| f |]
+    - Non-top-level 	Only if there is a liftable instance
+				h = \(x:Int) -> [| x |]
+
+Note [Quoting names]
+~~~~~~~~~~~~~~~~~~~~
+A quoted name is a bit like a quoted expression, except that we have no 
+cross-stage lifting (c.f. TcExpr.thBrackId).  
+
+Examples:
+
+  f 'map	-- OK; also for top-level defns of this module
+
+  \x. f 'x	-- Not ok (whereas \x. f [| x |] might have been ok, by
+		--				 cross-stage lifting
+
+  \y. [| \x. $(f 'y) |]	-- Not ok (same reason)
+
+  [| \x. $(f 'x) |]	-- OK
+
+
 
 %************************************************************************
 %*									*
@@ -187,19 +234,6 @@ quotedNameStageErr v
 	, ptext SLIT("must be used at the same stage at which is is bound")]
 \end{code}
 
-Note [Quoting names]
-~~~~~~~~~~~~~~~~~~~~
-A quoted name is a bit like a quoted expression, except that we have no 
-cross-stage lifting (c.f. TcExpr.thBrackId).  Examples:
-
-  f 'map	-- OK; also for top-level defns of this module
-
-  \x. f 'x	-- Not ok (whereas \x. f [| x |] might have been ok, by
-		--				 cross-stage lifting
-
-  \y. [| \x. $(f 'y) |]	-- Not ok (same reason)
-
-  [| \x. $(f 'x) |]	-- OK
 
 %************************************************************************
 %*									*
