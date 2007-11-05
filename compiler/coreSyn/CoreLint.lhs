@@ -366,8 +366,8 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
                    else lintAndScopeId var
      ; scope $ \_ ->
        do { -- Check the alternatives
-            checkCaseAlts e scrut_ty alts
-          ; mapM (lintCoreAlt scrut_ty alt_ty) alts
+            mapM (lintCoreAlt scrut_ty alt_ty) alts
+          ; checkCaseAlts e scrut_ty alts
           ; return alt_ty } }
   where
     pass_var f = f var
