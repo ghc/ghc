@@ -169,7 +169,7 @@ graphData session graph =
     where foundthings ms =
               let filename = msHsFilePath ms
                   modname = moduleName $ ms_mod ms
-              in  do mod <- checkModule session modname
+              in  do mod <- checkModule session modname False
                      return $ maybe (FileData filename []) id $ do
                        m <- mod
                        s <- renamedSource m
