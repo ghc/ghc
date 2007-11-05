@@ -193,7 +193,6 @@ ppr_expr add_par (Let bind@(NonRec val_bdr rhs@(Let _ _)) body)
       nest 2 (pprCoreExpr rhs),
       ptext SLIT("} in"),
       pprCoreExpr body ]
--}
 
 ppr_expr add_par (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
   = add_par
@@ -202,15 +201,16 @@ ppr_expr add_par (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
 		   ptext SLIT("} in")])
      $$
      pprCoreExpr expr)
+-}
 
--- general case (recursive case, too)
+-- General case (recursive case, too)
 ppr_expr add_par (Let bind expr)
   = add_par $
-    sep [hang (ptext keyword) 2 (ppr_bind bind),
-	 hang (ptext SLIT("} in ")) 2 (pprCoreExpr expr)]
+    sep [hang (ptext keyword) 2 (ppr_bind bind <+> ptext SLIT("} in")),
+	 pprCoreExpr expr]
   where
     keyword = case bind of
-		Rec _      -> SLIT("__letrec {")
+		Rec _      -> SLIT("letrec {")
 		NonRec _ _ -> SLIT("let {")
 
 ppr_expr add_par (Note (SCC cc) expr)
