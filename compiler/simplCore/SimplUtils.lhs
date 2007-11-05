@@ -1231,8 +1231,8 @@ have to check that r doesn't mention the variables bound by the
 pattern in each alternative, so the binder-info is rather useful.
 
 \begin{code}
-prepareAlts :: OutExpr -> OutId -> [InAlt] -> SimplM ([AltCon], [InAlt])
-prepareAlts scrut case_bndr' alts
+prepareAlts :: SimplEnv -> OutExpr -> OutId -> [InAlt] -> SimplM ([AltCon], [InAlt])
+prepareAlts env scrut case_bndr' alts
   = do	{ dflags <- getDOptsSmpl
 	; alts <- combineIdenticalAlts case_bndr' alts
 
@@ -1243,7 +1243,7 @@ prepareAlts scrut case_bndr' alts
 		--   EITHER by the context, 
 		--   OR by a non-DEFAULT branch in this case expression.
 
-	; default_alts <- prepareDefault dflags scrut case_bndr' mb_tc_app 
+	; default_alts <- prepareDefault dflags env case_bndr' mb_tc_app 
 					 imposs_deflt_cons maybe_deflt
 
 	; let trimmed_alts = filterOut impossible_alt alts_wo_default
@@ -1289,7 +1289,7 @@ combineIdenticalAlts case_bndr alts = return alts
 --			Prepare the default alternative
 -------------------------------------------------------------------------
 prepareDefault :: DynFlags
-	       -> OutExpr	-- Scrutinee
+	       -> SimplEnv
 	       -> OutId		-- Case binder; need just for its type. Note that as an
 				--   OutId, it has maximum information; this is important.
 				--   Test simpl013 is an example
@@ -1301,10 +1301,16 @@ prepareDefault :: DynFlags
 					-- And becuase case-merging can cause many to show up
 
 -------	Merge nested cases ----------
-prepareDefault dflags scrut outer_bndr bndr_ty imposs_cons (Just deflt_rhs)
+prepareDefault dflags env outer_bndr bndr_ty imposs_cons (Just deflt_rhs)
   | dopt Opt_CaseMerge dflags
-  , Case (Var scrut_var) inner_bndr _ inner_alts <- deflt_rhs
-  , scruting_same_var scrut_var
+  , Case (Var inner_scrut_var) inner_bndr _ inner_alts <- deflt_rhs
+  , DoneId inner_scrut_var' <- substId env inner_scrut_var
+	-- Remember, inner_scrut_var is an InId, but outer_bndr is an OutId
+  , inner_scrut_var' == outer_bndr
+	-- NB: the substId means that if the outer scrutinee was a 
+	--     variable, and inner scrutinee is the same variable, 
+	--     then inner_scrut_var' will be outer_bndr
+	--     via the magic of simplCaseBinder
   = do	{ tick (CaseMerge outer_bndr)
 
 	; let munge_rhs rhs = bindCaseBndr inner_bndr (Var outer_bndr) rhs
@@ -1324,17 +1330,10 @@ prepareDefault dflags scrut outer_bndr bndr_ty imposs_cons (Just deflt_rhs)
     	-- mkCase applied to them, so they won't have a case in their default
     	-- Secondly, if you do, you get an infinite loop, because the bindCaseBndr
     	-- in munge_rhs may put a case into the DEFAULT branch!
-  where
-    	-- We are scrutinising the same variable if it's
-    	-- the outer case-binder, or if the outer case scrutinises a variable
-    	-- (and it's the same).  Testing both allows us not to replace the
-    	-- outer scrut-var with the outer case-binder (Simplify.simplCaseBinder).
-    scruting_same_var = case scrut of
-			  Var outer_scrut -> \ v -> v == outer_bndr || v == outer_scrut
-			  other		  -> \ v -> v == outer_bndr
+
 
 --------- Fill in known constructor -----------
-prepareDefault dflags scrut case_bndr (Just (tycon, inst_tys)) imposs_cons (Just deflt_rhs)
+prepareDefault dflags env case_bndr (Just (tycon, inst_tys)) imposs_cons (Just deflt_rhs)
   | 	-- This branch handles the case where we are 
 	-- scrutinisng an algebraic data type
     isAlgTyCon tycon		-- It's a data type, tuple, or unboxed tuples.  
@@ -1368,10 +1367,10 @@ prepareDefault dflags scrut case_bndr (Just (tycon, inst_tys)) imposs_cons (Just
 	two_or_more -> return [(DEFAULT, [], deflt_rhs)]
 
 --------- Catch-all cases -----------
-prepareDefault dflags scrut case_bndr bndr_ty imposs_cons (Just deflt_rhs)
+prepareDefault dflags env case_bndr bndr_ty imposs_cons (Just deflt_rhs)
   = return [(DEFAULT, [], deflt_rhs)]
 
-prepareDefault dflags scrut case_bndr bndr_ty imposs_cons Nothing
+prepareDefault dflags env case_bndr bndr_ty imposs_cons Nothing
   = return []	-- No default branch
 \end{code}
 

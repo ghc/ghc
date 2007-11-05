@@ -456,14 +456,16 @@ floatBinds (Floats bs _) = fromOL bs
 
 \begin{code}
 substId :: SimplEnv -> Id -> SimplSR
+-- Returns DoneEx only on a non-Var expression
 substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v 
   | not (isLocalId v) 
   = DoneId v
   | otherwise	-- A local Id
   = case lookupVarEnv ids v of
-	Just (DoneId v) -> DoneId (refine in_scope v)
-	Just res	-> res
-	Nothing		-> DoneId (refine in_scope v)
+	Nothing		      -> DoneId (refine in_scope v)
+	Just (DoneId v)       -> DoneId (refine in_scope v)
+	Just (DoneEx (Var v)) -> DoneId (refine in_scope v)
+	Just res	      -> res	-- DoneEx non-var, or ContEx
   where
 
 	-- Get the most up-to-date thing from the in-scope set

@@ -1467,7 +1467,7 @@ simplCaseBinder env scrut case_bndr alts
 		-- See Note [no-case-of-case]
 	= (env, case_bndr)
 
-	| otherwise	-- Failed try [see Note 2 above]
+	| otherwise	-- Failed try; see Note [Suppressing the case binder-swap]
 			--     not (isEvaldUnfolding (idUnfolding v))
 	= case scrut of
 	    Var v -> (modifyInScope env1 v case_bndr', case_bndr')
@@ -1545,7 +1545,7 @@ simplAlts env scrut case_bndr alts cont'
     do	{ let alt_env = zapFloats env
 	; (alt_env, scrut', case_bndr') <- simplCaseBinder alt_env scrut case_bndr alts
 
-	; (imposs_deflt_cons, in_alts) <- prepareAlts scrut case_bndr' alts
+	; (imposs_deflt_cons, in_alts) <- prepareAlts alt_env scrut case_bndr' alts
 
 	; alts' <- mapM (simplAlt alt_env imposs_deflt_cons case_bndr' cont') in_alts
 	; return (scrut', case_bndr', alts') }
