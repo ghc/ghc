@@ -455,7 +455,7 @@ floatBinds (Floats bs _) = fromOL bs
 
 
 \begin{code}
-substId :: SimplEnv -> Id -> SimplSR
+substId :: SimplEnv -> InId -> SimplSR
 -- Returns DoneEx only on a non-Var expression
 substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v 
   | not (isLocalId v) 
@@ -464,7 +464,9 @@ substId (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
   = case lookupVarEnv ids v of
 	Nothing		      -> DoneId (refine in_scope v)
 	Just (DoneId v)       -> DoneId (refine in_scope v)
-	Just (DoneEx (Var v)) -> DoneId (refine in_scope v)
+	Just (DoneEx (Var v)) 
+	       | isLocalId v  -> DoneId (refine in_scope v)
+	       | otherwise    -> DoneId v
 	Just res	      -> res	-- DoneEx non-var, or ContEx
   where
 
@@ -475,7 +477,7 @@ refine in_scope v = case lookupInScope in_scope v of
 			 Just v' -> v'
 			 Nothing -> WARN( True, ppr v ) v	-- This is an error!
 
-lookupRecBndr :: SimplEnv -> Id -> Id
+lookupRecBndr :: SimplEnv -> InId -> OutId
 -- Look up an Id which has been put into the envt by simplRecBndrs,
 -- but where we have not yet done its RHS
 lookupRecBndr (SimplEnv { seInScope = in_scope, seIdSubst = ids }) v
