@@ -1,6 +1,9 @@
+{-# OPTIONS_GHC -XCPP #-}
 module Main where
 
 import GHC
+import BasicTypes
+import Digraph  ( flattenSCCs )
 import DriverPhases ( isHaskellSrcFilename )
 import HscTypes (msHsFilePath)
 import Name
@@ -12,6 +15,7 @@ import Bag
 import Util ( handle, handleDyn )
 import FastString
 
+import Control.Monad
 import System.Environment
 import System.Console.GetOpt
 import System.Exit
@@ -25,12 +29,6 @@ import Data.Maybe
 
 -- We generate both CTAGS and ETAGS format tags files
 -- The former is for use in most sensible editors, while EMACS uses ETAGS
-
----------------------------------
---------- CONFIGURATION ---------
-
-ghcRootDir = "/usr/local/lib/ghc-6.5" --- root for -package ghc? (passed to GHC.init)
-
 
 ----------------------------------
 ---- CENTRAL DATA TYPES ----------
@@ -56,46 +54,66 @@ main = do
               "Usage: " ++ progName ++ " [OPTION...] [-- GHC OPTION... --] [files...]"
 	args <- getArgs
         let (ghcArgs, ourArgs, unbalanced) = splitArgs args
-	let (modes, filenames, errs) = getOpt Permute options ourArgs
+	let (flags, filenames, errs) = getOpt Permute options ourArgs
         let (hsfiles, otherfiles) = List.partition isHaskellSrcFilename filenames
+        let ghc_topdir = case [ d | FlagTopDir d <- flags ] of
+                                [] -> ""
+                                (x:_) -> x
         mapM_ (\n -> putStr $ "Warning: ignoring non-Haskellish file " ++ n ++ "\n")
               otherfiles
-	if unbalanced || errs /= [] || elem Help modes || hsfiles == []
+	if unbalanced || errs /= [] || elem FlagHelp flags || hsfiles == []
          then do
            putStr $ unlines errs 
 	   putStr $ usageInfo usageString options
 	   exitWith (ExitFailure 1)
          else return ()
+
+        let modes = getMode flags
+        let openFileMode = if elem FlagAppend flags
+		     then AppendMode
+		     else WriteMode
+        ctags_hdl <-  if CTags `elem` modes
+                           then Just `liftM` openFile "tags" openFileMode
+                           else return Nothing
+        etags_hdl <- if ETags `elem` modes
+                           then Just `liftM` openFile "TAGS" openFileMode
+                           else return Nothing
+
         GHC.defaultErrorHandler defaultDynFlags $ do
-          session <- newSession (Just ghcRootDir)
+          session <- newSession (Just ghc_topdir)
           flags <- getSessionDynFlags session
-          (pflags, _) <- parseDynamicFlags flags ghcArgs
+          (pflags, _) <- parseDynamicFlags flags{ verbosity=1 } ghcArgs
           let flags = pflags { hscTarget = HscNothing } -- don't generate anything
           GHC.defaultCleanupHandler flags $ do
-            setSessionDynFlags session flags
-	  -- targets <- mapM (\s -> guessTarget s Nothing) hsfiles
-                --  guessTarget would be more compatible with ghc -M
-          filedata <- targetsAtOneGo session hsfiles
-          filedata <- case filedata of
-                        Just fd -> return fd
-                        Nothing -> targetsOneAtATime session hsfiles
-          emitTagsData modes filedata
-
+  
+          setSessionDynFlags session flags
+          targetsAtOneGo session hsfiles (ctags_hdl,etags_hdl)
 
 ----------------------------------------------
 ----------  ARGUMENT PROCESSING --------------
 
-data Mode = ETags | CTags | BothTags | Append | Help deriving (Ord, Eq, Show)
+data Flag
+   = FlagETags
+   | FlagCTags
+   | FlagBoth
+   | FlagAppend
+   | FlagHelp
+   | FlagTopDir FilePath
+  deriving (Ord, Eq, Show)
   -- ^Represents options passed to the program
 
--- | getMode takes a list of modes and extract the mode with the
---   highest precedence.  These are as follows: Both, CTags, ETags
---   The default case is Both.
-getMode :: [Mode] -> Mode
-getMode [] = BothTags
-getMode [x] = x
-getMode (x:xs) = max x (getMode xs)
+data Mode = ETags | CTags deriving Eq
 
+getMode :: [Flag] -> [Mode]
+getMode fs = go (concatMap modeLike fs)
+ where go []     = [ETags,CTags]
+       go [x]    = [x]
+       go more   = nub more
+
+       modeLike FlagETags = [ETags]
+       modeLike FlagCTags = [CTags]
+       modeLike FlagBoth  = [ETags,CTags]
+       modeLike _         = []
 
 splitArgs :: [String] -> ([String], [String], Bool)
 -- ^Pull out arguments between -- for GHC
@@ -104,17 +122,19 @@ splitArgs args = split [] [] False args
           split ghc' tags' unbal (arg : args) = split ghc' (arg:tags') unbal args
           split ghc' tags' unbal [] = (reverse ghc', reverse tags', unbal)
 
-options :: [OptDescr Mode]
+options :: [OptDescr Flag]
 -- supports getopt
-options = [ Option "c" ["ctags"]
-	    (NoArg CTags) "generate CTAGS file (ctags)"
+options = [ Option "" ["topdir"] 
+            (ReqArg FlagTopDir "DIR") "root of GHC installation (optional)"
+          , Option "c" ["ctags"]
+	    (NoArg FlagCTags) "generate CTAGS file (ctags)"
 	  , Option "e" ["etags"]
-	    (NoArg ETags) "generate ETAGS file (etags)"
+	    (NoArg FlagETags) "generate ETAGS file (etags)"
 	  , Option "b" ["both"]
-	    (NoArg BothTags) ("generate both CTAGS and ETAGS")
+	    (NoArg FlagBoth) ("generate both CTAGS and ETAGS")
 	  , Option "a" ["append"]
-	    (NoArg Append) ("append to existing CTAGS and/or ETAGS file(s)")
-	  , Option "h" ["help"] (NoArg Help) "This help"
+	    (NoArg FlagAppend) ("append to existing CTAGS and/or ETAGS file(s)")
+	  , Option "h" ["help"] (NoArg FlagHelp) "This help"
 	  ]
 
 
@@ -131,49 +151,39 @@ safeLoad session mode = do
 	  		  return Failed) $ load session mode
 
 
-targetsAtOneGo :: Session -> [FileName] -> IO (Maybe [FileData])
+targetsAtOneGo :: Session -> [FileName] -> (Maybe Handle, Maybe Handle) -> IO ()
 -- load a list of targets
-targetsAtOneGo session hsfiles = do
-  let targets = map fileTarget hsfiles
+targetsAtOneGo session hsfiles handles = do
+  targets <- mapM (\f -> guessTarget f Nothing) hsfiles
   setTargets session targets
-  print $ "trying " ++ targetInfo hsfiles
-  success <- safeLoad session LoadAllTargets  --- bring module graph up to date
-  case success of
-    Failed -> return Nothing
-    Succeeded -> do
-                 print $ "loaded " ++ targetInfo hsfiles
-                 graph <- getModuleGraph session
-                 print "got modules graph"
-                 fd <- graphData session graph
-                 return $ Just fd
+  putStrLn $ "Load it all:"
+  flag <- load session LoadAllTargets
+  when (failed flag) $ exitWith (ExitFailure 1)
+  modgraph <- getModuleGraph session
+  let mods = flattenSCCs $ topSortModuleGraph False modgraph Nothing
+  graphData session mods handles
 
   where targetInfo [hs] = "target " ++ hs
         targetInfo hss  = show (length hss) ++ " targets at one go"
 
-targetsOneAtATime :: Session -> [FileName] -> IO ([FileData])
--- load a list of targets, one at a time (more resilient to errors)
-targetsOneAtATime session hsfiles = do
-  print "trying targets one by one"
-  results <- mapM (targetsAtOneGo session) [[f] | f <- hsfiles]
-  return $ List.concat $ catMaybes results
-    
 fileTarget :: FileName -> Target
 fileTarget filename = Target (TargetFile filename Nothing) Nothing
 
 ---------------------------------------------------------------
 ----- CRAWLING ABSTRACT SYNTAX TO SNAFFLE THE DEFINITIONS -----
 
-graphData :: Session -> ModuleGraph -> IO [FileData]
-graphData session graph =
-    mapM foundthings graph
+graphData :: Session -> ModuleGraph -> (Maybe Handle, Maybe Handle) -> IO ()
+graphData session graph handles = do
+    mapM_ foundthings graph
     where foundthings ms =
               let filename = msHsFilePath ms
                   modname = moduleName $ ms_mod ms
               in  do mod <- checkModule session modname False
-                     return $ maybe (FileData filename []) id $ do
-                       m <- mod
-                       s <- renamedSource m
-                       return $ fileData filename modname s
+                     let fd = maybe (FileData filename []) id $ do
+                                m <- mod
+                                s <- renamedSource m
+                                return $ fileData filename modname s
+                     writeTagsData handles fd
 
 fileData :: FileName -> ModuleName -> RenamedSource -> FileData
 fileData filename modname (group, _imports, _lie, _doc, _haddock) =
@@ -236,7 +246,11 @@ boundThings modname lbinding =
                ConPatIn _ conargs -> conArgs conargs tl
                ConPatOut _ _ _ _ conargs _ -> conArgs conargs tl
                LitPat _ -> tl
+#if __GLASGOW_HASKELL__ > 608
+               NPat _ _ _ -> tl -- form of literal pattern?
+#else
                NPat _ _ _ _ -> tl -- form of literal pattern?
+#endif
                NPlusKPat id _ _ _ -> thing id : tl
                TypePat _ -> tl -- XXX need help here
                SigPatIn p _ -> patThings p tl
@@ -247,34 +261,15 @@ boundThings modname lbinding =
         conArgs (InfixCon p1 p2) tl = patThings p1 $ patThings p2 tl
 
 
------------------------------------------------
-------- WRITING THE DATA TO TAGS FILES --------
-
-emitTagsData :: [Mode] -> [FileData] -> IO ()
-emitTagsData modes filedata = do
-  let mode = getMode (Append `delete` modes)
-  let openFileMode = if elem Append modes
-		     then AppendMode
-		     else WriteMode
-  if mode == BothTags || mode == CTags
-   then do 
-     ctagsfile <- openFile "tags" openFileMode
-     writectagsfile ctagsfile filedata
-     hClose ctagsfile
-   else return ()
-  if mode == BothTags || mode == ETags 
-   then do
-     etagsfile <- openFile "TAGS" openFileMode
-     writeetagsfile etagsfile filedata
-     hClose etagsfile
-   else return ()
-
-
 -- stuff for dealing with ctags output format
 
-writectagsfile :: Handle -> [FileData] -> IO ()
+writeTagsData (mb_ctags_hdl, mb_etags_hdl) fd = do 
+  maybe (return ()) (\hdl -> writectagsfile hdl fd) mb_ctags_hdl
+  maybe (return ()) (\hdl -> writeetagsfile hdl fd) mb_etags_hdl
+
+writectagsfile :: Handle -> FileData -> IO ()
 writectagsfile ctagsfile filedata = do
-	let things = concat $ map getfoundthings filedata
+	let things = getfoundthings filedata
 	mapM_ (\x -> hPutStrLn ctagsfile $ dumpthing False x) things
 	mapM_ (\x -> hPutStrLn ctagsfile $ dumpthing True  x) things
 
@@ -291,9 +286,8 @@ dumpthing showmod (FoundThing modname name loc) =
 
 -- stuff for dealing with etags output format
 
-writeetagsfile :: Handle -> [FileData] -> IO ()
-writeetagsfile etagsfile filedata = do
-	mapM_ (\x -> hPutStr etagsfile $ e_dumpfiledata x) filedata
+writeetagsfile :: Handle -> FileData -> IO ()
+writeetagsfile etagsfile = hPutStr etagsfile . e_dumpfiledata
 
 e_dumpfiledata :: FileData -> String
 e_dumpfiledata (FileData filename things) = 
