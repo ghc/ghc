@@ -611,11 +611,6 @@ ifacedir		= $(libdir)
 #     (NOTE: configure script setting is ignored).
 libexecdir		= $(libdir)
 
-# This is a bit of a lie, as this is a wrapper rather than the program
-# itself. However, it means that we don't have to worry about Windows
-# and non-Windows having different extensions.
-GHC_PKG_PROG = $(FPTOOLS_TOP_ABS)/$(GHC_PKG_DIR_REL)/ghc-pkg-inplace
-
 #-----------------------------------------------------------------------------
 # install configuration
 
