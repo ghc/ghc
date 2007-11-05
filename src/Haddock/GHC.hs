@@ -37,7 +37,7 @@ startGhc libDir flags = do
   dynflags  <- getSessionDynFlags session
   let dynflags' = dopt_set dynflags Opt_Haddock
   let dynflags'' = dynflags' {
-      hscTarget = HscNothing,
+      hscTarget = HscAsm,
       ghcMode   = CompManager,
       ghcLink   = NoLink
     }
