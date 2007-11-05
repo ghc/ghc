@@ -1014,7 +1014,9 @@ makeImplicationBind loc all_tvs reft
 	      tup_ty = mkTupleTy Boxed n_dict_irreds (map idType dict_irred_ids)
 	      pat = TuplePat (map nlVarPat dict_irred_ids) Boxed tup_ty
 	      rhs = L span (mkHsWrap co (HsVar (instToId implic_inst)))
-	      co  = mkWpApps (map instToId dict_givens) <.> mkWpTyApps eq_tyvar_cos <.> mkWpTyApps (mkTyVarTys all_tvs)
+	      co  = mkWpApps (map instToId dict_givens)
+		    <.> mkWpTyApps eq_tyvar_cos
+		    <.> mkWpTyApps (mkTyVarTys all_tvs)
 	      bind | [dict_irred_id] <- dict_irred_ids  = VarBind dict_irred_id rhs
 		   | otherwise        = PatBind { pat_lhs = L span pat, 
 				                  pat_rhs = unguardedGRHSs rhs, 
@@ -2216,8 +2218,13 @@ reduceImplication env orig_avails name reft tvs extra_givens wanteds inst_loc
 			-- SLPJ Sept07: this looks Utterly Wrong to me, but I think
 			--	        that current extra_givens has no EqInsts, so
 			--		it makes no difference
-		-- dict_ids = map instToId extra_givens
-		co  = mkWpTyLams tvs <.> mkWpTyLams eq_tyvars <.> mkWpLams dict_ids <.> WpLet (binds `unionBags` bind)
+		co  = wrap_inline	-- Note [Always inline implication constraints]
+		      <.> mkWpTyLams tvs
+		      <.> mkWpTyLams eq_tyvars
+		      <.> mkWpLams dict_ids
+		      <.> WpLet (binds `unionBags` bind)
+		wrap_inline | null dict_ids = idHsWrapper
+			    | otherwise	    = WpInline
 		rhs = mkHsWrap co payload
 	        loc = instLocSpan inst_loc
 		payload | [dict_wanted] <- dict_wanteds = HsVar (instToId dict_wanted)
@@ -2231,6 +2238,16 @@ reduceImplication env orig_avails name reft tvs extra_givens wanteds inst_loc
   	} 
     }
 \end{code}
+
+Note [Always inline implication constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose an implication constraint floats out of an INLINE function.
+Then although the implication has a single call site, it won't be 
+inlined.  And that is bad because it means that even if there is really
+*no* overloading (type signatures specify the exact types) there will
+still be dictionary passing in the resulting code.  To avert this,
+we mark the implication constraints themselves as INLINE, at least when
+there is no loss of sharing as a result.
 
 Note [Reducing implication constraints]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

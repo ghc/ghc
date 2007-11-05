@@ -463,6 +463,8 @@ dsCoercion (WpApp id)        thing_inside = do { expr <- thing_inside
 					       ; return (App expr (Var id)) }
 dsCoercion (WpTyApp ty)      thing_inside = do { expr <- thing_inside
 					       ; return (App expr (Type ty)) }
+dsCoercion WpInline 	     thing_inside = do { expr <- thing_inside
+					       ; return (mkInlineMe expr) }
 dsCoercion (WpLet bs)        thing_inside = do { prs <- dsLHsBinds bs
 					       ; expr <- thing_inside
 					       ; return (Let (Rec prs) expr) }

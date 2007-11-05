@@ -345,6 +345,7 @@ data HsWrapper
   | WpTyApp Type		-- [] t		the 't' is a type or corecion
   | WpLam Id	 		-- \d. []	the 'd' is a type-class dictionary
   | WpTyLam TyVar 		-- \a. []	the 'a' is a type or coercion variable
+  | WpInline			-- inline_me []   Wrap inline around the thing
 
 	-- Non-empty bindings, so that the identity coercion
 	-- is always exactly WpHole
@@ -365,6 +366,7 @@ pprHsWrapper it wrap =
         help it (WpLam id)    = sep [ptext SLIT("\\") <> pprBndr LambdaBind id <> dot, it]
         help it (WpTyLam tv)  = sep [ptext SLIT("/\\") <> pprBndr LambdaBind tv <> dot, it]
         help it (WpLet binds) = sep [ptext SLIT("let") <+> braces (ppr binds), it]
+        help it WpInline      = sep [ptext SLIT("_inline_me_"), it]
     in
       -- in debug mode, print the wrapper
       -- otherwise just print what's inside

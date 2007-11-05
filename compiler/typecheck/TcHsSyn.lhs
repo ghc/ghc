@@ -543,7 +543,8 @@ zonk_cmd_top env (HsCmdTop cmd stack_tys ty ids)
 
 -------------------------------------------------------------------------
 zonkCoFn :: ZonkEnv -> HsWrapper -> TcM (ZonkEnv, HsWrapper)
-zonkCoFn env WpHole = return (env, WpHole)
+zonkCoFn env WpHole   = return (env, WpHole)
+zonkCoFn env WpInline = return (env, WpInline)
 zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
 				    ; (env2, c2') <- zonkCoFn env1 c2
 				    ; return (env2, WpCompose c1' c2') }
