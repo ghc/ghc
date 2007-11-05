@@ -59,8 +59,9 @@ renameInterface renamingEnv mod =
 
       -- filter out certain built in type constructors using their string 
       -- representation. TODO: use the Name constants from the GHC API.
-      strings = filter (`notElem` ["()", "[]", "(->)"]) 
-                (map pretty missingNames)
+--      strings = filter (`notElem` ["()", "[]", "(->)"]) 
+--                (map pretty missingNames)
+      strings = map pretty . filter (\n -> not (isSystemName n || isWiredInName n || isBuiltInSyntax n)) $ missingNames
      
   in do
     -- report things that we couldn't link to. Only do this for non-hidden
