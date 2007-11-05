@@ -256,6 +256,8 @@ data AlgTyConRhs
 				-- See Note [Newtype coercions]
 				-- Invariant: arity = #tvs in nt_etad_rhs;
 				--	See Note [Newtype eta]
+				-- Watch out!  If any newtypes become transparent
+				-- again check Trac #1072.
 
 	nt_etad_rhs :: ([TyVar], Type) ,
 			-- The same again, but this time eta-reduced
