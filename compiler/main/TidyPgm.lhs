@@ -1,63 +1,52 @@
-%
+
 % (c) The GRASP/AQUA Project, Glasgow University, 1992-1998
 %
 \section{Tidying up Core}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TidyPgm( mkBootModDetails, tidyProgram ) where
 
 #include "HsVersions.h"
 
-import DynFlags		( DynFlag(..), DynFlags(..), dopt )
+import DynFlags
 import CoreSyn
-import CoreUnfold	( noUnfolding, mkTopUnfolding )
-import CoreFVs		( ruleLhsFreeIds, exprSomeFreeVars )
-import CoreTidy		( tidyExpr, tidyVarOcc, tidyRules )
-import PprCore 		( pprRules )
-import CoreLint		( showPass, endPass )
-import CoreUtils	( exprArity, rhsIsStatic )
+import CoreUnfold
+import CoreFVs
+import CoreTidy
+import PprCore
+import CoreLint
+import CoreUtils
 import VarEnv
 import VarSet
-import Var		( Id, Var )
-import Id		( idType, idInfo, idName, idCoreRules, isGlobalId,
-			  isExportedId, mkVanillaGlobal, isLocalId, isNaughtyRecordSelector,
-			  idArity, idCafInfo, idUnfolding, isImplicitId, setIdInfo,
-			  isTickBoxOp
-			) 
-import IdInfo		{- loads of stuff -}
-import InstEnv		( Instance, DFunId, instanceDFunId, setInstanceDFunId )
-import NewDemand	( isBottomingSig, topSig )
-import BasicTypes	( Arity, isNeverActive, isNonRuleLoopBreaker )
+import Var
+import Id
+import IdInfo
+import InstEnv
+import NewDemand
+import BasicTypes
 import Name
-import NameSet		( NameSet, elemNameSet )
-import IfaceEnv		( allocateGlobalBinder )
-import NameEnv		( filterNameEnv, mapNameEnv )
-import OccName		( TidyOccEnv, initTidyOccEnv, tidyOccName )
-import Type		( tidyTopType )
-import TcType		( isFFITy )
-import DataCon		( dataConName, dataConFieldLabels, dataConWrapId_maybe )
-import TyCon		( TyCon, makeTyConAbstract, tyConDataCons, isNewTyCon, 
-			  newTyConRep, tyConSelIds, isAlgTyCon,
-			  isEnumerationTyCon, isOpenTyCon )
-import Class		( classSelIds )
+import NameSet
+import IfaceEnv
+import NameEnv
+import OccName
+import TcType
+import DataCon
+import TyCon
+import Class
 import Module
 import HscTypes
-import Maybes		( orElse, mapCatMaybes )
-import ErrUtils		( showPass, dumpIfSet_core )
-import UniqSupply	( splitUniqSupply, uniqFromSupply )
+import Maybes
+import ErrUtils
+import UniqSupply
 import Outputable
-import FastTypes  hiding ( fastOr )
+import FastTypes hiding (fastOr)
 
 import Data.List	( partition )
 import Data.Maybe	( isJust )
 import Data.IORef	( IORef, readIORef, writeIORef )
+
+_dummy :: FS.FastString
+_dummy = FSLIT("")
 \end{code}
 
 
@@ -123,12 +112,10 @@ mkBootModDetails :: HscEnv -> ModGuts -> IO ModDetails
 -- We don't look at the bindings at all -- there aren't any
 -- for hs-boot files
 
-mkBootModDetails hsc_env (ModGuts { mg_module    = mod
-				  , mg_exports   = exports
+mkBootModDetails hsc_env (ModGuts { mg_exports   = exports
 				  , mg_types     = type_env
 				  , mg_insts     = insts
 				  , mg_fam_insts = fam_insts
-                                  , mg_modBreaks = modBreaks   
                                   })
   = do	{ let dflags = hsc_dflags hsc_env 
 	; showPass dflags "Tidy [hoot] type env"
@@ -241,7 +228,7 @@ RHSs, so that they print nicely in interfaces.
 \begin{code}
 tidyProgram :: HscEnv -> ModGuts -> IO (CgGuts, ModDetails)
 tidyProgram hsc_env
-	    mod_impl@(ModGuts {	mg_module = mod, mg_exports = exports, 
+                (ModGuts {      mg_module = mod, mg_exports = exports, 
 				mg_types = type_env, 
 				mg_insts = insts, mg_fam_insts = fam_insts,
 				mg_binds = binds, 
@@ -314,10 +301,11 @@ tidyProgram hsc_env
                               })
 	}
 
+lookup_dfun :: TypeEnv -> Var -> Id
 lookup_dfun type_env dfun_id
   = case lookupTypeEnv type_env (idName dfun_id) of
 	Just (AnId dfun_id') -> dfun_id'
-	other -> pprPanic "lookup_dfun" (ppr dfun_id)
+	_other -> pprPanic "lookup_dfun" (ppr dfun_id)
 
 tidyTypeEnv :: Bool -> NameSet -> TypeEnv -> [CoreBind] -> TypeEnv
 
@@ -349,7 +337,7 @@ tidyTypeEnv omit_prags exports type_env tidy_binds
 	-- (The bindings bind LocalIds.)
     keep_it thing | isWiredInThing thing = False
     keep_it (AnId id) = isGlobalId id	-- Keep GlobalIds (e.g. class ops)
-    keep_it other     = True		-- Keep all TyCons, DataCons, and Classes
+    keep_it _other    = True		-- Keep all TyCons, DataCons, and Classes
 
     trim_thing thing
 	= case thing of
@@ -359,7 +347,7 @@ tidyTypeEnv omit_prags exports type_env tidy_binds
 	    AnId id | isImplicitId id -> thing
 		    | otherwise	      -> AnId (id `setIdInfo` vanillaIdInfo)
 
-	    other -> thing
+	    _other -> thing
 
 mustExposeTyCon :: NameSet	-- Exports
 		-> TyCon	-- The tycon
@@ -411,7 +399,7 @@ getImplicitBinds type_env
 	-- They are there just so we can get decent error messages
 	-- See Note  [Naughty record selectors] in MkId.lhs
     other_implicit_ids (AClass cl) = classSelIds cl
-    other_implicit_ids other       = []
+    other_implicit_ids _other      = []
     
     get_defn :: Id -> CoreBind
     get_defn id = NonRec id (tidyExpr emptyTidyEnv rhs)
@@ -458,7 +446,7 @@ findExternalIds omit_prags binds
 	-- interface file emissions.  If the Id isn't in this set, and isn't
 	-- exported, there's no need to emit anything
     need_id needed_set id       = id `elemVarEnv` needed_set || isExportedId id 
-    need_pr needed_set (id,rhs)	= need_id needed_set id
+    need_pr needed_set (id,_)	= need_id needed_set id
 
 addExternal :: (Id,CoreExpr) -> IdEnv Bool -> IdEnv Bool
 -- The Id is needed; extend the needed set
@@ -503,7 +491,7 @@ addExternal (id,rhs) needed
 
     worker_ids = case worker_info of
 		   HasWorker work_id _ -> unitVarSet work_id
-		   otherwise	       -> emptyVarSet
+		   _otherwise          -> emptyVarSet
 \end{code}
 
 
@@ -605,7 +593,7 @@ tidyTopBind  :: PackageId
 	     -> TidyEnv -> CoreBind
 	     -> IO (TidyEnv, CoreBind)
 
-tidyTopBind this_pkg mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (NonRec bndr rhs)
+tidyTopBind this_pkg mod nc_var ext_ids (occ_env1,subst1) (NonRec bndr rhs)
   = do	{ (occ_env2, name') <- tidyTopName mod nc_var ext_ids occ_env1 bndr
 	; let	{ (bndr', rhs') = tidyTopPair ext_ids tidy_env2 caf_info name' (bndr, rhs)
 		; subst2        = extendVarEnv subst1 bndr bndr'
@@ -614,7 +602,7 @@ tidyTopBind this_pkg mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (NonRec bndr
   where
     caf_info = hasCafRefs this_pkg subst1 (idArity bndr) rhs
 
-tidyTopBind this_pkg mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (Rec prs)
+tidyTopBind this_pkg mod nc_var ext_ids (occ_env1,subst1) (Rec prs)
   = do	{ (occ_env2, names') <- tidyTopNames mod nc_var ext_ids occ_env1 bndrs
 	; let	{ prs'      = zipWith (tidyTopPair ext_ids tidy_env2 caf_info)
 				      names' prs
@@ -637,7 +625,9 @@ tidyTopBind this_pkg mod nc_var ext_ids tidy_env1@(occ_env1,subst1) (Rec prs)
 -- externally visible (see comment at the top of this module).  If the name
 -- was previously local, we have to give it a unique occurrence name if
 -- we intend to externalise it.
-tidyTopNames mod nc_var ext_ids occ_env [] = return (occ_env, [])
+tidyTopNames :: Module -> IORef NameCache -> VarEnv Bool -> TidyOccEnv
+             -> [Id] -> IO (TidyOccEnv, [Name])
+tidyTopNames _mod _nc_var _ext_ids occ_env [] = return (occ_env, [])
 tidyTopNames mod nc_var ext_ids occ_env (id:ids)
   = do	{ (occ_env1, name)  <- tidyTopName  mod nc_var ext_ids occ_env id
   	; (occ_env2, names) <- tidyTopNames mod nc_var ext_ids occ_env1 ids
@@ -670,6 +660,8 @@ tidyTopName mod nc_var ext_ids occ_env id
 			    ; let (nc', new_external_name) = mk_new_external nc
 			    ; writeIORef nc_var nc'
 			    ; return (occ_env', new_external_name) }
+
+  | otherwise = panic "tidyTopName"
   where
     name	= idName id
     external    = id `elemVarEnv` ext_ids
@@ -718,7 +710,7 @@ tidyTopPair ext_ids rhs_tidy_env caf_info name' (bndr, rhs)
     ty'	    = tidyTopType (idType bndr)
     rhs'    = tidyExpr rhs_tidy_env rhs
     idinfo  = idInfo bndr
-    idinfo' = tidyTopIdInfo rhs_tidy_env (isJust maybe_external)
+    idinfo' = tidyTopIdInfo (isJust maybe_external)
 			    idinfo unfold_info worker_info
 			    arity caf_info
 
@@ -752,8 +744,10 @@ tidyTopPair ext_ids rhs_tidy_env caf_info name' (bndr, rhs)
 -- 	occurrences of the binders in RHSs, and hence to occurrences in
 -- 	unfoldings, which are inside Ids imported by GHCi. Ditto RULES.
 --	CoreToStg makes use of this when constructing SRTs.
-
-tidyTopIdInfo tidy_env is_external idinfo unfold_info worker_info arity caf_info
+tidyTopIdInfo :: Bool -> IdInfo -> Unfolding
+              -> WorkerInfo -> ArityInfo -> CafInfo
+              -> IdInfo
+tidyTopIdInfo is_external idinfo unfold_info worker_info arity caf_info
   | not is_external	-- For internal Ids (not externally visible)
   = vanillaIdInfo	-- we only need enough info for code generation
 			-- Arity and strictness info are enough;
@@ -776,7 +770,8 @@ tidyTopIdInfo tidy_env is_external idinfo unfold_info worker_info arity caf_info
 
 
 ------------  Worker  --------------
-tidyWorker tidy_env show_unfold NoWorker
+tidyWorker :: TidyEnv -> Bool -> WorkerInfo -> WorkerInfo
+tidyWorker _tidy_env _show_unfold NoWorker
   = NoWorker
 tidyWorker tidy_env show_unfold (HasWorker work_id wrap_arity) 
   | show_unfold = HasWorker (tidyVarOcc tidy_env work_id) wrap_arity
@@ -829,6 +824,7 @@ hasCafRefs this_pkg p arity expr
   -- CorePrep later on, and we don't want to duplicate that
   -- knowledge in rhsIsStatic below.
 
+cafRefs :: VarEnv Id -> Expr a -> FastBool
 cafRefs p (Var id)
 	-- imported Ids first:
   | not (isLocalId id) = fastBool (mayHaveCafRefs (idCafInfo id))
@@ -838,18 +834,20 @@ cafRefs p (Var id)
 	Just id' -> fastBool (mayHaveCafRefs (idCafInfo id'))
 	Nothing  -> fastBool False
 
-cafRefs p (Lit l) 	       = fastBool False
+cafRefs _ (Lit _) 	       = fastBool False
 cafRefs p (App f a) 	       = fastOr (cafRefs p f) (cafRefs p) a
-cafRefs p (Lam x e) 	       = cafRefs p e
+cafRefs p (Lam _ e) 	       = cafRefs p e
 cafRefs p (Let b e) 	       = fastOr (cafRefss p (rhssOfBind b)) (cafRefs p) e
-cafRefs p (Case e bndr _ alts) = fastOr (cafRefs p e) (cafRefss p) (rhssOfAlts alts)
-cafRefs p (Note n e) 	       = cafRefs p e
-cafRefs p (Cast e co)          = cafRefs p e
-cafRefs p (Type t) 	       = fastBool False
+cafRefs p (Case e _bndr _ alts) = fastOr (cafRefs p e) (cafRefss p) (rhssOfAlts alts)
+cafRefs p (Note _n e) 	       = cafRefs p e
+cafRefs p (Cast e _co)         = cafRefs p e
+cafRefs _ (Type _) 	       = fastBool False
 
-cafRefss p [] 	  = fastBool False
+cafRefss :: VarEnv Id -> [Expr a] -> FastBool
+cafRefss _ [] 	  = fastBool False
 cafRefss p (e:es) = fastOr (cafRefs p e) (cafRefss p) es
 
+fastOr :: FastBool -> (a -> FastBool) -> a -> FastBool
 -- hack for lazy-or over FastBool.
 fastOr a f x = fastBool (isFastTrue a || isFastTrue (f x))
 \end{code}
