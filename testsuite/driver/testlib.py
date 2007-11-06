@@ -598,6 +598,7 @@ def ghci_script( name, way, script ):
     # filter out -no-recomp from compiler_always_flags, becuase we're
     # actually testing the recompilation behaviour in the GHCi tests.
     flags = filter(lambda f: f != '-no-recomp', config.compiler_always_flags)
+    flags.append(getTestOpts().extra_hc_opts)
 
     # We pass HC and HC_OPTS as environment variables, so that the
     # script can invoke the correct compiler by using ':! $HC $HC_OPTS'
