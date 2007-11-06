@@ -1001,7 +1001,7 @@ thLocalId orig id id_ty th_bind_lvl
 
 --------------------------------------
 thBrackId orig id ps_var lie_var
-  | isExternalName id_name
+  | thTopLevelId id
   =	-- Top-level identifiers in this module,
 	-- (which have External Names)
 	-- are just like the imported case:
@@ -1012,7 +1012,7 @@ thBrackId orig id ps_var lie_var
 	-- But we do need to put f into the keep-alive
 	-- set, because after desugaring the code will
 	-- only mention f's *name*, not f itself.
-    do	{ keepAliveTc id_name; return id }
+    do	{ keepAliveTc id; return id }
 
   | otherwise
   = 	-- Nested identifiers, such as 'x' in
@@ -1044,11 +1044,9 @@ thBrackId orig id ps_var lie_var
 	   
 		   -- Update the pending splices
 	; ps <- readMutVar ps_var
-	; writeMutVar ps_var ((id_name, nlHsApp (nlHsVar lift) (nlHsVar id)) : ps)
+	; writeMutVar ps_var ((idName id, nlHsApp (nlHsVar lift) (nlHsVar id)) : ps)
 
 	; return id } }
- where
-   id_name = idName id
 #endif /* GHCI */
 \end{code}
 

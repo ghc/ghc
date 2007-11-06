@@ -78,8 +78,14 @@ import qualified Control.Exception  as Exception( userErrors )
 Note [Template Haskell levels]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * Imported things are impLevel (= 0)
+
+* In GHCi, variables bound by a previous command are treated
+  as impLevel, because we have bytecode for them.
+
 * Variables are bound at the "current level"
+
 * The current level starts off at topLevel (= 1)
+
 * The level is decremented by splicing $(..)
 	       incremented by brackets [| |]
 	       incremented by name-quoting 'f
@@ -105,12 +111,22 @@ When a variable is used, we compare
     - Non-top-level 	Only if there is a liftable instance
 				h = \(x:Int) -> [| x |]
 
+See Note [What is a top-level Id?]
+
 Note [Quoting names]
 ~~~~~~~~~~~~~~~~~~~~
-A quoted name is a bit like a quoted expression, except that we have no 
-cross-stage lifting (c.f. TcExpr.thBrackId).  
+A quoted name 'n is a bit like a quoted expression [| n |], except that we 
+have no cross-stage lifting (c.f. TcExpr.thBrackId).  So, after incrementing
+the use-level to account for the brackets, the cases are:
 
-Examples:
+	bind > use			Error
+	bind = use			OK
+	bind < use	
+		Imported things		OK
+		Top-level things	OK
+		Non-top-level		Error
+
+See Note [What is a top-level Id?] in TcEnv.  Examples:
 
   f 'map	-- OK; also for top-level defns of this module
 
@@ -121,6 +137,20 @@ Examples:
 
   [| \x. $(f 'x) |]	-- OK
 
+
+Note [What is a top-level Id?]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In the level-control criteria above, we need to know what a "top level Id" is.
+There are three kinds:
+  * Imported from another module		(GlobalId, ExternalName)
+  * Bound at the top level of this module	(ExternalName)
+  * In GHCi, bound by a previous stmt		(GlobalId)
+It's strange that there is no one criterion tht picks out all three, but that's
+how it is right now.  (The obvious thing is to give an ExternalName to GHCi Ids 
+bound in an earlier Stmt, but what module would you choose?  See 
+Note [Interactively-bound Ids in GHCi] in TcRnDriver.)
+
+The predicate we use is TcEnv.thTopLevelId.
 
 
 %************************************************************************
@@ -175,7 +205,7 @@ tcBracket brack res_ty
     getLIEVar				`thenM` \ lie_var ->
 
     setStage (Brack next_level pending_splices lie_var) (
-	getLIE (tc_bracket brack)
+	getLIE (tc_bracket next_level brack)
     )					`thenM` \ (meta_ty, lie) ->
     tcSimplifyBracket lie 		`thenM_`  
 
@@ -187,35 +217,34 @@ tcBracket brack res_ty
     returnM (noLoc (HsBracketOut brack pendings))
     }
 
-tc_bracket :: HsBracket Name -> TcM TcType
-tc_bracket (VarBr name) 	-- Note [Quoting names]
+tc_bracket :: ThLevel -> HsBracket Name -> TcM TcType
+tc_bracket use_lvl (VarBr name) 	-- Note [Quoting names]
   = do	{ thing <- tcLookup name
 	; case thing of
     	    AGlobal _ -> return ()
-    	    ATcId { tct_level = bind_lvl }
-		| isExternalName name	-- C.f isExternalName case of
-		-> keepAliveTc name 	--     TcExpr.thBrackId
+    	    ATcId { tct_level = bind_lvl, tct_id = id }
+		| thTopLevelId id	-- C.f thTopLevelId case of
+		-> keepAliveTc id 	--     TcExpr.thBrackId
 		| otherwise
-		-> do { use_stage <- getStage
-		      ; checkTc (thLevel use_stage == bind_lvl)
+		-> do { checkTc (use_lvl == bind_lvl)
 				(quotedNameStageErr name) }
 	    other -> pprPanic "th_bracket" (ppr name)
 
 	; tcMetaTy nameTyConName 	-- Result type is Var (not Q-monadic)
 	}
 
-tc_bracket (ExpBr expr) 
+tc_bracket use_lvl (ExpBr expr) 
   = do	{ any_ty <- newFlexiTyVarTy liftedTypeKind
 	; tcMonoExpr expr any_ty
 	; tcMetaTy expQTyConName }
 	-- Result type is Expr (= Q Exp)
 
-tc_bracket (TypBr typ) 
+tc_bracket use_lvl (TypBr typ) 
   = do	{ tcHsSigType ExprSigCtxt typ
 	; tcMetaTy typeQTyConName }
 	-- Result type is Type (= Q Typ)
 
-tc_bracket (DecBr decls)
+tc_bracket use_lvl (DecBr decls)
   = do	{  tcTopSrcDecls emptyModDetails decls
 	-- Typecheck the declarations, dicarding the result
 	-- We'll get all that stuff later, when we splice it in
@@ -226,7 +255,7 @@ tc_bracket (DecBr decls)
 	-- Result type is Q [Dec]
     }
 
-tc_bracket (PatBr _)
+tc_bracket use_lvl (PatBr _)
   = failWithTc (ptext SLIT("Tempate Haskell pattern brackets are not supported yet"))
 
 quotedNameStageErr v 

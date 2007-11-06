@@ -47,7 +47,7 @@ module TcEnv(
 
 	-- Template Haskell stuff
 	checkWellStaged, spliceOK, bracketOK, tcMetaTy, thLevel, 
-	topIdLvl, 
+	topIdLvl, thTopLevelId,
 
 	-- New Ids
 	newLocalName, newDFunName, newFamInstTyConName,
@@ -604,6 +604,10 @@ tcMetaTy :: Name -> TcM Type
 tcMetaTy tc_name
   = tcLookupTyCon tc_name	`thenM` \ t ->
     returnM (mkTyConApp t [])
+
+thTopLevelId :: Id -> Bool
+-- See Note [What is a top-level Id?] in TcSplice
+thTopLevelId id = isGlobalId id || isExternalName (idName id)
 \end{code}
 
 

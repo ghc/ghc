@@ -875,9 +875,11 @@ setLclTypeEnv lcl_env thing_inside
 recordThUse :: TcM ()
 recordThUse = do { env <- getGblEnv; writeMutVar (tcg_th_used env) True }
 
-keepAliveTc :: Name -> TcM ()  	-- Record the name in the keep-alive set
-keepAliveTc n = do { env <- getGblEnv; 
-		   ; updMutVar (tcg_keep env) (`addOneToNameSet` n) }
+keepAliveTc :: Id -> TcM ()  	-- Record the name in the keep-alive set
+keepAliveTc id 
+  | isLocalId id = do { env <- getGblEnv; 
+		      ; updMutVar (tcg_keep env) (`addOneToNameSet` idName id) }
+  | otherwise = return ()
 
 keepAliveSetTc :: NameSet -> TcM ()  	-- Record the name in the keep-alive set
 keepAliveSetTc ns = do { env <- getGblEnv; 

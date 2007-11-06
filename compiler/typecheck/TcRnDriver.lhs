@@ -899,16 +899,7 @@ tcRnStmt hsc_env ictxt rdr_stmt
     mappM bad_unboxed (filter (isUnLiftedType . idType) zonked_ids) ;
 
     traceTc (text "tcs 1") ;
-    let {	-- (a) Make all the bound ids "global" ids, now that
-    		--     they're notionally top-level bindings.  This is
-	    	--     important: otherwise when we come to compile an expression
-	    	--     using these ids later, the byte code generator will consider
-	    	--     the occurrences to be free rather than global.
-		-- 
-		-- (b) Tidy their types; this is important, because :info may
-		--     ask to look at them, and :info expects the things it looks
-		--     up to have tidy types
-	global_ids = map globaliseAndTidy zonked_ids ;
+    let { global_ids = map globaliseAndTidy zonked_ids } ;
     
 {- ---------------------------------------------
    At one stage I removed any shadowed bindings from the type_env;
@@ -928,7 +919,6 @@ tcRnStmt hsc_env ictxt rdr_stmt
    Hence this code is commented out
 
 -------------------------------------------------- -}
-    } ;
 
     dumpOptTcRn Opt_D_dump_tc 
     	(vcat [text "Bound Ids" <+> pprWithCommas ppr global_ids,
@@ -941,12 +931,34 @@ tcRnStmt hsc_env ictxt rdr_stmt
 				  nest 2 (ppr id <+> dcolon <+> ppr (idType id))])
 
 globaliseAndTidy :: Id -> Id
-globaliseAndTidy id
--- Give the Id a Global Name, and tidy its type
+globaliseAndTidy id	-- Note [Interactively-bound Ids in GHCi]
   = Id.setIdType (globaliseId VanillaGlobal id) tidy_type
   where
     tidy_type = tidyTopType (idType id)
 \end{code}
+
+Note [Interactively-bound Ids in GHCi]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The Ids bound by previous Stmts in Template Haskell are currently
+	a) GlobalIds
+	b) with an Internal Name (not External)
+	c) and a tidied type
+
+ (a) They must be GlobalIds (not LocalIds) otherwise when we come to
+     compile an expression using these ids later, the byte code
+     generator will consider the occurrences to be free rather than
+     global.
+
+ (b) They retain their Internal names becuase we don't have a suitable
+     Module to name them with.  We could revisit this choice.
+
+ (c) Their types are tidied.  This is important, because :info may ask
+     to look at them, and :info expects the things it looks up to have
+     tidy types
+	
+
+--------------------------------------------------------------------------
+		Typechecking Stmts in GHCi
 
 Here is the grand plan, implemented in tcUserStmt
 
