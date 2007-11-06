@@ -1152,16 +1152,16 @@ GHC allows a small extension to the syntax of left operator sections, which
 allows you to define postfix operators.  The extension is this:  the left section
 <programlisting>
   (e !)
-</programlisting> 
+</programlisting>
 is equivalent (from the point of view of both type checking and execution) to the expression
 <programlisting>
   ((!) e)
-</programlisting> 
+</programlisting>
 (for any expression <literal>e</literal> and operator <literal>(!)</literal>.
 The strict Haskell 98 interpretation is that the section is equivalent to
 <programlisting>
   (\y -> (!) e y)
-</programlisting> 
+</programlisting>
 That is, the operator must be a function of two arguments.  GHC allows it to
 take only one argument, and that in turn allows you to write the function
 postfix.
@@ -2388,14 +2388,14 @@ Haskell 98, you can inherit instances of <literal>Eq</literal>, <literal>Ord</li
 other classes you have to write an explicit instance declaration. For
 example, if you define
 
-<programlisting> 
+<programlisting>
   newtype Dollars = Dollars Int 
-</programlisting> 
+</programlisting>
 
 and you want to use arithmetic on <literal>Dollars</literal>, you have to
 explicitly define an instance of <literal>Num</literal>:
 
-<programlisting> 
+<programlisting>
   instance Num Dollars where
     Dollars a + Dollars b = Dollars (a+b)
     ...
@@ -2413,17 +2413,17 @@ dictionary, only slower!
 GHC now permits such instances to be derived instead, 
 using the flag <option>-XGeneralizedNewtypeDeriving</option>,
 so one can write 
-<programlisting> 
+<programlisting>
   newtype Dollars = Dollars Int deriving (Eq,Show,Num)
-</programlisting> 
+</programlisting>
 
 and the implementation uses the <emphasis>same</emphasis> <literal>Num</literal> dictionary
 for <literal>Dollars</literal> as for <literal>Int</literal>. Notionally, the compiler
 derives an instance declaration of the form
 
-<programlisting> 
+<programlisting>
   instance Num Int => Num Dollars
-</programlisting> 
+</programlisting>
 
 which just adds or removes the <literal>newtype</literal> constructor according to the type.
 </para>
@@ -2433,27 +2433,27 @@ We can also derive instances of constructor classes in a similar
 way. For example, suppose we have implemented state and failure monad
 transformers, such that
 
-<programlisting> 
+<programlisting>
   instance Monad m => Monad (State s m) 
   instance Monad m => Monad (Failure m)
-</programlisting> 
+</programlisting>
 In Haskell 98, we can define a parsing monad by 
-<programlisting> 
+<programlisting>
   type Parser tok m a = State [tok] (Failure m) a
-</programlisting> 
+</programlisting>
 
 which is automatically a monad thanks to the instance declarations
 above. With the extension, we can make the parser type abstract,
 without needing to write an instance of class <literal>Monad</literal>, via
 
-<programlisting> 
+<programlisting>
   newtype Parser tok m a = Parser (State [tok] (Failure m) a)
                          deriving Monad
 </programlisting>
 In this case the derived instance declaration is of the form 
-<programlisting> 
+<programlisting>
   instance Monad (State [tok] (Failure m)) => Monad (Parser tok m) 
-</programlisting> 
+</programlisting>
 
 Notice that, since <literal>Monad</literal> is a constructor class, the
 instance is a <emphasis>partial application</emphasis> of the new type, not the
@@ -2468,12 +2468,12 @@ newtype is the last class parameter. In this case, a ``partial
 application'' of the class appears in the <literal>deriving</literal>
 clause. For example, given the class
 
-<programlisting> 
+<programlisting>
   class StateMonad s m | m -> s where ... 
   instance Monad m => StateMonad s (State s m) where ... 
-</programlisting> 
+</programlisting>
 then we can derive an instance of <literal>StateMonad</literal> for <literal>Parser</literal>s by 
-<programlisting> 
+<programlisting>
   newtype Parser tok m a = Parser (State [tok] (Failure m) a)
                          deriving (Monad, StateMonad [tok])
 </programlisting>
@@ -2481,7 +2481,7 @@ then we can derive an instance of <literal>StateMonad</literal> for <literal>Par
 The derived instance is obtained by completing the application of the
 class to the new type:
 
-<programlisting> 
+<programlisting>
   instance StateMonad [tok] (State [tok] (Failure m)) =>
            StateMonad [tok] (Parser tok m)
 </programlisting>
@@ -2501,9 +2501,9 @@ the newtype and its representation.
 Derived instance declarations are constructed as follows. Consider the
 declaration (after expansion of any type synonyms)
 
-<programlisting> 
+<programlisting>
   newtype T v1...vn = T' (t vk+1...vn) deriving (c1...cm) 
-</programlisting> 
+</programlisting>
 
 where 
  <itemizedlist>
@@ -2532,17 +2532,17 @@ where
 </itemizedlist>
 Then, for each <literal>ci</literal>, the derived instance
 declaration is:
-<programlisting> 
+<programlisting>
   instance ci t => ci (T v1...vk)
 </programlisting>
 As an example which does <emphasis>not</emphasis> work, consider 
-<programlisting> 
+<programlisting>
   newtype NonMonad m s = NonMonad (State s m s) deriving Monad 
-</programlisting> 
+</programlisting>
 Here we cannot derive the instance 
-<programlisting> 
+<programlisting>
   instance Monad (State s m) => Monad (NonMonad m) 
-</programlisting> 
+</programlisting>
 
 because the type variable <literal>s</literal> occurs in <literal>State s m</literal>,
 and so cannot be "eta-converted" away. It is a good thing that this
@@ -2556,7 +2556,7 @@ Notice also that the <emphasis>order</emphasis> of class parameters becomes
 important, since we can only derive instances for the last one. If the
 <literal>StateMonad</literal> class above were instead defined as
 
-<programlisting> 
+<programlisting>
   class StateMonad m s | m -> s where ... 
 </programlisting>
 
@@ -3144,7 +3144,7 @@ typechecker loop:
   class F a b | a->b
   instance F [a] [[a]]
   instance (D c, F a c) => D [a]   -- 'c' is not mentioned in the head
-</programlisting>  
+</programlisting>
 Similarly, it can be tempting to lift the coverage condition:
 <programlisting>
   class Mul a b c | a b -> c where
@@ -6024,7 +6024,7 @@ happen.
 
   h :: Eq a => a -> a -> a
   {-# SPECIALISE h :: (Eq a) => [a] -> [a] -> [a] #-}
-</programlisting>  
+</programlisting>
 The last of these examples will generate a 
 RULE with a somewhat-complex left-hand side (try it yourself), so it might not fire very
 well.  If you use this kind of specialisation, let us know how well it works.
