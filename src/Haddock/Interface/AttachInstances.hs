@@ -117,7 +117,7 @@ toHsInstHead (_, preds, cls, ts) = (map toHsPred preds, className cls, map toHsT
 --------------------------------------------------------------------------------
 
 
-toHsPred :: PredType -> HsPred Name 
+toHsPred :: PredType -> HsPred Name
 toHsPred (ClassP cls ts) = HsClassP (className cls) (map toLHsType ts)
 toHsPred (IParam n t) = HsIParam n (toLHsType t)
 
