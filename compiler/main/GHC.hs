@@ -92,7 +92,7 @@ module GHC (
         InteractiveEval.forward,
 	showModule,
         isModuleInterpreted,
-	compileExpr, HValue, dynCompileExpr,
+	InteractiveEval.compileExpr, HValue, dynCompileExpr,
 	lookupName,
         GHC.obtainTerm, GHC.obtainTerm1, GHC.obtainTermB, reconstructType,
         modInfoModBreaks,
@@ -235,7 +235,7 @@ import DriverPipeline
 import DriverPhases	( HscSource(..), Phase(..), isHaskellSrcFilename, startPhase )
 import HeaderInfo	( getImports, getOptions )
 import Finder
-import HscMain          hiding (compileExpr)
+import HscMain
 import HscTypes
 import DynFlags
 import StaticFlags
