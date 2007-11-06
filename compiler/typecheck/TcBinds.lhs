@@ -741,9 +741,9 @@ generalise dflags top_lvl bind_list sig_fn mono_infos lie_req
   where
     bndrs   = bndrNames mono_infos
     sigs    = [sig | (_, Just sig, _) <- mono_infos]
-    tau_tvs = foldr (unionVarSet . exactTyVarsOfType . getMonoType) emptyVarSet mono_infos
-		-- NB: exactTyVarsOfType; see Note [Silly type synonym] 
-		--     near defn of TcType.exactTyVarsOfType
+    get_tvs | isTopLevel top_lvl = tyVarsOfType	 -- See Note [Silly type synonym] in TcType
+	    | otherwise		 = exactTyVarsOfType
+    tau_tvs = foldr (unionVarSet . get_tvs . getMonoType) emptyVarSet mono_infos
     is_mono_sig sig = null (sig_theta sig)
     doc = ptext SLIT("type signature(s) for") <+> pprBinders bndrs
 

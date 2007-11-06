@@ -1062,6 +1062,15 @@ exactTyVarsOfType is used by the type checker to figure out exactly
 which type variables are mentioned in a type.  It's also used in the
 smart-app checking code --- see TcExpr.tcIdApp
 
+On the other hand, consider a *top-level* definition
+	f = (\x -> x) :: T a -> T a
+If we don't abstract over 'a' it'll get fixed to GHC.Prim.Any, and then
+if we have an application like (f "x") we get a confusing error message 
+involving Any.  So the conclusion is this: when generalising
+  - at top level use tyVarsOfType
+  - in nested bindings use exactTyVarsOfType
+See Trac #1813 for example.
+
 \begin{code}
 exactTyVarsOfType :: TcType -> TyVarSet
 -- Find the free type variables (of any kind)
