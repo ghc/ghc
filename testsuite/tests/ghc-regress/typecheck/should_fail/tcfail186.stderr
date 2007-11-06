@@ -1,0 +1,8 @@
+
+tcfail186.hs:7:8:
+    Couldn't match expected type `PhantomSyn a'
+	   against inferred type `[Char]'
+      Expected type: PhantomSyn a
+      Inferred type: [Char]
+    In the first argument of `f', namely `"hoo"'
+    In the expression: f "hoo"

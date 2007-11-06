@@ -172,3 +172,6 @@ test('tcfail182', normal, compile_fail, [''])
 test('tcfail183', normal, compile_fail, [''])
 test('tcfail184', normal, compile_fail, [''])
 test('tcfail185', normal, compile_fail, [''])
+test('tcfail186',
+     extra_clean(['Tcfail186_Help.hi', 'Tcfail186_Help.o']),
+     multimod_compile_fail, ['tcfail186', '-v0'])
