@@ -1,21 +1,22 @@
-{-# OPTIONS_GHC -XCPP #-}
+{-# OPTIONS_GHC -XCPP -XPatternGuards -Wall #-}
 module Main where
 
-import GHC
+import GHC hiding (flags)
+import HscTypes         ( isBootSummary )
 import BasicTypes
-import Digraph  ( flattenSCCs )
-import DriverPhases ( isHaskellSrcFilename )
-import HscTypes (msHsFilePath)
-import Name
-import Outputable
-import ErrUtils ( printBagOfErrors )
-import DynFlags(GhcMode, defaultDynFlags)
+import Digraph          ( flattenSCCs )
+import DriverPhases     ( isHaskellSrcFilename )
+import HscTypes         ( msHsFilePath )
+import Name             ( getOccString )
+import ErrUtils         ( printBagOfErrors )
+import DynFlags         ( defaultDynFlags )
 import SrcLoc
 import Bag
-import Util ( handle, handleDyn )
+import Util             ( handle, handleDyn )
 import FastString
 
-import Control.Monad
+import Prelude hiding (mapM)
+import Control.Monad hiding (mapM)
 import System.Environment
 import System.Console.GetOpt
 import System.Exit
@@ -23,6 +24,7 @@ import Data.Char
 import System.IO
 import Data.List as List
 import Data.Maybe
+import Data.Traversable (mapM)
 
 -- search for definitions of things 
 -- we do this by parsing the source and grabbing top-level definitions
@@ -81,13 +83,14 @@ main = do
 
         GHC.defaultErrorHandler defaultDynFlags $ do
           session <- newSession (Just ghc_topdir)
-          flags <- getSessionDynFlags session
-          (pflags, _) <- parseDynamicFlags flags{ verbosity=1 } ghcArgs
-          let flags = pflags { hscTarget = HscNothing } -- don't generate anything
-          GHC.defaultCleanupHandler flags $ do
+          dflags <- getSessionDynFlags session
+          (pflags, _) <- parseDynamicFlags dflags{ verbosity=1 } ghcArgs
+          let dflags2 = pflags { hscTarget = HscNothing } -- don't generate anything
+          GHC.defaultCleanupHandler dflags2 $ do
   
-          setSessionDynFlags session flags
+          setSessionDynFlags session dflags2
           targetsAtOneGo session hsfiles (ctags_hdl,etags_hdl)
+          mapM_ (mapM hClose) [ctags_hdl, etags_hdl]
 
 ----------------------------------------------
 ----------  ARGUMENT PROCESSING --------------
@@ -146,7 +149,7 @@ safeLoad :: Session -> LoadHowMuch -> IO SuccessFlag
 -- like GHC.load, but does not stop process on exception
 safeLoad session mode = do
   dflags <- getSessionDynFlags session
-  handle (\exception -> return Failed ) $
+  handle (\_exception -> return Failed ) $
     handleDyn (\dyn -> do printBagOfErrors dflags (unitBag dyn)
 	  		  return Failed) $ load session mode
 
@@ -156,15 +159,12 @@ targetsAtOneGo :: Session -> [FileName] -> (Maybe Handle, Maybe Handle) -> IO ()
 targetsAtOneGo session hsfiles handles = do
   targets <- mapM (\f -> guessTarget f Nothing) hsfiles
   setTargets session targets
-  putStrLn $ "Load it all:"
-  flag <- load session LoadAllTargets
-  when (failed flag) $ exitWith (ExitFailure 1)
-  modgraph <- getModuleGraph session
-  let mods = flattenSCCs $ topSortModuleGraph False modgraph Nothing
-  graphData session mods handles
-
-  where targetInfo [hs] = "target " ++ hs
-        targetInfo hss  = show (length hss) ++ " targets at one go"
+  mb_modgraph <- depanal session [] False
+  case mb_modgraph of
+    Nothing -> exitWith (ExitFailure 1)
+    Just modgraph -> do
+        let mods = flattenSCCs $ topSortModuleGraph False modgraph Nothing
+        graphData session mods handles
 
 fileTarget :: FileName -> Target
 fileTarget filename = Target (TargetFile filename Nothing) Nothing
@@ -178,12 +178,14 @@ graphData session graph handles = do
     where foundthings ms =
               let filename = msHsFilePath ms
                   modname = moduleName $ ms_mod ms
-              in  do mod <- checkModule session modname False
-                     let fd = maybe (FileData filename []) id $ do
-                                m <- mod
-                                s <- renamedSource m
-                                return $ fileData filename modname s
-                     writeTagsData handles fd
+              in  do putStrLn ("loading " ++ filename)
+                     mb_mod <- checkAndLoadModule session ms False
+                     case mb_mod of
+                       _ | isBootSummary ms -> return ()
+                       Just mod | Just s <- renamedSource mod ->
+                         writeTagsData handles (fileData filename modname s)
+                       _otherwise ->
+                         exitWith (ExitFailure 1)
 
 fileData :: FileName -> ModuleName -> RenamedSource -> FileData
 fileData filename modname (group, _imports, _lie, _doc, _haddock) =
@@ -196,9 +198,10 @@ boundValues :: ModuleName -> HsGroup Name -> [FoundThing]
 -- ^Finds all the top-level definitions in a module
 boundValues mod group =
   let vals = case hs_valds group of
-               ValBindsOut nest sigs ->
+               ValBindsOut nest _sigs ->
                    [ x | (_rec, binds) <- nest, bind <- bagToList binds,
                               x <- boundThings mod bind ]
+               _other -> error "boundValues"
       tys = concat $ map tyBound (hs_tyclds group)
             where tyBound ltcd = case unLoc ltcd of
                                    ForeignType { tcdLName = n } -> [found n]
@@ -206,6 +209,7 @@ boundValues mod group =
                                        dataNames tycon cons
                                    TySynonym { tcdLName = n } -> [found n]
                                    ClassDecl {	tcdLName = n } -> [found n]
+                                   _ -> error "boundValues: tys"
       fors = concat $ map forBound (hs_fords group)
              where forBound lford = case unLoc lford of
                                       ForeignImport n _ _ -> [found n]
@@ -255,6 +259,7 @@ boundThings modname lbinding =
                TypePat _ -> tl -- XXX need help here
                SigPatIn p _ -> patThings p tl
                SigPatOut p _ -> patThings p tl
+               _ -> error "boundThings"
         conArgs (PrefixCon ps) tl = foldr patThings tl ps
         conArgs (RecCon (HsRecFields { rec_flds = flds })) tl 
              = foldr (\f tl -> patThings (hsRecFieldArg f) tl) tl flds
@@ -263,6 +268,7 @@ boundThings modname lbinding =
 
 -- stuff for dealing with ctags output format
 
+writeTagsData :: (Maybe Handle, Maybe Handle) -> FileData -> IO ()
 writeTagsData (mb_ctags_hdl, mb_etags_hdl) fd = do 
   maybe (return ()) (\hdl -> writectagsfile hdl fd) mb_ctags_hdl
   maybe (return ()) (\hdl -> writeetagsfile hdl fd) mb_etags_hdl
@@ -274,7 +280,7 @@ writectagsfile ctagsfile filedata = do
 	mapM_ (\x -> hPutStrLn ctagsfile $ dumpthing True  x) things
 
 getfoundthings :: FileData -> [FoundThing]
-getfoundthings (FileData filename things) = things
+getfoundthings (FileData _filename things) = things
 
 dumpthing :: Bool -> FoundThing -> String
 dumpthing showmod (FoundThing modname name loc) =
