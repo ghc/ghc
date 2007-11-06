@@ -12,10 +12,12 @@
 -- for details
 
 module MkIface ( 
-	mkUsageInfo, 	-- Construct the usage info for a module
-
+        mkUsedNames,
+        mkDependencies,
 	mkIface, 	-- Build a ModIface from a ModGuts, 
 			-- including computing version information
+
+        mkIfaceTc,
 
 	writeIfaceFile,	-- Write the interface file
 
@@ -222,9 +224,11 @@ import Util             hiding ( eqListBy )
 import FiniteMap
 import FastString
 import Maybes
+import ListSetOps
 
 import Control.Monad
 import Data.List
+import Data.IORef
 \end{code}
 
 
@@ -238,34 +242,120 @@ import Data.List
 \begin{code}
 mkIface :: HscEnv
 	-> Maybe ModIface	-- The old interface, if we have it
-	-> ModGuts		-- Usages, deprecations, etc
 	-> ModDetails		-- The trimmed, tidied interface
+	-> ModGuts		-- Usages, deprecations, etc
 	-> IO (ModIface, 	-- The new one, complete with decls and versions
 	       Bool)		-- True <=> there was an old Iface, and the new one
 				--	    is identical, so no need to write it
 
-mkIface hsc_env maybe_old_iface 
-	(ModGuts{     mg_module    = this_mod,
+mkIface hsc_env maybe_old_iface mod_details
+	 ModGuts{     mg_module    = this_mod,
 		      mg_boot      = is_boot,
-		      mg_usages    = usages,
+		      mg_used_names = used_names,
 		      mg_deps      = deps,
+                      mg_dir_imps  = dir_imp_mods,
 		      mg_rdr_env   = rdr_env,
 		      mg_fix_env   = fix_env,
-		      mg_deprecs   = src_deprecs,
-	              mg_hpc_info  = hpc_info })
-	(ModDetails{  md_insts 	   = insts, 
+		      mg_deprecs   = deprecs,
+	              mg_hpc_info  = hpc_info }
+        = mkIface_ hsc_env maybe_old_iface
+                   this_mod is_boot used_names deps rdr_env 
+                   fix_env deprecs hpc_info dir_imp_mods mod_details
+	
+-- | make an interface from the results of typechecking only.  Useful
+-- for non-optimising compilation, or where we aren't generating any
+-- object code at all ('HscNothing').
+mkIfaceTc :: HscEnv
+          -> Maybe ModIface	-- The old interface, if we have it
+          -> ModDetails		-- gotten from mkBootModDetails, probably
+          -> TcGblEnv		-- Usages, deprecations, etc
+	  -> IO (ModIface,
+	         Bool)
+mkIfaceTc hsc_env maybe_old_iface mod_details
+  tc_result@TcGblEnv{ tcg_mod = this_mod,
+                      tcg_src = hsc_src,
+                      tcg_imports = imports,
+                      tcg_rdr_env = rdr_env,
+                      tcg_fix_env = fix_env,
+                      tcg_deprecs = deprecs,
+                      tcg_hpc = other_hpc_info
+                    }
+  = do
+          used_names <- mkUsedNames tc_result
+          deps <- mkDependencies tc_result
+          let hpc_info = emptyHpcInfo other_hpc_info
+          mkIface_ hsc_env maybe_old_iface
+                   this_mod (isHsBoot hsc_src) used_names deps rdr_env 
+                   fix_env deprecs hpc_info (imp_mods imports) mod_details
+        
+
+mkUsedNames :: TcGblEnv -> IO NameSet
+mkUsedNames 
+          TcGblEnv{ tcg_inst_uses = dfun_uses_var,
+                    tcg_dus = dus
+                  }
+ = do
+        dfun_uses <- readIORef dfun_uses_var		-- What dfuns are used
+        return (allUses dus `unionNameSets` dfun_uses)
+        
+mkDependencies :: TcGblEnv -> IO Dependencies
+mkDependencies
+          TcGblEnv{ tcg_mod = mod,
+                    tcg_imports = imports,
+                    tcg_th_used = th_var
+                  }
+ = do 
+      th_used   <- readIORef th_var                        -- Whether TH is used
+      let
+        dep_mods = eltsUFM (delFromUFM (imp_dep_mods imports) (moduleName mod))
+                -- M.hi-boot can be in the imp_dep_mods, but we must remove
+                -- it before recording the modules on which this one depends!
+                -- (We want to retain M.hi-boot in imp_dep_mods so that 
+                --  loadHiBootInterface can see if M's direct imports depend 
+                --  on M.hi-boot, and hence that we should do the hi-boot consistency 
+                --  check.)
+
+        dir_imp_mods = imp_mods imports
+
+                -- Modules don't compare lexicographically usually, 
+                -- but we want them to do so here.
+        le_mod :: Module -> Module -> Bool         
+        le_mod m1 m2 = moduleNameFS (moduleName m1) 
+                           <= moduleNameFS (moduleName m2)
+
+        le_dep_mod :: (ModuleName, IsBootInterface)
+                    -> (ModuleName, IsBootInterface) -> Bool         
+        le_dep_mod (m1,_) (m2,_) = moduleNameFS m1 <= moduleNameFS m2
+
+        
+        pkgs | th_used   = insertList thPackageId (imp_dep_pkgs imports)
+             | otherwise = imp_dep_pkgs imports
+
+      return Deps { dep_mods   = sortLe le_dep_mod dep_mods,
+                    dep_pkgs   = sortLe (<=)   pkgs,        
+                    dep_orphs  = sortLe le_mod (imp_orphs  imports),
+                    dep_finsts = sortLe le_mod (imp_finsts imports) }
+                -- sort to get into canonical order
+
+
+mkIface_ hsc_env maybe_old_iface 
+         this_mod is_boot used_names deps rdr_env fix_env src_deprecs hpc_info
+         dir_imp_mods
+	 ModDetails{  md_insts 	   = insts, 
 		      md_fam_insts = fam_insts,
 		      md_rules 	   = rules,
                       md_vect_info = vect_info,
 		      md_types 	   = type_env,
-		      md_exports   = exports })
-	
+		      md_exports   = exports }
 -- NB:	notice that mkIface does not look at the bindings
 --	only at the TypeEnv.  The previous Tidy phase has
 --	put exactly the info into the TypeEnv that we want
 --	to expose in the interface
 
   = do	{eps <- hscEPS hsc_env
+
+	; usages <- mkUsageInfo hsc_env dir_imp_mods (dep_mods deps) used_names
+
 	; let	{ entities = typeEnvElts type_env ;
                   decls  = [ tyThingToIfaceDecl entity
 			   | entity <- entities,

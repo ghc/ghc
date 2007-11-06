@@ -14,6 +14,7 @@ module HscTypes (
 
 	ModDetails(..),	emptyModDetails,
 	ModGuts(..), CoreModule(..), CgGuts(..), ModImports(..), ForeignStubs(..),
+        ImportedMods,
 
 	ModSummary(..), ms_mod_name, showModMsg, isBootSummary,
 	msHsFilePath, msHiFilePath, msObjFilePath, 
@@ -509,6 +510,8 @@ emptyModDetails = ModDetails { md_types = emptyTypeEnv,
 -- being compiled right now.  Once it is compiled, a ModIface and 
 -- ModDetails are extracted and the ModGuts is dicarded.
 
+type ImportedMods = ModuleEnv (Module, [(ModuleName, Bool, SrcSpan)])
+
 data ModGuts
   = ModGuts {
         mg_module    :: !Module,
@@ -516,9 +519,9 @@ data ModGuts
 	mg_exports   :: ![AvailInfo],	 -- What it exports
 	mg_deps	     :: !Dependencies,	 -- What is below it, directly or
 					 --   otherwise 
-	mg_dir_imps  :: ![Module],	 -- Directly-imported modules; used to
+	mg_dir_imps  :: !ImportedMods,	 -- Directly-imported modules; used to
 					 --	generate initialisation code
-	mg_usages    :: ![Usage],	 -- Version info for what it needed
+	mg_used_names:: !NameSet,	 -- What it needed (used in mkIface)
 
         mg_rdr_env   :: !GlobalRdrEnv,	 -- Top-level lexical environment
 

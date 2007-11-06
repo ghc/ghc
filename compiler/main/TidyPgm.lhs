@@ -4,10 +4,12 @@
 \section{Tidying up Core}
 
 \begin{code}
-module TidyPgm( mkBootModDetails, tidyProgram ) where
+module TidyPgm( mkBootModDetailsDs, mkBootModDetailsTc, tidyProgram ) where
 
 #include "HsVersions.h"
 
+import TcRnTypes
+import FamInstEnv
 import DynFlags
 import CoreSyn
 import CoreUnfold
@@ -105,18 +107,33 @@ Plan A: mkBootModDetails: omit pragmas, make interfaces small
   distinct OccNames in case of object-file splitting
 
 \begin{code}
-mkBootModDetails :: HscEnv -> ModGuts -> IO ModDetails
 -- This is Plan A: make a small type env when typechecking only,
 -- or when compiling a hs-boot file, or simply when not using -O
 --
 -- We don't look at the bindings at all -- there aren't any
 -- for hs-boot files
 
-mkBootModDetails hsc_env (ModGuts { mg_exports   = exports
-				  , mg_types     = type_env
-				  , mg_insts     = insts
-				  , mg_fam_insts = fam_insts
-                                  })
+mkBootModDetailsTc :: HscEnv -> TcGblEnv -> IO ModDetails
+mkBootModDetailsTc hsc_env 
+        TcGblEnv{ tcg_exports   = exports,
+                  tcg_type_env  = type_env,
+                  tcg_insts     = insts,
+                  tcg_fam_insts = fam_insts
+                }
+  = mkBootModDetails hsc_env exports type_env insts fam_insts
+
+mkBootModDetailsDs :: HscEnv -> ModGuts -> IO ModDetails
+mkBootModDetailsDs hsc_env 
+        ModGuts{ mg_exports   = exports,
+                 mg_types     = type_env,
+                 mg_insts     = insts,
+                 mg_fam_insts = fam_insts
+                }
+  = mkBootModDetails hsc_env exports type_env insts fam_insts
+  
+mkBootModDetails :: HscEnv -> [AvailInfo] -> NameEnv TyThing
+                 -> [Instance] -> [FamInstEnv.FamInst] -> IO ModDetails
+mkBootModDetails hsc_env exports type_env insts fam_insts
   = do	{ let dflags = hsc_dflags hsc_env 
 	; showPass dflags "Tidy [hoot] type env"
 
@@ -234,7 +251,8 @@ tidyProgram hsc_env
 				mg_binds = binds, 
 				mg_rules = imp_rules,
                                 mg_vect_info = vect_info,
-				mg_dir_imps = dir_imps, mg_deps = deps, 
+				mg_dir_imps = dir_imps, 
+                                mg_deps = deps, 
 				mg_foreign = foreign_stubs,
 			        mg_hpc_info = hpc_info,
                                 mg_modBreaks = modBreaks })
@@ -283,10 +301,12 @@ tidyProgram hsc_env
 		"Tidy Core Rules"
 		(pprRules tidy_rules)
 
+        ; let dir_imp_mods = map fst (moduleEnvElts dir_imps)
+
 	; return (CgGuts { cg_module   = mod, 
 			   cg_tycons   = alg_tycons,
 			   cg_binds    = all_tidy_binds,
-			   cg_dir_imps = dir_imps,
+			   cg_dir_imps = dir_imp_mods,
 			   cg_foreign  = foreign_stubs,
 			   cg_dep_pkgs = dep_pkgs deps,
 			   cg_hpc_info = hpc_info,

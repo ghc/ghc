@@ -320,8 +320,8 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
 
 	mod_guts = ModGuts {	mg_module    = this_mod,
 				mg_boot	     = False,
-				mg_usages    = [],		-- ToDo: compute usage
-				mg_dir_imps  = [],		-- ??
+				mg_used_names = emptyNameSet, -- ToDo: compute usage
+				mg_dir_imps  = emptyModuleEnv, -- ??
 				mg_deps      = noDependencies,	-- ??
 				mg_exports   = my_exports,
 				mg_types     = final_type_env,

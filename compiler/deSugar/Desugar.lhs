@@ -72,7 +72,6 @@ deSugar hsc_env
 		    	    tcg_type_env     = type_env,
 		    	    tcg_imports      = imports,
 		    	    tcg_exports      = exports,
-		    	    tcg_dus	     = dus, 
 		    	    tcg_inst_uses    = dfun_uses_var,
 			    tcg_th_used      = th_var,
 			    tcg_keep	     = keep_var,
@@ -134,46 +133,16 @@ deSugar hsc_env
 	; doIfSet (dopt Opt_D_dump_ds dflags) 
 		  (printDump (ppr_ds_rules ds_rules))
 
-	; dfun_uses <- readIORef dfun_uses_var		-- What dfuns are used
-	; th_used   <- readIORef th_var			-- Whether TH is used
-	; let used_names = allUses dus `unionNameSets` dfun_uses
-	      pkgs | th_used   = insertList thPackageId (imp_dep_pkgs imports)
-	      	   | otherwise = imp_dep_pkgs imports
+        ; used_names <- mkUsedNames tcg_env
+	; deps <- mkDependencies tcg_env
 
-	      dep_mods = eltsUFM (delFromUFM (imp_dep_mods imports) (moduleName mod))
-		-- M.hi-boot can be in the imp_dep_mods, but we must remove
-		-- it before recording the modules on which this one depends!
-		-- (We want to retain M.hi-boot in imp_dep_mods so that 
-		--  loadHiBootInterface can see if M's direct imports depend 
-		--  on M.hi-boot, and hence that we should do the hi-boot consistency 
-		--  check.)
-
-	      dir_imp_mods = imp_mods imports
-
-	; usages <- mkUsageInfo hsc_env dir_imp_mods dep_mods used_names
-
-	; let 
-		-- Modules don't compare lexicographically usually, 
-		-- but we want them to do so here.
-	     le_mod :: Module -> Module -> Bool	 
-	     le_mod m1 m2 = moduleNameFS (moduleName m1) 
-				<= moduleNameFS (moduleName m2)
-	     le_dep_mod :: (ModuleName, IsBootInterface) -> (ModuleName, IsBootInterface) -> Bool	 
-	     le_dep_mod (m1,_) (m2,_) = moduleNameFS m1 <= moduleNameFS m2
-
-	     deps = Deps { dep_mods   = sortLe le_dep_mod dep_mods,
-			   dep_pkgs   = sortLe (<=)   pkgs,	
-			   dep_orphs  = sortLe le_mod (imp_orphs  imports),
-			   dep_finsts = sortLe le_mod (imp_finsts imports) }
-		-- sort to get into canonical order
-
-	     mod_guts = ModGuts {	
+        ; let mod_guts = ModGuts {	
 		mg_module    	= mod,
 		mg_boot	     	= isHsBoot hsc_src,
 		mg_exports   	= exports,
 		mg_deps	     	= deps,
-		mg_usages    	= usages,
-		mg_dir_imps  	= [m | (m, _) <- moduleEnvElts dir_imp_mods],
+		mg_used_names   = used_names,
+		mg_dir_imps  	= imp_mods imports,
 	        mg_rdr_env   	= rdr_env,
 		mg_fix_env   	= fix_env,
 		mg_deprecs   	= deprecs,

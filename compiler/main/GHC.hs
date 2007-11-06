@@ -39,7 +39,7 @@ module GHC (
 	depanal,
 	load, LoadHowMuch(..), SuccessFlag(..),	-- also does depanal
 	workingDirectoryChanged,
-	checkModule, CheckedModule(..),
+	checkModule, checkAndLoadModule, CheckedModule(..),
 	TypecheckedSource, ParsedSource, RenamedSource,
         compileToCore, compileToCoreModule,
 
@@ -211,6 +211,7 @@ import TcRnDriver
 #endif
 
 import TcIface
+import TcRnTypes        hiding (LIE)
 import TcRnMonad        ( initIfaceCheck )
 import Packages
 import NameSet
@@ -234,7 +235,7 @@ import DriverPipeline
 import DriverPhases	( HscSource(..), Phase(..), isHaskellSrcFilename, startPhase )
 import HeaderInfo	( getImports, getOptions )
 import Finder
-import HscMain          ( newHscEnv, hscFileCheck, HscChecked(..) )
+import HscMain          hiding (compileExpr)
 import HscTypes
 import DynFlags
 import StaticFlags
@@ -804,28 +805,49 @@ type TypecheckedSource = LHsBinds Id
 -- If compileToCore is true, it also desugars the module and returns the 
 -- resulting Core bindings as a component of the CheckedModule.
 checkModule :: Session -> ModuleName -> Bool -> IO (Maybe CheckedModule)
-checkModule (Session ref) mod compileToCore = do
-	-- parse & typecheck the module
+checkModule (Session ref) mod compile_to_core
+ = do
    hsc_env <- readIORef ref   
    let mg  = hsc_mod_graph hsc_env
    case [ ms | ms <- mg, ms_mod_name ms == mod ] of
 	[] -> return Nothing
-	(ms:_) -> do 
-	   mbChecked <- hscFileCheck 
-                          hsc_env{hsc_dflags=ms_hspp_opts ms} 
-                          ms compileToCore
-	   case mbChecked of
+	(ms:_) -> checkModule_ ref ms compile_to_core False
+
+-- | parses and typechecks a module, optionally generates Core, and also
+-- loads the module into the 'Session' so that modules which depend on
+-- this one may subsequently be typechecked using 'checkModule' or
+-- 'checkAndLoadModule'.  If you need to check more than one module,
+-- you probably want to use 'checkAndLoadModule'.  Constructing the
+-- interface takes a little work, so it might be slightly slower than
+-- 'checkModule'.
+checkAndLoadModule :: Session -> ModSummary -> Bool -> IO (Maybe CheckedModule)
+checkAndLoadModule (Session ref) ms compile_to_core
+ = checkModule_ ref ms compile_to_core True
+
+checkModule_ :: IORef HscEnv -> ModSummary -> Bool -> Bool
+             -> IO (Maybe CheckedModule)
+checkModule_ ref ms compile_to_core load
+ = do
+   let mod = ms_mod_name ms
+   hsc_env0 <- readIORef ref   
+   let hsc_env = hsc_env0{hsc_dflags=ms_hspp_opts ms}
+   mb_parsed <- parseFile hsc_env ms
+   case mb_parsed of
              Nothing -> return Nothing
-             Just (HscChecked parsed renamed Nothing _) ->
-		   return (Just (CheckedModule {
-					parsedSource = parsed,
-					renamedSource = renamed,
-					typecheckedSource = Nothing,
-					checkedModuleInfo = Nothing,
-                                        coreModule = Nothing }))
-             Just (HscChecked parsed renamed
-			   (Just (tc_binds, rdr_env, details))
-                           maybeCoreBinds) -> do
+             Just rdr_module -> do
+               mb_typechecked <- typecheckRenameModule hsc_env ms rdr_module
+               case mb_typechecked of
+                 Nothing -> return (Just CheckedModule {
+                                              parsedSource = rdr_module,
+                                              renamedSource = Nothing,
+					      typecheckedSource = Nothing,
+					      checkedModuleInfo = Nothing,
+                                              coreModule = Nothing })
+                 Just (tcg, rn_info) -> do
+                   details <- makeSimpleDetails hsc_env tcg
+                   
+                   let tc_binds = tcg_binds tcg
+                   let rdr_env  = tcg_rdr_env tcg
 		   let minf = ModuleInfo {
 				minf_type_env  = md_types details,
 				minf_exports   = availsToNameSet $
@@ -836,12 +858,35 @@ checkModule (Session ref) mod compileToCore = do
                                ,minf_modBreaks = emptyModBreaks 
 #endif
 			      }
+
+                   mb_guts <- if compile_to_core
+                                 then deSugarModule hsc_env ms tcg
+                                 else return Nothing              
+
+                   let mb_core = fmap (\ mg ->
+                                        CoreModule { cm_module = mg_module mg,
+                                                     cm_types  = mg_types mg,
+                                                     cm_binds  = mg_binds mg })
+                                    mb_guts
+
+                   -- If we are loading this module so that we can typecheck
+                   -- dependent modules, generate an interface and stuff it
+                   -- all in the HomePackageTable.
+                   when load $ do
+		     (iface,_) <- makeSimpleIface hsc_env Nothing tcg details
+                     let mod_info = HomeModInfo {
+                                        hm_iface = iface,
+                                        hm_details = details,
+                                        hm_linkable = Nothing }
+                     let hpt_new = addToUFM (hsc_HPT hsc_env) mod mod_info
+                     writeIORef ref hsc_env0{ hsc_HPT = hpt_new }
+
 		   return (Just (CheckedModule {
-					parsedSource = parsed,
-					renamedSource = renamed,
+					parsedSource = rdr_module,
+					renamedSource = rn_info,
 					typecheckedSource = Just tc_binds,
 					checkedModuleInfo = Just minf,
-                                        coreModule = maybeCoreBinds}))
+                                        coreModule = mb_core }))
 
 -- | This is the way to get access to the Core bindings corresponding
 -- to a module. 'compileToCore' invokes 'checkModule' to parse, typecheck, and

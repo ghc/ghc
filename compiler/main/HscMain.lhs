@@ -7,7 +7,6 @@
 \begin{code}
 module HscMain
     ( newHscEnv, hscCmmFile
-    , hscFileCheck
     , hscParseIdentifier
 #ifdef GHCI
     , hscStmt, hscTcExpr, hscKcType
@@ -19,13 +18,19 @@ module HscMain
     , hscCompileInteractive -- :: Compiler (InteractiveStatus, ModIface, ModDetails)
     , HscStatus (..)
     , InteractiveStatus (..)
-    , HscChecked (..)
+
+    -- The new interface
+    , parseFile
+    , typecheckModule
+    , typecheckRenameModule
+    , deSugarModule
+    , makeSimpleIface
+    , makeSimpleDetails
     ) where
 
 #include "HsVersions.h"
 
 #ifdef GHCI
-import HsSyn		( StmtLR(..), LStmt, LHsType )
 import CodeOutput	( outputForeignStubs )
 import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
 import Linker		( HValue, linkExpr )
@@ -47,9 +52,8 @@ import VarEnv		( emptyTidyEnv )
 
 import Var		( Id )
 import Module		( emptyModuleEnv, ModLocation(..), Module )
-import RdrName		( GlobalRdrEnv, RdrName, emptyGlobalRdrEnv )
-import HsSyn		( HsModule, LHsBinds, HsGroup, LIE, LImportDecl, HsDoc,
-                          HaddockModInfo )
+import RdrName
+import HsSyn
 import CoreSyn
 import SrcLoc		( Located(..) )
 import StringBuffer
@@ -62,10 +66,10 @@ import TcRnMonad	( initIfaceCheck, TcGblEnv(..) )
 import IfaceEnv		( initNameCache )
 import LoadIface	( ifaceStats, initExternalPackageState )
 import PrelInfo		( wiredInThings, basicKnownKeyNames )
-import MkIface		( checkOldIface, mkIface, writeIfaceFile )
+import MkIface
 import Desugar          ( deSugar )
 import SimplCore        ( core2core )
-import TidyPgm		( tidyProgram, mkBootModDetails )
+import TidyPgm
 import CorePrep		( corePrepPgm )
 import CoreToStg	( coreToStg )
 import StgSyn
@@ -144,6 +148,85 @@ knownKeyNames = map getName wiredInThings
 \end{code}
 
 
+\begin{code}
+-- | parse a file, returning the abstract syntax
+parseFile :: HscEnv -> ModSummary -> IO (Maybe (Located (HsModule RdrName)))
+parseFile hsc_env mod_summary
+ = do 
+       maybe_parsed <- myParseModule dflags hspp_file hspp_buf
+       case maybe_parsed of
+         Left err
+             -> do printBagOfErrors dflags (unitBag err)
+                   return Nothing
+         Right rdr_module
+             -> return (Just rdr_module)
+  where
+           dflags    = hsc_dflags hsc_env
+           hspp_file = ms_hspp_file mod_summary
+           hspp_buf  = ms_hspp_buf  mod_summary
+
+-- | Rename and typecheck a module
+typecheckModule :: HscEnv -> ModSummary -> Located (HsModule RdrName)
+                -> IO (Maybe TcGblEnv)
+typecheckModule hsc_env mod_summary rdr_module
+ = do 
+        (tc_msgs, maybe_tc_result) 
+                <- {-# SCC "Typecheck-Rename" #-}
+                   tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
+        printErrorsAndWarnings dflags tc_msgs
+        return maybe_tc_result
+  where
+        dflags = hsc_dflags hsc_env
+
+type RenamedStuff = 
+        (Maybe (HsGroup Name, [LImportDecl Name], Maybe [LIE Name],
+                Maybe (HsDoc Name), HaddockModInfo Name))
+
+-- | Rename and typecheck a module, additinoally returning the renamed syntax
+typecheckRenameModule :: HscEnv -> ModSummary -> Located (HsModule RdrName)
+                -> IO (Maybe (TcGblEnv, RenamedStuff))
+typecheckRenameModule hsc_env mod_summary rdr_module
+ = do 
+        (tc_msgs, maybe_tc_result) 
+                <- {-# SCC "Typecheck-Rename" #-}
+                   tcRnModule hsc_env (ms_hsc_src mod_summary) True rdr_module
+        printErrorsAndWarnings dflags tc_msgs
+        case maybe_tc_result of
+           Nothing -> return Nothing
+           Just tc_result -> do
+              let rn_info = do decl <- tcg_rn_decls tc_result
+                               imports <- tcg_rn_imports tc_result
+                               let exports = tcg_rn_exports tc_result
+	      		       let doc = tcg_doc tc_result
+	      		       let hmi = tcg_hmi tc_result
+                               return (decl,imports,exports,doc,hmi)
+              return (Just (tc_result, rn_info))
+  where
+        dflags = hsc_dflags hsc_env
+
+-- | Convert a typechecked module to Core
+deSugarModule :: HscEnv -> ModSummary -> TcGblEnv -> IO (Maybe ModGuts)
+deSugarModule hsc_env mod_summary tc_result
+ = deSugar hsc_env (ms_location mod_summary) tc_result
+
+-- | Make a 'ModIface' from the results of typechecking.  Used when
+-- not optimising, and the interface doesn't need to contain any
+-- unfoldings or other cross-module optimisation info.
+-- ToDo: the old interface is only needed to get the version numbers,
+-- we should use fingerprint versions instead.
+makeSimpleIface :: HscEnv -> Maybe ModIface -> TcGblEnv -> ModDetails
+                -> IO (ModIface,Bool)
+makeSimpleIface hsc_env maybe_old_iface tc_result details = do
+  mkIfaceTc hsc_env maybe_old_iface details tc_result
+
+-- | Make a 'ModDetails' from the results of typechecking.  Used when
+-- typechecking only, as opposed to full compilation.
+makeSimpleDetails :: HscEnv -> TcGblEnv -> IO ModDetails
+makeSimpleDetails hsc_env tc_result = mkBootModDetailsTc hsc_env tc_result
+
+-- deSugarModule :: HscEnv -> TcGblEnv -> IO Core
+\end{code}
+
 %************************************************************************
 %*									*
 		The main compiler pipeline
@@ -182,18 +265,6 @@ Trying to compile a hs-boot file to byte-code will result in a run-time
 error. This is the only thing that isn't caught by the type-system.
 
 \begin{code}
-
-data HscChecked
-    = HscChecked
-        -- parsed
-        (Located (HsModule RdrName))
-        -- renamed
-        (Maybe (HsGroup Name, [LImportDecl Name], Maybe [LIE Name],
-                Maybe (HsDoc Name), HaddockModInfo Name))
-        -- typechecked
-        (Maybe (LHsBinds Id, GlobalRdrEnv, ModDetails))
-        -- desugared
-        (Maybe CoreModule)
 
 -- Status of a compilation to hard-code or nothing.
 data HscStatus
@@ -477,10 +548,10 @@ hscSimpleIface ds_result
        _mod_summary <- gets compModSummary
        maybe_old_iface <- gets compOldIface
        liftIO $ do
-       details <- mkBootModDetails hsc_env ds_result
+       details <- mkBootModDetailsDs hsc_env ds_result
        (new_iface, no_change) 
            <- {-# SCC "MkFinalIface" #-}
-              mkIface hsc_env maybe_old_iface ds_result details
+              mkIface hsc_env maybe_old_iface details ds_result
        -- And the answer is ...
        dumpIfaceStats hsc_env
        return (new_iface, no_change, details, ds_result)
@@ -505,7 +576,7 @@ hscNormalIface simpl_result
 	    -- until after code output
        (new_iface, no_change)
 		<- {-# SCC "MkFinalIface" #-}
-		   mkIface hsc_env maybe_old_iface simpl_result details
+		   mkIface hsc_env maybe_old_iface details simpl_result
 	-- Emit external core
        emitExternalCore (hsc_dflags hsc_env) (availsToNameSet (mg_exports simpl_result)) cg_guts -- Move this? --Lemmih 03/07/2006
        dumpIfaceStats hsc_env
@@ -630,72 +701,6 @@ hscInteractive _ = panic "GHC not compiled with interpreter"
 #endif
 
 ------------------------------
-
-hscFileCheck :: HscEnv -> ModSummary -> Bool -> IO (Maybe HscChecked)
-hscFileCheck hsc_env mod_summary compileToCore = do {
- 	    -------------------
- 	    -- PARSE
- 	    -------------------
-	; let dflags    = hsc_dflags hsc_env
-	      hspp_file = ms_hspp_file mod_summary
-	      hspp_buf  = ms_hspp_buf  mod_summary
-
-	; maybe_parsed <- myParseModule dflags hspp_file hspp_buf
-
-	; case maybe_parsed of {
-      	     Left err -> do { printBagOfErrors dflags (unitBag err)
-			    ; return Nothing } ;
-      	     Right rdr_module -> do {
-
- 	    -------------------
- 	    -- RENAME and TYPECHECK
- 	    -------------------
-	  (tc_msgs, maybe_tc_result) 
-		<- {-# SCC "Typecheck-Rename" #-}
-		   tcRnModule hsc_env (ms_hsc_src mod_summary) 
-			True{-save renamed syntax-}
-			rdr_module
-
-	; printErrorsAndWarnings dflags tc_msgs
-	; case maybe_tc_result of {
-      	     Nothing -> return (Just (HscChecked rdr_module Nothing Nothing Nothing));
-      	     Just tc_result -> do
-		let type_env = tcg_type_env tc_result
-		    md = ModDetails { 
-				md_types     = type_env,
-				md_exports   = tcg_exports   tc_result,
-				md_insts     = tcg_insts     tc_result,
-				md_fam_insts = tcg_fam_insts tc_result,
-				md_rules     = [panic "no rules"],
-				   -- Rules are CoreRules, not the
-				   -- RuleDecls we get out of the typechecker
-                                md_vect_info = noVectInfo
-                                   -- VectInfo is added by the Core 
-                                   -- vectorisation pass
-                          }
-                    rnInfo = do decl <- tcg_rn_decls tc_result
-                                imports <- tcg_rn_imports tc_result
-                                let exports = tcg_rn_exports tc_result
-			        let doc = tcg_doc tc_result
-				    hmi = tcg_hmi tc_result
-                                return (decl,imports,exports,doc,hmi)
-		maybeModGuts <- 
-                 if compileToCore then
-                   deSugar hsc_env (ms_location mod_summary) tc_result
-                 else
-                   return Nothing
-                return (Just (HscChecked rdr_module 
-                                   rnInfo
-				   (Just (tcg_binds tc_result,
-					  tcg_rdr_env tc_result,
-					  md))
-                                   (fmap (\ mg ->
-                                            (CoreModule { cm_module = mg_module mg,
-                                                          cm_types  = mg_types mg,
-                                                          cm_binds  = mg_binds mg}))
-                                    maybeModGuts)))
-	}}}}
-
 
 hscCmmFile :: DynFlags -> FilePath -> IO Bool
 hscCmmFile dflags filename = do
