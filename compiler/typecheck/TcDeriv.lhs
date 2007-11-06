@@ -654,7 +654,7 @@ cond_mayDeriveDataTypeable (mayDeriveDataTypeable, _)
  | mayDeriveDataTypeable = Nothing
  | otherwise = Just why
   where
-    why  = ptext SLIT("You need -fglasgow-exts to derive an instance for this class")
+    why  = ptext SLIT("You need -XDeriveDataTypeable to derive an instance for this class")
 
 std_class_via_iso :: Class -> Bool
 std_class_via_iso clas	-- These standard classes can be derived for a newtype
