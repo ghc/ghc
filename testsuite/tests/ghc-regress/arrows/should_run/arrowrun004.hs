@@ -6,7 +6,9 @@
 module Main(main) where
 
 import Control.Arrow
+import Control.Category
 import Data.Char
+import Prelude hiding (id, (.))
 
 -- Parsers
 
@@ -19,10 +21,13 @@ data Sym s = Sym { token :: s, value :: String }
 
 newtype BTParser s a b = BTParser (a -> [Sym s] -> [(b, [Sym s])])
 
+instance Category (BTParser s) where
+	id = BTParser $ \a ss -> [(a, ss)]
+	BTParser f . BTParser g = BTParser $ \b ss ->
+		[(d, ss'') | (c, ss') <- g b ss, (d, ss'') <- f c ss']
+
 instance Arrow (BTParser s) where
 	arr f = BTParser $ \a ss -> [(f a, ss)]
-	BTParser f >>> BTParser g = BTParser $ \b ss ->
-		[(d, ss'') | (c, ss') <- f b ss, (d,ss'') <- g c ss']
 	first (BTParser f) = BTParser $ \(b,d) ss ->
 		[((c,d), ss') | (c,ss') <- f b ss]
 

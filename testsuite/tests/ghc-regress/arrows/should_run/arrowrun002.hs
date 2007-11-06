@@ -5,7 +5,9 @@
 module Main where
 
 import Control.Arrow
+import Control.Category
 import Data.Complex
+import Prelude hiding (id, (.))
 
 infixr 4 :&:
 
@@ -53,9 +55,12 @@ apply (f :&: fs) (Succ t) = Succ (apply fs t)
 -- Having defined apply, we can forget about powertrees and do all our
 -- programming with Hom's.  Firstly, Hom is an arrow:
 
+instance Category Hom where
+	id = id :&: id
+	(f :&: fs) . (g :&: gs) = (f . g) :&: (fs . gs)
+
 instance Arrow Hom where
 	arr f = f :&: arr (f *** f)
-	(f :&: fs) >>> (g :&: gs) = (g . f) :&: (fs >>> gs)
 	first (f :&: fs) =
 		first f :&: (arr transpose >>> first fs >>> arr transpose)
 

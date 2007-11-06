@@ -3,6 +3,8 @@
 module Main(main) where
 
 import Control.Arrow
+import Control.Category
+import Prelude hiding (id, (.))
 
 class ArrowLoop a => ArrowCircuit a where
 	delay :: b -> a b b
@@ -23,9 +25,12 @@ unzipStream abs = (fmap fst abs, fmap snd abs)
 newtype StreamMap a b = StreamMap (Stream a -> Stream b)
 unStreamMap (StreamMap f) = f
 
+instance Category StreamMap where
+	id = StreamMap id
+	StreamMap f . StreamMap g = StreamMap (f . g)
+
 instance Arrow StreamMap where
 	arr f = StreamMap (fmap f)
-	StreamMap f >>> StreamMap g = StreamMap (g . f)
 	first (StreamMap f) =
 		StreamMap (uncurry zipStream . first f . unzipStream)
 
@@ -50,12 +55,15 @@ runStreamMap (StreamMap f) as =
 
 data Auto a b = Auto (a -> (b, Auto a b))
 
+instance Category Auto where
+	id = Auto $ \a -> (a, id)
+	Auto f . Auto g = Auto $ \b ->
+				let	(c, g') = g b
+					(d, f') = f c
+				in	(d, f' . g')
+
 instance Arrow Auto where
 	arr f = Auto $ \a -> (f a, arr f)
-	Auto f >>> Auto g = Auto $ \b ->
-				let	(c, f') = f b
-					(d, g') = g c
-				in	(d, f' >>> g')
 	first (Auto f) = Auto $ \(b,d) -> let (c,f') = f b in ((c,d), first f')
 
 instance ArrowLoop Auto where
