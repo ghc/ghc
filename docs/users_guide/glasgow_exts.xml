@@ -1744,11 +1744,6 @@ dictionaries for <literal>Eq</literal> and <literal>Show</literal> respectively,
 extract it on pattern matching.
 </para>
 
-<para>
-Notice the way that the syntax fits smoothly with that used for
-universal quantification earlier.
-</para>
-
 </sect3>
 
 <sect3 id="existential-records">
