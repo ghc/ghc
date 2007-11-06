@@ -28,10 +28,13 @@ import FastString
 #define FSLIT(x) (mkFastString# (x#))
 
 
-attachInstances :: [Interface] -> [Interface]
-attachInstances modules = map attach modules
+attachInstances :: [Interface] -> [Name] -> [Interface]
+attachInstances modules filterNames = map attach modules
   where
-    instMap = fmap (map toHsInstHead . sortImage instHead) $ collectInstances modules
+    instMap =
+      fmap (map toHsInstHead . sortImage instHead) $
+      collectInstances modules filterNames
+
     attach mod = mod { ifaceExportItems = newItems }
       where
         newItems = map attachExport (ifaceExportItems mod)
@@ -43,6 +46,11 @@ attachInstances modules = map attach modules
         attachExport otherExport = otherExport
 
 
+--------------------------------------------------------------------------------
+-- Collecting and sorting instances
+--------------------------------------------------------------------------------
+
+
 -- | Simplified type for sorting types, ignoring qualification (not visible
 -- in Haddock output) and unifying special tycons with normal ones.
 data SimpleType = SimpleType Name [SimpleType] deriving (Eq,Ord)
@@ -50,17 +58,19 @@ data SimpleType = SimpleType Name [SimpleType] deriving (Eq,Ord)
 
 collectInstances
    :: [Interface]
+   -> [Name]
    -> Map Name [([TyVar], [PredType], Class, [Type])]  -- maps class/type names to instances
 
-collectInstances modules
+collectInstances modules filterNames
   = Map.fromListWith (flip (++)) tyInstPairs `Map.union`
     Map.fromListWith (flip (++)) classInstPairs
   where
     allInstances = concat (map ifaceInstances modules)
     classInstPairs = [ (is_cls inst, [instanceHead inst]) | 
-                       inst <- allInstances ]
+                       inst <- allInstances, Just n <- nub (is_tcs inst), 
+                       n `elem` filterNames ]
     tyInstPairs = [ (tycon, [instanceHead inst]) | inst <- allInstances, 
-                    Just tycon <- nub (is_tcs inst) ]
+                    Just tycon <- nub (is_tcs inst) ]    
 
 
 instHead :: ([TyVar], [PredType], Class, [Type]) -> ([Int], Name, [SimpleType])

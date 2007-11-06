@@ -41,12 +41,15 @@ createInterfaces modules externalLinks flags = (interfaces, homeLinks, messages)
       -- part 1, create the interfaces
       interfaces <- createInterfaces' modules flags
 
-      -- part 2, attach the instances
-      let interfaces' = attachInstances interfaces
- 
-      -- part 3, rename the interfaces
+      -- part 2, build the link environment
       let homeLinks = buildHomeLinks interfaces
       let links = homeLinks `Map.union` externalLinks
+      let allNames = Map.keys links
+
+      -- part 3, attach the instances
+      let interfaces' = attachInstances interfaces allNames
+ 
+      -- part 3, rename the interfaces
       interfaces'' <- mapM (renameInterface links) interfaces'
 
       return (interfaces'', homeLinks)
