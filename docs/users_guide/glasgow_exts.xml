@@ -4450,7 +4450,7 @@ type variable <literal>s</literal> into scope, in the annotated expression
 <title>Pattern type signatures</title>
 <para>
 A type signature may occur in any pattern; this is a <emphasis>pattern type
-signature</emphasis>.  
+signature</emphasis>. 
 For example:
 <programlisting>
   -- f and g assume that 'a' is already in scope
@@ -4463,9 +4463,27 @@ already in scope (i.e. bound by the enclosing context), matters are simple: the
 signature simply constrains the type of the pattern in the obvious way.
 </para>
 <para>
-There is only one situation in which you can write a pattern type signature that
-mentions a type variable that is not already in scope, namely in pattern match
-of an existential data constructor.  For example:
+Unlike expression and declaration type signatures, pattern type signatures are not implictly generalised.
+The pattern in a <emphasis>patterm binding</emphasis> may only mention type variables
+that are already in scope.  For example:
+<programlisting>
+  f :: forall a. [a] -> (Int, [a])
+  f xs = (n, zs)
+    where
+      (ys::[a], n) = (reverse xs, length xs) -- OK
+      zs::[a] = xs ++ ys                     -- OK
+
+      Just (v::b) = ...  -- Not OK; b is not in scope
+</programlisting>
+Here, the pattern signatures for <literal>ys</literal> and <literal>zs</literal>
+are fine, but the one for <literal>v</literal> is not because <literal>b</literal> is
+not in scope. 
+</para>
+<para>
+However, in all patterns <emphasis>other</emphasis> than pattern bindings, a pattern
+type signature may mention a type variable that is not in scope; in this case,
+<emphasis>the signature brings that type variable into scope</emphasis>.
+This is particularly important for existential data constructors.  For example:
 <programlisting>
   data T = forall a. MkT [a]
 
@@ -4475,14 +4493,19 @@ of an existential data constructor.  For example:
                    t3::[a] = [t,t,t]
 </programlisting>
 Here, the pattern type signature <literal>(t::a)</literal> mentions a lexical type
-variable that is not already in scope.  Indeed, it cannot already be in scope,
+variable that is not already in scope.  Indeed, it <emphasis>cannot</emphasis> already be in scope,
 because it is bound by the pattern match.  GHC's rule is that in this situation
 (and only then), a pattern type signature can mention a type variable that is
 not already in scope; the effect is to bring it into scope, standing for the
 existentially-bound type variable.
 </para>
 <para>
-If this seems a little odd, we think so too.  But we must have
+When a pattern type signature binds a type variable in this way, GHC insists that the 
+type variable is bound to a <emphasis>rigid</emphasis>, or fully-known, type variable.
+This means that any user-written type signature always stands for a completely known type.
+</para>
+<para>
+If all this seems a little odd, we think so too.  But we must have
 <emphasis>some</emphasis> way to bring such type variables into scope, else we
 could not name existentially-bound type variables in subsequent type signatures.
 </para>
