@@ -6,13 +6,6 @@
 The Desugarer: turning HsSyn into Core.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Desugar ( deSugar, deSugarExpr ) where
 
 #include "HsVersions.h"
@@ -35,8 +28,6 @@ import DsForeign
 import DsExpr		()	-- Forces DsExpr to be compiled; DsBinds only
 				-- depends on DsExpr.hi-boot.
 import Module
-import UniqFM
-import PackageConfig
 import RdrName
 import NameSet
 import VarSet
@@ -44,12 +35,11 @@ import Rules
 import CoreLint
 import CoreFVs
 import ErrUtils
-import ListSetOps
 import Outputable
 import SrcLoc
 import Maybes
 import FastString
-import Util
+import Pretty      ( Doc )
 import Coverage
 import IOEnv
 import Data.IORef
@@ -72,8 +62,6 @@ deSugar hsc_env
 		    	    tcg_type_env     = type_env,
 		    	    tcg_imports      = imports,
 		    	    tcg_exports      = exports,
-		    	    tcg_inst_uses    = dfun_uses_var,
-			    tcg_th_used      = th_var,
 			    tcg_keep	     = keep_var,
 		    	    tcg_rdr_env      = rdr_env,
 		    	    tcg_fix_env      = fix_env,
@@ -107,8 +95,7 @@ deSugar hsc_env
 		                        { core_prs <- dsTopLHsBinds auto_scc binds_cvr
 		                        ; (ds_fords, foreign_prs) <- dsForeigns fords
 		                        ; let all_prs = foreign_prs ++ core_prs
-		                              local_bndrs = mkVarSet (map fst all_prs)
-		                        ; ds_rules <- mappM (dsRule mod local_bndrs) rules
+		                        ; ds_rules <- mappM dsRule rules
 		                        ; return (all_prs, catMaybes ds_rules, ds_fords, ds_hpc_info, modBreaks)
 		                        }
 	; case mb_res of {
@@ -166,7 +153,7 @@ mkAutoScc mod exports
   | not opt_SccProfilingOn 	-- No profiling
   = NoSccs		
   | opt_AutoSccsOnAllToplevs 	-- Add auto-scc on all top-level things
-  = AddSccs mod (\id -> True)
+  = AddSccs mod (\_ -> True)
   | opt_AutoSccsOnExportedToplevs	-- Only on exported things
   = AddSccs mod (\id -> idName id `elemNameSet` exports)
   | otherwise
@@ -212,6 +199,8 @@ deSugarExpr hsc_env this_mod rdr_env type_env tc_expr
 -- it's just because the type checker is rather busy already and
 -- I didn't want to pass in yet another mapping.
 
+addExportFlags :: HscTarget -> NameSet -> NameSet -> [(Id, t)] -> [CoreRule]
+               -> [(Id, t)]
 addExportFlags target exports keep_alive prs rules
   = [(add_export bndr, rhs) | (bndr,rhs) <- prs]
   where
@@ -244,6 +233,7 @@ addExportFlags target exports keep_alive prs rules
     is_exported | target == HscInterpreted = isExternalName
 		| otherwise 		   = (`elemNameSet` exports)
 
+ppr_ds_rules :: [CoreRule] -> PprStyle -> Doc
 ppr_ds_rules [] = empty
 ppr_ds_rules rules
   = text "" $$ text "-------------- DESUGARED RULES -----------------" $$
@@ -259,8 +249,8 @@ ppr_ds_rules rules
 %************************************************************************
 
 \begin{code}
-dsRule :: Module -> IdSet -> LRuleDecl Id -> DsM (Maybe CoreRule)
-dsRule mod in_scope (L loc (HsRule name act vars lhs tv_lhs rhs fv_rhs))
+dsRule :: LRuleDecl Id -> DsM (Maybe CoreRule)
+dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
   = putSrcSpanDs loc $ 
     do	{ let bndrs = [var | RuleBndr (L _ var) <- vars]
 	; lhs'  <- dsLExpr lhs
