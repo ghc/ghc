@@ -1817,26 +1817,27 @@ $ ghci -lm
 
       <varlistentry>
 	<term>
-          <literal>:def</literal> <replaceable>name</replaceable> <replaceable>expr</replaceable>
+          <literal>:def<optional>!</optional> <optional><replaceable>name</replaceable> <replaceable>expr</replaceable></optional></literal>
           <indexterm><primary><literal>:def</literal></primary></indexterm>
         </term>
 	<listitem>
-	  <para>The command <literal>:def</literal>
-	  <replaceable>name</replaceable>
-	  <replaceable>expr</replaceable> defines a new GHCi command
-	  <literal>:<replaceable>name</replaceable></literal>,
-	  implemented by the Haskell expression
-	  <replaceable>expr</replaceable>, which must have type
-	  <literal>String -> IO String</literal>.  When
-	  <literal>:<replaceable>name</replaceable>
-	  <replaceable>args</replaceable></literal> is typed at the
-	  prompt, GHCi will run the expression
-	  <literal>(<replaceable>name</replaceable>
-	  <replaceable>args</replaceable>)</literal>, take the
-	  resulting <literal>String</literal>, and feed it back into
-	  GHCi as a new sequence of commands.  Separate commands in
-	  the result must be separated by
-	  &lsquo;<literal>\n</literal>&rsquo;.</para>
+          <para><literal>:def</literal> is used to define new
+          commands, or macros, in GHCi.  The command
+          <literal>:def</literal> <replaceable>name</replaceable>
+          <replaceable>expr</replaceable> defines a new GHCi command
+          <literal>:<replaceable>name</replaceable></literal>,
+          implemented by the Haskell expression
+          <replaceable>expr</replaceable>, which must have type
+          <literal>String -> IO String</literal>.  When
+          <literal>:<replaceable>name</replaceable>
+          <replaceable>args</replaceable></literal> is typed at the
+          prompt, GHCi will run the expression
+          <literal>(<replaceable>name</replaceable>
+          <replaceable>args</replaceable>)</literal>, take the
+          resulting <literal>String</literal>, and feed it back into
+          GHCi as a new sequence of commands.  Separate commands in
+          the result must be separated by
+          &lsquo;<literal>\n</literal>&rsquo;.</para>
 
 	  <para>That's all a little confusing, so here's a few
 	  examples.  To start with, here's a new GHCi command which
@@ -1880,6 +1881,12 @@ Prelude> :. cmds.ghci
           <literal>:.</literal>, by analogy with the
           &lsquo;<literal>.</literal>&rsquo; Unix shell command that
           does the same thing.</para>
+
+          <para>Typing <literal>:def</literal> on its own lists the
+          currently-defined macros.  Attempting to redefine an
+          existing command name results in an error unless the
+          <literal>:def!</literal> form is used, in which case the old
+          command with that name is silently overwritten.</para>
 	</listitem>
       </varlistentry>
 

@@ -103,8 +103,8 @@ type Command = (String, String -> GHCi Bool, Bool, String -> IO [String])
 cmdName :: Command -> String
 cmdName (n,_,_,_) = n
 
-commands :: IORef [Command]
-GLOBAL_VAR(commands, builtin_commands, [Command])
+macros_ref :: IORef [Command]
+GLOBAL_VAR(macros_ref, [], [Command])
 
 builtin_commands :: [Command]
 builtin_commands = [
@@ -121,7 +121,8 @@ builtin_commands = [
   ("continue",  keepGoing continueCmd,          False, completeNone),
   ("cmd",       keepGoing cmdCmd,               False, completeIdentifier),
   ("ctags",	keepGoing createCTagsFileCmd, 	False, completeFilename),
-  ("def",	keepGoing defineMacro,		False, completeIdentifier),
+  ("def",	keepGoing (defineMacro False),  False, completeIdentifier),
+  ("def!",	keepGoing (defineMacro True),   False, completeIdentifier),
   ("delete",    keepGoing deleteCmd,            False, completeNone),
   ("e", 	keepGoing editFile,		False, completeFilename),
   ("edit",	keepGoing editFile,		False, completeFilename),
@@ -699,7 +700,8 @@ specialCommand str = do
 
 lookupCommand :: String -> IO (Maybe Command)
 lookupCommand str = do
-  cmds <- readIORef commands
+  macros <- readIORef macros_ref
+  let cmds = builtin_commands ++ macros
   -- look for exact match first, then the first prefix match
   case [ c | c <- cmds, str == cmdName c ] of
      c:_ -> return (Just c)
@@ -854,17 +856,23 @@ chooseEditFile =
   where fromTarget (GHC.Target (GHC.TargetFile f _) _) = Just f
         fromTarget _ = Nothing -- when would we get a module target?
 
-defineMacro :: String -> GHCi ()
-defineMacro s = do
+defineMacro :: Bool{-overwrite-} -> String -> GHCi ()
+defineMacro overwrite s = do
   let (macro_name, definition) = break isSpace s
-  cmds <- io (readIORef commands)
+  macros <- io (readIORef macros_ref)
+  let defined = map cmdName macros
   if (null macro_name) 
-	then throwDyn (CmdLineError "invalid macro name") 
+	then if null defined
+                then io $ putStrLn "no macros defined"
+                else io $ putStr ("the following macros are defined:\n" ++
+                                  unlines defined)
 	else do
-  if (macro_name `elem` map cmdName cmds)
+  if (not overwrite && macro_name `elem` defined)
 	then throwDyn (CmdLineError 
-		("command '" ++ macro_name ++ "' is already defined"))
+		("macro '" ++ macro_name ++ "' is already defined"))
 	else do
+
+  let filtered = [ cmd | cmd <- macros, cmdName cmd /= macro_name ]
 
   -- give the expression a type signature, so we can be sure we're getting
   -- something of the right type.
@@ -875,8 +883,8 @@ defineMacro s = do
   maybe_hv <- io (GHC.compileExpr cms new_expr)
   case maybe_hv of
      Nothing -> return ()
-     Just hv -> io (writeIORef commands --
-		    (cmds ++ [(macro_name, runMacro hv, False, completeNone)]))
+     Just hv -> io (writeIORef macros_ref --
+		    (filtered ++ [(macro_name, runMacro hv, False, completeNone)]))
 
 runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi Bool
 runMacro fun s = do
@@ -885,17 +893,14 @@ runMacro fun s = do
   return False
 
 undefineMacro :: String -> GHCi ()
-undefineMacro macro_name = do
-  cmds <- io (readIORef commands)
-  if (macro_name `elem` map cmdName builtin_commands) 
-	then throwDyn (CmdLineError
-		("command '" ++ macro_name ++ "' cannot be undefined"))
-	else do
-  if (macro_name `notElem` map cmdName cmds) 
-	then throwDyn (CmdLineError 
-		("command '" ++ macro_name ++ "' not defined"))
-	else do
-  io (writeIORef commands (filter ((/= macro_name) . cmdName) cmds))
+undefineMacro str = mapM_ undef (words str) 
+ where undef macro_name = do
+        cmds <- io (readIORef macros_ref)
+        if (macro_name `notElem` map cmdName cmds) 
+      	   then throwDyn (CmdLineError 
+      		("macro '" ++ macro_name ++ "' is not defined"))
+      	   else do
+            io (writeIORef macros_ref (filter ((/= macro_name) . cmdName) cmds))
 
 cmdCmd :: String -> GHCi ()
 cmdCmd str = do
@@ -1533,13 +1538,13 @@ completeWord w start end = do
 
 completeCmd :: String -> IO [String]
 completeCmd w = do
-  cmds <- readIORef commands
-  return (filter (w `isPrefixOf`) (map (':':) (map cmdName cmds)))
+  cmds <- readIORef macros_ref
+  return (filter (w `isPrefixOf`) (map (':':) 
+             (map cmdName (builtin_commands ++ cmds))))
 
 completeMacro w = do
-  cmds <- readIORef commands
-  let cmds' = [ cmd | cmd <- map cmdName cmds, cmd `elem` map cmdName builtin_commands ]
-  return (filter (w `isPrefixOf`) cmds')
+  cmds <- readIORef macros_ref
+  return (filter (w `isPrefixOf`) (map cmdName cmds))
 
 completeIdentifier w = do
   s <- restoreSession
