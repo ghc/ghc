@@ -423,7 +423,13 @@ mkIface_ hsc_env maybe_old_iface
 	; dumpIfSet_dyn dflags Opt_D_dump_hi "FINAL INTERFACE" 
 			(pprModIface new_iface)
 
-	; return (new_iface, no_change_at_all) }
+                -- bug #1617: on reload we weren't updating the PrintUnqualified
+                -- correctly.  This stems from the fact that the interface had
+                -- not changed, so addVersionInfo returns the old ModIface
+                -- with the old GlobalRdrEnv (mi_globals).
+        ; let final_iface = new_iface{ mi_globals = Just rdr_env }
+
+	; return (final_iface, no_change_at_all) }
   where
      r1 `le_rule`     r2 = ifRuleName      r1    <=    ifRuleName      r2
      i1 `le_inst`     i2 = ifDFun          i1 `le_occ` ifDFun          i2  
