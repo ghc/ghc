@@ -1,3 +1,6 @@
+-- testing ghci multiline commands :{ .. :}
+-- via stdin
+(1,2,3)
 data Maybe a = Nothing | Just a
 catMaybes :: [Maybe a] -> [a]
 fromJust :: Maybe a -> a
@@ -8,8 +11,6 @@ listToMaybe :: [a] -> Maybe a
 mapMaybe :: (a -> Maybe b) -> [a] -> [b]
 maybe :: b -> (a -> b) -> Maybe a -> b
 maybeToList :: Maybe a -> [a]
-data T = A Int | B Float
-f :: Double -> Double
-g :: Double -> Double
-h :: (Integral a) => a -> a
-f :: Double -> Double
+-- via readFile
+(True,False)
+id :: a -> a

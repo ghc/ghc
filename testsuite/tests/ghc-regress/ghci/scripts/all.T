@@ -31,4 +31,9 @@ test('ghci020', normal, ghci_script, ['ghci020.script'])
 test('ghci021', normal, ghci_script, ['ghci021.script'])
 test('ghci022', normal, ghci_script, ['ghci022.script'])
 
+test('ghci023', normal, ghci_script, ['ghci023.script'])
+execfile(in_testdir('ghci024.py')) # load function prepare024
+test('ghci024', prepare024, ghci_script, ['ghci024.script'])
+test('ghci025', normal, ghci_script, ['ghci025.script'])
 test('ghci026', namebase_if_compiler_lt('ghc','6.9', 'ghci026-6.8'), ghci_script, ['ghci026.script'])
+

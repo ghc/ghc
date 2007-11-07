@@ -1,0 +1,10 @@
+:l ghci025
+System.IO.putStrLn "test :browse! functionality"
+System.IO.putStrLn ":browse! -s *T -- sort output to get deterministic result (#1799)"
+:browse! *T
+System.IO.putStrLn ":browse! T"
+:browse! T
+:set -fglasgow-exts
+System.IO.putStrLn ":browse! T -- with -fglasgow-exts"
+:browse! T
+

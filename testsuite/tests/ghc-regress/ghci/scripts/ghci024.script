@@ -1,0 +1,9 @@
+:set
+:show languages
+putStrLn "-- :set -fglasgow-exts"
+:set -fglasgow-exts
+:show languages
+:show packages
+putStrLn "-- :set -package ghc"
+:set -package ghc
+:show packages

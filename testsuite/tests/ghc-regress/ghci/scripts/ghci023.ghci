@@ -1,0 +1,10 @@
+:{
+  let { a = True
+      ; b = False
+      }
+:}
+print (a,b)
+:{
+:type
+  id
+:}
