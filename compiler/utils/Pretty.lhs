@@ -989,26 +989,29 @@ display mode IBOX(page_width) IBOX(ribbon_width) txt end doc
 
                     other -> lay1 k s sl p
     
-        lay1 k s sl p = Str (indent k) `txt` (s `txt` lay2 (k PLUS sl) p)
+        lay1 k s sl p = indent k (s `txt` lay2 (k PLUS sl) p)
     
         lay2 k (NilAbove p)        = nl_text `txt` lay k p
         lay2 k (TextBeside s sl p) = s `txt` (lay2 (k PLUS sl) p)
         lay2 k (Nest _ p)          = lay2 k p
         lay2 k Empty               = end
+
+        -- optimise long indentations using LitString chunks of 8 spaces
+        indent n r | n GREQ ILIT(8) = LStr "        "# 8# `txt` 
+                                      indent (n MINUS ILIT(8)) r
+                   | otherwise      = Str (spaces n) `txt` r
     in
     lay ILIT(0) doc
     }}
 
 cant_fail = error "easy_display: NoDoc"
 
-indent n | n GREQ ILIT(8) = '\t' : indent (n MINUS ILIT(8))
-         | otherwise      = spaces n
-
 multi_ch n ch | n LTEQ ILIT(0) = ""
 	      | otherwise      = ch : multi_ch (n MINUS ILIT(1)) ch
 
 spaces n | n LTEQ ILIT(0) = ""
          | otherwise      = ' ' : spaces (n MINUS ILIT(1))
+
 \end{code}
 
 \begin{code}
