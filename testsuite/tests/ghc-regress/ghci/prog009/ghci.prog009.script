@@ -1,0 +1,15 @@
+:! cp A1.hs A.hs
+:load A
+:show modules
+:module +B
+yan
+:! touch A.hs
+:reload
+yan
+-- should keep B in the context
+:! sleep 1
+:! cp A2.hs A.hs
+:reload
+:show modules
+yan
+
