@@ -74,6 +74,7 @@ module GHC (
 	setContext, getContext,	
 	getNamesInScope,
 	getRdrNamesInScope,
+        getGRE,
 	moduleIsInterpreted,
 	getInfo,
 	exprType,
@@ -2048,6 +2049,12 @@ lookupGlobalName s name = withSession s $ \hsc_env -> do
    eps <- readIORef (hsc_EPS hsc_env)
    return $! lookupType (hsc_dflags hsc_env) 
 			(hsc_HPT hsc_env) (eps_PTE eps) name
+
+#ifdef GHCI
+-- | get the GlobalRdrEnv for a session
+getGRE :: Session -> IO GlobalRdrEnv
+getGRE s = withSession s $ \hsc_env-> return $ ic_rn_gbl_env (hsc_IC hsc_env)
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Misc exported utils

@@ -23,13 +23,14 @@ import GHC              ( Session, LoadHowMuch(..), Target(..),  TargetId(..),
 import PprTyThing
 import DynFlags
 
-#ifdef USE_READLINE
 import Packages
+#ifdef USE_READLINE
 import PackageConfig
 import UniqFM
 #endif
 
 import HscTypes		( implicitTyThings )
+import qualified RdrName ( getGRE_NameQualifier_maybes ) -- should this come via GHC?
 import Outputable       hiding (printForUser)
 import Module           -- for ModuleEnv
 import Name
@@ -113,7 +114,8 @@ builtin_commands = [
   ("abandon",   keepGoing abandonCmd,           False, completeNone),
   ("break",     keepGoing breakCmd,             False, completeIdentifier),
   ("back",      keepGoing backCmd,              False, completeNone),
-  ("browse",    keepGoing browseCmd,		False, completeModule),
+  ("browse",    keepGoing (browseCmd False),	False, completeModule),
+  ("browse!",   keepGoing (browseCmd True),	False, completeModule),
   ("cd",    	keepGoing changeDirectory,	False, completeFilename),
   ("check",	keepGoing checkModule,		False, completeHomeModule),
   ("continue",  keepGoing continueCmd,          False, completeNone),
@@ -163,8 +165,10 @@ helpText =
  " Commands available from the prompt:\n" ++
  "\n" ++
  "   <statement>                 evaluate/run <statement>\n" ++
+ "   :{\\n ..lines.. \\n:}\\n       multiline command\n" ++
  "   :add <filename> ...         add module(s) to the current target set\n" ++
- "   :browse [[*]<module>]       display the names defined by <module>\n" ++
+ "   :browse[!] [-s] [[*]<mod>]  display the names defined by module <mod>\n" ++
+ "                               (!: more details; -s: sort; *: all top-level names)\n" ++
  "   :cd <dir>                   change directory to <dir>\n" ++
  "   :cmd <expr>                 run the commands returned by <expr>::IO String\n" ++
  "   :ctags [<file>]             create tags file for Vi (default: \"tags\")\n" ++
@@ -223,6 +227,8 @@ helpText =
  "    +t            print type after evaluation\n" ++
  "    -<flags>      most GHC command line flags can also be set here\n" ++
  "                         (eg. -v2, -fglasgow-exts, etc.)\n" ++
+ "                    for GHCi-specific flags, see User's Guide,\n"++
+ "                    Flag reference, Interactive-mode options\n" ++
  "\n" ++
  " -- Commands for displaying information:\n" ++
  "\n" ++
@@ -230,6 +236,8 @@ helpText =
  "   :show breaks                show the active breakpoints\n" ++
  "   :show context               show the breakpoint context\n" ++
  "   :show modules               show the currently loaded modules\n" ++
+ "   :show packages              show the currently active package flags\n" ++
+ "   :show languages             show the currently active language flags\n" ++
  "   :show <setting>             show anything that can be set with :set (e.g. args)\n" ++
  "\n" 
 
@@ -330,7 +338,7 @@ runGHCi paths maybe_expr = do
   	  either_hdl <- io (IO.try (openFile "./.ghci" ReadMode))
   	  case either_hdl of
   	     Left _e   -> return ()
-  	     Right hdl -> fileLoop hdl False
+  	     Right hdl -> runCommands (fileLoop hdl False)
     
   when (read_dot_files) $ do
     -- Read in $HOME/.ghci
@@ -346,7 +354,7 @@ runGHCi paths maybe_expr = do
   	       either_hdl <- io (IO.try (openFile file ReadMode))
   	       case either_hdl of
   		  Left _e   -> return ()
-  		  Right hdl -> fileLoop hdl False
+  		  Right hdl -> runCommands (fileLoop hdl False)
 
   -- Perform a :load for files given on the GHCi command line
   -- When in -e mode, if the load fails then we want to stop
@@ -408,10 +416,10 @@ interactiveLoop is_tty show_prompt =
   -- read commands from stdin
 #ifdef USE_READLINE
   if (is_tty) 
-	then readlineLoop
-	else fileLoop stdin show_prompt
+	then runCommands readlineLoop
+	else runCommands (fileLoop stdin show_prompt)
 #else
-  fileLoop stdin show_prompt
+  runCommands (fileLoop stdin show_prompt)
 #endif
 
 
@@ -447,26 +455,22 @@ checkPerms name =
    	  else return True
 #endif
 
-fileLoop :: Handle -> Bool -> GHCi ()
+fileLoop :: Handle -> Bool -> GHCi (Maybe String)
 fileLoop hdl show_prompt = do
    when show_prompt $ do
         prompt <- mkPrompt
         (io (putStr prompt))
    l <- io (IO.try (hGetLine hdl))
    case l of
-	Left e | isEOFError e		   -> return ()
-	       | InvalidArgument <- etype  -> return ()
-	       | otherwise		   -> io (ioError e)
-		where etype = ioeGetErrorType e
-		-- treat InvalidArgument in the same way as EOF:
-		-- this can happen if the user closed stdin, or
-		-- perhaps did getContents which closes stdin at
-		-- EOF.
-	Right l -> 
-	  case removeSpaces l of
-            "" -> fileLoop hdl show_prompt
-	    l  -> do quit <- runCommands l
-                     if quit then return () else fileLoop hdl show_prompt
+        Left e | isEOFError e              -> return Nothing
+               | InvalidArgument <- etype  -> return Nothing
+               | otherwise                 -> io (ioError e)
+                where etype = ioeGetErrorType e
+                -- treat InvalidArgument in the same way as EOF:
+                -- this can happen if the user closed stdin, or
+                -- perhaps did getContents which closes stdin at
+                -- EOF.
+        Right l -> return (Just l)
 
 mkPrompt :: GHCi String
 mkPrompt = do
@@ -506,41 +510,72 @@ mkPrompt = do
 
 
 #ifdef USE_READLINE
-readlineLoop :: GHCi ()
+readlineLoop :: GHCi (Maybe String)
 readlineLoop = do
    io yield
    saveSession -- for use by completion
    prompt <- mkPrompt
    l <- io (readline prompt `finally` setNonBlockingFD 0)
-		-- readline sometimes puts stdin into blocking mode,
-		-- so we need to put it back for the IO library
+                -- readline sometimes puts stdin into blocking mode,
+                -- so we need to put it back for the IO library
    splatSavedSession
    case l of
-	Nothing -> return ()
-	Just l  ->
-	  case removeSpaces l of
-	    "" -> readlineLoop
-	    l  -> do
-        	  io (addHistory l)
-  	  	  quit <- runCommands l
-          	  if quit then return () else readlineLoop
+        Nothing -> return Nothing
+        Just l  -> do
+                   io (addHistory l)
+                   return (Just l)
 #endif
 
-runCommands :: String -> GHCi Bool
-runCommands cmd = do
-        q <- ghciHandle handler (doCommand cmd)
-        if q then return True else runNext
-  where
-       runNext = do
-          st <- getGHCiState
-          case cmdqueue st of
-            []   -> return False
-            c:cs -> do setGHCiState st{ cmdqueue = cs }
-                       runCommands c
+queryQueue :: GHCi (Maybe String)
+queryQueue = do
+  st <- getGHCiState
+  case cmdqueue st of
+    []   -> return Nothing
+    c:cs -> do setGHCiState st{ cmdqueue = cs }
+               return (Just c)
 
-       doCommand (':' : cmd) = specialCommand cmd
-       doCommand stmt        = do timeIt $ runStmt stmt GHC.RunToCompletion
-                                  return False
+runCommands :: GHCi (Maybe String) -> GHCi ()
+runCommands getCmd = do
+  mb_cmd <- noSpace queryQueue
+  mb_cmd <- maybe (noSpace getCmd) (return . Just) mb_cmd
+  case mb_cmd of 
+    Nothing -> return ()
+    Just c  -> do
+      b <- ghciHandle handler (doCommand c)
+      if b then return () else runCommands getCmd
+  where
+    noSpace q = q >>= maybe (return Nothing)
+                            (\c->case removeSpaces c of 
+                                   ""   -> noSpace q
+                                   ":{" -> multiLineCmd q
+                                   c    -> return (Just c) )
+    multiLineCmd q = do
+      st <- getGHCiState
+      let p = prompt st
+      setGHCiState st{ prompt = "%s| " }
+      mb_cmd <- collectCommand q ""
+      getGHCiState >>= \st->setGHCiState st{ prompt = p }
+      return mb_cmd
+    -- we can't use removeSpaces for the sublines here, so 
+    -- multiline commands are somewhat more brittle against
+    -- fileformat errors (such as \r in dos input on unix), 
+    -- we get rid of any extra spaces for the ":}" test; 
+    -- we also avoid silent failure if ":}" is not found;
+    -- and since there is no (?) valid occurrence of \r (as 
+    -- opposed to its String representation, "\r") inside a
+    -- ghci command, we replace any such with ' ' (argh:-(
+    collectCommand q c = q >>= 
+      maybe (io (ioError collectError))
+            (\l->if removeSpaces l == ":}" 
+                 then return (Just $ removeSpaces c) 
+                 else collectCommand q (c++map normSpace l))
+      where normSpace '\r' = ' '
+            normSpace   c  = c
+    -- QUESTION: is userError the one to use here?
+    collectError = userError "unterminated multiline command :{ .. :}"
+    doCommand (':' : cmd) = specialCommand cmd
+    doCommand stmt        = do timeIt $ runStmt stmt GHC.RunToCompletion
+                               return False
 
 enqueueCommands :: [String] -> GHCi ()
 enqueueCommands cmds = do
@@ -1022,15 +1057,15 @@ shellEscape str = io (system str >> return False)
 -----------------------------------------------------------------------------
 -- Browsing a module's contents
 
-browseCmd :: String -> GHCi ()
-browseCmd m = 
+browseCmd :: Bool -> String -> GHCi ()
+browseCmd bang m = 
   case words m of
     ['*':s] | looksLikeModuleName s -> do 
         m <-  wantInterpretedModule s
-        browseModule m False
+        browseModule bang m False
     [s] | looksLikeModuleName s -> do
         m <- lookupModule s
-        browseModule m True
+        browseModule bang m True
     [] -> do
         s <- getSession
         (as,bs) <- io $ GHC.getContext s
@@ -1038,20 +1073,24 @@ browseCmd m =
                 -- modules that are interpreted first.  The most
                 -- recently-added module occurs last, it seems.
         case (as,bs) of
-          (as@(_:_), _)   -> browseModule (last as) True
-          ([],  bs@(_:_)) -> browseModule (last bs) True
+          (as@(_:_), _)   -> browseModule bang (last as) True
+          ([],  bs@(_:_)) -> browseModule bang (last bs) True
           ([],  [])  -> throwDyn (CmdLineError ":browse: no current module")
     _ -> throwDyn (CmdLineError "syntax:  :browse <module>")
 
-browseModule :: Module -> Bool -> GHCi ()
-browseModule modl exports_only = do
+-- without bang, show items in context of their parents and omit children
+-- with bang, show class methods and data constructors separately, and
+--            indicate import modules, to aid qualifying unqualified names
+-- with sorted, sort items alphabetically
+browseModule :: Bool -> Module -> Bool -> GHCi ()
+browseModule bang modl exports_only = do
   s <- getSession
   -- Temporarily set the context to the module we're interested in,
   -- just so we can get an appropriate PrintUnqualified
   (as,bs) <- io (GHC.getContext s)
   prel_mod <- getPrelude
   io (if exports_only then GHC.setContext s [] [prel_mod,modl]
-		      else GHC.setContext s [modl] [])
+                      else GHC.setContext s [modl] [])
   unqual <- io (GHC.getPrintUnqual s)
   io (GHC.setContext s as bs)
 
@@ -1060,22 +1099,65 @@ browseModule modl exports_only = do
     Nothing -> throwDyn (CmdLineError ("unknown module: " ++
                                 GHC.moduleNameString (GHC.moduleName modl)))
     Just mod_info -> do
-        let names
-	       | exports_only = GHC.modInfoExports mod_info
-	       | otherwise    = GHC.modInfoTopLevelScope mod_info
-				`orElse` []
-
-        mb_things <- io $ mapM (GHC.lookupName s) names
- 	let filtered_things = filterOutChildren (\t -> t) (catMaybes mb_things)
-
         dflags <- getDynFlags
-	let pefas = dopt Opt_PrintExplicitForalls dflags
-	io (putStrLn (showSDocForUser unqual (
-		vcat (map (pprTyThingInContext pefas) filtered_things)
-	   )))
-	-- ToDo: modInfoInstances currently throws an exception for
-	-- package modules.  When it works, we can do this:
-	--	$$ vcat (map GHC.pprInstance (GHC.modInfoInstances mod_info))
+        let names
+               | exports_only = GHC.modInfoExports mod_info
+               | otherwise    = GHC.modInfoTopLevelScope mod_info
+                                `orElse` []
+
+                -- sort alphabetically name, but putting
+                -- locally-defined identifiers first.
+                -- We would like to improve this; see #1799.
+            sorted_names = loc_sort local ++ occ_sort external
+                where 
+                (local,external) = partition ((==modl) . nameModule) names
+                occ_sort = sortBy (compare `on` nameOccName) 
+                -- try to sort by src location.  If the first name in
+                -- our list has a good source location, then they all should.
+                loc_sort names
+                      | n:_ <- names, isGoodSrcSpan (nameSrcSpan n)
+                      = sortBy (compare `on` nameSrcSpan) names
+                      | otherwise
+                      = occ_sort names
+
+        mb_things <- io $ mapM (GHC.lookupName s) sorted_names
+        let filtered_things = filterOutChildren (\t -> t) (catMaybes mb_things)
+
+        rdr_env <- io $ GHC.getGRE s
+
+        let pefas              = dopt Opt_PrintExplicitForalls dflags
+            things | bang      = catMaybes mb_things
+                   | otherwise = filtered_things
+            pretty | bang      = pprTyThing
+                   | otherwise = pprTyThingInContext
+
+            labels  [] = text "-- not currently imported"
+            labels  l  = text $ intercalate "\n" $ map qualifier l
+            qualifier  = maybe "-- defined locally" 
+                             (("-- imported from "++) . intercalate ", " 
+                               . map GHC.moduleNameString)
+            importInfo = RdrName.getGRE_NameQualifier_maybes rdr_env
+            modNames   = map (importInfo . GHC.getName) things
+                                        
+            -- annotate groups of imports with their import modules
+            -- the default ordering is somewhat arbitrary, so we group 
+            -- by header and sort groups; the names themselves should
+            -- really come in order of source appearance.. (trac #1799)
+            annotate mts = concatMap (\(m,ts)->labels m:ts)
+                         $ sortBy cmpQualifiers $ group mts
+              where cmpQualifiers = 
+                      compare `on` (map (fmap (map moduleNameFS)) . fst)
+            group []            = []
+            group mts@((m,_):_) = (m,map snd g) : group ng
+              where (g,ng) = partition ((==m).fst) mts
+
+        let prettyThings = map (pretty pefas) things
+            prettyThings' | bang      = annotate $ zip modNames prettyThings
+                          | otherwise = prettyThings
+        io (putStrLn $ showSDocForUser unqual (vcat prettyThings'))
+        -- ToDo: modInfoInstances currently throws an exception for
+        -- package modules.  When it works, we can do this:
+        --        $$ vcat (map GHC.pprInstance (GHC.modInfoInstances mod_info))
 
 -----------------------------------------------------------------------------
 -- Setting the module context
@@ -1161,6 +1243,28 @@ setCmd ""
    		   then text "none."
    		   else hsep (map (\o -> char '+' <> text (optToStr o)) opts)
    	   ))
+       dflags <- getDynFlags
+       io $ putStrLn (showSDoc (
+          vcat (text "GHCi-specific dynamic flag settings:" 
+               :map (flagSetting dflags) ghciFlags)
+          ))
+       io $ putStrLn (showSDoc (
+          vcat (text "other dynamic, non-language, flag settings:" 
+               :map (flagSetting dflags) nonLanguageDynFlags)
+          ))
+  where flagSetting dflags (str,f)
+          | dopt f dflags = text "  " <> text "-f"    <> text str
+          | otherwise     = text "  " <> text "-fno-" <> text str
+        (ghciFlags,others)  = partition (\(_,f)->f `elem` flags) 
+                                        DynFlags.fFlags
+        nonLanguageDynFlags = filter (\(_,f)->not $ f `elem` map snd xFlags) 
+                                     others
+        flags = [Opt_PrintExplicitForalls
+                ,Opt_PrintBindResult
+                ,Opt_BreakOnException
+                ,Opt_BreakOnError
+                ,Opt_PrintEvldWithShow
+                ] 
 setCmd str
   = case toArgs str of
 	("args":args) -> setArgs args
@@ -1314,6 +1418,8 @@ showCmd str = do
 	["linker"]   -> io showLinkerState
         ["breaks"]   -> showBkptTable
         ["context"]  -> showContext
+        ["packages"]  -> showPackages
+        ["languages"]  -> showLanguages
 	_ -> throwDyn (CmdLineError "syntax:  :show [args|prog|prompt|editor|stop|modules|bindings|breaks|context]")
 
 showModules :: GHCi ()
@@ -1359,6 +1465,26 @@ showContext = do
         ptext SLIT("--> ") <> text (GHC.resumeStmt resume)
         $$ nest 2 (ptext SLIT("Stopped at") <+> ppr (GHC.resumeSpan resume))
 
+showPackages :: GHCi ()
+showPackages = do
+  pkg_flags <- fmap packageFlags getDynFlags
+  io $ putStrLn $ showSDoc $ vcat $
+    text ("active package flags:"++if null pkg_flags then " none" else "")
+    : map showFlag pkg_flags
+  pkg_ids <- fmap (preloadPackages . pkgState) getDynFlags
+  io $ putStrLn $ showSDoc $ vcat $
+    text "packages currently loaded:" 
+    : map (nest 2 . text . packageIdString) pkg_ids
+  where showFlag (ExposePackage p) = text $ "  -package " ++ p
+        showFlag (HidePackage p)   = text $ "  -hide-package " ++ p
+        showFlag (IgnorePackage p) = text $ "  -ignore-package " ++ p
+
+showLanguages :: GHCi ()
+showLanguages = do
+   dflags <- getDynFlags
+   io $ putStrLn $ showSDoc $ vcat $
+      text "active language flags:" :
+      [text ("  -X" ++ str) | (str,f) <- DynFlags.xFlags, dopt f dflags]
 
 -- -----------------------------------------------------------------------------
 -- Completion

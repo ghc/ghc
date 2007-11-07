@@ -35,7 +35,8 @@ module RdrName (
 	GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv, 
 	lookupGlobalRdrEnv, extendGlobalRdrEnv,
 	pprGlobalRdrEnv, globalRdrEnvElts,
-	lookupGRE_RdrName, lookupGRE_Name, hideSomeUnquals,
+	lookupGRE_RdrName, lookupGRE_Name, getGRE_NameQualifier_maybes,
+        hideSomeUnquals,
 
 	-- GlobalRdrElt, Provenance, ImportSpec
 	GlobalRdrElt(..), isLocalGRE, unQualOK, qualSpecOK, unQualSpecOK,
@@ -374,6 +375,11 @@ lookupGRE_Name env name
   = [ gre | gre <- lookupGlobalRdrEnv env (nameOccName name),
 	    gre_name gre == name ]
 
+getGRE_NameQualifier_maybes :: GlobalRdrEnv -> Name -> [Maybe [ModuleName]]
+getGRE_NameQualifier_maybes env
+  = map qualifier_maybe . map gre_prov . lookupGRE_Name env
+  where qualifier_maybe LocalDef       = Nothing
+        qualifier_maybe (Imported iss) = Just $ map (is_as . is_decl) iss 
 
 pickGREs :: RdrName -> [GlobalRdrElt] -> [GlobalRdrElt]
 -- Take a list of GREs which have the right OccName

@@ -424,6 +424,45 @@ Prelude>
       <para>Note that <literal>let</literal> bindings do not automatically
 	print the value bound, unlike monadic bindings.</para>
 
+      <para>Hint: you can also use <literal>let</literal>-statements
+      to define functions at the prompt:</para>
+<screen>
+Prelude> let add a b = a + b
+Prelude> add 1 2
+3
+Prelude>
+</screen>
+        <para>However, this quickly gets tedious when defining functions 
+        with multiple clauses, or groups of mutually recursive functions,
+        because the complete definition has to be given on a single line, 
+        using explicit braces and semicolons instead of layout:</para>
+<screen>
+Prelude> let { f op n [] = n ; f op n (h:t) = h `op` f op n t }
+Prelude> f (+) 0 [1..3]
+6
+Prelude>
+</screen>
+      <para>To alleviate this issue, GHCi commands can be split over
+      multiple lines, by wrapping them in <literal>:{</literal> and
+      <literal>:}</literal> (each on a single line of its own):</para>
+<screen>
+Prelude> :{
+Prelude| let { g op n [] = n
+Prelude|     ; g op n (h:t) = h `op` g op n t
+Prelude|     }
+Prelude| :}
+Prelude> g (*) 1 [1..3]
+6
+</screen>
+      <para>Such multiline commands can be used with any GHCi command,
+      and the lines between <literal>:{</literal> and
+      <literal>:}</literal> are simply merged into a single line for 
+      interpretation. That implies that each such group must form a single
+      valid command when merged, and that no layout rule is used. 
+      The main purpose of multiline commands is not to replace module
+      loading but to make definitions in .ghci-files (see <xref
+      linkend="ghci-dot-files"/>) more readable and maintainable.</para>
+
       <para>Any exceptions raised during the evaluation or execution
       of the statement are caught and printed by the GHCi command line
       interface (for more information on exceptions, see the module
@@ -1680,7 +1719,7 @@ $ ghci -lm
 
       <varlistentry>
 	<term>
-          <literal>:browse</literal> <optional><optional><literal>*</literal></optional><replaceable>module</replaceable></optional> ...
+          <literal>:browse</literal><optional><literal>!</literal></optional> <optional><optional><literal>*</literal></optional><replaceable>module</replaceable></optional> ...
           <indexterm><primary><literal>:browse</literal></primary></indexterm>
         </term>
 	<listitem>
@@ -1698,7 +1737,14 @@ $ ghci -lm
 	  <literal>*</literal>-form is only available for modules
 	  which are interpreted; for compiled modules (including
 	  modules from packages) only the non-<literal>*</literal>
-	  form of <literal>:browse</literal> is available.</para>
+    form of <literal>:browse</literal> is available.
+    If the <literal>!</literal> symbol is appended to the
+    command, data constructors and class methods will be 
+    listed individually, otherwise, they will only be listed
+    in the context of their data type or class declaration. 
+    The <literal>!</literal>-form also annotates the listing 
+    with comments giving possible imports for each group of 
+    entries.</para>
 	</listitem>
       </varlistentry>
 
@@ -2108,10 +2154,11 @@ Prelude> :main foo bar
           <indexterm><primary><literal>:set</literal></primary></indexterm>
         </term>
 	<listitem>
-	  <para>Sets various options.  See <xref linkend="ghci-set"/>
-	  for a list of available options.  The
-	  <literal>:set</literal> command by itself shows which
-	  options are currently set.</para>
+    <para>Sets various options.  See <xref linkend="ghci-set"/> for a list of
+      available options and <xref linkend="interactive-mode-options"/> for a
+      list of GHCi-specific flags.  The <literal>:set</literal> command by
+      itself shows which options are currently set. It also lists the current
+      dynamic flag settings, with GHCi-specific flags listed separately.</para>
 	</listitem>
       </varlistentry>
 
@@ -2231,6 +2278,28 @@ Prelude> :main foo bar
 	  <para>Show the list of modules currently loaded.</para>
 	</listitem>
       </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:show packages</literal>
+          <indexterm><primary><literal>:show packages</literal></primary></indexterm>
+        </term>
+	<listitem>
+    <para>Show the currently active package flags, as well as the list of
+      packages currently loaded.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
+          <literal>:show languages</literal>
+          <indexterm><primary><literal>:show languages</literal></primary></indexterm>
+        </term>
+	<listitem>
+    <para>Show the currently active language flags.</para>
+	</listitem>
+      </varlistentry>
+
 
       <varlistentry>
 	<term>

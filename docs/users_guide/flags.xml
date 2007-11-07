@@ -470,7 +470,7 @@
       </informaltable>
     </sect2>
 
-    <sect2>
+    <sect2 id="interactive-mode-options">
       <title>Interactive-mode options</title>
       
       <para><xref linkend="ghci-dot-files"/></para>

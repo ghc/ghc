@@ -29,6 +29,7 @@ module DynFlags (
 	GhcLink(..), isNoLink,
 	PackageFlag(..),
 	Option(..),
+        fFlags, xFlags,
 
 	-- Configuration of the core-to-core and stg-to-stg phases
 	CoreToDo(..),
