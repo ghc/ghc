@@ -493,10 +493,7 @@ SRC_HC_OPTS += -package readline -DUSE_READLINE
 PKG_DEPENDS += readline
 endif
 else
--include $(FPTOOLS_TOP_ABS)/libraries/readline/config.mk
-# readline's config.mk sets PACKAGE, which we don't want here
-PACKAGE=
-ifeq "$(READLINE_BUILD_PACKAGE)" "yes"
+ifeq "$(wildcard $(FPTOOLS_TOP_ABS)/libraries/readline/unbuildable)" ""
 SRC_HC_OPTS += -package readline -DUSE_READLINE
 PKG_DEPENDS += readline
 endif
