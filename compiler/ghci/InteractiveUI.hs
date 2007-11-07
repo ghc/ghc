@@ -993,8 +993,8 @@ afterLoad ok session maybe_context = do
      Just (as,bs) -> do
         r <- io $ Exception.try (GHC.setContext session as bs)
         case r of
-           Left err -> setContextAfterLoad session loaded_mods
-           Right _  -> return ()
+           Left _err -> setContextAfterLoad session loaded_mods
+           Right _   -> return ()
 
   modulesLoadedMsg ok (map GHC.ms_mod_name loaded_mods)
 
