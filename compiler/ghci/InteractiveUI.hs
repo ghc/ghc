@@ -334,7 +334,7 @@ runGHCi paths maybe_expr = do
     
   when (read_dot_files) $ do
     -- Read in $HOME/.ghci
-    either_dir <- io (IO.try (getEnv "HOME"))
+    either_dir <- io (IO.try getHomeDirectory)
     case either_dir of
        Left _e -> return ()
        Right dir -> do
@@ -1535,7 +1535,7 @@ expandPath :: String -> GHCi String
 expandPath path = 
   case dropWhile isSpace path of
    ('~':d) -> do
-	tilde <- io (getEnv "HOME")	-- will fail if HOME not defined
+	tilde <- io getHomeDirectory -- will fail if HOME not defined
 	return (tilde ++ '/':d)
    other -> 
 	return other
