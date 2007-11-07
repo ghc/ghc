@@ -1,7 +1,7 @@
 
 C.hs:6:10:
     Couldn't match expected type `bug1465-1.0:A.T'
-	   against inferred type `A.T'
+           against inferred type `A.T'
       Expected type: bug1465-1.0:A.T
       Inferred type: A.T
     In the expression: B2.f
