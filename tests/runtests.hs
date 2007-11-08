@@ -10,7 +10,7 @@ import Text.Regex
 
 main = do
   args <- getArgs
-  when (null args) $ error "You must give the path to the GHC lib dir with -B"  
+  when (null args) $ error "You must give the path to the GHC lib dir as an argument"  
   putStrLn "Running tests..."
   let libdir = head args
   walkDirs libdir "."
@@ -60,7 +60,7 @@ testDir libdir dir = do
   let mods' = map (dir </>) mods
   let outdir = "output" </> dir
   createDirectoryIfMissing True outdir
-  code <- system $ printf "haddock -B %s -o %s -h -g -fglasgow-exts %s" libdir outdir (unwords mods')
+  code <- system $ printf "haddock -B %s -o %s -h --optghc=-fglasgow-exts %s" libdir outdir (unwords mods')
   unless (code == ExitSuccess) $ error "Haddock run failed! Exiting."
   check mods'
   walkDirs libdir dir
