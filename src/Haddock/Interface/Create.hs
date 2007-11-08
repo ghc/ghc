@@ -292,7 +292,7 @@ getDeclFromGroup group name =
       [lsig] -> Just (L (getLoc lsig) (SigD (unLoc lsig)))
       _      -> Nothing
      where 
-        matching = [ lsig | L l (TypeSig (L _ n) _) <- lsigs, n == name ]
+        matching = [ s | s@(L l (TypeSig (L _ n) _)) <- lsigs, n == name ]
 
     getDeclFromVals _ = error "getDeclFromVals: illegal input"
 
@@ -313,11 +313,12 @@ getDeclFromGroup group name =
       [ltycl] -> Just (L (getLoc ltycl) (TyClD (unLoc ltycl)))
       _       -> Nothing
       where
-        matching = [ fmap makeVanillaTyCl ltycl | ltycl <- ltycls,
-                     name `elem` map unLoc (tyClDeclNames (unLoc ltycl))]
+        matching = [ fmap makeVanillaClass ltycl | ltycl <- ltycls,
+                     name `elem` (map unLoc . tyClDeclNames . unLoc $ ltycl)]
           where 
-            makeVanillaTyCl tycl = 
-              tycl { tcdSigs = filter isVanillaLSig (tcdSigs tycl) }
+            makeVanillaClass tycl
+              | isClassDecl tycl = tycl { tcdSigs = filter isVanillaLSig (tcdSigs tycl) }
+              | otherwise = tycl
  
     getDeclFromFors lfors = case matching of 
       [for] -> Just (L (getLoc for) (ForD (unLoc for)))
