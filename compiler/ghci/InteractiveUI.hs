@@ -167,8 +167,8 @@ helpText =
  "   <statement>                 evaluate/run <statement>\n" ++
  "   :{\\n ..lines.. \\n:}\\n       multiline command\n" ++
  "   :add <filename> ...         add module(s) to the current target set\n" ++
- "   :browse[!] [-s] [[*]<mod>]  display the names defined by module <mod>\n" ++
- "                               (!: more details; -s: sort; *: all top-level names)\n" ++
+ "   :browse[!] [[*]<mod>]       display the names defined by module <mod>\n" ++
+ "                               (!: more details; *: all top-level names)\n" ++
  "   :cd <dir>                   change directory to <dir>\n" ++
  "   :cmd <expr>                 run the commands returned by <expr>::IO String\n" ++
  "   :ctags [<file>]             create tags file for Vi (default: \"tags\")\n" ++
@@ -1171,14 +1171,18 @@ browseCmd bang m =
 browseModule :: Bool -> Module -> Bool -> GHCi ()
 browseModule bang modl exports_only = do
   s <- getSession
+  -- :browse! reports qualifiers wrt current context
+  current_unqual <- io (GHC.getPrintUnqual s)
   -- Temporarily set the context to the module we're interested in,
   -- just so we can get an appropriate PrintUnqualified
   (as,bs) <- io (GHC.getContext s)
   prel_mod <- getPrelude
   io (if exports_only then GHC.setContext s [] [prel_mod,modl]
                       else GHC.setContext s [modl] [])
-  unqual <- io (GHC.getPrintUnqual s)
+  target_unqual <- io (GHC.getPrintUnqual s)
   io (GHC.setContext s as bs)
+
+  let unqual = if bang then current_unqual else target_unqual
 
   mb_mod_info <- io $ GHC.getModuleInfo s modl
   case mb_mod_info of
@@ -1220,7 +1224,7 @@ browseModule bang modl exports_only = do
             labels  [] = text "-- not currently imported"
             labels  l  = text $ intercalate "\n" $ map qualifier l
             qualifier  = maybe "-- defined locally" 
-                             (("-- imported from "++) . intercalate ", " 
+                             (("-- imported via "++) . intercalate ", " 
                                . map GHC.moduleNameString)
             importInfo = RdrName.getGRE_NameQualifier_maybes rdr_env
             modNames   = map (importInfo . GHC.getName) things

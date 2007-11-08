@@ -1740,6 +1740,32 @@ $ ghci -lm
     The <literal>!</literal>-form also annotates the listing 
     with comments giving possible imports for each group of 
     entries.</para>
+<screen>
+Prelude> :browse! Data.Maybe
+-- not currently imported
+Data.Maybe.catMaybes :: [Maybe a] -> [a]
+Data.Maybe.fromJust :: Maybe a -> a
+Data.Maybe.fromMaybe :: a -> Maybe a -> a
+Data.Maybe.isJust :: Maybe a -> Bool
+Data.Maybe.isNothing :: Maybe a -> Bool
+Data.Maybe.listToMaybe :: [a] -> Maybe a
+Data.Maybe.mapMaybe :: (a -> Maybe b) -> [a] -> [b]
+Data.Maybe.maybeToList :: Maybe a -> [a]
+-- imported via Prelude
+Just :: a -> Maybe a
+data Maybe a = Nothing | Just a
+Nothing :: Maybe a
+maybe :: b -> (a -> b) -> Maybe a -> b
+</screen>
+  <para>
+    This output shows that, in the context of the current session, in the scope
+    of <literal>Prelude</literal>, the first group of items from
+    <literal>Data.Maybe</literal> have not been imported (but are available in
+    fully qualified form in the GHCi session - see <xref
+      linkend="ghci-scope"/>), whereas the second group of items have been
+    imported via <literal>Prelude</literal> and are therefore available either
+    unqualified, or with a <literal>Prelude.</literal> qualifier.
+  </para>
 	</listitem>
       </varlistentry>
 
