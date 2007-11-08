@@ -1,6 +1,6 @@
 :l ghci025
-System.IO.putStrLn "test :browse! functionality"
-System.IO.putStrLn ":browse! -s *T -- sort output to get deterministic result (#1799)"
+System.IO.putStrLn "-- test :browse! functionality"
+System.IO.putStrLn ":browse! *T"
 :browse! *T
 System.IO.putStrLn ":browse! T"
 :browse! T
@@ -8,3 +8,17 @@ System.IO.putStrLn ":browse! T"
 System.IO.putStrLn ":browse! T -- with -fglasgow-exts"
 :browse! T
 
+System.IO.putStrLn "-- test :browse! <target> relative to different contexts"
+:l ../prog001/D.hs
+:add ../prog001/C.hs
+System.IO.putStrLn ":browse! C -- from *C>"
+:browse! C
+:add ../prog001/B.hs
+System.IO.putStrLn ":browse! C -- from *B>, after :add B"
+:browse! C
+:m *C
+System.IO.putStrLn ":browse! C -- from *C>, after :m *C"
+:browse! C
+:m *D
+System.IO.putStrLn ":browse! C -- from *D>, after :m *D"
+:browse! C
