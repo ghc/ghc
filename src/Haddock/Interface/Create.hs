@@ -148,13 +148,14 @@ sortByLoc = map unLoc . sortBy (comparing getLoc)
 getClassEntities tcd = sortByLoc (docs ++ meths ++ sigs)
   where
     docs = [ L l (DocEntity d) | L l d <- tcdDocs tcd ]
+
     meths = 
       let bindings = bagToList (tcdMeths tcd)
           bindingName = unLoc . fun_id
       in [ L l (DeclEntity (bindingName b)) | L l b <- bindings ] 
-    sigs = 
-      let sigName = fromJust . sigNameNoLoc 
-      in [ L l (DeclEntity (sigName sig)) | L l sig <- tcdSigs tcd ]  
+
+    -- TODO: fixities
+    sigs = [ L l $ DeclEntity name | L l (TypeSig (L _ name) _) <- tcdSigs tcd ]
 
 
 -- | Get all the top level entities in a module. The entities are sorted by
@@ -170,7 +171,8 @@ getTopEntities group = sortByLoc (docs ++ declarations)
              -- we just use the sigs here for now.
              -- TODO: collect from the bindings as well 
              -- (needed for docs to work for inferred entities)
-                in [ (l, fromJust (sigNameNoLoc s)) | L l s <- sigs ] 
+                in [ (l, fromJust (sigNameNoLoc s)) | L l s <- sigs, 
+                      isVanillaLSig (L l s) ] -- TODO: document fixity decls
         tyclds = [ (l, tcdName t) | L l t <- hs_tyclds group ]
         fords  = [ (l, forName f) | L l f <- hs_fords group ]  
           where
@@ -290,10 +292,7 @@ getDeclFromGroup group name =
       [lsig] -> Just (L (getLoc lsig) (SigD (unLoc lsig)))
       _      -> Nothing
      where 
-        matching = [ lsig | lsig <- lsigs, let Just n = sigName lsig, n == name, 
-                     isNormal (unLoc lsig) ]
-        isNormal (TypeSig _ _) = True
-        isNormal _ = False
+        matching = [ lsig | L l (TypeSig (L _ n) _) <- lsigs, n == name ]
 
     getDeclFromVals _ = error "getDeclFromVals: illegal input"
 
@@ -314,8 +313,11 @@ getDeclFromGroup group name =
       [ltycl] -> Just (L (getLoc ltycl) (TyClD (unLoc ltycl)))
       _       -> Nothing
       where
-        matching = [ ltycl | ltycl <- ltycls, 
+        matching = [ fmap makeVanillaTyCl ltycl | ltycl <- ltycls,
                      name `elem` map unLoc (tyClDeclNames (unLoc ltycl))]
+          where 
+            makeVanillaTyCl tycl = 
+              tycl { tcdSigs = filter isVanillaLSig (tcdSigs tycl) }
  
     getDeclFromFors lfors = case matching of 
       [for] -> Just (L (getLoc for) (ForD (unLoc for)))
@@ -425,7 +427,8 @@ extractDecl name mdl decl
   | otherwise  =  
     case unLoc decl of
       TyClD d | isClassDecl d -> 
-        let matches = [ sig | sig <- tcdSigs d, sigName sig == Just name ] 
+        let matches = [ sig | sig <- tcdSigs d, sigName sig == Just name,
+                        isVanillaLSig sig ] -- TODO: document fixity
         in case matches of 
           [s0] -> let (n, tyvar_names) = name_and_tyvars d
                       L pos sig = extractClassDecl n mdl tyvar_names s0
