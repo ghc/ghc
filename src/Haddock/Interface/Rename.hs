@@ -116,35 +116,12 @@ lookupRn and_then name = do
 	(True, maps_to) -> return (and_then maps_to)
 
 
---------------------------------------------------------------------------------
--- Looking up names
---------------------------------------------------------------------------------
-
-
-newtype OrdName = MkOrdName Name
-
-instance Eq OrdName where
-  (MkOrdName a) == (MkOrdName b) = compare a b == EQ
-
-instance Ord OrdName where
-  (MkOrdName a) `compare` (MkOrdName b) =
-    case (nameModule_maybe a, nameModule_maybe b) of
-      (Just modA, Just modB) ->
-        (modA `compare` modB) `thenCmp` (getOccName a `compare` getOccName b)
-      (Nothing, Nothing) -> getOccName a `compare` getOccName b
-      _ -> LT
-
-instance Outputable OrdName where
-  ppr (MkOrdName x) = ppr (nameOccName x)
-
 runRnFM :: LinkEnv -> RnM a -> (a,[Name])
 runRnFM env rn = unRn rn lkp 
   where 
-    lkp n = case Map.lookup (MkOrdName n) ordEnv of
+    lkp n = case Map.lookup n env of
       Nothing -> (False, NoLink n) 
       Just q  -> (True, Link q)
-
-    ordEnv = Map.fromList . map (MkOrdName *** id) . Map.toList $ env
 
 
 --------------------------------------------------------------------------------
