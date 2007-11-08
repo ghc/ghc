@@ -107,7 +107,7 @@ main = handleTopExceptions $ do
   (session, dynflags) <- startGhc libDir (ghcFlags flags)
 
   -- get packages via --read-interface
-  packages <- readInterfaceFiles (ifacePairs flags)
+  packages <- readInterfaceFiles session (ifacePairs flags)
 
   -- typecheck argument modules using GHC
   modules <- typecheckFiles session fileArgs
@@ -212,14 +212,14 @@ render flags interfaces = do
 -------------------------------------------------------------------------------
 
 
-readInterfaceFiles :: [(FilePath, FilePath)] -> IO [(InterfaceFile, FilePath)]
-readInterfaceFiles pairs = do
+readInterfaceFiles :: Session -> [(FilePath, FilePath)] -> IO [(InterfaceFile, FilePath)]
+readInterfaceFiles session pairs = do
   mbPackages <- mapM tryReadIface pairs
   return (catMaybes mbPackages)
   where
     -- try to read an interface, warn if we can't
     tryReadIface (html, iface) = do
-      eIface <- readInterfaceFile iface
+      eIface <- readInterfaceFile session iface
       case eIface of
         Left err -> do
           putStrLn ("Warning: Cannot read " ++ iface ++ ":")
