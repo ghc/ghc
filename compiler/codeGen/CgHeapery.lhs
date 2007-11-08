@@ -231,7 +231,7 @@ mkStaticClosure :: CLabel -> CostCentreStack -> [CmmLit]
 mkStaticClosure info_lbl ccs payload padding_wds static_link_field saved_info_field
   =  [CmmLabel info_lbl]
   ++ variable_header_words
-  ++ payload
+  ++ concatMap padLitToWord payload
   ++ padding_wds
   ++ static_link_field
   ++ saved_info_field
@@ -241,6 +241,17 @@ mkStaticClosure info_lbl ccs payload padding_wds static_link_field saved_info_fi
 	++ staticParHdr
 	++ staticProfHdr ccs
 	++ staticTickyHdr
+
+padLitToWord :: CmmLit -> [CmmLit]
+padLitToWord lit = lit : padding pad_length
+  where rep = cmmLitRep lit
+        pad_length = wORD_SIZE - machRepByteWidth rep :: Int
+
+        padding n | n <= 0 = []
+                  | n `rem` 2 /= 0 = CmmInt 0 I8  : padding (n-1)
+                  | n `rem` 4 /= 0 = CmmInt 0 I16 : padding (n-2)
+                  | n `rem` 8 /= 0 = CmmInt 0 I32 : padding (n-4)
+                  | otherwise      = CmmInt 0 I64 : padding (n-8)
 \end{code}
 
 %************************************************************************

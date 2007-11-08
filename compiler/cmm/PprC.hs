@@ -145,7 +145,6 @@ pprTop top@(CmmData _section (CmmDataLabel lbl : lits)) =
 -- these shouldn't appear?
 pprTop (CmmData _ _) = panic "PprC.pprTop: can't handle this data"
 
-
 -- --------------------------------------------------------------------------
 -- BasicBlocks are self-contained entities: they always end in a jump.
 --
@@ -426,7 +425,13 @@ pprLit1 other = pprLit other
 pprStatics :: [CmmStatic] -> [SDoc]
 pprStatics [] = []
 pprStatics (CmmStaticLit (CmmFloat f F32) : rest) 
+  -- floats are padded to a word, see #1852
+  | wORD_SIZE == 8, CmmStaticLit (CmmInt 0 I32) : rest' <- rest
+  = pprLit1 (floatToWord f) : pprStatics rest'
+  | wORD_SIZE == 4
   = pprLit1 (floatToWord f) : pprStatics rest
+  | otherwise
+  = pprPanic "pprStatics: float" (vcat (map (\(CmmStaticLit l) -> ppr (cmmLitRep l)) rest))
 pprStatics (CmmStaticLit (CmmFloat f F64) : rest)
   = map pprLit1 (doubleToWords f) ++ pprStatics rest
 pprStatics (CmmStaticLit (CmmInt i I64) : rest)
