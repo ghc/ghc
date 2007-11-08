@@ -376,20 +376,7 @@ renameSig sig = case sig of
   TypeSig (L loc name) ltype -> do 
     ltype' <- renameLType ltype
     return (TypeSig (L loc (keep name)) ltype')
-{-  SpecSig lname ltype x -> do
-    lname' <- renameL lname
-    ltype' <- renameLType ltype
-    return (SpecSig lname' ltype' x)
-  InlineSig lname x -> do
-    lname' <- renameL lname
-    return (InlineSig lname' x)   
-  SpecInstSig t -> return . SpecInstSig =<< renameLType t
-  FixSig fsig -> return . FixSig =<< renameFixitySig fsig
-  where
-    renameFixitySig (FixitySig lname x) = do
-      lname' <- renameL lname
-      return (FixitySig lname' x)
--}
+  -- we have filtered out all other kinds of signatures in Interface.Create
 
 
 renameForD (ForeignImport lname ltype x) = do
