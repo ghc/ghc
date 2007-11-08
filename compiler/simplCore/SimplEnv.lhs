@@ -659,7 +659,7 @@ addBndrRules env in_id out_id
   where
     subst     = mkCoreSubst env
     old_rules = idSpecialisation in_id
-    new_rules = CoreSubst.substSpec subst old_rules
+    new_rules = CoreSubst.substSpec subst out_id old_rules
     final_id  = out_id `setIdSpecialisation` new_rules
 
 ------------------

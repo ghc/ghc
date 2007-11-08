@@ -333,7 +333,7 @@ substIdBndr rec_subst subst@(Subst in_scope env tvs) old_id
 	-- The lazy-set is because we're in a loop here, with 
 	-- rec_subst, when dealing with a mutually-recursive group
     new_id = maybeModifyIdInfo mb_new_info id2
-    mb_new_info = substIdInfo rec_subst (idInfo id2)
+    mb_new_info = substIdInfo rec_subst id2 (idInfo id2)
 	-- NB: unfolding info may be zapped
 
 	-- Extend the substitution if the unique has changed
@@ -376,7 +376,7 @@ clone_id rec_subst subst@(Subst in_scope env tvs) (old_id, uniq)
   where
     id1	    = setVarUnique old_id uniq
     id2     = substIdType subst id1
-    new_id  = maybeModifyIdInfo (substIdInfo rec_subst (idInfo old_id)) id2
+    new_id  = maybeModifyIdInfo (substIdInfo rec_subst id2 (idInfo old_id)) id2
     new_env = extendVarEnv env old_id (Var new_id)
 \end{code}
 
@@ -421,11 +421,11 @@ substIdType subst@(Subst in_scope id_env tv_env) id
     old_ty = idType id
 
 ------------------
-substIdInfo :: Subst -> IdInfo -> Maybe IdInfo
+substIdInfo :: Subst -> Id -> IdInfo -> Maybe IdInfo
 -- Always zaps the unfolding, to save substitution work
-substIdInfo  subst info
+substIdInfo subst new_id info
   | nothing_to_do = Nothing
-  | otherwise     = Just (info `setSpecInfo`   	  substSpec  subst old_rules
+  | otherwise     = Just (info `setSpecInfo`   	  substSpec subst new_id old_rules
 			       `setWorkerInfo` 	  substWorker subst old_wrkr
 			       `setUnfoldingInfo` noUnfolding)
   where
@@ -452,19 +452,21 @@ substWorker subst (HasWorker w a)
 				--  via postInlineUnconditionally, hence warning)
 
 ------------------
-substSpec :: Subst -> SpecInfo -> SpecInfo
+substSpec :: Subst -> Id -> SpecInfo -> SpecInfo
 
-substSpec subst spec@(SpecInfo rules rhs_fvs)
+substSpec subst new_fn spec@(SpecInfo rules rhs_fvs)
   | isEmptySubst subst
   = spec
   | otherwise
   = seqSpecInfo new_rules `seq` new_rules
   where
+    new_name = idName new_fn
     new_rules = SpecInfo (map do_subst rules) (substVarSet subst rhs_fvs)
 
     do_subst rule@(BuiltinRule {}) = rule
     do_subst rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs })
-	= rule { ru_bndrs = bndrs',
+	= rule { ru_bndrs = bndrs', 
+		 ru_fn = new_name, 	-- Important: the function may have changed its name!
 		 ru_args  = map (substExpr subst') args,
 		 ru_rhs   = substExpr subst' rhs }
 	where
