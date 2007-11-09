@@ -194,10 +194,10 @@ render flags interfaces = do
     ppHtmlHelpFiles title packageName visibleMods odir maybe_html_help_format []
 
   when (Flag_GenContents `elem` flags) $ do
-	ppHtmlContents odir title packageName maybe_html_help_format
-	               maybe_index_url maybe_source_urls maybe_wiki_urls
-	               visibleMods True prologue
-	copyHtmlBits odir libdir css_file
+    ppHtmlContents odir title packageName maybe_html_help_format
+	                 maybe_index_url maybe_source_urls maybe_wiki_urls
+	                 visibleMods True prologue
+    copyHtmlBits odir libdir css_file
 
   when (Flag_Html `elem` flags) $ do
     ppHtml title packageName visibleMods odir
