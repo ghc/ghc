@@ -224,10 +224,12 @@ runit cli nonopts = do
         pkgid <- readGlobPkgId pkgid_str
         hidePackage pkgid cli
     ["list"] -> do
-        listPackages cli Nothing
+        listPackages cli Nothing Nothing
     ["list", pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
-        listPackages cli (Just pkgid)
+        listPackages cli (Just pkgid) Nothing
+    ["find-module", moduleName] -> do
+        listPackages cli Nothing (Just moduleName)
     ["latest", pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
         latestPackage cli pkgid
@@ -461,13 +463,16 @@ modifyPackage fn pkgid flags  = do
 -- -----------------------------------------------------------------------------
 -- Listing packages
 
-listPackages ::  [Flag] -> Maybe PackageIdentifier -> IO ()
-listPackages flags mPackageName = do
+listPackages ::  [Flag] -> Maybe PackageIdentifier -> Maybe String -> IO ()
+listPackages flags mPackageName mModuleName = do
   let simple_output = FlagSimpleOutput `elem` flags
   db_stack <- getPkgDatabases False flags
   let db_stack_filtered -- if a package is given, filter out all other packages
         | Just this <- mPackageName =
             map (\(conf,pkgs) -> (conf, filter (this `matchesPkg`) pkgs))
+                db_stack
+        | Just this <- mModuleName = -- packages which expose mModuleName
+            map (\(conf,pkgs) -> (conf, filter (this `exposedInPkg`) pkgs))
                 db_stack
         | otherwise = db_stack
 
@@ -545,6 +550,9 @@ pid `matchesPkg` pkg = pid `matches` package pkg
 
 compPkgIdVer :: PackageIdentifier -> PackageIdentifier -> Ordering
 compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
+
+exposedInPkg :: String -> InstalledPackageInfo -> Bool
+moduleName `exposedInPkg` pkg = moduleName `elem` exposedModules pkg
 
 -- -----------------------------------------------------------------------------
 -- Field
@@ -959,8 +967,8 @@ oldRunit clis = do
       defines = [ (nm,val) | OF_DefinedName nm val <- clis ]
 
   case [ c | c <- clis, isAction c ] of
-    [ OF_List ]      -> listPackages new_flags Nothing
-    [ OF_ListLocal ] -> listPackages new_flags Nothing
+    [ OF_List ]      -> listPackages new_flags Nothing Nothing
+    [ OF_ListLocal ] -> listPackages new_flags Nothing Nothing
     [ OF_Add upd ]   ->
         registerPackage input_file defines new_flags auto_ghci_libs upd force
     [ OF_Remove pkgid_str ]  -> do
