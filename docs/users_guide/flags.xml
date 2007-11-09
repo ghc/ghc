@@ -826,7 +826,7 @@
 	      <entry><option>-XNoLiberalTypeSynonyms</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-XNoRank2Types</option></entry>
+	      <entry><option>-XRank2Types</option></entry>
 	      <entry>Enable rank-2 types.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoRank2Types</option></entry>
