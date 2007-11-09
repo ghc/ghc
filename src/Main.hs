@@ -185,10 +185,10 @@ render flags interfaces = do
     packageName = (Just . modulePkgStr . ifaceMod . head) visibleMods
  
   when (Flag_GenIndex `elem` flags) $ do
-	ppHtmlIndex odir title packageName maybe_html_help_format
+    ppHtmlIndex odir title packageName maybe_html_help_format
                 maybe_contents_url maybe_source_urls maybe_wiki_urls
                 visibleMods
-	copyHtmlBits odir libdir css_file
+    copyHtmlBits odir libdir css_file
         
   when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do
     ppHtmlHelpFiles title packageName visibleMods odir maybe_html_help_format []
