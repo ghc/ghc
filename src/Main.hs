@@ -252,7 +252,6 @@ handleEasyFlags flags fileArgs = do
   when (Flag_Help       `elem` flags) (bye usage)
   when (Flag_Version    `elem` flags) byeVersion
   when (Flag_GhcVersion `elem` flags) byeGhcVersion
-  when (null fileArgs) (bye usage)
 
   let ghcLibDir = case [ dir | Flag_GhcLibDir dir <- flags ] of
                     [] -> throwE "no GHC lib dir specified"
