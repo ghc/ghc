@@ -22,7 +22,10 @@ main = do let hooks = defaultUserHooks {
                   makefileHook = build_primitive_sources
                                $ filter_modules_hook
                                $ makefileHook defaultUserHooks,
-                  instHook = filter_modules_hook
+                  haddockHook = build_primitive_sources
+                               $ filter_modules_hook
+                               $ haddockHook defaultUserHooks,
+                   instHook = filter_modules_hook
                            $ instHook defaultUserHooks }
           defaultMainWithHooks hooks
 
