@@ -124,7 +124,7 @@ main = handleTopExceptions $ do
   render flags interfaces
 
   -- last but not least, dump the interface file!
-  dumpInterfaceFile (map ghcModule modules) homeLinks flags
+  dumpInterfaceFile (map toInstalledInterface interfaces) homeLinks flags
 
 
 -------------------------------------------------------------------------------
@@ -181,13 +181,14 @@ render flags interfaces = do
   prologue <- getPrologue flags
 
   let 
-    visibleMods = [ m | m <- interfaces, OptHide `notElem` (ifaceOptions m) ]
-    packageName = (Just . modulePkgStr . ifaceMod . head) visibleMods
+    visibleMods     = [ m | m <- interfaces, OptHide `notElem` (ifaceOptions m) ]
+    installedIfaces = map toInstalledInterface visibleMods
+    packageName     = (Just . modulePkgStr . ifaceMod . head) visibleMods
  
   when (Flag_GenIndex `elem` flags) $ do
     ppHtmlIndex odir title packageName maybe_html_help_format
                 maybe_contents_url maybe_source_urls maybe_wiki_urls
-                visibleMods
+                installedIfaces
     copyHtmlBits odir libdir css_file
         
   when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do
@@ -196,7 +197,7 @@ render flags interfaces = do
   when (Flag_GenContents `elem` flags) $ do
     ppHtmlContents odir title packageName maybe_html_help_format
 	                 maybe_index_url maybe_source_urls maybe_wiki_urls
-	                 visibleMods True prologue
+	                 installedIfaces True prologue
     copyHtmlBits odir libdir css_file
 
   when (Flag_Html `elem` flags) $ do
@@ -229,16 +230,18 @@ readInterfaceFiles session pairs = do
         Right iface -> return $ Just (iface, html)
 
 
-dumpInterfaceFile :: [Module] -> LinkEnv -> [Flag] -> IO ()
-dumpInterfaceFile modules homeLinks flags = 
+dumpInterfaceFile :: [InstalledInterface] -> LinkEnv -> [Flag] -> IO ()
+dumpInterfaceFile ifaces homeLinks flags = 
   case [str | Flag_DumpInterface str <- flags] of
     [] -> return ()
     fs -> let filename = last fs in writeInterfaceFile filename ifaceFile
   where 
     ifaceFile = InterfaceFile {
-        ifModules = modules,
-        ifLinkEnv = homeLinks
+        ifInstalledIfaces = ifaces,
+        ifLinkEnv         = homeLinks
       }
+
+
 
 
 -------------------------------------------------------------------------------
@@ -275,7 +278,8 @@ updateHTMLXRefs :: [(InterfaceFile, FilePath)] -> IO ()
 updateHTMLXRefs packages = do
   writeIORef html_xrefs_ref (Map.fromList mapping)
   where
-    mapping = [(mod, html) | (iface, html) <- packages, mod <- ifModules iface] 
+    mapping = [ (instMod iface, html) | (ifaces, html) <- packages,
+                iface <- ifInstalledIfaces ifaces ]
 
 
 getPrologue :: [Flag] -> IO (Maybe (HsDoc RdrName))

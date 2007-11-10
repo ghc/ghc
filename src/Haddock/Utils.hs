@@ -9,7 +9,7 @@ module Haddock.Utils (
 
   -- * Misc utilities
   restrictTo, 
-  toDescription,
+  toDescription, toInstalledDescription,
 
   -- * Filename utilities
   basename, dirname, splitFilename3, 
@@ -63,9 +63,15 @@ import System.IO.Unsafe	 ( unsafePerformIO )
 -- -----------------------------------------------------------------------------
 -- Some Utilities
 
+
 -- | extract a module's short description.
 toDescription :: Interface -> Maybe (HsDoc Name)
 toDescription = hmi_description . ifaceInfo
+
+-- | extract a module's short description.
+toInstalledDescription :: InstalledInterface -> Maybe (HsDoc Name)
+toInstalledDescription = hmi_description . instInfo
+
 
 -- ---------------------------------------------------------------------------
 -- Making abstract declarations

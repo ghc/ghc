@@ -8,7 +8,8 @@
 module Haddock.Types where
 
 
-import Data.Map
+import Data.Map (Map)
+import qualified Data.Map as Map
 import Control.Monad.Writer
 
 import GHC hiding (NoLink)
@@ -110,7 +111,7 @@ data GhcModule = GhcModule {
 -- data needed during its creation.
 data Interface = Interface {
 
-  -- | A value to identify the module
+  -- | The documented module
   ifaceMod             :: Module,
 
   -- | The original filename for this module
@@ -154,6 +155,28 @@ data Interface = Interface {
 
   -- | The instances exported by this module
   ifaceInstances       :: [Instance]
+}
+
+
+-- | A smaller version of 'Interface' that we can get from the Haddock
+-- interface files.
+data InstalledInterface = InstalledInterface {
+  instMod            :: Module,
+  instInfo           :: HaddockModInfo Name,
+  instDocMap         :: Map Name (HsDoc DocName),
+  instExports        :: [Name],
+  instVisibleExports :: [Name]
+}
+
+
+-- | Convert an 'Interface' to an 'InstalledInterface'
+toInstalledInterface :: Interface -> InstalledInterface
+toInstalledInterface interface = InstalledInterface {
+  instMod            = ifaceMod            interface,
+  instInfo           = ifaceInfo           interface,
+  instDocMap         = ifaceRnDocMap       interface,
+  instExports        = ifaceExports        interface,
+  instVisibleExports = ifaceVisibleExports interface
 }
 
 

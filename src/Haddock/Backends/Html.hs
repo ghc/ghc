@@ -75,13 +75,14 @@ ppHtml doctitle maybe_package ifaces odir prologue maybe_html_help_format
   when (not (isJust maybe_contents_url)) $ 
     ppHtmlContents odir doctitle maybe_package
         maybe_html_help_format maybe_index_url maybe_source_url maybe_wiki_url
-	visible_ifaces
+        (map toInstalledInterface visible_ifaces)
 	False -- we don't want to display the packages in a single-package contents
 	prologue
 
   when (not (isJust maybe_index_url)) $ 
     ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
-      maybe_contents_url maybe_source_url maybe_wiki_url visible_ifaces
+      maybe_contents_url maybe_source_url maybe_wiki_url 
+      (map toInstalledInterface visible_ifaces)
     
   when (not (isJust maybe_contents_url && isJust maybe_index_url)) $ 
 	ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format []
@@ -291,13 +292,13 @@ ppHtmlContents
    -> Maybe String
    -> SourceURLs
    -> WikiURLs
-   -> [Interface] -> Bool -> Maybe (GHC.HsDoc GHC.RdrName)
+   -> [InstalledInterface] -> Bool -> Maybe (GHC.HsDoc GHC.RdrName)
    -> IO ()
 ppHtmlContents odir doctitle
   maybe_package maybe_html_help_format maybe_index_url
-  maybe_source_url maybe_wiki_url modules showPkgs prologue = do
+  maybe_source_url maybe_wiki_url ifaces showPkgs prologue = do
   let tree = mkModuleTree showPkgs
-         [(ifaceMod mod, toDescription mod) | mod <- modules]
+         [(instMod mod, toInstalledDescription mod) | mod <- ifaces]
       html = 
 	header 
 		(documentCharacterEncoding +++
@@ -405,7 +406,7 @@ ppHtmlIndex :: FilePath
             -> Maybe String
             -> SourceURLs
             -> WikiURLs
-            -> [Interface] 
+            -> [InstalledInterface] 
             -> IO ()
 ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
   maybe_contents_url maybe_source_url maybe_wiki_url modules = do
@@ -483,9 +484,9 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
 
   getHModIndex iface = 
     [ (getOccString name, 
-	Map.fromList [(name, [(mdl, name `elem` ifaceVisibleExports iface)])])
-    | name <- ifaceExports iface ]
-    where mdl = ifaceMod iface
+	Map.fromList [(name, [(mdl, name `elem` instVisibleExports iface)])])
+    | name <- instExports iface ]
+    where mdl = instMod iface
 
   indexElt :: (String, Map GHC.Name [(Module,Bool)]) -> HtmlTable
   indexElt (str, entities) = 
