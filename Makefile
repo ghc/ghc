@@ -61,7 +61,7 @@ include $(TOP)/mk/boilerplate.mk
 ifeq "$(BootingFromHc)" "YES"
 SUBDIRS_BUILD = gmp includes rts compat compiler docs utils driver
 else
-SUBDIRS_BUILD = gmp includes compat utils driver docs compiler rts
+SUBDIRS_BUILD = gmp includes compat utils driver docs compiler rts libraries/Cabal/doc
 endif
 
 SUBDIRS = gmp includes compat utils driver docs rts libraries compiler libraries/Cabal/doc
