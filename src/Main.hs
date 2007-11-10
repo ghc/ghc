@@ -121,10 +121,12 @@ main = handleTopExceptions $ do
 
   -- render the interfaces
   updateHTMLXRefs packages
-  render flags interfaces
+  let ifaceFiles = map fst packages
+  let installedIfaces = concatMap ifInstalledIfaces ifaceFiles
+  render flags interfaces installedIfaces
 
   -- last but not least, dump the interface file!
-  dumpInterfaceFile (map toInstalledInterface interfaces) homeLinks flags
+  dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
 
 
 -------------------------------------------------------------------------------
@@ -133,8 +135,8 @@ main = handleTopExceptions $ do
 
 
 -- | Render the interfaces with whatever backend is specified in the flags 
-render :: [Flag] -> [Interface] -> IO ()
-render flags interfaces = do
+render :: [Flag] -> [Interface] -> [InstalledInterface] -> IO ()
+render flags interfaces installedIfaces = do
   let
     title = case [str | Flag_Heading str <- flags] of
 		[] -> ""
@@ -181,27 +183,32 @@ render flags interfaces = do
   prologue <- getPrologue flags
 
   let 
-    visibleMods     = [ m | m <- interfaces, OptHide `notElem` (ifaceOptions m) ]
-    installedIfaces = map toInstalledInterface visibleMods
-    packageName     = (Just . modulePkgStr . ifaceMod . head) visibleMods
+    -- visible home-module interfaces
+    visibleIfaces = [ m | m <- interfaces, OptHide `notElem` (ifaceOptions m) ]
+
+    -- *all* visible interfaces including external package modules
+    allVisibleIfaces = map toInstalledIface visibleIfaces
+                       ++ installedIfaces
+    
+    packageName     = (Just . modulePkgStr . ifaceMod . head) visibleIfaces
  
   when (Flag_GenIndex `elem` flags) $ do
     ppHtmlIndex odir title packageName maybe_html_help_format
                 maybe_contents_url maybe_source_urls maybe_wiki_urls
-                installedIfaces
+                allVisibleIfaces
     copyHtmlBits odir libdir css_file
         
   when (Flag_GenContents `elem` flags && Flag_GenIndex `elem` flags) $ do
-    ppHtmlHelpFiles title packageName visibleMods odir maybe_html_help_format []
+    ppHtmlHelpFiles title packageName visibleIfaces odir maybe_html_help_format []
 
   when (Flag_GenContents `elem` flags) $ do
     ppHtmlContents odir title packageName maybe_html_help_format
 	                 maybe_index_url maybe_source_urls maybe_wiki_urls
-	                 installedIfaces True prologue
+	                 allVisibleIfaces True prologue
     copyHtmlBits odir libdir css_file
 
   when (Flag_Html `elem` flags) $ do
-    ppHtml title packageName visibleMods odir
+    ppHtml title packageName visibleIfaces odir
                 prologue maybe_html_help_format
                 maybe_source_urls maybe_wiki_urls
                 maybe_contents_url maybe_index_url

@@ -170,8 +170,8 @@ data InstalledInterface = InstalledInterface {
 
 
 -- | Convert an 'Interface' to an 'InstalledInterface'
-toInstalledInterface :: Interface -> InstalledInterface
-toInstalledInterface interface = InstalledInterface {
+toInstalledIface :: Interface -> InstalledInterface
+toInstalledIface interface = InstalledInterface {
   instMod            = ifaceMod            interface,
   instInfo           = ifaceInfo           interface,
   instDocMap         = ifaceRnDocMap       interface,

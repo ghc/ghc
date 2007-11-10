@@ -75,14 +75,14 @@ ppHtml doctitle maybe_package ifaces odir prologue maybe_html_help_format
   when (not (isJust maybe_contents_url)) $ 
     ppHtmlContents odir doctitle maybe_package
         maybe_html_help_format maybe_index_url maybe_source_url maybe_wiki_url
-        (map toInstalledInterface visible_ifaces)
+        (map toInstalledIface visible_ifaces)
 	False -- we don't want to display the packages in a single-package contents
 	prologue
 
   when (not (isJust maybe_index_url)) $ 
     ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
       maybe_contents_url maybe_source_url maybe_wiki_url 
-      (map toInstalledInterface visible_ifaces)
+      (map toInstalledIface visible_ifaces)
     
   when (not (isJust maybe_contents_url && isJust maybe_index_url)) $ 
 	ppHtmlHelpFiles doctitle maybe_package ifaces odir maybe_html_help_format []
