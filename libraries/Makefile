@@ -285,7 +285,9 @@ $(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/GNUmakefile):\
 	   cd $* && setup/Setup makefile -f GNUmakefile; \
 	fi
 
-.PHONY: doc
+.PHONY: doc html
+
+html: doc
 
 doc: $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR))
 	sh gen_contents_index --inplace
@@ -393,3 +395,10 @@ binary-dist.library.%:
 	     \( \( -name "*.o" -o -name "*.p_o" \) -a ! -name "HS*" \) \
 	     -exec rm {} \; ; \
 	fi
+
+# Ignore some doc targets that we don't support
+# The root recurses into us when these targets are made
+.PHONY: html-no-chunks chm HxS fo dvi ps pdf
+html-no-chunks chm HxS fo dvi ps pdf:
+	@:
+
