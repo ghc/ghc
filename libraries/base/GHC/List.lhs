@@ -524,7 +524,7 @@ all p (x:xs)	=  p x && all p xs
 #endif
 
 -- | 'elem' is the list membership predicate, usually written in infix form,
--- e.g., @x `elem` xs@.
+-- e.g., @x \`elem\` xs@.
 elem                    :: (Eq a) => a -> [a] -> Bool
 
 -- | 'notElem' is the negation of 'elem'.
