@@ -1,0 +1,14 @@
+
+drvfail013.hs:4:0:
+    No instance for (Eq (m (Maybe a)))
+      arising from the 'deriving' clause of a data type declaration
+                   at drvfail013.hs:4:0-70
+    Possible fix: add an instance declaration for (Eq (m (Maybe a)))
+    When deriving the instance for (Eq (MaybeT m a))
+
+drvfail013.hs:6:0:
+    No instance for (Eq (m (Maybe a)))
+      arising from the 'deriving' clause of a data type declaration
+                   at drvfail013.hs:6:0-70
+    Possible fix: add an instance declaration for (Eq (m (Maybe a)))
+    When deriving the instance for (Eq (MaybeT' m a))
