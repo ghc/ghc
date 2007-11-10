@@ -10,7 +10,7 @@ case $* in
     GHC_PKG=../utils/ghc-pkg/ghc-pkg-inplace
     for DIR in */
     do
-        NAME=${DIR%/}
+        NAME=`echo "$DIR" | sed 's#/$##'`
         HADDOCK_FILE=$NAME/dist/doc/html/$NAME/$NAME.haddock
         if [ -f $HADDOCK_FILE ]
         then
