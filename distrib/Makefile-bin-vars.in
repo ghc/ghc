@@ -41,6 +41,7 @@ exeext      = @exeext@
 SED	        = @SedCmd@
 DEFAULT_TMPDIR = /tmp
 RANLIB      = @RANLIB@
+CPP         = @CPP@
 
 RAWCPP_FLAGS            = -undef -traditional
 
