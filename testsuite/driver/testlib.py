@@ -355,7 +355,16 @@ def skip_unless_tag( tag ):
 def _skip_unless_tag( opts, tag ):
     if not (tag in config.compiler_tags):
 	opts.skip = 1
-	
+
+def skip_if_compiler_lt( compiler, version ):
+   return lambda opts, c=compiler, v=version: \
+                 _skip_if_compiler_lt(opts, c, v)
+
+def _skip_if_compiler_lt( opts, compiler, version ):
+    if config.compiler_type == compiler and \
+       version_lt(config.compiler_version, version):
+        opts.skip = 1
+
 # ---
 def alone(opts):
     opts.alone = 1

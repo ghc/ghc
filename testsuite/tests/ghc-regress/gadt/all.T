@@ -42,7 +42,7 @@ test('rw', normal, compile_fail, [''])
 test('lazypat', normal, compile_fail, [''])
 test('lazypatok', normal, compile, [''])
 test('tc', normal, compile_and_run, [''])
-test('arrow', normal, compile, [''])
+test('arrow', skip_if_compiler_lt('ghc','6.9'), compile, [''])
 test('tdpe', normal, compile, [''])
 test('Nilsson', skip_if_fast, compile, [''])
 
