@@ -16,8 +16,8 @@ INSTALL_LIBEXEC_SCRIPTS += $(PROG)
 CLEAN_FILES += $(PROG) $(PROG).prl
 
 binary-dist:
-	$(INSTALL_DIR)              $(BIN_DIST_DIR)/driver/split
-	$(INSTALL_DATA)    Makefile $(BIN_DIST_DIR)/driver/split/
-	$(INSTALL_PROGRAM) $(PROG)  $(BIN_DIST_DIR)/driver/split/
+	$(INSTALL_DIR)             $(BIN_DIST_DIR)/driver/split
+	$(INSTALL_DATA)   Makefile $(BIN_DIST_DIR)/driver/split/
+	$(INSTALL_SCRIPT) $(PROG)  $(BIN_DIST_DIR)/driver/split/
 
 include $(TOP)/mk/target.mk

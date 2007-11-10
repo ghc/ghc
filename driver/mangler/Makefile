@@ -21,8 +21,8 @@ boot :: all
 endif
 
 binary-dist:
-	$(INSTALL_DIR)              $(BIN_DIST_DIR)/driver/mangler
-	$(INSTALL_DATA)    Makefile $(BIN_DIST_DIR)/driver/mangler/
-	$(INSTALL_PROGRAM) $(PROG)  $(BIN_DIST_DIR)/driver/mangler/
+	$(INSTALL_DIR)             $(BIN_DIST_DIR)/driver/mangler
+	$(INSTALL_DATA)   Makefile $(BIN_DIST_DIR)/driver/mangler/
+	$(INSTALL_SCRIPT) $(PROG)  $(BIN_DIST_DIR)/driver/mangler/
 
 include $(TOP)/mk/target.mk
