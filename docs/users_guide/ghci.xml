@@ -368,7 +368,6 @@ hello
       <literal>IO</literal> monad.
 <screen>
 Prelude> x &lt;- return 42
-42
 Prelude> print x
 42
 Prelude>
@@ -380,7 +379,8 @@ Prelude>
       <literal>x</literal> in future statements, for example to print
       it as we did above.</para>
 
-      <para>GHCi will print the result of a statement if and only if: 
+      <para>If <option>-fprint-bind-result</option> is set then
+      GHCi will print the result of a statement if and only if: 
 	<itemizedlist>
 	  <listitem>
 	    <para>The statement is not a binding, or it is a monadic binding 
@@ -393,13 +393,8 @@ Prelude>
 	      <literal>Show</literal></para>
 	  </listitem>
 	</itemizedlist>
-      The automatic printing of binding results can be suppressed with
-      <option>:set -fno-print-bind-result</option> (this does not
-      suppress printing the result of non-binding statements).
-      <indexterm><primary><option>-fno-print-bind-result</option></primary></indexterm><indexterm><primary><option>-fprint-bind-result</option></primary></indexterm>.
-      You might want to do this to prevent the result of binding
-      statements from being fully evaluated by the act of printing
-      them, for example.</para>
+      <indexterm><primary><option>-fprint-bind-result</option></primary></indexterm><indexterm><primary><option>-fno-print-bind-result</option></primary></indexterm>.
+      </para>
 
       <para>Of course, you can also bind normal non-IO expressions
       using the <literal>let</literal>-statement:</para>

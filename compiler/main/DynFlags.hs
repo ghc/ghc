@@ -524,27 +524,25 @@ defaultDynFlags =
         pkgDatabase             = Nothing,
         pkgState                = panic "no package state yet: call GHC.setSessionDynFlags",
   haddockOptions = Nothing,
-	flags = [ 
-    	    Opt_ReadUserPackageConf,
-    
-	    Opt_MonoPatBinds, 	-- Experimentally, I'm making this non-standard
-				-- behaviour the default, to see if anyone notices
-				-- SLPJ July 06
+        flags = [
+            Opt_ReadUserPackageConf,
 
-    	    Opt_ImplicitPrelude,
-    	    Opt_MonomorphismRestriction,
+            Opt_MonoPatBinds,   -- Experimentally, I'm making this non-standard
+                                -- behaviour the default, to see if anyone notices
+                                -- SLPJ July 06
 
-    	    Opt_DoAsmMangling,
-    
+            Opt_ImplicitPrelude,
+            Opt_MonomorphismRestriction,
+
+            Opt_DoAsmMangling,
+
             Opt_GenManifest,
-            Opt_EmbedManifest,
+            Opt_EmbedManifest
+            ]
+            ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
+                    -- The default -O0 options
+            ++ standardWarnings,
 
-	    -- on by default:
-	    Opt_PrintBindResult ]
-	    ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
-	    	    -- The default -O0 options
-	    ++ standardWarnings,
-               
         log_action = \severity srcSpan style msg -> 
                         case severity of
                           SevInfo  -> hPutStrLn stderr (show (msg style))
