@@ -902,13 +902,15 @@ ppDataDecl summary links instances x loc mbDoc dataDecl
   | summary = declWithDoc summary links loc name mbDoc 
               (ppShortDataDecl summary links loc mbDoc dataDecl)
   
-  | otherwise = dataHeader </> 
-    tda [theclass "body"] << vanillaTable << (
-      datadoc </> 
-      constrBit </>
-      instancesBit
-    )
-  
+  | otherwise
+      = (if validTable then (</>) else const) dataHeader $
+	      tda [theclass "body"] << vanillaTable << (
+		      datadoc </> 
+		      constrBit </>
+		      instancesBit
+        )
+
+
   where
     name      = orig (tcdLName dataDecl)
     context   = unLoc (tcdCtxt dataDecl)
@@ -945,30 +947,19 @@ ppDataDecl summary links instances x loc mbDoc dataDecl
 
     instId = collapseId name
 
-  | otherwise
-        = dataheader </> 
-	    tda [theclass "body"] << vanillaTable << (
-		datadoc </> 
-		constr_bit </>
-		instances_bit
+    instancesBit
+      | null instances = Html.emptyTable
+      | otherwise 
+        = instHdr instId </>
+	  tda [theclass "body"] << 
+          collapsed thediv instId (
+            spacedTable1 << (
+              aboves (map (declBox . ppInstHead) instances)
             )
-  where
-	dataheader = topDeclBox links loc nm (ppHsDataHeader False is_newty nm args)
+          )
 
-	constr_table
-	 	| any isRecDecl cons  = spacedTable5
-	  	| otherwise           = spacedTable1
+    validTable = isJust mbDoc || not (null cons) || not (null instances)
 
-	datadoc | isJust doc = ndocBox (docToHtml (fromJust doc))
-	  	| otherwise  = Html.emptyTable
-
-	constr_bit 
-		| null cons = Html.emptyTable
-		| otherwise = 
-			constr_hdr </>
-			(tda [theclass "body"] << constr_table << 
-			 aboves (map ppSideBySideConstr cons)
-			)
 
 isRecCon lcon = case con_details (unLoc lcon) of 
   RecCon _ -> True
