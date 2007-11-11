@@ -46,11 +46,15 @@ import Module
 import PackageConfig ( stringToPackageId )
 
 import Control.Monad ( liftM, MonadPlus(..) )
-import Data.Char ( isAlpha, isSpace, toUpper, ord )
+import Data.Char ( isAlpha, isSpace, toUpper, ord, chr )
+import Numeric ( showIntAtBase )
+import Data.Map ( Map )
+import qualified Data.Map as Map hiding ( Map )
 import Data.IORef ( IORef, newIORef, readIORef )
 import Data.List ( intersect, isSuffixOf, intersperse )
-import Data.Maybe ( maybeToList, fromMaybe )
-import Network.URI
+import Data.Maybe ( maybeToList, fromMaybe, isJust, fromJust )
+import Data.Word ( Word8 )
+import Data.Bits ( testBit )
 import System.Environment ( getProgName )
 import System.Exit ( exitWith, ExitCode(..) )
 import System.IO ( hPutStr, stderr )
