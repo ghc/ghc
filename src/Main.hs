@@ -273,7 +273,7 @@ handleEasyFlags flags fileArgs = do
   where
     byeVersion = bye $
       "Haddock version " ++ projectVersion ++ 
-      ", (c) Simon Marlow 2003; ported to the GHC-API by David Waern 2006\n"
+      ", (c) Simon Marlow 2006; ported to the GHC-API by David Waern 2006-2007\n"
 
     byeGhcVersion = bye $ 
       (fromJust $ lookup "Project version" $ compilerInfo) ++ "\n"
