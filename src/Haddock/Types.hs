@@ -89,6 +89,11 @@ instance Outputable DocName where
   ppr (NoLink n) = ppr n
 
 
+instance NamedThing DocName where
+  getName (Link n)   = n
+  getName (NoLink n) = n
+
+
 -- | This structure holds the module information we get from GHC's 
 -- type checking phase
 data GhcModule = GhcModule {

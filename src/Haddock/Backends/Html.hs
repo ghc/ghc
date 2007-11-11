@@ -664,78 +664,86 @@ doDecl :: Bool -> LinksInfo -> Name -> LHsDecl DocName ->
 doDecl summary links x (L loc d) mbDoc instances docMap = doDecl d
   where
     doDecl (TyClD d) = doTyClD d 
-    doDecl (SigD s) = ppSig summary links loc mbDoc s
+    doDecl (SigD (TypeSig (L _ n) (L _ t))) = 
+      ppFunSig summary links loc mbDoc (getName n) t
     doDecl (ForD d) = ppFor summary links loc mbDoc d
 
     doTyClD d0@(TyData {}) = ppDataDecl summary links instances x loc mbDoc d0
     doTyClD d0@(TySynonym {}) = ppTySyn summary links loc mbDoc d0
     doTyClD d0@(ClassDecl {}) = ppClassDecl summary links instances x loc mbDoc docMap d0
 
-ppSig :: Bool -> LinksInfo -> SrcSpan -> Maybe (HsDoc DocName) -> Sig DocName -> HtmlTable
-ppSig summary links loc mbDoc (TypeSig lname ltype) 
-  | summary || noArgDocs t = 
-    declWithDoc summary links loc n mbDoc (ppTypeSig summary n t)
-  | otherwise = topDeclBox links loc n (ppBinder False n) </>
+
+ppFunSig :: Bool -> LinksInfo -> SrcSpan -> Maybe (HsDoc DocName) ->
+            Name -> HsType DocName -> HtmlTable
+ppFunSig summary links loc mbDoc name typ =
+  ppTypeOrFunSig summary links loc name typ mbDoc 
+                 (ppTypeSig summary name typ, ppBinder False name, dcolon)
+
+
+ppTypeOrFunSig :: Bool -> LinksInfo -> SrcSpan -> Name -> HsType DocName ->
+                  Maybe (HsDoc DocName) -> (Html, Html, Html) -> HtmlTable
+ppTypeOrFunSig summary links loc name typ doc (pref1, pref2, sep)
+  | summary || noArgDocs typ = declWithDoc summary links loc name doc pref1
+  | otherwise = topDeclBox links loc name pref2 </>
     (tda [theclass "body"] << vanillaTable <<  (
-      do_args dcolon t </>
-        (case mbDoc of 
+      do_args sep typ </>
+        (case doc of
           Just doc -> ndocBox (docToHtml doc)
           Nothing -> Html.emptyTable)
 	))
-
   where 
-  t = unLoc ltype
-  NoLink n = unLoc lname
+    noLArgDocs (L _ t) = noArgDocs t
+    noArgDocs (HsForAllTy _ _ _ t) = noLArgDocs t
+    noArgDocs (HsFunTy (L _ (HsDocTy _ _)) _) = False 
+    noArgDocs (HsFunTy _ r) = noLArgDocs r
+    noArgDocs (HsDocTy _ _) = False
+    noArgDocs _ = True
 
-  noLArgDocs (L _ t) = noArgDocs t
-  noArgDocs (HsForAllTy _ _ _ t) = noLArgDocs t
-  noArgDocs (HsFunTy (L _ (HsDocTy _ _)) _) = False 
-  noArgDocs (HsFunTy _ r) = noLArgDocs r
-  noArgDocs (HsDocTy _ _) = False
-  noArgDocs _ = True
-
-  do_largs leader (L _ t) = do_args leader t  
-  do_args :: Html -> (HsType DocName) -> HtmlTable
-  do_args leader (HsForAllTy Explicit tvs lctxt ltype)
-    = (argBox (
-        leader <+> 
-        hsep (keyword "forall" : ppTyVars tvs ++ [dot]) <+>
-        ppLContextNoArrow lctxt)
+    do_largs leader (L _ t) = do_args leader t  
+    do_args :: Html -> (HsType DocName) -> HtmlTable
+    do_args leader (HsForAllTy Explicit tvs lctxt ltype)
+      = (argBox (
+          leader <+> 
+          hsep (keyword "forall" : ppTyVars tvs ++ [dot]) <+>
+          ppLContextNoArrow lctxt)
+            <-> rdocBox noHtml) </> 
+            do_largs darrow ltype
+    do_args leader (HsForAllTy Implicit _ lctxt ltype)
+      = (argBox (leader <+> ppLContextNoArrow lctxt)
           <-> rdocBox noHtml) </> 
           do_largs darrow ltype
-  do_args leader (HsForAllTy Implicit _ lctxt ltype)
-    = (argBox (leader <+> ppLContextNoArrow lctxt)
-        <-> rdocBox noHtml) </> 
-        do_largs darrow ltype
-  do_args leader (HsFunTy (L _ (HsDocTy lt ldoc)) r)
-    = (argBox (leader <+> ppLType lt) <-> rdocBox (docToHtml (unLoc ldoc)))
-        </> do_largs arrow r
-  do_args leader (HsFunTy lt r)
-    = (argBox (leader <+> ppLType lt) <-> rdocBox noHtml) </> do_largs arrow r
-  do_args leader (HsDocTy lt ldoc)
-    = (argBox (leader <+> ppLType lt) <-> rdocBox (docToHtml (unLoc ldoc)))
-  do_args leader t
-    = argBox (leader <+> ppType t) <-> rdocBox (noHtml)
+    do_args leader (HsFunTy (L _ (HsDocTy lt ldoc)) r)
+      = (argBox (leader <+> ppLType lt) <-> rdocBox (docToHtml (unLoc ldoc)))
+          </> do_largs arrow r
+    do_args leader (HsFunTy lt r)
+      = (argBox (leader <+> ppLType lt) <-> rdocBox noHtml) </> do_largs arrow r
+    do_args leader (HsDocTy lt ldoc)
+      = (argBox (leader <+> ppLType lt) <-> rdocBox (docToHtml (unLoc ldoc)))
+    do_args leader t
+      = argBox (leader <+> ppType t) <-> rdocBox (noHtml)
+
 
 ppTyVars tvs = ppTyNames (tyvarNames tvs)
 
 tyvarNames = map f 
   where f x = let NoLink n = hsTyVarName (unLoc x) in n
   
-ppFor summary links loc mbDoc (ForeignImport lname ltype _)
-  = ppSig summary links loc mbDoc (TypeSig lname ltype)
+ppFor summary links loc mbDoc (ForeignImport (L _ name) (L _ typ) _)
+  = ppFunSig summary links loc mbDoc (getName name) typ
 ppFor _ _ _ _ _ = error "ppFor"
 
 -- we skip type patterns for now
-ppTySyn summary links loc mbDoc (TySynonym lname ltyvars _ ltype) 
-  = declWithDoc summary links loc n mbDoc (
-    hsep ([keyword "type", ppBinder summary n]
-    ++ ppTyVars ltyvars) <+> equals <+> ppLType ltype)
-  where NoLink n = unLoc lname
+ppTySyn summary links loc mbDoc (TySynonym (L _ name) ltyvars _ ltype) 
+  = ppTypeOrFunSig summary links loc n (unLoc ltype) mbDoc 
+                   (full, hdr, spaceHtml +++ equals)
+  where
+    hdr  = hsep ([keyword "type", ppBinder summary n] ++ ppTyVars ltyvars)
+    full = hdr <+> equals <+> ppLType ltype
+    NoLink n = name
 
 ppLType (L _ t) = ppType t
 
-ppTypeSig :: Bool -> Name -> (HsType DocName) -> Html
+ppTypeSig :: Bool -> Name -> HsType DocName -> Html
 ppTypeSig summary nm ty = ppBinder summary nm <+> dcolon <+> ppType ty
 
 
@@ -804,8 +812,9 @@ ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc 
            (tda [theclass "body"] << 
 	     vanillaTable << 
          aboves ([ ppAT summary at | L _ at <- ats ] ++
-	        [ ppSig summary links loc mbDoc sig  
-		      | L _ sig@(TypeSig (L _ (NoLink n)) ty) <- sigs, let mbDoc = Map.lookup n docMap ])
+	        [ ppFunSig summary links loc mbDoc n typ
+		          | L _ (TypeSig (L _ (NoLink n)) (L _ typ)) <- sigs
+              , let mbDoc = Map.lookup n docMap ])
           )
   where
     hdr = ppClassHdr summary lctxt nm tvs fds
@@ -846,9 +855,9 @@ ppClassDecl summary links instances orig_c loc mbDoc docMap
       | otherwise  = 
         s8 </> methHdr </>
         tda [theclass "body"] << vanillaTable << (
-          abovesSep s8 [ ppSig summary links loc mbDoc sig
-                         | L _ sig@(TypeSig n _) <- lsigs, 
-                         let mbDoc = Map.lookup (orig n) docMap ]
+          abovesSep s8 [ ppFunSig summary links loc mbDoc (orig n) typ
+                           | L _ (TypeSig n (L _ typ)) <- lsigs
+                           , let mbDoc = Map.lookup (orig n) docMap ]
         )
 
     instId = collapseId nm
