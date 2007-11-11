@@ -484,10 +484,8 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
 	[ if visible then
 	     linkId mod (Just nm) << toHtml (moduleString mod)
 	  else
-	     toHtml mdl
-	| (Module mdl, visible) <- entries ])
-
-  initialChars = [ 'A'..'Z' ] ++ ":!#$%&*+./<=>?@\\^|-~"
+	     toHtml (moduleString mod)
+	| (mod, visible) <- entries ])
 
 -- ---------------------------------------------------------------------------
 -- Generate the HTML page for a module
