@@ -51,7 +51,7 @@ createInterface ghcMod flags modMap = do
   opts0 <- mkDocOpts (ghcMbDocOpts ghcMod) flags mod
   let opts
         | Flag_IgnoreAllExports `elem` flags = OptIgnoreExports : opts0
-        | otherwise = opts
+        | otherwise = opts0
 
   let group        = ghcGroup ghcMod
       entities     = (nubBy sameName . getTopEntities) group
