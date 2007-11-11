@@ -1,8 +1,11 @@
 import os
 import re
 
-conf_ghc = '/cygdrive/c/fptools/ghc/compiler/stage2/ghc-inplace'
-
+# prepare version-/platform-specific ghci024.stdout
+# - listen to ghci -package ghc, to figure out package ghc contents for :show packages
+# - drop new flags for old ghc
+# - change flag defaults according to platform (unregistered -> -fno-asm-mangling)
+#
 def prepare024( opts ):
   h = os.popen('echo :q | '+config.compiler+' --interactive -package ghc ')
   packages = h.read()
@@ -13,6 +16,19 @@ def prepare024( opts ):
       packagelist += [re.sub(r'^Loading package (\S*) .*$',r'\1',l)]
   packagelist.reverse()
   packagelist += ['rts']
+
+  if config.unregisterised :
+    mangling = 'no-'
+  else:
+    mangling = ''
+
+  if version_lt(config.compiler_version, '6.9') :
+    new_flags = ''
+  else:
+    new_flags = """\
+  -fno-run-cps
+  -fno-convert-to-zipper-and-back
+"""
 
   outtext = """\
 options currently set: none.
@@ -58,13 +74,11 @@ other dynamic, non-language, flag settings:
   -fno-unbox-strict-fields
   -fno-dicts-cheap
   -fno-excess-precision
-  -fasm-mangling
+  -f%(mangling)sasm-mangling
   -fno-force-recomp
   -fno-hpc-no-auto
   -fno-rewrite-rules
-  -fno-run-cps
-  -fno-convert-to-zipper-and-back
-  -fno-vectorise
+%(new_flags)s  -fno-vectorise
   -fno-regs-graph
   -fno-regs-iterative
   -fgen-manifest
@@ -116,7 +130,7 @@ packages currently loaded:
 active package flags:
   -package ghc
 packages currently loaded:
-"""
+"""%{'mangling': mangling, 'new_flags': new_flags}
 
   outfile = open(in_testdir('ghci024.stdout'), 'w')
   outfile.write(outtext)
