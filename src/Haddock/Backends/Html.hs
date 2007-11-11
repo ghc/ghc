@@ -875,10 +875,6 @@ orig (L _ (NoLink name)) = name
 orig _ = error "orig"
 
 
-lDocLinkName (L _ (NoLink name)) = name
-lDocLinkName (L _ (Link   name)) = name
-
-
 -- TODO: print contexts
 ppShortDataDecl :: Bool -> LinksInfo -> SrcSpan -> 
                    Maybe (HsDoc DocName) -> TyClDecl DocName -> Html
@@ -1254,7 +1250,7 @@ ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2)
     ppr_mono_lty pREC_OP ty1 <+> ppr_op <+> ppr_mono_lty pREC_OP ty2
   where
     ppr_op = if not (isNameSym name) then quote (ppLDocName op) else ppLDocName op
-    name = lDocLinkName op
+    name = getName . unLoc $ op
 
 ppr_mono_ty ctxt_prec (HsParTy ty)
   = parens (ppr_mono_lty pREC_TOP ty)
