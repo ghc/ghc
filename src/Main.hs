@@ -101,32 +101,45 @@ main = handleTopExceptions $ do
   -- parse command-line flags and handle some of them initially
   args <- getArgs
   (flags, fileArgs) <- parseHaddockOpts args
-  libDir <- handleEasyFlags flags fileArgs
-  
-  -- initialize GHC
-  (session, dynflags) <- startGhc libDir (ghcFlags flags)
+  handleEasyFlags flags fileArgs
 
-  -- get packages via --read-interface
-  packages <- readInterfaceFiles session (ifacePairs flags)
+  let renderStep packages interfaces = do 
+        updateHTMLXRefs packages
+        let ifaceFiles = map fst packages
+            installedIfaces = concatMap ifInstalledIfaces ifaceFiles
+        render flags interfaces installedIfaces
 
-  -- typecheck argument modules using GHC
-  modules <- typecheckFiles session fileArgs
+  if not (null fileArgs)
+    then do
+      -- initialize GHC
+      libDir <- getGhcLibDir flags
+      (session, dynflags) <- startGhc libDir (ghcFlags flags)
 
-  -- combine the link envs of the external packages into one
-  let extLinks = Map.unions (map (ifLinkEnv . fst) packages)
+      -- get packages supplied with --read-interface
+      packages <- readInterfaceFiles (Just session) (ifacePairs flags)
 
-  -- create the interfaces -- this is the core part of Haddock
-  let (interfaces, homeLinks, messages) = createInterfaces modules extLinks flags
-  mapM_ putStrLn messages
+      -- typecheck argument modules using GHC
+      modules <- typecheckFiles session fileArgs
 
-  -- render the interfaces
-  updateHTMLXRefs packages
-  let ifaceFiles = map fst packages
-  let installedIfaces = concatMap ifInstalledIfaces ifaceFiles
-  render flags interfaces installedIfaces
+      -- combine the link envs of the external packages into one
+      let extLinks = Map.unions (map (ifLinkEnv . fst) packages)
 
-  -- last but not least, dump the interface file!
-  dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
+      -- create the interfaces -- this is the core part of Haddock
+      let (interfaces, homeLinks, messages) = createInterfaces modules extLinks flags
+      mapM_ putStrLn messages
+
+      -- render the interfaces
+      renderStep packages interfaces
+ 
+      -- last but not least, dump the interface file
+      dumpInterfaceFile (map toInstalledIface interfaces) homeLinks flags
+
+    else do
+      -- get packages supplied with --read-interface
+      packages <- readInterfaceFiles Nothing (ifacePairs flags)
+
+      -- render even though there are no input files (usually contents/index)
+      renderStep packages []
 
 
 -------------------------------------------------------------------------------
@@ -220,7 +233,8 @@ render flags interfaces installedIfaces = do
 -------------------------------------------------------------------------------
 
 
-readInterfaceFiles :: Session -> [(FilePath, FilePath)] -> IO [(InterfaceFile, FilePath)]
+readInterfaceFiles :: Maybe Session -> [(FilePath, FilePath)] ->
+                      IO [(InterfaceFile, FilePath)]
 readInterfaceFiles session pairs = do
   mbPackages <- mapM tryReadIface pairs
   return (catMaybes mbPackages)
@@ -254,6 +268,12 @@ dumpInterfaceFile ifaces homeLinks flags =
 -------------------------------------------------------------------------------
 
 
+getGhcLibDir flags =
+  case [ dir | Flag_GhcLibDir dir <- flags ] of
+    [] -> throwE "no GHC lib dir specified"
+    xs -> return $ last xs
+
+
 handleEasyFlags flags fileArgs = do
   usage <- getUsage
 
@@ -261,15 +281,9 @@ handleEasyFlags flags fileArgs = do
   when (Flag_Version    `elem` flags) byeVersion
   when (Flag_GhcVersion `elem` flags) byeGhcVersion
 
-  let ghcLibDir = case [ dir | Flag_GhcLibDir dir <- flags ] of
-                    [] -> throwE "no GHC lib dir specified"
-                    xs -> last xs
-
   when ((Flag_GenIndex `elem` flags || Flag_GenContents `elem` flags)
         && Flag_Html `elem` flags) $
     throwE ("-h cannot be used with --gen-index or --gen-contents")
-
-  return ghcLibDir
   where
     byeVersion = bye $
       "Haddock version " ++ projectVersion ++ 

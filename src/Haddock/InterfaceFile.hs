@@ -97,8 +97,8 @@ writeInterfaceFile filename iface = do
   return ()
 
 
-readInterfaceFile :: Session -> FilePath -> IO (Either String InterfaceFile)
-readInterfaceFile session filename = do
+readInterfaceFile :: Maybe Session -> FilePath -> IO (Either String InterfaceFile)
+readInterfaceFile mbSession filename = do
   bh <- readBinMem filename
 
   magic   <- get bh
@@ -122,19 +122,29 @@ readInterfaceFile session filename = do
       ud <- newReadState dict
       bh <- return (setUserData bh ud)
 
-      -- get the name cache from the ghc session
-      ncRef <- withSession session (return . hsc_NC)
-      nc <- readIORef ncRef
+      -- get the name cache from ghc if we have a ghc session,
+      -- otherwise create a new one
+      (theNC, mbRef) <- case mbSession of
+        Just session -> do
+          ref <- withSession session (return . hsc_NC)
+          nc <- readIORef ref
+          return (nc, Just ref)
+        Nothing -> do
+          -- construct an empty name cache
+          u  <- mkSplitUniqSupply 'a' -- ??
+          return (initNameCache u [], Nothing)
 
       -- get the symbol table
       symtab_p <- get bh
       data_p   <- tellBin bh
       seekBin bh symtab_p
-      (nc', symtab) <- getSymbolTable bh nc
+      (nc', symtab) <- getSymbolTable bh theNC
       seekBin bh data_p
 
-      -- write back the new name cache
-      writeIORef ncRef nc'
+      -- write back the new name cache if we have a ghc session
+      case mbRef of
+        Just ref -> writeIORef ref nc'
+        Nothing  -> return ()
 
       -- set the symbol table
       let ud = getUserData bh
