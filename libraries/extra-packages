@@ -1,12 +1,10 @@
 ALUT
 GLUT
-HGL
 HUnit
 ObjectIO
 OpenAL
 OpenGL
 QuickCheck
-X11
 cgi
 fgl
 haskell-src
