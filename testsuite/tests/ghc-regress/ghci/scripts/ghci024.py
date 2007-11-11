@@ -18,7 +18,7 @@ def prepare024( opts ):
 options currently set: none.
 GHCi-specific dynamic flag settings:
   -fno-print-explicit-foralls
-  -fprint-bind-result
+  -fno-print-bind-result
   -fno-break-on-exception
   -fno-break-on-error
   -fno-print-evld-with-show
