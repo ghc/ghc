@@ -562,7 +562,9 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface
 
     no_doc_at_all = not (any has_doc exports)
 
-	contents = td << vanillaTable << ppModuleContents exports
+    contents = case ppModuleContents exports of
+                   Nothing -> []
+                   Just x -> [td << vanillaTable << x]
 
     description
           = case ifaceRnDoc iface of
@@ -593,7 +595,7 @@ ifaceToHtml maybe_source_url maybe_wiki_url iface
     linksInfo = (maybe_source_url, maybe_wiki_url, iface)
 
 
-ppModuleContents :: [ExportItem] -> HtmlTable
+ppModuleContents :: [ExportItem DocName] -> Maybe HtmlTable
 ppModuleContents exports
   | length sections == 0 = Nothing
   | otherwise            = Just (tda [theclass "section4"] << bold << toHtml "Contents"
