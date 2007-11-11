@@ -157,14 +157,15 @@ srcButton (Just src_base_url, _, _) Nothing =
 
 srcButton (_, Just src_module_url, _) (Just iface) =
   let url = spliceURL (Just $ ifaceOrigFilename iface)
-                      (Just $ ifaceMod iface) Nothing src_module_url
+                      (Just $ ifaceMod iface) Nothing Nothing src_module_url
    in topButBox (anchor ! [href url] << toHtml "Source code")
 
 srcButton _ _ =
   Html.emptyTable
  
-spliceURL :: Maybe FilePath -> Maybe Module -> Maybe GHC.Name -> String -> String
-spliceURL maybe_file maybe_mod maybe_name url = run url
+spliceURL :: Maybe FilePath -> Maybe Module -> Maybe GHC.Name -> 
+             Maybe SrcSpan -> String -> String
+spliceURL maybe_file maybe_mod maybe_name maybe_loc url = run url
  where
   file = fromMaybe "" maybe_file
   mod = case maybe_mod of
@@ -177,11 +178,17 @@ spliceURL maybe_file maybe_mod maybe_name url = run url
       Just n | isValOcc (nameOccName n) -> (escapeStr (getOccString n), "v")
              | otherwise -> (escapeStr (getOccString n), "t")
 
+  line = case maybe_loc of
+    Nothing -> ""
+    Just span -> show $ srcSpanStartLine span
+
   run "" = ""
   run ('%':'M':rest) = mod ++ run rest
   run ('%':'F':rest) = file ++ run rest
   run ('%':'N':rest) = name ++ run rest
   run ('%':'K':rest) = kind ++ run rest
+  run ('%':'L':rest) = line ++ run rest
+  run ('%':'%':rest) = "%" ++ run rest
 
   run ('%':'{':'M':'O':'D':'U':'L':'E':'}':rest) = mod ++ run rest
   run ('%':'{':'F':'I':'L':'E':'}':rest)         = file ++ run rest
@@ -194,6 +201,8 @@ spliceURL maybe_file maybe_mod maybe_name url = run url
   run ('%':'{':'F':'I':'L':'E':'/':'/':'/':c:'}':rest) =
     map (\x -> if x == '/' then c else x) file ++ run rest
 
+  run ('%':'{':'L':'I':'N':'E':'}':rest)         = line ++ run rest
+
   run (c:rest) = c : run rest
   
 wikiButton :: WikiURLs -> Maybe Module -> HtmlTable
@@ -201,7 +210,7 @@ wikiButton (Just wiki_base_url, _, _) Nothing =
   topButBox (anchor ! [href wiki_base_url] << toHtml "User Comments")
 
 wikiButton (_, Just wiki_module_url, _) (Just mod) =
-  let url = spliceURL Nothing (Just mod) Nothing wiki_module_url
+  let url = spliceURL Nothing (Just mod) Nothing Nothing wiki_module_url
    in topButBox (anchor ! [href url] << toHtml "User Comments")
 
 wikiButton _ _ =
@@ -1433,14 +1442,14 @@ topDeclBox ((_,_,maybe_source_url), (_,_,maybe_wiki_url), iface)
             Nothing  -> Html.emptyTable
             Just url -> tda [theclass "declbut"] <<
                           let url' = spliceURL (Just fname) (Just mod)
-                                               (Just name) url
+                                               (Just name) (Just loc) url
                            in anchor ! [href url'] << toHtml "Source"
         wikiLink =
           case maybe_wiki_url of
             Nothing  -> Html.emptyTable
             Just url -> tda [theclass "declbut"] <<
                           let url' = spliceURL (Just fname) (Just mod)
-                                               (Just name) url
+                                               (Just name) (Just loc) url
                            in anchor ! [href url'] << toHtml "Comments"
   
         mod = ifaceMod iface

@@ -115,13 +115,13 @@ options backwardsCompat =
         (ReqArg Flag_SourceModuleURL "URL")
 	"URL for a source code link for each module\n(using the %{FILE} or %{MODULE} vars)",
     Option []  ["source-entity"]  (ReqArg Flag_SourceEntityURL "URL") 
-	"URL for a source code link for each entity\n(using the %{FILE}, %{MODULE} or %{NAME} vars)",
+  "URL for a source code link for each entity\n(using the %{FILE}, %{MODULE}, %{NAME},\n%{KIND} or %{LINE} vars)",
     Option []  ["comments-base"]   (ReqArg Flag_WikiBaseURL "URL")
 	"URL for a comments link on the contents\nand index pages",
     Option []  ["comments-module"]  (ReqArg Flag_WikiModuleURL "URL") 
 	"URL for a comments link for each module\n(using the %{MODULE} var)",
     Option []  ["comments-entity"]  (ReqArg Flag_WikiEntityURL "URL") 
-	"URL for a comments link for each entity\n(using the %{FILE}, %{MODULE} or %{NAME} vars)",
+  "URL for a comments link for each entity\n(using the %{FILE}, %{MODULE}, %{NAME},\n%{KIND} or %{LINE} vars)",
     Option ['c']  ["css"]         (ReqArg Flag_CSS "FILE") 
 	"the CSS file to use for HTML output",
     Option ['p']  ["prologue"] (ReqArg Flag_Prologue "FILE")

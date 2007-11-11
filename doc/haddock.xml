@@ -512,6 +512,17 @@
 	      '<literal>v</literal>' or a type '<literal>t</literal>'. This is
 	      only valid for the <option>--source-entity</option> option.</para>
 	    </listitem>
+	    <listitem>
+	      <para>The string <literal>%L</literal> or <literal>%{LINE}</literal>
+	      is replaced by the number of the line where the exported value or
+	      type is defined. This is only valid for the
+	      <option>--source-entity</option> option.</para>
+	    </listitem>
+	    <listitem>
+	      <para>The string <literal>%%</literal> is replaced by
+	      <literal>%</literal>.</para>
+      </listitem>
+
 	  </itemizedlist>
 
 	  <para>For example, if your sources are online under some directory,
