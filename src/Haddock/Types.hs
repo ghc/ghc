@@ -10,7 +10,6 @@ module Haddock.Types where
 
 import Data.Map (Map)
 import qualified Data.Map as Map
-import Control.Monad.Writer
 
 import GHC hiding (NoLink)
 import Outputable
@@ -203,7 +202,18 @@ data DocMarkup id a = Markup {
 }
 
 
--- A monad which collects error messages
+-- A monad which collects error messages, locally defined to avoid a dep on mtl
 
 type ErrMsg = String
-type ErrMsgM a = Writer [ErrMsg] a
+
+newtype ErrMsgM a = Writer { runWriter :: (a, [ErrMsg]) }
+
+instance Monad ErrMsgM where
+        return a = Writer (a, [])
+        m >>= k  = Writer $ let
+                (a, w)  = runWriter m
+                (b, w') = runWriter (k a)
+                in (b, w ++ w')
+
+tell :: [ErrMsg] -> ErrMsgM ()
+tell w = Writer ((), w)

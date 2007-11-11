@@ -24,7 +24,6 @@ import Haddock.GHC.Utils
 import qualified Data.Map as Map
 import Data.Map (Map)
 import Data.List
-import Control.Monad.Writer
 import Control.Monad
 
 import Name

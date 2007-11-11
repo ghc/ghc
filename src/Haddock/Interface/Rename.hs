@@ -26,7 +26,6 @@ import Prelude hiding (mapM)
 import Data.Traversable (mapM)
 import Control.Arrow
 import Control.Monad hiding (mapM)
-import Control.Monad.Writer hiding (mapM)
 
 
 renameInterface :: LinkEnv -> Interface -> ErrMsgM Interface

@@ -19,7 +19,7 @@ import Data.List
 import Data.Maybe
 import Data.Char
 import Data.Ord
-import Control.Monad.Writer
+import Control.Monad
 
 import GHC
 import Outputable

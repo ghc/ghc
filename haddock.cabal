@@ -13,7 +13,6 @@ synopsis:             Haddock is a documentation-generation tool for Haskell
 build-depends:
   base,
   haskell98,
-  mtl,
   ghc>=6.8,
   Cabal,
   filepath,
