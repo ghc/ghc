@@ -32,10 +32,10 @@ other-modules:
 data-files:
   html/haddock-DEBUG.css
   html/haddock.css
-  html/haddock.js
+  html/haddock-util.js
   html/haskell_icon.gif
   html/minus.gif
-	html/plus.gif
+  html/plus.gif
 extra-source-files:
 	CHANGES
 	README
