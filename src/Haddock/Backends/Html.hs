@@ -421,7 +421,7 @@ ppHtmlIndex :: FilePath
             -> [InstalledInterface] 
             -> IO ()
 ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
-  maybe_contents_url maybe_source_url maybe_wiki_url modules = do
+  maybe_contents_url maybe_source_url maybe_wiki_url ifaces = do
   let html = 
         header (documentCharacterEncoding +++
                 thetitle (toHtml (doctitle ++ " (Index)")) +++
@@ -438,8 +438,8 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
     -- Generate index and contents page for Html Help if requested
   case maybe_html_help_format of
     Nothing        -> return ()
-    Just "mshelp"  -> ppHHIndex  odir maybe_package modules
-    Just "mshelp2" -> ppHH2Index odir maybe_package modules
+    Just "mshelp"  -> ppHHIndex  odir maybe_package ifaces
+    Just "mshelp2" -> ppHH2Index odir maybe_package ifaces
     Just "devhelp" -> return ()
     Just format    -> fail ("The "++format++" format is not implemented")
  where
@@ -473,47 +473,41 @@ ppHtmlIndex odir doctitle maybe_package maybe_html_help_format
   -- in a visible or invisible way (hence the Bool).
   full_index :: Map String (Map GHC.Name [(Module,Bool)])
   full_index = Map.fromListWith (flip (Map.unionWith (++)))
-		(concat (map getIfaceIndex ifaces))
+               (concat (map getIfaceIndex ifaces))
 
   getIfaceIndex iface = 
-    [ (hsNameStr nm, 
-	Map.fromList [(orig, [(mdl, not (nm `elem` iface_reexported iface))])])
-    | (nm, orig) <- Map.toAscList (iface_env iface) ]
-    where mdl = iface_module iface
+    [ (getOccString name
+       , Map.fromList [(name, [(mdl, name `elem` instVisibleExports iface)])])
+       | name <- instExports iface ]
+    where mdl = instMod iface
 
   indexElt :: (String, Map GHC.Name [(Module,Bool)]) -> HtmlTable
   indexElt (str, entities) = 
      case Map.toAscList entities of
 	[(nm,entries)] ->  
 	    tda [ theclass "indexentry" ] << toHtml str <-> 
-			indexLinks (unQual nm) entries
+			indexLinks nm entries
 	many_entities ->
 	    tda [ theclass "indexentry" ] << toHtml str </> 
 		aboves (map doAnnotatedEntity (zip [1..] many_entities))
 
   doAnnotatedEntity (j,(nm,entries))
 	= tda [ theclass "indexannot" ] << 
-		toHtml (show j) <+> parens (ppAnnot nm) <->
+		toHtml (show j) <+> parens (ppAnnot (nameOccName nm)) <->
 		 indexLinks nm entries
-	where nm = unQual qnm
 
-  ppAnnot (HsTyClsName n)
-       = toHtml "Type/Class"
-  ppAnnot (HsVarName n)
-       | isUpper c || c == ':'  = toHtml "Data Constructor"
-       | otherwise		= toHtml "Function"
-      where c = head (hsIdentifierStr n)
+  ppAnnot n | not (isValOcc n) = toHtml "Type/Class"
+            | isDataOcc n      = toHtml "Data Constructor"
+            | otherwise        = toHtml "Function"
 
   indexLinks nm entries = 
      tda [ theclass "indexlinks" ] << 
 	hsep (punctuate comma 
 	[ if visible then
-	     linkId (Module mdl) (Just nm) << toHtml mdl
+	     linkId mod (Just nm) << toHtml (moduleString mod)
 	  else
-	     toHtml mdl
-	| (Module mdl, visible) <- entries ])
-
-  initialChars = [ 'A'..'Z' ] ++ ":!#$%&*+./<=>?@\\^|-~"
+	     toHtml (moduleString mod)
+	| (mod, visible) <- entries ])
 
 -- ---------------------------------------------------------------------------
 -- Generate the HTML page for a module
