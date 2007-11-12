@@ -74,7 +74,8 @@ elem	:: { HsDoc RdrName }
 	| '@' seq1 '@'		{ DocMonospaced $2 }
 
 seq1	:: { HsDoc RdrName }
-	: elem1 seq1		{ docAppend $1 $2 }
+	: PARA seq1             { docAppend (DocString "\n") $2 }
+	| elem1 seq1            { docAppend $1 $2 }
 	| elem1			{ $1 }
 
 elem1	:: { HsDoc RdrName }
