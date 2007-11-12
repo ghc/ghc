@@ -591,7 +591,7 @@ y's occurrence info, which breaks the invariant.  It matters: y
 might have a BIG rhs, which will now be dup'd at every occurrenc of x.
 
 
-Evne RHSs labelled InlineMe aren't caught here, because there might be
+Even RHSs labelled InlineMe aren't caught here, because there might be
 no benefit from inlining at the call site.
 
 [Sept 01] Don't unconditionally inline a top-level thing, because that

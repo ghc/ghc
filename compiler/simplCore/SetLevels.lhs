@@ -126,8 +126,8 @@ allocation becomes static instead of dynamic.  We always start with
 context @Level 0 0@.  
 
 
-InlineCtxt
-~~~~~~~~~~
+Note [FloatOut inside INLINE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 @InlineCtxt@ very similar to @Level 0 0@, but is used for one purpose:
 to say "don't float anything out of here".  That's exactly what we
 want for the body of an INLINE, where we don't want to float anything

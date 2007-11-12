@@ -321,7 +321,9 @@ floatExpr lvl (Note InlineMe expr)	-- Other than SCCs
 	-- more efficient to test once here than to avoid putting
 	-- them into floating_defns (which would mean testing for
 	-- inlineCtxt  at every let)
-    (fs, [], Note InlineMe (install floating_defns expr')) }	-- See notes in SetLevels
+    (fs, [], Note InlineMe (install floating_defns expr')) }
+	-- See Note [FloatOut inside INLINE]
+	-- I'm guessing that floating_dens should be empty
 
 floatExpr lvl (Note note expr)	-- Other than SCCs
   = case (floatExpr lvl expr)    of { (fs, floating_defns, expr') ->

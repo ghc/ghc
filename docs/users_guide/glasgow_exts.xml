@@ -5858,8 +5858,26 @@ key_function :: Int -> String -> (Bool, Double)
         <para>The major effect of an <literal>INLINE</literal> pragma
         is to declare a function's &ldquo;cost&rdquo; to be very low.
         The normal unfolding machinery will then be very keen to
-        inline it.</para>
-
+        inline it.  However, an <literal>INLINE</literal> pragma for a 
+	function "<literal>f</literal>" has a number of other effects:
+<itemizedlist>
+<listitem><para>
+No funtions are inlined into <literal>f</literal>.  Otherwise
+GHC might inline a big function into <literal>f</literal>'s right hand side, 
+making <literal>f</literal> big; and then inline <literal>f</literal> blindly.
+</para></listitem>
+<listitem><para>
+The float-in, float-out, and common-sub-expression transformations are not 
+applied to the body of <literal>f</literal>.  
+</para></listitem>
+<listitem><para>
+An INLINE function is not worker/wrappered by strictness analysis.
+It's going to be inlined wholesale instead.
+</para></listitem>
+</itemizedlist>
+All of these effects are aimed at ensuring that what gets inlined is
+exactly what you asked for, no more and no less.
+</para>
 	<para>Syntactically, an <literal>INLINE</literal> pragma for a
         function can be put anywhere its type signature could be
         put.</para>

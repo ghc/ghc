@@ -171,7 +171,7 @@ Not CSE-ing inside INLINE also solves an annoying bug in CSE. Consider
 a worker/wrapper, in which the worker has turned into a single variable:
 	$wf = h
 	f = \x -> ...$wf...
-Now CSE may transoform to
+Now CSE may transform to
 	f = \x -> ...h...
 But the WorkerInfo for f still says $wf, which is now dead!  This won't
 happen now that we don't look inside INLINEs (which wrappers are).
