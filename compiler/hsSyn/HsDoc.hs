@@ -68,16 +68,34 @@ docAppend d1 d2
 -- is a DocMonospaced and make it into a DocCodeBlock
 docParagraph :: HsDoc id -> HsDoc id
 docParagraph (DocMonospaced p)
-  = DocCodeBlock p
+  = DocCodeBlock (docCodeBlock p)
 docParagraph (DocAppend (DocString s1) (DocMonospaced p))
   | all isSpace s1
-  = DocCodeBlock p
+  = DocCodeBlock (docCodeBlock p)
 docParagraph (DocAppend (DocString s1)
     (DocAppend (DocMonospaced p) (DocString s2)))
   | all isSpace s1 && all isSpace s2
-  = DocCodeBlock p
+  = DocCodeBlock (docCodeBlock p)
 docParagraph (DocAppend (DocMonospaced p) (DocString s2))
   | all isSpace s2
-  = DocCodeBlock p
+  = DocCodeBlock (docCodeBlock p)
 docParagraph p
   = DocParagraph p
+
+
+-- Drop trailing whitespace from @..@ code blocks.  Otherwise this:
+--
+--    -- @
+--    -- foo
+--    -- @
+--
+-- turns into (DocCodeBlock "\nfoo\n ") which when rendered in HTML
+-- gives an extra vertical space after the code block.  The single space
+-- on the final line seems to trigger the extra vertical space.
+--
+docCodeBlock :: HsDoc id -> HsDoc id
+docCodeBlock (DocString s)
+  = DocString (reverse $ dropWhile (`elem` " \t") $ reverse s)
+docCodeBlock (DocAppend l r)
+  = DocAppend l (docCodeBlock r)
+docCodeBlock d = d
