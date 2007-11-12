@@ -10,6 +10,7 @@ stability:            stable
 homepage:             http://www.haskell.org/haddock/
 synopsis:             Haddock is a documentation-generation tool for Haskell
                       libraries
+category:             Development
 build-depends:
   base,
   haskell98,
