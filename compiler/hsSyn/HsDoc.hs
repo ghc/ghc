@@ -34,6 +34,7 @@ data HsDoc id
   | DocDefList [(HsDoc id, HsDoc id)]
   | DocCodeBlock (HsDoc id)
   | DocURL String
+  | DocPic String
   | DocAName String
   deriving (Eq, Show)
 

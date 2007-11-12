@@ -21,6 +21,7 @@ import RdrName
 	']'     { TokDefEnd }
 	DQUO 	{ TokSpecial '\"' }
 	URL	{ TokURL $$ }
+	PIC     { TokPic $$ }
 	ANAME	{ TokAName $$ }
 	'/../'  { TokEmphasis $$ }
 	'-'	{ TokBullet }
@@ -83,6 +84,7 @@ elem1	:: { HsDoc RdrName }
 	: STRING		{ DocString $1 }
 	| '/../'                { DocEmphasis (DocString $1) }
 	| URL			{ DocURL $1 }
+	| PIC                   { DocPic $1 }
 	| ANAME			{ DocAName $1 }
 	| IDENT			{ DocIdentifier $1 }
 	| DQUO strings DQUO	{ DocModule $2 }

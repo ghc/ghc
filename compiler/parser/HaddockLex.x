@@ -67,6 +67,7 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
 
 <string,def> {
   $special			{ strtoken $ \s -> TokSpecial (head s) }
+  \<\<.*\>\>                    { strtoken $ \s -> TokPic (init $ init $ tail $ tail s) }
   \<.*\>			{ strtoken $ \s -> TokURL (init (tail s)) }
   \#.*\#			{ strtoken $ \s -> TokAName (init (tail s)) }
   \/ [^\/]* \/                  { strtoken $ \s -> TokEmphasis (init (tail s)) }
@@ -102,6 +103,7 @@ data Token
   | TokIdent [RdrName]
   | TokString String
   | TokURL String
+  | TokPic String
   | TokEmphasis String
   | TokAName String
   | TokBirdTrack String

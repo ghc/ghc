@@ -104,4 +104,6 @@ rnHsDoc doc = case doc of
 
   DocURL str -> return (DocURL str)
 
+  DocPic str -> return (DocPic str)
+
   DocAName str -> return (DocAName str)
