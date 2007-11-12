@@ -222,6 +222,9 @@ And then translate it to:
 	
 Note [Newtype deriving superclasses]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+(See also Trac #1220 for an interesting exchange on newtype
+deriving and superclasses.)
+
 The 'tys' here come from the partial application in the deriving
 clause. The last arg is the new instance type.
 
