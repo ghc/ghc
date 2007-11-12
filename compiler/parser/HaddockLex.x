@@ -34,7 +34,7 @@ import System.IO.Unsafe
 $ws    = $white # \n
 $digit = [0-9]
 $hexdigit = [0-9a-fA-F]
-$special =  [\"\@\/]
+$special =  [\"\@]
 $alphanum = [A-Za-z0-9]
 $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
 
@@ -69,15 +69,16 @@ $ident    = [$alphanum \'\_\.\!\#\$\%\&\*\+\/\<\=\>\?\@\\\\\^\|\-\~]
   $special			{ strtoken $ \s -> TokSpecial (head s) }
   \<.*\>			{ strtoken $ \s -> TokURL (init (tail s)) }
   \#.*\#			{ strtoken $ \s -> TokAName (init (tail s)) }
+  \/ [^\/]* \/                  { strtoken $ \s -> TokEmphasis (init (tail s)) }
   [\'\`] $ident+ [\'\`]		{ ident }
   \\ .				{ strtoken (TokString . tail) }
   "&#" $digit+ \;		{ strtoken $ \s -> TokString [chr (read (init (drop 2 s)))] }
   "&#" [xX] $hexdigit+ \;	{ strtoken $ \s -> case readHex (init (drop 3 s)) of [(n,_)] -> TokString [chr n] }
   -- allow special characters through if they don't fit one of the previous
   -- patterns.
-  [\'\`\<\#\&\\]			{ strtoken TokString }
-  [^ $special \< \# \n \'\` \& \\ \]]* \n { strtoken TokString `andBegin` line }
-  [^ $special \< \# \n \'\` \& \\ \]]+    { strtoken TokString }
+  [\/\'\`\<\#\&\\]			{ strtoken TokString }
+  [^ $special \/ \< \# \n \'\` \& \\ \]]* \n { strtoken TokString `andBegin` line }
+  [^ $special \/ \< \# \n \'\` \& \\ \]]+    { strtoken TokString }
 }
 
 <def> {
@@ -101,6 +102,7 @@ data Token
   | TokIdent [RdrName]
   | TokString String
   | TokURL String
+  | TokEmphasis String
   | TokAName String
   | TokBirdTrack String
 --  deriving Show

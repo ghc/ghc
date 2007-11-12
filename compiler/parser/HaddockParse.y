@@ -22,6 +22,7 @@ import RdrName
 	DQUO 	{ TokSpecial '\"' }
 	URL	{ TokURL $$ }
 	ANAME	{ TokAName $$ }
+	'/../'  { TokEmphasis $$ }
 	'-'	{ TokBullet }
 	'(n)'	{ TokNumber }
 	'>..'	{ TokBirdTrack $$ }
@@ -80,7 +81,7 @@ seq1	:: { HsDoc RdrName }
 
 elem1	:: { HsDoc RdrName }
 	: STRING		{ DocString $1 }
-	| '/' strings '/'	{ DocEmphasis (DocString $2) }
+	| '/../'                { DocEmphasis (DocString $1) }
 	| URL			{ DocURL $1 }
 	| ANAME			{ DocAName $1 }
 	| IDENT			{ DocIdentifier $1 }

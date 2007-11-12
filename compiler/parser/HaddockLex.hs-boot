@@ -14,5 +14,6 @@ data Token
   | TokIdent [RdrName]
   | TokString String
   | TokURL String
+  | TokEmphasis String
   | TokAName String
   | TokBirdTrack String
