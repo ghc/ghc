@@ -522,6 +522,13 @@
 	      <entry>dynamic</entry>
 	      <entry><option>-fno-print-bind-result</option></entry>
 	    </row>
+	    <row>
+	      <entry><option>-fno-print-bind-contents</option></entry>
+	      <entry><link linkend="breakpoints">Turn off printing of binding contents in GHCi</link></entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+
 	  </tbody>
 	</tgroup>
       </informaltable>

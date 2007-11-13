@@ -272,6 +272,7 @@ data DynFlag
    | Opt_BreakOnException
    | Opt_BreakOnError
    | Opt_PrintEvldWithShow
+   | Opt_PrintBindContents
    | Opt_GenManifest
    | Opt_EmbedManifest
    | Opt_RunCPSZ
@@ -536,7 +537,8 @@ defaultDynFlags =
             Opt_DoAsmMangling,
 
             Opt_GenManifest,
-            Opt_EmbedManifest
+            Opt_EmbedManifest,
+            Opt_PrintBindContents
             ]
             ++ [f | (ns,f) <- optLevelFlags, 0 `elem` ns]
                     -- The default -O0 options
@@ -1210,6 +1212,7 @@ fFlags = [
   ( "break-on-exception",               Opt_BreakOnException ),
   ( "break-on-error",                   Opt_BreakOnError ),
   ( "print-evld-with-show",             Opt_PrintEvldWithShow ),
+  ( "print-bind-contents",              Opt_PrintBindContents ),
   ( "run-cps",                          Opt_RunCPSZ ),
   ( "convert-to-zipper-and-back",       Opt_ConvertToZipCfgAndBack),
   ( "vectorise",                        Opt_Vectorise ),

@@ -681,13 +681,18 @@ printTypeOfName session n
 
 printTypeAndContents :: Session -> [Id] -> GHCi ()
 printTypeAndContents session ids = do
-              terms <- mapM (io . GHC.obtainTermB session 10 False) ids
-              docs_terms <- mapM (io . showTerm session) terms                                   
-	      dflags <- getDynFlags
-	      let pefas = dopt Opt_PrintExplicitForalls dflags
-              printForUser $ vcat $ zipWith (\ty cts -> ty <+> equals <+> cts)
-                                            (map (pprTyThing pefas . AnId) ids)
-                                            docs_terms
+  dflags <- getDynFlags
+  let pefas     = dopt Opt_PrintExplicitForalls dflags
+      pcontents = dopt Opt_PrintBindContents dflags
+  if pcontents 
+    then do
+      let depthBound = 100
+      terms      <- mapM (io . GHC.obtainTermB session depthBound False) ids
+      docs_terms <- mapM (io . showTerm session) terms
+      printForUser $ vcat $ zipWith (\ty cts -> ty <+> equals <+> cts)
+                                    (map (pprTyThing pefas . AnId) ids)
+                                    docs_terms
+    else printForUser $ vcat $ map (pprTyThing pefas . AnId) ids
 
 
 specialCommand :: String -> GHCi Bool
