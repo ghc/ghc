@@ -10,8 +10,8 @@ _result :: t = _
 Stopped at ../Test2.hs:5:6
 _result :: t = _
 y :: t = _
-_result :: t
-y :: t
+_result :: t = _
+y :: t = _
 y = (_t1::t)
 ()
 y = 1

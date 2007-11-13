@@ -13,14 +13,14 @@ _result :: [a] = _
 <end of history>
 Logged breakpoint at ../Test3.hs:(1,0)-(2,30)
 _result :: [a]
-_result :: [a]
+_result :: [a] = _
 Logged breakpoint at ../Test3.hs:2:21-30
 _result :: [a]
 f :: t -> a
 xs :: [t]
-_result :: [a]
-f :: t -> a
-xs :: [t]
+_result :: [a] = _
+f :: t -> a = _
+xs :: [t] = []
 *** Ignoring breakpoint
 _result = []
 Logged breakpoint at ../Test3.hs:2:17-19

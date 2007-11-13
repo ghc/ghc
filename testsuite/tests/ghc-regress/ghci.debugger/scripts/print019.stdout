@@ -2,8 +2,8 @@ a = O (_t1::t)
 b = O (_t2::t1)
 ()
 _t1 = 'a'
-_t1 :: Char
-_t2 :: t1
-a :: Opaque
-b :: Opaque
-it :: ()
+_t1 :: Char = 'a'
+_t2 :: t1 = _
+a :: Opaque = O 'a'
+b :: Opaque = O _
+it :: () = ()

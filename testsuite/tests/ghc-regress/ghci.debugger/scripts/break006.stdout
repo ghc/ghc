@@ -5,16 +5,16 @@ _result :: [a] = _
 f :: t -> a = _
 x :: t = _
 xs :: [t] = [_,_]
-_result :: [a]
-f :: t -> a
-x :: t
-xs :: [t]
+_result :: [a] = _
+f :: t -> a = _
+x :: t = _
+xs :: [t] = [_,_]
 y = (_t1::a)
 y = 2
-_result :: [Integer]
-_t1 :: Integer
-f :: t -> Integer
-x :: t
-xs :: [t]
-y :: Integer
+_result :: [Integer] = _
+_t1 :: Integer = 2
+f :: t -> Integer = _
+x :: t = 1
+xs :: [t] = [_,_]
+y :: Integer = 2
 2

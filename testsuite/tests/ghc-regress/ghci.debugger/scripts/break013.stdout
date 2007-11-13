@@ -5,7 +5,7 @@ _result :: (Bool, Bool, ()) = _
 a :: Bool = _
 b :: Bool = _
 c :: () = _
-_result :: (Bool, Bool, ())
-a :: Bool
-b :: Bool
-c :: ()
+_result :: (Bool, Bool, ()) = _
+a :: Bool = _
+b :: Bool = _
+c :: () = _

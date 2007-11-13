@@ -1,4 +1,4 @@
-Stopped at break020.hs:(9,7)-(17,1)
+Stopped at break020.hs:(9,7)-(15,10)
 _result :: IO () = _
 8  
         vv
