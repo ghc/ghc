@@ -609,7 +609,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
    let substs = [computeRTTIsubst ty ty' 
                  | (ty, Just ty') <- zip (map idType incompletelyTypedIds) tys]
        ic'    = foldr (flip substInteractiveContext) ic 
-                           (map skolemiseSubst $ catMaybes substs)
+                           (map skolemiseSubst substs)
    return hsc_env{hsc_IC=ic'}
 
 skolemiseSubst subst = subst `setTvSubstEnv` 

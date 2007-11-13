@@ -81,7 +81,7 @@ pprintClosureCommand session bindThings force str = do
      --  Then, we extract a substitution,
      --  mapping the old tyvars to the reconstructed types.
        let Just reconstructed_type = termType term
-           Just subst = computeRTTIsubst (idType id) (reconstructed_type)
+           subst = computeRTTIsubst (idType id) (reconstructed_type)
        return (term',subst)
 
    tidyTermTyVars :: Session -> Term -> IO Term

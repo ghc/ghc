@@ -736,16 +736,20 @@ cvReconstructType hsc_env max_depth mb_ty hval = runTR_maybe hsc_env $ do
      -- improved rtti_t computed by RTTI
      -- The main difference between RTTI types and their normal counterparts
      --  is that the former are _not_ polymorphic, thus polymorphism must
-     --  be stripped. Syntactically, forall's must be stripped
-computeRTTIsubst :: Type -> Type -> Maybe TvSubst
+     --  be stripped. Syntactically, forall's must be stripped.
+     -- We also remove predicates.
+computeRTTIsubst :: Type -> Type -> TvSubst
 computeRTTIsubst ty rtti_ty = 
+    case mb_subst of
+      Just subst -> subst
+      Nothing    -> pprPanic "Failed to compute a RTTI substitution" 
+                             (ppr (ty, rtti_ty))
      -- In addition, we strip newtypes too, since the reconstructed type might
      --   not have recovered them all
-           tcUnifyTys (const BindMe) 
-                      [repType' $ dropForAlls$ ty]
-                      [repType' $ rtti_ty]  
--- TODO stripping newtypes shouldn't be necessary, test
-
+     -- TODO stripping newtypes shouldn't be necessary, test
+   where mb_subst = tcUnifyTys (const BindMe) 
+                               [rttiView ty]
+                               [rttiView rtti_ty]  
 
 -- Dealing with newtypes
 {-

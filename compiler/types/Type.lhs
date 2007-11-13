@@ -55,7 +55,7 @@ module Type (
 	splitTyConApp_maybe, splitTyConApp, 
         splitNewTyConApp_maybe, splitNewTyConApp,
 
-	repType, repType', typePrimRep, coreView, tcView, kindView,
+	repType, typePrimRep, coreView, tcView, kindView, rttiView,
 
 	mkForAllTy, mkForAllTys, splitForAllTy_maybe, splitForAllTys, 
 	applyTy, applyTys, isForAllTy, dropForAlls,
@@ -188,6 +188,18 @@ tcView (NoteTy _ ty) 	 = Just ty
 tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys 
 			 = Just (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
 tcView ty		 = Nothing
+
+-----------------------------------------------
+rttiView :: Type -> Type
+-- Same, but for the RTTI system, which cannot deal with predicates nor polymorphism
+rttiView (ForAllTy _ ty) = rttiView ty
+rttiView (NoteTy   _ ty) = rttiView ty
+rttiView (FunTy PredTy{} ty) = rttiView ty
+rttiView (FunTy NoteTy{} ty) = rttiView ty
+rttiView ty@TyConApp{} | Just ty' <- coreView ty 
+                           = rttiView ty'
+rttiView (TyConApp tc tys) = mkTyConApp tc (map rttiView tys)
+rttiView ty = ty
 
 -----------------------------------------------
 {-# INLINE kindView #-}
@@ -482,16 +494,6 @@ repType (TyConApp tc tys)
     repType (substTyWith tvs tys rep_ty)
 
 repType ty = ty
-
--- repType' aims to be a more thorough version of repType
--- For now it simply looks through the TyConApp args too
-repType' ty -- | pprTrace "repType'" (ppr ty $$ ppr (go1 ty)) False = undefined
-            | otherwise = go1 ty 
- where 
-        go1 = go . repType
-        go (TyConApp tc tys) = mkTyConApp tc (map repType' tys)
-        go ty = ty
-
 
 -- ToDo: this could be moved to the code generator, using splitTyConApp instead
 -- of inspecting the type directly.
