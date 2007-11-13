@@ -1,0 +1,6 @@
++ = <function>
+print = <function>
+log = <function>
+head = <function>
+tail = <function>
+fst = <function>
