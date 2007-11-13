@@ -13,5 +13,3 @@ main = do
   in_another_module 0
   line2 1
   return ()
-  
-  
