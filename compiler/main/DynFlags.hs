@@ -936,10 +936,13 @@ allFlags :: [String]
 allFlags = map ('-':) $
            [ name | (name, optkind) <- dynamic_flags, ok optkind ] ++
            map ("fno-"++) flags ++
-           map ("f"++) flags
+           map ("f"++) flags ++
+           map ("X"++) xs ++
+           map ("XNo"++) xs
     where ok (PrefixPred _ _) = False
           ok _ = True
           flags = map fst fFlags
+          xs = map fst xFlags
 
 dynamic_flags :: [(String, OptKind DynP)]
 dynamic_flags = [
