@@ -21,8 +21,7 @@ test('divbyzero',
              exit_code_if_platform(1, 'i386-unknown-mingw32')),
      compile_and_run, [''])
 
-test('outofmem', exit_code(1), compile_and_run, [''])
-test('outofmem2', composes([exit_code(251),
-                            expect_fail_if_compiler_lt('ghc','6.9'),
-                            extra_run_opts('+RTS -M5m -RTS')]),
-                  compile_and_run, [''])
+test('outofmem', normal, run_command, ['$MAKE -s --no-print-directory outofmem'])
+test('outofmem2', composes([ expect_fail_if_compiler_lt('ghc','6.9'),
+                             extra_run_opts('+RTS -M5m -RTS')]),
+                  run_command, ['$MAKE -s --no-print-directory outofmem2'])
