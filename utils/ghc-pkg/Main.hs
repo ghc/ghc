@@ -70,17 +70,7 @@ main = do
            bye ourCopyright
         (cli,nonopts,[]) ->
            runit cli nonopts
-        (_,_,errors) -> tryOldCmdLine errors args
-
--- If the new command-line syntax fails, then we try the old.  If that
--- fails too, then we output the original errors and the new syntax
--- (so the old syntax is still available, but hidden).
-tryOldCmdLine :: [String] -> [String] -> IO ()
-tryOldCmdLine errors args = do
-  case getOpt Permute oldFlags args of
-        (cli@(_:_),[],[]) ->
-           oldRunit cli
-        _failed -> do
+        (_,_,errors) -> do
            prog <- getProgramName
            die (concat errors ++ usageInfo (usageHeader prog) flags)
 
@@ -97,7 +87,6 @@ data Flag
   | FlagForce
   | FlagForceFiles
   | FlagAutoGHCiLibs
-  | FlagDefinedName String String
   | FlagSimpleOutput
   | FlagNamesOnly
   deriving Eq
@@ -130,14 +119,8 @@ flags = [
 
 deprecFlags :: [OptDescr Flag]
 deprecFlags = [
-  Option ['D'] ["define-name"] (ReqArg toDefined "NAME=VALUE")
-          "define NAME as VALUE"
+        -- put deprecated flags here
   ]
-  where
-  toDefined str =
-    case break (=='=') str of
-      (nm,[])    -> FlagDefinedName nm []
-      (nm,_:val) -> FlagDefinedName nm val
 
 ourCopyright :: String
 ourCopyright = "GHC package manager version " ++ version ++ "\n"
@@ -206,14 +189,13 @@ runit cli nonopts = do
           | FlagForceFiles `elem` cli   = ForceFiles
           | otherwise                   = NoForce
         auto_ghci_libs = FlagAutoGHCiLibs `elem` cli
-        defines = [ (nm,val) | FlagDefinedName nm val <- cli ]
   --
   -- first, parse the command
   case nonopts of
     ["register", filename] ->
-        registerPackage filename defines cli auto_ghci_libs False force
+        registerPackage filename cli auto_ghci_libs False force
     ["update", filename] ->
-        registerPackage filename defines cli auto_ghci_libs True force
+        registerPackage filename cli auto_ghci_libs True force
     ["unregister", pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
         unregisterPackage pkgid cli
@@ -253,9 +235,6 @@ parseCheck parser str what =
   case [ x | (x,ys) <- readP_to_S parser str, all isSpace ys ] of
     [x] -> return x
     _ -> die ("cannot parse \'" ++ str ++ "\' as a " ++ what)
-
-readPkgId :: String -> IO PackageIdentifier
-readPkgId str = parseCheck parsePackageId str "package identifier"
 
 readGlobPkgId :: String -> IO PackageIdentifier
 readGlobPkgId str = parseCheck parseGlobPackageId str "package identifier"
@@ -386,13 +365,12 @@ emptyPackageConfig = "[]"
 -- Registering
 
 registerPackage :: FilePath
-                -> [(String,String)] -- defines
                 -> [Flag]
                 -> Bool              -- auto_ghci_libs
                 -> Bool              -- update
                 -> Force
                 -> IO ()
-registerPackage input defines flags auto_ghci_libs update force = do
+registerPackage input flags auto_ghci_libs update force = do
   db_stack <- getPkgDatabases True flags
   let
         db_to_operate_on = my_head "db" db_stack
@@ -408,9 +386,9 @@ registerPackage input defines flags auto_ghci_libs update force = do
         putStr ("Reading package info from " ++ show f ++ " ... ")
         readFile f
 
-  expanded <- expandEnvVars s defines force
+  expanded <- expandEnvVars s force
 
-  pkg <- parsePackageInfo expanded defines
+  pkg <- parsePackageInfo expanded
   putStrLn "done."
 
   validatePackageConfig pkg db_stack auto_ghci_libs update force
@@ -421,9 +399,8 @@ registerPackage input defines flags auto_ghci_libs update force = do
 
 parsePackageInfo
         :: String
-        -> [(String,String)]
         -> IO InstalledPackageInfo
-parsePackageInfo str defines =
+parsePackageInfo str =
   case parseInstalledPackageInfo str of
     ParseOk _warns ok -> return ok
     ParseFailed err -> case locatedErrorMsg err of
@@ -851,114 +828,11 @@ okInModuleName c
 
 #endif
 
--- -----------------------------------------------------------------------------
--- The old command-line syntax, supported for backwards compatibility
-
-data OldFlag
-  = OF_Config FilePath
-  | OF_Input FilePath
-  | OF_List
-  | OF_ListLocal
-  | OF_Add Bool {- True => replace existing info -}
-  | OF_Remove String | OF_Show String
-  | OF_Field String | OF_AutoGHCiLibs | OF_Force
-  | OF_DefinedName String String
-  | OF_GlobalConfig FilePath
-  deriving (Eq)
-
-isAction :: OldFlag -> Bool
-isAction OF_Config{}        = False
-isAction OF_Field{}         = False
-isAction OF_Input{}         = False
-isAction OF_AutoGHCiLibs{}  = False
-isAction OF_Force{}         = False
-isAction OF_DefinedName{}   = False
-isAction OF_GlobalConfig{}  = False
-isAction _                  = True
-
-oldFlags :: [OptDescr OldFlag]
-oldFlags = [
-  Option ['f'] ["config-file"] (ReqArg OF_Config "FILE")
-        "use the specified package config file",
-  Option ['l'] ["list-packages"] (NoArg OF_List)
-        "list packages in all config files",
-  Option ['L'] ["list-local-packages"] (NoArg OF_ListLocal)
-        "list packages in the specified config file",
-  Option ['a'] ["add-package"] (NoArg (OF_Add False))
-        "add a new package",
-  Option ['u'] ["update-package"] (NoArg (OF_Add True))
-        "update package with new configuration",
-  Option ['i'] ["input-file"] (ReqArg OF_Input "FILE")
-        "read new package info from specified file",
-  Option ['s'] ["show-package"] (ReqArg OF_Show "NAME")
-        "show the configuration for package NAME",
-  Option [] ["field"] (ReqArg OF_Field "FIELD")
-        "(with --show-package) Show field FIELD only",
-  Option [] ["force"] (NoArg OF_Force)
-        "ignore missing directories/libraries",
-  Option ['r'] ["remove-package"] (ReqArg OF_Remove "NAME")
-        "remove an installed package",
-  Option ['g'] ["auto-ghci-libs"] (NoArg OF_AutoGHCiLibs)
-        "automatically build libs for GHCi (with -a)",
-  Option ['D'] ["define-name"] (ReqArg toDefined "NAME=VALUE")
-        "define NAME as VALUE",
-  Option [] ["global-conf"] (ReqArg OF_GlobalConfig "FILE")
-        "location of the global package config"
-  ]
- where
-  toDefined str =
-    case break (=='=') str of
-      (nm,[]) -> OF_DefinedName nm []
-      (nm,_:val) -> OF_DefinedName nm val
-
-oldRunit :: [OldFlag] -> IO ()
-oldRunit clis = do
-  let new_flags = [ f | Just f <- map conv clis ]
-
-      conv (OF_GlobalConfig f) = Just (FlagGlobalConfig f)
-      conv (OF_Config f)       = Just (FlagConfig f)
-      conv _                   = Nothing
-
-
-
-  let fields = [ f | OF_Field f <- clis ]
-
-  let auto_ghci_libs = any isAuto clis
-         where isAuto OF_AutoGHCiLibs = True; isAuto _ = False
-      input_file = my_head "inp" ([ f | (OF_Input f) <- clis] ++ ["-"])
-
-      force = if OF_Force `elem` clis then ForceAll else NoForce
-
-      defines = [ (nm,val) | OF_DefinedName nm val <- clis ]
-
-  case [ c | c <- clis, isAction c ] of
-    [ OF_List ]      -> listPackages new_flags Nothing Nothing
-    [ OF_ListLocal ] -> listPackages new_flags Nothing Nothing
-    [ OF_Add upd ]   ->
-        registerPackage input_file defines new_flags auto_ghci_libs upd force
-    [ OF_Remove pkgid_str ]  -> do
-        pkgid <- readPkgId pkgid_str
-        unregisterPackage pkgid new_flags
-    [ OF_Show pkgid_str ]
-        | null fields -> do
-                pkgid <- readPkgId pkgid_str
-                describePackage new_flags pkgid
-        | otherwise   -> do
-                pkgid <- readPkgId pkgid_str
-                mapM_ (describeField new_flags pkgid) fields
-    _ -> do
-        prog <- getProgramName
-        die (usageInfo (usageHeader prog) flags)
-
-my_head :: String -> [a] -> a
-my_head s [] = error s
-my_head s (x:xs) = x
-
 -- ---------------------------------------------------------------------------
 -- expanding environment variables in the package configuration
 
-expandEnvVars :: String -> [(String, String)] -> Force -> IO String
-expandEnvVars str defines force = go str ""
+expandEnvVars :: String -> Force -> IO String
+expandEnvVars str force = go str ""
  where
    go "" acc = return $! reverse acc
    go ('$':'{':str) acc | (var, '}':rest) <- break close str
@@ -970,9 +844,6 @@ expandEnvVars str defines force = go str ""
 
    lookupEnvVar :: String -> IO String
    lookupEnvVar nm =
-     case lookup nm defines of
-       Just x | not (null x) -> return x
-       _      ->
         catch (System.getEnv nm)
            (\ _ -> do dieOrForceAll force ("Unable to expand variable " ++
                                         show nm)
@@ -1010,6 +881,10 @@ ignoreError s = do hFlush stdout; hPutStrLn stderr (s ++ " (ignoring)")
 
 dieForcible :: String -> IO ()
 dieForcible s = die (s ++ " (use --force to override)")
+
+my_head :: String -> [a] -> a
+my_head s [] = error s
+my_head s (x:xs) = x
 
 -----------------------------------------
 -- Cut and pasted from ghc/compiler/SysTools
