@@ -901,10 +901,15 @@ getCoreToDo dflags
 
 	runWhen spec_constr CoreDoSpecConstr,
 
+	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing },
+
 	-- Final clean-up simplification:
      	CoreDoSimplify (SimplPhase 0) [
 	  MaxSimplifierIterations max_iter
-	]
+	],
+
+	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing }
+
      ]
 
 -- -----------------------------------------------------------------------------
@@ -1137,7 +1142,7 @@ dynamic_flags = [
   ,  ( "fspec-threshold",          IntSuffix (\n -> upd (\dfs -> dfs{ specThreshold = n })))
   ,  ( "fliberate-case-threshold", IntSuffix (\n -> upd (\dfs -> dfs{ specThreshold = n })))
 
-  ,  ( "frule-check", SepArg (\s -> upd (\dfs -> dfs{ ruleCheck = Just s })))
+  ,  ( "frule-check",     SepArg (\s -> upd (\dfs -> dfs{ ruleCheck = Just s })))
   ,  ( "fcontext-stack"	, IntSuffix $ \n -> upd $ \dfs -> dfs{ ctxtStkDepth = n })
 
         ------ Compiler flags -----------------------------------------------
