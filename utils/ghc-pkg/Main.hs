@@ -410,10 +410,9 @@ registerPackage input defines flags auto_ghci_libs update force = do
 
   expanded <- expandEnvVars s defines force
 
-  pkg0 <- parsePackageInfo expanded defines
+  pkg <- parsePackageInfo expanded defines
   putStrLn "done."
 
-  pkg <- resolveDeps db_stack pkg0
   validatePackageConfig pkg db_stack auto_ghci_libs update force
   let new_details = filter not_this (snd db_to_operate_on) ++ [pkg]
       not_this p = package p /= package pkg
@@ -726,40 +725,6 @@ checkPackageId ipi =
     [_] -> return ()
     []  -> die ("invalid package identifier: " ++ str)
     _   -> die ("ambiguous package identifier: " ++ str)
-
--- ToDo: remove this (see #1837)
-resolveDeps :: PackageDBStack -> InstalledPackageInfo -> IO InstalledPackageInfo
-resolveDeps db_stack p  = do
-    when (not (null unversioned_deps)) $
-       hPutStr stderr ("WARNING: unversioned dependencies are deprecated, "++
-                       "and will NOT be accepted by GHC 6.10: " ++
-                       unwords (map showPackageId unversioned_deps) ++ "\n")
-    return (updateDeps p)
-  where
-        unversioned_deps = filter (not.realVersion) (depends p)
-
-        -- The input package spec is allowed to give a package dependency
-        -- without a version number; e.g.
-        --      depends: base
-        -- Here, we update these dependencies without version numbers to
-        -- match the actual versions of the relevant packages installed.
-        updateDeps p = p{depends = map resolveDep (depends p)}
-
-        resolveDep dep_pkgid
-           | realVersion dep_pkgid  = dep_pkgid
-           | otherwise              = lookupDep dep_pkgid
-
-        lookupDep dep_pkgid
-           = let
-                name = pkgName dep_pkgid
-             in
-             case [ pid | p <- concat (map snd db_stack),
-                          let pid = package p,
-                          pkgName pid == name ] of
-                (pid:_) -> pid          -- Found installed package,
-                                        -- replete with its version
-                []      -> dep_pkgid    -- No installed package; use
-                                        -- the version-less one
 
 checkDuplicates :: PackageDBStack -> InstalledPackageInfo -> Bool -> IO ()
 checkDuplicates db_stack pkg update = do
