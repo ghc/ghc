@@ -450,13 +450,13 @@ cPprTermBase y =
                         . pprDeeperList fsep 
                         . punctuate (space<>colon)
                         $ print_elems
-                     else brackets (pprDeeperList fsep$
+                     else brackets (pprDeeperList fcat$
                                          punctuate comma print_elems)
 
                 where Just a /= Just b = not (a `coreEqType` b)
                       _      /=   _    = True
                       getListTerms Term{subTerms=[h,t]} = h : getListTerms t
-                      getListTerms Term{subTerms=[]}  = []
+                      getListTerms Term{subTerms=[]}    = []
                       getListTerms t@Suspension{}       = [t]
                       getListTerms t = pprPanic "getListTerms" (ppr t)
 
