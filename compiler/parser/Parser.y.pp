@@ -1840,35 +1840,35 @@ commas :: { Int }
 
 docnext :: { LHsDoc RdrName }
   : DOCNEXT {% case parseHaddockParagraphs (tokenise (getDOCNEXT $1)) of {
-      Left  err -> parseError (getLoc $1) err;
-      Right doc -> return (L1 doc) } }
+      MyLeft  err -> parseError (getLoc $1) err;
+      MyRight doc -> return (L1 doc) } }
 
 docprev :: { LHsDoc RdrName }
   : DOCPREV {% case parseHaddockParagraphs (tokenise (getDOCPREV $1)) of {
-      Left  err -> parseError (getLoc $1) err;
-      Right doc -> return (L1 doc) } }
+      MyLeft  err -> parseError (getLoc $1) err;
+      MyRight doc -> return (L1 doc) } }
 
 docnamed :: { Located (String, (HsDoc RdrName)) }
   : DOCNAMED {%
       let string = getDOCNAMED $1 
           (name, rest) = break isSpace string
       in case parseHaddockParagraphs (tokenise rest) of {
-        Left  err -> parseError (getLoc $1) err;
-        Right doc -> return (L1 (name, doc)) } }
+        MyLeft  err -> parseError (getLoc $1) err;
+        MyRight doc -> return (L1 (name, doc)) } }
 
 docsection :: { Located (n, HsDoc RdrName) }
   : DOCSECTION {% let (n, doc) = getDOCSECTION $1 in
         case parseHaddockString (tokenise doc) of {
-      Left  err -> parseError (getLoc $1) err;
-      Right doc -> return (L1 (n, doc)) } }
+      MyLeft  err -> parseError (getLoc $1) err;
+      MyRight doc -> return (L1 (n, doc)) } }
 
 moduleheader :: { (HaddockModInfo RdrName, Maybe (HsDoc RdrName)) }                                    
         : DOCNEXT {% let string = getDOCNEXT $1 in
                case parseModuleHeader string of {                       
                  Right (str, info) ->                                  
                    case parseHaddockParagraphs (tokenise str) of {               
-                     Left err -> parseError (getLoc $1) err;                    
-                     Right doc -> return (info, Just doc);          
+                     MyLeft err -> parseError (getLoc $1) err;                    
+                     MyRight doc -> return (info, Just doc);          
                    };                                             
                  Left err -> parseError (getLoc $1) err
             }  }                                                  

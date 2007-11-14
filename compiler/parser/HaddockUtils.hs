@@ -47,8 +47,8 @@ parseModuleHeader str0 =
          Nothing -> Right Nothing                                                               
          Just description -> case parseHaddockString . tokenise $ description of                       
 
-            Left mess -> Left ("Cannot parse Description: " ++ mess)                            
-            Right doc -> Right (Just doc)                                                       
+            MyLeft mess -> Left ("Cannot parse Description: " ++ mess)                            
+            MyRight doc -> Right (Just doc)                                                       
    in                                                                                           
       case description1 of                                                                      
          Left mess -> Left mess                                                                 

@@ -6,7 +6,11 @@
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module HaddockParse (parseHaddockParagraphs, parseHaddockString) where
+module HaddockParse (
+  parseHaddockParagraphs, 
+  parseHaddockString, 
+  MyEither(..)
+) where
 
 import {-# SOURCE #-} HaddockLex
 import HsSyn
@@ -31,7 +35,7 @@ import RdrName
 	PARA    { TokPara }
 	STRING	{ TokString $$ }
 
-%monad { Either String }
+%monad { MyEither String }
 
 %name parseHaddockParagraphs  doc
 %name parseHaddockString seq
@@ -94,16 +98,17 @@ strings  :: { String }
 	| STRING strings	{ $1 ++ $2 }
 
 {
-happyError :: [Token] -> Either String a
-happyError toks = 
---  Left ("parse error in doc string: "  ++ show (take 3 toks))
-  Left ("parse error in doc string")
+happyError :: [Token] -> MyEither String a
+happyError toks = MyLeft ("parse error in doc string")
 
--- Either monad (we can't use MonadError because GHC < 5.00 has
--- an older incompatible version).
-instance Monad (Either String) where
-	return        = Right
-	Left  l >>= _ = Left l
-	Right r >>= k = k r
-	fail msg      = Left msg
+-- We don't want to make an instance for Either String,
+-- since every user of the GHC API would get that instance
+
+data MyEither a b = MyLeft a | MyRight b
+
+instance Monad (MyEither String) where
+	return          = MyRight
+	MyLeft  l >>= _ = MyLeft l
+	MyRight r >>= k = k r
+	fail msg        = MyLeft msg
 }

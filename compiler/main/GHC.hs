@@ -483,7 +483,10 @@ setGlobalTypeScope session ids
 -- Parsing Haddock comments
 
 parseHaddockComment :: String -> Either String (HsDoc RdrName)
-parseHaddockComment string = parseHaddockParagraphs (tokenise string)
+parseHaddockComment string = 
+  case parseHaddockParagraphs (tokenise string) of
+    MyLeft x  -> Left x
+    MyRight x -> Right x
 
 -- -----------------------------------------------------------------------------
 -- Loading the program
