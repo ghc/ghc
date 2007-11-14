@@ -47,12 +47,12 @@ import Util
 import NameSet
 import Maybes		( orElse )
 import FastString
+import Encoding
 
 #ifndef mingw32_HOST_OS
 import System.Posix hiding (getEnv)
 #else
 import GHC.ConsoleHandler ( flushConsole )
-import System.Win32	  ( setConsoleCP, setConsoleOutputCP )
 import qualified System.Win32
 #endif
 
@@ -75,14 +75,13 @@ import System.Exit	( exitWith, ExitCode(..) )
 import System.Directory
 import System.IO
 import System.IO.Error as IO
-import System.IO.Unsafe
 import Data.Char
 import Data.Dynamic
 import Data.Array
 import Control.Monad as Monad
 import Text.Printf
-
-import Foreign.StablePtr	( newStablePtr )
+import Foreign
+import Foreign.C        ( withCStringLen )
 import GHC.Exts		( unsafeCoerce# )
 import GHC.IOBase	( IOErrorType(InvalidArgument) )
 
@@ -339,7 +338,7 @@ runGHCi paths maybe_expr = do
   	  either_hdl <- io (IO.try (openFile "./.ghci" ReadMode))
   	  case either_hdl of
   	     Left _e   -> return ()
-  	     Right hdl -> runCommands (fileLoop hdl False)
+  	     Right hdl -> runCommands (fileLoop hdl False False)
     
   when (read_dot_files) $ do
     -- Read in $HOME/.ghci
@@ -355,7 +354,7 @@ runGHCi paths maybe_expr = do
   	       either_hdl <- io (IO.try (openFile file ReadMode))
   	       case either_hdl of
   		  Left _e   -> return ()
-  		  Right hdl -> runCommands (fileLoop hdl False)
+  		  Right hdl -> runCommands (fileLoop hdl False False)
 
   -- Perform a :load for files given on the GHCi command line
   -- When in -e mode, if the load fails then we want to stop
@@ -386,9 +385,6 @@ runGHCi paths maybe_expr = do
                       | otherwise -> io (ioError err)
              Right () -> return ()
 #endif
-            -- initialise the console if necessary
-            io setUpConsole
-
             -- enter the interactive loop
             interactiveLoop is_tty show_prompt
         Just expr -> do
@@ -418,9 +414,9 @@ interactiveLoop is_tty show_prompt =
 #ifdef USE_READLINE
   if (is_tty) 
 	then runCommands readlineLoop
-	else runCommands (fileLoop stdin show_prompt)
+	else runCommands (fileLoop stdin show_prompt is_tty)
 #else
-  runCommands (fileLoop stdin show_prompt)
+  runCommands (fileLoop stdin show_prompt is_tty)
 #endif
 
 
@@ -456,8 +452,8 @@ checkPerms name =
    	  else return True
 #endif
 
-fileLoop :: Handle -> Bool -> GHCi (Maybe String)
-fileLoop hdl show_prompt = do
+fileLoop :: Handle -> Bool -> Bool -> GHCi (Maybe String)
+fileLoop hdl show_prompt is_tty = do
    when show_prompt $ do
         prompt <- mkPrompt
         (io (putStr prompt))
@@ -471,7 +467,33 @@ fileLoop hdl show_prompt = do
                 -- this can happen if the user closed stdin, or
                 -- perhaps did getContents which closes stdin at
                 -- EOF.
-        Right l -> return (Just l)
+        Right l -> do
+                   str <- io $ consoleInputToUnicode is_tty l
+                   return (Just str)
+
+#ifdef mingw32_HOST_OS
+-- Convert the console input into Unicode according to the current code page.
+-- The Windows console stores Unicode characters directly, so this is a
+-- rather roundabout way of doing things... oh well.
+-- See #782, #1483, #1649
+consoleInputToUnicode :: Bool -> String -> IO String
+consoleInputToUnicode is_tty str
+  | is_tty = do
+    cp <- System.Win32.getConsoleCP
+    System.Win32.stringToUnicode cp str
+  | otherwise =
+    decodeStringAsUTF8 str
+#else
+-- for Unix, assume the input is in UTF-8 and decode it to a Unicode String. 
+-- See #782.
+consoleInputToUnicode :: Bool -> String -> IO String
+consoleInputToUnicode _is_tty str = decodeStringAsUTF8 str
+#endif
+
+decodeStringAsUTF8 :: String -> IO String
+decodeStringAsUTF8 str =
+  withCStringLen str $ \(cstr,len) -> 
+    utf8DecodeString (castPtr cstr :: Ptr Word8) len
 
 mkPrompt :: GHCi String
 mkPrompt = do
@@ -524,7 +546,8 @@ readlineLoop = do
         Nothing -> return Nothing
         Just l  -> do
                    io (addHistory l)
-                   return (Just l)
+                   str <- io $ consoleInputToUnicode True l
+                   return (Just str)
 #endif
 
 queryQueue :: GHCi (Maybe String)
@@ -1714,33 +1737,6 @@ wantNameFromInterpretedModule noCanDo str and_then = do
                then noCanDo n $ text "module " <> ppr modl <>
                                 text " is not interpreted"
                else and_then n
-
--- ----------------------------------------------------------------------------
--- Windows console setup
-
-setUpConsole :: IO ()
-setUpConsole = do
-#ifdef mingw32_HOST_OS
-	-- On Windows we need to set a known code page, otherwise the characters
-  	-- we read from the console will be be in some strange encoding, and
-	-- similarly for characters we write to the console.
-	--
-	-- At the moment, GHCi pretends all input is Latin-1.  In the
-	-- future we should support UTF-8, but for now we set the code
-	-- pages to Latin-1.  Doing it this way does lead to problems,
-	-- however: see bug #1649.
-	--
-	-- It seems you have to set the font in the console window to
-	-- a Unicode font in order for output to work properly,
-	-- otherwise non-ASCII characters are mapped wrongly.  sigh.
-	-- (see MSDN for SetConsoleOutputCP()).
-	--
-        -- This call has been known to hang on some machines, see bug #1483
-        --
-	setConsoleCP 28591       -- ISO Latin-1
-	setConsoleOutputCP 28591 -- ISO Latin-1
-#endif
-	return ()
 
 -- -----------------------------------------------------------------------------
 -- commands for debugger
