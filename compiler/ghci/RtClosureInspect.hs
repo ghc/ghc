@@ -335,7 +335,7 @@ pprTermM, pprNewtypeWrap :: Monad m =>
                            (Int -> Term -> m SDoc) -> Int -> Term -> m SDoc
 pprTermM y p Term{dc=Left dc_tag, subTerms=tt} = do
   tt_docs <- mapM (y app_prec) tt
-  return$ cparen (not(null tt) && p >= app_prec) (text dc_tag <+> sep tt_docs)
+  return$ cparen (not(null tt) && p >= app_prec) (text dc_tag <+> fsep tt_docs)
   
 pprTermM y p Term{dc=Right dc, subTerms=tt} 
 {-  | dataConIsInfix dc, (t1:t2:tt') <- tt  --TODO fixity
@@ -345,7 +345,7 @@ pprTermM y p Term{dc=Right dc, subTerms=tt}
   | null tt   = return$ ppr dc
   | otherwise = do
          tt_docs <- mapM (y app_prec) tt
-         return$ cparen (p >= app_prec) (ppr dc <+> sep tt_docs)
+         return$ cparen (p >= app_prec) (ppr dc <+> fsep tt_docs)
 
 pprTermM y p t@NewtypeWrap{} = pprNewtypeWrap y p t
 
@@ -446,10 +446,10 @@ cPprTermBase y =
                print_elems <- mapM (y cons_prec) elems
                return$ if isConsLast
                      then cparen (p >= cons_prec) 
-                        . hsep 
+                        . fsep 
                         . punctuate (space<>colon)
                         $ print_elems
-                     else brackets (hcat$ punctuate comma print_elems)
+                     else brackets (fsep$ punctuate comma print_elems)
 
                 where Just a /= Just b = not (a `coreEqType` b)
                       _      /=   _    = True
