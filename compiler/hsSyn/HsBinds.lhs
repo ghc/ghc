@@ -531,7 +531,7 @@ isInlineLSig other		  = False
 
 hsSigDoc (TypeSig {}) 		= ptext SLIT("type signature")
 hsSigDoc (SpecSig {})	 	= ptext SLIT("SPECIALISE pragma")
-hsSigDoc (InlineSig _ spec)   	= ppr spec <+> ptext SLIT("pragma")
+hsSigDoc (InlineSig _ spec)   	= ptext SLIT("INLINE pragma")
 hsSigDoc (SpecInstSig {})	= ptext SLIT("SPECIALISE instance pragma")
 hsSigDoc (FixSig {}) 		= ptext SLIT("fixity declaration")
 \end{code}
@@ -542,7 +542,7 @@ Signature equality is used when checking for duplicate signatures
 eqHsSig :: LSig Name -> LSig Name -> Bool
 eqHsSig (L _ (FixSig (FixitySig n1 _))) (L _ (FixSig (FixitySig n2 _))) = unLoc n1 == unLoc n2
 eqHsSig (L _ (TypeSig n1 _))         	(L _ (TypeSig n2 _))            = unLoc n1 == unLoc n2
-eqHsSig (L _ (InlineSig n1 s1))	(L _ (InlineSig n2 s2))    	        = s1 == s2 && unLoc n1 == unLoc n2
+eqHsSig (L _ (InlineSig n1 s1))	(L _ (InlineSig n2 s2))    	        = unLoc n1 == unLoc n2
  	-- For specialisations, we don't have equality over
 	-- HsType, so it's not convenient to spot duplicate 
 	-- specialisations here.  Check for this later, when we're in Type land

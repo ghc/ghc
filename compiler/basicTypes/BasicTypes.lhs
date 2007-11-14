@@ -544,14 +544,21 @@ alwaysInlineSpec  = Inline AlwaysActive True	-- INLINE always
 neverInlineSpec   = Inline NeverActive  False	-- NOINLINE 
 
 instance Outputable Activation where
-   ppr AlwaysActive     = empty		-- The default
+   ppr NeverActive      = ptext SLIT("NEVER")
+   ppr AlwaysActive     = ptext SLIT("ALWAYS")
    ppr (ActiveBefore n) = brackets (char '~' <> int n)
    ppr (ActiveAfter n)  = brackets (int n)
-   ppr NeverActive      = ptext SLIT("NEVER")
     
 instance Outputable InlineSpec where
-   ppr (Inline act True)  = ptext SLIT("INLINE") <> ppr act
-   ppr (Inline act False) = ptext SLIT("NOINLINE") <> ppr act
+   ppr (Inline act is_inline)  
+	| is_inline = ptext SLIT("INLINE")
+		      <> case act of
+			   AlwaysActive -> empty
+			   other	-> ppr act
+	| otherwise = ptext SLIT("NOINLINE")
+		      <> case act of
+			    NeverActive -> empty
+			    other	-> ppr act
 
 isActive :: CompilerPhase -> Activation -> Bool
 isActive p NeverActive      = False
