@@ -19,7 +19,7 @@ import Debugger
 import qualified GHC
 import GHC              ( Session, LoadHowMuch(..), Target(..),  TargetId(..),
                           Module, ModuleName, TyThing(..), Phase,
-                          BreakIndex, SrcSpan, Resume, SingleStep, Id )
+                          BreakIndex, SrcSpan, Resume, SingleStep )
 import PprTyThing
 import DynFlags
 
@@ -31,7 +31,7 @@ import UniqFM
 
 import HscTypes		( implicitTyThings )
 import qualified RdrName ( getGRE_NameQualifier_maybes ) -- should this come via GHC?
-import Outputable       hiding (printForUser)
+import Outputable       hiding (printForUser, printForUserPartWay)
 import Module           -- for ModuleEnv
 import Name
 import SrcLoc
@@ -657,8 +657,8 @@ afterRunStmt step_here run_result = do
                let namesSorted = sortBy compareNames names
                tythings <- catMaybes `liftM` 
                               io (mapM (GHC.lookupName session) namesSorted)
-
-               printTypeAndContents session [id | AnId id <- tythings]
+               docs <- io$ pprTypeAndContents session [id | AnId id <- tythings]
+               printForUserPartWay docs
                maybe (return ()) runBreakCmd mb_info
                -- run the command set with ":set stop <cmd>"
                st <- getGHCiState
@@ -702,20 +702,7 @@ printTypeOfName session n
             Nothing    -> return ()
             Just thing -> printTyThing thing
 
-printTypeAndContents :: Session -> [Id] -> GHCi ()
-printTypeAndContents session ids = do
-  dflags <- getDynFlags
-  let pefas     = dopt Opt_PrintExplicitForalls dflags
-      pcontents = dopt Opt_PrintBindContents dflags
-  if pcontents 
-    then do
-      let depthBound = 100
-      terms      <- mapM (io . GHC.obtainTermB session depthBound False) ids
-      docs_terms <- mapM (io . showTerm session) terms
-      printForUser $ vcat $ zipWith (\ty cts -> ty <+> equals <+> cts)
-                                    (map (pprTyThing pefas . AnId) ids)
-                                    docs_terms
-    else printForUser $ vcat $ map (pprTyThing pefas . AnId) ids
+
 
 
 specialCommand :: String -> GHCi Bool
@@ -1483,7 +1470,9 @@ showBindings :: GHCi ()
 showBindings = do
   s <- getSession
   bindings <- io (GHC.getBindings s)
-  printTypeAndContents s [ id | AnId id <- sortBy compareTyThings bindings]
+  docs     <- io$ pprTypeAndContents s 
+                  [ id | AnId id <- sortBy compareTyThings bindings]
+  printForUserPartWay docs
 
 compareTyThings :: TyThing -> TyThing -> Ordering
 t1 `compareTyThings` t2 = getName t1 `compareNames` getName t2

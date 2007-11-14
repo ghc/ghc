@@ -18,7 +18,7 @@ module GhciMonad where
 #include "HsVersions.h"
 
 import qualified GHC
-import Outputable       hiding (printForUser)
+import Outputable       hiding (printForUser, printForUserPartWay)
 import qualified Outputable
 import Panic            hiding (showException)
 import Util
@@ -27,6 +27,7 @@ import HscTypes
 import SrcLoc
 import Module
 import ObjLink
+import StaticFlags
 
 import Data.Maybe
 import Numeric
@@ -168,6 +169,12 @@ printForUser doc = do
   session <- getSession
   unqual <- io (GHC.getPrintUnqual session)
   io $ Outputable.printForUser stdout unqual doc
+
+printForUserPartWay :: SDoc -> GHCi ()
+printForUserPartWay doc = do
+  session <- getSession
+  unqual <- io (GHC.getPrintUnqual session)
+  io $ Outputable.printForUserPartWay stdout opt_PprUserLength unqual doc
 
 -- --------------------------------------------------------------------------
 -- timing & statistics

@@ -440,7 +440,7 @@ cPprTermBase y =
 
            coerceShow f _p = return . text . show . f . unsafeCoerce# . val
 
-           --TODO pprinting of list terms is not lazy
+           --NOTE pprinting of list terms is not lazy
            doList p h t = do
                let elems      = h : getListTerms t
                    isConsLast = termType(last elems) /= termType h

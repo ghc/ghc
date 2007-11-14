@@ -10,7 +10,7 @@
 -- 
 -----------------------------------------------------------------------------
 
-module Debugger (pprintClosureCommand, showTerm) where
+module Debugger (pprintClosureCommand, showTerm, pprTypeAndContents) where
 
 import Linker
 import RtClosureInspect
@@ -28,8 +28,8 @@ import GHC
 import DynFlags
 import InteractiveEval
 import Outputable
-import Pretty                    ( Mode(..), showDocWith )
 import SrcLoc
+import PprTyThing
 
 import Control.Exception
 import Control.Monad
@@ -61,10 +61,8 @@ pprintClosureCommand session bindThings force str = do
                                 (map skolemiseSubst substs)}
   -- Finally, print the Terms
   unqual  <- GHC.getPrintUnqual session
-  let showSDocForUserOneLine unqual doc =
-               showDocWith LeftMode (doc (mkErrStyle unqual))
   docterms <- mapM (showTerm session) terms
-  (putStrLn . showSDocForUserOneLine unqual . vcat)
+  (printForUser stdout unqual . vcat)
         (zipWith (\id docterm -> ppr id <+> char '=' <+> docterm)
                  ids
                  docterms)
@@ -199,3 +197,18 @@ newGrimName userName  = do
         occname = mkOccName varName userName
         name    = mkInternalName unique occname noSrcSpan
     return name
+
+pprTypeAndContents :: Session -> [Id] -> IO SDoc
+pprTypeAndContents session ids = do
+  dflags  <- GHC.getSessionDynFlags session
+  let pefas     = dopt Opt_PrintExplicitForalls dflags
+      pcontents = dopt Opt_PrintBindContents dflags
+  if pcontents 
+    then do
+      let depthBound = 100
+      terms      <- mapM (GHC.obtainTermB session depthBound False) ids
+      docs_terms <- mapM (showTerm session) terms
+      return $ vcat $ zipWith (\ty cts -> ty <+> equals <+> cts)
+                             (map (pprTyThing pefas . AnId) ids)
+                             docs_terms
+    else return $  vcat $ map (pprTyThing pefas . AnId) ids

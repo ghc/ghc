@@ -12,12 +12,14 @@ module Outputable (
 
 	BindingSite(..),
 
-	PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify, QualifyName(..),
+	PprStyle, CodeStyle(..), PrintUnqualified, alwaysQualify, neverQualify,
+        QualifyName(..),
 	getPprStyle, withPprStyle, withPprStyleDoc, 
 	pprDeeper, pprDeeperList, pprSetDepth,
 	codeStyle, userStyle, debugStyle, dumpStyle, asmStyle,
 	ifPprDebug, qualName, qualModule,
 	mkErrStyle, defaultErrStyle, defaultDumpStyle, defaultUserStyle,
+        mkUserStyle,
 
 	SDoc, 		-- Abstract
 	docToSDoc,
@@ -36,7 +38,7 @@ module Outputable (
 	speakNth, speakNTimes, speakN, speakNOf, plural,
 
 	printSDoc, printErrs, hPrintDump, printDump,
-	printForC, printForAsm, printForUser,
+	printForC, printForAsm, printForUser, printForUserPartWay,
 	pprCode, mkCodeStyle,
 	showSDoc, showSDocForUser, showSDocDebug, showSDocDump,
 	showSDocUnqual, showsPrecSDoc,
@@ -285,6 +287,10 @@ hPrintDump h doc = do
 printForUser :: Handle -> PrintUnqualified -> SDoc -> IO ()
 printForUser handle unqual doc 
   = Pretty.printDoc PageMode handle (doc (mkUserStyle unqual AllTheWay))
+
+printForUserPartWay :: Handle -> Int -> PrintUnqualified -> SDoc -> IO ()
+printForUserPartWay handle d unqual doc
+  = Pretty.printDoc PageMode handle (doc (mkUserStyle unqual (PartWay d)))
 
 -- printForC, printForAsm do what they sound like
 printForC :: Handle -> SDoc -> IO ()
