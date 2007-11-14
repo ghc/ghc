@@ -60,7 +60,7 @@ tcProc pat cmd exp_ty
     do	{ ((exp_ty1, res_ty), coi) <- boxySplitAppTy exp_ty 
 	; ((arr_ty, arg_ty), coi1) <- boxySplitAppTy exp_ty1
 	; let cmd_env = CmdEnv { cmd_arr = arr_ty }
-	; (pat', cmd') <- tcLamPat pat arg_ty (emptyRefinement, res_ty) $
+	; (pat', cmd') <- tcProcPat pat arg_ty (emptyRefinement, res_ty) $
 			  tcCmdTop cmd_env cmd []
         ; let res_coi = mkTransCoI coi (mkAppTyCoI exp_ty1 coi1 res_ty IdCo)
 	; return (pat', cmd', res_coi) 

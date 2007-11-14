@@ -13,7 +13,7 @@ TcPat: Typechecking patterns
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module TcPat ( tcLetPat, tcLamPat, tcLamPats, tcOverloadedLit,
+module TcPat ( tcLetPat, tcLamPat, tcLamPats, tcProcPat, tcOverloadedLit,
 	       addDataConStupidTheta, badFieldCon, polyPatSig ) where
 
 #include "HsVersions.h"
@@ -96,24 +96,29 @@ tcLamPats :: [LPat Name]				-- Patterns,
 --   5. Check that no existentials escape
 
 tcLamPats pats tys res_ty thing_inside
-  = tc_lam_pats (zipEqual "tcLamPats" pats tys)
+  = tc_lam_pats LamPat (zipEqual "tcLamPats" pats tys)
 	        (emptyRefinement, res_ty) thing_inside
 
 tcLamPat :: LPat Name -> BoxySigmaType 
       	 -> (Refinement,BoxyRhoType)		-- Result type
       	 -> ((Refinement,BoxyRhoType) -> TcM a)	-- Checker for body, given its result type
       	 -> TcM (LPat TcId, a)
-tcLamPat pat pat_ty res_ty thing_inside
-  = do	{ ([pat'],thing) <- tc_lam_pats [(pat, pat_ty)] res_ty thing_inside
+
+tcProcPat = tc_lam_pat ProcPat
+tcLamPat  = tc_lam_pat LamPat
+
+tc_lam_pat ctxt pat pat_ty res_ty thing_inside
+  = do	{ ([pat'],thing) <- tc_lam_pats ctxt [(pat, pat_ty)] res_ty thing_inside
 	; return (pat', thing) }
 
 -----------------
-tc_lam_pats :: [(LPat Name,BoxySigmaType)]
+tc_lam_pats :: PatCtxt
+	    -> [(LPat Name,BoxySigmaType)]
        	    -> (Refinement,BoxyRhoType)			-- Result type
        	    -> ((Refinement,BoxyRhoType) -> TcM a)	-- Checker for body, given its result type
        	    -> TcM ([LPat TcId], a)
-tc_lam_pats pat_ty_prs (reft, res_ty) thing_inside 
-  =  do	{ let init_state = PS { pat_ctxt = LamPat, pat_reft = reft, pat_eqs = False }
+tc_lam_pats ctxt pat_ty_prs (reft, res_ty) thing_inside 
+  =  do	{ let init_state = PS { pat_ctxt = ctxt, pat_reft = reft, pat_eqs = False }
 
 	; (pats', ex_tvs, res) <- tcMultiple tc_lpat_pr pat_ty_prs init_state $ \ pstate' ->
 				  refineEnvironment (pat_reft pstate') (pat_eqs pstate') $
@@ -156,6 +161,8 @@ data PatState = PS {
 
 data PatCtxt 
   = LamPat 
+  | ProcPat				-- The pattern in (proc pat -> ...)
+					--	see Note [Arrows and patterns]
   | LetPat (Name -> Maybe TcRhoType)	-- Used for let(rec) bindings
 
 patSigCtxt :: PatState -> UserTypeCtxt
@@ -173,18 +180,6 @@ patSigCtxt other			= LamPatSigCtxt
 
 \begin{code}
 tcPatBndr :: PatState -> Name -> BoxySigmaType -> TcM TcId
-tcPatBndr (PS { pat_ctxt = LamPat }) bndr_name pat_ty
-  = do	{ pat_ty' <- unBoxPatBndrType pat_ty bndr_name
-		-- We have an undecorated binder, so we do rule ABS1,
-		-- by unboxing the boxy type, forcing any un-filled-in
-		-- boxes to become monotypes
-		-- NB that pat_ty' can still be a polytype:
-		-- 	data T = MkT (forall a. a->a)
-		-- 	f t = case t of { MkT g -> ... }
-		-- Here, the 'g' must get type (forall a. a->a) from the
-		-- MkT context
-	; return (Id.mkLocalId bndr_name pat_ty') }
-
 tcPatBndr (PS { pat_ctxt = LetPat lookup_sig }) bndr_name pat_ty
   | Just mono_ty <- lookup_sig bndr_name
   = do	{ mono_name <- newLocalName bndr_name
@@ -195,6 +190,18 @@ tcPatBndr (PS { pat_ctxt = LetPat lookup_sig }) bndr_name pat_ty
   = do	{ pat_ty' <- unBoxPatBndrType pat_ty bndr_name
 	; mono_name <- newLocalName bndr_name
 	; return (Id.mkLocalId mono_name pat_ty') }
+
+tcPatBndr (PS { pat_ctxt = _lam_or_proc }) bndr_name pat_ty
+  = do	{ pat_ty' <- unBoxPatBndrType pat_ty bndr_name
+		-- We have an undecorated binder, so we do rule ABS1,
+		-- by unboxing the boxy type, forcing any un-filled-in
+		-- boxes to become monotypes
+		-- NB that pat_ty' can still be a polytype:
+		-- 	data T = MkT (forall a. a->a)
+		-- 	f t = case t of { MkT g -> ... }
+		-- Here, the 'g' must get type (forall a. a->a) from the
+		-- MkT context
+	; return (Id.mkLocalId bndr_name pat_ty') }
 
 
 -------------------
@@ -635,6 +642,9 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	  else do 	-- The general case, with existential, and local equality constraints
 	{ let eq_spec' = substEqSpec tenv eq_spec
 	      theta'   = substTheta  tenv full_theta
+	      ctxt     = pat_ctxt pstate
+	; checkTc (case ctxt of { ProcPat -> False; other -> True })
+		  (existentialProcPat data_con)
 	; co_vars <- newCoVars eq_spec'	-- Make coercion variables
 	; traceTc (text "tcConPat: refineAlt")
 	; pstate' <- refineAlt data_con pstate ex_tvs' co_vars pat_ty
@@ -1049,9 +1059,14 @@ badFieldCon con field
 polyPatSig :: TcType -> SDoc
 polyPatSig sig_ty
   = hang (ptext SLIT("Illegal polymorphic type signature in pattern:"))
-	 4 (ppr sig_ty)
+       2 (ppr sig_ty)
 
 badTypePat pat = ptext SLIT("Illegal type pattern") <+> ppr pat
+
+existentialProcPat :: DataCon -> SDoc
+existentialProcPat con
+  = hang (ptext SLIT("Illegal constructor") <+> quotes (ppr con) <+> ptext SLIT("in a 'proc' pattern"))
+       2 (ptext SLIT("Proc patterns cannot use existentials or GADTs"))
 
 lazyPatErr pat tvs
   = failWithTc $
