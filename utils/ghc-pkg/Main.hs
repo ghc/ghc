@@ -62,7 +62,7 @@ main :: IO ()
 main = do
   args <- getArgs
 
-  case getOpt Permute flags args of
+  case getOpt Permute (flags ++ deprecFlags) args of
         (cli,_,[]) | FlagHelp `elem` cli -> do
            prog <- getProgramName
            bye (usageInfo (usageHeader prog) flags)
@@ -120,8 +120,6 @@ flags = [
         "automatically build libs for GHCi (with register)",
   Option ['?'] ["help"] (NoArg FlagHelp)
         "display this help and exit",
-  Option ['D'] ["define-name"] (ReqArg toDefined "NAME=VALUE")
-          "define NAME as VALUE",
   Option ['V'] ["version"] (NoArg FlagVersion)
         "output version information and exit",
   Option [] ["simple-output"] (NoArg FlagSimpleOutput)
@@ -129,7 +127,13 @@ flags = [
   Option [] ["names-only"] (NoArg FlagNamesOnly)
         "only print package names, not versions; can only be used with list --simple-output"
   ]
- where
+
+deprecFlags :: [OptDescr Flag]
+deprecFlags = [
+  Option ['D'] ["define-name"] (ReqArg toDefined "NAME=VALUE")
+          "define NAME as VALUE"
+  ]
+  where
   toDefined str =
     case break (=='=') str of
       (nm,[])    -> FlagDefinedName nm []
