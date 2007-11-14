@@ -323,43 +323,51 @@ termTyVars = foldTerm TermFold {
 -- Pretty printing of terms
 ----------------------------------
 
+type Precedence        = Int
+type TermPrinter       = Precedence -> Term ->   SDoc
+type TermPrinterM m    = Precedence -> Term -> m SDoc
+
 app_prec,cons_prec ::Int
 app_prec = 10
 cons_prec = 5 -- TODO Extract this info from GHC itself
 
-pprTerm :: (Int -> Term -> Maybe SDoc) -> Int -> Term -> SDoc
-pprTerm y p t | Just doc <- pprTermM y p t = doc
+pprTerm :: TermPrinter -> TermPrinter
+pprTerm y p t | Just doc <- pprTermM (\p -> Just . y p) p t = doc
 pprTerm _ _ _ = panic "pprTerm"
 
-pprTermM, pprNewtypeWrap :: Monad m => 
-                           (Int -> Term -> m SDoc) -> Int -> Term -> m SDoc
-pprTermM y p Term{dc=Left dc_tag, subTerms=tt} = do
+pprTermM, ppr_termM, pprNewtypeWrap :: Monad m => TermPrinterM m -> TermPrinterM m
+pprTermM y p t = pprDeeper `liftM` ppr_termM y p t
+
+pprTermM1, ppr_termM1 :: Monad m => Term -> m SDoc
+pprTermM1 t    = pprDeeper `liftM` ppr_termM1 t
+
+ppr_termM y p Term{dc=Left dc_tag, subTerms=tt} = do
   tt_docs <- mapM (y app_prec) tt
-  return$ cparen (not(null tt) && p >= app_prec) (text dc_tag <+> fsep tt_docs)
+  return$ cparen (not(null tt) && p >= app_prec) (text dc_tag <+> pprDeeperList fsep tt_docs)
   
-pprTermM y p Term{dc=Right dc, subTerms=tt} 
+ppr_termM y p Term{dc=Right dc, subTerms=tt} 
 {-  | dataConIsInfix dc, (t1:t2:tt') <- tt  --TODO fixity
-  = parens (pprTerm1 True t1 <+> ppr dc <+> pprTerm1 True ppr t2) 
-    <+> hsep (map (pprTerm1 True) tt) 
+  = parens (ppr_term1 True t1 <+> ppr dc <+> ppr_term1 True ppr t2) 
+    <+> hsep (map (ppr_term1 True) tt) 
 -} -- TODO Printing infix constructors properly
   | null tt   = return$ ppr dc
   | otherwise = do
          tt_docs <- mapM (y app_prec) tt
-         return$ cparen (p >= app_prec) (ppr dc <+> fsep tt_docs)
+         return$ cparen (p >= app_prec) (ppr dc <+> pprDeeperList fsep tt_docs)
 
-pprTermM y p t@NewtypeWrap{} = pprNewtypeWrap y p t
+ppr_termM y p t@NewtypeWrap{} = pprNewtypeWrap y p t
 
-pprTermM _ _ t = pprTermM1 t
+ppr_termM _ _ t = ppr_termM1 t
 
-pprTermM1 :: Monad m => Term -> m SDoc
-pprTermM1 Prim{value=words, ty=ty} = 
+
+ppr_termM1 Prim{value=words, ty=ty} = 
     return$ text$ repPrim (tyConAppTyCon ty) words
-pprTermM1 Term{} = panic "pprTermM1 - unreachable"
-pprTermM1 Suspension{bound_to=Nothing} = return$ char '_'
-pprTermM1 Suspension{mb_ty=Just ty, bound_to=Just n}
+ppr_termM1 Term{} = panic "ppr_termM1 - unreachable"
+ppr_termM1 Suspension{bound_to=Nothing} = return$ char '_'
+ppr_termM1 Suspension{mb_ty=Just ty, bound_to=Just n}
   | Just _ <- splitFunTy_maybe ty = return$ ptext SLIT("<function>")
   | otherwise = return$ parens$ ppr n <> text "::" <> ppr ty 
-pprTermM1 _ = panic "pprTermM1"
+ppr_termM1 _ = panic "ppr_termM1"
 
 pprNewtypeWrap y p NewtypeWrap{ty=ty, wrapped_term=t} 
   | Just (tc,_) <- splitNewTyConApp_maybe ty
@@ -382,17 +390,10 @@ pprNewtypeWrap _ _ _ = panic "pprNewtypeWrap"
 --  which I didn't. Therefore, this code replicates a lot
 --  of what type classes provide for free.
 
--- Concretely a custom term printer takes an explicit
---  recursion knot, and produces a list of Term Processors,
---  which additionally need a precedence value to
---  either produce a SDoc or fail (and they do this in some monad m).
-
-type Precedence          = Int
-type RecursionKnot m     = Precedence -> Term -> m SDoc
-type CustomTermPrinter m = RecursionKnot m
+type CustomTermPrinter m = TermPrinterM m
                          -> [Precedence -> Term -> (m (Maybe SDoc))]
 
--- Takes a list of custom printers with a explicit recursion knot and a term, 
+-- | Takes a list of custom printers with a explicit recursion knot and a term, 
 -- and returns the output of the first succesful printer, or the default printer
 cPprTerm :: Monad m => CustomTermPrinter m -> Term -> m SDoc
 cPprTerm printers_ = go 0 where
@@ -446,10 +447,11 @@ cPprTermBase y =
                print_elems <- mapM (y cons_prec) elems
                return$ if isConsLast
                      then cparen (p >= cons_prec) 
-                        . fsep 
+                        . pprDeeperList fsep 
                         . punctuate (space<>colon)
                         $ print_elems
-                     else brackets (fsep$ punctuate comma print_elems)
+                     else brackets (pprDeeperList fsep$
+                                         punctuate comma print_elems)
 
                 where Just a /= Just b = not (a `coreEqType` b)
                       _      /=   _    = True
