@@ -1,3 +1,4 @@
+putStrLn "-- ghci024.stdout is a generated file! please edit ghci024.py instead."
 :set
 :show languages
 putStrLn "-- :set -fglasgow-exts"
