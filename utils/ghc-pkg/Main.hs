@@ -407,7 +407,7 @@ registerPackage input defines flags auto_ghci_libs update force = do
   pkg0 <- parsePackageInfo expanded defines
   putStrLn "done."
 
-  let pkg = resolveDeps db_stack pkg0
+  pkg <- resolveDeps db_stack pkg0
   validatePackageConfig pkg db_stack auto_ghci_libs update force
   let new_details = filter not_this (snd db_to_operate_on) ++ [pkg]
       not_this p = package p /= package pkg
@@ -715,9 +715,17 @@ checkPackageId ipi =
     []  -> die ("invalid package identifier: " ++ str)
     _   -> die ("ambiguous package identifier: " ++ str)
 
-resolveDeps :: PackageDBStack -> InstalledPackageInfo -> InstalledPackageInfo
-resolveDeps db_stack p = updateDeps p
+-- ToDo: remove this (see #1837)
+resolveDeps :: PackageDBStack -> InstalledPackageInfo -> IO InstalledPackageInfo
+resolveDeps db_stack p  = do
+    when (not (null unversioned_deps)) $
+       hPutStr stderr ("WARNING: unversioned dependencies are deprecated, "++
+                       "and will NOT be accepted by GHC 6.10: " ++
+                       unwords (map showPackageId unversioned_deps) ++ "\n")
+    return (updateDeps p)
   where
+        unversioned_deps = filter (not.realVersion) (depends p)
+
         -- The input package spec is allowed to give a package dependency
         -- without a version number; e.g.
         --      depends: base
