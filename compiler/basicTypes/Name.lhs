@@ -402,10 +402,13 @@ ppr_occ_name occ = ftext (occNameFS occ)
 -- cached behind the scenes in the FastString implementation.
 ppr_z_occ_name occ = ftext (zEncodeFS (occNameFS occ))
 
--- Prints "Defined at <loc>" or "Defined in <mod>" information for a Name.
+-- Prints (if mod information is available) "Defined at <loc>" or 
+--  "Defined in <mod>" information for a Name.
 pprNameLoc :: Name -> SDoc
 pprNameLoc name
   | isGoodSrcSpan loc = pprDefnLoc loc
+  | isInternalName name || isSystemName name 
+                      = ptext SLIT("<no location info>")
   | otherwise         = ptext SLIT("Defined in ") <> ppr (nameModule name)
   where loc = nameSrcSpan name
 \end{code}
