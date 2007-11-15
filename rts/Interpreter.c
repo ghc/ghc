@@ -1334,8 +1334,13 @@ run_BCO:
 	    // on the stack frame to describe this chunk of stack.
 	    //
 	    Sp -= ret_dyn_size;
-	    ((StgRetDyn *)Sp)->liveness = NO_PTRS | N_NONPTRS(stk_offset);
+	    ((StgRetDyn *)Sp)->liveness = R1_PTR | N_NONPTRS(stk_offset);
 	    ((StgRetDyn *)Sp)->info = (StgInfoTable *)&stg_gc_gen_info;
+
+            // save obj (pointer to the current BCO), since this
+            // might move during the call.  We use the R1 slot in the
+            // RET_DYN frame for this, hence R1_PTR above.
+            ((StgRetDyn *)Sp)->payload[0] = (StgClosure *)obj;
 
 	    SAVE_STACK_POINTERS;
 	    tok = suspendThread(&cap->r);
@@ -1357,6 +1362,16 @@ run_BCO:
 	    // And restart the thread again, popping the RET_DYN frame.
 	    cap = (Capability *)((void *)((unsigned char*)resumeThread(tok) - sizeof(StgFunTable)));
 	    LOAD_STACK_POINTERS;
+
+            // Re-load the pointer to the BCO from the RET_DYN frame,
+            // it might have moved during the call.  Also reload the
+            // pointers to the components of the BCO.
+            obj        = ((StgRetDyn *)Sp)->payload[0];
+            bco        = (StgBCO*)obj;
+            instrs     = (StgWord16*)(bco->instrs->payload);
+            literals   = (StgWord*)(&bco->literals->payload[0]);
+            ptrs       = (StgPtr*)(&bco->ptrs->payload[0]);
+
 	    Sp += ret_dyn_size;
 	    
 	    // Save the Haskell thread's current value of errno
