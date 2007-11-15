@@ -102,3 +102,6 @@ test('ffi018', only_ways(['ghci']), compile_and_run, ['ffi018_ghci_c.o'])
 clean(['ffi018_ghci_c.o'])
 
 test('ffi019', normal, compile_and_run, [''])
+
+# This one originally failed only GHCi, but doesn't hurt to test all ways.
+test('1679', normal, compile_and_run, [''])
