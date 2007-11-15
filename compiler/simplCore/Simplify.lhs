@@ -264,7 +264,7 @@ simplRecBind env top_lvl pairs
   where
     add_rules :: SimplEnv -> (InBndr,InExpr) -> (SimplEnv, (InBndr, OutBndr, InExpr))
 	-- Add the (substituted) rules to the binder
-    add_rules env (bndr, rhs) = (env, (bndr, bndr', rhs))
+    add_rules env (bndr, rhs) = (env', (bndr, bndr', rhs))
 	where
 	  (env', bndr') = addBndrRules env bndr (lookupRecBndr env bndr)
 
