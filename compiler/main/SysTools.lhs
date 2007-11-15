@@ -266,9 +266,6 @@ initSysTools mbMinusB dflags
 		-- later on; although gcc_args are in NATIVE format,
 		-- gcc can cope
 		--	(see comments with declarations of global variables)
-		--
-		-- The quotes round the -B argument are in case TopDir
-		-- has spaces in it
 
 	      perl_path | am_installed = installed_bin cGHC_PERL
 		        | otherwise    = cGHC_PERL
@@ -538,12 +535,20 @@ runWindres dflags args = do
   mb_env <- getGccEnv gcc_args
   runSomethingFiltered dflags id "Windres" windres 
         -- we must tell windres where to find gcc: it might not be on PATH
-        (Option ("--preprocessor=" ++ gcc ++ " " ++
-                                      unwords (map showOpt gcc_args) ++
-                 " -E -xc -DRC_INVOKED")
-         : args)
+        (Option ("--preprocessor=" ++ 
+                 unwords (map quote (gcc : map showOpt gcc_args ++
+                                     ["-E", "-xc", "-DRC_INVOKED"])))
+        -- -- use-temp-file is required for windres to interpret the
+        -- quoting in the preprocessor arg above correctly.  Without
+        -- this, windres calls the preprocessor with popen, which gets
+        -- the quoting wrong (discovered by experimentation and
+        -- reading the windres sources).  See #1828.
+        : Option "--use-temp-file"
+        : args)
         -- we must use the PATH workaround here too, since windres invokes gcc
         mb_env
+  where
+        quote x = '\"' : x ++ "\""
 
 touch :: DynFlags -> String -> String -> IO ()
 touch dflags purpose arg =
@@ -856,7 +861,6 @@ data BuildMessage
 #endif
 
 showOpt (FileOption pre f) = pre ++ platformPath f
-showOpt (Option "") = ""
 showOpt (Option s)  = s
 
 traceCmd :: DynFlags -> String -> String -> IO () -> IO ()
