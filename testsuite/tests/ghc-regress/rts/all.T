@@ -22,6 +22,5 @@ test('divbyzero',
      compile_and_run, [''])
 
 test('outofmem', normal, run_command, ['$MAKE -s --no-print-directory outofmem'])
-test('outofmem2', composes([ expect_fail_if_compiler_lt('ghc','6.9'),
-                             extra_run_opts('+RTS -M5m -RTS')]),
+test('outofmem2', extra_run_opts('+RTS -M5m -RTS'),
                   run_command, ['$MAKE -s --no-print-directory outofmem2'])
