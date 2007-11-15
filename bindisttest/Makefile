@@ -8,8 +8,17 @@ default_target: all
 TOP=..
 include $(TOP)/mk/boilerplate.mk
 
+ifeq "$(Windows)" "YES"
+BIN_DIST_INST_SUBDIR = "install dir"
+else
+# I very much doubt that paths with spaces will work on Unix
+BIN_DIST_INST_SUBDIR = installed
+endif
+
+BIN_DIST_INST_DIR = $(FPTOOLS_TOP_ABS)/bindisttest/$(BIN_DIST_INST_SUBDIR)
+
 all:
-	$(RM) -rf installed
+	$(RM) -rf $(BIN_DIST_INST_SUBDIR)
 	$(RM) -rf ghc*
 	$(RM) HelloWorld HelloWorld.o HelloWorld.hi output
 	$(TAR) -jxf $(BIN_DIST_TARBALL)
@@ -24,7 +33,7 @@ endif
 	$(CONTEXT_DIFF) output expected_output
 
 clean distclean:
-	$(RM) -rf installed
+	$(RM) -rf $(BIN_DIST_INST_SUBDIR)
 	$(RM) -rf ghc*
 	$(RM) HelloWorld HelloWorld.o HelloWorld.hi output
 
