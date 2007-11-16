@@ -1,4 +1,4 @@
-{-# OPTIONS -fth  -ddump-splices #-}
+{-# OPTIONS -fth  -ddump-splices -XExistentialQuantification #-}
 
 module TH_genEx where
 
