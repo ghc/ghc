@@ -6,7 +6,7 @@
 -- for details
 
 module VectBuiltIn (
-  Builtins(..), sumTyCon, prodTyCon,
+  Builtins(..), sumTyCon, prodTyCon, combinePAVar,
   initBuiltins, initBuiltinTyCons, initBuiltinPAs, initBuiltinPRs,
 
   primMethod, primPArray
@@ -45,6 +45,9 @@ mAX_NDP_PROD = 3
 mAX_NDP_SUM :: Int
 mAX_NDP_SUM = 3
 
+mAX_NDP_COMBINE :: Int
+mAX_NDP_COMBINE = 2
+
 mkNDPModule :: FastString -> Module
 mkNDPModule m = mkModule ndpPackageId (mkModuleNameFS m)
 
@@ -81,7 +84,7 @@ data Builtins = Builtins {
                 , replicatePAVar   :: Var
                 , emptyPAVar       :: Var
                 , packPAVar        :: Var
-                -- , combinePAVar     :: Var
+                , combinePAVars    :: Array Int Var
                 , liftingContext   :: Var
                 }
 
@@ -95,6 +98,11 @@ prodTyCon n bi
   | n == 1                      = wrapTyCon bi
   | n >= 0 && n <= mAX_NDP_PROD = tupleTyCon Boxed n
   | otherwise = pprPanic "prodTyCon" (ppr n)
+
+combinePAVar :: Int -> Builtins -> Var
+combinePAVar n bi
+  | n >= 2 && n <= mAX_NDP_COMBINE = combinePAVars bi ! n
+  | otherwise = pprPanic "combinePAVar" (ppr n)
 
 initBuiltins :: DsM Builtins
 initBuiltins
@@ -130,7 +138,11 @@ initBuiltins
       replicatePAVar   <- externalVar nDP_PARRAY FSLIT("replicatePA")
       emptyPAVar       <- externalVar nDP_PARRAY FSLIT("emptyPA")
       packPAVar        <- externalVar nDP_PARRAY FSLIT("packPA")
-      -- combinePAVar     <- dsLookupGlobalId combinePAName
+
+      combines <- mapM (externalVar nDP_PARRAY)
+                       [mkFastString ("combine" ++ show i ++ "PA")
+                          | i <- [2..mAX_NDP_COMBINE]]
+      let combinePAVars = listArray (2, mAX_NDP_COMBINE) combines
 
       liftingContext <- liftM (\u -> mkSysLocal FSLIT("lc") u intPrimTy)
                               newUnique
@@ -162,7 +174,7 @@ initBuiltins
                , replicatePAVar   = replicatePAVar
                , emptyPAVar       = emptyPAVar
                , packPAVar        = packPAVar
-               -- , combinePAVar     = combinePAVar
+               , combinePAVars    = combinePAVars
                , liftingContext   = liftingContext
                }
 
