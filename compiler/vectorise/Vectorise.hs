@@ -133,12 +133,30 @@ vectBndr v
   where
     mapTo vv lv env = env { local_vars = extendVarEnv (local_vars env) v (vv, lv) }
 
+vectBndrNew :: Var -> FastString -> VM VVar
+vectBndrNew v fs
+  = do
+      vty <- vectType (idType v)
+      vv  <- newLocalVVar fs vty
+      updLEnv (upd vv)
+      return vv
+  where
+    upd vv env = env { local_vars = extendVarEnv (local_vars env) v vv }
+
 vectBndrIn :: Var -> VM a -> VM (VVar, a)
 vectBndrIn v p
   = localV
   $ do
       vv <- vectBndr v
       x <- p
+      return (vv, x)
+
+vectBndrNewIn :: Var -> FastString -> VM a -> VM (VVar, a)
+vectBndrNewIn v fs p
+  = localV
+  $ do
+      vv <- vectBndrNew v fs
+      x  <- p
       return (vv, x)
 
 vectBndrIn' :: Var -> (VVar -> VM a) -> VM (VVar, a)
@@ -292,11 +310,12 @@ type CoreAltWithFVs = AnnAlt Id VarSet
 --
 -- to
 --
---   V:    let v = e in case v of _ { ... }
---   L:    let v = e in case v `cast` ... of _ { ... }
+--   V:    let v' = e in case v' of _ { ... }
+--   L:    let v' = e in case v' `cast` ... of _ { ... }
 --
 -- When lifting, we have to do it this way because v must have the type
--- [:V(T):] but the scrutinee must be cast to the representation type.
+-- [:V(T):] but the scrutinee must be cast to the representation type. We also
+-- have to handle the case where v is a wild var correctly.
 --   
 
 -- FIXME: this is too lazy
@@ -313,7 +332,7 @@ vectAlgCase scrut bndr ty [(DataAlt dc, bndrs, body)]
       vty <- vectType ty
       lty <- mkPArrayType vty
       vexpr <- vectExpr scrut
-      (vbndr, (vbndrs, vbody)) <- vectBndrIn bndr
+      (vbndr, (vbndrs, vbody)) <- vect_scrut_bndr
                                 . vectBndrsIn bndrs
                                 $ vectExpr body
 
@@ -325,3 +344,7 @@ vectAlgCase scrut bndr ty [(DataAlt dc, bndrs, body)]
       shape_bndrs <- mapM (newLocalVar FSLIT("s")) shape_tys
       return . vLet (vNonRec vbndr vexpr)
              $ vCaseProd vscrut vty lty vect_dc arr_dc shape_bndrs vbndrs vbody
+  where
+    vect_scrut_bndr | isDeadBinder bndr = vectBndrNewIn bndr FSLIT("scrut")
+                    | otherwise         = vectBndrIn bndr
+
