@@ -11,7 +11,7 @@ module VectMonad (
 
   noV, tryV, maybeV, traceMaybeV, orElseV, fixV, localV, closedV, initV,
   liftDs,
-  cloneName, cloneId,
+  cloneName, cloneId, cloneVar,
   newExportedVar, newLocalVar, newDummyVar, newTyVar,
   
   Builtins(..), sumTyCon, prodTyCon,
@@ -300,6 +300,9 @@ cloneId mk_occ id ty
       let id' | isExportedId id = Id.mkExportedLocalId name ty
               | otherwise       = Id.mkLocalId         name ty
       return id'
+
+cloneVar :: Var -> VM Var
+cloneVar var = liftM (setIdUnique var) (liftDs newUnique)
 
 newExportedVar :: OccName -> Type -> VM Var
 newExportedVar occ_name ty 

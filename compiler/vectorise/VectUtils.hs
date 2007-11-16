@@ -8,7 +8,9 @@
 module VectUtils (
   collectAnnTypeBinders, collectAnnTypeArgs, isAnnTypeArg,
   collectAnnValBinders,
-  mkDataConTag, mkDataConTagLit,
+  dataConTagZ, mkDataConTag, mkDataConTagLit,
+
+  newLocalVVar,
 
   mkBuiltinCo,
   mkPADictType, mkPArrayType, mkPReprType,
@@ -74,12 +76,14 @@ isAnnTypeArg :: AnnExpr b ann -> Bool
 isAnnTypeArg (_, AnnType t) = True
 isAnnTypeArg _              = False
 
+dataConTagZ :: DataCon -> Int
+dataConTagZ con = dataConTag con - fIRST_TAG
+
 mkDataConTagLit :: DataCon -> Literal
-mkDataConTagLit con
-  = mkMachInt . toInteger $ dataConTag con - fIRST_TAG
+mkDataConTagLit = mkMachInt . toInteger . dataConTagZ
 
 mkDataConTag :: DataCon -> CoreExpr
-mkDataConTag con = mkIntLitInt (dataConTag con - fIRST_TAG)
+mkDataConTag = mkIntLitInt . dataConTagZ
 
 splitPrimTyCon :: Type -> Maybe TyCon
 splitPrimTyCon ty

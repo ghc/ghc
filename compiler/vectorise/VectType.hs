@@ -6,7 +6,8 @@
 -- for details
 
 module VectType ( vectTyCon, vectType, vectTypeEnv,
-                   PAInstance, buildPADict )
+                  mkRepr, arrShapeTys, arrShapeVars, arrSelector,
+                  PAInstance, buildPADict )
 where
 
 #include "HsVersions.h"
@@ -361,6 +362,10 @@ replicateShape (SumRepr {})  len tag
 replicateShape (IdRepr _) _ _ = return []
 replicateShape (VoidRepr {}) len _ = return [len]
 replicateShape (EnumRepr {}) len _ = return [len]
+
+arrSelector :: Repr -> [a] -> a
+arrSelector (SumRepr {}) [_, sel, _] = sel
+arrSelector _ _ = panic "arrSelector"
 
 emptyArrRepr :: Repr -> VM [CoreExpr]
 emptyArrRepr (SumRepr { sum_components = prods })
