@@ -569,7 +569,7 @@ addMVarFinalizer (MVar m) finalizer =
 \begin{code}
 #ifdef mingw32_HOST_OS
 
--- Note: threadDelay, threadWaitRead and threadWaitWrite aren't really functional
+-- Note: threadWaitRead and threadWaitWrite aren't really functional
 -- on Win32, but left in there because lib code (still) uses them (the manner
 -- in which they're used doesn't cause problems on a Win32 platform though.)
 
