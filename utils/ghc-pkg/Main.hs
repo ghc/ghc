@@ -40,7 +40,7 @@ import Text.PrettyPrint
 import qualified Control.Exception as Exception
 import Data.Maybe
 
-import Data.Char ( isSpace )
+import Data.Char ( isSpace, toLower )
 import Monad
 import Directory
 import System ( getArgs, getProgName, getEnv, exitWith, ExitCode(..) )
@@ -681,7 +681,7 @@ validatePackageConfig :: InstalledPackageInfo
                       -> IO ()
 validatePackageConfig pkg db_stack auto_ghci_libs update force = do
   checkPackageId pkg
-  checkDuplicates db_stack pkg update
+  checkDuplicates db_stack pkg update force
   mapM_ (checkDep db_stack force) (depends pkg)
   mapM_ (checkDir force) (importDirs pkg)
   mapM_ (checkDir force) (libraryDirs pkg)
@@ -703,8 +703,8 @@ checkPackageId ipi =
     []  -> die ("invalid package identifier: " ++ str)
     _   -> die ("ambiguous package identifier: " ++ str)
 
-checkDuplicates :: PackageDBStack -> InstalledPackageInfo -> Bool -> IO ()
-checkDuplicates db_stack pkg update = do
+checkDuplicates :: PackageDBStack -> InstalledPackageInfo -> Bool -> Force -> IO ()
+checkDuplicates db_stack pkg update force = do
   let
         pkgid = package pkg
         (_top_db_name, pkgs) : _  = db_stack
@@ -714,6 +714,14 @@ checkDuplicates db_stack pkg update = do
   when (not update && (pkgid `elem` map package pkgs)) $
        die ("package " ++ showPackageId pkgid ++ " is already installed")
 
+  let
+        uncasep = map toLower . showPackageId
+        dups = filter ((== uncasep pkgid) . uncasep) (map package pkgs)
+
+  when (not (null dups)) $ dieOrForceAll force $
+        "Package names may be treated case-insensitively in the future.\n"++
+        "Package " ++ showPackageId pkgid ++
+        " overlaps with: " ++ unwords (map showPackageId dups)
 
 
 checkDir :: Force -> String -> IO ()
