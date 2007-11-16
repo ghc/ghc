@@ -57,6 +57,7 @@ module Unique (
 
 #include "HsVersions.h"
 
+import StaticFlags
 import BasicTypes
 import FastString
 import Outputable
@@ -197,6 +198,11 @@ We do sometimes make strings with @Uniques@ in them:
 \begin{code}
 pprUnique :: Unique -> SDoc
 pprUnique uniq
+#ifdef DEBUG
+  | opt_SuppressUniques
+  = empty	-- Used exclusively to suppress uniques so you 
+  | otherwise	-- can compare output easily
+#endif
   = case unpkUnique uniq of
       (tag, u) -> finish_ppr tag u (text (iToBase62 u))
 

@@ -26,6 +26,7 @@ module StaticFlags (
 
 	-- Output style options
 	opt_PprUserLength,
+	opt_SuppressUniques,
 	opt_PprStyle_Debug,
 
 	-- profiling opts
@@ -169,8 +170,9 @@ static_flags = [
  	-- ToDo: user ways
 
 	------ Debugging ----------------------------------------------------
-  ,  ( "dppr-debug",       PassFlag addOpt )
-  ,  ( "dppr-user-length", AnySuffix addOpt )
+  ,  ( "dppr-debug",        PassFlag addOpt )
+  ,  ( "dsuppress-uniques", PassFlag addOpt )
+  ,  ( "dppr-user-length",  AnySuffix addOpt )
       -- rest of the debugging flags are dynamic
 
 	--------- Profiling --------------------------------------------------
@@ -282,6 +284,7 @@ unpacked_opts =
 opt_IgnoreDotGhci		= lookUp FSLIT("-ignore-dot-ghci")
 
 -- debugging opts
+opt_SuppressUniques		= lookUp  FSLIT("-dsuppress-uniques")
 opt_PprStyle_Debug		= lookUp  FSLIT("-dppr-debug")
 opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
 
