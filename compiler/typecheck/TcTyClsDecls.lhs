@@ -1214,7 +1214,7 @@ badGadtDecl tc_name
 
 badExistential con_name
   = hang (ptext SLIT("Data constructor") <+> quotes (ppr con_name) <+>
-		ptext SLIT("has existential type variables, or a context, or both"))
+		ptext SLIT("has existential type variables, or a context"))
        2 (parens $ ptext SLIT("Use -XExistentialQuantification or -XGADTs to allow this"))
 
 badStupidTheta tc_name
