@@ -49,4 +49,4 @@ test('arith018', skip_if_fast, compile_and_run, [''])
 test('arith019', skip_if_fast, compile_and_run, [''])
 test('expfloat', skip_if_fast, compile_and_run, ['-fglasgow-exts'])
 
-test('1603', expect_broken_for(1603,['optc']), compile_and_run, ['-fglasgow-exts'])
+test('1603', skip, compile_and_run, ['-fglasgow-exts'])
