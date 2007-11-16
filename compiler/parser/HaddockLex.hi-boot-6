@@ -12,7 +12,7 @@ data Token
   | TokIdent [RdrName.RdrName]
   | TokString GHC.Base.String
   | TokURL GHC.Base.String
-  | TokPic String
-  | TokEmphasis String
+  | TokPic GHC.Base.String
+  | TokEmphasis GHC.Base.String
   | TokAName GHC.Base.String
   | TokBirdTrack GHC.Base.String
