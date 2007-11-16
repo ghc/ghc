@@ -10,19 +10,22 @@ ifeq "$(Windows)" "NO"
 SRC_HC_OPTS += -package unix
 endif
 
-HS_PROG = timeout
-
-boot :: calibrate.out
+all :: calibrate.out
 
 ifeq "$(findstring thr,$(GhcRTSWays))" "thr"
-boot :: $(HS_PROG)
+HS_PROG = timeout
 else
-boot :: python-timeout
+all :: python-timeout
+CLEAN_FILES += timeout
 endif
+
+boot :: all
 
 calibrate.out:
 	rm -f TimeMe.o TimeMe.hi TimeMe
 	$(PYTHON) calibrate "$(HC)" > $@
+
+CLEAN_FILES += calibrate.out
 
 python-timeout:
 	cp timeout.py timeout
