@@ -51,6 +51,7 @@ import BasicTypes           ( Boxity(..) )
 import Outputable
 import FastString
 import Control.Monad        ( liftM, liftM2, zipWithM, mapAndUnzipM )
+import Data.List            ( sortBy, unzip4 )
 
 vectorise :: HscEnv -> UniqSupply -> RuleBase -> ModGuts
           -> IO (SimplCount, ModGuts)
@@ -245,8 +246,9 @@ vectExpr (_, AnnApp fn arg)
     (arg_ty, res_ty) = splitFunTy . exprType $ deAnnotate fn
 
 vectExpr (_, AnnCase scrut bndr ty alts)
-  | isAlgType scrut_ty
-  = vectAlgCase scrut bndr ty alts
+  | Just (tycon, ty_args) <- splitTyConApp_maybe scrut_ty
+  , isAlgTyCon tycon
+  = vectAlgCase tycon ty_args scrut bndr ty alts
   where
     scrut_ty = exprType (deAnnotate scrut)
 
@@ -319,7 +321,7 @@ type CoreAltWithFVs = AnnAlt Id VarSet
 --   
 
 -- FIXME: this is too lazy
-vectAlgCase scrut bndr ty [(DEFAULT, [], body)]
+vectAlgCase tycon ty_args scrut bndr ty [(DEFAULT, [], body)]
   = do
       vscrut <- vectExpr scrut
       vty    <- vectType ty
@@ -327,8 +329,9 @@ vectAlgCase scrut bndr ty [(DEFAULT, [], body)]
       (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
       return $ vCaseDEFAULT vscrut vbndr vty lty vbody
 
-vectAlgCase scrut bndr ty [(DataAlt dc, bndrs, body)]
+vectAlgCase tycon ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
   = do
+      vect_tc <- maybeV (lookupTyCon tycon)
       vty <- vectType ty
       lty <- mkPArrayType vty
       vexpr <- vectExpr scrut
@@ -339,12 +342,117 @@ vectAlgCase scrut bndr ty [(DataAlt dc, bndrs, body)]
       (vscrut, arr_tc, arg_tys) <- mkVScrut (vVar vbndr)
       vect_dc <- maybeV (lookupDataCon dc)
       let [arr_dc] = tyConDataCons arr_tc
-      let shape_tys = take (dataConRepArity arr_dc - length bndrs)
-                           (dataConRepArgTys arr_dc)
-      shape_bndrs <- mapM (newLocalVar FSLIT("s")) shape_tys
+      repr <- mkRepr vect_tc
+      shape_bndrs <- arrShapeVars repr
       return . vLet (vNonRec vbndr vexpr)
              $ vCaseProd vscrut vty lty vect_dc arr_dc shape_bndrs vbndrs vbody
   where
     vect_scrut_bndr | isDeadBinder bndr = vectBndrNewIn bndr FSLIT("scrut")
                     | otherwise         = vectBndrIn bndr
+
+vectAlgCase tycon ty_args scrut bndr ty alts
+  = do
+      vect_tc <- maybeV (lookupTyCon tycon)
+      vty               <- vectType ty
+      lty               <- mkPArrayType vty
+
+      repr        <- mkRepr vect_tc
+      shape_bndrs <- arrShapeVars repr
+      (len, sel, indices) <- arrSelector repr (map Var shape_bndrs)
+
+      (vbndr, valts) <- vect_scrut_bndr $ mapM (proc_alt sel lty) alts'
+      let (vect_dcs, vect_bndrss, lift_bndrss, vbodies) = unzip4 valts
+
+      vexpr <- vectExpr scrut
+      (vscrut, arr_tc, arg_tys) <- mkVScrut (vVar vbndr)
+      let [arr_dc] = tyConDataCons arr_tc
+
+      let (vect_scrut,  lift_scrut)  = vscrut
+          (vect_bodies, lift_bodies) = unzip vbodies
+
+      let vect_case = Case vect_scrut (mkWildId (exprType vect_scrut)) vty
+                           (zipWith3 mk_vect_alt vect_dcs vect_bndrss vect_bodies)
+
+      lbody <- combinePA vty len sel indices lift_bodies
+      let lift_case = Case lift_scrut (mkWildId (exprType lift_scrut)) lty
+                           [(DataAlt arr_dc, shape_bndrs ++ concat lift_bndrss,
+                             lbody)]
+
+      return . vLet (vNonRec vbndr vexpr)
+             $ (vect_case, lift_case)
+  where
+    vect_scrut_bndr | isDeadBinder bndr = vectBndrNewIn bndr FSLIT("scrut")
+                    | otherwise         = vectBndrIn bndr
+
+    alts' = sortBy (\(alt1, _, _) (alt2, _, _) -> cmp alt1 alt2) alts
+
+    cmp (DataAlt dc1) (DataAlt dc2) = dataConTag dc1 `compare` dataConTag dc2
+    cmp DEFAULT       DEFAULT       = EQ
+    cmp DEFAULT       _             = LT
+    cmp _             DEFAULT       = GT
+
+    proc_alt sel lty (DataAlt dc, bndrs, body)
+      = do
+          vect_dc <- maybeV (lookupDataCon dc)
+          let tag = mkDataConTag vect_dc
+              fvs = freeVarsOf body `delVarSetList` bndrs
+          (vect_bndrs, lift_bndrs, vbody)
+            <- vect_alt_bndrs bndrs
+             $ \len -> packLiftingContext len sel tag fvs lty
+             $ vectExpr body
+
+          return (vect_dc, vect_bndrs, lift_bndrs, vbody)
+
+    vect_alt_bndrs [] p
+      = do
+          void_tc <- builtin voidTyCon
+          let void_ty = mkTyConApp void_tc []
+          arr_ty <- mkPArrayType void_ty
+          bndr   <- newLocalVar FSLIT("voids") arr_ty
+          len    <- lengthPA void_ty (Var bndr)
+          e      <- p len
+          return ([], [bndr], e)
+
+    vect_alt_bndrs bndrs p
+       = localV
+       $ do
+           vbndrs <- mapM vectBndr bndrs
+           let (vect_bndrs, lift_bndrs) = unzip vbndrs
+               vv : _ = vect_bndrs
+               lv : _ = lift_bndrs
+           len <- lengthPA (idType vv) (Var lv)
+           e   <- p len
+           return (vect_bndrs, lift_bndrs, e)
+
+    mk_vect_alt vect_dc bndrs body = (DataAlt vect_dc, bndrs, body)
+
+packLiftingContext :: CoreExpr -> CoreExpr -> CoreExpr -> VarSet -> Type -> VM VExpr -> VM VExpr
+packLiftingContext len shape tag fvs res_ty p
+  = do
+      select <- builtin selectPAIntPrimVar
+      let sel_expr = mkApps (Var select) [shape, tag]
+      sel_var <- newLocalVar FSLIT("sel#") (exprType sel_expr)
+      lc_var <- builtin liftingContext
+      localV $
+        do
+          bnds <- mapM (packFreeVar (Var lc_var) (Var sel_var)) (varSetElems fvs)
+          (vexpr, lexpr) <- p
+          return (vexpr, Let (NonRec sel_var sel_expr)
+                         $ Case len lc_var res_ty [(DEFAULT, [], lexpr)])
+
+packFreeVar :: CoreExpr -> CoreExpr -> Var -> VM [CoreBind]
+packFreeVar len sel v
+  = do
+      r <- lookupVar v
+      case r of
+        Local (vv,lv) ->
+          do
+            lv' <- cloneVar lv
+            expr <- packPA (idType vv) (Var lv) len sel
+            updLEnv (upd vv lv')
+            return [(NonRec lv' expr)]
+
+        _  -> return []
+  where
+    upd vv lv' env = env { local_vars = extendVarEnv (local_vars env) v (vv, lv') }
 

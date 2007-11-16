@@ -363,9 +363,8 @@ replicateShape (IdRepr _) _ _ = return []
 replicateShape (VoidRepr {}) len _ = return [len]
 replicateShape (EnumRepr {}) len _ = return [len]
 
-arrSelector :: Repr -> [a] -> a
-arrSelector (SumRepr {}) [_, sel, _] = sel
-arrSelector _ _ = panic "arrSelector"
+arrSelector :: Repr -> [CoreExpr] -> VM (CoreExpr, CoreExpr, CoreExpr)
+arrSelector (SumRepr {}) [len, sel, is] = return (len, sel, is)
 
 emptyArrRepr :: Repr -> VM [CoreExpr]
 emptyArrRepr (SumRepr { sum_components = prods })
