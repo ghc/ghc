@@ -469,6 +469,13 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
       options are given, the rightmost one is used as the database to act
       upon.</para>
 
+   <para>Commands that query the package database (list, latest,
+     describe, field) operate on the list of databases specified by
+     the flags <option>--user</option>, <option>--global</option>, and
+     <option>--package-conf</option>.  If none of these flags are
+     given, the default is <option>--global</option>
+     <option>--user</option>.</para>
+
     <para>If the environment variable <literal>GHC_PACKAGE_PATH</literal> is
       set, and its value does not end in a separator (<literal>:</literal> on
       Unix, <literal>;</literal> on Windows), then the last database is
@@ -526,6 +533,15 @@ $ export GHC_PACKAGE_PATH=$HOME/.my-ghc-packages.conf:</screen>
 	  <para>Sets the <literal>exposed</literal> flag for package
 	    <replaceable>P</replaceable> to <literal>True</literal>.</para>
 	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term><literal>ghc-pkg check</literal></term>
+	<listitem>
+          <para>Check consistency of dependencies in the package
+          database, and report packages that have missing
+          dependencies.</para>
+        </listitem>
       </varlistentry>
 
       <varlistentry>

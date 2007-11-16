@@ -46,7 +46,7 @@ import Directory
 import System ( getArgs, getProgName, getEnv, exitWith, ExitCode(..) )
 import System.IO
 import System.IO.Error (try)
-import Data.List ( isPrefixOf, isSuffixOf, intersperse, sortBy )
+import Data.List ( isPrefixOf, isSuffixOf, intersperse, sortBy, nub )
 
 #ifdef mingw32_HOST_OS
 import Foreign
@@ -96,9 +96,9 @@ flags = [
   Option [] ["user"] (NoArg FlagUser)
         "use the current user's package database",
   Option [] ["global"] (NoArg FlagGlobal)
-        "(default) use the global package database",
+        "use the global package database",
   Option ['f'] ["package-conf"] (ReqArg FlagConfig "FILE")
-        "act upon specified package config file (only)",
+        "use the specified package config file",
   Option [] ["global-conf"] (ReqArg FlagGlobalConfig "FILE")
         "location of the global package config",
   Option [] ["force"] (NoArg FlagForce)
@@ -167,6 +167,18 @@ usageHeader prog = substProg prog $
   "  $p field {pkg-id} {field}\n" ++
   "    Extract the specified field of the package description for the\n" ++
   "    specified package.\n" ++
+  "\n" ++
+  "  When asked to modify a database (register, unregister, update,\n"++
+  "  hide, expose, and also check), ghc-pkg modifies the global database by\n"++
+  "  default.  Specifying --user causes it to act on the user database,\n"++
+  "  or --package-conf can be used to act on another database\n"++
+  "  entirely. When multiple of these options are given, the rightmost\n"++
+  "  one is used as the database to act upon.\n"++
+  "\n"++
+  "  Commands that query the package database (list, latest, describe,\n"++
+  "  field) operate on the list of databases specified by the flags\n"++
+  "  --user, --global, and --package-conf.  If none of these flags are\n"++
+  "  given, the default is --global --user.\n"++
   "\n" ++
   " The following optional flags are also accepted:\n"
 
@@ -322,29 +334,40 @@ getPkgDatabases modify flags = do
         -- This is the database we modify by default.
       virt_global_conf = last env_stack
 
-  -- -f flags on the command line add to the database stack, unless any
-  -- of them are present in the stack already.
-  let flag_stack = filter (`notElem` env_stack)
-                        [ f | FlagConfig f <- reverse flags ] ++ env_stack
+  let db_flags = [ f | Just f <- map is_db_flag flags ]
+         where is_db_flag FlagUser       = Just user_conf
+               is_db_flag FlagGlobal     = Just virt_global_conf
+               is_db_flag (FlagConfig f) = Just f
+               is_db_flag _              = Nothing
 
-  -- Now we have the full stack of databases.  Next, if the current
-  -- command is a "modify" type command, then we truncate the stack
-  -- so that the topmost element is the database being modified.
   final_stack <-
      if not modify
-        then return flag_stack
+        then    -- For a "read" command, we use all the databases
+                -- specified on the command line.  If there are no
+                -- command-line flags specifying databases, the default
+                -- is to use all the ones we know about.
+             if null db_flags then return env_stack 
+                              else return (reverse (nub db_flags))
         else let
-                go (FlagUser : fs)     = modifying user_conf
-                go (FlagGlobal : fs)   = modifying virt_global_conf
-                go (FlagConfig f : fs) = modifying f
-                go (_ : fs)            = go fs
-                go []                  = modifying virt_global_conf
+                -- For a "modify" command, treat all the databases as
+                -- a stack, where we are modifying the top one, but it
+                -- can refer to packages in databases further down the
+                -- stack.
+
+                -- -f flags on the command line add to the database
+                -- stack, unless any of them are present in the stack
+                -- already.
+                flag_stack = filter (`notElem` env_stack)
+                                [ f | FlagConfig f <- reverse flags ]
+                                ++ env_stack
 
                 modifying f
                   | f `elem` flag_stack = return (dropWhile (/= f) flag_stack)
                   | otherwise           = die ("requesting modification of database:\n\t" ++ f ++ "\n\twhich is not in the database stack.")
              in
-                go flags
+                if null db_flags 
+                   then modifying virt_global_conf
+                   else modifying (head db_flags)
 
   db_stack <- mapM readParseDatabase final_stack
   return db_stack
@@ -597,7 +620,9 @@ strList = show
 
 checkConsistency :: [Flag] -> IO ()
 checkConsistency flags = do
-  db_stack <- getPkgDatabases False flags
+  db_stack <- getPkgDatabases True flags
+         -- check behaves like modify for the purposes of deciding which
+         -- databases to use, because ordering is important.
   let pkgs = map (\p -> (package p, p)) $ concatMap snd db_stack
       broken_pkgs = do
         (pid, p) <- pkgs
@@ -718,7 +743,7 @@ checkDuplicates db_stack pkg update force = do
         uncasep = map toLower . showPackageId
         dups = filter ((== uncasep pkgid) . uncasep) (map package pkgs)
 
-  when (not (null dups)) $ dieOrForceAll force $
+  when (not update && not (null dups)) $ dieOrForceAll force $
         "Package names may be treated case-insensitively in the future.\n"++
         "Package " ++ showPackageId pkgid ++
         " overlaps with: " ++ unwords (map showPackageId dups)
