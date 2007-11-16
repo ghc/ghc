@@ -62,6 +62,7 @@ data Builtins = Builtins {
                 , prTyCon          :: TyCon
                 , prDataCon        :: DataCon
                 , parrayIntPrimTyCon :: TyCon
+                , parrayBoolPrimTyCon :: TyCon
                 , voidTyCon        :: TyCon
                 , wrapTyCon        :: TyCon
                 , sumTyCons        :: Array Int TyCon
@@ -74,10 +75,12 @@ data Builtins = Builtins {
                 , applyClosurePVar :: Var
                 , replicatePAIntPrimVar :: Var
                 , upToPAIntPrimVar :: Var
+                , selectPAIntPrimVar :: Var
+                , truesPABoolPrimVar :: Var
                 , lengthPAVar      :: Var
                 , replicatePAVar   :: Var
                 , emptyPAVar       :: Var
-                -- , packPAVar        :: Var
+                , packPAVar        :: Var
                 -- , combinePAVar     :: Var
                 , liftingContext   :: Var
                 }
@@ -103,6 +106,7 @@ initBuiltins
       prTyCon      <- externalTyCon nDP_PARRAY FSLIT("PR")
       let [prDataCon] = tyConDataCons prTyCon
       parrayIntPrimTyCon <- externalTyCon nDP_PRIM FSLIT("PArray_Int#")
+      parrayBoolPrimTyCon <- externalTyCon nDP_PRIM FSLIT("PArray_Bool#")
       closureTyCon <- externalTyCon nDP_CLOSURE FSLIT(":->")
 
       voidTyCon    <- externalTyCon nDP_REPR FSLIT("Void")
@@ -120,10 +124,12 @@ initBuiltins
       applyClosurePVar <- externalVar nDP_CLOSURE FSLIT("$:^")
       replicatePAIntPrimVar <- externalVar nDP_PRIM FSLIT("replicatePA_Int#")
       upToPAIntPrimVar <- externalVar nDP_PRIM FSLIT("upToPA_Int#")
+      selectPAIntPrimVar <- externalVar nDP_PRIM FSLIT("selectPA_Int#")
+      truesPABoolPrimVar <- externalVar nDP_PRIM FSLIT("truesPA_Bool#")
       lengthPAVar      <- externalVar nDP_PARRAY FSLIT("lengthPA")
       replicatePAVar   <- externalVar nDP_PARRAY FSLIT("replicatePA")
       emptyPAVar       <- externalVar nDP_PARRAY FSLIT("emptyPA")
-      -- packPAVar        <- dsLookupGlobalId packPAName
+      packPAVar        <- externalVar nDP_PARRAY FSLIT("packPA")
       -- combinePAVar     <- dsLookupGlobalId combinePAName
 
       liftingContext <- liftM (\u -> mkSysLocal FSLIT("lc") u intPrimTy)
@@ -137,6 +143,7 @@ initBuiltins
                , prTyCon          = prTyCon
                , prDataCon        = prDataCon
                , parrayIntPrimTyCon = parrayIntPrimTyCon
+               , parrayBoolPrimTyCon = parrayBoolPrimTyCon
                , voidTyCon        = voidTyCon
                , wrapTyCon        = wrapTyCon
                , sumTyCons        = sumTyCons
@@ -149,10 +156,12 @@ initBuiltins
                , applyClosurePVar = applyClosurePVar
                , replicatePAIntPrimVar = replicatePAIntPrimVar
                , upToPAIntPrimVar = upToPAIntPrimVar
+               , selectPAIntPrimVar = selectPAIntPrimVar
+               , truesPABoolPrimVar = truesPABoolPrimVar
                , lengthPAVar      = lengthPAVar
                , replicatePAVar   = replicatePAVar
                , emptyPAVar       = emptyPAVar
-               -- , packPAVar        = packPAVar
+               , packPAVar        = packPAVar
                -- , combinePAVar     = combinePAVar
                , liftingContext   = liftingContext
                }

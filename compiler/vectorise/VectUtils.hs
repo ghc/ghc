@@ -16,7 +16,7 @@ module VectUtils (
   parrayReprTyCon, parrayReprDataCon, mkVScrut,
   prDFunOfTyCon,
   paDictArgType, paDictOfType, paDFunType,
-  paMethod, mkPR, lengthPA, replicatePA, emptyPA, liftPA,
+  paMethod, mkPR, lengthPA, replicatePA, emptyPA, packPA, liftPA,
   polyAbstract, polyApply, polyVApply,
   hoistBinding, hoistExpr, hoistPolyVExpr, takeHoisted,
   buildClosure, buildClosures,
@@ -221,6 +221,7 @@ type PAMethod = (Builtins -> Var, String)
 pa_length    = (lengthPAVar,    "lengthPA")
 pa_replicate = (replicatePAVar, "replicatePA")
 pa_empty     = (emptyPAVar,     "emptyPA")
+pa_pack      = (packPAVar,      "packPA")
 
 paMethod :: PAMethod -> Type -> VM CoreExpr
 paMethod (method, name) ty
@@ -252,6 +253,10 @@ replicatePA len x = liftM (`mkApps` [len,x])
 
 emptyPA :: Type -> VM CoreExpr
 emptyPA = paMethod pa_empty
+
+packPA :: Type -> CoreExpr -> CoreExpr -> CoreExpr -> VM CoreExpr
+packPA ty xs len sel = liftM (`mkApps` [len, sel])
+                             (paMethod pa_pack ty)
 
 liftPA :: CoreExpr -> VM CoreExpr
 liftPA x
