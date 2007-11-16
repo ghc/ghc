@@ -62,7 +62,10 @@ data GHCiState = GHCiState
                 -- tickarrays caches the TickArray for loaded modules,
                 -- so that we don't rebuild it each time the user sets
                 -- a breakpoint.
-        cmdqueue       :: [String]
+        cmdqueue       :: [String],
+        remembered_ctx :: Maybe ([Module],[Module])
+                -- modules we want to add to the context, but can't
+                -- because they currently have errors.  Set by :reload.
      }
 
 type TickArray = Array Int [(BreakIndex,SrcSpan)]

@@ -314,7 +314,8 @@ interactiveUI session srcs maybe_expr = do
                    break_ctr = 0,
                    breaks = [],
                    tickarrays = emptyModuleEnv,
-                   cmdqueue = []
+                   cmdqueue = [],
+                   remembered_ctx = Nothing
                  }
 
 #ifdef USE_READLINE
@@ -500,6 +501,7 @@ mkPrompt = do
   session <- getSession
   (toplevs,exports) <- io (GHC.getContext session)
   resumes <- io $ GHC.getResumeContext session
+  -- st <- getGHCiState
 
   context_bit <-
         case resumes of
@@ -517,8 +519,14 @@ mkPrompt = do
         dots | _:rs <- resumes, not (null rs) = text "... "
              | otherwise = empty
 
+        
+
         modules_bit = 
-             hsep (map (\m -> char '*' <> ppr (GHC.moduleName m)) toplevs) <+>
+       -- ToDo: maybe...
+       --  let (btoplevs, bexports) = fromMaybe ([],[]) (remembered_ctx st) in
+       --  hsep (map (\m -> text "!*" <> ppr (GHC.moduleName m)) btoplevs) <+>
+       --  hsep (map (\m -> char '!'  <> ppr (GHC.moduleName m)) bexports) <+>
+             hsep (map (\m -> char '*'  <> ppr (GHC.moduleName m)) toplevs) <+>
              hsep (map (ppr . GHC.moduleName) exports)
 
         deflt_prompt = dots <> context_bit <> modules_bit
@@ -814,8 +822,9 @@ addModule files = do
   targets <- mapM (\m -> io (GHC.guessTarget m Nothing)) files
   session <- getSession
   io (mapM_ (GHC.addTarget session) targets)
+  prev_context <- io $ GHC.getContext session
   ok <- io (GHC.load session LoadAllTargets)
-  afterLoad ok session Nothing
+  afterLoad ok session False prev_context
 
 changeDirectory :: String -> GHCi ()
 changeDirectory dir = do
@@ -823,9 +832,10 @@ changeDirectory dir = do
   graph <- io (GHC.getModuleGraph session)
   when (not (null graph)) $
 	io $ putStr "Warning: changing directory causes all loaded modules to be unloaded,\nbecause the search path has changed.\n"
+  prev_context <- io $ GHC.getContext session
   io (GHC.setTargets session [])
   io (GHC.load session LoadAllTargets)
-  setContextAfterLoad session []
+  setContextAfterLoad session prev_context []
   io (GHC.workingDirectoryChanged session)
   dir <- expandPath dir
   io (setCurrentDirectory dir)
@@ -940,6 +950,7 @@ loadModule_ fs = do loadModule (zip fs (repeat Nothing)); return ()
 loadModule' :: [(FilePath, Maybe Phase)] -> GHCi SuccessFlag
 loadModule' files = do
   session <- getSession
+  prev_context <- io $ GHC.getContext session
 
   -- unload first
   discardActiveBreakPoints
@@ -958,12 +969,13 @@ loadModule' files = do
   -- as a ToDo for now.
 
   io (GHC.setTargets session targets)
-  doLoad session False LoadAllTargets
+  doLoad session False prev_context LoadAllTargets
 
 checkModule :: String -> GHCi ()
 checkModule m = do
   let modl = GHC.mkModuleName m
   session <- getSession
+  prev_context <- io $ GHC.getContext session
   result <- io (GHC.checkModule session modl False)
   case result of
     Nothing -> io $ putStrLn "Nothing"
@@ -976,50 +988,74 @@ checkModule m = do
 			(text "global names: " <+> ppr global) $$
 		        (text "local  names: " <+> ppr local)
 	   _ -> empty))
-  afterLoad (successIf (isJust result)) session Nothing
+  afterLoad (successIf (isJust result)) session False prev_context
 
 reloadModule :: String -> GHCi ()
 reloadModule m = do
   session <- getSession
-  doLoad session True $ if null m then LoadAllTargets 
-                                  else LoadUpTo (GHC.mkModuleName m)
+  prev_context <- io $ GHC.getContext session
+  doLoad session True prev_context $ 
+        if null m then LoadAllTargets 
+                  else LoadUpTo (GHC.mkModuleName m)
   return ()
 
-doLoad :: Session -> Bool -> LoadHowMuch -> GHCi SuccessFlag
-doLoad session retain_context howmuch = do
+doLoad :: Session -> Bool -> ([Module],[Module]) -> LoadHowMuch -> GHCi SuccessFlag
+doLoad session retain_context prev_context howmuch = do
   -- turn off breakpoints before we load: we can't turn them off later, because
   -- the ModBreaks will have gone away.
   discardActiveBreakPoints
-  context <- io $ GHC.getContext session
   ok <- io (GHC.load session howmuch)
-  afterLoad ok session (if retain_context then Just context else Nothing)
+  afterLoad ok session retain_context prev_context
   return ok
 
-afterLoad :: SuccessFlag -> Session -> Maybe ([Module],[Module]) -> GHCi ()
-afterLoad ok session maybe_context = do
+afterLoad :: SuccessFlag -> Session -> Bool -> ([Module],[Module]) -> GHCi ()
+afterLoad ok session retain_context prev_context = do
   io (revertCAFs)  -- always revert CAFs on load.
   discardTickArrays
-  loaded_mods <- getLoadedModules session
+  loaded_mod_summaries <- getLoadedModules session
+  let loaded_mods = map GHC.ms_mod loaded_mod_summaries
+      loaded_mod_names = map GHC.moduleName loaded_mods
+  modulesLoadedMsg ok loaded_mod_names
 
-  -- try to retain the old module context for :reload.  This might
-  -- not be possible, for example if some modules have gone away, so
-  -- we attempt to set the same context, backing off to the default
-  -- context if that fails.
-  case maybe_context of
-     Nothing -> setContextAfterLoad session loaded_mods
-     Just (as,bs) -> do
-        r <- io $ Exception.try (GHC.setContext session as bs)
-        case r of
-           Left _err -> setContextAfterLoad session loaded_mods
-           Right _   -> return ()
+  st <- getGHCiState
+  if not retain_context
+    then do
+        setGHCiState st{ remembered_ctx = Nothing }
+        setContextAfterLoad session prev_context loaded_mod_summaries
+    else do
+        -- figure out which modules we can keep in the context, which we
+        -- have to put back, and which we have to remember because they
+        -- are (temporarily) unavailable.  See ghci.prog009, #1873, #1360
+        let (as,bs) = prev_context
+            as1 = filter isHomeModule as -- package modules are kept anyway
+            bs1 = filter isHomeModule bs
+            (as_ok, as_bad) = partition (`elem` loaded_mods) as1
+            (bs_ok, bs_bad) = partition (`elem` loaded_mods) bs1
+            (rem_as, rem_bs) = fromMaybe ([],[]) (remembered_ctx st)
+            (rem_as_ok, rem_as_bad) = partition (`elem` loaded_mods) rem_as
+            (rem_bs_ok, rem_bs_bad) = partition (`elem` loaded_mods) rem_bs
+            as' = nub (as_ok++rem_as_ok)
+            bs' = nub (bs_ok++rem_bs_ok)
+            rem_as' = nub (rem_as_bad ++ as_bad)
+            rem_bs' = nub (rem_bs_bad ++ bs_bad)
 
-  modulesLoadedMsg ok (map GHC.ms_mod_name loaded_mods)
+         -- Put back into the context any modules that we previously had
+         -- to drop because they weren't available (rem_as_ok, rem_bs_ok).
+        setContextKeepingPackageModules session prev_context (as',bs')
 
-setContextAfterLoad :: Session -> [GHC.ModSummary] -> GHCi ()
-setContextAfterLoad session [] = do
+         -- If compilation failed, remember any modules that we are unable
+         -- to load, so that we can put them back in the context in the future.
+        case ok of
+         Succeeded -> setGHCiState st{ remembered_ctx = Nothing }
+         Failed    -> setGHCiState st{ remembered_ctx = Just (rem_as',rem_bs') }
+
+
+
+setContextAfterLoad :: Session -> ([Module],[Module]) -> [GHC.ModSummary] -> GHCi ()
+setContextAfterLoad session prev [] = do
   prel_mod <- getPrelude
-  io (GHC.setContext session [] [prel_mod])
-setContextAfterLoad session ms = do
+  setContextKeepingPackageModules session prev ([], [prel_mod])
+setContextAfterLoad session prev ms = do
   -- load a target if one is available, otherwise load the topmost module.
   targets <- io (GHC.getTargets session)
   case [ m | Just m <- map (findTarget ms) targets ] of
@@ -1043,11 +1079,26 @@ setContextAfterLoad session ms = do
 
    load_this summary | m <- GHC.ms_mod summary = do
 	b <- io (GHC.moduleIsInterpreted session m)
-	if b then io (GHC.setContext session [m] []) 
+	if b then setContextKeepingPackageModules session prev ([m], [])
        	     else do
-                   prel_mod <- getPrelude
-                   io (GHC.setContext session []  [prel_mod,m])
+                prel_mod <- getPrelude
+                setContextKeepingPackageModules session prev ([],[prel_mod,m])
 
+-- | Keep any package modules (except Prelude) when changing the context.
+setContextKeepingPackageModules
+        :: Session
+        -> ([Module],[Module])          -- previous context
+        -> ([Module],[Module])          -- new context
+        -> GHCi ()
+setContextKeepingPackageModules session prev_context (as,bs) = do
+  let (_,bs0) = prev_context
+  prel_mod <- getPrelude
+  let pkg_modules = filter (\p -> not (isHomeModule p) && p /= prel_mod) bs0
+  let bs1 = if null as then nub (prel_mod : bs) else bs
+  io $ GHC.setContext session as (nub (bs1 ++ pkg_modules))
+
+isHomeModule :: Module -> Bool
+isHomeModule mod = GHC.modulePackageId mod == mainPackageId
 
 modulesLoadedMsg :: SuccessFlag -> [ModuleName] -> GHCi ()
 modulesLoadedMsg ok mods = do
@@ -1378,7 +1429,8 @@ newDynFlags minus_opts = do
         io (GHC.setTargets session [])
         io (GHC.load session LoadAllTargets)
         io (linkPackages dflags new_pkgs)
-        setContextAfterLoad session []
+        -- package flags changed, we can't re-use any of the old context
+        setContextAfterLoad session ([],[]) []
       return ()
 
 
