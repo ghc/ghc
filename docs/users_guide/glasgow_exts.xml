@@ -2689,7 +2689,7 @@ class type variable, thus:
 The type of <literal>elem</literal> is illegal in Haskell 98, because it
 contains the constraint <literal>Eq a</literal>, constrains only the 
 class type variable (in this case <literal>a</literal>).
-GHC lifts this restriction.
+GHC lifts this restriction (flag <option>-XConstrainedClassMethods</option>).
 </para>
 
 
@@ -3036,7 +3036,7 @@ must be of the form <literal>C a</literal> where <literal>a</literal>
 is a type variable that occurs in the head.
 </para>
 <para>
-The <option>-fglasgow-exts</option> flag loosens these restrictions
+The <option>-XFlexibleInstances</option> flag loosens these restrictions
 considerably.  Firstly, multi-parameter type classes are permitted.  Secondly,
 the context and head of the instance declaration can each consist of arbitrary
 (well-kinded) assertions <literal>(C t1 ... tn)</literal> subject only to the
@@ -3442,7 +3442,7 @@ to work since it gets translated into an equality comparison.
 <sect2 id="type-restrictions">
 <title>Type signatures</title>
 
-<sect3><title>The context of a type signature</title>
+<sect3 id="flexible-contexts"><title>The context of a type signature</title>
 <para>
 Unlike Haskell 98, constraints in types do <emphasis>not</emphasis> have to be of
 the form <emphasis>(class type-variable)</emphasis> or
@@ -4078,9 +4078,18 @@ The function <literal>f3</literal> has a rank-3 type;
 it has rank-2 types on the left of a function arrow.
 </para>
 <para>
-GHC allows types of arbitrary rank; you can nest <literal>forall</literal>s
-arbitrarily deep in function arrows.   (GHC used to be restricted to rank 2, but
-that restriction has now been lifted.)
+GHC has three flags to control higher-rank types:
+<itemizedlist>
+<listitem><para>
+ <option>-XPolymorphicComponents</option>: data constructors (only) can have polymorphic argment types.
+</para></listitem>
+<listitem><para>
+ <option>-XRank2Types</option>: any function (including data constructors) can have a rank-2 type.
+</para></listitem>
+<listitem><para>
+ <option>-XRankNTypes</option>: any function (including data constructors) can have an arbitrary-rank type.
+That is,  you can nest <literal>forall</literal>s
+arbitrarily deep in function arrows.
 In particular, a forall-type (also called a "type scheme"),
 including an operational type class context, is legal:
 <itemizedlist>
@@ -4091,6 +4100,8 @@ example, any of the <literal>f1,f2,f3,g1,g2</literal> above would be valid
 field type signatures.</para> </listitem>
 <listitem> <para> As the type of an implicit parameter </para> </listitem>
 <listitem> <para> In a pattern type signature (see <xref linkend="scoped-type-variables"/>) </para> </listitem>
+</itemizedlist>
+</para></listitem>
 </itemizedlist>
 Of course <literal>forall</literal> becomes a keyword; you can't use <literal>forall</literal> as
 a type variable any more!

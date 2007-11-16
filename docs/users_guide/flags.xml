@@ -786,9 +786,21 @@
 	    </row>
 	    <row>
 	      <entry><option>-XPolymorphicComponents</option></entry>
-	      <entry>Enable polymorphic components.</entry>
+	      <entry>Enable <link linkend="universal-quantification">polymorphic components for data constructors</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoPolymorphicComponents</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-XRank2Types</option></entry>
+	      <entry>Enable <link linkend="universal-quantification">rank-2 types</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoRank2Types</option></entry>
+	    </row>
+	    <row>
+	      <entry><option>-XRankNTypes</option></entry>
+	      <entry>Enable <link linkend="universal-quantification">rank-N types</link>.</entry>
+	      <entry>dynamic</entry>
+	      <entry><option>-XNoRankNTypes</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-XExistentialQuantification</option></entry>
@@ -833,18 +845,6 @@
 	      <entry><option>-XNoLiberalTypeSynonyms</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-XRank2Types</option></entry>
-	      <entry>Enable rank-2 types.</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-XNoRank2Types</option></entry>
-	    </row>
-	    <row>
-	      <entry><option>-XRankNTypes</option></entry>
-	      <entry>Enable rank-N types.</entry>
-	      <entry>dynamic</entry>
-	      <entry><option>-XNoRankNTypes</option></entry>
-	    </row>
-	    <row>
 	      <entry><option>-XTypeOperators</option></entry>
 	      <entry>Enable type operators.</entry>
 	      <entry>dynamic</entry>
@@ -864,19 +864,19 @@
 	    </row>
 	    <row>
 	      <entry><option>-XRecordWildCards</option></entry>
-	      <entry>Enable record wildcards.</entry>
+	      <entry>Enable <link linkend="record-wildcards">record wildcards</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoRecordWildCards</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-XRecordPuns</option></entry>
-	      <entry>Enable record puns.</entry>
+	      <entry>Enable <link linkend="record-puns">record puns</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoRecordPuns</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-XDisambiguateRecordFields</option></entry>
-	      <entry>Enable the <link linkend="disambiguate-fields">disambiguate fields.</link> exception</entry>
+	      <entry>Enable  <link linkend="disambiguate-fields">record field disambiguation</link>. </entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoDisambiguateRecordFields</option></entry>
 	    </row>
@@ -912,19 +912,19 @@
 	    </row>
 	    <row>
 	      <entry><option>-XFlexibleContexts</option></entry>
-	      <entry>Enable flexible contexts.</entry>
+	      <entry>Enable <link linkend="flexible-contexts">flexible contexts</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoFlexibleContexts</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-XFlexibleInstances</option></entry>
-	      <entry>Enable flexible instances.</entry>
+	      <entry>Enable <link linkend="instance-rules">flexible instances</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoFlexibleInstances</option></entry>
 	    </row>
 	    <row>
 	      <entry><option>-XConstrainedClassMethods</option></entry>
-	      <entry>Enable constrained class methods.</entry>
+	      <entry>Enable <link linkend="class-method-types">constrained class methods</link>.</entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoConstrainedClassMethods</option></entry>
 	    </row>
