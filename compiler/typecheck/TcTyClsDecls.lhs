@@ -336,8 +336,9 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
 
          -- (4) construct representation tycon
        ; rep_tc_name <- newFamInstTyConName tc_name loc
+       ; let ex_ok = True	-- Existentials ok for type families!
        ; tycon <- fixM (\ tycon -> do 
-	     { data_cons <- mappM (addLocM (tcConDecl unbox_strict tycon t_tvs))
+	     { data_cons <- mappM (addLocM (tcConDecl unbox_strict ex_ok tycon t_tvs))
 				  k_cons
 	     ; tc_rhs <-
 		 case new_or_data of
@@ -709,8 +710,10 @@ tcTyClDecl1 calc_isrec
   ; unbox_strict <- doptM Opt_UnboxStrictFields
   ; empty_data_decls <- doptM Opt_EmptyDataDecls
   ; kind_signatures <- doptM Opt_KindSignatures
+  ; existential_ok <- doptM Opt_ExistentialQuantification
   ; gadt_ok      <- doptM Opt_GADTs
   ; is_boot	 <- tcIsHsBoot	-- Are we compiling an hs-boot file?
+  ; let ex_ok = existential_ok || gadt_ok	-- Data cons can have existential context
 
 	-- Check that we don't use GADT syntax in H98 world
   ; checkTc (gadt_ok || h98_syntax) (badGadtDecl tc_name)
@@ -731,7 +734,7 @@ tcTyClDecl1 calc_isrec
 	    (newtypeConError tc_name (length cons))
 
   ; tycon <- fixM (\ tycon -> do 
-	{ data_cons <- mappM (addLocM (tcConDecl unbox_strict tycon final_tvs)) 
+	{ data_cons <- mappM (addLocM (tcConDecl unbox_strict ex_ok tycon final_tvs)) 
 			     cons
 	; tc_rhs <-
 	    if null cons && is_boot 	-- In a hs-boot file, empty cons means
@@ -802,14 +805,17 @@ tcTyClDecl1 calc_isrec
 
 -----------------------------------
 tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
+	  -> Bool		-- True <=> -XExistentialQuantificaton or -XGADTs
 	  -> TyCon -> [TyVar] 
 	  -> ConDecl Name 
 	  -> TcM DataCon
 
-tcConDecl unbox_strict tycon tc_tvs	-- Data types
+tcConDecl unbox_strict existential_ok tycon tc_tvs	-- Data types
 	  (ConDecl name _ tvs ctxt details res_ty _)
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
     { ctxt' <- tcHsKindedContext ctxt
+    ; checkTc (existential_ok || (null tvs && null (unLoc ctxt)))
+	      (badExistential name)
     ; (univ_tvs, ex_tvs, eq_preds, data_tc) <- tcResultType tycon tc_tvs tvs' res_ty
     ; let 
 	-- Tiresome: tidy the tyvar binders, since tc_tvs and tvs' may have the same OccNames
@@ -1205,6 +1211,11 @@ badDataConTyCon data_con
 badGadtDecl tc_name
   = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+> quotes (ppr tc_name)
 	 , nest 2 (parens $ ptext SLIT("Use -XGADTs to allow GADTs")) ]
+
+badExistential con_name
+  = hang (ptext SLIT("Data constructor") <+> quotes (ppr con_name) <+>
+		ptext SLIT("has existential type variables, or a context, or both"))
+       2 (parens $ ptext SLIT("Use -XExistentialQuantification or -XGADTs to allow this"))
 
 badStupidTheta tc_name
   = ptext SLIT("A data type declared in GADT style cannot have a context:") <+> quotes (ppr tc_name)
