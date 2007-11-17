@@ -30,7 +30,9 @@ import OccName
 import TypeRep         ( funTyCon )
 import Type            ( Type )
 import TysPrim
-import TysWiredIn      ( unitTyCon, tupleTyCon, intTyCon, intTyConName )
+import TysWiredIn      ( unitTyCon, tupleTyCon,
+                         intTyCon, intTyConName,
+                         boolTyCon, boolTyConName )
 import Module
 import BasicTypes      ( Boxity(..) )
 
@@ -184,7 +186,7 @@ initBuiltinTyCons bi = (tyConName funTyCon, closureTyCon bi)
                      : [(tyConName tc, tc) | tc <- defaultTyCons]
 
 defaultTyCons :: [TyCon]
-defaultTyCons = [intTyCon]
+defaultTyCons = [intTyCon, boolTyCon]
 
 initBuiltinDicts :: [(Name, Module, FastString)] -> DsM [(Name, Var)]
 initBuiltinDicts ps
@@ -204,6 +206,7 @@ builtinPAs bi
     , mk unitTyConName                  nDP_INSTANCES   FSLIT("dPA_Unit")
 
     , mk intTyConName                   nDP_INSTANCES   FSLIT("dPA_Int")
+    , mk boolTyConName                  nDP_INSTANCES   FSLIT("dPA_Bool")
     ]
     ++ tups
   where
