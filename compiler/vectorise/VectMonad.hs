@@ -31,6 +31,7 @@ module VectMonad (
   lookupDataCon, defDataCon,
   lookupTyConPA, defTyConPA, defTyConPAs,
   lookupTyConPR,
+  lookupBoxedTyCon,
   lookupPrimMethod, lookupPrimPArray,
   lookupTyVarPA, defLocalTyVar, defLocalTyVarWithPA, localTyVars,
 
@@ -102,6 +103,9 @@ data GlobalEnv = GlobalEnv {
                   -- Mapping from TyCons to their PR dfuns
                 , global_pr_funs :: NameEnv Var
 
+                  -- Mapping from unboxed TyCons to their boxed versions
+                , global_boxed_tycons :: NameEnv TyCon
+
                 -- External package inst-env & home-package inst-env for class
                 -- instances
                 --
@@ -142,6 +146,7 @@ initGlobalEnv info instEnvs famInstEnvs
     , global_datacons      = mapNameEnv snd $ vectInfoDataCon info
     , global_pa_funs       = mapNameEnv snd $ vectInfoPADFun info
     , global_pr_funs       = emptyNameEnv
+    , global_boxed_tycons  = emptyNameEnv
     , global_inst_env      = instEnvs
     , global_fam_inst_env  = famInstEnvs
     , global_bindings      = []
@@ -164,6 +169,10 @@ extendPAFunsEnv ps genv
 setPRFunsEnv :: [(Name, Var)] -> GlobalEnv -> GlobalEnv
 setPRFunsEnv ps genv
   = genv { global_pr_funs = mkNameEnv ps }
+
+setBoxedTyConsEnv :: [(Name, TyCon)] -> GlobalEnv -> GlobalEnv
+setBoxedTyConsEnv ps genv
+  = genv { global_boxed_tycons = mkNameEnv ps }
 
 emptyLocalEnv = LocalEnv {
                    local_vars     = emptyVarEnv
@@ -389,6 +398,10 @@ lookupTyVarPA tv = readLEnv $ \env -> lookupVarEnv (local_tyvar_pa env) tv
 lookupTyConPR :: TyCon -> VM (Maybe Var)
 lookupTyConPR tc = readGEnv $ \env -> lookupNameEnv (global_pr_funs env) (tyConName tc)
 
+lookupBoxedTyCon :: TyCon -> VM (Maybe TyCon)
+lookupBoxedTyCon tc = readGEnv $ \env -> lookupNameEnv (global_boxed_tycons env)
+                                                       (tyConName tc)
+
 defLocalTyVar :: TyVar -> VM ()
 defLocalTyVar tv = updLEnv $ \env ->
   env { local_tyvars   = tv : local_tyvars env
@@ -475,6 +488,7 @@ initV hsc_env guts info p
         let builtin_tycons = initBuiltinTyCons builtins
         builtin_pas    <- initBuiltinPAs builtins
         builtin_prs    <- initBuiltinPRs builtins
+        builtin_boxed  <- initBuiltinBoxedTyCons builtins
 
         eps <- ioToIOEnv $ hscEPS hsc_env
         let famInstEnvs = (eps_fam_inst_env eps, mg_fam_inst_env guts)
@@ -483,6 +497,7 @@ initV hsc_env guts info p
         let genv = extendTyConsEnv builtin_tycons
                  . extendPAFunsEnv builtin_pas
                  . setPRFunsEnv    builtin_prs
+                 . setBoxedTyConsEnv builtin_boxed
                  $ initGlobalEnv info instEnvs famInstEnvs
 
         r <- runVM p builtins genv emptyLocalEnv

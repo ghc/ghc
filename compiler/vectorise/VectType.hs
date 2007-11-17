@@ -71,7 +71,7 @@ vectType (TyVarTy tv) = return $ TyVarTy tv
 vectType (AppTy ty1 ty2) = liftM2 AppTy (vectType ty1) (vectType ty2)
 vectType (TyConApp tc tys) = liftM2 TyConApp (vectTyCon tc) (mapM vectType tys)
 vectType (FunTy ty1 ty2)   = liftM2 TyConApp (builtin closureTyCon)
-                                             (mapM vectType [ty1,ty2])
+                                             (mapM vectAndBoxType [ty1,ty2])
 vectType ty@(ForAllTy _ _)
   = do
       mdicts   <- mapM paDictArgType tyvars
@@ -81,6 +81,23 @@ vectType ty@(ForAllTy _ _)
     (tyvars, mono_ty) = splitForAllTys ty
 
 vectType ty = pprPanic "vectType:" (ppr ty)
+
+vectAndBoxType :: Type -> VM Type
+vectAndBoxType ty = vectType ty >>= boxType
+
+-- ----------------------------------------------------------------------------
+-- Boxing
+
+boxType :: Type -> VM Type
+boxType ty
+  | Just (tycon, []) <- splitTyConApp_maybe ty
+  , isUnLiftedTyCon tycon
+  = do
+      r <- lookupBoxedTyCon tycon
+      case r of
+        Just tycon' -> return $ mkTyConApp tycon' []
+        Nothing     -> return ty
+boxType ty = return ty
 
 -- ----------------------------------------------------------------------------
 -- Type definitions
@@ -285,7 +302,8 @@ boxedProductRepr tys
       tycon <- builtin (prodTyCon arity)
       let [data_con] = tyConDataCons tycon
 
-      (arr_tycon, _) <- parrayReprTyCon $ mkTyConApp tycon tys
+      tys' <- mapM boxType tys
+      (arr_tycon, _) <- parrayReprTyCon $ mkTyConApp tycon tys'
       let [arr_data_con] = tyConDataCons arr_tycon
 
       return $ ProdRepr {

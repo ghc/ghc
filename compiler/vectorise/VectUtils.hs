@@ -346,6 +346,19 @@ takeHoisted
       setGEnv $ env { global_bindings = [] }
       return $ global_bindings env
 
+boxExpr :: Type -> VExpr -> VM VExpr
+boxExpr ty (vexpr, lexpr)
+  | Just (tycon, []) <- splitTyConApp_maybe ty
+  , isUnLiftedTyCon tycon
+  = do
+      r <- lookupBoxedTyCon tycon
+      case r of
+        Just tycon' -> let [dc] = tyConDataCons tycon'
+                       in
+                       return (mkConApp dc [vexpr], lexpr)
+        Nothing     -> return (vexpr, lexpr)
+
+
 mkClosure :: Type -> Type -> Type -> VExpr -> VExpr -> VM VExpr
 mkClosure arg_ty res_ty env_ty (vfn,lfn) (venv,lenv)
   = do

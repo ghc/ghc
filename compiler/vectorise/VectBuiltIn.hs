@@ -8,6 +8,7 @@
 module VectBuiltIn (
   Builtins(..), sumTyCon, prodTyCon, combinePAVar,
   initBuiltins, initBuiltinTyCons, initBuiltinPAs, initBuiltinPRs,
+  initBuiltinBoxedTyCons,
 
   primMethod, primPArray
 ) where
@@ -29,7 +30,7 @@ import OccName
 import TypeRep         ( funTyCon )
 import Type            ( Type )
 import TysPrim
-import TysWiredIn      ( unitTyCon, tupleTyCon, intTyConName )
+import TysWiredIn      ( unitTyCon, tupleTyCon, intTyCon, intTyConName )
 import Module
 import BasicTypes      ( Boxity(..) )
 
@@ -237,6 +238,13 @@ builtinPRs bi =
 
     mk_prod n = (tyConName $ prodTyCon n bi, nDP_REPR,
                  mkFastString ("dPR_" ++ show n))
+
+initBuiltinBoxedTyCons :: Builtins -> DsM [(Name, TyCon)]
+initBuiltinBoxedTyCons = return . builtinBoxedTyCons
+
+builtinBoxedTyCons :: Builtins -> [(Name, TyCon)]
+builtinBoxedTyCons bi =
+  [(tyConName intPrimTyCon, intTyCon)]
 
 externalVar :: Module -> FastString -> DsM Var
 externalVar mod fs
