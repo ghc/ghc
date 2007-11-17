@@ -435,7 +435,9 @@ packLiftingContext len shape tag fvs res_ty p
       lc_var <- builtin liftingContext
       localV $
         do
-          bnds <- mapM (packFreeVar (Var lc_var) (Var sel_var)) (varSetElems fvs)
+          bnds <- mapM (packFreeVar (Var lc_var) (Var sel_var))
+                . filter isLocalId
+                $ varSetElems fvs
           (vexpr, lexpr) <- p
           return (vexpr, Let (NonRec sel_var sel_expr)
                          $ Case len lc_var res_ty [(DEFAULT, [], lexpr)])
