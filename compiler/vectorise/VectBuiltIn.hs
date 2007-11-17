@@ -179,7 +179,11 @@ initBuiltins
                }
 
 initBuiltinTyCons :: Builtins -> [(Name, TyCon)]
-initBuiltinTyCons bi = [(tyConName funTyCon, closureTyCon bi)]
+initBuiltinTyCons bi = (tyConName funTyCon, closureTyCon bi)
+                     : [(tyConName tc, tc) | tc <- defaultTyCons]
+
+defaultTyCons :: [TyCon]
+defaultTyCons = [intTyCon]
 
 initBuiltinDicts :: [(Name, Module, FastString)] -> DsM [(Name, Var)]
 initBuiltinDicts ps
