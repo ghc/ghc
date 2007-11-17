@@ -7,7 +7,8 @@
 
 module VectType ( vectTyCon, vectType, vectTypeEnv,
                   mkRepr, arrShapeTys, arrShapeVars, arrSelector,
-                  PAInstance, buildPADict )
+                  PAInstance, buildPADict,
+                  fromVect )
 where
 
 #include "HsVersions.h"
@@ -981,4 +982,41 @@ tyConsOfType other             = pprPanic "ClosureConv.tyConsOfType" $ ppr other
 
 tyConsOfTypes :: [Type] -> UniqSet TyCon
 tyConsOfTypes = unionManyUniqSets . map tyConsOfType
+
+
+-- ----------------------------------------------------------------------------
+-- Conversions
+
+fromVect :: Type -> CoreExpr -> VM CoreExpr
+fromVect ty expr | Just ty' <- coreView ty = fromVect ty' expr
+fromVect (FunTy arg_ty res_ty) expr
+  = do
+      arg     <- newLocalVar FSLIT("x") arg_ty
+      varg    <- toVect arg_ty (Var arg)
+      varg_ty <- vectType arg_ty
+      vres_ty <- vectType res_ty
+      apply   <- builtin applyClosureVar
+      body    <- fromVect res_ty
+               $ Var apply `mkTyApps` [arg_ty, res_ty] `mkApps` [expr, Var arg]
+      return $ Lam arg body
+fromVect ty expr
+  = identityConv ty >> return expr
+
+toVect :: Type -> CoreExpr -> VM CoreExpr
+toVect ty expr = identityConv ty >> return expr
+
+identityConv :: Type -> VM ()
+identityConv ty | Just ty' <- coreView ty = identityConv ty'
+identityConv (TyConApp tycon tys)
+  = do
+      mapM_ identityConv tys
+      identityConvTyCon tycon
+identityConv ty = noV
+
+identityConvTyCon :: TyCon -> VM ()
+identityConvTyCon tc
+  | isBoxedTupleTyCon tc = return ()
+  | isUnLiftedTyCon tc   = return ()
+  | otherwise            = maybeV (lookupTyCon tc) >> return ()
+
 

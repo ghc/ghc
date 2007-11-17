@@ -89,7 +89,8 @@ vectTopBind b@(NonRec var expr)
       var'  <- vectTopBinder var
       expr' <- vectTopRhs var expr
       hs    <- takeHoisted
-      return . Rec $ (var, expr) : (var', expr') : hs
+      cexpr <- tryConvert var var' expr
+      return . Rec $ (var, cexpr) : (var', expr') : hs
   `orElseV`
     return b
 
@@ -98,7 +99,8 @@ vectTopBind b@(Rec bs)
       vars'  <- mapM vectTopBinder vars
       exprs' <- zipWithM vectTopRhs vars exprs
       hs     <- takeHoisted
-      return . Rec $ bs ++ zip vars' exprs' ++ hs
+      cexprs <- sequence $ zipWith3 tryConvert vars vars' exprs
+      return . Rec $ zip vars cexprs ++ zip vars' exprs' ++ hs
   `orElseV`
     return b
   where
@@ -118,6 +120,10 @@ vectTopRhs var expr
       closedV . liftM vectorised
               . inBind var
               $ vectPolyExpr (freeVars expr)
+
+tryConvert :: Var -> Var -> CoreExpr -> VM CoreExpr
+tryConvert var vect_var rhs
+  = fromVect (idType var) (Var vect_var) `orElseV` return rhs
 
 -- ----------------------------------------------------------------------------
 -- Bindings
