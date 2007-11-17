@@ -161,7 +161,7 @@ amd64-*-openbsd*|x86_64-*-openbsd*)
         HostVendor_CPP='unknown'
         HostOS_CPP='openbsd'
         ;;
-amd64-*-freebsd*)
+amd64-*-freebsd*|x86_64-*-freebsd*)
         HostPlatform=x86_64-unknown-freebsd
         TargetPlatform=x86_64-unknown-freebsd
         BuildPlatform=x86_64-unknown-freebsd
