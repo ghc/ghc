@@ -278,7 +278,9 @@ voidRepr
 enumRepr :: VM Repr
 enumRepr
   = do
-      (arr_tycon, _) <- parrayReprTyCon intTy
+      tycon <- builtin enumerationTyCon
+      let [data_con] = tyConDataCons tycon
+      (arr_tycon, _) <- parrayReprTyCon (mkTyConApp tycon [])
       let [arr_data_con] = tyConDataCons arr_tycon
 
       return $ EnumRepr {
@@ -287,9 +289,6 @@ enumRepr
                , enum_arr_tycon    = arr_tycon
                , enum_arr_data_con = arr_data_con
                }
-  where
-    tycon = intTyCon
-    data_con = intDataCon
 
 unboxedProductRepr :: [Type] -> VM Repr
 unboxedProductRepr []   = voidRepr
@@ -359,31 +358,38 @@ arrReprType :: Repr -> VM Type
 arrReprType = mkPArrayType . reprType
 
 arrShapeTys :: Repr -> VM [Type]
-arrShapeTys (SumRepr  {})
-  = do
-      int_arr <- builtin parrayIntPrimTyCon
-      return [intPrimTy, mkTyConApp int_arr [], mkTyConApp int_arr []]
+arrShapeTys (SumRepr  {}) = sumShapeTys
 arrShapeTys (ProdRepr {}) = return [intPrimTy]
 arrShapeTys (IdRepr _)    = return []
 arrShapeTys (VoidRepr {}) = return [intPrimTy]
-arrShapeTys (EnumRepr {}) = return [intPrimTy]
+arrShapeTys (EnumRepr {}) = sumShapeTys
+
+sumShapeTys :: VM [Type]
+sumShapeTys = do
+                int_arr <- builtin parrayIntPrimTyCon
+                return [intPrimTy, mkTyConApp int_arr [], mkTyConApp int_arr []]
+
 
 arrShapeVars :: Repr -> VM [Var]
 arrShapeVars repr = mapM (newLocalVar FSLIT("sh")) =<< arrShapeTys repr
 
 replicateShape :: Repr -> CoreExpr -> CoreExpr -> VM [CoreExpr]
-replicateShape (ProdRepr {}) len _ = return [len]
-replicateShape (SumRepr {})  len tag
+replicateShape (ProdRepr {}) len _   = return [len]
+replicateShape (SumRepr {})  len tag = replicateSumShape len tag
+replicateShape (IdRepr _) _ _        = return []
+replicateShape (VoidRepr {}) len _   = return [len]
+replicateShape (EnumRepr {}) len tag = replicateSumShape len tag
+
+replicateSumShape :: CoreExpr -> CoreExpr -> VM [CoreExpr]
+replicateSumShape len tag
   = do
       rep <- builtin replicatePAIntPrimVar
       up  <- builtin upToPAIntPrimVar
       return [len, Var rep `mkApps` [len, tag], Var up `App` len]
-replicateShape (IdRepr _) _ _ = return []
-replicateShape (VoidRepr {}) len _ = return [len]
-replicateShape (EnumRepr {}) len _ = return [len]
 
 arrSelector :: Repr -> [CoreExpr] -> VM (CoreExpr, CoreExpr, CoreExpr)
-arrSelector (SumRepr {}) [len, sel, is] = return (len, sel, is)
+arrSelector (SumRepr {})  [len, sel, is] = return (len, sel, is)
+arrSelector (EnumRepr {}) [len, sel, is] = return (len, sel, is)
 
 emptyArrRepr :: Repr -> VM [CoreExpr]
 emptyArrRepr (SumRepr { sum_components = prods })
@@ -397,7 +403,7 @@ emptyArrRepr (IdRepr ty)
 emptyArrRepr (VoidRepr { void_tycon = tycon })
   = liftM singleton $ emptyPA (mkTyConApp tycon [])
 emptyArrRepr (EnumRepr { enum_tycon = tycon })
-  = liftM singleton $ emptyPA (mkTyConApp tycon [])
+  = return []
 
 arrReprTys :: Repr -> VM [Type]
 arrReprTys (SumRepr { sum_components = reprs })
@@ -411,7 +417,7 @@ arrReprTys (IdRepr ty)
 arrReprTys (VoidRepr { void_tycon = tycon })
   = liftM singleton $ mkPArrayType (mkTyConApp tycon [])
 arrReprTys (EnumRepr {})
-  = liftM singleton $ mkPArrayType intPrimTy
+  = return []
 
 arrReprTys' :: Repr -> VM [[Type]]
 arrReprTys' (SumRepr { sum_components = reprs })
@@ -607,12 +613,13 @@ buildToArrPRepr repr vect_tc prepr_tc arr_tc
                 . mkConApp data_con
                 $ map Type tys ++ map Var (len_var : repr_vars)
 
-    to_repr [len_var]
-            [[repr_var]]
+    to_repr shape_vars
+            _
             (EnumRepr { enum_arr_tycon    = tycon
                       , enum_arr_data_con = data_con })
       = return . wrapFamInstBody tycon []
-               $ mkConApp data_con [Var len_var, Var repr_var]
+               . mkConApp data_con
+                $ map Var shape_vars
 
     to_prod repr_vars@(r : _)
             (ProdRepr { prod_components   = tys@(ty : _)
@@ -708,15 +715,15 @@ buildFromArrPRepr repr vect_tc prepr_tc arr_tc
     from_prod (EnumRepr { enum_arr_tycon = tycon
                         , enum_arr_data_con = data_con })
               expr
-              [len_var]
-              [repr_var]
+              shape_vars
+              _
               res_ty
               body
       = let scrut    = unwrapFamInstScrut tycon [] expr
             scrut_ty = mkTyConApp tycon []
         in
         return $ Case scrut (mkWildId scrut_ty) res_ty
-                 [(DataAlt data_con, [len_var, repr_var], body)]
+                 [(DataAlt data_con, shape_vars, body)]
 
     from_prod (IdRepr ty)
               expr
