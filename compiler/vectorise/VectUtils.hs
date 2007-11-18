@@ -455,7 +455,7 @@ mkLiftEnv lc tys vs
           
           env = Var (dataConWrapId env_con)
                 `mkTyApps`  env_tyargs
-                `mkVarApps` (lc : vs)
+                `mkApps`    (Var lc : args)
 
           bind env body = let scrut = unwrapFamInstScrut env_tc env_tyargs env
                           in
@@ -465,6 +465,9 @@ mkLiftEnv lc tys vs
       return (env, bind)
   where
     vty = mkCoreTupTy tys
+
+    args  | null vs   = [Var unitDataConId]
+          | otherwise = map Var vs
 
     bndrs | null vs   = [mkWildId unitTy]
           | otherwise = vs
