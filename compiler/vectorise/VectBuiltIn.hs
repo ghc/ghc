@@ -71,6 +71,7 @@ data Builtins = Builtins {
                 , parrayBoolPrimTyCon :: TyCon
                 , voidTyCon        :: TyCon
                 , wrapTyCon        :: TyCon
+                , enumerationTyCon :: TyCon
                 , sumTyCons        :: Array Int TyCon
                 , closureTyCon     :: TyCon
                 , voidVar          :: Var
@@ -122,6 +123,7 @@ initBuiltins
 
       voidTyCon    <- externalTyCon nDP_REPR FSLIT("Void")
       wrapTyCon    <- externalTyCon nDP_REPR FSLIT("Wrap")
+      enumerationTyCon <- externalTyCon nDP_REPR FSLIT("Enumeration")
       sum_tcs <- mapM (externalTyCon nDP_REPR)
                       [mkFastString ("Sum" ++ show i) | i <- [2..mAX_NDP_SUM]]
 
@@ -161,6 +163,7 @@ initBuiltins
                , parrayBoolPrimTyCon = parrayBoolPrimTyCon
                , voidTyCon        = voidTyCon
                , wrapTyCon        = wrapTyCon
+               , enumerationTyCon = enumerationTyCon
                , sumTyCons        = sumTyCons
                , closureTyCon     = closureTyCon
                , voidVar          = voidVar
@@ -225,6 +228,7 @@ builtinPRs bi =
     mk (tyConName unitTyCon)          nDP_REPR      FSLIT("dPR_Unit")
   , mk (tyConName $ voidTyCon bi)     nDP_REPR      FSLIT("dPR_Void")
   , mk (tyConName $ wrapTyCon bi)     nDP_REPR      FSLIT("dPR_Wrap")
+  , mk (tyConName $ enumerationTyCon bi) nDP_REPR   FSLIT("dPR_Enumeration")
   , mk (tyConName $ closureTyCon bi)  nDP_CLOSURE   FSLIT("dPR_Clo")
 
     -- temporary
