@@ -7,7 +7,7 @@
 
 module VectBuiltIn (
   Builtins(..), sumTyCon, prodTyCon, combinePAVar,
-  initBuiltins, initBuiltinTyCons, initBuiltinDataCons,
+  initBuiltins, initBuiltinVars, initBuiltinTyCons, initBuiltinDataCons,
   initBuiltinPAs, initBuiltinPRs,
   initBuiltinBoxedTyCons,
 
@@ -20,7 +20,7 @@ import DsMonad
 import IfaceEnv        ( lookupOrig )
 
 import Module          ( Module )
-import DataCon         ( DataCon, dataConName )
+import DataCon         ( DataCon, dataConName, dataConWorkId )
 import TyCon           ( TyCon, tyConName, tyConDataCons )
 import Var             ( Var )
 import Id              ( mkSysLocal )
@@ -184,6 +184,12 @@ initBuiltins
                , combinePAVars    = combinePAVars
                , liftingContext   = liftingContext
                }
+
+initBuiltinVars :: Builtins -> [(Var, Var)]
+initBuiltinVars bi = [(v,v) | v <- map dataConWorkId defaultDataConWorkers]
+
+defaultDataConWorkers :: [DataCon]
+defaultDataConWorkers = [trueDataCon, falseDataCon]
 
 initBuiltinTyCons :: Builtins -> [(Name, TyCon)]
 initBuiltinTyCons bi = (tyConName funTyCon, closureTyCon bi)

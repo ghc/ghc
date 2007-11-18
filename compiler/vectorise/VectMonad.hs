@@ -152,6 +152,10 @@ initGlobalEnv info instEnvs famInstEnvs
     , global_bindings      = []
     }
 
+extendImportedVarsEnv :: [(Var, Var)] -> GlobalEnv -> GlobalEnv
+extendImportedVarsEnv ps genv
+  = genv { global_vars = extendVarEnvList (global_vars genv) ps }
+
 setFamInstEnv :: FamInstEnv -> GlobalEnv -> GlobalEnv
 setFamInstEnv l_fam_inst genv
   = genv { global_fam_inst_env = (g_fam_inst, l_fam_inst) }
@@ -489,7 +493,8 @@ initV hsc_env guts info p
     go =
       do
         builtins       <- initBuiltins
-        let builtin_tycons   = initBuiltinTyCons   builtins
+        let builtin_vars     = initBuiltinVars     builtins
+            builtin_tycons   = initBuiltinTyCons   builtins
             builtin_datacons = initBuiltinDataCons builtins
         builtin_pas    <- initBuiltinPAs builtins
         builtin_prs    <- initBuiltinPRs builtins
@@ -499,7 +504,8 @@ initV hsc_env guts info p
         let famInstEnvs = (eps_fam_inst_env eps, mg_fam_inst_env guts)
             instEnvs    = (eps_inst_env     eps, mg_inst_env     guts)
 
-        let genv = extendTyConsEnv builtin_tycons
+        let genv = extendImportedVarsEnv builtin_vars
+                 . extendTyConsEnv builtin_tycons
                  . extendDataConsEnv builtin_datacons
                  . extendPAFunsEnv builtin_pas
                  . setPRFunsEnv    builtin_prs
