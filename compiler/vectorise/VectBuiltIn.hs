@@ -42,6 +42,7 @@ import Outputable
 
 import Data.Array
 import Control.Monad   ( liftM, zipWithM )
+import Data.List       ( unzip4 )
 
 mAX_NDP_PROD :: Int
 mAX_NDP_PROD = 3
@@ -60,6 +61,9 @@ nDP_REPR        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Repr")
 nDP_CLOSURE     = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Closure")
 nDP_PRIM        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Prim")
 nDP_INSTANCES   = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Instances")
+nDP_COMBINATORS = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Combinators")
+
+nDP_PRELUDE_PARR = mkNDPModule FSLIT("Data.Array.Parallel.Prelude.PArr")
 
 data Builtins = Builtins {
                   parrayTyCon      :: TyCon
@@ -185,15 +189,34 @@ initBuiltins
                , liftingContext   = liftingContext
                }
 
-initBuiltinVars :: Builtins -> [(Var, Var)]
-initBuiltinVars bi = [(v,v) | v <- map dataConWorkId defaultDataConWorkers]
+initBuiltinVars :: Builtins -> DsM [(Var, Var)]
+initBuiltinVars bi
+  = do
+      uvars <- zipWithM externalVar umods ufs
+      vvars <- zipWithM externalVar vmods vfs
+      return $ [(v,v) | v <- map dataConWorkId defaultDataConWorkers]
+               ++ zip uvars vvars
+  where
+    (umods, ufs, vmods, vfs) = unzip4 preludeVars
 
 defaultDataConWorkers :: [DataCon]
 defaultDataConWorkers = [trueDataCon, falseDataCon]
 
-initBuiltinTyCons :: Builtins -> [(Name, TyCon)]
-initBuiltinTyCons bi = (tyConName funTyCon, closureTyCon bi)
-                     : [(tyConName tc, tc) | tc <- defaultTyCons]
+preludeVars :: [(Module, FastString, Module, FastString)]
+preludeVars
+  = [
+      mk nDP_PRELUDE_PARR FSLIT("mapP") nDP_COMBINATORS FSLIT("mapPA")
+    ]
+  where
+    mk = (,,,)
+
+initBuiltinTyCons :: Builtins -> DsM [(Name, TyCon)]
+initBuiltinTyCons bi
+  = do
+      parr <- externalTyCon nDP_PRELUDE_PARR FSLIT("PArr")
+      return $ (tyConName funTyCon, closureTyCon bi)
+             : (tyConName parr,     parrayTyCon bi)
+             : [(tyConName tc, tc) | tc <- defaultTyCons]
 
 defaultTyCons :: [TyCon]
 defaultTyCons = [intTyCon, boolTyCon]
@@ -219,6 +242,7 @@ builtinPAs bi
   = [
       mk (tyConName $ closureTyCon bi)  nDP_CLOSURE     FSLIT("dPA_Clo")
     , mk (tyConName $ voidTyCon bi)     nDP_REPR        FSLIT("dPA_Void")
+    , mk (tyConName $ parrayTyCon bi)   nDP_INSTANCES   FSLIT("dPA_PArray")
     , mk unitTyConName                  nDP_INSTANCES   FSLIT("dPA_Unit")
 
     , mk intTyConName                   nDP_INSTANCES   FSLIT("dPA_Int")
