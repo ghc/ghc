@@ -1042,6 +1042,7 @@ identityConvTyCon :: TyCon -> VM ()
 identityConvTyCon tc
   | isBoxedTupleTyCon tc = return ()
   | isUnLiftedTyCon tc   = return ()
-  | otherwise            = maybeV (lookupTyCon tc) >> return ()
-
+  | otherwise            = do
+                             tc' <- maybeV (lookupTyCon tc)
+                             if tc == tc' then return () else noV
 
