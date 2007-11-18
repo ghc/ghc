@@ -162,6 +162,10 @@ extendTyConsEnv :: [(Name, TyCon)] -> GlobalEnv -> GlobalEnv
 extendTyConsEnv ps genv
   = genv { global_tycons = extendNameEnvList (global_tycons genv) ps }
 
+extendDataConsEnv :: [(Name, DataCon)] -> GlobalEnv -> GlobalEnv
+extendDataConsEnv ps genv
+  = genv { global_datacons = extendNameEnvList (global_datacons genv) ps }
+
 extendPAFunsEnv :: [(Name, Var)] -> GlobalEnv -> GlobalEnv
 extendPAFunsEnv ps genv
   = genv { global_pa_funs = extendNameEnvList (global_pa_funs genv) ps }
@@ -485,7 +489,8 @@ initV hsc_env guts info p
     go =
       do
         builtins       <- initBuiltins
-        let builtin_tycons = initBuiltinTyCons builtins
+        let builtin_tycons   = initBuiltinTyCons   builtins
+            builtin_datacons = initBuiltinDataCons builtins
         builtin_pas    <- initBuiltinPAs builtins
         builtin_prs    <- initBuiltinPRs builtins
         builtin_boxed  <- initBuiltinBoxedTyCons builtins
@@ -495,6 +500,7 @@ initV hsc_env guts info p
             instEnvs    = (eps_inst_env     eps, mg_inst_env     guts)
 
         let genv = extendTyConsEnv builtin_tycons
+                 . extendDataConsEnv builtin_datacons
                  . extendPAFunsEnv builtin_pas
                  . setPRFunsEnv    builtin_prs
                  . setBoxedTyConsEnv builtin_boxed

@@ -7,7 +7,8 @@
 
 module VectBuiltIn (
   Builtins(..), sumTyCon, prodTyCon, combinePAVar,
-  initBuiltins, initBuiltinTyCons, initBuiltinPAs, initBuiltinPRs,
+  initBuiltins, initBuiltinTyCons, initBuiltinDataCons,
+  initBuiltinPAs, initBuiltinPRs,
   initBuiltinBoxedTyCons,
 
   primMethod, primPArray
@@ -19,7 +20,7 @@ import DsMonad
 import IfaceEnv        ( lookupOrig )
 
 import Module          ( Module )
-import DataCon         ( DataCon )
+import DataCon         ( DataCon, dataConName )
 import TyCon           ( TyCon, tyConName, tyConDataCons )
 import Var             ( Var )
 import Id              ( mkSysLocal )
@@ -32,7 +33,7 @@ import Type            ( Type )
 import TysPrim
 import TysWiredIn      ( unitTyCon, tupleTyCon,
                          intTyCon, intTyConName,
-                         boolTyCon, boolTyConName )
+                         boolTyCon, boolTyConName, trueDataCon, falseDataCon )
 import Module
 import BasicTypes      ( Boxity(..) )
 
@@ -190,6 +191,12 @@ initBuiltinTyCons bi = (tyConName funTyCon, closureTyCon bi)
 
 defaultTyCons :: [TyCon]
 defaultTyCons = [intTyCon, boolTyCon]
+
+initBuiltinDataCons :: Builtins -> [(Name, DataCon)]
+initBuiltinDataCons bi = [(dataConName dc, dc)| dc <- defaultDataCons]
+
+defaultDataCons :: [DataCon]
+defaultDataCons = [trueDataCon, falseDataCon]
 
 initBuiltinDicts :: [(Name, Module, FastString)] -> DsM [(Name, Var)]
 initBuiltinDicts ps
