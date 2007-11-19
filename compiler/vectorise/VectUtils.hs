@@ -259,7 +259,7 @@ emptyPA :: Type -> VM CoreExpr
 emptyPA = paMethod pa_empty
 
 packPA :: Type -> CoreExpr -> CoreExpr -> CoreExpr -> VM CoreExpr
-packPA ty xs len sel = liftM (`mkApps` [len, sel])
+packPA ty xs len sel = liftM (`mkApps` [xs, len, sel])
                              (paMethod pa_pack ty)
 
 combinePA :: Type -> CoreExpr -> CoreExpr -> CoreExpr -> [CoreExpr]

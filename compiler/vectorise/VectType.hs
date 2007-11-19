@@ -1022,7 +1022,7 @@ fromVect (FunTy arg_ty res_ty) expr
       vres_ty <- vectType res_ty
       apply   <- builtin applyClosureVar
       body    <- fromVect res_ty
-               $ Var apply `mkTyApps` [arg_ty, res_ty] `mkApps` [expr, Var arg]
+               $ Var apply `mkTyApps` [varg_ty, vres_ty] `mkApps` [expr, varg]
       return $ Lam arg body
 fromVect ty expr
   = identityConv ty >> return expr
