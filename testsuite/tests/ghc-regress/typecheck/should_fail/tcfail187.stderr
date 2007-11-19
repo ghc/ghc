@@ -1,0 +1,5 @@
+
+tcfail187.hs:7:7:
+    Constructor `:::' should have no arguments, but has been given 2
+    In the pattern: x ::: y
+    In the definition of `foo': foo (x ::: y) = ()
