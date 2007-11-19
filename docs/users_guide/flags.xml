@@ -703,7 +703,7 @@
 	      <entry><option>-XMonoPatBinds</option></entry>
 	    </row>
 	    <row>
-	      <entry><option>-XRelaxedPolyRed</option></entry>
+	      <entry><option>-XRelaxedPolyRec</option></entry>
 	      <entry>Relaxed checking for <link linkend="typing-binds">mutually-recursive polymorphic functions</link></entry>
 	      <entry>dynamic</entry>
 	      <entry><option>-XNoRelaxedPolyRec</option></entry>

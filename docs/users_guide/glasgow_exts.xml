@@ -7198,7 +7198,7 @@ can be completely switched off by
   [x] = e                    -- A pattern binding
 </programlisting>
 Experimentally, GHC now makes pattern bindings monomorphic <emphasis>by
-default</emphasis>.  Use <option>-XMonoPatBinds</option> to recover the
+default</emphasis>.  Use <option>-XNoMonoPatBinds</option> to recover the
 standard behaviour.
 </para>
 </sect2>
