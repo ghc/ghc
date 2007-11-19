@@ -717,9 +717,10 @@ tcConArgs data_con arg_tys (PrefixCon arg_pats) pstate thing_inside
     con_arity  = dataConSourceArity data_con
     no_of_args = length arg_pats
 
-tcConArgs data_con [arg_ty1,arg_ty2] (InfixCon p1 p2) pstate thing_inside
+tcConArgs data_con arg_tys (InfixCon p1 p2) pstate thing_inside
   = do	{ checkTc (con_arity == 2)	-- Check correct arity
 	 	  (arityErr "Constructor" data_con con_arity 2)
+	; let [arg_ty1,arg_ty2] = arg_tys	-- This can't fail after the arity check
 	; ([p1',p2'], tvs, res) <- tcMultiple tcConArg [(p1,arg_ty1),(p2,arg_ty2)]
 					      pstate thing_inside
 	; return (InfixCon p1' p2', tvs, res) }
