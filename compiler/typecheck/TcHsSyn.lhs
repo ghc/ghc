@@ -908,56 +908,76 @@ zonkTypeZapping ty
 	-- mutable tyvar to a fresh immutable one.  So the mutable store
 	-- plays the role of an environment.  If we come across a mutable
 	-- type variable that isn't so bound, it must be completely free.
-    zonk_unbound_tyvar tv = do { writeMetaTyVar tv ty; return ty }
-			  where 
-			    ty = mkArbitraryType tv
+    zonk_unbound_tyvar tv = do { ty <- mkArbitraryType warn tv
+			       ; writeMetaTyVar tv ty
+			       ; return ty }
+	where
+	    warn span msg = setSrcSpan span (addWarnTc msg)
 
 
--- When the type checker finds a type variable with no binding,
--- which means it can be instantiated with an arbitrary type, it
--- usually instantiates it to Void.  Eg.
--- 
--- 	length []
--- ===>
--- 	length Void (Nil Void)
--- 
--- But in really obscure programs, the type variable might have
--- a kind other than *, so we need to invent a suitably-kinded type.
--- 
--- This commit uses
--- 	Void for kind *
--- 	List for kind *->*
--- 	Tuple for kind *->...*->*
--- 
--- which deals with most cases.  (Previously, it only dealt with
--- kind *.)   
--- 
--- In the other cases, it just makes up a TyCon with a suitable
--- kind.  If this gets into an interface file, anyone reading that
--- file won't understand it.  This is fixable (by making the client
--- of the interface file make up a TyCon too) but it is tiresome and
--- never happens, so I am leaving it 
+{- 	Note [Strangely-kinded void TyCons]
+	~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	See Trac #959 for more examples
 
-mkArbitraryType :: TcTyVar -> Type
+When the type checker finds a type variable with no binding, which
+means it can be instantiated with an arbitrary type, it usually
+instantiates it to Void.  Eg.
+
+	length []
+===>
+	length Void (Nil Void)
+
+But in really obscure programs, the type variable might have a kind
+other than *, so we need to invent a suitably-kinded type.
+
+This commit uses
+	Void for kind *
+	List for kind *->*
+	Tuple for kind *->...*->*
+
+which deals with most cases.  (Previously, it only dealt with
+kind *.)   
+
+In the other cases, it just makes up a TyCon with a suitable kind.  If
+this gets into an interface file, anyone reading that file won't
+understand it.  This is fixable (by making the client of the interface
+file make up a TyCon too) but it is tiresome and never happens, so I
+am leaving it.
+
+Meanwhile I have now fixed GHC to emit a civilized warning.
+ -}
+
+mkArbitraryType :: (SrcSpan -> SDoc -> TcRnIf g l a)	-- How to complain
+		-> TcTyVar
+		-> TcRnIf g l Type		-- Used by desugarer too
 -- Make up an arbitrary type whose kind is the same as the tyvar.
 -- We'll use this to instantiate the (unbound) tyvar.
-mkArbitraryType tv 
-  | liftedTypeKind `isSubKind` kind = anyPrimTy		-- The vastly common case
-  | otherwise			    = mkTyConApp tycon []
-  where
-    kind       = tyVarKind tv
-    (args,res) = splitKindFunTys kind
-
-    tycon | eqKind kind (tyConKind anyPrimTyCon1) 	--  *->*
-	  = anyPrimTyCon1				-- No tuples this size
-
-	  | all isLiftedTypeKind args && isLiftedTypeKind res
-	  = tupleTyCon Boxed (length args)	--  *-> ... ->*->*
-		-- Horrible hack to make less use of mkAnyPrimTyCon
-
-	  | otherwise
-	  = mkAnyPrimTyCon (getUnique tv) kind
+--
+-- Also used by the desugarer; hence the (tiresome) parameter
+-- to use when generating a warning
+mkArbitraryType warn tv 
+  | liftedTypeKind `isSubKind` kind 		-- The vastly common case
+   = return anyPrimTy			
+  | eqKind kind (tyConKind anyPrimTyCon1) 	--  *->*
+  = return (mkTyConApp anyPrimTyCon1 [])	--     No tuples this size
+  | all isLiftedTypeKind args 			-- *-> ... ->*->*
+  , isLiftedTypeKind res			--    Horrible hack to make less use 
+  = return (mkTyConApp tup_tc [])		--    of mkAnyPrimTyCon
+  | otherwise
+  = do	{ warn (getSrcSpan tv) msg
+	; return (mkTyConApp (mkAnyPrimTyCon (getUnique tv) kind) []) }
 		-- Same name as the tyvar, apart from making it start with a colon (sigh)
 		-- I dread to think what will happen if this gets out into an 
 		-- interface file.  Catastrophe likely.  Major sigh.
+  where
+    kind       = tyVarKind tv
+    (args,res) = splitKindFunTys kind
+    tup_tc     = tupleTyCon Boxed (length args)
+		
+    msg = vcat [ hang (ptext SLIT("Inventing strangely-kinded Any TyCon"))
+		    2 (ptext SLIT("of kind") <+> quotes (ppr kind))
+	       , nest 2 (ptext SLIT("from an instantiation of type variable") <+> quotes (ppr tv))
+	       , ptext SLIT("This warning can be suppressed by a type signature fixing") <+> quotes (ppr tv)
+	       , nest 2 (ptext SLIT("but is harmless without -O (and usually harmless anyway)."))
+	       , ptext SLIT("See http://hackage.haskell.org/trac/ghc/ticket/959 for details")  ]
 \end{code}

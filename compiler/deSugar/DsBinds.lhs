@@ -189,7 +189,9 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 	      mk_bind ((tyvars, global, local, prags), n)	-- locals !! n == local
 	        = 	-- Need to make fresh locals to bind in the selector, because
 		      	-- some of the tyvars will be bound to 'Any'
-		  do { locals' <- newSysLocalsDs (map substitute local_tys)
+		  do { ty_args <- mapM mk_ty_arg all_tyvars
+		     ; let substitute = substTyWith all_tyvars ty_args
+		     ; locals' <- newSysLocalsDs (map substitute local_tys)
 		     ; tup_id  <- newSysLocalDs  (substitute tup_ty)
 		     ; mb_specs <- mapM (dsSpec all_tyvars dicts tyvars global local core_bind) 
 				      	 prags
@@ -200,10 +202,9 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 			         mkApps (mkTyApps (Var poly_tup_id) ty_args) dict_args
 		     ; returnDs ((global', rhs) : spec_binds) }
 	        where
-	          mk_ty_arg all_tyvar | all_tyvar `elem` tyvars = mkTyVarTy all_tyvar
-	      			      | otherwise		= mkArbitraryType all_tyvar
-	          ty_args    = map mk_ty_arg all_tyvars
-	          substitute = substTyWith all_tyvars ty_args
+	          mk_ty_arg all_tyvar
+			| all_tyvar `elem` tyvars = return (mkTyVarTy all_tyvar)
+	      		| otherwise		  = dsMkArbitraryType all_tyvar
 
 	; export_binds_s <- mappM mk_bind (exports `zip` [0..])
 	     -- don't scc (auto-)annotate the tuple itself.
@@ -271,27 +272,30 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 	  case mb_lhs of
 	    Nothing -> do { warnDs decomp_msg; return Nothing }
 
-	    Just (var, args) -> return (Just (addInlineInfo inl spec_id spec_rhs, rule))
-		where
-		  local_poly  = setIdNotExported poly_id
+	    Just (var, args) -> do
+	
+	{ f_body <- fix_up (Let mono_bind (Var mono_id))
+
+	; let	  local_poly  = setIdNotExported poly_id
 			-- Very important to make the 'f' non-exported,
 			-- else it won't be inlined!
 		  spec_id     = mkLocalId spec_name spec_ty
 		  spec_rhs    = Let (NonRec local_poly poly_f_body) ds_spec_expr
-		  poly_f_body = mkLams (tvs ++ dicts) $
-			   	fix_up (Let mono_bind (Var mono_id))
-
+		  poly_f_body = mkLams (tvs ++ dicts) f_body
+			   	
 		  rule =  mkLocalRule (mkFastString ("SPEC " ++ showSDoc (ppr poly_name)))
 				AlwaysActive poly_name
 			        bndrs args
 				(mkVarApps (Var spec_id) bndrs)
-	} }
+	; return (Just (addInlineInfo inl spec_id spec_rhs, rule))
+	} } }
   where
 	-- Bind to Any any of all_ptvs that aren't 
 	-- relevant for this particular function 
-    fix_up body | null void_tvs = body
-		| otherwise	= mkTyApps (mkLams void_tvs body) 
-					   (map mkArbitraryType void_tvs)
+    fix_up body | null void_tvs = return body
+		| otherwise	= do { void_tys <- mapM dsMkArbitraryType void_tvs
+				     ; return (mkTyApps (mkLams void_tvs body) void_tys) }
+
     void_tvs = all_tvs \\ tvs
 
     dead_msg bs = vcat [ sep [ptext SLIT("Useless constraint") <> plural bs
@@ -302,6 +306,10 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 
     decomp_msg = hang (ptext SLIT("Specialisation too complicated to desugar; ignored"))
 		    2 (ppr spec_expr)
+
+dsMkArbitraryType tv = mkArbitraryType warn tv
+  where
+    warn span msg = putSrcSpanDs span (warnDs msg)
 \end{code}
 
 Note [Unused spec binders]

@@ -67,6 +67,7 @@ import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
 import SrcLoc
 import Unique		( mkAlphaTyVarUnique, pprUnique )
 import PrelNames
+import StaticFlags
 import FastString	( FastString, mkFastString )
 import Outputable
 
@@ -311,7 +312,8 @@ anyPrimTyCon1 = mkLiftedPrimTyCon anyPrimTyCon1Name kind 0 PtrRep
 mkAnyPrimTyCon :: Unique -> Kind -> TyCon
 -- Grotesque hack alert: the client gives the unique; so equality won't work
 mkAnyPrimTyCon uniq kind 
-  = pprTrace "Urk! Inventing strangely-kinded Any TyCon:" (ppr uniq <+> ppr kind)
+  = WARN( opt_PprStyle_Debug, ptext SLIT("Urk! Inventing strangely-kinded Any TyCon:") <+> ppr uniq <+> ppr kind )
+	-- See Note [Strangely-kinded void TyCons] in TcHsSyn
     tycon
   where
      name  = mkPrimTc (mkFastString ("Any" ++ showSDoc (pprUnique uniq))) uniq tycon
