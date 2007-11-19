@@ -33,7 +33,9 @@ import Type            ( Type )
 import TysPrim
 import TysWiredIn      ( unitTyCon, tupleTyCon,
                          intTyCon, intTyConName,
-                         boolTyCon, boolTyConName, trueDataCon, falseDataCon )
+                         boolTyCon, boolTyConName, trueDataCon, falseDataCon,
+                         parrTyCon, parrTyConName )
+import PrelNames       ( gHC_PARR )
 import Module
 import BasicTypes      ( Boxity(..) )
 
@@ -63,7 +65,7 @@ nDP_PRIM        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Prim")
 nDP_INSTANCES   = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Instances")
 nDP_COMBINATORS = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Combinators")
 
-nDP_PRELUDE_PARR = mkNDPModule FSLIT("Data.Array.Parallel.Prelude.PArr")
+nDP_PRELUDE_PARR = gHC_PARR -- mkNDPModule FSLIT("Data.Array.Parallel.Prelude.PArr")
 nDP_PRELUDE_INT  = mkNDPModule FSLIT("Data.Array.Parallel.Prelude.Int")
 
 data Builtins = Builtins {
@@ -219,9 +221,9 @@ preludeVars
 initBuiltinTyCons :: Builtins -> DsM [(Name, TyCon)]
 initBuiltinTyCons bi
   = do
-      parr <- externalTyCon nDP_PRELUDE_PARR FSLIT("PArr")
+      -- parr <- externalTyCon nDP_PRELUDE_PARR FSLIT("PArr")
       return $ (tyConName funTyCon, closureTyCon bi)
-             : (tyConName parr,     parrayTyCon bi)
+             : (parrTyConName,      parrayTyCon bi)
              : [(tyConName tc, tc) | tc <- defaultTyCons]
 
 defaultTyCons :: [TyCon]
