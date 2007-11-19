@@ -278,7 +278,7 @@ endif
 
 ifeq "$(GhcRtsWithPapi)" "YES"
 
-SRC_HC_OPTS		+= -optc-DUSE_PAPI
+SRC_CC_OPTS		+= -DUSE_PAPI
 PACKAGE_CPP_OPTS	+= -DUSE_PAPI
 
 PACKAGE_CPP_OPTS += -DPAPI_INCLUDE_DIR=$(PapiIncludeDir)
