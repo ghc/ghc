@@ -431,7 +431,7 @@ arrReprVars repr
 mkRepr :: TyCon -> VM Repr
 mkRepr vect_tc
   | [tys] <- rep_tys = boxedProductRepr tys
-  | all null rep_tys = enumRepr
+  -- | all null rep_tys = enumRepr
   | otherwise        = sumRepr =<< mapM unboxedProductRepr rep_tys
   where
     rep_tys = map dataConRepArgTys $ tyConDataCons vect_tc
