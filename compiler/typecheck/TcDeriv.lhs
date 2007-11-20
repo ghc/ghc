@@ -86,8 +86,13 @@ data DerivSpec  = DS { ds_loc     :: SrcSpan
 
 type EarlyDerivSpec = Either DerivSpec DerivSpec
 	-- Left  ds => the context for the instance should be inferred
-	--		(ds_theta is required)
-	-- Right ds => the context for the instance is supplied by the programmer
+	--	       In this case ds_theta is the list of all the 
+	--		  constraints needed, such as (Eq [a], Eq a)
+	--		  The inference process is to reduce this to a 
+	--		  simpler form (e.g. Eq a)
+	-- 
+	-- Right ds => the exact context for the instance is supplied 
+	--	       by the programmer; it is ds_theta
 
 pprDerivSpec :: DerivSpec -> SDoc
 pprDerivSpec (DS { ds_loc = l, ds_name = n, ds_tvs = tvs, 
@@ -360,12 +365,12 @@ makeDerivSpecs :: [LTyClDecl Name]
 	       -> TcM [EarlyDerivSpec]
 
 makeDerivSpecs tycl_decls inst_decls deriv_decls
-  = do	{ eqns1 <- mapM deriveTyData $
+  = do	{ eqns1 <- mapAndRecoverM deriveTyData $
                      extractTyDataPreds tycl_decls ++
 		     [ pd                        -- traverse assoc data families
                      | L _ (InstDecl _ _ _ ats) <- inst_decls
 		     , pd <- extractTyDataPreds ats ]
-	; eqns2 <- mapM deriveStandalone deriv_decls
+	; eqns2 <- mapAndRecoverM deriveStandalone deriv_decls
 	; return (catMaybes (eqns1 ++ eqns2)) }
   where
     extractTyDataPreds decls = 		   
@@ -421,20 +426,12 @@ deriveTyData _other
 
 ------------------------------------------------------------------
 mkEqnHelp :: InstOrigin -> [TyVar] -> Class -> [Type] -> Type
-          -> Maybe ThetaType		-- Just    => context supplied
-					-- Nothing => context inferred
+          -> Maybe ThetaType	-- Just    => context supplied (standalone deriving)
+				-- Nothing => context inferred (deriving on data decl)
           -> TcRn (Maybe EarlyDerivSpec)
 mkEqnHelp orig tvs cls cls_tys tc_app mtheta
   | Just (tycon, tc_args) <- tcSplitTyConApp_maybe tc_app
-  = do	{ 	-- Make tc_app saturated, because that's what the
-		-- mkDataTypeEqn things expect
-		-- It might not be saturated in the standalone deriving case
-		-- 	derive instance Monad (T a)
-	  let extra_tvs = dropList tc_args (tyConTyVars tycon)
-	      full_tc_args = tc_args ++ mkTyVarTys extra_tvs
-	      full_tvs = tvs ++ extra_tvs
-		
-	; (rep_tc, rep_tc_args) <- tcLookupFamInstExact tycon full_tc_args
+  = do	{ (rep_tc, rep_tc_args) <- tcLookupFamInstExact tycon tc_args
 
 	; mayDeriveDataTypeable <- doptM Opt_DeriveDataTypeable
 	; newtype_deriving <- doptM Opt_GeneralizedNewtypeDeriving
@@ -442,12 +439,12 @@ mkEqnHelp orig tvs cls cls_tys tc_app mtheta
           -- Be careful to test rep_tc here: in the case of families, we want
           -- to check the instance tycon, not the family tycon
 	; if isDataTyCon rep_tc then
-		mkDataTypeEqn orig mayDeriveDataTypeable full_tvs cls cls_tys 
-			      tycon full_tc_args rep_tc rep_tc_args mtheta
+		mkDataTypeEqn orig mayDeriveDataTypeable tvs cls cls_tys 
+			      tycon tc_args rep_tc rep_tc_args mtheta
 	  else
 		mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving
-		             full_tvs cls cls_tys 
-			     tycon full_tc_args rep_tc rep_tc_args mtheta }
+		             tvs cls cls_tys 
+			     tycon tc_args rep_tc rep_tc_args mtheta }
   | otherwise
   = baleOut (derivingThingErr cls cls_tys tc_app
 		(ptext SLIT("Last argument of the instance must be a type application")))
@@ -504,27 +501,13 @@ mkDataTypeEqn orig mayDeriveDataTypeable tvs cls cls_tys
   = ASSERT( null cls_tys )
     mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
 
-mk_data_eqn :: InstOrigin -> [TyVar] -> Class 
-            -> TyCon -> [TcType] -> TyCon -> [TcType] -> Maybe ThetaType
-            -> TcM (Maybe EarlyDerivSpec)
+mk_data_eqn, mk_typeable_eqn
+   :: InstOrigin -> [TyVar] -> Class 
+   -> TyCon -> [TcType] -> TyCon -> [TcType] -> Maybe ThetaType
+   -> TcM (Maybe EarlyDerivSpec)
 mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
-  | cls `hasKey` typeableClassKey
-  =	-- The Typeable class is special in several ways
-	-- 	  data T a b = ... deriving( Typeable )
-	-- gives
-	--	  instance Typeable2 T where ...
-	-- Notice that:
-	-- 1. There are no constraints in the instance
-	-- 2. There are no type variables either
-	-- 3. The actual class we want to generate isn't necessarily
-	--	Typeable; it depends on the arity of the type
-    do	{ real_clas <- tcLookupClass (typeableClassNames !! tyConArity tycon)
-	; dfun_name <- new_dfun_name real_clas tycon
-  	; loc <- getSrcSpanM
-	; return (Just $ Right $
-		  DS { ds_loc = loc, ds_orig = orig, ds_name = dfun_name, ds_tvs = []
-		     , ds_cls = real_clas, ds_tys = [mkTyConApp tycon []] 
-		     , ds_theta = mtheta `orElse` [], ds_newtype = False })  }
+  | getName cls `elem` typeableClassNames
+  = mk_typeable_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
 
   | otherwise
   = do	{ dfun_name <- new_dfun_name cls tycon
@@ -550,6 +533,34 @@ mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
   	; return (if isJust mtheta then Just (Right spec)	-- Specified context
 				   else Just (Left spec)) }	-- Infer context
 
+
+mk_typeable_eqn orig tvs cls tycon tc_args rep_tc _rep_tc_args mtheta
+	-- The Typeable class is special in several ways
+	-- 	  data T a b = ... deriving( Typeable )
+	-- gives
+	--	  instance Typeable2 T where ...
+	-- Notice that:
+	-- 1. There are no constraints in the instance
+	-- 2. There are no type variables either
+	-- 3. The actual class we want to generate isn't necessarily
+	--	Typeable; it depends on the arity of the type
+  | isNothing mtheta	-- deriving on a data type decl
+  = do	{ checkTc (cls `hasKey` typeableClassKey)
+		  (ptext SLIT("Use deriving( Typeable ) on a data type declaration"))
+	; real_cls <- tcLookupClass (typeableClassNames !! tyConArity tycon)
+	; mk_typeable_eqn orig tvs real_cls tycon [] rep_tc [] (Just []) }
+
+  | otherwise		-- standaone deriving
+  = do	{ checkTc (null tc_args)
+		  (ptext SLIT("Derived typeable instance must be of form (Typeable") 
+			<> int (tyConArity tycon) <+> ppr tycon <> rparen)
+	; dfun_name <- new_dfun_name cls tycon
+  	; loc <- getSrcSpanM
+	; return (Just $ Right $
+		  DS { ds_loc = loc, ds_orig = orig, ds_name = dfun_name, ds_tvs = []
+		     , ds_cls = cls, ds_tys = [mkTyConApp tycon []] 
+		     , ds_theta = mtheta `orElse` [], ds_newtype = False })  }
+
 ------------------------------------------------------------------
 -- Check side conditions that dis-allow derivability for particular classes
 -- This is *apart* from the newtype-deriving mechanism
@@ -563,28 +574,27 @@ checkSideConditions mayDeriveDataTypeable cls cls_tys rep_tc
   | notNull cls_tys	
   = Just ty_args_why	-- e.g. deriving( Foo s )
   | otherwise
-  = case [cond | (key,cond) <- sideConditions, key == getUnique cls] of
-	[]     -> Just (non_std_why cls)
-	[cond] -> cond (mayDeriveDataTypeable, rep_tc)
-	_other -> pprPanic "checkSideConditions" (ppr cls)
+  = case sideConditions cls of
+	Just cond -> cond (mayDeriveDataTypeable, rep_tc)
+	Nothing   -> Just non_std_why
   where
     ty_args_why	= quotes (ppr (mkClassPred cls cls_tys)) <+> ptext SLIT("is not a class")
+    non_std_why = quotes (ppr cls) <+> ptext SLIT("is not a derivable class")
 
-non_std_why :: Class -> SDoc
-non_std_why cls = quotes (ppr cls) <+> ptext SLIT("is not a derivable class")
-
-sideConditions :: [(Unique, Condition)]
-sideConditions
-  = [	(eqClassKey, 	   cond_std),
-	(ordClassKey,	   cond_std),
-	(readClassKey,	   cond_std),
-	(showClassKey,	   cond_std),
-	(enumClassKey,	   cond_std `andCond` cond_isEnumeration),
-	(ixClassKey,	   cond_std `andCond` (cond_isEnumeration `orCond` cond_isProduct)),
-	(boundedClassKey,  cond_std `andCond` (cond_isEnumeration `orCond` cond_isProduct)),
- 	(typeableClassKey, cond_mayDeriveDataTypeable `andCond` cond_typeableOK),
-	(dataClassKey,	   cond_mayDeriveDataTypeable `andCond` cond_std)
-    ]
+sideConditions :: Class -> Maybe Condition
+sideConditions cls
+  | cls_key == eqClassKey   = Just cond_std
+  | cls_key == ordClassKey  = Just cond_std
+  | cls_key == readClassKey = Just cond_std
+  | cls_key == showClassKey = Just cond_std
+  | cls_key == enumClassKey = Just (cond_std `andCond` cond_isEnumeration)
+  | cls_key == ixClassKey   = Just (cond_std `andCond` (cond_isEnumeration `orCond` cond_isProduct))
+  | cls_key == boundedClassKey = Just (cond_std `andCond` (cond_isEnumeration `orCond` cond_isProduct))
+  | cls_key == dataClassKey    = Just (cond_mayDeriveDataTypeable `andCond` cond_std)
+  | getName cls `elem` typeableClassNames = Just (cond_mayDeriveDataTypeable `andCond` cond_typeableOK)
+  | otherwise = Nothing
+  where
+    cls_key = getUnique cls
 
 type Condition = (Bool, TyCon) -> Maybe SDoc
 	-- Bool is whether or not we are allowed to derive Data and Typeable
@@ -1116,7 +1126,8 @@ derivingThingErr clas tys ty why
     pred = mkClassPred clas (tys ++ [ty])
 
 standaloneCtxt :: LHsType Name -> SDoc
-standaloneCtxt ty = ptext SLIT("In the stand-alone deriving instance for") <+> quotes (ppr ty)
+standaloneCtxt ty = hang (ptext SLIT("In the stand-alone deriving instance for")) 
+		       2 (quotes (ppr ty))
 
 derivInstCtxt :: Class -> [Type] -> Message
 derivInstCtxt clas inst_tys

@@ -561,6 +561,19 @@ recoverM recover thing
 	   Left exn  -> recover
 	   Right res -> returnM res }
 
+
+-----------------------
+mapAndRecoverM :: (a -> TcRn b) -> [a] -> TcRn [b]
+-- Drop elements of the input that fail, so the result
+-- list can be shorter than the argument list
+mapAndRecoverM f []     = return []
+mapAndRecoverM f (x:xs) = do { mb_r <- tryM (f x)
+			     ; rs <- mapAndRecoverM f xs
+			     ; return (case mb_r of
+					  Left _  -> rs
+					  Right r -> r:rs) }
+			
+
 -----------------------
 tryTc :: TcRn a -> TcRn (Messages, Maybe a)
 -- (tryTc m) executes m, and returns
