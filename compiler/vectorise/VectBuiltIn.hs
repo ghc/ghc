@@ -67,6 +67,7 @@ nDP_COMBINATORS = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Combinators")
 
 nDP_PRELUDE_PARR = gHC_PARR -- mkNDPModule FSLIT("Data.Array.Parallel.Prelude.PArr")
 nDP_PRELUDE_INT  = mkNDPModule FSLIT("Data.Array.Parallel.Prelude.Int")
+nDP_PRELUDE      = mkNDPModule FSLIT("Data.Array.Parallel.Prelude")
 
 data Builtins = Builtins {
                   parrayTyCon      :: TyCon
@@ -214,6 +215,9 @@ preludeVars
     , mk nDP_PRELUDE_INT  FSLIT("minus") nDP_PRELUDE_INT FSLIT("minusV")
     , mk nDP_PRELUDE_INT  FSLIT("sumP")  nDP_PRELUDE_INT FSLIT("sumPA")
     , mk nDP_PRELUDE_INT  FSLIT("upToP") nDP_PRELUDE_INT FSLIT("upToPA")
+
+    -- FIXME: temporary
+    , mk nDP_PRELUDE FSLIT("fromPArrayP") nDP_PRELUDE FSLIT("fromPArrayPA")
     ]
   where
     mk = (,,,)
@@ -224,6 +228,10 @@ initBuiltinTyCons bi
       -- parr <- externalTyCon nDP_PRELUDE_PARR FSLIT("PArr")
       return $ (tyConName funTyCon, closureTyCon bi)
              : (parrTyConName,      parrayTyCon bi)
+
+             -- FIXME: temporary
+             : (tyConName $ parrayTyCon bi, parrayTyCon bi)
+
              : [(tyConName tc, tc) | tc <- defaultTyCons]
 
 defaultTyCons :: [TyCon]
