@@ -412,7 +412,11 @@ ifaceDeclSubBndrs (IfaceClass {ifCtxt = sc_ctxt, ifName = cls_occ,
     dcww_occ = mkDataConWorkerOcc dc_occ
     is_newtype = n_sigs + n_ctxt == 1			-- Sigh 
 
-ifaceDeclSubBndrs _other = []
+ifaceDeclSubBndrs (IfaceSyn {ifName = tc_occ,
+			     ifFamInst = famInst})
+  = famInstCo famInst tc_occ
+
+ifaceDeclSubBndrs _ = []
 
 -- coercion for data/newtype family instances
 famInstCo Nothing  baseOcc = []
