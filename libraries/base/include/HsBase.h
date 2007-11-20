@@ -125,7 +125,6 @@
 #if HAVE_VFORK_H
 #include <vfork.h>
 #endif
-#include "lockFile.h"
 #include "dirUtils.h"
 #include "WCsubst.h"
 
@@ -502,6 +501,8 @@ INLINE time_t __hscore_st_mtime ( struct stat* st ) { return st->st_mtime; }
 INLINE off_t  __hscore_st_size  ( struct stat* st ) { return st->st_size; }
 #if !defined(_MSC_VER)
 INLINE mode_t __hscore_st_mode  ( struct stat* st ) { return st->st_mode; }
+INLINE mode_t __hscore_st_dev  ( struct stat* st ) { return st->st_dev; }
+INLINE mode_t __hscore_st_ino  ( struct stat* st ) { return st->st_ino; }
 #endif
 
 #if HAVE_TERMIOS_H

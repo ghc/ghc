@@ -98,12 +98,18 @@ fileType file =
 
 -- NOTE: On Win32 platforms, this will only work with file descriptors
 -- referring to file handles. i.e., it'll fail for socket FDs.
-fdType :: FD -> IO FDType
-fdType fd = 
+fdStat :: FD -> IO (FDType, CDev, CIno)
+fdStat fd = 
   allocaBytes sizeof_stat $ \ p_stat -> do
     throwErrnoIfMinus1Retry "fdType" $
 	c_fstat fd p_stat
-    statGetType p_stat
+    ty <- statGetType p_stat
+    dev <- st_dev p_stat
+    ino <- st_ino p_stat
+    return (ty,dev,ino)
+    
+fdType :: FD -> IO FDType
+fdType fd = do (ty,_,_) <- fdStat fd; return ty
 
 statGetType p_stat = do
   c_mode <- st_mode p_stat :: IO CMode
@@ -476,6 +482,8 @@ foreign import ccall unsafe "HsBase.h __hscore_sizeof_stat" sizeof_stat :: Int
 foreign import ccall unsafe "HsBase.h __hscore_st_mtime" st_mtime :: Ptr CStat -> IO CTime
 foreign import ccall unsafe "HsBase.h __hscore_st_size" st_size :: Ptr CStat -> IO COff
 foreign import ccall unsafe "HsBase.h __hscore_st_mode" st_mode :: Ptr CStat -> IO CMode
+foreign import ccall unsafe "HsBase.h __hscore_st_dev" st_dev :: Ptr CStat -> IO CDev
+foreign import ccall unsafe "HsBase.h __hscore_st_ino" st_ino :: Ptr CStat -> IO CIno
 
 foreign import ccall unsafe "HsBase.h __hscore_echo"         const_echo :: CInt
 foreign import ccall unsafe "HsBase.h __hscore_tcsanow"      const_tcsanow :: CInt

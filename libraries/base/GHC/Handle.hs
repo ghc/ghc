@@ -62,6 +62,7 @@ import Foreign
 import Foreign.C
 import System.IO.Error
 import System.Posix.Internals
+import System.Posix.Types
 
 import GHC.Real
 
@@ -875,9 +876,9 @@ openFile' filepath mode binary =
     fd <- throwErrnoIfMinus1Retry "openFile"
  	        (c_open f (fromIntegral oflags) 0o666)
 
-    fd_type <- fdType fd
+    stat@(fd_type,_,_) <- fdStat fd
 
-    h <- fdToHandle' fd (Just fd_type) False filepath mode binary
+    h <- fdToHandle' fd (Just stat) False filepath mode binary
             `catchException` \e -> do c_close fd; throw e
 	-- NB. don't forget to close the FD if fdToHandle' fails, otherwise
 	-- this FD leaks.
@@ -907,8 +908,15 @@ append_flags = write_flags  .|. o_APPEND
 -- ---------------------------------------------------------------------------
 -- fdToHandle'
 
-fdToHandle' :: FD -> Maybe FDType -> Bool -> FilePath -> IOMode -> Bool -> IO Handle
-fdToHandle' fd mb_fd_type is_socket filepath mode binary = do
+fdToHandle' :: FD
+            -> Maybe (FDType, CDev, CIno)
+            -> Bool
+            -> FilePath
+            -> IOMode
+            -> Bool
+            -> IO Handle
+
+fdToHandle' fd mb_stat is_socket filepath mode binary = do
     -- turn on non-blocking mode
     setNonBlockingFD fd
 
@@ -929,10 +937,10 @@ fdToHandle' fd mb_fd_type is_socket filepath mode binary = do
 
     -- open() won't tell us if it was a directory if we only opened for
     -- reading, so check again.
-    fd_type <- 
-      case mb_fd_type of
+    (fd_type,dev,ino) <- 
+      case mb_stat of
         Just x  -> return x
-	Nothing -> fdType fd
+	Nothing -> fdStat fd
 
     case fd_type of
 	Directory -> 
@@ -942,7 +950,7 @@ fdToHandle' fd mb_fd_type is_socket filepath mode binary = do
 	-- regular files need to be locked
 	RegularFile -> do
 #ifndef mingw32_HOST_OS
-	   r <- lockFile fd (fromBool write) 1{-exclusive-}
+	   r <- lockFile fd dev ino (fromBool write)
 	   when (r == -1)  $
 		ioException (IOError Nothing ResourceBusy "openFile"
 				   "file is locked" Nothing)
@@ -969,7 +977,7 @@ fdToHandle fd = do
 
 #ifndef mingw32_HOST_OS
 foreign import ccall unsafe "lockFile"
-  lockFile :: CInt -> CInt -> CInt -> IO CInt
+  lockFile :: CInt -> CDev -> CIno -> CInt -> IO CInt
 
 foreign import ccall unsafe "unlockFile"
   unlockFile :: CInt -> IO CInt
