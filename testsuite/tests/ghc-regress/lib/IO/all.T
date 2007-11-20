@@ -69,6 +69,8 @@ clean(['openFile006.out'])
 test('openFile007',  compose(expect_fail_if_compiler_type('hugs'),
 			expect_fail_if_windows), compile_and_run, [''])
 clean(['openFile007.out'])
+test('openFile008', normal, compile_and_run, [''])
+
 test('putStr001',    normal, compile_and_run, [''])
 test('readFile001',  compose(expect_fail_if_compiler_type('hugs'),
 			expect_fail_if_windows), compile_and_run, [''])
