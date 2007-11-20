@@ -1409,8 +1409,8 @@ scavenge_find_global_work (void)
     step_workspace *ws;
 
     flag = rtsFalse;
-    for (g = RtsFlags.GcFlags.generations; --g >= 0; ) {
-	for (s = generations[g].n_steps; --s >= 0; ) {
+    for (g = RtsFlags.GcFlags.generations-1; g >= 0; g--) {
+	for (s = generations[g].n_steps-1; s >= 0; s--) {
 	    if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
 		continue; 
 	    }
@@ -1568,8 +1568,8 @@ any_work (void)
     // Check for global work in any step.  We don't need to check for
     // local work, because we have already exited scavenge_loop(),
     // which means there is no local work for this thread.
-    for (g = RtsFlags.GcFlags.generations; --g >= 0; ) {
-	for (s = generations[g].n_steps; --s >= 0; ) {
+    for (g = RtsFlags.GcFlags.generations-1; g >= 0; g--) {
+	for (s = generations[g].n_steps-1; s >= 0; s--) {
 	    if (g == 0 && s == 0 && RtsFlags.GcFlags.generations > 1) { 
 		continue; 
 	    }
