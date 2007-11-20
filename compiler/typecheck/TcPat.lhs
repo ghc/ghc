@@ -51,6 +51,7 @@ import Util
 import Maybes
 import Outputable
 import FastString
+import Monad
 \end{code}
 
 
@@ -625,14 +626,16 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	  -- Add the stupid theta
 	; addDataConStupidTheta data_con ctxt_res_tys
 
-	; ex_tvs' <- tcInstSkolTyVars skol_info ex_tvs	-- Get location from monad,
-							-- not from ex_tvs
+	; ex_tvs' <- tcInstSkolTyVars skol_info ex_tvs	
+                     -- Get location from monad, not from ex_tvs
+
 	; let tenv     = zipTopTvSubst (univ_tvs ++ ex_tvs)
 				       (ctxt_res_tys ++ mkTyVarTys ex_tvs')
 	      arg_tys' = substTys tenv arg_tys
 
 	; if null ex_tvs && null eq_spec && null full_theta
-	  then do { 	-- The common case; no class bindings etc (see Note [Arrows and patterns])
+	  then do { -- The common case; no class bindings etc 
+                    -- (see Note [Arrows and patterns])
 		    (arg_pats', inner_tvs, res) <- tcConArgs data_con arg_tys' 
 							       arg_pats pstate thing_inside
 		  ; let res_pat = ConPatOut { pat_con = L con_span data_con, 
@@ -641,27 +644,35 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 
 		    ; return (wrap_res_pat res_pat, inner_tvs, res) }
 
-	  else do 	-- The general case, with existential, and local equality constraints
-	{ let eq_spec' = substEqSpec tenv eq_spec
-	      theta'   = substTheta  tenv full_theta
+	  else do   -- The general case, with existential, and local equality 
+                    -- constraints
+	{ let eq_preds = [mkEqPred (mkTyVarTy tv, ty) | (tv, ty) <- eq_spec]
+	      theta'   = substTheta tenv (full_theta ++ eq_preds)
 	      ctxt     = pat_ctxt pstate
 	; checkTc (case ctxt of { ProcPat -> False; other -> True })
 		  (existentialProcPat data_con)
-	; co_vars <- newCoVars eq_spec'	-- Make coercion variables
-	; traceTc (text "tcConPat: refineAlt")
-	; pstate' <- refineAlt data_con pstate ex_tvs' co_vars pat_ty
-        ; traceTc (text "tcConPat: refineAlt done!")
-	
+
+          -- Need to test for rigidity if *any* constraints in theta as class
+          -- constraints may have superclass equality constraints.  However,
+          -- we don't want to check for rigidity if we got here only because
+          -- ex_tvs was non-null.
+--        ; unless (null theta') $
+          -- FIXME: AT THE MOMENT WE CHEAT!  We only perform the rigidity test
+          --   if we explicit or implicit (by a GADT def) have equality 
+          --   constraints.
+        ; unless (all (not . isEqPred) theta') $
+            checkTc (isRigidTy pat_ty) (nonRigidMatch data_con)
+
 	; ((arg_pats', inner_tvs, res), lie_req) <- getLIE $
-		tcConArgs data_con arg_tys' arg_pats pstate' thing_inside
+		tcConArgs data_con arg_tys' arg_pats pstate thing_inside
 
 	; loc <- getInstLoc origin
 	; dicts <- newDictBndrs loc theta'
-	; dict_binds <- tcSimplifyCheckPat loc co_vars (pat_reft pstate') 
+	; dict_binds <- tcSimplifyCheckPat loc [] emptyRefinement
 			   ex_tvs' dicts lie_req
 
         ; let res_pat = ConPatOut { pat_con = L con_span data_con, 
-			            pat_tvs = ex_tvs' ++ co_vars,
+			            pat_tvs = ex_tvs',
 			            pat_dicts = map instToVar dicts, 
 			            pat_binds = dict_binds,
 			            pat_args = arg_pats', pat_ty = pat_ty' }
