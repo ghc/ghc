@@ -1024,14 +1024,14 @@ gc_thread_mainloop (void)
         if (gct->papi_events == -1) {
             papi_init_eventset(&gct->papi_events);
         }
-        papi_thread_start_gc_count(gct->papi_events);
+        papi_thread_start_gc1_count(gct->papi_events);
 #endif
 
 	gc_thread_work();
 
 #ifdef USE_PAPI
         // count events in this thread towards the GC totals
-        papi_thread_stop_gc_count(gct->papi_events);
+        papi_thread_stop_gc1_count(gct->papi_events);
 #endif
     }
 }	

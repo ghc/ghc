@@ -16,10 +16,12 @@ void papi_init_eventset(int * event_set);
 void papi_init(void);
 void papi_start_mutator_count(void);
 void papi_stop_mutator_count(void);
+
 void papi_start_gc_count(void);
-void papi_stop_gc_count(void);
+void papi_stop_gc0_count(void);
+void papi_stop_gc1_count(void);
 
 // for multithreaded GC, each sub-thread uses these functions to count
 // events and aggregate them into the main GC counters.
-void papi_thread_start_gc_count(int event_set);
-void papi_thread_stop_gc_count(int event_set);
+void papi_thread_start_gc1_count(int event_set);
+void papi_thread_stop_gc1_count(int event_set);

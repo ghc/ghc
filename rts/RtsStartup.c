@@ -167,10 +167,6 @@ hs_init(int *argc, char **argv[])
     argv++; argc--;
 #endif
 
-#ifdef USE_PAPI
-    papi_init();
-#endif
-
     /* Set the RTS flags to default values. */
 
     initRtsFlagsDefaults();
@@ -184,6 +180,10 @@ hs_init(int *argc, char **argv[])
 	setupRtsFlags(argc, *argv, &rts_argc, rts_argv);
 	setProgArgv(*argc,*argv);
     }
+
+#ifdef USE_PAPI
+    papi_init();
+#endif
 
     /* initTracing must be after setupRtsFlags() */
     initTracing();

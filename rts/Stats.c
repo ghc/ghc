@@ -347,7 +347,11 @@ stat_endGC (lnat alloc, lnat live, lnat copied, lnat gen)
 #if USE_PAPI
     if(papi_is_reporting) {
       /* Switch to counting mutator events */
-      papi_stop_gc_count();
+      if (gen == 0) {
+          papi_stop_gc0_count();
+      } else {
+          papi_stop_gc1_count();
+      }
       papi_start_mutator_count();
     }
 #endif

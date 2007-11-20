@@ -321,6 +321,7 @@ void initRtsFlagsDefaults(void)
 #ifdef USE_PAPI
     /* By default no special measurements taken */
     RtsFlags.PapiFlags.eventType        = 0;
+    RtsFlags.PapiFlags.numUserEvents    = 0;
 #endif
 }
 
@@ -721,6 +722,14 @@ error = rtsTrue;
 		case 'e':
 		  RtsFlags.PapiFlags.eventType = PAPI_FLAG_CB_EVENTS;
 		  break;
+                case '+':
+                  if (RtsFlags.PapiFlags.numUserEvents >= MAX_PAPI_USER_EVENTS) {
+                      errorBelch("maximum number of PAPI events reached");
+                      stg_exit(EXIT_FAILURE);
+                  }
+                  RtsFlags.PapiFlags.eventType = PAPI_USER_EVENTS;
+                  RtsFlags.PapiFlags.userEvents[RtsFlags.PapiFlags.numUserEvents++] = rts_argv[arg] + 3;
+                  break;
 		default:
 		  bad_option( rts_argv[arg] );
 		}

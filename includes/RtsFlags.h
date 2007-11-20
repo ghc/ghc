@@ -304,11 +304,13 @@ struct TRACE_FLAGS {
     rtsBool timestamp;          /* add timestamps to traces */
 };
 
-/* Put them together: */
-
 #ifdef USE_PAPI
+#define MAX_PAPI_USER_EVENTS 8
+
 struct PAPI_FLAGS {
     nat     eventType;          /* The type of events to count */
+    nat     numUserEvents;
+    char *  userEvents[MAX_PAPI_USER_EVENTS];
 };
 
 #define PAPI_FLAG_CACHE_L1 1
@@ -316,8 +318,11 @@ struct PAPI_FLAGS {
 #define PAPI_FLAG_BRANCH 3
 #define PAPI_FLAG_STALLS 4
 #define PAPI_FLAG_CB_EVENTS 5
+#define PAPI_USER_EVENTS 6
 
 #endif
+
+/* Put them together: */
 
 typedef struct _RTS_FLAGS {
     /* The first portion of RTS_FLAGS is invariant. */
