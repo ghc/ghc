@@ -65,9 +65,8 @@ nDP_PRIM        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Prim")
 nDP_INSTANCES   = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Instances")
 nDP_COMBINATORS = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Combinators")
 
-nDP_PRELUDE_PARR = gHC_PARR -- mkNDPModule FSLIT("Data.Array.Parallel.Prelude.PArr")
-nDP_PRELUDE_INT  = mkNDPModule FSLIT("Data.Array.Parallel.Prelude.Int")
-nDP_PRELUDE      = mkNDPModule FSLIT("Data.Array.Parallel.Prelude")
+nDP_PRELUDE_PARR = mkNDPModule FSLIT("Data.Array.Parallel.Prelude.Base.PArr")
+nDP_PRELUDE_INT  = mkNDPModule FSLIT("Data.Array.Parallel.Prelude.Base.Int")
 
 data Builtins = Builtins {
                   parrayTyCon      :: TyCon
@@ -209,15 +208,15 @@ defaultDataConWorkers = [trueDataCon, falseDataCon]
 preludeVars :: [(Module, FastString, Module, FastString)]
 preludeVars
   = [
-      mk nDP_PRELUDE_PARR FSLIT("mapP") nDP_COMBINATORS FSLIT("mapPA")
-    , mk nDP_PRELUDE_PARR FSLIT("zipWithP") nDP_COMBINATORS FSLIT("zipWithPA")
+      mk gHC_PARR FSLIT("mapP") nDP_COMBINATORS FSLIT("mapPA")
+    , mk gHC_PARR FSLIT("zipWithP") nDP_COMBINATORS FSLIT("zipWithPA")
     , mk nDP_PRELUDE_INT  FSLIT("plus") nDP_PRELUDE_INT FSLIT("plusV")
     , mk nDP_PRELUDE_INT  FSLIT("minus") nDP_PRELUDE_INT FSLIT("minusV")
     , mk nDP_PRELUDE_INT  FSLIT("sumP")  nDP_PRELUDE_INT FSLIT("sumPA")
     , mk nDP_PRELUDE_INT  FSLIT("upToP") nDP_PRELUDE_INT FSLIT("upToPA")
 
     -- FIXME: temporary
-    , mk nDP_PRELUDE FSLIT("fromPArrayP") nDP_PRELUDE FSLIT("fromPArrayPA")
+    , mk nDP_PRELUDE_PARR FSLIT("fromPArrayP") nDP_PRELUDE_PARR FSLIT("fromPArrayPA")
     ]
   where
     mk = (,,,)
