@@ -250,12 +250,19 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 # build dies!
 
 # Build the library using 'make'
+# We re-run 'setup makefile' each time, just in case any preprocessing
+# needs to be done.  However, we're careful not to overwrite GNUmakefile
+# if it hasn't changed, so that dependency-generation isn't forced
+# every time.
 $(foreach SUBDIR,$(SUBDIRS),make.library.$(SUBDIR)):\
 make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-		%/GNUmakefile \
                 %/setup/Setup ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
+	  cmp -s ../Makefile.local Makefile.local || cp ../Makefile.local .; \
+	  mv GNUmakefile GNUmakefile.tmp; \
+	  setup/Setup makefile -f GNUmakefile; \
+	  cmp -s GNUmakefile GNUmakefile.tmp && mv GNUmakefile.tmp GNUmakefile; \
 	  $(MAKE) $(MFLAGS) && \
 	  setup/Setup register --inplace; \
 	fi
@@ -267,15 +274,6 @@ build.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
 	  setup/Setup build $(addprefix --ghc-option=,$(GhcLibHcOpts)); \
-	fi
-
-$(foreach SUBDIR,$(SUBDIRS),$(SUBDIR)/GNUmakefile):\
-%/GNUmakefile: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-                 %/setup/Setup ifBuildable/ifBuildable
-	$(RM) $*/GNUmakefile
-	cp Makefile.local $*
-	if ifBuildable/ifBuildable $*; then \
-	   cd $* && setup/Setup makefile -f GNUmakefile; \
 	fi
 
 .PHONY: doc html
