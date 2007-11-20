@@ -32,6 +32,13 @@ HashTable * allocStrHashTable ( void );
 #define removeStrHashTable(table, key, data) \
    (removeHashTable(table, (StgWord)key, data))
 
+/* Hash tables for arbitrary keys */
+typedef int HashFunction(HashTable *table, StgWord key);
+typedef int CompareFunction(StgWord key1, StgWord key2);
+HashTable * allocHashTable_(HashFunction *hash, CompareFunction *compare);
+int hashWord(HashTable *table, StgWord key);
+int hashStr(HashTable *table, char *key);
+
 /* Freeing hash tables 
  */
 void freeHashTable ( HashTable *table, void (*freeDataFun)(void *) );

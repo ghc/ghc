@@ -35,9 +35,6 @@ struct hashlist {
 
 typedef struct hashlist HashList;
 
-typedef int HashFunction(HashTable *table, StgWord key);
-typedef int CompareFunction(StgWord key1, StgWord key2);
-
 struct hashtable {
     int split;		    /* Next bucket to split when expanding */
     int max;		    /* Max bucket of smaller table */
@@ -55,7 +52,7 @@ struct hashtable {
  * next bucket to be split, re-hash using the larger table.
  * -------------------------------------------------------------------------- */
 
-static int
+int
 hashWord(HashTable *table, StgWord key)
 {
     int bucket;
@@ -73,7 +70,7 @@ hashWord(HashTable *table, StgWord key)
     return bucket;
 }
 
-static int
+int
 hashStr(HashTable *table, char *key)
 {
     int h, bucket;
@@ -347,7 +344,7 @@ freeHashTable(HashTable *table, void (*freeDataFun)(void *) )
  * initializing all of the first segment's hash buckets to NULL.
  * -------------------------------------------------------------------------- */
 
-static HashTable *
+HashTable *
 allocHashTable_(HashFunction *hash, CompareFunction *compare)
 {
     HashTable *table;

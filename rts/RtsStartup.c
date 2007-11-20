@@ -33,6 +33,7 @@
 #include "RtsTypeable.h"
 #include "Stable.h"
 #include "Hpc.h"
+#include "FileLock.h"
 
 #if defined(RTS_GTK_FRONTPANEL)
 #include "FrontPanel.h"
@@ -237,6 +238,11 @@ hs_init(int *argc, char **argv[])
 
     /* initialise the shared Typeable store */
     initTypeableStore();
+
+    /* initialise file locking, if necessary */
+#if !defined(mingw32_HOST_OS)    
+    initFileLocking();
+#endif
 
 #if defined(DEBUG)
     /* initialise thread label table (tso->char*) */
@@ -461,6 +467,11 @@ hs_exit_(rtsBool wait_foreign)
 
     /* free shared Typeable store */
     exitTypeableStore();
+
+    /* free file locking tables, if necessary */
+#if !defined(mingw32_HOST_OS)    
+    freeFileLocking();
+#endif
 
     /* free the stable pointer table */
     exitStablePtrTable();
