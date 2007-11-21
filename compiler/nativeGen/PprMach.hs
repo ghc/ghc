@@ -1415,18 +1415,9 @@ pprInstr g@(GDTOI src dst)
 pprInstr g@(GITOF src dst) 
    = pprInstr (GITOD src dst)
 pprInstr g@(GITOD src dst) 
-   = pprG g (vcat [
-         hcat [gtab, text "subl $8, %esp ; fnstcw 4(%esp)"],
-         hcat [gtab, gpush src 0],
-         hcat [gtab, text "movzwl 4(%esp), ", reg,
-                     text " ; orl $0xC00, ", reg],
-         hcat [gtab, text "movl ", reg, text ", 0(%esp) ; fldcw 0(%esp)"],
-         hcat [gtab, text "fistpl 0(%esp)"],
-         hcat [gtab, text "fldcw 4(%esp) ; movl 0(%esp), ", reg],
-         hcat [gtab, text "addl $8, %esp"]
-     ])
-   where
-     reg = pprReg I32 dst
+   = pprG g (hcat [gtab, text "pushl ", pprReg I32 src, 
+                   text " ; ffree %st(7); fildl (%esp) ; ",
+                   gpop dst 1, text " ; addl $4,%esp"])
 
 {- Gruesome swamp follows.  If you're unfortunate enough to have ventured
    this far into the jungle AND you give a Rat's Ass (tm) what's going
