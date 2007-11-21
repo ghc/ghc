@@ -807,8 +807,8 @@ merge_pairs cmp [xs] = [xs]
 merge_pairs cmp (xs:ys:xss) = merge cmp xs ys : merge_pairs cmp xss
 
 merge :: (a -> a -> Ordering) -> [a] -> [a] -> [a]
-merge cmp xs [] = xs
 merge cmp [] ys = ys
+merge cmp xs [] = xs
 merge cmp (x:xs) (y:ys)
  = case x `cmp` y of
         GT -> y : merge cmp (x:xs)   ys
