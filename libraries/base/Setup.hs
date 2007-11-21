@@ -58,9 +58,9 @@ maybeUpdateFile :: FilePath -> FilePath -> IO ()
 maybeUpdateFile source target = do
   r <- rawSystem "cmp" ["-s" {-quiet-}, source, target]
   case r of 
-    ExitSuccess   -> return ()
-    ExitFailure _ -> copyFile source target
-  removeFile source
+    ExitSuccess   -> removeFile source
+    ExitFailure _ -> do removeFile target; renameFile source target
+  
 
 filter_modules_hook :: Hook a -> Hook a
 filter_modules_hook f pd lbi uhs x
