@@ -295,7 +295,7 @@ selector_loop:
 #ifdef PROFILING
               // For the purposes of LDV profiling, we have destroyed
               // the original selector thunk, p.
-              SET_INFO(p, info_ptr);
+              SET_INFO(p, (StgInfoTable *)info_ptr);
               LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC((StgClosure *)p);
               SET_INFO(p, &stg_BLACKHOLE_info);
 #endif
