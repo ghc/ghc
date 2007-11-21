@@ -164,8 +164,11 @@ unchain_thunk_selectors(StgSelector *p, StgClosure *val)
     prev = NULL;
     while (p)
     {
-        ASSERT(p->header.info == &stg_BLACKHOLE_info
-              || p->header.info == &stg_WHITEHOLE_info);
+#ifdef THREADED_RTS
+        ASSERT(p->header.info == &stg_WHITEHOLE_info);
+#else
+        ASSERT(p->header.info == &stg_BLACKHOLE_info);
+#endif
         prev = (StgSelector*)((StgClosure *)p)->payload[0];
 
         // Update the THUNK_SELECTOR with an indirection to the
