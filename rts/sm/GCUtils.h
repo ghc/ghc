@@ -21,7 +21,7 @@ bdescr *allocBlock_sync(void);
 
 void    push_scan_block      (bdescr *bd, step_workspace *ws);
 bdescr *grab_todo_block      (step_workspace *ws);
-bdescr *gc_alloc_todo_block  (step_workspace *ws);
+StgPtr  gc_alloc_todo_block  (step_workspace *ws);
 bdescr *gc_alloc_scavd_block (step_workspace *ws);
 
 // Returns true if a block is 3/4 full.  This predicate is used to try

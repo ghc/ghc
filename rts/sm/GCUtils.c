@@ -91,10 +91,14 @@ push_scan_block (bdescr *bd, step_workspace *ws)
 	     ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks));
 }
 
-bdescr *
+StgPtr
 gc_alloc_todo_block (step_workspace *ws)
 {
     bdescr *bd;
+
+    if (ws->todo_bd != NULL) {
+        ws->todo_bd->free = ws->todo_free;
+    }
 
     // If we already have a todo block, it must be full, so we push it
     // out: first to the buffer_todo_bd, then to the step.  BUT, don't
@@ -124,8 +128,10 @@ gc_alloc_todo_block (step_workspace *ws)
     }
 	
     ws->todo_bd = bd;
+    ws->todo_free = bd->start;
+    ws->todo_lim  = bd->start + BLOCK_SIZE_W;
 
-    return bd;
+    return ws->todo_free;
 }
 
 /* -----------------------------------------------------------------------------

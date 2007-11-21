@@ -275,7 +275,7 @@ linear_scan:
 	info = get_itbl((StgClosure *)p);
 	
 	q = p;
-	switch (info->type) {
+        switch (((volatile StgWord *)info)[1] & 0xffff) {
 	    
         case MVAR_CLEAN:
         case MVAR_DIRTY:
@@ -1468,6 +1468,11 @@ scavenge_find_local_work (void)
 		continue; 
 	    }
 	    ws = &gct->steps[g][s];
+
+            if (ws->todo_bd != NULL)
+            {
+                ws->todo_bd->free = ws->todo_free;
+            }
 
 	    // If we have a todo block and no scan block, start
 	    // scanning the todo block.

@@ -82,6 +82,9 @@ typedef struct step_workspace_ {
 
     // where objects to be scavenged go
     bdescr *     todo_bd;
+    StgPtr       todo_free;            // free ptr for todo_bd
+    StgPtr       todo_lim;             // lim for todo_bd
+
     bdescr *     buffer_todo_bd;     // buffer to reduce contention
                                      // on the step's todos list
 
@@ -132,9 +135,9 @@ typedef struct gc_thread_ {
                                    // optimise it into a per-thread
                                    // variable).
 
-    rtsBool failed_to_evac;        // failue to evacuate an object typically 
-                                   //  causes it to be recorded in the mutable 
-                                   //  object list
+    rtsBool failed_to_evac;        // failure to evacuate an object typically 
+                                   // causes it to be recorded in the mutable 
+                                   // object list
 
     rtsBool eager_promotion;       // forces promotion to the evac gen
                                    // instead of the to-space

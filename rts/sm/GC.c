@@ -1239,6 +1239,8 @@ init_uncollected_gen (nat g, nat threads)
 	    if (isPartiallyFull(stp->blocks))
 	    {
 		ws->todo_bd = stp->blocks;
+                ws->todo_free = ws->todo_bd->free;
+                ws->todo_lim = ws->todo_bd->start + BLOCK_SIZE_W;
 		stp->blocks = stp->blocks->link;
 		stp->n_blocks -= 1;
 		ws->todo_bd->link = NULL;

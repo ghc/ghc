@@ -37,7 +37,6 @@ alloc_for_copy (nat size, step *stp)
 {
     StgPtr to;
     step_workspace *ws;
-    bdescr *bd;
 
     /* Find out where we're going, using the handy "to" pointer in 
      * the step of the source object.  If it turns out we need to
@@ -57,17 +56,18 @@ alloc_for_copy (nat size, step *stp)
     /* chain a new block onto the to-space for the destination step if
      * necessary.
      */
-    bd = ws->todo_bd;
-    to = bd->free;
-    if (to + size >= bd->start + BLOCK_SIZE_W) {
-	bd = gc_alloc_todo_block(ws);
-	to = bd->free;
+    
+    ASSERT(ws->todo_free >= ws->todo_bd->free && ws->todo_free <= ws->todo_lim);
+    to = ws->todo_free;
+    if (to + size >= ws->todo_lim) {
+	to = gc_alloc_todo_block(ws);
     }
-    bd->free = to + size;
+    ws->todo_free = to + size;
+    ASSERT(ws->todo_free >= ws->todo_bd->free && ws->todo_free <= ws->todo_lim);
 
     return to;
 }
-  
+
 /* -----------------------------------------------------------------------------
    The evacuate() code
    -------------------------------------------------------------------------- */
@@ -164,7 +164,8 @@ unchain_thunk_selectors(StgSelector *p, StgClosure *val)
     prev = NULL;
     while (p)
     {
-        ASSERT(p->header.info == &stg_BLACKHOLE_info);
+        ASSERT(p->header.info == &stg_BLACKHOLE_info
+              || p->header.info == &stg_WHITEHOLE_info);
         prev = (StgSelector*)((StgClosure *)p)->payload[0];
 
         // Update the THUNK_SELECTOR with an indirection to the
