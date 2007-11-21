@@ -431,10 +431,21 @@ mkEqnHelp :: InstOrigin -> [TyVar] -> Class -> [Type] -> Type
           -> TcRn (Maybe EarlyDerivSpec)
 mkEqnHelp orig tvs cls cls_tys tc_app mtheta
   | Just (tycon, tc_args) <- tcSplitTyConApp_maybe tc_app
-  = do	{ (rep_tc, rep_tc_args) <- tcLookupFamInstExact tycon tc_args
+  = do	{
+	-- For standalone deriving (mtheta /= Nothing), 
+	-- check that all the data constructors are in scope
+	-- By this time we know that the thing is algebraic
+	--	because we've called checkInstHead in derivingStandalone
+	  rdr_env <- getGlobalRdrEnv
+	; let hidden_data_cons = filter not_in_scope (tyConDataCons tycon)
+	      not_in_scope dc = null (lookupGRE_Name rdr_env (dataConName dc))
+	; checkTc (isNothing mtheta || null hidden_data_cons) 
+		  (derivingHiddenErr tycon)
 
 	; mayDeriveDataTypeable <- doptM Opt_DeriveDataTypeable
 	; newtype_deriving <- doptM Opt_GeneralizedNewtypeDeriving
+
+	; (rep_tc, rep_tc_args) <- tcLookupFamInstExact tycon tc_args
 
           -- Be careful to test rep_tc here: in the case of families, we want
           -- to check the instance tycon, not the family tycon
@@ -1124,6 +1135,11 @@ derivingThingErr clas tys ty why
 	 nest 2 (parens why)]
   where
     pred = mkClassPred clas (tys ++ [ty])
+
+derivingHiddenErr :: TyCon -> SDoc
+derivingHiddenErr tc
+  = hang (ptext SLIT("The data constructors of") <+> quotes (ppr tc) <+> ptext SLIT("are not all in scope"))
+       2 (ptext SLIT("so you cannot derive an instance for it"))
 
 standaloneCtxt :: LHsType Name -> SDoc
 standaloneCtxt ty = hang (ptext SLIT("In the stand-alone deriving instance for")) 
