@@ -1408,9 +1408,18 @@ pprInstr g@(GLD1 dst)
 pprInstr g@(GFTOI src dst) 
    = pprInstr (GDTOI src dst)
 pprInstr g@(GDTOI src dst) 
-   = pprG g (hcat [gtab, text "subl $4, %esp ; ", 
-                   gpush src 0, gsemi, text "fistpl 0(%esp) ; popl ", 
-                   pprReg I32 dst])
+   = pprG g (vcat [
+         hcat [gtab, text "subl $8, %esp ; fnstcw 4(%esp)"],
+         hcat [gtab, gpush src 0],
+         hcat [gtab, text "movzwl 4(%esp), ", reg,
+                     text " ; orl $0xC00, ", reg],
+         hcat [gtab, text "movl ", reg, text ", 0(%esp) ; fldcw 0(%esp)"],
+         hcat [gtab, text "fistpl 0(%esp)"],
+         hcat [gtab, text "fldcw 4(%esp) ; movl 0(%esp), ", reg],
+         hcat [gtab, text "addl $8, %esp"]
+     ])
+   where
+     reg = pprReg I32 dst
 
 pprInstr g@(GITOF src dst) 
    = pprInstr (GITOD src dst)
