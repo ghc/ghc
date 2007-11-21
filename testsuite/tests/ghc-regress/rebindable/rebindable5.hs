@@ -16,6 +16,9 @@ module Main where
 	infixl 1 >>=;
 	infixl 1 >>;
 
+	returnIO :: a -> IO a;
+        returnIO = Prelude.return;
+	
 	class HasReturn m where
 		{
 		return :: a -> m a;
@@ -38,7 +41,7 @@ module Main where
 
 	instance HasReturn IO where
 		{
-		return a = debugFunc "return" (Prelude.return a);
+		return a = debugFunc "return" (returnIO a);
 		};
 
 	instance HasBind IO IO IO where
@@ -53,7 +56,7 @@ module Main where
 
 	instance HasFail IO where
 		{
-		fail s = debugFunc "fail" (Prelude.return undefined);
+		fail s = debugFunc "fail" (returnIO undefined);
 	--	fail s = debugFunc "fail" (Prelude.fail s);
 		};
 
@@ -146,11 +149,11 @@ module Main where
 	main :: IO ();
 	main = 
 		(doTest "test_do failure"
-			(test_do (Prelude.return ()) (Prelude.return Nothing))
+			(test_do (returnIO ()) (returnIO Nothing))
 		)
 			Prelude.>>
 		(doTest "test_do success"
-			(test_do (Prelude.return ()) (Prelude.return (Just ())))
+			(test_do (returnIO ()) (returnIO (Just ())))
 		)
 			Prelude.>>
 		(doTest "test_fromInteger"

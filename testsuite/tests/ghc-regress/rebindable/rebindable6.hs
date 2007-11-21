@@ -16,6 +16,9 @@ module Main where
 	infixl 1 >>=;
 	infixl 1 >>;
 
+	returnIO :: a -> IO a;
+        returnIO = Prelude.return;
+	
 	class HasReturn a where
 		{
 		return :: a;
@@ -97,12 +100,12 @@ module Main where
 		(-) x y = y; -- changed function
 		};
 
-	test_do :: IO a -> IO (Maybe b) -> IO b;
+	test_do :: forall a b. IO a -> IO (Maybe b) -> IO b;
 	test_do f g = do
 		{
-		f;				-- >>
-		Just a <- g;	-- >>= (and fail if g returns Nothing)
-		return a;		-- return
+		f;			-- >>
+		Just (b::b) <- g;	-- >>= (and fail if g returns Nothing)
+		return b;		-- return
 		};
 	
 	test_fromInteger :: Integer;
