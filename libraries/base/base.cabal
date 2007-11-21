@@ -163,7 +163,7 @@ Library {
         cbits/selectUtils.c
     include-dirs: include
     includes:    HsBase.h
-    install-includes:    HsBase.h HsBaseConfig.h WCsubst.h dirUtils.h lockFile.h consUtils.h Typeable.h
+    install-includes:    HsBase.h HsBaseConfig.h WCsubst.h dirUtils.h consUtils.h Typeable.h
     if os(windows) {
         extra-libraries: wsock32, msvcrt, kernel32, user32, shell32
     }
