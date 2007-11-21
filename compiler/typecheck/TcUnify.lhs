@@ -15,7 +15,7 @@ Type subsumption and unification
 
 module TcUnify (
 	-- Full-blown subsumption
-  tcSubExp, tcFunResTy, tcGen, 
+  tcSubExp, tcGen, 
   checkSigTyVars, checkSigTyVarsWrt, bleatEscapedTvs, sigCtxt, 
 
 	-- Various unifications
@@ -70,11 +70,7 @@ import Unique
 
 \begin{code}
 tcInfer :: (BoxyType -> TcM a) -> TcM (a, TcType)
-tcInfer tc_infer
-  = do	{ box <- newBoxyTyVar openTypeKind
-	; res <- tc_infer (mkTyVarTy box)
-	; res_ty <- {- pprTrace "tcInfer" (ppr (mkTyVarTy box)) $ -} readFilledBox box	-- Guaranteed filled-in by now
-	; return (res, res_ty) }
+tcInfer tc_infer = withBox openTypeKind tc_infer
 \end{code}
 
 
@@ -417,7 +413,7 @@ withMetaTvs tv kinds mk_res_ty
 withBox :: Kind -> (BoxySigmaType -> TcM a) -> TcM (a, TcType)
 -- Allocate a *boxy* tyvar
 withBox kind thing_inside
-  = do	{ box_tv <- newMetaTyVar BoxTv kind
+  = do	{ box_tv <- newBoxyTyVar kind
 	; res <- thing_inside (mkTyVarTy box_tv)
 	; ty  <- {- pprTrace "with_box" (ppr (mkTyVarTy box_tv)) $ -} readFilledBox box_tv
   	; return (res, ty) }
@@ -675,24 +671,24 @@ Later stuff will fail.
 
 All the tcSub calls have the form
 	
-		tcSub expected_ty offered_ty
+		tcSub actual_ty expected_ty
 which checks
-		offered_ty <= expected_ty
+		actual_ty <= expected_ty
 
-That is, that a value of type offered_ty is acceptable in
+That is, that a value of type actual_ty is acceptable in
 a place expecting a value of type expected_ty.
 
 It returns a coercion function 
-	co_fn :: offered_ty ~ expected_ty
-which takes an HsExpr of type offered_ty into one of type
+	co_fn :: actual_ty ~ expected_ty
+which takes an HsExpr of type actual_ty into one of type
 expected_ty.
 
 \begin{code}
 -----------------
-tcSubExp :: BoxySigmaType -> BoxySigmaType -> TcM HsWrapper	-- Locally used only
+tcSubExp :: InstOrigin -> BoxySigmaType -> BoxySigmaType -> TcM HsWrapper
 	-- (tcSub act exp) checks that 
 	--	act <= exp
-tcSubExp actual_ty expected_ty
+tcSubExp orig actual_ty expected_ty
   = -- addErrCtxtM (unifyCtxt actual_ty expected_ty) $
     -- Adding the error context here leads to some very confusing error
     -- messages, such as "can't match forall a. a->a with forall a. a->a"
@@ -705,19 +701,10 @@ tcSubExp actual_ty expected_ty
     -- So instead I'm adding the error context when moving from tc_sub to u_tys
 
     traceTc (text "tcSubExp" <+> ppr actual_ty <+> ppr expected_ty) >>
-    tc_sub SubOther actual_ty actual_ty False expected_ty expected_ty
+    tc_sub orig actual_ty actual_ty False expected_ty expected_ty
 
-tcFunResTy :: Name -> BoxySigmaType -> BoxySigmaType -> TcM HsWrapper	-- Locally used only
-tcFunResTy fun actual_ty expected_ty
-  = traceTc (text "tcFunResTy" <+> ppr actual_ty <+> ppr expected_ty) >>
-    tc_sub (SubFun fun) actual_ty actual_ty False expected_ty expected_ty
-		   
 -----------------
-data SubCtxt = SubDone 		-- Error-context already pushed
-	     | SubFun Name 	-- Context is tcFunResTy
-	     | SubOther		-- Context is something else
-
-tc_sub :: SubCtxt		-- How to add an error-context
+tc_sub :: InstOrigin
        -> BoxySigmaType		-- actual_ty, before expanding synonyms
        -> BoxySigmaType		-- 		..and after
        -> InBox			-- True <=> expected_ty is inside a box
@@ -731,24 +718,24 @@ tc_sub :: SubCtxt		-- How to add an error-context
 -- This invariant is needed so that we can "see" the foralls, ad
 -- e.g. in the SPEC rule where we just use splitSigmaTy 
 	
-tc_sub sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
+tc_sub orig act_sty act_ty exp_ib exp_sty exp_ty
   = traceTc (text "tc_sub" <+> ppr act_ty $$ ppr exp_ty) >>
-    tc_sub1 sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
+    tc_sub1 orig act_sty act_ty exp_ib exp_sty exp_ty
 	-- This indirection is just here to make 
 	-- it easy to insert a debug trace!
 
-tc_sub1 sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
-  | Just exp_ty' <- tcView exp_ty = tc_sub sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty'
-tc_sub1 sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
-  | Just act_ty' <- tcView act_ty = tc_sub sub_ctxt act_sty act_ty' exp_ib exp_sty exp_ty
+tc_sub1 orig act_sty act_ty exp_ib exp_sty exp_ty
+  | Just exp_ty' <- tcView exp_ty = tc_sub orig act_sty act_ty exp_ib exp_sty exp_ty'
+tc_sub1 orig act_sty act_ty exp_ib exp_sty exp_ty
+  | Just act_ty' <- tcView act_ty = tc_sub orig act_sty act_ty' exp_ib exp_sty exp_ty
 
 -----------------------------------
 -- Rule SBOXY, plus other cases when act_ty is a type variable
 -- Just defer to boxy matching
 -- This rule takes precedence over SKOL!
-tc_sub1 sub_ctxt act_sty (TyVarTy tv) exp_ib exp_sty exp_ty
+tc_sub1 orig act_sty (TyVarTy tv) exp_ib exp_sty exp_ty
   = do	{ traceTc (text "tc_sub1 - case 1")
-	; coi <- addSubCtxt sub_ctxt act_sty exp_sty $
+	; coi <- addSubCtxt orig act_sty exp_sty $
 		 uVar True False tv exp_ib exp_sty exp_ty
 	; traceTc (case coi of 
 			IdCo   -> text "tc_sub1 (Rule SBOXY) IdCo"
@@ -767,14 +754,14 @@ tc_sub1 sub_ctxt act_sty (TyVarTy tv) exp_ib exp_sty exp_ty
 --	     g :: Ord b => b->b
 -- Consider  f g !
 
-tc_sub1 sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
+tc_sub1 orig act_sty act_ty exp_ib exp_sty exp_ty
   | isSigmaTy exp_ty	
   = do { traceTc (text "tc_sub1 - case 2") ;
     if exp_ib then  	-- SKOL does not apply if exp_ty is inside a box
-	defer_to_boxy_matching sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
+	defer_to_boxy_matching orig act_sty act_ty exp_ib exp_sty exp_ty
     else do 
 	{ (gen_fn, co_fn) <- tcGen exp_ty act_tvs $ \ _ body_exp_ty ->
-			     tc_sub sub_ctxt act_sty act_ty False body_exp_ty body_exp_ty
+			     tc_sub orig act_sty act_ty False body_exp_ty body_exp_ty
 	; return (gen_fn <.> co_fn) }
     }
   where
@@ -788,7 +775,7 @@ tc_sub1 sub_ctxt act_sty act_ty exp_ib exp_sty exp_ty
 --	expected_ty: Int -> Int
 --	co_fn e =    e Int dOrdInt
 
-tc_sub1 sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
+tc_sub1 orig act_sty actual_ty exp_ib exp_sty expected_ty
 -- Implements the new SPEC rule in the Appendix of the paper
 -- "Boxy types: inference for higher rank types and impredicativity"
 -- (This appendix isn't in the published version.)
@@ -815,73 +802,60 @@ tc_sub1 sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
 	; traceTc (text "tc_sub_spec" <+> vcat [ppr actual_ty, 
 						ppr tyvars <+> ppr theta <+> ppr tau,
 						ppr tau'])
-	; co_fn2 <- tc_sub sub_ctxt tau' tau' exp_ib exp_sty expected_ty
+	; co_fn2 <- tc_sub orig tau' tau' exp_ib exp_sty expected_ty
 
 		-- Deal with the dictionaries
-		-- The origin gives a helpful origin when we have
-		-- a function with type f :: Int -> forall a. Num a => ...
-		-- This way the (Num a) dictionary gets an OccurrenceOf f origin
-	; let orig = case sub_ctxt of
-			SubFun n -> OccurrenceOf n
-			other    -> InstSigOrigin	-- Unhelpful
 	; co_fn1 <- instCall orig inst_tys (substTheta subst' theta)
  	; return (co_fn2 <.> co_fn1) }
 
 -----------------------------------
 -- Function case (rule F1)
-tc_sub1 sub_ctxt act_sty (FunTy act_arg act_res) exp_ib exp_sty (FunTy exp_arg exp_res)
+tc_sub1 orig act_sty (FunTy act_arg act_res) exp_ib exp_sty (FunTy exp_arg exp_res)
   = do { traceTc (text "tc_sub1 - case 4")
-       ; addSubCtxt sub_ctxt act_sty exp_sty $
-                    tc_sub_funs act_arg act_res exp_ib exp_arg exp_res
+       ; tc_sub_funs orig act_arg act_res exp_ib exp_arg exp_res
        }
 
 -- Function case (rule F2)
-tc_sub1 sub_ctxt act_sty act_ty@(FunTy act_arg act_res) _ exp_sty (TyVarTy exp_tv)
+tc_sub1 orig act_sty act_ty@(FunTy act_arg act_res) _ exp_sty (TyVarTy exp_tv)
   | isBoxyTyVar exp_tv
-  = addSubCtxt sub_ctxt act_sty exp_sty $
-    do	{ traceTc (text "tc_sub1 - case 5")
+  = do	{ traceTc (text "tc_sub1 - case 5")
 	; cts <- readMetaTyVar exp_tv
 	; case cts of
-	    Indirect ty -> tc_sub SubDone act_sty act_ty True exp_sty ty
+	    Indirect ty -> tc_sub orig act_sty act_ty True exp_sty ty
 	    Flexi -> do { [arg_ty,res_ty] <- withMetaTvs exp_tv fun_kinds mk_res_ty
- 			      ; tc_sub_funs act_arg act_res True arg_ty res_ty } }
+ 			; tc_sub_funs orig act_arg act_res True arg_ty res_ty } }
  where
     mk_res_ty [arg_ty', res_ty'] = mkFunTy arg_ty' res_ty'
     mk_res_ty other = panic "TcUnify.mk_res_ty3"
     fun_kinds = [argTypeKind, openTypeKind]
 
 -- Everything else: defer to boxy matching
-tc_sub1 sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty@(TyVarTy exp_tv)
+tc_sub1 orig act_sty actual_ty exp_ib exp_sty expected_ty@(TyVarTy exp_tv)
   = do { traceTc (text "tc_sub1 - case 6a" <+> ppr [isBoxyTyVar exp_tv, isMetaTyVar exp_tv, isSkolemTyVar exp_tv, isExistentialTyVar exp_tv,isSigTyVar exp_tv] )
-       ; defer_to_boxy_matching sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
+       ; defer_to_boxy_matching orig act_sty actual_ty exp_ib exp_sty expected_ty
        }
 
-tc_sub1 sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
+tc_sub1 orig act_sty actual_ty exp_ib exp_sty expected_ty
   = do { traceTc (text "tc_sub1 - case 6")
-       ; defer_to_boxy_matching sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
+       ; defer_to_boxy_matching orig act_sty actual_ty exp_ib exp_sty expected_ty
        }
 
 -----------------------------------
-defer_to_boxy_matching sub_ctxt act_sty actual_ty exp_ib exp_sty expected_ty
-  = do	{ coi <- addSubCtxt sub_ctxt act_sty exp_sty $
-	  u_tys outer False act_sty actual_ty exp_ib exp_sty expected_ty
-	; return $ coiToHsWrapper coi
-	}
-  where
-    outer = case sub_ctxt of		-- Ugh
-		SubDone -> False
-		other	-> True
+defer_to_boxy_matching orig act_sty actual_ty exp_ib exp_sty expected_ty
+  = do	{ coi <- addSubCtxt orig act_sty exp_sty $
+		 u_tys True False act_sty actual_ty exp_ib exp_sty expected_ty
+	; return $ coiToHsWrapper coi }
 
 -----------------------------------
-tc_sub_funs act_arg act_res exp_ib exp_arg exp_res
-  = do	{ arg_coi   <- uTys False act_arg exp_ib exp_arg
-	; co_fn_res <- tc_sub SubDone act_res act_res exp_ib exp_res exp_res
+tc_sub_funs orig act_arg act_res exp_ib exp_arg exp_res
+  = do	{ arg_coi   <- addSubCtxt orig act_arg exp_arg $
+         	       uTysOuter False act_arg exp_ib exp_arg
+	; co_fn_res <- tc_sub orig act_res act_res exp_ib exp_res exp_res
 	; wrapper1  <- wrapFunResCoercion [exp_arg] co_fn_res 
         ; let wrapper2 = case arg_coi of 
 				IdCo   -> idHsWrapper
 				ACo co -> WpCo $ FunTy co act_res
-	; return (wrapper1 <.> wrapper2)
-        }
+	; return (wrapper1 <.> wrapper2) }
 
 -----------------------------------
 wrapFunResCoercion 
@@ -1714,9 +1688,7 @@ mkExpectedActualMsg act_ty exp_ty
 ----------------
 -- If an error happens we try to figure out whether the function
 -- function has been given too many or too few arguments, and say so.
-addSubCtxt SubDone actual_res_ty expected_res_ty thing_inside
-  = thing_inside
-addSubCtxt sub_ctxt actual_res_ty expected_res_ty thing_inside
+addSubCtxt orig actual_res_ty expected_res_ty thing_inside
   = addErrCtxtM mk_err thing_inside
   where
     mk_err tidy_env
@@ -1730,10 +1702,11 @@ addSubCtxt sub_ctxt actual_res_ty expected_res_ty thing_inside
 	         len_act_args     = length act_args
 	         len_exp_args     = length exp_args
 
-	         message = case sub_ctxt of
-	   		  SubFun fun | len_exp_args < len_act_args -> wrongArgsCtxt "too few"  fun
-	   		             | len_exp_args > len_act_args -> wrongArgsCtxt "too many" fun
-	   		  other -> mkExpectedActualMsg act_ty'' exp_ty''
+	         message = case orig of
+	   		     OccurrenceOf fun 
+				  | len_exp_args < len_act_args -> wrongArgsCtxt "too few"  fun
+	   		          | len_exp_args > len_act_args -> wrongArgsCtxt "too many" fun
+		   	     other -> mkExpectedActualMsg act_ty'' exp_ty''
 	   ; return (env2, message) }
 
     wrongArgsCtxt too_many_or_few fun

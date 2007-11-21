@@ -238,12 +238,10 @@ tcDoStmts PArrComp stmts body res_ty
                      (HsDo PArrComp stmts' body' (mkPArrTy elt_ty)) }
 
 tcDoStmts DoExpr stmts body res_ty
-  = do	{ ((m_ty, elt_ty), coi) <- boxySplitAppTy res_ty
-	; let res_ty' = mkAppTy m_ty elt_ty	-- The boxySplit consumes res_ty
-	; (stmts', body') <- tcStmts DoExpr (tcDoStmt m_ty) stmts 
-				     (emptyRefinement, res_ty') $
+  = do	{ (stmts', body') <- tcStmts DoExpr tcDoStmt stmts 
+				     (emptyRefinement, res_ty) $
 			     tcBody body
-	; return $ mkHsWrapCoI coi (HsDo DoExpr stmts' body' res_ty') }
+	; return (HsDo DoExpr stmts' body' res_ty) }
 
 tcDoStmts ctxt@(MDoExpr _) stmts body res_ty
   = do	{ ((m_ty, elt_ty), coi) <- boxySplitAppTy res_ty
@@ -400,12 +398,10 @@ tcLcStmt m_tc ctxt stmt elt_ty thing_inside
 --	Do-notation
 -- The main excitement here is dealing with rebindable syntax
 
-tcDoStmt :: TcType		-- Monad type,  m
-	 -> TcStmtChecker
+tcDoStmt :: TcStmtChecker
 
-tcDoStmt m_ty ctxt (BindStmt pat rhs bind_op fail_op) reft_res_ty@(_,res_ty) thing_inside
-  = do	{ (rhs', pat_ty) <- withBox liftedTypeKind $ \ pat_ty -> 
-			    tcMonoExpr rhs (mkAppTy m_ty pat_ty)
+tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op) reft_res_ty@(_,res_ty) thing_inside
+  = do	{ (rhs', rhs_ty) <- tcInferRho rhs
 		-- We should use type *inference* for the RHS computations, becuase of GADTs. 
 		-- 	do { pat <- rhs; <rest> }
 		-- is rather like
@@ -413,31 +409,34 @@ tcDoStmt m_ty ctxt (BindStmt pat rhs bind_op fail_op) reft_res_ty@(_,res_ty) thi
 		-- We do inference on rhs, so that information about its type can be refined
 		-- when type-checking the pattern. 
 
-	; (pat', thing) <- tcLamPat pat pat_ty reft_res_ty thing_inside
+	-- Deal with rebindable syntax; (>>=) :: rhs_ty -> (a -> res_ty) -> res_ty
+	; (bind_op', pat_ty) <- 
+	     withBox liftedTypeKind $ \ pat_ty ->
+	     tcSyntaxOp DoOrigin bind_op 
+			(mkFunTys [rhs_ty, mkFunTy pat_ty res_ty] res_ty)
 
-	-- Deal with rebindable syntax; (>>=) :: m a -> (a -> m b) -> m b
-	; let bind_ty = mkFunTys [mkAppTy m_ty pat_ty, 
-				  mkFunTy pat_ty res_ty] res_ty
-	; bind_op' <- tcSyntaxOp DoOrigin bind_op bind_ty
 		-- If (but only if) the pattern can fail, 
 		-- typecheck the 'fail' operator
-	; fail_op' <- if isIrrefutableHsPat pat' 
+	; fail_op' <- if isIrrefutableHsPat pat 
 		      then return noSyntaxExpr
 		      else tcSyntaxOp DoOrigin fail_op (mkFunTy stringTy res_ty)
+
+	; (pat', thing) <- tcLamPat pat pat_ty reft_res_ty thing_inside
+
 	; return (BindStmt pat' rhs' bind_op' fail_op', thing) }
 
 
-tcDoStmt m_ty ctxt (ExprStmt rhs then_op _) reft_res_ty@(_,res_ty) thing_inside
-  = do	{ 	-- Deal with rebindable syntax; (>>) :: m a -> m b -> m b
-	  a_ty <- newFlexiTyVarTy liftedTypeKind
-	; let rhs_ty  = mkAppTy m_ty a_ty
-	      then_ty = mkFunTys [rhs_ty, res_ty] res_ty
-	; then_op' <- tcSyntaxOp DoOrigin then_op then_ty
-	; rhs' <- tcPolyExpr rhs rhs_ty
+tcDoStmt ctxt (ExprStmt rhs then_op _) reft_res_ty@(_,res_ty) thing_inside
+  = do	{ (rhs', rhs_ty) <- tcInferRho rhs
+
+  	-- Deal with rebindable syntax; (>>) :: rhs_ty -> res_ty -> res_ty
+	; then_op' <- tcSyntaxOp DoOrigin then_op 
+				 (mkFunTys [rhs_ty, res_ty] res_ty)
+
 	; thing <- thing_inside reft_res_ty
 	; return (ExprStmt rhs' then_op' rhs_ty, thing) }
 
-tcDoStmt m_ty ctxt stmt res_ty thing_inside
+tcDoStmt ctxt stmt res_ty thing_inside
   = pprPanic "tcDoStmt: unexpected Stmt" (ppr stmt)
 
 --------------------------------
@@ -484,7 +483,7 @@ tcMDoStmt tc_rhs ctxt (RecStmt stmts laterNames recNames _ _) res_ty thing_insid
 	= do { poly_id <- tcLookupId rec_name
 		-- poly_id may have a polymorphic type
 		-- but mono_ty is just a monomorphic type variable
-	     ; co_fn <- tcSubExp (idType poly_id) mono_ty
+	     ; co_fn <- tcSubExp DoOrigin (idType poly_id) mono_ty
 	     ; return (mkHsWrap co_fn (HsVar poly_id)) }
 
 tcMDoStmt tc_rhs ctxt stmt res_ty thing_inside

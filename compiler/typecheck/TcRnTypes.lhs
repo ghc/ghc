@@ -864,18 +864,23 @@ data InstOrigin
 	-- The rest are all occurrences: Insts that are 'wanted'
 	-------------------------------------------------------
   | OccurrenceOf Name		-- Occurrence of an overloaded identifier
+  | SpecPragOrigin Name		-- Specialisation pragma for identifier
 
   | IPOccOrigin  (IPName Name)	-- Occurrence of an implicit parameter
 
   | LiteralOrigin (HsOverLit Name)	-- Occurrence of a literal
+  | NegateOrigin			-- Occurrence of syntactic negation
 
   | ArithSeqOrigin (ArithSeqInfo Name) -- [x..], [x..y] etc
   | PArrSeqOrigin  (ArithSeqInfo Name) -- [:x..y:] and [:x,y..z:]
+  | TupleOrigin			       -- (..,..)
 
   | InstSigOrigin	-- A dict occurrence arising from instantiating
 			-- a polymorphic type during a subsumption check
 
+  | ExprSigOrigin	-- e :: ty
   | RecordUpdOrigin
+  | ViewPatOrigin
   | InstScOrigin	-- Typechecking superclasses of an instance declaration
   | DerivOrigin		-- Typechecking deriving
   | StandAloneDerivOrigin -- Typechecking stand-alone deriving
@@ -887,13 +892,17 @@ data InstOrigin
 
 instance Outputable InstOrigin where
     ppr (OccurrenceOf name)   = hsep [ptext SLIT("a use of"), quotes (ppr name)]
+    ppr (SpecPragOrigin name) = hsep [ptext SLIT("a specialisation pragma for"), quotes (ppr name)]
     ppr (IPOccOrigin name)    = hsep [ptext SLIT("a use of implicit parameter"), quotes (ppr name)]
     ppr (IPBindOrigin name)   = hsep [ptext SLIT("a binding for implicit parameter"), quotes (ppr name)]
     ppr RecordUpdOrigin       = ptext SLIT("a record update")
+    ppr ExprSigOrigin         = ptext SLIT("an expression type signature")
+    ppr ViewPatOrigin         = ptext SLIT("a view pattern")
     ppr (LiteralOrigin lit)   = hsep [ptext SLIT("the literal"), quotes (ppr lit)]
     ppr (ArithSeqOrigin seq)  = hsep [ptext SLIT("the arithmetic sequence"), quotes (ppr seq)]
     ppr (PArrSeqOrigin seq)   = hsep [ptext SLIT("the parallel array sequence"), quotes (ppr seq)]
-    ppr InstSigOrigin	      = ptext SLIT("instantiating a type signature")
+    ppr TupleOrigin	      = ptext SLIT("a tuple")
+    ppr NegateOrigin	      = ptext SLIT("a use of syntactic negation")
     ppr InstScOrigin	      = ptext SLIT("the superclasses of an instance declaration")
     ppr DerivOrigin	      = ptext SLIT("the 'deriving' clause of a data type declaration")
     ppr StandAloneDerivOrigin = ptext SLIT("a 'deriving' declaration")
@@ -903,5 +912,4 @@ instance Outputable InstOrigin where
     ppr (ImplicOrigin doc)    = doc
     ppr (SigOrigin info)      = pprSkolInfo info
     ppr EqOrigin	      = ptext SLIT("a type equality")
-
 \end{code}

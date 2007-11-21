@@ -424,8 +424,9 @@ tcPrag poly_id (InlineSig v inl)             = return (InlinePrag inl)
 
 tcSpecPrag :: TcId -> LHsType Name -> InlineSpec -> TcM Prag
 tcSpecPrag poly_id hs_ty inl
-  = do	{ spec_ty <- tcHsSigType (FunSigCtxt (idName poly_id)) hs_ty
-	; (co_fn, lie) <- getLIE (tcSubExp (idType poly_id) spec_ty)
+  = do	{ let name = idName poly_id
+	; spec_ty <- tcHsSigType (FunSigCtxt name) hs_ty
+	; (co_fn, lie) <- getLIE (tcSubExp (SpecPragOrigin name) (idType poly_id) spec_ty)
 	; extendLIEs lie
 	; let const_dicts = map instToId lie
 	; return (SpecPrag (mkHsWrap co_fn (HsVar poly_id)) spec_ty const_dicts inl) }

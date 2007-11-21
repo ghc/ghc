@@ -421,7 +421,9 @@ tc_pat pstate (orig@(ViewPat expr pat _)) overall_pat_ty thing_inside
          -- (view -> f)    where view :: _ -> forall b. b
          -- we will only be able to use view at one instantation in the
          -- rest of the view
-	; (expr_coerc, pat_ty) <- tcInfer (\ pat_ty -> tcSubExp (expr'_expected pat_ty) expr'_inferred)
+	; (expr_coerc, pat_ty) <- tcInfer $ \ pat_ty -> 
+		tcSubExp ViewPatOrigin (expr'_expected pat_ty) expr'_inferred
+
          -- pattern must have pat_ty
        ; (pat', tvs, res) <- tc_lpat pat pat_ty pstate thing_inside
          -- this should get zonked later on, but we unBox it here

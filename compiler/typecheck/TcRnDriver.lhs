@@ -1056,10 +1056,9 @@ tcGhciStmts stmts
  = do { ioTyCon <- tcLookupTyCon ioTyConName ;
 	ret_id  <- tcLookupId returnIOName ;		-- return @ IO
 	let {
-	    io_ty     = mkTyConApp ioTyCon [] ;
 	    ret_ty    = mkListTy unitTy ;
 	    io_ret_ty = mkTyConApp ioTyCon [ret_ty] ;
-	    tc_io_stmts stmts = tcStmts DoExpr (tcDoStmt io_ty) stmts 
+	    tc_io_stmts stmts = tcStmts DoExpr tcDoStmt stmts 
 				        (emptyRefinement, io_ret_ty) ;
 
 	    names = map unLoc (collectLStmtsBinders stmts) ;

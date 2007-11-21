@@ -153,19 +153,20 @@ tcExpr (HsOverLit lit) res_ty
 	; return (HsOverLit lit') }
 
 tcExpr (NegApp expr neg_expr) res_ty
-  = do	{ neg_expr' <- tcSyntaxOp (OccurrenceOf negateName) neg_expr
+  = do	{ neg_expr' <- tcSyntaxOp NegateOrigin neg_expr
 				  (mkFunTy res_ty res_ty)
 	; expr' <- tcMonoExpr expr res_ty
 	; return (NegApp expr' neg_expr') }
 
 tcExpr (HsIPVar ip) res_ty
-  = do	{ 	-- Implicit parameters must have a *tau-type* not a 
+  = do	{ let origin = IPOccOrigin ip
+	 	-- Implicit parameters must have a *tau-type* not a 
 		-- type scheme.  We enforce this by creating a fresh
 		-- type variable as its type.  (Because res_ty may not
 		-- be a tau-type.)
-	  ip_ty <- newFlexiTyVarTy argTypeKind	-- argTypeKind: it can't be an unboxed tuple
-	; co_fn <- tcSubExp ip_ty res_ty
-	; (ip', inst) <- newIPDict (IPOccOrigin ip) ip ip_ty
+	; ip_ty <- newFlexiTyVarTy argTypeKind	-- argTypeKind: it can't be an unboxed tuple
+	; co_fn <- tcSubExp origin ip_ty res_ty
+	; (ip', inst) <- newIPDict origin ip ip_ty
 	; extendLIE inst
 	; return (mkHsWrap co_fn (HsIPVar ip')) }
 
@@ -192,7 +193,7 @@ tcExpr in_expr@(ExprWithTySig expr sig_ty) res_ty
 		             tcExtendTyVarEnv2 (hsExplicitTvs sig_ty `zip` mkTyVarTys skol_tvs) $
 			     tcPolyExprNC expr res_ty)
 
-	; co_fn <- tcSubExp sig_tc_ty res_ty
+	; co_fn <- tcSubExp ExprSigOrigin sig_tc_ty res_ty
 	; return (mkHsWrap co_fn (ExprWithTySigOut (mkLHsWrap gen_fn expr') sig_ty)) }
 
 tcExpr (HsType ty) res_ty
@@ -318,7 +319,7 @@ tcExpr (ExplicitTuple exprs boxity) res_ty
 	; arg_tys  <- preSubType tvs (mkVarSet tvs) tup_res_ty res_ty
 	; exprs'   <- tcPolyExprs exprs arg_tys
 	; arg_tys' <- mapM refineBox arg_tys
-	; co_fn    <- tcFunResTy (tyConName tup_tc) (mkTyConApp tup_tc arg_tys') res_ty
+	; co_fn    <- tcSubExp TupleOrigin (mkTyConApp tup_tc arg_tys') res_ty
 	; return (mkHsWrap co_fn (ExplicitTuple exprs' boxity)) }
 
 tcExpr (HsProc pat cmd) res_ty
@@ -469,8 +470,9 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
     let
 	result_ty     = substTy result_inst_env con1_res_ty
 	con1_arg_tys' = map (substTy result_inst_env) con1_arg_tys
+	origin 	      = RecordUpdOrigin
     in
-    tcSubExp result_ty res_ty			`thenM` \ co_fn ->
+    tcSubExp origin result_ty res_ty		`thenM` \ co_fn ->
     tcRecordBinds con1 con1_arg_tys' rbinds	`thenM` \ rbinds' ->
 
 	-- STEP 5: Typecheck the expression to be updated
@@ -490,7 +492,7 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
     let
 	theta' = substTheta scrut_inst_env (dataConStupidTheta con1)
     in
-    instStupidTheta RecordUpdOrigin theta'	`thenM_`
+    instStupidTheta origin theta'	`thenM_`
 
 	-- Step 7: make a cast for the scrutinee, in the case that it's from a type family
     let scrut_co | Just co_con <- tyConFamilyCoercion_maybe tycon 
@@ -679,7 +681,7 @@ tcIdApp fun_name n_args arg_checker res_ty
 	; let res_subst = zipOpenTvSubst qtvs qtys''
 	      fun_res_ty'' = substTy res_subst fun_res_ty
 	      res_ty'' = mkFunTys extra_arg_tys'' res_ty
-	; co_fn <- tcFunResTy fun_name fun_res_ty'' res_ty''
+	; co_fn <- tcSubExp orig fun_res_ty'' res_ty''
 			    
 	-- And pack up the results
 	-- By applying the coercion just to the *function* we can make
@@ -726,7 +728,7 @@ tcId orig fun_name res_ty
 	; let res_subst = zipTopTvSubst qtvs qtv_tys
 	      fun_tau'  = substTy res_subst fun_tau
 
-	; co_fn <- tcFunResTy fun_name fun_tau' res_ty
+	; co_fn <- tcSubExp orig fun_tau' res_ty
 
 	-- And pack up the results
 	; fun' <- instFun orig fun res_subst tv_theta_prs 
