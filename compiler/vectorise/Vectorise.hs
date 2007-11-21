@@ -216,6 +216,8 @@ vectLiteral lit
       return (Lit lit, lexpr)
 
 vectPolyExpr :: CoreExprWithFVs -> VM VExpr
+vectPolyExpr (_, AnnNote note expr)
+  = liftM (vNote note) $ vectPolyExpr expr
 vectPolyExpr expr
   = polyAbstract tvs $ \abstract ->
     do
