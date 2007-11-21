@@ -33,6 +33,7 @@ import Type            ( Type )
 import TysPrim
 import TysWiredIn      ( unitTyCon, tupleTyCon,
                          intTyCon, intTyConName,
+                         doubleTyCon, doubleTyConName,
                          boolTyCon, boolTyConName, trueDataCon, falseDataCon,
                          parrTyCon, parrTyConName )
 import PrelNames       ( gHC_PARR )
@@ -234,7 +235,7 @@ initBuiltinTyCons bi
              : [(tyConName tc, tc) | tc <- defaultTyCons]
 
 defaultTyCons :: [TyCon]
-defaultTyCons = [intTyCon, boolTyCon]
+defaultTyCons = [intTyCon, boolTyCon, doubleTyCon]
 
 initBuiltinDataCons :: Builtins -> [(Name, DataCon)]
 initBuiltinDataCons bi = [(dataConName dc, dc)| dc <- defaultDataCons]
@@ -261,6 +262,7 @@ builtinPAs bi
     , mk unitTyConName                  nDP_INSTANCES   FSLIT("dPA_Unit")
 
     , mk intTyConName                   nDP_INSTANCES   FSLIT("dPA_Int")
+    , mk doubleTyConName                nDP_INSTANCES   FSLIT("dPA_Double")
     , mk boolTyConName                  nDP_INSTANCES   FSLIT("dPA_Bool")
     ]
     ++ tups
@@ -285,6 +287,7 @@ builtinPRs bi =
 
     -- temporary
   , mk intTyConName          nDP_INSTANCES FSLIT("dPR_Int")
+  , mk doubleTyConName       nDP_INSTANCES FSLIT("dPR_Double")
   ]
 
   ++ map mk_sum  [2..mAX_NDP_SUM]
