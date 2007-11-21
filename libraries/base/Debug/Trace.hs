@@ -15,7 +15,8 @@
 module Debug.Trace (
 	-- * Tracing
 	putTraceMsg,      -- :: String -> IO ()
-	trace             -- :: String -> a -> a
+	trace,            -- :: String -> a -> a
+        traceShow
   ) where
 
 import Prelude
