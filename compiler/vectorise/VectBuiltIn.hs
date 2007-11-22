@@ -68,6 +68,7 @@ nDP_COMBINATORS = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Combinators")
 
 nDP_PRELUDE_PARR = mkNDPModule FSLIT("Data.Array.Parallel.Prelude.Base.PArr")
 nDP_PRELUDE_INT  = mkNDPModule FSLIT("Data.Array.Parallel.Prelude.Base.Int")
+nDP_PRELUDE_DOUBLE = mkNDPModule FSLIT("Data.Array.Parallel.Prelude.Base.Double")
 
 data Builtins = Builtins {
                   parrayTyCon      :: TyCon
@@ -211,10 +212,17 @@ preludeVars
   = [
       mk gHC_PARR FSLIT("mapP") nDP_COMBINATORS FSLIT("mapPA")
     , mk gHC_PARR FSLIT("zipWithP") nDP_COMBINATORS FSLIT("zipWithPA")
+
     , mk nDP_PRELUDE_INT  FSLIT("plus") nDP_PRELUDE_INT FSLIT("plusV")
     , mk nDP_PRELUDE_INT  FSLIT("minus") nDP_PRELUDE_INT FSLIT("minusV")
+    , mk nDP_PRELUDE_INT  FSLIT("mult")  nDP_PRELUDE_INT FSLIT("multV")
     , mk nDP_PRELUDE_INT  FSLIT("sumP")  nDP_PRELUDE_INT FSLIT("sumPA")
     , mk nDP_PRELUDE_INT  FSLIT("upToP") nDP_PRELUDE_INT FSLIT("upToPA")
+
+    , mk nDP_PRELUDE_DOUBLE  FSLIT("plus") nDP_PRELUDE_DOUBLE FSLIT("plusV")
+    , mk nDP_PRELUDE_DOUBLE  FSLIT("minus") nDP_PRELUDE_DOUBLE FSLIT("minusV")
+    , mk nDP_PRELUDE_DOUBLE  FSLIT("mult")  nDP_PRELUDE_DOUBLE FSLIT("multV")
+    , mk nDP_PRELUDE_DOUBLE  FSLIT("sumP")  nDP_PRELUDE_DOUBLE FSLIT("sumPA")
 
     -- FIXME: temporary
     , mk nDP_PRELUDE_PARR FSLIT("fromPArrayP") nDP_PRELUDE_PARR FSLIT("fromPArrayPA")
