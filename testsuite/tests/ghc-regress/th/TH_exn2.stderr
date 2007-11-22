@@ -3,10 +3,10 @@ TH_exn2.hs:1:0:
     Exception when trying to run compile-time code:
       Prelude.tail: empty list
       Code: let
-	      >>= = (>>=)
-	      $dMonad = $dMonad
-	      return = return
-	      ....
-	    in
-	      do ds <- [d| |]
-		 return (tail ds)
+              >>= = (>>=)
+              $dMonad = Language.Haskell.TH.Syntax.$f22
+              return = return
+              ....
+            in
+              do ds <- [d| |]
+                 return (tail ds)

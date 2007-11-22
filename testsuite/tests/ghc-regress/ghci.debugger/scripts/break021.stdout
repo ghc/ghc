@@ -53,7 +53,7 @@ _result :: IO () = _
       ^^^^^^^^^^^^^^^^^
 13    in_another_module 0
 Stopped at break020.hs:(6,0)-(7,29)
-_result :: t1 () = _
+_result :: m () = _
 5  
    vv
 6  in_another_decl _ = do line1 0
@@ -61,7 +61,7 @@ _result :: t1 () = _
                                  ^^
 8  
 Stopped at break020.hs:(6,20)-(7,29)
-_result :: t1 () = _
+_result :: m () = _
 5  
                      vv
 6  in_another_decl _ = do line1 0
@@ -69,37 +69,37 @@ _result :: t1 () = _
                                  ^^
 8  
 Stopped at break020.hs:6:23-29
-_result :: t1 () = _
+_result :: m () = _
 5  
 6  in_another_decl _ = do line1 0
                           ^^^^^^^
 7                         line2 0
 Stopped at break020.hs:3:0-18
-_result :: t1 () = _
+_result :: m () = _
 2  
 3  line1 _ = return ()
    ^^^^^^^^^^^^^^^^^^^
 4  line2 _ = return ()
 Stopped at break020.hs:3:10-18
-_result :: t1 () = _
+_result :: m () = _
 2  
 3  line1 _ = return ()
              ^^^^^^^^^
 4  line2 _ = return ()
 Stopped at break020.hs:7:23-29
-_result :: t1 () = _
+_result :: m () = _
 6  in_another_decl _ = do line1 0
 7                         line2 0
                           ^^^^^^^
 8  
 Stopped at break020.hs:4:0-18
-_result :: t1 () = _
+_result :: m () = _
 3  line1 _ = return ()
 4  line2 _ = return ()
    ^^^^^^^^^^^^^^^^^^^
 5  
 Stopped at break020.hs:4:10-18
-_result :: t1 () = _
+_result :: m () = _
 3  line1 _ = return ()
 4  line2 _ = return ()
              ^^^^^^^^^
