@@ -1068,26 +1068,35 @@ initBufferState _ 	   = WriteBuffer
 -- computation finishes, if @hdl@ is writable its buffer is flushed as
 -- for 'hFlush'.
 -- Performing 'hClose' on a handle that has already been closed has no effect; 
--- doing so not an error.  All other operations on a closed handle will fail.
+-- doing so is not an error.  All other operations on a closed handle will fail.
 -- If 'hClose' fails for any reason, any further operations (apart from
 -- 'hClose') on the handle will still fail as if @hdl@ had been successfully
 -- closed.
 
 hClose :: Handle -> IO ()
-hClose h@(FileHandle _ m)     = hClose' h m
-hClose h@(DuplexHandle _ r w) = hClose' h w >> hClose' h r
+hClose h@(FileHandle _ m)     = do 
+  mb_exc <- hClose' h m
+  case mb_exc of
+    Nothing -> return ()
+    Just e  -> throwIO e
+hClose h@(DuplexHandle _ r w) = do
+  mb_exc1 <- hClose' h w
+  mb_exc2 <- hClose' h r
+  case (do mb_exc1; mb_exc2) of
+     Nothing -> return ()
+     Just e  -> throwIO e
 
-hClose' h m = withHandle__' "hClose" h m $ hClose_help
+hClose' h m = withHandle' "hClose" h m $ hClose_help
 
 -- hClose_help is also called by lazyRead (in PrelIO) when EOF is read
 -- or an IO error occurs on a lazy stream.  The semi-closed Handle is
 -- then closed immediately.  We have to be careful with DuplexHandles
 -- though: we have to leave the closing to the finalizer in that case,
 -- because the write side may still be in use.
-hClose_help :: Handle__ -> IO Handle__
+hClose_help :: Handle__ -> IO (Handle__, Maybe Exception)
 hClose_help handle_ =
   case haType handle_ of 
-      ClosedHandle -> return handle_
+      ClosedHandle -> return (handle_,Nothing)
       _ -> do flushWriteBufferOnly handle_ -- interruptible
 	      hClose_handle_ handle_
 
@@ -1096,15 +1105,24 @@ hClose_handle_ handle_ = do
 
     -- close the file descriptor, but not when this is the read
     -- side of a duplex handle.
-    case haOtherSide handle_ of
-      Nothing ->
-  		  throwErrnoIfMinus1Retry_ "hClose" 
+    -- If an exception is raised by the close(), we want to continue
+    -- to close the handle and release the lock if it has one, then 
+    -- we return the exception to the caller of hClose_help which can
+    -- raise it if necessary.
+    maybe_exception <- 
+      case haOtherSide handle_ of
+        Nothing -> (do
+                      throwErrnoIfMinus1Retry_ "hClose" 
 #ifdef mingw32_HOST_OS
 	    			(closeFd (haIsStream handle_) fd)
 #else
 	    			(c_close fd)
 #endif
-      Just _  -> return ()
+                      return Nothing
+                    )
+                     `catchException` \e -> return (Just e)
+
+        Just _  -> return Nothing
 
     -- free the spare buffers
     writeIORef (haBuffers handle_) BufferListNil
@@ -1119,7 +1137,8 @@ hClose_handle_ handle_ = do
     -- to run eventually and try to close/unlock it.
     return (handle_{ haFD        = -1, 
   		     haType      = ClosedHandle
-  		   })
+  		   },
+            maybe_exception)
 
 {-# NOINLINE noBuffer #-}
 noBuffer = unsafePerformIO $ allocateBuffer 1 ReadBuffer

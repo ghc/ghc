@@ -353,7 +353,7 @@ lazyRead' h handle_ = do
 	let raw = bufBuf buf
 	r <- readRawBuffer "lazyRead" fd (haIsStream handle_) raw 0 1
 	if r == 0
-	   then do handle_ <- hClose_help handle_ 
+	   then do (handle_,_) <- hClose_help handle_ 
 		   return (handle_, "")
 	   else do (c,_) <- readCharFromBuffer raw 0
 		   rest <- lazyRead h
@@ -370,7 +370,7 @@ lazyReadBuffered h handle_ fd ref buf = do
 	    lazyReadHaveBuffer h handle_ fd ref buf
      	)
 	-- all I/O errors are discarded.  Additionally, we close the handle.
-     	(\e -> do handle_ <- hClose_help handle_
+     	(\e -> do (handle_,_) <- hClose_help handle_
 		  return (handle_, "")
 	)
 
