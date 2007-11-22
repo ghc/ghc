@@ -8,8 +8,8 @@ test('IOError001', compose(omit_ways(['ghci']), set_stdin('IOError001.hs')),
 
 test('IOError002',      normal, compile_and_run, [''])
 test('finalization001', normal, compile_and_run, [''])
-test('hClose001',       normal, compile_and_run, [''])
-clean(['hClose001.tmp'])
+test('hClose001',       extra_clean(['hClose001.tmp']), compile_and_run, [''])
+test('hClose002',       extra_clean(['hClose002.tmp']), compile_and_run, [''])
 test('hFileSize001',    normal, compile_and_run, [''])
 test('hFileSize002',    omit_ways(['ghci']), compile_and_run, [''])
 clean(['hFileSize002.out'])
