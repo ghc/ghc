@@ -718,9 +718,6 @@ run_thread:
       cap = scheduleDoGC(cap,task,rtsFalse);
     }
   } /* end of while() */
-
-  debugTrace(PAR_DEBUG_verbose,
-	     "== Leaving schedule() after having received Finish");
 }
 
 /* ----------------------------------------------------------------------------

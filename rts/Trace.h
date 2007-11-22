@@ -74,36 +74,7 @@ void traceEnd (void);
 #define DEBUG_linker		   (1<<12)
 #define DEBUG_squeeze              (1<<13)
 
-// PAR debugging flags, set with +RTS -qD<something>
-#define PAR_DEBUG_verbose	   (1<<14)
-#define PAR_DEBUG_bq		   (1<<15)
-#define PAR_DEBUG_schedule         (1<<16)
-#define PAR_DEBUG_free       	   (1<<17)
-#define PAR_DEBUG_resume     	   (1<<18)
-#define PAR_DEBUG_weight     	   (1<<19)
-#define PAR_DEBUG_fetch      	   (1<<21)
-#define PAR_DEBUG_fish       	   (1<<22)
-#define PAR_DEBUG_tables     	   (1<<23)
-#define PAR_DEBUG_packet     	   (1<<24)
-#define PAR_DEBUG_pack       	   (1<<25)
-#define PAR_DEBUG_paranoia         (1<<26)
 
-// GRAN and PAR don't coexist, so we re-use the PAR values for GRAN.
-#define GRAN_DEBUG_event_trace     (1<<14)  
-#define GRAN_DEBUG_event_stats     (1<<15)
-#define GRAN_DEBUG_bq              (1<<16)
-#define GRAN_DEBUG_pack            (1<<17)
-#define GRAN_DEBUG_checkSparkQ     (1<<18)
-#define GRAN_DEBUG_thunkStealing   (1<<19)
-#define GRAN_DEBUG_randomSteal     (1<<20)	
-#define GRAN_DEBUG_findWork        (1<<21)	
-#define GRAN_DEBUG_unused     	   (1<<22)
-#define GRAN_DEBUG_pri     	   (1<<23)
-#define GRAN_DEBUG_checkLight      (1<<24)	
-#define GRAN_DEBUG_sortedQ         (1<<25)	
-#define GRAN_DEBUG_blockOnFetch    (1<<26)
-#define GRAN_DEBUG_packBuffer      (1<<27)
-#define GRAN_DEBUG_BOF_sanity      (1<<28)
 
 // Profiling flags
 #define TRACE_sched                (1<<29)
