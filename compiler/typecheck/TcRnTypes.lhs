@@ -663,7 +663,7 @@ data Inst
 	tci_reft   :: Refinement,
 	tci_given  :: [Inst],	    -- Only Dicts and EqInsts
 				    --   (no Methods, LitInsts, ImplicInsts)
-	tci_wanted :: [Inst],	    -- Only Dicts and ImplicInsts
+	tci_wanted :: [Inst],	    -- Only Dicts, EqInst, and ImplicInsts
 				    --   (no Methods or LitInsts)
 
 	tci_loc    :: InstLoc

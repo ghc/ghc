@@ -1022,8 +1022,9 @@ makeImplicationBind loc all_tvs reft
 				                  pat_rhs = unguardedGRHSs rhs, 
 				      	          pat_rhs_ty = tup_ty,
 				      	          bind_fvs = placeHolderNames }
-	; -- pprTrace "Make implic inst" (ppr (implic_inst,irreds,dict_irreds,tup_ty)) $
-	  return ([implic_inst], unitBag (L span bind)) }
+	; traceTc $ text "makeImplicationBind" <+> ppr implic_inst
+	; return ([implic_inst], unitBag (L span bind)) 
+        }
 
 -----------------------------------------------------------
 tryHardCheckLoop :: SDoc
@@ -1848,7 +1849,7 @@ reduceContext env wanteds
 	     text "----",
 	     text "avails" <+> pprAvails avails,
 	     text "improved =" <+> ppr improved,
-	     text "irreds = " <+> ppr irreds,
+	     text "(all) irreds = " <+> ppr all_irreds,
 	     text "binds = " <+> ppr binds,
 	     text "needed givens = " <+> ppr needed_givens,
 	     text "----------------------"
