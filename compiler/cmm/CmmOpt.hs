@@ -341,7 +341,8 @@ cmmMachOpFold cmp [CmmMachOp conv [x], CmmLit (CmmInt i _)]
   = cmmMachOpFold narrow_cmp [x, CmmLit (CmmInt narrow_i rep)]
  where
     maybe_conversion (MO_U_Conv from _) = Just (from, narrowU)
-    maybe_conversion (MO_S_Conv from _) = Just (from, narrowS)
+    maybe_conversion (MO_S_Conv from _)
+        | not (isFloatingRep from) = Just (from, narrowS)
     maybe_conversion _ = Nothing
     
     maybe_comparison (MO_U_Gt _) rep = Just (MO_U_Gt rep)
