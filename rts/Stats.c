@@ -66,6 +66,7 @@ static lnat ResidencySamples = 0; // for stats only
 static lnat GC_start_faults = 0, GC_end_faults = 0;
 
 static Ticks *GC_coll_times;
+static Ticks *GC_coll_etimes;
 
 static void statsFlush( void );
 static void statsClose( void );
@@ -138,8 +139,13 @@ initStats(void)
 	(Ticks *)stgMallocBytes(
 	    sizeof(Ticks)*RtsFlags.GcFlags.generations,
 	    "initStats");
+    GC_coll_etimes = 
+	(Ticks *)stgMallocBytes(
+	    sizeof(Ticks)*RtsFlags.GcFlags.generations,
+	    "initStats");
     for (i = 0; i < RtsFlags.GcFlags.generations; i++) {
 	GC_coll_times[i] = 0;
+	GC_coll_etimes[i] = 0;
     }
 }    
 
@@ -314,6 +320,7 @@ stat_endGC (lnat alloc, lnat live, lnat copied, lnat gen)
 	}
 
 	GC_coll_times[gen] += gc_time;
+	GC_coll_etimes[gen] += gc_etime;
 
 	GC_tot_copied += (ullong) copied;
 	GC_tot_alloc  += (ullong) alloc;
@@ -533,9 +540,10 @@ stat_exit(int alloc)
 
 	    /* Print garbage collections in each gen */
 	    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-		statsPrintf("%11d collections in generation %d (%6.2fs)\n", 
+		statsPrintf("%11d collections in generation %d, %6.2fs, %6.2fs elapsed\n", 
 			generations[g].collections, g, 
-			TICK_TO_DBL(GC_coll_times[g]));
+                        TICK_TO_DBL(GC_coll_times[g]),
+                        TICK_TO_DBL(GC_coll_etimes[g]));
 	    }
 
 	    statsPrintf("\n%11ld Mb total memory in use\n\n", 
