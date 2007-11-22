@@ -184,6 +184,9 @@ class TestOptions:
        # Does this test use a .c file?
        self.c_src = 0
 
+       # Prefix to put on the command before running it
+       self.cmd_prefix = ''
+
 # The default set of options
 global default_testopts
 default_testopts = TestOptions()
