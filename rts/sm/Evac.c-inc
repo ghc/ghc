@@ -353,7 +353,7 @@ loop:
                             (StgClosure *)CHARLIKE_CLOSURE((StgChar)w)
 			   );
       }
-      if (q->header.info == Izh_con_info &&
+      else if (q->header.info == Izh_con_info &&
 	  (StgInt)w >= MIN_INTLIKE && (StgInt)w <= MAX_INTLIKE) {
 	  *p = TAG_CLOSURE(tag,
 			     (StgClosure *)INTLIKE_CLOSURE((StgInt)w)
