@@ -334,42 +334,51 @@ type Compiler result =  HscEnv
 -- Compile Haskell, boot and extCore in OneShot mode.
 hscCompileOneShot :: Compiler HscStatus
 hscCompileOneShot
-   = hscCompiler norecompOneShot oneShotMsg backend boot_backend
+   = hscCompiler norecompOneShot oneShotMsg (genComp backend boot_backend)
    where
      backend inp  = hscSimplify inp >>= hscNormalIface >>= hscWriteIface >>= hscOneShot
-     boot_backend inp = hscSimpleIface inp >>= hscWriteIface >> return (HscRecomp False)
+     boot_backend inp = hscSimpleIface inp >>= hscWriteIface >> return (Just (HscRecomp False))
 
 -- Compile Haskell, boot and extCore in batch mode.
 hscCompileBatch :: Compiler (HscStatus, ModIface, ModDetails)
 hscCompileBatch
-   = hscCompiler norecompBatch batchMsg backend boot_backend
+   = hscCompiler norecompBatch batchMsg (genComp backend boot_backend)
    where
      backend inp  = hscSimplify inp >>= hscNormalIface >>= hscWriteIface >>= hscBatch
      boot_backend inp = hscSimpleIface inp >>= hscWriteIface >>= hscNothing
 
--- Type-check Haskell, boot and extCore.
--- Does it make sense to compile extCore to nothing?
-hscCompileNothing :: Compiler (HscStatus, ModIface, ModDetails)
-hscCompileNothing
-   = hscCompiler norecompBatch batchMsg backend backend
-   where
-     backend inp = hscSimpleIface inp >>= hscIgnoreIface >>= hscNothing
-
 -- Compile Haskell, extCore to bytecode.
 hscCompileInteractive :: Compiler (InteractiveStatus, ModIface, ModDetails)
 hscCompileInteractive
-   = hscCompiler norecompInteractive batchMsg backend boot_backend
+   = hscCompiler norecompInteractive batchMsg (genComp backend boot_backend)
    where
      backend inp = hscSimplify inp >>= hscNormalIface >>= hscIgnoreIface >>= hscInteractive
-     boot_backend = panic "hscCompileInteractive: can't do boot files here"
+     boot_backend _ = panic "hscCompileInteractive: HsBootFile"
 
+-- Type-check Haskell and .hs-boot only (no external core)
+hscCompileNothing :: Compiler (HscStatus, ModIface, ModDetails)
+hscCompileNothing
+   = hscCompiler norecompBatch batchMsg comp
+   where
+     backend tc = hscSimpleIface tc >>= hscIgnoreIface >>= hscNothing
+
+     comp = do   -- genComp doesn't fit here, because we want to omit
+                 -- desugaring and for the backend to take a TcGblEnv
+        mod_summary <- gets compModSummary
+        case ms_hsc_src mod_summary of
+           ExtCoreFile -> panic "hscCompileNothing: cannot do external core"
+           _other -> do
+                mb_tc <- hscFileFrontEnd
+                case mb_tc of
+                  Nothing -> return Nothing
+                  Just tc_result -> backend tc_result
+        
 hscCompiler
-        :: NoRecomp result                                  -- No recomp necessary
-        -> (Maybe (Int,Int) -> Bool -> Comp ())             -- Message callback
-        -> (ModGuts -> Comp result)  -- Compile normal file
-        -> (ModGuts -> Comp result) -- Compile boot file
+        :: NoRecomp result                       -- No recomp necessary
+        -> (Maybe (Int,Int) -> Bool -> Comp ())  -- Message callback
+        -> Comp (Maybe result)
         -> Compiler result
-hscCompiler norecomp messenger nonBootComp bootComp hsc_env mod_summary 
+hscCompiler norecomp messenger recomp hsc_env mod_summary 
             source_unchanged mbOldIface mbModIndex
     = flip evalComp (CompState hsc_env mod_summary mbOldIface) $
       do (recomp_reqd, mbCheckedIface)
@@ -387,21 +396,32 @@ hscCompiler norecomp messenger nonBootComp bootComp hsc_env mod_summary
                      return (Just result)
            _otherwise
                -> do messenger mbModIndex True
-                     mb_modguts <- frontend
-                     case mb_modguts of
-                       Nothing
-                           -> return Nothing
-                       Just core
-                           -> do result <- backend core
-                                 return (Just result)
-    where
-          frontend :: Comp (Maybe ModGuts)       -- Front end
-          -- backend  :: (ModGuts -> Comp result)   -- Backend.
-          (frontend,backend)
-              = case ms_hsc_src mod_summary of
-                ExtCoreFile -> (hscCoreFrontEnd, nonBootComp)
-                HsSrcFile   -> (hscFileFrontEnd, nonBootComp)
-                HsBootFile  -> (hscFileFrontEnd, bootComp)
+                     recomp
+
+-- the usual way to build the Comp (Maybe result) to pass to hscCompiler
+genComp :: (ModGuts  -> Comp (Maybe a))
+        -> (TcGblEnv -> Comp (Maybe a))
+        -> Comp (Maybe a)
+genComp backend boot_backend = do
+    mod_summary <- gets compModSummary
+    case ms_hsc_src mod_summary of
+       ExtCoreFile -> do 
+          mb_modguts <- hscCoreFrontEnd
+          case mb_modguts of
+            Nothing -> return Nothing
+            Just guts -> backend guts
+       _not_core -> do
+          mb_tc <- hscFileFrontEnd
+          case mb_tc of
+            Nothing -> return Nothing
+            Just tc_result -> 
+              case ms_hsc_src mod_summary of
+                HsBootFile -> boot_backend tc_result
+                _other     -> do
+                  mb_guts <- hscDesugar tc_result
+                  case mb_guts of
+                    Nothing -> return Nothing
+                    Just guts -> backend guts
 
 --------------------------------------------------------------
 -- NoRecomp handlers
@@ -423,7 +443,6 @@ norecompInteractive = norecompWorker InteractiveNoRecomp True
 norecompWorker :: a -> Bool -> NoRecomp (a, ModIface, ModDetails)
 norecompWorker a _isInterp old_iface
     = do hsc_env <- gets compHscEnv
-         _mod_summary <- gets compModSummary
          liftIO $ do
          new_details <- {-# SCC "tcRnIface" #-}
                         initIfaceCheck hsc_env $
@@ -487,7 +506,7 @@ hscCoreFrontEnd =
                      Just mod_guts -> return (Just mod_guts)         -- No desugaring to do!
 
 	 
-hscFileFrontEnd :: Comp (Maybe ModGuts)
+hscFileFrontEnd :: Comp (Maybe TcGblEnv)
 hscFileFrontEnd =
     do hsc_env <- gets compHscEnv
        mod_summary <- gets compModSummary
@@ -511,14 +530,23 @@ hscFileFrontEnd =
                        <- {-# SCC "Typecheck-Rename" #-}
                           tcRnModule hsc_env (ms_hsc_src mod_summary) False rdr_module
                    printErrorsAndWarnings dflags tc_msgs
-                   case maybe_tc_result of
-                     Nothing
-                         -> return Nothing
-                     Just tc_result
-                         -------------------
-                         -- DESUGAR
-                         -------------------
-                         -> {-# SCC "DeSugar" #-} deSugar hsc_env (ms_location mod_summary) tc_result
+                   return maybe_tc_result
+
+--------------------------------------------------------------
+-- Desugaring
+--------------------------------------------------------------
+
+hscDesugar :: TcGblEnv -> Comp (Maybe ModGuts)
+hscDesugar tc_result
+  = do mod_summary <- gets compModSummary
+       hsc_env <- gets compHscEnv
+       liftIO $ do
+          -------------------
+          -- DESUGAR
+          -------------------
+       ds_result   <- {-# SCC "DeSugar" #-} 
+                      deSugar hsc_env (ms_location mod_summary) tc_result
+       return ds_result
 
 --------------------------------------------------------------
 -- Simplifiers
@@ -542,19 +570,18 @@ hscSimplify ds_result
 -- HACK: we return ModGuts even though we know it's not gonna be used.
 --       We do this because the type signature needs to be identical
 --       in structure to the type of 'hscNormalIface'.
-hscSimpleIface :: ModGuts -> Comp (ModIface, Bool, ModDetails, ModGuts)
-hscSimpleIface ds_result
+hscSimpleIface :: TcGblEnv -> Comp (ModIface, Bool, ModDetails, TcGblEnv)
+hscSimpleIface tc_result
   = do hsc_env <- gets compHscEnv
-       _mod_summary <- gets compModSummary
        maybe_old_iface <- gets compOldIface
        liftIO $ do
-       details <- mkBootModDetailsDs hsc_env ds_result
+       details <- mkBootModDetailsTc hsc_env tc_result
        (new_iface, no_change) 
            <- {-# SCC "MkFinalIface" #-}
-              mkIface hsc_env maybe_old_iface details ds_result
+              mkIfaceTc hsc_env maybe_old_iface details tc_result
        -- And the answer is ...
        dumpIfaceStats hsc_env
-       return (new_iface, no_change, details, ds_result)
+       return (new_iface, no_change, details, tc_result)
 
 hscNormalIface :: ModGuts -> Comp (ModIface, Bool, ModDetails, CgGuts)
 hscNormalIface simpl_result
@@ -604,21 +631,21 @@ hscIgnoreIface (iface, _no_change, details, a)
     = return (iface, details, a)
 
 -- Don't output any code.
-hscNothing :: (ModIface, ModDetails, a) -> Comp (HscStatus, ModIface, ModDetails)
+hscNothing :: (ModIface, ModDetails, a) -> Comp (Maybe (HscStatus, ModIface, ModDetails))
 hscNothing (iface, details, _)
-    = return (HscRecomp False, iface, details)
+    = return (Just (HscRecomp False, iface, details))
 
 -- Generate code and return both the new ModIface and the ModDetails.
-hscBatch :: (ModIface, ModDetails, CgGuts) -> Comp (HscStatus, ModIface, ModDetails)
+hscBatch :: (ModIface, ModDetails, CgGuts) -> Comp (Maybe (HscStatus, ModIface, ModDetails))
 hscBatch (iface, details, cgguts)
     = do hasStub <- hscCompile cgguts
-         return (HscRecomp hasStub, iface, details)
+         return (Just (HscRecomp hasStub, iface, details))
 
 -- Here we don't need the ModIface and ModDetails anymore.
-hscOneShot :: (ModIface, ModDetails, CgGuts) -> Comp HscStatus
+hscOneShot :: (ModIface, ModDetails, CgGuts) -> Comp (Maybe HscStatus)
 hscOneShot (_, _, cgguts)
     = do hasStub <- hscCompile cgguts
-         return (HscRecomp hasStub)
+         return (Just (HscRecomp hasStub))
 
 -- Compile to hard-code.
 hscCompile :: CgGuts -> Comp Bool
@@ -666,7 +693,7 @@ hscCompile cgguts
          return stub_c_exists
 
 hscInteractive :: (ModIface, ModDetails, CgGuts)
-               -> Comp (InteractiveStatus, ModIface, ModDetails)
+               -> Comp (Maybe (InteractiveStatus, ModIface, ModDetails))
 #ifdef GHCI
 hscInteractive (iface, details, cgguts)
     = do hsc_env <- gets compHscEnv
@@ -695,7 +722,7 @@ hscInteractive (iface, details, cgguts)
          ------------------ Create f-x-dynamic C-side stuff ---
          (_istub_h_exists, istub_c_exists) 
              <- outputForeignStubs dflags this_mod location foreign_stubs
-         return (InteractiveRecomp istub_c_exists comp_bc mod_breaks, iface, details)
+         return (Just (InteractiveRecomp istub_c_exists comp_bc mod_breaks, iface, details))
 #else
 hscInteractive _ = panic "GHC not compiled with interpreter"
 #endif
