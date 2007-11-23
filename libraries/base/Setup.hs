@@ -15,6 +15,7 @@ import System.Cmd
 import System.FilePath
 import System.Exit
 import System.Directory
+import Control.Exception (try)
 
 main :: IO ()
 main = do let hooks = defaultUserHooks {
@@ -59,7 +60,7 @@ maybeUpdateFile source target = do
   r <- rawSystem "cmp" ["-s" {-quiet-}, source, target]
   case r of 
     ExitSuccess   -> removeFile source
-    ExitFailure _ -> do removeFile target; renameFile source target
+    ExitFailure _ -> do try (removeFile target); renameFile source target
   
 
 filter_modules_hook :: Hook a -> Hook a
