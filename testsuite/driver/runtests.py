@@ -142,7 +142,7 @@ for file in t_files:
                 t.thread_pool.wait()
             t.thread_pool.release()
     except:
-        print '*** found an error while executing ', file, ':'
+        print '*** framework failure: found an error while executing ', file, ':'
         t.n_framework_failures = t.n_framework_failures + 1
         traceback.print_exc()
         

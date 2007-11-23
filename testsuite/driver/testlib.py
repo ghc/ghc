@@ -540,7 +540,7 @@ def do_test(name, way, func, args):
         
         if getTestOpts().expect != 'pass' and getTestOpts().expect != 'fail' or \
            result != 'pass' and result != 'fail':
-            framework_fail(name, way)
+            framework_fail(name, way, 'bad results ' + result)
 
         if result == 'pass':
             if getTestOpts().expect == 'pass' \
@@ -573,9 +573,8 @@ def do_test(name, way, func, args):
                 else:
                     t.expected_failures[name] = [way]
     except:
-        print '*** framework failure for', full_name, ':'
+        framework_fail(name, way, 'do_test exception')
         traceback.print_exc()
-        framework_fail(name, way)
 
 def skiptest (name, way):
     # print 'Skipping test \"', name, '\"'
@@ -585,7 +584,9 @@ def skiptest (name, way):
     else:
         t.tests_skipped[name] = [way]
 
-def framework_fail( name, way ):
+def framework_fail( name, way, reason ):
+    full_name = name + '(' + way + ')'
+    print '*** framework failure for', full_name, reason, ':'
     t.n_framework_failures = t.n_framework_failures + 1
     if name in t.framework_failures:
         t.framework_failures[name].append(way)
