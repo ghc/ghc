@@ -336,6 +336,7 @@ usage_text[] = {
 "The following run time system options are available:",
 "",
 "  -?       Prints this message and exits; the program is not executed",
+"  --info   Print information about the RTS used by this program",
 "",
 "  -K<size> Sets the maximum stack size (default 8M)  Egs: -K32k   -K512k",
 "  -k<size> Sets the initial thread stack size (default 1k)  Egs: -k4k   -k2m",
