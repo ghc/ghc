@@ -1041,6 +1041,8 @@ STRIP			= strip
 TAR			= @TarCmd@
 ZIP			= zip
 
+HSCOLOUR = @HSCOLOUR@
+
 #
 # This is special to literate/, ToDo: add literate-specific
 # configure setup to literate/.

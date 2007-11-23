@@ -133,6 +133,10 @@ CONFIGURE_OPTS += --enable-split-objs
 CONFIGURE_STAMP_EXTRAS := $(CONFIGURE_STAMP_EXTRAS)-splitting
 endif
 
+ifneq "$(HSCOLOUR)" ""
+CONFIGURE_OPTS += --with-hscolour=$(HSCOLOUR)
+endif
+
 BOOTSTRAP_LIBS = Cabal filepath
 BOOTSTRAP_STAMPS = $(addprefix stamp/bootstrapping.,$(BOOTSTRAP_LIBS))
 BOOTSTRAP_INC_1_UP = -DCABAL_VERSION=1,3 $(addprefix -i../bootstrapping.,$(BOOTSTRAP_LIBS))
@@ -283,11 +287,17 @@ html: doc
 doc: $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR))
 	sh gen_contents_index --inplace
 
+# Making hyperlinked source only works if we have hscolour
+ifneq "$(HSCOLOUR)" ""
+CABAL_HADDOCK_FLAGS=--hyperlink-source
+endif
+
 $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                %/setup/Setup ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
-	  cd $* && setup/Setup haddock --html-location='../$$pkgid'; \
+	  cd $* && setup/Setup haddock --html-location='../$$pkgid' \
+	                               $(CABAL_HADDOCK_FLAGS); \
 	fi
 
 .PHONY: distclean clean clean.library.%
