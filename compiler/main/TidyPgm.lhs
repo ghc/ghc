@@ -138,10 +138,9 @@ mkBootModDetails hsc_env exports type_env insts fam_insts
 	; showPass dflags "Tidy [hoot] type env"
 
 	; let { insts'     = tidyInstances tidyExternalId insts
-	      ; type_env1  = filterNameEnv (not . isWiredInThing) type_env
-	      ; type_env2  = mapNameEnv tidyBootThing type_env1
-	      ; type_env'  = extendTypeEnvWithIds type_env2
-				(map instanceDFunId insts')
+	      ; dfun_ids   = map instanceDFunId insts'
+	      ; type_env1  = tidyBootTypeEnv (availsToNameSet exports) type_env
+	      ; type_env'  = extendTypeEnvWithIds type_env1 dfun_ids
 	      }
 	; return (ModDetails { md_types     = type_env'
 			     , md_insts     = insts'
@@ -153,13 +152,27 @@ mkBootModDetails hsc_env exports type_env insts fam_insts
 	}
   where
 
-isWiredInThing :: TyThing -> Bool
-isWiredInThing thing = isWiredInName (getName thing)
+tidyBootTypeEnv :: NameSet -> TypeEnv -> TypeEnv
+tidyBootTypeEnv exports type_env 
+  = tidyTypeEnv True exports type_env final_ids
+  where
+	-- Find the LocalIds in the type env that are exported
+	-- Make them into GlobalIds, and tidy their types
+	--
+	-- It's very important to remove the non-exported ones
+	-- because we don't tidy the OccNames, and if we don't remove
+	-- the non-exported ones we'll get many things with the
+	-- same name in the interface file, giving chaos.
+    final_ids = [ tidyExternalId id
+		| id <- typeEnvIds type_env
+		, isLocalId id
+		, keep_it id ]
 
-tidyBootThing :: TyThing -> TyThing
--- Just externalise the Ids; keep everything
-tidyBootThing (AnId id) | isLocalId id = AnId (tidyExternalId id)
-tidyBootThing thing		       = thing
+        -- default methods have their export flag set, but everything
+        -- else doesn't (yet), because this is pre-desugaring, so we
+        -- must test both.
+    keep_it id = isExportedId id || idName id `elemNameSet` exports
+
 
 tidyExternalId :: Id -> Id
 -- Takes an LocalId with an External Name, 
@@ -277,8 +290,10 @@ tidyProgram hsc_env
 						 binds
 
 	; let { export_set = availsToNameSet exports
+	      ; final_ids  = [ id | id <- bindersOfBinds tidy_binds, 
+				    isExternalName (idName id)]
               ; tidy_type_env = tidyTypeEnv omit_prags export_set type_env 
-					    tidy_binds
+					    final_ids
 	      ; tidy_insts    = tidyInstances (lookup_dfun tidy_type_env) insts
 		-- A DFunId will have a binding in tidy_binds, and so
 		-- will now be in final_env, replete with IdInfo
@@ -327,7 +342,8 @@ lookup_dfun type_env dfun_id
 	Just (AnId dfun_id') -> dfun_id'
 	_other -> pprPanic "lookup_dfun" (ppr dfun_id)
 
-tidyTypeEnv :: Bool -> NameSet -> TypeEnv -> [CoreBind] -> TypeEnv
+--------------------------
+tidyTypeEnv :: Bool -> NameSet -> TypeEnv -> [Id] -> TypeEnv
 
 -- The competed type environment is gotten from
 --	Dropping any wired-in things, and then
@@ -341,17 +357,14 @@ tidyTypeEnv :: Bool -> NameSet -> TypeEnv -> [CoreBind] -> TypeEnv
 -- This truncates the type environment to include only the 
 -- exported Ids and things needed from them, which saves space
 
-tidyTypeEnv omit_prags exports type_env tidy_binds
+tidyTypeEnv omit_prags exports type_env final_ids
   = let type_env1 = filterNameEnv keep_it type_env
 	type_env2 = extendTypeEnvWithIds type_env1 final_ids
-	type_env3 | omit_prags = mapNameEnv trim_thing type_env2
+	type_env3 | omit_prags = mapNameEnv (trimThing exports) type_env2
 		  | otherwise  = type_env2
     in 
     type_env3
   where
-    final_ids  = [ id | id <- bindersOfBinds tidy_binds, 
-			isExternalName (idName id)]
-
    	-- We keep GlobalIds, because they won't appear 
 	-- in the bindings from which final_ids are derived!
 	-- (The bindings bind LocalIds.)
@@ -359,15 +372,24 @@ tidyTypeEnv omit_prags exports type_env tidy_binds
     keep_it (AnId id) = isGlobalId id	-- Keep GlobalIds (e.g. class ops)
     keep_it _other    = True		-- Keep all TyCons, DataCons, and Classes
 
-    trim_thing thing
-	= case thing of
-	    ATyCon tc | mustExposeTyCon exports tc -> thing
-		      | otherwise -> ATyCon (makeTyConAbstract tc)
+--------------------------
+isWiredInThing :: TyThing -> Bool
+isWiredInThing thing = isWiredInName (getName thing)
 
-	    AnId id | isImplicitId id -> thing
-		    | otherwise	      -> AnId (id `setIdInfo` vanillaIdInfo)
+--------------------------
+trimThing :: NameSet -> TyThing -> TyThing
+-- Trim off inessentials, for boot files and no -O
+trimThing exports (ATyCon tc)
+   | not (mustExposeTyCon exports tc)
+   = ATyCon (makeTyConAbstract tc)
 
-	    _other -> thing
+trimThing _exports (AnId id)
+   | not (isImplicitId id) 
+   = AnId (id `setIdInfo` vanillaIdInfo)
+
+trimThing _exports other_thing 
+  = other_thing
+
 
 mustExposeTyCon :: NameSet	-- Exports
 		-> TyCon	-- The tycon
