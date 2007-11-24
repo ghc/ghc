@@ -899,11 +899,11 @@ FP_PROG_FIND
 dnl ** Find sort command (for the benefit of Win32 environs)
 FP_PROG_SORT
 
-dnl ** figure out how to do a BSD-ish install
-AC_PROG_INSTALL
 dnl Let's make sure install-sh is executable here.  If we got it from
 dnl a darcs repo, it might not be (see bug #978).
 chmod +x install-sh
+dnl ** figure out how to do a BSD-ish install
+AC_PROG_INSTALL
 
 dnl If you can run configure, you certainly have /bin/sh
 AC_DEFINE([HAVE_BIN_SH], [1], [Define to 1 if you have /bin/sh.])
