@@ -162,6 +162,9 @@ else
 INSTALL_STAGE =
 endif
 
+install-strip:
+	$(MAKE) INSTALL_PROGRAM='$(INSTALL_PROGRAM) -s' install
+
 # Same as default rule, but we pass $(INSTALL_STAGE) to $(MAKE) too
 install :: check-packages
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
