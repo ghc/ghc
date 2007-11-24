@@ -1,7 +1,7 @@
 
 include Makefile-vars
 
-.PHONY: install postinstall denounce show-install-setup
+.PHONY: install-strip install postinstall denounce show-install-setup
 
 #.PHONY: in-place
 # This has bitrotted:
@@ -13,6 +13,9 @@ include Makefile-vars
 #		echo "Done" ; \
 #	fi
 #	@echo "Finished configuring..to use, add `pwd`/bin/$(platform) to your PATH."
+
+install-strip:
+	$(MAKE) INSTALL_PROGRAM='$(INSTALL_PROGRAM) -s' install
 
 install ::
 	$(INSTALL_DIR) $(bindir)
