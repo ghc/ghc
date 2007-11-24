@@ -45,17 +45,17 @@ BUILD_SHARED=no
 endif
 
 boot :: stamp.gmp.static
-all :: gmp.h libgmp.a
-install :: gmp.h libgmp.a
 INSTALL_HEADERS += gmp.h
 INSTALL_LIBS += libgmp.a
 
 ifeq "$(BUILD_SHARED)" "yes"
 boot :: stamp.gmp.shared
-all :: libgmp-3.dll libgmp.dll.a
-install :: libgmp-3.dll libgmp.dll.a
 INSTALL_LIBS += libgmp.dll.a
 INSTALL_PROGS += libgmp-3.dll
+endif
+
+ifneq "$(DOING_BIN_DIST)" "YES"
+install all :: $(INSTALL_HEADERS) $(INSTALL_LIBS) $(INSTALL_PROGS)
 endif
 
 stamp.gmp.static:
@@ -116,22 +116,19 @@ endif
 include $(TOP)/mk/target.mk
 
 binary-dist:
-	@:
-ifneq "$(HaveLibGmp)" "YES"
-ifneq "$(HaveFrameworkGMP)" "YES"
 	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/gmp
-	touch $(BIN_DIST_DIR)/gmp/$(GMP_TARBALL)
 	$(INSTALL_DATA)    Makefile            $(BIN_DIST_DIR)/gmp/
-ifneq "$(INSTALL_PROGS)" ""
+ifneq "$(HaveLibGmp)" "YES"
+ ifneq "$(HaveFrameworkGMP)" "YES"
+  ifneq "$(INSTALL_PROGS)" ""
 	$(INSTALL_DATA)    $(INSTALL_PROGS)    $(BIN_DIST_DIR)/gmp/
-endif
-ifneq "$(INSTALL_LIBS)" ""
+  endif
+  ifneq "$(INSTALL_LIBS)" ""
 	$(INSTALL_DATA)    $(INSTALL_LIBS)     $(BIN_DIST_DIR)/gmp/
-endif
-ifneq "$(INSTALL_HEADERS)" ""
+  endif
+  ifneq "$(INSTALL_HEADERS)" ""
 	$(INSTALL_HEADER)  $(INSTALL_HEADERS)  $(BIN_DIST_DIR)/gmp/
-endif
-
-endif
+  endif
+ endif
 endif
 
