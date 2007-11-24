@@ -95,9 +95,9 @@ ibindir             = $$topdir
 ilibdir             = $$topdir
 ilibexecdir         = $$topdir
 idatadir            = $$topdir
-idocdir             = $$topdir/doc/libraries/$$pkgid
-iinterfacedir       = $$topdir/doc/libraries/$$pkgid
-ihtmldir            = $$httptopdir/doc/libraries/$$pkgid
+idocdir             = $$topdir/doc/libraries/$$pkg
+iinterfacedir       = $$topdir/doc/libraries/$$pkg
+ihtmldir            = $$httptopdir/doc/libraries/$$pkg
 html_installed_root = $(prefix)/doc/libraries
 else
 # On non-Windows we can just give absolute paths all the time, and
@@ -107,9 +107,9 @@ ibindir             = $(bindir)
 ilibdir             = $(libdir)
 ilibexecdir         = $(libexecdir)
 idatadir            = $(datadir)
-idocdir             = $(docdir)/libraries/$$pkgid
-iinterfacedir       = $(htmldir)/libraries/$$pkgid
-ihtmldir            = $(htmldir)/libraries/$$pkgid
+idocdir             = $(docdir)/libraries/$$pkg
+iinterfacedir       = $(htmldir)/libraries/$$pkg
+ihtmldir            = $(htmldir)/libraries/$$pkg
 html_installed_root = $(htmldir)/libraries
 endif
 
@@ -296,7 +296,7 @@ $(foreach SUBDIR,$(SUBDIRS),doc.library.$(SUBDIR)):\
 doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
                %/setup/Setup ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
-	  cd $* && setup/Setup haddock --html-location='../$$pkgid' \
+	  cd $* && setup/Setup haddock --html-location='../$$pkg' \
 	                               $(CABAL_HADDOCK_FLAGS); \
 	fi
 
