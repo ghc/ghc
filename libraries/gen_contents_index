@@ -14,8 +14,7 @@ case $* in
         HADDOCK_FILE=$NAME/dist/doc/html/$NAME/$NAME.haddock
         if [ -f $HADDOCK_FILE ]
         then
-            FULLNAME=$NAME-`$GHC_PKG field $NAME version | sed 's#^version: *##'` 
-            HADDOCK_ARGS="$HADDOCK_ARGS --read-interface=$FULLNAME,$HADDOCK_FILE"
+            HADDOCK_ARGS="$HADDOCK_ARGS --read-interface=$NAME,$HADDOCK_FILE"
             NAMES="$NAMES $NAME"
         fi
     done
