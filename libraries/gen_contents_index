@@ -30,30 +30,9 @@ case $* in
     ;;
 esac
 
-# Automagically create the prologue for the combined index via a
-# header, the package prologues (in alphabetical order of the
-# packages) and a footer.
-{
-    cat libraries-header.txt
-    echo
-    # Hack to find out if we're in a build tree or installed docs
-    for NAME in $NAMES
-    do
-        if [ "$NAME" != haskell98 ]
-        then
-            echo "[@${NAME}@]"
-            grep -v '^ *$$' "$NAME"/prologue.txt
-            echo
-        fi
-    done
-    cat libraries-footer.txt
-    echo
-} > libraries.txt
-
 # Now create the combined contents and index pages
 haddock --gen-index --gen-contents -o . \
         -t "Haskell Hierarchical Libraries" \
-        -p libraries.txt \
         $HADDOCK_ARGS
 
 # Unhandled Windows help stuff?:
