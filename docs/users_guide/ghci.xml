@@ -1991,6 +1991,17 @@ Prelude> :. cmds.ghci
       </varlistentry>
 
       <varlistentry>
+       <term>
+          <literal>:</literal>
+          <indexterm><primary><literal>:</literal></primary></indexterm>
+        </term>
+       <listitem>
+         <para>Repeat the previous command.</para>
+       </listitem>
+      </varlistentry>
+
+      <varlistentry>
+
 	<term>
           <literal>:history [<replaceable>num</replaceable>]</literal>
           <indexterm><primary><literal>:history</literal></primary></indexterm>

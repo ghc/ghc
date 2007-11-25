@@ -46,6 +46,8 @@ import GHC.Exts
 -----------------------------------------------------------------------------
 -- GHCi monad
 
+type Command = (String, String -> GHCi Bool, Bool, String -> IO [String])
+
 data GHCiState = GHCiState
      { 
 	progname       :: String,
@@ -62,6 +64,9 @@ data GHCiState = GHCiState
                 -- tickarrays caches the TickArray for loaded modules,
                 -- so that we don't rebuild it each time the user sets
                 -- a breakpoint.
+        -- ":" at the GHCi prompt repeats the last command, so we
+        -- remember is here:
+        last_command   :: Maybe Command,
         cmdqueue       :: [String],
         remembered_ctx :: Maybe ([Module],[Module])
                 -- modules we want to add to the context, but can't

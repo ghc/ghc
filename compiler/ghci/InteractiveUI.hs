@@ -97,8 +97,6 @@ ghciWelcomeMsg :: String
 ghciWelcomeMsg = "GHCi, version " ++ cProjectVersion ++
                  ": http://www.haskell.org/ghc/  :? for help"
 
-type Command = (String, String -> GHCi Bool, Bool, String -> IO [String])
-
 cmdName :: Command -> String
 cmdName (n,_,_,_) = n
 
@@ -165,6 +163,7 @@ helpText =
  " Commands available from the prompt:\n" ++
  "\n" ++
  "   <statement>                 evaluate/run <statement>\n" ++
+ "   :                           repeat last command\n" ++
  "   :{\\n ..lines.. \\n:}\\n       multiline command\n" ++
  "   :add <filename> ...         add module(s) to the current target set\n" ++
  "   :browse[!] [[*]<mod>]       display the names defined by module <mod>\n" ++
@@ -314,6 +313,7 @@ interactiveUI session srcs maybe_expr = do
                    break_ctr = 0,
                    breaks = [],
                    tickarrays = emptyModuleEnv,
+                   last_command = Nothing,
                    cmdqueue = [],
                    remembered_ctx = Nothing
                  }
@@ -711,29 +711,48 @@ printTypeOfName session n
             Just thing -> printTyThing thing
 
 
-
+data MaybeCommand = GotCommand Command | BadCommand | NoLastCommand
 
 specialCommand :: String -> GHCi Bool
 specialCommand ('!':str) = shellEscape (dropWhile isSpace str)
 specialCommand str = do
   let (cmd,rest) = break isSpace str
-  maybe_cmd <- io (lookupCommand cmd)
+  maybe_cmd <- lookupCommand cmd
   case maybe_cmd of
-    Nothing -> io (hPutStr stdout ("unknown command ':" ++ cmd ++ "'\n" 
-		                    ++ shortHelpText) >> return False)
-    Just (_,f,_,_) -> f (dropWhile isSpace rest)
+    GotCommand (_,f,_,_) -> f (dropWhile isSpace rest)
+    BadCommand ->
+      do io $ hPutStr stdout ("unknown command ':" ++ cmd ++ "'\n"
+                           ++ shortHelpText)
+         return False
+    NoLastCommand ->
+      do io $ hPutStr stdout ("there is no last command to perform\n"
+                           ++ shortHelpText)
+         return False
 
-lookupCommand :: String -> IO (Maybe Command)
+lookupCommand :: String -> GHCi (MaybeCommand)
+lookupCommand "" = do
+  st <- getGHCiState
+  case last_command st of
+      Just c -> return $ GotCommand c
+      Nothing -> return NoLastCommand
 lookupCommand str = do
+  mc <- io $ lookupCommand' str
+  st <- getGHCiState
+  setGHCiState st{ last_command = mc }
+  return $ case mc of
+           Just c -> GotCommand c
+           Nothing -> BadCommand
+
+lookupCommand' :: String -> IO (Maybe Command)
+lookupCommand' str = do
   macros <- readIORef macros_ref
   let cmds = builtin_commands ++ macros
   -- look for exact match first, then the first prefix match
-  case [ c | c <- cmds, str == cmdName c ] of
-     c:_ -> return (Just c)
-     [] -> case [ c | c@(s,_,_,_) <- cmds, str `isPrefixOf` s ] of
-     		[] -> return Nothing
-     		c:_ -> return (Just c)
-
+  return $ case [ c | c <- cmds, str == cmdName c ] of
+           c:_ -> Just c
+           [] -> case [ c | c@(s,_,_,_) <- cmds, str `isPrefixOf` s ] of
+                 [] -> Nothing
+                 c:_ -> Just c
 
 getCurrentBreakSpan :: GHCi (Maybe SrcSpan)
 getCurrentBreakSpan = do
@@ -1594,7 +1613,7 @@ completeWord w start end = do
      ':':_ | all isSpace (take (start-1) line) -> wrapCompleter completeCmd w
      _other
 	| ((':':c) : _) <- line_words -> do
-	   maybe_cmd <- lookupCommand c
+	   maybe_cmd <- lookupCommand' c
            let (n,w') = selectWord (words' 0 line)
 	   case maybe_cmd of
 	     Nothing -> return Nothing
