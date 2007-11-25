@@ -1,3 +1,14 @@
+-----------------------------------------------------------------------------
+-- Small improvements
+
+* When no GHC can be found, give an error message that tells you to use
+  --with-ghc=<path>
+
+* Instead of receiving the GHC lib dir as input, try to autodetect it with
+  ghc --print-libdir. Add a --with-ghc flag instead of -B.
+
+* Print an error message when given -optghc=.. instead of --optghc=..
+
 -- ---------------------------------------------------------------------------
 -- Before next release
 
