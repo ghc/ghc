@@ -189,6 +189,7 @@ shutdownAsyncIO(rtsBool wait_threads)
         CloseHandle(completed_table_sema);
 	completed_table_sema = NULL;
     }
+    DeleteCriticalSection(&queue_lock);
 }
 
 /*

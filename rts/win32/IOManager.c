@@ -461,6 +461,8 @@ void ShutdownIOManager ( rtsBool wait_threads )
         }
         FreeWorkQueue(ioMan->workQueue);
         CloseHandle(ioMan->hExitEvent);
+        DeleteCriticalSection(&ioMan->active_work_lock);
+        DeleteCriticalSection(&ioMan->manLock);
         free(ioMan);
         ioMan = NULL;
     }

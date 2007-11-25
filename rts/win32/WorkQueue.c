@@ -82,6 +82,7 @@ FreeWorkQueue ( WorkQueue* pq )
   if ( pq->roomAvailable ) {
     CloseHandle(pq->roomAvailable);
   }
+  DeleteCriticalSection(&pq->queueLock);
   free(pq);
   return;
 }
