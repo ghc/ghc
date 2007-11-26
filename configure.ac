@@ -928,6 +928,15 @@ dnl   if GNU tar is named gtar, look for it first.
 AC_PATH_PROGS(TarCmd,gtar tar,tar)
 
 AC_PATH_PROG(HSCOLOUR,HsColour)
+# HsColour is passed to Cabal, so we need a native path
+if test "x$HostPlatform" = "xi386-unknown-mingw32"
+    then
+       if test "${OSTYPE}" != "msys"
+         then
+         # Canonicalise to <drive>:/path/to/gcc
+         HSCOLOUR=`cygpath -w ${HSCOLOUR} | sed -e 's@\\\\@/@g' `
+       fi
+fi
 
 dnl ** check for DocBook toolchain
 FP_CHECK_DOCBOOK_DTD
