@@ -246,7 +246,7 @@ until the call has completed.  This is the case regardless of whether
 the call is inside a 'block' or not.
 
 Important note: the behaviour of 'throwTo' differs from that described in
-the paper "Asynchronous exceptions in Haskell" 
+the paper \"Asynchronous exceptions in Haskell\"
 (<http://research.microsoft.com/~simonpj/Papers/asynch-exns.htm>).
 In the paper, 'throwTo' is non-blocking; but the library implementation adopts
 a more synchronous design in which 'throwTo' does not return until the exception
