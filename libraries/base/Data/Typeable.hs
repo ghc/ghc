@@ -163,7 +163,7 @@ instance Eq TyCon where
 #endif
 
 -- | Returns a unique integer associated with a 'TypeRep'.  This can
--- be used for making a mapping ('Data.IntMap.IntMap') with TypeReps
+-- be used for making a mapping with TypeReps
 -- as the keys, for example.  It is guaranteed that @t1 == t2@ if and only if
 -- @typeRepKey t1 == typeRepKey t2@.
 --

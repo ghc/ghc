@@ -10,7 +10,7 @@
 --
 -- The 'Ix' class is used to map a contiguous subrange of values in
 -- type onto integers.  It is used primarily for array indexing
--- (see "Data.Array", "Data.Array.IArray" and "Data.Array.MArray").
+-- (see the array package).
 -- 
 -----------------------------------------------------------------------------
 module Data.Ix

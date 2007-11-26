@@ -40,7 +40,7 @@ default ()
 \begin{code}
 -- | The 'Ix' class is used to map a contiguous subrange of values in
 -- a type onto integers.  It is used primarily for array indexing
--- (see "Data.Array", "Data.Array.IArray" and "Data.Array.MArray").
+-- (see the array package).
 --
 -- The first argument @(l,u)@ of each of these operations is a pair
 -- specifying the lower and upper bounds of a contiguous subrange of values.

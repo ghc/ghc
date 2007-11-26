@@ -57,7 +57,7 @@ data Timeout = Timeout Unique deriving (Eq, Typeable)
 -- blocks, no timeout event can be delivered until the FFI call returns, which
 -- pretty much negates the purpose of the combinator. In practice, however,
 -- this limitation is less severe than it may sound. Standard I\/O functions
--- like 'System.IO.hGetBuf', 'System.IO.hPutBuf', 'Network.Socket.accept', or
+-- like 'System.IO.hGetBuf', 'System.IO.hPutBuf', Network.Socket.accept, or
 -- 'System.IO.hWaitForInput' appear to be blocking, but they really don't
 -- because the runtime system uses scheduling mechanisms like @select(2)@ to
 -- perform asynchronous I\/O, so it is possible to interrupt standard socket

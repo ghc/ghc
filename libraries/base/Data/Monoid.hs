@@ -165,8 +165,8 @@ instance Num a => Monoid (Product a) where
 --                                            else Last Nothing)
 -- @
 --
--- Much of "Data.Map"'s interface can be implemented with
--- 'Data.Map.alter'. Some of the rest can be implemented with a new
+-- Much of Data.Map's interface can be implemented with
+-- Data.Map.alter. Some of the rest can be implemented with a new
 -- @alterA@ function and either 'First' or 'Last':
 --
 -- > alterA :: (Applicative f, Ord k) =>
