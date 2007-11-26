@@ -2609,8 +2609,8 @@ the standard method is used or the one described here.)
 <para>
 This section, and the next one, documents GHC's type-class extensions.
 There's lots of background in the paper <ulink
-url="http://research.microsoft.com/~simonpj/Papers/type-class-design-space" >Type
-classes: exploring the design space</ulink > (Simon Peyton Jones, Mark
+url="http://research.microsoft.com/~simonpj/Papers/type-class-design-space/">Type
+classes: exploring the design space</ulink> (Simon Peyton Jones, Mark
 Jones, Erik Meijer).
 </para>
 <para>
@@ -2701,7 +2701,7 @@ GHC lifts this restriction (flag <option>-XConstrainedClassMethods</option>).
 </title>
 
 <para> Functional dependencies are implemented as described by Mark Jones
-in &ldquo;<ulink url="http://www.cse.ogi.edu/~mpj/pubs/fundeps.html">Type Classes with Functional Dependencies</ulink>&rdquo;, Mark P. Jones, 
+in &ldquo;<ulink url="http://citeseer.ist.psu.edu/jones00type.html">Type Classes with Functional Dependencies</ulink>&rdquo;, Mark P. Jones, 
 In Proceedings of the 9th European Symposium on Programming, 
 ESOP 2000, Berlin, Germany, March 2000, Springer-Verlag LNCS 1782,
 .
@@ -4646,7 +4646,7 @@ and all others are monomorphic until the group is generalised
 </para>
 
 <para>Following a suggestion of Mark Jones, in his paper
-<ulink url="http://www.cse.ogi.edu/~mpj/thih/">Typing Haskell in
+<ulink url="http://citeseer.ist.psu.edu/424440.html">Typing Haskell in
 Haskell</ulink>,
 GHC implements a more general scheme.  If <option>-XRelaxedPolyRec</option> is
 specified:

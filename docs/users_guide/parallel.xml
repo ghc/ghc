@@ -33,7 +33,7 @@
 	      url="http://research.microsoft.com/copyright/accept.asp?path=/users/simonpj/papers/concurrent-haskell.ps.gz">
 	      Concurrent Haskell paper</ulink> is still an excellent
 	      resource, as is <ulink
-	      url="http://research.microsoft.com/%7Esimonpj/papers/marktoberdorf">Tackling
+	      url="http://research.microsoft.com/%7Esimonpj/papers/marktoberdorf/">Tackling
 	      the awkward squad</ulink>.
   </para><para>
   To the programmer, Concurrent Haskell introduces no new language constructs;
