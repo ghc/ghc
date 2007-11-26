@@ -110,7 +110,7 @@ All these features are described in the papers mentioned earlier.
     linkend="concurrent-haskell"/>), but the simplest mechanism for extracting parallelism from pure code is
       to use the <literal>par</literal> combinator, which is closely related to (and often used
       with) <literal>seq</literal>.  Both of these are available from <ulink
-	url="../libraries/base/Control-Parallel.html"><literal>Control.Parallel</literal></ulink>:</para>
+	url="../libraries/parallel/Control-Parallel.html"><literal>Control.Parallel</literal></ulink>:</para>
 
 <programlisting>
 infixr 0 `par`
@@ -163,7 +163,7 @@ nfib n | n &#60;= 1 = 1
 
     <para>More sophisticated combinators for expressing parallelism are
       available from the <ulink
-	url="../libraries/base/Control-Parallel-Strategies.html"><literal>Control.Parallel.Strategies</literal></ulink> module.
+	url="../libraries/parallel/Control-Parallel-Strategies.html"><literal>Control.Parallel.Strategies</literal></ulink> module.
       This module builds functionality around <literal>par</literal>,
       expressing more elaborate patterns of parallel computation, such as
       parallel <literal>map</literal>.</para>

@@ -992,7 +992,7 @@ $ cat foo.hspp</screen>
 
           <para>More details on the use of "bound threads" in the
           threaded runtime can be found in the <ulink
-          url="../libraries/base/Control.Concurrent.html"><literal>Control.Concurrent</literal></ulink> module.</para>
+          url="../libraries/base/Control-Concurrent.html"><literal>Control.Concurrent</literal></ulink> module.</para>
         </listitem>
       </varlistentry>
 
