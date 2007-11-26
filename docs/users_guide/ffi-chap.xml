@@ -7,7 +7,7 @@ Foreign function interface (FFI)
  </title>
 
   <para>GHC (mostly) conforms to the Haskell 98 Foreign Function Interface
-  Addendum 1.0, whose definition is available from <ulink url="http://haskell.org/"><literal>http://haskell.org/</literal></ulink>.</para>
+  Addendum 1.0, whose definition is available from <ulink url="http://www.haskell.org/"><literal>http://www.haskell.org/</literal></ulink>.</para>
 
   <para>To enable FFI support in GHC, give the <option>-fffi</option><indexterm><primary><option>-fffi</option></primary>
     </indexterm> flag, or

@@ -319,7 +319,7 @@ it is always correct!  It is also intended for processing into text.</para>
 <para> Indeed,
 the result of such processing is part of the description of the 
  <ulink
-      url="http://haskell.cs.yale.edu/ghc/docs/papers/core.ps.gz">External
+      url="http://www.haskell.org/ghc/docs/papers/core.ps.gz">External
 	 Core language</ulink>.
 So that document is a good place to look for a type-set version.
 We would be very happy if someone wanted to volunteer to produce an SGML
@@ -2233,7 +2233,7 @@ the result type of the <literal>case</literal> expression.  Hence the addition <
 <para>
 These and many other examples are given in papers by Hongwei Xi, and
 Tim Sheard. There is a longer introduction
-<ulink url="http://haskell.org/haskellwiki/GADT">on the wiki</ulink>,
+<ulink url="http://www.haskell.org/haskellwiki/GADT">on the wiki</ulink>,
 and Ralf Hinze's
 <ulink url="http://www.informatik.uni-bonn.de/~ralf/publications/With.pdf">Fun with phantom types</ulink> also has a number of examples. Note that papers
 may use different notation to that implemented in GHC.
@@ -3401,7 +3401,7 @@ instance of <literal>Num</literal> <emphasis>or</emphasis> of <literal>IsString<
 </para></listitem>
 
 <listitem><para>
-The standard defaulting rule (<ulink url="http://haskell.org/onlinereport/decls.html#sect4.3.4">Haskell Report, Section 4.3.4</ulink>)
+The standard defaulting rule (<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.3.4">Haskell Report, Section 4.3.4</ulink>)
 is extended thus: defaulting applies when all the unresolved constraints involve standard classes
 <emphasis>or</emphasis> <literal>IsString</literal>; and at least one is a numeric class
 <emphasis>or</emphasis> <literal>IsString</literal>.
@@ -4417,7 +4417,7 @@ A <emphasis>lexically scoped type variable</emphasis> can be bound by:
 <para>
 In Haskell, a programmer-written type signature is implicitly quantified over
 its free type variables (<ulink
-url="http://haskell.org/onlinereport/decls.html#sect4.1.2">Section
+url="http://www.haskell.org/onlinereport/decls.html#sect4.1.2">Section
 4.1.2</ulink> 
 of the Haskel Report).
 Lexically scoped type variables affect this implicit quantification rules
@@ -4635,14 +4635,14 @@ scope over the methods defined in the <literal>where</literal> part.  For exampl
 The Haskell Report specifies that a group of bindings (at top level, or in a
 <literal>let</literal> or <literal>where</literal>) should be sorted into
 strongly-connected components, and then type-checked in dependency order
-(<ulink url="http://haskell.org/onlinereport/decls.html#sect4.5.1">Haskell
+(<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.5.1">Haskell
 Report, Section 4.5.1</ulink>).  
 As each group is type-checked, any binders of the group that
 have
 an explicit type signature are put in the type environment with the specified
 polymorphic type,
 and all others are monomorphic until the group is generalised 
-(<ulink url="http://haskell.org/onlinereport/decls.html#sect4.5.2">Haskell Report, Section 4.5.2</ulink>).
+(<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.5.2">Haskell Report, Section 4.5.2</ulink>).
 </para>
 
 <para>Following a suggestion of Mark Jones, in his paper
@@ -4707,7 +4707,7 @@ Currently, only the former are fully implemented, while we are still working
 on the latter.  As a result, the specification of the language extension is
 also still to some degree in flux.  Hence, a more detailed description of
 the language extension and its use is currently available
-from <ulink url="http://haskell.org/haskellwiki/GHC/Indexed_types">the Haskell
+from <ulink url="http://www.haskell.org/haskellwiki/GHC/Indexed_types">the Haskell
 wiki page on type families</ulink>.  The material will be moved to this user's
 guide when it has stabilised.
 </para>
@@ -4735,7 +4735,7 @@ Template Meta-programming for Haskell</ulink>" (Proc Haskell Workshop 2002).
 </para>
 <para>
 There is a Wiki page about
-Template Haskell at <ulink url="http://haskell.org/haskellwiki/Template_Haskell">
+Template Haskell at <ulink url="http://www.haskell.org/haskellwiki/Template_Haskell">
 http://www.haskell.org/haskellwiki/Template_Haskell</ulink>, and that is the best place to look for
 further details.
 You may also 
@@ -5558,7 +5558,7 @@ prefix notation:
 (!) f x = 3
 </programlisting>
 The semantics of Haskell pattern matching is described in <ulink
-url="http://haskell.org/onlinereport/exps.html#sect3.17.2">
+url="http://www.haskell.org/onlinereport/exps.html#sect3.17.2">
 Section 3.17.2</ulink> of the Haskell Report.  To this description add 
 one extra item 10, saying:
 <itemizedlist><listitem><para>Matching
@@ -5568,7 +5568,7 @@ the pattern <literal>!pat</literal> against a value <literal>v</literal> behaves
 		<literal>v</literal></para></listitem>
 </itemizedlist>
 </para></listitem></itemizedlist>
-Similarly, in Figure 4 of  <ulink url="http://haskell.org/onlinereport/exps.html#sect3.17.3">
+Similarly, in Figure 4 of  <ulink url="http://www.haskell.org/onlinereport/exps.html#sect3.17.3">
 Section 3.17.3</ulink>, add a new case (t):
 <programlisting>
 case v of { !pat -> e; _ -> e' }
@@ -5576,7 +5576,7 @@ case v of { !pat -> e; _ -> e' }
 </programlisting>
 </para><para>
 That leaves let expressions, whose translation is given in 
-<ulink url="http://haskell.org/onlinereport/exps.html#sect3.12">Section
+<ulink url="http://www.haskell.org/onlinereport/exps.html#sect3.12">Section
 3.12</ulink>
 of the Haskell Report.
 In the translation box, first apply 
@@ -7171,7 +7171,7 @@ carried out at let and where bindings.
           <indexterm><primary><option>-XNoMonomorphismRestriction</option></primary></indexterm>
 
 <para>Haskell's monomorphism restriction (see 
-<ulink url="http://haskell.org/onlinereport/decls.html#sect4.5.5">Section
+<ulink url="http://www.haskell.org/onlinereport/decls.html#sect4.5.5">Section
 4.5.5</ulink>
 of the Haskell Report)
 can be completely switched off by
