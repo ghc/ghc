@@ -993,7 +993,7 @@ and improve termination (Section 3.2 of the paper).
 </para>
 
 <para>
-The web page: <ulink url="http://www.cse.ogi.edu/PacSoft/projects/rmb">http://www.cse.ogi.edu/PacSoft/projects/rmb</ulink>
+The web page: <ulink url="http://www.cse.ogi.edu/PacSoft/projects/rmb/">http://www.cse.ogi.edu/PacSoft/projects/rmb/</ulink>
 contains up to date information on recursive monadic bindings.
 </para>
 
@@ -2214,7 +2214,7 @@ the type <literal>a</literal> is refined to <literal>Int</literal>.  That's the 
 A precise specification of the type rules is beyond what this user manual aspires to, 
 but the design closely follows that described in
 the paper <ulink
-url="http://research.microsoft.com/%7Esimonpj/papers/gadt/index.htm">Simple
+url="http://research.microsoft.com/%7Esimonpj/papers/gadt/">Simple
 unification-based type inference for GADTs</ulink>,
 (ICFP 2006).
 The general principle is this: <emphasis>type refinement is only carried out 
@@ -4354,7 +4354,7 @@ Notice here that the <literal>Maybe</literal> type is parameterised by the
 [a])</literal>.
 </para>
 <para>The technical details of this extension are described in the paper
-<ulink url="http://research.microsoft.com/%7Esimonpj/papers/boxy">Boxy types:
+<ulink url="http://research.microsoft.com/%7Esimonpj/papers/boxy/">Boxy types:
 type inference for higher-rank types and impredicativity</ulink>,
 which appeared at ICFP 2006.  
 </para>
@@ -4730,7 +4730,7 @@ Type families are enabled by the flag <option>-XTypeFamilies</option>.
 Haskell.  
 The background to
 the main technical innovations is discussed in "<ulink
-url="http://research.microsoft.com/~simonpj/papers/meta-haskell">
+url="http://research.microsoft.com/~simonpj/papers/meta-haskell/">
 Template Meta-programming for Haskell</ulink>" (Proc Haskell Workshop 2002).
 </para>
 <para>
