@@ -271,7 +271,6 @@ endif
 	@echo "cUSER_WAY_NAMES       = \"$(USER_WAY_NAMES)\"" >> $(CONFIG_HS)
 	@echo "cUSER_WAY_OPTS        = \"$(USER_WAY_OPTS)\"" >> $(CONFIG_HS)
 	@echo "cDEFAULT_TMPDIR       = \"$(DEFAULT_TMPDIR)\"" >> $(CONFIG_HS)
-	@echo "cDocDir               = \"$(docdir)\""         >> $(CONFIG_HS)
 ifeq "$(RelocatableBuild)" "YES"
 	@echo "cRelocatableBuild     = True"                  >> $(CONFIG_HS)
 else

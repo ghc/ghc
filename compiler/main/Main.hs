@@ -171,7 +171,6 @@ main =
     ShowUsage              -> showGhcUsage dflags cli_mode
     PrintLibdir            -> putStrLn (topDir dflags)
     ShowSupportedLanguages -> alreadyHandled
-    ShowDocDir             -> showDocDir (topDir dflags)
     ShowVersion            -> alreadyHandled
     ShowNumVersion         -> alreadyHandled
     ShowInterface f        -> doShowIface dflags f
@@ -306,7 +305,6 @@ verifyOutputFiles dflags = do
 data CmdLineMode
   = ShowUsage               -- ghc -?
   | PrintLibdir             -- ghc --print-libdir
-  | ShowDocDir              -- ghc --print-docdir
   | ShowInfo                -- ghc --info
   | ShowSupportedLanguages  -- ghc --supported-languages
   | ShowVersion             -- ghc -V/--version
@@ -369,7 +367,6 @@ mode_flags =
      ( "?"                   , PassFlag (setMode ShowUsage))
   ,  ( "-help"               , PassFlag (setMode ShowUsage))
   ,  ( "-print-libdir"       , PassFlag (setMode PrintLibdir))
-  ,  ( "-print-docdir"       , PassFlag (setMode ShowDocDir))
   ,  ( "V"                   , PassFlag (setMode ShowVersion))
   ,  ( "-version"            , PassFlag (setMode ShowVersion))
   ,  ( "-numeric-version"    , PassFlag (setMode ShowNumVersion))
@@ -474,12 +471,6 @@ showInfo = do
 showSupportedLanguages :: IO ()
 showSupportedLanguages = do mapM_ putStrLn supportedLanguages
                             exitWith ExitSuccess
-
-showDocDir :: FilePath -> IO ()
-showDocDir topdir = putStrLn docDir
-    where docDir = if cRelocatableBuild
-                   then topdir ++ "/doc"
-                   else cDocDir
 
 showVersion :: IO ()
 showVersion = do

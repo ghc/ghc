@@ -422,20 +422,6 @@ module X where
 	</listitem>
       </varlistentry>
 
-      <varlistentry>
-	<term>
-	  <cmdsynopsis>
-            <command>ghc --print-docdir</command>
-          </cmdsynopsis>
-          <indexterm><primary><option>&ndash;&ndash;print-docdir</option></primary></indexterm>
-        </term>
-	<listitem>
-	  <para>Print the path to GHC's documentation directory. Note that
-      some distributions do no include the documentation, in which case
-      this directory may be empty or may not exist.</para>
-	</listitem>
-      </varlistentry>
-
     </variablelist>
 
     <sect2 id="make-mode">
