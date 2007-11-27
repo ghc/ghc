@@ -226,7 +226,7 @@ GLOBAL_VAR(v_opt_C_ready, False, Bool)
 staticFlags = unsafePerformIO $ do
   ready <- readIORef v_opt_C_ready
   if (not ready)
-        then panic "a static opt was looked at too early!"
+        then panic "Static flags have not been initialised!\n        Please call GHC.newSession or GHC.parseStaticFlags early enough."
         else readIORef v_opt_C
 
 -- -static is the default
