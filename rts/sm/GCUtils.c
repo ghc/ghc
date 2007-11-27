@@ -17,6 +17,7 @@
 #include "GC.h"
 #include "GCUtils.h"
 #include "Printer.h"
+#include "Trace.h"
 
 #ifdef THREADED_RTS
 SpinLock gc_alloc_block_sync;
@@ -57,6 +58,7 @@ grab_todo_block (step_workspace *ws)
     if (stp->todos) {
 	bd = stp->todos;
 	stp->todos = bd->link;
+        stp->n_todos--;
 	bd->link = NULL;
     }	
     RELEASE_SPIN_LOCK(&stp->sync_todo);
@@ -70,6 +72,8 @@ push_todo_block (bdescr *bd, step *stp)
     ACQUIRE_SPIN_LOCK(&stp->sync_todo);
     bd->link = stp->todos;
     stp->todos = bd;
+    stp->n_todos++;
+    trace(TRACE_gc, "step %d, n_todos: %d", stp->abs_no, stp->n_todos);
     RELEASE_SPIN_LOCK(&stp->sync_todo);
 }
 
