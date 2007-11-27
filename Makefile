@@ -251,6 +251,16 @@ binary-dist::
 	-rm -rf $(BIN_DIST_DIR)
 	-$(RM) $(BIN_DIST_DIR).tar.gz
 
+# When making bindists, we can have problems if some things (e.g. ghc-pkg)
+# are compiled with the bootstrapping compiler and some (e.g. the stage 2
+# compiler) with the stage1 compiler. See #1860 for an example.
+# Thus we rebuild the utils with stage 1 here. This is a bit unpleasant,
+# as binary-dist really shouldn't actually build anything, but it works.
+binary-dist::
+	$(MAKE) -C utils clean
+	$(MAKE) -C utils UseStage1=YES boot
+	$(MAKE) -C utils UseStage1=YES
+
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 
 binary-dist::
