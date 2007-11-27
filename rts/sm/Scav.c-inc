@@ -43,6 +43,7 @@ scavenge_block (bdescr *bd, StgPtr scan)
   StgInfoTable *info;
   step *saved_evac_step;
   rtsBool saved_eager_promotion;
+  step_workspace *ws;
 
   p = scan;
   
@@ -54,10 +55,12 @@ scavenge_block (bdescr *bd, StgPtr scan)
   saved_eager_promotion = gct->eager_promotion;
   gct->failed_to_evac = rtsFalse;
 
+  ws = &gct->steps[bd->step->abs_no];
+
   // we might be evacuating into the very object that we're
   // scavenging, so we have to check the real bd->free pointer each
   // time around the loop.
-  while (p < bd->free) {
+  while (p < bd->free || (bd == ws->todo_bd && p < ws->todo_free)) {
 
     ASSERT(LOOKS_LIKE_CLOSURE_PTR(p));
     info = get_itbl((StgClosure *)p);
@@ -460,6 +463,10 @@ scavenge_block (bdescr *bd, StgPtr scan)
 	    recordMutableGen_GC((StgClosure *)q, &generations[bd->gen_no]);
 	}
     }
+  }
+
+  if (p > bd->free)  {
+      bd->free = p;
   }
 
   debugTrace(DEBUG_gc, "   scavenged %ld bytes",
