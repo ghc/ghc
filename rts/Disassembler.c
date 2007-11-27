@@ -148,6 +148,9 @@ disInstr ( StgBCO *bco, int pc )
       case bci_ALLOC_AP:
          debugBelch("ALLOC_AP  %d words\n", instrs[pc] );
          pc += 1; break;
+      case bci_ALLOC_AP_NOUPD:
+         debugBelch("ALLOC_AP_NOUPD %d words\n", instrs[pc] );
+         pc += 1; break;
       case bci_ALLOC_PAP:
          debugBelch("ALLOC_PAP %d arity, %d words\n",
 		 instrs[pc], instrs[pc+1] );
