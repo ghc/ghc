@@ -189,7 +189,7 @@ interpretBCO (Capability* cap)
     // that these entities are non-aliasable.
     register StgPtr       Sp;    // local state -- stack pointer
     register StgPtr       SpLim; // local state -- stack lim pointer
-    register StgClosure*  obj;
+    register StgClosure   *tagged_obj = 0, *obj;
     nat n, m;
 
     LOAD_STACK_POINTERS;
@@ -241,10 +241,10 @@ interpretBCO (Capability* cap)
 
     // Evaluate the object on top of the stack.
 eval:
-    obj = (StgClosure*)Sp[0]; Sp++;
+    tagged_obj = (StgClosure*)Sp[0]; Sp++;
 
 eval_obj:
-    obj = UNTAG_CLOSURE(obj);
+    obj = UNTAG_CLOSURE(tagged_obj);
     INTERP_TICK(it_total_evals);
 
     IF_DEBUG(interpreter,
@@ -268,7 +268,7 @@ eval_obj:
     case IND_OLDGEN_PERM:
     case IND_STATIC:
     { 
-	obj = ((StgInd*)obj)->indirectee;
+	tagged_obj = ((StgInd*)obj)->indirectee;
 	goto eval_obj;
     }
     
@@ -308,7 +308,7 @@ eval_obj:
 	// Stack check
 	if (Sp - (words+sizeofW(StgUpdateFrame)) < SpLim) {
 	    Sp -= 2;
-	    Sp[1] = (W_)obj;
+	    Sp[1] = (W_)tagged_obj;
 	    Sp[0] = (W_)&stg_enter_info;
 	    RETURN_TO_SCHEDULER(ThreadInterpret, StackOverflow);
 	}
@@ -351,16 +351,17 @@ eval_obj:
 		 printObj(obj);
 	    );
 	Sp -= 2;
-	Sp[1] = (W_)obj;
+	Sp[1] = (W_)tagged_obj;
 	Sp[0] = (W_)&stg_enter_info;
 	RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
     }
     }
 
     // ------------------------------------------------------------------------
-    // We now have an evaluated object (obj).  The next thing to
+    // We now have an evaluated object (tagged_obj).  The next thing to
     // do is return it to the stack frame on top of the stack.
 do_return:
+    obj = UNTAG_CLOSURE(tagged_obj);
     ASSERT(closure_HNF(obj));
 
     IF_DEBUG(interpreter,
@@ -421,8 +422,16 @@ do_return:
     case UPDATE_FRAME:
 	// Returning to an update frame: do the update, pop the update
 	// frame, and continue with the next stack frame.
+        //
+        // NB. we must update with the *tagged* pointer.  Some tags
+        // are not optional, and if we omit the tag bits when updating
+        // then bad things can happen (albeit very rarely).  See #1925.
+        // What happened was an indirection was created with an
+        // untagged pointer, and this untagged pointer was propagated
+        // to a PAP by the GC, violating the invariant that PAPs
+        // always contain a tagged pointer to the function.
 	INTERP_TICK(it_retto_UPDATE);
-	UPD_IND(((StgUpdateFrame *)Sp)->updatee, obj); 
+	UPD_IND(((StgUpdateFrame *)Sp)->updatee, tagged_obj); 
 	Sp += sizeofW(StgUpdateFrame);
 	goto do_return;
 
@@ -432,6 +441,8 @@ do_return:
 	INTERP_TICK(it_retto_BCO);
 	Sp--;
 	Sp[0] = (W_)obj;
+        // NB. return the untagged object; the bytecode expects it to
+        // be untagged.  XXX this doesn't seem right.
 	obj = (StgClosure*)Sp[2];
 	ASSERT(get_itbl(obj)->type == BCO);
 	goto run_BCO_return;
@@ -446,7 +457,7 @@ do_return:
 		 printStackChunk(Sp,cap->r.rCurrentTSO->stack+cap->r.rCurrentTSO->stack_size);
 	    );
 	Sp -= 2;
-	Sp[1] = (W_)obj;
+	Sp[1] = (W_)tagged_obj;
 	Sp[0] = (W_)&stg_enter_info;
 	RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
     }
@@ -519,6 +530,7 @@ do_return_unboxed:
     // Application...
 
 do_apply:
+    ASSERT(obj == UNTAG_CLOSURE(tagged_obj));
     // we have a function to apply (obj), and n arguments taking up m
     // words on the stack.  The info table (stg_ap_pp_info or whatever)
     // is on top of the arguments on the stack.
@@ -582,7 +594,7 @@ do_apply:
 		for (i = 0; i < m; i++) {
 		    new_pap->payload[pap->n_args + i] = (StgClosure *)Sp[i];
 		}
-		obj = (StgClosure *)new_pap;
+		tagged_obj = (StgClosure *)new_pap;
 		Sp += m;
 		goto do_return;
 	    }
@@ -624,7 +636,7 @@ do_apply:
 		for (i = 0; i < m; i++) {
 		    pap->payload[i] = (StgClosure *)Sp[i];
 		}
-		obj = (StgClosure *)pap;
+		tagged_obj = (StgClosure *)pap;
 		Sp += m;
 		goto do_return;
 	    }
@@ -634,7 +646,7 @@ do_apply:
 	default:
 	defer_apply_to_sched:
 	    Sp -= 2;
-	    Sp[1] = (W_)obj;
+	    Sp[1] = (W_)tagged_obj;
 	    Sp[0] = (W_)&stg_enter_info;
 	    RETURN_TO_SCHEDULER_NO_PAUSE(ThreadRunGHC, ThreadYielding);
     }
@@ -1264,7 +1276,7 @@ run_BCO:
 	    goto eval;
 
 	case bci_RETURN:
-	    obj = (StgClosure *)Sp[0];
+	    tagged_obj = (StgClosure *)Sp[0];
 	    Sp++;
 	    goto do_return;
 
