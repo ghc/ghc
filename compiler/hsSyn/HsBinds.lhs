@@ -264,7 +264,7 @@ instance (OutputableBndr idL, OutputableBndr idR) => Outputable (HsBindLR idL id
 ppr_monobind :: (OutputableBndr idL, OutputableBndr idR) => HsBindLR idL idR -> SDoc
 
 ppr_monobind (PatBind { pat_lhs = pat, pat_rhs = grhss })      = pprPatBind pat grhss
-ppr_monobind (VarBind { var_id = var, var_rhs = rhs })         = ppr var <+> equals <+> pprExpr (unLoc rhs)
+ppr_monobind (VarBind { var_id = var, var_rhs = rhs })         = pprBndr CaseBind var <+> equals <+> pprExpr (unLoc rhs)
 ppr_monobind (FunBind { fun_id = fun, fun_infix = inf,
 			fun_matches = matches,
 		        fun_tick = tick }) = 
