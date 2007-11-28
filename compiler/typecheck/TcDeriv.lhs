@@ -530,20 +530,23 @@ mk_data_eqn orig tvs cls tycon tc_args rep_tc rep_tc_args mtheta
 				dataConInstOrigArgTys data_con rep_tc_args,
 	            not (isUnLiftedType arg_ty) ] -- No constraints for unlifted types?
 
+			-- See Note [Superclasses of derived instance]
+	      sc_constraints = substTheta (zipOpenTvSubst (classTyVars cls) inst_tys)
+					  (classSCTheta cls)
+	      inst_tys =  [mkTyConApp tycon tc_args]
+
 	      stupid_subst = zipTopTvSubst (tyConTyVars rep_tc) rep_tc_args
 	      stupid_constraints = substTheta stupid_subst (tyConStupidTheta rep_tc)
-	      all_constraints = stupid_constraints ++ ordinary_constraints
-			 -- see Note [Data decl contexts] above
+	      all_constraints = stupid_constraints ++ sc_constraints ++ ordinary_constraints
 
 	      spec = DS { ds_loc = loc, ds_orig = orig
 			, ds_name = dfun_name, ds_tvs = tvs 
-			, ds_cls = cls, ds_tys = [mkTyConApp tycon tc_args]
+			, ds_cls = cls, ds_tys = inst_tys
 			, ds_theta =  mtheta `orElse` all_constraints
 			, ds_newtype = False }
 
   	; return (if isJust mtheta then Just (Right spec)	-- Specified context
 				   else Just (Left spec)) }	-- Infer context
-
 
 mk_typeable_eqn orig tvs cls tycon tc_args rep_tc _rep_tc_args mtheta
 	-- The Typeable class is special in several ways
@@ -694,6 +697,30 @@ new_dfun_name clas tycon 	-- Just a simple wrapper
 	-- The type passed to newDFunName is only used to generate
 	-- a suitable string; hence the empty type arg list
 \end{code}
+
+Note [Superclasses of derived instance] 
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In general, a derived instance decl needs the superclasses of the derived
+class too.  So if we have
+	data T a = ...deriving( Ord )
+then the initial context for Ord (T a) should include Eq (T a).  Often this is 
+redundant; we'll also generate an Ord constraint for each constructor argument,
+and that will probably generate enough constraints to make the Eq (T a) constraint 
+be satisfied too.  But not always; consider:
+
+ data S a = S
+ instance Eq (S a)
+ instance Ord (S a)
+
+ data T a = MkT (S a) deriving( Ord )
+ instance Num a => Eq (T a)
+
+The derived instance for (Ord (T a)) must have a (Num a) constraint!
+Similarly consider:
+	data T a = MkT deriving( Data, Typeable )
+Here there *is* no argument field, but we must nevertheless generate
+a context for the Data instances:
+	instance Typable a => Data (T a) where ...
 
 
 %************************************************************************
