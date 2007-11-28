@@ -343,6 +343,8 @@ cmmMachOpFold cmp [CmmMachOp conv [x], CmmLit (CmmInt i _)]
     maybe_conversion (MO_U_Conv from _) = Just (from, narrowU)
     maybe_conversion (MO_S_Conv from _)
         | not (isFloatingRep from) = Just (from, narrowS)
+        -- don't attempt to apply this optimisation when the source
+        -- is a float; see #1916
     maybe_conversion _ = Nothing
     
     maybe_comparison (MO_U_Gt _) rep = Just (MO_U_Gt rep)
