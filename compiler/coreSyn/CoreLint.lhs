@@ -1,3 +1,4 @@
+
 %
 % (c) The University of Glasgow 2006
 % (c) The GRASP/AQUA Project, Glasgow University, 1993-1998
@@ -42,6 +43,7 @@ import Coercion
 import TyCon
 import BasicTypes
 import StaticFlags
+import ListSetOps
 import DynFlags
 import Outputable
 import Util
@@ -177,7 +179,8 @@ lintCoreBindings dflags whoDunnit binds
 	-- Put all the top-level binders in scope at the start
 	-- This is because transformation rules can bring something
 	-- into use 'unexpectedly'
-    lint_binds binds = addInScopeVars (bindersOfBinds binds) $
+    lint_binds binds = addLoc TopLevelBindings $
+		       addInScopeVars (bindersOfBinds binds) $
 		       mapM lint_bind binds 
 
     lint_bind (Rec prs)		= mapM_ (lintSingleBinding TopLevel Recursive) prs
@@ -641,6 +644,7 @@ data LintLocInfo
   | CasePat CoreAlt	-- *Pattern* of the case alternative
   | AnExpr CoreExpr	-- Some expression
   | ImportedUnfolding SrcLoc -- Some imported unfolding (ToDo: say which)
+  | TopLevelBindings
 \end{code}
 
                  
@@ -678,8 +682,13 @@ addLoc extra_loc m =
   LintM (\ loc subst errs -> unLintM m (extra_loc:loc) subst errs)
 
 addInScopeVars :: [Var] -> LintM a -> LintM a
-addInScopeVars vars m = 
-  LintM (\ loc subst errs -> unLintM m loc (extendTvInScope subst vars) errs)
+addInScopeVars vars m
+  | null dups
+  = LintM (\ loc subst errs -> unLintM m loc (extendTvInScope subst vars) errs)
+  | otherwise
+  = addErrL (dupVars dups)
+  where
+    (_, dups) = removeDups compare vars 
 
 updateTvSubst :: TvSubst -> LintM a -> LintM a
 updateTvSubst subst' m = 
@@ -767,6 +776,8 @@ dumpLoc (CasePat (con, args, rhs))
 
 dumpLoc (ImportedUnfolding locn)
   = (locn, brackets (ptext SLIT("in an imported unfolding")))
+dumpLoc TopLevelBindings
+  = (noSrcLoc, empty)
 
 pp_binders :: [Var] -> SDoc
 pp_binders bs = sep (punctuate comma (map pp_binder bs))
@@ -918,6 +929,10 @@ mkCastErr from_ty expr_ty
 	  ptext SLIT("From-type:") <+> ppr from_ty,
 	  ptext SLIT("Type of enclosed expr:") <+> ppr expr_ty
     ]
+
+dupVars vars
+  = hang (ptext SLIT("Duplicate variables brought into scope"))
+       2 (ppr vars)
 
 mkStrangeTyMsg e
   = ptext SLIT("Type where expression expected:") <+> ppr e
