@@ -109,11 +109,21 @@ gc_alloc_todo_block (step_workspace *ws)
     // push out the block out if it is already the scan block.
     if (ws->todo_bd != NULL && ws->scan_bd != ws->todo_bd) {
 	ASSERT(ws->todo_bd->link == NULL);
-	if (ws->buffer_todo_bd != NULL) {
+        if (ws->buffer_todo_bd == NULL) {
+            // If the global todo list is empty, push this block
+            // out immediately rather than caching it in
+            // buffer_todo_bd, because there might be other threads
+            // waiting for work.
+            if (ws->stp->todos == NULL) {
+                push_todo_block(ws->todo_bd, ws->stp);
+            } else {
+                ws->buffer_todo_bd = ws->todo_bd;
+            }
+        } else {            
 	    ASSERT(ws->buffer_todo_bd->link == NULL);
 	    push_todo_block(ws->buffer_todo_bd, ws->stp);
-	}
-	ws->buffer_todo_bd = ws->todo_bd;
+            ws->buffer_todo_bd = ws->todo_bd;
+        }
 	ws->todo_bd = NULL;
     }	    
 
