@@ -482,7 +482,7 @@ loop:
       StgClosure *e = ((StgEvacuated*)q)->evacuee;
       *p = e;
       if (stp < gct->evac_step) {  // optimisation 
-	  if (HEAP_ALLOCED(e) && Bdescr((P_)e)->step < gct->evac_step) {
+	  if (Bdescr((P_)e)->step < gct->evac_step) {
 	      gct->failed_to_evac = rtsTrue;
 	      TICK_GC_FAILED_PROMOTION();
 	  }
