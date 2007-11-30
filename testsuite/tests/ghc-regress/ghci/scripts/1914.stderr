@@ -1,0 +1,6 @@
+[1 of 2] Compiling B                ( B.hs, interpreted )
+[2 of 2] Compiling A                ( A.hs, interpreted )
+[2 of 2] Compiling A                ( A.hs, interpreted )
+
+A.hs:1:32: parse error on input `}'
+[2 of 2] Compiling A                ( A.hs, interpreted )
