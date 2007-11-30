@@ -35,7 +35,7 @@ module GHC.Handle (
   ioe_closedHandle, ioe_EOF, ioe_notReadable, ioe_notWritable,
 
   stdin, stdout, stderr,
-  IOMode(..), openFile, openBinaryFile, fdToHandle', fdToHandle,
+  IOMode(..), openFile, openBinaryFile, fdToHandle_stat, fdToHandle, fdToHandle',
   hFileSize, hSetFileSize, hIsEOF, isEOF, hLookAhead, hSetBuffering, hSetBinaryMode,
   hFlush, hDuplicate, hDuplicateTo,
 
@@ -878,7 +878,7 @@ openFile' filepath mode binary =
 
     stat@(fd_type,_,_) <- fdStat fd
 
-    h <- fdToHandle' fd (Just stat) False filepath mode binary
+    h <- fdToHandle_stat fd (Just stat) False filepath mode binary
             `catchException` \e -> do c_close fd; throw e
 	-- NB. don't forget to close the FD if fdToHandle' fails, otherwise
 	-- this FD leaks.
@@ -906,9 +906,9 @@ rw_flags     = output_flags .|. o_RDWR
 append_flags = write_flags  .|. o_APPEND
 
 -- ---------------------------------------------------------------------------
--- fdToHandle'
+-- fdToHandle
 
-fdToHandle' :: FD
+fdToHandle_stat :: FD
             -> Maybe (FDType, CDev, CIno)
             -> Bool
             -> FilePath
@@ -916,7 +916,7 @@ fdToHandle' :: FD
             -> Bool
             -> IO Handle
 
-fdToHandle' fd mb_stat is_socket filepath mode binary = do
+fdToHandle_stat fd mb_stat is_socket filepath mode binary = do
     -- turn on non-blocking mode
     setNonBlockingFD fd
 
@@ -968,11 +968,24 @@ fdToHandle' fd mb_stat is_socket filepath mode binary = do
 	RawDevice -> 
 		mkFileHandle fd is_stream filepath ha_type binary
 
+-- | Old API kept to avoid breaking clients
+fdToHandle' :: FD -> Maybe FDType -> Bool -> FilePath  -> IOMode -> Bool
+            -> IO Handle
+fdToHandle' fd mb_type is_socket filepath mode binary
+ = do
+       let mb_stat = case mb_type of
+                        Nothing          -> Nothing
+                          -- fdToHandle_stat will do the stat:
+                        Just RegularFile -> Nothing
+                          -- no stat required for streams etc.:
+                        Just other       -> Just (other,0,0)
+       fdToHandle_stat fd mb_stat is_socket filepath mode binary
+
 fdToHandle :: FD -> IO Handle
 fdToHandle fd = do
    mode <- fdGetMode fd
    let fd_str = "<file descriptor: " ++ show fd ++ ">"
-   fdToHandle' fd Nothing False{-XXX!-} fd_str mode True{-bin mode-}
+   fdToHandle_stat fd Nothing False{-XXX!-} fd_str mode True{-bin mode-}
 
 
 #ifndef mingw32_HOST_OS
