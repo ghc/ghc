@@ -1153,7 +1153,7 @@ upsweep hsc_env old_hpt stable_mods cleanup sccs = do
 	cleanup		-- Remove unwanted tmp files between compilations
 
         case mb_mod_info of
-	    Nothing -> return (Failed, hsc_env, [])
+	    Nothing -> return (Failed, hsc_env, done)
 	    Just mod_info -> do 
 		let this_mod = ms_mod_name mod
 
