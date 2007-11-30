@@ -15,3 +15,5 @@ test('utf8_022', normal, compile_fail, [''])
 # test that we can understand unicode characters in lexemes
 
 test('unicode001', normal, compile_and_run, [''])
+
+test('1744', normal, compile_and_run, [''])
