@@ -186,6 +186,11 @@ INTEGRAL_TYPE(CSigAtomic,tyConCSigAtomic,"CSigAtomic",HTYPE_SIG_ATOMIC_T)
 -- | Haskell type representing the C @clock_t@ type.
 ARITHMETIC_TYPE(CClock,tyConCClock,"CClock",HTYPE_CLOCK_T)
 -- | Haskell type representing the C @time_t@ type.
+--
+-- To convert to a @Data.Time.UTCTime@, use the following formula:
+--
+-- >  posixSecondsToUTCTime (fromRational (toRational t) :: POSIXTime)
+--
 ARITHMETIC_TYPE(CTime,tyConCTime,"CTime",HTYPE_TIME_T)
 
 -- FIXME: Implement and provide instances for Eq and Storable
