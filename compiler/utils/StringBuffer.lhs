@@ -106,10 +106,7 @@ hGetStringBuffer fname = do
      hClose h
      if (r /= size)
 	then ioError (userError "short read of file")
-	else do
-	  pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
-		 -- sentinels for UTF-8 decoding
-	  return (StringBuffer buf size 0)
+	else newUTF8StringBuffer buf ptr size
 
 hGetStringBufferBlock :: Handle -> Int -> IO StringBuffer
 hGetStringBufferBlock handle wanted
@@ -121,8 +118,21 @@ hGetStringBufferBlock handle wanted
              do r <- if size == 0 then return 0 else hGetBuf handle ptr size
                 if r /= size
                    then ioError (userError $ "short read of file: "++show(r,size,size_i,handle))
-                   else do pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
-                           return (StringBuffer buf size 0)
+                   else newUTF8StringBuffer buf ptr size
+
+newUTF8StringBuffer :: ForeignPtr Word8 -> Ptr Word8 -> Int -> IO StringBuffer
+newUTF8StringBuffer buf ptr size = do
+  pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
+	 -- sentinels for UTF-8 decoding
+  let 
+      sb0 = StringBuffer buf size 0
+      (first_char, sb1) = nextChar sb0
+        -- skip the byte-order mark if there is one (see #1744)
+        -- This is better than treating #FEFF as whitespace,
+        -- because that would mess up layout.  We don't have a concept
+        -- of zero-width whitespace in Haskell: all whitespace codepoints
+        -- have a width of one column.
+  return (if first_char == '\xfeff' then sb1 else sb0)
 
 appendStringBuffers :: StringBuffer -> StringBuffer -> IO StringBuffer
 appendStringBuffers sb1 sb2
