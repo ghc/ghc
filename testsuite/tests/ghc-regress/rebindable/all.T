@@ -14,4 +14,5 @@ test('rebindable4', normal, compile_and_run, [''])
 test('rebindable5', normal, compile_and_run, [''])
 test('rebindable6', normal, compile_and_run, [''])
 test('rebindable7', normal, compile_and_run, [''])
-test('rebindable8', normal, compile, [''])
+test('rebindable8', expect_broken_if_compiler_lt(1537, 'ghc', '6.9'),
+                    compile, [''])
