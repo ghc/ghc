@@ -154,7 +154,7 @@ test('tcfail164', normal, compile_fail, [''])
 test('tcfail165', normal, compile, [''])	  # Succeeds now!
 test('tcfail166', normal, compile_fail, [''])
 test('tcfail167', normal, compile_fail, [''])
-test('tcfail168', normal, compile_fail, [''])
+test('tcfail168', namebase_if_compiler_lt('ghc','6.9', 'tcfail168-6.8'), compile_fail, [''])
 test('tcfail169', normal, compile_fail, [''])
 test('tcfail170', normal, compile_fail, [''])
 test('tcfail171', normal, compile_fail, [''])
