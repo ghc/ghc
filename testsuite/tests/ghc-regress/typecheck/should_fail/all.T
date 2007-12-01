@@ -175,5 +175,5 @@ test('tcfail185', normal, compile_fail, [''])
 test('tcfail186',
      extra_clean(['Tcfail186_Help.hi', 'Tcfail186_Help.o']),
      multimod_compile_fail, ['tcfail186', '-v0'])
-test('tcfail187', normal, compile_fail, [''])
+test('tcfail187', namebase_if_compiler_lt('ghc','6.9', 'tcfail187-6.8'), compile_fail, [''])
 test('tcfail188', normal, compile_fail, [''])
