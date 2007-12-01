@@ -30,7 +30,7 @@ test('print027', normal, ghci_script, ['print027.script'])
 
 test('break001', normal, ghci_script, ['break001.script'])
 test('break002', normal, ghci_script, ['break002.script'])
-test('break003', normal, ghci_script, ['break003.script'])
+test('break003', namebase_if_compiler_lt('ghc','6.9', 'break003-6.8'), ghci_script, ['break003.script'])
 test('break005', normal, ghci_script, ['break005.script'])
 test('break006', normal, ghci_script, ['break006.script'])
 test('break007', normal, ghci_script, ['break007.script'])
