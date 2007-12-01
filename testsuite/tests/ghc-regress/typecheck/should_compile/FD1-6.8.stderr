@@ -1,4 +1,0 @@
-
-FD1.hs:16:0:
-    The equation(s) for `plus' have two arguments,
-    but its type `Int -> a' has only one
