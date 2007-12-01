@@ -9,4 +9,6 @@ test('arrowrun003',
      compose(expect_broken_for(1333, ['ghci']),
              skip_if_compiler_lt('ghc','6.9')),
      compile_and_run, [''])
-test('arrowrun004', skip_if_fast, compile_and_run, [''])
+test('arrowrun004', compose(skip_if_fast,
+                    skip_if_compiler_lt('ghc','6.9'))
+                  , compile_and_run, [''])
