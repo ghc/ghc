@@ -3,7 +3,7 @@
 
 -- Trac #1781
 -- This one should really succeed, because 'plus' can only
--- be called with a = Int->Int, but the old fundep story 
+-- be called with a = Int->Int, but the old fundep story
 -- certainly made it fail, and so that's what we expect for now
 -- We may become more liberal later
 
