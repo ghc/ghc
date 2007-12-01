@@ -73,6 +73,7 @@ other dynamic, non-language, flag settings:
   -fno-force-recomp
   -fno-hpc-no-auto
   -fno-rewrite-rules
+  -fprint-bind-contents
   -fno-vectorise
   -fno-regs-graph
   -fno-regs-iterative
