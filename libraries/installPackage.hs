@@ -52,20 +52,18 @@ doit verbosity ghcpkg ghcpkgconf destdir topdir
           lbi <- getConfig verbosity
           let pd = localPkgDescr lbi
               i = installDirTemplates lbi
-              -- XXX This is an almighty hack, shadowing the base
-              -- Setup.hs hack
-              mkLib filt = case library pd of
-                           Just lib ->
-                               let ems = filter filt $ exposedModules lib
-                               in lib {
-                                      exposedModules = ems
-                                   }
-                           Nothing ->
-                               error "Expected a library, but none found"
-              -- There's no files for GHC.Prim, so we will fail if we
-              -- try to copy them
-              pd_copy = pd { library = Just (mkLib ("GHC.Prim" /=)) }
-              pd_reg  = pd { library = Just (mkLib (const True)) }
+              -- This is an almighty hack. We need to register
+              -- base:GHC.Prim, but it doesn't exist, get built, get
+              -- haddocked, get copied, etc.
+              pd_reg = if pkgName (package pd) == "base"
+                       then case library pd of
+                            Just lib ->
+                                let ems = "GHC.Prim" : exposedModules lib
+                                    lib' = lib { exposedModules = ems }
+                                in pd { library = Just lib' }
+                            Nothing ->
+                                error "Expected a library, but none found"
+                       else pd
               -- When coying, we need to actually give a concrete
               -- directory to copy to rather than "$topdir"
               toPathTemplate' = toPathTemplate . replaceTopdir topdir
@@ -102,8 +100,8 @@ doit verbosity ghcpkg ghcpkgconf destdir topdir
                         }
               lbi_reg = lbi { installDirTemplates = i_reg,
                               withPrograms = progs' }
-          (copyHook simpleUserHooks) pd_copy lbi_copy userHooks copyFlags
-          (regHook simpleUserHooks)  pd_reg  lbi_reg  userHooks registerFlags
+          (copyHook simpleUserHooks) pd     lbi_copy userHooks copyFlags
+          (regHook simpleUserHooks)  pd_reg lbi_reg  userHooks registerFlags
           return ()
 
 replaceTopdir :: FilePath -> FilePath -> FilePath
