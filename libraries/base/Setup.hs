@@ -20,16 +20,11 @@ import Control.Exception (try)
 main :: IO ()
 main = do let hooks = defaultUserHooks {
                   buildHook = build_primitive_sources
-                            $ filter_modules_hook
                             $ buildHook defaultUserHooks,
                   makefileHook = build_primitive_sources
-                               $ filter_modules_hook
                                $ makefileHook defaultUserHooks,
                   haddockHook = build_primitive_sources
-                               $ filter_modules_hook
-                               $ haddockHook defaultUserHooks,
-                   instHook = filter_modules_hook
-                           $ instHook defaultUserHooks }
+                               $ haddockHook defaultUserHooks }
           defaultMainWithHooks hooks
 
 type Hook a = PackageDescription -> LocalBuildInfo -> UserHooks -> a -> IO ()
@@ -61,15 +56,4 @@ maybeUpdateFile source target = do
   case r of 
     ExitSuccess   -> removeFile source
     ExitFailure _ -> do try (removeFile target); renameFile source target
-  
-
-filter_modules_hook :: Hook a -> Hook a
-filter_modules_hook f pd lbi uhs x
- = let lib' = case library pd of
-                  Just lib ->
-                      let ems = filter ("GHC.Prim" /=) (exposedModules lib)
-                      in lib { exposedModules = ems }
-                  Nothing -> error "Expected a library"
-       pd' = pd { library = Just lib' }
-   in f pd' lbi uhs x
 
