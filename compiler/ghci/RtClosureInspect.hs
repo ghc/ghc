@@ -30,7 +30,7 @@ module RtClosureInspect(
      termTyVars,
 --     unsafeDeepSeq, 
      cvReconstructType,
-     computeRTTIsubst, 
+     unifyRTTI, 
      sigmaType,
      Closure(..),
      getClosureData,
@@ -141,7 +141,8 @@ isFullyEvaluatedTerm NewtypeWrap{wrapped_term=t} = isFullyEvaluatedTerm t
 isFullyEvaluatedTerm _                  = False
 
 instance Outputable (Term) where
- ppr = head . cPprTerm cPprTermBase
+ ppr t | Just doc <- cPprTerm cPprTermBase t = doc
+       | otherwise = panic "Outputable Term instance"
 
 -------------------------------------------------------------------------
 -- Runtime Closure Datatype and functions for retrieving closure related stuff
@@ -327,8 +328,9 @@ type Precedence        = Int
 type TermPrinter       = Precedence -> Term ->   SDoc
 type TermPrinterM m    = Precedence -> Term -> m SDoc
 
-app_prec,cons_prec ::Int
-app_prec = 10
+app_prec,cons_prec, max_prec ::Int
+max_prec  = 10
+app_prec  = max_prec
 cons_prec = 5 -- TODO Extract this info from GHC itself
 
 pprTerm :: TermPrinter -> TermPrinter
@@ -373,7 +375,7 @@ pprNewtypeWrap y p NewtypeWrap{ty=ty, wrapped_term=t}
   | Just (tc,_) <- splitNewTyConApp_maybe ty
   , ASSERT(isNewTyCon tc) True
   , Just new_dc <- maybeTyConSingleCon tc = do 
-         real_term <- y 10 t
+         real_term <- y max_prec t
          return$ cparen (p >= app_prec) (ppr new_dc <+> real_term)
 pprNewtypeWrap _ _ _ = panic "pprNewtypeWrap"
 
@@ -440,7 +442,7 @@ cPprTermBase y =
 
            coerceShow f _p = return . text . show . f . unsafeCoerce# . val
 
-           --NOTE pprinting of list terms is not lazy
+           --Note pprinting of list terms is not lazy
            doList p h t = do
                let elems      = h : getListTerms t
                    isConsLast = termType(last elems) /= termType h
@@ -740,8 +742,8 @@ cvReconstructType hsc_env max_depth mb_ty hval = runTR_maybe hsc_env $ do
      --  is that the former are _not_ polymorphic, thus polymorphism must
      --  be stripped. Syntactically, forall's must be stripped.
      -- We also remove predicates.
-computeRTTIsubst :: Type -> Type -> TvSubst
-computeRTTIsubst ty rtti_ty = 
+unifyRTTI :: Type -> Type -> TvSubst
+unifyRTTI ty rtti_ty = 
     case mb_subst of
       Just subst -> subst
       Nothing    -> pprPanic "Failed to compute a RTTI substitution" 

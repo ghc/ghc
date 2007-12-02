@@ -610,7 +610,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
    tys <- reconstructType hsc_env 10 `mapM` incompletelyTypedIds
           -- map termType `fmap` (obtainTerm hsc_env False `mapM` incompletelyTypedIds)
    
-   let substs = [computeRTTIsubst ty ty' 
+   let substs = [unifyRTTI ty ty' 
                  | (ty, Just ty') <- zip (map idType incompletelyTypedIds) tys]
        ic'    = foldr (flip substInteractiveContext) ic 
                            (map skolemiseSubst substs)
