@@ -37,7 +37,7 @@ import SMRep
 import GHC.Ptr
 
 import Module (Module)
-import GHC.Prim
+import GHC.Exts
 
 
 -- ----------------------------------------------------------------------------

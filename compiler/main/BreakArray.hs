@@ -26,7 +26,6 @@ module BreakArray
 
 import GHC.Exts
 import GHC.IOBase
-import GHC.Prim
 import GHC.Word
 import Constants
 

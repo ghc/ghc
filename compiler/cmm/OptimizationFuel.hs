@@ -11,7 +11,7 @@ module OptimizationFuel
     )
 where
 
-import GHC.Prim
+import GHC.Exts (State#)
 import Panic
 
 import Data.IORef
