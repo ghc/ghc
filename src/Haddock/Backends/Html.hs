@@ -776,6 +776,7 @@ ppLPred = ppPred . unLoc
 
 ppPred (HsClassP n ts) = ppDocName n <+> hsep (map ppLType ts)
 -- TODO: find out what happened to the Dupable/Linear distinction
+ppPred (HsEqualP t1 t2) = ppLType t1 <+> toHtml "~" <+> ppLType t2
 ppPred (HsIParam (IPName n) t) 
   = toHtml "?" +++ ppDocName n <+> dcolon <+> ppLType t
 

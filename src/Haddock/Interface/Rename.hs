@@ -197,6 +197,10 @@ renamePred (HsClassP name types) = do
   name'  <- rename name 
   types' <- mapM renameLType types
   return (HsClassP name' types')
+renamePred (HsEqualP type1 type2) = do
+  type1' <- renameLType type1
+  type2' <- renameLType type2
+  return (HsEqualP type1' type2')
 renamePred (HsIParam (IPName name) t) = do
   name' <- rename name
   t'    <- renameLType t
