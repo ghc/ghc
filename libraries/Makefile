@@ -375,10 +375,6 @@ ifeq "$(HADDOCK_DOCS)" "YES"
 	cp    doc-index*.html               $(BIN_DIST_LIBDIR)
 endif
 	cp -pR stamp                         $(BIN_DIST_LIBDIR)
-	# This gets used in the compiler directory to see if GHC should
-	# depend on the readline package or not
-	$(MKDIRHIER) $(BIN_DIST_LIBDIR)/readline
-	cp    readline/config.mk            $(BIN_DIST_LIBDIR)/readline
 
 $(foreach SUBDIR,$(SUBDIRS),binary-dist.library.$(SUBDIR)): \
 binary-dist.library.%:
@@ -389,6 +385,7 @@ binary-dist.library.%:
 	  cp    LICENSE       $(BIN_DIST_LIBDIR)/$* && \
 	  cp -R dist          $(BIN_DIST_LIBDIR)/$* && \
 	  $(FIND) . -name "*.buildinfo" -exec cp {} $(BIN_DIST_LIBDIR)/$* \; && \
+	  $(FIND) . -name unbuildable -exec cp {} $(BIN_DIST_LIBDIR)/$* \; && \
 	  (cp -RL include      $(BIN_DIST_LIBDIR)/$* || true) && \
 	  $(FIND) $(BIN_DIST_LIBDIR)/$*/dist \
 	     \( -name "*_split" -o -name "autogen" \) | xargs rm -rf && \
