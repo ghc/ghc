@@ -1751,8 +1751,8 @@ getRegister (CmmLit lit)
   = let rep = cmmLitRep lit
         imm = litToImm lit
         code dst = toOL [
-              LIS dst (HI imm),
-              OR dst dst (RIImm (LO imm))
+              LIS dst (HA imm),
+              ADD dst dst (RIImm (LO imm))
           ]
     in return (Any rep code)
 
