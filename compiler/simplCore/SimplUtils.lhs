@@ -49,8 +49,7 @@ import Id
 import Var	( isCoVar )
 import NewDemand
 import SimplMonad
-import Type	( Type, funArgTy, mkForAllTys, mkTyVarTys, 
-		  splitTyConApp_maybe, tyConAppArgs )
+import Type	hiding( substTy )
 import TyCon
 import DataCon
 import Unify	( dataConCannotMatch )
@@ -844,12 +843,14 @@ mkLam bndrs body
 	; mkLam' dflags bndrs body }
   where
     mkLam' :: DynFlags -> [OutBndr] -> OutExpr -> SimplM OutExpr
-    mkLam' dflags bndrs (Cast body@(Lam _ _) co)
+    mkLam' dflags bndrs (Cast body co)
+      | not (any bad bndrs)
 	-- Note [Casts and lambdas]
-      = do { lam <- mkLam' dflags (bndrs ++ bndrs') body'
+      = do { lam <- mkLam' dflags bndrs body
 	   ; return (mkCoerce (mkPiTypes bndrs co) lam) }
-      where	
-	(bndrs',body') = collectBinders body
+      where
+	co_vars  = tyVarsOfType co
+	bad bndr = isCoVar bndr && bndr `elemVarSet` co_vars      
 
     mkLam' dflags bndrs body
       | dopt Opt_DoEtaReduction dflags,
@@ -877,9 +878,26 @@ So this equation in mkLam' floats the g1 out, thus:
 	(\x. e `cast` g1)  -->  (\x.e) `cast` (tx -> g1)
 where x:tx.
 
-In general, this floats casts outside lambdas, where (I hope) they might meet
-and cancel with some other cast.
+In general, this floats casts outside lambdas, where (I hope) they
+might meet and cancel with some other cast:
+	\x. e `cast` co   ===>   (\x. e) `cast` (tx -> co)
+	/\a. e `cast` co  ===>   (/\a. e) `cast` (/\a. co)
+	/\g. e `cast` co  ===>   (/\g. e) `cast` (/\g. co)
+  		  	  (if not (g `in` co))
 
+Notice that it works regardless of 'e'.  Originally it worked only
+if 'e' was itself a lambda, but in some cases that resulted in 
+fruitless iteration in the simplifier.  A good example was when
+compiling Text.ParserCombinators.ReadPrec, where we had a definition 
+like	(\x. Get `cast` g)
+where Get is a constructor with nonzero arity.  Then mkLam eta-expanded
+the Get, and the next iteration eta-reduced it, and then eta-expanded 
+it again.
+
+Note also the side condition for the case of coercion binders.
+It does not make sense to transform
+	/\g. e `cast` g  ==>  (/\g.e) `cast` (/\g.g)
+because the latter is not well-kinded.
 
 --	c) floating lets out through big lambdas 
 --		[only if all tyvar lambdas, and only if this lambda
