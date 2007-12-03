@@ -55,7 +55,7 @@ test('GADT5', expect_fail, compile, [''])
 test('GADT6', expect_fail, compile, [''])
 test('GADT7', expect_fail, compile, [''])
 test('GADT8', normal, compile, [''])
-test('GADT9', expect_fail, compile, [''])
+test('GADT9', normal, compile, [''])
 test('GADT10', expect_fail, compile, [''])
 
 test('Class1', normal, compile, [''])
