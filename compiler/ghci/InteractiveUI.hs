@@ -846,6 +846,12 @@ addModule files = do
   afterLoad ok session False prev_context
 
 changeDirectory :: String -> GHCi ()
+changeDirectory "" = do
+  -- :cd on its own changes to the user's home directory
+  either_dir <- io (IO.try getHomeDirectory)
+  case either_dir of
+     Left _e -> return ()
+     Right dir -> changeDirectory dir
 changeDirectory dir = do
   session <- getSession
   graph <- io (GHC.getModuleGraph session)
