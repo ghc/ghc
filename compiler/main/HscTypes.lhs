@@ -96,7 +96,7 @@ import Type
 
 import Class		( Class, classSelIds, classATs, classTyCon )
 import TyCon
-import DataCon		( DataCon, dataConImplicitIds )
+import DataCon		( DataCon, dataConImplicitIds, dataConWrapId )
 import PrelNames	( gHC_PRIM )
 import Packages hiding ( Version(..) )
 import DynFlags		( DynFlags(..), isOneShot, HscTarget (..) )
@@ -959,8 +959,9 @@ tyThingDataCon (ADataCon dc) = dc
 tyThingDataCon other	     = pprPanic "tyThingDataCon" (pprTyThing other)
 
 tyThingId :: TyThing -> Id
-tyThingId (AnId id) = id
-tyThingId other     = pprPanic "tyThingId" (pprTyThing other)
+tyThingId (AnId id)     = id
+tyThingId (ADataCon dc) = dataConWrapId dc
+tyThingId other         = pprPanic "tyThingId" (pprTyThing other)
 \end{code}
 
 %************************************************************************
