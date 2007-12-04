@@ -278,10 +278,9 @@ traceRunStatus expr ref bindings final_ids
              evaluate history'
              status <- withBreakAction True (hsc_dflags hsc_env)
                                  breakMVar statusMVar $ do
-                       withInterruptsSentTo
-                         (do putMVar breakMVar ()  -- awaken the stopped thread
-                             return tid)
-                         (takeMVar statusMVar)     -- and wait for the result
+                       withInterruptsSentTo tid $ do
+                           putMVar breakMVar ()  -- awaken the stopped thread
+                           takeMVar statusMVar   -- and wait for the result
              traceRunStatus expr ref bindings final_ids 
                             breakMVar statusMVar status history'
      _other ->
@@ -316,12 +315,19 @@ foreign import ccall "&rts_breakpoint_io_action"
 -- thread.  ToDo: we might want a way to continue even if the target
 -- thread doesn't die when it receives the exception... "this thread
 -- is not responding".
+-- 
+-- Careful here: there may be ^C exceptions flying around, so we start
+-- the new thread blocked (forkIO inherits block from the parent,
+-- #1048), and unblock only while we execute the user's code.  We
+-- can't afford to lose the final putMVar, otherwise deadlock
+-- ensues. (#1583, #1922, #1946)
 sandboxIO :: DynFlags -> MVar Status -> IO [HValue] -> IO Status
-sandboxIO dflags statusMVar thing = 
-  withInterruptsSentTo 
-        (forkIO (do res <- Exception.try (rethrow dflags thing)
-                    putMVar statusMVar (Complete res)))
-        (takeMVar statusMVar)
+sandboxIO dflags statusMVar thing =
+   block $ do  -- fork starts blocked
+     id <- forkIO $ do res <- Exception.try (unblock $ rethrow dflags thing)
+                       putMVar statusMVar (Complete res) -- empty: can't block
+     withInterruptsSentTo id $ takeMVar statusMVar
+
 
 -- We want to turn ^C into a break when -fbreak-on-exception is on,
 -- but it's an async exception and we only break for sync exceptions.
@@ -351,12 +357,11 @@ rethrow dflags io = Exception.catch io $ \e -> do -- NB. not catchDyn
                 Exception.throwIO e
 
 
-withInterruptsSentTo :: IO ThreadId -> IO r -> IO r
-withInterruptsSentTo io get_result = do
-  ts <- takeMVar interruptTargetThread
-  child <- io
-  putMVar interruptTargetThread (child:ts)
-  get_result `finally` modifyMVar_ interruptTargetThread (return.tail)
+withInterruptsSentTo :: ThreadId -> IO r -> IO r
+withInterruptsSentTo thread get_result = do
+  bracket (modifyMVar_ interruptTargetThread (return . (thread:)))
+          (\_ -> modifyMVar_ interruptTargetThread (return.tail))
+          (\_ -> get_result)
 
 -- This function sets up the interpreter for catching breakpoints, and
 -- resets everything when the computation has stopped running.  This
@@ -422,11 +427,10 @@ resume (Session ref) step
               final_ids apStack info _ hist _ -> do
                 withBreakAction (isStep step) (hsc_dflags hsc_env) 
                                         breakMVar statusMVar $ do
-                status <- withInterruptsSentTo
-                             (do putMVar breakMVar ()
+                status <- withInterruptsSentTo tid $ do
+                             putMVar breakMVar ()
                                       -- this awakens the stopped thread...
-                                 return tid)
-                             (takeMVar statusMVar)
+                             takeMVar statusMVar
                                       -- and wait for the result 
                 let hist' = 
                      case info of 
