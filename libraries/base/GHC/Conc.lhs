@@ -80,6 +80,10 @@ module GHC.Conc
 	, asyncWriteBA  -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
 #endif
 
+#ifndef mingw32_HOST_OS
+        , signalHandlerLock
+#endif
+
 	, ensureIOManagerIsRunning
         ) where
 
@@ -103,7 +107,7 @@ import GHC.Real		( fromIntegral, div )
 #ifndef mingw32_HOST_OS
 import GHC.Base		( Int(..) )
 #endif
-import GHC.Exception    ( catchException, Exception(..), AsyncException(..) )
+import GHC.Exception
 import GHC.Pack		( packCString# )
 import GHC.Ptr          ( Ptr(..), plusPtr, FunPtr(..) )
 import GHC.STRef
@@ -958,9 +962,11 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 		 case s of
 		  _ | s == io_MANAGER_WAKEUP -> return False
 		  _ | s == io_MANAGER_DIE    -> return True
-		  _ -> do handler_tbl <- peek handlers
+		  _ -> withMVar signalHandlerLock $ \_ -> do
+                          handler_tbl <- peek handlers
 		          sp <- peekElemOff handler_tbl (fromIntegral s)
-		          forkIO (do io <- deRefStablePtr sp; io)
+                          io <- deRefStablePtr sp
+		          forkIO io
 		          return False
 
   if exit then return () else do
@@ -971,6 +977,15 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 			 else completeRequests reqs readfds writefds []
 
   service_loop wakeup readfds writefds ptimeval reqs' delays'
+
+withMVar :: MVar a -> (a -> IO b) -> IO b
+withMVar m io = 
+  block $ do
+    a <- takeMVar m
+    b <- catchException (unblock (io a))
+      	    (\e -> do putMVar m a; throw e)
+    putMVar m a
+    return b
 
 io_MANAGER_WAKEUP = 0xff :: CChar
 io_MANAGER_DIE    = 0xfe :: CChar
@@ -984,6 +999,12 @@ wakeupIOManager = do
   fd <- readIORef stick
   with io_MANAGER_WAKEUP $ \pbuf -> do 
     c_write (fromIntegral fd) pbuf 1; return ()
+
+-- Lock used to protect concurrent access to signal_handlers.  Symptom of
+-- this race condition is #1922, although that bug was on Windows a similar
+-- bug also exists on Unix.
+signalHandlerLock :: MVar ()
+signalHandlerLock = unsafePerformIO (newMVar ())
 
 foreign import ccall "&signal_handlers" handlers :: Ptr (Ptr (StablePtr (IO ())))
 
