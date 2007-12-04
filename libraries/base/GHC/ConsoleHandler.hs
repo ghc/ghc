@@ -35,22 +35,15 @@ import Prelude -- necessary to get dependencies right
 import Foreign
 import Foreign.C
 import GHC.IOBase
+import GHC.Conc
 import GHC.Handle
 import Data.Typeable
+import Control.Concurrent
 
 data Handler
  = Default
  | Ignore
  | Catch (ConsoleEvent -> IO ())
-
-data ConsoleEvent
- = ControlC
- | Break
- | Close
-    -- these are sent to Services only.
- | Logoff
- | Shutdown
- deriving (Eq, Ord, Enum, Show, Read, Typeable)
 
 -- | Allows Windows console events to be caught and handled.  To
 -- handle a console event, call 'installHandler' passing the
@@ -72,7 +65,28 @@ data ConsoleEvent
 -- it in one of these environments.
 --
 installHandler :: Handler -> IO Handler
-installHandler handler = 
+installHandler handler 
+  | threaded =
+    modifyMVar win32ConsoleHandler $ \old_h -> do
+      (new_h,rc) <- 
+        case handler of
+          Default -> do
+            r <- rts_installHandler STG_SIG_DFL nullPtr
+            return (no_handler, r)
+          Ignore  -> do
+            r <- rts_installHandler STG_SIG_IGN nullPtr
+            return (no_handler, r)
+          Catch h -> do
+            r <- rts_installHandler STG_SIG_HAN nullPtr
+            return (h, r)
+      prev_handler <- 
+        case rc of
+          STG_SIG_DFL -> return Default
+          STG_SIG_IGN -> return Ignore
+          STG_SIG_HAN -> return (Catch old_h)
+      return (new_h, prev_handler)
+
+  | otherwise =
   alloca $ \ p_sp -> do
    rc <- 
     case handler of
@@ -92,14 +106,6 @@ installHandler handler =
 	freeStablePtr osptr
 	return (Catch (\ ev -> oldh (fromConsoleEvent ev)))
   where
-   toConsoleEvent ev = 
-     case ev of
-       0 {- CTRL_C_EVENT-}        -> Just ControlC
-       1 {- CTRL_BREAK_EVENT-}    -> Just Break
-       2 {- CTRL_CLOSE_EVENT-}    -> Just Close
-       5 {- CTRL_LOGOFF_EVENT-}   -> Just Logoff
-       6 {- CTRL_SHUTDOWN_EVENT-} -> Just Shutdown
-       _ -> Nothing
    fromConsoleEvent ev = 
      case ev of
        ControlC -> 0 {- CTRL_C_EVENT-}
@@ -109,11 +115,15 @@ installHandler handler =
        Shutdown -> 6 {- CTRL_SHUTDOWN_EVENT-}
 
    toHandler hdlr ev = do
-      case toConsoleEvent ev of
+      case toWin32ConsoleEvent ev of
 	 -- see rts/win32/ConsoleHandler.c for comments as to why
 	 -- rts_ConsoleHandlerDone is called here.
         Just x  -> hdlr x >> rts_ConsoleHandlerDone ev
 	Nothing -> return () -- silently ignore..
+
+   no_handler = error "win32ConsoleHandler"
+
+foreign import ccall "rtsSupportsBoundThreads" threaded :: Bool
 
 foreign import ccall unsafe "RtsExternal.h rts_InstallConsoleEvent" 
   rts_installHandler :: CInt -> Ptr (StablePtr (CInt -> IO ())) -> IO CInt

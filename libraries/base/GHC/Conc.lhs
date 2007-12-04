@@ -85,6 +85,12 @@ module GHC.Conc
 #endif
 
 	, ensureIOManagerIsRunning
+
+#ifdef mingw32_HOST_OS
+        , ConsoleEvent(..)
+        , win32ConsoleHandler
+        , toWin32ConsoleEvent
+#endif
         ) where
 
 import System.Posix.Types
@@ -106,6 +112,10 @@ import GHC.Num		( Num(..) )
 import GHC.Real		( fromIntegral, div )
 #ifndef mingw32_HOST_OS
 import GHC.Base		( Int(..) )
+#endif
+#ifdef mingw32_HOST_OS
+import GHC.Read         ( Read )
+import GHC.Enum         ( Enum )
 #endif
 import GHC.Exception
 import GHC.Pack		( packCString# )
@@ -561,6 +571,15 @@ isEmptyMVar (MVar mv#) = IO $ \ s# ->
 addMVarFinalizer :: MVar a -> IO () -> IO ()
 addMVarFinalizer (MVar m) finalizer = 
   IO $ \s -> case mkWeak# m () finalizer s of { (# s1, w #) -> (# s1, () #) }
+
+withMVar :: MVar a -> (a -> IO b) -> IO b
+withMVar m io = 
+  block $ do
+    a <- takeMVar m
+    b <- catchException (unblock (io a))
+      	    (\e -> do putMVar m a; throw e)
+    putMVar m a
+    return b
 \end{code}
 
 
@@ -821,14 +840,34 @@ service_cont wakeup delays = do
 io_MANAGER_WAKEUP = 0xffffffff :: Word32
 io_MANAGER_DIE    = 0xfffffffe :: Word32
 
-start_console_handler :: Word32 -> IO ()
-start_console_handler r = do                   
-  stableptr <- peek console_handler
-  forkIO $ do io <- deRefStablePtr stableptr; io (fromIntegral r)
-  return ()
+data ConsoleEvent
+ = ControlC
+ | Break
+ | Close
+    -- these are sent to Services only.
+ | Logoff
+ | Shutdown
+ deriving (Eq, Ord, Enum, Show, Read, Typeable)
 
-foreign import ccall "&console_handler" 
-   console_handler :: Ptr (StablePtr (CInt -> IO ()))
+start_console_handler :: Word32 -> IO ()
+start_console_handler r =
+  case toWin32ConsoleEvent r of
+     Just x  -> withMVar win32ConsoleHandler $ \handler -> do
+                    forkIO (handler x)
+                    return ()
+     Nothing -> return ()
+
+toWin32ConsoleEvent ev = 
+   case ev of
+       0 {- CTRL_C_EVENT-}        -> Just ControlC
+       1 {- CTRL_BREAK_EVENT-}    -> Just Break
+       2 {- CTRL_CLOSE_EVENT-}    -> Just Close
+       5 {- CTRL_LOGOFF_EVENT-}   -> Just Logoff
+       6 {- CTRL_SHUTDOWN_EVENT-} -> Just Shutdown
+       _ -> Nothing
+
+win32ConsoleHandler :: MVar (ConsoleEvent -> IO ())
+win32ConsoleHandler = unsafePerformIO (newMVar (error "win32ConsoleHandler"))
 
 stick :: IORef HANDLE
 {-# NOINLINE stick #-}
@@ -977,15 +1016,6 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 			 else completeRequests reqs readfds writefds []
 
   service_loop wakeup readfds writefds ptimeval reqs' delays'
-
-withMVar :: MVar a -> (a -> IO b) -> IO b
-withMVar m io = 
-  block $ do
-    a <- takeMVar m
-    b <- catchException (unblock (io a))
-      	    (\e -> do putMVar m a; throw e)
-    putMVar m a
-    return b
 
 io_MANAGER_WAKEUP = 0xff :: CChar
 io_MANAGER_DIE    = 0xfe :: CChar
