@@ -264,8 +264,13 @@ rts_InstallConsoleEvent(int action, StgStablePtr *handler)
 	}
 	break;
     case STG_SIG_HAN:
+#ifdef THREADED_RTS
+        // handler is stored in an MVar in the threaded RTS
+	console_handler = STG_SIG_HAN;
+#else
 	console_handler = (StgInt)*handler;
-	if ( previous_hdlr < 0 ) {
+#endif
+	if (previous_hdlr < 0 || previous_hdlr == STG_SIG_HAN) {
 	  /* Only install generic_handler() once */
 	  if ( !SetConsoleCtrlHandler(generic_handler, TRUE) ) {
 	    errorBelch("warning: unable to install console event handler");
@@ -275,10 +280,13 @@ rts_InstallConsoleEvent(int action, StgStablePtr *handler)
     }
     
     if (previous_hdlr == STG_SIG_DFL || 
-	previous_hdlr == STG_SIG_IGN) {
+	previous_hdlr == STG_SIG_IGN ||
+        previous_hdlr == STG_SIG_HAN) {
 	return previous_hdlr;
     } else {
-	*handler = (StgStablePtr)previous_hdlr;
+	if (handler != NULL) {
+            *handler = (StgStablePtr)previous_hdlr;
+        }
 	return STG_SIG_HAN;
     }
 }
