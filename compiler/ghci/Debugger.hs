@@ -131,6 +131,9 @@ bindSuspensions cms@(Session ref) t = do
                                 \ty dc t -> do 
                                     (term, names) <- t
                                     return (NewtypeWrap ty dc term, names)
+                      , fRefWrap = \ty t -> do
+                                    (term, names) <- t 
+                                    return (RefWrap ty term, names)
                       }
         doSuspension freeNames ct mb_ty hval _name = do
           name <- atomicModifyIORef freeNames (\x->(tail x, head x))
@@ -173,7 +176,8 @@ showTerm cms@(Session ref) term = do
            GHC.setSessionDynFlags cms dflags
   cPprShowable prec NewtypeWrap{ty=new_ty,wrapped_term=t} = 
       cPprShowable prec t{ty=new_ty}
-  cPprShowable _ _ = panic "cPprShowable - unreachable"
+  cPprShowable prec RefWrap{wrapped_term=t} = cPprShowable prec t
+  cPprShowable _ _ = return Nothing
 
   needsParens ('"':_) = False   -- some simple heuristics to see whether parens
                                 -- are redundant in an arbitrary Show output

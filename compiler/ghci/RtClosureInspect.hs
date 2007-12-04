@@ -14,6 +14,7 @@ module RtClosureInspect(
      isTerm,
      isSuspension,
      isPrim,
+     isNewtypeWrap,
      pprTerm, 
      cPprTerm, 
      cPprTermBase,
@@ -74,6 +75,7 @@ import Panic
 
 import GHC.Arr          ( Array(..) )
 import GHC.Exts
+import GHC.IOBase
 
 import Control.Monad
 import Data.Maybe
@@ -119,6 +121,8 @@ data Term = Term { ty        :: Type
           | NewtypeWrap{ ty           :: Type
                        , dc           :: Either String DataCon
                        , wrapped_term :: Term }
+          | RefWrap    { ty           :: Type
+                       , wrapped_term :: Term }
 
 isTerm, isSuspension, isPrim, isNewtypeWrap :: Term -> Bool
 isTerm Term{} = True
@@ -138,6 +142,7 @@ isFullyEvaluatedTerm :: Term -> Bool
 isFullyEvaluatedTerm Term {subTerms=tt} = all isFullyEvaluatedTerm tt
 isFullyEvaluatedTerm Prim {}            = True
 isFullyEvaluatedTerm NewtypeWrap{wrapped_term=t} = isFullyEvaluatedTerm t
+isFullyEvaluatedTerm RefWrap{wrapped_term=t}     = isFullyEvaluatedTerm t
 isFullyEvaluatedTerm _                  = False
 
 instance Outputable (Term) where
@@ -155,7 +160,8 @@ data ClosureType = Constr
                  | AP 
                  | PAP 
                  | Indirection Int 
-                 | Other Int
+                 | MutVar Int
+                 | Other  Int
  deriving (Show, Eq)
 
 data Closure = Closure { tipe         :: ClosureType 
@@ -199,18 +205,20 @@ getClosureData a =
             return (Closure tipe (Ptr iptr) itbl ptrsList nptrs_data)
 
 readCType :: Integral a => a -> ClosureType
-readCType i
+readCType i 
  | i >= CONSTR && i <= CONSTR_NOCAF_STATIC = Constr
  | i >= FUN    && i <= FUN_STATIC          = Fun
- | i >= THUNK  && i < THUNK_SELECTOR       = Thunk (fromIntegral i)
+ | i >= THUNK  && i < THUNK_SELECTOR       = Thunk i'
  | i == THUNK_SELECTOR                     = ThunkSelector
  | i == BLACKHOLE                          = Blackhole
- | i >= IND    && i <= IND_STATIC          = Indirection (fromIntegral i)
- | fromIntegral i == aP_CODE               = AP
+ | i >= IND    && i <= IND_STATIC          = Indirection i'
+ | i' == aP_CODE                           = AP
  | i == AP_STACK                           = AP
- | fromIntegral i == pAP_CODE              = PAP
- | otherwise                               = Other (fromIntegral i)
-
+ | i' == pAP_CODE                          = PAP
+ | i == MUT_VAR_CLEAN || i == MUT_VAR_DIRTY     = MutVar i'
+ | otherwise                               = Other  i'
+  where i' = fromIntegral i
+ 
 isConstr, isIndirection, isThunk :: ClosureType -> Bool
 isConstr Constr = True
 isConstr    _   = False
@@ -274,12 +282,13 @@ sizeofTyCon = sizeofPrimRep . tyConPrimRep
 -----------------------------------
 type TermProcessor a b = Type -> Either String DataCon -> HValue -> [a] -> b
 
-data TermFold a = TermFold { fTerm :: TermProcessor a a
-                           , fPrim :: Type -> [Word] -> a
-                           , fSuspension :: ClosureType -> Maybe Type -> HValue
+data TermFold a = TermFold { fTerm        :: TermProcessor a a
+                           , fPrim        :: Type -> [Word] -> a
+                           , fSuspension  :: ClosureType -> Maybe Type -> HValue
                                            -> Maybe Name -> a
                            , fNewtypeWrap :: Type -> Either String DataCon
                                             -> a -> a
+                           , fRefWrap     :: Type -> a -> a
                            }
 
 foldTerm :: TermFold a -> Term -> a
@@ -287,20 +296,23 @@ foldTerm tf (Term ty dc v tt) = fTerm tf ty dc v (map (foldTerm tf) tt)
 foldTerm tf (Prim ty    v   ) = fPrim tf ty v
 foldTerm tf (Suspension ct ty v b) = fSuspension tf ct ty v b
 foldTerm tf (NewtypeWrap ty dc t)  = fNewtypeWrap tf ty dc (foldTerm tf t)
+foldTerm tf (RefWrap ty t)         = fRefWrap tf ty (foldTerm tf t)
 
 idTermFold :: TermFold Term
 idTermFold = TermFold {
               fTerm = Term,
               fPrim = Prim,
               fSuspension  = Suspension,
-              fNewtypeWrap = NewtypeWrap
+              fNewtypeWrap = NewtypeWrap,
+              fRefWrap = RefWrap
                       }
 idTermFoldM :: Monad m => TermFold (m Term)
 idTermFoldM = TermFold {
               fTerm       = \ty dc v tt -> sequence tt >>= return . Term ty dc v,
               fPrim       = (return.). Prim,
               fSuspension = (((return.).).). Suspension,
-              fNewtypeWrap= \ty dc t -> NewtypeWrap ty dc `liftM` t
+              fNewtypeWrap= \ty dc t -> NewtypeWrap ty dc `liftM` t,
+              fRefWrap    = \ty t -> RefWrap ty `liftM` t
                        }
 
 mapTermType :: (Type -> Type) -> Term -> Term
@@ -308,7 +320,8 @@ mapTermType f = foldTerm idTermFold {
           fTerm       = \ty dc hval tt -> Term (f ty) dc hval tt,
           fSuspension = \ct mb_ty hval n ->
                           Suspension ct (fmap f mb_ty) hval n,
-          fNewtypeWrap= \ty dc t -> NewtypeWrap (f ty) dc t}
+          fNewtypeWrap= \ty dc t -> NewtypeWrap (f ty) dc t,
+          fRefWrap    = \ty t -> RefWrap (f ty) t}
 
 termTyVars :: Term -> TyVarSet
 termTyVars = foldTerm TermFold {
@@ -317,7 +330,8 @@ termTyVars = foldTerm TermFold {
             fSuspension = \_ mb_ty _ _ -> 
                           maybe emptyVarEnv tyVarsOfType mb_ty,
             fPrim       = \ _ _ -> emptyVarEnv,
-            fNewtypeWrap= \ty _ t -> tyVarsOfType ty `plusVarEnv` t}
+            fNewtypeWrap= \ty _ t -> tyVarsOfType ty `plusVarEnv` t,
+            fRefWrap    = \ty t -> tyVarsOfType ty `plusVarEnv` t}
     where concatVarEnv = foldr plusVarEnv emptyVarEnv
 
 ----------------------------------
@@ -340,9 +354,6 @@ pprTerm _ _ _ = panic "pprTerm"
 pprTermM, ppr_termM, pprNewtypeWrap :: Monad m => TermPrinterM m -> TermPrinterM m
 pprTermM y p t = pprDeeper `liftM` ppr_termM y p t
 
-pprTermM1, ppr_termM1 :: Monad m => Term -> m SDoc
-pprTermM1 t    = pprDeeper `liftM` ppr_termM1 t
-
 ppr_termM y p Term{dc=Left dc_tag, subTerms=tt} = do
   tt_docs <- mapM (y app_prec) tt
   return$ cparen (not(null tt) && p >= app_prec) (text dc_tag <+> pprDeeperList fsep tt_docs)
@@ -358,18 +369,21 @@ ppr_termM y p Term{dc=Right dc, subTerms=tt}
          return$ cparen (p >= app_prec) (ppr dc <+> pprDeeperList fsep tt_docs)
 
 ppr_termM y p t@NewtypeWrap{} = pprNewtypeWrap y p t
-
+ppr_termM y p RefWrap{wrapped_term=t}  = braces `liftM` y p t
 ppr_termM _ _ t = ppr_termM1 t
 
 
+ppr_termM1 :: Monad m => Term -> m SDoc
 ppr_termM1 Prim{value=words, ty=ty} = 
     return$ text$ repPrim (tyConAppTyCon ty) words
-ppr_termM1 Term{} = panic "ppr_termM1 - unreachable"
 ppr_termM1 Suspension{bound_to=Nothing} = return$ char '_'
 ppr_termM1 Suspension{mb_ty=Just ty, bound_to=Just n}
   | Just _ <- splitFunTy_maybe ty = return$ ptext SLIT("<function>")
-  | otherwise = return$ parens$ ppr n <> text "::" <> ppr ty 
-ppr_termM1 _ = panic "ppr_termM1"
+  | otherwise = return$ parens$ ppr n <> text "::" <> ppr ty
+ppr_termM1 Suspension{}  = panic "ppr_termM1 - Suspension"
+ppr_termM1 Term{}        = panic "ppr_termM1 - Term"
+ppr_termM1 RefWrap{}     = panic "ppr_termM1 - RefWrap"
+ppr_termM1 NewtypeWrap{} = panic "ppr_termM1 - NewtypeWrap"
 
 pprNewtypeWrap y p NewtypeWrap{ty=ty, wrapped_term=t} 
   | Just (tc,_) <- splitNewTyConApp_maybe ty
@@ -400,12 +414,11 @@ type CustomTermPrinter m = TermPrinterM m
 cPprTerm :: Monad m => CustomTermPrinter m -> Term -> m SDoc
 cPprTerm printers_ = go 0 where
   printers = printers_ go
-  go prec t | isTerm t || isNewtypeWrap t = do
+  go prec t = do
     let default_ = Just `liftM` pprTermM go prec t
         mb_customDocs = [pp prec t | pp <- printers] ++ [default_]
     Just doc <- firstJustM mb_customDocs
     return$ cparen (prec>app_prec+1) doc
-  go _ t = pprTermM1 t
 
   firstJustM (mb:mbs) = mb >>= maybe (firstJustM mbs) (return . Just)
   firstJustM [] = return Nothing
@@ -592,6 +605,16 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
       t | isThunk t && force -> seq a $ go (pred bound) tv ty a
 -- We always follow indirections 
       Indirection _ -> go bound tv ty $! (ptrs clos ! 0)
+-- We also follow references
+      MutVar _ | Just (tycon,[world,ty_contents]) <- splitTyConApp_maybe ty
+                -- , tycon == mutVarPrimTyCon 
+             -> do
+         contents <- trIO$ IO$ \w -> readMutVar# (unsafeCoerce# a) w
+         tv' <- newVar liftedTypeKind
+         addConstraint tv (mkTyConApp tycon [world,tv'])
+         x <- go bound tv' ty_contents contents
+         return (RefWrap ty x)
+
  -- The interesting case
       Constr -> do
         Right dcname <- dataConInfoPtrToName (infoPtr clos)
@@ -636,7 +659,7 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
                                 (drop extra_args subTtypes)
             return (Term tv (Right dc) a subTerms)
 -- The otherwise case: can be a Thunk,AP,PAP,etc.
-      tipe_clos -> 
+      tipe_clos ->
          return (Suspension tipe_clos (Just tv) a Nothing)
 
   matchSubTypes dc ty
@@ -709,6 +732,13 @@ cvReconstructType hsc_env max_depth mb_ty hval = runTR_maybe hsc_env $ do
     clos <- trIO $ getClosureData a
     case tipe clos of
       Indirection _ -> go tv $! (ptrs clos ! 0)
+      MutVar _ -> do
+         contents <- trIO$ IO$ \w -> readMutVar# (unsafeCoerce# a) w
+         tv'   <- newVar liftedTypeKind
+         world <- newVar liftedTypeKind
+         addConstraint tv (mkTyConApp mutVarPrimTyCon [world,tv'])
+--         x <- go tv' ty_contents contents
+         return [(tv', contents)]
       Constr -> do
         Right dcname <- dataConInfoPtrToName (infoPtr clos)
         (_,mb_dc)    <- tryTcErrs (tcLookupDataCon dcname)
