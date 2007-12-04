@@ -34,7 +34,8 @@ module CoreUnfold (
 	couldBeSmallEnoughToInline, 
 	certainlyWillInline, smallEnoughToInline,
 
-	callSiteInline
+	callSiteInline, CallContInfo(..)
+
     ) where
 
 #include "HsVersions.h"
@@ -504,12 +505,23 @@ StrictAnal.addStrictnessInfoToTopId
 callSiteInline :: DynFlags
 	       -> Bool			-- True <=> the Id can be inlined
 	       -> Id			-- The Id
+	       -> Bool			-- True if there are are no arguments at all (incl type args)
 	       -> [Bool]		-- One for each value arg; True if it is interesting
-	       -> Bool			-- True <=> continuation is interesting
+	       -> CallContInfo		-- True <=> continuation is interesting
 	       -> Maybe CoreExpr	-- Unfolding, if any
 
 
-callSiteInline dflags active_inline id arg_infos interesting_cont
+data CallContInfo = BoringCont		
+		  | InterestingCont	-- Somewhat interesting
+		  | CaseCont		-- Very interesting; the argument of a case
+					-- that decomposes its scrutinee
+
+instance Outputable CallContInfo where
+  ppr BoringCont      = ptext SLIT("BoringCont")
+  ppr InterestingCont = ptext SLIT("InterestingCont")
+  ppr CaseCont 	      = ptext SLIT("CaseCont")
+
+callSiteInline dflags active_inline id lone_variable arg_infos cont_info
   = case idUnfolding id of {
 	NoUnfolding -> Nothing ;
 	OtherCon cs -> Nothing ;
@@ -529,9 +541,7 @@ callSiteInline dflags active_inline id arg_infos interesting_cont
 
 	n_val_args  = length arg_infos
 
- 	yes_or_no 
-	  | not active_inline = False
-	  | otherwise = is_cheap && consider_safe False
+ 	yes_or_no = active_inline && is_cheap && consider_safe
 		-- We consider even the once-in-one-branch
 		-- occurrences, because they won't all have been
 		-- caught by preInlineUnconditionally.  In particular,
@@ -540,14 +550,13 @@ callSiteInline dflags active_inline id arg_infos interesting_cont
 		-- pre-inline will not have inlined it for fear of
 		-- invalidating the occurrence info in the rhs.
 
-	consider_safe once
+	consider_safe
 		-- consider_safe decides whether it's a good idea to
 		-- inline something, given that there's no
 		-- work-duplication issue (the caller checks that).
 	  = case guidance of
 	      UnfoldNever  -> False
 	      UnfoldIfGoodArgs n_vals_wanted arg_discounts size res_discount
-
 		  | enough_args && size <= (n_vals_wanted + 1)
 			-- Inline unconditionally if there no size increase
 			-- Size of call is n_vals_wanted (+1 for the function)
@@ -557,43 +566,46 @@ callSiteInline dflags active_inline id arg_infos interesting_cont
 		  -> some_benefit && small_enough
 
 		  where
-		    some_benefit = or arg_infos || really_interesting_cont || 
-		    		   (not is_top && ({- once || -} (n_vals_wanted > 0 && enough_args)))
-				-- [was (once && not in_lam)]
-		-- If it occurs more than once, there must be
-		-- something interesting about some argument, or the
-		-- result context, to make it worth inlining
-		--
-		-- If a function has a nested defn we also record
-		-- some-benefit, on the grounds that we are often able
-		-- to eliminate the binding, and hence the allocation,
-		-- for the function altogether; this is good for join
-		-- points.  But this only makes sense for *functions*;
-		-- inlining a constructor doesn't help allocation
-		-- unless the result is scrutinised.  UNLESS the
-		-- constructor occurs just once, albeit possibly in
-		-- multiple case branches.  Then inlining it doesn't
-		-- increase allocation, but it does increase the
-		-- chance that the constructor won't be allocated at
-		-- all in the branches that don't use it.
+		    enough_args	= n_val_args >= n_vals_wanted
 
-		    enough_args		  = n_val_args >= n_vals_wanted
-		    really_interesting_cont | n_val_args <  n_vals_wanted = False	-- Too few args
-		    			    | n_val_args == n_vals_wanted = interesting_cont
-		    			    | otherwise		          = True	-- Extra args
+		    some_benefit = or arg_infos || really_interesting_cont
+				-- There must be something interesting
+				-- about some argument, or the result
+				-- context, to make it worth inlining
+
+		    really_interesting_cont 
+			| n_val_args <  n_vals_wanted = False	-- Too few args
+		    	| n_val_args == n_vals_wanted = interesting_saturated_call
+		    	| otherwise		      = True	-- Extra args
 		    	-- really_interesting_cont tells if the result of the
 		    	-- call is in an interesting context.
 
+		    interesting_saturated_call 
+			= case cont_info of
+			    BoringCont -> not is_top && n_vals_wanted > 0	-- Note [Nested functions] 
+			    CaseCont   -> not lone_variable || not is_value	-- Note [Lone variables]
+			    InterestingCont -> n_vals_wanted > 0
+
 		    small_enough = (size - discount) <= opt_UF_UseThreshold
-		    discount     = computeDiscount n_vals_wanted arg_discounts res_discount 
-						 arg_infos really_interesting_cont
+		    discount = computeDiscount n_vals_wanted arg_discounts 
+					       res_discount' arg_infos
+		    res_discount' = case cont_info of
+					BoringCont      -> 0
+					CaseCont        -> res_discount
+					InterestingCont -> 4 `min` res_discount
+			-- res_discount can be very large when a function returns
+			-- construtors; but we only want to invoke that large discount
+			-- when there's a case continuation.
+			-- Otherwise we, rather arbitrarily, threshold it.  Yuk.
+			-- But we want to aovid inlining large functions that return 
+			-- constructors into contexts that are simply "interesting"
 		
     in    
     if dopt Opt_D_dump_inlinings dflags then
 	pprTrace "Considering inlining"
 		 (ppr id <+> vcat [text "active:" <+> ppr active_inline,
 			  	   text "arg infos" <+> ppr arg_infos,
-				   text "interesting continuation" <+> ppr interesting_cont,
+				   text "interesting continuation" <+> ppr cont_info,
 				   text "is value:" <+> ppr is_value,
 				   text "is cheap:" <+> ppr is_cheap,
 				   text "guidance" <+> ppr guidance,
@@ -602,9 +614,78 @@ callSiteInline dflags active_inline id arg_infos interesting_cont
     else
     result
     }
+\end{code}
 
-computeDiscount :: Int -> [Int] -> Int -> [Bool] -> Bool -> Int
-computeDiscount n_vals_wanted arg_discounts res_discount arg_infos result_used
+Note [Nested functions]
+~~~~~~~~~~~~~~~~~~~~~~~
+If a function has a nested defn we also record some-benefit, on the
+grounds that we are often able to eliminate the binding, and hence the
+allocation, for the function altogether; this is good for join points.
+But this only makes sense for *functions*; inlining a constructor
+doesn't help allocation unless the result is scrutinised.  UNLESS the
+constructor occurs just once, albeit possibly in multiple case
+branches.  Then inlining it doesn't increase allocation, but it does
+increase the chance that the constructor won't be allocated at all in
+the branches that don't use it.
+
+Note [Lone variables]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The "lone-variable" case is important.  I spent ages messing about
+with unsatisfactory varaints, but this is nice.  The idea is that if a
+variable appears all alone
+	as an arg of lazy fn, or rhs	Stop
+	as scrutinee of a case		Select
+	as arg of a strict fn		ArgOf
+AND
+	it is bound to a value
+then we should not inline it (unless there is some other reason,
+e.g. is is the sole occurrence).  That is what is happening at 
+the use of 'lone_variable' in 'interesting_saturated_call'.
+
+Why?  At least in the case-scrutinee situation, turning
+	let x = (a,b) in case x of y -> ...
+into
+	let x = (a,b) in case (a,b) of y -> ...
+and thence to 
+	let x = (a,b) in let y = (a,b) in ...
+is bad if the binding for x will remain.
+
+Another example: I discovered that strings
+were getting inlined straight back into applications of 'error'
+because the latter is strict.
+	s = "foo"
+	f = \x -> ...(error s)...
+
+Fundamentally such contexts should not encourage inlining because the
+context can ``see'' the unfolding of the variable (e.g. case or a
+RULE) so there's no gain.  If the thing is bound to a value.
+
+However, watch out:
+
+ * Consider this:
+	foo = _inline_ (\n. [n])
+	bar = _inline_ (foo 20)
+	baz = \n. case bar of { (m:_) -> m + n }
+   Here we really want to inline 'bar' so that we can inline 'foo'
+   and the whole thing unravels as it should obviously do.  This is 
+   important: in the NDP project, 'bar' generates a closure data
+   structure rather than a list. 
+
+ * Even a type application or coercion isn't a lone variable.
+   Consider
+	case $fMonadST @ RealWorld of { :DMonad a b c -> c }
+   We had better inline that sucker!  The case won't see through it.
+
+   For now, I'm treating treating a variable applied to types 
+   in a *lazy* context "lone". The motivating example was
+	f = /\a. \x. BIG
+	g = /\a. \y.  h (f a)
+   There's no advantage in inlining f here, and perhaps
+   a significant disadvantage.  Hence some_val_args in the Stop case
+
+\begin{code}
+computeDiscount :: Int -> [Int] -> Int -> [Bool] -> Int
+computeDiscount n_vals_wanted arg_discounts result_discount arg_infos
  	-- We multiple the raw discounts (args_discount and result_discount)
 	-- ty opt_UnfoldingKeenessFactor because the former have to do with
 	--  *size* whereas the discounts imply that there's some extra 
@@ -626,8 +707,4 @@ computeDiscount n_vals_wanted arg_discounts res_discount arg_infos result_used
 
     mk_arg_discount discount is_evald | is_evald  = discount
 				      | otherwise = 0
-
-	-- Don't give a result discount unless there are enough args
-    result_discount | result_used = res_discount	-- Over-applied, or case scrut
-	            | otherwise	  = 0
 \end{code}

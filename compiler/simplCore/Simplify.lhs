@@ -1027,12 +1027,10 @@ completeCall env var cont
 	------------- Next try inlining ----------------
 	{ let	arg_infos = [interestingArg arg | arg <- args, isValArg arg]
 		n_val_args = length arg_infos
-	      	interesting_cont = interestingCallContext (notNull args)
-						  	  (notNull arg_infos)
-						  	  call_cont
+	      	interesting_cont = interestingCallContext call_cont
 	 	active_inline = activeInline env var
-		maybe_inline  = callSiteInline dflags active_inline
-				       var arg_infos interesting_cont
+		maybe_inline  = callSiteInline dflags active_inline var
+				               (null args) arg_infos interesting_cont
 	; case maybe_inline of {
 	    Just unfolding  	-- There is an inlining!
 	      ->  do { tick (UnfoldingDone var)

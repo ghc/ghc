@@ -621,7 +621,7 @@ Can we eta-expand f?  Only if we see that f has arity 1, and then we
 take advantage of the 'state hack' on the result of
 (f y) :: State# -> (State#, Int) to expand the arity one more.
 
-There is a disadvantage though.  Making the arity visible in the RHA
+There is a disadvantage though.  Making the arity visible in the RHS
 allows us to eta-reduce
 	f = \x -> f x
 to

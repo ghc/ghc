@@ -302,62 +302,25 @@ applies when x is bound to a lambda expression.  Hence
 contIsInteresting looks for case expressions with just a single
 default case.
 
+
 \begin{code}
-interestingCallContext :: Bool 		-- False <=> no args at all
-		       -> Bool		-- False <=> no value args
-		       -> SimplCont -> Bool
-	-- The "lone-variable" case is important.  I spent ages
-	-- messing about with unsatisfactory varaints, but this is nice.
-	-- The idea is that if a variable appear all alone
-	--	as an arg of lazy fn, or rhs	Stop
-	-- 	as scrutinee of a case		Select
-	--	as arg of a strict fn		ArgOf
-	-- then we should not inline it (unless there is some other reason,
-	-- e.g. is is the sole occurrence).  We achieve this by making
-	-- interestingCallContext return False for a lone variable.
-	--
-	-- Why?  At least in the case-scrutinee situation, turning
-	--	let x = (a,b) in case x of y -> ...
-	-- into
-	--	let x = (a,b) in case (a,b) of y -> ...
-	-- and thence to 
-	--	let x = (a,b) in let y = (a,b) in ...
-	-- is bad if the binding for x will remain.
-	--
-	-- Another example: I discovered that strings
-	-- were getting inlined straight back into applications of 'error'
-	-- because the latter is strict.
-	--	s = "foo"
-	--	f = \x -> ...(error s)...
-
-	-- Fundamentally such contexts should not ecourage inlining because
-	-- the context can ``see'' the unfolding of the variable (e.g. case or a RULE)
-	-- so there's no gain.
-	--
-	-- However, even a type application or coercion isn't a lone variable.
-	-- Consider
-	--	case $fMonadST @ RealWorld of { :DMonad a b c -> c }
-	-- We had better inline that sucker!  The case won't see through it.
-	--
-	-- For now, I'm treating treating a variable applied to types 
-	-- in a *lazy* context "lone". The motivating example was
-	--	f = /\a. \x. BIG
-	--	g = /\a. \y.  h (f a)
-	-- There's no advantage in inlining f here, and perhaps
-	-- a significant disadvantage.  Hence some_val_args in the Stop case
-
-interestingCallContext some_args some_val_args cont
+interestingCallContext :: SimplCont -> CallContInfo
+interestingCallContext cont
   = interesting cont
   where
-    interesting (Select {})              = some_args
-    interesting (ApplyTo {})             = True	-- Can happen if we have (coerce t (f x)) y
+    interesting (Select _ bndr _ _ _)
+	| isDeadBinder bndr       = CaseCont
+	| otherwise	          = InterestingCont
+		
+    interesting (ApplyTo {})      = InterestingCont
+						-- Can happen if we have (coerce t (f x)) y
 						-- Perhaps True is a bit over-keen, but I've
 						-- seen (coerce f) x, where f has an INLINE prag,
-						-- So we have to give some motivaiton for inlining it
-    interesting (StrictArg {})	         = some_val_args
-    interesting (StrictBind {})	         = some_val_args	-- ??
-    interesting (Stop ty _ interesting)  = some_val_args && interesting
-    interesting (CoerceIt _ cont)        = interesting cont
+						-- So we have to give some motivation for inlining it
+    interesting (StrictArg {})	  = InterestingCont
+    interesting (StrictBind {})	  = InterestingCont
+    interesting (Stop ty _ yes)   = if yes then InterestingCont else BoringCont
+    interesting (CoerceIt _ cont) = interesting cont
 	-- If this call is the arg of a strict function, the context
 	-- is a bit interesting.  If we inline here, we may get useful
 	-- evaluation information to avoid repeated evals: e.g.
@@ -418,7 +381,9 @@ interestingArgContext :: Id -> SimplCont -> Bool
 -- where g has rules, then we *do* want to inline f, in case it
 -- exposes a rule that might fire.  Similarly, if the context is
 --	h (g (f x x))
--- where h has rules, then we do want to inline f.
+-- where h has rules, then we do want to inline f; hence the
+-- call_cont argument to interestingArgContext
+--
 -- The interesting_arg_ctxt flag makes this happen; if it's
 -- set, the inliner gets just enough keener to inline f 
 -- regardless of how boring f's arguments are, if it's marked INLINE
@@ -426,8 +391,8 @@ interestingArgContext :: Id -> SimplCont -> Bool
 -- The alternative would be to *always* inline an INLINE function,
 -- regardless of how boring its context is; but that seems overkill
 -- For example, it'd mean that wrapper functions were always inlined
-interestingArgContext fn cont
-  = idHasRules fn || go cont
+interestingArgContext fn call_cont
+  = idHasRules fn || go call_cont
   where
     go (Select {})	      = False
     go (ApplyTo {})	      = False
