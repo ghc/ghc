@@ -882,48 +882,90 @@ because the latter is not well-kinded.
 
 %************************************************************************
 %*									*
-\subsection{Eta expansion and reduction}
+		Eta reduction
 %*									*
 %************************************************************************
 
-We try for eta reduction here, but *only* if we get all the 
-way to an exprIsTrivial expression.    
-We don't want to remove extra lambdas unless we are going 
-to avoid allocating this thing altogether
+Note [Eta reduction conditions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We try for eta reduction here, but *only* if we get all the way to an
+trivial expression.  We don't want to remove extra lambdas unless we
+are going to avoid allocating this thing altogether.
+
+There are some particularly delicate points here:
+
+* Eta reduction is not valid in general:  
+	\x. bot  /=  bot
+  This matters, partly for old-fashioned correctness reasons but,
+  worse, getting it wrong can yield a seg fault. Consider
+	f = \x.f x
+	h y = case (case y of { True -> f `seq` True; False -> False }) of
+		True -> ...; False -> ...
+
+  If we (unsoundly) eta-reduce f to get f=f, the strictness analyser
+  says f=bottom, and replaces the (f `seq` True) with just
+  (f `cast` unsafe-co).  BUT, as thing stand, 'f' got arity 1, and it
+  *keeps* arity 1 (perhaps also wrongly).  So CorePrep eta-expands 
+  the definition again, so that it does not termninate after all.
+  Result: seg-fault because the boolean case actually gets a function value.
+  See Trac #1947.
+
+  So it's important to to the right thing.
+
+* We need to be careful if we just look at f's arity. Currently (Dec07),
+  f's arity is visible in its own RHS (see Note [Arity robustness] in 
+  SimplEnv) so we must *not* trust the arity when checking that 'f' is
+  a value.  Instead, look at the unfolding. 
+
+  However for GlobalIds we can look at the arity; and for primops we
+  must, since they have no unfolding.  
+
+* Regardless of whether 'f' is a vlaue, we always want to 
+  reduce (/\a -> f a) to f
+  This came up in a RULE: foldr (build (/\a -> g a))
+  did not match 	   foldr (build (/\b -> ...something complex...))
+  The type checker can insert these eta-expanded versions,
+  with both type and dictionary lambdas; hence the slightly 
+  ad-hoc isDictId
+
+These delicacies are why we don't use exprIsTrivial and exprIsHNF here.
+Alas.
 
 \begin{code}
 tryEtaReduce :: [OutBndr] -> OutExpr -> Maybe OutExpr
 tryEtaReduce bndrs body 
-	-- We don't use CoreUtils.etaReduce, because we can be more
-	-- efficient here:
-	--  (a) we already have the binders
-	--  (b) we can do the triviality test before computing the free vars
   = go (reverse bndrs) body
   where
     go (b : bs) (App fun arg) | ok_arg b arg = go bs fun	-- Loop round
     go []       fun           | ok_fun fun   = Just fun		-- Success!
     go _        _			     = Nothing		-- Failure!
 
-    ok_fun fun =  exprIsTrivial fun
-	       && not (any (`elemVarSet` (exprFreeVars fun)) bndrs)
-	       && (exprIsHNF fun || all ok_lam bndrs)
+	-- Note [Eta reduction conditions]
+    ok_fun (App fun (Type ty)) 
+	| not (any (`elemVarSet` tyVarsOfType ty) bndrs)
+	=  ok_fun fun
+    ok_fun (Var fun_id)
+	=  not (fun_id `elem` bndrs)
+	&& (ok_fun_id fun_id || all ok_lam bndrs)
+    ok_fun _fun = False
+
+    ok_fun_id fun
+	| isLocalId fun       = isEvaldUnfolding (idUnfolding fun)
+	| isDataConWorkId fun = True
+	| isGlobalId fun      = idArity fun > 0
+
     ok_lam v = isTyVar v || isDictId v
-	-- The exprIsHNF is because eta reduction is not 
-	-- valid in general:  \x. bot  /=  bot
-	-- So we need to be sure that the "fun" is a value.
-	--
-	-- However, we always want to reduce (/\a -> f a) to f
-	-- This came up in a RULE: foldr (build (/\a -> g a))
-	--	did not match 	   foldr (build (/\b -> ...something complex...))
-	-- The type checker can insert these eta-expanded versions,
-	-- with both type and dictionary lambdas; hence the slightly 
-	-- ad-hoc isDictTy
 
     ok_arg b arg = varToCoreExpr b `cheapEqExpr` arg
 \end{code}
 
 
-	Try eta expansion for RHSs
+%************************************************************************
+%*									*
+		Eta expansion
+%*									*
+%************************************************************************
+
 
 We go for:
    f = \x1..xn -> N  ==>   f = \x1..xn y1..ym -> N y1..ym
@@ -937,6 +979,16 @@ where (in both cases)
 
 	* N is a NORMAL FORM (i.e. no redexes anywhere)
 	  wanting a suitable number of extra args.
+
+The biggest reason for doing this is for cases like
+
+	f = \x -> case x of
+		    True  -> \y -> e1
+		    False -> \y -> e2
+
+Here we want to get the lambdas together.  A good exmaple is the nofib
+program fibheaps, which gets 25% more allocation if you don't do this
+eta-expansion.
 
 We may have to sandwich some coerces between the lambdas
 to make the types work.   exprEtaExpandArity looks through coerces
