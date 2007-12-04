@@ -920,6 +920,12 @@ forkzh_fast
   ("ptr" threadid) = foreign "C" createIOThread( MyCapability() "ptr", 
 				RtsFlags_GcFlags_initialStkSize(RtsFlags), 
 				closure "ptr") [];
+
+  /* start blocked if the current thread is blocked */
+  StgTSO_flags(threadid) = 
+     StgTSO_flags(threadid) |  (StgTSO_flags(CurrentTSO) & 
+                                (TSO_BLOCKEX::I32 | TSO_INTERRUPTIBLE::I32));
+
   foreign "C" scheduleThread(MyCapability() "ptr", threadid "ptr") [];
 
   // switch at the earliest opportunity
@@ -943,6 +949,12 @@ forkOnzh_fast
   ("ptr" threadid) = foreign "C" createIOThread( MyCapability() "ptr", 
 				RtsFlags_GcFlags_initialStkSize(RtsFlags), 
 				closure "ptr") [];
+
+  /* start blocked if the current thread is blocked */
+  StgTSO_flags(threadid) = 
+     StgTSO_flags(threadid) |  (StgTSO_flags(CurrentTSO) & 
+                                (TSO_BLOCKEX::I32 | TSO_INTERRUPTIBLE::I32));
+
   foreign "C" scheduleThreadOn(MyCapability() "ptr", cpu, threadid "ptr") [];
 
   // switch at the earliest opportunity
