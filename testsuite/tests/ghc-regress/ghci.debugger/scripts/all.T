@@ -26,6 +26,7 @@ test('print024', normal, ghci_script, ['print024.script'])
 test('print025', normal, ghci_script, ['print025.script'])
 test('print026', normal, ghci_script, ['print026.script'])
 test('print027', normal, ghci_script, ['print027.script'])
+test('print028', normal, ghci_script, ['print028.script'])
 
 
 test('break001', normal, ghci_script, ['break001.script'])

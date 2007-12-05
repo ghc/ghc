@@ -1,0 +1,4 @@
+l = (_t1::[Maybe Integer])
+Just 1
+r = GHC.IOBase.IORef (GHC.STRef.STRef {(Just 1 : (_t2::[Maybe Integer]))})
+r = GHC.IOBase.IORef (GHC.STRef.STRef {(Just 1 : _)})
