@@ -210,8 +210,12 @@ defaultDataConWorkers = [trueDataCon, falseDataCon]
 preludeVars :: [(Module, FastString, Module, FastString)]
 preludeVars
   = [
-      mk gHC_PARR FSLIT("mapP") nDP_COMBINATORS FSLIT("mapPA")
-    , mk gHC_PARR FSLIT("zipWithP") nDP_COMBINATORS FSLIT("zipWithPA")
+      mk gHC_PARR FSLIT("mapP")       nDP_COMBINATORS FSLIT("mapPA")
+    , mk gHC_PARR FSLIT("zipWithP")   nDP_COMBINATORS FSLIT("zipWithPA")
+    , mk gHC_PARR FSLIT("filterP")    nDP_COMBINATORS FSLIT("filterPA")
+    , mk gHC_PARR FSLIT("replicateP") nDP_COMBINATORS FSLIT("replicatePA")
+    , mk gHC_PARR FSLIT("!:")         nDP_COMBINATORS FSLIT("indexPA")
+    , mk gHC_PARR FSLIT("crossMapP")  nDP_COMBINATORS FSLIT("crossMapPA")
 
     , mk nDP_PRELUDE_INT  FSLIT("plus") nDP_PRELUDE_INT FSLIT("plusV")
     , mk nDP_PRELUDE_INT  FSLIT("minus") nDP_PRELUDE_INT FSLIT("minusV")
