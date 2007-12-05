@@ -108,8 +108,8 @@ foreign import ccall unsafe times :: Ptr CTms -> IO CClock
   where 
 	ft2psecs :: Ptr FILETIME -> IO Integer
         ft2psecs ft = do
-          high <- (#peek FILETIME,dwHighDateTime) ft :: IO CLong
-          low <- (#peek FILETIME,dwLowDateTime) ft :: IO CLong
+          high <- (#peek FILETIME,dwHighDateTime) ft :: IO Word32
+          low  <- (#peek FILETIME,dwLowDateTime)  ft :: IO Word32
 	    -- Convert 100-ns units to picosecs (10^-12) 
 	    -- => multiply by 10^5.
           return (((fromIntegral high) * (2^32) + (fromIntegral low)) * 100000)
