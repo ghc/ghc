@@ -149,13 +149,13 @@ initBuiltins
       upToPAIntPrimVar <- externalVar nDP_PRIM FSLIT("upToPA_Int#")
       selectPAIntPrimVar <- externalVar nDP_PRIM FSLIT("selectPA_Int#")
       truesPABoolPrimVar <- externalVar nDP_PRIM FSLIT("truesPA_Bool#")
-      lengthPAVar      <- externalVar nDP_PARRAY FSLIT("lengthPA")
-      replicatePAVar   <- externalVar nDP_PARRAY FSLIT("replicatePA")
+      lengthPAVar      <- externalVar nDP_PARRAY FSLIT("lengthPA#")
+      replicatePAVar   <- externalVar nDP_PARRAY FSLIT("replicatePA#")
       emptyPAVar       <- externalVar nDP_PARRAY FSLIT("emptyPA")
-      packPAVar        <- externalVar nDP_PARRAY FSLIT("packPA")
+      packPAVar        <- externalVar nDP_PARRAY FSLIT("packPA#")
 
       combines <- mapM (externalVar nDP_PARRAY)
-                       [mkFastString ("combine" ++ show i ++ "PA")
+                       [mkFastString ("combine" ++ show i ++ "PA#")
                           | i <- [2..mAX_NDP_COMBINE]]
       let combinePAVars = listArray (2, mAX_NDP_COMBINE) combines
 
