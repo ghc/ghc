@@ -361,9 +361,8 @@ dsPArrComp      :: [Stmt Id]
 dsPArrComp [ParStmt qss] body _  =  -- parallel comprehension
   dePArrParComp qss body
 dsPArrComp qs            body _  =  -- no ParStmt in `qs'
-  dsLookupGlobalId replicatePName			  `thenDs` \repP ->
-  let unitArray = mkApps (Var repP) [Type unitTy, 
-				     mkIntExpr 1, 
+  dsLookupGlobalId singletonPName			  `thenDs` \sglP ->
+  let unitArray = mkApps (Var sglP) [Type unitTy, 
 				     mkCoreTup []]
   in
   dePArrComp qs body (mkTuplePat []) unitArray
@@ -396,6 +395,14 @@ dePArrComp (ExprStmt b _ _ : qs) body pa cea =
   in
   deLambda ty pa b				  `thenDs` \(clam,_) ->
   dePArrComp qs body pa (mkApps (Var filterP) [Type ty, clam, cea])
+
+--
+--  <<[:e' | p <- e, qs:]>> pa ea =
+--    let ef = \pa -> e
+--    in
+--    <<[:e' | qs:]>> (pa, p) (crossMap ea ef)
+--
+-- if matching again p cannot fail, or else
 --
 --  <<[:e' | p <- e, qs:]>> pa ea = 
 --    let ef = \pa -> filterP (\x -> case x of {p -> True; _ -> False}) e
@@ -413,7 +420,8 @@ dePArrComp (BindStmt p e _ _ : qs) body pa cea =
   in
   newSysLocalDs ety'ce					  `thenDs` \v       ->
   matchSimply (Var v) (StmtCtxt PArrComp) p true false    `thenDs` \pred    ->
-  let cef = mkApps (Var filterP) [Type ety'ce, mkLams [v] pred, ce]
+  let cef | isIrrefutableHsPat p = ce
+          | otherwise            = mkApps (Var filterP) [Type ety'ce, mkLams [v] pred, ce]
   in
   mkLambda ety'cea pa cef				  `thenDs` \(clam, 
 								     _    ) ->

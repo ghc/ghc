@@ -184,7 +184,7 @@ basicKnownKeyNames
 	zipName, foldrName, buildName, augmentName, appendName,
 
         -- Parallel array operations
-	nullPName, lengthPName, replicatePName,	mapPName,
+	nullPName, lengthPName, replicatePName,	singletonPName, mapPName,
 	filterPName, zipPName, crossMapPName, indexPName,
 	toPName, bpermutePName, bpermuteDftPName, indexOfPName,
 
@@ -603,6 +603,7 @@ enumFromToPName	   = varQual gHC_PARR FSLIT("enumFromToP") enumFromToPIdKey
 enumFromThenToPName= varQual gHC_PARR FSLIT("enumFromThenToP") enumFromThenToPIdKey
 nullPName	  = varQual gHC_PARR FSLIT("nullP")      	 nullPIdKey
 lengthPName	  = varQual gHC_PARR FSLIT("lengthP")    	 lengthPIdKey
+singletonPName    = varQual gHC_PARR FSLIT("singletonP")         singletonPIdKey
 replicatePName	  = varQual gHC_PARR FSLIT("replicateP") 	 replicatePIdKey
 mapPName	  = varQual gHC_PARR FSLIT("mapP")       	 mapPIdKey
 filterPName	  = varQual gHC_PARR FSLIT("filterP")    	 filterPIdKey
@@ -975,6 +976,7 @@ breakpointAutoJumpIdKey       = mkPreludeMiscIdUnique 67
 inlineIdKey		      = mkPreludeMiscIdUnique 68
 
 -- Parallel array functions
+singletonPIdKey               = mkPreludeMiscIdUnique 79
 nullPIdKey	              = mkPreludeMiscIdUnique 80
 lengthPIdKey		      = mkPreludeMiscIdUnique 81
 replicatePIdKey		      = mkPreludeMiscIdUnique 82
