@@ -92,6 +92,7 @@ module GHC.PArr (
   scanrP,		-- :: (a -> b -> b) -> b -> [:a:] -> [:b:]
   scanr1P,		-- :: (a -> a -> a) ->      [:a:] -> [:a:]
 --  iterate, repeat,	      -- parallel arrays must be finite
+  singletonP,           -- :: a -> [:a:]
   replicateP,		-- :: Int -> a -> [:a:]
 --  cycle,		      -- parallel arrays must be finite
   takeP,		-- :: Int -> [:a:] -> [:a:]
@@ -235,6 +236,10 @@ scanr1P :: (a -> a -> a) -> [:a:] -> [:a:]
 scanr1P  = error "Prelude.scanr1P: not implemented yet" -- FIXME
 
 --  iterate, repeat	      -- parallel arrays must be finite
+
+singletonP             :: a -> [:a:]
+{-# INLINE singletonP #-}
+singletonP e = replicateP 1 e
 
 replicateP             :: Int -> a -> [:a:]
 {-# INLINE replicateP #-}
