@@ -407,7 +407,9 @@ runUnlit dflags args = do
 runCpp :: DynFlags -> [Option] -> IO ()
 runCpp dflags args =   do 
   let (p,args0) = pgm_P dflags
-  runSomething dflags "C pre-processor" p (args0 ++ args)
+      args1 = args0 ++ args
+  mb_env <- getGccEnv args1
+  runSomethingFiltered dflags id  "C pre-processor" p args1 mb_env
 
 runPp :: DynFlags -> [Option] -> IO ()
 runPp dflags args =   do 
