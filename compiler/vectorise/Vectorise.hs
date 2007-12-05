@@ -337,6 +337,14 @@ vectAlgCase tycon ty_args scrut bndr ty [(DEFAULT, [], body)]
       (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
       return $ vCaseDEFAULT vscrut vbndr vty lty vbody
 
+vectAlgCase tycon ty_args scrut bndr ty [(DataAlt dc, [], body)]
+  = do
+      vscrut <- vectExpr scrut
+      vty    <- vectType ty
+      lty    <- mkPArrayType vty
+      (vbndr, vbody) <- vectBndrIn bndr (vectExpr body)
+      return $ vCaseDEFAULT vscrut vbndr vty lty vbody
+
 vectAlgCase tycon ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
   = do
       vect_tc <- maybeV (lookupTyCon tycon)
