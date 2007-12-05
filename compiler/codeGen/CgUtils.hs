@@ -51,7 +51,7 @@ module CgUtils (
   ) where
 
 #include "HsVersions.h"
-#include "MachRegs.h"
+#include "../includes/MachRegs.h"
 
 import CgMonad
 import TyCon

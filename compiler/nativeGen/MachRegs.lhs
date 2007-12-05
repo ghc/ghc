@@ -90,7 +90,7 @@ module MachRegs (
 -- HACK: go for the max
 #endif
 
-#include "MachRegs.h"
+#include "../includes/MachRegs.h"
 
 import Cmm
 import MachOp		( MachRep(..) )
