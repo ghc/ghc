@@ -217,6 +217,7 @@ preludeVars
     , mk gHC_PARR FSLIT("replicateP") nDP_COMBINATORS FSLIT("replicatePA")
     , mk gHC_PARR FSLIT("!:")         nDP_COMBINATORS FSLIT("indexPA")
     , mk gHC_PARR FSLIT("crossMapP")  nDP_COMBINATORS FSLIT("crossMapPA")
+    , mk gHC_PARR FSLIT("singletonP") nDP_COMBINATORS FSLIT("singletonPA")
 
     , mk nDP_PRELUDE_INT  FSLIT("plus") nDP_PRELUDE_INT FSLIT("plusV")
     , mk nDP_PRELUDE_INT  FSLIT("minus") nDP_PRELUDE_INT FSLIT("minusV")
