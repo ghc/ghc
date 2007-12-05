@@ -186,12 +186,15 @@ instance Ord ThreadId where
    compare = cmpThread
 
 {- |
-This sparks off a new thread to run the 'IO' computation passed as the
+Sparks off a new thread to run the 'IO' computation passed as the
 first argument, and returns the 'ThreadId' of the newly created
 thread.
 
 The new thread will be a lightweight thread; if you want to use a foreign
-library that uses thread-local storage, use 'forkOS' instead.
+library that uses thread-local storage, use 'Control.Concurrent.forkOS' instead.
+
+GHC note: the new thread inherits the /blocked/ state of the parent 
+(see 'Control.Exception.block').
 -}
 forkIO :: IO () -> IO ThreadId
 forkIO action = IO $ \ s -> 
@@ -199,6 +202,19 @@ forkIO action = IO $ \ s ->
  where
   action_plus = catchException action childHandler
 
+{- |
+Like 'forkIO', but lets you specify on which CPU the thread is
+created.  Unlike a `forkIO` thread, a thread created by `forkOnIO`
+will stay on the same CPU for its entire lifetime (`forkIO` threads
+can migrate between CPUs according to the scheduling policy).
+`forkOnIO` is useful for overriding the scheduling policy when you
+know in advance how best to distribute the threads.
+
+The `Int` argument specifies the CPU number; it is interpreted modulo
+'numCapabilities' (note that it actually specifies a capability number
+rather than a CPU number, but to a first approximation the two are
+equivalent).
+-}
 forkOnIO :: Int -> IO () -> IO ThreadId
 forkOnIO (I# cpu) action = IO $ \ s -> 
    case (forkOn# cpu action_plus s) of (# s1, id #) -> (# s1, ThreadId id #)

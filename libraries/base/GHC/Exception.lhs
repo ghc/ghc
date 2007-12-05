@@ -83,11 +83,17 @@ catch m k	=  catchException m handler
 -- | Applying 'block' to a computation will
 -- execute that computation with asynchronous exceptions
 -- /blocked/.  That is, any thread which
--- attempts to raise an exception in the current thread will be
+-- attempts to raise an exception in the current thread with 'Control.Exception.throwTo' will be
 -- blocked until asynchronous exceptions are enabled again.  There\'s
 -- no need to worry about re-enabling asynchronous exceptions; that is
 -- done automatically on exiting the scope of
 -- 'block'.
+--
+-- Threads created by 'Control.Concurrent.forkIO' inherit the blocked
+-- state from the parent; that is, to start a thread in blocked mode,
+-- use @block $ forkIO ...@.  This is particularly useful if you need to
+-- establish an exception handler in the forked thread before any
+-- asynchronous exceptions are received.
 block :: IO a -> IO a
 
 -- | To re-enable asynchronous exceptions inside the scope of
