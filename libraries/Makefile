@@ -300,7 +300,7 @@ doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 	                               $(CABAL_HADDOCK_FLAGS); \
 	fi
 ifneq "$(HSCOLOUR)" ""
-	ifBuildable/ifBuildable $* && cp hscolour.css $*/dist/doc/html/$*/src/
+	if ifBuildable/ifBuildable $*; then cp hscolour.css $*/dist/doc/html/$*/src/; fi
 endif
 
 .PHONY: distclean clean clean.library.%
