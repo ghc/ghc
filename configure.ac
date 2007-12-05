@@ -637,8 +637,6 @@ AC_ARG_WITH([ghc],
   WithGhc="$GHC"])
 AC_SUBST([WithGhc])
 
-FP_FIND_ROOT
-
 AC_ARG_WITH(hc,
 [AC_HELP_STRING([--with-hc=ARG],
         [Use ARG as the path to the compiler for compiling ordinary
@@ -757,6 +755,9 @@ dnl ** Must have GHC to build GHC, unless --enable-hc-boot is on
 if test "$BootingFromHc" = "NO" -a "$WithGhc" = "" -a -d "$srcdir/compiler"; then
 AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
 fi;
+
+# This uses GHC, so put it after the "GHC is required" check above:
+FP_FIND_ROOT
 
 dnl ** Enable the construction of Win32 DLLs?
 dnl --------------------------------------------------------------
