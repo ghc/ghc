@@ -189,7 +189,7 @@ ARITHMETIC_TYPE(CClock,tyConCClock,"CClock",HTYPE_CLOCK_T)
 --
 -- To convert to a @Data.Time.UTCTime@, use the following formula:
 --
--- >  posixSecondsToUTCTime (fromRational (toRational t) :: POSIXTime)
+-- >  posixSecondsToUTCTime (realToFrac :: POSIXTime)
 --
 ARITHMETIC_TYPE(CTime,tyConCTime,"CTime",HTYPE_TIME_T)
 
