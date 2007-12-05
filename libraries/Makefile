@@ -299,6 +299,9 @@ doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 	  cd $* && setup/Setup haddock --html-location='../$$pkg' \
 	                               $(CABAL_HADDOCK_FLAGS); \
 	fi
+ifneq "$(HSCOLOUR)" ""
+	ifBuildable/ifBuildable $* && cp hscolour.css $*/dist/doc/html/$*/src/
+endif
 
 .PHONY: distclean clean clean.library.%
 
