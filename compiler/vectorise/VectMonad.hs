@@ -376,7 +376,9 @@ defTyCon tc tc' = updGEnv $ \env ->
   env { global_tycons = extendNameEnv (global_tycons env) (tyConName tc) tc' }
 
 lookupDataCon :: DataCon -> VM (Maybe DataCon)
-lookupDataCon dc = readGEnv $ \env -> lookupNameEnv (global_datacons env) (dataConName dc)
+lookupDataCon dc
+  | isTupleTyCon (dataConTyCon dc) = return (Just dc)
+  | otherwise = readGEnv $ \env -> lookupNameEnv (global_datacons env) (dataConName dc)
 
 defDataCon :: DataCon -> DataCon -> VM ()
 defDataCon dc dc' = updGEnv $ \env ->

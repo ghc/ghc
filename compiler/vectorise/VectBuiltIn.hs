@@ -31,7 +31,8 @@ import OccName
 import TypeRep         ( funTyCon )
 import Type            ( Type )
 import TysPrim
-import TysWiredIn      ( unitTyCon, tupleTyCon,
+import TysWiredIn      ( unitTyCon, unitDataCon,
+                         tupleTyCon,
                          intTyCon, intTyConName,
                          doubleTyCon, doubleTyConName,
                          boolTyCon, boolTyConName, trueDataCon, falseDataCon,
@@ -205,7 +206,7 @@ initBuiltinVars bi
     (umods, ufs, vmods, vfs) = unzip4 preludeVars
 
 defaultDataConWorkers :: [DataCon]
-defaultDataConWorkers = [trueDataCon, falseDataCon]
+defaultDataConWorkers = [trueDataCon, falseDataCon, unitDataCon]
 
 preludeVars :: [(Module, FastString, Module, FastString)]
 preludeVars
@@ -253,7 +254,7 @@ initBuiltinDataCons :: Builtins -> [(Name, DataCon)]
 initBuiltinDataCons bi = [(dataConName dc, dc)| dc <- defaultDataCons]
 
 defaultDataCons :: [DataCon]
-defaultDataCons = [trueDataCon, falseDataCon]
+defaultDataCons = [trueDataCon, falseDataCon, unitDataCon]
 
 initBuiltinDicts :: [(Name, Module, FastString)] -> DsM [(Name, Var)]
 initBuiltinDicts ps
