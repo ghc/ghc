@@ -451,6 +451,11 @@ mkLiftEnv lc [ty] [v]
 mkLiftEnv lc tys vs
   = do
       (env_tc, env_tyargs) <- parrayReprTyCon vty
+
+      bndrs <- if null vs then do
+                                 v <- newDummyVar unitTy
+                                 return [v]
+                          else return vs
       let [env_con] = tyConDataCons env_tc
           
           env = Var (dataConWrapId env_con)
@@ -468,7 +473,4 @@ mkLiftEnv lc tys vs
 
     args  | null vs   = [Var unitDataConId]
           | otherwise = map Var vs
-
-    bndrs | null vs   = [mkWildId unitTy]
-          | otherwise = vs
 
