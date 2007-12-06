@@ -706,7 +706,7 @@ computeChangedOccs ver_fn this_module old_usages eq_info
     name_changed nm
         | Just ents <- lookupUFM usg_modmap (moduleName mod) 
         = case lookupUFM ents parent_occ of
-                Nothing -> pprPanic "computeChangedOccs" (ppr nm)
+                Nothing -> pprTrace "WARNING: computeChangedOccs" (ppr nm) $ False
                 Just v  -> v < new_version
         | otherwise = False -- must be in another package
       where
@@ -714,7 +714,7 @@ computeChangedOccs ver_fn this_module old_usages eq_info
          (parent_occ, new_version) = ver_fn nm
 
     -- Turn the usages from the old ModIface into a mapping
-    usg_modmap = listToUFM [ (usg_mod usg, listToUFM (usg_entities usg))
+    usg_modmap = listToUFM [ (usg_name usg, listToUFM (usg_entities usg))
                            | usg <- old_usages ]
 
     get_local_eq_info :: GenIfaceEq NameSet -> GenIfaceEq OccSet
