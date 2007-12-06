@@ -755,6 +755,11 @@ computeChangedOccs ver_fn this_module old_usages eq_info
 
 type OccIfaceEq = GenIfaceEq OccSet
 
+instance Outputable OccIfaceEq where
+  ppr Equal          = ptext SLIT("Equal")
+  ppr NotEqual       = ptext SLIT("NotEqual")
+  ppr (EqBut occset) = ptext SLIT("EqBut") <+> ppr (occSetElts occset)
+
 changedWrt :: OccSet -> OccIfaceEq -> Bool
 changedWrt so_far Equal        = False
 changedWrt so_far NotEqual     = True
