@@ -181,6 +181,10 @@ code of A, and thereby haul in all the stuff reachable from it.
 haul in all the unfoldings for B, in case the module that imports A *is*
 compiled with -O.  I think this is the case.]
 
+SimonM [30/11/2007]: I believe the above is all out of date; the
+current implementation doesn't do it this way.  Instead, when any of
+the dependencies of a declaration changes, the version of the
+declaration itself changes.
 
 \begin{code}
 #include "HsVersions.h"
