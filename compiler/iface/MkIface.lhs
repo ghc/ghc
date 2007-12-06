@@ -704,14 +704,20 @@ computeChangedOccs ver_fn this_module old_usages eq_info
     -- return True if an external name has changed
     name_changed :: Name -> Bool
     name_changed nm
-        | Just ents <- lookupUFM usg_modmap (moduleName mod) 
-        = case lookupUFM ents parent_occ of
-                Nothing -> pprTrace "WARNING: computeChangedOccs" (ppr nm) $ False
-                Just v  -> v < new_version
+        | Just ents <- lookupUFM usg_modmap (moduleName mod),
+          Just v    <- lookupUFM ents parent_occ
+        = v < new_version
+        | modulePackageId mod == this_pkg
+        = WARN(True, ptext SLIT("computeChangedOccs") <+> ppr nm) True
+        -- should really be a panic, see #1959.  The problem is that the usages doesn't
+        -- contain all the names that might be referred to by unfoldings.  So as a
+        -- conservative workaround we just assume these names have changed.
         | otherwise = False -- must be in another package
       where
          mod = nameModule nm
          (parent_occ, new_version) = ver_fn nm
+
+    this_pkg = modulePackageId this_module
 
     -- Turn the usages from the old ModIface into a mapping
     usg_modmap = listToUFM [ (usg_name usg, listToUFM (usg_entities usg))
