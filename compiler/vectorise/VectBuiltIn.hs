@@ -232,6 +232,8 @@ preludeVars
 
     -- FIXME: temporary
     , mk nDP_PRELUDE_PARR FSLIT("fromPArrayP") nDP_PRELUDE_PARR FSLIT("fromPArrayPA")
+    , mk nDP_PRELUDE_PARR FSLIT("toPArrayP") nDP_PRELUDE_PARR FSLIT("toPArrayPA")
+    , mk nDP_PRELUDE_PARR FSLIT("fromNestedPArrayP") nDP_PRELUDE_PARR FSLIT("fromNestedPArrayPA")
     ]
   where
     mk = (,,,)
