@@ -131,7 +131,7 @@ We produce a line for every module B below the module, A, currently being
 compiled:
 	import B <n> ;
 to record the fact that A does import B indirectly.  This is used to decide
-to look to look for B.hi rather than B.hi-boot when compiling a module that
+to look for B.hi rather than B.hi-boot when compiling a module that
 imports A.  This line says that A imports B, but uses nothing in it.
 So we'll get an early bale-out when compiling A if B's version changes.
 
