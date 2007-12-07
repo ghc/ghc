@@ -1820,7 +1820,8 @@ reduceContext env wanteds
 
 	  -- 8. Substitute the wanted *equations* in the wanted *dictionaries*
 	; let irreds = dict_irreds ++ implic_irreds
-	; (norm_irreds, normalise_binds2) <- substEqInDictInsts eq_irreds irreds
+	; (norm_irreds, normalise_binds2) <- substEqInDictInsts True {-wanted-}
+                                                                eq_irreds irreds
 		
 	  -- 9. eliminate the artificial skolem constants introduced in 1.
 	; eliminate_skolems	

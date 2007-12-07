@@ -519,9 +519,10 @@ lintCoreAlt scrut_ty alt_ty alt@(DataAlt con, args, rhs)
 	  {    -- Check the pattern
 		 -- Scrutinee type must be a tycon applicn; checked by caller
 		 -- This code is remarkably compact considering what it does!
-		 -- NB: args must be in scope here so that the lintCoreArgs line works.
-	         -- NB: relies on existential type args coming *after* ordinary type args
-
+		 -- NB: args must be in scope here so that the lintCoreArgs
+		 --     line works. 
+	         -- NB: relies on existential type args coming *after*
+	         --     ordinary type args 
 	  ; con_result_ty <- lintCoreArgs con_payload_ty (varsToCoreExprs args)
 	  ; checkTys con_result_ty scrut_ty (mkBadPatMsg con_result_ty scrut_ty) 
  	  }

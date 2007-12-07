@@ -637,17 +637,21 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 	  then do { -- The common case; no class bindings etc 
                     -- (see Note [Arrows and patterns])
 		    (arg_pats', inner_tvs, res) <- tcConArgs data_con arg_tys' 
-							       arg_pats pstate thing_inside
+						    arg_pats pstate thing_inside
 		  ; let res_pat = ConPatOut { pat_con = L con_span data_con, 
-			            	      pat_tvs = [], pat_dicts = [], pat_binds = emptyLHsBinds,
-					      pat_args = arg_pats', pat_ty = pat_ty' }
+			            	      pat_tvs = [], pat_dicts = [], 
+                                              pat_binds = emptyLHsBinds,
+					      pat_args = arg_pats', 
+                                              pat_ty = pat_ty' }
 
 		    ; return (wrap_res_pat res_pat, inner_tvs, res) }
 
 	  else do   -- The general case, with existential, and local equality 
                     -- constraints
 	{ let eq_preds = [mkEqPred (mkTyVarTy tv, ty) | (tv, ty) <- eq_spec]
-	      theta'   = substTheta tenv (full_theta ++ eq_preds)
+	      theta'   = substTheta tenv (eq_preds ++ full_theta)
+                           -- order is *important* as we generate the list of
+                           -- dictionary binders from theta'
 	      ctxt     = pat_ctxt pstate
 	; checkTc (case ctxt of { ProcPat -> False; other -> True })
 		  (existentialProcPat data_con)

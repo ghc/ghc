@@ -338,19 +338,21 @@ data DataCon
 	dcRepTyCon  :: TyCon,		-- Result tycon, T
 
 	dcRepType   :: Type,	-- Type of the constructor
-				-- 	forall a x y. (a:=:(x,y), Ord x) => x -> y -> MkT a
+				-- 	forall a x y. (a:=:(x,y), x~y, Ord x) =>
+                                --        x -> y -> T a
 				-- (this is *not* of the constructor wrapper Id:
 				--  see Note [Data con representation] below)
 	-- Notice that the existential type parameters come *second*.  
 	-- Reason: in a case expression we may find:
-	--	case (e :: T t) of { MkT b (d:Ord b) (x:t) (xs:[b]) -> ... }
+	--	case (e :: T t) of
+        --        MkT x y co1 co2 (d:Ord x) (v:r) (w:F s) -> ...
 	-- It's convenient to apply the rep-type of MkT to 't', to get
-	--	forall b. Ord b => ...
+	--	forall x y. (t:=:(x,y), x~y, Ord x) => x -> y -> T t
 	-- and use that to check the pattern.  Mind you, this is really only
-	-- use in CoreLint.
+	-- used in CoreLint.
 
 
-	-- Finally, the curried worker function that corresponds to the constructor
+	-- The curried worker function that corresponds to the constructor:
 	-- It doesn't have an unfolding; the code generator saturates these Ids
 	-- and allocates a real constructor when it finds one.
 	--

@@ -181,7 +181,7 @@ scrungleMatch var scrut body
     scrungle (Let binds body)  = Let binds (scrungle body)
     scrungle other = panic ("scrungleMatch: tuple pattern:\n" ++ showSDoc (ppr other))
 
-\end{code}	
+\end{code}
 
 %************************************************************************
 %*									*

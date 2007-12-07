@@ -388,14 +388,18 @@ normalise_dicts
 			-- Fals <=> they are given
 	-> TcM ([Inst],TcDictBinds)
 normalise_dicts given_eqs dicts is_wanted
-  = do	{ traceTc $ text "normalise???Dicts <-" <+> ppr dicts <+> 
+  = do	{ traceTc $ let name | is_wanted = "normaliseWantedDicts <-"
+                             | otherwise = "normaliseGivenDicts <-"
+                    in
+                    text name <+> ppr dicts <+> 
                     text "with" <+> ppr given_eqs
 	; (dicts0, binds0)  <- normaliseInsts is_wanted dicts
-	; (dicts1, binds1)  <- substEqInDictInsts given_eqs dicts0
+	; (dicts1, binds1)  <- substEqInDictInsts is_wanted given_eqs dicts0
 	; let binds01 = binds0 `unionBags` binds1
 	; if isEmptyBag binds1
 	  then return (dicts1, binds01)
-	  else do { (dicts2, binds2) <- normaliseGivenDicts given_eqs dicts1
+	  else do { (dicts2, binds2) <- 
+                      normalise_dicts given_eqs dicts1 is_wanted
 		  ; return (dicts2, binds01 `unionBags` binds2) } }
 \end{code}
 
@@ -1080,10 +1084,11 @@ form
 where F is a type family.
 
 \begin{code}
-substEqInDictInsts :: [Inst]    -- given equalities (used as rewrite rules)
+substEqInDictInsts :: Bool      -- whether the *dictionaries* are wanted/given
+                   -> [Inst]    -- given equalities (used as rewrite rules)
                    -> [Inst]    -- dictinaries to be normalised
                    -> TcM ([Inst], TcDictBinds)
-substEqInDictInsts eqInsts dictInsts 
+substEqInDictInsts isWanted eqInsts dictInsts 
   = do { traceTc (text "substEqInDictInst <-" <+> ppr dictInsts)
        ; dictInsts' <- 
            foldlM rewriteWithOneEquality (dictInsts, emptyBag) eqInsts
@@ -1097,7 +1102,7 @@ substEqInDictInsts eqInsts dictInsts
                                            tci_right = target})
       | isOpenSynTyConApp pattern || isTyVarTy pattern
       = do { (dictInsts', moreDictBinds) <- 
-               genericNormaliseInsts True {- wanted -} applyThisEq dictInsts
+               genericNormaliseInsts isWanted applyThisEq dictInsts
            ; return (dictInsts', dictBinds `unionBags` moreDictBinds)
            }
       where
@@ -1176,7 +1181,13 @@ genericNormaliseInsts isWanted fun insts
 			  rhs       = L (instLocSpan loc) cast_expr
 			  binds     = instToDictBind target_dict rhs
 		      -- return the new inst
-		    ; traceTc $ text "genericNormaliseInst ->" <+> ppr dict'
+		    ; traceTc $ let name | isWanted 
+                                         = "genericNormaliseInst (wanted) ->"
+                                         | otherwise
+                                         = "genericNormaliseInst (given) ->"
+                                in
+                                text name <+> ppr dict' <+>
+                                text "with" <+> ppr binds
                     ; return (dict', binds)
 		    }
 	   }
@@ -1184,6 +1195,8 @@ genericNormaliseInsts isWanted fun insts
 	-- TOMDO: What do we have to do about ImplicInst, Method, and LitInst??
     normaliseOneInst _isWanted _fun inst
       = do { inst' <- zonkInst inst
+           ; traceTc $ text "*** TcTyFuns.normaliseOneInst: Skipping" <+>
+                       ppr inst
 	   ; return (inst', emptyBag)
 	   }
 \end{code}
