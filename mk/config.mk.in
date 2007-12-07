@@ -1311,3 +1311,18 @@ WAY_o_HC_OPTS=
 
 CONFIGURE_ARGS = @CONFIGURE_ARGS@
 
+################################################################################
+#
+#    Bindist testing directory
+#
+################################################################################
+
+ifeq "$(Windows)" "YES"
+BIN_DIST_INST_SUBDIR = "install dir"
+else
+# I very much doubt that paths with spaces will work on Unix
+BIN_DIST_INST_SUBDIR = installed
+endif
+
+BIN_DIST_INST_DIR = $(FPTOOLS_TOP_ABS)/bindisttest/$(BIN_DIST_INST_SUBDIR)
+
