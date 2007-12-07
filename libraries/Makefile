@@ -268,7 +268,7 @@ make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 	  setup/Setup makefile -f GNUmakefile; \
 	  cmp -s GNUmakefile GNUmakefile.tmp && mv GNUmakefile.tmp GNUmakefile; \
 	  $(MAKE) $(MFLAGS) && \
-	  setup/Setup register --inplace; \
+	  ../installPackage/installPackage register --inplace; \
 	fi
 
 # Build the library using 'setup build' (not the default)
@@ -359,7 +359,7 @@ $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
-	  ../installPackage/installPackage '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(iinterfacedir)' ; \
+	  ../installPackage/installPackage install '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(iinterfacedir)' ; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%

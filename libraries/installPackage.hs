@@ -13,29 +13,50 @@ main :: IO ()
 main
   = do args <- getArgs
        case args of
-           ghcpkg : ghcpkgconf : destdir : topdir :
+           "register" : "--inplace" :args' ->
+               let verbosity = mkVerbosity args'
+               in doRegisterInplace verbosity
+           "install" : ghcpkg : ghcpkgconf : destdir : topdir :
                     iprefix : ibindir : ilibdir : ilibexecdir :
                     idatadir : idocdir : ihtmldir : iinterfacedir :
                     args' ->
-               let verbosity = case args' of
-                           [] -> normal
-                           ['-':'v':v] ->
-                               let m = case v of
-                                           "" -> Nothing
-                                           _ -> Just v
-                               in flagToVerbosity m
-                           _ -> error ("Bad arguments: " ++ show args)
-               in doit verbosity ghcpkg ghcpkgconf destdir topdir
-                       iprefix ibindir ilibdir ilibexecdir idatadir
-                       idocdir ihtmldir iinterfacedir
+               let verbosity = mkVerbosity args'
+               in doInstall verbosity ghcpkg ghcpkgconf destdir topdir
+                            iprefix ibindir ilibdir ilibexecdir idatadir
+                            idocdir ihtmldir iinterfacedir
            _ ->
-               error "Missing arguments"
+               error ("Bad arguments: " ++ show args)
 
-doit :: Verbosity -> FilePath -> FilePath -> FilePath -> FilePath
-     -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
-     -> FilePath -> FilePath -> FilePath
-     -> IO ()
-doit verbosity ghcpkg ghcpkgconf destdir topdir
+mkVerbosity :: [String] -> Verbosity
+mkVerbosity [] = normal
+mkVerbosity ['-':'v':v] = let m = case v of
+                                      "" -> Nothing
+                                      _ -> Just v
+                          in flagToVerbosity m
+mkVerbosity args = error ("Bad arguments: " ++ show args)
+
+doRegisterInplace :: Verbosity -> IO ()
+doRegisterInplace verbosity =
+       do lbi <- getConfig verbosity
+          let registerFlags = emptyRegisterFlags { regInPlace = True }
+              pd = localPkgDescr lbi
+              pd_reg = if pkgName (package pd) == "base"
+                       then case library pd of
+                            Just lib ->
+                                let ems = "GHC.Prim" : exposedModules lib
+                                    lib' = lib { exposedModules = ems }
+                                in pd { library = Just lib' }
+                            Nothing ->
+                                error "Expected a library, but none found"
+                       else pd
+          (regHook simpleUserHooks) pd_reg lbi simpleUserHooks registerFlags
+          return ()
+
+doInstall :: Verbosity -> FilePath -> FilePath -> FilePath -> FilePath
+          -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
+          -> FilePath -> FilePath -> FilePath
+          -> IO ()
+doInstall verbosity ghcpkg ghcpkgconf destdir topdir
      iprefix ibindir ilibdir ilibexecdir idatadir
      idocdir ihtmldir iinterfacedir =
        do let userHooks = simpleUserHooks
