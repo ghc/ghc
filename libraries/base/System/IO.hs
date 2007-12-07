@@ -155,12 +155,10 @@ module System.IO (
     hGetBufNonBlocking,	       -- :: Handle -> Ptr a -> Int -> IO Int
 #endif
 
-    -- * Temporary files (not portable: GHC\/Hugs only)
+    -- * Temporary files
 
-#if !defined(__NHC__)
     openTempFile,
     openBinaryTempFile,
-#endif
   ) where
 
 #ifndef __NHC__
@@ -416,7 +414,6 @@ openBinaryFile = openFile
 hSetBinaryMode _ _ = return ()
 #endif
 
-#ifndef __NHC__
 -- | The function creates a temporary file in ReadWrite mode.
 -- The created file isn\'t deleted automatically, so you need to delete it manually.
 --
@@ -465,6 +462,7 @@ openTempFile' loc tmp_dir template binary = do
          -- beginning with '.' as the second component.
          _                      -> error "bug in System.IO.openTempFile"
 
+#ifndef __NHC__
     oflags1 = rw_flags .|. o_EXCL
 
     binary_flags
@@ -472,7 +470,12 @@ openTempFile' loc tmp_dir template binary = do
       | otherwise = 0
 
     oflags = oflags1 .|. binary_flags
+#endif
 
+#ifdef __NHC__
+    findTempName x = do h <- openFile filepath ReadWriteMode
+                        return (filepath, h)
+#else
     findTempName x = do
       fd <- withCString filepath $ \ f ->
               c_open f oflags 0o600
@@ -489,6 +492,7 @@ openTempFile' loc tmp_dir template binary = do
          h <- fdToHandle fd
 	        `ExceptionBase.catchException` \e -> do c_close fd; throw e
 	 return (filepath, h)
+#endif
       where
         filename        = prefix ++ show x ++ suffix
         filepath        = tmp_dir `combine` filename
@@ -512,6 +516,7 @@ pathSeparator = '\\'
 pathSeparator = '/'
 #endif
 
+#ifndef __NHC__
 -- XXX Copied from GHC.Handle
 std_flags    = o_NONBLOCK   .|. o_NOCTTY
 output_flags = std_flags    .|. o_CREAT
@@ -519,6 +524,10 @@ read_flags   = std_flags    .|. o_RDONLY
 write_flags  = output_flags .|. o_WRONLY
 rw_flags     = output_flags .|. o_RDWR
 append_flags = write_flags  .|. o_APPEND
+#endif
+
+#ifdef __NHC__
+foreign import ccall "getpid" c_getpid :: IO Int
 #endif
 
 -- $locking
