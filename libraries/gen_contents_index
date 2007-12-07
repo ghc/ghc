@@ -7,28 +7,19 @@ NAMES=
 
 case $* in
 --inplace)
-    GHC_PKG=../utils/ghc-pkg/ghc-pkg-inplace
-    for DIR in */
-    do
-        NAME=`echo "$DIR" | sed 's#/$##'`
-        HADDOCK_FILE=$NAME/dist/doc/html/$NAME/$NAME.haddock
-        if [ -f $HADDOCK_FILE ]
-        then
-            HADDOCK_ARGS="$HADDOCK_ARGS --read-interface=$NAME,$HADDOCK_FILE"
-            NAMES="$NAMES $NAME"
-        fi
-    done
+    HADDOCK_FILES=`ls -1 */dist/doc/html/*/*.haddock | sort`
     ;;
 *)
     HADDOCK_FILES=`ls -1 */*.haddock | sort`
-    for HADDOCK_FILE in $HADDOCK_FILES
-    do
-        NAME=`echo "$HADDOCK_FILE" | sed "s#/.*##"`
-        HADDOCK_ARGS="$HADDOCK_ARGS --read-interface=$NAME,$HADDOCK_FILE"
-        NAMES="$NAMES $NAME"
-    done
     ;;
 esac
+
+for HADDOCK_FILE in $HADDOCK_FILES
+do
+    NAME=`echo "$DIR" | sed 's#/.*##'`
+    HADDOCK_ARGS="$HADDOCK_ARGS --read-interface=$NAME,$HADDOCK_FILE"
+    NAMES="$NAMES $NAME"
+done
 
 # Now create the combined contents and index pages
 haddock --gen-index --gen-contents -o . \
