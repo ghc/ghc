@@ -89,7 +89,7 @@ test('ColGivenCheck', normal, compile, [''])
 test('ColGivenCheck2', normal, compile, [''])
 
 test('InstEqContext', normal, compile, [''])
-test('InstEqContext2', expect_fail, compile, [''])
+test('InstEqContext2', normal, compile, [''])
 test('InstEqContext3', normal, compile, [''])
 
 test('HO', normal, compile, [''])
