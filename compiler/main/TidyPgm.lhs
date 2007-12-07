@@ -817,7 +817,7 @@ tidyWorker _tidy_env _show_unfold NoWorker
   = NoWorker
 tidyWorker tidy_env show_unfold (HasWorker work_id wrap_arity) 
   | show_unfold = HasWorker (tidyVarOcc tidy_env work_id) wrap_arity
-  | otherwise   = WARN( True, ppr work_id ) NoWorker
+  | otherwise   = NoWorker
     -- NB: do *not* expose the worker if show_unfold is off,
     --     because that means this thing is a loop breaker or
     --     marked NOINLINE or something like that
@@ -825,8 +825,12 @@ tidyWorker tidy_env show_unfold (HasWorker work_id wrap_arity)
     -- then you can make the simplifier go into an infinite loop, because
     -- in effect the unfolding is exposed.  See Trac #1709
     -- 
-    -- Mind you, it probably should not be w/w'd in the first place; 
-    -- hence the WARN
+    -- You might think that if show_unfold is False, then the thing should
+    -- not be w/w'd in the first place.  But a legitimate reason is this:
+    -- 	  the function returns bottom
+    -- In this case, show_unfold will be false (we don't expose unfoldings
+    -- for bottoming functions), but we might still have a worker/wrapper
+    -- split (see Note [Worker-wrapper for bottoming functions] in WorkWrap.lhs
 \end{code}
 
 %************************************************************************

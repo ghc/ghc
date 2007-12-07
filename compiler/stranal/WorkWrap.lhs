@@ -376,17 +376,7 @@ worthSplittingFun ds res
   = any worth_it ds || returnsCPR res
 	-- worthSplitting returns False for an empty list of demands,
 	-- and hence do_strict_ww is False if arity is zero and there is no CPR
-
-	-- We used not to split if the result is bottom.
-	-- [Justification:  there's no efficiency to be gained.]
-	-- But it's sometimes bad not to make a wrapper.  Consider
-	--	fw = \x# -> let x = I# x# in case e of
-	--					p1 -> error_fn x
-	--					p2 -> error_fn x
-	--					p3 -> the real stuff
-	-- The re-boxing code won't go away unless error_fn gets a wrapper too.
-	-- [We don't do reboxing now, but in general it's better to pass 
-	--  an unboxed thing to f, and have it reboxed in the error cases....]
+  -- See Note [Worker-wrapper for bottoming functions]
   where
     worth_it Abs	      = True	-- Absent arg
     worth_it (Eval (Prod ds)) = True	-- Product arg to evaluate
@@ -403,6 +393,19 @@ worthSplittingThunk maybe_dmd res
     worth_it other	   	     = False
 \end{code}
 
+Note [Worker-wrapper for bottoming functions]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We used not to split if the result is bottom.
+[Justification:  there's no efficiency to be gained.]
+
+But it's sometimes bad not to make a wrapper.  Consider
+	fw = \x# -> let x = I# x# in case e of
+					p1 -> error_fn x
+					p2 -> error_fn x
+					p3 -> the real stuff
+The re-boxing code won't go away unless error_fn gets a wrapper too.
+[We don't do reboxing now, but in general it's better to pass an
+unboxed thing to f, and have it reboxed in the error cases....]
 
 
 %************************************************************************
