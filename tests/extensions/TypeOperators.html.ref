@@ -6,7 +6,7 @@
 ><TITLE
 >TypeOperators</TITLE
 ><LINK HREF="haddock.css" REL="stylesheet" TYPE="text/css"
-><SCRIPT SRC="haddock.js" TYPE="text/javascript"
+><SCRIPT SRC="haddock-util.js" TYPE="text/javascript"
 ></SCRIPT
 ></HEAD
 ><BODY
@@ -211,12 +211,6 @@
 > b </TD
 ></TR
 ><TR
-><TD CLASS="body"
-><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
-></TABLE
-></TD
-></TR
-><TR
 ><TD CLASS="s15"
 ></TD
 ></TR
@@ -231,12 +225,6 @@
 > b) c </TD
 ></TR
 ><TR
-><TD CLASS="body"
-><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
-></TABLE
-></TD
-></TR
-><TR
 ><TD CLASS="s15"
 ></TD
 ></TR
@@ -249,12 +237,6 @@
 ><B
 >Op</B
 > a b </TD
-></TR
-><TR
-><TD CLASS="body"
-><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
-></TABLE
-></TD
 ></TR
 ><TR
 ><TD CLASS="s15"

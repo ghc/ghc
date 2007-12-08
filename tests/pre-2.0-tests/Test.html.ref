@@ -6,7 +6,7 @@
 ><TITLE
 >Test</TITLE
 ><LINK HREF="haddock.css" REL="stylesheet" TYPE="text/css"
-><SCRIPT SRC="haddock.js" TYPE="text/javascript"
+><SCRIPT SRC="haddock-util.js" TYPE="text/javascript"
 ></SCRIPT
 ></HEAD
 ><BODY
@@ -741,7 +741,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
-> <A HREF="#t%3AD"
+>  <A HREF="#t%3AD"
 >D</A
 > a  <SPAN CLASS="keyword"
 >where</SPAN
@@ -775,7 +775,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
-> <A HREF="#t%3AE"
+>  <A HREF="#t%3AE"
 >E</A
 > a </TD
 ></TR
@@ -787,7 +787,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
-> <A HREF="#t%3AF"
+>  <A HREF="#t%3AF"
 >F</A
 > a  <SPAN CLASS="keyword"
 >where</SPAN
@@ -2227,7 +2227,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
-> <A NAME="t%3AD"
+>  <A NAME="t%3AD"
 ></A
 ><B
 >D</B
@@ -2279,35 +2279,6 @@
 ></TABLE
 ></TD
 ></TR
-><TR
-><TD CLASS="s8"
-></TD
-></TR
-><TR
-><TD CLASS="section4"
-><IMG SRC="minus.gif" CLASS="coll" ONCLICK="toggle(this,'i:D')" ALT="show/hide"
-> Instances</TD
-></TR
-><TR
-><TD CLASS="body"
-><DIV ID="i:D" STYLE="display:block;"
-><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
-><TR
-><TD CLASS="decl"
-><A HREF="Test.html#t%3AD"
->D</A
-> Float</TD
-></TR
-><TR
-><TD CLASS="decl"
-><A HREF="Test.html#t%3AD"
->D</A
-> Int</TD
-></TR
-></TABLE
-></DIV
-></TD
-></TR
 ></TABLE
 ></TD
 ></TR
@@ -2319,7 +2290,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
-> <A NAME="t%3AE"
+>  <A NAME="t%3AE"
 ></A
 ><B
 >E</B
@@ -2344,7 +2315,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
-> <A NAME="t%3AF"
+>  <A NAME="t%3AF"
 ></A
 ><B
 >F</B

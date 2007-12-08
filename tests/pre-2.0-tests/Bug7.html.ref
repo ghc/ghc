@@ -6,7 +6,7 @@
 ><TITLE
 >Bug7</TITLE
 ><LINK HREF="haddock.css" REL="stylesheet" TYPE="text/css"
-><SCRIPT SRC="haddock.js" TYPE="text/javascript"
+><SCRIPT SRC="haddock-util.js" TYPE="text/javascript"
 ></SCRIPT
 ></HEAD
 ><BODY
@@ -41,16 +41,6 @@
 >Bug7</FONT
 ></TD
 ></TR
-></TABLE
-></TD
-></TR
-><TR
-><TD CLASS="s15"
-></TD
-></TR
-><TR
-><TD
-><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ></TABLE
 ></TD
 ></TR
@@ -101,7 +91,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
-> <A HREF="#t%3ABar"
+>  <A HREF="#t%3ABar"
 >Bar</A
 > x y </TD
 ></TR
@@ -192,7 +182,7 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >class</SPAN
-> <A NAME="t%3ABar"
+>  <A NAME="t%3ABar"
 ></A
 ><B
 >Bar</B
