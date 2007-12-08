@@ -750,6 +750,22 @@ ppTyNames = map ppTyName
 
 
 --------------------------------------------------------------------------------
+-- Type applications
+-- Ocurring in contexts and instance heads
+--------------------------------------------------------------------------------
+
+
+ppTypeApp n ts@(t1:t2:rest)
+  | operator, not . null $ rest = parens opApp <+> ppParendTypes rest
+  | operator                    = opApp
+  where
+    operator = isNameSym . getName $ n
+    opApp = ppParendType t1 <+> ppDocName n <+> ppParendType t2
+
+ppTypeApp n ts = ppDocName n <+> ppParendTypes ts
+
+
+--------------------------------------------------------------------------------
 -- Contexts 
 --------------------------------------------------------------------------------
 
@@ -774,16 +790,7 @@ pp_hs_context cxt = parenList (map ppPred cxt)
 ppLPred = ppPred . unLoc
 
 
-ppPred (HsClassP n ts)
-  | classOp, length ts > 2 = firstApp <+> ppLParendTypes rest
-  | classOp                = firstApp
-  | otherwise              = ppDocName n <+> ppLParendTypes ts
-  where
-   classOp    = isNameConSym . getName $ n
-   t1:t2:rest = ts
-   firstApp   = ppLParendType t1 <+> ppDocName n <+> ppLParendType t2
-
-
+ppPred (HsClassP n ts) = ppTypeApp n (map unLoc ts)
 -- TODO: find out what happened to the Dupable/Linear distinction
 ppPred (HsEqualP t1 t2) = ppLType t1 <+> toHtml "~" <+> ppLType t2
 ppPred (HsIParam (IPName n) t) 
@@ -878,10 +885,9 @@ ppClassDecl summary links instances orig_c loc mbDoc docMap
              ))
 
 ppInstHead :: InstHead DocName -> Html
-ppInstHead ([],   n, ts) = ppAsst n ts 
-ppInstHead (ctxt, n, ts) = ppContextNoLocs ctxt <+> ppAsst n ts 
+ppInstHead ([],   n, ts) = ppTypeApp n ts 
+ppInstHead (ctxt, n, ts) = ppContextNoLocs ctxt <+> ppTypeApp n ts 
 
-ppAsst n ts = ppDocName n <+> hsep (map ppParendType ts)
 
 -- -----------------------------------------------------------------------------
 -- Data & newtype declarations
@@ -1228,6 +1234,9 @@ maybeParen ctxt_prec op_prec p | ctxt_prec >= op_prec = parens p
 
 ppLTypes       = hsep . map ppLType
 ppLParendTypes = hsep . map ppLParendType
+
+
+ppParendTypes = hsep . map ppParendType
 
 
 ppLType       = ppType . unLoc
