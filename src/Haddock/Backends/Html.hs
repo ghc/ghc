@@ -780,8 +780,8 @@ ppLPred = ppPred . unLoc
 
 ppPred (HsClassP n ts)
   | classOp, length ts > 2 = firstApp <+> ppLTypes rest
-  | classOp = firstApp
-  | otherwise = ppDocName n <+> ppLTypes ts
+  | classOp                = firstApp
+  | otherwise              = ppDocName n <+> ppLTypes ts
   where
    classOp = isNameConSym . getName $ n
    t1:t2:rest = ts
