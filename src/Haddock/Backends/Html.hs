@@ -751,18 +751,30 @@ ppTyNames = map ppTyName
 
 --------------------------------------------------------------------------------
 -- Type applications
--- Ocurring in contexts and instance heads
 --------------------------------------------------------------------------------
 
 
-ppTypeApp n ts@(t1:t2:rest)
-  | operator, not . null $ rest = parens opApp <+> ppParendTypes rest
+-- | Print an application of a DocName and a list of HsTypes
+ppAppNameTypes :: DocName -> [HsType DocName] -> Html
+ppAppNameTypes n ts = ppTypeApp n ts ppDocName ppParendType
+
+
+-- | Print an application of a DocName and a list of Names 
+ppDataClassHead :: Bool -> DocName -> [Name] -> Html
+ppDataClassHead summ n ns = 
+  ppTypeApp n ns (ppBinder summ . getName) ppName
+
+
+-- | General printing of type applications
+ppTypeApp :: DocName -> [a] -> (DocName -> Html) -> (a -> Html) -> Html
+ppTypeApp n ts@(t1:t2:rest) ppDN ppT
+  | operator, not . null $ rest = parens opApp <+> hsep (map ppT rest)
   | operator                    = opApp
   where
     operator = isNameSym . getName $ n
-    opApp = ppParendType t1 <+> ppDocName n <+> ppParendType t2
+    opApp = ppT t1 <+> ppDN n <+> ppT t2
 
-ppTypeApp n ts = ppDocName n <+> ppParendTypes ts
+ppTypeApp n ts ppDN ppT = ppDN n <+> hsep (map ppT ts)
 
 
 --------------------------------------------------------------------------------
@@ -790,7 +802,7 @@ pp_hs_context cxt = parenList (map ppPred cxt)
 ppLPred = ppPred . unLoc
 
 
-ppPred (HsClassP n ts) = ppTypeApp n (map unLoc ts)
+ppPred (HsClassP n ts) = ppAppNameTypes n (map unLoc ts)
 -- TODO: find out what happened to the Dupable/Linear distinction
 ppPred (HsEqualP t1 t2) = ppLType t1 <+> toHtml "~" <+> ppLType t2
 ppPred (HsIParam (IPName n) t) 
@@ -800,13 +812,10 @@ ppPred (HsIParam (IPName n) t)
 -- -----------------------------------------------------------------------------
 -- Class declarations
 
-ppClassHdr summ (L _ []) n tvs fds = 
-  keyword "class"
-	<+> ppBinder summ n <+> hsep (ppTyVars tvs)
-	<+> ppFds fds
 ppClassHdr summ lctxt n tvs fds = 
-  keyword "class" <+> ppLContext lctxt
-	<+> ppBinder summ n <+> hsep (ppTyVars tvs)
+  keyword "class" 
+  <+> (if not . null . unLoc $ lctxt then ppLContext lctxt else empty)
+  <+> ppDataClassHead summ n (tyvarNames $ tvs)
 	<+> ppFds fds
 
 ppFds fds =
@@ -830,7 +839,7 @@ ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc 
               , let mbDoc = Map.lookup n docMap ])
           )
   where
-    hdr = ppClassHdr summary lctxt nm tvs fds
+    hdr = ppClassHdr summary lctxt (unLoc lname) tvs fds
     NoLink nm = unLoc lname
     
     ppAT summary at = case at of
@@ -857,7 +866,7 @@ ppClassDecl summary links instances orig_c loc mbDoc docMap
     NoLink nm = unLoc lname
     ctxt = unLoc lctxt
 
-    hdr = ppClassHdr summary lctxt nm ltyvars lfds
+    hdr = ppClassHdr summary lctxt (unLoc lname) ltyvars lfds
     
     classdoc = case mbDoc of
       Nothing -> Html.emptyTable
@@ -885,8 +894,8 @@ ppClassDecl summary links instances orig_c loc mbDoc docMap
              ))
 
 ppInstHead :: InstHead DocName -> Html
-ppInstHead ([],   n, ts) = ppTypeApp n ts 
-ppInstHead (ctxt, n, ts) = ppContextNoLocs ctxt <+> ppTypeApp n ts 
+ppInstHead ([],   n, ts) = ppAppNameTypes n ts 
+ppInstHead (ctxt, n, ts) = ppContextNoLocs ctxt <+> ppAppNameTypes n ts 
 
 
 -- -----------------------------------------------------------------------------
@@ -1148,32 +1157,7 @@ ppDataHeader summary decl
     -- context
     ppLContext (tcdCtxt decl) <+>
     -- T a b c ..., or a :+: b
-    ppDataHead summary (orig $ tcdLName decl) (tyvarNames $ tcdTyVars decl)
-
-
--- | data context => ... =
---                    ^ Print this part of a data\/newtype declaration
-ppDataHead :: Bool -> Name -> [Name] -> Html
-ppDataHead summary name tyvars
-
-  -- (a :+: b) c d
-  | isNameConSym name && length tyvars > 2 = parens first2 <+> rest
-
-  -- a :+: b
-  | isNameConSym name = first2
-
-  -- Would like a case for:
-  --       a `O` b
-  -- and  (a `O` b) c
-  -- but GHC doesn't keep this information
-
-  -- T a b c
-  | otherwise = ppBinder summary name <+> hsep (ppTyNames tyvars) 
-
-  where 
-    first2        = ppTyName a <+> ppBinder summary name <+> ppTyName b
-    rest          = hsep $ ppTyNames restTypes
-    a:b:restTypes = tyvars
+    ppDataClassHead summary (unLoc $ tcdLName decl) (tyvarNames $ tcdTyVars decl)
 
 
 -- ----------------------------------------------------------------------------
