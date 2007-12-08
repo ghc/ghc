@@ -369,7 +369,14 @@ ppr_termM y p Term{dc=Right dc, subTerms=tt}
          return$ cparen (p >= app_prec) (ppr dc <+> pprDeeperList fsep tt_docs)
 
 ppr_termM y p t@NewtypeWrap{} = pprNewtypeWrap y p t
-ppr_termM y p RefWrap{wrapped_term=t}  = braces `liftM` y p t
+ppr_termM y p RefWrap{wrapped_term=t, ty=ty}  = do
+  contents <- y app_prec t
+  return$ cparen (p >= app_prec) (text "GHC.Prim.MutVar#" <+> contents)
+  -- The constructor name is wired in here ^^^ for the sake of simplicity.
+  -- I don't think mutvars are going to change in a near future.
+  -- In any case this is solely a presentation matter: MutVar# is
+  -- a datatype with no constructors, implemented by the RTS
+  -- (hence there is no way to obtain a datacon and print it).
 ppr_termM _ _ t = ppr_termM1 t
 
 
