@@ -39,7 +39,8 @@ check modules = do
         ref <- readFile reffile
         if not $ haddockEq out ref
           then do
-            putStrLn $ "Output for " ++ mod ++ " has changed! Exiting."
+            putStrLn $ "Output for " ++ mod ++ " has changed! Exiting with diff:"
+            system $ "diff " ++ reffile ++ " " ++ outfile
             exitFailure
           else do
             putStrLn $ "Pass: " ++ mod
