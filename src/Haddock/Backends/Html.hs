@@ -736,7 +736,6 @@ ppTySyn summary links loc mbDoc (TySynonym (L _ name) ltyvars _ ltype)
     full = hdr <+> equals <+> ppLType ltype
     NoLink n = name
 
-ppLType (L _ t) = ppType t
 
 ppTypeSig :: Bool -> Name -> HsType DocName -> Html
 ppTypeSig summary nm ty = ppBinder summary nm <+> dcolon <+> ppType ty
@@ -748,9 +747,6 @@ ppTyName name
 
 
 ppTyNames = map ppTyName
-
-
-ppLTypes = hsep . map ppLType
 
 
 --------------------------------------------------------------------------------
@@ -1228,6 +1224,15 @@ maybeParen :: Int           -- Precedence of context
            -> Html -> Html  -- Wrap in parens if (ctxt >= op)
 maybeParen ctxt_prec op_prec p | ctxt_prec >= op_prec = parens p
                                | otherwise            = p
+
+
+ppLTypes       = hsep . map ppLType
+ppLParendTypes = hsep . map ppLParendType
+
+
+ppLType       = ppType . unLoc
+ppLParendType = ppParendType . unLoc
+
 
 ppType ty       = ppr_mono_ty pREC_TOP (prepare ty)
 ppParendType ty = ppr_mono_ty pREC_CON ty
