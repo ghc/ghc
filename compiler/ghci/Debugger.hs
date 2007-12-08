@@ -73,8 +73,10 @@ pprintClosureCommand session bindThings force str = do
    go cms id = do
        term_    <- GHC.obtainTerm cms force id
        term     <- tidyTermTyVars cms term_
-       term'    <- if not bindThings then return term
-                     else bindSuspensions cms term                       
+       term'    <- if bindThings && 
+                      Just False == isUnliftedTypeKind `fmap` termType term
+                     then bindSuspensions cms term
+                     else return term
      -- Before leaving, we compare the type obtained to see if it's more specific
      --  Then, we extract a substitution,
      --  mapping the old tyvars to the reconstructed types.
