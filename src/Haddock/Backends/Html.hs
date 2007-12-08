@@ -775,13 +775,13 @@ ppLPred = ppPred . unLoc
 
 
 ppPred (HsClassP n ts)
-  | classOp, length ts > 2 = firstApp <+> ppLTypes rest
+  | classOp, length ts > 2 = firstApp <+> ppLParendTypes rest
   | classOp                = firstApp
-  | otherwise              = ppDocName n <+> ppLTypes ts
+  | otherwise              = ppDocName n <+> ppLParendTypes ts
   where
-   classOp = isNameConSym . getName $ n
+   classOp    = isNameConSym . getName $ n
    t1:t2:rest = ts
-   firstApp = ppLType t1 <+> ppDocName n <+> ppLType t2
+   firstApp   = ppLParendType t1 <+> ppDocName n <+> ppLParendType t2
 
 
 -- TODO: find out what happened to the Dupable/Linear distinction
@@ -1236,6 +1236,7 @@ ppLParendType = ppParendType . unLoc
 
 ppType ty       = ppr_mono_ty pREC_TOP (prepare ty)
 ppParendType ty = ppr_mono_ty pREC_CON ty
+
 
 -- Before printing a type
 -- (a) Remove outermost HsParTy parens
