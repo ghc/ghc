@@ -9,6 +9,7 @@ module Haddock.Interface.AttachInstances (attachInstances) where
 
 
 import Haddock.Types
+import Haddock.GHC.Utils
 
 import qualified Data.Map as Map
 import Data.Map (Map)
@@ -129,10 +130,14 @@ toHsType :: Type -> HsType Name
 toHsType t = case t of 
   TyVarTy v -> HsTyVar (tyVarName v) 
   AppTy a b -> HsAppTy (toLHsType a) (toLHsType b)
+
   TyConApp tc ts -> case ts of 
-    [] -> HsTyVar (tyConName tc)
-    _  -> app (tycon tc) ts
-  FunTy a b -> HsFunTy (toLHsType a) (toLHsType b) 
+    t1:t2:rest
+      | isNameConSym . tyConName $ tc ->
+          app (HsOpTy (toLHsType t1) (noLoc . tyConName $ tc) (toLHsType t2)) rest
+    _ -> app (tycon tc) ts
+
+  FunTy a b -> HsFunTy (toLHsType a) (toLHsType b)
   ForAllTy v t -> cvForAll [v] t 
   PredTy p -> HsPredTy (toHsPred p) 
   NoteTy _ t -> toHsType t
