@@ -1912,15 +1912,19 @@ historyCmd arg
       (r:_) -> do
         let hist = GHC.resumeHistory r
             (took,rest) = splitAt num hist
-        spans <- mapM (io . GHC.getHistorySpan s) took
-        let nums  = map (printf "-%-3d:") [(1::Int)..]
-        let names = map GHC.historyEnclosingDecl took
-        printForUser (vcat(zipWith3 
-                             (\x y z -> x <+> y <+> z) 
-                             (map text nums) 
-                             (map (bold . ppr) names)
-                             (map (parens . ppr) spans)))
-        io $ putStrLn $ if null rest then "<end of history>" else "..."
+        case hist of
+          [] -> io $ putStrLn $ 
+                   "Empty history. Perhaps you forgot to use :trace?"
+          _  -> do
+                 spans <- mapM (io . GHC.getHistorySpan s) took
+                 let nums  = map (printf "-%-3d:") [(1::Int)..]
+                     names = map GHC.historyEnclosingDecl took
+                 printForUser (vcat(zipWith3 
+                                 (\x y z -> x <+> y <+> z) 
+                                 (map text nums) 
+                                 (map (bold . ppr) names)
+                                 (map (parens . ppr) spans)))
+                 io $ putStrLn $ if null rest then "<end of history>" else "..."
 
 bold :: SDoc -> SDoc
 bold c | do_bold   = text start_bold <> c <> text end_bold
