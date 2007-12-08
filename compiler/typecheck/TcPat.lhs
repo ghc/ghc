@@ -447,20 +447,25 @@ tc_pat pstate pat@(TypePat ty) pat_ty thing_inside
 -- Lists, tuples, arrays
 tc_pat pstate (ListPat pats _) pat_ty thing_inside
   = do	{ (elt_ty, coi) <- boxySplitListTy pat_ty
+        ; let scoi = mkSymCoI coi
 	; (pats', pats_tvs, res) <- tcMultiple (\p -> tc_lpat p elt_ty)
 					 	pats pstate thing_inside
- 	; return (mkCoPatCoI coi (ListPat pats' elt_ty) pat_ty, pats_tvs, res) }
+ 	; return (mkCoPatCoI scoi (ListPat pats' elt_ty) pat_ty, pats_tvs, res) 
+        }
 
 tc_pat pstate (PArrPat pats _) pat_ty thing_inside
   = do	{ (elt_ty, coi) <- boxySplitPArrTy pat_ty
+        ; let scoi = mkSymCoI coi
 	; (pats', pats_tvs, res) <- tcMultiple (\p -> tc_lpat p elt_ty)
 						pats pstate thing_inside 
 	; ifM (null pats) (zapToMonotype pat_ty)  -- c.f. ExplicitPArr in TcExpr
-	; return (mkCoPatCoI coi (PArrPat pats' elt_ty) pat_ty, pats_tvs, res) }
+	; return (mkCoPatCoI scoi (PArrPat pats' elt_ty) pat_ty, pats_tvs, res)
+        }
 
 tc_pat pstate (TuplePat pats boxity _) pat_ty thing_inside
   = do	{ let tc = tupleTyCon boxity (length pats)
         ; (arg_tys, coi) <- boxySplitTyConApp tc pat_ty
+        ; let scoi = mkSymCoI coi
 	; (pats', pats_tvs, res) <- tcMultiple tc_lpat_pr (pats `zip` arg_tys)
 					       pstate thing_inside
 
@@ -477,7 +482,7 @@ tc_pat pstate (TuplePat pats boxity _) pat_ty thing_inside
 	        | otherwise		    = unmangled_result
 
  	; ASSERT( length arg_tys == length pats )      -- Syntactically enforced
-	  return (mkCoPatCoI coi possibly_mangled_result pat_ty, pats_tvs, res) 
+	  return (mkCoPatCoI scoi possibly_mangled_result pat_ty, pats_tvs, res)
         }
 
 ------------------------
@@ -610,18 +615,27 @@ tcConPat :: PatState -> SrcSpan -> DataCon -> TyCon
 	 -> HsConPatDetails Name -> (PatState -> TcM a)
 	 -> TcM (Pat TcId, [TcTyVar], a)
 tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
-  = do	{ let (univ_tvs, ex_tvs, eq_spec, eq_theta, dict_theta, arg_tys, _) = dataConFullSig data_con
+  = do	{ let (univ_tvs, ex_tvs, eq_spec, eq_theta, dict_theta, arg_tys, _)
+                = dataConFullSig data_con
 	      skol_info  = PatSkol data_con
 	      origin     = SigOrigin skol_info
 	      full_theta = eq_theta ++ dict_theta
 
 	  -- Instantiate the constructor type variables [a->ty]
-	  -- This may involve doing a family-instance coercion, and building a wrapper
+	  -- This may involve doing a family-instance coercion, and building a
+	  -- wrapper 
 	; (ctxt_res_tys, coi) <- boxySplitTyConAppWithFamily tycon pat_ty
-	; let pat_ty' = mkTyConApp tycon ctxt_res_tys
-                                     -- pat_ty /= pat_ty iff coi /= IdCo
-              wrap_res_pat res_pat
-		= mkCoPatCoI coi (unwrapFamInstScrutinee tycon ctxt_res_tys res_pat) pat_ty
+        ; let sym_coi = mkSymCoI coi  -- boxy split coercion oriented wrongly
+	      pat_ty' = mkTyConApp tycon ctxt_res_tys
+                                      -- pat_ty' /= pat_ty iff coi /= IdCo
+              
+              wrap_res_pat res_pat = mkCoPatCoI sym_coi uwScrut pat_ty
+                where
+                  uwScrut = unwrapFamInstScrutinee tycon ctxt_res_tys res_pat
+
+        ; traceTc $ case sym_coi of
+                      IdCo -> text "sym_coi:IdCo" 
+                      ACo co -> text "sym_coi: ACoI" <+> ppr co
 
 	  -- Add the stupid theta
 	; addDataConStupidTheta data_con ctxt_res_tys

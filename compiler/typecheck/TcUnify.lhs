@@ -222,7 +222,7 @@ subFunTys error_herald n_pats res_ty thing_inside
 boxySplitTyConApp :: TyCon			-- T :: k1 -> ... -> kn -> *
 	          -> BoxyRhoType 		-- Expected type (T a b c)
 		  -> TcM ([BoxySigmaType],	-- Element types, a b c
-                          CoercionI)
+                          CoercionI)            -- T a b c ~ orig_ty
   -- It's used for wired-in tycons, so we call checkWiredInTyCon
   -- Precondition: never called with FunTyCon
   -- Precondition: input type :: *
@@ -314,7 +314,7 @@ boxySplitAppTy orig_ty
       | Just (fun_ty, arg_ty) <- tcSplitAppTy_maybe ty
       = return ((fun_ty, arg_ty), IdCo)
 
-    loop ty@(TyConApp tycon args)
+    loop ty@(TyConApp tycon _args)
       | isOpenSynTyCon tycon        -- try to normalise type family application
       = do { (coi1, ty') <- tcNormaliseFamInst ty
            ; case coi1 of
