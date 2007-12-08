@@ -762,7 +762,7 @@ ppAppNameTypes n ts = ppTypeApp n ts ppDocName ppParendType
 -- | Print an application of a DocName and a list of Names 
 ppDataClassHead :: Bool -> DocName -> [Name] -> Html
 ppDataClassHead summ n ns = 
-  ppTypeApp n ns (ppBinder summ . getName) ppName
+  ppTypeApp n ns (ppBinder summ . getName) ppTyName
 
 
 -- | General printing of type applications
