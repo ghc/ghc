@@ -91,21 +91,14 @@ import System.IO.Unsafe
 -- * A representation of semi evaluated Terms
 ---------------------------------------------
 {-
-  A few examples in this representation:
 
-  > Just 10 = Term Data.Maybe Data.Maybe.Just (Just 10) [Term Int I# (10) "10"]
-
-  > (('a',_,_),_,('b',_,_)) = 
-      Term ((Char,b,c),d,(Char,e,f)) (,,) (('a',_,_),_,('b',_,_))
-          [ Term (Char, b, c) (,,) ('a',_,_) [Term Char C# "a", Suspension, Suspension]
-          , Suspension
-          , Term (Char, e, f) (,,) ('b',_,_) [Term Char C# "b", Suspension, Suspension]]
 -}
 
 data Term = Term { ty        :: Type 
                  , dc        :: Either String DataCon
-                               -- Empty if the datacon aint exported by the .hi
-                               -- (private constructors in -O0 libraries)
+                               -- Carries a text representation if the datacon is
+                               -- not exported by the .hi file, which is the case 
+                               -- for private constructors in -O0 compiled libraries
                  , val       :: HValue 
                  , subTerms  :: [Term] }
 
@@ -222,7 +215,6 @@ isConstr Constr = True
 isConstr    _   = False
 
 isIndirection (Indirection _) = True
---isIndirection ThunkSelector = True
 isIndirection _ = False
 
 isThunk (Thunk _)     = True
@@ -767,12 +759,14 @@ cvReconstructType hsc_env max_depth mb_ty hval = runTR_maybe hsc_env $ do
                                      zip [0..] (filter isPointed subTtypes)]
       _ -> return []
 
-     -- This helper computes the difference between a base type t and the 
-     -- improved rtti_t computed by RTTI
-     -- The main difference between RTTI types and their normal counterparts
-     --  is that the former are _not_ polymorphic, thus polymorphism must
-     --  be stripped. Syntactically, forall's must be stripped.
-     -- We also remove predicates.
+{-
+ This helper computes the difference between a base type t and the 
+ improved rtti_t computed by RTTI
+ The main difference between RTTI types and their normal counterparts
+ is that the former are _not_ polymorphic, thus polymorphism must
+ be stripped. Syntactically, forall's must be stripped.
+ We also remove predicates.
+-}
 unifyRTTI :: Type -> Type -> TvSubst
 unifyRTTI ty rtti_ty = 
     case mb_subst of
@@ -788,35 +782,32 @@ unifyRTTI ty rtti_ty =
 
 -- Dealing with newtypes
 {-
-   A parallel fold over two Type values, 
+ congruenceNewtypes does a parallel fold over two Type values, 
  compensating for missing newtypes on both sides. 
  This is necessary because newtypes are not present 
- in runtime, but since sometimes there is evidence 
- available we do our best to reconstruct them. 
-   Evidence can come from DataCon signatures or 
+ in runtime, but sometimes there is evidence available.
+   Evidence can come from DataCon signatures or
  from compile-time type inference.
-   I am using the words congruence and rewriting 
- because what we are doing here is an approximation 
- of unification modulo a set of equations, which would 
- come from newtype definitions. These should be the 
- equality coercions seen in System Fc. Rewriting 
- is performed, taking those equations as rules, 
- before launching unification.
+ What we are doing here is an approximation
+ of unification modulo a set of equations derived
+ from newtype definitions. These equations should be the
+ same as the equality coercions generated for newtypes
+ in System Fc. The idea is to perform a sort of rewriting,
+ taking those equations as rules, before launching unification.
 
-   It doesn't make sense to rewrite everywhere, 
- or we would end up with all newtypes. So we rewrite 
- only in presence of evidence.
-   The lhs comes from the heap structure of ptrs,nptrs. 
-   The rhs comes from a DataCon type signature. 
- Rewriting in the rhs is restricted to the result type.
+ The caller must ensure the following.
+ The 1st type (lhs) comes from the heap structure of ptrs,nptrs.
+ The 2nd type (rhs) comes from a DataCon type signature.
+ Rewriting (i.e. adding/removing a newtype wrapper) can happen
+ in both types, but in the rhs it is restricted to the result type.
 
    Note that it is very tricky to make this 'rewriting'
  work with the unification implemented by TcM, where
- substitutions are 'inlined'. The order in which 
- constraints are unified is vital for this.
-   This is a simple form of residuation, the technique of 
- delaying unification steps until enough information
- is available.
+ substitutions are operationally inlined. The order in which
+ constraints are unified is vital as we cannot modify
+ anything that has been touched by a previous unification step.
+Therefore, congruenceNewtypes is sound only if the types
+recovered by the RTTI mechanism are unified Top-Down.
 -}
 congruenceNewtypes ::  TcType -> TcType -> TR (TcType,TcType)
 congruenceNewtypes lhs rhs 
