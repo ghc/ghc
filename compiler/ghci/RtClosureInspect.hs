@@ -70,7 +70,6 @@ import TysWiredIn
 
 import Constants
 import Outputable
-import Maybes
 import Panic
 
 import GHC.Arr          ( Array(..) )
@@ -114,7 +113,7 @@ data Term = Term { ty        :: Type
                  , value     :: [Word] }
 
           | Suspension { ctype    :: ClosureType
-                       , mb_ty    :: Maybe Type
+                       , ty       :: Type
                        , val      :: HValue
                        , bound_to :: Maybe Name   -- Useful for printing
                        }
@@ -134,9 +133,8 @@ isPrim   _    = False
 isNewtypeWrap NewtypeWrap{} = True
 isNewtypeWrap _             = False
 
-termType :: Term -> Maybe Type
-termType t@(Suspension {}) = mb_ty t
-termType t = Just$ ty t
+termType :: Term -> Type
+termType t = ty t
 
 isFullyEvaluatedTerm :: Term -> Bool
 isFullyEvaluatedTerm Term {subTerms=tt} = all isFullyEvaluatedTerm tt
@@ -284,8 +282,8 @@ type TermProcessor a b = Type -> Either String DataCon -> HValue -> [a] -> b
 
 data TermFold a = TermFold { fTerm        :: TermProcessor a a
                            , fPrim        :: Type -> [Word] -> a
-                           , fSuspension  :: ClosureType -> Maybe Type -> HValue
-                                           -> Maybe Name -> a
+                           , fSuspension  :: ClosureType -> Type -> HValue
+                                            -> Maybe Name -> a
                            , fNewtypeWrap :: Type -> Either String DataCon
                                             -> a -> a
                            , fRefWrap     :: Type -> a -> a
@@ -318,8 +316,8 @@ idTermFoldM = TermFold {
 mapTermType :: (Type -> Type) -> Term -> Term
 mapTermType f = foldTerm idTermFold {
           fTerm       = \ty dc hval tt -> Term (f ty) dc hval tt,
-          fSuspension = \ct mb_ty hval n ->
-                          Suspension ct (fmap f mb_ty) hval n,
+          fSuspension = \ct ty hval n ->
+                          Suspension ct (f ty) hval n,
           fNewtypeWrap= \ty dc t -> NewtypeWrap (f ty) dc t,
           fRefWrap    = \ty t -> RefWrap (f ty) t}
 
@@ -327,8 +325,7 @@ termTyVars :: Term -> TyVarSet
 termTyVars = foldTerm TermFold {
             fTerm       = \ty _ _ tt   -> 
                           tyVarsOfType ty `plusVarEnv` concatVarEnv tt,
-            fSuspension = \_ mb_ty _ _ -> 
-                          maybe emptyVarEnv tyVarsOfType mb_ty,
+            fSuspension = \_ ty _ _ -> tyVarsOfType ty,
             fPrim       = \ _ _ -> emptyVarEnv,
             fNewtypeWrap= \ty _ t -> tyVarsOfType ty `plusVarEnv` t,
             fRefWrap    = \ty t -> tyVarsOfType ty `plusVarEnv` t}
@@ -369,7 +366,7 @@ ppr_termM y p Term{dc=Right dc, subTerms=tt}
          return$ cparen (p >= app_prec) (ppr dc <+> pprDeeperList fsep tt_docs)
 
 ppr_termM y p t@NewtypeWrap{} = pprNewtypeWrap y p t
-ppr_termM y p RefWrap{wrapped_term=t, ty=ty}  = do
+ppr_termM y p RefWrap{wrapped_term=t}  = do
   contents <- y app_prec t
   return$ cparen (p >= app_prec) (text "GHC.Prim.MutVar#" <+> contents)
   -- The constructor name is wired in here ^^^ for the sake of simplicity.
@@ -384,10 +381,9 @@ ppr_termM1 :: Monad m => Term -> m SDoc
 ppr_termM1 Prim{value=words, ty=ty} = 
     return$ text$ repPrim (tyConAppTyCon ty) words
 ppr_termM1 Suspension{bound_to=Nothing} = return$ char '_'
-ppr_termM1 Suspension{mb_ty=Just ty, bound_to=Just n}
+ppr_termM1 Suspension{ty=ty, bound_to=Just n}
   | Just _ <- splitFunTy_maybe ty = return$ ptext SLIT("<function>")
   | otherwise = return$ parens$ ppr n <> text "::" <> ppr ty
-ppr_termM1 Suspension{}  = panic "ppr_termM1 - Suspension"
 ppr_termM1 Term{}        = panic "ppr_termM1 - Term"
 ppr_termM1 RefWrap{}     = panic "ppr_termM1 - RefWrap"
 ppr_termM1 NewtypeWrap{} = panic "ppr_termM1 - NewtypeWrap"
@@ -465,7 +461,7 @@ cPprTermBase y =
            --Note pprinting of list terms is not lazy
            doList p h t = do
                let elems      = h : getListTerms t
-                   isConsLast = termType(last elems) /= termType h
+                   isConsLast = not(termType(last elems) `coreEqType` termType h)
                print_elems <- mapM (y cons_prec) elems
                return$ if isConsLast
                      then cparen (p >= cons_prec) 
@@ -475,9 +471,7 @@ cPprTermBase y =
                      else brackets (pprDeeperList fcat$
                                          punctuate comma print_elems)
 
-                where Just a /= Just b = not (a `coreEqType` b)
-                      _      /=   _    = True
-                      getListTerms Term{subTerms=[h,t]} = h : getListTerms t
+                where getListTerms Term{subTerms=[h,t]} = h : getListTerms t
                       getListTerms Term{subTerms=[]}    = []
                       getListTerms t@Suspension{}       = [t]
                       getListTerms t = pprPanic "getListTerms" (ppr t)
@@ -598,7 +592,7 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
   go bound _ _ _ | seq bound False = undefined
   go 0 tv _ty a = do
     clos <- trIO $ getClosureData a
-    return (Suspension (tipe clos) (Just tv) a Nothing)
+    return (Suspension (tipe clos) tv a Nothing)
   go bound tv ty a = do 
     let monomorphic = not(isTyVarTy tv)   
     -- This ^^^ is a convention. The ancestor tests for
@@ -667,7 +661,7 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
             return (Term tv (Right dc) a subTerms)
 -- The otherwise case: can be a Thunk,AP,PAP,etc.
       tipe_clos ->
-         return (Suspension tipe_clos (Just tv) a Nothing)
+         return (Suspension tipe_clos tv a Nothing)
 
   matchSubTypes dc ty
     | Just (_,ty_args) <- splitTyConApp_maybe (repType ty) 
@@ -894,7 +888,7 @@ zonkTerm = foldTerm idTermFoldM {
               fTerm = \ty dc v tt -> sequence tt      >>= \tt ->
                                      zonkTcType ty    >>= \ty' ->
                                      return (Term ty' dc v tt)
-             ,fSuspension = \ct ty v b -> fmapMMaybe zonkTcType ty >>= \ty ->
+             ,fSuspension = \ct ty v b -> zonkTcType ty >>= \ty ->
                                           return (Suspension ct ty v b)
              ,fNewtypeWrap= \ty dc t -> 
                    return NewtypeWrap `ap` zonkTcType ty `ap` return dc `ap` t}

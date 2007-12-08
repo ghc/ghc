@@ -74,13 +74,13 @@ pprintClosureCommand session bindThings force str = do
        term_    <- GHC.obtainTerm cms force id
        term     <- tidyTermTyVars cms term_
        term'    <- if bindThings && 
-                      Just False == isUnliftedTypeKind `fmap` termType term
+                      False == isUnliftedTypeKind (termType term)
                      then bindSuspensions cms term
                      else return term
      -- Before leaving, we compare the type obtained to see if it's more specific
      --  Then, we extract a substitution,
      --  mapping the old tyvars to the reconstructed types.
-       let Just reconstructed_type = termType term
+       let reconstructed_type = termType term
            subst = unifyRTTI (idType id) (reconstructed_type)
        return (term',subst)
 
@@ -137,11 +137,10 @@ bindSuspensions cms@(Session ref) t = do
                                     (term, names) <- t 
                                     return (RefWrap ty term, names)
                       }
-        doSuspension freeNames ct mb_ty hval _name = do
+        doSuspension freeNames ct ty hval _name = do
           name <- atomicModifyIORef freeNames (\x->(tail x, head x))
           n <- newGrimName name
-          let ty' = fromMaybe (error "unexpected") mb_ty
-          return (Suspension ct mb_ty hval (Just n), [(n,ty',hval)])
+          return (Suspension ct ty hval (Just n), [(n,ty,hval)])
 
 
 --  A custom Term printer to enable the use of Show instances
