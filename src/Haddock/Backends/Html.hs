@@ -750,6 +750,9 @@ ppTyName name
 ppTyNames = map ppTyName
 
 
+ppLTypes = hsep . map ppLType
+
+
 --------------------------------------------------------------------------------
 -- Contexts 
 --------------------------------------------------------------------------------
@@ -774,11 +777,22 @@ pp_hs_context cxt = parenList (map ppPred cxt)
 
 ppLPred = ppPred . unLoc
 
-ppPred (HsClassP n ts) = ppDocName n <+> hsep (map ppLType ts)
+
+ppPred (HsClassP n ts)
+  | classOp, length ts > 2 = firstApp <+> ppLTypes rest
+  | classOp = firstApp
+  | otherwise = ppDocName n <+> ppLTypes ts
+  where
+   classOp = isNameConSym . getName $ n
+   t1:t2:rest = ts
+   firstApp = ppLType t1 <+> ppDocName n <+> ppLType t2
+
+
 -- TODO: find out what happened to the Dupable/Linear distinction
 ppPred (HsEqualP t1 t2) = ppLType t1 <+> toHtml "~" <+> ppLType t2
 ppPred (HsIParam (IPName n) t) 
   = toHtml "?" +++ ppDocName n <+> dcolon <+> ppLType t
+
 
 -- -----------------------------------------------------------------------------
 -- Class declarations
