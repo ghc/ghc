@@ -154,7 +154,7 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
 
 -- Next, match Haddock comments if no -haddock flag
 
-"-- " $docsym .* / { ifExtension (not . haddockEnabled) } ;
+"-- " [$docsym \#] .* / { ifExtension (not . haddockEnabled) } ;
 
 -- Now, when we've matched comments that begin with 2 dashes and continue
 -- with a different character, we need to match comments that begin with three
