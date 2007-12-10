@@ -752,10 +752,10 @@ data InstDecl name
 instance (OutputableBndr name) => Outputable (InstDecl name) where
 
     ppr (InstDecl inst_ty binds uprags ats)
-      = vcat [hsep [ptext SLIT("instance"), ppr inst_ty, ptext SLIT("where")],
-	      nest 4 (ppr ats),
-	      nest 4 (ppr uprags),
-	      nest 4 (pprLHsBinds binds) ]
+      = vcat [hsep [ptext SLIT("instance"), ppr inst_ty, ptext SLIT("where")]
+             , nest 4 $ vcat (map ppr ats)
+ 	     , nest 4 $ vcat (map ppr uprags)
+	     , nest 4 $ pprLHsBinds binds ]
 
 -- Extract the declarations of associated types from an instance
 --
