@@ -1,0 +1,10 @@
+
+GADTwrong1.hs:12:18:
+    Couldn't match expected type `b' against inferred type `a1'
+      `b' is a rigid type variable bound by
+          the type signature for `coerce' at GADTwrong1.hs:10:19
+      `a1' is a rigid type variable bound by
+           the constructor `T' at GADTwrong1.hs:12:11
+    In the expression: y
+    In a case alternative: T y -> y
+    In the expression: case T x :: T (Const b) of T y -> y
