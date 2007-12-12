@@ -63,7 +63,7 @@ mkNDPModule m = mkModule ndpPackageId (mkModuleNameFS m)
 nDP_PARRAY      = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.PArray")
 nDP_REPR        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Repr")
 nDP_CLOSURE     = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Closure")
-nDP_PRIM        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Prim")
+nDP_UNBOXED     = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Unboxed")
 nDP_INSTANCES   = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Instances")
 nDP_COMBINATORS = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Combinators")
 
@@ -128,8 +128,8 @@ initBuiltins
       preprTyCon   <- externalTyCon nDP_PARRAY FSLIT("PRepr")
       prTyCon      <- externalTyCon nDP_PARRAY FSLIT("PR")
       let [prDataCon] = tyConDataCons prTyCon
-      parrayIntPrimTyCon <- externalTyCon nDP_PRIM FSLIT("PArray_Int#")
-      parrayBoolPrimTyCon <- externalTyCon nDP_PRIM FSLIT("PArray_Bool#")
+      parrayIntPrimTyCon <- externalTyCon nDP_UNBOXED FSLIT("PArray_Int#")
+      parrayBoolPrimTyCon <- externalTyCon nDP_UNBOXED FSLIT("PArray_Bool#")
       closureTyCon <- externalTyCon nDP_CLOSURE FSLIT(":->")
 
       voidTyCon    <- externalTyCon nDP_REPR FSLIT("Void")
@@ -146,10 +146,10 @@ initBuiltins
       applyClosureVar  <- externalVar nDP_CLOSURE FSLIT("$:")
       mkClosurePVar    <- externalVar nDP_CLOSURE FSLIT("mkClosureP")
       applyClosurePVar <- externalVar nDP_CLOSURE FSLIT("$:^")
-      replicatePAIntPrimVar <- externalVar nDP_PRIM FSLIT("replicatePA_Int#")
-      upToPAIntPrimVar <- externalVar nDP_PRIM FSLIT("upToPA_Int#")
-      selectPAIntPrimVar <- externalVar nDP_PRIM FSLIT("selectPA_Int#")
-      truesPABoolPrimVar <- externalVar nDP_PRIM FSLIT("truesPA_Bool#")
+      replicatePAIntPrimVar <- externalVar nDP_UNBOXED FSLIT("replicatePA_Int#")
+      upToPAIntPrimVar <- externalVar nDP_UNBOXED FSLIT("upToPA_Int#")
+      selectPAIntPrimVar <- externalVar nDP_UNBOXED FSLIT("selectPA_Int#")
+      truesPABoolPrimVar <- externalVar nDP_UNBOXED FSLIT("truesPA_Bool#")
       lengthPAVar      <- externalVar nDP_PARRAY FSLIT("lengthPA#")
       replicatePAVar   <- externalVar nDP_PARRAY FSLIT("replicatePA#")
       emptyPAVar       <- externalVar nDP_PARRAY FSLIT("emptyPA")
@@ -349,7 +349,7 @@ primMethod :: TyCon -> String -> DsM (Maybe Var)
 primMethod tycon method
   | Just suffix <- lookupNameEnv prim_ty_cons (tyConName tycon)
   = liftM Just
-  $ dsLookupGlobalId =<< lookupOrig nDP_PRIM (mkVarOcc $ method ++ suffix)
+  $ dsLookupGlobalId =<< lookupOrig nDP_UNBOXED (mkVarOcc $ method ++ suffix)
 
   | otherwise = return Nothing
 
@@ -357,7 +357,7 @@ primPArray :: TyCon -> DsM (Maybe TyCon)
 primPArray tycon
   | Just suffix <- lookupNameEnv prim_ty_cons (tyConName tycon)
   = liftM Just
-  $ dsLookupTyCon =<< lookupOrig nDP_PRIM (mkOccName tcName $ "PArray" ++ suffix)
+  $ dsLookupTyCon =<< lookupOrig nDP_UNBOXED (mkOccName tcName $ "PArray" ++ suffix)
 
   | otherwise = return Nothing
 
