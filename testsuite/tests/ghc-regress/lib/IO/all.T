@@ -94,7 +94,8 @@ test('hGetBuf001', compose(only_compiler_types(['ghc']),
 test('hDuplicateTo001', normal, compile_and_run, [''])
 clean(['tmp'])
 
-test('countReaders001', extra_clean(['countReaders001.txt']),
+test('countReaders001', compose(extra_clean(['countReaders001.txt']),
+                                expect_fail_if_windows),
       compile_and_run, [''])
 
 test('concio001', skip_if_fast, run_command, ['$MAKE -s --no-print-directory test.concio001'])
