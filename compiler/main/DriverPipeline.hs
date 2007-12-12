@@ -835,6 +835,13 @@ runPhase cc_phase _stop dflags _basename _suff input_fn get_output_fn maybe_loc
 
 	pkg_extra_cc_opts <- getPackageExtraCcOpts dflags pkgs
 
+#ifdef darwin_TARGET_OS
+        pkg_framework_paths <- getPackageFrameworkPath dflags pkgs
+        let cmdline_framework_paths = frameworkPaths dflags
+        let framework_paths = map ("-F"++) 
+                        (cmdline_framework_paths ++ pkg_framework_paths)
+#endif
+
 	let split_objs = dopt Opt_SplitObjs dflags
 	    split_opt | hcc && split_objs = [ "-DUSE_SPLIT_MARKERS" ]
 		      | otherwise         = [ ]
@@ -907,6 +914,9 @@ runPhase cc_phase _stop dflags _basename _suff input_fn get_output_fn maybe_loc
 			     else [])
 		       ++ [ verb, "-S", "-Wimplicit", cc_opt ]
 		       ++ [ "-D__GLASGOW_HASKELL__="++cProjectVersionInt ]
+#ifdef darwin_TARGET_OS
+                       ++ framework_paths
+#endif
 		       ++ cc_opts
 		       ++ split_opt
 		       ++ include_paths
