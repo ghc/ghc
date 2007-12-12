@@ -695,11 +695,6 @@ GarbageCollect ( rtsBool force_major_gc )
      
    ------------------------------------------------------------------------ */
 
-/* This has to be protected either by the scheduler monitor, or by the
-	garbage collection monitor (probably the latter).
-	KH @ 25/10/99
-*/
-
 void
 GetRoots( evac_fn evac )
 {
