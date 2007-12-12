@@ -506,8 +506,8 @@ listPackages flags mPackageName mModuleName = do
                                                       else showPackageId
               pkgs = map showPkg $ sortBy compPkgIdVer $
                           map package (concatMap snd db_stack)
-          when (null pkgs) $ die "no matches"
-          hPutStrLn stdout $ concat $ intersperse " " pkgs
+          when (not (null pkgs)) $ 
+             hPutStrLn stdout $ concat $ intersperse " " pkgs
 
 -- -----------------------------------------------------------------------------
 -- Prints the highest (hidden or exposed) version of a package
