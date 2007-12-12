@@ -19,16 +19,16 @@ hidden a = a
 ==================== Parser ====================
 <document comment>
 module Test (
-	<IEGroup: 1>, <IEGroup: 2>, T(..), T2, T3(..), T4(..), T5(..), T6(..), N1(..),
-	N2(..), N3(..), N4, N5(..), N6(..), N7(..), <IEGroup: 2>, R(..), R1(..),
-	<document comment>, p, q, u, <IEGroup: 1>, C(a, b), D(..), E, F(..),
-	<document comment>, a, <IEGroup: 1>, f, g, <IEGroup: 1>, <IEDocNamed: aux1>,
-	<IEDocNamed: aux2>, <IEDocNamed: aux3>, <IEDocNamed: aux4>, <IEDocNamed: aux5>,
-	<IEDocNamed: aux6>, <IEDocNamed: aux7>, <IEDocNamed: aux8>, <IEDocNamed: aux9>,
-	<IEDocNamed: aux10>, <IEDocNamed: aux11>, <IEDocNamed: aux12>,
-	<document comment>, <IEGroup: 1>, module Hidden, <IEGroup: 1>, module Visible,
-	<document comment>, <IEGroup: 1>, Ex(..), <IEGroup: 1>, k, l, m, o,
-	<IEGroup: 1>, <IEGroup: 2>, <document comment>, f'
+        <IEGroup: 1>, <IEGroup: 2>, T(..), T2, T3(..), T4(..), T5(..), T6(..), N1(..),
+        N2(..), N3(..), N4, N5(..), N6(..), N7(..), <IEGroup: 2>, R(..), R1(..),
+        <document comment>, p, q, u, <IEGroup: 1>, C(a, b), D(..), E, F(..),
+        <document comment>, a, <IEGroup: 1>, f, g, <IEGroup: 1>, <IEDocNamed: aux1>,
+        <IEDocNamed: aux2>, <IEDocNamed: aux3>, <IEDocNamed: aux4>, <IEDocNamed: aux5>,
+        <IEDocNamed: aux6>, <IEDocNamed: aux7>, <IEDocNamed: aux8>, <IEDocNamed: aux9>,
+        <IEDocNamed: aux10>, <IEDocNamed: aux11>, <IEDocNamed: aux12>,
+        <document comment>, <IEGroup: 1>, module Hidden, <IEGroup: 1>, module Visible,
+        <document comment>, <IEGroup: 1>, Ex(..), <IEGroup: 1>, k, l, m, o,
+        <IEGroup: 1>, <IEGroup: 2>, <document comment>, f'
     ) where
 import Hidden
 import Visible
@@ -61,13 +61,9 @@ class (D a) => C a where { a :: IO a; b :: [a]; c :: a; }
 class D a where { d :: T a b; e :: (a, a); }
 <document comment>
 instance D Int where
-    []
-    []
     { d = undefined
       e = undefined }
 instance Test.D Float where
-    []
-    []
     { d = undefined
       e = undefined }
 class E a where { ee :: a; }
@@ -77,19 +73,19 @@ class F a where { ff :: a; }
 data R
     = <document comment>
       C1 {p :: Int <document comment>,
-	  q :: forall a. a -> a <document comment>,
-	  r :: Int <document comment>,
-	  s :: Int <document comment>} |
+          q :: forall a. a -> a <document comment>,
+          r :: Int <document comment>,
+          s :: Int <document comment>} |
       <document comment>
       C2 {t :: T1 -> (T2 Int Int) -> (T3 Bool Bool) -> (T4 Float Float) -> T5 () (),
-	  u :: Int,
-	  v :: Int}
+          u :: Int,
+          v :: Int}
 <document comment>
 data R1
     = <document comment>
       C3 {s1 :: Int <document comment>,
-	  s2 :: Int <document comment>,
-	  s3 :: Int <document comment>}
+          s2 :: Int <document comment>,
+          s3 :: Int <document comment>}
 <document comment>
 <document comment>
 <document comment>
@@ -123,7 +119,7 @@ k ::
   T () () <document comment>
   -> T2 Int Int <document comment>
      -> T3 Bool Bool -> T4 Float Float <document comment>
-	-> T5 () () <document comment> -> IO () <document comment>
+        -> T5 () () <document comment> -> IO () <document comment>
 l :: (Int, Int, Float) <document comment> -> Int <document comment>
 <document comment>
 m :: R -> N1 () <document comment> -> IO Int <document comment>
@@ -131,8 +127,8 @@ m :: R -> N1 () <document comment> -> IO Int <document comment>
 newn :: R <document comment> -> N1 () <document comment> -> IO Int
 newn = undefined
 <document comment>
-foreign import ccall unsafe "static header.h &o" o :: Float <document comment>
-					      -> IO Float <document comment>
+foreign import ccall unsafe "static header.h &o" o
+  :: Float <document comment> -> IO Float <document comment>
 <document comment>
 newp :: Int
 newp = undefined
