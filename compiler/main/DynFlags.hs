@@ -126,6 +126,7 @@ data DynFlag
    | Opt_D_dump_rn
    | Opt_D_dump_simpl
    | Opt_D_dump_simpl_iterations
+   | Opt_D_dump_simpl_phases
    | Opt_D_dump_spec
    | Opt_D_dump_prep
    | Opt_D_dump_stg
@@ -1079,6 +1080,7 @@ dynamic_flags = [
   ,  ( "ddump-rn",           	 setDumpFlag Opt_D_dump_rn)
   ,  ( "ddump-simpl",        	 setDumpFlag Opt_D_dump_simpl)
   ,  ( "ddump-simpl-iterations", setDumpFlag Opt_D_dump_simpl_iterations)
+  ,  ( "ddump-simpl-phases",     setDumpFlag Opt_D_dump_simpl_phases)
   ,  ( "ddump-spec",         	 setDumpFlag Opt_D_dump_spec)
   ,  ( "ddump-prep",          	 setDumpFlag Opt_D_dump_prep)
   ,  ( "ddump-stg",          	 setDumpFlag Opt_D_dump_stg)

@@ -407,7 +407,7 @@ simplifyPgm mode switches hsc_env us imp_rule_base guts
 			 text "",
 			 pprSimplCount counts_out]);
 
-	endPass dflags ("Simplify phase " ++ phase_info ++ " done") Opt_D_verbose_core2core binds';
+	endPass dflags ("Simplify phase " ++ phase_info ++ " done") Opt_D_dump_simpl_phases binds';
 
 	return (counts_out, guts { mg_binds = binds' })
     }
