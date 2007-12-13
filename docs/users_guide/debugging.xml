@@ -280,14 +280,25 @@
       
       <varlistentry>
 	<term>
+          <option>-ddump-simpl-phases</option>:
+          <indexterm><primary><option>-ddump-simpl-phases</option></primary></indexterm>
+        </term>
+	<listitem>
+	  <para>Show the output of each run of the simplifier.  Used when even
+        <option>-dverbose-simpl</option> doesn't cut it.</para>
+	</listitem>
+      </varlistentry>
+
+      <varlistentry>
+	<term>
           <option>-ddump-simpl-iterations</option>:
           <indexterm><primary><option>-ddump-simpl-iterations</option></primary></indexterm>
         </term>
 	<listitem>
 	  <para>Show the output of each <emphasis>iteration</emphasis>
         of the simplifier (each run of the simplifier has a maximum
-        number of iterations, normally 4).  Used when even
-        <option>-dverbose-simpl</option> doesn't cut it.</para>
+        number of iterations, normally 4).  This outputs even more information
+        than <option>-ddump-simpl-phases</option>.</para>
 	</listitem>
       </varlistentry>
 
