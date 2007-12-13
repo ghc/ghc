@@ -848,7 +848,7 @@ getCoreToDo dflags
 		-- Phase 0: allow all Ids to be inlined now
 		-- This gets foldr inlined before strictness analysis
 
-	   MaxSimplifierIterations 3
+	   MaxSimplifierIterations (max max_iter 3)
 		-- At least 3 iterations because otherwise we land up with
 		-- huge dead expressions because of an infelicity in the 
 		-- simpifier.   
