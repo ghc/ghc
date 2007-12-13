@@ -33,6 +33,14 @@ allocBlock_sync(void)
     return bd;
 }
 
+void
+freeChain_sync(bdescr *bd)
+{
+    ACQUIRE_SPIN_LOCK(&gc_alloc_block_sync);
+    freeChain(bd);
+    RELEASE_SPIN_LOCK(&gc_alloc_block_sync);
+}
+
 /* -----------------------------------------------------------------------------
    Workspace utilities
    -------------------------------------------------------------------------- */

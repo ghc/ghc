@@ -18,6 +18,7 @@ extern SpinLock gc_alloc_block_sync;
 #endif
 
 bdescr *allocBlock_sync(void);
+void    freeChain_sync(bdescr *bd);
 
 void    push_scan_block      (bdescr *bd, step_workspace *ws);
 bdescr *grab_todo_block      (step_workspace *ws);

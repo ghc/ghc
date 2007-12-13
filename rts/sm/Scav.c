@@ -1052,7 +1052,7 @@ scavenge_mutable_list(generation *gen)
     }
 
     // free the old mut_list
-    freeChain(gen->saved_mut_list);
+    freeChain_sync(gen->saved_mut_list);
     gen->saved_mut_list = NULL;
 }
 
