@@ -33,8 +33,8 @@ import HscTypes         ( availNames )
 import RnNames		( getLocalDeclBinders, extendRdrEnvRn )
 import RnTypes		( rnHsTypeFVs, 
 			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec)
-import RnPat          (rnOverLit, rnPatsAndThen_LocalRightwards, rnPat_LocalRec, localNameMaker, 
-                       rnLit,
+import RnPat            (rnOverLit, rnPatsAndThen_LocalRightwards, rnBindPat, 
+                         localRecNameMaker, rnLit,
 			 rnHsRecFields_Con, rnHsRecFields_Update, checkTupSize)
 import DynFlags		( DynFlag(..) )
 import BasicTypes	( FixityDirection(..) )
@@ -289,7 +289,7 @@ rnExpr e@(ELazyPat {}) = patSynErr e
 \begin{code}
 rnExpr (HsProc pat body)
   = newArrowScope $
-    rnPatsAndThen_LocalRightwards ProcExpr [pat] $ \ ([pat'],_) ->
+    rnPatsAndThen_LocalRightwards ProcExpr [pat] $ \ [pat'] ->
     rnCmdTop body	         `thenM` \ (body',fvBody) ->
     returnM (HsProc pat' body', fvBody)
 
@@ -614,7 +614,7 @@ rnStmt ctxt (BindStmt pat expr _ _) thing_inside
 		-- The binders do not scope over the expression
 	; (bind_op, fvs1) <- lookupSyntaxName bindMName
 	; (fail_op, fvs2) <- lookupSyntaxName failMName
-	; rnPatsAndThen_LocalRightwards (StmtCtxt ctxt) [pat] $ \ ([pat'],_) -> do
+	; rnPatsAndThen_LocalRightwards (StmtCtxt ctxt) [pat] $ \ [pat'] -> do
 	{ (thing, fvs3) <- thing_inside
 	; return ((BindStmt pat' expr' bind_op fail_op, thing),
 		  fv_expr `plusFV` fvs1 `plusFV` fvs2 `plusFV` fvs3) }}
@@ -779,18 +779,12 @@ rn_rec_stmts_and_then s cont = do
 
   --    bring them and their fixities into scope
   let bound_names = map unLoc $ collectLStmtsBinders (map fst new_lhs_and_fv)
-  bindLocalNamesFV_WithFixities bound_names fix_env $ do
+  bindLocalNamesFV_WithFixities bound_names fix_env $ 
+    warnUnusedLocalBinds bound_names $ do
 
   -- (C) do the right-hand-sides and thing-inside
   segs <- rn_rec_stmts bound_names new_lhs_and_fv
-  (result, result_fvs) <- cont segs
-  
-  -- (D) warn about unusued binders                    
-  let unused_bndrs = [ b | b <- bound_names, not (b `elemNameSet` result_fvs)]
-  warnUnusedLocalBinds unused_bndrs
-
-  -- (E) return
-  return (result, result_fvs)
+  cont segs
 
 
 -- get all the fixity decls in any Let stmt
@@ -819,7 +813,7 @@ rn_rec_stmt_lhs fix_env (L loc (ExprStmt expr a b)) = return [(L loc (ExprStmt e
 rn_rec_stmt_lhs fix_env (L loc (BindStmt pat expr a b)) 
   = do 
       -- should the ctxt be MDo instead?
-      (pat', fv_pat) <- rnPat_LocalRec fix_env pat 
+      (pat', fv_pat) <- rnBindPat (localRecNameMaker fix_env) pat 
       return [(L loc (BindStmt pat' expr a b),
                fv_pat)]
 

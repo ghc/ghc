@@ -32,7 +32,7 @@ import RnEnv		( lookupOccRn, lookupBndrRn, lookupSyntaxName,
 			  lookupLocatedOccRn, lookupLocatedBndrRn,
 			  lookupLocatedGlobalOccRn, bindTyVarsRn, 
 			  lookupFixityRn, lookupTyFixityRn, lookupConstructorFields,
-			  lookupRecordBndr, mapFvRn, warnUnusedMatches,
+			  lookupRecordBndr, mapFvRn, 
 			  newIPNameRn, bindPatSigTyVarsFV)
 import TcRnMonad
 import RdrName

@@ -74,7 +74,7 @@ import BasicTypes	( IPName, mapIPName, Fixity )
 import SrcLoc		( SrcSpan, srcSpanStart, Located(..), eqLocated, unLoc,
 			  srcLocSpan, getLoc, combineSrcSpans, isOneLineSpan )
 import Outputable
-import Util		( sortLe )
+import Util
 import Maybes
 import ListSetOps	( removeDups )
 import List		( nubBy )
@@ -562,17 +562,23 @@ bindLocalFixities fixes thing_inside
 
 -- Used for nested fixity decls to bind names along with their fixities.
 -- the fixities are given as a UFM from an OccName's FastString to a fixity decl
-bindLocalNamesFV_WithFixities :: [Name] -> UniqFM (Located Fixity) -> RnM (a, FreeVars) -> RnM (a, FreeVars)
-bindLocalNamesFV_WithFixities names fixities cont = 
+-- Also check for unused binders
+bindLocalNamesFV_WithFixities :: [Name]
+			      -> UniqFM (Located Fixity)
+			      -> RnM (a, FreeVars) -> RnM (a, FreeVars)
+bindLocalNamesFV_WithFixities names fixities thing_inside
+  = bindLocalNamesFV names $
+    extendFixityEnv boundFixities $ 
+    thing_inside
+  where
     -- find the names that have fixity decls
-    let boundFixities = foldr 
+    boundFixities = foldr 
                         (\ name -> \ acc -> 
                          -- check whether this name has a fixity decl
                           case lookupUFM fixities (occNameFS (nameOccName name)) of
                                Just (L _ fix) -> (name, FixItem (nameOccName name) fix) : acc
-                               Nothing -> acc) [] names in
+                               Nothing -> acc) [] names
     -- bind the names; extend the fixity env; do the thing inside
-    bindLocalNamesFV names (extendFixityEnv boundFixities cont)
 \end{code}
 
 --------------------------------
@@ -746,9 +752,8 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
   = 	-- Check for duplicate names
     checkDupNames doc_str rdr_names_w_loc	`thenM_`
 
-    	-- Warn about shadowing, but only in source modules
-    ifOptM Opt_WarnNameShadowing 
-      (checkShadowing doc_str rdr_names_w_loc)	`thenM_`
+    	-- Warn about shadowing
+    checkShadowing doc_str rdr_names_w_loc	`thenM_`
 
 	-- Make fresh Names and extend the environment
     newLocalsRn rdr_names_w_loc		`thenM` \ names ->
@@ -847,16 +852,20 @@ checkDupNames doc_str rdr_names_w_loc
 
 -------------------------------------
 checkShadowing doc_str loc_rdr_names
-  = getLocalRdrEnv		`thenM` \ local_env ->
+  = traceRn (text "shadow" <+> ppr loc_rdr_names) `thenM_`
+    getLocalRdrEnv		`thenM` \ local_env ->
     getGlobalRdrEnv		`thenM` \ global_env ->
     let
       check_shadow (L loc rdr_name)
-	|  rdr_name `elemLocalRdrEnv` local_env 
- 	|| not (null (lookupGRE_RdrName rdr_name global_env ))
-	= addWarnAt loc (shadowedNameWarn doc_str rdr_name)
-        | otherwise = returnM ()
+	| Just n <- mb_local = complain [ptext SLIT("bound at") <+> ppr (nameSrcLoc n)]
+	| not (null gres)    = complain (map pprNameProvenance gres)
+	| otherwise	     = return ()
+	where
+	  complain pp_locs = addWarnAt loc (shadowedNameWarn doc_str rdr_name pp_locs)
+	  mb_local = lookupLocalRdrEnv local_env rdr_name
+          gres     = lookupGRE_RdrName rdr_name global_env
     in
-    mappM_ check_shadow loc_rdr_names
+    ifOptM Opt_WarnNameShadowing (mappM_ check_shadow loc_rdr_names)
 \end{code}
 
 
@@ -877,16 +886,13 @@ mapFvRn f xs = mappM f xs	`thenM` \ stuff ->
 -- because some of the rename functions are CPSed:
 -- maps the function across the list from left to right; 
 -- collects all the free vars into one set
-mapFvRnCPS :: (a -> ((b,FreeVars) -> RnM (c, FreeVars)) -> RnM(c, FreeVars)) 
-           -> [a] 
-           -> (([b],FreeVars) -> RnM (c, FreeVars))
-           -> RnM (c, FreeVars)
+mapFvRnCPS :: (a  -> (b   -> RnM c) -> RnM c) 
+           -> [a] -> ([b] -> RnM c) -> RnM c
 
-mapFvRnCPS _ [] cont = cont ([], emptyFVs)
-
-mapFvRnCPS f (h:t) cont = f h $ \ (h',hfv) -> 
-                          mapFvRnCPS f t $ \ (t',tfv) ->
-                              cont (h':t', hfv `plusFV` tfv)
+mapFvRnCPS _ []     cont = cont []
+mapFvRnCPS f (x:xs) cont = f x 		   $ \ x' -> 
+                           mapFvRnCPS f xs $ \ xs' ->
+                           cont (x':xs')
 \end{code}
 
 
@@ -914,9 +920,19 @@ warnUnusedImports, warnUnusedTopBinds :: [GlobalRdrElt] -> RnM ()
 warnUnusedImports gres  = ifOptM Opt_WarnUnusedImports (warnUnusedGREs gres)
 warnUnusedTopBinds gres = ifOptM Opt_WarnUnusedBinds   (warnUnusedGREs gres)
 
-warnUnusedLocalBinds, warnUnusedMatches :: [Name] -> RnM ()
-warnUnusedLocalBinds names = ifOptM Opt_WarnUnusedBinds   (warnUnusedLocals names)
-warnUnusedMatches    names = ifOptM Opt_WarnUnusedMatches (warnUnusedLocals names)
+warnUnusedLocalBinds, warnUnusedMatches :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
+warnUnusedLocalBinds = check_unused Opt_WarnUnusedBinds
+warnUnusedMatches    = check_unused Opt_WarnUnusedMatches
+
+check_unused :: DynFlag -> [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
+check_unused flag names thing_inside
+ =  do	{ (res, res_fvs) <- thing_inside
+	
+	-- Warn about unused names
+	; ifOptM flag (warnUnusedLocals (filterOut (`elemNameSet` res_fvs) names))
+
+	-- And return
+	; return (res, res_fvs) }
 
 -------------------------
 --	Helpers
@@ -967,10 +983,10 @@ addNameClashErrRn rdr_name names
     msgs = [ptext SLIT("    or") <+> mk_ref np | np <- nps]
     mk_ref gre = quotes (ppr (gre_name gre)) <> comma <+> pprNameProvenance gre
 
-shadowedNameWarn doc shadow
-  = hsep [ptext SLIT("This binding for"), 
-	       quotes (ppr shadow),
-	       ptext SLIT("shadows an existing binding")]
+shadowedNameWarn doc rdr_name shadowed_locs
+  = sep [ptext SLIT("This binding for") <+> quotes (ppr rdr_name)
+	    <+> ptext SLIT("shadows the existing binding") <> plural shadowed_locs,
+	 nest 2 (vcat shadowed_locs)]
     $$ doc
 
 unknownNameErr rdr_name

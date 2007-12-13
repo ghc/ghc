@@ -32,8 +32,8 @@ import RdrHsSyn
 import RnHsSyn
 import TcRnMonad
 import RnTypes        ( rnHsSigType, rnLHsType, rnHsTypeFVs,checkPrecMatch)
-import RnPat          (rnPatsAndThen_LocalRightwards, rnPat_LocalRec, rnPat_TopRec, 
-                       NameMaker, localNameMaker, topNameMaker, applyNameMaker, 
+import RnPat          (rnPatsAndThen_LocalRightwards, rnBindPat,
+                       NameMaker, localRecNameMaker, topRecNameMaker, applyNameMaker, 
                        patSigErr)
                       
 import RnEnv		( lookupLocatedBndrRn, 
@@ -179,7 +179,7 @@ rnTopBindsLHS :: UniqFM (Located Fixity) -- mini fixity env for the names we're 
               -> HsValBinds RdrName 
               -> RnM (HsValBindsLR Name RdrName)
 rnTopBindsLHS fix_env binds = 
-    (uncurry $ rnValBindsLHSFromDoc True) (bindersAndDoc binds) fix_env binds
+    (uncurry $ rnValBindsLHSFromDoc (topRecNameMaker fix_env)) (bindersAndDoc binds) binds
 
 rnTopBindsRHS :: [Name] -- the names bound by these binds
               -> HsValBindsLR Name RdrName 
@@ -282,10 +282,8 @@ rnValBindsLHSFromDoc_Local boundNames doc fix_env binds = do
      -- Do error checking: we need to check for dups here because we
      -- don't don't bind all of the variables from the ValBinds at once
      -- with bindLocatedLocals any more.
-     --
-     checkDupNames doc boundNames
-     -- Warn about shadowing, but only in source modules
-     ifOptM Opt_WarnNameShadowing (checkShadowing doc boundNames)   
+     checkDupNames  doc boundNames
+     checkShadowing doc boundNames   
 
      -- (Note that we don't want to do this at the top level, since
      -- sorting out duplicates and shadowing there happens elsewhere.
@@ -297,7 +295,7 @@ rnValBindsLHSFromDoc_Local boundNames doc fix_env binds = do
      --   import A(f)
      --   g = let f = ... in f
      -- should.
-     rnValBindsLHSFromDoc False boundNames doc fix_env binds 
+     rnValBindsLHSFromDoc (localRecNameMaker fix_env) boundNames doc binds 
 
 bindersAndDoc :: HsValBinds RdrName -> ([Located RdrName], SDoc)
 bindersAndDoc binds = 
@@ -311,17 +309,15 @@ bindersAndDoc binds =
 -- renames the left-hand sides
 -- generic version used both at the top level and for local binds
 -- does some error checking, but not what gets done elsewhere at the top level
-rnValBindsLHSFromDoc :: Bool -- top or not
+rnValBindsLHSFromDoc :: NameMaker 
                      -> [Located RdrName] -- RdrNames of the LHS (so we don't have to gather them twice)
                      -> SDoc              -- doc string for dup names and shadowing
-                     -> UniqFM (Located Fixity) -- mini fixity env for the names we're about to bind
-                                                -- these fixities need to be brought into scope with the names
                      -> HsValBinds RdrName
                      -> RnM (HsValBindsLR Name RdrName)
-rnValBindsLHSFromDoc topP original_bndrs doc fix_env binds@(ValBindsIn mbinds sigs)
+rnValBindsLHSFromDoc topP original_bndrs doc binds@(ValBindsIn mbinds sigs)
  = do
      -- rename the LHSes
-     mbinds' <- mapBagM (rnBindLHS topP doc fix_env) mbinds
+     mbinds' <- mapBagM (rnBindLHS topP doc) mbinds
      return $ ValBindsIn mbinds' sigs
 
 -- assumes the LHS vars are in scope
@@ -383,7 +379,8 @@ rnValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside =
       let bound_names = map unLoc $ collectHsValBinders new_lhs
 
       --     and bring them (and their fixities) into scope
-      bindLocalNamesFV_WithFixities bound_names new_fixities $ do
+      bindLocalNamesFV_WithFixities bound_names new_fixities $ 
+        warnUnusedLocalBinds bound_names $ do
 
       -- (C) do the RHS and thing inside
       (binds', dus) <- rnValBindsRHS bound_names new_lhs 
@@ -400,13 +397,6 @@ rnValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside =
                 -- If we don't "see" the dependency of 'y' on 'x', we may put the
                 -- bindings in the wrong order, and the type checker will complain
                 -- that x isn't in scope
-
-            -- check for unused binders.  note that we only want to do
-            -- this for local ValBinds; it gets done elsewhere for
-            -- top-level binds (where the scoping is different)
-            unused_bndrs = [ b | b <- bound_names, not (b `elemNameSet` all_uses)]
-
-      warnUnusedLocalBinds unused_bndrs
 
       return (result, 
               -- the bound names are pruned out of all_uses
@@ -456,24 +446,22 @@ dupFixityDecl loc rdr_name
 
 -- renaming a single bind
 
-rnBindLHS :: Bool -- top if true; local if false
+rnBindLHS :: NameMaker
           -> SDoc 
-          -> UniqFM (Located Fixity) -- mini fixity env for the names we're about to bind
-                                     -- these fixities need to be brought into scope with the names
           -> LHsBind RdrName
           -- returns the renamed left-hand side,
           -- and the FreeVars *of the LHS*
           -- (i.e., any free variables of the pattern)
           -> RnM (LHsBindLR Name RdrName)
 
-rnBindLHS topP doc fix_env (L loc (PatBind { pat_lhs = pat, 
+rnBindLHS name_maker doc (L loc (PatBind { pat_lhs = pat, 
                                            pat_rhs = grhss, 
                                            bind_fvs=bind_fvs,
                                            pat_rhs_ty=pat_rhs_ty
                                          })) 
   = setSrcSpan loc $ do
       -- we don't actually use the FV processing of rnPatsAndThen here
-      (pat',pat'_fvs) <- (if topP then rnPat_TopRec else rnPat_LocalRec) fix_env pat
+      (pat',pat'_fvs) <- rnBindPat name_maker pat
       return (L loc (PatBind { pat_lhs = pat', 
                                pat_rhs = grhss, 
                                -- we temporarily store the pat's FVs here;
@@ -484,25 +472,26 @@ rnBindLHS topP doc fix_env (L loc (PatBind { pat_lhs = pat,
                                -- when we rename the RHS
 			       pat_rhs_ty = pat_rhs_ty }))
 
-rnBindLHS topP doc fix_env (L loc (FunBind { fun_id = name@(L nameLoc _), 
+rnBindLHS name_maker doc (L loc (FunBind { fun_id = name@(L nameLoc _), 
                                            fun_infix = inf, 
                                            fun_matches = matches,
                                            fun_co_fn = fun_co_fn, 
                                            bind_fvs = bind_fvs,
                                            fun_tick = fun_tick
                                          }))
-  = setSrcSpan loc $ do
-      newname <- applyNameMaker (if topP then topNameMaker else localNameMaker) name
-      return (L loc (FunBind { fun_id = L nameLoc newname, 
-                               fun_infix = inf, 
-                               fun_matches = matches,
-                               -- we temporatily store the LHS's FVs (empty in this case) here
-                               -- gets updated when doing the RHS below
-                               bind_fvs = emptyFVs,
-                               -- everything else will get ignored in the next pass
-                               fun_co_fn = fun_co_fn, 
-                               fun_tick = fun_tick
-                               }))
+  = setSrcSpan loc $ 
+    do { (newname, _fvs) <- applyNameMaker name_maker name $ \ newname ->
+		 	    return (newname, emptyFVs) 
+       ; return (L loc (FunBind { fun_id = L nameLoc newname, 
+                             	  fun_infix = inf, 
+                             	  fun_matches = matches,
+                             	  -- we temporatily store the LHS's FVs (empty in this case) here
+                             	  -- gets updated when doing the RHS below
+                             	  bind_fvs = emptyFVs,
+                             	  -- everything else will get ignored in the next pass
+                             	  fun_co_fn = fun_co_fn, 
+                             	  fun_tick = fun_tick
+                             	  })) }
 
 -- assumes the left-hands-side vars are in scope
 rnBind :: (Name -> [Name])		-- Signature tyvar function
@@ -789,7 +778,7 @@ rnMatch' ctxt match@(Match pats maybe_rhs_sig grhss)
 
 	-- Now the main event
        -- note that there are no local ficity decls for matches
-    rnPatsAndThen_LocalRightwards ctxt pats	$ \ (pats',_) ->
+    rnPatsAndThen_LocalRightwards ctxt pats	$ \ pats' ->
     rnGRHSs ctxt grhss		`thenM` \ (grhss', grhss_fvs) ->
 
     returnM (Match pats' maybe_rhs_sig' grhss', grhss_fvs `plusFV` ty_fvs)
