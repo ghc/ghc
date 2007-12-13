@@ -243,6 +243,17 @@ vectExpr e@(_, AnnApp _ arg)
   where
     (fn, tys) = collectAnnTypeArgs e
 
+vectExpr (_, AnnApp (_, AnnVar v) (_, AnnLit lit))
+  | Just con <- isDataConId_maybe v
+  , is_special_con con
+  = do
+      let vexpr = App (Var v) (Lit lit)
+      lexpr <- liftPA vexpr
+      return (vexpr, lexpr)
+  where
+    is_special_con con = con `elem` [intDataCon, floatDataCon, doubleDataCon]
+                
+
 vectExpr (_, AnnApp fn arg)
   = do
       arg_ty' <- vectType arg_ty
