@@ -37,7 +37,7 @@ import Simplify		( simplTopBinds, simplExpr )
 import SimplEnv		( SimplEnv, simplBinders, mkSimplEnv, setInScopeSet )
 import SimplMonad
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass )
-import CoreLint		( endPass )
+import CoreLint		( endPass, endIteration )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FamInstEnv
@@ -497,7 +497,7 @@ simplifyPgm mode switches hsc_env us imp_rule_base guts
 		-- Dump the result of this iteration
 	   dumpIfSet_dyn dflags Opt_D_dump_simpl_iterations herald
 		         (pprSimplCount counts') ;
-	   endPass dflags herald Opt_D_dump_simpl_iterations binds'' ;
+	   endIteration dflags herald Opt_D_dump_simpl_iterations binds'' ;
 
 		-- Loop
   	   do_iteration us2 (iteration_no + 1) all_counts binds''

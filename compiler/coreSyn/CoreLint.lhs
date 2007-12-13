@@ -17,7 +17,7 @@ A ``lint'' pass to check for Core correctness
 module CoreLint (
 	lintCoreBindings,
 	lintUnfolding, 
-	showPass, endPass
+	showPass, endPass, endIteration
     ) where
 
 #include "HsVersions.h"
@@ -62,7 +62,14 @@ and do Core Lint when necessary.
 
 \begin{code}
 endPass :: DynFlags -> String -> DynFlag -> [CoreBind] -> IO [CoreBind]
-endPass dflags pass_name dump_flag binds
+endPass = dumpAndLint dumpIfSet_core
+
+endIteration :: DynFlags -> String -> DynFlag -> [CoreBind] -> IO [CoreBind]
+endIteration = dumpAndLint dumpIfSet_dyn
+
+dumpAndLint :: (DynFlags -> DynFlag -> String -> SDoc -> IO ())
+            -> DynFlags -> String -> DynFlag -> [CoreBind] -> IO [CoreBind]
+dumpAndLint dump dflags pass_name dump_flag binds
   = do 
 	-- Report result size if required
 	-- This has the side effect of forcing the intermediate to be evaluated
@@ -70,7 +77,7 @@ endPass dflags pass_name dump_flag binds
 		(text "    Result size =" <+> int (coreBindsSize binds))
 
 	-- Report verbosely, if required
-	dumpIfSet_core dflags dump_flag pass_name (pprCoreBindings binds)
+	dump dflags dump_flag pass_name (pprCoreBindings binds)
 
 	-- Type check
 	lintCoreBindings dflags pass_name binds
