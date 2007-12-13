@@ -344,6 +344,11 @@ GarbageCollect ( rtsBool force_major_gc )
   gct->evac_step = 0;
   GetRoots(mark_root);
 
+#if defined(RTS_USER_SIGNALS)
+  // mark the signal handlers (signals should be already blocked)
+  markSignalHandlers(mark_root);
+#endif
+
   // Mark the weak pointer list, and prepare to detect dead weak pointers.
   markWeakPtrList();
   initWeakForGC();
@@ -702,7 +707,12 @@ GetRoots( evac_fn evac )
     Capability *cap;
     Task *task;
 
-    for (i = 0; i < n_capabilities; i++) {
+    // Each GC thread is responsible for following roots from the
+    // Capability of the same number.  There will usually be the same
+    // or fewer Capabilities as GC threads, but just in case there
+    // are more, we mark every Capability whose number is the GC
+    // thread's index plus a multiple of the number of GC threads.
+    for (i = gct->thread_index; i < n_capabilities; i += n_gc_threads) {
 	cap = &capabilities[i];
 	evac((StgClosure **)(void *)&cap->run_queue_hd);
 	evac((StgClosure **)(void *)&cap->run_queue_tl);
@@ -717,6 +727,9 @@ GetRoots( evac_fn evac )
 	    evac((StgClosure **)(void *)&task->suspended_tso);
 	}
 
+#if defined(THREADED_RTS)
+        markSparkQueue(evac,cap);
+#endif
     }
     
 #if !defined(THREADED_RTS)
@@ -724,17 +737,6 @@ GetRoots( evac_fn evac )
     evac((StgClosure **)(void *)&blocked_queue_tl);
     evac((StgClosure **)(void *)&sleeping_queue);
 #endif 
-
-    // evac((StgClosure **)&blackhole_queue);
-
-#if defined(THREADED_RTS)
-    markSparkQueue(evac);
-#endif
-    
-#if defined(RTS_USER_SIGNALS)
-    // mark the signal handlers (signals should be already blocked)
-    markSignalHandlers(evac);
-#endif
 }
 
 /* -----------------------------------------------------------------------------
@@ -972,6 +974,10 @@ gc_thread_work (void)
     // this is the main thread and we incremented it inside
     // GarbageCollect(), or this is a worker thread and the main
     // thread bumped gc_running_threads before waking us up.
+
+    // Every thread evacuates some roots.
+    gct->evac_step = 0;
+    GetRoots(mark_root);
 
 loop:
     scavenge_loop();

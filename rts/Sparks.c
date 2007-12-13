@@ -108,68 +108,65 @@ findSpark (Capability *cap)
  * -------------------------------------------------------------------------- */
 
 void
-markSparkQueue (evac_fn evac)
+markSparkQueue (evac_fn evac, Capability *cap)
 { 
     StgClosure **sparkp, **to_sparkp;
-    nat i, n, pruned_sparks; // stats only
+    nat n, pruned_sparks; // stats only
     StgSparkPool *pool;
-    Capability *cap;
     
     PAR_TICKY_MARK_SPARK_QUEUE_START();
     
     n = 0;
     pruned_sparks = 0;
-    for (i = 0; i < n_capabilities; i++) {
-	cap = &capabilities[i];
-	pool = &(cap->r.rSparks);
-	
-	ASSERT_SPARK_POOL_INVARIANTS(pool);
-
+    
+    pool = &(cap->r.rSparks);
+    
+    ASSERT_SPARK_POOL_INVARIANTS(pool);
+    
 #if defined(PARALLEL_HASKELL)
-	// stats only
-	n = 0;
-	pruned_sparks = 0;
+    // stats only
+    n = 0;
+    pruned_sparks = 0;
 #endif
 	
-	sparkp = pool->hd;
-	to_sparkp = pool->hd;
-	while (sparkp != pool->tl) {
-	    ASSERT(*sparkp!=NULL);
-	    ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgClosure *)*sparkp)));
-	    // ToDo?: statistics gathering here (also for GUM!)
-	    if (closure_SHOULD_SPARK(*sparkp)) {
-		evac(sparkp);
-		*to_sparkp++ = *sparkp;
-		if (to_sparkp == pool->lim) {
-		    to_sparkp = pool->base;
-		}
-		n++;
-	    } else {
-		pruned_sparks++;
-	    }
-	    sparkp++;
-	    if (sparkp == pool->lim) {
-		sparkp = pool->base;
-	    }
-	}
-	pool->tl = to_sparkp;
-	
-	PAR_TICKY_MARK_SPARK_QUEUE_END(n);
-	
-#if defined(PARALLEL_HASKELL)
-	debugTrace(DEBUG_sched, 
-		   "marked %d sparks and pruned %d sparks on [%x]",
-		   n, pruned_sparks, mytid);
-#else
-	debugTrace(DEBUG_sched, 
-		   "marked %d sparks and pruned %d sparks",
-		   n, pruned_sparks);
-#endif
-	
-	debugTrace(DEBUG_sched,
-		   "new spark queue len=%d; (hd=%p; tl=%p)\n",
-		   sparkPoolSize(pool), pool->hd, pool->tl);
+    sparkp = pool->hd;
+    to_sparkp = pool->hd;
+    while (sparkp != pool->tl) {
+        ASSERT(*sparkp!=NULL);
+        ASSERT(LOOKS_LIKE_CLOSURE_PTR(((StgClosure *)*sparkp)));
+        // ToDo?: statistics gathering here (also for GUM!)
+        if (closure_SHOULD_SPARK(*sparkp)) {
+            evac(sparkp);
+            *to_sparkp++ = *sparkp;
+            if (to_sparkp == pool->lim) {
+                to_sparkp = pool->base;
+            }
+            n++;
+        } else {
+            pruned_sparks++;
+        }
+        sparkp++;
+        if (sparkp == pool->lim) {
+            sparkp = pool->base;
+        }
     }
+    pool->tl = to_sparkp;
+	
+    PAR_TICKY_MARK_SPARK_QUEUE_END(n);
+	
+#if defined(PARALLEL_HASKELL)
+    debugTrace(DEBUG_sched, 
+               "marked %d sparks and pruned %d sparks on [%x]",
+               n, pruned_sparks, mytid);
+#else
+    debugTrace(DEBUG_sched, 
+               "marked %d sparks and pruned %d sparks",
+               n, pruned_sparks);
+#endif
+    
+    debugTrace(DEBUG_sched,
+               "new spark queue len=%d; (hd=%p; tl=%p)\n",
+               sparkPoolSize(pool), pool->hd, pool->tl);
 }
 
 /* -----------------------------------------------------------------------------
