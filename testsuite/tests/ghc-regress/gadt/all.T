@@ -25,7 +25,8 @@ clean(['Gadt17_help.hi', 'Gadt17_help.o'])
 test('gadt18', normal, compile, [''])
 test('gadt19', normal, compile, [''])
 test('gadt20', normal, compile, [''])
-test('gadt21', normal, compile_fail, [''])
+test('gadt21', namebase_if_compiler_lt('ghc','6.9', 'gadt21-6.8'), 
+     compile_fail, [''])
 test('gadt22', normal, compile, [''])
 
 test('gadt23', normal, run_command, ['$MAKE -s --no-print-directory gadt23'])
