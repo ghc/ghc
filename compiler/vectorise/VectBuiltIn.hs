@@ -221,6 +221,7 @@ preludeVars
     , mk gHC_PARR FSLIT("crossMapP")  nDP_COMBINATORS FSLIT("crossMapPA")
     , mk gHC_PARR FSLIT("singletonP") nDP_COMBINATORS FSLIT("singletonPA")
     , mk gHC_PARR FSLIT("concatP")    nDP_COMBINATORS FSLIT("concatPA")
+    , mk gHC_PARR FSLIT("+:+")        nDP_COMBINATORS FSLIT("appPA")
 
     , mk nDP_PRELUDE_INT  FSLIT("plus") nDP_PRELUDE_INT FSLIT("plusV")
     , mk nDP_PRELUDE_INT  FSLIT("minus") nDP_PRELUDE_INT FSLIT("minusV")
@@ -228,10 +229,21 @@ preludeVars
     , mk nDP_PRELUDE_INT  FSLIT("sumP")  nDP_PRELUDE_INT FSLIT("sumPA")
     , mk nDP_PRELUDE_INT  FSLIT("upToP") nDP_PRELUDE_INT FSLIT("upToPA")
 
+    , mk nDP_PRELUDE_INT  FSLIT("eq") nDP_PRELUDE_INT FSLIT("eqV")
+    , mk nDP_PRELUDE_INT  FSLIT("neq") nDP_PRELUDE_INT FSLIT("neqV")
+    , mk nDP_PRELUDE_INT  FSLIT("le")  nDP_PRELUDE_INT FSLIT("leV")
+    , mk nDP_PRELUDE_INT  FSLIT("lt") nDP_PRELUDE_INT FSLIT("ltV")
+    , mk nDP_PRELUDE_INT  FSLIT("ge") nDP_PRELUDE_INT FSLIT("geV")
+    , mk nDP_PRELUDE_INT  FSLIT("gt")  nDP_PRELUDE_INT FSLIT("gtV")
+
     , mk nDP_PRELUDE_DOUBLE  FSLIT("plus") nDP_PRELUDE_DOUBLE FSLIT("plusV")
     , mk nDP_PRELUDE_DOUBLE  FSLIT("minus") nDP_PRELUDE_DOUBLE FSLIT("minusV")
     , mk nDP_PRELUDE_DOUBLE  FSLIT("mult")  nDP_PRELUDE_DOUBLE FSLIT("multV")
     , mk nDP_PRELUDE_DOUBLE  FSLIT("sumP")  nDP_PRELUDE_DOUBLE FSLIT("sumPA")
+    , mk nDP_PRELUDE_DOUBLE  FSLIT("minIndexP") 
+         nDP_PRELUDE_DOUBLE  FSLIT("minIndexPA")
+    , mk nDP_PRELUDE_DOUBLE  FSLIT("maxIndexP")
+         nDP_PRELUDE_DOUBLE  FSLIT("maxIndexPA")
 
     , mk nDP_PRELUDE_DOUBLE  FSLIT("eq") nDP_PRELUDE_DOUBLE FSLIT("eqV")
     , mk nDP_PRELUDE_DOUBLE  FSLIT("neq") nDP_PRELUDE_DOUBLE FSLIT("neqV")
