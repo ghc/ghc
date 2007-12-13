@@ -41,16 +41,22 @@ import qualified Control.Exception as Exception
 import Data.Maybe
 
 import Data.Char ( isSpace, toLower )
-import Monad
-import Directory
-import System ( getArgs, getProgName, getEnv, exitWith, ExitCode(..) )
+import Control.Monad
+import System.Directory ( doesDirectoryExist, getDirectoryContents, 
+                          doesFileExist, renameFile, removeFile )
+import System.Exit ( exitWith, ExitCode(..) )
+import System.Environment ( getArgs, getProgName, getEnv )
 import System.IO
 import System.IO.Error (try)
 import Data.List ( isPrefixOf, isSuffixOf, intersperse, sortBy, nub )
+import Control.Concurrent
 
 #ifdef mingw32_HOST_OS
 import Foreign
 import Foreign.C.String
+import GHC.ConsoleHandler
+#else
+import System.Posix
 #endif
 
 import IO ( isPermissionError, isDoesNotExistError )
@@ -123,7 +129,7 @@ deprecFlags = [
   ]
 
 ourCopyright :: String
-ourCopyright = "GHC package manager version " ++ version ++ "\n"
+ourCopyright = "GHC package manager version " ++ Version.version ++ "\n"
 
 usageHeader :: String -> String
 usageHeader prog = substProg prog $
@@ -194,6 +200,7 @@ data Force = ForceAll | ForceFiles | NoForce
 
 runit :: [Flag] -> [String] -> IO ()
 runit cli nonopts = do
+  installSignalHandlers -- catch ^C and clean up
   prog <- getProgramName
   let
         force
@@ -310,7 +317,7 @@ getPkgDatabases modify flags = do
   appdir <- getAppUserDataDirectory "ghc"
 
   let
-        subdir = targetARCH ++ '-':targetOS ++ '-':version
+        subdir = targetARCH ++ '-':targetOS ++ '-':Version.version
         archdir   = appdir </> subdir
         user_conf = archdir </> "package.conf"
   user_exists <- doesFileExist user_conf
@@ -321,7 +328,7 @@ getPkgDatabases modify flags = do
         | modify || user_exists = user_conf : global_confs ++ [global_conf]
         | otherwise             = global_confs ++ [global_conf]
 
-  e_pkg_path <- try (getEnv "GHC_PACKAGE_PATH")
+  e_pkg_path <- try (System.Environment.getEnv "GHC_PACKAGE_PATH")
   let env_stack =
         case e_pkg_path of
                 Left  _ -> sys_databases
@@ -377,8 +384,8 @@ readParseDatabase filename = do
   str <- readFile filename `Exception.catch` \_ -> return emptyPackageConfig
   let packages = read str
   Exception.evaluate packages
-    `Exception.catch` \_ ->
-        die (filename ++ ": parse error in package config file")
+    `Exception.catch` \e->
+        die ("error while parsing " ++ filename ++ ": " ++ show e)
   return (filename,packages)
 
 emptyPackageConfig :: String
@@ -682,17 +689,22 @@ savingOldConfig filename io = Exception.block $ do
                                          "to", show oldFile])
               ioError err
           return False
-  hPutStrLn stdout "done."
-  io `catch` \e -> do
-      hPutStrLn stderr (show e)
-      hPutStr stdout ("\nWARNING: an error was encountered while writing"
+  (do hPutStrLn stdout "done."; io)
+    `Exception.catch` \e -> do
+      hPutStr stdout ("WARNING: an error was encountered while writing "
                    ++ "the new configuration.\n")
-      when restore_on_error $ do
-          hPutStr stdout "Attempting to restore the old configuration..."
-          do renameFile oldFile filename
-             hPutStrLn stdout "done."
-           `catch` \err -> hPutStrLn stdout ("Failed: " ++ show err)
-      ioError e
+      if restore_on_error 
+         then do 
+           hPutStr stdout "Attempting to restore the old configuration... "
+           do renameFile oldFile filename
+              hPutStrLn stdout "done."
+            `catch` \err -> hPutStrLn stdout ("Failed: " ++ show err)
+         else do
+           -- file did not exist before, so the new one which
+           -- might be partially complete.
+           try (removeFile filename)
+           return ()
+      Exception.throwIO e
 
 -----------------------------------------------------------------------------
 -- Sanity-check a new package config, and automatically build GHCi libs
@@ -877,7 +889,7 @@ expandEnvVars str force = go str ""
 
    lookupEnvVar :: String -> IO String
    lookupEnvVar nm =
-        catch (System.getEnv nm)
+        catch (System.Environment.getEnv nm)
            (\ _ -> do dieOrForceAll force ("Unable to expand variable " ++
                                         show nm)
                       return "")
@@ -920,7 +932,7 @@ my_head s [] = error s
 my_head s (x:xs) = x
 
 -----------------------------------------
--- Cut and pasted from ghc/compiler/SysTools
+-- Cut and pasted from ghc/compiler/main/SysTools
 
 #if defined(mingw32_HOST_OS)
 subst :: Char -> Char -> String -> String
@@ -949,4 +961,33 @@ foreign import stdcall unsafe  "GetModuleFileNameA"
 #else
 getExecDir :: String -> IO (Maybe String)
 getExecDir _ = return Nothing
+#endif
+
+-----------------------------------------
+-- Adapted from ghc/compiler/utils/Panic
+
+installSignalHandlers :: IO ()
+installSignalHandlers = do
+  threadid <- myThreadId
+  let
+      interrupt = throwTo threadid (Exception.ErrorCall "interrupted")
+  --
+#if !defined(mingw32_HOST_OS)
+  installHandler sigQUIT (Catch interrupt) Nothing 
+  installHandler sigINT  (Catch interrupt) Nothing
+  return ()
+#elif __GLASGOW_HASKELL__ >= 603
+  -- GHC 6.3+ has support for console events on Windows
+  -- NOTE: running GHCi under a bash shell for some reason requires
+  -- you to press Ctrl-Break rather than Ctrl-C to provoke
+  -- an interrupt.  Ctrl-C is getting blocked somewhere, I don't know
+  -- why --SDM 17/12/2004
+  let sig_handler ControlC = interrupt
+      sig_handler Break    = interrupt
+      sig_handler _        = return ()
+
+  installHandler (Catch sig_handler)
+  return ()
+#else
+  return () -- nothing
 #endif

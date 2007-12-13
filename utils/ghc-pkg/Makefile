@@ -16,6 +16,10 @@ SRC_HC_OPTS += $(PACKAGE_CABAL)
 # we must also build with $(GhcHcOpts) here:
 SRC_HC_OPTS += $(GhcHcOpts) $(GhcStage1HcOpts)
 
+ifeq "$(Windows)" "NO"
+SRC_HC_OPTS += -package unix
+endif
+
 ifeq "$(ghc_ge_607)" "YES"
 SRC_HC_OPTS += -package containers
 endif
