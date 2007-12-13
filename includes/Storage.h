@@ -173,9 +173,6 @@ extern bdescr * RTS_VAR(small_alloc_list);
 extern bdescr * RTS_VAR(large_alloc_list);
 extern bdescr * RTS_VAR(pinned_object_block);
 
-extern StgPtr RTS_VAR(alloc_Hp);
-extern StgPtr RTS_VAR(alloc_HpLim);
-
 extern nat RTS_VAR(alloc_blocks);
 extern nat RTS_VAR(alloc_blocks_lim);
 
