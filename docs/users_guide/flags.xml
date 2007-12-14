@@ -1292,6 +1292,13 @@
 	    </row>
 
 	    <row>
+	      <entry><option>-fspec-constr-threshold</option>=<replaceable>n</replaceable></entry>
+	      <entry>Set the size threshold for the SpecConstr transformation to <replaceable>n</replaceable> (default: 200)</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-spec-constr-threshold</option></entry>
+	    </row>
+
+	    <row>
 	      <entry><option>-fliberate-case</option></entry>
 	      <entry>Turn on the liberate-case transformation. Implied by <option>-O2</option>.</entry>
 	      <entry>dynamic</entry>
@@ -1299,11 +1306,10 @@
 	    </row>
 
 	    <row>
-	      <entry><option>-fspec-threshold</option>=<replaceable>n</replaceable></entry>
-	      <entry>Set the size threshold for function specialisation to <replaceable>n</replaceable>, for both
-		the liberate-case and SpecConstr transformations (default: 200)</entry>
+	      <entry><option>-fliberate-case-threshold</option>=<replaceable>n</replaceable></entry>
+	      <entry>Set the size threshold for the liberate-case transformation to <replaceable>n</replaceable> (default: 200)</entry>
 	      <entry>static</entry>
-	      <entry><option>-</option></entry>
+	      <entry><option>-fno-liberate-case-threshold</option></entry>
 	    </row>
 
 	    <row>
