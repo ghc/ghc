@@ -79,7 +79,6 @@ data Builtins = Builtins {
                 , prTyCon          :: TyCon
                 , prDataCon        :: DataCon
                 , parrayIntPrimTyCon :: TyCon
-                , parrayBoolPrimTyCon :: TyCon
                 , voidTyCon        :: TyCon
                 , wrapTyCon        :: TyCon
                 , enumerationTyCon :: TyCon
@@ -129,7 +128,6 @@ initBuiltins
       prTyCon      <- externalTyCon nDP_PARRAY FSLIT("PR")
       let [prDataCon] = tyConDataCons prTyCon
       parrayIntPrimTyCon <- externalTyCon nDP_UNBOXED FSLIT("PArray_Int#")
-      parrayBoolPrimTyCon <- externalTyCon nDP_UNBOXED FSLIT("PArray_Bool#")
       closureTyCon <- externalTyCon nDP_CLOSURE FSLIT(":->")
 
       voidTyCon    <- externalTyCon nDP_REPR FSLIT("Void")
@@ -171,7 +169,6 @@ initBuiltins
                , prTyCon          = prTyCon
                , prDataCon        = prDataCon
                , parrayIntPrimTyCon = parrayIntPrimTyCon
-               , parrayBoolPrimTyCon = parrayBoolPrimTyCon
                , voidTyCon        = voidTyCon
                , wrapTyCon        = wrapTyCon
                , enumerationTyCon = enumerationTyCon
