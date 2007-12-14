@@ -693,17 +693,16 @@ savingOldConfig filename io = Exception.block $ do
     `Exception.catch` \e -> do
       hPutStr stdout ("WARNING: an error was encountered while writing "
                    ++ "the new configuration.\n")
-      if restore_on_error 
-         then do 
+        -- remove any partially complete new version:
+      try (removeFile filename)
+        -- and attempt to restore the old one, if we had one:
+      when restore_on_error $ do
            hPutStr stdout "Attempting to restore the old configuration... "
            do renameFile oldFile filename
               hPutStrLn stdout "done."
             `catch` \err -> hPutStrLn stdout ("Failed: " ++ show err)
-         else do
-           -- file did not exist before, so the new one which
-           -- might be partially complete.
-           try (removeFile filename)
-           return ()
+        -- Note the above renameFile sometimes fails on Windows with
+        -- "permission denied", I have no idea why --SDM.
       Exception.throwIO e
 
 -----------------------------------------------------------------------------
