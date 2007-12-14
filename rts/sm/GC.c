@@ -1237,7 +1237,7 @@ init_uncollected_gen (nat g, nat threads)
 
 	    // If the block at the head of the list in this generation
 	    // is less than 3/4 full, then use it as a todo block.
-	    if (isPartiallyFull(stp->blocks))
+	    if (stp->blocks && isPartiallyFull(stp->blocks))
 	    {
 		ws->todo_bd = stp->blocks;
                 ws->todo_free = ws->todo_bd->free;
