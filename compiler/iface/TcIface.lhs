@@ -604,7 +604,7 @@ tcIfaceVectInfo mod typeEnv (IfaceVectInfo
                              })
   = do { vVars     <- mapM vectVarMapping vars
        ; tyConRes1 <- mapM vectTyConMapping      tycons
-       ; tyConRes2 <- mapM vectTyConReuseMapping tycons
+       ; tyConRes2 <- mapM vectTyConReuseMapping tyconsReuse
        ; let (vTyCons, vDataCons, vPAs, vIsos) = unzip4 (tyConRes1 ++ tyConRes2)
        ; return $ VectInfo 
                   { vectInfoVar     = mkVarEnv  vVars
