@@ -195,7 +195,8 @@ libCaseBind env (Rec pairs)
 
     rhs_small_enough (id,rhs)
 	=  idArity id > 0	-- Note [Only functions!]
-	&& couldBeSmallEnoughToInline (bombOutSize env) rhs
+	&& maybe True (\size -> couldBeSmallEnoughToInline size rhs)
+                      (bombOutSize env)
 \end{code}
 
 
@@ -349,7 +350,7 @@ topLevel = 0
 \begin{code}
 data LibCaseEnv
   = LibCaseEnv {
-	lc_size :: Int,		-- Bomb-out size for deciding if
+	lc_size :: Maybe Int,	-- Bomb-out size for deciding if
 				-- potential liberatees are too big.
 				-- (passed in from cmd-line args)
 
@@ -377,7 +378,7 @@ data LibCaseEnv
 
 initEnv :: DynFlags -> LibCaseEnv
 initEnv dflags 
-  = LibCaseEnv { lc_size = specThreshold dflags,
+  = LibCaseEnv { lc_size = liberateCaseThreshold dflags,
 		 lc_lvl = 0,
 		 lc_lvl_env = emptyVarEnv, 
 		 lc_rec_env = emptyVarEnv,

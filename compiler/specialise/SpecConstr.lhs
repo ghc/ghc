@@ -456,9 +456,9 @@ specConstrProgram dflags us binds
 %************************************************************************
 
 \begin{code}
-data ScEnv = SCE { sc_size :: Int,	-- Size threshold
+data ScEnv = SCE { sc_size :: Maybe Int,	-- Size threshold
 
-		   sc_subst :: Subst,	-- Current substitution
+		   sc_subst :: Subst,   	-- Current substitution
 
 		   sc_how_bound :: HowBoundEnv,
 			-- Binds interesting non-top-level variables
@@ -491,7 +491,7 @@ instance Outputable Value where
 
 ---------------------
 initScEnv dflags
-  = SCE { sc_size = specThreshold dflags,
+  = SCE { sc_size = specConstrThreshold dflags,
 	  sc_subst = emptySubst, 
 	  sc_how_bound = emptyVarEnv, 
 	  sc_vals = emptyVarEnv }
@@ -824,7 +824,8 @@ scExpr' env e@(App _ _)
 ----------------------
 scBind :: ScEnv -> CoreBind -> UniqSM (ScEnv, ScUsage, CoreBind)
 scBind env (Rec prs)
-  | not (all (couldBeSmallEnoughToInline (sc_size env)) rhss)
+  | Just threshold <- sc_size env
+  , not (all (couldBeSmallEnoughToInline threshold) rhss)
 		-- No specialisation
   = do	{ let (rhs_env,bndrs') = extendRecBndrs env bndrs
 	; (rhs_usgs, rhss') <- mapAndUnzipUs (scExpr rhs_env) rhss

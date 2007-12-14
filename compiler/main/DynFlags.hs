@@ -301,7 +301,8 @@ data DynFlags = DynFlags {
   maxSimplIterations    :: Int,		-- max simplifier iterations
   ruleCheck		:: Maybe String,
 
-  specThreshold		:: Int,		-- Threshold for function specialisation
+  specConstrThreshold   :: Maybe Int,	-- Threshold for SpecConstr
+  liberateCaseThreshold :: Maybe Int,   -- Threshold for LiberateCase 
 
   stolen_x86_regs	:: Int,		
   cmdlineHcIncludes	:: [String],	-- -#includes
@@ -478,7 +479,8 @@ defaultDynFlags =
 	optLevel		= 0,
 	maxSimplIterations	= 4,
 	ruleCheck		= Nothing,
-	specThreshold		= 200,
+	specConstrThreshold	= Just 200,
+        liberateCaseThreshold   = Just 200,
 	stolen_x86_regs		= 4,
 	cmdlineHcIncludes	= [],
 	importPaths		= ["."],
@@ -1140,9 +1142,14 @@ dynamic_flags = [
   ,  ( "fmax-simplifier-iterations", IntSuffix (\n -> 
 		upd (\dfs -> dfs{ maxSimplIterations = n })) )
 
-	-- liberate-case-threshold is an old flag for '-fspec-threshold'
-  ,  ( "fspec-threshold",          IntSuffix (\n -> upd (\dfs -> dfs{ specThreshold = n })))
-  ,  ( "fliberate-case-threshold", IntSuffix (\n -> upd (\dfs -> dfs{ specThreshold = n })))
+  ,  ( "fspec-constr-threshold",      IntSuffix (\n ->
+                upd (\dfs -> dfs{ specConstrThreshold = Just n })))
+  ,  ( "fno-spec-constr-threshold",   NoArg (
+                upd (\dfs -> dfs{ specConstrThreshold = Nothing })))
+  ,  ( "fliberate-case-threshold",    IntSuffix (\n ->
+                upd (\dfs -> dfs{ liberateCaseThreshold = Just n })))
+  ,  ( "fno-liberate-case-threshold", NoArg (
+                upd (\dfs -> dfs{ liberateCaseThreshold = Nothing })))
 
   ,  ( "frule-check",     SepArg (\s -> upd (\dfs -> dfs{ ruleCheck = Just s })))
   ,  ( "fcontext-stack"	, IntSuffix $ \n -> upd $ \dfs -> dfs{ ctxtStkDepth = n })
