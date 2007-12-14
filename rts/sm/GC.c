@@ -580,7 +580,9 @@ GarbageCollect ( rtsBool force_major_gc )
   resize_generations();
   
   // Guess the amount of live data for stats.
-  live = calcLive();
+  live = calcLiveBlocks() * BLOCK_SIZE_W;
+  debugTrace(DEBUG_gc, "Slop: %ldKB", 
+             (live - calcLiveWords()) / (1024/sizeof(W_)));
 
   // Free the small objects allocated via allocate(), since this will
   // all have been copied into G0S1 now.  

@@ -676,14 +676,10 @@ statDescribeGens(void)
       for (bd = step->large_objects, lge = 0; bd; bd = bd->link) {
 	lge++;
       }
-      live = step->n_large_blocks * BLOCK_SIZE;
-      bd = step->blocks;
       // This live figure will be slightly less that the "live" figure
       // given by +RTS -Sstderr, because we take don't count the
       // slop at the end of each block.
-      for (; bd; bd = bd->link) {
-	live += (bd->free - bd->start) * sizeof(W_);
-      }
+      live += countOccupied(step->blocks) + countOccupied(step->large_objects);
       if (s != 0) {
 	debugBelch("%36s","");
       }

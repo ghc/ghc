@@ -519,7 +519,9 @@ extern void         GetRoots     ( evac_fn evac );
 extern ullong RTS_VAR(total_allocated);
 
 extern lnat calcAllocated  ( void );
-extern lnat calcLive       ( void );
+extern lnat calcLiveBlocks ( void );
+extern lnat calcLiveWords  ( void );
+extern lnat countOccupied  ( bdescr *bd );
 extern lnat calcNeeded     ( void );
 
 #if defined(DEBUG)

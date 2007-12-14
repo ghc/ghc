@@ -918,15 +918,15 @@ calcAllocated( void )
 /* Approximate the amount of live data in the heap.  To be called just
  * after garbage collection (see GarbageCollect()).
  */
-extern lnat 
-calcLive(void)
+lnat 
+calcLiveBlocks(void)
 {
   nat g, s;
   lnat live = 0;
   step *stp;
 
   if (RtsFlags.GcFlags.generations == 1) {
-      return (g0s0->n_large_blocks + g0s0->n_blocks) * BLOCK_SIZE_W;
+      return g0s0->n_large_blocks + g0s0->n_blocks;
   }
 
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
@@ -938,10 +938,48 @@ calcLive(void)
 	  continue; 
       }
       stp = &generations[g].steps[s];
-      live += (stp->n_large_blocks + stp->n_blocks) * BLOCK_SIZE_W;
+      live += stp->n_large_blocks + stp->n_blocks;
     }
   }
   return live;
+}
+
+lnat
+countOccupied(bdescr *bd)
+{
+    lnat words;
+
+    words = 0;
+    for (; bd != NULL; bd = bd->link) {
+        words += bd->free - bd->start;
+    }
+    return words;
+}
+
+lnat
+calcLiveWords(void)
+{
+    nat g, s;
+    lnat live;
+    step *stp;
+    
+    if (RtsFlags.GcFlags.generations == 1) {
+        return countOccupied(g0s0->blocks) + countOccupied(g0s0->large_objects);
+    }
+    
+    live = 0;
+    for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+        for (s = 0; s < generations[g].n_steps; s++) {
+            /* approximate amount of live data (doesn't take into account slop
+             * at end of each block).
+             */
+            if (g == 0 && s == 0) continue; 
+            stp = &generations[g].steps[s];
+            live += countOccupied(stp->blocks) + 
+                    countOccupied(stp->large_objects);
+        } 
+    }
+    return live;
 }
 
 /* Approximate the number of blocks that will be needed at the next
