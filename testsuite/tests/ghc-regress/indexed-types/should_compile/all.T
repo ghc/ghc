@@ -49,7 +49,7 @@ test('Kind', normal, compile, [''])
 
 test('GADT1', expect_fail, compile, [''])
 test('GADT2', normal, compile, [''])
-test('GADT3', expect_fail, compile, [''])
+test('GADT3', if_compiler_ge('ghc', '6.9', expect_fail), compile, [''])
 test('GADT4', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
 test('GADT5', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
 test('GADT6', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
@@ -57,7 +57,7 @@ test('GADT7', expect_fail, compile, [''])
 test('GADT8', normal, compile, [''])
 test('GADT9', normal, compile, [''])
 test('GADT10', expect_fail, compile, [''])
-test('GADT11', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
+test('GADT11', normal, compile, [''])
 test('GADT12', expect_fail, compile, [''])
 
 test('Class1', normal, compile, [''])
@@ -81,7 +81,7 @@ test('ColInference5', normal, compile, [''])
 test('ColInference6', normal, compile, [''])
 
 test('ClassEqContext', normal, compile, [''])
-test('ClassEqContext2', if_compiler_lt('ghc','6.9',expect_fail), compile, [''])
+test('ClassEqContext2', normal, compile, [''])
 test('ClassEqContext3', normal, compile, [''])
 
 test('Col', normal, compile, [''])
@@ -91,7 +91,8 @@ test('ColGivenCheck', normal, compile, [''])
 test('ColGivenCheck2', normal, compile, [''])
 
 test('InstEqContext', normal, compile, [''])
-test('InstEqContext2', normal, compile, [''])
+test('InstEqContext2', if_compiler_lt('ghc', '6.9', expect_fail),
+                       compile, [''])
 test('InstEqContext3', normal, compile, [''])
 
 test('HO', normal, compile, [''])

@@ -35,7 +35,8 @@ test('rn037', normal, compile, [''])
 # Missing:
 # test('rn038', normal, compile, [''])
 
-test('rn039', normal, compile, [''])
+test('rn039', if_compiler_lt('ghc', '6.9', namebase('rn039-6.8')),
+              compile, [''])
 test('rn040', normal, compile, ['-fwarn-unused-binds -fwarn-unused-matches'])
 test('rn041', normal, compile, [''])
 test('rn042', normal, multimod_compile, ['rn042', '-v0'])
@@ -70,7 +71,7 @@ test('rn059', normal, multimod_compile, ['rn059', '-v0'])
 clean(['Rn059_A.hi', 'Rn059_A.o', 'Rn059_B.hi', 'Rn059_B.o'])
 test('rn060', normal, compile, [''])
 test('rn061', normal, compile, [''])
-test('T1972', normal, compile, [''])
+test('T1972', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
 
 test('timing001', normal, compile, [''])
 test('timing002', normal, compile, [''])
