@@ -42,7 +42,7 @@ import Module               ( Module )
 import DsMonad hiding (mapAndUnzipM)
 import DsUtils              ( mkCoreTup, mkCoreTupTy )
 
-import Literal              ( Literal )
+import Literal              ( Literal, mkMachInt )
 import PrelNames
 import TysWiredIn
 import TysPrim              ( intPrimTy )
@@ -300,6 +300,8 @@ vectExpr e@(fvs, AnnLam bndr _)
   where
     (bs,body) = collectAnnValBinders e
 
+vectExpr e = pprPanic "vectExpr" (ppr $ deAnnotate e)
+
 vectLam :: VarSet -> [Var] -> CoreExprWithFVs -> VM VExpr
 vectLam fvs bs body
   = do
@@ -387,7 +389,7 @@ vectAlgCase tycon ty_args scrut bndr ty alts
       shape_bndrs <- arrShapeVars repr
       (len, sel, indices) <- arrSelector repr (map Var shape_bndrs)
 
-      (vbndr, valts) <- vect_scrut_bndr $ mapM (proc_alt sel lty) alts'
+      (vbndr, valts) <- vect_scrut_bndr $ mapM (proc_alt sel vty lty) alts'
       let (vect_dcs, vect_bndrss, lift_bndrss, vbodies) = unzip4 valts
 
       vexpr <- vectExpr scrut
@@ -418,14 +420,14 @@ vectAlgCase tycon ty_args scrut bndr ty alts
     cmp DEFAULT       _             = LT
     cmp _             DEFAULT       = GT
 
-    proc_alt sel lty (DataAlt dc, bndrs, body)
+    proc_alt sel vty lty (DataAlt dc, bndrs, body)
       = do
           vect_dc <- maybeV (lookupDataCon dc)
           let tag = mkDataConTag vect_dc
               fvs = freeVarsOf body `delVarSetList` bndrs
           (vect_bndrs, lift_bndrs, vbody)
             <- vect_alt_bndrs bndrs
-             $ \len -> packLiftingContext len sel tag fvs lty
+             $ \len -> packLiftingContext len sel tag fvs vty lty
              $ vectExpr body
 
           return (vect_dc, vect_bndrs, lift_bndrs, vbody)
@@ -453,8 +455,9 @@ vectAlgCase tycon ty_args scrut bndr ty alts
 
     mk_vect_alt vect_dc bndrs body = (DataAlt vect_dc, bndrs, body)
 
-packLiftingContext :: CoreExpr -> CoreExpr -> CoreExpr -> VarSet -> Type -> VM VExpr -> VM VExpr
-packLiftingContext len shape tag fvs res_ty p
+packLiftingContext :: CoreExpr -> CoreExpr -> CoreExpr -> VarSet
+                   -> Type -> Type -> VM VExpr -> VM VExpr
+packLiftingContext len shape tag fvs vty lty p
   = do
       select <- builtin selectPAIntPrimVar
       let sel_expr = mkApps (Var select) [shape, tag]
@@ -466,9 +469,12 @@ packLiftingContext len shape tag fvs res_ty p
                 . filter isLocalId
                 $ varSetElems fvs
           (vexpr, lexpr) <- p
+          empty <- emptyPA vty
           return (vexpr, Let (NonRec sel_var sel_expr)
                          . mkLets (concat bnds)
-                         $ Case len lc_var res_ty [(DEFAULT, [], lexpr)])
+                         $ Case len lc_var lty
+                             [(DEFAULT, [], lexpr),
+                              (LitAlt (mkMachInt 0), [], empty)])
 
 packFreeVar :: CoreExpr -> CoreExpr -> Var -> VM [CoreBind]
 packFreeVar len sel v
