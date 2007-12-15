@@ -14,7 +14,8 @@ module VectMonad (
   cloneName, cloneId, cloneVar,
   newExportedVar, newLocalVar, newDummyVar, newTyVar,
   
-  Builtins(..), sumTyCon, prodTyCon, combinePAVar,
+  Builtins(..), sumTyCon, prodTyCon, uarrTy, intPrimArrayTy,
+  combinePAVar,
   builtin, builtins,
 
   GlobalEnv(..),

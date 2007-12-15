@@ -6,7 +6,8 @@
 -- for details
 
 module VectBuiltIn (
-  Builtins(..), sumTyCon, prodTyCon, combinePAVar,
+  Builtins(..), sumTyCon, prodTyCon, uarrTy, intPrimArrayTy,
+  combinePAVar,
   initBuiltins, initBuiltinVars, initBuiltinTyCons, initBuiltinDataCons,
   initBuiltinPAs, initBuiltinPRs,
   initBuiltinBoxedTyCons,
@@ -29,11 +30,11 @@ import NameEnv
 import OccName
 
 import TypeRep         ( funTyCon )
-import Type            ( Type )
+import Type            ( Type, mkTyConApp )
 import TysPrim
 import TysWiredIn      ( unitTyCon, unitDataCon,
                          tupleTyCon,
-                         intTyCon, intTyConName,
+                         intTyCon, intTyConName, intTy,
                          doubleTyCon, doubleTyConName,
                          boolTyCon, boolTyConName, trueDataCon, falseDataCon,
                          parrTyCon, parrTyConName )
@@ -60,6 +61,7 @@ mAX_NDP_COMBINE = 2
 mkNDPModule :: FastString -> Module
 mkNDPModule m = mkModule ndpPackageId (mkModuleNameFS m)
 
+nDP_UARR        = mkNDPModule FSLIT("Data.Array.Parallel.Unlifted.Flat.UArr")
 nDP_PARRAY      = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.PArray")
 nDP_REPR        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Repr")
 nDP_CLOSURE     = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Closure")
@@ -78,7 +80,7 @@ data Builtins = Builtins {
                 , preprTyCon       :: TyCon
                 , prTyCon          :: TyCon
                 , prDataCon        :: DataCon
-                , parrayIntPrimTyCon :: TyCon
+                , uarrTyCon        :: TyCon
                 , voidTyCon        :: TyCon
                 , wrapTyCon        :: TyCon
                 , enumerationTyCon :: TyCon
@@ -101,6 +103,12 @@ data Builtins = Builtins {
                 , combinePAVars    :: Array Int Var
                 , liftingContext   :: Var
                 }
+
+uarrTy :: Type -> Builtins -> Type
+uarrTy ty bi = mkTyConApp (uarrTyCon bi) [ty]
+
+intPrimArrayTy :: Builtins -> Type
+intPrimArrayTy = uarrTy intTy
 
 sumTyCon :: Int -> Builtins -> TyCon
 sumTyCon n bi
@@ -127,7 +135,7 @@ initBuiltins
       preprTyCon   <- externalTyCon nDP_PARRAY FSLIT("PRepr")
       prTyCon      <- externalTyCon nDP_PARRAY FSLIT("PR")
       let [prDataCon] = tyConDataCons prTyCon
-      parrayIntPrimTyCon <- externalTyCon nDP_UNBOXED FSLIT("PArray_Int#")
+      uarrTyCon    <- externalTyCon nDP_UARR   FSLIT("UArr")
       closureTyCon <- externalTyCon nDP_CLOSURE FSLIT(":->")
 
       voidTyCon    <- externalTyCon nDP_REPR FSLIT("Void")
@@ -168,7 +176,7 @@ initBuiltins
                , preprTyCon       = preprTyCon
                , prTyCon          = prTyCon
                , prDataCon        = prDataCon
-               , parrayIntPrimTyCon = parrayIntPrimTyCon
+               , uarrTyCon        = uarrTyCon
                , voidTyCon        = voidTyCon
                , wrapTyCon        = wrapTyCon
                , enumerationTyCon = enumerationTyCon
@@ -373,3 +381,4 @@ primPArray tycon
 prim_ty_cons = mkNameEnv [mk_prim intPrimTyCon]
   where
     mk_prim tycon = (tyConName tycon, '_' : getOccString tycon)
+

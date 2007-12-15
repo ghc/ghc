@@ -366,8 +366,8 @@ arrShapeTys (EnumRepr {}) = sumShapeTys
 
 sumShapeTys :: VM [Type]
 sumShapeTys = do
-                int_arr <- builtin parrayIntPrimTyCon
-                return [intPrimTy, mkTyConApp int_arr [], mkTyConApp int_arr []]
+                int_arr <- builtin intPrimArrayTy
+                return [intPrimTy, int_arr, int_arr]
 
 
 arrShapeVars :: Repr -> VM [Var]
