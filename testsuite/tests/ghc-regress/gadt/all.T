@@ -25,7 +25,7 @@ clean(['Gadt17_help.hi', 'Gadt17_help.o'])
 test('gadt18', normal, compile, [''])
 test('gadt19', normal, compile, [''])
 test('gadt20', normal, compile, [''])
-test('gadt21', namebase_if_compiler_lt('ghc','6.9', 'gadt21-6.8'), 
+test('gadt21', if_compiler_lt('ghc','6.9', namebase('gadt21-6.8')), 
      compile_fail, [''])
 test('gadt22', normal, compile, [''])
 
@@ -39,11 +39,11 @@ test('type-rep', skip_if_fast, compile_and_run, [''])
 test('equal', normal, compile, [''])
 test('nbe', normal, compile, [''])
 test('while', normal, compile_and_run, [''])
-test('rw', namebase_if_compiler_lt('ghc','6.9', 'rw-6.8'), compile_fail, [''])
+test('rw', if_compiler_lt('ghc','6.9', namebase('rw-6.8')), compile_fail, [''])
 test('lazypat', normal, compile_fail, [''])
 test('lazypatok', expect_fail, compile, [''])
 test('tc', normal, compile_and_run, [''])
-test('arrow', skip_if_compiler_lt('ghc','6.9'), compile, [''])
+test('arrow', if_compiler_lt('ghc', '6.9', skip), compile, [''])
 test('tdpe', normal, compile, [''])
 test('Nilsson', skip_if_fast, compile, [''])
 

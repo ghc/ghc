@@ -266,79 +266,39 @@ def _skip_if_platform( opts, plat ):
 	
 # ---
 
-def expect_broken_if_compiler_ge( bug, compiler, version ):
-   return lambda opts, c=compiler, v=version: \
-                 _expect_fail_if_compiler_ge(opts, c, v)
-
-def expect_fail_if_compiler_ge( compiler, version ):
-   return lambda opts, c=compiler, v=version: \
-                 _expect_fail_if_compiler_ge(opts, c, v)
-
-def _expect_fail_if_compiler_ge( opts, compiler, version ):
+def if_compiler_lt( compiler, version, f ):
     if config.compiler_type == compiler and \
-       version_ge(config.compiler_version, version):
-        opts.expect = 'fail'
+       version_lt(config.compiler_version, version):
+        return f
+    else:
+        return normal
 
-def expect_broken_if_compiler_gt( bug, compiler, version ):
-   return lambda opts, c=compiler, v=version: \
-                 _expect_fail_if_compiler_gt(opts, c, v)
-
-def expect_fail_if_compiler_gt( compiler, version ):
-   return lambda opts, c=compiler, v=version: \
-                 _expect_fail_if_compiler_gt(opts, c, v)
-
-def _expect_fail_if_compiler_gt( opts, compiler, version ):
-    if config.compiler_type == compiler and \
-       version_gt(config.compiler_version, version):
-        opts.expect = 'fail'
-
-def expect_broken_if_compiler_le( bug, compiler, version ):
-   return lambda opts, c=compiler, v=version: \
-                 _expect_fail_if_compiler_le(opts, c, v)
-
-def expect_fail_if_compiler_le( compiler, version ):
-   return lambda opts, c=compiler, v=version: \
-                 _expect_fail_if_compiler_le(opts, c, v)
-
-def _expect_fail_if_compiler_le( opts, compiler, version ):
+def if_compiler_le( compiler, version, f ):
     if config.compiler_type == compiler and \
        version_le(config.compiler_version, version):
-        opts.expect = 'fail'
+        return f
+    else:
+        return normal
 
-def expect_broken_if_compiler_lt( bug, compiler, version ):
-   return lambda opts, c=compiler, v=version: \
-                 _expect_fail_if_compiler_lt(opts, c, v)
-
-def expect_fail_if_compiler_lt( compiler, version ):
-   return lambda opts, c=compiler, v=version: \
-                 _expect_fail_if_compiler_lt(opts, c, v)
-
-def _expect_fail_if_compiler_lt( opts, compiler, version ):
+def if_compiler_gt( compiler, version, f ):
     if config.compiler_type == compiler and \
-       version_lt(config.compiler_version, version):
-        opts.expect = 'fail'
+       version_gt(config.compiler_version, version):
+        return f
+    else:
+        return normal
 
-def expect_broken_ways_if_compiler_lt( bug, compiler, version, ways ):
-   return lambda opts, c=compiler, v=version, w=ways: \
-                 _expect_fail_ways_if_compiler_lt(opts, c, v, w)
-
-def expect_fail_ways_if_compiler_lt( compiler, version, ways ):
-   return lambda opts, c=compiler, v=version, w=ways: \
-                 _expect_fail_ways_if_compiler_lt(opts, c, v, w)
-
-def _expect_fail_ways_if_compiler_lt( opts, compiler, version, ways ):
+def if_compiler_ge( compiler, version, f ):
     if config.compiler_type == compiler and \
-       version_lt(config.compiler_version, version):
-        opts.expect_fail_for = ways
+       version_ge(config.compiler_version, version):
+        return f
+    else:
+        return normal
 
-def namebase_if_compiler_lt( compiler, version, namebase ):
-   return lambda opts, c=compiler, v=version, nb=namebase: \
-                 _namebase_if_compiler_lt(opts, c, v, nb)
+def namebase( nb ):
+   return lambda opts, nb=nb: _namebase(opts, nb)
 
-def _namebase_if_compiler_lt( opts, compiler, version, namebase ):
-    if config.compiler_type == compiler and \
-       version_lt(config.compiler_version, version):
-        opts.namebase = namebase
+def _namebase( opts, nb ):
+    opts.with_namebase = nb
 
 # ---
 
@@ -355,15 +315,6 @@ def skip_unless_tag( tag ):
 def _skip_unless_tag( opts, tag ):
     if not (tag in config.compiler_tags):
 	opts.skip = 1
-
-def skip_if_compiler_lt( compiler, version ):
-   return lambda opts, c=compiler, v=version: \
-                 _skip_if_compiler_lt(opts, c, v)
-
-def _skip_if_compiler_lt( opts, compiler, version ):
-    if config.compiler_type == compiler and \
-       version_lt(config.compiler_version, version):
-        opts.skip = 1
 
 # ---
 def alone(opts):
@@ -658,10 +609,10 @@ def do_compile( name, way, should_fail, top_mod, extra_hc_opts ):
     # of whether we expected the compilation to fail or not (successful
     # compilations may generate warnings).
 
-    if getTestOpts().namebase == None:
+    if getTestOpts().with_namebase == None:
         namebase = name
     else:
-        namebase = getTestOpts().namebase
+        namebase = getTestOpts().with_namebase
 
     (platform_specific, expected_stderr_file) = platform_wordsize_qualify(namebase, 'stderr')
     actual_stderr_file = qualify(name, 'comp.stderr')
@@ -1019,10 +970,10 @@ def extcore_run( name, way, extra_hc_opts, compile_only, top_mod ):
 # Utils
 
 def check_stdout_ok( name ):
-   if getTestOpts().namebase == None:
+   if getTestOpts().with_namebase == None:
        namebase = name
    else:
-       namebase = getTestOpts().namebase
+       namebase = getTestOpts().with_namebase
 
    actual_stdout_file   = qualify(name, 'run.stdout')
    (platform_specific, expected_stdout_file) = platform_wordsize_qualify(namebase, 'stdout')
@@ -1041,10 +992,10 @@ def dump_stdout( name ):
    print read_no_crs(qualify(name, 'run.stdout'))
 
 def check_stderr_ok( name ):
-   if getTestOpts().namebase == None:
+   if getTestOpts().with_namebase == None:
        namebase = name
    else:
-       namebase = getTestOpts().namebase
+       namebase = getTestOpts().with_namebase
 
    actual_stderr_file   = qualify(name, 'run.stderr')
    (platform_specific, expected_stderr_file) = platform_wordsize_qualify(namebase, 'stderr')

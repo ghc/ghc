@@ -26,7 +26,7 @@ test('read020', normal, compile_fail, [''])
 test('read021', expect_fail_if_compiler_type('hugs'), compile_fail, [''])
 
 test('read022', normal, compile_fail, [''])
-test('read023', namebase_if_compiler_lt('ghc','6.9', 'read023-6.8'), compile_fail, [''])
+test('read023', if_compiler_lt('ghc','6.9', namebase('read023-6.8')), compile_fail, [''])
 test('read024', normal, compile_fail, [''])
 test('read025', normal, compile_fail, [''])
 test('read026', normal, compile_fail, [''])

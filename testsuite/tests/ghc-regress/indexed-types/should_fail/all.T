@@ -27,7 +27,7 @@ test('TyFamArity1', normal, compile_fail, [''])
 test('TyFamArity2', normal, compile_fail, [''])
 test('TyFamUndec', normal, compile_fail, [''])
 
-test('GADTwrong1', expect_fail_if_compiler_lt('ghc','6.9'), compile_fail, [''])
+test('GADTwrong1', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
 
 test('Over', normal, multimod_compile_fail, ['OverD', '-no-hs-main -no-link'])
 clean(['OverA.hi', 'OverA.o', 'OverB.hi', 'OverB.o', 'OverC.hi', 'OverC.o'])
