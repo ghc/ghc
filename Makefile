@@ -385,7 +385,8 @@ endif
 
 # Upload the distribution and documentation
 ifneq "$(PublishLocation)" ""
-publish :: publish-binary-dist
+publish ::
+	make publish-binary-dist 'prefix=$(BIN_DIST_INST_DIR)'
 endif
 
 .PHONY: publish-binary-dist
@@ -397,9 +398,9 @@ publish-binary-dist ::
 	    done \
 	done
 
-# You need to first make binddisttest, and then run
-#     make publish 'prefix=$(BIN_DIST_INST_DIR)'
-# for this to find the right place.
+# You need to "make binddisttest" before publishing the docs, as it
+# works by publish setting $(prefix) to inside the binddisttest
+# directory so $(docdir) points to the right place.
 
 # We assume that Windows means Cygwin, as we can't just use docdir
 # unchanged or rsync (really SSH?) thinks that c:/foo means /foo on
