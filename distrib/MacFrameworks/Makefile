@@ -4,7 +4,7 @@ GMP_DIR = gmp-4.2.1
 all: GMP.framework GNUreadline.framework
 
 $(GMP_DIR).tar.gz:
-	cp ../gmp/$(GMP_DIR).tar.gz .
+	cp ../../gmp/$(GMP_DIR).tar.gz .
 
 $(READLINE_DIR).tar.gz:
 	curl -O ftp://ftp.cwru.edu/pub/bash/$(READLINE_DIR).tar.gz
@@ -27,5 +27,5 @@ clean:
 	rm -rf 	GMP-framework.zip GNUreadline-framework.zip
 
 cleanall: clean
-	rm $(GMP_DIR).tar.gz
-	rm $(READLINE_DIR).tar.gz
+	rm -f $(GMP_DIR).tar.gz
+	rm -f $(READLINE_DIR).tar.gz
