@@ -150,6 +150,14 @@ ld-options:
 	 , "-u", "base_GHCziConc_ensureIOManagerIsRunning_closure"
 #endif
 
+/*  Pick up static libraries in preference over dynamic if in earlier search
+ *  path.  This is important to use the static gmp in preference on Mac OS.
+ *  The used option is specific to the Darwin linker.
+ */
+#ifdef darwin_BUILD_OS
+	 , "-Wl,-search_paths_first"
+#endif
+
 framework-dirs:
 
 #ifdef HAVE_FRAMEWORK_GMP

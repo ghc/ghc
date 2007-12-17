@@ -256,10 +256,15 @@ binary-dist::
 # compiler) with the stage1 compiler. See #1860 for an example.
 # Thus we rebuild the utils with stage 1 here. This is a bit unpleasant,
 # as binary-dist really shouldn't actually build anything, but it works.
+# We need to do the same for utilities used during library package installation.
 binary-dist::
 	$(MAKE) -C utils clean
 	$(MAKE) -C utils UseStage1=YES boot
 	$(MAKE) -C utils UseStage1=YES
+	$(RM) -f libraries/ifBuildable/ifBuildable
+	$(MAKE) -C libraries UseStage1=YES ifBuildable/ifBuildable
+	$(RM) -f libraries/installPackage/installPackage
+	$(MAKE) -C libraries UseStage1=YES installPackage/installPackage
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 

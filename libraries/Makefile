@@ -171,15 +171,28 @@ installPackage/installPackage: installPackage.hs $(BOOTSTRAP_STAMPS)
 	-$(RM) -rf installPackage
 	mkdir installPackage
 	$(CP) installPackage.hs installPackage/
+ifeq "$(UseStage1)" "YES"
+	cd installPackage && ../$(HC) -Wall -cpp \
+	                            --make installPackage -o installPackage \
+	                            $(BOOTSTRAP_INC_1_UP)
+else
 	cd installPackage && $(GHC) -Wall -cpp \
 	                            --make installPackage -o installPackage \
 	                            $(BOOTSTRAP_INC_1_UP)
+endif
+# TODO: The conditional is yucky, but we need to be able to build with stage1
+#       for bindists and as installPackages/ has no Makefile, it seems hard
+#	to make this nicer.
 
 ifBuildable/ifBuildable: ifBuildable.hs
 	-$(RM) -rf ifBuildable
 	mkdir ifBuildable
 	$(CP) ifBuildable.hs ifBuildable/
+ifeq "$(UseStage1)" "YES"
+	cd ifBuildable && ../$(HC) -Wall --make ifBuildable -o ifBuildable
+else
 	cd ifBuildable && $(GHC) -Wall --make ifBuildable -o ifBuildable
+endif
 
 $(BOOTSTRAP_STAMPS): stamp/bootstrapping.%:
 	$(RM) -rf bootstrapping.$*
