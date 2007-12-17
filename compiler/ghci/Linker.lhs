@@ -1129,15 +1129,20 @@ mkSOName root = ("lib" ++ root) `joinFileExt` "so"
 -- name. They are searched for in different paths than normal libraries.
 #ifdef darwin_TARGET_OS
 loadFramework extraPaths rootname
-   = do	{ mb_fwk <- findFile mk_fwk (extraPaths ++ defaultFrameworkPaths)
-	; case mb_fwk of
-	    Just fwk_path -> loadDLL fwk_path
-	    Nothing	  -> return (Just "not found") }
- 		-- Tried all our known library paths, but dlopen()
-		-- has no built-in paths for frameworks: give up
+   = do { either_dir <- Control.Exception.try getHomeDirectory
+        ; let homeFrameworkPath = case either_dir of
+                                  Left _ -> []
+                                  Right dir -> [dir ++ "/Library/Frameworks"]
+              ps = extraPaths ++ homeFrameworkPath ++ defaultFrameworkPaths
+        ; mb_fwk <- findFile mk_fwk ps
+        ; case mb_fwk of
+            Just fwk_path -> loadDLL fwk_path
+            Nothing       -> return (Just "not found") }
+                -- Tried all our known library paths, but dlopen()
+                -- has no built-in paths for frameworks: give up
    where
      mk_fwk dir = dir `joinFileName` (rootname ++ ".framework/" ++ rootname)
-	-- sorry for the hardcoded paths, I hope they won't change anytime soon:
+        -- sorry for the hardcoded paths, I hope they won't change anytime soon:
      defaultFrameworkPaths = ["/Library/Frameworks", "/System/Library/Frameworks"]
 #endif
 \end{code}
