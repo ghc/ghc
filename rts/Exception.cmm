@@ -214,6 +214,11 @@ killThreadzh_fast
      * If the exception went to a catch frame, we'll just continue from
      * the handler.
      */
+  loop:
+    if (StgTSO_what_next(target) == ThreadRelocated::I16) {
+        target = StgTSO_link(target);
+        goto loop;
+    }
     if (target == CurrentTSO) {
 	SAVE_THREAD_STATE();
 	/* ToDo: what if the current thread is blocking exceptions? */
