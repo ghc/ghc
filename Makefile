@@ -268,7 +268,7 @@ binary-dist::
 	$(MAKE) prefix=$(BIN_DIST_DIR) install-docs
 
 binary-dist::
-	cd $(BIN_DIST_DIR) && ../distrib/prep-bin-dist-mingw
+	cd $(BIN_DIST_DIR) && $(SHELL) ../distrib/prep-bin-dist-mingw
 
 binary-dist::
 	$(MKDIRHIER) $(BIN_DIST_DIR)/icons
