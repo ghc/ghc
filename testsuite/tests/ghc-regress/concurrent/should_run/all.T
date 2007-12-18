@@ -133,3 +133,5 @@ test('conc065', ignore_output, compile_and_run, [''])
 test('conc066', ignore_output, compile_and_run, [''])
 test('conc067', ignore_output, compile_and_run, [''])
 test('conc068', exit_code(1), compile_and_run, [''])
+
+test('1980', normal, compile_and_run, [''])
