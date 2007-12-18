@@ -37,6 +37,9 @@ module Data.List
    , intersperse       -- :: a -> [a] -> [a]
    , intercalate       -- :: [a] -> [[a]] -> [a]
    , transpose         -- :: [[a]] -> [[a]]
+   
+   , subsequences      -- :: [a] -> [[a]]
+   , permutations      -- :: [a] -> [[a]]
 
    -- * Reducing lists (folds)
 
@@ -729,6 +732,24 @@ inits (x:xs)            =  [[]] ++ map (x:) (inits xs)
 tails                   :: [a] -> [[a]]
 tails []                =  [[]]
 tails xxs@(_:xs)        =  xxs : tails xs
+
+
+-- | The 'subsequences' function returns the list of all subsequences of the argument.
+--
+-- > subsequences "abc" == ["","c","b","bc","a","ac","ab","abc"]
+subsequences            :: [a] -> [[a]]
+subsequences []         =  [[]]
+subsequences (x:xs)     =  subsequences xs ++ map (x:) (subsequences xs)
+
+-- | The 'permutations' function returns the list of all permutations of the argument.
+--
+-- > permutations "abc" == ["abc","bac","bca","acb","cab","cba"]
+permutations            :: [a] -> [[a]]
+permutations []         =  [[]]
+permutations (x:xs)     =  [zs | ys <- permutations xs, zs <- interleave x ys ]
+  where interleave          :: a -> [a] -> [[a]]
+        interleave x []     =  [[x]]
+        interleave x (y:ys) =  [x:y:ys] ++ map (y:) (interleave x ys)
 
 
 ------------------------------------------------------------------------------
