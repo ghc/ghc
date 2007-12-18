@@ -389,13 +389,12 @@ publish ::
 	make publish-binary-dist 'prefix=$(BIN_DIST_INST_DIR)'
 endif
 
+nTimes = set -e; for i in `seq 1 $(1)`; do echo Try "$$i: $(2)"; if $(2); then break; fi; done
+
 .PHONY: publish-binary-dist
 publish-binary-dist ::
-	@for f in $(PUBLISH_FILES); do \
-	    for i in 0 1 2 3 4 5 6 7 8 9; do \
-	        echo "Try $$i: $(PublishCp) $$f $(PublishLocation)/dist"; \
-	        if $(PublishCp) $$f $(PublishLocation)/dist; then break; fi; \
-	    done \
+	@for f in $(PUBLISH_FILES); \
+	    do $(call nTimes,10,$(PublishCp) $$f $(PublishLocation)/dist); \
 	done
 
 # You need to "make binddisttest" before publishing the docs, as it
@@ -413,7 +412,7 @@ PUBLISH_DOCDIR = $(docdir)
 endif
 
 publish-binary-dist ::
-	$(PublishCp) -r $(PUBLISH_DOCDIR)/* $(PublishLocation)/docs
+	$(call nTimes,10,$(PublishCp) -r "$(PUBLISH_DOCDIR)"/* $(PublishLocation)/docs)
 
 binary-dist::
 	@echo "Mechanical and super-natty! Inspect the result and *if* happy; freeze, sell and get some sleep!"
