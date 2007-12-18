@@ -546,7 +546,7 @@ stat_exit(int alloc)
                         TICK_TO_DBL(GC_coll_etimes[g]));
 	    }
 
-	    statsPrintf("\n%11ld Mb total memory in use\n\n", 
+	    statsPrintf("\n%11ld MB total memory in use\n\n", 
 		    mblocks_allocated * MBLOCK_SIZE / (1024 * 1024));
 
 #if defined(THREADED_RTS)
