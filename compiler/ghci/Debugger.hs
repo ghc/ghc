@@ -177,7 +177,6 @@ showTerm cms@(Session ref) term = do
            GHC.setSessionDynFlags cms dflags
   cPprShowable prec NewtypeWrap{ty=new_ty,wrapped_term=t} = 
       cPprShowable prec t{ty=new_ty}
-  cPprShowable prec RefWrap{wrapped_term=t} = cPprShowable prec t
   cPprShowable _ _ = return Nothing
 
   needsParens ('"':_) = False   -- some simple heuristics to see whether parens
