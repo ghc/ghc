@@ -409,7 +409,7 @@ sub process_stats_file {
 
 	    $GCs = $1 if /^\s*([0-9,]+) collections? in generation 0/;
 
-	    if ( /^\s+([0-9]+)\s+Mb total memory/ ) {
+	    if ( /^\s+([0-9]+)\s+M[Bb] total memory/ ) {
 		$TotMem = $1;
 	    }
 
