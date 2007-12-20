@@ -95,10 +95,8 @@ data SimplCont
 	Bool		-- True <=> There is something interesting about
 			--          the context, and hence the inliner
 			--	    should be a bit keener (see interestingCallContext)
-			-- Two cases:
-			-- (a) This is the RHS of a thunk whose type suggests
-			--     that update-in-place would be possible
-			-- (b) This is an argument of a function that has RULES
+			-- Specifically:
+			--     This is an argument of a function that has RULES
 			--     Inlining the call might allow the rule to fire
 
   | CoerceIt 		-- C `cast` co
@@ -156,10 +154,10 @@ mkBoringStop :: OutType -> SimplCont
 mkBoringStop ty = Stop ty AnArg False
 
 mkLazyArgStop :: OutType -> Bool -> SimplCont
-mkLazyArgStop ty has_rules = Stop ty AnArg (canUpdateInPlace ty || has_rules)
+mkLazyArgStop ty has_rules = Stop ty AnArg has_rules
 
 mkRhsStop :: OutType -> SimplCont
-mkRhsStop ty = Stop ty AnRhs (canUpdateInPlace ty)
+mkRhsStop ty = Stop ty AnRhs False
 
 -------------------
 contIsRhsOrArg (Stop {})       	 = True
@@ -400,27 +398,6 @@ interestingArgContext fn call_cont
     go (StrictBind {})	      = False	-- ??
     go (CoerceIt _ c)	      = go c
     go (Stop _ _ interesting) = interesting
-
--------------------
-canUpdateInPlace :: Type -> Bool
--- Consider   let x = <wurble> in ...
--- If <wurble> returns an explicit constructor, we might be able
--- to do update in place.  So we treat even a thunk RHS context
--- as interesting if update in place is possible.  We approximate
--- this by seeing if the type has a single constructor with a
--- small arity.  But arity zero isn't good -- we share the single copy
--- for that case, so no point in sharing.
-
-canUpdateInPlace ty 
-  | not opt_UF_UpdateInPlace = False
-  | otherwise
-  = case splitTyConApp_maybe ty of 
-	Nothing		-> False 
-	Just (tycon, _) -> case tyConDataCons_maybe tycon of
-				Just [dc]  -> arity == 1 || arity == 2
-				           where
-					      arity = dataConRepArity dc
-				other -> False
 \end{code}
 
 

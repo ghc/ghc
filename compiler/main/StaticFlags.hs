@@ -59,7 +59,6 @@ module StaticFlags (
 	opt_UF_UseThreshold,
 	opt_UF_FunAppDiscount,
 	opt_UF_KeenessFactor,
-	opt_UF_UpdateInPlace,
 	opt_UF_DearOp,
 
 	-- Related to linking
@@ -328,7 +327,6 @@ opt_UF_CreationThreshold	= lookup_def_int "-funfolding-creation-threshold"  (45:
 opt_UF_UseThreshold		= lookup_def_int "-funfolding-use-threshold"	   (8::Int)	-- Discounts can be big
 opt_UF_FunAppDiscount		= lookup_def_int "-funfolding-fun-discount"	   (6::Int)	-- It's great to inline a fn
 opt_UF_KeenessFactor		= lookup_def_float "-funfolding-keeness-factor"	   (1.5::Float)
-opt_UF_UpdateInPlace		= lookUp  FSLIT("-funfolding-update-in-place")
 
 opt_UF_DearOp   = ( 4 :: Int)
 			
