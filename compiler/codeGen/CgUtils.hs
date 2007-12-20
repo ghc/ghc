@@ -994,6 +994,7 @@ getSRTInfo = do
     -- TODO: Should we panic in this case?
     -- Someone obviously thinks there should be an SRT
     NoSRT -> return NoC_SRT
+    SRTEntries {} -> panic "getSRTInfo: SRTEntries.  Perhaps you forgot to run SimplStg?"
     SRT off len bmp
       | len > hALF_WORD_SIZE_IN_BITS || bmp == [fromIntegral srt_escape]
       -> do id <- newUnique
