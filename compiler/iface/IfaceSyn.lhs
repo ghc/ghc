@@ -244,7 +244,7 @@ data IfaceLetBndr = IfLetBndr FastString IfaceType IfaceIdInfo
 
 Note [IdInfo on nested let-bindings]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-Occasionally we want to preserve IdInfo on nested let bindings The one
+Occasionally we want to preserve IdInfo on nested let bindings. The one
 that came up was a NOINLINE pragma on a let-binding inside an INLINE
 function.  The user (Duncan Coutts) really wanted the NOINLINE control
 to cross the separate compilation boundary.
