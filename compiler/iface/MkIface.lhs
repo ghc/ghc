@@ -708,6 +708,8 @@ computeChangedOccs ver_fn this_module old_usages eq_info
     -- return True if an external name has changed
     name_changed :: Name -> Bool
     name_changed nm
+	| isWiredInName nm	-- Wired-in things don't get into interface
+	= False			-- files and hence don't get into the ver_fn
         | Just ents <- lookupUFM usg_modmap (moduleName mod),
           Just v    <- lookupUFM ents parent_occ
         = v < new_version
