@@ -41,12 +41,6 @@ Please send questions and suggestions to me:
 Simon Marlow <simonmar@microsoft.com>
 
 
-System Requirements
-===================
-
-Haddock currently requires GHC version 4.08 or later to compile.
-
-
 [1] IDoc - A No Frills Haskell Interface Documentation System
     http://www.cse.unsw.edu.au/~chak/haskell/idoc/
 
