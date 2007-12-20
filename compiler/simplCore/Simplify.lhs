@@ -1329,7 +1329,7 @@ where x::F Int.  Then we'd like to rewrite (F Int) to Int, getting
 	   I# x# -> let x = x' `cast` sym co 
 		    in rhs
 
-so that 'rhs' can take advantage of hte form of x'.  Notice that Note
+so that 'rhs' can take advantage of the form of x'.  Notice that Note
 [Case of cast] may then apply to the result.
 
 This showed up in Roman's experiments.  Example:

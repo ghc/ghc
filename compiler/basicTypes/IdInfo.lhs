@@ -72,7 +72,7 @@ module IdInfo (
 
 	-- Specialisation
 	SpecInfo(..), specInfo, setSpecInfo, isEmptySpecInfo, 
-	specInfoFreeVars, specInfoRules, seqSpecInfo,
+	specInfoFreeVars, specInfoRules, seqSpecInfo, setSpecInfoHead,
 
 	-- CAF info
 	CafInfo(..), cafInfo, ppCafInfo, setCafInfo, mayHaveCafRefs,
@@ -89,6 +89,7 @@ module IdInfo (
 import CoreSyn
 import Class
 import PrimOp
+import Name
 import Var
 import VarSet
 import BasicTypes
@@ -102,7 +103,6 @@ import Module
 import Data.Maybe
 
 #ifdef OLD_STRICTNESS
-import Name
 import Demand
 import qualified Demand
 import Util
@@ -474,7 +474,9 @@ type InlinePragInfo = Activation
 data SpecInfo 
   = SpecInfo 
 	[CoreRule] 
-	VarSet		-- Locally-defined free vars of *both* LHS and RHS of rules
+	VarSet		-- Locally-defined free vars of *both* LHS and RHS 
+			-- of rules.  I don't think it needs to include the
+			-- ru_fn though.
 			-- Note [Rule dependency info]
 
 emptySpecInfo :: SpecInfo
@@ -489,6 +491,12 @@ specInfoFreeVars (SpecInfo _ fvs) = fvs
 specInfoRules :: SpecInfo -> [CoreRule]
 specInfoRules (SpecInfo rules _) = rules
 
+setSpecInfoHead :: Name -> SpecInfo -> SpecInfo
+setSpecInfoHead fn (SpecInfo rules fvs)
+  = SpecInfo (map set_head rules) fvs
+  where
+    set_head rule = rule { ru_fn = fn }
+
 seqSpecInfo (SpecInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
 \end{code}
 
@@ -500,7 +508,7 @@ Consider
 	x = y
  	RULE f x = 4
 Then if we substitute y for x, we'd better do so in the
- rule's LHS too, so we'd better ensure the dependency is respsected
+ rule's LHS too, so we'd better ensure the dependency is respected
 
 
 

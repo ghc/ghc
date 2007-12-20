@@ -29,7 +29,7 @@ import Rules		( RuleBase, emptyRuleBase, mkRuleBase, unionRuleBase,
 import PprCore		( pprCoreBindings, pprCoreExpr, pprRules )
 import OccurAnal	( occurAnalysePgm, occurAnalyseExpr )
 import IdInfo		( setNewStrictnessInfo, newStrictnessInfo, 
-			  setWorkerInfo, workerInfo,
+			  setWorkerInfo, workerInfo, setSpecInfoHead,
 			  setInlinePragInfo, inlinePragInfo,
 			  setSpecInfo, specInfo, specInfoRules )
 import CoreUtils	( coreBindsSize )
@@ -700,6 +700,9 @@ transferIdInfo exported_id local_id
     transfer exp_info = exp_info `setNewStrictnessInfo` newStrictnessInfo local_info
 				 `setWorkerInfo`        workerInfo local_info
 				 `setInlinePragInfo`	inlinePragInfo local_info
-				 `setSpecInfo`	        addSpecInfo (specInfo exp_info)
-							            (specInfo local_info)
+				 `setSpecInfo`	        addSpecInfo (specInfo exp_info) new_info
+    new_info = setSpecInfoHead (idName exported_id) 
+			       (specInfo local_info)
+	-- Remember to set the function-name field of the
+	-- rules as we transfer them from one function to another
 \end{code}
