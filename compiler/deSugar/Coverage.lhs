@@ -65,7 +65,7 @@ addCoverageTicksToBinds
         :: DynFlags
         -> Module
         -> ModLocation          -- of the current module
-	-> [TyCon]		-- type constructor in this module
+        -> [TyCon]		-- type constructor in this module
         -> LHsBinds Id
         -> IO (LHsBinds Id, HpcInfo, ModBreaks)
 
@@ -442,23 +442,34 @@ addTickStmt isGuard (BindStmt pat e bind fail) = do
 		(addTickSyntaxExpr hpcSrcSpan fail)
 addTickStmt isGuard (ExprStmt e bind' ty) = do
 	liftM3 ExprStmt
-		(addTick e)
+		(addTick isGuard e)
 		(addTickSyntaxExpr hpcSrcSpan bind')
 		(return ty)
-  where
-   addTick e | Just fn <- isGuard = addBinTickLHsExpr fn e
-             | otherwise          = addTickLHsExprAlways e
-
 addTickStmt isGuard (LetStmt binds) = do
 	liftM LetStmt
 		(addTickHsLocalBinds binds)
 addTickStmt isGuard (ParStmt pairs) = do
-  	liftM ParStmt (mapM process pairs)
-  where
-	process (stmts,ids) = 
-		liftM2 (,) 
-			(addTickLStmts isGuard stmts)
-			(return ids)
+    liftM ParStmt 
+        (mapM (addTickStmtAndBinders isGuard) pairs)
+addTickStmt isGuard (TransformStmt (stmts, ids) usingExpr maybeByExpr) = do
+    liftM3 TransformStmt 
+        (addTickStmtAndBinders isGuard (stmts, ids))
+        (addTickLHsExprAlways usingExpr)
+        (addTickMaybeByLHsExpr maybeByExpr)
+addTickStmt isGuard (GroupStmt (stmts, binderMap) groupByClause) = do
+    liftM2 GroupStmt 
+        (addTickStmtAndBinders isGuard (stmts, binderMap))
+        (case groupByClause of
+            GroupByNothing usingExpr -> addTickLHsExprAlways usingExpr >>= (return . GroupByNothing)
+            GroupBySomething eitherUsingExpr byExpr -> do
+                eitherUsingExpr' <- mapEitherM addTickLHsExprAlways (addTickSyntaxExpr hpcSrcSpan) eitherUsingExpr
+                byExpr' <- addTickLHsExprAlways byExpr
+                return $ GroupBySomething eitherUsingExpr' byExpr')
+    where
+        mapEitherM f g x = do
+          case x of
+            Left a -> f a >>= (return . Left)
+            Right b -> g b >>= (return . Right)
 addTickStmt isGuard (RecStmt stmts ids1 ids2 tys dictbinds) = do
   	liftM5 RecStmt 
 		(addTickLStmts isGuard stmts)
@@ -466,6 +477,20 @@ addTickStmt isGuard (RecStmt stmts ids1 ids2 tys dictbinds) = do
 		(return ids2)
 		(return tys)
 		(addTickDictBinds dictbinds)
+
+addTick isGuard e | Just fn <- isGuard = addBinTickLHsExpr fn e
+                  | otherwise          = addTickLHsExprAlways e
+
+addTickStmtAndBinders isGuard (stmts, ids) = 
+    liftM2 (,) 
+        (addTickLStmts isGuard stmts)
+        (return ids)
+
+addTickMaybeByLHsExpr :: Maybe (LHsExpr Id) -> TM (Maybe (LHsExpr Id))
+addTickMaybeByLHsExpr maybeByExpr = 
+    case maybeByExpr of
+        Nothing -> return Nothing
+        Just byExpr -> addTickLHsExprAlways byExpr >>= (return . Just)
 
 addTickHsLocalBinds :: HsLocalBinds Id -> TM (HsLocalBinds Id)
 addTickHsLocalBinds (HsValBinds binds) = 

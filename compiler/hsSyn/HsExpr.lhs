@@ -755,6 +755,12 @@ type LStmtLR idL idR = Located (StmtLR idL idR)
 
 type Stmt id = StmtLR id id
 
+data GroupByClause id = GroupByNothing (LHsExpr id) -- Using expression, i.e. "then group using f" ==> GroupByNothing f
+                      | GroupBySomething (Either (LHsExpr id) (SyntaxExpr id))  
+                                         (LHsExpr id)
+                        -- "then group using f by e" ==> GroupBySomething (Left f) e
+                        -- "then group by e"         ==> GroupBySomething (Right _) e: in this case the expression is filled in by the renamer
+
 -- The SyntaxExprs in here are used *only* for do-notation, which
 -- has rebindable syntax.  Otherwise they are unused.
 data StmtLR idL idR
@@ -772,8 +778,17 @@ data StmtLR idL idR
   | LetStmt	(HsLocalBindsLR idL idR)	
 
 	-- ParStmts only occur in a list comprehension
-  | ParStmt	[([LStmt idL], [idR])] -- After renaming, the ids are the binders
-					 -- bound by the stmts and used subsequently
+  | ParStmt	[([LStmt idL], [idR])] 
+    -- After renaming, the ids are the binders bound by the stmts and used after them
+
+  | TransformStmt ([LStmt idL], [idR]) (LHsExpr idR) (Maybe (LHsExpr idR))
+    -- After renaming, the IDs are the binders occurring within this transform statement that are used after it
+    -- "qs, then f by e" ==> TransformStmt (qs, binders) f (Just e)
+    -- "qs, then f"      ==> TransformStmt (qs, binders) f Nothing
+
+  | GroupStmt ([LStmt idL], [(idR, idR)]) (GroupByClause idR)
+    -- After renaming, the IDs are the binders occurring within this transform statement that are used after it
+    -- which are paired with the names which they group over in statements
 
 	-- Recursive statement (see Note [RecStmt] below)
   | RecStmt  [LStmtLR idL idR] 
@@ -853,7 +868,17 @@ pprStmt (BindStmt pat expr _ _)	  = hsep [ppr pat, ptext SLIT("<-"), ppr expr]
 pprStmt (LetStmt binds)       	  = hsep [ptext SLIT("let"), pprBinds binds]
 pprStmt (ExprStmt expr _ _)   	  = ppr expr
 pprStmt (ParStmt stmtss)          = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
+pprStmt (TransformStmt (stmts, bndrs) usingExpr maybeByExpr) = (hsep [stmtsDoc, ptext SLIT("then"), ppr usingExpr, byExprDoc])
+  where stmtsDoc = interpp'SP stmts
+        byExprDoc = maybe empty (\byExpr -> hsep [ptext SLIT("by"), ppr byExpr]) maybeByExpr
+pprStmt (GroupStmt (stmts, bndrs) groupByClause) = (hsep [stmtsDoc, ptext SLIT("then group"), pprGroupByClause groupByClause])
+  where stmtsDoc = interpp'SP stmts
 pprStmt (RecStmt segment _ _ _ _) = ptext SLIT("rec") <+> braces (vcat (map ppr segment))
+
+pprGroupByClause :: (OutputableBndr id) => GroupByClause id -> SDoc
+pprGroupByClause (GroupByNothing usingExpr) = hsep [ptext SLIT("using"), ppr usingExpr]
+pprGroupByClause (GroupBySomething eitherUsingExpr byExpr) = hsep [ptext SLIT("by"), ppr byExpr, usingExprDoc]
+  where usingExprDoc = either (\usingExpr -> hsep [ptext SLIT("using"), ppr usingExpr]) (const empty) eitherUsingExpr
 
 pprDo :: OutputableBndr id => HsStmtContext any -> [LStmt id] -> LHsExpr id -> SDoc
 pprDo DoExpr      stmts body = ptext SLIT("do")  <+> pprDeeperList vcat (map ppr stmts ++ [ppr body])
@@ -968,6 +993,7 @@ data HsStmtContext id
   | PArrComp				-- Parallel array comprehension
   | PatGuard (HsMatchContext id)	-- Pattern guard for specified thing
   | ParStmtCtxt (HsStmtContext id)	-- A branch of a parallel stmt 
+  | TransformStmtCtxt (HsStmtContext id) -- A branch of a transform stmt
 \end{code}
 
 \begin{code}
@@ -1002,6 +1028,7 @@ pprMatchContext ProcExpr   	  = ptext SLIT("an arrow abstraction")
 pprMatchContext (StmtCtxt ctxt)   = ptext SLIT("a pattern binding in") $$ pprStmtContext ctxt
 
 pprStmtContext (ParStmtCtxt c) = sep [ptext SLIT("a parallel branch of"), pprStmtContext c]
+pprStmtContext (TransformStmtCtxt c) = sep [ptext SLIT("a transformed branch of"), pprStmtContext c]
 pprStmtContext (PatGuard ctxt) = ptext SLIT("a pattern guard for") $$ pprMatchContext ctxt
 pprStmtContext DoExpr          = ptext SLIT("a 'do' expression")
 pprStmtContext (MDoExpr _)     = ptext SLIT("an 'mdo' expression")
@@ -1031,6 +1058,7 @@ matchContextErrString RecUpd	      	      	 = "record update"
 matchContextErrString LambdaExpr      	      	 = "lambda"
 matchContextErrString ProcExpr      	      	 = "proc"
 matchContextErrString (StmtCtxt (ParStmtCtxt c)) = matchContextErrString (StmtCtxt c)
+matchContextErrString (StmtCtxt (TransformStmtCtxt c)) = matchContextErrString (StmtCtxt c)
 matchContextErrString (StmtCtxt (PatGuard _)) 	 = "pattern guard"
 matchContextErrString (StmtCtxt DoExpr)       	 = "'do' expression"
 matchContextErrString (StmtCtxt (MDoExpr _))   	 = "'mdo' expression"

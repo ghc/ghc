@@ -1058,6 +1058,166 @@ This name is not supported by GHC.
     branches.</para>
 
   </sect2>
+  
+  <!-- ===================== TRANSFORM LIST COMPREHENSIONS ===================  -->
+
+  <sect2 id="generalised-list-comprehensions">
+    <title>Generalised (SQL-Like) List Comprehensions</title>
+    <indexterm><primary>list comprehensions</primary><secondary>generalised</secondary>
+    </indexterm>
+    <indexterm><primary>extended list comprehensions</primary>
+    </indexterm>
+    <indexterm><primary>group</primary></indexterm>
+    <indexterm><primary>sql</primary></indexterm>
+
+
+    <para>Generalised list comprehensions are a further enhancement to the
+    list comprehension syntatic sugar to allow operations such as sorting
+    and grouping which are familiar from SQL.   They are fully described in the
+	paper <ulink url="http://research.microsoft.com/~simonpj/papers/list-comp">
+	  Comprehensive comprehensions: comprehensions with "order by" and "group by"</ulink>,
+    except that the syntax we use differs slightly from the paper.</para>
+<para>Here is an example: 
+<programlisting>
+employees = [ ("Simon", "MS", 80)
+, ("Erik", "MS", 100)
+, ("Phil", "Ed", 40)
+, ("Gordon", "Ed", 45)
+, ("Paul", "Yale", 60)]
+
+output = [ (the dept, sum salary)
+| (name, dept, salary) &lt;- employees
+, then group by dept
+, then sortWith by (sum salary)
+, then take 5 ]
+</programlisting>
+In this example, the list <literal>output</literal> would take on 
+    the value:
+    
+<programlisting>
+[("Yale", 60), ("Ed", 85), ("MS", 180)]
+</programlisting>
+</para>
+<para>There are three new keywords: <literal>group</literal>, <literal>by</literal>, and <literal>using</literal>.
+(The function <literal>sortWith</literal> is not a keyword; it is an ordinary
+function that is exported by <literal>GHC.Exts</literal>.)</para>
+
+<para>There are five new forms of compehension qualifier,
+all introduced by the (existing) keyword <literal>then</literal>:
+    <itemizedlist>
+    <listitem>
+    
+<programlisting>
+then f
+</programlisting>
+
+    This statement requires that <literal>f</literal> have the type <literal>
+    forall a. [a] -> [a]</literal>. You can see an example of it's use in the
+    motivating example, as this form is used to apply <literal>take 5</literal>.
+    
+    </listitem>
+    
+    
+    <listitem>
+<para>
+<programlisting>
+then f by e
+</programlisting>
+
+    This form is similar to the previous one, but allows you to create a function
+    which will be passed as the first argument to f. As a consequence f must have 
+    the type <literal>forall a. (a -> t) -> [a] -> [a]</literal>. As you can see
+    from the type, this function lets f &quot;project out&quot; some information 
+    from the elements of the list it is transforming.</para>
+
+    <para>An example is shown in the opening example, where <literal>sortWith</literal> 
+    is supplied with a function that lets it find out the <literal>sum salary</literal> 
+    for any item in the list comprehension it transforms.</para>
+
+    </listitem>
+
+
+    <listitem>
+
+<programlisting>
+then group by e using f
+</programlisting>
+
+    <para>This is the most general of the grouping-type statements. In this form,
+    f is required to have type <literal>forall a. (a -> t) -> [a] -> [[a]]</literal>.
+    As with the <literal>then f by e</literal> case above, the first argument
+    is a function supplied to f by the compiler which lets it compute e on every
+    element of the list being transformed. However, unlike the non-grouping case,
+    f additionally partitions the list into a number of sublists: this means that
+    at every point after this statement, binders occuring before it in the comprehension
+    refer to <emphasis>lists</emphasis> of possible values, not single values. To help understand
+    this, let's look at an example:</para>
+    
+<programlisting>
+-- This works similarly to groupWith in GHC.Exts, but doesn't sort its input first
+groupRuns :: Eq b => (a -> b) -> [a] -> [[a]]
+groupRuns f = groupBy (\x y -> f x == f y)
+
+output = [ (the x, y)
+| x &lt;- ([1..3] ++ [1..2])
+, y &lt;- [4..6]
+, then group by x using groupRuns ]
+</programlisting>
+
+    <para>This results in the variable <literal>output</literal> taking on the value below:</para>
+
+<programlisting>
+[(1, [4, 5, 6]), (2, [4, 5, 6]), (3, [4, 5, 6]), (1, [4, 5, 6]), (2, [4, 5, 6])]
+</programlisting>
+
+    <para>Note that we have used the <literal>the</literal> function to change the type 
+    of x from a list to its original numeric type. The variable y, in contrast, is left 
+    unchanged from the list form introduced by the grouping.</para>
+
+    </listitem>
+
+    <listitem>
+
+<programlisting>
+then group by e
+</programlisting>
+
+    <para>This form of grouping is essentially the same as the one described above. However,
+    since no function to use for the grouping has been supplied it will fall back on the
+    <literal>groupWith</literal> function defined in 
+    <ulink url="../libraries/base/GHC-Exts.html"><literal>GHC.Exts</literal></ulink>. This
+    is the form of the group statement that we made use of in the opening example.</para>
+
+    </listitem>
+    
+    
+    <listitem>
+
+<programlisting>
+then group using f
+</programlisting>
+
+    <para>With this form of the group statement, f is required to simply have the type
+    <literal>forall a. [a] -> [[a]]</literal>, which will be used to group up the
+    comprehension so far directly. An example of this form is as follows:</para>
+    
+<programlisting>
+output = [ x
+| y &lt;- [1..5]
+, x &lt;- "hello"
+, then group using inits]
+</programlisting>
+
+    <para>This will yield a list containing every prefix of the word "hello" written out 5 times:</para>
+
+<programlisting>
+["","h","he","hel","hell","hello","helloh","hellohe","hellohel","hellohell","hellohello","hellohelloh",...]
+</programlisting>
+
+    </listitem>
+</itemizedlist>
+</para>
+  </sect2>
 
    <!-- ===================== REBINDABLE SYNTAX ===================  -->
 

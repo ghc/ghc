@@ -745,7 +745,7 @@ newLocalsRn rdr_names_w_loc
 		      mkInternalName uniq (rdrNameOcc rdr_name) loc
 
 bindLocatedLocalsRn :: SDoc	-- Documentation string for error message
-	   	    -> [Located RdrName]
+	   	        -> [Located RdrName]
 	    	    -> ([Name] -> RnM a)
 	    	    -> RnM a
 bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
@@ -756,10 +756,8 @@ bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
     checkShadowing doc_str rdr_names_w_loc	`thenM_`
 
 	-- Make fresh Names and extend the environment
-    newLocalsRn rdr_names_w_loc		`thenM` \ names ->
-    getLocalRdrEnv			`thenM` \ local_env ->
-    setLocalRdrEnv (extendLocalRdrEnv local_env names)
-		   (enclosed_scope names)
+    newLocalsRn rdr_names_w_loc		`thenM` \names ->
+    bindLocalNames names (enclosed_scope names)
 
 bindLocalNames :: [Name] -> RnM a -> RnM a
 bindLocalNames names enclosed_scope

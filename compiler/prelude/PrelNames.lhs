@@ -175,12 +175,15 @@ basicKnownKeyNames
 	-- Stable pointers
 	newStablePtrName,
 
+    -- GHC Extensions
+    groupWithName,
+
 	-- Strings and lists
 	unpackCStringName, unpackCStringAppendName,
 	unpackCStringFoldrName, unpackCStringUtf8Name,
 
 	-- List operations
-	concatName, filterName,
+	concatName, filterName, mapName,
 	zipName, foldrName, buildName, augmentName, appendName,
 
         -- Parallel array operations
@@ -262,15 +265,15 @@ tYPEABLE	= mkBaseModule FSLIT("Data.Typeable")
 gENERICS	= mkBaseModule FSLIT("Data.Generics.Basics")
 dOTNET		= mkBaseModule FSLIT("GHC.Dotnet")
 rEAD_PREC	= mkBaseModule FSLIT("Text.ParserCombinators.ReadPrec")
-lEX		= mkBaseModule FSLIT("Text.Read.Lex")
+lEX		    = mkBaseModule FSLIT("Text.Read.Lex")
 gHC_INT		= mkBaseModule FSLIT("GHC.Int")
 gHC_WORD	= mkBaseModule FSLIT("GHC.Word")
 mONAD		= mkBaseModule FSLIT("Control.Monad")
 mONAD_FIX	= mkBaseModule FSLIT("Control.Monad.Fix")
 aRROW		= mkBaseModule FSLIT("Control.Arrow")
-gHC_DESUGAR     = mkBaseModule FSLIT("GHC.Desugar")
+gHC_DESUGAR = mkBaseModule FSLIT("GHC.Desugar")
 rANDOM		= mkBaseModule FSLIT("System.Random")
-gLA_EXTS	= mkBaseModule FSLIT("GHC.Exts")
+gHC_EXTS	= mkBaseModule FSLIT("GHC.Exts")
 
 mAIN	        = mkMainModule_ mAIN_NAME
 rOOT_MAIN	= mkMainModule FSLIT(":Main") -- Root module for initialisation 
@@ -496,12 +499,16 @@ bindMName	   = methName gHC_BASE FSLIT(">>=")    bindMClassOpKey
 returnMName	   = methName gHC_BASE FSLIT("return") returnMClassOpKey
 failMName	   = methName gHC_BASE FSLIT("fail")   failMClassOpKey
 
+-- Functions for GHC extensions
+groupWithName  = varQual gHC_EXTS FSLIT("groupWith") groupWithIdKey
+
 -- Random PrelBase functions
 fromStringName = methName dATA_STRING FSLIT("fromString") fromStringClassOpKey
 otherwiseIdName   = varQual gHC_BASE FSLIT("otherwise")  otherwiseIdKey
 foldrName	  = varQual gHC_BASE FSLIT("foldr")      foldrIdKey
 buildName	  = varQual gHC_BASE FSLIT("build")      buildIdKey
 augmentName	  = varQual gHC_BASE FSLIT("augment")    augmentIdKey
+mapName       = varQual gHC_BASE FSLIT("map")        mapIdKey
 appendName	  = varQual gHC_BASE FSLIT("++")         appendIdKey
 andName		  = varQual gHC_BASE FSLIT("&&")	 andIdKey
 orName		  = varQual gHC_BASE FSLIT("||")	 orIdKey
@@ -974,6 +981,9 @@ breakpointCondJumpIdKey       = mkPreludeMiscIdUnique 66
 breakpointAutoJumpIdKey       = mkPreludeMiscIdUnique 67
 
 inlineIdKey		      = mkPreludeMiscIdUnique 68
+
+mapIdKey		      = mkPreludeMiscIdUnique 69
+groupWithIdKey        = mkPreludeMiscIdUnique 70
 
 -- Parallel array functions
 singletonPIdKey               = mkPreludeMiscIdUnique 79

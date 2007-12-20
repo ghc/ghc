@@ -225,6 +225,7 @@ data DynFlag
    | Opt_KindSignatures
    | Opt_PatternSignatures
    | Opt_ParallelListComp
+   | Opt_TransformListComp
    | Opt_GeneralizedNewtypeDeriving
    | Opt_RecursiveDo
    | Opt_PatternGuards
@@ -1284,9 +1285,10 @@ xFlags = [
   ( "PatternSignatures",                Opt_PatternSignatures ),
   ( "EmptyDataDecls",                   Opt_EmptyDataDecls ),
   ( "ParallelListComp",                 Opt_ParallelListComp ),
+  ( "TransformListComp",                Opt_TransformListComp ),
   ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface ),
   ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes ),
-  ( "LiberalTypeSynonyms", 	        Opt_LiberalTypeSynonyms ),
+  ( "LiberalTypeSynonyms", 	            Opt_LiberalTypeSynonyms ),
   ( "Rank2Types",                       Opt_Rank2Types ),
   ( "RankNTypes",                       Opt_RankNTypes ),
   ( "TypeOperators",                    Opt_TypeOperators ),

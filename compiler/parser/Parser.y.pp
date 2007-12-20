@@ -243,6 +243,9 @@ incorrect.
  'dotnet'       { L _ ITdotnet }
  'proc'		{ L _ ITproc }		-- for arrow notation extension
  'rec'		{ L _ ITrec }		-- for arrow notation extension
+ 'group'    { L _ ITgroup }     -- for list transform extension
+ 'by'       { L _ ITby }        -- for list transform extension
+ 'using'    { L _ ITusing }     -- for list transform extension
 
  '{-# INLINE'      	  { L _ (ITinline_prag _) }
  '{-# SPECIALISE'  	  { L _ ITspec_prag }
@@ -1229,7 +1232,7 @@ gdrhs :: { Located [LGRHS RdrName] }
 	| gdrh			{ L1 [$1] }
 
 gdrh :: { LGRHS RdrName }
-	: '|' quals '=' exp  	{ sL (comb2 $1 $>) $ GRHS (reverse (unLoc $2)) $4 }
+	: '|' guardquals '=' exp  	{ sL (comb2 $1 $>) $ GRHS (unLoc $2) $4 }
 
 sigdecl :: { Located (OrdList (LHsDecl RdrName)) }
 	: infixexp '::' sigtypedoc
@@ -1423,7 +1426,7 @@ list :: { LHsExpr RdrName }
 	| texp ',' exp '..' 	{ LL $ ArithSeq noPostTcExpr (FromThen $1 $3) }
 	| texp '..' exp	 	{ LL $ ArithSeq noPostTcExpr (FromTo $1 $3) }
 	| texp ',' exp '..' exp	{ LL $ ArithSeq noPostTcExpr (FromThenTo $1 $3 $5) }
-	| texp pquals		{ sL (comb2 $1 $>) $ mkHsDo ListComp (reverse (unLoc $2)) $1 }
+	| texp '|' flattenedpquals	{ sL (comb2 $1 $>) $ mkHsDo ListComp (unLoc $3) $1 }
 
 lexps :: { Located [LHsExpr RdrName] }
 	: lexps ',' texp 		{ LL ($3 : unLoc $1) }
@@ -1432,23 +1435,50 @@ lexps :: { Located [LHsExpr RdrName] }
 -----------------------------------------------------------------------------
 -- List Comprehensions
 
-pquals :: { Located [LStmt RdrName] }	-- Either a singleton ParStmt, 
-					-- or a reversed list of Stmts
-	: pquals1			{ case unLoc $1 of
-					    [qs] -> L1 qs
-					    qss  -> L1 [L1 (ParStmt stmtss)]
-						 where
-						    stmtss = [ (reverse qs, undefined) 
-						    	     | qs <- qss ]
-					}
-			
-pquals1 :: { Located [[LStmt RdrName]] }
-	: pquals1 '|' quals		{ LL (unLoc $3 : unLoc $1) }
-	| '|' quals			{ L (getLoc $2) [unLoc $2] }
+flattenedpquals :: { Located [LStmt RdrName] }
+    : pquals   { case (unLoc $1) of
+                    ParStmt [(qs, _)] -> L1 qs
+                    -- We just had one thing in our "parallel" list so 
+                    -- we simply return that thing directly
+                    
+                    _ -> L1 [$1]
+                    -- We actually found some actual parallel lists so
+                    -- we leave them into as a ParStmt
+                }
 
-quals :: { Located [LStmt RdrName] }
-	: quals ',' qual		{ LL ($3 : unLoc $1) }
-	| qual				{ L1 [$1] }
+pquals :: { LStmt RdrName }
+    : pquals1   { L1 (ParStmt [(qs, undefined) | qs <- (reverse (unLoc $1))]) }
+
+pquals1 :: { Located [[LStmt RdrName]] }
+    : pquals1 '|' squals    { LL (unLoc $3 : unLoc $1) }
+    | squals                { L (getLoc $1) [unLoc $1] }
+
+squals :: { Located [LStmt RdrName] }
+    : squals1               { L (getLoc $1) (reverse (unLoc $1)) }
+
+squals1 :: { Located [LStmt RdrName] }
+    : transformquals1       { LL (unLoc $1) }
+
+transformquals1 :: { Located [LStmt RdrName] }
+    : transformquals1 ',' transformqual         { LL $ [LL ((unLoc $3) (unLoc $1))] }
+    | transformquals1 ',' qual                  { LL ($3 : unLoc $1) }
+--  | transformquals1 ',' '{|' pquals '|}'      { LL ($4 : unLoc $1) }
+    | transformqual                             { LL $ [LL ((unLoc $1) [])] }
+    | qual                                      { L1 [$1] }
+--  | '{|' pquals '|}'                          { L1 [$2] }
+
+
+-- It is possible to enable bracketing (associating) qualifier lists by uncommenting the lines with {| |}
+-- above. Due to a lack of consensus on the syntax, this feature is not being used until we get user
+-- demand. Note that the {| |} symbols are reused from -XGenerics and hence if you want to compile
+-- a program that makes use of this temporary syntax you must supply that flag to GHC
+
+transformqual :: { Located ([LStmt RdrName] -> Stmt RdrName) }
+    : 'then' exp                { LL $ \leftStmts -> (mkTransformStmt (reverse leftStmts) $2) }
+    | 'then' exp 'by' exp       { LL $ \leftStmts -> (mkTransformByStmt (reverse leftStmts) $2 $4) }
+    | 'then' 'group' 'by' exp              { LL $ \leftStmts -> (mkGroupByStmt (reverse leftStmts) $4) }
+    | 'then' 'group' 'using' exp           { LL $ \leftStmts -> (mkGroupUsingStmt (reverse leftStmts) $4) }
+    | 'then' 'group' 'by' exp 'using' exp  { LL $ \leftStmts -> (mkGroupByUsingStmt (reverse leftStmts) $4 $6) }
 
 -----------------------------------------------------------------------------
 -- Parallel array expressions
@@ -1465,9 +1495,19 @@ parr :: { LHsExpr RdrName }
 						       (reverse (unLoc $1)) }
 	| texp '..' exp	 		{ LL $ PArrSeq noPostTcExpr (FromTo $1 $3) }
 	| texp ',' exp '..' exp		{ LL $ PArrSeq noPostTcExpr (FromThenTo $1 $3 $5) }
-	| texp pquals			{ sL (comb2 $1 $>) $ mkHsDo PArrComp (reverse (unLoc $2)) $1 }
+	| texp '|' flattenedpquals	{ LL $ mkHsDo PArrComp (unLoc $3) $1 }
 
--- We are reusing `lexps' and `pquals' from the list case.
+-- We are reusing `lexps' and `flattenedpquals' from the list case.
+
+-----------------------------------------------------------------------------
+-- Guards
+
+guardquals :: { Located [LStmt RdrName] }
+    : guardquals1           { L (getLoc $1) (reverse (unLoc $1)) }
+
+guardquals1 :: { Located [LStmt RdrName] }
+    : guardquals1 ',' qual  { LL ($3 : unLoc $1) }
+    | qual                  { L1 [$1] }
 
 -----------------------------------------------------------------------------
 -- Case alternatives
@@ -1500,7 +1540,7 @@ gdpats :: { Located [LGRHS RdrName] }
 	| gdpat				{ L1 [$1] }
 
 gdpat	:: { LGRHS RdrName }
-	: '|' quals '->' exp	 	{ sL (comb2 $1 $>) $ GRHS (reverse (unLoc $2)) $4 }
+	: '|' guardquals '->' exp	 	{ sL (comb2 $1 $>) $ GRHS (unLoc $2) $4 }
 
 -- 'pat' recognises a pattern, including one with a bang at the top
 -- 	e.g.  "!x" or "!(x,y)" or "C a b" etc
@@ -1546,13 +1586,13 @@ maybe_stmt :: { Maybe (LStmt RdrName) }
 	| {- nothing -}			{ Nothing }
 
 stmt  :: { LStmt RdrName }
-	: qual				{ $1 }
+	: qual				    { $1 }
   	| 'rec' stmtlist		{ LL $ mkRecStmt (unLoc $2) }
 
 qual  :: { LStmt RdrName }
-	: pat '<-' exp			{ LL $ mkBindStmt $1 $3 }
-	| exp				{ L1 $ mkExprStmt $1 }
-  	| 'let' binds			{ LL $ LetStmt (unLoc $2) }
+    : pat '<-' exp			{ LL $ mkBindStmt $1 $3 }
+    | exp				    { L1 $ mkExprStmt $1 }
+    | 'let' binds			{ LL $ LetStmt (unLoc $2) }
 
 -----------------------------------------------------------------------------
 -- Record Field Update/Construction

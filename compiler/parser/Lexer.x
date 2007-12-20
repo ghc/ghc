@@ -450,6 +450,9 @@ data Token
   | ITdotnet
   | ITmdo
   | ITfamily
+  | ITgroup
+  | ITby
+  | ITusing
 
 	-- Pragmas
   | ITinline_prag Bool		-- True <=> INLINE, False <=> NOINLINE
@@ -583,6 +586,9 @@ isSpecial ITccallconv   = True
 isSpecial ITstdcallconv = True
 isSpecial ITmdo		= True
 isSpecial ITfamily	= True
+isSpecial ITgroup   = True
+isSpecial ITby      = True
+isSpecial ITusing   = True
 isSpecial _             = False
 
 -- the bitmap provided as the third component indicates whether the
@@ -621,9 +627,12 @@ reservedWordsFM = listToUFM $
 	( "where",	ITwhere, 	0 ),
 	( "_scc_",	ITscc, 		0 ),		-- ToDo: remove
 
-      	( "forall",	ITforall,	 bit explicitForallBit),
+    ( "forall",	ITforall,	 bit explicitForallBit),
 	( "mdo",	ITmdo,		 bit recursiveDoBit),
 	( "family",	ITfamily,	 bit tyFamBit),
+    ( "group",  ITgroup,     bit transformComprehensionsBit),
+    ( "by",     ITby,        bit transformComprehensionsBit),
+    ( "using",  ITusing,     bit transformComprehensionsBit),
 
 	( "foreign",	ITforeign,	 bit ffiBit),
 	( "export",	ITexport,	 bit ffiBit),
@@ -1510,6 +1519,7 @@ recursiveDoBit = 13 -- mdo
 unicodeSyntaxBit = 14 -- the forall symbol, arrow symbols, etc
 unboxedTuplesBit = 15 -- (# and #)
 standaloneDerivingBit = 16 -- standalone instance deriving declarations
+transformComprehensionsBit = 17
 
 genericsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 always           _     = True
@@ -1529,6 +1539,7 @@ recursiveDoEnabled flags = testBit flags recursiveDoBit
 unicodeSyntaxEnabled flags = testBit flags unicodeSyntaxBit
 unboxedTuplesEnabled flags = testBit flags unboxedTuplesBit
 standaloneDerivingEnabled flags = testBit flags standaloneDerivingBit
+transformComprehensionsEnabled flags = testBit flags transformComprehensionsBit
 
 -- PState for parsing options pragmas
 --
@@ -1590,6 +1601,7 @@ mkPState buf loc flags  =
 	       .|. unicodeSyntaxBit `setBitIf` dopt Opt_UnicodeSyntax flags
 	       .|. unboxedTuplesBit `setBitIf` dopt Opt_UnboxedTuples flags
 	       .|. standaloneDerivingBit `setBitIf` dopt Opt_StandaloneDeriving flags
+           .|. transformComprehensionsBit `setBitIf` dopt Opt_TransformListComp flags
       --
       setBitIf :: Int -> Bool -> Int
       b `setBitIf` cond | cond      = bit b

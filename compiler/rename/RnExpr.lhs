@@ -36,14 +36,15 @@ import RnTypes		( rnHsTypeFVs,
 import RnPat            (rnOverLit, rnPatsAndThen_LocalRightwards, rnBindPat, 
                          localRecNameMaker, rnLit,
 			 rnHsRecFields_Con, rnHsRecFields_Update, checkTupSize)
+import RdrName      ( mkRdrUnqual )
 import DynFlags		( DynFlag(..) )
 import BasicTypes	( FixityDirection(..) )
 import SrcLoc           ( SrcSpan )
 import PrelNames	( thFAKE, hasKey, assertIdKey, assertErrorName,
 			  loopAName, choiceAName, appAName, arrAName, composeAName, firstAName,
-			  negateName, thenMName, bindMName, failMName )
+			  negateName, thenMName, bindMName, failMName, groupWithName )
 
-import Name		( Name, nameOccName, nameIsLocalOrFrom )
+import Name		( Name, nameOccName, nameModule, nameIsLocalOrFrom )
 import NameSet
 import UniqFM
 import RdrName		( RdrName, extendLocalRdrEnv, lookupLocalRdrEnv, hideSomeUnquals )
@@ -55,7 +56,7 @@ import Util		( isSingleton )
 import ListSetOps	( removeDups )
 import Maybes		( expectJust )
 import Outputable
-import SrcLoc		( Located(..), unLoc, getLoc )
+import SrcLoc		( Located(..), unLoc, getLoc, noLoc )
 import FastString
 
 import List		( unzip4 )
@@ -477,7 +478,9 @@ methodNamesStmt (RecStmt stmts _ _ _ _)
   = methodNamesStmts stmts `addOneFV` loopAName
 methodNamesStmt (LetStmt b)  = emptyFVs
 methodNamesStmt (ParStmt ss) = emptyFVs
-   -- ParStmt can't occur in commands, but it's not convenient to error 
+methodNamesStmt (TransformStmt _ _ _) = emptyFVs
+methodNamesStmt (GroupStmt _ _) = emptyFVs
+   -- ParStmt, TransformStmt and GroupStmt can't occur in commands, but it's not convenient to error 
    -- here so we just do what's convenient
 \end{code}
 
@@ -588,13 +591,12 @@ rnNormalStmts :: HsStmtContext Name -> [LStmt RdrName]
 -- Implements nested scopes
 
 rnNormalStmts ctxt [] thing_inside 
-  = do	{ (thing, fvs) <- thing_inside
+  = do { (thing, fvs) <- thing_inside
 	; return (([],thing), fvs) } 
 
 rnNormalStmts ctxt (L loc stmt : stmts) thing_inside
-  = do	{ ((stmt', (stmts', thing)), fvs) 
-		<- rnStmt ctxt stmt 	$
-		   rnNormalStmts ctxt stmts thing_inside
+  = do { ((stmt', (stmts', thing)), fvs) <- rnStmt ctxt stmt $
+            rnNormalStmts ctxt stmts thing_inside
 	; return (((L loc stmt' : stmts'), thing), fvs) }
 
 
@@ -621,12 +623,11 @@ rnStmt ctxt (BindStmt pat expr _ _) thing_inside
        -- fv_expr shouldn't really be filtered by the rnPatsAndThen
 	-- but it does not matter because the names are unique
 
-rnStmt ctxt (LetStmt binds) thing_inside
-  = do	{ checkErr (ok ctxt binds) 
-		   (badIpBinds (ptext SLIT("a parallel list comprehension:")) binds)
-	; rnLocalBindsAndThen binds		$ \ binds' -> do
-	{ (thing, fvs) <- thing_inside
-	; return ((LetStmt binds', thing), fvs) }}
+rnStmt ctxt (LetStmt binds) thing_inside = do
+    checkErr (ok ctxt binds) (badIpBinds (ptext SLIT("a parallel list comprehension:")) binds)
+    rnLocalBindsAndThen binds $ \binds' -> do
+        (thing, fvs) <- thing_inside
+        return ((LetStmt binds', thing), fvs)
   where
 	-- We do not allow implicit-parameter bindings in a parallel
 	-- list comprehension.  I'm not sure what it might mean.
@@ -649,58 +650,163 @@ rnStmt ctxt (RecStmt rec_stmts _ _ _ _) thing_inside
   where
     doc = text "In a recursive do statement"
 
+rnStmt ctxt (TransformStmt (stmts, _) usingExpr maybeByExpr) thing_inside = do
+    checkIsTransformableListComp ctxt
+    
+    (usingExpr', fv_usingExpr) <- rnLExpr usingExpr
+    ((stmts', binders, (maybeByExpr', thing)), fvs) <- 
+        rnNormalStmtsAndFindUsedBinders (TransformStmtCtxt ctxt) stmts $ \unshadowed_bndrs -> do
+            (maybeByExpr', fv_maybeByExpr)  <- rnMaybeLExpr maybeByExpr
+            (thing, fv_thing)               <- thing_inside
+            
+            return ((maybeByExpr', thing), fv_maybeByExpr `plusFV` fv_thing)
+    
+    return ((TransformStmt (stmts', binders) usingExpr' maybeByExpr', thing), fv_usingExpr `plusFV` fvs)
+  where
+    rnMaybeLExpr Nothing = return (Nothing, emptyFVs)
+    rnMaybeLExpr (Just expr) = do
+        (expr', fv_expr) <- rnLExpr expr
+        return (Just expr', fv_expr)
+        
+rnStmt ctxt (GroupStmt (stmts, _) groupByClause) thing_inside = do
+    checkIsTransformableListComp ctxt
+    
+    -- We must rename the using expression in the context before the transform is begun
+    groupByClauseAction <- 
+        case groupByClause of
+            GroupByNothing usingExpr -> do
+                (usingExpr', fv_usingExpr) <- rnLExpr usingExpr
+                (return . return) (GroupByNothing usingExpr', fv_usingExpr)
+            GroupBySomething eitherUsingExpr byExpr -> do
+                (eitherUsingExpr', fv_eitherUsingExpr) <- 
+                    case eitherUsingExpr of
+                        Right _ -> return (Right $ HsVar groupWithName, unitNameSet groupWithName)
+                        Left usingExpr -> do
+                            (usingExpr', fv_usingExpr) <- rnLExpr usingExpr
+                            return (Left usingExpr', fv_usingExpr)
+                            
+                return $ do
+                    (byExpr', fv_byExpr) <- rnLExpr byExpr
+                    return (GroupBySomething eitherUsingExpr' byExpr', fv_eitherUsingExpr `plusFV` fv_byExpr)
+    
+    -- We only use rnNormalStmtsAndFindUsedBinders to get unshadowed_bndrs, so
+    -- perhaps we could refactor this to use rnNormalStmts directly?
+    ((stmts', _, (groupByClause', usedBinderMap, thing)), fvs) <- 
+        rnNormalStmtsAndFindUsedBinders (TransformStmtCtxt ctxt) stmts $ \unshadowed_bndrs -> do
+            (groupByClause', fv_groupByClause) <- groupByClauseAction
+            
+            unshadowed_bndrs' <- mapM newLocalName unshadowed_bndrs
+            let binderMap = zip unshadowed_bndrs unshadowed_bndrs'
+            
+            -- Bind the "thing" inside a context where we have REBOUND everything
+            -- bound by the statements before the group. This is necessary since after
+            -- the grouping the same identifiers actually have different meanings
+            -- i.e. they refer to lists not singletons!
+            (thing, fv_thing) <- bindLocalNames unshadowed_bndrs' thing_inside
+            
+            -- We remove entries from the binder map that are not used in the thing_inside.
+            -- We can then use that usage information to ensure that the free variables do 
+            -- not contain the things we just bound, but do contain the things we need to
+            -- make those bindings (i.e. the corresponding non-listy variables)
+            
+            -- Note that we also retain those entries which have an old binder in our
+            -- own free variables (the using or by expression). This is because this map
+            -- is reused in the desugarer to create the type to bind from the statements
+            -- that occur before this one. If the binders we need are not in the map, they
+            -- will never get bound into our desugared expression and hence the simplifier
+            -- crashes as we refer to variables that don't exist!
+            let usedBinderMap = filter 
+                    (\(old_binder, new_binder) -> 
+                        (new_binder `elemNameSet` fv_thing) || 
+                        (old_binder `elemNameSet` fv_groupByClause)) binderMap
+                (usedOldBinders, usedNewBinders) = unzip usedBinderMap
+                real_fv_thing = (delListFromNameSet fv_thing usedNewBinders) `plusFV` (mkNameSet usedOldBinders)
+            
+            return ((groupByClause', usedBinderMap, thing), fv_groupByClause `plusFV` real_fv_thing)
+    
+    traceRn (text "rnStmt: implicitly rebound these used binders:" <+> ppr usedBinderMap)
+    return ((GroupStmt (stmts', usedBinderMap) groupByClause', thing), fvs)
+  
 rnStmt ctxt (ParStmt segs) thing_inside
   = do	{ parallel_list_comp <- doptM Opt_ParallelListComp
 	; checkM parallel_list_comp parStmtErr
- 	; orig_lcl_env <- getLocalRdrEnv
-	; ((segs',thing), fvs) <- go orig_lcl_env [] segs
+	; ((segs', thing), fvs) <- rnParallelStmts (ParStmtCtxt ctxt) segs thing_inside
 	; return ((ParStmt segs', thing), fvs) }
+
+
+rnNormalStmtsAndFindUsedBinders :: HsStmtContext Name 
+          -> [LStmt RdrName]
+          -> ([Name] -> RnM (thing, FreeVars))
+          -> RnM (([LStmt Name], [Name], thing), FreeVars)	
+rnNormalStmtsAndFindUsedBinders ctxt stmts thing_inside = do
+    ((stmts', (used_bndrs, inner_thing)), fvs) <- rnNormalStmts ctxt stmts $ do
+        -- Find the Names that are bound by stmts that
+        -- by assumption we have just renamed
+        local_env <- getLocalRdrEnv
+        let 
+            stmts_binders = collectLStmtsBinders stmts
+            bndrs = map (expectJust "rnStmt"
+                        . lookupLocalRdrEnv local_env
+                        . unLoc) stmts_binders
+                        
+            -- If shadow, we'll look up (Unqual x) twice, getting
+            -- the second binding both times, which is the
+            -- one we want
+            unshadowed_bndrs = nub bndrs
+                        
+        -- Typecheck the thing inside, passing on all 
+        -- the Names bound before it for its information
+        (thing, fvs) <- thing_inside unshadowed_bndrs
+
+        -- Figure out which of the bound names are used
+        -- after the statements we renamed
+        let used_bndrs = filter (`elemNameSet` fvs) bndrs
+        return ((used_bndrs, thing), fvs)
+
+    -- Flatten the tuple returned by the above call a bit!
+    return ((stmts', used_bndrs, inner_thing), fvs)
+
+
+rnParallelStmts ctxt segs thing_inside = do
+        orig_lcl_env <- getLocalRdrEnv
+        go orig_lcl_env [] segs
+    where
+        go orig_lcl_env bndrs [] = do 
+            let (bndrs', dups) = removeDups cmpByOcc bndrs
+                inner_env = extendLocalRdrEnv orig_lcl_env bndrs'
+            
+            mappM dupErr dups
+            (thing, fvs) <- setLocalRdrEnv inner_env thing_inside
+            return (([], thing), fvs)
+
+        go orig_lcl_env bndrs_so_far ((stmts, _) : segs) = do 
+            ((stmts', bndrs, (segs', thing)), fvs) <- rnNormalStmtsAndFindUsedBinders ctxt stmts $ \new_bndrs -> do
+                -- Typecheck the thing inside, passing on all
+                -- the Names bound, but separately; revert the envt
+                setLocalRdrEnv orig_lcl_env $ do
+                    go orig_lcl_env (new_bndrs ++ bndrs_so_far) segs
+
+            let seg' = (stmts', bndrs)
+            return (((seg':segs'), thing), delListFromNameSet fvs bndrs)
+
+        cmpByOcc n1 n2 = nameOccName n1 `compare` nameOccName n2
+        dupErr vs = addErr (ptext SLIT("Duplicate binding in parallel list comprehension for:")
+                    <+> quotes (ppr (head vs)))
+
+
+checkIsTransformableListComp :: HsStmtContext Name -> RnM ()
+checkIsTransformableListComp ctxt = do
+    -- Ensure we are really within a list comprehension because otherwise the
+    -- desugarer will break when we come to operate on a parallel array
+    checkM (notParallelArray ctxt) transformStmtOutsideListCompErr
+    
+    -- Ensure the user has turned the correct flag on
+    transform_list_comp <- doptM Opt_TransformListComp
+    checkM transform_list_comp transformStmtErr
   where
---  type ParSeg id = [([LStmt id], [id])]
---  go :: NameSet -> [ParSeg RdrName]
---       -> RnM (([ParSeg Name], thing), FreeVars)
-
-    go orig_lcl_env bndrs [] 
-	= do { let { (bndrs', dups) = removeDups cmpByOcc bndrs
-		   ; inner_env = extendLocalRdrEnv orig_lcl_env bndrs' }
-	     ; mappM dupErr dups
-	     ; (thing, fvs) <- setLocalRdrEnv inner_env thing_inside
-	     ; return (([], thing), fvs) }
-
-    go orig_lcl_env bndrs_so_far ((stmts, _) : segs)
-	= do { ((stmts', (bndrs, segs', thing)), fvs)
-		  <- rnNormalStmts par_ctxt stmts $ do
-		     { 	-- Find the Names that are bound by stmts
-		       lcl_env <- getLocalRdrEnv
-		     ; let { rdr_bndrs = collectLStmtsBinders stmts
-		     	   ; bndrs = map ( expectJust "rnStmt"
-		     		         . lookupLocalRdrEnv lcl_env
-		     		         . unLoc) rdr_bndrs
-		           ; new_bndrs = nub bndrs ++ bndrs_so_far 
-				-- The nub is because there might be shadowing
-				--	x <- e1; x <- e2
-				-- So we'll look up (Unqual x) twice, getting
-				-- the second binding both times, which is the
-			}	-- one we want
-
-			-- Typecheck the thing inside, passing on all
-			-- the Names bound, but separately; revert the envt
-		     ; ((segs', thing), fvs) <- setLocalRdrEnv orig_lcl_env $
-						go orig_lcl_env new_bndrs segs
-
-			-- Figure out which of the bound names are used
-		     ; let used_bndrs = filter (`elemNameSet` fvs) bndrs
-		     ; return ((used_bndrs, segs', thing), fvs) }
-
-	     ; let seg' = (stmts', bndrs)
-	     ; return (((seg':segs'), thing), 
-		       delListFromNameSet fvs bndrs) }
-
-    par_ctxt = ParStmtCtxt ctxt
-
-    cmpByOcc n1 n2 = nameOccName n1 `compare` nameOccName n2
-    dupErr vs = addErr (ptext SLIT("Duplicate binding in parallel list comprehension for:")
-		        <+> quotes (ppr (head vs)))
+    notParallelArray PArrComp = False
+    notParallelArray _        = True
+    
 \end{code}
 
 
@@ -833,7 +939,13 @@ rn_rec_stmt_lhs fix_env (L loc (RecStmt stmts _ _ _ _))	-- Flatten Rec inside Re
 
 rn_rec_stmt_lhs _ stmt@(L _ (ParStmt _))	-- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt" (ppr stmt)
-
+  
+rn_rec_stmt_lhs _ stmt@(L _ (TransformStmt _ _ _))	-- Syntactically illegal in mdo
+  = pprPanic "rn_rec_stmt" (ppr stmt)
+  
+rn_rec_stmt_lhs _ stmt@(L _ (GroupStmt _ _))	-- Syntactically illegal in mdo
+  = pprPanic "rn_rec_stmt" (ppr stmt)
+  
 rn_rec_stmts_lhs :: UniqFM (Located Fixity) -- mini fixity env for the names we're about to bind
                                             -- these fixities need to be brought into scope with the names
                  -> [LStmt RdrName] 
@@ -889,6 +1001,12 @@ rn_rec_stmt all_bndrs stmt@(L loc (RecStmt stmts _ _ _ _)) _
 
 rn_rec_stmt all_bndrs stmt@(L _ (ParStmt _)) _	-- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt: ParStmt" (ppr stmt)
+
+rn_rec_stmt all_bndrs stmt@(L _ (TransformStmt _ _ _)) _	-- Syntactically illegal in mdo
+  = pprPanic "rn_rec_stmt: TransformStmt" (ppr stmt)
+
+rn_rec_stmt all_bndrs stmt@(L _ (GroupStmt _ _)) _	-- Syntactically illegal in mdo
+  = pprPanic "rn_rec_stmt: GroupStmt" (ppr stmt)
 
 rn_rec_stmts :: [Name] -> [(LStmtLR Name RdrName, FreeVars)] -> RnM [Segment (LStmt Name)]
 rn_rec_stmts bndrs stmts = mappM (uncurry (rn_rec_stmt bndrs)) stmts	`thenM` \ segs_s ->
@@ -1027,7 +1145,11 @@ patSynErr e = do { addErr (sep [ptext SLIT("Pattern syntax in expression context
 			 	nest 4 (ppr e)])
 		 ; return (EWildPat, emptyFVs) }
 
+
 parStmtErr = addErr (ptext SLIT("Illegal parallel list comprehension: use -XParallelListComp"))
+
+transformStmtErr = addErr (ptext SLIT("Illegal transform or grouping list comprehension: use -XTransformListComp"))
+transformStmtOutsideListCompErr = addErr (ptext SLIT("Currently you may only use transform or grouping comprehensions within list comprehensions, not parallel array comprehensions"))
 
 badIpBinds what binds
   = hang (ptext SLIT("Implicit-parameter bindings illegal in") <+> what)

@@ -175,7 +175,7 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 		-- Rec because of mixed-up dictionary bindings
 	      core_bind = Rec (map do_one core_prs)
 
-	      tup_expr      = mkTupleExpr locals
+	      tup_expr      = mkBigCoreVarTup locals
 	      tup_ty	    = exprType tup_expr
 	      poly_tup_expr = mkLams all_tyvars $ mkLams dicts $
 	 	     	      Let core_bind tup_expr

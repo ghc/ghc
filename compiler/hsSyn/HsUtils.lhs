@@ -139,6 +139,13 @@ mkHsDo ctxt stmts body = HsDo ctxt stmts body placeHolderType
 mkNPat lit neg     = NPat lit neg noSyntaxExpr
 mkNPlusKPat id lit = NPlusKPat id lit noSyntaxExpr noSyntaxExpr
 
+mkTransformStmt   stmts usingExpr        = TransformStmt (stmts, []) usingExpr Nothing
+mkTransformByStmt stmts usingExpr byExpr = TransformStmt (stmts, []) usingExpr (Just byExpr)
+
+mkGroupUsingStmt   stmts usingExpr        = GroupStmt (stmts, []) (GroupByNothing usingExpr)
+mkGroupByStmt      stmts byExpr           = GroupStmt (stmts, []) (GroupBySomething (Right noSyntaxExpr) byExpr)
+mkGroupByUsingStmt stmts byExpr usingExpr = GroupStmt (stmts, []) (GroupBySomething (Left usingExpr) byExpr)
+
 mkExprStmt expr	    = ExprStmt expr noSyntaxExpr placeHolderType
 mkBindStmt pat expr = BindStmt pat expr noSyntaxExpr noSyntaxExpr
 mkRecStmt stmts	    = RecStmt stmts [] [] [] emptyLHsBinds
@@ -351,6 +358,8 @@ collectStmtBinders (LetStmt binds)      = collectLocalBinders binds
 collectStmtBinders (ExprStmt _ _ _)     = []
 collectStmtBinders (ParStmt xs)         = collectLStmtsBinders
                                         $ concatMap fst xs
+collectStmtBinders (TransformStmt (stmts, _) _ _) = collectLStmtsBinders stmts
+collectStmtBinders (GroupStmt (stmts, _) _)     = collectLStmtsBinders stmts
 collectStmtBinders (RecStmt ss _ _ _ _) = collectLStmtsBinders ss
 \end{code}
 

@@ -8,12 +8,6 @@ Utilities for desugaring
 This module exports some utility functions of no great interest.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 module DsUtils (
 	EquationInfo(..), 
@@ -34,9 +28,19 @@ module DsUtils (
 	mkIntExpr, mkCharExpr,
 	mkStringExpr, mkStringExprFS, mkIntegerExpr, 
 
-	mkSelectorBinds, mkTupleExpr, mkTupleSelector, 
-	mkTupleType, mkTupleCase, mkBigCoreTup,
-	mkCoreTup, mkCoreTupTy, seqVar,
+    seqVar,
+	
+    -- Core tuples
+    mkCoreVarTup, mkCoreTup, mkCoreVarTupTy, mkCoreTupTy, 
+    mkBigCoreVarTup, mkBigCoreTup, mkBigCoreVarTupTy, mkBigCoreTupTy,
+    
+    -- LHs tuples
+    mkLHsVarTup, mkLHsTup, mkLHsVarPatTup, mkLHsPatTup,
+    mkBigLHsVarTup, mkBigLHsTup, mkBigLHsVarPatTup, mkBigLHsPatTup,
+    
+    -- Tuple bindings
+	mkSelectorBinds, mkTupleSelector, 
+	mkSmallTupleCase, mkTupleCase, 
 	
 	dsSyntaxTable, lookupEvidence,
 
@@ -151,17 +155,18 @@ mkDsApps :: CoreExpr -> [CoreExpr] -> CoreExpr
 mkDsApps fun args
   = go fun (exprType fun) args
   where
-    go fun fun_ty []               = fun
+    go fun _      []               = fun
     go fun fun_ty (Type ty : args) = go (App fun (Type ty)) (applyTy fun_ty ty) args
     go fun fun_ty (arg     : args) = go (mk_val_app fun arg arg_ty res_ty) res_ty args
 				   where
 				     (arg_ty, res_ty) = splitFunTy fun_ty
 -----------
-mk_val_app fun arg arg_ty res_ty	-- See Note [CoreSyn let/app invariant]
+mk_val_app :: CoreExpr -> CoreExpr -> Type -> Type -> CoreExpr
+mk_val_app fun arg arg_ty _	-- See Note [CoreSyn let/app invariant]
   | not (isUnLiftedType arg_ty) || exprOkForSpeculation arg
   = App fun arg		-- The vastly common case
 
-mk_val_app (Var f `App` Type ty1 `App` Type ty2 `App` arg1) arg2 _ res_ty
+mk_val_app (Var f `App` Type ty1 `App` Type _ `App` arg1) arg2 _ res_ty
   | f == seqId		-- Note [Desugaring seq]
   = Case arg1 (mkWildId ty1) res_ty [(DEFAULT,[],arg2)]
 
@@ -227,11 +232,12 @@ selectSimpleMatchVarL pat = selectMatchVar (unLoc pat)
 selectMatchVars :: [Pat Id] -> DsM [Id]
 selectMatchVars ps = mapM selectMatchVar ps
 
+selectMatchVar :: Pat Id -> DsM Id
 selectMatchVar (BangPat pat)   = selectMatchVar (unLoc pat)
 selectMatchVar (LazyPat pat)   = selectMatchVar (unLoc pat)
 selectMatchVar (ParPat pat)    = selectMatchVar (unLoc pat)
 selectMatchVar (VarPat var)    = return var
-selectMatchVar (AsPat var pat) = return (unLoc var)
+selectMatchVar (AsPat var _) = return (unLoc var)
 selectMatchVar other_pat       = newSysLocalDs (hsPatType other_pat)
 				  -- OK, better make up one...
 \end{code}
@@ -267,10 +273,10 @@ alwaysFailMatchResult :: MatchResult
 alwaysFailMatchResult = MatchResult CanFail (\fail -> returnDs fail)
 
 cantFailMatchResult :: CoreExpr -> MatchResult
-cantFailMatchResult expr = MatchResult CantFail (\ ignore -> returnDs expr)
+cantFailMatchResult expr = MatchResult CantFail (\_ -> returnDs expr)
 
 extractMatchResult :: MatchResult -> CoreExpr -> DsM CoreExpr
-extractMatchResult (MatchResult CantFail match_fn) fail_expr
+extractMatchResult (MatchResult CantFail match_fn) _
   = match_fn (error "It can't fail!")
 
 extractMatchResult (MatchResult CanFail match_fn) fail_expr
@@ -289,7 +295,7 @@ combineMatchResults (MatchResult CanFail      body_fn1)
 		   body_fn1 duplicatable_expr		`thenDs` \ body1 ->
 		   returnDs (Let fail_bind body1)
 
-combineMatchResults match_result1@(MatchResult CantFail body_fn1) match_result2
+combineMatchResults match_result1@(MatchResult CantFail _) _
   = match_result1
 
 adjustMatchResult :: DsWrapper -> MatchResult -> MatchResult
@@ -330,7 +336,7 @@ mkEvalMatchResult var ty
   = adjustMatchResult (\e -> Case (Var var) var ty [(DEFAULT, [], e)]) 
 
 mkGuardedMatchResult :: CoreExpr -> MatchResult -> MatchResult
-mkGuardedMatchResult pred_expr (MatchResult can_it_fail body_fn)
+mkGuardedMatchResult pred_expr (MatchResult _ body_fn)
   = MatchResult CanFail (\fail -> body_fn fail	`thenDs` \ body ->
 				  returnDs (mkIfThenElse pred_expr body fail))
 
@@ -430,8 +436,8 @@ mkCoAlgCaseMatchResult var ty match_alts
       case (isPArrFakeCon dcon, isPArrFakeAlts alts) of
         (True , True ) -> True
         (False, False) -> False
-	_	       -> 
-	  panic "DsUtils: You may not mix `[:...:]' with `PArr' patterns"
+        _              -> panic "DsUtils: you may not mix `[:...:]' with `PArr' patterns"
+    isPArrFakeAlts [] = panic "DsUtils: unexpectedly found an empty list of PArr fake alternatives"
     --
     mk_parrCase fail = 		   
       dsLookupGlobalId lengthPName			`thenDs` \lengthP  ->
@@ -540,6 +546,7 @@ mkIntegerExpr i
     in
     returnDs (horner tARGET_MAX_INT i)
 
+mkSmallIntegerLit :: DataCon -> Integer -> CoreExpr
 mkSmallIntegerLit small_integer_data_con i = mkConApp small_integer_data_con [mkIntLit i]
 
 mkStringExpr str = mkStringExprFS (mkFastString str)
@@ -643,7 +650,7 @@ mkSelectorBinds pat val_expr
     returnDs ( (tuple_var, tuple_expr) : map mk_tup_bind binders )
   where
     binders	= collectPatBinders pat
-    local_tuple = mkTupleExpr binders
+    local_tuple = mkBigCoreVarTup binders
     tuple_ty    = exprType local_tuple
 
     mk_bind scrut_var err_var bndr_var
@@ -662,44 +669,28 @@ mkSelectorBinds pat val_expr
     is_simple_pat (TuplePat ps Boxed _)        = all is_triv_lpat ps
     is_simple_pat (ConPatOut{ pat_args = ps }) = all is_triv_lpat (hsConPatArgs ps)
     is_simple_pat (VarPat _)	       	       = True
-    is_simple_pat (ParPat p)		       = is_simple_lpat p
-    is_simple_pat other		       	       = False
+    is_simple_pat (ParPat p)	     	       = is_simple_lpat p
+    is_simple_pat _	          	       	       = False
 
     is_triv_lpat p = is_triv_pat (unLoc p)
 
-    is_triv_pat (VarPat v)  = True
+    is_triv_pat (VarPat _)  = True
     is_triv_pat (WildPat _) = True
     is_triv_pat (ParPat p)  = is_triv_lpat p
-    is_triv_pat other       = False
+    is_triv_pat _           = False
 \end{code}
 
 
 %************************************************************************
 %*									*
-		Tuples
+		Big Tuples
 %*									*
 %************************************************************************
-
-@mkTupleExpr@ builds a tuple; the inverse to @mkTupleSelector@.  
-
-* If it has only one element, it is the identity function.
-
-* If there are more elements than a big tuple can have, it nests 
-  the tuples.  
 
 Nesting policy.  Better a 2-tuple of 10-tuples (3 objects) than
 a 10-tuple of 2-tuples (11 objects).  So we want the leaves to be big.
 
 \begin{code}
-mkTupleExpr :: [Id] -> CoreExpr
-mkTupleExpr ids = mkBigCoreTup (map Var ids)
-
--- corresponding type
-mkTupleType :: [Id] -> Type
-mkTupleType ids = mkBigTuple mkCoreTupTy (map idType ids)
-
-mkBigCoreTup :: [CoreExpr] -> CoreExpr
-mkBigCoreTup = mkBigTuple mkCoreTup
 
 mkBigTuple :: ([a] -> a) -> [a] -> a
 mkBigTuple small_tuple as = mk_big_tuple (chunkify as)
@@ -713,11 +704,99 @@ chunkify :: [a] -> [[a]]
 -- But there may be more than mAX_TUPLE_SIZE sub-lists
 chunkify xs
   | n_xs <= mAX_TUPLE_SIZE = {- pprTrace "Small" (ppr n_xs) -} [xs] 
-  | otherwise		   = {- pprTrace "Big"   (ppr n_xs) -} (split xs)
+  | otherwise		       = {- pprTrace "Big"   (ppr n_xs) -} (split xs)
   where
     n_xs     = length xs
     split [] = []
     split xs = take mAX_TUPLE_SIZE xs : split (drop mAX_TUPLE_SIZE xs)
+    
+\end{code}
+
+Creating tuples and their types for Core expressions 
+
+@mkBigCoreVarTup@ builds a tuple; the inverse to @mkTupleSelector@.  
+
+* If it has only one element, it is the identity function.
+
+* If there are more elements than a big tuple can have, it nests 
+  the tuples.  
+
+\begin{code}
+
+-- Small tuples: build exactly the specified tuple
+mkCoreVarTup :: [Id] -> CoreExpr
+mkCoreVarTup ids = mkCoreTup (map Var ids)
+
+mkCoreVarTupTy :: [Id] -> Type
+mkCoreVarTupTy ids = mkCoreTupTy (map idType ids)
+
+
+mkCoreTup :: [CoreExpr] -> CoreExpr
+mkCoreTup []  = Var unitDataConId
+mkCoreTup [c] = c
+mkCoreTup cs  = mkConApp (tupleCon Boxed (length cs))
+                         (map (Type . exprType) cs ++ cs)
+
+mkCoreTupTy :: [Type] -> Type
+mkCoreTupTy [ty] = ty
+mkCoreTupTy tys  = mkTupleTy Boxed (length tys) tys
+
+
+
+-- Big tuples
+mkBigCoreVarTup :: [Id] -> CoreExpr
+mkBigCoreVarTup ids = mkBigCoreTup (map Var ids)
+
+mkBigCoreVarTupTy :: [Id] -> Type
+mkBigCoreVarTupTy ids = mkBigCoreTupTy (map idType ids)
+
+
+mkBigCoreTup :: [CoreExpr] -> CoreExpr
+mkBigCoreTup = mkBigTuple mkCoreTup
+
+mkBigCoreTupTy :: [Type] -> Type
+mkBigCoreTupTy = mkBigTuple mkCoreTupTy
+
+\end{code}
+
+Creating tuples and their types for full Haskell expressions
+
+\begin{code}
+
+-- Smart constructors for source tuple expressions
+mkLHsVarTup :: [Id] -> LHsExpr Id
+mkLHsVarTup ids  = mkLHsTup (map nlHsVar ids)
+
+mkLHsTup :: [LHsExpr Id] -> LHsExpr Id
+mkLHsTup []     = nlHsVar unitDataConId
+mkLHsTup [lexp] = lexp
+mkLHsTup lexps  = noLoc $ ExplicitTuple lexps Boxed
+
+
+-- Smart constructors for source tuple patterns
+mkLHsVarPatTup :: [Id] -> LPat Id
+mkLHsVarPatTup bs  = mkLHsPatTup (map nlVarPat bs)
+
+mkLHsPatTup :: [LPat Id] -> LPat Id
+mkLHsPatTup [lpat] = lpat
+mkLHsPatTup lpats  = noLoc $ mkVanillaTuplePat lpats Boxed -- Handles the case where lpats = [] gracefully
+
+
+-- The Big equivalents for the source tuple expressions
+mkBigLHsVarTup :: [Id] -> LHsExpr Id
+mkBigLHsVarTup ids = mkBigLHsTup (map nlHsVar ids)
+
+mkBigLHsTup :: [LHsExpr Id] -> LHsExpr Id
+mkBigLHsTup = mkBigTuple mkLHsTup
+
+
+-- The Big equivalents for the source tuple patterns
+mkBigLHsVarPatTup :: [Id] -> LPat Id
+mkBigLHsVarPatTup bs = mkBigLHsPatTup (map nlVarPat bs)
+
+mkBigLHsPatTup :: [LPat Id] -> LPat Id
+mkBigLHsPatTup = mkBigTuple mkLHsPatTup
+
 \end{code}
 
 
@@ -790,20 +869,21 @@ mkTupleCase
 mkTupleCase uniqs vars body scrut_var scrut
   = mk_tuple_case uniqs (chunkify vars) body
   where
-    mk_tuple_case us [vars] body
+    -- This is the case where don't need any nesting
+    mk_tuple_case _ [vars] body
       = mkSmallTupleCase vars body scrut_var scrut
+      
+    -- This is the case where we must make nest tuples at least once
     mk_tuple_case us vars_s body
-      = let
-	    (us', vars', body') = foldr one_tuple_case (us, [], body) vars_s
-	in
-	mk_tuple_case us' (chunkify vars') body'
+      = let (us', vars', body') = foldr one_tuple_case (us, [], body) vars_s
+	    in mk_tuple_case us' (chunkify vars') body'
+    
     one_tuple_case chunk_vars (us, vs, body)
-      = let
-	    (us1, us2) = splitUniqSupply us
-	    scrut_var = mkSysLocal FSLIT("ds") (uniqFromSupply us1)
-			(mkCoreTupTy (map idType chunk_vars))
-	    body' = mkSmallTupleCase chunk_vars body scrut_var (Var scrut_var)
-	in (us2, scrut_var:vs, body')
+      = let (us1, us2) = splitUniqSupply us
+            scrut_var = mkSysLocal FSLIT("ds") (uniqFromSupply us1)
+              (mkCoreTupTy (map idType chunk_vars))
+            body' = mkSmallTupleCase chunk_vars body scrut_var (Var scrut_var)
+        in (us2, scrut_var:vs, body')
 \end{code}
 
 The same, but with a tuple small enough not to need nesting.
@@ -841,33 +921,21 @@ mkConsExpr ty hd tl = mkConApp consDataCon [Type ty, hd, tl]
 
 mkListExpr :: Type -> [CoreExpr] -> CoreExpr
 mkListExpr ty xs = foldr (mkConsExpr ty) (mkNilExpr ty) xs
-			    
-
--- The next three functions make tuple types, constructors and selectors,
--- with the rule that a 1-tuple is represented by the thing itselg
-mkCoreTupTy :: [Type] -> Type
-mkCoreTupTy [ty] = ty
-mkCoreTupTy tys  = mkTupleTy Boxed (length tys) tys
-
-mkCoreTup :: [CoreExpr] -> CoreExpr			    
--- Builds exactly the specified tuple.
--- No fancy business for big tuples
-mkCoreTup []  = Var unitDataConId
-mkCoreTup [c] = c
-mkCoreTup cs  = mkConApp (tupleCon Boxed (length cs))
-			 (map (Type . exprType) cs ++ cs)
 
 mkCoreSel :: [Id]	-- The tuple args
-	  -> Id		-- The selected one
-	  -> Id		-- A variable of the same type as the scrutinee
+	  -> Id         -- The selected one
+	  -> Id         -- A variable of the same type as the scrutinee
 	  -> CoreExpr	-- Scrutinee
 	  -> CoreExpr
--- mkCoreSel [x,y,z] x v e
--- ===>  case e of v { (x,y,z) -> x
-mkCoreSel [var] should_be_the_same_var scrut_var scrut
+
+-- mkCoreSel [x] x v e 
+-- ===>  e
+mkCoreSel [var] should_be_the_same_var _ scrut
   = ASSERT(var == should_be_the_same_var)
     scrut
 
+-- mkCoreSel [x,y,z] x v e
+-- ===>  case e of v { (x,y,z) -> x
 mkCoreSel vars the_var scrut_var scrut
   = ASSERT( notNull vars )
     Case scrut scrut_var (idType the_var)
@@ -977,9 +1045,7 @@ mkTickBox ix vars e = do
 
 mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
 mkBinaryTickBox ixT ixF e = do
-       mod <- getModuleDs
        uq <- newUnique 	
-       mod <- getModuleDs
        let bndr1 = mkSysLocal FSLIT("t1") uq boolTy 
        falseBox <- mkTickBox ixF [] $ Var falseDataConId
        trueBox  <- mkTickBox ixT [] $ Var trueDataConId

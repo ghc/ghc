@@ -647,6 +647,37 @@ zonkStmt env (ExprStmt expr then_op ty)
     zonkTcTypeToType env ty	`thenM` \ new_ty ->
     returnM (env, ExprStmt new_expr new_then new_ty)
 
+zonkStmt env (TransformStmt (stmts, binders) usingExpr maybeByExpr)
+  = do { (env', stmts') <- zonkStmts env stmts 
+    ; let binders' = zonkIdOccs env' binders
+    ; usingExpr' <- zonkLExpr env' usingExpr
+    ; maybeByExpr' <- zonkMaybeLExpr env' maybeByExpr
+    ; return (env', TransformStmt (stmts', binders') usingExpr' maybeByExpr') }
+    
+zonkStmt env (GroupStmt (stmts, binderMap) groupByClause)
+  = do { (env', stmts') <- zonkStmts env stmts 
+    ; binderMap' <- mappM (zonkBinderMapEntry env') binderMap
+    ; groupByClause' <- 
+        case groupByClause of
+            GroupByNothing usingExpr -> (zonkLExpr env' usingExpr) >>= (return . GroupByNothing)
+            GroupBySomething eitherUsingExpr byExpr -> do
+                eitherUsingExpr' <- mapEitherM (zonkLExpr env') (zonkExpr env') eitherUsingExpr
+                byExpr' <- zonkLExpr env' byExpr
+                return $ GroupBySomething eitherUsingExpr' byExpr'
+                
+    ; let env'' = extendZonkEnv env' (map snd binderMap')
+    ; return (env'', GroupStmt (stmts', binderMap') groupByClause') }
+  where
+    mapEitherM f g x = do
+      case x of
+        Left a -> f a >>= (return . Left)
+        Right b -> g b >>= (return . Right)
+  
+    zonkBinderMapEntry env (oldBinder, newBinder) = do 
+        let oldBinder' = zonkIdOcc env oldBinder
+        newBinder' <- zonkIdBndr env newBinder
+        return (oldBinder', newBinder') 
+
 zonkStmt env (LetStmt binds)
   = zonkLocalBinds env binds	`thenM` \ (env1, new_binds) ->
     returnM (env1, LetStmt new_binds)
@@ -657,6 +688,9 @@ zonkStmt env (BindStmt pat expr bind_op fail_op)
 	; new_bind <- zonkExpr env bind_op
 	; new_fail <- zonkExpr env fail_op
 	; return (env1, BindStmt new_pat new_expr new_bind new_fail) }
+
+zonkMaybeLExpr env Nothing = return Nothing
+zonkMaybeLExpr env (Just e) = (zonkLExpr env e) >>= (return . Just)
 
 
 -------------------------------------------------------------------------
