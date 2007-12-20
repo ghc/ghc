@@ -36,6 +36,9 @@ module GHC.Exts
 	-- * Ids with special behaviour
 	lazy, inline,
 
+        -- * Transform comprehensions
+        groupWith, sortWith, the
+
        ) where
 
 import Prelude
@@ -48,4 +51,23 @@ import GHC.Num
 import GHC.Float
 import GHC.Ptr
 import Data.String
+import Data.List
 
+-- | 'the' ensures that all the elements of the list are identical
+-- and then returns that unique element
+the :: Eq a => [a] -> a
+the (x:xs) 
+  | all (x ==) xs = x
+  | otherwise     = error "GHC.Exts.the: non-identical elements"
+the []            = error "GHC.Exts.the: empty list"
+
+-- | The 'sortWith' function sorts a list of elements using the
+-- user supplied function to project something out of each element
+sortWith :: Ord b => (a -> b) -> [a] -> [a]
+sortWith f = sortBy (\x y -> compare (f x) (f y))
+
+-- | The 'groupWith' function uses the user supplied function which
+-- projects an element out of every list element in order to to first sort the 
+-- input list and then to form groups by equality on these projected elements
+groupWith :: Ord b => (a -> b) -> [a] -> [[a]]
+groupWith f = groupBy (\x y -> f x == f y) . sortWith f
