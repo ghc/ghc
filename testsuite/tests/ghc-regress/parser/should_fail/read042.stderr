@@ -1,0 +1,10 @@
+
+read042.hs:8:6:
+    Illegal transform or grouping list comprehension: use -XTransformListComp
+
+read042.hs:8:6:
+    Illegal transform or grouping list comprehension: use -XTransformListComp
+
+read042.hs:11:22: Not in scope: `by'
+
+read042.hs:11:25: Not in scope: `x'

@@ -1,0 +1,8 @@
+
+tcfail192.hs:8:8:
+    Occurs check: cannot construct the infinite type: a = [a]
+    In the expression: take 5
+    In a list comprehension:
+        x <- ["Hello", "World"] then group using take 5
+    In the expression:
+        [x + 1 | x <- ["Hello", "World"] then group using take 5]
