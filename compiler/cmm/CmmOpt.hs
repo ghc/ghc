@@ -102,6 +102,11 @@ cmmMiniInline blocks = map do_inline blocks
 cmmMiniInlineStmts :: UniqFM Int -> [CmmStmt] -> [CmmStmt]
 cmmMiniInlineStmts uses [] = []
 cmmMiniInlineStmts uses (stmt@(CmmAssign (CmmLocal (LocalReg u _ _)) expr) : stmts)
+        -- not used at all: just discard this assignment
+  | Nothing <- lookupUFM uses u
+  = cmmMiniInlineStmts uses stmts
+
+        -- used once: try to inline at the use site
   | Just 1 <- lookupUFM uses u,
     Just stmts' <- lookForInline u expr stmts
   = 
