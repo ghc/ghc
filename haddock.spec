@@ -17,7 +17,7 @@
 # version label of your release tarball.
 
 %define name    haddock
-%define version 0.8
+%define version 0.9
 %define release 1
 
 Name:           %{name}
