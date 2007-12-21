@@ -48,7 +48,7 @@ test('cg049', normal, compile_and_run, ['-funbox-strict-fields'])
 test('cg050', normal, compile_and_run, [''])
 # Doesn't work with External Core due to datatype declaration with no constructors
 test('cg051', (compose (expect_fail_for(['extcore','optextcore']),exit_code(1))), compile_and_run, [''])
-test('cg052', only_ways(['opt']), compile_and_run, ['-funbox-strict-fields'])
+test('cg052', only_ways(['optc','optasm']), compile_and_run, ['-funbox-strict-fields'])
 test('cg053', normal, compile_and_run, [''])
 test('cg054', normal, compile_and_run, [''])
 test('cg055', normal, compile_and_run, [''])

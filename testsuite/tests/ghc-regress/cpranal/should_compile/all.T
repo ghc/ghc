@@ -1,6 +1,6 @@
 # Just do the opt way...
 def f( opts ):
-  opts.only_ways = ['opt']
+  opts.only_ways = ['optc','optasm']
 
 setTestOpts(f)
 

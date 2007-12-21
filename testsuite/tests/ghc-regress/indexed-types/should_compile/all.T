@@ -1,5 +1,5 @@
 setTestOpts(only_compiler_types(['ghc']))
-setTestOpts(omit_ways(['opt', 'optasm', 'hpc']))
+setTestOpts(omit_ways(['optc', 'optasm', 'hpc']))
 
 test('Simple1', normal, compile, [''])
 test('Simple2', normal, compile, [''])
