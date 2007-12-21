@@ -266,8 +266,8 @@ test('faxen', normal, compile, [''])
 test('T1495', normal, compile, [''])
 
 # Omitting temporarily
-# test('syn-perf', normal, compile, ['-fcontext-stack=30'])
-# test('syn-perf2', normal, compile, ['-fcontext-stack=30'])
+test('syn-perf', normal, compile, ['-fcontext-stack=30'])
+test('syn-perf2', normal, compile, [''])
 
 test('LoopOfTheDay1', normal, compile, [''])
 test('LoopOfTheDay2', normal, compile, [''])

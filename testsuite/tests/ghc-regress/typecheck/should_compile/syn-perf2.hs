@@ -1,4 +1,6 @@
 -- Another type-synonym performance test
+-- 	(Trac 323)
+-- Fails in GHC up to 6.6
 
 module ShouldCompile where
 
