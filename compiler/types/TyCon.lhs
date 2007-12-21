@@ -33,7 +33,7 @@ module TyCon(
 	isEnumerationTyCon, isGadtSyntaxTyCon, isOpenTyCon,
 	assocTyConArgPoss_maybe, isTyConAssoc, setTyConArgPoss,
 	isTupleTyCon, isUnboxedTupleTyCon, isBoxedTupleTyCon, tupleTyConBoxity,
-	isRecursiveTyCon, newTyConRep, newTyConRhs, newTyConEtadRhs, newTyConCo_maybe,
+	isRecursiveTyCon, newTyConRhs, newTyConEtadRhs, newTyConCo_maybe,
 	isHiBootTyCon, isSuperKindTyCon,
         isCoercionTyCon_maybe, isCoercionTyCon,
         isImplicitTyCon,
@@ -259,26 +259,11 @@ data AlgTyConRhs
 				-- Watch out!  If any newtypes become transparent
 				-- again check Trac #1072.
 
-	nt_etad_rhs :: ([TyVar], Type) ,
+	nt_etad_rhs :: ([TyVar], Type)
 			-- The same again, but this time eta-reduced
 			-- hence the [TyVar] which may be shorter than the declared 
 			-- arity of the TyCon.  See Note [Newtype eta]
-
-	nt_rep :: Type	-- Cached: the *ultimate* representation type
-			-- By 'ultimate' I mean that the top-level constructor
-			-- of the rep type is not itself a newtype or type synonym.
-			-- The rep type isn't entirely simple:
-			--  for a recursive newtype we pick () as the rep type
-			--	newtype T = MkT T
-			-- 
-			-- This one does not need to be eta reduced; hence its
-			-- free type variables are conveniently tyConTyVars
-			-- Thus:
-			-- 	newtype T a = MkT [(a,Int)]
-			-- The rep type is [(a,Int)]
-			-- NB: the rep type isn't necessarily the original RHS of the
-			--     newtype decl, because the rep type looks through other
-    }			--     newtypes.
+    }
 
 visibleDataCons :: AlgTyConRhs -> [DataCon]
 visibleDataCons AbstractTyCon      	      = []
@@ -871,9 +856,7 @@ tyConFamilySize (AlgTyCon   {algTcRhs = DataTyCon {data_cons = cons}}) =
 tyConFamilySize (AlgTyCon   {algTcRhs = NewTyCon {}})                  = 1
 tyConFamilySize (AlgTyCon   {algTcRhs = OpenTyCon {}})                 = 0
 tyConFamilySize (TupleTyCon {})	 		                       = 1
-#ifdef DEBUG
 tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
-#endif
 
 tyConSelIds :: TyCon -> [Id]
 tyConSelIds (AlgTyCon {algTcSelIds = fs}) = fs
@@ -893,10 +876,6 @@ newTyConRhs tycon = pprPanic "newTyConRhs" (ppr tycon)
 newTyConEtadRhs :: TyCon -> ([TyVar], Type)
 newTyConEtadRhs (AlgTyCon {algTcRhs = NewTyCon { nt_etad_rhs = tvs_rhs }}) = tvs_rhs
 newTyConEtadRhs tycon = pprPanic "newTyConEtadRhs" (ppr tycon)
-
-newTyConRep :: TyCon -> ([TyVar], Type)
-newTyConRep (AlgTyCon {tyConTyVars = tvs, algTcRhs = NewTyCon { nt_rep = rep }}) = (tvs, rep)
-newTyConRep tycon = pprPanic "newTyConRep" (ppr tycon)
 
 newTyConCo_maybe :: TyCon -> Maybe TyCon
 newTyConCo_maybe (AlgTyCon {algTcRhs = NewTyCon { nt_co = co }}) = co

@@ -798,10 +798,10 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 		-- Want to drop 1 arg from (T s a) and (ST s a)
 		-- to get 	instance Monad (ST s) => Monad (T s)
 
-	-- Note [newtype representation]
-	-- Need newTyConRhs *not* newTyConRep to get the representation 
-	-- type, because the latter looks through all intermediate newtypes
-	-- For example
+	-- Note [Newtype representation]
+	-- ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+	-- Need newTyConRhs (*not* a recursive representation finder) 
+	-- to get the representation type. For example
 	--	newtype B = MkB Int
 	--	newtype A = MkA B deriving( Num )
 	-- We want the Num instance of B, *not* the Num instance of Int,

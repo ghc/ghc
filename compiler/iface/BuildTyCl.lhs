@@ -146,10 +146,9 @@ mkNewTyConRhs tycon_name tycon con
 	; return (NewTyCon { data_con    = con, 
 		       	     nt_rhs      = rhs_ty,
 		       	     nt_etad_rhs = (etad_tvs, etad_rhs),
- 		       	     nt_co 	 = cocon_maybe, 
+ 		       	     nt_co 	 = cocon_maybe } ) }
                              -- Coreview looks through newtypes with a Nothing
                              -- for nt_co, or uses explicit coercions otherwise
-		       	     nt_rep = mkNewTyConRep tycon rhs_ty }) }
   where
         -- If all_coercions is True then we use coercions for all newtypes
         -- otherwise we use coercions for recursive newtypes and look through
@@ -179,42 +178,6 @@ mkNewTyConRhs tycon_name tycon con
 			 = eta_reduce as fun
     eta_reduce tvs ty = (reverse tvs, ty)
 				
-
-mkNewTyConRep :: TyCon		-- The original type constructor
-	      -> Type		-- The arg type of its constructor
-	      -> Type		-- Chosen representation type
--- The "representation type" is guaranteed not to be another newtype
--- at the outermost level; but it might have newtypes in type arguments
-
--- Find the representation type for this newtype TyCon
--- Remember that the representation type is the *ultimate* representation
--- type, looking through other newtypes.
--- 
--- splitTyConApp_maybe no longer looks through newtypes, so we must
--- deal explicitly with this case
--- 
--- The trick is to to deal correctly with recursive newtypes
--- such as	newtype T = MkT T
-
-mkNewTyConRep tc rhs_ty
-  | null (tyConDataCons tc) = unitTy
-	-- External Core programs can have newtypes with no data constructors
-  | otherwise		    = go [tc] rhs_ty
-  where
-	-- Invariant: tcs have been seen before
-    go tcs rep_ty 
-	= case splitTyConApp_maybe rep_ty of
-	    Just (tc, tys)
-		| tc `elem` tcs -> unitTy	-- Recursive loop
-		| isNewTyCon tc -> 
-                    if isRecursiveTyCon tc then
-			go (tc:tcs) (substTyWith tvs tys rhs_ty)
-                    else
-                        substTyWith tvs tys rhs_ty
-		where
-		  (tvs, rhs_ty) = newTyConRhs tc
-
-	    other -> rep_ty 
 
 ------------------------------------------------------
 buildDataCon :: Name -> Bool

@@ -468,6 +468,31 @@ The reason is that we then get better (shorter) type signatures in
 interfaces.  Notably this plays a role in tcTySigs in TcBinds.lhs.
 
 
+Note [Expanding newtypes]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+When expanding a type to expose a data-type constructor, we need to be
+careful about newtypes, lest we fall into an infinite loop. Here are
+the key examples:
+
+  newtype Id  x = MkId x
+  newtype Fix f = MkFix (f (Fix f))
+  newtype T     = MkT (T -> T) 
+  
+  Type	         Expansion
+ --------------------------
+  T		 T -> T
+  Fix Maybe      Maybe (Fix Maybe)
+  Id (Id Int)    Int
+  Fix Id         NO NO NO
+
+Notice that we can expand T, even though it's recursive.
+And we can expand Id (Id Int), even though the Id shows up
+twice at the outer level.  
+
+So, when expanding, we keep track of when we've seen a recursive
+newtype at outermost level; and bale out if we see it again.
+
+
 		Representation types
 		~~~~~~~~~~~~~~~~~~~~
 repType looks through 
@@ -481,19 +506,28 @@ It's useful in the back end.
 \begin{code}
 repType :: Type -> Type
 -- Only applied to types of kind *; hence tycons are saturated
-repType ty | Just ty' <- coreView ty = repType ty'
-repType (ForAllTy _ ty)  = repType ty
-repType (TyConApp tc tys)
-  | isNewTyCon tc
-  , (tvs, rep_ty) <- newTyConRep tc
-  = -- Recursive newtypes are opaque to coreView
-    -- but we must expand them here.  Sure to
-    -- be saturated because repType is only applied
-    -- to types of kind *
-    ASSERT( tys `lengthIs` tyConArity tc )
-    repType (substTyWith tvs tys rep_ty)
+repType ty
+  = go [] ty
+  where
+    go :: [TyCon] -> Type -> Type
+    go rec_nts ty | Just ty' <- coreView ty 	-- Expand synonyms
+	= go rec_nts ty'	
 
-repType ty = ty
+    go rec_nts (ForAllTy _ ty)			-- Look through foralls
+	= go rec_nts ty
+
+    go rec_nts ty@(TyConApp tc tys)		-- Expand newtypes
+	| Just co_con <- newTyConCo_maybe tc	-- See Note [Expanding newtypes]
+	= if tc `elem` rec_nts 			--  in Type.lhs
+	  then ty
+	  else go rec_nts' nt_rhs
+	where
+	  nt_rhs = newTyConInstRhs tc tys
+	  rec_nts' | isRecursiveTyCon tc = tc:rec_nts
+		   | otherwise		 = rec_nts
+
+    go rec_nts ty = ty
+
 
 -- ToDo: this could be moved to the code generator, using splitTyConApp instead
 -- of inspecting the type directly.
