@@ -371,7 +371,7 @@ coreToStgExpr (Case scrut bndr _ alts)
 		     (getLiveVars alts_lv_info)
 		     bndr'
 		     (mkSRT alts_lv_info)
-		     (mkStgAltType (idType bndr) alts)
+		     (mkStgAltType bndr alts)
 		     alts2,
       scrut_fvs `unionFVInfo` alts_fvs_wo_bndr,
       alts_escs_wo_bndr `unionVarSet` getFVSet scrut_fvs
@@ -411,21 +411,27 @@ coreToStgExpr (Let bind body)
 \end{code}
 
 \begin{code}
-mkStgAltType scrut_ty alts
-  = case splitTyConApp_maybe (repType scrut_ty) of
+mkStgAltType bndr alts
+  = case splitTyConApp_maybe (repType (idType bndr)) of
 	Just (tc,_) | isUnboxedTupleTyCon tc -> UbxTupAlt tc
 		    | isUnLiftedTyCon tc     -> PrimAlt tc
 		    | isHiBootTyCon tc	     -> look_for_better_tycon
 		    | isAlgTyCon tc 	     -> AlgAlt tc
-		    | isFunTyCon tc	     -> PolyAlt
-                    | isPrimTyCon tc         -> PolyAlt -- for "Any"
-		    | otherwise		     -> pprPanic "mkStgAlts" (ppr tc)
+		    | otherwise		     -> ASSERT( _is_poly_alt_tycon tc )
+						PolyAlt
 	Nothing				     -> PolyAlt
 
   where
-   -- Sometimes, the TyCon in the type of the scrutinee is an HiBootTyCon,
-   -- which may not have any constructors inside it.  If so, then we
-   -- can get a better TyCon by grabbing the one from a constructor alternative
+   _is_poly_alt_tycon tc
+	=  isFunTyCon tc
+        || isPrimTyCon tc   -- "Any" is lifted but primitive
+	|| isOpenTyCon tc   -- Type family; e.g. arising from strict
+			    -- function application where argument has a
+			    -- type-family type
+
+   -- Sometimes, the TyCon is a HiBootTyCon which may not have any 
+   -- constructors inside it.  Then we can get a better TyCon by 
+   -- grabbing the one from a constructor alternative
    -- if one exists.
    look_for_better_tycon
 	| ((DataAlt con, _, _) : _) <- data_alts = 
