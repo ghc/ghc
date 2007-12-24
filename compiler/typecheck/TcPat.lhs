@@ -1107,11 +1107,11 @@ lazyPatErr pat tvs
 
 nonRigidMatch con
   =  hang (ptext SLIT("GADT pattern match in non-rigid context for") <+> quotes (ppr con))
-	2 (ptext SLIT("Tell GHC HQ if you'd like this to unify the context"))
+	2 (ptext SLIT("Solution: add a type signature"))
 
 nonRigidResult res_ty
   =  hang (ptext SLIT("GADT pattern match with non-rigid result type") <+> quotes (ppr res_ty))
-	2 (ptext SLIT("Tell GHC HQ if you'd like this to unify the context"))
+	2 (ptext SLIT("Solution: add a type signature"))
 
 inaccessibleAlt msg
   = hang (ptext SLIT("Inaccessible case alternative:")) 2 msg
