@@ -8,6 +8,10 @@
 module HscMain
     ( newHscEnv, hscCmmFile
     , hscParseIdentifier
+    , hscSimplify
+    , evalComp
+    , hscNormalIface, hscWriteIface, hscOneShot
+    , CompState (..)
 #ifdef GHCI
     , hscStmt, hscTcExpr, hscKcType
     , compileExpr

@@ -378,7 +378,7 @@ data DataConIds
 	-- The 'Nothing' case of DCIds is important
 	-- Not only is this efficient,
 	-- but it also ensures that the wrapper is replaced
-	-- by the worker (becuase it *is* the worker)
+	-- by the worker (because it *is* the worker)
 	-- even when there are no args. E.g. in
 	-- 		f (:) x
 	-- the (:) *is* the worker.

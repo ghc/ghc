@@ -284,7 +284,7 @@ lookupIfaceByModule dflags hpt pit mod
 -- (a) In OneShot mode, even home-package modules accumulate in the PIT
 -- (b) Even in Batch (--make) mode, there is *one* case where a home-package
 --     module is in the PIT, namely GHC.Prim when compiling the base package.
--- We could eliminate (b) if we wanted, by making GHC.Prim belong to a packake
+-- We could eliminate (b) if we wanted, by making GHC.Prim belong to a package
 -- of its own, but it doesn't seem worth the bother.
 \end{code}
 
@@ -560,7 +560,9 @@ data CoreModule
       -- Type environment for types declared in this module
       cm_types    :: !TypeEnv,
       -- Declarations
-      cm_binds    :: [CoreBind]
+      cm_binds    :: [CoreBind],
+      -- Imports
+      cm_imports  :: ![Module]
     }
 
 instance Outputable CoreModule where

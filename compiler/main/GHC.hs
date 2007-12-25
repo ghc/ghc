@@ -41,7 +41,8 @@ module GHC (
 	workingDirectoryChanged,
 	checkModule, checkAndLoadModule, CheckedModule(..),
 	TypecheckedSource, ParsedSource, RenamedSource,
-        compileToCore, compileToCoreModule,
+        compileToCore, compileToCoreModule, compileToCoreSimplified,
+        compileCoreToObj,
 
 	-- * Parsing Haddock comments
 	parseHaddockComment,
@@ -229,9 +230,12 @@ import FunDeps
 import DataCon
 import Name             hiding ( varName )
 import OccName		( parenSymOcc )
-import InstEnv		( Instance, instanceDFunId, pprInstance, pprInstanceHdr )
+import InstEnv		( Instance, instanceDFunId, pprInstance, pprInstanceHdr,
+                          emptyInstEnv )
+import FamInstEnv       ( emptyFamInstEnv )
 import SrcLoc
 import CoreSyn
+import TidyPgm
 import DriverPipeline
 import DriverPhases	( HscSource(..), Phase(..), isHaskellSrcFilename, startPhase )
 import HeaderInfo	( getImports, getOptions )
@@ -263,13 +267,14 @@ import HaddockParse
 import HaddockLex       ( tokenise )
 
 import Control.Concurrent
-import System.Directory ( getModificationTime, doesFileExist )
+import System.Directory ( getModificationTime, doesFileExist,
+                          getCurrentDirectory )
 import Data.Maybe
 import Data.List
 import qualified Data.List as List
 import Control.Monad
 import System.Exit	( exitWith, ExitCode(..) )
-import System.Time	( ClockTime )
+import System.Time	( ClockTime, getClockTime )
 import Control.Exception as Exception hiding (handle)
 import Data.IORef
 import System.IO
@@ -777,7 +782,7 @@ data CheckedModule =
 		  renamedSource     :: Maybe RenamedSource,
 		  typecheckedSource :: Maybe TypecheckedSource,
 		  checkedModuleInfo :: Maybe ModuleInfo,
-                  coreModule        :: Maybe CoreModule
+                  coreModule        :: Maybe ModGuts
 	        }
 	-- ToDo: improvements that could be made here:
 	--  if the module succeeded renaming but not typechecking,
@@ -867,12 +872,6 @@ checkModule_ ref ms compile_to_core load
                                  then deSugarModule hsc_env ms tcg
                                  else return Nothing              
 
-                   let mb_core = fmap (\ mg ->
-                                        CoreModule { cm_module = mg_module mg,
-                                                     cm_types  = mg_types mg,
-                                                     cm_binds  = mg_binds mg })
-                                    mb_guts
-
                    -- If we are loading this module so that we can typecheck
                    -- dependent modules, generate an interface and stuff it
                    -- all in the HomePackageTable.
@@ -890,7 +889,7 @@ checkModule_ ref ms compile_to_core load
 					renamedSource = rn_info,
 					typecheckedSource = Just tc_binds,
 					checkedModuleInfo = Just minf,
-                                        coreModule = mb_core }))
+                                        coreModule = mb_guts }))
 
 -- | This is the way to get access to the Core bindings corresponding
 -- to a module. 'compileToCore' invokes 'checkModule' to parse, typecheck, and
@@ -898,7 +897,90 @@ checkModule_ ref ms compile_to_core load
 -- the module name, type declarations, and function declarations) if
 -- successful.
 compileToCoreModule :: Session -> FilePath -> IO (Maybe CoreModule)
-compileToCoreModule session fn = do
+compileToCoreModule = compileCore False
+
+-- | Like compileToCoreModule, but invokes the simplifier, so
+-- as to return simplified and tidied Core.
+compileToCoreSimplified :: Session -> FilePath -> IO (Maybe CoreModule)
+compileToCoreSimplified = compileCore True
+
+-- | Provided for backwards-compatibility: compileToCore returns just the Core
+-- bindings, but for most purposes, you probably want to call
+-- compileToCoreModule.
+compileToCore :: Session -> FilePath -> IO (Maybe [CoreBind])
+compileToCore session fn = do
+   maybeCoreModule <- compileToCoreModule session fn
+   return $ fmap cm_binds maybeCoreModule
+
+-- | Takes a CoreModule and compiles the bindings therein
+-- to object code. The first argument is a bool flag indicating
+-- whether to run the simplifier.
+-- The resulting .o, .hi, and executable files, if any, are stored in the
+-- current directory, and named according to the module name.
+-- Returns True iff compilation succeeded.
+-- This has only so far been tested with a single self-contained module.
+compileCoreToObj :: Bool -> Session -> CoreModule -> IO Bool
+compileCoreToObj simplify session cm@(CoreModule{ cm_module = mName }) = do
+  hscEnv      <- sessionHscEnv session
+  dflags      <- getSessionDynFlags session
+  currentTime <- getClockTime
+  cwd         <- getCurrentDirectory
+  modLocation <- mkHiOnlyModLocation dflags (hiSuf dflags) cwd
+                   ((moduleNameSlashes . moduleName) mName)
+
+  let modSummary = ModSummary { ms_mod = mName,
+         ms_hsc_src = ExtCoreFile,
+         ms_location = modLocation,
+         -- By setting the object file timestamp to Nothing,
+         -- we always force recompilation, which is what we
+         -- want. (Thus it doesn't matter what the timestamp
+         -- for the (nonexistent) source file is.)
+         ms_hs_date = currentTime,
+         ms_obj_date = Nothing,
+         -- Only handling the single-module case for now, so no imports.
+         ms_srcimps = [],
+         ms_imps = [],
+         -- No source file
+         ms_hspp_file = "",
+         ms_hspp_opts = dflags,
+         ms_hspp_buf = Nothing
+      }
+
+  mbHscResult <- evalComp
+     ((if simplify then hscSimplify else return) (mkModGuts cm)
+     >>= hscNormalIface >>= hscWriteIface >>= hscOneShot)
+     (CompState{ compHscEnv=hscEnv,
+                 compModSummary=modSummary,
+                 compOldIface=Nothing})
+  return $ isJust mbHscResult
+
+-- Makes a "vanilla" ModGuts.
+mkModGuts :: CoreModule -> ModGuts
+mkModGuts coreModule = ModGuts {
+  mg_module = cm_module coreModule,
+  mg_boot = False,
+  mg_exports = [],
+  mg_deps = noDependencies,
+  mg_dir_imps = emptyModuleEnv,
+  mg_used_names = emptyNameSet,
+  mg_rdr_env = emptyGlobalRdrEnv,
+  mg_fix_env = emptyFixityEnv,
+  mg_types = emptyTypeEnv,
+  mg_insts = [],
+  mg_fam_insts = [],
+  mg_rules = [],
+  mg_binds = cm_binds coreModule,
+  mg_foreign = NoStubs,
+  mg_deprecs = NoDeprecs,
+  mg_hpc_info = emptyHpcInfo False,
+  mg_modBreaks = emptyModBreaks,
+  mg_vect_info = noVectInfo,
+  mg_inst_env = emptyInstEnv,
+  mg_fam_inst_env = emptyFamInstEnv
+}
+
+compileCore :: Bool -> Session -> FilePath -> IO (Maybe CoreModule)
+compileCore simplify session fn = do
    -- First, set the target to the desired filename
    target <- guessTarget fn Nothing
    addTarget session target
@@ -916,17 +998,34 @@ compileToCoreModule session fn = do
            maybeCheckedModule <- checkModule session mod True
            case maybeCheckedModule of
              Nothing -> return Nothing 
-             Just checkedMod -> return $ coreModule checkedMod
+             Just checkedMod -> (liftM $ fmap gutsToCoreModule) $
+                                case (coreModule checkedMod) of
+                                  Just mg | simplify -> (sessionHscEnv session)
+                                  -- If simplify is true: simplify (hscSimplify),
+                                  -- then tidy (tidyProgram).
+                                   >>= \ hscEnv -> evalComp (hscSimplify mg)
+                                         (CompState{ compHscEnv=hscEnv,
+                                                     compModSummary=modSummary,
+                                                     compOldIface=Nothing})
+                                          >>= (tidyProgram hscEnv)
+                                          >>= (return . Just . Left)
+                                  Just guts -> return $ Just $ Right guts
+                                  Nothing   -> return Nothing
          Nothing -> panic "compileToCoreModule: target FilePath not found in\
                            module dependency graph"
+  where -- two versions, based on whether we simplify (thus run tidyProgram,
+        -- which returns a (CgGuts, ModDetails) pair, or not (in which case
+        -- we just have a ModGuts.
+        gutsToCoreModule :: Either (CgGuts, ModDetails) ModGuts -> CoreModule
+        gutsToCoreModule (Left (cg, md))  = CoreModule {
+          cm_module = cg_module cg,    cm_types = md_types md,
+          cm_imports = cg_dir_imps cg, cm_binds = cg_binds cg
+        }
+        gutsToCoreModule (Right mg) = CoreModule {
+          cm_module  = mg_module mg,                   cm_types   = mg_types mg,
+          cm_imports = moduleEnvKeys (mg_dir_imps mg), cm_binds   = mg_binds mg
+         }
 
--- | Provided for backwards-compatibility: compileToCore returns just the Core
--- bindings, but for most purposes, you probably want to call
--- compileToCoreModule.
-compileToCore :: Session -> FilePath -> IO (Maybe [CoreBind])
-compileToCore session fn = do
-   maybeCoreModule <- compileToCoreModule session fn
-   return $ fmap cm_binds maybeCoreModule
 -- ---------------------------------------------------------------------------
 -- Unloading
 

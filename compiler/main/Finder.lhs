@@ -12,6 +12,7 @@ module Finder (
     findHomeModule,
     mkHomeModLocation,
     mkHomeModLocation2,
+    mkHiOnlyModLocation,
     addHomeModuleToFinder,
     uncacheModule,
     mkStubPaths,
@@ -21,6 +22,7 @@ module Finder (
 
     cannotFindModule,
     cannotFindInterface,
+
   ) where
 
 #include "HsVersions.h"
@@ -337,7 +339,7 @@ searchPathExts paths mod exts
 	return result
 
   where
-    basename = dots_to_slashes (moduleNameString (moduleName mod))
+    basename = moduleNameSlashes (moduleName mod)
 
     to_search :: [(FilePath, IO ModLocation)]
     to_search = [ (file, fn path basename)
@@ -387,7 +389,7 @@ mkHomeModLocationSearched dflags mod suff path basename = do
 --      (b) and (c): "."
 --
 -- src_basename
---      (a): dots_to_slashes (moduleNameUserString mod)
+--      (a): (moduleNameSlashes mod)
 --      (b) and (c): The filename of the source file, minus its extension
 --
 -- ext
@@ -404,7 +406,7 @@ mkHomeModLocation2 :: DynFlags
 		   -> String 	-- Suffix
 		   -> IO ModLocation
 mkHomeModLocation2 dflags mod src_basename ext = do
-   let mod_basename = dots_to_slashes (moduleNameString mod)
+   let mod_basename = moduleNameSlashes mod
 
    obj_fn  <- mkObjPath  dflags src_basename mod_basename
    hi_fn   <- mkHiPath   dflags src_basename mod_basename
@@ -478,7 +480,7 @@ mkStubPaths dflags mod location
   = let
 		stubdir = stubDir dflags
 
-		mod_basename = dots_to_slashes (moduleNameString mod)
+		mod_basename = moduleNameSlashes mod
 		src_basename = basenameOf (expectJust "mkStubPaths" 
 						(ml_hs_file location))
 
@@ -528,12 +530,6 @@ findObjectLinkable mod obj_fn obj_time = do
   if stub_exist
 	then return (LM obj_time mod [DotO obj_fn, DotO stub_fn])
 	else return (LM obj_time mod [DotO obj_fn])
-
--- -----------------------------------------------------------------------------
--- Utils
-
-dots_to_slashes :: String -> String
-dots_to_slashes = map (\c -> if c == '.' then '/' else c)
 
 -- -----------------------------------------------------------------------------
 -- Error messages

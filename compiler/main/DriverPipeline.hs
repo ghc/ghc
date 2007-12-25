@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- GHC Driver
@@ -104,14 +97,9 @@ compile hsc_env summary mod_index nmods mb_old_iface maybe_old_linkable
    let dflags0     = ms_hspp_opts summary
        this_mod    = ms_mod summary
        src_flavour = ms_hsc_src summary
-
-       have_object 
-	       | Just l <- maybe_old_linkable, isObjectLinkable l = True
-	       | otherwise = False
-
-   let location	  = ms_location summary
-   let input_fn   = expectJust "compile:hs" (ml_hs_file location) 
-   let input_fnpp = ms_hspp_file summary
+       location	   = ms_location summary
+       input_fn    = expectJust "compile:hs" (ml_hs_file location) 
+       input_fnpp  = ms_hspp_file summary
 
    debugTraceMsg dflags0 2 (text "compile: input file" <+> text input_fnpp)
 
@@ -267,12 +255,12 @@ link :: GhcLink                 -- interactive or batch
 -- will succeed.
 
 #ifdef GHCI
-link LinkInMemory dflags batch_attempt_linking hpt
+link LinkInMemory _ _ _
     = do -- Not Linking...(demand linker will do the job)
          return Succeeded
 #endif
 
-link NoLink dflags batch_attempt_linking hpt
+link NoLink _ _ _
    = return Succeeded
 
 link LinkBinary dflags batch_attempt_linking hpt
@@ -308,9 +296,9 @@ link LinkBinary dflags batch_attempt_linking hpt
         extra_times <- mapM (IO.try . getModificationTime) extra_ld_inputs
         let other_times = map linkableTime linkables
                        ++ [ t' | Right t' <- extra_times ]
-            linking_needed
-                | Left _  <- e_exe_time = True
-                | Right t <- e_exe_time = any (t <) other_times
+            linking_needed = case e_exe_time of
+                               Left _  -> True
+                               Right t -> any (t <) other_times
 
         if not (dopt Opt_ForceRecomp dflags) && not linking_needed
            then do debugTraceMsg dflags 2 (text exe_file <+> ptext SLIT("is up to date, linking not required."))
@@ -324,6 +312,7 @@ link LinkBinary dflags batch_attempt_linking hpt
         let link = case ghcLink dflags of
                 LinkBinary  -> linkBinary
                 LinkDynLib  -> linkDynLib
+                other       -> panicBadLink other
         link dflags obj_files pkg_deps
 
         debugTraceMsg dflags 3 (text "link: done")
@@ -336,6 +325,12 @@ link LinkBinary dflags batch_attempt_linking hpt
                                 text "   Main.main not exported; not linking.")
         return Succeeded
 
+-- warning suppression
+link other _ _ _ = panicBadLink other
+
+panicBadLink :: GhcLink -> a
+panicBadLink other = panic ("link: GHC not built to link this way: " ++
+                            show other)
 -- -----------------------------------------------------------------------------
 -- Compile files in one-shot mode.
 
@@ -366,7 +361,7 @@ compileFile dflags stop_phase (src, mb_phase) = do
 
         stop_phase' = case stop_phase of 
 			As | split -> SplitAs
-			other      -> stop_phase
+                        _          -> stop_phase
 
    (_, out_file) <- runPipeline stop_phase' dflags
 			  (src, mb_phase) Nothing output 
@@ -384,6 +379,7 @@ doLink dflags stop_phase o_files
 	NoLink     -> return ()
 	LinkBinary -> linkBinary dflags o_files link_pkgs
 	LinkDynLib -> linkDynLib dflags o_files []
+        other      -> panicBadLink other
   where
    -- Always link in the haskell98 package for static linking.  Other
    -- packages have to be specified via the -package flag.
@@ -658,7 +654,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 			          ; m <- getCoreModuleName input_fn
 			          ; return (Nothing, mkModuleName m, [], []) }
 
-		other -> do { buf <- hGetStringBuffer input_fn
+		_           -> do { buf <- hGetStringBuffer input_fn
 			    ; (src_imps,imps,L _ mod_name) <- getImports dflags buf input_fn (basename `joinFileExt` suff)
 			    ; return (Just buf, mod_name, imps, src_imps) }
 
@@ -737,8 +733,6 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 
   -- Make the ModSummary to hand to hscMain
 	let
-	    unused_field = panic "runPhase:ModSummary field"
-		-- Some fields are not looked at by hscMain
 	    mod_summary = ModSummary {	ms_mod 	     = mod, 
 					ms_hsc_src   = src_flavour,
 				 	ms_hspp_file = input_fn,
@@ -777,13 +771,13 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 -----------------------------------------------------------------------------
 -- Cmm phase
 
-runPhase CmmCpp stop dflags basename suff input_fn get_output_fn maybe_loc
+runPhase CmmCpp _stop dflags _basename _suff input_fn get_output_fn maybe_loc
   = do
        output_fn <- get_output_fn dflags Cmm maybe_loc
        doCpp dflags False{-not raw-} True{-include CC opts-} input_fn output_fn	
        return (Cmm, dflags, maybe_loc, output_fn)
 
-runPhase Cmm stop dflags basename suff input_fn get_output_fn maybe_loc
+runPhase Cmm stop dflags basename _ input_fn get_output_fn maybe_loc
   = do
 	let hsc_lang = hscMaybeAdjustTarget dflags stop HsSrcFile (hscTarget dflags)
 	let next_phase = hscNextPhase dflags HsSrcFile hsc_lang
@@ -805,7 +799,7 @@ runPhase Cmm stop dflags basename suff input_fn get_output_fn maybe_loc
 -- we don't support preprocessing .c files (with -E) now.  Doing so introduces
 -- way too many hacks, and I can't say I've ever used it anyway.
 
-runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
+runPhase cc_phase _stop dflags _basename _suff input_fn get_output_fn maybe_loc
    | cc_phase `eqPhase` Cc || cc_phase `eqPhase` Ccpp || cc_phase `eqPhase` HCc
    = do	let cc_opts = getOpts dflags opt_c
 	    hcc = cc_phase `eqPhase` HCc
@@ -915,7 +909,7 @@ runPhase cc_phase stop dflags basename suff input_fn get_output_fn maybe_loc
 -----------------------------------------------------------------------------
 -- Mangle phase
 
-runPhase Mangle stop dflags _basename _suff input_fn get_output_fn maybe_loc
+runPhase Mangle _stop dflags _basename _suff input_fn get_output_fn maybe_loc
    = do let mangler_opts = getOpts dflags opt_m
 
 #if i386_TARGET_ARCH
@@ -941,7 +935,7 @@ runPhase Mangle stop dflags _basename _suff input_fn get_output_fn maybe_loc
 -----------------------------------------------------------------------------
 -- Splitting phase
 
-runPhase SplitMangle stop dflags _basename _suff input_fn get_output_fn maybe_loc
+runPhase SplitMangle _stop dflags _basename _suff input_fn _get_output_fn maybe_loc
   = do  -- tmp_pfx is the prefix used for the split .s files
 	-- We also use it as the file to contain the no. of split .s files (sigh)
 	split_s_prefix <- SysTools.newTempName dflags "split"
@@ -968,7 +962,7 @@ runPhase SplitMangle stop dflags _basename _suff input_fn get_output_fn maybe_lo
 -----------------------------------------------------------------------------
 -- As phase
 
-runPhase As stop dflags _basename _suff input_fn get_output_fn maybe_loc
+runPhase As _stop dflags _basename _suff input_fn get_output_fn maybe_loc
   = do	let as_opts =  getOpts dflags opt_a
         let cmdline_include_paths = includePaths dflags
 
@@ -1000,7 +994,7 @@ runPhase As stop dflags _basename _suff input_fn get_output_fn maybe_loc
 	return (StopLn, dflags, maybe_loc, output_fn)
 
 
-runPhase SplitAs stop dflags basename _suff _input_fn get_output_fn maybe_loc
+runPhase SplitAs _stop dflags _basename _suff _input_fn get_output_fn maybe_loc
   = do  
 	output_fn <- get_output_fn dflags StopLn maybe_loc
 
@@ -1058,7 +1052,9 @@ runPhase SplitAs stop dflags basename _suff _input_fn get_output_fn maybe_loc
 
 	return (StopLn, dflags, maybe_loc, output_fn)
 
-
+-- warning suppression
+runPhase other _stop _dflags _basename _suff _input_fn _get_output_fn _maybe_loc =
+   panic ("runPhase: don't know how to run phase " ++ show other)
 -----------------------------------------------------------------------------
 -- MoveBinary sort-of-phase
 -- After having produced a binary, move it somewhere else and generate a
@@ -1070,6 +1066,7 @@ runPhase SplitAs stop dflags basename _suff _input_fn get_output_fn maybe_loc
 -- we don't need the generality of a phase (MoveBinary is always
 -- done after linking and makes only sense in a parallel setup)   -- HWL
 
+runPhase_MoveBinary :: DynFlags -> FilePath -> IO Bool 
 runPhase_MoveBinary dflags input_fn
   = do	
         let sysMan = pgm_sysman dflags
@@ -1146,6 +1143,7 @@ mk_pvm_wrapper_script pvm_executable pvm_executable_base sysMan = unlines $
 -----------------------------------------------------------------------------
 -- Complain about non-dynamic flags in OPTIONS pragmas
 
+checkProcessArgsResult :: [String] -> FilePath -> IO ()
 checkProcessArgsResult flags filename
   = do when (notNull flags) (throwDyn (ProgramError (
 	  showSDoc (hang (text filename <> char ':')
@@ -1300,10 +1298,11 @@ maybeCreateManifest
    :: DynFlags
    -> FilePath                          -- filename of executable
    -> IO [FilePath]                     -- extra objects to embed, maybe
-maybeCreateManifest dflags exe_filename = do
 #ifndef mingw32_TARGET_OS
+maybeCreateManifest _ _ = do
   return []
 #else
+maybeCreateManifest dflags exe_filename = do
   if not (dopt Opt_GenManifest dflags) then return [] else do
 
   let manifest_filename = exe_filename `joinFileExt` "manifest"
@@ -1324,7 +1323,7 @@ maybeCreateManifest dflags exe_filename = do
       "  </trustInfo>\n"++
       "</assembly>\n"
 
-  -- Windows will fine the manifest file if it is named foo.exe.manifest.
+  -- Windows will find the manifest file if it is named foo.exe.manifest.
   -- However, for extra robustness, and so that we can move the binary around,
   -- we can embed the manifest in the binary itself using windres:
   if not (dopt Opt_EmbedManifest dflags) then return [] else do
@@ -1335,7 +1334,7 @@ maybeCreateManifest dflags exe_filename = do
   writeFile rc_filename $
       "1 24 MOVEABLE PURE " ++ show manifest_filename ++ "\n"
         -- magic numbers :-)
-        -- show is a bit hackish above, but we need to esacpe the
+        -- show is a bit hackish above, but we need to escape the
         -- backslashes in the path.
 
   let wr_opts = getOpts dflags opt_windres
@@ -1354,8 +1353,6 @@ maybeCreateManifest dflags exe_filename = do
 linkDynLib :: DynFlags -> [String] -> [PackageId] -> IO ()
 linkDynLib dflags o_files dep_packages = do
     let verb = getVerbFlag dflags
-    let static = opt_Static
-    let no_hs_main = dopt Opt_NoHsMain dflags
     let o_file = outputFile dflags
 
     pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
@@ -1519,8 +1516,10 @@ doCpp dflags raw include_cc_opts input_fn output_fn = do
 		       , SysTools.FileOption "" output_fn
 		       ])
 
+cHaskell1Version :: String
 cHaskell1Version = "5" -- i.e., Haskell 98
 
+hsSourceCppOpts :: [String]
 -- Default CPP defines in Haskell source
 hsSourceCppOpts =
 	[ "-D__HASKELL1__="++cHaskell1Version
@@ -1534,8 +1533,8 @@ hsSourceCppOpts =
 -- Misc.
 
 hscNextPhase :: DynFlags -> HscSource -> HscTarget -> Phase
-hscNextPhase dflags HsBootFile hsc_lang  =  StopLn
-hscNextPhase dflags other hsc_lang = 
+hscNextPhase _ HsBootFile _        =  StopLn
+hscNextPhase dflags _ hsc_lang = 
   case hsc_lang of
 	HscC -> HCc
 	HscAsm | dopt Opt_SplitObjs dflags -> SplitMangle
@@ -1546,7 +1545,7 @@ hscNextPhase dflags other hsc_lang =
 
 
 hscMaybeAdjustTarget :: DynFlags -> Phase -> HscSource -> HscTarget -> HscTarget
-hscMaybeAdjustTarget dflags stop other current_hsc_lang 
+hscMaybeAdjustTarget dflags stop _ current_hsc_lang 
   = hsc_lang 
   where
 	keep_hc = dopt Opt_KeepHcFiles dflags
@@ -1560,5 +1559,6 @@ hscMaybeAdjustTarget dflags stop other current_hsc_lang
 		-- otherwise, stick to the plan
 		 | otherwise = current_hsc_lang
 
+v_Split_info :: IORef (String, Int)
 GLOBAL_VAR(v_Split_info, ("",0), (String,Int))
 	-- The split prefix and number of files

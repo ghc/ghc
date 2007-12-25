@@ -436,7 +436,7 @@ data GhcLink	-- What to do in the link step, if there is one
   | LinkBinary		-- Link object code into a binary
   | LinkInMemory        -- Use the in-memory dynamic linker
   | LinkDynLib		-- Link objects into a dynamic lib (DLL on Windows, DSO on ELF platforms)
-  deriving Eq
+  deriving (Eq, Show)
 
 isNoLink :: GhcLink -> Bool
 isNoLink NoLink = True

@@ -16,6 +16,7 @@ module Module
 	pprModuleName,
 	moduleNameFS,
 	moduleNameString,
+        moduleNameSlashes,
 	mkModuleName,
 	mkModuleNameFS,
 
@@ -50,8 +51,8 @@ module Module
 	extendModuleEnvList_C, plusModuleEnv_C,
 	delModuleEnvList, delModuleEnv, plusModuleEnv, lookupModuleEnv,
 	lookupWithDefaultModuleEnv, mapModuleEnv, mkModuleEnv, emptyModuleEnv,
-	moduleEnvElts, unitModuleEnv, isEmptyModuleEnv, foldModuleEnv,
-	extendModuleEnv_C, filterModuleEnv,
+	moduleEnvKeys, moduleEnvElts, unitModuleEnv, isEmptyModuleEnv,
+        foldModuleEnv, extendModuleEnv_C, filterModuleEnv,
 
 	-- * ModuleName mappings
 	ModuleNameEnv,
@@ -173,6 +174,11 @@ mkModuleName s = ModuleName (mkFastString s)
 
 mkModuleNameFS :: FastString -> ModuleName
 mkModuleNameFS s = ModuleName s
+
+-- Returns the string version of the module name, with dots replaced by slashes
+moduleNameSlashes :: ModuleName -> String
+moduleNameSlashes = dots_to_slashes . moduleNameString
+  where dots_to_slashes = map (\c -> if c == '.' then '/' else c)
 \end{code}
 
 %************************************************************************
@@ -305,6 +311,7 @@ delModuleEnvList     :: ModuleEnv a -> [Module] -> ModuleEnv a
 delModuleEnv         :: ModuleEnv a -> Module -> ModuleEnv a
 plusModuleEnv_C      :: (a -> a -> a) -> ModuleEnv a -> ModuleEnv a -> ModuleEnv a
 mapModuleEnv         :: (a -> b) -> ModuleEnv a -> ModuleEnv b
+moduleEnvKeys        :: ModuleEnv a -> [Module]
 moduleEnvElts        :: ModuleEnv a -> [a]
                   
 isEmptyModuleEnv     :: ModuleEnv a -> Bool
@@ -329,6 +336,7 @@ lookupWithDefaultModuleEnv = lookupWithDefaultFM
 mapModuleEnv f      = mapFM (\_ v -> f v)
 mkModuleEnv         = listToFM
 emptyModuleEnv      = emptyFM
+moduleEnvKeys       = keysFM
 moduleEnvElts       = eltsFM
 unitModuleEnv       = unitFM
 isEmptyModuleEnv    = isEmptyFM
