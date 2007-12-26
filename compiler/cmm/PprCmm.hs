@@ -71,8 +71,8 @@ writeCmms handle cmms = printForC handle (pprCmms cmms)
 
 -----------------------------------------------------------------------------
 
-instance (Outputable info, Outputable g)
-    => Outputable (GenCmm CmmStatic info g) where
+instance (Outputable d, Outputable info, Outputable g)
+    => Outputable (GenCmm d info g) where
     ppr c = pprCmm c
 
 instance (Outputable d, Outputable info, Outputable i)
@@ -110,7 +110,7 @@ instance Outputable CmmInfo where
 
 -----------------------------------------------------------------------------
 
-pprCmm :: (Outputable info,  Outputable g) => GenCmm CmmStatic info g -> SDoc
+pprCmm :: (Outputable d, Outputable info, Outputable g) => GenCmm d info g -> SDoc
 pprCmm (Cmm tops) = vcat $ intersperse (text "") $ map pprTop tops
 
 -- --------------------------------------------------------------------------
