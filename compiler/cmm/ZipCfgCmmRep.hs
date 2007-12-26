@@ -197,9 +197,6 @@ instance Outputable Convention where
 
 instance DF.DebugNodes Middle Last
 
-instance Outputable CmmGraph where
-    ppr = pprLgraph
-
 debugPpr :: Bool
 debugPpr = debugIsOn
 

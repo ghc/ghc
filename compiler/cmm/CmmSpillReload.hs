@@ -360,9 +360,6 @@ instance Outputable m => Outputable (ExtendWithSpills m) where
     ppr (Reload regs) = ppr_regs "Reload" regs
     ppr (NotSpillOrReload m) = ppr m
 
-instance Outputable (LGraph M Last) where
-    ppr = pprLgraph
-
 instance DebugNodes M Last
                                
 ppr_regs :: String -> RegSet -> SDoc

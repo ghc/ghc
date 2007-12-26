@@ -244,7 +244,7 @@ fold_edge_facts_with_nodes_b :: LastNode l
 -- fixed point iteratively starting from somewhere other than bottom
 -- (as in the reachability analysis done for proc points).
 
-class (Outputable m, Outputable l, LastNode l, Outputable (LGraph m l)) => DebugNodes m l
+class (Outputable m, Outputable l, LastNode l) => DebugNodes m l
 
 refine_f_anal :: (DebugNodes m l, LastNode l, Outputable a) =>
         FAnalysis m l a -> LGraph m l -> DFA a () -> DFA a ()

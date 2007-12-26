@@ -688,6 +688,9 @@ mkBlockSet = mkUniqSet
 instance (Outputable m, Outputable l) => Outputable (ZTail m l) where
     ppr = pprTail
 
+instance (Outputable m, Outputable l, LastNode l) => Outputable (LGraph m l) where
+    ppr = pprLgraph
+
 pprTail :: (Outputable m, Outputable l) => ZTail m l -> SDoc 
 pprTail (ZTail m t) = ppr m $$ ppr t
 pprTail (ZLast LastExit) = text "<exit>"
