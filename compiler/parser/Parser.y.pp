@@ -1896,7 +1896,7 @@ docnamed :: { Located (String, (HsDoc RdrName)) }
         MyLeft  err -> parseError (getLoc $1) err;
         MyRight doc -> return (L1 (name, doc)) } }
 
-docsection :: { Located (n, HsDoc RdrName) }
+docsection :: { Located (Int, HsDoc RdrName) }
   : DOCSECTION {% let (n, doc) = getDOCSECTION $1 in
         case parseHaddockString (tokenise doc) of {
       MyLeft  err -> parseError (getLoc $1) err;
