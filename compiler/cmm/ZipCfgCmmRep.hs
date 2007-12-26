@@ -182,10 +182,6 @@ instance UserOfLocalRegs Last where
             last (LastCondBranch e _ _) = foldRegsUsed f z e
             last (LastSwitch e _tbl)    = foldRegsUsed f z e
 
-instance UserOfLocalRegs (ZLast Last) where
-    foldRegsUsed  f z (LastOther l) = foldRegsUsed f z l
-    foldRegsUsed _f z LastExit      = z
-
 
 ----------------------------------------------------------------------
 ----- Instance declarations for prettyprinting (avoids recursive imports)

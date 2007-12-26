@@ -37,6 +37,8 @@ where
 
 #include "HsVersions.h"
 
+import CmmExpr ( UserOfLocalRegs(..) ) --for an instance
+
 import Outputable hiding (empty)
 import Panic
 import Unique
@@ -139,6 +141,14 @@ data ZLast l
                  -- construction, or framgments of graph under optimisation,
                  -- so we don't want to pollute the 'l' type parameter with it
   | LastOther l
+
+--So that we don't have orphan instances, this goes here or in CmmExpr.
+--At least UserOfLocalRegs (ZLast Last) is needed (Last defined elsewhere),
+--but there's no need for non-Haskell98 instances for that.
+instance UserOfLocalRegs a => UserOfLocalRegs (ZLast a) where
+    foldRegsUsed  f z (LastOther l) = foldRegsUsed f z l
+    foldRegsUsed _f z LastExit      = z
+
 
 data ZHead m   = ZFirst BlockId  | ZHead (ZHead m) m
     -- ZHead is a (reversed) sequence of middle nodes labeled by a BlockId
