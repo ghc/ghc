@@ -18,12 +18,12 @@ main
                in doRegisterInplace verbosity
            "install" : ghcpkg : ghcpkgconf : destdir : topdir :
                     iprefix : ibindir : ilibdir : ilibexecdir :
-                    idatadir : idocdir : ihtmldir : iinterfacedir :
+                    idatadir : idocdir : ihtmldir : ihaddockdir :
                     args' ->
                let verbosity = mkVerbosity args'
                in doInstall verbosity ghcpkg ghcpkgconf destdir topdir
                             iprefix ibindir ilibdir ilibexecdir idatadir
-                            idocdir ihtmldir iinterfacedir
+                            idocdir ihtmldir ihaddockdir
            _ ->
                error ("Bad arguments: " ++ show args)
 
@@ -38,7 +38,7 @@ mkVerbosity args = error ("Bad arguments: " ++ show args)
 doRegisterInplace :: Verbosity -> IO ()
 doRegisterInplace verbosity =
        do lbi <- getConfig verbosity
-          let registerFlags = emptyRegisterFlags { regInPlace = True }
+          let registerFlags = defaultRegisterFlags { regInPlace = toFlag True }
               pd = localPkgDescr lbi
               pd_reg = if pkgName (package pd) == "base"
                        then case library pd of
@@ -58,17 +58,18 @@ doInstall :: Verbosity -> FilePath -> FilePath -> FilePath -> FilePath
           -> IO ()
 doInstall verbosity ghcpkg ghcpkgconf destdir topdir
      iprefix ibindir ilibdir ilibexecdir idatadir
-     idocdir ihtmldir iinterfacedir =
+     idocdir ihtmldir ihaddockdir =
        do let userHooks = simpleUserHooks
               copyto = if null destdir then NoCopyDest else CopyTo destdir
-              copyFlags = (emptyCopyFlags copyto) {
-                              copyVerbose = verbosity
+              copyFlags = defaultCopyFlags {
+                              copyDest = toFlag copyto,
+                              copyVerbose = toFlag verbosity
                           }
-              registerFlags = emptyRegisterFlags {
-                                  regPackageDB = Just GlobalPackageDB,
-                                  regVerbose = verbosity,
-                                  regGenScript = False,
-                                  regInPlace = False
+              registerFlags = defaultRegisterFlags {
+                                  regPackageDB = toFlag GlobalPackageDB,
+                                  regVerbose = toFlag verbosity,
+                                  regGenScript = toFlag $ False,
+                                  regInPlace = toFlag $ False
                               }
           lbi <- getConfig verbosity
           let pd = localPkgDescr lbi
@@ -88,14 +89,14 @@ doInstall verbosity ghcpkg ghcpkgconf destdir topdir
               -- When coying, we need to actually give a concrete
               -- directory to copy to rather than "$topdir"
               toPathTemplate' = toPathTemplate . replaceTopdir topdir
-              i_copy = i { prefixDirTemplate    = toPathTemplate' iprefix,
-                           binDirTemplate       = toPathTemplate' ibindir,
-                           libDirTemplate       = toPathTemplate' ilibdir,
-                           libexecDirTemplate   = toPathTemplate' ilibexecdir,
-                           dataDirTemplate      = toPathTemplate' idatadir,
-                           docDirTemplate       = toPathTemplate' idocdir,
-                           htmlDirTemplate      = toPathTemplate' ihtmldir,
-                           interfaceDirTemplate = toPathTemplate' iinterfacedir
+              i_copy = i { prefix       = toPathTemplate' iprefix,
+                           bindir       = toPathTemplate' ibindir,
+                           libdir       = toPathTemplate' ilibdir,
+                           libexecdir   = toPathTemplate' ilibexecdir,
+                           datadir      = toPathTemplate' idatadir,
+                           docdir       = toPathTemplate' idocdir,
+                           htmldir      = toPathTemplate' ihtmldir,
+                           haddockdir   = toPathTemplate' ihaddockdir
                          }
               lbi_copy = lbi { installDirTemplates = i_copy }
               -- When we run GHC we give it a $topdir that includes the
@@ -110,14 +111,14 @@ doInstall verbosity ghcpkg ghcpkgconf destdir topdir
                          programLocation = UserSpecified ghcpkg
                      }
               progs' = updateProgram prog progs
-              i_reg = i { prefixDirTemplate    = toPathTemplate iprefix,
-                          binDirTemplate       = toPathTemplate ibindir,
-                          libDirTemplate       = toPathTemplate ilibdir,
-                          libexecDirTemplate   = toPathTemplate ilibexecdir,
-                          dataDirTemplate      = toPathTemplate idatadir,
-                          docDirTemplate       = toPathTemplate idocdir,
-                          htmlDirTemplate      = toPathTemplate ihtmldir,
-                          interfaceDirTemplate = toPathTemplate iinterfacedir
+              i_reg = i { prefix       = toPathTemplate iprefix,
+                          bindir       = toPathTemplate ibindir,
+                          libdir       = toPathTemplate ilibdir,
+                          libexecdir   = toPathTemplate ilibexecdir,
+                          datadir      = toPathTemplate idatadir,
+                          docdir       = toPathTemplate idocdir,
+                          htmldir      = toPathTemplate ihtmldir,
+                          haddockdir   = toPathTemplate ihaddockdir
                         }
               lbi_reg = lbi { installDirTemplates = i_reg,
                               withPrograms = progs' }

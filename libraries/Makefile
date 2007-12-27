@@ -96,7 +96,7 @@ ilibdir             = $$topdir
 ilibexecdir         = $$topdir
 idatadir            = $$topdir
 idocdir             = $$topdir/doc/libraries/$$pkg
-iinterfacedir       = $$topdir/doc/libraries/$$pkg
+ihaddockdir         = $$topdir/doc/libraries/$$pkg
 ihtmldir            = $$httptopdir/doc/libraries/$$pkg
 html_installed_root = $(prefix)/doc/libraries
 else
@@ -108,7 +108,7 @@ ilibdir             = $(libdir)
 ilibexecdir         = $(libexecdir)
 idatadir            = $(datadir)
 idocdir             = $(docdir)/libraries/$$pkg
-iinterfacedir       = $(htmldir)/libraries/$$pkg
+ihaddockdir         = $(htmldir)/libraries/$$pkg
 ihtmldir            = $(htmldir)/libraries/$$pkg
 html_installed_root = $(htmldir)/libraries
 endif
@@ -250,7 +250,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 	           --libexecdir=/NONEXISTANT \
 	           --datadir=/NONEXISTANT \
 	           --docdir=/NONEXISTANT \
-			   --interfacedir=/NONEXISTANT \
+			   --haddockdir=/NONEXISTANT \
 	           --htmldir=/NONEXISTANT \
 	           --with-compiler=../../compiler/stage1/ghc-inplace \
 	           --with-hc-pkg=../../utils/ghc-pkg/ghc-pkg-inplace \
@@ -372,7 +372,7 @@ $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
-	  ../installPackage/installPackage install '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(iinterfacedir)' ; \
+	  ../installPackage/installPackage install '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(ihaddockdir)' ; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%
