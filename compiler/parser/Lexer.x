@@ -55,7 +55,7 @@ import Util		( maybePrefixMatch, readRational )
 
 import Control.Monad
 import Data.Bits
-import Data.Char 	( chr, isSpace )
+import Data.Char 	( chr, ord, isSpace )
 import Data.Ratio
 import Debug.Trace
 
