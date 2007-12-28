@@ -17,12 +17,12 @@ main
                let verbosity = mkVerbosity args'
                in doRegisterInplace verbosity
            "install" : ghcpkg : ghcpkgconf : destdir : topdir :
-                    iprefix : ibindir : ilibdir : ilibexecdir :
+                    iprefix : ibindir : ilibdir : ilibexecdir : idynlibdir :
                     idatadir : idocdir : ihtmldir : ihaddockdir :
                     args' ->
                let verbosity = mkVerbosity args'
                in doInstall verbosity ghcpkg ghcpkgconf destdir topdir
-                            iprefix ibindir ilibdir ilibexecdir idatadir
+                            iprefix ibindir ilibdir ilibexecdir idynlibdir idatadir
                             idocdir ihtmldir ihaddockdir
            _ ->
                error ("Bad arguments: " ++ show args)
@@ -54,10 +54,10 @@ doRegisterInplace verbosity =
 
 doInstall :: Verbosity -> FilePath -> FilePath -> FilePath -> FilePath
           -> FilePath -> FilePath -> FilePath -> FilePath -> FilePath
-          -> FilePath -> FilePath -> FilePath
+          -> FilePath -> FilePath -> FilePath -> FilePath
           -> IO ()
 doInstall verbosity ghcpkg ghcpkgconf destdir topdir
-     iprefix ibindir ilibdir ilibexecdir idatadir
+     iprefix ibindir ilibdir ilibexecdir idynlibdir idatadir
      idocdir ihtmldir ihaddockdir =
        do let userHooks = simpleUserHooks
               copyto = if null destdir then NoCopyDest else CopyTo destdir
@@ -92,6 +92,7 @@ doInstall verbosity ghcpkg ghcpkgconf destdir topdir
               i_copy = i { prefix       = toPathTemplate' iprefix,
                            bindir       = toPathTemplate' ibindir,
                            libdir       = toPathTemplate' ilibdir,
+                           dynlibdir    = toPathTemplate' idynlibdir,
                            libexecdir   = toPathTemplate' ilibexecdir,
                            datadir      = toPathTemplate' idatadir,
                            docdir       = toPathTemplate' idocdir,
@@ -114,6 +115,7 @@ doInstall verbosity ghcpkg ghcpkgconf destdir topdir
               i_reg = i { prefix       = toPathTemplate iprefix,
                           bindir       = toPathTemplate ibindir,
                           libdir       = toPathTemplate ilibdir,
+                          dynlibdir    = toPathTemplate idynlibdir,
                           libexecdir   = toPathTemplate ilibexecdir,
                           datadir      = toPathTemplate idatadir,
                           docdir       = toPathTemplate idocdir,

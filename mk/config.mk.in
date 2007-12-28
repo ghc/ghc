@@ -557,6 +557,7 @@ datadir0        := @datadir@
 libdir0         := @libdir@
 includedir      := @includedir@
 mandir          := @mandir@
+dynlibdir       := @libdir@
 
 ifeq "$(RelocatableBuild)" "YES"
 

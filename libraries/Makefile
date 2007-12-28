@@ -94,6 +94,7 @@ iprefix             = $$topdir
 ibindir             = $$topdir
 ilibdir             = $$topdir
 ilibexecdir         = $$topdir
+idynlibdir          = $$topdir
 idatadir            = $$topdir
 idocdir             = $$topdir/doc/libraries/$$pkg
 ihaddockdir         = $$topdir/doc/libraries/$$pkg
@@ -106,6 +107,7 @@ iprefix             = $(prefix)
 ibindir             = $(bindir)
 ilibdir             = $(libdir)
 ilibexecdir         = $(libexecdir)
+idynlibdir          = $(dynlibdir)
 idatadir            = $(datadir)
 idocdir             = $(docdir)/libraries/$$pkg
 ihaddockdir         = $(htmldir)/libraries/$$pkg
@@ -372,7 +374,7 @@ $(foreach SUBDIR,$(SUBDIRS),install.library.$(SUBDIR)): \
 install.library.%: installPackage/installPackage ifBuildable/ifBuildable
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
-	  ../installPackage/installPackage install '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(ihaddockdir)' ; \
+	  ../installPackage/installPackage install '$(GHC_PKG_PROG)' '$(DESTDIR)$(libdir)/package.conf' '$(DESTDIR)' '$(prefix)' '$(iprefix)' '$(ibindir)' '$(ilibdir)' '$(ilibexecdir)' '$(idynlibdir)' '$(idatadir)' '$(idocdir)' '$(ihtmldir)' '$(ihaddockdir)' ; \
 	fi
 
 .PHONY: binary-dist binary-dist.library.%
