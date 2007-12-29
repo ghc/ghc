@@ -275,7 +275,7 @@ stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).%: %/setup/Setup
 # every time.
 $(foreach SUBDIR,$(SUBDIRS),make.library.$(SUBDIR)):\
 make.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
-                %/setup/Setup ifBuildable/ifBuildable
+                %/setup/Setup ifBuildable/ifBuildable installPackage/installPackage
 	if ifBuildable/ifBuildable $*; then \
 	  cd $* && \
 	  cmp -s ../Makefile.local Makefile.local || cp ../Makefile.local .; \
