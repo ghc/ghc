@@ -153,15 +153,13 @@ SRC_HC_OPTS += -static
 else
 LIB_LD_OPTS += -ignore-package base -ignore-package rts
 ifeq "$(DYNAMIC_RTS) $(HOSTPLATFORM)" "YES i386-unknown-mingw32"
-BASE_VERSION=$(strip $(shell grep version: $(TOP)/libraries/base/base.cabal | cut -f2 -d:))
-BASE_NAME=HSbase-$(BASE_VERSION)-ghc$(ProjectVersion)$(soext)
+LIB_DEPS=buildbase
+.PHONY: buildbase
+
 BASE_DIST_LIB=$(TOP)/libraries/base/dist/build
-BASE_IMPORT_LIBRARY=$(BASE_DIST_LIB)/lib$(BASE_NAME).a
-LIB_DEPS=$(BASE_IMPORT_LIBRARY)
-LIB_LD_OPTS += -L$(BASE_DIST_LIB) -l$(BASE_NAME)
-# We extract a good bit of information out of the rts package.conf by going via ghc-pkg
-LIB_LD_OPTS += $(foreach lib,$(shell $(GHC_PKG_INPLACE) field rts extra-libraries | sed -e s/extra-libraries://),"-l$(lib)")
-LIB_LD_OPTS += $(foreach libdir,$(shell $(GHC_PKG_INPLACE) field rts library-dirs | sed -e s/library-dirs://),"-L$(libdir)")
+
+# The following must be a one liner otherwise its evaluation won't be delayed until base/rts packages are properly registered
+LIB_LD_OPTS = -L$(shell $(GHC_PKG_INPLACE) field base library-dirs | sed -e 's/library-dirs: //') -l$(shell $(GHC_PKG_INPLACE) field base hs-libraries | sed -e 's/hs-libraries: //')-ghc$(ProjectVersion)$(soext) $(foreach lib,$(shell $(GHC_PKG_INPLACE) field rts extra-libraries | sed -e s/extra-libraries://),"-l$(lib)") $(foreach libdir,$(shell $(GHC_PKG_INPLACE) field rts library-dirs | sed -e s/library-dirs://),"-L$(libdir)")
 endif
 endif
 
@@ -408,10 +406,11 @@ endif
 include $(TOP)/mk/target.mk
 
 ifeq "$(DYNAMIC_RTS) $(HOSTPLATFORM)" "YES i386-unknown-mingw32"
-$(BASE_IMPORT_LIBRARY): $(LIBRARY).a
-	$(MAKE) -C ../libraries/ make.library.base
-# just for the timestamps
-	touch $(BASE_IMPORT_LIBRARY)
+# $(LIBRARY).a is not the static library libHSrts.a but
+# libHSrts.dll.a, the import library for dynamic linking required for
+# linking the dynamic version of base
+buildbase: $(LIBRARY).a
+	$(MAKE) way="" -C ../libraries/ make.library.base
 endif
 
 #-----------------------------------------------------------------------------
