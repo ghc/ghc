@@ -596,7 +596,7 @@ maintainer-clean:: extraclean
 
 ifneq "$(way)" ""
 ifeq "$(findstring $(way), $(WAYS))" ""
-$(error Unknown way $(way))
+$(error Unknown way $(way) of $(WAYS))
 endif
 endif
 
