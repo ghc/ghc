@@ -842,6 +842,7 @@ PACKAGE = ghc
 HIERARCHICAL_LIB = NO
 VERSION = $(ProjectVersion)
 PKG_DEPENDS += base haskell98
+LIB_LD_OPTS += $(foreach pkg,$(PKG_DEPENDS),-package $(pkg))
 # We have to expand each package dependency with its version, which we
 # can do by calling "ghc-pkg list $pkg --simple-output".
 PACKAGE_CPP_OPTS += -DPKG_DEPENDS='$(foreach pkg,$(PKG_DEPENDS),$(shell $(GHC_PKG_INPLACE) latest --global $(pkg)))'
