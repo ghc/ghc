@@ -372,14 +372,14 @@ $(LIBRARY): $(LIBOBJS) $(LIBRARY).o $(LIB_DEPS)
 DLLTOOL=dlltool
 
 $(LIBRARY).def: $(LIBOBJS)
-	$(DLLTOOL) --output-def $@ --export-all $(LIBOBJS)
+	$(DLLTOOL) -D $(LIBRARY) --output-def $@ --export-all $(LIBOBJS)
 
 $(LIBRARY).o:
-	$(DLLTOOL) --output-exp $(LIBRARY).o $(LIBOBJS)
+	$(DLLTOOL) -D $(LIBRARY) --output-exp $(LIBRARY).o $(LIBOBJS)
 
 # Generates library.dll.a; by MinGW conventions, this is the dll's import library
 $(LIBRARY).a: $(LIBOBJS) $(LIBRARY).def
-	$(DLLTOOL) --def $(LIBRARY).def --output-lib $@
+	$(DLLTOOL) -D $(LIBRARY) --def $(LIBRARY).def --output-lib $@
 
 #
 # Version information is baked into a DLL by having the DLL include DllVersionInfo.o.
