@@ -463,6 +463,23 @@ typedef struct _RtsSymbolVal {
       SymX(stg_ap_pppppp_ret)
 #endif
 
+/* On Windows, we link libgmp.a statically into libHSrts.dll */
+#ifdef mingw32_HOST_OS
+#define GMP_SYMS				\
+      SymX(__gmpz_cmp)				\
+      SymX(__gmpz_cmp_si)			\
+      SymX(__gmpz_cmp_ui)			\
+      SymX(__gmpz_get_si)			\
+      SymX(__gmpz_get_ui)
+#else
+#define GMP_SYMS				\
+      SymExtern(__gmpz_cmp)			\
+      SymExtern(__gmpz_cmp_si)			\
+      SymExtern(__gmpz_cmp_ui)			\
+      SymExtern(__gmpz_get_si)			\
+      SymExtern(__gmpz_get_ui)
+#endif
+
 #define RTS_SYMBOLS				\
       Maybe_Stable_Names			\
       Sym(StgReturn)				\
@@ -502,12 +519,7 @@ typedef struct _RtsSymbolVal {
       SymX(__encodeDouble)			\
       SymX(__encodeFloat)			\
       SymX(addDLL)               		\
-      SymExtern(__gmpn_gcd_1)			\
-      SymExtern(__gmpz_cmp)			\
-      SymExtern(__gmpz_cmp_si)			\
-      SymExtern(__gmpz_cmp_ui)			\
-      SymExtern(__gmpz_get_si)			\
-      SymExtern(__gmpz_get_ui)			\
+      GMP_SYMS					\
       SymX(__int_encodeDouble)			\
       SymX(__int_encodeFloat)			\
       SymX(andIntegerzh_fast)			\

@@ -28,6 +28,7 @@
 #include "Cmm.h"
 
 #ifdef __PIC__
+#ifndef mingw32_HOST_OS
 import __gmpz_init;
 import __gmpz_add;
 import __gmpz_sub;
@@ -44,6 +45,7 @@ import __gmpz_and;
 import __gmpz_xor;
 import __gmpz_ior;
 import __gmpz_com;
+#endif
 import base_GHCziIOBase_NestedAtomically_closure;
 import pthread_mutex_lock;
 import pthread_mutex_unlock;
