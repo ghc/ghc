@@ -222,7 +222,8 @@ emptyStackMap = StackMap [0..maxSpillSlots] emptyUFM
 
 getStackSlotFor :: StackMap -> Unique -> (StackMap,Int)
 getStackSlotFor (StackMap [] _) _
-	= panic "RegAllocLinear.getStackSlotFor: out of stack slots"
+	= panic "RegAllocLinear.getStackSlotFor: out of stack slots, try -fregs-graph"
+        -- This happens with darcs' SHA1.hs, see #1993
 
 getStackSlotFor fs@(StackMap (freeSlot:stack') reserved) reg =
     case lookupUFM reserved reg of
