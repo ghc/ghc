@@ -752,13 +752,16 @@ nonEmptySubsequences (x:xs)  =  [x] : foldr f [] (nonEmptySubsequences xs)
 
 -- | The 'permutations' function returns the list of all permutations of the argument.
 --
--- > permutations "abc" == ["abc","bac","bca","acb","cab","cba"]
+-- > permutations "abc" == ["abc","bac","cba","bca","cab","acb"]
 permutations            :: [a] -> [[a]]
-permutations []         =  [[]]
-permutations (x:xs)     =  [zs | ys <- permutations xs, zs <- interleave x ys ]
-  where interleave          :: a -> [a] -> [[a]]
-        interleave x []     =  [[x]]
-        interleave x (y:ys) =  [x:y:ys] ++ map (y:) (interleave x ys)
+permutations xs         =  xs : perms xs []
+  where
+    perms []     is = []
+    perms (t:ts) is = foldr interleave (perms ts (t:is)) (permutations is)
+      where interleave    xs     r = let (_,zs) = interleave' id xs r in zs
+            interleave' f []     r = (ts, r)
+            interleave' f (y:ys) r = let (us,zs) = interleave' (f . (y:)) ys r
+                                     in  (y:us, f (t:y:us) : zs)
 
 
 ------------------------------------------------------------------------------
