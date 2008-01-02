@@ -828,8 +828,6 @@ runPhase cc_phase _stop dflags _basename _suff input_fn get_output_fn maybe_loc
 	    split_opt | hcc && split_objs = [ "-DUSE_SPLIT_MARKERS" ]
 		      | otherwise         = [ ]
 
-	let excessPrecision = dopt Opt_ExcessPrecision dflags
-
 	let cc_opt | optLevel dflags >= 2 = "-O2"
 		   | otherwise            = "-O"
 
@@ -848,7 +846,9 @@ runPhase cc_phase _stop dflags _basename _suff input_fn get_output_fn maybe_loc
 	     	-- than a double, which leads to unpredictable results.
 		-- By default, we turn this off with -ffloat-store unless
 		-- the user specified -fexcess-precision.
-		(if excessPrecision then [] else [ "-ffloat-store" ]) ++
+		(if dopt Opt_ExcessPrecision dflags 
+                        then [] 
+                        else [ "-ffloat-store" ]) ++
 #endif
 		-- gcc's -fstrict-aliasing allows two accesses to memory
 		-- to be considered non-aliasing if they have different types.
