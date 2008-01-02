@@ -5,13 +5,6 @@
 \section[Coverage]{@coverage@: the main function}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Coverage (addCoverageTicksToBinds) where
 
 #include "HsVersions.h"
@@ -31,14 +24,10 @@ import Data.List
 import FastString
 import HscTypes	
 import StaticFlags
-import UniqFM
-import Type
 import TyCon
 import FiniteMap
-import PackageConfig 
 
 import Data.Array
-import System.Time (ClockTime(..))
 import System.IO   (FilePath)
 #if __GLASGOW_HASKELL__ < 603
 import Compat.Directory ( createDirectoryIfMissing )
@@ -148,14 +137,14 @@ addTickLHsBinds :: LHsBinds Id -> TM (LHsBinds Id)
 addTickLHsBinds binds = mapBagM addTickLHsBind binds
 
 addTickLHsBind :: LHsBind Id -> TM (LHsBind Id)
-addTickLHsBind (L pos t@(AbsBinds abs_tvs abs_dicts abs_exports abs_binds)) = do
+addTickLHsBind (L pos (AbsBinds abs_tvs abs_dicts abs_exports abs_binds)) = do
   abs_binds' <- addTickLHsBinds abs_binds
   return $ L pos $ AbsBinds abs_tvs abs_dicts abs_exports abs_binds'
 addTickLHsBind (L pos (funBind@(FunBind { fun_id = (L _ id)  }))) = do 
   let name = getOccString id
   decl_path <- getPathEntry
 
-  (fvs, mg@(MatchGroup matches' ty)) <- 
+  (fvs, (MatchGroup matches' ty)) <- 
         getFreeVars $
         addPathEntry name $
         addTickMatchGroup (fun_matches funBind)
@@ -245,7 +234,7 @@ isGoodBreakExpr (RecordCon {}) = True
 isGoodBreakExpr (RecordUpd {}) = True
 isGoodBreakExpr (ArithSeq {})  = True
 isGoodBreakExpr (PArrSeq {})   = True
-isGoodBreakExpr other          = False 
+isGoodBreakExpr _other         = False 
 
 addTickLHsExprOptAlt :: Bool -> LHsExpr Id -> TM (LHsExpr Id)
 addTickLHsExprOptAlt oneOfMany (L pos e0)
@@ -264,7 +253,7 @@ addTickHsExpr e@(HsVar id) = do freeVar id; return e
 addTickHsExpr e@(HsIPVar _) = return e
 addTickHsExpr e@(HsOverLit _) = return e
 addTickHsExpr e@(HsLit _) = return e
-addTickHsExpr e@(HsLam matchgroup) =
+addTickHsExpr (HsLam matchgroup) =
         liftM HsLam (addTickMatchGroup matchgroup)
 addTickHsExpr (HsApp e1 e2) = 
 	liftM2 HsApp (addTickLHsExprNever e1) (addTickLHsExpr e2)
@@ -341,7 +330,7 @@ addTickHsExpr (ArithSeq	 ty arith_seq) =
 	liftM2 ArithSeq	
 		(return ty)
 		(addTickArithSeqInfo arith_seq)
-addTickHsExpr (HsTickPragma (file,(l1,c1),(l2,c2)) (L pos e0)) = do
+addTickHsExpr (HsTickPragma _ (L pos e0)) = do
     e2 <- allocTickBox (ExpBox False) pos $
                 addTickHsExpr e0
     return $ unLoc e2
@@ -381,16 +370,12 @@ addTickHsExpr (HsArrForm e fix cmdtop) =
 	       (return fix)
 	       (mapM (liftL (addTickHsCmdTop)) cmdtop)
 
-addTickHsExpr e@(HsType ty) = return e
+addTickHsExpr e@(HsType _) = return e
 
 -- Others dhould never happen in expression content.
-addTickHsExpr e@(ExprWithTySig {}) = pprPanic "addTickHsExpr" (ppr e)
-addTickHsExpr e@(EAsPat _ _)       = pprPanic "addTickHsExpr" (ppr e)
-addTickHsExpr e@(ELazyPat _)       = pprPanic "addTickHsExpr" (ppr e)
-addTickHsExpr e@(EWildPat)         = pprPanic "addTickHsExpr" (ppr e)
-addTickHsExpr e@(HsBinTick _ _ _)  = pprPanic "addTickHsExpr" (ppr e)
-addTickHsExpr e@(HsTick _ _ _)     = pprPanic "addTickHsExpr" (ppr e)
+addTickHsExpr e  = pprPanic "addTickHsExpr" (ppr e)
 
+addTickMatchGroup :: MatchGroup Id -> TM (MatchGroup Id)
 addTickMatchGroup (MatchGroup matches ty) = do
   let isOneOfMany = matchesOneOfMany matches
   matches' <- mapM (liftL (addTickMatch isOneOfMany)) matches
@@ -434,7 +419,7 @@ addTickLStmts' isGuard lstmts res
         binders = map unLoc (collectLStmtsBinders lstmts)
 
 addTickStmt :: (Maybe (Bool -> BoxLabel)) -> Stmt Id -> TM (Stmt Id)
-addTickStmt isGuard (BindStmt pat e bind fail) = do
+addTickStmt _isGuard (BindStmt pat e bind fail) = do
 	liftM4 BindStmt
 		(addTickLPat pat)
 		(addTickLHsExprAlways e)
@@ -445,7 +430,7 @@ addTickStmt isGuard (ExprStmt e bind' ty) = do
 		(addTick isGuard e)
 		(addTickSyntaxExpr hpcSrcSpan bind')
 		(return ty)
-addTickStmt isGuard (LetStmt binds) = do
+addTickStmt _isGuard (LetStmt binds) = do
 	liftM LetStmt
 		(addTickHsLocalBinds binds)
 addTickStmt isGuard (ParStmt pairs) = do
@@ -478,9 +463,12 @@ addTickStmt isGuard (RecStmt stmts ids1 ids2 tys dictbinds) = do
 		(return tys)
 		(addTickDictBinds dictbinds)
 
+addTick :: Maybe (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
 addTick isGuard e | Just fn <- isGuard = addBinTickLHsExpr fn e
                   | otherwise          = addTickLHsExprAlways e
 
+addTickStmtAndBinders :: Maybe (Bool -> BoxLabel) -> ([LStmt Id], a) 
+                      -> TM ([LStmt Id], a)
 addTickStmtAndBinders isGuard (stmts, ids) = 
     liftM2 (,) 
         (addTickLStmts isGuard stmts)
@@ -501,6 +489,7 @@ addTickHsLocalBinds (HsIPBinds binds)  =
 		(addTickHsIPBinds binds)
 addTickHsLocalBinds (EmptyLocalBinds)  = return EmptyLocalBinds
 
+addTickHsValBinds :: HsValBindsLR Id a -> TM (HsValBindsLR Id b)
 addTickHsValBinds (ValBindsOut binds sigs) =
 	liftM2 ValBindsOut
 		(mapM (\ (rec,binds') -> 
@@ -509,7 +498,9 @@ addTickHsValBinds (ValBindsOut binds sigs) =
 					(addTickLHsBinds binds'))
 			binds)
 		(return sigs)
+addTickHsValBinds _ = panic "addTickHsValBinds"
 
+addTickHsIPBinds :: HsIPBinds Id -> TM (HsIPBinds Id)
 addTickHsIPBinds (IPBinds ipbinds dictbinds) =
 	liftM2 IPBinds
 		(mapM (liftL (addTickIPBind)) ipbinds)
@@ -586,6 +577,7 @@ data TickTransEnv = TTE { fileName      :: FastString
 --	deriving Show
 
 type FreeVars = OccEnv Id
+noFVs :: FreeVars
 noFVs = emptyOccEnv
 
 -- Note [freevars]
@@ -605,7 +597,7 @@ data TM a = TM { unTM :: TickTransEnv -> TickTransState -> (a,FreeVars,TickTrans
         -- monad (FreeVars).
 
 instance Monad TM where
-  return a = TM $ \ env st -> (a,noFVs,st)
+  return a = TM $ \ _env st -> (a,noFVs,st)
   (TM m) >>= k = TM $ \ env st -> 
 		                case m env st of
 				  (r1,fv1,st1) -> 
@@ -616,8 +608,8 @@ instance Monad TM where
 -- getState :: TM TickTransState
 -- getState = TM $ \ env st -> (st, noFVs, st)
 
-setState :: (TickTransState -> TickTransState) -> TM ()
-setState f = TM $ \ env st -> ((), noFVs, f st)
+-- setState :: (TickTransState -> TickTransState) -> TM ()
+-- setState f = TM $ \ env st -> ((), noFVs, f st)
 
 getEnv :: TM TickTransEnv
 getEnv = TM $ \ env st -> (env, noFVs, st)
@@ -674,7 +666,7 @@ allocTickBox boxLabel pos m | isGoodSrcSpan' pos =
   sameFileName pos 
     (do e <- m; return (L pos e)) $ do
   (fvs, e) <- getFreeVars m
-  TM $ \ env st ->
+  TM $ \ _env st ->
     let c = tickBoxCount st
         ids = occEnvElts fvs
         mes = mixEntries st
@@ -684,14 +676,14 @@ allocTickBox boxLabel pos m | isGoodSrcSpan' pos =
     , fvs
     , st {tickBoxCount=c+1,mixEntries=me:mes}
     )
-allocTickBox boxLabel pos m = do e <- m; return (L pos e)
+allocTickBox _boxLabel pos m = do e <- m; return (L pos e)
 
 -- the tick application inherits the source position of its
 -- expression argument to support nested box allocations 
 allocATickBox :: BoxLabel -> SrcSpan -> FreeVars -> TM (Maybe (Int,[Id]))
 allocATickBox boxLabel pos fvs | isGoodSrcSpan' pos = 
   sameFileName pos 
-    (return Nothing) $ TM $ \ env st ->
+    (return Nothing) $ TM $ \ _env st ->
   let me = (pos, map (nameOccName.idName) ids, boxLabel)
       c = tickBoxCount st
       mes = mixEntries st
@@ -700,10 +692,10 @@ allocATickBox boxLabel pos fvs | isGoodSrcSpan' pos =
      , noFVs
      , st {tickBoxCount=c+1, mixEntries=me:mes}
      )
-allocATickBox boxLabel pos fvs = return Nothing
+allocATickBox _boxLabel _pos _fvs = return Nothing
 
 allocBinTickBox :: (Bool -> BoxLabel) -> LHsExpr Id -> TM (LHsExpr Id)
-allocBinTickBox boxLabel (L pos e) | isGoodSrcSpan' pos = TM $ \ env st ->
+allocBinTickBox boxLabel (L pos e) | isGoodSrcSpan' pos = TM $ \ _env st ->
   let meT = (pos,[],boxLabel True)
       meF = (pos,[],boxLabel False)
       meE = (pos,[],ExpBox False)
@@ -724,8 +716,9 @@ allocBinTickBox boxLabel (L pos e) | isGoodSrcSpan' pos = TM $ \ env st ->
              , st {tickBoxCount=c+1,mixEntries=meE:mes}
              )
 
-allocBinTickBox boxLabel e = return e
+allocBinTickBox _boxLabel e = return e
 
+isGoodSrcSpan' :: SrcSpan -> Bool
 isGoodSrcSpan' pos
    | not (isGoodSrcSpan pos) = False
    | start == end            = False
@@ -747,8 +740,7 @@ mkHpcPos pos
 		     , srcLocCol end
 		     )
 
-noHpcPos = toHpcPos (0,0,0,0)
-
+hpcSrcSpan :: SrcSpan
 hpcSrcSpan = mkGeneralSrcSpan (FSLIT("Haskell Program Coverage internals"))
 \end{code}
 
