@@ -27,6 +27,7 @@ import HscTypes		( IsBootInterface, DeprecTxt )
 import Lexer
 import RdrName
 import TysWiredIn	( unitTyCon, unitDataCon, tupleTyCon, tupleCon, nilDataCon,
+			  unboxedSingletonTyCon, unboxedSingletonDataCon,
 			  listTyCon_RDR, parrTyCon_RDR, consDataCon_RDR )
 import Type		( funTyCon )
 import ForeignCall	( Safety(..), CExportSpec(..), CLabelString,
@@ -1655,6 +1656,8 @@ con	:: { Located RdrName }
 sysdcon	:: { Located DataCon }	-- Wired in data constructors
 	: '(' ')'		{ LL unitDataCon }
 	| '(' commas ')'	{ LL $ tupleCon Boxed $2 }
+	| '(#' '#)'		{ LL $ unboxedSingletonDataCon }
+	| '(#' commas '#)'	{ LL $ tupleCon Unboxed $2 }
 	| '[' ']'		{ LL nilDataCon }
 
 conop :: { Located RdrName }
@@ -1672,6 +1675,8 @@ gtycon 	:: { Located RdrName }	-- A "general" qualified tycon
 	: oqtycon			{ $1 }
 	| '(' ')'			{ LL $ getRdrName unitTyCon }
 	| '(' commas ')'		{ LL $ getRdrName (tupleTyCon Boxed $2) }
+	| '(#' '#)'			{ LL $ getRdrName unboxedSingletonTyCon }
+	| '(#' commas '#)'		{ LL $ getRdrName (tupleTyCon Unboxed $2) }
 	| '(' '->' ')'			{ LL $ getRdrName funTyCon }
 	| '[' ']'			{ LL $ listTyCon_RDR }
 	| '[:' ':]'			{ LL $ parrTyCon_RDR }
