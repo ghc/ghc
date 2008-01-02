@@ -736,10 +736,19 @@ tails xxs@(_:xs)        =  xxs : tails xs
 
 -- | The 'subsequences' function returns the list of all subsequences of the argument.
 --
--- > subsequences "abc" == ["","c","b","bc","a","ac","ab","abc"]
+-- > subsequences "abc" == ["","a","b","ab","c","ac","bc","abc"]
 subsequences            :: [a] -> [[a]]
-subsequences []         =  [[]]
-subsequences (x:xs)     =  subsequences xs ++ map (x:) (subsequences xs)
+subsequences xs         =  [] : nonEmptySubsequences xs
+
+-- | The 'nonEmptySubsequences' function returns the list of all subsequences of the argument,
+--   except for the empty list.
+--
+-- > nonEmptySubsequences "abc" == ["a","b","ab","c","ac","bc","abc"]
+nonEmptySubsequences         :: [a] -> [[a]]
+nonEmptySubsequences []      =  []
+nonEmptySubsequences (x:xs)  =  [x] : foldr f [] (nonEmptySubsequences xs)
+  where f ys r = ys : (x : ys) : r
+
 
 -- | The 'permutations' function returns the list of all permutations of the argument.
 --
