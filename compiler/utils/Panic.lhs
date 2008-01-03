@@ -135,7 +135,7 @@ Panics and asserts.
 
 \begin{code}
 panic, pgmError :: String -> a
-panic    x = trace ("Panic (" ++ x ++ ")") (Exception.throwDyn (Panic x))
+panic    x = Exception.throwDyn (Panic x)
 pgmError x = Exception.throwDyn (ProgramError x)
 
 --  #-versions because panic can't return an unboxed int, and that's
