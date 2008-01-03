@@ -1347,13 +1347,6 @@
 	    </row>
 
 	    <row>
-	      <entry><option>-funfolding-update-in-place</option></entry>
-	      <entry>Tweak unfolding settings</entry>
-	      <entry>static</entry>
-	      <entry><option>-fno-unfolding-update-in-place</option></entry>
-	    </row>
-
-	    <row>
 	      <entry><option>-funfolding-use-threshold</option></entry>
 	      <entry>Tweak unfolding settings</entry>
 	      <entry>static</entry>

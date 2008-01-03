@@ -375,7 +375,6 @@ isStaticFlag f =
 	"fruntime-types",
 	"fno-pre-inlining",
 	"fexcess-precision",
-	"funfolding-update-in-place",
 	"static",
 	"fhardwire-lib-paths",
 	"funregisterised",

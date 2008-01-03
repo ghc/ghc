@@ -1602,24 +1602,6 @@ f "2"    = 2
 
 	<varlistentry>
 	  <term>
-            <option>-funfolding-update-in-place=<replaceable>n</replaceable></option>
-            <indexterm><primary><option>-funfolding-update-in-place</option></primary></indexterm>
-          </term>
-	  <listitem>
-	    <para>Switches on an experimental "optimisation".
-            Switching it on makes the compiler a little keener to
-            inline a function that returns a constructor, if the
-            context is that of a thunk.
-<programlisting>
-   x = plusInt a b
-</programlisting>
-            If we inlined plusInt we might get an opportunity to use
-            update-in-place for the thunk 'x'.</para>
-	  </listitem>
-	</varlistentry>
-
-	<varlistentry>
-	  <term>
             <option>-funfolding-creation-threshold=<replaceable>n</replaceable></option>:
 	    <indexterm><primary><option>-funfolding-creation-threshold</option></primary></indexterm>
 	    <indexterm><primary>inlining, controlling</primary></indexterm>
