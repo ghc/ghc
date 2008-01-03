@@ -56,6 +56,9 @@ extra-libraries:		"m"		/* for ldexp() */
 #if USE_PAPI
 			     , "papi"
 #endif
+#ifdef USE_LIBFFI
+			      , "ffi"
+#endif
 
 #ifdef INSTALLING
 include-dirs:		INCLUDE_DIR GMP_INCLUDE_DIRS

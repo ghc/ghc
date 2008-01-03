@@ -148,6 +148,11 @@ SRC_CC_OPTS += -DNOSMP
 SRC_HC_OPTS += -optc-DNOSMP
 endif
 
+ifeq "$(UseLibFFI)" "YES"
+SRC_CC_OPTS += -DUSE_LIBFFI
+PACKAGE_CPP_OPTS += -DUSE_LIBFFI
+endif
+
 ifneq "$(DYNAMIC_RTS)" "YES"
 SRC_HC_OPTS += -static
 else

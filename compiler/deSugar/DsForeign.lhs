@@ -45,6 +45,8 @@ import BasicTypes
 import SrcLoc
 import Outputable
 import FastString
+import Config
+import Constants
 
 import Data.Maybe
 import Data.List
@@ -271,7 +273,7 @@ dsFExport :: Id			-- Either the exported Id,
 				-- 	   the first argument's stable pointer
 	  -> DsM ( SDoc		-- contents of Module_stub.h
 		 , SDoc		-- contents of Module_stub.c
-		 , [MachRep]    -- primitive arguments expected by stub function
+		 , String       -- string describing type to pass to createAdj.
 		 , Int		-- size of args to stub function
 		 )
 
@@ -353,7 +355,7 @@ dsFExportDynamic id cconv
      dsLookupGlobalId bindIOName		`thenDs` \ bindIOId ->
      newSysLocalDs stable_ptr_ty		`thenDs` \ stbl_value ->
      dsFExport id export_ty fe_nm cconv True  	
-		`thenDs` \ (h_code, c_code, arg_reps, args_size) ->
+		`thenDs` \ (h_code, c_code, typestring, args_size) ->
      let
        {-
         The arguments to the external function which will
@@ -365,18 +367,12 @@ dsFExportDynamic id cconv
       adj_args      = [ mkIntLitInt (ccallConvToInt cconv)
 		      , Var stbl_value
 		      , mkLit (MachLabel fe_nm mb_sz_args)
-                      , mkLit (mkStringLit arg_type_info)
+                      , mkLit (mkStringLit typestring)
 		      ]
         -- name of external entry point providing these services.
 	-- (probably in the RTS.) 
       adjustor	 = FSLIT("createAdjustor")
       
-      arg_type_info = map repCharCode arg_reps
-      repCharCode F32 = 'f'
-      repCharCode F64 = 'd'
-      repCharCode I64 = 'l'
-      repCharCode _   = 'i'
-
 	-- Determine the number of bytes of arguments to the stub function,
 	-- so that we can attach the '@N' suffix to its label if it is a
 	-- stdcall on Windows.
@@ -435,12 +431,11 @@ mkFExportCBits :: FastString
 	       -> CCallConv 
 	       -> (SDoc, 
 		   SDoc,
-		   [MachRep], 	-- the argument reps
+		   String, 	-- the argument reps
 		   Int		-- total size of arguments
 		  )
 mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc 
- = (header_bits, c_bits, 
-    [rep | (_,_,_,rep) <- arg_info],  -- just the real args
+ = (header_bits, c_bits, type_string,
     sum [ machRepByteWidth rep | (_,_,_,rep) <- aug_arg_info] -- all the args
     )
  where
@@ -449,9 +444,28 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 		SDoc,		-- C type
 	        Type,		-- Haskell type
 		MachRep)]	-- the MachRep
-  arg_info  = [ (text ('a':show n), showStgType ty, ty, 
+  arg_info  = [ let stg_type = showStgType ty in
+                (arg_cname n stg_type,
+                 stg_type,
+                 ty, 
 		 typeMachRep (getPrimTyOf ty))
 	      | (ty,n) <- zip arg_htys [1::Int ..] ]
+
+  arg_cname n stg_ty
+        | libffi    = char '*' <> parens (stg_ty <> char '*') <> 
+                      ptext SLIT("args") <> brackets (int (n-1))
+        | otherwise = text ('a':show n)
+
+  -- generate a libffi-style stub if this is a "wrapper" and libffi is enabled
+  libffi = cLibFFI && isNothing maybe_target
+
+  type_string
+      -- libffi needs to know the result type too:
+      | libffi    = primTyDescChar res_hty : arg_type_string
+      | otherwise = arg_type_string
+
+  arg_type_string = [primTyDescChar ty | (_,_,ty,_) <- arg_info]
+                -- just the real args
 
   -- add some auxiliary args; the stable ptr in the wrapper case, and
   -- a slot for the dummy return address in the wrapper + ccall case
@@ -476,7 +490,12 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   header_bits = ptext SLIT("extern") <+> fun_proto <> semi
 
-  fun_proto = cResType <+> pprCconv <+> ftext c_nm <>
+  fun_proto
+    | libffi
+      = ptext SLIT("void") <+> ftext c_nm <> 
+          parens (ptext SLIT("void *cif STG_UNUSED, void* resp, void** args, void* the_stableptr"))
+    | otherwise
+      = cResType <+> pprCconv <+> ftext c_nm <>
 	      parens (hsep (punctuate comma (map (\(nm,ty,_,_) -> ty <+> nm) 
                                                  aug_arg_info)))
 
@@ -519,30 +538,33 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
     fun_proto  $$
     vcat 
      [ lbrace
-     ,   text "Capability *cap;"
+     ,   ptext SLIT("Capability *cap;")
      ,   declareResult
      ,   declareCResult
      ,   text "cap = rts_lock();"
 	  -- create the application + perform it.
-     ,   text "cap=rts_evalIO" <> parens (
+     ,   ptext SLIT("cap=rts_evalIO") <> parens (
 		cap <>
-		text "rts_apply" <> parens (
+		ptext SLIT("rts_apply") <> parens (
 		    cap <>
 		    text "(HaskellObj)"
-	         <> text (if is_IO_res_ty 
-				then "runIO_closure" 
-				else "runNonIO_closure")
+	         <> ptext (if is_IO_res_ty 
+				then SLIT("runIO_closure")
+				else SLIT("runNonIO_closure"))
 		 <> comma
         	 <> expr_to_run
 		) <+> comma
 	       <> text "&ret"
 	     ) <> semi
-     ,   text "rts_checkSchedStatus" <> parens (doubleQuotes (ftext c_nm)
+     ,   ptext SLIT("rts_checkSchedStatus") <> parens (doubleQuotes (ftext c_nm)
 						<> comma <> text "cap") <> semi
      ,   assignCResult
-     ,   text "rts_unlock(cap);"
+     ,   ptext SLIT("rts_unlock(cap);")
      ,   if res_hty_is_unit then empty
-            else text "return cret;"
+            else if libffi 
+                  then char '*' <> parens (cResType <> char '*') <> 
+                       ptext SLIT("resp = cret;")
+                  else ptext SLIT("return cret;")
      , rbrace
      ]
 
@@ -628,4 +650,26 @@ getPrimTyOf ty
      _other -> pprPanic "DsForeign.getPrimTyOf" (ppr ty)
   where
 	rep_ty = repType ty
+
+-- represent a primitive type as a Char, for building a string that
+-- described the foreign function type.  The types are size-dependent,
+-- e.g. 'W' is a signed 32-bit integer.
+primTyDescChar :: Type -> Char
+primTyDescChar ty
+ | ty `coreEqType` unitTy = 'v'
+ | otherwise
+ = case typePrimRep (getPrimTyOf ty) of
+     IntRep	 -> signed_word
+     WordRep     -> unsigned_word
+     Int64Rep    -> 'L'
+     Word64Rep   -> 'l'
+     AddrRep     -> unsigned_word
+     FloatRep    -> 'f'
+     DoubleRep   -> 'd'
+     _           -> pprPanic "primTyDescChar" (ppr ty)
+  where
+    (signed_word, unsigned_word)
+       | wORD_SIZE == 4  = ('W','w')
+       | wORD_SIZE == 8  = ('L','l')
+       | otherwise       = panic "primTyDescChar"
 \end{code}

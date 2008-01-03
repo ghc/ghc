@@ -276,6 +276,11 @@ ifeq "$(RelocatableBuild)" "YES"
 else
 	@echo "cRelocatableBuild     = False"                 >> $(CONFIG_HS)
 endif
+ifeq "$(UseLibFFI)" "YES"
+	@echo "cLibFFI               = True"                  >> $(CONFIG_HS)
+else
+	@echo "cLibFFI               = False"                 >> $(CONFIG_HS)
+endif
 	@echo done.
 
 CLEAN_FILES += $(CONFIG_HS)

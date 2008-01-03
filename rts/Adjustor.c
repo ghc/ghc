@@ -6,7 +6,7 @@
  * ---------------------------------------------------------------------------*/
 
 /* A little bit of background...
-
+   
 An adjustor thunk is a dynamically allocated code snippet that allows
 Haskell closures to be viewed as C function pointers. 
 
@@ -32,7 +32,7 @@ action. User code should never have to invoke it explicitly.
 
 An adjustor thunk differs from a C function pointer in one respect: when
 the code is through with it, it has to be freed in order to release Haskell
-and C resources. Failure to do so result in memory leaks on both the C and
+and C resources. Failure to do so will result in memory leaks on both the C and
 Haskell side.
 */
 
@@ -41,6 +41,89 @@ Haskell side.
 #include "RtsExternal.h"
 #include "RtsUtils.h"
 #include <stdlib.h>
+
+#if defined(USE_LIBFFI)
+
+#include <ffi.h>
+#include <string.h>
+
+void
+freeHaskellFunctionPtr(void* ptr)
+{
+    ffi_closure *cl;
+
+    cl = (ffi_closure*)ptr;
+    freeStablePtr(cl->user_data);
+    stgFree(cl->cif->arg_types);
+    stgFree(cl->cif);
+    freeExec(cl);
+}
+
+static ffi_type * char_to_ffi_type(char c)
+{
+    switch (c) {
+    case 'v':  return &ffi_type_void;
+    case 'f':  return &ffi_type_float;
+    case 'd':  return &ffi_type_double;
+    case 'L':  return &ffi_type_sint64;
+    case 'l':  return &ffi_type_uint64;
+    case 'W':  return &ffi_type_sint32;
+    case 'w':  return &ffi_type_uint32;
+    case 'S':  return &ffi_type_sint16;
+    case 's':  return &ffi_type_uint16;
+    case 'B':  return &ffi_type_sint8;
+    case 'b':  return &ffi_type_uint8;
+    default:   barf("char_to_ffi_type: unknown type '%c'", c);
+    }
+}
+
+void*
+createAdjustor (int cconv, 
+                StgStablePtr hptr,
+                StgFunPtr wptr,
+                char *typeString)
+{
+    ffi_cif *cif;
+    ffi_type **arg_types;
+    nat n_args, i;
+    ffi_type *result_type;
+    ffi_closure *cl;
+    int r, abi;
+
+    n_args = strlen(typeString) - 1;
+    cif = stgMallocBytes(sizeof(ffi_cif), "createAdjustor");
+    arg_types = stgMallocBytes(n_args * sizeof(ffi_type*), "createAdjustor");
+
+    result_type = char_to_ffi_type(typeString[0]);
+    for (i=0; i < n_args; i++) {
+        arg_types[i] = char_to_ffi_type(typeString[i+1]);
+    }
+    switch (cconv) {
+#ifdef mingw32_TARGET_OS
+    case 0: /* stdcall */
+        abi = FFI_STDCALL;
+        break;
+#endif
+    case 1: /* ccall */
+        abi = FFI_DEFAULT_ABI;
+        break;
+    default:
+        barf("createAdjustor: convention %d not supported on this platform", cconv);
+    }
+
+    r = ffi_prep_cif(cif, abi, n_args, result_type, arg_types);
+    if (r != FFI_OK) barf("ffi_prep_cif failed: %d", r);
+    
+    // ToDo: use ffi_closure_alloc()
+    cl = allocateExec(sizeof(ffi_closure));
+
+    r = ffi_prep_closure(cl, cif, (void*)wptr, hptr/*userdata*/);
+    if (r != FFI_OK) barf("ffi_prep_closure failed: %d", r);
+
+    return (void*)cl;
+}
+
+#else // To end of file...
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -220,6 +303,7 @@ static int totalArgumentSize(char *typeString)
                 // on 32-bit platforms, Double and Int64 occupy two words.
             case 'd':
             case 'l':
+            case 'L':
                 if(sizeof(void*) == 4)
                 {
                     sz += 2;
@@ -424,7 +508,7 @@ createAdjustor(int cconv, StgStablePtr hptr,
 	// determine whether we have 6 or more integer arguments,
 	// and therefore need to flush one to the stack.
 	for (c = typeString; *c != '\0'; c++) {
-	    if (*c == 'i' || *c == 'l') i++;
+	    if (*c != 'f' && *c != 'd') i++;
 	    if (i == 6) break;
 	}
 
@@ -618,48 +702,48 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
                 src_locs[i] = dst_locs[i] = -32-(fpr++);
             else
             {
-                if(t == 'l' && src_gpr <= 9)
+                if((t == 'l' || t == 'L') && src_gpr <= 9)
                 {
                     if((src_gpr & 1) == 0)
                         src_gpr++;
                     src_locs[i] = -src_gpr;
                     src_gpr += 2;
                 }
-                else if(t == 'i' && src_gpr <= 10)
+                else if((t == 'w' || t == 'W') && src_gpr <= 10)
                 {
                     src_locs[i] = -(src_gpr++);
                 }
                 else
                 {
-                    if(t == 'l' || t == 'd')
+                    if((t == 'l' || t == 'L' || t == 'd')
                     {
                         if(src_offset % 8)
                             src_offset += 4;
                     }
                     src_locs[i] = src_offset;
-                    src_offset += (t == 'l' || t == 'd') ? 8 : 4;
+                    src_offset += (t == 'l' || t == 'L' || t == 'd') ? 8 : 4;
                 }
 
-                if(t == 'l' && dst_gpr <= 9)
+                    if((t == 'l' || t == 'L') && dst_gpr <= 9)
                 {
                     if((dst_gpr & 1) == 0)
                         dst_gpr++;
                     dst_locs[i] = -dst_gpr;
                     dst_gpr += 2;
                 }
-                else if(t == 'i' && dst_gpr <= 10)
+                else if((t == 'w' || t == 'W') && dst_gpr <= 10)
                 {
                     dst_locs[i] = -(dst_gpr++);
                 }
                 else
                 {
-                    if(t == 'l' || t == 'd')
+                    if(t == 'l' || t == 'L' || t == 'd')
                     {
                         if(dst_offset % 8)
                             dst_offset += 4;
                     }
                     dst_locs[i] = dst_offset;
-                    dst_offset += (t == 'l' || t == 'd') ? 8 : 4;
+                    dst_offset += (t == 'l' || t == 'L' || t == 'd') ? 8 : 4;
                 }
             }
         }
@@ -701,7 +785,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
                     ASSERT(dst_locs[i] > -32);
                         // dst is in GPR, too.
 
-                    if(typeString[i] == 'l')
+                    if(typeString[i] == 'l' || typeString[i] == 'L')
                     {
                             // mr dst+1, src+1
                         *code++ = 0x7c000378
@@ -717,7 +801,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
                 }
                 else
                 {
-                    if(typeString[i] == 'l')
+                    if(typeString[i] == 'l' || typeString[i] == 'L')
                     {
                             // stw src+1, dst_offset+4(r1)
                         *code++ = 0x90010000
@@ -736,7 +820,7 @@ TODO: Depending on how much allocation overhead stgMallocBytes uses for
                 ASSERT(dst_locs[i] >= 0);
                 ASSERT(typeString[i] != 'f' && typeString[i] != 'd');
 
-                if(typeString[i] == 'l')
+                if(typeString[i] == 'l' || typeString[i] == 'L')
                 {
                     // lwz r0, src_offset(r1)
                         *code++ = 0x80010000
@@ -1086,3 +1170,5 @@ if ( *(unsigned char*)ptr != 0xe8 ) {
 
  freeExec(ptr);
 }
+
+#endif // !USE_LIBFFI
