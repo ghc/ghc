@@ -206,7 +206,7 @@ lockClosure(StgClosure *p)
 }
 
 INLINE_HEADER void
-unlockClosure(StgClosure *p, StgInfoTable *info)
+unlockClosure(StgClosure *p, const StgInfoTable *info)
 {
     // This is a strictly ordered write, so we need a write_barrier():
     write_barrier();
@@ -319,7 +319,7 @@ lockClosure(StgClosure *p)
 { return (StgInfoTable *)p->header.info; }
 
 INLINE_HEADER void
-unlockClosure(StgClosure *p STG_UNUSED, StgInfoTable *info STG_UNUSED)
+unlockClosure(StgClosure *p STG_UNUSED, const StgInfoTable *info STG_UNUSED)
 { /* nothing */ }
 
 // Using macros here means we don't have to ensure the argument is in scope
@@ -336,7 +336,7 @@ INLINE_HEADER void lockTSO(StgTSO *tso)
 { lockClosure((StgClosure *)tso); }
 
 INLINE_HEADER void unlockTSO(StgTSO *tso)
-{ unlockClosure((StgClosure*)tso, (StgInfoTable*)&stg_TSO_info); }
+{ unlockClosure((StgClosure*)tso, (const StgInfoTable *)&stg_TSO_info); }
 
 #endif /* SMP_H */
 
