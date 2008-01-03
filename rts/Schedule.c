@@ -2949,7 +2949,7 @@ checkBlackHoles (Capability *cap)
     t = blackhole_queue;
     while (t != END_TSO_QUEUE) {
 	ASSERT(t->why_blocked == BlockedOnBlackHole);
-	type = get_itbl(t->block_info.closure)->type;
+	type = get_itbl(UNTAG_CLOSURE(t->block_info.closure))->type;
 	if (type != BLACKHOLE && type != CAF_BLACKHOLE) {
 	    IF_DEBUG(sanity,checkTSO(t));
 	    t = unblockOne(cap, t);
