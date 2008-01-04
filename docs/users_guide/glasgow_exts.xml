@@ -5000,9 +5000,13 @@ Type splices are not implemented, and neither are pattern splices or quotations.
    </para></listitem>
 
    <listitem><para>
-   Furthermore, you can only run a function at compile time if it is imported
+   You can only run a function at compile time if it is imported
    from another module <emphasis>that is not part of a mutually-recursive group of modules
-   that includes the module currently being compiled</emphasis>.  For example, when compiling module A,
+   that includes the module currently being compiled</emphasis>.  Furthermore, all of the modules of 
+   the mutually-recursive group must be reachable by non-SOURCE imports from the module where the
+   splice is to be run.</para>
+   <para>
+   For example, when compiling module A,
    you can only run Template Haskell functions imported from B if B does not import A (directly or indirectly).
    The reason should be clear: to run B we must compile and run A, but we are currently type-checking A.
    </para></listitem>
@@ -6374,14 +6378,14 @@ data T = T {-# UNPACK #-} !(Int,Int)
 
       <para>will store the two <literal>Int</literal>s directly in the
       <function>T</function> constructor, by flattening the pair.
-      Multi-level unpacking is also supported:</para>
+      Multi-level unpacking is also supported:
 
 <programlisting>
 data T = T {-# UNPACK #-} !S
 data S = S {-# UNPACK #-} !Int {-# UNPACK #-} !Int
 </programlisting>
 
-      <para>will store two unboxed <literal>Int&num;</literal>s
+      will store two unboxed <literal>Int&num;</literal>s
       directly in the <function>T</function> constructor.  The
       unpacker can see through newtypes, too.</para>
 
@@ -6394,6 +6398,15 @@ data S = S {-# UNPACK #-} !Int {-# UNPACK #-} !Int
       <literal>{-#&nbsp;UNPACK&nbsp;#-}</literal> to every strict
       constructor field.</para>
     </sect2>
+
+    <sect2 id="source-pragma">
+      <title>SOURCE pragma</title>
+
+      <indexterm><primary>SOURCE</primary></indexterm>
+     <para>The <literal>{-# SOURCE #-}</literal> pragma is used only in <literal>import</literal> declarations,
+     to break a module loop.  It is described in detail in <xref linkend="mutual-recursion"/>.
+     </para>
+</sect2>
 
 </sect1>
 

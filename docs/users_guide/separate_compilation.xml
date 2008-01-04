@@ -702,7 +702,10 @@ module B where
       <literal>hi-boot</literal> files</primary></indexterm>
 Here <filename>A</filename> imports <filename>B</filename>, but <filename>B</filename> imports
 <filename>A</filename> with a <literal>{-# SOURCE #-}</literal> pragma, which breaks the
-circular dependency.  For every module <filename>A.hs</filename> that is <literal>{-# SOURCE #-}</literal>-imported
+circular dependency.  Every loop in the module import graph must be broken by a <literal>{-# SOURCE #-}</literal> import;
+or, equivalently, the module import graph must be acyclic if <literal>{-# SOURCE #-}</literal> imports are ignored.
+</para>
+<para>For every module <filename>A.hs</filename> that is <literal>{-# SOURCE #-}</literal>-imported
 in this way there must exist a source file <literal>A.hs-boot</literal>.  This file contains an abbreviated
 version of <filename>A.hs</filename>, thus:
 <programlisting>
