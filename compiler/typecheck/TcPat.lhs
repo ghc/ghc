@@ -867,11 +867,8 @@ refineAlt con pstate ex_tvs [] pat_ty
   = return pstate	-- Common case: no equational constraints
 
 refineAlt con pstate ex_tvs co_vars pat_ty
-  = do	{ opt_gadt <- doptM Opt_GADTs	-- No type-refinement unless GADTs are on
-	; if (not opt_gadt) then return pstate
-	  else do 
-
-	{ checkTc (isRigidTy pat_ty) (nonRigidMatch con)
+  = -- See Note [Flags and equational constraints]
+    do	{ checkTc (isRigidTy pat_ty) (nonRigidMatch con)
 	-- We are matching against a GADT constructor with non-trivial
 	-- constraints, but pattern type is wobbly.  For now we fail.
 	-- We can make sense of this, however:
@@ -899,8 +896,19 @@ refineAlt con pstate ex_tvs co_vars pat_ty
 				vcat [ ppr con <+> ppr ex_tvs,
 				       ppr [(v, tyVarKind v) | v <- co_vars],
 				       ppr reft]
-	} } }
+	} }
 \end{code}
+
+Note [Flags and equational constraints]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+If there are equational constraints, we take account of them
+regardless of flag settings; -XGADTs etc applies only to the
+*definition* of a data type.
+
+An alternative would be also to reject a program that *used*
+constructors with equational constraints.  But want we should avoid at
+all costs is simply to *ignore* the constraints, since that gives
+incomprehensible errors (Trac #2004).
 
 
 %************************************************************************
