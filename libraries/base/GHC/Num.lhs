@@ -32,7 +32,6 @@
 -- #hide
 module GHC.Num where
 
-import {-# SOURCE #-} GHC.Err
 import GHC.Base
 import GHC.Enum
 import GHC.Show

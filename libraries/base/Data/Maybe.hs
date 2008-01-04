@@ -31,7 +31,6 @@ module Data.Maybe
    ) where
 
 #ifdef __GLASGOW_HASKELL__
-import {-# SOURCE #-} GHC.Err ( error )
 import GHC.Base
 #endif
 

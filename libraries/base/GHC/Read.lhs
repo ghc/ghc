@@ -65,7 +65,6 @@ import Text.ParserCombinators.ReadPrec
 import Data.Maybe
 import Data.Either
 
-import {-# SOURCE #-} GHC.Err		( error )
 #ifndef __HADDOCK__
 import {-# SOURCE #-} GHC.Unicode	( isDigit )
 #endif

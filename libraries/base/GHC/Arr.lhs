@@ -17,7 +17,6 @@
 -- #hide
 module GHC.Arr where
 
-import {-# SOURCE #-} GHC.Err ( error )
 import GHC.Enum
 import GHC.Num
 import GHC.ST

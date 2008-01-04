@@ -26,7 +26,6 @@ module GHC.Word (
 
 import Data.Bits
 
-import {-# SOURCE #-} GHC.Err
 import GHC.Base
 import GHC.Enum
 import GHC.Num

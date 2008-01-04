@@ -18,7 +18,6 @@
 -- #hide
 module GHC.Real where
 
-import {-# SOURCE #-} GHC.Err
 import GHC.Base
 import GHC.Num
 import GHC.List
