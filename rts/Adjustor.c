@@ -73,6 +73,7 @@ static ffi_type * char_to_ffi_type(char c)
     case 's':  return &ffi_type_uint16;
     case 'B':  return &ffi_type_sint8;
     case 'b':  return &ffi_type_uint8;
+    case 'p':  return &ffi_type_pointer;
     default:   barf("char_to_ffi_type: unknown type '%c'", c);
     }
 }

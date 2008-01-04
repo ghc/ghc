@@ -656,7 +656,7 @@ primTyDescChar ty
      WordRep     -> unsigned_word
      Int64Rep    -> 'L'
      Word64Rep   -> 'l'
-     AddrRep     -> unsigned_word
+     AddrRep     -> 'p'
      FloatRep    -> 'f'
      DoubleRep   -> 'd'
      _           -> pprPanic "primTyDescChar" (ppr ty)
