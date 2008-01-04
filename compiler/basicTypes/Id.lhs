@@ -289,7 +289,7 @@ isDictId id = isDictTy (idType id)
 -- them at the CorePrep stage. 
 -- EXCEPT: unboxed tuples, which definitely have no binding
 hasNoBinding id = case globalIdDetails id of
-			PrimOpId _  	 -> True
+			PrimOpId _  	 -> True	-- See Note [Primop wrappers]
 			FCallId _   	 -> True
 			DataConWorkId dc -> isUnboxedTupleCon dc
 			other	         -> False
@@ -315,6 +315,21 @@ isImplicitId id
 idIsFrom :: Module -> Id -> Bool
 idIsFrom mod id = nameIsLocalOrFrom mod (idName id)
 \end{code}
+
+Note [Primop wrappers]
+~~~~~~~~~~~~~~~~~~~~~~
+Currently hasNoBinding claims that PrimOpIds don't have a curried
+function definition.  But actually they do, in GHC.PrimopWrappers,
+which is auto-generated from prelude/primops.txt.pp.  So actually, hasNoBinding
+could return 'False' for PrimOpIds.
+
+But we'd need to add something in CoreToStg to swizzle any unsaturated
+applications of GHC.Prim.plusInt# to GHC.PrimopWrappers.plusInt#.
+
+Nota Bene: GHC.PrimopWrappers is needed *regardless*, because it's
+used by GHCi, which does not implement primops direct at all.
+
+
 
 \begin{code}
 isDeadBinder :: Id -> Bool
