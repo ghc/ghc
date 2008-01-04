@@ -729,7 +729,7 @@ computeChangedOccs ver_fn this_module old_usages eq_info
     usg_modmap = listToUFM [ (usg_name usg, listToUFM (usg_entities usg))
                            | usg <- old_usages ]
 
-    get_local_eq_info :: GenIfaceEq NameSet -> GenIfaceEq OccSet
+    get_local_eq_info :: GenIfaceEq Name -> GenIfaceEq OccName
     get_local_eq_info Equal = Equal
     get_local_eq_info NotEqual = NotEqual
     get_local_eq_info (EqBut ns) = foldNameSet f Equal ns
@@ -759,7 +759,7 @@ computeChangedOccs ver_fn this_module old_usages eq_info
         where (occs, iface_eqs) = unzip pairs
     add_changes so_far other = so_far
 
-type OccIfaceEq = GenIfaceEq OccSet
+type OccIfaceEq = GenIfaceEq OccName
 
 instance Outputable OccIfaceEq where
   ppr Equal          = ptext SLIT("Equal")

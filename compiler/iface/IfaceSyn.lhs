@@ -38,6 +38,7 @@ import IfaceType
 import NewDemand
 import Class
 import UniqFM
+import UniqSet
 import NameSet 
 import Name
 import CostCentre
@@ -663,14 +664,14 @@ Of course, equality is also done modulo alpha conversion.
 data GenIfaceEq a
   = Equal 		-- Definitely exactly the same
   | NotEqual		-- Definitely different
-  | EqBut a       -- The same provided these Names have not changed
+  | EqBut (UniqSet a)   -- The same provided these things have not changed
 
-type IfaceEq = GenIfaceEq NameSet
+type IfaceEq = GenIfaceEq Name
 
-instance Outputable IfaceEq where
+instance Outputable a => Outputable (GenIfaceEq a) where
   ppr Equal          = ptext SLIT("Equal")
   ppr NotEqual       = ptext SLIT("NotEqual")
-  ppr (EqBut occset) = ptext SLIT("EqBut") <+> ppr (nameSetToList occset)
+  ppr (EqBut occset) = ptext SLIT("EqBut") <+> ppr (uniqSetToList occset)
 
 bool :: Bool -> IfaceEq
 bool True  = Equal
