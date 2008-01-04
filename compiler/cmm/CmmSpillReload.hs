@@ -360,7 +360,7 @@ instance Outputable m => Outputable (ExtendWithSpills m) where
     ppr (Reload regs) = ppr_regs "Reload" regs
     ppr (NotSpillOrReload m) = ppr m
 
-instance DebugNodes M Last
+instance Outputable m => DebugNodes (ExtendWithSpills m) Last
                                
 ppr_regs :: String -> RegSet -> SDoc
 ppr_regs s regs = text s <+> commafy (map ppr $ uniqSetToList regs)
