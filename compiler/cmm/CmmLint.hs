@@ -137,7 +137,7 @@ lintCmmStmt labels = lint
             lintCmmExpr r
             return ()
           lint (CmmCall target _res args _ _) =
-              lintTarget target >> mapM_ (lintCmmExpr.fst) args
+              lintTarget target >> mapM_ (lintCmmExpr . hintlessCmm) args
           lint (CmmCondBranch e id) = checkTarget id >> lintCmmExpr e >> checkCond e
           lint (CmmSwitch e branches) = do
             mapM_ checkTarget $ catMaybes branches
@@ -145,8 +145,8 @@ lintCmmStmt labels = lint
             if (erep == wordRep)
               then return ()
               else cmmLintErr (text "switch scrutinee is not a word: " <> ppr e)
-          lint (CmmJump e args) = lintCmmExpr e >> mapM_ (lintCmmExpr.fst) args
-          lint (CmmReturn ress) = mapM_ (lintCmmExpr.fst) ress
+          lint (CmmJump e args) = lintCmmExpr e >> mapM_ (lintCmmExpr . hintlessCmm) args
+          lint (CmmReturn ress) = mapM_ (lintCmmExpr . hintlessCmm) ress
           lint (CmmBranch id)    = checkTarget id
           checkTarget id = if elemBlockSet id labels then return ()
                            else cmmLintErr (text "Branch to nonexistent id" <+> ppr id)

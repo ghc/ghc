@@ -256,7 +256,7 @@ addProcPointProtocols procPoints formals g =
           maybe_add_proto (Block id _) env | id == lg_entry g =
               extendBlockEnv env id (Protocol stdArgConvention hinted_formals)
           maybe_add_proto _ env = env
-          hinted_formals = map (\x -> (x, NoHint)) formals
+          hinted_formals = map (\x -> CmmHinted x NoHint) formals
           stdArgConvention = ConventionStandard CmmCallConv Arguments
 
 -- | For now, following a suggestion by Ben Lippmeier, we pass all
@@ -279,7 +279,7 @@ pass_live_vars_as_args procPoints (protos, g) = (protos', g')
               Nothing -> let live = lookupBlockEnv liveness id `orElse`
                                     emptyRegSet -- XXX there's a bug lurking!
                                     -- panic ("no liveness at block " ++ show id)
-                             formals = map (\x->(x,NoHint)) $ uniqSetToList live
+                             formals = map (\x -> CmmHinted x NoHint) $ uniqSetToList live
                          in  extendBlockEnv protos id (Protocol ConventionPrivate formals)
         g' = g { lg_blocks = add_CopyIns protos' (lg_blocks g) }
 

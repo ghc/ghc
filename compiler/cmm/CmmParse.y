@@ -470,10 +470,10 @@ cmm_kind_exprs :: { [ExtFCode CmmActual] }
 	| cmm_kind_expr ',' cmm_kind_exprs	{ $1 : $3 }
 
 cmm_kind_expr :: { ExtFCode CmmActual }
-	: expr				{ do e <- $1; return (e, inferCmmKind e) }
+	: expr				{ do e <- $1; return (CmmHinted e (inferCmmKind e)) }
 	| expr STRING			{% do h <- parseCmmKind $2;
 					      return $ do
-						e <- $1; return (e,h) }
+						e <- $1; return (CmmHinted e h) }
 
 exprs0  :: { [ExtFCode CmmExpr] }
 	: {- empty -}			{ [] }
@@ -497,10 +497,10 @@ cmm_formals :: { [ExtFCode CmmFormal] }
 	| cmm_formal ',' cmm_formals	{ $1 : $3 }
 
 cmm_formal :: { ExtFCode CmmFormal }
-	: local_lreg			{ do e <- $1; return (e, inferCmmKind (CmmReg (CmmLocal e))) }
+	: local_lreg			{ do e <- $1; return (CmmHinted e (inferCmmKind (CmmReg (CmmLocal e)))) }
 	| STRING local_lreg		{% do h <- parseCmmKind $1;
 					      return $ do
-						e <- $2; return (e,h) }
+						e <- $2; return (CmmHinted e h) }
 
 local_lreg :: { ExtFCode LocalReg }
 	: NAME			{ do e <- lookupName $1;
@@ -921,13 +921,13 @@ foreignCall conv_string results_code expr_code args_code vols safety ret
                    (CmmCallee expr' convention) args vols NoC_SRT ret) where
 	        unused = panic "not used by emitForeignCall'"
 
-adjCallTarget :: CCallConv -> CmmExpr -> [(CmmExpr,MachHint)] -> CmmExpr
+adjCallTarget :: CCallConv -> CmmExpr -> [CmmHinted CmmExpr] -> CmmExpr
 #ifdef mingw32_TARGET_OS
 -- On Windows, we have to add the '@N' suffix to the label when making
 -- a call with the stdcall calling convention.
 adjCallTarget StdCallConv (CmmLit (CmmLabel lbl)) args
   = CmmLit (CmmLabel (addLabelSize lbl (sum (map size args))))
-  where size (e,_) = max wORD_SIZE (machRepByteWidth (cmmExprRep e))
+  where size (CmmHinted e _) = max wORD_SIZE (machRepByteWidth (cmmExprRep e))
                  -- c.f. CgForeignCall.emitForeignCall
 #endif
 adjCallTarget _ expr _

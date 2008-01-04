@@ -3054,7 +3054,7 @@ genCCall (CmmPrim MO_WriteBarrier) _ _ = return nilOL
 	-- we keep it this long in order to prevent earlier optimisations.
 
 -- we only cope with a single result for foreign calls
-genCCall (CmmPrim op) [(r,_)] args = do
+genCCall (CmmPrim op) [CmmHinted r _] args = do
   case op of
 	MO_F32_Sqrt -> actuallyInlineFloatOp F32  (GSQRT F32) args
 	MO_F64_Sqrt -> actuallyInlineFloatOp F64 (GSQRT F64) args
@@ -3070,14 +3070,14 @@ genCCall (CmmPrim op) [(r,_)] args = do
 	
 	other_op    -> outOfLineFloatOp op r args
  where
-  actuallyInlineFloatOp rep instr [(x,_)]
+  actuallyInlineFloatOp rep instr [CmmHinted x _]
 	= do res <- trivialUFCode rep instr x
 	     any <- anyReg res
  	     return (any (getRegisterReg (CmmLocal r)))
 
 genCCall target dest_regs args = do
     let
-        sizes               = map (arg_size . cmmExprRep . fst) (reverse args)
+        sizes               = map (arg_size . cmmExprRep . hintlessCmm) (reverse args)
 #if !darwin_TARGET_OS        
         tot_arg_size        = sum sizes
 #else
@@ -3129,7 +3129,7 @@ genCCall target dest_regs args = do
     let
 	-- assign the results, if necessary
 	assign_code []     = nilOL
-	assign_code [(dest,_hint)] = 
+	assign_code [CmmHinted dest _hint] = 
 	  case rep of
 		I64 -> toOL [MOV I32 (OpReg eax) (OpReg r_dest),
 			     MOV I32 (OpReg edx) (OpReg r_dest_hi)]
@@ -3156,10 +3156,10 @@ genCCall target dest_regs args = do
                 | otherwise = x + a - (x `mod` a)
 
 
-    push_arg :: (CmmExpr,MachHint){-current argument-}
+    push_arg :: (CmmHinted CmmExpr){-current argument-}
                     -> NatM InstrBlock  -- code
 
-    push_arg (arg,_hint) -- we don't need the hints on x86
+    push_arg (CmmHinted arg _hint) -- we don't need the hints on x86
       | arg_rep == I64 = do
         ChildCode64 code r_lo <- iselExpr64 arg
         delta <- getDeltaNat
@@ -3213,13 +3213,13 @@ outOfLineFloatOp mop res args
         
       if localRegRep res == F64
         then
-          stmtToInstrs (CmmCall target [(res,FloatHint)] args CmmUnsafe CmmMayReturn)
+          stmtToInstrs (CmmCall target [CmmHinted res FloatHint] args CmmUnsafe CmmMayReturn)
         else do
           uq <- getUniqueNat
           let 
             tmp = LocalReg uq F64 GCKindNonPtr
           -- in
-          code1 <- stmtToInstrs (CmmCall target [(tmp,FloatHint)] args CmmUnsafe CmmMayReturn)
+          code1 <- stmtToInstrs (CmmCall target [CmmHinted tmp FloatHint] args CmmUnsafe CmmMayReturn)
           code2 <- stmtToInstrs (CmmAssign (CmmLocal res) (CmmReg (CmmLocal tmp)))
           return (code1 `appOL` code2)
   where
@@ -3268,7 +3268,8 @@ genCCall (CmmPrim MO_WriteBarrier) _ _ = return nilOL
 	-- write barrier compiles to no code on x86/x86-64; 
 	-- we keep it this long in order to prevent earlier optimisations.
 
-genCCall (CmmPrim op) [(r,_)] args = 
+
+genCCall (CmmPrim op) [CmmHinted r _] args = 
   outOfLineFloatOp op r args
 
 genCCall target dest_regs args = do
@@ -3348,7 +3349,7 @@ genCCall target dest_regs args = do
     let
 	-- assign the results, if necessary
 	assign_code []     = nilOL
-	assign_code [(dest,_hint)] = 
+	assign_code [CmmHinted dest _hint] = 
 	  case rep of
 		F32 -> unitOL (MOV rep (OpReg xmm0) (OpReg r_dest))
 		F64 -> unitOL (MOV rep (OpReg xmm0) (OpReg r_dest))
@@ -3368,16 +3369,16 @@ genCCall target dest_regs args = do
   where
     arg_size = 8 -- always, at the mo
 
-    load_args :: [(CmmExpr,MachHint)]
+    load_args :: [CmmHinted CmmExpr]
 	      -> [Reg] 			-- int regs avail for args
 	      -> [Reg] 			-- FP regs avail for args
 	      -> InstrBlock
-	      -> NatM ([(CmmExpr,MachHint)],[Reg],[Reg],InstrBlock)
+	      -> NatM ([CmmHinted CmmExpr],[Reg],[Reg],InstrBlock)
     load_args args [] [] code     =  return (args, [], [], code)
 	-- no more regs to use
     load_args [] aregs fregs code =  return ([], aregs, fregs, code)
 	-- no more args to push
-    load_args ((arg,hint) : rest) aregs fregs code
+    load_args ((CmmHinted arg hint) : rest) aregs fregs code
 	| isFloatingRep arg_rep = 
 	case fregs of
 	  [] -> push_this_arg
@@ -3395,10 +3396,10 @@ genCCall target dest_regs args = do
 
 	  push_this_arg = do
 	    (args',ars,frs,code') <- load_args rest aregs fregs code
-	    return ((arg,hint):args', ars, frs, code')
+	    return ((CmmHinted arg hint):args', ars, frs, code')
 
     push_args [] code = return code
-    push_args ((arg,hint):rest) code
+    push_args ((CmmHinted arg hint):rest) code
        | isFloatingRep arg_rep = do
 	 (arg_reg, arg_code) <- getSomeReg arg
          delta <- getDeltaNat
@@ -3459,7 +3460,7 @@ genCCall target dest_regs args = do
 
 genCCall target dest_regs argsAndHints = do
     let
-        args = map fst argsAndHints
+        args = map hintlessCmm argsAndHints
     argcode_and_vregs <- mapM arg_to_int_vregs args
     let 
         (argcodes, vregss) = unzip argcode_and_vregs
@@ -3694,7 +3695,7 @@ genCCall target dest_regs argsAndHints
         initialStackOffset = 8
         stackDelta finalStack = roundTo 16 finalStack
 #endif
-	args = map fst argsAndHints
+	args = map hintlessCmm argsAndHints
 	argReps = map cmmExprRep args
 
 	roundTo a x | x `mod` a == 0 = x
@@ -3809,7 +3810,7 @@ genCCall target dest_regs argsAndHints
         moveResult reduceToF32 =
             case dest_regs of
                 [] -> nilOL
-                [(dest, _hint)]
+                [CmmHinted dest _hint]
                     | reduceToF32 && rep == F32 -> unitOL (FRSP r_dest f1)
                     | rep == F32 || rep == F64 -> unitOL (MR r_dest f1)
                     | rep == I64 -> toOL [MR (getHiVRegFromLo r_dest) r3,

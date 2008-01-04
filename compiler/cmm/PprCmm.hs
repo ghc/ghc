@@ -284,7 +284,7 @@ genCondBranch expr ident =
 --
 --     jump foo(a, b, c);
 --
-genJump :: CmmExpr -> [(CmmExpr, MachHint)] -> SDoc
+genJump :: CmmExpr -> [CmmHinted CmmExpr] -> SDoc
 genJump expr args = 
 
     hcat [ ptext SLIT("jump")
@@ -298,18 +298,18 @@ genJump expr args =
          , parens  ( commafy $ map pprHinted args )
          , semi ]
 
-pprHinted :: Outputable a => (a, MachHint) -> SDoc
-pprHinted (a, NoHint)     = ppr a
-pprHinted (a, PtrHint)    = quotes(text "address") <+> ppr a
-pprHinted (a, SignedHint) = quotes(text "signed")  <+> ppr a
-pprHinted (a, FloatHint)  = quotes(text "float")   <+> ppr a
+pprHinted :: Outputable a => (CmmHinted a) -> SDoc
+pprHinted (CmmHinted a NoHint)     = ppr a
+pprHinted (CmmHinted a PtrHint)    = quotes(text "address") <+> ppr a
+pprHinted (CmmHinted a SignedHint) = quotes(text "signed")  <+> ppr a
+pprHinted (CmmHinted a FloatHint)  = quotes(text "float")   <+> ppr a
 
 -- --------------------------------------------------------------------------
 -- Return from a function. [1], Section 6.8.2 of version 1.128
 --
 --     return (a, b, c);
 --
-genReturn :: [(CmmExpr, MachHint)] -> SDoc
+genReturn :: [CmmHinted CmmExpr] -> SDoc
 genReturn args = 
 
     hcat [ ptext SLIT("return")

@@ -15,7 +15,7 @@ where
 
 import CmmExpr
 import Cmm ( GenCmm(..), GenCmmTop(..), CmmStatic, CmmInfo
-           , CmmCallTarget(..), CmmActuals, CmmFormals
+           , CmmCallTarget(..), CmmActuals, CmmFormals, CmmHinted(..)
            , CmmStmt(CmmSwitch) -- imported in order to call ppr
            )
 import PprCmm()
@@ -262,11 +262,11 @@ ppr_target t@(CmmLit _) = ppr t
 ppr_target fn'          = parens (ppr fn')
 
 
-pprHinted :: Outputable a => (a, MachHint) -> SDoc
-pprHinted (a, NoHint)     = ppr a
-pprHinted (a, PtrHint)    = doubleQuotes (text "address") <+> ppr a
-pprHinted (a, SignedHint) = doubleQuotes (text "signed")  <+> ppr a
-pprHinted (a, FloatHint)  = doubleQuotes (text "float")   <+> ppr a
+pprHinted :: Outputable a => CmmHinted a -> SDoc
+pprHinted (CmmHinted a NoHint)     = ppr a
+pprHinted (CmmHinted a PtrHint)    = doubleQuotes (text "address") <+> ppr a
+pprHinted (CmmHinted a SignedHint) = doubleQuotes (text "signed")  <+> ppr a
+pprHinted (CmmHinted a FloatHint)  = doubleQuotes (text "float")   <+> ppr a
 
 pprLast :: Last -> SDoc    
 pprLast stmt = (case stmt of

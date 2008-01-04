@@ -164,7 +164,7 @@ addKilled new_killed live = live `minusUniqSet` new_killed
 -- Liveness of a CmmStmt
 --------------------------------
 cmmFormalsToLiveLocals :: CmmFormals -> [LocalReg]
-cmmFormalsToLiveLocals formals = map fst formals
+cmmFormalsToLiveLocals formals = map hintlessCmm formals
 
 cmmStmtLive :: BlockEntryLiveness -> CmmStmt -> CmmLivenessTransformer
 cmmStmtLive _ (CmmNop) = id
@@ -179,7 +179,7 @@ cmmStmtLive _ (CmmStore expr1 expr2) =
     cmmExprLive expr2 . cmmExprLive expr1
 cmmStmtLive _ (CmmCall target results arguments _ _) =
     target_liveness .
-    foldr ((.) . cmmExprLive) id (map fst arguments) .
+    foldr ((.) . cmmExprLive) id (map hintlessCmm arguments) .
     addKilled (mkUniqSet $ cmmFormalsToLiveLocals results) where
         target_liveness =
             case target of
@@ -197,9 +197,9 @@ cmmStmtLive other_live (CmmSwitch expr targets) =
            id
            (mapCatMaybes id targets))
 cmmStmtLive _ (CmmJump expr params) =
-    const (cmmExprLive expr $ foldr ((.) . cmmExprLive) id (map fst params) $ emptyUniqSet)
+    const (cmmExprLive expr $ foldr ((.) . cmmExprLive) id (map hintlessCmm params) $ emptyUniqSet)
 cmmStmtLive _ (CmmReturn params) =
-    const (foldr ((.) . cmmExprLive) id (map fst params) $ emptyUniqSet)
+    const (foldr ((.) . cmmExprLive) id (map hintlessCmm params) $ emptyUniqSet)
 
 --------------------------------
 -- Liveness of a CmmExpr

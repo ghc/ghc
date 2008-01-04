@@ -719,9 +719,9 @@ cmmStmtConFold stmt
 			        e' <- cmmExprConFold CallReference e
 			        return $ CmmCallee e' conv
 			      other -> return other
-                 args' <- mapM (\(arg, hint) -> do
+                 args' <- mapM (\(CmmHinted arg hint) -> do
                                   arg' <- cmmExprConFold DataReference arg
-                                  return (arg', hint)) args
+                                  return (CmmHinted arg' hint)) args
 	         return $ CmmCall target' regs args' srt returns
 
         CmmCondBranch test dest

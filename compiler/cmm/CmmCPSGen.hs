@@ -228,7 +228,7 @@ continuationToProc (max_stack, update_frame_size, formats) stack_use uniques
                                 foreignCall call_uniques (CmmPrim target)
                                             results arguments
 
-formal_to_actual reg = (CmmReg (CmmLocal reg), NoHint)
+formal_to_actual reg = CmmHinted (CmmReg (CmmLocal reg)) NoHint
 
 foreignCall :: [Unique] -> CmmCallTarget -> CmmFormals -> CmmActuals -> [CmmStmt]
 foreignCall uniques call results arguments =
@@ -236,14 +236,14 @@ foreignCall uniques call results arguments =
     saveThreadState ++
     caller_save ++
     [CmmCall (CmmCallee suspendThread CCallConv)
-		 [ (id,PtrHint) ]
-		 [ (CmmReg (CmmGlobal BaseReg), PtrHint) ]
+		 [ CmmHinted id PtrHint ]
+		 [ CmmHinted (CmmReg (CmmGlobal BaseReg)) PtrHint ]
 		 CmmUnsafe
                  CmmMayReturn,
      CmmCall call results new_args CmmUnsafe CmmMayReturn,
      CmmCall (CmmCallee resumeThread CCallConv)
-                 [ (new_base, PtrHint) ]
-		 [ (CmmReg (CmmLocal id), PtrHint) ]
+                 [ CmmHinted new_base PtrHint ]
+		 [ CmmHinted (CmmReg (CmmLocal id)) PtrHint ]
 		 CmmUnsafe
                  CmmMayReturn,
      -- Assign the result to BaseReg: we
@@ -251,7 +251,7 @@ foreignCall uniques call results arguments =
      CmmAssign (CmmGlobal BaseReg) (CmmReg (CmmLocal new_base))] ++
     caller_load ++
     loadThreadState tso_unique ++
-    [CmmJump (CmmReg spReg) (map (formal_to_actual . fst) results)]
+    [CmmJump (CmmReg spReg) (map (formal_to_actual . hintlessCmm) results)]
     where
       (_, arg_stmts, new_args) =
           loadArgsIntoTemps argument_uniques arguments
@@ -363,12 +363,12 @@ tail_call spRel target arguments
   = store_arguments ++ adjust_sp_reg spRel ++ jump where
     store_arguments =
         [stack_put spRel expr offset
-         | ((expr, _), StackParam offset) <- argument_formats] ++
+         | ((CmmHinted expr _), StackParam offset) <- argument_formats] ++
         [global_put expr global
-         | ((expr, _), RegisterParam global) <- argument_formats]
+         | ((CmmHinted expr _), RegisterParam global) <- argument_formats]
     jump = [CmmJump target arguments]
 
-    argument_formats = assignArguments (cmmExprRep . fst) arguments
+    argument_formats = assignArguments (cmmExprRep . hintlessCmm) arguments
 
 adjust_sp_reg spRel =
     if spRel == 0

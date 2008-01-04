@@ -245,9 +245,9 @@ pprCFunType cconv ress args
    ]
   where
 	res_type [] = ptext SLIT("void")
-	res_type [(one,hint)] = machRepHintCType (localRegRep one) hint
+	res_type [CmmHinted one hint] = machRepHintCType (localRegRep one) hint
 
-	arg_type (expr,hint) = machRepHintCType (cmmExprRep expr) hint
+	arg_type (CmmHinted expr hint) = machRepHintCType (cmmExprRep expr) hint
 
 -- ---------------------------------------------------------------------
 -- unconditional branches
@@ -755,17 +755,17 @@ pprCall ppr_fn cconv results args _
     ppr_assign results (ppr_fn <> parens (commafy (map pprArg args))) <> semi
   where 
      ppr_assign []           rhs = rhs
-     ppr_assign [(one,hint)] rhs
+     ppr_assign [CmmHinted one hint] rhs
 	 = pprLocalReg one <> ptext SLIT(" = ")
 		 <> pprUnHint hint (localRegRep one) <> rhs
      ppr_assign _other _rhs = panic "pprCall: multiple results"
 
-     pprArg (expr, PtrHint)
+     pprArg (CmmHinted expr PtrHint)
    	= cCast (ptext SLIT("void *")) expr
 	-- see comment by machRepHintCType below
-     pprArg (expr, SignedHint)
+     pprArg (CmmHinted expr SignedHint)
 	= cCast (machRepSignedCType (cmmExprRep expr)) expr
-     pprArg (expr, _other)
+     pprArg (CmmHinted expr _other)
 	= pprExpr expr
 
      pprUnHint PtrHint    rep = parens (machRepCType rep)
@@ -849,8 +849,8 @@ te_Lit _ = return ()
 te_Stmt :: CmmStmt -> TE ()
 te_Stmt (CmmAssign r e)		= te_Reg r >> te_Expr e
 te_Stmt (CmmStore l r)		= te_Expr l >> te_Expr r
-te_Stmt (CmmCall _ rs es _ _)	= mapM_ (te_temp.fst) rs >>
-				  mapM_ (te_Expr.fst) es
+te_Stmt (CmmCall _ rs es _ _)	= mapM_ (te_temp.hintlessCmm) rs >>
+				  mapM_ (te_Expr.hintlessCmm) es
 te_Stmt (CmmCondBranch e _)	= te_Expr e
 te_Stmt (CmmSwitch e _)		= te_Expr e
 te_Stmt (CmmJump e _)		= te_Expr e
