@@ -856,9 +856,14 @@ NHC		= @NHC@
 # tree).  We can refer to "this ghc" as $(GHC_INPLACE):
 
 GHC_INPLACE 	= $(GHC_COMPILER_DIR)/ghc-inplace
-GHC_STAGE1 	= $(GHC_COMPILER_DIR)/stage1/ghc-inplace
-GHC_STAGE2 	= $(GHC_COMPILER_DIR)/stage2/ghc-inplace
-GHC_STAGE3 	= $(GHC_COMPILER_DIR)/stage3/ghc-inplace
+GHC_STAGE1 	= $(GHC_COMPILER_DIR)/stage1/ghc-inplace -no-user-package-conf
+GHC_STAGE2 	= $(GHC_COMPILER_DIR)/stage2/ghc-inplace -no-user-package-conf
+GHC_STAGE3 	= $(GHC_COMPILER_DIR)/stage3/ghc-inplace -no-user-package-conf
+
+# NOTE: add -no-user-package-conf for stage 1-3 above, so that
+# we avoid picking up any packages the user might happen to have
+# installed for this GHC version.  They are bound to be incompatible
+# with the packages we built in the tree.
 
 ifneq "$(findstring YES, $(UseStage1) $(BootingFromHc))" ""
 
