@@ -117,8 +117,8 @@ Instead, we shoudl replace (f x) by (# a,b #).  That is, the "reverse mapping" i
 	f x --> (# a,b #)
 That is why the CSEMap has pairs of expressions.
 
-Note [INLINE and NOINLINE]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [CSE for INLINE and NOINLINE]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 We are careful to do no CSE inside functions that the user has marked as
 INLINE or NOINLINE.  In terms of Core, that means 
 
@@ -216,7 +216,7 @@ do_one env (id, rhs)
     (env', id') = addBinder env id
     rhs' | isAlwaysActive (idInlinePragma id) = cseExpr env' rhs
 	 | otherwise			      = rhs
-		-- See Note [INLINE and NOINLINE]
+		-- See Note [CSE for INLINE and NOINLINE]
 
 tryForCSE :: CSEnv -> CoreExpr -> CoreExpr
 tryForCSE env (Type t) = Type t
@@ -231,7 +231,7 @@ cseExpr env (Type t)		   = Type t
 cseExpr env (Lit lit)		   = Lit lit
 cseExpr env (Var v)		   = Var (lookupSubst env v)
 cseExpr env (App f a)        	   = App (cseExpr env f) (tryForCSE env a)
-cseExpr evn (Note InlineMe e)	   = Note InlineMe e	-- See Note [INLINE and NOINLINE]
+cseExpr env (Note InlineMe e)	   = Note InlineMe e	-- See Note [CSE for INLINE and NOINLINE]
 cseExpr env (Note n e)       	   = Note n (cseExpr env e)
 cseExpr env (Cast e co)            = Cast (cseExpr env e) co
 cseExpr env (Lam b e)	     	   = let (env', b') = addBinder env b

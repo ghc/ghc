@@ -413,7 +413,7 @@ mkIface_ hsc_env maybe_old_iface
 			mi_fix_fn = mkIfaceFixCache fixities }
 
 		-- Add version information
-              ; ext_ver_fn = mkParentVerFun hsc_env eps
+                ; ext_ver_fn = mkParentVerFun hsc_env eps
 		; (new_iface, no_change_at_all, pp_diffs, pp_orphs) 
 			= {-# SCC "versioninfo" #-}
 			 addVersionInfo ext_ver_fn maybe_old_iface
