@@ -14,7 +14,7 @@ import qualified Data.Map as Map
 import GHC hiding (NoLink)
 import Outputable
 
-
+{-! for DocOption derive: Binary !-}
 data DocOption
   = OptHide           -- ^ This module should not appear in the docs
   | OptPrune
@@ -80,6 +80,7 @@ type DocMap        = Map Name (HsDoc DocName)
 type LinkEnv       = Map Name Name
 
 
+{-! for DocName   derive: Binary !-}
 data DocName = Link Name | NoLink Name
 
 
