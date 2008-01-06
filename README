@@ -76,14 +76,24 @@ XML toolchain if you want to build the compiler documentation.
 
 Quick start:  the following gives you a default build:
 
-	$ sh boot
-	$ ./configure
-	$ make
-	$ make install
+    $ sh boot
+    $ ./configure
+    $ make
+    $ make install
 
 The "sh boot" step is only necessary if this is a tree checked out
 from darcs.  For source distributions downloaded from GHC's web site,
 this step has already been performed.
+
+If you want the documentation too then use these commands instead:
+
+    $ echo "XMLDocWays   = html" > mk/build.mk
+    $ echo "HADDOCK_DOCS = YES" >> mk/build.mk
+    $ sh boot
+    $ ./configure
+    $ make
+    $ make install
+    $ make install-docs
 
 These steps give you the default build, which includes everything
 optimised and built in various ways (eg. profiling libs are built).
