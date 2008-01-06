@@ -13,6 +13,7 @@ import qualified Data.Map as Map
 
 import GHC hiding (NoLink)
 import Outputable
+import OccName
 
 {-! for DocOption derive: Binary !-}
 data DocOption
@@ -140,6 +141,9 @@ data Interface = Interface {
 
   ifaceExportItems     :: [ExportItem Name],
   ifaceRnExportItems   :: [ExportItem DocName],
+
+  -- | Environment mapping exported names to *original* names
+	ifaceEnv             :: Map OccName Name,
 
   -- | All the names that are defined in this module
   ifaceLocals          :: [Name],

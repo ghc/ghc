@@ -53,17 +53,19 @@ createInterface ghcMod flags modMap = do
         | Flag_IgnoreAllExports `elem` flags = OptIgnoreExports : opts0
         | otherwise = opts0
 
-  let group        = ghcGroup ghcMod
-      entities     = (nubBy sameName . getTopEntities) group
-      exports      = fmap (reverse . map unLoc) (ghcMbExports ghcMod)
-      entityNames_ = entityNames entities
-      subNames     = allSubNames group
-      localNames   = entityNames_ ++ subNames
-      subMap       = mkSubMap group
-      expDeclMap   = mkDeclMap (ghcExportedNames ghcMod) group
-      localDeclMap = mkDeclMap entityNames_ group
-      docMap       = mkDocMap group 
-      ignoreExps   = Flag_IgnoreAllExports `elem` flags
+  let group         = ghcGroup ghcMod
+      entities      = (nubBy sameName . getTopEntities) group
+      exports       = fmap (reverse . map unLoc) (ghcMbExports ghcMod)
+      entityNames_  = entityNames entities
+      subNames      = allSubNames group
+      localNames    = entityNames_ ++ subNames
+      subMap        = mkSubMap group
+      expDeclMap    = mkDeclMap (ghcExportedNames ghcMod) group
+      localDeclMap  = mkDeclMap entityNames_ group
+      docMap        = mkDocMap group 
+      ignoreExps    = Flag_IgnoreAllExports `elem` flags
+      exportedNames = ghcExportedNames ghcMod
+      origEnv       = Map.fromList [ (nameOccName n, n) | n <- exportedNames ]
 
   visibleNames <- mkVisibleNames mod modMap localNames 
                                  (ghcNamesInScope ghcMod) 
@@ -92,8 +94,9 @@ createInterface ghcMod flags modMap = do
     ifaceRnDocMap        = Map.empty,
     ifaceSubMap          = subMap,
     ifaceExportItems     = prunedExportItems,
-    ifaceRnExportItems   = [], 
-    ifaceExports         = ghcExportedNames ghcMod,
+    ifaceRnExportItems   = [],
+    ifaceEnv             = origEnv, 
+    ifaceExports         = exportedNames,
     ifaceVisibleExports  = visibleNames, 
     ifaceExportedDeclMap = expDeclMap,
     ifaceInstances       = ghcInstances ghcMod

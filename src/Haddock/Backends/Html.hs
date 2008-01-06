@@ -1467,17 +1467,17 @@ topDeclBox ((_,_,maybe_source_url), (_,_,maybe_wiki_url), iface)
           case maybe_source_url of
             Nothing  -> Html.emptyTable
             Just url -> tda [theclass "declbut"] <<
-                          let url' = spliceURL (Just fname) (Just orig_mod)
+                          let url' = spliceURL (Just fname) (Just origMod)
                                                (Just name) (Just loc) url
                            in anchor ! [href url'] << toHtml "Source"
 
-        mod = iface_module iface
-
-        -- for source links, we want to point to the original module
-        -- for the name, because only that will have the source.
-        orig_mod = case Map.lookup name (iface_env iface) of
-                      Just (Qual m _) -> m
-                      _               -> mod
+        -- for source links, we want to point to the original module,
+        -- because only that will have the source.
+        origMod = case Map.lookup (nameOccName name) (ifaceEnv iface) of
+          Just n -> case nameModule_maybe n of
+            Just m -> m
+            Nothing -> mod
+          _ -> error "This shouldn't happen (topDeclBox)"
 
         wikiLink =
           case maybe_wiki_url of
@@ -1487,7 +1487,9 @@ topDeclBox ((_,_,maybe_source_url), (_,_,maybe_wiki_url), iface)
                                                (Just name) (Just loc) url
                            in anchor ! [href url'] << toHtml "Comments"
   
-        mod = iface_module iface
+        mod = ifaceMod iface
+        fname = unpackFS (srcSpanFile loc)
+
 
 -- a box for displaying an 'argument' (some code which has text to the
 -- right of it).  Wrapping is not allowed in these boxes, whereas it is
