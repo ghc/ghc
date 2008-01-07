@@ -1,3 +1,29 @@
+Changes in version 0.9:
+
+  * Infix type operators, e.g., first :: a~>a' -> (a,b)~>(a',b)
+
+  * Add a search box to the index page which automatically narrows
+    the index to the search as you type (thanks to Neil Mitchell).
+
+  * Add a --ghc-pkg flag
+
+  * Add a flag --allow-missing-html
+
+  * URL expansion for %%, %L, %{LINE}
+
+  * added substitution %{FILE///c}
+
+  * Lexing of /.../ is now more like '...', in that a / character must
+    be matched by another / character on the same line, otherwise it
+    is treated as a literal '/'.  This removes a common source of
+    accidental parse errors in documentation.
+
+  * Various bugs were fixed.
+
+  * Cabal 1.2 is now required, and Haddock builds with GHC 6.8.x.
+
+-----------------------------------------------------------------------------
+
 Changes in version 0.8:
 
   * Haddock has a Cabal build system, and will build on Windows without
