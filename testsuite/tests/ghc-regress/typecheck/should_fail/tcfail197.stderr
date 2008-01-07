@@ -1,0 +1,5 @@
+
+tcfail197.hs:5:0:
+    Illegal polymorphic or qualified type: forall a. a
+    In the type signature for `foo':
+      foo :: [forall a. a] -> Int

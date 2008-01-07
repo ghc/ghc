@@ -1,7 +1,5 @@
 
 tcfail127.hs:3:0:
-    All of the type variables in the constraint `Num a'
-    are already in scope (at least one must be universally quantified here)
-	(Use -XFlexibleContexts to lift this restriction)
+    Illegal polymorphic or qualified type: (Num a) => a -> a
     In the type signature for `foo':
       foo :: IO ((Num a) => a -> a)
