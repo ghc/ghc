@@ -237,6 +237,17 @@
 
       <varlistentry>
 	<term>
+          <indexterm><primary><option>--optghc</option></primary></indexterm>
+          <option>--optghc</option>=<replaceable>option</replaceable>
+        </term>
+	<listitem>
+	  <para>Pass <replaceable>option</replaceable> to GHC.</para>
+	</listitem>
+      </varlistentry>
+
+
+      <varlistentry>
+	<term>
           <indexterm><primary><option>-o</option></primary></indexterm>
           <option>-o</option> <replaceable>dir</replaceable>
         </term>
