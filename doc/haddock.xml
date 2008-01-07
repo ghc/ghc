@@ -1285,26 +1285,20 @@ import B
 
       <para>Certain attributes may be specified for each module which
       affects the way that Haddock generates documentation for that
-      module.  Attributes are specified in a comma-separated list in a
-      <literal>-- #</literal> (or
-      <literal>{-&nbsp;#&nbsp;...&nbsp;-}</literal>) comment at the
+      module.  Attributes are specified in a comma-separated list in an
+      <literal>{-# OPTIONS_HADDOCK ... #-}</literal> pragma at the
       top of the module, either before or after the module
       description.  For example:</para>
 
 <programlisting>
--- #hide, prune, ignore-exports
+{-# OPTIONS_HADDOCK hide, prune, ignore-exports #-}
 
 -- |Module description
 module A where
 ...
 </programlisting>
 
-      <para>The options and module description can be in either order, but
-	remember to separate them using a blank line if you are using the
-	<literal>--</literal> style comments.  Without the blank line in the
-	example above, the module description would be assumed to be part of
-	the options, and Haddock would complain about unrecognised
-	options.</para>
+      <para>The options and module description can be in either order.</para>
 
       <para>The following attributes are currently understood by
       Haddock:</para>
