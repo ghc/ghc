@@ -232,6 +232,7 @@ data DynFlag
    | Opt_LiberalTypeSynonyms
    | Opt_Rank2Types
    | Opt_RankNTypes
+   | Opt_ImpredicativeTypes
    | Opt_TypeOperators
 
    | Opt_PrintExplicitForalls
@@ -1288,9 +1289,10 @@ xFlags = [
   ( "TransformListComp",                Opt_TransformListComp ),
   ( "ForeignFunctionInterface",         Opt_ForeignFunctionInterface ),
   ( "UnliftedFFITypes",                 Opt_UnliftedFFITypes ),
-  ( "LiberalTypeSynonyms", 	            Opt_LiberalTypeSynonyms ),
+  ( "LiberalTypeSynonyms", 	        Opt_LiberalTypeSynonyms ),
   ( "Rank2Types",                       Opt_Rank2Types ),
   ( "RankNTypes",                       Opt_RankNTypes ),
+  ( "ImpredicativeTypes",		Opt_ImpredicativeTypes ),
   ( "TypeOperators",                    Opt_TypeOperators ),
   ( "RecursiveDo",                      Opt_RecursiveDo ),
   ( "Arrows",                           Opt_Arrows ),
@@ -1339,9 +1341,9 @@ glasgowExtsFlags = [
              Opt_PrintExplicitForalls
            , Opt_ForeignFunctionInterface
            , Opt_UnliftedFFITypes
-		   , Opt_GADTs
-		   , Opt_ImplicitParams 
-		   , Opt_ScopedTypeVariables
+	   , Opt_GADTs
+	   , Opt_ImplicitParams 
+	   , Opt_ScopedTypeVariables
            , Opt_UnboxedTuples
            , Opt_TypeSynonymInstances
            , Opt_StandaloneDeriving
@@ -1351,13 +1353,14 @@ glasgowExtsFlags = [
            , Opt_ConstrainedClassMethods
            , Opt_MultiParamTypeClasses
            , Opt_FunctionalDependencies
-		   , Opt_MagicHash
+	   , Opt_MagicHash
            , Opt_PolymorphicComponents
            , Opt_ExistentialQuantification
            , Opt_UnicodeSyntax
            , Opt_PatternGuards
            , Opt_LiberalTypeSynonyms
            , Opt_RankNTypes
+           , Opt_ImpredicativeTypes
            , Opt_TypeOperators
            , Opt_RecursiveDo
            , Opt_ParallelListComp
@@ -1365,7 +1368,7 @@ glasgowExtsFlags = [
            , Opt_KindSignatures
            , Opt_PatternSignatures
            , Opt_GeneralizedNewtypeDeriving
-		   , Opt_TypeFamilies ]
+	   , Opt_TypeFamilies ]
 
 ------------------
 isFlag :: [(String,a)] -> String -> Bool

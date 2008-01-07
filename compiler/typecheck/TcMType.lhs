@@ -46,7 +46,7 @@ module TcMType (
 
   --------------------------------
   -- Checking type validity
-  Rank, UserTypeCtxt(..), checkValidType, 
+  Rank, UserTypeCtxt(..), checkValidType, checkValidMonoType,
   SourceTyCtxt(..), checkValidTheta, checkFreeness,
   checkValidInstHead, checkValidInstance, 
   checkInstTermination, checkValidTypeInst, checkTyFamFreeness,
@@ -1009,9 +1009,9 @@ checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Checks that the type is valid for the given context
 checkValidType ctxt ty
   = traceTc (text "checkValidType" <+> ppr ty)	`thenM_`
-    doptM Opt_UnboxedTuples `thenM` \ unboxed ->
-    doptM Opt_Rank2Types	`thenM` \ rank2 ->
-    doptM Opt_RankNTypes	`thenM` \ rankn ->
+    doptM Opt_UnboxedTuples		`thenM` \ unboxed ->
+    doptM Opt_Rank2Types		`thenM` \ rank2 ->
+    doptM Opt_RankNTypes		`thenM` \ rankn ->
     doptM Opt_PolymorphicComponents	`thenM` \ polycomp ->
     let 
 	rank | rankn = Arbitrary
@@ -1053,9 +1053,12 @@ checkValidType ctxt ty
     checkTc kind_ok (kindErr actual_kind)	`thenM_`
 
 	-- Check the internal validity of the type itself
-    check_poly_type rank ubx_tup ty		`thenM_`
+    check_type rank ubx_tup ty		`thenM_`
 
     traceTc (text "checkValidType done" <+> ppr ty)
+
+checkValidMonoType :: Type -> TcM ()
+checkValidMonoType ty = check_mono_type ty
 \end{code}
 
 
@@ -1066,28 +1069,107 @@ decRank :: Rank -> Rank
 decRank Arbitrary = Arbitrary
 decRank (Rank n)  = Rank (n-1)
 
+nonZeroRank :: Rank -> Bool
+nonZeroRank (Rank 0) = False
+nonZeroRank _        = True
+
 ----------------------------------------
 data UbxTupFlag = UT_Ok	| UT_NotOk
 	-- The "Ok" version means "ok if -fglasgow-exts is on"
 
 ----------------------------------------
-check_poly_type :: Rank -> UbxTupFlag -> Type -> TcM ()
-check_poly_type (Rank 0) ubx_tup ty 
-  = check_tau_type (Rank 0) ubx_tup ty
+check_mono_type :: Type -> TcM ()	-- No foralls anywhere
+					-- No unlifted types of any kind
+check_mono_type ty
+   = do { check_type (Rank 0) UT_NotOk ty
+	; checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty) }
 
-check_poly_type rank ubx_tup ty 
-  | null tvs && null theta
-  = check_tau_type rank ubx_tup ty
-  | otherwise
-  = do	{ check_valid_theta SigmaCtxt theta
-	; check_poly_type rank ubx_tup tau	-- Allow foralls to right of arrow
+check_type :: Rank -> UbxTupFlag -> Type -> TcM ()
+-- The args say what the *type* context requires, independent
+-- of *flag* settings.  You test the flag settings at usage sites.
+-- 
+-- Rank is allowed rank for function args
+-- Rank 0 means no for-alls anywhere
+
+check_type rank ubx_tup ty
+  | not (null tvs && null theta)
+  = do	{ checkTc (nonZeroRank rank) (forAllTyErr ty)
+		-- Reject e.g. (Maybe (?x::Int => Int)), 
+		-- with a decent error message
+	; check_valid_theta SigmaCtxt theta
+	; check_type rank ubx_tup tau	-- Allow foralls to right of arrow
 	; checkFreeness tvs theta
 	; checkAmbiguity tvs theta (tyVarsOfType tau) }
   where
     (tvs, theta, tau) = tcSplitSigmaTy ty
    
+-- Naked PredTys don't usually show up, but they can as a result of
+--	{-# SPECIALISE instance Ord Char #-}
+-- The Right Thing would be to fix the way that SPECIALISE instance pragmas
+-- are handled, but the quick thing is just to permit PredTys here.
+check_type rank ubx_tup (PredTy sty)
+  = do	{ dflags <- getDOpts
+	; check_pred_ty dflags TypeCtxt sty }
+
+check_type rank ubx_tup (TyVarTy _)       = returnM ()
+check_type rank ubx_tup ty@(FunTy arg_ty res_ty)
+  = do	{ check_type (decRank rank) UT_NotOk arg_ty
+	; check_type rank 	    UT_Ok    res_ty }
+
+check_type rank ubx_tup (AppTy ty1 ty2)
+  = do	{ check_arg_type rank ty1
+	; check_arg_type rank ty2 }
+
+check_type rank ubx_tup (NoteTy other_note ty)
+  = check_type rank ubx_tup ty
+
+check_type rank ubx_tup ty@(TyConApp tc tys)
+  | isSynTyCon tc
+  = do	{ 	-- Check that the synonym has enough args
+		-- This applies equally to open and closed synonyms
+	 	-- It's OK to have an *over-applied* type synonym
+		--	data Tree a b = ...
+		--	type Foo a = Tree [a]
+		--	f :: Foo a b -> ...
+ 	  checkTc (tyConArity tc <= length tys) arity_msg
+
+	-- See Note [Liberal type synonyms]
+	; liberal <- doptM Opt_LiberalTypeSynonyms
+	; if not liberal || isOpenSynTyCon tc then
+		-- For H98 and synonym families, do check the type args
+		mappM_ check_mono_type tys
+
+	  else	-- In the liberal case (only for closed syns), expand then check
+	  case tcView ty of   
+	     Just ty' -> check_type rank ubx_tup ty' 
+	     Nothing  -> pprPanic "check_tau_type" (ppr ty)
+    }
+    
+  | isUnboxedTupleTyCon tc
+  = do	{ ub_tuples_allowed <- doptM Opt_UnboxedTuples
+	; checkTc (ubx_tup_ok ub_tuples_allowed) ubx_tup_msg
+
+	; impred <- doptM Opt_ImpredicativeTypes	
+	; let rank' = if impred then rank else Rank 0
+		-- c.f. check_arg_type
+		-- However, args are allowed to be unlifted, or
+		-- more unboxed tuples, so can't use check_arg_ty
+	; mappM_ (check_type rank' UT_Ok) tys }
+
+  | otherwise
+  = mappM_ (check_arg_type rank) tys
+
+  where
+    ubx_tup_ok ub_tuples_allowed = case ubx_tup of { UT_Ok -> ub_tuples_allowed; other -> False }
+
+    n_args    = length tys
+    tc_arity  = tyConArity tc
+
+    arity_msg   = arityErr "Type synonym" (tyConName tc) tc_arity n_args
+    ubx_tup_msg = ubxArgTyErr ty
+
 ----------------------------------------
-check_arg_type :: Type -> TcM ()
+check_arg_type :: Rank -> Type -> TcM ()
 -- The sort of type that can instantiate a type variable,
 -- or be the argument of a type constructor.
 -- Not an unboxed tuple, but now *can* be a forall (since impredicativity)
@@ -1106,81 +1188,15 @@ check_arg_type :: Type -> TcM ()
 --     But not in user code.
 -- Anyway, they are dealt with by a special case in check_tau_type
 
-check_arg_type ty 
-  = check_poly_type Arbitrary UT_NotOk ty	`thenM_` 
-    checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty)
-
-----------------------------------------
-check_tau_type :: Rank -> UbxTupFlag -> Type -> TcM ()
--- Rank is allowed rank for function args
--- No foralls otherwise
-
-check_tau_type rank ubx_tup ty@(ForAllTy _ _)       = failWithTc (forAllTyErr ty)
-check_tau_type rank ubx_tup ty@(FunTy (PredTy _) _) = failWithTc (forAllTyErr ty)
-	-- Reject e.g. (Maybe (?x::Int => Int)), with a decent error message
-
--- Naked PredTys don't usually show up, but they can as a result of
---	{-# SPECIALISE instance Ord Char #-}
--- The Right Thing would be to fix the way that SPECIALISE instance pragmas
--- are handled, but the quick thing is just to permit PredTys here.
-check_tau_type rank ubx_tup (PredTy sty) = getDOpts		`thenM` \ dflags ->
-					   check_pred_ty dflags TypeCtxt sty
-
-check_tau_type rank ubx_tup (TyVarTy _)       = returnM ()
-check_tau_type rank ubx_tup ty@(FunTy arg_ty res_ty)
-  = check_poly_type (decRank rank) UT_NotOk arg_ty	`thenM_`
-    check_poly_type rank 	   UT_Ok    res_ty
-
-check_tau_type rank ubx_tup (AppTy ty1 ty2)
-  = check_arg_type ty1 `thenM_` check_arg_type ty2
-
-check_tau_type rank ubx_tup (NoteTy other_note ty)
-  = check_tau_type rank ubx_tup ty
-
-check_tau_type rank ubx_tup ty@(TyConApp tc tys)
-  | isSynTyCon tc
-  = do	{ 	-- Check that the synonym has enough args
-		-- This applies equally to open and closed synonyms
-	 	-- It's OK to have an *over-applied* type synonym
-		--	data Tree a b = ...
-		--	type Foo a = Tree [a]
-		--	f :: Foo a b -> ...
- 	  checkTc (tyConArity tc <= length tys) arity_msg
-
-	-- See Note [Liberal type synonyms]
-	; liberal <- doptM Opt_LiberalTypeSynonyms
-	; if not liberal || isOpenSynTyCon tc then
-		-- For H98 and synonym families, do check the type args
-		mappM_ check_arg_type tys
-
-	  else	-- In the liberal case (only for closed syns), expand then check
-	  case tcView ty of   
-	     Just ty' -> check_tau_type rank ubx_tup ty' 
-	     Nothing  -> pprPanic "check_tau_type" (ppr ty)
-    }
-    
-  | isUnboxedTupleTyCon tc
-  = doptM Opt_UnboxedTuples `thenM` \ ub_tuples_allowed ->
-    checkTc (ubx_tup_ok ub_tuples_allowed) ubx_tup_msg	`thenM_`
-    mappM_ (check_tau_type (Rank 0) UT_Ok) tys	
-		-- Args are allowed to be unlifted, or
-		-- more unboxed tuples, so can't use check_arg_ty
-
-  | otherwise
-  = mappM_ check_arg_type tys
-
-  where
-    ubx_tup_ok ub_tuples_allowed = case ubx_tup of { UT_Ok -> ub_tuples_allowed; other -> False }
-
-    n_args    = length tys
-    tc_arity  = tyConArity tc
-
-    arity_msg   = arityErr "Type synonym" (tyConName tc) tc_arity n_args
-    ubx_tup_msg = ubxArgTyErr ty
+check_arg_type rank ty 
+  = do	{ impred <- doptM Opt_ImpredicativeTypes
+	; let rank' = if impred then rank else Rank 0	-- Monotype unless impredicative
+	; check_type rank' UT_NotOk ty
+	; checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty) }
 
 ----------------------------------------
 forAllTyErr     ty = ptext SLIT("Illegal polymorphic or qualified type:") <+> ppr ty
-unliftedArgErr  ty = ptext SLIT("Illegal unlifted type argument:") <+> ppr ty
+unliftedArgErr  ty = ptext SLIT("Illegal unlifted type:") <+> ppr ty
 ubxArgTyErr     ty = ptext SLIT("Illegal unboxed tuple type as function argument:") <+> ppr ty
 kindErr kind       = ptext SLIT("Expecting an ordinary type, but found a type of kind") <+> ppr kind
 \end{code}
@@ -1268,7 +1284,7 @@ check_pred_ty dflags ctxt pred@(ClassP cls tys)
        ; checkTc (arity == n_tys) arity_err
 
 		-- Check the form of the argument types
-       ; mappM_ check_arg_type tys
+       ; mappM_ check_mono_type tys
        ; checkTc (check_class_pred_tys dflags ctxt tys)
 		 (predTyVarErr pred $$ how_to_allow)
        }
@@ -1285,13 +1301,11 @@ check_pred_ty dflags ctxt pred@(EqPred ty1 ty2)
        ; checkTc (dopt Opt_TypeFamilies dflags) (eqPredTyErr pred)
 
 		-- Check the form of the argument types
-       ; check_eq_arg_type ty1
-       ; check_eq_arg_type ty2
+       ; check_mono_type ty1
+       ; check_mono_type ty2
        }
-  where 
-    check_eq_arg_type = check_poly_type (Rank 0) UT_NotOk
 
-check_pred_ty dflags SigmaCtxt (IParam _ ty) = check_arg_type ty
+check_pred_ty dflags SigmaCtxt (IParam _ ty) = check_mono_type ty
 	-- Implicit parameters only allowed in type
 	-- signatures; not in instance decls, superclasses etc
 	-- The reason for not allowing implicit params in instances is a bit
@@ -1470,7 +1484,7 @@ checkValidInstHead ty	-- Should be a source type
         Just (clas,tys) ->
 
     getDOpts					`thenM` \ dflags ->
-    mappM_ check_arg_type tys			`thenM_`
+    mappM_ check_mono_type tys			`thenM_`
     check_inst_head dflags clas tys		`thenM_`
     returnM (clas, tys)
     }}
@@ -1486,7 +1500,13 @@ check_inst_head dflags clas tys
        checkTc (dopt Opt_MultiParamTypeClasses dflags ||
                 isSingleton tys)
                (instTypeErr (pprClassPred clas tys) head_one_type_msg)
-       mapM_ check_one tys
+       mapM_ check_mono_type tys
+	-- For now, I only allow tau-types (not polytypes) in 
+	-- the head of an instance decl.  
+	-- 	E.g.  instance C (forall a. a->a) is rejected
+	-- One could imagine generalising that, but I'm not sure
+	-- what all the consequences might be
+
   where
     head_type_synonym_msg = parens (
                 text "All instance types must be of the form (T t1 ... tn)" $$
@@ -1501,14 +1521,6 @@ check_inst_head dflags clas tys
     head_one_type_msg = parens (
                 text "Only one type can be given in an instance head." $$
                 text "Use -XMultiParamTypeClasses if you want to allow more.")
-
-	-- For now, I only allow tau-types (not polytypes) in 
-	-- the head of an instance decl.  
-	-- 	E.g.  instance C (forall a. a->a) is rejected
-	-- One could imagine generalising that, but I'm not sure
-	-- what all the consequences might be
-    check_one ty = do { check_tau_type (Rank 0) UT_NotOk ty
-		      ; checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty) }
 
 instTypeErr pp_ty msg
   = sep [ptext SLIT("Illegal instance declaration for") <+> quotes pp_ty, 

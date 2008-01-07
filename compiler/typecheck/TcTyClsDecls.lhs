@@ -1054,6 +1054,9 @@ checkValidDataCon tc con
     addErrCtxt (dataConCtxt con)		$ 
     do	{ checkTc (dataConTyCon con == tc) (badDataConTyCon con)
 	; checkValidType ctxt (dataConUserType con)
+	; checkValidMonoType (dataConOrigResTy con)
+		-- Disallow MkT :: T (forall a. a->a)
+		-- Reason: it's really the argument of an equality constraint
 	; ifM (isNewTyCon tc) (checkNewDataCon con)
     }
   where

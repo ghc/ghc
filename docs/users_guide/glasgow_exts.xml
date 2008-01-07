@@ -4501,7 +4501,9 @@ for rank-2 types.
 <sect2 id="impredicative-polymorphism">
 <title>Impredicative polymorphism
 </title>
-<para>GHC supports <emphasis>impredicative polymorphism</emphasis>.  This means
+<para>GHC supports <emphasis>impredicative polymorphism</emphasis>, 
+enabled with <option>-XImpredicativeTypes</option>.  
+This means
 that you can call a polymorphic function at a polymorphic type, and
 parameterise data structures over polymorphic types.  For example:
 <programlisting>
