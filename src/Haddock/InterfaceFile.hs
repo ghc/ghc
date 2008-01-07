@@ -96,7 +96,11 @@ writeInterfaceFile filename iface = do
   writeBinMem bh filename
   return ()
 
-
+-- | Read a Haddock (@.haddock@) interface file. Return either an 
+-- 'InterfaceFile' or an error message. If given a GHC 'Session', the function
+-- registers all read names in the name cache of the session.
+-- The aim is to be compatible with interface files produced by any Haddock 
+-- of version 2.0.0.0 or greater.
 readInterfaceFile :: Maybe Session -> FilePath -> IO (Either String InterfaceFile)
 readInterfaceFile mbSession filename = do
   bh <- readBinMem filename
