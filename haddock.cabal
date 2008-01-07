@@ -17,7 +17,6 @@ build-depends:
   haskell98,
   ghc >= 6.8.2 && < 6.9,
   filepath,
-  process,
   directory,
   pretty,
   containers,
