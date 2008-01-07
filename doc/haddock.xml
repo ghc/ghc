@@ -788,29 +788,12 @@
     <section id="cpp">
       <title>Using literate or pre-processed source</title>
 
-      <para>Haddock only accepts plain, non-literate, Haskell source.
-      This means that if you program in Literate Haskell, or you need
-      to use the C pre-processor in your Haskell source, then you need
-      to pre-process the files before feeding them to Haddock.  This
-      is easily accomplished using GHC; for example, suppose we have a
-      Literate Haskell source file <filename>Foo.lhs</filename>, on
-      which we also need to run the C pre-processor:</para>
-
-<screen>
-$ ghc -cpp -E -optP-P -D__HADDOCK__ Foo.lhs -o Foo.hs
-$ haddock -h Foo.hs ...
-</screen>
-
-      <para>The <option>-E</option> option to GHC says "stop after
-      pre-processing", the <option>-cpp</option> option turns on the C
-      pre-processor, the <option>-optP-P</option> option tells the C
-      pre-processor not to leave any extra dropping behind (see the
-      description of the <option>-P</option> option in the gcc manual
-      for details), and the <option>-D__HADDOCK__</option> option
-      defines the symbol <literal>__HADDOCK__</literal> when
-      pre-processing (this is sometimes handy if you need to any
-      pre-processing conditionals in your source which depend on
-      whether the source is going to be fed to Haddock).</para>
+      <para>Since Haddock uses GHC internally, both plain and 
+            literate Haskell sources are accepted without the need for the user
+            to do anything. To use the C pre-processor, however,
+            the user must pass the the <option>-cpp</option> option to GHC 
+            using <option>--optghc</option>.
+      </para>
     </section>
 
   </chapter>
