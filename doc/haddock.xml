@@ -203,9 +203,8 @@
     </cmdsynopsis>
 
     <para>Where each <replaceable>file</replaceable> is a filename
-    containing a Haskell source module.  Only plain Haskell source
-    files are accepted (but see <xref linkend="cpp"/> for instructions
-    on how to pre-process source files for feeding to Haddock).</para>
+    containing a Haskell source module (.hs) or a Literate Haskell source
+    module (.lhs) or just a module name.</para>
 
     <para>All the modules specified on the command line will be
     processed together.  When one module refers to an entity in
