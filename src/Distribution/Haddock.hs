@@ -7,7 +7,11 @@
 
 module Distribution.Haddock (
   readInterfaceFile,
+  InterfaceFile(..),
+  LinkEnv,
+  InstalledInterface(..)
 ) where
 
 
 import Haddock.InterfaceFile
+import Haddock.Types
