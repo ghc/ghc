@@ -13,11 +13,11 @@ Changes in version 2.0.0.0:
 
   * Haddock understands literate source files
 
-  * Add the flag -B for passing the path to the GHC lib dir
+  * Add a flag -B for passing the path to the GHC lib dir
 
-  * Add the flag --optghc for passing options to GHC
+  * Add a flag --optghc for passing options to GHC
 
-  * Add the flag --ghc-version for printing the GHC version
+  * Add a flag --ghc-version for printing the GHC version
 
   * Remove --use-package, --allow-missing-html, --ghc-pkg, in favour of only
     supporting --read-interface
