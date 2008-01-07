@@ -420,7 +420,7 @@ cvtGuard (NormalB e)      = do { e' <- cvtl e; g' <- returnL $ GRHS [] e'; retur
 
 cvtpair :: (TH.Guard, TH.Exp) -> CvtM (LGRHS RdrName)
 cvtpair (NormalG ge,rhs) = do { ge' <- cvtl ge; rhs' <- cvtl rhs
-			      ; g' <- returnL $ mkBindStmt truePat ge'
+			      ; g' <- returnL $ mkExprStmt ge'
 			      ; returnL $ GRHS [g'] rhs' }
 cvtpair (PatG gs,rhs)    = do { gs' <- cvtStmts gs; rhs' <- cvtl rhs
 			      ; returnL $ GRHS gs' rhs' }
