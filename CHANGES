@@ -5,7 +5,7 @@ Changes in version 2.0.0.0:
   * Haddock now understands all syntax understood by GHC 6.8.2
 
   * Haddock can generate documentation for some of the language extensions
-    available in GHC 6.8.2
+    in GHC 6.8.2
 
   * Format of module attributes has changed. The only way of specifiying
     module attributes is via a new OPTIONS_HADDOCK pragma. Example: 
