@@ -22,6 +22,11 @@ Changes in version 2.0.0.0:
   * Remove --use-package, --allow-missing-html, --ghc-pkg, in favour of only
     supporting --read-interface
 
+  * Remove --package flag, the GHC flag -package-name can be used instead
+
+  * Remove --no-implicit-prelude flag, the GHC flag -XNoImplicitPrelude can
+    be used instead.
+
 -----------------------------------------------------------------------------
 
 Changes in version 0.9:
