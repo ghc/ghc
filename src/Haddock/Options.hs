@@ -63,7 +63,6 @@ data Flag
   | Flag_Hoogle
   | Flag_HtmlHelp String
   | Flag_Lib String
-  | Flag_NoImplicitPrelude
   | Flag_OutputDir FilePath
   | Flag_Prologue FilePath
   | Flag_SourceBaseURL   String
@@ -127,8 +126,6 @@ options backwardsCompat =
 	"file containing prologue text",
     Option ['t']  ["title"]    (ReqArg Flag_Heading "TITLE")
 	"page heading",
-    Option ['n']  ["no-implicit-prelude"] (NoArg Flag_NoImplicitPrelude)
- 	"do not assume Prelude is imported",
     Option ['d']  ["debug"]  (NoArg Flag_Debug)
 	"extra debugging output",
     Option ['?']  ["help"]  (NoArg Flag_Help)
