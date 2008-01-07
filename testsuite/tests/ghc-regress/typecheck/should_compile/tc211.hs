@@ -32,8 +32,9 @@ data Pair a b where
 data List a where
    Nil  :: List a
    Cons :: a -> List a -> List a
-   FromMono :: (a->a) -> List (forall a. a->a)
-
+--   FromMono :: (a->a) -> List (forall a. a->a)
+--   This constructor looks utterly bogus, so
+--   I'm commenting it out; SLPJ 7 Jan 08
 
 f :: Int -> Pair Int Int
 f x = P x x
