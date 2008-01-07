@@ -285,22 +285,6 @@
 
       <varlistentry>
 	<term>
-	  <indexterm><primary><option>--use-package</option></primary></indexterm>
-          <option>--use-package</option>=<replaceable>package</replaceable>
-        </term>
-	<listitem>
-	  <para>Like <option>--read-interface</option>, but use
-	  <command>ghc-pkg</command> to locate the interface file and
-	  HTML documentation for <replaceable>package</replaceable>,
-	  to reference when generating the documentation.</para>
-
-	  <para>Multiple <option>--use-package</option> options may
-	  be given.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-	<term>
   	  <indexterm><primary><option>-D</option></primary></indexterm>
           <option>-D</option> <replaceable>file</replaceable>
         </term>
@@ -685,22 +669,6 @@
 
       <varlistentry>
         <term>
-          <indexterm><primary><option>-n</option></primary></indexterm>
-          <option>-n</option>
-        </term>
-        <term>
-          <indexterm><primary><option>--no-implicit-prelude</option></primary></indexterm>
-          <option>--no-implicit-prelude</option>
-        </term>
-	<listitem>
-	  <para>Don't automatically import <literal>Prelude</literal>
-	  in every module.  Used when producing documentation for the
-	  <literal>Prelude</literal> itself.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-        <term>
           <indexterm><primary><option>-d</option></primary></indexterm>
           <option>-d</option>
         </term>
@@ -785,23 +753,6 @@
 	  <option>-i</option> or <option>--read-interface</option>).
 	  This is used to generate a single index for multiple sets of
 	  Haddock documentation.</para>
-	</listitem>
-      </varlistentry>
-
-      <varlistentry>
-        <term>
-          <indexterm><primary><option>-k</option></primary></indexterm>
-          <option>-k</option> <replaceable>P</replaceable>
-        </term>
-        <term>
-          <indexterm><primary><option>--package</option></primary></indexterm>
-          <option>--package=</option><replaceable>P</replaceable>
-        </term>
-	<listitem>
-	  <para>Set the package name for these modules to
-	  <replaceable>P</replaceable>.  In a combined index generated
-	  with <option>--gen-index</option>, the package name for each
-	  module is shown in the right-hand column.</para>
 	</listitem>
       </varlistentry>
 
