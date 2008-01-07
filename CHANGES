@@ -11,6 +11,8 @@ Changes in version 2.0.0.0:
     module attributes is via a new OPTIONS_HADDOCK pragma. Example: 
     {-# OPTIONS_HADDOCK hide, prune #-}
 
+  * Haddock understands literate source files
+
   * Add the flag -B for passing the path to the GHC lib dir
 
   * Add the flag --optghc for passing options to GHC
