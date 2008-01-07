@@ -40,6 +40,7 @@ data Results = Results {
         cache_misses    :: Maybe Integer,
         gc_work         :: Maybe Integer,
         gc_time         :: [Float],
+        gc_elapsed_time :: [Float],
         allocs          :: Maybe Integer,
         run_status      :: Status,
         compile_status  :: Status
@@ -58,6 +59,7 @@ emptyResults = Results {
         mem_writes      = Nothing,
         cache_misses    = Nothing,
         gc_time         = [],
+        gc_elapsed_time = [],
         gc_work         = Nothing,
         allocs          = Nothing,
         compile_status  = NotDone,
@@ -183,7 +185,7 @@ combine2Results
                       run_time = rt1, mut_time = mt1,
                       instrs = is1, mem_reads = mr1, mem_writes = mw1,
                       cache_misses = cm1,
-                      gc_time = gt1, gc_work = gw1,
+                      gc_time = gt1, gc_elapsed_time = ge1, gc_work = gw1,
                       binary_size = bs1, allocs = al1,
                       run_status = rs1, compile_status = cs1 }
              Results{ compile_time = ct2, link_time = lt2,
@@ -191,7 +193,7 @@ combine2Results
                       run_time = rt2, mut_time = mt2,
                       instrs = is2, mem_reads = mr2, mem_writes = mw2,
                       cache_misses = cm2,
-                      gc_time = gt2, gc_work = gw2,
+                      gc_time = gt2, gc_elapsed_time = ge2, gc_work = gw2,
                       binary_size = bs2, allocs = al2,
                       run_status = rs2, compile_status = cs2 }
           =  Results{ compile_time   = Map.unionWith (flip const) ct1 ct2,
@@ -204,6 +206,7 @@ combine2Results
                       mem_writes     = mw1 `mplus` mw2,
                       cache_misses   = cm1 `mplus` cm2,
                       gc_time        = gt1 ++ gt2,
+                      gc_elapsed_time= ge1 ++ ge2,
                       gc_work        = gw1 `mplus` gw2,
                       binary_size    = bs1 `mplus` bs2,
                       allocs         = al1 `mplus` al2,
@@ -310,28 +313,28 @@ parse_run_time _ [] _ NotDone = []
 parse_run_time prog [] res ex = [(prog, res{run_status=ex})]
 parse_run_time prog (l:ls) res ex =
         case ghc1_re l of {
-           Just (allocations, _, _, _, _, _, initialisation, _, mut, _, gc, _) ->
-                got_run_result allocations initialisation mut gc Nothing
-                        Nothing Nothing Nothing Nothing;
+           Just (allocations, _, _, _, _, _, initialisation, _, mut, _, gc, gc_elapsed) ->
+                got_run_result allocations initialisation mut gc gc_elapsed
+                        Nothing Nothing Nothing Nothing Nothing;
            Nothing ->
 
         case ghc2_re l of {
-           Just (allocations, _, _, _, _, _, initialisation, _, mut, _, gc, _) ->
-                got_run_result allocations initialisation mut gc Nothing
-                        Nothing Nothing Nothing Nothing;
+           Just (allocations, _, _, _, _, _, initialisation, _, mut, _, gc, gc_elapsed) ->
+                got_run_result allocations initialisation mut gc gc_elapsed
+                        Nothing Nothing Nothing Nothing Nothing;
 
             Nothing ->
 
         case ghc3_re l of {
-           Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, _, gc, _) ->
-                got_run_result allocations initialisation mut gc
+           Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, _, gc, gc_elapsed) ->
+                got_run_result allocations initialisation mut gc gc_elapsed
                         (Just gc_work') Nothing Nothing Nothing Nothing;
 
             Nothing ->
 
         case ghc4_re l of {
-           Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, _, gc, _, is, mem_rs, mem_ws, cache_misses') ->
-                got_run_result allocations initialisation mut gc
+           Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, _, gc, gc_elapsed, is, mem_rs, mem_ws, cache_misses') ->
+                got_run_result allocations initialisation mut gc gc_elapsed
                         (Just gc_work') (Just is) (Just mem_rs)
                         (Just mem_ws) (Just cache_misses');
 
@@ -364,7 +367,7 @@ parse_run_time prog (l:ls) res ex =
 
         }}}}}}}}
   where
-  got_run_result allocations initialisation mut gc gc_work' instrs' mem_rs mem_ws cache_misses'
+  got_run_result allocations initialisation mut gc gc_elapsed gc_work' instrs' mem_rs mem_ws cache_misses'
       = -- trace ("got_run_result: " ++ initialisation ++ ", " ++ mut ++ ", " ++ gc) $
         let
           time = initialisation + mut + gc
@@ -372,6 +375,7 @@ parse_run_time prog (l:ls) res ex =
                         emptyResults{   run_time   = [time],
                                         mut_time   = [mut],
                                         gc_time    = [gc],
+                                        gc_elapsed_time = [gc_elapsed],
                                         gc_work    = gc_work',
                                         allocs     = Just allocations,
                                         instrs     = instrs',

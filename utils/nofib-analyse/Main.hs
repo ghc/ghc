@@ -102,7 +102,7 @@ data PerModuleTableSpec =
                 (a -> Bool)             -- Result within reasonable limits?
 
 -- The various per-program aspects of execution that we can generate results for.
-size_spec, alloc_spec, runtime_spec, muttime_spec, gctime_spec,
+size_spec, alloc_spec, runtime_spec, muttime_spec, gctime_spec, gcelap_spec,
     gcwork_spec, instrs_spec, mreads_spec, mwrite_spec, cmiss_spec
         :: PerProgTableSpec
 size_spec    = SpecP "Binary Sizes" "Size" "binary-sizes" binary_size compile_status always_ok
@@ -110,6 +110,7 @@ alloc_spec   = SpecP "Allocations" "Allocs" "allocations" allocs run_status alwa
 runtime_spec = SpecP "Run Time" "Runtime" "run-times" (mean run_time) run_status time_ok
 muttime_spec = SpecP "Mutator Time" "MutTime" "mutator-time" (mean mut_time) run_status time_ok
 gctime_spec  = SpecP "GC Time" "GCTime" "gc-time" (mean gc_time) run_status time_ok
+gcelap_spec  = SpecP "GC Elapsed Time" "GCETime" "gc-elapsed-time" (mean gc_elapsed_time) run_status time_ok
 gcwork_spec  = SpecP "GC Work" "GCWork" "gc-work" gc_work run_status always_ok
 instrs_spec  = SpecP "Instructions" "Instrs" "instrs" instrs run_status always_ok
 mreads_spec  = SpecP "Memory Reads" "Reads" "mem-reads" mem_reads run_status always_ok
@@ -123,6 +124,7 @@ all_specs = [
   runtime_spec,
   muttime_spec,
   gctime_spec,
+  gcelap_spec,
   gcwork_spec,
   instrs_spec,
   mreads_spec,
@@ -166,6 +168,7 @@ checkTimes prog results = do
 per_prog_result_tab :: [PerProgTableSpec]
 per_prog_result_tab =
         [ size_spec, alloc_spec, runtime_spec, muttime_spec, gctime_spec,
+          gcelap_spec,
           gcwork_spec, instrs_spec, mreads_spec, mwrite_spec, cmiss_spec ]
 
 -- A single summary table, giving comparison figures for a number of
