@@ -72,7 +72,7 @@ import Id		( Id, idType, mkSysLocal, isOneShotLambda,
 			  idSpecialisation, idWorkerInfo, setIdInfo
 			)
 import IdInfo		( workerExists, vanillaIdInfo, isEmptySpecInfo )
-import Var		( Var )
+import Var
 import VarSet
 import VarEnv
 import Name		( getOccName )
@@ -772,15 +772,19 @@ abstractVars :: Level -> LevelEnv -> VarSet -> [Var]
 	-- Find the variables in fvs, free vars of the target expresion,
 	-- whose level is greater than the destination level
 	-- These are the ones we are going to abstract out
-abstractVars dest_lvl env fvs
-  = uniq (sortLe le [var | fv <- varSetElems fvs, var <- absVarsOf dest_lvl env fv])
+abstractVars dest_lvl (_, lvl_env, _, id_env) fvs
+  = uniq (sortLe le [var | fv <- varSetElems fvs
+			 , var <- absVarsOf id_env fv
+			 , abstract_me var])
   where
-	-- Sort the variables so we don't get 
-	-- mixed-up tyvars and Ids; it's just messy
-    v1 `le` v2 = case (isId v1, isId v2) of
-		   (True, False) -> False
-		   (False, True) -> True
+	-- Sort the variables so the true type variables come first;
+	-- the tyvars scope over Ids and coercion vars
+    v1 `le` v2 = case (is_tv v1, is_tv v2) of
+		   (True, False) -> True
+		   (False, True) -> False
 		   other	 -> v1 <= v2	-- Same family
+
+    is_tv v = isTyVar v && not (isCoVar v)
 
     uniq :: [Var] -> [Var]
 	-- Remove adjacent duplicates; the sort will have brought them together
@@ -788,22 +792,21 @@ abstractVars dest_lvl env fvs
 		    | otherwise = v1 : uniq (v2:vs)
     uniq vs = vs
 
-absVarsOf :: Level -> LevelEnv -> Var -> [Var]
-	-- If f is free in the expression, and f maps to poly_f a b c in the
-	-- current substitution, then we must report a b c as candidate type
-	-- variables
-absVarsOf dest_lvl (_, lvl_env, _, id_env) v 
-  | isId v
-  = [zap av2 | av1 <- lookup_avs v, av2 <- add_tyvars av1, abstract_me av2]
-
-  | otherwise
-  = if abstract_me v then [v] else []
-
-  where
     abstract_me v = case lookupVarEnv lvl_env v of
 			Just lvl -> dest_lvl `ltLvl` lvl
 			Nothing  -> False
 
+absVarsOf :: IdEnv ([Var], LevelledExpr) -> Var -> [Var]
+	-- If f is free in the expression, and f maps to poly_f a b c in the
+	-- current substitution, then we must report a b c as candidate type
+	-- variables
+absVarsOf id_env v 
+  | isId v    = [zap av2 | av1 <- lookup_avs v
+			 , av2 <- add_tyvars av1]
+  | isCoVar v = add_tyvars v
+  | otherwise = [v]
+
+  where
     lookup_avs v = case lookupVarEnv id_env v of
 			Just (abs_vars, _) -> abs_vars
 			Nothing	           -> [v]
