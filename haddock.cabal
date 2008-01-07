@@ -6,7 +6,7 @@ license:              BSD3
 license-file:         LICENSE
 copyright:            (c) Simon Marlow, David Waern
 author:               Simon Marlow, David Waern
-maintainer:           David Waern <davve@dtek.chalmers.se>
+maintainer:           David Waern <david.waern@gmail.com>
 stability:            experimental
 homepage:             http://www.haskell.org/haddock/
 description:          Haddock is a documentation-generation tool for Haskell
