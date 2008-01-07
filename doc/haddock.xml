@@ -223,6 +223,18 @@
     <para>The following options are available:</para>
 
     <variablelist>
+
+      <varlistentry>
+	<term>
+          <indexterm><primary><option>-B</option></primary></indexterm>
+          <option>-B</option> <replaceable>dir</replaceable>
+        </term>
+	<listitem>
+	  <para>Tell GHC that that its lib directory is
+    <replaceable>dir</replaceable>. Needed to do any processing. </para>
+	</listitem>
+      </varlistentry>
+
       <varlistentry>
 	<term>
           <indexterm><primary><option>-o</option></primary></indexterm>
