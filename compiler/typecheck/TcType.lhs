@@ -670,9 +670,7 @@ tcSplitPhiTy ty = split ty ty []
   split orig_ty ty tvs | Just ty' <- tcView ty = split orig_ty ty' tvs
 
   split orig_ty (ForAllTy tv ty) ts
-        | isCoVar tv = split ty ty (eq_pred:ts)
-        where
-           PredTy eq_pred = tyVarKind tv
+        | isCoVar tv = split ty ty (coVarPred tv : ts)
   split orig_ty (FunTy arg res) ts 
 	| Just p <- tcSplitPredTy_maybe arg = split res res (p:ts)
   split orig_ty ty		ts = (reverse ts, orig_ty)

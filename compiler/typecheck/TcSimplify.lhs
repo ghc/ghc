@@ -2207,7 +2207,7 @@ reduceImplication env
 			--		it makes no difference
 		co  = wrap_inline	-- Note [Always inline implication constraints]
 		      <.> mkWpTyLams tvs
-		      <.> mkWpTyLams eq_tyvars
+		      <.> mkWpLams eq_tyvars
 		      <.> mkWpLams dict_ids
 		      <.> WpLet (binds `unionBags` bind)
 		wrap_inline | null dict_ids = idHsWrapper

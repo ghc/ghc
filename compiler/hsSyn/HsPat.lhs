@@ -97,9 +97,10 @@ data Pat id
 
   | ConPatOut {
 	pat_con   :: Located DataCon,
-	pat_tvs   :: [TyVar],		-- Existentially bound type variables
-					--   including any bound coercion variables
-	pat_dicts :: [id],		-- Ditto dictionaries
+	pat_tvs   :: [TyVar],		-- Existentially bound type variables (tyvars only)
+	pat_dicts :: [id],		-- Ditto *coercion variables* and *dictionaries*
+					-- One reason for putting coercion variable here, I think,
+					-- 	is to ensure their kinds are zonked
 	pat_binds :: DictBinds id,	-- Bindings involving those dictionaries
 	pat_args  :: HsConPatDetails id,
 	pat_ty	  :: Type   		-- The type of the pattern

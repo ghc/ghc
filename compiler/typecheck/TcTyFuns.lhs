@@ -233,7 +233,7 @@ tcGenericNormaliseFamInst fun (ForAllTy tyvar ty1)
 	}
 tcGenericNormaliseFamInst fun (NoteTy note ty1)
   = do	{ (coi,nty1) <- tcGenericNormaliseFamInst fun ty1
-	; return (mkNoteTyCoI note coi, NoteTy note nty1)
+	; return (coi, NoteTy note nty1)
 	}
 tcGenericNormaliseFamInst fun ty@(TyVarTy tv)
   | isTcTyVar tv

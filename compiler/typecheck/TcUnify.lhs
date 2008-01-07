@@ -924,7 +924,7 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 	-- list of "free vars" for the signature check.
 
 	; loc <- getInstLoc (SigOrigin skol_info)
-	; dicts <- newDictBndrs loc theta'
+	; dicts <- newDictBndrs loc theta'	-- Includes equalities
 	; inst_binds <- tcSimplifyCheck loc tvs' dicts lie
 
 	; checkSigTyVarsWrt free_tvs tvs'

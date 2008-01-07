@@ -343,8 +343,8 @@ data HsWrapper
 
   | WpApp Var			-- [] d		the 'd' is a type-class dictionary
   | WpTyApp Type		-- [] t		the 't' is a type or corecion
-  | WpLam Id	 		-- \d. []	the 'd' is a type-class dictionary
-  | WpTyLam TyVar 		-- \a. []	the 'a' is a type or coercion variable
+  | WpLam Var	 		-- \d. []	the 'd' is a type-class dictionary or coercion variable
+  | WpTyLam TyVar 		-- \a. []	the 'a' is a type variable (not coercion var)
   | WpInline			-- inline_me []   Wrap inline around the thing
 
 	-- Non-empty bindings, so that the identity coercion

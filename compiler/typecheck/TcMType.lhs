@@ -104,6 +104,7 @@ import Data.List	( (\\) )
 tcInstType :: ([TyVar] -> TcM [TcTyVar]) 		-- How to instantiate the type variables
 	   -> TcType 					-- Type to instantiate
 	   -> TcM ([TcTyVar], TcThetaType, TcType)	-- Result
+		-- (type vars (excl coercion vars), preds (incl equalities), rho)
 tcInstType inst_tyvars ty
   = case tcSplitForAllTys ty of
 	([],     rho) -> let	-- There may be overloading despite no type variables;

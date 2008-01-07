@@ -31,6 +31,7 @@ module TypeRep (
         argTypeKind, ubxTupleKind,
 	isLiftedTypeKindCon, isLiftedTypeKind,
 	mkArrowKind, mkArrowKinds, isCoercionKind,
+  	coVarPred,
 
         -- Kind constructors...
         liftedTypeKindTyCon, openTypeKindTyCon, unliftedTypeKindTyCon,
@@ -412,6 +413,13 @@ isCoercionKind :: Kind -> Bool
 isCoercionKind (NoteTy _ k)         = isCoercionKind k
 isCoercionKind (PredTy (EqPred {})) = True
 isCoercionKind other		    = False
+
+coVarPred :: CoVar -> PredType
+coVarPred tv
+  = ASSERT( isCoVar tv )
+    case tyVarKind tv of
+	PredTy eq -> eq		-- There shouldn't even be a NoteTy in the way
+	other	  -> pprPanic "coVarPred" (ppr tv $$ ppr other)
 \end{code}
 
 
@@ -484,7 +492,7 @@ pprParendKind = pprParendType
 ppr_type :: Prec -> Type -> SDoc
 ppr_type p (TyVarTy tv)       = ppr tv
 ppr_type p (PredTy pred)      = ifPprDebug (ptext SLIT("<pred>")) <> (ppr pred)
-ppr_type p (NoteTy other ty2) = ppr_type p ty2
+ppr_type p (NoteTy other ty2) = ifPprDebug (ptext SLIT("<note>")) <> ppr_type p ty2
 ppr_type p (TyConApp tc tys)  = ppr_tc_app p tc tys
 
 ppr_type p (AppTy t1 t2) = maybeParen p TyConPrec $
@@ -504,28 +512,27 @@ ppr_type p (FunTy ty1 ty2)
 ppr_forall_type :: Prec -> Type -> SDoc
 ppr_forall_type p ty
   = maybeParen p FunPrec $
-    sep [pprForAll tvs, pprThetaArrow (ctxt1 ++ ctxt2), pprType tau]
+    sep [pprForAll tvs, pprThetaArrow ctxt, pprType tau]
   where
-    (tvs, ctxt1, rho) = split1 [] [] ty
-    (ctxt2, tau)      = split2 [] rho
+    (tvs,  rho) = split1 [] ty
+    (ctxt, tau) = split2 [] rho
 
     -- We need to be extra careful here as equality constraints will occur as
     -- type variables with an equality kind.  So, while collecting quantified
     -- variables, we separate the coercion variables out and turn them into
     -- equality predicates.
-    split1 tvs eqs (ForAllTy tv ty) 
-      | isCoVar tv               = split1 tvs (eq:eqs) ty
-      | otherwise                = split1 (tv:tvs) eqs ty
-      where
-        PredTy eq = tyVarKind tv
-    split1 tvs eqs (NoteTy _ ty) = split1 tvs eqs ty
-    split1 tvs eqs ty		 = (reverse tvs, reverse eqs, ty)
+    split1 tvs (ForAllTy tv ty) 
+      | not (isCoVar tv)     = split1 (tv:tvs) ty
+    split1 tvs (NoteTy _ ty) = split1 tvs ty
+    split1 tvs ty	     = (reverse tvs, ty)
  
     split2 ps (NoteTy _ arg 	-- Rather a disgusting case
-	       `FunTy` res) 	      = split2 ps (arg `FunTy` res)
-    split2 ps (PredTy p `FunTy` ty)   = split2 (p:ps) ty
-    split2 ps (NoteTy _ ty) 	      = split2 ps ty
-    split2 ps ty		      = (reverse ps, ty)
+	       `FunTy` res) 	    = split2 ps (arg `FunTy` res)
+    split2 ps (PredTy p `FunTy` ty) = split2 (p:ps) ty
+    split2 ps (ForAllTy tv ty) 
+	| isCoVar tv		    = split2 (coVarPred tv : ps) ty
+    split2 ps (NoteTy _ ty) 	    = split2 ps ty
+    split2 ps ty		    = (reverse ps, ty)
 
 ppr_tc_app :: Prec -> TyCon -> [Type] -> SDoc
 ppr_tc_app p tc [] 

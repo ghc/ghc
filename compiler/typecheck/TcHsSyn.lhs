@@ -550,7 +550,7 @@ zonkCoFn env (WpCompose c1 c2) = do { (env1, c1') <- zonkCoFn env c1
 				    ; return (env2, WpCompose c1' c2') }
 zonkCoFn env (WpCo co)      = do { co' <- zonkTcTypeToType env co
 				 ; return (env, WpCo co') }
-zonkCoFn env (WpLam id)     = do { id' <- zonkIdBndr env id
+zonkCoFn env (WpLam id)     = do { id' <- zonkDictBndr env id
 				 ; let env1 = extendZonkEnv1 env id'
 				 ; return (env1, WpLam id') }
 zonkCoFn env (WpTyLam tv)   = ASSERT( isImmutableTyVar tv )
@@ -776,7 +776,7 @@ zonk_pat env (TuplePat pats boxed ty)
 zonk_pat env p@(ConPatOut { pat_ty = ty, pat_dicts = dicts, pat_binds = binds, pat_args = args })
   = ASSERT( all isImmutableTyVar (pat_tvs p) ) 
     do	{ new_ty <- zonkTcTypeToType env ty
-	; new_dicts <- zonkIdBndrs env dicts
+	; new_dicts <- zonkDictBndrs env dicts
 	; let env1 = extendZonkEnv env new_dicts
 	; (env2, new_binds) <- zonkRecMonoBinds env1 binds
 	; (env', new_args) <- zonkConStuff env2 args
