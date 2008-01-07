@@ -1,3 +1,27 @@
+Changes in version 2.0.0.0:
+
+  * The GHC API is used as the front-end
+
+  * Haddock now understands all syntax understood by GHC 6.8.2
+
+  * Haddock can generate documentation for some of the language extensions
+    available in GHC 6.8.2
+
+  * Format of module attributes has changed. The only way of specifiying
+    module attributes is via a new OPTIONS_HADDOCK pragma. Example: 
+    {-# OPTIONS_HADDOCK hide, prune #-}
+
+  * Add the flag -B for passing the path to the GHC lib dir
+
+  * Add the flag --optghc for passing options to GHC
+
+  * Add the flag --ghc-version for printing the GHC version
+
+  * Remove --use-package, --allow-missing-html, --ghc-pkg, in favour of only
+    supporting --read-interface
+
+-----------------------------------------------------------------------------
+
 Changes in version 0.9:
 
   * Infix type operators, e.g., first :: a~>a' -> (a,b)~>(a',b)
