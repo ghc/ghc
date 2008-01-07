@@ -9,7 +9,7 @@ author:               Simon Marlow, David Waern
 maintainer:           David Waern <davve@dtek.chalmers.se>
 stability:            experimental
 homepage:             http://www.haskell.org/haddock/
-synopsis:             Haddock is a documentation-generation tool for Haskell
+description:          Haddock is a documentation-generation tool for Haskell
                       libraries
 category:             Development
 build-depends:
