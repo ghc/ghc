@@ -81,7 +81,6 @@ data Flag
   | Flag_GenIndex
   | Flag_IgnoreAllExports
   | Flag_HideModule String
-  | Flag_UsePackage String
   | Flag_OptGhc String
   | Flag_GhcLibDir String
   | Flag_GhcVersion
@@ -150,8 +149,6 @@ options backwardsCompat =
 	"behave as if all modules have the\nignore-exports atribute",
     Option [] ["hide"] (ReqArg Flag_HideModule "MODULE")
 	"behave as if MODULE has the hide attribute",
-    Option [] ["use-package"] (ReqArg Flag_UsePackage "PACKAGE")
-	"the modules being processed depend on PACKAGE",
     Option [] ["optghc"] (ReqArg Flag_OptGhc "OPTION")
  	"Forward option to GHC",
     Option []  ["ghc-version"]  (NoArg Flag_GhcVersion)
