@@ -787,17 +787,19 @@ getCoreToDo dflags
     rule_check    = ruleCheck dflags
     vectorisation = dopt Opt_Vectorise dflags
 
-    core_todo = 
-     if opt_level == 0 then
-      [
-	CoreDoSimplify (SimplPhase 0) [
-	    MaxSimplifierIterations max_iter
-	]
-      ]
-     else {- opt_level >= 1 -} [ 
+    maybe_rule_check phase | Just s <- rule_check = CoreDoRuleCheck phase s
+                           | otherwise            = CoreDoNothing
+
+    simpl_phase phase iter = CoreDoPasses
+                               [ CoreDoSimplify (SimplPhase phase) [
+                                   MaxSimplifierIterations iter
+                                 ],
+                                 maybe_rule_check phase
+                               ]
+
 
 	-- initial simplify: mk specialiser happy: minimum effort please
-	CoreDoSimplify SimplGently [
+    simpl_gently = CoreDoSimplify SimplGently [
 			-- 	Simplify "gently"
 			-- Don't inline anything till full laziness has bitten
 			-- In particular, inlining wrappers inhibits floating
@@ -811,16 +813,19 @@ getCoreToDo dflags
             NoCaseOfCase,	-- Don't do case-of-case transformations.
 				-- This makes full laziness work better
 	    MaxSimplifierIterations max_iter
-	],
+	]
 
+    core_todo = 
+     if opt_level == 0 then
+       [simpl_phase 0 max_iter]
+     else {- opt_level >= 1 -} [ 
+
+	-- initial simplify: mk specialiser happy: minimum effort please
+        simpl_gently,
 
         -- We run vectorisation here for now, but we might also try to run
         -- it later
-        runWhen vectorisation (CoreDoPasses [
-                  CoreDoVectorisation,
-                  CoreDoSimplify SimplGently
-                                  [NoCaseOfCase,
-                                   MaxSimplifierIterations max_iter]]),
+        runWhen vectorisation (CoreDoPasses [ CoreDoVectorisation, simpl_gently]),
 
 	-- Specialisation is best done before full laziness
 	-- so that overloaded functions have all their dictionary lambdas manifest
@@ -830,29 +835,21 @@ getCoreToDo dflags
 
 	CoreDoFloatInwards,
 
-	CoreDoSimplify (SimplPhase 2) [
 		-- Want to run with inline phase 2 after the specialiser to give
 		-- maximum chance for fusion to work before we inline build/augment
 		-- in phase 1.  This made a difference in 'ansi' where an 
 		-- overloaded function wasn't inlined till too late.
-	   MaxSimplifierIterations max_iter
-	],
-	case rule_check of { Just pat -> CoreDoRuleCheck 2 pat; Nothing -> CoreDoNothing },
+        simpl_phase 2 max_iter,
 
-	CoreDoSimplify (SimplPhase 1) [
 		-- Need inline-phase2 here so that build/augment get 
 		-- inlined.  I found that spectral/hartel/genfft lost some useful
 		-- strictness in the function sumcode' if augment is not inlined
 		-- before strictness analysis runs
-	   MaxSimplifierIterations max_iter
-	],
-	case rule_check of { Just pat -> CoreDoRuleCheck 1 pat; Nothing -> CoreDoNothing },
+	simpl_phase 1 max_iter,
 
-	CoreDoSimplify (SimplPhase 0) [
 		-- Phase 0: allow all Ids to be inlined now
 		-- This gets foldr inlined before strictness analysis
 
-	   MaxSimplifierIterations (max max_iter 3)
 		-- At least 3 iterations because otherwise we land up with
 		-- huge dead expressions because of an infelicity in the 
 		-- simpifier.   
@@ -860,9 +857,8 @@ getCoreToDo dflags
 		-- ==>  let k = BIG in letrec go = \xs -> ...(k x).... in go xs
 		-- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs
 		-- Don't stop now!
+	simpl_phase 0 (max max_iter 3),
 
-	],
-	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing },
 
 #ifdef OLD_STRICTNESS
 	CoreDoOldStrictness,
@@ -871,9 +867,8 @@ getCoreToDo dflags
 		CoreDoStrictness,
 		CoreDoWorkerWrapper,
 		CoreDoGlomBinds,
-		CoreDoSimplify (SimplPhase 0) [
-		   MaxSimplifierIterations max_iter
-		]]),
+                simpl_phase 0 max_iter
+                ]),
 
 	runWhen full_laziness 
 	  (CoreDoFloatOutwards (FloatOutSw False    -- Not lambdas
@@ -892,29 +887,23 @@ getCoreToDo dflags
 
 	CoreDoFloatInwards,
 
-	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing },
+	maybe_rule_check 0,
 
 		-- Case-liberation for -O2.  This should be after
 		-- strictness analysis and the simplification which follows it.
 	runWhen liberate_case (CoreDoPasses [
 	    CoreLiberateCase,
-	    CoreDoSimplify (SimplPhase 0) [
-		  MaxSimplifierIterations max_iter
-	    ] ]),	-- Run the simplifier after LiberateCase to vastly 
+            simpl_phase 0 max_iter
+            ]),         -- Run the simplifier after LiberateCase to vastly 
 			-- reduce the possiblility of shadowing
 			-- Reason: see Note [Shadowing] in SpecConstr.lhs
 
 	runWhen spec_constr CoreDoSpecConstr,
 
-	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing },
+        maybe_rule_check 0,
 
 	-- Final clean-up simplification:
-     	CoreDoSimplify (SimplPhase 0) [
-	  MaxSimplifierIterations max_iter
-	],
-
-	case rule_check of { Just pat -> CoreDoRuleCheck 0 pat; Nothing -> CoreDoNothing }
-
+        simpl_phase 0 max_iter
      ]
 
 -- -----------------------------------------------------------------------------
