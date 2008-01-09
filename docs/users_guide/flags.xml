@@ -1252,6 +1252,14 @@
 	    </row>
 
 	    <row>
+	      <entry><option>-fsimplifier-phases</option></entry>
+	      <entry>Set the number of phases for the simplifier (default 2).
+              Ignored with <option>-O0</option>.</entry>
+	      <entry>dynamic</entry>
+	      <entry>-</entry>
+	    </row>
+
+	    <row>
 	      <entry><option>-fmax-simplifier-iterations</option></entry>
 	      <entry>Set the max iterations for the simplifier</entry>
 	      <entry>dynamic</entry>
