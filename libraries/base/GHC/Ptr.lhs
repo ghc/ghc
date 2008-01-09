@@ -62,7 +62,7 @@ alignPtr addr@(Ptr a) (I# i)
       0# -> addr;
       n -> Ptr (plusAddr# a (i -# n)) }
 
--- |Computes the offset required to get from the first to the second
+-- |Computes the offset required to get from the second to the first
 -- argument.  We have 
 --
 -- > p2 == p1 `plusPtr` (p2 `minusPtr` p1)
