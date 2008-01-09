@@ -300,6 +300,7 @@ data DynFlags = DynFlags {
   extCoreName		:: String,	-- name of the .core output file
   verbosity  		:: Int,	 	-- verbosity level
   optLevel		:: Int,		-- optimisation level
+  simplPhases           :: Int,         -- number of simplifier phases
   maxSimplIterations    :: Int,		-- max simplifier iterations
   ruleCheck		:: Maybe String,
 
@@ -479,6 +480,7 @@ defaultDynFlags =
 	extCoreName		= "",
 	verbosity		= 0, 
 	optLevel		= 0,
+        simplPhases             = 2,
 	maxSimplIterations	= 4,
 	ruleCheck		= Nothing,
 	specConstrThreshold	= Just 200,
@@ -778,6 +780,7 @@ getCoreToDo dflags
   | otherwise = core_todo
   where
     opt_level  	  = optLevel dflags
+    phases        = simplPhases dflags
     max_iter   	  = maxSimplIterations dflags
     strictness    = dopt Opt_Strictness dflags
     full_laziness = dopt Opt_FullLaziness dflags
@@ -796,6 +799,20 @@ getCoreToDo dflags
                                  ],
                                  maybe_rule_check phase
                                ]
+
+                -- By default, we have 2 phases before phase 0.
+
+		-- Want to run with inline phase 2 after the specialiser to give
+		-- maximum chance for fusion to work before we inline build/augment
+		-- in phase 1.  This made a difference in 'ansi' where an 
+		-- overloaded function wasn't inlined till too late.
+
+		-- Need phase 1 so that build/augment get 
+		-- inlined.  I found that spectral/hartel/genfft lost some useful
+		-- strictness in the function sumcode' if augment is not inlined
+		-- before strictness analysis runs
+    simpl_phases = CoreDoPasses [ simpl_phase phase max_iter
+                                  | phase <- [phases, phases-1 .. 1] ]
 
 
 	-- initial simplify: mk specialiser happy: minimum effort please
@@ -835,17 +852,7 @@ getCoreToDo dflags
 
 	CoreDoFloatInwards,
 
-		-- Want to run with inline phase 2 after the specialiser to give
-		-- maximum chance for fusion to work before we inline build/augment
-		-- in phase 1.  This made a difference in 'ansi' where an 
-		-- overloaded function wasn't inlined till too late.
-        simpl_phase 2 max_iter,
-
-		-- Need inline-phase2 here so that build/augment get 
-		-- inlined.  I found that spectral/hartel/genfft lost some useful
-		-- strictness in the function sumcode' if augment is not inlined
-		-- before strictness analysis runs
-	simpl_phase 1 max_iter,
+        simpl_phases,
 
 		-- Phase 0: allow all Ids to be inlined now
 		-- This gets foldr inlined before strictness analysis
@@ -1130,6 +1137,8 @@ dynamic_flags = [
   ,  ( "O"	, OptIntSuffix (\mb_n -> upd (setOptLevel (mb_n `orElse` 1))))
 		-- If the number is missing, use 1
 
+  ,  ( "fsimplifier-phases",         IntSuffix (\n ->
+                upd (\dfs -> dfs{ simplPhases = n })) )
   ,  ( "fmax-simplifier-iterations", IntSuffix (\n -> 
 		upd (\dfs -> dfs{ maxSimplIterations = n })) )
 
