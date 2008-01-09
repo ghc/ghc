@@ -39,6 +39,7 @@ copy_tag(StgClosure **p, StgClosure *src, nat size, step *stp, StgWord tag)
 	return evacuate(p); // does the failed_to_evac stuff
     }
 #else
+    ASSERT(n_gc_threads == 1);
     info = (W_)src->header.info;
     src->header.info = &stg_EVACUATED_info;
 #endif
@@ -563,3 +564,8 @@ loop:
 
   barf("evacuate");
 }
+
+#undef copy
+#undef copy_tag
+#undef copyPart
+#undef evacuate

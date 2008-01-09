@@ -20,6 +20,7 @@
 #else
 #undef scavenge_block
 #undef evacuate
+#undef recordMutableGen_GC
 #endif
 
 static void scavenge_block (bdescr *bd, StgPtr scan);
