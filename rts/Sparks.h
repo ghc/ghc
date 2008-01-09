@@ -13,7 +13,6 @@
 StgClosure * findSpark         (Capability *cap);
 void         initSparkPools    (void);
 void         freeSparkPool     (StgSparkPool *pool);
-void         markSparkQueue    (evac_fn evac, Capability *cap);
 void         createSparkThread (Capability *cap, StgClosure *p);
 
 INLINE_HEADER void     discardSparks  (StgSparkPool *pool);
