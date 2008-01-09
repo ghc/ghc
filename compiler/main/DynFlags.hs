@@ -774,6 +774,10 @@ runWhen :: Bool -> CoreToDo -> CoreToDo
 runWhen True  do_this = do_this
 runWhen False do_this = CoreDoNothing
 
+runMaybe :: Maybe a -> (a -> CoreToDo) -> CoreToDo
+runMaybe (Just x) f = f x
+runMaybe Nothing  _ = CoreDoNothing
+
 getCoreToDo :: DynFlags -> [CoreToDo]
 getCoreToDo dflags
   | Just todo <- coreToDo dflags = todo -- set explicitly by user
@@ -790,8 +794,7 @@ getCoreToDo dflags
     rule_check    = ruleCheck dflags
     vectorisation = dopt Opt_Vectorise dflags
 
-    maybe_rule_check phase | Just s <- rule_check = CoreDoRuleCheck phase s
-                           | otherwise            = CoreDoNothing
+    maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
     simpl_phase phase iter = CoreDoPasses
                                [ CoreDoSimplify (SimplPhase phase) [
@@ -842,7 +845,7 @@ getCoreToDo dflags
 
         -- We run vectorisation here for now, but we might also try to run
         -- it later
-        runWhen vectorisation (CoreDoPasses [ CoreDoVectorisation, simpl_gently]),
+        runWhen vectorisation (CoreDoPasses [ CoreDoVectorisation, simpl_gently ]),
 
 	-- Specialisation is best done before full laziness
 	-- so that overloaded functions have all their dictionary lambdas manifest
