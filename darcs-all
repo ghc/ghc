@@ -11,8 +11,10 @@ chomp $defaultrepo;
 my $defaultrepo_base;
 my $defaultrepo_lib;
 
-if ($defaultrepo =~ /:/) {
+if ($defaultrepo =~ /^...*:/) {
     # HTTP or SSH
+    # Above regex says "at least two chars before the :", to avoid
+    # catching Win32 drives ("C:\").
     $defaultrepo_base = $defaultrepo;
     $defaultrepo_base =~ s#/[^/]+/?$##;
     $defaultrepo_lib = "$defaultrepo_base/packages";
