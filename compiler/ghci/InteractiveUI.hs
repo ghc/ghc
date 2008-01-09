@@ -106,48 +106,66 @@ GLOBAL_VAR(macros_ref, [], [Command])
 builtin_commands :: [Command]
 builtin_commands = [
 	-- Hugs users are accustomed to :e, so make sure it doesn't overlap
-  ("?",		keepGoing help,			False, completeNone),
-  ("add",	keepGoingPaths addModule,	False, completeFilename),
-  ("abandon",   keepGoing abandonCmd,           False, completeNone),
-  ("break",     keepGoing breakCmd,             False, completeIdentifier),
-  ("back",      keepGoing backCmd,              False, completeNone),
-  ("browse",    keepGoing (browseCmd False),	False, completeModule),
-  ("browse!",   keepGoing (browseCmd True),	False, completeModule),
-  ("cd",    	keepGoing changeDirectory,	False, completeFilename),
-  ("check",	keepGoing checkModule,		False, completeHomeModule),
-  ("continue",  keepGoing continueCmd,          False, completeNone),
-  ("cmd",       keepGoing cmdCmd,               False, completeIdentifier),
-  ("ctags",	keepGoing createCTagsFileCmd, 	False, completeFilename),
-  ("def",	keepGoing (defineMacro False),  False, completeIdentifier),
-  ("def!",	keepGoing (defineMacro True),   False, completeIdentifier),
-  ("delete",    keepGoing deleteCmd,            False, completeNone),
-  ("e", 	keepGoing editFile,		False, completeFilename),
-  ("edit",	keepGoing editFile,		False, completeFilename),
-  ("etags",	keepGoing createETagsFileCmd,	False, completeFilename),
-  ("force",     keepGoing forceCmd,             False, completeIdentifier),
-  ("forward",   keepGoing forwardCmd,           False, completeNone),
-  ("help",	keepGoing help,			False, completeNone),
-  ("history",   keepGoing historyCmd,           False, completeNone), 
-  ("info",      keepGoing info,			False, completeIdentifier),
-  ("kind",	keepGoing kindOfType,		False, completeIdentifier),
-  ("load",	keepGoingPaths loadModule_,     False, completeHomeModuleOrFile),
-  ("list",	keepGoing listCmd,              False, completeNone),
-  ("module",	keepGoing setContext,		False, completeModule),
-  ("main",	keepGoing runMain,		False, completeIdentifier),
-  ("print",     keepGoing printCmd,             False, completeIdentifier),
-  ("quit",	quit,				False, completeNone),
-  ("reload", 	keepGoing reloadModule,  	False, completeNone),
-  ("set",	keepGoing setCmd,		True,  completeSetOptions),
-  ("show",	keepGoing showCmd,		False, completeNone),
-  ("sprint",    keepGoing sprintCmd,            False, completeIdentifier),
-  ("step",      keepGoing stepCmd,              False, completeIdentifier), 
-  ("steplocal", keepGoing stepLocalCmd,         False, completeIdentifier), 
-  ("stepmodule",keepGoing stepModuleCmd,        False, completeIdentifier), 
-  ("type",	keepGoing typeOfExpr,		False, completeIdentifier),
-  ("trace",     keepGoing traceCmd,             False, completeIdentifier), 
-  ("undef",     keepGoing undefineMacro,	False, completeMacro),
-  ("unset",	keepGoing unsetOptions,		True,  completeSetOptions)
+  ("?",		keepGoing help,			Nothing, completeNone),
+  ("add",	keepGoingPaths addModule,	Just filenameWordBreakChars, completeFilename),
+  ("abandon",   keepGoing abandonCmd,           Nothing, completeNone),
+  ("break",     keepGoing breakCmd,             Nothing, completeIdentifier),
+  ("back",      keepGoing backCmd,              Nothing, completeNone),
+  ("browse",    keepGoing (browseCmd False),	Nothing, completeModule),
+  ("browse!",   keepGoing (browseCmd True),	Nothing, completeModule),
+  ("cd",    	keepGoing changeDirectory,	Just filenameWordBreakChars, completeFilename),
+  ("check",	keepGoing checkModule,		Nothing, completeHomeModule),
+  ("continue",  keepGoing continueCmd,          Nothing, completeNone),
+  ("cmd",       keepGoing cmdCmd,               Nothing, completeIdentifier),
+  ("ctags",	keepGoing createCTagsFileCmd, 	Just filenameWordBreakChars, completeFilename),
+  ("def",	keepGoing (defineMacro False),  Nothing, completeIdentifier),
+  ("def!",	keepGoing (defineMacro True),   Nothing, completeIdentifier),
+  ("delete",    keepGoing deleteCmd,            Nothing, completeNone),
+  ("e", 	keepGoing editFile,		Just filenameWordBreakChars, completeFilename),
+  ("edit",	keepGoing editFile,		Just filenameWordBreakChars, completeFilename),
+  ("etags",	keepGoing createETagsFileCmd,	Just filenameWordBreakChars, completeFilename),
+  ("force",     keepGoing forceCmd,             Nothing, completeIdentifier),
+  ("forward",   keepGoing forwardCmd,           Nothing, completeNone),
+  ("help",	keepGoing help,			Nothing, completeNone),
+  ("history",   keepGoing historyCmd,           Nothing, completeNone), 
+  ("info",      keepGoing info,			Nothing, completeIdentifier),
+  ("kind",	keepGoing kindOfType,		Nothing, completeIdentifier),
+  ("load",	keepGoingPaths loadModule_,     Just filenameWordBreakChars, completeHomeModuleOrFile),
+  ("list",	keepGoing listCmd,              Nothing, completeNone),
+  ("module",	keepGoing setContext,		Nothing, completeModule),
+  ("main",	keepGoing runMain,		Nothing, completeIdentifier),
+  ("print",     keepGoing printCmd,             Nothing, completeIdentifier),
+  ("quit",	quit,				Nothing, completeNone),
+  ("reload", 	keepGoing reloadModule,  	Nothing, completeNone),
+  ("set",	keepGoing setCmd,		Just flagWordBreakChars, completeSetOptions),
+  ("show",	keepGoing showCmd,		Nothing, completeNone),
+  ("sprint",    keepGoing sprintCmd,            Nothing, completeIdentifier),
+  ("step",      keepGoing stepCmd,              Nothing, completeIdentifier), 
+  ("steplocal", keepGoing stepLocalCmd,         Nothing, completeIdentifier), 
+  ("stepmodule",keepGoing stepModuleCmd,        Nothing, completeIdentifier), 
+  ("type",	keepGoing typeOfExpr,		Nothing, completeIdentifier),
+  ("trace",     keepGoing traceCmd,             Nothing, completeIdentifier), 
+  ("undef",     keepGoing undefineMacro,	Nothing, completeMacro),
+  ("unset",	keepGoing unsetOptions,		Just flagWordBreakChars,  completeSetOptions)
   ]
+
+
+-- We initialize readline (in the interactiveUI function) to use 
+-- word_break_chars as the default set of completion word break characters.
+-- This can be overridden for a particular command (for example, filename
+-- expansion shouldn't consider '/' to be a word break) by setting the third
+-- entry in the Command tuple above.
+-- 
+-- NOTE: in order for us to override the default correctly, any custom entry
+-- must be a SUBSET of word_break_chars.
+word_break_chars, flagWordBreakChars, filenameWordBreakChars :: String
+word_break_chars = let symbols = "!#$%&*+/<=>?@\\^|-~"
+                       specials = "(),;[]`{}"
+                       spaces = " \t\n"
+                   in spaces ++ specials ++ symbols
+flagWordBreakChars = " \t\n"
+filenameWordBreakChars = " \t\n\\`@$><=;|&{(" -- bash defaults
+
 
 keepGoing :: (String -> GHCi ()) -> (String -> GHCi Bool)
 keepGoing a str = a str >> return False
@@ -289,11 +307,6 @@ interactiveUI session srcs maybe_expr = do
    Readline.initialize
    Readline.setAttemptedCompletionFunction (Just completeWord)
    --Readline.parseAndBind "set show-all-if-ambiguous 1"
-
-   let symbols = "!#$%&*+/<=>?@\\^|-~"
-       specials = "(),;[]`{}"
-       spaces = " \t\n"
-       word_break_chars = spaces ++ specials ++ symbols
 
    Readline.setBasicWordBreakCharacters word_break_chars
    Readline.setCompleterWordBreakCharacters word_break_chars
@@ -936,7 +949,7 @@ defineMacro overwrite s = do
   case maybe_hv of
      Nothing -> return ()
      Just hv -> io (writeIORef macros_ref --
-		    (filtered ++ [(macro_name, runMacro hv, False, completeNone)]))
+		    (filtered ++ [(macro_name, runMacro hv, Nothing, completeNone)]))
 
 runMacro :: GHC.HValue{-String -> IO String-} -> String -> GHCi Bool
 runMacro fun s = do
@@ -1619,23 +1632,24 @@ completeWord w start end = do
      ':':_ | all isSpace (take (start-1) line) -> wrapCompleter completeCmd w
      _other
 	| ((':':c) : _) <- line_words -> do
-	   maybe_cmd <- lookupCommand' c
-           let (n,w') = selectWord (words' 0 line)
-	   case maybe_cmd of
-	     Nothing -> return Nothing
-	     Just (_,_,False,complete) -> wrapCompleter complete w
-	     Just (_,_,True,complete) -> let complete' w = do rets <- complete w
-                                                              return (map (drop n) rets)
-                                         in wrapCompleter complete' w'
+           completionVars <- lookupCompletionVars c
+	   case completionVars of
+	     (Nothing,complete) -> wrapCompleter complete w
+	     (Just breakChars,complete) 
+                    -> let (n,w') = selectWord 
+                                        (words' (`elem` breakChars) 0 line)
+                           complete' w = do rets <- complete w
+                                            return (map (drop n) rets)
+                       in wrapCompleter complete' w'
         | ("import" : _) <- line_words ->
                 wrapCompleter completeModule w
 	| otherwise     -> do
 		--printf "complete %s, start = %d, end = %d\n" w start end
 		wrapCompleter completeIdentifier w
-    where words' _ [] = []
-          words' n str = let (w,r) = break isSpace str
-                             (s,r') = span isSpace r
-                         in (n,w):words' (n+length w+length s) r'
+    where words' _ _ [] = []
+          words' isBreak n str = let (w,r) = break isBreak str
+                                     (s,r') = span isBreak r
+                                 in (n,w):words' isBreak (n+length w+length s) r'
           -- In a Haskell expression we want to parse 'a-b' as three words
           -- where a compiler flag (ie. -fno-monomorphism-restriction) should
           -- only be a single word.
@@ -1643,6 +1657,16 @@ completeWord w start end = do
           selectWord ((offset,x):xs)
               | offset+length x >= start = (start-offset,take (end-offset) x)
               | otherwise = selectWord xs
+          
+          lookupCompletionVars ('!':_) = return (Just filenameWordBreakChars,
+                                            completeFilename)
+          lookupCompletionVars c = do
+              maybe_cmd <- lookupCommand' c
+              case maybe_cmd of
+                  Just (_,_,ws,f) -> return (ws,f)
+                  Nothing -> return (Just filenameWordBreakChars,
+                                        completeFilename)
+
 
 completeCmd :: String -> IO [String]
 completeCmd w = do

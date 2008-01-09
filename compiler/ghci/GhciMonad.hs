@@ -46,7 +46,7 @@ import GHC.Exts
 -----------------------------------------------------------------------------
 -- GHCi monad
 
-type Command = (String, String -> GHCi Bool, Bool, String -> IO [String])
+type Command = (String, String -> GHCi Bool, Maybe String, String -> IO [String])
 
 data GHCiState = GHCiState
      { 
