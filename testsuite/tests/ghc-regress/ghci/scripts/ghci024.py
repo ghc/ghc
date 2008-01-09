@@ -204,6 +204,7 @@ active language flags:
   -XUnliftedFFITypes
   -XLiberalTypeSynonyms
   -XRankNTypes
+  -XImpredicativeTypes
   -XTypeOperators
   -XRecursiveDo
   -XImplicitPrelude
