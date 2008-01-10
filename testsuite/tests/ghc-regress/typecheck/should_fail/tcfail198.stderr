@@ -1,0 +1,10 @@
+
+tcfail198.hs:6:37:
+    Couldn't match expected type `a1' against inferred type `a'
+      `a1' is a rigid type variable bound by
+           the polymorphic type `forall a1. a1' at tcfail198.hs:6:37
+      `a' is a rigid type variable bound by
+          the polymorphic type `forall a. [a] -> [a]' at tcfail198.hs:6:18
+    In the expression: x :: a
+    In the second argument of `(++)', namely `[x :: a]'
+    In the expression: xs ++ [x :: a]
