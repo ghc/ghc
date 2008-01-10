@@ -35,7 +35,7 @@ import Module
 import UniqFM		( eltsUFM )
 import ErrUtils
 import DynFlags
-import StaticFlags	( v_Ld_inputs, opt_Static, opt_HardwireLibPaths, WayName(..) )
+import StaticFlags	( v_Ld_inputs, opt_Static, WayName(..) )
 import Config
 import Panic
 import Util
@@ -1197,8 +1197,12 @@ linkBinary dflags o_files dep_packages = do
 
     pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
     let pkg_lib_path_opts = concat (map get_pkg_lib_path_opts pkg_lib_paths)
-	get_pkg_lib_path_opts l | opt_HardwireLibPaths && not opt_Static = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
-				| otherwise = ["-L" ++ l]
+#ifdef linux_TARGET_OS
+        get_pkg_lib_path_opts l | (dynLibLoader dflags)==SystemDependent && not opt_Static = ["-L" ++ l, "-Wl,-rpath", "-Wl," ++ l]
+                                | otherwise = ["-L" ++ l]
+#else
+        get_pkg_lib_path_opts l = ["-L" ++ l]
+#endif
 
     let lib_paths = libraryPaths dflags
     let lib_path_opts = map ("-L"++) lib_paths

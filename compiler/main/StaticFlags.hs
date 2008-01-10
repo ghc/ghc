@@ -64,7 +64,6 @@ module StaticFlags (
 	-- Related to linking
 	opt_PIC,
 	opt_Static,
-	opt_HardwireLibPaths,
 
 	-- misc opts
 	opt_IgnoreDotGhci,
@@ -336,7 +335,6 @@ opt_PIC                         = True
 opt_PIC                         = lookUp FSLIT("-fPIC")
 #endif
 opt_Static			= lookUp  FSLIT("-static")
-opt_HardwireLibPaths		= lookUp  FSLIT("-fhardwire-lib-paths")
 opt_Unregisterised		= lookUp  FSLIT("-funregisterised")
 
 -- Derived, not a real option.  Determines whether we will be compiling
