@@ -310,6 +310,7 @@ interactiveUI session srcs maybe_expr = do
 
    Readline.setBasicWordBreakCharacters word_break_chars
    Readline.setCompleterWordBreakCharacters word_break_chars
+   Readline.setCompletionAppendCharacter Nothing
 #endif
 
    default_editor <- findEditor
@@ -1699,7 +1700,18 @@ completeSetOptions w = do
   return (filter (w `isPrefixOf`) options)
     where options = "args":"prog":allFlags
 
-completeFilename = Readline.filenameCompletionFunction
+completeFilename w = do
+    ws <- Readline.filenameCompletionFunction w
+    case ws of
+        -- If we only found one result, and it's a directory, 
+        -- add a trailing slash.
+        [file] -> do
+                isDir <- expandPathIO file >>= doesDirectoryExist
+                if isDir && last file /= '/'
+                    then return [file ++ "/"]
+                    else return [file]
+        _ -> return ws
+                
 
 completeHomeModuleOrFile = unionComplete completeHomeModule completeFilename
 
@@ -1713,8 +1725,10 @@ wrapCompleter :: (String -> IO [String]) -> String -> IO (Maybe (String,[String]
 wrapCompleter fun w =  do
   strs <- fun w
   case strs of
-    []  -> return Nothing
-    [x] -> return (Just (x,[]))
+    []  -> Readline.setAttemptedCompletionOver True >> return Nothing
+    [x] -> -- Add a trailing space, unless it already has an appended slash.
+           let appended = if last x == '/' then x else x ++ " "
+           in return (Just (appended,[]))
     xs  -> case getCommonPrefix xs of
 		""   -> return (Just ("",xs))
 		pref -> return (Just (pref,xs))
@@ -1795,10 +1809,13 @@ ghciUnblock (GHCi a) = GHCi $ \s -> Exception.unblock (a s)
 -- Utils
 
 expandPath :: String -> GHCi String
-expandPath path = 
+expandPath path = io (expandPathIO path)
+
+expandPathIO :: String -> IO String
+expandPathIO path = 
   case dropWhile isSpace path of
    ('~':d) -> do
-	tilde <- io getHomeDirectory -- will fail if HOME not defined
+	tilde <- getHomeDirectory -- will fail if HOME not defined
 	return (tilde ++ '/':d)
    other -> 
 	return other
