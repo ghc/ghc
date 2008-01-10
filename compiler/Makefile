@@ -745,15 +745,12 @@ SRC_LD_OPTS += -no-link-chk
 
 INPLACE_SRC  = $(odir)/ghc-inplace.c
 INPLACE_PROG = $(odir)/ghc-inplace$(_way)$(exeext)
+INPLACE_EXTRA_FLAGS = -I$(TOP)/includes
 EXCLUDED_C_SRCS += ghc-inplace.c
 
 CLEAN_FILES += $(INPLACE_SRC)
 
 GHC_PATH=$(FPTOOLS_TOP_ABS)/$(GHC_COMPILER_DIR_REL)/$(GHC_PROG)$(exeext)
-
-ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-INPLACE_EXTRA_FLAGS = -optc-DWINDOWS
-endif
 
 $(INPLACE_PROG): ghc-inplace.c
 	$(SED) -e "s@GHC_PATH@$(GHC_PATH)@g" -e "s@TOP_ABS@$(FPTOOLS_TOP_ABS)@g" < $< > $(INPLACE_SRC)
