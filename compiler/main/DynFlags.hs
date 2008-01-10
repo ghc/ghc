@@ -1335,7 +1335,10 @@ xFlags = [
 
 impliedFlags :: [(DynFlag, [DynFlag])]
 impliedFlags = [
-  ( Opt_GADTs, [Opt_RelaxedPolyRec] )	-- We want type-sig variables to be completely rigid for GADTs
+   ( Opt_GADTs, 	      [Opt_RelaxedPolyRec] )	-- We want type-sig variables to 
+							-- 	be completely rigid for GADTs
+ , ( Opt_ScopedTypeVariables, [Opt_RelaxedPolyRec] )	-- Ditto for scoped type variables; see
+							-- 	Note [Scoped tyvars] in TcBinds
   ]
 
 glasgowExtsFlags = [

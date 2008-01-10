@@ -548,14 +548,17 @@ tcMonoBinds [L b_loc (FunBind { fun_id = L nm_loc name, fun_infix = inf,
 	-- we can (a) use genuine, rigid skolem constants for the type variables
 	--	  (b) bring (rigid) scoped type variables into scope
     setSrcSpan b_loc  	$
-    do	{ tc_sig <- tcInstSig True name scoped_tvs
+    do	{ tc_sig <- tcInstSig True name
 	; mono_name <- newLocalName name
 	; let mono_ty = sig_tau tc_sig
 	      mono_id = mkLocalId mono_name mono_ty
 	      rhs_tvs = [ (name, mkTyVarTy tv)
-			| (name, tv) <- sig_scoped tc_sig `zip` sig_tvs tc_sig ]
+		        | (name, tv) <- scoped_tvs `zip` sig_tvs tc_sig ]
+			-- See Note [More instantiated than scoped]
+			-- Note that the scoped_tvs and the (sig_tvs sig) 
+			-- may have different Names. That's quite ok.
 
-	; (co_fn, matches') <- tcExtendTyVarEnv2 rhs_tvs    $
+	; (co_fn, matches') <- tcExtendTyVarEnv2 rhs_tvs $
 		    	       tcMatchesFun mono_name inf matches mono_ty
 
 	; let fun_bind' = FunBind { fun_id = L nm_loc mono_id, 
@@ -574,7 +577,7 @@ tcMonoBinds binds sig_fn non_rec
 			 	-- A monomorphic binding for each term variable that lacks 
 				-- a type sig.  (Ones with a sig are already in scope.)
 
-	; binds' <- tcExtendIdEnv2    rhs_id_env $
+	; binds' <- tcExtendIdEnv2 rhs_id_env $
 		    traceTc (text "tcMonoBinds" <+> vcat [ ppr n <+> ppr id <+> ppr (idType id) 
 							 | (n,id) <- rhs_id_env]) `thenM_`
 		    mapM (wrapLocM tcRhs) tc_binds
@@ -662,7 +665,11 @@ tcLhs sig_fn other_bind = pprPanic "tcLhs" (ppr other_bind)
 
 -------------------
 tcRhs :: TcMonoBind -> TcM (HsBind TcId)
-tcRhs (TcFunBind info fun'@(L _ mono_id) inf matches)
+-- When we are doing pattern bindings, or multiple function bindings at a time
+-- we *don't* bring any scoped type variables into scope
+-- Wny not?  They are not completely rigid.
+-- That's why we have the special case for a single FunBind in tcMonoBinds
+tcRhs (TcFunBind (_,_,mono_id) fun' inf matches)
   = do	{ (co_fn, matches') <- tcMatchesFun (idName mono_id) inf 
 				    	    matches (idType mono_id)
 	; return (FunBind { fun_id = fun', fun_infix = inf, fun_matches = matches',
@@ -970,6 +977,44 @@ The @TcSigInfo@ contains @TcTypes@ because they are unified with
 the variable's type, and after that checked to see whether they've
 been instantiated.
 
+Note [Scoped tyvars]
+~~~~~~~~~~~~~~~~~~~~
+The -XScopedTypeVariables flag brings lexically-scoped type variables
+into scope for any explicitly forall-quantified type variables:
+	f :: forall a. a -> a
+	f x = e
+Then 'a' is in scope inside 'e'.
+
+However, we do *not* support this 
+  - For pattern bindings e.g
+	f :: forall a. a->a
+	(f,g) = e
+
+  - For multiple function bindings, unless Opt_RelaxedPolyRec is on
+   	f :: forall a. a -> a
+	f = g
+   	g :: forall b. b -> b
+	g = ...f...
+    Reason: we use mutable variables for 'a' and 'b', since they may
+    unify to each other, and that means the scoped type variable would
+    not stand for a completely rigid variable.
+
+    Currently, we simply make Opt_ScopedTypeVariables imply Opt_RelaxedPolyRec
+
+
+Note [More instantiated than scoped]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+There may be more instantiated type variables than lexically-scoped 
+ones.  For example:
+	type T a = forall b. b -> (a,b)
+	f :: forall c. T c
+Here, the signature for f will have one scoped type variable, c,
+but two instantiated type variables, c' and b'.  
+
+We assume that the scoped ones are at the *front* of sig_tvs,
+and remember the names from the original HsForAllTy in the TcSigFun.
+
+
 \begin{code}
 type TcSigFun = Name -> Maybe [Name]	-- Maps a let-binder to the list of
 					-- type variables brought into scope
@@ -986,17 +1031,13 @@ mkTcSigFun sigs = lookupNameEnv env
 		    | L span (TypeSig (L _ name) lhs_ty) <- sigs]
 	-- The scoped names are the ones explicitly mentioned
 	-- in the HsForAll.  (There may be more in sigma_ty, because
-	-- of nested type synonyms.  See Note [Scoped] with TcSigInfo.)
+	-- of nested type synonyms.  See Note [More instantiated than scoped].)
 	-- See Note [Only scoped tyvars are in the TyVarEnv]
 
 ---------------
 data TcSigInfo
   = TcSigInfo {
 	sig_id     :: TcId,		--  *Polymorphic* binder for this value...
-
-	sig_scoped :: [Name],		-- Names for any scoped type variables
-					-- Invariant: correspond 1-1 with an initial
-					-- segment of sig_tvs (see Note [Scoped])
 
 	sig_tvs    :: [TcTyVar],	-- Instantiated type variables
 					-- See Note [Instantiate sig]
@@ -1018,17 +1059,6 @@ data TcSigInfo
 -- the lexically-scoped ones are... and at the moment we do that by putting
 -- only the lexically scoped ones into the environment.
 
-
--- 	Note [Scoped]
--- There may be more instantiated type variables than scoped 
--- ones.  For example:
---	type T a = forall b. b -> (a,b)
---	f :: forall c. T c
--- Here, the signature for f will have one scoped type variable, c,
--- but two instantiated type variables, c' and b'.  
---
--- We assume that the scoped ones are at the *front* of sig_tvs,
--- and remember the names from the original HsForAllTy in sig_scoped
 
 -- 	Note [Instantiate sig]
 -- It's vital to instantiate a type signature with fresh variables.
@@ -1060,10 +1090,12 @@ tcInstSig_maybe :: TcSigFun -> Name -> TcM (Maybe TcSigInfo)
 tcInstSig_maybe sig_fn name 
   = case sig_fn name of
 	Nothing  -> return Nothing
-	Just tvs -> do	{ tc_sig <- tcInstSig False name tvs
-			; return (Just tc_sig) }
+	Just scoped_tvs -> do	{ tc_sig <- tcInstSig False name
+				; return (Just tc_sig) }
+	-- NB: the scoped_tvs may be non-empty, but we can 
+	-- just ignore them.  See Note [Scoped tyvars].
 
-tcInstSig :: Bool -> Name -> [Name] -> TcM TcSigInfo
+tcInstSig :: Bool -> Name -> TcM TcSigInfo
 -- Instantiate the signature, with either skolems or meta-type variables
 -- depending on the use_skols boolean.  This variable is set True
 -- when we are typechecking a single function binding; and False for
@@ -1082,7 +1114,7 @@ tcInstSig :: Bool -> Name -> [Name] -> TcM TcSigInfo
 --
 -- We must not use the same 'a' from the defn of T at both places!!
 
-tcInstSig use_skols name scoped_names
+tcInstSig use_skols name
   = do	{ poly_id <- tcLookupId name	-- Cannot fail; the poly ids are put into 
 					-- scope when starting the binding group
 	; let skol_info = SigSkol (FunSigCtxt name)
@@ -1091,15 +1123,7 @@ tcInstSig use_skols name scoped_names
 	; loc <- getInstLoc (SigOrigin skol_info)
 	; return (TcSigInfo { sig_id = poly_id,
 			      sig_tvs = tvs, sig_theta = theta, sig_tau = tau, 
-			      sig_scoped = final_scoped_names, sig_loc = loc }) }
-		-- Note that the scoped_names and the sig_tvs will have
-		-- different Names. That's quite ok; when we bring the 
-		-- scoped_names into scope, we just bind them to the sig_tvs
-  where
-	-- We also only have scoped type variables when we are instantiating
-	-- with true skolems
-    final_scoped_names | use_skols = scoped_names
-		       | otherwise = []
+			      sig_loc = loc }) }
 
 -------------------
 isMonoGroup :: DynFlags -> [LHsBind Name] -> Bool

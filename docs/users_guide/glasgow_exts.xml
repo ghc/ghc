@@ -2400,7 +2400,7 @@ may use different notation to that implemented in GHC.
 </para>
 <para>
 The rest of this section outlines the extensions to GHC that support GADTs.   The extension is enabled with 
-<option>-XGADTs</option>.
+<option>-XGADTs</option>.  The <option>-XGADTs</option> flag also sets <option>-XRelaxedPolyRec</option>.
 <itemizedlist>
 <listitem><para>
 A GADT can only be declared using GADT-style syntax (<xref linkend="gadt-style"/>); 
@@ -4544,7 +4544,7 @@ a type for <varname>ys</varname>; a major benefit of scoped type variables is th
 it becomes possible to do so.
 </para>
 <para>Lexically-scoped type variables are enabled by
-<option>-fglasgow-exts</option>.
+<option>-XScopedTypeVariables</option>.  This flag implies <option>-XRelaxedPolyRec</option>.
 </para>
 <para>Note: GHC 6.6 contains substantial changes to the way that scoped type
 variables work, compared to earlier releases.  Read this section
@@ -4602,7 +4602,7 @@ then
 <para>A declaration type signature that has <emphasis>explicit</emphasis>
 quantification (using <literal>forall</literal>) brings into scope the
 explicitly-quantified
-type variables, in the definition of the named function(s).  For example:
+type variables, in the definition of the named function.  For example:
 <programlisting>
   f :: forall a. [a] -> [a]
   f (x:xs) = xs ++ [ x :: a ]
@@ -4610,7 +4610,9 @@ type variables, in the definition of the named function(s).  For example:
 The "<literal>forall a</literal>" brings "<literal>a</literal>" into scope in
 the definition of "<literal>f</literal>".
 </para>
-<para>This only happens if the quantification in <literal>f</literal>'s type
+<para>This only happens if:
+<itemizedlist>
+<listitem><para> The quantification in <literal>f</literal>'s type
 signature is explicit.  For example:
 <programlisting>
   g :: [a] -> [a]
@@ -4620,6 +4622,26 @@ This program will be rejected, because "<literal>a</literal>" does not scope
 over the definition of "<literal>f</literal>", so "<literal>x::a</literal>"
 means "<literal>x::forall a. a</literal>" by Haskell's usual implicit
 quantification rules.
+</para></listitem>
+<listitem><para> The signature gives a type for a function binding or a bare variable binding, 
+not a pattern binding.
+For example:
+<programlisting>
+  f1 :: forall a. [a] -> [a]
+  f1 (x:xs) = xs ++ [ x :: a ]   -- OK
+
+  f2 :: forall a. [a] -> [a]
+  f2 = \(x:xs) -> xs ++ [ x :: a ]   -- OK
+
+  f3 :: forall a. [a] -> [a] 
+  Just f3 = Just (\(x:xs) -> xs ++ [ x :: a ])   -- Not OK!
+</programlisting>
+The binding for <literal>f3</literal> is a pattern binding, and so its type signature
+does not bring <literal>a</literal> into scope.   However <literal>f1</literal> is a
+function binding, and <literal>f2</literal> binds a bare variable; in both cases
+the type signature brings <literal>a</literal> into scope.
+</para></listitem>
+</itemizedlist>
 </para>
 </sect3>
 
