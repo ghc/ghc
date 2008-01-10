@@ -34,7 +34,9 @@ copy_tag(StgClosure **p, StgClosure *src, nat size, step *stp, StgWord tag)
 	info = xchg((StgPtr)&src->header.info, (W_)&stg_WHITEHOLE_info);
 	// so..  what is it?
     } while (info == (W_)&stg_WHITEHOLE_info);
-    if (info == (W_)&stg_EVACUATED_info) {
+    if (info == (W_)&stg_EVACUATED_info || info == (W_)&stg_IND_info) {
+        // NB. a closure might be updated with an IND by
+        // unchain_selector_thunks(), hence the test above.
 	src->header.info = (const StgInfoTable *)info;
 	return evacuate(p); // does the failed_to_evac stuff
     }

@@ -169,6 +169,9 @@ unchain_thunk_selectors(StgSelector *p, StgClosure *val)
 #else
         ASSERT(p->header.info == &stg_BLACKHOLE_info);
 #endif
+        // val must be in to-space.
+        ASSERT(Bdescr((P_)val)->gen_no > N || (Bdescr((P_)val)->flags & BF_EVACUATED));
+
         prev = (StgSelector*)((StgClosure *)p)->payload[0];
 
         // Update the THUNK_SELECTOR with an indirection to the
@@ -177,8 +180,9 @@ unchain_thunk_selectors(StgSelector *p, StgClosure *val)
         // EVACUATED closure always points to an object in the
         // same or an older generation (required by the short-cut
         // test in the EVACUATED case, below).
-        SET_INFO(p, &stg_IND_info);
         ((StgInd *)p)->indirectee = val;
+        write_barrier();
+        SET_INFO(p, &stg_IND_info);
 
         // For the purposes of LDV profiling, we have created an
         // indirection.
@@ -243,16 +247,26 @@ selector_chain:
     // In threaded mode, we'll use WHITEHOLE to lock the selector
     // thunk while we evaluate it.
     {
-	info_ptr = xchg((StgPtr)&p->header.info, (W_)&stg_WHITEHOLE_info);
-	if (info_ptr == (W_)&stg_WHITEHOLE_info) {
-            do {
-                info_ptr = xchg((StgPtr)&p->header.info, (W_)&stg_WHITEHOLE_info);
-            } while (info_ptr == (W_)&stg_WHITEHOLE_info);
-            goto bale_out;
-	}
-        // make sure someone else didn't get here first
+        do {
+            info_ptr = xchg((StgPtr)&p->header.info, (W_)&stg_WHITEHOLE_info);
+        } while (info_ptr == (W_)&stg_WHITEHOLE_info);
+
+        // make sure someone else didn't get here first...
         if (INFO_PTR_TO_STRUCT(info_ptr)->type != THUNK_SELECTOR) {
-            goto bale_out;
+            // v. tricky now.  The THUNK_SELECTOR has been evacuated
+            // by another thread, and is now either EVACUATED or IND.
+            // We need to extract ourselves from the current situation
+            // as cleanly as possible.
+            //   - unlock the closure
+            //   - update *q, we may have done *some* evaluation
+            //   - if evac, we need to call evacuate(), because we
+            //     need the write-barrier stuff.
+            //   - undo the chain we've built to point to p.
+            SET_INFO(p, (const StgInfoTable *)info_ptr);
+            *q = (StgClosure *)p;
+            if (evac) evacuate(q);
+            unchain_thunk_selectors(prev_thunk_selector, (StgClosure *)p);
+            return;
         }
     }
 #else
@@ -404,6 +418,9 @@ bale_out:
     // We didn't manage to evaluate this thunk; restore the old info
     // pointer.  But don't forget: we still need to evacuate the thunk itself.
     SET_INFO(p, (const StgInfoTable *)info_ptr);
+    // THREADED_RTS: we just unlocked the thunk, so another thread
+    // might get in and update it.  copy() will lock it again and
+    // check whether it was updated in the meantime.
     *q = (StgClosure *)p;
     if (evac) {
         copy(q,(StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->step->to);
