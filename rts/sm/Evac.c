@@ -404,13 +404,11 @@ bale_out:
     // We didn't manage to evaluate this thunk; restore the old info
     // pointer.  But don't forget: we still need to evacuate the thunk itself.
     SET_INFO(p, (const StgInfoTable *)info_ptr);
+    *q = (StgClosure *)p;
     if (evac) {
-        copy(&val,(StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->step->to);
-    } else {
-        val = (StgClosure *)p;
+        copy(q,(StgClosure *)p,THUNK_SELECTOR_sizeW(),bd->step->to);
     }
-    *q = val;
-    unchain_thunk_selectors(prev_thunk_selector, val);
+    unchain_thunk_selectors(prev_thunk_selector, *q);
     return;
 }
 
