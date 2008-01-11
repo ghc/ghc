@@ -171,7 +171,6 @@ extern bdescr *oldgen_scan_bd;
 extern StgPtr  oldgen_scan;
 
 extern long copied;
-extern long scavd_copied;
 
 #ifdef THREADED_RTS
 extern SpinLock static_objects_sync;
