@@ -259,11 +259,28 @@ recordMutableGenLock(StgClosure *p, generation *gen)
     RELEASE_SM_LOCK;
 }
 
+extern bdescr *allocBlock_sync(void);
+
+// Version of recordMutableGen() for use in parallel GC.  The same as
+// recordMutableGen(), except that we surround it with a spinlock and
+// call the spinlock version of allocBlock().
 INLINE_HEADER void
 recordMutableGen_GC(StgClosure *p, generation *gen)
 {
+    bdescr *bd;
+
     ACQUIRE_SPIN_LOCK(&recordMutableGen_sync);
-    recordMutableGen(p,gen);
+
+    bd = gen->mut_list;
+    if (bd->free >= bd->start + BLOCK_SIZE_W) {
+	bdescr *new_bd;
+	new_bd = allocBlock_sync();
+	new_bd->link = bd;
+	bd = new_bd;
+	gen->mut_list = bd;
+    }
+    *bd->free++ = (StgWord)p;
+
     RELEASE_SPIN_LOCK(&recordMutableGen_sync);
 }
 
