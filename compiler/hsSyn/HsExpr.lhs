@@ -6,13 +6,6 @@
 HsExpr: Abstract Haskell syntax: expressions
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module HsExpr where
 
 #include "HsVersions.h"
@@ -333,7 +326,7 @@ ppr_expr (HsApp e1 e2)
     collect_args (L _ (HsApp fun arg)) args = collect_args fun (arg:args)
     collect_args fun args = (fun, args)
 
-ppr_expr (OpApp e1 op fixity e2)
+ppr_expr (OpApp e1 op _ e2)
   = case unLoc op of
       HsVar v -> pp_infixly v
       _	      -> pp_prefixly
@@ -405,7 +398,7 @@ ppr_expr (ExplicitPArr _ exprs)
 ppr_expr (ExplicitTuple exprs boxity)
   = tupleParens boxity (sep (punctuate comma (map ppr_lexpr exprs)))
 
-ppr_expr (RecordCon con_id con_expr rbinds)
+ppr_expr (RecordCon con_id _ rbinds)
   = hang (ppr con_id) 2 (ppr rbinds)
 
 ppr_expr (RecordUpd aexp rbinds _ _ _)
@@ -418,12 +411,13 @@ ppr_expr (ExprWithTySigOut expr sig)
   = hang (nest 2 (ppr_lexpr expr) <+> dcolon)
 	 4 (ppr sig)
 
-ppr_expr (ArithSeq expr info) = brackets (ppr info)
-ppr_expr (PArrSeq expr info)  = pa_brackets (ppr info)
+ppr_expr (ArithSeq _ info) = brackets (ppr info)
+ppr_expr (PArrSeq  _ info) = pa_brackets (ppr info)
 
-ppr_expr EWildPat     = char '_'
-ppr_expr (ELazyPat e) = char '~' <> pprParendExpr e
-ppr_expr (EAsPat v e) = ppr v <> char '@' <> pprParendExpr e
+ppr_expr EWildPat       = char '_'
+ppr_expr (ELazyPat e)   = char '~' <> pprParendExpr e
+ppr_expr (EAsPat v e)   = ppr v <> char '@' <> pprParendExpr e
+ppr_expr (EViewPat p e) = ppr p <+> ptext SLIT("->") <+> ppr e
 
 ppr_expr (HsSCC lbl expr)
   = sep [ ptext SLIT("_scc_") <+> doubleQuotes (ftext lbl), pprParendExpr expr ]
@@ -510,8 +504,8 @@ pprParendExpr expr
 	-- I think that is usually (always?) right
     in
     case unLoc expr of
-      HsLit l		   -> pp_as_was
-      HsOverLit l 	   -> pp_as_was
+      HsLit _		   -> pp_as_was
+      HsOverLit _ 	   -> pp_as_was
       HsVar _		   -> pp_as_was
       HsIPVar _		   -> pp_as_was
       ExplicitList _ _     -> pp_as_was
@@ -524,14 +518,14 @@ pprParendExpr expr
        | isListCompExpr sc -> pp_as_was
       _			   -> parens pp_as_was
 
-isAtomicHsExpr :: HsExpr id -> Bool	-- A single token
+isAtomicHsExpr :: HsExpr id -> Bool -- A single token
 isAtomicHsExpr (HsVar {})     = True
 isAtomicHsExpr (HsLit {})     = True
 isAtomicHsExpr (HsOverLit {}) = True
 isAtomicHsExpr (HsIPVar {})   = True
 isAtomicHsExpr (HsWrap _ e)   = isAtomicHsExpr e
 isAtomicHsExpr (HsPar e)      = isAtomicHsExpr (unLoc e)
-isAtomicHsExpr e	      = False
+isAtomicHsExpr _              = False
 \end{code}
 
 %************************************************************************
@@ -681,7 +675,8 @@ We know the list must have at least one @Match@ in it.
 
 \begin{code}
 pprMatches :: (OutputableBndr idL, OutputableBndr idR) => HsMatchContext idL -> MatchGroup idR -> SDoc
-pprMatches ctxt (MatchGroup matches ty) = vcat (map (pprMatch ctxt) (map unLoc matches))
+pprMatches ctxt (MatchGroup matches _)
+    = vcat (map (pprMatch ctxt) (map unLoc matches))
                                           -- Don't print the type; it's only 
                                           -- a place-holder before typechecking
 
@@ -719,7 +714,7 @@ pprMatch ctxt (Match pats maybe_ty grhss)
 		  pp_infix = ppr pat1 <+> ppr fun <+> ppr pat2
 
 	    LambdaExpr -> (char '\\', pats)
-	    other      -> (empty,     pats)
+	    _          -> (empty,     pats)
 
     ppr_maybe_ty = case maybe_ty of
 			Just ty -> dcolon <+> ppr ty
@@ -740,6 +735,7 @@ pprGRHS ctxt (GRHS [] expr)
 pprGRHS ctxt (GRHS guards expr)
  = sep [char '|' <+> interpp'SP guards, pp_rhs ctxt expr]
 
+pp_rhs :: OutputableBndr idR => HsMatchContext idL -> LHsExpr idR -> SDoc
 pp_rhs ctxt rhs = matchSeparator ctxt <+> pprDeeper (ppr rhs)
 \end{code}
 
@@ -868,10 +864,11 @@ pprStmt (BindStmt pat expr _ _)	  = hsep [ppr pat, ptext SLIT("<-"), ppr expr]
 pprStmt (LetStmt binds)       	  = hsep [ptext SLIT("let"), pprBinds binds]
 pprStmt (ExprStmt expr _ _)   	  = ppr expr
 pprStmt (ParStmt stmtss)          = hsep (map (\stmts -> ptext SLIT("| ") <> ppr stmts) stmtss)
-pprStmt (TransformStmt (stmts, bndrs) usingExpr maybeByExpr) = (hsep [stmtsDoc, ptext SLIT("then"), ppr usingExpr, byExprDoc])
+pprStmt (TransformStmt (stmts, _) usingExpr maybeByExpr)
+    = (hsep [stmtsDoc, ptext SLIT("then"), ppr usingExpr, byExprDoc])
   where stmtsDoc = interpp'SP stmts
         byExprDoc = maybe empty (\byExpr -> hsep [ptext SLIT("by"), ppr byExpr]) maybeByExpr
-pprStmt (GroupStmt (stmts, bndrs) groupByClause) = (hsep [stmtsDoc, ptext SLIT("then group"), pprGroupByClause groupByClause])
+pprStmt (GroupStmt (stmts, _) groupByClause) = (hsep [stmtsDoc, ptext SLIT("then group"), pprGroupByClause groupByClause])
   where stmtsDoc = interpp'SP stmts
 pprStmt (RecStmt segment _ _ _ _) = ptext SLIT("rec") <+> braces (vcat (map ppr segment))
 
@@ -885,7 +882,7 @@ pprDo DoExpr      stmts body = ptext SLIT("do")  <+> pprDeeperList vcat (map ppr
 pprDo (MDoExpr _) stmts body = ptext SLIT("mdo") <+> pprDeeperList vcat (map ppr stmts ++ [ppr body])
 pprDo ListComp    stmts body = pprComp brackets    stmts body
 pprDo PArrComp    stmts body = pprComp pa_brackets stmts body
-pprDo other	  stmts body = panic "pprDo" 	-- PatGuard, ParStmtCxt
+pprDo _           _     _    = panic "pprDo" -- PatGuard, ParStmtCxt
 
 pprComp :: OutputableBndr id => (SDoc -> SDoc) -> [LStmt id] -> LHsExpr id -> SDoc
 pprComp brack quals body
@@ -922,6 +919,7 @@ instance OutputableBndr id => Outputable (HsBracket id) where
   ppr = pprHsBracket
 
 
+pprHsBracket :: OutputableBndr id => HsBracket id -> SDoc
 pprHsBracket (ExpBr e) = thBrackets empty (ppr e)
 pprHsBracket (PatBr p) = thBrackets (char 'p') (ppr p)
 pprHsBracket (DecBr d) = thBrackets (char 'd') (ppr d)
@@ -932,6 +930,7 @@ pprHsBracket (VarBr n) = char '\'' <> ppr n
 	-- pretty-printer for HsExpr doesn't ask for NamedThings
 	-- But the pretty-printer for names will show the OccName class
 
+thBrackets :: SDoc -> SDoc -> SDoc
 thBrackets pp_kind pp_body = char '[' <> pp_kind <> char '|' <+> 
 			     pp_body <+> ptext SLIT("|]")
 \end{code}
@@ -962,6 +961,7 @@ instance OutputableBndr id => Outputable (ArithSeqInfo id) where
     ppr (FromThenTo e1 e2 e3)
       = hcat [ppr e1, comma, space, ppr e2, pp_dotdot, ppr e3]
 
+pp_dotdot :: SDoc
 pp_dotdot = ptext SLIT(" .. ")
 \end{code}
 
@@ -1009,6 +1009,7 @@ isListCompExpr _        = False
 \end{code}
 
 \begin{code}
+matchSeparator :: HsMatchContext id -> SDoc
 matchSeparator (FunRhs {})  = ptext SLIT("=")
 matchSeparator CaseAlt      = ptext SLIT("->") 
 matchSeparator LambdaExpr   = ptext SLIT("->") 
@@ -1019,6 +1020,7 @@ matchSeparator RecUpd       = panic "unused"
 \end{code}
 
 \begin{code}
+pprMatchContext :: Outputable id => HsMatchContext id -> SDoc
 pprMatchContext (FunRhs fun _) 	  = ptext SLIT("the definition of") <+> quotes (ppr fun)
 pprMatchContext CaseAlt	     	  = ptext SLIT("a case alternative")
 pprMatchContext RecUpd	     	  = ptext SLIT("a record-update construct")
@@ -1027,6 +1029,7 @@ pprMatchContext LambdaExpr   	  = ptext SLIT("a lambda abstraction")
 pprMatchContext ProcExpr   	  = ptext SLIT("an arrow abstraction")
 pprMatchContext (StmtCtxt ctxt)   = ptext SLIT("a pattern binding in") $$ pprStmtContext ctxt
 
+pprStmtContext :: Outputable id => HsStmtContext id -> SDoc
 pprStmtContext (ParStmtCtxt c) = sep [ptext SLIT("a parallel branch of"), pprStmtContext c]
 pprStmtContext (TransformStmtCtxt c) = sep [ptext SLIT("a transformed branch of"), pprStmtContext c]
 pprStmtContext (PatGuard ctxt) = ptext SLIT("a pattern guard for") $$ pprMatchContext ctxt
@@ -1051,6 +1054,7 @@ pprStmtResultContext other	     = ptext SLIT("the result of") <+> pprStmtContext
 -}
 
 -- Used to generate the string for a *runtime* error message
+matchContextErrString :: Outputable id => HsMatchContext id -> String
 matchContextErrString (FunRhs fun _)   	      	 = "function " ++ showSDoc (ppr fun)
 matchContextErrString CaseAlt	      	      	 = "case"
 matchContextErrString PatBindRhs      	      	 = "pattern binding"
