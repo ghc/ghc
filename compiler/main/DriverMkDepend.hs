@@ -22,7 +22,7 @@ module DriverMkDepend (
 import qualified GHC
 import GHC		( Session, ModSummary(..) )
 import DynFlags
-import Util		( escapeSpaces, splitFilename, joinFileExt )
+import Util		( escapeSpaces )
 import HscTypes		( HscEnv, IsBootInterface, msObjFilePath, msHsFilePath )
 import SysTools		( newTempName )
 import qualified SysTools
@@ -42,6 +42,7 @@ import Data.IORef	( IORef, readIORef, writeIORef )
 import Control.Exception
 import System.Exit	( ExitCode(..), exitWith )
 import System.Directory
+import System.FilePath
 import System.IO
 import SYSTEM_IO_ERROR  ( isEOFError )
 import Control.Monad    ( when )
@@ -272,9 +273,9 @@ insertSuffixes
 	-- Lots of other things will break first!
 
 insertSuffixes file_name extras
-  = file_name : [ basename `joinFileExt` (extra ++ "_" ++ suffix) | extra <- extras ]
+  = file_name : [ basename <.> (extra ++ "_" ++ suffix) | extra <- extras ]
   where
-    (basename, suffix) = splitFilename file_name
+    (basename, suffix) = splitExtension file_name
 
 
 -----------------------------------------------------------------

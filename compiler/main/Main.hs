@@ -54,6 +54,7 @@ import System.IO
 import System.Directory	( doesDirectoryExist )
 import System.Environment
 import System.Exit
+import System.FilePath
 import Control.Monad
 import Data.List
 import Data.Maybe
@@ -147,7 +148,7 @@ main =
      -- To simplify the handling of filepaths, we normalise all filepaths right 
      -- away - e.g., for win32 platforms, backslashes are converted
      -- into forward slashes.
-    normal_fileish_paths = map normalisePath fileish_args
+    normal_fileish_paths = map normalise fileish_args
     (srcs, objs)         = partition_args normal_fileish_paths [] []
 
   -- Note: have v_Ld_inputs maintain the order in which 'objs' occurred on 

@@ -29,7 +29,6 @@ module SysTools (
 	touch,			-- String -> String -> IO ()
 	copy,
         copyWithHeader,
-	normalisePath,          -- FilePath -> FilePath
         getExtraViaCOpts,
 	
 	-- Temporary-file management
@@ -58,6 +57,7 @@ import Data.IORef
 import Control.Monad
 import System.Exit
 import System.Environment
+import System.FilePath
 import System.IO
 import SYSTEM_IO_ERROR as IO
 import System.Directory
@@ -172,10 +172,9 @@ initSysTools mbMinusB dflags
 		-- format, '/' separated
 
 	; let installed, installed_bin :: FilePath -> FilePath
-              installed_bin pgm   =  pgmPath top_dir pgm
-	      installed     file  =  pgmPath top_dir file
-	      inplace dir   pgm   =  pgmPath (top_dir `joinFileName` 
-						cPROJECT_DIR `joinFileName` dir) pgm
+              installed_bin pgm   =  top_dir </> pgm
+	      installed     file  =  top_dir </> file
+	      inplace dir   pgm   =  top_dir </> cPROJECT_DIR </> dir </> pgm
 
 	; let pkgconfig_path
 		| am_installed = installed "package.conf"
@@ -281,9 +280,9 @@ initSysTools mbMinusB dflags
 
 	; let (mkdll_prog, mkdll_args)
 	        | am_installed = 
-		    (pgmPath (installed "gcc-lib/") cMKDLL,
+		    (installed "gcc-lib/" </> cMKDLL,
 		     [ Option "--dlltool-name",
-		       Option (pgmPath (installed "gcc-lib/") "dlltool"),
+		       Option (installed "gcc-lib/" </> "dlltool"),
 		       Option "--driver-name",
 		       Option gcc_prog, gcc_b_arg ])
 		| otherwise    = (cMKDLL, [])
@@ -374,14 +373,14 @@ findTopDir mbMinusB
   = do { top_dir <- get_proto
         -- Discover whether we're running in a build tree or in an installation,
 	-- by looking for the package configuration file.
-       ; am_installed <- doesFileExist (top_dir `joinFileName` "package.conf")
+       ; am_installed <- doesFileExist (top_dir </> "package.conf")
 
        ; return (am_installed, top_dir)
        }
   where
     -- get_proto returns a Unix-format path (relying on getBaseDir to do so too)
     get_proto = case mbMinusB of
-                  Just minusb -> return (normalisePath minusb)
+                  Just minusb -> return (normalise minusb)
                   Nothing
                       -> do maybe_exec_dir <- getBaseDir -- Get directory of executable
 		            case maybe_exec_dir of       -- (only works on Windows; 
@@ -573,7 +572,7 @@ copyWithHeader dflags purpose maybe_header from to = do
 
 getExtraViaCOpts :: DynFlags -> IO [String]
 getExtraViaCOpts dflags = do
-  f <- readFile (topDir dflags `joinFileName` "extra-gcc-opts")
+  f <- readFile (topDir dflags </> "extra-gcc-opts")
   return (words f)
 \end{code}
 
@@ -621,11 +620,11 @@ newTempName dflags extn
   where
     findTempName :: FilePath -> Integer -> IO FilePath
     findTempName prefix x
-      = do let filename = (prefix ++ show x) `joinFileExt` extn
-  	   b  <- doesFileExist filename
-	   if b then findTempName prefix (x+1)
-		else do consIORef v_FilesToClean filename -- clean it up later
-		        return filename
+      = do let filename = (prefix ++ show x) <.> extn
+           b  <- doesFileExist filename
+           if b then findTempName prefix (x+1)
+                else do consIORef v_FilesToClean filename -- clean it up later
+                        return filename
 
 -- return our temporary directory within tmp_dir, creating one if we
 -- don't have one yet
@@ -862,7 +861,7 @@ data BuildMessage
   | EOF
 #endif
 
-showOpt (FileOption pre f) = pre ++ platformPath f
+showOpt (FileOption pre f) = pre ++ f
 showOpt (Option s)  = s
 
 traceCmd :: DynFlags -> String -> String -> IO () -> IO ()
@@ -908,7 +907,12 @@ getBaseDir = do let len = (2048::Int) -- plenty, PATH_MAX is 512 under Win32.
 				    free buf
 				    return (Just (rootDir s))
   where
-    rootDir s = reverse (dropList "/bin/ghc.exe" (reverse (normalisePath s)))
+    rootDir s = case splitFileName $ normalise s of
+                (d, "ghc.exe") ->
+                    case splitFileName $ takeDirectory d of
+                    (d', "bin") -> takeDirectory d'
+                    _ -> panic ("Expected \"bin\" in " ++ show s)
+                _ -> panic ("Expected \"ghc.exe\" in " ++ show s)
 
 foreign import stdcall unsafe "GetModuleFileNameA"
   getModuleFileName :: Ptr () -> CString -> Int -> IO Int32

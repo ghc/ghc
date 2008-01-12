@@ -66,6 +66,7 @@ import FastString
 import ErrUtils         ( debugTraceMsg, putMsg, Message )
 
 import System.Directory
+import System.FilePath
 import Data.Maybe
 import Control.Monad
 import Data.List
@@ -210,14 +211,14 @@ getSystemPackageConfigs dflags = do
 	-- to maintain the package database on systems with a package
 	-- management system, or systems that don't want to run ghc-pkg
 	-- to register or unregister packages.  Undocumented feature for now.
-   let system_pkgconf_dir = system_pkgconf ++ ".d"
+   let system_pkgconf_dir = system_pkgconf <.> "d"
    system_pkgconf_dir_exists <- doesDirectoryExist system_pkgconf_dir
    system_pkgconfs <-
      if system_pkgconf_dir_exists
        then do files <- getDirectoryContents system_pkgconf_dir
-               return [ system_pkgconf_dir ++ '/' : file
+               return [ system_pkgconf_dir </> file
                       | file <- files
-                      , isSuffixOf ".conf" file]
+                      , takeExtension file == ".conf" ]
        else return []
 
 	-- Read user's package conf (eg. ~/.ghc/i386-linux-6.3/package.conf)
@@ -228,8 +229,8 @@ getSystemPackageConfigs dflags = do
       appdir <- getAppUserDataDirectory "ghc"
       let 
      	 pkgconf = appdir
-		   `joinFileName` (TARGET_ARCH ++ '-':TARGET_OS ++ '-':cProjectVersion)
-		   `joinFileName` "package.conf"
+		   </> (TARGET_ARCH ++ '-':TARGET_OS ++ '-':cProjectVersion)
+		   </> "package.conf"
       flg <- doesFileExist pkgconf
       if (flg && dopt Opt_ReadUserPackageConf dflags)
 	then return [pkgconf]

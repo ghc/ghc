@@ -233,6 +233,7 @@ import ListSetOps
 import Control.Monad
 import Data.List
 import Data.IORef
+import System.FilePath
 \end{code}
 
 
@@ -465,7 +466,7 @@ mkIface_ hsc_env maybe_old_iface
 -----------------------------
 writeIfaceFile :: DynFlags -> ModLocation -> ModIface -> IO ()
 writeIfaceFile dflags location new_iface
-    = do createDirectoryHierarchy (directoryOf hi_file_path)
+    = do createDirectoryHierarchy (takeDirectory hi_file_path)
          writeBinIface dflags hi_file_path new_iface
     where hi_file_path = ml_hi_file location
 

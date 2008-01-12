@@ -40,8 +40,8 @@ module DriverPhases (
    isSourceFilename         -- :: FilePath -> Bool
  ) where
 
-import Util		( suffixOf )
 import Panic		( panic )
+import System.FilePath
 
 -----------------------------------------------------------------------------
 -- Phases
@@ -220,17 +220,18 @@ isCishSuffix           s = s `elem` cish_suffixes
 isExtCoreSuffix        s = s `elem` extcoreish_suffixes
 isObjectSuffix         s = s `elem` objish_suffixes
 isHaskellUserSrcSuffix s = s `elem` haskellish_user_src_suffixes
-isDynLibSuffix	       s = s `elem` dynlib_suffixes
+isDynLibSuffix         s = s `elem` dynlib_suffixes
 
 isSourceSuffix suff  = isHaskellishSuffix suff || isCishSuffix suff
 
-isHaskellishFilename     f = isHaskellishSuffix     (suffixOf f)
-isHaskellSrcFilename     f = isHaskellSrcSuffix     (suffixOf f)
-isCishFilename           f = isCishSuffix           (suffixOf f)
-isExtCoreFilename        f = isExtCoreSuffix        (suffixOf f)
-isObjectFilename         f = isObjectSuffix         (suffixOf f)
-isHaskellUserSrcFilename f = isHaskellUserSrcSuffix (suffixOf f)
-isDynLibFilename	 f = isDynLibSuffix         (suffixOf f)
-isSourceFilename 	 f = isSourceSuffix 	    (suffixOf f)
+-- takeExtension return .foo, so we drop 1 to get rid of the .
+isHaskellishFilename     f = isHaskellishSuffix     (drop 1 $ takeExtension f)
+isHaskellSrcFilename     f = isHaskellSrcSuffix     (drop 1 $ takeExtension f)
+isCishFilename           f = isCishSuffix           (drop 1 $ takeExtension f)
+isExtCoreFilename        f = isExtCoreSuffix        (drop 1 $ takeExtension f)
+isObjectFilename         f = isObjectSuffix         (drop 1 $ takeExtension f)
+isHaskellUserSrcFilename f = isHaskellUserSrcSuffix (drop 1 $ takeExtension f)
+isDynLibFilename         f = isDynLibSuffix         (drop 1 $ takeExtension f)
+isSourceFilename         f = isSourceSuffix         (drop 1 $ takeExtension f)
 
 

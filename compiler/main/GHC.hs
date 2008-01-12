@@ -218,7 +218,8 @@ import TcRnMonad        ( initIfaceCheck )
 import Packages
 import NameSet
 import RdrName
-import HsSyn 
+import qualified HsSyn -- hack as we want to reexport the whole module
+import HsSyn hiding ((<.>))
 import Type             hiding (typeKind)
 import TcType           hiding (typeKind)
 import Id
@@ -277,6 +278,7 @@ import System.Exit	( exitWith, ExitCode(..) )
 import System.Time	( ClockTime, getClockTime )
 import Control.Exception as Exception hiding (handle)
 import Data.IORef
+import System.FilePath
 import System.IO
 import System.IO.Error	( try, isDoesNotExistError )
 import Prelude hiding (init)
@@ -395,7 +397,7 @@ guessOutputFile s = modifySession s $ \env ->
             let isMain = (== mainModIs dflags) . ms_mod
             [ms] <- return (filter isMain mod_graph)
             ml_hs_file (ms_location ms)
-        guessedName = fmap basenameOf mainModuleSrcPath
+        guessedName = fmap dropExtension mainModuleSrcPath
     in
     case outputFile dflags of
         Just _ -> env
@@ -456,8 +458,8 @@ guessTarget file Nothing
 	   else do
 	return (Target (TargetModule (mkModuleName file)) Nothing)
      where 
-	 hs_file  = file `joinFileExt` "hs"
-	 lhs_file = file `joinFileExt` "lhs"
+	 hs_file  = file <.> "hs"
+	 lhs_file = file <.> "lhs"
 
 -- -----------------------------------------------------------------------------
 -- Extending the program scope

@@ -50,6 +50,7 @@ import Control.Exception as Exception
 import Data.IORef	( readIORef, writeIORef, IORef )
 import GHC.Exts		( Int(..) )
 import System.Directory
+import System.FilePath
 import System.IO
 import SYSTEM_IO_ERROR as IO
 import Control.Monad
@@ -57,6 +58,7 @@ import Data.List	( isSuffixOf )
 import Data.Maybe
 import System.Exit
 import System.Environment
+import System.FilePath
 
 -- ---------------------------------------------------------------------------
 -- Pre-process
@@ -103,12 +105,14 @@ compile hsc_env summary mod_index nmods mb_old_iface maybe_old_linkable
 
    debugTraceMsg dflags0 2 (text "compile: input file" <+> text input_fnpp)
 
-   let (basename, _) = splitFilename input_fn
+   let basename = dropExtension input_fn
 
   -- We add the directory in which the .hs files resides) to the import path.
   -- This is needed when we try to compile the .hc file later, if it
   -- imports a _stub.h file that we created here.
-   let current_dir = directoryOf basename
+   let current_dir = case takeDirectory basename of
+                     "" -> "." -- XXX Hack
+                     d -> d
        old_paths   = includePaths dflags0
        dflags      = dflags0 { includePaths = current_dir : old_paths }
 
@@ -227,8 +231,8 @@ compile hsc_env summary mod_index nmods mb_old_iface maybe_old_linkable
 
 compileStub :: DynFlags -> Module -> ModLocation -> IO FilePath
 compileStub dflags mod location = do
-	let (o_base, o_ext) = splitFilename (ml_obj_file location)
-	    stub_o = o_base ++ "_stub" `joinFileExt` o_ext
+	let (o_base, o_ext) = splitExtension (ml_obj_file location)
+	    stub_o = (o_base ++ "_stub") <.> o_ext
 
 	-- compile the _stub.c file w/ gcc
 	let (stub_c,_,_) = mkStubPaths dflags (moduleName mod) location
@@ -420,7 +424,8 @@ runPipeline
 runPipeline stop_phase dflags0 (input_fn, mb_phase) mb_basename output maybe_loc
   = do
   let
-      (input_basename, suffix) = splitFilename input_fn
+      (input_basename, suffix) = splitExtension input_fn
+      suffix' = drop 1 suffix -- strip off the .
       basename | Just b <- mb_basename = b
                | otherwise             = input_basename
 
@@ -428,7 +433,7 @@ runPipeline stop_phase dflags0 (input_fn, mb_phase) mb_basename output maybe_loc
       dflags = dflags0 { dumpPrefix = Just (basename ++ ".") }
 
 	-- If we were given a -x flag, then use that phase to start from
-      start_phase = fromMaybe (startPhase suffix) mb_phase
+      start_phase = fromMaybe (startPhase suffix') mb_phase
 
   -- We want to catch cases of "you can't get there from here" before
   -- we start the pipeline, because otherwise it will just run off the
@@ -449,7 +454,7 @@ runPipeline stop_phase dflags0 (input_fn, mb_phase) mb_basename output maybe_loc
   -- Execute the pipeline...
   (dflags', output_fn, maybe_loc) <- 
 	pipeLoop dflags start_phase stop_phase input_fn 
-	  	 basename suffix get_output_fn maybe_loc
+	  	 basename suffix' get_output_fn maybe_loc
 
   -- Sometimes, a compilation phase doesn't actually generate any output
   -- (eg. the CPP phase when -fcpp is not turned on).  If we end on this
@@ -538,11 +543,11 @@ getOutputFilename stop_phase output basename
 		   | StopLn <- next_phase = return odir_persistent
 		   | otherwise            = return persistent
 
-		persistent = basename `joinFileExt` suffix
+		persistent = basename <.> suffix
 
 		odir_persistent
 		   | Just loc <- maybe_location = ml_obj_file loc
-		   | Just d <- odir = d `joinFileName` persistent
+		   | Just d <- odir = d </> persistent
 		   | otherwise      = persistent
 
 
@@ -599,7 +604,7 @@ runPhase (Unlit sf) _stop dflags _basename _suff input_fn get_output_fn maybe_lo
 runPhase (Cpp sf) _stop dflags0 basename suff input_fn get_output_fn maybe_loc
   = do src_opts <- getOptionsFromFile input_fn
        (dflags,unhandled_flags) <- parseDynamicFlags dflags0 (map unLoc src_opts)
-       checkProcessArgsResult unhandled_flags (basename `joinFileExt` suff)
+       checkProcessArgsResult unhandled_flags (basename <.> suff)
 
        if not (dopt Opt_Cpp dflags) then
            -- no need to preprocess CPP, just pass input file along
@@ -620,7 +625,7 @@ runPhase (HsPp sf) _stop dflags basename suff input_fn get_output_fn maybe_loc
           return (Hsc sf, dflags, maybe_loc, input_fn)
 	else do
 	    let hspp_opts = getOpts dflags opt_F
-	    let orig_fn = basename `joinFileExt` suff
+	    let orig_fn = basename <.> suff
 	    output_fn <- get_output_fn dflags (Hsc sf) maybe_loc
 	    SysTools.runPp dflags
 			   ( [ SysTools.Option     orig_fn
@@ -642,7 +647,9 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
   -- we add the current directory (i.e. the directory in which
   -- the .hs files resides) to the include path, since this is
   -- what gcc does, and it's probably what you want.
-	let current_dir = directoryOf basename
+	let current_dir = case takeDirectory basename of
+                      "" -> "." -- XXX Hack
+                      d -> d
 	
 	    paths = includePaths dflags0
 	    dflags = dflags0 { includePaths = current_dir : paths }
@@ -655,7 +662,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
 			          ; return (Nothing, mkModuleName m, [], []) }
 
 		_           -> do { buf <- hGetStringBuffer input_fn
-			    ; (src_imps,imps,L _ mod_name) <- getImports dflags buf input_fn (basename `joinFileExt` suff)
+			    ; (src_imps,imps,L _ mod_name) <- getImports dflags buf input_fn (basename <.> suff)
 			    ; return (Just buf, mod_name, imps, src_imps) }
 
   -- Build a ModLocation to pass to hscMain.
@@ -699,7 +706,7 @@ runPhase (Hsc src_flavour) stop dflags0 basename suff input_fn get_output_fn _ma
   -- changed (which the compiler itself figures out).
   -- Setting source_unchanged to False tells the compiler that M.o is out of
   -- date wrt M.hs (or M.o doesn't exist) so we must recompile regardless.
-	src_timestamp <- getModificationTime (basename `joinFileExt` suff)
+	src_timestamp <- getModificationTime (basename <.> suff)
 
 	let force_recomp = dopt Opt_ForceRecomp dflags
 	source_unchanged <- 
@@ -970,7 +977,7 @@ runPhase As _stop dflags _basename _suff input_fn get_output_fn maybe_loc
 
 	-- we create directories for the object file, because it
 	-- might be a hierarchical module.
-	createDirectoryHierarchy (directoryOf output_fn)
+	createDirectoryHierarchy (takeDirectory output_fn)
 
 	SysTools.runAs dflags	
 		       (map SysTools.Option as_opts
@@ -995,62 +1002,60 @@ runPhase As _stop dflags _basename _suff input_fn get_output_fn maybe_loc
 
 
 runPhase SplitAs _stop dflags _basename _suff _input_fn get_output_fn maybe_loc
-  = do  
-	output_fn <- get_output_fn dflags StopLn maybe_loc
+  = do
+        output_fn <- get_output_fn dflags StopLn maybe_loc
 
-	let (base_o, _) = splitFilename output_fn
-	    split_odir  = base_o ++ "_split"
-	    osuf = objectSuf dflags
+        let base_o = dropExtension output_fn
+            split_odir  = base_o ++ "_split"
+            osuf = objectSuf dflags
 
-	createDirectoryHierarchy split_odir
+        createDirectoryHierarchy split_odir
 
-	-- remove M_split/ *.o, because we're going to archive M_split/ *.o
-	-- later and we don't want to pick up any old objects.
-	fs <- getDirectoryContents split_odir 
-	mapM_ removeFile $ map (split_odir `joinFileName`)
-			 $ filter (osuf `isSuffixOf`) fs
+        -- remove M_split/ *.o, because we're going to archive M_split/ *.o
+        -- later and we don't want to pick up any old objects.
+        fs <- getDirectoryContents split_odir
+        mapM_ removeFile $ map (split_odir </>) $ filter (osuf `isSuffixOf`) fs
 
-	let as_opts = getOpts dflags opt_a
+        let as_opts = getOpts dflags opt_a
 
-	(split_s_prefix, n) <- readIORef v_Split_info
+        (split_s_prefix, n) <- readIORef v_Split_info
 
-	let split_s   n = split_s_prefix ++ "__" ++ show n `joinFileExt` "s"
-	    split_obj n = split_odir `joinFileName`
-				filenameOf base_o ++ "__" ++ show n
-					`joinFileExt` osuf
+        let split_s   n = split_s_prefix ++ "__" ++ show n <.> "s"
+            split_obj n = split_odir </>
+                          takeFileName base_o ++ "__" ++ show n <.> osuf
 
-	let assemble_file n
-	      = SysTools.runAs dflags
-			 (map SysTools.Option as_opts ++
-		   	 [ SysTools.Option "-c"
-			 , SysTools.Option "-o"
-			 , SysTools.FileOption "" (split_obj n)
-			 , SysTools.FileOption "" (split_s n)
-			 ])
-	
-	mapM_ assemble_file [1..n]
+        let assemble_file n
+              = SysTools.runAs dflags
+                         (map SysTools.Option as_opts ++
+                          [ SysTools.Option "-c"
+                          , SysTools.Option "-o"
+                          , SysTools.FileOption "" (split_obj n)
+                          , SysTools.FileOption "" (split_s n)
+                          ])
 
-	-- and join the split objects into a single object file:
-	let ld_r args = SysTools.runLink dflags ([ 
-				SysTools.Option "-nostdlib",
-				SysTools.Option "-nodefaultlibs",
-				SysTools.Option "-Wl,-r", 
-				SysTools.Option ld_x_flag, 
-				SysTools.Option "-o", 
-				SysTools.FileOption "" output_fn ] ++ args)
+        mapM_ assemble_file [1..n]
+
+        -- and join the split objects into a single object file:
+        let ld_r args = SysTools.runLink dflags ([
+                            SysTools.Option "-nostdlib",
+                            SysTools.Option "-nodefaultlibs",
+                            SysTools.Option "-Wl,-r",
+                            SysTools.Option ld_x_flag,
+                            SysTools.Option "-o",
+                            SysTools.FileOption "" output_fn ] ++ args)
             ld_x_flag | null cLD_X = ""
-		      | otherwise  = "-Wl,-x"	  
+                      | otherwise  = "-Wl,-x"
 
-	if cLdIsGNULd == "YES"
-	    then do 
-		  let script = split_odir `joinFileName` "ld.script"
-		  writeFile script $
-		      "INPUT(" ++ unwords (map split_obj [1..n]) ++ ")"
-		  ld_r [SysTools.FileOption "" script]
-	    else do
-		  ld_r (map (SysTools.FileOption "" . split_obj) [1..n])
+        if cLdIsGNULd == "YES"
+            then do
+                  let script = split_odir </> "ld.script"
+                  writeFile script $
+                      "INPUT(" ++ unwords (map split_obj [1..n]) ++ ")"
+                  ld_r [SysTools.FileOption "" script]
+            else do
+                  ld_r (map (SysTools.FileOption "" . split_obj) [1..n])
 
-	return (StopLn, dflags, maybe_loc, output_fn)
+        return (StopLn, dflags, maybe_loc, output_fn)
 
 -- warning suppression
 runPhase other _stop _dflags _basename _suff _input_fn _get_output_fn _maybe_loc =
@@ -1279,10 +1284,10 @@ linkBinary dflags o_files dep_packages = do
 
 exeFileName :: DynFlags -> FilePath
 exeFileName dflags
-  | Just s <- outputFile dflags = 
+  | Just s <- outputFile dflags =
 #if defined(mingw32_HOST_OS)
-      if null (suffixOf s)
-        then s `joinFileExt` "exe"
+      if null (takeExtension s)
+        then s <.> "exe"
         else s
 #else
       s
@@ -1305,14 +1310,14 @@ maybeCreateManifest _ _ = do
 maybeCreateManifest dflags exe_filename = do
   if not (dopt Opt_GenManifest dflags) then return [] else do
 
-  let manifest_filename = exe_filename `joinFileExt` "manifest"
+  let manifest_filename = exe_filename <.> "manifest"
 
   writeFile manifest_filename $ 
       "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"++
       "  <assembly xmlns=\"urn:schemas-microsoft-com:asm.v1\" manifestVersion=\"1.0\">\n"++
       "  <assemblyIdentity version=\"1.0.0.0\"\n"++
       "     processorArchitecture=\"X86\"\n"++
-      "     name=\"" ++ basenameOf exe_filename ++ "\"\n"++
+      "     name=\"" ++ dropExtension exe_filename ++ "\"\n"++
       "     type=\"win32\"/>\n\n"++
       "  <trustInfo xmlns=\"urn:schemas-microsoft-com:asm.v3\">\n"++
       "    <security>\n"++
@@ -1433,7 +1438,7 @@ linkDynLib dflags o_files dep_packages = do
 	 ++ map SysTools.Option (
 	    md_c_flags
 	 ++ o_files
-	 ++ [ "-undefined", "dynamic_lookup", "-single_module", "-Wl,-macosx_version_min","-Wl,10.3", "-install_name " ++ (pwd `joinFileName` output_fn) ]
+	 ++ [ "-undefined", "dynamic_lookup", "-single_module", "-Wl,-macosx_version_min","-Wl,10.3", "-install_name " ++ (pwd </> output_fn) ]
 	 ++ extra_ld_inputs
 	 ++ lib_path_opts
 	 ++ extra_ld_opts

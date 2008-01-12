@@ -42,6 +42,7 @@ import Maybes		( expectJust )
 import Data.IORef	( IORef, writeIORef, readIORef, modifyIORef )
 import Data.List
 import System.Directory
+import System.FilePath
 import System.IO
 import Control.Monad
 import System.Time	( ClockTime )
@@ -346,8 +347,8 @@ searchPathExts paths mod exts
 		| path <- paths, 
 		  (ext,fn) <- exts,
 		  let base | path == "." = basename
-	     	           | otherwise   = path `joinFileName` basename
-	              file = base `joinFileExt` ext
+	     	           | otherwise   = path </> basename
+	              file = base <.> ext
 		]
 
     search [] = return (NotFound (map fst to_search) (Just (modulePackageId mod)))
@@ -360,7 +361,7 @@ searchPathExts paths mod exts
 mkHomeModLocationSearched :: DynFlags -> ModuleName -> FileExt
 		          -> FilePath -> BaseName -> IO ModLocation
 mkHomeModLocationSearched dflags mod suff path basename = do
-   mkHomeModLocation2 dflags mod (path `joinFileName` basename) suff
+   mkHomeModLocation2 dflags mod (path </> basename) suff
 
 -- -----------------------------------------------------------------------------
 -- Constructing a home module location
@@ -397,7 +398,7 @@ mkHomeModLocationSearched dflags mod suff path basename = do
 
 mkHomeModLocation :: DynFlags -> ModuleName -> FilePath -> IO ModLocation
 mkHomeModLocation dflags mod src_filename = do
-   let (basename,extension) = splitFilename src_filename
+   let (basename,extension) = splitExtension src_filename
    mkHomeModLocation2 dflags mod basename extension
 
 mkHomeModLocation2 :: DynFlags
@@ -411,17 +412,17 @@ mkHomeModLocation2 dflags mod src_basename ext = do
    obj_fn  <- mkObjPath  dflags src_basename mod_basename
    hi_fn   <- mkHiPath   dflags src_basename mod_basename
 
-   return (ModLocation{ ml_hs_file   = Just (src_basename `joinFileExt` ext),
+   return (ModLocation{ ml_hs_file   = Just (src_basename <.> ext),
 			ml_hi_file   = hi_fn,
 			ml_obj_file  = obj_fn })
 
 mkHiOnlyModLocation :: DynFlags -> Suffix -> FilePath -> String
 		    -> IO ModLocation
 mkHiOnlyModLocation dflags hisuf path basename
- = do let full_basename = path `joinFileName` basename
+ = do let full_basename = path </> basename
       obj_fn  <- mkObjPath  dflags full_basename basename
       return ModLocation{    ml_hs_file   = Nothing,
- 	        	     ml_hi_file   = full_basename  `joinFileExt` hisuf,
+ 	        	     ml_hi_file   = full_basename <.> hisuf,
 		 		-- Remove the .hi-boot suffix from
 		 		-- hi_file, if it had one.  We always
 		 		-- want the name of the real .hi file
@@ -441,10 +442,10 @@ mkObjPath dflags basename mod_basename
 		odir = objectDir dflags
 		osuf = objectSuf dflags
 	
-		obj_basename | Just dir <- odir = dir `joinFileName` mod_basename
+		obj_basename | Just dir <- odir = dir </> mod_basename
 			     | otherwise        = basename
 
-        return (obj_basename `joinFileExt` osuf)
+        return (obj_basename <.> osuf)
 
 -- | Constructs the filename of a .hi file for a given source file.
 -- Does /not/ check whether the .hi file exists
@@ -458,10 +459,10 @@ mkHiPath dflags basename mod_basename
 		hidir = hiDir dflags
 		hisuf = hiSuf dflags
 
-		hi_basename | Just dir <- hidir = dir `joinFileName` mod_basename
+		hi_basename | Just dir <- hidir = dir </> mod_basename
 			    | otherwise         = basename
 
-        return (hi_basename `joinFileExt` hisuf)
+        return (hi_basename <.> hisuf)
 
 
 -- -----------------------------------------------------------------------------
@@ -478,35 +479,35 @@ mkStubPaths
 
 mkStubPaths dflags mod location
   = let
-		stubdir = stubDir dflags
+        stubdir = stubDir dflags
 
-		mod_basename = moduleNameSlashes mod
+		mod_basename = dots_to_slashes (moduleNameString mod)
 		src_basename = basenameOf (expectJust "mkStubPaths" 
 						(ml_hs_file location))
 
-		stub_basename0
-			| Just dir <- stubdir = dir `joinFileName` mod_basename
-			| otherwise           = src_basename
+        stub_basename0
+            | Just dir <- stubdir = dir </> mod_basename
+            | otherwise           = src_basename
 
-		stub_basename = stub_basename0 ++ "_stub"
+        stub_basename = stub_basename0 ++ "_stub"
 
-                -- this is the filename we're going to use when
-                -- #including the stub_h file from the .hc file.
-                -- Without -stubdir, we just #include the basename
-                -- (eg. for a module A.B, we #include "B_stub.h"),
-                -- relying on the fact that we add an implicit -I flag
-                -- for the directory in which the source file resides
-                -- (see DriverPipeline.hs).  With -stubdir, we
-                -- #include "A/B.h", assuming that the user has added
-                -- -I<dir> along with -stubdir <dir>.
-                include_basename
-                        | Just _ <- stubdir = mod_basename 
-                        | otherwise         = filenameOf src_basename
+        -- this is the filename we're going to use when
+        -- #including the stub_h file from the .hc file.
+        -- Without -stubdir, we just #include the basename
+        -- (eg. for a module A.B, we #include "B_stub.h"),
+        -- relying on the fact that we add an implicit -I flag
+        -- for the directory in which the source file resides
+        -- (see DriverPipeline.hs).  With -stubdir, we
+        -- #include "A/B.h", assuming that the user has added
+        -- -I<dir> along with -stubdir <dir>.
+        include_basename
+                | Just _ <- stubdir = mod_basename 
+                | otherwise         = takeFileName src_basename
      in
-        (stub_basename `joinFileExt` "c",
-	 stub_basename `joinFileExt` "h",
-         (include_basename ++ "_stub") `joinFileExt` "h")
-	-- the _stub.o filename is derived from the ml_obj_file.
+        (stub_basename <.> "c",
+         stub_basename <.> "h",
+         (include_basename ++ "_stub") <.> "h")
+        -- the _stub.o filename is derived from the ml_obj_file.
 
 -- -----------------------------------------------------------------------------
 -- findLinkable isn't related to the other stuff in here, 
@@ -524,12 +525,17 @@ findObjectLinkableMaybe mod locn
 -- its modification time.
 findObjectLinkable :: Module -> FilePath -> ClockTime -> IO Linkable
 findObjectLinkable mod obj_fn obj_time = do
-  let stub_fn = case splitFilename3 obj_fn of
-			(dir, base, _ext) -> dir ++ "/" ++ base ++ "_stub.o"
+  let stub_fn = (dropExtension obj_fn ++ "_stub") <.> "o"
   stub_exist <- doesFileExist stub_fn
   if stub_exist
 	then return (LM obj_time mod [DotO obj_fn, DotO stub_fn])
 	else return (LM obj_time mod [DotO obj_fn])
+
+-- -----------------------------------------------------------------------------
+-- Utils
+
+dots_to_slashes :: String -> String
+dots_to_slashes = map (\c -> if c == '.' then '/' else c)
 
 -- -----------------------------------------------------------------------------
 -- Error messages

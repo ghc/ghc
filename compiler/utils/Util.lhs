@@ -73,16 +73,10 @@ module Util (
 	later, handleDyn, handle,
 
 	-- Filename utils
-	Suffix,
-	splitFilename, suffixOf, basenameOf, joinFileExt,
-	splitFilenameDir, joinFileName,
-	splitFilename3,
+    Suffix,
 	splitLongestPrefix,
-	replaceFilenameSuffix, directoryOf, filenameOf,
-	replaceFilenameDirectory,
-	escapeSpaces, isPathSeparator,
+	escapeSpaces,
 	parseSearchPath,
-	normalisePath, platformPath, pgmPath,
     ) where
 
 #include "HsVersions.h"
@@ -106,10 +100,11 @@ import qualified Data.List as List ( elem )
 import qualified Data.List as List ( notElem )
 #endif
 
-import Control.Monad	( when )
+import Control.Monad	( unless )
 import SYSTEM_IO_ERROR as IO ( catch, isDoesNotExistError )
 import System.Directory	( doesDirectoryExist, createDirectory,
                           getModificationTime )
+import System.FilePath hiding ( searchPathSeparator )
 import Data.Char	( isUpper, isAlphaNum, isSpace, ord, isDigit )
 import Data.Ratio	( (%) )
 import System.Time	( ClockTime )
@@ -761,17 +756,20 @@ readRational top_s
 -- Create a hierarchy of directories
 
 createDirectoryHierarchy :: FilePath -> IO ()
+createDirectoryHierarchy dir | isDrive dir = return () -- XXX Hack
 createDirectoryHierarchy dir = do
   b <- doesDirectoryExist dir
-  when (not b) $ do
-	createDirectoryHierarchy (directoryOf dir)
+  unless b $ do
+	createDirectoryHierarchy (takeDirectory dir)
 	createDirectory dir
 
 -----------------------------------------------------------------------------
 -- Verify that the 'dirname' portion of a FilePath exists.
 -- 
 doesDirNameExist :: FilePath -> IO Bool
-doesDirNameExist fpath = doesDirectoryExist (directoryOf fpath)
+doesDirNameExist fpath = case takeDirectory fpath of
+                         ""  -> return True -- XXX Hack
+                         dir -> doesDirectoryExist (takeDirectory fpath)
 
 -- -----------------------------------------------------------------------------
 -- Exception utils
@@ -796,49 +794,6 @@ modificationTimeIfExists f = do
 			then return Nothing 
 			else ioError e
 
--- --------------------------------------------------------------
--- Filename manipulation
-		
--- Filenames are kept "normalised" inside GHC, using '/' as the path
--- separator.  On Windows these functions will also recognise '\\' as
--- the path separator, but will generally construct paths using '/'.
-
-type Suffix = String
-
-splitFilename :: String -> (String,Suffix)
-splitFilename f = splitLongestPrefix f (=='.')
-
-basenameOf :: FilePath -> String
-basenameOf = fst . splitFilename
-
-suffixOf :: FilePath -> Suffix
-suffixOf = snd . splitFilename
-
-joinFileExt :: String -> String -> FilePath
-joinFileExt path ""  = path
-joinFileExt path ext = path ++ '.':ext
-
--- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy.ext")
-splitFilenameDir :: String -> (String,String)
-splitFilenameDir str
-   = let (dir, rest) = splitLongestPrefix str isPathSeparator
-	 (dir', rest') | null rest = (".", dir)
-		       | otherwise = (dir, rest)
-     in  (dir', rest')
-
--- "foo/bar/xyzzy.ext" -> ("foo/bar", "xyzzy", ".ext")
-splitFilename3 :: String -> (String,String,Suffix)
-splitFilename3 str
-   = let (dir, rest) = splitFilenameDir str
-	 (name, ext) = splitFilename rest
-     in  (dir, name, ext)
-
-joinFileName :: String -> String -> FilePath
-joinFileName ""  fname = fname
-joinFileName "." fname = fname
-joinFileName dir ""    = dir
-joinFileName dir fname = dir ++ '/':fname
-
 -- split a string at the last character where 'pred' is True,
 -- returning a pair of strings. The first component holds the string
 -- up (but not including) the last character for which 'pred' returned
@@ -856,32 +811,10 @@ splitLongestPrefix str pred
   where 
     (r_suf, r_pre) = break pred (reverse str)
 
-replaceFilenameSuffix :: FilePath -> Suffix -> FilePath
-replaceFilenameSuffix file suf = basenameOf file `joinFileExt` suf
-
--- directoryOf strips the filename off the input string, returning
--- the directory.
-directoryOf :: FilePath -> String
-directoryOf = fst . splitFilenameDir
-
--- filenameOf strips the directory off the input string, returning
--- the filename.
-filenameOf :: FilePath -> String
-filenameOf = snd . splitFilenameDir
-
-replaceFilenameDirectory :: FilePath -> String -> FilePath
-replaceFilenameDirectory path dir = dir `joinFileName` filenameOf path
-
 escapeSpaces :: String -> String
 escapeSpaces = foldr (\c s -> if isSpace c then '\\':c:s else c:s) ""
 
-isPathSeparator :: Char -> Bool
-isPathSeparator ch =
-#ifdef mingw32_TARGET_OS
-  ch == '/' || ch == '\\'
-#else
-  ch == '/'
-#endif
+type Suffix = String
 
 --------------------------------------------------------------
 -- * Search path
@@ -915,40 +848,5 @@ searchPathSeparator :: Char
 searchPathSeparator = ';'
 #else
 searchPathSeparator = ':'
-#endif
-
------------------------------------------------------------------------------
--- Convert filepath into platform / MSDOS form.
-
--- We maintain path names in Unix form ('/'-separated) right until 
--- the last moment.  On Windows we dos-ify them just before passing them
--- to the Windows command.
--- 
--- The alternative, of using '/' consistently on Unix and '\' on Windows,
--- proved quite awkward.  There were a lot more calls to platformPath,
--- and even on Windows we might invoke a unix-like utility (eg 'sh'), which
--- interpreted a command line 'foo\baz' as 'foobaz'.
-
-normalisePath :: String -> String
--- Just changes '\' to '/'
-
-pgmPath :: String		-- Directory string in Unix format
-	-> String		-- Program name with no directory separators
-				--	(e.g. copy /y)
-	-> String		-- Program invocation string in native format
-
-#if defined(mingw32_HOST_OS)
---------------------- Windows version ------------------
-normalisePath xs = subst '\\' '/' xs
-pgmPath dir pgm  = platformPath dir ++ '\\' : pgm
-platformPath p   = subst '/' '\\' p
-
-subst a b ls = map (\ x -> if x == a then b else x) ls
-#else
---------------------- Non-Windows version --------------
-normalisePath xs   = xs
-pgmPath dir pgm    = dir ++ '/' : pgm
-platformPath stuff = stuff
---------------------------------------------------------
 #endif
 \end{code}

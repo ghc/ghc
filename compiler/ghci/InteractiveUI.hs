@@ -264,7 +264,7 @@ findEditor = do
     `IO.catch` \_ -> do
 #if mingw32_HOST_OS
 	win <- System.Win32.getWindowsDirectory
-	return (win `joinFileName` "notepad.exe")
+	return (win </> "notepad.exe")
 #else
 	return ""
 #endif

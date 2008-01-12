@@ -73,6 +73,7 @@ import Data.IORef
 import Data.List
 import Foreign
 
+import System.FilePath
 import System.IO
 import System.Directory
 
@@ -657,7 +658,7 @@ getLinkDeps hsc_env hpt pit maybe_normal_osuf span mods
 			return lnk
 
 	    adjust_ul osuf (DotO file) = do
-		let new_file = replaceFilenameSuffix file osuf
+		let new_file = replaceExtension file osuf
 		ok <- doesFileExist new_file
 		if (not ok)
 		   then dieWith span $
@@ -1080,8 +1081,8 @@ locateOneObj dirs lib
                        Just lib_path -> return (DLL (lib ++ "-ghc" ++ cProjectVersion))
                        Nothing       -> return (DLL lib) }}		-- We assume
    where
-     mk_obj_path dir = dir `joinFileName` (lib `joinFileExt` "o")
-     mk_dyn_lib_path dir = dir `joinFileName` mkSOName (lib ++ "-ghc" ++ cProjectVersion)
+     mk_obj_path dir = dir </> lib <.> "o"
+     mk_dyn_lib_path dir = dir </> mkSOName (lib ++ "-ghc" ++ cProjectVersion)
 #else
 -- When the GHC package was compiled as dynamic library (=__PIC__ set),
 -- we search for .so libraries first.
@@ -1096,8 +1097,8 @@ locateOneObj dirs lib
                        Just obj_path -> return (Object obj_path)
                        Nothing       -> return (DLL lib) }}		-- We assume
    where
-     mk_obj_path dir = dir `joinFileName` (lib `joinFileExt` "o")
-     mk_dyn_lib_path dir = dir `joinFileName` mkSOName (lib ++ "-ghc" ++ cProjectVersion)
+     mk_obj_path dir = dir </> (lib <.> "o")
+     mk_dyn_lib_path dir = dir </> mkSOName (lib ++ "-ghc" ++ cProjectVersion)
 #endif
 
 -- ----------------------------------------------------------------------------
@@ -1112,16 +1113,16 @@ loadDynamic paths rootname
 			-- Tried all our known library paths, so let 
 			-- dlopen() search its own builtin paths now.
   where
-    mk_dll_path dir = dir `joinFileName` mkSOName rootname
+    mk_dll_path dir = dir </> mkSOName rootname
 
 #if defined(darwin_TARGET_OS)
-mkSOName root = ("lib" ++ root) `joinFileExt` "dylib"
+mkSOName root = ("lib" ++ root) <.> "dylib"
 #elif defined(mingw32_TARGET_OS)
 -- Win32 DLLs have no .dll extension here, because addDLL tries
 -- both foo.dll and foo.drv
 mkSOName root = root
 #else
-mkSOName root = ("lib" ++ root) `joinFileExt` "so"
+mkSOName root = ("lib" ++ root) <.> "so"
 #endif
 
 -- Darwin / MacOS X only: load a framework
@@ -1141,7 +1142,7 @@ loadFramework extraPaths rootname
                 -- Tried all our known library paths, but dlopen()
                 -- has no built-in paths for frameworks: give up
    where
-     mk_fwk dir = dir `joinFileName` (rootname ++ ".framework/" ++ rootname)
+     mk_fwk dir = dir </> (rootname ++ ".framework/" ++ rootname)
         -- sorry for the hardcoded paths, I hope they won't change anytime soon:
      defaultFrameworkPaths = ["/Library/Frameworks", "/System/Library/Frameworks"]
 #endif

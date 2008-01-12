@@ -93,6 +93,7 @@ import Util		( split )
 #endif
 
 import Data.Char
+import System.FilePath
 import System.IO        ( hPutStrLn, stderr )
 
 -- -----------------------------------------------------------------------------
@@ -1573,32 +1574,28 @@ setTmpDir :: FilePath -> DynFlags -> DynFlags
 setTmpDir dir dflags = dflags{ tmpDir = canonicalise dir }
   where
 #if !defined(mingw32_HOST_OS)
-     canonicalise p = normalisePath p
+     canonicalise p = normalise p
 #else
-	-- Canonicalisation of temp path under win32 is a bit more
-	-- involved: (a) strip trailing slash, 
-	-- 	     (b) normalise slashes
-	--	     (c) just in case, if there is a prefix /cygdrive/x/, change to x:
-	-- 
-     canonicalise path = normalisePath (xltCygdrive (removeTrailingSlash path))
+     -- Canonicalisation of temp path under win32 is a bit more
+     -- involved: (a) strip trailing slash,
+     --      (b) normalise slashes
+     --     (c) just in case, if there is a prefix /cygdrive/x/, change to x:
+     canonicalise path = removeTrailingSlash $ normalise $ xltCygdrive path
 
-        -- if we're operating under cygwin, and TMP/TEMP is of
-	-- the form "/cygdrive/drive/path", translate this to
-	-- "drive:/path" (as GHC isn't a cygwin app and doesn't
-	-- understand /cygdrive paths.)
-     xltCygdrive path
-      | "/cygdrive/" `isPrefixOf` path = 
-	  case drop (length "/cygdrive/") path of
-	    drive:xs@('/':_) -> drive:':':xs
-	    _ -> path
-      | otherwise = path
+     -- if we're operating under cygwin, and TMP/TEMP is of
+     -- the form "/cygdrive/drive/path", translate this to
+     -- "drive:/path" (as GHC isn't a cygwin app and doesn't
+     -- understand /cygdrive paths.)
+     cygdrivePrefix = [pathSeparator] ++ "/cygdrive/" ++ [pathSeparator]
+     xltCygdrive path = case maybePrefixMatch cygdrivePrefix path of
+                        Just (drive:sep:xs))
+                         | isPathSeparator sep -> drive:':':pathSeparator:xs
+                        _ -> path
 
-        -- strip the trailing backslash (awful, but we only do this once).
-     removeTrailingSlash path = 
-       case last path of
-         '/'  -> init path
-         '\\' -> init path
-         _    -> path
+     -- strip the trailing backslash (awful, but we only do this once).
+     removeTrailingSlash path
+      | isPathSeparator (last path) = init path
+      | othwerwise                  = path
 #endif
 
 -----------------------------------------------------------------------------
