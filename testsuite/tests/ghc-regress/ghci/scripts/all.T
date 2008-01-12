@@ -40,4 +40,6 @@ test('ghci026', normal, ghci_script, ['ghci026.script'])
 test('ghci027', normal, ghci_script, ['ghci027.script'])
 test('ghci028', normal, ghci_script, ['ghci028.script'])
 
-test('1914', normal, ghci_script, ['1914.script'])
+test('1914', if_compiler_ge('ghc', '6.9', expect_broken(2034)),
+             ghci_script, ['1914.script'])
+
