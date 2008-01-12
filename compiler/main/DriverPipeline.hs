@@ -58,7 +58,6 @@ import Data.List	( isSuffixOf )
 import Data.Maybe
 import System.Exit
 import System.Environment
-import System.FilePath
 
 -- ---------------------------------------------------------------------------
 -- Pre-process

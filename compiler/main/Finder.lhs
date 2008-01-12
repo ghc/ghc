@@ -481,9 +481,9 @@ mkStubPaths dflags mod location
   = let
         stubdir = stubDir dflags
 
-		mod_basename = dots_to_slashes (moduleNameString mod)
-		src_basename = basenameOf (expectJust "mkStubPaths" 
-						(ml_hs_file location))
+        mod_basename = dots_to_slashes (moduleNameString mod)
+        src_basename = dropExtension $ expectJust "mkStubPaths" 
+                                                  (ml_hs_file location)
 
         stub_basename0
             | Just dir <- stubdir = dir </> mod_basename
