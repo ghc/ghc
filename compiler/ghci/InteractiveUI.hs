@@ -298,20 +298,20 @@ interactiveUI session srcs maybe_expr = do
         -- intended for the program, so unbuffer stdin.
         hSetBuffering stdin NoBuffering
 
-        -- initial context is just the Prelude
+#ifdef USE_READLINE
+        Readline.initialize
+        Readline.setAttemptedCompletionFunction (Just completeWord)
+        --Readline.parseAndBind "set show-all-if-ambiguous 1"
+
+        Readline.setBasicWordBreakCharacters word_break_chars
+        Readline.setCompleterWordBreakCharacters word_break_chars
+        Readline.setCompletionAppendCharacter Nothing
+#endif
+
+   -- initial context is just the Prelude
    prel_mod <- GHC.findModule session (GHC.mkModuleName "Prelude") 
                                       (Just basePackageId)
    GHC.setContext session [] [prel_mod]
-
-#ifdef USE_READLINE
-   Readline.initialize
-   Readline.setAttemptedCompletionFunction (Just completeWord)
-   --Readline.parseAndBind "set show-all-if-ambiguous 1"
-
-   Readline.setBasicWordBreakCharacters word_break_chars
-   Readline.setCompleterWordBreakCharacters word_break_chars
-   Readline.setCompletionAppendCharacter Nothing
-#endif
 
    default_editor <- findEditor
 
