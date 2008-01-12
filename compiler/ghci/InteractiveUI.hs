@@ -263,10 +263,10 @@ findEditor = do
   getEnv "EDITOR" 
     `IO.catch` \_ -> do
 #if mingw32_HOST_OS
-	win <- System.Win32.getWindowsDirectory
-	return (win </> "notepad.exe")
+        win <- System.Win32.getWindowsDirectory
+        return (win </> "notepad.exe")
 #else
-	return ""
+        return ""
 #endif
 
 interactiveUI :: Session -> [(FilePath, Maybe Phase)] -> Maybe String -> IO ()
@@ -316,13 +316,13 @@ interactiveUI session srcs maybe_expr = do
    default_editor <- findEditor
 
    startGHCi (runGHCi srcs maybe_expr)
-	GHCiState{ progname = "<interactive>",
-		   args = [],
+        GHCiState{ progname = "<interactive>",
+                   args = [],
                    prompt = "%s> ",
                    stop = "",
-		   editor = default_editor,
-		   session = session,
-		   options = [],
+                   editor = default_editor,
+                   session = session,
+                   options = [],
                    prelude = prel_mod,
                    break_ctr = 0,
                    breaks = [],
@@ -350,35 +350,35 @@ runGHCi paths maybe_expr = do
        dir_ok  <- io (checkPerms ".")
        file_ok <- io (checkPerms file)
        when (dir_ok && file_ok) $ do
-  	  either_hdl <- io (IO.try (openFile "./.ghci" ReadMode))
-  	  case either_hdl of
-  	     Left _e   -> return ()
-  	     Right hdl -> runCommands (fileLoop hdl False False)
-    
+          either_hdl <- io (IO.try (openFile "./.ghci" ReadMode))
+          case either_hdl of
+             Left _e   -> return ()
+             Right hdl -> runCommands (fileLoop hdl False False)
+
   when (read_dot_files) $ do
     -- Read in $HOME/.ghci
     either_dir <- io (IO.try getHomeDirectory)
     case either_dir of
        Left _e -> return ()
        Right dir -> do
-  	  cwd <- io (getCurrentDirectory)
-  	  when (dir /= cwd) $ do
-  	     let file = dir ++ "/.ghci"
-  	     ok <- io (checkPerms file)
-  	     when ok $ do
-  	       either_hdl <- io (IO.try (openFile file ReadMode))
-  	       case either_hdl of
-  		  Left _e   -> return ()
-  		  Right hdl -> runCommands (fileLoop hdl False False)
+          cwd <- io (getCurrentDirectory)
+          when (dir /= cwd) $ do
+             let file = dir ++ "/.ghci"
+             ok <- io (checkPerms file)
+             when ok $ do
+               either_hdl <- io (IO.try (openFile file ReadMode))
+               case either_hdl of
+                  Left _e   -> return ()
+                  Right hdl -> runCommands (fileLoop hdl False False)
 
   -- Perform a :load for files given on the GHCi command line
   -- When in -e mode, if the load fails then we want to stop
   -- immediately rather than going on to evaluate the expression.
   when (not (null paths)) $ do
-     ok <- ghciHandle (\e -> do showException e; return Failed) $ 
-		loadModule paths
+     ok <- ghciHandle (\e -> do showException e; return Failed) $
+                loadModule paths
      when (isJust maybe_expr && failed ok) $
-	io (exitWith (ExitFailure 1))
+        io (exitWith (ExitFailure 1))
 
   -- if verbosity is greater than 0, or we are connected to a
   -- terminal, display the prompt in the interactive loop.
