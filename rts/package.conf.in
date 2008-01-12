@@ -69,6 +69,7 @@ include-dirs:		INCLUDE_DIR GMP_INCLUDE_DIRS
 include-dirs:		FPTOOLS_TOP_ABS"/includes"
              		FPTOOLS_TOP_ABS"/rts"
              		FPTOOLS_TOP_ABS"/gmp/gmpbuild"
+             		GMP_INCLUDE_DIRS
 #endif
 
 includes:		Stg.h
