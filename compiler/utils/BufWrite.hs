@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- Fast write-buffered Handles
@@ -55,7 +48,8 @@ newBufHandle hdl = do
   writeFastMutInt r 0
   return (BufHandle ptr r hdl)
 
-buf_size = 8192 :: Int
+buf_size :: Int
+buf_size = 8192
 
 #define STRICT2(f) f a b | a `seq` b `seq` False = undefined
 #define STRICT3(f) f a b c | a `seq` b `seq` c `seq` False = undefined
@@ -73,7 +67,7 @@ bPutChar b@(BufHandle buf r hdl) c = do
 
 bPutStr :: BufHandle -> String -> IO ()
 STRICT2(bPutStr)
-bPutStr b@(BufHandle buf r hdl) str = do
+bPutStr (BufHandle buf r hdl) str = do
   i <- readFastMutInt r
   loop str i
   where loop _ i | i `seq` False = undefined
@@ -115,7 +109,7 @@ bPutLitString b@(BufHandle buf r hdl) a# len# = do
 		writeFastMutInt r (i+len)
 
 bFlush :: BufHandle -> IO ()
-bFlush b@(BufHandle buf r hdl) = do
+bFlush (BufHandle buf r hdl) = do
   i <- readFastMutInt r
   when (i > 0) $ hPutBuf hdl buf i
   free buf
