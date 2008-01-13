@@ -9,29 +9,21 @@ Based on @UniqFMs@ (as you would expect).
 Basically, the things need to be in class @Uniquable@.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module UniqSet (
-	UniqSet,    -- abstract type: NOT
+        UniqSet,    -- abstract type: NOT
 
-	mkUniqSet, uniqSetToList, emptyUniqSet, unitUniqSet,
-	addOneToUniqSet, addListToUniqSet, delOneFromUniqSet, delListFromUniqSet,
-	unionUniqSets, unionManyUniqSets, minusUniqSet,
-	elementOfUniqSet, mapUniqSet, intersectUniqSets,
-	isEmptyUniqSet, filterUniqSet, sizeUniqSet, foldUniqSet,
-	elemUniqSet_Directly, lookupUniqSet, hashUniqSet
+        mkUniqSet, uniqSetToList, emptyUniqSet, unitUniqSet,
+        addOneToUniqSet, addListToUniqSet,
+        delOneFromUniqSet, delListFromUniqSet,
+        unionUniqSets, unionManyUniqSets, minusUniqSet,
+        elementOfUniqSet, mapUniqSet, intersectUniqSets,
+        isEmptyUniqSet, filterUniqSet, sizeUniqSet, foldUniqSet,
+        elemUniqSet_Directly, lookupUniqSet, hashUniqSet
     ) where
 
-#include "HsVersions.h"
-
-import Maybes		( maybeToBool )
+import Maybes
 import UniqFM
-import Unique		( Unique, Uniquable(..) )
+import Unique
 
 #if ! OMIT_NATIVE_CODEGEN
 #define IF_NCG(a) a
@@ -41,9 +33,9 @@ import Unique		( Unique, Uniquable(..) )
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{The @UniqSet@ type}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 We use @UniqFM@, with a (@getUnique@-able) @Unique@ as ``key''
@@ -65,7 +57,7 @@ uniqSetToList :: UniqSet a -> [a]
 uniqSetToList (MkUniqSet set) = eltsUFM set
 
 foldUniqSet :: (a -> b -> b) -> b -> UniqSet a -> b
-foldUniqSet k z (MkUniqSet set) = foldUFM k z set 
+foldUniqSet k z (MkUniqSet set) = foldUFM k z set
 
 mkUniqSet :: Uniquable a => [a]  -> UniqSet a
 mkUniqSet xs = MkUniqSet (listToUFM [ (x, x) | x <- xs])
@@ -86,9 +78,9 @@ unionUniqSets :: UniqSet a -> UniqSet a -> UniqSet a
 unionUniqSets (MkUniqSet set1) (MkUniqSet set2) = MkUniqSet (plusUFM set1 set2)
 
 unionManyUniqSets :: [UniqSet a] -> UniqSet a
-	-- = foldr unionUniqSets emptyUniqSet ss
-unionManyUniqSets []	 = emptyUniqSet
-unionManyUniqSets [s]	 = s
+-- = foldr unionUniqSets emptyUniqSet ss
+unionManyUniqSets []     = emptyUniqSet
+unionManyUniqSets [s]    = s
 unionManyUniqSets (s:ss) = s `unionUniqSets` unionManyUniqSets ss
 
 minusUniqSet  :: UniqSet a -> UniqSet a -> UniqSet a
@@ -134,7 +126,7 @@ mapUniqSet f (MkUniqSet set) = MkUniqSet (mapUFM f set)
 
 {- SPECIALIZE
     elementOfUniqSet :: Name -> UniqSet Name -> Bool
-		      , Unique -> UniqSet Unique -> Bool
+                      , Unique -> UniqSet Unique -> Bool
     -}
 {- SPECIALIZE
     mkUniqSet :: [Name] -> UniqSet Name
@@ -142,7 +134,7 @@ mapUniqSet f (MkUniqSet set) = MkUniqSet (mapUFM f set)
 
 {- SPECIALIZE
     unitUniqSet :: Name -> UniqSet Name
-		 , Unique -> UniqSet Unique
+                 , Unique -> UniqSet Unique
     -}
 #endif
 \end{code}
