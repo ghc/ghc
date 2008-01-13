@@ -55,9 +55,11 @@ name = Util.global (value) :: IORef (ty); \
 #define WARN(e,msg)    if False && (e) then pprPanic "WARN" (msg) else
 #endif
 
--- This #ifndef lets us switch off the "import FastString"
--- when compiling FastString itself
-#ifndef COMPILING_FAST_STRING
+-- This conditional lets us switch off the "import FastString"
+-- when compiling FastString itself, or when compiling modules that
+-- don't use it (and would otherwise get warnings, which we treat
+-- as errors). Can we do this more nicely?
+#if !defined(COMPILING_FAST_STRING) && !defined(FAST_STRING_NOT_NEEDED)
 -- 
 import qualified FastString as FS 
 #endif

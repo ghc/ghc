@@ -5,94 +5,85 @@
 \section[Util]{Highly random utility functions}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Util (
 
-	-- general list processing
-	zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
+        -- general list processing
+        zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
         zipLazy, stretchZipWith,
-	mapFst, mapSnd,
-	mapAndUnzip, mapAndUnzip3,
-	nOfThem, filterOut, partitionWith, splitEithers,
+        mapFst, mapSnd,
+        mapAndUnzip, mapAndUnzip3,
+        nOfThem, filterOut, partitionWith, splitEithers,
         foldl1',
 
-	lengthExceeds, lengthIs, lengthAtLeast, 
-	listLengthCmp, atLength, equalLength, compareLength,
+        lengthExceeds, lengthIs, lengthAtLeast,
+        listLengthCmp, atLength, equalLength, compareLength,
 
-	isSingleton, only, singleton,
-	notNull, snocView,
+        isSingleton, only, singleton,
+        notNull, snocView,
 
-	isIn, isn'tIn,
+        isIn, isn'tIn,
 
-	-- for-loop
-	nTimes,
+        -- for-loop
+        nTimes,
 
-	-- sorting
-	sortLe, sortWith, on,
+        -- sorting
+        sortLe, sortWith, on,
 
-	-- transitive closures
-	transitiveClosure,
+        -- transitive closures
+        transitiveClosure,
 
-	-- accumulating
-	foldl2, count, all2,
-	
-	takeList, dropList, splitAtList, split,
+        -- accumulating
+        foldl2, count, all2,
 
-	-- comparisons
-	isEqual, eqListBy, 
-	thenCmp, cmpList, maybePrefixMatch,
-	removeSpaces,
+        takeList, dropList, splitAtList, split,
 
-	-- strictness
-	seqList,
+        -- comparisons
+        isEqual, eqListBy,
+        thenCmp, cmpList, maybePrefixMatch,
+        removeSpaces,
 
-	-- pairs
-	unzipWith,
+        -- strictness
+        seqList,
 
-	global, consIORef,
+        -- pairs
+        unzipWith,
 
-	-- module names
-	looksLikeModuleName,
-	
-	toArgs,
+        global, consIORef,
 
-	-- Floating point stuff
-	readRational,
+        -- module names
+        looksLikeModuleName,
 
-	-- IO-ish utilities
-	createDirectoryHierarchy,
-	doesDirNameExist,
-	modificationTimeIfExists,
+        toArgs,
 
-	later, handleDyn, handle,
+        -- Floating point stuff
+        readRational,
 
-	-- Filename utils
-    Suffix,
-	splitLongestPrefix,
-	escapeSpaces,
-	parseSearchPath,
+        -- IO-ish utilities
+        createDirectoryHierarchy,
+        doesDirNameExist,
+        modificationTimeIfExists,
+
+        later, handleDyn, handle,
+
+        -- Filename utils
+        Suffix,
+        splitLongestPrefix,
+        escapeSpaces,
+        parseSearchPath,
     ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
-import FastTypes
-
-#if defined(DEBUG) || __GLASGOW_HASKELL__ < 604
 import Panic
-#endif
 
 import Control.Exception ( Exception(..), finally, catchDyn, throw )
 import qualified Control.Exception as Exception
-import Data.Dynamic	( Typeable )
-import Data.IORef	( IORef, newIORef )
-import System.IO.Unsafe	( unsafePerformIO )
-import Data.IORef	( readIORef, writeIORef )
+import Data.Dynamic     ( Typeable )
+import Data.IORef       ( IORef, newIORef )
+import System.IO.Unsafe ( unsafePerformIO )
+import Data.IORef       ( readIORef, writeIORef )
 import Data.List        hiding (group)
 
 import qualified Data.List as List ( elem )
@@ -100,22 +91,22 @@ import qualified Data.List as List ( elem )
 import qualified Data.List as List ( notElem )
 #endif
 
-import Control.Monad	( unless )
+import Control.Monad    ( unless )
 import SYSTEM_IO_ERROR as IO ( catch, isDoesNotExistError )
-import System.Directory	( doesDirectoryExist, createDirectory,
+import System.Directory ( doesDirectoryExist, createDirectory,
                           getModificationTime )
 import System.FilePath hiding ( searchPathSeparator )
-import Data.Char	( isUpper, isAlphaNum, isSpace, ord, isDigit )
-import Data.Ratio	( (%) )
-import System.Time	( ClockTime )
+import Data.Char        ( isUpper, isAlphaNum, isSpace, ord, isDigit )
+import Data.Ratio       ( (%) )
+import System.Time      ( ClockTime )
 
 infixr 9 `thenCmp`
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{A for loop}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -127,33 +118,31 @@ nTimes n f = f . nTimes (n-1) f
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[Utils-lists]{General list processing}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 filterOut :: (a->Bool) -> [a] -> [a]
 -- Like filter, only reverses the sense of the test
-filterOut p [] = []
+filterOut _ [] = []
 filterOut p (x:xs) | p x       = filterOut p xs
-		   | otherwise = x : filterOut p xs
+                   | otherwise = x : filterOut p xs
 
 partitionWith :: (a -> Either b c) -> [a] -> ([b], [c])
-partitionWith f [] = ([],[])
+partitionWith _ [] = ([],[])
 partitionWith f (x:xs) = case f x of
-			   Left  b -> (b:bs, cs)
-			   Right c -> (bs, c:cs)
-		       where
-			 (bs,cs) = partitionWith f xs
+                         Left  b -> (b:bs, cs)
+                         Right c -> (bs, c:cs)
+    where (bs,cs) = partitionWith f xs
 
 splitEithers :: [Either a b] -> ([a], [b])
 splitEithers [] = ([],[])
 splitEithers (e : es) = case e of
-			  Left x -> (x:xs, ys)
-			  Right y -> (xs, y:ys)
-		      where
-			(xs,ys) = splitEithers es
+                        Left x -> (x:xs, ys)
+                        Right y -> (xs, y:ys)
+    where (xs,ys) = splitEithers es
 \end{code}
 
 A paranoid @zip@ (and some @zipWith@ friends) that checks the lists
@@ -161,10 +150,10 @@ are of equal length.  Alastair Reid thinks this should only happen if
 DEBUGging on; hey, why not?
 
 \begin{code}
-zipEqual	:: String -> [a] -> [b] -> [(a,b)]
-zipWithEqual	:: String -> (a->b->c) -> [a]->[b]->[c]
-zipWith3Equal	:: String -> (a->b->c->d) -> [a]->[b]->[c]->[d]
-zipWith4Equal	:: String -> (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
+zipEqual        :: String -> [a] -> [b] -> [(a,b)]
+zipWithEqual    :: String -> (a->b->c) -> [a]->[b]->[c]
+zipWith3Equal   :: String -> (a->b->c->d) -> [a]->[b]->[c]->[d]
+zipWith4Equal   :: String -> (a->b->c->d->e) -> [a]->[b]->[c]->[d]->[e]
 
 #ifndef DEBUG
 zipEqual      _ = zip
@@ -177,18 +166,18 @@ zipEqual msg (a:as) (b:bs) = (a,b) : zipEqual msg as bs
 zipEqual msg as     bs     = panic ("zipEqual: unequal lists:"++msg)
 
 zipWithEqual msg z (a:as) (b:bs)=  z a b : zipWithEqual msg z as bs
-zipWithEqual msg _ [] []	=  []
-zipWithEqual msg _ _ _		=  panic ("zipWithEqual: unequal lists:"++msg)
+zipWithEqual msg _ [] []        =  []
+zipWithEqual msg _ _ _          =  panic ("zipWithEqual: unequal lists:"++msg)
 
 zipWith3Equal msg z (a:as) (b:bs) (c:cs)
-				=  z a b c : zipWith3Equal msg z as bs cs
-zipWith3Equal msg _ [] []  []	=  []
-zipWith3Equal msg _ _  _   _	=  panic ("zipWith3Equal: unequal lists:"++msg)
+                                =  z a b c : zipWith3Equal msg z as bs cs
+zipWith3Equal msg _ [] []  []   =  []
+zipWith3Equal msg _ _  _   _    =  panic ("zipWith3Equal: unequal lists:"++msg)
 
 zipWith4Equal msg z (a:as) (b:bs) (c:cs) (d:ds)
-				=  z a b c d : zipWith4Equal msg z as bs cs ds
-zipWith4Equal msg _ [] [] [] []	=  []
-zipWith4Equal msg _ _  _  _  _	=  panic ("zipWith4Equal: unequal lists:"++msg)
+                                =  z a b c d : zipWith4Equal msg z as bs cs ds
+zipWith4Equal msg _ [] [] [] [] =  []
+zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists:"++msg)
 #endif
 \end{code}
 
@@ -196,22 +185,22 @@ zipWith4Equal msg _ _  _  _  _	=  panic ("zipWith4Equal: unequal lists:"++msg)
 -- zipLazy is lazy in the second list (observe the ~)
 
 zipLazy :: [a] -> [b] -> [(a,b)]
-zipLazy [] ys = []
+zipLazy []     _       = []
 zipLazy (x:xs) ~(y:ys) = (x,y) : zipLazy xs ys
 \end{code}
 
 
 \begin{code}
 stretchZipWith :: (a -> Bool) -> b -> (a->b->c) -> [a] -> [b] -> [c]
--- (stretchZipWith p z f xs ys) stretches ys by inserting z in 
+-- (stretchZipWith p z f xs ys) stretches ys by inserting z in
 -- the places where p returns *True*
 
-stretchZipWith p z f [] ys = []
+stretchZipWith _ _ _ []     _ = []
 stretchZipWith p z f (x:xs) ys
   | p x       = f x z : stretchZipWith p z f xs ys
   | otherwise = case ys of
-		  []     -> []
-		  (y:ys) -> f x y : stretchZipWith p z f xs ys
+                []     -> []
+                (y:ys) -> f x y : stretchZipWith p z f xs ys
 \end{code}
 
 
@@ -224,21 +213,19 @@ mapSnd f xys = [(x, f y) | (x,y) <- xys]
 
 mapAndUnzip :: (a -> (b, c)) -> [a] -> ([b], [c])
 
-mapAndUnzip f [] = ([],[])
+mapAndUnzip _ [] = ([], [])
 mapAndUnzip f (x:xs)
-  = let
-	(r1,  r2)  = f x
-	(rs1, rs2) = mapAndUnzip f xs
+  = let (r1,  r2)  = f x
+        (rs1, rs2) = mapAndUnzip f xs
     in
     (r1:rs1, r2:rs2)
 
 mapAndUnzip3 :: (a -> (b, c, d)) -> [a] -> ([b], [c], [d])
 
-mapAndUnzip3 f [] = ([],[],[])
+mapAndUnzip3 _ [] = ([], [], [])
 mapAndUnzip3 f (x:xs)
-  = let
-	(r1,  r2,  r3)  = f x
-	(rs1, rs2, rs3) = mapAndUnzip3 f xs
+  = let (r1,  r2,  r3)  = f x
+        (rs1, rs2, rs3) = mapAndUnzip3 f xs
     in
     (r1:rs1, r2:rs2, r3:rs3)
 \end{code}
@@ -260,8 +247,8 @@ atLength :: ([a] -> b)
          -> [a]
          -> Int
          -> b
-atLength atLenPred atEndPred ls n 
-  | n < 0     = atEndPred n 
+atLength atLenPred atEndPred ls n
+  | n < 0     = atEndPred n
   | otherwise = go n ls
   where
     go n [] = atEndPred n
@@ -279,8 +266,8 @@ lengthAtLeast = atLength notNull (== 0)
 lengthIs :: [a] -> Int -> Bool
 lengthIs = atLength null (==0)
 
-listLengthCmp :: [a] -> Int -> Ordering 
-listLengthCmp = atLength atLen atEnd 
+listLengthCmp :: [a] -> Int -> Ordering
+listLengthCmp = atLength atLen atEnd
  where
   atEnd 0      = EQ
   atEnd x
@@ -291,23 +278,23 @@ listLengthCmp = atLength atLen atEnd
   atLen _      = GT
 
 equalLength :: [a] -> [b] -> Bool
-equalLength [] []         = True
+equalLength []     []     = True
 equalLength (_:xs) (_:ys) = equalLength xs ys
-equalLength xs    ys      = False
+equalLength _      _      = False
 
 compareLength :: [a] -> [b] -> Ordering
-compareLength [] []         = EQ
+compareLength []     []     = EQ
 compareLength (_:xs) (_:ys) = compareLength xs ys
-compareLength [] _ys        = LT
-compareLength _xs []        = GT
+compareLength []     _      = LT
+compareLength _      []     = GT
 
 ----------------------------
 singleton :: a -> [a]
 singleton x = [x]
 
 isSingleton :: [a] -> Bool
-isSingleton [x] = True
-isSingleton  _  = False
+isSingleton [_] = True
+isSingleton _   = False
 
 notNull :: [a] -> Bool
 notNull [] = False
@@ -319,32 +306,35 @@ only [a] = a
 #else
 only (a:_) = a
 #endif
+only _ = panic "Util: only"
 \end{code}
 
 Debugging/specialising versions of \tr{elem} and \tr{notElem}
 
 \begin{code}
-isIn, isn'tIn :: (Eq a) => String -> a -> [a] -> Bool
+isIn, isn'tIn :: Eq a => String -> a -> [a] -> Bool
 
 # ifndef DEBUG
-isIn    msg x ys = elem__    x ys
-isn'tIn msg x ys = notElem__ x ys
+isIn    _msg x ys = elem__    x ys
+isn'tIn _msg x ys = notElem__ x ys
 
 --these are here to be SPECIALIZEd (automagically)
-elem__ _ []	= False
-elem__ x (y:ys)	= x==y || elem__ x ys
+elem__ :: Eq a => a -> [a] -> Bool
+elem__ _ []     = False
+elem__ x (y:ys) = x == y || elem__ x ys
 
-notElem__ x []	   =  True
-notElem__ x (y:ys) =  x /= y && notElem__ x ys
+notElem__ :: Eq a => a -> [a] -> Bool
+notElem__ _ []     = True
+notElem__ x (y:ys) = x /= y && notElem__ x ys
 
 # else /* DEBUG */
 isIn msg x ys
   = elem (_ILIT 0) x ys
   where
-    elem i _ []	    = False
+    elem i _ []        = False
     elem i x (y:ys)
-      | i ># _ILIT 100 = trace ("Over-long elem in " ++ msg) $
-			 x `List.elem` (y:ys)
+      | i ># _ILIT 100 = trace ("Over-long elem in " ++ msg)
+                               (x `List.elem` (y:ys))
       | otherwise      = x == y || elem (i +# _ILIT(1)) x ys
 
 isn'tIn msg x ys
@@ -352,8 +342,8 @@ isn'tIn msg x ys
   where
     notElem i x [] =  True
     notElem i x (y:ys)
-      | i ># _ILIT 100 = trace ("Over-long notElem in " ++ msg) $
-		         x `List.notElem` (y:ys)
+      | i ># _ILIT 100 = trace ("Over-long notElem in " ++ msg)
+                               (x `List.notElem` (y:ys))
       | otherwise      =  x /= y && notElem (i +# _ILIT(1)) x ys
 # endif /* DEBUG */
 \end{code}
@@ -362,16 +352,16 @@ foldl1' was added in GHC 6.4
 
 \begin{code}
 #if __GLASGOW_HASKELL__ < 604
-foldl1'                  :: (a -> a -> a) -> [a] -> a
-foldl1' f (x:xs)         =  foldl' f x xs
-foldl1' _ []             =  panic "foldl1'"
+foldl1'          :: (a -> a -> a) -> [a] -> a
+foldl1' f (x:xs) =  foldl' f x xs
+foldl1' _ []     =  panic "foldl1'"
 #endif
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsubsection[Utils-Carsten-mergesort]{A mergesort from Carsten}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{display}
@@ -411,7 +401,7 @@ Carsten
 
 \begin{code}
 group :: (a -> a -> Bool) -> [a] -> [[a]]
--- Given a <= function, group finds maximal contiguous up-runs 
+-- Given a <= function, group finds maximal contiguous up-runs
 -- or down-runs in the input list.
 -- It's stable, in the sense that it never re-orders equal elements
 --
@@ -419,35 +409,36 @@ group :: (a -> a -> Bool) -> [a] -> [[a]]
 -- From: Andy Gill <andy@dcs.gla.ac.uk>
 -- Here is a `better' definition of group.
 
-group p []     = []
+group _ []     = []
 group p (x:xs) = group' xs x x (x :)
   where
     group' []     _     _     s  = [s []]
-    group' (x:xs) x_min x_max s 
-	|      x_max `p` x  = group' xs x_min x (s . (x :)) 
-	| not (x_min `p` x) = group' xs x x_max ((x :) . s) 
-	| otherwise         = s [] : group' xs x x (x :) 
-	-- NB: the 'not' is essential for stablity
-	--	x `p` x_min would reverse equal elements
+    group' (x:xs) x_min x_max s
+        |      x_max `p` x  = group' xs x_min x     (s . (x :))
+        | not (x_min `p` x) = group' xs x     x_max ((x :) . s)
+        | otherwise         = s [] : group' xs x x (x :)
+        -- NB: the 'not' is essential for stablity
+        --     x `p` x_min would reverse equal elements
 
 generalMerge :: (a -> a -> Bool) -> [a] -> [a] -> [a]
-generalMerge p xs [] = xs
-generalMerge p [] ys = ys
-generalMerge p (x:xs) (y:ys) | x `p` y   = x : generalMerge p xs (y:ys)
-			     | otherwise = y : generalMerge p (x:xs) ys
+generalMerge _ xs [] = xs
+generalMerge _ [] ys = ys
+generalMerge p (x:xs) (y:ys) | x `p` y   = x : generalMerge p xs     (y:ys)
+                             | otherwise = y : generalMerge p (x:xs) ys
 
 -- gamma is now called balancedFold
 
 balancedFold :: (a -> a -> a) -> [a] -> a
-balancedFold f [] = error "can't reduce an empty list using balancedFold"
-balancedFold f [x] = x
+balancedFold _ [] = error "can't reduce an empty list using balancedFold"
+balancedFold _ [x] = x
 balancedFold f l  = balancedFold f (balancedFold' f l)
 
 balancedFold' :: (a -> a -> a) -> [a] -> [a]
 balancedFold' f (x:y:xs) = f x y : balancedFold' f xs
-balancedFold' f xs = xs
+balancedFold' _ xs = xs
 
-generalNaturalMergeSort p [] = []
+generalNaturalMergeSort :: (a -> a -> Bool) -> [a] -> [a]
+generalNaturalMergeSort _ [] = []
 generalNaturalMergeSort p xs = (balancedFold (generalMerge p) . group p) xs
 
 #if NOT_USED
@@ -468,7 +459,7 @@ sortLe le = generalNaturalMergeSort le
 sortWith :: Ord b => (a->b) -> [a] -> [a]
 sortWith get_key xs = sortLe le xs
   where
-    x `le` y = get_key x < get_key y	
+    x `le` y = get_key x < get_key y
 
 on :: (a -> a -> Ordering) -> (b -> a) -> b -> b -> Ordering
 on cmp sel = \x y -> sel x `cmp` sel y
@@ -476,59 +467,60 @@ on cmp sel = \x y -> sel x `cmp` sel y
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[Utils-transitive-closure]{Transitive closure}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 This algorithm for transitive closure is straightforward, albeit quadratic.
 
 \begin{code}
-transitiveClosure :: (a -> [a])		-- Successor function
-		  -> (a -> a -> Bool)	-- Equality predicate
-		  -> [a]
-		  -> [a]		-- The transitive closure
+transitiveClosure :: (a -> [a])         -- Successor function
+                  -> (a -> a -> Bool)   -- Equality predicate
+                  -> [a]
+                  -> [a]                -- The transitive closure
 
 transitiveClosure succ eq xs
  = go [] xs
  where
-   go done [] 			   = done
+   go done []                      = done
    go done (x:xs) | x `is_in` done = go done xs
-   		  | otherwise      = go (x:done) (succ x ++ xs)
+                  | otherwise      = go (x:done) (succ x ++ xs)
 
-   x `is_in` []                 = False
+   _ `is_in` []                 = False
    x `is_in` (y:ys) | eq x y    = True
-  		    | otherwise = x `is_in` ys
+                    | otherwise = x `is_in` ys
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[Utils-accum]{Accumulating}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 A combination of foldl with zip.  It works with equal length lists.
 
 \begin{code}
 foldl2 :: (acc -> a -> b -> acc) -> acc -> [a] -> [b] -> acc
-foldl2 k z [] [] = z
+foldl2 _ z [] [] = z
 foldl2 k z (a:as) (b:bs) = foldl2 k (k z a b) as bs
+foldl2 _ _ _      _      = panic "Util: foldl2"
 
 all2 :: (a -> b -> Bool) -> [a] -> [b] -> Bool
--- True if the lists are the same length, and 
+-- True if the lists are the same length, and
 -- all corresponding elements satisfy the predicate
-all2 p []     []     = True
+all2 _ []     []     = True
 all2 p (x:xs) (y:ys) = p x y && all2 p xs ys
-all2 p xs     ys     = False
+all2 _ _      _      = False
 \end{code}
 
 Count the number of times a predicate is true
 
 \begin{code}
 count :: (a -> Bool) -> [a] -> Int
-count p [] = 0
+count _ [] = 0
 count p (x:xs) | p x       = 1 + count p xs
-	       | otherwise = count p xs
+               | otherwise = count p xs
 \end{code}
 
 @splitAt@, @take@, and @drop@ but with length of another
@@ -537,7 +529,7 @@ list giving the break-off point:
 \begin{code}
 takeList :: [b] -> [a] -> [a]
 takeList [] _ = []
-takeList (_:xs) ls = 
+takeList (_:xs) ls =
    case ls of
      [] -> []
      (y:ys) -> y : takeList xs ys
@@ -556,26 +548,27 @@ splitAtList (_:xs) (y:ys) = (y:ys', ys'')
       (ys', ys'') = splitAtList xs ys
 
 snocView :: [a] -> Maybe ([a],a)
-	-- Split off the last element
+        -- Split off the last element
 snocView [] = Nothing
 snocView xs = go [] xs
-	    where
-		-- Invariant: second arg is non-empty
-	      go acc [x]    = Just (reverse acc, x)
-	      go acc (x:xs) = go (x:acc) xs
+            where
+                -- Invariant: second arg is non-empty
+              go acc [x]    = Just (reverse acc, x)
+              go acc (x:xs) = go (x:acc) xs
+              go _   []     = panic "Util: snocView"
 
 split :: Char -> String -> [String]
 split c s = case rest of
-		[]     -> [chunk] 
-		_:rest -> chunk : split c rest
+                []     -> [chunk]
+                _:rest -> chunk : split c rest
   where (chunk, rest) = break (==c) s
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[Utils-comparison]{Comparisons}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -587,20 +580,20 @@ isEqual LT = False
 
 thenCmp :: Ordering -> Ordering -> Ordering
 {-# INLINE thenCmp #-}
-thenCmp EQ   any = any
-thenCmp other any = other
+thenCmp EQ       ordering = ordering
+thenCmp ordering _        = ordering
 
 eqListBy :: (a->a->Bool) -> [a] -> [a] -> Bool
-eqListBy eq []     []     = True
+eqListBy _  []     []     = True
 eqListBy eq (x:xs) (y:ys) = eq x y && eqListBy eq xs ys
-eqListBy eq xs     ys     = False
+eqListBy _  _      _      = False
 
 cmpList :: (a -> a -> Ordering) -> [a] -> [a] -> Ordering
     -- `cmpList' uses a user-specified comparer
 
-cmpList cmp []     [] = EQ
-cmpList cmp []     _  = LT
-cmpList cmp _      [] = GT
+cmpList _   []     [] = EQ
+cmpList _   []     _  = LT
+cmpList _   _      [] = GT
 cmpList cmp (a:as) (b:bs)
   = case cmp a b of { EQ -> cmpList cmp as bs; xxx -> xxx }
 \end{code}
@@ -620,9 +613,9 @@ removeSpaces = reverse . dropWhile isSpace . reverse . dropWhile isSpace
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[Utils-pairs]{Pairs}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -657,8 +650,8 @@ looksLikeModuleName :: String -> Bool
 looksLikeModuleName [] = False
 looksLikeModuleName (c:cs) = isUpper c && go cs
   where go [] = True
-	go ('.':cs) = looksLikeModuleName cs
-	go (c:cs)   = (isAlphaNum c || c == '_') && go cs
+        go ('.':cs) = looksLikeModuleName cs
+        go (c:cs)   = (isAlphaNum c || c == '_') && go cs
 \end{code}
 
 Akin to @Prelude.words@, but acts like the Bourne shell, treating
@@ -707,24 +700,23 @@ toArgs s  =
 
 \begin{code}
 readRational__ :: ReadS Rational -- NB: doesn't handle leading "-"
-readRational__ r = do 
+readRational__ r = do
      (n,d,s) <- readFix r
      (k,t)   <- readExp s
      return ((n%1)*10^^(k-d), t)
  where
      readFix r = do
-	(ds,s)  <- lexDecDigits r
-	(ds',t) <- lexDotDigits s
-	return (read (ds++ds'), length ds', t)
+        (ds,s)  <- lexDecDigits r
+        (ds',t) <- lexDotDigits s
+        return (read (ds++ds'), length ds', t)
 
      readExp (e:s) | e `elem` "eE" = readExp' s
-     readExp s			   = return (0,s)
+     readExp s                     = return (0,s)
 
      readExp' ('+':s) = readDec s
-     readExp' ('-':s) = do
-			(k,t) <- readDec s
-			return (-k,t)
-     readExp' s	      = readDec s
+     readExp' ('-':s) = do (k,t) <- readDec s
+                           return (-k,t)
+     readExp' s       = readDec s
 
      readDec s = do
         (ds,r) <- nonnull isDigit s
@@ -747,9 +739,9 @@ readRational top_s
   where
     read_me s
       = case (do { (x,"") <- readRational__ s ; return x }) of
-	  [x] -> x
-	  []  -> error ("readRational: no parse:"        ++ top_s)
-	  _   -> error ("readRational: ambiguous parse:" ++ top_s)
+          [x] -> x
+          []  -> error ("readRational: no parse:"        ++ top_s)
+          _   -> error ("readRational: ambiguous parse:" ++ top_s)
 
 
 -----------------------------------------------------------------------------
@@ -759,21 +751,21 @@ createDirectoryHierarchy :: FilePath -> IO ()
 createDirectoryHierarchy dir | isDrive dir = return () -- XXX Hack
 createDirectoryHierarchy dir = do
   b <- doesDirectoryExist dir
-  unless b $ do
-	createDirectoryHierarchy (takeDirectory dir)
-	createDirectory dir
+  unless b $ do createDirectoryHierarchy (takeDirectory dir)
+                createDirectory dir
 
 -----------------------------------------------------------------------------
 -- Verify that the 'dirname' portion of a FilePath exists.
--- 
+--
 doesDirNameExist :: FilePath -> IO Bool
 doesDirNameExist fpath = case takeDirectory fpath of
-                         ""  -> return True -- XXX Hack
-                         dir -> doesDirectoryExist (takeDirectory fpath)
+                         "" -> return True -- XXX Hack
+                         _  -> doesDirectoryExist (takeDirectory fpath)
 
 -- -----------------------------------------------------------------------------
 -- Exception utils
 
+later :: IO b -> IO a -> IO a
 later = flip finally
 
 handleDyn :: Typeable ex => (ex -> IO a) -> IO a -> IO a
@@ -790,9 +782,9 @@ handle h f = f `Exception.catch` \e -> case e of
 modificationTimeIfExists :: FilePath -> IO (Maybe ClockTime)
 modificationTimeIfExists f = do
   (do t <- getModificationTime f; return (Just t))
-	`IO.catch` \e -> if isDoesNotExistError e 
-			then return Nothing 
-			else ioError e
+        `IO.catch` \e -> if isDoesNotExistError e
+                         then return Nothing
+                         else ioError e
 
 -- split a string at the last character where 'pred' is True,
 -- returning a pair of strings. The first component holds the string
@@ -807,9 +799,8 @@ splitLongestPrefix :: String -> (Char -> Bool) -> (String,String)
 splitLongestPrefix str pred
   | null r_pre = (str,           [])
   | otherwise  = (reverse (tail r_pre), reverse r_suf)
-	-- 'tail' drops the char satisfying 'pred'
-  where 
-    (r_suf, r_pre) = break pred (reverse str)
+                           -- 'tail' drops the char satisfying 'pred'
+  where (r_suf, r_pre) = break pred (reverse str)
 
 escapeSpaces :: String -> String
 escapeSpaces = foldr (\c s -> if isSpace c then '\\':c:s else c:s) ""
@@ -828,10 +819,10 @@ parseSearchPath path = split path
     split :: String -> [String]
     split s =
       case rest' of
-        []     -> [chunk] 
+        []     -> [chunk]
         _:rest -> chunk : split rest
       where
-        chunk = 
+        chunk =
           case chunk' of
 #ifdef mingw32_HOST_OS
             ('\"':xs@(_:_)) | last xs == '\"' -> init xs
@@ -840,9 +831,9 @@ parseSearchPath path = split path
 
         (chunk', rest') = break (==searchPathSeparator) s
 
--- | A platform-specific character used to separate search path strings in 
--- environment variables. The separator is a colon (\":\") on Unix and Macintosh, 
--- and a semicolon (\";\") on the Windows operating system.
+-- | A platform-specific character used to separate search path strings in
+-- environment variables. The separator is a colon (\":\") on Unix and
+-- Macintosh, and a semicolon (\";\") on the Windows operating system.
 searchPathSeparator :: Char
 #if mingw32_HOST_OS || mingw32_TARGET_OS
 searchPathSeparator = ';'
