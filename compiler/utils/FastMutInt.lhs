@@ -5,19 +5,10 @@
 -- Unboxed mutable Ints
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module FastMutInt(
 	FastMutInt, newFastMutInt,
 	readFastMutInt, writeFastMutInt
   ) where
-
-#include "HsVersions.h"
 
 #ifdef __GLASGOW_HASKELL__
 
