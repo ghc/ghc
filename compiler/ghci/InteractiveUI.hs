@@ -299,13 +299,15 @@ interactiveUI session srcs maybe_expr = do
         hSetBuffering stdin NoBuffering
 
 #ifdef USE_READLINE
-        Readline.initialize
-        Readline.setAttemptedCompletionFunction (Just completeWord)
-        --Readline.parseAndBind "set show-all-if-ambiguous 1"
+        is_tty <- hIsTerminalDevice stdin
+        when is_tty $ do
+            Readline.initialize
+            Readline.setAttemptedCompletionFunction (Just completeWord)
+            --Readline.parseAndBind "set show-all-if-ambiguous 1"
 
-        Readline.setBasicWordBreakCharacters word_break_chars
-        Readline.setCompleterWordBreakCharacters word_break_chars
-        Readline.setCompletionAppendCharacter Nothing
+            Readline.setBasicWordBreakCharacters word_break_chars
+            Readline.setCompleterWordBreakCharacters word_break_chars
+            Readline.setCompletionAppendCharacter Nothing
 #endif
 
    -- initial context is just the Prelude
