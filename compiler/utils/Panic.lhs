@@ -9,13 +9,6 @@ It's hard to put these functions anywhere else without causing
 some unnecessary loops in the module dependency graph.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Panic  
    ( 
      GhcException(..), showGhcException, ghcError, progName, 
@@ -29,6 +22,8 @@ module Panic
      installSignalHandlers, interruptTargetThread
    ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import Config
@@ -79,9 +74,11 @@ data GhcException
   | ProgramError String		-- error in the user's code, probably
   deriving Eq
 
+progName :: String
 progName = unsafePerformIO (getProgName)
 {-# NOINLINE progName #-}
 
+short_usage :: String
 short_usage = "Usage: For basic information, try the `--help' option."
    
 showException :: Exception.Exception -> String
@@ -94,6 +91,7 @@ instance Show GhcException where
   showsPrec _ e@(ProgramError _) = showGhcException e
   showsPrec _ e = showString progName . showString ": " . showGhcException e
 
+showGhcException :: GhcException -> String -> String
 showGhcException (UsageError str)
    = showString str . showChar '\n' . showString short_usage
 showGhcException (PhaseFailed phase code)
@@ -119,12 +117,14 @@ showGhcException (Panic s)
 	         ++ s ++ "\n\n"
 	         ++ "Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug\n")
 
+myMkTyConApp :: TyCon -> [TypeRep] -> TypeRep
 #if __GLASGOW_HASKELL__ < 603
 myMkTyConApp = mkAppTy
 #else 
 myMkTyConApp = mkTyConApp
 #endif
 
+ghcExceptionTc :: TyCon
 ghcExceptionTc = mkTyCon "GhcException"
 {-# NOINLINE ghcExceptionTc #-}
 instance Typeable GhcException where
