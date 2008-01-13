@@ -4,30 +4,21 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Maybes (
-	module Data.Maybe,	-- Re-export all of Maybe
+        module Data.Maybe,
 
-	MaybeErr(..),	-- Instance of Monad
-	failME, isSuccess,
+        MaybeErr(..), -- Instance of Monad
+        failME, isSuccess,
 
-	orElse, 
-	mapCatMaybes,
-	allMaybes,
-	firstJust,
-	expectJust,
-	maybeToBool,
+        orElse,
+        mapCatMaybes,
+        allMaybes,
+        firstJust,
+        expectJust,
+        maybeToBool,
 
-	thenMaybe, seqMaybe, returnMaybe, failMaybe, fmapMMaybe
+        thenMaybe, seqMaybe, returnMaybe, failMaybe, fmapMMaybe
     ) where
-
-#include "HsVersions.h"
 
 import Data.Maybe
 
@@ -35,29 +26,29 @@ infixr 4 `orElse`
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[Maybe type]{The @Maybe@ type}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
 maybeToBool :: Maybe a -> Bool
 maybeToBool Nothing  = False
-maybeToBool (Just x) = True
+maybeToBool (Just _) = True
 \end{code}
 
 @catMaybes@ takes a list of @Maybe@s and returns a list of
-the contents of all the @Just@s in it.	@allMaybes@ collects
+the contents of all the @Just@s in it. @allMaybes@ collects
 a list of @Justs@ into a single @Just@, returning @Nothing@ if there
 are any @Nothings@.
 
 \begin{code}
 allMaybes :: [Maybe a] -> Maybe [a]
 allMaybes [] = Just []
-allMaybes (Nothing : ms) = Nothing
-allMaybes (Just x  : ms) = case (allMaybes ms) of
-			     Nothing -> Nothing
-			     Just xs -> Just (x:xs)
+allMaybes (Nothing : _)  = Nothing
+allMaybes (Just x  : ms) = case allMaybes ms of
+                           Nothing -> Nothing
+                           Just xs -> Just (x:xs)
 
 \end{code}
 
@@ -67,23 +58,23 @@ first @Just@ if there is one, or @Nothing@ otherwise.
 \begin{code}
 firstJust :: [Maybe a] -> Maybe a
 firstJust [] = Nothing
-firstJust (Just x  : ms) = Just x
+firstJust (Just x  : _)  = Just x
 firstJust (Nothing : ms) = firstJust ms
 \end{code}
 
 \begin{code}
 expectJust :: String -> Maybe a -> a
 {-# INLINE expectJust #-}
-expectJust err (Just x) = x
+expectJust _   (Just x) = x
 expectJust err Nothing  = error ("expectJust " ++ err)
 \end{code}
 
 \begin{code}
 mapCatMaybes :: (a -> Maybe b) -> [a] -> [b]
-mapCatMaybes f [] = []
+mapCatMaybes _ [] = []
 mapCatMaybes f (x:xs) = case f x of
-			  Just y  -> y : mapCatMaybes f xs
-			  Nothing -> mapCatMaybes f xs
+                        Just y  -> y : mapCatMaybes f xs
+                        Nothing -> mapCatMaybes f xs
 \end{code}
 
 The Maybe monad
@@ -95,8 +86,8 @@ seqMaybe Nothing  my = my
 
 thenMaybe :: Maybe a -> (a -> Maybe b) -> Maybe b
 thenMaybe ma mb = case ma of
-		    Just x  -> mb x
-		    Nothing -> Nothing
+                  Just x  -> mb x
+                  Nothing -> Nothing
 
 returnMaybe :: a -> Maybe a
 returnMaybe = Just
@@ -105,20 +96,20 @@ failMaybe :: Maybe a
 failMaybe = Nothing
 
 orElse :: Maybe a -> a -> a
-(Just x) `orElse` y = x
+(Just x) `orElse` _ = x
 Nothing  `orElse` y = y
 
 fmapMMaybe :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
-fmapMMaybe f Nothing  = return Nothing
+fmapMMaybe _ Nothing  = return Nothing
 fmapMMaybe f (Just x) = f x >>= \x' -> return (Just x')
 
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[MaybeErr type]{The @MaybeErr@ type}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -127,7 +118,7 @@ data MaybeErr err val = Succeeded val | Failed err
 instance Monad (MaybeErr err) where
   return v = Succeeded v
   Succeeded v >>= k = k v
-  Failed e    >>= k = Failed e
+  Failed e    >>= _ = Failed e
 
 isSuccess :: MaybeErr err val -> Bool
 isSuccess (Succeeded {}) = True
