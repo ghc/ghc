@@ -9,13 +9,6 @@ Provide trees (of instructions), so that lists of instructions
 can be appended in linear time.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module OrdList (
 	OrdList, 
         nilOL, isNilOL, unitOL, appOL, consOL, snocOL, concatOL,
@@ -58,7 +51,7 @@ appOL as   None = as
 appOL as   bs   = Two as bs
 
 mapOL :: (a -> b) -> OrdList a -> OrdList b
-mapOL f None = None
+mapOL _ None = None
 mapOL f (One x) = One (f x)
 mapOL f (Two x y) = Two (mapOL f x) (mapOL f y)
 mapOL f (Many xs) = Many (map f xs)
@@ -67,13 +60,13 @@ instance Functor OrdList where
   fmap = mapOL
 
 foldrOL :: (a->b->b) -> b -> OrdList a -> b
-foldrOL k z None        = z
+foldrOL _ z None        = z
 foldrOL k z (One x)     = k x z
 foldrOL k z (Two b1 b2) = foldrOL k (foldrOL k z b2) b1
 foldrOL k z (Many xs)   = foldr k z xs
 
 foldlOL :: (b->a->b) -> b -> OrdList a -> b
-foldlOL k z None        = z
+foldlOL _ z None        = z
 foldlOL k z (One x)     = k z x
 foldlOL k z (Two b1 b2) = foldlOL k (foldlOL k z b1) b2
 foldlOL k z (Many xs)   = foldl k z xs
