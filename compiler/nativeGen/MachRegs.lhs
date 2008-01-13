@@ -103,7 +103,7 @@ import qualified Outputable
 import Unique
 import UniqSet
 import Constants
-import FastTypes
+import FastBool
 import UniqFM
 
 import GHC.Exts

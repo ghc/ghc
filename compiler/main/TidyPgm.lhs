@@ -41,7 +41,7 @@ import Maybes
 import ErrUtils
 import UniqSupply
 import Outputable
-import FastTypes hiding (fastOr)
+import FastBool hiding ( fastOr )
 
 import Data.List	( partition )
 import Data.Maybe	( isJust )

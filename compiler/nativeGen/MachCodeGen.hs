@@ -45,7 +45,7 @@ import OrdList
 import Pretty
 import Outputable
 import FastString
-import FastTypes	( isFastTrue )
+import FastBool		( isFastTrue )
 import Constants	( wORD_SIZE )
 
 #ifdef DEBUG

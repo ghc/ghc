@@ -42,7 +42,7 @@ import MachInstrs
 import MachRegs
 import Outputable
 import Constants	( rESERVED_C_STACK_BYTES )
-import FastTypes
+import FastBool
 
 -- -----------------------------------------------------------------------------
 -- RegUsage type
