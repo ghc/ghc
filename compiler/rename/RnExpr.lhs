@@ -278,6 +278,7 @@ We return a (bogus) EWildPat in each case.
 \begin{code}
 rnExpr e@EWildPat      = patSynErr e
 rnExpr e@(EAsPat {})   = patSynErr e
+rnExpr e@(EViewPat {}) = patSynErr e
 rnExpr e@(ELazyPat {}) = patSynErr e
 \end{code}
 
