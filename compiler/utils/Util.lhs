@@ -89,6 +89,7 @@ import Data.List        hiding (group)
 import qualified Data.List as List ( elem )
 #ifdef DEBUG
 import qualified Data.List as List ( notElem )
+import FastTypes
 #endif
 
 import Control.Monad    ( unless )
