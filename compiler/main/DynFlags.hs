@@ -1588,7 +1588,7 @@ setTmpDir dir dflags = dflags{ tmpDir = canonicalise dir }
      -- understand /cygdrive paths.)
      cygdrivePrefix = [pathSeparator] ++ "/cygdrive/" ++ [pathSeparator]
      xltCygdrive path = case maybePrefixMatch cygdrivePrefix path of
-                        Just (drive:sep:xs))
+                        Just (drive:sep:xs)
                          | isPathSeparator sep -> drive:':':pathSeparator:xs
                         _ -> path
 
