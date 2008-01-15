@@ -207,11 +207,11 @@ GarbageCollect ( rtsBool force_major_gc )
   }
 #endif
 
-  // tell the STM to discard any cached closures it's hoping to re-use
-  stmPreGCHook();
-
   // tell the stats department that we've started a GC 
   stat_startGC();
+
+  // tell the STM to discard any cached closures it's hoping to re-use
+  stmPreGCHook();
 
 #ifdef DEBUG
   // check for memory leaks if DEBUG is on 
