@@ -275,7 +275,9 @@ insertSuffixes
 insertSuffixes file_name extras
   = file_name : [ basename <.> (extra ++ "_" ++ suffix) | extra <- extras ]
   where
-    (basename, suffix) = splitExtension file_name
+    (basename, suffix) = case splitExtension file_name of
+                         -- Drop the "." from the extension
+                         (b, s) -> (b, drop 1 s)
 
 
 -----------------------------------------------------------------
