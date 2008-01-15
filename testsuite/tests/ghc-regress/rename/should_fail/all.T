@@ -52,3 +52,5 @@ test('rnfail047', normal, multimod_compile_fail, ['rnfail047', '-v0'])
 test('rnfail048', normal, compile_fail, [''])
 test('rnfail049', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
 test('rnfail050', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
+test('rnfail051', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
+
