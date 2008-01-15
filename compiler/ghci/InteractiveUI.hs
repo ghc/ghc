@@ -158,11 +158,15 @@ builtin_commands = [
 -- 
 -- NOTE: in order for us to override the default correctly, any custom entry
 -- must be a SUBSET of word_break_chars.
-word_break_chars, flagWordBreakChars, filenameWordBreakChars :: String
+#ifdef USE_READLINE
+word_break_chars :: String
 word_break_chars = let symbols = "!#$%&*+/<=>?@\\^|-~"
                        specials = "(),;[]`{}"
                        spaces = " \t\n"
                    in spaces ++ specials ++ symbols
+#endif
+
+flagWordBreakChars, filenameWordBreakChars :: String
 flagWordBreakChars = " \t\n"
 filenameWordBreakChars = " \t\n\\`@$><=;|&{(" -- bash defaults
 
