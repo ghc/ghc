@@ -1019,9 +1019,13 @@ arityType dflags (Lam x e)
 
 	-- Applications; decrease arity
 arityType dflags (App f (Type _)) = arityType dflags f
-arityType dflags (App f a)  	  = case arityType dflags f of
-					AFun one_shot xs | exprIsCheap a -> xs
-					other				 -> ATop
+arityType dflags (App f a)
+   = case arityType dflags f of
+	ABot -> ABot	-- If function diverges, ignore argument
+	ATop -> ATop	-- No no info about function
+	AFun one_shot xs 
+		| exprIsCheap a -> xs
+		| otherwise	-> ATop
 							   
 	-- Case/Let; keep arity if either the expression is cheap
 	-- or it's a 1-shot lambda
