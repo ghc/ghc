@@ -472,11 +472,20 @@ instance (Outputable a, Outputable b, Outputable c) => Outputable (a, b, c) wher
 
 instance (Outputable a, Outputable b, Outputable c, Outputable d) =>
 	 Outputable (a, b, c, d) where
-    ppr (x,y,z,w) =
-      parens (sep [ppr x <> comma,
-		   ppr y <> comma,
-		   ppr z <> comma,
-		   ppr w])
+    ppr (a,b,c,d) =
+      parens (sep [ppr a <> comma,
+		   ppr b <> comma,
+		   ppr c <> comma,
+		   ppr d])
+
+instance (Outputable a, Outputable b, Outputable c, Outputable d, Outputable e) =>
+	 Outputable (a, b, c, d, e) where
+    ppr (a,b,c,d,e) =
+      parens (sep [ppr a <> comma,
+		   ppr b <> comma,
+		   ppr c <> comma,
+		   ppr d <> comma,
+		   ppr e])
 
 instance Outputable FastString where
     ppr fs = ftext fs		-- Prints an unadorned string,
