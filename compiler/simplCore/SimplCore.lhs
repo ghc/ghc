@@ -157,7 +157,7 @@ doCorePass CoreDoSpecConstr	       = {-# SCC "SpecConstr" #-}    trBindsU specCo
 doCorePass CoreDoGlomBinds	       = trBinds glomBinds
 doCorePass CoreDoVectorisation         = {-# SCC "Vectorise" #-}     vectorise
 doCorePass CoreDoPrintCore	       = observe printCore
-doCorePass (CoreDoRuleCheck phase pat) = observe (ruleCheck phase pat)
+doCorePass (CoreDoRuleCheck phase pat) = ruleCheck phase pat
 doCorePass CoreDoNothing	       = observe (\ _ _ -> return ())
 #ifdef OLD_STRICTNESS		       
 doCorePass CoreDoOldStrictness	       = {-# SCC "OldStrictness" #-} trBinds doOldStrictness
@@ -175,8 +175,11 @@ doOldStrictness dfs binds
 
 printCore _ binds = dumpIfSet True "Print Core" (pprCoreBindings binds)
 
-ruleCheck phase pat dflags binds = do showPass dflags "RuleCheck"
-				      printDump (ruleCheckProgram phase pat binds)
+ruleCheck phase pat hsc_env us rb guts 
+  =  do let dflags = hsc_dflags hsc_env
+	showPass dflags "RuleCheck"
+        printDump (ruleCheckProgram phase pat rb (mg_binds guts))
+	return (zeroSimplCount dflags, guts)
 
 -- Most passes return no stats and don't change rules
 trBinds :: (DynFlags -> [CoreBind] -> IO [CoreBind])

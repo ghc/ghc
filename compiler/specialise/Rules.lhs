@@ -225,15 +225,17 @@ lookupRule :: (Activation -> Bool) -> InScopeSet
 	   -> Id -> [CoreExpr] -> Maybe (CoreRule, CoreExpr)
 -- See Note [Extra argsin rule matching]
 lookupRule is_active in_scope rule_base fn args
-  = matchRules is_active in_scope fn args rules
-  where
+  = matchRules is_active in_scope fn args (getRules rule_base fn)
+
+getRules :: RuleBase -> Id -> [CoreRule]
 	-- The rules for an Id come from two places:
 	--	(a) the ones it is born with (idCoreRules fn)
 	--	(b) rules added in subsequent modules (extra_rules)
 	-- PrimOps, for example, are born with a bunch of rules under (a)
-    rules = extra_rules ++ idCoreRules fn
-    extra_rules | isLocalId fn = []
-	  	| otherwise    = lookupNameEnv rule_base (idName fn) `orElse` []
+getRules rule_base fn
+  | isLocalId fn = idCoreRules fn
+  | otherwise    = WARN( null (idCoreRules fn), ppr fn <+> ppr (idCoreRules fn) )
+		   lookupNameEnv rule_base (idName fn) `orElse` []
 
 matchRules :: (Activation -> Bool) -> InScopeSet
 	   -> Id -> [CoreExpr]
@@ -765,16 +767,11 @@ is so important.
 We want to know what sites have rules that could have fired but didn't.
 This pass runs over the tree (without changing it) and reports such.
 
-NB: we assume that this follows a run of the simplifier, so every Id
-occurrence (including occurrences of imported Ids) is decorated with
-all its (active) rules.  No need to construct a rule base or anything
-like that.
-
 \begin{code}
-ruleCheckProgram :: CompilerPhase -> String -> [CoreBind] -> SDoc
+ruleCheckProgram :: CompilerPhase -> String -> RuleBase -> [CoreBind] -> SDoc
 -- Report partial matches for rules beginning 
 -- with the specified string
-ruleCheckProgram phase rule_pat binds 
+ruleCheckProgram phase rule_pat rule_base binds 
   | isEmptyBag results
   = text "Rule check results: no rule application sites"
   | otherwise
@@ -783,10 +780,10 @@ ruleCheckProgram phase rule_pat binds
 	  vcat [ p $$ line | p <- bagToList results ]
 	 ]
   where
-    results = unionManyBags (map (ruleCheckBind (phase, rule_pat)) binds)
+    results = unionManyBags (map (ruleCheckBind (phase, rule_pat, rule_base)) binds)
     line = text (replicate 20 '-')
 	  
-type RuleCheckEnv = (CompilerPhase, String) 	-- Phase and Pattern
+type RuleCheckEnv = (CompilerPhase, String, RuleBase) 	-- Phase and Pattern
 
 ruleCheckBind :: RuleCheckEnv -> CoreBind -> Bag SDoc
    -- The Bag returned has one SDoc for each call site found
@@ -815,11 +812,11 @@ ruleCheckFun :: RuleCheckEnv -> Id -> [CoreExpr] -> Bag SDoc
 -- Produce a report for all rules matching the predicate
 -- saying why it doesn't match the specified application
 
-ruleCheckFun (phase, pat) fn args
+ruleCheckFun (phase, pat, rule_base) fn args
   | null name_match_rules = emptyBag
   | otherwise		  = unitBag (ruleAppCheck_help phase fn args name_match_rules)
   where
-    name_match_rules = filter match (idCoreRules fn)
+    name_match_rules = filter match (getRules rule_base fn)
     match rule = pat `isPrefixOf` unpackFS (ruleName rule)
 
 ruleAppCheck_help :: CompilerPhase -> Id -> [CoreExpr] -> [CoreRule] -> SDoc
