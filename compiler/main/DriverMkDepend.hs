@@ -22,7 +22,7 @@ module DriverMkDepend (
 import qualified GHC
 import GHC		( Session, ModSummary(..) )
 import DynFlags
-import Util		( escapeSpaces )
+import Util
 import HscTypes		( HscEnv, IsBootInterface, msObjFilePath, msHsFilePath )
 import SysTools		( newTempName )
 import qualified SysTools
@@ -248,10 +248,10 @@ findDependency hsc_env src imp is_boot include_pkg_deps
 -----------------------------
 writeDependency :: Handle -> [FilePath] -> FilePath -> IO ()
 -- (writeDependency h [t1,t2] dep) writes to handle h the dependency
---	t1 t2 : dep
+--      t1 t2 : dep
 writeDependency hdl targets dep
-  = hPutStrLn hdl (unwords (map escapeSpaces targets) ++ " : "
-		   ++ escapeSpaces dep)
+  = hPutStrLn hdl (unwords (map forOutput targets) ++ " : " ++ forOutput dep)
+    where forOutput = escapeSpaces . reslash Forwards . normalise
 
 -----------------------------
 insertSuffixes	
