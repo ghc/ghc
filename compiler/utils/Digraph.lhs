@@ -83,6 +83,16 @@ instance Outputable a => Outputable (SCC a) where
    ppr (CyclicSCC vs) = text "REC" $$ (nest 3 (vcat (map ppr vs)))
 \end{code}
 
+Note [Nodes, keys, vertices]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ * A 'node' is a big blob of client-stuff
+
+ * Each 'node' has a unique (client) 'key', but the latter 
+	is in Ord and has fast comparison
+
+ * Digraph then maps each 'key' to a Vertex (Int) which is
+  	arranged densely in 0.n
+
 \begin{code}
 stronglyConnComp
         :: Ord key
