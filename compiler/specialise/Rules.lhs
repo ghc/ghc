@@ -35,8 +35,7 @@ import Type		( Type, TvSubstEnv )
 import Coercion         ( coercionKind )
 import TcType		( tcSplitTyConApp_maybe )
 import CoreTidy		( tidyRules )
-import Id		( Id, idUnfolding, isLocalId, isGlobalId, idName, idType,
-			  idSpecialisation, idCoreRules, setIdSpecialisation ) 
+import Id
 import IdInfo		( SpecInfo( SpecInfo ) )
 import Var		( Var )
 import VarEnv
@@ -233,9 +232,11 @@ getRules :: RuleBase -> Id -> [CoreRule]
 	--	(b) rules added in subsequent modules (extra_rules)
 	-- PrimOps, for example, are born with a bunch of rules under (a)
 getRules rule_base fn
-  | isLocalId fn = idCoreRules fn
-  | otherwise    = WARN( null (idCoreRules fn), ppr fn <+> ppr (idCoreRules fn) )
-		   lookupNameEnv rule_base (idName fn) `orElse` []
+  | isLocalId fn  = idCoreRules fn
+  | otherwise     = WARN( not (isPrimOpId fn) && notNull (idCoreRules fn), 
+ 			  ppr fn <+> ppr (idCoreRules fn) )
+		    idCoreRules fn ++ (lookupNameEnv rule_base (idName fn) `orElse` [])
+	-- Only PrimOpIds have rules inside themselves, and perhaps more besides
 
 matchRules :: (Activation -> Bool) -> InScopeSet
 	   -> Id -> [CoreExpr]
