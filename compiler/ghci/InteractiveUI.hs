@@ -54,6 +54,7 @@ import System.Posix hiding (getEnv)
 #else
 import GHC.ConsoleHandler ( flushConsole )
 import qualified System.Win32
+import System.FilePath
 #endif
 
 #ifdef USE_READLINE
