@@ -424,7 +424,7 @@ repTy (HsForAllTy _ tvs ctxt ty)  =
 
 repTy (HsTyVar n)
   | isTvOcc (nameOccName n)       = do 
-				      tv1 <- lookupBinder n
+				      tv1 <- lookupTvOcc n
 				      repTvar tv1
   | otherwise		          = do 
 				      tc1 <- lookupOcc n
@@ -916,6 +916,18 @@ lookupOcc n
 		Just (Bound x)  -> return (coreVar x)
 		Just (Splice _) -> pprPanic "repE:lookupOcc" (ppr n) 
     }
+
+lookupTvOcc :: Name -> DsM (Core TH.Name)
+-- Type variables can't be staged and are not lexically scoped in TH
+lookupTvOcc n	
+  = do {  mb_val <- dsLookupMetaEnv n ;
+          case mb_val of
+		Just (Bound x)  -> return (coreVar x)
+		other	        -> failWithDs msg
+    }
+  where
+    msg = vcat  [ ptext SLIT("Illegal lexically-scoped type variable") <+> quotes (ppr n)
+		, ptext SLIT("Lexically scoped type variables are not supported by Template Haskell") ]
 
 globalVar :: Name -> DsM (Core TH.Name)
 -- Not bound by the meta-env
