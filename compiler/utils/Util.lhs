@@ -70,6 +70,7 @@ module Util (
         splitLongestPrefix,
         escapeSpaces,
         parseSearchPath,
+        Direction(..), reslash,
     ) where
 
 -- XXX This define is a bit of a hack, and should be done more nicely
@@ -841,4 +842,17 @@ searchPathSeparator = ';'
 #else
 searchPathSeparator = ':'
 #endif
+
+data Direction = Forwards | Backwards
+
+reslash :: Direction -> FilePath -> FilePath
+reslash d = f
+    where f ('/'  : xs) = slash : f xs
+          f ('\\' : xs) = slash : f xs
+          f (x    : xs) = x     : f xs
+          f ""          = ""
+          slash = case d of
+                  Forwards -> '/'
+                  Backwards -> '\\'
 \end{code}
+

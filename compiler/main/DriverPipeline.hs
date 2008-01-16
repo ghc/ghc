@@ -582,17 +582,22 @@ runPhase :: Phase	-- Do this phase first
 -- Unlit phase 
 
 runPhase (Unlit sf) _stop dflags _basename _suff input_fn get_output_fn maybe_loc
-  = do let unlit_flags = getOpts dflags opt_L
-       -- The -h option passes the file name for unlit to put in a #line directive
+  = do
        output_fn <- get_output_fn dflags (Cpp sf) maybe_loc
 
-       SysTools.runUnlit dflags 
-		(map SysTools.Option unlit_flags ++
-       			  [ SysTools.Option     "-h"
- 			  , SysTools.Option     input_fn
-			  , SysTools.FileOption "" input_fn
-			  , SysTools.FileOption "" output_fn
-			  ])
+       let unlit_flags = getOpts dflags opt_L
+           flags = map SysTools.Option unlit_flags ++
+                   [ -- The -h option passes the file name for unlit to
+                     -- put in a #line directive
+                     SysTools.Option     "-h"
+                     -- cpp interprets \b etc as escape sequences,
+                     -- so we use / for filenames in pragmas
+                   , SysTools.Option $ reslash Forwards $ normalise input_fn
+                   , SysTools.FileOption "" input_fn
+                   , SysTools.FileOption "" output_fn
+                   ]
+
+       SysTools.runUnlit dflags flags
 
        return (Cpp sf, dflags, maybe_loc, output_fn)
 
