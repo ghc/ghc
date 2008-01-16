@@ -20,6 +20,8 @@
 -----------------------------------------------------------------------------
 -- bugs
 
+* Haddock fails to process source files containing UNPACK pragmas
+
 * HsParser bug: starting the module with '-- | doc' followed by a declaration
   doesn't parse, because the '-- | doc' is interpreted as the module
   documentation (the grammar has an S/R conflict because of this).
