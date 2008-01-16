@@ -1595,7 +1595,7 @@ setTmpDir dir dflags = dflags{ tmpDir = canonicalise dir }
      -- strip the trailing backslash (awful, but we only do this once).
      removeTrailingSlash path
       | isPathSeparator (last path) = init path
-      | othwerwise                  = path
+      | otherwise                   = path
 #endif
 
 -----------------------------------------------------------------------------
