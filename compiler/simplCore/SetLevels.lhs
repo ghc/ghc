@@ -773,9 +773,10 @@ abstractVars :: Level -> LevelEnv -> VarSet -> [Var]
 	-- whose level is greater than the destination level
 	-- These are the ones we are going to abstract out
 abstractVars dest_lvl (_, lvl_env, _, id_env) fvs
-  = uniq (sortLe le [var | fv <- varSetElems fvs
-			 , var <- absVarsOf id_env fv
-			 , abstract_me var])
+  = map zap $ uniq $ sortLe le 
+    [var | fv <- varSetElems fvs
+	 , var <- absVarsOf id_env fv
+	 , abstract_me var]
   where
 	-- Sort the variables so the true type variables come first;
 	-- the tyvars scope over Ids and coercion vars
@@ -796,13 +797,25 @@ abstractVars dest_lvl (_, lvl_env, _, id_env) fvs
 			Just lvl -> dest_lvl `ltLvl` lvl
 			Nothing  -> False
 
+	-- We are going to lambda-abstract, so nuke any IdInfo,
+	-- and add the tyvars of the Id (if necessary)
+    zap v | isId v = WARN( workerExists (idWorkerInfo v) ||
+		           not (isEmptySpecInfo (idSpecialisation v)),
+		           text "absVarsOf: discarding info on" <+> ppr v )
+		     setIdInfo v vanillaIdInfo
+	  | otherwise = v
+
 absVarsOf :: IdEnv ([Var], LevelledExpr) -> Var -> [Var]
 	-- If f is free in the expression, and f maps to poly_f a b c in the
 	-- current substitution, then we must report a b c as candidate type
 	-- variables
+	--
+	-- Also, if x::a is an abstracted variable, then so is a; that is,
+	--	we must look in x's type
+	-- And similarly if x is a coercion variable.
 absVarsOf id_env v 
-  | isId v    = [zap av2 | av1 <- lookup_avs v
-			 , av2 <- add_tyvars av1]
+  | isId v    = [av2 | av1 <- lookup_avs v
+		     , av2 <- add_tyvars av1]
   | isCoVar v = add_tyvars v
   | otherwise = [v]
 
@@ -812,14 +825,6 @@ absVarsOf id_env v
 			Nothing	           -> [v]
 
     add_tyvars v = v : varSetElems (varTypeTyVars v)
-
-	-- We are going to lambda-abstract, so nuke any IdInfo,
-	-- and add the tyvars of the Id (if necessary)
-    zap v | isId v = WARN( workerExists (idWorkerInfo v) ||
-		           not (isEmptySpecInfo (idSpecialisation v)),
-		           text "absVarsOf: discarding info on" <+> ppr v )
-		     setIdInfo v vanillaIdInfo
-	  | otherwise = v
 \end{code}
 
 \begin{code}
