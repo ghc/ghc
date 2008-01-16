@@ -1075,13 +1075,15 @@ runPhase other _stop _dflags _basename _suff _input_fn _get_output_fn _maybe_loc
 -- we don't need the generality of a phase (MoveBinary is always
 -- done after linking and makes only sense in a parallel setup)   -- HWL
 
-runPhase_MoveBinary :: DynFlags -> FilePath -> IO Bool 
-runPhase_MoveBinary dflags input_fn
-  = do	
+runPhase_MoveBinary :: DynFlags -> FilePath -> [PackageId] -> IO Bool
+runPhase_MoveBinary dflags input_fn dep_packages
+    | WayPar `elem` (wayNames dflags) && not opt_Static =
+	panic ("Don't know how to combine PVM wrapper and dynamic wrapper")
+    | WayPar `elem` (wayNames dflags) = do
         let sysMan = pgm_sysman dflags
         pvm_root <- getEnv "PVM_ROOT"
         pvm_arch <- getEnv "PVM_ARCH"
-        let 
+        let
            pvm_executable_base = "=" ++ input_fn
            pvm_executable = pvm_root ++ "/bin/" ++ pvm_arch ++ "/" ++ pvm_executable_base
         -- nuke old binary; maybe use configur'ed names for cp and rm?
@@ -1091,6 +1093,40 @@ runPhase_MoveBinary dflags input_fn
         -- generate a wrapper script for running a parallel prg under PVM
         writeFile input_fn (mk_pvm_wrapper_script pvm_executable pvm_executable_base sysMan)
 	return True
+    | not opt_Static =
+	case (dynLibLoader dflags) of
+	  Wrapped wrapmode ->
+	      do
+		let (o_base, o_ext) = splitFilename input_fn
+		let wrapped_executable | o_ext == "exe" = (o_base ++ "_real") `joinFileExt` o_ext
+				       | otherwise = input_fn ++ "_real"
+		behaviour <- wrapper_behaviour dflags wrapmode dep_packages
+
+                -- THINKME isn't this possible to do a bit nicer?
+		let behaviour' = concatMap (\x -> if x=='\\' then "\\\\" else [x]) behaviour
+		renameFile input_fn wrapped_executable
+		let rtsDetails = (getPackageDetails (pkgState dflags) rtsPackageId);
+		SysTools.runCc dflags
+                  ([ SysTools.FileOption "" ((head (libraryDirs rtsDetails)) ++ "/dyn-wrapper.c")
+		   , SysTools.Option ("-DBEHAVIOUR=\"" ++ behaviour' ++ "\"")
+		   , SysTools.Option "-o"
+		   , SysTools.FileOption "" input_fn
+		   ] ++ map (SysTools.FileOption "-I") (includeDirs rtsDetails))
+		return True
+	  _ -> return True
+    | otherwise = return True
+
+wrapper_behaviour :: DynFlags -> Maybe [Char] -> [PackageId] -> IO [Char]
+wrapper_behaviour dflags mode dep_packages =
+    let seperateBySemiColon strs = tail $ concatMap (';':) strs
+    in case mode of
+      Nothing -> do
+		pkg_lib_paths <- getPackageLibraryPath dflags dep_packages
+		return ('H' : (seperateBySemiColon pkg_lib_paths))
+      Just s -> do
+	allpkg <- getPreloadPackagesAnd dflags dep_packages
+	putStrLn (unwords (map (packageIdString . packageConfigId) allpkg))
+	return $ 'F':s ++ ';':(seperateBySemiColon (map (packageIdString . packageConfigId) allpkg))
 
 -- generates a Perl skript starting a parallel prg under PVM
 mk_pvm_wrapper_script :: String -> String -> String -> String
@@ -1292,10 +1328,9 @@ linkBinary dflags o_files dep_packages = do
 		    ))
 
     -- parallel only: move binary to another dir -- HWL
-    when (WayPar `elem` ways)
-	 (do success <- runPhase_MoveBinary dflags output_fn
-             if success then return ()
-                        else throwDyn (InstallationError ("cannot move binary to PVM dir")))
+    success <- runPhase_MoveBinary dflags output_fn dep_packages
+    if success then return ()
+               else throwDyn (InstallationError ("cannot move binary"))
 
 
 exeFileName :: DynFlags -> FilePath
