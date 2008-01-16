@@ -96,7 +96,7 @@ arg: while ($_ = $ARGV[0]) {
     /^-accept-output$/        && do { $SaveStdout = 1; $SaveStderr = 1; next arg; };
 
     /^-stdout-binary/ && do { $StdoutBinary=1; next arg; };
-    /^-stdout-binary/ && do { $StderrBinary=1; next arg; };
+    /^-stderr-binary/ && do { $StderrBinary=1; next arg; };
 
     /^-O(.*)/	&& do { push(@PgmArgs, &grab_arg_arg('-O',$1)); next arg; };
     /^-i(.*)/	&& do { $PgmStdinFile = &grab_arg_arg('-i',$1);
