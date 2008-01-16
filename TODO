@@ -74,6 +74,24 @@
 -----------------------------------------------------------------------------
 -- features
 
+
+* Optionally show qualifications of identifiers, that is print
+"Sequence.map" rather than "map", "Music.T" rather than just "T". The
+option for haddock could be
+    --qualification QUAL
+          QUAL=none   (default) strip off qualification (just "map")
+          QUAL=orig   show the identifiers as they are written in the module (e.g. "map" or "List.map")
+          QUAL=full   show all identifiers with full qualification (Data.List.map)
+  Actually I tried to implement it by myself in the old Haddock, but I
+could not precisely identify the place, where the qualification is
+removed.
+
+* Documentation of arguments of type constructors other than 'top level' arrows. E.g.
+   T (a {- ^ arg -}  ->  b {- ^ result -} )
+   (a {- ^ arg -}  ->  b {- ^ result -} ) -> c
+   (a {- ^ x coord -}, b {- ^ y coord -}) -> c
+  It's probably difficult to format properly in HTML.
+
 * Do something better about re-exported symbols from another package.
 
 * Haddock could compare interfaces from multiple versions of a module
