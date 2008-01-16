@@ -93,6 +93,15 @@ endif
 
 EXCLUDED_SRCS += parallel/SysMan.c
 
+EXCLUDED_SRCS += dyn-wrapper.c
+
+# compile generatic patchable dyn-wrapper
+
+DYNWRAPPER_SRC = dyn-wrapper.c
+DYNWRAPPER_PROG = dyn-wrapper$(exeext)
+$(DYNWRAPPER_PROG): $(DYNWRAPPER_SRC)
+	$(HC) -cpp -optc-include -optcdyn-wrapper-patchable-behaviour.h $(INPLACE_EXTRA_FLAGS) $< -o $@
+
 # The build system doesn't give us these
 CMM_SRCS = $(filter-out AutoApply%.cmm, $(wildcard *.cmm)) $(EXTRA_CMM_SRCS)
 CMM_OBJS = $(patsubst %.cmm,%.$(way_)o, $(CMM_SRCS))
