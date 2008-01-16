@@ -29,6 +29,7 @@ module DynFlags (
 	GhcLink(..), isNoLink,
 	PackageFlag(..),
 	Option(..),
+	DynLibLoader(..),
         fFlags, xFlags,
 
 	-- Configuration of the core-to-core and stg-to-stg phases
@@ -333,6 +334,7 @@ data DynFlags = DynFlags {
 
   outputFile		:: Maybe String,
   outputHi		:: Maybe String,
+  dynLibLoader		:: DynLibLoader,
 
   -- | This is set by DriverPipeline.runPipeline based on where
   --	its output is going.
@@ -459,6 +461,12 @@ defaultObjectTarget
   | cGhcWithNativeCodeGen == "YES" 	=  HscAsm
   | otherwise				=  HscC
 
+data DynLibLoader
+  = Deployable
+  | Wrapped (Maybe String)
+  | SystemDependent
+  deriving Eq
+
 initDynFlags dflags = do
  -- someday these will be dynamic flags
  ways <- readIORef v_Ways
@@ -505,6 +513,7 @@ defaultDynFlags =
 
 	outputFile		= Nothing,
 	outputHi		= Nothing,
+	dynLibLoader		= Deployable,
 	dumpPrefix		= Nothing,
 	dumpPrefixForce		= Nothing,
 	includePaths		= [],
@@ -600,6 +609,15 @@ setHcSuf      f d = d{ hcSuf      = f}
 
 setOutputFile f d = d{ outputFile = f}
 setOutputHi   f d = d{ outputHi   = f}
+
+parseDynLibLoaderMode f d =
+ case splitAt 8 f of
+   ("deploy", "")       -> d{ dynLibLoader = Deployable }
+   ("sysdep", "")       -> d{ dynLibLoader = SystemDependent }
+   ("wrapped", "")      -> d{ dynLibLoader = Wrapped Nothing }
+   ("wrapped:", "hard") -> d{ dynLibLoader = Wrapped Nothing }
+   ("wrapped:", flex)   -> d{ dynLibLoader = Wrapped (Just flex) }
+   (_,_)                -> error "Unknown dynlib loader"
 
 setDumpPrefixForce f d = d { dumpPrefixForce = f}
 
@@ -993,6 +1011,7 @@ dynamic_flags = [
   ,  ( "c"		, NoArg (upd $ \d -> d{ ghcLink=NoLink } ))
   ,  ( "no-link"	, NoArg (upd $ \d -> d{ ghcLink=NoLink } )) -- Dep.
   ,  ( "shared"		, NoArg (upd $ \d -> d{ ghcLink=LinkDynLib } ))
+  ,  ( "dynload"	, HasArg (upd . parseDynLibLoaderMode))
 
 	------- Libraries ---------------------------------------------------
   ,  ( "L"		, Prefix addLibraryPath )
