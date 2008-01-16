@@ -369,7 +369,7 @@ sub process_asm_block_iX86 {
     # http://bugs6.perl.org/rt2/Ticket/Display.html?id=1760 and illustrated
     # by the seg fault of perl -e '("x\n" x 5000) =~ /(.*\n)+/'
     # -- ccshan 2002-09-05]
-    while ( ($str =~ /(\.?(LC\d+):\n(\t\.(ascii|string).*\n|\s*\.byte.*\n){1,100})/ )) {
+    while ( ($str =~ /((?:^|\.)(LC\d+):\n(\t\.(ascii|string).*\n|\s*\.byte.*\n){1,100})/ )) {
 	local($label) = $2;
 	local($body)  = $1;
 	local($prefix, $suffix, $*) = ($`, $', 0);
@@ -407,7 +407,7 @@ sub process_asm_block_x86_64 {
     # http://bugs6.perl.org/rt2/Ticket/Display.html?id=1760 and illustrated
     # by the seg fault of perl -e '("x\n" x 5000) =~ /(.*\n)+/'
     # -- ccshan 2002-09-05]
-    while ( ($str =~ /(\.?(LC\d+):\n(\t\.(ascii|string).*\n|\s*\.byte.*\n){1,100})/ )) {
+    while ( ($str =~ /((?:^|\.)(LC\d+):\n(\t\.(ascii|string).*\n|\s*\.byte.*\n){1,100})/ )) {
 	local($label) = $2;
 	local($body)  = $1;
 	local($prefix, $suffix, $*) = ($`, $', 0);
@@ -502,7 +502,7 @@ sub process_asm_block_mips {
     }
 
     # remove/record any literal constants defined here
-    while ( $str =~ /(\t\.rdata\n\t\.align \d\n)?(\$(LC\d+):\n(\t\.byte\t.*\n)+)/ ) {
+    while ( $str =~ /(\t\.rdata\n\t\.align \d\n)?^(\$(LC\d+):\n(\t\.byte\t.*\n)+)/ ) {
 	local($label) = $3;
 	local($body)  = $2;
 
