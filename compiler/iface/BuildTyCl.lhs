@@ -210,7 +210,7 @@ buildDataCon src_name declared_infix arg_stricts field_lbls
 				     stupid_ctxt dc_ids
 		dc_ids = mkDataConIds wrap_name work_name data_con
 
-	; returnM data_con }
+	; return data_con }
 
 
 -- The stupid context for a data constructor should be limited to
