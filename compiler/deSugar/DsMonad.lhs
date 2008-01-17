@@ -14,9 +14,10 @@
 -- for details
 
 module DsMonad (
-	DsM, mappM, mapAndUnzipM,
-	initDs, initDsTc, returnDs, thenDs, listDs, fixDs, mapAndUnzipDs, 
-	foldlDs, foldrDs, ifOptDs,
+	DsM, mapM, mapAndUnzipM,
+	initDs, initDsTc, fixDs, mapAndUnzipM,
+	foldlM, foldrM, ifOptM,
+	Applicative(..),(<$>),
 
 	newTyVarsDs, newLocalName,
 	duplicateLocalDs, newSysLocalDs, newSysLocalsDs, newUniqueId,
@@ -64,10 +65,9 @@ import NameEnv
 import OccName
 import DynFlags
 import ErrUtils
+import MonadUtils
 
 import Data.IORef
-
-infixr 9 `thenDs`
 \end{code}
 
 %************************************************************************
@@ -124,13 +124,6 @@ type DsM result = TcRnIf DsGblEnv DsLclEnv result
 
 -- Compatibility functions
 fixDs    = fixM
-thenDs   = thenM
-returnDs = returnM
-listDs   = sequenceM
-foldlDs  = foldlM
-foldrDs  = foldrM
-mapAndUnzipDs = mapAndUnzipM
-ifOptDs   = ifOptM
 
 type DsWarning = (SrcSpan, SDoc)
 	-- Not quite the same as a WarnMsg, we have an SDoc here 
@@ -199,7 +192,7 @@ initDsTc thing_inside
         ; dflags   <- getDOpts
 	; let type_env = tcg_type_env tcg_env
 	      rdr_env  = tcg_rdr_env tcg_env
-        ; ds_envs <- ioToIOEnv$ mkDsEnvs dflags this_mod rdr_env type_env msg_var
+        ; ds_envs <- liftIO $ mkDsEnvs dflags this_mod rdr_env type_env msg_var
 	; setEnvs ds_envs thing_inside }
 
 mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> IORef Messages -> IO (DsGblEnv, DsLclEnv)
@@ -233,33 +226,33 @@ it easier to read debugging output.
 \begin{code}
 -- Make a new Id with the same print name, but different type, and new unique
 newUniqueId :: Name -> Type -> DsM Id
-newUniqueId id ty
-  = newUnique 	`thenDs` \ uniq ->
-    returnDs (mkSysLocal (occNameFS (nameOccName id)) uniq ty)
+newUniqueId id ty = do
+    uniq <- newUnique
+    return (mkSysLocal (occNameFS (nameOccName id)) uniq ty)
 
 duplicateLocalDs :: Id -> DsM Id
-duplicateLocalDs old_local 
-  = newUnique 	`thenDs` \ uniq ->
-    returnDs (setIdUnique old_local uniq)
+duplicateLocalDs old_local = do
+    uniq <- newUnique
+    return (setIdUnique old_local uniq)
 
 newSysLocalDs, newFailLocalDs :: Type -> DsM Id
-newSysLocalDs ty
-  = newUnique 	`thenDs` \ uniq ->
-    returnDs (mkSysLocal FSLIT("ds") uniq ty)
+newSysLocalDs ty = do
+    uniq <- newUnique
+    return (mkSysLocal FSLIT("ds") uniq ty)
 
-newSysLocalsDs tys = mappM newSysLocalDs tys
+newSysLocalsDs tys = mapM newSysLocalDs tys
 
-newFailLocalDs ty 
-  = newUnique 	`thenDs` \ uniq ->
-    returnDs (mkSysLocal FSLIT("fail") uniq ty)
+newFailLocalDs ty = do
+    uniq <- newUnique
+    return (mkSysLocal FSLIT("fail") uniq ty)
 	-- The UserLocal bit just helps make the code a little clearer
 \end{code}
 
 \begin{code}
 newTyVarsDs :: [TyVar] -> DsM [TyVar]
-newTyVarsDs tyvar_tmpls 
-  = newUniqueSupply	`thenDs` \ uniqs ->
-    returnDs (zipWith setTyVarUnique tyvar_tmpls (uniqsFromSupply uniqs))
+newTyVarsDs tyvar_tmpls = do
+    uniqs <- newUniqueSupply
+    return (zipWith setTyVarUnique tyvar_tmpls (uniqsFromSupply uniqs))
 \end{code}
 
 We can also reach out and either set/grab location information from
@@ -312,23 +305,19 @@ dsLookupGlobal name
 
 dsLookupGlobalId :: Name -> DsM Id
 dsLookupGlobalId name 
-  = dsLookupGlobal name		`thenDs` \ thing ->
-    returnDs (tyThingId thing)
+  = tyThingId <$> dsLookupGlobal name
 
 dsLookupTyCon :: Name -> DsM TyCon
 dsLookupTyCon name
-  = dsLookupGlobal name		`thenDs` \ thing ->
-    returnDs (tyThingTyCon thing)
+  = tyThingTyCon <$> dsLookupGlobal name
 
 dsLookupDataCon :: Name -> DsM DataCon
 dsLookupDataCon name
-  = dsLookupGlobal name		`thenDs` \ thing ->
-    returnDs (tyThingDataCon thing)
+  = tyThingDataCon <$> dsLookupGlobal name
 
 dsLookupClass :: Name -> DsM Class
 dsLookupClass name
-  = dsLookupGlobal name         `thenDs` \ thing ->
-    returnDs (tyThingClass thing)
+  = tyThingClass <$> dsLookupGlobal name
 \end{code}
 
 \begin{code}
