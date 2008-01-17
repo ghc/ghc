@@ -56,6 +56,8 @@ import List
 import Util
 import BasicTypes
 import Outputable
+
+import Control.Monad
 \end{code}
 
 
@@ -141,11 +143,11 @@ tcLocalBinds (HsIPBinds (IPBinds ip_binds _)) thing_inside
 	-- I wonder if we should do these one at at time
 	-- Consider	?x = 4
 	--		?y = ?x + 1
-    tc_ip_bind (IPBind ip expr)
-      = newFlexiTyVarTy argTypeKind		`thenM` \ ty ->
-  	newIPDict (IPBindOrigin ip) ip ty	`thenM` \ (ip', ip_inst) ->
-  	tcMonoExpr expr ty			`thenM` \ expr' ->
-  	returnM (ip_inst, (IPBind ip' expr'))
+    tc_ip_bind (IPBind ip expr) = do
+        ty <- newFlexiTyVarTy argTypeKind
+        (ip', ip_inst) <- newIPDict (IPBindOrigin ip) ip ty
+        expr' <- tcMonoExpr expr ty
+        return (ip_inst, (IPBind ip' expr'))
 
 ------------------------
 tcValBinds :: TopLevelFlag 
@@ -575,9 +577,9 @@ tcMonoBinds binds sig_fn non_rec
 			 	-- A monomorphic binding for each term variable that lacks 
 				-- a type sig.  (Ones with a sig are already in scope.)
 
-	; binds' <- tcExtendIdEnv2 rhs_id_env $
+	; binds' <- tcExtendIdEnv2 rhs_id_env $ do
 		    traceTc (text "tcMonoBinds" <+> vcat [ ppr n <+> ppr id <+> ppr (idType id) 
-							 | (n,id) <- rhs_id_env]) `thenM_`
+							 | (n,id) <- rhs_id_env])
 		    mapM (wrapLocM tcRhs) tc_binds
 	; return (listToBag binds', mono_info) }
 
@@ -743,7 +745,7 @@ generalise dflags top_lvl bind_list sig_fn mono_infos lie_req
    	-- Check that signature type variables are OK
 	; final_qtvs <- checkSigsTyVars qtvs sigs
 
-	; returnM (final_qtvs, sig_lie, binds) }
+	; return (final_qtvs, sig_lie, binds) }
   where
     bndrs   = bndrNames mono_infos
     sigs    = [sig | (_, Just sig, _) <- mono_infos]
@@ -799,7 +801,7 @@ unifyCtxts (sig1 : sigs) 	-- Argument is always non-empty
 checkSigsTyVars :: [TcTyVar] -> [TcSigInfo] -> TcM [TcTyVar]
 checkSigsTyVars qtvs sigs 
   = do	{ gbl_tvs <- tcGetGlobalTyVars
-	; sig_tvs_s <- mappM (check_sig gbl_tvs) sigs
+	; sig_tvs_s <- mapM (check_sig gbl_tvs) sigs
 
 	; let	-- Sigh.  Make sure that all the tyvars in the type sigs
 		-- appear in the returned ty var list, which is what we are
@@ -811,15 +813,15 @@ checkSigsTyVars qtvs sigs
 		-- Here, 'a' won't appear in qtvs, so we have to add it
 	 	sig_tvs = foldl extendVarSetList emptyVarSet sig_tvs_s
 		all_tvs = varSetElems (extendVarSetList sig_tvs qtvs)
-	; returnM all_tvs }
+	; return all_tvs }
   where
     check_sig gbl_tvs (TcSigInfo {sig_id = id, sig_tvs = tvs, 
 				  sig_theta = theta, sig_tau = tau})
       = addErrCtxt (ptext SLIT("In the type signature for") <+> quotes (ppr id))	$
 	addErrCtxtM (sigCtxt id tvs theta tau)						$
 	do { tvs' <- checkDistinctTyVars tvs
-	   ; ifM (any (`elemVarSet` gbl_tvs) tvs')
-		 (bleatEscapedTvs gbl_tvs tvs tvs') 
+	   ; when (any (`elemVarSet` gbl_tvs) tvs')
+	          (bleatEscapedTvs gbl_tvs tvs tvs')
 	   ; return tvs' }
 
 checkDistinctTyVars :: [TcTyVar] -> TcM [TcTyVar]
