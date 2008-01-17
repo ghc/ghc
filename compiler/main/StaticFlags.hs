@@ -49,6 +49,7 @@ module StaticFlags (
 	-- optimisation opts
 	opt_NoMethodSharing, 
 	opt_NoStateHack,
+	opt_SpecInlineJoinPoints,
 	opt_CprOff,
 	opt_SimplNoPreInlining,
 	opt_SimplExcessPrecision,
@@ -303,6 +304,7 @@ opt_Parallel			= lookUp  FSLIT("-fparallel")
 opt_Flatten			= lookUp  FSLIT("-fflatten")
 
 -- optimisation opts
+opt_SpecInlineJoinPoints	= lookUp  FSLIT("-fspec-inline-join-points")
 opt_NoStateHack			= lookUp  FSLIT("-fno-state-hack")
 opt_NoMethodSharing		= lookUp  FSLIT("-fno-method-sharing")
 opt_CprOff			= lookUp  FSLIT("-fcpr-off")
@@ -362,6 +364,7 @@ isStaticFlag f =
 	"fauto-sccs-on-individual-cafs",
 	"fscc-profiling",
 	"fdicts-strict",
+	"fspec-inline-join-points",
 	"firrefutable-tuples",
 	"fparallel",
 	"fflatten",
