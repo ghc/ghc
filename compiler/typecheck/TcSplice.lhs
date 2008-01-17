@@ -198,30 +198,29 @@ Desugared:	f = do { s7 <- g Int 3
 
 \begin{code}
 tcBracket :: HsBracket Name -> BoxyRhoType -> TcM (LHsExpr TcId)
-tcBracket brack res_ty
-  = getStage 				`thenM` \ level ->
-    case bracketOK level of {
+tcBracket brack res_ty = do
+   level <- getStage
+   case bracketOK level of {
 	Nothing         -> failWithTc (illegalBracket level) ;
-	Just next_level ->
+	Just next_level -> do
 
    	-- Typecheck expr to make sure it is valid,
 	-- but throw away the results.  We'll type check
 	-- it again when we actually use it.
-    recordThUse				`thenM_`
-    newMutVar []	 		`thenM` \ pending_splices ->
-    getLIEVar				`thenM` \ lie_var ->
+    recordThUse
+    pending_splices <- newMutVar []
+    lie_var <- getLIEVar
 
-    setStage (Brack next_level pending_splices lie_var) (
-	getLIE (tc_bracket next_level brack)
-    )					`thenM` \ (meta_ty, lie) ->
-    tcSimplifyBracket lie 		`thenM_`  
+    (meta_ty, lie) <- setStage (Brack next_level pending_splices lie_var)
+                               (getLIE (tc_bracket next_level brack))
+    tcSimplifyBracket lie
 
 	-- Make the expected type have the right shape
-    boxyUnify meta_ty res_ty		`thenM_`
+    boxyUnify meta_ty res_ty
 
 	-- Return the original expression, not the type-decorated one
-    readMutVar pending_splices		`thenM` \ pendings ->
-    returnM (noLoc (HsBracketOut brack pendings))
+    pendings <- readMutVar pending_splices
+    return (noLoc (HsBracketOut brack pendings))
     }
 
 tc_bracket :: ThLevel -> HsBracket Name -> TcM TcType
@@ -279,16 +278,16 @@ quotedNameStageErr v
 
 \begin{code}
 tcSpliceExpr (HsSplice name expr) res_ty
-  = setSrcSpan (getLoc expr) 	$
-    getStage		`thenM` \ level ->
+  = setSrcSpan (getLoc expr) 	$ do
+    level <- getStage
     case spliceOK level of {
 	Nothing 	-> failWithTc (illegalSplice level) ;
 	Just next_level -> 
 
-    case level of {
+     case level of {
 	Comp 		       -> do { e <- tcTopSplice expr res_ty
-				     ; returnM (unLoc e) } ;
-	Brack _ ps_var lie_var ->  
+				     ; return (unLoc e) } ;
+	Brack _ ps_var lie_var -> do
 
 	-- A splice inside brackets
   	-- NB: ignore res_ty, apart from zapping it to a mono-type
@@ -296,19 +295,19 @@ tcSpliceExpr (HsSplice name expr) res_ty
 	-- Here (h 4) :: Q Exp
 	-- but $(h 4) :: forall a.a 	i.e. anything!
 
-    unBox res_ty				`thenM_`
-    tcMetaTy expQTyConName			`thenM` \ meta_exp_ty ->
-    setStage (Splice next_level) (
-	setLIEVar lie_var	   $
-	tcMonoExpr expr meta_exp_ty
-    )						`thenM` \ expr' ->
+      unBox res_ty
+      meta_exp_ty <- tcMetaTy expQTyConName
+      expr' <- setStage (Splice next_level) (
+                 setLIEVar lie_var    $
+                 tcMonoExpr expr meta_exp_ty
+               )
 
 	-- Write the pending splice into the bucket
-    readMutVar ps_var				`thenM` \ ps ->
-    writeMutVar ps_var ((name,expr') : ps) 	`thenM_`
+      ps <- readMutVar ps_var
+      writeMutVar ps_var ((name,expr') : ps)
 
-    returnM (panic "tcSpliceExpr")	-- The returned expression is ignored
-    }} 
+      return (panic "tcSpliceExpr")	-- The returned expression is ignored
+     }} 
 
 -- tcTopSplice used to have this:
 -- Note that we do not decrement the level (to -1) before 
@@ -318,24 +317,24 @@ tcSpliceExpr (HsSplice name expr) res_ty
 -- inner escape before dealing with the outer one
 
 tcTopSplice :: LHsExpr Name -> BoxyRhoType -> TcM (LHsExpr Id)
-tcTopSplice expr res_ty
-  = tcMetaTy expQTyConName		`thenM` \ meta_exp_ty ->
+tcTopSplice expr res_ty = do
+    meta_exp_ty <- tcMetaTy expQTyConName
 
-	-- Typecheck the expression
-    tcTopSpliceExpr expr meta_exp_ty	`thenM` \ zonked_q_expr ->
+        -- Typecheck the expression
+    zonked_q_expr <- tcTopSpliceExpr expr meta_exp_ty
 
-	-- Run the expression
-    traceTc (text "About to run" <+> ppr zonked_q_expr) 	`thenM_`
-    runMetaE convertToHsExpr zonked_q_expr	`thenM` \ expr2 ->
-  
-    traceTc (text "Got result" <+> ppr expr2) 	`thenM_`
+        -- Run the expression
+    traceTc (text "About to run" <+> ppr zonked_q_expr)
+    expr2 <- runMetaE convertToHsExpr zonked_q_expr
+
+    traceTc (text "Got result" <+> ppr expr2)
 
     showSplice "expression" 
-	       zonked_q_expr (ppr expr2)	`thenM_`
+               zonked_q_expr (ppr expr2)
 
-	-- Rename it, but bale out if there are errors
-	-- otherwise the type checker just gives more spurious errors
-    checkNoErrs (rnLExpr expr2)			`thenM` \ (exp3, fvs) ->
+        -- Rename it, but bale out if there are errors
+        -- otherwise the type checker just gives more spurious errors
+    (exp3, fvs) <- checkNoErrs (rnLExpr expr2)
 
     tcMonoExpr exp3 res_ty
 
@@ -472,7 +471,7 @@ kcSpliceType (HsSplice name hs_expr)
 	-- Here (h 4) :: Q Type
 	-- but $(h 4) :: forall a.a 	i.e. any kind
 	; kind <- newKindVar
-	; returnM (panic "kcSpliceType", kind)	-- The returned type is ignored
+	; return (panic "kcSpliceType", kind)	-- The returned type is ignored
     }}}}}
 
 kcTopSpliceType :: LHsExpr Name -> TcM (LHsType Name, TcKind)
@@ -522,7 +521,7 @@ tcSpliceDecls expr
 	; showSplice "declarations"
 	  	     zonked_q_expr 
 		     (ppr (getLoc expr) $$ (vcat (map ppr decls)))
-	; returnM decls }
+	; return decls }
 
   where handleErrors :: [Either a Message] -> TcM [a]
         handleErrors [] = return []
@@ -681,8 +680,8 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
 
 \begin{code}
 showSplice :: String -> LHsExpr Id -> SDoc -> TcM ()
-showSplice what before after
-  = getSrcSpanM		`thenM` \ loc ->
+showSplice what before after = do
+    loc <- getSrcSpanM
     traceSplice (vcat [ppr loc <> colon <+> text "Splicing" <+> text what, 
 		       nest 2 (sep [nest 2 (ppr before),
 				    text "======>",
@@ -750,7 +749,7 @@ tcLookupTh :: Name -> TcM TcTyThing
 tcLookupTh name
   = do	{ (gbl_env, lcl_env) <- getEnvs
 	; case lookupNameEnv (tcl_env lcl_env) name of {
-		Just thing -> returnM thing;
+		Just thing -> return thing;
 		Nothing    -> do
 	{ if nameIsLocalOrFrom (tcg_mod gbl_env) name
 	  then	-- It's defined in this module
