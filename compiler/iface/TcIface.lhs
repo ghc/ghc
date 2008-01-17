@@ -419,9 +419,9 @@ tcIfaceDecl ignore_prags
   = bindIfaceTyVars tv_bndrs $ \ tyvars -> do
     { cls_name <- lookupIfaceTop occ_name
     ; ctxt <- tcIfaceCtxt rdr_ctxt
-    ; sigs <- mappM tc_sig rdr_sigs
-    ; fds  <- mappM tc_fd rdr_fds
-    ; ats'  <- mappM (tcIfaceDecl ignore_prags) rdr_ats
+    ; sigs <- mapM tc_sig rdr_sigs
+    ; fds  <- mapM tc_fd rdr_fds
+    ; ats' <- mapM (tcIfaceDecl ignore_prags) rdr_ats
     ; let ats = zipWith setTyThingPoss ats' (map ifTyVars rdr_ats)
     ; cls  <- buildClass cls_name tyvars ctxt fds ats sigs tc_isrec
     ; return (AClass cls) }
@@ -436,8 +436,8 @@ tcIfaceDecl ignore_prags
 
    mk_doc op_name op_ty = ptext SLIT("Class op") <+> sep [ppr op_name, ppr op_ty]
 
-   tc_fd (tvs1, tvs2) = do { tvs1' <- mappM tcIfaceTyVar tvs1
-			   ; tvs2' <- mappM tcIfaceTyVar tvs2
+   tc_fd (tvs1, tvs2) = do { tvs1' <- mapM tcIfaceTyVar tvs1
+			   ; tvs2' <- mapM tcIfaceTyVar tvs2
 			   ; return (tvs1', tvs2') }
 
    -- For each AT argument compute the position of the corresponding class
@@ -462,7 +462,7 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
   = case if_cons of
 	IfAbstractTyCon	 -> return mkAbstractTyConRhs
 	IfOpenDataTyCon	 -> return mkOpenDataTyConRhs
-	IfDataTyCon cons -> do 	{ data_cons <- mappM tc_con_decl cons
+	IfDataTyCon cons -> do 	{ data_cons <- mapM tc_con_decl cons
 				; return (mkDataTyConRhs data_cons) }
 	IfNewTyCon con	 -> do 	{ data_con <- tc_con_decl con
 				; mkNewTyConRhs tycon_name tycon data_con }
@@ -488,8 +488,8 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
 
 	-- Read the argument types, but lazily to avoid faulting in
 	-- the component types unless they are really needed
- 	; arg_tys <- forkM (mk_doc name) (mappM tcIfaceType args)
-	; lbl_names <- mappM lookupIfaceTop field_lbls
+ 	; arg_tys <- forkM (mk_doc name) (mapM tcIfaceType args)
+	; lbl_names <- mapM lookupIfaceTop field_lbls
 
 	; buildDataCon name is_infix {- Not infix -}
 		       stricts lbl_names
@@ -527,12 +527,12 @@ tcIfaceInst (IfaceInst { ifDFun = dfun_occ, ifOFlag = oflag,
 tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
 tcIfaceFamInst (IfaceFamInst { ifFamInstTyCon = tycon, 
 			       ifFamInstFam = fam, ifFamInstTys = mb_tcs })
---  = do	{ tycon'  <- forkM (ptext SLIT("Inst tycon") <+> ppr tycon) $
+--	{ tycon'  <- forkM (ptext SLIT("Inst tycon") <+> ppr tycon) $
 -- ^^^this line doesn't work, but vvv this does => CPP in Haskell = evil!
-  = do	{ tycon'  <- forkM (text ("Inst tycon") <+> ppr tycon) $
-		     tcIfaceTyCon tycon
-        ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
-	; return (mkImportedFamInst fam mb_tcs' tycon') }
+    = do tycon'  <- forkM (text ("Inst tycon") <+> ppr tycon) $
+                    tcIfaceTyCon tycon
+         let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
+         return (mkImportedFamInst fam mb_tcs' tycon')
 \end{code}
 
 
@@ -562,11 +562,11 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
 		-- Typecheck the payload lazily, in the hope it'll never be looked at
 		forkM (ptext SLIT("Rule") <+> ftext name) $
 		bindIfaceBndrs bndrs 			  $ \ bndrs' ->
-		do { args' <- mappM tcIfaceExpr args
+		do { args' <- mapM tcIfaceExpr args
 		   ; rhs'  <- tcIfaceExpr rhs
 		   ; return (bndrs', args', rhs') }
 	; let mb_tcs = map ifTopFreeName args
-	; returnM (Rule { ru_name = name, ru_fn = fn, ru_act = act, 
+	; return (Rule { ru_name = name, ru_fn = fn, ru_act = act, 
 			  ru_bndrs = bndrs', ru_args = args', 
 			  ru_rhs = rhs', 
 			  ru_rough = mb_tcs,
@@ -703,7 +703,7 @@ tcIfacePredType (IfaceEqPred t1 t2)  = do { t1' <- tcIfaceType t1; t2' <- tcIfac
 
 -----------------------------------------
 tcIfaceCtxt :: IfaceContext -> IfL ThetaType
-tcIfaceCtxt sts = mappM tcIfacePredType sts
+tcIfaceCtxt sts = mapM tcIfacePredType sts
 \end{code}
 
 
@@ -716,54 +716,45 @@ tcIfaceCtxt sts = mappM tcIfacePredType sts
 \begin{code}
 tcIfaceExpr :: IfaceExpr -> IfL CoreExpr
 tcIfaceExpr (IfaceType ty)
-  = tcIfaceType ty		`thenM` \ ty' ->
-    returnM (Type ty')
+  = Type <$> tcIfaceType ty
 
 tcIfaceExpr (IfaceLcl name)
-  = tcIfaceLclId name 	`thenM` \ id ->
-    returnM (Var id)
+  = Var <$> tcIfaceLclId name
 
 tcIfaceExpr (IfaceTick modName tickNo)
-  = tcIfaceTick modName tickNo	`thenM` \ id ->
-    returnM (Var id)
+  = Var <$> tcIfaceTick modName tickNo
 
 tcIfaceExpr (IfaceExt gbl)
-  = tcIfaceExtId gbl 	`thenM` \ id ->
-    returnM (Var id)
+  = Var <$> tcIfaceExtId gbl
 
 tcIfaceExpr (IfaceLit lit)
-  = returnM (Lit lit)
+  = return (Lit lit)
 
-tcIfaceExpr (IfaceFCall cc ty)
-  = tcIfaceType ty 	`thenM` \ ty' ->
-    newUnique		`thenM` \ u ->
-    returnM (Var (mkFCallId u cc ty'))
+tcIfaceExpr (IfaceFCall cc ty) = do
+    ty' <- tcIfaceType ty
+    u <- newUnique
+    return (Var (mkFCallId u cc ty'))
 
-tcIfaceExpr (IfaceTuple boxity args) 
-  = mappM tcIfaceExpr args	`thenM` \ args' ->
-    let
-	-- Put the missing type arguments back in
-	con_args = map (Type . exprType) args' ++ args'
-    in
-    returnM (mkApps (Var con_id) con_args)
+tcIfaceExpr (IfaceTuple boxity args)  = do
+    args' <- mapM tcIfaceExpr args
+    -- Put the missing type arguments back in
+    let con_args = map (Type . exprType) args' ++ args'
+    return (mkApps (Var con_id) con_args)
   where
     arity = length args
     con_id = dataConWorkId (tupleCon boxity arity)
     
 
 tcIfaceExpr (IfaceLam bndr body)
-  = bindIfaceBndr bndr 		$ \ bndr' ->
-    tcIfaceExpr body		`thenM` \ body' ->
-    returnM (Lam bndr' body')
+  = bindIfaceBndr bndr $ \bndr' ->
+    Lam bndr' <$> tcIfaceExpr body
 
 tcIfaceExpr (IfaceApp fun arg)
-  = tcIfaceExpr fun		`thenM` \ fun' ->
-    tcIfaceExpr arg		`thenM` \ arg' ->
-    returnM (App fun' arg')
+  = App <$> tcIfaceExpr fun <*> tcIfaceExpr arg
 
-tcIfaceExpr (IfaceCase scrut case_bndr ty alts) 
-  = tcIfaceExpr scrut		`thenM` \ scrut' ->
-    newIfaceName (mkVarOccFS case_bndr)	`thenM` \ case_bndr_name ->
+tcIfaceExpr (IfaceCase scrut case_bndr ty alts)  = do
+    scrut' <- tcIfaceExpr scrut
+    case_bndr_name <- newIfaceName (mkVarOccFS case_bndr)
     let
 	scrut_ty   = exprType scrut'
 	case_bndr' = mkLocalId case_bndr_name scrut_ty
@@ -773,49 +764,49 @@ tcIfaceExpr (IfaceCase scrut case_bndr ty alts)
 		-- NB: not tcSplitTyConApp; we are looking at Core here
 		--     look through non-rec newtypes to find the tycon that
 		--     corresponds to the datacon in this case alternative
-    in
-    extendIfaceIdEnv [case_bndr']	$
-    mappM (tcIfaceAlt scrut' tc_app) alts	`thenM` \ alts' ->
-    tcIfaceType ty				`thenM` \ ty' ->
-    returnM (Case scrut' case_bndr' ty' alts')
 
-tcIfaceExpr (IfaceLet (IfaceNonRec bndr rhs) body)
-  = do	{ rhs' <- tcIfaceExpr rhs
-	; id   <- tcIfaceLetBndr bndr
-	; body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
-	; return (Let (NonRec id rhs') body') }
+    extendIfaceIdEnv [case_bndr'] $ do
+     alts' <- mapM (tcIfaceAlt scrut' tc_app) alts
+     ty' <- tcIfaceType ty
+     return (Case scrut' case_bndr' ty' alts')
 
-tcIfaceExpr (IfaceLet (IfaceRec pairs) body)
-  = do	{ ids <- mapM tcIfaceLetBndr bndrs
-	; extendIfaceIdEnv ids $ do
-	{ rhss' <- mapM tcIfaceExpr rhss
-	; body' <- tcIfaceExpr body
-	; return (Let (Rec (ids `zip` rhss')) body') } }
+tcIfaceExpr (IfaceLet (IfaceNonRec bndr rhs) body) = do
+    rhs' <- tcIfaceExpr rhs
+    id   <- tcIfaceLetBndr bndr
+    body' <- extendIfaceIdEnv [id] (tcIfaceExpr body)
+    return (Let (NonRec id rhs') body')
+
+tcIfaceExpr (IfaceLet (IfaceRec pairs) body) = do
+    ids <- mapM tcIfaceLetBndr bndrs
+    extendIfaceIdEnv ids $ do
+     rhss' <- mapM tcIfaceExpr rhss
+     body' <- tcIfaceExpr body
+     return (Let (Rec (ids `zip` rhss')) body')
   where
     (bndrs, rhss) = unzip pairs
 
 tcIfaceExpr (IfaceCast expr co) = do
-  expr' <- tcIfaceExpr expr
-  co' <- tcIfaceType co
-  returnM (Cast expr' co')
+    expr' <- tcIfaceExpr expr
+    co' <- tcIfaceType co
+    return (Cast expr' co')
 
-tcIfaceExpr (IfaceNote note expr) 
-  = tcIfaceExpr expr		`thenM` \ expr' ->
+tcIfaceExpr (IfaceNote note expr) = do
+    expr' <- tcIfaceExpr expr
     case note of
-	IfaceInlineMe     -> returnM (Note InlineMe   expr')
-	IfaceSCC cc       -> returnM (Note (SCC cc)   expr')
-	IfaceCoreNote n   -> returnM (Note (CoreNote n) expr')
+        IfaceInlineMe     -> return (Note InlineMe   expr')
+        IfaceSCC cc       -> return (Note (SCC cc)   expr')
+        IfaceCoreNote n   -> return (Note (CoreNote n) expr')
 
 -------------------------
 tcIfaceAlt _ _ (IfaceDefault, names, rhs)
-  = ASSERT( null names )
-    tcIfaceExpr rhs		`thenM` \ rhs' ->
-    returnM (DEFAULT, [], rhs')
+  = ASSERT( null names ) do
+    rhs' <- tcIfaceExpr rhs
+    return (DEFAULT, [], rhs')
   
 tcIfaceAlt _ _ (IfaceLitAlt lit, names, rhs)
-  = ASSERT( null names )
-    tcIfaceExpr rhs		`thenM` \ rhs' ->
-    returnM (LitAlt lit, [], rhs')
+  = ASSERT( null names ) do
+    rhs' <- tcIfaceExpr rhs
+    return (LitAlt lit, [], rhs')
 
 -- A case alternative is made quite a bit more complicated
 -- by the fact that we omit type annotations because we can
@@ -823,8 +814,8 @@ tcIfaceAlt _ _ (IfaceLitAlt lit, names, rhs)
 tcIfaceAlt scrut (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
   = do	{ con <- tcIfaceDataCon data_occ
 #ifdef DEBUG
-	; ifM (not (con `elem` tyConDataCons tycon))
-	      (failIfM (ppr scrut $$ ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon)))
+	; when (not (con `elem` tyConDataCons tycon))
+	       (failIfM (ppr scrut $$ ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon)))
 #endif
 	; tcIfaceDataAlt con inst_tys arg_strs rhs }
 		  
@@ -861,9 +852,9 @@ do_one (IfaceNonRec bndr rhs) thing_inside
 	; return (NonRec bndr' rhs' : core_binds) }}
 
 do_one (IfaceRec pairs) thing_inside
-  = do	{ bndrs' <- mappM newExtCoreBndr bndrs
+  = do	{ bndrs' <- mapM newExtCoreBndr bndrs
 	; extendIfaceIdEnv bndrs' $ do
- 	{ rhss' <- mappM tcIfaceExpr rhss
+ 	{ rhss' <- mapM tcIfaceExpr rhss
 	; core_binds <- thing_inside
 	; return (Rec (bndrs' `zip` rhss') : core_binds) }}
   where
@@ -889,23 +880,22 @@ tcIdInfo ignore_prags name ty info
     -- we start; default assumption is that it has CAFs
     init_info = vanillaIdInfo
 
-    tcPrag info HsNoCafRefs         = returnM (info `setCafInfo`   NoCafRefs)
-    tcPrag info (HsArity arity)     = returnM (info `setArityInfo` arity)
-    tcPrag info (HsStrictness str)  = returnM (info `setAllStrictnessInfo` Just str)
+    tcPrag info HsNoCafRefs         = return (info `setCafInfo`   NoCafRefs)
+    tcPrag info (HsArity arity)     = return (info `setArityInfo` arity)
+    tcPrag info (HsStrictness str)  = return (info `setAllStrictnessInfo` Just str)
 
 	-- The next two are lazy, so they don't transitively suck stuff in
     tcPrag info (HsWorker nm arity) = tcWorkerInfo ty info nm arity
-    tcPrag info (HsInline inline_prag) = returnM (info `setInlinePragInfo` inline_prag)
-    tcPrag info (HsUnfold expr)
-	= tcPragExpr name expr 	`thenM` \ maybe_expr' ->
+    tcPrag info (HsInline inline_prag) = return (info `setInlinePragInfo` inline_prag)
+    tcPrag info (HsUnfold expr) = do
+          maybe_expr' <- tcPragExpr name expr
 	  let
 		-- maybe_expr' doesn't get looked at if the unfolding
 		-- is never inspected; so the typecheck doesn't even happen
 		unfold_info = case maybe_expr' of
 				Nothing    -> noUnfolding
 				Just expr' -> mkTopUnfolding expr' 
-	  in
- 	  returnM (info `setUnfoldingInfoLazily` unfold_info)
+          return (info `setUnfoldingInfoLazily` unfold_info)
 \end{code}
 
 \begin{code}
@@ -919,7 +909,7 @@ tcWorkerInfo ty info wkr arity
 	-- over the unfolding until it's actually used does seem worth while.)
 	; us <- newUniqueSupply
 
-	; returnM (case mb_wkr_id of
+	; return (case mb_wkr_id of
 		     Nothing     -> info
 		     Just wkr_id -> add_wkr_info us wkr_id info) }
   where
@@ -943,18 +933,17 @@ an unfolding that isn't going to be looked at.
 \begin{code}
 tcPragExpr :: Name -> IfaceExpr -> IfL (Maybe CoreExpr)
 tcPragExpr name expr
-  = forkM_maybe doc $
-    tcIfaceExpr expr		`thenM` \ core_expr' ->
+  = forkM_maybe doc $ do
+    core_expr' <- tcIfaceExpr expr
 
-		-- Check for type consistency in the unfolding
-    ifOptM Opt_DoCoreLinting (
-	get_in_scope_ids			`thenM` \ in_scope -> 
-	case lintUnfolding noSrcLoc in_scope core_expr' of
-	  Nothing       -> returnM ()
-	  Just fail_msg -> pprPanic "Iface Lint failure" (hang doc 2 fail_msg)
-    )				`thenM_`
+                -- Check for type consistency in the unfolding
+    ifOptM Opt_DoCoreLinting $ do
+        in_scope <- get_in_scope_ids
+        case lintUnfolding noSrcLoc in_scope core_expr' of
+          Nothing       -> return ()
+          Just fail_msg -> pprPanic "Iface Lint failure" (hang doc 2 fail_msg)
 
-   returnM core_expr'	
+    return core_expr'
   where
     doc = text "Unfolding of" <+> ppr name
     get_in_scope_ids 	-- Urgh; but just for linting
@@ -1127,7 +1116,7 @@ tcIfaceLetBndr (IfLetBndr fs ty info)
 
 -----------------------
 newExtCoreBndr :: IfaceLetBndr -> IfL Id
-newExtCoreBndr (IfLetBndr var ty _)	-- Ignoring IdInfo for now
+newExtCoreBndr (IfLetBndr var ty _)    -- Ignoring IdInfo for now
   = do	{ mod <- getIfModule
 	; name <- newGlobalBinder mod (mkVarOccFS var) noSrcSpan
 	; ty' <- tcIfaceType ty
@@ -1143,7 +1132,7 @@ bindIfaceTyVar (occ,kind) thing_inside
 bindIfaceTyVars :: [IfaceTvBndr] -> ([TyVar] -> IfL a) -> IfL a
 bindIfaceTyVars bndrs thing_inside
   = do	{ names <- newIfaceNames (map mkTyVarOcc occs)
-  	; tyvars <- TcRnMonad.zipWithM mk_iface_tyvar names kinds
+  	; tyvars <- zipWithM mk_iface_tyvar names kinds
 	; extendIfaceTyVarEnv tyvars (thing_inside tyvars) }
   where
     (occs,kinds) = unzip bndrs
