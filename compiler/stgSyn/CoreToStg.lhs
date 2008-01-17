@@ -38,8 +38,7 @@ import BasicTypes       ( Arity )
 import StaticFlags	( opt_RuntimeTypes )
 import Module
 import Outputable
-
-infixr 9 `thenLne`
+import MonadUtils
 \end{code}
 
 %************************************************************************
@@ -181,10 +180,9 @@ coreTopBindToStg this_pkg env body_fvs (NonRec id rhs)
 	how_bound = LetBound TopLet $! manifestArity rhs
 
         (stg_rhs, fvs') = 
-	    initLne env (
-              coreToTopStgRhs this_pkg body_fvs (id,rhs)	`thenLne` \ (stg_rhs, fvs') ->
-	      returnLne (stg_rhs, fvs')
-           )
+	    initLne env $ do
+              (stg_rhs, fvs') <- coreToTopStgRhs this_pkg body_fvs (id,rhs)
+              return (stg_rhs, fvs')
 	
 	bind = StgNonRec id stg_rhs
     in
@@ -202,12 +200,10 @@ coreTopBindToStg this_pkg env body_fvs (Rec pairs)
 	env' = extendVarEnvList env extra_env'
 
         (stg_rhss, fvs')
-	  = initLne env' (
-	       mapAndUnzipLne (coreToTopStgRhs this_pkg body_fvs) pairs
-						`thenLne` \ (stg_rhss, fvss') ->
-	       let fvs' = unionFVInfos fvss' in
-	       returnLne (stg_rhss, fvs')
-           )
+	  = initLne env' $ do
+	       (stg_rhss, fvss') <- mapAndUnzipM (coreToTopStgRhs this_pkg body_fvs) pairs
+	       let fvs' = unionFVInfos fvss'
+	       return (stg_rhss, fvs')
 
 	bind = StgRec (zip binders stg_rhss)
     in
@@ -238,10 +234,10 @@ coreToTopStgRhs
 	-> (Id,CoreExpr)
 	-> LneM (StgRhs, FreeVarsInfo)
 
-coreToTopStgRhs this_pkg scope_fv_info (bndr, rhs)
-  = coreToStgExpr rhs 		`thenLne` \ (new_rhs, rhs_fvs, _) ->
-    freeVarsToLiveVars rhs_fvs	`thenLne` \ lv_info ->
-    returnLne (mkTopStgRhs is_static rhs_fvs (mkSRT lv_info) bndr_info new_rhs, rhs_fvs)
+coreToTopStgRhs this_pkg scope_fv_info (bndr, rhs) = do
+    (new_rhs, rhs_fvs, _) <- coreToStgExpr rhs
+    lv_info <- freeVarsToLiveVars rhs_fvs
+    return (mkTopStgRhs is_static rhs_fvs (mkSRT lv_info) bndr_info new_rhs, rhs_fvs)
   where
     bndr_info = lookupFVInfo scope_fv_info bndr
     is_static = rhsIsStatic this_pkg rhs
@@ -294,7 +290,7 @@ on these components, but it in turn is not scrutinised as the basis for any
 decisions.  Hence no black holes.
 
 \begin{code}
-coreToStgExpr (Lit l) = returnLne (StgLit l, emptyFVInfo, emptyVarSet)
+coreToStgExpr (Lit l) = return (StgLit l, emptyFVInfo, emptyVarSet)
 coreToStgExpr (Var v) = coreToStgApp Nothing v []
 
 coreToStgExpr expr@(App _ _)
@@ -307,24 +303,24 @@ coreToStgExpr expr@(Lam _ _)
 	(args, body) = myCollectBinders expr 
 	args'	     = filterStgBinders args
     in
-    extendVarEnvLne [ (a, LambdaBound) | a <- args' ] $
-    coreToStgExpr body  `thenLne` \ (body, body_fvs, body_escs) ->
+    extendVarEnvLne [ (a, LambdaBound) | a <- args' ] $ do
+    (body, body_fvs, body_escs) <- coreToStgExpr body
     let
 	fvs		= args' `minusFVBinders` body_fvs
 	escs		= body_escs `delVarSetList` args'
 	result_expr | null args' = body
 		    | otherwise  = StgLam (exprType expr) args' body
-    in
-    returnLne (result_expr, fvs, escs)
 
-coreToStgExpr (Note (SCC cc) expr)
-  = coreToStgExpr expr		`thenLne` ( \ (expr2, fvs, escs) ->
-    returnLne (StgSCC cc expr2, fvs, escs) )
+    return (result_expr, fvs, escs)
+
+coreToStgExpr (Note (SCC cc) expr) = do
+    (expr2, fvs, escs) <- coreToStgExpr expr
+    return (StgSCC cc expr2, fvs, escs)
 
 coreToStgExpr (Case (Var id) _bndr ty [(DEFAULT,[],expr)])
-  | Just (TickBox m n) <- isTickBoxOp_maybe id
-  = coreToStgExpr expr         `thenLne` ( \ (expr2, fvs, escs) ->
-    returnLne (StgTick m n expr2, fvs, escs) )
+  | Just (TickBox m n) <- isTickBoxOp_maybe id = do
+    (expr2, fvs, escs) <- coreToStgExpr expr
+    return (StgTick m n expr2, fvs, escs)
 
 coreToStgExpr (Note other_note expr)
   = coreToStgExpr expr
@@ -334,13 +330,13 @@ coreToStgExpr (Cast expr co)
 
 -- Cases require a little more real work.
 
-coreToStgExpr (Case scrut bndr _ alts)
-  = extendVarEnvLne [(bndr, LambdaBound)]	(
-	 mapAndUnzip3Lne vars_alt alts	`thenLne` \ (alts2, fvs_s, escs_s) ->
-	 returnLne ( alts2,
-		     unionFVInfos fvs_s,
-		     unionVarSets escs_s )
-    )			   		`thenLne` \ (alts2, alts_fvs, alts_escs) ->
+coreToStgExpr (Case scrut bndr _ alts) = do
+    (alts2, alts_fvs, alts_escs)
+       <- extendVarEnvLne [(bndr, LambdaBound)] $ do
+            (alts2, fvs_s, escs_s) <- mapAndUnzip3M vars_alt alts
+            return ( alts2,
+                     unionFVInfos fvs_s,
+                     unionVarSets escs_s )
     let
 	-- Determine whether the default binder is dead or not
 	-- This helps the code generator to avoid generating an assignment
@@ -353,20 +349,18 @@ coreToStgExpr (Case scrut bndr _ alts)
 	-- the default binder is not free.
 	alts_fvs_wo_bndr  = bndr `minusFVBinder` alts_fvs
 	alts_escs_wo_bndr = alts_escs `delVarSet` bndr
-    in
 
-    freeVarsToLiveVars alts_fvs_wo_bndr		`thenLne` \ alts_lv_info ->
+    alts_lv_info <- freeVarsToLiveVars alts_fvs_wo_bndr
 
 	-- We tell the scrutinee that everything 
 	-- live in the alts is live in it, too.
-    setVarsLiveInCont alts_lv_info (
-	coreToStgExpr scrut	  `thenLne` \ (scrut2, scrut_fvs, scrut_escs) ->
-        freeVarsToLiveVars scrut_fvs `thenLne` \ scrut_lv_info ->
-	returnLne (scrut2, scrut_fvs, scrut_escs, scrut_lv_info)
-      )    
-		`thenLne` \ (scrut2, scrut_fvs, scrut_escs, scrut_lv_info) ->
+    (scrut2, scrut_fvs, scrut_escs, scrut_lv_info)
+       <- setVarsLiveInCont alts_lv_info $ do
+            (scrut2, scrut_fvs, scrut_escs) <- coreToStgExpr scrut
+            scrut_lv_info <- freeVarsToLiveVars scrut_fvs
+            return (scrut2, scrut_fvs, scrut_escs, scrut_lv_info)
 
-    returnLne (
+    return (
       StgCase scrut2 (getLiveVars scrut_lv_info)
 		     (getLiveVars alts_lv_info)
 		     bndr'
@@ -384,15 +378,15 @@ coreToStgExpr (Case scrut bndr _ alts)
       = let    	-- Remove type variables
 	    binders' = filterStgBinders binders
         in	
-        extendVarEnvLne [(b, LambdaBound) | b <- binders']	$
-        coreToStgExpr rhs	`thenLne` \ (rhs2, rhs_fvs, rhs_escs) ->
+        extendVarEnvLne [(b, LambdaBound) | b <- binders'] $ do
+        (rhs2, rhs_fvs, rhs_escs) <- coreToStgExpr rhs
         let
 	    	-- Records whether each param is used in the RHS
 	    good_use_mask = [ b `elementOfFVInfo` rhs_fvs | b <- binders' ]
-        in
-        returnLne ( (con, binders', good_use_mask, rhs2),
-		    binders' `minusFVBinders` rhs_fvs,
-		    rhs_escs `delVarSetList` binders' )
+
+        return ( (con, binders', good_use_mask, rhs2),
+                 binders' `minusFVBinders` rhs_fvs,
+                 rhs_escs `delVarSetList` binders' )
     		-- ToDo: remove the delVarSet;
     		-- since escs won't include any of these binders
 \end{code}
@@ -402,12 +396,13 @@ then to let-no-escapes, if we wish.
 
 (Meanwhile, we don't expect to see let-no-escapes...)
 \begin{code}
-coreToStgExpr (Let bind body)
-  = fixLne (\ ~(_, _, _, no_binder_escapes) ->
-	coreToStgLet no_binder_escapes bind body
-    )				`thenLne` \ (new_let, fvs, escs, _) ->
+coreToStgExpr (Let bind body) = do
+    (new_let, fvs, escs, _)
+       <- mfix (\ ~(_, _, _, no_binder_escapes) ->
+             coreToStgLet no_binder_escapes bind body
+          )
 
-    returnLne (new_let, fvs, escs)
+    return (new_let, fvs, escs)
 \end{code}
 
 \begin{code}
@@ -459,9 +454,9 @@ coreToStgApp
 	-> LneM (StgExpr, FreeVarsInfo, EscVarsSet)
 
 
-coreToStgApp maybe_thunk_body f args
-  = coreToStgArgs args		`thenLne` \ (args', args_fvs) ->
-    lookupVarLne f		`thenLne` \ how_bound ->
+coreToStgApp maybe_thunk_body f args = do
+    (args', args_fvs) <- coreToStgArgs args
+    how_bound <- lookupVarLne f
 
     let
 	n_val_args	 = valArgCount args
@@ -519,14 +514,13 @@ coreToStgApp maybe_thunk_body f args
                 TickBoxOpId {}   -> pprPanic "coreToStg TickBox" $ ppr (f,args')
 		_other      	 -> StgApp f args'
 
-    in
-    returnLne (
+    return (
 	app,
 	fun_fvs  `unionFVInfo` args_fvs,
 	fun_escs `unionVarSet` (getFVSet args_fvs)
 				-- All the free vars of the args are disqualified
 				-- from being let-no-escaped.
-    )
+     )
 
 
 
@@ -537,18 +531,18 @@ coreToStgApp maybe_thunk_body f args
 
 coreToStgArgs :: [CoreArg] -> LneM ([StgArg], FreeVarsInfo)
 coreToStgArgs []
-  = returnLne ([], emptyFVInfo)
+  = return ([], emptyFVInfo)
 
-coreToStgArgs (Type ty : args)	-- Type argument
-  = coreToStgArgs args	`thenLne` \ (args', fvs) ->
+coreToStgArgs (Type ty : args) = do     -- Type argument
+    (args', fvs) <- coreToStgArgs args
     if opt_RuntimeTypes then
- 	returnLne (StgTypeArg ty : args', fvs `unionFVInfo` tyvarFVInfo (tyVarsOfType ty))
-    else
-    returnLne (args', fvs)
+        return (StgTypeArg ty : args', fvs `unionFVInfo` tyvarFVInfo (tyVarsOfType ty))
+     else
+        return (args', fvs)
 
-coreToStgArgs (arg : args)	-- Non-type argument
-  = coreToStgArgs args	`thenLne` \ (stg_args, args_fvs) ->
-    coreToStgExpr arg	`thenLne` \ (arg', arg_fvs, escs) ->
+coreToStgArgs (arg : args) = do         -- Non-type argument
+    (stg_args, args_fvs) <- coreToStgArgs args
+    (arg', arg_fvs, escs) <- coreToStgExpr arg
     let
 	fvs = args_fvs `unionFVInfo` arg_fvs
 	stg_arg = case arg' of
@@ -556,7 +550,7 @@ coreToStgArgs (arg : args)	-- Non-type argument
 		       StgConApp con [] -> StgVarArg (dataConWorkId con)
 		       StgLit lit       -> StgLitArg lit
 		       _ 		-> pprPanic "coreToStgArgs" (ppr arg)
-    in
+
 	-- WARNING: what if we have an argument like (v `cast` co)
 	-- 	    where 'co' changes the representation type?
 	--	    (This really only happens if co is unsafe.)
@@ -576,9 +570,9 @@ coreToStgArgs (arg : args)	-- Non-type argument
 	-- we can treat an unlifted value as lifted.  But the other way round 
 	-- we complain.
 	-- We also want to check if a pointer is cast to a non-ptr etc
-    in
+
     WARN( bad_args, ptext SLIT("Dangerous-looking argument. Probable cause: bad unsafeCoerce#") $$ ppr arg )
-    returnLne (stg_arg : stg_args, fvs)
+     return (stg_arg : stg_args, fvs)
 
 
 -- ---------------------------------------------------------------------------
@@ -595,29 +589,27 @@ coreToStgLet
 		  Bool)		-- True <=> none of the binders in the bindings
 				-- is among the escaping vars
 
-coreToStgLet let_no_escape bind body
-  = fixLne (\ ~(_, _, _, _, _, rec_body_fvs, _, _) ->
+coreToStgLet let_no_escape bind body = do
+    (bind2, bind_fvs, bind_escs, bind_lvs,
+     body2, body_fvs, body_escs, body_lvs)
+       <- mfix $ \ ~(_, _, _, _, _, rec_body_fvs, _, _) -> do
 
-	-- Do the bindings, setting live_in_cont to empty if
-	-- we ain't in a let-no-escape world
-	getVarsLiveInCont		`thenLne` \ live_in_cont ->
-	setVarsLiveInCont (if let_no_escape 
-				then live_in_cont 
-				else emptyLiveInfo)
-			  (vars_bind rec_body_fvs bind)
-	    `thenLne` \ ( bind2, bind_fvs, bind_escs, bind_lv_info, env_ext) ->
+          -- Do the bindings, setting live_in_cont to empty if
+          -- we ain't in a let-no-escape world
+          live_in_cont <- getVarsLiveInCont
+          ( bind2, bind_fvs, bind_escs, bind_lv_info, env_ext)
+                <- setVarsLiveInCont (if let_no_escape 
+                                          then live_in_cont 
+                                          else emptyLiveInfo)
+                                     (vars_bind rec_body_fvs bind)
 
-  	-- Do the body
-	extendVarEnvLne env_ext (
-	  coreToStgExpr body          `thenLne` \(body2, body_fvs, body_escs) ->
-	  freeVarsToLiveVars body_fvs `thenLne` \ body_lv_info ->
+          -- Do the body
+          extendVarEnvLne env_ext $ do
+             (body2, body_fvs, body_escs) <- coreToStgExpr body
+             body_lv_info <- freeVarsToLiveVars body_fvs
 
-  	  returnLne (bind2, bind_fvs, bind_escs, getLiveVars bind_lv_info,
-		     body2, body_fvs, body_escs, getLiveVars body_lv_info)
-	)
-
-    ) `thenLne` (\ (bind2, bind_fvs, bind_escs, bind_lvs, 
-		    body2, body_fvs, body_escs, body_lvs) ->
+             return (bind2, bind_fvs, bind_escs, getLiveVars bind_lv_info,
+                     body2, body_fvs, body_escs, getLiveVars body_lv_info)
 
 
 	-- Compute the new let-expression
@@ -657,13 +649,12 @@ coreToStgLet let_no_escape bind body
 			    
 		-- Mustn't depend on the passed-in let_no_escape flag, since
 		-- no_binder_escapes is used by the caller to derive the flag!
-    in
-    returnLne (
+    return (
 	new_let,
 	free_in_whole_let,
 	let_escs,
 	checked_no_binder_escapes
-    ))
+      )
   where
     set_of_binders = mkVarSet binders
     binders	   = bindersOf bind
@@ -684,36 +675,34 @@ coreToStgLet let_no_escape bind body
 		       [(Id, HowBound)])  -- extension to environment
 					 
 
-    vars_bind body_fvs (NonRec binder rhs)
-      = coreToStgRhs body_fvs [] (binder,rhs)
-				`thenLne` \ (rhs2, bind_fvs, bind_lv_info, escs) ->
+    vars_bind body_fvs (NonRec binder rhs) = do
+        (rhs2, bind_fvs, bind_lv_info, escs) <- coreToStgRhs body_fvs [] (binder,rhs)
 	let
 	    env_ext_item = mk_binding bind_lv_info binder rhs
-	in
-	returnLne (StgNonRec binder rhs2, 
-		   bind_fvs, escs, bind_lv_info, [env_ext_item])
+
+	return (StgNonRec binder rhs2,
+	        bind_fvs, escs, bind_lv_info, [env_ext_item])
 
 
     vars_bind body_fvs (Rec pairs)
-      = fixLne (\ ~(_, rec_rhs_fvs, _, bind_lv_info, _) ->
+      = mfix $ \ ~(_, rec_rhs_fvs, _, bind_lv_info, _) ->
 	   let
 		rec_scope_fvs = unionFVInfo body_fvs rec_rhs_fvs
 	        binders = map fst pairs
 	        env_ext = [ mk_binding bind_lv_info b rhs 
 			  | (b,rhs) <- pairs ]
 	   in
-	   extendVarEnvLne env_ext (
-	      mapAndUnzip4Lne (coreToStgRhs rec_scope_fvs binders) pairs 
-					`thenLne` \ (rhss2, fvss, lv_infos, escss) ->
+	   extendVarEnvLne env_ext $ do
+	      (rhss2, fvss, lv_infos, escss)
+	             <- mapAndUnzip4M (coreToStgRhs rec_scope_fvs binders) pairs 
 	      let
 			bind_fvs = unionFVInfos fvss
 			bind_lv_info = foldr unionLiveInfo emptyLiveInfo lv_infos
 			escs     = unionVarSets escss
-	      in
-	      returnLne (StgRec (binders `zip` rhss2),
-			 bind_fvs, escs, bind_lv_info, env_ext)
-	   )
-	)
+	      
+	      return (StgRec (binders `zip` rhss2),
+	              bind_fvs, escs, bind_lv_info, env_ext)
+
 
 is_join_var :: Id -> Bool
 -- A hack (used only for compiler debuggging) to tell if
@@ -727,12 +716,12 @@ coreToStgRhs :: FreeVarsInfo		-- Free var info for the scope of the binding
 	     -> (Id,CoreExpr)
   	     -> LneM (StgRhs, FreeVarsInfo, LiveInfo, EscVarsSet)
 
-coreToStgRhs scope_fv_info binders (bndr, rhs)
-  = coreToStgExpr rhs 		`thenLne` \ (new_rhs, rhs_fvs, rhs_escs) ->
-    getEnvLne			`thenLne` \ env ->    
-    freeVarsToLiveVars (binders `minusFVBinders` rhs_fvs) `thenLne` \ lv_info ->
-    returnLne (mkStgRhs rhs_fvs (mkSRT lv_info) bndr_info new_rhs,
-	       rhs_fvs, lv_info, rhs_escs)
+coreToStgRhs scope_fv_info binders (bndr, rhs) = do
+    (new_rhs, rhs_fvs, rhs_escs) <- coreToStgExpr rhs
+    env <- getEnvLne
+    lv_info <- freeVarsToLiveVars (binders `minusFVBinders` rhs_fvs)
+    return (mkStgRhs rhs_fvs (mkSRT lv_info) bndr_info new_rhs,
+            rhs_fvs, lv_info, rhs_escs)
   where
     bndr_info = lookupFVInfo scope_fv_info bndr
 
@@ -817,9 +806,11 @@ There's a lot of stuff to pass around, so we use this @LneM@ monad to
 help.  All the stuff here is only passed *down*.
 
 \begin{code}
-type LneM a =  IdEnv HowBound
-	    -> LiveInfo		-- Vars and CAFs live in continuation
-	    -> a
+newtype LneM a = LneM
+    { unLneM :: IdEnv HowBound
+             -> LiveInfo                -- Vars and CAFs live in continuation
+             -> a
+    }
 
 type LiveInfo = (StgLiveVars, 	-- Dynamic live variables; 
 				-- i.e. ones with a nested (non-top-level) binding
@@ -895,7 +886,7 @@ getLiveVars (lvs, _) = lvs
 The std monad functions:
 \begin{code}
 initLne :: IdEnv HowBound -> LneM a -> a
-initLne env m = m env emptyLiveInfo
+initLne env m = unLneM m env emptyLiveInfo
 
 
 
@@ -903,59 +894,43 @@ initLne env m = m env emptyLiveInfo
 {-# INLINE returnLne #-}
 
 returnLne :: a -> LneM a
-returnLne e env lvs_cont = e
+returnLne e = LneM $ \env lvs_cont -> e
 
 thenLne :: LneM a -> (a -> LneM b) -> LneM b
-thenLne m k env lvs_cont 
-  = k (m env lvs_cont) env lvs_cont
+thenLne m k = LneM $ \env lvs_cont
+  -> unLneM (k (unLneM m env lvs_cont)) env lvs_cont
 
-mapAndUnzipLne  :: (a -> LneM (b,c))   -> [a] -> LneM ([b],[c])
-mapAndUnzipLne f [] = returnLne ([],[])
-mapAndUnzipLne f (x:xs)
-  = f x		    	`thenLne` \ (r1,  r2)  ->
-    mapAndUnzipLne f xs	`thenLne` \ (rs1, rs2) ->
-    returnLne (r1:rs1, r2:rs2)
+instance Monad LneM where
+    return = returnLne
+    (>>=)  = thenLne
 
-mapAndUnzip3Lne :: (a -> LneM (b,c,d)) -> [a] -> LneM ([b],[c],[d])
-mapAndUnzip3Lne f []	= returnLne ([],[],[])
-mapAndUnzip3Lne f (x:xs)
-  = f x		    	 `thenLne` \ (r1,  r2,  r3)  ->
-    mapAndUnzip3Lne f xs `thenLne` \ (rs1, rs2, rs3) ->
-    returnLne (r1:rs1, r2:rs2, r3:rs3)
-
-mapAndUnzip4Lne :: (a -> LneM (b,c,d,e)) -> [a] -> LneM ([b],[c],[d],[e])
-mapAndUnzip4Lne f []	= returnLne ([],[],[],[])
-mapAndUnzip4Lne f (x:xs)
-  = f x		    	 `thenLne` \ (r1,  r2,  r3, r4)  ->
-    mapAndUnzip4Lne f xs `thenLne` \ (rs1, rs2, rs3, rs4) ->
-    returnLne (r1:rs1, r2:rs2, r3:rs3, r4:rs4)
-
-fixLne :: (a -> LneM a) -> LneM a
-fixLne expr env lvs_cont
-  = result
-  where
-    result = expr result env lvs_cont
+instance MonadFix LneM where
+    mfix expr = LneM $ \env lvs_cont ->
+                       let result = unLneM (expr result) env lvs_cont
+                       in  result
 \end{code}
 
 Functions specific to this monad:
 
 \begin{code}
 getVarsLiveInCont :: LneM LiveInfo
-getVarsLiveInCont env lvs_cont = lvs_cont
+getVarsLiveInCont = LneM $ \env lvs_cont -> lvs_cont
 
 setVarsLiveInCont :: LiveInfo -> LneM a -> LneM a
-setVarsLiveInCont new_lvs_cont expr env lvs_cont
-  = expr env new_lvs_cont
+setVarsLiveInCont new_lvs_cont expr
+   =    LneM $   \env lvs_cont
+   -> unLneM expr env new_lvs_cont
 
 extendVarEnvLne :: [(Id, HowBound)] -> LneM a -> LneM a
-extendVarEnvLne ids_w_howbound expr env lvs_cont
-  = expr (extendVarEnvList env ids_w_howbound) lvs_cont
+extendVarEnvLne ids_w_howbound expr
+   =    LneM $   \env lvs_cont
+   -> unLneM expr (extendVarEnvList env ids_w_howbound) lvs_cont
 
 lookupVarLne :: Id -> LneM HowBound
-lookupVarLne v env lvs_cont = returnLne (lookupBinding env v) env lvs_cont
+lookupVarLne v = LneM $ \env lvs_cont -> lookupBinding env v
 
 getEnvLne :: LneM (IdEnv HowBound)
-getEnvLne env lvs_cont = returnLne env env lvs_cont
+getEnvLne = LneM $ \env lvs_cont -> env
 
 lookupBinding :: IdEnv HowBound -> Id -> HowBound
 lookupBinding env v = case lookupVarEnv env v of
@@ -968,9 +943,10 @@ lookupBinding env v = case lookupVarEnv env v of
 -- the basis of a control decision, which might give a black hole.
 
 freeVarsToLiveVars :: FreeVarsInfo -> LneM LiveInfo
-freeVarsToLiveVars fvs env live_in_cont
-  = returnLne live_info env live_in_cont
-  where
+freeVarsToLiveVars fvs = LneM freeVarsToLiveVars'
+ where
+  freeVarsToLiveVars' env live_in_cont = live_info
+   where
     live_info    = foldr unionLiveInfo live_in_cont lvs_from_fvs
     lvs_from_fvs = map do_one (allFreeIds fvs)
 
