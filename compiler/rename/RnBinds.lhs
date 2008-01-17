@@ -62,7 +62,7 @@ import Bag
 import Outputable
 import Maybes		( orElse )
 import Util		( filterOut )
-import Monad		( foldM )
+import Monad		( foldM, unless )
 \end{code}
 
 -- ToDo: Put the annotations into the monad, so that they arrive in the proper
@@ -235,19 +235,19 @@ rnLocalBindsAndThen (HsValBinds val_binds) thing_inside
   = rnValBindsAndThen val_binds $ \ val_binds' -> 
       thing_inside (HsValBinds val_binds')
 
-rnLocalBindsAndThen (HsIPBinds binds) thing_inside
-  = rnIPBinds binds			`thenM` \ (binds',fv_binds) ->
-    thing_inside (HsIPBinds binds')	`thenM` \ (thing, fvs_thing) ->
-    returnM (thing, fvs_thing `plusFV` fv_binds)
+rnLocalBindsAndThen (HsIPBinds binds) thing_inside = do
+    (binds',fv_binds) <- rnIPBinds binds
+    (thing, fvs_thing) <- thing_inside (HsIPBinds binds')
+    return (thing, fvs_thing `plusFV` fv_binds)
 
 
-rnIPBinds (IPBinds ip_binds _no_dict_binds)
-  = do	{ (ip_binds', fvs_s) <- mapAndUnzipM (wrapLocFstM rnIPBind) ip_binds
-	; return (IPBinds ip_binds' emptyLHsBinds, plusFVs fvs_s) }
+rnIPBinds (IPBinds ip_binds _no_dict_binds) = do
+    (ip_binds', fvs_s) <- mapAndUnzipM (wrapLocFstM rnIPBind) ip_binds
+    return (IPBinds ip_binds' emptyLHsBinds, plusFVs fvs_s)
 
-rnIPBind (IPBind n expr)
-  = newIPNameRn  n		`thenM` \ name ->
-    rnLExpr expr		`thenM` \ (expr',fvExpr) ->
+rnIPBind (IPBind n expr) = do
+    name <- newIPNameRn  n
+    (expr',fvExpr) <- rnLExpr expr
     return (IPBind name expr', fvExpr)
 \end{code}
 
@@ -313,8 +313,7 @@ rnValBindsLHSFromDoc :: NameMaker
                      -> SDoc              -- doc string for dup names and shadowing
                      -> HsValBinds RdrName
                      -> RnM (HsValBindsLR Name RdrName)
-rnValBindsLHSFromDoc topP original_bndrs doc binds@(ValBindsIn mbinds sigs)
- = do
+rnValBindsLHSFromDoc topP original_bndrs doc binds@(ValBindsIn mbinds sigs) = do
      -- rename the LHSes
      mbinds' <- mapBagM (rnBindLHS topP doc) mbinds
      return $ ValBindsIn mbinds' sigs
@@ -330,8 +329,8 @@ rnValBindsRHSGen :: (FreeVars -> FreeVars)  -- for trimming free var sets
                  -> HsValBindsLR Name RdrName
                  -> RnM (HsValBinds Name, DefUses)
 
-rnValBindsRHSGen trim bound_names binds@(ValBindsIn mbinds sigs)
- = do -- rename the sigs
+rnValBindsRHSGen trim bound_names binds@(ValBindsIn mbinds sigs) = do
+   -- rename the sigs
    sigs' <- rename_sigs sigs
    -- rename the RHSes
    binds_w_dus <- mapBagM (rnBind (mkSigTvFn sigs') trim) mbinds
@@ -341,7 +340,7 @@ rnValBindsRHSGen trim bound_names binds@(ValBindsIn mbinds sigs)
    -- We do the check-sigs after renaming the bindings,
    -- so that we have convenient access to the binders
    check_sigs (okBindSig (duDefs anal_dus)) sigs'                       
-   returnM (valbind', valbind'_dus)
+   return (valbind', valbind'_dus)
 
 -- wrapper for local binds
 --
@@ -628,24 +627,24 @@ rnMethodBinds cls sig_fn gen_tyvars binds
 
 rnMethodBind cls sig_fn gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = inf, 
 					             fun_matches = MatchGroup matches _ }))
-  = setSrcSpan loc $ 
-    lookupInstDeclBndr cls name			`thenM` \ sel_name -> 
-    let plain_name = unLoc sel_name in
-	-- We use the selector name as the binder
+  = setSrcSpan loc $ do
+    sel_name <- lookupInstDeclBndr cls name
+    let plain_name = unLoc sel_name
+        -- We use the selector name as the binder
 
-    bindSigTyVarsFV (sig_fn plain_name)			$
-    mapFvRn (rn_match plain_name) matches		`thenM` \ (new_matches, fvs) ->
-    let 
-	new_group = MatchGroup new_matches placeHolderType
-    in
-    checkPrecMatch inf plain_name new_group		`thenM_`
-    returnM (unitBag (L loc (FunBind { 
-				fun_id = sel_name, fun_infix = inf, 
-				fun_matches = new_group,
-				bind_fvs = fvs, fun_co_fn = idHsWrapper,
-				fun_tick = Nothing })), 
-	     fvs `addOneFV` plain_name)
-	-- The 'fvs' field isn't used for method binds
+    bindSigTyVarsFV (sig_fn plain_name) $ do
+     (new_matches, fvs) <- mapFvRn (rn_match plain_name) matches
+     let
+         new_group = MatchGroup new_matches placeHolderType
+
+     checkPrecMatch inf plain_name new_group
+     return (unitBag (L loc (FunBind {
+                                fun_id = sel_name, fun_infix = inf,
+                                fun_matches = new_group,
+                                bind_fvs = fvs, fun_co_fn = idHsWrapper,
+                                fun_tick = Nothing })),
+             fvs `addOneFV` plain_name)
+        -- The 'fvs' field isn't used for method binds
   where
 	-- Truly gruesome; bring into scope the correct members of the generic 
 	-- type variables.  See comments in RnSource.rnSourceDecl(ClassDecl)
@@ -660,9 +659,9 @@ rnMethodBind cls sig_fn gen_tyvars (L loc (FunBind { fun_id = name, fun_infix = 
 
 
 -- Can't handle method pattern-bindings which bind multiple methods.
-rnMethodBind cls sig_fn gen_tyvars mbind@(L loc (PatBind other_pat _ _ _))
-  = addLocErr mbind methodBindErr	`thenM_`
-    returnM (emptyBag, emptyFVs) 
+rnMethodBind cls sig_fn gen_tyvars mbind@(L loc (PatBind other_pat _ _ _)) = do
+    addLocErr mbind methodBindErr
+    return (emptyBag, emptyFVs)
 \end{code}
 
 
@@ -686,25 +685,24 @@ signatures.  We'd only need this if we wanted to report unused tyvars.
 \begin{code}
 renameSigs :: (LSig Name -> Bool) -> [LSig RdrName] -> RnM [LSig Name]
 -- Renames the signatures and performs error checks
-renameSigs ok_sig sigs 
+renameSigs ok_sig sigs
   = do	{ sigs' <- rename_sigs sigs
 	; check_sigs ok_sig sigs'
 	; return sigs' }
 
 ----------------------
 rename_sigs :: [LSig RdrName] -> RnM [LSig Name]
-rename_sigs sigs = mappM (wrapLocM renameSig) sigs
+rename_sigs sigs = mapM (wrapLocM renameSig) sigs
 
 ----------------------
 check_sigs :: (LSig Name -> Bool) -> [LSig Name] -> RnM ()
 -- Used for class and instance decls, as well as regular bindings
-check_sigs ok_sig sigs 
+check_sigs ok_sig sigs = do
 	-- Check for (a) duplicate signatures
-	--	     (b) signatures for things not in this group
-  = do	{ 
-        traceRn (text "SIGS" <+> ppr sigs)
-        ; mappM_ unknownSigErr (filter (not . ok_sig) sigs')
-	; mappM_ dupSigDeclErr (findDupsEq eqHsSig sigs') }
+	--           (b) signatures for things not in this group = do
+    traceRn (text "SIGS" <+> ppr sigs)
+    mapM_ unknownSigErr (filter (not . ok_sig) sigs')
+    mapM_ dupSigDeclErr (findDupsEq eqHsSig sigs')
   where
 	-- Don't complain about an unbound name again
     sigs' = filterOut bad_name sigs
@@ -723,27 +721,27 @@ check_sigs ok_sig sigs
 
 renameSig :: Sig RdrName -> RnM (Sig Name)
 -- FixitSig is renamed elsewhere.
-renameSig (TypeSig v ty)
-  = lookupLocatedSigOccRn v			`thenM` \ new_v ->
-    rnHsSigType (quotes (ppr v)) ty		`thenM` \ new_ty ->
-    returnM (TypeSig new_v new_ty)
+renameSig (TypeSig v ty) = do
+    new_v <- lookupLocatedSigOccRn v
+    new_ty <- rnHsSigType (quotes (ppr v)) ty
+    return (TypeSig new_v new_ty)
 
-renameSig (SpecInstSig ty)
-  = rnLHsType (text "A SPECIALISE instance pragma") ty `thenM` \ new_ty ->
-    returnM (SpecInstSig new_ty)
+renameSig (SpecInstSig ty) = do
+    new_ty <- rnLHsType (text "A SPECIALISE instance pragma") ty
+    return (SpecInstSig new_ty)
 
-renameSig (SpecSig v ty inl)
-  = lookupLocatedSigOccRn v		`thenM` \ new_v ->
-    rnHsSigType (quotes (ppr v)) ty	`thenM` \ new_ty ->
-    returnM (SpecSig new_v new_ty inl)
+renameSig (SpecSig v ty inl) = do
+    new_v <- lookupLocatedSigOccRn v
+    new_ty <- rnHsSigType (quotes (ppr v)) ty
+    return (SpecSig new_v new_ty inl)
 
-renameSig (InlineSig v s)
-  = lookupLocatedSigOccRn v		`thenM` \ new_v ->
-    returnM (InlineSig new_v s)
+renameSig (InlineSig v s) = do
+    new_v <- lookupLocatedSigOccRn v
+    return (InlineSig new_v s)
 
-renameSig (FixSig (FixitySig v f))
-  = lookupLocatedSigOccRn v		`thenM` \ new_v ->
-    returnM (FixSig (FixitySig new_v f))
+renameSig (FixSig (FixitySig v f)) = do
+    new_v <- lookupLocatedSigOccRn v
+    return (FixSig (FixitySig new_v f))
 \end{code}
 
 
@@ -755,9 +753,9 @@ renameSig (FixSig (FixitySig v f))
 
 \begin{code}
 rnMatchGroup :: HsMatchContext Name -> MatchGroup RdrName -> RnM (MatchGroup Name, FreeVars)
-rnMatchGroup ctxt (MatchGroup ms _)
-  = mapFvRn (rnMatch ctxt) ms	`thenM` \ (new_ms, ms_fvs) ->
-    returnM (MatchGroup new_ms placeHolderType, ms_fvs)
+rnMatchGroup ctxt (MatchGroup ms _) = do
+    (new_ms, ms_fvs) <- mapFvRn (rnMatch ctxt) ms
+    return (MatchGroup new_ms placeHolderType, ms_fvs)
 
 rnMatch :: HsMatchContext Name -> LMatch RdrName -> RnM (LMatch Name, FreeVars)
 rnMatch ctxt  = wrapLocFstM (rnMatch' ctxt)
@@ -765,22 +763,22 @@ rnMatch ctxt  = wrapLocFstM (rnMatch' ctxt)
 rnMatch' ctxt match@(Match pats maybe_rhs_sig grhss)
   = 
 	-- Deal with the rhs type signature
-    bindPatSigTyVarsFV rhs_sig_tys	$ 
-    doptM Opt_PatternSignatures `thenM` \ opt_PatternSignatures ->
-    (case maybe_rhs_sig of
-	Nothing -> returnM (Nothing, emptyFVs)
-	Just ty | opt_PatternSignatures -> rnHsTypeFVs doc_sig ty	`thenM` \ (ty', ty_fvs) ->
-				     returnM (Just ty', ty_fvs)
-		| otherwise	  -> addLocErr ty patSigErr	`thenM_`
-				     returnM (Nothing, emptyFVs)
-    )					`thenM` \ (maybe_rhs_sig', ty_fvs) ->
+    bindPatSigTyVarsFV rhs_sig_tys	$ do
+    opt_PatternSignatures <- doptM Opt_PatternSignatures
+    (maybe_rhs_sig', ty_fvs) <-
+      case maybe_rhs_sig of
+        Nothing -> return (Nothing, emptyFVs)
+        Just ty | opt_PatternSignatures -> do (ty', ty_fvs) <- rnHsTypeFVs doc_sig ty
+                                              return (Just ty', ty_fvs)
+                | otherwise             -> do addLocErr ty patSigErr
+                                              return (Nothing, emptyFVs)
 
-	-- Now the main event
+       -- Now the main event
        -- note that there are no local ficity decls for matches
-    rnPatsAndThen_LocalRightwards ctxt pats	$ \ pats' ->
-    rnGRHSs ctxt grhss		`thenM` \ (grhss', grhss_fvs) ->
+    rnPatsAndThen_LocalRightwards ctxt pats	$ \ pats' -> do
+      (grhss', grhss_fvs) <- rnGRHSs ctxt grhss
 
-    returnM (Match pats' maybe_rhs_sig' grhss', grhss_fvs `plusFV` ty_fvs)
+      return (Match pats' maybe_rhs_sig' grhss', grhss_fvs `plusFV` ty_fvs)
 	-- The bindPatSigTyVarsFV and rnPatsAndThen will remove the bound FVs
   where
      rhs_sig_tys =  case maybe_rhs_sig of
@@ -800,9 +798,9 @@ rnMatch' ctxt match@(Match pats maybe_rhs_sig grhss)
 rnGRHSs :: HsMatchContext Name -> GRHSs RdrName -> RnM (GRHSs Name, FreeVars)
 
 rnGRHSs ctxt (GRHSs grhss binds)
-  = rnLocalBindsAndThen binds	$ \ binds' ->
-    mapFvRn (rnGRHS ctxt) grhss	`thenM` \ (grhss', fvGRHSs) ->
-    returnM (GRHSs grhss' binds', fvGRHSs)
+  = rnLocalBindsAndThen binds	$ \ binds' -> do
+    (grhss', fvGRHSs) <- mapFvRn (rnGRHS ctxt) grhss
+    return (GRHSs grhss' binds', fvGRHSs)
 
 rnGRHS :: HsMatchContext Name -> LGRHS RdrName -> RnM (LGRHS Name, FreeVars)
 rnGRHS ctxt = wrapLocFstM (rnGRHS' ctxt)
@@ -812,7 +810,7 @@ rnGRHS' ctxt (GRHS guards rhs)
 	; ((guards', rhs'), fvs) <- rnStmts (PatGuard ctxt) guards $
 				    rnLExpr rhs
 
-	; checkM (pattern_guards_allowed || is_standard_guard guards')
+	; unless (pattern_guards_allowed || is_standard_guard guards')
 	  	 (addWarn (nonStdGuardErr guards'))
 
 	; return (GRHS guards' rhs', fvs) }
