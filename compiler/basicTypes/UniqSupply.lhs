@@ -18,10 +18,7 @@ module UniqSupply (
 	uniqFromSupply, uniqsFromSupply,	-- basic ops
 
 	UniqSM,		-- type: unique supply monad
-	initUs, initUs_, thenUs, thenUs_, returnUs, fixUs, getUs, withUs,
-	getUniqueUs, getUniquesUs,
-	mapUs, mapAndUnzipUs, mapAndUnzip3Us,
-	thenMaybeUs, mapAccumLUs,
+	initUs, initUs_,
 	lazyThenUs, lazyMapUs,
 	module MonadUtils, mapAndUnzipM,
 	MonadUnique(..),
@@ -130,8 +127,8 @@ initUs_ init_us m = case unUSM m init_us of { (r,us) -> r }
 
 @thenUs@ is where we split the @UniqSupply@.
 \begin{code}
-fixUs :: (a -> UniqSM a) -> UniqSM a
-fixUs m = USM (\us -> let (r,us') = unUSM (m r) us in (r,us'))
+instance MonadFix UniqSM where
+    mfix m = USM (\us -> let (r,us') = unUSM (m r) us in (r,us'))
 
 thenUs :: UniqSM a -> (a -> UniqSM b) -> UniqSM b
 thenUs (USM expr) cont
@@ -145,7 +142,6 @@ lazyThenUs (USM expr) cont
 thenUs_ :: UniqSM a -> UniqSM b -> UniqSM b
 thenUs_ (USM expr) (USM cont)
   = USM (\us -> case (expr us) of { (_, us') -> cont us' })
-
 
 returnUs :: a -> UniqSM a
 returnUs result = USM (\us -> (result, us))
@@ -183,12 +179,9 @@ getUniquesUs = USM (\us -> case splitUniqSupply us of
 \end{code}
 
 \begin{code}
-mapUs :: (a -> UniqSM b) -> [a] -> UniqSM [b]
-mapUs f []     = returnUs []
-mapUs f (x:xs)
-  = f x         `thenUs` \ r  ->
-    mapUs f xs  `thenUs` \ rs ->
-    returnUs (r:rs)
+{-# -- SPECIALIZE mapM          :: (a -> UniqSM b) -> [a] -> UniqSM [b] #-}
+{-# -- SPECIALIZE mapAndUnzipM  :: (a -> UniqSM (b,c))   -> [a] -> UniqSM ([b],[c]) #-}
+{-# -- SPECIALIZE mapAndUnzip3M :: (a -> UniqSM (b,c,d)) -> [a] -> UniqSM ([b],[c],[d]) #-}
 
 lazyMapUs :: (a -> UniqSM b) -> [a] -> UniqSM [b]
 lazyMapUs f []     = returnUs []
@@ -197,36 +190,4 @@ lazyMapUs f (x:xs)
     lazyMapUs f xs  `lazyThenUs` \ rs ->
     returnUs (r:rs)
 
-mapAndUnzipUs  :: (a -> UniqSM (b,c))   -> [a] -> UniqSM ([b],[c])
-mapAndUnzip3Us :: (a -> UniqSM (b,c,d)) -> [a] -> UniqSM ([b],[c],[d])
-
-mapAndUnzipUs f [] = returnUs ([],[])
-mapAndUnzipUs f (x:xs)
-  = f x		    	`thenUs` \ (r1,  r2)  ->
-    mapAndUnzipUs f xs	`thenUs` \ (rs1, rs2) ->
-    returnUs (r1:rs1, r2:rs2)
-
-mapAndUnzip3Us f [] = returnUs ([],[],[])
-mapAndUnzip3Us f (x:xs)
-  = f x		    	`thenUs` \ (r1,  r2,  r3)  ->
-    mapAndUnzip3Us f xs	`thenUs` \ (rs1, rs2, rs3) ->
-    returnUs (r1:rs1, r2:rs2, r3:rs3)
-
-thenMaybeUs :: UniqSM (Maybe a) -> (a -> UniqSM (Maybe b)) -> UniqSM (Maybe b)
-thenMaybeUs m k
-  = m	`thenUs` \ result ->
-    case result of
-      Nothing -> returnUs Nothing
-      Just x  -> k x
-
-mapAccumLUs :: (acc -> x -> UniqSM (acc, y))
-	    -> acc
-	    -> [x]
-	    -> UniqSM (acc, [y])
-
-mapAccumLUs f b []     = returnUs (b, [])
-mapAccumLUs f b (x:xs)
-  = f b x   	        	    `thenUs` \ (b__2, x__2) ->
-    mapAccumLUs f b__2 xs   	    `thenUs` \ (b__3, xs__2) ->
-    returnUs (b__3, x__2:xs__2)
 \end{code}
