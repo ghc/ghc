@@ -742,7 +742,7 @@ simplType :: SimplEnv -> InType -> SimplM OutType
 	-- Kept monadic just so we can do the seqType
 simplType env ty
   = -- pprTrace "simplType" (ppr ty $$ ppr (seTvSubst env)) $
-    seqType new_ty   `seq`   returnSmpl new_ty
+    seqType new_ty   `seq`   return new_ty
   where
     new_ty = substTy env ty
 \end{code}
@@ -939,8 +939,8 @@ simplNote env InlineMe e cont
 		-- (even a type application -- anything except Stop)
   = simplExprF env e cont
 
-simplNote env (CoreNote s) e cont
-  = simplExpr env e    `thenSmpl` \ e' ->
+simplNote env (CoreNote s) e cont = do
+    e' <- simplExpr env e
     rebuild env (Note (CoreNote s) e') cont
 \end{code}
 
@@ -1009,8 +1009,8 @@ completeCall env var cont
 				Just act_fn -> lookupRule act_fn in_scope 
 							  rules var args 
 	; case maybe_rule of {
-	    Just (rule, rule_rhs) -> 
-		tick (RuleFired (ru_name rule))			`thenSmpl_`
+	    Just (rule, rule_rhs) -> do
+		tick (RuleFired (ru_name rule))
 		(if dopt Opt_D_dump_rule_firings dflags then
 		   pprTrace "Rule fired" (vcat [
 			text "Rule:" <+> ftext (ru_name rule),
@@ -1019,8 +1019,8 @@ completeCall env var cont
 			text "Cont:  " <+> ppr call_cont])
 		 else
 			id)		$
-		simplExprF env rule_rhs (dropArgs (ruleArity rule) cont)
-		-- The ruleArity says how many args the rule consumed
+		 simplExprF env rule_rhs (dropArgs (ruleArity rule) cont)
+		 -- The ruleArity says how many args the rule consumed
 	
 	  ; Nothing -> do	-- No rules
 
@@ -1740,7 +1740,7 @@ mkDupableCont :: SimplEnv -> SimplCont
 
 mkDupableCont env cont
   | contIsDupable cont
-  = returnSmpl (env, cont, mkBoringStop (contResultType cont))
+  = return (env, cont, mkBoringStop (contResultType cont))
 
 mkDupableCont env (Stop {}) = panic "mkDupableCont" 	-- Handled by previous eqn
 
