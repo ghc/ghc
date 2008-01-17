@@ -130,7 +130,7 @@ tc_lam_pats ctxt pat_ty_prs (reft, res_ty) thing_inside
 	; let tys = map snd pat_ty_prs
 	; tcCheckExistentialPat pats' ex_tvs tys res_ty
 
-	; returnM (pats', res) }
+	; return (pats', res) }
 
 
 -----------------
@@ -461,7 +461,7 @@ tc_pat pstate (PArrPat pats _) pat_ty thing_inside
         ; let scoi = mkSymCoI coi
 	; (pats', pats_tvs, res) <- tcMultiple (\p -> tc_lpat p elt_ty)
 						pats pstate thing_inside 
-	; ifM (null pats) (zapToMonotype pat_ty)  -- c.f. ExplicitPArr in TcExpr
+	; when (null pats) (zapToMonotype pat_ty >> return ())  -- c.f. ExplicitPArr in TcExpr
 	; return (mkCoPatCoI scoi (PArrPat pats' elt_ty) pat_ty, pats_tvs, res)
         }
 
@@ -506,7 +506,7 @@ tc_pat pstate (LitPat simple_lit) pat_ty thing_inside
 			-- pattern coercions have to
 			-- be of kind: pat_ty ~ lit_ty
 			-- hence, sym coi
-	; returnM (mkCoPatCoI (mkSymCoI coi) (LitPat simple_lit) pat_ty, 
+	; return (mkCoPatCoI (mkSymCoI coi) (LitPat simple_lit) pat_ty, 
                    [], res) }
 
 ------------------------
@@ -522,7 +522,7 @@ tc_pat pstate pat@(NPat over_lit mb_neg eq) pat_ty thing_inside
  			    do { neg' <- tcSyntaxOp orig neg (mkFunTy pat_ty pat_ty)
 			       ; return (Just neg') }
 	; res <- thing_inside pstate
-	; returnM (NPat lit' mb_neg' eq', [], res) }
+	; return (NPat lit' mb_neg' eq', [], res) }
 
 tc_pat pstate pat@(NPlusKPat (L nm_loc name) lit ge minus) pat_ty thing_inside
   = do	{ bndr_id <- setSrcSpan nm_loc (tcPatBndr pstate name pat_ty)
@@ -540,7 +540,7 @@ tc_pat pstate pat@(NPlusKPat (L nm_loc name) lit ge minus) pat_ty thing_inside
 	; instStupidTheta orig [mkClassPred icls [pat_ty']]	
     
 	; res <- tcExtendIdEnv1 name bndr_id (thing_inside pstate)
-	; returnM (NPlusKPat (L nm_loc bndr_id) lit' ge' minus', [], res) }
+	; return (NPlusKPat (L nm_loc bndr_id) lit' ge' minus', [], res) }
 
 tc_pat _ _other_pat _ _ = panic "tc_pat" 	-- ConPatOut, SigPatOut, VarPatOut
 \end{code}
