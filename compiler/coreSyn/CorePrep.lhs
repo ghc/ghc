@@ -41,6 +41,7 @@ import ErrUtils
 import DynFlags
 import Util
 import Outputable
+import MonadUtils
 \end{code}
 
 -- ---------------------------------------------------------------------------
@@ -103,31 +104,29 @@ any trivial or useless bindings.
 
 \begin{code}
 corePrepPgm :: DynFlags -> [CoreBind] -> [TyCon] -> IO [CoreBind]
-corePrepPgm dflags binds data_tycons
-  = do	showPass dflags "CorePrep"
-	us <- mkSplitUniqSupply 's'
+corePrepPgm dflags binds data_tycons = do
+    showPass dflags "CorePrep"
+    us <- mkSplitUniqSupply 's'
 
-	let implicit_binds = mkDataConWorkers data_tycons
-		-- NB: we must feed mkImplicitBinds through corePrep too
-		-- so that they are suitably cloned and eta-expanded
+    let implicit_binds = mkDataConWorkers data_tycons
+            -- NB: we must feed mkImplicitBinds through corePrep too
+            -- so that they are suitably cloned and eta-expanded
 
-	    binds_out = initUs_ us (
-			  corePrepTopBinds binds	`thenUs` \ floats1 ->
-			  corePrepTopBinds implicit_binds	`thenUs` \ floats2 ->
-			  returnUs (deFloatTop (floats1 `appendFloats` floats2))
-			)
-	    
-        endPass dflags "CorePrep" Opt_D_dump_prep binds_out
-	return binds_out
+        binds_out = initUs_ us $ do
+                      floats1 <- corePrepTopBinds binds
+                      floats2 <- corePrepTopBinds implicit_binds
+                      return (deFloatTop (floats1 `appendFloats` floats2))
+
+    endPass dflags "CorePrep" Opt_D_dump_prep binds_out
+    return binds_out
 
 corePrepExpr :: DynFlags -> CoreExpr -> IO CoreExpr
-corePrepExpr dflags expr
-  = do showPass dflags "CorePrep"
-       us <- mkSplitUniqSupply 's'
-       let new_expr = initUs_ us (corePrepAnExpr emptyCorePrepEnv expr)
-       dumpIfSet_dyn dflags Opt_D_dump_prep "CorePrep" 
-		     (ppr new_expr)
-       return new_expr
+corePrepExpr dflags expr = do
+    showPass dflags "CorePrep"
+    us <- mkSplitUniqSupply 's'
+    let new_expr = initUs_ us (corePrepAnExpr emptyCorePrepEnv expr)
+    dumpIfSet_dyn dflags Opt_D_dump_prep "CorePrep" (ppr new_expr)
+    return new_expr
 \end{code}
 
 -- -----------------------------------------------------------------------------
@@ -236,10 +235,10 @@ corePrepTopBinds :: [CoreBind] -> UniqSM Floats
 corePrepTopBinds binds 
   = go emptyCorePrepEnv binds
   where
-    go env []		  = returnUs emptyFloats
-    go env (bind : binds) = corePrepTopBind env bind	`thenUs` \ (env', bind') ->
-			    go env' binds		`thenUs` \ binds' ->
-			    returnUs (bind' `appendFloats` binds')
+    go env []		  = return emptyFloats
+    go env (bind : binds) = do (env', bind') <- corePrepTopBind env bind
+                               binds' <- go env' binds
+                               return (bind' `appendFloats` binds')
 
 -- NB: we do need to float out of top-level bindings
 -- Consider	x = length [True,False]
@@ -270,24 +269,24 @@ corePrepTopBinds binds
 
 --------------------------------
 corePrepTopBind :: CorePrepEnv -> CoreBind -> UniqSM (CorePrepEnv, Floats)
-corePrepTopBind env (NonRec bndr rhs) 
-  = cloneBndr env bndr					`thenUs` \ (env', bndr') ->
-    corePrepRhs TopLevel NonRecursive env (bndr, rhs)	`thenUs` \ (floats, rhs') -> 
-    returnUs (env', addFloat floats (FloatLet (NonRec bndr' rhs')))
+corePrepTopBind env (NonRec bndr rhs) = do
+    (env', bndr') <- cloneBndr env bndr
+    (floats, rhs') <- corePrepRhs TopLevel NonRecursive env (bndr, rhs)
+    return (env', addFloat floats (FloatLet (NonRec bndr' rhs')))
 
 corePrepTopBind env (Rec pairs) = corePrepRecPairs TopLevel env pairs
 
 --------------------------------
 corePrepBind ::  CorePrepEnv -> CoreBind -> UniqSM (CorePrepEnv, Floats)
 	-- This one is used for *local* bindings
-corePrepBind env (NonRec bndr rhs)
-  = etaExpandRhs bndr rhs				`thenUs` \ rhs1 ->
-    corePrepExprFloat env rhs1				`thenUs` \ (floats, rhs2) ->
-    cloneBndr env bndr					`thenUs` \ (_, bndr') ->
-    mkLocalNonRec bndr' (bdrDem bndr) floats rhs2	`thenUs` \ (floats', bndr'') ->
-	-- We want bndr'' in the envt, because it records
-	-- the evaluated-ness of the binder
-    returnUs (extendCorePrepEnv env bndr bndr'', floats')
+corePrepBind env (NonRec bndr rhs) = do
+    rhs1 <- etaExpandRhs bndr rhs
+    (floats, rhs2) <- corePrepExprFloat env rhs1
+    (_, bndr') <- cloneBndr env bndr
+    (floats', bndr'') <- mkLocalNonRec bndr' (bdrDem bndr) floats rhs2
+        -- We want bndr'' in the envt, because it records
+        -- the evaluated-ness of the binder
+    return (extendCorePrepEnv env bndr bndr'', floats')
 
 corePrepBind env (Rec pairs) = corePrepRecPairs NotTopLevel env pairs
 
@@ -296,10 +295,10 @@ corePrepRecPairs :: TopLevelFlag -> CorePrepEnv
 		 -> [(Id,CoreExpr)]	-- Recursive bindings
 		 -> UniqSM (CorePrepEnv, Floats)
 -- Used for all recursive bindings, top level and otherwise
-corePrepRecPairs lvl env pairs
-  = cloneBndrs env (map fst pairs)				`thenUs` \ (env', bndrs') ->
-    mapAndUnzipUs (corePrepRhs lvl Recursive env') pairs	`thenUs` \ (floats_s, rhss') ->
-    returnUs (env', unitFloat (FloatLet (Rec (flatten (concatFloats floats_s) bndrs' rhss'))))
+corePrepRecPairs lvl env pairs = do
+    (env', bndrs') <- cloneBndrs env (map fst pairs)
+    (floats_s, rhss') <- mapAndUnzipM (corePrepRhs lvl Recursive env') pairs
+    return (env', unitFloat (FloatLet (Rec (flatten (concatFloats floats_s) bndrs' rhss'))))
   where
 	-- Flatten all the floats, and the currrent
 	-- group into a single giant Rec
@@ -314,9 +313,9 @@ corePrepRhs :: TopLevelFlag -> RecFlag
 	    -> CorePrepEnv -> (Id, CoreExpr)
 	    -> UniqSM (Floats, CoreExpr)
 -- Used for top-level bindings, and local recursive bindings
-corePrepRhs top_lvl is_rec env (bndr, rhs)
-  = etaExpandRhs bndr rhs	`thenUs` \ rhs' ->
-    corePrepExprFloat env rhs'	`thenUs` \ floats_w_rhs ->
+corePrepRhs top_lvl is_rec env (bndr, rhs) = do
+    rhs' <- etaExpandRhs bndr rhs
+    floats_w_rhs <- corePrepExprFloat env rhs'
     floatRhs top_lvl is_rec bndr floats_w_rhs
 
 
@@ -327,32 +326,32 @@ corePrepRhs top_lvl is_rec env (bndr, rhs)
 -- This is where we arrange that a non-trivial argument is let-bound
 corePrepArg :: CorePrepEnv -> CoreArg -> RhsDemand
 	   -> UniqSM (Floats, CoreArg)
-corePrepArg env arg dem
-  = corePrepExprFloat env arg		`thenUs` \ (floats, arg') ->
+corePrepArg env arg dem = do
+    (floats, arg') <- corePrepExprFloat env arg
     if exprIsTrivial arg'
-    then returnUs (floats, arg')
-    else newVar (exprType arg')			`thenUs` \ v ->
-	 mkLocalNonRec v dem floats arg'	`thenUs` \ (floats', v') -> 
-	 returnUs (floats', Var v')
+     then return (floats, arg')
+     else do v <- newVar (exprType arg')
+             (floats', v') <- mkLocalNonRec v dem floats arg'
+             return (floats', Var v')
 
 -- version that doesn't consider an scc annotation to be trivial.
-exprIsTrivial (Var v)		       = True
-exprIsTrivial (Type _)	      	       = True
-exprIsTrivial (Lit lit)       	       = True
-exprIsTrivial (App e arg)     	       = isTypeArg arg && exprIsTrivial e
-exprIsTrivial (Note (SCC _) e) 	       = False
-exprIsTrivial (Note _ e)      	       = exprIsTrivial e
+exprIsTrivial (Var v)                  = True
+exprIsTrivial (Type _)                 = True
+exprIsTrivial (Lit lit)                = True
+exprIsTrivial (App e arg)              = isTypeArg arg && exprIsTrivial e
+exprIsTrivial (Note (SCC _) e)         = False
+exprIsTrivial (Note _ e)               = exprIsTrivial e
 exprIsTrivial (Cast e co)              = exprIsTrivial e
 exprIsTrivial (Lam b body) | isTyVar b = exprIsTrivial body
-exprIsTrivial other	      	       = False
+exprIsTrivial other                    = False
 
 -- ---------------------------------------------------------------------------
 -- Dealing with expressions
 -- ---------------------------------------------------------------------------
 
 corePrepAnExpr :: CorePrepEnv -> CoreExpr -> UniqSM CoreExpr
-corePrepAnExpr env expr
-  = corePrepExprFloat env expr		`thenUs` \ (floats, expr) ->
+corePrepAnExpr env expr = do
+    (floats, expr) <- corePrepExprFloat env expr
     mkBinds floats expr
 
 
@@ -365,75 +364,73 @@ corePrepExprFloat :: CorePrepEnv -> CoreExpr -> UniqSM (Floats, CoreExpr)
 -- For example
 --	f (g x)	  ===>   ([v = g x], f v)
 
-corePrepExprFloat env (Var v)
-  = fiddleCCall v				`thenUs` \ v1 ->
-    let 
-	v2 = lookupCorePrepEnv env v1
-    in
+corePrepExprFloat env (Var v) = do
+    v1 <- fiddleCCall v
+    let
+        v2 = lookupCorePrepEnv env v1
     maybeSaturate v2 (Var v2) 0 emptyFloats (idType v2)
 
 corePrepExprFloat env expr@(Type _)
-  = returnUs (emptyFloats, expr)
+  = return (emptyFloats, expr)
 
 corePrepExprFloat env expr@(Lit lit)
-  = returnUs (emptyFloats, expr)
+  = return (emptyFloats, expr)
 
-corePrepExprFloat env (Let bind body)
-  = corePrepBind env bind		`thenUs` \ (env', new_binds) ->
-    corePrepExprFloat env' body		`thenUs` \ (floats, new_body) ->
-    returnUs (new_binds `appendFloats` floats, new_body)
+corePrepExprFloat env (Let bind body) = do
+    (env', new_binds) <- corePrepBind env bind
+    (floats, new_body) <- corePrepExprFloat env' body
+    return (new_binds `appendFloats` floats, new_body)
 
-corePrepExprFloat env (Note n@(SCC _) expr)
-  = corePrepAnExpr env expr		`thenUs` \ expr1 ->
-    deLamFloat expr1			`thenUs` \ (floats, expr2) ->
-    returnUs (floats, Note n expr2)
+corePrepExprFloat env (Note n@(SCC _) expr) = do
+    expr1 <- corePrepAnExpr env expr
+    (floats, expr2) <- deLamFloat expr1
+    return (floats, Note n expr2)
 
 corePrepExprFloat env (Case (Var id) bndr ty [(DEFAULT,[],expr)])
-  | Just (TickBox {}) <- isTickBoxOp_maybe id
-  = corePrepAnExpr env expr            `thenUs` \ expr1 ->
-    deLamFloat expr1                   `thenUs` \ (floats, expr2) ->
+  | Just (TickBox {}) <- isTickBoxOp_maybe id = do
+    expr1 <- corePrepAnExpr env expr
+    (floats, expr2) <- deLamFloat expr1
     return (floats, Case (Var id) bndr ty [(DEFAULT,[],expr2)])
 
-corePrepExprFloat env (Note other_note expr)
-  = corePrepExprFloat env expr		`thenUs` \ (floats, expr') ->
-    returnUs (floats, Note other_note expr')
+corePrepExprFloat env (Note other_note expr) = do
+    (floats, expr') <- corePrepExprFloat env expr
+    return (floats, Note other_note expr')
 
-corePrepExprFloat env (Cast expr co)
-  = corePrepExprFloat env expr		`thenUs` \ (floats, expr') ->
-    returnUs (floats, Cast expr' co)
+corePrepExprFloat env (Cast expr co) = do
+    (floats, expr') <- corePrepExprFloat env expr
+    return (floats, Cast expr' co)
 
-corePrepExprFloat env expr@(Lam _ _)
-  = cloneBndrs env bndrs		`thenUs` \ (env', bndrs') ->
-    corePrepAnExpr env' body		`thenUs` \ body' ->
-    returnUs (emptyFloats, mkLams bndrs' body')
+corePrepExprFloat env expr@(Lam _ _) = do
+    (env', bndrs') <- cloneBndrs env bndrs
+    body' <- corePrepAnExpr env' body
+    return (emptyFloats, mkLams bndrs' body')
   where
     (bndrs,body) = collectBinders expr
 
-corePrepExprFloat env (Case scrut bndr ty alts)
-  = corePrepExprFloat env scrut		`thenUs` \ (floats1, scrut1) ->
-    deLamFloat scrut1			`thenUs` \ (floats2, scrut2) ->
+corePrepExprFloat env (Case scrut bndr ty alts) = do
+    (floats1, scrut1) <- corePrepExprFloat env scrut
+    (floats2, scrut2) <- deLamFloat scrut1
     let
-	bndr1 = bndr `setIdUnfolding` evaldUnfolding
-	-- Record that the case binder is evaluated in the alternatives
-    in
-    cloneBndr env bndr1			`thenUs` \ (env', bndr2) ->
-    mapUs (sat_alt env') alts		`thenUs` \ alts' ->
-    returnUs (floats1 `appendFloats` floats2 , Case scrut2 bndr2 ty alts')
+        bndr1 = bndr `setIdUnfolding` evaldUnfolding
+        -- Record that the case binder is evaluated in the alternatives
+    (env', bndr2) <- cloneBndr env bndr1
+    alts' <- mapM (sat_alt env') alts
+    return (floats1 `appendFloats` floats2 , Case scrut2 bndr2 ty alts')
   where
-    sat_alt env (con, bs, rhs)
-	  = cloneBndrs env bs		`thenUs` \ (env2, bs') ->
-	    corePrepAnExpr env2 rhs  	`thenUs` \ rhs1 ->
-	    deLam rhs1			`thenUs` \ rhs2 ->
-	    returnUs (con, bs', rhs2)
+    sat_alt env (con, bs, rhs) = do
+            (env2, bs') <- cloneBndrs env bs
+            rhs1 <- corePrepAnExpr env2 rhs
+            rhs2 <- deLam rhs1
+            return (con, bs', rhs2)
 
-corePrepExprFloat env expr@(App _ _)
-  = collect_args expr 0  `thenUs` \ (app, (head,depth), ty, floats, ss) ->
-    ASSERT(null ss)	-- make sure we used all the strictness info
+corePrepExprFloat env expr@(App _ _) = do
+    (app, (head,depth), ty, floats, ss) <- collect_args expr 0
+    MASSERT(null ss)	-- make sure we used all the strictness info
 
 	-- Now deal with the function
     case head of
       Var fn_id -> maybeSaturate fn_id app depth floats ty
-      _other    -> returnUs (floats, app)
+      _other    -> return (floats, app)
 
   where
 
@@ -453,28 +450,26 @@ corePrepExprFloat env expr@(App _ _)
 		   Floats, 		  -- any floats we pulled out
 		   [Demand])		  -- remaining argument demands
 
-    collect_args (App fun arg@(Type arg_ty)) depth
-        = collect_args fun depth   `thenUs` \ (fun',hd,fun_ty,floats,ss) ->
-	  returnUs (App fun' arg, hd, applyTy fun_ty arg_ty, floats, ss)
+    collect_args (App fun arg@(Type arg_ty)) depth = do
+          (fun',hd,fun_ty,floats,ss) <- collect_args fun depth
+          return (App fun' arg, hd, applyTy fun_ty arg_ty, floats, ss)
 
-    collect_args (App fun arg) depth
-        = collect_args fun (depth+1)   `thenUs` \ (fun',hd,fun_ty,floats,ss) ->
-	  let
-	      (ss1, ss_rest)   = case ss of
-				   (ss1:ss_rest) -> (ss1,     ss_rest)
-				   []	         -> (lazyDmd, [])
+    collect_args (App fun arg) depth = do
+          (fun',hd,fun_ty,floats,ss) <- collect_args fun (depth+1)
+          let
+              (ss1, ss_rest)   = case ss of
+                                   (ss1:ss_rest) -> (ss1,     ss_rest)
+                                   []            -> (lazyDmd, [])
               (arg_ty, res_ty) = expectJust "corePrepExprFloat:collect_args" $
                                  splitFunTy_maybe fun_ty
-	  in
-	  corePrepArg env arg (mkDemTy ss1 arg_ty)	`thenUs` \ (fs, arg') ->
-	  returnUs (App fun' arg', hd, res_ty, fs `appendFloats` floats, ss_rest)
 
-    collect_args (Var v) depth
-	= fiddleCCall v `thenUs` \ v1 ->
-	  let 
-		v2 = lookupCorePrepEnv env v1
-	  in
-	  returnUs (Var v2, (Var v2, depth), idType v2, emptyFloats, stricts)
+          (fs, arg') <- corePrepArg env arg (mkDemTy ss1 arg_ty)
+          return (App fun' arg', hd, res_ty, fs `appendFloats` floats, ss_rest)
+
+    collect_args (Var v) depth = do
+          v1 <- fiddleCCall v
+          let v2 = lookupCorePrepEnv env v1
+          return (Var v2, (Var v2, depth), idType v2, emptyFloats, stricts)
 	where
 	  stricts = case idNewStrictness v of
 			StrictSig (DmdType _ demands _)
@@ -487,25 +482,25 @@ corePrepExprFloat env expr@(App _ _)
 		-- Here, we can't evaluate the arg strictly, because this 
 		-- partial application might be seq'd
 
-    collect_args (Cast fun co) depth
-        = let (_ty1,ty2) = coercionKind co in
-          collect_args fun depth  `thenUs` \ (fun', hd, fun_ty, floats, ss) ->
-	  returnUs (Cast fun' co, hd, ty2, floats, ss)
+    collect_args (Cast fun co) depth = do
+          let (_ty1,ty2) = coercionKind co
+          (fun', hd, fun_ty, floats, ss) <- collect_args fun depth
+          return (Cast fun' co, hd, ty2, floats, ss)
           
     collect_args (Note note fun) depth
-	| ignore_note note 	-- Drop these notes altogether
-				-- They aren't used by the code generator
-        = collect_args fun depth   `thenUs` \ (fun', hd, fun_ty, floats, ss) ->
-	  returnUs (fun', hd, fun_ty, floats, ss)
+        | ignore_note note = do -- Drop these notes altogether
+                                -- They aren't used by the code generator
+          (fun', hd, fun_ty, floats, ss) <- collect_args fun depth
+	  return (fun', hd, fun_ty, floats, ss)
 
 	-- N-variable fun, better let-bind it
 	-- ToDo: perhaps we can case-bind rather than let-bind this closure,
 	-- since it is sure to be evaluated.
-    collect_args fun depth
-	= corePrepExprFloat env fun			`thenUs` \ (fun_floats, fun') ->
-	  newVar ty			 		`thenUs` \ fn_id ->
-          mkLocalNonRec fn_id onceDem fun_floats fun'	`thenUs` \ (floats, fn_id') ->
-	  returnUs (Var fn_id', (Var fn_id', depth), ty, floats, [])
+    collect_args fun depth = do
+          (fun_floats, fun') <- corePrepExprFloat env fun
+          fn_id <- newVar ty
+          (floats, fn_id') <- mkLocalNonRec fn_id onceDem fun_floats fun'
+          return (Var fn_id', (Var fn_id', depth), ty, floats, [])
         where
 	  ty = exprType fun
 
@@ -522,52 +517,49 @@ corePrepExprFloat env expr@(App _ _)
 -- The type is the type of the entire application
 maybeSaturate :: Id -> CoreExpr -> Int -> Floats -> Type -> UniqSM (Floats, CoreExpr)
 maybeSaturate fn expr n_args floats ty
-  | Just DataToTagOp <- isPrimOpId_maybe fn	-- DataToTag must have an evaluated arg
-						-- A gruesome special case
-  = saturate_it		`thenUs` \ sat_expr ->
+  | Just DataToTagOp <- isPrimOpId_maybe fn     -- DataToTag must have an evaluated arg
+                                                -- A gruesome special case
+  = do sat_expr <- saturate_it
 
-	-- OK, now ensure that the arg is evaluated.
-	-- But (sigh) take into account the lambdas we've now introduced
-    let 
-	(eta_bndrs, eta_body) = collectBinders sat_expr
-    in
-    eval_data2tag_arg eta_body	`thenUs` \ (eta_floats, eta_body') -> 
-    if null eta_bndrs then
-	returnUs (floats `appendFloats` eta_floats, eta_body')
-    else
-	mkBinds eta_floats eta_body'		`thenUs` \ eta_body'' ->
-	returnUs (floats, mkLams eta_bndrs eta_body'')
+        -- OK, now ensure that the arg is evaluated.
+        -- But (sigh) take into account the lambdas we've now introduced
+       let (eta_bndrs, eta_body) = collectBinders sat_expr
+       (eta_floats, eta_body') <- eval_data2tag_arg eta_body
+       if null eta_bndrs then
+           return (floats `appendFloats` eta_floats, eta_body')
+        else do
+           eta_body'' <- mkBinds eta_floats eta_body'
+           return (floats, mkLams eta_bndrs eta_body'')
 
-  | hasNoBinding fn = saturate_it	`thenUs` \ sat_expr ->
-		      returnUs (floats, sat_expr)
+  | hasNoBinding fn = do sat_expr <- saturate_it
+                         return (floats, sat_expr)
 
-  | otherwise       = returnUs (floats, expr)
+  | otherwise       = return (floats, expr)
 
   where
     fn_arity	 = idArity fn
     excess_arity = fn_arity - n_args
 
     saturate_it :: UniqSM CoreExpr
-    saturate_it | excess_arity == 0 = returnUs expr
-		| otherwise	    = getUniquesUs		`thenUs` \ us ->
-				      returnUs (etaExpand excess_arity us expr ty)
+    saturate_it | excess_arity == 0 = return expr
+                | otherwise         = do us <- getUniquesM
+                                         return (etaExpand excess_arity us expr ty)
 
 	-- Ensure that the argument of DataToTagOp is evaluated
     eval_data2tag_arg :: CoreExpr -> UniqSM (Floats, CoreExpr)
     eval_data2tag_arg app@(fun `App` arg)
-	| exprIsHNF arg		-- Includes nullary constructors
-	= returnUs (emptyFloats, app)	-- The arg is evaluated
-	| otherwise			-- Arg not evaluated, so evaluate it
-	= newVar (exprType arg)		`thenUs` \ arg_id ->
-	  let 
-	     arg_id1 = setIdUnfolding arg_id evaldUnfolding
-	  in
-	  returnUs (unitFloat (FloatCase arg_id1 arg False ),
-		    fun `App` Var arg_id1)
+        | exprIsHNF arg         -- Includes nullary constructors
+        = return (emptyFloats, app)   -- The arg is evaluated
+        | otherwise                     -- Arg not evaluated, so evaluate it
+        = do arg_id <- newVar (exprType arg)
+             let
+                arg_id1 = setIdUnfolding arg_id evaldUnfolding
+             return (unitFloat (FloatCase arg_id1 arg False ),
+                     fun `App` Var arg_id1)
 
     eval_data2tag_arg (Note note app)	-- Scc notes can appear
-	= eval_data2tag_arg app		`thenUs` \ (floats, app') ->
-	  returnUs (floats, Note note app')
+        = do (floats, app') <- eval_data2tag_arg app
+             return (floats, Note note app')
 
     eval_data2tag_arg other	-- Should not happen
 	= pprPanic "eval_data2tag" (ppr other)
@@ -590,12 +582,12 @@ floatRhs top_lvl is_rec bndr (floats, rhs)
 	--	v = f (x `divInt#` y)
 	-- we don't want to float the case, even if f has arity 2,
 	-- because floating the case would make it evaluated too early
-    returnUs (floats, rhs)
+    return (floats, rhs)
     
-  | otherwise
+  | otherwise = do
 	-- Don't float; the RHS isn't a value
-  = mkBinds floats rhs		`thenUs` \ rhs' ->
-    returnUs (emptyFloats, rhs')
+    rhs' <- mkBinds floats rhs
+    return (emptyFloats, rhs')
 
 -- mkLocalNonRec is used only for *nested*, *non-recursive* bindings
 mkLocalNonRec :: Id  -> RhsDemand 	-- Lhs: id with demand
@@ -610,7 +602,7 @@ mkLocalNonRec bndr dem floats rhs
     let
 	float = FloatCase bndr rhs (exprOkForSpeculation rhs)
     in
-    returnUs (addFloat floats float, evald_bndr)
+    return (addFloat floats float, evald_bndr)
 
   | isStrict dem 
 	-- It's a strict let so we definitely float all the bindings
@@ -620,12 +612,12 @@ mkLocalNonRec bndr dem floats rhs
 	float | exprIsHNF rhs = FloatLet (NonRec bndr rhs)
 	      | otherwise	= FloatCase bndr rhs (exprOkForSpeculation rhs)
     in
-    returnUs (addFloat floats float, evald_bndr)
+    return (addFloat floats float, evald_bndr)
 
   | otherwise
-  = floatRhs NotTopLevel NonRecursive bndr (floats, rhs)	`thenUs` \ (floats', rhs') ->
-    returnUs (addFloat floats' (FloatLet (NonRec bndr rhs')),
-	      if exprIsHNF rhs' then evald_bndr else bndr)
+  = do (floats', rhs') <- floatRhs NotTopLevel NonRecursive bndr (floats, rhs)
+       return (addFloat floats' (FloatLet (NonRec bndr rhs')),
+               if exprIsHNF rhs' then evald_bndr else bndr)
 
   where
     evald_bndr = bndr `setIdUnfolding` evaldUnfolding
@@ -634,16 +626,16 @@ mkLocalNonRec bndr dem floats rhs
 
 mkBinds :: Floats -> CoreExpr -> UniqSM CoreExpr
 mkBinds (Floats _ binds) body 
-  | isNilOL binds = returnUs body
-  | otherwise	  = deLam body		`thenUs` \ body' ->
-			-- Lambdas are not allowed as the body of a 'let'
-		    returnUs (foldrOL mk_bind body' binds)
+  | isNilOL binds = return body
+  | otherwise	  = do body' <- deLam body
+                        -- Lambdas are not allowed as the body of a 'let'
+                       return (foldrOL mk_bind body' binds)
   where
     mk_bind (FloatCase bndr rhs _) body = Case rhs bndr (exprType body) [(DEFAULT, [], body)]
     mk_bind (FloatLet bind)        body = Let bind body
 
-etaExpandRhs bndr rhs
-  = 	-- Eta expand to match the arity claimed by the binder
+etaExpandRhs bndr rhs = do
+   	-- Eta expand to match the arity claimed by the binder
 	-- Remember, after CorePrep we must not change arity
 	--
 	-- Eta expansion might not have happened already, 
@@ -672,8 +664,8 @@ etaExpandRhs bndr rhs
 	-- Eta expanding first gives
 	--		f = /\a -> \y -> let s = h 3 in g s y
 	--
-    getUniquesUs		`thenUs` \ us ->
-    returnUs (etaExpand arity us rhs (idType bndr))
+    us <- getUniquesM
+    return (etaExpand arity us rhs (idType bndr))
   where
 	-- For a GlobalId, take the Arity from the Id.
 	-- It was set in CoreTidy and must not change
@@ -690,32 +682,32 @@ deLam :: CoreExpr -> UniqSM CoreExpr
 -- Takes an expression that may be a lambda, 
 -- and returns one that definitely isn't:
 --	(\x.e) ==>  let f = \x.e in f
-deLam expr = 
-  deLamFloat expr   `thenUs` \ (floats, expr) ->
-  mkBinds floats expr
+deLam expr = do
+    (floats, expr) <- deLamFloat expr
+    mkBinds floats expr
 
 
 deLamFloat :: CoreExpr -> UniqSM (Floats, CoreExpr)
 -- Remove top level lambdas by let-bindinig
 
-deLamFloat (Note n expr)
-  =	-- You can get things like
-	-- 	case e of { p -> coerce t (\s -> ...) }
-    deLamFloat expr	`thenUs` \ (floats, expr') ->
-    returnUs (floats, Note n expr')
+deLamFloat (Note n expr) = do
+        -- You can get things like
+        --      case e of { p -> coerce t (\s -> ...) }
+    (floats, expr') <- deLamFloat expr
+    return (floats, Note n expr')
 
-deLamFloat (Cast e co)
-  = deLamFloat e	`thenUs` \ (floats, e') ->
-    returnUs (floats, Cast e' co)
+deLamFloat (Cast e co) = do
+    (floats, e') <- deLamFloat e
+    return (floats, Cast e' co)
 
 deLamFloat expr 
-  | null bndrs = returnUs (emptyFloats, expr)
+  | null bndrs = return (emptyFloats, expr)
   | otherwise 
   = case tryEta bndrs body of
-      Just no_lam_result -> returnUs (emptyFloats, no_lam_result)
-      Nothing	         -> newVar (exprType expr)	`thenUs` \ fn ->
-			    returnUs (unitFloat (FloatLet (NonRec fn expr)), 
-				      Var fn)
+      Just no_lam_result -> return (emptyFloats, no_lam_result)
+      Nothing            -> do fn <- newVar (exprType expr)
+                               return (unitFloat (FloatLet (NonRec fn expr)), 
+                                         Var fn)
   where
     (bndrs,body) = collectBinders expr
 
@@ -818,21 +810,18 @@ lookupCorePrepEnv (CPE env) id
 -- ---------------------------------------------------------------------------
 
 cloneBndrs :: CorePrepEnv -> [Var] -> UniqSM (CorePrepEnv, [Var])
-cloneBndrs env bs = mapAccumLUs cloneBndr env bs
+cloneBndrs env bs = mapAccumLM cloneBndr env bs
 
 cloneBndr  :: CorePrepEnv -> Var -> UniqSM (CorePrepEnv, Var)
 cloneBndr env bndr
   | isLocalId bndr
-  = getUniqueUs   `thenUs` \ uniq ->
-    let
-	bndr' = setVarUnique bndr uniq
-    in
-    returnUs (extendCorePrepEnv env bndr bndr', bndr')
+  = do bndr' <- setVarUnique bndr <$> getUniqueM
+       return (extendCorePrepEnv env bndr bndr', bndr')
 
   | otherwise	-- Top level things, which we don't want
 		-- to clone, have become GlobalIds by now
 		-- And we don't clone tyvars
-  = returnUs (env, bndr)
+  = return (env, bndr)
   
 
 ------------------------------------------------------------------------------
@@ -842,9 +831,8 @@ cloneBndr env bndr
 
 fiddleCCall :: Id -> UniqSM Id
 fiddleCCall id 
-  | isFCallId id = getUniqueUs   	`thenUs` \ uniq ->
-		   returnUs (id `setVarUnique` uniq)
-  | otherwise    = returnUs id
+  | isFCallId id = (id `setVarUnique`) <$> getUniqueM
+  | otherwise    = return id
 
 ------------------------------------------------------------------------------
 -- Generating new binders
@@ -852,7 +840,7 @@ fiddleCCall id
 
 newVar :: Type -> UniqSM Id
 newVar ty
- = seqType ty			`seq`
-   getUniqueUs	 		`thenUs` \ uniq ->
-   returnUs (mkSysLocal FSLIT("sat") uniq ty)
+ = seqType ty `seq` do
+     uniq <- getUniqueM
+     return (mkSysLocal FSLIT("sat") uniq ty)
 \end{code}
