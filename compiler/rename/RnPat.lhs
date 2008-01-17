@@ -244,15 +244,15 @@ rnLPatAndThen var@(NM varf) (L loc p) cont =
                -- we need to bind pattern variables for view pattern expressions
                -- (e.g. in the pattern (x, x -> y) x needs to be bound in the rhs of the tuple)
                                      
-         SigPatIn pat ty ->
-             doptM Opt_PatternSignatures `thenM` \ patsigs ->
+         SigPatIn pat ty -> do
+             patsigs <- doptM Opt_PatternSignatures
              if patsigs
-             then rnLPatAndThen var pat
+              then rnLPatAndThen var pat
                       (\ pat' -> do { (ty', fvs1) <- rnHsTypeFVs tvdoc ty
 				    ; (res, fvs2) <- lcont (SigPatIn pat' ty')
 				    ; return (res, fvs1 `plusFV` fvs2) })
-             else addErr (patSigErr ty) `thenM_`
-                  rnLPatAndThen var pat cont 
+              else do addErr (patSigErr ty)
+                      rnLPatAndThen var pat cont
            where
              tvdoc = text "In a pattern type-signature"
        
@@ -412,7 +412,7 @@ rnHsRecFieldsAndThen choice rn_thing (HsRecFields fields dd) cont =
                 -- duplicate field reporting function
                 field_dup_err dup_group = addErr (dupFieldErr doingstr (head dup_group))
             in
-              mappM_ field_dup_err dup_fields
+              mapM_ field_dup_err dup_fields
 
         -- helper to rename each field
         rn_field pun_ok (HsRecField field inside pun) cont = do 
@@ -458,9 +458,9 @@ rnHsRecFieldsAndThen choice rn_thing (HsRecFields fields dd) cont =
                           checkErr dd_flag (needFlagDotDot doingstr)
                           let fld_names1 = map (unLoc . hsRecFieldId) fields1
                           case doDotDot choice of 
-                                Nothing -> addErr (badDotDot doingstr) `thenM_` 
-                                           -- we return a junk value here so that error reporting goes on
-                                           cont (HsRecFields fields1 dd)
+                                Nothing -> do addErr (badDotDot doingstr)
+                                              -- we return a junk value here so that error reporting goes on
+                                              cont (HsRecFields fields1 dd)
                                 Just (con, mk_field) ->
                                     dot_dot_fields fld_names1 con mk_field $
                                       \ fields2 -> 
@@ -529,24 +529,24 @@ are made available.
 \begin{code}
 rnLit :: HsLit -> RnM ()
 rnLit (HsChar c) = checkErr (inCharRange c) (bogusCharError c)
-rnLit other	 = returnM ()
+rnLit other	 = return ()
 
-rnOverLit (HsIntegral i _ _)
-  = lookupSyntaxName fromIntegerName	`thenM` \ (from_integer_name, fvs) ->
+rnOverLit (HsIntegral i _ _) = do
+    (from_integer_name, fvs) <- lookupSyntaxName fromIntegerName
     if inIntRange i then
-	returnM (HsIntegral i from_integer_name placeHolderType, fvs)
-    else let
+        return (HsIntegral i from_integer_name placeHolderType, fvs)
+     else let
 	extra_fvs = mkFVs [plusIntegerName, timesIntegerName]
 	-- Big integer literals are built, using + and *, 
 	-- out of small integers (DsUtils.mkIntegerLit)
 	-- [NB: plusInteger, timesInteger aren't rebindable... 
 	--	they are used to construct the argument to fromInteger, 
 	--	which is the rebindable one.]
-    in
-    returnM (HsIntegral i from_integer_name placeHolderType, fvs `plusFV` extra_fvs)
+        in
+        return (HsIntegral i from_integer_name placeHolderType, fvs `plusFV` extra_fvs)
 
-rnOverLit (HsFractional i _ _)
-  = lookupSyntaxName fromRationalName		`thenM` \ (from_rat_name, fvs) ->
+rnOverLit (HsFractional i _ _) = do
+    (from_rat_name, fvs) <- lookupSyntaxName fromRationalName
     let
 	extra_fvs = mkFVs [ratioDataConName, plusIntegerName, timesIntegerName]
 	-- We have to make sure that the Ratio type is imported with
@@ -556,12 +556,11 @@ rnOverLit (HsFractional i _ _)
 	-- as part of the type for fromRational.
 	-- The plus/times integer operations may be needed to construct the numerator
 	-- and denominator (see DsUtils.mkIntegerLit)
-    in
-    returnM (HsFractional i from_rat_name placeHolderType, fvs `plusFV` extra_fvs)
+    return (HsFractional i from_rat_name placeHolderType, fvs `plusFV` extra_fvs)
 
-rnOverLit (HsIsString s _ _)
-  = lookupSyntaxName fromStringName	`thenM` \ (from_string_name, fvs) ->
-	returnM (HsIsString s from_string_name placeHolderType, fvs)
+rnOverLit (HsIsString s _ _) = do
+    (from_string_name, fvs) <- lookupSyntaxName fromStringName
+    return (HsIsString s from_string_name placeHolderType, fvs)
 \end{code}
 
 %************************************************************************
@@ -595,7 +594,7 @@ rnQuasiQuote (HsQuasiQuote n quoter quoteSpan quote)
 checkTupSize :: Int -> RnM ()
 checkTupSize tup_size
   | tup_size <= mAX_TUPLE_SIZE 
-  = returnM ()
+  = return ()
   | otherwise		       
   = addErr (sep [ptext SLIT("A") <+> int tup_size <> ptext SLIT("-tuple is too large for GHC"),
 		 nest 2 (parens (ptext SLIT("max size is") <+> int mAX_TUPLE_SIZE)),
