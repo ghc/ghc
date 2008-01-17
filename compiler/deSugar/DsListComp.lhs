@@ -75,7 +75,7 @@ dsListComp lquals body elt_ty = do
             
             result <- dfListComp c n quals body
             build_id <- dsLookupGlobalId buildName
-            returnDs (Var build_id `App` Type elt_ty `App` mkLams [n_tyvar, c, n] result)
+            return (Var build_id `App` Type elt_ty `App` mkLams [n_tyvar, c, n] result)
 
   where 
     -- We must test for ParStmt anywhere, not just at the head, because an extension
@@ -247,7 +247,7 @@ deListComp :: [Stmt Id] -> LHsExpr Id -> CoreExpr -> DsM CoreExpr
 
 deListComp (ParStmt stmtss_w_bndrs : quals) body list
   = do
-    exps_and_qual_tys <- mappM dsInnerListComp stmtss_w_bndrs
+    exps_and_qual_tys <- mapM dsInnerListComp stmtss_w_bndrs
     let (exps, qual_tys) = unzip exps_and_qual_tys
     
     (zip_fn, zip_rhs) <- mkZipBind qual_tys
@@ -260,23 +260,23 @@ deListComp (ParStmt stmtss_w_bndrs : quals) body list
 	bndrs_s = map snd stmtss_w_bndrs
 
 	-- pat is the pattern ((x1,..,xn), (y1,..,ym)) in the example above
-	pat	 = mkBigLHsPatTup pats
+	pat  = mkBigLHsPatTup pats
 	pats = map mkBigLHsVarPatTup bndrs_s
 
 	-- Last: the one to return
-deListComp [] body list		-- Figure 7.4, SLPJ, p 135, rule C above
-  = dsLExpr body		`thenDs` \ core_body ->
-    returnDs (mkConsExpr (exprType core_body) core_body list)
+deListComp [] body list = do    -- Figure 7.4, SLPJ, p 135, rule C above
+    core_body <- dsLExpr body
+    return (mkConsExpr (exprType core_body) core_body list)
 
 	-- Non-last: must be a guard
-deListComp (ExprStmt guard _ _ : quals) body list	-- rule B above
-  = dsLExpr guard      		`thenDs` \ core_guard ->
-    deListComp quals body list	`thenDs` \ core_rest ->
-    returnDs (mkIfThenElse core_guard core_rest list)
+deListComp (ExprStmt guard _ _ : quals) body list = do  -- rule B above
+    core_guard <- dsLExpr guard
+    core_rest <- deListComp quals body list
+    return (mkIfThenElse core_guard core_rest list)
 
 -- [e | let B, qs] = let B in [e | qs]
-deListComp (LetStmt binds : quals) body list
-  = deListComp quals body list	`thenDs` \ core_rest ->
+deListComp (LetStmt binds : quals) body list = do
+    core_rest <- deListComp quals body list
     dsLocalBinds binds core_rest
 
 deListComp (stmt@(TransformStmt _ _ _) : quals) body list = do
@@ -287,8 +287,8 @@ deListComp (stmt@(GroupStmt _ _) : quals) body list = do
     (inner_list_expr, pat) <- dsGroupStmt stmt
     deBindComp pat inner_list_expr quals body list
 
-deListComp (BindStmt pat list1 _ _ : quals) body core_list2 -- rule A' above
-  = dsLExpr list1		    `thenDs` \ core_list1 ->
+deListComp (BindStmt pat list1 _ _ : quals) body core_list2 = do -- rule A' above
+    core_list1 <- dsLExpr list1
     deBindComp pat core_list1 quals body core_list2
 \end{code}
 
@@ -350,19 +350,19 @@ dfListComp :: Id -> Id -- 'c' and 'n'
         -> DsM CoreExpr
 
 	-- Last: the one to return
-dfListComp c_id n_id [] body
-  = dsLExpr body		`thenDs` \ core_body ->
-    returnDs (mkApps (Var c_id) [core_body, Var n_id])
+dfListComp c_id n_id [] body = do
+    core_body <- dsLExpr body
+    return (mkApps (Var c_id) [core_body, Var n_id])
 
 	-- Non-last: must be a guard
-dfListComp c_id n_id (ExprStmt guard _ _  : quals) body
-  = dsLExpr guard              		`thenDs` \ core_guard ->
-    dfListComp c_id n_id quals body	`thenDs` \ core_rest ->
-    returnDs (mkIfThenElse core_guard core_rest (Var n_id))
+dfListComp c_id n_id (ExprStmt guard _ _  : quals) body = do
+    core_guard <- dsLExpr guard
+    core_rest <- dfListComp c_id n_id quals body
+    return (mkIfThenElse core_guard core_rest (Var n_id))
 
-dfListComp c_id n_id (LetStmt binds : quals) body
-  -- new in 1.3, local bindings
-  = dfListComp c_id n_id quals body	`thenDs` \ core_rest ->
+dfListComp c_id n_id (LetStmt binds : quals) body = do
+    -- new in 1.3, local bindings
+    core_rest <- dfListComp c_id n_id quals body
     dsLocalBinds binds core_rest
 
 dfListComp c_id n_id (stmt@(TransformStmt _ _ _) : quals) body = do
@@ -430,9 +430,9 @@ mkZipBind :: [Type] -> DsM (Id, CoreExpr)
 --				(a2:as'2) -> (a1, a2) : zip as'1 as'2)]
 
 mkZipBind elt_tys = do
-    ass  <- mappM newSysLocalDs  elt_list_tys
-    as'  <- mappM newSysLocalDs  elt_tys
-    as's <- mappM newSysLocalDs  elt_list_tys
+    ass  <- mapM newSysLocalDs  elt_list_tys
+    as'  <- mapM newSysLocalDs  elt_tys
+    as's <- mapM newSysLocalDs  elt_list_tys
     
     zip_fn <- newSysLocalDs zip_fn_ty
     
@@ -470,8 +470,8 @@ mkUnzipBind elt_tys = do
     ax  <- newSysLocalDs elt_tuple_ty
     axs <- newSysLocalDs elt_list_tuple_ty
     ys  <- newSysLocalDs elt_tuple_list_ty
-    xs  <- mappM newSysLocalDs elt_tys
-    xss <- mappM newSysLocalDs elt_list_tys
+    xs  <- mapM newSysLocalDs elt_tys
+    xss <- mapM newSysLocalDs elt_list_tys
     
     unzip_fn <- newSysLocalDs unzip_fn_ty
 
@@ -523,12 +523,10 @@ dsPArrComp :: [Stmt Id]
             -> DsM CoreExpr
 dsPArrComp [ParStmt qss] body _  =  -- parallel comprehension
   dePArrParComp qss body
-dsPArrComp qs            body _  =  -- no ParStmt in `qs'
-  dsLookupGlobalId singletonPName			  `thenDs` \sglP ->
-  let unitArray = mkApps (Var sglP) [Type unitTy, 
-				     mkCoreTup []]
-  in
-  dePArrComp qs body (mkLHsPatTup []) unitArray
+dsPArrComp qs            body _  = do -- no ParStmt in `qs'
+    sglP <- dsLookupGlobalId singletonPName
+    let unitArray = mkApps (Var sglP) [Type unitTy, mkCoreTup []]
+    dePArrComp qs body (mkLHsPatTup []) unitArray
 
 
 
@@ -542,22 +540,19 @@ dePArrComp :: [Stmt Id]
 --
 --  <<[:e' | :]>> pa ea = mapP (\pa -> e') ea
 --
-dePArrComp [] e' pa cea =
-  dsLookupGlobalId mapPName				  `thenDs` \mapP    ->
-  let ty = parrElemType cea
-  in
-  deLambda ty pa e'					  `thenDs` \(clam, 
-								     ty'e') ->
-  returnDs $ mkApps (Var mapP) [Type ty, Type ty'e', clam, cea]
+dePArrComp [] e' pa cea = do
+    mapP <- dsLookupGlobalId mapPName
+    let ty = parrElemType cea
+    (clam, ty'e') <- deLambda ty pa e'
+    return $ mkApps (Var mapP) [Type ty, Type ty'e', clam, cea]
 --
 --  <<[:e' | b, qs:]>> pa ea = <<[:e' | qs:]>> pa (filterP (\pa -> b) ea)
 --
-dePArrComp (ExprStmt b _ _ : qs) body pa cea =
-  dsLookupGlobalId filterPName			  `thenDs` \filterP  ->
-  let ty = parrElemType cea
-  in
-  deLambda ty pa b				  `thenDs` \(clam,_) ->
-  dePArrComp qs body pa (mkApps (Var filterP) [Type ty, clam, cea])
+dePArrComp (ExprStmt b _ _ : qs) body pa cea = do
+    filterP <- dsLookupGlobalId filterPName
+    let ty = parrElemType cea
+    (clam,_) <- deLambda ty pa b
+    dePArrComp qs body pa (mkApps (Var filterP) [Type ty, clam, cea])
 
 --
 --  <<[:e' | p <- e, qs:]>> pa ea =
@@ -572,27 +567,24 @@ dePArrComp (ExprStmt b _ _ : qs) body pa cea =
 --    in
 --    <<[:e' | qs:]>> (pa, p) (crossMapP ea ef)
 --
-dePArrComp (BindStmt p e _ _ : qs) body pa cea =
-  dsLookupGlobalId filterPName			  `thenDs` \filterP    ->
-  dsLookupGlobalId crossMapPName		  `thenDs` \crossMapP  ->
-  dsLExpr e					  `thenDs` \ce         ->
-  let ety'cea = parrElemType cea
-      ety'ce  = parrElemType ce
-      false   = Var falseDataConId
-      true    = Var trueDataConId
-  in
-  newSysLocalDs ety'ce					  `thenDs` \v       ->
-  matchSimply (Var v) (StmtCtxt PArrComp) p true false    `thenDs` \pred    ->
-  let cef | isIrrefutableHsPat p = ce
-          | otherwise            = mkApps (Var filterP) [Type ety'ce, mkLams [v] pred, ce]
-  in
-  mkLambda ety'cea pa cef				  `thenDs` \(clam, 
-								     _    ) ->
-  let ety'cef = ety'ce		    -- filter doesn't change the element type
-      pa'     = mkLHsPatTup [pa, p]
-  in
-  dePArrComp qs body pa' (mkApps (Var crossMapP) 
-				 [Type ety'cea, Type ety'cef, cea, clam])
+dePArrComp (BindStmt p e _ _ : qs) body pa cea = do
+    filterP <- dsLookupGlobalId filterPName
+    crossMapP <- dsLookupGlobalId crossMapPName
+    ce <- dsLExpr e
+    let ety'cea = parrElemType cea
+        ety'ce  = parrElemType ce
+        false   = Var falseDataConId
+        true    = Var trueDataConId
+    v <- newSysLocalDs ety'ce
+    pred <- matchSimply (Var v) (StmtCtxt PArrComp) p true false
+    let cef | isIrrefutableHsPat p = ce
+            | otherwise            = mkApps (Var filterP) [Type ety'ce, mkLams [v] pred, ce]
+    (clam, _) <- mkLambda ety'cea pa cef
+    let ety'cef = ety'ce		    -- filter doesn't change the element type
+        pa'     = mkLHsPatTup [pa, p]
+
+    dePArrComp qs body pa' (mkApps (Var crossMapP) 
+                                 [Type ety'cea, Type ety'cef, cea, clam])
 --
 --  <<[:e' | let ds, qs:]>> pa ea = 
 --    <<[:e' | qs:]>> (pa, (x_1, ..., x_n)) 
@@ -600,26 +592,23 @@ dePArrComp (BindStmt p e _ _ : qs) body pa cea =
 --  where
 --    {x_1, ..., x_n} = DV (ds)		-- Defined Variables
 --
-dePArrComp (LetStmt ds : qs) body pa cea =
-  dsLookupGlobalId mapPName				  `thenDs` \mapP    ->
-  let xs     = map unLoc (collectLocalBinders ds)
-      ty'cea = parrElemType cea
-  in
-  newSysLocalDs ty'cea					  `thenDs` \v       ->
-  dsLocalBinds ds (mkCoreTup (map Var xs))		  `thenDs` \clet    ->
-  newSysLocalDs (exprType clet)				  `thenDs` \let'v   ->
-  let projBody = mkDsLet (NonRec let'v clet) $ 
-		 mkCoreTup [Var v, Var let'v]
-      errTy    = exprType projBody
-      errMsg   = "DsListComp.dePArrComp: internal error!"
-  in
-  mkErrorAppDs pAT_ERROR_ID errTy errMsg                  `thenDs` \cerr    ->
-  matchSimply (Var v) (StmtCtxt PArrComp) pa projBody cerr`thenDs` \ccase   ->
-  let pa'    = mkLHsPatTup [pa, mkLHsPatTup (map nlVarPat xs)]
-      proj   = mkLams [v] ccase
-  in
-  dePArrComp qs body pa' (mkApps (Var mapP) 
-				 [Type ty'cea, Type errTy, proj, cea])
+dePArrComp (LetStmt ds : qs) body pa cea = do
+    mapP <- dsLookupGlobalId mapPName
+    let xs     = map unLoc (collectLocalBinders ds)
+        ty'cea = parrElemType cea
+    v <- newSysLocalDs ty'cea
+    clet <- dsLocalBinds ds (mkCoreTup (map Var xs))
+    let'v <- newSysLocalDs (exprType clet)
+    let projBody = mkDsLet (NonRec let'v clet) $ 
+                   mkCoreTup [Var v, Var let'v]
+        errTy    = exprType projBody
+        errMsg   = "DsListComp.dePArrComp: internal error!"
+    cerr <- mkErrorAppDs pAT_ERROR_ID errTy errMsg
+    ccase <- matchSimply (Var v) (StmtCtxt PArrComp) pa projBody cerr
+    let pa'    = mkLHsPatTup [pa, mkLHsPatTup (map nlVarPat xs)]
+        proj   = mkLams [v] ccase
+    dePArrComp qs body pa' (mkApps (Var mapP) 
+                                   [Type ty'cea, Type errTy, proj, cea])
 --
 -- The parser guarantees that parallel comprehensions can only appear as
 -- singeltons qualifier lists, which we already special case in the caller.
@@ -634,31 +623,27 @@ dePArrComp (ParStmt _ : _) _ _ _ =
 --    where
 --      {x_1, ..., x_n} = DV (qs)
 --
-dePArrParComp qss body = 
-  deParStmt qss						`thenDs` \(pQss, 
-								   ceQss) ->
-  dePArrComp [] body pQss ceQss
+dePArrParComp qss body = do
+    (pQss, ceQss) <- deParStmt qss
+    dePArrComp [] body pQss ceQss
   where
     deParStmt []             =
       -- empty parallel statement lists have no source representation
       panic "DsListComp.dePArrComp: Empty parallel list comprehension"
-    deParStmt ((qs, xs):qss) =          -- first statement
+    deParStmt ((qs, xs):qss) = do        -- first statement
       let res_expr = mkLHsVarTup xs
-      in
-      dsPArrComp (map unLoc qs) res_expr undefined	  `thenDs` \cqs     ->
+      cqs <- dsPArrComp (map unLoc qs) res_expr undefined
       parStmts qss (mkLHsVarPatTup xs) cqs
     ---
     parStmts []             pa cea = return (pa, cea)
-    parStmts ((qs, xs):qss) pa cea =    -- subsequent statements (zip'ed)
-      dsLookupGlobalId zipPName				  `thenDs` \zipP    ->
+    parStmts ((qs, xs):qss) pa cea = do  -- subsequent statements (zip'ed)
+      zipP <- dsLookupGlobalId zipPName
       let pa'      = mkLHsPatTup [pa, mkLHsVarPatTup xs]
-	  ty'cea   = parrElemType cea
-	  res_expr = mkLHsVarTup xs
-      in
-      dsPArrComp (map unLoc qs) res_expr undefined	  `thenDs` \cqs     ->
+          ty'cea   = parrElemType cea
+          res_expr = mkLHsVarTup xs
+      cqs <- dsPArrComp (map unLoc qs) res_expr undefined
       let ty'cqs = parrElemType cqs
-	  cea'   = mkApps (Var zipP) [Type ty'cea, Type ty'cqs, cea, cqs]
-      in
+          cea'   = mkApps (Var zipP) [Type ty'cea, Type ty'cqs, cea, cqs]
       parStmts qss pa' cea'
 
 -- generate Core corresponding to `\p -> e'
@@ -668,8 +653,7 @@ deLambda :: Type			-- type of the argument
 	  -> LHsExpr Id			-- body
 	  -> DsM (CoreExpr, Type)
 deLambda ty p e =
-  dsLExpr e						  `thenDs` \ce      ->
-  mkLambda ty p ce
+    mkLambda ty p =<< dsLExpr e
 
 -- generate Core for a lambda pattern match, where the body is already in Core
 --
@@ -677,14 +661,13 @@ mkLambda :: Type			-- type of the argument
 	 -> LPat Id			-- argument pattern
 	 -> CoreExpr			-- desugared body
 	 -> DsM (CoreExpr, Type)
-mkLambda ty p ce =
-  newSysLocalDs ty					  `thenDs` \v       ->
-  let errMsg = "DsListComp.deLambda: internal error!"
-      ce'ty  = exprType ce
-  in
-  mkErrorAppDs pAT_ERROR_ID ce'ty errMsg                  `thenDs` \cerr    -> 
-  matchSimply (Var v) (StmtCtxt PArrComp) p ce cerr	  `thenDs` \res	    ->
-  returnDs (mkLams [v] res, ce'ty)
+mkLambda ty p ce = do
+    v <- newSysLocalDs ty
+    let errMsg = do "DsListComp.deLambda: internal error!"
+        ce'ty  = exprType ce
+    cerr <- mkErrorAppDs pAT_ERROR_ID ce'ty errMsg
+    res <- matchSimply (Var v) (StmtCtxt PArrComp) p ce cerr
+    return (mkLams [v] res, ce'ty)
 
 -- obtain the element type of the parallel array produced by the given Core
 -- expression
