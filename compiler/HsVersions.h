@@ -42,6 +42,8 @@ name = Util.global (value) :: IORef (ty); \
 #define debugIsOn True
 #define ASSERT(e) if (not (e)) then (assertPanic __FILE__ __LINE__) else
 #define ASSERT2(e,msg) if (not (e)) then (assertPprPanic __FILE__ __LINE__ (msg)) else
+#define MASSERT(e)      ASSERT(e) return ()
+#define MASSERT2(e,msg) ASSERT2(e,msg) return ()
 #define WARN( e, msg ) (warnPprTrace (e) __FILE__ __LINE__ (msg))
 #define ASSERTM(mbool) do { bool <- mbool; ASSERT(bool) return () }
 #define ASSERTM2(mbool,msg) do { bool <- mbool; ASSERT2(bool,msg) return () }
@@ -51,6 +53,8 @@ name = Util.global (value) :: IORef (ty); \
 -- unused variable warnings when DEBUG is off.
 #define ASSERT(e)      if False && (not (e)) then panic "ASSERT" else
 #define ASSERT2(e,msg) if False && (not (e)) then pprPanic "ASSERT2" (msg) else
+#define MASSERT(e)      ASSERT(e) return ()
+#define MASSERT2(e,msg) ASSERT2(e,msg) return ()
 #define ASSERTM(e)       do { let { _mbool = (e) } }
 -- Here we deliberately don't use when as Control.Monad might not be imported
 #define ASSERTM2(e,msg)  do { let { _mbool = (e) }; if False then panic "ASSERTM2" else return () }
