@@ -42,6 +42,8 @@ import Type
 import SrcLoc
 import Outputable
 import Util
+
+import Control.Monad
 \end{code}
 
 %************************************************************************
@@ -128,12 +130,11 @@ tc_cmd env (HsLet binds (L body_loc body)) res_ty
 	; return (HsLet binds' (L body_loc body')) }
 
 tc_cmd env in_cmd@(HsCase scrut matches) (stk, res_ty)
-  = addErrCtxt (cmdCtxt in_cmd)		$
-    addErrCtxt (caseScrutCtxt scrut)	(
-      tcInferRho scrut 
-    )							`thenM`	\ (scrut', scrut_ty) ->
-    tcMatchesCase match_ctxt scrut_ty matches res_ty	`thenM`	\ matches' ->
-    returnM (HsCase scrut' matches')
+  = addErrCtxt (cmdCtxt in_cmd) $ do
+      (scrut', scrut_ty) <- addErrCtxt (caseScrutCtxt scrut) $
+                              tcInferRho scrut 
+      matches' <- tcMatchesCase match_ctxt scrut_ty matches res_ty
+      return (HsCase scrut' matches')
   where
     match_ctxt = MC { mc_what = CaseAlt,
                       mc_body = mc_body }
@@ -272,7 +273,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 		-- the s1..sm and check each cmd
 	; cmds' <- mapM (tc_cmd w_tv) cmds_w_tys
 
-	; returnM (HsArrForm (noLoc $ HsWrap (WpTyLam w_tv) 
+	; return (HsArrForm (noLoc $ HsWrap (WpTyLam w_tv) 
 					       (unLoc $ mkHsDictLet inst_binds expr')) 
 			     fixity cmds')
 	}
