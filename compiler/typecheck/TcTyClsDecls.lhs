@@ -186,7 +186,7 @@ tcTyAndClassDecls boot_details allDecls
 		; tcExtendGlobalEnv syn_tycons $ do
 
 			-- Type-check the data types and classes
-		{ alg_tyclss <- mappM tc_decl kc_alg_decls
+		{ alg_tyclss <- mapM tc_decl kc_alg_decls
 		; return (syn_tycons, concat alg_tyclss)
 	    }}})
 	-- Finished with knot-tying now
@@ -195,7 +195,7 @@ tcTyAndClassDecls boot_details allDecls
 
 	-- Perform the validity check
 	{ traceTc (text "ready for validity check")
-	; mappM_ (addLocM checkValidTyCl) decls
+	; mapM_ (addLocM checkValidTyCl) decls
  	; traceTc (text "done")
    
 	-- Add the implicit things;
@@ -248,7 +248,7 @@ GADTs).
 tcFamInstDecl :: LTyClDecl Name -> TcM (Maybe TyThing)   -- Nothing if error
 tcFamInstDecl (L loc decl)
   =	-- Prime error recovery, set source location
-    recoverM (returnM Nothing)		        $
+    recoverM (return Nothing)		        $
     setSrcSpan loc				$
     tcAddDeclCtxt decl				$
     do { -- type families require -XTypeFamilies and can't be in an
@@ -282,7 +282,7 @@ tcFamInstDecl1 (decl@TySynonym {tcdLName = L loc tc_name})
 
          -- (2) type check type equation
        ; tcTyVarBndrs k_tvs $ \t_tvs -> do {  -- turn kinded into proper tyvars
-       ; t_typats <- mappM tcHsKindedType k_typats
+       ; t_typats <- mapM tcHsKindedType k_typats
        ; t_rhs    <- tcHsKindedType k_rhs
 
          -- (3) check that 
@@ -318,14 +318,14 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
        ; unbox_strict <- doptM Opt_UnboxStrictFields
 
          -- kind check the type indexes and the context
-       ; t_typats     <- mappM tcHsKindedType k_typats
+       ; t_typats     <- mapM tcHsKindedType k_typats
        ; stupid_theta <- tcHsKindedContext k_ctxt
 
          -- (3) Check that
          --     - left-hand side contains no type family applications
          --       (vanilla synonyms are fine, though, and we checked for
          --       foralls earlier)
-       ; mappM_ checkTyFamFreeness t_typats
+       ; mapM_ checkTyFamFreeness t_typats
 
 	 --     - we don't use GADT syntax for indexed types
        ; checkTc h98_syntax (badGadtIdxTyDecl tc_name)
@@ -338,7 +338,7 @@ tcFamInstDecl1 (decl@TyData {tcdND = new_or_data, tcdLName = L loc tc_name,
        ; rep_tc_name <- newFamInstTyConName tc_name loc
        ; let ex_ok = True	-- Existentials ok for type families!
        ; tycon <- fixM (\ tycon -> do 
-	     { data_cons <- mappM (addLocM (tcConDecl unbox_strict ex_ok tycon t_tvs))
+	     { data_cons <- mapM (addLocM (tcConDecl unbox_strict ex_ok tycon t_tvs))
 				  k_cons
 	     ; tc_rhs <-
 		 case new_or_data of
@@ -387,7 +387,7 @@ kcIdxTyPats decl thing_inside
 
          -- type functions can have a higher-kinded result
        ; let resultKind = mkArrowKinds (drop (length hs_typats) kinds) resKind
-       ; typats <- TcRnMonad.zipWithM kcCheckHsType hs_typats kinds
+       ; typats <- zipWithM kcCheckHsType hs_typats kinds
        ; thing_inside tvs typats resultKind family
        }
   where
@@ -439,7 +439,7 @@ kcTyClDecls syn_decls alg_decls
   = do	{ 	-- First extend the kind env with each data type, class, and
 		-- indexed type, mapping them to a type variable
           let initialKindDecls = concat [allDecls decl | L _ decl <- alg_decls]
-	; alg_kinds <- mappM getInitialKind initialKindDecls
+	; alg_kinds <- mapM getInitialKind initialKindDecls
 	; tcExtendKindEnv alg_kinds $ do
 
 		-- Now kind-check the type synonyms, in dependency order
@@ -455,7 +455,7 @@ kcTyClDecls syn_decls alg_decls
 		-- returning kind-annotated decls; we don't kind-check
 		-- instances of indexed types yet, but leave this to
 		-- `tcInstDecls1'
-	{ kc_alg_decls <- mappM (wrapLocM kcTyClDecl) 
+	{ kc_alg_decls <- mapM (wrapLocM kcTyClDecl)
 			    (filter (not . isFamInstDecl . unLoc) alg_decls)
 
 	; return (kc_syn_decls, kc_alg_decls) }}}
@@ -536,8 +536,8 @@ kcTyClDecl decl@(ClassDecl {tcdCtxt = ctxt, tcdSigs = sigs, tcdATs = ats})
   = kcTyClDeclBody decl	$ \ tvs' ->
     do	{ is_boot <- tcIsHsBoot
 	; ctxt' <- kcHsContext ctxt	
-	; ats'  <- mappM (wrapLocM (kcFamilyDecl tvs')) ats
-	; sigs' <- mappM (wrapLocM kc_sig) sigs
+	; ats'  <- mapM (wrapLocM (kcFamilyDecl tvs')) ats
+	; sigs' <- mapM (wrapLocM kc_sig) sigs
 	; return (decl {tcdTyVars = tvs', tcdCtxt = ctxt', tcdSigs = sigs',
 		        tcdATs = ats'}) }
   where
@@ -575,7 +575,7 @@ kcDataDecl :: TyClDecl Name -> [LHsTyVarBndr Name] -> TcM (TyClDecl Name)
 kcDataDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
 	   tvs
   = do	{ ctxt' <- kcHsContext ctxt	
-	; cons' <- mappM (wrapLocM kc_con_decl) cons
+	; cons' <- mapM (wrapLocM kc_con_decl) cons
 	; return (decl {tcdTyVars = tvs, tcdCtxt = ctxt', tcdCons = cons'}) }
   where
     -- doc comments are typechecked to Nothing here
@@ -589,14 +589,14 @@ kcDataDecl decl@(TyData {tcdND = new_or_data, tcdCtxt = ctxt, tcdCons = cons})
         return (ConDecl name expl ex_tvs' ex_ctxt' details' res' Nothing)
 
     kc_con_details (PrefixCon btys) 
-	= do { btys' <- mappM kc_larg_ty btys 
+	= do { btys' <- mapM kc_larg_ty btys 
              ; return (PrefixCon btys') }
     kc_con_details (InfixCon bty1 bty2) 
 	= do { bty1' <- kc_larg_ty bty1
              ; bty2' <- kc_larg_ty bty2
              ; return (InfixCon bty1' bty2') }
     kc_con_details (RecCon fields) 
-	= do { fields' <- mappM kc_field fields
+	= do { fields' <- mapM kc_field fields
              ; return (RecCon fields') }
 
     kc_field (ConDeclField fld bty d) = do { bty' <- kc_larg_ty bty
@@ -734,7 +734,7 @@ tcTyClDecl1 calc_isrec
 	    (newtypeConError tc_name (length cons))
 
   ; tycon <- fixM (\ tycon -> do 
-	{ data_cons <- mappM (addLocM (tcConDecl unbox_strict ex_ok tycon final_tvs)) 
+	{ data_cons <- mapM (addLocM (tcConDecl unbox_strict ex_ok tycon final_tvs))
 			     cons
 	; tc_rhs <-
 	    if null cons && is_boot 	-- In a hs-boot file, empty cons means
@@ -761,8 +761,8 @@ tcTyClDecl1 calc_isrec
 	      tcdFDs = fundeps, tcdSigs = sigs, tcdATs = ats} )
   = tcTyVarBndrs tvs		$ \ tvs' -> do 
   { ctxt' <- tcHsKindedContext ctxt
-  ; fds' <- mappM (addLocM tc_fundep) fundeps
-  ; atss <- mappM (addLocM (tcTyClDecl1 (const Recursive))) ats
+  ; fds' <- mapM (addLocM tc_fundep) fundeps
+  ; atss <- mapM (addLocM (tcTyClDecl1 (const Recursive))) ats
             -- NB: 'ats' only contains "type family" and "data family"
             --     declarations as well as type family defaults
   ; let ats' = zipWith setTyThingPoss atss (map (tcdTyVars . unLoc) ats)
@@ -781,8 +781,8 @@ tcTyClDecl1 calc_isrec
       --     tying the the type and class declaration type checking knot.
   }
   where
-    tc_fundep (tvs1, tvs2) = do { tvs1' <- mappM tcLookupTyVar tvs1 ;
-				; tvs2' <- mappM tcLookupTyVar tvs2 ;
+    tc_fundep (tvs1, tvs2) = do { tvs1' <- mapM tcLookupTyVar tvs1 ;
+				; tvs2' <- mapM tcLookupTyVar tvs2 ;
 				; return (tvs1', tvs2') }
 
     -- For each AT argument compute the position of the corresponding class
@@ -801,7 +801,7 @@ tcTyClDecl1 calc_isrec
 
 tcTyClDecl1 calc_isrec 
   (ForeignType {tcdLName = L _ tc_name, tcdExtName = tc_ext_name})
-  = returnM [ATyCon (mkForeignTyCon tc_name tc_ext_name liftedTypeKind 0)]
+  = return [ATyCon (mkForeignTyCon tc_name tc_ext_name liftedTypeKind 0)]
 
 -----------------------------------
 tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
@@ -821,7 +821,7 @@ tcConDecl unbox_strict existential_ok tycon tc_tvs	-- Data types
 	-- Tiresome: tidy the tyvar binders, since tc_tvs and tvs' may have the same OccNames
 	tc_datacon is_infix field_lbls btys
 	  = do { let bangs = map getBangStrictness btys
-	       ; arg_tys <- mappM tcHsBangType btys
+	       ; arg_tys <- mapM tcHsBangType btys
     	       ; buildDataCon (unLoc name) is_infix
     		    (argStrictness unbox_strict bangs arg_tys)
     		    (map unLoc field_lbls)
@@ -953,7 +953,7 @@ checkCycleErrs tyclss
   | null cls_cycles
   = return ()
   | otherwise
-  = do	{ mappM_ recClsErr cls_cycles
+  = do	{ mapM_ recClsErr cls_cycles
 	; failM	}	-- Give up now, because later checkValidTyCl
 			-- will loop if the synonym is recursive
   where
@@ -987,14 +987,14 @@ checkValidTyCon tc
       OpenSynTyCon _ _ -> return ()
       SynonymTyCon ty  -> checkValidType syn_ctxt ty
   | otherwise
-  = 	-- Check the context on the data decl
-    checkValidTheta (DataTyCtxt name) (tyConStupidTheta tc)	`thenM_` 
+  = do	-- Check the context on the data decl
+    checkValidTheta (DataTyCtxt name) (tyConStupidTheta tc)
 	
 	-- Check arg types of data constructors
-    mappM_ (checkValidDataCon tc) data_cons			`thenM_`
+    mapM_ (checkValidDataCon tc) data_cons
 
 	-- Check that fields with the same name share a type
-    mappM_ check_fields groups
+    mapM_ check_fields groups
 
   where
     syn_ctxt  = TySynCtxt name
@@ -1057,7 +1057,7 @@ checkValidDataCon tc con
 	; checkValidMonoType (dataConOrigResTy con)
 		-- Disallow MkT :: T (forall a. a->a)
 		-- Reason: it's really the argument of an equality constraint
-	; ifM (isNewTyCon tc) (checkNewDataCon con)
+	; when (isNewTyCon tc) (checkNewDataCon con)
     }
   where
     ctxt = ConArgCtxt (dataConName con) 
@@ -1095,7 +1095,7 @@ checkValidClass cls
 	; checkValidTheta (ClassSCCtxt (className cls)) theta
 
 	-- Check the class operations
-	; mappM_ (check_op constrained_class_methods) op_stuff
+	; mapM_ (check_op constrained_class_methods) op_stuff
 
   	-- Check that if the class has generic methods, then the
 	-- class has only one parameter.  We can't do generic
