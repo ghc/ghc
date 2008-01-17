@@ -24,7 +24,7 @@ import Type
 import Coercion         ( mkSymCoercion, splitNewTypeRepCo_maybe )
 import BasicTypes	( Boxity(..) )
 import Var              ( Var, isId )
-import UniqSupply	( returnUs, thenUs, getUniquesUs, UniqSM )
+import UniqSupply
 import Unique
 import Util		( zipWithEqual, notNull )
 import Outputable
@@ -119,30 +119,28 @@ mkWwBodies :: Type				-- Type of original function
 --			  let x = (a,b) in
 --			  E
 
-mkWwBodies fun_ty demands res_info one_shots
-  = mkWWargs fun_ty demands one_shots'	`thenUs` \ (wrap_args,   wrap_fn_args, work_fn_args, res_ty) ->
-    mkWWstr wrap_args			`thenUs` \ (work_args,   wrap_fn_str,  work_fn_str) ->
-    let
-	(work_lam_args, work_call_args) = mkWorkerArgs work_args res_ty
-    in
-	-- Don't do CPR if the worker doesn't have any value arguments
-	-- Then the worker is just a constant, so we don't want to unbox it.
-    (if any isId work_args then
-	mkWWcpr res_ty res_info
-     else
-	returnUs (id, id, res_ty)
-    )					`thenUs` \ (wrap_fn_cpr, work_fn_cpr,  _cpr_res_ty) ->
+mkWwBodies fun_ty demands res_info one_shots = do
+    (wrap_args,   wrap_fn_args, work_fn_args, res_ty) <- mkWWargs fun_ty demands one_shots'
+    (work_args,   wrap_fn_str,  work_fn_str) <- mkWWstr wrap_args
+    let (work_lam_args, work_call_args) = do mkWorkerArgs work_args res_ty
+        -- Don't do CPR if the worker doesn't have any value arguments
+        -- Then the worker is just a constant, so we don't want to unbox it.
+    (wrap_fn_cpr, work_fn_cpr,  _cpr_res_ty)
+       <- if any isId work_args then
+             mkWWcpr res_ty res_info
+          else
+             return (id, id, res_ty)
 
-    returnUs ([idNewDemandInfo v | v <- work_call_args, isId v],
-	      Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
-	      mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args)
-	-- We use an INLINE unconditionally, even if the wrapper turns out to be
-	-- something trivial like
-	--	fw = ...
-	--	f = __inline__ (coerce T fw)
-	-- The point is to propagate the coerce to f's call sites, so even though
-	-- f's RHS is now trivial (size 1) we still want the __inline__ to prevent
-	-- fw from being inlined into f's RHS
+    return ([idNewDemandInfo v | v <- work_call_args, isId v],
+              Note InlineMe . wrap_fn_args . wrap_fn_cpr . wrap_fn_str . applyToVars work_call_args . Var,
+              mkLams work_lam_args. work_fn_str . work_fn_cpr . work_fn_args)
+        -- We use an INLINE unconditionally, even if the wrapper turns out to be
+        -- something trivial like
+        --      fw = ...
+        --      f = __inline__ (coerce T fw)
+        -- The point is to propagate the coerce to f's call sites, so even though
+        -- f's RHS is now trivial (size 1) we still want the __inline__ to prevent
+        -- fw from being inlined into f's RHS
   where
     one_shots' = one_shots ++ repeat False
 \end{code}
@@ -224,7 +222,7 @@ mkWWargs :: Type
 		     Type)			-- Type of wrapper body
 
 mkWWargs fun_ty demands one_shots
-  | Just (rep_ty, co) <- splitNewTypeRepCo_maybe fun_ty
+  | Just (rep_ty, co) <- splitNewTypeRepCo_maybe fun_ty = do
    	-- The newtype case is for when the function has
 	-- a recursive newtype after the arrow (rare)
 	-- We check for arity >= 0 to avoid looping in the case
@@ -235,13 +233,13 @@ mkWWargs fun_ty demands one_shots
 	-- wrapped in a recursive newtype, at least if CPR analysis can look 
 	-- through such newtypes, which it probably can since they are 
 	-- simply coerces.
-  = mkWWargs rep_ty demands one_shots	`thenUs` \ (wrap_args, wrap_fn_args, work_fn_args, res_ty) ->
-    returnUs (wrap_args,
-	      \ e -> Cast (wrap_fn_args e) (mkSymCoercion co),
-	      \ e -> work_fn_args (Cast e co),
-	      res_ty)
-  | notNull demands
-  = getUniquesUs 		`thenUs` \ wrap_uniqs ->
+    (wrap_args, wrap_fn_args, work_fn_args, res_ty) <- mkWWargs rep_ty demands one_shots
+    return (wrap_args,
+              \ e -> Cast (wrap_fn_args e) (mkSymCoercion co),
+              \ e -> work_fn_args (Cast e co),
+              res_ty)
+  | notNull demands = do
+    wrap_uniqs <- getUniquesM
     let
       (tyvars, tau)      = splitForAllTys fun_ty
       (arg_tys, body_ty) = splitFunTys tau
@@ -254,26 +252,24 @@ mkWWargs fun_ty demands one_shots
       new_demands   = drop n_arg_tys demands
       new_one_shots = drop n_args one_shots
 
-      val_args	= zipWith4 mk_wrap_arg wrap_uniqs arg_tys demands one_shots
+      val_args  = zipWith4 mk_wrap_arg wrap_uniqs arg_tys demands one_shots
       wrap_args = tyvars ++ val_args
-    in
 {-     ASSERT( notNull tyvars || notNull arg_tys ) -}
     if (null tyvars) && (null arg_tys) then
-	pprTrace "mkWWargs" (ppr fun_ty $$ ppr demands) 
-		returnUs ([], id, id, fun_ty)
-	else
+        pprTrace "mkWWargs" (ppr fun_ty $$ ppr demands) 
+                return ([], id, id, fun_ty)
+     else do
 
-    mkWWargs new_fun_ty
-	     new_demands
-	     new_one_shots	`thenUs` \ (more_wrap_args, wrap_fn_args, work_fn_args, res_ty) ->
+       (more_wrap_args, wrap_fn_args, work_fn_args, res_ty) <-
+             mkWWargs new_fun_ty new_demands new_one_shots
 
-    returnUs (wrap_args ++ more_wrap_args,
-	      mkLams wrap_args . wrap_fn_args,
-	      work_fn_args . applyToVars wrap_args,
-	      res_ty)
+       return (wrap_args ++ more_wrap_args,
+                 mkLams wrap_args . wrap_fn_args,
+                 work_fn_args . applyToVars wrap_args,
+                 res_ty)
 
   | otherwise
-  = returnUs ([], id, id, fun_ty)
+  = return ([], id, id, fun_ty)
 
 
 applyToVars :: [Var] -> CoreExpr -> CoreExpr
@@ -306,12 +302,12 @@ mkWWstr :: [Var]				-- Wrapper args; have their demand info on them
 						-- and lacking its lambdas.
 						-- This fn does the reboxing
 mkWWstr []
-  = returnUs ([], nop_fn, nop_fn)
+  = return ([], nop_fn, nop_fn)
 
-mkWWstr (arg : args)
-  = mkWWstr_one arg		`thenUs` \ (args1, wrap_fn1, work_fn1) ->
-    mkWWstr args		`thenUs` \ (args2, wrap_fn2, work_fn2) ->
-    returnUs (args1 ++ args2, wrap_fn1 . wrap_fn2, work_fn1 . work_fn2)
+mkWWstr (arg : args) = do
+    (args1, wrap_fn1, work_fn1) <- mkWWstr_one arg
+    (args2, wrap_fn2, work_fn2) <- mkWWstr args
+    return (args1 ++ args2, wrap_fn1 . wrap_fn2, work_fn1 . work_fn2)
 
 ----------------------
 -- mkWWstr_one wrap_arg = (work_args, wrap_fn, work_fn)
@@ -322,7 +318,7 @@ mkWWstr (arg : args)
 mkWWstr_one :: Var -> UniqSM ([Var], CoreExpr -> CoreExpr, CoreExpr -> CoreExpr)
 mkWWstr_one arg
   | isTyVar arg
-  = returnUs ([arg],  nop_fn, nop_fn)
+  = return ([arg],  nop_fn, nop_fn)
 
   | otherwise
   = case idNewDemandInfo arg of
@@ -331,22 +327,21 @@ mkWWstr_one arg
 	-- though, because it's not so easy to manufacture a placeholder
 	-- We'll see if this turns out to be a problem
       Abs | not (isUnLiftedType (idType arg)) ->
-	returnUs ([], nop_fn, mk_absent_let arg) 
+	return ([], nop_fn, mk_absent_let arg) 
 
 	-- Unpack case
       Eval (Prod cs)
 	| Just (_arg_tycon, _tycon_arg_tys, data_con, inst_con_arg_tys) 
 		<- deepSplitProductType_maybe (idType arg)
-	-> getUniquesUs 		`thenUs` \ uniqs ->
-	   let
-	     unpk_args	    = zipWith mk_ww_local uniqs inst_con_arg_tys
-	     unpk_args_w_ds = zipWithEqual "mkWWstr" set_worker_arg_info unpk_args cs
-	     unbox_fn       = mkUnpackCase (sanitiseCaseBndr arg) (Var arg) unpk_args data_con
-	     rebox_fn	    = Let (NonRec arg con_app) 
-	     con_app	    = mkProductBox unpk_args (idType arg)
-	   in
-	   mkWWstr unpk_args_w_ds		`thenUs` \ (worker_args, wrap_fn, work_fn) ->
-	   returnUs (worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) 
+	-> do uniqs <- getUniquesM
+	      let
+	        unpk_args      = zipWith mk_ww_local uniqs inst_con_arg_tys
+	        unpk_args_w_ds = zipWithEqual "mkWWstr" set_worker_arg_info unpk_args cs
+	        unbox_fn       = mkUnpackCase (sanitiseCaseBndr arg) (Var arg) unpk_args data_con
+	        rebox_fn       = Let (NonRec arg con_app) 
+	        con_app        = mkProductBox unpk_args (idType arg)
+	      (worker_args, wrap_fn, work_fn) <- mkWWstr unpk_args_w_ds
+	      return (worker_args, unbox_fn . wrap_fn, work_fn . rebox_fn) 
 	  		   -- Don't pass the arg, rebox instead
 
 	-- `seq` demand; evaluate in wrapper in the hope
@@ -357,7 +352,7 @@ mkWWstr_one arg
 		-- Tell the worker arg that it's sure to be evaluated
 		-- so that internal seqs can be dropped
 	   in
-	   returnUs ([arg_w_unf], mk_seq_case arg, nop_fn)
+	   return ([arg_w_unf], mk_seq_case arg, nop_fn)
 	  	-- Pass the arg, anyway, even if it is in theory discarded
 		-- Consider
 		--	f x y = x `seq` y
@@ -372,7 +367,7 @@ mkWWstr_one arg
 		-- during simplification, so for now I've just nuked this whole case
 			
 	-- Other cases
-      _other_demand -> returnUs ([arg], nop_fn, nop_fn)
+      _other_demand -> return ([arg], nop_fn, nop_fn)
 
   where
 	-- If the wrapper argument is a one-shot lambda, then
@@ -416,27 +411,27 @@ mkWWcpr body_ty RetCPR
     | not (isClosedAlgType body_ty)
     = WARN( True, 
             text "mkWWcpr: non-algebraic or open body type" <+> ppr body_ty )
-      returnUs (id, id, body_ty)
+      return (id, id, body_ty)
 
-    | n_con_args == 1 && isUnLiftedType con_arg_ty1
+    | n_con_args == 1 && isUnLiftedType con_arg_ty1 = do
 	-- Special case when there is a single result of unlifted type
 	--
 	-- Wrapper:	case (..call worker..) of x -> C x
 	-- Worker:	case (   ..body..    ) of C x -> x
-    = getUniquesUs 			`thenUs` \ (work_uniq : arg_uniq : _) ->
+      (work_uniq : arg_uniq : _) <- getUniquesM
       let
 	work_wild = mk_ww_local work_uniq body_ty
 	arg	  = mk_ww_local arg_uniq  con_arg_ty1
 	con_app   = mkProductBox [arg] body_ty
-      in
-      returnUs (\ wkr_call -> Case wkr_call (arg) (exprType con_app) [(DEFAULT, [], con_app)],
+
+      return (\ wkr_call -> Case wkr_call (arg) (exprType con_app) [(DEFAULT, [], con_app)],
 		\ body     -> workerCase (work_wild) body [arg] data_con (Var arg),
 		con_arg_ty1)
 
-    | otherwise		-- The general case
+    | otherwise = do	-- The general case
 	-- Wrapper: case (..call worker..) of (# a, b #) -> C a b
 	-- Worker:  case (   ...body...  ) of C a b -> (# a, b #)     
-    = getUniquesUs 	  	`thenUs` \ uniqs ->
+      uniqs <- getUniquesM
       let
         (wrap_wild : work_wild : args) = zipWith mk_ww_local uniqs (ubx_tup_ty : body_ty : con_arg_tys)
 	arg_vars		       = map Var args
@@ -444,8 +439,8 @@ mkWWcpr body_ty RetCPR
 	ubx_tup_ty		       = exprType ubx_tup_app
 	ubx_tup_app		       = mkConApp ubx_tup_con (map Type con_arg_tys   ++ arg_vars)
         con_app			       = mkProductBox args body_ty
-      in
-      returnUs (\ wkr_call -> Case wkr_call (wrap_wild) (exprType con_app)  [(DataAlt ubx_tup_con, args, con_app)],
+
+      return (\ wkr_call -> Case wkr_call (wrap_wild) (exprType con_app)  [(DataAlt ubx_tup_con, args, con_app)],
 		\ body     -> workerCase (work_wild) body args data_con ubx_tup_app,
 		ubx_tup_ty)
     where
@@ -454,7 +449,7 @@ mkWWcpr body_ty RetCPR
       con_arg_ty1 = head con_arg_tys
 
 mkWWcpr body_ty _other		-- No CPR info
-    = returnUs (id, id, body_ty)
+    = return (id, id, body_ty)
 
 -- If the original function looked like
 --	f = \ x -> _scc_ "foo" E
