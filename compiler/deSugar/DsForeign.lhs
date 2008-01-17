@@ -72,9 +72,8 @@ type Binding = (Id, CoreExpr)	-- No rec/nonrec structure;
 dsForeigns :: [LForeignDecl Id] 
 	   -> DsM (ForeignStubs, [Binding])
 dsForeigns [] 
-  = returnDs (NoStubs, [])
-dsForeigns fos
-  = do 
+  = return (NoStubs, [])
+dsForeigns fos = do
     fives <- mapM do_ldecl fos
     let
         (hs, cs, hdrs, idss, bindss) = unzip5 fives
@@ -89,16 +88,15 @@ dsForeigns fos
   where
    do_ldecl (L loc decl) = putSrcSpanDs loc (do_decl decl)
             
-   do_decl (ForeignImport id _ spec)
-    = traceIf (text "fi start" <+> ppr id)	`thenDs` \ _ ->
-      dsFImport (unLoc id) spec	                `thenDs` \ (bs, h, c, mbhd) -> 
-      traceIf (text "fi end" <+> ppr id)	`thenDs` \ _ ->
-      returnDs (h, c, maybeToList mbhd, [], bs)
+   do_decl (ForeignImport id _ spec) = do
+      traceIf (text "fi start" <+> ppr id)
+      (bs, h, c, mbhd) <- dsFImport (unLoc id) spec
+      traceIf (text "fi end" <+> ppr id)
+      return (h, c, maybeToList mbhd, [], bs)
 
-   do_decl (ForeignExport (L _ id) _ (CExport (CExportStatic ext_nm cconv)))
-    = dsFExport id (idType id) 
-		ext_nm cconv False                 `thenDs` \(h, c, _, _) ->
-      returnDs (h, c, [], [id], [])
+   do_decl (ForeignExport (L _ id) _ (CExport (CExportStatic ext_nm cconv))) = do
+      (h, c, _, _) <- dsFExport id (idType id) ext_nm cconv False
+      return (h, c, [], [id], [])
 \end{code}
 
 
@@ -130,18 +128,18 @@ because it exposes the boxing to the call site.
 dsFImport :: Id
 	  -> ForeignImport
 	  -> DsM ([Binding], SDoc, SDoc, Maybe FastString)
-dsFImport id (CImport cconv safety header lib spec)
-  = dsCImport id spec cconv safety no_hdrs	  `thenDs` \(ids, h, c) ->
-    returnDs (ids, h, c, if no_hdrs then Nothing else Just header)
+dsFImport id (CImport cconv safety header lib spec) = do
+    (ids, h, c) <- dsCImport id spec cconv safety no_hdrs
+    return (ids, h, c, if no_hdrs then Nothing else Just header)
   where
     no_hdrs = nullFS header
 
   -- FIXME: the `lib' field is needed for .NET ILX generation when invoking
   --	    routines that are external to the .NET runtime, but GHC doesn't
   --	    support such calls yet; if `nullFastString lib', the value was not given
-dsFImport id (DNImport spec)
-  = dsFCall id (DNCall spec) True {- No headers -} `thenDs` \(ids, h, c) ->
-    returnDs (ids, h, c, Nothing)
+dsFImport id (DNImport spec) = do
+    (ids, h, c) <- dsFCall id (DNCall spec) True {- No headers -}
+    return (ids, h, c, Nothing)
 
 dsCImport :: Id
 	  -> CImportSpec
@@ -149,11 +147,11 @@ dsCImport :: Id
 	  -> Safety
 	  -> Bool	-- True <=> no headers in the f.i decl
 	  -> DsM ([Binding], SDoc, SDoc)
-dsCImport id (CLabel cid) _ _ no_hdrs
- = resultWrapper (idType id) `thenDs` \ (resTy, foRhs) ->
+dsCImport id (CLabel cid) _ _ no_hdrs = do
+   (resTy, foRhs) <- resultWrapper (idType id)
    ASSERT(fromJust resTy `coreEqType` addrPrimTy)    -- typechecker ensures this
     let rhs = foRhs (mkLit (MachLabel cid Nothing)) in
-    returnDs ([(setImpInline no_hdrs id, rhs)], empty, empty)
+    return ([(setImpInline no_hdrs id, rhs)], empty, empty)
 dsCImport id (CFunction target) cconv safety no_hdrs
   = dsFCall id (CCall (CCallSpec target cconv safety)) no_hdrs
 dsCImport id CWrapper cconv _ _
@@ -184,64 +182,62 @@ setImpInline False id = id `setInlinePragma` NeverActive
 %************************************************************************
 
 \begin{code}
-dsFCall fn_id fcall no_hdrs
-  = let
-	ty		     = idType fn_id
-	(tvs, fun_ty)        = tcSplitForAllTys ty
-	(arg_tys, io_res_ty) = tcSplitFunTys fun_ty
-		-- Must use tcSplit* functions because we want to 
-		-- see that (IO t) in the corner
-    in
-    newSysLocalsDs arg_tys  			`thenDs` \ args ->
-    mapAndUnzipDs unboxArg (map Var args)	`thenDs` \ (val_args, arg_wrappers) ->
+dsFCall fn_id fcall no_hdrs = do
+    let
+        ty                   = idType fn_id
+        (tvs, fun_ty)        = tcSplitForAllTys ty
+        (arg_tys, io_res_ty) = tcSplitFunTys fun_ty
+                -- Must use tcSplit* functions because we want to
+                -- see that (IO t) in the corner
+
+    args <- newSysLocalsDs arg_tys
+    (val_args, arg_wrappers) <- mapAndUnzipM unboxArg (map Var args)
 
     let
-	work_arg_ids  = [v | Var v <- val_args]	-- All guaranteed to be vars
+        work_arg_ids  = [v | Var v <- val_args] -- All guaranteed to be vars
 
-	forDotnet = 
-	 case fcall of
-	   DNCall{} -> True
-	   _        -> False
+        forDotnet =
+         case fcall of
+           DNCall{} -> True
+           _        -> False
 
-	topConDs
-	  | forDotnet = 
-	     dsLookupGlobalId checkDotnetResName `thenDs` \ check_id -> 
-	     return (Just check_id)
+        topConDs
+          | forDotnet = Just <$> dsLookupGlobalId checkDotnetResName
           | otherwise = return Nothing
-	     
-	augmentResultDs
-	  | forDotnet = 
-	  	newSysLocalDs addrPrimTy `thenDs` \ err_res -> 
-		returnDs (\ (mb_res_ty, resWrap) ->
-			      case mb_res_ty of
-			  	Nothing -> (Just (mkTyConApp (tupleTyCon Unboxed 1)
-							     [ addrPrimTy ]),
-						 resWrap)
-				Just x  -> (Just (mkTyConApp (tupleTyCon Unboxed 2)
-							     [ x, addrPrimTy ]),
-						 resWrap))
-	  | otherwise = returnDs id
-    in
-    augmentResultDs				     `thenDs` \ augment -> 
-    topConDs					     `thenDs` \ topCon -> 
-    boxResult augment topCon io_res_ty `thenDs` \ (ccall_result_ty, res_wrapper) ->
 
-    newUnique					`thenDs` \ ccall_uniq ->
-    newUnique					`thenDs` \ work_uniq ->
+        augmentResultDs
+          | forDotnet = do
+                err_res <- newSysLocalDs addrPrimTy
+                return (\ (mb_res_ty, resWrap) ->
+                              case mb_res_ty of
+                                Nothing -> (Just (mkTyConApp (tupleTyCon Unboxed 1)
+                                                             [ addrPrimTy ]),
+                                                 resWrap)
+                                Just x  -> (Just (mkTyConApp (tupleTyCon Unboxed 2)
+                                                             [ x, addrPrimTy ]),
+                                                 resWrap))
+          | otherwise = return id
+
+    augment <- augmentResultDs
+    topCon <- topConDs
+    (ccall_result_ty, res_wrapper) <- boxResult augment topCon io_res_ty
+
+    ccall_uniq <- newUnique
+    work_uniq  <- newUnique
     let
-	-- Build the worker
-	worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
- 	the_ccall_app = mkFCall ccall_uniq fcall val_args ccall_result_ty
-	work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
-	work_id       = setImpInline no_hdrs $	-- See comments with setImpInline
-			mkSysLocal FSLIT("$wccall") work_uniq worker_ty
+        -- Build the worker
+        worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
+        the_ccall_app = mkFCall ccall_uniq fcall val_args ccall_result_ty
+        work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
+        work_id       = setImpInline no_hdrs $  -- See comments with setImpInline
+                        mkSysLocal FSLIT("$wccall") work_uniq worker_ty
 
-	-- Build the wrapper
-	work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args
-	wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
+        -- Build the wrapper
+        work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args
+        wrapper_body = foldr ($) (res_wrapper work_app) arg_wrappers
         wrap_rhs     = mkInlineMe (mkLams (tvs ++ args) wrapper_body)
-    in
-    returnDs ([(work_id, work_rhs), (fn_id, wrap_rhs)], empty, empty)
+    
+    return ([(work_id, work_rhs), (fn_id, wrap_rhs)], empty, empty)
 \end{code}
 
 
@@ -277,31 +273,31 @@ dsFExport :: Id			-- Either the exported Id,
 		 , Int		-- size of args to stub function
 		 )
 
-dsFExport fn_id ty ext_name cconv isDyn
-   = 
-     let
-        (_tvs,sans_foralls)		= tcSplitForAllTys ty
-        (fe_arg_tys', orig_res_ty)	= tcSplitFunTys sans_foralls
-	-- We must use tcSplits here, because we want to see 
-	-- the (IO t) in the corner of the type!
-        fe_arg_tys | isDyn     = tail fe_arg_tys'
-                   | otherwise = fe_arg_tys'
-     in
-	-- Look at the result type of the exported function, orig_res_ty
-	-- If it's IO t, return		(t, True)
-	-- If it's plain t, return	(t, False)
-     (case tcSplitIOType_maybe orig_res_ty of
-	Just (ioTyCon, res_ty, co) -> returnDs (res_ty, True)
-		-- The function already returns IO t
-		-- ToDo: what about the coercion?
-	Nothing 	       -> returnDs (orig_res_ty, False)	
-		-- The function returns t
-     )					`thenDs` \ (res_ty,		-- t
-						    is_IO_res_ty) ->	-- Bool
-     returnDs $
-       mkFExportCBits ext_name 
-                      (if isDyn then Nothing else Just fn_id)
-                      fe_arg_tys res_ty is_IO_res_ty cconv
+dsFExport fn_id ty ext_name cconv isDyn=  do
+    let
+       (_tvs,sans_foralls)             = tcSplitForAllTys ty
+       (fe_arg_tys', orig_res_ty)      = tcSplitFunTys sans_foralls
+       -- We must use tcSplits here, because we want to see 
+       -- the (IO t) in the corner of the type!
+       fe_arg_tys | isDyn     = tail fe_arg_tys'
+                  | otherwise = fe_arg_tys'
+    
+       -- Look at the result type of the exported function, orig_res_ty
+       -- If it's IO t, return         (t, True)
+       -- If it's plain t, return      (t, False)
+    (res_ty,             -- t
+     is_IO_res_ty) <-    -- Bool
+        case tcSplitIOType_maybe orig_res_ty of
+           Just (ioTyCon, res_ty, co) -> return (res_ty, True)
+                   -- The function already returns IO t
+                   -- ToDo: what about the coercion?
+           Nothing                    -> return (orig_res_ty, False) 
+                   -- The function returns t
+    
+    return $
+      mkFExportCBits ext_name 
+                     (if isDyn then Nothing else Just fn_id)
+                     fe_arg_tys res_ty is_IO_res_ty cconv
 \end{code}
 
 @foreign import "wrapper"@ (previously "foreign export dynamic") lets
@@ -338,72 +334,69 @@ f_helper(StablePtr s, HsBool b, HsInt i)
 dsFExportDynamic :: Id
 		 -> CCallConv
 		 -> DsM ([Binding], SDoc, SDoc)
-dsFExportDynamic id cconv
-  =  newSysLocalDs ty				 `thenDs` \ fe_id ->
-     getModuleDs				`thenDs` \ mod -> 
-     let 
+dsFExportDynamic id cconv = do
+    fe_id <-  newSysLocalDs ty
+    mod <- getModuleDs
+    let
         -- hack: need to get at the name of the C stub we're about to generate.
-       fe_nm	   = mkFastString (unpackFS (zEncodeFS (moduleNameFS (moduleName mod))) ++ "_" ++ toCName fe_id)
-     in
-     newSysLocalDs arg_ty			`thenDs` \ cback ->
-     dsLookupGlobalId newStablePtrName		`thenDs` \ newStablePtrId ->
-     dsLookupTyCon stablePtrTyConName		`thenDs` \ stable_ptr_tycon ->
-     let
-	stable_ptr_ty	= mkTyConApp stable_ptr_tycon [arg_ty]
-	export_ty	= mkFunTy stable_ptr_ty arg_ty
-     in
-     dsLookupGlobalId bindIOName		`thenDs` \ bindIOId ->
-     newSysLocalDs stable_ptr_ty		`thenDs` \ stbl_value ->
-     dsFExport id export_ty fe_nm cconv True  	
-		`thenDs` \ (h_code, c_code, typestring, args_size) ->
-     let
-       {-
-        The arguments to the external function which will
-	create a little bit of (template) code on the fly
-	for allowing the (stable pointed) Haskell closure
-	to be entered using an external calling convention
-	(stdcall, ccall).
-       -}
-      adj_args      = [ mkIntLitInt (ccallConvToInt cconv)
-		      , Var stbl_value
-		      , mkLit (MachLabel fe_nm mb_sz_args)
-                      , mkLit (mkStringLit typestring)
-		      ]
-        -- name of external entry point providing these services.
-	-- (probably in the RTS.) 
-      adjustor	 = FSLIT("createAdjustor")
-      
-	-- Determine the number of bytes of arguments to the stub function,
-	-- so that we can attach the '@N' suffix to its label if it is a
-	-- stdcall on Windows.
-      mb_sz_args = case cconv of
-		      StdCallConv -> Just args_size
-		      _ 	  -> Nothing
+        fe_nm    = mkFastString (unpackFS (zEncodeFS (moduleNameFS (moduleName mod))) ++ "_" ++ toCName fe_id)
 
-     in
-     dsCCall adjustor adj_args PlayRisky (mkTyConApp io_tc [res_ty])  `thenDs` \ ccall_adj ->
-	-- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
+    cback <- newSysLocalDs arg_ty
+    newStablePtrId <- dsLookupGlobalId newStablePtrName
+    stable_ptr_tycon <- dsLookupTyCon stablePtrTyConName
+    let
+        stable_ptr_ty = mkTyConApp stable_ptr_tycon [arg_ty]
+        export_ty     = mkFunTy stable_ptr_ty arg_ty
+    bindIOId <- dsLookupGlobalId bindIOName
+    stbl_value <- newSysLocalDs stable_ptr_ty
+    (h_code, c_code, typestring, args_size) <- dsFExport id export_ty fe_nm cconv True
+    let
+         {-
+          The arguments to the external function which will
+          create a little bit of (template) code on the fly
+          for allowing the (stable pointed) Haskell closure
+          to be entered using an external calling convention
+          (stdcall, ccall).
+         -}
+        adj_args      = [ mkIntLitInt (ccallConvToInt cconv)
+                        , Var stbl_value
+                        , mkLit (MachLabel fe_nm mb_sz_args)
+                        , mkLit (mkStringLit typestring)
+                        ]
+          -- name of external entry point providing these services.
+          -- (probably in the RTS.) 
+        adjustor   = FSLIT("createAdjustor")
+        
+          -- Determine the number of bytes of arguments to the stub function,
+          -- so that we can attach the '@N' suffix to its label if it is a
+          -- stdcall on Windows.
+        mb_sz_args = case cconv of
+                        StdCallConv -> Just args_size
+                        _           -> Nothing
 
-     let io_app = mkLams tvs	 	    $
-		  Lam cback	 	    $          
-		  mkCoerceI (mkSymCoI co)   $
-		  mkApps (Var bindIOId)
-			 [ Type stable_ptr_ty
-			 , Type res_ty       
-			 , mkApps (Var newStablePtrId) [ Type arg_ty, Var cback ]
-			 , Lam stbl_value ccall_adj
-			 ]
+    ccall_adj <- dsCCall adjustor adj_args PlayRisky (mkTyConApp io_tc [res_ty])
+        -- PlayRisky: the adjustor doesn't allocate in the Haskell heap or do a callback
 
-	 fed = (id `setInlinePragma` NeverActive, io_app)
-		-- Never inline the f.e.d. function, because the litlit
-		-- might not be in scope in other modules.
-     in
-     returnDs ([fed], h_code, c_code)
+    let io_app = mkLams tvs                $
+                 Lam cback                 $
+                 mkCoerceI (mkSymCoI co)   $
+                 mkApps (Var bindIOId)
+                        [ Type stable_ptr_ty
+                        , Type res_ty       
+                        , mkApps (Var newStablePtrId) [ Type arg_ty, Var cback ]
+                        , Lam stbl_value ccall_adj
+                        ]
+
+        fed = (id `setInlinePragma` NeverActive, io_app)
+               -- Never inline the f.e.d. function, because the litlit
+               -- might not be in scope in other modules.
+
+    return ([fed], h_code, c_code)
 
  where
-  ty			   = idType id
-  (tvs,sans_foralls)	   = tcSplitForAllTys ty
-  ([arg_ty], fn_res_ty)	   = tcSplitFunTys sans_foralls
+  ty                       = idType id
+  (tvs,sans_foralls)       = tcSplitForAllTys ty
+  ([arg_ty], fn_res_ty)    = tcSplitFunTys sans_foralls
   Just (io_tc, res_ty, co) = tcSplitIOType_maybe fn_res_ty
 	-- Must have an IO type; hence Just
 	-- co : fn_res_ty ~ IO res_ty
