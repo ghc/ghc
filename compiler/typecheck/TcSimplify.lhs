@@ -657,7 +657,7 @@ tcSimplifyInfer
 \begin{code}
 tcSimplifyInfer doc tau_tvs wanted
   = do	{ tau_tvs1 <- zonkTcTyVarsAndFV (varSetElems tau_tvs)
-	; wanted'  <- mappM zonkInst wanted	-- Zonk before deciding quantified tyvars
+	; wanted'  <- mapM zonkInst wanted	-- Zonk before deciding quantified tyvars
 	; gbl_tvs  <- tcGetGlobalTyVars
 	; let preds1   = fdPredsOfInsts wanted'
 	      gbl_tvs1 = oclose preds1 gbl_tvs
@@ -726,7 +726,7 @@ tcSimplifyInfer doc tau_tvs wanted
 
 		-- Prepare equality instances for quantification
 	; let (q_eqs0,q_dicts) = partition isEqInst q_dicts0
-	; q_eqs <- mappM finalizeEqInst q_eqs0
+	; q_eqs <- mapM finalizeEqInst q_eqs0
 
 	; return (qtvs2, q_eqs ++ q_dicts, binds1 `unionBags` binds2 `unionBags` implic_bind) }
 	-- NB: when we are done, we might have some bindings, but
@@ -806,7 +806,7 @@ tcSimplifyInferCheck
 
 tcSimplifyInferCheck loc tau_tvs givens wanteds
   = do	{ traceTc (text "tcSimplifyInferCheck <-" <+> ppr wanteds)
-      	; (irreds, binds) <- gentleCheckLoop loc givens wanteds
+	; (irreds, binds) <- gentleCheckLoop loc givens wanteds
 
 	-- Figure out which type variables to quantify over
 	-- You might think it should just be the signature tyvars,
@@ -1103,7 +1103,7 @@ checkLoop :: RedEnv
 checkLoop env wanteds
   = go env wanteds
   where go env wanteds
-	  = do {  -- We do need to zonk the givens; cf Note [Zonking RedEnv]
+	  = do  {  -- We do need to zonk the givens; cf Note [Zonking RedEnv]
                 ; env'     <- zonkRedEnv env
 		; wanteds' <- zonkInsts  wanteds
 	
@@ -1619,10 +1619,10 @@ bindInstsOfLocalFuns ::	[Inst] -> [TcId] -> TcM TcDictBinds
 -- arguably a bug in Match.tidyEqnInfo (see notes there)
 
 bindInstsOfLocalFuns wanteds local_ids
-  | null overloaded_ids
+  | null overloaded_ids = do
 	-- Common case
-  = extendLIEs wanteds		`thenM_`
-    returnM emptyLHsBinds
+    extendLIEs wanteds
+    return emptyLHsBinds
 
   | otherwise
   = do	{ (irreds, binds) <- gentleInferLoop doc for_me
@@ -1710,8 +1710,8 @@ data WantSCs = NoSCs | AddSCs	-- Tells whether we should add the superclasses
 	-- Note [SUPER-CLASS LOOP 1]
 
 zonkRedEnv :: RedEnv -> TcM RedEnv
-zonkRedEnv env 
-  = do { givens' <- mappM zonkInst (red_givens env)
+zonkRedEnv env
+  = do { givens' <- mapM zonkInst (red_givens env)
        ; return $ env {red_givens = givens'}
        }
 \end{code}
@@ -1893,13 +1893,13 @@ unifyEqns :: [(Equation,(PredType,SDoc),(PredType,SDoc))]
 unifyEqns [] = return False
 unifyEqns eqns
   = do	{ traceTc (ptext SLIT("Improve:") <+> vcat (map pprEquationDoc eqns))
-        ; mappM_ unify eqns
+        ; mapM_ unify eqns
 	; return True }
   where
     unify ((qtvs, pairs), what1, what2)
-	 = addErrCtxtM (mkEqnMsg what1 what2)	$
-	   tcInstTyVars (varSetElems qtvs)	`thenM` \ (_, _, tenv) ->
-	   mapM_ (unif_pr tenv) pairs
+         = addErrCtxtM (mkEqnMsg what1 what2) $ do
+           (_, _, tenv) <- tcInstTyVars (varSetElems qtvs)
+           mapM_ (unif_pr tenv) pairs
     unif_pr tenv (ty1,ty2) =  unifyType (substTy tenv ty1) (substTy tenv ty2)
 
 pprEquationDoc (eqn, (p1,w1), (p2,w2)) = vcat [pprEquation eqn, nest 2 (ppr p1), nest 2 (ppr p2)]
@@ -1918,7 +1918,7 @@ The main context-reduction function is @reduce@.  Here's its game plan.
 \begin{code}
 reduceList :: RedEnv -> [Inst] -> Avails -> TcM Avails
 reduceList env@(RedEnv {red_stack = (n,stk)}) wanteds state
-  = do 	{ traceTc (text "reduceList " <+> (ppr wanteds $$ ppr state))
+  = do	{ traceTc (text "reduceList " <+> (ppr wanteds $$ ppr state))
 	; dopts <- getDOpts
 #ifdef DEBUG
 	; if n > 8 then
@@ -1940,7 +1940,7 @@ reduce env wanted avails
     -- It's the same as an existing inst, or a superclass thereof
   | Just avail <- findAvail avails wanted
   = do { traceTc (text "reduce: found " <+> ppr wanted)
-       ; returnM avails	
+       ; return avails
        }
 
   | otherwise
@@ -2342,7 +2342,7 @@ elemAvails wanted (Avails _ avails) = wanted `elemFM` avails
 
 extendAvails :: Avails -> Inst -> AvailHow -> TcM Avails
 -- Does improvement
-extendAvails avails@(Avails imp env) inst avail 
+extendAvails avails@(Avails imp env) inst avail
   = do	{ imp1 <- tcImproveOne avails inst	-- Do any improvement
 	; return (Avails (imp || imp1) (extendAvailEnv env inst avail)) }
 
@@ -2607,7 +2607,7 @@ tcSimplifyInteractive wanteds
 -- error message generation for the monomorphism restriction
 tc_simplify_top doc interactive wanteds
   = do	{ dflags <- getDOpts
-  	; wanteds <- zonkInsts wanteds
+	; wanteds <- zonkInsts wanteds
 	; mapM_ zonkTopTyVar (varSetElems (tyVarsOfInsts wanteds))
 
 	; traceTc (text "tc_simplify_top 0: " <+> ppr wanteds)
@@ -2869,13 +2869,13 @@ whether it worked or not.
 tcSimplifyDefault :: ThetaType	-- Wanted; has no type variables in it
 		  -> TcM ()
 
-tcSimplifyDefault theta
-  = newDictBndrsO DefaultOrigin theta	`thenM` \ wanteds ->
-    tryHardCheckLoop doc wanteds	`thenM` \ (irreds, _) ->
-    addNoInstanceErrs  irreds	 	`thenM_`
+tcSimplifyDefault theta = do
+    wanteds <- newDictBndrsO DefaultOrigin theta
+    (irreds, _) <- tryHardCheckLoop doc wanteds
+    addNoInstanceErrs  irreds
     if null irreds then
-	returnM ()
-    else
+	return ()
+     else
 	traceTc (ptext SLIT("tcSimplifyDefault failing")) >> failM
   where
     doc = ptext SLIT("default declaration")
@@ -2901,7 +2901,7 @@ groupErrs :: ([Inst] -> TcM ())	-- Deal with one group
 
 groupErrs report_err [] 
   = return ()
-groupErrs report_err (inst:insts) 
+groupErrs report_err (inst:insts)
   = do	{ do_one (inst:friends)
 	; groupErrs report_err others }
   where
@@ -3069,11 +3069,11 @@ addTopAmbigErrs dicts
     cmp (_,tvs1) (_,tvs2) = tvs1 `compare` tvs2
     
     report :: [(Inst,[TcTyVar])] -> TcM ()
-    report pairs@((inst,tvs) : _)	-- The pairs share a common set of ambiguous tyvars
-	= mkMonomorphismMsg tidy_env tvs	`thenM` \ (tidy_env, mono_msg) ->
+    report pairs@((inst,tvs) : _) = do	-- The pairs share a common set of ambiguous tyvars
+	  (tidy_env, mono_msg) <- mkMonomorphismMsg tidy_env tvs
 	  setSrcSpan (instSpan inst) $
 		-- the location of the first one will do for the err message
-	  addErrTcM (tidy_env, msg $$ mono_msg)
+	   addErrTcM (tidy_env, msg $$ mono_msg)
 	where
 	  dicts = map fst pairs
 	  msg = sep [text "Ambiguous type variable" <> plural tvs <+> 
@@ -3115,8 +3115,8 @@ monomorphism_fix dflags
            else empty]	-- Only suggest adding "-fno-monomorphism-restriction"
 			-- if it is not already set!
     
-warnDefault ups default_ty
-  = doptM Opt_WarnTypeDefaults  `thenM` \ warn_flag ->
+warnDefault ups default_ty = do
+    warn_flag <- doptM Opt_WarnTypeDefaults
     addInstCtxt (instLoc (head (dicts))) (warnTc warn_flag warn_msg)
   where
     dicts = [d | (d,_,_) <- ups]
