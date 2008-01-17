@@ -31,7 +31,7 @@ import IdInfo		( WorkerInfo(..), arityInfo,
 import NewDemand        ( Demand(..), StrictSig(..), DmdType(..), DmdResult(..), 
 			  Demands(..), mkTopDmdType, isBotRes, returnsCPR, topSig, isAbsent
 			)
-import UniqSupply	( UniqSupply, initUs_, returnUs, thenUs, mapUs, getUniqueUs, UniqSM )
+import UniqSupply
 import Unique		( hasKey )
 import BasicTypes	( RecFlag(..), isNonRec, isNeverActive )
 import VarEnv		( isEmptyVarEnv )
@@ -93,9 +93,9 @@ wwTopBinds dflags us binds
 workersAndWrappers :: UniqSupply -> [CoreBind] -> [CoreBind]
 
 workersAndWrappers us top_binds
-  = initUs_ us $
-    mapUs wwBind top_binds `thenUs` \ top_binds' ->
-    returnUs (concat top_binds')
+  = initUs_ us $ do
+    top_binds' <- mapM wwBind top_binds
+    return (concat top_binds')
 \end{code}
 
 %************************************************************************
@@ -113,19 +113,18 @@ wwBind	:: CoreBind
 				-- the caller will convert to Expr/Binding,
 				-- as appropriate.
 
-wwBind (NonRec binder rhs)
-  = wwExpr rhs				`thenUs` \ new_rhs ->
-    tryWW NonRecursive binder new_rhs 	`thenUs` \ new_pairs ->
-    returnUs [NonRec b e | (b,e) <- new_pairs]
+wwBind (NonRec binder rhs) = do
+    new_rhs <- wwExpr rhs
+    new_pairs <- tryWW NonRecursive binder new_rhs
+    return [NonRec b e | (b,e) <- new_pairs]
       -- Generated bindings must be non-recursive
       -- because the original binding was.
 
 wwBind (Rec pairs)
-  = mapUs do_one pairs		`thenUs` \ new_pairs ->
-    returnUs [Rec (concat new_pairs)]
+  = return . Rec <$> concatMapM do_one pairs
   where
-    do_one (binder, rhs) = wwExpr rhs 	`thenUs` \ new_rhs ->
-			   tryWW Recursive binder new_rhs
+    do_one (binder, rhs) = do new_rhs <- wwExpr rhs
+                              tryWW Recursive binder new_rhs
 \end{code}
 
 @wwExpr@ basically just walks the tree, looking for appropriate
@@ -136,47 +135,41 @@ matching by looking for strict arguments of the correct type.
 \begin{code}
 wwExpr :: CoreExpr -> UniqSM CoreExpr
 
-wwExpr e@(Type _)   	      = returnUs e
-wwExpr e@(Lit _)    	      = returnUs e
-wwExpr e@(Note InlineMe expr) = returnUs e
+wwExpr e@(Type _)             = return e
+wwExpr e@(Lit _)              = return e
+wwExpr e@(Note InlineMe expr) = return e
 	-- Don't w/w inside InlineMe's
 
 wwExpr e@(Var v)
-  | v `hasKey` lazyIdKey = returnUs lazyIdUnfolding
-  | otherwise            = returnUs e
+  | v `hasKey` lazyIdKey = return lazyIdUnfolding
+  | otherwise            = return e
 	-- HACK alert: Inline 'lazy' after strictness analysis
 	-- (but not inside InlineMe's)
 
 wwExpr (Lam binder expr)
-  = wwExpr expr			`thenUs` \ new_expr ->
-    returnUs (Lam binder new_expr)
+  = Lam binder <$> wwExpr expr
 
 wwExpr (App f a)
-  = wwExpr f			`thenUs` \ new_f ->
-    wwExpr a			`thenUs` \ new_a ->
-    returnUs (App new_f new_a)
+  = App <$> wwExpr f <*> wwExpr a
 
 wwExpr (Note note expr)
-  = wwExpr expr			`thenUs` \ new_expr ->
-    returnUs (Note note new_expr)
+  = Note note <$> wwExpr expr
 
-wwExpr (Cast expr co)
-  = wwExpr expr			`thenUs` \ new_expr ->
-    returnUs (Cast new_expr co)
+wwExpr (Cast expr co) = do
+    new_expr <- wwExpr expr
+    return (Cast new_expr co)
 
 wwExpr (Let bind expr)
-  = wwBind bind			`thenUs` \ intermediate_bind ->
-    wwExpr expr			`thenUs` \ new_expr ->
-    returnUs (mkLets intermediate_bind new_expr)
+  = mkLets <$> wwBind bind <*> wwExpr expr
 
-wwExpr (Case expr binder ty alts)
-  = wwExpr expr				`thenUs` \ new_expr ->
-    mapUs ww_alt alts			`thenUs` \ new_alts ->
-    returnUs (Case new_expr binder ty new_alts)
+wwExpr (Case expr binder ty alts) = do
+    new_expr <- wwExpr expr
+    new_alts <- mapM ww_alt alts
+    return (Case new_expr binder ty new_alts)
   where
-    ww_alt (con, binders, rhs)
-      =	wwExpr rhs			`thenUs` \ new_rhs ->
-	returnUs (con, binders, new_rhs)
+    ww_alt (con, binders, rhs) = do
+        new_rhs <- wwExpr rhs
+        return (con, binders, new_rhs)
 \end{code}
 
 %************************************************************************
@@ -236,7 +229,7 @@ tryWW is_rec fn_id rhs
 	-- No point in worker/wrappering if the thing is never inlined!
 	-- Because the no-inline prag will prevent the wrapper ever
 	-- being inlined at a call site. 
-  = returnUs [ (new_fn_id, rhs) ]
+  = return [ (new_fn_id, rhs) ]
 
   | is_thunk && worthSplittingThunk maybe_fn_dmd res_info
   = ASSERT2( isNonRec is_rec, ppr new_fn_id )	-- The thunk must be non-recursive
@@ -246,7 +239,7 @@ tryWW is_rec fn_id rhs
   = splitFun new_fn_id fn_info wrap_dmds res_info inline_prag rhs
 
   | otherwise
-  = returnUs [ (new_fn_id, rhs) ]
+  = return [ (new_fn_id, rhs) ]
 
   where
     fn_info   	 = idInfo fn_id
@@ -273,10 +266,10 @@ tryWW is_rec fn_id rhs
 
 ---------------------
 splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
-  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) )
+  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) do
 	-- The arity should match the signature
-    mkWwBodies fun_ty wrap_dmds res_info one_shots 	`thenUs` \ (work_demands, wrap_fn, work_fn) ->
-    getUniqueUs						`thenUs` \ work_uniq ->
+    (work_demands, wrap_fn, work_fn) <- mkWwBodies fun_ty wrap_dmds res_info one_shots
+    work_uniq <- getUniqueM
     let
 	work_rhs = work_fn rhs
 	work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs) 
@@ -297,8 +290,7 @@ splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
 	wrap_rhs = wrap_fn work_id
 	wrap_id  = fn_id `setIdWorkerInfo` HasWorker work_id arity
 
-    in
-    returnUs ([(work_id, work_rhs), (wrap_id, wrap_rhs)])
+    return ([(work_id, work_rhs), (wrap_id, wrap_rhs)])
 	-- Worker first, because wrapper mentions it
 	-- mkWwBodies has already built a wrap_rhs with an INLINE pragma wrapped around it
   where
@@ -366,9 +358,9 @@ then the splitting will go deeper too.
 --		 I# y -> let x = I# y in x }
 -- See comments above. Is it not beautifully short?
 
-splitThunk fn_id rhs
-  = mkWWstr [fn_id]		`thenUs` \ (_, wrap_fn, work_fn) ->
-    returnUs [ (fn_id, Let (NonRec fn_id rhs) (wrap_fn (work_fn (Var fn_id)))) ]
+splitThunk fn_id rhs = do
+    (_, wrap_fn, work_fn) <- mkWWstr [fn_id]
+    return [ (fn_id, Let (NonRec fn_id rhs) (wrap_fn (work_fn (Var fn_id)))) ]
 \end{code}
 
 
@@ -431,9 +423,9 @@ mkWrapper :: Type		-- Wrapper type
 	  -> StrictSig		-- Wrapper strictness info
 	  -> UniqSM (Id -> CoreExpr)	-- Wrapper body, missing worker Id
 
-mkWrapper fun_ty (StrictSig (DmdType _ demands res_info))
-  = mkWwBodies fun_ty demands res_info noOneShotInfo	`thenUs` \ (_, wrap_fn, _) ->
-    returnUs wrap_fn
+mkWrapper fun_ty (StrictSig (DmdType _ demands res_info)) = do
+    (_, wrap_fn, _) <- mkWwBodies fun_ty demands res_info noOneShotInfo
+    return wrap_fn
 
 noOneShotInfo = repeat False
 \end{code}
