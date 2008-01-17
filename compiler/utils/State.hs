@@ -46,18 +46,3 @@ execState s i = case runState' s i of
 runState :: State s a -> s -> (a, s)
 runState s i = case runState' s i of
                (# a, s' #) -> (a, s')
-
-
-mapAccumLM
-        :: Monad m
-        => (acc -> x -> m (acc, y))     -- ^ combining funcction
-        -> acc                          -- ^ initial state
-        -> [x]                          -- ^ inputs
-        -> m (acc, [y])                 -- ^ final state, outputs
-
-mapAccumLM _ s [] = return (s, [])
-mapAccumLM f s (x:xs)
- = do (s1, x')  <- f s x
-      (s2, xs') <- mapAccumLM f s1 xs
-      return (s2, x' : xs')
-
