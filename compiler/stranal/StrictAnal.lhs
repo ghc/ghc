@@ -38,6 +38,7 @@ import Util		( zipWith3Equal, stretchZipWith, compareLength )
 import BasicTypes	( Activation( NeverActive ) )
 import Outputable
 import FastTypes
+import State
 \end{code}
 
 %************************************************************************
@@ -98,11 +99,11 @@ saBinds dflags binds
 
 	-- Mark each binder with its strictness
 #ifndef OMIT_STRANAL_STATS
-	let { (binds_w_strictness, sa_stats) = saTopBinds binds nullSaStats };
+	let { (binds_w_strictness, sa_stats) = runState $ (saTopBinds binds) nullSaStats };
 	dumpIfSet_dyn dflags Opt_D_dump_simpl_stats "Strictness analysis statistics"
 		  (pp_stats sa_stats);
 #else
-	let { binds_w_strictness = saTopBindsBinds binds };
+	let { binds_w_strictness = unSaM $ saTopBindsBinds binds };
 #endif
 
 	endPass dflags "Strictness analysis" Opt_D_dump_stranal
@@ -140,11 +141,11 @@ saTopBinds binds
     in
     do_it starting_abs_env starting_abs_env binds
   where
-    do_it _    _    [] = returnSa []
-    do_it senv aenv (b:bs)
-      = saTopBind senv  aenv  b  `thenSa` \ (senv2, aenv2, new_b) ->
-	do_it     senv2 aenv2 bs `thenSa` \ new_bs ->
-	returnSa (new_b : new_bs)
+    do_it _    _    [] = return []
+    do_it senv aenv (b:bs) = do
+        (senv2, aenv2, new_b) <- saTopBind senv  aenv  b
+        new_bs                <- do_it     senv2 aenv2 bs
+        return (new_b : new_bs)
 \end{code}
 
 @saTopBind@ is only used for the top level.  We don't add any demand
@@ -157,8 +158,8 @@ saTopBind :: StrictEnv -> AbsenceEnv
 	  -> CoreBind
 	  -> SaM (StrictEnv, AbsenceEnv, CoreBind)
 
-saTopBind str_env abs_env (NonRec binder rhs)
-  = saExpr minDemand str_env abs_env rhs 	`thenSa` \ new_rhs ->
+saTopBind str_env abs_env (NonRec binder rhs) = do
+    new_rhs <- saExpr minDemand str_env abs_env rhs
     let
 	str_rhs = absEval StrAnal rhs str_env
 	abs_rhs = absEval AbsAnal rhs abs_env
@@ -177,8 +178,8 @@ saTopBind str_env abs_env (NonRec binder rhs)
 	  -- binder to its abstract values, computed by absEval
       	new_str_env = addOneToAbsValEnv str_env binder widened_str_rhs
       	new_abs_env = addOneToAbsValEnv abs_env binder widened_abs_rhs
-    in
-    returnSa (new_str_env, new_abs_env, NonRec new_binder new_rhs)
+    
+    return (new_str_env, new_abs_env, NonRec new_binder new_rhs)
 
 saTopBind str_env abs_env (Rec pairs)
   = let
@@ -190,12 +191,12 @@ saTopBind str_env abs_env (Rec pairs)
       	new_abs_env = growAbsValEnvList abs_env (binders `zip` abs_rhss)
 	new_binders = zipWith3Equal "saTopBind" addStrictnessInfoToTopId
 				    str_rhss abs_rhss binders
-    in
-    mapSa (saExpr minDemand new_str_env new_abs_env) rhss	`thenSa` \ new_rhss ->
+    
+    new_rhss <- mapM (saExpr minDemand new_str_env new_abs_env) rhss
     let
 	new_pairs   = new_binders `zip` new_rhss
-    in
-    returnSa (new_str_env, new_abs_env, Rec new_pairs)
+    
+    return (new_str_env, new_abs_env, Rec new_pairs)
 
 -- Hack alert!
 -- Top level divergent bindings are marked NOINLINE
@@ -232,10 +233,10 @@ minDemands = repeat minDemand
 
 -- When we find an application, do the arguments
 -- with demands gotten from the function
-saApp str_env abs_env (fun, args)
-  = sequenceSa sa_args				`thenSa` \ args' ->
-    saExpr minDemand str_env abs_env fun	`thenSa` \ fun'  -> 
-    returnSa (mkApps fun' args')
+saApp str_env abs_env (fun, args) = do
+    args' <- sequence sa_args
+    fun' <- saExpr minDemand str_env abs_env fun
+    return (mkApps fun' args')
   where
     arg_dmds = case fun of
 		 Var var -> case lookupAbsValEnv str_env var of
@@ -258,43 +259,42 @@ saApp str_env abs_env (fun, args)
 			dmd' | isLazy dmd = minDemand
 			     | otherwise  = dmd
 
-saExpr _ _ _ e@(Var _)	= returnSa e
-saExpr _ _ _ e@(Lit _)	= returnSa e
-saExpr _ _ _ e@(Type _)	= returnSa e
+saExpr _ _ _ e@(Var _)	= return e
+saExpr _ _ _ e@(Lit _)	= return e
+saExpr _ _ _ e@(Type _)	= return e
 
 saExpr dmd str_env abs_env (Lam bndr body)
-  =	-- Don't bother to set the demand-info on a lambda binder
+  = do	-- Don't bother to set the demand-info on a lambda binder
 	-- We do that only for let(rec)-bound functions
-    saExpr minDemand str_env abs_env body	`thenSa` \ new_body ->
-    returnSa (Lam bndr new_body)
+    new_body <- saExpr minDemand str_env abs_env body
+    return (Lam bndr new_body)
 
 saExpr dmd str_env abs_env e@(App fun arg)
   = saApp str_env abs_env (collectArgs e)
 
-saExpr dmd str_env abs_env (Note note expr)
-  = saExpr dmd str_env abs_env expr	`thenSa` \ new_expr ->
-    returnSa (Note note new_expr)
+saExpr dmd str_env abs_env (Note note expr) = do
+    new_expr <- saExpr dmd str_env abs_env expr
+    return (Note note new_expr)
 
-saExpr dmd str_env abs_env (Case expr case_bndr alts)
-  = saExpr minDemand str_env abs_env expr	`thenSa` \ new_expr  ->
-    mapSa sa_alt alts				`thenSa` \ new_alts  ->
+saExpr dmd str_env abs_env (Case expr case_bndr alts) = do
+    new_expr <- saExpr minDemand str_env abs_env expr
+    new_alts <- mapM sa_alt alts
     let
 	new_case_bndr = addDemandInfoToCaseBndr dmd str_env abs_env alts case_bndr
-    in
-    returnSa (Case new_expr new_case_bndr new_alts)
+    return (Case new_expr new_case_bndr new_alts)
   where
-    sa_alt (con, binders, rhs)
-      = saExpr dmd str_env abs_env rhs  `thenSa` \ new_rhs ->
+    sa_alt (con, binders, rhs) = do
+        new_rhs <- saExpr dmd str_env abs_env rhs
 	let
 	    new_binders = map add_demand_info binders
 	    add_demand_info bndr | isTyVar bndr = bndr
 			  	 | otherwise	= addDemandInfoToId dmd str_env abs_env rhs bndr
-	in
-	tickCases new_binders	    `thenSa_` -- stats
-	returnSa (con, new_binders, new_rhs)
+	
+	tickCases new_binders -- stats
+	return (con, new_binders, new_rhs)
 
-saExpr dmd str_env abs_env (Let (NonRec binder rhs) body)
-  =	-- Analyse the RHS in the environment at hand
+saExpr dmd str_env abs_env (Let (NonRec binder rhs) body) = do
+	-- Analyse the RHS in the environment at hand
     let
 	-- Find the demand on the RHS
 	rhs_dmd = findDemand dmd str_env abs_env body binder
@@ -317,23 +317,23 @@ saExpr dmd str_env abs_env (Let (NonRec binder rhs) body)
 	new_binder = addStrictnessInfoToId
 			widened_str_rhs widened_abs_rhs
 			(binder `setIdDemandInfo` rhs_dmd)
-    in
-    tickLet new_binder				`thenSa_` -- stats
-    saExpr rhs_dmd str_env abs_env rhs		`thenSa` \ new_rhs  ->
-    saExpr dmd new_str_env new_abs_env body	`thenSa` \ new_body ->
-    returnSa (Let (NonRec new_binder new_rhs) new_body)
+    
+    tickLet new_binder		 -- stats
+    new_rhs <- saExpr rhs_dmd str_env abs_env rhs
+    new_body <- saExpr dmd new_str_env new_abs_env body
+    return (Let (NonRec new_binder new_rhs) new_body)
 
-saExpr dmd str_env abs_env (Let (Rec pairs) body)
-  = let
+saExpr dmd str_env abs_env (Let (Rec pairs) body) = do
+    let
 	(binders,rhss) = unzip pairs
 	str_vals       = fixpoint StrAnal binders rhss str_env
 	abs_vals       = fixpoint AbsAnal binders rhss abs_env
 			 -- fixpoint returns widened values
       	new_str_env    = growAbsValEnvList str_env (binders `zip` str_vals)
       	new_abs_env    = growAbsValEnvList abs_env (binders `zip` abs_vals)
-    in
-    saExpr dmd new_str_env new_abs_env body			`thenSa` \ new_body ->
-    mapSa (saExpr minDemand new_str_env new_abs_env) rhss	`thenSa` \ new_rhss ->
+    
+    new_body <- saExpr dmd new_str_env new_abs_env body
+    new_rhss <- mapM (saExpr minDemand new_str_env new_abs_env) rhss
     let
 -- 		DON'T add demand info in a Rec!
 --		a) it's useless: we can't do let-to-case
@@ -350,8 +350,8 @@ saExpr dmd str_env abs_env (Let (Rec pairs) body)
 				         str_vals abs_vals binders
 
       	new_pairs   = improved_binders `zip` new_rhss
-    in
-    returnSa (Let (Rec new_pairs) new_body)
+    
+    return (Let (Rec new_pairs) new_body)
 \end{code}
 
 
@@ -414,48 +414,27 @@ nullSaStats = SaStats
    (_ILIT(0)) (_ILIT(0))
    (_ILIT(0)) (_ILIT(0))
 
-thenSa	      :: SaM a -> (a -> SaM b) -> SaM b
-thenSa_	      :: SaM a -> SaM b -> SaM b
-returnSa      :: a -> SaM a
-
-{-# INLINE thenSa #-}
-{-# INLINE thenSa_ #-}
-{-# INLINE returnSa #-}
-
 tickLambda :: Id   -> SaM ()
 tickCases  :: [CoreBndr] -> SaM ()
 tickLet    :: Id   -> SaM ()
 
 #ifndef OMIT_STRANAL_STATS
-type SaM a = SaStats -> (a, SaStats)
+type SaM a = State SaStats a
 
-thenSa expr cont stats
-  = case (expr stats) of { (result, stats1) ->
-    cont result stats1 }
+tickLambda var = modify $ \(SaStats tlam dlam tc dc tlet dlet)
+  -> case (tick_demanded var (0,0)) of { (totB, demandedB) ->
+     let tot = iUnbox totB ; demanded = iUnbox demandedB 
+     in SaStats (tlam +# tot) (dlam +# demanded) tc dc tlet dlet)
 
-thenSa_ expr cont stats
-  = case (expr stats) of { (_, stats1) ->
-    cont stats1 }
-
-returnSa x stats = (x, stats)
-
-tickLambda var (SaStats tlam dlam tc dc tlet dlet)
-  = case (tick_demanded var (0,0)) of { (totB, demandedB) ->
-    let tot = iUnbox totB ; demanded = iUnbox demandedB 
-    in
-    ((), SaStats (tlam +# tot) (dlam +# demanded) tc dc tlet dlet) }
-
-tickCases vars (SaStats tlam dlam tc dc tlet dlet)
+tickCases vars = modify $ \(SaStats tlam dlam tc dc tlet dlet)
   = case (foldr tick_demanded (0,0) vars) of { (totB, demandedB) ->
     let tot = iUnbox totB ; demanded = iUnbox demandedB 
-    in
-    ((), SaStats tlam dlam (tc +# tot) (dc +# demanded) tlet dlet) }
+    in  SaStats tlam dlam (tc +# tot) (dc +# demanded) tlet dlet)
 
-tickLet var (SaStats tlam dlam tc dc tlet dlet)
+tickLet var = modify $ \(SaStats tlam dlam tc dc tlet dlet)
   = case (tick_demanded var (0,0))        of { (totB, demandedB) ->
     let tot = iUnbox totB ; demanded = iUnbox demandedB 
-    in
-    ((), SaStats tlam dlam tc dc (tlet +# tot) (dlet +# demanded)) }
+    in SaStats tlam dlam tc dc (tlet +# tot) (dlet +# demanded))
 
 tick_demanded var (tot, demanded)
   | isTyVar var = (tot, demanded)
@@ -473,32 +452,17 @@ pp_stats (SaStats tlam dlam tc dc tlet dlet)
 
 #else /* OMIT_STRANAL_STATS */
 -- identity monad
-type SaM a = a
+newtype SaM a = SaM { unSaM :: a }
 
-thenSa expr cont = cont expr
-
-thenSa_ expr cont = cont
-
-returnSa x = x
+instance Monad SaM where
+    return x    = SaM x
+    SaM x >>= f = f x
 
 tickLambda var  = panic "OMIT_STRANAL_STATS: tickLambda"
 tickCases  vars = panic "OMIT_STRANAL_STATS: tickCases"
 tickLet    var  = panic "OMIT_STRANAL_STATS: tickLet"
 
 #endif /* OMIT_STRANAL_STATS */
-
-mapSa	      :: (a -> SaM b) -> [a] -> SaM [b]
-
-mapSa f []     = returnSa []
-mapSa f (x:xs) = f x		`thenSa` \ r  ->
-		 mapSa f xs	`thenSa` \ rs ->
-		 returnSa (r:rs)
-
-sequenceSa :: [SaM a] -> SaM [a]
-sequenceSa []     = returnSa []
-sequenceSa (m:ms) = m		  `thenSa` \ r ->
-		    sequenceSa ms `thenSa` \ rs ->
-		    returnSa (r:rs)
 
 #endif /* OLD_STRICTNESS */
 \end{code}
