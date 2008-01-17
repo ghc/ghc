@@ -34,25 +34,24 @@ import Outputable
 
 \begin{code}
 tcRules :: [LRuleDecl Name] -> TcM [LRuleDecl TcId]
-tcRules decls = mappM (wrapLocM tcRule) decls
+tcRules decls = mapM (wrapLocM tcRule) decls
 
 tcRule :: RuleDecl Name -> TcM (RuleDecl TcId)
 tcRule (HsRule name act vars lhs fv_lhs rhs fv_rhs)
-  = addErrCtxt (ruleCtxt name)			$
-    traceTc (ptext SLIT("---- Rule ------")
-		 <+> ppr name)			`thenM_` 
-    newFlexiTyVarTy openTypeKind		`thenM` \ rule_ty ->
+  = addErrCtxt (ruleCtxt name)			$ do
+    traceTc (ptext SLIT("---- Rule ------") <+> ppr name)
+    rule_ty <- newFlexiTyVarTy openTypeKind
 
 	-- Deal with the tyvars mentioned in signatures
-    tcRuleBndrs vars (\ ids ->
+    (ids, lhs', rhs', lhs_lie, rhs_lie) <-
+      tcRuleBndrs vars $ \ ids -> do
 		-- Now LHS and RHS
-	getLIE (tcMonoExpr lhs rule_ty)	`thenM` \ (lhs', lhs_lie) ->
-	getLIE (tcMonoExpr rhs rule_ty)	`thenM` \ (rhs', rhs_lie) ->
-	returnM (ids, lhs', rhs', lhs_lie, rhs_lie)
-    )				`thenM` \ (ids, lhs', rhs', lhs_lie, rhs_lie) ->
+        (lhs', lhs_lie) <- getLIE (tcMonoExpr lhs rule_ty)
+        (rhs', rhs_lie) <- getLIE (tcMonoExpr rhs rule_ty)
+        return (ids, lhs', rhs', lhs_lie, rhs_lie)
 
 		-- Check that LHS has no overloading at all
-    tcSimplifyRuleLhs lhs_lie	`thenM` \ (lhs_dicts, lhs_binds) ->
+    (lhs_dicts, lhs_binds) <- tcSimplifyRuleLhs lhs_lie
 
 	-- Gather the template variables and tyvars
     let
@@ -79,18 +78,18 @@ tcRule (HsRule name act vars lhs fv_lhs rhs fv_rhs)
 	-- during zonking (see TcHsSyn.zonkRule)
 	--
 	forall_tvs = tyVarsOfTypes (rule_ty : map idType tpl_ids)
-    in
+
 	-- RHS can be a bit more lenient.  In particular,
 	-- we let constant dictionaries etc float outwards
 	--
 	-- NB: tcSimplifyInferCheck zonks the forall_tvs, and 
 	--     knocks out any that are constrained by the environment
-    getInstLoc (SigOrigin (RuleSkol name))	`thenM` \ loc -> 
-    tcSimplifyInferCheck loc
-			 forall_tvs
-			 lhs_dicts rhs_lie	`thenM` \ (forall_tvs1, rhs_binds) ->
+    loc <- getInstLoc (SigOrigin (RuleSkol name))
+    (forall_tvs1, rhs_binds) <- tcSimplifyInferCheck loc
+                                        forall_tvs
+                                        lhs_dicts rhs_lie
 
-    returnM (HsRule name act
+    return (HsRule name act
 		    (map (RuleBndr . noLoc) (forall_tvs1 ++ tpl_ids))	-- yuk
 		    (mkHsDictLet lhs_binds lhs') fv_lhs
 		    (mkHsDictLet rhs_binds rhs') fv_rhs)
