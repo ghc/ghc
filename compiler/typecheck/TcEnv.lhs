@@ -134,29 +134,29 @@ tcLookupGlobal name
 	}}}}}
 
 tcLookupField :: Name -> TcM Id		-- Returns the selector Id
-tcLookupField name
-  = tcLookupGlobal name		`thenM` \ thing ->
+tcLookupField name = do
+    thing <- tcLookupGlobal name
     case thing of
 	AnId id -> return id
 	other	-> wrongThingErr "field name" (AGlobal thing) name
 
 tcLookupDataCon :: Name -> TcM DataCon
-tcLookupDataCon name
-  = tcLookupGlobal name	`thenM` \ thing ->
+tcLookupDataCon name = do
+    thing <- tcLookupGlobal name
     case thing of
 	ADataCon con -> return con
 	other	     -> wrongThingErr "data constructor" (AGlobal thing) name
 
 tcLookupClass :: Name -> TcM Class
-tcLookupClass name
-  = tcLookupGlobal name		`thenM` \ thing ->
+tcLookupClass name = do
+    thing <- tcLookupGlobal name
     case thing of
 	AClass cls -> return cls
 	other	   -> wrongThingErr "class" (AGlobal thing) name
 	
 tcLookupTyCon :: Name -> TcM TyCon
-tcLookupTyCon name
-  = tcLookupGlobal name		`thenM` \ thing ->
+tcLookupTyCon name = do
+    thing <- tcLookupGlobal name
     case thing of
 	ATyCon tc -> return tc
 	other	  -> wrongThingErr "type constructor" (AGlobal thing) name
@@ -245,16 +245,15 @@ tcLookupLocated :: Located Name -> TcM TcTyThing
 tcLookupLocated = addLocM tcLookup
 
 tcLookup :: Name -> TcM TcTyThing
-tcLookup name
-  = getLclEnv 		`thenM` \ local_env ->
+tcLookup name = do
+    local_env <- getLclEnv
     case lookupNameEnv (tcl_env local_env) name of
-	Just thing -> returnM thing
-	Nothing    -> tcLookupGlobal name `thenM` \ thing ->
-		      returnM (AGlobal thing)
+	Just thing -> return thing
+	Nothing    -> AGlobal <$> tcLookupGlobal name
 
 tcLookupTyVar :: Name -> TcM TcTyVar
-tcLookupTyVar name
-  = tcLookup name	`thenM` \ thing -> 
+tcLookupTyVar name = do
+    thing <- tcLookup name
     case thing of
 	ATyVar _ ty -> return (tcGetTyVar "tcLookupTyVar" ty)
 	other	    -> pprPanic "tcLookupTyVar" (ppr name)
@@ -264,19 +263,19 @@ tcLookupId :: Name -> TcM Id
 -- The "no refinement" part means that we return the un-refined Id regardless
 -- 
 -- The Id is never a DataCon. (Why does that matter? see TcExpr.tcId)
-tcLookupId name
-  = tcLookup name	`thenM` \ thing -> 
+tcLookupId name = do
+    thing <- tcLookup name
     case thing of
-	ATcId { tct_id = id} -> returnM id
-	AGlobal (AnId id)    -> returnM id
-	other		     -> pprPanic "tcLookupId" (ppr name)
+        ATcId { tct_id = id} -> return id
+        AGlobal (AnId id)    -> return id
+        other                -> pprPanic "tcLookupId" (ppr name)
 
 tcLookupLocalIds :: [Name] -> TcM [TcId]
 -- We expect the variables to all be bound, and all at
 -- the same level as the lookup.  Only used in one place...
-tcLookupLocalIds ns
-  = getLclEnv 		`thenM` \ env ->
-    returnM (map (lookup (tcl_env env) (thLevel (tcl_th_ctxt env))) ns)
+tcLookupLocalIds ns = do
+    env <- getLclEnv
+    return (map (lookup (tcl_env env) (thLevel (tcl_th_ctxt env))) ns)
   where
     lookup lenv lvl name 
 	= case lookupNameEnv lenv name of
@@ -289,11 +288,10 @@ lclEnvElts env = nameEnvElts (tcl_env env)
 
 getInLocalScope :: TcM (Name -> Bool)
   -- Ids only
-getInLocalScope = getLclEnv	`thenM` \ env ->
-		  let 
-			lcl_env = tcl_env env
-		  in
-		  return (`elemNameEnv` lcl_env)
+getInLocalScope = do
+    env <- getLclEnv
+    let lcl_env = tcl_env env
+    return (`elemNameEnv` lcl_env)
 \end{code}
 
 \begin{code}
@@ -317,22 +315,22 @@ tcExtendTyVarEnv tvs thing_inside
   = tcExtendTyVarEnv2 [(tyVarName tv, mkTyVarTy tv) | tv <- tvs] thing_inside
 
 tcExtendTyVarEnv2 :: [(Name,TcType)] -> TcM r -> TcM r
-tcExtendTyVarEnv2 binds thing_inside
-  = getLclEnv	   `thenM` \ env@(TcLclEnv {tcl_env = le, 
-					    tcl_tyvars = gtvs, 
-					    tcl_rdr = rdr_env}) ->
+tcExtendTyVarEnv2 binds thing_inside = do
+    env@(TcLclEnv {tcl_env = le,
+                   tcl_tyvars = gtvs,
+                   tcl_rdr = rdr_env}) <- getLclEnv
     let
 	rdr_env'   = extendLocalRdrEnv rdr_env (map fst binds)
 	new_tv_set = tcTyVarsOfTypes (map snd binds)
  	le'        = extendNameEnvList le [(name, ATyVar name ty) | (name, ty) <- binds]
-    in
+
 	-- It's important to add the in-scope tyvars to the global tyvar set
 	-- as well.  Consider
 	--	f (_::r) = let g y = y::r in ...
 	-- Here, g mustn't be generalised.  This is also important during
 	-- class and instance decls, when we mustn't generalise the class tyvars
 	-- when typechecking the methods.
-    tc_extend_gtvs gtvs new_tv_set		`thenM` \ gtvs' ->
+    gtvs' <- tc_extend_gtvs gtvs new_tv_set
     setLclEnv (env {tcl_env = le', tcl_tyvars = gtvs', tcl_rdr = rdr_env'}) thing_inside
 
 getScopedTyVarBinds :: TcM [(Name, TcType)]
@@ -408,13 +406,13 @@ findGlobals :: TcTyVarSet
             -> TidyEnv 
             -> TcM (TidyEnv, [SDoc])
 
-findGlobals tvs tidy_env
-  = getLclEnv		`thenM` \ lcl_env ->
+findGlobals tvs tidy_env = do
+    lcl_env <- getLclEnv
     go tidy_env [] (lclEnvElts lcl_env)
   where
-    go tidy_env acc [] = returnM (tidy_env, acc)
-    go tidy_env acc (thing : things)
-      = find_thing ignore_it tidy_env thing 	`thenM` \ (tidy_env1, maybe_doc) ->
+    go tidy_env acc [] = return (tidy_env, acc)
+    go tidy_env acc (thing : things) = do
+        (tidy_env1, maybe_doc) <- find_thing ignore_it tidy_env thing
 	case maybe_doc of
 	  Just d  -> go tidy_env1 (d:acc) things
 	  Nothing -> go tidy_env1 acc     things
@@ -422,23 +420,23 @@ findGlobals tvs tidy_env
     ignore_it ty = tvs `disjointVarSet` tyVarsOfType ty
 
 -----------------------
-find_thing ignore_it tidy_env (ATcId { tct_id = id })
-  = zonkTcType  (idType id)	`thenM` \ id_ty ->
+find_thing ignore_it tidy_env (ATcId { tct_id = id }) = do
+    id_ty <- zonkTcType  (idType id)
     if ignore_it id_ty then
-	returnM (tidy_env, Nothing)
-    else let
+	return (tidy_env, Nothing)
+     else let
 	(tidy_env', tidy_ty) = tidyOpenType tidy_env id_ty
 	msg = sep [ppr id <+> dcolon <+> ppr tidy_ty, 
 		   nest 2 (parens (ptext SLIT("bound at") <+>
 			 	   ppr (getSrcLoc id)))]
-    in
-    returnM (tidy_env', Just msg)
+     in
+      return (tidy_env', Just msg)
 
-find_thing ignore_it tidy_env (ATyVar tv ty)
-  = zonkTcType ty		`thenM` \ tv_ty ->
+find_thing ignore_it tidy_env (ATyVar tv ty) = do
+    tv_ty <- zonkTcType ty
     if ignore_it tv_ty then
-	returnM (tidy_env, Nothing)
-    else let
+	return (tidy_env, Nothing)
+     else let
 	-- The name tv is scoped, so we don't need to tidy it
 	(tidy_env1, tidy_ty) = tidyOpenType  tidy_env tv_ty
 	msg = sep [ptext SLIT("Scoped type variable") <+> quotes (ppr tv) <+> eq_stuff, nest 2 bound_at]
@@ -448,8 +446,8 @@ find_thing ignore_it tidy_env (ATyVar tv ty)
 		 | otherwise = equals <+> ppr tidy_ty
 		-- It's ok to use Type.getTyVar_maybe because ty is zonked by now
 	bound_at = parens $ ptext SLIT("bound at:") <+> ppr (getSrcLoc tv)
-    in
-    returnM (tidy_env1, Just msg)
+     in
+       return (tidy_env1, Just msg)
 
 find_thing _ _ thing = pprPanic "find_thing" (ppr thing)
 \end{code}
@@ -493,8 +491,8 @@ refineEnvironment reft otherEquations thing_inside
 %************************************************************************
 
 \begin{code}
-tc_extend_gtvs gtvs extra_global_tvs
-  = readMutVar gtvs		`thenM` \ global_tvs ->
+tc_extend_gtvs gtvs extra_global_tvs = do
+    global_tvs <- readMutVar gtvs
     newMutVar (global_tvs `unionVarSet` extra_global_tvs)
 \end{code}
 
@@ -504,12 +502,12 @@ the environment.
 
 \begin{code}
 tcGetGlobalTyVars :: TcM TcTyVarSet
-tcGetGlobalTyVars
-  = getLclEnv					`thenM` \ (TcLclEnv {tcl_tyvars = gtv_var}) ->
-    readMutVar gtv_var				`thenM` \ gbl_tvs ->
-    zonkTcTyVarsAndFV (varSetElems gbl_tvs)	`thenM` \ gbl_tvs' ->
-    writeMutVar gtv_var gbl_tvs'		`thenM_` 
-    returnM gbl_tvs'
+tcGetGlobalTyVars = do
+    (TcLclEnv {tcl_tyvars = gtv_var}) <- getLclEnv
+    gbl_tvs  <- readMutVar gtv_var
+    gbl_tvs' <- zonkTcTyVarsAndFV (varSetElems gbl_tvs)
+    writeMutVar gtv_var gbl_tvs'
+    return gbl_tvs'
 \end{code}
 
 
@@ -558,7 +556,7 @@ checkWellStaged :: SDoc		-- What the stage check is for
 		-> TcM ()	-- Fail if badly staged, adding an error
 checkWellStaged pp_thing bind_lvl use_stage
   | use_lvl >= bind_lvl 	-- OK! Used later than bound
-  = returnM ()			-- E.g.  \x -> [| $(f x) |]
+  = return ()			-- E.g.  \x -> [| $(f x) |]
 
   | bind_lvl == topLevel	-- GHC restriction on top level splices
   = failWithTc $ 
@@ -601,9 +599,9 @@ tcMetaTy :: Name -> TcM Type
 -- Given the name of a Template Haskell data type, 
 -- return the type
 -- E.g. given the name "Expr" return the type "Expr"
-tcMetaTy tc_name
-  = tcLookupTyCon tc_name	`thenM` \ t ->
-    returnM (mkTyConApp t [])
+tcMetaTy tc_name = do
+    t <- tcLookupTyCon tc_name
+    return (mkTyConApp t [])
 
 thTopLevelId :: Id -> Bool
 -- See Note [What is a top-level Id?] in TcSplice
