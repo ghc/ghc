@@ -14,12 +14,11 @@
 module IOEnv (
 	IOEnv,	-- Instance of Monad
 
-	-- Standard combinators, specialised
-	returnM, thenM, thenM_, failM, failWithM,
-	mappM, mappM_, mapSndM, sequenceM, sequenceM_, 
-	foldlM, foldrM, anyM,
-	mapAndUnzipM, mapAndUnzip3M, 
-	checkM, ifM, zipWithM, zipWithM_,
+	-- Monad utilities
+	module MonadUtils,
+
+	-- Errors
+	failM, failWithM,
 
 	-- Getting at the environment
 	getEnv, setEnv, updEnv,
@@ -153,10 +152,12 @@ getEnv :: IOEnv env env
 {-# INLINE getEnv #-}
 getEnv = IOEnv (\ env -> return env)
 
+-- | Perform a computation with a different environment
 setEnv :: env' -> IOEnv env' a -> IOEnv env a
 {-# INLINE setEnv #-}
 setEnv new_env (IOEnv m) = IOEnv (\ env -> m new_env)
 
+-- | Perform a computation with an altered environment
 updEnv :: (env -> env') -> IOEnv env' a -> IOEnv env a
 {-# INLINE updEnv #-}
 updEnv upd (IOEnv m) = IOEnv (\ env -> m (upd env))
@@ -167,67 +168,17 @@ updEnv upd (IOEnv m) = IOEnv (\ env -> m (upd env))
 --			(for efficiency)
 ----------------------------------------------------------------------
 
-mappM  	      :: (a -> IOEnv env b) -> [a] -> IOEnv env [b]
-mappM_ 	      :: (a -> IOEnv env b) -> [a] -> IOEnv env ()
-mapSndM       :: (b -> IOEnv env c) -> [(a,b)] -> IOEnv env [(a,c)]
-	-- Funny names to avoid clash with Prelude
-sequenceM     :: [IOEnv env a] -> IOEnv env [a]
-sequenceM_    :: [IOEnv env a] -> IOEnv env ()
-foldlM        :: (a -> b -> IOEnv env a)  -> a -> [b] -> IOEnv env a
-foldrM        :: (b -> a -> IOEnv env a)  -> a -> [b] -> IOEnv env a
-mapAndUnzipM  :: (a -> IOEnv env (b,c))   -> [a] -> IOEnv env ([b],[c])
-mapAndUnzip3M :: (a -> IOEnv env (b,c,d)) -> [a] -> IOEnv env ([b],[c],[d])
-checkM	      :: Bool -> IOEnv env a -> IOEnv env ()	-- Perform arg if bool is False
-ifM	      :: Bool -> IOEnv env a -> IOEnv env ()	-- Perform arg if bool is True
-anyM	      :: (a -> IOEnv env Bool) -> [a] -> IOEnv env Bool
-
-mappM f []     = return []
-mappM f (x:xs) = do { r <- f x; rs <- mappM f xs; return (r:rs) }
-
-mapSndM f []     = return []
-mapSndM f ((a,b):xs) = do { c <- f b; rs <- mapSndM f xs; return ((a,c):rs) }
-
-mappM_ f []     = return ()
-mappM_ f (x:xs) = f x >> mappM_ f xs
-
-anyM f [] = return False
-anyM f (x:xs) = do { b <- f x; if b then return True 
-				    else anyM f xs }
-
-zipWithM :: (a -> b -> IOEnv env c) -> [a] -> [b] -> IOEnv env [c]
-zipWithM f [] bs = return []
-zipWithM f as [] = return []
-zipWithM f (a:as) (b:bs) = do { r <- f a b; rs <- zipWithM f as bs; return (r:rs) } 
-
-zipWithM_ :: (a -> b -> IOEnv env c) -> [a] -> [b] -> IOEnv env ()
-zipWithM_ f [] bs = return ()
-zipWithM_ f as [] = return ()
-zipWithM_ f (a:as) (b:bs) = do { f a b; zipWithM_ f as bs } 
-
-sequenceM [] = return []
-sequenceM (x:xs) = do { r <- x; rs <- sequenceM xs; return (r:rs) }
-
-sequenceM_ []     = return ()
-sequenceM_ (x:xs) = do { x; sequenceM_ xs }
-
-foldlM k z [] = return z
-foldlM k z (x:xs) = do { r <- k z x; foldlM k r xs }
-
-foldrM k z [] = return z
-foldrM k z (x:xs) = do { r <- foldrM k z xs; k x r }
-
-mapAndUnzipM f []     = return ([],[])
-mapAndUnzipM f (x:xs) = do { (r,s) <- f x; 
-			     (rs,ss) <- mapAndUnzipM f xs; 
-			     return (r:rs, s:ss) }
-
-mapAndUnzip3M f []     = return ([],[], [])
-mapAndUnzip3M f (x:xs) = do { (r,s,t) <- f x; 
-			      (rs,ss,ts) <- mapAndUnzip3M f xs; 
-			      return (r:rs, s:ss, t:ts) }
-
-checkM True  err = return ()
-checkM False err = do { err; return () }
-
-ifM True  do_it = do { do_it; return () }
-ifM False do_it = return ()
+{-# -- SPECIALIZE mapM          :: (a -> IOEnv env b) -> [a] -> IOEnv env [b] #-}
+{-# -- SPECIALIZE mapM_         :: (a -> IOEnv env b) -> [a] -> IOEnv env () #-}
+{-# -- SPECIALIZE mapSndM       :: (b -> IOEnv env c) -> [(a,b)] -> IOEnv env [(a,c)] #-}
+{-# -- SPECIALIZE sequence      :: [IOEnv env a] -> IOEnv env [a] #-}
+{-# -- SPECIALIZE sequence_     :: [IOEnv env a] -> IOEnv env () #-}
+{-# -- SPECIALIZE foldlM        :: (a -> b -> IOEnv env a)  -> a -> [b] -> IOEnv env a #-}
+{-# -- SPECIALIZE foldrM        :: (b -> a -> IOEnv env a)  -> a -> [b] -> IOEnv env a #-}
+{-# -- SPECIALIZE mapAndUnzipM  :: (a -> IOEnv env (b,c))   -> [a] -> IOEnv env ([b],[c]) #-}
+{-# -- SPECIALIZE mapAndUnzip3M :: (a -> IOEnv env (b,c,d)) -> [a] -> IOEnv env ([b],[c],[d]) #-}
+{-# -- SPECIALIZE zipWithM      :: (a -> b -> IOEnv env c) -> [a] -> [b] -> IOEnv env [c] #-}
+{-# -- SPECIALIZE zipWithM_     :: (a -> b -> IOEnv env c) -> [a] -> [b] -> IOEnv env () #-}
+{-# -- SPECIALIZE anyM          :: (a -> IOEnv env Bool) -> [a] -> IOEnv env Bool #-}
+{-# -- SPECIALIZE when          :: Bool -> IOEnv env a -> IOEnv env () #-}
+{-# -- SPECIALIZE unless        :: Bool -> IOEnv env a -> IOEnv env () #-}
