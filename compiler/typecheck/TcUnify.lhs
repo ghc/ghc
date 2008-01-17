@@ -60,6 +60,8 @@ import BasicTypes
 import Util
 import Outputable
 import Unique
+
+import Control.Monad
 \end{code}
 
 %************************************************************************
@@ -755,8 +757,8 @@ tc_sub1 orig act_sty (TyVarTy tv) exp_ib exp_sty exp_ty
 -- Consider  f g !
 
 tc_sub1 orig act_sty act_ty exp_ib exp_sty exp_ty
-  | isSigmaTy exp_ty	
-  = do { traceTc (text "tc_sub1 - case 2") ;
+  | isSigmaTy exp_ty = do
+    { traceTc (text "tc_sub1 - case 2") ;
     if exp_ib then  	-- SKOL does not apply if exp_ty is inside a box
 	defer_to_boxy_matching orig act_sty act_ty exp_ib exp_sty exp_ty
     else do 
@@ -867,7 +869,7 @@ wrapFunResCoercion arg_tys co_fn_res
   = return idHsWrapper
   | null arg_tys	   
   = return co_fn_res
-  | otherwise 	       
+  | otherwise
   = do	{ arg_ids <- newSysLocalIds FSLIT("sub") arg_tys
 	; return (mkWpLams arg_ids <.> co_fn_res <.> mkWpApps arg_ids) }
 \end{code}
@@ -934,7 +936,7 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 	    -- The WpLet binds any Insts which came out of the simplification.
 	    dict_vars = map instToVar dicts
 	    co_fn = mkWpTyLams tvs' <.> mkWpLams dict_vars <.> WpLet inst_binds
-	; returnM (co_fn, result) }
+	; return (co_fn, result) }
   where
     free_tvs = tyVarsOfType expected_ty `unionVarSet` extra_tvs
 \end{code}
@@ -1008,8 +1010,8 @@ lists, when all the elts should be of the same type.
 
 \begin{code}
 unifyTypeList :: [TcTauType] -> TcM ()
-unifyTypeList []		 = returnM ()
-unifyTypeList [ty]		 = returnM ()
+unifyTypeList []		 = return ()
+unifyTypeList [ty]		 = return ()
 unifyTypeList (ty1:tys@(ty2:_)) = do { unifyType ty1 ty2
 				      ; unifyTypeList tys }
 \end{code}
@@ -1063,7 +1065,7 @@ uTys nb1 ty1 nb2 ty2
 uTys_s :: InBox -> [TcType]	-- tys1 are the *actual*   types
        -> InBox -> [TcType]	-- tys2 are the *expected* types
        -> TcM [CoercionI] 
-uTys_s nb1 []	      nb2 []	     = returnM []
+uTys_s nb1 []	      nb2 []	     = return []
 uTys_s nb1 (ty1:tys1) nb2 (ty2:tys2) = do { coi <- uTys nb1 ty1 nb2 ty2
 					  ; cois <- uTys_s nb1 tys1 nb2 tys2 
 					  ; return (coi:cois)
@@ -1112,7 +1114,7 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
     go1 _ ty1 ty2
       | isSigmaTy ty1 || isSigmaTy ty2
       = do   { traceTc (text "We have sigma types: equalLength" <+> ppr tvs1 <+> ppr tvs2)
-	     ; checkM (equalLength tvs1 tvs2)
+	     ; unless (equalLength tvs1 tvs2)
 		      (unifyMisMatch outer False orig_ty1 orig_ty2)
 	     ; traceTc (text "We're past the first length test")
 	     ; tvs <- tcInstSkolTyVars UnkSkol tvs1	-- Not a helpful SkolemInfo
@@ -1125,7 +1127,7 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 		   (theta2,tau2) = tcSplitPhiTy phi2
 
 	     ; addErrCtxtM (unifyForAllCtxt tvs phi1 phi2) $ do
-	     { checkM (equalLength theta1 theta2)
+	     { unless (equalLength theta1 theta2)
 		      (unifyMisMatch outer False orig_ty1 orig_ty2)
 	     
 	     ; cois <- uPreds False nb1 theta1 nb2 theta2 -- TOMDO: do something with these pred_cois
@@ -1134,7 +1136,7 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 
 		-- Check for escape; e.g. (forall a. a->b) ~ (forall a. a->a)
 	     ; free_tvs <- zonkTcTyVarsAndFV (varSetElems (tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2))
-	     ; ifM (any (`elemVarSet` free_tvs) tvs)
+	     ; when (any (`elemVarSet` free_tvs) tvs)
 		   (bleatEscapedTvs free_tvs tvs tvs)
 
 		-- If both sides are inside a box, we are in a "box-meets-box"
@@ -1143,7 +1145,7 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 		-- the same polytype... but it should be a monotype.
 		-- This check comes last, because the error message is 
 		-- extremely unhelpful.  
-	     ; ifM (nb1 && nb2) (notMonoType ty1)
+	     ; when (nb1 && nb2) (notMonoType ty1)
 	     ; return coi
 	     }}
       where
@@ -1380,7 +1382,7 @@ uUnfilledVar outer swapped tv1 details1 ps_ty2 (TyVarTy tv2)
 		    ; updateMeta tv1 ref1 (mkTyVarTy tau_tv) 
 	 	    ; return IdCo
                     }
-	other -> returnM IdCo	-- No-op
+	other -> return IdCo	-- No-op
 
   | otherwise  -- Distinct type variables
   = do	{ lookup2 <- lookupTcTyVar tv2
@@ -1716,7 +1718,7 @@ addSubCtxt orig actual_res_ty expected_res_ty thing_inside
 
 ------------------
 unifyForAllCtxt tvs phi1 phi2 env
-  = returnM (env2, msg)
+  = return (env2, msg)
   where
     (env', tvs') = tidyOpenTyVars env tvs	-- NB: not tidyTyVarBndrs
     (env1, phi1') = tidyOpenType env' phi1
@@ -1745,7 +1747,7 @@ unifyKind :: TcKind		    -- Expected
 	  -> TcKind		    -- Actual
 	  -> TcM ()
 unifyKind (TyConApp kc1 []) (TyConApp kc2 []) 
-  | isSubKindCon kc2 kc1 = returnM ()
+  | isSubKindCon kc2 kc1 = return ()
 
 unifyKind (FunTy a1 r1) (FunTy a2 r2)
   = do { unifyKind a2 a1; unifyKind r1 r2 }
@@ -1756,10 +1758,10 @@ unifyKind k1 (TyVarTy kv2) = uKVar True kv2 k1
 unifyKind k1 k2 = unifyKindMisMatch k1 k2
 
 unifyKinds :: [TcKind] -> [TcKind] -> TcM ()
-unifyKinds []       []       = returnM ()
-unifyKinds (k1:ks1) (k2:ks2) = unifyKind k1 k2 	`thenM_`
-			       unifyKinds ks1 ks2
-unifyKinds _ _ 		     = panic "unifyKinds: length mis-match"
+unifyKinds []       []       = return ()
+unifyKinds (k1:ks1) (k2:ks2) = do unifyKind k1 k2
+                                  unifyKinds ks1 ks2
+unifyKinds _ _               = panic "unifyKinds: length mis-match"
 
 ----------------
 uKVar :: Bool -> KindVar -> TcKind -> TcM ()
@@ -1773,7 +1775,7 @@ uKVar swapped kv1 k2
 ----------------
 uUnboundKVar :: Bool -> KindVar -> TcKind -> TcM ()
 uUnboundKVar swapped kv1 k2@(TyVarTy kv2)
-  | kv1 == kv2 = returnM ()
+  | kv1 == kv2 = return ()
   | otherwise	-- Distinct kind variables
   = do	{ mb_k2 <- readKindVar kv2
 	; case mb_k2 of
@@ -1834,18 +1836,18 @@ kindOccurCheckErr tyvar ty
 unifyFunKind :: TcKind -> TcM (Maybe (TcKind, TcKind))
 -- Like unifyFunTy, but does not fail; instead just returns Nothing
 
-unifyFunKind (TyVarTy kvar)
-  = readKindVar kvar `thenM` \ maybe_kind ->
+unifyFunKind (TyVarTy kvar) = do
+    maybe_kind <- readKindVar kvar
     case maybe_kind of
       Indirect fun_kind -> unifyFunKind fun_kind
       Flexi -> 
           do { arg_kind <- newKindVar
              ; res_kind <- newKindVar
              ; writeKindVar kvar (mkArrowKind arg_kind res_kind)
-             ; returnM (Just (arg_kind,res_kind)) }
+             ; return (Just (arg_kind,res_kind)) }
     
-unifyFunKind (FunTy arg_kind res_kind) = returnM (Just (arg_kind,res_kind))
-unifyFunKind other		       = returnM Nothing
+unifyFunKind (FunTy arg_kind res_kind) = return (Just (arg_kind,res_kind))
+unifyFunKind other		       = return Nothing
 \end{code}
 
 %************************************************************************
@@ -1872,50 +1874,49 @@ checkExpectedKind :: Outputable a => a -> TcKind -> TcKind -> TcM ()
 -- The first argument, ty, is used only in the error message generation
 checkExpectedKind ty act_kind exp_kind
   | act_kind `isSubKind` exp_kind -- Short cut for a very common case
-  = returnM ()
-  | otherwise
-  = tryTc (unifyKind exp_kind act_kind)	`thenM` \ (_errs, mb_r) ->
-    case mb_r of {
-	Just r  -> returnM () ;	-- Unification succeeded
-	Nothing ->
+  = return ()
+  | otherwise = do
+    (_errs, mb_r) <- tryTc (unifyKind exp_kind act_kind)
+    case mb_r of
+	Just r  -> return () ;	-- Unification succeeded
+	Nothing -> do
 
 	-- So there's definitely an error
 	-- Now to find out what sort
-    zonkTcKind exp_kind		`thenM` \ exp_kind ->
-    zonkTcKind act_kind		`thenM` \ act_kind ->
+           exp_kind <- zonkTcKind exp_kind
+           act_kind <- zonkTcKind act_kind
 
-    tcInitTidyEnv		`thenM` \ env0 -> 
-    let (exp_as, _) = splitKindFunTys exp_kind
-        (act_as, _) = splitKindFunTys act_kind
-	n_exp_as = length exp_as
-	n_act_as = length act_as
-	
-	(env1, tidy_exp_kind) = tidyKind env0 exp_kind
-	(env2, tidy_act_kind) = tidyKind env1 act_kind
+           env0 <- tcInitTidyEnv
+           let (exp_as, _) = splitKindFunTys exp_kind
+               (act_as, _) = splitKindFunTys act_kind
+               n_exp_as = length exp_as
+               n_act_as = length act_as
 
-	err | n_exp_as < n_act_as	-- E.g. [Maybe]
-	    = quotes (ppr ty) <+> ptext SLIT("is not applied to enough type arguments")
+               (env1, tidy_exp_kind) = tidyKind env0 exp_kind
+               (env2, tidy_act_kind) = tidyKind env1 act_kind
 
-		-- Now n_exp_as >= n_act_as. In the next two cases, 
-		-- n_exp_as == 0, and hence so is n_act_as
-	    | isLiftedTypeKind exp_kind && isUnliftedTypeKind act_kind
-	    = ptext SLIT("Expecting a lifted type, but") <+> quotes (ppr ty)
-		<+> ptext SLIT("is unlifted")
+               err | n_exp_as < n_act_as     -- E.g. [Maybe]
+                   = quotes (ppr ty) <+> ptext SLIT("is not applied to enough type arguments")
 
-	    | isUnliftedTypeKind exp_kind && isLiftedTypeKind act_kind
-	    = ptext SLIT("Expecting an unlifted type, but") <+> quotes (ppr ty)
-		<+> ptext SLIT("is lifted")
+                     -- Now n_exp_as >= n_act_as. In the next two cases,
+                     -- n_exp_as == 0, and hence so is n_act_as
+                   | isLiftedTypeKind exp_kind && isUnliftedTypeKind act_kind
+                   = ptext SLIT("Expecting a lifted type, but") <+> quotes (ppr ty)
+                       <+> ptext SLIT("is unlifted")
 
-	    | otherwise 		-- E.g. Monad [Int]
-	    = ptext SLIT("Kind mis-match")
+                   | isUnliftedTypeKind exp_kind && isLiftedTypeKind act_kind
+                   = ptext SLIT("Expecting an unlifted type, but") <+> quotes (ppr ty)
+                       <+> ptext SLIT("is lifted")
 
-	more_info = sep [ ptext SLIT("Expected kind") <+> 
-				quotes (pprKind tidy_exp_kind) <> comma,
-		   	  ptext SLIT("but") <+> quotes (ppr ty) <+> 
-			  	ptext SLIT("has kind") <+> quotes (pprKind tidy_act_kind)]
-   in
-   failWithTcM (env2, err $$ more_info)
-   }
+                   | otherwise               -- E.g. Monad [Int]
+                   = ptext SLIT("Kind mis-match")
+
+               more_info = sep [ ptext SLIT("Expected kind") <+>
+                                     quotes (pprKind tidy_exp_kind) <> comma,
+                                 ptext SLIT("but") <+> quotes (ppr ty) <+>
+                                     ptext SLIT("has kind") <+> quotes (pprKind tidy_act_kind)]
+
+           failWithTcM (env2, err $$ more_info)
 \end{code}
 
 %************************************************************************
@@ -1969,7 +1970,7 @@ check_sig_tyvars
 			--	Guaranteed to be skolems
 	-> TcM ()
 check_sig_tyvars extra_tvs []
-  = returnM ()
+  = return ()
 check_sig_tyvars extra_tvs sig_tvs 
   = ASSERT( all isSkolemTyVar sig_tvs )
     do	{ gbl_tvs <- tcGetGlobalTyVars
@@ -1978,8 +1979,8 @@ check_sig_tyvars extra_tvs sig_tvs
 				      text "extra_tvs" <+> ppr extra_tvs]))
 
 	; let env_tvs = gbl_tvs `unionVarSet` extra_tvs
-	; ifM (any (`elemVarSet` env_tvs) sig_tvs)
-	      (bleatEscapedTvs env_tvs sig_tvs sig_tvs)
+	; when (any (`elemVarSet` env_tvs) sig_tvs)
+	       (bleatEscapedTvs env_tvs sig_tvs sig_tvs)
 	}
 
 bleatEscapedTvs :: TcTyVarSet	-- The global tvs
@@ -2004,7 +2005,7 @@ bleatEscapedTvs globals sig_tvs zonked_tvs
       | not (zonked_tv `elemVarSet` globals) = return (tidy_env, msgs)
       | otherwise
       = do { (tidy_env1, globs) <- findGlobals (unitVarSet zonked_tv) tidy_env
-	   ; returnM (tidy_env1, escape_msg sig_tv zonked_tv globs : msgs) }
+	   ; return (tidy_env1, escape_msg sig_tv zonked_tv globs : msgs) }
 
 -----------------------
 escape_msg sig_tv zonked_tv globs
@@ -2028,8 +2029,8 @@ These two context are used with checkSigTyVars
 \begin{code}
 sigCtxt :: Id -> [TcTyVar] -> TcThetaType -> TcTauType
 	-> TidyEnv -> TcM (TidyEnv, Message)
-sigCtxt id sig_tvs sig_theta sig_tau tidy_env
-  = zonkTcType sig_tau		`thenM` \ actual_tau ->
+sigCtxt id sig_tvs sig_theta sig_tau tidy_env = do
+    actual_tau <- zonkTcType sig_tau
     let
 	(env1, tidy_sig_tvs)    = tidyOpenTyVars tidy_env sig_tvs
 	(env2, tidy_sig_rho)	= tidyOpenType env1 (mkPhiTy sig_theta sig_tau)
@@ -2039,6 +2040,6 @@ sigCtxt id sig_tvs sig_theta sig_tau tidy_env
 		   ]
  	msg = vcat [ptext SLIT("When trying to generalise the type inferred for") <+> quotes (ppr id),
 		    nest 2 sub_msg]
-    in
-    returnM (env3, msg)
+    
+    return (env3, msg)
 \end{code}
