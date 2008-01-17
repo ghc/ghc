@@ -248,13 +248,13 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
     ifOptM Opt_WarnDeprecations	(
        case deprecs of	
 	  DeprecAll txt -> addWarn (moduleDeprec imp_mod_name txt)
-	  other	        -> returnM ()
+	  other	        -> return ()
      )
 
     let new_imp_decl = L loc (ImportDecl loc_imp_mod_name want_boot
                                          qual_only as_mod new_imp_details)
 
-    returnM (new_imp_decl, gbl_env, imports, mi_hpc iface)
+    return (new_imp_decl, gbl_env, imports, mi_hpc iface)
     )
 
 warnRedundantSourceImport mod_name
@@ -296,7 +296,7 @@ importsFromLocalDecls shadowP group fixities
 
         ; traceRn (text "local avails: " <> ppr avails)
 
-	; returnM (gbl_env { tcg_rdr_env = rdr_env',
+	; return (gbl_env { tcg_rdr_env = rdr_env',
                              tcg_fix_env = fix_env'})
 	}
 
@@ -376,9 +376,9 @@ getLocalDeclBinders gbl_env (HsGroup {hs_valds = ValBindsIn val_decls val_sigs,
 				         hs_tyclds = tycl_decls, 
 				         hs_instds = inst_decls,
 				         hs_fords = foreign_decls })
-  = do	{ tc_names_s <- mappM new_tc tycl_decls
-	; at_names_s <- mappM inst_ats inst_decls
-	; val_names  <- mappM new_simple val_bndrs
+  = do	{ tc_names_s <- mapM new_tc tycl_decls
+	; at_names_s <- mapM inst_ats inst_decls
+	; val_names  <- mapM new_simple val_bndrs
 	; return (val_names ++ tc_names_s ++ concat at_names_s) }
   where
     mod        = tcg_mod gbl_env
@@ -398,18 +398,18 @@ getLocalDeclBinders gbl_env (HsGroup {hs_valds = ValBindsIn val_decls val_sigs,
     new_tc tc_decl 
       | isFamInstDecl (unLoc tc_decl)
 	= do { main_name <- lookupFamInstDeclBndr mod main_rdr
-	     ; sub_names <- mappM (newTopSrcBinder mod) sub_rdrs
+	     ; sub_names <- mapM (newTopSrcBinder mod) sub_rdrs
 	     ; return (AvailTC main_name sub_names) }
                 	-- main_name is not bound here!
       | otherwise
 	= do { main_name <- newTopSrcBinder mod main_rdr
-	     ; sub_names <- mappM (newTopSrcBinder mod) sub_rdrs
+	     ; sub_names <- mapM (newTopSrcBinder mod) sub_rdrs
 	     ; return (AvailTC main_name (main_name : sub_names)) }
       where
 	(main_rdr : sub_rdrs) = tyClDeclNames (unLoc tc_decl)
 
     inst_ats inst_decl 
-	= mappM new_tc (instDeclATs (unLoc inst_decl))
+	= mapM new_tc (instDeclATs (unLoc inst_decl))
 
 getLocalDeclBinders _ _ = panic "getLocalDeclBinders"	-- ValBindsOut can't happen
 \end{code}
@@ -825,7 +825,7 @@ exports_from_avail (Just rdr_items) rdr_env imports this_mod
 	, mod `elem` earlier_mods 	-- Duplicate export of M
 	= do { warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
 	       warnIf warn_dup_exports (dupModuleExport mod) ;
-	       returnM acc }
+	       return acc }
 
 	| otherwise
 	= do { implicit_prelude <- doptM Opt_ImplicitPrelude
@@ -952,18 +952,18 @@ check_occs ie occs names
   where
     check occs name
       = case lookupOccEnv occs name_occ of
-	  Nothing -> returnM (extendOccEnv occs name_occ (name, ie))
+	  Nothing -> return (extendOccEnv occs name_occ (name, ie))
 
 	  Just (name', ie') 
 	    | name == name'  	-- Duplicate export
 	    ->	do { warn_dup_exports <- doptM Opt_WarnDuplicateExports ;
 		     warnIf warn_dup_exports (dupExportWarn name_occ ie ie') ;
-		     returnM occs }
+		     return occs }
 
 	    | otherwise		-- Same occ name but different names: an error
 	    ->	do { global_env <- getGlobalRdrEnv ;
   		     addErr (exportClashErr global_env name' name ie' ie) ;
-		     returnM occs }
+		     return occs }
       where
 	name_occ = nameOccName name
 \end{code}
@@ -1013,7 +1013,7 @@ finishDeprecations dflags mod_deprec tcg_env
 	  extra | imp_mod == moduleName name_mod = empty
 		| otherwise = ptext SLIT(", but defined in") <+> ppr name_mod
 
-    check hpt pit ok_gre = returnM ()	-- Local, or not used, or not deprectated
+    check hpt pit ok_gre = return ()	-- Local, or not used, or not deprectated
 	    -- The Imported pattern-match: don't deprecate locally defined names
 	    -- For a start, we may be exporting a deprecated thing
 	    -- Also we may use a deprecated thing in the defn of another
@@ -1231,7 +1231,7 @@ warnDuplicateImports :: [GlobalRdrElt] -> RnM ()
 
 warnDuplicateImports gres
   = ifOptM Opt_WarnUnusedImports $ 
-    sequenceM_	[ warn name pr
+    sequence_	[ warn name pr
 		| GRE { gre_name = name, gre_prov = Imported imps } <- gres
 		, pr <- redundants imps ]
   where
@@ -1299,7 +1299,7 @@ printMinimalImports :: FiniteMap ModuleName AvailEnv	-- Minimal imports
 printMinimalImports imps
  = ifOptM Opt_D_dump_minimal_imports $ do {
 
-   mod_ies  <-  initIfaceTcRn $ mappM to_ies (fmToList imps) ;
+   mod_ies  <-  initIfaceTcRn $ mapM to_ies (fmToList imps) ;
    this_mod <- getModule ;
    rdr_env  <- getGlobalRdrEnv ;
    dflags   <- getDOpts ;
@@ -1319,25 +1319,25 @@ printMinimalImports imps
 		    parens (fsep (punctuate comma (map ppr ies)))
 
     to_ies (mod, avail_env) = do ies <- mapM to_ie (availEnvElts avail_env)
-                                 returnM (mod, ies)
+                                 return (mod, ies)
 
     to_ie :: AvailInfo -> IfG (IE Name)
 	-- The main trick here is that if we're importing all the constructors
 	-- we want to say "T(..)", but if we're importing only a subset we want
 	-- to say "T(A,B,C)".  So we have to find out what the module exports.
-    to_ie (Avail n)       = returnM (IEVar n)
+    to_ie (Avail n)       = return (IEVar n)
     to_ie (AvailTC n [m]) = ASSERT( n==m ) 
-			    returnM (IEThingAbs n)
-    to_ie (AvailTC n ns)  
-	= loadSysInterface doc n_mod			`thenM` \ iface ->
+			    return (IEThingAbs n)
+    to_ie (AvailTC n ns)  = do
+          iface <- loadSysInterface doc n_mod
 	  case [xs | (m,as) <- mi_exports iface,
 		     m == n_mod,
 		     AvailTC x xs <- as, 
 		     x == nameOccName n] of
-	      [xs] | all_used xs -> returnM (IEThingAll n)
-		   | otherwise	 -> returnM (IEThingWith n (filter (/= n) ns))
+	      [xs] | all_used xs -> return (IEThingAll n)
+		   | otherwise	 -> return (IEThingWith n (filter (/= n) ns))
 	      other		 -> pprTrace "to_ie" (ppr n <+> ppr n_mod <+> ppr other) $
-				    returnM (IEVar n)
+				    return (IEVar n)
 	where
 	  all_used avail_occs = all (`elem` map nameOccName ns) avail_occs
 	  doc = text "Compute minimal imports from" <+> ppr n
