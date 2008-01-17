@@ -57,6 +57,8 @@ import ListSetOps
 import Maybes
 import Outputable
 import FastString
+
+import Control.Monad
 \end{code}
 
 %************************************************************************
@@ -94,11 +96,11 @@ tcPolyExprNC expr res_ty
 
 ---------------
 tcPolyExprs :: [LHsExpr Name] -> [TcType] -> TcM [LHsExpr TcId]
-tcPolyExprs [] [] = returnM []
+tcPolyExprs [] [] = return []
 tcPolyExprs (expr:exprs) (ty:tys)
  = do 	{ expr'  <- tcPolyExpr  expr  ty
 	; exprs' <- tcPolyExprs exprs tys
-	; returnM (expr':exprs') }
+	; return (expr':exprs') }
 tcPolyExprs exprs tys = pprPanic "tcPolyExprs" (ppr exprs $$ ppr tys)
 
 ---------------
@@ -139,10 +141,10 @@ tcExpr (HsPar expr)     res_ty = do { expr' <- tcMonoExpr expr res_ty
 				    ; return (HsPar expr') }
 
 tcExpr (HsSCC lbl expr) res_ty = do { expr' <- tcMonoExpr expr res_ty
-				    ; returnM (HsSCC lbl expr') }
+				    ; return (HsSCC lbl expr') }
 tcExpr (HsTickPragma info expr) res_ty 
        		     	       = do { expr' <- tcMonoExpr expr res_ty
-				    ; returnM (HsTickPragma info expr') }
+				    ; return (HsTickPragma info expr') }
 
 tcExpr (HsCoreAnn lbl expr) res_ty 	 -- hdaume: core annotation
   = do	{ expr' <- tcMonoExpr expr res_ty
@@ -290,15 +292,15 @@ tcExpr (HsDo do_or_lc stmts body _) res_ty
 
 tcExpr in_expr@(ExplicitList _ exprs) res_ty	-- Non-empty list
   = do 	{ (elt_ty, coi) <- boxySplitListTy res_ty
-	; exprs' <- mappM (tc_elt elt_ty) exprs
+	; exprs' <- mapM (tc_elt elt_ty) exprs
 	; return $ mkHsWrapCoI coi (ExplicitList elt_ty exprs') }
   where
     tc_elt elt_ty expr = tcPolyExpr expr elt_ty
 
 tcExpr in_expr@(ExplicitPArr _ exprs) res_ty	-- maybe empty
   = do	{ (elt_ty, coi) <- boxySplitPArrTy res_ty
-    	; exprs' <- mappM (tc_elt elt_ty) exprs	
-	; ifM (null exprs) (zapToMonotype elt_ty)
+    	; exprs' <- mapM (tc_elt elt_ty) exprs	
+	; when (null exprs) (zapToMonotype elt_ty >> return ())
 		-- If there are no expressions in the comprehension
 		-- we must still fill in the box
 		-- (Not needed for [] and () becuase they happen
@@ -361,7 +363,7 @@ tcExpr expr@(RecordCon (L loc con_name) _ rbinds) res_ty
 
 	; (con_expr, rbinds') <- tcIdApp con_name arity check_fields res_ty
 
-	; returnM (RecordCon (L loc (dataConWrapId data_con)) con_expr rbinds') }
+	; return (RecordCon (L loc (dataConWrapId data_con)) con_expr rbinds') }
 
 -- The main complication with RecordUpd is that we need to explicitly
 -- handle the *non-updated* fields.  Consider:
@@ -396,14 +398,14 @@ tcExpr expr@(RecordCon (L loc con_name) _ rbinds) res_ty
 -- don't know how to do the update otherwise.
 
 
-tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
-  = 	-- STEP 0
+tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty = do
+	-- STEP 0
 	-- Check that the field names are really field names
     let 
 	field_names = hsRecFields rbinds
-    in
-    ASSERT( notNull field_names )
-    mappM tcLookupField field_names	`thenM` \ sel_ids ->
+
+    MASSERT( notNull field_names )
+    sel_ids <- mapM tcLookupField field_names
 	-- The renamer has already checked that they
 	-- are all in scope
     let
@@ -412,8 +414,8 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
 		     not (isRecordSelector sel_id), 	-- Excludes class ops
 		     let L loc field_name = hsRecFieldId fld
 		   ]
-    in
-    checkM (null bad_guys) (sequenceM bad_guys `thenM_` failM)	`thenM_`
+
+    unless (null bad_guys) (sequence bad_guys >> failM)
     
 	-- STEP 1
 	-- Figure out the tycon and data cons from the first field name
@@ -426,18 +428,17 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
 
 	relevant_cons   = filter is_relevant data_cons
 	is_relevant con = all (`elem` dataConFieldLabels con) field_names
-    in
 
 	-- STEP 2
 	-- Check that at least one constructor has all the named fields
 	-- i.e. has an empty set of bad fields returned by badFields
     checkTc (not (null relevant_cons))
-	    (badFieldsUpd rbinds)	`thenM_`
+	    (badFieldsUpd rbinds)
 
 	-- Check that all relevant data cons are vanilla.  Doing record updates on 
 	-- GADTs and/or existentials is more than my tiny brain can cope with today
     checkTc (all isVanillaDataCon relevant_cons)
-	    (nonVanillaUpd tycon)	`thenM_`
+	    (nonVanillaUpd tycon)
 
 	-- STEP 4
 	-- Use the un-updated fields to find a vector of booleans saying
@@ -457,12 +458,12 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
  	is_common_tv tv = tv `elemVarSet` common_tyvars
 
 	mk_inst_ty tv result_inst_ty 
-	  | is_common_tv tv = returnM result_inst_ty		-- Same as result type
+	  | is_common_tv tv = return result_inst_ty		-- Same as result type
 	  | otherwise	    = newFlexiTyVarTy (tyVarKind tv)	-- Fresh type, of correct kind
-    in
-    ASSERT( null theta )	-- Vanilla datacon
-    tcInstTyVars con1_tyvars				`thenM` \ (_, result_inst_tys, result_inst_env) ->
-    zipWithM mk_inst_ty con1_tyvars result_inst_tys	`thenM` \ scrut_inst_tys ->
+
+    MASSERT( null theta )	-- Vanilla datacon
+    (_, result_inst_tys, result_inst_env) <- tcInstTyVars con1_tyvars
+    scrut_inst_tys <- zipWithM mk_inst_ty con1_tyvars result_inst_tys
 
 	-- STEP 3: Typecheck the update bindings.
 	-- Do this after checking for bad fields in case 
@@ -471,9 +472,9 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
 	result_ty     = substTy result_inst_env con1_res_ty
 	con1_arg_tys' = map (substTy result_inst_env) con1_arg_tys
 	origin 	      = RecordUpdOrigin
-    in
-    tcSubExp origin result_ty res_ty		`thenM` \ co_fn ->
-    tcRecordBinds con1 con1_arg_tys' rbinds	`thenM` \ rbinds' ->
+
+    co_fn   <- tcSubExp origin result_ty res_ty
+    rbinds' <- tcRecordBinds con1 con1_arg_tys' rbinds
 
 	-- STEP 5: Typecheck the expression to be updated
     let
@@ -481,8 +482,8 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
 	scrut_ty = substTy scrut_inst_env con1_res_ty
 	-- This is one place where the isVanilla check is important
 	-- So that inst_tys matches the con1_tyvars
-    in
-    tcMonoExpr record_expr scrut_ty		`thenM` \ record_expr' ->
+
+    record_expr' <- tcMonoExpr record_expr scrut_ty
 
 	-- STEP 6: Figure out the LIE we need.  
 	-- We have to generate some dictionaries for the data type context, 
@@ -491,17 +492,17 @@ tcExpr expr@(RecordUpd record_expr rbinds _ _ _) res_ty
 	-- What dictionaries do we need?  The dataConStupidTheta tells us.
     let
 	theta' = substTheta scrut_inst_env (dataConStupidTheta con1)
-    in
-    instStupidTheta origin theta'	`thenM_`
+
+    instStupidTheta origin theta'
 
 	-- Step 7: make a cast for the scrutinee, in the case that it's from a type family
     let scrut_co | Just co_con <- tyConFamilyCoercion_maybe tycon 
 		 = WpCo $ mkTyConApp co_con scrut_inst_tys
 		 | otherwise
 		 = idHsWrapper
-    in
+
 	-- Phew!
-    returnM (mkHsWrap co_fn (RecordUpd (mkLHsWrap scrut_co record_expr') rbinds'
+    return (mkHsWrap co_fn (RecordUpd (mkLHsWrap scrut_co record_expr') rbinds'
 				       relevant_cons scrut_inst_tys result_inst_tys))
 \end{code}
 
@@ -1086,7 +1087,7 @@ tcRecordBinds
 	-> TcM (HsRecordBinds TcId)
 
 tcRecordBinds data_con arg_tys (HsRecFields rbinds dd)
-  = do	{ mb_binds <- mappM do_bind rbinds
+  = do	{ mb_binds <- mapM do_bind rbinds
 	; return (HsRecFields (catMaybes mb_binds) dd) }
   where
     flds_w_tys = zipEqual "tcRecordBinds" (dataConFieldLabels data_con) arg_tys
@@ -1109,14 +1110,14 @@ checkMissingFields data_con rbinds
 	-- Illegal if any arg is strict
 	addErrTc (missingStrictFields data_con [])
     else
-	returnM ()
+	return ()
 			
-  | otherwise		-- A record
-  = checkM (null missing_s_fields)
-	   (addErrTc (missingStrictFields data_con missing_s_fields))	`thenM_`
+  | otherwise = do		-- A record
+    unless (null missing_s_fields)
+	   (addErrTc (missingStrictFields data_con missing_s_fields))
 
-    doptM Opt_WarnMissingFields		`thenM` \ warn ->
-    checkM (not (warn && notNull missing_ns_fields))
+    warn <- doptM Opt_WarnMissingFields
+    unless (not (warn && notNull missing_ns_fields))
 	   (warnTc True (missingFields data_con missing_ns_fields))
 
   where
