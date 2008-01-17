@@ -100,7 +100,7 @@ import Data.List
 import TypeRep
 import Class
 
-import Control.Monad ( liftM )
+import Control.Monad
 \end{code}
 
 
@@ -367,15 +367,15 @@ cloneDict other = pprPanic "cloneDict" (ppr other)
 -- scope, so we make up a new namea.
 newIPDict :: InstOrigin -> IPName Name -> Type 
 	  -> TcM (IPName Id, Inst)
-newIPDict orig ip_name ty
-  = getInstLoc orig			`thenM` \ inst_loc ->
-    newUnique				`thenM` \ uniq ->
+newIPDict orig ip_name ty = do
+    inst_loc <- getInstLoc orig
+    uniq <- newUnique
     let
 	pred = IParam ip_name ty
         name = mkPredName uniq inst_loc pred 
 	dict = Dict {tci_name = name, tci_pred = pred, tci_loc = inst_loc}
-    in
-    returnM (mapIPName (\n -> instToId dict) ip_name, dict)
+    
+    return (mapIPName (\n -> instToId dict) ip_name, dict)
 \end{code}
 
 
@@ -405,22 +405,22 @@ mkPredName uniq loc pred_ty
 
 \begin{code}
 newMethodFromName :: InstOrigin -> BoxyRhoType -> Name -> TcM TcId
-newMethodFromName origin ty name
-  = tcLookupId name		`thenM` \ id ->
+newMethodFromName origin ty name = do
+    id <- tcLookupId name
 	-- Use tcLookupId not tcLookupGlobalId; the method is almost
 	-- always a class op, but with -fno-implicit-prelude GHC is
 	-- meant to find whatever thing is in scope, and that may
 	-- be an ordinary function. 
-    getInstLoc origin		`thenM` \ loc ->
-    tcInstClassOp loc id [ty]	`thenM` \ inst ->
-    extendLIE inst		`thenM_`
-    returnM (instToId inst)
+    loc <- getInstLoc origin
+    inst <- tcInstClassOp loc id [ty]
+    extendLIE inst
+    return (instToId inst)
 
-newMethodWithGivenTy orig id tys
-  = getInstLoc orig		`thenM` \ loc ->
-    newMethod loc id tys	`thenM` \ inst ->
-    extendLIE inst		`thenM_`
-    returnM (instToId inst)
+newMethodWithGivenTy orig id tys = do
+    loc <- getInstLoc orig
+    inst <- newMethod loc id tys
+    extendLIE inst
+    return (instToId inst)
 
 --------------------------------------------
 -- tcInstClassOp, and newMethod do *not* drop the 
@@ -434,11 +434,10 @@ newMethodWithGivenTy orig id tys
 --     Hence the call to checkKind
 -- A worry: is this needed anywhere else?
 tcInstClassOp :: InstLoc -> Id -> [TcType] -> TcM Inst
-tcInstClassOp inst_loc sel_id tys
-  = let
+tcInstClassOp inst_loc sel_id tys = do
+    let
 	(tyvars, _rho) = tcSplitForAllTys (idType sel_id)
-    in
-    zipWithM_ checkKind tyvars tys	`thenM_` 
+    zipWithM_ checkKind tyvars tys
     newMethod inst_loc sel_id tys
 
 checkKind :: TyVar -> TcType -> TcM ()
@@ -459,16 +458,16 @@ checkKind tv ty
 
 
 ---------------------------
-newMethod inst_loc id tys
-  = newUnique		`thenM` \ new_uniq ->
+newMethod inst_loc id tys = do
+    new_uniq <- newUnique
     let
 	(theta,tau) = tcSplitPhiTy (applyTys (idType id) tys)
 	meth_id	    = mkUserLocal (mkMethodOcc (getOccName id)) new_uniq tau loc
 	inst        = Method {tci_id = meth_id, tci_oid = id, tci_tys = tys,
 			      tci_theta = theta, tci_loc = inst_loc}
 	loc         = instLocSpan inst_loc
-    in
-    returnM inst
+    
+    return inst
 \end{code}
 
 \begin{code}
@@ -497,22 +496,22 @@ shortCutStringLit s ty
   | otherwise = Nothing
 
 mkIntegerLit :: Integer -> TcM (LHsExpr TcId)
-mkIntegerLit i
-  = tcMetaTy integerTyConName 	`thenM` \ integer_ty ->
-    getSrcSpanM			`thenM` \ span -> 
-    returnM (L span $ HsLit (HsInteger i integer_ty))
+mkIntegerLit i = do
+    integer_ty <- tcMetaTy integerTyConName
+    span <- getSrcSpanM
+    return (L span $ HsLit (HsInteger i integer_ty))
 
 mkRatLit :: Rational -> TcM (LHsExpr TcId)
-mkRatLit r
-  = tcMetaTy rationalTyConName 	`thenM` \ rat_ty ->
-    getSrcSpanM			`thenM` \ span -> 
-    returnM (L span $ HsLit (HsRat r rat_ty))
+mkRatLit r = do
+    rat_ty <- tcMetaTy rationalTyConName
+    span <- getSrcSpanM
+    return (L span $ HsLit (HsRat r rat_ty))
 
 mkStrLit :: FastString -> TcM (LHsExpr TcId)
-mkStrLit s
-  = --tcMetaTy stringTyConName 	`thenM` \ string_ty ->
-    getSrcSpanM			`thenM` \ span -> 
-    returnM (L span $ HsLit (HsString s))
+mkStrLit s = do
+    --string_ty <- tcMetaTy stringTyConName
+    span <- getSrcSpanM
+    return (L span $ HsLit (HsString s))
 
 isHsVar :: HsExpr Name -> Name -> Bool
 isHsVar (HsVar f) g = f==g
@@ -530,24 +529,24 @@ Zonking makes sure that the instance types are fully zonked.
 
 \begin{code}
 zonkInst :: Inst -> TcM Inst
-zonkInst dict@(Dict { tci_pred = pred})
-  = zonkTcPredType pred			`thenM` \ new_pred ->
-    returnM (dict {tci_pred = new_pred})
+zonkInst dict@(Dict { tci_pred = pred}) = do
+    new_pred <- zonkTcPredType pred
+    return (dict {tci_pred = new_pred})
 
-zonkInst meth@(Method {tci_oid = id, tci_tys = tys, tci_theta = theta}) 
-  = zonkId id			`thenM` \ new_id ->
+zonkInst meth@(Method {tci_oid = id, tci_tys = tys, tci_theta = theta}) = do
+    new_id <- zonkId id
 	-- Essential to zonk the id in case it's a local variable
 	-- Can't use zonkIdOcc because the id might itself be
 	-- an InstId, in which case it won't be in scope
 
-    zonkTcTypes tys		`thenM` \ new_tys ->
-    zonkTcThetaType theta	`thenM` \ new_theta ->
-    returnM (meth { tci_oid = new_id, tci_tys = new_tys, tci_theta = new_theta })
+    new_tys <- zonkTcTypes tys
+    new_theta <- zonkTcThetaType theta
+    return (meth { tci_oid = new_id, tci_tys = new_tys, tci_theta = new_theta })
 	-- No need to zonk the tci_id
 
-zonkInst lit@(LitInst {tci_ty = ty})
-  = zonkTcType ty			`thenM` \ new_ty ->
-    returnM (lit {tci_ty = new_ty})
+zonkInst lit@(LitInst {tci_ty = ty}) = do
+    new_ty <- zonkTcType ty
+    return (lit {tci_ty = new_ty})
 
 zonkInst implic@(ImplicInst {})
   = ASSERT( all isImmutableTyVar (tci_tyvars implic) )
@@ -564,7 +563,7 @@ zonkInst eqinst@(EqInst {tci_left = ty1, tci_right = ty2})
        ; return (eqinst {tci_co = co', tci_left= ty1', tci_right = ty2' })
        }
 
-zonkInsts insts = mappM zonkInst insts
+zonkInsts insts = mapM zonkInst insts
 \end{code}
 
 
@@ -784,37 +783,37 @@ lookupSimpleInst (Method {tci_oid = id, tci_tys = tys, tci_theta = theta, tci_lo
 
 lookupSimpleInst (LitInst {tci_lit = HsIntegral i from_integer_name _, tci_ty = ty, tci_loc = loc})
   | Just expr <- shortCutIntLit i ty
-  = returnM (GenInst [] (noLoc expr))
+  = return (GenInst [] (noLoc expr))
   | otherwise
-  = ASSERT( from_integer_name `isHsVar` fromIntegerName )	-- A LitInst invariant
-    tcLookupId fromIntegerName			`thenM` \ from_integer ->
-    tcInstClassOp loc from_integer [ty]		`thenM` \ method_inst ->
-    mkIntegerLit i				`thenM` \ integer_lit ->
-    returnM (GenInst [method_inst]
+  = ASSERT( from_integer_name `isHsVar` fromIntegerName ) do	-- A LitInst invariant
+    from_integer <- tcLookupId fromIntegerName
+    method_inst <- tcInstClassOp loc from_integer [ty]
+    integer_lit <- mkIntegerLit i
+    return (GenInst [method_inst]
 		     (mkHsApp (L (instLocSpan loc)
 			   	 (HsVar (instToId method_inst))) integer_lit))
 
 lookupSimpleInst (LitInst {tci_lit = HsFractional f from_rat_name _, tci_ty = ty, tci_loc = loc})
   | Just expr <- shortCutFracLit f ty
-  = returnM (GenInst [] (noLoc expr))
+  = return (GenInst [] (noLoc expr))
 
   | otherwise
-  = ASSERT( from_rat_name `isHsVar` fromRationalName )	-- A LitInst invariant
-    tcLookupId fromRationalName			`thenM` \ from_rational ->
-    tcInstClassOp loc from_rational [ty]	`thenM` \ method_inst ->
-    mkRatLit f					`thenM` \ rat_lit ->
-    returnM (GenInst [method_inst] (mkHsApp (L (instLocSpan loc) 
+  = ASSERT( from_rat_name `isHsVar` fromRationalName ) do	-- A LitInst invariant
+    from_rational <- tcLookupId fromRationalName
+    method_inst <- tcInstClassOp loc from_rational [ty]
+    rat_lit <- mkRatLit f
+    return (GenInst [method_inst] (mkHsApp (L (instLocSpan loc) 
 					       (HsVar (instToId method_inst))) rat_lit))
 
 lookupSimpleInst (LitInst {tci_lit = HsIsString s from_string_name _, tci_ty = ty, tci_loc = loc})
   | Just expr <- shortCutStringLit s ty
-  = returnM (GenInst [] (noLoc expr))
+  = return (GenInst [] (noLoc expr))
   | otherwise
-  = ASSERT( from_string_name `isHsVar` fromStringName )	-- A LitInst invariant
-    tcLookupId fromStringName			`thenM` \ from_string ->
-    tcInstClassOp loc from_string [ty]		`thenM` \ method_inst ->
-    mkStrLit s					`thenM` \ string_lit ->
-    returnM (GenInst [method_inst]
+  = ASSERT( from_string_name `isHsVar` fromStringName ) do	-- A LitInst invariant
+    from_string <- tcLookupId fromStringName
+    method_inst <- tcInstClassOp loc from_string [ty]
+    string_lit <- mkStrLit s
+    return (GenInst [method_inst]
 		     (mkHsApp (L (instLocSpan loc)
 			   	 (HsVar (instToId method_inst))) string_lit))
 
@@ -837,17 +836,17 @@ lookupSimpleInst (Dict {tci_pred = pred, tci_loc = loc})
 
     ; let inst_tv (Left tv)  = do { tv' <- tcInstTyVar tv; return (mkTyVarTy tv') }
 	  inst_tv (Right ty) = return ty
-    ; tys <- mappM inst_tv mb_inst_tys
+    ; tys <- mapM inst_tv mb_inst_tys
     ; let
     	(theta, _) = tcSplitPhiTy (applyTys (idType dfun_id) tys)
 	src_loc	   = instLocSpan loc
 	dfun	   = HsVar dfun_id
     ; if null theta then
-    	returnM (GenInst [] (L src_loc $ HsWrap (mkWpTyApps tys) dfun))
+        return (GenInst [] (L src_loc $ HsWrap (mkWpTyApps tys) dfun))
       else do
     { (dict_app, dicts) <- getLIE $ instCallDicts loc theta -- !!!
     ; let co_fn = dict_app <.> mkWpTyApps tys
-    ; returnM (GenInst dicts (L src_loc $ HsWrap co_fn dfun))
+    ; return (GenInst dicts (L src_loc $ HsWrap co_fn dfun))
     }}}}
 
 ---------------
@@ -943,36 +942,36 @@ tcSyntaxName :: InstOrigin
 
 tcSyntaxName orig ty (std_nm, HsVar user_nm)
   | std_nm == user_nm
-  = newMethodFromName orig ty std_nm	`thenM` \ id ->
-    returnM (std_nm, HsVar id)
+  = do id <- newMethodFromName orig ty std_nm
+       return (std_nm, HsVar id)
 
-tcSyntaxName orig ty (std_nm, user_nm_expr)
-  = tcLookupId std_nm		`thenM` \ std_id ->
+tcSyntaxName orig ty (std_nm, user_nm_expr) = do
+    std_id <- tcLookupId std_nm
     let	
 	-- C.f. newMethodAtLoc
 	([tv], _, tau)  = tcSplitSigmaTy (idType std_id)
  	sigma1		= substTyWith [tv] [ty] tau
 	-- Actually, the "tau-type" might be a sigma-type in the
 	-- case of locally-polymorphic methods.
-    in
-    addErrCtxtM (syntaxNameCtxt user_nm_expr orig sigma1)	$
+
+    addErrCtxtM (syntaxNameCtxt user_nm_expr orig sigma1) $ do
 
 	-- Check that the user-supplied thing has the
 	-- same type as the standard one.  
 	-- Tiresome jiggling because tcCheckSigma takes a located expression
-    getSrcSpanM					`thenM` \ span -> 
-    tcPolyExpr (L span user_nm_expr) sigma1	`thenM` \ expr ->
-    returnM (std_nm, unLoc expr)
+     span <- getSrcSpanM
+     expr <- tcPolyExpr (L span user_nm_expr) sigma1
+     return (std_nm, unLoc expr)
 
-syntaxNameCtxt name orig ty tidy_env
-  = getInstLoc orig		`thenM` \ inst_loc ->
+syntaxNameCtxt name orig ty tidy_env = do
+    inst_loc <- getInstLoc orig
     let
 	msg = vcat [ptext SLIT("When checking that") <+> quotes (ppr name) <+> 
 				ptext SLIT("(needed by a syntactic construct)"),
 		    nest 2 (ptext SLIT("has the required type:") <+> ppr (tidyType tidy_env ty)),
 		    nest 2 (ptext SLIT("arising from") <+> pprInstLoc inst_loc)]
-    in
-    returnM (tidy_env, msg)
+    
+    return (tidy_env, msg)
 \end{code}
 
 %************************************************************************
