@@ -1097,8 +1097,8 @@ runPhase_MoveBinary dflags input_fn dep_packages
 	case (dynLibLoader dflags) of
 	  Wrapped wrapmode ->
 	      do
-		let (o_base, o_ext) = splitFilename input_fn
-		let wrapped_executable | o_ext == "exe" = (o_base ++ "_real") `joinFileExt` o_ext
+		let (o_base, o_ext) = splitExtension input_fn
+		let wrapped_executable | o_ext == "exe" = (o_base ++ "_real") <.> o_ext
 				       | otherwise = input_fn ++ "_real"
 		behaviour <- wrapper_behaviour dflags wrapmode dep_packages
 
