@@ -38,7 +38,7 @@ import Panic		( try, tryUser, tryMost, Exception(..) )
 import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
 import System.IO.Unsafe	( unsafeInterleaveIO )
 import System.IO	( fixIO )
-
+import MonadUtils
 
 ----------------------------------------------------------------------
 --		Defining the monad type
@@ -49,13 +49,17 @@ newtype IOEnv env a = IOEnv (env -> IO a)
 unIOEnv (IOEnv m) = m
 
 instance Monad (IOEnv m) where
-  (>>=)  = thenM
-  (>>)   = thenM_
-  return = returnM
-  fail s = failM	-- Ignore the string
+    (>>=)  = thenM
+    (>>)   = thenM_
+    return = returnM
+    fail s = failM	-- Ignore the string
+
+instance Applicative (IOEnv m) where
+    pure = returnM
+    IOEnv f <*> IOEnv x = IOEnv (\ env -> f env <*> x env )
 
 instance Functor (IOEnv m) where
-  fmap f (IOEnv m) = IOEnv (\ env -> fmap f (m env))
+    fmap f (IOEnv m) = IOEnv (\ env -> fmap f (m env))
 
 returnM :: a -> IOEnv env a
 returnM a = IOEnv (\ env -> return a)
