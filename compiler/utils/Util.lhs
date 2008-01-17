@@ -163,22 +163,22 @@ zipWithEqual  _ = zipWith
 zipWith3Equal _ = zipWith3
 zipWith4Equal _ = zipWith4
 #else
-zipEqual msg []     []     = []
+zipEqual _   []     []     = []
 zipEqual msg (a:as) (b:bs) = (a,b) : zipEqual msg as bs
-zipEqual msg as     bs     = panic ("zipEqual: unequal lists:"++msg)
+zipEqual msg _      _      = panic ("zipEqual: unequal lists:"++msg)
 
 zipWithEqual msg z (a:as) (b:bs)=  z a b : zipWithEqual msg z as bs
-zipWithEqual msg _ [] []        =  []
+zipWithEqual _   _ [] []        =  []
 zipWithEqual msg _ _ _          =  panic ("zipWithEqual: unequal lists:"++msg)
 
 zipWith3Equal msg z (a:as) (b:bs) (c:cs)
                                 =  z a b c : zipWith3Equal msg z as bs cs
-zipWith3Equal msg _ [] []  []   =  []
+zipWith3Equal _   _ [] []  []   =  []
 zipWith3Equal msg _ _  _   _    =  panic ("zipWith3Equal: unequal lists:"++msg)
 
 zipWith4Equal msg z (a:as) (b:bs) (c:cs) (d:ds)
                                 =  z a b c d : zipWith4Equal msg z as bs cs ds
-zipWith4Equal msg _ [] [] [] [] =  []
+zipWith4Equal _   _ [] [] [] [] =  []
 zipWith4Equal msg _ _  _  _  _  =  panic ("zipWith4Equal: unequal lists:"++msg)
 #endif
 \end{code}
@@ -333,7 +333,7 @@ notElem__ x (y:ys) = x /= y && notElem__ x ys
 isIn msg x ys
   = elem (_ILIT 0) x ys
   where
-    elem i _ []        = False
+    elem _ _ []        = False
     elem i x (y:ys)
       | i ># _ILIT 100 = trace ("Over-long elem in " ++ msg)
                                (x `List.elem` (y:ys))
@@ -342,7 +342,7 @@ isIn msg x ys
 isn'tIn msg x ys
   = notElem (_ILIT 0) x ys
   where
-    notElem i x [] =  True
+    notElem _ _ [] =  True
     notElem i x (y:ys)
       | i ># _ILIT 100 = trace ("Over-long notElem in " ++ msg)
                                (x `List.notElem` (y:ys))
