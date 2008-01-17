@@ -60,7 +60,7 @@ regAlloc dflags regsFree slotsFree code
 	return	( code_final
 		, reverse debug_codeGraphs )
 
-regAlloc_spin dflags (spinCount :: Int) triv regsFree slotsFree debug_codeGraphs code
+regAlloc_spin dflags spinCount triv regsFree slotsFree debug_codeGraphs code
  = do
  	-- if any of these dump flags are turned on we want to hang on to
 	--	intermediate structures in the allocator - otherwise tell the

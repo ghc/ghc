@@ -860,7 +860,7 @@ zonkRules :: ZonkEnv -> [LRuleDecl TcId] -> TcM [LRuleDecl Id]
 zonkRules env rs = mappM (wrapLocM (zonkRule env)) rs
 
 zonkRule :: ZonkEnv -> RuleDecl TcId -> TcM (RuleDecl Id)
-zonkRule env (HsRule name act (vars::[RuleBndr TcId]) lhs fv_lhs rhs fv_rhs)
+zonkRule env (HsRule name act (vars{-::[RuleBndr TcId]-}) lhs fv_lhs rhs fv_rhs)
   = mappM zonk_bndr vars		`thenM` \ new_bndrs ->
     newMutVar emptyVarSet		`thenM` \ unbound_tv_set ->
     let

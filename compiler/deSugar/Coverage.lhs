@@ -29,7 +29,7 @@ import FiniteMap
 
 import Data.Array
 import System.IO   (FilePath)
-#if __GLASGOW_HASKELL__ < 603
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 603
 import Compat.Directory ( createDirectoryIfMissing )
 #else
 import System.Directory ( createDirectoryIfMissing )

@@ -33,7 +33,9 @@ module FastString
 	mkFastStringBytes,
         mkFastStringByteList,
 	mkFastStringForeignPtr,
+#if defined(__GLASGOW_HASKELL__)
 	mkFastString#,
+#endif
 	mkZFastString,
 	mkZFastStringBytes,
 
@@ -65,8 +67,15 @@ module FastString
 
 	-- * LitStrings
 	LitString, 
+#if defined(__GLASGOW_HASKELL__)
 	mkLitString#,
-	strLength
+#else
+	mkLitString,
+#endif
+	unpackLitString,
+	strLength,
+
+	ptrStrLength
        ) where
 
 -- This #define suppresses the "import FastString" that
@@ -75,6 +84,8 @@ module FastString
 #include "HsVersions.h"
 
 import Encoding
+import FastTypes
+import FastFunctions
 
 import Foreign
 import Foreign.C
@@ -84,6 +95,7 @@ import Control.Monad.ST	( stToIO )
 import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
 import System.IO	( hPutBuf )
 import Data.Maybe	( isJust )
+import Data.Char	( ord )
 
 import GHC.ST
 import GHC.IOBase	( IO(..) )
@@ -188,7 +200,7 @@ updTbl fs_table_var (FastStringTable uid arr#) (I# i#) ls = do
   writeIORef fs_table_var (FastStringTable (uid+1) arr#)
 
 mkFastString# :: Addr# -> FastString
-mkFastString# a# = mkFastStringBytes ptr (strLength ptr)
+mkFastString# a# = mkFastStringBytes ptr (ptrStrLength ptr)
   where ptr = Ptr a#
 
 mkFastStringBytes :: Ptr Word8 -> Int -> FastString
@@ -352,10 +364,10 @@ hashStr  :: Ptr Word8 -> Int -> Int
  -- use the Addr to produce a hash value between 0 & m (inclusive)
 hashStr (Ptr a#) (I# len#) = loop 0# 0#
    where 
-    loop h n | n ==# len# = I# h
-	     | otherwise  = loop h2 (n +# 1#)
+    loop h n | n GHC.Exts.==# len# = I# h
+	     | otherwise  = loop h2 (n GHC.Exts.+# 1#)
 	  where c = ord# (indexCharOffAddr# a# n)
-		h2 = (c +# (h *# 128#)) `remInt#` hASH_TBL_SIZE#
+		h2 = (c GHC.Exts.+# (h GHC.Exts.*# 128#)) `remInt#` hASH_TBL_SIZE#
 
 -- -----------------------------------------------------------------------------
 -- Operations
@@ -446,8 +458,8 @@ tailFS (FastString _ n_bytes _ buf enc) =
 consFS :: Char -> FastString -> FastString
 consFS c fs = mkFastString (c : unpackFS fs)
 
-uniqueOfFS :: FastString -> Int#
-uniqueOfFS (FastString (I# u#) _ _ _ _) = u#
+uniqueOfFS :: FastString -> FastInt
+uniqueOfFS (FastString u _ _ _ _) = iUnbox u
 
 nilFS = mkFastString ""
 
@@ -475,23 +487,77 @@ hPutFS handle (FastString _ len _ fp _)
 -- -----------------------------------------------------------------------------
 -- LitStrings, here for convenience only.
 
-type LitString = Ptr ()
+-- hmm, not unboxed (or rather FastPtr), interesting
+--a.k.a. Ptr CChar, Ptr Word8, Ptr (), hmph.  We don't
+--really care about C types in naming, where we can help it.
+type LitString = Ptr Word8
+--Why do we recalculate length every time it's requested?
+--If it's commonly needed, we should perhaps have
+--data LitString = LitString {-#UNPACK#-}!(FastPtr Word8) {-#UNPACK#-}!FastInt
 
+#if defined(__GLASGOW_HASKELL__)
 mkLitString# :: Addr# -> LitString
 mkLitString# a# = Ptr a#
+#endif
 
-foreign import ccall unsafe "ghc_strlen" 
-  strLength :: Ptr () -> Int
+--can/should we use FastTypes here?
+--Is this likely to be memory-preserving if only used on constant strings?
+--should we inline it? If lucky, that would make a CAF that wouldn't
+--be computationally repeated... although admittedly we're not
+--really intending to use mkLitString when __GLASGOW_HASKELL__...
+--(I wonder, is unicode / multi-byte characters allowed in LitStrings
+-- at all?)
+{-# INLINE mkLitString #-}
+mkLitString :: String -> LitString
+mkLitString s =
+ unsafePerformIO (do
+   p <- mallocBytes (length s + 1)
+   let
+     loop :: Int -> String -> IO ()
+     loop n cs | n `seq` null cs = pokeByteOff p n (0 :: Word8)
+     loop n (c:cs) = do
+        pokeByteOff p n (fromIntegral (ord c) :: Word8)
+        loop (1+n) cs
+   loop 0 s
+   return p
+ )
+
+unpackLitString :: LitString -> String
+unpackLitString p_ = case pUnbox p_ of
+ p -> unpack (_ILIT(0))
+  where
+    unpack n = case indexWord8OffFastPtrAsFastChar p n of
+      ch -> if ch `eqFastChar` _CLIT('\0')
+            then [] else cBox ch : unpack (n +# _ILIT(1))
+
+strLength :: LitString -> Int
+strLength = ptrStrLength
+
+-- for now, use a simple String representation
+--no, let's not do that right now - it's work in other places
+#if 0
+type LitString = String
+
+mkLitString :: String -> LitString
+mkLitString = id
+
+unpackLitString :: LitString -> String
+unpackLitString = id
+
+strLength :: LitString -> Int
+strLength = length
+
+#endif
 
 -- -----------------------------------------------------------------------------
 -- under the carpet
 
--- Just like unsafePerformIO, but we inline it.
-{-# INLINE inlinePerformIO #-}
-inlinePerformIO :: IO a -> a
-inlinePerformIO (IO m) = case m realWorld# of (# _, r #)   -> r
+foreign import ccall unsafe "ghc_strlen" 
+  ptrStrLength :: Ptr Word8 -> Int
 
 -- NB. does *not* add a '\0'-terminator.
+-- We only use CChar here to be parallel to the imported
+-- peekC(A)StringLen.
 pokeCAString :: Ptr CChar -> String -> IO ()
 pokeCAString ptr str =
   let
@@ -500,7 +566,7 @@ pokeCAString ptr str =
   in
   go str 0
 
-#if __GLASGOW_HASKELL__ <= 602
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 602
 peekCAStringLen = peekCStringLen
 #endif
 \end{code}

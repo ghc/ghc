@@ -186,14 +186,17 @@ module Pretty (
 
 import BufWrite
 import FastString
-
-import GHC.Exts
+import FastTypes
 
 import Numeric (fromRat)
 import System.IO
+--import Foreign.Ptr (castPtr)
 
+#if defined(__GLASGOW_HASKELL__)
+--for a RULES
 import GHC.Base		( unpackCString# )
 import GHC.Ptr		( Ptr(..) )
+#endif
 
 -- Don't import Util( assertPanic ) because it makes a loop in the module structure
 
@@ -203,63 +206,10 @@ infixl 5 $$, $+$
 \end{code}
 
 
-
-*********************************************************
-*                                                       *
-\subsection{CPP magic so that we can compile with both GHC and Hugs}
-*                                                       *
-*********************************************************
-
-The library uses unboxed types to get a bit more speed, but these CPP macros
-allow you to use either GHC or Hugs.  To get GHC, just set the CPP variable
-        __GLASGOW_HASKELL__
-
 \begin{code}
-
-#if defined(__GLASGOW_HASKELL__)
-
--- Glasgow Haskell
 
 -- Disable ASSERT checks; they are expensive!
 #define LOCAL_ASSERT(x)
-
-#define ILIT(x) (x#)
-#define IBOX(x) (I# (x))
-#define INT     Int#
-#define MINUS   -#
-#define NEGATE  negateInt#
-#define PLUS    +#
-#define GR      >#
-#define GREQ    >=#
-#define LT      <#
-#define LTEQ    <=#
-#define DIV     `quotInt#`
-
-
-#define SHOW    Show
-#define MAXINT  maxBound
-
-#else
-
--- Standard Haskell
-
-#define LOCAL_ASSERT(x)
-
-#define INT     Int
-#define IBOX(x) x
-#define MINUS   -
-#define NEGATE  negate
-#define PLUS    +
-#define GR      >
-#define GREQ    >=
-#define LT      <
-#define DIV     `quot`
-#define ILIT(x) x
-
-#define SHOW    Show
-#define MAXINT  maxBound
-
-#endif
 
 \end{code}
 
@@ -321,7 +271,7 @@ punctuate :: Doc -> [Doc] -> [Doc]      -- punctuate p [d1, ... dn] = [d1 <> p, 
 Displaying @Doc@ values. 
 
 \begin{code}
-instance SHOW Doc where
+instance Show Doc where
   showsPrec prec doc cont = showDoc doc cont
 
 render     :: Doc -> String             -- Uses default style
@@ -491,8 +441,8 @@ no occurrences of @Union@ or @NoDoc@ represents just one layout.
 data Doc
  = Empty                                -- empty
  | NilAbove Doc                         -- text "" $$ x
- | TextBeside !TextDetails INT Doc       -- text s <> x  
- | Nest INT Doc                         -- nest k x
+ | TextBeside !TextDetails FastInt Doc       -- text s <> x  
+ | Nest FastInt Doc                         -- nest k x
  | Union Doc Doc                        -- ul `union` ur
  | NoDoc                                -- The empty set of documents
  | Beside Doc Bool Doc                  -- True <=> space between
@@ -510,7 +460,7 @@ reduceDoc p              = p
 data TextDetails = Chr  {-#UNPACK#-}!Char
                  | Str  String
                  | PStr FastString	-- a hashed string
-		 | LStr Addr# Int#	-- a '\0'-terminated array of bytes
+		 | LStr {-#UNPACK#-}!LitString FastInt  -- a '\0'-terminated array of bytes
 
 space_text = Chr ' '
 nl_text    = Chr '\n'
@@ -597,24 +547,27 @@ empty = Empty
 isEmpty Empty = True
 isEmpty _     = False
 
-char  c = textBeside_ (Chr c) 1# Empty
-text  s = case length   s of {IBOX(sl) -> textBeside_ (Str s)  sl Empty}
-ftext s = case lengthFS s of {IBOX(sl) -> textBeside_ (PStr s) sl Empty}
-ptext (Ptr s) = case strLength (Ptr s) of {IBOX(sl) -> textBeside_ (LStr s sl) sl Empty}
+char  c = textBeside_ (Chr c) (_ILIT(1)) Empty
+text  s = case iUnbox (length   s) of {sl -> textBeside_ (Str s)  sl Empty}
+ftext s = case iUnbox (lengthFS s) of {sl -> textBeside_ (PStr s) sl Empty}
+ptext s_= case iUnbox (strLength s) of {sl -> textBeside_ (LStr s sl) sl Empty}
+  where s = {-castPtr-} s_
 
+#if defined(__GLASGOW_HASKELL__)
 -- RULE that turns (text "abc") into (ptext (A# "abc"#)) to avoid the
 -- intermediate packing/unpacking of the string.
 {-# RULES 
   "text/str" forall a. text (unpackCString# a) = ptext (Ptr a)
  #-}
+#endif
 
-nest IBOX(k)  p = mkNest k (reduceDoc p)        -- Externally callable version
+nest k  p = mkNest (iUnbox k) (reduceDoc p)        -- Externally callable version
 
 -- mkNest checks for Nest's invariant that it doesn't have an Empty inside it
-mkNest k       (Nest k1 p) = mkNest (k PLUS k1) p
+mkNest k       (Nest k1 p) = mkNest (k +# k1) p
 mkNest k       NoDoc       = NoDoc
 mkNest k       Empty       = Empty
-mkNest ILIT(0) p           = p                  -- Worth a try!
+mkNest k       p  | k ==# _ILIT(0)  = p       -- Worth a try!
 mkNest k       p           = nest_ k p
 
 -- mkUnion checks for an empty document
@@ -635,10 +588,10 @@ p $+$ q = Above p True q
 
 above :: Doc -> Bool -> RDoc -> RDoc
 above (Above p g1 q1)  g2 q2 = above p g1 (above q1 g2 q2)
-above p@(Beside _ _ _) g  q  = aboveNest (reduceDoc p) g ILIT(0) (reduceDoc q)
-above p g q                  = aboveNest p             g ILIT(0) (reduceDoc q)
+above p@(Beside _ _ _) g  q  = aboveNest (reduceDoc p) g (_ILIT(0)) (reduceDoc q)
+above p g q                  = aboveNest p             g (_ILIT(0)) (reduceDoc q)
 
-aboveNest :: RDoc -> Bool -> INT -> RDoc -> RDoc
+aboveNest :: RDoc -> Bool -> FastInt -> RDoc -> RDoc
 -- Specfication: aboveNest p g k q = p $g$ (nest k q)
 
 aboveNest NoDoc               g k q = NoDoc
@@ -646,27 +599,27 @@ aboveNest (p1 `Union` p2)     g k q = aboveNest p1 g k q `union_`
                                       aboveNest p2 g k q
                                 
 aboveNest Empty               g k q = mkNest k q
-aboveNest (Nest k1 p)         g k q = nest_ k1 (aboveNest p g (k MINUS k1) q)
+aboveNest (Nest k1 p)         g k q = nest_ k1 (aboveNest p g (k -# k1) q)
                                   -- p can't be Empty, so no need for mkNest
                                 
 aboveNest (NilAbove p)        g k q = nilAbove_ (aboveNest p g k q)
 aboveNest (TextBeside s sl p) g k q = textBeside_ s sl rest
                                     where
-                                      k1   = k MINUS sl
+                                      k1   = k -# sl
                                       rest = case p of
                                                 Empty -> nilAboveNest g k1 q
                                                 other -> aboveNest  p g k1 q
 \end{code}
 
 \begin{code}
-nilAboveNest :: Bool -> INT -> RDoc -> RDoc
+nilAboveNest :: Bool -> FastInt -> RDoc -> RDoc
 -- Specification: text s <> nilaboveNest g k q 
 --              = text s <> (text "" $g$ nest k q)
 
 nilAboveNest g k Empty       = Empty    -- Here's why the "text s <>" is in the spec!
-nilAboveNest g k (Nest k1 q) = nilAboveNest g (k PLUS k1) q
+nilAboveNest g k (Nest k1 q) = nilAboveNest g (k +# k1) q
 
-nilAboveNest g k q           | (not g) && (k GR ILIT(0))        -- No newline if no overlap
+nilAboveNest g k q           | (not g) && (k ># _ILIT(0))        -- No newline if no overlap
                              = textBeside_ (Str (spaces k)) k q
                              | otherwise                        -- Put them really above
                              = nilAbove_ (mkNest k q)
@@ -711,7 +664,7 @@ nilBeside :: Bool -> RDoc -> RDoc
 
 nilBeside g Empty      = Empty  -- Hence the text "" in the spec
 nilBeside g (Nest _ p) = nilBeside g p
-nilBeside g p          | g         = textBeside_ space_text ILIT(1) p
+nilBeside g p          | g         = textBeside_ space_text (_ILIT(1)) p
                        | otherwise = p
 \end{code}
 
@@ -730,24 +683,24 @@ sep = sepX True         -- Separate with spaces
 cat = sepX False        -- Don't
 
 sepX x []     = empty
-sepX x (p:ps) = sep1 x (reduceDoc p) ILIT(0) ps
+sepX x (p:ps) = sep1 x (reduceDoc p) (_ILIT(0)) ps
 
 
 -- Specification: sep1 g k ys = sep (x : map (nest k) ys)
 --                            = oneLiner (x <g> nest k (hsep ys))
 --                              `union` x $$ nest k (vcat ys)
 
-sep1 :: Bool -> RDoc -> INT -> [Doc] -> RDoc
+sep1 :: Bool -> RDoc -> FastInt -> [Doc] -> RDoc
 sep1 g NoDoc               k ys = NoDoc
 sep1 g (p `Union` q)       k ys = sep1 g p k ys
                                   `union_`
                                   (aboveNest q False k (reduceDoc (vcat ys)))
 
 sep1 g Empty               k ys = mkNest k (sepX g ys)
-sep1 g (Nest n p)          k ys = nest_ n (sep1 g p (k MINUS n) ys)
+sep1 g (Nest n p)          k ys = nest_ n (sep1 g p (k -# n) ys)
 
 sep1 g (NilAbove p)        k ys = nilAbove_ (aboveNest p False k (reduceDoc (vcat ys)))
-sep1 g (TextBeside s sl p) k ys = textBeside_ s sl (sepNB g p (k MINUS sl) ys)
+sep1 g (TextBeside s sl p) k ys = textBeside_ s sl (sepNB g p (k -# sl) ys)
 
 -- Specification: sepNB p k ys = sep1 (text "" <> p) k ys
 -- Called when we have already found some text in the first item
@@ -784,20 +737,20 @@ fcat = fill False
 --                      p1 $$ fill ps
 
 fill g []     = empty
-fill g (p:ps) = fill1 g (reduceDoc p) ILIT(0) ps
+fill g (p:ps) = fill1 g (reduceDoc p) (_ILIT(0)) ps
 
 
-fill1 :: Bool -> RDoc -> INT -> [Doc] -> Doc
+fill1 :: Bool -> RDoc -> FastInt -> [Doc] -> Doc
 fill1 g NoDoc               k ys = NoDoc
 fill1 g (p `Union` q)       k ys = fill1 g p k ys
                                    `union_`
                                    (aboveNest q False k (fill g ys))
 
 fill1 g Empty               k ys = mkNest k (fill g ys)
-fill1 g (Nest n p)          k ys = nest_ n (fill1 g p (k MINUS n) ys)
+fill1 g (Nest n p)          k ys = nest_ n (fill1 g p (k -# n) ys)
 
 fill1 g (NilAbove p)        k ys = nilAbove_ (aboveNest p False k (fill g ys))
-fill1 g (TextBeside s sl p) k ys = textBeside_ s sl (fillNB g p (k MINUS sl) ys)
+fill1 g (TextBeside s sl p) k ys = textBeside_ s sl (fillNB g p (k -# sl) ys)
 
 fillNB g (Nest _ p)  k ys  = fillNB g p k ys
 fillNB g Empty k []        = Empty
@@ -805,7 +758,7 @@ fillNB g Empty k (y:ys)    = nilBeside g (fill1 g (oneLiner (reduceDoc y)) k1 ys
                              `mkUnion` 
                              nilAboveNest False k (fill g (y:ys))
                            where
-                             k1 | g         = k MINUS ILIT(1)
+                             k1 | g         = k -# _ILIT(1)
                                 | otherwise = k
 
 fillNB g p k ys            = fill1 g p k ys
@@ -824,47 +777,45 @@ best :: Int             -- Line length
      -> RDoc
      -> RDoc            -- No unions in here!
 
-best IBOX(w) IBOX(r) p
-  = get w p
+best w_ r_ p
+  = get (iUnbox w_) p
   where
-    get :: INT          -- (Remaining) width of line
+    r = iUnbox r_
+    get :: FastInt          -- (Remaining) width of line
         -> Doc -> Doc
     get w Empty               = Empty
     get w NoDoc               = NoDoc
     get w (NilAbove p)        = nilAbove_ (get w p)
     get w (TextBeside s sl p) = textBeside_ s sl (get1 w sl p)
-    get w (Nest k p)          = nest_ k (get (w MINUS k) p)
+    get w (Nest k p)          = nest_ k (get (w -# k) p)
     get w (p `Union` q)       = nicest w r (get w p) (get w q)
 
-    get1 :: INT         -- (Remaining) width of line
-         -> INT         -- Amount of first line already eaten up
+    get1 :: FastInt         -- (Remaining) width of line
+         -> FastInt         -- Amount of first line already eaten up
          -> Doc         -- This is an argument to TextBeside => eat Nests
          -> Doc         -- No unions in here!
 
     get1 w sl Empty               = Empty
     get1 w sl NoDoc               = NoDoc
-    get1 w sl (NilAbove p)        = nilAbove_ (get (w MINUS sl) p)
-    get1 w sl (TextBeside t tl p) = textBeside_ t tl (get1 w (sl PLUS tl) p)
+    get1 w sl (NilAbove p)        = nilAbove_ (get (w -# sl) p)
+    get1 w sl (TextBeside t tl p) = textBeside_ t tl (get1 w (sl +# tl) p)
     get1 w sl (Nest k p)          = get1 w sl p
     get1 w sl (p `Union` q)       = nicest1 w r sl (get1 w sl p) 
                                                    (get1 w sl q)
 
-nicest w r p q = nicest1 w r ILIT(0) p q
-nicest1 w r sl p q | fits ((w `minn` r) MINUS sl) p = p
+nicest w r p q = nicest1 w r (_ILIT(0)) p q
+nicest1 w r sl p q | fits ((w `minFastInt` r) -# sl) p = p
                    | otherwise                   = q
 
-fits :: INT     -- Space available
+fits :: FastInt     -- Space available
      -> Doc
      -> Bool    -- True if *first line* of Doc fits in space available
  
-fits n p    | n LT ILIT(0) = False
+fits n p   | n <# _ILIT(0) = False
 fits n NoDoc               = False
 fits n Empty               = True
 fits n (NilAbove _)        = True
-fits n (TextBeside _ sl p) = fits (n MINUS sl) p
-
-minn x y | x LT y    = x
-         | otherwise = y
+fits n (TextBeside _ sl p) = fits (n -# sl) p
 \end{code}
 
 @first@ and @nonEmptySet@ are similar to @nicest@ and @fits@, only simpler.
@@ -922,15 +873,6 @@ string_txt (Chr c)   s  = c:s
 string_txt (Str s1)  s2 = s1 ++ s2
 string_txt (PStr s1) s2 = unpackFS s1 ++ s2
 string_txt (LStr s1 _) s2 = unpackLitString s1 ++ s2
-
-unpackLitString addr =
- unpack 0#
- where
-    unpack nh
-      | ch `eqChar#` '\0'# = []
-      | otherwise   = C# ch : unpack (nh +# 1#)
-      where
-	ch = indexCharOffAddr# addr nh
 \end{code}
 
 \begin{code}
@@ -962,55 +904,55 @@ fullRender mode line_length ribbons_per_line txt end doc
 
     hacked_line_length, ribbon_length :: Int
     ribbon_length = round (fromIntegral line_length / ribbons_per_line)
-    hacked_line_length = case mode of { ZigZagMode -> MAXINT; other -> line_length }
+    hacked_line_length = case mode of { ZigZagMode -> maxBound; other -> line_length }
 
-display mode IBOX(page_width) IBOX(ribbon_width) txt end doc
-  = case page_width MINUS ribbon_width of { gap_width ->
-    case gap_width DIV ILIT(2) of { shift ->
+display mode page_width ribbon_width txt end doc
+  = case (iUnbox page_width) -# (iUnbox ribbon_width) of { gap_width ->
+    case gap_width `quotFastInt` _ILIT(2) of { shift ->
     let
-        lay k (Nest k1 p)  = lay (k PLUS k1) p
+        lay k (Nest k1 p)  = lay (k +# k1) p
         lay k Empty        = end
     
         lay k (NilAbove p) = nl_text `txt` lay k p
     
         lay k (TextBeside s sl p)
             = case mode of
-                    ZigZagMode |  k GREQ gap_width
+                    ZigZagMode |  k >=# gap_width
                                -> nl_text `txt` (
                                   Str (multi_ch shift '/') `txt` (
                                   nl_text `txt` (
-                                  lay1 (k MINUS shift) s sl p)))
+                                  lay1 (k -# shift) s sl p)))
 
-                               |  k LT ILIT(0)
+                               |  k <# _ILIT(0)
                                -> nl_text `txt` (
                                   Str (multi_ch shift '\\') `txt` (
                                   nl_text `txt` (
-                                  lay1 (k PLUS shift) s sl p )))
+                                  lay1 (k +# shift) s sl p )))
 
                     other -> lay1 k s sl p
     
-        lay1 k s sl p = indent k (s `txt` lay2 (k PLUS sl) p)
+        lay1 k s sl p = indent k (s `txt` lay2 (k +# sl) p)
     
         lay2 k (NilAbove p)        = nl_text `txt` lay k p
-        lay2 k (TextBeside s sl p) = s `txt` (lay2 (k PLUS sl) p)
+        lay2 k (TextBeside s sl p) = s `txt` (lay2 (k +# sl) p)
         lay2 k (Nest _ p)          = lay2 k p
         lay2 k Empty               = end
 
         -- optimise long indentations using LitString chunks of 8 spaces
-        indent n r | n GREQ ILIT(8) = LStr "        "# 8# `txt` 
-                                      indent (n MINUS ILIT(8)) r
+        indent n r | n >=# _ILIT(8) = LStr SLIT("        ") (_ILIT(8)) `txt` 
+                                      indent (n -# _ILIT(8)) r
                    | otherwise      = Str (spaces n) `txt` r
     in
-    lay ILIT(0) doc
+    lay (_ILIT(0)) doc
     }}
 
 cant_fail = error "easy_display: NoDoc"
 
-multi_ch n ch | n LTEQ ILIT(0) = ""
-	      | otherwise      = ch : multi_ch (n MINUS ILIT(1)) ch
+multi_ch n ch | n <=# _ILIT(0) = ""
+	      | otherwise      = ch : multi_ch (n -# _ILIT(1)) ch
 
-spaces n | n LTEQ ILIT(0) = ""
-         | otherwise      = ' ' : spaces (n MINUS ILIT(1))
+spaces n | n <=# _ILIT(0) = ""
+         | otherwise      = ' ' : spaces (n -# _ILIT(1))
 
 \end{code}
 
@@ -1032,9 +974,9 @@ printDoc mode hdl doc
     done = hPutChar hdl '\n'
 
   -- some versions of hPutBuf will barf if the length is zero
-hPutLitString handle a# 0# = return ()
-hPutLitString handle a# l#
-  = hPutBuf handle (Ptr a#) (I# l#)
+hPutLitString handle a l = if l ==# _ILIT(0)
+                            then return ()
+                            else hPutBuf handle a (iBox l)
 
 -- Printing output in LeftMode is performance critical: it's used when
 -- dumping C and assembly output, so we allow ourselves a few dirty

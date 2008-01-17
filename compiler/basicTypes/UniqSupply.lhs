@@ -31,20 +31,16 @@ module UniqSupply (
 #include "HsVersions.h"
 
 import Unique
-
-import GHC.Exts
-import System.IO.Unsafe	( unsafeInterleaveIO )
+import FastTypes
 
 #if __GLASGOW_HASKELL__ >= 607
 import GHC.IOBase (unsafeDupableInterleaveIO)
 #else
+import System.IO.Unsafe	( unsafeInterleaveIO )
 unsafeDupableInterleaveIO :: IO a -> IO a
 unsafeDupableInterleaveIO = unsafeInterleaveIO
 #endif
 
-w2i x = word2Int# x
-i2w x = int2Word# x
-i2w_s x = (x :: Int#)
 \end{code}
 
 
@@ -61,7 +57,7 @@ which will be distinct from the first and from all others.
 
 \begin{code}
 data UniqSupply
-  = MkSplitUniqSupply Int#	-- make the Unique with this
+  = MkSplitUniqSupply FastInt	-- make the Unique with this
 		   UniqSupply UniqSupply
 				-- when split => these two supplies
 \end{code}
@@ -76,21 +72,21 @@ uniqsFromSupply :: UniqSupply -> [Unique]	-- Infinite
 \end{code}
 
 \begin{code}
-mkSplitUniqSupply (C# c#)
-  = let
-	mask# = (i2w (ord# c#)) `uncheckedShiftL#` (i2w_s 24#)
+mkSplitUniqSupply c
+  = case fastOrd (cUnbox c) `shiftLFastInt` _ILIT(24) of
+     mask -> let
 	-- here comes THE MAGIC:
 
 	-- This is one of the most hammered bits in the whole compiler
-	mk_supply#
+	mk_supply
 	  = unsafeDupableInterleaveIO (
-		genSymZh    >>= \ (I# u#) ->
-		mk_supply#  >>= \ s1 ->
-		mk_supply#  >>= \ s2 ->
-		return (MkSplitUniqSupply (w2i (mask# `or#` (i2w u#))) s1 s2)
-	    )
-    in
-    mk_supply#
+		genSymZh    >>= \ u_ -> case iUnbox u_ of { u -> (
+		mk_supply   >>= \ s1 ->
+		mk_supply   >>= \ s2 ->
+		return (MkSplitUniqSupply (mask `bitOrFastInt` u) s1 s2)
+	    )})
+       in
+       mk_supply
 
 foreign import ccall unsafe "genSymZh" genSymZh :: IO Int
 
@@ -99,8 +95,8 @@ listSplitUniqSupply  (MkSplitUniqSupply _ s1 s2) = s1 : listSplitUniqSupply s2
 \end{code}
 
 \begin{code}
-uniqFromSupply  (MkSplitUniqSupply n _ _)  = mkUniqueGrimily (I# n)
-uniqsFromSupply (MkSplitUniqSupply n _ s2) = mkUniqueGrimily (I# n) : uniqsFromSupply s2
+uniqFromSupply  (MkSplitUniqSupply n _ _)  = mkUniqueGrimily (iBox n)
+uniqsFromSupply (MkSplitUniqSupply n _ s2) = mkUniqueGrimily (iBox n) : uniqsFromSupply s2
 \end{code}
 
 %************************************************************************

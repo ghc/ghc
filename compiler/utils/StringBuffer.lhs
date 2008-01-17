@@ -47,22 +47,22 @@ module StringBuffer
 
 import Encoding
 import FastString		( FastString,mkFastString,mkFastStringBytes )
+import FastTypes
+import FastFunctions
 
 import Foreign
 import System.IO		( hGetBuf, hFileSize,IOMode(ReadMode), hClose
                                 , Handle, hTell )
 
 import GHC.Exts
-import GHC.IOBase		( IO(..) )
-import GHC.Base			( unsafeChr )
 
-#if __GLASGOW_HASKELL__ >= 601
+#if !defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ >= 601
 import System.IO		( openBinaryFile )
 #else
 import IOExts                   ( openFileEx, IOModeEx(..) )
 #endif
 
-#if __GLASGOW_HASKELL__ < 601
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 601
 openBinaryFile fp mode = openFileEx fp (BinaryMode mode)
 #endif
 
@@ -216,28 +216,28 @@ lexemeToFastString (StringBuffer buf _ cur) len =
 
 -- -----------------------------------------------------------------------------
 -- Parsing integer strings in various bases
-
+{-
 byteOff :: StringBuffer -> Int -> Char
 byteOff (StringBuffer buf _ cur) i = 
   inlinePerformIO $ withForeignPtr buf $ \ptr -> do
-    w <- peek (ptr `plusPtr` (cur+i))
-    return (unsafeChr (fromIntegral (w::Word8)))
-
+--    return $! cBox (indexWord8OffFastPtrAsFastChar
+--                         (pUnbox ptr) (iUnbox (cur+i)))
+--or
+--    w <- peek (ptr `plusPtr` (cur+i))
+--    return (unsafeChr (fromIntegral (w::Word8)))
+-}
 -- | XXX assumes ASCII digits only (by using byteOff)
 parseUnsignedInteger :: StringBuffer -> Int -> Integer -> (Char->Int) -> Integer
-parseUnsignedInteger buf len radix char_to_int 
-  = go 0 0
-  where
+parseUnsignedInteger (StringBuffer buf _ cur) len radix char_to_int 
+  = inlinePerformIO $ withForeignPtr buf $ \ptr -> return $! let
+    --LOL, in implementations where the indexing needs slow unsafePerformIO,
+    --this is less (not more) efficient than using the IO monad explicitly
+    --here.
+    byteOff p i = cBox (indexWord8OffFastPtrAsFastChar
+                         (pUnbox ptr) (iUnbox (cur+i)))
     go i x | i == len  = x
-           | otherwise = go (i+1)
-              (x * radix + toInteger (char_to_int (byteOff buf i)))
-
--- -----------------------------------------------------------------------------
--- under the carpet
-
--- Just like unsafePerformIO, but we inline it.
-{-# INLINE inlinePerformIO #-}
-inlinePerformIO :: IO a -> a
-inlinePerformIO (IO m) = case m realWorld# of (# _, r #)   -> r
+           | otherwise = case byteOff ptr i of
+               char -> go (i+1) (x * radix + toInteger (char_to_int char))
+  in go 0 0
 
 \end{code}

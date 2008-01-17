@@ -11,7 +11,7 @@ module OptimizationFuel
     )
 where
 
-import GHC.Exts (State#)
+--import GHC.Exts (State#)
 import Panic
 
 import Data.IORef
@@ -49,7 +49,7 @@ diffFuel _ _ = 0
 #endif
 
 -- stop warnings about things that aren't used
-_unused :: State# () -> FS.FastString
+_unused :: {-State#-} () -> FS.FastString
 _unused = undefined panic
 
 

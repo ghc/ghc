@@ -9,7 +9,7 @@
 module HaddockParse (
   parseHaddockParagraphs, 
   parseHaddockString, 
-  MyEither(..)
+  EitherString(..)
 ) where
 
 import {-# SOURCE #-} HaddockLex
@@ -35,7 +35,7 @@ import RdrName
 	PARA    { TokPara }
 	STRING	{ TokString $$ }
 
-%monad { MyEither String }
+%monad { EitherString }
 
 %name parseHaddockParagraphs  doc
 %name parseHaddockString seq
@@ -98,15 +98,18 @@ strings  :: { String }
 	| STRING strings	{ $1 ++ $2 }
 
 {
-happyError :: [Token] -> MyEither String a
+happyError :: [Token] -> EitherString a
 happyError toks = MyLeft ("parse error in doc string")
 
 -- We don't want to make an instance for Either String,
 -- since every user of the GHC API would get that instance
 
-data MyEither a b = MyLeft a | MyRight b
+-- But why use non-Haskell98 instances when MyEither String
+-- is the only MyEither we're intending to use anyway? --Isaac Dupree
+--data MyEither a b = MyLeft a | MyRight b
+data EitherString b = MyLeft String | MyRight b
 
-instance Monad (MyEither String) where
+instance Monad EitherString where
 	return          = MyRight
 	MyLeft  l >>= _ = MyLeft l
 	MyRight r >>= k = k r

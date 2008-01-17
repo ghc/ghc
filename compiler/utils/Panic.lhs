@@ -14,7 +14,7 @@ module Panic
      GhcException(..), showGhcException, ghcError, progName, 
      pgmError,
 
-     panic, panic#, assertPanic, trace,
+     panic, panicFastInt, assertPanic, trace,
      
      Exception.Exception(..), showException, try, tryJust, tryMost, tryUser,
      catchJust, ioErrors, throwTo,
@@ -118,7 +118,7 @@ showGhcException (Panic s)
 	         ++ "Please report this as a GHC bug:  http://www.haskell.org/ghc/reportabug\n")
 
 myMkTyConApp :: TyCon -> [TypeRep] -> TypeRep
-#if __GLASGOW_HASKELL__ < 603
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 603
 myMkTyConApp = mkAppTy
 #else 
 myMkTyConApp = mkTyConApp
@@ -142,8 +142,8 @@ pgmError x = Exception.throwDyn (ProgramError x)
 -- what TAG_ is with GHC at the moment.  Ugh. (Simon)
 -- No, man -- Too Beautiful! (Will)
 
-panic# :: String -> FastInt
-panic# s = case (panic s) of () -> _ILIT 0
+panicFastInt :: String -> FastInt
+panicFastInt s = case (panic s) of () -> _ILIT(0)
 
 assertPanic :: String -> Int -> a
 assertPanic file line = 

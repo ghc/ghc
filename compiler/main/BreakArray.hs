@@ -3,6 +3,10 @@
 -- Break Arrays in the IO monad
 -- Entries in the array are Word sized 
 --
+-- Conceptually, a zero-indexed IOArray of Bools, initially False.
+-- They're represented as Words with 0==False, 1==True.
+-- They're used to determine whether GHCI breakpoints are on or off.
+--
 -- (c) The University of Glasgow 2007
 --
 -----------------------------------------------------------------------------
@@ -15,15 +19,19 @@
 -- for details
 
 module BreakArray
-  ( BreakArray (BA)
-        -- constructor is exported only for ByteCodeGen
+  ( BreakArray
+#ifdef GHCI
+      (BA)  -- constructor is exported only for ByteCodeGen
+#endif
   , newBreakArray
+#ifdef GHCI
   , getBreak 
   , setBreakOn 
   , setBreakOff
   , showBreakArray
+#endif
   ) where
-
+#ifdef GHCI
 import GHC.Exts
 import GHC.IOBase
 import GHC.Word
@@ -105,3 +113,14 @@ readBA# array i = IO $ \s ->
 
 readBreakArray :: BreakArray -> Int -> IO Word 
 readBreakArray (BA array) (I# i) = readBA# array i
+
+#else /* GHCI */
+--stub implementation to make main/, etc., code happier.
+--IOArray and IOUArray are increasingly non-portable,
+--still don't have quite the same interface, and (for GHCI)
+--presumably have a different representation.
+data BreakArray = Unspecified
+newBreakArray :: Int -> IO BreakArray
+newBreakArray _ = return Unspecified
+#endif /* GHCI */
+

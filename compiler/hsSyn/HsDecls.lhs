@@ -685,7 +685,7 @@ data ResType name
 \end{code}
 
 \begin{code}
-conDeclsNames :: forall name. Eq name => [ConDecl name] -> [Located name]
+conDeclsNames :: (Eq name) => [ConDecl name] -> [Located name]
   -- See tyClDeclNames for what this does
   -- The function is boringly complicated because of the records
   -- And since we only have equality, we have to be a little careful

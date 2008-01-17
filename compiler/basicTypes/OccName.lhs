@@ -82,6 +82,7 @@ import StaticFlags
 import UniqFM
 import UniqSet
 import FastString
+import FastTypes
 import Outputable
 import Binary
 
@@ -89,7 +90,7 @@ import GHC.Exts
 import Data.Char
 
 -- Unicode TODO: put isSymbol in libcompat
-#if __GLASGOW_HASKELL__ > 604
+#if !defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ > 604
 #else
 isSymbol = const False
 #endif
@@ -255,7 +256,7 @@ easy to build an OccEnv.
 \begin{code}
 instance Uniquable OccName where
   getUnique (OccName ns fs)
-      = mkUnique char (I# (uniqueOfFS fs))
+      = mkUnique char (iBox (uniqueOfFS fs))
       where	-- See notes above about this getUnique function
         char = case ns of
 		VarName   -> 'i'

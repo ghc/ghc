@@ -45,10 +45,12 @@ module Binary
    lazyGet,
    lazyPut,
 
+#ifdef __GLASGOW_HASKELL__
    -- GHC only:
    ByteArray(..),
    getByteArray,
    putByteArray,
+#endif
 
    UserData(..), getUserData, setUserData,
    newReadState, newWriteState,
@@ -84,7 +86,7 @@ import GHC.Real			( Ratio(..) )
 import GHC.Exts
 import GHC.IOBase	 	( IO(..) )
 import GHC.Word			( Word8(..) )
-#if __GLASGOW_HASKELL__ < 601
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 601
 -- openFileEx is available from the lang package, but we want to 
 -- be independent of hslibs libraries.
 import GHC.Handle		( openFileEx, IOModeEx(..) )
@@ -92,7 +94,7 @@ import GHC.Handle		( openFileEx, IOModeEx(..) )
 import System.IO		( openBinaryFile )
 #endif
 
-#if __GLASGOW_HASKELL__ < 601
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 601
 openBinaryFile f mode = openFileEx f (BinaryMode mode)
 #endif
 
@@ -457,7 +459,21 @@ instance (Binary a, Binary b) => Binary (Either a b) where
                              0 -> do a <- get bh ; return (Left a)
                              _ -> do b <- get bh ; return (Right b)
 
-#ifdef __GLASGOW_HASKELL__
+#if defined(__GLASGOW_HASKELL__) || 1
+--to quote binary-0.3 on this code idea,
+--
+-- TODO  This instance is not architecture portable.  GMP stores numbers as
+-- arrays of machine sized words, so the byte format is not portable across
+-- architectures with different endianess and word size.
+--
+-- This makes it hard (impossible) to make an equivalent instance
+-- with code that is compilable with non-GHC.  Do we need any instance
+-- Binary Integer, and if so, does it have to be blazing fast?  Or can
+-- we just change this instance to be portable like the rest of the
+-- instances? (binary package has code to steal for that)
+--
+-- yes, we need Binary Integer and Binary Rational in basicTypes/Literal.lhs
+
 instance Binary Integer where
     put_ bh (S# i#) = do putByte bh 0; put_ bh (I# i#)
     put_ bh (J# s# a#) = do
@@ -476,6 +492,10 @@ instance Binary Integer where
 		  sz <- get bh
 		  (BA a#) <- getByteArray bh sz
 		  return (J# s# a#)
+
+-- As for the rest of this code, even though this module
+-- exports it, it doesn't seem to be used anywhere else
+-- in GHC!
 
 putByteArray :: BinHandle -> ByteArray# -> Int# -> IO ()
 putByteArray bh a s# = loop 0#

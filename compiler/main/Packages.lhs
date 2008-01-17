@@ -54,7 +54,7 @@ import Maybes		( expectJust, MaybeErr(..) )
 import Panic
 import Outputable
 
-#if __GLASGOW_HASKELL__ < 603
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 603
 import Compat.Directory	( getAppUserDataDirectory )
 #endif
 

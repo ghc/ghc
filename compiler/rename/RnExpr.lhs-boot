@@ -9,7 +9,7 @@ import TcRnTypes
 rnLExpr :: LHsExpr RdrName
 	-> RnM (LHsExpr Name, FreeVars)
 
-rnStmts :: forall thing.
+rnStmts :: --forall thing.
 	   HsStmtContext Name -> [LStmt RdrName] 
 	-> RnM (thing, FreeVars)
 	-> RnM (([LStmt Name], thing), FreeVars)

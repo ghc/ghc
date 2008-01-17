@@ -62,7 +62,7 @@ respectively (which will be wrong on a 64-bit machine).
 
 \begin{code}
 tARGET_MIN_INT, tARGET_MAX_INT, tARGET_MAX_WORD :: Integer
-#if __GLASGOW_HASKELL__
+#ifdef __GLASGOW_HASKELL__
 tARGET_MIN_INT  = toInteger (minBound :: Int)
 tARGET_MAX_INT  = toInteger (maxBound :: Int)
 #else

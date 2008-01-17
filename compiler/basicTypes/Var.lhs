@@ -166,12 +166,12 @@ varUnique var = mkUniqueGrimily (iBox (realUnique var))
 
 setVarUnique :: Var -> Unique -> Var
 setVarUnique var uniq 
-  = var { realUnique = getKey# uniq, 
+  = var { realUnique = getKeyFastInt uniq, 
 	  varName = setNameUnique (varName var) uniq }
 
 setVarName :: Var -> Name -> Var
 setVarName var new_name
-  = var { realUnique = getKey# (getUnique new_name), 
+  = var { realUnique = getKeyFastInt (getUnique new_name), 
    	  varName = new_name }
 \end{code}
 
@@ -199,7 +199,7 @@ setTyVarKind tv k = tv {varType = k}
 mkTyVar :: Name -> Kind -> TyVar
 mkTyVar name kind = ASSERT( not (isCoercionKind kind ) )
 		    TyVar { varName    = name
-			  , realUnique = getKey# (nameUnique name)
+			  , realUnique = getKeyFastInt (nameUnique name)
 			  , varType  = kind
                           , isCoercionVar    = False
 			}
@@ -209,7 +209,7 @@ mkTcTyVar name kind details
   = -- TOM: no longer valid assertion? 
     -- ASSERT( not (isCoercionKind kind) )
     TcTyVar {	varName    = name,
-		realUnique = getKey# (nameUnique name),
+		realUnique = getKeyFastInt (nameUnique name),
 		varType  = kind,
 		tcTyVarDetails = details
 	}
@@ -232,7 +232,7 @@ setCoVarName   = setVarName
 mkCoVar :: Name -> Kind -> CoVar
 mkCoVar name kind = ASSERT( isCoercionKind kind )
 		    TyVar { varName    	  = name
-			  , realUnique 	  = getKey# (nameUnique name)
+			  , realUnique 	  = getKeyFastInt (nameUnique name)
 			  , varType    	  = kind	
 				-- varType is always PredTy (EqPred t1 t2)
                           , isCoercionVar = True
@@ -330,7 +330,7 @@ maybeModifyIdInfo Nothing	  id = id
 mkGlobalId :: GlobalIdDetails -> Name -> Type -> IdInfo -> Id
 mkGlobalId details name ty info 
   = GlobalId {	varName    = name, 
-		realUnique = getKey# (nameUnique name), 	-- Cache the unique
+		realUnique = getKeyFastInt (nameUnique name), 	-- Cache the unique
 		varType     = ty,	
 		gblDetails = details,
 		idInfo_    = info }
@@ -338,7 +338,7 @@ mkGlobalId details name ty info
 mk_local_id :: Name -> Type -> LocalIdDetails -> IdInfo -> Id
 mk_local_id name ty details info
   = LocalId {	varName    = name, 
-		realUnique = getKey# (nameUnique name), 	-- Cache the unique
+		realUnique = getKeyFastInt (nameUnique name), 	-- Cache the unique
 		varType     = ty,	
 		lclDetails = details,
 		idInfo_    = info }

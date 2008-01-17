@@ -292,8 +292,8 @@ cmpCostCentre other_1 other_2
     in
     if tag1 <# tag2 then LT else GT
   where
-    tag_CC (NormalCC   {}) = (_ILIT 1 :: FastInt)
-    tag_CC (AllCafsCC  {}) = _ILIT 2
+    tag_CC (NormalCC   {}) = _ILIT(1)
+    tag_CC (AllCafsCC  {}) = _ILIT(2)
 
 cmp_caf NotCafCC CafCC     = LT
 cmp_caf NotCafCC NotCafCC  = EQ

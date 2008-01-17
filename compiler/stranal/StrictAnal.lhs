@@ -409,7 +409,10 @@ data SaStats
 	    FastInt FastInt	-- total/marked-demanded let-bound
 				-- (excl. top-level; excl. letrecs)
 
-nullSaStats = SaStats (_ILIT 0) (_ILIT 0) (_ILIT 0) (_ILIT 0) (_ILIT 0) (_ILIT 0)
+nullSaStats = SaStats
+   (_ILIT(0)) (_ILIT(0))
+   (_ILIT(0)) (_ILIT(0))
+   (_ILIT(0)) (_ILIT(0))
 
 thenSa	      :: SaM a -> (a -> SaM b) -> SaM b
 thenSa_	      :: SaM a -> SaM b -> SaM b

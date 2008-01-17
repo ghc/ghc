@@ -116,7 +116,7 @@ mapUniqSet f (MkUniqSet set) = MkUniqSet (mapUFM f set)
 \end{code}
 
 \begin{code}
-#if __GLASGOW_HASKELL__
+#ifdef __GLASGOW_HASKELL__
 {-# SPECIALIZE
     addOneToUniqSet :: UniqSet Unique -> Unique -> UniqSet Unique
     #-}

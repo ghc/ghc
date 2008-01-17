@@ -72,16 +72,16 @@ instance Outputable InScopeSet where
   ppr (InScope s i) = ptext SLIT("InScope") <+> ppr s
 
 emptyInScopeSet :: InScopeSet
-emptyInScopeSet = InScope emptyVarSet 1#
+emptyInScopeSet = InScope emptyVarSet (_ILIT(1))
 
 getInScopeVars ::  InScopeSet -> VarEnv Var
 getInScopeVars (InScope vs _) = vs
 
 mkInScopeSet :: VarEnv Var -> InScopeSet
-mkInScopeSet in_scope = InScope in_scope 1#
+mkInScopeSet in_scope = InScope in_scope (_ILIT(1))
 
 extendInScopeSet :: InScopeSet -> Var -> InScopeSet
-extendInScopeSet (InScope in_scope n) v = InScope (extendVarEnv in_scope v v) (n +# 1#)
+extendInScopeSet (InScope in_scope n) v = InScope (extendVarEnv in_scope v v) (n +# _ILIT(1))
 
 extendInScopeSetList :: InScopeSet -> [Var] -> InScopeSet
 extendInScopeSetList (InScope in_scope n) vs
@@ -95,7 +95,7 @@ extendInScopeSetSet (InScope in_scope n) vs
 modifyInScopeSet :: InScopeSet -> Var -> Var -> InScopeSet
 -- Exploit the fact that the in-scope "set" is really a map
 -- 	Make old_v map to new_v
-modifyInScopeSet (InScope in_scope n) old_v new_v = InScope (extendVarEnv in_scope old_v new_v) (n +# 1#)
+modifyInScopeSet (InScope in_scope n) old_v new_v = InScope (extendVarEnv in_scope old_v new_v) (n +# _ILIT(1))
 
 delInScopeSet :: InScopeSet -> Var -> InScopeSet
 delInScopeSet (InScope in_scope n) v = InScope (in_scope `delVarEnv` v) n
@@ -134,17 +134,17 @@ uniqAway in_scope var
 uniqAway' :: InScopeSet -> Var -> Var
 -- This one *always* makes up a new variable
 uniqAway' (InScope set n) var
-  = try 1#
+  = try (_ILIT(1))
   where
     orig_unique = getUnique var
     try k 
 #ifdef DEBUG
-	  | k ># 1000#
+	  | k ># _ILIT(1000)
 	  = pprPanic "uniqAway loop:" (ppr (iBox k) <+> text "tries" <+> ppr var <+> int (iBox n)) 
 #endif			    
-	  | uniq `elemVarSetByKey` set = try (k +# 1#)
+	  | uniq `elemVarSetByKey` set = try (k +# _ILIT(1))
 #ifdef DEBUG
-	  | opt_PprStyle_Debug && k ># 3#
+	  | opt_PprStyle_Debug && k ># _ILIT(3)
 	  = pprTrace "uniqAway:" (ppr (iBox k) <+> text "tries" <+> ppr var <+> int (iBox n)) 
 	    setVarUnique var uniq
 #endif			    

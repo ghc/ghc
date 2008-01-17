@@ -331,21 +331,21 @@ notElem__ x (y:ys) = x /= y && notElem__ x ys
 
 # else /* DEBUG */
 isIn msg x ys
-  = elem (_ILIT 0) x ys
+  = elem (_ILIT(0)) x ys
   where
     elem _ _ []        = False
     elem i x (y:ys)
-      | i ># _ILIT 100 = trace ("Over-long elem in " ++ msg)
-                               (x `List.elem` (y:ys))
-      | otherwise      = x == y || elem (i +# _ILIT(1)) x ys
+      | i ># _ILIT(100) = trace ("Over-long elem in " ++ msg)
+                                (x `List.elem` (y:ys))
+      | otherwise       = x == y || elem (i +# _ILIT(1)) x ys
 
 isn'tIn msg x ys
-  = notElem (_ILIT 0) x ys
+  = notElem (_ILIT(0)) x ys
   where
     notElem _ _ [] =  True
     notElem i x (y:ys)
-      | i ># _ILIT 100 = trace ("Over-long notElem in " ++ msg)
-                               (x `List.notElem` (y:ys))
+      | i ># _ILIT(100) = trace ("Over-long notElem in " ++ msg)
+                                (x `List.notElem` (y:ys))
       | otherwise      =  x /= y && notElem (i +# _ILIT(1)) x ys
 # endif /* DEBUG */
 \end{code}
@@ -353,7 +353,7 @@ isn'tIn msg x ys
 foldl1' was added in GHC 6.4
 
 \begin{code}
-#if __GLASGOW_HASKELL__ < 604
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 604
 foldl1'          :: (a -> a -> a) -> [a] -> a
 foldl1' f (x:xs) =  foldl' f x xs
 foldl1' _ []     =  panic "foldl1'"

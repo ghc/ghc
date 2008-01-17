@@ -679,7 +679,7 @@ When the FiniteMap module is used in GHC, we specialise it for
 \begin{code}
 #if 0
 
-#if __GLASGOW_HASKELL__
+#ifdef __GLASGOW_HASKELL__
 
 {-# SPECIALIZE addListToFM
 		:: FiniteMap (FastString, FAST_STRING) elt -> [((FAST_STRING, FAST_STRING),elt)] -> FiniteMap (FAST_STRING, FAST_STRING) elt

@@ -814,7 +814,7 @@ mkSpillInstr reg delta slot
                                     RcInteger -> I32;
 				    RcFloat   -> F32;
                                     RcDouble  -> F64}}
-                        in ST sz reg (fpRel (- off_w))
+                        in ST sz reg (fpRel (negate off_w))
 #endif
 #ifdef powerpc_TARGET_ARCH
     let sz = case regClass reg of

@@ -50,8 +50,6 @@ import FastString	( FastString )
 import Outputable
 import FastTypes
 
-import GHC.Exts		( indexArray# )
-
 import Data.Array
 import Data.Array.Base (unsafeAt)
 

@@ -384,7 +384,8 @@ rnHsRecFieldsAndThen choice rn_thing (HsRecFields fields dd) cont =
                 -- each list represents a RdrName that occurred more than once
                 -- (the list contains all occurrences)
                 -- invariant: each list in dup_fields is non-empty
-                (_, dup_fields :: [[RdrName]]) = removeDups compare
+                dup_fields :: [[RdrName]]
+                (_, dup_fields) = removeDups compare
                                                  (map (unLoc . hsRecFieldId) fields)
                                              
                 -- duplicate field reporting function

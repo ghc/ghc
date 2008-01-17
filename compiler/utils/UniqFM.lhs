@@ -51,12 +51,10 @@ module UniqFM (
 
 #include "HsVersions.h"
 
-import Unique		( Uniquable(..), Unique, getKey#, mkUniqueGrimily )
+import Unique		( Uniquable(..), Unique, getKeyFastInt, mkUniqueGrimily )
 import Maybes		( maybeToBool )
 import FastTypes
 import Outputable
-
-import GHC.Exts		-- Lots of Int# operations
 \end{code}
 
 %************************************************************************
@@ -237,8 +235,8 @@ First the ways of building a UniqFM.
 
 \begin{code}
 emptyUFM		     = EmptyUFM
-unitUFM	     key elt = mkLeafUFM (getKey# (getUnique key)) elt
-unitDirectlyUFM key elt = mkLeafUFM (getKey# key) elt
+unitUFM	     key elt = mkLeafUFM (getKeyFastInt (getUnique key)) elt
+unitDirectlyUFM key elt = mkLeafUFM (getKeyFastInt key) elt
 
 listToUFM key_elt_pairs
   = addListToUFM_C use_snd EmptyUFM key_elt_pairs
@@ -257,13 +255,13 @@ could be optimised using it.
 \begin{code}
 addToUFM fm key elt = addToUFM_C use_snd fm key elt
 
-addToUFM_Directly fm u elt = insert_ele use_snd fm (getKey# u) elt
+addToUFM_Directly fm u elt = insert_ele use_snd fm (getKeyFastInt u) elt
 
 addToUFM_C combiner fm key elt
-  = insert_ele combiner fm (getKey# (getUnique key)) elt
+  = insert_ele combiner fm (getKeyFastInt (getUnique key)) elt
 
 addToUFM_Acc add unit fm key item
-  = insert_ele combiner fm (getKey# (getUnique key)) (unit item)
+  = insert_ele combiner fm (getKeyFastInt (getUnique key)) (unit item)
   where
     combiner old _unit_item = add item old
 
@@ -271,12 +269,12 @@ addListToUFM fm key_elt_pairs = addListToUFM_C use_snd fm key_elt_pairs
 addListToUFM_Directly fm uniq_elt_pairs = addListToUFM_directly_C use_snd fm uniq_elt_pairs
 
 addListToUFM_C combiner fm key_elt_pairs
- = foldl (\ fm (k, e) -> insert_ele combiner fm (getKey# (getUnique k)) e)
+ = foldl (\ fm (k, e) -> insert_ele combiner fm (getKeyFastInt (getUnique k)) e)
 	 fm key_elt_pairs
 
 addListToUFM_directly_C :: (elt -> elt -> elt) -> UniqFM elt -> [(Unique,elt)] -> UniqFM elt
 addListToUFM_directly_C combiner fm uniq_elt_pairs
- = foldl (\ fm (k, e) -> insert_ele combiner fm (getKey# k) e)
+ = foldl (\ fm (k, e) -> insert_ele combiner fm (getKeyFastInt k) e)
 	 fm uniq_elt_pairs
 \end{code}
 
@@ -285,10 +283,10 @@ Now ways of removing things from UniqFM.
 \begin{code}
 delListFromUFM fm lst = foldl delFromUFM fm lst
 
-delFromUFM          fm key = delete fm (getKey# (getUnique key))
-delFromUFM_Directly fm u   = delete fm (getKey# u)
+delFromUFM          fm key = delete fm (getKeyFastInt (getUnique key))
+delFromUFM_Directly fm u   = delete fm (getKeyFastInt u)
 
-delete :: UniqFM a -> Int# -> UniqFM a
+delete :: UniqFM a -> FastInt -> UniqFM a
 delete EmptyUFM _   = EmptyUFM
 delete fm       key = del_ele fm
   where
@@ -539,9 +537,7 @@ mapUFM _fn EmptyUFM   = EmptyUFM
 mapUFM  fn fm	      = map_tree fn fm
 
 filterUFM _fn EmptyUFM = EmptyUFM
-filterUFM  fn fm       = filter_tree pred fm
-	where
-	  pred (_::FastInt) e = fn e
+filterUFM  fn fm       = filter_tree (\_ e -> fn e) fm
 
 filterUFM_Directly _fn EmptyUFM = EmptyUFM
 filterUFM_Directly  fn fm       = filter_tree pred fm
@@ -576,20 +572,20 @@ Lookup up a binary tree is easy (and fast).
 elemUFM          key fm = maybeToBool (lookupUFM fm key)
 elemUFM_Directly key fm = maybeToBool (lookupUFM_Directly fm key)
 
-lookupUFM	   fm key = lookUp fm (getKey# (getUnique key))
-lookupUFM_Directly fm key = lookUp fm (getKey# key)
+lookupUFM	   fm key = lookUp fm (getKeyFastInt (getUnique key))
+lookupUFM_Directly fm key = lookUp fm (getKeyFastInt key)
 
 lookupWithDefaultUFM fm deflt key
-  = case lookUp fm (getKey# (getUnique key)) of
+  = case lookUp fm (getKeyFastInt (getUnique key)) of
       Nothing  -> deflt
       Just elt -> elt
 
 lookupWithDefaultUFM_Directly fm deflt key
-  = case lookUp fm (getKey# key) of
+  = case lookUp fm (getKeyFastInt key) of
       Nothing  -> deflt
       Just elt -> elt
 
-lookUp :: UniqFM a -> Int# -> Maybe a
+lookUp :: UniqFM a -> FastInt -> Maybe a
 lookUp EmptyUFM _   = Nothing
 lookUp fm i	    = lookup_tree fm
   where
@@ -787,10 +783,7 @@ This specifies the relationship between NodeUFMData and CalcNodeUFMData.
 indexToRoot :: FastInt -> NodeUFMData
 
 indexToRoot i
-  = let
-	l = (_ILIT(1) :: FastInt)
-    in
-    NodeUFMData (((i `shiftR_` l) `shiftL_` l) +# _ILIT(1)) l
+  = NodeUFMData ((shiftL1 (shiftR1 i)) +# _ILIT(1)) (_ILIT(1))
 
 getCommonNodeUFMData :: NodeUFMData -> NodeUFMData -> NodeUFMData
 
@@ -799,17 +792,16 @@ getCommonNodeUFMData (NodeUFMData i p) (NodeUFMData i2 p2)
   | p <# p2	= getCommonNodeUFMData_ p2 (j `quotFastInt` (p2 `quotFastInt` p)) j2
   | otherwise	= getCommonNodeUFMData_ p j (j2 `quotFastInt` (p `quotFastInt` p2))
   where
-    l  = (_ILIT(1) :: FastInt)
-    j  = i  `quotFastInt` (p  `shiftL_` l)
-    j2 = i2 `quotFastInt` (p2 `shiftL_` l)
+    j  = i  `quotFastInt` (shiftL1 p)
+    j2 = i2 `quotFastInt` (shiftL1 p2)
 
     getCommonNodeUFMData_ :: FastInt -> FastInt -> FastInt -> NodeUFMData
 
     getCommonNodeUFMData_ p j j_
       | j ==# j_
-      = NodeUFMData (((j `shiftL_` l) +# l) *# p) p
+      = NodeUFMData (((shiftL1 j) +# _ILIT(1)) *# p) p
       | otherwise
-      = getCommonNodeUFMData_ (p `shiftL_`  l) (j `shiftR_` l) (j_ `shiftR_` l)
+      = getCommonNodeUFMData_ (shiftL1 p) (shiftR1 j) (shiftR1 j_)
 
 ask_about_common_ancestor :: NodeUFMData -> NodeUFMData -> CommonRoot
 
@@ -832,20 +824,14 @@ This might be better in Util.lhs ?
 
 Now the bit twiddling functions.
 \begin{code}
-shiftL_ :: FastInt -> FastInt -> FastInt
-shiftR_ :: FastInt -> FastInt -> FastInt
+shiftL1 :: FastInt -> FastInt
+shiftR1 :: FastInt -> FastInt
 
-#if __GLASGOW_HASKELL__
-{-# INLINE shiftL_ #-}
-{-# INLINE shiftR_ #-}
-shiftL_ n p = word2Int#((int2Word# n) `uncheckedShiftL#` p)
-shiftR_ n p = word2Int#((int2Word# n) `uncheckedShiftRL#` p)
+{-# INLINE shiftL1 #-}
+{-# INLINE shiftR1 #-}
 
-#else /* not GHC */
-shiftL_ n p = n * (2 ^ p)
-shiftR_ n p = n `quot` (2 ^ p)
-
-#endif /* not GHC */
+shiftL1 n = n `shiftLFastInt` _ILIT(1)
+shiftR1 n = n `shiftR_FastInt` _ILIT(1)
 \end{code}
 
 \begin{code}

@@ -30,7 +30,7 @@ module Unique (
 
 	mkUnique,			-- Used in UniqSupply
 	mkUniqueGrimily,		-- Used in UniqSupply only!
-	getKey, getKey#,		-- Used in Var, UniqFM, Name only!
+	getKey, getKeyFastInt,		-- Used in Var, UniqFM, Name only!
 
 	incrUnique,			-- Used for renumbering
 	deriveUnique,			-- Ditto
@@ -59,10 +59,16 @@ module Unique (
 
 import StaticFlags
 import BasicTypes
+import FastTypes
 import FastString
 import Outputable
 
-import GHC.Exts
+#if defined(__GLASGOW_HASKELL__)
+--just for implementing a fast [0,61) -> Char function
+import GHC.Exts (indexCharOffAddr#, Char(..))
+#else
+import Data.Array
+#endif
 import Data.Char	( chr, ord )
 \end{code}
 
@@ -76,7 +82,8 @@ The @Chars@ are ``tag letters'' that identify the @UniqueSupply@.
 Fast comparison is everything on @Uniques@:
 
 \begin{code}
-data Unique = MkUnique Int#
+--why not newtype Int?
+data Unique = MkUnique FastInt
 \end{code}
 
 Now come the functions which construct uniques from their pieces, and vice versa.
@@ -88,7 +95,7 @@ unpkUnique	:: Unique -> (Char, Int)	-- The reverse
 
 mkUniqueGrimily :: Int -> Unique		-- A trap-door for UniqSupply
 getKey		:: Unique -> Int		-- for Var
-getKey#		:: Unique -> Int#		-- for Var
+getKeyFastInt	:: Unique -> FastInt		-- for Var
 
 incrUnique	:: Unique -> Unique
 deriveUnique	:: Unique -> Int -> Unique
@@ -99,18 +106,18 @@ isTupleKey	:: Unique -> Bool
 
 
 \begin{code}
-mkUniqueGrimily (I# x) = MkUnique x
+mkUniqueGrimily x = MkUnique (iUnbox x)
 
 {-# INLINE getKey #-}
-getKey (MkUnique x) = I# x
-{-# INLINE getKey# #-}
-getKey# (MkUnique x) = x
+getKey (MkUnique x) = iBox x
+{-# INLINE getKeyFastInt #-}
+getKeyFastInt (MkUnique x) = x
 
-incrUnique (MkUnique i) = MkUnique (i +# 1#)
+incrUnique (MkUnique i) = MkUnique (i +# _ILIT(1))
 
 -- deriveUnique uses an 'X' tag so that it won't clash with
 -- any of the uniques produced any other way
-deriveUnique (MkUnique i) delta = mkUnique 'X' (I# i + delta)
+deriveUnique (MkUnique i) delta = mkUnique 'X' (iBox i + delta)
 
 -- newTagUnique changes the "domain" of a unique to a different char
 newTagUnique u c = mkUnique c i where (_,i) = unpkUnique u
@@ -119,20 +126,20 @@ newTagUnique u c = mkUnique c i where (_,i) = unpkUnique u
 
 -- No 64-bit bugs here, as long as we have at least 32 bits. --JSM
 
-w2i x = word2Int# x
-i2w x = int2Word# x
-i2w_s x = (x::Int#)
+-- and as long as the Char fits in 8 bits, which we assume anyway!
 
-mkUnique (C# c) (I# i)
-  = MkUnique (w2i (tag `or#` bits))
+mkUnique c i
+  = MkUnique (tag `bitOrFastInt` bits)
   where
-    tag  = i2w (ord# c) `uncheckedShiftL#` i2w_s 24#
-    bits = i2w i `and#` (i2w 16777215#){-``0x00ffffff''-}
+    tag  = fastOrd (cUnbox c) `shiftLFastInt` _ILIT(24)
+    bits = iUnbox i `bitAndFastInt` _ILIT(16777215){-``0x00ffffff''-}
 
 unpkUnique (MkUnique u)
   = let
-	tag = C# (chr# (w2i ((i2w u) `uncheckedShiftRL#` (i2w_s 24#))))
-	i   = I# (w2i ((i2w u) `and#` (i2w 16777215#){-``0x00ffffff''-}))
+	-- as long as the Char may have its eighth bit set, we
+	-- really do need the logical right-shift here!
+	tag = cBox (fastChr (u `shiftRLFastInt` _ILIT(24)))
+	i   = iBox (u `bitAndFastInt` _ILIT(16777215){-``0x00ffffff''-})
     in
     (tag, i)
 \end{code}
@@ -153,7 +160,7 @@ hasKey		:: Uniquable a => a -> Unique -> Bool
 x `hasKey` k	= getUnique x == k
 
 instance Uniquable FastString where
- getUnique fs = mkUniqueGrimily (I# (uniqueOfFS fs))
+ getUnique fs = mkUniqueGrimily (iBox (uniqueOfFS fs))
 
 instance Uniquable Int where
  getUnique i = mkUniqueGrimily i
@@ -238,17 +245,28 @@ Code stolen from Lennart.
 
 \begin{code}
 iToBase62 :: Int -> String
-iToBase62 n@(I# n#) 
-  = ASSERT(n >= 0) go n# ""
+iToBase62 n_
+  = ASSERT(n_ >= 0) go (iUnbox n_) ""
   where
-    go n# cs | n# <# 62# 
-	     = case (indexCharOffAddr# chars62# n#) of { c# -> C# c# : cs }
+    go n cs | n <# _ILIT(62)
+	     = case chooseChar62 n of { c -> c `seq` (c : cs) }
 	     | otherwise
-	     =	case (quotRem (I# n#) 62)	     of { (I# q#, I# r#) ->
-		case (indexCharOffAddr# chars62# r#) of { c#  ->
-		go q# (C# c# : cs) }}
+	     =	case (quotRem (iBox n) 62) of { (q_, r_) ->
+                case iUnbox q_ of { q -> case iUnbox r_ of { r ->
+		case (chooseChar62 r) of { c -> c `seq`
+		(go q (c : cs)) }}}}
 
-    chars62# = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"#
+    chooseChar62 :: FastInt -> Char
+    {-# INLINE chooseChar62 #-}
+#if defined(__GLASGOW_HASKELL__)
+    --then FastInt == Int#
+    chooseChar62 n = C# (indexCharOffAddr# chars62 n)
+    chars62 = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"#
+#else
+    --Haskell98 arrays are portable
+    chooseChar62 n = (!) chars62 n
+    chars62 = listArray (0,61) "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+#endif
 \end{code}
 
 %************************************************************************

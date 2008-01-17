@@ -54,7 +54,7 @@ import Data.Maybe
 import Data.Array
 import Data.List
 
-#if __GLASGOW_HASKELL__ > 604
+#if !defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ > 604
 import Data.Array.ST
 #else
 import Data.Array.ST  hiding ( indices, bounds )

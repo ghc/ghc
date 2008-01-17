@@ -72,7 +72,7 @@ import Foreign
 import CString		( CString, peekCString )
 #endif
 
-#if __GLASGOW_HASKELL__ < 603
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 603
 -- rawSystem comes from libghccompat.a in stage1
 import Compat.RawSystem ( rawSystem )
 import System.Cmd       ( system )
@@ -480,7 +480,7 @@ xs `isContainedIn` ys = any (xs `isPrefixOf`) (tails ys)
 -- binaries (see bug #1110).
 getGccEnv :: [Option] -> IO (Maybe [(String,String)])
 getGccEnv opts = 
-#if __GLASGOW_HASKELL__ < 603
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 603
   return Nothing
 #else
   if null b_dirs
@@ -747,7 +747,7 @@ runSomethingFiltered dflags filter_fn phase_name pgm args mb_env = do
 
 
 
-#if __GLASGOW_HASKELL__ < 603
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 603
 builderMainLoop dflags filter_fn pgm real_args mb_env = do
   rawSystem pgm real_args
 #else

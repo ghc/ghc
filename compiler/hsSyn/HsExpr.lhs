@@ -370,12 +370,15 @@ ppr_expr (SectionR op expr)
     pp_infixly v
       = (sep [pprInfix v, pp_expr])
 
-ppr_expr (HsLam matches :: HsExpr id)
-  = pprMatches (LambdaExpr :: HsMatchContext id) matches
+--avoid using PatternSignatures for stage1 code portability
+ppr_expr exprType@(HsLam matches)
+  = pprMatches (LambdaExpr `asTypeOf` idType exprType) matches
+ where idType :: HsExpr id -> HsMatchContext id; idType = undefined
 
-ppr_expr (HsCase expr matches :: HsExpr id)
+ppr_expr exprType@(HsCase expr matches)
   = sep [ sep [ptext SLIT("case"), nest 4 (ppr expr), ptext SLIT("of")],
-          nest 2 (pprMatches (CaseAlt :: HsMatchContext id) matches) ]
+          nest 2 (pprMatches (CaseAlt `asTypeOf` idType exprType) matches) ]
+ where idType :: HsExpr id -> HsMatchContext id; idType = undefined
 
 ppr_expr (HsIf e1 e2 e3)
   = sep [hsep [ptext SLIT("if"), nest 2 (ppr e1), ptext SLIT("then")],
@@ -699,8 +702,10 @@ pprFunBind fun inf matches = pprMatches (FunRhs fun inf) matches
 -- Exported to HsBinds, which can't see the defn of HsMatchContext
 pprPatBind :: (OutputableBndr bndr, OutputableBndr id)
            => LPat bndr -> GRHSs id -> SDoc
-pprPatBind pat (grhss :: GRHSs id)
- = sep [ppr pat, nest 4 (pprGRHSs (PatBindRhs :: HsMatchContext id) grhss)]
+pprPatBind pat ty@(grhss)
+ = sep [ppr pat, nest 4 (pprGRHSs (PatBindRhs `asTypeOf` idType ty) grhss)]
+--avoid using PatternSignatures for stage1 code portability
+ where idType :: GRHSs id -> HsMatchContext id; idType = undefined
 
 
 pprMatch :: (OutputableBndr idL, OutputableBndr idR) => HsMatchContext idL -> Match idR -> SDoc

@@ -22,13 +22,15 @@ you will screw up the layout where they are used in case expressions!
  * settings for the target plat instead). */
 #include "../includes/ghcautoconf.h"
 
-#if __GLASGOW_HASKELL__ >= 602
+#if !defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ >= 602
 #define SYSTEM_IO_ERROR System.IO.Error
 #else
 #define SYSTEM_IO_ERROR System.IO
 #endif
 
-#ifdef __GLASGOW_HASKELL__
+/* Global variables may not work in other Haskell implementations,
+ * but we need them currently! so the conditional on GLASGOW won't do. */
+#if defined(__GLASGOW_HASKELL__) || !defined(__GLASGOW_HASKELL__)
 #define GLOBAL_VAR(name,value,ty)  \
 name = Util.global (value) :: IORef (ty); \
 {-# NOINLINE name #-}
@@ -64,8 +66,13 @@ name = Util.global (value) :: IORef (ty); \
 import qualified FastString as FS 
 #endif
 
+#if defined(__GLASGOW_HASKELL__)
 #define SLIT(x)	 (FS.mkLitString# (x#))
 #define FSLIT(x) (FS.mkFastString# (x#))
+#else
+#define SLIT(x)  (FS.mkLitString (x))
+#define FSLIT(x) (FS.mkFastString (x))
+#endif
 
 -- Useful for declaring arguments to be strict
 #define STRICT1(f) f a | a `seq` False = undefined

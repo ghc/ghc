@@ -91,7 +91,7 @@ errMsgTc :: TyCon
 errMsgTc = mkTyCon "ErrMsg"
 {-# NOINLINE errMsgTc #-}
 instance Typeable ErrMsg where
-#if __GLASGOW_HASKELL__ < 603
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 603
   typeOf _ = mkAppTy errMsgTc []
 #else
   typeOf _ = mkTyConApp errMsgTc []

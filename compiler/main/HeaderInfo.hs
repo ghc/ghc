@@ -46,13 +46,13 @@ import System.Exit
 import System.IO
 import Data.List
 
-#if __GLASGOW_HASKELL__ >= 601
+#if !defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ >= 601
 import System.IO		( openBinaryFile )
 #else
 import IOExts                   ( openFileEx, IOModeEx(..) )
 #endif
 
-#if __GLASGOW_HASKELL__ < 601
+#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 601
 openBinaryFile fp mode = openFileEx fp (BinaryMode mode)
 #endif
 

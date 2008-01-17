@@ -23,17 +23,13 @@ module BufWrite (
 #include "HsVersions.h"
 
 import FastString
+import FastTypes
 import FastMutInt
 
 import Control.Monad	( when )
 import Data.Char	( ord )
 import Foreign
 import System.IO
-
-import GHC.IOBase	( IO(..) )
-import GHC.Ptr		( Ptr(..) )
-
-import GHC.Exts		( Int(..), Int#, Addr# )
 
 -- -----------------------------------------------------------------------------
 
@@ -94,18 +90,18 @@ bPutFS b@(BufHandle buf r hdl) fs@(FastString _ len _ fp _) =
 		copyBytes (buf `plusPtr` i) ptr len
 		writeFastMutInt r (i+len)
 
-bPutLitString :: BufHandle -> Addr# -> Int# -> IO ()
-bPutLitString b@(BufHandle buf r hdl) a# len# = do
-  let len = I# len#
+bPutLitString :: BufHandle -> LitString -> FastInt -> IO ()
+bPutLitString b@(BufHandle buf r hdl) a len_ = a `seq` do
+  let len = iBox len_
   i <- readFastMutInt r
   if (i+len) >= buf_size
 	then do hPutBuf hdl buf i
 		writeFastMutInt r 0
 		if (len >= buf_size) 
-		    then hPutBuf hdl (Ptr a#) len
-		    else bPutLitString b a# len#
+		    then hPutBuf hdl a len
+		    else bPutLitString b a len_
 	else do
-		copyBytes (buf `plusPtr` i) (Ptr a#) len
+		copyBytes (buf `plusPtr` i) a len
 		writeFastMutInt r (i+len)
 
 bFlush :: BufHandle -> IO ()

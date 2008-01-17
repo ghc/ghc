@@ -103,10 +103,9 @@ import qualified Outputable
 import Unique
 import UniqSet
 import Constants
+import FastTypes
 import FastBool
 import UniqFM
-
-import GHC.Exts
 
 #if powerpc_TARGET_ARCH
 import Data.Word	( Word8, Word16, Word32 )
@@ -503,18 +502,18 @@ worst n classN classC
 -- Compare MachRegs.freeRegs  and MachRegs.h to get these numbers.
 --
 #if i386_TARGET_ARCH
-#define ALLOCATABLE_REGS_INTEGER 3#
-#define ALLOCATABLE_REGS_DOUBLE  6#
+#define ALLOCATABLE_REGS_INTEGER (_ILIT(3))
+#define ALLOCATABLE_REGS_DOUBLE  (_ILIT(6))
 #endif
 
 #if x86_64_TARGET_ARCH
-#define ALLOCATABLE_REGS_INTEGER 5#
-#define ALLOCATABLE_REGS_DOUBLE  2#
+#define ALLOCATABLE_REGS_INTEGER (_ILIT(5))
+#define ALLOCATABLE_REGS_DOUBLE  (_ILIT(2))
 #endif
 
 #if powerpc_TARGET_ARCH
-#define ALLOCATABLE_REGS_INTEGER 16#
-#define ALLOCATABLE_REGS_DOUBLE  26#
+#define ALLOCATABLE_REGS_INTEGER (_ILIT(16))
+#define ALLOCATABLE_REGS_DOUBLE  (_ILIT(26))
 #endif
 
 {-# INLINE regClass      #-}
@@ -535,17 +534,17 @@ trivColorable classN conflicts exclusions
 		LeafUFM _ reg
 		 -> case regClass reg of
 		 	RcInteger
-			 -> case cI +# 1# of
+			 -> case cI +# _ILIT(1) of
 			  	cI' -> (# cI' >=# ALLOCATABLE_REGS_INTEGER, cI', cF #)
 
 			RcDouble
-			 -> case cF +# 1# of
+			 -> case cF +# _ILIT(1) of
 			 	cF' -> (# cF' >=# ALLOCATABLE_REGS_DOUBLE,  cI, cF' #)
 
 		EmptyUFM
 		 ->	(# False, cI, cF #)
 
-   in case isSqueesed 0# 0# conflicts of
+   in case isSqueesed (_ILIT(0)) (_ILIT(0)) conflicts of
 	(# False, cI', cF' #)
 	 -> case isSqueesed cI' cF' exclusions of
 		(# s, _, _ #)	-> not s

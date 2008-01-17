@@ -1484,7 +1484,9 @@ data Unlinked
    | BCOs CompiledByteCode ModBreaks
 
 #ifndef GHCI
-data CompiledByteCode
+data CompiledByteCode = CompiledByteCodeUndefined
+_unused :: CompiledByteCode
+_unused = CompiledByteCodeUndefined
 #endif
 
 instance Outputable Unlinked where

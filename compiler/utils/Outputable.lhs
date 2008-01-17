@@ -45,9 +45,9 @@ module Outputable (
 	pprHsChar, pprHsString,
 
 	-- error handling
-	pprPanic, assertPprPanic, pprPanic#, pprPgmError, 
+	pprPanic, assertPprPanic, pprPanicFastInt, pprPgmError, 
 	pprTrace, warnPprTrace,
-	trace, pgmError, panic, panic#, assertPanic
+	trace, pgmError, panic, panicFastInt, assertPanic
     ) where
 
 #include "HsVersions.h"
@@ -59,7 +59,6 @@ import {-# SOURCE #-} 	OccName( OccName )
 import StaticFlags	( opt_PprStyle_Debug, opt_PprUserLength )
 import FastString
 import FastTypes
-import GHC.Ptr
 import qualified Pretty
 import Pretty		( Doc, Mode(..) )
 import Panic
@@ -336,7 +335,7 @@ empty    :: SDoc
 text     :: String     -> SDoc
 char     :: Char       -> SDoc
 ftext    :: FastString -> SDoc
-ptext    :: Ptr t      -> SDoc
+ptext    :: LitString  -> SDoc
 int      :: Int        -> SDoc
 integer  :: Integer    -> SDoc
 float    :: Float      -> SDoc
@@ -625,8 +624,8 @@ pprPgmError = pprAndThen pgmError	-- Throw an exn saying "bug in pgm being compi
 					--	(used for unusual pgm errors)
 pprTrace    = pprAndThen trace
 
-pprPanic# :: String -> SDoc -> FastInt
-pprPanic# heading pretty_msg = panic# (show (doc PprDebug))
+pprPanicFastInt :: String -> SDoc -> FastInt
+pprPanicFastInt heading pretty_msg = panicFastInt (show (doc PprDebug))
 			     where
 			       doc = text heading <+> pretty_msg
 

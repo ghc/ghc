@@ -30,13 +30,12 @@ import StaticFlags
 
 import UniqFM
 import Unique
-
+import FastTypes
 import Outputable
 
 import Data.Bits
 import Data.Word
 import Data.Int
-import GHC.Exts
 
 -- -----------------------------------------------------------------------------
 -- The mini-inliner
@@ -463,23 +462,26 @@ cmmMachOpFold mop args = CmmMachOp mop args
 -- Used to be in MachInstrs --SDM.
 -- ToDo: remove use of unboxery --SDM.
 
-w2i x = word2Int# x
-i2w x = int2Word# x
+-- Unboxery removed in favor of FastInt; but is the function supposed to fail
+-- on inputs >= 2147483648, or was that just an implementation artifact?
+-- And is this speed-critical, or can we just use Integer operations
+-- (including Data.Bits)?
+--  --Isaac Dupree
 
 exactLog2 :: Integer -> Maybe Integer
-exactLog2 x
-  = if (x <= 0 || x >= 2147483648) then
+exactLog2 x_
+  = if (x_ <= 0 || x_ >= 2147483648) then
        Nothing
     else
-       case fromInteger x of { I# x# ->
-       if (w2i ((i2w x#) `and#` (i2w (0# -# x#))) /=# x#) then
+       case iUnbox (fromInteger x_) of { x ->
+       if (x `bitAndFastInt` negateFastInt x) /=# x then
 	  Nothing
        else
-	  Just (toInteger (I# (pow2 x#)))
+	  Just (toInteger (iBox (pow2 x)))
        }
   where
-    pow2 x# | x# ==# 1# = 0#
-            | otherwise = 1# +# pow2 (w2i (i2w x# `shiftRL#` 1#))
+    pow2 x | x ==# _ILIT(1) = _ILIT(0)
+           | otherwise = _ILIT(1) +# pow2 (x `shiftR_FastInt` _ILIT(1))
 
 
 -- -----------------------------------------------------------------------------

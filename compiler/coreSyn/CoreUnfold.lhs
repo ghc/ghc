@@ -57,7 +57,6 @@ import Bag
 import FastTypes
 import Outputable
 
-import GHC.Exts		( Int# )
 \end{code}
 
 
@@ -182,7 +181,7 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
 \end{code}
 
 \begin{code}
-sizeExpr :: Int# 	    -- Bomb out if it gets bigger than this
+sizeExpr :: FastInt 	    -- Bomb out if it gets bigger than this
 	 -> [Id]	    -- Arguments; we're interested in which of these
 			    -- get case'd
 	 -> CoreExpr
@@ -242,7 +241,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 
 	    case alts of
 
-		[alt] -> size_up_alt alt `addSize` SizeIs 0# (unitBag (v, 1)) 0#
+		[alt] -> size_up_alt alt `addSize` SizeIs (_ILIT(0)) (unitBag (v, 1)) (_ILIT(0))
 		-- We want to make wrapper-style evaluation look cheap, so that
 		-- when we inline a wrapper it doesn't make call site (much) bigger
 		-- Otherwise we get nasty phase ordering stuff: 
@@ -270,7 +269,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 		-- the case when we are scrutinising an argument variable
 	  alts_size (SizeIs tot tot_disc tot_scrut)		-- Size of all alternatives
 		    (SizeIs max max_disc max_scrut)		-- Size of biggest alternative
-	 	= SizeIs tot (unitBag (v, iBox (_ILIT 1 +# tot -# max)) `unionBags` max_disc) max_scrut
+	 	= SizeIs tot (unitBag (v, iBox (_ILIT(1) +# tot -# max)) `unionBags` max_disc) max_scrut
 			-- If the variable is known, we produce a discount that
 			-- will take us back to 'max', the size of rh largest alternative
 			-- The 1+ is a little discount for reduced allocation in the caller
@@ -335,7 +334,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 
     ------------
 	-- We want to record if we're case'ing, or applying, an argument
-    fun_discount v | v `elem` top_args = SizeIs 0# (unitBag (v, opt_UF_FunAppDiscount)) 0#
+    fun_discount v | v `elem` top_args = SizeIs (_ILIT(0)) (unitBag (v, opt_UF_FunAppDiscount)) (_ILIT(0))
     fun_discount other		       = sizeZero
 
     ------------
@@ -373,12 +372,12 @@ maxSize _              TooBig				  = TooBig
 maxSize s1@(SizeIs n1 _ _) s2@(SizeIs n2 _ _) | n1 ># n2  = s1
 					      | otherwise = s2
 
-sizeZero     	= SizeIs (_ILIT 0)  emptyBag (_ILIT 0)
-sizeOne      	= SizeIs (_ILIT 1)  emptyBag (_ILIT 0)
-sizeN n 	= SizeIs (iUnbox n) emptyBag (_ILIT 0)
+sizeZero     	= SizeIs (_ILIT(0))  emptyBag (_ILIT(0))
+sizeOne      	= SizeIs (_ILIT(1))  emptyBag (_ILIT(0))
+sizeN n 	= SizeIs (iUnbox n) emptyBag (_ILIT(0))
 conSizeN dc n   
-  | isUnboxedTupleCon dc = SizeIs (_ILIT 0) emptyBag (iUnbox n +# _ILIT 1)
-  | otherwise		 = SizeIs (_ILIT 1) emptyBag (iUnbox n +# _ILIT 1)
+  | isUnboxedTupleCon dc = SizeIs (_ILIT(0)) emptyBag (iUnbox n +# _ILIT(1))
+  | otherwise		 = SizeIs (_ILIT(1)) emptyBag (iUnbox n +# _ILIT(1))
 	-- Treat constructors as size 1; we are keen to expose them
 	-- (and we charge separately for their args).  We can't treat
 	-- them as size zero, else we find that (iBox x) has size 1,
@@ -404,7 +403,7 @@ primOpSize op n_args
 	-- and there's a good chance it'll get inlined back into C's RHS. Urgh!
  | otherwise	      	    = sizeOne
 
-buildSize = SizeIs (-2#) emptyBag 4#
+buildSize = SizeIs (_ILIT(-2)) emptyBag (_ILIT(4))
 	-- We really want to inline applications of build
 	-- build t (\cn -> e) should cost only the cost of e (because build will be inlined later)
 	-- Indeed, we should add a result_discount becuause build is 
@@ -412,11 +411,11 @@ buildSize = SizeIs (-2#) emptyBag 4#
 	-- build is saturated (it usually is).  The "-2" discounts for the \c n, 
 	-- The "4" is rather arbitrary.
 
-augmentSize = SizeIs (-2#) emptyBag 4#
+augmentSize = SizeIs (_ILIT(-2)) emptyBag (_ILIT(4))
 	-- Ditto (augment t (\cn -> e) ys) should cost only the cost of
 	-- e plus ys. The -2 accounts for the \cn 
 						
-nukeScrutDiscount (SizeIs n vs d) = SizeIs n vs 0#
+nukeScrutDiscount (SizeIs n vs d) = SizeIs n vs (_ILIT(0))
 nukeScrutDiscount TooBig	  = TooBig
 
 -- When we return a lambda, give a discount if it's used (applied)

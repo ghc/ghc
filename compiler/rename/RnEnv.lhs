@@ -553,7 +553,9 @@ bindLocalFixities fixes thing_inside
         Just new_v -> returnM (Left (new_v, (FixItem (rdrNameOcc v) fix)))
         Nothing -> returnM (Right (occNameFS $ rdrNameOcc v, (L loc fix)))
 
-    nowAndLater (ls :: [Either (Name, FixItem) (FastString, Located Fixity)]) = 
+    nowAndLater :: [Either (Name, FixItem) (FastString, Located Fixity)]
+                       -> ([(Name,FixItem)], UniqFM (Located Fixity))
+    nowAndLater ls =
         foldr (\ cur -> \ (now, later) ->
                         case cur of 
                           Left (n, f) -> ((n, f) : now, later)
