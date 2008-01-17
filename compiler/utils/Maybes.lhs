@@ -17,6 +17,7 @@ module Maybes (
         expectJust,
         maybeToBool,
 
+        MaybeT(..)
     ) where
 
 import Data.Maybe
@@ -80,6 +81,26 @@ mapCatMaybes f (x:xs) = case f x of
 orElse :: Maybe a -> a -> a
 (Just x) `orElse` _ = x
 Nothing  `orElse` y = y
+\end{code}
+
+%************************************************************************
+%*									*
+\subsection[MaybeT type]{The @MaybeT@ monad transformer}
+%*									*
+%************************************************************************
+
+\begin{code}
+
+newtype MaybeT m a = MaybeT {runMaybeT :: m (Maybe a)}
+
+instance Functor m => Functor (MaybeT m) where
+  fmap f x = MaybeT $ fmap (fmap f) $ runMaybeT x
+
+instance Monad m => Monad (MaybeT m) where
+  return = MaybeT . return . Just
+  x >>= f = MaybeT $ runMaybeT x >>= maybe (return Nothing) (runMaybeT . f)
+  fail _ = MaybeT $ return Nothing
+
 \end{code}
 
 
