@@ -60,20 +60,20 @@ matchCheck ::  DsMatchContext
             -> [EquationInfo]   -- Info about patterns, etc. (type synonym below)
             -> DsM MatchResult  -- Desugared result!
 
-matchCheck ctx vars ty qs
-   = getDOptsDs 				`thenDs` \ dflags ->
-     matchCheck_really dflags ctx vars ty qs
+matchCheck ctx vars ty qs = do
+    dflags <- getDOptsDs
+    matchCheck_really dflags ctx vars ty qs
 
 matchCheck_really dflags ctx vars ty qs
-  | incomplete && shadow = 
-      dsShadowWarn ctx eqns_shadow		`thenDs`   \ () ->
-      dsIncompleteWarn ctx pats			`thenDs`   \ () ->
+  | incomplete && shadow  = do
+      dsShadowWarn ctx eqns_shadow
+      dsIncompleteWarn ctx pats
       match vars ty qs
-  | incomplete            = 
-      dsIncompleteWarn ctx pats			`thenDs`   \ () ->
+  | incomplete            = do
+      dsIncompleteWarn ctx pats
       match vars ty qs
-  | shadow                = 
-      dsShadowWarn ctx eqns_shadow		`thenDs`   \ () ->
+  | shadow                = do
+      dsShadowWarn ctx eqns_shadow
       match vars ty qs
   | otherwise             =
       match vars ty qs
@@ -263,7 +263,7 @@ match :: [Id]		  -- Variables rep'ing the exprs we're matching with
 
 match [] ty eqns
   = ASSERT2( not (null eqns), ppr ty )
-    returnDs (foldr1 combineMatchResults match_results)
+    return (foldr1 combineMatchResults match_results)
   where
     match_results = [ ASSERT( null (eqn_pats eqn) ) 
 		      eqn_rhs eqn
@@ -280,7 +280,7 @@ match vars@(v:_) ty eqns
        ; let grouped = (groupEquations tidy_eqns)
 
          -- print the view patterns that are commoned up to help debug
-       ; ifOptDs Opt_D_dump_view_pattern_commoning (debug grouped)
+       ; ifOptM Opt_D_dump_view_pattern_commoning (debug grouped)
 
 	; match_results <- mapM match_group grouped
 	; return (adjustMatchResult (foldr1 (.) aux_binds) $
@@ -372,7 +372,7 @@ which will be scrutinised.  This means:
 Replace variable patterns @x@ (@x /= v@) with the pattern @_@,
 together with the binding @x = v@.
 \item
-Replace the `as' pattern @x@@p@ with the pattern p and a binding @x = v@.
+Replace the `as' pattern @xp@ with the pattern p and a binding @x = do v@.
 \item
 Removing lazy (irrefutable) patterns (you don't want to know...).
 \item
@@ -416,9 +416,9 @@ tidyEqnInfo :: Id -> EquationInfo
 	--	NPlusKPat
 	-- but no other
 
-tidyEqnInfo v eqn@(EqnInfo { eqn_pats = pat : pats })
-  = tidy1 v pat 	`thenDs` \ (wrap, pat') ->
-    returnDs (wrap, eqn { eqn_pats = pat' : pats })
+tidyEqnInfo v eqn@(EqnInfo { eqn_pats = pat : pats }) = do
+    (wrap, pat') <- tidy1 v pat
+    return (wrap, eqn { eqn_pats = do pat' : pats })
 
 tidy1 :: Id 			-- The Id being scrutinised
       -> Pat Id 		-- The pattern against which it is to be matched
@@ -438,12 +438,12 @@ tidy1 :: Id 			-- The Id being scrutinised
 
 tidy1 v (ParPat pat)      = tidy1 v (unLoc pat) 
 tidy1 v (SigPatOut pat _) = tidy1 v (unLoc pat) 
-tidy1 v (WildPat ty)      = returnDs (idDsWrapper, WildPat ty)
+tidy1 v (WildPat ty)      = return (idDsWrapper, WildPat ty)
 
 	-- case v of { x -> mr[] }
 	-- = case v of { _ -> let x=v in mr[] }
 tidy1 v (VarPat var)
-  = returnDs (wrapBind var v, WildPat (idType var)) 
+  = return (wrapBind var v, WildPat (idType var)) 
 
 tidy1 v (VarPatOut var binds)
   = do	{ prs <- dsLHsBinds binds
@@ -470,10 +470,10 @@ tidy1 v (AsPat (L _ var) pat)
 tidy1 v (LazyPat pat)
   = do	{ sel_prs <- mkSelectorBinds pat (Var v)
 	; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
-	; returnDs (mkDsLets sel_binds, WildPat (idType v)) }
+	; return (mkDsLets sel_binds, WildPat (idType v)) }
 
 tidy1 v (ListPat pats ty)
-  = returnDs (idDsWrapper, unLoc list_ConPat)
+  = return (idDsWrapper, unLoc list_ConPat)
   where
     list_ty     = mkListTy ty
     list_ConPat = foldr (\ x y -> mkPrefixConPat consDataCon [x, y] list_ty)
@@ -483,29 +483,29 @@ tidy1 v (ListPat pats ty)
 -- Introduce fake parallel array constructors to be able to handle parallel
 -- arrays with the existing machinery for constructor pattern
 tidy1 v (PArrPat pats ty)
-  = returnDs (idDsWrapper, unLoc parrConPat)
+  = return (idDsWrapper, unLoc parrConPat)
   where
     arity      = length pats
     parrConPat = mkPrefixConPat (parrFakeCon arity) pats (mkPArrTy ty)
 
 tidy1 v (TuplePat pats boxity ty)
-  = returnDs (idDsWrapper, unLoc tuple_ConPat)
+  = return (idDsWrapper, unLoc tuple_ConPat)
   where
     arity = length pats
     tuple_ConPat = mkPrefixConPat (tupleCon boxity arity) pats ty
 
 -- LitPats: we *might* be able to replace these w/ a simpler form
 tidy1 v (LitPat lit)
-  = returnDs (idDsWrapper, tidyLitPat lit)
+  = return (idDsWrapper, tidyLitPat lit)
 
 -- NPats: we *might* be able to replace these w/ a simpler form
 tidy1 v (NPat lit mb_neg eq)
-  = returnDs (idDsWrapper, tidyNPat lit mb_neg eq)
+  = return (idDsWrapper, tidyNPat lit mb_neg eq)
 
 -- Everything else goes through unchanged...
 
 tidy1 v non_interesting_pat
-  = returnDs (idDsWrapper, non_interesting_pat)
+  = return (idDsWrapper, non_interesting_pat)
 \end{code}
 
 \noindent
@@ -702,34 +702,32 @@ matchSimply :: CoreExpr			-- Scrutinee
 	    -> CoreExpr			-- Return this if it doesn't
 	    -> DsM CoreExpr
 
-matchSimply scrut hs_ctx pat result_expr fail_expr
-  = let
+matchSimply scrut hs_ctx pat result_expr fail_expr = do
+    let
       match_result = cantFailMatchResult result_expr
-      rhs_ty	   = exprType fail_expr
-	-- Use exprType of fail_expr, because won't refine in the case of failure!
-    in 
-    matchSinglePat scrut hs_ctx pat rhs_ty match_result	`thenDs` \ match_result' ->
+      rhs_ty       = exprType fail_expr
+        -- Use exprType of fail_expr, because won't refine in the case of failure!
+    match_result' <- matchSinglePat scrut hs_ctx pat rhs_ty match_result
     extractMatchResult match_result' fail_expr
 
 
 matchSinglePat :: CoreExpr -> HsMatchContext Name -> LPat Id
 	       -> Type -> MatchResult -> DsM MatchResult
-matchSinglePat (Var var) hs_ctx (L _ pat) ty match_result
-  = getDOptsDs				`thenDs` \ dflags ->
-    getSrcSpanDs			`thenDs` \ locn ->
+matchSinglePat (Var var) hs_ctx (L _ pat) ty match_result = do
+    dflags <- getDOptsDs
+    locn <- getSrcSpanDs
     let
-	match_fn dflags
+        match_fn dflags
            | dopt Opt_WarnSimplePatterns dflags = matchCheck ds_ctx
-  	   | otherwise	       		        = match
-	   where
-	     ds_ctx = DsMatchContext hs_ctx locn
-    in
+           | otherwise                          = match
+           where
+             ds_ctx = DsMatchContext hs_ctx locn
     match_fn dflags [var] ty [EqnInfo { eqn_pats = [pat], eqn_rhs  = match_result }]
 
-matchSinglePat scrut hs_ctx pat ty match_result
-  = selectSimpleMatchVarL pat 		 		`thenDs` \ var ->
-    matchSinglePat (Var var) hs_ctx pat ty match_result	`thenDs` \ match_result' ->
-    returnDs (adjustMatchResult (bindNonRec var scrut) match_result')
+matchSinglePat scrut hs_ctx pat ty match_result = do
+    var <- selectSimpleMatchVarL pat
+    match_result' <- matchSinglePat (Var var) hs_ctx pat ty match_result
+    return (adjustMatchResult (bindNonRec var scrut) match_result')
 \end{code}
 
 
