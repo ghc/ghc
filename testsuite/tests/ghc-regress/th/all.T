@@ -77,6 +77,8 @@ test('TH_dataD1', normal, compile_fail, ['-v0'])
 test('TH_ppr1', normal, compile_and_run, ['-fglasgow-exts'])
 
 test('TH_fail', normal, compile_fail, ['-v0'])
+test('TH_scopedTvs', normal, compile_fail, ['-v0'])
+
 test('TH_runIO', if_compiler_lt('ghc','6.9', namebase('TH_runIO-6.8')), compile_fail, ['-v0'])
 
 test('TH_ghci1', normal, ghci_script, ['TH_ghci1.script'])
