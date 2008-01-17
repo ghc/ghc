@@ -24,7 +24,7 @@ import DataCon		( DataCon, dataConInstArgTys, dataConRepType )
 import CoreSyn		( AltCon(..) )
 import PrimOp		( primOpType )
 import Literal		( literalType )
-import Maybes		( catMaybes )
+import Maybes
 import Name		( getSrcLoc )
 import ErrUtils		( Message, mkLocMessage )
 import Type		( mkFunTys, splitFunTys, splitTyConApp_maybe,
@@ -34,8 +34,7 @@ import TyCon		( isAlgTyCon, isNewTyCon, tyConDataCons )
 import Util		( zipEqual, equalLength )
 import SrcLoc		( srcLocSpan )
 import Outputable
-
-infixr 9 `thenL`, `thenL_`, `thenMaybeL`
+import Control.Monad
 \end{code}
 
 Checks for
@@ -78,57 +77,53 @@ lintStgBindings whodunnit binds
   where
     lint_binds :: [StgBinding] -> LintM ()
 
-    lint_binds [] = returnL ()
-    lint_binds (bind:binds)
-      = lintStgBinds bind 		`thenL` \ binders ->
-	addInScopeVars binders (
-	    lint_binds binds
-	)
+    lint_binds [] = return ()
+    lint_binds (bind:binds) = do
+        binders <- lintStgBinds bind
+        addInScopeVars binders $
+            lint_binds binds
 \end{code}
 
 
 \begin{code}
 lintStgArg :: StgArg -> LintM (Maybe Type)
-lintStgArg (StgLitArg lit) = returnL (Just (literalType lit))
+lintStgArg (StgLitArg lit) = return (Just (literalType lit))
 lintStgArg (StgVarArg v)   = lintStgVar v
 
-lintStgVar v  = checkInScope v	`thenL_`
-		returnL (Just (idType v))
+lintStgVar v = do checkInScope v
+                  return (Just (idType v))
 \end{code}
 
 \begin{code}
 lintStgBinds :: StgBinding -> LintM [Id]		-- Returns the binders
-lintStgBinds (StgNonRec binder rhs)
-  = lint_binds_help (binder,rhs) 	`thenL_`
-    returnL [binder]
+lintStgBinds (StgNonRec binder rhs) = do
+    lint_binds_help (binder,rhs)
+    return [binder]
 
 lintStgBinds (StgRec pairs)
-  = addInScopeVars binders (
-	mapL lint_binds_help pairs `thenL_`
-	returnL binders
-    )
+  = addInScopeVars binders $ do
+        mapM_ lint_binds_help pairs
+        return binders
   where
     binders = [b | (b,_) <- pairs]
 
 lint_binds_help (binder, rhs)
-  = addLoc (RhsOf binder) (
+  = addLoc (RhsOf binder) $ do
 	-- Check the rhs
-	lintStgRhs rhs    `thenL` \ maybe_rhs_ty ->
+	maybe_rhs_ty <- lintStgRhs rhs
 
 	-- Check binder doesn't have unlifted type
 	checkL (not (isUnLiftedType binder_ty))
-	       (mkUnLiftedTyMsg binder rhs)		`thenL_`
+	       (mkUnLiftedTyMsg binder rhs)
 
 	-- Check match to RHS type
-	(case maybe_rhs_ty of
-	  Nothing     -> returnL ()
+	case maybe_rhs_ty of
+	  Nothing     -> return ()
 	  Just rhs_ty -> checkTys  binder_ty
 				   rhs_ty
 				   (mkRhsMsg binder rhs_ty)
-	)			`thenL_`
 
-	returnL ()
-    )
+	return ()
   where
     binder_ty = idType binder
 \end{code}
@@ -140,17 +135,14 @@ lintStgRhs (StgRhsClosure _ _ _ _ _ [] expr)
   = lintStgExpr expr
 
 lintStgRhs (StgRhsClosure _ _ _ _ _ binders expr)
-  = addLoc (LambdaBodyOf binders) (
-    addInScopeVars binders (
-	lintStgExpr expr   `thenMaybeL` \ body_ty ->
-	returnL (Just (mkFunTys (map idType binders) body_ty))
-    ))
+  = addLoc (LambdaBodyOf binders) $
+      addInScopeVars binders $ runMaybeT $ do
+        body_ty <- MaybeT $ lintStgExpr expr
+        return (mkFunTys (map idType binders) body_ty)
 
-lintStgRhs (StgRhsCon _ con args)
-  = mapMaybeL lintStgArg args	`thenL` \ maybe_arg_tys ->
-    case maybe_arg_tys of
-      Nothing 	    -> returnL Nothing
-      Just arg_tys  -> checkFunApp con_ty arg_tys (mkRhsConMsg con_ty arg_tys)
+lintStgRhs (StgRhsCon _ con args) = runMaybeT $ do
+    arg_tys <- mapM (MaybeT . lintStgArg) args
+    MaybeT $ checkFunApp con_ty arg_tys (mkRhsConMsg con_ty arg_tys)
   where
     con_ty = dataConRepType con
 \end{code}
@@ -158,77 +150,69 @@ lintStgRhs (StgRhsCon _ con args)
 \begin{code}
 lintStgExpr :: StgExpr -> LintM (Maybe Type)	-- Nothing if error found
 
-lintStgExpr (StgLit l) = returnL (Just (literalType l))
+lintStgExpr (StgLit l) = return (Just (literalType l))
 
-lintStgExpr e@(StgApp fun args)
-  = lintStgVar fun		`thenMaybeL` \ fun_ty  ->
-    mapMaybeL lintStgArg args	`thenL`      \ maybe_arg_tys ->
-    case maybe_arg_tys of
-      Nothing 	    -> returnL Nothing
-      Just arg_tys  -> checkFunApp fun_ty arg_tys (mkFunAppMsg fun_ty arg_tys e)
+lintStgExpr e@(StgApp fun args) = runMaybeT $ do
+    fun_ty <- MaybeT $ lintStgVar fun
+    arg_tys <- mapM (MaybeT . lintStgArg) args
+    MaybeT $ checkFunApp fun_ty arg_tys (mkFunAppMsg fun_ty arg_tys e)
 
-lintStgExpr e@(StgConApp con args)
-  = mapMaybeL lintStgArg args	`thenL` \ maybe_arg_tys ->
-    case maybe_arg_tys of
-      Nothing 	    -> returnL Nothing
-      Just arg_tys  -> checkFunApp con_ty arg_tys (mkFunAppMsg con_ty arg_tys e)
+lintStgExpr e@(StgConApp con args) = runMaybeT $ do
+    arg_tys <- mapM (MaybeT . lintStgArg) args
+    MaybeT $ checkFunApp con_ty arg_tys (mkFunAppMsg con_ty arg_tys e)
   where
     con_ty = dataConRepType con
 
-lintStgExpr e@(StgOpApp (StgFCallOp _ _) args res_ty)
-  = 	-- We don't have enough type information to check
+lintStgExpr e@(StgOpApp (StgFCallOp _ _) args res_ty) = runMaybeT $ do
+	-- We don't have enough type information to check
 	-- the application; ToDo
-    mapMaybeL lintStgArg args	`thenL` \ maybe_arg_tys ->
-    returnL (Just res_ty)
+    maybe_arg_tys <- mapM (MaybeT . lintStgArg) args
+    return res_ty
 
-lintStgExpr e@(StgOpApp (StgPrimOp op) args _)
-  = mapMaybeL lintStgArg args	`thenL` \ maybe_arg_tys ->
-    case maybe_arg_tys of
-      Nothing 	    -> returnL Nothing
-      Just arg_tys  -> checkFunApp op_ty arg_tys (mkFunAppMsg op_ty arg_tys e)
+lintStgExpr e@(StgOpApp (StgPrimOp op) args _) = runMaybeT $ do
+    arg_tys <- mapM (MaybeT . lintStgArg) args
+    MaybeT $ checkFunApp op_ty arg_tys (mkFunAppMsg op_ty arg_tys e)
   where
     op_ty = primOpType op
 
-lintStgExpr (StgLam _ bndrs _)
-  = addErrL (ptext SLIT("Unexpected StgLam") <+> ppr bndrs)	`thenL_`
-    returnL Nothing
+lintStgExpr (StgLam _ bndrs _) = do
+    addErrL (ptext SLIT("Unexpected StgLam") <+> ppr bndrs)
+    return Nothing
 
-lintStgExpr (StgLet binds body)
-  = lintStgBinds binds		`thenL` \ binders ->
-    addLoc (BodyOfLetRec binders) (
-    addInScopeVars binders (
-	lintStgExpr body
-    ))
+lintStgExpr (StgLet binds body) = do
+    binders <- lintStgBinds binds
+    addLoc (BodyOfLetRec binders) $
+      addInScopeVars binders $
+        lintStgExpr body
 
-lintStgExpr (StgLetNoEscape _ _ binds body)
-  = lintStgBinds binds		`thenL` \ binders ->
-    addLoc (BodyOfLetRec binders) (
-    addInScopeVars binders (
-	lintStgExpr body
-    ))
+lintStgExpr (StgLetNoEscape _ _ binds body) = do
+    binders <- lintStgBinds binds
+    addLoc (BodyOfLetRec binders) $
+      addInScopeVars binders $
+        lintStgExpr body
 
 lintStgExpr (StgSCC _ expr)	= lintStgExpr expr
 
-lintStgExpr e@(StgCase scrut _ _ bndr _ alts_type alts)
-  = lintStgExpr scrut		`thenMaybeL` \ _ ->
+lintStgExpr e@(StgCase scrut _ _ bndr _ alts_type alts) = runMaybeT $ do
+    MaybeT $ lintStgExpr scrut
 
-    (case alts_type of
-	AlgAlt tc    -> check_bndr tc
-	PrimAlt tc   -> check_bndr tc
-	UbxTupAlt tc -> check_bndr tc
-	PolyAlt      -> returnL ()
-    )							`thenL_`
-	
-    (trace (showSDoc (ppr e)) $ 
+    MaybeT $ liftM Just $
+     case alts_type of
+        AlgAlt tc    -> check_bndr tc
+        PrimAlt tc   -> check_bndr tc
+        UbxTupAlt tc -> check_bndr tc
+        PolyAlt      -> return ()
+
+    MaybeT $ trace (showSDoc (ppr e)) $ do
 	-- we only allow case of tail-call or primop.
-    (case scrut of
-	StgApp _ _    -> returnL ()
-	StgConApp _ _ -> returnL ()
-	StgOpApp _ _ _ -> returnL ()
-	other -> addErrL (mkCaseOfCaseMsg e))   `thenL_`
+     case scrut of
+        StgApp _ _     -> return ()
+        StgConApp _ _  -> return ()
+        StgOpApp _ _ _ -> return ()
+        other          -> addErrL (mkCaseOfCaseMsg e)
 
-    addInScopeVars [bndr] (lintStgAlts alts scrut_ty)
-    )
+     addInScopeVars [bndr] $
+        lintStgAlts alts scrut_ty
   where
     scrut_ty	  = idType bndr
     bad_bndr      = mkDefltMsg bndr
@@ -241,45 +225,43 @@ lintStgAlts :: [StgAlt]
 	    -> Type 		-- Type of scrutinee
 	    -> LintM (Maybe Type)	-- Type of alternatives
 
-lintStgAlts alts scrut_ty
-  = mapL (lintAlt scrut_ty) alts 	`thenL` \ maybe_result_tys ->
+lintStgAlts alts scrut_ty = do
+    maybe_result_tys <- mapM (lintAlt scrut_ty) alts
 
 	 -- Check the result types
     case catMaybes (maybe_result_tys) of
-      []	     -> returnL Nothing
+      []             -> return Nothing
 
-      (first_ty:tys) -> mapL check tys	`thenL_`
-			returnL (Just first_ty)
+      (first_ty:tys) -> do mapM_ check tys
+                           return (Just first_ty)
 	where
 	  check ty = checkTys first_ty ty (mkCaseAltMsg alts)
 
 lintAlt scrut_ty (DEFAULT, _, _, rhs)
  = lintStgExpr rhs
 
-lintAlt scrut_ty (LitAlt lit, _, _, rhs)
- = checkTys (literalType lit) scrut_ty (mkAltMsg1 scrut_ty)	`thenL_`
+lintAlt scrut_ty (LitAlt lit, _, _, rhs) = do
+   checkTys (literalType lit) scrut_ty (mkAltMsg1 scrut_ty)
    lintStgExpr rhs
 
-lintAlt scrut_ty (DataAlt con, args, _, rhs)
-  = (case splitTyConApp_maybe scrut_ty of
+lintAlt scrut_ty (DataAlt con, args, _, rhs) = do
+    case splitTyConApp_maybe scrut_ty of
       Just (tycon, tys_applied) | isAlgTyCon tycon && 
-				  not (isNewTyCon tycon) ->
+				  not (isNewTyCon tycon) -> do
 	 let
 	   cons    = tyConDataCons tycon
 	   arg_tys = dataConInstArgTys con tys_applied
 		-- This almost certainly does not work for existential constructors
-	 in
-	 checkL (con `elem` cons) (mkAlgAltMsg2 scrut_ty con) `thenL_`
+	 
+	 checkL (con `elem` cons) (mkAlgAltMsg2 scrut_ty con)
 	 checkL (equalLength arg_tys args) (mkAlgAltMsg3 con args)
-								 `thenL_`
-	 mapL check (zipEqual "lintAlgAlt:stg" arg_tys args)	 `thenL_`
-	 returnL ()
+	 mapM_ check (zipEqual "lintAlgAlt:stg" arg_tys args)
+	 return ()
       other ->
 	 addErrL (mkAltMsg1 scrut_ty)
-    )								 `thenL_`
-    addInScopeVars args 	(
+
+    addInScopeVars args $
 	 lintStgExpr rhs
-    )
   where
     check (ty, arg) = checkTys ty (idType arg) (mkAlgAltMsg4 ty arg)
 
@@ -298,10 +280,12 @@ lintAlt scrut_ty (DataAlt con, args, _, rhs)
 %************************************************************************
 
 \begin{code}
-type LintM a = [LintLocInfo] 	-- Locations
-	    -> IdSet		-- Local vars in scope
-	    -> Bag Message	-- Error messages so far
-	    -> (a, Bag Message)	-- Result and error messages (if any)
+newtype LintM a = LintM
+    { unLintM :: [LintLocInfo]      -- Locations
+              -> IdSet              -- Local vars in scope
+              -> Bag Message        -- Error messages so far
+              -> (a, Bag Message)   -- Result and error messages (if any)
+    }
 
 data LintLocInfo
   = RhsOf Id		-- The variable bound
@@ -327,7 +311,7 @@ pp_binders bs
 
 \begin{code}
 initL :: LintM a -> Maybe Message
-initL m
+initL (LintM m)
   = case (m [] emptyVarSet emptyBag) of { (_, errs) ->
     if isEmptyBag errs then
 	Nothing
@@ -335,51 +319,31 @@ initL m
 	Just (vcat (punctuate (text "") (bagToList errs)))
     }
 
-returnL :: a -> LintM a
-returnL r loc scope errs = (r, errs)
+instance Monad LintM where
+    return a = LintM $ \loc scope errs -> (a, errs)
+    (>>=) = thenL
+    (>>)  = thenL_
 
 thenL :: LintM a -> (a -> LintM b) -> LintM b
-thenL m k loc scope errs
-  = case m loc scope errs of
-      (r, errs') -> k r loc scope errs'
+thenL m k = LintM $ \loc scope errs
+  -> case unLintM m loc scope errs of
+      (r, errs') -> unLintM (k r) loc scope errs'
 
 thenL_ :: LintM a -> LintM b -> LintM b
-thenL_ m k loc scope errs
-  = case m loc scope errs of
-      (_, errs') -> k loc scope errs'
-
-thenMaybeL :: LintM (Maybe a) -> (a -> LintM (Maybe b)) -> LintM (Maybe b)
-thenMaybeL m k loc scope errs
-  = case m loc scope errs of
-      (Nothing, errs2) -> (Nothing, errs2)
-      (Just r,  errs2) -> k r loc scope errs2
-
-mapL :: (a -> LintM b) -> [a] -> LintM [b]
-mapL f [] = returnL []
-mapL f (x:xs)
-  = f x 	`thenL` \ r ->
-    mapL f xs	`thenL` \ rs ->
-    returnL (r:rs)
-
-mapMaybeL :: (a -> LintM (Maybe b)) -> [a] -> LintM (Maybe [b])
-	-- Returns Nothing if anything fails
-mapMaybeL f [] = returnL (Just [])
-mapMaybeL f (x:xs)
-  = f x	    	    `thenMaybeL` \ r ->
-    mapMaybeL f xs  `thenMaybeL` \ rs ->
-    returnL (Just (r:rs))
+thenL_ m k = LintM $ \loc scope errs
+  -> case unLintM m loc scope errs of
+      (_, errs') -> unLintM k loc scope errs'
 \end{code}
 
 \begin{code}
 checkL :: Bool -> Message -> LintM ()
-checkL True  msg loc scope errs = ((), errs)
-checkL False msg loc scope errs = ((), addErr errs msg loc)
+checkL True  msg = return ()
+checkL False msg = addErrL msg
 
 addErrL :: Message -> LintM ()
-addErrL msg loc scope errs = ((), addErr errs msg loc)
+addErrL msg = LintM $ \loc scope errs -> ((), addErr errs msg loc)
 
 addErr :: Bag Message -> Message -> [LintLocInfo] -> Bag Message
-
 addErr errs_so_far msg locs
   = errs_so_far `snocBag` mk_msg locs
   where
@@ -388,12 +352,12 @@ addErr errs_so_far msg locs
     mk_msg []      = msg
 
 addLoc :: LintLocInfo -> LintM a -> LintM a
-addLoc extra_loc m loc scope errs
-  = m (extra_loc:loc) scope errs
+addLoc extra_loc m = LintM $ \loc scope errs
+   -> unLintM m (extra_loc:loc) scope errs
 
 addInScopeVars :: [Id] -> LintM a -> LintM a
-addInScopeVars ids m loc scope errs
-  = -- We check if these "new" ids are already
+addInScopeVars ids m = LintM $ \loc scope errs
+ -> -- We check if these "new" ids are already
     -- in scope, i.e., we have *shadowing* going on.
     -- For now, it's just a "trace"; we may make
     -- a real error out of it...
@@ -405,7 +369,7 @@ addInScopeVars ids m loc scope errs
 --  (if isEmptyVarSet shadowed
 --  then id
 --  else pprTrace "Shadowed vars:" (ppr (varSetElems shadowed))) $
-    m loc (scope `unionVarSet` new_set) errs
+    unLintM m loc (scope `unionVarSet` new_set) errs
 \end{code}
 
 Checking function applications: we only check that the type has the
@@ -420,9 +384,11 @@ checkFunApp :: Type 		    -- The function type
 	    -> Message		    -- Error messgae
 	    -> LintM (Maybe Type)   -- The result type
 
-checkFunApp fun_ty arg_tys msg loc scope errs
-  = cfa res_ty expected_arg_tys arg_tys
-  where
+checkFunApp fun_ty arg_tys msg = LintM checkFunApp'
+ where
+  checkFunApp' loc scope errs
+   = cfa res_ty expected_arg_tys arg_tys
+   where
     (expected_arg_tys, res_ty) = splitFunTys (dropForAlls fun_ty)
 
     cfa res_ty expected []	-- Args have run out; that's fine
@@ -445,15 +411,15 @@ checkFunApp fun_ty arg_tys msg loc scope errs
 
 \begin{code}
 checkInScope :: Id -> LintM ()
-checkInScope id loc scope errs
-  = if isLocalId id && not (id `elemVarSet` scope) then
+checkInScope id = LintM $ \loc scope errs
+ -> if isLocalId id && not (id `elemVarSet` scope) then
 	((), addErr errs (hsep [ppr id, ptext SLIT("is out of scope")]) loc)
     else
 	((), errs)
 
 checkTys :: Type -> Type -> Message -> LintM ()
-checkTys ty1 ty2 msg loc scope errs
-  = -- if (ty1 == ty2) then
+checkTys ty1 ty2 msg = LintM $ \loc scope errs
+ -> -- if (ty1 == ty2) then
     ((), errs)
     -- else ((), addErr errs msg loc)
 \end{code}
