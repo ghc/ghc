@@ -998,7 +998,7 @@ checkOldIface hsc_env mod_summary source_unchanged maybe_iface
 
 check_old_iface hsc_env mod_summary source_unchanged maybe_iface
  =  do 	-- CHECK WHETHER THE SOURCE HAS CHANGED
-    { ifM (not source_unchanged)
+    { when (not source_unchanged)
 	   (traceHiDiffs (nest 4 (text "Source file changed or recompilation check turned off")))
 
      -- If the source has changed and we're in interactive mode, avoid reading
@@ -1030,7 +1030,7 @@ check_old_iface hsc_env mod_summary source_unchanged maybe_iface
 	-- We have got the old iface; check its versions
     { traceIf (text "Read the interface file" <+> text iface_path)
     ; recomp <- checkVersions hsc_env source_unchanged mod_summary iface
-    ; returnM (recomp, Just iface)
+    ; return (recomp, Just iface)
     }}}}}
 
 \end{code}
@@ -1052,7 +1052,7 @@ checkVersions :: HscEnv
 	      -> IfG RecompileRequired
 checkVersions hsc_env source_unchanged mod_summary iface
   | not source_unchanged
-  = returnM outOfDate
+  = return outOfDate
   | otherwise
   = do	{ traceHiDiffs (text "Considering whether compilation is required for" <+> 
 		        ppr (mi_module iface) <> colon)
@@ -1106,7 +1106,7 @@ checkDependencies hsc_env summary iface
     where f m rest = do b <- m; if b then return True else rest
 
    dep_missing (L _ mod) = do
-     find_res <- ioToIOEnv $ findImportedModule hsc_env mod Nothing
+     find_res <- liftIO $ findImportedModule hsc_env mod Nothing
      case find_res of
         Found _ mod
           | pkg == this_pkg
@@ -1138,16 +1138,13 @@ checkModUsage this_pkg (Usage { usg_name = mod_name, usg_mod = old_mod_vers,
 		       		usg_rules = old_rule_vers,
 		       		usg_exports = maybe_old_export_vers, 
 		       		usg_entities = old_decl_vers })
-  = 	-- Load the imported interface is possible
-    let
-    	doc_str = sep [ptext SLIT("need version info for"), ppr mod_name]
-    in
-    traceHiDiffs (text "Checking usages for module" <+> ppr mod_name) `thenM_`
+  = do	-- Load the imported interface is possible
+    let doc_str = sep [ptext SLIT("need version info for"), ppr mod_name]
+    traceHiDiffs (text "Checking usages for module" <+> ppr mod_name)
 
-    let
-	mod = mkModule this_pkg mod_name
-    in
-    loadInterface doc_str mod ImportBySystem		`thenM` \ mb_iface ->
+    let mod = mkModule this_pkg mod_name
+
+    mb_iface <- loadInterface doc_str mod ImportBySystem
 	-- Load the interface, but don't complain on failure;
 	-- Instead, get an Either back which we can test
 
@@ -1166,9 +1163,9 @@ checkModUsage this_pkg (Usage { usg_name = mod_name, usg_mod = old_mod_vers,
 	new_rule_vers   = mi_rule_vers iface
     in
 	-- CHECK MODULE
-    checkModuleVersion old_mod_vers new_mod_vers	`thenM` \ recompile ->
+    checkModuleVersion old_mod_vers new_mod_vers	>>= \ recompile ->
     if not recompile then
-	returnM upToDate
+	return upToDate
     else
 				 
 	-- CHECK EXPORT LIST
@@ -1185,9 +1182,9 @@ checkModUsage this_pkg (Usage { usg_name = mod_name, usg_mod = old_mod_vers,
     else
 
 	-- CHECK ITEMS ONE BY ONE
-    checkList [checkEntityUsage new_decl_vers u | u <- old_decl_vers]	`thenM` \ recompile ->
+    checkList [checkEntityUsage new_decl_vers u | u <- old_decl_vers]	>>= \ recompile ->
     if recompile then
-	returnM outOfDate	-- This one failed, so just bail out now
+	return outOfDate	-- This one failed, so just bail out now
     else
 	up_to_date (ptext SLIT("  Great!  The bits I use are up to date"))
     }
@@ -1213,25 +1210,24 @@ checkEntityUsage new_vers (name,old_vers)
 			  out_of_date (sep [ptext SLIT("No longer exported:"), ppr name])
 
 	Just (_, new_vers) 	-- It's there, but is it up to date?
-	  | new_vers == old_vers -> traceHiDiffs (text "  Up to date" <+> ppr name <+> parens (ppr new_vers)) `thenM_`
-			  	    returnM upToDate
+	  | new_vers == old_vers -> do traceHiDiffs (text "  Up to date" <+> ppr name <+> parens (ppr new_vers))
+			  	       return upToDate
 	  | otherwise	 	 -> out_of_date_vers (ptext SLIT("  Out of date:") <+> ppr name)
 						     old_vers new_vers
 
-up_to_date  msg = traceHiDiffs msg `thenM_` returnM upToDate
-out_of_date msg = traceHiDiffs msg `thenM_` returnM outOfDate
+up_to_date  msg = traceHiDiffs msg >> return upToDate
+out_of_date msg = traceHiDiffs msg >> return outOfDate
 out_of_date_vers msg old_vers new_vers 
   = out_of_date (hsep [msg, ppr old_vers, ptext SLIT("->"), ppr new_vers])
 
 ----------------------
 checkList :: [IfG RecompileRequired] -> IfG RecompileRequired
 -- This helper is used in two places
-checkList []		 = returnM upToDate
-checkList (check:checks) = check	`thenM` \ recompile ->
-			   if recompile then 
-				returnM outOfDate
-			   else
-				checkList checks
+checkList []		 = return upToDate
+checkList (check:checks) = do recompile <- check
+                              if recompile
+                                then return outOfDate
+                                else checkList checks
 \end{code}
 
 %************************************************************************
