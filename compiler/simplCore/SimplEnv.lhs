@@ -519,18 +519,19 @@ simplBinder env bndr
 -------------
 simplLamBndr :: SimplEnv -> Var -> SimplM (SimplEnv, Var)
 -- Used for lambda binders.  These sometimes have unfoldings added by
--- the worker/wrapper pass that must be preserved, becuase they can't
+-- the worker/wrapper pass that must be preserved, because they can't
 -- be reconstructed from context.  For example:
 --	f x = case x of (a,b) -> fw a b x
 --	fw a b x{=(a,b)} = ...
 -- The "{=(a,b)}" is an unfolding we can't reconstruct otherwise.
 simplLamBndr env bndr
-  | not (isId bndr && hasSomeUnfolding old_unf) = simplBinder env bndr	-- Normal case
-  | otherwise					= seqId id2 `seq` return (env', id2)
+  | isId bndr && hasSomeUnfolding old_unf = seqId id2 `seq` return (env2, id2)  -- Special case
+  | otherwise 				  = seqId id1 `seq` return (env1, id1) 	-- Normal case
   where
     old_unf = idUnfolding bndr
-    (env', id1) = substIdBndr env bndr
-    id2 = id1 `setIdUnfolding` substUnfolding env old_unf
+    (env1, id1) = substIdBndr env bndr
+    id2  = id1 `setIdUnfolding` substUnfolding env old_unf
+    env2 = modifyInScope env1 id1 id2
 
 ---------------
 simplNonRecBndr :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)

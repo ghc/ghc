@@ -1572,19 +1572,19 @@ simplAlt env imposs_deflt_cons case_bndr' cont' (LitAlt lit, bndrs, rhs)
 
 simplAlt env imposs_deflt_cons case_bndr' cont' (DataAlt con, vs, rhs)
   = do	{	-- Deal with the pattern-bound variables
-	  (env, vs') <- simplBinders env (add_evals con vs)
-
 		-- Mark the ones that are in ! positions in the
 		-- data constructor as certainly-evaluated.
-	; let vs'' = add_evals con vs'
+		-- NB: simplLamBinders preserves this eval info
+	  let vs_with_evals = add_evals vs (dataConRepStrictness con)
+	; (env, vs') <- simplLamBndrs env vs_with_evals
 
 		-- Bind the case-binder to (con args)
 	; let inst_tys' = tyConAppArgs (idType case_bndr')
-	      con_args  = map Type inst_tys' ++ varsToCoreExprs vs'' 
+	      con_args  = map Type inst_tys' ++ varsToCoreExprs vs' 
 	      env'      = addBinderUnfolding env case_bndr' (mkConApp con con_args)
 
 	; rhs' <- simplExprC env' rhs cont'
-	; return (DataAlt con, vs'', rhs') }
+	; return (DataAlt con, vs', rhs') }
   where
 	-- add_evals records the evaluated-ness of the bound variables of
 	-- a case pattern.  This is *important*.  Consider
@@ -1595,9 +1595,7 @@ simplAlt env imposs_deflt_cons case_bndr' cont' (DataAlt con, vs, rhs)
 	-- We really must record that b is already evaluated so that we don't
 	-- go and re-evaluate it when constructing the result.
 	-- See Note [Data-con worker strictness] in MkId.lhs
-    add_evals dc vs = cat_evals dc vs (dataConRepStrictness dc)
-
-    cat_evals dc vs strs
+    add_evals vs strs
 	= go vs strs
 	where
 	  go [] [] = []
@@ -1608,12 +1606,15 @@ simplAlt env imposs_deflt_cons case_bndr' cont' (DataAlt con, vs, rhs)
 	    where
 	      zapped_v = zap_occ_info v
 	      evald_v  = zapped_v `setIdUnfolding` evaldUnfolding
-	  go _ _ = pprPanic "cat_evals" (ppr dc $$ ppr vs $$ ppr strs)
+	  go _ _ = pprPanic "cat_evals" (ppr con $$ ppr vs $$ ppr strs)
 
-	-- If the case binder is alive, then we add the unfolding
+	-- zap_occ_info: if the case binder is alive, then we add the unfolding
 	--	case_bndr = C vs
 	-- to the envt; so vs are now very much alive
-	-- Note [Aug06] I can't see why this actually matters
+	-- Note [Aug06] I can't see why this actually matters, but it's neater
+	-- 	  case e of t { (a,b) -> ...(case t of (p,q) -> p)... }
+	--   ==>  case e of t { (a,b) -> ...(a)... }
+	-- Look, Ma, a is alive now.
     zap_occ_info | isDeadBinder case_bndr' = \id -> id
 		 | otherwise		   = zapOccInfo
 
