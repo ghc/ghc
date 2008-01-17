@@ -102,7 +102,7 @@ import Maybes
 import Util
 import Bag
 
-import Control.Monad    ( unless )
+import Control.Monad
 import Data.Maybe	( isJust )
 
 \end{code}
@@ -896,7 +896,7 @@ tcRnStmt hsc_env ictxt rdr_stmt
     
 	-- None of the Ids should be of unboxed type, because we
 	-- cast them all to HValues in the end!
-    mappM bad_unboxed (filter (isUnLiftedType . idType) zonked_ids) ;
+    mapM bad_unboxed (filter (isUnLiftedType . idType) zonked_ids) ;
 
     traceTc (text "tcs 1") ;
     let { global_ids = map globaliseAndTidy zonked_ids } ;
@@ -924,7 +924,7 @@ tcRnStmt hsc_env ictxt rdr_stmt
     	(vcat [text "Bound Ids" <+> pprWithCommas ppr global_ids,
     	       text "Typechecked expr" <+> ppr zonked_expr]) ;
 
-    returnM (global_ids, zonked_expr)
+    return (global_ids, zonked_expr)
     }
   where
     bad_unboxed id = addErr (sep [ptext SLIT("GHCi can't bind a variable of unlifted type:"),
@@ -1012,7 +1012,7 @@ mkPlan (L loc (ExprStmt expr _ _))	-- An expression typed at the prompt
 	; runPlans [	-- Plan A
 		    do { stuff@([it_id], _) <- tcGhciStmts [bind_stmt, print_it]
 		       ; it_ty <- zonkTcType (idType it_id)
-		       ; ifM (isUnitTy it_ty) failM
+		       ; when (isUnitTy it_ty) failM
 		       ; return stuff },
 
 			-- Plan B; a naked bind statment
@@ -1037,7 +1037,7 @@ mkPlan stmt@(L loc (BindStmt {}))
 	; let print_plan = do
 		  { stuff@([v_id], _) <- tcGhciStmts [stmt, print_v]
 		  ; v_ty <- zonkTcType (idType v_id)
-		  ; ifM (isUnitTy v_ty || not (isTauTy v_ty)) failM
+		  ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
 		  ; return stuff }
 
 	-- The plans are:
@@ -1083,7 +1083,7 @@ tcGhciStmts stmts
 	-- OK, we're ready to typecheck the stmts
 	traceTc (text "TcRnDriver.tcGhciStmts: tc stmts") ;
 	((tc_stmts, ids), lie) <- getLIE $ tc_io_stmts stmts $ \ _ ->
-					   mappM tcLookupId names ;
+					   mapM tcLookupId names ;
 					-- Look up the names right in the middle,
 					-- where they will all be in scope
 
@@ -1328,8 +1328,8 @@ tcDump env
  = do { dflags <- getDOpts ;
 
 	-- Dump short output if -ddump-types or -ddump-tc
-	ifM (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
-	    (dumpTcRn short_dump) ;
+	when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
+	     (dumpTcRn short_dump) ;
 
 	-- Dump bindings if -ddump-tc
 	dumpOptTcRn Opt_D_dump_tc (mkDumpDoc "Typechecker" full_dump)
@@ -1342,8 +1342,8 @@ tcDump env
 
 tcCoreDump mod_guts
  = do { dflags <- getDOpts ;
-	ifM (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
- 	    (dumpTcRn (pprModGuts mod_guts)) ;
+	when (dopt Opt_D_dump_types dflags || dopt Opt_D_dump_tc dflags)
+ 	     (dumpTcRn (pprModGuts mod_guts)) ;
 
 	-- Dump bindings if -ddump-tc
 	dumpOptTcRn Opt_D_dump_tc (mkDumpDoc "Typechecker" full_dump) }
