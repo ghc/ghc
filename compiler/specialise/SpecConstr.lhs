@@ -442,10 +442,10 @@ specConstrProgram dflags us binds
 
 	return binds'
   where
-    go _   []	        = returnUs []
-    go env (bind:binds) = scBind env bind 	`thenUs` \ (env', _, bind') ->
-			  go env' binds 	`thenUs` \ binds' ->
-			  returnUs (bind' : binds')
+    go _   []	        = return []
+    go env (bind:binds) = do (env', _, bind') <- scBind env bind
+                             binds' <- go env' binds
+                             return (bind' : binds')
 \end{code}
 
 
@@ -719,19 +719,19 @@ scExpr env e = scExpr' env e
 
 
 scExpr' env (Var v)     = case scSubstId env v of
-		       	    Var v' -> returnUs (varUsage env v' UnkOcc, Var v')
+		            Var v' -> return (varUsage env v' UnkOcc, Var v')
 		            e'     -> scExpr (zapScSubst env) e'
 
-scExpr' env (Type t)    = returnUs (nullUsage, Type (scSubstTy env t))
-scExpr' _   e@(Lit {})  = returnUs (nullUsage, e)
-scExpr' env (Note n e)  = do { (usg,e') <- scExpr env e
-			    ; return (usg, Note n e') }
-scExpr' env (Cast e co) = do { (usg, e') <- scExpr env e
-		            ; return (usg, Cast e' (scSubstTy env co)) }
+scExpr' env (Type t)    = return (nullUsage, Type (scSubstTy env t))
+scExpr' _   e@(Lit {})  = return (nullUsage, e)
+scExpr' env (Note n e)  = do (usg,e') <- scExpr env e
+                             return (usg, Note n e')
+scExpr' env (Cast e co) = do (usg, e') <- scExpr env e
+                             return (usg, Cast e' (scSubstTy env co))
 scExpr' env e@(App _ _) = scApp env (collectArgs e)
-scExpr' env (Lam b e)   = do { let (env', b') = extendBndr env b
-			    ; (usg, e') <- scExpr env' e
-			    ; return (usg, Lam b' e') }
+scExpr' env (Lam b e)   = do let (env', b') = extendBndr env b
+                             (usg, e') <- scExpr env' e
+                             return (usg, Lam b' e')
 
 scExpr' env (Case scrut b ty alts) 
   = do	{ (scrut_usg, scrut') <- scExpr env scrut
@@ -750,7 +750,7 @@ scExpr' env (Case scrut b ty alts)
 			-- Record RecArg for the components
 
 	  ; (alt_usgs, alt_occs, alts')
-		<- mapAndUnzip3Us (sc_alt alt_env scrut' b') alts
+		<- mapAndUnzip3M (sc_alt alt_env scrut' b') alts
 
 	  ; let (alt_usg, b_occ) = lookupOcc (combineUsages alt_usgs) b'
 		scrut_occ        = foldr combineOcc b_occ alt_occs
@@ -819,7 +819,7 @@ scApp :: ScEnv -> (InExpr, [InExpr]) -> UniqSM (ScUsage, CoreExpr)
 
 scApp env (Var fn, args)	-- Function is a variable
   = ASSERT( not (null args) )
-    do	{ args_w_usgs <- mapUs (scExpr env) args
+    do	{ args_w_usgs <- mapM (scExpr env) args
 	; let (arg_usgs, args') = unzip args_w_usgs
 	      arg_usg = combineUsages arg_usgs
 	; case scSubstId env fn of
@@ -852,7 +852,7 @@ scApp env (Var fn, args)	-- Function is a variable
 --	(let f = ...f... in f) arg1 arg2
 scApp env (other_fn, args)
   = do 	{ (fn_usg,   fn')   <- scExpr env other_fn
-	; (arg_usgs, args') <- mapAndUnzipUs (scExpr env) args
+	; (arg_usgs, args') <- mapAndUnzipM (scExpr env) args
 	; return (combineUsages arg_usgs `combineUsage` fn_usg, mkApps fn' args') }
 
 ----------------------
@@ -862,13 +862,13 @@ scBind env (Rec prs)
   , not (all (couldBeSmallEnoughToInline threshold) rhss)
 		-- No specialisation
   = do	{ let (rhs_env,bndrs') = extendRecBndrs env bndrs
-	; (rhs_usgs, rhss') <- mapAndUnzipUs (scExpr rhs_env) rhss
+	; (rhs_usgs, rhss') <- mapAndUnzipM (scExpr rhs_env) rhss
 	; return (rhs_env, combineUsages rhs_usgs, Rec (bndrs' `zip` rhss')) }
   | otherwise	-- Do specialisation
   = do	{ let (rhs_env1,bndrs') = extendRecBndrs env bndrs
 	      rhs_env2 = extendHowBound rhs_env1 bndrs' RecFun
 
-	; (rhs_usgs, rhs_infos) <- mapAndUnzipUs (scRecRhs rhs_env2) (bndrs' `zip` rhss)
+	; (rhs_usgs, rhs_infos) <- mapAndUnzipM (scRecRhs rhs_env2) (bndrs' `zip` rhss)
 	; let rhs_usg = combineUsages rhs_usgs
 
 	; (spec_usg, specs) <- spec_loop rhs_env2 (scu_calls rhs_usg)
@@ -887,7 +887,7 @@ scBind env (Rec prs)
 	      -> [([CallPat], RhsInfo)]			-- One per binder
 	      -> UniqSM (ScUsage, [[SpecInfo]])		-- One list per binder
     spec_loop env all_calls rhs_stuff
-	= do { (spec_usg_s, new_pats_s, specs) <- mapAndUnzip3Us (specialise env all_calls) rhs_stuff
+	= do { (spec_usg_s, new_pats_s, specs) <- mapAndUnzip3M (specialise env all_calls) rhs_stuff
 	     ; let spec_usg = combineUsages spec_usg_s
 	     ; if all null new_pats_s then
 		return (spec_usg, specs) else do
@@ -970,7 +970,7 @@ specialise env bind_calls (done_pats, (fn, arg_bndrs, body, arg_occs))
 --	  				text "good pats" <+> ppr pats])  $
 --	  return ()
 
-	; (spec_usgs, specs) <- mapAndUnzipUs (spec_one env fn arg_bndrs body)
+	; (spec_usgs, specs) <- mapAndUnzipM (spec_one env fn arg_bndrs body)
 					      (pats `zip` [length done_pats..])
 
 	; return (combineUsages spec_usgs, pats, specs) }
@@ -1220,7 +1220,7 @@ argsToPats :: InScopeSet -> ValueEnv
 	   -> [(CoreArg, ArgOcc)]
 	   -> UniqSM [(Bool, CoreArg)]
 argsToPats in_scope val_env args
-  = mapUs do_one args
+  = mapM do_one args
   where
     do_one (arg,occ) = argToPat in_scope val_env arg occ
 \end{code}
