@@ -83,7 +83,7 @@ loadSrcInterface doc mod want_boot  = do
   -- interface; it will call the Finder again, but the ModLocation will be
   -- cached from the first search.
   hsc_env <- getTopEnv
-  res <- ioToIOEnv $ findImportedModule hsc_env mod Nothing
+  res <- liftIO $ findImportedModule hsc_env mod Nothing
   case res of
     Found _ mod -> do
       mb_iface <- initIfaceTcRn $ loadInterface doc mod (ImportByUser want_boot)
@@ -99,12 +99,12 @@ loadOrphanModules :: [Module]	      -- the modules
 		  -> Bool	      -- these are family instance-modules
 		  -> TcM ()
 loadOrphanModules mods isFamInstMod
-  | null mods = returnM ()
+  | null mods = return ()
   | otherwise = initIfaceTcRn $
 		do { traceIf (text "Loading orphan modules:" <+> 
 		     		 fsep (map ppr mods))
-		   ; mappM_ load mods
-		   ; returnM () }
+		   ; mapM_ load mods
+		   ; return () }
   where
     load mod   = loadSysInterface (mk_doc mod) mod
     mk_doc mod 
@@ -200,7 +200,7 @@ loadInterface doc_str mod from
  	; dflags <- getDOpts
 	; case lookupIfaceByModule dflags hpt (eps_PIT eps) mod of {
 	    Just iface 
-		-> returnM (Succeeded iface) ;	-- Already loaded
+		-> return (Succeeded iface) ;	-- Already loaded
 			-- The (src_imp == mi_boot iface) test checks that the already-loaded
 			-- interface isn't a boot iface.  This can conceivably happen,
 			-- if an earlier import had a before we got to real imports.   I think.
@@ -228,7 +228,7 @@ loadInterface doc_str mod from
 			-- Not found, so add an empty iface to 
 			-- the EPS map so that we don't look again
 				
-		; returnM (Failed err) } ;
+		; return (Failed err) } ;
 
 	-- Found and parsed!
 	    Succeeded (iface, file_path) 	-- Sanity check:
@@ -236,7 +236,7 @@ loadInterface doc_str mod from
 		  modulePackageId (mi_module iface) == thisPackage dflags,
 		  				--   a home-package module...
 		  Nothing <- mb_dep		--   that we know nothing about
-		-> returnM (Failed (badDepMsg mod))
+		-> return (Failed (badDepMsg mod))
 
 		| otherwise ->
 
@@ -418,7 +418,7 @@ loadDecl ignore_prags mod (_version, decl)
 			   Nothing    -> 
 			     pprPanic "loadDecl" (ppr main_name <+> ppr n $$ ppr (decl))
 
-	; returnM $ (main_name, thing) : 
+	; return $ (main_name, thing) :
                       -- uses the invariant that implicit_names and
                       -- implictTyThings are bijective
                       [(n, lookup n) | n <- implicit_names]
@@ -464,19 +464,19 @@ findAndReadIface doc_str mod hi_boot_file
 	-- Check for GHC.Prim, and return its static interface
 	; dflags <- getDOpts
 	; if mod == gHC_PRIM
-	  then returnM (Succeeded (ghcPrimIface, 
+	  then return (Succeeded (ghcPrimIface,
 				   "<built in interface for GHC.Prim>"))
 	  else do
 
 	-- Look for the file
 	; hsc_env <- getTopEnv
-	; mb_found <- ioToIOEnv (findExactModule hsc_env mod)
+	; mb_found <- liftIO (findExactModule hsc_env mod)
 	; case mb_found of {
               
 	      err | notFound err -> do
 		{ traceIf (ptext SLIT("...not found"))
 		; dflags <- getDOpts
-		; returnM (Failed (cannotFindInterface dflags 
+		; return (Failed (cannotFindInterface dflags 
 					(moduleName mod) err)) } ;
 	      Found loc mod -> do 
 
@@ -485,18 +485,18 @@ findAndReadIface doc_str mod hi_boot_file
 
         ; if thisPackage dflags == modulePackageId mod
                 && not (isOneShot (ghcMode dflags))
-            then returnM (Failed (homeModError mod loc))
+            then return (Failed (homeModError mod loc))
             else do {
 
         ; traceIf (ptext SLIT("readIFace") <+> text file_path)
 	; read_result <- readIface mod file_path hi_boot_file
 	; case read_result of
-	    Failed err -> returnM (Failed (badIfaceFile file_path err))
+	    Failed err -> return (Failed (badIfaceFile file_path err))
 	    Succeeded iface 
 		| mi_module iface /= mod ->
 		  return (Failed (wrongIfaceModErr iface mod file_path))
 		| otherwise ->
-		  returnM (Succeeded (iface, file_path))
+		  return (Succeeded (iface, file_path))
 			-- Don't forget to fill in the package name...
 	}}}}
 
