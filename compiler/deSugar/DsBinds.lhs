@@ -90,25 +90,25 @@ dsHsBind :: AutoScc
 	 -> HsBind Id
 	 -> DsM [(Id,CoreExpr)] -- Result
 
-dsHsBind auto_scc rest (VarBind var expr)
-  = dsLExpr expr		`thenDs` \ core_expr ->
+dsHsBind auto_scc rest (VarBind var expr) = do
+    core_expr <- dsLExpr expr
 
-	-- Dictionary bindings are always VarMonoBinds, so
-	-- we only need do this here
-    addDictScc var core_expr	`thenDs` \ core_expr' ->
-    returnDs ((var, core_expr') : rest)
+        -- Dictionary bindings are always VarMonoBinds, so
+        -- we only need do this here
+    core_expr' <- addDictScc var core_expr
+    return ((var, core_expr') : rest)
 
 dsHsBind auto_scc rest (FunBind { fun_id = L _ fun, fun_matches = matches, 
-				  fun_co_fn = co_fn, fun_tick = tick, fun_infix = inf })
-  = matchWrapper (FunRhs (idName fun) inf) matches	`thenDs` \ (args, body) ->
-    mkOptTickBox tick body 				`thenDs` \ body' ->
-    dsCoercion co_fn (return (mkLams args body'))	`thenDs` \ rhs ->
-    returnDs ((fun,rhs) : rest)
+				  fun_co_fn = co_fn, fun_tick = tick, fun_infix = inf }) = do
+    (args, body) <- matchWrapper (FunRhs (idName fun) inf) matches
+    body' <- mkOptTickBox tick body
+    rhs <- dsCoercion co_fn (return (mkLams args body'))
+    return ((fun,rhs) : rest)
 
-dsHsBind auto_scc rest (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty })
-  = dsGuarded grhss ty				`thenDs` \ body_expr ->
-    mkSelectorBinds pat body_expr		`thenDs` \ sel_binds ->
-    returnDs (sel_binds ++ rest)
+dsHsBind auto_scc rest (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }) = do
+    body_expr <- dsGuarded grhss ty
+    sel_binds <- mkSelectorBinds pat body_expr
+    return (sel_binds ++ rest)
 
 -- Note [Rules and inlining]
 -- Common special case: no type or dictionary abstraction
@@ -149,22 +149,21 @@ dsHsBind auto_scc rest (AbsBinds [] [] exports binds)
 	-- Non-recursive bindings come through this way
 dsHsBind auto_scc rest
      (AbsBinds all_tyvars dicts exports@[(tyvars, global, local, prags)] binds)
-  = ASSERT( all (`elem` tyvars) all_tyvars )
-    ds_lhs_binds NoSccs binds 	`thenDs` \ core_prs ->
-    let 
-	-- Always treat the binds as recursive, because the typechecker
-	-- makes rather mixed-up dictionary bindings
-	core_bind = Rec core_prs
-    in
-    mappM (dsSpec all_tyvars dicts tyvars global local core_bind) 
-	  prags				`thenDs` \ mb_specs ->
+  = ASSERT( all (`elem` tyvars) all_tyvars ) do
+    core_prs <- ds_lhs_binds NoSccs binds
     let
-	(spec_binds, rules) = unzip (catMaybes mb_specs)
-	global' = addIdSpecialisations global rules
-	rhs'    = mkLams tyvars $ mkLams dicts $ Let core_bind (Var local)
-	bind    = addInlinePrags prags global' $ addAutoScc auto_scc global' rhs'
-    in
-    returnDs (bind  : spec_binds ++ rest)
+        -- Always treat the binds as recursive, because the typechecker
+        -- makes rather mixed-up dictionary bindings
+        core_bind = Rec core_prs
+    
+    mb_specs <- mapM (dsSpec all_tyvars dicts tyvars global local core_bind) prags
+    let
+        (spec_binds, rules) = unzip (catMaybes mb_specs)
+        global' = addIdSpecialisations global rules
+        rhs'    = mkLams tyvars $ mkLams dicts $ Let core_bind (Var local)
+        bind    = addInlinePrags prags global' $ addAutoScc auto_scc global' rhs'
+    
+    return (bind  : spec_binds ++ rest)
 
 dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
   = do	{ core_prs <- ds_lhs_binds NoSccs binds
@@ -202,16 +201,16 @@ dsHsBind auto_scc rest (AbsBinds all_tyvars dicts exports binds)
 	                   rhs = mkLams tyvars $ mkLams dicts $
 	      	     		 mkTupleSelector locals' (locals' !! n) tup_id $
 			         mkApps (mkTyApps (Var poly_tup_id) ty_args) dict_args
-		     ; returnDs ((global', rhs) : spec_binds) }
+		     ; return ((global', rhs) : spec_binds) }
 	        where
 	          mk_ty_arg all_tyvar
 			| all_tyvar `elem` tyvars = return (mkTyVarTy all_tyvar)
 	      		| otherwise		  = dsMkArbitraryType all_tyvar
 
-	; export_binds_s <- mappM mk_bind (exports `zip` [0..])
+	; export_binds_s <- mapM mk_bind (exports `zip` [0..])
 	     -- don't scc (auto-)annotate the tuple itself.
 
-	; returnDs ((poly_tup_id, poly_tup_expr) : 
+	; return ((poly_tup_id, poly_tup_expr) : 
 		    (concat export_binds_s ++ rest)) }
 
 mkABEnv :: [([TyVar], Id, Id, [LPrag])] -> VarEnv (Id, [LPrag])
@@ -446,17 +445,17 @@ If profiling and dealing with a dict binding,
 wrap the dict in @_scc_ DICT <dict>@:
 
 \begin{code}
-addDictScc var rhs = returnDs rhs
+addDictScc var rhs = return rhs
 
 {- DISABLED for now (need to somehow make up a name for the scc) -- SDM
   | not ( opt_SccProfilingOn && opt_AutoSccsOnDicts)
     || not (isDictId var)
-  = returnDs rhs				-- That's easy: do nothing
+  = return rhs				-- That's easy: do nothing
 
   | otherwise
-  = getModuleAndGroupDs 	`thenDs` \ (mod, grp) ->
+  = do (mod, grp) <- getModuleAndGroupDs
 	-- ToDo: do -dicts-all flag (mark dict things with individual CCs)
-    returnDs (Note (SCC (mkAllDictsCC mod grp False)) rhs)
+       return (Note (SCC (mkAllDictsCC mod grp False)) rhs)
 -}
 \end{code}
 
