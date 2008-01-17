@@ -50,8 +50,7 @@ import Linker
 import DataCon
 import Type
 import Var
-import TcRnMonad        ( TcM, initTc, ioToTcRn,
-                          tryTcErrs, traceTc)
+import TcRnMonad
 import TcType
 import TcMType
 import TcUnify
@@ -538,7 +537,7 @@ traceTR :: SDoc -> TR ()
 traceTR = liftTcM . traceTc
 
 trIO :: IO a -> TR a 
-trIO = liftTcM . ioToTcRn
+trIO = liftTcM . liftIO
 
 liftTcM :: TcM a -> TR a
 liftTcM = id

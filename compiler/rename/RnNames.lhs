@@ -1303,9 +1303,9 @@ printMinimalImports imps
    this_mod <- getModule ;
    rdr_env  <- getGlobalRdrEnv ;
    dflags   <- getDOpts ;
-   ioToTcRn (do { h <- openFile (mkFilename this_mod) WriteMode ;
-		  printForUser h (mkPrintUnqualified dflags rdr_env) 
-				 (vcat (map ppr_mod_ie mod_ies)) })
+   liftIO $ do h <- openFile (mkFilename this_mod) WriteMode
+               printForUser h (mkPrintUnqualified dflags rdr_env)
+                              (vcat (map ppr_mod_ie mod_ies))
    }
   where
     mkFilename this_mod = moduleNameString (moduleName this_mod) ++ ".imports"

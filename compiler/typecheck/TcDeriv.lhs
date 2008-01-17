@@ -286,8 +286,8 @@ tcDeriving tycl_decls inst_decls deriv_decls
 	; let inst_info = insts1 ++ insts2
 
 	; dflags <- getDOpts
-	; ioToTcRn (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances" 
-	  	   (ddump_deriving inst_info rn_binds))
+	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Derived instances"
+	         (ddump_deriving inst_info rn_binds))
 
 	; return (inst_info, rn_binds) }
   where

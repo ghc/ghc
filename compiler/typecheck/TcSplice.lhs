@@ -567,7 +567,7 @@ runMeta convert expr
 	-- Compile and link it; might fail if linking fails
 	; hsc_env <- getTopEnv
 	; src_span <- getSrcSpanM
-	; either_hval <- tryM $ ioToTcRn $
+	; either_hval <- tryM $ liftIO $
 			 HscMain.compileExpr hsc_env src_span ds_expr
 	; case either_hval of {
 	    Left exn   -> failWithTc (mk_msg "compile and link" exn) ;
@@ -668,7 +668,7 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
 		  	         Nothing  -> recover			-- Discard all msgs
 			  }
 
-  qRunIO io = ioToTcRn io
+  qRunIO io = liftIO io
 \end{code}
 
 

@@ -65,11 +65,6 @@ import Control.Monad
 %************************************************************************
 
 \begin{code}
-ioToTcRn :: IO r -> TcRn r
-ioToTcRn = liftIO
-\end{code}
-
-\begin{code}
 
 initTc :: HscEnv
        -> HscSource
@@ -373,7 +368,7 @@ traceOptTcRn flag doc = ifOptM flag $ do
 dumpTcRn :: SDoc -> TcRn ()
 dumpTcRn doc = do { rdr_env <- getGlobalRdrEnv ;
                     dflags <- getDOpts ;
-		    ioToTcRn (printForUser stderr (mkPrintUnqualified dflags rdr_env) doc) }
+		    liftIO (printForUser stderr (mkPrintUnqualified dflags rdr_env) doc) }
 
 dumpOptTcRn :: DynFlag -> SDoc -> TcRn ()
 dumpOptTcRn flag doc = ifOptM flag (dumpTcRn doc)

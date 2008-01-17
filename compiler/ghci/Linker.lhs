@@ -172,7 +172,7 @@ deleteFromLinkEnv to_remove
 
 dataConInfoPtrToName :: Ptr () -> TcM (Either String Name)
 dataConInfoPtrToName x = do 
-   theString <- ioToTcRn $ do
+   theString <- liftIO $ do
       let ptr = castPtr x :: Ptr StgInfoTable
       conDescAddress <- getConDescAddress ptr 
       peekArray0 0 conDescAddress  

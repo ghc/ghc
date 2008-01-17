@@ -521,7 +521,7 @@ mkDefMethRhs origin clas inst_tys sel_id loc GenDefMeth
 	   	  (badGenericInstance sel_id (notGeneric tycon))
 
 	; dflags <- getDOpts
-	; ioToTcRn (dumpIfSet_dyn dflags Opt_D_dump_deriv "Filling in method body" 
+	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Filling in method body"
 		   (vcat [ppr clas <+> ppr inst_tys,
 			  nest 2 (ppr sel_id <+> equals <+> ppr rhs)]))
 
@@ -602,8 +602,8 @@ getGenericInstances class_decls
 
 	-- Otherwise print it out
 	{ dflags <- getDOpts
-	; ioToTcRn (dumpIfSet_dyn dflags Opt_D_dump_deriv "Generic instances" 
-	 	   (vcat (map pprInstInfoDetails gen_inst_info)))	
+	; liftIO (dumpIfSet_dyn dflags Opt_D_dump_deriv "Generic instances"
+	         (vcat (map pprInstInfoDetails gen_inst_info)))	
 	; return gen_inst_info }}
 
 get_generics decl@(ClassDecl {tcdLName = class_name, tcdMeths = def_methods})
