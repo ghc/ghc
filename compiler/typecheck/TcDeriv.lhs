@@ -265,7 +265,7 @@ tcDeriving  :: [LTyClDecl Name]  -- All type constructors
 		    HsValBinds Name)	-- Extra generated top-level bindings
 
 tcDeriving tycl_decls inst_decls deriv_decls
-  = recoverM (returnM ([], emptyValBindsOut)) $
+  = recoverM (return ([], emptyValBindsOut)) $
     do	{   	-- Fish the "deriving"-related information out of the TcEnv
 		-- And make the necessary "equations".
 	; early_specs <- makeDerivSpecs tycl_decls inst_decls deriv_decls
