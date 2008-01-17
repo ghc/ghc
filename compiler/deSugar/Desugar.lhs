@@ -41,7 +41,6 @@ import Maybes
 import FastString
 import Pretty      ( Doc )
 import Coverage
-import IOEnv
 import Data.IORef
 \end{code}
 
@@ -95,7 +94,7 @@ deSugar hsc_env
 		                        { core_prs <- dsTopLHsBinds auto_scc binds_cvr
 		                        ; (ds_fords, foreign_prs) <- dsForeigns fords
 		                        ; let all_prs = foreign_prs ++ core_prs
-		                        ; ds_rules <- mappM dsRule rules
+		                        ; ds_rules <- mapM dsRule rules
 		                        ; return (all_prs, catMaybes ds_rules, ds_fords, ds_hpc_info, modBreaks)
 		                        }
 	; case mb_res of {
