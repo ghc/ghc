@@ -1,7 +1,19 @@
 
 module State where
 
+import MonadUtils
+
 newtype State s a = State { runState' :: s -> (# a, s #) }
+
+instance Functor (State s) where
+    fmap f m  = State $ \s -> case runState' m s of
+                              (# r, s' #) -> (# f r, s' #)
+
+instance Applicative (State s) where
+   pure x   = State $ \s -> (# x, s #)
+   m <*> n  = State $ \s -> case runState' m s of
+                            (# f, s' #) -> case runState' n s' of
+                                           (# x, s'' #) -> (# f x, s'' #)
 
 instance Monad (State s) where
     return x = State $ \s -> (# x, s #)
