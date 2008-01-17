@@ -139,7 +139,7 @@ lookupAvail mod (AvailTC p_occ occs) = do
   p_name <- lookupOrig mod p_occ
   let lookup_sub occ | occ == p_occ = return p_name
                      | otherwise    = lookupOrig mod occ
-  subs <- mappM lookup_sub occs
+  subs <- mapM lookup_sub occs
   return (AvailTC p_name subs)
 	-- Remember that 'occs' is all the exported things, including
 	-- the parent.  It's possible to export just class ops without
@@ -159,7 +159,7 @@ lookupOrig mod occ
     
 	; name_cache <- getNameCache
     	; case lookupOrigNameCache (nsNames name_cache) mod occ of {
-	      Just name -> returnM name;
+	      Just name -> return name;
 	      Nothing   ->
               let
                 us        = nsUniqs name_cache
@@ -173,15 +173,14 @@ lookupOrig mod occ
     }}}
 
 newIPName :: IPName OccName -> TcRnIf m n (IPName Name)
-newIPName occ_name_ip
-  = getNameCache		`thenM` \ name_supply ->
+newIPName occ_name_ip = do
+    name_supply <- getNameCache
     let
 	ipcache = nsIPs name_supply
-    in
     case lookupFM ipcache key of
-	Just name_ip -> returnM name_ip
-	Nothing      -> setNameCache new_ns 	`thenM_`
-		        returnM name_ip
+	Just name_ip -> return name_ip
+	Nothing      -> do setNameCache new_ns
+		           return name_ip
 		  where
 		     (us', us1)  = splitUniqSupply (nsUniqs name_supply)
 		     uniq   	 = uniqFromSupply us1
