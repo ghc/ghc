@@ -54,7 +54,7 @@ import HscTypes
 import FastString
 
 import Data.Maybe
-import Control.Monad hiding (zipWithM_, mapAndUnzipM)
+import Control.Monad
 import Data.List
 \end{code}
 
@@ -157,8 +157,8 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
 
 		-- (1) Do class and family instance declarations
        ; let { idxty_decls = filter (isFamInstDecl . unLoc) tycl_decls }
-       ; local_info_tycons <- mappM tcLocalInstDecl1  inst_decls
-       ; idx_tycons        <- mappM tcIdxTyInstDeclTL idxty_decls
+       ; local_info_tycons <- mapM tcLocalInstDecl1  inst_decls
+       ; idx_tycons        <- mapM tcIdxTyInstDeclTL idxty_decls
 
        ; let { (local_infos,
 	        at_tycons)     = unzip local_info_tycons
@@ -194,7 +194,7 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
        ; addInsts deriv_inst_info   $ do {
 
        ; gbl_env <- getGblEnv
-       ; returnM (gbl_env, 
+       ; return (gbl_env,
 		  generic_inst_info ++ deriv_inst_info ++ local_info,
 		  deriv_binds) 
     }}}}}}
@@ -242,7 +242,7 @@ tcLocalInstDecl1 :: LInstDecl Name
 	-- We check for respectable instance type, and context
 tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
   =	-- Prime error recovery, set source location
-    recoverM (returnM ([], []))		$
+    recoverM (return ([], []))		$
     setSrcSpan loc			$
     addErrCtxt (instDeclCtxt1 poly_ty)	$
 
@@ -253,7 +253,7 @@ tcLocalInstDecl1 decl@(L loc (InstDecl poly_ty binds uprags ats))
 	; (tyvars, theta, tau) <- tcHsInstHead poly_ty
 	
 	-- Next, process any associated types.
-	; idx_tycons <- mappM tcFamInstDecl ats
+	; idx_tycons <- mapM tcFamInstDecl ats
 
 	-- Now, check the validity of the instance.
 	; (clas, inst_tys) <- checkValidInstHead tau
@@ -390,13 +390,13 @@ tcInstDecls2 tycl_decls inst_decls
 	; tcExtendIdEnv (concat dm_ids_s) 	$ do 
     
 	 	-- (b) instance declarations
-	; inst_binds_s <- mappM tcInstDecl2 inst_decls
+	; inst_binds_s <- mapM tcInstDecl2 inst_decls
 
 		-- Done
 	; let binds = unionManyBags dm_binds_s `unionBags` 
 		      unionManyBags inst_binds_s
 	; tcl_env <- getLclEnv		-- Default method Ids in here
-	; returnM (binds, tcl_env) }
+	; return (binds, tcl_env) }
 \end{code}
 
 ======= New documentation starts here (Sept 92)	 ==============
@@ -590,12 +590,12 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
 	loc   	   = srcLocSpan (getSrcLoc dfun_id)
     in
 	 -- Prime error recovery
-    recoverM (returnM emptyLHsBinds)		$
+    recoverM (return emptyLHsBinds)		$
     setSrcSpan loc				$
-    addErrCtxt (instDeclCtxt2 (idType dfun_id))	$
+    addErrCtxt (instDeclCtxt2 (idType dfun_id))	$ do
 
 	-- Instantiate the instance decl with skolem constants 
-    tcSkolSigType rigid_info inst_ty	`thenM` \ (inst_tyvars', dfun_theta', inst_head') ->
+    (inst_tyvars', dfun_theta', inst_head') <- tcSkolSigType rigid_info inst_ty
 		-- These inst_tyvars' scope over the 'where' part
 		-- Those tyvars are inside the dfun_id's type, which is a bit
 		-- bizarre, but OK so long as you realise it!
@@ -608,17 +608,17 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
 	(eq_sc_theta',dict_sc_theta')     = partition isEqPred sc_theta'
 	origin	  = SigOrigin rigid_info
 	(eq_dfun_theta',dict_dfun_theta') = partition isEqPred dfun_theta'
-    in
+
 	 -- Create dictionary Ids from the specified instance contexts.
-    getInstLoc InstScOrigin				`thenM` \ sc_loc -> 
-    newDictBndrs sc_loc dict_sc_theta'			`thenM` \ sc_dicts ->
-    getInstLoc origin					`thenM` \ inst_loc -> 
-    mkMetaCoVars eq_sc_theta'				`thenM` \ sc_covars ->
-    mkEqInsts eq_sc_theta' (map mkWantedCo sc_covars)	`thenM`	\ wanted_sc_eqs ->
-    mkCoVars eq_dfun_theta'				`thenM` \ dfun_covars ->
-    mkEqInsts eq_dfun_theta' (map mkGivenCo $ mkTyVarTys dfun_covars)	`thenM`	\ dfun_eqs    ->
-    newDictBndrs inst_loc dict_dfun_theta'		`thenM` \ dfun_dicts ->
-    newDictBndr inst_loc (mkClassPred clas inst_tys')   `thenM` \ this_dict ->
+    sc_loc        <- getInstLoc InstScOrigin
+    sc_dicts      <- newDictBndrs sc_loc dict_sc_theta'
+    inst_loc      <- getInstLoc origin
+    sc_covars     <- mkMetaCoVars eq_sc_theta'
+    wanted_sc_eqs <- mkEqInsts eq_sc_theta' (map mkWantedCo sc_covars)
+    dfun_covars   <- mkCoVars eq_dfun_theta'
+    dfun_eqs      <- mkEqInsts eq_dfun_theta' (map mkGivenCo $ mkTyVarTys dfun_covars)
+    dfun_dicts    <- newDictBndrs inst_loc dict_dfun_theta'
+    this_dict     <- newDictBndr inst_loc (mkClassPred clas inst_tys')
 		-- Default-method Ids may be mentioned in synthesised RHSs,
 		-- but they'll already be in the environment.
 
@@ -629,24 +629,23 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
 	given_sc_eqs    = map (updateEqInstCoercion (mkGivenCo . TyVarTy . fromWantedCo "tcInstDecl2") ) wanted_sc_eqs
 	given_sc_insts  = given_sc_eqs   ++ sc_dicts
 	avail_insts     = [this_dict] ++ dfun_insts ++ given_sc_insts
-    in
-    tcMethods origin clas inst_tyvars' 
-	      dfun_theta' inst_tys' avail_insts 
-	      op_items monobinds uprags		`thenM` \ (meth_ids, meth_binds) ->
+
+    (meth_ids, meth_binds) <- tcMethods origin clas inst_tyvars'
+                                 dfun_theta' inst_tys' avail_insts
+                                 op_items monobinds uprags
 
 	-- Figure out bindings for the superclass context
 	-- Don't include this_dict in the 'givens', else
 	-- wanted_sc_insts get bound by just selecting  from this_dict!!
-    addErrCtxt superClassCtxt
-	(tcSimplifySuperClasses inst_loc
-			 dfun_insts wanted_sc_insts)	`thenM` \ sc_binds ->
+    sc_binds <- addErrCtxt superClassCtxt
+                   (tcSimplifySuperClasses inst_loc dfun_insts wanted_sc_insts)
 
 	-- It's possible that the superclass stuff might unified one
 	-- of the inst_tyavars' with something in the envt
-    checkSigTyVars inst_tyvars' 	`thenM_`
+    checkSigTyVars inst_tyvars'
 
 	-- Deal with 'SPECIALISE instance' pragmas 
-    tcPrags dfun_id (filter isSpecInstLSig uprags)	`thenM` \ prags -> 
+    prags <- tcPrags dfun_id (filter isSpecInstLSig uprags)
     
 	-- Create the result bindings
     let
@@ -683,9 +682,9 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = VanillaInst monobinds uprags })
 		 	    (map instToId dfun_dicts)
 		 	    [(inst_tyvars' ++ dfun_covars, dfun_id, this_dict_id, inline_prag ++ prags)] 
 		 	    all_binds
-    in
-    showLIE (text "instance") 		`thenM_`
-    returnM (unitBag main_bind)
+
+    showLIE (text "instance")
+    return (unitBag main_bind)
 
 mkCoVars :: [PredType] -> TcM [TyVar]
 mkCoVars = newCoVars . map unEqPred
@@ -694,25 +693,25 @@ mkCoVars = newCoVars . map unEqPred
     unEqPred _                = panic "TcInstDcls.mkCoVars"
 
 mkMetaCoVars :: [PredType] -> TcM [TyVar]
-mkMetaCoVars = mappM eqPredToCoVar
+mkMetaCoVars = mapM eqPredToCoVar
   where
     eqPredToCoVar (EqPred ty1 ty2) = newMetaCoVar ty1 ty2
     eqPredToCoVar _                = panic "TcInstDcls.mkMetaCoVars"
 
 tcMethods origin clas inst_tyvars' dfun_theta' inst_tys' 
-	  avail_insts op_items monobinds uprags
-  = 	-- Check that all the method bindings come from this class
+	  avail_insts op_items monobinds uprags = do
+	-- Check that all the method bindings come from this class
     let
 	sel_names = [idName sel_id | (sel_id, _) <- op_items]
 	bad_bndrs = collectHsBindBinders monobinds `minusList` sel_names
-    in
-    mappM (addErrTc . badMethodErr clas) bad_bndrs	`thenM_`
+
+    mapM (addErrTc . badMethodErr clas) bad_bndrs
 
 	-- Make the method bindings
     let
 	mk_method_bind = mkMethodBind origin clas inst_tys' monobinds
-    in
-    mapAndUnzipM mk_method_bind op_items 	`thenM` \ (meth_insts, meth_infos) ->
+
+    (meth_insts, meth_infos) <- mapAndUnzipM mk_method_bind op_items
 
 	-- And type check them
 	-- It's really worth making meth_insts available to the tcMethodBind
@@ -751,11 +750,10 @@ tcMethods origin clas inst_tyvars' dfun_theta' inst_tys'
 					-- the method has the right type
 	tc_method_bind = tcMethodBind inst_tyvars' dfun_theta' all_insts sig_fn prag_fn
 	meth_ids       = [meth_id | (_,meth_id,_) <- meth_infos]
-    in
 
-    mapM tc_method_bind meth_infos		`thenM` \ meth_binds_s ->
+    meth_binds_s <- mapM tc_method_bind meth_infos
    
-    returnM (meth_ids, unionManyBags meth_binds_s)
+    return (meth_ids, unionManyBags meth_binds_s)
 \end{code}
 
 
