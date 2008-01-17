@@ -228,11 +228,11 @@ setLevels float_lams binds us
     -- things unbound in the envt have level number zero implicitly
     do_them :: [CoreBind] -> LvlM [LevelledBind]
 
-    do_them [] = returnLvl []
-    do_them (b:bs)
-      = lvlTopBind init_env b	`thenLvl` \ (lvld_bind, _) ->
-	do_them bs		`thenLvl` \ lvld_binds ->
-    	returnLvl (lvld_bind : lvld_binds)
+    do_them [] = return []
+    do_them (b:bs) = do
+        (lvld_bind, _) <- lvlTopBind init_env b
+        lvld_binds <- do_them bs
+        return (lvld_bind : lvld_binds)
 
     init_env = initialEnv float_lams
 
@@ -273,14 +273,14 @@ don't want @lvlExpr@ to turn the scrutinee of the @case@ into an MFE
 If there were another lambda in @r@'s rhs, it would get level-2 as well.
 
 \begin{code}
-lvlExpr _ _ (_, AnnType ty)   = returnLvl (Type ty)
-lvlExpr _ env (_, AnnVar v)   = returnLvl (lookupVar env v)
-lvlExpr _ env (_, AnnLit lit) = returnLvl (Lit lit)
+lvlExpr _ _ (_, AnnType ty)   = return (Type ty)
+lvlExpr _ env (_, AnnVar v)   = return (lookupVar env v)
+lvlExpr _ env (_, AnnLit lit) = return (Lit lit)
 
-lvlExpr ctxt_lvl env (_, AnnApp fun arg)
-  = lvl_fun fun				`thenLvl` \ fun' ->
-    lvlMFE  False ctxt_lvl env arg	`thenLvl` \ arg' ->
-    returnLvl (App fun' arg')
+lvlExpr ctxt_lvl env (_, AnnApp fun arg) = do
+    fun' <- lvl_fun fun
+    arg' <- lvlMFE  False ctxt_lvl env arg
+    return (App fun' arg')
   where
 -- gaw 2004
     lvl_fun (_, AnnCase _ _ _ _) = lvlMFE True ctxt_lvl env fun
@@ -288,18 +288,18 @@ lvlExpr ctxt_lvl env (_, AnnApp fun arg)
 	-- We don't do MFE on partial applications generally,
 	-- but we do if the function is big and hairy, like a case
 
-lvlExpr ctxt_lvl env (_, AnnNote InlineMe expr)
+lvlExpr ctxt_lvl env (_, AnnNote InlineMe expr) = do
 -- Don't float anything out of an InlineMe; hence the iNLINE_CTXT
-  = lvlExpr iNLINE_CTXT env expr 	`thenLvl` \ expr' ->
-    returnLvl (Note InlineMe expr')
+    expr' <- lvlExpr iNLINE_CTXT env expr
+    return (Note InlineMe expr')
 
-lvlExpr ctxt_lvl env (_, AnnNote note expr)
-  = lvlExpr ctxt_lvl env expr 		`thenLvl` \ expr' ->
-    returnLvl (Note note expr')
+lvlExpr ctxt_lvl env (_, AnnNote note expr) = do
+    expr' <- lvlExpr ctxt_lvl env expr
+    return (Note note expr')
 
-lvlExpr ctxt_lvl env (_, AnnCast expr co)
-  = lvlExpr ctxt_lvl env expr		`thenLvl` \ expr' ->
-    returnLvl (Cast expr' co)
+lvlExpr ctxt_lvl env (_, AnnCast expr co) = do
+    expr' <- lvlExpr ctxt_lvl env expr
+    return (Cast expr' co)
 
 -- We don't split adjacent lambdas.  That is, given
 --	\x y -> (x+1,y)
@@ -308,9 +308,9 @@ lvlExpr ctxt_lvl env (_, AnnCast expr co)
 -- Why not?  Because partial applications are fairly rare, and splitting
 -- lambdas makes them more expensive.
 
-lvlExpr ctxt_lvl env expr@(_, AnnLam bndr rhs)
-  = lvlMFE True new_lvl new_env body	`thenLvl` \ new_body ->
-    returnLvl (mkLams new_bndrs new_body)
+lvlExpr ctxt_lvl env expr@(_, AnnLam bndr rhs) = do
+    new_body <- lvlMFE True new_lvl new_env body
+    return (mkLams new_bndrs new_body)
   where 
     (bndrs, body)	 = collectAnnBndrs expr
     (new_lvl, new_bndrs) = lvlLamBndrs ctxt_lvl bndrs
@@ -323,7 +323,7 @@ lvlExpr ctxt_lvl env expr@(_, AnnLam bndr rhs)
 	-- [See SetLevels rev 1.50 for a version with this approach.]
 
 lvlExpr ctxt_lvl env (_, AnnLet (AnnNonRec bndr rhs) body)
-  | isUnLiftedType (idType bndr)
+  | isUnLiftedType (idType bndr) = do
 	-- Treat unlifted let-bindings (let x = b in e) just like (case b of x -> e)
 	-- That is, leave it exactly where it is
 	-- We used to float unlifted bindings too (e.g. to get a cheap primop
@@ -331,35 +331,33 @@ lvlExpr ctxt_lvl env (_, AnnLet (AnnNonRec bndr rhs) body)
 	-- but an unrelated change meant that these unlifed bindings
 	-- could get to the top level which is bad.  And there's not much point;
 	-- unlifted bindings are always cheap, and so hardly worth floating.
-  = lvlExpr ctxt_lvl env rhs		`thenLvl` \ rhs' ->
-    lvlExpr incd_lvl env' body		`thenLvl` \ body' ->
-    returnLvl (Let (NonRec bndr' rhs') body')
+    rhs'  <- lvlExpr ctxt_lvl env rhs
+    body' <- lvlExpr incd_lvl env' body
+    return (Let (NonRec bndr' rhs') body')
   where
     incd_lvl = incMinorLvl ctxt_lvl
     bndr' = TB bndr incd_lvl
     env'  = extendLvlEnv env [bndr']
 
-lvlExpr ctxt_lvl env (_, AnnLet bind body)
-  = lvlBind NotTopLevel ctxt_lvl env bind	`thenLvl` \ (bind', new_env) ->
-    lvlExpr ctxt_lvl new_env body		`thenLvl` \ body' ->
-    returnLvl (Let bind' body')
+lvlExpr ctxt_lvl env (_, AnnLet bind body) = do
+    (bind', new_env) <- lvlBind NotTopLevel ctxt_lvl env bind
+    body' <- lvlExpr ctxt_lvl new_env body
+    return (Let bind' body')
 
-lvlExpr ctxt_lvl env (_, AnnCase expr case_bndr ty alts)
-  = lvlMFE True ctxt_lvl env expr	`thenLvl` \ expr' ->
-    let
-	alts_env = extendCaseBndrLvlEnv env expr' case_bndr incd_lvl
-    in
-    mapLvl (lvl_alt alts_env) alts	`thenLvl` \ alts' ->
-    returnLvl (Case expr' (TB case_bndr incd_lvl) ty alts')
+lvlExpr ctxt_lvl env (_, AnnCase expr case_bndr ty alts) = do
+    expr' <- lvlMFE True ctxt_lvl env expr
+    let alts_env = extendCaseBndrLvlEnv env expr' case_bndr incd_lvl
+    alts' <- mapM (lvl_alt alts_env) alts
+    return (Case expr' (TB case_bndr incd_lvl) ty alts')
   where
       incd_lvl  = incMinorLvl ctxt_lvl
 
-      lvl_alt alts_env (con, bs, rhs)
-	= lvlMFE True incd_lvl new_env rhs	`thenLvl` \ rhs' ->
-	  returnLvl (con, bs', rhs')
-	where
-	  bs'     = [ TB b incd_lvl | b <- bs ]
-	  new_env = extendLvlEnv alts_env bs'
+      lvl_alt alts_env (con, bs, rhs) = do
+          rhs' <- lvlMFE True incd_lvl new_env rhs
+          return (con, bs', rhs')
+        where
+          bs'     = [ TB b incd_lvl | b <- bs ]
+          new_env = extendLvlEnv alts_env bs'
 \end{code}
 
 @lvlMFE@ is just like @lvlExpr@, except that it might let-bind
@@ -380,7 +378,7 @@ lvlMFE ::  Bool			-- True <=> strict context [body of case or let]
 	-> LvlM LevelledExpr	-- Result expression
 
 lvlMFE strict_ctxt ctxt_lvl env (_, AnnType ty)
-  = returnLvl (Type ty)
+  = return (Type ty)
 
 
 lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
@@ -392,10 +390,10 @@ lvlMFE strict_ctxt ctxt_lvl env ann_expr@(fvs, _)
     lvlExpr ctxt_lvl env ann_expr
 
   | otherwise	-- Float it out!
-  = lvlFloatRhs abs_vars dest_lvl env ann_expr	`thenLvl` \ expr' ->
-    newLvlVar "lvl" abs_vars ty			`thenLvl` \ var ->
-    returnLvl (Let (NonRec (TB var dest_lvl) expr') 
-		   (mkVarApps (Var var) abs_vars))
+  = do expr' <- lvlFloatRhs abs_vars dest_lvl env ann_expr
+       var <- newLvlVar "lvl" abs_vars ty
+       return (Let (NonRec (TB var dest_lvl) expr') 
+                   (mkVarApps (Var var) abs_vars))
   where
     expr     = deAnnotate ann_expr
     ty       = exprType expr
@@ -489,20 +487,20 @@ lvlBind :: TopLevelFlag		-- Used solely to decide whether to clone
 
 lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
   | isInlineCtxt ctxt_lvl		-- Don't do anything inside InlineMe
-  = lvlExpr ctxt_lvl env rhs			`thenLvl` \ rhs' ->
-    returnLvl (NonRec (TB bndr ctxt_lvl) rhs', env)
+  = do rhs' <- lvlExpr ctxt_lvl env rhs
+       return (NonRec (TB bndr ctxt_lvl) rhs', env)
 
   | null abs_vars
-  =	-- No type abstraction; clone existing binder
-    lvlExpr dest_lvl env rhs			`thenLvl` \ rhs' ->
-    cloneVar top_lvl env bndr ctxt_lvl dest_lvl	`thenLvl` \ (env', bndr') ->
-    returnLvl (NonRec (TB bndr' dest_lvl) rhs', env') 
+  = do  -- No type abstraction; clone existing binder
+       rhs' <- lvlExpr dest_lvl env rhs
+       (env', bndr') <- cloneVar top_lvl env bndr ctxt_lvl dest_lvl
+       return (NonRec (TB bndr' dest_lvl) rhs', env') 
 
   | otherwise
-  = -- Yes, type abstraction; create a new binder, extend substitution, etc
-    lvlFloatRhs abs_vars dest_lvl env rhs	`thenLvl` \ rhs' ->
-    newPolyBndrs dest_lvl env abs_vars [bndr]	`thenLvl` \ (env', [bndr']) ->
-    returnLvl (NonRec (TB bndr' dest_lvl) rhs', env')
+  = do  -- Yes, type abstraction; create a new binder, extend substitution, etc
+       rhs' <- lvlFloatRhs abs_vars dest_lvl env rhs
+       (env', [bndr']) <- newPolyBndrs dest_lvl env abs_vars [bndr]
+       return (NonRec (TB bndr' dest_lvl) rhs', env')
 
   where
     bind_fvs = rhs_fvs `unionVarSet` idFreeVars bndr
@@ -514,16 +512,16 @@ lvlBind top_lvl ctxt_lvl env (AnnNonRec bndr rhs@(rhs_fvs,_))
 \begin{code}
 lvlBind top_lvl ctxt_lvl env (AnnRec pairs)
   | isInlineCtxt ctxt_lvl	-- Don't do anything inside InlineMe
-  = mapLvl (lvlExpr ctxt_lvl env) rhss			`thenLvl` \ rhss' ->
-    returnLvl (Rec ([TB b ctxt_lvl | b <- bndrs] `zip` rhss'), env)
+  = do rhss' <- mapM (lvlExpr ctxt_lvl env) rhss
+       return (Rec ([TB b ctxt_lvl | b <- bndrs] `zip` rhss'), env)
 
   | null abs_vars
-  = cloneRecVars top_lvl env bndrs ctxt_lvl dest_lvl	`thenLvl` \ (new_env, new_bndrs) ->
-    mapLvl (lvlExpr ctxt_lvl new_env) rhss		`thenLvl` \ new_rhss ->
-    returnLvl (Rec ([TB b dest_lvl | b <- new_bndrs] `zip` new_rhss), new_env)
+  = do (new_env, new_bndrs) <- cloneRecVars top_lvl env bndrs ctxt_lvl dest_lvl
+       new_rhss <- mapM (lvlExpr ctxt_lvl new_env) rhss
+       return (Rec ([TB b dest_lvl | b <- new_bndrs] `zip` new_rhss), new_env)
 
   | isSingleton pairs && count isId abs_vars > 1
-  = 	-- Special case for self recursion where there are
+  = do	-- Special case for self recursion where there are
 	-- several variables carried around: build a local loop:	
 	--	poly_f = \abs_vars. \lam_vars . letrec f = \lam_vars. rhs in f lam_vars
 	-- This just makes the closures a bit smaller.  If we don't do
@@ -534,29 +532,27 @@ lvlBind top_lvl ctxt_lvl env (AnnRec pairs)
 	-- 
 	-- This all seems a bit ad hoc -- sigh
     let
-	(bndr,rhs) = head pairs
-	(rhs_lvl, abs_vars_w_lvls) = lvlLamBndrs dest_lvl abs_vars
-	rhs_env = extendLvlEnv env abs_vars_w_lvls
-    in
-    cloneVar NotTopLevel rhs_env bndr rhs_lvl rhs_lvl	`thenLvl` \ (rhs_env', new_bndr) ->
+        (bndr,rhs) = head pairs
+        (rhs_lvl, abs_vars_w_lvls) = lvlLamBndrs dest_lvl abs_vars
+        rhs_env = extendLvlEnv env abs_vars_w_lvls
+    (rhs_env', new_bndr) <- cloneVar NotTopLevel rhs_env bndr rhs_lvl rhs_lvl
     let
-	(lam_bndrs, rhs_body)     = collectAnnBndrs rhs
+        (lam_bndrs, rhs_body)     = collectAnnBndrs rhs
         (body_lvl, new_lam_bndrs) = lvlLamBndrs rhs_lvl lam_bndrs
-	body_env 		  = extendLvlEnv rhs_env' new_lam_bndrs
-    in
-    lvlExpr body_lvl body_env rhs_body		`thenLvl` \ new_rhs_body ->
-    newPolyBndrs dest_lvl env abs_vars [bndr]	`thenLvl` \ (poly_env, [poly_bndr]) ->
-    returnLvl (Rec [(TB poly_bndr dest_lvl, 
-	       mkLams abs_vars_w_lvls $
-	       mkLams new_lam_bndrs $
-	       Let (Rec [(TB new_bndr rhs_lvl, mkLams new_lam_bndrs new_rhs_body)]) 
-		   (mkVarApps (Var new_bndr) lam_bndrs))],
-	       poly_env)
+        body_env                  = extendLvlEnv rhs_env' new_lam_bndrs
+    new_rhs_body <- lvlExpr body_lvl body_env rhs_body
+    (poly_env, [poly_bndr]) <- newPolyBndrs dest_lvl env abs_vars [bndr]
+    return (Rec [(TB poly_bndr dest_lvl, 
+               mkLams abs_vars_w_lvls $
+               mkLams new_lam_bndrs $
+               Let (Rec [(TB new_bndr rhs_lvl, mkLams new_lam_bndrs new_rhs_body)]) 
+                   (mkVarApps (Var new_bndr) lam_bndrs))],
+               poly_env)
 
-  | otherwise	-- Non-null abs_vars
-  = newPolyBndrs dest_lvl env abs_vars bndrs		`thenLvl` \ (new_env, new_bndrs) ->
-    mapLvl (lvlFloatRhs abs_vars dest_lvl new_env) rhss `thenLvl` \ new_rhss ->
-    returnLvl (Rec ([TB b dest_lvl | b <- new_bndrs] `zip` new_rhss), new_env)
+  | otherwise = do  -- Non-null abs_vars
+    (new_env, new_bndrs) <- newPolyBndrs dest_lvl env abs_vars bndrs
+    new_rhss <- mapM (lvlFloatRhs abs_vars dest_lvl new_env) rhss
+    return (Rec ([TB b dest_lvl | b <- new_bndrs] `zip` new_rhss), new_env)
 
   where
     (bndrs,rhss) = unzip pairs
@@ -573,9 +569,9 @@ lvlBind top_lvl ctxt_lvl env (AnnRec pairs)
 ----------------------------------------------------
 -- Three help functons for the type-abstraction case
 
-lvlFloatRhs abs_vars dest_lvl env rhs
-  = lvlExpr rhs_lvl rhs_env rhs	`thenLvl` \ rhs' ->
-    returnLvl (mkLams abs_vars_w_lvls rhs')
+lvlFloatRhs abs_vars dest_lvl env rhs = do
+    rhs' <- lvlExpr rhs_lvl rhs_env rhs
+    return (mkLams abs_vars_w_lvls rhs')
   where
     (rhs_lvl, abs_vars_w_lvls) = lvlLamBndrs dest_lvl abs_vars
     rhs_env = extendLvlEnv env abs_vars_w_lvls
@@ -833,18 +829,13 @@ absVarsOf id_env v
 type LvlM result = UniqSM result
 
 initLvl		= initUs_
-thenLvl		= thenUs
-returnLvl	= returnUs
-mapLvl		= mapUs
 \end{code}
 
 \begin{code}
-newPolyBndrs dest_lvl env abs_vars bndrs
-  = getUniquesUs 		`thenLvl` \ uniqs ->
-    let
-	new_bndrs = zipWith mk_poly_bndr bndrs uniqs
-    in
-    returnLvl (extendPolyLvlEnv dest_lvl env abs_vars (bndrs `zip` new_bndrs), new_bndrs)
+newPolyBndrs dest_lvl env abs_vars bndrs = do
+    uniqs <- getUniquesM
+    let new_bndrs = zipWith mk_poly_bndr bndrs uniqs
+    return (extendPolyLvlEnv dest_lvl env abs_vars (bndrs `zip` new_bndrs), new_bndrs)
   where
     mk_poly_bndr bndr uniq = mkSysLocal (mkFastString str) uniq poly_ty
 			   where
@@ -855,38 +846,36 @@ newPolyBndrs dest_lvl env abs_vars bndrs
 newLvlVar :: String 
 	  -> [CoreBndr] -> Type 	-- Abstract wrt these bndrs
 	  -> LvlM Id
-newLvlVar str vars body_ty 	
-  = getUniqueUs	`thenLvl` \ uniq ->
-    returnUs (mkSysLocal (mkFastString str) uniq (mkPiTypes vars body_ty))
+newLvlVar str vars body_ty = do
+    uniq <- getUniqueM
+    return (mkSysLocal (mkFastString str) uniq (mkPiTypes vars body_ty))
     
 -- The deeply tiresome thing is that we have to apply the substitution
 -- to the rules inside each Id.  Grr.  But it matters.
 
 cloneVar :: TopLevelFlag -> LevelEnv -> Id -> Level -> Level -> LvlM (LevelEnv, Id)
 cloneVar TopLevel env v ctxt_lvl dest_lvl
-  = returnUs (env, v)	-- Don't clone top level things
+  = return (env, v)	-- Don't clone top level things
 cloneVar NotTopLevel env@(_,_,subst,_) v ctxt_lvl dest_lvl
-  = ASSERT( isId v )
-    getUs	`thenLvl` \ us ->
+  = ASSERT( isId v ) do
+    us <- getUniqueSupplyM
     let
       (subst', v1) = cloneIdBndr subst us v
       v2	   = zap_demand ctxt_lvl dest_lvl v1
       env'	   = extendCloneLvlEnv dest_lvl env subst' [(v,v2)]
-    in
-    returnUs (env', v2)
+    return (env', v2)
 
 cloneRecVars :: TopLevelFlag -> LevelEnv -> [Id] -> Level -> Level -> LvlM (LevelEnv, [Id])
 cloneRecVars TopLevel env vs ctxt_lvl dest_lvl 
-  = returnUs (env, vs)	-- Don't clone top level things
+  = return (env, vs)	-- Don't clone top level things
 cloneRecVars NotTopLevel env@(_,_,subst,_) vs ctxt_lvl dest_lvl
-  = ASSERT( all isId vs )
-    getUs 			`thenLvl` \ us ->
+  = ASSERT( all isId vs ) do
+    us <- getUniqueSupplyM
     let
       (subst', vs1) = cloneRecIdBndrs subst us vs
       vs2	    = map (zap_demand ctxt_lvl dest_lvl) vs1
       env'	    = extendCloneLvlEnv dest_lvl env subst' (vs `zip` vs2)
-    in
-    returnUs (env', vs2)
+    return (env', vs2)
 
 	-- VERY IMPORTANT: we must zap the demand info 
 	-- if the thing is going to float out past a lambda,
