@@ -40,7 +40,7 @@ import Maybes
 
 -- standard
 import Data.List
-import Control.Monad (liftM)
+import Control.Monad
 \end{code}
 
 
@@ -663,7 +663,7 @@ The following rules exploits the reflexivity of equality:
 \begin{code}
 trivialRule :: IdemRewriteRule
 trivialRule insts 
-  = liftM catMaybes $ mappM trivial insts
+  = liftM catMaybes $ mapM trivial insts
   where
     trivial inst
       | ASSERT( isEqInst inst )
