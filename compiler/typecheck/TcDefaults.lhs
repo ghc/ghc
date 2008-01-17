@@ -50,7 +50,7 @@ tcDefaults []
 	-- defaultDefaultTys
 
 tcDefaults [L locn (DefaultDecl [])]
-  = returnM (Just [])		-- Default declaration specifying no types
+  = return (Just [])		-- Default declaration specifying no types
 
 tcDefaults [L locn (DefaultDecl mono_tys)]
   = setSrcSpan locn 			$
@@ -61,7 +61,7 @@ tcDefaults [L locn (DefaultDecl mono_tys)]
 	; let deflt_clss | ovl_str   = [num_class, is_str_class]
 			 | otherwise = [num_class]
 
-	; tau_tys <- mappM (tc_default_ty deflt_clss) mono_tys
+	; tau_tys <- mapM (tc_default_ty deflt_clss) mono_tys
     
 	; return (Just tau_tys) }
 
