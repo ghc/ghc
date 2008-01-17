@@ -163,7 +163,7 @@ checkKinds swapped tv1 ty2
 -- We're about to unify a type variable tv1 with a non-tyvar-type ty2.
 -- ty2 has been zonked at this stage, which ensures that
 -- its kind has as much boxity information visible as possible.
-  | tk2 `isSubKind` tk1 = returnM ()
+  | tk2 `isSubKind` tk1 = return ()
 
   | otherwise
 	-- Either the kinds aren't compatible
@@ -220,7 +220,7 @@ checkTauTvUpdate orig_tv orig_ty
     -- closed type synonym that expands to a tau type.
     go (TyConApp tc tys)
 	| isSynTyCon tc  = go_syn tc tys
-	| otherwise	 = do { tys' <- mappM go tys
+	| otherwise	 = do { tys' <- mapM go tys
                               ; return $ occurs (TyConApp tc) tys' }
     go (NoteTy _ ty2) 	 = go ty2	-- Discard free-tyvar annotations
     go (PredTy p)	 = do { p' <- go_pred p
@@ -344,20 +344,19 @@ Rather, we should bind t to () (= non_var_ty2).
 Error mesages in case of kind mismatch.
 
 \begin{code}
-unifyKindMisMatch ty1 ty2
-  = zonkTcKind ty1	`thenM` \ ty1' ->
-    zonkTcKind ty2	`thenM` \ ty2' ->
+unifyKindMisMatch ty1 ty2 = do
+    ty1' <- zonkTcKind ty1
+    ty2' <- zonkTcKind ty2
     let
 	msg = hang (ptext SLIT("Couldn't match kind"))
 		   2 (sep [quotes (ppr ty1'), 
 			   ptext SLIT("against"), 
 			   quotes (ppr ty2')])
-    in
     failWithTc msg
 
 unifyKindCtxt swapped tv1 ty2 tidy_env	-- not swapped => tv1 expected, ty2 inferred
 	-- tv1 and ty2 are zonked already
-  = returnM msg
+  = return msg
   where
     msg = (env2, ptext SLIT("When matching the kinds of") <+> 
 		 sep [quotes pp_expected <+> ptext SLIT("and"), quotes pp_actual])
@@ -409,7 +408,7 @@ newKindVar = do	{ uniq <- newUnique
 		; return (mkTyVarTy (mkKindVar uniq ref)) }
 
 newKindVars :: Int -> TcM [TcKind]
-newKindVars n = mappM (\ _ -> newKindVar) (nOfThem n ())
+newKindVars n = mapM (\ _ -> newKindVar) (nOfThem n ())
 \end{code}
 
 
@@ -514,7 +513,7 @@ writeMetaTyVar tyvar ty = writeMutVar (metaTvRef tyvar) (Indirect ty)
 writeMetaTyVar tyvar ty
   | not (isMetaTyVar tyvar)
   = pprTrace "writeMetaTyVar" (ppr tyvar) $
-    returnM ()
+    return ()
 
   | otherwise
   = ASSERT( isMetaTyVar tyvar )
@@ -540,12 +539,12 @@ newFlexiTyVar :: Kind -> TcM TcTyVar
 newFlexiTyVar kind = newMetaTyVar TauTv kind
 
 newFlexiTyVarTy  :: Kind -> TcM TcType
-newFlexiTyVarTy kind
-  = newFlexiTyVar kind	`thenM` \ tc_tyvar ->
-    returnM (TyVarTy tc_tyvar)
+newFlexiTyVarTy kind = do
+    tc_tyvar <- newFlexiTyVar kind
+    return (TyVarTy tc_tyvar)
 
 newFlexiTyVarTys :: Int -> Kind -> TcM [TcType]
-newFlexiTyVarTys n kind = mappM newFlexiTyVarTy (nOfThem n kind)
+newFlexiTyVarTys n kind = mapM newFlexiTyVarTy (nOfThem n kind)
 
 tcInstTyVar :: TyVar -> TcM TcTyVar
 -- Instantiate with a META type variable
@@ -556,7 +555,7 @@ tcInstTyVars :: [TyVar] -> TcM ([TcTyVar], [TcType], TvSubst)
 tcInstTyVars tyvars
   = do	{ tc_tvs <- mapM tcInstTyVar tyvars
 	; let tys = mkTyVarTys tc_tvs
-	; returnM (tc_tvs, tys, zipTopTvSubst tyvars tys) }
+	; return (tc_tvs, tys, zipTopTvSubst tyvars tys) }
 		-- Since the tyvars are freshly made,
 		-- they cannot possibly be captured by
 		-- any existing for-alls.  Hence zipTopTvSubst
@@ -657,33 +656,33 @@ lookupTcTyVar tyvar
 getTcTyVar tyvar
   | not (isTcTyVar tyvar)
   = pprTrace "getTcTyVar" (ppr tyvar) $
-    returnM (Just (mkTyVarTy tyvar))
+    return (Just (mkTyVarTy tyvar))
 
   | otherwise
-  = ASSERT2( isTcTyVar tyvar, ppr tyvar )
-    readMetaTyVar tyvar				`thenM` \ maybe_ty ->
+  = ASSERT2( isTcTyVar tyvar, ppr tyvar ) do
+    maybe_ty <- readMetaTyVar tyvar
     case maybe_ty of
-	Just ty -> short_out ty				`thenM` \ ty' ->
-		   writeMetaTyVar tyvar (Just ty')	`thenM_`
-		   returnM (Just ty')
+        Just ty -> do ty' <- short_out ty
+                      writeMetaTyVar tyvar (Just ty')
+                      return (Just ty')
 
-	Nothing	   -> returnM Nothing
+	Nothing	   -> return Nothing
 
 short_out :: TcType -> TcM TcType
 short_out ty@(TyVarTy tyvar)
   | not (isTcTyVar tyvar)
-  = returnM ty
+  = return ty
 
-  | otherwise
-  = readMetaTyVar tyvar	`thenM` \ maybe_ty ->
+  | otherwise = do
+    maybe_ty <- readMetaTyVar tyvar
     case maybe_ty of
-	Just ty' -> short_out ty' 			`thenM` \ ty' ->
-		    writeMetaTyVar tyvar (Just ty')	`thenM_`
-		    returnM ty'
+        Just ty' -> do ty' <- short_out ty'
+                       writeMetaTyVar tyvar (Just ty')
+                       return ty'
 
-	other    -> returnM ty
+	other    -> return ty
 
-short_out other_ty = returnM other_ty
+short_out other_ty = return other_ty
 -}
 \end{code}
 
@@ -698,45 +697,37 @@ short_out other_ty = returnM other_ty
 
 \begin{code}
 zonkTcTyVars :: [TcTyVar] -> TcM [TcType]
-zonkTcTyVars tyvars = mappM zonkTcTyVar tyvars
+zonkTcTyVars tyvars = mapM zonkTcTyVar tyvars
 
 zonkTcTyVarsAndFV :: [TcTyVar] -> TcM TcTyVarSet
-zonkTcTyVarsAndFV tyvars = mappM zonkTcTyVar tyvars	`thenM` \ tys ->
-			   returnM (tyVarsOfTypes tys)
+zonkTcTyVarsAndFV tyvars = tyVarsOfTypes <$> mapM zonkTcTyVar tyvars
 
 zonkTcTyVar :: TcTyVar -> TcM TcType
 zonkTcTyVar tyvar = ASSERT2( isTcTyVar tyvar, ppr tyvar)
-		    zonk_tc_tyvar (\ tv -> returnM (TyVarTy tv)) tyvar
+		    zonk_tc_tyvar (\ tv -> return (TyVarTy tv)) tyvar
 \end{code}
 
 -----------------  Types
 
 \begin{code}
 zonkTcType :: TcType -> TcM TcType
-zonkTcType ty = zonkType (\ tv -> returnM (TyVarTy tv)) ty
+zonkTcType ty = zonkType (\ tv -> return (TyVarTy tv)) ty
 
 zonkTcTypes :: [TcType] -> TcM [TcType]
-zonkTcTypes tys = mappM zonkTcType tys
+zonkTcTypes tys = mapM zonkTcType tys
 
-zonkTcClassConstraints cts = mappM zonk cts
-    where zonk (clas, tys)
-	    = zonkTcTypes tys	`thenM` \ new_tys ->
-	      returnM (clas, new_tys)
+zonkTcClassConstraints cts = mapM zonk cts
+    where zonk (clas, tys) = do
+              new_tys <- zonkTcTypes tys
+              return (clas, new_tys)
 
 zonkTcThetaType :: TcThetaType -> TcM TcThetaType
-zonkTcThetaType theta = mappM zonkTcPredType theta
+zonkTcThetaType theta = mapM zonkTcPredType theta
 
 zonkTcPredType :: TcPredType -> TcM TcPredType
-zonkTcPredType (ClassP c ts)
-  = zonkTcTypes ts	`thenM` \ new_ts ->
-    returnM (ClassP c new_ts)
-zonkTcPredType (IParam n t)
-  = zonkTcType t	`thenM` \ new_t ->
-    returnM (IParam n new_t)
-zonkTcPredType (EqPred t1 t2)
-  = zonkTcType t1	`thenM` \ new_t1 ->
-    zonkTcType t2	`thenM` \ new_t2 ->
-    returnM (EqPred new_t1 new_t2)
+zonkTcPredType (ClassP c ts)  = ClassP c <$> zonkTcTypes ts
+zonkTcPredType (IParam n t)   = IParam n <$> zonkTcType t
+zonkTcPredType (EqPred t1 t2) = EqPred <$> zonkTcType t1 <*> zonkTcType t2
 \end{code}
 
 -------------------  These ...ToType, ...ToKind versions
@@ -768,7 +759,7 @@ zonkTopTyVar tv
     default_k = defaultKind k
 
 zonkQuantifiedTyVars :: [TcTyVar] -> TcM [TcTyVar]
-zonkQuantifiedTyVars = mappM zonkQuantifiedTyVar
+zonkQuantifiedTyVars = mapM zonkQuantifiedTyVar
 
 zonkQuantifiedTyVar :: TcTyVar -> TcM TcTyVar
 -- zonkQuantifiedTyVar is applied to the a TcTyVar when quantifying over it.
@@ -898,20 +889,20 @@ zonkType unbound_var_fn ty
   = go ty
   where
     go (NoteTy _ ty2) 	 = go ty2	-- Discard free-tyvar annotations
-			 
-    go (TyConApp tc tys) = mappM go tys	`thenM` \ tys' ->
-			   returnM (TyConApp tc tys')
-			    
-    go (PredTy p)	 = go_pred p		`thenM` \ p' ->
-			   returnM (PredTy p')
-			 
-    go (FunTy arg res)   = go arg		`thenM` \ arg' ->
-			   go res		`thenM` \ res' ->
-			   returnM (FunTy arg' res')
- 			 
-    go (AppTy fun arg)	 = go fun		`thenM` \ fun' ->
-			   go arg		`thenM` \ arg' ->
-			   returnM (mkAppTy fun' arg')
+
+    go (TyConApp tc tys) = do tys' <- mapM go tys
+                              return (TyConApp tc tys')
+
+    go (PredTy p)        = do p' <- go_pred p
+                              return (PredTy p')
+
+    go (FunTy arg res)   = do arg' <- go arg
+                              res' <- go res
+                              return (FunTy arg' res')
+
+    go (AppTy fun arg)   = do fun' <- go fun
+                              arg' <- go arg
+                              return (mkAppTy fun' arg')
 		-- NB the mkAppTy; we might have instantiated a
 		-- type variable to a type constructor, so we need
 		-- to pull the TyConApp to the top.
@@ -921,23 +912,23 @@ zonkType unbound_var_fn ty
 		       | otherwise	 = return (TyVarTy tyvar)
 		-- Ordinary (non Tc) tyvars occur inside quantified types
 
-    go (ForAllTy tyvar ty) = ASSERT( isImmutableTyVar tyvar )
-			     go ty		`thenM` \ ty' ->
-			     returnM (ForAllTy tyvar ty')
+    go (ForAllTy tyvar ty) = ASSERT( isImmutableTyVar tyvar ) do
+                             ty' <- go ty
+                             return (ForAllTy tyvar ty')
 
-    go_pred (ClassP c tys)   = mappM go tys	`thenM` \ tys' ->
-			       returnM (ClassP c tys')
-    go_pred (IParam n ty)    = go ty		`thenM` \ ty' ->
-			       returnM (IParam n ty')
-    go_pred (EqPred ty1 ty2) = go ty1		`thenM` \ ty1' ->
-			       go ty2		`thenM` \ ty2' ->
-			       returnM (EqPred ty1' ty2')
+    go_pred (ClassP c tys)   = do tys' <- mapM go tys
+                                  return (ClassP c tys')
+    go_pred (IParam n ty)    = do ty' <- go ty
+                                  return (IParam n ty')
+    go_pred (EqPred ty1 ty2) = do ty1' <- go ty1
+                                  ty2' <- go ty2
+                                  return (EqPred ty1' ty2')
 
 zonk_tc_tyvar :: (TcTyVar -> TcM Type)		-- What to do for an unbound mutable variable
  	      -> TcTyVar -> TcM TcType
 zonk_tc_tyvar unbound_var_fn tyvar 
   | not (isMetaTyVar tyvar)	-- Skolems
-  = returnM (TyVarTy tyvar)
+  = return (TyVarTy tyvar)
 
   | otherwise			-- Mutables
   = do	{ cts <- readMetaTyVar tyvar
@@ -1008,12 +999,12 @@ This might not necessarily show up in kind checking.
 \begin{code}
 checkValidType :: UserTypeCtxt -> Type -> TcM ()
 -- Checks that the type is valid for the given context
-checkValidType ctxt ty
-  = traceTc (text "checkValidType" <+> ppr ty)	`thenM_`
-    doptM Opt_UnboxedTuples		`thenM` \ unboxed ->
-    doptM Opt_Rank2Types		`thenM` \ rank2 ->
-    doptM Opt_RankNTypes		`thenM` \ rankn ->
-    doptM Opt_PolymorphicComponents	`thenM` \ polycomp ->
+checkValidType ctxt ty = do
+    traceTc (text "checkValidType" <+> ppr ty)
+    unboxed  <- doptM Opt_UnboxedTuples
+    rank2    <- doptM Opt_Rank2Types
+    rankn    <- doptM Opt_RankNTypes
+    polycomp <- doptM Opt_PolymorphicComponents
     let 
 	rank | rankn = Arbitrary
 	     | rank2 = Rank 2
@@ -1049,12 +1040,12 @@ checkValidType ctxt ty
 	              TySynCtxt _ | unboxed -> UT_Ok
 	              ExprSigCtxt | unboxed -> UT_Ok
 	              _                     -> UT_NotOk
-    in
+
 	-- Check that the thing has kind Type, and is lifted if necessary
-    checkTc kind_ok (kindErr actual_kind)	`thenM_`
+    checkTc kind_ok (kindErr actual_kind)
 
 	-- Check the internal validity of the type itself
-    check_type rank ubx_tup ty		`thenM_`
+    check_type rank ubx_tup ty
 
     traceTc (text "checkValidType done" <+> ppr ty)
 
@@ -1112,7 +1103,7 @@ check_type rank ubx_tup (PredTy sty)
   = do	{ dflags <- getDOpts
 	; check_pred_ty dflags TypeCtxt sty }
 
-check_type rank ubx_tup (TyVarTy _)       = returnM ()
+check_type rank ubx_tup (TyVarTy _)       = return ()
 check_type rank ubx_tup ty@(FunTy arg_ty res_ty)
   = do	{ check_type (decRank rank) UT_NotOk arg_ty
 	; check_type rank 	    UT_Ok    res_ty }
@@ -1138,7 +1129,7 @@ check_type rank ubx_tup ty@(TyConApp tc tys)
 	; liberal <- doptM Opt_LiberalTypeSynonyms
 	; if not liberal || isOpenSynTyCon tc then
 		-- For H98 and synonym families, do check the type args
-		mappM_ check_mono_type tys
+		mapM_ check_mono_type tys
 
 	  else	-- In the liberal case (only for closed syns), expand then check
 	  case tcView ty of   
@@ -1155,10 +1146,10 @@ check_type rank ubx_tup ty@(TyConApp tc tys)
 		-- c.f. check_arg_type
 		-- However, args are allowed to be unlifted, or
 		-- more unboxed tuples, so can't use check_arg_ty
-	; mappM_ (check_type rank' UT_Ok) tys }
+	; mapM_ (check_type rank' UT_Ok) tys }
 
   | otherwise
-  = mappM_ (check_arg_type rank) tys
+  = mapM_ (check_arg_type rank) tys
 
   where
     ubx_tup_ok ub_tuples_allowed = case ubx_tup of { UT_Ok -> ub_tuples_allowed; other -> False }
@@ -1270,11 +1261,11 @@ checkValidTheta ctxt theta
 
 -------------------------
 check_valid_theta ctxt []
-  = returnM ()
-check_valid_theta ctxt theta
-  = getDOpts					`thenM` \ dflags ->
-    warnTc (notNull dups) (dupPredWarn dups)	`thenM_`
-    mappM_ (check_pred_ty dflags ctxt) theta
+  = return ()
+check_valid_theta ctxt theta = do
+    dflags <- getDOpts
+    warnTc (notNull dups) (dupPredWarn dups)
+    mapM_ (check_pred_ty dflags ctxt) theta
   where
     (_,dups) = removeDups tcCmpPred theta
 
@@ -1285,7 +1276,7 @@ check_pred_ty dflags ctxt pred@(ClassP cls tys)
        ; checkTc (arity == n_tys) arity_err
 
 		-- Check the form of the argument types
-       ; mappM_ check_mono_type tys
+       ; mapM_ check_mono_type tys
        ; checkTc (check_class_pred_tys dflags ctxt tys)
 		 (predTyVarErr pred $$ how_to_allow)
        }
@@ -1376,7 +1367,7 @@ don't need to check for ambiguity either, because the test can't fail
 \begin{code}
 checkAmbiguity :: [TyVar] -> ThetaType -> TyVarSet -> TcM ()
 checkAmbiguity forall_tyvars theta tau_tyvars
-  = mappM_ complain (filter is_ambig theta)
+  = mapM_ complain (filter is_ambig theta)
   where
     complain pred     = addErrTc (ambigErr pred)
     extended_tau_vars = grow theta tau_tyvars
@@ -1402,7 +1393,7 @@ even in a scope where b is in scope.
 \begin{code}
 checkFreeness forall_tyvars theta
   = do	{ flexible_contexts <- doptM Opt_FlexibleContexts
-	; unless flexible_contexts $ mappM_ complain (filter is_free theta) }
+	; unless flexible_contexts $ mapM_ complain (filter is_free theta) }
   where    
     is_free pred     =  not (isIPPred pred)
 		     && not (any bound_var (varSetElems (tyVarsOfPred pred)))
@@ -1482,12 +1473,12 @@ checkValidInstHead ty	-- Should be a source type
 
     case getClassPredTys_maybe pred of {
 	Nothing -> failWithTc (instTypeErr (pprPred pred) empty) ;
-        Just (clas,tys) ->
+        Just (clas,tys) -> do
 
-    getDOpts					`thenM` \ dflags ->
-    mappM_ check_mono_type tys			`thenM_`
-    check_inst_head dflags clas tys		`thenM_`
-    returnM (clas, tys)
+    dflags <- getDOpts
+    mapM_ check_mono_type tys
+    check_inst_head dflags clas tys
+    return (clas, tys)
     }}
 
 check_inst_head dflags clas tys
@@ -1679,7 +1670,7 @@ checkValidTypeInst :: [Type] -> Type -> TcM ()
 checkValidTypeInst typats rhs
   = do { -- left-hand side contains no type family applications
          -- (vanilla synonyms are fine, though)
-       ; mappM_ checkTyFamFreeness typats
+       ; mapM_ checkTyFamFreeness typats
 
          -- the right-hand side is a tau type
        ; checkTc (isTauTy rhs) $ 
