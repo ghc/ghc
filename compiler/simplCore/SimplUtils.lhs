@@ -56,7 +56,9 @@ import Unify	( dataConCannotMatch )
 import VarSet
 import BasicTypes
 import Util
+import MonadUtils
 import Outputable
+
 import List( nub )
 \end{code}
 
@@ -806,7 +808,7 @@ mkLam bndrs body
  	   ; return (mkLams bndrs body') }
    
       | otherwise 
-      = returnSmpl (mkLams bndrs body)
+      = return (mkLams bndrs body)
 \end{code}
 
 Note [Casts and lambdas]
@@ -852,8 +854,8 @@ because the latter is not well-kinded.
 			-- if this is indeed a right-hand side; otherwise
 			-- we end up floating the thing out, only for float-in
 			-- to float it right back in again!
- = tryRhsTyLam env bndrs body		`thenSmpl` \ (floats, body') ->
-   returnSmpl (floats, mkLams bndrs body')
+ = do (floats, body') <- tryRhsTyLam env bndrs body
+      return (floats, mkLams bndrs body')
 -}
 
 
@@ -975,9 +977,9 @@ actually computing the expansion.
 \begin{code}
 tryEtaExpansion :: DynFlags -> OutExpr -> SimplM OutExpr
 -- There is at least one runtime binder in the binders
-tryEtaExpansion dflags body
-  = getUniquesSmpl 			`thenSmpl` \ us ->
-    returnSmpl (etaExpand fun_arity us body (exprType body))
+tryEtaExpansion dflags body = do
+    us <- getUniquesM
+    return (etaExpand fun_arity us body (exprType body))
   where
     fun_arity = exprEtaExpandArity dflags body
 \end{code}
@@ -1069,7 +1071,7 @@ it is guarded by the doFloatFromRhs call in simplLazyBind.
 abstractFloats :: [OutTyVar] -> SimplEnv -> OutExpr -> SimplM ([OutBind], OutExpr)
 abstractFloats main_tvs body_env body
   = ASSERT( notNull body_floats )
-    do	{ (subst, float_binds) <- mapAccumLSmpl abstract empty_subst body_floats
+    do	{ (subst, float_binds) <- mapAccumLM abstract empty_subst body_floats
 	; return (float_binds, CoreSubst.substExpr subst body) }
   where
     main_tv_set = mkVarSet main_tvs
@@ -1105,7 +1107,7 @@ abstractFloats main_tvs body_env body
 		-- gives rise to problems.   SLPJ June 98
 
     abstract subst (Rec prs)
-       = do { (poly_ids, poly_apps) <- mapAndUnzipSmpl (mk_poly tvs_here) ids
+       = do { (poly_ids, poly_apps) <- mapAndUnzipM (mk_poly tvs_here) ids
 	    ; let subst' = CoreSubst.extendSubstList subst (ids `zip` poly_apps)
 		  poly_rhss = [mkLams tvs_here (CoreSubst.substExpr subst' rhs) | rhs <- rhss]
 	    ; return (subst', Rec (poly_ids `zip` poly_rhss)) }
@@ -1127,7 +1129,7 @@ abstractFloats main_tvs body_env body
 	 tvs_here = main_tvs
 
     mk_poly tvs_here var
-      = do { uniq <- getUniqueSmpl
+      = do { uniq <- getUniqueM
 	   ; let  poly_name = setNameUnique (idName var) uniq		-- Keep same name
 		  poly_ty   = mkForAllTys tvs_here (idType var)	-- But new type of course
 		  poly_id   = mkLocalId poly_name poly_ty 
@@ -1371,7 +1373,7 @@ prepareDefault dflags env case_bndr (Just (tycon, inst_tys)) imposs_cons (Just d
 
 	[con] -> 	-- It matches exactly one constructor, so fill it in
 		 do { tick (FillInCaseDefault case_bndr)
-                    ; us <- getUniquesSmpl
+                    ; us <- getUniquesM
                     ; let (ex_tvs, co_tvs, arg_ids) =
                               dataConRepInstPat us con inst_tys
                     ; return [(DataAlt con, ex_tvs ++ co_tvs ++ arg_ids, deflt_rhs)] }
@@ -1428,8 +1430,8 @@ mkCase scrut case_bndr ty []
 
 mkCase scrut case_bndr ty alts	-- Identity case
   | all identity_alt alts
-  = tick (CaseIdentity case_bndr)		`thenSmpl_`
-    returnSmpl (re_cast scrut)
+  = do tick (CaseIdentity case_bndr)
+       return (re_cast scrut)
   where
     identity_alt (con, args, rhs) = check_eq con args (de_cast rhs)
 
@@ -1462,7 +1464,7 @@ mkCase scrut case_bndr ty alts	-- Identity case
 --------------------------------------------------
 --	Catch-all
 --------------------------------------------------
-mkCase scrut bndr ty alts = returnSmpl (Case scrut bndr ty alts)
+mkCase scrut bndr ty alts = return (Case scrut bndr ty alts)
 \end{code}
 
 
