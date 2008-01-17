@@ -526,7 +526,7 @@ simplLamBndr :: SimplEnv -> Var -> SimplM (SimplEnv, Var)
 -- The "{=(a,b)}" is an unfolding we can't reconstruct otherwise.
 simplLamBndr env bndr
   | isId bndr && hasSomeUnfolding old_unf = seqId id2 `seq` return (env2, id2)  -- Special case
-  | otherwise 				  = seqId id1 `seq` return (env1, id1) 	-- Normal case
+  | otherwise 				  = simplBinder env bndr	 	-- Normal case
   where
     old_unf = idUnfolding bndr
     (env1, id1) = substIdBndr env bndr
