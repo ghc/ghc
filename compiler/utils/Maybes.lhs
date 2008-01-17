@@ -17,7 +17,6 @@ module Maybes (
         expectJust,
         maybeToBool,
 
-        thenMaybe, seqMaybe, returnMaybe, failMaybe, fmapMMaybe
     ) where
 
 import Data.Maybe
@@ -77,32 +76,10 @@ mapCatMaybes f (x:xs) = case f x of
                         Nothing -> mapCatMaybes f xs
 \end{code}
 
-The Maybe monad
-~~~~~~~~~~~~~~~
 \begin{code}
-seqMaybe :: Maybe a -> Maybe a -> Maybe a
-seqMaybe (Just x) _  = Just x
-seqMaybe Nothing  my = my
-
-thenMaybe :: Maybe a -> (a -> Maybe b) -> Maybe b
-thenMaybe ma mb = case ma of
-                  Just x  -> mb x
-                  Nothing -> Nothing
-
-returnMaybe :: a -> Maybe a
-returnMaybe = Just
-
-failMaybe :: Maybe a
-failMaybe = Nothing
-
 orElse :: Maybe a -> a -> a
 (Just x) `orElse` _ = x
 Nothing  `orElse` y = y
-
-fmapMMaybe :: Monad m => (a -> m b) -> Maybe a -> m (Maybe b)
-fmapMMaybe _ Nothing  = return Nothing
-fmapMMaybe f (Just x) = f x >>= \x' -> return (Just x')
-
 \end{code}
 
 
