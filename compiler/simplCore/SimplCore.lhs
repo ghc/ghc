@@ -244,7 +244,7 @@ prepareRules hsc_env@(HscEnv { hsc_dflags = dflags, hsc_HPT = hpt })
 	      local_ids        = mkInScopeSet (mkVarSet (bindersOfBinds binds))
 	      env	       = setInScopeSet gentleSimplEnv local_ids 
 	      (better_rules,_) = initSmpl dflags emptyRuleBase emptyFamInstEnvs us $
-				 (mapSmpl (simplRule env) local_rules)
+				 (mapM (simplRule env) local_rules)
 	      home_pkg_rules   = hptRules hsc_env (dep_mods deps)
 
 		-- Find the rules for locally-defined Ids; then we can attach them
@@ -301,12 +301,12 @@ This doesn't match unless you do eta reduction on the build argument.
 
 \begin{code}
 simplRule env rule@(BuiltinRule {})
-  = returnSmpl rule
+  = return rule
 simplRule env rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs })
-  = simplBinders env bndrs		`thenSmpl` \ (env, bndrs') -> 
-    mapSmpl (simplExprGently env) args	`thenSmpl` \ args' ->
-    simplExprGently env rhs		`thenSmpl` \ rhs' ->
-    returnSmpl (rule { ru_bndrs = bndrs', ru_args = args', ru_rhs = rhs' })
+  = do (env, bndrs') <- simplBinders env bndrs
+       args' <- mapM (simplExprGently env) args
+       rhs' <- simplExprGently env rhs
+       return (rule { ru_bndrs = bndrs', ru_args = args', ru_rhs = rhs' })
 
 -- It's important that simplExprGently does eta reduction.
 -- For example, in a rule like:
@@ -333,8 +333,8 @@ simplExprGently :: SimplEnv -> CoreExpr -> SimplM CoreExpr
 -- and in fact that is so.... but the 'Gently' in simplExprGently doesn't
 -- enforce that; it just simplifies the expression twice
 
-simplExprGently env expr
-  = simplExpr env (occurAnalyseExpr expr) 	`thenSmpl` \ expr1 ->
+simplExprGently env expr = do
+    expr1 <- simplExpr env (occurAnalyseExpr expr)
     simplExpr env (occurAnalyseExpr expr1)
 \end{code}
 
