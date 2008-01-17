@@ -53,6 +53,7 @@ import Panic
 import System.IO
 import Data.IORef
 import Control.Exception
+import Control.Monad
 \end{code}
 
 
@@ -65,7 +66,7 @@ import Control.Exception
 
 \begin{code}
 ioToTcRn :: IO r -> TcRn r
-ioToTcRn = ioToIOEnv
+ioToTcRn = liftIO
 \end{code}
 
 \begin{code}
@@ -247,7 +248,8 @@ unsetOptM :: DynFlag -> TcRnIf gbl lcl a -> TcRnIf gbl lcl a
 unsetOptM flag = updEnv (\ env@(Env { env_top = top }) ->
 			 env { env_top = top { hsc_dflags = dopt_unset (hsc_dflags top) flag}} )
 
-ifOptM :: DynFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()	-- Do it flag is true
+-- | Do it flag is true
+ifOptM :: DynFlag -> TcRnIf gbl lcl () -> TcRnIf gbl lcl ()
 ifOptM flag thing_inside = do { b <- doptM flag; 
 				if b then thing_inside else return () }
 
@@ -357,7 +359,7 @@ traceHiDiffs = traceOptIf Opt_D_dump_hi_diffs
 
 traceOptIf :: DynFlag -> SDoc -> TcRnIf m n ()  -- No RdrEnv available, so qualify everything
 traceOptIf flag doc = ifOptM flag $
-		     ioToIOEnv (printForUser stderr alwaysQualify doc)
+		      liftIO (printForUser stderr alwaysQualify doc)
 
 traceOptTcRn :: DynFlag -> SDoc -> TcRn ()
 traceOptTcRn flag doc = ifOptM flag $ do
@@ -486,7 +488,7 @@ addLongErrAt loc msg extra
   	 writeMutVar errs_var (warns, errs `snocBag` err) }
 
 addErrs :: [(SrcSpan,Message)] -> TcRn ()
-addErrs msgs = mappM_ add msgs
+addErrs msgs = mapM_ add msgs
 	     where
 	       add (loc,msg) = addErrAt loc msg
 
@@ -513,7 +515,7 @@ addLocWarn (L loc e) fn = addReportAt loc (fn e)
 
 checkErr :: Bool -> Message -> TcRn ()
 -- Add the error if the bool is False
-checkErr ok msg = checkM ok (addErr msg)
+checkErr ok msg = unless ok (addErr msg)
 
 warnIf :: Bool -> Message -> TcRn ()
 warnIf True  msg = addWarn msg
@@ -562,7 +564,7 @@ recoverM recover thing
   = do { mb_res <- try_m thing ;
 	 case mb_res of
 	   Left exn  -> recover
-	   Right res -> returnM res }
+	   Right res -> return res }
 
 
 -----------------------
@@ -687,7 +689,7 @@ setErrCtxt :: ErrCtxt -> TcM a -> TcM a
 setErrCtxt ctxt = updLclEnv (\ env -> env { tcl_ctxt = ctxt })
 
 addErrCtxt :: Message -> TcM a -> TcM a
-addErrCtxt msg = addErrCtxtM (\env -> returnM (env, msg))
+addErrCtxt msg = addErrCtxtM (\env -> return (env, msg))
 
 addErrCtxtM :: (TidyEnv -> TcM (TidyEnv, Message)) -> TcM a -> TcM a
 addErrCtxtM msg = updCtxt (\ msgs -> msg : msgs)
@@ -727,7 +729,7 @@ addErrTc err_msg = do { env0 <- tcInitTidyEnv
 		      ; addErrTcM (env0, err_msg) }
 
 addErrsTc :: [Message] -> TcM ()
-addErrsTc err_msgs = mappM_ addErrTc err_msgs
+addErrsTc err_msgs = mapM_ addErrTc err_msgs
 
 addErrTcM :: (TidyEnv, Message) -> TcM ()
 addErrTcM (tidy_env, err_msg)
@@ -748,7 +750,7 @@ failWithTcM local_and_msg
   = addErrTcM local_and_msg >> failM
 
 checkTc :: Bool -> Message -> TcM ()	     -- Check that the boolean is true
-checkTc True  err = returnM ()
+checkTc True  err = return ()
 checkTc False err = failWithTc err
 \end{code}
 
@@ -862,7 +864,7 @@ extendLIE inst
 
 extendLIEs :: [Inst] -> TcM ()
 extendLIEs [] 
-  = returnM ()
+  = return ()
 extendLIEs insts
   = do { lie_var <- getLIEVar ;
 	 lie <- readMutVar lie_var ;
@@ -1007,7 +1009,7 @@ failIfM :: Message -> IfL a
 failIfM msg
   = do 	{ env <- getLclEnv
 	; let full_msg = (if_loc env <> colon) $$ nest 2 msg
-	; ioToIOEnv (printErrs (full_msg defaultErrStyle))
+	; liftIO (printErrs (full_msg defaultErrStyle))
 	; failM }
 
 --------------------
@@ -1042,7 +1044,7 @@ forkM_maybe doc thing_inside
 	  	    ; return Nothing }
 	}}
   where
-    print_errs sdoc = ioToIOEnv (printErrs (sdoc defaultErrStyle))
+    print_errs sdoc = liftIO (printErrs (sdoc defaultErrStyle))
 
 forkM :: SDoc -> IfL a -> IfL a
 forkM doc thing_inside
