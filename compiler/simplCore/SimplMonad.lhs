@@ -19,7 +19,7 @@ module SimplMonad (
 	getDOptsSmpl, getRules, getFamEnvs,
 
         -- Unique supply
-        getUniqueSmpl, getUniquesSmpl, getUniqSupplySmpl, newId,
+        MonadUnique(..), newId,
 
 	-- Counting
 	SimplCount, Tick(..),
@@ -38,9 +38,7 @@ import Id		( Id, mkSysLocal )
 import Type             ( Type )
 import FamInstEnv	( FamInstEnv )
 import Rules		( RuleBase )
-import UniqSupply	( uniqsFromSupply, uniqFromSupply, splitUniqSupply,
-			  UniqSupply
-			)
+import UniqSupply
 import DynFlags		( SimplifierSwitch(..), DynFlags, DynFlag(..), dopt )
 import StaticFlags	( opt_PprStyle_Debug, opt_HistorySize )
 import Unique		( Unique )
@@ -148,20 +146,18 @@ mapAccumLSmpl f acc (x:xs) = f acc x	`thenSmpl` \ (acc', x') ->
 %************************************************************************
 
 \begin{code}
-getUniqSupplySmpl :: SimplM UniqSupply
-getUniqSupplySmpl 
-   = SM (\st_env us sc -> case splitUniqSupply us of
-			        (us1, us2) -> (us1, us2, sc))
+instance MonadUnique SimplM where
+    getUniqueSupplyM
+       = SM (\st_env us sc -> case splitUniqSupply us of
+                                (us1, us2) -> (us1, us2, sc))
 
-getUniqueSmpl :: SimplM Unique
-getUniqueSmpl 
-   = SM (\st_env us sc -> case splitUniqSupply us of
-			        (us1, us2) -> (uniqFromSupply us1, us2, sc))
+    getUniqueM
+       = SM (\st_env us sc -> case splitUniqSupply us of
+                                (us1, us2) -> (uniqFromSupply us1, us2, sc))
 
-getUniquesSmpl :: SimplM [Unique]
-getUniquesSmpl 
-   = SM (\st_env us sc -> case splitUniqSupply us of
-			        (us1, us2) -> (uniqsFromSupply us1, us2, sc))
+    getUniquesM
+        = SM (\st_env us sc -> case splitUniqSupply us of
+                                (us1, us2) -> (uniqsFromSupply us1, us2, sc))
 
 getDOptsSmpl :: SimplM DynFlags
 getDOptsSmpl = SM (\st_env us sc -> (st_flags st_env, us, sc))
@@ -173,8 +169,8 @@ getFamEnvs :: SimplM (FamInstEnv, FamInstEnv)
 getFamEnvs = SM (\st_env us sc -> (st_fams st_env, us, sc))
 
 newId :: FastString -> Type -> SimplM Id
-newId fs ty = getUniqueSmpl 	`thenSmpl` \ uniq ->
-	      returnSmpl (mkSysLocal fs uniq ty)
+newId fs ty = do uniq <- getUniqueM
+                 return (mkSysLocal fs uniq ty)
 \end{code}
 
 
