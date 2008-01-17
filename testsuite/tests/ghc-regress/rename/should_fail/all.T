@@ -54,3 +54,5 @@ test('rnfail049', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
 test('rnfail050', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
 test('rnfail051', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
 
+test('rn_dup', normal, compile_fail, [''])
+
