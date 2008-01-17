@@ -23,6 +23,8 @@ module UniqSupply (
 	mapUs, mapAndUnzipUs, mapAndUnzip3Us,
 	thenMaybeUs, mapAccumLUs,
 	lazyThenUs, lazyMapUs,
+	module MonadUtils, mapAndUnzipM,
+	MonadUnique(..),
 
 	mkSplitUniqSupply,
 	splitUniqSupply, listSplitUniqSupply
@@ -153,6 +155,23 @@ withUs f = USM (\us -> f us)	-- Ha ha!
 		
 getUs :: UniqSM UniqSupply
 getUs = USM (\us -> splitUniqSupply us)
+
+-- | A monad for generating unique identifiers
+class Monad m => MonadUnique m where
+    -- | Get a new UniqueSupply
+    getUniqueSupplyM :: m UniqSupply
+    -- | Get a new unique identifier
+    getUniqueM  :: m Unique
+    -- | Get an infinite list of new unique identifiers
+    getUniquesM :: m [Unique]
+    
+    getUniqueM  = liftM uniqFromSupply  getUniqueSupplyM
+    getUniquesM = liftM uniqsFromSupply getUniqueSupplyM
+
+instance MonadUnique UniqSM where
+    getUniqueSupplyM = USM (\us -> splitUniqSupply us)
+    getUniqueM  = getUniqueUs
+    getUniquesM = getUniquesUs
 
 getUniqueUs :: UniqSM Unique
 getUniqueUs = USM (\us -> case splitUniqSupply us of
