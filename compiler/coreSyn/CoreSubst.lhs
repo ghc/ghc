@@ -23,7 +23,7 @@ module CoreSubst (
 
 	emptySubst, mkEmptySubst, mkSubst, substInScope, isEmptySubst, 
  	extendIdSubst, extendIdSubstList, extendTvSubst, extendTvSubstList,
-	extendSubstList, zapSubstEnv,
+	extendSubst, extendSubstList, zapSubstEnv,
 	extendInScope, extendInScopeList, extendInScopeIds, 
 	isInScope,
 
@@ -172,12 +172,13 @@ extendTvSubstList :: Subst -> [(TyVar,Type)] -> Subst
 extendTvSubstList (Subst in_scope ids tvs) prs = Subst in_scope ids (extendVarEnvList tvs prs)
 
 extendSubstList :: Subst -> [(Var,CoreArg)] -> Subst
-extendSubstList subst [] 
-  = subst
-extendSubstList (Subst in_scope ids tvs) ((tv,Type ty):prs)
-  = ASSERT( isTyVar tv ) extendSubstList (Subst in_scope ids (extendVarEnv tvs tv ty)) prs
-extendSubstList (Subst in_scope ids tvs) ((id,expr):prs)
-  = ASSERT( isId id ) extendSubstList (Subst in_scope (extendVarEnv ids id expr) tvs) prs
+extendSubstList subst []	      = subst
+extendSubstList subst ((var,rhs):prs) = extendSubstList (extendSubst subst var rhs) prs
+
+extendSubst (Subst in_scope ids tvs) tv (Type ty)
+  = ASSERT( isTyVar tv ) Subst in_scope ids (extendVarEnv tvs tv ty)
+extendSubst (Subst in_scope ids tvs) id expr
+  = ASSERT( isId id ) Subst in_scope (extendVarEnv ids id expr) tvs
 
 lookupIdSubst :: Subst -> Id -> CoreExpr
 lookupIdSubst (Subst in_scope ids tvs) v 
