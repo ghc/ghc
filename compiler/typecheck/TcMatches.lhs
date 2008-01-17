@@ -44,7 +44,7 @@ import Outputable
 import Util
 import SrcLoc
 
-import Control.Monad( liftM )
+import Control.Monad
 \end{code}
 
 %************************************************************************
@@ -197,9 +197,9 @@ tcGRHSs :: TcMatchCtxt -> GRHSs Name -> (Refinement, BoxyRhoType)
 
 tcGRHSs ctxt (GRHSs grhss binds) res_ty
   = do	{ (binds', grhss') <- tcLocalBinds binds $
-			      mappM (wrapLocM (tcGRHS ctxt res_ty)) grhss
+			      mapM (wrapLocM (tcGRHS ctxt res_ty)) grhss
 
-	; returnM (GRHSs grhss' binds') }
+	; return (GRHSs grhss' binds') }
 
 -------------
 tcGRHS :: TcMatchCtxt -> (Refinement, BoxyRhoType) -> GRHS Name -> TcM (GRHS TcId)
