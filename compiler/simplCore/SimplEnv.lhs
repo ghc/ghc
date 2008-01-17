@@ -46,7 +46,7 @@ module SimplEnv (
 
 #include "HsVersions.h"
 
-import SimplMonad	
+import SimplMonad
 import IdInfo
 import CoreSyn
 import Rules
@@ -64,6 +64,7 @@ import Coercion
 import BasicTypes	
 import DynFlags
 import Util
+import MonadUtils
 import Outputable
 
 import Data.List
@@ -500,8 +501,8 @@ These functions are in the monad only so that they can be made strict via seq.
 \begin{code}
 simplBinders, simplLamBndrs
 	:: SimplEnv -> [InBndr] -> SimplM (SimplEnv, [OutBndr])
-simplBinders  env bndrs = mapAccumLSmpl simplBinder  env bndrs
-simplLamBndrs env bndrs = mapAccumLSmpl simplLamBndr env bndrs
+simplBinders  env bndrs = mapAccumLM simplBinder  env bndrs
+simplLamBndrs env bndrs = mapAccumLM simplLamBndr env bndrs
 
 -------------
 simplBinder :: SimplEnv -> InBndr -> SimplM (SimplEnv, OutBndr)
