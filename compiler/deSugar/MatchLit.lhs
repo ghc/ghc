@@ -66,26 +66,26 @@ See also below where we look for @DictApps@ for \tr{plusInt}, etc.
 
 \begin{code}
 dsLit :: HsLit -> DsM CoreExpr
-dsLit (HsStringPrim s) = returnDs (mkLit (MachStr s))
-dsLit (HsCharPrim c)   = returnDs (mkLit (MachChar c))
-dsLit (HsIntPrim i)    = returnDs (mkLit (MachInt i))
-dsLit (HsFloatPrim f)  = returnDs (mkLit (MachFloat f))
-dsLit (HsDoublePrim d) = returnDs (mkLit (MachDouble d))
+dsLit (HsStringPrim s) = return (mkLit (MachStr s))
+dsLit (HsCharPrim   c) = return (mkLit (MachChar c))
+dsLit (HsIntPrim    i) = return (mkLit (MachInt i))
+dsLit (HsFloatPrim  f) = return (mkLit (MachFloat f))
+dsLit (HsDoublePrim d) = return (mkLit (MachDouble d))
 
-dsLit (HsChar c)       = returnDs (mkCharExpr c)
+dsLit (HsChar c)       = return (mkCharExpr c)
 dsLit (HsString str)   = mkStringExprFS str
 dsLit (HsInteger i _)  = mkIntegerExpr i
-dsLit (HsInt i)	       = returnDs (mkIntExpr i)
+dsLit (HsInt i)	       = return (mkIntExpr i)
 
-dsLit (HsRat r ty)
-  = mkIntegerExpr (numerator r)		`thenDs` \ num ->
-    mkIntegerExpr (denominator r)	`thenDs` \ denom ->
-    returnDs (mkConApp ratio_data_con [Type integer_ty, num, denom])
+dsLit (HsRat r ty) = do
+   num   <- mkIntegerExpr (numerator r)
+   denom <- mkIntegerExpr (denominator r)
+   return (mkConApp ratio_data_con [Type integer_ty, num, denom])
   where
     (ratio_data_con, integer_ty) 
-	= case tcSplitTyConApp ty of
-		(tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
-				   (head (tyConDataCons tycon), i_ty)
+        = case tcSplitTyConApp ty of
+                (tycon, [i_ty]) -> ASSERT(isIntegerTy i_ty && tycon `hasKey` ratioTyConKey)
+                                   (head (tyConDataCons tycon), i_ty)
 
 dsOverLit :: HsOverLit Id -> DsM CoreExpr
 -- Post-typechecker, the SyntaxExpr field of an OverLit contains 
