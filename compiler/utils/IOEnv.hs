@@ -35,7 +35,7 @@ module IOEnv (
 
 import Panic		( try, tryUser, tryMost, Exception(..) )
 
-import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
+import Data.IORef	( IORef, newIORef, readIORef, writeIORef, modifyIORef )
 import System.IO.Unsafe	( unsafeInterleaveIO )
 import System.IO	( fixIO )
 import MonadUtils
@@ -130,20 +130,23 @@ unsafeInterleaveM (IOEnv m) = IOEnv (\ env -> unsafeInterleaveIO (m env))
 --	Accessing input/output
 ----------------------------------------------------------------------
 
+instance MonadIO (IOEnv env) where
+    liftIO io = IOEnv (\ env -> io)
+
 ioToIOEnv :: IO a -> IOEnv env a
 ioToIOEnv io = IOEnv (\ env -> io)
 
 newMutVar :: a -> IOEnv env (IORef a)
-newMutVar val = IOEnv (\ env -> newIORef val)
+newMutVar val = liftIO (newIORef val)
 
 writeMutVar :: IORef a -> a -> IOEnv env ()
-writeMutVar var val = IOEnv (\ env -> writeIORef var val)
+writeMutVar var val = liftIO (writeIORef var val)
 
 readMutVar :: IORef a -> IOEnv env a
-readMutVar var = IOEnv (\ env -> readIORef var)
+readMutVar var = liftIO (readIORef var)
 
-updMutVar :: IORef a -> (a->a) -> IOEnv env ()
-updMutVar var upd_fn = IOEnv (\ env -> do { v <- readIORef var; writeIORef var (upd_fn v) })
+updMutVar :: IORef a -> (a -> a) -> IOEnv env ()
+updMutVar var upd = liftIO (modifyIORef var upd)
 
 
 ----------------------------------------------------------------------
