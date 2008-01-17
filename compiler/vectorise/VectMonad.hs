@@ -58,7 +58,7 @@ import NameEnv
 import TysPrim       ( intPrimTy )
 import Module
 import IfaceEnv
-import IOEnv         ( ioToIOEnv )
+import IOEnv         ( liftIO )
 
 import DsMonad
 import PrelNames
@@ -503,7 +503,7 @@ initV hsc_env guts info p
         builtin_prs    <- initBuiltinPRs builtins
         builtin_boxed  <- initBuiltinBoxedTyCons builtins
 
-        eps <- ioToIOEnv $ hscEPS hsc_env
+        eps <- liftIO $ hscEPS hsc_env
         let famInstEnvs = (eps_fam_inst_env eps, mg_fam_inst_env guts)
             instEnvs    = (eps_inst_env     eps, mg_inst_env     guts)
 

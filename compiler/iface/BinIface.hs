@@ -54,7 +54,7 @@ import Control.Monad
 readBinIface :: FilePath -> TcRnIf a b ModIface
 readBinIface hi_path = do
   nc <- getNameCache
-  (new_nc, iface) <- ioToIOEnv $ readBinIface_ hi_path nc
+  (new_nc, iface) <- liftIO $ readBinIface_ hi_path nc
   setNameCache new_nc
   return iface
 

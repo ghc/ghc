@@ -28,7 +28,6 @@ module IOEnv (
 	tryM, tryAllM, tryMostM, fixM, 
 
 	-- I/O operations
-	ioToIOEnv,
 	IORef, newMutVar, readMutVar, writeMutVar, updMutVar
   ) where
 #include "HsVersions.h"
@@ -132,9 +131,6 @@ unsafeInterleaveM (IOEnv m) = IOEnv (\ env -> unsafeInterleaveIO (m env))
 
 instance MonadIO (IOEnv env) where
     liftIO io = IOEnv (\ env -> io)
-
-ioToIOEnv :: IO a -> IOEnv env a
-ioToIOEnv io = IOEnv (\ env -> io)
 
 newMutVar :: a -> IOEnv env (IORef a)
 newMutVar val = liftIO (newIORef val)
