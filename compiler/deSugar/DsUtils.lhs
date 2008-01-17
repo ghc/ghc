@@ -100,17 +100,17 @@ dsSyntaxTable :: SyntaxTable Id
 	       -> DsM ([CoreBind], 	-- Auxiliary bindings
 		       [(Name,Id)])	-- Maps the standard name to its value
 
-dsSyntaxTable rebound_ids
-  = mapAndUnzipDs mk_bind rebound_ids	`thenDs` \ (binds_s, prs) ->
+dsSyntaxTable rebound_ids = do
+    (binds_s, prs) <- mapAndUnzipM mk_bind rebound_ids
     return (concat binds_s, prs)
   where
-	-- The cheapo special case can happen when we 
-	-- make an intermediate HsDo when desugaring a RecStmt
+        -- The cheapo special case can happen when we 
+        -- make an intermediate HsDo when desugaring a RecStmt
     mk_bind (std_name, HsVar id) = return ([], (std_name, id))
-    mk_bind (std_name, expr)
- 	 = dsExpr expr				`thenDs` \ rhs ->
-     	   newSysLocalDs (exprType rhs)		`thenDs` \ id ->
-     	   return ([NonRec id rhs], (std_name, id))
+    mk_bind (std_name, expr) = do
+           rhs <- dsExpr expr
+           id <- newSysLocalDs (exprType rhs)
+           return ([NonRec id rhs], (std_name, id))
 
 lookupEvidence :: [(Name, Id)] -> Name -> Id
 lookupEvidence prs std_name
@@ -270,43 +270,41 @@ matchCanFail (MatchResult CanFail _)  = True
 matchCanFail (MatchResult CantFail _) = False
 
 alwaysFailMatchResult :: MatchResult
-alwaysFailMatchResult = MatchResult CanFail (\fail -> returnDs fail)
+alwaysFailMatchResult = MatchResult CanFail (\fail -> return fail)
 
 cantFailMatchResult :: CoreExpr -> MatchResult
-cantFailMatchResult expr = MatchResult CantFail (\_ -> returnDs expr)
+cantFailMatchResult expr = MatchResult CantFail (\_ -> return expr)
 
 extractMatchResult :: MatchResult -> CoreExpr -> DsM CoreExpr
 extractMatchResult (MatchResult CantFail match_fn) _
   = match_fn (error "It can't fail!")
 
-extractMatchResult (MatchResult CanFail match_fn) fail_expr
-  = mkFailurePair fail_expr	 	`thenDs` \ (fail_bind, if_it_fails) ->
-    match_fn if_it_fails		`thenDs` \ body ->
-    returnDs (mkDsLet fail_bind body)
+extractMatchResult (MatchResult CanFail match_fn) fail_expr = do
+    (fail_bind, if_it_fails) <- mkFailurePair fail_expr
+    body <- match_fn if_it_fails
+    return (mkDsLet fail_bind body)
 
 
 combineMatchResults :: MatchResult -> MatchResult -> MatchResult
 combineMatchResults (MatchResult CanFail      body_fn1)
-		    (MatchResult can_it_fail2 body_fn2)
+                    (MatchResult can_it_fail2 body_fn2)
   = MatchResult can_it_fail2 body_fn
   where
-    body_fn fail = body_fn2 fail			`thenDs` \ body2 ->
-		   mkFailurePair body2	 		`thenDs` \ (fail_bind, duplicatable_expr) ->
-		   body_fn1 duplicatable_expr		`thenDs` \ body1 ->
-		   returnDs (Let fail_bind body1)
+    body_fn fail = do body2 <- body_fn2 fail
+                      (fail_bind, duplicatable_expr) <- mkFailurePair body2
+                      body1 <- body_fn1 duplicatable_expr
+                      return (Let fail_bind body1)
 
 combineMatchResults match_result1@(MatchResult CantFail _) _
   = match_result1
 
 adjustMatchResult :: DsWrapper -> MatchResult -> MatchResult
 adjustMatchResult encl_fn (MatchResult can_it_fail body_fn)
-  = MatchResult can_it_fail (\fail -> body_fn fail	`thenDs` \ body ->
-				      returnDs (encl_fn body))
+  = MatchResult can_it_fail (\fail -> encl_fn <$> body_fn fail)
 
 adjustMatchResultDs :: (CoreExpr -> DsM CoreExpr) -> MatchResult -> MatchResult
 adjustMatchResultDs encl_fn (MatchResult can_it_fail body_fn)
-  = MatchResult can_it_fail (\fail -> body_fn fail	`thenDs` \ body ->
-				      encl_fn body)
+  = MatchResult can_it_fail (\fail -> encl_fn =<< body_fn fail)
 
 wrapBinds :: [(Var,Var)] -> CoreExpr -> CoreExpr
 wrapBinds [] e = e
@@ -337,8 +335,8 @@ mkEvalMatchResult var ty
 
 mkGuardedMatchResult :: CoreExpr -> MatchResult -> MatchResult
 mkGuardedMatchResult pred_expr (MatchResult _ body_fn)
-  = MatchResult CanFail (\fail -> body_fn fail	`thenDs` \ body ->
-				  returnDs (mkIfThenElse pred_expr body fail))
+  = MatchResult CanFail (\fail -> do body <- body_fn fail
+                                     return (mkIfThenElse pred_expr body fail))
 
 mkCoPrimCaseMatchResult :: Id				-- Scrutinee
                     -> Type                             -- Type of the case
@@ -347,13 +345,13 @@ mkCoPrimCaseMatchResult :: Id				-- Scrutinee
 mkCoPrimCaseMatchResult var ty match_alts
   = MatchResult CanFail mk_case
   where
-    mk_case fail
-      = mappM (mk_alt fail) sorted_alts		`thenDs` \ alts ->
-	returnDs (Case (Var var) var ty ((DEFAULT, [], fail) : alts))
+    mk_case fail = do
+        alts <- mapM (mk_alt fail) sorted_alts
+        return (Case (Var var) var ty ((DEFAULT, [], fail) : alts))
 
     sorted_alts = sortWith fst match_alts	-- Right order for a Case
-    mk_alt fail (lit, MatchResult _ body_fn) = body_fn fail	`thenDs` \ body ->
-					       returnDs (LitAlt lit, [], body)
+    mk_alt fail (lit, MatchResult _ body_fn) = do body <- body_fn fail
+                                                  return (LitAlt lit, [], body)
 
 
 mkCoAlgCaseMatchResult :: Id					-- Scrutinee
@@ -394,13 +392,13 @@ mkCoAlgCaseMatchResult var ty match_alts
     wild_var = mkWildId (idType var)
     sorted_alts  = sortWith get_tag match_alts
     get_tag (con, _, _) = dataConTag con
-    mk_case fail = mappM (mk_alt fail) sorted_alts	`thenDs` \ alts ->
-		   returnDs (Case (Var var) wild_var ty (mk_default fail ++ alts))
+    mk_case fail = do alts <- mapM (mk_alt fail) sorted_alts
+                      return (Case (Var var) wild_var ty (mk_default fail ++ alts))
 
-    mk_alt fail (con, args, MatchResult _ body_fn)
-	= body_fn fail				`thenDs` \ body ->
-	  newUniqueSupply			`thenDs` \ us ->
-	  returnDs (mkReboxingAlt (uniqsFromSupply us) con args body)
+    mk_alt fail (con, args, MatchResult _ body_fn) = do
+          body <- body_fn fail
+          us <- newUniqueSupply
+          return (mkReboxingAlt (uniqsFromSupply us) con args body)
 
     mk_default fail | exhaustive_case = []
 		    | otherwise       = [(DEFAULT, [], fail)]
@@ -439,10 +437,10 @@ mkCoAlgCaseMatchResult var ty match_alts
         _              -> panic "DsUtils: you may not mix `[:...:]' with `PArr' patterns"
     isPArrFakeAlts [] = panic "DsUtils: unexpectedly found an empty list of PArr fake alternatives"
     --
-    mk_parrCase fail = 		   
-      dsLookupGlobalId lengthPName			`thenDs` \lengthP  ->
-      unboxAlt						`thenDs` \alt      ->
-      returnDs (Case (len lengthP) (mkWildId intTy) ty [alt])
+    mk_parrCase fail = do
+      lengthP <- dsLookupGlobalId lengthPName
+      alt <- unboxAlt
+      return (Case (len lengthP) (mkWildId intTy) ty [alt])
       where
 	elemTy      = case splitTyConApp (idType var) of
 		        (_, [elemTy]) -> elemTy
@@ -450,11 +448,11 @@ mkCoAlgCaseMatchResult var ty match_alts
         panicMsg    = "DsUtils.mkCoAlgCaseMatchResult: not a parallel array?"
 	len lengthP = mkApps (Var lengthP) [Type elemTy, Var var]
 	--
-	unboxAlt = 
-	  newSysLocalDs intPrimTy			`thenDs` \l	   ->
-	  dsLookupGlobalId indexPName			`thenDs` \indexP   ->
-	  mappM (mkAlt indexP) sorted_alts              `thenDs` \alts     ->
-	  returnDs (DataAlt intDataCon, [l], (Case (Var l) wild ty (dft : alts)))
+	unboxAlt = do
+	  l      <- newSysLocalDs intPrimTy
+	  indexP <- dsLookupGlobalId indexPName
+	  alts   <- mapM (mkAlt indexP) sorted_alts
+	  return (DataAlt intDataCon, [l], (Case (Var l) wild ty (dft : alts)))
           where
 	    wild = mkWildId intPrimTy
 	    dft  = (DEFAULT, [], fail)
@@ -465,9 +463,9 @@ mkCoAlgCaseMatchResult var ty match_alts
 	-- constructor argument, which are bound to array elements starting
 	-- with the first
 	--
-	mkAlt indexP (con, args, MatchResult _ bodyFun) = 
-	  bodyFun fail					`thenDs` \body     ->
-	  returnDs (LitAlt lit, [], mkDsLets binds body)
+	mkAlt indexP (con, args, MatchResult _ bodyFun) = do
+	  body <- bodyFun fail
+	  return (LitAlt lit, [], mkDsLets binds body)
 	  where
 	    lit   = MachInt $ toInteger (dataConSourceArity con)
 	    binds = [NonRec arg (indexExpr i) | (i, arg) <- zip [1..] args]
@@ -488,14 +486,13 @@ mkErrorAppDs :: Id 		-- The error function
 	     -> String		-- The error message string to pass
 	     -> DsM CoreExpr
 
-mkErrorAppDs err_id ty msg
-  = getSrcSpanDs		`thenDs` \ src_loc ->
+mkErrorAppDs err_id ty msg = do
+    src_loc <- getSrcSpanDs
     let
-	full_msg = showSDoc (hcat [ppr src_loc, text "|", text msg])
-	core_msg = Lit (mkStringLit full_msg)
-	-- mkStringLit returns a result of type String#
-    in
-    returnDs (mkApps (Var err_id) [Type ty, core_msg])
+        full_msg = showSDoc (hcat [ppr src_loc, text "|", text msg])
+        core_msg = Lit (mkStringLit full_msg)
+        -- mkStringLit returns a result of type String#
+    return (mkApps (Var err_id) [Type ty, core_msg])
 \end{code}
 
 
@@ -516,35 +513,34 @@ mkIntExpr  i = mkConApp intDataCon  [mkIntLit i]
 mkCharExpr c = mkConApp charDataCon [mkLit (MachChar c)]
 
 mkIntegerExpr i
-  | inIntRange i  	-- Small enough, so start from an Int
-  = dsLookupDataCon  smallIntegerDataConName	`thenDs` \ integer_dc ->
-    returnDs (mkSmallIntegerLit integer_dc i)
+  | inIntRange i        -- Small enough, so start from an Int
+    = do integer_dc <- dsLookupDataCon  smallIntegerDataConName
+         return (mkSmallIntegerLit integer_dc i)
 
 -- Special case for integral literals with a large magnitude:
 -- They are transformed into an expression involving only smaller
 -- integral literals. This improves constant folding.
 
-  | otherwise 		-- Big, so start from a string
-  = dsLookupGlobalId plusIntegerName		`thenDs` \ plus_id ->
-    dsLookupGlobalId timesIntegerName		`thenDs` \ times_id ->
-    dsLookupDataCon  smallIntegerDataConName	`thenDs` \ integer_dc ->
-    let 
-	lit i = mkSmallIntegerLit integer_dc i
-        plus a b  = Var plus_id  `App` a `App` b
-        times a b = Var times_id `App` a `App` b
+  | otherwise = do       -- Big, so start from a string
+      plus_id <- dsLookupGlobalId plusIntegerName
+      times_id <- dsLookupGlobalId timesIntegerName
+      integer_dc <- dsLookupDataCon  smallIntegerDataConName
+      let
+           lit i = mkSmallIntegerLit integer_dc i
+           plus a b  = Var plus_id  `App` a `App` b
+           times a b = Var times_id `App` a `App` b
 
-	-- Transform i into (x1 + (x2 + (x3 + (...) * b) * b) * b) with abs xi <= b
-	horner :: Integer -> Integer -> CoreExpr
-	horner b i | abs q <= 1 = if r == 0 || r == i 
-				  then lit i 
-				  else lit r `plus` lit (i-r)
-	           | r == 0     =               horner b q `times` lit b
-	           | otherwise  = lit r `plus` (horner b q `times` lit b)
-  		   where
-		     (q,r) = i `quotRem` b
+           -- Transform i into (x1 + (x2 + (x3 + (...) * b) * b) * b) with abs xi <= b
+           horner :: Integer -> Integer -> CoreExpr
+           horner b i | abs q <= 1 = if r == 0 || r == i 
+                                     then lit i 
+                                     else lit r `plus` lit (i-r)
+                      | r == 0     =               horner b q `times` lit b
+                      | otherwise  = lit r `plus` (horner b q `times` lit b)
+                      where
+                        (q,r) = i `quotRem` b
 
-    in
-    returnDs (horner tARGET_MAX_INT i)
+      return (horner tARGET_MAX_INT i)
 
 mkSmallIntegerLit :: DataCon -> Integer -> CoreExpr
 mkSmallIntegerLit small_integer_data_con i = mkConApp small_integer_data_con [mkIntLit i]
@@ -553,21 +549,19 @@ mkStringExpr str = mkStringExprFS (mkFastString str)
 
 mkStringExprFS str
   | nullFS str
-  = returnDs (mkNilExpr charTy)
+  = return (mkNilExpr charTy)
 
   | lengthFS str == 1
-  = let
-	the_char = mkCharExpr (headFS str)
-    in
-    returnDs (mkConsExpr charTy the_char (mkNilExpr charTy))
+  = do let the_char = mkCharExpr (headFS str)
+       return (mkConsExpr charTy the_char (mkNilExpr charTy))
 
   | all safeChar chars
-  = dsLookupGlobalId unpackCStringName	`thenDs` \ unpack_id ->
-    returnDs (App (Var unpack_id) (Lit (MachStr str)))
+  = do unpack_id <- dsLookupGlobalId unpackCStringName
+       return (App (Var unpack_id) (Lit (MachStr str)))
 
   | otherwise
-  = dsLookupGlobalId unpackCStringUtf8Name	`thenDs` \ unpack_id ->
-    returnDs (App (Var unpack_id) (Lit (MachStr str)))
+  = do unpack_id <- dsLookupGlobalId unpackCStringUtf8Name
+       return (App (Var unpack_id) (Lit (MachStr str)))
 
   where
     chars = unpackFS str
@@ -603,63 +597,60 @@ mkSelectorBinds :: LPat Id	-- The pattern
 		-> DsM [(Id,CoreExpr)]
 
 mkSelectorBinds (L _ (VarPat v)) val_expr
-  = returnDs [(v, val_expr)]
+  = return [(v, val_expr)]
 
 mkSelectorBinds pat val_expr
-  | isSingleton binders || is_simple_lpat pat
-  = 	-- Given   p = e, where p binds x,y
-	-- we are going to make
-	--	v = p	(where v is fresh)
-	--	x = case v of p -> x
-	--	y = case v of p -> x
+  | isSingleton binders || is_simple_lpat pat = do
+        -- Given   p = e, where p binds x,y
+        -- we are going to make
+        --      v = p   (where v is fresh)
+        --      x = case v of p -> x
+        --      y = case v of p -> x
 
-	-- Make up 'v'
-	-- NB: give it the type of *pattern* p, not the type of the *rhs* e.
-	-- This does not matter after desugaring, but there's a subtle 
-	-- issue with implicit parameters. Consider
-	--	(x,y) = ?i
-	-- Then, ?i is given type {?i :: Int}, a PredType, which is opaque
-	-- to the desugarer.  (Why opaque?  Because newtypes have to be.  Why
-	-- does it get that type?  So that when we abstract over it we get the
-	-- right top-level type  (?i::Int) => ...)
-	--
-	-- So to get the type of 'v', use the pattern not the rhs.  Often more
-	-- efficient too.
-    newSysLocalDs (hsLPatType pat)	`thenDs` \ val_var ->
+        -- Make up 'v'
+        -- NB: give it the type of *pattern* p, not the type of the *rhs* e.
+        -- This does not matter after desugaring, but there's a subtle 
+        -- issue with implicit parameters. Consider
+        --      (x,y) = ?i
+        -- Then, ?i is given type {?i :: Int}, a PredType, which is opaque
+        -- to the desugarer.  (Why opaque?  Because newtypes have to be.  Why
+        -- does it get that type?  So that when we abstract over it we get the
+        -- right top-level type  (?i::Int) => ...)
+        --
+        -- So to get the type of 'v', use the pattern not the rhs.  Often more
+        -- efficient too.
+      val_var <- newSysLocalDs (hsLPatType pat)
 
-	-- For the error message we make one error-app, to avoid duplication.
-	-- But we need it at different types... so we use coerce for that
-    mkErrorAppDs iRREFUT_PAT_ERROR_ID 
-		 unitTy (showSDoc (ppr pat))	`thenDs` \ err_expr ->
-    newSysLocalDs unitTy			`thenDs` \ err_var ->
-    mappM (mk_bind val_var err_var) binders	`thenDs` \ binds ->
-    returnDs ( (val_var, val_expr) : 
-	       (err_var, err_expr) :
-	       binds )
+        -- For the error message we make one error-app, to avoid duplication.
+        -- But we need it at different types... so we use coerce for that
+      err_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID  unitTy (showSDoc (ppr pat))
+      err_var <- newSysLocalDs unitTy
+      binds <- mapM (mk_bind val_var err_var) binders
+      return ( (val_var, val_expr) : 
+               (err_var, err_expr) :
+               binds )
 
 
-  | otherwise
-  = mkErrorAppDs iRREFUT_PAT_ERROR_ID 
-		 tuple_ty (showSDoc (ppr pat))			`thenDs` \ error_expr ->
-    matchSimply val_expr PatBindRhs pat local_tuple error_expr	`thenDs` \ tuple_expr ->
-    newSysLocalDs tuple_ty					`thenDs` \ tuple_var ->
-    let
-	mk_tup_bind binder
-	  = (binder, mkTupleSelector binders binder tuple_var (Var tuple_var))
-    in
-    returnDs ( (tuple_var, tuple_expr) : map mk_tup_bind binders )
+  | otherwise = do
+      error_expr <- mkErrorAppDs iRREFUT_PAT_ERROR_ID   tuple_ty (showSDoc (ppr pat))
+      tuple_expr <- matchSimply val_expr PatBindRhs pat local_tuple error_expr
+      tuple_var <- newSysLocalDs tuple_ty
+      let
+          mk_tup_bind binder
+            = (binder, mkTupleSelector binders binder tuple_var (Var tuple_var))
+      return ( (tuple_var, tuple_expr) : map mk_tup_bind binders )
   where
-    binders	= collectPatBinders pat
+    binders     = collectPatBinders pat
     local_tuple = mkBigCoreVarTup binders
     tuple_ty    = exprType local_tuple
 
-    mk_bind scrut_var err_var bndr_var
+    mk_bind scrut_var err_var bndr_var = do
     -- (mk_bind sv err_var) generates
-    --		bv = case sv of { pat -> bv; other -> coerce (type-of-bv) err_var }
+    --          bv = case sv of { pat -> bv; other -> coerce (type-of-bv) err_var }
     -- Remember, pat binds bv
-      = matchSimply (Var scrut_var) PatBindRhs pat
-		    (Var bndr_var) error_expr			`thenDs` \ rhs_expr ->
-        returnDs (bndr_var, rhs_expr)
+        rhs_expr <- matchSimply (Var scrut_var) PatBindRhs pat
+                                (Var bndr_var) error_expr
+        return (bndr_var, rhs_expr)
       where
         error_expr = mkCoerce co (Var err_var)
         co         = mkUnsafeCoercion (exprType (Var err_var)) (idType bndr_var)
@@ -668,9 +659,9 @@ mkSelectorBinds pat val_expr
 
     is_simple_pat (TuplePat ps Boxed _)        = all is_triv_lpat ps
     is_simple_pat (ConPatOut{ pat_args = ps }) = all is_triv_lpat (hsConPatArgs ps)
-    is_simple_pat (VarPat _)	       	       = True
-    is_simple_pat (ParPat p)	     	       = is_simple_lpat p
-    is_simple_pat _	          	       	       = False
+    is_simple_pat (VarPat _)                   = True
+    is_simple_pat (ParPat p)                   = is_simple_lpat p
+    is_simple_pat _                                    = False
 
     is_triv_lpat p = is_triv_pat (unLoc p)
 
@@ -1003,15 +994,15 @@ mkFailurePair :: CoreExpr	-- Result type of the whole case expression
 		      CoreExpr)	-- Either the fail variable, or fail variable
 				-- applied to unit tuple
 mkFailurePair expr
-  | isUnLiftedType ty
-  = newFailLocalDs (unitTy `mkFunTy` ty)	`thenDs` \ fail_fun_var ->
-    newSysLocalDs unitTy			`thenDs` \ fail_fun_arg ->
-    returnDs (NonRec fail_fun_var (Lam fail_fun_arg expr),
-	      App (Var fail_fun_var) (Var unitDataConId))
+  | isUnLiftedType ty = do
+     fail_fun_var <- newFailLocalDs (unitTy `mkFunTy` ty)
+     fail_fun_arg <- newSysLocalDs unitTy
+     return (NonRec fail_fun_var (Lam fail_fun_arg expr),
+             App (Var fail_fun_var) (Var unitDataConId))
 
-  | otherwise
-  = newFailLocalDs ty 		`thenDs` \ fail_var ->
-    returnDs (NonRec fail_var expr, Var fail_var)
+  | otherwise = do
+     fail_var <- newFailLocalDs ty
+     return (NonRec fail_var expr, Var fail_var)
   where
     ty = exprType expr
 \end{code}
