@@ -51,12 +51,12 @@ import OccName
 import Outputable
 import SrcLoc		( Located(..), unLoc, noLoc )
 import DynFlags	( DynFlag(..) )
-import Maybes		( seqMaybe )
 import Maybe            ( isNothing )
-import Monad		( liftM, when )
 import BasicTypes       ( Boxity(..) )
 
 import ListSetOps    (findDupsEq, mkLookupFun)
+
+import Control.Monad
 \end{code}
 
 @rnSourceDecl@ `renames' declarations.
@@ -535,8 +535,8 @@ validRuleLhs foralls lhs
   where
     checkl (L loc e) = check e
 
-    check (OpApp e1 op _ e2)		  = checkl op `seqMaybe` checkl_e e1 `seqMaybe` checkl_e e2
-    check (HsApp e1 e2) 		  = checkl e1 `seqMaybe` checkl_e e2
+    check (OpApp e1 op _ e2)		  = checkl op `mplus` checkl_e e1 `mplus` checkl_e e2
+    check (HsApp e1 e2) 		  = checkl e1 `mplus` checkl_e e2
     check (HsVar v) | v `notElem` foralls = Nothing
     check other				  = Just other 	-- Failure
 
@@ -549,14 +549,14 @@ validRuleLhs foralls lhs
     check_e (HsLit e) 	  = Nothing
     check_e (HsOverLit e) = Nothing
 
-    check_e (OpApp e1 op _ e2) 	 = checkl_e e1 `seqMaybe` checkl_e op `seqMaybe` checkl_e e2
-    check_e (HsApp e1 e2)      	 = checkl_e e1 `seqMaybe` checkl_e e2
+    check_e (OpApp e1 op _ e2) 	 = checkl_e e1 `mplus` checkl_e op `mplus` checkl_e e2
+    check_e (HsApp e1 e2)      	 = checkl_e e1 `mplus` checkl_e e2
     check_e (NegApp e _)       	 = checkl_e e
     check_e (ExplicitList _ es)	 = checkl_es es
     check_e (ExplicitTuple es _) = checkl_es es
     check_e other		 = Just other	-- Fails
 
-    checkl_es es = foldr (seqMaybe . checkl_e) Nothing es
+    checkl_es es = foldr (mplus . checkl_e) Nothing es
 -}
 
 badRuleLhsErr name lhs bad_e

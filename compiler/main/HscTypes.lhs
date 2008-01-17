@@ -106,7 +106,7 @@ import BasicTypes	( Version, initialVersion, IPName,
 import IfaceSyn
 import FiniteMap	( FiniteMap )
 import CoreSyn		( CoreRule )
-import Maybes		( orElse, expectJust, catMaybes, seqMaybe )
+import Maybes		( orElse, expectJust, catMaybes )
 import Outputable
 import BreakArray
 import SrcLoc		( SrcSpan, Located )
@@ -120,6 +120,7 @@ import System.Time	( ClockTime )
 import Data.IORef
 import Data.Array       ( Array, array )
 import Data.List
+import Control.Monad    ( mplus )
 \end{code}
 
 
@@ -277,7 +278,7 @@ lookupIfaceByModule dflags hpt pit mod
 	-- in the HPT.  If it's not from the home package it's wrong to look
 	-- in the HPT, because the HPT is indexed by *ModuleName* not Module
     fmap hm_iface (lookupUFM hpt (moduleName mod)) 
-    `seqMaybe` lookupModuleEnv pit mod
+    `mplus` lookupModuleEnv pit mod
 
   | otherwise = lookupModuleEnv pit mod		-- Look in PIT only 
 

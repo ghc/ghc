@@ -60,6 +60,8 @@ import List
 import BasicTypes
 import Bag
 import FastString
+
+import Control.Monad
 \end{code}
 
 
@@ -552,7 +554,7 @@ isInstDecl (SigOrigin (ClsSkol _)) = False
 -- The renamer just puts the selector ID as the binder in the method binding
 -- but we must use the method name; so we substitute it here.  Crude but simple.
 find_bind sel_name meth_name binds
-  = foldlBag seqMaybe Nothing (mapBag f binds)
+  = foldlBag mplus Nothing (mapBag f binds)
   where 
 	f (L loc1 bind@(FunBind { fun_id = L loc2 op_name })) | op_name == sel_name
 		 = Just (L loc1 (bind { fun_id = L loc2 meth_name }))
