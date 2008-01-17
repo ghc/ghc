@@ -14,8 +14,7 @@
 module SimplMonad (
 	-- The monad
 	SimplM,
-	initSmpl, returnSmpl, thenSmpl, thenSmpl_,
-	mapSmpl, mapAndUnzipSmpl, mapAccumLSmpl,
+	initSmpl,
 	getDOptsSmpl, getRules, getFamEnvs,
 
         -- Unique supply
@@ -50,8 +49,6 @@ import FastTypes
 
 import Data.Array
 import Data.Array.Base (unsafeAt)
-
-infixr 0  `thenSmpl`, `thenSmpl_`
 \end{code}
 
 %************************************************************************
@@ -112,30 +109,11 @@ thenSmpl_ m k
   = SM (\st_env us0 sc0 ->
 	 case (unSM m st_env us0 sc0) of 
 		(_, us1, sc1) -> unSM k st_env us1 sc1)
-\end{code}
 
-
-\begin{code}
-mapSmpl	    	:: (a -> SimplM b) -> [a] -> SimplM [b]
-mapAndUnzipSmpl :: (a -> SimplM (b, c)) -> [a] -> SimplM ([b],[c])
-
-mapSmpl f [] = returnSmpl []
-mapSmpl f (x:xs)
-  = f x		    `thenSmpl` \ x'  ->
-    mapSmpl f xs    `thenSmpl` \ xs' ->
-    returnSmpl (x':xs')
-
-mapAndUnzipSmpl f [] = returnSmpl ([],[])
-mapAndUnzipSmpl f (x:xs)
-  = f x			    `thenSmpl` \ (r1,  r2)  ->
-    mapAndUnzipSmpl f xs    `thenSmpl` \ (rs1, rs2) ->
-    returnSmpl (r1:rs1, r2:rs2)
-
-mapAccumLSmpl :: (acc -> b -> SimplM (acc,c)) -> acc -> [b] -> SimplM (acc, [c])
-mapAccumLSmpl f acc []     = returnSmpl (acc, [])
-mapAccumLSmpl f acc (x:xs) = f acc x	`thenSmpl` \ (acc', x') ->
-			     mapAccumLSmpl f acc' xs	`thenSmpl` \ (acc'', xs') ->
-			     returnSmpl (acc'', x':xs')
+-- TODO: this specializing is not allowed
+{-# -- SPECIALIZE mapM         :: (a -> SimplM b) -> [a] -> SimplM [b] #-}
+{-# -- SPECIALIZE mapAndUnzipM :: (a -> SimplM (b, c)) -> [a] -> SimplM ([b],[c]) #-}
+{-# -- SPECIALIZE mapAccumLM   :: (acc -> b -> SimplM (acc,c)) -> acc -> [b] -> SimplM (acc, [c]) #-}
 \end{code}
 
 
