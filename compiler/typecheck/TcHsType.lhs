@@ -53,6 +53,8 @@ import BasicTypes
 import SrcLoc
 import UniqSupply
 import Outputable
+
+import Control.Monad
 \end{code}
 
 
@@ -149,7 +151,7 @@ tcHsSigType ctxt hs_ty
     do	{ kinded_ty <- kcTypeType hs_ty
 	; ty <- tcHsKindedType kinded_ty
 	; checkValidType ctxt ty	
-	; returnM ty }
+	; return ty }
 
 tcHsInstHead :: LHsType Name -> TcM ([TyVar], ThetaType, Type)
 -- Typecheck an instance head.  We can't use 
@@ -217,7 +219,7 @@ tcHsBangType ty 		      = tcHsKindedType ty
 tcHsKindedContext :: LHsContext Name -> TcM ThetaType
 -- Used when we are expecting a ClassContext (i.e. no implicit params)
 -- Does not do validity checking, like tcHsKindedType
-tcHsKindedContext hs_theta = addLocM (mappM dsHsLPred) hs_theta
+tcHsKindedContext hs_theta = addLocM (mapM dsHsLPred) hs_theta
 \end{code}
 
 
@@ -291,51 +293,51 @@ kcHsType ty = wrapLocFstM kc_hs_type ty
 --
 -- The translated type has explicitly-kinded type-variable binders
 
-kc_hs_type (HsParTy ty)
- = kcHsType ty		`thenM` \ (ty', kind) ->
-   returnM (HsParTy ty', kind)
+kc_hs_type (HsParTy ty) = do
+   (ty', kind) <- kcHsType ty
+   return (HsParTy ty', kind)
 
-kc_hs_type (HsTyVar name)
-  = kcTyVar name	`thenM` \ kind ->
-    returnM (HsTyVar name, kind)
+kc_hs_type (HsTyVar name) = do
+    kind <- kcTyVar name
+    return (HsTyVar name, kind)
 
-kc_hs_type (HsListTy ty) 
-  = kcLiftedType ty			`thenM` \ ty' ->
-    returnM (HsListTy ty', liftedTypeKind)
+kc_hs_type (HsListTy ty) = do
+    ty' <- kcLiftedType ty
+    return (HsListTy ty', liftedTypeKind)
 
-kc_hs_type (HsPArrTy ty)
-  = kcLiftedType ty			`thenM` \ ty' ->
-    returnM (HsPArrTy ty', liftedTypeKind)
+kc_hs_type (HsPArrTy ty) = do
+    ty' <- kcLiftedType ty
+    return (HsPArrTy ty', liftedTypeKind)
 
 kc_hs_type (HsNumTy n)
-   = returnM (HsNumTy n, liftedTypeKind)
+   = return (HsNumTy n, liftedTypeKind)
 
-kc_hs_type (HsKindSig ty k) 
-  = kcCheckHsType ty k	`thenM` \ ty' ->
-    returnM (HsKindSig ty' k, k)
+kc_hs_type (HsKindSig ty k) = do
+    ty' <- kcCheckHsType ty k
+    return (HsKindSig ty' k, k)
 
-kc_hs_type (HsTupleTy Boxed tys)
-  = mappM kcLiftedType tys	`thenM` \ tys' ->
-    returnM (HsTupleTy Boxed tys', liftedTypeKind)
+kc_hs_type (HsTupleTy Boxed tys) = do
+    tys' <- mapM kcLiftedType tys
+    return (HsTupleTy Boxed tys', liftedTypeKind)
 
-kc_hs_type (HsTupleTy Unboxed tys)
-  = mappM kcTypeType tys	`thenM` \ tys' ->
-    returnM (HsTupleTy Unboxed tys', ubxTupleKind)
+kc_hs_type (HsTupleTy Unboxed tys) = do
+    tys' <- mapM kcTypeType tys
+    return (HsTupleTy Unboxed tys', ubxTupleKind)
 
-kc_hs_type (HsFunTy ty1 ty2)
-  = kcCheckHsType ty1 argTypeKind	`thenM` \ ty1' ->
-    kcTypeType ty2			`thenM` \ ty2' ->
-    returnM (HsFunTy ty1' ty2', liftedTypeKind)
+kc_hs_type (HsFunTy ty1 ty2) = do
+    ty1' <- kcCheckHsType ty1 argTypeKind
+    ty2' <- kcTypeType ty2
+    return (HsFunTy ty1' ty2', liftedTypeKind)
 
-kc_hs_type ty@(HsOpTy ty1 op ty2)
-  = addLocM kcTyVar op			`thenM` \ op_kind ->
-    kcApps op_kind (ppr op) [ty1,ty2]	`thenM` \ ([ty1',ty2'], res_kind) ->
-    returnM (HsOpTy ty1' op ty2', res_kind)
+kc_hs_type ty@(HsOpTy ty1 op ty2) = do
+    op_kind <- addLocM kcTyVar op
+    ([ty1',ty2'], res_kind) <- kcApps op_kind (ppr op) [ty1,ty2]
+    return (HsOpTy ty1' op ty2', res_kind)
 
-kc_hs_type ty@(HsAppTy ty1 ty2)
-  = kcHsType fun_ty			  `thenM` \ (fun_ty', fun_kind) ->
-    kcApps fun_kind (ppr fun_ty) arg_tys  `thenM` \ ((arg_ty':arg_tys'), res_kind) ->
-    returnM (foldl mk_app (HsAppTy fun_ty' arg_ty') arg_tys', res_kind)
+kc_hs_type ty@(HsAppTy ty1 ty2) = do
+    (fun_ty', fun_kind) <- kcHsType fun_ty
+    ((arg_ty':arg_tys'), res_kind) <- kcApps fun_kind (ppr fun_ty) arg_tys
+    return (foldl mk_app (HsAppTy fun_ty' arg_ty') arg_tys', res_kind)
   where
     (fun_ty, arg_tys) = split ty1 [ty2]
     split (L _ (HsAppTy f a)) as = split f (a:as)
@@ -347,12 +349,12 @@ kc_hs_type ty@(HsAppTy ty1 ty2)
 kc_hs_type ty@(HsPredTy (HsEqualP _ _))
   = wrongEqualityErr
 
-kc_hs_type (HsPredTy pred)
-  = kcHsPred pred		`thenM` \ pred' ->
-    returnM (HsPredTy pred', liftedTypeKind)
+kc_hs_type (HsPredTy pred) = do
+    pred' <- kcHsPred pred
+    return (HsPredTy pred', liftedTypeKind)
 
 kc_hs_type (HsForAllTy exp tv_names context ty)
-  = kcHsTyVars tv_names		$ \ tv_names' ->
+  = kcHsTyVars tv_names         $ \ tv_names' ->
     do	{ ctxt' <- kcHsContext context
 	; ty'   <- kcLiftedType ty
 	     -- The body of a forall is usually a type, but in principle
@@ -366,9 +368,9 @@ kc_hs_type (HsForAllTy exp tv_names context ty)
 
   	; return (HsForAllTy exp tv_names' ctxt' ty', liftedTypeKind) }
 
-kc_hs_type (HsBangTy b ty)
-  = do { (ty', kind) <- kcHsType ty
-       ; return (HsBangTy b ty', kind) }
+kc_hs_type (HsBangTy b ty) = do
+    (ty', kind) <- kcHsType ty
+    return (HsBangTy b ty', kind)
 
 kc_hs_type ty@(HsSpliceTy _)
   = failWithTc (ptext SLIT("Unexpected type splice:") <+> ppr ty)
@@ -383,17 +385,17 @@ kcApps :: TcKind			-- Function kind
        -> SDoc				-- Function 
        -> [LHsType Name]		-- Arg types
        -> TcM ([LHsType Name], TcKind)	-- Kind-checked args
-kcApps fun_kind ppr_fun args
-  = split_fk fun_kind (length args)	`thenM` \ (arg_kinds, res_kind) ->
-    zipWithM kc_arg args arg_kinds	`thenM` \ args' ->
-    returnM (args', res_kind)
+kcApps fun_kind ppr_fun args = do
+    (arg_kinds, res_kind) <- split_fk fun_kind (length args)
+    args' <- zipWithM kc_arg args arg_kinds
+    return (args', res_kind)
   where
-    split_fk fk 0 = returnM ([], fk)
-    split_fk fk n = unifyFunKind fk	`thenM` \ mb_fk ->
-		    case mb_fk of 
-			Nothing       -> failWithTc too_many_args 
-			Just (ak,fk') -> split_fk fk' (n-1)	`thenM` \ (aks, rk) ->
-					 returnM (ak:aks, rk)
+    split_fk fk 0 = return ([], fk)
+    split_fk fk n = do mb_fk <- unifyFunKind fk
+                       case mb_fk of
+                          Nothing       -> failWithTc too_many_args 
+                          Just (ak,fk') -> do (aks, rk) <- split_fk fk' (n-1)
+                                              return (ak:aks, rk)
 
     kc_arg arg arg_kind = kcCheckHsType arg arg_kind
 
@@ -402,16 +404,16 @@ kcApps fun_kind ppr_fun args
 
 ---------------------------
 kcHsContext :: LHsContext Name -> TcM (LHsContext Name)
-kcHsContext ctxt = wrapLocM (mappM kcHsLPred) ctxt
+kcHsContext ctxt = wrapLocM (mapM kcHsLPred) ctxt
 
 kcHsLPred :: LHsPred Name -> TcM (LHsPred Name)
 kcHsLPred = wrapLocM kcHsPred
 
 kcHsPred :: HsPred Name -> TcM (HsPred Name)
-kcHsPred pred	-- Checks that the result is of kind liftedType
-  = kc_pred pred				`thenM` \ (pred', kind) ->
-    checkExpectedKind pred kind liftedTypeKind	`thenM_` 
-    returnM pred'
+kcHsPred pred = do	-- Checks that the result is of kind liftedType
+    (pred', kind) <- kc_pred pred
+    checkExpectedKind pred kind liftedTypeKind
+    return pred'
     
 ---------------------------
 kc_pred :: HsPred Name -> TcM (HsPred Name, TcKind)	
@@ -419,12 +421,12 @@ kc_pred :: HsPred Name -> TcM (HsPred Name, TcKind)
 	-- application (reason: used from TcDeriv)
 kc_pred pred@(HsIParam name ty)
   = do { (ty', kind) <- kcHsType ty
-       ; returnM (HsIParam name ty', kind)
+       ; return (HsIParam name ty', kind)
        }
 kc_pred pred@(HsClassP cls tys)
   = do { kind <- kcClass cls
        ; (tys', res_kind) <- kcApps kind (ppr cls) tys
-       ; returnM (HsClassP cls tys', res_kind)
+       ; return (HsClassP cls tys', res_kind)
        }
 kc_pred pred@(HsEqualP ty1 ty2)
   = do { (ty1', kind1) <- kcHsType ty1
@@ -432,28 +434,28 @@ kc_pred pred@(HsEqualP ty1 ty2)
        ; (ty2', kind2) <- kcHsType ty2
 --       ; checkExpectedKind ty2 kind2 liftedTypeKind
        ; checkExpectedKind ty2 kind2 kind1
-       ; returnM (HsEqualP ty1' ty2', liftedTypeKind)
+       ; return (HsEqualP ty1' ty2', liftedTypeKind)
        }
 
 ---------------------------
 kcTyVar :: Name -> TcM TcKind
-kcTyVar name	-- Could be a tyvar or a tycon
-  = traceTc (text "lk1" <+> ppr name) 	`thenM_`
-    tcLookup name	`thenM` \ thing ->
-    traceTc (text "lk2" <+> ppr name <+> ppr thing) 	`thenM_`
+kcTyVar name = do	-- Could be a tyvar or a tycon
+    traceTc (text "lk1" <+> ppr name)
+    thing <- tcLookup name
+    traceTc (text "lk2" <+> ppr name <+> ppr thing)
     case thing of 
-	ATyVar _ ty	    	-> returnM (typeKind ty)
-	AThing kind		-> returnM kind
-	AGlobal (ATyCon tc) 	-> returnM (tyConKind tc) 
-	other			-> wrongThingErr "type" thing name
+        ATyVar _ ty             -> return (typeKind ty)
+        AThing kind             -> return kind
+        AGlobal (ATyCon tc)     -> return (tyConKind tc)
+        other                   -> wrongThingErr "type" thing name
 
 kcClass :: Name -> TcM TcKind
-kcClass cls	-- Must be a class
-  = tcLookup cls 				`thenM` \ thing -> 
+kcClass cls = do	-- Must be a class
+    thing <- tcLookup cls
     case thing of
-	AThing kind		-> returnM kind
-	AGlobal (AClass cls)    -> returnM (tyConKind (classTyCon cls))
-	other		        -> wrongThingErr "class" thing cls
+        AThing kind             -> return kind
+        AGlobal (AClass cls)    -> return (tyConKind (classTyCon cls))
+        other                   -> wrongThingErr "class" thing cls
 \end{code}
 
 
@@ -490,57 +492,57 @@ ds_type ty@(HsBangTy _ _)	-- No bangs should be here
 ds_type (HsKindSig ty k)
   = dsHsType ty	-- Kind checking done already
 
-ds_type (HsListTy ty)
-  = dsHsType ty			`thenM` \ tau_ty ->
-    checkWiredInTyCon listTyCon	`thenM_`
-    returnM (mkListTy tau_ty)
+ds_type (HsListTy ty) = do
+    tau_ty <- dsHsType ty
+    checkWiredInTyCon listTyCon
+    return (mkListTy tau_ty)
 
-ds_type (HsPArrTy ty)
-  = dsHsType ty			`thenM` \ tau_ty ->
-    checkWiredInTyCon parrTyCon	`thenM_`
-    returnM (mkPArrTy tau_ty)
+ds_type (HsPArrTy ty) = do
+    tau_ty <- dsHsType ty
+    checkWiredInTyCon parrTyCon
+    return (mkPArrTy tau_ty)
 
-ds_type (HsTupleTy boxity tys)
-  = dsHsTypes tys		`thenM` \ tau_tys ->
-    checkWiredInTyCon tycon	`thenM_`
-    returnM (mkTyConApp tycon tau_tys)
+ds_type (HsTupleTy boxity tys) = do
+    tau_tys <- dsHsTypes tys
+    checkWiredInTyCon tycon
+    return (mkTyConApp tycon tau_tys)
   where
     tycon = tupleTyCon boxity (length tys)
 
-ds_type (HsFunTy ty1 ty2)
-  = dsHsType ty1			`thenM` \ tau_ty1 ->
-    dsHsType ty2			`thenM` \ tau_ty2 ->
-    returnM (mkFunTy tau_ty1 tau_ty2)
+ds_type (HsFunTy ty1 ty2) = do
+    tau_ty1 <- dsHsType ty1
+    tau_ty2 <- dsHsType ty2
+    return (mkFunTy tau_ty1 tau_ty2)
 
-ds_type (HsOpTy ty1 (L span op) ty2)
-  = dsHsType ty1 		`thenM` \ tau_ty1 ->
-    dsHsType ty2 		`thenM` \ tau_ty2 ->
+ds_type (HsOpTy ty1 (L span op) ty2) = do
+    tau_ty1 <- dsHsType ty1
+    tau_ty2 <- dsHsType ty2
     setSrcSpan span (ds_var_app op [tau_ty1,tau_ty2])
 
 ds_type (HsNumTy n)
-  = ASSERT(n==1)
-    tcLookupTyCon genUnitTyConName	`thenM` \ tc ->
-    returnM (mkTyConApp tc [])
+  = ASSERT(n==1) do
+    tc <- tcLookupTyCon genUnitTyConName
+    return (mkTyConApp tc [])
 
 ds_type ty@(HsAppTy _ _)
   = ds_app ty []
 
-ds_type (HsPredTy pred)
-  = dsHsPred pred	`thenM` \ pred' ->
-    returnM (mkPredTy pred')
+ds_type (HsPredTy pred) = do
+    pred' <- dsHsPred pred
+    return (mkPredTy pred')
 
 ds_type full_ty@(HsForAllTy exp tv_names ctxt ty)
-  = tcTyVarBndrs tv_names		$ \ tyvars ->
-    mappM dsHsLPred (unLoc ctxt)	`thenM` \ theta ->
-    dsHsType ty				`thenM` \ tau ->
-    returnM (mkSigmaTy tyvars theta tau)
+  = tcTyVarBndrs tv_names               $ \ tyvars -> do
+    theta <- mapM dsHsLPred (unLoc ctxt)
+    tau <- dsHsType ty
+    return (mkSigmaTy tyvars theta tau)
 
 ds_type (HsSpliceTy {}) = panic "ds_type: HsSpliceTy"
 
 ds_type (HsDocTy ty _)  -- Remove the doc comment
   = dsHsType ty
 
-dsHsTypes arg_tys = mappM dsHsType arg_tys
+dsHsTypes arg_tys = mapM dsHsType arg_tys
 \end{code}
 
 Help functions for type applications
@@ -551,19 +553,19 @@ ds_app :: HsType Name -> [LHsType Name] -> TcM Type
 ds_app (HsAppTy ty1 ty2) tys
   = ds_app (unLoc ty1) (ty2:tys)
 
-ds_app ty tys
-  = dsHsTypes tys			`thenM` \ arg_tys ->
+ds_app ty tys = do
+    arg_tys <- dsHsTypes tys
     case ty of
 	HsTyVar fun -> ds_var_app fun arg_tys
-	other	    -> ds_type ty		`thenM` \ fun_ty ->
-		       returnM (mkAppTys fun_ty arg_tys)
+	other	    -> do fun_ty <- ds_type ty
+                          return (mkAppTys fun_ty arg_tys)
 
 ds_var_app :: Name -> [Type] -> TcM Type
-ds_var_app name arg_tys 
- = tcLookup name			`thenM` \ thing ->
+ds_var_app name arg_tys = do
+    thing <- tcLookup name
     case thing of
-	ATyVar _ ty 	    -> returnM (mkAppTys ty arg_tys)
-	AGlobal (ATyCon tc) -> returnM (mkTyConApp tc arg_tys)
+	ATyVar _ ty 	    -> return (mkAppTys ty arg_tys)
+	AGlobal (ATyCon tc) -> return (mkTyConApp tc arg_tys)
 	other		    -> wrongThingErr "type" thing name
 \end{code}
 
@@ -578,16 +580,16 @@ dsHsLPred pred = dsHsPred (unLoc pred)
 dsHsPred pred@(HsClassP class_name tys)
   = do { arg_tys <- dsHsTypes tys
        ; clas <- tcLookupClass class_name
-       ; returnM (ClassP clas arg_tys)
+       ; return (ClassP clas arg_tys)
        }
 dsHsPred pred@(HsEqualP ty1 ty2)
   = do { arg_ty1 <- dsHsType ty1
        ; arg_ty2 <- dsHsType ty2
-       ; returnM (EqPred arg_ty1 arg_ty2)
+       ; return (EqPred arg_ty1 arg_ty2)
        }
 dsHsPred (HsIParam name ty)
   = do { arg_ty <- dsHsType ty
-       ; returnM (IParam name arg_ty)
+       ; return (IParam name arg_ty)
        }
 \end{code}
 
@@ -638,15 +640,14 @@ kcHsTyVars :: [LHsTyVarBndr Name]
 	   -> ([LHsTyVarBndr Name] -> TcM r) 	-- These binders are kind-annotated
 						-- They scope over the thing inside
 	   -> TcM r
-kcHsTyVars tvs thing_inside 
-  = mappM (wrapLocM kcHsTyVar) tvs	`thenM` \ bndrs ->
+kcHsTyVars tvs thing_inside  = do
+    bndrs <- mapM (wrapLocM kcHsTyVar) tvs
     tcExtendKindEnvTvs bndrs (thing_inside bndrs)
 
 kcHsTyVar :: HsTyVarBndr Name -> TcM (HsTyVarBndr Name)
 	-- Return a *kind-annotated* binder, and a tyvar with a mutable kind in it	
-kcHsTyVar (UserTyVar name)        = newKindVar 	`thenM` \ kind ->
-				    returnM (KindedTyVar name kind)
-kcHsTyVar (KindedTyVar name kind) = returnM (KindedTyVar name kind)
+kcHsTyVar (UserTyVar name)        = KindedTyVar name <$> newKindVar
+kcHsTyVar (KindedTyVar name kind) = return (KindedTyVar name kind)
 
 ------------------
 tcTyVarBndrs :: [LHsTyVarBndr Name] 	-- Kind-annotated binders, which need kind-zonking
@@ -654,8 +655,8 @@ tcTyVarBndrs :: [LHsTyVarBndr Name] 	-- Kind-annotated binders, which need kind-
 	     -> TcM r
 -- Used when type-checking types/classes/type-decls
 -- Brings into scope immutable TyVars, not mutable ones that require later zonking
-tcTyVarBndrs bndrs thing_inside
-  = mapM (zonk . unLoc) bndrs	`thenM` \ tyvars ->
+tcTyVarBndrs bndrs thing_inside = do
+    tyvars <- mapM (zonk . unLoc) bndrs
     tcExtendTyVarEnv tyvars (thing_inside tyvars)
   where
     zonk (KindedTyVar name kind) = do { kind' <- zonkTcKindToKind kind
