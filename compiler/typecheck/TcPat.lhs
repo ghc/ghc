@@ -386,6 +386,9 @@ tc_pat pstate lpat@(LazyPat pat) pat_ty thing_inside
 
 	; return (LazyPat pat', [], res) }
 
+tc_pat _ p@(QuasiQuotePat _) _ _
+  = pprPanic "Should never see QuasiQuotePat in type checker" (ppr p)
+
 tc_pat pstate (WildPat _) pat_ty thing_inside
   = do	{ pat_ty' <- unBoxWildCardType pat_ty	-- Make sure it's filled in with monotypes
 	; res <- thing_inside pstate

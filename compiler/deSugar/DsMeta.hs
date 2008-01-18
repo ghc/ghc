@@ -22,8 +22,9 @@
 
 module DsMeta( dsBracket, 
 	       templateHaskellNames, qTyConName, nameTyConName,
-	       liftName, expQTyConName, decQTyConName, typeQTyConName,
-	       decTyConName, typeTyConName, mkNameG_dName, mkNameG_vName, mkNameG_tcName
+	       liftName, expQTyConName, patQTyConName, decQTyConName, typeQTyConName,
+	       decTyConName, typeTyConName, mkNameG_dName, mkNameG_vName, mkNameG_tcName,
+	       quoteExpName, quotePatName
 	        ) where
 
 #include "HsVersions.h"
@@ -1425,11 +1426,15 @@ templateHaskellNames = [
     decQTyConName, conQTyConName, strictTypeQTyConName,
     varStrictTypeQTyConName, typeQTyConName, expTyConName, decTyConName,
     typeTyConName, matchTyConName, clauseTyConName, patQTyConName,
-    fieldPatQTyConName, fieldExpQTyConName, funDepTyConName]
+    fieldPatQTyConName, fieldExpQTyConName, funDepTyConName,
+
+    -- Quasiquoting
+    quoteExpName, quotePatName]
 
 thSyn :: Module
 thSyn = mkTHModule FSLIT("Language.Haskell.TH.Syntax")
 thLib = mkTHModule FSLIT("Language.Haskell.TH.Lib")
+qqLib = mkTHModule FSLIT("Language.Haskell.TH.Quote")
 
 mkTHModule m = mkModule thPackageId (mkModuleNameFS m)
 
@@ -1437,6 +1442,7 @@ libFun = mk_known_key_name OccName.varName thLib
 libTc  = mk_known_key_name OccName.tcName  thLib
 thFun  = mk_known_key_name OccName.varName thSyn
 thTc   = mk_known_key_name OccName.tcName  thSyn
+qqFun  = mk_known_key_name OccName.varName qqLib
 
 -------------------- TH.Syntax -----------------------
 qTyConName        = thTc FSLIT("Q")            qTyConKey
@@ -1603,6 +1609,10 @@ fieldExpQTyConName      = libTc FSLIT("FieldExpQ")      fieldExpQTyConKey
 patQTyConName           = libTc FSLIT("PatQ")           patQTyConKey
 fieldPatQTyConName      = libTc FSLIT("FieldPatQ")      fieldPatQTyConKey
 
+-- quasiquoting
+quoteExpName	    = qqFun FSLIT("quoteExp") quoteExpKey
+quotePatName	    = qqFun FSLIT("quotePat") quotePatKey
+
 --	TyConUniques available: 100-129
 -- 	Check in PrelNames if you want to change this
 
@@ -1768,4 +1778,8 @@ threadsafeIdKey = mkPreludeMiscIdUnique 307
 
 -- data FunDep = ...
 funDepIdKey = mkPreludeMiscIdUnique 320
+
+-- quasiquoting
+quoteExpKey = mkPreludeMiscIdUnique 321
+quotePatKey = mkPreludeMiscIdUnique 322
 

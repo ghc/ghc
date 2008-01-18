@@ -44,7 +44,7 @@ import RnEnv		( lookupLocatedBndrRn,
                           bindLocatedLocalsFV, bindLocalNames, bindLocalNamesFV,
                           bindLocalNamesFV_WithFixities,
                           bindLocatedLocalsRn,
-                          checkDupNames, checkShadowing
+                          checkDupAndShadowedRdrNames
 			)
 import DynFlags	( DynFlag(..) )
 import HscTypes		(FixItem(..))
@@ -282,8 +282,7 @@ rnValBindsLHSFromDoc_Local boundNames doc fix_env binds = do
      -- Do error checking: we need to check for dups here because we
      -- don't don't bind all of the variables from the ValBinds at once
      -- with bindLocatedLocals any more.
-     checkDupNames  doc boundNames
-     checkShadowing doc boundNames   
+     checkDupAndShadowedRdrNames doc boundNames
 
      -- (Note that we don't want to do this at the top level, since
      -- sorting out duplicates and shadowing there happens elsewhere.

@@ -1,4 +1,6 @@
 module HsPat where
 
+data HsQuasiQuote i = HsQuasiQuote i i SrcSpan FastString
+
 data Pat i
 type LPat i = SrcLoc.Located (Pat i)

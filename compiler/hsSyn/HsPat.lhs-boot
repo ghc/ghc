@@ -1,6 +1,9 @@
 \begin{code}
 module HsPat where
-import SrcLoc( Located )
+import SrcLoc( Located, SrcSpan )
+import FastString ( FastString )
+
+data HsQuasiQuote i = HsQuasiQuote i i SrcSpan FastString
 
 data Pat i
 type LPat i = Located (Pat i)

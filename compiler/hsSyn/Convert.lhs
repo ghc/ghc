@@ -13,7 +13,7 @@ This module converts Template Haskell syntax into HsSyn
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module Convert( convertToHsExpr, convertToHsDecls, 
+module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
                 convertToHsType, thRdrName ) where
 
 #include "HsVersions.h"
@@ -57,6 +57,13 @@ convertToHsExpr loc e
 	Left msg  -> Left (msg $$ (ptext SLIT("When converting TH expression")
 				    <+> text (show e)))
 	Right res -> Right res
+
+convertToPat :: SrcSpan -> TH.Pat -> Either Message (LPat RdrName)
+convertToPat loc e
+  = case initCvt loc (cvtPat e) of
+        Left msg  -> Left (msg $$ (ptext SLIT("When converting TH pattern")
+                                    <+> text (show e)))
+        Right res -> Right res
 
 convertToHsType :: SrcSpan -> TH.Type -> Either Message (LHsType RdrName)
 convertToHsType loc t = initCvt loc (cvtType t)

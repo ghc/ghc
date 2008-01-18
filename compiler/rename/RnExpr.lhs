@@ -23,6 +23,10 @@ module RnExpr (
 
 #include "HsVersions.h"
 
+#ifdef GHCI
+import {-# SOURCE #-} TcSplice( runQuasiQuoteExpr )
+#endif 	/* GHCI */
+
 import RnSource  ( rnSrcDecls, rnSplice, checkTH ) 
 import RnBinds   ( rnLocalBindsAndThen, rnValBindsLHS, rnValBindsRHS,
                    rnMatchGroup, makeMiniFixityEnv) 
@@ -33,7 +37,7 @@ import HscTypes         ( availNames )
 import RnNames		( getLocalDeclBinders, extendRdrEnvRn )
 import RnTypes		( rnHsTypeFVs, 
 			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec)
-import RnPat            (rnOverLit, rnPatsAndThen_LocalRightwards, rnBindPat, 
+import RnPat            (rnQuasiQuote, rnOverLit, rnPatsAndThen_LocalRightwards, rnBindPat,
                          localRecNameMaker, rnLit,
 			 rnHsRecFields_Con, rnHsRecFields_Update, checkTupSize)
 import RdrName      ( mkRdrUnqual )
@@ -174,6 +178,16 @@ rnExpr e@(HsBracket br_body)
 rnExpr e@(HsSpliceE splice)
   = rnSplice splice 		`thenM` \ (splice', fvs) ->
     returnM (HsSpliceE splice', fvs)
+
+#ifndef GHCI
+rnExpr e@(HsQuasiQuoteE _) = pprPanic "Cant do quasiquotation without GHCi" (ppr e)
+#else
+rnExpr e@(HsQuasiQuoteE qq)
+  = rnQuasiQuote qq 		`thenM` \ (qq', fvs_qq) ->
+    runQuasiQuoteExpr qq'	`thenM` \ (L _ expr') ->
+    rnExpr expr'		`thenM` \ (expr'', fvs_expr) ->
+    returnM (expr'', fvs_qq `plusFV` fvs_expr)
+#endif 	/* GHCI */
 
 rnExpr section@(SectionL expr op)
   = rnLExpr expr	 	`thenM` \ (expr', fvs_expr) ->
@@ -958,7 +972,7 @@ rn_rec_stmts_lhs fix_env stmts =
      -- First do error checking: we need to check for dups here because we
      -- don't bind all of the variables from the Stmt at once
      -- with bindLocatedLocals.
-     checkDupNames doc boundNames
+     checkDupRdrNames doc boundNames
      mappM (rn_rec_stmt_lhs fix_env) stmts `thenM` \ ls -> returnM (concat ls)
 
 

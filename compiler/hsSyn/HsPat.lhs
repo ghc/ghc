@@ -19,6 +19,8 @@ module HsPat (
 	HsConPatDetails, hsConPatArgs, 
 	HsRecFields(..), HsRecField(..), hsRecFields,
 
+	HsQuasiQuote(..),
+
 	mkPrefixConPat, mkCharLitPat, mkNilPat, mkCoPat, mkCoPatCoI,
 
 	isBangHsBind,	
@@ -46,6 +48,7 @@ import TyCon
 import Outputable	
 import Type
 import SrcLoc
+import FastString
 \end{code}
 
 
@@ -112,6 +115,10 @@ data Pat id
                   PostTcType        -- The overall type of the pattern
                                     -- (= the argument type of the view function)
                                     -- for hsPatType.
+
+	------------ Quasiquoted patterns ---------------
+	-- See Note [Quasi-quote overview] in TcSplice
+  | QuasiQuotePat   (HsQuasiQuote id)
 
 	------------ Literal and n+k patterns ---------------
   | LitPat	    HsLit		-- Used for *non-overloaded* literal patterns:
@@ -200,6 +207,14 @@ hsRecFields :: HsRecFields id arg -> [id]
 hsRecFields rbinds = map (unLoc . hsRecFieldId) (rec_flds rbinds)
 \end{code}
 
+\begin{code}
+data HsQuasiQuote id = HsQuasiQuote 
+		       id
+		       id
+		       SrcSpan
+		       FastString
+\end{code}
+
 
 %************************************************************************
 %*									*
@@ -247,6 +262,10 @@ pprPat (LitPat s)	      = ppr s
 pprPat (NPat l Nothing  _)  = ppr l
 pprPat (NPat l (Just _) _)  = char '-' <> ppr l
 pprPat (NPlusKPat n k _ _)    = hcat [ppr n, char '+', ppr k]
+pprPat (QuasiQuotePat (HsQuasiQuote name quoter _ quote)) 
+    = char '$' <> brackets (ppr name) <>
+      ptext SLIT("[:") <> ppr quoter <> ptext SLIT("|") <>
+      ppr quote <> ptext SLIT("|]")
 pprPat (TypePat ty)	      = ptext SLIT("{|") <> ppr ty <> ptext SLIT("|}")
 pprPat (CoPat co pat _)	      = parens (pprHsWrapper (ppr pat) co)
 pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty

@@ -30,6 +30,9 @@ module RnPat (-- main entry points
 	      -- Literals
 	      rnLit, rnOverLit,     
 
+	      -- Quasiquotation
+	      rnQuasiQuote,
+
              -- Pattern Error messages that are also used elsewhere
              checkTupSize, patSigErr
              ) where
@@ -37,6 +40,9 @@ module RnPat (-- main entry points
 -- ENH: thin imports to only what is necessary for patterns
 
 import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts)
+#ifdef GHCI
+import {-# SOURCE #-} TcSplice( runQuasiQuotePat )
+#endif 	/* GHCI */
 
 #include "HsVersions.h"
 
@@ -57,12 +63,15 @@ import PrelNames	( thFAKE, hasKey, assertIdKey, assertErrorName,
                         eqClassName, integralClassName, geName, eqName,
 		  	  negateName, minusName, lengthPName, indexPName,
 			  plusIntegerName, fromIntegerName, timesIntegerName,
-			  ratioDataConName, fromRationalName, fromStringName )
+			  ratioDataConName, fromRationalName, fromStringName, mkUnboundName )
 import Constants	( mAX_TUPLE_SIZE )
-import Name		( Name, nameOccName, nameIsLocalOrFrom, getOccName, nameSrcSpan )
+import Name		( Name, nameOccName, nameModule_maybe, getOccName, nameSrcSpan )
+import OccName		( occEnvElts )
 import NameSet
 import UniqFM
-import RdrName        ( RdrName, extendLocalRdrEnv, lookupLocalRdrEnv, hideSomeUnquals, mkRdrUnqual, nameRdrName )
+import RdrName          ( RdrName, GlobalRdrElt(..), Provenance(..),
+                          extendLocalRdrEnv, lookupLocalRdrEnv, hideSomeUnquals,
+                          mkRdrUnqual, nameRdrName, gre_name, globalRdrEnvElts, isLocalGRE )
 import LoadIface	( loadInterfaceForName )
 import UniqFM		( isNullUFM )
 import UniqSet		( emptyUniqSet )
@@ -161,21 +170,23 @@ rnPatsAndThen_LocalRightwards :: HsMatchContext Name -- for error messages
                               -> RnM (a, FreeVars)
 
 rnPatsAndThen_LocalRightwards ctxt pats thing_inside
-  = do	{ -- Check for duplicated and shadowed names 
-	  -- Because we don't bind the vars all at once, we can't
-	  -- 	check incrementally for duplicates; 
-	  -- Nor can we check incrementally for shadowing, else we'll
-	  -- 	complain *twice* about duplicates e.g. f (x,x) = ...
-	  let rdr_names_w_loc = collectLocatedPatsBinders pats
-	; checkDupNames  doc_pat rdr_names_w_loc
-      	; checkShadowing doc_pat rdr_names_w_loc
+  = do	{ envs_before <- getRdrEnvs
 
 	  -- (0) bring into scope all of the type variables bound by the patterns
 	  -- (1) rename the patterns, bringing into scope all of the term variables
 	  -- (2) then do the thing inside.
 	; bindPatSigTyVarsFV (collectSigTysFromPats pats) $ 
-	  rnLPatsAndThen matchNameMaker pats	$
-	  thing_inside }
+	  rnLPatsAndThen matchNameMaker pats	$ \ pats' ->
+            do { -- Check for duplicated and shadowed names 
+	         -- Because we don't bind the vars all at once, we can't
+	         -- 	check incrementally for duplicates; 
+	         -- Nor can we check incrementally for shadowing, else we'll
+	         -- 	complain *twice* about duplicates e.g. f (x,x) = ...
+            ; let names = collectPatsBinders pats'
+            ; checkDupNames doc_pat names
+	    ; checkShadowedNames doc_pat envs_before
+				 [(nameSrcSpan name, nameOccName name) | name <- names]
+            ; thing_inside pats' } }
   where
     doc_pat = ptext SLIT("In") <+> pprMatchContext ctxt
 
@@ -287,6 +298,16 @@ rnLPatAndThen var@(NM varf) (L loc p) cont =
               ; (res, fvs_res) <- rnLPatAndThen var pat $ \ pat' ->
 		                  lcont (ViewPat expr' pat' ty)
 	      ; return (res, fvs_res `plusFV` fv_expr) }
+
+#ifndef GHCI
+         pat@(QuasiQuotePat _) -> pprPanic "Can't do QuasiQuotePat without GHCi" (ppr p)
+#else
+         QuasiQuotePat qq -> do
+             (qq', _) <- rnQuasiQuote qq
+             pat' <- runQuasiQuotePat qq'
+             rnLPatAndThen var pat' $ \ (L _ pat'') ->
+                 lcont pat''
+#endif 	/* GHCI */
 
          ConPatIn con stuff -> 
              -- rnConPatAndThen takes care of reconstructing the pattern
@@ -543,6 +564,26 @@ rnOverLit (HsIsString s _ _)
 	returnM (HsIsString s from_string_name placeHolderType, fvs)
 \end{code}
 
+%************************************************************************
+%*									*
+\subsubsection{Quasiquotation}
+%*									*
+%************************************************************************
+
+See Note [Quasi-quote overview] in TcSplice.
+
+\begin{code}
+rnQuasiQuote :: HsQuasiQuote RdrName -> RnM (HsQuasiQuote Name, FreeVars)
+rnQuasiQuote (HsQuasiQuote n quoter quoteSpan quote)
+  = do	{ loc  <- getSrcSpanM
+   	; [n'] <- newLocalsRn [L loc n]
+   	; quoter' <-  (lookupOccRn quoter)
+		-- If 'quoter' is not in scope, proceed no further
+		-- Otherwise lookupOcc adds an error messsage and returns 
+		-- an "unubound name", which makes the subsequent attempt to
+		-- run the quote fail
+   	; return (HsQuasiQuote n' quoter' quoteSpan quote, unitFV quoter') }
+\end{code}
 
 %************************************************************************
 %*									*

@@ -290,6 +290,17 @@ documentation</ulink> describes all the libraries that come with GHC.
 	</listitem>
       </varlistentry>
 
+      <varlistentry>
+	<term><option>-XQuasiQuotes</option></term>
+	<listitem>
+	  <para>Enables quasiquotation (see <xref
+	  linkend="th-quasiquotation"/>).</para>
+
+	  <para>Syntax stolen:
+	  <literal>[:<replaceable>varid</replaceable>|</literal>.</para>
+	</listitem>
+      </varlistentry>
+
     </variablelist>
   </sect1>
 
@@ -4985,6 +4996,15 @@ Wiki page</ulink>.
 		  </itemizedlist></para></listitem>
 
 	      <listitem><para>
+		  A quasi-quotation can appear in either a pattern context or an
+		  expression context and is also written in Oxford brackets:
+		  <itemizedlist>
+		    <listitem><para> <literal>[:<replaceable>varid</replaceable>| ... |]</literal>,
+                        where the "..." is an arbitrary string; a full description of the
+			quasi-quotation facility is given in <xref linkend="th-quasiquotation"/>.</para></listitem>
+		  </itemizedlist></para></listitem>
+
+	      <listitem><para>
 		  A name can be quoted with either one or two prefix single quotes:
 		  <itemizedlist>
 		    <listitem><para> <literal>'f</literal> has type <literal>Name</literal>, and names the function <literal>f</literal>.
@@ -5156,6 +5176,124 @@ The basic idea is to compile the program twice:</para>
   GHC will emit an error message. </para>
 </listitem>
 </orderedlist>
+</sect2>
+
+<sect2 id="th-quasiquotation">  <title> Template Haskell Quasi-quotation </title>
+<para>Quasi-quotation allows patterns and expressions to be written using
+programmer-defined concrete syntax; the motivation behind the extension and
+several examples are documented in
+"<ulink url="http://www.eecs.harvard.edu/~mainland/ghc-quasiquoting/">Why It's
+Nice to be Quoted: Quasiquoting for Haskell</ulink>" (Proc Haskell Workshop
+2007). The example below shows how to write a quasiquoter for a simple
+expression language.</para>
+
+<para>
+In the example, the quasiquoter <literal>expr</literal> is bound to a value of
+type <literal>Language.Haskell.TH.Quote.QuasiQuoter</literal> which contains two
+functions for quoting expressions and patterns, respectively. The first argument
+to each quoter is the (arbitrary) string enclosed in the Oxford brackets. The
+context of the quasi-quotation statement determines which of the two parsers is
+called: if the quasi-quotation occurs in an expression context, the expression
+parser is called, and if it occurs in a pattern context, the pattern parser is
+called.</para>
+
+<para>
+Note that in the example we make use of an antiquoted
+variable <literal>n</literal>, indicated by the syntax <literal>'int:n</literal>
+(this syntax for anti-quotation was defined by the parser's
+author, <emphasis>not</emphasis> by GHC). This binds <literal>n</literal> to the
+integer value argument of the constructor <literal>IntExpr</literal> when
+pattern matching. Please see the referenced paper for further details regarding
+anti-quotation as well as the description of a technique that uses SYB to
+leverage a single parser of type <literal>String -> a</literal> to generate both
+an expression parser that returns a value of type <literal>Q Exp</literal> and a
+pattern parser that returns a value of type <literal>Q Pat</literal>.
+</para>
+
+<para>In general, a quasi-quote has the form
+<literal>[$<replaceable>quoter</replaceable>| <replaceable>string</replaceable> |]</literal>.
+The <replaceable>quoter</replaceable> must be the name of an imported quoter; it
+cannot be an arbitrary expression.  The quoted <replaceable>string</replaceable> 
+can be arbitrary, and may contain newlines.
+</para>
+<para>
+Quasiquoters must obey the same stage restrictions as Template Haskell, e.g., in
+the example, <literal>expr</literal> cannot be defined
+in <literal>Main.hs</literal> where it is used, but must be imported.
+</para>
+
+<programlisting>
+
+{- Main.hs -}
+module Main where
+
+import Expr
+
+main :: IO ()
+main = do { print $ eval [$expr|1 + 2|]
+          ; case IntExpr 1 of
+              { [$expr|'int:n|] -> print n
+              ;  _              -> return ()
+              }
+          }
+
+
+{- Expr.hs -}
+module Expr where
+
+import qualified Language.Haskell.TH as TH
+import Language.Haskell.TH.Quasi
+
+data Expr  =  IntExpr Integer
+           |  AntiIntExpr String
+           |  BinopExpr BinOp Expr Expr
+           |  AntiExpr String
+    deriving(Show, Typeable, Data)
+
+data BinOp  =  AddOp
+            |  SubOp
+            |  MulOp
+            |  DivOp
+    deriving(Show, Typeable, Data)
+
+eval :: Expr -> Integer
+eval (IntExpr n)        = n
+eval (BinopExpr op x y) = (opToFun op) (eval x) (eval y)
+  where
+    opToFun AddOp = (+)
+    opToFun SubOp = (-)
+    opToFun MulOp = (*)
+    opToFun DivOp = div
+
+expr = QuasiQuoter parseExprExp parseExprPat
+
+-- Parse an Expr, returning its representation as
+-- either a Q Exp or a Q Pat. See the referenced paper
+-- for how to use SYB to do this by writing a single
+-- parser of type String -> Expr instead of two
+-- separate parsers.
+
+parseExprExp :: String -> Q Exp
+parseExprExp ...
+
+parseExprPat :: String -> Q Pat
+parseExprPat ...
+</programlisting>
+
+<para>Now run the compiler:
+</para>
+<programlisting>
+$ ghc --make -XQuasiQuotes Main.hs -o main
+</programlisting>
+
+<para>Run "main" and here is your output:</para>
+
+<programlisting>
+$ ./main
+3
+1
+</programlisting>
+
 </sect2>
 
 </sect1>

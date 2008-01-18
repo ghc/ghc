@@ -203,6 +203,9 @@ data HsExpr id
 
   | HsSpliceE (HsSplice id)
 
+  | HsQuasiQuoteE (HsQuasiQuote id)
+	-- See Note [Quasi-quote overview] in TcSplice
+
   -----------------------------------------------------------
   -- Arrow notation extension
 
@@ -438,6 +441,10 @@ ppr_expr (HsSpliceE s)       = pprSplice s
 ppr_expr (HsBracket b)       = pprHsBracket b
 ppr_expr (HsBracketOut e []) = ppr e
 ppr_expr (HsBracketOut e ps) = ppr e $$ ptext SLIT("pending") <+> ppr ps
+ppr_expr (HsQuasiQuoteE (HsQuasiQuote name quoter _ quote)) 
+    = char '$' <> brackets (ppr name) <>
+      ptext SLIT("[:") <> ppr quoter <> ptext SLIT("|") <>
+      ppr quote <> ptext SLIT("|]")
 
 ppr_expr (HsProc pat (L _ (HsCmdTop cmd _ _ _)))
   = hsep [ptext SLIT("proc"), ppr pat, ptext SLIT("->"), ppr cmd]

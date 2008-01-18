@@ -318,8 +318,8 @@ data TcLclEnv		-- Changes as we move inside an expression
 	tcl_ctxt :: ErrCtxt,		-- Error context
 	tcl_errs :: TcRef Messages,	-- Place to accumulate errors
 
-	tcl_th_ctxt    :: ThStage,	-- Template Haskell context
-	tcl_arrow_ctxt :: ArrowCtxt,	-- Arrow-notation context
+	tcl_th_ctxt    :: ThStage,	      -- Template Haskell context
+	tcl_arrow_ctxt :: ArrowCtxt,	      -- Arrow-notation context
 
 	tcl_rdr :: LocalRdrEnv,		-- Local name envt
 		-- Maintained during renaming, of course, but also during

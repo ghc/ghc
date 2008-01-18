@@ -34,7 +34,7 @@ import RnEnv		( lookupLocalDataTcNames,
 			  lookupOccRn, newLocalsRn, 
 			  bindLocatedLocalsFV, bindPatSigTyVarsFV,
 			  bindTyVarsRn, extendTyVarEnvFVRn,
-			  bindLocalNames, checkDupNames, mapFvRn, lookupGreLocalRn,
+			  bindLocalNames, checkDupRdrNames, mapFvRn, lookupGreLocalRn,
 			)
 import RnNames       (importsFromLocalDecls, extendRdrEnvRn)
 import HscTypes      (GenAvailInfo(..))
@@ -360,16 +360,6 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	-- Used for both source and interface file decls
   = rnHsSigType (text "an instance decl") inst_ty	`thenM` \ inst_ty' ->
 
-	-- Rename the associated types
-	-- The typechecker (not the renamer) checks that all 
-	-- the declarations are for the right class
-    let
-	at_doc   = text "In the associated types of an instance declaration"
-	at_names = map (head . tyClDeclNames . unLoc) ats
-    in
-    checkDupNames at_doc at_names		`thenM_`
-    rnATInsts ats				`thenM` \ (ats', at_fvs) ->
-
 	-- Rename the bindings
 	-- The typechecker (not the renamer) checks that all 
 	-- the bindings are for the right class
@@ -378,13 +368,34 @@ rnSrcInstDecl (InstDecl inst_ty mbinds uprags ats)
 	meth_names  = collectHsBindLocatedBinders mbinds
 	(inst_tyvars, _, cls,_) = splitHsInstDeclTy (unLoc inst_ty')
     in
-    checkDupNames meth_doc meth_names 	`thenM_`
+    checkDupRdrNames meth_doc meth_names 	`thenM_`
+	-- Check that the same method is not given twice in the
+	-- same instance decl	instance C T where
+	--			      f x = ...
+	--			      g y = ...
+	--			      f x = ...
+	-- We must use checkDupRdrNames because the Name of the
+	-- method is the Name of the class selector, whose SrcSpan
+	-- points to the class declaration
+
     extendTyVarEnvForMethodBinds inst_tyvars (		
 	-- (Slightly strangely) the forall-d tyvars scope over
 	-- the method bindings too
 	rnMethodBinds cls (\n->[]) 	-- No scoped tyvars
 		      [] mbinds
     )						`thenM` \ (mbinds', meth_fvs) ->
+	-- Rename the associated types
+	-- The typechecker (not the renamer) checks that all 
+	-- the declarations are for the right class
+    let
+	at_doc   = text "In the associated types of an instance declaration"
+	at_names = map (head . tyClDeclNames . unLoc) ats
+    in
+    checkDupRdrNames at_doc at_names		`thenM_`
+	-- See notes with checkDupRdrNames for methods, above
+
+    rnATInsts ats				`thenM` \ (ats', at_fvs) ->
+
 	-- Rename the prags and signatures.
 	-- Note that the type variables are not in scope here,
 	-- so that	instance Eq a => Eq (T a) where
@@ -602,8 +613,9 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 	; context' <- rnContext data_doc context
 	; typats' <- rnTyPats data_doc typatsMaybe
 	; (derivs', deriv_fvs) <- rn_derivs derivs
-	; checkDupNames data_doc con_names
 	; condecls' <- rnConDecls (unLoc tycon') condecls
+		-- No need to check for duplicate constructor decls
+		-- since that is done by RnNames.extendRdrEnvRn
 	; returnM (TyData {tcdND = new_or_data, tcdCtxt = context', 
 			   tcdLName = tycon', tcdTyVars = tyvars', 
 			   tcdTyPats = typats', tcdKindSig = Nothing, 
@@ -629,8 +641,9 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 		-- do not scope over the constructor signatures
 		-- 	data T a where { T1 :: forall b. b-> b }
 	; (derivs', deriv_fvs) <- rn_derivs derivs
-	; checkDupNames data_doc con_names
 	; condecls' <- rnConDecls (unLoc tycon') condecls
+		-- No need to check for duplicate constructor decls
+		-- since that is done by RnNames.extendRdrEnvRn
 	; returnM (TyData {tcdND = new_or_data, tcdCtxt = noLoc [], 
 			   tcdLName = tycon', tcdTyVars = tyvars', 
 			   tcdTyPats = Nothing, tcdKindSig = sig,
@@ -694,14 +707,13 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	     ; sigs' <- renameSigs okClsDclSig sigs
 	     ; return   (tyvars', context', fds', ats', ats_fvs, sigs') }
 
-	-- Check for duplicates among the associated types
-	; let at_rdr_names_w_locs = [tcdLName ty | L _ ty <- ats]
-	; checkDupNames at_doc at_rdr_names_w_locs
+	-- No need to check for duplicate associated type decls
+	-- since that is done by RnNames.extendRdrEnvRn
 
 	-- Check the signatures
 	-- First process the class op sigs (op_sigs), then the fixity sigs (non_op_sigs).
 	; let sig_rdr_names_w_locs = [op | L _ (TypeSig op _) <- sigs]
-	; checkDupNames sig_doc sig_rdr_names_w_locs
+	; checkDupRdrNames sig_doc sig_rdr_names_w_locs
 		-- Typechecker is responsible for checking that we only
 		-- give default-method bindings for things in this class.
 		-- The renamer *could* check this for class decls, but can't
@@ -721,7 +733,9 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	    ; let meth_rdr_names_w_locs = collectHsBindLocatedBinders mbinds
 	          gen_rdr_tyvars_w_locs = [ tv | tv <- extractGenericPatTyVars mbinds,
 	    		 		         not (unLoc tv `elemLocalRdrEnv` name_env) ]
-	    ; checkDupNames meth_doc meth_rdr_names_w_locs
+		-- No need to check for duplicate method signatures
+		-- since that is done by RnNames.extendRdrEnvRn
+		-- and the methods are already in scope
 	    ; gen_tyvars <- newLocalsRn gen_rdr_tyvars_w_locs
 	    ; rnMethodBinds (unLoc cname') (mkSigTvFn sigs') gen_tyvars mbinds }
 
@@ -820,8 +834,9 @@ rnConDeclDetails doc (InfixCon ty1 ty2)
     returnM (InfixCon new_ty1 new_ty2)
 
 rnConDeclDetails doc (RecCon fields)
-  = do	{ checkDupNames doc (map cd_fld_name fields)
-	; new_fields <- mappM (rnField doc) fields
+  = do	{ new_fields <- mappM (rnField doc) fields
+		-- No need to check for duplicate fields
+		-- since that is done by RnNames.extendRdrEnvRn
 	; return (RecCon new_fields) }
 
 rnField doc (ConDeclField name ty haddock_doc)

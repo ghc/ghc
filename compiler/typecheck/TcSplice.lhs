@@ -13,7 +13,8 @@ TcSplice: Template Haskell splices
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
-module TcSplice( tcSpliceExpr, tcSpliceDecls, tcBracket ) where
+module TcSplice( tcSpliceExpr, tcSpliceDecls, tcBracket,
+                 runQuasiQuoteExpr, runQuasiQuotePat ) where
 
 #include "HsVersions.h"
 
@@ -165,9 +166,15 @@ tcSpliceExpr  :: HsSplice Name -> BoxyRhoType -> TcM (HsExpr TcId)
 kcSpliceType  :: HsSplice Name -> TcM (HsType Name, TcKind)
 	-- None of these functions add constraints to the LIE
 
+runQuasiQuoteExpr :: HsQuasiQuote Name -> TcM (LHsExpr RdrName)
+runQuasiQuotePat  :: HsQuasiQuote Name -> TcM (LPat RdrName)
+
 #ifndef GHCI
 tcSpliceExpr n e ty = pprPanic "Cant do tcSpliceExpr without GHCi" (ppr e)
 tcSpliceDecls e     = pprPanic "Cant do tcSpliceDecls without GHCi" (ppr e)
+
+runQuasiQuoteExpr q  = pprPanic "Cant do runQuasiQuoteExpr without GHCi" (ppr q)
+runQuasiQuotePat  q  = pprPanic "Cant do runQuasiQuotePat without GHCi" (ppr q)
 #else
 \end{code}
 
@@ -358,6 +365,80 @@ tcTopSpliceExpr expr meta_ty
 
 %************************************************************************
 %*									*
+	Quasi-quoting
+%*									*
+%************************************************************************
+
+Note [Quasi-quote overview]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The GHC "quasi-quote" extension is described by Geoff Mainland's paper
+"Why it's nice to be quoted: quasiquoting for Haskell" (Haskell
+Workshop 2007).
+
+Briefly, one writes
+	[:p| stuff |]
+and the arbitrary string "stuff" gets parsed by the parser 'p', whose
+type should be Language.Haskell.TH.Quote.QuasiQuoter.  'p' must be
+defined in another module, because we are going to run it here.  It's
+a bit like a TH splice:
+	$(p "stuff")
+
+However, you can do this in patterns as well as terms.  Becuase of this,
+the splice is run by the *renamer* rather than the type checker.
+
+\begin{code}
+runQuasiQuote :: Outputable hs_syn
+              => HsQuasiQuote Name	-- Contains term of type QuasiQuoter, and the String
+              -> Name			-- Of type QuasiQuoter -> String -> Q th_syn
+              -> String			-- Documentation string only
+              -> Name			-- Name of th_syn type  
+              -> (SrcSpan -> th_syn -> Either Message hs_syn)
+              -> TcM hs_syn
+runQuasiQuote (HsQuasiQuote name quoter q_span quote) quote_selector desc meta_ty convert
+  = do	{ -- Check that the quoter is not locally defined, otherwise the TH
+          -- machinery will not be able to run the quasiquote.
+        ; this_mod <- getModule
+        ; let is_local = case nameModule_maybe quoter of
+                           Just mod | mod == this_mod -> True
+                                    | otherwise       -> False
+                           Nothing -> True
+	; traceTc (text "runQQ" <+> ppr quoter <+> ppr is_local)
+        ; checkTc (not is_local) (quoteStageError quoter)
+
+	  -- Build the expression 
+      	; let quoterExpr = L q_span $! HsVar $! quoter
+      	; let quoteExpr = L q_span $! HsLit $! HsString quote
+      	; let expr = L q_span $
+      	             HsApp (L q_span $
+      	                    HsApp (L q_span (HsVar quote_selector)) quoterExpr) quoteExpr
+      	; recordThUse
+      	; meta_exp_ty <- tcMetaTy meta_ty
+
+      	-- Typecheck the expression
+      	; zonked_q_expr <- tcTopSpliceExpr expr meta_exp_ty
+
+      	-- Run the expression
+      	; traceTc (text "About to run" <+> ppr zonked_q_expr)
+      	; result <- runMeta convert zonked_q_expr
+      	; traceTc (text "Got result" <+> ppr result)
+      	; showSplice desc zonked_q_expr (ppr result)
+      	; return result
+      	}
+
+runQuasiQuoteExpr quasiquote
+    = runQuasiQuote quasiquote quoteExpName "expression" expQTyConName convertToHsExpr
+
+runQuasiQuotePat quasiquote
+    = runQuasiQuote quasiquote quotePatName "pattern" patQTyConName convertToPat
+
+quoteStageError quoter
+  = sep [ptext SLIT("GHC stage restriction:") <+> ppr quoter,
+         nest 2 (ptext SLIT("is used in a quasiquote, and must be imported, not defined locally"))]
+\end{code}
+
+
+%************************************************************************
+%*									*
 		Splicing a type
 %*									*
 %************************************************************************
@@ -463,6 +544,11 @@ runMetaE :: (SrcSpan -> TH.Exp -> Either Message (LHsExpr RdrName))
 	 -> TcM (LHsExpr RdrName)
 runMetaE  = runMeta
 
+runMetaP :: (SrcSpan -> TH.Pat -> Either Message (Pat RdrName))
+         -> LHsExpr Id          -- Of type (Q Pat)
+         -> TcM (Pat RdrName)
+runMetaP  = runMeta
+
 runMetaT :: (SrcSpan -> TH.Type -> Either Message (LHsType RdrName))
 	 -> LHsExpr Id 		-- Of type (Q Type)
 	 -> TcM (LHsType RdrName)	
@@ -499,9 +585,12 @@ runMeta convert expr
 		-- encounter them inside the try
 		--
 		-- See Note [Exceptions in TH] 
-	  either_tval <- tryAllM $ do
-		{ th_syn <- TH.runQ (unsafeCoerce# hval)
-		; case convert (getLoc expr) th_syn of
+	  let expr_span = getLoc expr
+	; either_tval <- tryAllM $
+            		 setSrcSpan expr_span $	-- Set the span so that qLocation can
+						-- see where this splice is
+	     do	{ th_syn <- TH.runQ (unsafeCoerce# hval)
+		; case convert expr_span th_syn of
 		    Left err     -> failWithTc err
 		    Right hs_syn -> return hs_syn }
 
@@ -560,10 +649,14 @@ instance TH.Quasi (IOEnv (Env TcGblEnv TcLclEnv)) where
   qReport True msg  = addErr (text msg)
   qReport False msg = addReport (text msg)
 
-  qCurrentModule = do { m <- getModule;
-                        return (moduleNameString (moduleName m)) }
-                -- ToDo: is throwing away the package name ok here?
-
+  qLocation = do { m <- getModule
+		 ; l <- getSrcSpanM
+		 ; return (TH.Loc { TH.loc_filename = unpackFS (srcSpanFile l)
+				  , TH.loc_module   = moduleNameString (moduleName m)
+				  , TH.loc_package  = packageIdString (modulePackageId m)
+				  , TH.loc_start = (srcSpanStartLine l, srcSpanStartCol l)
+				  , TH.loc_end = (srcSpanEndLine   l, srcSpanEndCol   l) }) }
+		
   qReify v = reify v
 
 	-- For qRecover, discard error messages if 

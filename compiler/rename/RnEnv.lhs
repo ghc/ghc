@@ -31,7 +31,9 @@ module RnEnv (
 	bindTyVarsRn, extendTyVarEnvFVRn,
 	bindLocalFixities,
 
-	checkDupNames, checkShadowing, mapFvRn, mapFvRnCPS,
+	checkDupRdrNames, checkDupNames, checkShadowedNames, 
+	checkDupAndShadowedRdrNames,
+	mapFvRn, mapFvRnCPS,
 	warnUnusedMatches, warnUnusedModules, warnUnusedImports, 
 	warnUnusedTopBinds, warnUnusedLocalBinds,
 	dataTcOccs, unknownNameErr,
@@ -45,27 +47,17 @@ import HsSyn		( FixitySig(..), HsExpr(..), SyntaxExpr, SyntaxTable,
 			  LHsTyVarBndr, LHsType, 
 			  Fixity, hsLTyVarLocNames, replaceTyVarName )
 import RdrHsSyn		( extractHsTyRdrTyVars )
-import RdrName		( RdrName, isQual, isUnqual, isOrig_maybe,
-			  isQual_maybe,
-			  mkRdrUnqual, setRdrNameSpace, rdrNameOcc,
-			  pprGlobalRdrEnv, lookupGRE_RdrName, 
-			  isExact_maybe, isSrcRdrName,
-			  Parent(..),
-			  GlobalRdrElt(..), GlobalRdrEnv, lookupGlobalRdrEnv, 
-			  isLocalGRE, extendLocalRdrEnv, elemLocalRdrEnv, lookupLocalRdrEnv,
-			  Provenance(..), pprNameProvenance,
-			  importSpecLoc, importSpecModule
-			)
+import RdrName
 import HscTypes		( availNames, ModIface(..), FixItem(..), lookupFixity)
 import TcEnv		( tcLookupDataCon )
 import TcRnMonad
 import Name		( Name, nameIsLocalOrFrom, mkInternalName, isWiredInName,
-			  nameSrcLoc, nameOccName, nameModule, isExternalName )
+			  nameSrcLoc, nameSrcSpan, nameOccName, nameModule, isExternalName )
 import NameSet
 import NameEnv
 import UniqFM
 import DataCon		( dataConFieldLabels )
-import OccName		( tcName, isDataOcc, pprNonVarNameSpace, occNameSpace,
+import OccName		( OccName, tcName, isDataOcc, pprNonVarNameSpace, occNameSpace,
 			  reportIfUnused, occNameFS )
 import Module		( Module, ModuleName )
 import PrelNames	( mkUnboundName, rOOT_MAIN, iNTERACTIVE, consDataConKey, hasKey )
@@ -356,7 +348,7 @@ lookupFamInstDeclBndr mod lrdr_name@(L _ rdr_name)
 getLookupOccRn :: RnM (Name -> Maybe Name)
 getLookupOccRn
   = getLocalRdrEnv			`thenM` \ local_env ->
-    return (lookupLocalRdrEnv local_env . mkRdrUnqual . nameOccName)
+    return (lookupLocalRdrOcc local_env . nameOccName)
 
 lookupLocatedOccRn :: Located RdrName -> RnM (Located Name)
 lookupLocatedOccRn = wrapLocM lookupOccRn
@@ -746,16 +738,21 @@ newLocalsRn rdr_names_w_loc
 			-- lookupRdrEnv doesn't even attempt to look up a qualified RdrName
 		      mkInternalName uniq (rdrNameOcc rdr_name) loc
 
+---------------------
+checkDupAndShadowedRdrNames :: SDoc -> [Located RdrName] -> RnM ()
+checkDupAndShadowedRdrNames doc loc_rdr_names
+  = do	{ checkDupRdrNames doc loc_rdr_names
+	; envs <- getRdrEnvs
+	; checkShadowedNames doc envs 
+		[(loc,rdrNameOcc rdr) | L loc rdr <- loc_rdr_names] }
+
+---------------------
 bindLocatedLocalsRn :: SDoc	-- Documentation string for error message
 	   	        -> [Located RdrName]
 	    	    -> ([Name] -> RnM a)
 	    	    -> RnM a
 bindLocatedLocalsRn doc_str rdr_names_w_loc enclosed_scope
-  = 	-- Check for duplicate names
-    checkDupNames doc_str rdr_names_w_loc	`thenM_`
-
-    	-- Warn about shadowing
-    checkShadowing doc_str rdr_names_w_loc	`thenM_`
+  = checkDupAndShadowedRdrNames doc_str rdr_names_w_loc	`thenM_`
 
 	-- Make fresh Names and extend the environment
     newLocalsRn rdr_names_w_loc		`thenM` \names ->
@@ -841,31 +838,39 @@ extendTyVarEnvFVRn :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
 extendTyVarEnvFVRn tyvars thing_inside = bindLocalNamesFV tyvars thing_inside
 
 -------------------------------------
-checkDupNames :: SDoc
-	      -> [Located RdrName]
-	      -> RnM ()
-checkDupNames doc_str rdr_names_w_loc
+checkDupRdrNames :: SDoc
+	         -> [Located RdrName]
+	         -> RnM ()
+checkDupRdrNames doc_str rdr_names_w_loc
   = 	-- Check for duplicated names in a binding group
-    mappM_ (dupNamesErr doc_str) dups
+    mappM_ (dupNamesErr getLoc doc_str) dups
   where
     (_, dups) = removeDups (\n1 n2 -> unLoc n1 `compare` unLoc n2) rdr_names_w_loc
 
+checkDupNames :: SDoc
+	      -> [Name]
+	      -> RnM ()
+checkDupNames doc_str names
+  = 	-- Check for duplicated names in a binding group
+    mappM_ (dupNamesErr nameSrcSpan doc_str) dups
+  where
+    (_, dups) = removeDups (\n1 n2 -> nameOccName n1 `compare` nameOccName n2) names
+
 -------------------------------------
-checkShadowing doc_str loc_rdr_names
-  = traceRn (text "shadow" <+> ppr loc_rdr_names) `thenM_`
-    getLocalRdrEnv		`thenM` \ local_env ->
-    getGlobalRdrEnv		`thenM` \ global_env ->
-    let
-      check_shadow (L loc rdr_name)
-	| Just n <- mb_local = complain [ptext SLIT("bound at") <+> ppr (nameSrcLoc n)]
+checkShadowedNames :: SDoc -> (GlobalRdrEnv, LocalRdrEnv) -> [(SrcSpan,OccName)] -> RnM ()
+checkShadowedNames doc_str (global_env,local_env) loc_rdr_names
+  = ifOptM Opt_WarnNameShadowing $ 
+    do	{ traceRn (text "shadow" <+> ppr loc_rdr_names)
+	; mappM_ check_shadow loc_rdr_names }
+  where
+    check_shadow (loc, occ)
+	| Just n <- mb_local = complain [ptext SLIT("bound at") <+> ppr loc]
 	| not (null gres)    = complain (map pprNameProvenance gres)
 	| otherwise	     = return ()
 	where
-	  complain pp_locs = addWarnAt loc (shadowedNameWarn doc_str rdr_name pp_locs)
-	  mb_local = lookupLocalRdrEnv local_env rdr_name
-          gres     = lookupGRE_RdrName rdr_name global_env
-    in
-    ifOptM Opt_WarnNameShadowing (mappM_ check_shadow loc_rdr_names)
+	  complain pp_locs = addWarnAt loc (shadowedNameWarn doc_str occ pp_locs)
+	  mb_local = lookupLocalRdrOcc  local_env  occ
+          gres     = lookupGlobalRdrEnv global_env occ
 \end{code}
 
 
@@ -983,8 +988,8 @@ addNameClashErrRn rdr_name names
     msgs = [ptext SLIT("    or") <+> mk_ref np | np <- nps]
     mk_ref gre = quotes (ppr (gre_name gre)) <> comma <+> pprNameProvenance gre
 
-shadowedNameWarn doc rdr_name shadowed_locs
-  = sep [ptext SLIT("This binding for") <+> quotes (ppr rdr_name)
+shadowedNameWarn doc occ shadowed_locs
+  = sep [ptext SLIT("This binding for") <+> quotes (ppr occ)
 	    <+> ptext SLIT("shadows the existing binding") <> plural shadowed_locs,
 	 nest 2 (vcat shadowed_locs)]
     $$ doc
@@ -1002,14 +1007,13 @@ badOrigBinding name
   = ptext SLIT("Illegal binding of built-in syntax:") <+> ppr (rdrNameOcc name)
 	-- The rdrNameOcc is because we don't want to print Prelude.(,)
 
-dupNamesErr :: SDoc -> [Located RdrName] -> RnM ()
-dupNamesErr descriptor located_names
+dupNamesErr :: Outputable n => (n -> SrcSpan) -> SDoc -> [n] -> RnM ()
+dupNamesErr get_loc descriptor names
   = addErrAt big_loc $
-    vcat [ptext SLIT("Conflicting definitions for") <+> quotes (ppr name1),
+    vcat [ptext SLIT("Conflicting definitions for") <+> quotes (ppr (head names)),
 	  locations, descriptor]
   where
-    L _ name1 = head located_names
-    locs      = map getLoc located_names
+    locs      = map get_loc names
     big_loc   = foldr1 combineSrcSpans locs
     one_line  = isOneLineSpan big_loc
     locations | one_line  = empty 

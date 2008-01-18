@@ -337,6 +337,7 @@ TH_ID_SPLICE    { L _ (ITidEscape _)  }     -- $x
 '$('	        { L _ ITparenEscape   }     -- $( exp )
 TH_VAR_QUOTE	{ L _ ITvarQuote      }     -- 'x
 TH_TY_QUOTE	{ L _ ITtyQuote       }      -- ''T
+TH_QUASIQUOTE	{ L _ (ITquasiQuote _) }
 
 %monad { P } { >>= } { return }
 %lexer { lexer } { L _ ITeof }
@@ -1368,6 +1369,11 @@ aexp2	:: { LHsExpr RdrName }
 							(getTH_ID_SPLICE $1)))) } -- $x
 	| '$(' exp ')'   	{ LL $ HsSpliceE (mkHsSplice $2) }               -- $( exp )
 
+	| TH_QUASIQUOTE       	{ let { loc = getLoc $1
+                                      ; ITquasiQuote (quoter, quote, quoteSpan) = unLoc $1
+                                      ; quoterId = mkUnqual varName quoter
+                                      }
+                                  in sL loc $ HsQuasiQuoteE (mkHsQuasiQuote quoterId quoteSpan quote) }
 	| TH_VAR_QUOTE qvar 	{ LL $ HsBracket (VarBr (unLoc $2)) }
 	| TH_VAR_QUOTE qcon 	{ LL $ HsBracket (VarBr (unLoc $2)) }
 	| TH_TY_QUOTE tyvar 	{ LL $ HsBracket (VarBr (unLoc $2)) }

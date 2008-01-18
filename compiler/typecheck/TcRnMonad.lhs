@@ -397,6 +397,9 @@ tcIsHsBoot = do { env <- getGblEnv; return (isHsBoot (tcg_src env)) }
 getGlobalRdrEnv :: TcRn GlobalRdrEnv
 getGlobalRdrEnv = do { env <- getGblEnv; return (tcg_rdr_env env) }
 
+getRdrEnvs :: TcRn (GlobalRdrEnv, LocalRdrEnv)
+getRdrEnvs = do { (gbl,lcl) <- getEnvs; return (tcg_rdr_env gbl, tcl_rdr lcl) }
+
 getImports :: TcRn ImportAvails
 getImports = do { env <- getGblEnv; return (tcg_imports env) }
 

@@ -29,7 +29,7 @@ module RdrName (
 
 	-- LocalRdrEnv
 	LocalRdrEnv, emptyLocalRdrEnv, extendLocalRdrEnv,
-	lookupLocalRdrEnv, elemLocalRdrEnv,
+	lookupLocalRdrEnv, lookupLocalRdrOcc, elemLocalRdrEnv,
 
 	-- GlobalRdrEnv
 	GlobalRdrEnv, emptyGlobalRdrEnv, mkGlobalRdrEnv, plusGlobalRdrEnv, 
@@ -276,6 +276,9 @@ lookupLocalRdrEnv env (Exact name) = Just name
 lookupLocalRdrEnv env (Unqual occ) = lookupOccEnv env occ
 lookupLocalRdrEnv env other	   = Nothing
 
+lookupLocalRdrOcc :: LocalRdrEnv -> OccName -> Maybe Name
+lookupLocalRdrOcc env occ = lookupOccEnv env occ
+
 elemLocalRdrEnv :: RdrName -> LocalRdrEnv -> Bool
 elemLocalRdrEnv rdr_name env 
   | isUnqual rdr_name = rdrNameOcc rdr_name `elemOccEnv` env
@@ -354,7 +357,7 @@ pprGlobalRdrEnv env
 
 \begin{code}
 lookupGlobalRdrEnv :: GlobalRdrEnv -> OccName -> [GlobalRdrElt]
-lookupGlobalRdrEnv env rdr_name = case lookupOccEnv env rdr_name of
+lookupGlobalRdrEnv env occ_name = case lookupOccEnv env occ_name of
 					Nothing   -> []
 					Just gres -> gres
 

@@ -702,6 +702,7 @@ checkAPat loc e = case e of
    RecordCon c _ (HsRecFields fs dd) 
 		      -> mapM checkPatField fs >>= \fs ->
 			 return (ConPatIn c (RecCon (HsRecFields fs dd)))
+   HsQuasiQuoteE q    -> return (QuasiQuotePat q)
 -- Generics 
    HsType ty          -> return (TypePat ty) 
    _                  -> patFail loc

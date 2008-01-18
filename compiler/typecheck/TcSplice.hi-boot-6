@@ -12,4 +12,6 @@ tcBracket :: HsExpr.HsBracket Name.Name
 	  -> TcRnTypes.TcM (HsExpr.LHsExpr Var.Id)
 
 tcSpliceDecls :: HsExpr.LHsExpr Name.Name
-	      -> TcRnTypes.TcM [HsDecls.LHsDecl RdrName.RdrName]
+
+runQuasiQuoteExpr :: HsQuasiQuote Name.Name -> TcM (LHsExpr RdrName)
+runQuasiQuotePat  :: HsQuasiQuote Name -> TcM (LPat RdrName)

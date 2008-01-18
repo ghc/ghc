@@ -197,6 +197,7 @@ data DynFlag
    | Opt_PArr				-- Syntactic support for parallel arrays
    | Opt_Arrows				-- Arrow-notation syntax
    | Opt_TemplateHaskell
+   | Opt_QuasiQuotes
    | Opt_ImplicitParams
    | Opt_Generics
    | Opt_ImplicitPrelude 
@@ -1319,6 +1320,7 @@ xFlags = [
   ( "Arrows",                           Opt_Arrows ),
   ( "PArr",                             Opt_PArr ),
   ( "TemplateHaskell",                  Opt_TemplateHaskell ),
+  ( "QuasiQuotes",                      Opt_QuasiQuotes ),
   ( "Generics",                         Opt_Generics ),
   -- On by default:
   ( "ImplicitPrelude",                  Opt_ImplicitPrelude ),

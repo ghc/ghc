@@ -161,6 +161,12 @@ unqualSplice = mkRdrUnqual (mkVarOccFS FSLIT("splice"))
 		-- A name (uniquified later) to
 		-- identify the splice
 
+mkHsQuasiQuote quoter span quote = HsQuasiQuote unqualQuasiQuote quoter span quote
+
+unqualQuasiQuote = mkRdrUnqual (mkVarOccFS FSLIT("quasiquote"))
+		-- A name (uniquified later) to
+		-- identify the quasi-quote
+
 mkHsString s = HsString (mkFastString s)
 
 -------------
@@ -417,6 +423,7 @@ collectl (L l pat) bndrs
  				  
     go (SigPatIn pat _)	 	  = collectl pat bndrs
     go (SigPatOut pat _)	  = collectl pat bndrs
+    go (QuasiQuotePat _)          = bndrs
     go (TypePat ty)               = bndrs
     go (CoPat _ pat ty)           = collectl (noLoc pat) bndrs
 \end{code}

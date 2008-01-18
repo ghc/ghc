@@ -308,6 +308,9 @@ $tab+         { warn Opt_WarnTabs (text "Tab character") }
   "|]"	    / { ifExtension thEnabled }	{ token ITcloseQuote }
   \$ @varid / { ifExtension thEnabled }	{ skip_one_varid ITidEscape }
   "$("	    / { ifExtension thEnabled }	{ token ITparenEscape }
+
+  "[$" @varid "|"  / { ifExtension qqEnabled }
+                     { lex_quasiquote_tok }
 }
 
 <0> {
@@ -542,6 +545,7 @@ data Token
   | ITparenEscape		--  $( 
   | ITvarQuote			--  '
   | ITtyQuote			--  ''
+  | ITquasiQuote (FastString,FastString,SrcSpan) --  [:...|...|]
 
   -- Arrow notation extension
   | ITproc
@@ -1318,6 +1322,42 @@ getCharOrFail =  do
 	Just (c,i)  -> do setInput i; return c
 
 -- -----------------------------------------------------------------------------
+-- QuasiQuote
+
+lex_quasiquote_tok :: Action
+lex_quasiquote_tok span buf len = do
+  let quoter = reverse $ takeWhile (/= '$')
+               $ reverse $ lexemeToString buf (len - 1)
+  quoteStart <- getSrcLoc              
+  quote <- lex_quasiquote ""
+  end <- getSrcLoc 
+  return (L (mkSrcSpan (srcSpanStart span) end)
+           (ITquasiQuote (mkFastString quoter,
+                          mkFastString (reverse quote),
+                          mkSrcSpan quoteStart end)))
+
+lex_quasiquote :: String -> P String
+lex_quasiquote s = do
+  i <- getInput
+  case alexGetChar' i of
+    Nothing -> lit_error
+
+    Just ('\\',i)
+	| Just ('|',i) <- next -> do 
+		setInput i; lex_quasiquote ('|' : s)
+	| Just (']',i) <- next -> do 
+		setInput i; lex_quasiquote (']' : s)
+	where next = alexGetChar' i
+
+    Just ('|',i)
+	| Just (']',i) <- next -> do 
+		setInput i; return s
+	where next = alexGetChar' i
+
+    Just (c, i) -> do
+	 setInput i; lex_quasiquote (c : s)
+
+-- -----------------------------------------------------------------------------
 -- Warnings
 
 warn :: DynFlag -> SDoc -> Action
@@ -1520,6 +1560,7 @@ unicodeSyntaxBit = 14 -- the forall symbol, arrow symbols, etc
 unboxedTuplesBit = 15 -- (# and #)
 standaloneDerivingBit = 16 -- standalone instance deriving declarations
 transformComprehensionsBit = 17
+qqBit	   = 18 -- enable quasiquoting
 
 genericsEnabled, ffiEnabled, parrEnabled :: Int -> Bool
 always           _     = True
@@ -1540,6 +1581,7 @@ unicodeSyntaxEnabled flags = testBit flags unicodeSyntaxBit
 unboxedTuplesEnabled flags = testBit flags unboxedTuplesBit
 standaloneDerivingEnabled flags = testBit flags standaloneDerivingBit
 transformComprehensionsEnabled flags = testBit flags transformComprehensionsBit
+qqEnabled        flags = testBit flags qqBit
 
 -- PState for parsing options pragmas
 --
@@ -1586,6 +1628,7 @@ mkPState buf loc flags  =
 	       .|. parrBit      `setBitIf` dopt Opt_PArr         flags
 	       .|. arrowsBit    `setBitIf` dopt Opt_Arrows       flags
 	       .|. thBit        `setBitIf` dopt Opt_TemplateHaskell flags
+	       .|. qqBit        `setBitIf` dopt Opt_QuasiQuotes flags
 	       .|. ipBit        `setBitIf` dopt Opt_ImplicitParams flags
 	       .|. explicitForallBit `setBitIf` dopt Opt_ScopedTypeVariables flags
 	       .|. explicitForallBit `setBitIf` dopt Opt_PolymorphicComponents flags

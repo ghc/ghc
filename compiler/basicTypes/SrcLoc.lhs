@@ -186,7 +186,12 @@ data SrcSpan
   | UnhelpfulSpan FastString	-- Just a general indication
 				-- also used to indicate an empty span
 
+#ifdef DEBUG
+  deriving (Eq, Show)	-- Show is used by Lexer.x, becuase we
+			-- derive Show for Token
+#else
   deriving Eq
+#endif
 
 -- We want to order SrcSpans first by the start point, then by the end point.
 instance Ord SrcSpan where
