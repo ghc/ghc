@@ -1,0 +1,13 @@
+[1 of 2] Compiling Expr             ( ./Expr.hs, ./Expr.o )
+[2 of 2] Compiling Main             ( Main.hs, Main.o )
+
+Main.hs:8:20:
+    Conflicting definitions for `x'
+    In a case alternative
+Loading package base ... linking ... done.
+Loading package array-0.1 ... linking ... done.
+Loading package packedstring-0.1 ... linking ... done.
+Loading package containers-0.1 ... linking ... done.
+Loading package pretty-1.0 ... linking ... done.
+Loading package template-haskell ... linking ... done.
+Loading package parsec-2.1.0.0 ... linking ... done.
