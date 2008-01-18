@@ -2139,9 +2139,23 @@ listCmd :: String -> GHCi ()
 listCmd "" = do
    mb_span <- getCurrentBreakSpan
    case mb_span of
-      Nothing  -> printForUser $ text "not stopped at a breakpoint; nothing to list"
-      Just span | GHC.isGoodSrcSpan span -> io $ listAround span True
-                | otherwise              -> printForUser $ text "unable to list source for" <+> ppr span
+      Nothing ->
+          printForUser $ text "Not stopped at a breakpoint; nothing to list"
+      Just span
+       | GHC.isGoodSrcSpan span -> io $ listAround span True
+       | otherwise ->
+          do s <- getSession
+             resumes <- io $ GHC.getResumeContext s
+             case resumes of
+                 [] -> panic "No resumes"
+                 (r:_) ->
+                     do let traceIt = case GHC.resumeHistory r of
+                                      [] -> text "rerunning with :trace,"
+                                      _ -> empty
+                            doWhat = traceIt <+> text ":back then :list"
+                        printForUser (text "Unable to list source for" <+>
+                                      ppr span
+                                   $$ text "Try" <+> doWhat)
 listCmd str = list2 (words str)
 
 list2 :: [String] -> GHCi ()
