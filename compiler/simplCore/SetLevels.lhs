@@ -669,8 +669,8 @@ type LevelEnv = (FloatOutSwitches,
 	-- We also use these envs when making a variable polymorphic
 	-- because we want to float it out past a big lambda.
 	--
-	-- The SubstEnv and IdEnv always implement the same mapping, but the
-	-- SubstEnv maps to CoreExpr and the IdEnv to LevelledExpr
+	-- The Subst and IdEnv always implement the same mapping, but the
+	-- Subst maps to CoreExpr and the IdEnv to LevelledExpr
 	-- Since the range is always a variable or type application,
 	-- there is never any difference between the two, but sadly
 	-- the types differ.  The SubstEnv is used when substituting in
@@ -774,9 +774,11 @@ abstractVars :: Level -> LevelEnv -> VarSet -> [Var]
 	-- These are the ones we are going to abstract out
 abstractVars dest_lvl (_, lvl_env, _, id_env) fvs
   = map zap $ uniq $ sortLe le 
-    [var | fv <- varSetElems fvs
-	 , var <- absVarsOf id_env fv
-	 , abstract_me var]
+	[var | fv <- varSetElems fvs
+	     , var <- absVarsOf id_env fv
+	     , abstract_me var ]
+	-- NB: it's important to call abstract_me only on the OutIds the
+	-- come from absVarsOf (not on fv, which is an InId)
   where
 	-- Sort the variables so the true type variables come first;
 	-- the tyvars scope over Ids and coercion vars
