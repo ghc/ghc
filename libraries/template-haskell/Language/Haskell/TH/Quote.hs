@@ -1,5 +1,5 @@
 {-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
-module Language.Haskell.TH.Quasi(
+module Language.Haskell.TH.Quote(
 	QuasiQuoter(..),
         dataToQa, dataToExpQ, dataToPatQ
     ) where
