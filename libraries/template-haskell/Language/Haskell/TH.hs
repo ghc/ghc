@@ -3,11 +3,11 @@
 module Language.Haskell.TH(
 	-- The monad and its operations
 	Q, runQ, 
-	report,		-- :: Bool -> String -> Q ()
-	recover, 	-- :: Q a -> Q a -> Q a
-	reify, 		-- :: Name -> Q Info
-	currentModule, 	-- :: Q String
-	runIO, 		-- :: IO a -> Q a
+	report,		  -- :: Bool -> String -> Q ()
+	recover, 	  -- :: Q a -> Q a -> Q a
+	reify, 		  -- :: Name -> Q Info
+	location,	  -- :: Q Location
+	runIO, 		  -- :: IO a -> Q a
 
 	-- Names
 	Name, 
@@ -22,7 +22,7 @@ module Language.Haskell.TH(
 	Clause(..), Body(..), Guard(..), Stmt(..), Range(..),
 	Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..), FunDep(..),
-	Info(..), 
+	Info(..), Loc(..),
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
 	-- Library functions

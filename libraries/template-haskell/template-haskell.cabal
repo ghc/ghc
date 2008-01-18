@@ -12,6 +12,7 @@ exposed-modules:
     Language.Haskell.TH.PprLib,
     Language.Haskell.TH.Ppr,
     Language.Haskell.TH.Lib,
+    Language.Haskell.TH.Quote,
     Language.Haskell.TH
 -- We need to set the package name to template-haskell (without a
 -- version number) as it's magic.

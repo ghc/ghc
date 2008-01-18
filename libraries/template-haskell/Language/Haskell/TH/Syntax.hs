@@ -26,11 +26,11 @@ module Language.Haskell.TH.Syntax(
 
 	Q, runQ, 
 	report,	recover, reify,
-	currentModule, runIO,
+	location, runIO,
 
 	-- Names
 	Name(..), mkName, newName, nameBase, nameModule,
-    showName, showName', NameIs(..),
+        showName, showName', NameIs(..),
 
 	-- The algebraic data types
 	Dec(..), Exp(..), Con(..), Type(..), Cxt, Match(..), 
@@ -38,7 +38,7 @@ module Language.Haskell.TH.Syntax(
 	Lit(..), Pat(..), FieldExp, FieldPat, 
 	Strict(..), Foreign(..), Callconv(..), Safety(..),
 	StrictType, VarStrictType, FunDep(..),
-	Info(..), 
+	Info(..), Loc(..), CharPos,
 	Fixity(..), FixityDirection(..), defaultFixity, maxPrecedence,
 
 	-- Internal functions
@@ -80,7 +80,7 @@ class (Monad m, Functor m) => Quasi m where
  
 	-- Inspect the type-checker's environment
   qReify :: Name -> m Info
-  qCurrentModule :: m String
+  qLocation :: m Loc
 
 	-- Input/output (dangerous)
   qRunIO :: IO a -> m a
@@ -105,9 +105,9 @@ instance Quasi IO where
   qReport True  msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
   qReport False msg = hPutStrLn stderr ("Template Haskell error: " ++ msg)
 
-  qReify v       = badIO "reify"
-  qCurrentModule = badIO "currentModule"
-  qRecover a b   = badIO "recover"	-- Maybe we could fix this?
+  qReify v     = badIO "reify"
+  qLocation    = badIO "currentLocation"
+  qRecover a b = badIO "recover"	-- Maybe we could fix this?
 
   qRunIO m = m
   
@@ -156,10 +156,10 @@ recover (Q r) (Q m) = Q (qRecover r m)
 reify :: Name -> Q Info
 reify v = Q (qReify v)
 
--- | 'currentModule' gives you the name of the module in which this 
+-- | 'location' gives you the 'Location' at which this
 -- computation is spliced.
-currentModule :: Q String
-currentModule = Q qCurrentModule
+location :: Q Loc
+location = Q qLocation
 
 -- |The 'runIO' function lets you run an I\/O computation in the 'Q' monad.
 -- Take care: you are guaranteed the ordering of calls to 'runIO' within 
@@ -172,12 +172,12 @@ runIO :: IO a -> Q a
 runIO m = Q (qRunIO m)
 
 instance Quasi Q where
-  qNewName        = newName
-  qReport 	 = report
-  qRecover  	 = recover 
-  qReify    	 = reify
-  qCurrentModule = currentModule
-  qRunIO         = runIO
+  qNewName  = newName
+  qReport   = report
+  qRecover  = recover 
+  qReify    = reify
+  qLocation = location
+  qRunIO    = runIO
 
 
 ----------------------------------------------------
@@ -523,6 +523,19 @@ mk_tup_name n_commas space
     tup_mod = mkModName "Data.Tuple"
 
 
+
+-----------------------------------------------------
+--		Locations
+-----------------------------------------------------
+
+data Loc
+  = Loc { loc_filename :: String
+	, loc_package  :: String
+	, loc_module   :: String
+	, loc_start    :: CharPos
+	, loc_end      :: CharPos }
+
+type CharPos = (Int, Int)	-- Line and character position
 
 
 -----------------------------------------------------
