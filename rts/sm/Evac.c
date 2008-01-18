@@ -170,7 +170,7 @@ unchain_thunk_selectors(StgSelector *p, StgClosure *val)
         ASSERT(p->header.info == &stg_BLACKHOLE_info);
 #endif
         // val must be in to-space.
-        ASSERT(Bdescr((P_)val)->gen_no > N || (Bdescr((P_)val)->flags & BF_EVACUATED));
+        ASSERT(!HEAP_ALLOCED(val) || Bdescr((P_)val)->gen_no > N || (Bdescr((P_)val)->flags & BF_EVACUATED));
 
         prev = (StgSelector*)((StgClosure *)p)->payload[0];
 
