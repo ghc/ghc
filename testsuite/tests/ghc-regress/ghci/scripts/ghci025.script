@@ -10,6 +10,8 @@ System.IO.putStrLn ":browse! T -- with -fglasgow-exts"
 
 System.IO.putStrLn "-- test :browse! <target> relative to different contexts"
 :set -fforce-recomp
+-- ToDo: this will go wrong in parallel
+:! cp ../prog001/D1.hs ../prog001/D.hs
 :l ../prog001/D.hs
 :add ../prog001/C.hs
 System.IO.putStrLn ":browse! C -- from *C>"
