@@ -6,13 +6,6 @@
 CoreSyn: A data type for the Haskell compiler midsection
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CoreSyn (
 	Expr(..), Alt, Bind(..), AltCon(..), Arg, Note(..),
 	CoreExpr, CoreAlt, CoreBind, CoreArg, CoreBndr,
@@ -66,6 +59,7 @@ import DataCon
 import BasicTypes
 import FastString
 import Outputable
+import Util
 
 infixl 4 `mkApps`, `mkValApps`, `mkTyApps`, `mkVarApps`
 -- Left associative, so that we can say (f `mkTyApps` xs `mkVarApps` ys)
@@ -243,6 +237,7 @@ data CoreRule
 		-- is just the rewrite of ru_fn applied to the first ru_nargs args
 		-- See Note [Extra args in rule matching] in Rules.lhs
 
+isBuiltinRule :: CoreRule -> Bool
 isBuiltinRule (BuiltinRule {}) = True
 isBuiltinRule _		       = False
 
@@ -311,68 +306,71 @@ data UnfoldingGuidance
 				-- a context (case (thing args) of ...),
 				-- (where there are the right number of arguments.)
 
+noUnfolding, evaldUnfolding :: Unfolding
 noUnfolding    = NoUnfolding
 evaldUnfolding = OtherCon []
 
+mkOtherCon :: [AltCon] -> Unfolding
 mkOtherCon = OtherCon
 
 seqUnfolding :: Unfolding -> ()
 seqUnfolding (CoreUnfolding e top b1 b2 g)
   = seqExpr e `seq` top `seq` b1 `seq` b2 `seq` seqGuidance g
-seqUnfolding other = ()
+seqUnfolding _ = ()
 
+seqGuidance :: UnfoldingGuidance -> ()
 seqGuidance (UnfoldIfGoodArgs n ns a b) = n `seq` sum ns `seq` a `seq` b `seq` ()
-seqGuidance other			= ()
+seqGuidance _                           = ()
 \end{code}
 
 \begin{code}
 unfoldingTemplate :: Unfolding -> CoreExpr
 unfoldingTemplate (CoreUnfolding expr _ _ _ _) = expr
 unfoldingTemplate (CompulsoryUnfolding expr)   = expr
-unfoldingTemplate other = panic "getUnfoldingTemplate"
+unfoldingTemplate _ = panic "getUnfoldingTemplate"
 
 maybeUnfoldingTemplate :: Unfolding -> Maybe CoreExpr
 maybeUnfoldingTemplate (CoreUnfolding expr _ _ _ _) = Just expr
 maybeUnfoldingTemplate (CompulsoryUnfolding expr)   = Just expr
-maybeUnfoldingTemplate other 			    = Nothing
+maybeUnfoldingTemplate _                            = Nothing
 
 otherCons :: Unfolding -> [AltCon]
 otherCons (OtherCon cons) = cons
-otherCons other		  = []
+otherCons _               = []
 
 isValueUnfolding :: Unfolding -> Bool
 	-- Returns False for OtherCon
 isValueUnfolding (CoreUnfolding _ _ is_evald _ _) = is_evald
-isValueUnfolding other			          = False
+isValueUnfolding _                                = False
 
 isEvaldUnfolding :: Unfolding -> Bool
 	-- Returns True for OtherCon
 isEvaldUnfolding (OtherCon _)		          = True
 isEvaldUnfolding (CoreUnfolding _ _ is_evald _ _) = is_evald
-isEvaldUnfolding other			          = False
+isEvaldUnfolding _                                = False
 
 isCheapUnfolding :: Unfolding -> Bool
 isCheapUnfolding (CoreUnfolding _ _ _ is_cheap _) = is_cheap
-isCheapUnfolding other			  	  = False
+isCheapUnfolding _                                = False
 
 isCompulsoryUnfolding :: Unfolding -> Bool
 isCompulsoryUnfolding (CompulsoryUnfolding _) = True
-isCompulsoryUnfolding other		      = False
+isCompulsoryUnfolding _                       = False
 
 hasUnfolding :: Unfolding -> Bool
 hasUnfolding (CoreUnfolding _ _ _ _ _) = True
 hasUnfolding (CompulsoryUnfolding _)   = True
-hasUnfolding other 	 	       = False
+hasUnfolding _                         = False
 
 hasSomeUnfolding :: Unfolding -> Bool
 hasSomeUnfolding NoUnfolding = False
-hasSomeUnfolding other	     = True
+hasSomeUnfolding _           = True
 
 neverUnfold :: Unfolding -> Bool
 neverUnfold NoUnfolding				= True
 neverUnfold (OtherCon _)			= True
 neverUnfold (CoreUnfolding _ _ _ _ UnfoldNever) = True
-neverUnfold other 				= False
+neverUnfold _                                   = False
 \end{code}
 
 
@@ -400,12 +398,12 @@ cmpAlt :: Alt b -> Alt b -> Ordering
 cmpAlt (con1, _, _) (con2, _, _) = con1 `cmpAltCon` con2
 
 ltAlt :: Alt b -> Alt b -> Bool
-ltAlt a1 a2 = case a1 `cmpAlt` a2 of { LT -> True; other -> False }
+ltAlt a1 a2 = (a1 `cmpAlt` a2) == LT
 
 cmpAltCon :: AltCon -> AltCon -> Ordering
 -- Compares AltCons within a single list of alternatives
 cmpAltCon DEFAULT      DEFAULT	   = EQ
-cmpAltCon DEFAULT      con	   = LT
+cmpAltCon DEFAULT      _           = LT
 
 cmpAltCon (DataAlt d1) (DataAlt d2) = dataConTag d1 `compare` dataConTag d2
 cmpAltCon (DataAlt _)  DEFAULT      = GT
@@ -579,10 +577,10 @@ It looks inside lambdas because (scc "foo" \x.e) = \x.scc "foo" e
 
 \begin{code}
 coreExprCc :: Expr b -> CostCentre
-coreExprCc (Note (SCC cc) e)   = cc
-coreExprCc (Note other_note e) = coreExprCc e
+coreExprCc (Note (SCC cc) _)   = cc
+coreExprCc (Note _ e)          = coreExprCc e
 coreExprCc (Lam _ e)           = coreExprCc e
-coreExprCc other               = noCostCentre
+coreExprCc _                   = noCostCentre
 \end{code}
 
 
@@ -601,30 +599,28 @@ Similarly isRuntimeArg.
 
 \begin{code}
 isRuntimeVar :: Var -> Bool
-isRuntimeVar | opt_RuntimeTypes = \v -> True
+isRuntimeVar | opt_RuntimeTypes = \_ -> True
 	     | otherwise	= \v -> isId v
 
 isRuntimeArg :: CoreExpr -> Bool
-isRuntimeArg | opt_RuntimeTypes = \e -> True
+isRuntimeArg | opt_RuntimeTypes = \_ -> True
 	     | otherwise	= \e -> isValArg e
 \end{code}
 
 \begin{code}
+isValArg :: Expr b -> Bool
 isValArg (Type _) = False
-isValArg other    = True
+isValArg _        = True
 
+isTypeArg :: Expr b -> Bool
 isTypeArg (Type _) = True
-isTypeArg other    = False
+isTypeArg _        = False
 
 valBndrCount :: [CoreBndr] -> Int
-valBndrCount []		    	  = 0
-valBndrCount (b : bs) | isId b    = 1 + valBndrCount bs
-		      | otherwise = valBndrCount bs
+valBndrCount = count isId
 
 valArgCount :: [Arg b] -> Int
-valArgCount []		    = 0
-valArgCount (Type _ : args) = valArgCount args
-valArgCount (other  : args) = 1 + valArgCount args
+valArgCount = count isValArg
 \end{code}
 
 
@@ -646,26 +642,34 @@ seqExpr (Cast e co)     = seqExpr e `seq` seqType co
 seqExpr (Note n e)      = seqNote n `seq` seqExpr e
 seqExpr (Type t)        = seqType t
 
+seqExprs :: [CoreExpr] -> ()
 seqExprs [] = ()
 seqExprs (e:es) = seqExpr e `seq` seqExprs es
 
+seqNote :: Note -> ()
 seqNote (CoreNote s)   = s `seq` ()
-seqNote other	       = ()
+seqNote _              = ()
 
+seqBndr :: CoreBndr -> ()
 seqBndr b = b `seq` ()
 
+seqBndrs :: [CoreBndr] -> ()
 seqBndrs [] = ()
 seqBndrs (b:bs) = seqBndr b `seq` seqBndrs bs
 
+seqBind :: Bind CoreBndr -> ()
 seqBind (NonRec b e) = seqBndr b `seq` seqExpr e
 seqBind (Rec prs)    = seqPairs prs
 
+seqPairs :: [(CoreBndr, CoreExpr)] -> ()
 seqPairs [] = ()
 seqPairs ((b,e):prs) = seqBndr b `seq` seqExpr e `seq` seqPairs prs
 
+seqAlts :: [CoreAlt] -> ()
 seqAlts [] = ()
-seqAlts ((c,bs,e):alts) = seqBndrs bs `seq` seqExpr e `seq` seqAlts alts
+seqAlts ((_,bs,e):alts) = seqBndrs bs `seq` seqExpr e `seq` seqAlts alts
 
+seqRules :: [CoreRule] -> ()
 seqRules [] = ()
 seqRules (Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs } : rules) 
   = seqBndrs bndrs `seq` seqExprs (rhs:args) `seq` seqRules rules
@@ -705,6 +709,7 @@ data AnnBind bndr annot
 deAnnotate :: AnnExpr bndr annot -> Expr bndr
 deAnnotate (_, e) = deAnnotate' e
 
+deAnnotate' :: AnnExpr' bndr annot -> Expr bndr
 deAnnotate' (AnnType t)           = Type t
 deAnnotate' (AnnVar  v)           = Var v
 deAnnotate' (AnnLit  lit)         = Lit lit
