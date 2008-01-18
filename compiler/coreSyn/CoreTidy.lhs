@@ -7,17 +7,12 @@ This module contains "tidying" code for *nested* expressions, bindings, rules.
 The code for *top-level* bindings is in TidyPgm.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CoreTidy (
 	tidyExpr, tidyVarOcc, tidyRule, tidyRules 
     ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import CoreSyn
@@ -62,7 +57,7 @@ tidyBind env (Rec prs)
 tidyExpr :: TidyEnv -> CoreExpr -> CoreExpr
 tidyExpr env (Var v)   	 =  Var (tidyVarOcc env v)
 tidyExpr env (Type ty) 	 =  Type (tidyType env ty)
-tidyExpr env (Lit lit) 	 =  Lit lit
+tidyExpr _   (Lit lit)   =  Lit lit
 tidyExpr env (App f a) 	 =  App (tidyExpr env f) (tidyExpr env a)
 tidyExpr env (Note n e)  =  Note (tidyNote env n) (tidyExpr env e)
 tidyExpr env (Cast e co) =  Cast (tidyExpr env e) (tidyType env co)
@@ -81,23 +76,25 @@ tidyExpr env (Lam b e)
     Lam b (tidyExpr env' e)
 
 ------------  Case alternatives  --------------
-tidyAlt case_bndr env (con, vs, rhs)
+tidyAlt :: CoreBndr -> TidyEnv -> CoreAlt -> CoreAlt
+tidyAlt _case_bndr env (con, vs, rhs)
   = tidyBndrs env vs 	=: \ (env', vs) ->
     (con, vs, tidyExpr env' rhs)
 
 ------------  Notes  --------------
-tidyNote env note            = note
+tidyNote :: TidyEnv -> Note -> Note
+tidyNote _ note            = note
 
 ------------  Rules  --------------
 tidyRules :: TidyEnv -> [CoreRule] -> [CoreRule]
-tidyRules env [] = []
+tidyRules _   [] = []
 tidyRules env (rule : rules)
   = tidyRule env rule  		=: \ rule ->
     tidyRules env rules 	=: \ rules ->
     (rule : rules)
 
 tidyRule :: TidyEnv -> CoreRule -> CoreRule
-tidyRule env rule@(BuiltinRule {}) = rule
+tidyRule _   rule@(BuiltinRule {}) = rule
 tidyRule env rule@(Rule { ru_bndrs = bndrs, ru_args = args, ru_rhs = rhs,
 			  ru_fn = fn, ru_rough = mb_ns })
   = tidyBndrs env bndrs		=: \ (env', bndrs) ->
@@ -193,5 +190,6 @@ tidyIdBndr env@(tidy_env, var_env) id
 \end{code}
 
 \begin{code}
+(=:) :: a -> (a -> b) -> b
 m =: k = m `seq` k m
 \end{code}
