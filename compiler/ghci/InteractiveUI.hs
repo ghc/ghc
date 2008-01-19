@@ -417,8 +417,10 @@ runGHCi paths maybe_expr = do
             interactiveLoop is_tty show_prompt
         Just expr -> do
             -- just evaluate the expression we were given
-            runCommandEval expr
-            return ()
+            enqueueCommands [expr]
+            let handleEval (ExitException code) = io (exitWith code)
+                handleEval e                    = handler e
+            runCommands' handleEval (return Nothing)
 
   -- and finally, exit
   io $ do when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."
@@ -594,13 +596,17 @@ queryQueue = do
                return (Just c)
 
 runCommands :: GHCi (Maybe String) -> GHCi ()
-runCommands getCmd = do
+runCommands = runCommands' handler
+
+runCommands' :: (Exception -> GHCi Bool) -- Exception handler
+             -> GHCi (Maybe String) -> GHCi ()
+runCommands' eh getCmd = do
   mb_cmd <- noSpace queryQueue
   mb_cmd <- maybe (noSpace getCmd) (return . Just) mb_cmd
   case mb_cmd of 
     Nothing -> return ()
     Just c  -> do
-      b <- ghciHandle handler (doCommand c)
+      b <- ghciHandle eh (doCommand c)
       if b then return () else runCommands getCmd
   where
     noSpace q = q >>= maybe (return Nothing)
@@ -641,24 +647,6 @@ enqueueCommands cmds = do
   st <- getGHCiState
   setGHCiState st{ cmdqueue = cmds ++ cmdqueue st }
 
-
--- This version is for the GHC command-line option -e.  The only difference
--- from runCommand is that it catches the ExitException exception and
--- exits, rather than printing out the exception.
-runCommandEval :: String -> GHCi Bool
-runCommandEval c = ghciHandle handleEval (doCommand c)
-  where 
-    handleEval (ExitException code) = io (exitWith code)
-    handleEval e                    = do handler e
-				         io (exitWith (ExitFailure 1))
-
-    doCommand (':' : command) = specialCommand command
-    doCommand stmt
-       = do r <- runStmt stmt GHC.RunToCompletion
-	    case r of 
-		False -> io (exitWith (ExitFailure 1))
-		  -- failure to run the command causes exit(1) for ghc -e.
-		_       -> return True
 
 runStmt :: String -> SingleStep -> GHCi Bool
 runStmt stmt step
