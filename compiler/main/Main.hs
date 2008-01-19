@@ -397,10 +397,10 @@ mode_flags =
 setMode :: CmdLineMode -> String -> ModeM ()
 setMode m flag = do
   (old_mode, old_flag, flags) <- getCmdLineState
-  when (notNull old_flag && flag /= old_flag) $
-      throwDyn (UsageError 
-          ("cannot use `" ++ old_flag ++ "' with `" ++ flag ++ "'"))
-  putCmdLineState (m, flag, flags)
+  if notNull old_flag && flag /= old_flag
+      then throwDyn (UsageError
+               ("cannot use `" ++ old_flag ++ "' with `" ++ flag ++ "'"))
+      else putCmdLineState (m, flag, flags)
 
 addFlag :: String -> ModeM ()
 addFlag s = do
