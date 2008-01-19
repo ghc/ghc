@@ -611,7 +611,7 @@ Prelude IO>
       </sect3>
 
       <sect3>
-        <title>The <literal>:main</literal> command</title>
+        <title>The <literal>:main</literal> and <literal>:run</literal> commands</title>
 
         <para>
           When a program is compiled and executed, it can use the
@@ -634,6 +634,37 @@ Prelude IO>
 Prelude> let main = System.Environment.getArgs >>= print
 Prelude> :main foo bar
 ["foo","bar"]
+</screen>
+
+        <para>
+            We can also quote arguments which contains characters like
+            spaces, and they are treated like Haskell strings, or we can
+            just use Haskell list syntax:
+        </para>
+
+<screen>
+Prelude> :main foo "bar baz"
+["foo","bar baz"]
+Prelude> :main ["foo", "bar baz"]
+["foo","bar baz"]
+</screen>
+
+        <para>
+            Finally, other functions can be called, either with the
+            <literal>-main-is</literal> flag or the <literal>:run</literal>
+            command:
+        </para>
+
+<screen>
+Prelude> let foo = putStrLn "foo" >> System.Environment.getArgs >>= print
+Prelude> let bar = putStrLn "bar" >> System.Environment.getArgs >>= print
+Prelude> :set -main-is foo
+Prelude> :main foo "bar baz"
+foo
+["foo","bar baz"]
+Prelude> :run bar ["foo", "bar baz"]
+bar
+["foo","bar baz"]
 </screen>
 
       </sect3>
@@ -2117,6 +2148,37 @@ Prelude> :. cmds.ghci
 Prelude> let main = System.Environment.getArgs >>= print
 Prelude> :main foo bar
 ["foo","bar"]
+</screen>
+
+        <para>
+            We can also quote arguments which contains characters like
+            spaces, and they are treated like Haskell strings, or we can
+            just use Haskell list syntax:
+        </para>
+
+<screen>
+Prelude> :main foo "bar baz"
+["foo","bar baz"]
+Prelude> :main ["foo", "bar baz"]
+["foo","bar baz"]
+</screen>
+
+        <para>
+            Finally, other functions can be called, either with the
+            <literal>-main-is</literal> flag or the <literal>:run</literal>
+            command:
+        </para>
+
+<screen>
+Prelude> let foo = putStrLn "foo" >> System.Environment.getArgs >>= print
+Prelude> let bar = putStrLn "bar" >> System.Environment.getArgs >>= print
+Prelude> :set -main-is foo
+Prelude> :main foo "bar baz"
+foo
+["foo","bar baz"]
+Prelude> :run bar ["foo", "bar baz"]
+bar
+["foo","bar baz"]
 </screen>
 
         </listitem>

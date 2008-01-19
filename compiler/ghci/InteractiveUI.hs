@@ -138,6 +138,7 @@ builtin_commands = [
   ("print",     keepGoing printCmd,             Nothing, completeIdentifier),
   ("quit",	quit,				Nothing, completeNone),
   ("reload", 	keepGoing reloadModule,  	Nothing, completeNone),
+  ("run",	keepGoing runRun,		Nothing, completeIdentifier),
   ("set",	keepGoing setCmd,		Just flagWordBreakChars, completeSetOptions),
   ("show",	keepGoing showCmd,		Nothing, completeNone),
   ("sprint",    keepGoing sprintCmd,            Nothing, completeIdentifier),
@@ -176,7 +177,11 @@ keepGoing :: (String -> GHCi ()) -> (String -> GHCi Bool)
 keepGoing a str = a str >> return False
 
 keepGoingPaths :: ([FilePath] -> GHCi ()) -> (String -> GHCi Bool)
-keepGoingPaths a str = a (toArgs str) >> return False
+keepGoingPaths a str
+ = do case toArgs str of
+          Left err -> io (hPutStrLn stderr err)
+          Right args -> a args
+      return False
 
 shortHelpText :: String
 shortHelpText = "use :? for help.\n"
@@ -206,6 +211,7 @@ helpText =
  "   :module [+/-] [*]<mod> ...  set the context for expression evaluation\n" ++
  "   :quit                       exit GHCi\n" ++
  "   :reload                     reload the current module set\n" ++
+ "   :run function [<arguments> ...] run the function with the given arguments\n" ++
  "   :type <expr>                show the type of <expr>\n" ++
  "   :undef <cmd>                undefine user-defined command :<cmd>\n" ++
  "   :!<command>                 run the shell command <command>\n" ++
@@ -851,9 +857,22 @@ pprInfo pefas (thing, fixity, insts)
 	| otherwise		   = ppr fix <+> ppr (GHC.getName thing)
 
 runMain :: String -> GHCi ()
-runMain args = do
-  let ss = concat $ intersperse "," (map (\ s -> ('"':s)++"\"") (toArgs args))
-  enqueueCommands  ['[': ss ++ "] `System.Environment.withArgs` main"]
+runMain s = case toArgs s of
+            Left err   -> io (hPutStrLn stderr err)
+            Right args ->
+                do dflags <- getDynFlags
+                   case mainFunIs dflags of
+                       Nothing -> doWithArgs args "main"
+                       Just f  -> doWithArgs args f
+
+runRun :: String -> GHCi ()
+runRun s = case toCmdArgs s of
+           Left err          -> io (hPutStrLn stderr err)
+           Right (cmd, args) -> doWithArgs args cmd
+
+doWithArgs :: [String] -> String -> GHCi ()
+doWithArgs args cmd = enqueueCommands ["System.Environment.withArgs " ++
+                                       show args ++ " (" ++ cmd ++ ")"]
 
 addModule :: [FilePath] -> GHCi ()
 addModule files = do
@@ -1398,27 +1417,32 @@ setCmd ""
                 ,Opt_PrintEvldWithShow
                 ] 
 setCmd str
-  = case toArgs str of
-	("args":args) -> setArgs args
-	("prog":prog) -> setProg prog
-        ("prompt":_)  -> setPrompt (after 6)
-        ("editor":_)  -> setEditor (after 6)
-        ("stop":_)    -> setStop (after 4)
-	wds -> setOptions wds
-   where after n = dropWhile isSpace $ drop n $ dropWhile isSpace str
+  = case getCmd str of
+    Right ("args",   rest) ->
+        case toArgs rest of
+            Left err -> io (hPutStrLn stderr err)
+            Right args -> setArgs args
+    Right ("prog",   rest) ->
+        case toArgs rest of
+            Right [prog] -> setProg prog
+            _ -> io (hPutStrLn stderr "syntax: :set prog <progname>")
+    Right ("prompt", rest) -> setPrompt $ dropWhile isSpace rest
+    Right ("editor", rest) -> setEditor $ dropWhile isSpace rest
+    Right ("stop",   rest) -> setStop   $ dropWhile isSpace rest
+    _ -> case toArgs str of
+         Left err -> io (hPutStrLn stderr err)
+         Right wds -> setOptions wds
 
-setArgs, setProg, setOptions :: [String] -> GHCi ()
-setEditor, setStop, setPrompt :: String -> GHCi ()
+setArgs, setOptions :: [String] -> GHCi ()
+setProg, setEditor, setStop, setPrompt :: String -> GHCi ()
 
 setArgs args = do
   st <- getGHCiState
   setGHCiState st{ args = args }
 
-setProg [prog] = do
+setProg prog = do
   st <- getGHCiState
   setGHCiState st{ progname = prog }
-setProg _ = do
-  io (hPutStrLn stderr "syntax: :set prog <progname>")
 
 setEditor cmd = do
   st <- getGHCiState

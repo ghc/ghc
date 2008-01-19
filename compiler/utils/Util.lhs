@@ -53,7 +53,7 @@ module Util (
         -- module names
         looksLikeModuleName,
 
-        toArgs,
+        getCmd, toCmdArgs, toArgs,
 
         -- Floating point stuff
         readRational,
@@ -657,44 +657,51 @@ looksLikeModuleName (c:cs) = isUpper c && go cs
 \end{code}
 
 Akin to @Prelude.words@, but acts like the Bourne shell, treating
-quoted strings and escaped characters within the input as solid blocks
-of characters.  Doesn't raise any exceptions on malformed escapes or
-quoting.
+quoted strings as Haskell Strings, and also parses Haskell [String]
+syntax.
 
 \begin{code}
-toArgs :: String -> [String]
-toArgs "" = []
-toArgs s  =
-  case dropWhile isSpace s of  -- drop initial spacing
-    [] -> []  -- empty, so no more tokens
-    rem -> let (tok,aft) = token rem [] in tok : toArgs aft
+getCmd :: String -> Either String             -- Error
+                           (String, String) -- (Cmd, Rest)
+getCmd s = case break isSpace $ dropWhile isSpace s of
+           ([], _) -> Left ("Couldn't find command in " ++ show s)
+           res -> Right res
+
+toCmdArgs :: String -> Either String             -- Error
+                              (String, [String]) -- (Cmd, Args)
+toCmdArgs s = case getCmd s of
+              Left err -> Left err
+              Right (cmd, s') -> case toArgs s' of
+                                 Left err -> Left err
+                                 Right args -> Right (cmd, args)
+
+toArgs :: String -> Either String   -- Error
+                           [String] -- Args
+toArgs str
+    = case dropWhile isSpace str of
+      s@('[':_) -> case reads s of
+                   [(args, spaces)]
+                    | all isSpace spaces ->
+                       Right args
+                   _ ->
+                       Left ("Couldn't read " ++ show str ++ "as [String]")
+      s -> toArgs' s
  where
-   -- Grab a token off the string, given that the first character exists and
-   -- isn't whitespace.  The second argument is an accumulator which has to be
-   -- reversed at the end.
-  token [] acc = (reverse acc,[])            -- out of characters
-  token ('\\':c:aft) acc                     -- escapes
-               = token aft ((escape c) : acc)
-  token (q:aft) acc | q == '"' || q == '\''  -- open quotes
-               = let (aft',acc') = quote q aft acc in token aft' acc'
-  token (c:aft) acc | isSpace c              -- unescaped, unquoted spacing
-               = (reverse acc,aft)
-  token (c:aft) acc                          -- anything else goes in the token
-               = token aft (c:acc)
-
-   -- Get the appropriate character for a single-character escape.
-  escape 'n' = '\n'
-  escape 't' = '\t'
-  escape 'r' = '\r'
-  escape c   = c
-
-   -- Read into accumulator until a quote character is found.
-  quote qc =
-    let quote' [] acc                  = ([],acc)
-        quote' ('\\':c:aft) acc        = quote' aft ((escape c) : acc)
-        quote' (c:aft) acc | c == qc   = (aft,acc)
-        quote' (c:aft) acc             = quote' aft (c:acc)
-    in quote'
+  toArgs' s = case dropWhile isSpace s of
+              [] -> Right []
+              ('"' : _) -> case reads s of
+                           [(arg, rest)]
+                              -- rest must either be [] or start with a space
+                            | all isSpace (take 1 rest) ->
+                               case toArgs' rest of
+                               Left err -> Left err
+                               Right args -> Right (arg : args)
+                           _ ->
+                               Left ("Couldn't read " ++ show s ++ "as String")
+              s' -> case break isSpace s' of
+                    (arg, s'') -> case toArgs' s'' of
+                                  Left err -> Left err
+                                  Right args -> Right (arg : args)
 \end{code}
 
 -- -----------------------------------------------------------------------------
