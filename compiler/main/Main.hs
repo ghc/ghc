@@ -376,22 +376,22 @@ mode_flags =
 
       ------- interfaces ----------------------------------------------------
   ,  ( "-show-iface"     , HasArg (\f -> setMode (ShowInterface f)
-					  "--show-iface"))
+                                                 "--show-iface"))
 
       ------- primary modes ------------------------------------------------
-  ,  ( "M"		, PassFlag (setMode DoMkDependHS))
-  ,  ( "E"		, PassFlag (setMode (StopBefore anyHsc)))
-  ,  ( "C"		, PassFlag (\f -> do setMode (StopBefore HCc) f
-					     addFlag "-fvia-C"))
-  ,  ( "S"		, PassFlag (setMode (StopBefore As)))
-  ,  ( "-make"		, PassFlag (setMode DoMake))
-  ,  ( "-interactive"	, PassFlag (setMode DoInteractive))
+  ,  ( "M"              , PassFlag (setMode DoMkDependHS))
+  ,  ( "E"              , PassFlag (setMode (StopBefore anyHsc)))
+  ,  ( "C"              , PassFlag (\f -> do setMode (StopBefore HCc) f
+                                             addFlag "-fvia-C"))
+  ,  ( "S"              , PassFlag (setMode (StopBefore As)))
+  ,  ( "-make"          , PassFlag (setMode DoMake))
+  ,  ( "-interactive"   , PassFlag (setMode DoInteractive))
   ,  ( "e"              , HasArg   (\s -> setMode (DoEval s) "-e"))
 
-	-- -fno-code says to stop after Hsc but don't generate any code.
-  ,  ( "fno-code"	, PassFlag (\f -> do setMode (StopBefore HCc) f
-					     addFlag "-fno-code"
-					     addFlag "-no-recomp"))
+       -- -fno-code says to stop after Hsc but don't generate any code.
+  ,  ( "fno-code"       , PassFlag (\f -> do setMode (StopBefore HCc) f
+                                             addFlag "-fno-code"
+                                             addFlag "-no-recomp"))
   ]
 
 setMode :: CmdLineMode -> String -> ModeM ()
