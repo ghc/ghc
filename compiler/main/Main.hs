@@ -1,10 +1,4 @@
 {-# OPTIONS -fno-warn-incomplete-patterns -optc-DNON_POSIX_SOURCE #-}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
 
 -----------------------------------------------------------------------------
 --
@@ -43,7 +37,7 @@ import StaticFlags
 import DynFlags
 import BasicTypes	( failed )
 import ErrUtils		( putMsg )
-import FastString	( getFastStringTable, isZEncoded, hasZEncoding )
+import FastString
 import Outputable
 import Util
 import Panic
@@ -71,6 +65,7 @@ import Data.Maybe
 -----------------------------------------------------------------------------
 -- GHC's command-line interface
 
+main :: IO ()
 main =
   GHC.defaultErrorHandler defaultDynFlags $ do
   
@@ -185,6 +180,7 @@ main =
   exitWith ExitSuccess
 
 #ifndef GHCI
+interactiveUI :: a -> b -> c -> IO ()
 interactiveUI _ _ _ = 
   throwDyn (CmdLineError "not built for interactive use")
 #endif
@@ -194,6 +190,8 @@ interactiveUI _ _ _ =
 -- interpret the -x <suffix> option, and attach a (Maybe Phase) to each source
 -- file indicating the phase specified by the -x option in force, if any.
 
+partition_args :: [String] -> [(String, Maybe Phase)] -> [String]
+               -> ([(String, Maybe Phase)], [String])
 partition_args [] srcs objs = (reverse srcs, reverse objs)
 partition_args ("-x":suff:args) srcs objs
   | "none" <- suff	= partition_args args srcs objs
@@ -223,6 +221,7 @@ partition_args (arg:args) srcs objs
       Everything else is considered to be a linker object, and passed
       straight through to the linker.
     -}
+looks_like_an_input :: String -> Bool
 looks_like_an_input m =  isSourceFilename m 
 		      || looksLikeModuleName m
 		      || '.' `notElem` m
@@ -319,17 +318,19 @@ data CmdLineMode
   | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   deriving (Show)
 
-isInteractiveMode, isInterpretiveMode     :: CmdLineMode -> Bool
-isLinkMode, isCompManagerMode :: CmdLineMode -> Bool
-
+#ifdef GHCI
+isInteractiveMode :: CmdLineMode -> Bool
 isInteractiveMode DoInteractive = True
 isInteractiveMode _		= False
+#endif
 
 -- isInterpretiveMode: byte-code compiler involved
+isInterpretiveMode :: CmdLineMode -> Bool
 isInterpretiveMode DoInteractive = True
 isInterpretiveMode (DoEval _)    = True
 isInterpretiveMode _             = False
 
+needsInputsMode :: CmdLineMode -> Bool
 needsInputsMode DoMkDependHS	= True
 needsInputsMode (StopBefore _)	= True
 needsInputsMode DoMake		= True
@@ -337,10 +338,12 @@ needsInputsMode _		= False
 
 -- True if we are going to attempt to link in this mode.
 -- (we might not actually link, depending on the GhcLink flag)
+isLinkMode :: CmdLineMode -> Bool
 isLinkMode (StopBefore StopLn) = True
 isLinkMode DoMake	       = True
 isLinkMode _   		       = False
 
+isCompManagerMode :: CmdLineMode -> Bool
 isCompManagerMode DoMake        = True
 isCompManagerMode DoInteractive = True
 isCompManagerMode (DoEval _)    = True
@@ -419,13 +422,13 @@ addFlag s = do
 -- Run --make mode
 
 doMake :: Session -> [(String,Maybe Phase)] -> IO ()
-doMake sess []    = throwDyn (UsageError "no input files")
+doMake _    []    = throwDyn (UsageError "no input files")
 doMake sess srcs  = do 
     let (hs_srcs, non_hs_srcs) = partition haskellish srcs
 
 	haskellish (f,Nothing) = 
 	  looksLikeModuleName f || isHaskellSrcFilename f || '.' `notElem` f
-	haskellish (f,Just phase) = 
+	haskellish (_,Just phase) = 
 	  phase `notElem` [As, Cc, CmmCpp, Cmm, StopLn]
 
     dflags <- GHC.getSessionDynFlags sess
@@ -451,12 +454,12 @@ doShowIface dflags file = do
 -- Various banners and verbosity output.
 
 showBanner :: CmdLineMode -> DynFlags -> IO ()
-showBanner cli_mode dflags = do
+showBanner _cli_mode dflags = do
    let verb = verbosity dflags
 
 #ifdef GHCI
    -- Show the GHCi banner
-   when (isInteractiveMode cli_mode && verb >= 1) $ putStrLn ghciWelcomeMsg
+   when (isInteractiveMode _cli_mode && verb >= 1) $ putStrLn ghciWelcomeMsg
 #endif
 
    -- Display details of the configuration in verbose mode
@@ -485,6 +488,7 @@ showVersion = do
   putStrLn (cProjectName ++ ", version " ++ cProjectVersion)
   exitWith ExitSuccess
 
+showGhcUsage :: DynFlags -> CmdLineMode -> IO ()
 showGhcUsage dflags cli_mode = do 
   let usage_path 
 	| DoInteractive <- cli_mode = ghciUsagePath dflags
@@ -520,7 +524,8 @@ dumpFastStringStats dflags = do
   putMsg dflags msg
   where
    x `pcntOf` y = int ((x * 100) `quot` y) <> char '%'
-  
+
+countFS :: Int -> Int -> Int -> Int -> [[FastString]] -> (Int, Int, Int, Int)
 countFS entries longest is_z has_z [] = (entries, longest, is_z, has_z)
 countFS entries longest is_z has_z (b:bs) = 
   let
