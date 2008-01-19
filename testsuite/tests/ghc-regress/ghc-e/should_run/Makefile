@@ -5,3 +5,6 @@ include $(TOP)/mk/test.mk
 ghc-e001:
 	$(TEST_HC) -ignore-dot-ghci -e "return ()"
 
+ghc-e002:
+	$(TEST_HC) -ignore-dot-ghci -e ":main" ghc-e002.hs
+
