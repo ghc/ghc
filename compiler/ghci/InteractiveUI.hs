@@ -280,8 +280,9 @@ findEditor = do
         return ""
 #endif
 
-interactiveUI :: Session -> [(FilePath, Maybe Phase)] -> Maybe String -> IO ()
-interactiveUI session srcs maybe_expr = do
+interactiveUI :: Session -> [(FilePath, Maybe Phase)] -> Maybe [String]
+              -> IO ()
+interactiveUI session srcs maybe_exprs = do
    -- HACK! If we happen to get into an infinite loop (eg the user
    -- types 'let x=x in x' at the prompt), then the thread will block
    -- on a blackhole, and become unreachable during GC.  The GC will
@@ -297,7 +298,7 @@ interactiveUI session srcs maybe_expr = do
     -- Initialise buffering for the *interpreted* I/O system
    initInterpBuffering session
 
-   when (isNothing maybe_expr) $ do
+   when (isNothing maybe_exprs) $ do
         -- Only for GHCi (not runghc and ghc -e):
 
         -- Turn buffering off for the compiled program's stdout/stderr
@@ -328,7 +329,7 @@ interactiveUI session srcs maybe_expr = do
 
    default_editor <- findEditor
 
-   startGHCi (runGHCi srcs maybe_expr)
+   startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname = "<interactive>",
                    args = [],
                    prompt = "%s> ",
@@ -351,8 +352,8 @@ interactiveUI session srcs maybe_expr = do
 
    return ()
 
-runGHCi :: [(FilePath, Maybe Phase)] -> Maybe String -> GHCi ()
-runGHCi paths maybe_expr = do
+runGHCi :: [(FilePath, Maybe Phase)] -> Maybe [String] -> GHCi ()
+runGHCi paths maybe_exprs = do
   let read_dot_files = not opt_IgnoreDotGhci
 
   when (read_dot_files) $ do
@@ -390,7 +391,7 @@ runGHCi paths maybe_expr = do
   when (not (null paths)) $ do
      ok <- ghciHandle (\e -> do showException e; return Failed) $
                 loadModule paths
-     when (isJust maybe_expr && failed ok) $
+     when (isJust maybe_exprs && failed ok) $
         io (exitWith (ExitFailure 1))
 
   -- if verbosity is greater than 0, or we are connected to a
@@ -399,7 +400,7 @@ runGHCi paths maybe_expr = do
   dflags <- getDynFlags
   let show_prompt = verbosity dflags > 0 || is_tty
 
-  case maybe_expr of
+  case maybe_exprs of
         Nothing ->
           do
 #if defined(mingw32_HOST_OS)
@@ -415,9 +416,9 @@ runGHCi paths maybe_expr = do
 #endif
             -- enter the interactive loop
             interactiveLoop is_tty show_prompt
-        Just expr -> do
+        Just exprs -> do
             -- just evaluate the expression we were given
-            enqueueCommands [expr]
+            enqueueCommands exprs
             let handleEval (ExitException code) = io (exitWith code)
                 handleEval e                    = handler e
             runCommands' handleEval (return Nothing)

@@ -179,7 +179,7 @@ main =
     DoMkDependHS           -> doMkDependHS session (map fst srcs)
     StopBefore p           -> oneShot dflags p srcs
     DoInteractive          -> interactiveUI session srcs Nothing
-    DoEval expr            -> interactiveUI session srcs (Just expr)
+    DoEval exprs           -> interactiveUI session srcs $ Just $ reverse exprs
 
   dumpFinalStats dflags
   exitWith ExitSuccess
@@ -316,7 +316,7 @@ data CmdLineMode
                             -- StopBefore StopLn is the default
   | DoMake                  -- ghc --make
   | DoInteractive           -- ghc --interactive
-  | DoEval String           -- ghc -e
+  | DoEval [String]         -- ghc -e foo -e bar => DoEval ["bar", "foo"]
   deriving (Show)
 
 isInteractiveMode, isInterpretiveMode     :: CmdLineMode -> Bool
@@ -386,7 +386,7 @@ mode_flags =
   ,  ( "S"              , PassFlag (setMode (StopBefore As)))
   ,  ( "-make"          , PassFlag (setMode DoMake))
   ,  ( "-interactive"   , PassFlag (setMode DoInteractive))
-  ,  ( "e"              , HasArg   (\s -> setMode (DoEval s) "-e"))
+  ,  ( "e"              , HasArg   (\s -> updateMode (updateDoEval s) "-e"))
 
        -- -fno-code says to stop after Hsc but don't generate any code.
   ,  ( "fno-code"       , PassFlag (\f -> do setMode (StopBefore HCc) f
@@ -395,12 +395,19 @@ mode_flags =
   ]
 
 setMode :: CmdLineMode -> String -> ModeM ()
-setMode m flag = do
+setMode m flag = updateMode (\_ -> m) flag
+
+updateDoEval :: String -> CmdLineMode -> CmdLineMode
+updateDoEval expr (DoEval exprs) = DoEval (expr : exprs)
+updateDoEval expr _              = DoEval [expr]
+
+updateMode :: (CmdLineMode -> CmdLineMode) -> String -> ModeM ()
+updateMode f flag = do
   (old_mode, old_flag, flags) <- getCmdLineState
   if notNull old_flag && flag /= old_flag
       then throwDyn (UsageError
                ("cannot use `" ++ old_flag ++ "' with `" ++ flag ++ "'"))
-      else putCmdLineState (m, flag, flags)
+      else putCmdLineState (f old_mode, flag, flags)
 
 addFlag :: String -> ModeM ()
 addFlag s = do
