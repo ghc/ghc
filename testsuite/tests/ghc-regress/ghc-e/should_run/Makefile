@@ -11,3 +11,6 @@ ghc-e002:
 ghc-e003:
 	$(TEST_HC) -ignore-dot-ghci -e "putStrLn \"Foo\"" -e "putStrLn \"Bar\""
 
+ghc-e004:
+	$(TEST_HC) -ignore-dot-ghci -e ":m + System.Exit" -e "exitWith (ExitFailure 6)"; echo $$?
+
