@@ -63,6 +63,7 @@ Other Prelude modules are much easier with fewer complex dependencies.
 
 \begin{code}
 {-# OPTIONS_GHC -fno-implicit-prelude #-}
+{-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Base

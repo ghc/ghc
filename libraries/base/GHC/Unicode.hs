@@ -1,5 +1,6 @@
 {-# OPTIONS -fno-implicit-prelude #-}
 {-# OPTIONS -#include "WCsubst.h" #-}
+{-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Unicode

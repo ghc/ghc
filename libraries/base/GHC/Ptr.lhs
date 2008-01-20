@@ -1,5 +1,6 @@
 \begin{code}
 {-# OPTIONS_GHC -fno-implicit-prelude #-}
+{-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Ptr

@@ -1,5 +1,6 @@
 \begin{code}
 {-# OPTIONS_GHC -fno-implicit-prelude -fno-bang-patterns -funbox-strict-fields #-}
+{-# OPTIONS_HADDOCK hide #-}
 -----------------------------------------------------------------------------
 -- |
 -- Module      :  GHC.Arr
