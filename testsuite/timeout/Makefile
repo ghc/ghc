@@ -6,7 +6,9 @@ MKDEPENDHS = $(GHC_INPLACE)
 SRC_HC_OPTS += -threaded
 EXCLUDED_SRCS += TimeMe.hs
 
-ifeq "$(Windows)" "NO"
+ifeq "$(Windows)" "YES"
+SRC_HC_OPTS += -package Win32
+else
 SRC_HC_OPTS += -package unix
 endif
 
