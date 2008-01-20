@@ -17,7 +17,9 @@
 
 -- #hide
 module GHC.TopHandler (
-   runMainIO, runIO, runIOFastExit, runNonIO, reportStackOverflow, reportError
+   runMainIO, runIO, runIOFastExit, runNonIO,
+   topHandler, topHandlerFastExit,
+   reportStackOverflow, reportError,
   ) where
 
 import Prelude
