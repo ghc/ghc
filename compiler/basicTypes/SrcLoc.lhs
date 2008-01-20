@@ -43,6 +43,7 @@ module SrcLoc (
 import Util
 import Outputable
 import FastString
+import System.FilePath
 \end{code}
 
 %************************************************************************
@@ -129,17 +130,20 @@ cmpSrcLoc (SrcLoc s1 l1 c1) (SrcLoc s2 l2 c2)
   = (s1 `compare` s2) `thenCmp` (l1 `compare` l2) `thenCmp` (c1 `compare` c2)
 cmpSrcLoc (SrcLoc _ _ _) _other = GT
 
+pprFastFilePath :: FastString -> SDoc
+pprFastFilePath path = text $ normalise $ unpackFS path
+
 instance Outputable SrcLoc where
     ppr (SrcLoc src_path src_line src_col)
       = getPprStyle $ \ sty ->
         if userStyle sty || debugStyle sty then
-	   hcat [ ftext src_path, char ':', 
-		  int src_line,
-		  char ':', int src_col
-		]
-	else
-	   hcat [text "{-# LINE ", int src_line, space,
-		 char '\"', ftext src_path, text " #-}"]
+            hcat [ pprFastFilePath src_path, char ':', 
+                   int src_line,
+                   char ':', int src_col
+                 ]
+        else
+            hcat [text "{-# LINE ", int src_line, space,
+                  char '\"', pprFastFilePath src_path, text " #-}"]
 
     ppr (UnhelpfulLoc s)  = ftext s
 \end{code}
@@ -316,15 +320,15 @@ instance Outputable SrcSpan where
     ppr span
       = getPprStyle $ \ sty ->
         if userStyle sty || debugStyle sty then
-	   pprUserSpan span
-	else
-	   hcat [text "{-# LINE ", int (srcSpanStartLine span), space,
-		 char '\"', ftext (srcSpanFile span), text " #-}"]
+           pprUserSpan span
+        else
+           hcat [text "{-# LINE ", int (srcSpanStartLine span), space,
+                 char '\"', pprFastFilePath $ srcSpanFile span, text " #-}"]
 
 
 pprUserSpan :: SrcSpan -> SDoc
 pprUserSpan (SrcSpanOneLine src_path line start_col end_col)
-  = hcat [ ftext src_path, char ':', 
+  = hcat [ pprFastFilePath src_path, char ':', 
 	   int line,
 	   char ':', int start_col
 	 ]
@@ -335,7 +339,7 @@ pprUserSpan (SrcSpanOneLine src_path line start_col end_col)
 	  else  char '-' <> int (end_col-1)
 
 pprUserSpan (SrcSpanMultiLine src_path sline scol eline ecol)
-  = hcat [ ftext src_path, char ':', 
+  = hcat [ pprFastFilePath src_path, char ':', 
 		  parens (int sline <> char ',' <>  int scol),
 		  char '-',
 		  parens (int eline <> char ',' <>  
@@ -343,7 +347,7 @@ pprUserSpan (SrcSpanMultiLine src_path sline scol eline ecol)
 		]
 
 pprUserSpan (SrcSpanPoint src_path line col)
-  = hcat [ ftext src_path, char ':', 
+  = hcat [ pprFastFilePath src_path, char ':', 
 	   int line,
 	   char ':', int col
 	 ]
