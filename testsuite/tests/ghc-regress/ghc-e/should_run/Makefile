@@ -14,3 +14,7 @@ ghc-e003:
 ghc-e004:
 	$(TEST_HC) -ignore-dot-ghci -e ":m + System.Exit" -e "exitWith (ExitFailure 6)"; echo $$?
 
+# This is what runghc does:
+ghc-e005:
+	$(TEST_HC) -ignore-dot-ghci -main-is foo ghc-e005.hs -e ":set prog ghc-e005-prog" -e ":main [\"the\",\"args\"]"; echo $$?
+
