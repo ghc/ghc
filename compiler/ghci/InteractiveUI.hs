@@ -608,7 +608,7 @@ runCommands' eh getCmd = do
     Nothing -> return ()
     Just c  -> do
       b <- ghciHandle eh (doCommand c)
-      if b then return () else runCommands getCmd
+      if b then return () else runCommands' eh getCmd
   where
     noSpace q = q >>= maybe (return Nothing)
                             (\c->case removeSpaces c of 
