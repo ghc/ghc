@@ -61,31 +61,23 @@ doIt ghc args = do
     case rest of
         [] -> dieProg usage
         filename : prog_args -> do
-            let expr = "System.Environment.withProgName " ++ show filename ++
-                       " (System.Environment.withArgs " ++ show prog_args ++
-                       " (GHC.TopHandler.runIOFastExit" ++
-                       " (Main.main Prelude.>> Prelude.return ())))"
+            let c1 = ":set prog " ++ show filename
+                c2 = ":main " ++ show prog_args
             res <- rawSystem ghc (["-ignore-dot-ghci"] ++ ghc_args ++
-                                  [ "-e", expr, filename])
-               -- runIOFastExit: makes exceptions raised by Main.main
-               -- behave in the same way as for a compiled program.
-               -- The "fast exit" part just calls exit() directly
-               -- instead of doing an orderly runtime shutdown,
-               -- otherwise the main GHCi thread will complain about
-               -- being interrupted.
-               --
-               -- Why (main >> return ()) rather than just main?  Because
-               -- otherwise GHCi by default tries to evaluate the result
-               -- of the IO in order to show it (see #1200).
+                                  [ "-e", c1, "-e", c2, filename])
             exitWith res
 
 getGhcArgs :: [String] -> ([String], [String])
-getGhcArgs args = case break pastArgs args of
-                      (xs, "--":ys) -> (xs, ys)
-                      (xs, ys)      -> (xs, ys)
+getGhcArgs args
+ = let (ghcArgs, otherArgs) = case break pastArgs args of
+                              (xs, "--":ys) -> (xs, ys)
+                              (xs, ys)      -> (xs, ys)
+   in (map unescape ghcArgs, otherArgs)
+    where unescape ('-':'-':'g':'h':'c':'-':'a':'r':'g':'=':arg) = arg
+          unescape arg = arg
 
 pastArgs :: String -> Bool
--- You can use -- to mark the end of the flags, in caes you need to use
+-- You can use -- to mark the end of the flags, in case you need to use
 -- a file called -foo.hs for some reason. You almost certainly shouldn't,
 -- though.
 pastArgs "--" = True
