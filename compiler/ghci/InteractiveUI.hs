@@ -344,7 +344,7 @@ interactiveUI session srcs maybe_exprs = do
                    tickarrays = emptyModuleEnv,
                    last_command = Nothing,
                    cmdqueue = [],
-                   remembered_ctx = Nothing
+                   remembered_ctx = []
                  }
 
 #ifdef USE_READLINE
@@ -898,7 +898,7 @@ changeDirectory dir = do
   prev_context <- io $ GHC.getContext session
   io (GHC.setTargets session [])
   io (GHC.load session LoadAllTargets)
-  setContextAfterLoad session prev_context []
+  setContextAfterLoad session prev_context False []
   io (GHC.workingDirectoryChanged session)
   dir <- expandPath dir
   io (setCurrentDirectory dir)
@@ -1080,45 +1080,14 @@ afterLoad ok session retain_context prev_context = do
       loaded_mod_names = map GHC.moduleName loaded_mods
   modulesLoadedMsg ok loaded_mod_names
 
-  st <- getGHCiState
-  if not retain_context
-    then do
-        setGHCiState st{ remembered_ctx = Nothing }
-        setContextAfterLoad session prev_context loaded_mod_summaries
-    else do
-        -- figure out which modules we can keep in the context, which we
-        -- have to put back, and which we have to remember because they
-        -- are (temporarily) unavailable.  See ghci.prog009, #1873, #1360
-        let (as,bs) = prev_context
-            as1 = filter isHomeModule as -- package modules are kept anyway
-            bs1 = filter isHomeModule bs
-            (as_ok, as_bad) = partition (`elem` loaded_mods) as1
-            (bs_ok, bs_bad) = partition (`elem` loaded_mods) bs1
-            (rem_as, rem_bs) = fromMaybe ([],[]) (remembered_ctx st)
-            (rem_as_ok, rem_as_bad) = partition (`elem` loaded_mods) rem_as
-            (rem_bs_ok, rem_bs_bad) = partition (`elem` loaded_mods) rem_bs
-            as' = nub (as_ok++rem_as_ok)
-            bs' = nub (bs_ok++rem_bs_ok)
-            rem_as' = nub (rem_as_bad ++ as_bad)
-            rem_bs' = nub (rem_bs_bad ++ bs_bad)
-
-         -- Put back into the context any modules that we previously had
-         -- to drop because they weren't available (rem_as_ok, rem_bs_ok).
-        setContextKeepingPackageModules session prev_context (as',bs')
-
-         -- If compilation failed, remember any modules that we are unable
-         -- to load, so that we can put them back in the context in the future.
-        case ok of
-         Succeeded -> setGHCiState st{ remembered_ctx = Nothing }
-         Failed    -> setGHCiState st{ remembered_ctx = Just (rem_as',rem_bs') }
+  setContextAfterLoad session prev_context retain_context loaded_mod_summaries
 
 
-
-setContextAfterLoad :: Session -> ([Module],[Module]) -> [GHC.ModSummary] -> GHCi ()
-setContextAfterLoad session prev [] = do
+setContextAfterLoad :: Session -> ([Module],[Module]) -> Bool -> [GHC.ModSummary] -> GHCi ()
+setContextAfterLoad session prev keep_ctxt [] = do
   prel_mod <- getPrelude
-  setContextKeepingPackageModules session prev ([], [prel_mod])
-setContextAfterLoad session prev ms = do
+  setContextKeepingPackageModules session prev keep_ctxt ([], [prel_mod])
+setContextAfterLoad session prev keep_ctxt ms = do
   -- load a target if one is available, otherwise load the topmost module.
   targets <- io (GHC.getTargets session)
   case [ m | Just m <- map (findTarget ms) targets ] of
@@ -1142,23 +1111,31 @@ setContextAfterLoad session prev ms = do
 
    load_this summary | m <- GHC.ms_mod summary = do
 	b <- io (GHC.moduleIsInterpreted session m)
-	if b then setContextKeepingPackageModules session prev ([m], [])
+	if b then setContextKeepingPackageModules session prev keep_ctxt ([m], [])
        	     else do
                 prel_mod <- getPrelude
-                setContextKeepingPackageModules session prev ([],[prel_mod,m])
+                setContextKeepingPackageModules session prev keep_ctxt ([],[prel_mod,m])
 
 -- | Keep any package modules (except Prelude) when changing the context.
 setContextKeepingPackageModules
         :: Session
         -> ([Module],[Module])          -- previous context
+        -> Bool                         -- re-execute :module commands
         -> ([Module],[Module])          -- new context
         -> GHCi ()
-setContextKeepingPackageModules session prev_context (as,bs) = do
+setContextKeepingPackageModules session prev_context keep_ctxt (as,bs) = do
   let (_,bs0) = prev_context
   prel_mod <- getPrelude
   let pkg_modules = filter (\p -> not (isHomeModule p) && p /= prel_mod) bs0
   let bs1 = if null as then nub (prel_mod : bs) else bs
   io $ GHC.setContext session as (nub (bs1 ++ pkg_modules))
+  if keep_ctxt
+     then do
+          st <- getGHCiState
+          mapM_ (playCtxtCmd False) (remembered_ctx st)
+     else do
+          st <- getGHCiState
+          setGHCiState st{ remembered_ctx = [] }
 
 isHomeModule :: Module -> Bool
 isHomeModule mod = GHC.modulePackageId mod == mainPackageId
@@ -1317,60 +1294,65 @@ browseModule bang modl exports_only = do
 
 setContext :: String -> GHCi ()
 setContext str
-  | all sensible mods = fn mods
+  | all sensible strs = do
+       playCtxtCmd True (cmd, as, bs)
+       st <- getGHCiState
+       setGHCiState st{ remembered_ctx = remembered_ctx st ++ [(cmd,as,bs)] }
   | otherwise = throwDyn (CmdLineError "syntax:  :module [+/-] [*]M1 ... [*]Mn")
   where
-    (fn, mods) = case str of 
-			'+':stuff -> (addToContext,      words stuff)
-			'-':stuff -> (removeFromContext, words stuff)
-			stuff     -> (newContext,        words stuff) 
+    (cmd, strs, as, bs) =
+        case str of 
+                '+':stuff -> rest AddModules stuff
+                '-':stuff -> rest RemModules stuff
+                stuff     -> rest SetContext stuff
+
+    rest cmd stuff = (cmd, strs, as, bs)
+       where strs = words stuff
+             (as,bs) = partitionWith starred strs
 
     sensible ('*':m) = looksLikeModuleName m
     sensible m       = looksLikeModuleName m
 
-separate :: Session -> [String] -> [Module] -> [Module] 
-        -> GHCi ([Module],[Module])
-separate _       []             as bs = return (as,bs)
-separate session (('*':str):ms) as bs = do
-  m <- wantInterpretedModule str
-  separate session ms (m:as) bs
-separate session (str:ms) as bs = do
-  m <- lookupModule str
-  separate session ms as (m:bs)
+    starred ('*':m) = Left m
+    starred m       = Right m
 
-newContext :: [String] -> GHCi ()
-newContext strs = do
-  s <- getSession
-  (as,bs) <- separate s strs [] []
-  prel_mod <- getPrelude
-  let bs' = if null as && prel_mod `notElem` bs then prel_mod:bs else bs
-  io $ GHC.setContext s as bs'
+playCtxtCmd :: Bool -> (CtxtCmd, [String], [String]) -> GHCi ()
+playCtxtCmd fail (cmd, as, bs)
+  = do
+    s <- getSession
+    (as',bs') <- do_checks fail
+    (prev_as,prev_bs) <- io $ GHC.getContext s
+    (new_as, new_bs) <-
+      case cmd of
+        SetContext -> do
+          prel_mod <- getPrelude
+          let bs'' = if null as && prel_mod `notElem` bs' then prel_mod:bs'
+                                                          else bs'
+          return (as',bs'')
+        AddModules -> do
+          let as_to_add = as' \\ (prev_as ++ prev_bs)
+              bs_to_add = bs' \\ (prev_as ++ prev_bs)
+          return (prev_as ++ as_to_add, prev_bs ++ bs_to_add)
+        RemModules -> do
+          let new_as = prev_as \\ (as' ++ bs')
+              new_bs = prev_bs \\ (as' ++ bs')
+          return (new_as, new_bs)
+    io $ GHC.setContext s new_as new_bs
+  where
+    do_checks True = do
+      as' <- mapM wantInterpretedModule as
+      bs' <- mapM lookupModule bs
+      return (as',bs')
+    do_checks False = do
+      as' <- mapM (trymaybe . wantInterpretedModule) as
+      bs' <- mapM (trymaybe . lookupModule) bs
+      return (catMaybes as', catMaybes bs')
 
-
-addToContext :: [String] -> GHCi ()
-addToContext strs = do
-  s <- getSession
-  (as,bs) <- io $ GHC.getContext s
-
-  (new_as,new_bs) <- separate s strs [] []
-
-  let as_to_add = new_as \\ (as ++ bs)
-      bs_to_add = new_bs \\ (as ++ bs)
-
-  io $ GHC.setContext s (as ++ as_to_add) (bs ++ bs_to_add)
-
-
-removeFromContext :: [String] -> GHCi ()
-removeFromContext strs = do
-  s <- getSession
-  (as,bs) <- io $ GHC.getContext s
-
-  (as_to_remove,bs_to_remove) <- separate s strs [] []
-
-  let as' = as \\ (as_to_remove ++ bs_to_remove)
-      bs' = bs \\ (as_to_remove ++ bs_to_remove)
-
-  io $ GHC.setContext s as' bs'
+    trymaybe m = do
+        r <- ghciTry m
+        case r of
+          Left _  -> return Nothing
+          Right a -> return (Just a)
 
 ----------------------------------------------------------------------------
 -- Code for `:set'
@@ -1502,7 +1484,7 @@ newDynFlags minus_opts = do
         io (GHC.load session LoadAllTargets)
         io (linkPackages dflags new_pkgs)
         -- package flags changed, we can't re-use any of the old context
-        setContextAfterLoad session ([],[]) []
+        setContextAfterLoad session ([],[]) False []
       return ()
 
 
@@ -1833,6 +1815,8 @@ ghciHandle h (GHCi m) = GHCi $ \s ->
 ghciUnblock :: GHCi a -> GHCi a
 ghciUnblock (GHCi a) = GHCi $ \s -> Exception.unblock (a s)
 
+ghciTry :: GHCi a -> GHCi (Either Exception a)
+ghciTry (GHCi m) = GHCi $ \s -> Exception.try (m s) 
 
 -- ----------------------------------------------------------------------------
 -- Utils
@@ -2358,4 +2342,3 @@ setBreakFlag :: Bool -> GHC.BreakArray -> Int -> IO Bool
 setBreakFlag toggle array index
    | toggle    = GHC.setBreakOn array index 
    | otherwise = GHC.setBreakOff array index
-

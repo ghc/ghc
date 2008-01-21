@@ -68,10 +68,19 @@ data GHCiState = GHCiState
         -- remember is here:
         last_command   :: Maybe Command,
         cmdqueue       :: [String],
-        remembered_ctx :: Maybe ([Module],[Module])
-                -- modules we want to add to the context, but can't
-                -- because they currently have errors.  Set by :reload.
+        remembered_ctx :: [(CtxtCmd, [String], [String])]
+             -- we remember the :module commands between :loads, so that
+             -- on a :reload we can replay them.  See bugs #2049,
+             -- #1873, #1360. Previously we tried to remember modules that
+             -- were supposed to be in the context but currently had errors,
+             -- but this was complicated.  Just replaying the :module commands
+             -- seems to be the right thing.
      }
+
+data CtxtCmd
+  = SetContext
+  | AddModules
+  | RemModules
 
 type TickArray = Array Int [(BreakIndex,SrcSpan)]
 
