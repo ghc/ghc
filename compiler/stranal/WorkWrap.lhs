@@ -197,6 +197,27 @@ reason), then we don't w-w it.
 
 The only reason this is monadised is for the unique supply.
 
+Note [Don't w/w inline things]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+It's very important to refrain from w/w-ing an INLINE function
+If we do so by mistake we transform
+	f = __inline (\x -> E)
+into
+	f = __inline (\x -> case x of (a,b) -> fw E)
+	fw = \ab -> (__inline (\x -> E)) (a,b)
+and the original __inline now vanishes, so E is no longer
+inside its __inline wrapper.  Death!  Disaster!
+
+Furthermore, if the programmer has marked something as INLINE, 
+we may lose by w/w'ing it.
+
+If the strictness analyser is run twice, this test also prevents
+wrappers (which are INLINEd) from being re-done.
+
+Notice that we refrain from w/w'ing an INLINE function even if it is
+in a recursive group.  It might not be the loop breaker.  (We could
+test for loop-breaker-hood, but I'm not sure that ever matters.)
+
 \begin{code}
 tryWW	:: RecFlag
 	-> Id				-- The fn binder
@@ -208,20 +229,8 @@ tryWW	:: RecFlag
 					-- if two, then a worker and a
 					-- wrapper.
 tryWW is_rec fn_id rhs
-  |  isNonRec is_rec && certainlyWillInline unfolding
-	-- No point in worker/wrappering a function that is going to be
-	-- INLINEd wholesale anyway.  If the strictness analyser is run
-	-- twice, this test also prevents wrappers (which are INLINEd)
-	-- from being re-done.
-	--	
-	-- It's very important to refrain from w/w-ing an INLINE function
-	-- If we do so by mistake we transform
-	--	f = __inline (\x -> E)
-	-- into
-	--	f = __inline (\x -> case x of (a,b) -> fw E)
-	--	fw = \ab -> (__inline (\x -> E)) (a,b)
-	-- and the original __inline now vanishes, so E is no longer
-	-- inside its __inline wrapper.  Death!  Disaster!
+  |  -- isNonRec is_rec && 	-- Now omitted: see Note [Don't w/w inline things]
+     certainlyWillInline unfolding
 
   || isNeverActive inline_prag
 	-- No point in worker/wrappering if the thing is never inlined!
