@@ -6309,7 +6309,7 @@ exactly what you asked for, no more and no less.
 	      there was no pragma).
             </para></listitem>
 	    <listitem>
-	    <para>"<literal>INLINE[~k] f</literal>" means: be willing to inline
+	    <para>"<literal>NOINLINE[~k] f</literal>" means: be willing to inline
 	    <literal>f</literal>
 	      until phase <literal>k</literal>, but from phase
 	      <literal>k</literal> onwards do not inline it.
