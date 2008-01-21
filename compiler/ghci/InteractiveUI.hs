@@ -82,9 +82,10 @@ import Data.Array
 import Control.Monad as Monad
 import Text.Printf
 import Foreign
-import Foreign.C        ( withCStringLen )
+import Foreign.C
 import GHC.Exts		( unsafeCoerce# )
 import GHC.IOBase	( IOErrorType(InvalidArgument) )
+import GHC.TopHandler
 
 import Data.IORef	( IORef, readIORef, writeIORef )
 
@@ -419,13 +420,21 @@ runGHCi paths maybe_exprs = do
         Just exprs -> do
             -- just evaluate the expression we were given
             enqueueCommands exprs
-            let handleEval (ExitException code) = io (exitWith code)
-                handleEval e                    = handler e
-            runCommands' handleEval (return Nothing)
+            let handle e = do st <- getGHCiState
+                                   -- Jump through some hoops to get the
+                                   -- current progname in the exception text:
+                                   -- <progname>: <exception>
+                              io $ withProgName (progname st)
+                                   -- The "fast exit" part just calls exit()
+                                   -- directly instead of doing an orderly
+                                   -- runtime shutdown, otherwise the main
+                                   -- GHCi thread will complain about being
+                                   -- interrupted.
+                                 $ topHandlerFastExit e
+            runCommands' handle (return Nothing)
 
   -- and finally, exit
   io $ do when (verbosity dflags > 0) $ putStrLn "Leaving GHCi."
-
 
 interactiveLoop :: Bool -> Bool -> GHCi ()
 interactiveLoop is_tty show_prompt =
