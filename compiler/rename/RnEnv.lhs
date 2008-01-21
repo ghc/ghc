@@ -869,8 +869,10 @@ checkShadowedNames doc_str (global_env,local_env) loc_rdr_names
 	| otherwise	     = return ()
 	where
 	  complain pp_locs = addWarnAt loc (shadowedNameWarn doc_str occ pp_locs)
-	  mb_local = lookupLocalRdrOcc  local_env  occ
-          gres     = lookupGlobalRdrEnv global_env occ
+	  mb_local = lookupLocalRdrOcc local_env occ
+          gres     = lookupGRE_RdrName (mkRdrUnqual occ) global_env
+		-- Make an Unqualified RdrName and look that up, so that
+		-- we don't find any GREs that are in scope qualified-only
 \end{code}
 
 
