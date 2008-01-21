@@ -221,7 +221,7 @@ However things are made quite a bit more complicated by RULES.  Remember
     Remmber that we simplify the RULES before any RHS (see Note
     [Rules are visible in their own rec group] above).
 
-    So we must *not* postInlineUnconditinoally 'g', even though
+    So we must *not* postInlineUnconditionally 'g', even though
     its RHS turns out to be trivial.  (I'm assuming that 'g' is
     not choosen as a loop breaker.)
 
@@ -235,7 +235,7 @@ However things are made quite a bit more complicated by RULES.  Remember
 	other			yes 	yes
 
     The **sole** reason for this kind of loop breaker is so that
-    postInlineUnconditioanlly does not fire.  Ugh.
+    postInlineUnconditionally does not fire.  Ugh.
 
   * Note [Rule dependency info]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -307,10 +307,14 @@ occAnalBind env (Rec pairs) body_usage
 	= body_usage +++ addRuleUsage rhs_usage bndr
 
     (final_usage, tagged_bndrs) = tagBinders total_usage bndrs
-    final_bndrs | no_rules  = tagged_bndrs
+    final_bndrs | isEmptyVarSet all_rule_fvs = tagged_bndrs
 		| otherwise = map tag_rule_var tagged_bndrs
+		
     tag_rule_var bndr | bndr `elemVarSet` all_rule_fvs = makeLoopBreaker True bndr
 	    	      | otherwise		       = bndr
+    all_rule_fvs = bndr_set `intersectVarSet` foldr (unionVarSet . idRuleVars) emptyVarSet bndrs
+	-- Mark the binder with OccInfo saying "no preInlineUnconditionally" if
+	-- it is used in any rule (lhs or rhs) of the recursive group
 
     ---- stuff for dependency analysis of binds -------------------------------
     sccs :: [SCC (Node Details)]
@@ -353,7 +357,6 @@ occAnalBind env (Rec pairs) body_usage
     rule_fv_env = rule_loop init_rule_fvs
 
     no_rules      = null init_rule_fvs
-    all_rule_fvs  = foldr (unionVarSet . snd) emptyVarSet init_rule_fvs
     init_rule_fvs = [(b, rule_fvs)
 		    | b <- bndrs 
 		    , let rule_fvs = idRuleRhsVars b `intersectVarSet` bndr_set
