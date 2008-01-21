@@ -15,18 +15,12 @@ SRC_HC_OPTS += -i$(GHC_COMPAT_DIR)
 SRC_LD_OPTS += -L$(GHC_COMPAT_DIR) -lghccompat
 
 # Do *not* use the installed Cabal:
-ifeq "$(ghc_ge_603)" "YES"
 SRC_HC_OPTS += -ignore-package Cabal
-endif
 
 ifeq "$(ghc_ge_607)" "YES"
 SRC_HC_OPTS += -package directory
 SRC_HC_OPTS += -package pretty
 SRC_HC_OPTS += -package containers
-endif
-
-ifeq "$(ghc_ge_603)" "NO"
-SRC_HC_OPTS += -package unix
 endif
 
 # And similarly for when booting from .hc files:

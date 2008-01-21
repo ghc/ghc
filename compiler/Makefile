@@ -112,7 +112,7 @@ stage_dirs :
 	    $(MKDIRHIER) stage$(stage)/$$i; \
 	done
 
-ifeq "$(stage) $(ghc_ge_603)" "1 YES"
+ifeq "$(stage)" "1"
 UsingHsBoot = YES
 else
 ifneq "$(findstring $(stage), 2 3)" ""
@@ -173,7 +173,7 @@ SRC_HC_OPTS += $(patsubst %, -i$(odir)/%, $(ALL_DIRS))
 SRC_HC_OPTS += -Wall -fno-warn-name-shadowing
 # Turn off orphan warnings, but only if the flag exists (i.e. not if we
 # are building stage 1 and using GHC < 6.3).
-ifneq "$(stage) $(ghc_ge_603)" "1 NO"
+ifneq "$(stage)" "1 NO"
 SRC_HC_OPTS += -fno-warn-orphans
 endif
 
@@ -567,12 +567,10 @@ SRC_HC_OPTS += -package Cabal
 PKG_DEPENDS += Cabal
 endif
 
-ifeq "$(ghc_ge_603)" "YES"
 # Ignore lang, to avoid potential clash with the Generics module if
 # lang happens to be a dependency of some exposed package in the local
 # GHC installation (eg. wxHaskell did this around 6.4).
 SRC_HC_OPTS += -ignore-package lang
-endif
 
 SRC_CC_OPTS += -Iparser -I. -O
 SRC_HC_OPTS += -recomp $(GhcHcOpts) $(GhcStage$(stage)HcOpts)
@@ -593,17 +591,6 @@ prelude/PrimOp_HC_OPTS 		= -H80m
 
 main/ParsePkgConf_HC_OPTS	+= -fno-warn-incomplete-patterns
 parser/Parser_HC_OPTS 		+= -fno-warn-incomplete-patterns
-
-ifeq "$(ghc_ge_603)" "NO"
-# Use -fvia-C since the NCG can't handle the narrow16Int# (and intToInt16#?)
-# primops on all platforms.
-parser/Parser_HC_OPTS		+= -fvia-C
-# because the NCG can't handle the 64-bit math in here
-prelude/PrelRules_HC_OPTS	+= -fvia-C
-# ByteCodeItbls uses primops that the NCG doesn't support.
-ghci/ByteCodeItbls_HC_OPTS	+= -fvia-C
-ghci/ByteCodeLink_HC_OPTS	+= -fvia-C -monly-3-regs
-endif
 
 # Careful optimisation of the parser: we don't want to throw everything
 # at it, because that takes too long and doesn't buy much, but we do want

@@ -654,14 +654,8 @@ if test "$WithGhc" != ""; then
   AC_SUBST(GhcPatchLevel)dnl
   GhcMinVersion2=`echo "$GhcMinVersion" | sed 's/^\\(.\\)$/0\\1/'`
   GhcCanonVersion="$GhcMajVersion$GhcMinVersion2"
-  if test $GhcCanonVersion -ge 601; then ghc_ge_601=YES; else ghc_ge_601=NO; fi
-  if test $GhcCanonVersion -ge 602; then ghc_ge_602=YES; else ghc_ge_602=NO; fi
-  if test $GhcCanonVersion -ge 603; then ghc_ge_603=YES; else ghc_ge_603=NO; fi
   if test $GhcCanonVersion -ge 605; then ghc_ge_605=YES; else ghc_ge_605=NO; fi
   if test $GhcCanonVersion -ge 607; then ghc_ge_607=YES; else ghc_ge_607=NO; fi
-  AC_SUBST(ghc_ge_601)dnl
-  AC_SUBST(ghc_ge_602)dnl
-  AC_SUBST(ghc_ge_603)dnl
   AC_SUBST(ghc_ge_605)dnl
   AC_SUBST(ghc_ge_607)dnl
 fi
@@ -752,8 +746,12 @@ fi;
 fi;
 
 dnl ** Must have GHC to build GHC, unless --enable-hc-boot is on
-if test "$BootingFromHc" = "NO" -a "$WithGhc" = "" -a -d "$srcdir/compiler"; then
-AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
+if test "$BootingFromHc" = "NO" -a -d "$srcdir/compiler"; then
+  if test "$WithGhc" = ""; then
+     AC_MSG_ERROR([GHC is required unless bootstrapping from .hc files.])
+  fi
+  FP_COMPARE_VERSIONS([$GhcVersion],[-lt],[6.4],
+    [AC_MSG_ERROR([GHC version 6.4 or later is required to compile GHC.])])dnl
 fi;
 
 # This uses GHC, so put it after the "GHC is required" check above:
