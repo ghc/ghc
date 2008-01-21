@@ -25,7 +25,7 @@ module OccurAnal (
 #include "HsVersions.h"
 
 import CoreSyn
-import CoreFVs		( idRuleVars )
+import CoreFVs
 import CoreUtils	( exprIsTrivial, isDefaultAlt )
 import Id
 import IdInfo
@@ -151,6 +151,10 @@ However things are made quite a bit more complicated by RULES.  Remember
     To that end, we build a Rec group for each cyclic strongly
     connected component,
 	*treating f's rules as extra RHSs for 'f'*.
+
+    When we make the Rec groups we include variables free in *either*
+    LHS *or* RHS of the rule.  The former might seems silly, but see
+    Note [Rule dependency info].
  
     So in Example [eftInt], eftInt and eftIntFB will be put in the
     same Rec, even though their 'main' RHSs are both non-recursive.
@@ -158,7 +162,7 @@ However things are made quite a bit more complicated by RULES.  Remember
   * Note [Rules are visible in their own rec group]
     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     We want the rules for 'f' to be visible in f's right-hand side.
-    And we'd like them to be visible in other function in f's Rec
+    And we'd like them to be visible in other functions in f's Rec
     group.  E.g. in Example [Specialisation rules] we want f' rule
     to be visible in both f's RHS, and fs's RHS.
 
@@ -186,6 +190,10 @@ However things are made quite a bit more complicated by RULES.  Remember
     reachable by RULES from those starting points.  That is the whole
     reason for computing rule_fv_env in occAnalBind.  (Of course we
     only consider free vars that are also binders in this Rec group.)
+
+    Note that when we compute this rule_fv_env, we only consider variables
+    free in the *RHS* of the rule, in contrast to the way we build the 
+    Rec group in the first place (Note [Rule dependency info])
 
     Note that in Example [eftInt], *neither* eftInt *nor* eftIntFB is
     chosen as a loop breaker, because their RHSs don't mention each other.
@@ -228,6 +236,16 @@ However things are made quite a bit more complicated by RULES.  Remember
 
     The **sole** reason for this kind of loop breaker is so that
     postInlineUnconditioanlly does not fire.  Ugh.
+
+  * Note [Rule dependency info]
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    The VarSet in a SpecInfo is used for dependency analysis in the 
+    occurrence analyser.  We must track free vars in *both* lhs and rhs.  Why both?  
+    Consider
+    	x = y
+     	RULE f x = 4
+    Then if we substitute y for x, we'd better do so in the
+    rule's LHS too, so we'd better ensure the dependency is respected
 
 
 Example [eftInt]
@@ -322,7 +340,7 @@ occAnalBind env (Rec pairs) body_usage
     do_final_bind (CyclicSCC cycle)
 	| no_rules  = Rec (reOrderCycle cycle)
 	| otherwise = Rec (concatMap reOrderRec (stronglyConnCompR loop_breaker_edges))
-	where	-- See Note [Loop breaking for reason for looop_breker_edges]
+	where	-- See Note [Choosing loop breakers] for looop_breker_edges
 	  loop_breaker_edges = map mk_node cycle
 	  mk_node (details@(bndr, rhs, rhs_fvs), k, _) = (details, k, new_ks)
 		where
@@ -338,7 +356,7 @@ occAnalBind env (Rec pairs) body_usage
     all_rule_fvs  = foldr (unionVarSet . snd) emptyVarSet init_rule_fvs
     init_rule_fvs = [(b, rule_fvs)
 		    | b <- bndrs 
-		    , let rule_fvs = idRuleVars b `intersectVarSet` bndr_set
+		    , let rule_fvs = idRuleRhsVars b `intersectVarSet` bndr_set
 		    , not (isEmptyVarSet rule_fvs)]
 
     rule_loop :: [(Id,IdSet)] -> IdEnv IdSet	-- Finds fixpoint
@@ -353,6 +371,11 @@ occAnalBind env (Rec pairs) body_usage
 		| otherwise		  = (False,     (b,new_fvs `unionVarSet` fvs))
 		where
 		  new_fvs = extendFvs env emptyVarSet fvs
+
+idRuleRhsVars :: Id -> VarSet
+-- Just the variables free on the *rhs* of a rule
+-- See Note [Choosing loop breakers]
+idRuleRhsVars id = foldr (unionVarSet . ruleRhsFreeVars) emptyVarSet (idCoreRules id)
 
 extendFvs :: IdEnv IdSet -> IdSet -> IdSet -> IdSet
 -- (extendFVs env fvs s) returns (fvs `union` env(s))
