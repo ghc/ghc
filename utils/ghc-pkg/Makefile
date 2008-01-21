@@ -28,12 +28,16 @@ endif
 # ($bindir/ghc-pkg.exe), whereas on Unix it needs a wrapper script
 # to pass the appropriate flag to the real binary
 # ($libexecdir/ghc-pkg.bin) so that it can find package.conf.
+# on Windows, we need to take control of filename globbing ourselves
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 HS_PROG           = ghc-pkg.exe
 INSTALL_PROGS    += $(HS_PROG)
+EXCLUDE_SRCS     += CRT_noglob.c
+NOGLOB_O          = CRT_noglob.o
 else
 HS_PROG           = ghc-pkg.bin
 INSTALL_LIBEXECS += $(HS_PROG)
+NOGLOB_O	  =
 endif
 
 # -----------------------------------------------------------------------------
@@ -69,12 +73,12 @@ INPLACE_HS=ghc-pkg-inplace.hs
 INPLACE_PROG=ghc-pkg-inplace
 EXCLUDED_SRCS+=$(INPLACE_HS)
 
-$(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk
+$(INPLACE_HS): Makefile $(FPTOOLS_TOP)/mk/config.mk $(NOGLOB_O)
 	echo "import System.Cmd; import System.Environment; import System.Exit" > $@
 	echo "main = do args <- getArgs; rawSystem \"$(FPTOOLS_TOP_ABS)/$(GHC_PKG_DIR_REL)/$(HS_PROG)\" (\"--global-conf\":\"$(FPTOOLS_TOP_ABS)/driver/package.conf.inplace\":args) >>= exitWith" >> $@
 
 $(INPLACE_PROG): $(INPLACE_HS)
-	$(HC) --make $< -o $@
+	$(HC) --make $< -o $@ $(LD_OPTS) $(NOGLOB_O)
 
 all :: $(INPLACE_PROG)
 

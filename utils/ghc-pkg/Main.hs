@@ -1,4 +1,4 @@
-{-# OPTIONS -fglasgow-exts #-}
+{-# OPTIONS -fglasgow-exts -cpp #-}
 -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow 2004.
@@ -48,7 +48,8 @@ import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
 import System.IO
 import System.IO.Error (try)
-import Data.List ( isPrefixOf, isSuffixOf, intersperse, sortBy, nub )
+import Data.List ( isPrefixOf, isSuffixOf, isInfixOf, intersperse, sortBy, nub,
+                   unfoldr, break )
 import Control.Concurrent
 
 #ifdef mingw32_HOST_OS
@@ -60,6 +61,11 @@ import System.Posix
 #endif
 
 import IO ( isPermissionError, isDoesNotExistError )
+
+#if defined(GLOB)
+import System.Process(runInteractiveCommand)
+import qualified System.Info(os)
+#endif
 
 -- -----------------------------------------------------------------------------
 -- Entry point
@@ -95,6 +101,7 @@ data Flag
   | FlagAutoGHCiLibs
   | FlagSimpleOutput
   | FlagNamesOnly
+  | FlagIgnoreCase
   deriving Eq
 
 flags :: [OptDescr Flag]
@@ -120,7 +127,9 @@ flags = [
   Option [] ["simple-output"] (NoArg FlagSimpleOutput)
         "print output in easy-to-parse format for some commands",
   Option [] ["names-only"] (NoArg FlagNamesOnly)
-        "only print package names, not versions; can only be used with list --simple-output"
+        "only print package names, not versions; can only be used with list --simple-output",
+  Option [] ["ignore-case"] (NoArg FlagIgnoreCase)
+        "ignore case for substring matching"
   ]
 
 deprecFlags :: [OptDescr Flag]
@@ -155,24 +164,34 @@ usageHeader prog = substProg prog $
   "  $p list [pkg]\n" ++
   "    List registered packages in the global database, and also the\n" ++
   "    user database if --user is given. If a package name is given\n" ++
-  "    all the registered versions will be listed in ascending order.\n" ++
+  "    All the registered versions will be listed in ascending order.\n" ++
   "    Accepts the --simple-output flag.\n" ++
   "\n" ++
-  "  $p latest pkg\n" ++
+  "  $p find-module {module}\n" ++
+  "    List registered packages exposing module {module} in the global\n" ++
+  "    database, and also the user database if --user is given. \n" ++
+  "    All the registered versions will be listed in ascending order.\n" ++
+  "    Accepts the --simple-output flag.\n" ++
+  "\n" ++
+  "  $p latest {pkg-id}\n" ++
   "    Prints the highest registered version of a package.\n" ++
   "\n" ++
   "  $p check\n" ++
   "    Check the consistency of package depenencies and list broken packages.\n" ++
   "    Accepts the --simple-output flag.\n" ++
   "\n" ++
-  "  $p describe {pkg-id}\n" ++
+  "  $p describe {pkg}\n" ++
   "    Give the registered description for the specified package. The\n" ++
   "    description is returned in precisely the syntax required by $p\n" ++
   "    register.\n" ++
   "\n" ++
-  "  $p field {pkg-id} {field}\n" ++
+  "  $p field {pkg} {field}\n" ++
   "    Extract the specified field of the package description for the\n" ++
-  "    specified package.\n" ++
+  "    specified package. Accepts comma-separated multiple fields.\n" ++
+  "\n" ++
+  " Substring matching is supported for {module} in find-module and\n" ++
+  " for {pkg} in list, describe, and field, where a '*' indicates\n" ++
+  " open substring ends (prefix*, *suffix, *infix*).\n" ++
   "\n" ++
   "  When asked to modify a database (register, unregister, update,\n"++
   "  hide, expose, and also check), ghc-pkg modifies the global database by\n"++
@@ -198,6 +217,8 @@ substProg prog (c:xs) = c : substProg prog xs
 
 data Force = ForceAll | ForceFiles | NoForce
 
+data PackageArg = Id PackageIdentifier | Substring String (String->Bool)
+
 runit :: [Flag] -> [String] -> IO ()
 runit cli nonopts = do
   installSignalHandlers -- catch ^C and clean up
@@ -208,9 +229,42 @@ runit cli nonopts = do
           | FlagForceFiles `elem` cli   = ForceFiles
           | otherwise                   = NoForce
         auto_ghci_libs = FlagAutoGHCiLibs `elem` cli
+        splitFields fields = unfoldr splitComma (',':fields)
+          where splitComma "" = Nothing
+                splitComma fs = Just $ break (==',') (tail fs)
+
+        substringCheck :: String -> Maybe (String -> Bool)
+        substringCheck ""    = Nothing
+        substringCheck "*"   = Just (const True)
+        substringCheck [_]   = Nothing
+        substringCheck (h:t) =
+          case (h, init t, last t) of
+            ('*',s,'*') -> Just (isInfixOf (f s) . f)
+            ('*',_, _ ) -> Just (isSuffixOf (f t) . f)
+            ( _ ,s,'*') -> Just (isPrefixOf (f (h:s)) . f)
+            _           -> Nothing
+          where f | FlagIgnoreCase `elem` cli = map toLower
+                  | otherwise                 = id
+#if defined(GLOB)
+        glob x | System.Info.os=="mingw32" = do
+          -- glob echoes its argument, after win32 filename globbing
+          (_,o,_,_) <- runInteractiveCommand ("glob "++x)
+          txt <- hGetContents o
+          return (read txt)
+        glob x | otherwise = return [x]
+#endif
   --
   -- first, parse the command
   case nonopts of
+#if defined(GLOB)
+    -- dummy command to demonstrate usage and permit testing
+    -- without messing things up; use glob to selectively enable
+    -- windows filename globbing for file parameters
+    -- register, update, FlagGlobalConfig, FlagConfig; others?
+    ["glob", filename] -> do
+        print filename
+        glob filename >>= print
+#endif
     ["register", filename] ->
         registerPackage filename cli auto_ghci_libs False force
     ["update", filename] ->
@@ -226,20 +280,28 @@ runit cli nonopts = do
         hidePackage pkgid cli
     ["list"] -> do
         listPackages cli Nothing Nothing
-    ["list", pkgid_str] -> do
-        pkgid <- readGlobPkgId pkgid_str
-        listPackages cli (Just pkgid) Nothing
+    ["list", pkgid_str] ->
+        case substringCheck pkgid_str of
+          Nothing -> do pkgid <- readGlobPkgId pkgid_str
+                        listPackages cli (Just (Id pkgid)) Nothing
+          Just m -> listPackages cli (Just (Substring pkgid_str m)) Nothing
     ["find-module", moduleName] -> do
-        listPackages cli Nothing (Just moduleName)
+        let match = maybe (==moduleName) id (substringCheck moduleName)
+        listPackages cli Nothing (Just match)
     ["latest", pkgid_str] -> do
         pkgid <- readGlobPkgId pkgid_str
         latestPackage cli pkgid
-    ["describe", pkgid_str] -> do
-        pkgid <- readGlobPkgId pkgid_str
-        describePackage cli pkgid
-    ["field", pkgid_str, field] -> do
-        pkgid <- readGlobPkgId pkgid_str
-        describeField cli pkgid field
+    ["describe", pkgid_str] ->
+        case substringCheck pkgid_str of
+          Nothing -> do pkgid <- readGlobPkgId pkgid_str
+                        describePackage cli (Id pkgid)
+          Just m -> describePackage cli (Substring pkgid_str m)
+    ["field", pkgid_str, fields] ->
+        case substringCheck pkgid_str of
+          Nothing -> do pkgid <- readGlobPkgId pkgid_str
+                        describeField cli (Id pkgid) (splitFields fields)
+          Just m -> describeField cli (Substring pkgid_str m)
+                                      (splitFields fields)
     ["check"] -> do
         checkConsistency cli
     [] -> do
@@ -457,7 +519,7 @@ modifyPackage
 modifyPackage fn pkgid flags  = do
   db_stack <- getPkgDatabases True{-modify-} flags
   let ((db_name, pkgs) : _) = db_stack
-  ps <- findPackages [(db_name,pkgs)] pkgid
+  ps <- findPackages [(db_name,pkgs)] (Id pkgid)
   let pids = map package ps
   let new_config = concat (map modify pkgs)
       modify pkg
@@ -469,7 +531,7 @@ modifyPackage fn pkgid flags  = do
 -- -----------------------------------------------------------------------------
 -- Listing packages
 
-listPackages ::  [Flag] -> Maybe PackageIdentifier -> Maybe String -> IO ()
+listPackages ::  [Flag] -> Maybe PackageArg -> Maybe (String->Bool) -> IO ()
 listPackages flags mPackageName mModuleName = do
   let simple_output = FlagSimpleOutput `elem` flags
   db_stack <- getPkgDatabases False flags
@@ -477,8 +539,8 @@ listPackages flags mPackageName mModuleName = do
         | Just this <- mPackageName =
             map (\(conf,pkgs) -> (conf, filter (this `matchesPkg`) pkgs))
                 db_stack
-        | Just this <- mModuleName = -- packages which expose mModuleName
-            map (\(conf,pkgs) -> (conf, filter (this `exposedInPkg`) pkgs))
+        | Just match <- mModuleName = -- packages which expose mModuleName
+            map (\(conf,pkgs) -> (conf, filter (match `exposedInPkg`) pkgs))
                 db_stack
         | otherwise = db_stack
 
@@ -491,6 +553,8 @@ listPackages flags mPackageName mModuleName = do
                         GT -> GT
                         EQ -> pkgVersion p1 `compare` pkgVersion p2
                    where (p1,p2) = (package pkg1, package pkg2)
+
+      match `exposedInPkg` pkg = any match (exposedModules pkg)
 
       pkg_map = map (\p -> (package p, p)) $ concatMap snd db_stack
       show_func = if simple_output then show_simple else mapM_ (show_normal pkg_map)
@@ -522,7 +586,7 @@ listPackages flags mPackageName mModuleName = do
 latestPackage ::  [Flag] -> PackageIdentifier -> IO ()
 latestPackage flags pkgid = do
   db_stack <- getPkgDatabases False flags
-  ps <- findPackages db_stack pkgid
+  ps <- findPackages db_stack (Id pkgid)
   show_pkg (sortBy compPkgIdVer (map package ps))
   where
     show_pkg [] = die "no matches"
@@ -531,47 +595,51 @@ latestPackage flags pkgid = do
 -- -----------------------------------------------------------------------------
 -- Describe
 
-describePackage :: [Flag] -> PackageIdentifier -> IO ()
-describePackage flags pkgid = do
+describePackage :: [Flag] -> PackageArg -> IO ()
+describePackage flags pkgarg = do
   db_stack <- getPkgDatabases False flags
-  ps <- findPackages db_stack pkgid
+  ps <- findPackages db_stack pkgarg
   mapM_ (putStrLn . showInstalledPackageInfo) ps
 
 -- PackageId is can have globVersion for the version
-findPackages :: PackageDBStack -> PackageIdentifier -> IO [InstalledPackageInfo]
-findPackages db_stack pkgid
-  = case [ p | p <- all_pkgs, pkgid `matchesPkg` p ] of
-        []  -> die ("cannot find package " ++ showPackageId pkgid)
+findPackages :: PackageDBStack -> PackageArg -> IO [InstalledPackageInfo]
+findPackages db_stack pkgarg
+  = case [ p | p <- all_pkgs, pkgarg `matchesPkg` p ] of
+        []  -> die ("cannot find package " ++ pkg_msg pkgarg)
         ps -> return ps
   where
         all_pkgs = concat (map snd db_stack)
+        pkg_msg (Id pkgid)           = showPackageId pkgid
+        pkg_msg (Substring pkgpat _) = "matching "++pkgpat
 
 matches :: PackageIdentifier -> PackageIdentifier -> Bool
 pid `matches` pid'
   = (pkgName pid == pkgName pid')
     && (pkgVersion pid == pkgVersion pid' || not (realVersion pid))
 
-matchesPkg :: PackageIdentifier -> InstalledPackageInfo -> Bool
-pid `matchesPkg` pkg = pid `matches` package pkg
+matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
+(Id pid)        `matchesPkg` pkg = pid `matches` package pkg
+(Substring _ m) `matchesPkg` pkg = m (pkgName (package pkg))
 
 compPkgIdVer :: PackageIdentifier -> PackageIdentifier -> Ordering
 compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
 
-exposedInPkg :: String -> InstalledPackageInfo -> Bool
-moduleName `exposedInPkg` pkg = moduleName `elem` exposedModules pkg
-
 -- -----------------------------------------------------------------------------
 -- Field
 
-describeField :: [Flag] -> PackageIdentifier -> String -> IO ()
-describeField flags pkgid field = do
+describeField :: [Flag] -> PackageArg -> [String] -> IO ()
+describeField flags pkgarg fields = do
   db_stack <- getPkgDatabases False flags
-  case toField field of
-    Nothing -> die ("unknown field: " ++ field)
-    Just fn -> do
-        ps <- findPackages db_stack pkgid
-        let top_dir = takeDirectory (fst (last db_stack))
-        mapM_ (putStrLn . fn) (mungePackagePaths top_dir ps)
+  fns <- toFields fields
+  ps <- findPackages db_stack pkgarg
+  let top_dir = takeDirectory (fst (last db_stack))
+  mapM_ (selectFields fns) (mungePackagePaths top_dir ps)
+  where toFields [] = return []
+        toFields (f:fs) = case toField f of
+            Nothing -> die ("unknown field: " ++ f)
+            Just fn -> do fns <- toFields fs
+                          return (fn:fns)
+        selectFields fns info = mapM_ (\fn->putStrLn (fn info)) fns
 
 mungePackagePaths :: String -> [InstalledPackageInfo] -> [InstalledPackageInfo]
 -- Replace the strings "$topdir" and "$httptopdir" at the beginning of a path
