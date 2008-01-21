@@ -71,6 +71,8 @@ test('rn059', normal, multimod_compile, ['rn059', '-v0'])
 clean(['Rn059_A.hi', 'Rn059_A.o', 'Rn059_B.hi', 'Rn059_B.o'])
 test('rn060', normal, compile, [''])
 test('rn061', normal, compile, [''])
+test('rn062', normal, compile, [''])
+
 test('T1972', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
 
 test('timing001', normal, compile, [''])
