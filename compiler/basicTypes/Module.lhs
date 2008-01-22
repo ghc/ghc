@@ -70,6 +70,8 @@ import FiniteMap
 import UniqFM
 import FastString
 import Binary
+
+import System.FilePath
 \end{code}
 
 %************************************************************************
@@ -178,7 +180,7 @@ mkModuleNameFS s = ModuleName s
 -- Returns the string version of the module name, with dots replaced by slashes
 moduleNameSlashes :: ModuleName -> String
 moduleNameSlashes = dots_to_slashes . moduleNameString
-  where dots_to_slashes = map (\c -> if c == '.' then '/' else c)
+  where dots_to_slashes = map (\c -> if c == '.' then pathSeparator else c)
 \end{code}
 
 %************************************************************************
