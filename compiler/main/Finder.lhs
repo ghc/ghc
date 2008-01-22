@@ -481,7 +481,7 @@ mkStubPaths dflags mod location
   = let
         stubdir = stubDir dflags
 
-        mod_basename = dots_to_slashes (moduleNameString mod)
+        mod_basename = moduleNameSlashes mod
         src_basename = dropExtension $ expectJust "mkStubPaths" 
                                                   (ml_hs_file location)
 
@@ -530,12 +530,6 @@ findObjectLinkable mod obj_fn obj_time = do
   if stub_exist
 	then return (LM obj_time mod [DotO obj_fn, DotO stub_fn])
 	else return (LM obj_time mod [DotO obj_fn])
-
--- -----------------------------------------------------------------------------
--- Utils
-
-dots_to_slashes :: String -> String
-dots_to_slashes = map (\c -> if c == '.' then '/' else c)
 
 -- -----------------------------------------------------------------------------
 -- Error messages
