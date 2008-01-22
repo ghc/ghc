@@ -187,6 +187,9 @@ class TestOptions:
        # Prefix to put on the command before running it
        self.cmd_prefix = ''
 
+       # Extra output normalisation
+       self.extra_normaliser = lambda x: x
+
 # The default set of options
 global default_testopts
 default_testopts = TestOptions()

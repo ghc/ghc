@@ -336,6 +336,11 @@ def _cmd_prefix( opts, prefix ):
     opts.cmd_prefix = prefix
 
 # ----
+
+def normalise_slashes( opts ):
+    opts.extra_normaliser = normalise_slashes_
+
+# ----
 # Function for composing two opt-fns together
 
 def composes( fs ):
@@ -984,7 +989,7 @@ def check_stdout_ok( name ):
       else:
          return normalise_output(str)
 
-   return compare_outputs('stdout', norm, id, \
+   return compare_outputs('stdout', norm, getTestOpts().extra_normaliser, \
                           expected_stdout_file, actual_stdout_file)
 
 def dump_stdout( name ):
@@ -1006,7 +1011,7 @@ def check_stderr_ok( name ):
       else:
          return normalise_output(str)
 
-   return compare_outputs('stderr', norm, id, \
+   return compare_outputs('stderr', norm, getTestOpts().extra_normaliser, \
                           expected_stderr_file, actual_stderr_file)
 
 def dump_stderr( name ):
@@ -1094,9 +1099,6 @@ def compare_outputs( kind, normaliser, extra_normaliser,
         return 0
     return 1
 
-def id(str):
-    return str
-
 def normalise_whitespace( str ):
     # Merge contiguous whitespace characters into a single space.
     str = re.sub('[ \t\n]+', ' ', str)
@@ -1111,6 +1113,10 @@ def normalise_errmsg( str ):
     #    hacky solution is used in place of more sophisticated filename
     #    mangling
     str = re.sub('([^\\s])\\.exe', '\\1', str)
+    return str
+
+def normalise_slashes_( str ):
+    str = re.sub('\\\\', '/', str)
     return str
 
 def normalise_output( str ):
