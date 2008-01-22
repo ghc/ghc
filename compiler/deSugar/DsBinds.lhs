@@ -34,6 +34,7 @@ import DsUtils
 import HsSyn		-- lots of things
 import CoreSyn		-- lots of things
 import CoreUtils
+import CoreFVs
 
 import TcHsSyn		( mkArbitraryType )	-- Mis-placed?
 import TcType
@@ -42,6 +43,7 @@ import CostCentre
 import Module
 import Id
 import Var	( TyVar )
+import VarSet
 import Rules
 import VarEnv
 import Type
@@ -242,8 +244,9 @@ dsSpec :: [TyVar] -> [DictId] -> [TyVar]
 --		inlined and specialised
 --
 -- Given SpecPrag (/\as.\ds. f es) t, we have
--- the defn		f_spec as ds = f es 
--- and the RULE		f es = f_spec as ds
+-- the defn		f_spec as ds = let-nonrec f = /\fas\fds. let f_mono = <f-rhs> in f_mono
+--				       in f es 
+-- and the RULE		forall as, ds. f es = f_spec as ds
 --
 -- It is *possible* that 'es' does not mention all of the dictionaries 'ds'
 -- (a bit silly, because then the 
@@ -251,8 +254,7 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind (L _ (InlinePrag {}))
   = return Nothing
 
 dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
-       (L loc (SpecPrag spec_expr spec_ty _const_dicts inl))
-	-- See Note [Const rule dicts]
+       (L loc (SpecPrag spec_expr spec_ty inl))
   = putSrcSpanDs loc $ 
     do	{ let poly_name = idName poly_id
 	; spec_name <- newLocalName poly_name
@@ -283,9 +285,12 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 		  spec_rhs    = Let (NonRec local_poly poly_f_body) ds_spec_expr
 		  poly_f_body = mkLams (tvs ++ dicts) f_body
 			   	
+		  extra_dict_bndrs = filter isDictId (varSetElems (exprFreeVars ds_spec_expr))
+			-- Note [Const rule dicts]
+
 		  rule =  mkLocalRule (mkFastString ("SPEC " ++ showSDoc (ppr poly_name)))
 				AlwaysActive poly_name
-			        bndrs args
+			        (extra_dict_bndrs ++ bndrs) args
 				(mkVarApps (Var spec_id) bndrs)
 	; return (Just (addInlineInfo inl spec_id spec_rhs, rule))
 	} } }
@@ -329,17 +334,23 @@ a mistake.  That's what the isDeadBinder call detects.
 
 Note [Const rule dicts]
 ~~~~~~~~~~~~~~~~~~~~~~~
-A SpecPrag has a field for "constant dicts" in the RULE, but I think
-it's pretty useless.  See the place where it's generated in TcBinds.
-TcSimplify will discharge a constraint by binding it to, say, 
-GHC.Base.$f2 :: Eq Int, withour putting anything in the LIE, so this 
-dict won't show up in the const-dicts field.  It probably doesn't matter,
-because the rule will end up being something like
-	f Int GHC.Base.$f2 = ...
-rather than
-	forall d. f Int d = ...
-The latter is more general, but in practice I think it won't make any
-difference.
+When the LHS of a specialisation rule, (/\as\ds. f es) has a free dict, 
+which is presumably in scope at the function definition site, we can quantify 
+over it too.  *Any* dict with that type will do.
+
+So for example when you have
+	f :: Eq a => a -> a
+	f = <rhs>
+	{-# SPECIALISE f :: Int -> Int #-}
+
+Then we get the SpecPrag
+	SpecPrag (f Int dInt) Int
+
+And from that we want the rule
+	
+	RULE forall dInt. f Int dInt = f_spec
+	f_spec = let f = <rhs> in f Int dInt
+
 
 
 %************************************************************************

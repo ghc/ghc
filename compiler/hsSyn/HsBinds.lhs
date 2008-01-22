@@ -454,9 +454,6 @@ data Prag
   | SpecPrag   
 	(HsExpr Id)	-- An expression, of the given specialised type, which
 	PostTcType 	-- specialises the polymorphic function
-	[Id]		-- Dicts mentioned free in the expression
-			--   Apr07: I think this is pretty useless
-			--	    see Note [Const rule dicts] in DsBinds
 	InlineSpec 	-- Inlining spec for the specialised function
 
 isInlinePrag (InlinePrag _) = True
@@ -573,7 +570,7 @@ pprSpec :: (Outputable id, Outputable ty) => id -> ty -> InlineSpec -> SDoc
 pprSpec var ty inl = sep [ptext SLIT("SPECIALIZE") <+> ppr inl <+> pprVarSig var ty]
 
 pprPrag :: Outputable id => id -> LPrag -> SDoc
-pprPrag var (L _ (InlinePrag inl))         = ppr inl <+> ppr var
-pprPrag var (L _ (SpecPrag expr ty _ inl)) = pprSpec var ty inl
+pprPrag var (L _ (InlinePrag inl))       = ppr inl <+> ppr var
+pprPrag var (L _ (SpecPrag expr ty inl)) = pprSpec var ty inl
 \end{code}
 
