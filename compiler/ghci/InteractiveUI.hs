@@ -1557,7 +1557,8 @@ showCmd str = do
         ["context"]  -> showContext
         ["packages"]  -> showPackages
         ["languages"]  -> showLanguages
-	_ -> throwDyn (CmdLineError "syntax:  :show [args|prog|prompt|editor|stop|modules|bindings|breaks|context]")
+	_ -> throwDyn (CmdLineError ("syntax:  :show [ args | prog | prompt | editor | stop | modules | bindings\n"++
+                                     "               | breaks | context | packages | languages ]"))
 
 showModules :: GHCi ()
 showModules = do
