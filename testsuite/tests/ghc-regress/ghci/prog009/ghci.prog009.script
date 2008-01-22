@@ -23,3 +23,14 @@ yan
 :reload
 :show modules
 yan -- error
+
+-- Now testing for bug #2049
+:! cp A3.hs A.hs
+:load A.hs
+-- should fail
+-- Data.List should still be in scope:
+:type nub
+:! sleep 1
+:! cp A1.hs A.hs
+:reload
+yan

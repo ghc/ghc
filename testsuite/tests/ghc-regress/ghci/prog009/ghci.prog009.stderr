@@ -2,3 +2,5 @@
 A.hs:1:15: parse error on input `where'
 
 <interactive>:1:0: Not in scope: `yan'
+
+A.hs:1:15: parse error on input `where'
