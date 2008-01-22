@@ -228,15 +228,15 @@ helpText =
  "   :delete *                   delete all breakpoints\n" ++
  "   :force <expr>               print <expr>, forcing unevaluated parts\n" ++
  "   :forward                    go forward in the history (after :back)\n" ++
- "   :history [<n>]              show the last <n> items in the history (after :trace)\n" ++
+ "   :history [<n>]              after :trace, show the execution history\n" ++
  "   :print [<name> ...]         prints a value without forcing its computation\n" ++
  "   :sprint [<name> ...]        simplifed version of :print\n" ++
  "   :step                       single-step after stopping at a breakpoint\n"++
  "   :step <expr>                single-step into <expr>\n"++
- "   :steplocal                  single-step restricted to the current top level decl.\n"++
+ "   :steplocal                  single-step within the current top-level binding\n"++
  "   :stepmodule                 single-step restricted to the current module\n"++
  "   :trace                      trace after stopping at a breakpoint\n"++
- "   :trace <expr>               trace into <expr> (remembers breakpoints for :history)\n"++
+ "   :trace <expr>               evaluate <expr> with tracing on (see :history)\n"++
 
  "\n" ++
  " -- Commands for changing settings:\n" ++
@@ -267,7 +267,8 @@ helpText =
  "   :show modules               show the currently loaded modules\n" ++
  "   :show packages              show the currently active package flags\n" ++
  "   :show languages             show the currently active language flags\n" ++
- "   :show <setting>             show anything that can be set with :set (e.g. args)\n" ++
+ "   :show <setting>             show value of <setting>, which is one of\n" ++
+ "                                  [args, prog, prompt, editor, stop]\n" ++
  "\n" 
 
 findEditor :: IO String
