@@ -7,5 +7,5 @@ include $(TOP)/mk/test.mk
 # version number.
 
 conflicting_flags:
-	@$(TEST_HC) -V --print-libdir 2>&1 | sed "s/^ghc-[0-9]*\(\.[0-9]*\)*:/ghc:/"
+	$(TEST_HC) -V --print-libdir 2>&1 | sed "s/^ghc-[0-9]*\(\.[0-9]*\)*:/ghc:/"
 
