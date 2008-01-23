@@ -59,7 +59,8 @@ int run(char *this, char *program, int argc, char** argv) {
     cmdline_len = 0;
     for(i = 1; i < argc; i++) {
         /* Note: play it safe and quote all argv strings */
-        cmdline_len += 1 + strlen(argv[i]) + 2;
+        /* In the worst case we have to escape every character with a \ */
+        cmdline_len += 1 + 2 * strlen(argv[i]) + 2;
     }
     new_cmdline = (char*)malloc(sizeof(char) * (cmdline_len + 1));
     if (!new_cmdline) {
@@ -73,6 +74,10 @@ int run(char *this, char *program, int argc, char** argv) {
         *ptr++ = '"';
         src = argv[i];
         while(*src) {
+            /* Escape any \ and " characters */
+            if ((*src == '\\') || (*src == '"')) {
+                *ptr++ = '\\';
+            }
             *ptr++ = *src++;
         }
         *ptr++ = '"';
