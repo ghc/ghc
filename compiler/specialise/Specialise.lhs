@@ -892,7 +892,8 @@ specDefn subst calls (fn, rhs)
 		-- The rule to put in the function's specialisation is:
 		--	forall b,d, d1',d2'.  f t1 b t3 d d1' d2' = f1 b d  
            spec_env_rule = mkLocalRule (mkFastString ("SPEC " ++ showSDoc (ppr fn)))
-				AlwaysActive (idName fn)
+				inline_prag 	-- Note [Auto-specialisation and RULES]
+			 	(idName fn)
 			        (poly_tyvars ++ rhs_dicts')
 				inst_args 
 				(mkVarApps (Var spec_f) app_args)
@@ -917,6 +918,33 @@ specDefn subst calls (fn, rhs)
 #endif
 	 | otherwise		   = zipEqual doc xs ys
 \end{code}
+
+Note [Auto-specialisation and RULES]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider:
+   g :: Num a => a -> a
+   g = ...
+
+   f :: (Int -> Int) -> Int
+   f w = ...
+   {-# RULE f g = 0 #-}
+
+Suppose that auto-specialisation makes a specialised version of
+g::Int->Int That version won't appear in the LHS of the RULE for f.
+So if the specialisation rule fires too early, the rule for f may
+never fire. 
+
+It might be possible to add new rules, to "complete" the rewrite system.
+Thus when adding
+	RULE forall d. g Int d = g_spec
+also add
+	RULE f g_spec = 0
+
+But that's a bit complicated.  For now we ask the programmer's help,
+by *copying the INLINE activation pragma* to the auto-specialised rule.
+So if g says {-# NOINLINE[2] g #-}, then the auto-spec rule will also
+not be active until phase 2.  
+
 
 Note [Specialisation shape]
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
