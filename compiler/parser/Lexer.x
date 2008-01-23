@@ -1735,20 +1735,21 @@ lexToken = do
   sc <- getLexState
   exts <- getExts
   case alexScanUser exts inp sc of
-    AlexEOF -> do let span = mkSrcSpan loc1 loc1
-		  setLastToken span 0 0
-		  return (L span ITeof)
-    AlexError (AI loc2 _ buf) -> do 
-	reportLexError loc1 loc2 buf "lexical error"
+    AlexEOF -> do
+        let span = mkSrcSpan loc1 loc1
+        setLastToken span 0 0
+        return (L span ITeof)
+    AlexError (AI loc2 _ buf) ->
+        reportLexError loc1 loc2 buf "lexical error"
     AlexSkip inp2 _ -> do
-	setInput inp2
-	lexToken
+        setInput inp2
+        lexToken
     AlexToken inp2@(AI end _ buf2) len t -> do
-    setInput inp2
-    let span = mkSrcSpan loc1 end
-    let bytes = byteDiff buf buf2
-    span `seq` setLastToken span bytes bytes
-    t span buf bytes
+        setInput inp2
+        let span = mkSrcSpan loc1 end
+        let bytes = byteDiff buf buf2
+        span `seq` setLastToken span bytes bytes
+        t span buf bytes
 
 reportLexError loc1 loc2 buf str
   | atEnd buf = failLocMsgP loc1 loc2 (str ++ " at end of input")
