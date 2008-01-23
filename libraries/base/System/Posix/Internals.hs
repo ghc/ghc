@@ -83,7 +83,7 @@ fdFileSize fd =
     if not (s_isreg c_mode)
 	then return (-1)
 	else do
-    c_size <- st_size p_stat :: IO COff
+    c_size <- st_size p_stat
     return (fromIntegral c_size)
 
 data FDType  = Directory | Stream | RegularFile | RawDevice
@@ -346,8 +346,13 @@ foreign import ccall unsafe "HsBase.h getcwd"
 foreign import ccall unsafe "HsBase.h isatty"
    c_isatty :: CInt -> IO CInt
 
+#if defined(mingw32_HOST_OS) || defined(__MINGW32__)
+foreign import ccall unsafe "HsBase.h __hscore_lseek"
+   c_lseek :: CInt -> Int64 -> CInt -> IO Int64
+#else
 foreign import ccall unsafe "HsBase.h __hscore_lseek"
    c_lseek :: CInt -> COff -> CInt -> IO COff
+#endif
 
 foreign import ccall unsafe "HsBase.h __hscore_lstat"
    lstat :: CString -> Ptr CStat -> IO CInt
@@ -481,7 +486,11 @@ s_isfifo cm = c_s_isfifo cm /= 0
 
 foreign import ccall unsafe "HsBase.h __hscore_sizeof_stat" sizeof_stat :: Int
 foreign import ccall unsafe "HsBase.h __hscore_st_mtime" st_mtime :: Ptr CStat -> IO CTime
+#ifdef mingw32_HOST_OS
+foreign import ccall unsafe "HsBase.h __hscore_st_size" st_size :: Ptr CStat -> IO Int64
+#else
 foreign import ccall unsafe "HsBase.h __hscore_st_size" st_size :: Ptr CStat -> IO COff
+#endif
 foreign import ccall unsafe "HsBase.h __hscore_st_mode" st_mode :: Ptr CStat -> IO CMode
 foreign import ccall unsafe "HsBase.h __hscore_st_dev" st_dev :: Ptr CStat -> IO CDev
 foreign import ccall unsafe "HsBase.h __hscore_st_ino" st_ino :: Ptr CStat -> IO CIno

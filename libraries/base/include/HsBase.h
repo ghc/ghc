@@ -491,18 +491,32 @@ __hscore_free_dirent(struct dirent *dEnt)
 #endif
 }
 
+#if defined(__MINGW32__)
+// We want the versions of stat/fstat/lseek that use 64-bit offsets,
+// and you have to ask for those explicitly.  Unfortunately there
+// doesn't seem to be a 64-bit version of truncate/ftruncate, so while
+// hFileSize and hSeek will work with large files, hSetFileSize will not.
+#define stat(file,buf)       _stati64(file,buf)
+#define fstat(fd,buf)        _fstati64(fd,buf)
+typedef struct _stati64 struct_stat;
+typedef off64_t stsize_t;
+#else
+typedef struct stat struct_stat;
+typedef off_t stsize_t;
+#endif
+
 INLINE HsInt
 __hscore_sizeof_stat( void )
 {
-  return sizeof(struct stat);
+  return sizeof(struct_stat);
 }
 
-INLINE time_t __hscore_st_mtime ( struct stat* st ) { return st->st_mtime; }
-INLINE off_t  __hscore_st_size  ( struct stat* st ) { return st->st_size; }
+INLINE time_t __hscore_st_mtime ( struct_stat* st ) { return st->st_mtime; }
+INLINE stsize_t __hscore_st_size  ( struct_stat* st ) { return st->st_size; }
 #if !defined(_MSC_VER)
-INLINE mode_t __hscore_st_mode  ( struct stat* st ) { return st->st_mode; }
-INLINE mode_t __hscore_st_dev  ( struct stat* st ) { return st->st_dev; }
-INLINE mode_t __hscore_st_ino  ( struct stat* st ) { return st->st_ino; }
+INLINE mode_t __hscore_st_mode  ( struct_stat* st ) { return st->st_mode; }
+INLINE mode_t __hscore_st_dev  ( struct_stat* st ) { return st->st_dev; }
+INLINE mode_t __hscore_st_ino  ( struct_stat* st ) { return st->st_ino; }
 #endif
 
 #if HAVE_TERMIOS_H
@@ -652,15 +666,21 @@ INLINE int __hscore_open(char *file, int how, mode_t mode) {
 // macros which redirect to the 64-bit-off_t versions when large file
 // support is enabled.
 //
+#if defined(__MINGW32__)
+INLINE off64_t __hscore_lseek(int fd, off64_t off, int whence) {
+	return (_lseeki64(fd,off,whence));
+}
+#else
 INLINE off_t __hscore_lseek(int fd, off_t off, int whence) {
 	return (lseek(fd,off,whence));
 }
+#endif
 
-INLINE int __hscore_stat(char *file, struct stat *buf) {
+INLINE int __hscore_stat(char *file, struct_stat *buf) {
 	return (stat(file,buf));
 }
 
-INLINE int __hscore_fstat(int fd, struct stat *buf) {
+INLINE int __hscore_fstat(int fd, struct_stat *buf) {
 	return (fstat(fd,buf));
 }
 
