@@ -2622,18 +2622,34 @@ Prelude> :set -fno-glasgow-exts
     </indexterm>
 
     <para>When it starts, unless the <literal>-ignore-dot-ghci</literal>
-    flag is given, GHCi reads and executes commands from
-    <filename>./.ghci</filename>, followed by
-    <filename>$HOME/.ghci</filename>.</para>
+    flag is given, GHCi reads and executes commands from the following
+    files, in this order, if they exist:</para>
 
-    <para>The <filename>.ghci</filename> in your home directory is
-    most useful for turning on favourite options (eg. <literal>:set
-    +s</literal>), and defining useful macros.  Placing a
-    <filename>.ghci</filename> file in a directory with a Haskell
-    project is a useful way to set certain project-wide options so you
-    don't have to type them everytime you start GHCi: eg. if your
-    project uses GHC extensions and CPP, and has source files in three
-    subdirectories A, B and C, you might put the following lines in
+    <enumeratedlist>
+    <listitem>
+      <para><filename>./.ghci</filename></para>
+    </listitem>
+    <listitem>
+      <para><literal><replaceable>appdata</replaceable>/ghc/ghci.conf</literal>,
+      where <replaceable>appdata</replaceable> depends on your system,
+      but is usually something like <literal>C:/Documents and Settings/<replaceable>user</replaceable>/Application Data</literal></para>
+    </listitem>
+    <listitem>
+      <para>On Unix: <literal>$HOME/.ghc/ghci.conf</literal></para>
+    </listitem>
+    <listitem>
+      <para><literal>$HOME/.ghci</literal></para>
+    </listitem>
+   </enumeratedlist>
+
+    <para>The <filename>ghci.conf</filename> file is most useful for
+    turning on favourite options (eg. <literal>:set +s</literal>), and
+    defining useful macros.  Placing a <filename>.ghci</filename> file
+    in a directory with a Haskell project is a useful way to set
+    certain project-wide options so you don't have to type them
+    everytime you start GHCi: eg. if your project uses GHC extensions
+    and CPP, and has source files in three subdirectories A, B and C,
+    you might put the following lines in
     <filename>.ghci</filename>:</para>
 
 <screen>
@@ -2647,7 +2663,7 @@ Prelude> :set -fno-glasgow-exts
     until the next <literal>:load</literal>, though.)</para>
 
     <para>Two command-line options control whether the
-    <filename>.ghci</filename> files are read:</para>
+    startup files files are read:</para>
 
     <variablelist>
       <varlistentry>
@@ -2656,8 +2672,8 @@ Prelude> :set -fno-glasgow-exts
           <indexterm><primary><option>-ignore-dot-ghci</option></primary></indexterm>
         </term>
 	<listitem>
-	  <para>Don't read either <filename>./.ghci</filename> or
-	  <filename>$HOME/.ghci</filename> when starting up.</para>
+	  <para>Don't read either <filename>./.ghci</filename> or the
+          other startup files when starting up.</para>
 	</listitem>
       </varlistentry>
       <varlistentry>
@@ -2666,8 +2682,8 @@ Prelude> :set -fno-glasgow-exts
           <indexterm><primary><option>-read-dot-ghci</option></primary></indexterm>
         </term>
 	<listitem>
-	  <para>Read <filename>.ghci</filename> and
-	  <filename>$HOME/.ghci</filename>.  This is normally the
+	  <para>Read <filename>./.ghci</filename> and the other
+          startup files (see above).  This is normally the
 	  default, but the <option>-read-dot-ghci</option> option may
 	  be used to override a previous
 	  <option>-ignore-dot-ghci</option> option.</para>

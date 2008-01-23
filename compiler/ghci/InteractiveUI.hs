@@ -356,36 +356,43 @@ interactiveUI session srcs maybe_exprs = do
 
 runGHCi :: [(FilePath, Maybe Phase)] -> Maybe [String] -> GHCi ()
 runGHCi paths maybe_exprs = do
-  let read_dot_files = not opt_IgnoreDotGhci
+  let 
+   read_dot_files = not opt_IgnoreDotGhci
 
-  when (read_dot_files) $ do
-    -- Read in ./.ghci.
-    let file = "./.ghci"
-    exists <- io (doesFileExist file)
-    when exists $ do
-       dir_ok  <- io (checkPerms ".")
-       file_ok <- io (checkPerms file)
-       when (dir_ok && file_ok) $ do
-          either_hdl <- io (IO.try (openFile "./.ghci" ReadMode))
-          case either_hdl of
-             Left _e   -> return ()
-             Right hdl -> runCommands (fileLoop hdl False False)
+   current_dir = return (Just ".ghci")
 
-  when (read_dot_files) $ do
-    -- Read in $HOME/.ghci
-    either_dir <- io (IO.try getHomeDirectory)
+   app_user_dir = do
+    either_dir <- io $ IO.try (getAppUserDataDirectory "ghc")
     case either_dir of
-       Left _e -> return ()
-       Right dir -> do
-          cwd <- io (getCurrentDirectory)
-          when (dir /= cwd) $ do
-             let file = dir ++ "/.ghci"
-             ok <- io (checkPerms file)
-             when ok $ do
-               either_hdl <- io (IO.try (openFile file ReadMode))
-               case either_hdl of
-                  Left _e   -> return ()
-                  Right hdl -> runCommands (fileLoop hdl False False)
+      Right dir -> return (Just (dir </> "ghci.conf"))
+      _ -> return Nothing
+
+   home_dir = do
+    either_dir <- io $ IO.try (getEnv "HOME")
+    case either_dir of
+      Right home -> return (Just (home </> ".ghci"))
+      _ -> return Nothing
+
+   sourceConfigFile :: FilePath -> GHCi ()
+   sourceConfigFile file = do
+     exists <- io $ doesFileExist file
+     when exists $ do
+       dir_ok  <- io $ checkPerms (getDirectory file)
+       file_ok <- io $ checkPerms file
+       when (dir_ok && file_ok) $ do
+         either_hdl <- io $ IO.try (openFile file ReadMode)
+         case either_hdl of
+           Left _e   -> return ()
+           Right hdl -> runCommands (fileLoop hdl False False)
+     where
+      getDirectory f = case takeDirectory f of "" -> "."; d -> d
+
+  when (read_dot_files) $ do
+    cfgs0 <- sequence [ current_dir, app_user_dir, home_dir ]
+    cfgs <- io $ mapM canonicalizePath (catMaybes cfgs0)
+    mapM_ sourceConfigFile (nub cfgs)
+        -- nub, because we don't want to read .ghci twice if the
+        -- CWD is $HOME.
 
   -- Perform a :load for files given on the GHCi command line
   -- When in -e mode, if the load fails then we want to stop
