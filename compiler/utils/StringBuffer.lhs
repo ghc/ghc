@@ -46,7 +46,7 @@ module StringBuffer
 #include "HsVersions.h"
 
 import Encoding
-import FastString		( FastString,mkFastString,mkFastStringBytes )
+import FastString hiding ( buf )
 import FastTypes
 import FastFunctions
 
@@ -208,7 +208,7 @@ lexemeToString (StringBuffer buf _ cur) bytes =
       utf8DecodeString (ptr `plusPtr` cur) bytes
 
 lexemeToFastString :: StringBuffer -> Int {-bytes-} -> FastString
-lexemeToFastString _ 0 = mkFastString ""
+lexemeToFastString _ 0 = nilFS
 lexemeToFastString (StringBuffer buf _ cur) len =
    inlinePerformIO $
      withForeignPtr buf $ \ptr ->
