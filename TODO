@@ -20,6 +20,9 @@
 -----------------------------------------------------------------------------
 -- bugs
 
+* Haddock generates links to hidden modules (e.g. uses of IO point at 
+  GHC.IOBase.IO).
+
 * Haddock fails to process source files containing UNPACK pragmas
 
 * HsParser bug: starting the module with '-- | doc' followed by a declaration
