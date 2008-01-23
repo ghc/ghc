@@ -89,6 +89,7 @@ showException other_exn	       	 	 = show other_exn
 
 instance Show GhcException where
   showsPrec _ e@(ProgramError _) = showGhcException e
+  showsPrec _ e@(CmdLineError _) = showString "<command line>: " . showGhcException e
   showsPrec _ e = showString progName . showString ": " . showGhcException e
 
 showGhcException :: GhcException -> String -> String
