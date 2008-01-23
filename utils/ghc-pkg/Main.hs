@@ -720,11 +720,16 @@ missingPackageDeps :: InstalledPackageInfo
                    -> [PackageIdentifier]
 missingPackageDeps pkg pkg_map =
   [ d | d <- depends pkg, isNothing (lookup d pkg_map)] ++
-  [ d | d <- depends pkg, Just p <- return (lookup d pkg_map), isBrokenPackage p pkg_map]
+  [ d | d <- depends pkg, Just p <- return (lookup d pkg_map), 
+                          isBrokenPackage p pkg_map]
 
 isBrokenPackage :: InstalledPackageInfo -> [(PackageIdentifier, InstalledPackageInfo)] -> Bool
-isBrokenPackage pkg pkg_map = not . null $ missingPackageDeps pkg pkg_map
-
+isBrokenPackage pkg pkg_map
+   = not . null $ missingPackageDeps pkg (filter notme pkg_map)
+   where notme (p,ipi) = package pkg /= p
+        -- remove p from the database when we invoke missingPackageDeps,
+        -- because we want mutually recursive groups of package to show up
+        -- as broken. (#1750)
 
 -- -----------------------------------------------------------------------------
 -- Manipulating package.conf files
