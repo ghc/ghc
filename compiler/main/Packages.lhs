@@ -453,10 +453,13 @@ findWiredInPackages dflags pkgs preload this_package = do
 
   return (pkgs2, preload1, new_this_pkg)
 
--- -----------------------------------------------------------------------------
+-- ----------------------------------------------------------------------------
 --
--- Eliminate any packages which have dangling dependencies (
--- because the dependency was removed by -ignore-package).
+-- Detect any packages that have missing dependencies, and also any
+-- mutually-recursive groups of packages (loops in the package graph
+-- are not allowed).  We do this by taking the least fixpoint of the
+-- dependency graph, repeatedly adding packages whose dependencies are
+-- satisfied until no more can be added.
 --
 elimDanglingDeps
    :: DynFlags
@@ -464,22 +467,28 @@ elimDanglingDeps
    -> [PackageId]       -- ignored packages
    -> IO [PackageConfig]
 
-elimDanglingDeps dflags pkgs ignored = 
-   case partition (not.null.snd) (map (getDanglingDeps pkgs ignored) pkgs) of
-        ([],ps) -> return (map fst ps)
-        (ps,qs) -> do
-            mapM_ reportElim ps
-            elimDanglingDeps dflags (map fst qs)
-                (ignored ++ map packageConfigId (map fst ps))
+elimDanglingDeps dflags pkgs ignored = go [] pkgs'
  where
+   pkgs' = filter (\p -> packageConfigId p `notElem` ignored) pkgs
+
+   go avail not_avail =
+     case partitionWith (depsAvailable avail) not_avail of
+        ([],        not_avail) -> do mapM_ reportElim not_avail; return avail
+        (new_avail, not_avail) -> go (new_avail ++ avail) (map fst not_avail)
+
+   depsAvailable :: [PackageConfig] -> PackageConfig
+                 -> Either PackageConfig (PackageConfig, [PackageIdentifier])
+   depsAvailable pkgs_ok pkg 
+        | null dangling = Left pkg
+        | otherwise     = Right (pkg, dangling)
+        where dangling = filter (`notElem` pids) (depends pkg)
+              pids = map package pkgs_ok
+
    reportElim (p, deps) = 
         debugTraceMsg dflags 2 $
              (ptext SLIT("package") <+> pprPkg p <+> 
-                  ptext SLIT("will be ignored due to missing dependencies:") $$ 
+                  ptext SLIT("will be ignored due to missing or recursive dependencies:") $$ 
 	      nest 2 (hsep (map (text.showPackageId) deps)))
-
-   getDanglingDeps pkgs ignored p = (p, filter dangling (depends p))
-        where dangling pid = mkPackageId pid `elem` ignored
 
 -- -----------------------------------------------------------------------------
 -- When all the command-line options are in, we can process our package
