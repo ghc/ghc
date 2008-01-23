@@ -68,6 +68,15 @@ ghcpkg04 :
 	@: # testpkg-1.2.3.4 and newtestpkg-2.0 are both exposed now
 	@$(TEST_HC) -package-conf $(PKGCONF) -c ghcpkg04.hs || true
 
+1750:
+	@rm -f $(PKGCONF) 1750.hs 1750.o 1750.hi 1750.out
+	@echo "[]" >$(PKGCONF)
+	@$(LOCAL_GHC_PKG) register --force 1750A.pkg >1750.out 2>&1
+	@$(LOCAL_GHC_PKG) register --force 1750B.pkg >1750.out 2>&1
+	@$(LOCAL_GHC_PKG) list
+	@echo "main = return ()" >1750.hs
+	@$(TEST_HC) -package-conf $(PKGCONF) -package 1750A 1750.hs || true
+
 # -----------------------------------------------------------------------------
 # Try piping the output of "ghc-pkg describe" into "ghc-pkg update" for
 # every package we know about.  This is for testing the pretty printing/parsing

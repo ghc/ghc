@@ -12,3 +12,5 @@ clean(['local.package.conf', 'local.package.conf.old'])
 # Test that we *can* compile a module that also belongs to a package
 # (this was disallowed in GHC 6.4 and earlier)
 test('pkg01', normal, compile, [''])
+
+test('1750', normal, run_command, ['$MAKE --no-print-directory 1750'])
