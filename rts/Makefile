@@ -177,13 +177,8 @@ LIB_LD_OPTS = -L$(shell $(GHC_PKG_INPLACE) field base library-dirs | sed -e 's/l
 endif
 endif
 
-ifeq "$(Windows)" "YES"
-# On Windows GHC does its own commandline parsing, so we need extra
-# doublequote protection. Sigh.
-DQ = \\\"
-else
+# XXX DQ is now the same on all platforms, so get rid of it
 DQ = \"
-endif
 
 # If Main.c is built with optimisation then the SEH exception stuff on
 # Windows gets confused.

@@ -95,15 +95,8 @@ ifeq "$(stage)" ""
 stage=1
 endif
 
-ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
-ifeq "$(stage)" "1"
+# XXX DQ is now the same on all platforms, so get rid of it
 DQ = \"
-else
-DQ = \\\"
-endif
-else
-DQ = \"
-endif
 
 .DUMMY: stage_dir
 stage_dirs :
