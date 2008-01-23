@@ -57,7 +57,7 @@ int run(char *this, char *program, int argc, char** argv) {
   
     /* Compute length of the flattened 'argv', including spaces! */
     cmdline_len = 0;
-    for(i = 1; i < argc; i++) {
+    for(i = 0; i < argc; i++) {
         /* Note: play it safe and quote all argv strings */
         /* In the worst case we have to escape every character with a \ */
         cmdline_len += 1 + 2 * strlen(argv[i]) + 2;
@@ -69,7 +69,7 @@ int run(char *this, char *program, int argc, char** argv) {
     }
 
     ptr = new_cmdline;
-    for(i = 1; i < argc; i++) {
+    for(i = 0; i < argc; i++) {
         *ptr++ = ' ';
         *ptr++ = '"';
         src = argv[i];
@@ -83,6 +83,7 @@ int run(char *this, char *program, int argc, char** argv) {
         *ptr++ = '"';
     }
     *ptr = '\0';
+    new_cmdline = new_cmdline + 1; /* Skip the leading space */
 
     /* Note: Used to use _spawnv(_P_WAIT, ...) here, but it suffered
        from the parent intercepting console events such as Ctrl-C,
