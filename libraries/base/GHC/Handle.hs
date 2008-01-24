@@ -27,6 +27,7 @@ module GHC.Handle (
   flushWriteBufferOnly, flushWriteBuffer, flushReadBuffer, 
   fillReadBuffer, fillReadBufferWithoutBlocking,
   readRawBuffer, readRawBufferPtr,
+  readRawBufferNoBlock, readRawBufferPtrNoBlock,
   writeRawBuffer, writeRawBufferPtr,
 
 #ifndef mingw32_HOST_OS
@@ -589,6 +590,18 @@ readRawBufferNoBlock loc fd is_nonblock buf off len
    unsafe_read  = do_read (read_rawBuffer fd buf off len)
    safe_read    = do_read (safe_read_rawBuffer fd buf off len)
 
+readRawBufferPtrNoBlock :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
+readRawBufferPtrNoBlock loc fd is_nonblock buf off len
+  | is_nonblock  = unsafe_read
+  | otherwise    = do r <- fdReady (fromIntegral fd) 0 0 False
+                      if r /= 0 then safe_read
+                                else return 0
+       -- XXX see note [nonblock]
+ where
+   do_read call = throwErrnoIfMinus1RetryOnBlock loc call (return 0)
+   unsafe_read  = do_read (read_off fd buf off len)
+   safe_read    = do_read (safe_read_off fd buf off len)
+
 writeRawBuffer :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 writeRawBuffer loc fd is_nonblock buf off len
   | is_nonblock = unsafe_write
@@ -658,6 +671,8 @@ writeRawBufferPtr loc fd is_stream buf off len
 readRawBufferNoBlock :: String -> FD -> Bool -> RawBuffer -> Int -> CInt -> IO CInt
 readRawBufferNoBlock = readRawBuffer
 
+readRawBufferPtrNoBlock :: String -> FD -> Bool -> Ptr CChar -> Int -> CInt -> IO CInt
+readRawBufferPtrNoBlock = readRawBufferPtr
 -- Async versions of the read/write primitives, for the non-threaded RTS
 
 asyncReadRawBuffer loc fd is_stream buf off len = do

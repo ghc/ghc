@@ -906,24 +906,13 @@ bufReadNonBlocking fd ref is_stream ptr so_far count =
 
 readChunkNonBlocking :: FD -> Bool -> Ptr a -> Int -> IO Int
 readChunkNonBlocking fd is_stream ptr bytes = do
-#ifndef mingw32_HOST_OS
-    ssize <- c_read fd (castPtr ptr) (fromIntegral bytes)
-    let r = fromIntegral ssize :: Int
-    if (r == -1)
-      then do errno <- getErrno
-	      if (errno == eAGAIN || errno == eWOULDBLOCK)
-		 then return 0
-		 else throwErrno "readChunk"
-      else return r
-#else
     fromIntegral `liftM`
-        readRawBufferPtr "readChunkNonBlocking" fd is_stream 
+        readRawBufferPtrNoBlock "readChunkNonBlocking" fd is_stream 
 	   		    (castPtr ptr) 0 (fromIntegral bytes)
 
     -- we don't have non-blocking read support on Windows, so just invoke
     -- the ordinary low-level read which will block until data is available,
     -- but won't wait for the whole buffer to fill.
-#endif
 
 slurpFile :: FilePath -> IO (Ptr (), Int)
 slurpFile fname = do
