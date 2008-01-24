@@ -1108,7 +1108,7 @@ HAPPY_VERSION		= @HappyVersion@
 #
 # Options to pass to Happy when we're going to compile the output with GHC
 #
-GHC_HAPPY_OPTS		= -agc
+GHC_HAPPY_OPTS		= -agc --strict
 
 # Temp. to work around performance problems in the HEAD around 8/12/2003,
 # A Happy compiled with this compiler needs more stack.
