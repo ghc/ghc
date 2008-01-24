@@ -1971,14 +1971,16 @@ getDOCSECTION (L _ (ITdocSection n x)) = (n, x)
 
 -- Utilities for combining source spans
 comb2 :: Located a -> Located b -> SrcSpan
-comb2 = combineLocs
+comb2 a b = a `seq` b `seq` combineLocs a b
 
 comb3 :: Located a -> Located b -> Located c -> SrcSpan
-comb3 a b c = combineSrcSpans (getLoc a) (combineSrcSpans (getLoc b) (getLoc c))
+comb3 a b c = a `seq` b `seq` c `seq`
+    combineSrcSpans (getLoc a) (combineSrcSpans (getLoc b) (getLoc c))
 
 comb4 :: Located a -> Located b -> Located c -> Located d -> SrcSpan
-comb4 a b c d = combineSrcSpans (getLoc a) $ combineSrcSpans (getLoc b) $
-		combineSrcSpans (getLoc c) (getLoc d)
+comb4 a b c d = a `seq` b `seq` c `seq` d `seq`
+    (combineSrcSpans (getLoc a) $ combineSrcSpans (getLoc b) $
+		combineSrcSpans (getLoc c) (getLoc d))
 
 -- strict constructor version:
 {-# INLINE sL #-}
