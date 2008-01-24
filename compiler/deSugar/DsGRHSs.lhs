@@ -33,8 +33,6 @@ import PrelNames
 import Name
 import SrcLoc
 
-import Control.Monad ((>=>))
-
 \end{code}
 
 @dsGuarded@ is used for both @case@ expressions and pattern bindings.
@@ -142,11 +140,11 @@ isTrueLHsExpr (L _ (HsVar v)) |  v `hasKey` otherwiseIdKey
                                       = Just return
 	-- trueDataConId doesn't have the same unique as trueDataCon
 isTrueLHsExpr (L loc (HsTick    ix frees e))
-    | Just ticks <- isTrueLHsExpr e   = Just (ticks >=> mkTickBox ix frees)
+    | Just ticks <- isTrueLHsExpr e   = Just (\x -> ticks x >>= mkTickBox ix frees)
    -- This encodes that the result is constant True for Hpc tick purposes;
    -- which is specifically what isTrueLHsExpr is trying to find out.
 isTrueLHsExpr (L loc (HsBinTick ixT _ e))
-    | Just ticks <- isTrueLHsExpr e   = Just (ticks >=> mkTickBox ixT [])
+    | Just ticks <- isTrueLHsExpr e   = Just (\x -> ticks x >>= mkTickBox ixT [])
 isTrueLHsExpr (L _ (HsPar e))         = isTrueLHsExpr e
 isTrueLHsExpr other = Nothing
 \end{code}

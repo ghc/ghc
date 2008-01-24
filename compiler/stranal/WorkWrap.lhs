@@ -40,6 +40,7 @@ import DynFlags
 import WwLib
 import Util		( lengthIs, notNull )
 import Outputable
+import MonadUtils
 \end{code}
 
 We take Core bindings whose binders have:

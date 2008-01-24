@@ -1,5 +1,5 @@
 
-module State where
+module State (module State, mapAccumLM {- XXX hack -}) where
 
 import MonadUtils
 

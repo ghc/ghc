@@ -70,9 +70,30 @@ import Util
 import Maybes
 import ListSetOps	( removeDups )
 import List		( nubBy )
-import Monad		( when )
 import DynFlags
 import FastString
+import Control.Monad
+\end{code}
+
+\begin{code}
+-- XXX
+thenM :: Monad a => a b -> (b -> a c) -> a c
+thenM = (>>=)
+
+thenM_ :: Monad a => a b -> a c -> a c
+thenM_ = (>>)
+
+returnM :: Monad m => a -> m a
+returnM = return
+
+mappM :: (Monad m) => (a -> m b) -> [a] -> m [b]
+mappM = mapM
+
+mappM_ :: (Monad m) => (a -> m b) -> [a] -> m ()
+mappM_ = mapM_
+
+checkM :: Monad m => Bool -> m () -> m ()
+checkM = unless
 \end{code}
 
 %*********************************************************

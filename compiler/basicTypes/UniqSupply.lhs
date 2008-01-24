@@ -20,11 +20,14 @@ module UniqSupply (
 	UniqSM,		-- type: unique supply monad
 	initUs, initUs_,
 	lazyThenUs, lazyMapUs,
-	module MonadUtils, mapAndUnzipM,
+	mapAndUnzipM,
 	MonadUnique(..),
 
 	mkSplitUniqSupply,
-	splitUniqSupply, listSplitUniqSupply
+	splitUniqSupply, listSplitUniqSupply,
+
+    -- Deprecated:
+    getUniqueUs, getUs, returnUs, thenUs, mapUs
   ) where
 
 #include "HsVersions.h"
@@ -32,6 +35,9 @@ module UniqSupply (
 import Unique
 import FastTypes
 
+import MonadUtils
+import Control.Monad
+import Control.Monad.Fix
 #if __GLASGOW_HASKELL__ >= 607
 import GHC.IOBase (unsafeDupableInterleaveIO)
 #else
@@ -112,6 +118,16 @@ instance Monad UniqSM where
   (>>=) = thenUs
   (>>)  = thenUs_
 
+instance Functor UniqSM where
+    fmap f (USM x) = USM (\us -> case x us of
+                                 (r, us') -> (f r, us'))
+
+instance Applicative UniqSM where
+    pure = returnUs
+    (USM f) <*> (USM x) = USM $ \us -> case f us of 
+                            (ff, us')  -> case x us' of 
+                              (xx, us'') -> (ff xx, us'')
+
 -- the initUs function also returns the final UniqSupply; initUs_ drops it
 initUs :: UniqSupply -> UniqSM a -> (a,UniqSupply)
 initUs init_us m = case unUSM m init_us of { (r,us) -> (r,us) }
@@ -176,6 +192,13 @@ getUniqueUs = USM (\us -> case splitUniqSupply us of
 getUniquesUs :: UniqSM [Unique]
 getUniquesUs = USM (\us -> case splitUniqSupply us of
 			      (us1,us2) -> (uniqsFromSupply us1, us2))
+
+mapUs :: (a -> UniqSM b) -> [a] -> UniqSM [b]
+mapUs f []     = returnUs []
+mapUs f (x:xs)
+  = f x         `thenUs` \ r  ->
+    mapUs f xs  `thenUs` \ rs ->
+    returnUs (r:rs)
 \end{code}
 
 \begin{code}
@@ -189,5 +212,4 @@ lazyMapUs f (x:xs)
   = f x             `lazyThenUs` \ r  ->
     lazyMapUs f xs  `lazyThenUs` \ rs ->
     returnUs (r:rs)
-
 \end{code}

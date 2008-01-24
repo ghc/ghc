@@ -47,6 +47,7 @@ import UniqSupply
 import Outputable
 import FastString
 import UniqFM
+import MonadUtils
 \end{code}
 
 -----------------------------------------------------

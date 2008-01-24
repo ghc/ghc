@@ -73,7 +73,7 @@ import Panic
 
 import GHC.Arr          ( Array(..) )
 import GHC.Exts
-import GHC.IOBase
+import GHC.IOBase ( IO(IO) )
 
 import Control.Monad
 import Data.Maybe

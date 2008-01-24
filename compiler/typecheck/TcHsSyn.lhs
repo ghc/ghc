@@ -59,6 +59,21 @@ import Bag
 import Outputable
 \end{code}
 
+\begin{code}
+-- XXX
+thenM :: Monad a => a b -> (b -> a c) -> a c
+thenM = (>>=)
+
+thenM_ :: Monad a => a b -> a c -> a c
+thenM_ = (>>)
+
+returnM :: Monad m => a -> m a
+returnM = return
+
+mappM :: (Monad m) => (a -> m b) -> [a] -> m [b]
+mappM = mapM
+\end{code}
+
 
 %************************************************************************
 %*									*
