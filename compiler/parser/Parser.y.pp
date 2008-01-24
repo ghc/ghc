@@ -1221,8 +1221,9 @@ decl 	:: { Located (OrdList (LHsDecl RdrName)) }
 					        return (LL $ unitOL $ LL $ ValD ( 
 							PatBind (LL $ BangPat pat) (unLoc $3)
 								placeHolderType placeHolderNames)) } }
-	| infixexp opt_sig rhs		{% do { r <- checkValDef $1 $2 $3;
-						return $! (LL $! (unitOL $! (LL $ ValD r))) } }
+        | infixexp opt_sig rhs          {% do { r <- checkValDef $1 $2 $3;
+                                                let { l = comb2 $1 $> };
+                                                return $! (sL l (unitOL $! (sL l $ ValD r))) } }
         | docdecl                       { LL $ unitOL $1 }
 
 rhs	:: { Located (GRHSs RdrName) }
