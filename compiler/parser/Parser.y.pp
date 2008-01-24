@@ -1977,7 +1977,7 @@ comb4 a b c d = combineSrcSpans (getLoc a) $ combineSrcSpans (getLoc b) $
 -- strict constructor version:
 {-# INLINE sL #-}
 sL :: SrcSpan -> a -> Located a
-sL span a = span `seq` L span a
+sL span a = span `seq` a `seq` L span a
 
 -- Make a source location for the file.  We're a bit lazy here and just
 -- make a point SrcSpan at line 1, column 0.  Strictly speaking we should
