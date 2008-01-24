@@ -822,7 +822,11 @@ where_inst :: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
 -- Declarations in binding groups other than classes and instances
 --
 decls 	:: { Located (OrdList (LHsDecl RdrName)) }	
-	: decls ';' decl		{ LL (unLoc $1 `appOL` unLoc $3) }
+	: decls ';' decl		{ let { this = unLoc $3;
+                                    rest = unLoc $1;
+                                    these = unLoc $1 `appOL` unLoc $3 }
+                              in rest `seq` this `seq` these `seq`
+                                    LL these }
 	| decls ';'			{ LL (unLoc $1) }
 	| decl				{ $1 }
 	| {- empty -}			{ noLoc nilOL }
@@ -1625,9 +1629,10 @@ fbind	:: { HsRecField RdrName (LHsExpr RdrName) }
 -- Implicit Parameter Bindings
 
 dbinds 	:: { Located [LIPBind RdrName] }
-	: dbinds ';' dbind		{ LL ($3 : unLoc $1) }
+	: dbinds ';' dbind		{ let { this = $3; rest = unLoc $1 }
+                              in rest `seq` this `seq` LL (this : rest) }
 	| dbinds ';'			{ LL (unLoc $1) }
-	| dbind				{ L1 [$1] }
+	| dbind				{ let this = $1 in this `seq` L1 [this] }
 --	| {- empty -}			{ [] }
 
 dbind	:: { LIPBind RdrName }
