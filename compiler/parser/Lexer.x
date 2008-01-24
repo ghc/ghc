@@ -1410,7 +1410,7 @@ instance Monad P where
   fail = failP
 
 returnP :: a -> P a
-returnP a = P $ \s -> POk s a
+returnP a = a `seq` (P $ \s -> POk s a)
 
 thenP :: P a -> (a -> P b) -> P b
 (P m) `thenP` k = P $ \ s ->
