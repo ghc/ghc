@@ -576,7 +576,7 @@ uncaughtExceptionHandler = unsafePerformIO (newIORef defaultHandler)
          let msg = case ex of
                Deadlock    -> "no threads to run:  infinite loop or deadlock?"
                ErrorCall s -> s
-               other       -> showsPrec 0 other "\n"
+               other       -> showsPrec 0 other ""
          withCString "%s" $ \cfmt ->
           withCString msg $ \cmsg ->
             errorBelch cfmt cmsg
