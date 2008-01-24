@@ -54,7 +54,6 @@ import System.Posix hiding (getEnv)
 #else
 import GHC.ConsoleHandler ( flushConsole )
 import qualified System.Win32
-import System.FilePath
 #endif
 
 #ifdef USE_READLINE
@@ -67,6 +66,7 @@ import System.Console.Readline as Readline
 import Control.Exception as Exception
 -- import Control.Concurrent
 
+import System.FilePath
 import qualified Data.ByteString.Char8 as BS
 import Data.List
 import Data.Maybe
