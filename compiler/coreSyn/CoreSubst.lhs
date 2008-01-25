@@ -6,13 +6,6 @@
 Utility functions on @Core@ syntax
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CoreSubst (
 	-- Substitution stuff
 	Subst, TvSubstEnv, IdSubstEnv, InScopeSet,
@@ -50,8 +43,6 @@ import UniqSupply
 import Maybes
 import Outputable
 import PprCore		()		-- Instances
-import Util
-import FastTypes
 
 import Data.List
 \end{code}
@@ -175,13 +166,14 @@ extendSubstList :: Subst -> [(Var,CoreArg)] -> Subst
 extendSubstList subst []	      = subst
 extendSubstList subst ((var,rhs):prs) = extendSubstList (extendSubst subst var rhs) prs
 
+extendSubst :: Subst -> Var -> CoreArg -> Subst
 extendSubst (Subst in_scope ids tvs) tv (Type ty)
   = ASSERT( isTyVar tv ) Subst in_scope ids (extendVarEnv tvs tv ty)
 extendSubst (Subst in_scope ids tvs) id expr
   = ASSERT( isId id ) Subst in_scope (extendVarEnv ids id expr) tvs
 
 lookupIdSubst :: Subst -> Id -> CoreExpr
-lookupIdSubst (Subst in_scope ids tvs) v 
+lookupIdSubst (Subst in_scope ids _) v
   | not (isLocalId v) = Var v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
@@ -190,7 +182,7 @@ lookupIdSubst (Subst in_scope ids tvs) v
 		Var v
 
 lookupTvSubst :: Subst -> TyVar -> Type
-lookupTvSubst (Subst _ ids tvs) v = lookupVarEnv tvs v `orElse` Type.mkTyVarTy v
+lookupTvSubst (Subst _ _ tvs) v = lookupVarEnv tvs v `orElse` Type.mkTyVarTy v
 
 ------------------------------
 isInScope :: Var -> Subst -> Bool
@@ -399,7 +391,7 @@ substTyVarBndr (Subst in_scope id_env tv_env) tv
 	   -> (Subst in_scope' id_env tv_env', tv')
 
 substTy :: Subst -> Type -> Type 
-substTy (Subst in_scope id_env tv_env) ty 
+substTy (Subst in_scope _id_env tv_env) ty
   = Type.substTy (TvSubst in_scope tv_env) ty
 \end{code}
 
@@ -412,7 +404,7 @@ substTy (Subst in_scope id_env tv_env) ty
 
 \begin{code}
 substIdType :: Subst -> Id -> Id
-substIdType subst@(Subst in_scope id_env tv_env) id
+substIdType subst@(Subst _ _ tv_env) id
   | isEmptyVarEnv tv_env || isEmptyVarSet (Type.tyVarsOfType old_ty) = id
   | otherwise	= setIdType id (substTy subst old_ty)
 		-- The tyVarsOfType is cheaper than it looks
@@ -442,7 +434,7 @@ substWorker :: Subst -> WorkerInfo -> WorkerInfo
 	-- Seq'ing on the returned WorkerInfo is enough to cause all the 
 	-- substitutions to happen completely
 
-substWorker subst NoWorker
+substWorker _ NoWorker
   = NoWorker
 substWorker subst (HasWorker w a)
   = case lookupIdSubst subst w of
@@ -474,6 +466,7 @@ substSpec subst new_fn spec@(SpecInfo rules rhs_fvs)
 	  (subst', bndrs') = substBndrs subst bndrs
 
 ------------------
+substVarSet :: Subst -> VarSet -> VarSet
 substVarSet subst fvs 
   = foldVarSet (unionVarSet . subst_fv subst) emptyVarSet fvs
   where
