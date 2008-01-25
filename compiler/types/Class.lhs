@@ -6,13 +6,6 @@
 The @Class@ datatype
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Class (
 	Class, ClassOpItem, 
 	DefMeth (..),
@@ -124,12 +117,16 @@ classMethods :: Class -> [Id]
 classMethods (Class {classOpStuff = op_stuff})
   = [op_sel | (op_sel, _) <- op_stuff]
 
+classTvsFds :: Class -> ([TyVar], [FunDep TyVar])
 classTvsFds c
   = (classTyVars c, classFunDeps c)
 
+classBigSig :: Class -> ([TyVar], [PredType], [Id], [ClassOpItem])
 classBigSig (Class {classTyVars = tyvars, classSCTheta = sc_theta, 
 	 	    classSCSels = sc_sels, classOpStuff = op_stuff})
   = (tyvars, sc_theta, sc_sels, op_stuff)
+
+classExtraBigSig :: Class -> ([TyVar], [FunDep TyVar], [PredType], [Id], [TyCon], [ClassOpItem])
 classExtraBigSig (Class {classTyVars = tyvars, classFunDeps = fundeps,
 			 classSCTheta = sc_theta, classSCSels = sc_sels,
 			 classATs = ats, classOpStuff = op_stuff})
