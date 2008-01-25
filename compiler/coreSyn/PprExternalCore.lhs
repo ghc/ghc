@@ -3,13 +3,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module PprExternalCore () where
 
 import Pretty
@@ -18,40 +11,43 @@ import Char
 import Encoding
 
 instance Show Module where
-  showsPrec d m = shows (pmodule m)
+  showsPrec _ m = shows (pmodule m)
 
 instance Show Tdef where
-  showsPrec d t = shows (ptdef t)
+  showsPrec _ t = shows (ptdef t)
 
 instance Show Cdef where
-  showsPrec d c = shows (pcdef c)
+  showsPrec _ c = shows (pcdef c)
 
 instance Show Vdefg where
-  showsPrec d v = shows (pvdefg v)
+  showsPrec _ v = shows (pvdefg v)
 
 instance Show Exp where
-  showsPrec d e = shows (pexp e)
+  showsPrec _ e = shows (pexp e)
 
 instance Show Alt where
-  showsPrec d a = shows (palt a)
+  showsPrec _ a = shows (palt a)
 
 instance Show Ty where
-  showsPrec d t = shows (pty t)
+  showsPrec _ t = shows (pty t)
 
 instance Show Kind where
-  showsPrec d k = shows (pkind k)
+  showsPrec _ k = shows (pkind k)
 
 instance Show Lit where
-  showsPrec d l = shows (plit l)
+  showsPrec _ l = shows (plit l)
 
 
+indent :: Doc -> Doc
 indent = nest 2
 
+pmodule :: Module -> Doc
 pmodule (Module mname tdefs vdefgs) =
   (text "%module" <+> text mname)
     $$ indent ((vcat (map ((<> char ';') . ptdef) tdefs))
 	       $$ (vcat (map ((<> char ';') . pvdefg) vdefgs)))
 
+ptdef :: Tdef -> Doc
 ptdef (Data tcon tbinds cdefs) =
   (text "%data" <+> pqname tcon <+> (hsep (map ptbind tbinds)) <+> char '=')
   $$ indent (braces ((vcat (punctuate (char ';') (map pcdef cdefs)))))
@@ -62,21 +58,26 @@ ptdef (Newtype tcon tbinds rep ) =
                            Just ty -> char '=' <+> pty ty 
 			   Nothing -> empty
 
+pcdef :: Cdef -> Doc
 pcdef (Constr dcon tbinds tys)  =
   (pname dcon) <+> (sep [hsep (map pattbind tbinds),sep (map paty tys)])
 pcdef (GadtConstr dcon ty)  =
   (pname dcon) <+> text "::" <+> pty ty
 
+pname :: Id -> Doc
 pname id = text (zEncodeString id)
 
+pqname :: Qual Id -> Doc
 pqname ("",id) = pname id
 pqname (m,id)  = text m <> char '.' <> pname id
 
+ptbind, pattbind :: Tbind -> Doc
 ptbind (t,Klifted) = pname t
 ptbind (t,k) = parens (pname t <> text "::" <> pkind k)
 
 pattbind (t,k) = char '@' <> ptbind (t,k)
 
+pakind, pkind :: Kind -> Doc
 pakind (Klifted) = char '*'
 pakind (Kunlifted) = char '#'
 pakind (Kopen) = char '?'
@@ -86,6 +87,7 @@ pkind (Karrow k1 k2) = parens (pakind k1 <> text "->" <> pkind k2)
 pkind (Keq t1 t2) = parens (pty t1 <> text ":=:" <> pty t2)
 pkind k = pakind k
 
+paty, pbty, pty :: Ty -> Doc
 paty (Tvar n) = pname n
 paty (Tcon c) = pqname c
 paty t = parens (pty t)
@@ -98,30 +100,38 @@ pty (Tapp(Tapp(Tcon tc) t1) t2) | tc == tcArrow = fsep [pbty t1, text "->",pty t
 pty (Tforall tb t) = text "%forall" <+> pforall [tb] t
 pty t = pbty t
 
+pappty :: Ty -> [Ty] -> Doc
 pappty (Tapp t1 t2) ts = pappty t1 (t2:ts)
 pappty t ts = sep (map paty (t:ts))
 
+pforall :: [Tbind] -> Ty -> Doc
 pforall tbs (Tforall tb t) = pforall (tbs ++ [tb]) t
 pforall tbs t = hsep (map ptbind tbs) <+> char '.' <+> pty t
 
+pvdefg :: Vdefg -> Doc
 pvdefg (Rec vdefs) = text "%rec" $$ braces (indent (vcat (punctuate (char ';') (map pvdef vdefs))))
 pvdefg (Nonrec vdef) = pvdef vdef
 
+pvdef :: Vdef -> Doc
 pvdef (l,v,t,e) = sep [plocal l <+> pname v <+> text "::" <+> pty t <+> char '=',
 		    indent (pexp e)]
 
+plocal :: Bool -> Doc
 plocal True  = text "%local"
 plocal False = empty
 
+paexp, pfexp, pexp :: Exp -> Doc
 paexp (Var x) = pqname x
 paexp (Dcon x) = pqname x
 paexp (Lit l) = plit l
 paexp e = parens(pexp e)
 
+plamexp :: [Bind] -> Exp -> Doc
 plamexp bs (Lam b e) = plamexp (bs ++ [b]) e
 plamexp bs e = sep [sep (map pbind bs) <+> text "->",
 		    indent (pexp e)]
 
+pbind :: Bind -> Doc
 pbind (Tb tb) = char '@' <+> ptbind tb
 pbind (Vb vb) = pvbind vb
 
@@ -129,6 +139,7 @@ pfexp (App e1 e2) = pappexp e1 [Left e2]
 pfexp (Appt e t) = pappexp e [Right t]
 pfexp e = paexp e
 
+pappexp :: Exp -> [Either Exp Ty] -> Doc
 pappexp (App e1 e2) as = pappexp e1 (Left e2:as)
 pappexp (Appt e t) as = pappexp e (Right t:as)
 pappexp e as = fsep (paexp e : map pa as)
@@ -147,9 +158,10 @@ pexp (DynExternal cc t) = (text "%dynexternal" <+> text cc) $$ paty t
 pexp (Label n) = (text "%label" <+> pstring n)
 pexp e = pfexp e
 
-
+pvbind :: Vbind -> Doc
 pvbind (x,t) = parens(pname x <> text "::" <> pty t)
 
+palt :: Alt -> Doc
 palt (Acon c tbs vbs e) =
 	sep [pqname c, 
 	     sep (map pattbind tbs),
@@ -162,13 +174,16 @@ palt (Adefault e) =
 	(text "%_ ->")
 	$$ indent (pexp e)
 
+plit :: Lit -> Doc
 plit (Lint i t) = parens (integer i <> text "::" <> pty t)
 plit (Lrational r t) = parens (rational r <>  text "::" <> pty t)  -- might be better to print as two integers
 plit (Lchar c t) = parens (text ("\'" ++ escape [c] ++ "\'") <> text "::" <> pty t)
 plit (Lstring s t) = parens (pstring s <> text "::" <> pty t)
 
+pstring :: String -> Doc
 pstring s = doubleQuotes(text (escape s))
 
+escape :: String -> String
 escape s = foldr f [] (map ord s)
     where 
      f cv rest
