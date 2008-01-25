@@ -94,10 +94,8 @@
 ></TR
 ><TR
 ><TD CLASS="doc"
-><EM
->multi-line
- emphasis</EM
->
+>/multi-line
+ emphasis/
 </TD
 ></TR
 ><TR
@@ -108,7 +106,7 @@
 ><TD CLASS="botbar"
 >Produced by <A HREF="http://www.haskell.org/haddock/"
 >Haddock</A
-> version 2.0</TD
+> version 2.0.0.0</TD
 ></TR
 ></TABLE
 ></BODY

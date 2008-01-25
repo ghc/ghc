@@ -845,9 +845,9 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3Ahidden"
->hidden</A
-> :: Int -&gt; Int</TD
+>module <A HREF="Hidden.html"
+>Hidden</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -2500,7 +2500,7 @@ using double quotes: <A HREF="Foo.html"
  referred to in the export list using its name.
 </P
 ><PRE
-> code block in named doc </PRE
+> code block in named doc</PRE
 ></TD
 ></TR
 ><TR
@@ -2519,7 +2519,7 @@ using double quotes: <A HREF="Foo.html"
 ><TR
 ><TD CLASS="doc"
 ><PRE
-> code block on its own in named doc </PRE
+> code block on its own in named doc</PRE
 ></TD
 ></TR
 ><TR
@@ -2529,7 +2529,7 @@ using double quotes: <A HREF="Foo.html"
 ><TR
 ><TD CLASS="doc"
 ><PRE
-> code block on its own in named doc (after newline) </PRE
+> code block on its own in named doc (after newline)</PRE
 ></TD
 ></TR
 ><TR
@@ -2545,7 +2545,7 @@ using double quotes: <A HREF="Foo.html"
 >with a paragraph,
 </P
 ><PRE
-> and a code block </PRE
+> and a code block</PRE
 ></TD
 ></TR
 ><TR
@@ -2690,11 +2690,9 @@ test2
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A NAME="v%3Ahidden"
-></A
-><B
->hidden</B
-> :: Int -&gt; Int</TD
+>module <A HREF="Hidden.html"
+>Hidden</A
+></TD
 ></TR
 ><TR
 ><TD CLASS="s15"
@@ -3097,7 +3095,7 @@ test2
 ><TD CLASS="botbar"
 >Produced by <A HREF="http://www.haskell.org/haddock/"
 >Haddock</A
-> version 2.0</TD
+> version 2.0.0.0</TD
 ></TR
 ></TABLE
 ></BODY
