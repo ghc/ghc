@@ -845,9 +845,9 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
->module <A HREF="Hidden.html"
->Hidden</A
-></TD
+><A HREF="#v%3Ahidden"
+>hidden</A
+> :: Int -&gt; Int</TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -2690,9 +2690,11 @@ test2
 ></TR
 ><TR
 ><TD CLASS="decl"
->module <A HREF="Hidden.html"
->Hidden</A
-></TD
+><A NAME="v%3Ahidden"
+></A
+><B
+>hidden</B
+> :: Int -&gt; Int</TD
 ></TR
 ><TR
 ><TD CLASS="s15"
