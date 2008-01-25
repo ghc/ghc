@@ -5,13 +5,6 @@
 Core pass to saturate constructors and PrimOps
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CorePrep (
       corePrepPgm, corePrepExpr
   ) where
@@ -149,6 +142,7 @@ always fully applied, and the bindings are just there to support
 partial applications. But it's easier to let them through.
 
 \begin{code}
+mkDataConWorkers :: [TyCon] -> [CoreBind]
 mkDataConWorkers data_tycons
   = [ NonRec id (Var id)	-- The ice is thin here, but it works
     | tycon <- data_tycons, 	-- CorePrep will eta-expand it
@@ -202,6 +196,7 @@ appendFloats (Floats spec1 floats1) (Floats spec2 floats2)
 concatFloats :: [Floats] -> Floats
 concatFloats = foldr appendFloats emptyFloats
 
+combine :: OkToSpec -> OkToSpec -> OkToSpec
 combine NotOkToSpec _ = NotOkToSpec
 combine _ NotOkToSpec = NotOkToSpec
 combine IfUnboxedOk _ = IfUnboxedOk
@@ -218,7 +213,7 @@ deFloatTop (Floats _ floats)
   = foldrOL get [] floats
   where
     get (FloatLet b) bs = b:bs
-    get b	     bs = pprPanic "corePrepPgm" (ppr b)
+    get b            _  = pprPanic "corePrepPgm" (ppr b)
 
 allLazy :: TopLevelFlag -> RecFlag -> Floats -> Bool
 allLazy top_lvl is_rec (Floats ok_to_spec _)
@@ -235,7 +230,7 @@ corePrepTopBinds :: [CoreBind] -> UniqSM Floats
 corePrepTopBinds binds 
   = go emptyCorePrepEnv binds
   where
-    go env []		  = return emptyFloats
+    go _   []             = return emptyFloats
     go env (bind : binds) = do (env', bind') <- corePrepTopBind env bind
                                binds' <- go env' binds
                                return (bind' `appendFloats` binds')
@@ -306,7 +301,7 @@ corePrepRecPairs lvl env pairs = do
 
     get (FloatLet (NonRec b r)) prs2 = (b,r) : prs2
     get (FloatLet (Rec prs1))   prs2 = prs1 ++ prs2
-    get b			prs2 = pprPanic "corePrepRecPairs" (ppr b)
+    get b                       _    = pprPanic "corePrepRecPairs" (ppr b)
 
 --------------------------------
 corePrepRhs :: TopLevelFlag -> RecFlag
@@ -335,15 +330,16 @@ corePrepArg env arg dem = do
              return (floats', Var v')
 
 -- version that doesn't consider an scc annotation to be trivial.
-exprIsTrivial (Var v)                  = True
+exprIsTrivial :: CoreExpr -> Bool
+exprIsTrivial (Var _)                  = True
 exprIsTrivial (Type _)                 = True
-exprIsTrivial (Lit lit)                = True
+exprIsTrivial (Lit _)                  = True
 exprIsTrivial (App e arg)              = isTypeArg arg && exprIsTrivial e
-exprIsTrivial (Note (SCC _) e)         = False
+exprIsTrivial (Note (SCC _) _)         = False
 exprIsTrivial (Note _ e)               = exprIsTrivial e
-exprIsTrivial (Cast e co)              = exprIsTrivial e
+exprIsTrivial (Cast e _)               = exprIsTrivial e
 exprIsTrivial (Lam b body) | isTyVar b = exprIsTrivial body
-exprIsTrivial other                    = False
+exprIsTrivial _                        = False
 
 -- ---------------------------------------------------------------------------
 -- Dealing with expressions
@@ -370,10 +366,10 @@ corePrepExprFloat env (Var v) = do
         v2 = lookupCorePrepEnv env v1
     maybeSaturate v2 (Var v2) 0 emptyFloats (idType v2)
 
-corePrepExprFloat env expr@(Type _)
+corePrepExprFloat _env expr@(Type _)
   = return (emptyFloats, expr)
 
-corePrepExprFloat env expr@(Lit lit)
+corePrepExprFloat _env expr@(Lit _)
   = return (emptyFloats, expr)
 
 corePrepExprFloat env (Let bind body) = do
@@ -484,7 +480,7 @@ corePrepExprFloat env expr@(App _ _) = do
 
     collect_args (Cast fun co) depth = do
           let (_ty1,ty2) = coercionKind co
-          (fun', hd, fun_ty, floats, ss) <- collect_args fun depth
+          (fun', hd, _, floats, ss) <- collect_args fun depth
           return (Cast fun' co, hd, ty2, floats, ss)
           
     collect_args (Note note fun) depth
@@ -575,7 +571,7 @@ floatRhs :: TopLevelFlag -> RecFlag
 	 -> UniqSM (Floats, 	-- Floats out of this bind
 		    CoreExpr)	-- Final Rhs
 
-floatRhs top_lvl is_rec bndr (floats, rhs)
+floatRhs top_lvl is_rec _bndr (floats, rhs)
   | isTopLevel top_lvl || exprIsHNF rhs,	-- Float to expose value or 
     allLazy top_lvl is_rec floats 		-- at top level
   = 	-- Why the test for allLazy? 
@@ -634,6 +630,7 @@ mkBinds (Floats _ binds) body
     mk_bind (FloatCase bndr rhs _) body = Case rhs bndr (exprType body) [(DEFAULT, [], body)]
     mk_bind (FloatLet bind)        body = Let bind body
 
+etaExpandRhs :: CoreBndr -> CoreExpr -> UniqSM CoreExpr
 etaExpandRhs bndr rhs = do
    	-- Eta expand to match the arity claimed by the binder
 	-- Remember, after CorePrep we must not change arity
@@ -717,6 +714,7 @@ deLamFloat expr
 -- get to a partial application:
 -- 	\xs. map f xs ==> map f
 
+tryEta :: [CoreBndr] -> CoreExpr -> Maybe CoreExpr
 tryEta bndrs expr@(App _ _)
   | ok_to_eta_reduce f &&
     n_remaining >= 0 &&
@@ -731,13 +729,13 @@ tryEta bndrs expr@(App _ _)
     n_remaining = length args - length bndrs
 
     ok bndr (Var arg) = bndr == arg
-    ok bndr other     = False
+    ok _    _         = False
 
 	  -- we can't eta reduce something which must be saturated.
     ok_to_eta_reduce (Var f) = not (hasNoBinding f)
     ok_to_eta_reduce _       = False --safe. ToDo: generalise
 
-tryEta bndrs (Let bind@(NonRec b r) body)
+tryEta bndrs (Let bind@(NonRec _ r) body)
   | not (any (`elemVarSet` fvs) bndrs)
   = case tryEta bndrs body of
 	Just e -> Just (Let bind e)
@@ -745,7 +743,7 @@ tryEta bndrs (Let bind@(NonRec b r) body)
   where
     fvs = exprFreeVars r
 
-tryEta bndrs _ = Nothing
+tryEta _ _ = Nothing
 \end{code}
 
 
@@ -755,16 +753,16 @@ tryEta bndrs _ = Nothing
 
 \begin{code}
 data RhsDemand
-     = RhsDemand { isStrict :: Bool,  -- True => used at least once
-                   isOnceDem   :: Bool   -- True => used at most once
+     = RhsDemand { isStrict  :: Bool,  -- True => used at least once
+                  _isOnceDem :: Bool   -- True => used at most once
                  }
 
 mkDem :: Demand -> Bool -> RhsDemand
 mkDem strict once = RhsDemand (isStrictDmd strict) once
 
 mkDemTy :: Demand -> Type -> RhsDemand
-mkDemTy strict ty = RhsDemand (isStrictDmd strict) 
-			      False {- For now -}
+mkDemTy strict _ty = RhsDemand (isStrictDmd strict)
+                               False {- For now -}
 
 bdrDem :: Id -> RhsDemand
 bdrDem id = mkDem (idNewDemandInfo id)
