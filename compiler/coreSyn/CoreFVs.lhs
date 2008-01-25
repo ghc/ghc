@@ -5,7 +5,7 @@
 Taken quite directly from the Peyton Jones/Lester paper.
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -30,6 +30,8 @@ module CoreFVs (
 	freeVarsOf		-- CoreExprWithFVs -> IdSet
     ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import CoreSyn
@@ -68,7 +70,7 @@ exprsFreeVars :: [CoreExpr] -> VarSet
 exprsFreeVars = foldr (unionVarSet . exprFreeVars) emptyVarSet
 
 bindFreeVars :: CoreBind -> VarSet
-bindFreeVars (NonRec b r) = exprFreeVars r
+bindFreeVars (NonRec _ r) = exprFreeVars r
 bindFreeVars (Rec prs)    = addBndrs (map fst prs) 
 				     (foldr (union . rhs_fvs) noVars prs)
 				     isLocalVar emptyVarSet
@@ -96,7 +98,7 @@ union :: FV -> FV -> FV
 union fv1 fv2 fv_cand in_scope = fv1 fv_cand in_scope `unionVarSet` fv2 fv_cand in_scope
 
 noVars :: FV
-noVars fv_cand in_scope = emptyVarSet
+noVars _ _ = emptyVarSet
 
 --	Comment about obselete code
 -- We used to gather the free variables the RULES at a variable occurrence
@@ -137,6 +139,7 @@ someVars :: VarSet -> FV
 someVars vars fv_cand in_scope
   = filterVarSet (keep_it fv_cand in_scope) vars
 
+keep_it :: InterestingVarFun -> VarSet -> Var -> Bool
 keep_it fv_cand in_scope var
   | var `elemVarSet` in_scope = False
   | fv_cand var		      = True
@@ -160,7 +163,7 @@ expr_fvs :: CoreExpr -> FV
 
 expr_fvs (Type ty) 	 = someVars (tyVarsOfType ty)
 expr_fvs (Var var) 	 = oneVar var
-expr_fvs (Lit lit)	 = noVars
+expr_fvs (Lit _)         = noVars
 expr_fvs (Note _ expr)   = expr_fvs expr
 expr_fvs (App fun arg)   = expr_fvs fun `union` expr_fvs arg
 expr_fvs (Lam bndr body) = addBndr bndr (expr_fvs body)
@@ -170,7 +173,7 @@ expr_fvs (Case scrut bndr ty alts)
   = expr_fvs scrut `union` someVars (tyVarsOfType ty) `union` addBndr bndr  
       (foldr (union . alt_fvs) noVars alts)
   where
-    alt_fvs (con, bndrs, rhs) = addBndrs bndrs (expr_fvs rhs)
+    alt_fvs (_, bndrs, rhs) = addBndrs bndrs (expr_fvs rhs)
 
 expr_fvs (Let (NonRec bndr rhs) body)
   = rhs_fvs (bndr, rhs) `union` addBndr bndr (expr_fvs body)
@@ -180,10 +183,12 @@ expr_fvs (Let (Rec pairs) body)
 	     (foldr (union . rhs_fvs) (expr_fvs body) pairs)
 
 ---------
+rhs_fvs :: (Id,CoreExpr) -> FV
 rhs_fvs (bndr, rhs) = expr_fvs rhs `union` someVars (idRuleVars bndr)
 	-- Treat any RULES as extra RHSs of the binding
 
 ---------
+exprs_fvs :: [CoreExpr] -> FV
 exprs_fvs exprs = foldr (union . expr_fvs) noVars exprs
 \end{code}
 
@@ -209,7 +214,7 @@ be *internal* names.
 \begin{code}
 ruleLhsFreeNames :: CoreRule -> NameSet
 ruleLhsFreeNames (BuiltinRule { ru_fn = fn }) = unitNameSet fn
-ruleLhsFreeNames (Rule { ru_fn = fn, ru_bndrs = tpl_vars, ru_args = tpl_args })
+ruleLhsFreeNames (Rule { ru_fn = fn, ru_args = tpl_args })
   = addOneToNameSet (exprsFreeNames tpl_args) fn
 
 exprFreeNames :: CoreExpr -> NameSet
@@ -225,15 +230,16 @@ exprFreeNames e
     go (Type ty)   	    = tyClsNamesOfType ty	-- Don't need free tyvars
     go (App e1 e2) 	    = go e1 `unionNameSets` go e2
     go (Lam v e)   	    = go e `delFromNameSet` idName v
-    go (Note n e)  	    = go e  
+    go (Note _ e)           = go e
     go (Cast e co)          = go e `unionNameSets` tyClsNamesOfType co
-    go (Let (NonRec b r) e) = go e `unionNameSets` go r
+    go (Let (NonRec _ r) e) = go e `unionNameSets` go r
     go (Let (Rec prs) e)    = exprsFreeNames (map snd prs) `unionNameSets` go e
-    go (Case e b ty as)     = go e `unionNameSets` tyClsNamesOfType ty 
+    go (Case e _ ty as)     = go e `unionNameSets` tyClsNamesOfType ty
                               `unionNameSets` unionManyNameSets (map go_alt as)
 
     go_alt (_,_,r) = go r
 
+exprsFreeNames :: [CoreExpr] -> NameSet
 exprsFreeNames es = foldr (unionNameSets . exprFreeNames) emptyNameSet es
 \end{code}
 
@@ -295,8 +301,13 @@ type CoreExprWithFVs = AnnExpr Id VarSet
 freeVarsOf :: CoreExprWithFVs -> IdSet
 freeVarsOf (free_vars, _) = free_vars
 
+noFVs :: VarSet
 noFVs    = emptyVarSet
+
+aFreeVar :: Var -> VarSet
 aFreeVar = unitVarSet
+
+unionFVs :: VarSet -> VarSet -> VarSet
 unionFVs = unionVarSet
 
 delBindersFV :: [Var] -> VarSet -> VarSet
