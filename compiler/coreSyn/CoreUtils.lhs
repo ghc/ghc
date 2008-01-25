@@ -6,7 +6,7 @@
 Utility functions on @Core@ syntax
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -97,9 +97,9 @@ exprType :: CoreExpr -> Type
 exprType (Var var)	     = idType var
 exprType (Lit lit)	     = literalType lit
 exprType (Let _ body)	     = exprType body
-exprType (Case _ _ ty alts)  = ty
-exprType (Cast e co)	     = snd (coercionKind co)
-exprType (Note other_note e) = exprType e
+exprType (Case _ _ ty _)     = ty
+exprType (Cast _ co)         = snd (coercionKind co)
+exprType (Note _ e)          = exprType e
 exprType (Lam binder expr)   = mkPiType binder (exprType expr)
 exprType e@(App _ _)
   = case collectArgs e of
@@ -130,13 +130,13 @@ mkPiType v ty
 \begin{code}
 applyTypeToArg :: Type -> CoreExpr -> Type
 applyTypeToArg fun_ty (Type arg_ty) = applyTy fun_ty arg_ty
-applyTypeToArg fun_ty other_arg     = funResultTy fun_ty
+applyTypeToArg fun_ty _             = funResultTy fun_ty
 
 applyTypeToArgs :: CoreExpr -> Type -> [CoreExpr] -> Type
 -- A more efficient version of applyTypeToArg 
 -- when we have several args
 -- The first argument is just for debugging
-applyTypeToArgs e op_ty [] = op_ty
+applyTypeToArgs _ op_ty [] = op_ty
 
 applyTypeToArgs e op_ty (Type ty : args)
   =	-- Accumulate type arguments so we can instantiate all at once
@@ -147,7 +147,7 @@ applyTypeToArgs e op_ty (Type ty : args)
 			 	where
 				  op_ty' = applyTys op_ty (reverse rev_tys)
 
-applyTypeToArgs e op_ty (other_arg : args)
+applyTypeToArgs e op_ty (_ : args)
   = case (splitFunTy_maybe op_ty) of
 	Just (_, res_ty) -> applyTypeToArgs e res_ty args
 	Nothing -> pprPanic "applyTypeToArgs" (pprCoreExpr e $$ ppr op_ty)
@@ -194,6 +194,7 @@ its rhs is trivial) and *then* we could get rid of the inline_me.
 But it hardly seems worth it, so I don't bother.
 
 \begin{code}
+mkInlineMe :: CoreExpr -> CoreExpr
 mkInlineMe (Var v) = Var v
 mkInlineMe e	   = Note InlineMe e
 \end{code}
@@ -213,7 +214,7 @@ mkCoerce co (Cast expr co2)
     mkCoerce (mkTransCoercion co2 co) expr
 
 mkCoerce co expr 
-  = let (from_ty, to_ty) = coercionKind co in
+  = let (from_ty, _to_ty) = coercionKind co in
 --    if to_ty `coreEqType` from_ty
 --    then expr
 --    else 
@@ -225,7 +226,7 @@ mkCoerce co expr
 mkSCC :: CostCentre -> Expr b -> Expr b
 	-- Note: Nested SCC's *are* preserved for the benefit of
 	--       cost centre stack profiling
-mkSCC cc (Lit lit)  	    = Lit lit
+mkSCC _  (Lit lit)          = Lit lit
 mkSCC cc (Lam x e)  	    = Lam x (mkSCC cc e)  -- Move _scc_ inside lambda
 mkSCC cc (Note (SCC cc') e) = Note (SCC cc) (Note (SCC cc') e)
 mkSCC cc (Note n e) 	    = Note n (mkSCC cc e) -- Move _scc_ inside notes
@@ -256,6 +257,7 @@ bindNonRec bndr rhs body
   | needsCaseBinding (idType bndr) rhs = Case rhs bndr (exprType body) [(DEFAULT,[],body)]
   | otherwise			       = Let (NonRec bndr rhs) body
 
+needsCaseBinding :: Type -> CoreExpr -> Bool
 needsCaseBinding ty rhs = isUnLiftedType ty && not (exprOkForSpeculation rhs)
 	-- Make a case expression instead of a let
 	-- These can arise either from the desugarer,
@@ -300,7 +302,7 @@ findAlt :: AltCon -> [CoreAlt] -> CoreAlt
 findAlt con alts
   = case alts of
 	(deflt@(DEFAULT,_,_):alts) -> go alts deflt
-	other			   -> go alts panic_deflt
+        _                          -> go alts panic_deflt
   where
     panic_deflt = pprPanic "Missing alternative" (ppr con $$ vcat (map ppr alts))
 
@@ -313,7 +315,7 @@ findAlt con alts
 
 isDefaultAlt :: CoreAlt -> Bool
 isDefaultAlt (DEFAULT, _, _) = True
-isDefaultAlt other	     = False
+isDefaultAlt _               = False
 
 ---------------------------------
 mergeAlts :: [CoreAlt] -> [CoreAlt] -> [CoreAlt]
@@ -336,7 +338,7 @@ trimConArgs :: AltCon -> [CoreArg] -> [CoreArg]
 -- leaving the arguments to match agains the pattern
 
 trimConArgs DEFAULT      args = ASSERT( null args ) []
-trimConArgs (LitAlt lit) args = ASSERT( null args ) []
+trimConArgs (LitAlt _)   args = ASSERT( null args ) []
 trimConArgs (DataAlt dc) args = dropList (dataConUnivTyVars dc) args
 \end{code}
 
@@ -372,15 +374,16 @@ SCC notes.  We do not treat (_scc_ "foo" x) as trivial, because
   b) see the note [SCC-and-exprIsTrivial] in Simplify.simplLazyBind
 
 \begin{code}
-exprIsTrivial (Var v)	   = True	-- See notes above
-exprIsTrivial (Type _)	   = True
-exprIsTrivial (Lit lit)    = litIsTrivial lit
-exprIsTrivial (App e arg)  = not (isRuntimeArg arg) && exprIsTrivial e
-exprIsTrivial (Note (SCC _) e) = False		-- See notes above
+exprIsTrivial :: CoreExpr -> Bool
+exprIsTrivial (Var _)          = True        -- See notes above
+exprIsTrivial (Type _)         = True
+exprIsTrivial (Lit lit)        = litIsTrivial lit
+exprIsTrivial (App e arg)      = not (isRuntimeArg arg) && exprIsTrivial e
+exprIsTrivial (Note (SCC _) _) = False       -- See notes above
 exprIsTrivial (Note _       e) = exprIsTrivial e
-exprIsTrivial (Cast e co)  = exprIsTrivial e
-exprIsTrivial (Lam b body) = not (isRuntimeVar b) && exprIsTrivial body
-exprIsTrivial other	   = False
+exprIsTrivial (Cast e _)       = exprIsTrivial e
+exprIsTrivial (Lam b body)     = not (isRuntimeVar b) && exprIsTrivial body
+exprIsTrivial _                = False
 \end{code}
 
 
@@ -396,20 +399,21 @@ exprIsTrivial other	   = False
 
 
 \begin{code}
-exprIsDupable (Type _)	     	= True
-exprIsDupable (Var v)	     	= True
-exprIsDupable (Lit lit)      	= litIsDupable lit
-exprIsDupable (Note InlineMe e) = True
+exprIsDupable :: CoreExpr -> Bool
+exprIsDupable (Type _)          = True
+exprIsDupable (Var _)           = True
+exprIsDupable (Lit lit)         = litIsDupable lit
+exprIsDupable (Note InlineMe _) = True
 exprIsDupable (Note _ e)        = exprIsDupable e
-exprIsDupable (Cast e co)       = exprIsDupable e
-exprIsDupable expr	     
+exprIsDupable (Cast e _)        = exprIsDupable e
+exprIsDupable expr
   = go expr 0
   where
-    go (Var v)   n_args = True
+    go (Var _)   _      = True
     go (App f a) n_args =  n_args < dupAppSize
 			&& exprIsDupable a
 			&& go f (n_args+1)
-    go other n_args 	= False
+    go _         _      = False
 
 dupAppSize :: Int
 dupAppSize = 4		-- Size of application we are prepared to duplicate
@@ -445,12 +449,12 @@ because sharing will make sure it is only evaluated once.
 
 \begin{code}
 exprIsCheap :: CoreExpr -> Bool
-exprIsCheap (Lit lit) 	      = True
+exprIsCheap (Lit _)           = True
 exprIsCheap (Type _)          = True
 exprIsCheap (Var _)           = True
-exprIsCheap (Note InlineMe e) = True
+exprIsCheap (Note InlineMe _) = True
 exprIsCheap (Note _ e)        = exprIsCheap e
-exprIsCheap (Cast e co)       = exprIsCheap e
+exprIsCheap (Cast e _)        = exprIsCheap e
 exprIsCheap (Lam x e)         = isRuntimeVar x || exprIsCheap e
 exprIsCheap (Case e _ _ alts) = exprIsCheap e && 
 				and [exprIsCheap rhs | (_,_,rhs) <- alts]
@@ -471,7 +475,7 @@ exprIsCheap other_expr 	-- Applications and variables
     go (App f a) val_args | isRuntimeArg a = go f (a:val_args)
 			  | otherwise      = go f val_args
 
-    go (Var f) [] = True	-- Just a type application of a variable
+    go (Var _) [] = True	-- Just a type application of a variable
 				-- (f t1 t2 t3) counts as WHNF
     go (Var f) args
  	= case globalIdDetails f of
@@ -480,14 +484,14 @@ exprIsCheap other_expr 	-- Applications and variables
 		PrimOpId op    -> go_primop op args
 
 		DataConWorkId _ -> go_pap args
-		other | length args < idArity f -> go_pap args
+		_ | length args < idArity f -> go_pap args
 
-	        other -> isBottomingId f
+	        _ -> isBottomingId f
 			-- Application of a function which
 			-- always gives bottom; we treat this as cheap
 			-- because it certainly doesn't need to be shared!
 	
-    go other args = False
+    go _ _ = False
  
     --------------
     go_pap args = all exprIsTrivial args
@@ -505,7 +509,7 @@ exprIsCheap other_expr 	-- Applications and variables
  
     --------------
     go_sel [arg] = exprIsCheap arg	-- I'm experimenting with making record selection
-    go_sel other = False 	 	-- look cheap, so we will substitute it inside a
+    go_sel _     = False		-- look cheap, so we will substitute it inside a
  					-- lambda.  Particularly for dictionary field selection.
   		-- BUT: Take care with (sel d x)!  The (sel d) might be cheap, but
   		--	there's no guarantee that (sel d x) will be too.  Hence (n_val_args == 1)
@@ -547,14 +551,14 @@ exprOkForSpeculation (Type _)    = True
 exprOkForSpeculation (Var v)     = isUnLiftedType (idType v)
 				 && not (isTickBoxOp v)
 exprOkForSpeculation (Note _ e)  = exprOkForSpeculation e
-exprOkForSpeculation (Cast e co) = exprOkForSpeculation e
+exprOkForSpeculation (Cast e _)  = exprOkForSpeculation e
 exprOkForSpeculation other_expr
   = case collectArgs other_expr of
 	(Var f, args) -> spec_ok (globalIdDetails f) args
-	other	      -> False
+        _             -> False
  
   where
-    spec_ok (DataConWorkId _) args
+    spec_ok (DataConWorkId _) _
       = True	-- The strictness of the constructor has already
 		-- been expressed by its "wrapper", so we don't need
 		-- to take the arguments into account
@@ -572,7 +576,7 @@ exprOkForSpeculation other_expr
 				-- A bit conservative: we don't really need
 				-- to care about lazy arguments, but this is easy
 
-    spec_ok other args = False
+    spec_ok _ _ = False
 
 isDivOp :: PrimOp -> Bool
 -- True of dyadic operators that can fail 
@@ -588,24 +592,24 @@ isDivOp IntegerQuotRemOp = True
 isDivOp IntegerDivModOp  = True
 isDivOp FloatDivOp       = True
 isDivOp DoubleDivOp      = True
-isDivOp other		 = False
+isDivOp _                = False
 \end{code}
 
 
 \begin{code}
 exprIsBottom :: CoreExpr -> Bool	-- True => definitely bottom
 exprIsBottom e = go 0 e
-	       where
-		-- n is the number of args
-		 go n (Note _ e)     = go n e
-                 go n (Cast e co)    = go n e
-		 go n (Let _ e)      = go n e
-		 go n (Case e _ _ _) = go 0 e	-- Just check the scrut
-		 go n (App e _)      = go (n+1) e
-		 go n (Var v)        = idAppIsBottom v n
-		 go n (Lit _)        = False
-		 go n (Lam _ _)	     = False
-		 go n (Type _)	     = False
+               where
+                -- n is the number of args
+                 go n (Note _ e)     = go n e
+                 go n (Cast e _)     = go n e
+                 go n (Let _ e)      = go n e
+                 go _ (Case e _ _ _) = go 0 e   -- Just check the scrut
+                 go n (App e _)      = go (n+1) e
+                 go n (Var v)        = idAppIsBottom v n
+                 go _ (Lit _)        = False
+                 go _ (Lam _ _)      = False
+                 go _ (Type _)       = False
 
 idAppIsBottom :: Id -> Int -> Bool
 idAppIsBottom id n_val_args = appIsBottom (idNewStrictness id) n_val_args
@@ -645,27 +649,30 @@ exprIsHNF (Var v) 	-- NB: There are no value args at this point
 	-- A worry: what if an Id's unfolding is just itself: 
 	-- then we could get an infinite loop...
 
-exprIsHNF (Lit l)	   = True
-exprIsHNF (Type ty)	   = True	-- Types are honorary Values; 
-			   		-- we don't mind copying them
-exprIsHNF (Lam b e)  	   = isRuntimeVar b || exprIsHNF e
-exprIsHNF (Note _ e) 	   = exprIsHNF e
-exprIsHNF (Cast e co)      = exprIsHNF e
+exprIsHNF (Lit _)          = True
+exprIsHNF (Type _)         = True       -- Types are honorary Values;
+                                        -- we don't mind copying them
+exprIsHNF (Lam b e)        = isRuntimeVar b || exprIsHNF e
+exprIsHNF (Note _ e)       = exprIsHNF e
+exprIsHNF (Cast e _)       = exprIsHNF e
 exprIsHNF (App e (Type _)) = exprIsHNF e
 exprIsHNF (App e a)        = app_is_value e [a]
-exprIsHNF other	           = False
+exprIsHNF _                = False
 
 -- There is at least one value argument
+app_is_value :: CoreExpr -> [CoreArg] -> Bool
 app_is_value (Var fun) args
   = idArity fun > valArgCount args	-- Under-applied function
     ||  isDataConWorkId fun 		--  or data constructor
-app_is_value (Note n f) as = app_is_value f as
+app_is_value (Note _ f) as = app_is_value f as
 app_is_value (Cast f _) as = app_is_value f as
 app_is_value (App f a)  as = app_is_value f (a:as)
-app_is_value other      as = False
+app_is_value _          _  = False
 \end{code}
 
 \begin{code}
+dataConRepInstPat, dataConOrigInstPat :: [Unique] -> DataCon -> [Type] -> ([TyVar], [CoVar], [Id])
+dataConRepFSInstPat :: [FastString] -> [Unique] -> DataCon -> [Type] -> ([TyVar], [CoVar], [Id])
 -- These InstPat functions go here to avoid circularity between DataCon and Id
 dataConRepInstPat   = dataConInstPat dataConRepArgTys (repeat (FSLIT("ipv")))
 dataConRepFSInstPat = dataConInstPat dataConRepArgTys
@@ -870,7 +877,7 @@ exprIsConApp_maybe expr = analyse (collectArgs expr)
 	  isCheapUnfolding unf
 	= exprIsConApp_maybe (unfoldingTemplate unf)
 
-    analyse other = Nothing
+    analyse _ = Nothing
 \end{code}
 
 
@@ -971,26 +978,27 @@ data ArityType = AFun Bool ArityType	-- True <=> one-shot
 
 arityDepth :: ArityType -> Arity
 arityDepth (AFun _ ty) = 1 + arityDepth ty
-arityDepth ty	       = 0
+arityDepth _           = 0
 
-andArityType ABot	    at2		  = at2
-andArityType ATop	    at2		  = ATop
+andArityType :: ArityType -> ArityType -> ArityType
+andArityType ABot           at2           = at2
+andArityType ATop           _             = ATop
 andArityType (AFun t1 at1)  (AFun t2 at2) = AFun (t1 && t2) (andArityType at1 at2)
-andArityType at1	    at2		  = andArityType at2 at1
+andArityType at1            at2           = andArityType at2 at1
 
 arityType :: DynFlags -> CoreExpr -> ArityType
 	-- (go1 e) = [b1,..,bn]
 	-- means expression can be rewritten \x_b1 -> ... \x_bn -> body
 	-- where bi is True <=> the lambda is one-shot
 
-arityType dflags (Note n e) = arityType dflags e
+arityType dflags (Note _ e) = arityType dflags e
 --	Not needed any more: etaExpand is cleverer
 --  | ok_note n = arityType dflags e
 --  | otherwise = ATop
 
-arityType dflags (Cast e co) = arityType dflags e
+arityType dflags (Cast e _) = arityType dflags e
 
-arityType dflags (Var v) 
+arityType _ (Var v)
   = mk (idArity v) (arg_tys (idType v))
   where
     mk :: Arity -> [Type] -> ArityType
@@ -1000,9 +1008,9 @@ arityType dflags (Var v)
 	--		False -> \(s:RealWorld) -> e
 	-- where foo has arity 1.  Then we want the state hack to
 	-- apply to foo too, so we can eta expand the case.
-    mk 0 tys | isBottomingId v			   = ABot
-             | (ty:tys) <- tys, isStateHackType ty = AFun True ATop
-	     | otherwise			   = ATop
+    mk 0 tys | isBottomingId v                   = ABot
+             | (ty:_) <- tys, isStateHackType ty = AFun True ATop
+             | otherwise                         = ATop
     mk n (ty:tys) = AFun (isStateHackType ty) (mk (n-1) tys)
     mk n []       = AFun False		      (mk (n-1) [])
 
@@ -1023,7 +1031,7 @@ arityType dflags (App f a)
    = case arityType dflags f of
 	ABot -> ABot	-- If function diverges, ignore argument
 	ATop -> ATop	-- No no info about function
-	AFun one_shot xs 
+	AFun _ xs
 		| exprIsCheap a -> xs
 		| otherwise	-> ATop
 							   
@@ -1036,15 +1044,15 @@ arityType dflags (App f a)
 	-- The difference is observable using 'seq'
 arityType dflags (Case scrut _ _ alts)
   = case foldr1 andArityType [arityType dflags rhs | (_,_,rhs) <- alts] of
-	xs | exprIsCheap scrut	        -> xs
-	xs@(AFun one_shot _) | one_shot -> AFun True ATop
-	other	 	  	        -> ATop
+        xs | exprIsCheap scrut     -> xs
+        AFun one_shot _ | one_shot -> AFun True ATop
+        _                          -> ATop
 
 arityType dflags (Let b e) 
   = case arityType dflags e of
-	xs		     | cheap_bind b -> xs
-	xs@(AFun one_shot _) | one_shot	    -> AFun True ATop
-	other				    -> ATop
+        xs              | cheap_bind b -> xs
+        AFun one_shot _ | one_shot     -> AFun True ATop
+        _                              -> ATop
   where
     cheap_bind (NonRec b e) = is_cheap (b,e)
     cheap_bind (Rec prs)    = all is_cheap prs
@@ -1067,7 +1075,7 @@ arityType dflags (Let b e)
 	-- One could go further and make exprIsCheap reply True to any
 	-- dictionary-typed expression, but that's more work.
 
-arityType dflags other = ATop
+arityType _ _ = ATop
 
 {- NOT NEEDED ANY MORE: etaExpand is cleverer
 ok_note InlineMe = False
@@ -1114,7 +1122,7 @@ manifestArity (Lam v e) | isId v    = 1 + manifestArity e
 			| otherwise = manifestArity e
 manifestArity (Note _ e)	    = manifestArity e
 manifestArity (Cast e _)            = manifestArity e
-manifestArity e			    = 0
+manifestArity _                     = 0
 
 -- etaExpand deals with for-alls. For example:
 --		etaExpand 1 E
@@ -1124,8 +1132,9 @@ manifestArity e			    = 0
 --
 -- It deals with coerces too, though they are now rare
 -- so perhaps the extra code isn't worth it
+eta_expand :: Int -> [Unique] -> CoreExpr -> Type -> CoreExpr
 
-eta_expand n us expr ty
+eta_expand n _ expr ty
   | n == 0 && 
     -- The ILX code generator requires eta expansion for type arguments
     -- too, but alas the 'n' doesn't tell us how many of them there 
@@ -1230,9 +1239,9 @@ exprArity e = go e
 	      go (Var v) 	       	   = idArity v
 	      go (Lam x e) | isId x    	   = go e + 1
 			   | otherwise 	   = go e
-	      go (Note n e) 		   = go e
+              go (Note _ e)                = go e
               go (Cast e _)                = go e
-	      go (App e (Type t))      	   = go e
+              go (App e (Type _))          = go e
 	      go (App f a) | exprIsCheap a = (go f - 1) `max` 0
 		-- NB: exprIsCheap a!  
 		--	f (fac x) does not have arity 2, 
@@ -1267,11 +1276,11 @@ cheapEqExpr _ _ = False
 exprIsBig :: Expr b -> Bool
 -- Returns True of expressions that are too big to be compared by cheapEqExpr
 exprIsBig (Lit _)      = False
-exprIsBig (Var v)      = False
-exprIsBig (Type t)     = False
+exprIsBig (Var _)      = False
+exprIsBig (Type _)     = False
 exprIsBig (App f a)    = exprIsBig f || exprIsBig a
 exprIsBig (Cast e _)   = exprIsBig e	-- Hopefully coercions are not too big!
-exprIsBig other	       = True
+exprIsBig _            = True
 \end{code}
 
 
@@ -1286,7 +1295,7 @@ tcEqExpr e1 e2 = tcEqExprX rn_env e1 e2
 
 tcEqExprX :: RnEnv2 -> CoreExpr -> CoreExpr -> Bool
 tcEqExprX env (Var v1)	   (Var v2)	= rnOccL env v1 == rnOccR env v2
-tcEqExprX env (Lit lit1)   (Lit lit2)   = lit1 == lit2
+tcEqExprX _   (Lit lit1)   (Lit lit2)   = lit1 == lit2
 tcEqExprX env (App f1 a1)  (App f2 a2)  = tcEqExprX env f1 f2 && tcEqExprX env a1 a2
 tcEqExprX env (Lam v1 e1)  (Lam v2 e2)  = tcEqExprX (rnBndr2 env v1 v2) e1 e2
 tcEqExprX env (Let (NonRec v1 r1) e1)
@@ -1308,16 +1317,18 @@ tcEqExprX env (Case e1 v1 t1 a1)
 				     where
 				       env' = rnBndr2 env v1 v2
 
-tcEqExprX env (Note n1 e1) (Note n2 e2) = eq_note env n1 n2 && tcEqExprX env e1 e2
+tcEqExprX env (Note n1 e1)  (Note n2 e2)  = eq_note env n1 n2 && tcEqExprX env e1 e2
 tcEqExprX env (Cast e1 co1) (Cast e2 co2) = tcEqTypeX env co1 co2 && tcEqExprX env e1 e2
-tcEqExprX env (Type t1)    (Type t2)    = tcEqTypeX env t1 t2
-tcEqExprX env e1		e2	= False
-				         
+tcEqExprX env (Type t1)     (Type t2)     = tcEqTypeX env t1 t2
+tcEqExprX _   _             _             = False
+
+eq_alt :: RnEnv2 -> CoreAlt -> CoreAlt -> Bool
 eq_alt env (c1,vs1,r1) (c2,vs2,r2) = c1==c2 && tcEqExprX (rnBndrs2 env vs1  vs2) r1 r2
 
-eq_note env (SCC cc1)      (SCC cc2)      = cc1 == cc2
-eq_note env (CoreNote s1)  (CoreNote s2)  = s1 == s2
-eq_note env other1	       other2	  = False
+eq_note :: RnEnv2 -> Note -> Note -> Bool
+eq_note _ (SCC cc1)     (SCC cc2)      = cc1 == cc2
+eq_note _ (CoreNote s1) (CoreNote s2)  = s1 == s2
+eq_note _ _             _              = False
 \end{code}
 
 
@@ -1344,6 +1355,7 @@ exprSize (Cast e co)     = (seqType co `seq` 1) + exprSize e
 exprSize (Note n e)      = noteSize n + exprSize e
 exprSize (Type t)        = seqType t `seq` 1
 
+noteSize :: Note -> Int
 noteSize (SCC cc)       = cc `seq` 1
 noteSize InlineMe       = 1
 noteSize (CoreNote s)   = s `seq` 1  -- hdaume: core annotations
@@ -1354,13 +1366,17 @@ varSize b  | isTyVar b = 1
 			 megaSeqIdInfo (idInfo b) 	`seq`
 			 1
 
-varsSize = foldr ((+) . varSize) 0
+varsSize :: [Var] -> Int
+varsSize = sum . map varSize
 
+bindSize :: CoreBind -> Int
 bindSize (NonRec b e) = varSize b + exprSize e
 bindSize (Rec prs)    = foldr ((+) . pairSize) 0 prs
 
+pairSize :: (Var, CoreExpr) -> Int
 pairSize (b,e) = varSize b + exprSize e
 
+altSize :: CoreAlt -> Int
 altSize (c,bs,e) = c `seq` varsSize bs + exprSize e
 \end{code}
 
@@ -1393,25 +1409,26 @@ hash_expr :: HashEnv -> CoreExpr -> Word32
 -- Word32, because we're expecting overflows here, and overflowing
 -- signed types just isn't cool.  In C it's even undefined.
 hash_expr env (Note _ e)   	      = hash_expr env e
-hash_expr env (Cast e co)             = hash_expr env e
+hash_expr env (Cast e _)              = hash_expr env e
 hash_expr env (Var v)     	      = hashVar env v
-hash_expr env (Lit lit)		      = fromIntegral (hashLiteral lit)
+hash_expr _   (Lit lit)               = fromIntegral (hashLiteral lit)
 hash_expr env (App f e)   	      = hash_expr env f * fast_hash_expr env e
 hash_expr env (Let (NonRec b r) e)    = hash_expr (extend_env env b) e * fast_hash_expr env r
-hash_expr env (Let (Rec ((b,r):_)) e) = hash_expr (extend_env env b) e
+hash_expr env (Let (Rec ((b,_):_)) e) = hash_expr (extend_env env b) e
 hash_expr env (Case e _ _ _)	      = hash_expr env e
 hash_expr env (Lam b e)	              = hash_expr (extend_env env b) e
-hash_expr env (Type t)	              = WARN(True, text "hash_expr: type") 1
+hash_expr _   (Type _)                = WARN(True, text "hash_expr: type") 1
 -- Shouldn't happen.  Better to use WARN than trace, because trace
 -- prevents the CPR optimisation kicking in for hash_expr.
 
+fast_hash_expr :: HashEnv -> CoreExpr -> Word32
 fast_hash_expr env (Var v)     	= hashVar env v
 fast_hash_expr env (Type t)	= fast_hash_type env t
-fast_hash_expr env (Lit lit)	= fromIntegral (hashLiteral lit)
-fast_hash_expr env (Cast e co)  = fast_hash_expr env e
-fast_hash_expr env (Note n e)   = fast_hash_expr env e
-fast_hash_expr env (App f a)    = fast_hash_expr env a	-- A bit idiosyncratic ('a' not 'f')!
-fast_hash_expr env other        = 1
+fast_hash_expr _   (Lit lit)    = fromIntegral (hashLiteral lit)
+fast_hash_expr env (Cast e _)   = fast_hash_expr env e
+fast_hash_expr env (Note _ e)   = fast_hash_expr env e
+fast_hash_expr env (App _ a)    = fast_hash_expr env a	-- A bit idiosyncratic ('a' not 'f')!
+fast_hash_expr _   _            = 1
 
 fast_hash_type :: HashEnv -> Type -> Word32
 fast_hash_type env ty 
@@ -1511,14 +1528,14 @@ rhsIsStatic this_pkg rhs = is_static False rhs
   
   is_static False (Lam b e) = isRuntimeVar b || is_static False e
   
-  is_static in_arg (Note (SCC _) e) = False
+  is_static _      (Note (SCC _) _) = False
   is_static in_arg (Note _ e)       = is_static in_arg e
-  is_static in_arg (Cast e co)      = is_static in_arg e
+  is_static in_arg (Cast e _)       = is_static in_arg e
   
-  is_static in_arg (Lit lit)
+  is_static _      (Lit lit)
     = case lit of
   	MachLabel _ _ -> False
-  	other 	      -> True
+        _             -> True
   	-- A MachLabel (foreign import "&foo") in an argument
   	-- prevents a constructor application from being static.  The
   	-- reason is that it might give rise to unresolvable symbols
@@ -1554,11 +1571,11 @@ rhsIsStatic this_pkg rhs = is_static False rhs
         --   x = D# (1.0## /## 2.0##)
         -- can't float because /## can fail.
 
-    go (Note (SCC _) f) n_val_args = False
-    go (Note _ f) n_val_args       = go f n_val_args
-    go (Cast e co) n_val_args      = go e n_val_args
+    go (Note (SCC _) _) _          = False
+    go (Note _ f)       n_val_args = go f n_val_args
+    go (Cast e _)       n_val_args = go e n_val_args
 
-    go other n_val_args = False
+    go _                _          = False
 
     saturated_data_con f n_val_args
 	= case isDataConWorkId_maybe f of
