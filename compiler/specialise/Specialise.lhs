@@ -805,10 +805,10 @@ specDefn subst calls (fn, rhs)
               rhs_uds `plusUDs` plusUDList spec_uds)
 
   | otherwise	-- No calls or RHS doesn't fit our preconceptions
-  = WARN( notNull calls_for_me, ptext SLIT("Missed specialisation opportunity for") <+> ppr fn ) do
+  = WARN( notNull calls_for_me, ptext SLIT("Missed specialisation opportunity for") <+> ppr fn )
 	  -- Note [Specialisation shape]
-    (rhs', rhs_uds) <- specExpr subst rhs
-    return ((fn, rhs'), [], rhs_uds)
+    (do  { (rhs', rhs_uds) <- specExpr subst rhs
+	; return ((fn, rhs'), [], rhs_uds) })
   
   where
     fn_type	       = idType fn

@@ -267,11 +267,12 @@ tryWW is_rec fn_id rhs
 
 ---------------------
 splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
-  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) do
+  = WARN( not (wrap_dmds `lengthIs` arity), ppr fn_id <+> (ppr arity $$ ppr wrap_dmds $$ ppr res_info) ) 
+    (do {
 	-- The arity should match the signature
-    (work_demands, wrap_fn, work_fn) <- mkWwBodies fun_ty wrap_dmds res_info one_shots
-    work_uniq <- getUniqueM
-    let
+      (work_demands, wrap_fn, work_fn) <- mkWwBodies fun_ty wrap_dmds res_info one_shots
+    ; work_uniq <- getUniqueM
+    ; let
 	work_rhs = work_fn rhs
 	work_id  = mkWorkerId work_uniq fn_id (exprType work_rhs) 
 			`setInlinePragma` inline_prag
@@ -291,7 +292,7 @@ splitFun fn_id fn_info wrap_dmds res_info inline_prag rhs
 	wrap_rhs = wrap_fn work_id
 	wrap_id  = fn_id `setIdWorkerInfo` HasWorker work_id arity
 
-    return ([(work_id, work_rhs), (wrap_id, wrap_rhs)])
+    ; return ([(work_id, work_rhs), (wrap_id, wrap_rhs)]) })
 	-- Worker first, because wrapper mentions it
 	-- mkWwBodies has already built a wrap_rhs with an INLINE pragma wrapped around it
   where
