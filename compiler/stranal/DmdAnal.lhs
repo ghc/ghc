@@ -567,9 +567,47 @@ in the case where t turns out to be not-demanded.  This is handled
 by dmdAnalTopBind.
 
 
+Note [NOINLINE and strictness]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The strictness analyser used to have a HACK which ensured that NOINLNE
+things were not strictness-analysed.  The reason was unsafePerformIO. 
+Left to itself, the strictness analyser would discover this strictness 
+for unsafePerformIO:
+	unsafePerformIO:  C(U(AV))
+But then consider this sub-expression
+	unsafePerformIO (\s -> let r = f x in 
+			       case writeIORef v r s of (# s1, _ #) ->
+			       (# s1, r #)
+The strictness analyser will now find that r is sure to be eval'd,
+and may then hoist it out.  This makes tests/lib/should_run/memo002
+deadlock.
+
+Solving this by making all NOINLINE things have no strictness info is overkill.
+In particular, it's overkill for runST, which is perfectly respectable.
+Consider
+	f x = runST (return x)
+This should be strict in x.
+
+So the new plan is to define unsafePerformIO using the 'lazy' combinator:
+
+	unsafePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
+
+Remember, 'lazy' is a wired-in identity-function Id, of type a->a, which is 
+magically NON-STRICT, and is inlined after strictness analysis.  So
+unsafePerformIO will look non-strict, and that's what we want.
+
+Now we don't need the hack in the strictness analyser.  HOWEVER, this
+decision does mean that even a NOINLINE function is not entirely
+opaque: some aspect of its implementation leaks out, notably its
+strictness.  For example, if you have a function implemented by an
+error stub, but which has RULES, you may want it not to be eliminated
+in favour of error!
+
+
 \begin{code}
 mk_sig_ty never_inline thunk_cpr_ok rhs (DmdType fv dmds res) 
   = (lazy_fv, mkStrictSig dmd_ty)
+	-- Re unused never_inline, see Note [NOINLINE and strictness]
   where
     dmd_ty = DmdType strict_fv final_dmds res'
 
@@ -704,6 +742,11 @@ annotateBndr dmd_ty@(DmdType fv ds res) var
     (fv', dmd) = removeFV fv var res
 
 annotateBndrs = mapAccumR annotateBndr
+
+annotateLamIdBndr :: DmdType 	-- Demand type of body
+		  -> Id 	-- Lambda binder
+		  -> (DmdType, 	-- Demand type of lambda
+		      Id)	-- and binder annotated with demand	
 
 annotateLamIdBndr dmd_ty@(DmdType fv ds res) id
 -- For lambdas we add the demand to the argument demands
