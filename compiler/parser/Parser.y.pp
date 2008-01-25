@@ -1231,7 +1231,7 @@ decl 	:: { Located (OrdList (LHsDecl RdrName)) }
         | docdecl                       { LL $ unitOL $1 }
 
 rhs	:: { Located (GRHSs RdrName) }
-	: '=' exp wherebinds	{ L (comb3 $1 $2 $3) $ GRHSs (unguardedRHS $2) (unLoc $3) }
+	: '=' exp wherebinds	{ sL (comb3 $1 $2 $3) $ GRHSs (unguardedRHS $2) (unLoc $3) }
 	| gdrhs	wherebinds	{ LL $ GRHSs (reverse (unLoc $1)) (unLoc $2) }
 
 gdrhs :: { Located [LGRHS RdrName] }
