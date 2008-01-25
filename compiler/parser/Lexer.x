@@ -920,6 +920,7 @@ splitQualName orig_buf len = split orig_buf orig_buf
 	qual_size = orig_buf `byteDiff` dot_buf
 
 varid span buf len = 
+  fs `seq`
   case lookupUFM reservedWordsFM fs of
 	Just (keyword,0)    -> do
 		maybe_layout keyword

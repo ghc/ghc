@@ -824,7 +824,7 @@ where_inst :: { Located (OrdList (LHsDecl RdrName)) }	-- Reversed
 decls 	:: { Located (OrdList (LHsDecl RdrName)) }	
 	: decls ';' decl		{ let { this = unLoc $3;
                                     rest = unLoc $1;
-                                    these = unLoc $1 `appOL` unLoc $3 }
+                                    these = rest `appOL` this }
                               in rest `seq` this `seq` these `seq`
                                     LL these }
 	| decls ';'			{ LL (unLoc $1) }
