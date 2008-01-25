@@ -597,7 +597,7 @@ endif
 
 utils/Digraph_HC_OPTS		= -fglasgow-exts 
 
-basicTypes/SrcLoc_HC_OPTS	= -funbox-strict-fields
+# basicTypes/SrcLoc_HC_OPTS	= -funbox-strict-fields
 
 # We always optimise some low-level modules, otherwise performance of
 # a non-optimised compiler is severely affected.

@@ -57,8 +57,8 @@ this is the obvious stuff:
 \begin{code}
 data SrcLoc
   = SrcLoc	FastString	-- A precise location (file name)
-		!Int		-- line number, begins at 1
-		!Int		-- column number, begins at 0
+		{-# UNPACK #-} !Int		-- line number, begins at 1
+		{-# UNPACK #-} !Int		-- column number, begins at 0
 		-- Don't ask me why lines start at 1 and columns start at
 		-- zero.  That's just the way it is, so there.  --SDM
 
@@ -167,27 +167,27 @@ span of (1,1)-(1,1) is zero characters long.
 -}
 data SrcSpan
   = SrcSpanOneLine 		-- a common case: a single line
-	{ srcSpanFile     :: FastString,
-	  srcSpanLine     :: !Int,
-	  srcSpanSCol     :: !Int,
-	  srcSpanECol     :: !Int
+	{ srcSpanFile     :: !FastString,
+	  srcSpanLine     :: {-# UNPACK #-} !Int,
+	  srcSpanSCol     :: {-# UNPACK #-} !Int,
+	  srcSpanECol     :: {-# UNPACK #-} !Int
 	}
 
   | SrcSpanMultiLine
-	{ srcSpanFile	  :: FastString,
-	  srcSpanSLine    :: !Int,
-	  srcSpanSCol	  :: !Int,
-	  srcSpanELine    :: !Int,
-	  srcSpanECol     :: !Int
+	{ srcSpanFile	  :: !FastString,
+	  srcSpanSLine    :: {-# UNPACK #-} !Int,
+	  srcSpanSCol	  :: {-# UNPACK #-} !Int,
+	  srcSpanELine    :: {-# UNPACK #-} !Int,
+	  srcSpanECol     :: {-# UNPACK #-} !Int
 	}
 
   | SrcSpanPoint
-	{ srcSpanFile	  :: FastString,
-	  srcSpanLine	  :: !Int,
-	  srcSpanCol      :: !Int
+	{ srcSpanFile	  :: !FastString,
+	  srcSpanLine	  :: {-# UNPACK #-} !Int,
+	  srcSpanCol      :: {-# UNPACK #-} !Int
 	}
 
-  | UnhelpfulSpan FastString	-- Just a general indication
+  | UnhelpfulSpan !FastString	-- Just a general indication
 				-- also used to indicate an empty span
 
 #ifdef DEBUG
