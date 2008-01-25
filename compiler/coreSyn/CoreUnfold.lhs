@@ -15,13 +15,6 @@ literal'').  In the corner of a @CoreUnfolding@ unfolding, you will
 find, unsurprisingly, a Core expression.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CoreUnfold (
 	Unfolding, UnfoldingGuidance,	-- Abstract types
 
@@ -67,8 +60,10 @@ import Outputable
 %************************************************************************
 
 \begin{code}
+mkTopUnfolding :: CoreExpr -> Unfolding
 mkTopUnfolding expr = mkUnfolding True {- Top level -} expr
 
+mkUnfolding :: Bool -> CoreExpr -> Unfolding
 mkUnfolding top_lvl expr
   = CoreUnfolding (occurAnalyseExpr expr)
 		  top_lvl
@@ -97,6 +92,7 @@ instance Outputable Unfolding where
 	= ptext SLIT("Unf") <+> sep [ppr top <+> ppr hnf <+> ppr cheap <+> ppr g, 
 				     ppr e]
 
+mkCompulsoryUnfolding :: CoreExpr -> Unfolding
 mkCompulsoryUnfolding expr	-- Used for things that absolutely must be unfolded
   = CompulsoryUnfolding (occurAnalyseExpr expr)
 \end{code}
@@ -174,7 +170,7 @@ calcUnfoldingGuidance bOMB_OUT_SIZE expr
 	-- We want to say "2 value binders".  Why?  So that 
 	-- we take account of information given for the arguments
 
-    go inline rev_vbs (Note InlineMe e)     = go True   rev_vbs     e
+    go _      rev_vbs (Note InlineMe e)     = go True   rev_vbs     e
     go inline rev_vbs (Lam b e) | isId b    = go inline (b:rev_vbs) e
 				| otherwise = go inline rev_vbs     e
     go inline rev_vbs e			    = (inline, reverse rev_vbs, e)
@@ -190,10 +186,10 @@ sizeExpr :: FastInt 	    -- Bomb out if it gets bigger than this
 sizeExpr bOMB_OUT_SIZE top_args expr
   = size_up expr
   where
-    size_up (Type t)	      = sizeZero	-- Types cost nothing
-    size_up (Var v)           = sizeOne
+    size_up (Type _)           = sizeZero        -- Types cost nothing
+    size_up (Var _)            = sizeOne
 
-    size_up (Note InlineMe body) = sizeOne	-- Inline notes make it look very small
+    size_up (Note InlineMe _)  = sizeOne         -- Inline notes make it look very small
 	-- This can be important.  If you have an instance decl like this:
 	-- 	instance Foo a => Foo [a] where
 	--	   {-# INLINE op1, op2 #-}
@@ -201,11 +197,11 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 	--	   op2 = ...
 	-- then we'll get a dfun which is a pair of two INLINE lambdas
 
-    size_up (Note _        body) = size_up body	-- Other notes cost nothing
+    size_up (Note _      body) = size_up body  -- Other notes cost nothing
     
-    size_up (Cast e _)           = size_up e
+    size_up (Cast e _)         = size_up e
 
-    size_up (App fun (Type t)) = size_up fun
+    size_up (App fun (Type _)) = size_up fun
     size_up (App fun arg)      = size_up_app fun [arg]
 
     size_up (Lit lit) 	       = sizeN (litSize lit)
@@ -267,8 +263,8 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 
 		-- alts_size tries to compute a good discount for
 		-- the case when we are scrutinising an argument variable
-	  alts_size (SizeIs tot tot_disc tot_scrut)		-- Size of all alternatives
-		    (SizeIs max max_disc max_scrut)		-- Size of biggest alternative
+	  alts_size (SizeIs tot _tot_disc _tot_scrut)           -- Size of all alternatives
+		    (SizeIs max  max_disc  max_scrut)           -- Size of biggest alternative
 	 	= SizeIs tot (unitBag (v, iBox (_ILIT(1) +# tot -# max)) `unionBags` max_disc) max_scrut
 			-- If the variable is known, we produce a discount that
 			-- will take us back to 'max', the size of rh largest alternative
@@ -305,7 +301,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
       = case globalIdDetails fun of
 	  DataConWorkId dc -> conSizeN dc (valArgCount args)
 
-	  FCallId fc   -> sizeN opt_UF_DearOp
+	  FCallId _    -> sizeN opt_UF_DearOp
 	  PrimOpId op  -> primOpSize op (valArgCount args)
 			  -- foldr addSize (primOpSize op) (map arg_discount args)
 			  -- At one time I tried giving an arg-discount if a primop 
@@ -315,7 +311,7 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 			  -- if we know nothing about it.  And just having it in a primop
 			  -- doesn't help at all if we don't know something more.
 
-	  other	       -> fun_discount fun `addSizeN` 
+	  _            -> fun_discount fun `addSizeN`
 			  (1 + length (filter (not . exprIsTrivial) args))
 				-- The 1+ is for the function itself
 				-- Add 1 for each non-trivial arg;
@@ -325,17 +321,17 @@ sizeExpr bOMB_OUT_SIZE top_args expr
 				-- 	We should really only count for non-prim-typed args in the
 				--	general case, but that seems too much like hard work
 
-    size_up_fun other args = size_up other
+    size_up_fun other _ = size_up other
 
     ------------ 
-    size_up_alt (con, bndrs, rhs) = size_up rhs
+    size_up_alt (_con, _bndrs, rhs) = size_up rhs
  	-- Don't charge for args, so that wrappers look cheap
 	-- (See comments about wrappers with Case)
 
     ------------
 	-- We want to record if we're case'ing, or applying, an argument
     fun_discount v | v `elem` top_args = SizeIs (_ILIT(0)) (unitBag (v, opt_UF_FunAppDiscount)) (_ILIT(0))
-    fun_discount other		       = sizeZero
+    fun_discount _                     = sizeZero
 
     ------------
 	-- These addSize things have to be here because
@@ -364,13 +360,19 @@ data ExprSize = TooBig
 --  	tup = (a_1, ..., a_99)
 --  	x = case tup of ...
 --
+mkSizeIs :: FastInt -> FastInt -> Bag (Id, Int) -> FastInt -> ExprSize
 mkSizeIs max n xs d | (n -# d) ># max = TooBig
 		    | otherwise	      = SizeIs n xs d
  
+maxSize :: ExprSize -> ExprSize -> ExprSize
 maxSize TooBig         _ 				  = TooBig
 maxSize _              TooBig				  = TooBig
 maxSize s1@(SizeIs n1 _ _) s2@(SizeIs n2 _ _) | n1 ># n2  = s1
 					      | otherwise = s2
+
+sizeZero, sizeOne :: ExprSize
+sizeN :: Int -> ExprSize
+conSizeN :: DataCon ->Int -> ExprSize
 
 sizeZero     	= SizeIs (_ILIT(0))  emptyBag (_ILIT(0))
 sizeOne      	= SizeIs (_ILIT(1))  emptyBag (_ILIT(0))
@@ -389,6 +391,7 @@ conSizeN dc n
 	--	f x y z = case op# x y z of { s -> (# s, () #) }
 	-- and f wasn't getting inlined
 
+primOpSize :: PrimOp -> Int -> ExprSize
 primOpSize op n_args
  | not (primOpIsDupable op) = sizeN opt_UF_DearOp
  | not (primOpOutOfLine op) = sizeN (2 - n_args)
@@ -403,6 +406,7 @@ primOpSize op n_args
 	-- and there's a good chance it'll get inlined back into C's RHS. Urgh!
  | otherwise	      	    = sizeOne
 
+buildSize :: ExprSize
 buildSize = SizeIs (_ILIT(-2)) emptyBag (_ILIT(4))
 	-- We really want to inline applications of build
 	-- build t (\cn -> e) should cost only the cost of e (because build will be inlined later)
@@ -411,16 +415,19 @@ buildSize = SizeIs (_ILIT(-2)) emptyBag (_ILIT(4))
 	-- build is saturated (it usually is).  The "-2" discounts for the \c n, 
 	-- The "4" is rather arbitrary.
 
+augmentSize :: ExprSize
 augmentSize = SizeIs (_ILIT(-2)) emptyBag (_ILIT(4))
 	-- Ditto (augment t (\cn -> e) ys) should cost only the cost of
 	-- e plus ys. The -2 accounts for the \cn 
-						
-nukeScrutDiscount (SizeIs n vs d) = SizeIs n vs (_ILIT(0))
-nukeScrutDiscount TooBig	  = TooBig
+
+nukeScrutDiscount :: ExprSize -> ExprSize
+nukeScrutDiscount (SizeIs n vs _) = SizeIs n vs (_ILIT(0))
+nukeScrutDiscount TooBig          = TooBig
 
 -- When we return a lambda, give a discount if it's used (applied)
-lamScrutDiscount  (SizeIs n vs d) = case opt_UF_FunAppDiscount of { d -> SizeIs n vs (iUnbox d) }
-lamScrutDiscount TooBig	 	  = TooBig
+lamScrutDiscount :: ExprSize -> ExprSize
+lamScrutDiscount (SizeIs n vs _) = case opt_UF_FunAppDiscount of { d -> SizeIs n vs (iUnbox d) }
+lamScrutDiscount TooBig          = TooBig
 \end{code}
 
 
@@ -461,20 +468,20 @@ Just the same as smallEnoughToInline, except that it has no actual arguments.
 \begin{code}
 couldBeSmallEnoughToInline :: Int -> CoreExpr -> Bool
 couldBeSmallEnoughToInline threshold rhs = case calcUnfoldingGuidance threshold rhs of
-						UnfoldNever -> False
-						other	    -> True
+                                                UnfoldNever -> False
+                                                _           -> True
 
 certainlyWillInline :: Unfolding -> Bool
   -- Sees if the unfolding is pretty certain to inline	
 certainlyWillInline (CoreUnfolding _ _ _ is_cheap (UnfoldIfGoodArgs n_vals _ size _))
   = is_cheap && size - (n_vals +1) <= opt_UF_UseThreshold
-certainlyWillInline other
+certainlyWillInline _
   = False
 
 smallEnoughToInline :: Unfolding -> Bool
 smallEnoughToInline (CoreUnfolding _ _ _ _ (UnfoldIfGoodArgs _ _ size _))
   = size <= opt_UF_UseThreshold
-smallEnoughToInline other
+smallEnoughToInline _
   = False
 \end{code}
 
@@ -523,7 +530,7 @@ instance Outputable CallContInfo where
 callSiteInline dflags active_inline id lone_variable arg_infos cont_info
   = case idUnfolding id of {
 	NoUnfolding -> Nothing ;
-	OtherCon cs -> Nothing ;
+	OtherCon _  -> Nothing ;
 
 	CompulsoryUnfolding unf_template -> Just unf_template ;
 		-- CompulsoryUnfolding => there is no top-level binding
