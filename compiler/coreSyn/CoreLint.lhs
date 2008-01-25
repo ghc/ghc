@@ -7,13 +7,6 @@
 A ``lint'' pass to check for Core correctness
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CoreLint (
 	lintCoreBindings,
 	lintUnfolding, 
@@ -173,7 +166,7 @@ Now the inner case look as though it has incompatible branches.
 \begin{code}
 lintCoreBindings :: DynFlags -> String -> [CoreBind] -> IO ()
 
-lintCoreBindings dflags whoDunnit binds
+lintCoreBindings dflags _whoDunnit _binds
   | not (dopt Opt_DoCoreLinting dflags)
   = return ()
 
@@ -232,6 +225,7 @@ lintUnfolding locn vars expr
 Check a core binding, returning the list of variables bound.
 
 \begin{code}
+lintSingleBinding :: TopLevelFlag -> RecFlag -> (Id, CoreExpr) -> LintM ()
 lintSingleBinding top_lvl_flag rec_flag (binder,rhs)
   = addLoc (RhsOf binder) $
          -- Check the rhs 
@@ -306,7 +300,7 @@ lintCoreExpr (Cast expr co)
        ; checkTys from_ty expr_ty (mkCastErr from_ty expr_ty)
        ; return to_ty }
 
-lintCoreExpr (Note other_note expr)
+lintCoreExpr (Note _ expr)
   = lintCoreExpr expr
 
 lintCoreExpr (Let (NonRec bndr rhs) body)
@@ -382,7 +376,7 @@ lintCoreExpr e@(Case scrut var alt_ty alts) =
   where
     pass_var f = f var
 
-lintCoreExpr e@(Type ty)
+lintCoreExpr e@(Type _)
   = addErrL (mkStrangeTyMsg e)
 \end{code}
 
@@ -407,7 +401,7 @@ lintCoreArgs ty (a : args) =
   do { res <- lintCoreArg ty a
      ; lintCoreArgs res args }
 
-lintCoreArg fun_ty a@(Type arg_ty) = 
+lintCoreArg fun_ty (Type arg_ty) =
   do { arg_ty <- lintTy arg_ty	
      ; lintTyApp fun_ty arg_ty }
 
@@ -435,6 +429,7 @@ lintTyApp ty arg_ty
 		; checkKinds tyvar arg_ty
 		; return (substTyWith [tyvar] [arg_ty] body) }
 
+checkKinds :: Var -> Type -> LintM ()
 checkKinds tyvar arg_ty
 	-- Arg type might be boxed for a function with an uncommitted
 	-- tyvar; notably this is used so that we can give
@@ -465,7 +460,7 @@ checkCaseAlts :: CoreExpr -> OutType -> [CoreAlt] -> LintM ()
 --     the simplifer correctly eliminates case that can't 
 --     possibly match.
 
-checkCaseAlts e ty [] 
+checkCaseAlts e _ []
   = addErrL (mkNullAltsMsg e)
 
 checkCaseAlts e ty alts = 
@@ -478,14 +473,14 @@ checkCaseAlts e ty alts =
 
 	-- Check that successive alternatives have increasing tags 
     increasing_tag (alt1 : rest@( alt2 : _)) = alt1 `ltAlt` alt2 && increasing_tag rest
-    increasing_tag other 		     = True
+    increasing_tag _                         = True
 
     non_deflt (DEFAULT, _, _) = False
-    non_deflt alt	      = True
+    non_deflt _               = True
 
     is_infinite_ty = case splitTyConApp_maybe ty of
-			Nothing			    -> False
-			Just (tycon, tycon_arg_tys) -> isPrimTyCon tycon
+                        Nothing         -> False
+                        Just (tycon, _) -> isPrimTyCon tycon
 \end{code}
 
 \begin{code}
@@ -499,11 +494,11 @@ lintCoreAlt :: OutType 		-- Type of scrutinee
 	    -> CoreAlt
 	    -> LintM ()
 
-lintCoreAlt scrut_ty alt_ty alt@(DEFAULT, args, rhs) = 
+lintCoreAlt _ alt_ty (DEFAULT, args, rhs) =
   do { checkL (null args) (mkDefaultArgsMsg args)
      ; checkAltExpr rhs alt_ty }
 
-lintCoreAlt scrut_ty alt_ty alt@(LitAlt lit, args, rhs) = 
+lintCoreAlt scrut_ty alt_ty (LitAlt lit, args, rhs) = 
   do { checkL (null args) (mkDefaultArgsMsg args)
      ; checkTys lit_ty scrut_ty (mkBadPatMsg lit_ty scrut_ty)	
      ; checkAltExpr rhs alt_ty } 
@@ -636,7 +631,7 @@ Here we substitute 'ty' for 'a' in 'body', on the fly.
 -}
 
 instance Monad LintM where
-  return x = LintM (\ loc subst errs -> (Just x, errs))
+  return x = LintM (\ _   _     errs -> (Just x, errs))
   fail err = LintM (\ loc subst errs -> (Nothing, addErr subst errs (text err) loc))
   m >>= k  = LintM (\ loc subst errs -> 
                        let (res, errs') = unLintM m loc subst errs in
@@ -666,7 +661,7 @@ initL m
 
 \begin{code}
 checkL :: Bool -> Message -> LintM ()
-checkL True  msg = return ()
+checkL True  _   = return ()
 checkL False msg = addErrL msg
 
 addErrL :: Message -> LintM a
@@ -700,10 +695,10 @@ addInScopeVars vars m
 
 updateTvSubst :: TvSubst -> LintM a -> LintM a
 updateTvSubst subst' m = 
-  LintM (\ loc subst errs -> unLintM m loc subst' errs)
+  LintM (\ loc _ errs -> unLintM m loc subst' errs)
 
 getTvSubst :: LintM TvSubst
-getTvSubst = LintM (\ loc subst errs -> (Just subst, errs))
+getTvSubst = LintM (\ _ subst errs -> (Just subst, errs))
 
 applySubst :: Type -> LintM Type
 applySubst ty = do { subst <- getTvSubst; return (substTy subst ty) }
@@ -761,6 +756,8 @@ checkTys ty1 ty2 msg = checkL (ty1 `coreEqType` ty2) msg
 %************************************************************************
 
 \begin{code}
+dumpLoc :: LintLocInfo -> (SrcLoc, SDoc)
+
 dumpLoc (RhsOf v)
   = (getSrcLoc v, brackets (ptext SLIT("RHS of") <+> pp_binders [v]))
 
@@ -776,10 +773,10 @@ dumpLoc (BodyOfLetRec bs@(_:_))
 dumpLoc (AnExpr e)
   = (noSrcLoc, text "In the expression:" <+> ppr e)
 
-dumpLoc (CaseAlt (con, args, rhs))
+dumpLoc (CaseAlt (con, args, _))
   = (noSrcLoc, text "In a case alternative:" <+> parens (ppr con <+> pp_binders args))
 
-dumpLoc (CasePat (con, args, rhs))
+dumpLoc (CasePat (con, args, _))
   = (noSrcLoc, text "In the pattern of a case alternative:" <+> parens (ppr con <+> pp_binders args))
 
 dumpLoc (ImportedUnfolding locn)
@@ -792,7 +789,7 @@ pp_binders bs = sep (punctuate comma (map pp_binder bs))
 
 pp_binder :: Var -> SDoc
 pp_binder b | isId b    = hsep [ppr b, dcolon, ppr (idType b)]
-            | isTyVar b = hsep [ppr b, dcolon, ppr (tyVarKind b)]
+            | otherwise = hsep [ppr b, dcolon, ppr (tyVarKind b)]
 \end{code}
 
 \begin{code}
@@ -821,6 +818,7 @@ mkScrutMsg var var_ty scrut_ty subst
 	  text "Scrutinee type:" <+> ppr scrut_ty,
      hsep [ptext SLIT("Current TV subst"), ppr subst]]
 
+mkNonDefltMsg, mkNonIncreasingAltsMsg :: CoreExpr -> Message
 mkNonDefltMsg e
   = hang (text "Case expression with DEFAULT not at the beginnning") 4 (ppr e)
 mkNonIncreasingAltsMsg e
@@ -901,7 +899,7 @@ mkRhsMsg binder ty
      hsep [ptext SLIT("Rhs type:"), ppr ty]]
 
 mkRhsPrimMsg :: Id -> CoreExpr -> Message
-mkRhsPrimMsg binder rhs
+mkRhsPrimMsg binder _rhs
   = vcat [hsep [ptext SLIT("The type of this binder is primitive:"),
 		     ppr binder],
 	      hsep [ptext SLIT("Binder's type:"), ppr (idType binder)]
@@ -932,16 +930,19 @@ mkUnboxedTupleMsg binder
   = vcat [hsep [ptext SLIT("A variable has unboxed tuple type:"), ppr binder],
 	  hsep [ptext SLIT("Binder's type:"), ppr (idType binder)]]
 
+mkCastErr :: Type -> Type -> Message
 mkCastErr from_ty expr_ty
   = vcat [ptext SLIT("From-type of Cast differs from type of enclosed expression"),
 	  ptext SLIT("From-type:") <+> ppr from_ty,
 	  ptext SLIT("Type of enclosed expr:") <+> ppr expr_ty
     ]
 
+dupVars :: [[Var]] -> Message
 dupVars vars
   = hang (ptext SLIT("Duplicate variables brought into scope"))
        2 (ppr vars)
 
+mkStrangeTyMsg :: CoreExpr -> Message
 mkStrangeTyMsg e
   = ptext SLIT("Type where expression expected:") <+> ppr e
 \end{code}
