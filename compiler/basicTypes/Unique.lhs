@@ -16,13 +16,6 @@ Some of the other hair in this code is to be able to use a
 Haskell).
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Unique (
 	Unique, Uniquable(..), hasKey,
 
@@ -57,7 +50,6 @@ module Unique (
 
 #include "HsVersions.h"
 
-import StaticFlags
 import BasicTypes
 import FastTypes
 import FastString
@@ -178,10 +170,12 @@ use `deriving' because we want {\em precise} control of ordering
 (equality on @Uniques@ is v common).
 
 \begin{code}
+eqUnique, ltUnique, leUnique :: Unique -> Unique -> Bool
 eqUnique (MkUnique u1) (MkUnique u2) = u1 ==# u2
 ltUnique (MkUnique u1) (MkUnique u2) = u1 <#  u2
 leUnique (MkUnique u1) (MkUnique u2) = u1 <=# u2
 
+cmpUnique :: Unique -> Unique -> Ordering
 cmpUnique (MkUnique u1) (MkUnique u2)
   = if u1 ==# u2 then EQ else if u1 <# u2 then LT else GT
 
@@ -220,11 +214,12 @@ pprUnique10 uniq	-- in base-10, dudes
       (tag, u) -> finish_ppr tag u (int u)
 #endif
 
-finish_ppr 't' u pp_u | u < 26
+finish_ppr :: Char -> Int -> SDoc -> SDoc
+finish_ppr 't' u _pp_u | u < 26
   =	-- Special case to make v common tyvars, t1, t2, ...
 	-- come out as a, b, ... (shorter, easier to read)
     char (chr (ord 'a' + u))
-finish_ppr tag u pp_u = char tag <> pp_u
+finish_ppr tag _ pp_u = char tag <> pp_u
 
 instance Outputable Unique where
     ppr u = pprUnique u
@@ -294,9 +289,19 @@ Allocation of unique supply characters:
 	s	simplifier
 
 \begin{code}
+mkAlphaTyVarUnique     :: Int -> Unique
+mkPreludeClassUnique   :: Int -> Unique
+mkPreludeTyConUnique   :: Int -> Unique
+mkTupleTyConUnique     :: Boxity -> Int -> Unique
+mkPreludeDataConUnique :: Int -> Unique
+mkTupleDataConUnique   :: Boxity -> Int -> Unique
+mkPrimOpIdUnique       :: Int -> Unique
+mkPreludeMiscIdUnique  :: Int -> Unique
+mkPArrDataConUnique    :: Int -> Unique
+
 mkAlphaTyVarUnique i            = mkUnique '1' i
 
-mkPreludeClassUnique i		= mkUnique '2' i
+mkPreludeClassUnique i          = mkUnique '2' i
 
 -- Prelude type constructors occupy *three* slots.
 -- The first is for the tycon itself; the latter two
