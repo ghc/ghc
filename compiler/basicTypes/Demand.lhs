@@ -5,13 +5,6 @@
 \section[Demand]{@Demand@: the amount of demand on a value}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 #ifndef OLD_STRICTNESS
 module Demand () where
 #else
@@ -75,6 +68,9 @@ data Demand
 type MaybeAbsent = Bool -- True <=> not even used
 
 -- versions that don't worry about Absence:
+wwLazy, wwStrict, wwPrim, wwEnum :: Demand
+wwUnpack :: [Demand] -> Demand
+
 wwLazy	    = WwLazy 	  False
 wwStrict    = WwStrict
 wwUnpack xs = WwUnpack False xs
@@ -84,8 +80,9 @@ wwEnum	    = WwEnum
 seqDemand :: Demand -> ()
 seqDemand (WwLazy a)      = a `seq` ()
 seqDemand (WwUnpack b ds) = b `seq` seqDemands ds
-seqDemand other		  = ()
+seqDemand _               = ()
 
+seqDemands :: [Demand] -> ()
 seqDemands [] = ()
 seqDemands (d:ds) = seqDemand d `seq` seqDemands ds
 \end{code}
@@ -107,7 +104,7 @@ isStrict d = not (isLazy d)
 
 isPrim :: Demand -> Bool
 isPrim WwPrim = True
-isPrim other  = False
+isPrim _      = False
 \end{code}
 
 
@@ -119,12 +116,14 @@ isPrim other  = False
 
 
 \begin{code}
+pprDemands :: [Demand] -> Bool -> SDoc
 pprDemands demands bot = hcat (map pprDemand demands) <> pp_bot
 		       where
 			 pp_bot | bot       = ptext SLIT("B")
 				| otherwise = empty
 
 
+pprDemand :: Demand -> SDoc
 pprDemand (WwLazy False)  	 = char 'L'
 pprDemand (WwLazy True)   	 = char 'A'
 pprDemand WwStrict	      	 = char 'S'
@@ -185,7 +184,7 @@ data StrictnessInfo
 
 seqStrictnessInfo :: StrictnessInfo -> ()
 seqStrictnessInfo (StrictnessInfo ds b) = b `seq` seqDemands ds
-seqStrictnessInfo other		        = ()
+seqStrictnessInfo _                     = ()
 \end{code}
 
 \begin{code}
@@ -196,17 +195,21 @@ mkStrictnessInfo (xs, is_bot)
   | otherwise		    	        = StrictnessInfo xs is_bot
   where
     totally_boring (WwLazy False) = True
-    totally_boring other	  = False
+    totally_boring _              = False
 
+noStrictnessInfo :: StrictnessInfo
 noStrictnessInfo = NoStrictnessInfo
 
+isBottomingStrictness :: StrictnessInfo -> Bool
 isBottomingStrictness (StrictnessInfo _ bot) = bot
 isBottomingStrictness NoStrictnessInfo       = False
 
 -- appIsBottom returns true if an application to n args would diverge
+appIsBottom :: StrictnessInfo -> Int -> Bool
 appIsBottom (StrictnessInfo ds bot)   n = bot && (listLengthCmp ds n /=GT) -- not more than 'n' elts in 'ds'.
-appIsBottom  NoStrictnessInfo	      n	= False
+appIsBottom  NoStrictnessInfo         _ = False
 
+ppStrictnessInfo :: StrictnessInfo -> SDoc
 ppStrictnessInfo NoStrictnessInfo		   = empty
 ppStrictnessInfo (StrictnessInfo wrapper_args bot) = hsep [pprDemands wrapper_args bot]
 \end{code}
