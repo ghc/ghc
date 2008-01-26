@@ -17,6 +17,7 @@ import System.Directory
 import Data.List
 import Data.Maybe(fromJust)
 import Data.Array
+import Data.Monoid
 import qualified HpcSet as Set
 
 ------------------------------------------------------------------------------
@@ -110,7 +111,7 @@ markup_main flags (prog:modNames) = do
 	    	   | (modName,fileName,summary) <- mods'
 	           ] ++
 	    "<tr></tr>" ++
-   	    showTotalSummary (foldr1 combineSummary 
+   	    showTotalSummary (mconcat
 	    		     	 [ summary 
 				 | (_,_,summary) <- mods'
 				 ])
@@ -197,14 +198,7 @@ genHtmlFromMod dest_dir flags tix theFunTotals invertOutput = do
              , let ticked = if isTicked gid
 	       	   	    then succ
 			    else id
-             ] $ ModuleSummary 
-	          { expTicked = 0
-	          , expTotal  = 0
-                  , topFunTicked = 0
-                  , topFunTotal  = 0
-                  , altTicked = 0
-                  , altTotal  = 0
-                  }
+             ] $ mempty
 
   -- add prefix to modName argument
   content <- readFileFromPath (hpcError markup_plugin) origFile theHsPath
@@ -438,10 +432,19 @@ percent :: (Integral a) => a -> a -> Maybe a
 percent ticked total = if total == 0 then Nothing else Just (ticked * 100 `div` total)
 
 
-combineSummary :: ModuleSummary -> ModuleSummary -> ModuleSummary
-combineSummary (ModuleSummary eTik1 eTot1 tTik1 tTot1 aTik1 aTot1)
-	       (ModuleSummary eTik2 eTot2 tTik2 tTot2 aTik2 aTot2)
-  = ModuleSummary (eTik1 + eTik2) (eTot1 + eTot2) (tTik1 + tTik2) (tTot1 + tTot2) (aTik1 + aTik2) (aTot1 + aTot2)
+instance Monoid ModuleSummary where
+  mempty = ModuleSummary
+	          { expTicked = 0
+	          , expTotal  = 0
+                  , topFunTicked = 0
+                  , topFunTotal  = 0
+                  , altTicked = 0
+                  , altTotal  = 0
+                  }
+  mappend (ModuleSummary eTik1 eTot1 tTik1 tTot1 aTik1 aTot1)
+	  (ModuleSummary eTik2 eTot2 tTik2 tTot2 aTik2 aTot2)
+     = ModuleSummary (eTik1 + eTik2) (eTot1 + eTot2) (tTik1 + tTik2) (tTot1 + tTot2) (aTik1 + aTik2) (aTot1 + aTot2)
+
 
 ------------------------------------------------------------------------------
 -- global color pallete

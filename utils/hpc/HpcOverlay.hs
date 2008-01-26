@@ -138,9 +138,10 @@ qualifier pos (Just (AtPosition l1' c1' l2' c2'))
 	  = (l1', c1', l2', c2') == fromHpcPos pos
 
 concatSpec :: [Spec] -> Spec
-concatSpec = foldl1 $ 
-	       \ (Spec pre1 body1) (Spec pre2 body2) 
-		     -> Spec (pre1 ++ pre2) (body1 ++ body2)
+concatSpec = foldr 
+	       (\ (Spec pre1 body1) (Spec pre2 body2) 
+		     -> Spec (pre1 ++ pre2) (body1 ++ body2))
+		(Spec [] [])
 
 
 
