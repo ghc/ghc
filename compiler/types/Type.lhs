@@ -6,7 +6,7 @@
 Type - public interface
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -176,7 +176,7 @@ coreView (TyConApp tc tys) | Just (tenv, rhs, tys') <- coreExpandTyCon_maybe tc 
 				-- Its important to use mkAppTys, rather than (foldl AppTy),
 				-- because the function part might well return a 
 				-- partially-applied type constructor; indeed, usually will!
-coreView ty		   = Nothing
+coreView _                 = Nothing
 
 
 
@@ -187,7 +187,7 @@ tcView :: Type -> Maybe Type
 tcView (NoteTy _ ty) 	 = Just ty
 tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys 
 			 = Just (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
-tcView ty		 = Nothing
+tcView _                 = Nothing
 
 -----------------------------------------------
 rttiView :: Type -> Type
@@ -207,7 +207,7 @@ kindView :: Kind -> Maybe Kind
 -- C.f. coreView, tcView
 -- For the moment, we don't even handle synonyms in kinds
 kindView (NoteTy _ k) = Just k
-kindView other	      = Nothing
+kindView _            = Nothing
 \end{code}
 
 
@@ -239,7 +239,7 @@ isTyVarTy ty = isJust (getTyVar_maybe ty)
 getTyVar_maybe :: Type -> Maybe TyVar
 getTyVar_maybe ty | Just ty' <- coreView ty = getTyVar_maybe ty'
 getTyVar_maybe (TyVarTy tv) 	 	    = Just tv  
-getTyVar_maybe other	         	    = Nothing
+getTyVar_maybe _                            = Nothing
 
 \end{code}
 
@@ -252,12 +252,13 @@ invariant that a TyConApp is always visibly so.  mkAppTy maintains the
 invariant: use it.
 
 \begin{code}
+mkAppTy :: Type -> Type -> Type
 mkAppTy orig_ty1 orig_ty2
   = mk_app orig_ty1
   where
     mk_app (NoteTy _ ty1)    = mk_app ty1
     mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ [orig_ty2])
-    mk_app ty1		     = AppTy orig_ty1 orig_ty2
+    mk_app _                 = AppTy orig_ty1 orig_ty2
 	-- Note that the TyConApp could be an 
 	-- under-saturated type synonym.  GHC allows that; e.g.
 	--	type Foo k = k a -> k a
@@ -280,7 +281,7 @@ mkAppTys orig_ty1 orig_tys2
     mk_app (NoteTy _ ty1)    = mk_app ty1
     mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ orig_tys2)
 				-- mkTyConApp: see notes with mkAppTy
-    mk_app ty1		     = foldl AppTy orig_ty1 orig_tys2
+    mk_app _                 = foldl AppTy orig_ty1 orig_tys2
 
 -------------
 splitAppTy_maybe :: Type -> Maybe (Type, Type)
@@ -310,17 +311,17 @@ splitAppTys :: Type -> (Type, [Type])
 splitAppTys ty = split ty ty []
   where
     split orig_ty ty args | Just ty' <- coreView ty = split orig_ty ty' args
-    split orig_ty (AppTy ty arg)        args = split ty ty (arg:args)
-    split orig_ty (TyConApp tc tc_args) args 
+    split _       (AppTy ty arg)        args = split ty ty (arg:args)
+    split _       (TyConApp tc tc_args) args
       = let -- keep type families saturated
             n | isOpenSynTyCon tc = tyConArity tc
               | otherwise         = 0
             (tc_args1, tc_args2)  = splitAt n tc_args
         in
         (TyConApp tc tc_args1, tc_args2 ++ args)
-    split orig_ty (FunTy ty1 ty2)       args = ASSERT( null args )
+    split _       (FunTy ty1 ty2)       args = ASSERT( null args )
 					       (TyConApp funTyCon [], [ty1,ty2])
-    split orig_ty ty		        args = (orig_ty, args)
+    split orig_ty _                     args = (orig_ty, args)
 
 \end{code}
 
@@ -348,14 +349,14 @@ splitFunTy other	     = pprPanic "splitFunTy" (ppr other)
 splitFunTy_maybe :: Type -> Maybe (Type, Type)
 splitFunTy_maybe ty | Just ty' <- coreView ty = splitFunTy_maybe ty'
 splitFunTy_maybe (FunTy arg res)   = Just (arg, res)
-splitFunTy_maybe other	           = Nothing
+splitFunTy_maybe _                 = Nothing
 
 splitFunTys :: Type -> ([Type], Type)
 splitFunTys ty = split [] ty ty
   where
     split args orig_ty ty | Just ty' <- coreView ty = split args orig_ty ty'
-    split args orig_ty (FunTy arg res) 	 = split (arg:args) res res
-    split args orig_ty ty                = (reverse args, orig_ty)
+    split args _       (FunTy arg res)   = split (arg:args) res res
+    split args orig_ty _                 = (reverse args, orig_ty)
 
 splitFunTysN :: Int -> Type -> ([Type], Type)
 -- Split off exactly n arg tys
@@ -367,21 +368,21 @@ splitFunTysN n ty = case splitFunTy ty of { (arg, res) ->
 zipFunTys :: Outputable a => [a] -> Type -> ([(a,Type)], Type)
 zipFunTys orig_xs orig_ty = split [] orig_xs orig_ty orig_ty
   where
-    split acc []     nty ty  	           = (reverse acc, nty)
+    split acc []     nty _                 = (reverse acc, nty)
     split acc xs     nty ty 
 	  | Just ty' <- coreView ty 	   = split acc xs nty ty'
-    split acc (x:xs) nty (FunTy arg res)   = split ((x,arg):acc) xs res res
-    split acc (x:xs) nty ty                = pprPanic "zipFunTys" (ppr orig_xs <+> ppr orig_ty)
+    split acc (x:xs) _   (FunTy arg res)   = split ((x,arg):acc) xs res res
+    split _   _      _   _                 = pprPanic "zipFunTys" (ppr orig_xs <+> ppr orig_ty)
     
 funResultTy :: Type -> Type
 funResultTy ty | Just ty' <- coreView ty = funResultTy ty'
-funResultTy (FunTy arg res)   = res
-funResultTy ty		      = pprPanic "funResultTy" (ppr ty)
+funResultTy (FunTy _arg res)  = res
+funResultTy ty                = pprPanic "funResultTy" (ppr ty)
 
 funArgTy :: Type -> Type
 funArgTy ty | Just ty' <- coreView ty = funArgTy ty'
-funArgTy (FunTy arg res)   = arg
-funArgTy ty		   = pprPanic "funArgTy" (ppr ty)
+funArgTy (FunTy arg _res)  = arg
+funArgTy ty                = pprPanic "funArgTy" (ppr ty)
 \end{code}
 
 
@@ -422,7 +423,7 @@ splitTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
 splitTyConApp_maybe ty | Just ty' <- coreView ty = splitTyConApp_maybe ty'
 splitTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 splitTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
-splitTyConApp_maybe other	      = Nothing
+splitTyConApp_maybe _                 = Nothing
 
 -- Sometimes we do NOT want to look throught a newtype.  When case matching
 -- on a newtype we want a convenient way to access the arguments of a newty
@@ -435,7 +436,7 @@ splitNewTyConApp_maybe :: Type -> Maybe (TyCon, [Type])
 splitNewTyConApp_maybe ty | Just ty' <- tcView ty = splitNewTyConApp_maybe ty'
 splitNewTyConApp_maybe (TyConApp tc tys) = Just (tc, tys)
 splitNewTyConApp_maybe (FunTy arg res)   = Just (funTyCon, [arg,res])
-splitNewTyConApp_maybe other	      = Nothing
+splitNewTyConApp_maybe _                 = Nothing
 
 newTyConInstRhs :: TyCon -> [Type] -> Type
 -- Unwrap one 'layer' of newtype
@@ -517,7 +518,7 @@ repType ty
 	= go rec_nts ty
 
     go rec_nts ty@(TyConApp tc tys)		-- Expand newtypes
-	| Just co_con <- newTyConCo_maybe tc	-- See Note [Expanding newtypes]
+	| Just _co_con <- newTyConCo_maybe tc	-- See Note [Expanding newtypes]
 	= if tc `elem` rec_nts 			--  in Type.lhs
 	  then ty
 	  else go rec_nts' nt_rhs
@@ -526,7 +527,7 @@ repType ty
 	  rec_nts' | isRecursiveTyCon tc = tc:rec_nts
 		   | otherwise		 = rec_nts
 
-    go rec_nts ty = ty
+    go _ ty = ty
 
 
 -- ToDo: this could be moved to the code generator, using splitTyConApp instead
@@ -537,7 +538,7 @@ typePrimRep ty = case repType ty of
 		   FunTy _ _	 -> PtrRep
 		   AppTy _ _	 -> PtrRep	-- See note below
 		   TyVarTy _	 -> PtrRep
-		   other	 -> pprPanic "typePrimRep" (ppr ty)
+		   _             -> pprPanic "typePrimRep" (ppr ty)
 	-- Types of the form 'f a' must be of kind *, not *#, so
 	-- we are guaranteed that they are represented by pointers.
 	-- The reason is that f must have kind *->*, not *->*#, because
@@ -561,7 +562,7 @@ mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 isForAllTy :: Type -> Bool
 isForAllTy (NoteTy _ ty)  = isForAllTy ty
 isForAllTy (ForAllTy _ _) = True
-isForAllTy other_ty	  = False
+isForAllTy _              = False
 
 splitForAllTy_maybe :: Type -> Maybe (TyVar, Type)
 splitForAllTy_maybe ty = splitFAT_m ty
@@ -574,8 +575,8 @@ splitForAllTys :: Type -> ([TyVar], Type)
 splitForAllTys ty = split ty ty []
    where
      split orig_ty ty tvs | Just ty' <- coreView ty = split orig_ty ty' tvs
-     split orig_ty (ForAllTy tv ty)  tvs = split ty ty (tv:tvs)
-     split orig_ty t		     tvs = (reverse tvs, orig_ty)
+     split _       (ForAllTy tv ty)  tvs = split ty ty (tv:tvs)
+     split orig_ty _                 tvs = (reverse tvs, orig_ty)
 
 dropForAlls :: Type -> Type
 dropForAlls ty = snd (splitForAllTys ty)
@@ -595,7 +596,7 @@ the expression.
 applyTy :: Type -> Type -> Type
 applyTy ty arg | Just ty' <- coreView ty = applyTy ty' arg
 applyTy (ForAllTy tv ty) arg = substTyWith [tv] [arg] ty
-applyTy other		 arg = panic "applyTy"
+applyTy _                _   = panic "applyTy"
 
 applyTys :: Type -> [Type] -> Type
 -- This function is interesting because 
@@ -676,6 +677,7 @@ mkFamilyTyConApp tc tys
 -- representation tycon.  For example
 --  	e.g.  data T [a] = ...
 -- In that case we want to print `T [a]', where T is the family TyCon
+pprSourceTyCon :: TyCon -> SDoc
 pprSourceTyCon tycon 
   | Just (fam_tc, tys) <- tyConFamInst_maybe tycon
   = ppr $ fam_tc `TyConApp` tys	       -- can't be FunTyCon
@@ -701,10 +703,10 @@ typeKind (TyConApp tycon tys) = ASSERT( not (isCoercionTyCon tycon) )
 				foldr (\_ k -> kindFunResult k) (tyConKind tycon) tys
 typeKind (NoteTy _ ty)	      = typeKind ty
 typeKind (PredTy pred)	      = predKind pred
-typeKind (AppTy fun arg)      = kindFunResult (typeKind fun)
-typeKind (ForAllTy tv ty)     = typeKind ty
+typeKind (AppTy fun _)        = kindFunResult (typeKind fun)
+typeKind (ForAllTy _ ty)      = typeKind ty
 typeKind (TyVarTy tyvar)      = tyVarKind tyvar
-typeKind (FunTy arg res)
+typeKind (FunTy _arg res)
     -- Hack alert.  The kind of (Int -> Int#) is liftedTypeKind (*), 
     --              not unliftedTypKind (#)
     -- The only things that can be after a function arrow are
@@ -729,8 +731,8 @@ predKind (IParam {}) = liftedTypeKind 	-- always represented by lifted types
 tyVarsOfType :: Type -> TyVarSet
 -- NB: for type synonyms tyVarsOfType does *not* expand the synonym
 tyVarsOfType (TyVarTy tv)		= unitVarSet tv
-tyVarsOfType (TyConApp tycon tys)	= tyVarsOfTypes tys
-tyVarsOfType (NoteTy (FTVNote tvs) ty2) = tvs
+tyVarsOfType (TyConApp _ tys)           = tyVarsOfTypes tys
+tyVarsOfType (NoteTy (FTVNote tvs) _)   = tvs
 tyVarsOfType (PredTy sty)		= tyVarsOfPred sty
 tyVarsOfType (FunTy arg res)		= tyVarsOfType arg `unionVarSet` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)		= tyVarsOfType fun `unionVarSet` tyVarsOfType arg
@@ -813,13 +815,13 @@ tidyOpenTyVars env tyvars = mapAccumL tidyOpenTyVar env tyvars
 
 tidyOpenTyVar :: TidyEnv -> TyVar -> (TidyEnv, TyVar)
 -- Treat a new tyvar as a binder, and give it a fresh tidy name
-tidyOpenTyVar env@(tidy_env, subst) tyvar
+tidyOpenTyVar env@(_, subst) tyvar
   = case lookupVarEnv subst tyvar of
 	Just tyvar' -> (env, tyvar')		-- Already substituted
 	Nothing	    -> tidyTyVarBndr env tyvar	-- Treat it as a binder
 
 tidyType :: TidyEnv -> Type -> Type
-tidyType env@(tidy_env, subst) ty
+tidyType env@(_, subst) ty
   = go ty
   where
     go (TyVarTy tv)	    = case lookupVarEnv subst tv of
@@ -835,8 +837,9 @@ tidyType env@(tidy_env, subst) ty
 			      where
 			        (envp, tvp) = tidyTyVarBndr env tv
 
-    go_note note@(FTVNote ftvs) = note	-- No need to tidy the free tyvars
+    go_note note@(FTVNote _ftvs) = note	-- No need to tidy the free tyvars
 
+tidyTypes :: TidyEnv -> [Type] -> [Type]
 tidyTypes env tys = map (tidyType env) tys
 
 tidyPred :: TidyEnv -> PredType -> PredType
@@ -886,14 +889,14 @@ isUnLiftedType :: Type -> Bool
 	-- construct them
 
 isUnLiftedType ty | Just ty' <- coreView ty = isUnLiftedType ty'
-isUnLiftedType (ForAllTy tv ty)  = isUnLiftedType ty
+isUnLiftedType (ForAllTy _ ty)   = isUnLiftedType ty
 isUnLiftedType (TyConApp tc _)   = isUnLiftedTyCon tc
-isUnLiftedType other		 = False	
+isUnLiftedType _                 = False
 
 isUnboxedTupleType :: Type -> Bool
 isUnboxedTupleType ty = case splitTyConApp_maybe ty of
-			   Just (tc, ty_args) -> isUnboxedTupleTyCon tc
-			   other	      -> False
+                           Just (tc, _ty_args) -> isUnboxedTupleTyCon tc
+                           _                   -> False
 
 -- Should only be applied to *types*; hence the assert
 isAlgType :: Type -> Bool
@@ -920,14 +923,16 @@ this function should be in TcType, but isStrictType is used by DataCon,
 which is below TcType in the hierarchy, so it's convenient to put it here.
 
 \begin{code}
+isStrictType :: Type -> Bool
 isStrictType (PredTy pred)     = isStrictPred pred
 isStrictType ty | Just ty' <- coreView ty = isStrictType ty'
-isStrictType (ForAllTy tv ty)  = isStrictType ty
+isStrictType (ForAllTy _ ty)   = isStrictType ty
 isStrictType (TyConApp tc _)   = isUnLiftedTyCon tc
-isStrictType other	       = False	
+isStrictType _                 = False
 
+isStrictPred :: PredType -> Bool
 isStrictPred (ClassP clas _) = opt_DictsStrict && not (isNewTyCon (classTyCon clas))
-isStrictPred other	     = False
+isStrictPred _               = False
 	-- We may be strict in dictionary types, but only if it 
 	-- has more than one component.
 	-- [Being strict in a single-component dictionary risks
@@ -942,7 +947,7 @@ isPrimitiveType :: Type -> Bool
 isPrimitiveType ty = case splitTyConApp_maybe ty of
 			Just (tc, ty_args) -> ASSERT( ty_args `lengthIs` tyConArity tc )
 					      isPrimTyCon tc
-			other		   -> False
+			_                  -> False
 \end{code}
 
 
@@ -1014,7 +1019,7 @@ coreEqType t1 t2
 		 | Just t2' <- coreView t2 = eq env t1 t2' 
 
 	-- Fall through case; not equal!
-    eq env t1 t2 = False
+    eq _ _ _ = False
 \end{code}
 
 
@@ -1106,30 +1111,30 @@ cmpTypeX env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `then
 cmpTypeX env t1			(NoteTy _ t2)	     = cmpTypeX env t1 t2
 
     -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy < PredTy
-cmpTypeX env (AppTy _ _) (TyVarTy _) = GT
-    
-cmpTypeX env (FunTy _ _) (TyVarTy _) = GT
-cmpTypeX env (FunTy _ _) (AppTy _ _) = GT
-    
-cmpTypeX env (TyConApp _ _) (TyVarTy _) = GT
-cmpTypeX env (TyConApp _ _) (AppTy _ _) = GT
-cmpTypeX env (TyConApp _ _) (FunTy _ _) = GT
-    
-cmpTypeX env (ForAllTy _ _) (TyVarTy _)    = GT
-cmpTypeX env (ForAllTy _ _) (AppTy _ _)    = GT
-cmpTypeX env (ForAllTy _ _) (FunTy _ _)    = GT
-cmpTypeX env (ForAllTy _ _) (TyConApp _ _) = GT
+cmpTypeX _ (AppTy _ _)    (TyVarTy _)    = GT
 
-cmpTypeX env (PredTy _)   t2		= GT
+cmpTypeX _ (FunTy _ _)    (TyVarTy _)    = GT
+cmpTypeX _ (FunTy _ _)    (AppTy _ _)    = GT
 
-cmpTypeX env _ _ = LT
+cmpTypeX _ (TyConApp _ _) (TyVarTy _)    = GT
+cmpTypeX _ (TyConApp _ _) (AppTy _ _)    = GT
+cmpTypeX _ (TyConApp _ _) (FunTy _ _)    = GT
+
+cmpTypeX _ (ForAllTy _ _) (TyVarTy _)    = GT
+cmpTypeX _ (ForAllTy _ _) (AppTy _ _)    = GT
+cmpTypeX _ (ForAllTy _ _) (FunTy _ _)    = GT
+cmpTypeX _ (ForAllTy _ _) (TyConApp _ _) = GT
+
+cmpTypeX _ (PredTy _)     _              = GT
+
+cmpTypeX _ _              _              = LT
 
 -------------
 cmpTypesX :: RnEnv2 -> [Type] -> [Type] -> Ordering
-cmpTypesX env []        []        = EQ
+cmpTypesX _   []        []        = EQ
 cmpTypesX env (t1:tys1) (t2:tys2) = cmpTypeX env t1 t2 `thenCmp` cmpTypesX env tys1 tys2
-cmpTypesX env []        tys       = LT
-cmpTypesX env ty        []        = GT
+cmpTypesX _   []        _         = LT
+cmpTypesX _   _         []        = GT
 
 -------------
 cmpPredX :: RnEnv2 -> PredType -> PredType -> Ordering
@@ -1143,10 +1148,10 @@ cmpPredX env (ClassP c1 tys1) (ClassP c2 tys2) = (c1 `compare` c2) `thenCmp` (cm
 cmpPredX env (EqPred ty1 ty2) (EqPred ty1' ty2') = (cmpTypeX env ty1 ty1') `thenCmp` (cmpTypeX env ty2 ty2')
 
 -- Constructor order: IParam < ClassP < EqPred
-cmpPredX env (IParam {})     _		    = LT
-cmpPredX env (ClassP {})    (IParam {})     = GT
-cmpPredX env (ClassP {})    (EqPred {})     = LT
-cmpPredX env (EqPred {})    _		    = GT
+cmpPredX _   (IParam {})     _              = LT
+cmpPredX _   (ClassP {})    (IParam {})     = GT
+cmpPredX _   (ClassP {})    (EqPred {})     = LT
+cmpPredX _   (EqPred {})    _               = GT
 \end{code}
 
 PredTypes are used as a FM key in TcSimplify, 
@@ -1248,6 +1253,7 @@ composeTvSubst in_scope env1 env2
   where
     subst1 = TvSubst in_scope env1
 
+emptyTvSubst :: TvSubst
 emptyTvSubst = TvSubst emptyInScopeSet emptyVarEnv
 
 isEmptyTvSubst :: TvSubst -> Bool
@@ -1324,6 +1330,7 @@ zipTyEnv tyvars tys
 
 -- Later substitutions in the list over-ride earlier ones, 
 -- but there should be no loops
+zip_ty_env :: [TyVar] -> [Type] -> TvSubstEnv -> TvSubstEnv
 zip_ty_env []       []       env = env
 zip_ty_env (tv:tvs) (ty:tys) env = zip_ty_env tvs tys (extendVarEnv env tv ty)
 	-- There used to be a special case for when 
@@ -1408,7 +1415,7 @@ subst_ty subst ty
 					(subst', tv') -> ForAllTy tv' $! (subst_ty subst' ty)
 
 substTyVar :: TvSubst -> TyVar  -> Type
-substTyVar subst@(TvSubst in_scope env) tv
+substTyVar subst@(TvSubst _ _) tv
   = case lookupTyVar subst tv of {
 	Nothing -> TyVarTy tv;
        	Just ty -> ty	-- See Note [Apply Once]
@@ -1419,7 +1426,7 @@ substTyVars subst tvs = map (substTyVar subst) tvs
 
 lookupTyVar :: TvSubst -> TyVar  -> Maybe Type
 	-- See Note [Extending the TvSubst]
-lookupTyVar (TvSubst in_scope env) tv = lookupVarEnv env tv
+lookupTyVar (TvSubst _ env) tv = lookupVarEnv env tv
 
 substTyVarBndr :: TvSubst -> TyVar -> (TvSubst, TyVar)	
 substTyVarBndr subst@(TvSubst in_scope env) old_var
@@ -1531,26 +1538,28 @@ splitKindFunTysN :: Int -> Kind -> ([Kind],Kind)
 splitKindFunTysN k = splitFunTysN k
 
 isUbxTupleKind, isOpenTypeKind, isArgTypeKind, isUnliftedTypeKind :: Kind -> Bool
+isOpenTypeKindCon, isUbxTupleKindCon, isArgTypeKindCon,
+        isUnliftedTypeKindCon, isSubArgTypeKindCon      :: TyCon -> Bool
 
 isOpenTypeKindCon tc    = tyConUnique tc == openTypeKindTyConKey
 
 isOpenTypeKind (TyConApp tc _) = isOpenTypeKindCon tc
-isOpenTypeKind other           = False
+isOpenTypeKind _               = False
 
 isUbxTupleKindCon tc = tyConUnique tc == ubxTupleKindTyConKey
 
 isUbxTupleKind (TyConApp tc _) = isUbxTupleKindCon tc
-isUbxTupleKind other 	       = False
+isUbxTupleKind _               = False
 
 isArgTypeKindCon tc = tyConUnique tc == argTypeKindTyConKey
 
 isArgTypeKind (TyConApp tc _) = isArgTypeKindCon tc
-isArgTypeKind other = False
+isArgTypeKind _               = False
 
 isUnliftedTypeKindCon tc = tyConUnique tc == unliftedTypeKindTyConKey
 
 isUnliftedTypeKind (TyConApp tc _) = isUnliftedTypeKindCon tc
-isUnliftedTypeKind other           = False
+isUnliftedTypeKind _               = False
 
 isSubOpenTypeKind :: Kind -> Bool
 -- True of any sub-kind of OpenTypeKind (i.e. anything except arrow)
@@ -1572,11 +1581,11 @@ isSubArgTypeKindCon kc
 isSubArgTypeKind :: Kind -> Bool
 -- True of any sub-kind of ArgTypeKind 
 isSubArgTypeKind (TyConApp kc []) = isSubArgTypeKindCon kc
-isSubArgTypeKind other            = False
+isSubArgTypeKind _                = False
 
 isSuperKind :: Type -> Bool
 isSuperKind (TyConApp (skc) []) = isSuperKindTyCon skc
-isSuperKind other = False
+isSuperKind _                   = False
 
 isKind :: Kind -> Bool
 isKind k = isSuperKind (typeKind k)
@@ -1587,7 +1596,7 @@ isSubKind (TyConApp kc1 []) (TyConApp kc2 []) = kc1 `isSubKindCon` kc2
 isSubKind (FunTy a1 r1) (FunTy a2 r2)	      = (a2 `isSubKind` a1) && (r1 `isSubKind` r2)
 isSubKind (PredTy (EqPred ty1 ty2)) (PredTy (EqPred ty1' ty2')) 
   = ty1 `tcEqType` ty1' && ty2 `tcEqType` ty2'
-isSubKind k1 		k2 		      = False
+isSubKind _             _                     = False
 
 eqKind :: Kind -> Kind -> Bool
 eqKind = tcEqType
@@ -1624,5 +1633,5 @@ defaultKind k
 
 isEqPred :: PredType -> Bool
 isEqPred (EqPred _ _) = True
-isEqPred other	      = False
+isEqPred _            = False
 \end{code}
