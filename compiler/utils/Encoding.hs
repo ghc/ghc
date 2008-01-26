@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -- -----------------------------------------------------------------------------
 --
 -- (c) The University of Glasgow, 1997-2006
@@ -141,8 +134,9 @@ countUTF8Chars ptr bytes = go ptr 0
 	   | ptr >= end = return n
 	   | otherwise  = do
 		case utf8DecodeChar# (unPtr ptr) of
-		  (# c, a #) -> go (Ptr a) (n+1)
+		  (# _, a #) -> go (Ptr a) (n+1)
 
+unPtr :: Ptr a -> Addr#
 unPtr (Ptr a) = a
 
 utf8EncodeChar :: Char -> Ptr Word8 -> IO (Ptr Word8)
@@ -173,7 +167,7 @@ utf8EncodeChar c ptr =
 utf8EncodeString :: Ptr Word8 -> String -> IO ()
 utf8EncodeString ptr str = go ptr str
   where STRICT2(go)
-	go ptr [] = return ()
+	go _   []     = return ()
 	go ptr (c:cs) = do
 	  ptr' <- utf8EncodeChar c ptr
 	  go ptr' cs
@@ -334,6 +328,7 @@ decode_lower 'v' = '%'
 decode_lower ch  = {-pprTrace "decode_lower" (char ch)-} ch
 
 -- Characters not having a specific code are coded as z224U (in hex)
+decode_num_esc :: Char -> EncodedString -> UserString
 decode_num_esc d rest
   = go (digitToInt d) rest
   where
@@ -371,13 +366,13 @@ maybe_tuple :: UserString -> Maybe EncodedString
 
 maybe_tuple "(# #)" = Just("Z1H")
 maybe_tuple ('(' : '#' : cs) = case count_commas (0::Int) cs of
-				 (n, '#' : ')' : cs) -> Just ('Z' : shows (n+1) "H")
-				 other		     -> Nothing
+                                 (n, '#' : ')' : _) -> Just ('Z' : shows (n+1) "H")
+                                 _                  -> Nothing
 maybe_tuple "()" = Just("Z0T")
 maybe_tuple ('(' : cs)       = case count_commas (0::Int) cs of
-				 (n, ')' : cs) -> Just ('Z' : shows (n+1) "T")
-				 other	       -> Nothing
-maybe_tuple other    	     = Nothing
+                                 (n, ')' : _) -> Just ('Z' : shows (n+1) "T")
+                                 _            -> Nothing
+maybe_tuple _                = Nothing
 
 count_commas :: Int -> String -> (Int, String)
 count_commas n (',' : cs) = count_commas (n+1) cs
