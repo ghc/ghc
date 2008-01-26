@@ -5,13 +5,6 @@
 FamInstEnv: Type checked family instance declarations
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module FamInstEnv (
 	FamInst(..), famInstTyCon, famInstTyVars, 
 	pprFamInst, pprFamInstHdr, pprFamInsts, 
@@ -40,8 +33,6 @@ import Coercion
 import VarSet
 import Var
 import Name
-import OccName
-import SrcLoc
 import UniqFM
 import Outputable
 import Maybes
@@ -82,6 +73,7 @@ data FamInst
 famInstTyCon :: FamInst -> TyCon
 famInstTyCon = fi_tycon
 
+famInstTyVars :: FamInst -> TyVarSet
 famInstTyVars = fi_tvs
 \end{code}
 
@@ -330,6 +322,7 @@ lookupFamInstEnvUnify (pkg_ie, home_ie) fam tys
 
 -- See explanation at @InstEnv.bind_fn@.
 --
+bind_fn :: TyVar -> BindFlag
 bind_fn tv | isTcTyVar tv && isExistentialTyVar tv = Skolem
 	   | otherwise	 		 	   = BindMe
 \end{code}
@@ -382,7 +375,7 @@ topNormaliseType env ty
 		-- to be sure that 
 	   add_co co rec_nts ty
 
-    go rec_nts ty = Nothing
+    go _ _ = Nothing
 
     add_co co rec_nts ty 
 	= case go rec_nts ty of
@@ -411,7 +404,7 @@ normaliseTcApp env tc tys
 
 		-- No unique matching family instance exists;
 		-- we do not do anything
-	other -> (tycon_coi, TyConApp tc ntys)
+	_ -> (tycon_coi, TyConApp tc ntys)
 ---------------
 normaliseType :: FamInstEnvs 		-- environment with family instances
 	      -> Type  			-- old type
@@ -422,26 +415,26 @@ normaliseType :: FamInstEnvs 		-- environment with family instances
 
 normaliseType env ty 
   | Just ty' <- coreView ty = normaliseType env ty' 
-normaliseType env ty@(TyConApp tc tys)
+normaliseType env (TyConApp tc tys)
   = normaliseTcApp env tc tys
-normaliseType env ty@(AppTy ty1 ty2)
+normaliseType env (AppTy ty1 ty2)
   = let (coi1,nty1) = normaliseType env ty1
         (coi2,nty2) = normaliseType env ty2
     in  (mkAppTyCoI nty1 coi1 nty2 coi2, AppTy nty1 nty2)
-normaliseType env ty@(FunTy ty1 ty2)
+normaliseType env (FunTy ty1 ty2)
   = let (coi1,nty1) = normaliseType env ty1
         (coi2,nty2) = normaliseType env ty2
     in  (mkFunTyCoI nty1 coi1 nty2 coi2, FunTy nty1 nty2)
-normaliseType env ty@(ForAllTy tyvar ty1)
+normaliseType env (ForAllTy tyvar ty1)
   = let (coi,nty1) = normaliseType env ty1
     in  (mkForAllTyCoI tyvar coi,ForAllTy tyvar nty1)
-normaliseType env ty@(NoteTy note ty1)
+normaliseType env (NoteTy note ty1)
   = let (coi,nty1) = normaliseType env ty1
     in  (coi,NoteTy note nty1)
-normaliseType env ty@(TyVarTy _)
+normaliseType _   ty@(TyVarTy _)
   = (IdCo,ty)
 normaliseType env (PredTy predty)
-  = normalisePred env predty	
+  = normalisePred env predty
 
 ---------------
 normalisePred :: FamInstEnvs -> PredType -> (CoercionI,Type)
