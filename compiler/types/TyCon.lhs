@@ -6,13 +6,6 @@
 The @TyCon@ datatype
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TyCon(
 	TyCon, FieldLabel,
 
@@ -301,9 +294,9 @@ data TyConParent
 	-- with :R7T's algTcParent = FamilyTyCon T [a] co
 
 okParent :: Name -> TyConParent -> Bool	-- Checks invariants
-okParent tc_name NoParentTyCon    		= True
-okParent tc_name (ClassTyCon cls) 		= tyConName (classTyCon cls) == tc_name
-okParent tc_name (FamilyTyCon fam_tc tys co_tc) = tyConArity fam_tc == length tys
+okParent _       NoParentTyCon                   = True
+okParent tc_name (ClassTyCon cls)                = tyConName (classTyCon cls) == tc_name
+okParent _       (FamilyTyCon fam_tc tys _co_tc) = tyConArity fam_tc == length tys
 
 --------------------
 data SynTyConRhs
@@ -502,6 +495,17 @@ mkFunTyCon name kind
 -- This is the making of a TyCon. Just the same as the old mkAlgTyCon,
 -- but now you also have to pass in the generic information about the type
 -- constructor - you can get hold of it easily (see Generics module)
+mkAlgTyCon :: Name
+           -> Kind
+           -> [TyVar]
+           -> [PredType]
+           -> AlgTyConRhs
+           -> [Id]
+           -> TyConParent
+           -> RecFlag
+           -> Bool
+           -> Bool
+           -> TyCon
 mkAlgTyCon name kind tyvars stupid rhs sel_ids parent is_rec gen_info gadt_syn
   = AlgTyCon {	
 	tyConName 	 = name,
@@ -518,9 +522,11 @@ mkAlgTyCon name kind tyvars stupid rhs sel_ids parent is_rec gen_info gadt_syn
 	hasGenerics = gen_info
     }
 
+mkClassTyCon :: Name -> Kind -> [TyVar] -> AlgTyConRhs -> Class -> RecFlag -> TyCon
 mkClassTyCon name kind tyvars rhs clas is_rec =
   mkAlgTyCon name kind tyvars [] rhs [] (ClassTyCon clas) is_rec False False
 
+mkTupleTyCon :: Name -> Kind -> Arity -> [TyVar] -> DataCon -> Boxity -> Bool -> TyCon
 mkTupleTyCon name kind arity tyvars con boxed gen_info
   = TupleTyCon {
 	tyConUnique = nameUnique name,
@@ -537,6 +543,7 @@ mkTupleTyCon name kind arity tyvars con boxed gen_info
 -- as primitive, but *lifted*, TyCons for now. They are lifted
 -- because the Haskell type T representing the (foreign) .NET
 -- type T is actually implemented (in ILX) as a thunk<T>
+mkForeignTyCon :: Name -> Maybe FastString -> Kind -> Arity -> TyCon
 mkForeignTyCon name ext_name kind arity
   = PrimTyCon {
 	tyConName    = name,
@@ -550,16 +557,20 @@ mkForeignTyCon name ext_name kind arity
 
 
 -- most Prim tycons are lifted
+mkPrimTyCon :: Name  -> Kind -> Arity -> PrimRep -> TyCon
 mkPrimTyCon name kind arity rep
   = mkPrimTyCon' name kind arity rep True  
 
+mkVoidPrimTyCon :: Name -> Kind -> Arity -> TyCon
 mkVoidPrimTyCon name kind arity 
   = mkPrimTyCon' name kind arity VoidRep True  
 
 -- but RealWorld is lifted
+mkLiftedPrimTyCon :: Name  -> Kind -> Arity -> PrimRep -> TyCon
 mkLiftedPrimTyCon name kind arity rep
   = mkPrimTyCon' name kind arity rep False
 
+mkPrimTyCon' :: Name  -> Kind -> Arity -> PrimRep -> Bool -> TyCon
 mkPrimTyCon' name kind arity rep is_unlifted
   = PrimTyCon {
 	tyConName    = name,
@@ -571,6 +582,7 @@ mkPrimTyCon' name kind arity rep is_unlifted
 	tyConExtName = Nothing
     }
 
+mkSynTyCon :: Name -> Kind -> [TyVar] -> SynTyConRhs -> TyConParent -> TyCon
 mkSynTyCon name kind tyvars rhs parent
   = SynTyCon {	
 	tyConName = name,
@@ -582,6 +594,7 @@ mkSynTyCon name kind tyvars rhs parent
         synTcParent = parent
     }
 
+mkCoercionTyCon :: Name -> Arity -> ([Type] -> (Type,Type)) -> TyCon
 mkCoercionTyCon name arity kindRule
   = CoercionTyCon {
         tyConName = name,
@@ -591,6 +604,7 @@ mkCoercionTyCon name arity kindRule
     }
 
 -- Super kinds always have arity zero
+mkSuperKindTyCon :: Name -> TyCon
 mkSuperKindTyCon name
   = SuperKindTyCon {
         tyConName = name,
@@ -624,7 +638,7 @@ isUnLiftedTyCon _    				        = False
 isAlgTyCon :: TyCon -> Bool
 isAlgTyCon (AlgTyCon {})   = True
 isAlgTyCon (TupleTyCon {}) = True
-isAlgTyCon other 	   = False
+isAlgTyCon _               = False
 
 isDataTyCon :: TyCon -> Bool
 -- isDataTyCon returns True for data types that are definitely
@@ -639,25 +653,25 @@ isDataTyCon :: TyCon -> Bool
 -- NB: for a data type family, T, only the *instance* tycons are
 --     get an info table etc.  The family tycon does not.
 --     Hence False for OpenTyCon
-isDataTyCon tc@(AlgTyCon {algTcRhs = rhs})  
+isDataTyCon (AlgTyCon {algTcRhs = rhs})
   = case rhs of
         OpenTyCon {}  -> False
 	DataTyCon {}  -> True
 	NewTyCon {}   -> False
 	AbstractTyCon -> False	 -- We don't know, so return False
 isDataTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
-isDataTyCon other = False
+isDataTyCon _ = False
 
 isNewTyCon :: TyCon -> Bool
 isNewTyCon (AlgTyCon {algTcRhs = NewTyCon {}}) = True
-isNewTyCon other		               = False
+isNewTyCon _                                   = False
 
 unwrapNewTyCon_maybe :: TyCon -> Maybe ([TyVar], Type, Maybe TyCon)
 unwrapNewTyCon_maybe (AlgTyCon { tyConTyVars = tvs, 
 				 algTcRhs = NewTyCon { nt_co = mb_co, 
 						       nt_rhs = rhs }})
 			   = Just (tvs, rhs, mb_co)
-unwrapNewTyCon_maybe other = Nothing
+unwrapNewTyCon_maybe _     = Nothing
 
 isProductTyCon :: TyCon -> Bool
 -- A "product" tycon
@@ -672,9 +686,9 @@ isProductTyCon tc@(AlgTyCon {}) = case algTcRhs tc of
 				    DataTyCon{ data_cons = [data_con] } 
 						-> isVanillaDataCon data_con
 				    NewTyCon {}	-> True
-				    other	-> False
+				    _           -> False
 isProductTyCon (TupleTyCon {})  = True   
-isProductTyCon other		= False
+isProductTyCon _                = False
 
 isSynTyCon :: TyCon -> Bool
 isSynTyCon (SynTyCon {}) = True
@@ -692,11 +706,11 @@ isOpenSynTyCon tycon = isSynTyCon tycon && isOpenTyCon tycon
 
 isGadtSyntaxTyCon :: TyCon -> Bool
 isGadtSyntaxTyCon (AlgTyCon { algTcGadtSyntax = res }) = res
-isGadtSyntaxTyCon other				       = False
+isGadtSyntaxTyCon _                                    = False
 
 isEnumerationTyCon :: TyCon -> Bool
 isEnumerationTyCon (AlgTyCon {algTcRhs = DataTyCon { is_enum = res }}) = res
-isEnumerationTyCon other				       	       = False
+isEnumerationTyCon _                                                   = False
 
 isOpenTyCon :: TyCon -> Bool
 isOpenTyCon (SynTyCon {synTcRhs = OpenSynTyCon _ _}) = True
@@ -729,44 +743,45 @@ isTupleTyCon :: TyCon -> Bool
 -- get spat into the interface file as tuple tycons, so I don't think
 -- it matters.
 isTupleTyCon (TupleTyCon {}) = True
-isTupleTyCon other 	     = False
+isTupleTyCon _               = False
 
 isUnboxedTupleTyCon :: TyCon -> Bool
 isUnboxedTupleTyCon (TupleTyCon {tyConBoxed = boxity}) = not (isBoxed boxity)
-isUnboxedTupleTyCon other = False
+isUnboxedTupleTyCon _                                  = False
 
 isBoxedTupleTyCon :: TyCon -> Bool
 isBoxedTupleTyCon (TupleTyCon {tyConBoxed = boxity}) = isBoxed boxity
-isBoxedTupleTyCon other = False
+isBoxedTupleTyCon _                                  = False
 
+tupleTyConBoxity :: TyCon -> Boxity
 tupleTyConBoxity tc = tyConBoxed tc
 
 isRecursiveTyCon :: TyCon -> Bool
 isRecursiveTyCon (AlgTyCon {algTcRec = Recursive}) = True
-isRecursiveTyCon other				      = False
+isRecursiveTyCon _                                 = False
 
 isHiBootTyCon :: TyCon -> Bool
 -- Used for knot-tying in hi-boot files
 isHiBootTyCon (AlgTyCon {algTcRhs = AbstractTyCon}) = True
-isHiBootTyCon other			            = False
+isHiBootTyCon _                                     = False
 
 isForeignTyCon :: TyCon -> Bool
 -- isForeignTyCon identifies foreign-imported type constructors
 isForeignTyCon (PrimTyCon {tyConExtName = Just _}) = True
-isForeignTyCon other				   = False
+isForeignTyCon _                                   = False
 
 isSuperKindTyCon :: TyCon -> Bool
 isSuperKindTyCon (SuperKindTyCon {}) = True
-isSuperKindTyCon other               = False
+isSuperKindTyCon _                   = False
 
 isCoercionTyCon_maybe :: TyCon -> Maybe (Arity, [Type] -> (Type,Type))
 isCoercionTyCon_maybe (CoercionTyCon {tyConArity = ar, coKindFun = rule}) 
   = Just (ar, rule)
-isCoercionTyCon_maybe other = Nothing
+isCoercionTyCon_maybe _ = Nothing
 
 isCoercionTyCon :: TyCon -> Bool
 isCoercionTyCon (CoercionTyCon {}) = True
-isCoercionTyCon other              = False
+isCoercionTyCon _                  = False
 
 -- Identifies implicit tycons that, in particular, do not go into interface
 -- files (because they are implicitly reconstructed when the interface is
@@ -806,7 +821,7 @@ tcExpandTyCon_maybe, coreExpandTyCon_maybe
 tcExpandTyCon_maybe (SynTyCon {tyConTyVars = tvs, 
 			       synTcRhs = SynonymTyCon rhs }) tys
    = expand tvs rhs tys
-tcExpandTyCon_maybe other_tycon tys = Nothing
+tcExpandTyCon_maybe _ _ = Nothing
 
 ---------------
 -- For the *Core* view, we expand synonyms only as well
@@ -837,7 +852,7 @@ expand tvs rhs tys
 tyConHasGenerics :: TyCon -> Bool
 tyConHasGenerics (AlgTyCon {hasGenerics = hg})   = hg
 tyConHasGenerics (TupleTyCon {hasGenerics = hg}) = hg
-tyConHasGenerics other				 = False	-- Synonyms
+tyConHasGenerics _                               = False        -- Synonyms
 
 tyConDataCons :: TyCon -> [DataCon]
 -- It's convenient for tyConDataCons to return the
@@ -848,7 +863,7 @@ tyConDataCons_maybe :: TyCon -> Maybe [DataCon]
 tyConDataCons_maybe (AlgTyCon {algTcRhs = DataTyCon { data_cons = cons }}) = Just cons
 tyConDataCons_maybe (AlgTyCon {algTcRhs = NewTyCon { data_con = con }})    = Just [con]
 tyConDataCons_maybe (TupleTyCon {dataCon = con})	       		   = Just [con]
-tyConDataCons_maybe other			               		   = Nothing
+tyConDataCons_maybe _                                                      = Nothing
 
 tyConFamilySize  :: TyCon -> Int
 tyConFamilySize (AlgTyCon   {algTcRhs = DataTyCon {data_cons = cons}}) = 
@@ -860,7 +875,7 @@ tyConFamilySize other = pprPanic "tyConFamilySize:" (ppr other)
 
 tyConSelIds :: TyCon -> [Id]
 tyConSelIds (AlgTyCon {algTcSelIds = fs}) = fs
-tyConSelIds other_tycon		          = []
+tyConSelIds _                             = []
 
 algTyConRhs :: TyCon -> AlgTyConRhs
 algTyConRhs (AlgTyCon {algTcRhs = rhs})  = rhs
@@ -927,23 +942,23 @@ maybeTyConSingleCon tc = pprPanic "maybeTyConSingleCon: unexpected tycon " $ ppr
 \begin{code}
 isClassTyCon :: TyCon -> Bool
 isClassTyCon (AlgTyCon {algTcParent = ClassTyCon _}) = True
-isClassTyCon other_tycon			     = False
+isClassTyCon _                                       = False
 
 tyConClass_maybe :: TyCon -> Maybe Class
 tyConClass_maybe (AlgTyCon {algTcParent = ClassTyCon clas}) = Just clas
-tyConClass_maybe other_tycon				    = Nothing
+tyConClass_maybe _                                          = Nothing
 
 isFamInstTyCon :: TyCon -> Bool
 isFamInstTyCon (AlgTyCon {algTcParent = FamilyTyCon _ _ _ }) = True
 isFamInstTyCon (SynTyCon {synTcParent = FamilyTyCon _ _ _ }) = True
-isFamInstTyCon other_tycon			             = False
+isFamInstTyCon _                                             = False
 
 tyConFamInst_maybe :: TyCon -> Maybe (TyCon, [Type])
 tyConFamInst_maybe (AlgTyCon {algTcParent = FamilyTyCon fam instTys _}) = 
   Just (fam, instTys)
 tyConFamInst_maybe (SynTyCon {synTcParent = FamilyTyCon fam instTys _}) = 
   Just (fam, instTys)
-tyConFamInst_maybe other_tycon				                = 
+tyConFamInst_maybe _                                                    = 
   Nothing
 
 tyConFamilyCoercion_maybe :: TyCon -> Maybe TyCon
@@ -951,7 +966,7 @@ tyConFamilyCoercion_maybe (AlgTyCon {algTcParent = FamilyTyCon _ _ coe}) =
   Just coe
 tyConFamilyCoercion_maybe (SynTyCon {synTcParent = FamilyTyCon _ _ coe}) = 
   Just coe
-tyConFamilyCoercion_maybe other_tycon 				         = 
+tyConFamilyCoercion_maybe _                                              =
   Nothing
 \end{code}
 
