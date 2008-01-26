@@ -2,7 +2,7 @@
 % (c) The University of Glasgow 2001-2006
 %
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -44,8 +44,8 @@ emitExternalCore dflags exports cg_guts
  = (do handle <- openFile corename WriteMode
        hPutStrLn handle (show (mkExternalCore exports cg_guts))      
        hClose handle)
-   `catch` (\err -> pprPanic "Failed to open or write external core output file" 
-	                     (text corename))
+   `catch` (\_ -> pprPanic "Failed to open or write external core output file"
+                           (text corename))
    where corename = extCoreName dflags
 emitExternalCore _ _ _
  | otherwise
@@ -116,7 +116,7 @@ make_exp (Var v) =
         -> pprPanic "MkExternalCore died: can't handle non-{static,dynamic}-C foreign call"
                     (ppr v)
     _ -> C.Var (make_var_qid (Var.varName v))
-make_exp (Lit (l@(MachLabel s _))) = C.Label (unpackFS s)
+make_exp (Lit (MachLabel s _)) = C.Label (unpackFS s)
 make_exp (Lit l) = C.Lit (make_lit l)
 make_exp (App e (Type t)) = C.Appt (make_exp e) (make_ty t)
 make_exp (App e1 e2) = C.App (make_exp e1) (make_exp e2)
@@ -126,7 +126,7 @@ make_exp (Cast e co) = C.Cast (make_exp e) (make_ty co)
 make_exp (Let b e) = C.Let (make_vdef emptyNameSet b) (make_exp e)
 -- gaw 2004
 make_exp (Case e v ty alts) = C.Case (make_exp e) (make_vbind v) (make_ty ty) (map make_alt alts)
-make_exp (Note (SCC cc) e) = C.Note "SCC"  (make_exp e) -- temporary
+make_exp (Note (SCC _) e) = C.Note "SCC"  (make_exp e) -- temporary
 make_exp (Note (CoreNote s) e) = C.Note s (make_exp e)  -- hdaume: core annotations
 make_exp (Note InlineMe e) = C.Note "InlineMe" (make_exp e)
 make_exp _ = error "MkExternalCore died: make_exp"
@@ -196,7 +196,7 @@ make_kind _ = error "MkExternalCore died: make_kind"
 {- Use encoded strings.
    Also, adjust casing to work around some badly-chosen internal names. -}
 make_id :: Bool -> Name -> C.Id
-make_id is_var nm = (occNameString . nameOccName) nm
+make_id _is_var nm = (occNameString . nameOccName) nm
 
 {-	SIMON thinks this stuff isn't necessary
 make_id is_var nm = 
