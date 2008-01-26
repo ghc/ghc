@@ -3,7 +3,7 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -392,6 +392,7 @@ splitInHalf list = (left, right)
 mkGenericLocal :: US -> RdrName
 mkGenericLocal u = mkVarUnqual (mkFastString ("g" ++ show u))
 
+mkGenericNames :: TyCon -> (RdrName, RdrName)
 mkGenericNames tycon
   = (from_RDR, to_RDR)
   where
@@ -532,6 +533,7 @@ bimapTyCon tycon arg_eps
 
 -------------------
 -- bimapArrow :: [EP a a', EP b b'] -> EP (a->b) (a'->b')
+bimapArrow :: [EP (LHsExpr RdrName)] -> EP (LHsExpr RdrName)
 bimapArrow [ep1, ep2]
   = EP { fromEP = mkHsLam [nlVarPat a_RDR, nlVarPat b_RDR] from_body, 
 	 toEP   = mkHsLam [nlVarPat a_RDR, nlVarPat b_RDR] to_body }
@@ -541,6 +543,7 @@ bimapArrow [ep1, ep2]
 
 -------------------
 -- bimapTuple :: [EP a1 b1, ... EP an bn] -> EP (a1,...an) (b1,..bn)
+bimapTuple :: [EP (LHsExpr RdrName)] -> EP (LHsExpr RdrName)
 bimapTuple eps 
   = EP { fromEP = mkHsLam [noLoc tuple_pat] (noLoc from_body),
 	 toEP   = mkHsLam [noLoc tuple_pat] (noLoc to_body) }
@@ -553,13 +556,17 @@ bimapTuple eps
 
 -------------------
 -- bimapList :: EP a b -> EP [a] [b]
+bimapList :: [EP (LHsExpr RdrName)] -> EP (LHsExpr RdrName)
 bimapList [ep]
   = EP { fromEP = nlHsApp (nlHsVar map_RDR) (fromEP ep),
 	 toEP   = nlHsApp (nlHsVar map_RDR) (toEP ep) }
 
 -------------------
+a_RDR, b_RDR :: RdrName
 a_RDR	= mkVarUnqual FSLIT("a")
 b_RDR	= mkVarUnqual FSLIT("b")
+
+gs_RDR :: [RdrName]
 gs_RDR	= [ mkVarUnqual (mkFastString ("g"++show i)) | i <- [(1::Int) .. ] ]
 
 idEP :: EP (LHsExpr RdrName)
