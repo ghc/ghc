@@ -5,7 +5,7 @@
 \section[Literal]{@Literal@: Machine literals (unboxed, of course)}
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -230,7 +230,7 @@ isZeroLit (MachWord   0) = True
 isZeroLit (MachWord64 0) = True
 isZeroLit (MachFloat  0) = True
 isZeroLit (MachDouble 0) = True
-isZeroLit other		 = False
+isZeroLit _              = False
 \end{code}
 
 	Coercions
@@ -283,14 +283,14 @@ litIsTrivial :: Literal -> Bool
 --	c.f. CoreUtils.exprIsTrivial
 -- False principally of strings
 litIsTrivial (MachStr _) = False
-litIsTrivial other	 = True
+litIsTrivial _           = True
 
 litIsDupable :: Literal -> Bool
 -- True if code space does not go bad if we duplicate this literal
 --	c.f. CoreUtils.exprIsDupable
 -- Currently we treat it just like litIsTrivial
 litIsDupable (MachStr _) = False
-litIsDupable other	 = True
+litIsDupable _           = True
 
 litFitsInChar :: Literal -> Bool
 litFitsInChar (MachInt i)
@@ -329,6 +329,7 @@ literalType (MachLabel _ _) = addrPrimTy
 	Comparison
 	~~~~~~~~~~
 \begin{code}
+cmpLit :: Literal -> Literal -> Ordering
 cmpLit (MachChar      a)   (MachChar	   b)   = a `compare` b
 cmpLit (MachStr       a)   (MachStr	   b)   = a `compare` b
 cmpLit (MachNullAddr)      (MachNullAddr)       = EQ
@@ -342,6 +343,7 @@ cmpLit (MachLabel     a _) (MachLabel      b _) = a `compare` b
 cmpLit lit1		   lit2		        | litTag lit1 <# litTag lit2 = LT
 					        | otherwise  		     = GT
 
+litTag :: Literal -> FastInt
 litTag (MachChar      _)   = _ILIT(1)
 litTag (MachStr       _)   = _ILIT(2)
 litTag (MachNullAddr)      = _ILIT(3)
@@ -360,6 +362,7 @@ litTag (MachLabel   _ _)   = _ILIT(10)
   exceptions: MachFloat gets an initial keyword prefix.
 
 \begin{code}
+pprLit :: Literal -> SDoc
 pprLit (MachChar ch)  	= pprHsChar ch
 pprLit (MachStr s)    	= pprHsString s
 pprLit (MachInt i)    	= pprIntVal i
