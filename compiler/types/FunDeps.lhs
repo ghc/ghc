@@ -8,13 +8,6 @@ FunDeps - functional dependencies
 It's better to read it as: "if we know these, then we're going to know these"
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module FunDeps (
  	Equation, pprEquation,
 	oclose, grow, improveOne,
@@ -204,6 +197,7 @@ type Equation = (TyVarSet, [(Type, Type)])
 -- We usually act on an equation by instantiating the quantified type varaibles
 -- to fresh type variables, and then calling the standard unifier.
 
+pprEquation :: Equation -> SDoc
 pprEquation (qtvs, pairs) 
   = vcat [ptext SLIT("forall") <+> braces (pprWithCommas ppr (varSetElems qtvs)),
 	  nest 2 (vcat [ ppr t1 <+> ptext SLIT(":=:") <+> ppr t2 | (t1,t2) <- pairs])]
@@ -250,7 +244,7 @@ improveOne :: (Class -> [Instance])		-- Gives instances for given class
 						-- combined (for error messages)
 -- Just do improvement triggered by a single, distinguised predicate
 
-improveOne inst_env pred@(IParam ip ty, _) preds
+improveOne _inst_env pred@(IParam ip ty, _) preds
   = [ ((emptyVarSet, [(ty,ty2)]), pred, p2) 
     | p2@(IParam ip2 ty2, _) <- preds
     , ip==ip2
@@ -301,7 +295,7 @@ improveOne inst_env pred@(ClassP cls tys, _) preds
 			<+> ppr (getSrcLoc ispec))
 	]
 
-improveOne inst_env eq_pred preds
+improveOne _ _ _
   = []
 
 
