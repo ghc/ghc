@@ -4,7 +4,7 @@
 \section[CostCentre]{The @CostCentre@ data type}
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -162,6 +162,7 @@ being moved across module boundaries.
 SIMON: Maybe later...
 
 \begin{code}
+noCCS, subsumedCCS, currentCCS, overheadCCS, dontCareCCS :: CostCentreStack
 
 noCCS 			= NoCCS
 subsumedCCS 		= SubsumedCCS
@@ -169,35 +170,44 @@ currentCCS	 	= CurrentCCS
 overheadCCS	 	= OverheadCCS
 dontCareCCS	 	= DontCareCCS
 
+noCostCentre :: CostCentre
 noCostCentre  		= NoCostCentre
 \end{code}
 
 Predicates on Cost-Centre Stacks
 
 \begin{code}
+noCCSAttached :: CostCentreStack -> Bool
 noCCSAttached NoCCS			= True
 noCCSAttached _				= False
 
+noCCAttached :: CostCentre -> Bool
 noCCAttached NoCostCentre		= True
 noCCAttached _				= False
 
+isCurrentCCS :: CostCentreStack -> Bool
 isCurrentCCS CurrentCCS			= True
 isCurrentCCS _	      			= False
 
+isSubsumedCCS :: CostCentreStack -> Bool
 isSubsumedCCS SubsumedCCS 		= True
 isSubsumedCCS _		     		= False
 
+isCafCCS :: CostCentreStack -> Bool
 isCafCCS (PushCC cc NoCCS)		= isCafCC cc
 isCafCCS _				= False
 
+isDerivedFromCurrentCCS :: CostCentreStack -> Bool
 isDerivedFromCurrentCCS CurrentCCS	= True
 isDerivedFromCurrentCCS (PushCC _ ccs)	= isDerivedFromCurrentCCS ccs
 isDerivedFromCurrentCCS _		= False
 
+currentOrSubsumedCCS :: CostCentreStack -> Bool
 currentOrSubsumedCCS SubsumedCCS	= True
 currentOrSubsumedCCS CurrentCCS		= True
 currentOrSubsumedCCS _			= False
 
+maybeSingletonCCS :: CostCentreStack -> Maybe CostCentre
 maybeSingletonCCS (PushCC cc NoCCS)	= Just cc
 maybeSingletonCCS _			= Nothing
 \end{code}
@@ -224,6 +234,7 @@ mkAutoCC id mod is_caf
         str | isSystemName name = mkFastString (showSDoc (ppr name))
             | otherwise         = occNameFS (getOccName id)
 
+mkAllCafsCC :: Module -> CostCentre
 mkAllCafsCC m = AllCafsCC  { cc_mod = m }
 
 
@@ -234,6 +245,7 @@ mkSingletonCCS cc = pushCCOnCCS cc NoCCS
 pushCCOnCCS :: CostCentre -> CostCentreStack -> CostCentreStack
 pushCCOnCCS = PushCC
 
+dupifyCC :: CostCentre -> CostCentre
 dupifyCC cc = cc {cc_is_dupd = DupdCC}
 
 isCafCC, isDupdCC :: CostCentre -> Bool
@@ -295,6 +307,8 @@ cmpCostCentre other_1 other_2
     tag_CC (NormalCC   {}) = _ILIT(1)
     tag_CC (AllCafsCC  {}) = _ILIT(2)
 
+-- TODO: swap order of IsCafCC, add deriving Ord
+cmp_caf :: IsCafCC -> IsCafCC -> Ordering
 cmp_caf NotCafCC CafCC     = LT
 cmp_caf NotCafCC NotCafCC  = EQ
 cmp_caf CafCC    CafCC     = EQ
@@ -352,6 +366,7 @@ instance Outputable CostCentre where
 	   else text (costCentreUserName cc)
 
 -- Printing in an interface file or in Core generally
+pprCostCentreCore :: CostCentre -> SDoc
 pprCostCentreCore (AllCafsCC {cc_mod = m})
   = text "__sccC" <+> braces (ppr m)
 pprCostCentreCore (NormalCC {cc_name = n, cc_mod = m,
@@ -363,13 +378,16 @@ pprCostCentreCore (NormalCC {cc_name = n, cc_mod = m,
 	pp_caf caf
     ])
 
+pp_dup :: IsDupdCC -> SDoc
 pp_dup DupdCC = char '!'
-pp_dup other   = empty
+pp_dup _      = empty
 
+pp_caf :: IsCafCC -> SDoc
 pp_caf CafCC = text "__C"
-pp_caf other   = empty
+pp_caf _     = empty
 
 -- Printing as a C label
+ppCostCentreLbl :: CostCentre -> SDoc
 ppCostCentreLbl (NoCostCentre)		  = text "NONE_cc"
 ppCostCentreLbl (AllCafsCC  {cc_mod = m}) = ppr m <> text "_CAFs_cc"
 ppCostCentreLbl (NormalCC {cc_name = n, cc_mod = m, cc_is_caf = is_caf}) 
@@ -378,8 +396,9 @@ ppCostCentreLbl (NormalCC {cc_name = n, cc_mod = m, cc_is_caf = is_caf})
 
 -- This is the name to go in the user-displayed string, 
 -- recorded in the cost centre declaration
+costCentreUserName :: CostCentre -> String
 costCentreUserName (NoCostCentre)  = "NO_CC"
 costCentreUserName (AllCafsCC {})  = "CAF"
-costCentreUserName cc@(NormalCC {cc_name = name, cc_is_caf = is_caf})
+costCentreUserName (NormalCC {cc_name = name, cc_is_caf = is_caf})
   =  case is_caf of { CafCC -> "CAF:";   _ -> "" } ++ unpackFS name
 \end{code}
