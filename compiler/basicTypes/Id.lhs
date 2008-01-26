@@ -5,13 +5,6 @@
 \section[Id]{@Ids@: Value and constructor identifiers}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Id (
 	Id, DictId,
 
@@ -104,6 +97,9 @@ import DataCon
 import NewDemand
 import Name
 import Module
+import Class
+import PrimOp
+import ForeignCall
 import OccName
 import Maybes
 import SrcLoc
@@ -223,50 +219,62 @@ idPrimRep id = typePrimRep (idType id)
 recordSelectorFieldLabel :: Id -> (TyCon, FieldLabel)
 recordSelectorFieldLabel id
   = case globalIdDetails id of
-	RecordSelId { sel_tycon = tycon, sel_label = lbl } -> (tycon,lbl)
-	other -> panic "recordSelectorFieldLabel"
+        RecordSelId { sel_tycon = tycon, sel_label = lbl } -> (tycon,lbl)
+        _ -> panic "recordSelectorFieldLabel"
+
+isRecordSelector        :: Var -> Bool
+isNaughtyRecordSelector :: Var -> Bool
+isPrimOpId              :: Var -> Bool
+isFCallId               :: Var -> Bool
+isDataConWorkId         :: Var -> Bool
+hasNoBinding            :: Var -> Bool
+
+isClassOpId_maybe       :: Var -> Maybe Class
+isPrimOpId_maybe        :: Var -> Maybe PrimOp
+isFCallId_maybe         :: Var -> Maybe ForeignCall
+isDataConWorkId_maybe   :: Var -> Maybe DataCon
 
 isRecordSelector id = case globalIdDetails id of
-			RecordSelId {}  -> True
-			other	  	-> False
+                        RecordSelId {}  -> True
+                        _               -> False
 
 isNaughtyRecordSelector id = case globalIdDetails id of
-			RecordSelId { sel_naughty = n } -> n
-			other	  	  	        -> False
+                        RecordSelId { sel_naughty = n } -> n
+                        _                               -> False
 
 isClassOpId_maybe id = case globalIdDetails id of
 			ClassOpId cls -> Just cls
 			_other        -> Nothing
 
 isPrimOpId id = case globalIdDetails id of
-		    PrimOpId op -> True
-		    other	-> False
+                        PrimOpId _ -> True
+                        _          -> False
 
 isPrimOpId_maybe id = case globalIdDetails id of
-			    PrimOpId op -> Just op
-			    other	-> Nothing
+                        PrimOpId op -> Just op
+                        _           -> Nothing
 
 isFCallId id = case globalIdDetails id of
-		    FCallId call -> True
-		    other	 -> False
+                        FCallId _ -> True
+                        _         -> False
 
 isFCallId_maybe id = case globalIdDetails id of
-			    FCallId call -> Just call
-			    other	 -> Nothing
+                        FCallId call -> Just call
+                        _            -> Nothing
 
 isDataConWorkId id = case globalIdDetails id of
-			DataConWorkId _ -> True
-			other	        -> False
+                        DataConWorkId _ -> True
+                        _               -> False
 
 isDataConWorkId_maybe id = case globalIdDetails id of
-			  DataConWorkId con -> Just con
-			  other	            -> Nothing
+                        DataConWorkId con -> Just con
+                        _                 -> Nothing
 
 isDataConId_maybe :: Id -> Maybe DataCon
 isDataConId_maybe id = case globalIdDetails id of
-		 	 DataConWorkId con -> Just con
-			 DataConWrapId con -> Just con
-			 other		    -> Nothing
+                         DataConWorkId con -> Just con
+                         DataConWrapId con -> Just con
+                         _                 -> Nothing
 
 idDataCon :: Id -> DataCon
 -- Get from either the worker or the wrapper to the DataCon
@@ -274,9 +282,9 @@ idDataCon :: Id -> DataCon
 --	 INVARIANT: idDataCon (dataConWrapId d) = d
 -- (Remember, dataConWrapId can return either the wrapper or the worker.)
 idDataCon id = case globalIdDetails id of
-		  DataConWorkId con -> con
-		  DataConWrapId con -> con
-		  other		    -> pprPanic "idDataCon" (ppr id)
+                  DataConWorkId con -> con
+                  DataConWrapId con -> con
+                  _                 -> pprPanic "idDataCon" (ppr id)
 
 
 isDictId :: Id -> Bool
@@ -292,7 +300,7 @@ hasNoBinding id = case globalIdDetails id of
 			PrimOpId _  	 -> True	-- See Note [Primop wrappers]
 			FCallId _   	 -> True
 			DataConWorkId dc -> isUnboxedTupleCon dc
-			other	         -> False
+			_                -> False
 
 isImplicitId :: Id -> Bool
 	-- isImplicitId tells whether an Id's info is implied by other
@@ -310,7 +318,7 @@ isImplicitId id
 		-- remember that all type and class decls appear in the interface file.
 		-- The dfun id is not an implicit Id; it must *not* be omitted, because 
 		-- it carries version info for the instance decl
-	other		-> False
+        _               -> False
 
 idIsFrom :: Module -> Id -> Bool
 idIsFrom mod id = nameIsLocalOrFrom mod (idName id)
@@ -341,7 +349,7 @@ isDeadBinder bndr | isId bndr = isDeadOcc (idOccInfo bndr)
 isTickBoxOp :: Id -> Bool
 isTickBoxOp id = 
   case globalIdDetails id of
-    TickBoxOpId tick -> True
+    TickBoxOpId _    -> True
     _                -> False
 
 isTickBoxOp_maybe :: Id -> Maybe TickBoxOp
@@ -524,7 +532,7 @@ isStateHackType ty
   | otherwise
   = case splitTyConApp_maybe ty of
 	Just (tycon,_) -> tycon == statePrimTyCon
-        other          -> False
+        _              -> False
 	-- This is a gross hack.  It claims that 
 	-- every function over realWorldStatePrimTy is a one-shot
 	-- function.  This is pretty true in practice, and makes a big
@@ -570,6 +578,7 @@ zapInfo zapper id = maybeModifyIdInfo (zapper (idInfo id)) id
 zapLamIdInfo :: Id -> Id
 zapLamIdInfo = zapInfo zapLamInfo
 
+zapDemandIdInfo :: Id -> Id
 zapDemandIdInfo = zapInfo zapDemandInfo
 
 zapFragileIdInfo :: Id -> Id
