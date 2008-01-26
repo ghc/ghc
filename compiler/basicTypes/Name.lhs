@@ -5,13 +5,6 @@
 \section[Name]{@Name@: to transmit name info from renamer to typechecker}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Name (
 	-- Re-export the OccName stuff
 	module OccName,
@@ -151,25 +144,27 @@ isSystemName	  :: Name -> Bool
 isWiredInName	  :: Name -> Bool
 
 isWiredInName (Name {n_sort = WiredIn _ _ _}) = True
-isWiredInName other			      = False
+isWiredInName _                               = False
 
 wiredInNameTyThing_maybe :: Name -> Maybe TyThing
 wiredInNameTyThing_maybe (Name {n_sort = WiredIn _ thing _}) = Just thing
-wiredInNameTyThing_maybe other				     = Nothing
+wiredInNameTyThing_maybe _                                   = Nothing
 
+isBuiltInSyntax :: Name -> Bool
 isBuiltInSyntax (Name {n_sort = WiredIn _ _ BuiltInSyntax}) = True
-isBuiltInSyntax other			 	            = False
+isBuiltInSyntax _                                           = False
 
 isExternalName (Name {n_sort = External _})    = True
 isExternalName (Name {n_sort = WiredIn _ _ _}) = True
-isExternalName other                           = False
+isExternalName _                               = False
 
 isInternalName name = not (isExternalName name)
 
 nameModule name = nameModule_maybe name `orElse` pprPanic "nameModule" (ppr name)
+nameModule_maybe :: Name -> Maybe Module
 nameModule_maybe (Name { n_sort = External mod})    = Just mod
 nameModule_maybe (Name { n_sort = WiredIn mod _ _}) = Just mod
-nameModule_maybe name				    = Nothing
+nameModule_maybe _                                  = Nothing
 
 nameIsLocalOrFrom from name
   | isExternalName name = from == nameModule name
@@ -182,7 +177,7 @@ isTyConName :: Name -> Bool
 isTyConName name = isTcOcc (nameOccName name)
 
 isSystemName (Name {n_sort = System}) = True
-isSystemName other		      = False
+isSystemName _                        = False
 \end{code}
 
 
@@ -285,6 +280,7 @@ hashName name = getKey (nameUnique name) + 1
 %************************************************************************
 
 \begin{code}
+cmpName :: Name -> Name -> Ordering
 cmpName n1 n2 = iBox (n_uniq n1) `compare` iBox (n_uniq n2)
 \end{code}
 
@@ -348,7 +344,8 @@ instance Outputable Name where
 instance OutputableBndr Name where
     pprBndr _ name = pprName name
 
-pprName name@(Name {n_sort = sort, n_uniq = u, n_occ = occ})
+pprName :: Name -> SDoc
+pprName (Name {n_sort = sort, n_uniq = u, n_occ = occ})
   = getPprStyle $ \ sty ->
     case sort of
       WiredIn mod _ builtin   -> pprExternal sty uniq mod occ True  builtin
@@ -357,6 +354,7 @@ pprName name@(Name {n_sort = sort, n_uniq = u, n_occ = occ})
       Internal    	      -> pprInternal sty uniq occ
   where uniq = mkUniqueGrimily (iBox u)
 
+pprExternal :: PprStyle -> Unique -> Module -> OccName -> Bool -> BuiltInSyntax -> SDoc
 pprExternal sty uniq mod occ is_wired is_builtin
   | codeStyle sty        = ppr mod <> char '_' <> ppr_z_occ_name occ
 	-- In code style, always qualify
@@ -376,6 +374,7 @@ pprExternal sty uniq mod occ is_wired is_builtin
   | otherwise		          = ppr_occ_name occ
   where qual_name = qualName sty mod occ
 
+pprInternal :: PprStyle -> Unique -> OccName -> SDoc
 pprInternal sty uniq occ
   | codeStyle sty  = pprUnique uniq
   | debugStyle sty = ppr_occ_name occ <> braces (hsep [pprNameSpaceBrief (occNameSpace occ), 
@@ -386,6 +385,7 @@ pprInternal sty uniq occ
   | otherwise      = ppr_occ_name occ	-- User style
 
 -- Like Internal, except that we only omit the unique in Iface style
+pprSystem :: PprStyle -> Unique -> OccName -> SDoc
 pprSystem sty uniq occ
   | codeStyle sty  = pprUnique uniq
   | debugStyle sty = ppr_occ_name occ <> char '_' <> pprUnique uniq
@@ -395,12 +395,14 @@ pprSystem sty uniq occ
 				-- is unlikely to be informative (like 's'),
 				-- so print the unique
 
+ppr_occ_name :: OccName -> SDoc
 ppr_occ_name occ = ftext (occNameFS occ)
 	-- Don't use pprOccName; instead, just print the string of the OccName; 
 	-- we print the namespace in the debug stuff above
 
 -- In code style, we Z-encode the strings.  The results of Z-encoding each FastString are
 -- cached behind the scenes in the FastString implementation.
+ppr_z_occ_name :: OccName -> SDoc
 ppr_z_occ_name occ = ftext (zEncodeFS (occNameFS occ))
 
 -- Prints (if mod information is available) "Defined at <loc>" or 
