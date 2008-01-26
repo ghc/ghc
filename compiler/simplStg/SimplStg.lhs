@@ -4,15 +4,10 @@
 \section[SimplStg]{Driver for simplifying @STG@ programs}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module SimplStg ( stg2stg ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import StgSyn
@@ -63,7 +58,7 @@ stg2stg dflags module_name binds
   where
     stg_linter = if dopt Opt_DoStgLinting dflags
 		 then lintStgBindings
-		 else ( \ whodunnit binds -> binds )
+		 else ( \ _whodunnit binds -> binds )
 
     -------------------------------------------
     do_stg_pass (binds, us, ccs) to_do
@@ -96,7 +91,8 @@ stg2stg dflags module_name binds
 	    --	       add to description of what's happened (reverse order)
 
 -- here so it can be inlined...
-foldl_mn f z []     = return z
+foldl_mn :: (b -> a -> IO b) -> b -> [a] -> IO b
+foldl_mn _ z []     = return z
 foldl_mn f z (x:xs) = f z x	>>= \ zz ->
 		     foldl_mn f zz xs
 \end{code}
