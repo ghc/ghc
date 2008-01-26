@@ -4,13 +4,6 @@
 \section{Common subexpression}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module CSE (
 	cseProgram
     ) where
@@ -194,7 +187,7 @@ cseProgram dflags binds
     }
 
 cseBinds :: CSEnv -> [CoreBind] -> [CoreBind]
-cseBinds env []     = []
+cseBinds _   []     = []
 cseBinds env (b:bs) = (b':bs')
 		    where
 		      (env1, b') = cseBind  env  b
@@ -207,6 +200,7 @@ cseBind env (Rec pairs)  = let (env', pairs') = mapAccumL do_one env pairs
 			   in (env', Rec pairs')
 			 
 
+do_one :: CSEnv -> (Id, CoreExpr) -> (CSEnv, (Id, CoreExpr))
 do_one env (id, rhs) 
   = case lookupCSEnv env rhs' of
 	Just (Var other_id) -> (extendSubst env' id other_id, 	  (id', Var other_id))
@@ -219,7 +213,7 @@ do_one env (id, rhs)
 		-- See Note [CSE for INLINE and NOINLINE]
 
 tryForCSE :: CSEnv -> CoreExpr -> CoreExpr
-tryForCSE env (Type t) = Type t
+tryForCSE _   (Type t) = Type t
 tryForCSE env expr     = case lookupCSEnv env expr' of
 			    Just smaller_expr -> smaller_expr
  			    Nothing  	      -> expr'
@@ -227,11 +221,11 @@ tryForCSE env expr     = case lookupCSEnv env expr' of
 	 	         expr' = cseExpr env expr
 
 cseExpr :: CSEnv -> CoreExpr -> CoreExpr
-cseExpr env (Type t)		   = Type t
-cseExpr env (Lit lit)		   = Lit lit
+cseExpr _   (Type t)               = Type t
+cseExpr _   (Lit lit)              = Lit lit
 cseExpr env (Var v)		   = Var (lookupSubst env v)
 cseExpr env (App f a)        	   = App (cseExpr env f) (tryForCSE env a)
-cseExpr env (Note InlineMe e)	   = Note InlineMe e	-- See Note [CSE for INLINE and NOINLINE]
+cseExpr _   (Note InlineMe e)      = Note InlineMe e    -- See Note [CSE for INLINE and NOINLINE]
 cseExpr env (Note n e)       	   = Note n (cseExpr env e)
 cseExpr env (Cast e co)            = Cast (cseExpr env e) co
 cseExpr env (Lam b e)	     	   = let (env', b') = addBinder env b
@@ -244,7 +238,9 @@ cseExpr env (Case scrut bndr ty alts) = Case scrut' bndr' ty (cseAlts env' scrut
 				     (env', bndr') = addBinder env bndr
 
 
-cseAlts env scrut' bndr bndr' [(DataAlt con, args, rhs)]
+cseAlts :: CSEnv -> CoreExpr -> CoreBndr -> CoreBndr -> [CoreAlt] -> [CoreAlt]
+
+cseAlts env scrut' bndr _bndr' [(DataAlt con, args, rhs)]
   | isUnboxedTupleCon con
 	-- Unboxed tuples are special because the case binder isn't
 	-- a real values.  See [Note: unboxed tuple case binders]
@@ -263,7 +259,7 @@ cseAlts env scrut' bndr bndr' alts
 		Var v' -> (v',    extendSubst env bndr v')	-- See [Note: case binder 1]
 								-- map: bndr -> v'
 
-		other ->  (bndr', extendCSEnv env scrut' (Var  bndr'))	-- See [Note: case binder 2]
+		_      ->  (bndr', extendCSEnv env scrut' (Var  bndr'))	-- See [Note: case binder 2]
 									-- map: scrut' -> bndr'
 
     arg_tys = tyConAppArgs (idType bndr)
@@ -303,6 +299,7 @@ type CSEMap = UniqFM [(CoreExpr, CoreExpr)]	-- This is the reverse mapping
 	-- This means that it's good to replace e by e'
 	-- INVARIANT: The expr in the range has already been CSE'd
 
+emptyCSEnv :: CSEnv
 emptyCSEnv = CS emptyUFM emptyInScopeSet emptyVarEnv
 
 lookupCSEnv :: CSEnv -> CoreExpr -> Maybe CoreExpr
@@ -312,15 +309,17 @@ lookupCSEnv (CS cs _ _) expr
 	Just pairs -> lookup_list pairs expr
 
 lookup_list :: [(CoreExpr,CoreExpr)] -> CoreExpr -> Maybe CoreExpr
-lookup_list [] expr = Nothing
+lookup_list [] _ = Nothing
 lookup_list ((e,e'):es) expr | cheapEqExpr e expr = Just e'
 			     | otherwise	  = lookup_list es expr
 
+addCSEnvItem :: CSEnv -> CoreExpr -> CoreExpr -> CSEnv
 addCSEnvItem env expr expr' | exprIsBig expr = env
 			    | otherwise      = extendCSEnv env expr expr'
    -- We don't try to CSE big expressions, because they are expensive to compare
    -- (and are unlikely to be the same anyway)
 
+extendCSEnv :: CSEnv -> CoreExpr -> CoreExpr -> CSEnv
 extendCSEnv (CS cs in_scope sub) expr expr'
   = CS (addToUFM_C combine cs hash [(expr, expr')]) in_scope sub
   where
@@ -333,14 +332,16 @@ extendCSEnv (CS cs in_scope sub) expr expr'
 	  long_msg | opt_PprStyle_Debug = (text "hash code" <+> text (show hash)) $$ ppr result 
 		   | otherwise	        = empty
 
+lookupSubst :: CSEnv -> Id -> Id
 lookupSubst (CS _ _ sub) x = case lookupVarEnv sub x of
 			       Just y  -> y
 			       Nothing -> x
 
+extendSubst :: CSEnv -> Id  -> Id -> CSEnv
 extendSubst (CS cs in_scope sub) x y = CS cs in_scope (extendVarEnv sub x y)
 
 addBinder :: CSEnv -> Id -> (CSEnv, Id)
-addBinder env@(CS cs in_scope sub) v
+addBinder (CS cs in_scope sub) v
   | not (v `elemInScopeSet` in_scope) = (CS cs (extendInScopeSet in_scope v)  sub,		       v)
   | isId v			      = (CS cs (extendInScopeSet in_scope v') (extendVarEnv sub v v'), v')
   | otherwise			      = WARN( True, ppr v )
