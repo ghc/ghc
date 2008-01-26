@@ -4,13 +4,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module RdrName (
 	RdrName(..),	-- Constructors exported only to BinIface
 
@@ -161,34 +154,46 @@ nukeExact n
 \end{code}
 
 \begin{code}
+isRdrDataCon :: RdrName -> Bool
+isRdrTyVar   :: RdrName -> Bool
+isRdrTc      :: RdrName -> Bool
+
 isRdrDataCon rn = isDataOcc (rdrNameOcc rn)
 isRdrTyVar   rn = isTvOcc   (rdrNameOcc rn)
 isRdrTc      rn = isTcOcc   (rdrNameOcc rn)
 
+isSrcRdrName :: RdrName -> Bool
 isSrcRdrName (Unqual _) = True
 isSrcRdrName (Qual _ _) = True
 isSrcRdrName _		= False
 
+isUnqual :: RdrName -> Bool
 isUnqual (Unqual _) = True
-isUnqual other	    = False
+isUnqual _          = False
 
+isQual :: RdrName -> Bool
 isQual (Qual _ _) = True
 isQual _	  = False
 
+isQual_maybe :: RdrName -> Maybe (ModuleName, OccName)
 isQual_maybe (Qual m n) = Just (m,n)
 isQual_maybe _	        = Nothing
 
+isOrig :: RdrName -> Bool
 isOrig (Orig _ _) = True
 isOrig _	  = False
 
+isOrig_maybe :: RdrName -> Maybe (Module, OccName)
 isOrig_maybe (Orig m n) = Just (m,n)
 isOrig_maybe _		= Nothing
 
+isExact :: RdrName -> Bool
 isExact (Exact _) = True
-isExact other	= False
+isExact _         = False
 
+isExact_maybe :: RdrName -> Maybe Name
 isExact_maybe (Exact n) = Just n
-isExact_maybe other	= Nothing
+isExact_maybe _         = Nothing
 \end{code}
 
 
@@ -219,7 +224,7 @@ instance Eq RdrName where
     (Orig m1 o1)  == (Orig m2 o2)  = m1==m2 && o1==o2
     (Qual m1 o1)  == (Qual m2 o2)  = m1==m2 && o1==o2
     (Unqual o1)   == (Unqual o2)   = o1==o2
-    r1 == r2 = False
+    _             == _             = False
 
 instance Ord RdrName where
     a <= b = case (a `compare` b) of { LT -> True;  EQ -> True;  GT -> False }
@@ -236,7 +241,7 @@ instance Ord RdrName where
 	--	     <decl involving n1,n2> }
 	--	I think we can do without this conversion
     compare (Exact n1) (Exact n2) = n1 `compare` n2
-    compare (Exact n1) n2	  = LT
+    compare (Exact _)  _          = LT
 
     compare (Unqual _)   (Exact _)    = GT
     compare (Unqual o1)  (Unqual  o2) = o1 `compare` o2
@@ -265,6 +270,7 @@ It is keyed by OccName, because we never use it for qualified names.
 \begin{code}
 type LocalRdrEnv = OccEnv Name
 
+emptyLocalRdrEnv :: LocalRdrEnv
 emptyLocalRdrEnv = emptyOccEnv
 
 extendLocalRdrEnv :: LocalRdrEnv -> [Name] -> LocalRdrEnv
@@ -272,9 +278,9 @@ extendLocalRdrEnv env names
   = extendOccEnvList env [(nameOccName n, n) | n <- names]
 
 lookupLocalRdrEnv :: LocalRdrEnv -> RdrName -> Maybe Name
-lookupLocalRdrEnv env (Exact name) = Just name
+lookupLocalRdrEnv _   (Exact name) = Just name
 lookupLocalRdrEnv env (Unqual occ) = lookupOccEnv env occ
-lookupLocalRdrEnv env other	   = Nothing
+lookupLocalRdrEnv _   _            = Nothing
 
 lookupLocalRdrOcc :: LocalRdrEnv -> OccName -> Maybe Name
 lookupLocalRdrOcc env occ = lookupOccEnv env occ
@@ -336,6 +342,7 @@ plusParent (ParentIs n) rel =
   ParentIs n
  -}
 
+emptyGlobalRdrEnv :: GlobalRdrEnv
 emptyGlobalRdrEnv = emptyOccEnv
 
 globalRdrEnvElts :: GlobalRdrEnv -> [GlobalRdrElt]
@@ -430,7 +437,7 @@ pickGREs rdr_name gres
 
 isLocalGRE :: GlobalRdrElt -> Bool
 isLocalGRE (GRE {gre_prov = LocalDef}) = True
-isLocalGRE other    		       = False
+isLocalGRE _                           = False
 
 unQualOK :: GlobalRdrElt -> Bool
 -- An unqualifed version of this thing is in scope
@@ -595,9 +602,9 @@ plusProv :: Provenance -> Provenance -> Provenance
 -- defined, and one might refer to it with a qualified name from
 -- the import -- but I'm going to ignore that because it makes
 -- the isLocalGRE predicate so much nicer this way
-plusProv LocalDef 	 LocalDef        = panic "plusProv"
-plusProv LocalDef	 p2		 = LocalDef
-plusProv p1 		 LocalDef 	 = LocalDef
+plusProv LocalDef        LocalDef        = panic "plusProv"
+plusProv LocalDef        _               = LocalDef
+plusProv _               LocalDef        = LocalDef
 plusProv (Imported is1)  (Imported is2)  = Imported (is1++is2)
 
 pprNameProvenance :: GlobalRdrElt -> SDoc
@@ -606,11 +613,12 @@ pprNameProvenance (GRE {gre_name = name, gre_prov = LocalDef})
   = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
 pprNameProvenance (GRE {gre_name = name, gre_prov = Imported whys})
   = case whys of
-	(why:whys) -> sep [ppr why, nest 2 (ppr_defn (nameSrcLoc name))]
+	(why:_) -> sep [ppr why, nest 2 (ppr_defn (nameSrcLoc name))]
 	[] -> panic "pprNameProvenance"
 
 -- If we know the exact definition point (which we may do with GHCi)
 -- then show that too.  But not if it's just "imported from X".
+ppr_defn :: SrcLoc -> SDoc
 ppr_defn loc | isGoodSrcLoc loc = parens (ptext SLIT("defined at") <+> ppr loc)
 	     | otherwise	= empty
 
