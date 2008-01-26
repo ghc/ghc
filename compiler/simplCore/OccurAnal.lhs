@@ -11,17 +11,12 @@ The occurrence analyser re-typechecks a core expression, returning a new
 core expression with (hopefully) improved usage information.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module OccurAnal (
 	occurAnalysePgm, occurAnalyseExpr
     ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import CoreSyn
@@ -29,7 +24,7 @@ import CoreFVs
 import CoreUtils	( exprIsTrivial, isDefaultAlt )
 import Id
 import IdInfo
-import BasicTypes	( OccInfo(..), isOneOcc, InterestingCxt )
+import BasicTypes
 
 import VarSet
 import VarEnv
@@ -38,7 +33,7 @@ import Maybes		( orElse )
 import Digraph		( stronglyConnCompR, SCC(..) )
 import PrelNames	( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique		( Unique )
-import UniqFM		( keysUFM, intersectsUFM, intersectUFM_C, foldUFM_Directly )  
+import UniqFM		( keysUFM, intersectUFM_C, foldUFM_Directly )
 import Util		( mapAndUnzip )
 import Outputable
 
@@ -60,7 +55,7 @@ occurAnalysePgm binds
   = snd (go initOccEnv binds)
   where
     go :: OccEnv -> [CoreBind] -> (UsageDetails, [CoreBind])
-    go env [] 
+    go _ []
 	= (emptyDetails, [])
     go env (bind:binds) 
 	= (final_usage, bind' ++ binds')
@@ -346,7 +341,7 @@ occAnalBind env (Rec pairs) body_usage
 	| otherwise = Rec (concatMap reOrderRec (stronglyConnCompR loop_breaker_edges))
 	where	-- See Note [Choosing loop breakers] for looop_breker_edges
 	  loop_breaker_edges = map mk_node cycle
-	  mk_node (details@(bndr, rhs, rhs_fvs), k, _) = (details, k, new_ks)
+	  mk_node (details@(_bndr, _rhs, rhs_fvs), k, _) = (details, k, new_ks)
 		where
 		  new_ks = keysUFM (extendFvs rule_fv_env rhs_fvs rhs_fvs)
 
@@ -459,7 +454,7 @@ reOrderCycle (bind : binds)
 
 	-- This loop looks for the bind with the lowest score
 	-- to pick as the loop  breaker.  The rest accumulate in 
-    choose_loop_breaker (details,_,_) loop_sc acc []
+    choose_loop_breaker (details,_,_) _loop_sc acc []
 	= (details, acc)	-- Done
 
     choose_loop_breaker loop_bind loop_sc acc (bind : binds)
@@ -492,8 +487,8 @@ reOrderCycle (bind : binds)
 	| otherwise = 0
 
     inlineCandidate :: Id -> CoreExpr -> Bool
-    inlineCandidate id (Note InlineMe _) = True
-    inlineCandidate id rhs	         = isOneOcc (idOccInfo id)
+    inlineCandidate _  (Note InlineMe _) = True
+    inlineCandidate id _                 = isOneOcc (idOccInfo id)
 
         -- Note [conapp]
         --
@@ -521,9 +516,9 @@ reOrderCycle (bind : binds)
 	-- 	Note [Closure conversion]
     is_con_app (Var v)    = isDataConWorkId v
     is_con_app (App f _)  = is_con_app f
-    is_con_app (Lam b e)  = is_con_app e
+    is_con_app (Lam _ e)  = is_con_app e
     is_con_app (Note _ e) = is_con_app e
-    is_con_app other      = False
+    is_con_app _          = False
 
 makeLoopBreaker :: Bool -> Id -> Id
 -- Set the loop-breaker flag
@@ -613,7 +608,7 @@ occAnalRhs env id rhs
 
     certainly_inline id = case idOccInfo id of
 			    OneOcc in_lam one_br _ -> not in_lam && one_br
-			    other		   -> False
+			    _                      -> False
 \end{code}
 
 
@@ -637,7 +632,7 @@ occAnal :: OccEnv
 	-> (UsageDetails,	-- Gives info only about the "interesting" Ids
 	    CoreExpr)
 
-occAnal env (Type t)  = (emptyDetails, Type t)
+occAnal _   (Type t)  = (emptyDetails, Type t)
 occAnal env (Var v)   = (mkOneOcc env v False, Var v)
     -- At one stage, I gathered the idRuleVars for v here too,
     -- which in a way is the right thing to do.
@@ -663,7 +658,7 @@ If we aren't careful we duplicate the (expensive x) call!
 Constructors are rather like lambdas in this way.
 
 \begin{code}
-occAnal env expr@(Lit lit) = (emptyDetails, expr)
+occAnal _   expr@(Lit _) = (emptyDetails, expr)
 \end{code}
 
 \begin{code}
@@ -672,7 +667,7 @@ occAnal env (Note InlineMe body)
     (mapVarEnv markMany usage, Note InlineMe body')
     }
 
-occAnal env (Note note@(SCC cc) body)
+occAnal env (Note note@(SCC _) body)
   = case occAnal env body of { (usage, body') ->
     (mapVarEnv markInsideSCC usage, Note note body')
     }
@@ -692,14 +687,14 @@ occAnal env (Cast expr co)
 \end{code}
 
 \begin{code}
-occAnal env app@(App fun arg)
-  = occAnalApp env (collectArgs app) False
+occAnal env app@(App _ _)
+  = occAnalApp env (collectArgs app)
 
 -- Ignore type variables altogether
 --   (a) occurrences inside type lambdas only not marked as InsideLam
 --   (b) type variables not in environment
 
-occAnal env expr@(Lam x body) | isTyVar x
+occAnal env (Lam x body) | isTyVar x
   = case occAnal env body of { (body_usage, body') ->
     (body_usage, Lam x body')
     }
@@ -764,7 +759,7 @@ occAnal env (Case scrut bndr ty alts)
     occ_anal_scrut (Var v) (alt1 : other_alts)
 				| not (null other_alts) || not (isDefaultAlt alt1)
 			        = (mkOneOcc env v True, Var v)
-    occ_anal_scrut scrut alts   = occAnal vanillaCtxt scrut
+    occ_anal_scrut scrut _alts  = occAnal vanillaCtxt scrut
 					-- No need for rhsCtxt
 
 occAnal env (Let bind body)
@@ -772,7 +767,8 @@ occAnal env (Let bind body)
     case occAnalBind env bind body_usage of { (final_usage, new_binds) ->
        (final_usage, mkLets new_binds body') }}
 
-occAnalArgs env args
+occAnalArgs :: OccEnv -> [CoreExpr] -> (UsageDetails, [CoreExpr])
+occAnalArgs _env args
   = case mapAndUnzip (occAnal arg_env) args of	{ (arg_uds_s, args') ->
     (foldr (+++) emptyDetails arg_uds_s, args')}
   where
@@ -783,7 +779,10 @@ Applications are dealt with specially because we want
 the "build hack" to work.
 
 \begin{code}
-occAnalApp env (Var fun, args) is_rhs
+occAnalApp :: OccEnv
+           -> (Expr CoreBndr, [Arg CoreBndr])
+           -> (UsageDetails, Expr CoreBndr)
+occAnalApp env (Var fun, args)
   = case args_stuff of { (args_uds, args') ->
     let
         final_args_uds = markRhsUds env is_pap args_uds
@@ -808,7 +807,7 @@ occAnalApp env (Var fun, args) is_rhs
 		| otherwise = occAnalArgs env args
 
 
-occAnalApp env (fun, args) is_rhs
+occAnalApp env (fun, args)
   = case occAnal (addAppCtxt env args) fun of	{ (fun_uds, fun') ->
 	-- The addAppCtxt is a bit cunning.  One iteration of the simplifier
 	-- often leaves behind beta redexs like
@@ -849,7 +848,7 @@ appSpecial env n ctxt args
   where
     arg_env = vanillaCtxt
 
-    go n [] = (emptyDetails, [])	-- Too few args
+    go _ [] = (emptyDetails, [])	-- Too few args
 
     go 1 (arg:args)			-- The magic arg
       = case occAnal (setCtxt arg_env ctxt) arg of	{ (arg_uds, arg') ->
@@ -878,7 +877,11 @@ Note [Aug 06]: I don't think this is necessary any more, and it helpe
 	       isDeadBinder in Simplify.mkDupableAlt
 
 \begin{code}
-occAnalAlt env case_bndr (con, bndrs, rhs)
+occAnalAlt :: OccEnv
+           -> CoreBndr
+           -> CoreAlt
+           -> (UsageDetails, Alt IdWithOccInfo)
+occAnalAlt env _case_bndr (con, bndrs, rhs)
   = case occAnal env rhs of { (rhs_usage, rhs') ->
     let
         (final_usage, tagged_bndrs) = tagBinders rhs_usage bndrs
@@ -932,9 +935,13 @@ type CtxtTy = [Bool]
 initOccEnv :: OccEnv
 initOccEnv = OccEnv OccRhs []
 
+vanillaCtxt :: OccEnv
 vanillaCtxt = OccEnv OccVanilla []
+
+rhsCtxt :: OccEnv
 rhsCtxt     = OccEnv OccRhs     []
 
+isRhsEnv :: OccEnv -> Bool
 isRhsEnv (OccEnv OccRhs     _) = True
 isRhsEnv (OccEnv OccVanilla _) = False
 
@@ -951,10 +958,10 @@ oneShotGroup :: OccEnv -> [CoreBndr] -> [CoreBndr]
 	-- linearity context knows that c,n are one-shot, and it records that fact in
 	-- the binder. This is useful to guide subsequent float-in/float-out tranformations
 
-oneShotGroup (OccEnv encl ctxt) bndrs 
+oneShotGroup (OccEnv _encl ctxt) bndrs
   = go ctxt bndrs []
   where
-    go ctxt [] rev_bndrs = reverse rev_bndrs
+    go _ [] rev_bndrs = reverse rev_bndrs
 
     go (lin_ctxt:ctxt) (bndr:bndrs) rev_bndrs
 	| isId bndr = go ctxt bndrs (bndr':rev_bndrs)
@@ -964,6 +971,7 @@ oneShotGroup (OccEnv encl ctxt) bndrs
 
     go ctxt (bndr:bndrs) rev_bndrs = go ctxt bndrs (bndr:rev_bndrs)
 
+addAppCtxt :: OccEnv -> [Arg CoreBndr] -> OccEnv
 addAppCtxt (OccEnv encl ctxt) args 
   = OccEnv encl (replicate (valArgCount args) True ++ ctxt)
 \end{code}
@@ -991,6 +999,7 @@ addOneOcc usage id info
   = plusVarEnv_C addOccInfo usage (unitVarEnv id info)
 	-- ToDo: make this more efficient
 
+emptyDetails :: UsageDetails
 emptyDetails = (emptyVarEnv :: UsageDetails)
 
 usedIn :: Id -> UsageDetails -> Bool
@@ -1027,7 +1036,7 @@ setBinderOcc usage bndr
   | isTyVar bndr      = bndr
   | isExportedId bndr = case idOccInfo bndr of
 			  NoOccInfo -> bndr
-			  other     -> setIdOccInfo bndr NoOccInfo
+			  _         -> setIdOccInfo bndr NoOccInfo
   	    -- Don't use local usage info for visible-elsewhere things
 	    -- BUT *do* erase any IAmALoopBreaker annotation, because we're
 	    -- about to re-generate it and it shouldn't be "sticky"
@@ -1046,14 +1055,14 @@ setBinderOcc usage bndr
 
 \begin{code}
 mkOneOcc :: OccEnv -> Id -> InterestingCxt -> UsageDetails
-mkOneOcc env id int_cxt
+mkOneOcc _env id int_cxt
   | isLocalId id = unitVarEnv id (OneOcc False True int_cxt)
   | otherwise    = emptyDetails
 
 markMany, markInsideLam, markInsideSCC :: OccInfo -> OccInfo
 
 markMany IAmDead = IAmDead
-markMany other   = NoOccInfo
+markMany _       = NoOccInfo
 
 markInsideSCC occ = markMany occ
 
@@ -1064,17 +1073,17 @@ addOccInfo, orOccInfo :: OccInfo -> OccInfo -> OccInfo
 
 addOccInfo IAmDead info2       = info2
 addOccInfo info1 IAmDead       = info1
-addOccInfo info1 info2         = NoOccInfo
+addOccInfo _     _             = NoOccInfo
 
 -- (orOccInfo orig new) is used
 -- when combining occurrence info from branches of a case
 
 orOccInfo IAmDead info2 = info2
 orOccInfo info1 IAmDead = info1
-orOccInfo (OneOcc in_lam1 one_branch1 int_cxt1)
-	  (OneOcc in_lam2 one_branch2 int_cxt2)
+orOccInfo (OneOcc in_lam1 _ int_cxt1)
+	  (OneOcc in_lam2 _ int_cxt2)
   = OneOcc (in_lam1 || in_lam2)
 	   False	-- False, because it occurs in both branches
 	   (int_cxt1 && int_cxt2)
-orOccInfo info1 info2 = NoOccInfo
+orOccInfo _     _       = NoOccInfo
 \end{code}
