@@ -4,13 +4,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module OccName (
 	-- * The NameSpace type; abstact
 	NameSpace, tcName, clsName, tcClsName, dataName, varName, 
@@ -129,6 +122,9 @@ data NameSpace = VarName	-- Variables, including "real" data constructors
 -- The real   datacon has type Int -> Int -> T
 -- GHC chooses a representation based on the strictness etc.
 
+tcName, clsName, tcClsName :: NameSpace
+dataName, srcDataName      :: NameSpace
+tvName, varName            :: NameSpace
 
 -- Though type constructors and classes are in the same name space now,
 -- the NameSpace type is abstract, so we can easily separate them later
@@ -150,7 +146,7 @@ isTcClsName _	      = False
 isVarName :: NameSpace -> Bool	-- Variables or type variables, but not constructors
 isVarName TvName  = True
 isVarName VarName = True
-isVarName other   = False
+isVarName _       = False
 
 pprNameSpace :: NameSpace -> SDoc
 pprNameSpace DataName  = ptext SLIT("data constructor")
@@ -162,6 +158,7 @@ pprNonVarNameSpace :: NameSpace -> SDoc
 pprNonVarNameSpace VarName = empty
 pprNonVarNameSpace ns = pprNameSpace ns
 
+pprNameSpaceBrief :: NameSpace -> SDoc
 pprNameSpaceBrief DataName  = char 'd'
 pprNameSpaceBrief VarName   = char 'v'
 pprNameSpaceBrief TvName    = ptext SLIT("tv")
@@ -352,20 +349,20 @@ occNameString (OccName _ s) = unpackFS s
 setOccNameSpace :: NameSpace -> OccName -> OccName
 setOccNameSpace sp (OccName _ occ) = OccName sp occ
 
-isVarOcc, isTvOcc, isDataSymOcc, isSymOcc, isTcOcc :: OccName -> Bool
+isVarOcc, isTvOcc, isDataSymOcc, isSymOcc, isTcOcc, isValOcc, isDataOcc :: OccName -> Bool
 
 isVarOcc (OccName VarName _) = True
-isVarOcc other               = False
+isVarOcc _                   = False
 
 isTvOcc (OccName TvName _) = True
-isTvOcc other              = False
+isTvOcc _                  = False
 
 isTcOcc (OccName TcClsName _) = True
-isTcOcc other                 = False
+isTcOcc _                     = False
 
 isValOcc (OccName VarName  _) = True
 isValOcc (OccName DataName _) = True
-isValOcc other		      = False
+isValOcc _                    = False
 
 -- Data constructor operator (starts with ':', or '[]')
 -- Pretty inefficient!
@@ -373,13 +370,13 @@ isDataSymOcc (OccName DataName s) = isLexConSym s
 isDataSymOcc (OccName VarName s)  
   | isLexConSym s = pprPanic "isDataSymOcc: check me" (ppr s)
 		-- Jan06: I don't think this should happen
-isDataSymOcc other		  = False
+isDataSymOcc _                    = False
 
 isDataOcc (OccName DataName _) = True
 isDataOcc (OccName VarName s)  
   | isLexCon s = pprPanic "isDataOcc: check me" (ppr s)
 		-- Jan06: I don't think this should happen
-isDataOcc other		       = False
+isDataOcc _                    = False
 
 -- Any operator (data constructor or variable)
 -- Pretty inefficient!
@@ -449,7 +446,10 @@ mk_deriv occ_sp sys_prefix str = mkOccName occ_sp (sys_prefix ++ str)
 mkDataConWrapperOcc, mkWorkerOcc, mkDefaultMethodOcc, mkDerivedTyConOcc,
   	mkClassTyConOcc, mkClassDataConOcc, mkDictOcc, mkIPOcc, 
  	mkSpecOcc, mkForeignExportOcc, mkGenOcc1, mkGenOcc2,
-	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc
+	mkDataTOcc, mkDataCOcc, mkDataConWorkerOcc, mkNewTyCoOcc,
+	mkInstTyCoOcc, mkEqPredCoOcc,
+	mkVectOcc, mkVectTyConOcc, mkVectDataConOcc, mkVectIsoOcc,
+	mkPArrayTyConOcc, mkPArrayDataConOcc, mkPReprTyConOcc, mkPADFunOcc
    :: OccName -> OccName
 
 -- These derived variables have a prefix that no Haskell value could have
@@ -488,6 +488,7 @@ mkPArrayDataConOcc = mk_simple_deriv dataName ":VPD_"
 mkPReprTyConOcc    = mk_simple_deriv tcName   ":VR_"
 mkPADFunOcc        = mk_simple_deriv varName  "$PA_"
 
+mk_simple_deriv :: NameSpace -> String -> OccName -> OccName
 mk_simple_deriv sp px occ = mk_deriv sp px (occNameString occ)
 
 -- Data constructor workers are made by setting the name space
@@ -564,8 +565,8 @@ guys never show up in error messages.  What a hack.
 
 \begin{code}
 mkMethodOcc :: OccName -> OccName
-mkMethodOcc occ@(OccName VarName fs) = occ
-mkMethodOcc occ			     = mk_simple_deriv varName "$m" occ
+mkMethodOcc occ@(OccName VarName _) = occ
+mkMethodOcc occ                     = mk_simple_deriv varName "$m" occ
 \end{code}
 
 
@@ -590,6 +591,7 @@ tack on the '1', if necessary.
 type TidyOccEnv = OccEnv Int	-- The in-scope OccNames
 	-- Range gives a plausible starting point for new guesses
 
+emptyTidyOccEnv :: TidyOccEnv
 emptyTidyOccEnv = emptyOccEnv
 
 initTidyOccEnv :: [OccName] -> TidyOccEnv	-- Initialise with names to avoid!
@@ -684,6 +686,7 @@ startsConSym c = c == ':'				-- Infix data constructors
 startsVarId c  = isLower c || c == '_'	-- Ordinary Ids
 startsConId c  = isUpper c || c == '('	-- Ordinary type constructors and data constructors
 
+isSymbolASCII :: Char -> Bool
 isSymbolASCII c = c `elem` "!#$%&*+./<=>?@\\^|~-"
 \end{code}
 
