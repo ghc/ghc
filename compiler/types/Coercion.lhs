@@ -12,7 +12,7 @@ The coercion kind constructor is a special TyCon that must always be saturated
   typeKind (symCoercion type) :: TyConApp CoercionTyCon{...} [type, type]
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -80,7 +80,7 @@ decomposeCo :: Arity -> Coercion -> [Coercion]
 decomposeCo n co
   = go n co []
   where
-    go 0 co cos = cos
+    go 0 _  cos = cos
     go n co cos = go (n-1) (mkLeftCoercion co)
 			   (mkRightCoercion co : cos)
 
@@ -89,8 +89,9 @@ decomposeCo n co
 -------------------------------------------------------
 -- and some coercion kind stuff
 
+isEqPredTy :: Type -> Bool
 isEqPredTy (PredTy pred) = isEqPred pred
-isEqPredTy other         = False
+isEqPredTy _             = False
 
 mkEqPred :: (Type, Type) -> PredType
 mkEqPred (ty1, ty2) = EqPred ty1 ty2
@@ -112,7 +113,7 @@ splitCoercionKind (PredTy (EqPred ty1 ty2))    = (ty1, ty2)
 splitCoercionKind_maybe :: Kind -> Maybe (Type, Type)
 splitCoercionKind_maybe co | Just co' <- kindView co = splitCoercionKind_maybe co'
 splitCoercionKind_maybe (PredTy (EqPred ty1 ty2)) = Just (ty1, ty2)
-splitCoercionKind_maybe other = Nothing
+splitCoercionKind_maybe _ = Nothing
 
 coercionKind :: Coercion -> (Type, Type)
 -- 	c :: (t1 :=: t2)
@@ -163,11 +164,14 @@ coercionKinds tys = unzip $ map coercionKind tys
 -- Coercion kind and type mk's
 -- (make saturated TyConApp CoercionTyCon{...} args)
 
+mkCoercion :: TyCon -> [Type] -> Coercion
 mkCoercion coCon args = ASSERT( tyConArity coCon == length args ) 
                         TyConApp coCon args
 
 mkAppCoercion, mkFunCoercion, mkTransCoercion, mkInstCoercion :: Coercion -> Coercion -> Coercion
 mkSymCoercion, mkLeftCoercion, mkRightCoercion :: Coercion -> Coercion
+mkAppsCoercion, mkInstsCoercion :: Coercion -> [Coercion] -> Coercion
+mkForAllCoercion :: Var -> Coercion -> Coercion
 
 mkAppCoercion    co1 co2 = mkAppTy co1 co2
 mkAppsCoercion   co1 tys = foldl mkAppTy co1 tys
@@ -233,9 +237,10 @@ mkLeftCoercion co
   | otherwise = mkCoercion leftCoercionTyCon [co]
 
 mkRightCoercion  co      
-  | Just (co1, co2) <- splitAppCoercion_maybe co = co2
+  | Just (_, co2) <- splitAppCoercion_maybe co = co2
   | otherwise = mkCoercion rightCoercionTyCon [co]
 
+mkRightCoercions :: Int -> Coercion -> [Coercion]
 mkRightCoercions n co
   = go n co []
   where
@@ -255,12 +260,14 @@ mkInstCoercion co ty
 
 mkInstsCoercion co tys = foldl mkInstCoercion co tys
 
+{-
 splitSymCoercion_maybe :: Coercion -> Maybe Coercion
 splitSymCoercion_maybe (TyConApp tc [co]) = 
   if tc `hasKey` symCoercionTyConKey
   then Just co
   else Nothing
 splitSymCoercion_maybe co = Nothing
+-}
 
 splitAppCoercion_maybe :: Coercion -> Maybe (Coercion, Coercion)
 -- Splits a coercion application, being careful *not* to split (left c), etc
@@ -273,8 +280,9 @@ splitAppCoercion_maybe (TyConApp tc tys)
    = case snocView tys of
        Just (tys', ty') -> Just (TyConApp tc tys', ty')
        Nothing          -> Nothing
-splitAppCoercion_maybe co = Nothing
+splitAppCoercion_maybe _ = Nothing
 
+{-
 splitTransCoercion_maybe :: Coercion -> Maybe (Coercion, Coercion)
 splitTransCoercion_maybe (TyConApp tc [ty1, ty2]) 
  = if tc `hasKey` transCoercionTyConKey then
@@ -306,6 +314,7 @@ splitRightCoercion_maybe (TyConApp tc [co])
    else
        Nothing
 splitRightCoercion_maybe other = Nothing
+-}
 
 -- Unsafe coercion is not safe, it is used when we know we are dealing with
 -- bottom, which is one case in which it is safe.  It is also used to 
@@ -354,7 +363,7 @@ mkFamInstCoercion name tvs family instTys rep_tycon
 --    sym e :: p3=q3
 -- then ((sym c) (sym d) (sym e)) :: (p1 p2 p3)=(q1 q2 q3)
 
-symCoercionTyCon, transCoercionTyCon, leftCoercionTyCon, rightCoercionTyCon, instCoercionTyCon :: TyCon
+symCoercionTyCon, transCoercionTyCon, leftCoercionTyCon, rightCoercionTyCon, instCoercionTyCon, unsafeCoercionTyCon :: TyCon
 -- Each coercion TyCon is built with the special CoercionTyCon record and
 -- carries its own kinding rule.  Such CoercionTyCons must be fully applied
 -- by any TyConApp in which they are applied, however they may also be over
@@ -427,8 +436,11 @@ unsafeCoercionTyCon
 --------------------------------------
 -- ...and their names
 
+mkCoConName :: FS.FastString -> Unique -> TyCon -> Name
 mkCoConName occ key coCon = mkWiredInName gHC_PRIM (mkOccNameFS tcName occ)
                             key (ATyCon coCon) BuiltInSyntax
+
+transCoercionTyConName, symCoercionTyConName, leftCoercionTyConName, rightCoercionTyConName, instCoercionTyConName, unsafeCoercionTyConName :: Name
 
 transCoercionTyConName = mkCoConName FSLIT("trans") transCoercionTyConKey transCoercionTyCon
 symCoercionTyConName   = mkCoConName FSLIT("sym") symCoercionTyConKey symCoercionTyCon
@@ -468,7 +480,7 @@ splitNewTypeRepCo_maybe (TyConApp tc tys)
 	ACo co -> Just (ty', co)
 	IdCo   -> panic "splitNewTypeRepCo_maybe"
 			-- This case handled by coreView
-splitNewTypeRepCo_maybe other 
+splitNewTypeRepCo_maybe _
   = Nothing
 \end{code}
 
@@ -495,7 +507,7 @@ zipCoArgs cois tys = zipWith fromCoI cois tys
 
 fromCoI :: CoercionI -> Type -> Type
 fromCoI IdCo ty     = ty	-- Identity coercion represented 
-fromCoI (ACo co) ty = co	-- 	by the type itself
+fromCoI (ACo co) _  = co	-- 	by the type itself
 
 mkSymCoI :: CoercionI -> CoercionI
 mkSymCoI IdCo = IdCo
@@ -514,12 +526,12 @@ mkTyConAppCoI tyCon tys cois
   | otherwise	  = ACo (TyConApp tyCon (zipCoArgs cois tys))
 
 mkAppTyCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
-mkAppTyCoI ty1 IdCo ty2 IdCo = IdCo
+mkAppTyCoI _   IdCo _   IdCo = IdCo
 mkAppTyCoI ty1 coi1 ty2 coi2 =
 	ACo $ AppTy (fromCoI coi1 ty1) (fromCoI coi2 ty2)
 
 mkFunTyCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
-mkFunTyCoI ty1 IdCo ty2 IdCo = IdCo
+mkFunTyCoI _   IdCo _   IdCo = IdCo
 mkFunTyCoI ty1 coi1 ty2 coi2 =
 	ACo $ FunTy (fromCoI coi1 ty1) (fromCoI coi2 ty2)
 
@@ -543,13 +555,13 @@ mkClassPPredCoI cls tys cois
 
 mkIParamPredCoI :: (IPName Name) -> CoercionI -> CoercionI 
 -- Similar invariant to mkclassPPredCoI
-mkIParamPredCoI ipn IdCo     = IdCo
+mkIParamPredCoI _   IdCo     = IdCo
 mkIParamPredCoI ipn (ACo co) = ACo $ PredTy $ IParam ipn co
 
 mkEqPredCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
 -- Similar invariant to mkclassPPredCoI
 mkEqPredCoI _    IdCo     _   IdCo      = IdCo
 mkEqPredCoI ty1  IdCo     _   (ACo co2) = ACo $ PredTy $ EqPred ty1 co2
-mkEqPredCoI ty1 (ACo co1) ty2 coi2      = ACo $ PredTy $ EqPred co1 (fromCoI coi2 ty2)
+mkEqPredCoI _   (ACo co1) ty2 coi2      = ACo $ PredTy $ EqPred co1 (fromCoI coi2 ty2)
 \end{code}
 
