@@ -7,13 +7,6 @@
 The bits common to TcInstDcls and TcDeriv.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module InstEnv (
 	DFunId, OverlapFlag(..),
 	Instance(..), pprInstance, pprInstanceHdr, pprInstances, 
@@ -40,7 +33,6 @@ import Outputable
 import BasicTypes
 import UniqFM
 import Id
-import SrcLoc
 
 import Data.Maybe	( isJust, isNothing )
 \end{code}
@@ -139,7 +131,7 @@ instance Outputable Instance where
 
 pprInstance :: Instance -> SDoc
 -- Prints the Instance as an instance declaration
-pprInstance ispec@(Instance { is_flag = flag })
+pprInstance ispec
   = hang (pprInstanceHdr ispec)
 	2 (ptext SLIT("--") <+> pprNameLoc (getName ispec))
 
@@ -191,7 +183,7 @@ instanceCantMatch :: [Maybe Name] -> [Maybe Name] -> Bool
 -- possibly be instantiated to actual, nor vice versa; 
 -- False is non-committal
 instanceCantMatch (Just t : ts) (Just a : as) = t/=a || instanceCantMatch ts as
-instanceCantMatch ts		as	      =  False	-- Safe
+instanceCantMatch _             _             =  False  -- Safe
 \end{code}
 
 
@@ -494,6 +486,7 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
 	    Nothing  -> find ms us	   rest
 
 ---------------
+bind_fn :: TyVar -> BindFlag
 bind_fn tv | isTcTyVar tv && isExistentialTyVar tv = Skolem
 	   | otherwise	 		 	   = BindMe
 	-- The key_tys can contain skolem constants, and we can guarantee that those
@@ -539,6 +532,6 @@ insert_overlapping new_item (item:items)
 	where
 	  overlap_ok = case is_flag instB of
 			NoOverlap -> False
-			other	  -> True
+			_         -> True
 \end{code}
 
