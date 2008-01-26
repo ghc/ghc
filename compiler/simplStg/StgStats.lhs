@@ -21,7 +21,7 @@ The program gather statistics about
 \end{enumerate}
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -30,6 +30,8 @@ The program gather statistics about
 
 module StgStats ( showStgStats ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import StgSyn
@@ -130,10 +132,10 @@ statBinding top (StgRec pairs)
 
 statRhs :: Bool -> (Id, StgRhs) -> StatEnv
 
-statRhs top (b, StgRhsCon cc con args)
+statRhs top (_, StgRhsCon _ _ _)
   = countOne (ConstructorBinds top)
 
-statRhs top (b, StgRhsClosure cc bi fv u _srt args body)
+statRhs top (_, StgRhsClosure _ _ fv u _ _ body)
   = statExpr body			`combineSE`
     countN FreeVariables (length fv)	`combineSE`
     countOne (
@@ -157,10 +159,10 @@ statExpr (StgApp _ _)	  = countOne Applications
 statExpr (StgLit _)	  = countOne Literals
 statExpr (StgConApp _ _)  = countOne ConstructorApps
 statExpr (StgOpApp _ _ _) = countOne PrimitiveApps
-statExpr (StgSCC l e) 	  = statExpr e
-statExpr (StgTick m n e)  = statExpr e
+statExpr (StgSCC _ e)     = statExpr e
+statExpr (StgTick _ _ e)  = statExpr e
 
-statExpr (StgLetNoEscape lvs_whole lvs_rhss binds body)
+statExpr (StgLetNoEscape _ _ binds body)
   = statBinding False{-not top-level-} binds	`combineSE`
     statExpr body				`combineSE`
     countOne LetNoEscapes
@@ -169,7 +171,7 @@ statExpr (StgLet binds body)
   = statBinding False{-not top-level-} binds	`combineSE`
     statExpr body
 
-statExpr (StgCase expr lve lva bndr srt alt_type alts)
+statExpr (StgCase expr _ _ _ _ _ alts)
   = statExpr expr	`combineSE`
     stat_alts alts	`combineSE`
     countOne StgCases
