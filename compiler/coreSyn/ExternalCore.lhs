@@ -2,13 +2,6 @@
 % (c) The University of Glasgow 2001-2006
 %
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module ExternalCore where
 
 
@@ -87,6 +80,7 @@ type Qual t = (Mname,t)
 
 type Id = String
 
+primMname :: Mname
 primMname = "base:GHC.Prim"
 
 tcArrow :: Qual Tcon
