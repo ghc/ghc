@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module VectUtils (
   collectAnnTypeBinders, collectAnnTypeArgs, isAnnTypeArg,
   collectAnnValBinders,
@@ -41,18 +34,15 @@ import DataCon
 import Var
 import Id                 ( mkWildId )
 import MkId               ( unwrapFamInstScrut )
-import Name               ( Name )
-import PrelNames
 import TysWiredIn
-import TysPrim            ( intPrimTy )
 import BasicTypes         ( Boxity(..) )
 import Literal            ( Literal, mkMachInt )
 
 import Outputable
 import FastString
 
-import Data.List             ( zipWith4 )
-import Control.Monad         ( liftM, liftM2, zipWithM_ )
+import Control.Monad
+
 
 collectAnnTypeArgs :: AnnExpr b ann -> (AnnExpr b ann, [Type])
 collectAnnTypeArgs expr = go expr []
@@ -73,7 +63,7 @@ collectAnnValBinders expr = go [] expr
     go bs e                        = (reverse bs, e)
 
 isAnnTypeArg :: AnnExpr b ann -> Bool
-isAnnTypeArg (_, AnnType t) = True
+isAnnTypeArg (_, AnnType _) = True
 isAnnTypeArg _              = False
 
 dataConTagZ :: DataCon -> Int
@@ -107,9 +97,10 @@ mkBuiltinTyConApps get_tc tys ty
   where
     mk tc ty1 ty2 = mkTyConApp tc [ty1,ty2]
 
+{-
 mkBuiltinTyConApps1 :: (Builtins -> TyCon) -> Type -> [Type] -> VM Type
-mkBuiltinTyConApps1 get_tc dft [] = return dft
-mkBuiltinTyConApps1 get_tc dft tys
+mkBuiltinTyConApps1 _      dft [] = return dft
+mkBuiltinTyConApps1 get_tc _   tys
   = do
       tc <- builtin get_tc
       case tys of
@@ -120,6 +111,7 @@ mkBuiltinTyConApps1 get_tc dft tys
 
 mkClosureType :: Type -> Type -> VM Type
 mkClosureType arg_ty res_ty = mkBuiltinTyConApp closureTyCon [arg_ty, res_ty]
+-}
 
 mkClosureTypes :: [Type] -> Type -> VM Type
 mkClosureTypes = mkBuiltinTyConApps closureTyCon
@@ -183,7 +175,7 @@ paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
       | isLiftedTypeKind k
       = liftM Just (mkPADictType ty)
 
-    go ty k = return Nothing
+    go _ _ = return Nothing
 
 paDictOfType :: Type -> VM CoreExpr
 paDictOfType ty = paDictOfTyApp ty_fn ty_args
@@ -201,7 +193,7 @@ paDictOfTyApp (TyConApp tc _) ty_args
   = do
       dfun <- traceMaybeV "paDictOfTyApp" (ppr tc) (lookupTyConPA tc)
       paDFunApply (Var dfun) ty_args
-paDictOfTyApp ty ty_args = pprPanic "paDictOfTyApp" (ppr ty)
+paDictOfTyApp ty _ = pprPanic "paDictOfTyApp" (ppr ty)
 
 paDFunType :: TyCon -> VM Type
 paDFunType tc
@@ -222,20 +214,21 @@ paDFunApply dfun tys
 
 type PAMethod = (Builtins -> Var, String)
 
+pa_length, pa_replicate, pa_empty, pa_pack :: (Builtins -> Var, String)
 pa_length    = (lengthPAVar,    "lengthPA")
 pa_replicate = (replicatePAVar, "replicatePA")
 pa_empty     = (emptyPAVar,     "emptyPA")
 pa_pack      = (packPAVar,      "packPA")
 
 paMethod :: PAMethod -> Type -> VM CoreExpr
-paMethod (method, name) ty
+paMethod (_method, name) ty
   | Just tycon <- splitPrimTyCon ty
   = do
       fn <- traceMaybeV "paMethod" (ppr tycon <+> text name)
           $ lookupPrimMethod tycon name
       return (Var fn)
 
-paMethod (method, name) ty
+paMethod (method, _name) ty
   = do
       fn   <- builtin method
       dict <- paDictOfType ty
@@ -346,6 +339,7 @@ takeHoisted
       setGEnv $ env { global_bindings = [] }
       return $ global_bindings env
 
+{-
 boxExpr :: Type -> VExpr -> VM VExpr
 boxExpr ty (vexpr, lexpr)
   | Just (tycon, []) <- splitTyConApp_maybe ty
@@ -357,7 +351,7 @@ boxExpr ty (vexpr, lexpr)
                        in
                        return (mkConApp dc [vexpr], lexpr)
         Nothing     -> return (vexpr, lexpr)
-
+-}
 
 mkClosure :: Type -> Type -> Type -> VExpr -> VExpr -> VM VExpr
 mkClosure arg_ty res_ty env_ty (vfn,lfn) (venv,lenv)
@@ -377,7 +371,7 @@ mkClosureApp arg_ty res_ty (vclo, lclo) (varg, larg)
               Var lapply `mkTyApps` [arg_ty, res_ty] `mkApps` [lclo, larg])
 
 buildClosures :: [TyVar] -> [VVar] -> [Type] -> Type -> VM VExpr -> VM VExpr
-buildClosures tvs vars [] res_ty mk_body
+buildClosures _   _    [] _ mk_body
   = mk_body
 buildClosures tvs vars [arg_ty] res_ty mk_body
   = buildClosure tvs vars arg_ty res_ty mk_body
@@ -431,7 +425,7 @@ buildEnv vvs
     tys     = map idType vs
 
 mkVectEnv :: [Type] -> [Var] -> (Type, CoreExpr, CoreExpr -> CoreExpr -> CoreExpr)
-mkVectEnv []   []  = (unitTy, Var unitDataConId, \env body -> body)
+mkVectEnv []   []  = (unitTy, Var unitDataConId, \_ body -> body)
 mkVectEnv [ty] [v] = (ty, Var v, \env body -> Let (NonRec v env) body)
 mkVectEnv tys  vs  = (ty, mkCoreTup (map Var vs),
                         \env body -> Case env (mkWildId ty) (exprType body)
