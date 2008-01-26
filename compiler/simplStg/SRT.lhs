@@ -7,7 +7,7 @@ each let-binding.  At the same time, we figure out which top-level
 bindings have no CAF references, and record the fact in their IdInfo.
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -16,6 +16,8 @@ bindings have no CAF references, and record the fact in their IdInfo.
 
 module SRT( computeSRTs ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import StgSyn
@@ -46,7 +48,7 @@ computeSRTs binds = srtTopBinds emptyVarEnv binds
 
 srtTopBinds :: IdEnv Id -> [StgBinding] -> [(StgBinding, [(Id,[Id])])]
 
-srtTopBinds env [] = []
+srtTopBinds _   [] = []
 srtTopBinds env (StgNonRec b rhs : binds) = 
   (StgNonRec b rhs', [(b,srt')]) : srtTopBinds env' binds
   where
@@ -71,22 +73,24 @@ srtTopBinds env (StgRec bs : binds) =
 -- this information across module boundaries too, but we currently
 -- don't.
 
+maybeExtendEnv ::IdEnv Id -> Id -> StgRhs -> IdEnv Id
 maybeExtendEnv env bndr (StgRhsClosure _ _ _ ReEntrant (SRTEntries cafs) _ _)
   | [one] <- varSetElems cafs
   = extendVarEnv env bndr (applyEnv env one)
-maybeExtendEnv env bndr _ = env
+maybeExtendEnv env _ _ = env
 
 applyEnvList :: IdEnv Id -> [Id] -> [Id]
 applyEnvList env = map (applyEnv env)
 
+applyEnv :: IdEnv Id -> Id -> Id
 applyEnv env id = lookupVarEnv env id `orElse` id
 
 -- ----  Top-level right hand sides:
 
 srtTopRhs :: Id -> StgRhs -> (StgRhs, [Id])
 
-srtTopRhs binder rhs@(StgRhsCon _ _ _) = (rhs, [])
-srtTopRhs binder rhs@(StgRhsClosure _ _ _ _  (SRTEntries cafs) _ _)
+srtTopRhs _ rhs@(StgRhsCon _ _ _) = (rhs, [])
+srtTopRhs _ rhs@(StgRhsClosure _ _ _ _  (SRTEntries cafs) _ _)
   = (srtRhs table rhs, elems)
   where
 	elems = varSetElems cafs
@@ -103,7 +107,7 @@ srtBind table (StgRec pairs) = StgRec [ (b, srtRhs table r) | (b,r) <- pairs ]
 
 srtRhs :: IdEnv Int -> StgRhs -> StgRhs
 
-srtRhs table e@(StgRhsCon cc con args) = e
+srtRhs _     e@(StgRhsCon _ _ _) = e
 srtRhs table (StgRhsClosure cc bi free_vars u srt args body)
   = StgRhsClosure cc bi free_vars u (constructSRT table srt) args 
 	$! (srtExpr table body)
@@ -113,10 +117,10 @@ srtRhs table (StgRhsClosure cc bi free_vars u srt args body)
 
 srtExpr :: IdEnv Int -> StgExpr -> StgExpr
 
-srtExpr table e@(StgApp f args) 	= e
-srtExpr table e@(StgLit l)      	= e
-srtExpr table e@(StgConApp con args)    = e
-srtExpr table e@(StgOpApp op args ty)   = e
+srtExpr _ e@(StgApp _ _)       = e
+srtExpr _ e@(StgLit _)         = e
+srtExpr _ e@(StgConApp _ _)    = e
+srtExpr _ e@(StgOpApp _ _ _)   = e
 
 srtExpr table (StgSCC cc expr) = StgSCC cc $! srtExpr table expr
 
@@ -166,6 +170,7 @@ constructSRT table (SRTEntries entries)
 -- ---------------------------------------------------------------------------
 -- Misc stuff
 
+(=:) :: a -> (a -> b) -> b
 a =: k  = k a
 
 \end{code}
