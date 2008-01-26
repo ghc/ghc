@@ -14,13 +14,6 @@ types that
 \end{itemize}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module BasicTypes(
 	Version, bumpVersion, initialVersion,
 
@@ -158,7 +151,9 @@ instance Outputable FixityDirection where
     ppr InfixN = ptext SLIT("infix")
 
 ------------------------
-maxPrecedence = (9::Int)
+maxPrecedence :: Int
+maxPrecedence = 9
+defaultFixity :: Fixity
 defaultFixity = Fixity maxPrecedence InfixL
 
 negateFixity, funTyFixity :: Fixity
@@ -395,7 +390,7 @@ type RulesOnly = Bool
 \begin{code}
 isNoOcc :: OccInfo -> Bool
 isNoOcc NoOccInfo = True
-isNoOcc other     = False
+isNoOcc _         = False
 
 seqOccInfo :: OccInfo -> ()
 seqOccInfo occ = occ `seq` ()
@@ -409,33 +404,36 @@ type InterestingCxt = Bool	-- True <=> Function: is applied
 type InsideLam = Bool	-- True <=> Occurs inside a non-linear lambda
 			-- Substituting a redex for this occurrence is
 			-- dangerous because it might duplicate work.
+insideLam, notInsideLam :: InsideLam
 insideLam    = True
 notInsideLam = False
 
 -----------------
 type OneBranch = Bool	-- True <=> Occurs in only one case branch
 			--	so no code-duplication issue to worry about
+oneBranch, notOneBranch :: OneBranch
 oneBranch    = True
 notOneBranch = False
 
 isLoopBreaker :: OccInfo -> Bool
 isLoopBreaker (IAmALoopBreaker _) = True
-isLoopBreaker other	          = False
+isLoopBreaker _                   = False
 
 isNonRuleLoopBreaker :: OccInfo -> Bool
-isNonRuleLoopBreaker (IAmALoopBreaker False) = True	-- Loop-breaker that breaks a non-rule cycle
-isNonRuleLoopBreaker other	             = False
+isNonRuleLoopBreaker (IAmALoopBreaker False) = True   -- Loop-breaker that breaks a non-rule cycle
+isNonRuleLoopBreaker _                       = False
 
 isDeadOcc :: OccInfo -> Bool
 isDeadOcc IAmDead = True
-isDeadOcc other	  = False
+isDeadOcc _       = False
 
+isOneOcc :: OccInfo -> Bool
 isOneOcc (OneOcc _ _ _) = True
-isOneOcc other	        = False
+isOneOcc _              = False
 
 isFragileOcc :: OccInfo -> Bool
 isFragileOcc (OneOcc _ _ _) = True
-isFragileOcc other	    = False
+isFragileOcc _              = False
 \end{code}
 
 \begin{code}
@@ -474,11 +472,13 @@ data StrictnessMark	-- Used in interface decls only
    | NotMarkedStrict	
    deriving( Eq )
 
+isMarkedUnboxed :: StrictnessMark -> Bool
 isMarkedUnboxed MarkedUnboxed = True
-isMarkedUnboxed other	      = False
+isMarkedUnboxed _             = False
 
+isMarkedStrict :: StrictnessMark -> Bool
 isMarkedStrict NotMarkedStrict = False
-isMarkedStrict other	       = True	-- All others are strict
+isMarkedStrict _               = True   -- All others are strict
 
 instance Outputable StrictnessMark where
   ppr MarkedStrict     = ptext SLIT("!")
@@ -539,6 +539,8 @@ data InlineSpec
 			--	    is enabled, it will definitely actually happen
   deriving( Eq )
 
+defaultInlineSpec, alwaysInlineSpec, neverInlineSpec :: InlineSpec
+
 defaultInlineSpec = Inline AlwaysActive False	-- Inlining is OK, but not forced
 alwaysInlineSpec  = Inline AlwaysActive True	-- INLINE always
 neverInlineSpec   = Inline NeverActive  False	-- NOINLINE 
@@ -553,24 +555,24 @@ instance Outputable InlineSpec where
    ppr (Inline act is_inline)  
 	| is_inline = ptext SLIT("INLINE")
 		      <> case act of
-			   AlwaysActive -> empty
-			   other	-> ppr act
+			    AlwaysActive -> empty
+			    _            -> ppr act
 	| otherwise = ptext SLIT("NOINLINE")
 		      <> case act of
-			    NeverActive -> empty
-			    other	-> ppr act
+			    NeverActive  -> empty
+			    _            -> ppr act
 
 isActive :: CompilerPhase -> Activation -> Bool
-isActive p NeverActive      = False
-isActive p AlwaysActive     = True
+isActive _ NeverActive      = False
+isActive _ AlwaysActive     = True
 isActive p (ActiveAfter n)  = p <= n
 isActive p (ActiveBefore n) = p >  n
 
 isNeverActive, isAlwaysActive :: Activation -> Bool
 isNeverActive NeverActive = True
-isNeverActive act	  = False
+isNeverActive _           = False
 
 isAlwaysActive AlwaysActive = True
-isAlwaysActive other	    = False
+isAlwaysActive _            = False
 \end{code}
 
