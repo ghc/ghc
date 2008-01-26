@@ -5,13 +5,6 @@
 \section[TypeRep]{Type - friends' interface}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TypeRep (
 	TyThing(..), 
 	Type(..), TyNote(..), 		-- Representation visible 
@@ -66,6 +59,7 @@ import Class
 -- others
 import PrelNames
 import Outputable
+import FastString
 \end{code}
 
 %************************************************************************
@@ -325,6 +319,15 @@ We define a few wired-in type constructors here to avoid module knots
 --------------------------
 -- First the TyCons...
 
+funTyCon, tySuperKindTyCon, coSuperKindTyCon, liftedTypeKindTyCon,
+      openTypeKindTyCon, unliftedTypeKindTyCon,
+      ubxTupleKindTyCon, argTypeKindTyCon
+   :: TyCon
+funTyConName, tySuperKindTyConName, coSuperKindTyConName, liftedTypeKindTyConName,
+      openTypeKindTyConName, unliftedTypeKindTyConName,
+      ubxTupleKindTyConName, argTypeKindTyConName
+   :: Name
+
 funTyCon = mkFunTyCon funTyConName (mkArrowKinds [argTypeKind, openTypeKind] liftedTypeKind)
 	-- You might think that (->) should have type (?? -> ? -> *), and you'd be right
 	-- But if we do that we get kind errors when saying
@@ -359,6 +362,7 @@ ubxTupleKindTyConName     = mkPrimTyConName FSLIT("(#)") ubxTupleKindTyConKey ub
 argTypeKindTyConName      = mkPrimTyConName FSLIT("??") argTypeKindTyConKey argTypeKindTyCon
 funTyConName              = mkPrimTyConName FSLIT("(->)") funTyConKey funTyCon
 
+mkPrimTyConName :: FastString -> Unique -> TyCon -> Name
 mkPrimTyConName occ key tycon = mkWiredInName gHC_PRIM (mkOccNameFS tcName occ) 
 					      key 
 					      (ATyCon tycon)
@@ -371,6 +375,8 @@ mkPrimTyConName occ key tycon = mkWiredInName gHC_PRIM (mkOccNameFS tcName occ)
 
 kindTyConType :: TyCon -> Type
 kindTyConType kind = TyConApp kind []
+
+liftedTypeKind, unliftedTypeKind, openTypeKind, argTypeKind, ubxTupleKind :: Kind
 
 liftedTypeKind   = kindTyConType liftedTypeKindTyCon
 unliftedTypeKind = kindTyConType unliftedTypeKindTyCon
@@ -388,23 +394,25 @@ tySuperKind, coSuperKind :: SuperKind
 tySuperKind = kindTyConType tySuperKindTyCon 
 coSuperKind = kindTyConType coSuperKindTyCon 
 
+isTySuperKind :: SuperKind -> Bool
 isTySuperKind (NoteTy _ ty)    = isTySuperKind ty
 isTySuperKind (TyConApp kc []) = kc `hasKey` tySuperKindTyConKey
-isTySuperKind other            = False
+isTySuperKind _                = False
 
 isCoSuperKind :: SuperKind -> Bool
 isCoSuperKind (NoteTy _ ty)    = isCoSuperKind ty
 isCoSuperKind (TyConApp kc []) = kc `hasKey` coSuperKindTyConKey
-isCoSuperKind other            = False
+isCoSuperKind _                = False
 
 -------------------
 -- Lastly we need a few functions on Kinds
 
+isLiftedTypeKindCon :: TyCon -> Bool
 isLiftedTypeKindCon tc    = tc `hasKey` liftedTypeKindTyConKey
 
 isLiftedTypeKind :: Kind -> Bool
 isLiftedTypeKind (TyConApp tc []) = isLiftedTypeKindCon tc
-isLiftedTypeKind other            = False
+isLiftedTypeKind _                = False
 
 isCoercionKind :: Kind -> Bool
 -- All coercions are of form (ty1 ~ ty2)
@@ -412,7 +420,7 @@ isCoercionKind :: Kind -> Bool
 -- because it's used in a knot-tied way to enforce invariants in Var
 isCoercionKind (NoteTy _ k)         = isCoercionKind k
 isCoercionKind (PredTy (EqPred {})) = True
-isCoercionKind other		    = False
+isCoercionKind _                    = False
 
 coVarPred :: CoVar -> PredType
 coVarPred tv
@@ -486,13 +494,14 @@ instance Outputable name => OutputableBndr (IPName name) where
 ------------------
 	-- OK, here's the main printer
 
+pprKind, pprParendKind :: Kind -> SDoc
 pprKind = pprType
 pprParendKind = pprParendType
 
 ppr_type :: Prec -> Type -> SDoc
-ppr_type p (TyVarTy tv)       = ppr tv
-ppr_type p (PredTy pred)      = ifPprDebug (ptext SLIT("<pred>")) <> (ppr pred)
-ppr_type p (NoteTy other ty2) = ifPprDebug (ptext SLIT("<note>")) <> ppr_type p ty2
+ppr_type _ (TyVarTy tv)       = ppr tv
+ppr_type _ (PredTy pred)      = ifPprDebug (ptext SLIT("<pred>")) <> (ppr pred)
+ppr_type p (NoteTy _ ty2)     = ifPprDebug (ptext SLIT("<note>")) <> ppr_type p ty2
 ppr_type p (TyConApp tc tys)  = ppr_tc_app p tc tys
 
 ppr_type p (AppTy t1 t2) = maybeParen p TyConPrec $
@@ -535,9 +544,9 @@ ppr_forall_type p ty
     split2 ps ty		    = (reverse ps, ty)
 
 ppr_tc_app :: Prec -> TyCon -> [Type] -> SDoc
-ppr_tc_app p tc [] 
+ppr_tc_app _ tc []
   = ppr_tc tc
-ppr_tc_app p tc [ty] 
+ppr_tc_app _ tc [ty]
   | tc `hasKey` listTyConKey = brackets (pprType ty)
   | tc `hasKey` parrTyConKey = ptext SLIT("[:") <> pprType ty <> ptext SLIT(":]")
   | tc `hasKey` liftedTypeKindTyConKey   = ptext SLIT("*")
@@ -578,9 +587,11 @@ ppr_naked_tc tc
 	       | otherwise     = empty
 
 -------------------
+pprForAll :: [TyVar] -> SDoc
 pprForAll []  = empty
 pprForAll tvs = ptext SLIT("forall") <+> sep (map pprTvBndr tvs) <> dot
 
+pprTvBndr :: TyVar -> SDoc
 pprTvBndr tv | isLiftedTypeKind kind = ppr tv
 	     | otherwise	     = parens (ppr tv <+> dcolon <+> pprKind kind)
 	     where
