@@ -5,13 +5,6 @@
 \section{@Vars@: Variables}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Var (
 	Var, 
 	varName, varUnique, varType,
@@ -185,10 +178,16 @@ setVarName var new_name
 \begin{code}
 type TyVar = Var
 
+tyVarName :: TyVar -> Name
 tyVarName = varName
+
+tyVarKind :: TyVar -> Kind
 tyVarKind = varType
 
+setTyVarUnique :: TyVar -> Unique -> TyVar
 setTyVarUnique = setVarUnique
+
+setTyVarName :: TyVar -> Name -> TyVar
 setTyVarName   = setVarName
 
 setTyVarKind :: TyVar -> Kind -> TyVar
@@ -224,9 +223,14 @@ mkTcTyVar name kind details
 \begin{code}
 type CoVar = Var	-- A coercion variable is simply a type 
 			-- variable of kind (ty1 :=: ty2)
+
+coVarName :: CoVar -> Name
 coVarName = varName
 
+setCoVarUnique :: CoVar -> Unique -> CoVar
 setCoVarUnique = setVarUnique
+
+setCoVarName :: CoVar -> Name -> CoVar
 setCoVarName   = setVarName
 
 mkCoVar :: Name -> Kind -> CoVar
@@ -265,6 +269,10 @@ type DictId = Id
 \end{code}
 
 \begin{code}
+idName   :: Id -> Name
+idUnique :: Id -> Unique
+idType   :: Id -> Kind
+
 idName    = varName
 idUnique  = varUnique
 idType    = varType
@@ -355,29 +363,30 @@ isTyVar, isTcTyVar	    :: Var -> Bool
 isId, isLocalVar, isLocalId :: Var -> Bool
 isGlobalId, isExportedId    :: Var -> Bool
 mustHaveLocalBinding	    :: Var -> Bool
+isCoVar                     :: Var -> Bool
 
 isTyVar (TyVar {})   = True
 isTyVar (TcTyVar {}) = True
-isTyVar other	     = False
+isTyVar _            = False
 
 isTcTyVar (TcTyVar {}) = True
-isTcTyVar other	       = False
+isTcTyVar _            = False
 
 isId (LocalId {})  = True
 isId (GlobalId {}) = True
-isId other	   = False
+isId _             = False
 
 isLocalId (LocalId {}) = True
-isLocalId other	       = False
+isLocalId _            = False
 
 isCoVar (v@(TyVar {})) = isCoercionVar v
-isCoVar other          = False
+isCoVar _              = False
 
 -- isLocalVar returns True for type variables as well as local Ids
 -- These are the variables that we need to pay attention to when finding free
 -- variables, or doing dependency analysis.
 isLocalVar (GlobalId {}) = False 
-isLocalVar other	 = True
+isLocalVar _             = True
 
 -- mustHaveLocalBinding returns True of Ids and TyVars
 -- that must have a binding in this module.  The converse
@@ -387,21 +396,21 @@ isLocalVar other	 = True
 mustHaveLocalBinding var = isLocalVar var
 
 isGlobalId (GlobalId {}) = True
-isGlobalId other	 = False
+isGlobalId _             = False
 
 -- isExportedId means "don't throw this away"
 isExportedId (GlobalId {}) = True
 isExportedId (LocalId {lclDetails = details}) 
   = case details of
 	Exported   -> True
-	other	   -> False
-isExportedId other = False
+	_          -> False
+isExportedId _ = False
 \end{code}
 
 \begin{code}
 globalIdDetails :: Var -> GlobalIdDetails
 -- Works OK on local Ids too, returning notGlobalId
 globalIdDetails (GlobalId {gblDetails = details}) = details
-globalIdDetails other				  = notGlobalId
+globalIdDetails _                                 = notGlobalId
 \end{code}
 
