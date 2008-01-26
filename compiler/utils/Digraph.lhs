@@ -3,13 +3,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Digraph(
 
         -- At present the only one with a "nice" external interface
@@ -31,7 +24,9 @@ module Digraph(
         bcc
     ) where
 
-# include "HsVersions.h"
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
+#include "HsVersions.h"
 
 ------------------------------------------------------------------------------
 -- A version of the graph algorithms described in:
@@ -75,6 +70,7 @@ data SCC vertex = AcyclicSCC vertex
 flattenSCCs :: [SCC a] -> [a]
 flattenSCCs = concatMap flattenSCC
 
+flattenSCC :: SCC a -> [a]
 flattenSCC (AcyclicSCC v) = [v]
 flattenSCC (CyclicSCC vs) = vs
 
@@ -167,7 +163,7 @@ reverseE g   = [ (w, v) | (v, w) <- edges g ]
 
 outdegree :: Graph -> Table Int
 outdegree  = mapT numEdges
-             where numEdges v ws = length ws
+             where numEdges _ ws = length ws
 
 indegree :: Graph -> Table Int
 indegree  = outdegree . transposeG
@@ -192,7 +188,7 @@ graphFromEdges' edges
     max_v           = length edges - 1
     bounds          = (0,max_v) :: (Vertex, Vertex)
     sorted_edges    = let
-                         (_,k1,_) `le` (_,k2,_) = case k1 `compare` k2 of { GT -> False; other -> True }
+                         (_,k1,_) `le` (_,k2,_) = (k1 `compare` k2) /= GT
                       in
                         sortLe le edges
     edges1          = zipWith (,) [0..] sorted_edges
@@ -234,7 +230,7 @@ mapTree f (Node x ts) = Node (f x) (map (mapTree f) ts)
 
 \begin{code}
 instance Show a => Show (Tree a) where
-  showsPrec p t s = showTree t ++ s
+  showsPrec _ t s = showTree t ++ s
 
 showTree :: Show a => Tree a -> String
 showTree  = drawTree . mapTree show
@@ -245,6 +241,7 @@ showForest  = unlines . map showTree
 drawTree        :: Tree String -> String
 drawTree         = unlines . draw
 
+draw :: Tree String -> [String]
 draw (Node x ts) = grp this (space (length this)) (stLoop ts)
  where this          = s1 ++ x ++ " "
 
@@ -254,6 +251,7 @@ draw (Node x ts) = grp this (space (length this)) (stLoop ts)
        stLoop [t]    = grp s2 "  " (draw t)
        stLoop (t:ts) = grp s3 s4 (draw t) ++ [s4] ++ rsLoop ts
 
+       rsLoop []     = []
        rsLoop [t]    = grp s5 "  " (draw t)
        rsLoop (t:ts) = grp s6 s4 (draw t) ++ [s4] ++ rsLoop ts
 
@@ -297,7 +295,7 @@ prune bnds ts = runST (mkEmpty bnds  >>= \m ->
                        chop m ts)
 
 chop         :: Set s -> Forest Vertex -> ST s (Forest Vertex)
-chop m []     = return []
+chop _ []     = return []
 chop m (Node v ts : us)
               = contains m v >>= \visited ->
                 if visited then
@@ -321,7 +319,7 @@ chop m (Node v ts : us)
 ------------------------------------------------------------
 
 \begin{code}
---preorder            :: Tree a -> [a]
+preorder            :: Tree a -> [a]
 preorder (Node a ts) = a : preorderF ts
 
 preorderF           :: Forest a -> [a]
@@ -421,16 +419,16 @@ do_label :: Graph -> Table Int -> Tree Vertex -> Tree (Vertex,Int,Int)
 do_label g dnum (Node v ts) = Node (v,dnum!v,lv) us
  where us = map (do_label g dnum) ts
        lv = minimum ([dnum!v] ++ [dnum!w | w <- g!v]
-                     ++ [lu | Node (u,du,lu) xs <- us])
+                     ++ [lu | Node (_,_,lu) _ <- us])
 
 bicomps :: Tree (Vertex,Int,Int) -> Forest [Vertex]
-bicomps (Node (v,dv,lv) ts)
-      = [ Node (v:vs) us | (l,Node vs us) <- map collect ts]
+bicomps (Node (v,_,_) ts)
+      = [ Node (v:vs) us | (_,Node vs us) <- map collect ts]
 
 collect :: Tree (Vertex,Int,Int) -> (Int, Tree [Vertex])
 collect (Node (v,dv,lv) ts) = (lv, Node (v:vs) cs)
  where collected = map collect ts
-       vs = concat [ ws | (lw, Node ws us) <- collected, lw<dv]
+       vs = concat [ ws | (lw, Node ws _)  <- collected, lw<dv]
        cs = concat [ if lw<dv then us else [Node (v:ws) us]
                         | (lw, Node ws us) <- collected ]
 \end{code}
