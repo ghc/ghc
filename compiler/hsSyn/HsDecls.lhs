@@ -9,7 +9,7 @@ Definitions for: @TyDecl@ and @oCnDecl@, @ClassDecl@,
 @InstDecl@, @DefaultDecl@ and @ForeignDecl@.
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -472,7 +472,7 @@ isSynDecl _other	                    = False
 
 -- type class
 isClassDecl (ClassDecl {}) = True
-isClassDecl other	   = False
+isClassDecl _              = False
 
 -- type family declaration
 isFamilyDecl (TyFamily {}) = True
@@ -508,6 +508,7 @@ tyClDeclNames (ClassDecl {tcdLName = cls_name, tcdSigs = sigs, tcdATs = ats})
 tyClDeclNames (TyData {tcdLName = tc_name, tcdCons = cons})
   = tc_name : conDeclsNames (map unLoc cons)
 
+tyClDeclTyVars :: TyClDecl name -> [LHsTyVarBndr name]
 tyClDeclTyVars (TyFamily    {tcdTyVars = tvs}) = tvs
 tyClDeclTyVars (TySynonym   {tcdTyVars = tvs}) = tvs
 tyClDeclTyVars (TyData      {tcdTyVars = tvs}) = tvs
@@ -604,12 +605,14 @@ pp_decl_head context thing _      (Just typats) -- explicit type patterns
   = hsep [ pprHsContext context, ppr thing
 	 , hsep (map (pprParendHsType.unLoc) typats)]
 
+pp_condecls :: OutputableBndr name => [LConDecl name] -> SDoc
 pp_condecls cs@(L _ ConDecl{ con_res = ResTyGADT _ } : _) -- In GADT syntax
   = hang (ptext SLIT("where")) 2 (vcat (map ppr cs))
 pp_condecls cs 			  -- In H98 syntax
   = equals <+> sep (punctuate (ptext SLIT(" |")) (map ppr cs))
 
-pp_tydecl True pp_head pp_decl_rhs derivings
+pp_tydecl :: OutputableBndr name => Bool -> SDoc -> SDoc -> Maybe [LHsType name] -> SDoc
+pp_tydecl True  pp_head _ _
   = pp_head
 pp_tydecl False pp_head pp_decl_rhs derivings
   = hang pp_head 4 (sep [
@@ -724,6 +727,7 @@ pprConDecl (ConDecl con expl tvs cxt (PrefixCon arg_tys) (ResTyGADT res_ty) _)
 pprConDecl (ConDecl con expl tvs cxt (RecCon fields) (ResTyGADT res_ty) _)
   = sep [pprHsForAll expl tvs cxt, ppr con <+> ppr_fields fields <+> dcolon <+> ppr res_ty]
 
+ppr_fields :: OutputableBndr name => [ConDeclField name] -> SDoc
 ppr_fields fields = braces (sep (punctuate comma (map ppr_fld fields)))
   where
     ppr_fld (ConDeclField { cd_fld_name = n, cd_fld_type = ty, 
@@ -892,7 +896,7 @@ instance Outputable ForeignImport where
       pprCEntity header lib (CFunction (StaticTarget lbl)) = 
         ptext SLIT("static") <+> ftext header <+> char '&' <>
 	pprLib lib <> ppr lbl
-      pprCEntity header lib (CFunction (DynamicTarget)) = 
+      pprCEntity _      _   (CFunction (DynamicTarget)) =
         ptext SLIT("dynamic")
       pprCEntity _      _   (CWrapper) = ptext SLIT("wrapper")
       --
@@ -937,7 +941,7 @@ collectRuleBndrSigTys :: [RuleBndr name] -> [LHsType name]
 collectRuleBndrSigTys bndrs = [ty | RuleBndrSig _ ty <- bndrs]
 
 instance OutputableBndr name => Outputable (RuleDecl name) where
-  ppr (HsRule name act ns lhs fv_lhs rhs fv_rhs)
+  ppr (HsRule name act ns lhs _fv_lhs rhs _fv_rhs)
 	= sep [text "{-# RULES" <+> doubleQuotes (ftext name) <+> ppr act,
 	       nest 4 (pp_forall <+> pprExpr (unLoc lhs)), 
 	       nest 4 (equals <+> pprExpr (unLoc rhs) <+> text "#-}") ]
@@ -970,6 +974,7 @@ data DocDecl name
 instance Outputable (DocDecl name) where
   ppr _ = text "<document comment>"
 
+docDeclDoc :: DocDecl name -> HsDoc name
 docDeclDoc (DocCommentNext d) = d
 docDeclDoc (DocCommentPrev d) = d
 docDeclDoc (DocCommentNamed _ d) = d
