@@ -13,13 +13,6 @@ which deal with the intantiated versions are located elsewhere:
    Id			typecheck/TcHsSyn	
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module HsUtils where
 
 #include "HsVersions.h"
@@ -131,6 +124,26 @@ mkSimpleHsAlt pat expr
 -- These are the bits of syntax that contain rebindable names
 -- See RnEnv.lookupSyntaxName
 
+mkHsIntegral   :: Integer -> PostTcType -> HsOverLit id
+mkHsFractional :: Rational -> PostTcType -> HsOverLit id
+mkHsIsString   :: FastString -> PostTcType -> HsOverLit id
+mkHsDo         :: HsStmtContext Name -> [LStmt id] -> LHsExpr id -> HsExpr id
+
+mkNPat      :: HsOverLit id -> Maybe (SyntaxExpr id) -> Pat id
+mkNPlusKPat :: Located id -> HsOverLit id -> Pat id
+
+mkTransformStmt   :: [LStmt idL] -> LHsExpr idR                -> StmtLR idL idR
+mkTransformByStmt :: [LStmt idL] -> LHsExpr idR -> LHsExpr idR -> StmtLR idL idR
+
+mkGroupUsingStmt   :: [LStmt idL]                -> LHsExpr idR -> StmtLR idL idR
+mkGroupByStmt      :: [LStmt idL] -> LHsExpr idR                -> StmtLR idL idR
+mkGroupByUsingStmt :: [LStmt idL] -> LHsExpr idR -> LHsExpr idR -> StmtLR idL idR
+
+mkExprStmt :: LHsExpr idR -> StmtLR idL idR
+mkBindStmt :: LPat idL -> LHsExpr idR -> StmtLR idL idR
+mkRecStmt  :: [LStmtLR idL idR] -> StmtLR idL idR
+
+
 mkHsIntegral   i       = HsIntegral   i  noSyntaxExpr
 mkHsFractional f       = HsFractional f  noSyntaxExpr
 mkHsIsString   s       = HsIsString   s  noSyntaxExpr
@@ -153,20 +166,26 @@ mkRecStmt stmts	    = RecStmt stmts [] [] [] emptyLHsBinds
 -------------------------------
 --- A useful function for building @OpApps@.  The operator is always a
 -- variable, and we don't know the fixity yet.
+mkHsOpApp :: LHsExpr id -> id -> LHsExpr id -> HsExpr id
 mkHsOpApp e1 op e2 = OpApp e1 (noLoc (HsVar op)) (error "mkOpApp:fixity") e2
 
+mkHsSplice :: LHsExpr RdrName -> HsSplice RdrName
 mkHsSplice e = HsSplice unqualSplice e
 
+unqualSplice :: RdrName
 unqualSplice = mkRdrUnqual (mkVarOccFS FSLIT("splice"))
 		-- A name (uniquified later) to
 		-- identify the splice
 
+mkHsQuasiQuote :: RdrName -> SrcSpan -> FastString -> HsQuasiQuote RdrName
 mkHsQuasiQuote quoter span quote = HsQuasiQuote unqualQuasiQuote quoter span quote
 
+unqualQuasiQuote :: RdrName
 unqualQuasiQuote = mkRdrUnqual (mkVarOccFS FSLIT("quasiquote"))
 		-- A name (uniquified later) to
 		-- identify the quasi-quote
 
+mkHsString :: String -> HsLit
 mkHsString s = HsString (mkFastString s)
 
 -------------
@@ -197,6 +216,7 @@ nlLitPat l = noLoc (LitPat l)
 nlHsApp :: LHsExpr id -> LHsExpr id -> LHsExpr id
 nlHsApp f x = noLoc (HsApp f x)
 
+nlHsIntLit :: Integer -> LHsExpr id
 nlHsIntLit n = noLoc (HsLit (HsInt n))
 
 nlHsApps :: id -> [LHsExpr id] -> LHsExpr id
@@ -223,13 +243,24 @@ nlWildConPat :: DataCon -> LPat RdrName
 nlWildConPat con = noLoc (ConPatIn (noLoc (getRdrName con))
 				   (PrefixCon (nOfThem (dataConSourceArity con) nlWildPat)))
 
+nlTuplePat :: [LPat id] -> Boxity -> LPat id
 nlTuplePat pats box = noLoc (TuplePat pats box placeHolderType)
+
+nlWildPat :: LPat id
 nlWildPat  = noLoc (WildPat placeHolderType)	-- Pre-typechecking
 
 nlHsDo :: HsStmtContext Name -> [LStmt id] -> LHsExpr id -> LHsExpr id
 nlHsDo ctxt stmts body = noLoc (mkHsDo ctxt stmts body)
 
+nlHsOpApp :: LHsExpr id -> id -> LHsExpr id -> LHsExpr id
 nlHsOpApp e1 op e2 = noLoc (mkHsOpApp e1 op e2)
+
+nlHsLam  :: LMatch id -> LHsExpr id
+nlHsPar  :: LHsExpr id -> LHsExpr id
+nlHsIf   :: LHsExpr id -> LHsExpr id -> LHsExpr id -> LHsExpr id
+nlHsCase :: LHsExpr id -> [LMatch id] -> LHsExpr id
+nlTuple  :: [LHsExpr id] -> Boxity -> LHsExpr id
+nlList   :: [LHsExpr id] -> LHsExpr id
 
 nlHsLam	match		= noLoc (HsLam (mkMatchGroup [match]))
 nlHsPar e		= noLoc (HsPar e)
@@ -238,10 +269,15 @@ nlHsCase expr matches	= noLoc (HsCase expr (mkMatchGroup matches))
 nlTuple exprs box	= noLoc (ExplicitTuple exprs box)
 nlList exprs		= noLoc (ExplicitList placeHolderType exprs)
 
+nlHsAppTy :: LHsType name -> LHsType name -> LHsType name
+nlHsTyVar :: name                         -> LHsType name
+nlHsFunTy :: LHsType name -> LHsType name -> LHsType name
+
 nlHsAppTy f t		= noLoc (HsAppTy f t)
 nlHsTyVar x		= noLoc (HsTyVar x)
 nlHsFunTy a b		= noLoc (HsFunTy a b)
 
+nlHsTyConApp :: name -> [LHsType name] -> LHsType name
 nlHsTyConApp tycon tys  = foldl nlHsAppTy (nlHsTyVar tycon) tys
 \end{code}
 
@@ -276,7 +312,7 @@ mk_FunBind :: SrcSpan -> id
 	   -> [([LPat id], LHsExpr id)]
 	   -> LHsBind id
 
-mk_FunBind loc fun [] = panic "TcGenDeriv:mk_FunBind"
+mk_FunBind _   _   [] = panic "TcGenDeriv:mk_FunBind"
 mk_FunBind loc fun pats_and_exprs
   = L loc $ mkFunBind (L loc fun) matches
   where
@@ -317,8 +353,8 @@ collectLocalBinders (HsIPBinds _)   = []
 collectLocalBinders EmptyLocalBinds = []
 
 collectHsValBinders :: HsValBindsLR idL idR -> [Located idL]
-collectHsValBinders (ValBindsIn binds sigs)  = collectHsBindLocatedBinders binds
-collectHsValBinders (ValBindsOut binds sigs) = foldr collect_one [] binds
+collectHsValBinders (ValBindsIn  binds _) = collectHsBindLocatedBinders binds
+collectHsValBinders (ValBindsOut binds _) = foldr collect_one [] binds
   where
    collect_one (_,binds) acc = foldrBag (collectAcc . unLoc) acc binds
 
@@ -326,7 +362,7 @@ collectAcc :: HsBindLR idL idR -> [Located idL] -> [Located idL]
 collectAcc (PatBind { pat_lhs = p }) acc = collectLocatedPatBinders p ++ acc
 collectAcc (FunBind { fun_id = f })  acc    = f : acc
 collectAcc (VarBind { var_id = f })  acc    = noLoc f : acc
-collectAcc (AbsBinds { abs_exports = dbinds, abs_binds = binds }) acc
+collectAcc (AbsBinds { abs_exports = dbinds, abs_binds = _binds }) acc
   = [noLoc dp | (_,dp,_,_) <- dbinds] ++ acc
 	-- ++ foldr collectAcc acc binds
 	-- I don't think we want the binders from the nested binds
@@ -397,6 +433,7 @@ collectLocatedPatsBinders :: [LPat a] -> [Located a]
 collectLocatedPatsBinders pats = foldr collectl [] pats
 
 ---------------------
+collectl :: LPat name -> [Located name] -> [Located name]
 collectl (L l pat) bndrs
   = go pat
   where
@@ -407,14 +444,14 @@ collectl (L l pat) bndrs
     go (LazyPat pat)     	  = collectl pat bndrs
     go (BangPat pat)     	  = collectl pat bndrs
     go (AsPat a pat)     	  = a : collectl pat bndrs
-    go (ViewPat exp pat _)     = collectl pat bndrs
+    go (ViewPat _ pat _)          = collectl pat bndrs
     go (ParPat  pat)     	  = collectl pat bndrs
 				  
     go (ListPat pats _)    	  = foldr collectl bndrs pats
     go (PArrPat pats _)    	  = foldr collectl bndrs pats
     go (TuplePat pats _ _)  	  = foldr collectl bndrs pats
 				  
-    go (ConPatIn c ps)   	  = foldr collectl bndrs (hsConPatArgs ps)
+    go (ConPatIn _ ps)            = foldr collectl bndrs (hsConPatArgs ps)
     go (ConPatOut {pat_args=ps})  = foldr collectl bndrs (hsConPatArgs ps)
 	-- See Note [Dictionary binders in ConPatOut]
     go (LitPat _)	      	  = bndrs
@@ -424,8 +461,8 @@ collectl (L l pat) bndrs
     go (SigPatIn pat _)	 	  = collectl pat bndrs
     go (SigPatOut pat _)	  = collectl pat bndrs
     go (QuasiQuotePat _)          = bndrs
-    go (TypePat ty)               = bndrs
-    go (CoPat _ pat ty)           = collectl (noLoc pat) bndrs
+    go (TypePat _)                = bndrs
+    go (CoPat _ pat _)            = collectl (noLoc pat) bndrs
 \end{code}
 
 Note [Dictionary binders in ConPatOut]
@@ -461,18 +498,20 @@ collectSigTysFromPats pats = foldr collect_lpat [] pats
 collectSigTysFromPat :: InPat name -> [LHsType name]
 collectSigTysFromPat pat = collect_lpat pat []
 
+collect_lpat :: InPat name -> [LHsType name] -> [LHsType name]
 collect_lpat pat acc = collect_pat (unLoc pat) acc
 
+collect_pat :: Pat name -> [LHsType name] -> [LHsType name]
 collect_pat (SigPatIn pat ty)  	acc = collect_lpat pat (ty:acc)
 collect_pat (TypePat ty)       	acc = ty:acc
 
 collect_pat (LazyPat pat)      	acc = collect_lpat pat acc
 collect_pat (BangPat pat)      	acc = collect_lpat pat acc
-collect_pat (AsPat a pat)      	acc = collect_lpat pat acc
+collect_pat (AsPat _ pat)      	acc = collect_lpat pat acc
 collect_pat (ParPat  pat)      	acc = collect_lpat pat acc
 collect_pat (ListPat pats _)   	acc = foldr collect_lpat acc pats
 collect_pat (PArrPat pats _)   	acc = foldr collect_lpat acc pats
 collect_pat (TuplePat pats _ _) acc = foldr collect_lpat acc pats
-collect_pat (ConPatIn c ps)     acc = foldr collect_lpat acc (hsConPatArgs ps)
-collect_pat other	        acc = acc 	-- Literals, vars, wildcard
+collect_pat (ConPatIn _ ps)     acc = foldr collect_lpat acc (hsConPatArgs ps)
+collect_pat _                   acc = acc       -- Literals, vars, wildcard
 \end{code}
