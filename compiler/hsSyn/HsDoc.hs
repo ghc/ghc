@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module HsDoc (
   HsDoc(..),
   LHsDoc,
@@ -13,6 +6,8 @@ module HsDoc (
   ppr_mbDoc
   ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import Outputable
@@ -43,6 +38,7 @@ type LHsDoc a = Located (HsDoc a)
 instance Outputable (HsDoc a) where
   ppr _ = text "<document comment>"
 
+ppr_mbDoc :: Maybe (LHsDoc a) -> SDoc
 ppr_mbDoc (Just doc) = ppr doc
 ppr_mbDoc Nothing    = empty
 
