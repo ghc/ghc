@@ -5,13 +5,6 @@
 \section[HsLit]{Abstract syntax: source-language literals}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module HsLit where
 
 #include "HsVersions.h"
@@ -59,7 +52,7 @@ instance Eq HsLit where
   (HsRat x1 _)	    == (HsRat x2 _)      = x1==x2
   (HsFloatPrim x1)  == (HsFloatPrim x2)  = x1==x2
   (HsDoublePrim x1) == (HsDoublePrim x2) = x1==x2
-  lit1		    == lit2		 = False
+  _                 == _                 = False
 
 data HsOverLit id 	-- An overloaded literal
   = HsIntegral   Integer    (SyntaxExpr id)  PostTcType	-- Integer-looking literals;
@@ -92,18 +85,18 @@ instance Eq (HsOverLit id) where
   (HsIntegral i1 _ _)   == (HsIntegral i2 _ _)   = i1 == i2
   (HsFractional f1 _ _) == (HsFractional f2 _ _) = f1 == f2
   (HsIsString s1 _ _)   == (HsIsString s2 _ _)   = s1 == s2
-  l1		      == l2		     = False
+  _                     == _                     = False
 
 instance Ord (HsOverLit id) where
   compare (HsIntegral i1 _ _)   (HsIntegral i2 _ _)   = i1 `compare` i2
   compare (HsIntegral _ _ _)    (HsFractional _ _ _)  = LT
   compare (HsIntegral _ _ _)    (HsIsString _ _ _)    = LT
   compare (HsFractional f1 _ _) (HsFractional f2 _ _) = f1 `compare` f2
-  compare (HsFractional f1 _ _) (HsIntegral _ _ _)    = GT
-  compare (HsFractional f1 _ _) (HsIsString _ _ _)    = LT
+  compare (HsFractional _ _ _)  (HsIntegral _ _ _)    = GT
+  compare (HsFractional _ _ _)  (HsIsString _ _ _)    = LT
   compare (HsIsString s1 _ _)   (HsIsString s2 _ _)   = s1 `compare` s2
-  compare (HsIsString s1 _ _)   (HsIntegral _ _ _)    = GT
-  compare (HsIsString s1 _ _)   (HsFractional _ _ _)  = GT
+  compare (HsIsString _ _ _)    (HsIntegral _ _ _)    = GT
+  compare (HsIsString _ _ _)    (HsFractional _ _ _)  = GT
 \end{code}
 
 \begin{code}
