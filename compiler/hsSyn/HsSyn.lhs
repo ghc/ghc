@@ -9,13 +9,6 @@ which is declared in the various \tr{Hs*} modules.  This module,
 therefore, is almost nothing but re-exporting.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module HsSyn (
 	module HsBinds,
 	module HsDecls,
@@ -127,9 +120,11 @@ instance (OutputableBndr name)
 
 	pp_modname = ptext SLIT("module") <+> ppr name
 
+pp_mb :: Outputable t => Maybe t -> SDoc
 pp_mb (Just x) = ppr x 
 pp_mb Nothing  = empty
 
+pp_nonnull :: Outputable t => [t] -> SDoc
 pp_nonnull [] = empty
 pp_nonnull xs = vcat (map ppr xs)
 \end{code}
