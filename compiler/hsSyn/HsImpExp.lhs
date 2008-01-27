@@ -6,7 +6,7 @@
 HsImpExp: Abstract syntax: imports, exports, interfaces
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -66,6 +66,7 @@ instance (Outputable name) => Outputable (ImportDecl name) where
 	pp_spec (Just (True, spec))
 			= ptext SLIT("hiding") <+> parens (interpp'SP spec)
 
+ideclName :: ImportDecl name -> Located ModuleName
 ideclName (ImportDecl mod_nm _ _ _ _) = mod_nm
 \end{code}
 
@@ -116,7 +117,7 @@ instance (Outputable name) => Outputable (IE name) where
 	= ppr thing <> parens (fsep (punctuate comma (map pprHsVar withs)))
     ppr (IEModuleContents mod)
 	= ptext SLIT("module") <+> ppr mod
-    ppr (IEGroup n doc)         = text ("<IEGroup: " ++ (show n) ++ ">") 
+    ppr (IEGroup n _)           = text ("<IEGroup: " ++ (show n) ++ ">")
     ppr (IEDoc doc)             = ppr doc
     ppr (IEDocNamed string)     = text ("<IEDocNamed: " ++ string ++ ">")
 \end{code}
@@ -131,13 +132,13 @@ pprHsVar v | isOperator ppr_v = parens ppr_v
 isOperator :: SDoc -> Bool
 isOperator ppr_v 
   = case showSDocUnqual ppr_v of
-	('(':s)   -> False		-- (), (,) etc
-	('[':s)   -> False		-- []
-	('$':c:s) -> not (isAlpha c)	-- Don't treat $d as an operator
-	(':':c:s) -> not (isAlpha c)	-- Don't treat :T as an operator
-	('_':s)   -> False		-- Not an operator
-	(c:s)     -> not (isAlpha c)	-- Starts with non-alpha
-	other     -> False
+        ('(':_)   -> False              -- (), (,) etc
+        ('[':_)   -> False              -- []
+        ('$':c:_) -> not (isAlpha c)    -- Don't treat $d as an operator
+        (':':c:_) -> not (isAlpha c)    -- Don't treat :T as an operator
+        ('_':_)   -> False              -- Not an operator
+        (c:_)     -> not (isAlpha c)    -- Starts with non-alpha
+        _         -> False
     -- We use (showSDoc (ppr v)), rather than isSymOcc (getOccName v) simply so
     -- that we don't need NamedThing in the context of all these functions.
     -- Gruesome, but simple.
