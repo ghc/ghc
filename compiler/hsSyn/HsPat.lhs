@@ -5,7 +5,7 @@
 \section[PatSyntax]{Abstract Haskell syntax---patterns}
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -36,7 +36,6 @@ import {-# SOURCE #-} HsExpr		(SyntaxExpr, LHsExpr, pprLExpr)
 import HsBinds
 import HsLit
 import HsTypes
-import HsDoc
 import BasicTypes
 -- others:
 import Coercion
@@ -271,9 +270,11 @@ pprPat (CoPat co pat _)	      = parens (pprHsWrapper (ppr pat) co)
 pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
 pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
 
+pprUserCon :: (Outputable con, OutputableBndr id) => con -> HsConPatDetails id -> SDoc
 pprUserCon c (InfixCon p1 p2) = ppr p1 <+> ppr c <+> ppr p2
 pprUserCon c details          = ppr c <+> pprConArgs details
 
+pprConArgs ::  OutputableBndr id => HsConPatDetails id -> SDoc
 pprConArgs (PrefixCon pats) = interppSP pats
 pprConArgs (InfixCon p1 p2) = interppSP [p1,p2]
 pprConArgs (RecCon rpats)   = ppr rpats
@@ -326,7 +327,7 @@ mkCoPat co pat ty
   | otherwise        = CoPat co pat ty
 
 mkCoPatCoI :: CoercionI -> Pat id -> Type -> Pat id
-mkCoPatCoI IdCo     pat ty = pat
+mkCoPatCoI IdCo     pat _  = pat
 mkCoPatCoI (ACo co) pat ty = mkCoPat (WpCo co) pat ty
 \end{code}
 
@@ -361,37 +362,41 @@ patterns are treated specially, of course.
 
 The 1.3 report defines what ``irrefutable'' and ``failure-free'' patterns are.
 \begin{code}
+isWildPat :: Pat id -> Bool
 isWildPat (WildPat _) = True
-isWildPat other	      = False
+isWildPat _           = False
 
 patsAreAllCons :: [Pat id] -> Bool
 patsAreAllCons pat_list = all isConPat pat_list
 
+isConPat :: Pat id -> Bool
 isConPat (AsPat _ pat)	 = isConPat (unLoc pat)
 isConPat (ConPatIn {})	 = True
 isConPat (ConPatOut {})  = True
 isConPat (ListPat {})	 = True
 isConPat (PArrPat {})	 = True
 isConPat (TuplePat {})	 = True
-isConPat other		 = False
+isConPat _               = False
 
+isSigPat :: Pat id -> Bool
 isSigPat (SigPatIn _ _)  = True
 isSigPat (SigPatOut _ _) = True
-isSigPat other		 = False
+isSigPat _               = False
 
 patsAreAllLits :: [Pat id] -> Bool
 patsAreAllLits pat_list = all isLitPat pat_list
 
+isLitPat :: Pat id -> Bool
 isLitPat (AsPat _ pat)	        = isLitPat (unLoc pat)
 isLitPat (LitPat _)	        = True
 isLitPat (NPat _ _ _)	        = True
 isLitPat (NPlusKPat _ _ _ _)    = True
-isLitPat other		        = False
+isLitPat _                      = False
 
 isBangHsBind :: HsBind id -> Bool
 -- In this module because HsPat is above HsBinds in the import graph
-isBangHsBind (PatBind { pat_lhs = L _ (BangPat p) }) = True
-isBangHsBind bind				     = False
+isBangHsBind (PatBind { pat_lhs = L _ (BangPat _) }) = True
+isBangHsBind _                                       = False
 
 isIrrefutableHsPat :: LPat id -> Bool
 -- (isIrrefutableHsPat p) is true if matching against p cannot fail,
@@ -410,7 +415,7 @@ isIrrefutableHsPat pat
     go1 (WildPat _)         = True
     go1 (VarPat _)          = True
     go1 (VarPatOut _ _)     = True
-    go1 (LazyPat pat)       = True
+    go1 (LazyPat _)         = True
     go1 (BangPat pat)       = go pat
     go1 (CoPat _ pat _)     = go1 pat
     go1 (ParPat pat)        = go pat
@@ -419,8 +424,8 @@ isIrrefutableHsPat pat
     go1 (SigPatIn pat _)    = go pat
     go1 (SigPatOut pat _)   = go pat
     go1 (TuplePat pats _ _) = all go pats
-    go1 (ListPat pats _)    = False
-    go1 (PArrPat pats _)    = False	-- ?
+    go1 (ListPat _ _)       = False
+    go1 (PArrPat _ _)       = False	-- ?
 
     go1 (ConPatIn _ _) = False	-- Conservative
     go1 (ConPatOut{ pat_con = L _ con, pat_args = details }) 
