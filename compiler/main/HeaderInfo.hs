@@ -1,4 +1,4 @@
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -27,9 +27,8 @@ import FastString
 import HsSyn		( ImportDecl(..), HsModule(..) )
 import Module		( ModuleName, moduleName )
 import PrelNames        ( gHC_PRIM, mAIN_NAME )
-import StringBuffer	( StringBuffer(..), hGetStringBuffer, hGetStringBufferBlock
+import StringBuffer	( StringBuffer(..), hGetStringBufferBlock
                         , appendStringBuffers )
-import Config
 import SrcLoc
 import DynFlags
 import ErrUtils
@@ -47,7 +46,8 @@ import System.IO
 import Data.List
 
 #if !defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ >= 601
-import System.IO		( openBinaryFile )
+  -- already imported above
+--import System.IO		( openBinaryFile )
 #else
 import IOExts                   ( openFileEx, IOModeEx(..) )
 #endif
@@ -79,10 +79,13 @@ getImports dflags buf filename source_filename = do
 	      in
 	      return (source_imps, ordinary_imps, mod)
   
+parseError :: SrcSpan -> Message -> a
 parseError span err = throwDyn $ mkPlainErrMsg span err
 
+isSourceIdecl :: ImportDecl name -> Bool
 isSourceIdecl (ImportDecl _ s _ _ _) = s
 
+getImpMod :: ImportDecl name -> Located ModuleName
 getImpMod (ImportDecl located_mod _ _ _ _) = located_mod
 
 --------------------------------------------------------------
@@ -130,8 +133,8 @@ getOptions' buf filename
     = parseToks (lexAll (pragState buf loc))
     where loc  = mkSrcLoc (mkFastString filename) 1 0
 
-          getToken (buf,L _loc tok) = tok
-          getLoc (buf,L loc _tok) = loc
+          getToken (_buf,L _loc tok) = tok
+          getLoc (_buf,L loc _tok) = loc
           getBuf (buf,_tok) = buf
           combine opts (flag, opts') = (flag, opts++opts')
           add opt (flag, opts) = (flag, opt:opts)
@@ -170,14 +173,14 @@ getOptions' buf filename
           parseLanguage ((_buf,L loc (ITconid fs)):rest)
               = checkExtension (L loc fs) `add`
                 case rest of
-                  (_,L loc ITcomma):more -> parseLanguage more
-                  (_,L loc ITclose_prag):more -> parseToks more
+                  (_,L _loc ITcomma):more -> parseLanguage more
+                  (_,L _loc ITclose_prag):more -> parseToks more
                   (_,L loc _):_ -> languagePragParseError loc
           parseLanguage (tok:_)
               = languagePragParseError (getLoc tok)
           lexToken t = return t
           lexAll state = case unP (lexer lexToken) state of
-                           POk state' t@(L _ ITeof) -> [(buffer state,t)]
+                           POk _      t@(L _ ITeof) -> [(buffer state,t)]
                            POk state' t -> (buffer state,t):lexAll state'
                            _ -> [(buffer state,L (last_loc state) ITeof)]
 
@@ -191,10 +194,12 @@ checkExtension (L l ext)
     then L l ("-X"++ext')
     else unsupportedExtnError l ext'
 
+languagePragParseError :: SrcSpan -> a
 languagePragParseError loc =
   pgmError (showSDoc (mkLocMessage loc (
                 text "cannot parse LANGUAGE pragma")))
 
+unsupportedExtnError :: SrcSpan -> String -> a
 unsupportedExtnError loc unsup =
   pgmError (showSDoc (mkLocMessage loc (
                 text "unsupported extension: " <>
@@ -202,7 +207,7 @@ unsupportedExtnError loc unsup =
 
 
 optionsErrorMsgs :: [String] -> [Located String] -> FilePath -> Messages
-optionsErrorMsgs unhandled_flags flags_lines filename
+optionsErrorMsgs unhandled_flags flags_lines _filename
   = (emptyBag, listToBag (map mkMsg unhandled_flags_lines))
   where	unhandled_flags_lines = [ L l f | f <- unhandled_flags, 
 					  L l f' <- flags_lines, f == f' ]
