@@ -1,6 +1,5 @@
 
 {-# OPTIONS -fno-warn-missing-fields #-}
-{-# OPTIONS -w #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -61,6 +60,8 @@ module DynFlags (
     compilerInfo,
   ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import Module
@@ -87,9 +88,7 @@ import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
 import Data.IORef	( readIORef )
 import Control.Exception ( throwDyn )
 import Control.Monad	( when )
-#ifdef mingw32_TARGET_OS
-import Data.List	( isPrefixOf )
-#else
+#ifndef mingw32_TARGET_OS
 import Util		( split )
 #endif
 
@@ -446,7 +445,7 @@ data GhcLink	-- What to do in the link step, if there is one
 
 isNoLink :: GhcLink -> Bool
 isNoLink NoLink = True
-isNoLink other  = False
+isNoLink _      = False
 
 data PackageFlag
   = ExposePackage  String
@@ -454,10 +453,12 @@ data PackageFlag
   | IgnorePackage  String
   deriving Eq
 
+defaultHscTarget :: HscTarget
 defaultHscTarget = defaultObjectTarget
 
 -- | the 'HscTarget' value corresponding to the default way to create
 -- object files on the current platform.
+defaultObjectTarget :: HscTarget
 defaultObjectTarget
   | cGhcWithNativeCodeGen == "YES" 	=  HscAsm
   | otherwise				=  HscC
@@ -468,6 +469,7 @@ data DynLibLoader
   | SystemDependent
   deriving Eq
 
+initDynFlags :: DynFlags -> IO DynFlags
 initDynFlags dflags = do
  -- someday these will be dynamic flags
  ways <- readIORef v_Ways
@@ -479,6 +481,7 @@ initDynFlags dflags = do
 	rtsBuildTag	= rts_build_tag
 	}
 
+defaultDynFlags :: DynFlags
 defaultDynFlags =
      DynFlags {
 	ghcMode			= CompManager,
@@ -598,6 +601,14 @@ getVerbFlag dflags
   | verbosity dflags >= 3  = "-v" 
   | otherwise =  ""
 
+setObjectDir, setHiDir, setStubDir, setObjectSuf, setHiSuf, setHcSuf, parseDynLibLoaderMode,
+         setPgmP, setPgmL, setPgmF, setPgmc, setPgmm, setPgms, setPgma, setPgml, setPgmdll, setPgmwindres,
+         addOptL, addOptP, addOptF, addOptc, addOptm, addOpta, addOptl, addOptdep, addOptwindres,
+         addCmdlineFramework, addHaddockOpts
+   :: String -> DynFlags -> DynFlags
+setOutputFile, setOutputHi, setDumpPrefixForce
+   :: Maybe String -> DynFlags -> DynFlags
+
 setObjectDir  f d = d{ objectDir  = Just f}
 setHiDir      f d = d{ hiDir      = Just f}
 setStubDir    f d = d{ stubDir    = Just f, includePaths = f : includePaths d }
@@ -709,6 +720,7 @@ optLevelFlags
 -- -----------------------------------------------------------------------------
 -- Standard sets of warning options
 
+standardWarnings :: [DynFlag]
 standardWarnings
     = [ Opt_WarnDeprecations,
 	Opt_WarnOverlappingPatterns,
@@ -717,6 +729,7 @@ standardWarnings
 	Opt_WarnDuplicateExports
       ]
 
+minusWOpts :: [DynFlag]
 minusWOpts
     = standardWarnings ++ 
       [	Opt_WarnUnusedBinds,
@@ -726,6 +739,7 @@ minusWOpts
 	Opt_WarnDodgyImports
       ]
 
+minusWallOpts :: [DynFlag]
 minusWallOpts
     = minusWOpts ++
       [	Opt_WarnTypeDefaults,
@@ -736,6 +750,7 @@ minusWallOpts
       ]
 
 -- minuswRemovesOpts should be every warning option
+minuswRemovesOpts :: [DynFlag]
 minuswRemovesOpts
     = minusWallOpts ++
       [Opt_WarnImplicitPrelude,
@@ -792,7 +807,7 @@ data FloatOutSwitches
 -- The core-to-core pass ordering is derived from the DynFlags:
 runWhen :: Bool -> CoreToDo -> CoreToDo
 runWhen True  do_this = do_this
-runWhen False do_this = CoreDoNothing
+runWhen False _       = CoreDoNothing
 
 runMaybe :: Maybe a -> (a -> CoreToDo) -> CoreToDo
 runMaybe (Just x) f = f x
@@ -1206,6 +1221,7 @@ dynamic_flags = [
 
 -- these -f<blah> flags can all be reversed with -fno-<blah>
 
+fFlags :: [(String, DynFlag)]
 fFlags = [
   ( "warn-dodgy-imports",               Opt_WarnDodgyImports ),
   ( "warn-duplicate-exports",           Opt_WarnDuplicateExports ),
@@ -1363,6 +1379,7 @@ impliedFlags = [
 							-- 	Note [Scoped tyvars] in TcBinds
   ]
 
+glasgowExtsFlags :: [DynFlag]
 glasgowExtsFlags = [
              Opt_PrintExplicitForalls
            , Opt_ForeignFunctionInterface
@@ -1408,7 +1425,7 @@ isPrefFlag pref flags no_f
 ------------------
 getFlag :: [(String,a)] -> String -> a
 getFlag flags f = case [ opt | (ff, opt) <- flags, ff == f] of
-                      (o:os) -> o
+                      (o:_)  -> o
                       []     -> panic ("get_flag " ++ f)
 
 getPrefFlag :: String -> [(String,a)] -> String -> a
@@ -1455,10 +1472,13 @@ setDumpFlag dump_flag
 setVerbosity :: Maybe Int -> DynP ()
 setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })
 
+addCmdlineHCInclude :: String -> DynP ()
 addCmdlineHCInclude a = upd (\s -> s{cmdlineHcIncludes =  a : cmdlineHcIncludes s})
 
+extraPkgConf_ :: FilePath -> DynP ()
 extraPkgConf_  p = upd (\s -> s{ extraPkgConfs = p : extraPkgConfs s })
 
+exposePackage, hidePackage, ignorePackage :: String -> DynP ()
 exposePackage p = 
   upd (\s -> s{ packageFlags = ExposePackage p : packageFlags s })
 hidePackage p = 
@@ -1466,6 +1486,7 @@ hidePackage p =
 ignorePackage p = 
   upd (\s -> s{ packageFlags = IgnorePackage p : packageFlags s })
 
+setPackageName :: String -> DynFlags -> DynFlags
 setPackageName p
   | Nothing <- unpackPackageId pid
   = throwDyn (CmdLineError ("cannot parse \'" ++ p ++ "\' as a package identifier"))
@@ -1476,6 +1497,7 @@ setPackageName p
 
 -- If we're linking a binary, then only targets that produce object
 -- code are allowed (requests for other target types are ignored).
+setTarget :: HscTarget -> DynP ()
 setTarget l = upd set
   where 
    set dfs 
@@ -1486,6 +1508,7 @@ setTarget l = upd set
 -- used by -fasm and -fvia-C, which switch from one to the other, but
 -- not from bytecode to object-code.  The idea is that -fasm/-fvia-C
 -- can be safely used in an OPTIONS_GHC pragma.
+setObjTarget :: HscTarget -> DynP ()
 setObjTarget l = upd set
   where 
    set dfs 
@@ -1520,6 +1543,8 @@ setMainIs arg
 -----------------------------------------------------------------------------
 -- Paths & Libraries
 
+addImportPath, addLibraryPath, addIncludePath, addFrameworkPath :: FilePath -> DynP ()
+
 -- -i on its own deletes the import paths
 addImportPath "" = upd (\s -> s{importPaths = []})
 addImportPath p  = upd (\s -> s{importPaths = importPaths s ++ splitPathList p})
@@ -1534,7 +1559,10 @@ addIncludePath p =
 addFrameworkPath p = 
   upd (\s -> s{frameworkPaths = frameworkPaths s ++ splitPathList p})
 
+#ifndef mingw32_TARGET_OS
+split_marker :: Char
 split_marker = ':'   -- not configurable (ToDo)
+#endif
 
 splitPathList :: String -> [String]
 splitPathList s = filter notNull (splitUp s)
@@ -1578,7 +1606,7 @@ splitPathList s = filter notNull (splitUp s)
     -- finding the next split marker.
     findNextPath xs = 
         case break (`elem` split_markers) xs of
-	   (p, d:ds) -> (p, ds)
+           (p, _:ds) -> (p, ds)
 	   (p, xs)   -> (p, xs)
 
     split_markers :: [Char]
@@ -1723,7 +1751,7 @@ machdepCCOpts dflags
 #endif
 
 picCCOpts :: DynFlags -> [String]
-picCCOpts dflags
+picCCOpts _dflags
 #if darwin_TARGET_OS
       -- Apple prefers to do things the other way round.
       -- PIC is on by default.
