@@ -4,13 +4,6 @@
 \section[ErrsUtils]{Utilities for error reporting}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module ErrUtils (
 	Message, mkLocMessage, printError,
 	Severity(..),
@@ -34,9 +27,10 @@ module ErrUtils (
 	debugTraceMsg,	
     ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
-import Module		( ModLocation(..))
 import Bag		( Bag, bagToList, isEmptyBag, emptyBag )
 import SrcLoc		( SrcSpan )
 import Util		( sortLe )
@@ -145,7 +139,7 @@ printBagOfErrors :: DynFlags -> Bag ErrMsg -> IO ()
 printBagOfErrors dflags bag_of_errors
   = sequence_   [ let style = mkErrStyle unqual
 		  in log_action dflags SevError s style (d $$ e)
-		| ErrMsg { errMsgSpans = s:ss,
+		| ErrMsg { errMsgSpans = s:_,
 			   errMsgShortDoc = d,
 			   errMsgExtraInfo = e,
 			   errMsgContext = unqual } <- sorted_errs ]
@@ -163,7 +157,7 @@ printBagOfWarnings :: DynFlags -> Bag ErrMsg -> IO ()
 printBagOfWarnings dflags bag_of_warns
   = sequence_   [ let style = mkErrStyle unqual
 		  in log_action dflags SevWarning s style (d $$ e)
-		| ErrMsg { errMsgSpans = s:ss,
+		| ErrMsg { errMsgSpans = s:_,
 			   errMsgShortDoc = d,
 			   errMsgExtraInfo = e,
 			   errMsgContext = unqual } <- sorted_errs ]
@@ -223,6 +217,7 @@ dumpIfSet_dyn_or dflags flags hdr doc
   = printDump (mkDumpDoc hdr doc)
   | otherwise = return ()
 
+mkDumpDoc :: String -> SDoc -> SDoc
 mkDumpDoc hdr doc 
    = vcat [text "", 
 	   line <+> text hdr <+> line,
