@@ -7,7 +7,7 @@
 Datatype for: @BindGroup@, @Bind@, @Sig@, @Bind@.
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -397,7 +397,7 @@ idHsWrapper = WpHole
 
 isIdHsWrapper :: HsWrapper -> Bool
 isIdHsWrapper WpHole = True
-isIdHsWrapper other  = False
+isIdHsWrapper _      = False
 \end{code}
 
 
@@ -456,11 +456,13 @@ data Prag
 	PostTcType 	-- specialises the polymorphic function
 	InlineSpec 	-- Inlining spec for the specialised function
 
+isInlinePrag :: Prag -> Bool
 isInlinePrag (InlinePrag _) = True
-isInlinePrag prag	    = False
+isInlinePrag _              = False
 
+isSpecPrag :: Prag -> Bool
 isSpecPrag (SpecPrag {}) = True
-isSpecPrag prag		 = False
+isSpecPrag _             = False
 \end{code}
 
 \begin{code}
@@ -470,19 +472,19 @@ okBindSig ns sig = sigForThisGroup ns sig
 okHsBootSig :: LSig Name -> Bool
 okHsBootSig (L _ (TypeSig  _ _)) = True
 okHsBootSig (L _ (FixSig _)) 	 = True
-okHsBootSig sig	      	     	 = False
+okHsBootSig _                    = False
 
 okClsDclSig :: LSig Name -> Bool
 okClsDclSig (L _ (SpecInstSig _)) = False
-okClsDclSig sig 	          = True	-- All others OK
+okClsDclSig _                     = True        -- All others OK
 
 okInstDclSig :: NameSet -> LSig Name -> Bool
 okInstDclSig ns lsig@(L _ sig) = ok ns sig
   where
-    ok ns (TypeSig _ _)	  = False
-    ok ns (FixSig _)	  = False
-    ok ns (SpecInstSig _) = True
-    ok ns sig		  = sigForThisGroup ns lsig
+    ok _  (TypeSig _ _)   = False
+    ok _  (FixSig _)      = False
+    ok _  (SpecInstSig _) = True
+    ok ns _               = sigForThisGroup ns lsig
 
 sigForThisGroup :: NameSet -> LSig Name -> Bool
 sigForThisGroup ns sig
@@ -498,7 +500,7 @@ sigNameNoLoc (TypeSig   n _)          = Just (unLoc n)
 sigNameNoLoc (SpecSig   n _ _)        = Just (unLoc n)
 sigNameNoLoc (InlineSig n _)          = Just (unLoc n)
 sigNameNoLoc (FixSig (FixitySig n _)) = Just (unLoc n)
-sigNameNoLoc other		                = Nothing
+sigNameNoLoc _                        = Nothing
 
 isFixityLSig :: LSig name -> Bool
 isFixityLSig (L _ (FixSig {})) = True
@@ -506,29 +508,31 @@ isFixityLSig _	               = False
 
 isVanillaLSig :: LSig name -> Bool
 isVanillaLSig (L _(TypeSig {})) = True
-isVanillaLSig sig	        = False
+isVanillaLSig _                 = False
 
 isSpecLSig :: LSig name -> Bool
 isSpecLSig (L _(SpecSig {})) = True
-isSpecLSig sig	     	     = False
+isSpecLSig _                 = False
 
+isSpecInstLSig :: LSig name -> Bool
 isSpecInstLSig (L _ (SpecInstSig {})) = True
-isSpecInstLSig sig	       	      = False
+isSpecInstLSig _                      = False
 
 isPragLSig :: LSig name -> Bool
 	-- Identifies pragmas 
 isPragLSig (L _ (SpecSig {}))   = True
 isPragLSig (L _ (InlineSig {})) = True
-isPragLSig other		= False
+isPragLSig _                    = False
 
 isInlineLSig :: LSig name -> Bool
 	-- Identifies inline pragmas 
 isInlineLSig (L _ (InlineSig {})) = True
-isInlineLSig other		  = False
+isInlineLSig _                    = False
 
+hsSigDoc :: Sig name -> SDoc
 hsSigDoc (TypeSig {}) 		= ptext SLIT("type signature")
 hsSigDoc (SpecSig {})	 	= ptext SLIT("SPECIALISE pragma")
-hsSigDoc (InlineSig _ spec)   	= ptext SLIT("INLINE pragma")
+hsSigDoc (InlineSig {})         = ptext SLIT("INLINE pragma")
 hsSigDoc (SpecInstSig {})	= ptext SLIT("SPECIALISE instance pragma")
 hsSigDoc (FixSig {}) 		= ptext SLIT("fixity declaration")
 \end{code}
@@ -539,7 +543,7 @@ Signature equality is used when checking for duplicate signatures
 eqHsSig :: LSig Name -> LSig Name -> Bool
 eqHsSig (L _ (FixSig (FixitySig n1 _))) (L _ (FixSig (FixitySig n2 _))) = unLoc n1 == unLoc n2
 eqHsSig (L _ (TypeSig n1 _))         	(L _ (TypeSig n2 _))            = unLoc n1 == unLoc n2
-eqHsSig (L _ (InlineSig n1 s1))	(L _ (InlineSig n2 s2))    	        = unLoc n1 == unLoc n2
+eqHsSig (L _ (InlineSig n1 _))          (L _ (InlineSig n2 _))          = unLoc n1 == unLoc n2
  	-- For specialisations, we don't have equality over
 	-- HsType, so it's not convenient to spot duplicate 
 	-- specialisations here.  Check for this later, when we're in Type land
@@ -570,7 +574,7 @@ pprSpec :: (Outputable id, Outputable ty) => id -> ty -> InlineSpec -> SDoc
 pprSpec var ty inl = sep [ptext SLIT("SPECIALIZE") <+> ppr inl <+> pprVarSig var ty]
 
 pprPrag :: Outputable id => id -> LPrag -> SDoc
-pprPrag var (L _ (InlinePrag inl))       = ppr inl <+> ppr var
-pprPrag var (L _ (SpecPrag expr ty inl)) = pprSpec var ty inl
+pprPrag var (L _ (InlinePrag inl))        = ppr inl <+> ppr var
+pprPrag var (L _ (SpecPrag _expr ty inl)) = pprSpec var ty inl
 \end{code}
 
