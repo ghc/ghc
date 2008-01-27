@@ -6,13 +6,6 @@
 HsTypes: Abstract syntax: user-defined types
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module HsTypes (
 	HsType(..), LHsType, 
 	HsTyVarBndr(..), LHsTyVarBndr,
@@ -179,6 +172,8 @@ data HsExplicitForAll = Explicit | Implicit
 --
 -- A valid type must have one for-all at the top of the type, or of the fn arg types
 
+mkImplicitHsForAllTy ::                        LHsContext name -> LHsType name -> HsType name
+mkExplicitHsForAllTy :: [LHsTyVarBndr name] -> LHsContext name -> LHsType name -> HsType name
 mkImplicitHsForAllTy     ctxt ty = mkHsForAllTy Implicit [] ctxt ty
 mkExplicitHsForAllTy tvs ctxt ty = mkHsForAllTy Explicit tvs ctxt ty
 
@@ -188,6 +183,7 @@ mkHsForAllTy exp tvs (L _ []) ty = mk_forall_ty exp tvs ty
 mkHsForAllTy exp tvs ctxt ty = HsForAllTy exp tvs ctxt ty
 
 -- mk_forall_ty makes a pure for-all type (no context)
+mk_forall_ty :: HsExplicitForAll -> [LHsTyVarBndr name] -> LHsType name -> HsType name
 mk_forall_ty exp  tvs  (L _ (HsParTy ty))		    = mk_forall_ty exp tvs ty
 mk_forall_ty exp1 tvs1 (L _ (HsForAllTy exp2 tvs2 ctxt ty)) = mkHsForAllTy (exp1 `plus` exp2) (tvs1 ++ tvs2) ctxt ty
 mk_forall_ty exp  tvs  ty			            = HsForAllTy exp tvs (L noSrcSpan []) ty
@@ -197,13 +193,14 @@ mk_forall_ty exp  tvs  ty			            = HsForAllTy exp tvs (L noSrcSpan []) ty
 	--	(see the sigtype production in Parser.y.pp)
 	-- 	so that (forall. ty) isn't implicitly quantified
 
+plus :: HsExplicitForAll -> HsExplicitForAll -> HsExplicitForAll
 Implicit `plus` Implicit = Implicit
-exp1     `plus` exp2     = Explicit
+_        `plus` _        = Explicit
 
 hsExplicitTvs :: LHsType name -> [name]
 -- The explicitly-given forall'd type variables of a HsType
 hsExplicitTvs (L _ (HsForAllTy Explicit tvs _ _)) = hsLTyVarNames tvs
-hsExplicitTvs other   			          = []
+hsExplicitTvs _                                   = []
 
 ---------------------
 type LHsTyVarBndr name = Located (HsTyVarBndr name)
@@ -235,8 +232,8 @@ hsLTyVarLocNames :: [LHsTyVarBndr name] -> [Located name]
 hsLTyVarLocNames = map hsLTyVarLocName
 
 replaceTyVarName :: HsTyVarBndr name1 -> name2 -> HsTyVarBndr name2
-replaceTyVarName (UserTyVar n)     n' = UserTyVar n'
-replaceTyVarName (KindedTyVar n k) n' = KindedTyVar n' k
+replaceTyVarName (UserTyVar _)     n' = UserTyVar n'
+replaceTyVarName (KindedTyVar _ k) n' = KindedTyVar n' k
 \end{code}
 
 
@@ -256,13 +253,13 @@ splitHsInstDeclTy inst_ty
   where
     split_tau tvs cxt (HsPredTy (HsClassP cls tys)) = (tvs, cxt, cls, tys)
     split_tau tvs cxt (HsParTy (L _ ty))	    = split_tau tvs cxt ty
-    split_tau _ _ other = pprPanic "splitHsInstDeclTy" (ppr inst_ty)
+    split_tau _ _ _ = pprPanic "splitHsInstDeclTy" (ppr inst_ty)
 
 -- Splits HsType into the (init, last) parts
 -- Breaks up any parens in the result type: 
 --	splitHsFunType (a -> (b -> c)) = ([a,b], c)
 splitHsFunType :: LHsType name -> ([LHsType name], LHsType name)
-splitHsFunType (L l (HsFunTy x y)) = (x:args, res)
+splitHsFunType (L _ (HsFunTy x y)) = (x:args, res)
   where
   (args, res) = splitHsFunType y
 splitHsFunType (L _ (HsParTy ty))  = splitHsFunType ty
@@ -297,6 +294,7 @@ pprHsTyVarBndr :: Outputable name => name -> Kind -> SDoc
 pprHsTyVarBndr name kind | isLiftedTypeKind kind = ppr name
 			 | otherwise 	  	 = hsep [ppr name, dcolon, pprParendKind kind]
 
+pprHsForAll :: OutputableBndr name => HsExplicitForAll -> [LHsTyVarBndr name] ->  LHsContext name -> SDoc
 pprHsForAll exp tvs cxt 
   | show_forall = forall_part <+> pprHsContext (unLoc cxt)
   | otherwise   = pprHsContext (unLoc cxt)
@@ -310,18 +308,20 @@ pprHsContext :: (OutputableBndr name) => HsContext name -> SDoc
 pprHsContext []	 = empty
 pprHsContext cxt = ppr_hs_context cxt <+> ptext SLIT("=>")
 
+ppr_hs_context :: (OutputableBndr name) => HsContext name -> SDoc
 ppr_hs_context []  = empty
 ppr_hs_context cxt = parens (interpp'SP cxt)
 \end{code}
 
 \begin{code}
-pREC_TOP = (0 :: Int)  -- type   in ParseIface.y
-pREC_FUN = (1 :: Int)  -- btype  in ParseIface.y
-			-- Used for LH arg of (->)
-pREC_OP  = (2 :: Int)	-- Used for arg of any infix operator
-			-- (we don't keep their fixities around)
-pREC_CON = (3 :: Int)	-- Used for arg of type applicn: 
-			-- always parenthesise unless atomic
+pREC_TOP, pREC_FUN, pREC_OP, pREC_CON :: Int
+pREC_TOP = 0  -- type   in ParseIface.y
+pREC_FUN = 1  -- btype  in ParseIface.y
+              -- Used for LH arg of (->)
+pREC_OP  = 2  -- Used for arg of any infix operator
+              -- (we don't keep their fixities around)
+pREC_CON = 3  -- Used for arg of type applicn:
+              -- always parenthesise unless atomic
 
 maybeParen :: Int 	-- Precedence of context
 	   -> Int	-- Precedence of top-level operator
@@ -340,25 +340,28 @@ pprParendHsType ty = ppr_mono_ty pREC_CON ty
 -- (a) Remove outermost HsParTy parens
 -- (b) Drop top-level for-all type variables in user style
 --     since they are implicit in Haskell
+prepare :: PprStyle -> HsType name -> HsType name
 prepare sty (HsParTy ty)	  = prepare sty (unLoc ty)
-prepare sty ty			  = ty
+prepare _   ty                    = ty
 
+ppr_mono_lty :: (OutputableBndr name) => Int -> LHsType name -> SDoc
 ppr_mono_lty ctxt_prec ty = ppr_mono_ty ctxt_prec (unLoc ty)
 
+ppr_mono_ty :: (OutputableBndr name) => Int -> HsType name -> SDoc
 ppr_mono_ty ctxt_prec (HsForAllTy exp tvs ctxt ty)
   = maybeParen ctxt_prec pREC_FUN $
     sep [pprHsForAll exp tvs ctxt, ppr_mono_lty pREC_TOP ty]
 
-ppr_mono_ty ctxt_prec (HsBangTy b ty)     = ppr b <> ppr ty
-ppr_mono_ty ctxt_prec (HsTyVar name)      = ppr name
+ppr_mono_ty _         (HsBangTy b ty)     = ppr b <> ppr ty
+ppr_mono_ty _         (HsTyVar name)      = ppr name
 ppr_mono_ty ctxt_prec (HsFunTy ty1 ty2)   = ppr_fun_ty ctxt_prec ty1 ty2
-ppr_mono_ty ctxt_prec (HsTupleTy con tys) = tupleParens con (interpp'SP tys)
-ppr_mono_ty ctxt_prec (HsKindSig ty kind) = parens (ppr_mono_lty pREC_TOP ty <+> dcolon <+> pprKind kind)
-ppr_mono_ty ctxt_prec (HsListTy ty)	  = brackets (ppr_mono_lty pREC_TOP ty)
-ppr_mono_ty ctxt_prec (HsPArrTy ty)	  = pabrackets (ppr_mono_lty pREC_TOP ty)
-ppr_mono_ty ctxt_prec (HsPredTy pred)     = ppr pred
-ppr_mono_ty ctxt_prec (HsNumTy n)         = integer n  -- generics only
-ppr_mono_ty ctxt_prec (HsSpliceTy s)      = pprSplice s
+ppr_mono_ty _         (HsTupleTy con tys) = tupleParens con (interpp'SP tys)
+ppr_mono_ty _         (HsKindSig ty kind) = parens (ppr_mono_lty pREC_TOP ty <+> dcolon <+> pprKind kind)
+ppr_mono_ty _         (HsListTy ty)	  = brackets (ppr_mono_lty pREC_TOP ty)
+ppr_mono_ty _         (HsPArrTy ty)	  = pabrackets (ppr_mono_lty pREC_TOP ty)
+ppr_mono_ty _         (HsPredTy pred)     = ppr pred
+ppr_mono_ty _         (HsNumTy n)         = integer n  -- generics only
+ppr_mono_ty _         (HsSpliceTy s)      = pprSplice s
 
 ppr_mono_ty ctxt_prec (HsAppTy fun_ty arg_ty)
   = maybeParen ctxt_prec pREC_CON $
@@ -368,16 +371,17 @@ ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2)
   = maybeParen ctxt_prec pREC_OP $
     ppr_mono_lty pREC_OP ty1 <+> ppr op <+> ppr_mono_lty pREC_OP ty2
 
-ppr_mono_ty ctxt_prec (HsParTy ty)
+ppr_mono_ty _         (HsParTy ty)
   = parens (ppr_mono_lty pREC_TOP ty)
   -- Put the parens in where the user did
   -- But we still use the precedence stuff to add parens because
   --	toHsType doesn't put in any HsParTys, so we may still need them
 
-ppr_mono_ty ctxt_prec (HsDocTy ty doc)
+ppr_mono_ty _         (HsDocTy ty doc)
   = ppr ty <+> ppr (unLoc doc)
 
 --------------------------
+ppr_fun_ty :: (OutputableBndr name) => Int -> LHsType name -> LHsType name -> SDoc
 ppr_fun_ty ctxt_prec ty1 ty2
   = let p1 = ppr_mono_lty pREC_FUN ty1
 	p2 = ppr_mono_lty pREC_TOP ty2
@@ -386,6 +390,7 @@ ppr_fun_ty ctxt_prec ty1 ty2
     sep [p1, ptext SLIT("->") <+> p2]
 
 --------------------------
+pabrackets :: SDoc -> SDoc
 pabrackets p = ptext SLIT("[:") <> p <> ptext SLIT(":]")
 \end{code}
 
