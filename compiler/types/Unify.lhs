@@ -161,7 +161,8 @@ match menv subst (TyVarTy tv1) ty2
 	    -> Nothing	-- Occurs check
 	    | otherwise	
 	    -> do { subst1 <- match_kind menv subst tv1 ty2
-		  ; return (extendVarEnv subst tv1' ty2) }
+		  ; return (extendVarEnv subst1 tv1' ty2) }
+			-- Note [Matching kinds]
 
 	Just ty1' 	-- There is an existing binding; check whether ty2 matches it
 	    | tcEqTypeX (nukeRnEnvL rn_env) ty1' ty2
