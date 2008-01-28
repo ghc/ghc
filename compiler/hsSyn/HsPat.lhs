@@ -398,7 +398,7 @@ isBangHsBind :: HsBind id -> Bool
 isBangHsBind (PatBind { pat_lhs = L _ (BangPat _) }) = True
 isBangHsBind _                                       = False
 
-isIrrefutableHsPat :: LPat id -> Bool
+isIrrefutableHsPat :: OutputableBndr id => LPat id -> Bool
 -- (isIrrefutableHsPat p) is true if matching against p cannot fail,
 -- in the sense of falling through to the next pattern.
 --	(NB: this is not quite the same as the (silly) defn
@@ -436,6 +436,10 @@ isIrrefutableHsPat pat
     go1 (NPat _ _ _)	   = False
     go1 (NPlusKPat _ _ _ _) = False
 
-    go1 (TypePat _)   = panic "isIrrefutableHsPat: type pattern"
+    go1 (QuasiQuotePat {}) = urk pat	-- Gotten rid of by renamer, before
+					-- isIrrefutablePat is called
+    go1 (TypePat {})       = urk pat
+
+    urk pat = pprPanic "isIrrefutableHsPat:" (ppr pat)
 \end{code}
 
