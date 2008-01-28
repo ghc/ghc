@@ -727,6 +727,11 @@ pprConDecl (ConDecl con expl tvs cxt (PrefixCon arg_tys) (ResTyGADT res_ty) _)
 pprConDecl (ConDecl con expl tvs cxt (RecCon fields) (ResTyGADT res_ty) _)
   = sep [pprHsForAll expl tvs cxt, ppr con <+> ppr_fields fields <+> dcolon <+> ppr res_ty]
 
+pprConDecl (ConDecl con expl tvs cxt (InfixCon _ _) (ResTyGADT res_ty) _)
+  = pprPanic "pprConDecl" (ppr con)
+	-- In GADT syntax we don't allow infix constructors
+
+
 ppr_fields :: OutputableBndr name => [ConDeclField name] -> SDoc
 ppr_fields fields = braces (sep (punctuate comma (map ppr_fld fields)))
   where
