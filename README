@@ -64,15 +64,20 @@ There are two ways to get a source tree:
 Building & Installing
 =====================
 
+For full information on building GHC, see the GHC Building Guide [3].
+Here follows a summary - if you get into trouble, the Building Guide
+has all the answers.
+
 NB. you need GHC installed in order to build GHC, because the compiler
 is itself written in Haskell.  It is possible to build GHC using just
 a C compiler, but we don't recommend this as the normal route.  If you
-*really* want to do it this way, then see the Building Guide (link
-below).
+*really* want to do it this way, then see the Building Guide.
 
-You also need a few other tools installed: Happy [4], Alex [5], and
-Haddock [6] (for building library documentation), and a good DocBook
-XML toolchain if you want to build the compiler documentation.
+If you're building from darcs sources (as opposed to a source
+distribution) then you also need to install Happy [4] and Alex [5].
+
+For building library documentation, you'll need Haddock [6].  To build
+the compiler documentation, you need a good DocBook XML toolchain.
 
 Quick start:  the following gives you a default build:
 
@@ -100,7 +105,6 @@ optimised and built in various ways (eg. profiling libs are built).
 It can take a long time.  To customise the build, see the file
 HACKING.
 
-For full information on building GHC, see the GHC Building Guide [3].
 
 
 References
