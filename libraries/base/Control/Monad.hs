@@ -39,7 +39,7 @@ module Control.Monad
     , (=<<)         -- :: (Monad m) => (a -> m b) -> m a -> m b
     , (>=>)         -- :: (Monad m) => (a -> m b) -> (b -> m c) -> (a -> m c)
     , (<=<)         -- :: (Monad m) => (b -> m c) -> (a -> m b) -> (a -> m c)
-    , forever       -- :: (Monad m) => m a -> m ()
+    , forever       -- :: (Monad m) => m a -> m b
 
     -- ** Generalisations of list functions
 
@@ -187,7 +187,7 @@ f >=> g     = \x -> f x >>= g
 (<=<)       = flip (>=>)
 
 -- | @'forever' act@ repeats the action infinitely.
-forever     :: (Monad m) => m a -> m ()
+forever     :: (Monad m) => m a -> m b
 forever a   = a >> forever a
 
 -- -----------------------------------------------------------------------------
