@@ -656,15 +656,6 @@ nonAbsentArgs (d   : ds) = 1 + nonAbsentArgs ds
 %************************************************************************
 
 \begin{code}
-splitDmdTy :: DmdType -> (Demand, DmdType)
--- Split off one function argument
--- We already have a suitable demand on all
--- free vars, so no need to add more!
-splitDmdTy (DmdType fv (dmd:dmds) res_ty) = (dmd, DmdType fv dmds res_ty)
-splitDmdTy ty@(DmdType fv [] res_ty)      = (resTypeArgDmd res_ty, ty)
-\end{code}
-
-\begin{code}
 unitVarDmd var dmd = DmdType (unitVarEnv var dmd) [] TopRes
 
 addVarDmd top_lvl dmd_ty@(DmdType fv ds res) var dmd
@@ -869,6 +860,13 @@ dmdTransform sigs var dmd
 %************************************************************************
 
 \begin{code}
+splitDmdTy :: DmdType -> (Demand, DmdType)
+-- Split off one function argument
+-- We already have a suitable demand on all
+-- free vars, so no need to add more!
+splitDmdTy (DmdType fv (dmd:dmds) res_ty) = (dmd, DmdType fv dmds res_ty)
+splitDmdTy ty@(DmdType fv [] res_ty)      = (resTypeArgDmd res_ty, ty)
+
 splitCallDmd :: Demand -> (Int, Demand)
 splitCallDmd (Call d) = case splitCallDmd d of
 			  (n, r) -> (n+1, r)
@@ -883,7 +881,6 @@ deferType (DmdType fv _ _) = DmdType (deferEnv fv) [] TopRes
 	-- Notice that we throw away info about both arguments and results
 	-- For example,   f = let ... in \x -> x
 	-- We don't want to get a stricness type V->T for f.
-	-- Peter??
 
 deferEnv :: DmdEnv -> DmdEnv
 deferEnv fv = mapVarEnv defer fv
