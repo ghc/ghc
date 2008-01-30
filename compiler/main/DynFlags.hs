@@ -88,9 +88,6 @@ import {-# SOURCE #-} ErrUtils ( Severity(..), Message, mkLocMessage )
 import Data.IORef	( readIORef )
 import Control.Exception ( throwDyn )
 import Control.Monad	( when )
-#ifndef mingw32_TARGET_OS
-import Util		( split )
-#endif
 
 import Data.Char
 import System.FilePath
@@ -1670,7 +1667,7 @@ setOptHpcDir arg  = upd $ \ d -> d{hpcDir = arg}
 
 machdepCCOpts :: DynFlags -> ([String], -- flags for all C compilations
 			      [String]) -- for registerised HC compilations
-machdepCCOpts dflags
+machdepCCOpts _dflags
 #if alpha_TARGET_ARCH
 	=       ( ["-w", "-mieee"
 #ifdef HAVE_THREADED_RTS_SUPPORT
@@ -1703,7 +1700,7 @@ machdepCCOpts dflags
       --
       -- -fomit-frame-pointer : *must* in .hc files; because we're stealing
       --   the fp (%ebp) for our register maps.
-	=  let n_regs = stolen_x86_regs dflags
+	=  let n_regs = stolen_x86_regs _dflags
 	       sta = opt_Static
 	   in
 	            ( [ if sta then "-DDONT_WANT_WIN32_DLL_SUPPORT" else ""

@@ -1521,7 +1521,7 @@ rhsIsStatic :: PackageId -> CoreExpr -> Bool
 -- When opt_RuntimeTypes is on, we keep type lambdas and treat
 -- them as making the RHS re-entrant (non-updatable).
 
-rhsIsStatic this_pkg rhs = is_static False rhs
+rhsIsStatic _this_pkg rhs = is_static False rhs
   where
   is_static :: Bool	-- True <=> in a constructor argument; must be atomic
   	  -> CoreExpr -> Bool
@@ -1549,7 +1549,7 @@ rhsIsStatic this_pkg rhs = is_static False rhs
    where
     go (Var f) n_val_args
 #if mingw32_TARGET_OS
-        | not (isDllName this_pkg (idName f))
+        | not (isDllName _this_pkg (idName f))
 #endif
 	=  saturated_data_con f n_val_args
 	|| (in_arg && n_val_args == 0)	
