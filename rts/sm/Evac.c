@@ -169,8 +169,11 @@ unchain_thunk_selectors(StgSelector *p, StgClosure *val)
 #else
         ASSERT(p->header.info == &stg_BLACKHOLE_info);
 #endif
-        // val must be in to-space.
-        ASSERT(!HEAP_ALLOCED(val) || Bdescr((P_)val)->gen_no > N || (Bdescr((P_)val)->flags & BF_EVACUATED));
+        // val must be in to-space.  Not always: when we recursively
+        // invoke eval_thunk_selector(), the recursive calls will not 
+        // evacuate the value (because we want to select on the value,
+        // not evacuate it), so in this case val is in from-space.
+        // ASSERT(!HEAP_ALLOCED(val) || Bdescr((P_)val)->gen_no > N || (Bdescr((P_)val)->flags & BF_EVACUATED));
 
         prev = (StgSelector*)((StgClosure *)p)->payload[0];
 
