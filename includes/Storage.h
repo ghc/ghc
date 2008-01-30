@@ -542,7 +542,7 @@ extern lnat countOccupied  ( bdescr *bd );
 extern lnat calcNeeded     ( void );
 
 #if defined(DEBUG)
-extern void memInventory(void);
+extern void memInventory(rtsBool show);
 extern void checkSanity(void);
 extern nat  countBlocks(bdescr *);
 extern void checkNurserySanity( step *stp );

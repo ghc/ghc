@@ -1173,7 +1173,7 @@ stepBlocks (step *stp)
 }
 
 void
-memInventory(void)
+memInventory (rtsBool show)
 {
   nat g, s, i;
   step *stp;
@@ -1181,6 +1181,7 @@ memInventory(void)
   lnat nursery_blocks, retainer_blocks,
        arena_blocks, exec_blocks;
   lnat live_blocks = 0, free_blocks = 0;
+  rtsBool leak;
 
   // count the blocks we current have
 
@@ -1224,20 +1225,36 @@ memInventory(void)
   live_blocks += nursery_blocks + 
                + retainer_blocks + arena_blocks + exec_blocks;
 
-  if (live_blocks + free_blocks != mblocks_allocated * BLOCKS_PER_MBLOCK)
+#define MB(n) (((n) * BLOCK_SIZE_W) / ((1024*1024)/sizeof(W_)))
+
+  leak = live_blocks + free_blocks != mblocks_allocated * BLOCKS_PER_MBLOCK;
+  if (show || leak)
   {
-      debugBelch("Memory leak detected\n");
-      for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-	  debugBelch("  gen %d blocks : %4lu\n", g, gen_blocks[g]);
+      if (leak) { 
+          debugBelch("Memory leak detected:\n");
+      } else {
+          debugBelch("Memory inventory:\n");
       }
-      debugBelch("  nursery      : %4lu\n", nursery_blocks);
-      debugBelch("  retainer     : %4lu\n", retainer_blocks);
-      debugBelch("  arena blocks : %4lu\n", arena_blocks);
-      debugBelch("  exec         : %4lu\n", exec_blocks);
-      debugBelch("  free         : %4lu\n", free_blocks);
-      debugBelch("  total        : %4lu\n\n", live_blocks + free_blocks);
-      debugBelch("  in system    : %4lu\n", mblocks_allocated * BLOCKS_PER_MBLOCK);
-      ASSERT(0);
+      for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+	  debugBelch("  gen %d blocks : %5lu blocks (%lu MB)\n", g, 
+                     gen_blocks[g], MB(gen_blocks[g]));
+      }
+      debugBelch("  nursery      : %5lu blocks (%lu MB)\n", 
+                 nursery_blocks, MB(nursery_blocks));
+      debugBelch("  retainer     : %5lu blocks (%lu MB)\n", 
+                 retainer_blocks, MB(retainer_blocks));
+      debugBelch("  arena blocks : %5lu blocks (%lu MB)\n", 
+                 arena_blocks, MB(arena_blocks));
+      debugBelch("  exec         : %5lu blocks (%lu MB)\n", 
+                 exec_blocks, MB(exec_blocks));
+      debugBelch("  free         : %5lu blocks (%lu MB)\n", 
+                 free_blocks, MB(free_blocks));
+      debugBelch("  total        : %5lu blocks (%lu MB)\n",
+                 live_blocks + free_blocks, MB(live_blocks+free_blocks));
+      if (leak) {
+          debugBelch("\n  in system    : %5lu blocks (%lu MB)\n", 
+                     mblocks_allocated * BLOCKS_PER_MBLOCK, mblocks_allocated);
+      }
   }
 }
 

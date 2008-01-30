@@ -214,11 +214,6 @@ GarbageCollect ( rtsBool force_major_gc )
   stmPreGCHook();
 
 #ifdef DEBUG
-  // check for memory leaks if DEBUG is on 
-  memInventory();
-#endif
-
-#ifdef DEBUG
   mutlist_MUTVARS = 0;
   mutlist_MUTARRS = 0;
   mutlist_OTHERS = 0;
@@ -264,6 +259,11 @@ GarbageCollect ( rtsBool force_major_gc )
   if (RtsFlags.GcFlags.frontpanel) {
       updateFrontPanelBeforeGC(N);
   }
+#endif
+
+#ifdef DEBUG
+  // check for memory leaks if DEBUG is on 
+  memInventory(traceClass(DEBUG_gc));
 #endif
 
   // check stack sanity *before* GC (ToDo: check all threads) 
@@ -667,7 +667,7 @@ GarbageCollect ( rtsBool force_major_gc )
 
 #ifdef DEBUG
   // check for memory leaks if DEBUG is on 
-  memInventory();
+  memInventory(traceClass(DEBUG_gc));
 #endif
 
 #ifdef RTS_GTK_FRONTPANEL
