@@ -10,13 +10,6 @@ in that the @Rec@/@NonRec@/etc structure is thrown away (whereas at
 lower levels it is preserved with @let@/@letrec@s).
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module DsBinds ( dsTopLHsBinds, dsLHsBinds, decomposeRuleLhs, 
 		 dsCoercion,
 		 AutoScc(..)
@@ -90,7 +83,7 @@ dsHsBind :: AutoScc
 	 -> HsBind Id
 	 -> DsM [(Id,CoreExpr)] -- Result
 
-dsHsBind auto_scc rest (VarBind var expr) = do
+dsHsBind _ rest (VarBind var expr) = do
     core_expr <- dsLExpr expr
 
         -- Dictionary bindings are always VarMonoBinds, so
@@ -98,14 +91,14 @@ dsHsBind auto_scc rest (VarBind var expr) = do
     core_expr' <- addDictScc var core_expr
     return ((var, core_expr') : rest)
 
-dsHsBind auto_scc rest (FunBind { fun_id = L _ fun, fun_matches = matches, 
+dsHsBind _ rest (FunBind { fun_id = L _ fun, fun_matches = matches, 
 				  fun_co_fn = co_fn, fun_tick = tick, fun_infix = inf }) = do
     (args, body) <- matchWrapper (FunRhs (idName fun) inf) matches
     body' <- mkOptTickBox tick body
     rhs <- dsCoercion co_fn (return (mkLams args body'))
     return ((fun,rhs) : rest)
 
-dsHsBind auto_scc rest (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }) = do
+dsHsBind _ rest (PatBind { pat_lhs = pat, pat_rhs = grhss, pat_rhs_ty = ty }) = do
     body_expr <- dsGuarded grhss ty
     sel_binds <- mkSelectorBinds pat body_expr
     return (sel_binds ++ rest)
@@ -148,7 +141,7 @@ dsHsBind auto_scc rest (AbsBinds [] [] exports binds)
 	-- Another common case: one exported variable
 	-- Non-recursive bindings come through this way
 dsHsBind auto_scc rest
-     (AbsBinds all_tyvars dicts exports@[(tyvars, global, local, prags)] binds)
+     (AbsBinds all_tyvars dicts [(tyvars, global, local, prags)] binds)
   = ASSERT( all (`elem` tyvars) all_tyvars ) do
     core_prs <- ds_lhs_binds NoSccs binds
     let
@@ -249,7 +242,7 @@ dsSpec :: [TyVar] -> [DictId] -> [TyVar]
 --
 -- It is *possible* that 'es' does not mention all of the dictionaries 'ds'
 -- (a bit silly, because then the 
-dsSpec all_tvs dicts tvs poly_id mono_id mono_bind (L _ (InlinePrag {}))
+dsSpec _ _ _ _ _ _ (L _ (InlinePrag {}))
   = return Nothing
 
 dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
@@ -273,7 +266,7 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 	  case mb_lhs of
 	    Nothing -> do { warnDs decomp_msg; return Nothing }
 
-	    Just (var, args) -> do
+	    Just (_, args) -> do
 	
 	{ f_body <- fix_up (Let mono_bind (Var mono_id))
 
@@ -311,6 +304,7 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
     decomp_msg = hang (ptext SLIT("Specialisation too complicated to desugar; ignored"))
 		    2 (ppr spec_expr)
 
+dsMkArbitraryType :: TcTyVar -> DsM Type
 dsMkArbitraryType tv = mkArbitraryType warn tv
   where
     warn span msg = putSrcSpanDs span (warnDs msg)
@@ -365,16 +359,16 @@ decomposeRuleLhs lhs
   = go emptyVarEnv (occurAnalyseExpr lhs)	-- Occurrence analysis sorts out the dict
 						-- bindings so we know if they are recursive
   where
-	-- Substitute dicts in the LHS args, so that there 
-	-- aren't any lets getting in the way
-	-- Note that we substitute the function too; we might have this as
-	-- a LHS:	let f71 = M.f Int in f71
+        -- Substitute dicts in the LHS args, so that there 
+        -- aren't any lets getting in the way
+        -- Note that we substitute the function too; we might have this as
+        -- a LHS:       let f71 = M.f Int in f71
     go env (Let (NonRec dict rhs) body) 
-	= go (extendVarEnv env dict (simpleSubst env rhs)) body
+        = go (extendVarEnv env dict (simpleSubst env rhs)) body
     go env body 
-	= case collectArgs (simpleSubst env body) of
-	    (Var fn, args) -> Just (fn, args)
-	    other 	   -> Nothing
+        = case collectArgs (simpleSubst env body) of
+            (Var fn, args) -> Just (fn, args)
+            _              -> Nothing
 
 simpleSubst :: IdEnv CoreExpr -> CoreExpr -> CoreExpr
 -- Similar to CoreSubst.substExpr, except that 
@@ -445,7 +439,8 @@ If profiling and dealing with a dict binding,
 wrap the dict in @_scc_ DICT <dict>@:
 
 \begin{code}
-addDictScc var rhs = return rhs
+addDictScc :: Id -> CoreExpr -> DsM CoreExpr
+addDictScc _ rhs = return rhs
 
 {- DISABLED for now (need to somehow make up a name for the scc) -- SDM
   | not ( opt_SccProfilingOn && opt_AutoSccsOnDicts)
