@@ -956,6 +956,8 @@ countOccupied(bdescr *bd)
     return words;
 }
 
+// Return an accurate count of the live data in the heap, excluding
+// generation 0.
 lnat
 calcLiveWords(void)
 {
@@ -970,9 +972,6 @@ calcLiveWords(void)
     live = 0;
     for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
         for (s = 0; s < generations[g].n_steps; s++) {
-            /* approximate amount of live data (doesn't take into account slop
-             * at end of each block).
-             */
             if (g == 0 && s == 0) continue; 
             stp = &generations[g].steps[s];
             live += countOccupied(stp->blocks) + 
