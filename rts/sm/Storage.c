@@ -999,10 +999,11 @@ calcNeeded(void)
 	for (s = 0; s < generations[g].n_steps; s++) {
 	    if (g == 0 && s == 0) { continue; }
 	    stp = &generations[g].steps[s];
-	    if (generations[g].steps[0].n_blocks +
-		generations[g].steps[0].n_large_blocks 
-		> generations[g].max_blocks
-		&& stp->is_compacted == 0) {
+	    if (g == 0 || // always collect gen 0
+                (generations[g].steps[0].n_blocks +
+                 generations[g].steps[0].n_large_blocks 
+                 > generations[g].max_blocks
+                 && stp->is_compacted == 0)) {
 		needed += 2 * stp->n_blocks + stp->n_large_blocks;
 	    } else {
 		needed += stp->n_blocks + stp->n_large_blocks;
