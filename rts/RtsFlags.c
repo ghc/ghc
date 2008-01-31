@@ -870,10 +870,6 @@ error = rtsTrue;
 	      case 'H':
 		RtsFlags.GcFlags.heapSizeSuggestion = 
 		  decode(rts_argv[arg]+2) / BLOCK_SIZE;
-
-		if (RtsFlags.GcFlags.heapSizeSuggestion <= 0) {
-		  bad_option(rts_argv[arg]);
-		}
 		break;
 
 #ifdef RTS_GTK_FRONTPANEL
