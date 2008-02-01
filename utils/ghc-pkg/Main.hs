@@ -48,8 +48,13 @@ import System.Exit ( exitWith, ExitCode(..) )
 import System.Environment ( getArgs, getProgName, getEnv )
 import System.IO
 import System.IO.Error (try)
-import Data.List ( isPrefixOf, isSuffixOf, isInfixOf, intersperse, sortBy, nub,
+import Data.List ( isPrefixOf, isSuffixOf, intersperse, sortBy, nub,
                    unfoldr, break )
+#if __GLASGOW_HASKELL__ > 604
+import Data.List ( isInfixOf )
+#else
+import Data.List ( tails )
+#endif
 import Control.Concurrent
 
 #ifdef mingw32_HOST_OS
@@ -1062,4 +1067,9 @@ installSignalHandlers = do
   return ()
 #else
   return () -- nothing
+#endif
+
+#if __GLASGOW_HASKELL__ <= 604
+isInfixOf               :: (Eq a) => [a] -> [a] -> Bool
+isInfixOf needle haystack = any (isPrefixOf needle) (tails haystack)
 #endif
