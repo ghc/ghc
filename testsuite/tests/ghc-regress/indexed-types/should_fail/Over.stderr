@@ -1,6 +1,6 @@
 [1 of 4] Compiling OverA            ( OverA.hs, OverA.o )
-[2 of 4] Compiling OverB            ( OverB.hs, OverB.o )
-[3 of 4] Compiling OverC            ( OverC.hs, OverC.o )
+[2 of 4] Compiling OverC            ( OverC.hs, OverC.o )
+[3 of 4] Compiling OverB            ( OverB.hs, OverB.o )
 [4 of 4] Compiling OverD            ( OverD.hs, OverD.o )
 
 OverB.hs:7:14:
