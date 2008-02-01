@@ -503,7 +503,7 @@ If the thing is in WHNF, there's no danger of duplicating work,
 so we can inline if it occurs once, or is small
 
 NOTE: we don't want to inline top-level functions that always diverge.
-It just makes the code bigger.  It turns out that the convenient way to prevent
+It just makes the code bigger.  Tt turns out that the convenient way to prevent
 them inlining is to give them a NOINLINE pragma, which we do in 
 StrictAnal.addStrictnessInfoToTopId
 
@@ -569,10 +569,10 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 		  -> True
 
 	  	  | otherwise
-		  -> some_benefit && small_enough 
+		  -> some_benefit && small_enough
+
 		  where
 		    enough_args	= n_val_args >= n_vals_wanted
-			-- Note [Enough args] 
 
 		    some_benefit = or arg_infos || really_interesting_cont
 				-- There must be something interesting
@@ -590,7 +590,7 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 			= case cont_info of
 			    BoringCont -> not is_top && n_vals_wanted > 0	-- Note [Nested functions] 
 			    CaseCont   -> not lone_variable || not is_value	-- Note [Lone variables]
-			    InterestingCont -> True	-- Something else interesting about continuation
+			    InterestingCont -> n_vals_wanted > 0
 
 		    small_enough = (size - discount) <= opt_UF_UseThreshold
 		    discount = computeDiscount n_vals_wanted arg_discounts 
@@ -611,8 +611,7 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 	pprTrace "Considering inlining"
 		 (ppr id <+> vcat [text "active:" <+> ppr active_inline,
 			  	   text "arg infos" <+> ppr arg_infos,
-				   text "interesting continuation" <+> ppr cont_info <+> 
-					ppr n_val_args,
+				   text "interesting continuation" <+> ppr cont_info,
 				   text "is value:" <+> ppr is_value,
 				   text "is cheap:" <+> ppr is_cheap,
 				   text "guidance" <+> ppr guidance,
@@ -622,16 +621,6 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
     result
     }
 \end{code}
-
-Note [Enough args]
-~~~~~~~~~~~~~~~~~~
-At one stage we considered only inlining a function that has enough
-arguments to saturate its arity.  But we can lose from this. For
-example (f . g) might not be a saturated application of (.), but
-nevertheless f and g might usefully optimise with each other if we
-inlined (.) and f and g.  
-
-Current story (Jan08): inline even if not saturated.
 
 Note [Nested functions]
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -646,7 +635,7 @@ increase the chance that the constructor won't be allocated at all in
 the branches that don't use it.
 
 Note [Lone variables]
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The "lone-variable" case is important.  I spent ages messing about
 with unsatisfactory varaints, but this is nice.  The idea is that if a
 variable appears all alone
