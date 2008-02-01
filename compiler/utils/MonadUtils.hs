@@ -21,7 +21,11 @@ module MonadUtils
 -- Detection of available libraries
 ----------------------------------------------------------------------------------------
 
+#if __GLASGOW_HASKELL__ >= 606
 #define HAVE_APPLICATIVE 1
+#else
+#define HAVE_APPLICATIVE 0
+#endif
 -- we don't depend on MTL for now
 #define HAVE_MTL 0
 
@@ -53,6 +57,10 @@ class Functor f => Applicative f where
 
 infixl 4 <$>
 infixl 4 <*>
+
+instance Applicative IO where
+	pure = return
+	(<*>) = ap
 
 #endif
 

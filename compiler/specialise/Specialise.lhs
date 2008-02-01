@@ -672,7 +672,7 @@ specExpr subst (Case scrut case_bndr ty alts) = do
 
     spec_alt (con, args, rhs) = do
           (rhs', uds) <- specExpr subst_rhs rhs
-          let (uds', rhs'') = do dumpUDs args uds rhs'
+          let (uds', rhs'') = dumpUDs args uds rhs'
           return ((con, args', rhs''), uds')
         where
           (subst_rhs, args') = substBndrs subst_alt args
@@ -1220,7 +1220,7 @@ cloneBindSM :: Subst -> CoreBind -> SpecM (Subst, Subst, CoreBind)
 -- Return the substitution to use for RHSs, and the one to use for the body
 cloneBindSM subst (NonRec bndr rhs) = do
     us <- getUniqueSupplyM
-    let (subst', bndr') = do cloneIdBndr subst us bndr
+    let (subst', bndr') = cloneIdBndr subst us bndr
     return (subst, subst', NonRec bndr' rhs)
 
 cloneBindSM subst (Rec pairs) = do

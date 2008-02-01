@@ -122,7 +122,7 @@ mkWwBodies :: Type				-- Type of original function
 mkWwBodies fun_ty demands res_info one_shots = do
     (wrap_args,   wrap_fn_args, work_fn_args, res_ty) <- mkWWargs fun_ty demands one_shots'
     (work_args,   wrap_fn_str,  work_fn_str) <- mkWWstr wrap_args
-    let (work_lam_args, work_call_args) = do mkWorkerArgs work_args res_ty
+    let (work_lam_args, work_call_args) = mkWorkerArgs work_args res_ty
         -- Don't do CPR if the worker doesn't have any value arguments
         -- Then the worker is just a constant, so we don't want to unbox it.
     (wrap_fn_cpr, work_fn_cpr,  _cpr_res_ty)
