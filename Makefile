@@ -227,7 +227,7 @@ install-docs ::
 # -----------------------------------------------------------------------------
 # Making a binary distribution
 #
-# `dist' `binary-dist'
+# `dist' `binary-dist' `binary-dist-macos'
 #      Create a distribution tar file for this program. The tar file
 #      should be set up so that the file names in the tar file start with
 #      a subdirectory name which is the name of the package it is a
@@ -244,12 +244,14 @@ install-docs ::
 #      that are in the distribution, to make sure they are up to date in
 #      the distribution. See Making Releases.
 #
-#	binary-dist is a GHC addition for binary distributions
+#	binary-dist is a GHC addition for binary distributions and
+#	binary-dist-macos is the Mac OS X-specific variant creating an
+#	installer package for GHC.framework.
 # 
 
 binary-dist::
 	-rm -rf $(BIN_DIST_DIR)
-	-$(RM) $(BIN_DIST_DIR).tar.gz
+	-$(RM) $(BIN_DIST_TARBALL)
 
 # When making bindists, we can have problems if some things (e.g. ghc-pkg)
 # are compiled with the bootstrapping compiler and some (e.g. the stage 2
@@ -299,7 +301,7 @@ ifeq "$(darwin_TARGET_OS)" "1"
 BIN_DIST_TOP+=mk/fix_install_names.sh
 endif
 
-.PHONY: binary-dist-pre% binary-dist binary-pack
+.PHONY: binary-dist-pre% binary-dist binary-dist-macos
 
 binary-dist:: binary-dist-pre
 
@@ -365,7 +367,7 @@ binary-dist :: tar-binary-dist
 .PHONY: tar-binary-dist
 tar-binary-dist:
 	( cd $(BIN_DIST_TOPDIR_ABS); tar cf - $(BIN_DIST_NAME) | bzip2 >$(BIN_DIST_TARBALL) )
-	( cd $(BIN_DIST_TOPDIR_ABS); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >bin-manifest-$(ProjectVersion) )
+	( cd $(BIN_DIST_TOPDIR_ABS); bunzip2 -c $(BIN_DIST_TARBALL) | tar tf - | sed "s/^ghc-$(ProjectVersion)/fptools/" | sort >$(FPTOOLS_TOP_ABS)/bin-manifest-$(ProjectVersion) )
 
 PUBLISH_FILES = $(BIN_DIST_TARBALL)
 
@@ -416,6 +418,39 @@ publish-binary-dist ::
 
 binary-dist::
 	@echo "Mechanical and super-natty! Inspect the result and *if* happy; freeze, sell and get some sleep!"
+
+ifeq "$(darwin_TARGET_OS)" "1"
+
+# Wrap a binary dist as a MacOS framework and put it into an installer package.
+
+# The ProjectVersionInt is GHC's idea of an API version and hence determines
+# the framework version.
+FRAMEWORK_VERSION = $(ProjectVersionInt)
+
+# Xcode requires CURRENT_PROJECT_VERSION to be an int or float.  We use this
+# only as the build version (aka CFBundleVersion).
+CURRENT_PROJECT_VERSION = $(ProjectVersionInt).$(ProjectPatchLevel)
+
+# The user-visible CFBundleShortVersionString is set to the standard GHC 
+# version number.
+SHORT_VERSION_STRING = $(ProjectVersion)
+
+# Instead of making 'binary-dist' a Makefile dependency, we let xcodebuild call
+# 'make binary-dist'.  This has the advantage that xcode knows the framework
+# path into which the distribution should be installed and can instruct 
+# binary-dist to put it into the right place without copying the whole tree yet
+# another time.
+#
+binary-dist-macos:
+	(cd distrib/MacOS; \
+	 xcodebuild CURRENT_PROJECT_VERSION=$(CURRENT_PROJECT_VERSION)\
+	    	    SHORT_VERSION_STRING=$(SHORT_VERSION_STRING)\
+	 	    FRAMEWORK_VERSION=$(FRAMEWORK_VERSION)\
+		    CURRENT_LIBRARY_VERSION=$(FRAMEWORK_VERSION))
+	(cd distrib/MacOS; \
+	 !!!Call the packager!!! )
+
+endif
 
 # -----------------------------------------------------------------------------
 # Building source distributions
