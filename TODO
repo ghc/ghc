@@ -36,7 +36,8 @@
 * Haddock generates links to hidden modules (e.g. uses of IO point at 
   GHC.IOBase.IO).
 
-* Haddock fails to process source files containing UNPACK pragmas
+* Haddock fails to process source files containing UNPACK pragmas.
+  This needs to be fixed in the GHC parser.
 
 * HsParser bug: starting the module with '-- | doc' followed by a declaration
   doesn't parse, because the '-- | doc' is interpreted as the module
