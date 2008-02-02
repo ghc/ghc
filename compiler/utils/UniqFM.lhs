@@ -698,7 +698,7 @@ insert_ele  f (LeafUFM j old) i new
 			  (indexToRoot j))
 		 (mkLeafUFM i new)
 		 (mkLeafUFM j old)
-  | j ==# i  = mkLeafUFM j (f old new)
+  | j ==# i  = mkLeafUFM j $! f old new
   | otherwise =
 	  mkLLNodeUFM (getCommonNodeUFMData
 			  (indexToRoot i)
