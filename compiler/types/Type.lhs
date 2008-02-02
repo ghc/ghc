@@ -1398,21 +1398,22 @@ subst_ty :: TvSubst -> Type -> Type
 subst_ty subst ty
    = go ty
   where
-    go (TyVarTy tv)   		   = substTyVar subst tv
-    go (TyConApp tc tys)	   = let args = map go tys
-				     in  args `seqList` TyConApp tc args
+    go (TyVarTy tv)                = substTyVar subst tv
+    go (TyConApp tc tys)           = let args = map go tys
+                                     in  args `seqList` TyConApp tc args
 
-    go (PredTy p)  		   = PredTy $! (substPred subst p)
+    go (PredTy p)                  = PredTy $! (substPred subst p)
 
-    go (NoteTy (FTVNote _) ty2)    = go ty2		-- Discard the free tyvar note
+    go (NoteTy (FTVNote _) ty2)    = go ty2 -- Discard the free tyvar note
 
-    go (FunTy arg res)   	   = (FunTy $! (go arg)) $! (go res)
-    go (AppTy fun arg)   	   = mkAppTy (go fun) $! (go arg)
-		-- The mkAppTy smart constructor is important
-		-- we might be replacing (a Int), represented with App
-		-- by [Int], represented with TyConApp
-    go (ForAllTy tv ty)		   = case substTyVarBndr subst tv of
-					(subst', tv') -> ForAllTy tv' $! (subst_ty subst' ty)
+    go (FunTy arg res)             = (FunTy $! (go arg)) $! (go res)
+    go (AppTy fun arg)             = mkAppTy (go fun) $! (go arg)
+                -- The mkAppTy smart constructor is important
+                -- we might be replacing (a Int), represented with App
+                -- by [Int], represented with TyConApp
+    go (ForAllTy tv ty)            = case substTyVarBndr subst tv of
+                                     (subst', tv') ->
+                                         ForAllTy tv' $! (subst_ty subst' ty)
 
 substTyVar :: TvSubst -> TyVar  -> Type
 substTyVar subst@(TvSubst _ _) tv
