@@ -6,16 +6,9 @@
 @DsMonad@: monadery used in desugaring
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module DsMonad (
 	DsM, mapM, mapAndUnzipM,
-	initDs, initDsTc, fixDs, mapAndUnzipM,
+	initDs, initDsTc, fixDs,
 	foldlM, foldrM, ifOptM,
 	Applicative(..),(<$>),
 
@@ -87,6 +80,7 @@ data EquationInfo
 	      eqn_rhs  :: MatchResult }	-- What to do after match
 
 type DsWrapper = CoreExpr -> CoreExpr
+idDsWrapper :: DsWrapper
 idDsWrapper e = e
 
 -- The semantics of (match vs (EqnInfo wrap pats rhs)) is the MatchResult
@@ -105,8 +99,9 @@ data MatchResult
 
 data CanItFail = CanFail | CantFail
 
+orFail :: CanItFail -> CanItFail -> CanItFail
 orFail CantFail CantFail = CantFail
-orFail _        _	 = CanFail
+orFail _        _        = CanFail
 \end{code}
 
 
@@ -123,6 +118,7 @@ presumably include source-file location information:
 type DsM result = TcRnIf DsGblEnv DsLclEnv result
 
 -- Compatibility functions
+fixDs :: (a -> DsM a) -> DsM a
 fixDs    = fixM
 
 type DsWarning = (SrcSpan, SDoc)
@@ -197,8 +193,7 @@ initDsTc thing_inside
 
 mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> IORef Messages -> IO (DsGblEnv, DsLclEnv)
 mkDsEnvs dflags mod rdr_env type_env msg_var
-  = do 
-       sites_var <- newIORef []
+  = do -- TODO: unnecessarily monadic
        let     if_genv = IfGblEnv { if_rec_types = Just (mod, return type_env) }
                if_lenv = mkIfLclEnv mod (ptext SLIT("GHC error in desugarer lookup in") <+> ppr mod)
                gbl_env = DsGblEnv { ds_mod = mod, 
@@ -240,6 +235,7 @@ newSysLocalDs ty = do
     uniq <- newUnique
     return (mkSysLocal FSLIT("ds") uniq ty)
 
+newSysLocalsDs :: [Type] -> DsM [Id]
 newSysLocalsDs tys = mapM newSysLocalDs tys
 
 newFailLocalDs ty = do
