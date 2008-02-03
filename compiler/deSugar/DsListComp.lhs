@@ -6,7 +6,7 @@
 Desugaring list comprehensions and array comprehensions
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -15,11 +15,12 @@ Desugaring list comprehensions and array comprehensions
 
 module DsListComp ( dsListComp, dsPArrComp ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import {-# SOURCE #-} DsExpr ( dsLExpr, dsLocalBinds )
 
-import BasicTypes
 import HsSyn
 import TcHsSyn
 import CoreSyn
@@ -37,7 +38,6 @@ import Match
 import PrelNames
 import PrelInfo
 import SrcLoc
-import Panic
 import Outputable
 
 import Control.Monad ( liftM2 )
@@ -294,6 +294,12 @@ deListComp (BindStmt pat list1 _ _ : quals) body core_list2 = do -- rule A' abov
 
 
 \begin{code}
+deBindComp :: OutPat Id
+           -> CoreExpr
+           -> [Stmt Id]
+           -> LHsExpr Id
+           -> CoreExpr
+           -> DsM (Expr Id)
 deBindComp pat core_list1 quals body core_list2 = do
     let
         u3_ty@u1_ty = exprType core_list1	-- two names, same thing
@@ -623,6 +629,7 @@ dePArrComp (ParStmt _ : _) _ _ _ =
 --    where
 --      {x_1, ..., x_n} = DV (qs)
 --
+dePArrParComp :: [([LStmt Id], [Id])] -> LHsExpr Id -> DsM CoreExpr
 dePArrParComp qss body = do
     (pQss, ceQss) <- deParStmt qss
     dePArrComp [] body pQss ceQss
