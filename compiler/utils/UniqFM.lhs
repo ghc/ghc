@@ -203,9 +203,9 @@ First, the DataType itself; which is either a Node, a Leaf, or an Empty.
 \begin{code}
 data UniqFM ele
   = EmptyUFM
-  | LeafUFM FastInt ele
-  | NodeUFM FastInt         -- the switching
-            FastInt         -- the delta
+  | LeafUFM !FastInt ele
+  | NodeUFM !FastInt         -- the switching
+            !FastInt         -- the delta
             (UniqFM ele)
             (UniqFM ele)
 -- INVARIANT: the children of a NodeUFM are never EmptyUFMs
