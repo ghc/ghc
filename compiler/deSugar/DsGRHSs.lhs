@@ -6,7 +6,7 @@
 Matching guarded right-hand-sides (GRHSs)
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -15,6 +15,8 @@ Matching guarded right-hand-sides (GRHSs)
 
 module DsGRHSs ( dsGuarded, dsGRHSs ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import {-# SOURCE #-} DsExpr  ( dsLExpr, dsLocalBinds )
@@ -62,7 +64,7 @@ dsGRHSs :: HsMatchContext Name -> [Pat Id]	-- These are to build a MatchContext 
 	-> GRHSs Id				-- Guarded RHSs
 	-> Type					-- Type of RHS
 	-> DsM MatchResult
-dsGRHSs hs_ctx pats grhssa@(GRHSs grhss binds) rhs_ty = do
+dsGRHSs hs_ctx pats (GRHSs grhss binds) rhs_ty = do
     match_results <- mapM (dsGRHS hs_ctx pats rhs_ty) grhss
     let 
 	match_result1 = foldr1 combineMatchResults match_results
@@ -73,7 +75,8 @@ dsGRHSs hs_ctx pats grhssa@(GRHSs grhss binds) rhs_ty = do
     --
     return match_result2
 
-dsGRHS hs_ctx pats rhs_ty (L loc (GRHS guards rhs))
+dsGRHS :: HsMatchContext Name -> [Pat Id] -> Type -> LGRHS Id -> DsM MatchResult
+dsGRHS hs_ctx _ rhs_ty (L _ (GRHS guards rhs))
   = matchGuards (map unLoc guards) hs_ctx rhs rhs_ty
 \end{code}
 
@@ -94,7 +97,7 @@ matchGuards :: [Stmt Id] 		-- Guard
 -- See comments with HsExpr.Stmt re what an ExprStmt means
 -- Here we must be in a guard context (not do-expression, nor list-comp)	
 
-matchGuards [] ctx rhs rhs_ty
+matchGuards [] _ rhs _
   = do	{ core_rhs <- dsLExpr rhs
 	; return (cantFailMatchResult core_rhs) }
 
@@ -139,14 +142,14 @@ isTrueLHsExpr (L _ (HsVar v)) |  v `hasKey` otherwiseIdKey
                               || v `hasKey` getUnique trueDataConId
                                       = Just return
 	-- trueDataConId doesn't have the same unique as trueDataCon
-isTrueLHsExpr (L loc (HsTick    ix frees e))
+isTrueLHsExpr (L _ (HsTick    ix frees e))
     | Just ticks <- isTrueLHsExpr e   = Just (\x -> ticks x >>= mkTickBox ix frees)
    -- This encodes that the result is constant True for Hpc tick purposes;
    -- which is specifically what isTrueLHsExpr is trying to find out.
-isTrueLHsExpr (L loc (HsBinTick ixT _ e))
+isTrueLHsExpr (L _ (HsBinTick ixT _ e))
     | Just ticks <- isTrueLHsExpr e   = Just (\x -> ticks x >>= mkTickBox ixT [])
 isTrueLHsExpr (L _ (HsPar e))         = isTrueLHsExpr e
-isTrueLHsExpr other = Nothing
+isTrueLHsExpr _                       = Nothing
 \end{code}
 
 Should {\em fail} if @e@ returns @D@
