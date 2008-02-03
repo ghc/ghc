@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module VectMonad (
   Scope(..),
   VM,
@@ -48,30 +41,23 @@ import CoreSyn
 import TyCon
 import DataCon
 import Type
-import Class
 import Var
 import VarEnv
 import Id
-import OccName
 import Name
 import NameEnv
-import TysPrim       ( intPrimTy )
-import Module
-import IfaceEnv
 import IOEnv         ( liftIO )
 
 import DsMonad
-import PrelNames
 
 import InstEnv
 import FamInstEnv
 
-import Panic
 import Outputable
 import FastString
 import SrcLoc        ( noSrcSpan )
 
-import Control.Monad ( liftM, zipWithM )
+import Control.Monad
 
 data Scope a b = Global a | Local b
 
@@ -183,6 +169,7 @@ setBoxedTyConsEnv :: [(Name, TyCon)] -> GlobalEnv -> GlobalEnv
 setBoxedTyConsEnv ps genv
   = genv { global_boxed_tycons = mkNameEnv ps }
 
+emptyLocalEnv :: LocalEnv
 emptyLocalEnv = LocalEnv {
                    local_vars     = emptyVarEnv
                  , local_tyvars   = []
@@ -210,7 +197,7 @@ data VResult a = Yes GlobalEnv LocalEnv a | No
 newtype VM a = VM { runVM :: Builtins -> GlobalEnv -> LocalEnv -> DsM (VResult a) }
 
 instance Monad VM where
-  return x   = VM $ \bi genv lenv -> return (Yes genv lenv x)
+  return x   = VM $ \_  genv lenv -> return (Yes genv lenv x)
   VM p >>= f = VM $ \bi genv lenv -> do
                                       r <- p bi genv lenv
                                       case r of
@@ -241,9 +228,10 @@ orElseV :: VM a -> VM a -> VM a
 orElseV p q = maybe q return =<< tryV p
 
 fixV :: (a -> VM a) -> VM a
-fixV f = VM (\bi genv lenv -> fixDs $ \r -> runVM (f (unYes r)) bi genv lenv )
-  where
-    unYes (Yes _ _ x) = x
+fixV f = VM $ \bi genv lenv -> fixDs $
+               \r -> case r of
+                       Yes _ _ x -> runVM (f x) bi genv lenv
+                       No        -> return No
 
 localV :: VM a -> VM a
 localV p = do
@@ -261,7 +249,7 @@ closedV p = do
               return x
 
 liftDs :: DsM a -> VM a
-liftDs p = VM $ \bi genv lenv -> do { x <- p; return (Yes genv lenv x) }
+liftDs p = VM $ \_ genv lenv -> do { x <- p; return (Yes genv lenv x) }
 
 builtin :: (Builtins -> a) -> VM a
 builtin f = VM $ \bi genv lenv -> return (Yes genv lenv (f bi))
@@ -270,7 +258,7 @@ builtins :: (a -> Builtins -> b) -> VM (a -> b)
 builtins f = VM $ \bi genv lenv -> return (Yes genv lenv (`f` bi))
 
 readGEnv :: (GlobalEnv -> a) -> VM a
-readGEnv f = VM $ \bi genv lenv -> return (Yes genv lenv (f genv))
+readGEnv f = VM $ \_ genv lenv -> return (Yes genv lenv (f genv))
 
 setGEnv :: GlobalEnv -> VM ()
 setGEnv genv = VM $ \_ _ lenv -> return (Yes genv lenv ())
@@ -279,7 +267,7 @@ updGEnv :: (GlobalEnv -> GlobalEnv) -> VM ()
 updGEnv f = VM $ \_ genv lenv -> return (Yes (f genv) lenv ())
 
 readLEnv :: (LocalEnv -> a) -> VM a
-readLEnv f = VM $ \bi genv lenv -> return (Yes genv lenv (f lenv))
+readLEnv f = VM $ \_ genv lenv -> return (Yes genv lenv (f lenv))
 
 setLEnv :: LocalEnv -> VM ()
 setLEnv lenv = VM $ \_ genv _ -> return (Yes genv lenv ())
@@ -287,8 +275,10 @@ setLEnv lenv = VM $ \_ genv _ -> return (Yes genv lenv ())
 updLEnv :: (LocalEnv -> LocalEnv) -> VM ()
 updLEnv f = VM $ \_ genv lenv -> return (Yes genv (f lenv) ())
 
+{-
 getInstEnv :: VM (InstEnv, InstEnv)
 getInstEnv = readGEnv global_inst_env
+-}
 
 getFamInstEnv :: VM FamInstEnvs
 getFamInstEnv = readGEnv global_fam_inst_env
