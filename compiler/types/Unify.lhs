@@ -3,13 +3,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Unify ( 
 	-- Matching of types: 
 	--	the "tc" prefix indicates that matching always
@@ -20,6 +13,8 @@ module Unify (
 	dataConCannotMatch
    ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import Var
@@ -175,7 +170,7 @@ match menv subst (TyVarTy tv1) ty2
    | otherwise	-- tv1 is not a template tyvar
    = case ty2 of
 	TyVarTy tv2 | tv1' == rnOccR rn_env tv2 -> Just subst
-	other					-> Nothing
+	_                                       -> Nothing
   where
     rn_env = me_env menv
     tv1' = rnOccL rn_env tv1
@@ -198,7 +193,7 @@ match menv subst (AppTy ty1a ty1b) ty2
   = do { subst' <- match menv subst ty1a ty2a
        ; match menv subst' ty1b ty2b }
 
-match menv subst ty1 ty2
+match _ _ _ _
   = Nothing
 
 --------------
@@ -229,22 +224,24 @@ match_kind menv subst tv ty
 -- thing to do.  C.f. Note [Matching variable types] in Rules.lhs
 
 --------------
+match_tys :: MatchEnv -> TvSubstEnv -> [Type] -> [Type] -> Maybe TvSubstEnv
 match_tys menv subst tys1 tys2 = match_list (match menv) subst tys1 tys2
 
 --------------
 match_list :: (TvSubstEnv -> a -> a -> Maybe TvSubstEnv)
 	   -> TvSubstEnv -> [a] -> [a] -> Maybe TvSubstEnv
-match_list fn subst []         []	  = Just subst
+match_list _  subst []         []         = Just subst
 match_list fn subst (ty1:tys1) (ty2:tys2) = do	{ subst' <- fn subst ty1 ty2
 						; match_list fn subst' tys1 tys2 }
-match_list fn subst tys1       tys2 	  = Nothing	
+match_list _  _     _          _          = Nothing
 
 --------------
+match_pred :: MatchEnv -> TvSubstEnv -> PredType -> PredType -> Maybe TvSubstEnv
 match_pred menv subst (ClassP c1 tys1) (ClassP c2 tys2)
   | c1 == c2 = match_tys menv subst tys1 tys2
 match_pred menv subst (IParam n1 t1) (IParam n2 t2)
   | n1 == n2 = match menv subst t1 t2
-match_pred menv subst p1 p2 = Nothing
+match_pred _    _     _ _ = Nothing
 \end{code}
 
 
@@ -363,7 +360,7 @@ dataConCannotMatch tys con
 	| Just (f1, a1) <- repSplitAppTy_maybe ty1
 	= cant_match f1 f2 || cant_match a1 a2
 
-    cant_match ty1 ty2 = False	-- Safe!
+    cant_match _ _ = False      -- Safe!
 
 -- Things we could add;
 --	foralls
