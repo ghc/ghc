@@ -6,7 +6,7 @@
 The @match@ function
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -37,7 +37,6 @@ import MatchLit
 import PrelInfo
 import Type
 import TysWiredIn
-import BasicTypes
 import ListSetOps
 import SrcLoc
 import Maybes
@@ -64,6 +63,12 @@ matchCheck ctx vars ty qs = do
     dflags <- getDOptsDs
     matchCheck_really dflags ctx vars ty qs
 
+matchCheck_really :: DynFlags
+                  -> DsMatchContext
+                  -> [Id]
+                  -> Type
+                  -> [EquationInfo]
+                  -> DsM MatchResult
 matchCheck_really dflags ctx vars ty qs
   | incomplete && shadow  = do
       dsShadowWarn ctx eqns_shadow
@@ -94,6 +99,7 @@ It will limit the number of patterns/equations displayed to@ maximum_output@.
 (ToDo: add command-line option?)
 
 \begin{code}
+maximum_output :: Int
 maximum_output = 4
 \end{code}
 
@@ -118,7 +124,7 @@ dsIncompleteWarn ctx@(DsMatchContext kind loc) pats
   = putSrcSpanDs loc (warnDs warn)
 	where
 	  warn = pp_context ctx (ptext SLIT("are non-exhaustive"))
-                    	    (\f -> hang (ptext SLIT("Patterns not matched:"))
+                            (\_ -> hang (ptext SLIT("Patterns not matched:"))
 		                   4 ((vcat $ map (ppr_incomplete_pats kind)
 						  (take maximum_output pats))
 		                      $$ dots))
@@ -126,6 +132,7 @@ dsIncompleteWarn ctx@(DsMatchContext kind loc) pats
 	  dots | pats `lengthExceeds` maximum_output = ptext SLIT("...")
 	       | otherwise                           = empty
 
+pp_context :: DsMatchContext -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc
 pp_context (DsMatchContext kind _loc) msg rest_of_msg_fun
   = vcat [ptext SLIT("Pattern match(es)") <+> msg,
 	  sep [ptext SLIT("In") <+> ppr_match <> char ':', nest 4 (rest_of_msg_fun pref)]]
@@ -133,21 +140,25 @@ pp_context (DsMatchContext kind _loc) msg rest_of_msg_fun
     (ppr_match, pref)
 	= case kind of
 	     FunRhs fun _ -> (pprMatchContext kind, \ pp -> ppr fun <+> pp)
-	     other	  -> (pprMatchContext kind, \ pp -> pp)
+             _            -> (pprMatchContext kind, \ pp -> pp)
 
+ppr_pats :: Outputable a => [a] -> SDoc
 ppr_pats pats = sep (map ppr pats)
 
+ppr_shadow_pats :: HsMatchContext Name -> [Pat Id] -> SDoc
 ppr_shadow_pats kind pats
   = sep [ppr_pats pats, matchSeparator kind, ptext SLIT("...")]
-    
-ppr_incomplete_pats kind (pats,[]) = ppr_pats pats
-ppr_incomplete_pats kind (pats,constraints) = 
+
+ppr_incomplete_pats :: HsMatchContext Name -> ExhaustivePat -> SDoc
+ppr_incomplete_pats _ (pats,[]) = ppr_pats pats
+ppr_incomplete_pats _ (pats,constraints) =
 	                 sep [ppr_pats pats, ptext SLIT("with"), 
 	                      sep (map ppr_constraint constraints)]
-    
 
+ppr_constraint :: (Name,[HsLit]) -> SDoc
 ppr_constraint (var,pats) = sep [ppr var, ptext SLIT("`notElem`"), ppr pats]
 
+ppr_eqn :: (SDoc -> SDoc) -> HsMatchContext Name -> EquationInfo -> SDoc
 ppr_eqn prefixF kind eqn = prefixF (ppr_shadow_pats kind (eqn_pats eqn))
 \end{code}
 
@@ -295,8 +306,8 @@ match vars@(v:_) ty eqns
             PgAny      -> matchVariables  vars ty (dropGroup eqns)
             PgCon _    -> matchConFamily  vars ty (subGroups eqns)
             PgLit _    -> matchLiterals   vars ty (subGroups eqns)
-            PgN lit    -> matchNPats      vars ty (subGroups eqns)
-            PgNpK lit  -> matchNPlusKPats vars ty (dropGroup eqns)
+            PgN _      -> matchNPats      vars ty (subGroups eqns)
+            PgNpK _    -> matchNPlusKPats vars ty (dropGroup eqns)
             PgBang     -> matchBangs      vars ty (dropGroup eqns)
             PgCo _     -> matchCoercion   vars ty (dropGroup eqns)
             PgView _ _ -> matchView       vars ty (dropGroup eqns)
@@ -319,7 +330,7 @@ match vars@(v:_) ty eqns
 matchVariables :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 -- Real true variables, just like in matchVar, SLPJ p 94
 -- No binding to do: they'll all be wildcards by now (done in tidy)
-matchVariables (var:vars) ty eqns = match vars ty (shiftEqns eqns)
+matchVariables (_:vars) ty eqns = match vars ty (shiftEqns eqns)
 
 matchBangs :: [Id] -> Type -> [EquationInfo] -> DsM MatchResult
 matchBangs (var:vars) ty eqns
@@ -350,8 +361,11 @@ matchView (var:vars) ty (eqns@(eqn1:_))
 	; return (mkViewMatchResult var' viewExpr' var match_result) }
 
 -- decompose the first pattern and leave the rest alone
+decomposeFirstPat :: (Pat Id -> Pat Id) -> EquationInfo -> EquationInfo
 decomposeFirstPat extractpat (eqn@(EqnInfo { eqn_pats = pat : pats }))
 	= eqn { eqn_pats = extractpat pat : pats}
+
+decomposeFirst_Coercion, decomposeFirst_Bang, decomposeFirst_View :: EquationInfo -> EquationInfo
 
 decomposeFirst_Coercion = decomposeFirstPat (\ (CoPat _ pat _) -> pat)
 decomposeFirst_Bang     = decomposeFirstPat (\ (BangPat pat  ) -> unLoc pat)
@@ -438,7 +452,7 @@ tidy1 :: Id 			-- The Id being scrutinised
 
 tidy1 v (ParPat pat)      = tidy1 v (unLoc pat) 
 tidy1 v (SigPatOut pat _) = tidy1 v (unLoc pat) 
-tidy1 v (WildPat ty)      = return (idDsWrapper, WildPat ty)
+tidy1 _ (WildPat ty)      = return (idDsWrapper, WildPat ty)
 
 	-- case v of { x -> mr[] }
 	-- = case v of { _ -> let x=v in mr[] }
@@ -472,7 +486,7 @@ tidy1 v (LazyPat pat)
 	; let sel_binds =  [NonRec b rhs | (b,rhs) <- sel_prs]
 	; return (mkDsLets sel_binds, WildPat (idType v)) }
 
-tidy1 v (ListPat pats ty)
+tidy1 _ (ListPat pats ty)
   = return (idDsWrapper, unLoc list_ConPat)
   where
     list_ty     = mkListTy ty
@@ -482,29 +496,29 @@ tidy1 v (ListPat pats ty)
 
 -- Introduce fake parallel array constructors to be able to handle parallel
 -- arrays with the existing machinery for constructor pattern
-tidy1 v (PArrPat pats ty)
+tidy1 _ (PArrPat pats ty)
   = return (idDsWrapper, unLoc parrConPat)
   where
     arity      = length pats
     parrConPat = mkPrefixConPat (parrFakeCon arity) pats (mkPArrTy ty)
 
-tidy1 v (TuplePat pats boxity ty)
+tidy1 _ (TuplePat pats boxity ty)
   = return (idDsWrapper, unLoc tuple_ConPat)
   where
     arity = length pats
     tuple_ConPat = mkPrefixConPat (tupleCon boxity arity) pats ty
 
 -- LitPats: we *might* be able to replace these w/ a simpler form
-tidy1 v (LitPat lit)
+tidy1 _ (LitPat lit)
   = return (idDsWrapper, tidyLitPat lit)
 
 -- NPats: we *might* be able to replace these w/ a simpler form
-tidy1 v (NPat lit mb_neg eq)
+tidy1 _ (NPat lit mb_neg eq)
   = return (idDsWrapper, tidyNPat lit mb_neg eq)
 
 -- Everything else goes through unchanged...
 
-tidy1 v non_interesting_pat
+tidy1 _ non_interesting_pat
   = return (idDsWrapper, non_interesting_pat)
 \end{code}
 
@@ -782,7 +796,7 @@ sameGroup PgAny      PgAny      = True
 sameGroup PgBang     PgBang     = True
 sameGroup (PgCon _)  (PgCon _)  = True		-- One case expression
 sameGroup (PgLit _)  (PgLit _)  = True		-- One case expression
-sameGroup (PgN l1)   (PgN l2)   = True		-- Needs conditionals
+sameGroup (PgN _)    (PgN _)    = True		-- Needs conditionals
 sameGroup (PgNpK l1) (PgNpK l2) = l1==l2	-- Order is significant
 						-- See Note [Order of n+k]
 sameGroup (PgCo	t1)  (PgCo t2)  = t1 `coreEqType` t2
@@ -808,7 +822,7 @@ sameGroup _          _          = False
 --   f (e1 -> True) = ...
 --   f (e2 -> "hi") = ...
 viewLExprEq :: (LHsExpr Id,Type) -> (LHsExpr Id,Type) -> Bool
-viewLExprEq (e1,t1) (e2,t2) = 
+viewLExprEq (e1,_) (e2,_) =
     let 
         -- short name for recursive call on unLoc
         lexp e e' = exp (unLoc e) (unLoc e')
