@@ -6,7 +6,7 @@
 Desugaring exporessions.
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -76,6 +76,7 @@ dsValBinds :: HsValBinds Id -> CoreExpr -> DsM CoreExpr
 dsValBinds (ValBindsOut binds _) body = foldrM ds_val_bind body binds
 
 -------------------------
+dsIPBinds :: HsIPBinds Id -> CoreExpr -> DsM CoreExpr
 dsIPBinds (IPBinds ip_binds dict_binds) body
   = do	{ prs <- dsLHsBinds dict_binds
 	; let inner = Let (Rec prs) body
@@ -131,16 +132,16 @@ ds_val_bind (NonRecursive, hsbinds) body
               ; result <- matchEquations PatBindRhs [var] [eqn] (exprType body)
               ; return (scrungleMatch var rhs result) }
 
-      other -> pprPanic "dsLet: unlifted" (pprLHsBinds hsbinds $$ ppr body)
+      _ -> pprPanic "dsLet: unlifted" (pprLHsBinds hsbinds $$ ppr body)
 
 
 -- Ordinary case for bindings; none should be unlifted
-ds_val_bind (is_rec, binds) body
+ds_val_bind (_is_rec, binds) body
   = do	{ prs <- dsLHsBinds binds
 	; ASSERT( not (any (isUnLiftedType . idType . fst) prs) )
 	  case prs of
-	    []    -> return body
-	    other -> return (Let (Rec prs) body) }
+            [] -> return body
+            _  -> return (Let (Rec prs) body) }
 	-- Use a Rec regardless of is_rec. 
 	-- Why? Because it allows the binds to be all
 	-- mixed up, which is what happens in one rare case
@@ -154,7 +155,7 @@ ds_val_bind (is_rec, binds) body
 
 isUnboxedTupleBind :: HsBind Id -> Bool
 isUnboxedTupleBind (PatBind { pat_rhs_ty = ty }) = isUnboxedTupleType ty
-isUnboxedTupleBind other			 = False
+isUnboxedTupleBind _                             = False
 
 scrungleMatch :: Id -> CoreExpr -> CoreExpr -> CoreExpr
 -- Returns something like (let var = scrut in body)
@@ -206,10 +207,10 @@ dsExpr (HsWrap co_fn e)       = dsCoercion co_fn (dsExpr e)
 dsExpr (NegApp expr neg_expr) 
   = App <$> dsExpr neg_expr <*> dsLExpr expr
 
-dsExpr expr@(HsLam a_Match)
+dsExpr (HsLam a_Match)
   = uncurry mkLams <$> matchWrapper LambdaExpr a_Match
 
-dsExpr expr@(HsApp fun arg)      
+dsExpr (HsApp fun arg)
   = mkDsApp <$> dsLExpr fun <*>  dsLExpr arg
 \end{code}
 
@@ -349,7 +350,7 @@ dsExpr (PArrSeq expr (FromTo from to))
 dsExpr (PArrSeq expr (FromThenTo from thn to))
   = mkApps <$> dsExpr expr <*> mapM dsLExpr [from, thn, to]
 
-dsExpr (PArrSeq expr _)
+dsExpr (PArrSeq _ _)
   = panic "DsExpr.dsExpr: Infinite parallel array!"
     -- the parser shouldn't have generated it and the renamer and typechecker
     -- shouldn't have let it through
@@ -569,6 +570,7 @@ dsDo stmts body result_ty
       | otherwise
       = extractMatchResult match (error "It can't fail") 
 
+mk_fail_msg :: Located e -> String
 mk_fail_msg pat = "Pattern match failure in do expression at " ++ 
 		  showSDoc (ppr (getLoc pat))
 \end{code}
