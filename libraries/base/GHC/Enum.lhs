@@ -482,56 +482,95 @@ eftIntFB c n x y | x ># y    = n
 			-- Watch out for y=maxBound; hence ==, not >
 	-- Be very careful not to have more than one "c"
 	-- so that when eftInfFB is inlined we can inline
-	-- whatver is bound to "c"
+	-- whatever is bound to "c"
 
 
 -----------------------------------------------------
--- efdInt and efdtInt deal with [a,b..] and [a,b..c], which are much less common
--- so we are less elaborate.  The code is more complicated anyway, because
--- of worries about Int overflow, so we don't both with rules and deforestation
+-- efdInt and efdtInt deal with [a,b..] and [a,b..c].
+-- The code is more complicated because of worries about Int overflow.
+
+{-# RULES
+"efdtInt"       [~1] forall x1 x2 y.
+                     efdtInt x1 x2 y = build (\ c n -> efdtIntFB c n x1 x2 y)
+"efdtIntUpList" [1]  efdtIntFB (:) [] = efdtInt
+ #-}
 
 efdInt :: Int# -> Int# -> [Int]
 -- [x1,x2..maxInt]
 efdInt x1 x2 
-  | x2 >=# x1 = case maxInt of I# y -> efdtIntUp x1 x2 y
-  | otherwise = case minInt of I# y -> efdtIntDn x1 x2 y
+ | x2 >=# x1 = case maxInt of I# y -> efdtIntUp x1 x2 y
+ | otherwise = case minInt of I# y -> efdtIntDn x1 x2 y
 
 efdtInt :: Int# -> Int# -> Int# -> [Int]
 -- [x1,x2..y]
 efdtInt x1 x2 y
-  | x2 >=# x1  = efdtIntUp x1 x2 y
-  | otherwise  = efdtIntDn x1 x2 y
+ | x2 >=# x1 = efdtIntUp x1 x2 y
+ | otherwise = efdtIntDn x1 x2 y
 
+{-# INLINE [0] efdtIntFB #-}
+efdtIntFB :: (Int -> r -> r) -> r -> Int# -> Int# -> Int# -> r
+efdtIntFB c n x1 x2 y
+ | x2 >=# x1  = efdtIntUpFB c n x1 x2 y
+ | otherwise  = efdtIntDnFB c n x1 x2 y
+
+-- Requires x2 >= x1
 efdtIntUp :: Int# -> Int# -> Int# -> [Int]
-efdtIntUp x1 x2 y	-- Be careful about overflow!
-  | y <# x2    = if y <# x1 then [] else [I# x1]
-  | otherwise 
-  = 	-- Common case: x1 < x2 <= y
-    let 
-	delta = x2 -# x1	
-	y' = y -# delta	
-	-- NB: x1 <= y'; hence y' is representable
+efdtIntUp x1 x2 y    -- Be careful about overflow!
+ | y <# x2   = if y <# x1 then [] else [I# x1]
+ | otherwise = -- Common case: x1 <= x2 <= y
+               let delta = x2 -# x1 -- >= 0
+                   y' = y -# delta  -- x1 <= y' <= y; hence y' is representable
 
-	-- Invariant: x <= y; and x+delta won't overflow
-        go_up x | x ># y'  = [I# x]
-	        | otherwise = I# x : go_up (x +# delta)
-    in 
-    I# x1 : go_up x2
-  		 	
+                   -- Invariant: x <= y
+                   -- Note that: z <= y' => z + delta won't overflow
+                   -- so we are guaranteed not to overflow if/when we recurse
+                   go_up x | x ># y'  = [I# x]
+                           | otherwise = I# x : go_up (x +# delta)
+               in I# x1 : go_up x2
+
+-- Requires x2 >= x1
+efdtIntUpFB :: (Int -> r -> r) -> r -> Int# -> Int# -> Int# -> r
+efdtIntUpFB c n x1 x2 y    -- Be careful about overflow!
+ | y <# x2   = if y <# x1 then n else I# x1 `c` n
+ | otherwise = -- Common case: x1 <= x2 <= y
+               let delta = x2 -# x1 -- >= 0
+                   y' = y -# delta  -- x1 <= y' <= y; hence y' is representable
+
+                   -- Invariant: x <= y
+                   -- Note that: z <= y' => z + delta won't overflow
+                   -- so we are guaranteed not to overflow if/when we recurse
+                   go_up x | x ># y'   = I# x `c` n
+                           | otherwise = I# x `c` go_up (x +# delta)
+               in I# x1 `c` go_up x2
+
+-- Requires x2 <= x1
 efdtIntDn :: Int# -> Int# -> Int# -> [Int]
-efdtIntDn x1 x2 y	-- x2 < x1
-  | y ># x2    = if y ># x1 then [] else [I# x1]
-  | otherwise 
-  = 	-- Common case: x1 > x2 >= y
-    let 
-	delta = x2 -# x1	
-	y' = y -# delta	
-	-- NB: x1 <= y'; hence y' is representable
+efdtIntDn x1 x2 y    -- Be careful about underflow!
+ | y ># x2   = if y ># x1 then [] else [I# x1]
+ | otherwise = -- Common case: x1 >= x2 >= y
+               let delta = x2 -# x1 -- <= 0
+                   y' = y -# delta  -- y <= y' <= x1; hence y' is representable
 
-	-- Invariant: x >= y; and x+delta won't overflow
-        go_dn x | x <# y'  = [I# x]
-	        | otherwise = I# x : go_dn (x +# delta)
-    in 
-    I# x1 : go_dn x2
+                   -- Invariant: x >= y
+                   -- Note that: z >= y' => z + delta won't underflow
+                   -- so we are guaranteed not to underflow if/when we recurse
+                   go_dn x | x <# y'  = [I# x]
+                           | otherwise = I# x : go_dn (x +# delta)
+   in I# x1 : go_dn x2
+
+-- Requires x2 <= x1
+efdtIntDnFB :: (Int -> r -> r) -> r -> Int# -> Int# -> Int# -> r
+efdtIntDnFB c n x1 x2 y    -- Be careful about underflow!
+ | y ># x2 = if y ># x1 then n else I# x1 `c` n
+ | otherwise = -- Common case: x1 >= x2 >= y
+               let delta = x2 -# x1 -- <= 0
+                   y' = y -# delta  -- y <= y' <= x1; hence y' is representable
+
+                   -- Invariant: x >= y
+                   -- Note that: z >= y' => z + delta won't underflow
+                   -- so we are guaranteed not to underflow if/when we recurse
+                   go_dn x | x <# y'   = I# x `c` n
+                           | otherwise = I# x `c` go_dn (x +# delta)
+               in I# x1 `c` go_dn x2
 \end{code}
 
