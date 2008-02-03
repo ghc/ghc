@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module VectBuiltIn (
   Builtins(..), sumTyCon, prodTyCon, uarrTy, intPrimArrayTy,
   combinePAVar,
@@ -20,7 +13,7 @@ module VectBuiltIn (
 import DsMonad
 import IfaceEnv        ( lookupOrig )
 
-import Module          ( Module )
+import Module
 import DataCon         ( DataCon, dataConName, dataConWorkId )
 import TyCon           ( TyCon, tyConName, tyConDataCons )
 import Var             ( Var )
@@ -37,9 +30,8 @@ import TysWiredIn      ( unitTyCon, unitDataCon,
                          intTyCon, intTyConName, intTy,
                          doubleTyCon, doubleTyConName,
                          boolTyCon, boolTyConName, trueDataCon, falseDataCon,
-                         parrTyCon, parrTyConName )
+                         parrTyConName )
 import PrelNames       ( gHC_PARR )
-import Module
 import BasicTypes      ( Boxity(..) )
 
 import FastString
@@ -60,6 +52,9 @@ mAX_NDP_COMBINE = 2
 
 mkNDPModule :: FastString -> Module
 mkNDPModule m = mkModule ndpPackageId (mkModuleNameFS m)
+
+nDP_UARR, nDP_PARRAY, nDP_REPR, nDP_CLOSURE, nDP_UNBOXED, nDP_INSTANCES, nDP_COMBINATORS,
+    nDP_PRELUDE_PARR, nDP_PRELUDE_INT, nDP_PRELUDE_DOUBLE :: Module
 
 nDP_UARR        = mkNDPModule FSLIT("Data.Array.Parallel.Unlifted.Flat.UArr")
 nDP_PARRAY      = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.PArray")
@@ -201,7 +196,7 @@ initBuiltins
                }
 
 initBuiltinVars :: Builtins -> DsM [(Var, Var)]
-initBuiltinVars bi
+initBuiltinVars _
   = do
       uvars <- zipWithM externalVar umods ufs
       vvars <- zipWithM externalVar vmods vfs
@@ -281,7 +276,7 @@ defaultTyCons :: [TyCon]
 defaultTyCons = [intTyCon, boolTyCon, doubleTyCon]
 
 initBuiltinDataCons :: Builtins -> [(Name, DataCon)]
-initBuiltinDataCons bi = [(dataConName dc, dc)| dc <- defaultDataCons]
+initBuiltinDataCons _ = [(dataConName dc, dc)| dc <- defaultDataCons]
 
 defaultDataCons :: [DataCon]
 defaultDataCons = [trueDataCon, falseDataCon, unitDataCon]
@@ -294,6 +289,7 @@ initBuiltinDicts ps
   where
     (tcs, mods, fss) = unzip3 ps
 
+initBuiltinPAs :: Builtins -> DsM [(Name, Var)]
 initBuiltinPAs = initBuiltinDicts . builtinPAs
 
 builtinPAs :: Builtins -> [(Name, Module, FastString)]
@@ -317,6 +313,7 @@ builtinPAs bi
                   nDP_INSTANCES
                   (mkFastString $ "dPA_" ++ show n)
 
+initBuiltinPRs :: Builtins -> DsM [(Name, Var)]
 initBuiltinPRs = initBuiltinDicts . builtinPRs
 
 builtinPRs :: Builtins -> [(Name, Module, FastString)]
@@ -348,7 +345,7 @@ initBuiltinBoxedTyCons :: Builtins -> DsM [(Name, TyCon)]
 initBuiltinBoxedTyCons = return . builtinBoxedTyCons
 
 builtinBoxedTyCons :: Builtins -> [(Name, TyCon)]
-builtinBoxedTyCons bi =
+builtinBoxedTyCons _ =
   [(tyConName intPrimTyCon, intTyCon)]
 
 externalVar :: Module -> FastString -> DsM Var
@@ -359,6 +356,7 @@ externalTyCon :: Module -> FastString -> DsM TyCon
 externalTyCon mod fs
   = dsLookupTyCon =<< lookupOrig mod (mkOccNameFS tcName fs)
 
+unitTyConName :: Name
 unitTyConName = tyConName unitTyCon
 
 
@@ -378,6 +376,7 @@ primPArray tycon
 
   | otherwise = return Nothing
 
+prim_ty_cons :: NameEnv String
 prim_ty_cons = mkNameEnv [mk_prim intPrimTyCon]
   where
     mk_prim tycon = (tyConName tycon, '_' : getOccString tycon)
