@@ -5,7 +5,7 @@
 % Author: Juan J. Quintela    <quintela@krilin.dc.fi.udc.es>
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -26,7 +26,6 @@ import Name
 import TysWiredIn
 import PrelNames
 import TyCon
-import BasicTypes
 import SrcLoc
 import UniqSet
 import Util
@@ -140,16 +139,17 @@ untidy_pars p = untidy True p
 untidy :: NeedPars -> WarningPat -> WarningPat
 untidy b (L loc p) = L loc (untidy' b p)
   where
-    untidy' _ p@(WildPat _)   = p
-    untidy' _ p@(VarPat name) = p
-    untidy' _ (LitPat lit)    = LitPat (untidy_lit lit)
-    untidy' _ p@(ConPatIn name (PrefixCon [])) = p
+    untidy' _ p@(WildPat _)          = p
+    untidy' _ p@(VarPat _)           = p
+    untidy' _ (LitPat lit)           = LitPat (untidy_lit lit)
+    untidy' _ p@(ConPatIn _ (PrefixCon [])) = p
     untidy' b (ConPatIn name ps)     = pars b (L loc (ConPatIn name (untidy_con ps)))
     untidy' _ (ListPat pats ty)      = ListPat (map untidy_no_pars pats) ty
     untidy' _ (TuplePat pats box ty) = TuplePat (map untidy_no_pars pats) box ty
     untidy' _ (PArrPat _ _)	     = panic "Check.untidy: Shouldn't get a parallel array here!"
     untidy' _ (SigPatIn _ _) 	     = panic "Check.untidy: SigPat"
 
+untidy_con :: HsConPatDetails Name -> HsConPatDetails Name
 untidy_con (PrefixCon pats) = PrefixCon (map untidy_pars pats) 
 untidy_con (InfixCon p1 p2) = InfixCon  (untidy_pars p1) (untidy_pars p2)
 untidy_con (RecCon (HsRecFields flds dd)) 
@@ -289,7 +289,7 @@ remove_first_column_lit lit qs
     [(n, shift_pat eqn) | q@(n,eqn) <- qs, is_var_lit lit (firstPatN q)]
   where
      shift_pat eqn@(EqnInfo { eqn_pats = _:ps}) = eqn { eqn_pats = ps }
-     shift_pat eqn@(EqnInfo { eqn_pats = []})   = panic "Check.shift_var: no patterns"
+     shift_pat _                                = panic "Check.shift_var: no patterns"
 \end{code}
 
 This function splits the equations @qs@ in groups that deal with the 
@@ -387,6 +387,7 @@ make_row_vars used_lits (_, EqnInfo { eqn_pats = pats})
   where 
      new_var = hash_x
 
+hash_x :: Name
 hash_x = mkInternalName unboundKey {- doesn't matter much -}
 		     (mkVarOccFS FSLIT("#x"))
 		     noSrcSpan
@@ -407,8 +408,9 @@ get_used_cons :: [(EqnNo, EquationInfo)] -> [Pat Id]
 get_used_cons qs = remove_dups [pat | q <- qs, let pat = firstPatN q, 
 				      isConPatOut pat]
 
+isConPatOut :: Pat Id -> Bool
 isConPatOut (ConPatOut {}) = True
-isConPatOut other	   = False
+isConPatOut _              = False
 
 remove_dups' :: [HsLit] -> [HsLit] 
 remove_dups' []                   = []
@@ -435,7 +437,7 @@ get_lit (LitPat lit)			 = Just lit
 get_lit (NPat (HsIntegral i   _ _) mb _) = Just (HsIntPrim   (mb_neg mb i))
 get_lit (NPat (HsFractional f _ _) mb _) = Just (HsFloatPrim (mb_neg mb f))
 get_lit (NPat (HsIsString s   _ _)  _ _) = Just (HsStringPrim s)
-get_lit other_pat			 = Nothing
+get_lit _                                = Nothing
 
 mb_neg :: Num a => Maybe b -> a -> a
 mb_neg Nothing  v = v
@@ -444,7 +446,7 @@ mb_neg (Just _) v = -v
 get_unused_cons :: [Pat Id] -> [DataCon]
 get_unused_cons used_cons = ASSERT( not (null used_cons) ) unused_cons
      where
-       (ConPatOut { pat_con = l_con, pat_ty = ty }) = head used_cons
+       (ConPatOut { pat_con = l_con }) = head used_cons
        ty_con 	       = dataConTyCon (unLoc l_con)	-- Newtype observable
        all_cons        = tyConDataCons ty_con
        used_cons_as_id = map (\ (ConPatOut{ pat_con = L _ d}) -> d) used_cons
@@ -473,6 +475,8 @@ okGroup (e:es) = n_pats > 0 && and [length (eqnPats e) == n_pats | e <- es]
 		 n_pats = length (eqnPats e)
 
 -- Half-baked print
+pprGroup :: [(EqnNo, EquationInfo)] -> SDoc
+pprEqnInfo :: (EqnNo, EquationInfo) -> SDoc
 pprGroup es = vcat (map pprEqnInfo es)
 pprEqnInfo e = ppr (eqnPats e)
 
@@ -494,12 +498,12 @@ is_var (WildPat _) = True
 is_var _           = False
 
 is_var_con :: DataCon -> Pat Id -> Bool
-is_var_con con (WildPat _)                                 = True
+is_var_con _   (WildPat _)                                 = True
 is_var_con con (ConPatOut{ pat_con = L _ id }) | id == con = True
-is_var_con con _                                           = False
+is_var_con _   _                                           = False
 
 is_var_lit :: HsLit -> Pat Id -> Bool
-is_var_lit lit (WildPat _)   = True
+is_var_lit _   (WildPat _)   = True
 is_var_lit lit pat 
   | Just lit' <- get_lit pat = lit == lit'
   | otherwise		     = False
@@ -543,16 +547,21 @@ contructors until the @[]@ to know that we need to use the second case,
 not the second. \fbox{\ ???\ }
 %
 \begin{code}
+isInfixCon :: DataCon -> Bool
 isInfixCon con = isDataSymOcc (getOccName con)
 
+is_nil :: Pat Name -> Bool
 is_nil (ConPatIn con (PrefixCon [])) = unLoc con == getName nilDataCon
 is_nil _               		     = False
 
+is_list :: Pat Name -> Bool
 is_list (ListPat _ _) = True
 is_list _             = False
 
+return_list :: DataCon -> Pat Name -> Bool
 return_list id q = id == consDataCon && (is_nil q || is_list q) 
 
+make_list :: LPat Name -> Pat Name -> Pat Name
 make_list p q | is_nil q    = ListPat [p] placeHolderType
 make_list p (ListPat ps ty) = ListPat (p:ps) ty
 make_list _ _               = panic "Check.make_list: Invalid argument"
@@ -583,7 +592,7 @@ make_whole_con con | isInfixCon con = nlInfixConPat name nlWildPat nlWildPat
                    | otherwise      = nlConPat name pats
                 where 
                   name   = getName con
-                  pats   = [nlWildPat | t <- dataConOrigArgTys con]
+                  pats   = [nlWildPat | _ <- dataConOrigArgTys con]
 \end{code}
 
 This equation makes the same thing as @tidy@ in @Match.lhs@, the
@@ -612,34 +621,34 @@ has_nplusk_pat :: Pat Id -> Bool
 has_nplusk_pat (NPlusKPat _ _ _ _) 	     = True
 has_nplusk_pat (ParPat p)  	   	     = has_nplusk_lpat p
 has_nplusk_pat (AsPat _ p) 	   	     = has_nplusk_lpat p
-has_nplusk_pat (ViewPat _ p _)           = has_nplusk_lpat p
+has_nplusk_pat (ViewPat _ p _)               = has_nplusk_lpat p
 has_nplusk_pat (SigPatOut p _ )    	     = has_nplusk_lpat p
 has_nplusk_pat (ListPat ps _)  	   	     = any has_nplusk_lpat ps
 has_nplusk_pat (TuplePat ps _ _)   	     = any has_nplusk_lpat ps
 has_nplusk_pat (PArrPat ps _)  	   	     = any has_nplusk_lpat ps
-has_nplusk_pat (LazyPat p)     	   	     = False	-- Why?
+has_nplusk_pat (LazyPat _)                   = False    -- Why?
 has_nplusk_pat (BangPat p)     	   	     = has_nplusk_lpat p	-- I think
 has_nplusk_pat (ConPatOut { pat_args = ps }) = any has_nplusk_lpat (hsConPatArgs ps)
-has_nplusk_pat p = False 	-- VarPat, VarPatOut, WildPat, LitPat, NPat, TypePat
+has_nplusk_pat _                             = False -- VarPat, VarPatOut, WildPat, LitPat, NPat, TypePat
 
 simplify_lpat :: LPat Id -> LPat Id  
 simplify_lpat p = fmap simplify_pat p
 
 simplify_pat :: Pat Id -> Pat Id
-simplify_pat pat@(WildPat gt) = pat
+simplify_pat pat@(WildPat _)  = pat
 simplify_pat (VarPat id)      = WildPat (idType id) 
 simplify_pat (VarPatOut id _) = WildPat (idType id) 	-- Ignore the bindings
 simplify_pat (ParPat p)       = unLoc (simplify_lpat p)
 simplify_pat (LazyPat p)      = WildPat (hsLPatType p)	-- For overlap and exhaustiveness checking
 							-- purposes, a ~pat is like a wildcard
 simplify_pat (BangPat p)      = unLoc (simplify_lpat p)
-simplify_pat (AsPat id p)     = unLoc (simplify_lpat p)
+simplify_pat (AsPat _ p)      = unLoc (simplify_lpat p)
 
 simplify_pat (ViewPat expr p ty)     = ViewPat expr (simplify_lpat p) ty
 
 simplify_pat (SigPatOut p _)  = unLoc (simplify_lpat p)	-- I'm not sure this is right
 
-simplify_pat pat@(ConPatOut { pat_con = L loc id, pat_args = ps })
+simplify_pat pat@(ConPatOut { pat_con = L _ id, pat_args = ps })
   = pat { pat_args = simplify_con id ps }
 
 simplify_pat (ListPat ps ty) = 
@@ -664,7 +673,7 @@ simplify_pat (TuplePat ps boxity ty)
 
 -- unpack string patterns fully, so we can see when they overlap with
 -- each other, or even explicit lists of Chars.
-simplify_pat pat@(LitPat (HsString s)) = 
+simplify_pat (LitPat (HsString s)) =
    unLoc $ foldr (\c pat -> mkPrefixConPat consDataCon [mk_char_lit c, pat] stringTy)
 		 (mkPrefixConPat nilDataCon [] stringTy) (unpackFS s)
   where
@@ -673,16 +682,17 @@ simplify_pat pat@(LitPat (HsString s)) =
 simplify_pat (LitPat lit)		 = tidyLitPat lit 
 simplify_pat (NPat lit mb_neg eq) = tidyNPat lit mb_neg eq
 
-simplify_pat (NPlusKPat id hslit hsexpr1 hsexpr2)
+simplify_pat (NPlusKPat id _ _ _)
    = WildPat (idType (unLoc id))
 
-simplify_pat (CoPat co pat ty) = simplify_pat pat 
+simplify_pat (CoPat _ pat _) = simplify_pat pat
 
 -----------------
-simplify_con con (PrefixCon ps)   = PrefixCon (map simplify_lpat ps)
-simplify_con con (InfixCon p1 p2) = PrefixCon [simplify_lpat p1, simplify_lpat p2]
+simplify_con :: DataCon -> HsConPatDetails Id -> HsConPatDetails Id
+simplify_con _   (PrefixCon ps)   = PrefixCon (map simplify_lpat ps)
+simplify_con _   (InfixCon p1 p2) = PrefixCon [simplify_lpat p1, simplify_lpat p2]
 simplify_con con (RecCon (HsRecFields fs _))      
-  | null fs   = PrefixCon [nlWildPat | t <- dataConOrigArgTys con]
+  | null fs   = PrefixCon [nlWildPat | _ <- dataConOrigArgTys con]
 		-- Special case for null patterns; maybe not a record at all
   | otherwise = PrefixCon (map (simplify_lpat.snd) all_pats)
   where
