@@ -667,7 +667,7 @@ seqPairs ((b,e):prs) = seqBndr b `seq` seqExpr e `seq` seqPairs prs
 
 seqAlts :: [CoreAlt] -> ()
 seqAlts [] = ()
-seqAlts ((_,bs,e):alts) = seqBndrs bs `seq` seqExpr e `seq` seqAlts alts
+seqAlts ((c,bs,e):alts) = c `seq` seqBndrs bs `seq` seqExpr e `seq` seqAlts alts
 
 seqRules :: [CoreRule] -> ()
 seqRules [] = ()
