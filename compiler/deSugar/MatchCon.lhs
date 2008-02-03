@@ -6,7 +6,7 @@
 Pattern-matching constructors
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -15,6 +15,8 @@ Pattern-matching constructors
 
 module MatchCon ( matchConFamily ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import {-# SOURCE #-} Match	( match )
@@ -29,6 +31,7 @@ import DsMonad
 import DsUtils
 import Util	( takeList )
 import Id
+import Var      (TyVar)
 import SrcLoc
 import Outputable
 \end{code}
@@ -93,6 +96,10 @@ matchConFamily (var:vars) ty groups
   = do	{ alts <- mapM (matchOneCon vars ty) groups
 	; return (mkCoAlgCaseMatchResult var ty alts) }
 
+matchOneCon :: [Id]
+            -> Type
+            -> [EquationInfo]
+            -> DsM (DataCon, [TyVar], MatchResult)
 matchOneCon vars ty (eqn1 : eqns)	-- All eqns for a single constructor
   = do	{ (wraps, eqns') <- mapAndUnzipM shift (eqn1:eqns)
 	; arg_vars <- selectMatchVars (take (dataConSourceArity con1) 
@@ -128,9 +135,9 @@ conArgPats :: DataCon
 			-- are probably never looked at anyway
 	   -> HsConDetails (LPat Id) (HsRecFields Id (LPat Id))
 	   -> [Pat Id]
-conArgPats data_con arg_tys (PrefixCon ps)   = map unLoc ps
-conArgPats data_con arg_tys (InfixCon p1 p2) = [unLoc p1, unLoc p2]
-conArgPats data_con arg_tys (RecCon (HsRecFields rpats _))
+conArgPats _data_con _arg_tys (PrefixCon ps)   = map unLoc ps
+conArgPats _data_con _arg_tys (InfixCon p1 p2) = [unLoc p1, unLoc p2]
+conArgPats  data_con  arg_tys (RecCon (HsRecFields rpats _))
   | null rpats
   =	-- Special case for C {}, which can be used for 
 	-- a constructor that isn't declared to have
