@@ -418,6 +418,11 @@ ALL_DIRS += javaGen
 SRC_HC_OPTS += -DJAVA
 endif
 
+ifeq ($(UseLibFFI),YES)
+SRC_HC_OPTS += -DUSE_LIBFFI
+SRC_HSC2HS_OPTS += -DUSE_LIBFFI
+endif
+
 ifeq "$(BootingFromHc)" "YES"
 # HC files are always from a self-booted compiler
 bootstrapped = YES

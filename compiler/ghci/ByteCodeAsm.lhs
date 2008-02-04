@@ -390,12 +390,13 @@ mkBits findLabel st proto_insns
        literal st (MachLabel fs _) = litlabel st fs
        literal st (MachWord w)     = int st (fromIntegral w)
        literal st (MachInt j)      = int st (fromIntegral j)
+       literal st MachNullAddr     = int st (fromIntegral 0)
        literal st (MachFloat r)    = float st (fromRational r)
        literal st (MachDouble r)   = double st (fromRational r)
        literal st (MachChar c)     = int st (ord c)
        literal st (MachInt64 ii)   = int64 st (fromIntegral ii)
        literal st (MachWord64 ii)  = int64 st (fromIntegral ii)
-       literal st other            = pprPanic "ByteCodeLink.literal" (ppr other)
+       literal st other            = pprPanic "ByteCodeAsm.literal" (ppr other)
 
 
 push_alts NonPtrArg = bci_PUSH_ALTS_N

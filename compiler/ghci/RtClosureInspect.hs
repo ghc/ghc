@@ -67,7 +67,6 @@ import TysPrim
 import PrelNames
 import TysWiredIn
 
-import Constants
 import Outputable
 import Panic
 
@@ -260,11 +259,11 @@ extractUnboxed tt clos = go tt (nonPtrs clos)
            | otherwise = pprPanic "Expected a TcTyCon" (ppr t)
          go [] _ = []
          go (t:tt) xx 
-           | (x, rest) <- splitAt ((sizeofType t + wORD_SIZE - 1) `div` wORD_SIZE) xx 
+           | (x, rest) <- splitAt (sizeofType t) xx
            = x : go tt rest
 
-sizeofTyCon :: TyCon -> Int
-sizeofTyCon = sizeofPrimRep . tyConPrimRep
+sizeofTyCon :: TyCon -> Int -- in *words*
+sizeofTyCon = primRepSizeW . tyConPrimRep
 
 -----------------------------------
 -- * Traversals for Terms

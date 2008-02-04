@@ -12,10 +12,22 @@ ByteCodeGen: Generate machine-code sequences for foreign import
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
 
+#ifdef USE_LIBFFI
+
+module ByteCodeFFI ( moan64, newExec ) where
+
+import Outputable
+import System.IO
+import Foreign
+import Foreign.C
+
+#else
+
 module ByteCodeFFI ( mkMarshalCode, moan64, newExec ) where
 
 #include "HsVersions.h"
 
+import TyCon
 import Outputable
 import SMRep
 import ForeignCall
@@ -44,21 +56,6 @@ import System.IO	( hPutStrLn, stderr )
 
 \begin{code}
 
-moan64 :: String -> SDoc -> a
-moan64 msg pp_rep
-   = unsafePerformIO (
-        hPutStrLn stderr (
-        "\nGHCi's bytecode generation machinery can't handle 64-bit\n" ++
-        "code properly yet.  You can work around this for the time being\n" ++
-        "by compiling this module and all those it imports to object code,\n" ++
-        "and re-starting your GHCi session.  The panic below contains information,\n" ++
-        "intended for the GHC implementors, about the exact place where GHC gave up.\n"
-        )
-     )
-     `seq`
-     pprPanic msg pp_rep
-
-
 -- For sparc_TARGET_ARCH, i386_TARGET_ARCH, etc.
 #include "nativeGen/NCG.h"
 
@@ -78,27 +75,15 @@ itself expects only to be called using the ccall convention -- that is,
 we don't clear our own (single) arg off the C stack.
 -}
 mkMarshalCode :: CCallConv
-              -> (Int, CgRep) -> Int -> [(Int, CgRep)] 
+              -> (Int, PrimRep) -> Int -> [(Int, PrimRep)] 
               -> IO (FunPtr ())
 mkMarshalCode cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
    = let bytes = mkMarshalCode_wrk cconv (r_offW, r_rep) 
                                    addr_offW arg_offs_n_reps
      in  newExec bytes
 
-newExec :: Storable a => [a] -> IO (FunPtr ())
-newExec code
-   = do ptr <- _allocateExec (fromIntegral $ codeSize undefined code)
-        pokeArray ptr code
-        return (castPtrToFunPtr ptr)
-   where
-   codeSize :: Storable a => a -> [a] -> Int
-   codeSize dummy array = sizeOf(dummy) * length array
-
-foreign import ccall unsafe "allocateExec"
-  _allocateExec :: CUInt -> IO (Ptr a)  
-
 mkMarshalCode_wrk :: CCallConv 
-                  -> (Int, CgRep) -> Int -> [(Int, CgRep)] 
+                  -> (Int, PrimRep) -> Int -> [(Int, PrimRep)] 
                   -> [Word8]
 
 mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
@@ -111,7 +96,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
          offsets_to_pushW
             = concat
               [   -- reversed because x86 is little-endian
-                  reverse [a_offW .. a_offW + cgRepSizeW a_rep - 1]
+                  reverse [a_offW .. a_offW + primRepSizeW a_rep - 1]
 
                 -- reversed because args are pushed L -> R onto C stack
                 | (a_offW, a_rep) <- reverse arg_offs_n_reps
@@ -267,11 +252,14 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
             f64 = fstpl_offesimem 0
         in
         case r_rep of
-           NonPtrArg -> i32
-           DoubleArg -> f64  
-           FloatArg  -> f32
-           LongArg   -> i64
-           VoidArg   -> []
+           VoidRep   -> []
+           IntRep    -> i32
+           WordRep   -> i32
+           Int64Rep  -> i64
+           Word64Rep -> i64
+           AddrRep   -> i32
+           FloatRep  -> f32
+           DoubleRep -> f64
            other     -> moan64 "ByteCodeFFI.mkMarshalCode_wrk(x86)" 
                                (ppr r_rep)
 
@@ -489,7 +477,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
 
          offsets_to_pushW
             = concat
-              [  [a_offW .. a_offW + cgRepSizeW a_rep - 1]
+              [  [a_offW .. a_offW + primRepSizeW a_rep - 1]
 
                 | (a_offW, a_rep) <- arg_offs_n_reps
               ]
@@ -640,10 +628,12 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
             f64 = [mkSTF f0 i0 0, mkSTF f1 i0 4]
         in
             case r_rep of
-               NonPtrArg -> i32
-               DoubleArg -> f64
-               FloatArg  -> f32
-               VoidArg   -> []
+               VoidRep   -> []
+               IntRep    -> i32
+               WordRep   -> i32
+               AddrRep   -> i32
+               FloatRep  -> f32
+               DoubleRep -> f64
                other     -> moan64 "ByteCodeFFI.mkMarshalCode_wrk(sparc)" 
                                    (ppr r_rep)
 
@@ -668,7 +658,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
          result_off  = r_offW * bytes_per_word
 
          linkageArea = 24
-         parameterArea = sum [ cgRepSizeW a_rep * bytes_per_word
+         parameterArea = sum [ primRepSizeW a_rep * bytes_per_word
                         | (_, a_rep) <- arg_offs_n_reps ]
          savedRegisterArea = 4
          frameSize = padTo16 (linkageArea + max parameterArea 32 + savedRegisterArea)
@@ -680,7 +670,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
          pass_parameters ((a_offW, a_rep):args) nextFPR offsetW =
             let
                haskellArgOffset = a_offW * bytes_per_word
-               offsetW' = offsetW + cgRepSizeW a_rep
+               offsetW' = offsetW + primRepSizeW a_rep
                
                pass_word w 
                    | offsetW + w < 8 =
@@ -708,7 +698,7 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
                         .|. (fromIntegral nextFPR `shiftL` 21))
                       : pass_parameters args (nextFPR+1) offsetW'
                   _ ->
-                      concatMap pass_word [0 .. cgRepSizeW a_rep - 1]
+                      concatMap pass_word [0 .. primRepSizeW a_rep - 1]
                       ++ pass_parameters args nextFPR offsetW'              
                
          gather_result = case r_rep of
@@ -719,12 +709,12 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
             DoubleArg -> 
                [0xd83f0000 .|. (fromIntegral result_off .&. 0xFFFF)]
                -- stfd f1, result_off(r31)
-            _ | cgRepSizeW r_rep == 2 ->
+            _ | primRepSizeW r_rep == 2 ->
                [0x907f0000 .|. (fromIntegral result_off .&. 0xFFFF),
                 0x909f0000 .|. (fromIntegral (result_off+4) .&. 0xFFFF)]
                -- stw r3, result_off(r31)
                -- stw r4, result_off+4(r31)
-            _ | cgRepSizeW r_rep == 1 ->
+            _ | primRepSizeW r_rep == 1 ->
                [0x907f0000 .|. (fromIntegral result_off .&. 0xFFFF)]
                -- stw r3, result_off(r31)
      in
@@ -862,5 +852,33 @@ lit32 i = let w32 = (fromIntegral i) :: Word32
                   [w32, w32 `shiftR` 8, 
                    w32 `shiftR` 16,  w32 `shiftR` 24]
 #endif
+
+#endif /* !USE_LIBFFI */
+
+moan64 :: String -> SDoc -> a
+moan64 msg pp_rep
+   = unsafePerformIO (
+        hPutStrLn stderr (
+        "\nGHCi's bytecode generation machinery can't handle 64-bit\n" ++
+        "code properly yet.  You can work around this for the time being\n" ++
+        "by compiling this module and all those it imports to object code,\n" ++
+        "and re-starting your GHCi session.  The panic below contains information,\n" ++
+        "intended for the GHC implementors, about the exact place where GHC gave up.\n"
+        )
+     )
+     `seq`
+     pprPanic msg pp_rep
+
+newExec :: Storable a => [a] -> IO (FunPtr ())
+newExec code
+   = do ptr <- _allocateExec (fromIntegral $ codeSize undefined code)
+        pokeArray ptr code
+        return (castPtrToFunPtr ptr)
+   where
+   codeSize :: Storable a => a -> [a] -> Int
+   codeSize dummy array = sizeOf(dummy) * length array
+
+foreign import ccall unsafe "allocateExec"
+  _allocateExec :: CUInt -> IO (Ptr a)  
 \end{code}
 

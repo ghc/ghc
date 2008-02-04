@@ -28,6 +28,9 @@
 #include <errno.h>
 #endif
 
+#ifdef USE_LIBFFI
+#include <ffi.h>
+#endif
 
 /* --------------------------------------------------------------------------
  * The bytecode interpreter
@@ -1321,14 +1324,68 @@ run_BCO:
 		RET_DYN_BITMAP_SIZE + RET_DYN_NONPTR_REGS_SIZE
 		+ sizeofW(StgRetDyn);
 
-#ifdef THREADED_RTS
-	    // Threaded RTS:
-	    // Arguments on the TSO stack are not good, because garbage
-	    // collection might move the TSO as soon as we call
-	    // suspendThread below.
+            /* the stack looks like this:
+               
+               |             |  <- Sp + stk_offset
+               +-------------+  
+               |             |
+               |    args     |
+               |             |  <- Sp + ret_size + 1
+               +-------------+
+               |    C fun    |  <- Sp + ret_size
+               +-------------+
+               |     ret     |  <- Sp
+               +-------------+
 
+               ret is a placeholder for the return address, and may be
+               up to 2 words.
+
+               We need to copy the args out of the TSO, because when
+               we call suspendThread() we no longer own the TSO stack,
+               and it may move at any time - indeed suspendThread()
+               itself may do stack squeezing and move our args.
+               So we make a copy of the argument block.
+            */
+
+#ifdef USE_LIBFFI
+#define ROUND_UP_WDS(p)  ((((StgWord)(p)) + sizeof(W_)-1)/sizeof(W_))
+
+            ffi_cif *cif = (ffi_cif *)marshall_fn;
+            nat nargs = cif->nargs;
+            nat ret_size;
+            nat i;
+            StgPtr p;
+            W_ ret[2];                  // max needed
+	    W_ *arguments[stk_offset];  // max needed
+            void *argptrs[nargs];
+            void (*fn)(void);
+
+            if (cif->rtype->type == FFI_TYPE_VOID) {
+                // necessary because cif->rtype->size == 1 for void,
+                // but the bytecode generator has not pushed a
+                // placeholder in this case.
+                ret_size = 0;
+            } else {
+                ret_size = ROUND_UP_WDS(cif->rtype->size);
+            }
+
+	    memcpy(arguments, Sp+ret_size+1, 
+                   sizeof(W_) * (stk_offset-1-ret_size));
+            
+            // libffi expects the args as an array of pointers to
+            // values, so we have to construct this array before making
+            // the call.
+            p = (StgPtr)arguments;
+            for (i = 0; i < nargs; i++) {
+                argptrs[i] = (void *)p;
+                // get the size from the cif
+                p += ROUND_UP_WDS(cif->arg_types[i]->size);
+            }
+
+            // this is the function we're going to call
+            fn = (void(*)(void))Sp[ret_size];
+#else
 	    W_ arguments[stk_offset];
-	    
 	    memcpy(arguments, Sp, sizeof(W_) * stk_offset);
 #endif
 
@@ -1357,17 +1414,10 @@ run_BCO:
 	    SAVE_STACK_POINTERS;
 	    tok = suspendThread(&cap->r);
 
-#ifndef THREADED_RTS
-	    // Careful:
-	    // suspendThread might have shifted the stack
-	    // around (stack squeezing), so we have to grab the real
-	    // Sp out of the TSO to find the ccall args again.
-
-	    marshall_fn ( (void*)(cap->r.rCurrentTSO->sp + ret_dyn_size) );
-#else
-	    // Threaded RTS:
 	    // We already made a copy of the arguments above.
-
+#ifdef USE_LIBFFI
+            ffi_call(cif, fn, ret, argptrs);
+#else
 	    marshall_fn ( arguments );
 #endif
 
@@ -1389,12 +1439,12 @@ run_BCO:
 	    // Save the Haskell thread's current value of errno
 	    cap->r.rCurrentTSO->saved_errno = errno;
 		
-#ifdef THREADED_RTS
-	    // Threaded RTS:
-	    // Copy the "arguments", which might include a return value,
-	    // back to the TSO stack. It would of course be enough to
-	    // just copy the return value, but we don't know the offset.
-	    memcpy(Sp, arguments, sizeof(W_) * stk_offset);
+	    // Copy the return value back to the TSO stack.  It is at
+            // most 2 words large, and resides at arguments[0].
+#ifdef USE_LIBFFI
+            memcpy(Sp, ret, sizeof(W_) * stg_min(stk_offset,ret_size));
+#else
+	    memcpy(Sp, arguments, sizeof(W_) * stg_min(stk_offset,2));
 #endif
 
 	    goto nextInsn;

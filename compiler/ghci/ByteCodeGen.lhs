@@ -18,9 +18,12 @@ module ByteCodeGen ( UnlinkedBCO, byteCodeGen, coreExprToBCOs ) where
 
 import ByteCodeInstr
 import ByteCodeItbls
-import ByteCodeFFI
 import ByteCodeAsm
 import ByteCodeLink
+import ByteCodeFFI
+#ifdef USE_LIBFFI
+import LibFFI
+#endif
 
 import Outputable
 import Name
@@ -55,8 +58,7 @@ import OrdList
 import Constants
 
 import Data.List	( intersperse, sortBy, zip4, zip6, partition )
-import Foreign		( Ptr, castPtr, mallocBytes, pokeByteOff, Word8,
-			  withForeignPtr, castFunPtrToPtr, nullPtr, plusPtr )
+import Foreign
 import Foreign.C
 import Control.Exception	( throwDyn )
 
@@ -932,18 +934,18 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
 		     | t == arrayPrimTyCon || t == mutableArrayPrimTyCon
                        -> do rest <- pargs (d + addr_sizeW) az
                              code <- parg_ArrayishRep arrPtrsHdrSize d p a
-                             return ((code,NonPtrArg):rest)
+                             return ((code,AddrRep):rest)
 
 		     | t == byteArrayPrimTyCon || t == mutableByteArrayPrimTyCon
                        -> do rest <- pargs (d + addr_sizeW) az
                              code <- parg_ArrayishRep arrWordsHdrSize d p a
-                             return ((code,NonPtrArg):rest)
+                             return ((code,AddrRep):rest)
 
                     -- Default case: push taggedly, but otherwise intact.
                     other
                        -> do (code_a, sz_a) <- pushAtom d p a
                              rest <- pargs (d+sz_a) az
-                             return ((code_a, atomRep a) : rest)
+                             return ((code_a, atomPrimRep a) : rest)
 
          -- Do magic for Ptr/Byte arrays.  Push a ptr to the array on
          -- the stack but then advance it over the headers, so as to
@@ -960,9 +962,9 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
          (pushs_arg, a_reps_pushed_r_to_l) = unzip code_n_reps
 
          push_args    = concatOL pushs_arg
-         d_after_args = d0 + sum (map cgRepSizeW a_reps_pushed_r_to_l)
+         d_after_args = d0 + sum (map primRepSizeW a_reps_pushed_r_to_l)
          a_reps_pushed_RAW
-            | null a_reps_pushed_r_to_l || head a_reps_pushed_r_to_l /= VoidArg
+            | null a_reps_pushed_r_to_l || head a_reps_pushed_r_to_l /= VoidRep
             = panic "ByteCodeGen.generateCCall: missing or invalid World token?"
             | otherwise
             = reverse (tail a_reps_pushed_r_to_l)
@@ -974,7 +976,7 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
          -- Get the result rep.
          (returns_void, r_rep)
             = case maybe_getCCallReturnRep (idType fn) of
-                 Nothing -> (True,  VoidArg)
+                 Nothing -> (True,  VoidRep)
                  Just rr -> (False, rr) 
          {-
          Because the Haskell stack grows down, the a_reps refer to 
@@ -1040,7 +1042,7 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
 
          -- Push the return placeholder.  For a call returning nothing,
          -- this is a VoidArg (tag).
-         r_sizeW   = cgRepSizeW r_rep
+         r_sizeW   = primRepSizeW r_rep
          d_after_r = d_after_Addr + r_sizeW
          r_lit     = mkDummyLiteral r_rep
          push_r    = (if   returns_void 
@@ -1052,24 +1054,36 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
          addr_offW    = r_sizeW
          arg1_offW    = r_sizeW + addr_sizeW
          args_offW    = map (arg1_offW +) 
-                            (init (scanl (+) 0 (map cgRepSizeW a_reps)))
-     -- in
-     addr_of_marshaller <- ioToBc (mkMarshalCode cconv
-                                (r_offW, r_rep) addr_offW
-                                (zip args_offW a_reps))
-     recordItblMallocBc (ItblPtr (castFunPtrToPtr addr_of_marshaller))
-     let
+                            (init (scanl (+) 0 (map primRepSizeW a_reps)))
+
 	 -- Offset of the next stack frame down the stack.  The CCALL
  	 -- instruction needs to describe the chunk of stack containing
 	 -- the ccall args to the GC, so it needs to know how large it
 	 -- is.  See comment in Interpreter.c with the CCALL instruction.
 	 stk_offset   = d_after_r - s
 
+     -- in
+#if !defined(USE_LIBFFI)
+     -- In the native case, we build marshalling code and attach the
+     -- address of that to the CCALL instruction
+     addr_of_marshaller <- ioToBc (mkMarshalCode cconv
+                                (r_offW, r_rep) addr_offW
+                                (zip args_offW a_reps))
+#else
+     -- the only difference in libffi mode is that we prepare a cif
+     -- describing the call type by calling libffi, and we attach the
+     -- address of this to the CCALL instruction.
+     token <- ioToBc $ prepForeignCall cconv a_reps r_rep
+     let addr_of_marshaller = castPtrToFunPtr token
+#endif
+
+     recordItblMallocBc (ItblPtr (castFunPtrToPtr addr_of_marshaller))
+     let
          -- do the call
          do_call      = unitOL (CCALL stk_offset (castFunPtrToPtr addr_of_marshaller))
          -- slide and return
          wrapup       = mkSLIDE r_sizeW (d_after_r - r_sizeW - s)
-                        `snocOL` RETURN_UBX r_rep
+                        `snocOL` RETURN_UBX (primRepToCgRep r_rep)
      --in
          --trace (show (arg1_offW, args_offW  ,  (map cgRepSizeW a_reps) )) $
      return (
@@ -1077,17 +1091,19 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
          push_Addr `appOL` push_r `appOL` do_call `appOL` wrapup
          )
 
-
 -- Make a dummy literal, to be used as a placeholder for FFI return
 -- values on the stack.
-mkDummyLiteral :: CgRep -> Literal
+mkDummyLiteral :: PrimRep -> Literal
 mkDummyLiteral pr
    = case pr of
-        NonPtrArg -> MachWord 0
-        DoubleArg -> MachDouble 0
-        FloatArg  -> MachFloat 0
-        LongArg   -> MachWord64 0
-        _         -> moan64 "mkDummyLiteral" (ppr pr)
+        IntRep    -> MachInt 0
+        WordRep   -> MachWord 0
+        AddrRep   -> MachNullAddr
+        DoubleRep -> MachDouble 0
+        FloatRep  -> MachFloat 0
+        Int64Rep  -> MachInt64 0
+        Word64Rep -> MachWord64 0
+        _         -> panic "mkDummyLiteral"
 
 
 -- Convert (eg) 
@@ -1104,21 +1120,21 @@ mkDummyLiteral pr
 --
 -- to  Nothing
 
-maybe_getCCallReturnRep :: Type -> Maybe CgRep
+maybe_getCCallReturnRep :: Type -> Maybe PrimRep
 maybe_getCCallReturnRep fn_ty
    = let (a_tys, r_ty) = splitFunTys (dropForAlls fn_ty)
          maybe_r_rep_to_go  
             = if isSingleton r_reps then Nothing else Just (r_reps !! 1)
          (r_tycon, r_reps) 
             = case splitTyConApp_maybe (repType r_ty) of
-                      (Just (tyc, tys)) -> (tyc, map typeCgRep tys)
+                      (Just (tyc, tys)) -> (tyc, map typePrimRep tys)
                       Nothing -> blargh
-         ok = ( ( r_reps `lengthIs` 2 && VoidArg == head r_reps)
-                || r_reps == [VoidArg] )
+         ok = ( ( r_reps `lengthIs` 2 && VoidRep == head r_reps)
+                || r_reps == [VoidRep] )
               && isUnboxedTupleTyCon r_tycon
               && case maybe_r_rep_to_go of
                     Nothing    -> True
-                    Just r_rep -> r_rep /= PtrArg
+                    Just r_rep -> r_rep /= PtrRep
                                   -- if it was, it would be impossible 
                                   -- to create a valid return value 
                                   -- placeholder on the stack
@@ -1420,19 +1436,22 @@ isTypeAtom (AnnType _) = True
 isTypeAtom _           = False
 
 isVoidArgAtom :: AnnExpr' id ann -> Bool
-isVoidArgAtom (AnnVar v)        = typeCgRep (idType v) == VoidArg
+isVoidArgAtom (AnnVar v)        = typePrimRep (idType v) == VoidRep
 isVoidArgAtom (AnnNote n (_,e)) = isVoidArgAtom e
 isVoidArgAtom (AnnCast (_,e) _) = isVoidArgAtom e
 isVoidArgAtom _ 	        = False
 
+atomPrimRep :: AnnExpr' Id ann -> PrimRep
+atomPrimRep (AnnVar v)    = typePrimRep (idType v)
+atomPrimRep (AnnLit l)    = typePrimRep (literalType l)
+atomPrimRep (AnnNote n b) = atomPrimRep (snd b)
+atomPrimRep (AnnApp f (_, AnnType _)) = atomPrimRep (snd f)
+atomPrimRep (AnnLam x e) | isTyVar x = atomPrimRep (snd e)
+atomPrimRep (AnnCast b _) = atomPrimRep (snd b)
+atomPrimRep other = pprPanic "atomPrimRep" (ppr (deAnnotate (undefined,other)))
+
 atomRep :: AnnExpr' Id ann -> CgRep
-atomRep (AnnVar v)    = typeCgRep (idType v)
-atomRep (AnnLit l)    = typeCgRep (literalType l)
-atomRep (AnnNote n b) = atomRep (snd b)
-atomRep (AnnApp f (_, AnnType _)) = atomRep (snd f)
-atomRep (AnnLam x e) | isTyVar x = atomRep (snd e)
-atomRep (AnnCast b _) = atomRep (snd b)
-atomRep other = pprPanic "atomRep" (ppr (deAnnotate (undefined,other)))
+atomRep e = primRepToCgRep (atomPrimRep e)
 
 isPtrAtom :: AnnExpr' Id ann -> Bool
 isPtrAtom e = atomRep e == PtrArg

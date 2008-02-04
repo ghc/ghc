@@ -11,7 +11,7 @@ module TyCon(
 
 	PrimRep(..),
 	tyConPrimRep,
-        sizeofPrimRep,
+        primRepSizeW,
 
 	AlgTyConRhs(..), visibleDataCons, 
         TyConParent(..), 
@@ -455,19 +455,22 @@ data PrimRep
   | AddrRep		-- a pointer, but not to a Haskell value
   | FloatRep
   | DoubleRep
-  deriving( Eq )
+  deriving( Eq, Show )
 
--- Size of a PrimRep, in bytes
-sizeofPrimRep :: PrimRep -> Int
-sizeofPrimRep IntRep   = wORD_SIZE
-sizeofPrimRep WordRep  = wORD_SIZE
-sizeofPrimRep Int64Rep = wORD64_SIZE
-sizeofPrimRep Word64Rep= wORD64_SIZE
-sizeofPrimRep FloatRep = 4
-sizeofPrimRep DoubleRep= 8
-sizeofPrimRep AddrRep  = wORD_SIZE
-sizeofPrimRep PtrRep   = wORD_SIZE
-sizeofPrimRep VoidRep  = 0
+instance Outputable PrimRep where
+  ppr r = text (show r)
+
+-- Size of a PrimRep, in words
+primRepSizeW :: PrimRep -> Int
+primRepSizeW IntRep   = 1
+primRepSizeW WordRep  = 1
+primRepSizeW Int64Rep = wORD64_SIZE `quot` wORD_SIZE
+primRepSizeW Word64Rep= wORD64_SIZE `quot` wORD_SIZE
+primRepSizeW FloatRep = 1    -- NB. might not take a full word
+primRepSizeW DoubleRep= dOUBLE_SIZE `quot` wORD_SIZE
+primRepSizeW AddrRep  = 1
+primRepSizeW PtrRep   = 1
+primRepSizeW VoidRep  = 0
 \end{code}
 
 %************************************************************************
