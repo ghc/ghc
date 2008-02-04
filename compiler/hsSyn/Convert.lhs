@@ -6,7 +6,7 @@
 This module converts Template Haskell syntax into HsSyn
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-incomplete-patterns #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -25,7 +25,6 @@ import qualified Name
 import Module
 import RdrHsSyn
 import qualified OccName
-import PackageConfig
 import OccName
 import SrcLoc
 import Type
@@ -84,7 +83,7 @@ newtype CvtM a = CvtM { unCvtM :: SrcSpan -> Either Message a }
 -- the spliced-in declarations get a location that at least relates to the splice point
 
 instance Monad CvtM where
-  return x       = CvtM $ \loc -> Right x
+  return x       = CvtM $ \_   -> Right x
   (CvtM m) >>= k = CvtM $ \loc -> case m loc of
 				    Left err -> Left err
 				    Right v  -> unCvtM (k v) loc
@@ -96,7 +95,7 @@ force :: a -> CvtM a
 force a = a `seq` return a
 
 failWith :: Message -> CvtM a
-failWith m = CvtM (\loc -> Left full_msg)
+failWith m = CvtM (\_ -> Left full_msg)
    where
      full_msg = m $$ ptext SLIT("When splicing generated code into the program")
 
@@ -154,6 +153,11 @@ cvtTop (InstanceD tys ty decs)
 
 cvtTop (ForeignD ford) = do { ford' <- cvtForD ford; returnL $ ForD ford' }
 
+cvt_tycl_hdr :: TH.Cxt -> TH.Name -> [TH.Name]
+             -> CvtM (LHsContext RdrName
+                     ,Located RdrName
+                     ,[LHsTyVarBndr RdrName]
+                     ,Maybe [LHsType RdrName])
 cvt_tycl_hdr cxt tc tvs
   = do	{ cxt' <- cvtContext cxt
 	; tc'  <- tconNameL tc
@@ -164,6 +168,8 @@ cvt_tycl_hdr cxt tc tvs
 -- 	Data types
 -- Can't handle GADTs yet
 ---------------------------------------------------
+
+cvtConstr :: TH.Con -> CvtM (LConDecl RdrName)
 
 cvtConstr (NormalC c strtys)
   = do	{ c'   <- cNameL c 
@@ -194,16 +200,19 @@ cvtConstr (ForallC tvs ctxt con)
 	; case con' of
 	    ConDecl l _ [] (L _ []) x ResTyH98 _
 	      -> returnL $ ConDecl l Explicit tvs' ctxt' x ResTyH98 Nothing
-	    c -> panic "ForallC: Can't happen" }
+	    _ -> panic "ForallC: Can't happen" }
 
+cvt_arg :: (TH.Strict, TH.Type) -> CvtM (LHsType RdrName)
 cvt_arg (IsStrict, ty)  = do { ty' <- cvtType ty; returnL $ HsBangTy HsStrict ty' }
 cvt_arg (NotStrict, ty) = cvtType ty
 
+cvt_id_arg :: (TH.Name, TH.Strict, TH.Type) -> CvtM (ConDeclField RdrName)
 cvt_id_arg (i, str, ty) 
   = do	{ i' <- vNameL i
 	; ty' <- cvt_arg (str,ty)
 	; return (ConDeclField { cd_fld_name = i', cd_fld_type =  ty', cd_fld_doc = Nothing}) }
 
+cvtDerivs :: [TH.Name] -> CvtM (Maybe [LHsType RdrName])
 cvtDerivs [] = return Nothing
 cvtDerivs cs = do { cs' <- mapM cvt_one cs
 		  ; return (Just cs') }
@@ -214,6 +223,7 @@ cvtDerivs cs = do { cs' <- mapM cvt_one cs
 cvt_fundep :: FunDep -> CvtM (Located (Class.FunDep RdrName))
 cvt_fundep (FunDep xs ys) = do { xs' <- mapM tName xs; ys' <- mapM tName ys; returnL (xs', ys') }
 
+noExistentials :: [LHsTyVarBndr RdrName]
 noExistentials = []
 
 ------------------------------------------
@@ -242,6 +252,7 @@ cvtForD (ExportF callconv as nm ty)
 	; let e = CExport (CExportStatic (mkFastString as) (cvt_conv callconv))
  	; return $ ForeignExport nm' ty' e }
 
+cvt_conv :: TH.Callconv -> CCallConv
 cvt_conv TH.CCall   = CCallConv
 cvt_conv TH.StdCall = StdCallConv
 
@@ -295,6 +306,7 @@ cvtDecs [] = return EmptyLocalBinds
 cvtDecs ds = do { (binds,sigs) <- cvtBindsAndSigs ds
 		; return (HsValBinds (ValBindsIn binds sigs)) }
 
+cvtBindsAndSigs :: [TH.Dec] -> CvtM (Bag (LHsBind RdrName), [LSig RdrName])
 cvtBindsAndSigs ds 
   = do { binds' <- mapM cvtBind binds; sigs' <- mapM cvtSig sigs
        ; return (listToBag binds', sigs') }
@@ -302,8 +314,9 @@ cvtBindsAndSigs ds
     (sigs, binds) = partition is_sig ds
 
     is_sig (TH.SigD _ _) = True
-    is_sig other	 = False
+    is_sig _             = False
 
+cvtSig :: TH.Dec -> CvtM (LSig RdrName)
 cvtSig (TH.SigD nm ty)
   = do { nm' <- vNameL nm; ty' <- cvtType ty; returnL (Hs.TypeSig nm' ty') }
 
@@ -384,6 +397,7 @@ cvtl e = wrapL (cvt e)
 			      ; flds' <- mapM cvtFld flds
 			      ; return $ RecordUpd e' (HsRecFields flds' Nothing) [] [] [] }
 
+cvtFld :: (TH.Name, TH.Exp) -> CvtM (HsRecField RdrName (LHsExpr RdrName))
 cvtFld (v,e) 
   = do	{ v' <- vNameL v; e' <- cvtl e
 	; return (HsRecField { hsRecFieldId = v', hsRecFieldArg = e', hsRecPun = False}) }
@@ -398,12 +412,14 @@ cvtDD (FromThenToR x y z) = do { x' <- cvtl x; y' <- cvtl y; z' <- cvtl z; retur
 -- 	Do notation and statements
 -------------------------------------
 
+cvtHsDo :: HsStmtContext Name.Name -> [TH.Stmt] -> CvtM (HsExpr RdrName)
 cvtHsDo do_or_lc stmts
   = do	{ stmts' <- cvtStmts stmts
 	; let body = case last stmts' of
 			L _ (ExprStmt body _ _) -> body
 	; return $ HsDo do_or_lc (init stmts') body void }
 
+cvtStmts :: [TH.Stmt] -> CvtM [Hs.LStmt RdrName]
 cvtStmts = mapM cvtStmt 
 
 cvtStmt :: TH.Stmt -> CvtM (Hs.LStmt RdrName)
@@ -473,6 +489,7 @@ cvtp (RecP c fs)      = do { c' <- cNameL c; fs' <- mapM cvtPatFld fs
 cvtp (ListP ps)       = do { ps' <- cvtPats ps; return $ ListPat ps' void }
 cvtp (SigP p t)       = do { p' <- cvtPat p; t' <- cvtType t; return $ SigPatIn p' t' }
 
+cvtPatFld :: (TH.Name, TH.Pat) -> CvtM (HsRecField RdrName (LPat RdrName))
 cvtPatFld (s,p)
   = do	{ s' <- vNameL s; p' <- cvtPat p
 	; return (HsRecField { hsRecFieldId = s', hsRecFieldArg = p', hsRecPun = False}) }
@@ -483,6 +500,7 @@ cvtPatFld (s,p)
 cvtTvs :: [TH.Name] -> CvtM [LHsTyVarBndr RdrName]
 cvtTvs tvs = mapM cvt_tv tvs
 
+cvt_tv :: TH.Name -> CvtM (LHsTyVarBndr RdrName)
 cvt_tv tv = do { tv' <- tName tv; returnL $ UserTyVar tv' }
 
 cvtContext :: Cxt -> CvtM (LHsContext RdrName)
@@ -494,7 +512,7 @@ cvtPred ty
 	; case head of
 	    ConT tc -> do { tc' <- tconName tc; returnL $ HsClassP tc' tys' }
 	    VarT tv -> do { tv' <- tName tv;    returnL $ HsClassP tv' tys' }
-	    other   -> failWith (ptext SLIT("Malformed predicate") <+> text (TH.pprint ty)) }
+	    _       -> failWith (ptext SLIT("Malformed predicate") <+> text (TH.pprint ty)) }
 
 cvtType :: TH.Type -> CvtM (LHsType RdrName)
 cvtType ty = do { (head, tys') <- split_ty_app ty
@@ -511,7 +529,7 @@ cvtType ty = do { (head, tys') <- split_ty_app ty
 							 ; cxt' <- cvtContext cxt
 							 ; ty'  <- cvtType ty
 							 ; returnL $ mkExplicitHsForAllTy tvs' cxt' ty' }
-		    otherwise -> failWith (ptext SLIT("Malformed type") <+> text (show ty))
+		    _       -> failWith (ptext SLIT("Malformed type") <+> text (show ty))
 	     }
   where
     mk_apps head []       = returnL head
@@ -529,13 +547,11 @@ split_ty_app ty = go ty []
 -----------------------------------------------------------
 -- some useful things
 
-truePat  = nlConPat (getRdrName trueDataCon)  []
-
 overloadedLit :: Lit -> Bool
 -- True for literals that Haskell treats as overloaded
-overloadedLit (IntegerL  l) = True
-overloadedLit (RationalL l) = True
-overloadedLit l	            = False
+overloadedLit (IntegerL  _) = True
+overloadedLit (RationalL _) = True
+overloadedLit _             = False
 
 void :: Type.Type
 void = placeHolderType
@@ -591,7 +607,7 @@ thRdrName :: OccName.NameSpace -> String -> TH.NameFlavour -> RdrName
 -- 	 which will give confusing error messages later
 -- 
 -- The strict applications ensure that any buried exceptions get forced
-thRdrName ctxt_ns occ (TH.NameG th_ns pkg mod) = (mkOrig $! (mkModule (mk_pkg pkg) (mk_mod mod))) $! (mk_occ (mk_ghc_ns th_ns) occ)
+thRdrName _       occ (TH.NameG th_ns pkg mod) = (mkOrig $! (mkModule (mk_pkg pkg) (mk_mod mod))) $! (mk_occ (mk_ghc_ns th_ns) occ)
 thRdrName ctxt_ns occ (TH.NameL uniq)      = nameRdrName $! (((Name.mkInternalName $! (mk_uniq uniq)) $! (mk_occ ctxt_ns occ)) noSrcSpan)
 thRdrName ctxt_ns occ (TH.NameQ mod)       = (mkRdrQual  $! (mk_mod mod)) $! (mk_occ ctxt_ns occ)
 thRdrName ctxt_ns occ (TH.NameU uniq)      = mkRdrUnqual $! (mk_uniq_occ ctxt_ns occ uniq)
@@ -608,11 +624,11 @@ isBuiltInOcc ctxt_ns occ
 	"[]"		 -> Just (Name.getName nilDataCon)
 	"()"		 -> Just (tup_name 0)
 	'(' : ',' : rest -> go_tuple 2 rest
-	other		 -> Nothing
+	_                -> Nothing
   where
     go_tuple n ")" 	    = Just (tup_name n)
     go_tuple n (',' : rest) = go_tuple (n+1) rest
-    go_tuple n other	    = Nothing
+    go_tuple _ _            = Nothing
 
     tup_name n 
 	| OccName.isTcClsName ctxt_ns = Name.getName (tupleTyCon Boxed n)
