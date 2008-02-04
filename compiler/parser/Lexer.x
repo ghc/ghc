@@ -27,6 +27,9 @@
 -- any warnings in the module. See
 --     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
 -- for details
+--
+-- Note that Alex itself generates code with with some unused bindings and
+-- without type signatures, so removing the flag might not be possible.
 
 module Lexer (
    Token(..), lexer, pragState, mkPState, PState(..),
@@ -572,6 +575,7 @@ data Token
   deriving Show -- debugging
 #endif
 
+{-
 isSpecial :: Token -> Bool
 -- If we see M.x, where x is a keyword, but
 -- is special, we treat is as just plain M.x, 
@@ -594,6 +598,7 @@ isSpecial ITgroup   = True
 isSpecial ITby      = True
 isSpecial ITusing   = True
 isSpecial _             = False
+-}
 
 -- the bitmap provided as the third component indicates whether the
 -- corresponding extension keyword is valid under the extension options
@@ -701,11 +706,11 @@ reservedSymsFM = listToUFM $
 type Action = SrcSpan -> StringBuffer -> Int -> P (Located Token)
 
 special :: Token -> Action
-special tok span _buf len = return (L span tok)
+special tok span _buf _len = return (L span tok)
 
 token, layout_token :: Token -> Action
-token t span buf len = return (L span t)
-layout_token t span buf len = pushLexState layout >> return (L span t)
+token t span _buf _len = return (L span t)
+layout_token t span _buf _len = pushLexState layout >> return (L span t)
 
 idtoken :: (StringBuffer -> Int -> Token) -> Action
 idtoken f span buf len = return (L span $! (f buf len))
@@ -755,8 +760,10 @@ isNormalComment bits _ _ (AI _ _ buf)
 
 spaceAndP buf p = p buf || nextCharIs buf (==' ') && p (snd (nextChar buf))
 
+{-
 haddockDisabledAnd p bits _ _ (AI _ _ buf)
   = if haddockEnabled bits then False else (p buf)
+-}
 
 atEOL _ _ _ (AI _ _ buf) = atEnd buf || currentChar buf == '\n'
 
@@ -805,12 +812,12 @@ nested_comment cont span _str _len = do
       Just ('-',input) -> case alexGetChar input of
         Nothing  -> errBrace input span
         Just ('\125',input) -> go (n-1) input
-        Just (c,_)          -> go n input
+        Just (_,_)          -> go n input
       Just ('\123',input) -> case alexGetChar input of
         Nothing  -> errBrace input span
         Just ('-',input) -> go (n+1) input
-        Just (c,_)       -> go n input
-      Just (c,input) -> go n input
+        Just (_,_)       -> go n input
+      Just (_,input) -> go n input
 
 nested_doc_comment :: Action
 nested_doc_comment span buf _len = withLexedDocType (go "")
@@ -819,16 +826,16 @@ nested_doc_comment span buf _len = withLexedDocType (go "")
       Nothing -> errBrace input span
       Just ('-',input) -> case alexGetChar input of
         Nothing -> errBrace input span
-        Just ('\125',input@(AI end _ buf2)) ->
+        Just ('\125',input) ->
           docCommentEnd input commentAcc docType buf span
-        Just (c,_) -> go ('-':commentAcc) input docType False
+        Just (_,_) -> go ('-':commentAcc) input docType False
       Just ('\123', input) -> case alexGetChar input of
         Nothing  -> errBrace input span
         Just ('-',input) -> do
           setInput input
           let cont = do input <- getInput; go commentAcc input docType False
           nested_comment cont span buf _len
-        Just (c,_) -> go ('\123':commentAcc) input docType False
+        Just (_,_) -> go ('\123':commentAcc) input docType False
       Just (c,input) -> go (c:commentAcc) input docType False
 
 withLexedDocType lexDocComment = do
@@ -842,7 +849,7 @@ withLexedDocType lexDocComment = do
  where 
     lexDocSection n input = case alexGetChar input of 
       Just ('*', input) -> lexDocSection (n+1) input
-      Just (c, _) -> lexDocComment input (ITdocSection n) True
+      Just (_,   _)     -> lexDocComment input (ITdocSection n) True
       Nothing -> do setInput input; lexToken -- eof reached, lex it normally
 
 -- docCommentEnd
@@ -1029,7 +1036,7 @@ new_layout_context strict span _buf _len = do
 		-- we must generate a {} sequence now.
 		pushLexState layout_left
 		return (L span ITvocurly)
-	other -> do
+	_ -> do
 		setContext (Layout offset : ctx)
 		return (L span ITvocurly)
 
@@ -1063,7 +1070,7 @@ setFile code span buf len = do
 -- Options, includes and language pragmas.
 
 lex_string_prag :: (String -> Token) -> Action
-lex_string_prag mkTok span buf len
+lex_string_prag mkTok span _buf _len
     = do input <- getInput
          start <- getSrcLoc
          tok <- go [] input
@@ -1076,7 +1083,7 @@ lex_string_prag mkTok span buf len
                    else case alexGetChar input of
                           Just (c,i) -> go (c:acc) i
                           Nothing -> err input
-          isString i [] = True
+          isString _ [] = True
           isString i (x:xs)
               = case alexGetChar i of
                   Just (c,i') | c == x    -> isString i' xs
@@ -1090,7 +1097,7 @@ lex_string_prag mkTok span buf len
 -- This stuff is horrible.  I hates it.
 
 lex_string_tok :: Action
-lex_string_tok span buf len = do
+lex_string_tok span _buf _len = do
   tok <- lex_string ""
   end <- getSrcLoc 
   return (L (mkSrcSpan (srcSpanStart span) end) tok)
@@ -1147,7 +1154,7 @@ lex_char_tok :: Action
 -- but WIHTOUT CONSUMING the x or T part  (the parser does that).
 -- So we have to do two characters of lookahead: when we see 'x we need to
 -- see if there's a trailing quote
-lex_char_tok span buf len = do	-- We've seen '
+lex_char_tok span _buf _len = do	-- We've seen '
    i1 <- getInput	-- Look ahead to first character
    let loc = srcSpanStart span
    case alexGetChar' i1 of
@@ -1160,14 +1167,14 @@ lex_char_tok span buf len = do	-- We've seen '
 			return (L (mkSrcSpan loc end2)  ITtyQuote)
 		   else lit_error
 
-	Just ('\\', i2@(AI end2 _ _)) -> do 	-- We've seen 'backslash 
+	Just ('\\', i2@(AI _end2 _ _)) -> do 	-- We've seen 'backslash
 		  setInput i2
 		  lit_ch <- lex_escape
 		  mc <- getCharOrFail	-- Trailing quote
 		  if mc == '\'' then finish_char_tok loc lit_ch
 			        else do setInput i2; lit_error 
 
-        Just (c, i2@(AI end2 _ _)) 
+        Just (c, i2@(AI _end2 _ _))
 		| not (isAny c) -> lit_error
 		| otherwise ->
 
@@ -1426,10 +1433,10 @@ failMsgP :: String -> P a
 failMsgP msg = P $ \s -> PFailed (last_loc s) (text msg)
 
 failLocMsgP :: SrcLoc -> SrcLoc -> String -> P a
-failLocMsgP loc1 loc2 str = P $ \s -> PFailed (mkSrcSpan loc1 loc2) (text str)
+failLocMsgP loc1 loc2 str = P $ \_ -> PFailed (mkSrcSpan loc1 loc2) (text str)
 
 failSpanMsgP :: SrcSpan -> String -> P a
-failSpanMsgP span msg = P $ \s -> PFailed span (text msg)
+failSpanMsgP span msg = P $ \_ -> PFailed span (text msg)
 
 extension :: (Int -> Bool) -> P Bool
 extension p = P $ \s -> POk s (p $! extsBitmap s)
@@ -1519,7 +1526,7 @@ alexGetChar' (AI loc ofs s)
         ofs'   = advanceOffs c ofs
 
 advanceOffs :: Char -> Int -> Int
-advanceOffs '\n' offs = 0
+advanceOffs '\n' _    = 0
 advanceOffs '\t' offs = (offs `quot` 8 + 1) * 8
 advanceOffs _    offs = offs + 1
 
@@ -1536,7 +1543,7 @@ popLexState :: P Int
 popLexState = P $ \s@PState{ lex_state=ls:l } -> POk s{ lex_state=l } ls
 
 getLexState :: P Int
-getLexState = P $ \s@PState{ lex_state=ls:l } -> POk s ls
+getLexState = P $ \s@PState{ lex_state=ls:_ } -> POk s ls
 
 -- for reasons of efficiency, flags indicating language extensions (eg,
 -- -fglasgow-exts or -fparr) are represented by a bitmap stored in an unboxed
@@ -1669,7 +1676,7 @@ setContext ctx = P $ \s -> POk s{context=ctx} ()
 
 popContext :: P ()
 popContext = P $ \ s@(PState{ buffer = buf, context = ctx, 
-			   loc = loc, last_len = len, last_loc = last_loc }) ->
+                              last_len = len, last_loc = last_loc }) ->
   case ctx of
 	(_:tl) -> POk s{ context = tl } ()
 	[]     -> PFailed last_loc (srcParseErr buf len)
@@ -1717,7 +1724,7 @@ srcParseFail = P $ \PState{ buffer = buf, last_len = len,
 lexError :: String -> P a
 lexError str = do
   loc <- getSrcLoc
-  i@(AI end _ buf) <- getInput
+  (AI end _ buf) <- getInput
   reportLexError loc end buf str
 
 -- -----------------------------------------------------------------------------
@@ -1726,7 +1733,7 @@ lexError str = do
 
 lexer :: (Located Token -> P a) -> P a
 lexer cont = do
-  tok@(L span tok__) <- lexToken
+  tok@(L _span _tok__) <- lexToken
 --  trace ("token: " ++ show tok__) $ do
   cont tok
 
@@ -1745,7 +1752,7 @@ lexToken = do
     AlexSkip inp2 _ -> do
         setInput inp2
         lexToken
-    AlexToken inp2@(AI end _ buf2) len t -> do
+    AlexToken inp2@(AI end _ buf2) _ t -> do
         setInput inp2
         let span = mkSrcSpan loc1 end
         let bytes = byteDiff buf buf2
