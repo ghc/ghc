@@ -54,6 +54,9 @@ import BasicTypes
 import FastTypes
 import FastString
 import Outputable
+#ifdef DEBUG
+import StaticFlags	( opt_SuppressUniques )
+#endif
 
 #if defined(__GLASGOW_HASKELL__)
 --just for implementing a fast [0,61) -> Char function
