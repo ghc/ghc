@@ -24,3 +24,6 @@ test('divbyzero',
 test('outofmem', normal, run_command, ['$MAKE -s --no-print-directory outofmem'])
 test('outofmem2', extra_run_opts('+RTS -M5m -RTS'),
                   run_command, ['$MAKE -s --no-print-directory outofmem2'])
+
+test('2047', compose(ignore_output, extra_run_opts('+RTS -c -RTS')),
+             compile_and_run, ['-package containers'])
