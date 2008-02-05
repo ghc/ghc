@@ -174,7 +174,13 @@ initSysTools mbMinusB dflags
 	; let installed, installed_bin :: FilePath -> FilePath
               installed_bin pgm   =  top_dir </> pgm
 	      installed     file  =  top_dir </> file
-	      inplace dir   pgm   =  top_dir </> cPROJECT_DIR </> dir </> pgm
+	      inplace dir   pgm   =  top_dir </> 
+#ifndef darwin_TARGET_OS
+-- Not sure where cPROJECT_DIR makes sense, on Mac OS, building with
+-- xcodebuild, it surely is a *bad* idea!  -=chak
+                                     cPROJECT_DIR </> 
+#endif
+                                     dir </> pgm
 
 	; let pkgconfig_path
 		| am_installed = installed "package.conf"

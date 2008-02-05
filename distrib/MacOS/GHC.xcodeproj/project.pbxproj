@@ -8,12 +8,15 @@
 
 /* Begin PBXBuildFile section */
 		8D07F2C00486CC7A007CD1D0 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 089C1666FE841158C02AAC07 /* InfoPlist.strings */; };
+		E72A15E90D54ADB90059C234 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 089C1666FE841158C02AAC07 /* InfoPlist.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		089C1667FE841158C02AAC07 /* English */ = {isa = PBXFileReference; fileEncoding = 10; lastKnownFileType = text.plist.strings; name = English; path = English.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		8D07F2C70486CC7A007CD1D0 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		8D07F2C80486CC7A007CD1D0 /* GHC.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = GHC.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		E72A15EE0D54ADB90059C234 /* GHC.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = GHC.framework; sourceTree = BUILT_PRODUCTS_DIR; };
+		E72A15EF0D54ADB90059C234 /* Info copy.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "Info copy.plist"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -21,6 +24,7 @@
 			isa = PBXGroup;
 			children = (
 				8D07F2C80486CC7A007CD1D0 /* GHC.framework */,
+				E72A15EE0D54ADB90059C234 /* GHC.framework */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -48,6 +52,7 @@
 			children = (
 				8D07F2C70486CC7A007CD1D0 /* Info.plist */,
 				089C1666FE841158C02AAC07 /* InfoPlist.strings */,
+				E72A15EF0D54ADB90059C234 /* Info copy.plist */,
 			);
 			name = Resources;
 			sourceTree = "<group>";
@@ -62,22 +67,40 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		8D07F2BC0486CC7A007CD1D0 /* GHC */ = {
+		8D07F2BC0486CC7A007CD1D0 /* GHC-relocatable */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 4FADC24208B4156D00ABE55E /* Build configuration list for PBXNativeTarget "GHC" */;
+			buildConfigurationList = 4FADC24208B4156D00ABE55E /* Build configuration list for PBXNativeTarget "GHC-relocatable" */;
 			buildPhases = (
 				8D07F2BF0486CC7A007CD1D0 /* Resources */,
 				E76B00450D52DFDB00A05A2F /* ShellScript */,
 			);
 			buildRules = (
 			);
-			comments = "This project creates a Mac OS X framework that encapsulates a (relocatable) binary GHC distribution.";
+			comments = "Supported targets: build\n\nPrecondition: Fully compiled tree (i.e., \"sh boot; ./configure; make\" was already executed)\n\nThis project creates a Mac OS X framework that encapsulates a *relocatable* *binary* GHC distribution.\n\n*  The framework is versioned using GHC's ProjectVersionInt. and we call the current version directory in the following CONTENTS_FOLDER_BUILD.\n\n* This target installs into CONTENTS_FOLDER_BUILD/ghc/ the same contents that is in a binary-dist tar ball.\n\n* The idea is that at framework installation time, a post install script will perform \n\n    ./configure --prefix=CONTENTS_FOLDER_INSTALL/usr; make install \n\n   in that ghc/ directory, where CONTENTS_FOLDER_INSTALL is the path that CONTENTS_FOLDER_BUILD has after the package containing the framework was installed by the package installer.  This effectively rellocates the ghc installation to its final destination.";
 			dependencies = (
 			);
-			name = GHC;
+			name = "GHC-relocatable";
 			productInstallPath = "$(HOME)/Library/Frameworks";
 			productName = GHC;
 			productReference = 8D07F2C80486CC7A007CD1D0 /* GHC.framework */;
+			productType = "com.apple.product-type.framework";
+		};
+		E72A15E70D54ADB90059C234 /* GHC-systemwide */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = E72A15EB0D54ADB90059C234 /* Build configuration list for PBXNativeTarget "GHC-systemwide" */;
+			buildPhases = (
+				E72A15E80D54ADB90059C234 /* Resources */,
+				E72A15EA0D54ADB90059C234 /* ShellScript */,
+			);
+			buildRules = (
+			);
+			comments = "Supported targets: build, install, clean\n\nPrecondition: We are in a distribution tree, not a vanilla tree from darcs - i.e., \"sh boot\" was already executed.\n\nThis project creates a Mac OS X framework at /Library/Frameworks.\n\n*  The framework is versioned using GHC's ProjectVersionInt.\n\n* The target configures the tree for the deployment location and builds the tree.\n\n* This target installs the framework not into its final destination, but into a build directory using the DESTDIR feature of GHC build system (unless the deployment flag in the build rules is set).\n\n* The idea is that the framework at the build location is being turned into a package and the package installer eventually puts its at its final destination. \n\nTODO: build and install documentation";
+			dependencies = (
+			);
+			name = "GHC-systemwide";
+			productInstallPath = "$(HOME)/Library/Frameworks";
+			productName = GHC;
+			productReference = E72A15EE0D54ADB90059C234 /* GHC.framework */;
 			productType = "com.apple.product-type.framework";
 		};
 /* End PBXNativeTarget section */
@@ -93,7 +116,8 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				8D07F2BC0486CC7A007CD1D0 /* GHC */,
+				E72A15E70D54ADB90059C234 /* GHC-systemwide */,
+				8D07F2BC0486CC7A007CD1D0 /* GHC-relocatable */,
 			);
 		};
 /* End PBXProject section */
@@ -107,9 +131,31 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		E72A15E80D54ADB90059C234 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E72A15E90D54ADB90059C234 /* InfoPlist.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
+		E72A15EA0D54ADB90059C234 /* ShellScript */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			comments = "Perform a DESTDIR install unless the build settings have DEPLOYMENT_LOCATION=1.\n\nNB: Why use a run script build phase instead of an external target (with a dependency)?  Because we need to be underneath the GHC target to get the right build settings.";
+			files = (
+			);
+			inputPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# We need to be at the top of the ghc tree\ncd ../..\n\nPREFIX=${INSTALL_PATH}/${CONTENTS_FOLDER_PATH}/usr\n\nif [ ${ACTION} = installsrc ]; then\n  echo \"xcodebuild action 'installsrc' not supported\"\n  exit 0\nfi\n\nif [ ${ACTION} = build ]; then\n  ./configure --prefix=${PREFIX}\n  MAKE_ACTION=\nelse\n  MAKE_ACTION=${ACTION}\nfi\n\nmake DESTDIR=${DSTROOT} ${MAKE_ACTION}\n";
+		};
 		E76B00450D52DFDB00A05A2F /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -207,10 +253,57 @@
 			};
 			name = Release;
 		};
+		E72A15EC0D54ADB90059C234 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				COPY_PHASE_STRIP = NO;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				FRAMEWORK_VERSION = A;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_ENABLE_FIX_AND_CONTINUE = YES;
+				GCC_MODEL_TUNING = G5;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = GHC_Prefix.pch;
+				INFOPLIST_FILE = "/Users/chak/Code/ghc/distrib/MacOS/Info copy.plist";
+				INSTALL_PATH = "$(HOME)/Library/Frameworks";
+				LIBRARY_STYLE = DYNAMIC;
+				MACH_O_TYPE = mh_dylib;
+				PRODUCT_NAME = GHC;
+				WRAPPER_EXTENSION = framework;
+				ZERO_LINK = YES;
+			};
+			name = Debug;
+		};
+		E72A15ED0D54ADB90059C234 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ARCHS = (
+					ppc,
+					i386,
+				);
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				FRAMEWORK_VERSION = A;
+				GCC_MODEL_TUNING = G5;
+				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_PREFIX_HEADER = GHC_Prefix.pch;
+				INFOPLIST_FILE = "/Users/chak/Code/ghc/distrib/MacOS/Info copy.plist";
+				INSTALL_PATH = /Library/Frameworks;
+				LIBRARY_STYLE = DYNAMIC;
+				MACH_O_TYPE = mh_dylib;
+				PRODUCT_NAME = GHC;
+				VERSIONING_SYSTEM = "";
+				WRAPPER_EXTENSION = framework;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		4FADC24208B4156D00ABE55E /* Build configuration list for PBXNativeTarget "GHC" */ = {
+		4FADC24208B4156D00ABE55E /* Build configuration list for PBXNativeTarget "GHC-relocatable" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4FADC24308B4156D00ABE55E /* Debug */,
@@ -224,6 +317,15 @@
 			buildConfigurations = (
 				4FADC24708B4156D00ABE55E /* Debug */,
 				4FADC24808B4156D00ABE55E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		E72A15EB0D54ADB90059C234 /* Build configuration list for PBXNativeTarget "GHC-systemwide" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E72A15EC0D54ADB90059C234 /* Debug */,
+				E72A15ED0D54ADB90059C234 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
