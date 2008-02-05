@@ -150,14 +150,14 @@ sub init_TARGET_STUFF {
     $T_COPY_DIRVS   = '\.(globl|stab|lcomm)';
     $T_DOT_WORD	    = '\.(long|word|value|byte|space)';
     $T_DOT_GLOBAL   = '\.globl';
-    $T_HDR_literal  = "\.text\n\t\.align 2\n";
-    $T_HDR_misc	    = "\.text\n\t\.align 2,0x90\n";
-    $T_HDR_data	    = "\.data\n\t\.align 2\n";
-    $T_HDR_rodata   = "\.text\n\t\.align 2\n";
-    $T_HDR_closure  = "\.data\n\t\.align 2\n";
-    $T_HDR_info	    = "\.text\n\t\.align 2\n"; # NB: requires padding
+    $T_HDR_literal  = "\.text\n\t\.align 4\n";
+    $T_HDR_misc	    = "\.text\n\t\.align 4,0x90\n";
+    $T_HDR_data	    = "\.data\n\t\.align 4\n";
+    $T_HDR_rodata   = "\.text\n\t\.align 4\n";
+    $T_HDR_closure  = "\.data\n\t\.align 4\n";
+    $T_HDR_info	    = "\.text\n\t\.align 4\n"; # NB: requires padding
     $T_HDR_entry    = "\.text\n"; # no .align so we're right next to _info (arguably wrong...?)
-    $T_HDR_vector   = "\.text\n\t\.align 2\n"; # NB: requires padding
+    $T_HDR_vector   = "\.text\n\t\.align 4\n"; # NB: requires padding
 
     #--------------------------------------------------------#
     } elsif ( $TargetPlatform =~ /^i386-.*-(solaris2|linux|gnu|freebsd|netbsd|openbsd|kfreebsdgnu)$/m ) {
