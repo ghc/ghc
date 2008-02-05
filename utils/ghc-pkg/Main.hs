@@ -624,7 +624,7 @@ pid `matches` pid'
 
 matchesPkg :: PackageArg -> InstalledPackageInfo -> Bool
 (Id pid)        `matchesPkg` pkg = pid `matches` package pkg
-(Substring _ m) `matchesPkg` pkg = m (pkgName (package pkg))
+(Substring _ m) `matchesPkg` pkg = m (showPackageId (package pkg))
 
 compPkgIdVer :: PackageIdentifier -> PackageIdentifier -> Ordering
 compPkgIdVer p1 p2 = pkgVersion p1 `compare` pkgVersion p2
