@@ -467,7 +467,7 @@ tcLcStmt m_tc ctxt stmt elt_ty thing_inside
 
 tcDoStmt :: TcStmtChecker
 
-tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op) reft_res_ty@(_,res_ty) thing_inside
+tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op) (reft,res_ty) thing_inside
   = do	{ (rhs', rhs_ty) <- tcInferRho rhs
 		-- We should use type *inference* for the RHS computations, becuase of GADTs. 
 		-- 	do { pat <- rhs; <rest> }
@@ -476,31 +476,37 @@ tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op) reft_res_ty@(_,res_ty) thing_in
 		-- We do inference on rhs, so that information about its type can be refined
 		-- when type-checking the pattern. 
 
-	-- Deal with rebindable syntax; (>>=) :: rhs_ty -> (a -> res_ty) -> res_ty
-	; (bind_op', pat_ty) <- 
+	-- Deal with rebindable syntax:
+	--	 (>>=) :: rhs_ty -> (pat_ty -> new_res_ty) -> res_ty
+	-- This level of generality is needed for using do-notation
+	-- in full generality; see Trac #1537
+	; ((bind_op', new_res_ty), pat_ty) <- 
 	     withBox liftedTypeKind $ \ pat_ty ->
+	     withBox liftedTypeKind $ \ new_res_ty ->
 	     tcSyntaxOp DoOrigin bind_op 
-			(mkFunTys [rhs_ty, mkFunTy pat_ty res_ty] res_ty)
+			(mkFunTys [rhs_ty, mkFunTy pat_ty new_res_ty] res_ty)
 
 		-- If (but only if) the pattern can fail, 
 		-- typecheck the 'fail' operator
 	; fail_op' <- if isIrrefutableHsPat pat 
 		      then return noSyntaxExpr
-		      else tcSyntaxOp DoOrigin fail_op (mkFunTy stringTy res_ty)
+		      else tcSyntaxOp DoOrigin fail_op (mkFunTy stringTy new_res_ty)
 
-	; (pat', thing) <- tcLamPat pat pat_ty reft_res_ty thing_inside
+	; (pat', thing) <- tcLamPat pat pat_ty (reft, new_res_ty) thing_inside
 
 	; return (BindStmt pat' rhs' bind_op' fail_op', thing) }
 
 
-tcDoStmt ctxt (ExprStmt rhs then_op _) reft_res_ty@(_,res_ty) thing_inside
+tcDoStmt ctxt (ExprStmt rhs then_op _) (reft,res_ty) thing_inside
   = do	{ (rhs', rhs_ty) <- tcInferRho rhs
 
-  	-- Deal with rebindable syntax; (>>) :: rhs_ty -> res_ty -> res_ty
-	; then_op' <- tcSyntaxOp DoOrigin then_op 
-				 (mkFunTys [rhs_ty, res_ty] res_ty)
+  	-- Deal with rebindable syntax; (>>) :: rhs_ty -> new_res_ty -> res_ty
+	; (then_op', new_res_ty) <-
+		withBox liftedTypeKind $ \ new_res_ty ->
+		tcSyntaxOp DoOrigin then_op 
+			   (mkFunTys [rhs_ty, new_res_ty] res_ty)
 
-	; thing <- thing_inside reft_res_ty
+	; thing <- thing_inside (reft, new_res_ty)
 	; return (ExprStmt rhs' then_op' rhs_ty, thing) }
 
 tcDoStmt ctxt stmt res_ty thing_inside

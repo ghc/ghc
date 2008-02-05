@@ -548,13 +548,15 @@ dsDo stmts body result_ty
 
     go (BindStmt pat rhs bind_op fail_op : stmts)
       = 
-       do { body  <- go stmts
+       do  { body     <- go stmts
+           ; rhs'     <- dsLExpr rhs
+	   ; bind_op' <- dsExpr bind_op
 	   ; var   <- selectSimpleMatchVarL pat
+	   ; let bind_ty = exprType bind_op' 	-- rhs -> (pat -> res1) -> res2
+		 res1_ty = funResultTy (funArgTy (funResultTy bind_ty))
 	   ; match <- matchSinglePat (Var var) (StmtCtxt DoExpr) pat
-    				  result_ty (cantFailMatchResult body)
+    				     res1_ty (cantFailMatchResult body)
 	   ; match_code <- handle_failure pat match fail_op
-           ; rhs'       <- dsLExpr rhs
-	   ; bind_op'   <- dsExpr bind_op
 	   ; return (mkApps bind_op' [rhs', Lam var match_code]) }
     
     -- In a do expression, pattern-match failure just calls
