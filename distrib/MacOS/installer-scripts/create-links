@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# GHC framework post-install script
+# * Add links to all executables into standard bin/ directory
+
+INSTALL_DEST=$2
+INSTALL_BASE=$3
+
+if [ ${INSTALL_BASE} = / ]; then
+  INSTALL_BIN=${INSTALL_BASE}/usr/bin/
+else
+  INSTALL_BIN=${INSTALL_BASE}/bin/
+fi
+mkdir -p ${INSTALL_BIN}
+ln -sf ${INSTALL_DEST}/GHC.framework/Versions/Current/usr/bin/* ${INSTALL_BIN}

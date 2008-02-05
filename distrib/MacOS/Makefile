@@ -37,6 +37,7 @@ framework-pkg:
 	    	   SHORT_VERSION_STRING=$(SHORT_VERSION_STRING)\
 	 	   FRAMEWORK_VERSION=$(FRAMEWORK_VERSION)\
 		   CURRENT_LIBRARY_VERSION=$(FRAMEWORK_VERSION)
+	@echo "FIXME: What about the contents list?!?"; exit 1
 	@echo "FIXME: call the packager"; exit 1
 
 # Instead of making 'binary-dist' a Makefile dependency, we let xcodebuild call
