@@ -300,7 +300,8 @@ loadInterface doc_str mod from
 						 fam_inst_env,
 	      eps_stats        = addEpsInStats (eps_stats eps) 
 					       (length new_eps_decls)
-	      (length new_eps_insts) (length new_eps_rules) }
+					       (length new_eps_insts)
+					       (length new_eps_rules) }
 
 	; return (Succeeded final_iface)
     }}}}
