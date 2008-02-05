@@ -302,7 +302,7 @@ filterOccEnv x (A y)       = A $ filterUFM x y
 instance Outputable a => Outputable (OccEnv a) where
     ppr (A x) = ppr x
 
-type OccSet = UniqFM OccName
+type OccSet = UniqSet OccName
 
 emptyOccSet	  :: OccSet
 unitOccSet	  :: OccName -> OccSet

@@ -95,8 +95,8 @@ lookupVarSet	= lookupUniqSet
 mapVarSet	= mapUniqSet
 sizeVarSet	= sizeUniqSet
 filterVarSet	= filterUniqSet
-extendVarSet_C combine s x = addToUFM_C combine s x x
-delVarSetByKey	= delFromUFM_Directly	-- Can't be bothered to add this to UniqSet
+extendVarSet_C = addOneToUniqSet_C
+delVarSetByKey	= delOneFromUniqSet_Directly
 elemVarSetByKey	= elemUniqSet_Directly
 \end{code}
 
