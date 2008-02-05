@@ -53,8 +53,7 @@ import NameSet
 import UniqFM
 import RdrName		( RdrName, extendLocalRdrEnv, lookupLocalRdrEnv, hideSomeUnquals )
 import LoadIface	( loadInterfaceForName )
-import UniqFM		( isNullUFM )
-import UniqSet		( emptyUniqSet )
+import UniqSet		( isEmptyUniqSet, emptyUniqSet )
 import List		( nub )
 import Util		( isSingleton )
 import ListSetOps	( removeDups )
@@ -112,7 +111,7 @@ rnExprs ls = rnExprs' ls emptyUniqSet
     returnM (expr':exprs', fvExprs)
 
 -- Grubby little function to do "seq" on namesets; replace by proper seq when GHC can do seq
-grubby_seqNameSet ns result | isNullUFM ns = result
+grubby_seqNameSet ns result | isEmptyUniqSet ns = result
 			    | otherwise    = result
 \end{code}
 
