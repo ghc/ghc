@@ -283,8 +283,8 @@ instance Show TyCon where
   showsPrec _ (TyCon _ s) = showString s
 
 isTupleTyCon :: TyCon -> Bool
-isTupleTyCon (TyCon _ (',':_)) = True
-isTupleTyCon _		       = False
+isTupleTyCon (TyCon _ ('(':',':_)) = True
+isTupleTyCon _		           = False
 
 -- Some (Show.TypeRep) helpers:
 
