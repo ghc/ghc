@@ -19,9 +19,7 @@ import DynFlags		( CoreToDo(..), SimplifierSwitch(..),
 			  SimplifierMode(..), DynFlags, DynFlag(..), dopt,
 			  getCoreToDo )
 import CoreSyn
-import HscTypes		( HscEnv(..), ModGuts(..), ExternalPackageState(..),
-			  Dependencies( dep_mods ), 
-			  hscEPS, hptRules )
+import HscTypes
 import CSE		( cseProgram )
 import Rules		( RuleBase, emptyRuleBase, mkRuleBase, unionRuleBase,
 			  extendRuleBaseList, pprRuleBase, ruleCheckProgram,
@@ -41,8 +39,10 @@ import CoreLint		( endPass, endIteration )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FamInstEnv
-import Id		( Id, modifyIdInfo, idInfo, isExportedId, isLocalId,
-			  idSpecialisation, idName )
+import Id
+import DataCon
+import TyCon		( tyConSelIds, tyConDataCons )
+import Class		( classSelIds )
 import VarSet
 import VarEnv
 import NameEnv		( lookupNameEnv )
@@ -62,7 +62,7 @@ import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import IO		( hPutStr, stderr )
 import Outputable
 import List		( partition )
-import Maybes		( orElse )
+import Maybes
 \end{code}
 
 %************************************************************************
@@ -77,26 +77,30 @@ core2core :: HscEnv
 	  -> IO ModGuts
 
 core2core hsc_env guts
-  = do
-        let dflags = hsc_dflags hsc_env
-	    core_todos = getCoreToDo dflags
+  = do	{
+	; let dflags = hsc_dflags hsc_env
+	      core_todos = getCoreToDo dflags
 
-	us <- mkSplitUniqSupply 's'
-	let (cp_us, ru_us) = splitUniqSupply us
+	; us <- mkSplitUniqSupply 's'
+	; let (cp_us, ru_us) = splitUniqSupply us
 
 		-- COMPUTE THE RULE BASE TO USE
-	(imp_rule_base, guts') <- prepareRules hsc_env guts ru_us
+	; (imp_rule_base, guts1) <- prepareRules hsc_env guts ru_us
+
+		-- Note [Injecting implicit bindings]
+        ; let implicit_binds = getImplicitBinds (mg_types guts1)
+	      guts2 = guts1 { mg_binds = implicit_binds ++ mg_binds guts1 }
 
 		-- DO THE BUSINESS
-	(stats, guts'') <- doCorePasses hsc_env imp_rule_base cp_us
-			 		(zeroSimplCount dflags) 
-					guts' core_todos
+	; (stats, guts3) <- doCorePasses hsc_env imp_rule_base cp_us
+			 		 (zeroSimplCount dflags) 
+				 	 guts2 core_todos
 
-	dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
+	; dumpIfSet_dyn dflags Opt_D_dump_simpl_stats
 		  "Grand total simplifier statistics"
 		  (pprSimplCount stats)
 
-	return guts''
+	; return guts3 }
 
 
 simplifyExpr :: DynFlags -- includes spec of what core-to-core passes to do
@@ -212,10 +216,51 @@ observe do_pass hsc_env us rb guts
 \end{code}
 
 
+%************************************************************************
+%*									*
+	Implicit bindings
+%*									*
+%************************************************************************
+
+Note [Injecting implicit bindings]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+We used to inject the implict bindings right at the end, in CoreTidy.
+But some of these bindings, notably record selectors, are not
+constructed in an optimised form.  E.g. record selector for
+	data T = MkT { x :: {-# UNPACK #-} !Int }
+Then the unfolding looks like
+	x = \t. case t of MkT x1 -> let x = I# x1 in x
+This generates bad code unless it's first simplified a bit.
+(Only matters when the selector is used curried; eg map x ys.)
+See Trac #2070.
+
+\begin{code}
+getImplicitBinds :: TypeEnv -> [CoreBind]
+getImplicitBinds type_env
+  = map get_defn (concatMap implicit_con_ids (typeEnvTyCons type_env)
+		  ++ concatMap other_implicit_ids (typeEnvElts type_env))
+	-- Put the constructor wrappers first, because
+	-- other implicit bindings (notably the fromT functions arising 
+	-- from generics) use the constructor wrappers.  At least that's
+	-- what External Core likes
+  where
+    implicit_con_ids tc = mapCatMaybes dataConWrapId_maybe (tyConDataCons tc)
+    
+    other_implicit_ids (ATyCon tc) = filter (not . isNaughtyRecordSelector) (tyConSelIds tc)
+	-- The "naughty" ones are not real functions at all
+	-- They are there just so we can get decent error messages
+	-- See Note  [Naughty record selectors] in MkId.lhs
+    other_implicit_ids (AClass cl) = classSelIds cl
+    other_implicit_ids _other      = []
+    
+    get_defn :: Id -> CoreBind
+    get_defn id = NonRec id (unfoldingTemplate (idUnfolding id))
+\end{code}
+
 
 %************************************************************************
 %*									*
-\subsection{Dealing with rules}
+	Dealing with rules
 %*									*
 %************************************************************************
 
