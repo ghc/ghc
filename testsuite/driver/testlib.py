@@ -9,6 +9,7 @@ import re
 import traceback
 import copy
 import glob
+import types
 
 have_subprocess = False
 try:
@@ -376,6 +377,10 @@ def getTestDir():
 def test ( name, setup, func, args):
     n = 1
     opts = copy.copy(thisdir_testopts)
+
+    if type(setup) is types.ListType:
+       setup = composes(setup)
+
     setup(opts)
     if opts.alone:
         n = config.threads
