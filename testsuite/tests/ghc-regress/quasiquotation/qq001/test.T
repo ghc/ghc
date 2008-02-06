@@ -1,2 +1,3 @@
-test('qq001', only_compiler_types(['ghc']),
+test('qq001', [ if_compiler_lt( 'ghc', '6.9', skip ),
+                only_compiler_types(['ghc']) ],
      compile_fail, [''])
