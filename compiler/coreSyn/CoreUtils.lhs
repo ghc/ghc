@@ -34,7 +34,7 @@ module CoreUtils (
 	exprEtaExpandArity, etaExpand, 
 
 	-- Size
-	coreBindsSize,
+	coreBindsSize, exprSize,
 
 	-- Hashing
 	hashExpr,
@@ -1270,6 +1270,9 @@ cheapEqExpr (Type t1)  (Type t2)  = t1 `coreEqType` t2
 
 cheapEqExpr (App f1 a1) (App f2 a2)
   = f1 `cheapEqExpr` f2 && a1 `cheapEqExpr` a2
+
+cheapEqExpr (Cast e1 t1) (Cast e2 t2)
+  = e1 `cheapEqExpr` e2 && t1 `coreEqCoercion` t2
 
 cheapEqExpr _ _ = False
 

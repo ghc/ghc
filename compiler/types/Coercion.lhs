@@ -42,6 +42,9 @@ module Coercion (
         transCoercionTyCon, leftCoercionTyCon, 
         rightCoercionTyCon, instCoercionTyCon, -- needed by TysWiredIn
 
+        -- Comparison
+        coreEqCoercion,
+
 	-- CoercionI
 	CoercionI(..),
 	isIdentityCoercion,
@@ -482,6 +485,12 @@ splitNewTypeRepCo_maybe (TyConApp tc tys)
 			-- This case handled by coreView
 splitNewTypeRepCo_maybe _
   = Nothing
+
+-------------------------------------
+-- Syntactic equality of coercions
+
+coreEqCoercion :: Coercion -> Coercion -> Bool
+coreEqCoercion = coreEqType
 \end{code}
 
 
