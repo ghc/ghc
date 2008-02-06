@@ -1,0 +1,27 @@
+
+DoParamM.hs:146:17:
+    Couldn't match expected type `Int' against inferred type `Char'
+    In the second argument of `(==)', namely `v''
+    In the first argument of `return', namely `(v == v')'
+    In the expression: return (v == v')
+
+DoParamM.hs:286:27:
+    Couldn't match expected type `Locked'
+           against inferred type `Unlocked'
+      Expected type: LIO Locked r b
+      Inferred type: LIO Unlocked Locked ()
+    In the expression: tlock2_do
+    In the expression:
+        do tlock2_do
+           tlock2_do
+
+DoParamM.hs:302:36:
+    Couldn't match expected type `Unlocked'
+           against inferred type `Locked'
+      Expected type: LIO Unlocked r b
+      Inferred type: LIO Locked Unlocked ()
+    In the expression: unlock
+    In the expression:
+        do tlock2_do
+           unlock
+           unlock

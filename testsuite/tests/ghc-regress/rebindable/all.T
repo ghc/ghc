@@ -17,3 +17,7 @@ test('rebindable7', normal, compile_and_run, [''])
 test('rebindable8', if_compiler_lt('ghc', '6.9', expect_broken(1537)),
                     compile, [''])
 test('rebindable9', expect_broken(1537), compile, [''])
+
+# Tests from Oleg
+test('DoRestrictedM', normal, compile, [''])
+test('DoParamM', normal, compile_fail, [''])
