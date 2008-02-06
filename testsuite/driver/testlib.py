@@ -382,6 +382,7 @@ def test ( name, setup, func, args):
        setup = composes(setup)
 
     setup(opts)
+
     if opts.alone:
         n = config.threads
 
@@ -1237,22 +1238,42 @@ def in_testdir( name ):
 def qualify( name, suff ):
     return in_testdir(add_suffix(name, suff))
 
-# "foo" -> qualify("foo-platform") if it exists, otherwise
-# try qualify("foo-compiler_type"), qualify("foo-ws-wordsize")
-# or finally qualify("foo")
+
+# Finding the sample output.  The filename is of the form
+#
+#   <test>.stdout[-<compiler>][-<version>][-ws-<wordsize>][-<platform>]
+#
+# and we pick the most specific version available.  The <version> is
+# the major version of the compiler (e.g. 6.8.2 would be "6.8").  For
+# more fine-grained control use if_compiler_lt().
+#
 def platform_wordsize_qualify( name, suff ):
-    path = qualify(name, suff)
-    platform_path = path + '-' + config.platform
-    compiler_type_path = path + '-' + config.compiler_type
-    wordsize_path = path + '-ws-' + config.wordsize
-    if os.path.exists(platform_path):
-        return (1,platform_path)
-    elif os.path.exists(compiler_type_path):
-        return (0,compiler_type_path)
-    elif os.path.exists(wordsize_path):
-        return (0,wordsize_path)
-    else:
-        return (0,path)
+
+    basepath = qualify(name, suff)
+
+    fns = [ lambda x: x + '-' + config.compiler_type,
+            lambda x: x + '-' + config.compiler_maj_version,
+            lambda x: x + '-ws-' + config.wordsize ]
+
+    paths = [ basepath ]
+    for fn in fns:
+        paths = paths + map(fn, paths)
+
+    paths.reverse()
+
+    plat_paths = map (lambda x: x + '-' + config.platform, paths)
+
+    dir = glob.glob(basepath + '*')
+
+    for f in plat_paths:
+       if f in dir:
+            return (1,f)
+
+    for f in paths:
+       if f in dir:
+            return (0,f)
+
+    return (0, basepath)
 
 # Clean up prior to the test, so that we can't spuriously conclude
 # that it passed on the basis of old run outputs.

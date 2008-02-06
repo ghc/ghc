@@ -92,5 +92,5 @@ def get_compiler_info():
     v = re.sub('[\r\n]', '', v)
     v = v.split('-')
     config.compiler_version = v[0]
+    config.compiler_maj_version = re.sub('^([0-9]+\.[0-9]+).*',r'\1', v[0])
     config.compiler_tags = v[1:]
-
