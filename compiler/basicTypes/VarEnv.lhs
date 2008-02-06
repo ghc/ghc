@@ -46,7 +46,7 @@ module VarEnv (
 import OccName
 import Var
 import VarSet
-import UniqFM  
+import UniqFM
 import Unique
 import Util
 import Maybes

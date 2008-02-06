@@ -27,7 +27,7 @@ module NameEnv (
 
 import Name
 import Unique(Unique)
-import UniqFM
+import LazyUniqFM
 import Maybes
 import Outputable
 \end{code}
