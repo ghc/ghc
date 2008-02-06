@@ -356,13 +356,13 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
      load_arg_regs args [] [] code     =  (args, [], code)
      load_arg_regs [] iregs fregs code =  ([], fregs, code)
      load_arg_regs ((off,rep):args) iregs fregs code
-	| FloatArg  <- rep =
+	| FloatRep  <- rep =
             case fregs of
               [] -> push_this_arg
               n : frest ->
 		load_arg_regs args iregs frest 
                       (mov_f32_rbpoff_xmm n (bytes_per_word * off) : code)
-	| DoubleArg <- rep =
+	| DoubleRep <- rep =
             case fregs of
               [] -> push_this_arg
               n : frest ->
@@ -378,10 +378,10 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
 
      push_args [] code pushed_words = (code, pushed_words)
      push_args ((off,rep):args) code pushed_words
-	| FloatArg  <- rep =
+	| FloatRep  <- rep =
 		push_args args (push_f32_rbpoff (bytes_per_word * off) : code) 
 			(pushed_words+1)
-	| DoubleArg <- rep =
+	| DoubleRep <- rep =
 		push_args args (push_f64_rbpoff (bytes_per_word * off) : code)
 			(pushed_words+1)
 	| otherwise =
@@ -391,9 +391,9 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
 
      assign_result = 
 	case r_rep of
-	  DoubleArg -> f64
-	  FloatArg  -> f32
-          VoidArg   -> []
+	  DoubleRep -> f64
+	  FloatRep  -> f32
+          VoidRep   -> []
 	  _other    -> i64
 	where
 	  i64 = movq_rax_rbpoff 0
