@@ -7,7 +7,7 @@ INSTALL_DEST=$2
 INSTALL_BASE=$3
 
 if [ ${INSTALL_BASE} = / ]; then
-  INSTALL_BIN=${INSTALL_BASE}/usr/bin/
+  INSTALL_BIN=/usr/bin/
 else
   INSTALL_BIN=${INSTALL_BASE}/bin/
 fi
