@@ -788,7 +788,7 @@ is_cish StdCallConv = True
 -- 
 pprTempAndExternDecls :: [CmmBasicBlock] -> (SDoc{-temps-}, SDoc{-externs-})
 pprTempAndExternDecls stmts 
-  = (vcat (map pprTempDecl (eltsUFM temps)), 
+  = (vcat (map pprTempDecl (uniqSetToList temps)), 
      vcat (map (pprExternDecl False{-ToDo-}) (keysFM lbls)))
   where (temps, lbls) = runTE (mapM_ te_BB stmts)
 
