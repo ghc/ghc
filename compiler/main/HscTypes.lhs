@@ -110,7 +110,7 @@ import Maybes		( orElse, expectJust, catMaybes )
 import Outputable
 import BreakArray
 import SrcLoc		( SrcSpan, Located )
-import UniqFM		( lookupUFM, eltsUFM, emptyUFM )
+import LazyUniqFM		( lookupUFM, eltsUFM, emptyUFM )
 import UniqSupply	( UniqSupply )
 import FastString	( FastString )
 import StringBuffer	( StringBuffer )

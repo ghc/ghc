@@ -223,7 +223,7 @@ import SrcLoc
 import PackageConfig    hiding ( Version )
 import Outputable
 import BasicTypes       hiding ( SuccessFlag(..) )
-import UniqFM
+import LazyUniqFM
 import Util             hiding ( eqListBy )
 import FiniteMap
 import FastString

@@ -52,7 +52,7 @@ import SrcLoc
 import Maybes
 import ErrUtils
 import Finder
-import UniqFM
+import LazyUniqFM
 import StaticFlags
 import Outputable
 import BinIface

@@ -47,7 +47,7 @@ import Name
 import NameEnv
 import NameSet
 import qualified OccName
-import UniqFM
+import LazyUniqFM
 import Module
 import ListSetOps
 import DynFlags

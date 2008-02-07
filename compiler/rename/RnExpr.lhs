@@ -50,7 +50,7 @@ import PrelNames	( thFAKE, hasKey, assertIdKey, assertErrorName,
 
 import Name		( Name, nameOccName, nameModule, nameIsLocalOrFrom )
 import NameSet
-import UniqFM
+import LazyUniqFM
 import RdrName		( RdrName, extendLocalRdrEnv, lookupLocalRdrEnv, hideSomeUnquals )
 import LoadIface	( loadInterfaceForName )
 import UniqSet		( isEmptyUniqSet, emptyUniqSet )

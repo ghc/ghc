@@ -104,7 +104,7 @@ import MkExternalCore	( emitExternalCore )
 import ParserCore
 import ParserCoreUtils
 import FastString
-import UniqFM		( emptyUFM )
+import LazyUniqFM		( emptyUFM )
 import UniqSupply       ( initUs_ )
 import Bag		( unitBag )
 

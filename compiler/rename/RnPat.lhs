@@ -68,7 +68,7 @@ import Constants	( mAX_TUPLE_SIZE )
 import Name		( Name, nameOccName, nameModule_maybe, getOccName, nameSrcSpan )
 import OccName		( occEnvElts )
 import NameSet
-import UniqFM
+import LazyUniqFM
 import RdrName          ( RdrName, GlobalRdrElt(..), Provenance(..),
                           extendLocalRdrEnv, lookupLocalRdrEnv, hideSomeUnquals,
                           mkRdrUnqual, nameRdrName, gre_name, globalRdrEnvElts, isLocalGRE )

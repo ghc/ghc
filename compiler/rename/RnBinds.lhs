@@ -50,7 +50,7 @@ import DynFlags	( DynFlag(..) )
 import HscTypes		(FixItem(..))
 import Name
 import NameEnv
-import UniqFM
+import LazyUniqFM
 import NameSet
 import PrelNames	( isUnboundName )
 import RdrName		( RdrName, rdrNameOcc )

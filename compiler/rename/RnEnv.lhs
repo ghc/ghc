@@ -55,7 +55,7 @@ import Name		( Name, nameIsLocalOrFrom, mkInternalName, isWiredInName,
 			  nameSrcLoc, nameSrcSpan, nameOccName, nameModule, isExternalName )
 import NameSet
 import NameEnv
-import UniqFM
+import LazyUniqFM
 import DataCon		( dataConFieldLabels )
 import OccName		( OccName, tcName, isDataOcc, pprNonVarNameSpace, occNameSpace,
 			  reportIfUnused, occNameFS )

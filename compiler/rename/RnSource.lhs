@@ -46,7 +46,7 @@ import Class		( FunDep )
 import Name		( Name, nameOccName )
 import NameSet
 import NameEnv
-import UniqFM
+import LazyUniqFM
 import OccName 
 import Outputable
 import SrcLoc		( Located(..), unLoc, noLoc )

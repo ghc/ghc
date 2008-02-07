@@ -36,7 +36,7 @@ import PrelNames        ( gHC_PRIM )
 import DynFlags		( DynFlags(..), isOneShot, GhcMode(..) )
 import Outputable
 import FiniteMap
-import UniqFM
+import LazyUniqFM
 import Maybes		( expectJust )
 
 import Data.IORef	( IORef, writeIORef, readIORef, modifyIORef )

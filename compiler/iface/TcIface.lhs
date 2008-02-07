@@ -50,7 +50,7 @@ import Name
 import NameEnv
 import OccName
 import Module
-import UniqFM
+import LazyUniqFM
 import UniqSupply
 import Outputable	
 import ErrUtils

@@ -36,7 +36,7 @@ import PrelNames
 import Module
 import Name
 import NameEnv
-import UniqFM
+import LazyUniqFM
 import NameSet
 import OccName
 import HscTypes

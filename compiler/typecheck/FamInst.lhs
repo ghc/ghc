@@ -25,7 +25,7 @@ import Name
 import Module
 import SrcLoc
 import Outputable
-import UniqFM
+import LazyUniqFM
 import FiniteMap
 
 import Maybe

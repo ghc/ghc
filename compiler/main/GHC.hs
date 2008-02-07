@@ -248,7 +248,7 @@ import StaticFlags
 import SysTools     ( initSysTools, cleanTempFiles, cleanTempFilesExcept,
                       cleanTempDirs )
 import Module
-import UniqFM
+import LazyUniqFM
 import UniqSet
 import Unique
 import FiniteMap

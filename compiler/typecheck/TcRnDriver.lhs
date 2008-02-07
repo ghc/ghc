@@ -69,7 +69,7 @@ import ErrUtils
 import Id
 import Var
 import Module
-import UniqFM
+import LazyUniqFM
 import Name
 import NameEnv
 import NameSet

@@ -36,7 +36,7 @@ import Name
 import OccName
 import PrelNames
 import Module
-import UniqFM
+import LazyUniqFM
 import FastString
 import UniqSupply
 import FiniteMap
