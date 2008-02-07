@@ -13,8 +13,8 @@
 -----------------------------------------------------------------------------
 
 module System.Environment
-    ( 
-      getArgs,	     -- :: IO [String]
+    (
+      getArgs,       -- :: IO [String]
       getProgName,   -- :: IO String
       getEnv,        -- :: String -> IO String
 #ifndef __NHC__
@@ -32,7 +32,7 @@ import Prelude
 import Data.List
 import Foreign
 import Foreign.C
-import Control.Exception 	( bracket )
+import Control.Exception        ( bracket )
 import Control.Monad
 import GHC.IOBase
 #endif
@@ -57,15 +57,15 @@ import System
 
 #ifdef __GLASGOW_HASKELL__
 getArgs :: IO [String]
-getArgs = 
-  alloca $ \ p_argc ->  
+getArgs =
+  alloca $ \ p_argc ->
   alloca $ \ p_argv -> do
    getProgArgv p_argc p_argv
    p    <- fromIntegral `liftM` peek p_argc
    argv <- peek p_argv
    peekArray (p - 1) (advancePtr argv 1) >>= mapM peekCString
 
-   
+
 foreign import ccall unsafe "getProgArgv"
   getProgArgv :: Ptr CInt -> Ptr (Ptr CString) -> IO ()
 
@@ -80,15 +80,15 @@ between platforms: on Windows, for example, a program invoked as foo
 is probably really @FOO.EXE@, and that is what 'getProgName' will return.
 -}
 getProgName :: IO String
-getProgName = 
+getProgName =
   alloca $ \ p_argc ->
   alloca $ \ p_argv -> do
      getProgArgv p_argc p_argv
      argv <- peek p_argv
      unpackProgName argv
-  
-unpackProgName	:: Ptr (Ptr CChar) -> IO String   -- argv[0]
-unpackProgName argv = do 
+
+unpackProgName  :: Ptr (Ptr CChar) -> IO String   -- argv[0]
+unpackProgName argv = do
   s <- peekElemOff argv 0 >>= peekCString
   return (basename s)
   where
@@ -96,7 +96,7 @@ unpackProgName argv = do
    basename f = go f f
     where
       go acc [] = acc
-      go acc (x:xs) 
+      go acc (x:xs)
         | isPathSeparator x = go xs xs
         | otherwise         = go acc xs
 
@@ -121,9 +121,9 @@ getEnv name =
     withCString name $ \s -> do
       litstring <- c_getenv s
       if litstring /= nullPtr
-	then peekCString litstring
+        then peekCString litstring
         else ioException (IOError Nothing NoSuchThing "getEnv"
-			  "no environment variable" (Just name))
+                          "no environment variable" (Just name))
 
 foreign import ccall unsafe "getenv"
    c_getenv :: CString -> IO (Ptr CChar)
@@ -153,9 +153,9 @@ withArgv :: [String] -> IO a -> IO a
 withArgv new_args act = do
   pName <- System.Environment.getProgName
   existing_args <- System.Environment.getArgs
-  bracket (setArgs new_args) 
-	  (\argv -> do setArgs (pName:existing_args); freeArgv argv)
-  	  (const act)
+  bracket (setArgs new_args)
+          (\argv -> do setArgs (pName:existing_args); freeArgv argv)
+          (const act)
 
 freeArgv :: Ptr CString -> IO ()
 freeArgv argv = do
@@ -186,7 +186,7 @@ getEnvironment = do
       stuff <- peekArray0 nullPtr pBlock >>= mapM peekCString
       return (map divvy stuff)
   where
-   divvy str = 
+   divvy str =
       case break (=='=') str of
         (xs,[])        -> (xs,[]) -- don't barf (like Posix.getEnvironment)
         (name,_:value) -> (name,value)
