@@ -20,7 +20,7 @@ module SimplUtils (
 	activeInline, activeRule, inlineMode,
 
 	-- The continuation type
-	SimplCont(..), DupFlag(..), LetRhsFlag(..), 
+	SimplCont(..), DupFlag(..), ArgInfo(..),
 	contIsDupable, contResultType, contIsTrivial, contArgs, dropArgs, 
 	countValArgs, countArgs, splitInlineCont,
 	mkBoringStop, mkLazyArgStop, mkRhsStop, contIsRhsOrArg,
@@ -93,8 +93,7 @@ Key points:
 data SimplCont	
   = Stop		-- An empty context, or hole, []     
 	OutType		-- Type of the result
-	LetRhsFlag
-	Bool		-- True <=> There is something interesting about
+	CallCtxt	-- True <=> There is something interesting about
 			--          the context, and hence the inliner
 			--	    should be a bit keener (see interestingCallContext)
 			-- Specifically:
@@ -123,22 +122,28 @@ data SimplCont
 
   | StrictArg 		-- e C
 	OutExpr OutType		-- e and its type
-	(Bool,[Bool])		-- Whether the function at the head of e has rules,
-	SimplCont		--     plus strictness flags for further args
+	CallCtxt		-- Whether *this* argument position is interesting
+ 	ArgInfo			-- Whether the function at the head of e has rules, etc
+	SimplCont		--     plus strictness flags for *further* args
 
-data LetRhsFlag = AnArg		-- It's just an argument not a let RHS
-		| AnRhs 	-- It's the RHS of a let (so please float lets out of big lambdas)
-
-instance Outputable LetRhsFlag where
-  ppr AnArg = ptext SLIT("arg")
-  ppr AnRhs = ptext SLIT("rhs")
+data ArgInfo 
+  = ArgInfo {
+	ai_rules :: Bool,	-- Function has rules (recursively)
+				--	=> be keener to inline in all args
+	ai_strs :: [Bool],	-- Strictness of arguments
+				--   Usually infinite, but if it is finite it guarantees
+				--   that the function diverges after being given
+				--   that number of args
+	ai_discs :: [Int]	-- Discounts for arguments; non-zero => be keener to inline
+				--   Always infinite
+    }
 
 instance Outputable SimplCont where
-  ppr (Stop ty is_rhs _)  	     = ptext SLIT("Stop") <> brackets (ppr is_rhs) <+> ppr ty
+  ppr (Stop ty _) 	 	     = ptext SLIT("Stop") <+> ppr ty
   ppr (ApplyTo dup arg se cont)      = ((ptext SLIT("ApplyTo") <+> ppr dup <+> pprParendExpr arg)
 					  {-  $$ nest 2 (pprSimplEnv se) -}) $$ ppr cont
   ppr (StrictBind b _ _ _ cont)      = (ptext SLIT("StrictBind") <+> ppr b) $$ ppr cont
-  ppr (StrictArg f _ _ cont)         = (ptext SLIT("StrictArg") <+> ppr f) $$ ppr cont
+  ppr (StrictArg f _ _ _ cont)       = (ptext SLIT("StrictArg") <+> ppr f) $$ ppr cont
   ppr (Select dup bndr alts se cont) = (ptext SLIT("Select") <+> ppr dup <+> ppr bndr) $$ 
 				       (nest 4 (ppr alts)) $$ ppr cont 
   ppr (CoerceIt co cont)	     = (ptext SLIT("CoerceIt") <+> ppr co) $$ ppr cont
@@ -153,13 +158,13 @@ instance Outputable DupFlag where
 
 -------------------
 mkBoringStop :: OutType -> SimplCont
-mkBoringStop ty = Stop ty AnArg False
+mkBoringStop ty = Stop ty BoringCtxt
 
-mkLazyArgStop :: OutType -> Bool -> SimplCont
-mkLazyArgStop ty has_rules = Stop ty AnArg has_rules
+mkLazyArgStop :: OutType -> CallCtxt -> SimplCont
+mkLazyArgStop ty cci = Stop ty cci
 
 mkRhsStop :: OutType -> SimplCont
-mkRhsStop ty = Stop ty AnRhs False
+mkRhsStop ty = Stop ty BoringCtxt
 
 -------------------
 contIsRhsOrArg (Stop {})       	 = True
@@ -184,8 +189,8 @@ contIsTrivial other			  = False
 
 -------------------
 contResultType :: SimplCont -> OutType
-contResultType (Stop to_ty _ _)	      	 = to_ty
-contResultType (StrictArg _ _ _ cont) 	 = contResultType cont
+contResultType (Stop to_ty _)	      	 = to_ty
+contResultType (StrictArg _ _ _ _ cont)  = contResultType cont
 contResultType (StrictBind _ _ _ _ cont) = contResultType cont
 contResultType (ApplyTo _ _ _ cont)   	 = contResultType cont
 contResultType (CoerceIt _ cont)      	 = contResultType cont
@@ -226,9 +231,9 @@ splitInlineCont :: SimplCont -> Maybe (SimplCont, SimplCont)
 
 splitInlineCont (ApplyTo dup (Type ty) se c)
   | Just (c1, c2) <- splitInlineCont c 	        = Just (ApplyTo dup (Type ty) se c1, c2)
-splitInlineCont cont@(Stop ty _ _)       	= Just (mkBoringStop ty, cont)
+splitInlineCont cont@(Stop ty _)  	     	= Just (mkBoringStop ty, cont)
 splitInlineCont cont@(StrictBind bndr _ _ se _) = Just (mkBoringStop (substTy se (idType bndr)), cont)
-splitInlineCont cont@(StrictArg _ fun_ty _ _)   = Just (mkBoringStop (funArgTy fun_ty), cont)
+splitInlineCont cont@(StrictArg _ fun_ty _ _ _) = Just (mkBoringStop (funArgTy fun_ty), cont)
 splitInlineCont other				= Nothing
 	-- NB: the calculation of the type for mkBoringStop is an annoying
 	--     duplication of the same calucation in mkDupableCont
@@ -304,23 +309,26 @@ default case.
 
 
 \begin{code}
-interestingCallContext :: SimplCont -> CallContInfo
+interestingCallContext :: SimplCont -> CallCtxt
 interestingCallContext cont
   = interesting cont
   where
+    interestingCtxt = ArgCtxt False 2	-- Give *some* incentive!
+
     interesting (Select _ bndr _ _ _)
-	| isDeadBinder bndr       = CaseCont
-	| otherwise	          = InterestingCont
+	| isDeadBinder bndr       = CaseCtxt
+	| otherwise	          = interestingCtxt
 		
-    interesting (ApplyTo {})      = InterestingCont
-						-- Can happen if we have (coerce t (f x)) y
-						-- Perhaps True is a bit over-keen, but I've
-						-- seen (coerce f) x, where f has an INLINE prag,
-						-- So we have to give some motivation for inlining it
-    interesting (StrictArg {})	  = InterestingCont
-    interesting (StrictBind {})	  = InterestingCont
-    interesting (Stop ty _ yes)   = if yes then InterestingCont else BoringCont
-    interesting (CoerceIt _ cont) = interesting cont
+    interesting (ApplyTo {})      = interestingCtxt
+				-- Can happen if we have (coerce t (f x)) y
+				-- Perhaps interestingCtxt is a bit over-keen, but I've
+				-- seen (coerce f) x, where f has an INLINE prag,
+				-- So we have to give some motivation for inlining it
+
+    interesting (StrictArg _ _ cci _ _)	= cci
+    interesting (StrictBind {})	  	= BoringCtxt
+    interesting (Stop ty cci)   	= cci
+    interesting (CoerceIt _ cont) 	= interesting cont
 	-- If this call is the arg of a strict function, the context
 	-- is a bit interesting.  If we inline here, we may get useful
 	-- evaluation information to avoid repeated evals: e.g.
@@ -341,21 +349,24 @@ interestingCallContext cont
 mkArgInfo :: Id
 	  -> Int	-- Number of value args
 	  -> SimplCont	-- Context of the cal
-	  -> (Bool, [Bool])	-- Arg info
--- The arg info consists of
---  * A Bool indicating if the function has rules (recursively)
---  * A [Bool] indicating strictness for each arg
--- The [Bool] is usually infinite, but if it is finite it 
--- guarantees that the function diverges after being given
--- that number of args
+	  -> ArgInfo
 
 mkArgInfo fun n_val_args call_cont
-  = (interestingArgContext fun call_cont, fun_stricts)
+  = ArgInfo { ai_rules = interestingArgContext fun call_cont
+	    , ai_strs  = arg_stricts
+	    , ai_discs = arg_discounts }
   where
-    vanilla_stricts, fun_stricts :: [Bool]
+    vanilla_discounts, arg_discounts :: [Int]
+    vanilla_discounts = repeat 0
+    arg_discounts = case idUnfolding fun of
+			CoreUnfolding _ _ _ _ (UnfoldIfGoodArgs _ discounts _ _)
+			      -> discounts ++ vanilla_discounts
+			other -> vanilla_discounts
+
+    vanilla_stricts, arg_stricts :: [Bool]
     vanilla_stricts  = repeat False
 
-    fun_stricts
+    arg_stricts
       = case splitStrictSig (idNewStrictness fun) of
 	  (demands, result_info)
 		| not (demands `lengthExceeds` n_val_args)
@@ -394,12 +405,15 @@ interestingArgContext :: Id -> SimplCont -> Bool
 interestingArgContext fn call_cont
   = idHasRules fn || go call_cont
   where
-    go (Select {})	      = False
-    go (ApplyTo {})	      = False
-    go (StrictArg {})	      = True
-    go (StrictBind {})	      = False	-- ??
-    go (CoerceIt _ c)	      = go c
-    go (Stop _ _ interesting) = interesting
+    go (Select {})	       = False
+    go (ApplyTo {})	       = False
+    go (StrictArg _ _ cci _ _) = interesting cci
+    go (StrictBind {})	       = False	-- ??
+    go (CoerceIt _ c)	       = go c
+    go (Stop _ cci)            = interesting cci
+
+    interesting (ArgCtxt rules _) = rules
+    interesting other		  = False
 \end{code}
 
 

@@ -27,7 +27,7 @@ module CoreUnfold (
 	couldBeSmallEnoughToInline, 
 	certainlyWillInline, smallEnoughToInline,
 
-	callSiteInline, CallContInfo(..)
+	callSiteInline, CallCtxt(..)
 
     ) where
 
@@ -513,19 +513,25 @@ callSiteInline :: DynFlags
 	       -> Id			-- The Id
 	       -> Bool			-- True if there are are no arguments at all (incl type args)
 	       -> [Bool]		-- One for each value arg; True if it is interesting
-	       -> CallContInfo		-- True <=> continuation is interesting
+	       -> CallCtxt		-- True <=> continuation is interesting
 	       -> Maybe CoreExpr	-- Unfolding, if any
 
 
-data CallContInfo = BoringCont		
-		  | InterestingCont	-- Somewhat interesting
-		  | CaseCont		-- Very interesting; the argument of a case
-					-- that decomposes its scrutinee
+data CallCtxt = BoringCtxt
 
-instance Outputable CallContInfo where
-  ppr BoringCont      = ptext SLIT("BoringCont")
-  ppr InterestingCont = ptext SLIT("InterestingCont")
-  ppr CaseCont 	      = ptext SLIT("CaseCont")
+	      | ArgCtxt Bool	-- We're somewhere in the RHS of function with rules
+				--	=> be keener to inline
+			Int	-- We *are* the argument of a function with this arg discount
+				--	=> be keener to inline
+		-- INVARIANT: ArgCtxt False 0 ==> BoringCtxt
+
+	      | CaseCtxt	-- We're the scrutinee of a case
+				-- that decomposes its scrutinee
+
+instance Outputable CallCtxt where
+  ppr BoringCtxt    = ptext SLIT("BoringCtxt")
+  ppr (ArgCtxt _ _) = ptext SLIT("ArgCtxt")
+  ppr CaseCtxt 	    = ptext SLIT("CaseCtxt")
 
 callSiteInline dflags active_inline id lone_variable arg_infos cont_info
   = case idUnfolding id of {
@@ -588,17 +594,18 @@ callSiteInline dflags active_inline id lone_variable arg_infos cont_info
 
 		    interesting_saturated_call 
 			= case cont_info of
-			    BoringCont -> not is_top && n_vals_wanted > 0	-- Note [Nested functions] 
-			    CaseCont   -> not lone_variable || not is_value	-- Note [Lone variables]
-			    InterestingCont -> n_vals_wanted > 0
+			    BoringCtxt -> not is_top && n_vals_wanted > 0	-- Note [Nested functions] 
+			    CaseCtxt   -> not lone_variable || not is_value	-- Note [Lone variables]
+			    ArgCtxt {} -> True
+				-- Was: n_vals_wanted > 0; but see test eyeball/inline1.hs
 
 		    small_enough = (size - discount) <= opt_UF_UseThreshold
 		    discount = computeDiscount n_vals_wanted arg_discounts 
 					       res_discount' arg_infos
 		    res_discount' = case cont_info of
-					BoringCont      -> 0
-					CaseCont        -> res_discount
-					InterestingCont -> 4 `min` res_discount
+					BoringCtxt  -> 0
+					CaseCtxt    -> res_discount
+					ArgCtxt _ _ -> 4 `min` res_discount
 			-- res_discount can be very large when a function returns
 			-- construtors; but we only want to invoke that large discount
 			-- when there's a case continuation.

@@ -29,7 +29,7 @@ import DataCon		( dataConRepStrictness, dataConUnivTyVars )
 import CoreSyn
 import NewDemand	( isStrictDmd )
 import PprCore		( pprParendExpr, pprCoreExpr )
-import CoreUnfold	( mkUnfolding, callSiteInline )
+import CoreUnfold	( mkUnfolding, callSiteInline, CallCtxt(..) )
 import CoreUtils
 import Rules		( lookupRule )
 import BasicTypes	( isMarkedStrict )
@@ -764,7 +764,7 @@ rebuild env expr cont
       Stop {}		      	   -> return (env, expr)
       CoerceIt co cont	      	   -> rebuild env (mkCoerce co expr) cont
       Select _ bndr alts se cont   -> rebuildCase (se `setFloats` env) expr bndr alts cont
-      StrictArg fun ty info cont   -> rebuildCall env (fun `App` expr) (funResultTy ty) info cont
+      StrictArg fun ty _ info cont -> rebuildCall env (fun `App` expr) (funResultTy ty) info cont
       StrictBind b bs body se cont -> do { env' <- simplNonRecX (se `setFloats` env) b expr
 					 ; simplLam env' bs body cont }
       ApplyTo _ arg se cont	   -> do { arg' <- simplExpr (se `setInScope` env) arg
@@ -1054,10 +1054,10 @@ completeCall env var cont
 
 rebuildCall :: SimplEnv
 	    -> OutExpr -> OutType	-- Function and its type
-	    -> (Bool, [Bool])		-- See SimplUtils.mkArgInfo
+	    -> ArgInfo
 	    -> SimplCont
 	    -> SimplM (SimplEnv, OutExpr)
-rebuildCall env fun fun_ty (has_rules, []) cont
+rebuildCall env fun fun_ty (ArgInfo { ai_strs = [] }) cont
   -- When we run out of strictness args, it means
   -- that the call is definitely bottom; see SimplUtils.mkArgInfo
   -- Then we want to discard the entire strict continuation.  E.g.
@@ -1080,11 +1080,13 @@ rebuildCall env fun fun_ty info (ApplyTo _ (Type arg_ty) se cont)
   = do	{ ty' <- simplType (se `setInScope` env) arg_ty
 	; rebuildCall env (fun `App` Type ty') (applyTy fun_ty ty') info cont }
 
-rebuildCall env fun fun_ty (has_rules, str:strs) (ApplyTo _ arg arg_se cont)
+rebuildCall env fun fun_ty
+	   (ArgInfo { ai_rules = has_rules, ai_strs = str:strs, ai_discs = disc:discs }) 
+	   (ApplyTo _ arg arg_se cont)
   | str || isStrictType arg_ty		-- Strict argument
   = -- pprTrace "Strict Arg" (ppr arg $$ ppr (seIdSubst env) $$ ppr (seInScope env)) $
     simplExprF (arg_se `setFloats` env) arg
-	       (StrictArg fun fun_ty (has_rules, strs) cont)
+	       (StrictArg fun fun_ty cci arg_info' cont)
 		-- Note [Shadowing]
 
   | otherwise				-- Lazy argument
@@ -1093,10 +1095,13 @@ rebuildCall env fun fun_ty (has_rules, str:strs) (ApplyTo _ arg arg_se cont)
 	-- have to be very careful about bogus strictness through 
 	-- floating a demanded let.
   = do	{ arg' <- simplExprC (arg_se `setInScope` env) arg
-			     (mkLazyArgStop arg_ty has_rules)
-	; rebuildCall env (fun `App` arg') res_ty (has_rules, strs) cont }
+			     (mkLazyArgStop arg_ty cci)
+	; rebuildCall env (fun `App` arg') res_ty arg_info' cont }
   where
     (arg_ty, res_ty) = splitFunTy fun_ty
+    arg_info' = ArgInfo { ai_rules = has_rules, ai_strs = strs, ai_discs = discs }
+    cci | has_rules || disc > 0	= ArgCtxt has_rules disc  -- Be keener here
+	| otherwise		= BoringCtxt		  -- Nothing interesting
 
 rebuildCall env fun fun_ty info cont
   = rebuild env fun cont
@@ -1752,7 +1757,7 @@ mkDupableCont env cont@(StrictBind bndr _ _ se _)
   =  return (env, mkBoringStop (substTy se (idType bndr)), cont)
 	-- See Note [Duplicating strict continuations]
 
-mkDupableCont env cont@(StrictArg _ fun_ty _ _)
+mkDupableCont env cont@(StrictArg _ fun_ty _ _ _)
   =  return (env, mkBoringStop (funArgTy fun_ty), cont)
 	-- See Note [Duplicating strict continuations]
 
