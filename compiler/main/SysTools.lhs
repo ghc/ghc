@@ -207,31 +207,9 @@ initSysTools mbMinusB dflags
 		| otherwise    = "windres"
 
 	; let dflags0 = defaultDynFlags
-#ifndef mingw32_HOST_OS
-	-- check whether TMPDIR is set in the environment
-	; e_tmpdir <- IO.try (getEnv "TMPDIR") -- fails if not set
-#else
-	  -- On Win32, consult GetTempPath() for a temp dir.
-	  --  => it first tries TMP, TEMP, then finally the
-	  --   Windows directory(!). The directory is in short-path
-	  --   form.
-	; e_tmpdir <- 
-            IO.try (do
-	        let len = (2048::Int)
-		buf  <- mallocArray len
-		ret  <- getTempPath len buf
-		if ret == 0 then do
-		      -- failed, consult TMPDIR.
- 	             free buf
-		     getEnv "TMPDIR"
-		  else do
-		     s <- peekCString buf
-		     free buf
-		     return s)
-#endif
-        ; let dflags1 = case e_tmpdir of
-			  Left _  -> dflags0
-			  Right d -> setTmpDir d dflags0
+
+        ; tmpdir <- getTemporaryDirectory
+        ; let dflags1 = setTmpDir tmpdir dflags0
 
 	-- Check that the package config exists
 	; config_exists <- doesFileExist pkgconfig_path
