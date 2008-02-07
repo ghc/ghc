@@ -50,7 +50,7 @@ stackSqueeze(StgTSO *tso, StgPtr bottom)
     current_gap_size = 0;
     gap = (struct stack_gap *) (tso->sp - sizeofW(StgUpdateFrame));
 
-    while (frame < bottom) {
+    while (frame <= bottom) {
 	
 	info = get_ret_itbl((StgClosure *)frame);
 	switch (info->i.type) {
@@ -202,6 +202,11 @@ threadPaused(Capability *cap, StgTSO *tso)
     while (1) {
 	// If we've already marked this frame, then stop here.
 	if (frame->header.info == (StgInfoTable *)&stg_marked_upd_frame_info) {
+	    if (prev_was_update_frame) {
+		words_to_squeeze += sizeofW(StgUpdateFrame);
+		weight += weight_pending;
+		weight_pending = 0;
+	    }
 	    goto end;
 	}
 
@@ -305,7 +310,7 @@ end:
     // the number of words we have to shift down is less than the
     // number of stack words we squeeze away by doing so.
     if (RtsFlags.GcFlags.squeezeUpdFrames == rtsTrue &&
-	weight < words_to_squeeze) {
+	((weight <= 4 && words_to_squeeze > 0) || weight < words_to_squeeze)) {
 	stackSqueeze(tso, (StgPtr)frame);
     }
 }
