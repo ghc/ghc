@@ -27,13 +27,14 @@ import System.IO
 import Data.List
 import System.Exit
 import Data.Char
+import System.Directory ( removeFile )
+import Control.Exception  ( bracket )
+import System.Directory ( findExecutable, getTemporaryDirectory )
 
 #ifdef USING_COMPAT
 import Compat.RawSystem ( rawSystem )
-import Compat.Directory ( findExecutable )
 #else
 import System.Cmd       ( rawSystem )
-import System.Directory ( findExecutable )
 #endif
 
 main :: IO ()
@@ -59,7 +60,17 @@ doIt :: String -> [String] -> IO ()
 doIt ghc args = do
     let (ghc_args, rest) = getGhcArgs args
     case rest of
-        [] -> dieProg usage
+        [] -> do
+           -- behave like typical perl, python, ruby interpreters:      
+           -- read from stdin
+           tmpdir <- getTemporaryDirectory
+           bracket
+             (openTempFile tmpdir "runghcXXXX.hs")
+             (\(filename,_) -> removeFile filename)
+             $ \(filename,h) -> do
+                 getContents >>= hPutStr h
+                 hClose h
+                 doIt ghc (ghc_args ++ [filename])
         filename : prog_args -> do
             let c1 = ":set prog " ++ show filename
                 c2 = ":main " ++ show prog_args
@@ -90,6 +101,6 @@ dieProg msg = do
     hPutStrLn stderr (p ++ ": " ++ msg)
     exitWith (ExitFailure 1)
 
-usage :: String
-usage = "syntax: runghc [-f GHC-PATH | --] [GHC-ARGS] [--] FILE ARG..."
+-- usage :: String
+-- usage = "syntax: runghc [-f GHC-PATH | --] [GHC-ARGS] [--] FILE ARG..."
 
