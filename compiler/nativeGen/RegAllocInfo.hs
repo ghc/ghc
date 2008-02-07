@@ -774,7 +774,7 @@ isRegRegMove (MOV _ (OpReg r1) (OpReg r2)) = Just (r1,r2)
 #elif powerpc_TARGET_ARCH
 isRegRegMove (MR dst src) = Just (src,dst)
 #else
-#warning ToDo: isRegRegMove
+#error ToDo: isRegRegMove
 #endif
 isRegRegMove _ = Nothing
 
@@ -877,6 +877,8 @@ mkRegRegMoveInstr src dst
 #endif
 #elif powerpc_TARGET_ARCH
     = MR dst src
+#else
+#error ToDo: mkRegRegMoveInstr
 #endif
 
 mkBranchInstr

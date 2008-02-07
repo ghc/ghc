@@ -305,7 +305,7 @@ assignMem_I64Code addrTree valueTree = do
          mov_lo = ST I32 rlo (AddrRegImm src (ImmInt 4))
      return (vcode `appOL` code `snocOL` mov_hi `snocOL` mov_lo)
 
-assignReg_I64Code (CmmLocal (LocalReg u_dst pk)) valueTree = do
+assignReg_I64Code (CmmLocal (LocalReg u_dst pk _)) valueTree = do
      ChildCode64 vcode r_src_lo <- iselExpr64 valueTree    
      let 
          r_dst_lo = mkVReg u_dst pk
@@ -335,7 +335,7 @@ iselExpr64 (CmmLoad addrTree I64) = do
                          rlo
           )
 
-iselExpr64 (CmmReg (CmmLocal (LocalReg uq I64))) = do
+iselExpr64 (CmmReg (CmmLocal (LocalReg uq I64 _))) = do
      r_dst_lo <-  getNewRegNat I32
      let r_dst_hi = getHiVRegFromLo r_dst_lo
          r_src_lo = mkVReg uq I32
@@ -3993,7 +3993,7 @@ genSwitch expr ids
                     ]
         return code
 #else
-genSwitch expr ids = panic "ToDo: genSwitch"
+#error "ToDo: genSwitch"
 #endif
 
 jumpTableEntry Nothing = CmmStaticLit (CmmInt 0 wordRep)

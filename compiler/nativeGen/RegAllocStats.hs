@@ -291,11 +291,10 @@ regColors
 	, (fake3, "#aa00aa")
 	, (fake4, "#ff0055")
 	, (fake5, "#5500ff") ]
-#endif
 
 
 -- reg colors for x86_64
-#if x86_64_TARGET_ARCH
+#elif x86_64_TARGET_ARCH
 regDotColor :: Reg -> SDoc
 regDotColor reg
  = let	Just	str	= lookupUFM regColors reg
@@ -317,17 +316,19 @@ regColors
 	, (r15, "#002080") ]
 
 	++ zip (map RealReg [16..31]) (repeat "red")
-#endif
 
 
 -- reg colors for ppc
-#if powerpc_TARGET_ARCH
+#elif powerpc_TARGET_ARCH
 regDotColor :: Reg -> SDoc
 regDotColor reg
  = case regClass reg of
  	RcInteger	-> text "blue"
 	RcFloat		-> text "red"
 	RcDouble	-> text "green"
+
+#else
+#error ToDo: regDotColor
 #endif
 
 

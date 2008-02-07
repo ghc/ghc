@@ -505,16 +505,17 @@ worst n classN classC
 #if i386_TARGET_ARCH
 #define ALLOCATABLE_REGS_INTEGER (_ILIT(3))
 #define ALLOCATABLE_REGS_DOUBLE  (_ILIT(6))
-#endif
 
-#if x86_64_TARGET_ARCH
+#elif x86_64_TARGET_ARCH
 #define ALLOCATABLE_REGS_INTEGER (_ILIT(5))
 #define ALLOCATABLE_REGS_DOUBLE  (_ILIT(2))
-#endif
 
-#if powerpc_TARGET_ARCH
+#elif powerpc_TARGET_ARCH
 #define ALLOCATABLE_REGS_INTEGER (_ILIT(16))
 #define ALLOCATABLE_REGS_DOUBLE  (_ILIT(26))
+
+#else
+#error ToDo: define ALLOCATABLE_REGS_INTEGER and ALLOCATABLE_REGS_DOUBLE
 #endif
 
 {-# INLINE regClass      #-}
