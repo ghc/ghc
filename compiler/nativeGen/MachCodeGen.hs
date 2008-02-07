@@ -1046,8 +1046,7 @@ getRegister (CmmMachOp mop [x]) -- unary MachOps
 
 
 getRegister e@(CmmMachOp mop [x, y]) -- dyadic MachOps
-  = ASSERT2(cmmExprRep x /= I8, pprExpr e)
-    case mop of
+  = case mop of
       MO_Eq F32   -> condFltReg EQQ x y
       MO_Ne F32   -> condFltReg NE x y
       MO_S_Gt F32 -> condFltReg GTT x y
