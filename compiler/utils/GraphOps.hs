@@ -24,7 +24,7 @@ import GraphBase
 import Outputable
 import Unique
 import UniqSet
-import UniqFM
+import LazyUniqFM
 
 import Data.List	hiding (union)
 import Data.Maybe

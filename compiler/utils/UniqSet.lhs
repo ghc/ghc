@@ -22,7 +22,7 @@ module UniqSet (
     ) where
 
 import Maybes
-import UniqFM
+import LazyUniqFM
 import Unique
 
 #if ! OMIT_NATIVE_CODEGEN

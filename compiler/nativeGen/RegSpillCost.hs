@@ -23,7 +23,7 @@ import MachInstrs
 import MachRegs
 import Cmm
 
-import UniqFM
+import LazyUniqFM
 import UniqSet
 import Outputable
 import State

@@ -30,7 +30,7 @@ import MachInstrs
 import Cmm
 
 import Outputable
-import UniqFM
+import LazyUniqFM
 import UniqSet
 import State
 

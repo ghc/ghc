@@ -45,7 +45,7 @@ import Var		( Var )
 import VarEnv
 import TysWiredIn	( unboxedPairDataCon )
 import TysPrim		( realWorldStatePrimTy )
-import UniqFM		( plusUFM_C, addToUFM_Directly, lookupUFM_Directly,
+import LazyUniqFM		( plusUFM_C, addToUFM_Directly, lookupUFM_Directly,
 			  keysUFM, minusUFM, ufmToList, filterUFM )
 import Type		( isUnLiftedType, coreEqType, splitTyConApp_maybe )
 import Coercion         ( coercionKind )

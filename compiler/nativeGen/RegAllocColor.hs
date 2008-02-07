@@ -24,7 +24,7 @@ import PprMach
 
 import UniqSupply
 import UniqSet
-import UniqFM
+import LazyUniqFM
 import Bag
 import Outputable
 import DynFlags

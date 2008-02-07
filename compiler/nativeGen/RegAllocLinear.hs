@@ -97,7 +97,7 @@ import Cmm hiding (RegSet)
 import Digraph
 import Unique		( Uniquable(getUnique), Unique )
 import UniqSet
-import UniqFM
+import LazyUniqFM
 import UniqSupply
 import Outputable
 import State

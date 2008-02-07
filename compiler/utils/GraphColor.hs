@@ -19,7 +19,7 @@ import GraphOps
 import GraphPpr
 
 import Unique
-import UniqFM
+import LazyUniqFM
 import UniqSet
 import Outputable	
 
