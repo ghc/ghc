@@ -31,14 +31,39 @@ CURRENT_PROJECT_VERSION = $(ProjectVersionInt).$(ProjectPatchLevel)
 # version number.
 SHORT_VERSION_STRING = $(ProjectVersion)
 
+# Name of the installer package
+PACKAGE_NAME = GHC-$(ProjectVersion)-$(TargetArch_CPP).pkg
+
+# Xcode's installation build product location (this is where the GHC.framework
+# is assembled)
+DSTROOT=/tmp/GHC.dst
+
+# Tools directory for a system volume install
+TOOLS_SYSTEM=$(DSTROOT)/Library/Frameworks/GHC.framework/Tools
+
+PACKAGEMAKER=/Developer/usr/bin/packagemaker
+
+# Build and package GHC.framework for /Library/Frameworks
+#
+# * Be careful to clean out Xcode's build product location first, as Xcode
+#   sets permissions such that a second install on top of an existing one
+#   fails
+# * Make there are no contents component descriptions in the .pmdoc.  These are
+#   created by the PackageMaker GUI and have per default the wrong ownership
+#   and permissions for all files (as well as prevent correct setting of those
+#   for files that are not in the content list).
 framework-pkg:
-	xcodebuild -target GHC-systemwide install\
+	-chmod -R u+w $(DSTROOT)
+	-$(RM) -rf $(DSTROOT)
+	mkdir -p $(TOOLS_SYSTEM)
+	cp installer-scripts/Uninstaller $(TOOLS_SYSTEM)
+	xcodebuild -target GHC-systemwide clean install\
 		   CURRENT_PROJECT_VERSION=$(CURRENT_PROJECT_VERSION)\
 	    	   SHORT_VERSION_STRING=$(SHORT_VERSION_STRING)\
 	 	   FRAMEWORK_VERSION=$(FRAMEWORK_VERSION)\
 		   CURRENT_LIBRARY_VERSION=$(FRAMEWORK_VERSION)
-	@echo "FIXME: What about the contents list?!?"; exit 1
-	@echo "FIXME: call the packager"; exit 1
+	-$(RM) -f GHC-system.pmdoc/*-contents.xml
+	$(PACKAGEMAKER) -v --doc GHC-system.pmdoc -o $(TOP)/$(PACKAGE_NAME)
 
 # Instead of making 'binary-dist' a Makefile dependency, we let xcodebuild call
 # 'make binary-dist'.  This has the advantage that xcode knows the framework
@@ -47,9 +72,13 @@ framework-pkg:
 # tree yet another time.
 #
 framework-binary-dist:
-	xcodebuild -target GHC-relocatable build\
+	xcodebuild -target GHC-relocatable clean build\
 		   CURRENT_PROJECT_VERSION=$(CURRENT_PROJECT_VERSION)\
 	    	   SHORT_VERSION_STRING=$(SHORT_VERSION_STRING)\
 	 	   FRAMEWORK_VERSION=$(FRAMEWORK_VERSION)\
 		   CURRENT_LIBRARY_VERSION=$(FRAMEWORK_VERSION)
 	@echo "FIXME: call the packager"; exit 1
+	# FIXME: The approach with the binary-dist in the package has the
+	# problem that the BOM is wrong and the installer relocation feature
+	# isn't sufficient as the layout in the binary-dist and the installed
+	# tree is different

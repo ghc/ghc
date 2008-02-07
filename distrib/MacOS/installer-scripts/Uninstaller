@@ -55,8 +55,7 @@ done
 echo "Removing ${INSTALL_DEST}/GHC.framework"
 rm -rf ${INSTALL_DEST}/GHC.framework
 
-echo "Removing package recipts"
+echo "Removing package recipt"
 rm -f /Library/Receipts/boms/org.haskell.glasgowHaskellCompiler.ghc.pkg.bom
-rm -f /Library/Receipts/boms/org.haskell.glasgowHaskellCompiler.uninstaller.pkg
 
 echo "${INSTALL_DEST}/GHC.framework has been purged!"
