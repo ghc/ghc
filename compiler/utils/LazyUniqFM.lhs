@@ -13,9 +13,7 @@ Basically, the things need to be in class @Uniquable@, and we use the
 \begin{code}
 {-# OPTIONS -Wall -fno-warn-name-shadowing -Werror -fallow-undecidable-instances #-}
 module LazyUniqFM (
-	UniqFM(..),   	-- abstract type
-    -- XXX Not actually abstract because of nativeGen/MachRegs; sigh
-    Lazy(Lazy), -- XXX Also for nativeGen/MachRegs; sigh
+	UniqFM,   	-- abstract type
 
 	emptyUFM,
 	unitUFM,

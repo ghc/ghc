@@ -40,7 +40,7 @@ import MachOp
 import CLabel
 import State
 
-import LazyUniqFM
+import UniqFM
 import Unique		( Unique, getUnique )
 import UniqSupply
 import List		( groupBy, sortBy )

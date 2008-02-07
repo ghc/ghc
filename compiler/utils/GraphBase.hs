@@ -14,7 +14,7 @@ module GraphBase (
 where
 
 import UniqSet
-import LazyUniqFM
+import UniqFM
 
 
 -- | A fn to check if a node is trivially colorable

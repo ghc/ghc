@@ -42,7 +42,7 @@ import Digraph
 import Outputable
 import Unique
 import UniqSet
-import LazyUniqFM
+import UniqFM
 import UniqSupply
 import Bag
 import State

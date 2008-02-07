@@ -105,8 +105,7 @@ import UniqSet
 import Constants
 import FastTypes
 import FastBool
-import qualified UniqFM as S
-import LazyUniqFM
+import UniqFM
 
 #if powerpc_TARGET_ARCH
 import Data.Word	( Word8, Word16, Word32 )
@@ -520,20 +519,20 @@ worst n classN classC
 
 {-# INLINE regClass      #-}
 trivColorable :: RegClass -> UniqSet Reg -> UniqSet Reg -> Bool
-trivColorable classN (MkUniqFM conflicts) (MkUniqFM exclusions)
+trivColorable classN conflicts exclusions
  = {-# SCC "trivColorable" #-}
    let
 	{-# INLINE   isSqueesed    #-}
 	isSqueesed cI cF ufm
 	  = case ufm of
-		S.NodeUFM _ _ left right
+		NodeUFM _ _ left right
 		 -> case isSqueesed cI cF right of
 		 	(# s, cI', cF' #)
 			 -> case s of
 			 	False	-> isSqueesed cI' cF' left
 				True	-> (# True, cI', cF' #)
 
-		S.LeafUFM _ (Lazy reg)
+		LeafUFM _ reg
 		 -> case regClass reg of
 		 	RcInteger
 			 -> case cI +# _ILIT(1) of
@@ -543,7 +542,7 @@ trivColorable classN (MkUniqFM conflicts) (MkUniqFM exclusions)
 			 -> case cF +# _ILIT(1) of
 			 	cF' -> (# cF' >=# ALLOCATABLE_REGS_DOUBLE,  cI, cF' #)
 
-		S.EmptyUFM
+		EmptyUFM
 		 ->	(# False, cI, cF #)
 
    in case isSqueesed (_ILIT(0)) (_ILIT(0)) conflicts of

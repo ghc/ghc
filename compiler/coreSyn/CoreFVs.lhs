@@ -38,7 +38,7 @@ import CoreSyn
 import Id
 import IdInfo
 import NameSet
-import LazyUniqFM
+import UniqFM
 import Name
 import VarSet
 import Var

@@ -40,7 +40,7 @@ import Control.Monad
 import Outputable
 import TcType
 import Unique
-import LazyUniqFM
+import UniqFM
 \end{code}
 
 

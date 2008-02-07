@@ -12,7 +12,7 @@ import GraphBase
 import Outputable
 import Unique
 import UniqSet
-import LazyUniqFM
+import UniqFM
 
 import Data.List
 import Data.Maybe

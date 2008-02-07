@@ -33,7 +33,7 @@ import Maybes		( orElse )
 import Digraph		( stronglyConnCompR, SCC(..) )
 import PrelNames	( buildIdKey, foldrIdKey, runSTRepIdKey, augmentIdKey )
 import Unique		( Unique )
-import LazyUniqFM		( keysUFM, intersectUFM_C, foldUFM_Directly )
+import UniqFM		( keysUFM, intersectUFM_C, foldUFM_Directly )
 import Util		( mapAndUnzip )
 import Outputable
 

@@ -39,7 +39,7 @@ import TysWiredIn
 import TysPrim           ( intPrimTy )
 
 import Unique
-import LazyUniqFM
+import UniqFM
 import UniqSet
 import Util              ( singleton )
 import Digraph           ( SCC(..), stronglyConnComp )

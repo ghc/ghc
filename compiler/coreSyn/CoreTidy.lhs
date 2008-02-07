@@ -22,7 +22,7 @@ import IdInfo
 import Type
 import Var
 import VarEnv
-import LazyUniqFM
+import UniqFM
 import Name hiding (tidyNameOcc)
 import OccName
 import SrcLoc

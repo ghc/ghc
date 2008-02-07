@@ -35,7 +35,7 @@ module NewDemand(
 import StaticFlags
 import BasicTypes
 import VarEnv
-import LazyUniqFM
+import UniqFM
 import Util
 import Outputable
 \end{code}
