@@ -73,7 +73,6 @@ import RdrName          ( RdrName, GlobalRdrElt(..), Provenance(..),
                           extendLocalRdrEnv, lookupLocalRdrEnv, hideSomeUnquals,
                           mkRdrUnqual, nameRdrName, gre_name, globalRdrEnvElts, isLocalGRE )
 import LoadIface	( loadInterfaceForName )
-import UniqFM		( isNullUFM )
 import UniqSet		( emptyUniqSet )
 import List		( nub )
 import Util		( isSingleton )
