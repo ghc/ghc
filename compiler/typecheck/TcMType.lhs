@@ -1505,10 +1505,11 @@ check_inst_head dflags clas tys
                 text "where T is not a synonym." $$
                 text "Use -XTypeSynonymInstances if you want to disable this.")
 
-    head_type_args_tyvars_msg = parens (
-                text "All instance types must be of the form (T a1 ... an)" $$
-                text "where a1 ... an are distinct type *variables*" $$
-                text "Use -XFlexibleInstances if you want to disable this.")
+    head_type_args_tyvars_msg = parens (vcat [
+                text "All instance types must be of the form (T a1 ... an)",
+                text "where a1 ... an are type *variables*,",
+                text "and each type variable appears at most once in the instance head.",
+                text "Use -XFlexibleInstances if you want to disable this."])
 
     head_one_type_msg = parens (
                 text "Only one type can be given in an instance head." $$
