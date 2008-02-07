@@ -21,36 +21,36 @@
 
 module Text.Read (
    -- * The 'Read' class
-   Read(..),		-- The Read class
-   ReadS, 		-- String -> Maybe (a,String)
+   Read(..),            -- The Read class
+   ReadS,               -- String -> Maybe (a,String)
 
    -- * Haskell 98 functions
-   reads,		-- :: (Read a) => ReadS a
-   read,		-- :: (Read a) => String -> a
-   readParen, 		-- :: Bool -> ReadS a -> ReadS a
-   lex,			-- :: ReadS String
+   reads,               -- :: (Read a) => ReadS a
+   read,                -- :: (Read a) => String -> a
+   readParen,           -- :: Bool -> ReadS a -> ReadS a
+   lex,                 -- :: ReadS String
 
 #if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
    -- * New parsing functions
    module Text.ParserCombinators.ReadPrec,
-   L.Lexeme(..),	
-   lexP,		-- :: ReadPrec Lexeme
-   parens,		-- :: ReadPrec a -> ReadPrec a
+   L.Lexeme(..),
+   lexP,                -- :: ReadPrec Lexeme
+   parens,              -- :: ReadPrec a -> ReadPrec a
 #endif
 #ifdef __GLASGOW_HASKELL__
-   readListDefault,	-- :: Read a => ReadS [a]
-   readListPrecDefault,	-- :: Read a => ReadPrec [a]
+   readListDefault,     -- :: Read a => ReadS [a]
+   readListPrecDefault, -- :: Read a => ReadPrec [a]
 #endif
 
  ) where
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Read
-#endif   
+#endif
 #if defined(__GLASGOW_HASKELL__) || defined(__HUGS__)
 import Text.ParserCombinators.ReadPrec
 import qualified Text.Read.Lex as L
-#endif   
+#endif
 
 #ifdef __HUGS__
 -- copied from GHC.Read
