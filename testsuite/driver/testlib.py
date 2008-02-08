@@ -803,6 +803,11 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
     rm_no_fail(errname)
     rm_no_fail(name)
     
+    if getTestOpts().cmd_prefix == '':
+        cmd_prefix = ''
+    else:
+        cmd_prefix = getTestOpts().cmd_prefix + ' '
+
     if (top_mod == ''):
         srcname = add_hs_lhs_suffix(name)
     else:
@@ -843,7 +848,7 @@ def interpreter_run( name, way, extra_hc_opts, compile_only, top_mod ):
         
     script.close()
 
-    cmd = 'cd ' + testdir + " && '" \
+    cmd = 'cd ' + testdir + " && " + cmd_prefix + "'" \
           + config.compiler + "' " \
           + join(config.compiler_always_flags,' ') + ' ' \
           + srcname + ' ' \
