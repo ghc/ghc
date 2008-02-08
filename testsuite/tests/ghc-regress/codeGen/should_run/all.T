@@ -63,3 +63,4 @@ test('cg058', normal, compile_and_run, [''])
 test('cg059', exit_code(1), compile_and_run, [''])
 
 test('1852', normal, compile_and_run, [''])
+test('2080', normal, compile_and_run, [''])
