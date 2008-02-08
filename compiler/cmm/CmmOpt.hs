@@ -330,37 +330,53 @@ cmmMachOpFold (MO_Sub _) [CmmLit (CmmLabel lbl), CmmLit (CmmInt i rep)]
   = CmmLit (CmmLabelOff lbl (fromIntegral (negate (narrowU rep i))))
 
 
--- Comparison of literal with narrowed/widened operand: perform
--- the comparison at a different width, as long as the literal is
--- within range.
+-- Comparison of literal with widened operand: perform the comparison
+-- at the smaller width, as long as the literal is within range.
+
+-- We can't do the reverse trick, when the operand is narrowed:
+-- narrowing throws away bits from the operand, there's no way to do
+-- the same comparison at the larger size.
 
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
 -- powerPC NCG has a TODO for I8/I16 comparisons, so don't try
 
 cmmMachOpFold cmp [CmmMachOp conv [x], CmmLit (CmmInt i _)]
-  | Just (rep, narrow) <- maybe_conversion conv,
-    Just narrow_cmp <- maybe_comparison cmp rep,
-    let narrow_i = narrow rep i,
-    narrow_i == i
-  = cmmMachOpFold narrow_cmp [x, CmmLit (CmmInt narrow_i rep)]
+  |     -- if the operand is widened:
+    Just (rep, signed, narrow_fn) <- maybe_conversion conv,
+        -- and this is a comparison operation:
+    Just narrow_cmp <- maybe_comparison cmp rep signed,
+        -- and the literal fits in the smaller size:
+    i == narrow_fn rep i
+        -- then we can do the comparison at the smaller size
+  = cmmMachOpFold narrow_cmp [x, CmmLit (CmmInt i rep)]
  where
-    maybe_conversion (MO_U_Conv from _) = Just (from, narrowU)
-    maybe_conversion (MO_S_Conv from _)
-        | not (isFloatingRep from) = Just (from, narrowS)
+    maybe_conversion (MO_U_Conv from to)
+        | to > from
+        = Just (from, False, narrowU)
+    maybe_conversion (MO_S_Conv from to)
+        | to > from, not (isFloatingRep from)
+        = Just (from, True, narrowS)
         -- don't attempt to apply this optimisation when the source
         -- is a float; see #1916
     maybe_conversion _ = Nothing
     
-    maybe_comparison (MO_U_Gt _) rep = Just (MO_U_Gt rep)
-    maybe_comparison (MO_U_Ge _) rep = Just (MO_U_Ge rep)
-    maybe_comparison (MO_U_Lt _) rep = Just (MO_U_Lt rep)
-    maybe_comparison (MO_U_Le _) rep = Just (MO_U_Le rep)
-    maybe_comparison (MO_S_Gt _) rep = Just (MO_S_Gt rep)
-    maybe_comparison (MO_S_Ge _) rep = Just (MO_S_Ge rep)
-    maybe_comparison (MO_S_Lt _) rep = Just (MO_S_Lt rep)
-    maybe_comparison (MO_S_Le _) rep = Just (MO_S_Le rep)
-    maybe_comparison (MO_Eq   _) rep = Just (MO_Eq   rep)
-    maybe_comparison _ _ = Nothing
+        -- careful (#2080): if the original comparison was signed, but
+        -- we were doing an unsigned widen, then we must do an
+        -- unsigned comparison at the smaller size.
+    maybe_comparison (MO_U_Gt _) rep _     = Just (MO_U_Gt rep)
+    maybe_comparison (MO_U_Ge _) rep _     = Just (MO_U_Ge rep)
+    maybe_comparison (MO_U_Lt _) rep _     = Just (MO_U_Lt rep)
+    maybe_comparison (MO_U_Le _) rep _     = Just (MO_U_Le rep)
+    maybe_comparison (MO_Eq   _) rep _     = Just (MO_Eq   rep)
+    maybe_comparison (MO_S_Gt _) rep True  = Just (MO_S_Gt rep)
+    maybe_comparison (MO_S_Ge _) rep True  = Just (MO_S_Ge rep)
+    maybe_comparison (MO_S_Lt _) rep True  = Just (MO_S_Lt rep)
+    maybe_comparison (MO_S_Le _) rep True  = Just (MO_S_Le rep)
+    maybe_comparison (MO_S_Gt _) rep False = Just (MO_U_Gt rep)
+    maybe_comparison (MO_S_Ge _) rep False = Just (MO_U_Ge rep)
+    maybe_comparison (MO_S_Lt _) rep False = Just (MO_U_Lt rep)
+    maybe_comparison (MO_S_Le _) rep False = Just (MO_U_Le rep)
+    maybe_comparison _ _ _ = Nothing
 
 #endif
 
