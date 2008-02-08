@@ -72,17 +72,10 @@ import Foreign
 import CString		( CString, peekCString )
 #endif
 
-#if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ < 603
--- rawSystem comes from libghccompat.a in stage1
-import Compat.RawSystem ( rawSystem )
-import System.Cmd       ( system )
-import GHC.IOBase       ( IOErrorType(..) ) 
-#else
 import System.Process	( runInteractiveProcess, getProcessExitCode )
 import Control.Concurrent( forkIO, newChan, readChan, writeChan )
 import FastString       ( mkFastString )
 import SrcLoc           ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
-#endif
 \end{code}
 
 

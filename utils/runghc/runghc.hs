@@ -30,12 +30,7 @@ import Data.Char
 import System.Directory ( removeFile )
 import Control.Exception  ( bracket )
 import System.Directory ( findExecutable, getTemporaryDirectory )
-
-#ifdef USING_COMPAT
-import Compat.RawSystem ( rawSystem )
-#else
 import System.Cmd       ( rawSystem )
-#endif
 
 main :: IO ()
 main = do
