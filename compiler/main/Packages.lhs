@@ -260,7 +260,10 @@ mungePackagePaths top_dir ps = map munge_pkg ps
   munge_pkg p = p{ importDirs  = munge_paths (importDirs p),
 		   includeDirs = munge_paths (includeDirs p),
     		   libraryDirs = munge_paths (libraryDirs p),
-		   frameworkDirs = munge_paths (frameworkDirs p) }
+		   frameworkDirs = munge_paths (frameworkDirs p),
+                   haddockInterfaces = munge_paths (haddockInterfaces p),
+	           haddockHTMLs = munge_paths (haddockHTMLs p)
+                    }
 
   munge_paths = map munge_path
 
