@@ -133,7 +133,7 @@ toHsType t = case t of
 
   TyConApp tc ts -> case ts of 
     t1:t2:rest
-      | isNameConSym . tyConName $ tc ->
+      | isSymOcc . nameOccName . tyConName $ tc ->
           app (HsOpTy (toLHsType t1) (noLoc . tyConName $ tc) (toLHsType t2)) rest
     _ -> app (tycon tc) ts
 

@@ -14,6 +14,7 @@ module Haddock.Backends.Html (
 
 import Prelude hiding (div)
 
+import Haddock.DocName
 import Haddock.Backends.DevHelp
 import Haddock.Backends.HH
 import Haddock.Backends.HH2
@@ -660,7 +661,7 @@ doDecl summary links x (L loc d) mbDoc instances docMap = doDecl d
   where
     doDecl (TyClD d) = doTyClD d 
     doDecl (SigD (TypeSig (L _ n) (L _ t))) = 
-      ppFunSig summary links loc mbDoc (getName n) t
+      ppFunSig summary links loc mbDoc (docNameOrig n) t
     doDecl (ForD d) = ppFor summary links loc mbDoc d
 
     doTyClD d0@(TyData {}) = ppDataDecl summary links instances x loc mbDoc d0
@@ -672,7 +673,8 @@ ppFunSig :: Bool -> LinksInfo -> SrcSpan -> Maybe (HsDoc DocName) ->
             Name -> HsType DocName -> HtmlTable
 ppFunSig summary links loc mbDoc name typ =
   ppTypeOrFunSig summary links loc name typ mbDoc 
-                 (ppTypeSig summary name typ, ppBinder False name, dcolon)
+    (ppTypeSig summary (nameOccName name) typ, 
+     ppBinder False (nameOccName name), dcolon)
 
 
 ppTypeOrFunSig :: Bool -> LinksInfo -> SrcSpan -> Name -> HsType DocName ->
@@ -721,10 +723,10 @@ ppTypeOrFunSig summary links loc name typ doc (pref1, pref2, sep)
 ppTyVars tvs = ppTyNames (tyvarNames tvs)
 
 tyvarNames = map f 
-  where f x = let NoLink n = hsTyVarName (unLoc x) in n
+  where f x = docNameOrig . hsTyVarName . unLoc $ x
   
 ppFor summary links loc mbDoc (ForeignImport (L _ name) (L _ typ) _)
-  = ppFunSig summary links loc mbDoc (getName name) typ
+  = ppFunSig summary links loc mbDoc (docNameOrig name) typ
 ppFor _ _ _ _ _ = error "ppFor"
 
 -- we skip type patterns for now
@@ -732,12 +734,13 @@ ppTySyn summary links loc mbDoc (TySynonym (L _ name) ltyvars _ ltype)
   = ppTypeOrFunSig summary links loc n (unLoc ltype) mbDoc 
                    (full, hdr, spaceHtml +++ equals)
   where
-    hdr  = hsep ([keyword "type", ppBinder summary n] ++ ppTyVars ltyvars)
+    hdr  = hsep ([keyword "type", ppBinder summary occ] ++ ppTyVars ltyvars)
     full = hdr <+> equals <+> ppLType ltype
-    NoLink n = name
+    n    = docNameOrig name
+    occ  = docNameOcc name
 
 
-ppTypeSig :: Bool -> Name -> HsType DocName -> Html
+ppTypeSig :: Bool -> OccName -> HsType DocName -> Html
 ppTypeSig summary nm ty = ppBinder summary nm <+> dcolon <+> ppType ty
 
 
@@ -762,7 +765,7 @@ ppAppNameTypes n ts = ppTypeApp n ts ppDocName ppParendType
 -- | Print an application of a DocName and a list of Names 
 ppDataClassHead :: Bool -> DocName -> [Name] -> Html
 ppDataClassHead summ n ns = 
-  ppTypeApp n ns (ppBinder summ . getName) ppTyName
+  ppTypeApp n ns (ppBinder summ . docNameOcc) ppTyName
 
 
 -- | General printing of type applications
@@ -771,7 +774,7 @@ ppTypeApp n ts@(t1:t2:rest) ppDN ppT
   | operator, not . null $ rest = parens opApp <+> hsep (map ppT rest)
   | operator                    = opApp
   where
-    operator = isNameSym . getName $ n
+    operator = isNameSym . docNameOrig $ n
     opApp = ppT t1 <+> ppDN n <+> ppT t2
 
 ppTypeApp n ts ppDN ppT = ppDN n <+> hsep (map ppT ts)
@@ -835,12 +838,12 @@ ppShortClassDecl summary links (ClassDecl lctxt lname tvs fds sigs _ ats _) loc 
 	     vanillaTable << 
          aboves ([ ppAT summary at | L _ at <- ats ] ++
 	        [ ppFunSig summary links loc mbDoc n typ
-		          | L _ (TypeSig (L _ (NoLink n)) (L _ typ)) <- sigs
-              , let mbDoc = Map.lookup n docMap ])
+		          | L _ (TypeSig (L _ fname) (L _ typ)) <- sigs
+              , let n = docNameOrig fname, let mbDoc = Map.lookup n docMap ])
           )
   where
     hdr = ppClassHdr summary lctxt (unLoc lname) tvs fds
-    NoLink nm = unLoc lname
+    nm  = docNameOrig . unLoc $ lname
     
     ppAT summary at = case at of
       TyData {} -> topDeclBox links loc nm (ppDataHeader summary at)
@@ -863,7 +866,7 @@ ppClassDecl summary links instances orig_c loc mbDoc docMap
       | null lsigs = topDeclBox links loc nm hdr
       | otherwise  = topDeclBox links loc nm (hdr <+> keyword "where")
 
-    NoLink nm = unLoc lname
+    nm   = docNameOrig . unLoc $ lname
     ctxt = unLoc lctxt
 
     hdr = ppClassHdr summary lctxt (unLoc lname) ltyvars lfds
@@ -877,9 +880,9 @@ ppClassDecl summary links instances orig_c loc mbDoc docMap
       | otherwise  = 
         s8 </> methHdr </>
         tda [theclass "body"] << vanillaTable << (
-          abovesSep s8 [ ppFunSig summary links loc mbDoc (orig n) typ
-                           | L _ (TypeSig n (L _ typ)) <- lsigs
-                           , let mbDoc = Map.lookup (orig n) docMap ]
+          abovesSep s8 [ ppFunSig summary links loc mbDoc (docNameOrig n) typ
+                           | L _ (TypeSig (L _ n) (L _ typ)) <- lsigs
+                           , let mbDoc = Map.lookup (docNameOrig n) docMap ]
         )
 
     instId = collapseId nm
@@ -900,9 +903,6 @@ ppInstHead (ctxt, n, ts) = ppContextNoLocs ctxt <+> ppAppNameTypes n ts
 
 -- -----------------------------------------------------------------------------
 -- Data & newtype declarations
-
-orig (L _ (NoLink name)) = name
-orig _ = error "orig"
 
 
 -- TODO: print contexts
@@ -937,7 +937,7 @@ ppShortDataDecl summary links loc mbDoc dataDecl
     doConstr c con = declBox (toHtml [c] <+> ppShortConstr summary (unLoc con))
     doGADTConstr con = declBox (ppShortConstr summary (unLoc con))
 
-    name      = orig (tcdLName dataDecl)
+    name      = docNameOrig . unLoc . tcdLName $ dataDecl
     context   = unLoc (tcdCtxt dataDecl)
     newOrData = tcdND dataDecl
     tyVars    = tyvarNames (tcdTyVars dataDecl)
@@ -962,7 +962,7 @@ ppDataDecl summary links instances x loc mbDoc dataDecl
 
 
   where
-    name      = orig (tcdLName dataDecl)
+    name      = docNameOrig . unLoc . tcdLName $ dataDecl
     context   = unLoc (tcdCtxt dataDecl)
     newOrData = tcdND dataDecl
     tyVars    = tyvarNames (tcdTyVars dataDecl)
@@ -1019,11 +1019,11 @@ ppShortConstr :: Bool -> ConDecl DocName -> Html
 ppShortConstr summary con = case con_res con of 
 
   ResTyH98 -> case con_details con of 
-    PrefixCon args -> header +++ hsep (ppBinder summary name : map ppLType args)
-    RecCon fields -> header +++ ppBinder summary name <+>
+    PrefixCon args -> header +++ hsep (ppBinder summary occ : map ppLType args)
+    RecCon fields -> header +++ ppBinder summary occ <+>
       braces (vanillaTable << aboves (map (ppShortField summary) fields))
     InfixCon arg1 arg2 -> header +++ 
-      hsep [ppLType arg1, ppBinder summary name, ppLType arg2]    
+      hsep [ppLType arg1, ppBinder summary occ, ppLType arg2]    
 
   ResTyGADT resTy -> case con_details con of 
     PrefixCon args -> doGADTCon args resTy
@@ -1031,12 +1031,12 @@ ppShortConstr summary con = case con_res con of
     InfixCon arg1 arg2 -> doGADTCon [arg1, arg2] resTy 
     
   where
-    doGADTCon args resTy = ppBinder summary name <+> dcolon <+> hsep [
+    doGADTCon args resTy = ppBinder summary occ <+> dcolon <+> hsep [
                              ppForAll forall ltvs lcontext,
                              ppLType (foldr mkFunTy resTy args) ]
 
     header   = ppConstrHdr forall tyVars context
-    name     = orig (con_name con)
+    occ      = docNameOcc . unLoc . con_name $ con
     ltvs     = con_qvars con
     tyVars   = tyvarNames ltvs 
     lcontext = con_cxt con
@@ -1060,17 +1060,17 @@ ppSideBySideConstr (L _ con) = case con_res con of
   ResTyH98 -> case con_details con of 
 
     PrefixCon args -> 
-      argBox (hsep ((header +++ ppBinder False name) : map ppLType args)) 
+      argBox (hsep ((header +++ ppBinder False occ) : map ppLType args)) 
       <-> maybeRDocBox mbLDoc  
 
     RecCon fields -> 
-      argBox (header +++ ppBinder False name) <->
+      argBox (header +++ ppBinder False occ) <->
       maybeRDocBox mbLDoc </>
       (tda [theclass "body"] << spacedTable1 <<
       aboves (map ppSideBySideField fields))
 
     InfixCon arg1 arg2 -> 
-      argBox (hsep [header+++ppLType arg1, ppBinder False name, ppLType arg2])
+      argBox (hsep [header+++ppLType arg1, ppBinder False occ, ppLType arg2])
       <-> maybeRDocBox mbLDoc
  
   ResTyGADT resTy -> case con_details con of
@@ -1079,14 +1079,14 @@ ppSideBySideConstr (L _ con) = case con_res con of
     InfixCon arg1 arg2 -> doGADTCon [arg1, arg2] resTy 
 
  where 
-    doGADTCon args resTy = argBox (ppBinder False name <+> dcolon <+> hsep [
+    doGADTCon args resTy = argBox (ppBinder False occ <+> dcolon <+> hsep [
                                ppForAll forall ltvs (con_cxt con),
                                ppLType (foldr mkFunTy resTy args) ]
                             ) <-> maybeRDocBox mbLDoc
 
 
     header  = ppConstrHdr forall tyVars context
-    name    = orig (con_name con)
+    occ     = docNameOcc . unLoc . con_name $ con
     ltvs    = con_qvars con
     tyVars  = tyvarNames (con_qvars con)
     context = unLoc (con_cxt con)
@@ -1095,8 +1095,8 @@ ppSideBySideConstr (L _ con) = case con_res con of
     mkFunTy a b = noLoc (HsFunTy a b)
 
 ppSideBySideField :: ConDeclField DocName -> HtmlTable
-ppSideBySideField (ConDeclField lname ltype mbLDoc) =
-  argBox (ppBinder False (orig lname)
+ppSideBySideField (ConDeclField (L _ name) ltype mbLDoc) =
+  argBox (ppBinder False (docNameOcc name)
     <+> dcolon <+> ppLType ltype) <->
   maybeRDocBox mbLDoc
 
@@ -1128,9 +1128,9 @@ ppHsFullConstr (HsRecDecl _ nm tvs ctxt fields doc) =
 -}
 
 ppShortField :: Bool -> ConDeclField DocName -> HtmlTable
-ppShortField summary (ConDeclField lname ltype _) 
+ppShortField summary (ConDeclField (L _ name) ltype _) 
   = tda [theclass "recfield"] << (
-      ppBinder summary (orig lname)
+      ppBinder summary (docNameOcc name)
       <+> dcolon <+> ppLType ltype
     )
 
@@ -1272,8 +1272,8 @@ ppr_mono_ty ctxt_prec (HsOpTy ty1 op ty2)
   = maybeParen ctxt_prec pREC_OP $
     ppr_mono_lty pREC_OP ty1 <+> ppr_op <+> ppr_mono_lty pREC_OP ty2
   where
-    ppr_op = if not (isNameSym name) then quote (ppLDocName op) else ppLDocName op
-    name = getName . unLoc $ op
+    ppr_op = if not (isSymOcc occName) then quote (ppLDocName op) else ppLDocName op
+    occName = docNameOcc . unLoc $ op
 
 ppr_mono_ty ctxt_prec (HsParTy ty)
   = parens (ppr_mono_lty pREC_TOP ty)
@@ -1300,28 +1300,34 @@ ppRdrName = ppOccName . rdrNameOcc
 ppLDocName (L _ d) = ppDocName d
 
 ppDocName :: DocName -> Html
-ppDocName (Link name) = linkId (nameModule name) (Just name) << ppName name
-ppDocName (NoLink name) = toHtml (getOccString name)
+ppDocName (Documented name mod) = 
+  linkIdOcc mod (Just occName) << ppOccName occName
+    where occName = nameOccName name
+ppDocName (Undocumented name) = toHtml (getOccString name)
 
-linkTarget :: Name -> Html
-linkTarget name = namedAnchor (anchorNameStr name) << toHtml "" 
+linkTarget :: OccName -> Html
+linkTarget n = namedAnchor (anchorNameStr n) << toHtml "" 
 
 ppName :: Name -> Html
 ppName name = toHtml (getOccString name)
 
-ppBinder :: Bool -> Name -> Html
+ppBinder :: Bool -> OccName -> Html
 -- The Bool indicates whether we are generating the summary, in which case
 -- the binder will be a link to the full definition.
-ppBinder True nm = linkedAnchor (anchorNameStr nm) << ppBinder' nm
-ppBinder False nm = linkTarget nm +++ bold << ppBinder' nm
+ppBinder True n = linkedAnchor (anchorNameStr n) << ppBinder' n
+ppBinder False n = linkTarget n +++ bold << ppBinder' n
 
-ppBinder' :: Name -> Html
-ppBinder' name
-  | isNameVarSym name = parens $ toHtml (getOccString name)
-  | otherwise = toHtml (getOccString name)             
+ppBinder' :: OccName -> Html
+ppBinder' n
+  | isSymOcc n = parens $ toHtml (occNameString n)
+  | otherwise  = toHtml (occNameString n)             
 
-linkId :: Module -> Maybe Name -> Html -> Html
-linkId mod mbName = anchor ! [href hr]
+
+linkId mod mbName = linkIdOcc mod (fmap nameOccName mbName)
+
+
+linkIdOcc :: Module -> Maybe OccName -> Html -> Html
+linkIdOcc mod mbName = anchor ! [href hr]
   where 
     hr = case mbName of
       Nothing   -> moduleHtmlFile mod

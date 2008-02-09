@@ -167,8 +167,8 @@ moduleHtmlFile mdl =
    mdl' = map (\c -> if c == '.' then '-' else c) 
               (moduleNameString (moduleName mdl))
 
-nameHtmlRef :: Module -> Name -> String	
-nameHtmlRef mdl str = moduleHtmlFile mdl ++ '#':escapeStr (anchorNameStr str)
+nameHtmlRef :: Module -> OccName -> String	
+nameHtmlRef mdl n = moduleHtmlFile mdl ++ '#':escapeStr (anchorNameStr n)
 
 contentsHtmlFile, indexHtmlFile :: String
 contentsHtmlFile = "index.html"
@@ -179,10 +179,9 @@ subIndexHtmlFile a = "doc-index-" ++ b ++ ".html"
    where b | isAlpha a = [a]
            | otherwise = show (ord a)
 
-anchorNameStr :: Name -> String
-anchorNameStr name | isValOcc occName = "v:" ++ getOccString name 
-                   | otherwise        = "t:" ++ getOccString name
-  where occName = nameOccName name
+anchorNameStr :: OccName -> String
+anchorNameStr name | isValOcc name = "v:" ++ occNameString name 
+                   | otherwise     = "t:" ++ occNameString name
 
 pathJoin :: [FilePath] -> FilePath
 pathJoin = foldr join []

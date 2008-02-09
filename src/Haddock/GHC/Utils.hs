@@ -61,9 +61,7 @@ instance (Outputable a, Outputable b) => Outputable (Map.Map a b) where
 -- misc
 
 
-isNameSym n  = isNameVarSym n || isNameConSym n
-isNameVarSym = isLexVarSym . occNameFS . nameOccName 
-isNameConSym = isLexConSym . occNameFS . nameOccName 
+isNameSym = isSymOcc . nameOccName
 
 
 getMainDeclBinder :: HsDecl name -> Maybe name

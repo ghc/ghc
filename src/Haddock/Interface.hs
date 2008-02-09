@@ -14,6 +14,7 @@ module Haddock.Interface (
 ) where
 
 
+import Haddock.DocName
 import Haddock.Interface.Create
 import Haddock.Interface.AttachInstances
 import Haddock.Interface.Rename
@@ -74,17 +75,15 @@ createInterfaces' modules flags = do
 -- The interfaces are passed in in topologically sorted order, but we start
 -- by reversing the list so we can do a foldl.
 buildHomeLinks :: [Interface] -> LinkEnv
-buildHomeLinks modules = foldl upd Map.empty (reverse modules)
+buildHomeLinks ifaces = foldl upd Map.empty (reverse ifaces)
   where
-    upd old_env mod
-      | OptHide    `elem` ifaceOptions mod = old_env
-      | OptNotHome `elem` ifaceOptions mod =
+    upd old_env iface
+      | OptHide    `elem` ifaceOptions iface = old_env
+      | OptNotHome `elem` ifaceOptions iface =
         foldl' keep_old old_env exported_names
       | otherwise = foldl' keep_new old_env exported_names
       where
-        exported_names = ifaceVisibleExports mod
-        modName = ifaceMod mod
-
-        keep_old env n = Map.insertWith (\new old -> old) n
-                         (nameSetMod n modName) env
-        keep_new env n = Map.insert n (nameSetMod n modName) env
+        exported_names = ifaceVisibleExports iface
+        mod            = ifaceMod iface
+        keep_old env n = Map.insertWith (\new old -> old) n mod env
+        keep_new env n = Map.insert n mod env

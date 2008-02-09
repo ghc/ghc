@@ -8,6 +8,7 @@
 module Haddock.Interface.Rename (renameInterface) where
 
 
+import Haddock.DocName
 import Haddock.Types
 import Haddock.GHC.Utils
 
@@ -35,7 +36,7 @@ renameInterface renamingEnv mod =
   -- is mapped to itself, and everything else comes from the global renaming
   -- env
   let localEnv = foldl fn renamingEnv (ifaceVisibleExports mod)
-        where fn env name = Map.insert name (nameSetMod name (ifaceMod mod)) env
+        where fn env name = Map.insert name (ifaceMod mod) env
       
       docs = Map.toList (ifaceDocMap mod)
       renameMapElem (k,d) = do d' <- renameDoc d; return (k, d') 
@@ -119,8 +120,8 @@ runRnFM :: LinkEnv -> RnM a -> (a,[Name])
 runRnFM env rn = unRn rn lkp 
   where 
     lkp n = case Map.lookup n env of
-      Nothing -> (False, NoLink n) 
-      Just q  -> (True, Link q)
+      Nothing  -> (False, Undocumented n) 
+      Just mod -> (True,  Documented n mod)
 
 
 --------------------------------------------------------------------------------
@@ -128,8 +129,8 @@ runRnFM env rn = unRn rn lkp
 --------------------------------------------------------------------------------
 
 
-keep n = NoLink n
-keepL (L loc n) = L loc (NoLink n)
+keep n = Undocumented n
+keepL (L loc n) = L loc (Undocumented n)
 
 
 rename = lookupRn id 
@@ -162,7 +163,7 @@ renameDoc doc = case doc of
     lkp <- getLookupRn
     case [ n | (True, n) <- map lkp ids ] of
       ids'@(_:_) -> return (DocIdentifier ids')
-      [] -> return (DocIdentifier (map NoLink ids))
+      [] -> return (DocIdentifier (map Undocumented ids))
   DocModule str -> return (DocModule str)
   DocEmphasis doc -> do
     doc' <- renameDoc doc

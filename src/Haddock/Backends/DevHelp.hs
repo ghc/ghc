@@ -12,7 +12,7 @@ import Haddock.Utils
 
 import Module        ( moduleName, moduleNameString, Module, mkModule, mkModuleName )
 import PackageConfig ( stringToPackageId )
-import Name          ( Name, nameModule, getOccString )
+import Name          ( Name, nameModule, getOccString, nameOccName )
 
 import Data.Maybe    ( fromMaybe )
 import qualified Data.Map as Map
@@ -77,5 +77,5 @@ ppDevHelpFile odir doctitle maybe_package modules = do
     ppReference :: Name -> [Module] -> Doc
     ppReference name [] = empty
     ppReference name (mod:refs) =  
-      text "<function name=\""<>text (escapeStr (getOccString name))<>text"\" link=\""<>text (nameHtmlRef mod name)<>text"\"/>" $$
+      text "<function name=\""<>text (escapeStr (getOccString name))<>text"\" link=\""<>text (nameHtmlRef mod (nameOccName name))<>text"\"/>" $$
       ppReference name refs

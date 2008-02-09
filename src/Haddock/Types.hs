@@ -8,12 +8,17 @@
 module Haddock.Types where
 
 
+import Haddock.GHC.Utils
+import Haddock.DocName
+
 import Data.Map (Map)
 import qualified Data.Map as Map
 
 import GHC hiding (NoLink)
 import Outputable
 import OccName
+import Name
+
 
 {-! for DocOption derive: Binary !-}
 data DocOption
@@ -78,21 +83,7 @@ data ExportItem name
 type InstHead name = ([HsPred name], name, [HsType name])
 type ModuleMap     = Map Module Interface
 type DocMap        = Map Name (HsDoc DocName)
-type LinkEnv       = Map Name Name
-
-
-{-! for DocName   derive: Binary !-}
-data DocName = Link Name | NoLink Name
-
-
-instance Outputable DocName where
-  ppr (Link   n) = ppr n
-  ppr (NoLink n) = ppr n
-
-
-instance NamedThing DocName where
-  getName (Link n)   = n
-  getName (NoLink n) = n
+type LinkEnv       = Map Name Module
 
 
 -- | This structure holds the module information we get from GHC's 

@@ -13,7 +13,7 @@ module Main (main) where
 import Haddock.Backends.Html
 import Haddock.Backends.Hoogle
 import Haddock.Interface
-import Haddock.Types hiding (NoLink)
+import Haddock.Types
 import Haddock.Version
 import Haddock.InterfaceFile
 import Haddock.Exception

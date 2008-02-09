@@ -6,7 +6,7 @@
 
 module Haddock.ModuleTree ( ModuleTree(..), mkModuleTree ) where
 
-import Haddock.Types ( DocName )
+import Haddock.DocName
 import GHC           ( HsDoc, Name )
 import Module        ( Module, moduleNameString, moduleName, modulePackageId )
 import PackageConfig ( packageIdString )
