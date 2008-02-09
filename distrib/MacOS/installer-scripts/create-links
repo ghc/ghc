@@ -1,15 +1,25 @@
 #!/bin/sh
 
 # GHC framework post-install script
-# * Add links to all executables into standard bin/ directory
+# * Add links to all executables into the standard bin/ directory
+# * Add link to the man page into the standard man/man1/ directory
+# * Add link to the HTML docs into the standard share/doc/ directory
 
 INSTALL_DEST=$2
 INSTALL_BASE=$3
 
 if [ ${INSTALL_BASE} = / ]; then
-  INSTALL_BIN=/usr/bin/
-else
-  INSTALL_BIN=${INSTALL_BASE}/bin/
+  INSTALL_BASE=/usr
 fi
+
+INSTALL_BIN=${INSTALL_BASE}/bin
 mkdir -p ${INSTALL_BIN}
-ln -sf ${INSTALL_DEST}/GHC.framework/Versions/Current/usr/bin/* ${INSTALL_BIN}
+ln -sf ${INSTALL_DEST}/GHC.framework/Versions/Current/usr/bin/* ${INSTALL_BIN}/
+
+INSTALL_MAN1=${INSTALL_BASE}/share/man/man1
+INSTALL_HTML=${INSTALL_BASE}/share/doc
+mkdir -p ${INSTALL_MAN1}
+ln -sf ${INSTALL_DEST}/GHC.framework/Versions/Current/usr/share/man/man1/*\
+       ${INSTALL_MAN1}/
+ln -sf ${INSTALL_DEST}/GHC.framework/Versions/Current/usr/share/doc/ghc\
+       ${INSTALL_HTML}/
