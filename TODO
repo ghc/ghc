@@ -20,18 +20,8 @@
 -----------------------------------------------------------------------------
 -- bugs
 
-* Parser is less liberal than before (pre 2.0.0.0) in respect to doc comments
-  that aren't attached to anything. Some examples of things people do that 
-  were harmless before:
-
-     -- | module header
-
-     -- | extra comment describing module
-     module MyModule where
-
-     import Stuff -- ^ we might use this
-
-     type MyInt = Int  -- ^ comment
+* parser doesn't support doc comments on types in type aliases:
+    type MyInt = Int -- ^ comment
 
 * Haddock generates links to hidden modules (e.g. uses of IO point at 
   GHC.IOBase.IO).
