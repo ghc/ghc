@@ -2,16 +2,38 @@
 
 set -e
 
-if [ -f mk/config.mk ]; then
-   make distclean
+no_clean=0
+testsuite_only=0
+
+while [ $# -gt 0 ]
+do
+    case "$1" in
+    --no-clean)
+        no_clean=1
+        ;;
+    --testsuite-only)
+        testsuite_only=1
+        ;;
+    *)
+        echo "Bad argument: $1" >&2
+        exit 1;;
+    esac
+    shift
+done
+
+if [ $testsuite_only -eq 0 ]; then
+
+if [ $no_clean -eq 0 ] && [ -f mk/config.mk ]; then
+    make distclean
 fi
 
 case $OSTYPE in
-  cygwin|msys) config_args=--build=i386-unknown-mingw32
-               if [ -f c:/mingw/bin/gcc.exe ]; then
-                   config_args="$config_args --with-gcc=c:/mingw/bin/gcc"
-               fi
-               ;;
+    cygwin|msys) config_args=--build=i386-unknown-mingw32
+        if [ -f c:/mingw/bin/gcc.exe ]
+        then
+            config_args="$config_args --with-gcc=c:/mingw/bin/gcc"
+        fi
+        ;;
 esac
 
 if [ "$CPUS" = "" ]; then
@@ -24,28 +46,41 @@ sh boot
 ./configure $config_args
 
 make Validating=YES -j$threads
+fi # testsuite-only
 
 # ToDo: use THREADS=$threads, see #1558
 make Validating=YES -C testsuite/tests/ghc-regress fast stage=2 CLEANUP=1 2>&1 | tee testlog
 
+echo "-------------------------------------------------------------------"
 if
     grep '\<0 caused framework failures' testlog >/dev/null 2>/dev/null &&
     grep '\<0 unexpected passes' testlog >/dev/null 2>/dev/null &&
     grep '\<0 unexpected failures' testlog >/dev/null 2>/dev/null ; then
-   echo "-------------------------------------------------------------------"
-   echo "Congratulations!  This tree has passed minimal testing."
-   echo
-   echo "NOTE: If you have made changes that may cause failures not tested"
-   echo "for by the minimal testing procedure, please do further testing"
-   echo "as necessary."
-   echo
-   echo "When you are satisfied that you haven't broken anything, go ahead"
-   echo "and push/send your patches".
-   echo "-------------------------------------------------------------------"
+    if [ $testsuite_only -eq 0 ] && [ $no_clean -eq 0 ]
+    then
+        cat <<EOF
+Congratulations!  This tree has passed minimal testing.
+
+NOTE: If you have made changes that may cause failures not tested for by
+the minimal testing procedure, please do further testing as necessary.
+
+When you are satisfied that you haven't broken anything, go ahead and
+push/send your patches.
+EOF
+    else
+        cat <<EOF
+I didn't find any problems, but this wasn't a complete validate run,
+so be careful!
+
+NOTE: If you have made changes that may cause failures not tested for by
+the minimal testing procedure, please do further testing as necessary.
+EOF
+   fi
 else
-   echo "-------------------------------------------------------------------"
-   echo "Oops!  Looks like you have some unexpected test results or"
-   echo "framework failures."
-   echo "Please fix them before pushing/sending patches."
-   echo "-------------------------------------------------------------------"
+    cat <<EOF
+Oops!  Looks like you have some unexpected test results or framework failures.
+Please fix them before pushing/sending patches.
+EOF
 fi
+echo "-------------------------------------------------------------------"
+
