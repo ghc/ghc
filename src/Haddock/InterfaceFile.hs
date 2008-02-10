@@ -12,7 +12,7 @@ module Haddock.InterfaceFile (
 ) where
 
 
-import Haddock.DocName
+import Haddock.DocName ()
 import Haddock.Types
 import Haddock.Exception
 
@@ -45,11 +45,14 @@ data InterfaceFile = InterfaceFile {
 } 
 
 
-binaryInterfaceMagic = 0xD0Cface :: Word32
-binaryInterfaceVersion = 1 :: Word16
+binaryInterfaceMagic :: Word32
+binaryInterfaceMagic = 0xD0Cface
 
+binaryInterfaceVersion :: Word16
+binaryInterfaceVersion = 1
 
-initBinMemSize = (1024*1024) :: Int
+initBinMemSize :: Int
+initBinMemSize = 1024*1024
 
 
 writeInterfaceFile :: FilePath -> InterfaceFile -> IO ()
