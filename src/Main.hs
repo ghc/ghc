@@ -286,8 +286,8 @@ handleEasyFlags flags fileArgs = do
     throwE ("-h cannot be used with --gen-index or --gen-contents")
   where
     byeVersion = bye $
-      "Haddock version " ++ projectVersion ++ 
-      ", (c) Simon Marlow 2006; ported to the GHC-API by David Waern 2006-2007\n"
+      "Haddock version " ++ projectVersion ++ ", (c) Simon Marlow 2006\n"
+      ++ "Ported to use the GHC API by David Waern 2006-2008\n"
 
     byeGhcVersion = bye $ 
       (fromJust $ lookup "Project version" $ compilerInfo) ++ "\n"
