@@ -95,9 +95,6 @@ ifeq "$(stage)" ""
 stage=1
 endif
 
-# XXX DQ is now the same on all platforms, so get rid of it
-DQ = \"
-
 .DUMMY: stage_dir
 stage_dirs :
 	$(MKDIRHIER) stage$(stage)
@@ -985,7 +982,7 @@ ifeq "$(BUILD_GHC_PACKAGE)" "YES"
 all :: $(GHC_PROG)
 endif
 
-$(odir)/main/Config.$(way_)o: SRC_HC_OPTS+=-DSTAGE=$(DQ)$(stage)$(DQ)
+$(odir)/main/Config.$(way_)o: SRC_HC_OPTS+=-DSTAGE='"$(stage)"'
 
 ifneq "$(findstring $(stage), 2 3)" ""
 $(warning LIBRARY is $(LIBRARY))
