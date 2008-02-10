@@ -219,7 +219,6 @@ boot :: $(CONFIG_HS)
 $(CONFIG_HS) : $(FPTOOLS_TOP)/mk/config.mk
 	@$(RM) -f $(CONFIG_HS)
 	@echo "Creating $(CONFIG_HS) ... "
-	@echo "{-# OPTIONS -w #-}" >>$(CONFIG_HS)
 	@echo "module Config where" >>$(CONFIG_HS)
 	@echo "cProjectName          :: String" >> $(CONFIG_HS)
 	@echo "cProjectName          = \"$(ProjectName)\"" >> $(CONFIG_HS)
