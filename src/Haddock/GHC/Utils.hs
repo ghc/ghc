@@ -17,10 +17,18 @@ import HsSyn
 import SrcLoc
 import Outputable
 import Name
+import Packages
 
 
 moduleString :: Module -> String
 moduleString = moduleNameString . moduleName 
+
+
+modulePkgStr = packageIdString . modulePackageId
+
+
+mkModuleNoPkg :: String -> Module
+mkModuleNoPkg str = mkModule (stringToPackageId "") (mkModuleName str)
 
 
 instance (Outputable a, Outputable b) => Outputable (Map.Map a b) where
