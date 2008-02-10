@@ -82,20 +82,31 @@ def expect_fail( opts ):
 def reqlib( lib ):
     return lambda opts, l=lib: _reqlib (opts, l )
 
-def _reqlib( opts, lib ):
-    # opts.reqlibs.append(lib)
-    if have_subprocess:
-        # By preference we use subprocess, as the alternative uses /dev/null
-        # which mingw doesn't have.
-        p = subprocess.Popen([config.ghc_pkg, 'describe', lib],
-                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        # read from stdout and stderr to avoid blocking due to buffers filling
-        p.communicate()
-        r = p.wait()
-    else:
-        r = os.system(config.ghc_pkg + ' describe ' + lib + ' > /dev/null 2> /dev/null')
+# Cache the results of looking to see if we have a library or not.
+# This makes quite a difference, especially on Windows.
+have_lib = {}
 
-    if r != 0:
+def _reqlib( opts, lib ):
+    if have_lib.has_key(lib):
+        got_it = have_lib[lib]
+    else:
+        if have_subprocess:
+            # By preference we use subprocess, as the alternative uses
+            # /dev/null which mingw doesn't have.
+            p = subprocess.Popen([config.ghc_pkg, 'describe', lib],
+                                 stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE)
+            # read from stdout and stderr to avoid blocking due to
+            # buffers filling
+            p.communicate()
+            r = p.wait()
+        else:
+            r = os.system(config.ghc_pkg + ' describe ' + lib
+                                         + ' > /dev/null 2> /dev/null')
+        got_it = r == 0
+        have_lib[lib] = got_it
+
+    if not got_it:
         opts.expect = 'fail'
 
 def req_profiling( opts ):
