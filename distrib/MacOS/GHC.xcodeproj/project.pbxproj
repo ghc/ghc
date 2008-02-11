@@ -94,7 +94,7 @@
 			);
 			buildRules = (
 			);
-			comments = "Supported targets: build, install\n\nPrecondition: We are in a distribution tree, not a vanilla tree from darcs - i.e., \"sh boot\" was already executed.\n\nThis project creates a Mac OS X framework at /Library/Frameworks.\n\n*  The framework is versioned using GHC's ProjectVersionInt.\n\n* The target configures the tree for the deployment location and builds the tree.\n\n* This target installs the framework not into its final destination, but into a build directory using the DESTDIR feature of GHC build system (unless the deployment flag in the build rules is set).\n\n* The idea is that the framework at the build location is being turned into a package and the package installer eventually puts its at its final destination. \n\nTODO: build and install documentation";
+			comments = "Supported targets: build, install\n\nPrecondition: We are in a distribution tree, not a vanilla tree from darcs - i.e., \"sh boot; ./configure\" was already executed.\n\nAs part of the build target, ./configure will be executed again (setting a --prefix).  Additional arguments to ./configure can be specified by way of the environment variable XCODE_EXTRA_CONFIGURE_ARGS.\n\nThis project creates a Mac OS X framework at /Library/Frameworks.\n\n*  The framework is versioned using GHC's ProjectVersionInt.\n\n* The target configures the tree for the deployment location and builds the tree.\n\n* This target installs the framework not into its final destination, but into a build directory using the DESTDIR feature of GHC build system (unless the deployment flag in the build rules is set).\n\n* The idea is that the framework at the build location is being turned into a package and the package installer eventually puts its at its final destination. \n";
 			dependencies = (
 			);
 			name = "GHC-systemwide";
@@ -154,7 +154,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# We need to be at the top of the ghc tree\ncd ../..\n\nPREFIX=${INSTALL_PATH}/${CONTENTS_FOLDER_PATH}/usr\n\nif [ ${ACTION} = build ]; then\n  ./configure --prefix=${PREFIX}\n  MAKE_ACTION=\n  DOCS_ACTION=html\nelse\n  MAKE_ACTION=${ACTION}\n  DOCS_ACTION=install-docs\nfi\n\n# - Yes, it's the vanilla install target that must see HADDOCK_DOCS=YES, not the install-docs target.\n# - We must explictly force the creation of a symbol table in .a files on BSD, and not all versions of Cabal\n#   do that consistently; hence, the EXTRA_AR_ARGS.\nmake DESTDIR=${DSTROOT} HADDOCK_DOCS=YES EXTRA_AR_ARGS=-s ${MAKE_ACTION}\nmake DESTDIR=${DSTROOT} XMLDocWays=html ${DOCS_ACTION}";
+			shellScript = "# We need to be at the top of the ghc tree\ncd ../..\n\nPREFIX=${INSTALL_PATH}/${CONTENTS_FOLDER_PATH}/usr\n\nif [ ${ACTION} = build ]; then\n  ./configure --prefix=${PREFIX} ${XCODE_EXTRA_CONFIGURE_ARGS}\n  MAKE_ACTION=\n  DOCS_ACTION=html\nelse\n  MAKE_ACTION=${ACTION}\n  DOCS_ACTION=install-docs\nfi\n\n# - Yes, it's the vanilla install target that must see HADDOCK_DOCS=YES, not the install-docs target.\n# - We must explictly force the creation of a symbol table in .a files on BSD, and not all versions of Cabal\n#   do that consistently; hence, the EXTRA_AR_ARGS.\nmake DESTDIR=${DSTROOT} HADDOCK_DOCS=YES EXTRA_AR_ARGS=-s ${MAKE_ACTION}\nmake DESTDIR=${DSTROOT} XMLDocWays=html ${DOCS_ACTION}";
 		};
 		E76B00450D52DFDB00A05A2F /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;
