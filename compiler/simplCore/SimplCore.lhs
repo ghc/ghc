@@ -17,7 +17,7 @@ module SimplCore ( core2core, simplifyExpr ) where
 
 import DynFlags		( CoreToDo(..), SimplifierSwitch(..),
 			  SimplifierMode(..), DynFlags, DynFlag(..), dopt,
-			  getCoreToDo )
+			  getCoreToDo, shouldDumpSimplPhase )
 import CoreSyn
 import HscTypes
 import CSE		( cseProgram )
@@ -35,7 +35,7 @@ import Simplify		( simplTopBinds, simplExpr )
 import SimplEnv		( SimplEnv, simplBinders, mkSimplEnv, setInScopeSet )
 import SimplMonad
 import ErrUtils		( dumpIfSet, dumpIfSet_dyn, showPass )
-import CoreLint		( endPass, endIteration )
+import CoreLint		( endPassIf, endIteration )
 import FloatIn		( floatInwards )
 import FloatOut		( floatOutwards )
 import FamInstEnv
@@ -448,14 +448,15 @@ simplifyPgm mode switches hsc_env us imp_rule_base guts
 	(termination_msg, it_count, counts_out, binds') 
 	   <- do_iteration us 1 (zeroSimplCount dflags) (mg_binds guts) ;
 
-	dumpIfSet (dopt Opt_D_verbose_core2core dflags 
-                   && dopt Opt_D_dump_simpl_stats dflags)
+	dumpIfSet (dump_phase && dopt Opt_D_dump_simpl_stats dflags)
 		  "Simplifier statistics"
 		  (vcat [text termination_msg <+> text "after" <+> ppr it_count <+> text "iterations",
 			 text "",
 			 pprSimplCount counts_out]);
 
-	endPass dflags ("Simplify phase " ++ phase_info ++ " done") Opt_D_dump_simpl_phases binds';
+	endPassIf dump_phase dflags
+                  ("Simplify phase " ++ phase_info ++ " done")
+                  Opt_D_dump_simpl_phases binds';
 
 	return (counts_out, guts { mg_binds = binds' })
     }
@@ -464,6 +465,8 @@ simplifyPgm mode switches hsc_env us imp_rule_base guts
     phase_info	   = case mode of
 		   	  SimplGently  -> "gentle"
 		   	  SimplPhase n -> show n
+
+    dump_phase     = shouldDumpSimplPhase dflags mode
 		   
     sw_chkr	   = isAmongSimpl switches
     max_iterations = intSwitchSet sw_chkr MaxSimplifierIterations `orElse` 2

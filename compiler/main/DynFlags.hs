@@ -301,6 +301,7 @@ data DynFlags = DynFlags {
   optLevel		:: Int,		-- optimisation level
   simplPhases           :: Int,         -- number of simplifier phases
   maxSimplIterations    :: Int,		-- max simplifier iterations
+  shouldDumpSimplPhase  :: SimplifierMode -> Bool,
   ruleCheck		:: Maybe String,
 
   specConstrThreshold   :: Maybe Int,	-- Threshold for SpecConstr
@@ -492,6 +493,7 @@ defaultDynFlags =
 	optLevel		= 0,
         simplPhases             = 2,
 	maxSimplIterations	= 4,
+        shouldDumpSimplPhase    = const False,
 	ruleCheck		= Nothing,
 	specConstrThreshold	= Just 200,
         liberateCaseThreshold   = Just 200,
@@ -1116,7 +1118,7 @@ dynamic_flags = [
   ,  ( "ddump-rn",           	 setDumpFlag Opt_D_dump_rn)
   ,  ( "ddump-simpl",        	 setDumpFlag Opt_D_dump_simpl)
   ,  ( "ddump-simpl-iterations", setDumpFlag Opt_D_dump_simpl_iterations)
-  ,  ( "ddump-simpl-phases",     setDumpFlag Opt_D_dump_simpl_phases)
+  ,  ( "ddump-simpl-phases",     OptPrefix setDumpSimplPhases)
   ,  ( "ddump-spec",         	 setDumpFlag Opt_D_dump_spec)
   ,  ( "ddump-prep",          	 setDumpFlag Opt_D_dump_prep)
   ,  ( "ddump-stg",          	 setDumpFlag Opt_D_dump_stg)
@@ -1135,7 +1137,7 @@ dynamic_flags = [
   ,  ( "ddump-simpl-stats",      setDumpFlag Opt_D_dump_simpl_stats)
   ,  ( "ddump-bcos",             setDumpFlag Opt_D_dump_BCOs)
   ,  ( "dsource-stats",          setDumpFlag Opt_D_source_stats)
-  ,  ( "dverbose-core2core",     setDumpFlag Opt_D_verbose_core2core)
+  ,  ( "dverbose-core2core",     NoArg setVerboseCore2Core)
   ,  ( "dverbose-stg2stg",       setDumpFlag Opt_D_verbose_stg2stg)
   ,  ( "ddump-hi",               setDumpFlag Opt_D_dump_hi)
   ,  ( "ddump-minimal-imports",  setDumpFlag Opt_D_dump_minimal_imports)
@@ -1465,6 +1467,36 @@ setDumpFlag dump_flag
   = NoArg (setDynFlag Opt_ForceRecomp >> setDynFlag dump_flag)
 	-- Whenver we -ddump, switch off the recompilation checker,
 	-- else you don't see the dump!
+
+setVerboseCore2Core = do setDynFlag Opt_ForceRecomp
+                         setDynFlag Opt_D_verbose_core2core
+                         upd (\s -> s { shouldDumpSimplPhase = const True })
+
+setDumpSimplPhases s = do setDynFlag Opt_ForceRecomp
+                          upd (\s -> s { shouldDumpSimplPhase = spec })
+  where
+    spec = join (||)
+         . map (join (&&))
+         . map (map match)
+         . map (split '+')
+         . split ','
+         $ case s of
+             '=' : s' -> s'
+             _        -> s
+
+    join op [] = const True
+    join op ss = foldr1 (\f g x -> f x `op` g x) ss
+
+    match "" = const True
+    match s  = case reads s of
+                [(n,"")] -> phase_num  n
+                _        -> phase_name s
+
+    phase_num n (SimplPhase k) = n == k
+    phase_num _ _              = False
+
+    phase_name "gentle" SimplGently = True
+    phase_name _        _           = False
 
 setVerbosity :: Maybe Int -> DynP ()
 setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })

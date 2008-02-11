@@ -10,7 +10,7 @@ A ``lint'' pass to check for Core correctness
 module CoreLint (
 	lintCoreBindings,
 	lintUnfolding, 
-	showPass, endPass, endIteration
+	showPass, endPass, endPassIf, endIteration
     ) where
 
 #include "HsVersions.h"
@@ -56,6 +56,9 @@ and do Core Lint when necessary.
 \begin{code}
 endPass :: DynFlags -> String -> DynFlag -> [CoreBind] -> IO [CoreBind]
 endPass = dumpAndLint dumpIfSet_core
+
+endPassIf :: Bool -> DynFlags -> String -> DynFlag -> [CoreBind] -> IO [CoreBind]
+endPassIf cond = dumpAndLint (dumpIf_core cond)
 
 endIteration :: DynFlags -> String -> DynFlag -> [CoreBind] -> IO [CoreBind]
 endIteration = dumpAndLint dumpIfSet_dyn
