@@ -73,7 +73,10 @@ ghcpkg04 :
 	@echo "[]" >$(PKGCONF)
 	@$(LOCAL_GHC_PKG) register --force 1750A.pkg >1750.out 2>&1
 	@$(LOCAL_GHC_PKG) register --force 1750B.pkg >1750.out 2>&1
-	@$(LOCAL_GHC_PKG) list
+	@GHC_PACKAGE_PATH=$(PKGCONF) $(GHC_PKG_INPLACE) list
+# GHC_PACKAGE_PATH trick is to make this work with 6.8.2 which doesn't have
+# the patch "Change the command-line semantics for query commands" to
+# ghc-pkg
 	@echo "main = return ()" >1750.hs
 	@$(TEST_HC) -package-conf $(PKGCONF) -package 1750A 1750.hs || true
 
