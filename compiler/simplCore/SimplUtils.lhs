@@ -433,7 +433,7 @@ settings:
 			(d) Simplifying a GHCi expression or Template 
 				Haskell splice
 
-	SimplPhase n	Used at all other times
+	SimplPhase n _	 Used at all other times
 
 The key thing about SimplGently is that it does no call-site inlining.
 Before full laziness we must be careful not to inline wrappers,
@@ -582,8 +582,8 @@ preInlineUnconditionally env top_lvl bndr rhs
   where
     phase = getMode env
     active = case phase of
-		   SimplGently  -> isAlwaysActive prag
-		   SimplPhase n -> isActive n prag
+		   SimplGently    -> isAlwaysActive prag
+		   SimplPhase n _ -> isActive n prag
     prag = idInlinePragma bndr
 
     try_once in_lam int_cxt	-- There's one textual occurrence
@@ -617,8 +617,8 @@ preInlineUnconditionally env top_lvl bndr rhs
     canInlineInLam _			= False
 
     early_phase = case phase of
-			SimplPhase 0 -> False
-			other	     -> True
+			SimplPhase 0 _ -> False
+			other	       -> True
 -- If we don't have this early_phase test, consider
 --	x = length [1,2,3]
 -- The full laziness pass carefully floats all the cons cells to
@@ -738,8 +738,8 @@ postInlineUnconditionally env top_lvl bndr occ_info rhs unfolding
 
   where
     active = case getMode env of
-		   SimplGently  -> isAlwaysActive prag
-		   SimplPhase n -> isActive n prag
+		   SimplGently    -> isAlwaysActive prag
+		   SimplPhase n _ -> isActive n prag
     prag = idInlinePragma bndr
 
 activeInline :: SimplEnv -> OutId -> Bool
@@ -761,7 +761,7 @@ activeInline env id
 	-- and they are now constructed as Compulsory unfoldings (in MkId)
 	-- so they'll happen anyway.
 
-      SimplPhase n -> isActive n prag
+      SimplPhase n _ -> isActive n prag
   where
     prag = idInlinePragma id
 
@@ -772,13 +772,13 @@ activeRule dflags env
   = Nothing	-- Rewriting is off
   | otherwise
   = case getMode env of
-	SimplGently  -> Just isAlwaysActive
+	SimplGently    -> Just isAlwaysActive
 			-- Used to be Nothing (no rules in gentle mode)
 			-- Main motivation for changing is that I wanted
 			-- 	lift String ===> ...
 			-- to work in Template Haskell when simplifying
 			-- splices, so we get simpler code for literal strings
-	SimplPhase n -> Just (isActive n)
+	SimplPhase n _ -> Just (isActive n)
 \end{code}
 
 

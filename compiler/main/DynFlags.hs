@@ -791,7 +791,7 @@ data CoreToDo		-- These are diff core-to-core passes,
 
 data SimplifierMode 		-- See comments in SimplMonad
   = SimplGently
-  | SimplPhase Int
+  | SimplPhase Int [String]
 
 data SimplifierSwitch
   = MaxSimplifierIterations Int
@@ -830,12 +830,13 @@ getCoreToDo dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
-    simpl_phase phase iter = CoreDoPasses
-                               [ CoreDoSimplify (SimplPhase phase) [
-                                   MaxSimplifierIterations iter
-                                 ],
-                                 maybe_rule_check phase
-                               ]
+    simpl_phase phase names iter
+      = CoreDoPasses
+          [ CoreDoSimplify (SimplPhase phase names) [
+              MaxSimplifierIterations iter
+            ],
+            maybe_rule_check phase
+          ]
 
                 -- By default, we have 2 phases before phase 0.
 
@@ -848,7 +849,7 @@ getCoreToDo dflags
 		-- inlined.  I found that spectral/hartel/genfft lost some useful
 		-- strictness in the function sumcode' if augment is not inlined
 		-- before strictness analysis runs
-    simpl_phases = CoreDoPasses [ simpl_phase phase max_iter
+    simpl_phases = CoreDoPasses [ simpl_phase phase ["main"] max_iter
                                   | phase <- [phases, phases-1 .. 1] ]
 
 
@@ -871,7 +872,7 @@ getCoreToDo dflags
 
     core_todo = 
      if opt_level == 0 then
-       [simpl_phase 0 max_iter]
+       [simpl_phase 0 ["final"] max_iter]
      else {- opt_level >= 1 -} [ 
 
 	-- initial simplify: mk specialiser happy: minimum effort please
@@ -901,7 +902,7 @@ getCoreToDo dflags
 		-- ==>  let k = BIG in letrec go = \xs -> ...(k x).... in go xs
 		-- ==>  let k = BIG in letrec go = \xs -> ...(BIG x).... in go xs
 		-- Don't stop now!
-	simpl_phase 0 (max max_iter 3),
+	simpl_phase 0 ["main"] (max max_iter 3),
 
 
 #ifdef OLD_STRICTNESS
@@ -911,7 +912,7 @@ getCoreToDo dflags
 		CoreDoStrictness,
 		CoreDoWorkerWrapper,
 		CoreDoGlomBinds,
-                simpl_phase 0 max_iter
+                simpl_phase 0 ["post-worker-wrapper"] max_iter
                 ]),
 
 	runWhen full_laziness 
@@ -937,7 +938,7 @@ getCoreToDo dflags
 		-- strictness analysis and the simplification which follows it.
 	runWhen liberate_case (CoreDoPasses [
 	    CoreLiberateCase,
-            simpl_phase 0 max_iter
+            simpl_phase 0 ["post-liberate-case"] max_iter
             ]),         -- Run the simplifier after LiberateCase to vastly 
 			-- reduce the possiblility of shadowing
 			-- Reason: see Note [Shadowing] in SpecConstr.lhs
@@ -947,7 +948,7 @@ getCoreToDo dflags
         maybe_rule_check 0,
 
 	-- Final clean-up simplification:
-        simpl_phase 0 max_iter
+        simpl_phase 0 ["final"] max_iter
      ]
 
 -- -----------------------------------------------------------------------------
@@ -1468,23 +1469,25 @@ setDumpFlag dump_flag
 	-- Whenver we -ddump, switch off the recompilation checker,
 	-- else you don't see the dump!
 
+setVerboseCore2Core :: DynP ()
 setVerboseCore2Core = do setDynFlag Opt_ForceRecomp
                          setDynFlag Opt_D_verbose_core2core
                          upd (\s -> s { shouldDumpSimplPhase = const True })
 
+setDumpSimplPhases :: String -> DynP ()
 setDumpSimplPhases s = do setDynFlag Opt_ForceRecomp
                           upd (\s -> s { shouldDumpSimplPhase = spec })
   where
     spec = join (||)
          . map (join (&&))
          . map (map match)
-         . map (split '+')
+         . map (split ':')
          . split ','
          $ case s of
              '=' : s' -> s'
              _        -> s
 
-    join op [] = const True
+    join _  [] = const True
     join op ss = foldr1 (\f g x -> f x `op` g x) ss
 
     match "" = const True
@@ -1492,11 +1495,11 @@ setDumpSimplPhases s = do setDynFlag Opt_ForceRecomp
                 [(n,"")] -> phase_num  n
                 _        -> phase_name s
 
-    phase_num n (SimplPhase k) = n == k
-    phase_num _ _              = False
+    phase_num n (SimplPhase k _) = n == k
+    phase_num _ _                = False
 
-    phase_name "gentle" SimplGently = True
-    phase_name _        _           = False
+    phase_name s SimplGently       = s == "gentle"
+    phase_name s (SimplPhase _ ss) = s `elem` ss
 
 setVerbosity :: Maybe Int -> DynP ()
 setVerbosity mb_n = upd (\dfs -> dfs{ verbosity = mb_n `orElse` 3 })

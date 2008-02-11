@@ -61,7 +61,7 @@ import Vectorise        ( vectorise )
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import IO		( hPutStr, stderr )
 import Outputable
-import List		( partition )
+import List		( partition, intersperse )
 import Maybes
 \end{code}
 
@@ -463,8 +463,11 @@ simplifyPgm mode switches hsc_env us imp_rule_base guts
   where
     dflags 	   = hsc_dflags hsc_env
     phase_info	   = case mode of
-		   	  SimplGently  -> "gentle"
-		   	  SimplPhase n -> show n
+		   	  SimplGently     -> "gentle"
+		   	  SimplPhase n ss -> shows n
+                                           . showString " ["
+                                           . showString (concat $ intersperse "," ss)
+                                           $ "]"
 
     dump_phase     = shouldDumpSimplPhase dflags mode
 		   
