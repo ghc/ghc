@@ -86,7 +86,7 @@ import Data.Maybe
 import Data.Either
 import Data.Int
 import Data.Word
-import Data.List( foldl )
+import Data.List( foldl, intersperse )
 import Unsafe.Coerce
 
 #ifdef __GLASGOW_HASKELL__
@@ -269,7 +269,7 @@ instance Show TypeRep where
 			         showsPrec 9 a .
                                  showString " -> " .
                                  showsPrec 8 r
-      xs | isTupleTyCon tycon -> showTuple tycon xs
+      xs | isTupleTyCon tycon -> showTuple xs
 	 | otherwise	     ->
 	    showParen (p > 9) $
    	    showsPrec p tycon . 
@@ -293,13 +293,11 @@ showArgs [] = id
 showArgs [a] = showsPrec 10 a
 showArgs (a:as) = showsPrec 10 a . showString " " . showArgs as 
 
-showTuple :: TyCon -> [TypeRep] -> ShowS
-showTuple (TyCon _ str) args = showChar '(' . go str args
- where
-  go [] [a] = showsPrec 10 a . showChar ')'
-  go _  []  = showChar ')' -- a failure condition, really.
-  go (',':xs) (a:as) = showsPrec 10 a . showChar ',' . go xs as
-  go _ _   = showChar ')'
+showTuple :: [TypeRep] -> ShowS
+showTuple args = showChar '('
+               . (foldr (.) id $ intersperse (showChar ',') 
+                               $ map (showsPrec 10) args)
+               . showChar ')'
 
 -------------------------------------------------------------
 --
