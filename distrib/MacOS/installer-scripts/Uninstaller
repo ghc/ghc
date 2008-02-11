@@ -48,19 +48,19 @@ if [ ${NO_VERSIONS} -ne 2 ]; then
 fi
 
 echo "Removing symbolic links into GHC.framework"
-for thisfile in `ls ${INSTALL_BIN}`; do
-  if ls -l ${INSTALL_BIN}/${thisfile} | grep -q GHC.framework/Versions; then
-    rm -f ${INSTALL_BIN}/${thisfile}
+for thisfile in ${INSTALL_BIN}/*; do
+  if ls -l "${thisfile}" | grep -q GHC.framework/Versions; then
+    rm -f "${thisfile}"
   fi
 done
-for thisfile in `ls ${INSTALL_MAN1}`; do
-  if ls -l ${INSTALL_MAN1}/${thisfile} | grep -q GHC.framework/Versions; then
-    rm -f ${INSTALL_MAN1}/${thisfile}
+for thisfile in ${INSTALL_MAN1}/*; do
+  if ls -l "${thisfile}" | grep -q GHC.framework/Versions; then
+    rm -f "${thisfile}"
   fi
 done
-for thisfile in `ls ${INSTALL_HTML}`; do
-  if ls -l ${INSTALL_HTML}/${thisfile} | grep -q GHC.framework/Versions; then
-    rm -f ${INSTALL_HTML}/${thisfile}
+for thisfile in ${INSTALL_HTML}/*; do
+  if ls -l "${thisfile}" | grep -q GHC.framework/Versions; then
+    rm -f "${thisfile}"
   fi
 done
 

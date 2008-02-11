@@ -14,12 +14,18 @@ fi
 
 INSTALL_BIN=${INSTALL_BASE}/bin
 mkdir -p ${INSTALL_BIN}
-ln -sf ${INSTALL_DEST}/GHC.framework/Versions/Current/usr/bin/* ${INSTALL_BIN}/
+if [ -d ${INSTALL_DEST}/GHC.framework/Versions/Current/usr/bin ]; then
+  ln -sf ${INSTALL_DEST}/GHC.framework/Versions/Current/usr/bin/*\
+     	 ${INSTALL_BIN}/
+fi
 
 INSTALL_MAN1=${INSTALL_BASE}/share/man/man1
 INSTALL_HTML=${INSTALL_BASE}/share/doc
 mkdir -p ${INSTALL_MAN1}
-ln -sf ${INSTALL_DEST}/GHC.framework/Versions/Current/usr/share/man/man1/*\
-       ${INSTALL_MAN1}/
-ln -sf ${INSTALL_DEST}/GHC.framework/Versions/Current/usr/share/doc/ghc\
-       ${INSTALL_HTML}/
+if [ -d ${INSTALL_DEST}/GHC.framework/Versions/Current/usr/share/man/man1 ]; 
+then
+  ln -sf ${INSTALL_DEST}/GHC.framework/Versions/Current/usr/share/man/man1/*\
+	 ${INSTALL_MAN1}/
+  ln -sf ${INSTALL_DEST}/GHC.framework/Versions/Current/usr/share/doc/ghc\
+	 ${INSTALL_HTML}/
+fi
