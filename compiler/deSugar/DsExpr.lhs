@@ -532,7 +532,7 @@ dsDo	:: [LStmt Id]
 	-> Type			-- Type of the whole expression
 	-> DsM CoreExpr
 
-dsDo stmts body result_ty
+dsDo stmts body _result_ty
   = go (map unLoc stmts)
   where
     go [] = dsLExpr body
