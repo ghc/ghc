@@ -489,7 +489,7 @@ simplifyPgm mode switches hsc_env us imp_rule_base guts
 #endif
 		-- Subtract 1 from iteration_no to get the
 		-- number of iterations we actually completed
-	    return ("Simplifier baled out", iteration_no - 1, counts, binds)
+	    return ("Simplifier bailed out", iteration_no - 1, counts, binds)
 	}
 
       -- Try and force thunks off the binds; significantly reduces
