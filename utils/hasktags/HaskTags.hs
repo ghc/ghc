@@ -20,6 +20,9 @@ import System.Exit
 -- We generate both CTAGS and ETAGS format tags files
 -- The former is for use in most sensible editors, while EMACS uses ETAGS
 
+--  
+-- TODO add tag categories 
+-- alternatives: http://haskell.org/haskellwiki/Tags
 
 main :: IO ()
 main = do
