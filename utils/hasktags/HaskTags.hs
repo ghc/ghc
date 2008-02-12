@@ -87,11 +87,11 @@ data Pos = Pos
 		Int			-- line number 
 		Int     	-- token number
 		String 		-- string that makes up that line
-	deriving Show
+	deriving (Show, Eq)
 
 -- A definition we have found
 data FoundThing = FoundThing ThingName Pos
-	deriving Show
+	deriving (Show, Eq)
 
 -- Data we have obtained from a file
 data FileData = FileData FileName [FoundThing]
@@ -105,7 +105,9 @@ data Token = Token String Pos
 writectagsfile :: Handle -> [FileData] -> IO ()
 writectagsfile ctagsfile filedata = do
 	let things = concat $ map getfoundthings filedata
-	mapM_ (\x -> hPutStrLn ctagsfile $ dumpthing x) things
+	mapM_ (\x -> hPutStrLn ctagsfile $ dumpthing x) (sortThings things)
+
+sortThings = sortBy (\(FoundThing a _) (FoundThing b _) -> compare a b)
 
 getfoundthings :: FileData -> [FoundThing]
 getfoundthings (FileData filename things) = things
@@ -156,9 +158,13 @@ findthings filename = do
     let aslines = lines text
     let wordlines = map mywords aslines
     let noslcoms = map stripslcomments wordlines
-    let tokens = concat $ zipWith3 (withline filename) noslcoms aslines [0 ..]
+        -- there are some tokens with "" (don't know why yet) this filter fixes it 
+	let tokens = filter (\(Token s _ ) -> (not .  null) s ) $
+                      concat $ zipWith3 (withline filename) noslcoms 
+					aslines [0 ..]
     let nocoms = stripblockcomments tokens
-    return $ FileData filename $ findstuff nocoms
+    -- using nub because getcons and findstuff are parsing parts of the file twice
+    return $ FileData filename $ nub $ findstuff nocoms
   where evaluate [] = return ()
         evaluate (c:cs) = c `seq` evaluate cs
         -- my words is mainly copied from Data.List.
@@ -177,6 +183,7 @@ findthings filename = do
                                    myBreak (' ':xs) = ([],xs);
                                    myBreak (x:xs) = let (a,b) = myBreak xs
                                                     in  (x:a,b)
+
 -- Create tokens from words, by recording their line number
 -- and which token they are through that line
 
@@ -224,17 +231,37 @@ ints i = i:(ints $ i+1)
 -- actually pick up definitions
 
 findstuff :: [Token] -> [FoundThing]
+findstuff ((Token "module" _):(Token name pos):xs) = 
+	FoundThing name pos : (getcons xs) ++ (findstuff xs)
 findstuff ((Token "data" _):(Token name pos):xs) = 
 	FoundThing name pos : (getcons xs) ++ (findstuff xs)
 findstuff ((Token "newtype" _):(Token name pos):xs) = 
 	FoundThing name pos : findstuff xs
 findstuff ((Token "type" _):(Token name pos):xs) = 
 	FoundThing name pos : findstuff xs
+findstuff ((Token "class" _):xs) = findClassName xs
 findstuff ((Token name pos):(Token "::" _):xs) = 
 	FoundThing name pos : findstuff xs
 findstuff (x:xs) = findstuff xs
 findstuff [] = []
 
+findClassName :: [Token] -> [FoundThing]
+findClassName []  = []
+findClassName [Token n p]  = [FoundThing n p]
+findClassName xs = (\((Token n pos):xs) -> FoundThing n pos : findstuff xs) . drop2 . dropParens 0 $ xs
+dropParens n ((Token "(" _ ):xs) = dropParens (n+1) xs
+dropParens 0 (x:xs) = x:xs
+dropParens 1 ((Token ")" _ ):xs) = xs
+dropParens n ((Token ")" _ ):xs) = dropParens (n-1) xs
+dropParens n (x:xs) = dropParens n xs
+-- dropsEverything till token "=>" (if it is on the same line as the first token. if not return tokens)
+drop2 tokens@(x@(Token _ (Pos _ line_nr _ _ )):xs) = 
+  let (line, following) = span (\(Token s (Pos _ l _ _)) -> l == line_nr) tokens
+      (_, following_in_line) = span (\(Token n _) -> n /= "=>") line
+  in case following_in_line of
+          (Token "=>" _:xs) ->  xs ++ following
+          _ -> tokens
+drop2 xs = xs
 
 -- get the constructor definitions, knowing that a datatype has just started
 
