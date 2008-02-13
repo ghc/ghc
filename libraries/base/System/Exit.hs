@@ -13,10 +13,11 @@
 -----------------------------------------------------------------------------
 
 module System.Exit
-    ( 
+    (
       ExitCode(ExitSuccess,ExitFailure)
     , exitWith      -- :: ExitCode -> IO a
     , exitFailure   -- :: IO a
+    , exitSuccess   -- :: IO a
   ) where
 
 import Prelude
@@ -72,3 +73,9 @@ exitWith code@(ExitFailure n)
 -- where /exitfail/ is implementation-dependent.
 exitFailure :: IO a
 exitFailure = exitWith (ExitFailure 1)
+
+-- | The computation 'exitSuccess' is equivalent to
+-- 'exitWith' 'ExitSuccess', It terminates the program
+-- sucessfully.
+exitSuccess :: IO a
+exitSuccess = exitWith ExitSuccess
