@@ -18,7 +18,7 @@ module Foreign
         ( module Data.Bits
         , module Data.Int
         , module Data.Word
-	, module Foreign.Ptr
+        , module Foreign.Ptr
         , module Foreign.ForeignPtr
         , module Foreign.StablePtr
         , module Foreign.Storable
