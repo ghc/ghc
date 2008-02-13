@@ -13,36 +13,36 @@
 -----------------------------------------------------------------------------
 
 module Control.Concurrent.MVar
-	( 
-	  -- * @MVar@s
-	  MVar		-- abstract
-	, newEmptyMVar  -- :: IO (MVar a)
-	, newMVar 	-- :: a -> IO (MVar a)
-	, takeMVar 	-- :: MVar a -> IO a
-	, putMVar  	-- :: MVar a -> a -> IO ()
-	, readMVar 	-- :: MVar a -> IO a
-	, swapMVar 	-- :: MVar a -> a -> IO a
-	, tryTakeMVar   -- :: MVar a -> IO (Maybe a)
-	, tryPutMVar    -- :: MVar a -> a -> IO Bool
-	, isEmptyMVar	-- :: MVar a -> IO Bool
-	, withMVar	-- :: MVar a -> (a -> IO b) -> IO b
-	, modifyMVar_ 	-- :: MVar a -> (a -> IO a) -> IO ()
-	, modifyMVar 	-- :: MVar a -> (a -> IO (a,b)) -> IO b
+        (
+          -- * @MVar@s
+          MVar          -- abstract
+        , newEmptyMVar  -- :: IO (MVar a)
+        , newMVar       -- :: a -> IO (MVar a)
+        , takeMVar      -- :: MVar a -> IO a
+        , putMVar       -- :: MVar a -> a -> IO ()
+        , readMVar      -- :: MVar a -> IO a
+        , swapMVar      -- :: MVar a -> a -> IO a
+        , tryTakeMVar   -- :: MVar a -> IO (Maybe a)
+        , tryPutMVar    -- :: MVar a -> a -> IO Bool
+        , isEmptyMVar   -- :: MVar a -> IO Bool
+        , withMVar      -- :: MVar a -> (a -> IO b) -> IO b
+        , modifyMVar_   -- :: MVar a -> (a -> IO a) -> IO ()
+        , modifyMVar    -- :: MVar a -> (a -> IO (a,b)) -> IO b
 #ifndef __HUGS__
-	, addMVarFinalizer -- :: MVar a -> IO () -> IO ()
+        , addMVarFinalizer -- :: MVar a -> IO () -> IO ()
 #endif
     ) where
 
 #ifdef __HUGS__
 import Hugs.ConcBase ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
-		  tryTakeMVar, tryPutMVar, isEmptyMVar,
-		)
+                  tryTakeMVar, tryPutMVar, isEmptyMVar,
+                )
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Conc	( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
-		  tryTakeMVar, tryPutMVar, isEmptyMVar, addMVarFinalizer
-		)
+import GHC.Conc ( MVar, newEmptyMVar, newMVar, takeMVar, putMVar,
+                  tryTakeMVar, tryPutMVar, isEmptyMVar, addMVarFinalizer
+                )
 #endif
 
 import Prelude
@@ -82,11 +82,11 @@ swapMVar mvar new =
 -- inlining has been reported to have dramatic effects; see
 -- http://www.haskell.org//pipermail/haskell/2006-May/017907.html
 withMVar :: MVar a -> (a -> IO b) -> IO b
-withMVar m io = 
+withMVar m io =
   block $ do
     a <- takeMVar m
     b <- Exception.catch (unblock (io a))
-      	    (\e -> do putMVar m a; throw e)
+            (\e -> do putMVar m a; throw e)
     putMVar m a
     return b
 
@@ -97,11 +97,11 @@ withMVar m io =
 -}
 {-# INLINE modifyMVar_ #-}
 modifyMVar_ :: MVar a -> (a -> IO a) -> IO ()
-modifyMVar_ m io = 
+modifyMVar_ m io =
   block $ do
     a  <- takeMVar m
     a' <- Exception.catch (unblock (io a))
-      	    (\e -> do putMVar m a; throw e)
+            (\e -> do putMVar m a; throw e)
     putMVar m a'
 
 {-|
@@ -110,10 +110,10 @@ modifyMVar_ m io =
 -}
 {-# INLINE modifyMVar #-}
 modifyMVar :: MVar a -> (a -> IO (a,b)) -> IO b
-modifyMVar m io = 
+modifyMVar m io =
   block $ do
     a      <- takeMVar m
     (a',b) <- Exception.catch (unblock (io a))
-      	        (\e -> do putMVar m a; throw e)
+                (\e -> do putMVar m a; throw e)
     putMVar m a'
     return b
