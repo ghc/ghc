@@ -515,7 +515,9 @@ checkTyClHdr (L l cxt) ty
 extractTyVars :: [LHsType RdrName] -> P [LHsTyVarBndr RdrName]
 extractTyVars tvs = collects tvs []
   where
-        -- Collect all variables (1st arg serves as an accumulator)
+        -- Collect all variables (2nd arg serves as an accumulator)
+    collect :: LHsType RdrName -> [LHsTyVarBndr RdrName]
+                               -> P [LHsTyVarBndr RdrName]
     collect (L l (HsForAllTy _ _ _ _)) =
       const $ parseError l "Forall type not allowed as type parameter"
     collect (L l (HsTyVar tv))
