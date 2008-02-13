@@ -712,12 +712,12 @@ checkAPat loc e = case e of
                                _ -> patFail loc
    
    HsPar e	      -> checkLPat e >>= (return . ParPat)
-   ExplicitList _ es  -> do ps <- mapM (\e -> checkLPat e) es
+   ExplicitList _ es  -> do ps <- mapM checkLPat es
                             return (ListPat ps placeHolderType)
-   ExplicitPArr _ es  -> do ps <- mapM (\e -> checkLPat e) es
+   ExplicitPArr _ es  -> do ps <- mapM checkLPat es
                             return (PArrPat ps placeHolderType)
    
-   ExplicitTuple es b -> do ps <- mapM (\e -> checkLPat e) es
+   ExplicitTuple es b -> do ps <- mapM checkLPat es
                             return (TuplePat ps b placeHolderType)
    
    RecordCon c _ (HsRecFields fs dd)
