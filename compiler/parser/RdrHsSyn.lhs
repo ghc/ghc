@@ -1021,6 +1021,7 @@ parseDImport (L loc entity) = parse0 comps
   parse2 _ _ [] = d'oh
   parse2 isStatic kind (('[':x):xs) =
      case x of
+        [] -> d'oh
         vs | last vs == ']' -> parse3 isStatic kind (init vs) xs
         _ -> d'oh
   parse2 isStatic kind xs = parse3 isStatic kind "" xs
