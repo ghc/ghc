@@ -292,7 +292,7 @@ pprTyVarBndr tyvar
 pprIdBndr id = ppr id <+> pprIdBndrInfo (idInfo id)
 
 pprIdBndrInfo info 
-  = megaSeqIdInfo `seq` doc -- The seq is useful for poking on black holes
+  = megaSeqIdInfo info `seq` doc -- The seq is useful for poking on black holes
   where
     prag_info = inlinePragInfo info
     occ_info  = occInfo info
