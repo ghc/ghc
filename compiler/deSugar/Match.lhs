@@ -386,7 +386,7 @@ which will be scrutinised.  This means:
 Replace variable patterns @x@ (@x /= v@) with the pattern @_@,
 together with the binding @x = v@.
 \item
-Replace the `as' pattern @xp@ with the pattern p and a binding @x = do v@.
+Replace the `as' pattern @x@@p@ with the pattern p and a binding @x = v@.
 \item
 Removing lazy (irrefutable) patterns (you don't want to know...).
 \item
