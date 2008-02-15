@@ -7,50 +7,50 @@ import System.Console.GetOpt
 import System.Exit
 
 
--- search for definitions of things 
+-- search for definitions of things
 -- we do this by looking for the following patterns:
 -- data XXX = ...      giving a datatype location
 -- newtype XXX = ...   giving a newtype location
 -- bla :: ...          giving a function location
 --
 -- by doing it this way, we avoid picking up local definitions
--- 		(whether this is good or not is a matter for debate)
+--              (whether this is good or not is a matter for debate)
 --
 
 -- We generate both CTAGS and ETAGS format tags files
 -- The former is for use in most sensible editors, while EMACS uses ETAGS
 
---  
--- TODO add tag categories 
+--
+-- TODO add tag categories
 -- alternatives: http://haskell.org/haskellwiki/Tags
 
 main :: IO ()
 main = do
         progName <- getProgName
-	args <- getArgs
+        args <- getArgs
         let usageString = "Usage: " ++ progName ++ " [OPTION...] [files...]"
-	let (modes, filenames, errs) = getOpt Permute options args
-	if errs /= [] || elem Help modes || filenames == []
+        let (modes, filenames, errs) = getOpt Permute options args
+        if errs /= [] || elem Help modes || filenames == []
          then do
-           putStr $ unlines errs 
-	   putStr $ usageInfo usageString options
-	   exitWith (ExitFailure 1)
+           putStr $ unlines errs
+           putStr $ usageInfo usageString options
+           exitWith (ExitFailure 1)
          else return ()
         let mode = getMode (Append `delete` modes)
         let openFileMode = if elem Append modes
-			   then AppendMode
-			   else WriteMode
-	filedata <- mapM findthings filenames
+                           then AppendMode
+                           else WriteMode
+        filedata <- mapM findthings filenames
         if mode == BothTags || mode == CTags
-         then do 
+         then do
            ctagsfile <- openFile "tags" openFileMode
-	   writectagsfile ctagsfile filedata
+           writectagsfile ctagsfile filedata
            hClose ctagsfile
          else return ()
-	if mode == BothTags || mode == ETags 
+        if mode == BothTags || mode == ETags
          then do
            etagsfile <- openFile "TAGS" openFileMode
-	   writeetagsfile etagsfile filedata
+           writeetagsfile etagsfile filedata
            hClose etagsfile
          else return ()
 
@@ -67,45 +67,45 @@ data Mode = ETags | CTags | BothTags | Append | Help deriving (Ord, Eq, Show)
 
 options :: [OptDescr Mode]
 options = [ Option "c" ["ctags"]
-	    (NoArg CTags) "generate CTAGS file (ctags)"
-	  , Option "e" ["etags"]
-	    (NoArg ETags) "generate ETAGS file (etags)"
-	  , Option "b" ["both"]
-	    (NoArg BothTags) ("generate both CTAGS and ETAGS")
-	  , Option "a" ["append"]
-	    (NoArg Append) ("append to existing CTAGS and/or ETAGS file(s)")
-	  , Option "h" ["help"] (NoArg Help) "This help"
-	  ]
+            (NoArg CTags) "generate CTAGS file (ctags)"
+          , Option "e" ["etags"]
+            (NoArg ETags) "generate ETAGS file (etags)"
+          , Option "b" ["both"]
+            (NoArg BothTags) ("generate both CTAGS and ETAGS")
+          , Option "a" ["append"]
+            (NoArg Append) ("append to existing CTAGS and/or ETAGS file(s)")
+          , Option "h" ["help"] (NoArg Help) "This help"
+          ]
 
 type FileName = String
 
 type ThingName = String
 
 -- The position of a token or definition
-data Pos = Pos 
-		FileName 	-- file name
-		Int			-- line number 
-		Int     	-- token number
-		String 		-- string that makes up that line
-	deriving (Show, Eq)
+data Pos = Pos
+                FileName -- file name
+                Int      -- line number
+                Int      -- token number
+                String   -- string that makes up that line
+    deriving (Show, Eq)
 
 -- A definition we have found
 data FoundThing = FoundThing ThingName Pos
-	deriving (Show, Eq)
+    deriving (Show, Eq)
 
 -- Data we have obtained from a file
 data FileData = FileData FileName [FoundThing]
 
 data Token = Token String Pos
-	deriving Show
+    deriving Show
 
 
 -- stuff for dealing with ctags output format
 
 writectagsfile :: Handle -> [FileData] -> IO ()
 writectagsfile ctagsfile filedata = do
-	let things = concat $ map getfoundthings filedata
-	mapM_ (\x -> hPutStrLn ctagsfile $ dumpthing x) (sortThings things)
+    let things = concat $ map getfoundthings filedata
+    mapM_ (\x -> hPutStrLn ctagsfile $ dumpthing x) (sortThings things)
 
 sortThings = sortBy (\(FoundThing a _) (FoundThing b _) -> compare a b)
 
@@ -113,42 +113,40 @@ getfoundthings :: FileData -> [FoundThing]
 getfoundthings (FileData filename things) = things
 
 dumpthing :: FoundThing -> String
-dumpthing (FoundThing name (Pos filename line _ _)) = 
-	name ++ "\t" ++ filename ++ "\t" ++ (show $ line + 1)
+dumpthing (FoundThing name (Pos filename line _ _)) =
+    name ++ "\t" ++ filename ++ "\t" ++ (show $ line + 1)
 
 
 -- stuff for dealing with etags output format
 
 writeetagsfile :: Handle -> [FileData] -> IO ()
 writeetagsfile etagsfile filedata = do
-	mapM_ (\x -> hPutStr etagsfile $ e_dumpfiledata x) filedata
+    mapM_ (\x -> hPutStr etagsfile $ e_dumpfiledata x) filedata
 
 e_dumpfiledata :: FileData -> String
-e_dumpfiledata (FileData filename things) = 
-	"\x0c\n" ++ filename ++ "," ++ (show thingslength) ++ "\n" ++ thingsdump
-	where 
-		thingsdump = concat $ map e_dumpthing things 
-		thingslength = length thingsdump
+e_dumpfiledata (FileData filename things) =
+    "\x0c\n" ++ filename ++ "," ++ (show thingslength) ++ "\n" ++ thingsdump
+    where thingsdump = concat $ map e_dumpthing things
+          thingslength = length thingsdump
 
 e_dumpthing :: FoundThing -> String
 e_dumpthing (FoundThing name (Pos filename line token fullline)) =
-	(concat $ take (token + 1) $ spacedwords fullline) 
-	++ "\x7f" ++ (show line) ++ "," ++ (show $ line+1) ++ "\n"
-	
-	
+    (concat $ take (token + 1) $ spacedwords fullline)
+ ++ "\x7f" ++ (show line) ++ "," ++ (show $ line+1) ++ "\n"
+
+
 -- like "words", but keeping the whitespace, and so letting us build
--- accurate prefixes	
-	
+-- accurate prefixes
+
 spacedwords :: String -> [String]
 spacedwords [] = []
 spacedwords xs = (blanks ++ wordchars):(spacedwords rest2)
-	where 
-		(blanks,rest) = span Char.isSpace xs
-		(wordchars,rest2) = span (\x -> not $ Char.isSpace x) rest
-	
-	
--- Find the definitions in a file	
-	
+    where (blanks,rest) = span Char.isSpace xs
+          (wordchars,rest2) = span (\x -> not $ Char.isSpace x) rest
+
+
+-- Find the definitions in a file
+
 findthings :: FileName -> IO FileData
 findthings filename = do
     text <- readFile filename
@@ -186,15 +184,15 @@ findthings filename = do
 -- Create tokens from words, by recording their line number
 -- and which token they are through that line
 
-withline :: FileName -> [String] -> String -> Int -> [Token]		
-withline filename words fullline i = 
-	zipWith (\w t -> Token w (Pos filename i t fullline)) words $ [0 ..]
+withline :: FileName -> [String] -> String -> Int -> [Token]
+withline filename words fullline i =
+    zipWith (\w t -> Token w (Pos filename i t fullline)) words $ [0 ..]
 
 -- comments stripping
 
 stripslcomments :: [String] -> [String]
 stripslcomments ("--":xs) = []
-stripslcomments (x:xs) = x : stripslcomments xs 
+stripslcomments (x:xs) = x : stripslcomments xs
 stripslcomments [] = []
 
 stripblockcomments :: [Token] -> [Token]
@@ -213,15 +211,16 @@ afterlitend (x:xs) = afterlitend xs
 afterlitend [] = []
 
 afterblockcomend :: [Token] -> [Token]
-afterblockcomend ((Token token _):xs) | contains "-}" token = xs
-						| otherwise = afterblockcomend xs
+afterblockcomend ((Token token _):xs)
+ | contains "-}" token = xs
+ | otherwise           = afterblockcomend xs
 afterblockcomend [] = []
 
 
 -- does one string contain another string
 
 contains :: Eq a => [a] -> [a] -> Bool
-contains sub full = any (isPrefixOf sub) $ tails full 
+contains sub full = any (isPrefixOf sub) $ tails full
 
 ints :: Int -> [Int]
 ints i = i:(ints $ i+1)
@@ -230,17 +229,17 @@ ints i = i:(ints $ i+1)
 -- actually pick up definitions
 
 findstuff :: [Token] -> [FoundThing]
-findstuff ((Token "module" _):(Token name pos):xs) = 
-	FoundThing name pos : (getcons xs) ++ (findstuff xs)
-findstuff ((Token "data" _):(Token name pos):xs) = 
-	FoundThing name pos : (getcons xs) ++ (findstuff xs)
-findstuff ((Token "newtype" _):(Token name pos):xs) = 
-	FoundThing name pos : findstuff xs
-findstuff ((Token "type" _):(Token name pos):xs) = 
-	FoundThing name pos : findstuff xs
+findstuff ((Token "module" _):(Token name pos):xs) =
+    FoundThing name pos : (getcons xs) ++ (findstuff xs)
+findstuff ((Token "data" _):(Token name pos):xs) =
+    FoundThing name pos : (getcons xs) ++ (findstuff xs)
+findstuff ((Token "newtype" _):(Token name pos):xs) =
+    FoundThing name pos : findstuff xs
+findstuff ((Token "type" _):(Token name pos):xs) =
+    FoundThing name pos : findstuff xs
 findstuff ((Token "class" _):xs) = findClassName xs
-findstuff ((Token name pos):(Token "::" _):xs) = 
-	FoundThing name pos : findstuff xs
+findstuff ((Token name pos):(Token "::" _):xs) =
+    FoundThing name pos : findstuff xs
 findstuff (x:xs) = findstuff xs
 findstuff [] = []
 
@@ -253,8 +252,9 @@ dropParens 0 (x:xs) = x:xs
 dropParens 1 ((Token ")" _ ):xs) = xs
 dropParens n ((Token ")" _ ):xs) = dropParens (n-1) xs
 dropParens n (x:xs) = dropParens n xs
--- dropsEverything till token "=>" (if it is on the same line as the first token. if not return tokens)
-drop2 tokens@(x@(Token _ (Pos _ line_nr _ _ )):xs) = 
+-- dropsEverything till token "=>" (if it is on the same line as the
+-- first token. if not return tokens)
+drop2 tokens@(x@(Token _ (Pos _ line_nr _ _ )):xs) =
   let (line, following) = span (\(Token s (Pos _ l _ _)) -> l == line_nr) tokens
       (_, following_in_line) = span (\(Token n _) -> n /= "=>") line
   in case following_in_line of
@@ -265,15 +265,14 @@ drop2 xs = xs
 -- get the constructor definitions, knowing that a datatype has just started
 
 getcons :: [Token] -> [FoundThing]
-getcons ((Token "=" _):(Token name pos):xs) = 
-	FoundThing name pos : getcons2 xs
+getcons ((Token "=" _):(Token name pos):xs) =
+    FoundThing name pos : getcons2 xs
 getcons (x:xs) = getcons xs
 getcons [] = []
 
-
 getcons2 ((Token "=" _):xs) = []
-getcons2 ((Token "|" _):(Token name pos):xs) = 
-	FoundThing name pos : getcons2 xs
+getcons2 ((Token "|" _):(Token name pos):xs) =
+    FoundThing name pos : getcons2 xs
 getcons2 (x:xs) = getcons2 xs
 getcons2 [] = []
 
