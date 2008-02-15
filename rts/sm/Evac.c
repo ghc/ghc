@@ -59,7 +59,7 @@ alloc_for_copy (nat size, step *stp)
     
     ASSERT(ws->todo_free >= ws->todo_bd->free && ws->todo_free <= ws->todo_lim);
     to = ws->todo_free;
-    if (to + size >= ws->todo_lim) {
+    if (to + size > ws->todo_lim) {
 	to = gc_alloc_todo_block(ws);
     }
     ws->todo_free = to + size;
