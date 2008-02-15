@@ -51,7 +51,9 @@ extern "C" {
  * We often want to know the size of something in units of an
  * StgWord... (rounded up, of course!)
  */
-#define sizeofW(t) ((sizeof(t)+sizeof(W_)-1)/sizeof(W_))
+#define ROUNDUP_BYTES_TO_WDS(n) (((n) + sizeof(W_) - 1) / sizeof(W_))
+
+#define sizeofW(t) ROUNDUP_BYTES_TO_WDS(sizeof(t))
 
 /* 
  * It's nice to be able to grep for casts
