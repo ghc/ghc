@@ -158,11 +158,10 @@ findthings filename = do
     let aslines = lines text
     let wordlines = map mywords aslines
     let noslcoms = map stripslcomments wordlines
-        -- there are some tokens with "" (don't know why yet) this filter fixes it 
-	let tokens = filter (\(Token s _ ) -> (not .  null) s ) $
-                      concat $ zipWith3 (withline filename) noslcoms 
-					aslines [0 ..]
-    let nocoms = stripblockcomments tokens
+    let tokens = concat $ zipWith3 (withline filename) noslcoms aslines [0 ..]
+    -- there are some tokens with "" (don't know why yet) this filter fixes it
+    let tokens' = filter (\(Token s _ ) -> (not .  null) s ) tokens
+    let nocoms = stripblockcomments tokens'
     -- using nub because getcons and findstuff are parsing parts of the file twice
     return $ FileData filename $ nub $ findstuff nocoms
   where evaluate [] = return ()
