@@ -5,6 +5,8 @@ HS_PROG = hasktags
 
 CLEAN_FILES += Main.hi
 
+SRC_HC_OPTS += -Wall
+
 INSTALL_PROGS += $(HS_PROG)
 
 binary-dist:

@@ -1,4 +1,6 @@
-module Main where
+
+module Main (main) where
+
 import Char
 import List
 import IO
@@ -107,10 +109,11 @@ writectagsfile ctagsfile filedata = do
     let things = concat $ map getfoundthings filedata
     mapM_ (\x -> hPutStrLn ctagsfile $ dumpthing x) (sortThings things)
 
+sortThings :: [FoundThing] -> [FoundThing]
 sortThings = sortBy (\(FoundThing a _) (FoundThing b _) -> compare a b)
 
 getfoundthings :: FileData -> [FoundThing]
-getfoundthings (FileData filename things) = things
+getfoundthings (FileData _ things) = things
 
 dumpthing :: FoundThing -> String
 dumpthing (FoundThing name (Pos filename line _ _)) =
@@ -130,7 +133,7 @@ e_dumpfiledata (FileData filename things) =
           thingslength = length thingsdump
 
 e_dumpthing :: FoundThing -> String
-e_dumpthing (FoundThing name (Pos filename line token fullline)) =
+e_dumpthing (FoundThing _ (Pos _ line token fullline)) =
     (concat $ take (token + 1) $ spacedwords fullline)
  ++ "\x7f" ++ (show line) ++ "," ++ (show $ line+1) ++ "\n"
 
@@ -185,14 +188,14 @@ findthings filename = do
 -- and which token they are through that line
 
 withline :: FileName -> [String] -> String -> Int -> [Token]
-withline filename words fullline i =
-    zipWith (\w t -> Token w (Pos filename i t fullline)) words $ [0 ..]
+withline filename theWords fullline i =
+    zipWith (\w t -> Token w (Pos filename i t fullline)) theWords $ [0 ..]
 
 -- comments stripping
 
 stripslcomments :: [String] -> [String]
-stripslcomments ("--":xs) = []
-stripslcomments (x:xs) = x : stripslcomments xs
+stripslcomments ("--" : _) = []
+stripslcomments (x : xs) = x : stripslcomments xs
 stripslcomments [] = []
 
 stripblockcomments :: [Token] -> [Token]
@@ -201,13 +204,9 @@ stripblockcomments ((Token "{-" _):xs) = afterblockcomend xs
 stripblockcomments (x:xs) = x:stripblockcomments xs
 stripblockcomments [] = []
 
-afterlitend2 :: [Token] -> [Token]
-afterlitend2 (x:xs) = afterlitend xs
-afterlitend2 [] = []
-
 afterlitend :: [Token] -> [Token]
-afterlitend ((Token "\\begin{code}" _):xs) = xs
-afterlitend (x:xs) = afterlitend xs
+afterlitend (Token "\\begin{code}" _ : xs) = xs
+afterlitend (_ : xs) = afterlitend xs
 afterlitend [] = []
 
 afterblockcomend :: [Token] -> [Token]
@@ -221,10 +220,6 @@ afterblockcomend [] = []
 
 contains :: Eq a => [a] -> [a] -> Bool
 contains sub full = any (isPrefixOf sub) $ tails full
-
-ints :: Int -> [Int]
-ints i = i:(ints $ i+1)
-
 
 -- actually pick up definitions
 
@@ -240,39 +235,45 @@ findstuff ((Token "type" _):(Token name pos):xs) =
 findstuff ((Token "class" _):xs) = findClassName xs
 findstuff ((Token name pos):(Token "::" _):xs) =
     FoundThing name pos : findstuff xs
-findstuff (x:xs) = findstuff xs
+findstuff (_ : xs) = findstuff xs
 findstuff [] = []
 
 findClassName :: [Token] -> [FoundThing]
 findClassName []  = []
 findClassName [Token n p]  = [FoundThing n p]
-findClassName xs = (\((Token n pos):xs) -> FoundThing n pos : findstuff xs) . drop2 . dropParens 0 $ xs
-dropParens n ((Token "(" _ ):xs) = dropParens (n+1) xs
-dropParens 0 (x:xs) = x:xs
-dropParens 1 ((Token ")" _ ):xs) = xs
-dropParens n ((Token ")" _ ):xs) = dropParens (n-1) xs
-dropParens n (x:xs) = dropParens n xs
+findClassName xs = (\(Token n pos : xs') -> FoundThing n pos : findstuff xs') . drop2 . dropParens 0 $ xs
+
+dropParens :: Integer -> [Token] -> [Token]
+dropParens n (Token "(" _ : xs) = dropParens (n + 1) xs
+dropParens 0 (x           : xs) = x : xs
+dropParens 1 (Token ")" _ : xs) = xs
+dropParens n (Token ")" _ : xs) = dropParens (n - 1) xs
+dropParens n (_           : xs) = dropParens n xs
+dropParens _ []                 = [] -- Shouldn't happen on correct source
+
 -- dropsEverything till token "=>" (if it is on the same line as the
 -- first token. if not return tokens)
-drop2 tokens@(x@(Token _ (Pos _ line_nr _ _ )):xs) =
-  let (line, following) = span (\(Token s (Pos _ l _ _)) -> l == line_nr) tokens
+drop2 :: [Token] -> [Token]
+drop2 tokens@(Token _ (Pos _ line_nr _ _ ) : _) =
+  let (line, following) = span (\(Token _ (Pos _ l _ _)) -> l == line_nr) tokens
       (_, following_in_line) = span (\(Token n _) -> n /= "=>") line
   in case following_in_line of
-          (Token "=>" _:xs) ->  xs ++ following
+          (Token "=>" _ : xs) -> xs ++ following
           _ -> tokens
 drop2 xs = xs
 
 -- get the constructor definitions, knowing that a datatype has just started
 
 getcons :: [Token] -> [FoundThing]
-getcons ((Token "=" _):(Token name pos):xs) =
+getcons (Token "=" _ : Token name pos : xs) =
     FoundThing name pos : getcons2 xs
-getcons (x:xs) = getcons xs
+getcons (_ : xs) = getcons xs
 getcons [] = []
 
-getcons2 ((Token "=" _):xs) = []
-getcons2 ((Token "|" _):(Token name pos):xs) =
+getcons2 :: [Token] -> [FoundThing]
+getcons2 (Token "=" _ : _) = []
+getcons2 (Token "|" _ : Token name pos : xs) =
     FoundThing name pos : getcons2 xs
-getcons2 (x:xs) = getcons2 xs
+getcons2 (_:xs) = getcons2 xs
 getcons2 [] = []
 
