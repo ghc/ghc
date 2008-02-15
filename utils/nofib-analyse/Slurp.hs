@@ -34,6 +34,7 @@ data Results = Results {
         link_time       :: Maybe Float,
         run_time        :: [Float],
         mut_time        :: [Float],
+        mut_elapsed_time :: [Float],
         instrs          :: Maybe Integer,
         mem_reads       :: Maybe Integer,
         mem_writes      :: Maybe Integer,
@@ -54,6 +55,7 @@ emptyResults = Results {
         link_time       = Nothing,
         run_time        = [],
         mut_time        = [],
+        mut_elapsed_time = [],
         instrs          = Nothing,
         mem_reads       = Nothing,
         mem_writes      = Nothing,
@@ -183,6 +185,7 @@ combine2Results
              Results{ compile_time = ct1, link_time = lt1,
                       module_size = ms1,
                       run_time = rt1, mut_time = mt1,
+                      mut_elapsed_time = me1,
                       instrs = is1, mem_reads = mr1, mem_writes = mw1,
                       cache_misses = cm1,
                       gc_time = gt1, gc_elapsed_time = ge1, gc_work = gw1,
@@ -191,6 +194,7 @@ combine2Results
              Results{ compile_time = ct2, link_time = lt2,
                       module_size = ms2,
                       run_time = rt2, mut_time = mt2,
+                      mut_elapsed_time = me2,
                       instrs = is2, mem_reads = mr2, mem_writes = mw2,
                       cache_misses = cm2,
                       gc_time = gt2, gc_elapsed_time = ge2, gc_work = gw2,
@@ -201,6 +205,7 @@ combine2Results
                       link_time      = lt1 `mplus` lt2,
                       run_time       = rt1 ++ rt2,
                       mut_time       = mt1 ++ mt2,
+                      mut_elapsed_time = me1 ++ me2,
                       instrs         = is1 `mplus` is2,
                       mem_reads      = mr1 `mplus` mr2,
                       mem_writes     = mw1 `mplus` mw2,
@@ -313,28 +318,28 @@ parse_run_time _ [] _ NotDone = []
 parse_run_time prog [] res ex = [(prog, res{run_status=ex})]
 parse_run_time prog (l:ls) res ex =
         case ghc1_re l of {
-           Just (allocations, _, _, _, _, _, initialisation, _, mut, _, gc, gc_elapsed) ->
-                got_run_result allocations initialisation mut gc gc_elapsed
+           Just (allocations, _, _, _, _, _, initialisation, _, mut, mut_elapsed, gc, gc_elapsed) ->
+                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed
                         Nothing Nothing Nothing Nothing Nothing;
            Nothing ->
 
         case ghc2_re l of {
-           Just (allocations, _, _, _, _, _, initialisation, _, mut, _, gc, gc_elapsed) ->
-                got_run_result allocations initialisation mut gc gc_elapsed
+           Just (allocations, _, _, _, _, _, initialisation, _, mut, mut_elapsed, gc, gc_elapsed) ->
+                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed
                         Nothing Nothing Nothing Nothing Nothing;
 
             Nothing ->
 
         case ghc3_re l of {
-           Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, _, gc, gc_elapsed) ->
-                got_run_result allocations initialisation mut gc gc_elapsed
+           Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, mut_elapsed, gc, gc_elapsed) ->
+                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed
                         (Just gc_work') Nothing Nothing Nothing Nothing;
 
             Nothing ->
 
         case ghc4_re l of {
-           Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, _, gc, gc_elapsed, is, mem_rs, mem_ws, cache_misses') ->
-                got_run_result allocations initialisation mut gc gc_elapsed
+           Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, mut_elapsed, gc, gc_elapsed, is, mem_rs, mem_ws, cache_misses') ->
+                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed
                         (Just gc_work') (Just is) (Just mem_rs)
                         (Just mem_ws) (Just cache_misses');
 
@@ -367,13 +372,14 @@ parse_run_time prog (l:ls) res ex =
 
         }}}}}}}}
   where
-  got_run_result allocations initialisation mut gc gc_elapsed gc_work' instrs' mem_rs mem_ws cache_misses'
+  got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed gc_work' instrs' mem_rs mem_ws cache_misses'
       = -- trace ("got_run_result: " ++ initialisation ++ ", " ++ mut ++ ", " ++ gc) $
         let
           time = initialisation + mut + gc
           res' = combine2Results res
                         emptyResults{   run_time   = [time],
                                         mut_time   = [mut],
+                                        mut_elapsed_time   = [mut_elapsed],
                                         gc_time    = [gc],
                                         gc_elapsed_time = [gc_elapsed],
                                         gc_work    = gc_work',
