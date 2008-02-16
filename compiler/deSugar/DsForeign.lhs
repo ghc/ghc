@@ -483,14 +483,17 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   header_bits = ptext SLIT("extern") <+> fun_proto <> semi
 
+  fun_args
+    | null aug_arg_info = text "void"
+    | otherwise         = hsep $ punctuate comma
+                               $ map (\(nm,ty,_,_) -> ty <+> nm) aug_arg_info
+
   fun_proto
     | libffi
       = ptext SLIT("void") <+> ftext c_nm <> 
           parens (ptext SLIT("void *cif STG_UNUSED, void* resp, void** args, void* the_stableptr"))
     | otherwise
-      = cResType <+> pprCconv <+> ftext c_nm <>
-	      parens (hsep (punctuate comma (map (\(nm,ty,_,_) -> ty <+> nm) 
-                                                 aug_arg_info)))
+      = cResType <+> pprCconv <+> ftext c_nm <> parens fun_args
 
   -- the target which will form the root of what we ask rts_evalIO to run
   the_cfun
