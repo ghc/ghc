@@ -1806,16 +1806,15 @@ statements or clauses.
   <indexterm><primary>intermediate code generation</primary></indexterm>
 
   <para>GHC can dump its optimized intermediate code (said to be in &ldquo;Core&rdquo; format) 
-  to a file as a side-effect of compilation. Core files, which are given the suffix
-  <filename>.hcr</filename>, can be read and processed by non-GHC back-end
-  tools.  The Core format is formally described in <ulink url="http://www.haskell.org/ghc/docs/papers/core.ps.gz">
+  to a file as a side-effect of compilation. Non-GHC back-end tools can read and process Core files; these files have the suffix
+  <filename>.hcr</filename>. The Core format is described in <ulink url="http://www.haskell.org/ghc/docs/papers/core.ps.gz">
   <citetitle>An External Representation for the GHC Core Language</citetitle></ulink>, 
-  and sample tools (in Haskell)
-  for manipulating Core files are available in the GHC source distribution 
-  directory <literal>/fptools/ghc/utils/ext-core</literal>.  
+  and sample tools
+  for manipulating Core files (in Haskell) are in the GHC source distribution 
+  directory under <literal>utils/ext-core</literal>.  
   Note that the format of <literal>.hcr</literal> 
-  files is <emphasis>different</emphasis> (though similar) to the Core output format generated 
-  for debugging purposes (<xref linkend="options-debugging"/>).</para>
+  files is <emphasis>different</emphasis> from the Core output format that GHC generates 
+  for debugging purposes (<xref linkend="options-debugging"/>), though the two formats appear somewhat similar.</para>
 
   <para>The Core format natively supports notes which you can add to
   your source code using the <literal>CORE</literal> pragma (see <xref
@@ -1835,10 +1834,8 @@ statements or clauses.
 
     </variablelist>
 
-<para>GHC can also read in External Core files as source; just give the <literal>.hcr</literal> file on
-the command line, instead of the <literal>.hs</literal> or <literal>.lhs</literal> Haskell source.
-A current infelicity is that you need to give the <literal>-fglasgow-exts</literal> flag too, because
-ordinary Haskell 98, when translated to External Core, uses things like rank-2 types.</para>
+<para>Currently (as of version 6.8.2), GHC does not have the ability to read in External Core files as source. If you would like GHC to have this ability, please <ulink url="http://hackage.haskell.org/trac/ghc/wiki/MailingListsAndIRC">make your wishes known to the GHC Team</ulink>.</para>
+
 </sect1>
 
 &debug;
