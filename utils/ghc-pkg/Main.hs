@@ -163,7 +163,7 @@ usageHeader prog = substProg prog $
   "  $p list [pkg]\n" ++
   "    List registered packages in the global database, and also the\n" ++
   "    user database if --user is given. If a package name is given\n" ++
-  "    All the registered versions will be listed in ascending order.\n" ++
+  "    all the registered versions will be listed in ascending order.\n" ++
   "    Accepts the --simple-output flag.\n" ++
   "\n" ++
   "  $p find-module {module}\n" ++
