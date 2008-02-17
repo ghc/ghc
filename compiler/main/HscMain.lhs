@@ -64,7 +64,7 @@ import StringBuffer
 import Parser
 import Lexer
 import SrcLoc		( mkSrcLoc )
-import TcRnDriver	( tcRnModule, tcRnExtCore )
+import TcRnDriver	( tcRnModule )
 import TcIface		( typecheckIface )
 import TcRnMonad	( initIfaceCheck, TcGblEnv(..) )
 import IfaceEnv		( initNameCache )
@@ -101,8 +101,6 @@ import Outputable
 import HscStats		( ppSourceStats )
 import HscTypes
 import MkExternalCore	( emitExternalCore )
-import ParserCore
-import ParserCoreUtils
 import FastString
 import LazyUniqFM		( emptyUFM )
 import UniqSupply       ( initUs_ )
@@ -409,11 +407,8 @@ genComp :: (ModGuts  -> Comp (Maybe a))
 genComp backend boot_backend = do
     mod_summary <- gets compModSummary
     case ms_hsc_src mod_summary of
-       ExtCoreFile -> do 
-          mb_modguts <- hscCoreFrontEnd
-          case mb_modguts of
-            Nothing -> return Nothing
-            Just guts -> backend guts
+       ExtCoreFile -> do
+          panic "GHC does not currently support reading External Core files"
        _not_core -> do
           mb_tc <- hscFileFrontEnd
           case mb_tc of
@@ -484,32 +479,6 @@ batchMsg mb_mod_index recomp
 --------------------------------------------------------------
 -- FrontEnds
 --------------------------------------------------------------
-
-hscCoreFrontEnd :: Comp (Maybe ModGuts)
-hscCoreFrontEnd =
-    do hsc_env <- gets compHscEnv
-       mod_summary <- gets compModSummary
-       liftIO $ do
-            -------------------
-            -- PARSE
-            -------------------
-       inp <- readFile (ms_hspp_file mod_summary)
-       case parseCore inp 1 of
-         FailP s
-             -> do errorMsg (hsc_dflags hsc_env) (text s{-ToDo: wrong-})
-                   return Nothing
-         OkP rdr_module
-             -------------------
-             -- RENAME and TYPECHECK
-             -------------------
-             -> do (tc_msgs, maybe_tc_result) <- {-# SCC "TypeCheck" #-}
-                                                 tcRnExtCore hsc_env rdr_module
-                   printErrorsAndWarnings (hsc_dflags hsc_env) tc_msgs
-                   case maybe_tc_result of
-                     Nothing       -> return Nothing
-                     Just mod_guts -> return (Just mod_guts)         -- No desugaring to do!
-
-	 
 hscFileFrontEnd :: Comp (Maybe TcGblEnv)
 hscFileFrontEnd =
     do hsc_env <- gets compHscEnv
