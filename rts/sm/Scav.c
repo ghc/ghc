@@ -134,6 +134,10 @@ scavenge_fun_srt(const StgInfoTable *info)
 static void
 scavengeTSO (StgTSO *tso)
 {
+    rtsBool saved_eager = gct->eager_promotion;
+
+    gct->eager_promotion = rtsFalse;
+
     if (   tso->why_blocked == BlockedOnMVar
 	|| tso->why_blocked == BlockedOnBlackHole
 	|| tso->why_blocked == BlockedOnException
@@ -154,6 +158,14 @@ scavengeTSO (StgTSO *tso)
     
     // scavenge this thread's stack 
     scavenge_stack(tso->sp, &(tso->stack[tso->stack_size]));
+
+    if (gct->failed_to_evac) {
+        tso->flags |= TSO_DIRTY;
+    } else {
+        tso->flags &= ~TSO_DIRTY;
+    }
+
+    gct->eager_promotion = saved_eager;
 }
 
 /* -----------------------------------------------------------------------------
@@ -494,19 +506,7 @@ linear_scan:
 
 	case TSO:
 	{ 
-	    StgTSO *tso = (StgTSO *)p;
-	    rtsBool saved_eager = gct->eager_promotion;
-
-	    gct->eager_promotion = rtsFalse;
-	    scavengeTSO(tso);
-	    gct->eager_promotion = saved_eager;
-	    
-	    if (gct->failed_to_evac) {
-		tso->flags |= TSO_DIRTY;
-	    } else {
-		tso->flags &= ~TSO_DIRTY;
-	    }
-	    
+            scavengeTSO((StgTSO*)p);
 	    gct->failed_to_evac = rtsTrue; // always on the mutable list
 	    break;
 	}
@@ -826,19 +826,7 @@ scavenge_one(StgPtr p)
 
     case TSO:
     {
-	StgTSO *tso = (StgTSO *)p;
-	rtsBool saved_eager = gct->eager_promotion;
-
-	gct->eager_promotion = rtsFalse;
-	scavengeTSO(tso);
-	gct->eager_promotion = saved_eager;
-
-	if (gct->failed_to_evac) {
-	    tso->flags |= TSO_DIRTY;
-	} else {
-	    tso->flags &= ~TSO_DIRTY;
-	}
-
+	scavengeTSO((StgTSO*)p);
 	gct->failed_to_evac = rtsTrue; // always on the mutable list
 	break;
     }
