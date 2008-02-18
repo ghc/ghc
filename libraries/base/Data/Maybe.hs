@@ -16,18 +16,18 @@
 module Data.Maybe
    (
      Maybe(Nothing,Just)-- instance of: Eq, Ord, Show, Read,
-			--		Functor, Monad, MonadPlus
+                        --              Functor, Monad, MonadPlus
 
-   , maybe		-- :: b -> (a -> b) -> Maybe a -> b
+   , maybe              -- :: b -> (a -> b) -> Maybe a -> b
 
-   , isJust		-- :: Maybe a -> Bool
-   , isNothing		-- :: Maybe a -> Bool
-   , fromJust		-- :: Maybe a -> a
-   , fromMaybe		-- :: a -> Maybe a -> a
+   , isJust             -- :: Maybe a -> Bool
+   , isNothing          -- :: Maybe a -> Bool
+   , fromJust           -- :: Maybe a -> a
+   , fromMaybe          -- :: a -> Maybe a -> a
    , listToMaybe        -- :: [a] -> Maybe a
-   , maybeToList	-- :: Maybe a -> [a]
-   , catMaybes		-- :: [Maybe a] -> [a]
-   , mapMaybe		-- :: (a -> Maybe b) -> [a] -> [b]
+   , maybeToList        -- :: Maybe a -> [a]
+   , catMaybes          -- :: [Maybe a] -> [a]
+   , mapMaybe           -- :: (a -> Maybe b) -> [a] -> [b]
    ) where
 
 #ifdef __GLASGOW_HASKELL__
@@ -43,7 +43,7 @@ import Maybe
     , fromJust
     , fromMaybe
     , listToMaybe
-    , maybeToList 
+    , maybeToList
     , catMaybes
     , mapMaybe
     )
@@ -63,7 +63,7 @@ import Maybe
 -- monad, where all errors are represented by 'Nothing'.  A richer
 -- error monad can be built using the 'Data.Either.Either' type.
 
-data  Maybe a  =  Nothing | Just a	
+data  Maybe a  =  Nothing | Just a
   deriving (Eq, Ord)
 
 instance  Functor Maybe  where
@@ -78,7 +78,7 @@ instance  Monad Maybe  where
     Nothing  >>  _      = Nothing
 
     return              = Just
-    fail _		= Nothing
+    fail _              = Nothing
 
 -- ---------------------------------------------------------------------------
 -- Functions over Maybe
