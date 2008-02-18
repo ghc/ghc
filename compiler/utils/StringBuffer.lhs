@@ -16,31 +16,31 @@ Buffers for scanning string input stored in external arrays.
 module StringBuffer
        (
         StringBuffer(..),
-	-- non-abstract for vs\/HaskellService
+        -- non-abstract for vs\/HaskellService
 
-	 -- * Creation\/destruction
+         -- * Creation\/destruction
         hGetStringBuffer,
         hGetStringBufferBlock,
         appendStringBuffers,
-	stringToStringBuffer,
+        stringToStringBuffer,
 
-	-- * Inspection
-	nextChar,
-	currentChar,
-	prevChar,
-	atEnd,
+        -- * Inspection
+        nextChar,
+        currentChar,
+        prevChar,
+        atEnd,
 
-	-- * Moving and comparison
-	stepOn,
-	offsetBytes,
-	byteDiff,
+        -- * Moving and comparison
+        stepOn,
+        offsetBytes,
+        byteDiff,
 
         -- * Conversion
         lexemeToString,
         lexemeToFastString,
 
-	 -- * Parsing integers
-	parseUnsignedInteger,
+         -- * Parsing integers
+        parseUnsignedInteger,
        ) where
 
 #include "HsVersions.h"
@@ -51,13 +51,13 @@ import FastTypes
 import FastFunctions
 
 import Foreign
-import System.IO		( hGetBuf, hFileSize,IOMode(ReadMode), hClose
+import System.IO                ( hGetBuf, hFileSize,IOMode(ReadMode), hClose
                                 , Handle, hTell )
 
 import GHC.Exts
 
 #if !defined(__GLASGOW_HASKELL__) || __GLASGOW_HASKELL__ >= 601
-import System.IO		( openBinaryFile )
+import System.IO                ( openBinaryFile )
 #else
 import IOExts                   ( openFileEx, IOModeEx(..) )
 #endif
@@ -79,18 +79,18 @@ openBinaryFile fp mode = openFileEx fp (BinaryMode mode)
 data StringBuffer
  = StringBuffer {
      buf :: {-# UNPACK #-} !(ForeignPtr Word8),
-     len :: {-# UNPACK #-} !Int, 	-- length
-     cur :: {-# UNPACK #-} !Int		-- current pos
+     len :: {-# UNPACK #-} !Int,        -- length
+     cur :: {-# UNPACK #-} !Int         -- current pos
   }
-	-- The buffer is assumed to be UTF-8 encoded, and furthermore
-	-- we add three '\0' bytes to the end as sentinels so that the
-	-- decoder doesn't have to check for overflow at every single byte
-	-- of a multibyte sequence.
+  -- The buffer is assumed to be UTF-8 encoded, and furthermore
+  -- we add three '\0' bytes to the end as sentinels so that the
+  -- decoder doesn't have to check for overflow at every single byte
+  -- of a multibyte sequence.
 
 instance Show StringBuffer where
-	showsPrec _ s = showString "<stringbuffer(" 
-		      . shows (len s) . showString "," . shows (cur s)
-		      . showString ">"
+        showsPrec _ s = showString "<stringbuffer("
+                      . shows (len s) . showString "," . shows (cur s)
+                      . showString ">"
 
 -- -----------------------------------------------------------------------------
 -- Creation / Destruction
@@ -105,8 +105,8 @@ hGetStringBuffer fname = do
      r <- if size == 0 then return 0 else hGetBuf h ptr size
      hClose h
      if (r /= size)
-	then ioError (userError "short read of file")
-	else newUTF8StringBuffer buf ptr size
+        then ioError (userError "short read of file")
+        else newUTF8StringBuffer buf ptr size
 
 hGetStringBufferBlock :: Handle -> Int -> IO StringBuffer
 hGetStringBufferBlock handle wanted
@@ -123,8 +123,8 @@ hGetStringBufferBlock handle wanted
 newUTF8StringBuffer :: ForeignPtr Word8 -> Ptr Word8 -> Int -> IO StringBuffer
 newUTF8StringBuffer buf ptr size = do
   pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
-	 -- sentinels for UTF-8 decoding
-  let 
+  -- sentinels for UTF-8 decoding
+  let
       sb0 = StringBuffer buf size 0
       (first_char, sb1) = nextChar sb0
         -- skip the byte-order mark if there is one (see #1744)
@@ -154,7 +154,7 @@ stringToStringBuffer str = do
   withForeignPtr buf $ \ptr -> do
     utf8EncodeString ptr str
     pokeArray (ptr `plusPtr` size :: Ptr Word8) [0,0,0]
-	 -- sentinels for UTF-8 decoding
+    -- sentinels for UTF-8 decoding
   return (StringBuffer buf size 0)
 
 -- -----------------------------------------------------------------------------
@@ -166,17 +166,17 @@ nextChar :: StringBuffer -> (Char,StringBuffer)
 nextChar (StringBuffer buf len (I# cur#)) =
   inlinePerformIO $ do
     withForeignPtr buf $ \(Ptr a#) -> do
-	case utf8DecodeChar# (a# `plusAddr#` cur#) of
-	  (# c#, b# #) ->
-	     let cur' = I# (b# `minusAddr#` a#) in
-	     return (C# c#, StringBuffer buf len cur')
+        case utf8DecodeChar# (a# `plusAddr#` cur#) of
+          (# c#, b# #) ->
+             let cur' = I# (b# `minusAddr#` a#) in
+             return (C# c#, StringBuffer buf len cur')
 
 currentChar :: StringBuffer -> Char
 currentChar = fst . nextChar
 
 prevChar :: StringBuffer -> Char -> Char
 prevChar (StringBuffer buf len 0)   deflt = deflt
-prevChar (StringBuffer buf len cur) deflt = 
+prevChar (StringBuffer buf len cur) deflt =
   inlinePerformIO $ do
     withForeignPtr buf $ \p -> do
       p' <- utf8PrevChar (p `plusPtr` cur)
@@ -203,8 +203,8 @@ atEnd (StringBuffer _ l c) = l == c
 lexemeToString :: StringBuffer -> Int {-bytes-} -> String
 lexemeToString _ 0 = ""
 lexemeToString (StringBuffer buf _ cur) bytes =
-  inlinePerformIO $ 
-    withForeignPtr buf $ \ptr -> 
+  inlinePerformIO $
+    withForeignPtr buf $ \ptr ->
       utf8DecodeString (ptr `plusPtr` cur) bytes
 
 lexemeToFastString :: StringBuffer -> Int {-bytes-} -> FastString
@@ -218,7 +218,7 @@ lexemeToFastString (StringBuffer buf _ cur) len =
 -- Parsing integer strings in various bases
 {-
 byteOff :: StringBuffer -> Int -> Char
-byteOff (StringBuffer buf _ cur) i = 
+byteOff (StringBuffer buf _ cur) i =
   inlinePerformIO $ withForeignPtr buf $ \ptr -> do
 --    return $! cBox (indexWord8OffFastPtrAsFastChar
 --                         (pUnbox ptr) (iUnbox (cur+i)))
@@ -228,7 +228,7 @@ byteOff (StringBuffer buf _ cur) i =
 -}
 -- | XXX assumes ASCII digits only (by using byteOff)
 parseUnsignedInteger :: StringBuffer -> Int -> Integer -> (Char->Int) -> Integer
-parseUnsignedInteger (StringBuffer buf _ cur) len radix char_to_int 
+parseUnsignedInteger (StringBuffer buf _ cur) len radix char_to_int
   = inlinePerformIO $ withForeignPtr buf $ \ptr -> return $! let
     --LOL, in implementations where the indexing needs slow unsafePerformIO,
     --this is less (not more) efficient than using the IO monad explicitly
