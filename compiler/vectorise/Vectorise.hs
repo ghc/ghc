@@ -70,10 +70,10 @@ vectModule :: ModGuts -> VM ModGuts
 vectModule guts
   = do
       (types', fam_insts, tc_binds) <- vectTypeEnv (mg_types guts)
-      
+
       let fam_inst_env' = extendFamInstEnvList (mg_fam_inst_env guts) fam_insts
       updGEnv (setFamInstEnv fam_inst_env')
-     
+
       -- dicts   <- mapM buildPADict pa_insts
       -- workers <- mapM vectDataConWorkers pa_insts
       binds'  <- mapM vectTopBind (mg_binds guts)
@@ -113,7 +113,7 @@ vectTopBinder var
       var' <- cloneId mkVectOcc var vty
       defGlobalVar var var'
       return var'
-    
+
 vectTopRhs :: Var -> CoreExpr -> VM CoreExpr
 vectTopRhs var expr
   = do
@@ -224,8 +224,8 @@ vectPolyExpr expr
       mono' <- vectExpr mono
       return $ mapVect abstract mono'
   where
-    (tvs, mono) = collectAnnTypeBinders expr  
-                
+    (tvs, mono) = collectAnnTypeBinders expr
+
 vectExpr :: CoreExprWithFVs -> VM VExpr
 vectExpr (_, AnnType ty)
   = liftM vType (vectType ty)
@@ -252,7 +252,7 @@ vectExpr (_, AnnApp (_, AnnVar v) (_, AnnLit lit))
       return (vexpr, lexpr)
   where
     is_special_con con = con `elem` [intDataCon, floatDataCon, doubleDataCon]
-                
+
 
 vectExpr (_, AnnApp fn arg)
   = do
@@ -320,7 +320,7 @@ vectLam fvs bs body
             (vbndrs, vbody) <- vectBndrsIn (vs ++ bs)
                                            (vectExpr body)
             return $ vLams lc vbndrs vbody
-  
+
 vectTyAppExpr :: CoreExprWithFVs -> [Type] -> VM VExpr
 vectTyAppExpr (_, AnnVar v) tys = vectPolyVar v tys
 vectTyAppExpr e tys = pprPanic "vectTyAppExpr" (ppr $ deAnnotate e)
@@ -339,7 +339,7 @@ type CoreAltWithFVs = AnnAlt Id VarSet
 -- When lifting, we have to do it this way because v must have the type
 -- [:V(T):] but the scrutinee must be cast to the representation type. We also
 -- have to handle the case where v is a wild var correctly.
---   
+--
 
 -- FIXME: this is too lazy
 vectAlgCase tycon ty_args scrut bndr ty [(DEFAULT, [], body)]
