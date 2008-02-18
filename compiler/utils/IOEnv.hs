@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 --
 -- (c) The University of Glasgow 2002-2006
 --
@@ -29,7 +22,6 @@ module IOEnv (
         -- I/O operations
         IORef, newMutVar, readMutVar, writeMutVar, updMutVar
   ) where
-#include "HsVersions.h"
 
 import Panic            ( try, tryUser, tryMost, Exception(..) )
 
@@ -44,13 +36,15 @@ import MonadUtils
 
 
 newtype IOEnv env a = IOEnv (env -> IO a)
+
+unIOEnv :: IOEnv env a -> (env -> IO a)
 unIOEnv (IOEnv m) = m
 
 instance Monad (IOEnv m) where
     (>>=)  = thenM
     (>>)   = thenM_
     return = returnM
-    fail s = failM -- Ignore the string
+    fail _ = failM -- Ignore the string
 
 instance Applicative (IOEnv m) where
     pure = returnM
@@ -60,7 +54,7 @@ instance Functor (IOEnv m) where
     fmap f (IOEnv m) = IOEnv (\ env -> fmap f (m env))
 
 returnM :: a -> IOEnv env a
-returnM a = IOEnv (\ env -> return a)
+returnM a = IOEnv (\ _ -> return a)
 
 thenM :: IOEnv env a -> (a -> IOEnv env b) -> IOEnv env b
 thenM (IOEnv m) f = IOEnv (\ env -> do { r <- m env ;
@@ -70,10 +64,10 @@ thenM_ :: IOEnv env a -> IOEnv env b -> IOEnv env b
 thenM_ (IOEnv m) f = IOEnv (\ env -> do { m env ; unIOEnv f env })
 
 failM :: IOEnv env a
-failM = IOEnv (\ env -> ioError (userError "IOEnv failure"))
+failM = IOEnv (\ _ -> ioError (userError "IOEnv failure"))
 
 failWithM :: String -> IOEnv env a
-failWithM s = IOEnv (\ env -> ioError (userError s))
+failWithM s = IOEnv (\ _ -> ioError (userError s))
 
 
 
@@ -129,7 +123,7 @@ unsafeInterleaveM (IOEnv m) = IOEnv (\ env -> unsafeInterleaveIO (m env))
 ----------------------------------------------------------------------
 
 instance MonadIO (IOEnv env) where
-    liftIO io = IOEnv (\ env -> io)
+    liftIO io = IOEnv (\ _ -> io)
 
 newMutVar :: a -> IOEnv env (IORef a)
 newMutVar val = liftIO (newIORef val)
@@ -155,7 +149,7 @@ getEnv = IOEnv (\ env -> return env)
 -- | Perform a computation with a different environment
 setEnv :: env' -> IOEnv env' a -> IOEnv env a
 {-# INLINE setEnv #-}
-setEnv new_env (IOEnv m) = IOEnv (\ env -> m new_env)
+setEnv new_env (IOEnv m) = IOEnv (\ _ -> m new_env)
 
 -- | Perform a computation with an altered environment
 updEnv :: (env -> env') -> IOEnv env' a -> IOEnv env a
