@@ -1441,7 +1441,7 @@ list :: { LHsExpr RdrName }
 	| texp '|' flattenedpquals	{ sL (comb2 $1 $>) $ mkHsDo ListComp (unLoc $3) $1 }
 
 lexps :: { Located [LHsExpr RdrName] }
-	: lexps ',' texp 		{ LL ($3 : unLoc $1) }
+	: lexps ',' texp 		{ LL (((:) $! $3) $! unLoc $1) }
 	| texp ',' texp			{ LL [$3,$1] }
 
 -----------------------------------------------------------------------------
