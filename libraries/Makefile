@@ -173,7 +173,7 @@ installPackage/installPackage: installPackage.hs $(BOOTSTRAP_STAMPS)
 	-$(RM) -rf installPackage
 	mkdir installPackage
 	$(CP) installPackage.hs installPackage/
-ifeq "$(UseStage1)" "YES"
+ifeq "$(stage)" "2"
 	cd installPackage && ../$(HC) -Wall -cpp \
 	                            --make installPackage -o installPackage \
 	                            $(BOOTSTRAP_INC_1_UP)
@@ -190,7 +190,7 @@ ifBuildable/ifBuildable: ifBuildable.hs
 	-$(RM) -rf ifBuildable
 	mkdir ifBuildable
 	$(CP) ifBuildable.hs ifBuildable/
-ifeq "$(UseStage1)" "YES"
+ifeq "$(stage)" "2"
 	cd ifBuildable && ../$(HC) -Wall --make ifBuildable -o ifBuildable
 else
 	cd ifBuildable && $(GHC) -Wall --make ifBuildable -o ifBuildable

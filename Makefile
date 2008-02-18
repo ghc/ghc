@@ -98,6 +98,7 @@ endif
 endif
 
 stage1 : $(GCC_LIB_DEP) check-packages
+	$(MAKE) -C utils mostlyclean
 	$(MAKE) -C utils/mkdependC boot
 	@case '${MFLAGS}' in *-[ik]*) x_on_err=0;; *-r*[ik]*) x_on_err=0;; *) x_on_err=1;; esac; \
 	for i in $(SUBDIRS_BUILD); do \
@@ -119,9 +120,23 @@ stage1 : $(GCC_LIB_DEP) check-packages
 	$(MAKE) -C libraries boot
 	$(MAKE) -C libraries all
 
+# When making distributions (i.e., whether with binary-dist or using the 
+# vanilla install target to create an installer package), we can have problems
+# if some things (e.g. ghc-pkg) are compiled with the bootstrapping compiler 
+# and some (e.g. the stage 2 compiler) with the stage1 compiler. See #1860 for
+# an example.  Thus, we explicitly build a second version with the stage 1 
+# compiler of all utils that get installed and of all extra support binaries
+# includes in binary dists.
 stage2 : check-packages
+	$(MAKE) -C utils mostlyclean
+	$(MAKE) -C utils stage=2
 	$(MAKE) -C compiler boot stage=2
 	$(MAKE) -C compiler stage=2
+	$(RM) -f libraries/ifBuildable/ifBuildable
+	$(MAKE) -C libraries stage=2 ifBuildable/ifBuildable
+	$(RM) -f libraries/installPackage/installPackage
+	$(MAKE) -C libraries stage=2 installPackage/installPackage
+
 
 stage3 : check-packages
 	$(MAKE) -C compiler boot stage=3
@@ -258,21 +273,6 @@ install-docs ::
 binary-dist::
 	-rm -rf $(BIN_DIST_DIR)
 	-$(RM) $(BIN_DIST_TARBALL)
-
-# When making bindists, we can have problems if some things (e.g. ghc-pkg)
-# are compiled with the bootstrapping compiler and some (e.g. the stage 2
-# compiler) with the stage1 compiler. See #1860 for an example.
-# Thus we rebuild the utils with stage 1 here. This is a bit unpleasant,
-# as binary-dist really shouldn't actually build anything, but it works.
-# We need to do the same for utilities used during library package installation.
-binary-dist::
-	$(MAKE) -C utils clean
-	$(MAKE) -C utils UseStage1=YES boot
-	$(MAKE) -C utils UseStage1=YES
-	$(RM) -f libraries/ifBuildable/ifBuildable
-	$(MAKE) -C libraries UseStage1=YES ifBuildable/ifBuildable
-	$(RM) -f libraries/installPackage/installPackage
-	$(MAKE) -C libraries UseStage1=YES installPackage/installPackage
 
 ifeq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 

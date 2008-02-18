@@ -1,7 +1,13 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
-HS_PROG = hasktags
+# We have two version: the inplace version compiled by the bootstrap compiler
+#   and the install version compiled by the stage 1 compiler
+ifeq "$(stage)" "2"
+HS_PROG           = hasktags
+else
+HS_PROG           = hasktags-inplace
+endif
 
 CLEAN_FILES += Main.hi
 

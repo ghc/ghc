@@ -1,7 +1,13 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
+# We have two version: the inplace version compiled by the bootstrap compiler
+#   and the install version compiled by the stage 1 compiler
+ifeq "$(stage)" "2"
 HS_PROG		= hpc$(exeext)
+else
+HS_PROG		= hpc-inplace$(exeext)
+endif
 INSTALL_PROGS  += $(HS_PROG)
 HPC_LIB         = $(TOP)/libraries/hpc
 

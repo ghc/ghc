@@ -1,7 +1,13 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
-HS_PROG		= runghc$(exeext)
+# We have two version: the inplace version compiled by the bootstrap compiler
+#   and the install version compiled by the stage 1 compiler
+ifeq "$(stage)" "2"
+HS_PROG           = runghc$(exeext)
+else
+HS_PROG           = runghc-inplace$(exeext)
+endif
 INSTALL_PROGS   += $(HS_PROG)
 
 UseGhcForCc = YES

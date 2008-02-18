@@ -864,6 +864,9 @@ GHC_STAGE3 	= $(GHC_COMPILER_DIR)/stage3/ghc-inplace -no-user-package-conf
 # installed for this GHC version.  They are bound to be incompatible
 # with the packages we built in the tree.
 
+ifeq "$(stage)" "2"
+  UseStage1 = YES
+endif
 ifneq "$(findstring YES, $(UseStage1) $(BootingFromHc))" ""
 
 # We are using the stage1 compiler to compile Haskell code, set up

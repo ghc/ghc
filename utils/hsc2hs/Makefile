@@ -13,7 +13,14 @@ include $(GHC_COMPAT_DIR)/compat.mk
 # we must also build with $(GhcHcOpts) here:
 SRC_HC_OPTS += $(GhcHcOpts) $(GhcStage1HcOpts)
 
-HS_PROG           = hsc2hs-bin
+# We have two version: the inplace version compiled by the bootstrap compiler
+#   and the install version compiled by the stage 1 compiler
+ifeq "$(stage)" "2"
+HS_PROG           = hsc2hs.bin
+else
+HS_PROG           = hsc2hs-inplace.bin
+endif
+
 ifeq "$(HOSTPLATFORM)" "i386-unknown-mingw32"
 HS_PROG           = hsc2hs$(exeext)
 endif

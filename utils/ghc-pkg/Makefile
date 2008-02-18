@@ -35,9 +35,17 @@ INSTALL_PROGS    += $(HS_PROG)
 EXCLUDE_SRCS     += CRT_noglob.c
 NOGLOB_O          = CRT_noglob.o
 else
+
+# We have two version: the inplace version compiled by the bootstrap compiler
+#   and the install version compiled by the stage 1 compiler
+ifeq "$(stage)" "2"
 HS_PROG           = ghc-pkg.bin
+else
+HS_PROG           = ghc-pkg-inplace.bin
+endif
 INSTALL_LIBEXECS += $(HS_PROG)
 NOGLOB_O	  =
+
 endif
 
 # -----------------------------------------------------------------------------
