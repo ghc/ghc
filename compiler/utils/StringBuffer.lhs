@@ -6,13 +6,6 @@
 Buffers for scanning string input stored in external arrays.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module StringBuffer
        (
         StringBuffer(..),
@@ -175,8 +168,8 @@ currentChar :: StringBuffer -> Char
 currentChar = fst . nextChar
 
 prevChar :: StringBuffer -> Char -> Char
-prevChar (StringBuffer buf len 0)   deflt = deflt
-prevChar (StringBuffer buf len cur) deflt =
+prevChar (StringBuffer _   _   0)   deflt = deflt
+prevChar (StringBuffer buf _   cur) _     =
   inlinePerformIO $ do
     withForeignPtr buf $ \p -> do
       p' <- utf8PrevChar (p `plusPtr` cur)
@@ -233,11 +226,11 @@ parseUnsignedInteger (StringBuffer buf _ cur) len radix char_to_int
     --LOL, in implementations where the indexing needs slow unsafePerformIO,
     --this is less (not more) efficient than using the IO monad explicitly
     --here.
-    byteOff p i = cBox (indexWord8OffFastPtrAsFastChar
-                         (pUnbox ptr) (iUnbox (cur+i)))
+    ptr' = pUnbox ptr
+    byteOff i = cBox (indexWord8OffFastPtrAsFastChar ptr' (iUnbox (cur + i)))
     go i x | i == len  = x
-           | otherwise = case byteOff ptr i of
-               char -> go (i+1) (x * radix + toInteger (char_to_int char))
+           | otherwise = case byteOff i of
+               char -> go (i + 1) (x * radix + toInteger (char_to_int char))
   in go 0 0
 
 \end{code}
