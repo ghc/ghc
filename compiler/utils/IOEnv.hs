@@ -12,34 +12,34 @@
 --
 
 module IOEnv (
-	IOEnv,	-- Instance of Monad
+        IOEnv, -- Instance of Monad
 
-	-- Monad utilities
-	module MonadUtils,
+        -- Monad utilities
+        module MonadUtils,
 
-	-- Errors
-	failM, failWithM,
+        -- Errors
+        failM, failWithM,
 
-	-- Getting at the environment
-	getEnv, setEnv, updEnv,
+        -- Getting at the environment
+        getEnv, setEnv, updEnv,
 
-	runIOEnv, unsafeInterleaveM,			
-	tryM, tryAllM, tryMostM, fixM, 
+        runIOEnv, unsafeInterleaveM,
+        tryM, tryAllM, tryMostM, fixM,
 
-	-- I/O operations
-	IORef, newMutVar, readMutVar, writeMutVar, updMutVar
+        -- I/O operations
+        IORef, newMutVar, readMutVar, writeMutVar, updMutVar
   ) where
 #include "HsVersions.h"
 
-import Panic		( try, tryUser, tryMost, Exception(..) )
+import Panic            ( try, tryUser, tryMost, Exception(..) )
 
-import Data.IORef	( IORef, newIORef, readIORef, writeIORef, modifyIORef )
-import System.IO.Unsafe	( unsafeInterleaveIO )
-import System.IO	( fixIO )
+import Data.IORef       ( IORef, newIORef, readIORef, writeIORef, modifyIORef )
+import System.IO.Unsafe ( unsafeInterleaveIO )
+import System.IO        ( fixIO )
 import MonadUtils
 
 ----------------------------------------------------------------------
---		Defining the monad type
+-- Defining the monad type
 ----------------------------------------------------------------------
 
 
@@ -50,7 +50,7 @@ instance Monad (IOEnv m) where
     (>>=)  = thenM
     (>>)   = thenM_
     return = returnM
-    fail s = failM	-- Ignore the string
+    fail s = failM -- Ignore the string
 
 instance Applicative (IOEnv m) where
     pure = returnM
@@ -64,7 +64,7 @@ returnM a = IOEnv (\ env -> return a)
 
 thenM :: IOEnv env a -> (a -> IOEnv env b) -> IOEnv env b
 thenM (IOEnv m) f = IOEnv (\ env -> do { r <- m env ;
-				       unIOEnv (f r) env })
+                                         unIOEnv (f r) env })
 
 thenM_ :: IOEnv env a -> IOEnv env b -> IOEnv env b
 thenM_ (IOEnv m) f = IOEnv (\ env -> do { m env ; unIOEnv f env })
@@ -78,7 +78,7 @@ failWithM s = IOEnv (\ env -> ioError (userError s))
 
 
 ----------------------------------------------------------------------
---	Fundmantal combinators specific to the monad
+-- Fundmantal combinators specific to the monad
 ----------------------------------------------------------------------
 
 
@@ -106,7 +106,7 @@ tryM :: IOEnv env r -> IOEnv env (Either Exception r)
 --
 -- The idea is that errors in the program being compiled will give rise
 -- to UserErrors.  But, say, pattern-match failures in GHC itself should
--- not be caught here, else they'll be reported as errors in the program 
+-- not be caught here, else they'll be reported as errors in the program
 -- begin compiled!
 tryM (IOEnv thing) = IOEnv (\ env -> tryUser (thing env))
 
@@ -125,7 +125,7 @@ unsafeInterleaveM (IOEnv m) = IOEnv (\ env -> unsafeInterleaveIO (m env))
 
 
 ----------------------------------------------------------------------
---	Accessing input/output
+-- Accessing input/output
 ----------------------------------------------------------------------
 
 instance MonadIO (IOEnv env) where
@@ -145,7 +145,7 @@ updMutVar var upd = liftIO (modifyIORef var upd)
 
 
 ----------------------------------------------------------------------
---	Accessing the environment
+-- Accessing the environment
 ----------------------------------------------------------------------
 
 getEnv :: IOEnv env env
@@ -164,8 +164,8 @@ updEnv upd (IOEnv m) = IOEnv (\ env -> m (upd env))
 
 
 ----------------------------------------------------------------------
---	Standard combinators, but specialised for this monad
---			(for efficiency)
+-- Standard combinators, but specialised for this monad
+-- (for efficiency)
 ----------------------------------------------------------------------
 
 {-# -- SPECIALIZE mapM          :: (a -> IOEnv env b) -> [a] -> IOEnv env [b] #-}
