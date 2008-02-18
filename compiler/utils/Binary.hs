@@ -1,11 +1,4 @@
 {-# OPTIONS -cpp #-}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 --
 -- (c) The University of Glasgow 2002-2006
 --
@@ -105,19 +98,19 @@ type BinArray = IOUArray Int Word8
 ---------------------------------------------------------------
 
 data BinHandle
-  = BinMem {                    -- binary data stored in an unboxed array
-     bh_usr :: UserData,        -- sigh, need parameterized modules :-)
-     off_r :: !FastMutInt,      -- the current offset
-     sz_r  :: !FastMutInt,      -- size of the array (cached)
-     arr_r :: !(IORef BinArray) -- the array (bounds: (0,size-1))
+  = BinMem {                     -- binary data stored in an unboxed array
+     bh_usr :: UserData,         -- sigh, need parameterized modules :-)
+     _off_r :: !FastMutInt,      -- the current offset
+     _sz_r  :: !FastMutInt,      -- size of the array (cached)
+     _arr_r :: !(IORef BinArray) -- the array (bounds: (0,size-1))
     }
         -- XXX: should really store a "high water mark" for dumping out
         -- the binary data to a file.
 
   | BinIO {                     -- binary data stored in a file
      bh_usr :: UserData,
-     off_r :: !FastMutInt,      -- the current offset (cached)
-     hdl   :: !IO.Handle        -- the file handle (must be seekable)
+     _off_r :: !FastMutInt,     -- the current offset (cached)
+     _hdl   :: !IO.Handle       -- the file handle (must be seekable)
    }
         -- cache the file ptr in BinIO; using hTell is too expensive
         -- to call repeatedly.  If anyone else is modifying this Handle
@@ -190,22 +183,22 @@ seekBin :: BinHandle -> Bin a -> IO ()
 seekBin (BinIO _ ix_r h) (BinPtr p) = do
   writeFastMutInt ix_r p
   hSeek h AbsoluteSeek (fromIntegral p)
-seekBin h@(BinMem _ ix_r sz_r a) (BinPtr p) = do
+seekBin h@(BinMem _ ix_r sz_r _) (BinPtr p) = do
   sz <- readFastMutInt sz_r
   if (p >= sz)
         then do expandBin h p; writeFastMutInt ix_r p
         else writeFastMutInt ix_r p
 
 isEOFBin :: BinHandle -> IO Bool
-isEOFBin (BinMem _ ix_r sz_r a) = do
+isEOFBin (BinMem _ ix_r sz_r _) = do
   ix <- readFastMutInt ix_r
   sz <- readFastMutInt sz_r
   return (ix >= sz)
-isEOFBin (BinIO _ ix_r h) = hIsEOF h
+isEOFBin (BinIO _ _ h) = hIsEOF h
 
 writeBinMem :: BinHandle -> FilePath -> IO ()
 writeBinMem (BinIO _ _ _) _ = error "Data.Binary.writeBinMem: not a memory handle"
-writeBinMem (BinMem _ ix_r sz_r arr_r) fn = do
+writeBinMem (BinMem _ ix_r _ arr_r) fn = do
   h <- openBinaryFile fn WriteMode
   arr <- readIORef arr_r
   ix  <- readFastMutInt ix_r
@@ -232,7 +225,7 @@ readBinMem filename = do
 
 -- expand the size of the array to include a specified offset
 expandBin :: BinHandle -> Int -> IO ()
-expandBin (BinMem _ ix_r sz_r arr_r) off = do
+expandBin (BinMem _ _ sz_r arr_r) off = do
    sz <- readFastMutInt sz_r
    let sz' = head (dropWhile (<= off) (iterate (* 2) sz))
    arr <- readIORef arr_r
@@ -375,8 +368,8 @@ instance Binary Int64 where
 -- Instances for standard types
 
 instance Binary () where
-    put_ bh () = return ()
-    get  _     = return ()
+    put_ _ () = return ()
+    get  _    = return ()
 --    getF bh p  = case getBitsF bh 0 p of (_,b) -> ((),b)
 
 instance Binary Bool where
@@ -476,7 +469,7 @@ instance (Binary a, Binary b) => Binary (Either a b) where
 instance Binary Integer where
     put_ bh (S# i#) = do putByte bh 0; put_ bh (I# i#)
     put_ bh (J# s# a#) = do
-        p <- putByte bh 1;
+        putByte bh 1
         put_ bh (I# s#)
         let sz# = sizeofByteArray# a#  -- in *bytes*
         put_ bh (I# sz#)  -- in *bytes*
@@ -618,8 +611,10 @@ newWriteState = do
                     ud_symtab_map = symtab_map
                    }
 
+noUserData :: a
 noUserData = undef "UserData"
 
+undef :: String -> a
 undef s = panic ("Binary.UserData: no " ++ s)
 
 ---------------------------------------------------------
@@ -653,7 +648,8 @@ type SymbolTable = Array Int Name
 -- Reading and writing FastStrings
 ---------------------------------------------------------
 
-putFS bh (FastString id l _ buf _) = do
+putFS :: BinHandle -> FastString -> IO ()
+putFS bh (FastString _ l _ buf _) = do
   put_ bh l
   withForeignPtr buf $ \ptr ->
     let
@@ -672,6 +668,7 @@ getFS bh@BinMem{} = do
   off <- readFastMutInt (off_r bh)
   return $! (mkFastSubStringBA# arr off l)
 -}
+getFS :: BinHandle -> IO FastString
 getFS bh = do
   l <- get bh
   fp <- mallocForeignPtrBytes l
@@ -686,20 +683,19 @@ getFS bh = do
   go 0
 
 instance Binary FastString where
-  put_ bh f@(FastString id l _ fp _) =
+  put_ bh f =
     case getUserData bh of {
         UserData { ud_dict_next = j_r,
-                   ud_dict_map = out_r,
-                   ud_dict = dict} -> do
+                   ud_dict_map = out_r} -> do
     out <- readIORef out_r
     let uniq = getUnique f
     case lookupUFM out uniq of
-        Just (j,f)  -> put_ bh j
+        Just (j, _)  -> put_ bh j
         Nothing -> do
            j <- readFastMutInt j_r
            put_ bh j
-           writeFastMutInt j_r (j+1)
-           writeIORef out_r $! addToUFM out uniq (j,f)
+           writeFastMutInt j_r (j + 1)
+           writeIORef out_r $! addToUFM out uniq (j, f)
     }
 
   get bh = do
