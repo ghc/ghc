@@ -16,14 +16,14 @@
 module System.IO (
     -- * The IO monad
 
-    IO,			       -- instance MonadFix
-    fixIO,		       -- :: (a -> IO a) -> IO a
+    IO,                        -- instance MonadFix
+    fixIO,                     -- :: (a -> IO a) -> IO a
 
     -- * Files and handles
 
-    FilePath,		       -- :: String
+    FilePath,                  -- :: String
 
-    Handle,		-- abstract, instance of: Eq, Show.
+    Handle,             -- abstract, instance of: Eq, Show.
 
     -- ** Standard handles
 
@@ -37,20 +37,20 @@ module System.IO (
     -- ** Opening files
 
     withFile,
-    openFile,		       -- :: FilePath -> IOMode -> IO Handle
+    openFile,                  -- :: FilePath -> IOMode -> IO Handle
     IOMode(ReadMode,WriteMode,AppendMode,ReadWriteMode),
 
     -- ** Closing files
 
-    hClose,		       -- :: Handle -> IO ()
+    hClose,                    -- :: Handle -> IO ()
 
     -- ** Special cases
 
     -- | These functions are also exported by the "Prelude".
 
-    readFile,		       -- :: FilePath -> IO String
-    writeFile,		       -- :: FilePath -> String -> IO ()
-    appendFile,		       -- :: FilePath -> String -> IO ()
+    readFile,                  -- :: FilePath -> IO String
+    writeFile,                 -- :: FilePath -> String -> IO ()
+    appendFile,                -- :: FilePath -> String -> IO ()
 
     -- ** File locking
 
@@ -60,33 +60,33 @@ module System.IO (
 
     -- ** Determining and changing the size of a file
 
-    hFileSize,		       -- :: Handle -> IO Integer
+    hFileSize,                 -- :: Handle -> IO Integer
 #ifdef __GLASGOW_HASKELL__
     hSetFileSize,              -- :: Handle -> Integer -> IO ()
 #endif
 
     -- ** Detecting the end of input
 
-    hIsEOF,		       -- :: Handle -> IO Bool
-    isEOF,		       -- :: IO Bool
+    hIsEOF,                    -- :: Handle -> IO Bool
+    isEOF,                     -- :: IO Bool
 
     -- ** Buffering operations
 
     BufferMode(NoBuffering,LineBuffering,BlockBuffering),
-    hSetBuffering,	       -- :: Handle -> BufferMode -> IO ()
-    hGetBuffering,	       -- :: Handle -> IO BufferMode
-    hFlush,		       -- :: Handle -> IO ()
+    hSetBuffering,             -- :: Handle -> BufferMode -> IO ()
+    hGetBuffering,             -- :: Handle -> IO BufferMode
+    hFlush,                    -- :: Handle -> IO ()
 
     -- ** Repositioning handles
 
-    hGetPosn,		       -- :: Handle -> IO HandlePosn
-    hSetPosn,		       -- :: HandlePosn -> IO ()
+    hGetPosn,                  -- :: Handle -> IO HandlePosn
+    hSetPosn,                  -- :: HandlePosn -> IO ()
     HandlePosn,                -- abstract, instance of: Eq, Show.
 
-    hSeek,		       -- :: Handle -> SeekMode -> Integer -> IO ()
+    hSeek,                     -- :: Handle -> SeekMode -> Integer -> IO ()
     SeekMode(AbsoluteSeek,RelativeSeek,SeekFromEnd),
 #if !defined(__NHC__)
-    hTell,		       -- :: Handle -> IO Integer
+    hTell,                     -- :: Handle -> IO Integer
 #endif
 
     -- ** Handle properties
@@ -98,61 +98,61 @@ module System.IO (
     -- ** Terminal operations (not portable: GHC\/Hugs only)
 
 #if !defined(__NHC__)
-    hIsTerminalDevice,	 	-- :: Handle -> IO Bool
+    hIsTerminalDevice,          -- :: Handle -> IO Bool
 
-    hSetEcho,			-- :: Handle -> Bool -> IO ()
-    hGetEcho,			-- :: Handle -> IO Bool
+    hSetEcho,                   -- :: Handle -> Bool -> IO ()
+    hGetEcho,                   -- :: Handle -> IO Bool
 #endif
 
     -- ** Showing handle state (not portable: GHC only)
 
 #ifdef __GLASGOW_HASKELL__
-    hShow,			-- :: Handle -> IO String
+    hShow,                      -- :: Handle -> IO String
 #endif
 
     -- * Text input and output
 
     -- ** Text input
 
-    hWaitForInput,	       -- :: Handle -> Int -> IO Bool
-    hReady,		       -- :: Handle -> IO Bool
-    hGetChar,		       -- :: Handle -> IO Char
-    hGetLine,		       -- :: Handle -> IO [Char]
-    hLookAhead,		       -- :: Handle -> IO Char
-    hGetContents,	       -- :: Handle -> IO [Char]
+    hWaitForInput,             -- :: Handle -> Int -> IO Bool
+    hReady,                    -- :: Handle -> IO Bool
+    hGetChar,                  -- :: Handle -> IO Char
+    hGetLine,                  -- :: Handle -> IO [Char]
+    hLookAhead,                -- :: Handle -> IO Char
+    hGetContents,              -- :: Handle -> IO [Char]
 
     -- ** Text output
 
-    hPutChar,		       -- :: Handle -> Char -> IO ()
-    hPutStr,		       -- :: Handle -> [Char] -> IO ()
-    hPutStrLn,		       -- :: Handle -> [Char] -> IO ()
-    hPrint,		       -- :: Show a => Handle -> a -> IO ()
+    hPutChar,                  -- :: Handle -> Char -> IO ()
+    hPutStr,                   -- :: Handle -> [Char] -> IO ()
+    hPutStrLn,                 -- :: Handle -> [Char] -> IO ()
+    hPrint,                    -- :: Show a => Handle -> a -> IO ()
 
     -- ** Special cases for standard input and output
 
     -- | These functions are also exported by the "Prelude".
 
-    interact,		       -- :: (String -> String) -> IO ()
-    putChar,		       -- :: Char   -> IO ()
-    putStr,		       -- :: String -> IO () 
-    putStrLn,		       -- :: String -> IO ()
-    print,		       -- :: Show a => a -> IO ()
-    getChar,		       -- :: IO Char
-    getLine,		       -- :: IO String
-    getContents,	       -- :: IO String
-    readIO,		       -- :: Read a => String -> IO a
-    readLn,		       -- :: Read a => IO a
+    interact,                  -- :: (String -> String) -> IO ()
+    putChar,                   -- :: Char   -> IO ()
+    putStr,                    -- :: String -> IO () 
+    putStrLn,                  -- :: String -> IO ()
+    print,                     -- :: Show a => a -> IO ()
+    getChar,                   -- :: IO Char
+    getLine,                   -- :: IO String
+    getContents,               -- :: IO String
+    readIO,                    -- :: Read a => String -> IO a
+    readLn,                    -- :: Read a => IO a
 
     -- * Binary input and output
 
     withBinaryFile,
-    openBinaryFile,	       -- :: FilePath -> IOMode -> IO Handle
-    hSetBinaryMode,	       -- :: Handle -> Bool -> IO ()
-    hPutBuf,		       -- :: Handle -> Ptr a -> Int -> IO ()
-    hGetBuf,		       -- :: Handle -> Ptr a -> Int -> IO Int
+    openBinaryFile,            -- :: FilePath -> IOMode -> IO Handle
+    hSetBinaryMode,            -- :: Handle -> Bool -> IO ()
+    hPutBuf,                   -- :: Handle -> Ptr a -> Int -> IO ()
+    hGetBuf,                   -- :: Handle -> Ptr a -> Int -> IO Int
 #if !defined(__NHC__) && !defined(__HUGS__)
-    hPutBufNonBlocking,	       -- :: Handle -> Ptr a -> Int -> IO Int
-    hGetBufNonBlocking,	       -- :: Handle -> Ptr a -> Int -> IO Int
+    hPutBufNonBlocking,        -- :: Handle -> Ptr a -> Int -> IO Int
+    hGetBufNonBlocking,        -- :: Handle -> Ptr a -> Int -> IO Int
 #endif
 
     -- * Temporary files
@@ -179,8 +179,8 @@ import Hugs.Exception   as ExceptionBase
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.IOBase	-- Together these four Prelude modules define
-import GHC.Handle	-- all the stuff exported by IO for the GHC version
+import GHC.IOBase       -- Together these four Prelude modules define
+import GHC.Handle       -- all the stuff exported by IO for the GHC version
 import GHC.IO
 import GHC.Exception
 import GHC.Num
@@ -192,9 +192,9 @@ import GHC.Show
 import Hugs.IO
 import Hugs.IOExts
 import Hugs.IORef
-import Hugs.Prelude	( throw, Exception(NonTermination) )
+import Hugs.Prelude     ( throw, Exception(NonTermination) )
 import Control.Exception ( bracket )
-import System.IO.Unsafe	( unsafeInterleaveIO )
+import System.IO.Unsafe ( unsafeInterleaveIO )
 #endif
 
 #ifdef __NHC__
@@ -307,7 +307,7 @@ interact f      =   do s <- getContents
 -- The file is read lazily, on demand, as with 'getContents'.
 
 readFile        :: FilePath -> IO String
-readFile name	=  openFile name ReadMode >>= hGetContents
+readFile name   =  openFile name ReadMode >>= hGetContents
 
 -- | The computation 'writeFile' @file str@ function writes the string @str@,
 -- to the file @file@.
@@ -338,11 +338,11 @@ readLn          =  do l <- getLine
 
 readIO          :: Read a => String -> IO a
 readIO s        =  case (do { (x,t) <- reads s ;
-			      ("","") <- lex t ;
+                              ("","") <- lex t ;
                               return x }) of
-			[x]    -> return x
-			[]     -> ioError (userError "Prelude.readIO: no parse")
-			_      -> ioError (userError "Prelude.readIO: ambiguous parse")
+                        [x]    -> return x
+                        []     -> ioError (userError "Prelude.readIO: no parse")
+                        _      -> ioError (userError "Prelude.readIO: ambiguous parse")
 #endif  /* __GLASGOW_HASKELL__ */
 
 #ifndef __NHC__
@@ -353,12 +353,12 @@ readIO s        =  case (do { (x,t) <- reads s ;
 --
 --  * 'System.IO.Error.isEOFError' if the end of file has been reached.
 
-hReady		:: Handle -> IO Bool
-hReady h 	=  hWaitForInput h 0
+hReady          :: Handle -> IO Bool
+hReady h        =  hWaitForInput h 0
 
 -- | The same as 'hPutStr', but adds a newline character.
 
-hPutStrLn	:: Handle -> String -> IO ()
+hPutStrLn       :: Handle -> String -> IO ()
 hPutStrLn hndl str = do
  hPutStr  hndl str
  hPutChar hndl '\n'
@@ -373,8 +373,8 @@ hPutStrLn hndl str = do
 --
 --  * 'System.IO.Error.isPermissionError' if another system resource limit would be exceeded.
 
-hPrint		:: Show a => Handle -> a -> IO ()
-hPrint hdl 	=  hPutStrLn hdl . show
+hPrint          :: Show a => Handle -> a -> IO ()
+hPrint hdl      =  hPutStrLn hdl . show
 #endif /* !__NHC__ */
 
 -- | @'withFile' name mode act@ opens a file using 'openFile' and passes
@@ -448,7 +448,7 @@ openTempFile' loc tmp_dir template binary = do
     -- We split off the last extension, so we can use .foo.ext files
     -- for temporary files (hidden on Unix OSes). Unfortunately we're
     -- below filepath in the hierarchy here.
-    (prefix,suffix) = 
+    (prefix,suffix) =
        case break (== '.') $ reverse template of
          -- First case: template contains no '.'s. Just re-reverse it.
          (rev_suffix, "")       -> (reverse rev_suffix, "")
@@ -479,7 +479,7 @@ openTempFile' loc tmp_dir template binary = do
     findTempName x = do
       fd <- withCString filepath $ \ f ->
               c_open f oflags 0o600
-      if fd < 0 
+      if fd < 0
        then do
          errno <- getErrno
          if errno == eEXIST
@@ -490,8 +490,8 @@ openTempFile' loc tmp_dir template binary = do
          -- as any exceptions etc will only be able to report the
          -- fd currently
          h <- fdToHandle fd
-	        `ExceptionBase.catchException` \e -> do c_close fd; throw e
-	 return (filepath, h)
+                `ExceptionBase.catchException` \e -> do c_close fd; throw e
+         return (filepath, h)
 #endif
       where
         filename        = prefix ++ show x ++ suffix
@@ -554,17 +554,17 @@ foreign import ccall "getpid" c_getpid :: IO Int
 
 #ifdef __GLASGOW_HASKELL__
 -- Copied here to avoid recursive dependency with Control.Exception
-bracket 
-	:: IO a		-- ^ computation to run first (\"acquire resource\")
-	-> (a -> IO b)  -- ^ computation to run last (\"release resource\")
-	-> (a -> IO c)	-- ^ computation to run in-between
-	-> IO c		-- returns the value from the in-between computation
+bracket
+        :: IO a         -- ^ computation to run first (\"acquire resource\")
+        -> (a -> IO b)  -- ^ computation to run last (\"release resource\")
+        -> (a -> IO c)  -- ^ computation to run in-between
+        -> IO c         -- returns the value from the in-between computation
 bracket before after thing =
   block (do
-    a <- before 
+    a <- before
     r <- catchException
-	   (unblock (thing a))
-	   (\e -> do { after a; throw e })
+           (unblock (thing a))
+           (\e -> do { after a; throw e })
     after a
     return r
  )
