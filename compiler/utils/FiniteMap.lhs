@@ -18,13 +18,6 @@ The code is SPECIALIZEd to various highly-desirable types (e.g., Id)
 near the end.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module FiniteMap (
         FiniteMap, -- abstract type
 
@@ -53,8 +46,6 @@ module FiniteMap (
         bagToFM
     ) where
 
-#include "HsVersions.h"
-
 #if defined(DEBUG_FINITEMAPS)/* NB NB NB */
 #define OUTPUTABLE_key , Outputable key
 #else
@@ -63,7 +54,6 @@ module FiniteMap (
 
 import Maybes
 import Bag ( Bag, foldrBag )
-import Util
 import Outputable
 
 #if 0
@@ -225,16 +215,17 @@ bagToFM = foldrBag (\(k,v) fm -> addToFM fm k v) emptyFM
 %************************************************************************
 
 \begin{code}
-addToFM fm key elt = addToFM_C (\ old new -> new) fm key elt
+addToFM fm key elt = addToFM_C (\ _old new -> new) fm key elt
 
-addToFM_C combiner EmptyFM key elt = unitFM key elt
+addToFM_C _        EmptyFM key elt = unitFM key elt
 addToFM_C combiner (Branch key elt size fm_l fm_r) new_key new_elt
   = case compare new_key key of
         LT -> mkBalBranch key elt (addToFM_C combiner fm_l new_key new_elt) fm_r
         GT -> mkBalBranch key elt fm_l (addToFM_C combiner fm_r new_key new_elt)
         EQ -> Branch new_key (combiner elt new_elt) size fm_l fm_r
 
-addListToFM fm key_elt_pairs = addListToFM_C (\ old new -> new) fm key_elt_pairs
+addListToFM fm key_elt_pairs
+    = addListToFM_C (\ _old new -> new) fm key_elt_pairs
 
 addListToFM_C combiner fm key_elt_pairs
   = foldl' add fm key_elt_pairs	-- foldl adds from the left
@@ -243,8 +234,8 @@ addListToFM_C combiner fm key_elt_pairs
 \end{code}
 
 \begin{code}
-delFromFM EmptyFM del_key = emptyFM
-delFromFM (Branch key elt size fm_l fm_r) del_key
+delFromFM EmptyFM _ = emptyFM
+delFromFM (Branch key elt _ fm_l fm_r) del_key
   = case compare del_key key of
         GT -> mkBalBranch key elt fm_l (delFromFM fm_r del_key)
         LT -> mkBalBranch key elt (delFromFM fm_l del_key) fm_r
@@ -260,8 +251,8 @@ delListFromFM fm keys = foldl' delFromFM fm keys
 %************************************************************************
 
 \begin{code}
-plusFM_C combiner EmptyFM fm2 = fm2
-plusFM_C combiner fm1 EmptyFM = fm1
+plusFM_C _ EmptyFM fm2 = fm2
+plusFM_C _ fm1 EmptyFM = fm1
 plusFM_C combiner fm1 (Branch split_key elt2 _ left right)
   = mkVBalBranch split_key new_elt
                  (plusFM_C combiner lts left)
@@ -285,19 +276,19 @@ plusFM fm1 (Branch split_key elt1 _ left right)
     lts     = splitLT fm1 split_key
     gts     = splitGT fm1 split_key
 
-minusFM EmptyFM fm2 = emptyFM
+minusFM EmptyFM _ = emptyFM
 minusFM fm1 EmptyFM = fm1
-minusFM fm1 (Branch split_key elt _ left right)
+minusFM fm1 (Branch split_key _ _ left right)
   = glueVBal (minusFM lts left) (minusFM gts right)
     -- The two can be way different, so we need glueVBal
   where
     lts = splitLT fm1 split_key -- NB gt and lt, so the equal ones
     gts = splitGT fm1 split_key -- are not in either.
 
-intersectFM fm1 fm2 = intersectFM_C (\ left right -> right) fm1 fm2
+intersectFM fm1 fm2 = intersectFM_C (\ _ right -> right) fm1 fm2
 
-intersectFM_C combiner fm1 EmptyFM = emptyFM
-intersectFM_C combiner EmptyFM fm2 = emptyFM
+intersectFM_C _ _ EmptyFM = emptyFM
+intersectFM_C _ EmptyFM _ = emptyFM
 intersectFM_C combiner fm1 (Branch split_key elt2 _ left right)
 
   | maybeToBool maybe_elt1 -- split_elt *is* in intersection
@@ -324,15 +315,15 @@ intersectFM_C combiner fm1 (Branch split_key elt2 _ left right)
 %************************************************************************
 
 \begin{code}
-foldFM k z EmptyFM = z
+foldFM _ z EmptyFM = z
 foldFM k z (Branch key elt _ fm_l fm_r)
   = foldFM k (k key elt (foldFM k z fm_r)) fm_l
 
-mapFM f EmptyFM = emptyFM
+mapFM _ EmptyFM = emptyFM
 mapFM f (Branch key elt size fm_l fm_r)
   = Branch key (f key elt) size (mapFM f fm_l) (mapFM f fm_r)
 
-filterFM p EmptyFM = emptyFM
+filterFM _ EmptyFM = emptyFM
 filterFM p (Branch key elt _ fm_l fm_r)
   | p key elt -- Keep the item
   = mkVBalBranch key elt (filterFM p fm_l) (filterFM p fm_r)
@@ -354,15 +345,14 @@ sizeFM (Branch _ _ size _ _) = size
 
 isEmptyFM fm = sizeFM fm == 0
 
-lookupFM EmptyFM key = Nothing
+lookupFM EmptyFM _ = Nothing
 lookupFM (Branch key elt _ fm_l fm_r) key_to_find
   = case compare key_to_find key of
         LT -> lookupFM fm_l key_to_find
         GT -> lookupFM fm_r key_to_find
         EQ -> Just elt
 
-key `elemFM` fm
-  = case (lookupFM fm key) of { Nothing -> False; Just elt -> True }
+key `elemFM` fm = isJust (lookupFM fm key)
 
 lookupWithDefaultFM fm deflt key
   = case (lookupFM fm key) of { Nothing -> deflt; Just elt -> elt }
@@ -375,9 +365,9 @@ lookupWithDefaultFM fm deflt key
 %************************************************************************
 
 \begin{code}
-fmToList fm = foldFM (\ key elt rest -> (key,elt) : rest) [] fm
-keysFM fm   = foldFM (\ key elt rest -> key : rest)       [] fm
-eltsFM fm   = foldFM (\ key elt rest -> elt : rest)       [] fm
+fmToList fm = foldFM (\  key elt  rest -> (key, elt) : rest) [] fm
+keysFM fm   = foldFM (\  key _elt rest -> key        : rest) [] fm
+eltsFM fm   = foldFM (\ _key elt  rest -> elt        : rest) [] fm
 \end{code}
 
 
@@ -408,11 +398,11 @@ mkBranch :: (Ord key OUTPUTABLE_key) -- Used for the assertion checking only
          -> FiniteMap key elt -> FiniteMap key elt
          -> FiniteMap key elt
 
-mkBranch which key elt fm_l fm_r
+mkBranch _which key elt fm_l fm_r
   = --ASSERT( left_ok && right_ok && balance_ok )
 #if defined(DEBUG_FINITEMAPS)
     if not ( left_ok && right_ok && balance_ok ) then
-        pprPanic ("mkBranch:"++show which)
+        pprPanic ("mkBranch:"++show _which)
                  (vcat [ppr [left_ok, right_ok, balance_ok],
                             ppr key,
                             ppr fm_l,
@@ -429,19 +419,21 @@ mkBranch which key elt fm_l fm_r
 --      result
 --      )
   where
+#if defined(DEBUG_FINITEMAPS)
     left_ok  = case fm_l of
                 EmptyFM                  -> True
-                Branch left_key _ _ _ _  -> let
+                Branch _ _ _ _ _  -> let
                                                 biggest_left_key = fst (findMax fm_l)
                                             in
                                             biggest_left_key < key
     right_ok = case fm_r of
                 EmptyFM                  -> True
-                Branch right_key _ _ _ _ -> let
+                Branch _ _ _ _ _ -> let
                                                 smallest_right_key = fst (findMin fm_r)
                                             in
                                             key < smallest_right_key
     balance_ok = True -- sigh
+#endif
 {- LATER:
     balance_ok
       = -- Both subtrees have one or no elements...
@@ -483,15 +475,14 @@ mkBalBranch key elt fm_L fm_R
         Branch _ _ _ fm_rl fm_rr
                 | sizeFM fm_rl < 2 * sizeFM fm_rr -> single_L fm_L fm_R
                 | otherwise                       -> double_L fm_L fm_R
-        -- Other case impossible
+        _ -> panic "mkBalBranch: impossible case 1"
 
   | size_l > sIZE_RATIO * size_r -- Left tree too big
   = case fm_L of
         Branch _ _ _ fm_ll fm_lr
                 | sizeFM fm_lr < 2 * sizeFM fm_ll -> single_R fm_L fm_R
                 | otherwise                       -> double_R fm_L fm_R
-        -- Other case impossible
-
+        _ -> panic "mkBalBranch: impossible case 2"
   | otherwise -- No imbalance
   = mkBranch 2{-which-} key elt fm_L fm_R
 
@@ -501,20 +492,24 @@ mkBalBranch key elt fm_L fm_R
 
     single_L fm_l (Branch key_r elt_r _ fm_rl fm_rr)
         = mkBranch 3{-which-} key_r elt_r (mkBranch 4{-which-} key elt fm_l fm_rl) fm_rr
+    single_L _ _ = panic "mkBalBranch: impossible case 3"
 
     double_L fm_l (Branch key_r elt_r _ (Branch key_rl elt_rl _ fm_rll fm_rlr) fm_rr)
         = mkBranch 5{-which-} key_rl elt_rl
                    (mkBranch 6{-which-} key   elt   fm_l   fm_rll)
                    (mkBranch 7{-which-} key_r elt_r fm_rlr fm_rr)
+    double_L _ _ = panic "mkBalBranch: impossible case 4"
 
     single_R (Branch key_l elt_l _ fm_ll fm_lr) fm_r
         = mkBranch 8{-which-} key_l elt_l fm_ll
                    (mkBranch 9{-which-} key elt fm_lr fm_r)
+    single_R _ _ = panic "mkBalBranch: impossible case 5"
 
     double_R (Branch key_l elt_l _ fm_ll (Branch key_lr elt_lr _ fm_lrl fm_lrr)) fm_r
         = mkBranch 10{-which-} key_lr elt_lr
                    (mkBranch 11{-which-} key_l elt_l fm_ll  fm_lrl)
                    (mkBranch 12{-which-} key   elt   fm_lrr fm_r)
+    double_R _ _ = panic "mkBalBranch: impossible case 6"
 \end{code}
 
 
@@ -616,14 +611,14 @@ splitLT, splitGT :: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> key -> Fini
 -- splitLT fm split_key  =  fm restricted to keys <  split_key
 -- splitGT fm split_key  =  fm restricted to keys >  split_key
 
-splitLT EmptyFM split_key = emptyFM
+splitLT EmptyFM _ = emptyFM
 splitLT (Branch key elt _ fm_l fm_r) split_key
   = case compare split_key key of
         LT -> splitLT fm_l split_key
         GT -> mkVBalBranch key elt fm_l (splitLT fm_r split_key)
         EQ -> fm_l
 
-splitGT EmptyFM split_key = emptyFM
+splitGT EmptyFM _ = emptyFM
 splitGT (Branch key elt _ fm_l fm_r) split_key
   = case compare split_key key of
         GT -> splitGT fm_r split_key
@@ -631,20 +626,25 @@ splitGT (Branch key elt _ fm_l fm_r) split_key
         EQ -> fm_r
 
 findMin :: FiniteMap key elt -> (key,elt)
-findMin (Branch key elt _ EmptyFM _) = (key,elt)
-findMin (Branch key elt _ fm_l    _) = findMin fm_l
+findMin (Branch key elt _ EmptyFM _) = (key, elt)
+findMin (Branch _   _   _ fm_l    _) = findMin fm_l
+findMin EmptyFM = panic "findMin: Empty"
 
 deleteMin :: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt
-deleteMin (Branch key elt _ EmptyFM fm_r) = fm_r
-deleteMin (Branch key elt _ fm_l    fm_r) = mkBalBranch key elt (deleteMin fm_l) fm_r
+deleteMin (Branch _   _   _ EmptyFM fm_r) = fm_r
+deleteMin (Branch key elt _ fm_l    fm_r)
+    = mkBalBranch key elt (deleteMin fm_l) fm_r
+deleteMin EmptyFM = panic "deleteMin: Empty"
 
-findMax :: FiniteMap key elt -> (key,elt)
-findMax (Branch key elt _ _ EmptyFM) = (key,elt)
-findMax (Branch key elt _ _    fm_r) = findMax fm_r
+findMax :: FiniteMap key elt -> (key, elt)
+findMax (Branch key elt _ _ EmptyFM) = (key, elt)
+findMax (Branch _   _   _ _    fm_r) = findMax fm_r
+findMax EmptyFM = panic "findMax: Empty"
 
 deleteMax :: (Ord key OUTPUTABLE_key) => FiniteMap key elt -> FiniteMap key elt
-deleteMax (Branch key elt _ fm_l EmptyFM) = fm_l
+deleteMax (Branch _   _   _ fm_l EmptyFM) = fm_l
 deleteMax (Branch key elt _ fm_l    fm_r) = mkBalBranch key elt fm_l (deleteMax fm_r)
+deleteMax EmptyFM = panic "deleteMax: Empty"
 \end{code}
 
 %************************************************************************
