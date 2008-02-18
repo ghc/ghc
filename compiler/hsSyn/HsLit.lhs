@@ -55,9 +55,9 @@ instance Eq HsLit where
   _                 == _                 = False
 
 data HsOverLit id 	-- An overloaded literal
-  = HsIntegral   Integer    (SyntaxExpr id)  PostTcType	-- Integer-looking literals;
-  | HsFractional Rational   (SyntaxExpr id)  PostTcType	-- Frac-looking literals
-  | HsIsString   FastString (SyntaxExpr id)  PostTcType	-- String-looking literals
+  = HsIntegral   !Integer    (SyntaxExpr id)  PostTcType	-- Integer-looking literals;
+  | HsFractional !Rational   (SyntaxExpr id)  PostTcType	-- Frac-looking literals
+  | HsIsString   !FastString (SyntaxExpr id)  PostTcType	-- String-looking literals
   -- Before type checking, the SyntaxExpr is 'fromInteger' or 'fromRational'
   -- After type checking, it is (fromInteger 3) or lit_78; that is,
   -- the expression that should replace the literal.
