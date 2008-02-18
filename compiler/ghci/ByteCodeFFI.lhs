@@ -687,12 +687,12 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
                      dst = linkageArea + (offsetW+w) * bytes_per_word
             in
                case a_rep of
-                  FloatArg | nextFPR < 14 ->
+                  FloatRep | nextFPR < 14 ->
                       (0xc01f0000    -- lfs fX, haskellArgOffset(r31)
                         .|. (fromIntegral haskellArgOffset .&. 0xFFFF)
                         .|. (fromIntegral nextFPR `shiftL` 21))
                       : pass_parameters args (nextFPR+1) offsetW'
-                  DoubleArg | nextFPR < 14 ->
+                  DoubleRep | nextFPR < 14 ->
                       (0xc81f0000    -- lfd fX, haskellArgOffset(r31)
                         .|. (fromIntegral haskellArgOffset .&. 0xFFFF)
                         .|. (fromIntegral nextFPR `shiftL` 21))
@@ -702,11 +702,11 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
                       ++ pass_parameters args nextFPR offsetW'              
                
          gather_result = case r_rep of
-            VoidArg -> []
-            FloatArg -> 
+            VoidRep -> []
+            FloatRep -> 
                [0xd03f0000 .|. (fromIntegral result_off .&. 0xFFFF)]
                -- stfs f1, result_off(r31)
-            DoubleArg -> 
+            DoubleRep -> 
                [0xd83f0000 .|. (fromIntegral result_off .&. 0xFFFF)]
                -- stfd f1, result_off(r31)
             _ | primRepSizeW r_rep == 2 ->
@@ -765,10 +765,11 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
    where
      gather_result :: [Word32]
      gather_result = case r_rep of
-       VoidArg   -> []
-       FloatArg  -> storeFloat  1 r_offW
-       DoubleArg -> storeDouble 1 r_offW
-       LongArg   -> storeLong   3 r_offW
+       VoidRep   -> []
+       FloatRep  -> storeFloat  1 r_offW
+       DoubleRep -> storeDouble 1 r_offW
+       Int64Rep  -> storeLong   3 r_offW
+       Word64Rep -> storeLong   3 r_offW
        _         -> storeWord   3 r_offW
 
      pass_parameters :: [Word32]
@@ -780,23 +781,26 @@ mkMarshalCode_wrk cconv (r_offW, r_rep) addr_offW arg_offs_n_reps
      ((_,_,argsize), params) = mapAccumL loadparam (3,1,2) arg_offs_n_reps
 
      -- handle one argument, returning machine code and the updated state
-     loadparam :: (Int, Int, Int) -> (Int, CgRep) ->
+     loadparam :: (Int, Int, Int) -> (Int, PrimRep) ->
                   ((Int, Int, Int), [Word32])
 
      loadparam (gpr, fpr, stack) (ofs, rep) = case rep of
-       FloatArg | fpr <= 8  -> ( (gpr, fpr + 1, stack),  loadFloat fpr ofs )
-       FloatArg             -> ( (gpr, fpr, stack + 1),  stackWord stack ofs )
+       FloatRep | fpr <= 8  -> ( (gpr, fpr + 1, stack),  loadFloat fpr ofs )
+       FloatRep             -> ( (gpr, fpr, stack + 1),  stackWord stack ofs )
 
-       DoubleArg | fpr <= 8 -> ( (gpr, fpr + 1, stack),  loadDouble fpr ofs )
-       DoubleArg            -> ( (gpr, fpr, astack + 2), stackLong astack ofs )
+       DoubleRep | fpr <= 8 -> ( (gpr, fpr + 1, stack),  loadDouble fpr ofs )
+       DoubleRep            -> ( (gpr, fpr, astack + 2), stackLong astack ofs )
 
-       LongArg | even gpr   -> loadparam (gpr + 1, fpr, stack) (ofs, rep)
-       LongArg | gpr <= 9   -> ( (gpr + 2, fpr, stack),  loadLong gpr ofs )
-       LongArg              -> ( (gpr, fpr, astack + 2), stackLong astack ofs )
-
+       r | is64 r && even gpr  -> loadparam (gpr + 1, fpr, stack) (ofs, rep)
+       r | is64 r && gpr <= 9  -> ( (gpr + 2, fpr, stack),  loadLong gpr ofs )
+       r | is64 r              -> ( (gpr, fpr, astack + 2), stackLong astack ofs )
        _ | gpr <= 10        -> ( (gpr + 1, fpr, stack),  loadWord gpr ofs )
        _                    -> ( (gpr, fpr, stack + 1),  stackWord stack ofs )
       where astack = alignedTo 2 stack
+
+            is64 Int64Rep = True
+            is64 Word64Rep = True
+            is64 _ = False
 
      alignedTo :: Int -> Int -> Int
      alignedTo alignment x = case x `mod` alignment of
