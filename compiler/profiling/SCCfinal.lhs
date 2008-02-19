@@ -36,45 +36,45 @@ module SCCfinal ( stgMassageForProfiling ) where
 
 import StgSyn
 
-import StaticFlags	( opt_AutoSccsOnIndividualCafs )
-import CostCentre	-- lots of things
+import StaticFlags      ( opt_AutoSccsOnIndividualCafs )
+import CostCentre       -- lots of things
 import Id
 import Name
 import Module
-import UniqSupply	( splitUniqSupply, UniqSupply )
+import UniqSupply       ( splitUniqSupply, UniqSupply )
 #ifdef PROF_DO_BOXING
-import UniqSupply	( uniqFromSupply )
+import UniqSupply       ( uniqFromSupply )
 #endif
 import VarSet
-import ListSetOps	( removeDups )
+import ListSetOps       ( removeDups )
 import Outputable
 \end{code}
 
 \begin{code}
 stgMassageForProfiling
-	:: PackageId
-	-> Module			-- module name
-	-> UniqSupply		    	-- unique supply
-	-> [StgBinding]		    	-- input
-	-> (CollectedCCs, [StgBinding])
+        :: PackageId
+        -> Module                       -- module name
+        -> UniqSupply                   -- unique supply
+        -> [StgBinding]                 -- input
+        -> (CollectedCCs, [StgBinding])
 
 stgMassageForProfiling this_pkg mod_name us stg_binds
   = let
-	((local_ccs, extern_ccs, cc_stacks),
-	 stg_binds2)
-	  = initMM mod_name us (do_top_bindings stg_binds)
+        ((local_ccs, extern_ccs, cc_stacks),
+         stg_binds2)
+          = initMM mod_name us (do_top_bindings stg_binds)
 
-	(fixed_ccs, fixed_cc_stacks)
-	  = if opt_AutoSccsOnIndividualCafs
-	    then ([],[])  -- don't need "all CAFs" CC 
-			  -- (for Prelude, we use PreludeCC)
-	    else ([all_cafs_cc], [all_cafs_ccs])
+        (fixed_ccs, fixed_cc_stacks)
+          = if opt_AutoSccsOnIndividualCafs
+            then ([],[])  -- don't need "all CAFs" CC
+                          -- (for Prelude, we use PreludeCC)
+            else ([all_cafs_cc], [all_cafs_ccs])
 
-	local_ccs_no_dups  = fst (removeDups cmpCostCentre local_ccs)
-	extern_ccs_no_dups = fst (removeDups cmpCostCentre extern_ccs)
+        local_ccs_no_dups  = fst (removeDups cmpCostCentre local_ccs)
+        extern_ccs_no_dups = fst (removeDups cmpCostCentre extern_ccs)
     in
-    ((fixed_ccs ++ local_ccs_no_dups, 
-      extern_ccs_no_dups, 
+    ((fixed_ccs ++ local_ccs_no_dups,
+      extern_ccs_no_dups,
       fixed_cc_stacks ++ cc_stacks), stg_binds2)
   where
 
@@ -108,18 +108,18 @@ stgMassageForProfiling this_pkg mod_name us stg_binds
 
     do_top_rhs binder (StgRhsClosure _ bi fv u srt [] (StgSCC cc (StgConApp con args)))
       | not (isSccCountCostCentre cc) && not (isDllConApp this_pkg con args)
-	-- Trivial _scc_ around nothing but static data
-	-- Eliminate _scc_ ... and turn into StgRhsCon
+        -- Trivial _scc_ around nothing but static data
+        -- Eliminate _scc_ ... and turn into StgRhsCon
 
-	-- isDllConApp checks for LitLit args too
+        -- isDllConApp checks for LitLit args too
       = return (StgRhsCon dontCareCCS con args)
 
 {- Can't do this one with cost-centre stacks:  --SDM
     do_top_rhs binder (StgRhsClosure no_cc bi fv u [] (StgSCC ty cc expr))
       | (noCCSAttached no_cc || currentOrSubsumedCCS no_cc)
         && not (isSccCountCostCentre cc)
-	-- Top level CAF without a cost centre attached
-	-- Attach and collect cc of trivial _scc_ in body
+        -- Top level CAF without a cost centre attached
+        -- Attach and collect cc of trivial _scc_ in body
       = do collectCC cc
            expr' <- set_prevailing_cc cc (do_expr expr)
            return (StgRhsClosure cc bi fv u [] expr')
@@ -147,12 +147,12 @@ stgMassageForProfiling this_pkg mod_name us stg_binds
         return (StgRhsClosure caf_ccs bi fv u srt [] body')
 
     do_top_rhs binder (StgRhsClosure cc bi fv u srt [] body)
-	-- Top level CAF with cost centre attached
-	-- Should this be a CAF cc ??? Does this ever occur ???
+        -- Top level CAF with cost centre attached
+        -- Should this be a CAF cc ??? Does this ever occur ???
       = pprPanic "SCCfinal: CAF with cc:" (ppr cc)
 
     do_top_rhs binder (StgRhsClosure no_ccs bi fv u srt args body)
-	-- Top level function, probably subsumed
+        -- Top level function, probably subsumed
       | noCCSAttached no_ccs
       = do body' <- set_lambda_cc (do_expr body)
            return (StgRhsClosure subsumedCCS bi fv u srt args body')
@@ -161,9 +161,9 @@ stgMassageForProfiling this_pkg mod_name us stg_binds
       = pprPanic "SCCfinal: CAF with cc:" (ppr no_ccs)
 
     do_top_rhs binder (StgRhsCon ccs con args)
-	-- Top-level (static) data is not counted in heap
-	-- profiles; nor do we set CCCS from it; so we
-	-- just slam in dontCareCostCentre
+        -- Top-level (static) data is not counted in heap
+        -- profiles; nor do we set CCCS from it; so we
+        -- just slam in dontCareCostCentre
       = return (StgRhsCon dontCareCCS con args)
 
     ------
@@ -180,7 +180,7 @@ stgMassageForProfiling this_pkg mod_name us stg_binds
     do_expr (StgOpApp con args res_ty)
       = boxHigherOrderArgs (\args -> StgOpApp con args res_ty) args
 
-    do_expr (StgSCC cc expr) = do	-- Ha, we found a cost centre!
+    do_expr (StgSCC cc expr) = do -- Ha, we found a cost centre!
         collectCC cc
         expr' <- do_expr expr
         return (StgSCC cc expr')
@@ -231,14 +231,14 @@ stgMassageForProfiling this_pkg mod_name us stg_binds
 
     ----------------------------------
     do_rhs :: StgRhs -> MassageM StgRhs
-	-- We play much the same game as we did in do_top_rhs above;
-	-- but we don't have to worry about cafs etc.
+        -- We play much the same game as we did in do_top_rhs above;
+        -- but we don't have to worry about cafs etc.
 
 {-
     do_rhs (StgRhsClosure closure_cc bi fv u [] (StgSCC ty cc (StgCon (DataCon con) args _)))
       | not (isSccCountCostCentre cc)
       = do collectCC cc
-	   return (StgRhsCon cc con args)
+           return (StgRhsCon cc con args)
 -}
 
     do_rhs (StgRhsClosure _ bi fv u srt args expr) = do
@@ -246,20 +246,20 @@ stgMassageForProfiling this_pkg mod_name us stg_binds
         expr'' <- do_expr expr'
         return (StgRhsClosure ccs bi fv u srt args expr'')
       where
-	slurpSCCs ccs (StgSCC cc e)
+        slurpSCCs ccs (StgSCC cc e)
              = do collectCC cc
                   slurpSCCs (cc `pushCCOnCCS` ccs) e
-	slurpSCCs ccs e 
-	     = return (e, ccs)
+        slurpSCCs ccs e
+             = return (e, ccs)
 
     do_rhs (StgRhsCon cc con args)
       = return (StgRhsCon currentCCS con args)
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Boxing higher-order args}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 Boxing is *turned off* at the moment, until we can figure out how to
@@ -268,8 +268,8 @@ do it properly in general.
 \begin{code}
 boxHigherOrderArgs
     :: ([StgArg] -> StgExpr)
-			-- An application lacking its arguments
-    -> [StgArg]		-- arguments which we might box
+                        -- An application lacking its arguments
+    -> [StgArg]         -- arguments which we might box
     -> MassageM StgExpr
 
 #ifndef PROF_DO_BOXING
@@ -284,15 +284,15 @@ boxHigherOrderArgs almost_expr args = do
     ---------------
 
     do_arg ids bindings arg@(StgVarArg old_var)
-	|  (not (isLocalVar old_var) || elemVarSet old_var ids)
-	&& isFunTy (dropForAlls var_type)
+        |  (not (isLocalVar old_var) || elemVarSet old_var ids)
+        && isFunTy (dropForAlls var_type)
       = do    -- make a trivial let-binding for the top-level function
-	uniq <- getUniqueMM
-	let
-	    new_var = mkSysLocal FSLIT("sf") uniq var_type
-	return ( (new_var, old_var) : bindings, StgVarArg new_var )
+        uniq <- getUniqueMM
+        let
+            new_var = mkSysLocal FSLIT("sf") uniq var_type
+        return ( (new_var, old_var) : bindings, StgVarArg new_var )
       where
-	var_type = idType old_var
+        var_type = idType old_var
 
     do_arg ids bindings arg = return (bindings, arg)
 
@@ -301,19 +301,19 @@ boxHigherOrderArgs almost_expr args = do
 
     mk_stg_let cc (new_var, old_var) body
       = let
-	    rhs_body    = StgApp old_var [{-args-}]
-	    rhs_closure = StgRhsClosure cc stgArgOcc [{-fvs-}] ReEntrant NoSRT{-eeek!!!-} [{-args-}] rhs_body
+            rhs_body    = StgApp old_var [{-args-}]
+            rhs_closure = StgRhsClosure cc stgArgOcc [{-fvs-}] ReEntrant NoSRT{-eeek!!!-} [{-args-}] rhs_body
         in
-	StgLet (StgNonRec new_var rhs_closure) body
+        StgLet (StgNonRec new_var rhs_closure) body
       where
-	bOGUS_LVs = emptyUniqSet -- easier to print than: panic "mk_stg_let: LVs"
+        bOGUS_LVs = emptyUniqSet -- easier to print than: panic "mk_stg_let: LVs"
 #endif
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Boring monad stuff for this}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -336,7 +336,7 @@ instance Monad MassageM where
 
 -- the initMM function also returns the final CollectedCCs
 
-initMM :: Module	-- module name, which we may consult
+initMM :: Module        -- module name, which we may consult
        -> UniqSupply
        -> MassageM a
        -> (CollectedCCs, a)
@@ -369,7 +369,7 @@ addTopLevelIshId id scope
 
 addTopLevelIshIds :: [Id] -> MassageM a -> MassageM a
 addTopLevelIshIds [] cont = cont
-addTopLevelIshIds (id:ids) cont 
+addTopLevelIshIds (id:ids) cont
   = addTopLevelIshId id (addTopLevelIshIds ids cont)
 
 getTopLevelIshIds :: MassageM VarSet
@@ -401,13 +401,13 @@ collectCC :: CostCentre -> MassageM ()
 collectCC cc = MassageM $ \mod_name scope_cc us ids (local_ccs, extern_ccs, ccss)
   -> ASSERT(not (noCCAttached cc))
      if (cc `ccFromThisModule` mod_name) then
-	((cc : local_ccs, extern_ccs, ccss), ())
+        ((cc : local_ccs, extern_ccs, ccss), ())
      else -- must declare it "extern"
-	((local_ccs, cc : extern_ccs, ccss), ())
+        ((local_ccs, cc : extern_ccs, ccss), ())
 
 -- Version of collectCC used when we definitely want to declare this
 -- CC as local, even if its module name is not the same as the current
--- module name (eg. the special :Main module) see bug #249, #1472, 
+-- module name (eg. the special :Main module) see bug #249, #1472,
 -- test prof001,prof002.
 collectNewCC :: CostCentre -> MassageM ()
 collectNewCC cc = MassageM $ \mod_name scope_cc us ids (local_ccs, extern_ccs, ccss)
