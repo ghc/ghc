@@ -1634,7 +1634,16 @@ scheduleHandleHeapOverflow( Capability *cap, StgTSO *t )
     }
 #endif
       
-    pushOnRunQueue(cap,t);
+    if (context_switch) {
+        // Sometimes we miss a context switch, e.g. when calling
+        // primitives in a tight loop, MAYBE_GC() doesn't check the
+        // context switch flag, and we end up waiting for a GC.
+        // See #1984, and concurrent/should_run/1984
+        context_switch = 0;
+        addToRunQueue(cap,t);
+    } else {
+        pushOnRunQueue(cap,t);
+    }
     return rtsTrue;
     /* actual GC is done at the end of the while loop in schedule() */
 }
