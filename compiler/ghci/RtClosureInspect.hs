@@ -70,6 +70,10 @@ import TysWiredIn
 import Outputable
 import Panic
 
+#ifndef GHCI_TABLES_NEXT_TO_CODE
+import Constants        ( wORD_SIZE )
+#endif
+
 import GHC.Arr          ( Array(..) )
 import GHC.Exts
 import GHC.IOBase ( IO(IO) )
