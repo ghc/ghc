@@ -23,15 +23,10 @@ This is now a sort-of-normal STG-to-STG pass (WDP 94/06), run by stg2stg.
 * "Distributes" given cost-centres to all as-yet-unmarked RHSs.
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module SCCfinal ( stgMassageForProfiling ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import StgSyn
@@ -106,7 +101,7 @@ stgMassageForProfiling this_pkg mod_name us stg_binds
     ----------
     do_top_rhs :: Id -> StgRhs -> MassageM StgRhs
 
-    do_top_rhs binder (StgRhsClosure _ bi fv u srt [] (StgSCC cc (StgConApp con args)))
+    do_top_rhs _ (StgRhsClosure _ _ _ _ _ [] (StgSCC cc (StgConApp con args)))
       | not (isSccCountCostCentre cc) && not (isDllConApp this_pkg con args)
         -- Trivial _scc_ around nothing but static data
         -- Eliminate _scc_ ... and turn into StgRhsCon
@@ -146,12 +141,12 @@ stgMassageForProfiling this_pkg mod_name us stg_binds
         body' <- set_prevailing_cc caf_ccs (do_expr body)
         return (StgRhsClosure caf_ccs bi fv u srt [] body')
 
-    do_top_rhs binder (StgRhsClosure cc bi fv u srt [] body)
+    do_top_rhs _ (StgRhsClosure cc _ _ _ _ [] _)
         -- Top level CAF with cost centre attached
         -- Should this be a CAF cc ??? Does this ever occur ???
       = pprPanic "SCCfinal: CAF with cc:" (ppr cc)
 
-    do_top_rhs binder (StgRhsClosure no_ccs bi fv u srt args body)
+    do_top_rhs _ (StgRhsClosure no_ccs bi fv u srt args body)
         -- Top level function, probably subsumed
       | noCCSAttached no_ccs
       = do body' <- set_lambda_cc (do_expr body)
@@ -160,7 +155,7 @@ stgMassageForProfiling this_pkg mod_name us stg_binds
       | otherwise
       = pprPanic "SCCfinal: CAF with cc:" (ppr no_ccs)
 
-    do_top_rhs binder (StgRhsCon ccs con args)
+    do_top_rhs _ (StgRhsCon _ con args)
         -- Top-level (static) data is not counted in heap
         -- profiles; nor do we set CCCS from it; so we
         -- just slam in dontCareCostCentre
@@ -206,9 +201,7 @@ stgMassageForProfiling this_pkg mod_name us stg_binds
           expr' <- do_expr expr
           return (StgTick m n expr')
 
-#ifdef DEBUG
     do_expr other = pprPanic "SCCfinal.do_expr" (ppr other)
-#endif
 
     ----------------------------------
 
@@ -252,7 +245,7 @@ stgMassageForProfiling this_pkg mod_name us stg_binds
         slurpSCCs ccs e
              = return (e, ccs)
 
-    do_rhs (StgRhsCon cc con args)
+    do_rhs (StgRhsCon _ con args)
       = return (StgRhsCon currentCCS con args)
 \end{code}
 
@@ -372,8 +365,10 @@ addTopLevelIshIds [] cont = cont
 addTopLevelIshIds (id:ids) cont
   = addTopLevelIshId id (addTopLevelIshIds ids cont)
 
+#ifdef PROF_DO_BOXING
 getTopLevelIshIds :: MassageM VarSet
-getTopLevelIshIds = MassageM $ \mod scope_cc us ids ccs -> (ccs, ids)
+getTopLevelIshIds = MassageM $ \_mod _scope_cc _us ids ccs -> (ccs, ids)
+#endif
 \end{code}
 
 The prevailing CCS is used to tell whether we're in a top-levelish
@@ -384,21 +379,19 @@ I'm sure --SDM
 \begin{code}
 set_lambda_cc :: MassageM a -> MassageM a
 set_lambda_cc action
-   =    MassageM $     \mod scope_cc   us ids ccs
+   =    MassageM $     \mod _scope_cc  us ids ccs
    -> unMassageM action mod currentCCS us ids ccs
 
 set_prevailing_cc :: CostCentreStack -> MassageM a -> MassageM a
 set_prevailing_cc cc_to_set_to action
-   =    MassageM $     \mod scope_cc     us ids ccs
+   =    MassageM $     \mod _scope_cc    us ids ccs
    -> unMassageM action mod cc_to_set_to us ids ccs
-
-get_prevailing_cc :: MassageM CostCentreStack
-get_prevailing_cc = MassageM $ \mod scope_cc us ids ccs -> (ccs, scope_cc)
 \end{code}
 
 \begin{code}
 collectCC :: CostCentre -> MassageM ()
-collectCC cc = MassageM $ \mod_name scope_cc us ids (local_ccs, extern_ccs, ccss)
+collectCC cc
+ = MassageM $ \mod_name _scope_cc _us _ids (local_ccs, extern_ccs, ccss)
   -> ASSERT(not (noCCAttached cc))
      if (cc `ccFromThisModule` mod_name) then
         ((cc : local_ccs, extern_ccs, ccss), ())
@@ -410,12 +403,14 @@ collectCC cc = MassageM $ \mod_name scope_cc us ids (local_ccs, extern_ccs, ccss
 -- module name (eg. the special :Main module) see bug #249, #1472,
 -- test prof001,prof002.
 collectNewCC :: CostCentre -> MassageM ()
-collectNewCC cc = MassageM $ \mod_name scope_cc us ids (local_ccs, extern_ccs, ccss)
-  -> ((cc : local_ccs, extern_ccs, ccss), ())
+collectNewCC cc
+ = MassageM $ \_mod_name _scope_cc _us _ids (local_ccs, extern_ccs, ccss)
+              -> ((cc : local_ccs, extern_ccs, ccss), ())
 
 collectCCS :: CostCentreStack -> MassageM ()
 
-collectCCS ccs = MassageM $ \mod_name scope_cc us ids (local_ccs, extern_ccs, ccss)
-  -> ASSERT(not (noCCSAttached ccs))
-     ((local_ccs, extern_ccs, ccs : ccss), ())
+collectCCS ccs
+ = MassageM $ \_mod_name _scope_cc _us _ids (local_ccs, extern_ccs, ccss)
+              -> ASSERT(not (noCCSAttached ccs))
+                       ((local_ccs, extern_ccs, ccs : ccss), ())
 \end{code}
