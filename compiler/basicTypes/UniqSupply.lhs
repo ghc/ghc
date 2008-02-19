@@ -4,13 +4,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module UniqSupply (
 
         UniqSupply, -- Abstractly
@@ -29,8 +22,6 @@ module UniqSupply (
         -- Deprecated:
         getUniqueUs, getUs, returnUs, thenUs, mapUs
   ) where
-
-#include "HsVersions.h"
 
 import Unique
 import FastTypes
@@ -133,7 +124,7 @@ initUs :: UniqSupply -> UniqSM a -> (a,UniqSupply)
 initUs init_us m = case unUSM m init_us of { (r,us) -> (r,us) }
 
 initUs_ :: UniqSupply -> UniqSM a -> a
-initUs_ init_us m = case unUSM m init_us of { (r,us) -> r }
+initUs_ init_us m = case unUSM m init_us of { (r, _) -> r }
 
 {-# INLINE thenUs #-}
 {-# INLINE lazyThenUs #-}
@@ -161,9 +152,6 @@ thenUs_ (USM expr) (USM cont)
 
 returnUs :: a -> UniqSM a
 returnUs result = USM (\us -> (result, us))
-
-withUs :: (UniqSupply -> (a, UniqSupply)) -> UniqSM a
-withUs f = USM (\us -> f us)    -- Ha ha!
 
 getUs :: UniqSM UniqSupply
 getUs = USM (\us -> splitUniqSupply us)
@@ -194,7 +182,7 @@ getUniquesUs = USM (\us -> case splitUniqSupply us of
                            (us1,us2) -> (uniqsFromSupply us1, us2))
 
 mapUs :: (a -> UniqSM b) -> [a] -> UniqSM [b]
-mapUs f []     = returnUs []
+mapUs _ []     = returnUs []
 mapUs f (x:xs)
   = f x         `thenUs` \ r  ->
     mapUs f xs  `thenUs` \ rs ->
@@ -207,7 +195,7 @@ mapUs f (x:xs)
 {-# -- SPECIALIZE mapAndUnzip3M :: (a -> UniqSM (b,c,d)) -> [a] -> UniqSM ([b],[c],[d]) #-}
 
 lazyMapUs :: (a -> UniqSM b) -> [a] -> UniqSM [b]
-lazyMapUs f []     = returnUs []
+lazyMapUs _ []     = returnUs []
 lazyMapUs f (x:xs)
   = f x             `lazyThenUs` \ r  ->
     lazyMapUs f xs  `lazyThenUs` \ rs ->
