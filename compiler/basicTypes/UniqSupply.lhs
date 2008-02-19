@@ -13,21 +13,21 @@
 
 module UniqSupply (
 
-	UniqSupply,		-- Abstractly
+        UniqSupply, -- Abstractly
 
-	uniqFromSupply, uniqsFromSupply,	-- basic ops
+        uniqFromSupply, uniqsFromSupply, -- basic ops
 
-	UniqSM,		-- type: unique supply monad
-	initUs, initUs_,
-	lazyThenUs, lazyMapUs,
-	mapAndUnzipM,
-	MonadUnique(..),
+        UniqSM, -- type: unique supply monad
+        initUs, initUs_,
+        lazyThenUs, lazyMapUs,
+        mapAndUnzipM,
+        MonadUnique(..),
 
-	mkSplitUniqSupply,
-	splitUniqSupply, listSplitUniqSupply,
+        mkSplitUniqSupply,
+        splitUniqSupply, listSplitUniqSupply,
 
-    -- Deprecated:
-    getUniqueUs, getUs, returnUs, thenUs, mapUs
+        -- Deprecated:
+        getUniqueUs, getUs, returnUs, thenUs, mapUs
   ) where
 
 #include "HsVersions.h"
@@ -41,7 +41,7 @@ import Control.Monad.Fix
 #if __GLASGOW_HASKELL__ >= 607
 import GHC.IOBase (unsafeDupableInterleaveIO)
 #else
-import System.IO.Unsafe	( unsafeInterleaveIO )
+import System.IO.Unsafe ( unsafeInterleaveIO )
 unsafeDupableInterleaveIO :: IO a -> IO a
 unsafeDupableInterleaveIO = unsafeInterleaveIO
 #endif
@@ -50,9 +50,9 @@ unsafeDupableInterleaveIO = unsafeInterleaveIO
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Splittable Unique supply: @UniqSupply@}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 A value of type @UniqSupply@ is unique, and it can
@@ -62,34 +62,34 @@ which will be distinct from the first and from all others.
 
 \begin{code}
 data UniqSupply
-  = MkSplitUniqSupply FastInt	-- make the Unique with this
-		   UniqSupply UniqSupply
-				-- when split => these two supplies
+  = MkSplitUniqSupply FastInt   -- make the Unique with this
+                   UniqSupply UniqSupply
+                                -- when split => these two supplies
 \end{code}
 
 \begin{code}
 mkSplitUniqSupply :: Char -> IO UniqSupply
 
 splitUniqSupply :: UniqSupply -> (UniqSupply, UniqSupply)
-listSplitUniqSupply :: UniqSupply -> [UniqSupply]   -- Infinite
+listSplitUniqSupply :: UniqSupply -> [UniqSupply] -- Infinite
 uniqFromSupply  :: UniqSupply -> Unique
-uniqsFromSupply :: UniqSupply -> [Unique]	-- Infinite
+uniqsFromSupply :: UniqSupply -> [Unique] -- Infinite
 \end{code}
 
 \begin{code}
 mkSplitUniqSupply c
   = case fastOrd (cUnbox c) `shiftLFastInt` _ILIT(24) of
      mask -> let
-	-- here comes THE MAGIC:
+        -- here comes THE MAGIC:
 
-	-- This is one of the most hammered bits in the whole compiler
-	mk_supply
-	  = unsafeDupableInterleaveIO (
-		genSymZh    >>= \ u_ -> case iUnbox u_ of { u -> (
-		mk_supply   >>= \ s1 ->
-		mk_supply   >>= \ s2 ->
-		return (MkSplitUniqSupply (mask `bitOrFastInt` u) s1 s2)
-	    )})
+        -- This is one of the most hammered bits in the whole compiler
+        mk_supply
+          = unsafeDupableInterleaveIO (
+                genSymZh    >>= \ u_ -> case iUnbox u_ of { u -> (
+                mk_supply   >>= \ s1 ->
+                mk_supply   >>= \ s2 ->
+                return (MkSplitUniqSupply (mask `bitOrFastInt` u) s1 s2)
+            )})
        in
        mk_supply
 
@@ -105,9 +105,9 @@ uniqsFromSupply (MkSplitUniqSupply n _ s2) = mkUniqueGrimily (iBox n) : uniqsFro
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsubsection[UniqSupply-monad]{@UniqSupply@ monad: @UniqSM@}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -124,8 +124,8 @@ instance Functor UniqSM where
 
 instance Applicative UniqSM where
     pure = returnUs
-    (USM f) <*> (USM x) = USM $ \us -> case f us of 
-                            (ff, us')  -> case x us' of 
+    (USM f) <*> (USM x) = USM $ \us -> case f us of
+                            (ff, us')  -> case x us' of
                               (xx, us'') -> (ff xx, us'')
 
 -- the initUs function also returns the final UniqSupply; initUs_ drops it
@@ -148,8 +148,8 @@ instance MonadFix UniqSM where
 
 thenUs :: UniqSM a -> (a -> UniqSM b) -> UniqSM b
 thenUs (USM expr) cont
-  = USM (\us -> case (expr us) of 
-		   (result, us') -> unUSM (cont result) us')
+  = USM (\us -> case (expr us) of
+                   (result, us') -> unUSM (cont result) us')
 
 lazyThenUs :: UniqSM a -> (a -> UniqSM b) -> UniqSM b
 lazyThenUs (USM expr) cont
@@ -163,8 +163,8 @@ returnUs :: a -> UniqSM a
 returnUs result = USM (\us -> (result, us))
 
 withUs :: (UniqSupply -> (a, UniqSupply)) -> UniqSM a
-withUs f = USM (\us -> f us)	-- Ha ha!
-		
+withUs f = USM (\us -> f us)    -- Ha ha!
+
 getUs :: UniqSM UniqSupply
 getUs = USM (\us -> splitUniqSupply us)
 
@@ -176,7 +176,7 @@ class Monad m => MonadUnique m where
     getUniqueM  :: m Unique
     -- | Get an infinite list of new unique identifiers
     getUniquesM :: m [Unique]
-    
+
     getUniqueM  = liftM uniqFromSupply  getUniqueSupplyM
     getUniquesM = liftM uniqsFromSupply getUniqueSupplyM
 
@@ -187,11 +187,11 @@ instance MonadUnique UniqSM where
 
 getUniqueUs :: UniqSM Unique
 getUniqueUs = USM (\us -> case splitUniqSupply us of
-			   (us1,us2) -> (uniqFromSupply us1, us2))
+                          (us1,us2) -> (uniqFromSupply us1, us2))
 
 getUniquesUs :: UniqSM [Unique]
 getUniquesUs = USM (\us -> case splitUniqSupply us of
-			      (us1,us2) -> (uniqsFromSupply us1, us2))
+                           (us1,us2) -> (uniqsFromSupply us1, us2))
 
 mapUs :: (a -> UniqSM b) -> [a] -> UniqSM [b]
 mapUs f []     = returnUs []
