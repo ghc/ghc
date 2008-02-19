@@ -190,7 +190,7 @@ pprDataConDecl pefas gadt_style show_label dataCon
 
 	-- printing out the dataCon as a type signature, in GADT style
     pp_tau = foldr add (ppr res_ty) tys_w_strs
-    add (str,ty) pp_ty = pprBangTy str ty <+> arrow <+> pp_ty
+    add str_ty pp_ty = pprParendBangTy str_ty <+> arrow <+> pp_ty
 
     pprParendBangTy (strict,ty)
 	| GHC.isMarkedStrict strict = char '!' <> GHC.pprParendType ty
