@@ -17,38 +17,38 @@
 
 module Foreign.ForeignPtr
         ( 
-	-- * Finalised data pointers
-	  ForeignPtr
-	, FinalizerPtr
+        -- * Finalised data pointers
+          ForeignPtr
+        , FinalizerPtr
 #if defined(__HUGS__) || defined(__GLASGOW_HASKELL__)
-	, FinalizerEnvPtr
+        , FinalizerEnvPtr
 #endif
-	-- ** Basic operations
+        -- ** Basic operations
         , newForeignPtr
         , newForeignPtr_
         , addForeignPtrFinalizer
 #if defined(__HUGS__) || defined(__GLASGOW_HASKELL__)
-	, newForeignPtrEnv
-	, addForeignPtrFinalizerEnv
+        , newForeignPtrEnv
+        , addForeignPtrFinalizerEnv
 #endif
-	, withForeignPtr
+        , withForeignPtr
 
 #ifdef __GLASGOW_HASKELL__
-	, finalizeForeignPtr
+        , finalizeForeignPtr
 #endif
 
-	-- ** Low-level operations
-	, unsafeForeignPtrToPtr
-	, touchForeignPtr
-	, castForeignPtr
+        -- ** Low-level operations
+        , unsafeForeignPtrToPtr
+        , touchForeignPtr
+        , castForeignPtr
 
-	-- ** Allocating managed memory
-	, mallocForeignPtr
-	, mallocForeignPtrBytes
-	, mallocForeignPtrArray
-	, mallocForeignPtrArray0
+        -- ** Allocating managed memory
+        , mallocForeignPtr
+        , mallocForeignPtrBytes
+        , mallocForeignPtrArray
+        , mallocForeignPtrArray0
         ) 
-	where
+        where
 
 import Foreign.Ptr
 
@@ -73,19 +73,19 @@ import Hugs.ForeignPtr
 #endif
 
 #ifndef __NHC__
-import Foreign.Storable	( Storable(sizeOf) )
+import Foreign.Storable ( Storable(sizeOf) )
 #endif
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 import GHC.IOBase
 import GHC.Num
-import GHC.Err		( undefined )
+import GHC.Err          ( undefined )
 import GHC.ForeignPtr
 #endif
 
 #if !defined(__NHC__) && !defined(__GLASGOW_HASKELL__)
-import Foreign.Marshal.Alloc	( malloc, mallocBytes, finalizerFree )
+import Foreign.Marshal.Alloc    ( malloc, mallocBytes, finalizerFree )
 
 instance Eq (ForeignPtr a) where 
     p == q  =  unsafeForeignPtrToPtr p == unsafeForeignPtrToPtr q
@@ -163,7 +163,7 @@ addForeignPtrFinalizerEnv ::
   FinalizerEnvPtr env a -> Ptr env -> ForeignPtr a -> IO ()
 addForeignPtrFinalizerEnv finalizer env fptr = 
   addForeignPtrConcFinalizer fptr 
-	(mkFinalizerEnv finalizer env (unsafeForeignPtrToPtr fptr))
+        (mkFinalizerEnv finalizer env (unsafeForeignPtrToPtr fptr))
 
 foreign import ccall "dynamic" 
   mkFinalizerEnv :: FinalizerEnvPtr env a -> Ptr env -> Ptr a -> IO ()
