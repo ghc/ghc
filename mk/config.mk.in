@@ -185,6 +185,11 @@ BootingFromUnregisterisedHc = @BootingFromUnregisterisedHc@
 #
 XMLDocWays=
 
+# Mac OS X deployment target (to cross-compile for older OS versions)
+#
+MACOS_DEPLOYMENT_VERSION = @MACOS_DEPLOYMENT_VERSION@
+MACOS_DEPLOYMENT_SDK = @MACOS_DEPLOYMENT_SDK@
+
 ################################################################################
 #
 # Variables that control how the compiler itself is built
