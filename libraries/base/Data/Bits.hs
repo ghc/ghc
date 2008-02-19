@@ -85,14 +85,14 @@ class Num a => Bits a where
     complement        :: a -> a
 
     {-| @'shift' x i@ shifts @x@ left by @i@ bits if @i@ is positive,
-	or right by @-i@ bits otherwise.
-	Right shifts perform sign extension on signed number types;
-	i.e. they fill the top bits with 1 if the @x@ is negative
-	and with 0 otherwise.
+        or right by @-i@ bits otherwise.
+        Right shifts perform sign extension on signed number types;
+        i.e. they fill the top bits with 1 if the @x@ is negative
+        and with 0 otherwise.
 
-	An instance can define either this unified 'shift' or 'shiftL' and
-	'shiftR', depending on which is more convenient for the type in
-	question. -}
+        An instance can define either this unified 'shift' or 'shiftL' and
+        'shiftR', depending on which is more convenient for the type in
+        question. -}
     shift             :: a -> Int -> a
 
     x `shift`   i | i<0  = x `shiftR` (-i)
@@ -100,13 +100,13 @@ class Num a => Bits a where
                   | i>0  = x `shiftL` i
 
     {-| @'rotate' x i@ rotates @x@ left by @i@ bits if @i@ is positive,
-	or right by @-i@ bits otherwise.
+        or right by @-i@ bits otherwise.
 
         For unbounded types like 'Integer', 'rotate' is equivalent to 'shift'.
 
-	An instance can define either this unified 'rotate' or 'rotateL' and
-	'rotateR', depending on which is more convenient for the type in
-	question. -}
+        An instance can define either this unified 'rotate' or 'rotateL' and
+        'rotateR', depending on which is more convenient for the type in
+        question. -}
     rotate            :: a -> Int -> a
 
     x `rotate`  i | i<0  = x `rotateR` (-i)
@@ -143,9 +143,9 @@ class Num a => Bits a where
     testBit           :: a -> Int -> Bool
 
     {-| Return the number of bits in the type of the argument.  The actual
-	value of the argument is ignored.  The function 'bitSize' is
-	undefined for types that do not have a fixed bitsize, like 'Integer'.
-	-}
+        value of the argument is ignored.  The function 'bitSize' is
+        undefined for types that do not have a fixed bitsize, like 'Integer'.
+        -}
     bitSize           :: a -> Int
 
     {-| Return 'True' if the argument is a signed type.  The actual
@@ -159,41 +159,41 @@ class Num a => Bits a where
     x `testBit` i       = (x .&. bit i) /= 0
 
     {-| Shift the argument left by the specified number of bits
-	(which must be non-negative).
+        (which must be non-negative).
 
-	An instance can define either this and 'shiftR' or the unified
-	'shift', depending on which is more convenient for the type in
-	question. -}
+        An instance can define either this and 'shiftR' or the unified
+        'shift', depending on which is more convenient for the type in
+        question. -}
     shiftL            :: a -> Int -> a
     x `shiftL`  i = x `shift`  i
 
     {-| Shift the first argument right by the specified number of bits
-	(which must be non-negative).
-	Right shifts perform sign extension on signed number types;
-	i.e. they fill the top bits with 1 if the @x@ is negative
-	and with 0 otherwise.
+        (which must be non-negative).
+        Right shifts perform sign extension on signed number types;
+        i.e. they fill the top bits with 1 if the @x@ is negative
+        and with 0 otherwise.
 
-	An instance can define either this and 'shiftL' or the unified
-	'shift', depending on which is more convenient for the type in
-	question. -}
+        An instance can define either this and 'shiftL' or the unified
+        'shift', depending on which is more convenient for the type in
+        question. -}
     shiftR            :: a -> Int -> a
     x `shiftR`  i = x `shift`  (-i)
 
     {-| Rotate the argument left by the specified number of bits
-	(which must be non-negative).
+        (which must be non-negative).
 
-	An instance can define either this and 'rotateR' or the unified
-	'rotate', depending on which is more convenient for the type in
-	question. -}
+        An instance can define either this and 'rotateR' or the unified
+        'rotate', depending on which is more convenient for the type in
+        question. -}
     rotateL           :: a -> Int -> a
     x `rotateL` i = x `rotate` i
 
     {-| Rotate the argument right by the specified number of bits
-	(which must be non-negative).
+        (which must be non-negative).
 
-	An instance can define either this and 'rotateL' or the unified
-	'rotate', depending on which is more convenient for the type in
-	question. -}
+        An instance can define either this and 'rotateL' or the unified
+        'rotate', depending on which is more convenient for the type in
+        question. -}
     rotateR           :: a -> Int -> a
     x `rotateR` i = x `rotate` (-i)
 
@@ -214,7 +214,7 @@ instance Bits Int where
         where
         x'# = int2Word# x#
         i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
-	wsib = WORD_SIZE_IN_BITS#   {- work around preprocessor problem (??) -}
+        wsib = WORD_SIZE_IN_BITS#   {- work around preprocessor problem (??) -}
     bitSize  _             = WORD_SIZE_IN_BITS
 #else /* !__GLASGOW_HASKELL__ */
 
@@ -238,12 +238,12 @@ instance Bits Int where
 #endif /* __NHC__ */
 
     x `rotate`  i
-	| i<0 && x<0       = let left = i+bitSize x in
+        | i<0 && x<0       = let left = i+bitSize x in
                              ((x `shift` i) .&. complement ((-1) `shift` left))
                              .|. (x `shift` left)
-	| i<0              = (x `shift` i) .|. (x `shift` (i+bitSize x))
-	| i==0             = x
-	| i>0              = (x `shift` i) .|. (x `shift` (i-bitSize x))
+        | i<0              = (x `shift` i) .|. (x `shift` (i+bitSize x))
+        | i==0             = x
+        | i>0              = (x `shift` i) .|. (x `shift` (i-bitSize x))
 
 #endif /* !__GLASGOW_HASKELL__ */
 
@@ -264,22 +264,22 @@ instance Bits Integer where
    x@(S# _) .&. y = toBig x .&. y
    x .&. y@(S# _) = x .&. toBig y
    (J# s1 d1) .&. (J# s2 d2) = 
-	case andInteger# s1 d1 s2 d2 of
-	  (# s, d #) -> J# s d
-   
+        case andInteger# s1 d1 s2 d2 of
+          (# s, d #) -> J# s d
+
    (S# x) .|. (S# y) = S# (word2Int# (int2Word# x `or#` int2Word# y))
    x@(S# _) .|. y = toBig x .|. y
    x .|. y@(S# _) = x .|. toBig y
    (J# s1 d1) .|. (J# s2 d2) = 
-	case orInteger# s1 d1 s2 d2 of
-	  (# s, d #) -> J# s d
+        case orInteger# s1 d1 s2 d2 of
+          (# s, d #) -> J# s d
    
    (S# x) `xor` (S# y) = S# (word2Int# (int2Word# x `xor#` int2Word# y))
    x@(S# _) `xor` y = toBig x `xor` y
    x `xor` y@(S# _) = x `xor` toBig y
    (J# s1 d1) `xor` (J# s2 d2) =
-	case xorInteger# s1 d1 s2 d2 of
-	  (# s, d #) -> J# s d
+        case xorInteger# s1 d1 s2 d2 of
+          (# s, d #) -> J# s d
    
    complement (S# x) = S# (word2Int# (int2Word# x `xor#` int2Word# (0# -# 1#)))
    complement (J# s d) = case complementInteger# s d of (# s, d #) -> J# s d
@@ -287,22 +287,22 @@ instance Bits Integer where
    -- reduce bitwise binary operations to special cases we can handle
 
    x .&. y   | x<0 && y<0 = complement (complement x `posOr` complement y)
-	     | otherwise  = x `posAnd` y
+             | otherwise  = x `posAnd` y
    
    x .|. y   | x<0 || y<0 = complement (complement x `posAnd` complement y)
-	     | otherwise  = x `posOr` y
+             | otherwise  = x `posOr` y
    
    x `xor` y | x<0 && y<0 = complement x `posXOr` complement y
-	     | x<0        = complement (complement x `posXOr` y)
-	     |        y<0 = complement (x `posXOr` complement y)
-	     | otherwise  = x `posXOr` y
+             | x<0        = complement (complement x `posXOr` y)
+             |        y<0 = complement (x `posXOr` complement y)
+             | otherwise  = x `posXOr` y
 
    -- assuming infinite 2's-complement arithmetic
    complement a = -1 - a
 #endif
 
    shift x i | i >= 0    = x * 2^i
-	     | otherwise = x `div` 2^(-i)
+             | otherwise = x `div` 2^(-i)
 
    rotate x i = shift x i   -- since an Integer never wraps around
 
@@ -332,7 +332,7 @@ toInts n
     | n == 0 = []
     | otherwise = mkInt (n `mod` numInts):toInts (n `div` numInts)
   where mkInt n | n > toInteger(maxBound::Int) = fromInteger (n-numInts)
-		| otherwise = fromInteger n
+                | otherwise = fromInteger n
 
 fromInts :: [Int] -> Integer
 fromInts = foldr catInt 0
