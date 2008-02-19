@@ -24,19 +24,19 @@ module Foreign.Marshal.Alloc (
   mallocBytes,  -- ::               Int -> IO (Ptr a)
 
   realloc,      -- :: Storable b => Ptr a        -> IO (Ptr b)
-  reallocBytes, -- ::		    Ptr a -> Int -> IO (Ptr a)
+  reallocBytes, -- ::               Ptr a -> Int -> IO (Ptr a)
 
   free,         -- :: Ptr a -> IO ()
   finalizerFree -- :: FinalizerPtr a
 ) where
 
 import Data.Maybe
-import Foreign.Ptr	 	( Ptr, nullPtr, FunPtr )
-import Foreign.C.Types	 	( CSize )
-import Foreign.Storable  	( Storable(sizeOf) )
+import Foreign.Ptr              ( Ptr, nullPtr, FunPtr )
+import Foreign.C.Types          ( CSize )
+import Foreign.Storable         ( Storable(sizeOf) )
 
 #ifdef __GLASGOW_HASKELL__
-import Foreign.ForeignPtr	( FinalizerPtr )
+import Foreign.ForeignPtr       ( FinalizerPtr )
 import GHC.IOBase
 import GHC.Real
 import GHC.Ptr
@@ -44,16 +44,16 @@ import GHC.Err
 import GHC.Base
 import GHC.Num
 #elif defined(__NHC__)
-import NHC.FFI			( FinalizerPtr, CInt(..) )
-import IO			( bracket )
+import NHC.FFI                  ( FinalizerPtr, CInt(..) )
+import IO                       ( bracket )
 #else
-import Control.Exception	( bracket )
+import Control.Exception        ( bracket )
 #endif
 
 #ifdef __HUGS__
-import Hugs.Prelude		( IOException(IOError),
-				  IOErrorType(ResourceExhausted) )
-import Hugs.ForeignPtr		( FinalizerPtr )
+import Hugs.Prelude             ( IOException(IOError),
+                                  IOErrorType(ResourceExhausted) )
+import Hugs.ForeignPtr          ( FinalizerPtr )
 #endif
 
 
@@ -135,9 +135,9 @@ realloc  = doRealloc undefined
   where
     doRealloc           :: Storable b' => b' -> Ptr a' -> IO (Ptr b')
     doRealloc dummy ptr  = let
-			     size = fromIntegral (sizeOf dummy)
-			   in
-			   failWhenNULL "realloc" (_realloc ptr size)
+                             size = fromIntegral (sizeOf dummy)
+                           in
+                           failWhenNULL "realloc" (_realloc ptr size)
 
 -- |Resize a memory area that was allocated with 'malloc' or 'mallocBytes'
 -- to the given size.  The returned pointer may refer to an entirely
@@ -177,7 +177,7 @@ failWhenNULL name f = do
    if addr == nullPtr
 #if __GLASGOW_HASKELL__ || __HUGS__
       then ioError (IOError Nothing ResourceExhausted name 
-					"out of memory" Nothing)
+                                        "out of memory" Nothing)
 #else
       then ioError (userError (name++": out of memory"))
 #endif
