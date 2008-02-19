@@ -636,7 +636,7 @@ occAnal _   (Type t)  = (emptyDetails, Type t)
 occAnal env (Var v)   = (mkOneOcc env v False, Var v)
     -- At one stage, I gathered the idRuleVars for v here too,
     -- which in a way is the right thing to do.
-    -- Btu that went wrong right after specialisation, when
+    -- But that went wrong right after specialisation, when
     -- the *occurrences* of the overloaded function didn't have any
     -- rules in them, so the *specialised* versions looked as if they
     -- weren't used at all.
