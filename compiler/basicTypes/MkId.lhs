@@ -12,7 +12,7 @@ have a standard form, namely:
 * primitive operations
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-missing-signatures #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -799,6 +799,7 @@ mkReboxingAlt us con args rhs
       | otherwise
       = let (binds, args') = go args stricts us
         in  (binds, arg:args')
+    go (_ : _) [] _ = panic "mkReboxingAlt"
 \end{code}
 
 
@@ -1221,6 +1222,7 @@ realWorldPrimId -- :: State# RealWorld
         -- which in turn makes INLINE things applied to realWorld# likely
         -- to be inlined
 
+voidArgId :: Id
 voidArgId       -- :: State# RealWorld
   = mkSysLocal FSLIT("void") voidArgIdKey realWorldStatePrimTy
 \end{code}
@@ -1269,7 +1271,11 @@ nO_METHOD_BINDING_ERROR_ID      = mkRuntimeErrorId noMethodBindingErrorName
 nON_EXHAUSTIVE_GUARDS_ERROR_ID  = mkRuntimeErrorId nonExhaustiveGuardsErrorName
 
 -- The runtime error Ids take a UTF8-encoded string as argument
+
+mkRuntimeErrorId :: Name -> Id
 mkRuntimeErrorId name = pc_bottoming_Id name runtimeErrorTy
+
+runtimeErrorTy :: Type
 runtimeErrorTy        = mkSigmaTy [openAlphaTyVar] [] (mkFunTy addrPrimTy openAlphaTy)
 \end{code}
 
@@ -1300,6 +1306,7 @@ pcMiscPrelId name ty info
     -- being compiled, then it's just a matter of luck if the definition
     -- will be in "the right place" to be in scope.
 
+pc_bottoming_Id :: Name -> Type -> Id
 pc_bottoming_Id name ty
  = pcMiscPrelId name ty bottoming_info
  where
