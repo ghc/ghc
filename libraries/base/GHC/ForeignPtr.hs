@@ -17,31 +17,31 @@
 -- #hide
 module GHC.ForeignPtr
   (
-	ForeignPtr(..),
-	FinalizerPtr,
-	newForeignPtr_,
-	mallocForeignPtr,
-	mallocPlainForeignPtr,
-	mallocForeignPtrBytes,
-	mallocPlainForeignPtrBytes,
-	addForeignPtrFinalizer,	
-	touchForeignPtr,
-	unsafeForeignPtrToPtr,
-	castForeignPtr,
-	newConcForeignPtr,
-	addForeignPtrConcFinalizer,
-	finalizeForeignPtr
+        ForeignPtr(..),
+        FinalizerPtr,
+        newForeignPtr_,
+        mallocForeignPtr,
+        mallocPlainForeignPtr,
+        mallocForeignPtrBytes,
+        mallocPlainForeignPtrBytes,
+        addForeignPtrFinalizer, 
+        touchForeignPtr,
+        unsafeForeignPtrToPtr,
+        castForeignPtr,
+        newConcForeignPtr,
+        addForeignPtrConcFinalizer,
+        finalizeForeignPtr
   ) where
 
-import Control.Monad 	( sequence_ )
+import Control.Monad    ( sequence_ )
 import Foreign.Storable
 
 import GHC.Show
-import GHC.List  	( null )
+import GHC.List         ( null )
 import GHC.Base
 import GHC.IOBase
-import GHC.STRef	( STRef(..) )
-import GHC.Ptr		( Ptr(..), FunPtr )
+import GHC.STRef        ( STRef(..) )
+import GHC.Ptr          ( Ptr(..), FunPtr )
 import GHC.Err
 
 -- |The type 'ForeignPtr' represents references to objects that are
@@ -61,15 +61,15 @@ import GHC.Err
 -- class 'Storable'.
 --
 data ForeignPtr a = ForeignPtr Addr# ForeignPtrContents
-	-- we cache the Addr# in the ForeignPtr object, but attach
-	-- the finalizer to the IORef (or the MutableByteArray# in
-	-- the case of a MallocPtr).  The aim of the representation
-	-- is to make withForeignPtr efficient; in fact, withForeignPtr
-	-- should be just as efficient as unpacking a Ptr, and multiple
-	-- withForeignPtrs can share an unpacked ForeignPtr.  Note
-	-- that touchForeignPtr only has to touch the ForeignPtrContents
-	-- object, because that ensures that whatever the finalizer is
-	-- attached to is kept alive.
+        -- we cache the Addr# in the ForeignPtr object, but attach
+        -- the finalizer to the IORef (or the MutableByteArray# in
+        -- the case of a MallocPtr).  The aim of the representation
+        -- is to make withForeignPtr efficient; in fact, withForeignPtr
+        -- should be just as efficient as unpacking a Ptr, and multiple
+        -- withForeignPtrs can share an unpacked ForeignPtr.  Note
+        -- that touchForeignPtr only has to touch the ForeignPtrContents
+        -- object, because that ensures that whatever the finalizer is
+        -- attached to is kept alive.
 
 data ForeignPtrContents
   = PlainForeignPtr !(IORef [IO ()])
@@ -136,13 +136,13 @@ mallocForeignPtr :: Storable a => IO (ForeignPtr a)
 mallocForeignPtr = doMalloc undefined
   where doMalloc :: Storable b => b -> IO (ForeignPtr b)
         doMalloc a = do
-  	  r <- newIORef []
-	  IO $ \s ->
-	    case newPinnedByteArray# size s of { (# s, mbarr# #) ->
-	     (# s, ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
-		     	      (MallocPtr mbarr# r) #)
+          r <- newIORef []
+          IO $ \s ->
+            case newPinnedByteArray# size s of { (# s, mbarr# #) ->
+             (# s, ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
+                              (MallocPtr mbarr# r) #)
             }
-	    where (I# size) = sizeOf a
+            where (I# size) = sizeOf a
 
 -- | This function is similar to 'mallocForeignPtr', except that the
 -- size of the memory required is given explicitly as a number of bytes.
@@ -152,7 +152,7 @@ mallocForeignPtrBytes (I# size) = do
   IO $ \s ->
      case newPinnedByteArray# size s      of { (# s, mbarr# #) ->
        (# s, ForeignPtr (byteArrayContents# (unsafeCoerce# mbarr#))
-		        (MallocPtr mbarr# r) #)
+                        (MallocPtr mbarr# r) #)
      }
 
 -- | Allocate some memory and return a 'ForeignPtr' to it.  The memory
@@ -195,7 +195,7 @@ addForeignPtrFinalizer :: FinalizerPtr a -> ForeignPtr a -> IO ()
 -- object which have already been registered.
 addForeignPtrFinalizer finalizer fptr = 
   addForeignPtrConcFinalizer fptr 
-	(mkFinalizer finalizer (unsafeForeignPtrToPtr fptr))
+        (mkFinalizer finalizer (unsafeForeignPtrToPtr fptr))
 
 addForeignPtrConcFinalizer :: ForeignPtr a -> IO () -> IO ()
 -- ^This function adds a finalizer to the given @ForeignPtr@.  The
@@ -220,17 +220,17 @@ addForeignPtrConcFinalizer_ f@(PlainForeignPtr r) finalizer = do
   writeIORef r (finalizer : fs)
   if (null fs)
      then IO $ \s ->
-	      case r of { IORef (STRef r#) ->
-	      case mkWeak# r# () (foreignPtrFinalizer r) s of {  (# s1, w #) ->
-	      (# s1, () #) }}
+              case r of { IORef (STRef r#) ->
+              case mkWeak# r# () (foreignPtrFinalizer r) s of {  (# s1, w #) ->
+              (# s1, () #) }}
      else return ()
 addForeignPtrConcFinalizer_ f@(MallocPtr fo r) finalizer = do 
   fs <- readIORef r
   writeIORef r (finalizer : fs)
   if (null fs)
      then  IO $ \s -> 
-	       case mkWeak# fo () (do foreignPtrFinalizer r; touch f) s of
-		  (# s1, w #) -> (# s1, () #)
+               case mkWeak# fo () (do foreignPtrFinalizer r; touch f) s of
+                  (# s1, w #) -> (# s1, () #)
      else return ()
 
 addForeignPtrConcFinalizer_ _ _ =
@@ -305,11 +305,11 @@ castForeignPtr f = unsafeCoerce# f
 finalizeForeignPtr :: ForeignPtr a -> IO ()
 finalizeForeignPtr (ForeignPtr _ (PlainPtr _)) = return () -- no effect
 finalizeForeignPtr (ForeignPtr _ foreignPtr) = do
-	finalizers <- readIORef refFinalizers
-	sequence_ finalizers
-	writeIORef refFinalizers []
-	where
-		refFinalizers = case foreignPtr of
-			(PlainForeignPtr ref) -> ref
-			(MallocPtr     _ ref) -> ref
+        finalizers <- readIORef refFinalizers
+        sequence_ finalizers
+        writeIORef refFinalizers []
+        where
+                refFinalizers = case foreignPtr of
+                        (PlainForeignPtr ref) -> ref
+                        (MallocPtr     _ ref) -> ref
 
