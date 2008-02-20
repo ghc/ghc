@@ -881,6 +881,8 @@ LIB_LD_OPTS += $(foreach pkg,$(PKG_DEPENDS),-package $(pkg))
 # We have to expand each package dependency with its version, which we
 # can do by calling "ghc-pkg list $pkg --simple-output".
 PACKAGE_CPP_OPTS += -DPKG_DEPENDS='$(foreach pkg,$(PKG_DEPENDS),$(shell $(GHC_PKG_INPLACE) latest --global $(pkg)))'
+# We want to define STAGE to be like "2" in the Haskell code, so we need
+# to quote the "s so that they don't get interpreted by the shell.
 PACKAGE_CPP_OPTS += -DSTAGE='"$(stage)"'
 
 # Omit Main from the library, the client will want to plug their own Main in
