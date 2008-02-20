@@ -164,7 +164,7 @@ lintStgExpr e@(StgConApp con args) = runMaybeT $ do
   where
     con_ty = dataConRepType con
 
-lintStgExpr e@(StgOpApp (StgFCallOp _ _) args res_ty) = runMaybeT $ do
+lintStgExpr (StgOpApp (StgFCallOp _ _) args res_ty) = runMaybeT $ do
         -- We don't have enough type information to check
         -- the application; ToDo
     maybe_arg_tys <- mapM (MaybeT . lintStgArg) args
@@ -210,7 +210,7 @@ lintStgExpr e@(StgCase scrut _ _ bndr _ alts_type alts) = runMaybeT $ do
         StgApp _ _     -> return ()
         StgConApp _ _  -> return ()
         StgOpApp _ _ _ -> return ()
-        other          -> addErrL (mkCaseOfCaseMsg e)
+        _              -> addErrL (mkCaseOfCaseMsg e)
 
      addInScopeVars [bndr] $
         lintStgAlts alts scrut_ty
@@ -238,7 +238,7 @@ lintStgAlts alts scrut_ty = do
         where
           check ty = checkTys first_ty ty (mkCaseAltMsg alts)
 
-lintAlt scrut_ty (DEFAULT, _, _, rhs)
+lintAlt _ (DEFAULT, _, _, rhs)
  = lintStgExpr rhs
 
 lintAlt scrut_ty (LitAlt lit, _, _, rhs) = do
@@ -258,7 +258,7 @@ lintAlt scrut_ty (DataAlt con, args, _, rhs) = do
          checkL (equalLength arg_tys args) (mkAlgAltMsg3 con args)
          mapM_ check (zipEqual "lintAlgAlt:stg" arg_tys args)
          return ()
-      other ->
+      _ ->
          addErrL (mkAltMsg1 scrut_ty)
 
     addInScopeVars args $
@@ -321,7 +321,7 @@ initL (LintM m)
     }
 
 instance Monad LintM where
-    return a = LintM $ \loc scope errs -> (a, errs)
+    return a = LintM $ \_loc _scope errs -> (a, errs)
     (>>=) = thenL
     (>>)  = thenL_
 
@@ -338,11 +338,11 @@ thenL_ m k = LintM $ \loc scope errs
 
 \begin{code}
 checkL :: Bool -> Message -> LintM ()
-checkL True  msg = return ()
+checkL True  _   = return ()
 checkL False msg = addErrL msg
 
 addErrL :: Message -> LintM ()
-addErrL msg = LintM $ \loc scope errs -> ((), addErr errs msg loc)
+addErrL msg = LintM $ \loc _scope errs -> ((), addErr errs msg loc)
 
 addErr :: Bag Message -> Message -> [LintLocInfo] -> Bag Message
 addErr errs_so_far msg locs
@@ -387,7 +387,7 @@ checkFunApp :: Type                 -- The function type
 
 checkFunApp fun_ty arg_tys msg = LintM checkFunApp'
  where
-  checkFunApp' loc scope errs
+  checkFunApp' loc _scope errs
    = cfa res_ty expected_arg_tys arg_tys
    where
     (expected_arg_tys, res_ty) = splitFunTys (dropForAlls fun_ty)
@@ -406,7 +406,7 @@ checkFunApp fun_ty arg_tys msg = LintM checkFunApp'
           ([], _)                 -> (Nothing, addErr errs msg loc)     -- Too many args
           (new_expected, new_res) -> cfa new_res new_expected arg_tys
 
-    cfa res_ty (expected_arg_ty:expected_arg_tys) (arg_ty:arg_tys)
+    cfa res_ty (_:expected_arg_tys) (_:arg_tys)
       = cfa res_ty expected_arg_tys arg_tys
 \end{code}
 
