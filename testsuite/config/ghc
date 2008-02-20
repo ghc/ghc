@@ -23,7 +23,7 @@ config.run_ways		     = ['normal', 'optc', 'hpc']
 # ways that are not enabled by default, but can always be invoked explicitly
 config.other_ways            = ['extcore','optextcore',
                                 'prof_hc_hb','prof_hb',
-                                'prof_hd','prof_hy','prof_hr']
+                                'prof_hd','prof_hy','prof_hr', 'dyn']
 
 if (ghc_with_native_codegen == 1):
 	config.compile_ways.append('optasm')
@@ -63,7 +63,8 @@ config.way_flags = {
         'prof_hb'    : ['-O -prof -auto-all'],
         'prof_hd'    : ['-O -prof -auto-all'],
         'prof_hy'    : ['-O -prof -auto-all'],
-        'prof_hr'    : ['-O -prof -auto-all']
+        'prof_hr'    : ['-O -prof -auto-all'],
+        'dyn'        : ['-O -dynamic']
 	}
 
 config.way_rts_flags = { 
@@ -82,7 +83,8 @@ config.way_rts_flags = {
         'prof_hb'    : ['-hb'],
         'prof_hd'    : ['-hd'],
         'prof_hy'    : ['-hy'],
-        'prof_hr'    : ['-hr']
+        'prof_hr'    : ['-hr'],
+        'dyn'        : []
     	}
 
 def get_compiler_info():
