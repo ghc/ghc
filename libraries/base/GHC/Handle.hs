@@ -1212,6 +1212,9 @@ hSetFileSize handle size =
 -- 'True' if no further input can be taken from @hdl@ or for a
 -- physical file, if the current I\/O position is equal to the length of
 -- the file.  Otherwise, it returns 'False'.
+--
+-- NOTE: 'hIsEOF' may block, because it is the same as calling
+-- 'hLookAhead' and checking for an EOF exception.
 
 hIsEOF :: Handle -> IO Bool
 hIsEOF handle =
