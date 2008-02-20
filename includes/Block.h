@@ -231,8 +231,8 @@ void freeChain_lock(bdescr *p);
 
 #define WORDS_PER_MBLOCK  (BLOCKS_PER_MBLOCK * BLOCK_SIZE_W)
 
-INLINE_HEADER nat
-round_to_mblocks(nat words)
+INLINE_HEADER StgWord
+round_to_mblocks(StgWord words)
 {
   if (words > WORDS_PER_MBLOCK) {
     if ((words % WORDS_PER_MBLOCK) < (WORDS_PER_MBLOCK / 2)) {
