@@ -237,11 +237,15 @@ fixTvCoEnv in_scope env
       -- then use transitivity with the original coercion
 
 -----------------------------
+-- XXX Can we do this more nicely, by exploiting laziness?
+-- Or avoid needing it in the first place?
 fixTvSubstEnv :: InScopeSet -> TvSubstEnv -> TvSubstEnv
-fixTvSubstEnv in_scope env
-  = fixpt 
+fixTvSubstEnv in_scope env = f env
   where
-    fixpt = mapVarEnv (substTy (mkTvSubst in_scope fixpt)) env
+    f e = let e' = mapUFM (substTy (mkTvSubst in_scope e)) e
+          in if and $ eltsUFM $ intersectUFM_C tcEqType e e'
+             then e
+             else f e'
 
 ----------------------------
 tryToBind :: TyVarSet -> TyVar -> BindFlag
