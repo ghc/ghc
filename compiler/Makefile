@@ -473,6 +473,15 @@ bootstrapped = NO
 endif
 endif
 
+# Beyond stage 1, honour any Mac OS X depolyment target options.  If we use 
+# these options in stage 1 we get a linker error if the bootstrap compiler is
+#  for a more recent OS version
+ifneq "$(findstring $(stage), 2 3)" ""
+SRC_CC_OPTS += $(MACOSX_DEPLOYMENT_CC_OPTS)
+SRC_HC_OPTS += $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS))
+SRC_LD_OPTS += $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
+endif
+
 # -----------------------------------------------------------------------------
 # Building a compiler with interpreter support
 #

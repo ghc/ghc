@@ -1,6 +1,9 @@
 TOP=../..
 include $(TOP)/mk/boilerplate.mk
 
+SRC_CC_OPTS += $(MACOSX_DEPLOYMENT_CC_OPTS)
+SRC_LD_OPTS += $(MACOSX_DEPLOYMENT_LD_OPTS)
+
 C_PROG 	= hp2ps
 
 SRC_CC_OPTS += -I$(GHC_INCLUDE_DIR) -Wall

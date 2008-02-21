@@ -143,6 +143,8 @@ BOOTSTRAP_LIBS = Cabal filepath
 BOOTSTRAP_STAMPS = $(addprefix stamp/bootstrapping.,$(BOOTSTRAP_LIBS))
 BOOTSTRAP_INC_1_UP = -DCABAL_VERSION=1,3 $(addprefix -i../bootstrapping.,$(BOOTSTRAP_LIBS))
 BOOTSTRAP_INC_2_UP = -DCABAL_VERSION=1,3 $(addprefix -i../../bootstrapping.,$(BOOTSTRAP_LIBS))
+DEPLOYMENT_OPTS = $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS)) \
+		  $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
 
 .PHONY: subdirs
 
@@ -176,7 +178,7 @@ installPackage/installPackage: installPackage.hs $(BOOTSTRAP_STAMPS)
 ifeq "$(stage)" "2"
 	cd installPackage && ../$(HC) -Wall -cpp \
 	                            --make installPackage -o installPackage \
-	                            $(BOOTSTRAP_INC_1_UP)
+	                            $(BOOTSTRAP_INC_1_UP) $(DEPLOYMENT_OPTS)
 else
 	cd installPackage && $(GHC) -Wall -cpp \
 	                            --make installPackage -o installPackage \
@@ -191,7 +193,8 @@ ifBuildable/ifBuildable: ifBuildable.hs
 	mkdir ifBuildable
 	$(CP) ifBuildable.hs ifBuildable/
 ifeq "$(stage)" "2"
-	cd ifBuildable && ../$(HC) -Wall --make ifBuildable -o ifBuildable
+	cd ifBuildable && ../$(HC) -Wall --make ifBuildable -o ifBuildable \
+	   	       	         $(DEPLOYMENT_OPTS)
 else
 	cd ifBuildable && $(GHC) -Wall --make ifBuildable -o ifBuildable
 endif

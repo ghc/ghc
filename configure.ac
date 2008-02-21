@@ -821,20 +821,20 @@ AC_SUBST(DotnetSupport)
 
 dnl ** Mac OS X: explicit deployment target
 dnl --------------------------------------------------------------
-AC_ARG_WITH([macos-deployment-target],
-[AC_HELP_STRING([--macos-deployment-target=VERSION],
-        [Build for Mac OS VERSION and higher  [default= version of build host]])],
-[MACOS_DEPLOYMENT_TARGET="$withval"
+AC_ARG_WITH([macosx-deployment-target],
+[AC_HELP_STRING([--with-macosx-deployment-target=VERSION],
+        [Build for Mac OS VERSION and higher  (default= version of build host)])],
+[FP_MACOSX_DEPLOYMENT_TARGET="$withval"
  if test "x$TargetOS_CPP-$TargetVendor_CPP" != "xdarwin-apple"; then
    # ignore everywhere, but on Mac OS
-   AC_MSG_WARN([--macos-deployment-target is only available on Mac OS X])
-   MACOS_DEPLOYMENT_TARGET=none
+   AC_MSG_WARN([--macosx-deployment-target is only available on Mac OS X])
+   FP_MACOSX_DEPLOYMENT_TARGET=none
  fi],
-[MACOS_DEPLOYMENT_TARGET=none]
+[FP_MACOSX_DEPLOYMENT_TARGET=none]
 )
-FP_MACOS_DEPLOYMENT_TARGET
-AC_SUBST(MACOS_DEPLOYMENT_VERSION)
-AC_SUBST(MACOS_DEPLOYMENT_SDK)
+FP_CHECK_MACOSX_DEPLOYMENT_TARGET
+AC_SUBST(MACOSX_DEPLOYMENT_VERSION)
+AC_SUBST(MACOSX_DEPLOYMENT_SDK)
 
 dnl --------------------------------------------------------------
 dnl End of configure script option section

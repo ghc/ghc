@@ -177,6 +177,11 @@ LIB_LD_OPTS = -L$(shell $(GHC_PKG_INPLACE) field base library-dirs | sed -e 's/l
 endif
 endif
 
+# Mac OS X: make sure we compile for the right OS version
+SRC_CC_OPTS += $(MACOSX_DEPLOYMENT_CC_OPTS)
+SRC_HC_OPTS += $(addprefix -optc, $(MACOSX_DEPLOYMENT_CC_OPTS))
+LIB_LD_OPTS += $(addprefix -optl, $(MACOSX_DEPLOYMENT_LD_OPTS))
+
 # XXX DQ is now the same on all platforms, so get rid of it
 DQ = \"
 
