@@ -1478,26 +1478,31 @@ setDumpSimplPhases :: String -> DynP ()
 setDumpSimplPhases s = do setDynFlag Opt_ForceRecomp
                           upd (\s -> s { shouldDumpSimplPhase = spec })
   where
+    spec :: SimplifierMode -> Bool
     spec = join (||)
-         . map (join (&&))
-         . map (map match)
-         . map (split ':')
+         . map (join (&&) . map match . split ':')
          . split ','
          $ case s of
              '=' : s' -> s'
              _        -> s
 
+    join :: (Bool -> Bool -> Bool)
+	 -> [SimplifierMode -> Bool]
+	 -> SimplifierMode -> Bool
     join _  [] = const True
     join op ss = foldr1 (\f g x -> f x `op` g x) ss
 
+    match :: String -> SimplifierMode -> Bool
     match "" = const True
     match s  = case reads s of
                 [(n,"")] -> phase_num  n
                 _        -> phase_name s
 
+    phase_num :: Int -> SimplifierMode -> Bool
     phase_num n (SimplPhase k _) = n == k
     phase_num _ _                = False
 
+    phase_name :: String -> SimplifierMode -> Bool
     phase_name s SimplGently       = s == "gentle"
     phase_name s (SimplPhase _ ss) = s `elem` ss
 
