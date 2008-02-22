@@ -11,10 +11,10 @@ test('rebindable1', normal, compile, [''])
 test('rebindable2', normal, compile_and_run, [''])
 test('rebindable3', normal, compile_and_run, [''])
 test('rebindable4', normal, compile_and_run, [''])
+test('rebindable5', normal, compile_and_run, [''])
 
-# rebindable 5 and 6 have become expected failures
+# rebindable6 has become expected failures
 # following Trac #1537
-test('rebindable5', normal, compile_fail, [''])
 test('rebindable6', normal, compile_fail, [''])
 
 test('rebindable7', normal, compile_and_run, [''])

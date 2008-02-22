@@ -24,12 +24,12 @@ module Main where
 		return :: a -> m a;
 		};
 
-	class HasBind m n mn | m n -> mn where
+	class HasBind m n mn | m n -> mn, m mn -> n where
 		{
 		(>>=) :: m a -> (a -> n b) -> mn b;
 		};
 
-	class HasSeq m n mn | m n -> mn where
+	class HasSeq m n mn | m n -> mn, m mn -> n where
 		{
 		(>>) :: m a -> n b -> mn b;
 		};
@@ -190,5 +190,6 @@ module Main where
 			Prelude.>>
 		(doTest "test_fromRational_pattern 1.7"
 			(putStrLn (test_fromRational_pattern 1.7))
-		);
+		)
+	   ;
 	}
