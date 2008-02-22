@@ -4,13 +4,6 @@
 \section[Simplify]{The main module of the simplifier}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Simplify ( simplTopBinds, simplExpr ) where
 
 #include "HsVersions.h"
@@ -41,7 +34,6 @@ import BasicTypes       ( TopLevelFlag(..), isTopLevel,
 import Maybes           ( orElse )
 import Data.List        ( mapAccumL )
 import Outputable
-import Util
 \end{code}
 
 
@@ -207,18 +199,18 @@ expansion at a let RHS can concentrate solely on the PAP case.
 \begin{code}
 simplTopBinds :: SimplEnv -> [InBind] -> SimplM [OutBind]
 
-simplTopBinds env binds
+simplTopBinds env0 binds0
   = do  {       -- Put all the top-level binders into scope at the start
                 -- so that if a transformation rule has unexpectedly brought
                 -- anything into scope, then we don't get a complaint about that.
                 -- It's rather as if the top-level binders were imported.
-        ; env <- simplRecBndrs env (bindersOfBinds binds)
+        ; env1 <- simplRecBndrs env0 (bindersOfBinds binds0)
         ; dflags <- getDOptsSmpl
         ; let dump_flag = dopt Opt_D_dump_inlinings dflags ||
                           dopt Opt_D_dump_rule_firings dflags
-        ; env' <- simpl_binds dump_flag env binds
+        ; env2 <- simpl_binds dump_flag env1 binds0
         ; freeTick SimplifierDone
-        ; return (getFloats env') }
+        ; return (getFloats env2) }
   where
         -- We need to track the zapped top-level binders, because
         -- they should have their fragile IdInfo zapped (notably occurrence info)
@@ -227,13 +219,13 @@ simplTopBinds env binds
         -- The dump-flag emits a trace for each top-level binding, which
         -- helps to locate the tracing for inlining and rule firing
     simpl_binds :: Bool -> SimplEnv -> [InBind] -> SimplM SimplEnv
-    simpl_binds dump env []           = return env
-    simpl_binds dump env (bind:binds) = do { env' <- trace dump bind $
+    simpl_binds _    env []           = return env
+    simpl_binds dump env (bind:binds) = do { env' <- trace_bind dump bind $
                                                      simpl_bind env bind
                                            ; simpl_binds dump env' binds }
 
-    trace True  bind = pprTrace "SimplBind" (ppr (bindersOf bind))
-    trace False bind = \x -> x
+    trace_bind True  bind = pprTrace "SimplBind" (ppr (bindersOf bind))
+    trace_bind False _    = \x -> x
 
     simpl_bind env (Rec pairs)  = simplRecBind      env  TopLevel pairs
     simpl_bind env (NonRec b r) = simplRecOrTopPair env' TopLevel b b' r
@@ -255,12 +247,12 @@ simplRecBind is used for
 simplRecBind :: SimplEnv -> TopLevelFlag
              -> [(InId, InExpr)]
              -> SimplM SimplEnv
-simplRecBind env top_lvl pairs
-  = do  { let (env_with_info, triples) = mapAccumL add_rules env pairs
-        ; env' <- go (zapFloats env_with_info) triples
-        ; return (env `addRecFloats` env') }
-        -- addFloats adds the floats from env',
-        -- *and* updates env with the in-scope set from env'
+simplRecBind env0 top_lvl pairs0
+  = do  { let (env_with_info, triples) = mapAccumL add_rules env0 pairs0
+        ; env1 <- go (zapFloats env_with_info) triples
+        ; return (env0 `addRecFloats` env1) }
+        -- addFloats adds the floats from env1,
+        -- *and* updates env0 with the in-scope set from env1
   where
     add_rules :: SimplEnv -> (InBndr,InExpr) -> (SimplEnv, (InBndr, OutBndr, InExpr))
         -- Add the (substituted) rules to the binder
@@ -271,8 +263,8 @@ simplRecBind env top_lvl pairs
     go env [] = return env
 
     go env ((old_bndr, new_bndr, rhs) : pairs)
-        = do { env <- simplRecOrTopPair env top_lvl old_bndr new_bndr rhs
-             ; go env pairs }
+        = do { env' <- simplRecOrTopPair env top_lvl old_bndr new_bndr rhs
+             ; go env' pairs }
 \end{code}
 
 simplOrTopPair is used for
@@ -364,8 +356,8 @@ simplNonRecX :: SimplEnv
              -> SimplM SimplEnv
 
 simplNonRecX env bndr new_rhs
-  = do  { (env, bndr') <- simplBinder env bndr
-        ; completeNonRecX env NotTopLevel NonRecursive
+  = do  { (env', bndr') <- simplBinder env bndr
+        ; completeNonRecX env' NotTopLevel NonRecursive
                           (isStrictId bndr) bndr bndr' new_rhs }
 
 completeNonRecX :: SimplEnv
@@ -430,14 +422,14 @@ That's what the 'go' loop in prepareRhs does
 prepareRhs :: SimplEnv -> OutExpr -> SimplM (SimplEnv, OutExpr)
 -- Adds new floats to the env iff that allows us to return a good RHS
 prepareRhs env (Cast rhs co)    -- Note [Float coercions]
-  | (ty1, ty2) <- coercionKind co       -- Do *not* do this if rhs has an unlifted type
+  | (ty1, _ty2) <- coercionKind co       -- Do *not* do this if rhs has an unlifted type
   , not (isUnLiftedType ty1)            -- see Note [Float coercions (unlifted)]
   = do  { (env', rhs') <- makeTrivial env rhs
         ; return (env', Cast rhs' co) }
 
-prepareRhs env rhs
-  = do  { (is_val, env', rhs') <- go 0 env rhs
-        ; return (env', rhs') }
+prepareRhs env0 rhs0
+  = do  { (_is_val, env1, rhs1) <- go 0 env0 rhs0
+        ; return (env1, rhs1) }
   where
     go n_val_args env (Cast rhs co)
         = do { (is_val, env', rhs') <- go n_val_args env rhs
@@ -457,7 +449,7 @@ prepareRhs env rhs
           is_val = n_val_args > 0       -- There is at least one arg
                                         -- ...and the fun a constructor or PAP
                  && (isDataConWorkId fun || n_val_args < idArity fun)
-    go n_val_args env other
+    go _ env other
         = return (False, env, other)
 \end{code}
 
@@ -509,9 +501,9 @@ makeTrivial env expr
   = return (env, expr)
   | otherwise           -- See Note [Take care] below
   = do  { var <- newId FSLIT("a") (exprType expr)
-        ; env <- completeNonRecX env NotTopLevel NonRecursive
-                                 False var var expr
-        ; return (env, substExpr env (Var var)) }
+        ; env' <- completeNonRecX env NotTopLevel NonRecursive
+                                  False var var expr
+        ; return (env', substExpr env' (Var var)) }
 \end{code}
 
 
@@ -682,6 +674,8 @@ simplExprF env e cont
   = -- pprTrace "simplExprF" (ppr e $$ ppr cont $$ ppr (seTvSubst env) $$ ppr (seIdSubst env) {- $$ ppr (seFloats env) -} ) $
     simplExprF' env e cont
 
+simplExprF' :: SimplEnv -> InExpr -> SimplCont
+            -> SimplM (SimplEnv, OutExpr)
 simplExprF' env (Var v)        cont = simplVar env v cont
 simplExprF' env (Lit lit)      cont = rebuild env (Lit lit) cont
 simplExprF' env (Note n expr)  cont = simplNote env n expr cont
@@ -727,12 +721,12 @@ simplExprF' env (Case scrut bndr case_ty alts) cont
     case_ty'  = substTy env case_ty     -- c.f. defn of simplExpr
 
 simplExprF' env (Let (Rec pairs) body) cont
-  = do  { env <- simplRecBndrs env (map fst pairs)
+  = do  { env' <- simplRecBndrs env (map fst pairs)
                 -- NB: bndrs' don't have unfoldings or rules
                 -- We add them as we go down
 
-        ; env <- simplRecBind env NotTopLevel pairs
-        ; simplExprF env body cont }
+        ; env'' <- simplRecBind env' NotTopLevel pairs
+        ; simplExprF env'' body cont }
 
 simplExprF' env (Let (NonRec bndr rhs) body) cont
   = simplNonRecE env bndr (rhs, env) ([], body) cont
@@ -758,9 +752,9 @@ simplType env ty
 rebuild :: SimplEnv -> OutExpr -> SimplCont -> SimplM (SimplEnv, OutExpr)
 -- At this point the substitution in the SimplEnv should be irrelevant
 -- only the in-scope set and floats should matter
-rebuild env expr cont
-  = -- pprTrace "rebuild" (ppr expr $$ ppr cont $$ ppr (seFloats env)) $
-    case cont of
+rebuild env expr cont0
+  = -- pprTrace "rebuild" (ppr expr $$ ppr cont0 $$ ppr (seFloats env)) $
+    case cont0 of
       Stop {}                      -> return (env, expr)
       CoerceIt co cont             -> rebuild env (mkCoerce co expr) cont
       Select _ bndr alts se cont   -> rebuildCase (se `setFloats` env) expr bndr alts cont
@@ -781,17 +775,17 @@ rebuild env expr cont
 \begin{code}
 simplCast :: SimplEnv -> InExpr -> Coercion -> SimplCont
           -> SimplM (SimplEnv, OutExpr)
-simplCast env body co cont
-  = do  { co' <- simplType env co
-        ; simplExprF env body (addCoerce co' cont) }
+simplCast env body co0 cont0
+  = do  { co1 <- simplType env co0
+        ; simplExprF env body (addCoerce co1 cont0) }
   where
        addCoerce co cont = add_coerce co (coercionKind co) cont
 
-       add_coerce co (s1, k1) cont      -- co :: ty~ty
+       add_coerce _co (s1, k1) cont     -- co :: ty~ty
          | s1 `coreEqType` k1 = cont    -- is a no-op
 
-       add_coerce co1 (s1, k2) (CoerceIt co2 cont)
-         | (l1, t1) <- coercionKind co2
+       add_coerce co1 (s1, _k2) (CoerceIt co2 cont)
+         | (_l1, t1) <- coercionKind co2
                 --      coerce T1 S1 (coerce S1 K1 e)
                 -- ==>
                 --      e,                      if T1=K1
@@ -804,7 +798,7 @@ simplCast env body co cont
          , s1 `coreEqType` t1  = cont            -- The coerces cancel out
          | otherwise           = CoerceIt (mkTransCoercion co1 co2) cont
 
-       add_coerce co (s1s2, t1t2) (ApplyTo dup (Type arg_ty) arg_se cont)
+       add_coerce co (s1s2, _t1t2) (ApplyTo dup (Type arg_ty) arg_se cont)
                 -- (f `cast` g) ty  --->   (f ty) `cast` (g @ ty)
                 -- This implements the PushT rule from the paper
          | Just (tyvar,_) <- splitForAllTy_maybe s1s2
@@ -815,7 +809,7 @@ simplCast env body co cont
 
         -- ToDo: the PushC rule is not implemented at all
 
-       add_coerce co (s1s2, t1t2) (ApplyTo dup arg arg_se cont)
+       add_coerce co (s1s2, _t1t2) (ApplyTo dup arg arg_se cont)
          | not (isTypeArg arg)  -- This implements the Push rule from the paper
          , isFunTy s1s2   -- t1t2 must be a function type, becuase it's applied
                 -- co : s1s2 :=: t1t2
@@ -871,10 +865,10 @@ simplLam env (bndr:bndrs) body (ApplyTo _ arg arg_se cont)
 
         -- Not enough args, so there are real lambdas left to put in the result
 simplLam env bndrs body cont
-  = do  { (env, bndrs') <- simplLamBndrs env bndrs
-        ; body' <- simplExpr env body
+  = do  { (env', bndrs') <- simplLamBndrs env bndrs
+        ; body' <- simplExpr env' body
         ; new_lam <- mkLam bndrs' body'
-        ; rebuild env new_lam cont }
+        ; rebuild env' new_lam cont }
 
 ------------------
 simplNonRecE :: SimplEnv
@@ -923,6 +917,8 @@ simplNonRecE env bndr (rhs, rhs_se) (bndrs, body) cont
 \begin{code}
 -- Hack alert: we only distinguish subsumed cost centre stacks for the
 -- purposes of inlining.  All other CCCSs are mapped to currentCCS.
+simplNote :: SimplEnv -> Note -> CoreExpr -> SimplCont
+          -> SimplM (SimplEnv, OutExpr)
 simplNote env (SCC cc) e cont
   = do  { e' <- simplExpr (setEnclosingCC env currentCCS) e
         ; rebuild env (mkSCC cc e') cont }
@@ -952,6 +948,7 @@ simplNote env (CoreNote s) e cont = do
 %************************************************************************
 
 \begin{code}
+simplVar :: SimplEnv -> Id -> SimplCont -> SimplM (SimplEnv, OutExpr)
 simplVar env var cont
   = case substId env var of
         DoneEx e         -> simplExprF (zapSubstEnv env) e cont
@@ -970,6 +967,7 @@ simplVar env var cont
 ---------------------------------------------------------
 --      Dealing with a call site
 
+completeCall :: SimplEnv -> Id -> SimplCont -> SimplM (SimplEnv, OutExpr)
 completeCall env var cont
   = do  { dflags <- getDOptsSmpl
         ; let   (args,call_cont) = contArgs cont
@@ -1073,8 +1071,8 @@ rebuildCall env fun fun_ty (ArgInfo { ai_strs = [] }) cont
   where                          -- again and again!
     cont_ty = contResultType cont
     co      = mkUnsafeCoercion fun_ty cont_ty
-    mk_coerce expr | cont_ty `coreEqType` fun_ty = fun
-                   | otherwise = mkCoerce co fun
+    mk_coerce expr | cont_ty `coreEqType` fun_ty = expr
+                   | otherwise = mkCoerce co expr
 
 rebuildCall env fun fun_ty info (ApplyTo _ (Type arg_ty) se cont)
   = do  { ty' <- simplType (se `setInScope` env) arg_ty
@@ -1103,7 +1101,7 @@ rebuildCall env fun fun_ty
     cci | has_rules || disc > 0 = ArgCtxt has_rules disc  -- Be keener here
         | otherwise             = BoringCtxt              -- Nothing interesting
 
-rebuildCall env fun fun_ty info cont
+rebuildCall env fun _ _ cont
   = rebuild env fun cont
 \end{code}
 
@@ -1169,7 +1167,7 @@ rebuildCase env scrut case_bndr alts cont
 --      2. Eliminate the case if scrutinee is evaluated
 --------------------------------------------------
 
-rebuildCase env scrut case_bndr [(con,bndrs,rhs)] cont
+rebuildCase env scrut case_bndr [(_, bndrs, rhs)] cont
   -- See if we can get rid of the case altogether
   -- See the extensive notes on case-elimination above
   -- mkCase made sure that if all the alternatives are equal,
@@ -1198,8 +1196,8 @@ rebuildCase env scrut case_bndr [(con,bndrs,rhs)] cont
 --      other problems
 --      Also we don't want to discard 'seq's
   = do  { tick (CaseElim case_bndr)
-        ; env <- simplNonRecX env case_bndr scrut
-        ; simplExprF env rhs cont }
+        ; env' <- simplNonRecX env case_bndr scrut
+        ; simplExprF env' rhs cont }
   where
         -- The case binder is going to be evaluated later,
         -- and the scrutinee is a simple variable
@@ -1207,7 +1205,7 @@ rebuildCase env scrut case_bndr [(con,bndrs,rhs)] cont
                                  && not (isTickBoxOp v)
                                     -- ugly hack; covering this case is what
                                     -- exprOkForSpeculation was intended for.
-    var_demanded_later other   = False
+    var_demanded_later _       = False
 
 
 --------------------------------------------------
@@ -1217,16 +1215,16 @@ rebuildCase env scrut case_bndr [(con,bndrs,rhs)] cont
 rebuildCase env scrut case_bndr alts cont
   = do  {       -- Prepare the continuation;
                 -- The new subst_env is in place
-          (env, dup_cont, nodup_cont) <- prepareCaseCont env alts cont
+          (env', dup_cont, nodup_cont) <- prepareCaseCont env alts cont
 
         -- Simplify the alternatives
-        ; (scrut', case_bndr', alts') <- simplAlts env scrut case_bndr alts dup_cont
+        ; (scrut', case_bndr', alts') <- simplAlts env' scrut case_bndr alts dup_cont
         ; let res_ty' = contResultType dup_cont
         ; case_expr <- mkCase scrut' case_bndr' res_ty' alts'
 
-        -- Notice that rebuildDone returns the in-scope set from env, not alt_env
+        -- Notice that rebuildDone returns the in-scope set from env', not alt_env
         -- The case binder *not* scope over the whole returned case-expression
-        ; rebuild env case_expr nodup_cont }
+        ; rebuild env' case_expr nodup_cont }
 \end{code}
 
 simplCaseBinder checks whether the scrutinee is a variable, v.  If so,
@@ -1440,12 +1438,12 @@ I don't really know how to improve this situation.
 \begin{code}
 simplCaseBinder :: SimplEnv -> OutExpr -> OutId -> [InAlt]
                 -> SimplM (SimplEnv, OutExpr, OutId)
-simplCaseBinder env scrut case_bndr alts
-  = do  { (env1, case_bndr1) <- simplBinder env case_bndr
+simplCaseBinder env0 scrut0 case_bndr0 alts
+  = do  { (env1, case_bndr1) <- simplBinder env0 case_bndr0
 
         ; fam_envs <- getFamEnvs
-        ; (env2, scrut2, case_bndr2) <- improve_seq fam_envs env1 scrut
-                                                case_bndr case_bndr1 alts
+        ; (env2, scrut2, case_bndr2) <- improve_seq fam_envs env1 scrut0
+                                                case_bndr0 case_bndr1 alts
                         -- Note [Improving seq]
 
         ; let (env3, case_bndr3) = improve_case_bndr env2 scrut2 case_bndr2
@@ -1454,15 +1452,15 @@ simplCaseBinder env scrut case_bndr alts
         ; return (env3, scrut2, case_bndr3) }
   where
 
-    improve_seq fam_envs env1 scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
+    improve_seq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
         | Just (co, ty2) <- topNormaliseType fam_envs (idType case_bndr1)
         =  do { case_bndr2 <- newId FSLIT("nt") ty2
               ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCoercion co)
-                    env2 = extendIdSubst env1 case_bndr rhs
+                    env2 = extendIdSubst env case_bndr rhs
               ; return (env2, scrut `Cast` co, case_bndr2) }
 
-    improve_seq fam_envs env1 scrut case_bndr case_bndr1 alts
-        = return (env1, scrut, case_bndr1)
+    improve_seq _ env scrut _ case_bndr1 _
+        = return (env, scrut, case_bndr1)
 
 
     improve_case_bndr env scrut case_bndr
@@ -1483,7 +1481,7 @@ simplCaseBinder env scrut case_bndr alts
                             where
                                 rhs = Cast (Var case_bndr') (mkSymCoercion co)
 
-            other -> (env, case_bndr)
+            _ -> (env, case_bndr)
         where
           case_bndr' = zapOccInfo case_bndr
           env1       = modifyInScope env case_bndr case_bndr'
@@ -1546,11 +1544,11 @@ simplAlts :: SimplEnv
 simplAlts env scrut case_bndr alts cont'
   = -- pprTrace "simplAlts" (ppr alts $$ ppr (seIdSubst env)) $
     do  { let alt_env = zapFloats env
-        ; (alt_env, scrut', case_bndr') <- simplCaseBinder alt_env scrut case_bndr alts
+        ; (alt_env', scrut', case_bndr') <- simplCaseBinder alt_env scrut case_bndr alts
 
-        ; (imposs_deflt_cons, in_alts) <- prepareAlts alt_env scrut case_bndr' alts
+        ; (imposs_deflt_cons, in_alts) <- prepareAlts alt_env' scrut case_bndr' alts
 
-        ; alts' <- mapM (simplAlt alt_env imposs_deflt_cons case_bndr' cont') in_alts
+        ; alts' <- mapM (simplAlt alt_env' imposs_deflt_cons case_bndr' cont') in_alts
         ; return (scrut', case_bndr', alts') }
 
 ------------------------------------
@@ -1569,26 +1567,27 @@ simplAlt env imposs_deflt_cons case_bndr' cont' (DEFAULT, bndrs, rhs)
         ; rhs' <- simplExprC env' rhs cont'
         ; return (DEFAULT, [], rhs') }
 
-simplAlt env imposs_deflt_cons case_bndr' cont' (LitAlt lit, bndrs, rhs)
+simplAlt env _ case_bndr' cont' (LitAlt lit, bndrs, rhs)
   = ASSERT( null bndrs )
     do  { let env' = addBinderUnfolding env case_bndr' (Lit lit)
         ; rhs' <- simplExprC env' rhs cont'
         ; return (LitAlt lit, [], rhs') }
 
-simplAlt env imposs_deflt_cons case_bndr' cont' (DataAlt con, vs, rhs)
+simplAlt env _ case_bndr' cont' (DataAlt con, vs, rhs)
   = do  {       -- Deal with the pattern-bound variables
                 -- Mark the ones that are in ! positions in the
                 -- data constructor as certainly-evaluated.
                 -- NB: simplLamBinders preserves this eval info
-          let vs_with_evals = add_evals vs (dataConRepStrictness con)
-        ; (env, vs') <- simplLamBndrs env vs_with_evals
+          let vs_with_evals = add_evals (dataConRepStrictness con)
+        ; (env', vs') <- simplLamBndrs env vs_with_evals
 
                 -- Bind the case-binder to (con args)
         ; let inst_tys' = tyConAppArgs (idType case_bndr')
               con_args  = map Type inst_tys' ++ varsToCoreExprs vs'
-              env'      = addBinderUnfolding env case_bndr' (mkConApp con con_args)
+              env''     = addBinderUnfolding env' case_bndr'
+                                             (mkConApp con con_args)
 
-        ; rhs' <- simplExprC env' rhs cont'
+        ; rhs' <- simplExprC env'' rhs cont'
         ; return (DataAlt con, vs', rhs') }
   where
         -- add_evals records the evaluated-ness of the bound variables of
@@ -1600,18 +1599,18 @@ simplAlt env imposs_deflt_cons case_bndr' cont' (DataAlt con, vs, rhs)
         -- We really must record that b is already evaluated so that we don't
         -- go and re-evaluate it when constructing the result.
         -- See Note [Data-con worker strictness] in MkId.lhs
-    add_evals vs strs
-        = go vs strs
+    add_evals the_strs
+        = go vs the_strs
         where
           go [] [] = []
-          go (v:vs) strs | isTyVar v = v : go vs strs
-          go (v:vs) (str:strs)
-            | isMarkedStrict str = evald_v  : go vs strs
-            | otherwise          = zapped_v : go vs strs
+          go (v:vs') strs | isTyVar v = v : go vs' strs
+          go (v:vs') (str:strs)
+            | isMarkedStrict str = evald_v  : go vs' strs
+            | otherwise          = zapped_v : go vs' strs
             where
               zapped_v = zap_occ_info v
               evald_v  = zapped_v `setIdUnfolding` evaldUnfolding
-          go _ _ = pprPanic "cat_evals" (ppr con $$ ppr vs $$ ppr strs)
+          go _ _ = pprPanic "cat_evals" (ppr con $$ ppr vs $$ ppr the_strs)
 
         -- zap_occ_info: if the case binder is alive, then we add the unfolding
         --      case_bndr = C vs
@@ -1620,7 +1619,7 @@ simplAlt env imposs_deflt_cons case_bndr' cont' (DataAlt con, vs, rhs)
         --        case e of t { (a,b) -> ...(case t of (p,q) -> p)... }
         --   ==>  case e of t { (a,b) -> ...(a)... }
         -- Look, Ma, a is alive now.
-    zap_occ_info | isDeadBinder case_bndr' = \id -> id
+    zap_occ_info | isDeadBinder case_bndr' = \ident -> ident
                  | otherwise               = zapOccInfo
 
 addBinderUnfolding :: SimplEnv -> Id -> CoreExpr -> SimplEnv
@@ -1661,23 +1660,26 @@ knownCon env scrut con args bndr alts cont
   = do  { tick (KnownBranch bndr)
         ; knownAlt env scrut args bndr (findAlt con alts) cont }
 
-knownAlt env scrut args bndr (DEFAULT, bs, rhs) cont
+knownAlt :: SimplEnv -> OutExpr -> [OutExpr]
+         -> InId -> (AltCon, [CoreBndr], InExpr) -> SimplCont
+         -> SimplM (SimplEnv, OutExpr)
+knownAlt env scrut _ bndr (DEFAULT, bs, rhs) cont
   = ASSERT( null bs )
-    do  { env <- simplNonRecX env bndr scrut
+    do  { env' <- simplNonRecX env bndr scrut
                 -- This might give rise to a binding with non-atomic args
                 -- like x = Node (f x) (g x)
                 -- but simplNonRecX will atomic-ify it
-        ; simplExprF env rhs cont }
+        ; simplExprF env' rhs cont }
 
-knownAlt env scrut args bndr (LitAlt lit, bs, rhs) cont
+knownAlt env scrut _ bndr (LitAlt _, bs, rhs) cont
   = ASSERT( null bs )
-    do  { env <- simplNonRecX env bndr scrut
-        ; simplExprF env rhs cont }
+    do  { env' <- simplNonRecX env bndr scrut
+        ; simplExprF env' rhs cont }
 
-knownAlt env scrut args bndr (DataAlt dc, bs, rhs) cont
+knownAlt env scrut the_args bndr (DataAlt dc, bs, rhs) cont
   = do  { let dead_bndr  = isDeadBinder bndr    -- bndr is an InId
               n_drop_tys = length (dataConUnivTyVars dc)
-        ; env <- bind_args env dead_bndr bs (drop n_drop_tys args)
+        ; env' <- bind_args env dead_bndr bs (drop n_drop_tys the_args)
         ; let
                 -- It's useful to bind bndr to scrut, rather than to a fresh
                 -- binding      x = Con arg1 .. argn
@@ -1687,35 +1689,36 @@ knownAlt env scrut args bndr (DataAlt dc, bs, rhs) cont
                 -- about duplicating the arg redexes; in that case, make
                 -- a new con-app from the args
                 bndr_rhs  = case scrut of
-                                Var v -> scrut
-                                other -> con_app
-                con_app = mkConApp dc (take n_drop_tys args ++ con_args)
-                con_args = [substExpr env (varToCoreExpr b) | b <- bs]
+                                Var _ -> scrut
+                                _     -> con_app
+                con_app = mkConApp dc (take n_drop_tys the_args ++ con_args)
+                con_args = [substExpr env' (varToCoreExpr b) | b <- bs]
                                 -- args are aready OutExprs, but bs are InIds
 
-        ; env <- simplNonRecX env bndr bndr_rhs
-        ; -- pprTrace "knownCon2" (ppr bs $$ ppr rhs $$ ppr (seIdSubst env)) $
-          simplExprF env rhs cont }
+        ; env'' <- simplNonRecX env' bndr bndr_rhs
+        ; -- pprTrace "knownCon2" (ppr bs $$ ppr rhs $$ ppr (seIdSubst env'')) $
+          simplExprF env'' rhs cont }
   where
     -- Ugh!
-    bind_args env dead_bndr [] _  = return env
+    bind_args env' _ [] _  = return env'
 
-    bind_args env dead_bndr (b:bs) (Type ty : args)
+    bind_args env' dead_bndr (b:bs') (Type ty : args)
       = ASSERT( isTyVar b )
-        bind_args (extendTvSubst env b ty) dead_bndr bs args
+        bind_args (extendTvSubst env' b ty) dead_bndr bs' args
 
-    bind_args env dead_bndr (b:bs) (arg : args)
+    bind_args env' dead_bndr (b:bs') (arg : args)
       = ASSERT( isId b )
-        do      { let b' = if dead_bndr then b else zapOccInfo b
-                    -- Note that the binder might be "dead", because it doesn't occur
-                    -- in the RHS; and simplNonRecX may therefore discard it via postInlineUnconditionally
-                    -- Nevertheless we must keep it if the case-binder is alive, because it may
-                    -- be used in the con_app.  See Note [zapOccInfo]
-            ; env <- simplNonRecX env b' arg
-            ; bind_args env dead_bndr bs args }
+        do { let b' = if dead_bndr then b else zapOccInfo b
+             -- Note that the binder might be "dead", because it doesn't
+             -- occur in the RHS; and simplNonRecX may therefore discard
+             -- it via postInlineUnconditionally.
+             -- Nevertheless we must keep it if the case-binder is alive,
+             -- because it may be used in the con_app.  See Note [zapOccInfo]
+           ; env'' <- simplNonRecX env' b' arg
+           ; bind_args env'' dead_bndr bs' args }
 
     bind_args _ _ _ _ =
-      pprPanic "bind_args" $ ppr dc $$ ppr bs $$ ppr args $$
+      pprPanic "bind_args" $ ppr dc $$ ppr bs $$ ppr the_args $$
                              text "scrut:" <+> ppr scrut
 \end{code}
 
@@ -1735,8 +1738,8 @@ prepareCaseCont :: SimplEnv
                         -- continunation)
 
         -- No need to make it duplicatable if there's only one alternative
-prepareCaseCont env [alt] cont = return (env, cont, mkBoringStop (contResultType cont))
-prepareCaseCont env alts  cont = mkDupableCont env cont
+prepareCaseCont env [_] cont = return (env, cont, mkBoringStop (contResultType cont))
+prepareCaseCont env _   cont = mkDupableCont env cont
 \end{code}
 
 \begin{code}
@@ -1747,11 +1750,11 @@ mkDupableCont env cont
   | contIsDupable cont
   = return (env, cont, mkBoringStop (contResultType cont))
 
-mkDupableCont env (Stop {}) = panic "mkDupableCont"     -- Handled by previous eqn
+mkDupableCont _   (Stop {}) = panic "mkDupableCont"     -- Handled by previous eqn
 
 mkDupableCont env (CoerceIt ty cont)
-  = do  { (env, dup, nodup) <- mkDupableCont env cont
-        ; return (env, CoerceIt ty dup, nodup) }
+  = do  { (env', dup, nodup) <- mkDupableCont env cont
+        ; return (env', CoerceIt ty dup, nodup) }
 
 mkDupableCont env cont@(StrictBind bndr _ _ se _)
   =  return (env, mkBoringStop (substTy se (idType bndr)), cont)
@@ -1766,13 +1769,13 @@ mkDupableCont env (ApplyTo _ arg se cont)
         --      ==>
         --              let a = ...arg...
         --              in [...hole...] a
-    do  { (env, dup_cont, nodup_cont) <- mkDupableCont env cont
-        ; arg <- simplExpr (se `setInScope` env) arg
-        ; (env, arg) <- makeTrivial env arg
-        ; let app_cont = ApplyTo OkToDup arg (zapSubstEnv env) dup_cont
-        ; return (env, app_cont, nodup_cont) }
+    do  { (env', dup_cont, nodup_cont) <- mkDupableCont env cont
+        ; arg' <- simplExpr (se `setInScope` env') arg
+        ; (env'', arg'') <- makeTrivial env' arg'
+        ; let app_cont = ApplyTo OkToDup arg'' (zapSubstEnv env') dup_cont
+        ; return (env'', app_cont, nodup_cont) }
 
-mkDupableCont env cont@(Select _ case_bndr [(_,bs,rhs)] se case_cont)
+mkDupableCont env cont@(Select _ case_bndr [(_, bs, _rhs)] se _case_cont)
 --  See Note [Single-alternative case]
 --  | not (exprIsDupable rhs && contIsDupable case_cont)
 --  | not (isDeadBinder case_bndr)
@@ -1787,14 +1790,14 @@ mkDupableCont env (Select _ case_bndr alts se cont)
         --              let ji = \xij -> ei
         --              in case [...hole...] of { pi -> ji xij }
     do  { tick (CaseOfCase case_bndr)
-        ; (env, dup_cont, nodup_cont) <- mkDupableCont env cont
+        ; (env', dup_cont, nodup_cont) <- mkDupableCont env cont
                 -- NB: call mkDupableCont here, *not* prepareCaseCont
                 -- We must make a duplicable continuation, whereas prepareCaseCont
                 -- doesn't when there is a single case branch
 
-        ; let alt_env = se `setInScope` env
-        ; (alt_env, case_bndr') <- simplBinder alt_env case_bndr
-        ; alts' <- mapM (simplAlt alt_env [] case_bndr' dup_cont) alts
+        ; let alt_env = se `setInScope` env'
+        ; (alt_env', case_bndr') <- simplBinder alt_env case_bndr
+        ; alts' <- mapM (simplAlt alt_env' [] case_bndr' dup_cont) alts
         -- Safe to say that there are no handled-cons for the DEFAULT case
                 -- NB: simplBinder does not zap deadness occ-info, so
                 -- a dead case_bndr' will still advertise its deadness
@@ -1807,9 +1810,9 @@ mkDupableCont env (Select _ case_bndr alts se cont)
         -- NB: we don't use alt_env further; it has the substEnv for
         --     the alternatives, and we don't want that
 
-        ; (env, alts') <- mkDupableAlts env case_bndr' alts'
-        ; return (env,  -- Note [Duplicated env]
-                  Select OkToDup case_bndr' alts' (zapSubstEnv env)
+        ; (env'', alts'') <- mkDupableAlts env' case_bndr' alts'
+        ; return (env'',  -- Note [Duplicated env]
+                  Select OkToDup case_bndr' alts'' (zapSubstEnv env'')
                          (mkBoringStop (contResultType dup_cont)),
                   nodup_cont) }
 
@@ -1818,15 +1821,17 @@ mkDupableAlts :: SimplEnv -> OutId -> [InAlt]
               -> SimplM (SimplEnv, [InAlt])
 -- Absorbs the continuation into the new alternatives
 
-mkDupableAlts env case_bndr' alts
-  = go env alts
+mkDupableAlts env case_bndr' the_alts
+  = go env the_alts
   where
-    go env [] = return (env, [])
-    go env (alt:alts)
-        = do { (env, alt') <- mkDupableAlt env case_bndr' alt
-     ; (env, alts') <- go env alts
-             ; return (env, alt' : alts' ) }
+    go env0 [] = return (env0, [])
+    go env0 (alt:alts)
+        = do { (env1, alt') <- mkDupableAlt env0 case_bndr' alt
+             ; (env2, alts') <- go env1 alts
+             ; return (env2, alt' : alts' ) }
 
+mkDupableAlt :: SimplEnv -> OutId -> (AltCon, [CoreBndr], CoreExpr)
+              -> SimplM (SimplEnv, (AltCon, [CoreBndr], CoreExpr))
 mkDupableAlt env case_bndr' (con, bndrs', rhs')
   | exprIsDupable rhs'  -- Note [Small alternative rhs]
   = return (env, (con, bndrs', rhs'))
