@@ -36,7 +36,7 @@ module RnEnv (
 	mapFvRn, mapFvRnCPS,
 	warnUnusedMatches, warnUnusedModules, warnUnusedImports, 
 	warnUnusedTopBinds, warnUnusedLocalBinds,
-	dataTcOccs, unknownNameErr,
+	dataTcOccs, unknownNameErr
     ) where
 
 #include "HsVersions.h"
@@ -60,7 +60,8 @@ import DataCon		( dataConFieldLabels )
 import OccName		( OccName, tcName, isDataOcc, pprNonVarNameSpace, occNameSpace,
 			  reportIfUnused, occNameFS )
 import Module		( Module, ModuleName )
-import PrelNames	( mkUnboundName, rOOT_MAIN, iNTERACTIVE, consDataConKey, hasKey )
+import PrelNames	( mkUnboundName, rOOT_MAIN, iNTERACTIVE, 
+			  consDataConKey, hasKey, forall_tv_RDR )
 import UniqSupply
 import BasicTypes	( IPName, mapIPName, Fixity )
 import SrcLoc		( SrcSpan, srcSpanStart, Located(..), eqLocated, unLoc,
@@ -1018,9 +1019,14 @@ shadowedNameWarn doc occ shadowed_locs
     $$ doc
 
 unknownNameErr rdr_name
-  = sep [ptext SLIT("Not in scope:"), 
-	 nest 2 $ pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
-		  <+> quotes (ppr rdr_name)]
+  = vcat [ hang (ptext SLIT("Not in scope:")) 
+	      2 (pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
+			  <+> quotes (ppr rdr_name))
+	 , extra ]
+  where
+    extra | rdr_name == forall_tv_RDR 
+	  = ptext SLIT("Perhaps you intended to use -XRankNTypes or similar flag")
+	  | otherwise = empty
 
 unknownSubordinateErr doc op	-- Doc is "method of class" or 
 				-- "field of constructor"

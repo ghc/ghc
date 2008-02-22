@@ -73,6 +73,7 @@ import ForeignCall	( CCallConv, Safety, CCallTarget(..), CExportSpec(..),
 			  DNCallSpec(..), DNKind(..), CLabelString )
 import OccName  	( srcDataName, varName, isDataOcc, isTcOcc, 
 			  occNameString )
+import PrelNames	( forall_tv_RDR )
 import SrcLoc
 import OrdList		( OrdList, fromOL )
 import Bag		( Bag, emptyBag, snocBag, consBag, foldrBag )
@@ -401,7 +402,12 @@ tyConToDataCon loc tc
   | isTcOcc (rdrNameOcc tc)
   = return (L loc (setRdrNameSpace tc srcDataName))
   | otherwise
-  = parseError loc (showSDoc (text "Not a constructor:" <+> quotes (ppr tc)))
+  = parseErrorSDoc loc (msg $$ extra)
+  where
+    msg = text "Not a data constructor:" <+> quotes (ppr tc)
+    extra | tc == forall_tv_RDR
+	  = text "Perhaps you intended to use -XExistentialQuantification"
+	  | otherwise = empty
 
 ----------------------------------------------------------------------------
 -- Various Syntactic Checks
@@ -770,8 +776,8 @@ checkFunBind :: SrcSpan
              -> P (HsBind RdrName)
 checkFunBind lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
   | isQual (unLoc fun)
-  = parseError (getLoc fun) ("Qualified name in function definition: "  ++ 
-			     showRdrName (unLoc fun))
+  = parseErrorSDoc (getLoc fun) 
+	(ptext SLIT("Qualified name in function definition:") <+> ppr (unLoc fun))
   | otherwise
   = do	ps <- checkPatterns pats
 	let match_span = combineSrcSpans lhs_loc rhs_span
@@ -1070,5 +1076,8 @@ showRdrName :: RdrName -> String
 showRdrName r = showSDoc (ppr r)
 
 parseError :: SrcSpan -> String -> P a
-parseError span s = failSpanMsgP span s
+parseError span s = parseErrorSDoc span (text s)
+
+parseErrorSDoc :: SrcSpan -> SDoc -> P a
+parseErrorSDoc span s = failSpanMsgP span s
 \end{code}

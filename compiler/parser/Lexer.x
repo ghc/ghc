@@ -1435,8 +1435,8 @@ failMsgP msg = P $ \s -> PFailed (last_loc s) (text msg)
 failLocMsgP :: SrcLoc -> SrcLoc -> String -> P a
 failLocMsgP loc1 loc2 str = P $ \_ -> PFailed (mkSrcSpan loc1 loc2) (text str)
 
-failSpanMsgP :: SrcSpan -> String -> P a
-failSpanMsgP span msg = P $ \_ -> PFailed span (text msg)
+failSpanMsgP :: SrcSpan -> SDoc -> P a
+failSpanMsgP span msg = P $ \_ -> PFailed span msg
 
 extension :: (Int -> Bool) -> P Bool
 extension p = P $ \s -> POk s (p $! extsBitmap s)

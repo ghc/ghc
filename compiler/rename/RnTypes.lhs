@@ -28,18 +28,11 @@ import RnHsSyn		( extractHsTyNames, parrTyCon_name, tupleTyCon_name,
 			  listTyCon_name
 			)
 import RnHsDoc          ( rnLHsDoc )
-import RnEnv		( lookupOccRn, lookupBndrRn, lookupSyntaxName,
-			  lookupLocatedOccRn, lookupLocatedBndrRn,
-			  lookupLocatedGlobalOccRn, bindTyVarsRn, 
-			  lookupFixityRn, lookupTyFixityRn, lookupConstructorFields,
-			  lookupRecordBndr, mapFvRn, 
-			  newIPNameRn, bindPatSigTyVarsFV)
+import RnEnv
 import TcRnMonad
+import ErrUtils
 import RdrName
-import PrelNames	( eqClassName, integralClassName, geName, eqName,
-		  	  negateName, minusName, lengthPName, indexPName,
-			  plusIntegerName, fromIntegerName, timesIntegerName,
-			  ratioDataConName, fromRationalName, fromStringName )
+import PrelNames
 import TypeRep		( funTyCon )
 import Constants	( mAX_TUPLE_SIZE )
 import Name
@@ -121,11 +114,16 @@ rnHsType doc (HsTyVar tyvar) = do
     tyvar' <- lookupOccRn tyvar
     return (HsTyVar tyvar')
 
+-- If we see (forall a . ty), without foralls on, the forall will give
+-- a sensible error message, but we don't want to complain about the dot too
+-- Hence the jiggery pokery with ty1
 rnHsType doc ty@(HsOpTy ty1 (L loc op) ty2)
   = setSrcSpan loc $ 
-    do	{ ty_ops_ok <- doptM Opt_TypeOperators
-	; checkErr ty_ops_ok (opTyErr op ty)
-	; op' <- lookupOccRn op
+    do	{ ops_ok <- doptM Opt_TypeOperators
+	; op' <- if ops_ok
+		 then lookupOccRn op 
+		 else do { addErr (opTyErr op ty)
+			 ; return (mkUnboundName op) }	-- Avoid double complaint
 	; let l_op' = L loc op'
 	; fix <- lookupTyFixityRn l_op'
 	; ty1' <- rnLHsType doc ty1
@@ -532,7 +530,16 @@ forAllWarn doc ty (L loc tyvar)
 		   $$
 		   doc)
 
-opTyErr op ty 
+opTyErr op ty@(HsOpTy ty1 _ ty2)
   = hang (ptext SLIT("Illegal operator") <+> quotes (ppr op) <+> ptext SLIT("in type") <+> quotes (ppr ty))
-	 2 (parens (ptext SLIT("Use -XTypeOperators to allow operators in types")))
+	 2 extra
+  where
+    extra | op == dot_tv_RDR && forall_head ty1
+	  = ptext SLIT("Perhaps you intended to use -XRankNTypes or similar flag")
+	  | otherwise 
+	  = ptext SLIT("Use -XTypeOperators to allow operators in types")
+
+    forall_head (L _ (HsTyVar tv))   = tv == forall_tv_RDR
+    forall_head (L _ (HsAppTy ty _)) = forall_head ty
+    forall_head _other		     = False
 \end{code}

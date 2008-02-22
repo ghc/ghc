@@ -57,8 +57,8 @@ module PrelNames (
 #include "HsVersions.h"
 
 import Module
-import OccName	  ( dataName, tcName, clsName, varName, mkOccNameFS,
-		    mkVarOccFS )
+import OccName	  ( dataName, tcName, clsName, varName, tvName, 
+		    mkOccNameFS, mkVarOccFS )
 import RdrName	  ( RdrName, nameRdrName, mkOrig, rdrNameOcc, mkUnqual )
 import Unique	  ( Unique, Uniquable(..), hasKey,
 		    mkPreludeMiscIdUnique, mkPreludeDataConUnique,
@@ -322,9 +322,13 @@ mkTupleModule Unboxed _ = gHC_PRIM
 %************************************************************************
 
 \begin{code}
-main_RDR_Unqual 	= mkUnqual varName FSLIT("main")
+main_RDR_Unqual	= mkUnqual varName FSLIT("main")
 	-- We definitely don't want an Orig RdrName, because
 	-- main might, in principle, be imported into module Main
+
+forall_tv_RDR, dot_tv_RDR :: RdrName
+forall_tv_RDR = mkUnqual tvName FSLIT("forall")
+dot_tv_RDR    = mkUnqual tvName FSLIT(".")
 
 eq_RDR 			= nameRdrName eqName
 ge_RDR 			= nameRdrName geName
