@@ -646,7 +646,7 @@ checkNoErrs main
   = do	{ (msgs, mb_res) <- tryTcLIE main
 	; addMessages msgs
 	; case mb_res of
-	    Nothing   -> failM
+	    Nothing  -> failM
 	    Just val -> return val
 	} 
 

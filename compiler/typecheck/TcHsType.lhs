@@ -597,9 +597,9 @@ GADT constructor signatures
 
 \begin{code}
 tcLHsConResTy :: LHsType Name -> TcM (TyCon, [TcType])
-tcLHsConResTy res_ty
-  = addErrCtxt (gadtResCtxt res_ty) $
-    case get_largs res_ty [] of
+tcLHsConResTy (L span res_ty)
+  = setSrcSpan span $
+    case get_args res_ty [] of
 	   (HsTyVar tc_name, args) 
 	      -> do { args' <- mapM dsHsType args
 		    ; thing <- tcLookup tc_name
@@ -612,15 +612,11 @@ tcLHsConResTy res_ty
 	-- because that causes a black hole, and for good reason.  Building
 	-- the type means expanding type synonyms, and we can't do that
 	-- inside the "knot".  So we have to work by steam.
-    get_largs (L _ ty) args = get_args ty args
-    get_args (HsAppTy fun arg) 		  args = get_largs fun (arg:args)
-    get_args (HsParTy ty)      		  args = get_largs ty  args
+    get_args (HsAppTy (L _ fun) arg) 	  args = get_args fun (arg:args)
+    get_args (HsParTy (L _ ty)) 	  args = get_args ty  args
     get_args (HsOpTy ty1 (L span tc) ty2) args = (HsTyVar tc, ty1:ty2:args)
     get_args ty  	     		  args = (ty, args)
 
-gadtResCtxt ty
-  = hang (ptext SLIT("In the result type of a data constructor:"))
-       2 (ppr ty)
 badGadtDecl ty
   = hang (ptext SLIT("Malformed constructor result type:"))
        2 (ppr ty)

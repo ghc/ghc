@@ -812,7 +812,8 @@ tcConDecl :: Bool 		-- True <=> -funbox-strict_fields
 
 tcConDecl unbox_strict existential_ok tycon tc_tvs	-- Data types
 	  (ConDecl name _ tvs ctxt details res_ty _)
-  = tcTyVarBndrs tvs		$ \ tvs' -> do 
+  = addErrCtxt (dataConCtxt name)	$ 
+    tcTyVarBndrs tvs			$ \ tvs' -> do 
     { ctxt' <- tcHsKindedContext ctxt
     ; checkTc (existential_ok || (null tvs && null (unLoc ctxt)))
 	      (badExistential name)
