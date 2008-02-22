@@ -42,6 +42,11 @@ data Results = Results {
         gc_work         :: Maybe Integer,
         gc_time         :: [Float],
         gc_elapsed_time :: [Float],
+        gc0_time         :: [Float],
+        gc0_elapsed_time :: [Float],
+        gc1_time         :: [Float],
+        gc1_elapsed_time :: [Float],
+        balance         :: [Float],
         allocs          :: Maybe Integer,
         run_status      :: Status,
         compile_status  :: Status
@@ -62,6 +67,11 @@ emptyResults = Results {
         cache_misses    = Nothing,
         gc_time         = [],
         gc_elapsed_time = [],
+        gc0_time         = [],
+        gc0_elapsed_time = [],
+        gc1_time         = [],
+        gc1_elapsed_time = [],
+        balance         = [],
         gc_work         = Nothing,
         allocs          = Nothing,
         compile_status  = NotDone,
@@ -126,6 +136,7 @@ size_re s = case matchRegex re s of
 ghc1_re = pre GHC 4.02
 ghc2_re = GHC 4.02 (includes "xxM in use")
 ghc3_re = GHC 4.03 (includes "xxxx bytes GC work")
+ghc5_re = GHC 6.9 (includes GC(0) and GC(1) times)
 -}
 
 ghc1_re :: String -> Maybe (Integer, Integer, Integer, Integer, Integer, Integer, Float, Float, Float, Float, Float, Float)
@@ -160,6 +171,14 @@ ghc4_re s = case matchRegex re s of
                 Nothing -> Nothing
     where re = mkRegex "^<<ghc-instrs:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+) bytes GC work, ([0-9]+)M in use, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\), ([0-9]+) instructions, ([0-9]+) memory reads, ([0-9]+) memory writes, ([0-9]+) L2 cache misses :ghc-instrs>>"
 
+ghc5_re :: String -> Maybe (Integer, Integer, Integer, Integer, Integer, Integer, Integer, Float, Float, Float, Float, Float, Float,Float,Float,Float,Float,Float)
+ghc5_re s = case matchRegex re s of
+                Just [allocations, gcs, avg_residency, max_residency, samples, gc_work', in_use, initialisation, initialisation_elapsed, mut, mut_elapsed, gc, gc_elapsed, gc0, gc0_elapsed, gc1, gc1_elapsed, bal] ->
+                    Just (read allocations, read gcs, read avg_residency, read max_residency, read samples, read gc_work', read in_use, read initialisation, read initialisation_elapsed, read mut, read mut_elapsed, read gc, read gc_elapsed, read gc0, read gc0_elapsed, read gc1, read gc1_elapsed, read bal)
+                Just _ -> error "ghc3_re: Can't happen"
+                Nothing -> Nothing
+    where re = mkRegex "^<<ghc:[ \t]+([0-9]+)[ \t]+bytes,[ \t]*([0-9]+)[ \t]+GCs,[ \t]*([0-9]+)/([0-9]+)[ \t]+avg/max bytes residency \\(([0-9]+) samples\\), ([0-9]+) bytes GC work, ([0-9]+)M in use, ([0-9.]+) INIT \\(([0-9.]+) elapsed\\), ([0-9.]+) MUT \\(([0-9.]+) elapsed\\), ([0-9.]+) GC \\(([0-9.]+) elapsed\\), ([0-9.]+) GC\\(0\\) \\(([0-9.]+) elapsed\\), ([0-9.]+) GC\\(1\\) \\(([0-9.]+) elapsed\\), ([0-9.]+) balance :ghc>>"
+
 wrong_exit_status, wrong_output, out_of_heap, out_of_stack :: Regex
 wrong_exit_status = mkRegex "^\\**[ \t]*expected exit status ([0-9]+) not seen ; got ([0-9]+)"
 wrong_output      = mkRegex "^expected (stdout|stderr) not matched by reality$"
@@ -189,6 +208,9 @@ combine2Results
                       instrs = is1, mem_reads = mr1, mem_writes = mw1,
                       cache_misses = cm1,
                       gc_time = gt1, gc_elapsed_time = ge1, gc_work = gw1,
+                      gc0_time = g0t1, gc0_elapsed_time = g0e1, 
+                      gc1_time = g1t1, gc1_elapsed_time = g1e1, 
+                      balance = b1,
                       binary_size = bs1, allocs = al1,
                       run_status = rs1, compile_status = cs1 }
              Results{ compile_time = ct2, link_time = lt2,
@@ -198,6 +220,9 @@ combine2Results
                       instrs = is2, mem_reads = mr2, mem_writes = mw2,
                       cache_misses = cm2,
                       gc_time = gt2, gc_elapsed_time = ge2, gc_work = gw2,
+                      gc0_time = g0t2, gc0_elapsed_time = g0e2, 
+                      gc1_time = g1t2, gc1_elapsed_time = g1e2, 
+                      balance = b2,
                       binary_size = bs2, allocs = al2,
                       run_status = rs2, compile_status = cs2 }
           =  Results{ compile_time   = Map.unionWith (flip const) ct1 ct2,
@@ -212,6 +237,11 @@ combine2Results
                       cache_misses   = cm1 `mplus` cm2,
                       gc_time        = gt1 ++ gt2,
                       gc_elapsed_time= ge1 ++ ge2,
+                      gc0_time        = g0t1 ++ g0t2,
+                      gc0_elapsed_time= g0e1 ++ g0e2,
+                      gc1_time        = g1t1 ++ g1t2,
+                      gc1_elapsed_time= g1e1 ++ g1e2,
+                      balance        = b1 ++ b2,
                       gc_work        = gw1 `mplus` gw2,
                       binary_size    = bs1 `mplus` bs2,
                       allocs         = al1 `mplus` al2,
@@ -319,29 +349,37 @@ parse_run_time prog [] res ex = [(prog, res{run_status=ex})]
 parse_run_time prog (l:ls) res ex =
         case ghc1_re l of {
            Just (allocations, _, _, _, _, _, initialisation, _, mut, mut_elapsed, gc, gc_elapsed) ->
-                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed
+                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed [] [] [] [] []
                         Nothing Nothing Nothing Nothing Nothing;
            Nothing ->
 
         case ghc2_re l of {
            Just (allocations, _, _, _, _, _, initialisation, _, mut, mut_elapsed, gc, gc_elapsed) ->
-                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed
+                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed [] [] [] [] []
                         Nothing Nothing Nothing Nothing Nothing;
 
             Nothing ->
 
         case ghc3_re l of {
            Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, mut_elapsed, gc, gc_elapsed) ->
-                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed
+                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed [] [] [] [] []
                         (Just gc_work') Nothing Nothing Nothing Nothing;
 
             Nothing ->
 
         case ghc4_re l of {
            Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, mut_elapsed, gc, gc_elapsed, is, mem_rs, mem_ws, cache_misses') ->
-                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed
+                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed [] [] [] [] []
                         (Just gc_work') (Just is) (Just mem_rs)
                         (Just mem_ws) (Just cache_misses');
+
+            Nothing ->
+
+        case ghc5_re l of {
+           Just (allocations, _, _, _, _, gc_work', _, initialisation, _, mut, mut_elapsed, gc, gc_elapsed, gc0, gc0_elapsed, gc1, gc1_elapsed, bal) ->
+                got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed
+                        [gc0] [gc0_elapsed] [gc1] [gc1_elapsed] [bal]
+                        (Just gc_work') Nothing Nothing Nothing Nothing;
 
             Nothing ->
 
@@ -370,9 +408,9 @@ parse_run_time prog (l:ls) res ex =
             Nothing ->
                 parse_run_time prog ls res ex;
 
-        }}}}}}}}
+        }}}}}}}}}
   where
-  got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed gc_work' instrs' mem_rs mem_ws cache_misses'
+  got_run_result allocations initialisation mut mut_elapsed gc gc_elapsed gc0 gc0_elapsed gc1 gc1_elapsed bal gc_work' instrs' mem_rs mem_ws cache_misses'
       = -- trace ("got_run_result: " ++ initialisation ++ ", " ++ mut ++ ", " ++ gc) $
         let
           time = initialisation + mut + gc
@@ -382,6 +420,11 @@ parse_run_time prog (l:ls) res ex =
                                         mut_elapsed_time   = [mut_elapsed],
                                         gc_time    = [gc],
                                         gc_elapsed_time = [gc_elapsed],
+                                        gc0_time    = gc0,
+                                        gc0_elapsed_time = gc0_elapsed,
+                                        gc1_time    = gc1,
+                                        gc1_elapsed_time = gc1_elapsed,
+                                        balance    = bal,
                                         gc_work    = gc_work',
                                         allocs     = Just allocations,
                                         instrs     = instrs',
@@ -409,8 +452,8 @@ parse_size progName modName (l:ls) =
             Nothing -> parse_size progName modName ls
             Just (text, datas, _bss)
                  | progName == modName ->
-                        [(progName,emptyResults{binary_size =
-                                              Just (text + datas),
+                        [(progName,emptyResults{binary_size = 
+                                             Just (text + datas),
                                     compile_status = Success})]
                  | otherwise ->
                         let ms  = Map.singleton modName (text + datas)

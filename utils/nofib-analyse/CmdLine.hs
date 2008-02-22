@@ -54,6 +54,8 @@ data CLIFlags
   | OptTitle String
   | OptColumns String
   | OptRows String
+  | OptCSV String
+  | OptNoNormalise
   | OptHelp
   deriving Eq
 
@@ -81,6 +83,10 @@ argInfo =
 	"Specify columns for summary table (comma separates)"
   , Option [] ["rows"] (ReqArg OptRows "ROWS")
 	"Specify rows for summary table (comma separates)"
+  , Option [] ["csv"] (ReqArg OptCSV "TABLE")
+	"Output a single table in CSV format"
+  , Option [] ["no-normalise"] (NoArg OptNoNormalise)
+	"Do not normalise to the baseline"
   , Option ['n'] ["nodeviations"] (NoArg OptNoDeviations)
 	"Hide deviations"
   , Option ['t'] ["title"] (ReqArg OptTitle "title")

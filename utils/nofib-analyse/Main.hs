@@ -40,7 +40,9 @@ main = do
 
  let { html  = OptHTMLOutput  `elem` flags;
        latex = OptLaTeXOutput `elem` flags;
-       ascii = OptASCIIOutput `elem` flags
+       ascii = OptASCIIOutput `elem` flags;
+       csv   = [ table | OptCSV table <- flags ];
+       no_norm = OptNoNormalise `elem` flags;
      }
 
  when (ascii && html)  $ die "Can't produce both ASCII and HTML"
@@ -63,6 +65,8 @@ main = do
                                    (prog,res) <- Map.toList result_table ]
 
  case () of
+   _ | not (null csv) ->
+        putStr (csvTable results (head csv) (not no_norm))
    _ | html      ->
         putStr (renderHtml (htmlPage results column_headings))
    _ | latex     ->
@@ -104,7 +108,8 @@ data PerModuleTableSpec =
 -- The various per-program aspects of execution that we can generate results for.
 size_spec, alloc_spec, runtime_spec, muttime_spec, mutetime_spec,
     gctime_spec, gcelap_spec,
-    gcwork_spec, instrs_spec, mreads_spec, mwrite_spec, cmiss_spec
+    gcwork_spec, instrs_spec, mreads_spec, mwrite_spec, cmiss_spec,
+    gc0time_spec, gc0elap_spec, gc1time_spec, gc1elap_spec, balance_spec
         :: PerProgTableSpec
 size_spec    = SpecP "Binary Sizes" "Size" "binary-sizes" binary_size compile_status always_ok
 alloc_spec   = SpecP "Allocations" "Allocs" "allocations" allocs run_status always_ok
@@ -113,6 +118,11 @@ muttime_spec = SpecP "Mutator Time" "MutTime" "mutator-time" (mean mut_time) run
 mutetime_spec = SpecP "Mutator Elapsed Time" "MutETime" "mutator-elapsed-time" (mean mut_elapsed_time) run_status time_ok
 gctime_spec  = SpecP "GC Time" "GCTime" "gc-time" (mean gc_time) run_status time_ok
 gcelap_spec  = SpecP "GC Elapsed Time" "GCETime" "gc-elapsed-time" (mean gc_elapsed_time) run_status time_ok
+gc0time_spec  = SpecP "GC(0) Time" "GC0Time" "gc0-time" (mean gc0_time) run_status time_ok
+gc0elap_spec  = SpecP "GC(0) Elapsed Time" "GC0ETime" "gc0-elapsed-time" (mean gc0_elapsed_time) run_status time_ok
+gc1time_spec  = SpecP "GC(1) Time" "GC1Time" "gc1-time" (mean gc1_time) run_status time_ok
+gc1elap_spec  = SpecP "GC(1) Elapsed Time" "GC1ETime" "gc1-elapsed-time" (mean gc1_elapsed_time) run_status time_ok
+balance_spec  = SpecP "GC work balance" "Balance" "balance" (mean balance) run_status time_ok
 gcwork_spec  = SpecP "GC Work" "GCWork" "gc-work" gc_work run_status always_ok
 instrs_spec  = SpecP "Instructions" "Instrs" "instrs" instrs run_status always_ok
 mreads_spec  = SpecP "Memory Reads" "Reads" "mem-reads" mem_reads run_status always_ok
@@ -128,6 +138,11 @@ all_specs = [
   mutetime_spec,
   gctime_spec,
   gcelap_spec,
+  gc0time_spec,
+  gc0elap_spec,
+  gc1time_spec,
+  gc1elap_spec,
+  balance_spec,
   gcwork_spec,
   instrs_spec,
   mreads_spec,
@@ -170,9 +185,9 @@ checkTimes prog results = do
 -- These are the per-prog tables we want to generate
 per_prog_result_tab :: [PerProgTableSpec]
 per_prog_result_tab =
-        [ size_spec, alloc_spec, runtime_spec, muttime_spec, mutetime_spec,
-          gctime_spec, gcelap_spec,
-          gcwork_spec, instrs_spec, mreads_spec, mwrite_spec, cmiss_spec ]
+        [ size_spec, alloc_spec, runtime_spec, muttime_spec, mutetime_spec, gctime_spec,
+          gcelap_spec, gc0time_spec, gc0elap_spec, gc1time_spec, gc1elap_spec,
+          gcwork_spec, balance_spec, instrs_spec, mreads_spec, mwrite_spec, cmiss_spec]
 
 -- A single summary table, giving comparison figures for a number of
 -- aspects, each in its own column.  Only works when comparing two runs.
@@ -269,7 +284,7 @@ htmlShowResults (r:rs) ss f stat result_ok
                     ++ [tableRow (-1) ("Average", gms)])
  where
         -- results_per_prog :: [ (String,[BoxValue a]) ]
-        results_per_prog = map (calc_result rs f stat result_ok) (Map.toList r)
+        results_per_prog = map (calc_result rs f stat result_ok convert_to_percentage) (Map.toList r)
 
         results_per_run  = transpose (map snd results_per_prog)
         (lows,gms,highs) = unzip3 (map calc_gmsd results_per_run)
@@ -311,7 +326,7 @@ htmlShowMultiResults (r:rs) ss f result_ok =
                                         Just res -> f res
 
                  get_results_for_mod id_attr
-                     = calc_result fms Just (const Success) result_ok id_attr
+                     = calc_result fms Just (const Success) result_ok convert_to_percentage id_attr
 
         show_results_for_prog (prog,mrs) =
             td <! [valign "top"] << bold << prog
@@ -449,7 +464,7 @@ ascii_show_results (r:rs) ss f stat result_ok
         . show_per_prog_results ("Average",gms)
  where
         -- results_per_prog :: [ (String,[BoxValue a]) ]
-        results_per_prog = map (calc_result rs f stat result_ok) (Map.toList r)
+        results_per_prog = map (calc_result rs f stat result_ok convert_to_percentage) (Map.toList r)
 
         results_per_run  = transpose (map snd results_per_prog)
         (lows,gms,highs) = unzip3 (map calc_gmsd results_per_run)
@@ -494,7 +509,7 @@ ascii_summary_table latex (r1:r2:_) specs mb_restrict
             -- throw away the baseline result
           = (heading, column, [column_min, column_max, column_mean])
           where (_, boxes) = unzip (map calc_one_result baseline)
-                calc_one_result = calc_result [r2] getr gets ok
+                calc_one_result = calc_result [r2] getr gets ok convert_to_percentage
                 column = map (\(_:b:_) -> b) boxes
                 (_, column_mean, _) = calc_gmsd column
                 (column_min, column_max) = calc_minmax column
@@ -562,7 +577,7 @@ ascii_show_multi_results (r:rs) ss f result_ok
                                         Just res -> f res
 
                  get_results_for_mod id_attr
-                     = calc_result fms Just (const Success) result_ok id_attr
+                     = calc_result fms Just (const Success) result_ok convert_to_percentage id_attr
 
         show_results_for_prog (prog,mrs) =
               str ("\n"++prog++"\n")
@@ -585,6 +600,46 @@ show_per_prog_results_width w (prog,results)
         . str (space 5)
         . foldr (.) id (map (str . rjustify w . showBox) results)
 
+-- -----------------------------------------------------------------------------
+-- CSV output
+
+csvTable :: [ResultTable] -> String -> Bool -> String
+csvTable results table_name norm
+  = let
+        table_spec = [ spec | spec@(SpecP _ n _ _ _ _) <- per_prog_result_tab, 
+                       n == table_name ]
+    in
+    case table_spec of
+        [] -> error ("can't find table named: " ++ table_name)
+        (spec:_) -> csvProgTable results spec norm "\n"
+
+csvProgTable :: [ResultTable] -> PerProgTableSpec -> Bool -> ShowS
+csvProgTable results (SpecP long_name _ _ get_result get_status result_ok) norm
+  = csv_show_results results get_result get_status result_ok norm
+
+csv_show_results
+   :: Result a
+        => [ResultTable]
+        -> (Results -> Maybe a)
+        -> (Results -> Status)
+        -> (a -> Bool)
+        -> Bool
+        -> ShowS
+
+csv_show_results []      _ _    _ _
+ = error "csv_show_results: Can't happen?"
+csv_show_results (r:rs) f stat result_ok norm
+        = interleave "\n" results_per_prog
+ where
+        -- results_per_prog :: [ (String,[BoxValue a]) ]
+        results_per_prog = map (result_line . calc) (Map.toList r)
+        calc = calc_result rs f stat (const True) do_norm
+
+        do_norm | norm      = normalise_to_base
+                | otherwise = \base res -> toBox res
+
+        result_line (prog,boxes) = interleave "," (str prog : map (str.showBox) boxes)
+
 -- ---------------------------------------------------------------------------
 -- Generic stuff for results generation
 
@@ -594,11 +649,12 @@ calc_result
         => [Map String b]               -- accumulated results
         -> (b -> Maybe a)               -- get a result from the b
         -> (b -> Status)                -- get a status from the b
-        -> (a -> Bool)                  -- is this result ok?
+        -> (a -> Bool)                  -- normalise against the baseline?
+        -> (a -> a -> BoxValue)             -- how to normalise
         -> (String,b)                   -- the baseline result
         -> (String,[BoxValue])
 
-calc_result rts get_maybe_a get_stat result_ok (prog,base_r) =
+calc_result rts get_maybe_a get_stat base_ok normalise (prog,base_r) =
         (prog, (just_result m_baseline base_stat :
 
           let
@@ -609,10 +665,10 @@ calc_result rts get_maybe_a get_stat result_ok (prog,base_r) =
           in
           (
           case m_baseline of
-                Just baseline
-                 | result_ok baseline
-                  -> map (\(r,s) -> percentage  r s baseline) rts'
-                _ -> map (\(r,s) -> just_result r s) rts'
+             Just baseline | base_ok baseline
+                 -> map (\(r,s) -> do_norm r s baseline) rts'
+             _other
+                 -> map (\(r,s) -> just_result r s) rts'
            )))
  where
         m_baseline  = get_maybe_a base_r
@@ -621,9 +677,9 @@ calc_result rts get_maybe_a get_stat result_ok (prog,base_r) =
         just_result Nothing  s = RunFailed s
         just_result (Just a) _ = toBox a
 
-        percentage Nothing   s _    = RunFailed s
-        percentage (Just a)  _ baseline
-            = Percentage (convert_to_percentage baseline a)
+        do_norm Nothing   s _        = RunFailed s
+        do_norm (Just a)  _ baseline = normalise baseline a
+
 -----------------------------------------------------------------------------
 -- Calculating geometric means and standard deviations
 
@@ -688,29 +744,26 @@ calc_minmax xs
 -----------------------------------------------------------------------------
 -- Show the Results
 
-class Num a => Result a where
+convert_to_percentage :: Result a => a -> a -> BoxValue
+convert_to_percentage 0 val = Percentage 100
+convert_to_percentage baseline val = Percentage  ((realToFrac val / realToFrac baseline) * 100)
+
+normalise_to_base :: Result a => a -> a -> BoxValue
+normalise_to_base 0 val        = BoxFloat 1
+normalise_to_base baseline val = BoxFloat (realToFrac baseline / realToFrac val)
+
+class Real a => Result a where
         toBox :: a -> BoxValue
-        convert_to_percentage :: a -> a -> Float
 
 -- We assume an Int is a size, and print it in kilobytes.
 
 instance Result Int where
-    convert_to_percentage 0 _ = 100
-    convert_to_percentage baseline val
-        = (fromIntegral val / fromIntegral baseline) * 100
-
     toBox = BoxInt
 
 instance Result Integer where
-    convert_to_percentage 0 _ = 100
-    convert_to_percentage baseline val
-        = (fromInteger val / fromInteger baseline) * 100
     toBox = BoxInteger
 
 instance Result Float where
-    convert_to_percentage 0.0 _ = 100.0
-    convert_to_percentage baseline val = val / baseline * 100
-
     toBox = BoxFloat
 
 -- -----------------------------------------------------------------------------

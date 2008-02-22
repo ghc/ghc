@@ -12,4 +12,8 @@ ifeq "$(ghc_ge_605)" "YES"
 SRC_HC_OPTS	+= -package regex-compat -package html
 endif
 
+ifeq "$(ghc_ge_607)" "YES"
+SRC_HC_OPTS     += -package containers
+endif
+
 include $(TOP)/mk/target.mk
