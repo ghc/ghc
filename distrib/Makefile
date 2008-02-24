@@ -34,13 +34,19 @@ install::
 
 install :: postinstall denounce
 
+# Look to see if $(bindir) is in $(PATH). Assumes there are no funky
+# characters.
+GREPPED_PATH=$(shell echo "$(PATH)" | grep "\(^\|:\)$(bindir)\(:\|$$\)")
+
 denounce:
 	@echo
 	@echo =======================================================================
 	@echo Installation of $(package)-$(version) was successful.
 	@echo
+ifneq "$(GREPPED_PATH)" ""
 	@echo To use, add $(bindir) to your PATH.
 	@echo
+endif
 	@if test -f share/html/index.html; then \
 	   echo For documentation, see $(htmldir)/index.html ; \
 	elif test -d share/html ; then \
