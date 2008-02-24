@@ -599,6 +599,7 @@ readlineLoop = do
    splatSavedSession
    case l of
         Nothing -> return Nothing
+        Just "" -> return (Just "") -- Don't put empty lines in the history
         Just l  -> do
                    io (addHistory l)
                    str <- io $ consoleInputToUnicode True l
