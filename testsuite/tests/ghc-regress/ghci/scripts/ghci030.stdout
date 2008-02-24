@@ -1,6 +1,6 @@
 data D where
   C :: forall a. (Int -> a) -> Char -> D
-        -- Defined at q.hs:8:5
+        -- Defined at ghci030.hs:8:5
 data D where
   C :: forall a. (Int -> a) -> Char -> D
-        -- Defined at q.hs:8:20
+        -- Defined at ghci030.hs:8:20
