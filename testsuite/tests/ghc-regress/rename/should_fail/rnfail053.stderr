@@ -1,0 +1,4 @@
+
+rnfail053.hs:5:9:
+    Not a data constructor: `forall'
+    Perhaps you intended to use -XExistentialQuantification
