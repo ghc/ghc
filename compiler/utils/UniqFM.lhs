@@ -203,7 +203,7 @@ First, the DataType itself; which is either a Node, a Leaf, or an Empty.
 \begin{code}
 data UniqFM ele
   = EmptyUFM
-  | LeafUFM !FastInt !ele
+  | LeafUFM !FastInt ele
   | NodeUFM !FastInt         -- the switching
             !FastInt         -- the delta
             (UniqFM ele)
