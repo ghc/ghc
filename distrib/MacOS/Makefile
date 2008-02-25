@@ -7,7 +7,11 @@
 #	framework-pkg  [MacOS only]
 #		Builds /Library/Frameworks/GHC.framework wrapped into a Mac
 #		installer package; must be executed in a ./configure'd tree
-#		(--prefix doesn't matter as it will be overridden)
+#		(--prefix doesn't matter as it will be overridden); other
+#		./configure arguments are passed through, unless overwritten
+#		with XCODE_EXTRA_CONFIGURE_ARGS.  A deployment target can
+#		be specified by setting the corresponding ./configure
+#		argument or by setting MACOSX_DEPLOYMENT_TARGET.
 #
 #	framework-binary-dist  [MacOS only]
 #		Builds GHC.framework encapsulating a binary distribution
@@ -33,6 +37,20 @@ SHORT_VERSION_STRING = $(ProjectVersion)
 
 # Name of the installer package
 PACKAGE_NAME = GHC-$(ProjectVersion)-$(TargetArch_CPP).pkg
+
+# Determine arguments that should be passed to ./configure from within Xcode
+#
+# By default, we pass whatever was used whne the present tree was configured.
+# The user can override this by setting XCODE_EXTRA_CONFIGURE_ARGS.  If
+# MACOSX_DEPLOYMENT_TARGET is set, the target is added to whatever arguments
+# are passed.
+export XCODE_EXTRA_CONFIGURE_ARGS
+ifeq "$(XCODE_EXTRA_CONFIGURE_ARGS)" ""
+XCODE_EXTRA_CONFIGURE_ARGS = $(shell echo $(CONFIGURE_ARGS))
+endif
+ifneq "$(MACOSX_DEPLOYMENT_TARGET)" ""
+XCODE_EXTRA_CONFIGURE_ARGS += --with-macosx-deployment-target=$(MACOSX_DEPLOYMENT_TARGET)
+endif
 
 # Xcode's installation build product location (this is where the GHC.framework
 # is assembled)
