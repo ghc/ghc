@@ -175,7 +175,6 @@ tc_cmd env cmd@(HsArrApp fun arg _ ho_app lr) (cmd_stk, res_ty)
 
 tc_cmd env cmd@(HsApp fun arg) (cmd_stk, res_ty)
   = addErrCtxt (cmdCtxt cmd)	$
--- gaw 2004 FIX?
     do  { arg_ty <- newFlexiTyVarTy openTypeKind
 
 	; fun' <- tcCmd env fun (arg_ty:cmd_stk, res_ty)
