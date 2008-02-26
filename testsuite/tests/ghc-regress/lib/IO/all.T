@@ -102,3 +102,5 @@ test('concio001', skip, run_command, ['$MAKE -s --no-print-directory test.concio
 test('concio001.thr', skip, run_command, ['$MAKE -s --no-print-directory test.concio001.thr'])
 
 test('concio002', reqlib('process'), compile_and_run, [''])
+
+test('2122', extra_clean(['2122-test']), compile_and_run, [''])
