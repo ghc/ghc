@@ -88,6 +88,7 @@ lockFile(int fd, dev_t dev, ino_t ino, int for_writing)
         if (for_writing || lock->readers < 0) {
             return -1;
         }
+        insertHashTable(fd_hash, fd, lock);
         lock->readers++;
         return 0;
     }
