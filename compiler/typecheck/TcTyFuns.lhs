@@ -986,26 +986,30 @@ unifyMetaRule insts
         uMeta _swapped _tv (IndirectTv _) _ty _cotv
           = return ([inst], False)
 
-        -- signature skolem meets non-variable type
-        -- => cannot update!
-        uMeta _swapped _tv (DoneTv (MetaTv (SigTv _) _)) ty _cotv
-          | not $ isTyVarTy ty
-          = return ([inst], False)
-
         -- type variable meets type variable
         -- => check that tv2 hasn't been updated yet and choose which to update
 	uMeta swapped tv1 (DoneTv details1) (TyVarTy tv2) cotv
+	  | tv1 == tv2
+ 	  = return ([inst], False)	-- The two types are already identical
+
+	  | otherwise
 	  = do { lookupTV2 <- lookupTcTyVar tv2
                ; case lookupTV2 of
-                   IndirectTv ty  -> uMeta swapped tv1 (DoneTv details1) ty cotv
-                   DoneTv details2 -> 
-                     uMetaVar swapped tv1 details1 tv2 details2 cotv
+                   IndirectTv ty   -> uMeta swapped tv1 (DoneTv details1) ty cotv
+                   DoneTv details2 -> uMetaVar swapped tv1 details1 tv2 details2 cotv
 	       }
+
+	------ Beyond this point we know that ty2 is not a type variable
+
+        -- signature skolem meets non-variable type
+        -- => cannot update!
+        uMeta _swapped _tv (DoneTv (MetaTv (SigTv _) _)) _non_tv_ty _cotv
+          = return ([inst], False)
 
         -- updatable meta variable meets non-variable type
         -- => occurs check, monotype check, and kinds match check, then update
-	uMeta swapped tv (DoneTv (MetaTv _ ref)) ty cotv
-	  = do { mb_ty' <- checkTauTvUpdate tv ty    -- occurs + monotype check
+	uMeta swapped tv (DoneTv (MetaTv _ ref)) non_tv_ty cotv
+	  = do { mb_ty' <- checkTauTvUpdate tv non_tv_ty    -- occurs + monotype check
                ; case mb_ty' of
                    Nothing  -> return ([inst], False)  -- tv occurs in faminst
                    Just ty' ->
@@ -1017,6 +1021,7 @@ unifyMetaRule insts
 
         uMeta _ _ _ _ _ = panic "uMeta"
 
+	-- uMetaVar: unify two type variables
         -- meta variable meets skolem 
         -- => just update
         uMetaVar swapped tv1 (MetaTv _ ref) tv2 (SkolemTv _) cotv
