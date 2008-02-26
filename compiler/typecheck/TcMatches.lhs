@@ -509,6 +509,11 @@ tcDoStmt ctxt (ExprStmt rhs then_op _) (reft,res_ty) thing_inside
 	; thing <- thing_inside (reft, new_res_ty)
 	; return (ExprStmt rhs' then_op' rhs_ty, thing) }
 
+tcDoStmt ctxt (RecStmt {}) res_ty thing_inside
+  = failWithTc (ptext SLIT("Illegal 'rec' stmt in") <+> pprStmtContext ctxt)
+	-- This case can't be caught in the renamer
+	-- see RnExpr.checkRecStmt
+
 tcDoStmt ctxt stmt res_ty thing_inside
   = pprPanic "tcDoStmt: unexpected Stmt" (ppr stmt)
 
