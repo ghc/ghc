@@ -845,10 +845,12 @@ def = toEnum 0
     <para>GHCi contains a simple imperative-style debugger in which you can
       stop a running computation in order to examine the values of
       variables.  The debugger is integrated into GHCi, and is turned on by
-      default: no flags are required to enable the debugging facilities.  There
-      is one major restriction: breakpoints and single-stepping are only
-      available in <emphasis>interpreted</emphasis> modules; compiled code is
-      invisible to the debugger.</para>
+      default: no flags are required to enable the debugging
+      facilities.  There is one major restriction: breakpoints and
+      single-stepping are only available in interpreted modules;
+      compiled code is invisible to the debugger<footnote><para>Note that packages
+      only contain compiled code, so debugging a package requires
+      finding its source and loading that directly.</para></footnote>.</para>
 
     <para>The debugger provides the following:
     <itemizedlist>
@@ -883,9 +885,12 @@ def = toEnum 0
     </para>
       
     <para>There is currently no support for obtaining a &ldquo;stack
-      trace&rdquo;, but the tracing and history features provide a useful
-      second-best, which will often be enough to establish the context of an
-      error.</para>
+    trace&rdquo;, but the tracing and history features provide a
+    useful second-best, which will often be enough to establish the
+    context of an error.  For instance, it is possible to break
+    automatically when an exception is thrown, even if it is thrown
+    from within compiled code (see <xref
+    linkend="ghci-debugger-exceptions" />).</para>
       
     <sect2 id="breakpoints">
       <title>Breakpoints and inspecting variables</title>
