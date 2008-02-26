@@ -2625,7 +2625,7 @@ Prelude> :set -fno-glasgow-exts
     flag is given, GHCi reads and executes commands from the following
     files, in this order, if they exist:</para>
 
-    <enumeratedlist>
+    <orderedlist>
     <listitem>
       <para><filename>./.ghci</filename></para>
     </listitem>
@@ -2640,7 +2640,7 @@ Prelude> :set -fno-glasgow-exts
     <listitem>
       <para><literal>$HOME/.ghci</literal></para>
     </listitem>
-   </enumeratedlist>
+   </orderedlist>
 
     <para>The <filename>ghci.conf</filename> file is most useful for
     turning on favourite options (eg. <literal>:set +s</literal>), and
