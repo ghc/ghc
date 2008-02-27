@@ -724,15 +724,17 @@ tcTyClDecl1 calc_isrec
 	-- Check that the stupid theta is empty for a GADT-style declaration
   ; checkTc (null stupid_theta || h98_syntax) (badStupidTheta tc_name)
 
+	-- Check that a newtype has exactly one constructor
+	-- Do this before checking for empty data decls, so that
+	-- we don't suggest -XEmptyDataDecls for newtypes
+  ; checkTc (new_or_data == DataType || isSingleton cons) 
+	    (newtypeConError tc_name (length cons))
+
 	-- Check that there's at least one condecl,
 	-- or else we're reading an hs-boot file, or -XEmptyDataDecls
   ; checkTc (not (null cons) || empty_data_decls || is_boot)
 	    (emptyConDeclsErr tc_name)
     
-	-- Check that a newtype has exactly one constructor
-  ; checkTc (new_or_data == DataType || isSingleton cons) 
-	    (newtypeConError tc_name (length cons))
-
   ; tycon <- fixM (\ tycon -> do 
 	{ data_cons <- mapM (addLocM (tcConDecl unbox_strict ex_ok tycon final_tvs))
 			     cons
