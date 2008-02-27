@@ -16,7 +16,8 @@
 module Bitmap ( 
 	Bitmap, mkBitmap,
 	intsToBitmap, intsToReverseBitmap,
-	mAX_SMALL_BITMAP_SIZE
+	mAX_SMALL_BITMAP_SIZE,
+	seqBitmap,
   ) where
 
 #include "HsVersions.h"
@@ -24,6 +25,7 @@ module Bitmap (
 
 import SMRep
 import Constants
+import Util
 
 import Data.Bits
 
@@ -84,4 +86,7 @@ packed into a single word.
 mAX_SMALL_BITMAP_SIZE :: Int
 mAX_SMALL_BITMAP_SIZE  | wORD_SIZE == 4 = 27
 		       | otherwise      = 58
+
+seqBitmap :: Bitmap -> a -> a
+seqBitmap = seqList
 

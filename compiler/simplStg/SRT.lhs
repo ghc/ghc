@@ -25,7 +25,7 @@ import Id        	( Id )
 import VarSet
 import VarEnv
 import Maybes		( orElse, expectJust )
-import Bitmap		( intsToBitmap )
+import Bitmap
 
 #ifdef DEBUG
 import Outputable
@@ -157,7 +157,7 @@ srtAlt table (con,args,used,rhs)
 constructSRT :: IdEnv Int -> SRT -> SRT
 constructSRT table (SRTEntries entries)
  | isEmptyVarSet entries = NoSRT
- | otherwise  = SRT offset len bitmap
+ | otherwise  = seqBitmap bitmap $ SRT offset len bitmap
   where
     ints = map (expectJust "constructSRT" . lookupVarEnv table) 
 		(varSetElems entries)
