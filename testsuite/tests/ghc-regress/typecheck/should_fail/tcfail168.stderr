@@ -2,7 +2,7 @@
 tcfail168.hs:8:10:
     Couldn't match expected type `Char -> b'
            against inferred type `IO b1'
-    In a 'do' expression: putChar 'a'
+    In a stmt of a 'do' expression: putChar 'a'
     In the expression:
         do putChar
            putChar 'a'

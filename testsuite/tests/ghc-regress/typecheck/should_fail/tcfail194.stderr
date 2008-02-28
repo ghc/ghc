@@ -2,5 +2,5 @@
 tcfail194.hs:9:28:
     Couldn't match expected type `a -> t' against inferred type `[a1]'
     In the expression: take 5
-    In a list comprehension: x <- [1 .. 10] then take 5 by x
+    In a stmt of a list comprehension: x <- [1 .. 10] then take 5 by x
     In the expression: [x | x <- [1 .. 10] then take 5 by x]
