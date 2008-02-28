@@ -1,0 +1,20 @@
+
+T2111.hs:6:11:
+    Illegal 'rec' stmt in a 'do' expression
+    In a stmt of a 'do' expression: rec {x <- undefined -< x}
+    In the expression:
+        do rec {x <- undefined -< x}
+           undefined -< x
+    In the definition of `foo':
+        foo = do rec {x <- undefined -< x}
+                 undefined -< x
+
+T2111.hs:8:12:
+    Illegal 'rec' stmt in a 'do' expression
+    In a stmt of a 'do' expression: rec {x <- return ('a' : x)}
+    In the expression:
+        do rec {x <- return ('a' : x)}
+           putStrLn (take 20 x)
+    In the definition of `bar1':
+        bar1 = do rec {x <- return ('a' : x)}
+                  putStrLn (take 20 x)
