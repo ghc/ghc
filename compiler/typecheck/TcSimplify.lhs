@@ -1101,24 +1101,27 @@ checkLoop :: RedEnv
 -- Postcondition: returned Insts are zonked
 
 checkLoop env wanteds
-  = go env wanteds
-  where go env wanteds
+  = go env wanteds (return ())
+  where go env wanteds elim_skolems
 	  = do  {  -- We do need to zonk the givens; cf Note [Zonking RedEnv]
                 ; env'     <- zonkRedEnv env
 		; wanteds' <- zonkInsts  wanteds
 	
-		; (improved, binds, irreds) <- reduceContext env' wanteds'
+		; (improved, binds, irreds, elim_more_skolems)
+                    <- reduceContext env' wanteds'
+                ; let elim_skolems' = elim_skolems >> elim_more_skolems
 
 		; if not improved then
-	 	     return (irreds, binds)
+	 	    elim_skolems' >> return (irreds, binds)
 		  else do
 	
 		-- If improvement did some unification, we go round again.
 		-- We start again with irreds, not wanteds
-		-- Using an instance decl might have introduced a fresh type variable
-		-- which might have been unified, so we'd get an infinite loop
-		-- if we started again with wanteds!  See Note [LOOP]
-		{ (irreds1, binds1) <- go env' irreds
+		-- Using an instance decl might have introduced a fresh type
+		-- variable which might have been unified, so we'd get an 
+                -- infinite loop if we started again with wanteds!  
+                -- See Note [LOOP]
+		{ (irreds1, binds1) <- go env' irreds elim_skolems'
 		; return (irreds1, binds `unionBags` binds1) } }
 \end{code}
 
@@ -1367,7 +1370,9 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- HOWEVER, some unification may take place, if we instantiate
 	-- 	    a method Inst with an equality constraint
 	; let env = mkNoImproveRedEnv doc (\i -> ReduceMe AddSCs)
-	; (_imp, _binds, constrained_dicts) <- reduceContext env wanteds'
+	; (_imp, _binds, constrained_dicts, elim_skolems) 
+            <- reduceContext env wanteds'
+        ; elim_skolems
 
 	-- Next, figure out the tyvars we will quantify over
 	; tau_tvs' <- zonkTcTyVarsAndFV (varSetElems tau_tvs)
@@ -1416,7 +1421,8 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 			   (is_nested_group || isDict inst) = Stop
 		          | otherwise  	         = ReduceMe AddSCs
 	      env = mkNoImproveRedEnv doc try_me
-	; (_imp, binds, irreds) <- reduceContext env wanteds'
+	; (_imp, binds, irreds, elim_skolems) <- reduceContext env wanteds'
+        ; elim_skolems
 
 	-- See "Notes on implicit parameters, Question 4: top level"
 	; ASSERT( all (isFreeWrtTyVars qtvs) irreds )	-- None should be captured
@@ -1565,7 +1571,8 @@ tcSimplifyIPs given_ips wanteds
 		-- Unusually for checking, we *must* zonk the given_ips
 
 	; let env = mkRedEnv doc try_me given_ips'
-	; (improved, binds, irreds) <- reduceContext env wanteds'
+	; (improved, binds, irreds, elim_skolems) <- reduceContext env wanteds'
+        ; elim_skolems
 
 	; if not improved then 
 		ASSERT( all is_free irreds )
@@ -1741,7 +1748,8 @@ reduceContext :: RedEnv
 	      -> [Inst]			-- Wanted
 	      -> TcM (ImprovementDone,
 		      TcDictBinds,	-- Dictionary bindings
-		      [Inst])		-- Irreducible
+		      [Inst],		-- Irreducible
+                      TcM ())           -- Undo skolems from SkolemOccurs
 
 reduceContext env wanteds
   = do	{ traceTc (text "reduceContext" <+> (vcat [
@@ -1824,7 +1832,7 @@ reduceContext env wanteds
                                                                 eq_irreds irreds
 		
 	  -- 9. eliminate the artificial skolem constants introduced in 1.
-	; eliminate_skolems	
+--	; eliminate_skolems	
 
 	  -- Figure out whether we should go round again
   	  -- My current plan is to see if any of the mutable tyvars in
@@ -1868,7 +1876,8 @@ reduceContext env wanteds
                               `unionBags` normalise_binds2 
                               `unionBags` dict_binds 
                               `unionBags` implic_binds, 
-                  all_irreds) 
+                  all_irreds,
+                  eliminate_skolems) 
         }
 
 tcImproveOne :: Avails -> Inst -> TcM ImprovementDone
