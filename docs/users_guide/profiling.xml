@@ -33,7 +33,9 @@
     <listitem>
       <para> Run your program with one of the profiling options, eg.
       <literal>+RTS -p -RTS</literal>.  This generates a file of
-      profiling information.</para>
+      profiling information.  Note that multi-processor execution
+      (e.g. <literal>+RTS -N2</literal>) is not supported while
+      profiling.</para>
       <indexterm><primary><option>-p</option></primary><secondary>RTS
       option</secondary></indexterm>
     </listitem>
