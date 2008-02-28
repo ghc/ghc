@@ -32,7 +32,6 @@ import DynFlags
 import CoreUtils
 import Var
 import Type
-import TysPrim
 import TysWiredIn
 import Match
 import PrelNames
@@ -65,17 +64,9 @@ dsListComp lquals body elt_ty = do
        || isParallelComp quals
        -- Foldr-style desugaring can't handle parallel list comprehensions
         then deListComp quals body (mkNilExpr elt_ty)
-        else do -- Foldr/build should be enabled, so desugar 
-                -- into foldrs and builds
-            [n_tyvar] <- newTyVarsDs [alphaTyVar]
-            
-            let n_ty = mkTyVarTy n_tyvar
-                c_ty = mkFunTys [elt_ty, n_ty] n_ty
-            [c, n] <- newSysLocalsDs [c_ty, n_ty]
-            
-            result <- dfListComp c n quals body
-            build_id <- dsLookupGlobalId buildName
-            return (Var build_id `App` Type elt_ty `App` mkLams [n_tyvar, c, n] result)
+        else mkBuildExpr elt_ty (\(c, _) (n, _) -> dfListComp c n quals body) 
+             -- Foldr/build should be enabled, so desugar 
+             -- into foldrs and builds
 
   where 
     -- We must test for ParStmt anywhere, not just at the head, because an extension
@@ -409,13 +400,7 @@ dfBindComp c_id n_id (pat, core_list1) quals body = do
 		pat core_rest (Var b)
 
     -- now build the outermost foldr, and return
-    foldr_id <- dsLookupGlobalId foldrName
-    return (Var foldr_id `App` Type x_ty 
-               `App` Type b_ty
-               `App` mkLams [x, b] core_expr
-               `App` Var n_id
-               `App` core_list1)
-    
+    mkFoldrExpr x_ty b_ty (mkLams [x, b] core_expr) (Var n_id) core_list1
 \end{code}
 
 %************************************************************************
@@ -481,7 +466,6 @@ mkUnzipBind elt_tys = do
     
     unzip_fn <- newSysLocalDs unzip_fn_ty
 
-    foldr_id <- dsLookupGlobalId foldrName
     [us1, us2] <- sequence [newUniqueSupply, newUniqueSupply]
 
     let nil_tuple = mkBigCoreTup (map mkNilExpr elt_tys)
@@ -493,10 +477,8 @@ mkUnzipBind elt_tys = do
         folder_body_outer_case = mkTupleCase us2 xs folder_body_inner_case ax (Var ax)
         folder_body = mkLams [ax, axs] folder_body_outer_case
         
-        unzip_body = mkApps (Var foldr_id) [Type elt_tuple_ty, Type elt_list_tuple_ty, folder_body, nil_tuple, Var ys]
-        unzip_body_saturated = mkLams [ys] unzip_body
-
-    return (unzip_fn, unzip_body_saturated)
+    unzip_body <- mkFoldrExpr elt_tuple_ty elt_list_tuple_ty folder_body nil_tuple (Var ys)
+    return (unzip_fn, mkLams [ys] unzip_body)
   where
     elt_tuple_ty       = mkBigCoreTupTy elt_tys
     elt_tuple_list_ty  = mkListTy elt_tuple_ty

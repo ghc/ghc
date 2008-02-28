@@ -1469,8 +1469,9 @@ rhsIsStatic :: PackageId -> CoreExpr -> Bool
 -- no thunks involved at all.
 --
 -- It's called (i) in TidyPgm.hasCafRefs to decide if the rhs is, or
--- refers to, CAFs; and (ii) in CoreToStg to decide whether to put an
--- update flag on it.
+-- refers to, CAFs; (ii) in CoreToStg to decide whether to put an
+-- update flag on it and (iii) in DsExpr to decide how to expand
+-- list literals
 --
 -- The basic idea is that rhsIsStatic returns True only if the RHS is
 --	(a) a value lambda

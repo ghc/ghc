@@ -17,7 +17,6 @@ module DsExpr ( dsExpr, dsLExpr, dsLocalBinds, dsValBinds, dsLit ) where
 
 #include "HsVersions.h"
 
-
 import Match
 import MatchLit
 import DsBinds
@@ -44,6 +43,7 @@ import Type
 import CoreSyn
 import CoreUtils
 
+import DynFlags
 import CostCentre
 import Id
 import PrelInfo
@@ -306,11 +306,8 @@ dsExpr (HsIf guard_expr then_expr else_expr)
 \underline{\bf Various data construction things}
 %              ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 \begin{code}
-dsExpr (ExplicitList ty xs)
-  = go xs
-  where
-    go []     = return (mkNilExpr ty)
-    go (x:xs) = mkConsExpr ty <$> dsLExpr x <*> go xs
+dsExpr (ExplicitList elt_ty xs) 
+  = dsExplicitList elt_ty xs
 
 -- we create a list from the array elements and convert them into a list using
 -- `PrelPArr.toP'
@@ -521,6 +518,59 @@ findField rbinds lbl
 \end{code}
 
 %--------------------------------------------------------------------
+
+Note [Desugaring explicit lists]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Explicit lists are desugared in a cleverer way to prevent some
+fruitless allocations.  Essentially, whenever we see a list literal
+[x_1, ..., x_n] we:
+
+1. Find the tail of the list that can be allocated statically (say
+   [x_k, ..., x_n]) by later stages and ensure we desugar that
+   normally: this makes sure that we don't cause a code size increase
+   by having the cons in that expression fused (see later) and hence
+   being unable to statically allocate any more
+
+2. For the prefix of the list which cannot be allocated statically,
+   say [x_1, ..., x_(k-1)], we turn it into an expression involving
+   build so that if we find any foldrs over it it will fuse away
+   entirely!
+   
+   So in this example we will desugar to:
+   build (\c n -> x_1 `c` x_2 `c` .... `c` foldr c n [x_k, ..., x_n]
+   
+   If fusion fails to occur then build will get inlined and (since we
+   defined a RULE for foldr (:) []) we will get back exactly the
+   normal desugaring for an explicit list! However, if it does occur
+   then we can potentially save quite a bit of allocation (up to 25\%
+   of the total in some nofib programs!)
+
+Of course, if rules aren't turned on then there is pretty much no
+point doing this fancy stuff, and it may even be harmful.
+
+\begin{code}
+
+dsExplicitList :: PostTcType -> [LHsExpr Id] -> DsM CoreExpr
+-- See Note [Desugaring explicit lists]
+dsExplicitList elt_ty xs = do
+    dflags <- getDOptsDs
+    xs' <- mapM dsLExpr xs
+    if not (dopt Opt_RewriteRules dflags)
+        then return $ mkListExpr elt_ty xs'
+        else mkBuildExpr elt_ty (mkSplitExplicitList (thisPackage dflags) xs')
+  where
+    mkSplitExplicitList this_package xs' (c, _) (n, n_ty) = do
+        let (dynamic_prefix, static_suffix) = spanTail (rhsIsStatic this_package) xs'
+            static_suffix' = mkListExpr elt_ty static_suffix
+        
+        folded_static_suffix <- mkFoldrExpr elt_ty n_ty (Var c) (Var n) static_suffix'
+        let build_body = foldr (App . App (Var c)) folded_static_suffix dynamic_prefix
+        return build_body
+
+spanTail :: (a -> Bool) -> [a] -> ([a], [a])
+spanTail f xs = (reverse rejected, reverse satisfying)
+    where (satisfying, rejected) = span f $ reverse xs
+\end{code}
 
 Desugar 'do' and 'mdo' expressions (NOT list comprehensions, they're
 handled in DsListComp).  Basically does the translation given in the

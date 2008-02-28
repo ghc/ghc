@@ -27,6 +27,7 @@ module DsUtils (
 	mkErrorAppDs, mkNilExpr, mkConsExpr, mkListExpr,
 	mkIntExpr, mkCharExpr,
 	mkStringExpr, mkStringExprFS, mkIntegerExpr, 
+	mkBuildExpr, mkFoldrExpr,
 
     seqVar,
 	
@@ -912,6 +913,27 @@ mkConsExpr ty hd tl = mkConApp consDataCon [Type ty, hd, tl]
 
 mkListExpr :: Type -> [CoreExpr] -> CoreExpr
 mkListExpr ty xs = foldr (mkConsExpr ty) (mkNilExpr ty) xs
+
+mkFoldrExpr :: PostTcType -> PostTcType -> CoreExpr -> CoreExpr -> CoreExpr -> DsM CoreExpr
+mkFoldrExpr elt_ty result_ty c n list = do
+    foldr_id <- dsLookupGlobalId foldrName
+    return (Var foldr_id `App` Type elt_ty 
+           `App` Type result_ty
+           `App` c
+           `App` n
+           `App` list)
+
+mkBuildExpr :: Type -> ((Id, Type) -> (Id, Type) -> DsM CoreExpr) -> DsM CoreExpr
+mkBuildExpr elt_ty mk_build_inside = do
+    [n_tyvar] <- newTyVarsDs [alphaTyVar]
+    let n_ty = mkTyVarTy n_tyvar
+        c_ty = mkFunTys [elt_ty, n_ty] n_ty
+    [c, n] <- newSysLocalsDs [c_ty, n_ty]
+    
+    build_inside <- mk_build_inside (c, c_ty) (n, n_ty)
+    
+    build_id <- dsLookupGlobalId buildName
+    return $ Var build_id `App` Type elt_ty `App` mkLams [n_tyvar, c, n] build_inside
 
 mkCoreSel :: [Id]	-- The tuple args
 	  -> Id         -- The selected one
