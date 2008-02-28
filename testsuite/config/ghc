@@ -36,6 +36,8 @@ if (ghc_with_profiling == 1):
 	if (ghc_with_native_codegen == 1):
 		config.compile_ways.append('profasm')
 		config.run_ways.append('profasm')
+        if (ghc_with_threaded_rts == 1):
+		config.run_ways.append('profthreaded')
 
 if (ghc_with_interpreter == 1):
 	config.run_ways.append('ghci')
@@ -53,6 +55,7 @@ config.way_flags = {
 	'optasm'     : ['-O -fasm'],
 	'profc'      : ['-O -prof -auto-all -fvia-C'],
 	'profasm'    : ['-O -prof -auto-all -fasm'],
+	'profthreaded' : ['-O -prof -auto-all -fasm -threaded'],
 	'ghci'       : ['--interactive', '-v0', '-ignore-dot-ghci'],
 	'extcore'    : ['-fext-core'],
 	'optextcore' : ['-O -fext-core'],
@@ -73,6 +76,7 @@ config.way_rts_flags = {
 	'optasm'     : [],
 	'profc'      : ['-p'],
 	'profasm'    : ['-hc'], # test heap profiling too
+	'profthreaded' : ['-p'],
 	'ghci'       : [],
 	'extcore'    : [],
 	'optextcore' : [],
