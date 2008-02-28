@@ -15,18 +15,18 @@
 
 module Data.Int
   ( 
-	-- * Signed integer types
-	Int,
-	Int8, Int16, Int32, Int64,
+        -- * Signed integer types
+        Int,
+        Int8, Int16, Int32, Int64,
 
-	-- * Notes
+        -- * Notes
 
-	-- $notes
-	) where
+        -- $notes
+        ) where
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Base	( Int )
-import GHC.Int	( Int8, Int16, Int32, Int64 )
+import GHC.Base ( Int )
+import GHC.Int  ( Int8, Int16, Int32, Int64 )
 #endif
 
 #ifdef __HUGS__
@@ -37,7 +37,7 @@ import Hugs.Int ( Int8, Int16, Int32, Int64 )
 import Prelude
 import Prelude (Int)
 import NHC.FFI (Int8, Int16, Int32, Int64)
-import NHC.SizedTypes (Int8, Int16, Int32, Int64)	-- instances of Bits
+import NHC.SizedTypes (Int8, Int16, Int32, Int64)       -- instances of Bits
 #endif
 
 {- $notes
