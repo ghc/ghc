@@ -13,12 +13,12 @@
 -----------------------------------------------------------------------------
 
 module Control.Concurrent.QSem
-	( -- * Simple Quantity Semaphores
-	  QSem,		-- abstract
-	  newQSem,	-- :: Int  -> IO QSem
-	  waitQSem,	-- :: QSem -> IO ()
-	  signalQSem	-- :: QSem -> IO ()
-	) where
+        ( -- * Simple Quantity Semaphores
+          QSem,         -- abstract
+          newQSem,      -- :: Int  -> IO QSem
+          waitQSem,     -- :: QSem -> IO ()
+          signalQSem    -- :: QSem -> IO ()
+        ) where
 
 import Prelude
 import Control.Concurrent.MVar
@@ -54,13 +54,13 @@ waitQSem (QSem sem) = do
     else do
      block <- newEmptyMVar
       {-
-	Stuff the reader at the back of the queue,
-	so as to preserve waiting order. A signalling
-	process then only have to pick the MVar at the
-	front of the blocked list.
+        Stuff the reader at the back of the queue,
+        so as to preserve waiting order. A signalling
+        process then only have to pick the MVar at the
+        front of the blocked list.
 
-	The version of waitQSem given in the paper could
-	lead to starvation.
+        The version of waitQSem given in the paper could
+        lead to starvation.
       -}
      putMVar sem (0, blocked++[block])
      takeMVar block
@@ -73,5 +73,5 @@ signalQSem (QSem sem) = do
      [] -> putMVar sem (avail+1,[])
 
      (block:blocked') -> do
-	   putMVar sem (0,blocked')
-	   putMVar block ()
+           putMVar sem (0,blocked')
+           putMVar block ()
