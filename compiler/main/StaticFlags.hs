@@ -492,6 +492,7 @@ allowed_combination way = and [ x `allowedWith` y
 	WayDebug `allowedWith` _		= True
 
 	WayProf `allowedWith` WayNDP		= True
+	WayThreaded `allowedWith` WayProf	= True
 	_ `allowedWith` _ 			= False
 
 

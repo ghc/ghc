@@ -281,10 +281,6 @@ hs_init(int *argc, char **argv[])
     x86_init_fpu();
 #endif
 
-#if defined(THREADED_RTS)
-    ioManagerStart();
-#endif
-
     /* Record initialization times */
     stat_endInit();
 }
@@ -360,6 +356,11 @@ hs_add_root(void (*init_root)(void))
     // This must be done after module initialisation.
     // ToDo: make this work in the presence of multiple hs_add_root()s.
     initProfiling2();
+
+    // ditto.
+#if defined(THREADED_RTS)
+    ioManagerStart();
+#endif
 }
 
 /* ----------------------------------------------------------------------------

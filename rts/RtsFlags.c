@@ -1117,6 +1117,12 @@ error = rtsTrue;
 		      errorBelch("bad value for -N");
 		      error = rtsTrue;
 		    }
+#if defined(PROFILING)
+                    if (RtsFlags.ParFlags.nNodes > 1) {
+                        errorBelch("bad option %s: only -N1 is supported with profiling", rts_argv[arg]);
+		      error = rtsTrue;
+                    }
+#endif
 		}
 		) break;
 
