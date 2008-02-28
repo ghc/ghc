@@ -134,8 +134,17 @@ scavenge_fun_srt(const StgInfoTable *info)
 static void
 scavengeTSO (StgTSO *tso)
 {
-    rtsBool saved_eager = gct->eager_promotion;
+    rtsBool saved_eager;
 
+    if (tso->what_next == ThreadRelocated) {
+        // the only way this can happen is if the old TSO was on the
+        // mutable list.  We might have other links to this defunct
+        // TSO, so we must update its link field.
+        evacuate((StgClosure**)&tso->_link);
+        return;
+    }
+
+    saved_eager = gct->eager_promotion;
     gct->eager_promotion = rtsFalse;
 
     if (   tso->why_blocked == BlockedOnMVar
