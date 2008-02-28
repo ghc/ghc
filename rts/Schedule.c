@@ -222,6 +222,7 @@ static Capability *scheduleDoGC(Capability *cap, Task *task,
 static rtsBool checkBlackHoles(Capability *cap);
 
 static StgTSO *threadStackOverflow(Capability *cap, StgTSO *tso);
+static StgTSO *threadStackUnderflow(Task *task, StgTSO *tso);
 
 static void deleteThread (Capability *cap, StgTSO *tso);
 static void deleteAllThreads (Capability *cap);
@@ -598,7 +599,7 @@ run_thread:
         // ACTIVITY_DONE_GC means we turned off the timer signal to
         // conserve power (see #1623).  Re-enable it here.
         nat prev;
-        prev = xchg(&recent_activity, ACTIVITY_YES);
+        prev = xchg((P_)&recent_activity, ACTIVITY_YES);
         if (prev == ACTIVITY_DONE_GC) {
             startTimer();
         }
@@ -682,6 +683,8 @@ run_thread:
 #endif
     
     schedulePostRunThread();
+
+    t = threadStackUnderflow(task,t);
 
     ready_to_gc = rtsFalse;
 
@@ -2803,6 +2806,54 @@ threadStackOverflow(Capability *cap, StgTSO *tso)
 #endif
 
   return dest;
+}
+
+static StgTSO *
+threadStackUnderflow (Task *task STG_UNUSED, StgTSO *tso)
+{
+    bdescr *bd, *new_bd;
+    lnat new_tso_size_w, tso_size_w;
+    StgTSO *new_tso;
+
+    tso_size_w = tso_sizeW(tso);
+
+    if (tso_size_w < MBLOCK_SIZE_W || 
+        (nat)(tso->stack + tso->stack_size - tso->sp) > tso->stack_size / 4) 
+    {
+        return tso;
+    }
+
+    // don't allow throwTo() to modify the blocked_exceptions queue
+    // while we are moving the TSO:
+    lockClosure((StgClosure *)tso);
+
+    new_tso_size_w = round_to_mblocks(tso_size_w/2);
+
+    debugTrace(DEBUG_sched, "thread %ld: reducing TSO size from %lu words to %lu",
+               tso->id, tso_size_w, new_tso_size_w);
+
+    bd = Bdescr((StgPtr)tso);
+    new_bd = splitLargeBlock(bd, new_tso_size_w / BLOCK_SIZE_W);
+
+    new_tso = (StgTSO *)new_bd->start;
+    memcpy(new_tso,tso,TSO_STRUCT_SIZE);
+    new_tso->stack_size = new_tso_size_w - TSO_STRUCT_SIZEW;
+
+    tso->what_next = ThreadRelocated;
+    tso->_link = new_tso; // no write barrier reqd: same generation
+
+    // The TSO attached to this Task may have moved, so update the
+    // pointer to it.
+    if (task->tso == tso) {
+        task->tso = new_tso;
+    }
+
+    unlockTSO(new_tso);
+    unlockTSO(tso);
+
+    IF_DEBUG(sanity,checkTSO(new_tso));
+
+    return new_tso;
 }
 
 /* ---------------------------------------------------------------------------

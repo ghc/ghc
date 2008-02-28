@@ -186,6 +186,9 @@ doYouWantToGC( void )
 extern void *allocateExec (nat bytes);
 extern void freeExec (void *p);
 
+/* for splitting blocks groups in two */
+extern bdescr * splitLargeBlock (bdescr *bd, nat blocks);
+
 /* -----------------------------------------------------------------------------
    Performing Garbage Collection
 

@@ -227,21 +227,30 @@ void freeChain(bdescr *p);
 void freeGroup_lock(bdescr *p);
 void freeChain_lock(bdescr *p);
 
+bdescr * splitBlockGroup (bdescr *bd, nat blocks);
+
 /* Round a value to megablocks --------------------------------------------- */
 
-#define WORDS_PER_MBLOCK  (BLOCKS_PER_MBLOCK * BLOCK_SIZE_W)
-
+// We want to allocate an object around a given size, round it up or
+// down to the nearest size that will fit in an mblock group.
 INLINE_HEADER StgWord
 round_to_mblocks(StgWord words)
 {
-  if (words > WORDS_PER_MBLOCK) {
-    if ((words % WORDS_PER_MBLOCK) < (WORDS_PER_MBLOCK / 2)) {
-      words = (words / WORDS_PER_MBLOCK) * WORDS_PER_MBLOCK;
-    } else {
-      words = ((words / WORDS_PER_MBLOCK) + 1) * WORDS_PER_MBLOCK;
+    if (words > BLOCKS_PER_MBLOCK * BLOCK_SIZE_W) {
+        // first, ignore the gap at the beginning of the first mblock by
+        // adding it to the total words.  Then we can pretend we're
+        // dealing in a uniform unit of megablocks.
+        words += FIRST_BLOCK_OFF/sizeof(W_);
+
+        if ((words % MBLOCK_SIZE_W) < (MBLOCK_SIZE_W / 2)) {
+            words = (words / MBLOCK_SIZE_W) * MBLOCK_SIZE_W;
+        } else {
+            words = ((words / MBLOCK_SIZE_W) + 1) * MBLOCK_SIZE_W;
+        }
+
+        words -= FIRST_BLOCK_OFF/sizeof(W_);
     }
-  }
-  return words;
+    return words;
 }
 
 #endif /* !CMINUSMINUS */

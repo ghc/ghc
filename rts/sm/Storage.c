@@ -633,6 +633,34 @@ allocatedBytes( void )
     return allocated;
 }
 
+// split N blocks off the start of the given bdescr, returning the 
+// remainder as a new block group.  We treat the remainder as if it
+// had been freshly allocated in generation 0.
+bdescr *
+splitLargeBlock (bdescr *bd, nat blocks)
+{
+    bdescr *new_bd;
+
+    // subtract the original number of blocks from the counter first
+    bd->step->n_large_blocks -= bd->blocks;
+
+    new_bd = splitBlockGroup (bd, blocks);
+
+    dbl_link_onto(new_bd, &g0s0->large_objects);
+    g0s0->n_large_blocks += new_bd->blocks;
+    new_bd->gen_no  = g0s0->no;
+    new_bd->step    = g0s0;
+    new_bd->flags   = BF_LARGE;
+    new_bd->free    = bd->free;
+
+    // add the new number of blocks to the counter.  Due to the gaps
+    // for block descriptor, new_bd->blocks + bd->blocks might not be
+    // equal to the original bd->blocks, which is why we do it this way.
+    bd->step->n_large_blocks += bd->blocks;
+
+    return new_bd;
+}    
+
 /* -----------------------------------------------------------------------------
    allocateLocal()
 
