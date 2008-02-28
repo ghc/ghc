@@ -122,8 +122,7 @@ tcMatchLambda match res_ty
 \begin{code}
 tcGRHSsPat :: GRHSs Name -> BoxyRhoType -> TcM (GRHSs TcId)
 -- Used for pattern bindings
-tcGRHSsPat grhss res_ty = tcGRHSs match_ctxt grhss (emptyRefinement, res_ty)
-			-- emptyRefinement: no refinement in a pattern binding
+tcGRHSsPat grhss res_ty = tcGRHSs match_ctxt grhss res_ty
   where
     match_ctxt = MC { mc_what = PatBindRhs,
 		      mc_body = tcBody }
@@ -145,8 +144,9 @@ tcMatches :: TcMatchCtxt
 
 data TcMatchCtxt 	-- c.f. TcStmtCtxt, also in this module
   = MC { mc_what :: HsMatchContext Name,	-- What kind of thing this is
-    	 mc_body :: LHsExpr Name 		-- Type checker for a body of an alternative
-		 -> (Refinement, BoxyRhoType) 
+    	 mc_body :: LHsExpr Name 		-- Type checker for a body of
+                                                -- an alternative
+		 -> BoxyRhoType
 		 -> TcM (LHsExpr TcId) }	
 
 tcMatches ctxt pat_tys rhs_ty (MatchGroup matches _)
@@ -173,10 +173,10 @@ tcMatch ctxt pat_tys rhs_ty match
       = tcGRHSs ctxt grhss rhs_ty	-- No result signature
 
 	-- Result type sigs are no longer supported
-    tc_grhss ctxt (Just res_sig) grhss (co, rhs_ty)
+    tc_grhss ctxt (Just res_sig) grhss rhs_ty
       = do { addErr (ptext SLIT("Ignoring (deprecated) result type signature")
 			<+> ppr res_sig)
-    	   ; tcGRHSs ctxt grhss (co, rhs_ty) }
+    	   ; tcGRHSs ctxt grhss rhs_ty }
 
 	-- For (\x -> e), tcExpr has already said "In the expresssion \x->e"
 	-- so we don't want to add "In the lambda abstraction \x->e"
@@ -186,7 +186,7 @@ tcMatch ctxt pat_tys rhs_ty match
 	    m_ctxt     -> addErrCtxt (matchCtxt m_ctxt match) thing_inside
 
 -------------
-tcGRHSs :: TcMatchCtxt -> GRHSs Name -> (Refinement, BoxyRhoType) 
+tcGRHSs :: TcMatchCtxt -> GRHSs Name -> BoxyRhoType
 	-> TcM (GRHSs TcId)
 
 -- Notice that we pass in the full res_ty, so that we get
@@ -202,7 +202,7 @@ tcGRHSs ctxt (GRHSs grhss binds) res_ty
 	; return (GRHSs grhss' binds') }
 
 -------------
-tcGRHS :: TcMatchCtxt -> (Refinement, BoxyRhoType) -> GRHS Name -> TcM (GRHS TcId)
+tcGRHS :: TcMatchCtxt -> BoxyRhoType -> GRHS Name -> TcM (GRHS TcId)
 
 tcGRHS ctxt res_ty (GRHS guards rhs)
   = do  { (guards', rhs') <- tcStmts stmt_ctxt tcGuardStmt guards res_ty $
@@ -228,7 +228,7 @@ tcDoStmts :: HsStmtContext Name
 tcDoStmts ListComp stmts body res_ty
   = do	{ (elt_ty, coi) <- boxySplitListTy res_ty
 	; (stmts', body') <- tcStmts ListComp (tcLcStmt listTyCon) stmts 
-				     (emptyRefinement,elt_ty) $
+				     elt_ty $
 			     tcBody body
 	; return $ mkHsWrapCoI coi 
                      (HsDo ListComp stmts' body' (mkListTy elt_ty)) }
@@ -236,14 +236,14 @@ tcDoStmts ListComp stmts body res_ty
 tcDoStmts PArrComp stmts body res_ty
   = do	{ (elt_ty, coi) <- boxySplitPArrTy res_ty
 	; (stmts', body') <- tcStmts PArrComp (tcLcStmt parrTyCon) stmts 
-				     (emptyRefinement, elt_ty) $
+				     elt_ty $
 			     tcBody body
 	; return $ mkHsWrapCoI coi 
                      (HsDo PArrComp stmts' body' (mkPArrTy elt_ty)) }
 
 tcDoStmts DoExpr stmts body res_ty
   = do	{ (stmts', body') <- tcStmts DoExpr tcDoStmt stmts 
-				     (emptyRefinement, res_ty) $
+				     res_ty $
 			     tcBody body
 	; return (HsDo DoExpr stmts' body' res_ty) }
 
@@ -254,7 +254,7 @@ tcDoStmts ctxt@(MDoExpr _) stmts body res_ty
 			   tcMonoExpr rhs (mkAppTy m_ty pat_ty)
 
 	; (stmts', body') <- tcStmts ctxt (tcMDoStmt tc_rhs) stmts 
-				     (emptyRefinement, res_ty') $
+				     res_ty' $
 			     tcBody body
 
 	; let names = [mfixName, bindMName, thenMName, returnMName, failMName]
@@ -265,12 +265,12 @@ tcDoStmts ctxt@(MDoExpr _) stmts body res_ty
 
 tcDoStmts ctxt stmts body res_ty = pprPanic "tcDoStmts" (pprStmtContext ctxt)
 
-tcBody :: LHsExpr Name -> (Refinement, BoxyRhoType) -> TcM (LHsExpr TcId)
-tcBody body (reft, res_ty)
-  = do	{ traceTc (text "tcBody" <+> ppr res_ty <+> ppr reft)
-	; let (co, res_ty') = refineResType reft res_ty
-	; body' <- tcPolyExpr body res_ty'
-	; return (mkLHsWrap co body') } 
+tcBody :: LHsExpr Name -> BoxyRhoType -> TcM (LHsExpr TcId)
+tcBody body res_ty
+  = do	{ traceTc (text "tcBody" <+> ppr res_ty)
+	; body' <- tcPolyExpr body res_ty
+	; return body' 
+        } 
 \end{code}
 
 
@@ -284,18 +284,15 @@ tcBody body (reft, res_ty)
 type TcStmtChecker
   =  forall thing. HsStmtContext Name
         	-> Stmt Name
-		-> (Refinement, BoxyRhoType)			-- Result type for comprehension
-	      	-> ((Refinement,BoxyRhoType) -> TcM thing)	-- Checker for what follows the stmt
+		-> BoxyRhoType			-- Result type for comprehension
+	      	-> (BoxyRhoType -> TcM thing)	-- Checker for what follows the stmt
               	-> TcM (Stmt TcId, thing)
-
-  -- The incoming BoxyRhoType may be refined by type refinements
-  -- before being passed to the thing_inside
 
 tcStmts :: HsStmtContext Name
 	-> TcStmtChecker	-- NB: higher-rank type
         -> [LStmt Name]
-	-> (Refinement, BoxyRhoType)
-	-> ((Refinement, BoxyRhoType) -> TcM thing)
+	-> BoxyRhoType
+	-> (BoxyRhoType -> TcM thing)
         -> TcM ([LStmt TcId], thing)
 
 -- Note the higher-rank type.  stmt_chk is applied at different
@@ -384,7 +381,7 @@ tcLcStmt m_tc ctxt (ParStmt bndr_stmts_s) elt_ty thing_inside
 	; return (ParStmt pairs', thing) }
   where
     -- loop :: [([LStmt Name], [Name])] -> TcM ([([LStmt TcId], [TcId])], thing)
-    loop [] = do { thing <- thing_inside elt_ty	-- No refinement from pattern 
+    loop [] = do { thing <- thing_inside elt_ty
 		 ; return ([], thing) }		-- matching in the branches
 
     loop ((stmts, names) : pairs)
@@ -467,14 +464,15 @@ tcLcStmt m_tc ctxt stmt elt_ty thing_inside
 
 tcDoStmt :: TcStmtChecker
 
-tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op) (reft,res_ty) thing_inside
+tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op) res_ty thing_inside
   = do	{ (rhs', rhs_ty) <- tcInferRho rhs
-		-- We should use type *inference* for the RHS computations, becuase of GADTs. 
+		-- We should use type *inference* for the RHS computations, 
+                -- becuase of GADTs. 
 		-- 	do { pat <- rhs; <rest> }
 		-- is rather like
 		--	case rhs of { pat -> <rest> }
-		-- We do inference on rhs, so that information about its type can be refined
-		-- when type-checking the pattern. 
+		-- We do inference on rhs, so that information about its type 
+                -- can be refined when type-checking the pattern. 
 
 	-- Deal with rebindable syntax:
 	--	 (>>=) :: rhs_ty -> (pat_ty -> new_res_ty) -> res_ty
@@ -492,12 +490,12 @@ tcDoStmt ctxt (BindStmt pat rhs bind_op fail_op) (reft,res_ty) thing_inside
 		      then return noSyntaxExpr
 		      else tcSyntaxOp DoOrigin fail_op (mkFunTy stringTy new_res_ty)
 
-	; (pat', thing) <- tcLamPat pat pat_ty (reft, new_res_ty) thing_inside
+	; (pat', thing) <- tcLamPat pat pat_ty new_res_ty thing_inside
 
 	; return (BindStmt pat' rhs' bind_op' fail_op', thing) }
 
 
-tcDoStmt ctxt (ExprStmt rhs then_op _) (reft,res_ty) thing_inside
+tcDoStmt ctxt (ExprStmt rhs then_op _) res_ty thing_inside
   = do	{ (rhs', rhs_ty) <- tcInferRho rhs
 
   	-- Deal with rebindable syntax; (>>) :: rhs_ty -> new_res_ty -> res_ty
@@ -506,7 +504,7 @@ tcDoStmt ctxt (ExprStmt rhs then_op _) (reft,res_ty) thing_inside
 		tcSyntaxOp DoOrigin then_op 
 			   (mkFunTys [rhs_ty, new_res_ty] res_ty)
 
-	; thing <- thing_inside (reft, new_res_ty)
+	; thing <- thing_inside new_res_ty
 	; return (ExprStmt rhs' then_op' rhs_ty, thing) }
 
 tcDoStmt ctxt (RecStmt {}) res_ty thing_inside

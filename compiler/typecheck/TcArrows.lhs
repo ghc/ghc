@@ -62,7 +62,7 @@ tcProc pat cmd exp_ty
     do	{ ((exp_ty1, res_ty), coi) <- boxySplitAppTy exp_ty 
 	; ((arr_ty, arg_ty), coi1) <- boxySplitAppTy exp_ty1
 	; let cmd_env = CmdEnv { cmd_arr = arr_ty }
-	; (pat', cmd') <- tcProcPat pat arg_ty (emptyRefinement, res_ty) $
+	; (pat', cmd') <- tcProcPat pat arg_ty res_ty $
 			  tcCmdTop cmd_env cmd []
         ; let res_coi = mkTransCoI coi (mkAppTyCoI exp_ty1 coi1 res_ty IdCo)
 	; return (pat', cmd', res_coi) 
@@ -90,27 +90,27 @@ mkCmdArrTy env t1 t2 = mkAppTys (cmd_arr env) [t1, t2]
 tcCmdTop :: CmdEnv 
          -> LHsCmdTop Name
          -> CmdStack
-	 -> (Refinement, TcTauType)	-- Expected result type; always a monotype
-					-- We know exactly how many cmd args are expected,
-					-- albeit perhaps not their types; so we can pass 
-					-- in a CmdStack
+	 -> TcTauType	-- Expected result type; always a monotype
+                             -- We know exactly how many cmd args are expected,
+			     -- albeit perhaps not their types; so we can pass 
+			     -- in a CmdStack
         -> TcM (LHsCmdTop TcId)
 
-tcCmdTop env (L loc (HsCmdTop cmd _ _ names)) cmd_stk reft_res_ty@(_,res_ty)
+tcCmdTop env (L loc (HsCmdTop cmd _ _ names)) cmd_stk res_ty
   = setSrcSpan loc $
-    do	{ cmd'   <- tcGuardedCmd env cmd cmd_stk reft_res_ty
+    do	{ cmd'   <- tcGuardedCmd env cmd cmd_stk res_ty
 	; names' <- mapM (tcSyntaxName ProcOrigin (cmd_arr env)) names
 	; return (L loc $ HsCmdTop cmd' cmd_stk res_ty names') }
 
 
 ----------------------------------------
 tcGuardedCmd :: CmdEnv -> LHsExpr Name -> CmdStack
-	     -> (Refinement, TcTauType) -> TcM (LHsExpr TcId)
+	     -> TcTauType -> TcM (LHsExpr TcId)
 -- A wrapper that deals with the refinement (if any)
-tcGuardedCmd env expr stk (reft, res_ty)
-  = do	{ let (co, res_ty') = refineResType reft res_ty
-    	; body <- tcCmd env expr (stk, res_ty')
-	; return (mkLHsWrap co body) }
+tcGuardedCmd env expr stk res_ty
+  = do	{ body <- tcCmd env expr (stk, res_ty)
+	; return body 
+        }
 
 tcCmd :: CmdEnv -> LHsExpr Name -> (CmdStack, TcTauType) -> TcM (LHsExpr TcId)
 	-- The main recursive function
@@ -224,7 +224,7 @@ tc_cmd env cmd@(HsLam (MatchGroup [L mtch_loc (match@(Match pats maybe_rhs_sig g
 
 tc_cmd env cmd@(HsDo do_or_lc stmts body ty) (cmd_stk, res_ty)
   = do 	{ checkTc (null cmd_stk) (nonEmptyCmdStkErr cmd)
-	; (stmts', body') <- tcStmts do_or_lc tc_stmt stmts (emptyRefinement, res_ty) $
+	; (stmts', body') <- tcStmts do_or_lc tc_stmt stmts res_ty $
 			     tcGuardedCmd env body []
 	; return (HsDo do_or_lc stmts' body' res_ty) }
   where
@@ -301,7 +301,7 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 		      not (w_tv `elemVarSet` tyVarsOfTypes arg_tys))
 		     (badFormFun i tup_ty')
 
-	   ; tcCmdTop (env { cmd_arr = b }) cmd arg_tys (emptyRefinement, s) }
+	   ; tcCmdTop (env { cmd_arr = b }) cmd arg_tys s }
 
     unscramble :: TcType -> (TcType, [TcType])
     -- unscramble ((w,s1) .. sn)	=  (w, [s1..sn])

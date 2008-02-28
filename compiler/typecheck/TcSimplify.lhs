@@ -921,16 +921,16 @@ tcSimplifyCheck loc qtvs givens wanteds
 -----------------------------------------------------------
 -- tcSimplifyCheckPat is used for existential pattern match
 tcSimplifyCheckPat :: InstLoc
-	 	   -> [CoVar] -> Refinement
+	 	   -> [CoVar]
 	 	   -> [TcTyVar]		-- Quantify over these
 	 	   -> [Inst]		-- Given
 	 	   -> [Inst]		-- Wanted
 	 	   -> TcM TcDictBinds	-- Bindings
-tcSimplifyCheckPat loc co_vars reft qtvs givens wanteds
+tcSimplifyCheckPat loc co_vars qtvs givens wanteds
   = ASSERT( all isTcTyVar qtvs && all isSkolemTyVar qtvs )
     do	{ traceTc (text "tcSimplifyCheckPat")
       	; (irreds, binds) <- gentleCheckLoop loc givens wanteds
-	; implic_bind <- bindIrredsR loc qtvs co_vars reft 
+	; implic_bind <- bindIrredsR loc qtvs co_vars emptyRefinement 
 				    givens irreds
 	; return (binds `unionBags` implic_bind) }
 

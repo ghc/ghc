@@ -1058,8 +1058,7 @@ tcGhciStmts stmts
 	let {
 	    ret_ty    = mkListTy unitTy ;
 	    io_ret_ty = mkTyConApp ioTyCon [ret_ty] ;
-	    tc_io_stmts stmts = tcStmts DoExpr tcDoStmt stmts 
-				        (emptyRefinement, io_ret_ty) ;
+	    tc_io_stmts stmts = tcStmts DoExpr tcDoStmt stmts io_ret_ty ;
 
 	    names = map unLoc (collectLStmtsBinders stmts) ;
 

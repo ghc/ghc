@@ -67,10 +67,10 @@ tcLetPat :: (Name -> Maybe TcRhoType)
      	 -> TcM a
       	 -> TcM (LPat TcId, a)
 tcLetPat sig_fn pat pat_ty thing_inside
-  = do	{ let init_state = PS { pat_ctxt = LetPat sig_fn, 
-				pat_reft = emptyRefinement,
+  = do	{ let init_state = PS { pat_ctxt = LetPat sig_fn,
 				pat_eqs  = False }
-	; (pat', ex_tvs, res) <- tc_lpat pat pat_ty init_state (\ _ -> thing_inside)
+	; (pat', ex_tvs, res) <- tc_lpat pat pat_ty init_state 
+                                   (\ _ -> thing_inside)
 
 	-- Don't know how to deal with pattern-bound existentials yet
 	; checkTc (null ex_tvs) (existentialExplode pat)
@@ -78,10 +78,10 @@ tcLetPat sig_fn pat pat_ty thing_inside
 	; return (pat', res) }
 
 -----------------
-tcLamPats :: [LPat Name]				-- Patterns,
-	  -> [BoxySigmaType]				--   and their types
-	  -> BoxyRhoType 				-- Result type,
-	  -> ((Refinement, BoxyRhoType) -> TcM a)	--   and the checker for the body
+tcLamPats :: [LPat Name]		-- Patterns,
+	  -> [BoxySigmaType]		--   and their types
+	  -> BoxyRhoType 		-- Result type,
+	  -> (BoxyRhoType -> TcM a)	--   and the checker for the body
 	  -> TcM ([LPat TcId], a)
 
 -- This is the externally-callable wrapper function
@@ -92,17 +92,16 @@ tcLamPats :: [LPat Name]				-- Patterns,
 
 --   1. Initialise the PatState
 --   2. Check the patterns
---   3. Apply the refinement to the environment and result type
---   4. Check the body
---   5. Check that no existentials escape
+--   3. Check the body
+--   4. Check that no existentials escape
 
 tcLamPats pats tys res_ty thing_inside
   = tc_lam_pats LamPat (zipEqual "tcLamPats" pats tys)
-	        (emptyRefinement, res_ty) thing_inside
+	        res_ty thing_inside
 
 tcLamPat :: LPat Name -> BoxySigmaType 
-      	 -> (Refinement,BoxyRhoType)		-- Result type
-      	 -> ((Refinement,BoxyRhoType) -> TcM a)	-- Checker for body, given its result type
+      	 -> BoxyRhoType		    -- Result type
+      	 -> (BoxyRhoType -> TcM a)  -- Checker for body, given its result type
       	 -> TcM (LPat TcId, a)
 
 tcProcPat = tc_lam_pat ProcPat
@@ -115,17 +114,16 @@ tc_lam_pat ctxt pat pat_ty res_ty thing_inside
 -----------------
 tc_lam_pats :: PatCtxt
 	    -> [(LPat Name,BoxySigmaType)]
-       	    -> (Refinement,BoxyRhoType)			-- Result type
-       	    -> ((Refinement,BoxyRhoType) -> TcM a)	-- Checker for body, given its result type
+       	    -> BoxyRhoType            -- Result type
+       	    -> (BoxyRhoType -> TcM a) -- Checker for body, given its result type
        	    -> TcM ([LPat TcId], a)
-tc_lam_pats ctxt pat_ty_prs (reft, res_ty) thing_inside 
-  =  do	{ let init_state = PS { pat_ctxt = ctxt, pat_reft = reft, pat_eqs = False }
+tc_lam_pats ctxt pat_ty_prs res_ty thing_inside 
+  =  do	{ let init_state = PS { pat_ctxt = ctxt, pat_eqs = False }
 
 	; (pats', ex_tvs, res) <- tcMultiple tc_lpat_pr pat_ty_prs init_state $ \ pstate' ->
-				  refineEnvironment (pat_reft pstate') (pat_eqs pstate') $
 				  if (pat_eqs pstate' && (not $ isRigidTy res_ty))
 				     then failWithTc (nonRigidResult res_ty)
-	     			     else thing_inside (pat_reft pstate', res_ty)
+	     			     else thing_inside res_ty
 
 	; let tys = map snd pat_ty_prs
 	; tcCheckExistentialPat pats' ex_tvs tys res_ty
@@ -155,7 +153,6 @@ tcCheckExistentialPat pats ex_tvs pat_tys body_ty
 
 data PatState = PS {
 	pat_ctxt :: PatCtxt,
-	pat_reft :: Refinement,	-- Binds rigid TcTyVars to their refinements
 	pat_eqs  :: Bool        -- <=> there are GADT equational constraints 
 				--     for refinement 
   }
@@ -302,22 +299,8 @@ tc_lpat :: LPat Name
 tc_lpat (L span pat) pat_ty pstate thing_inside
   = setSrcSpan span		  $
     maybeAddErrCtxt (patCtxt pat) $
-    do	{ let mb_reft = refineType (pat_reft pstate) pat_ty
-	      pat_ty' = case mb_reft of { Just (_, ty') -> ty'; Nothing -> pat_ty }
-
-		-- Make sure the result type reflects the current refinement
-		-- We must do this here, so that it correctly ``sees'' all
-		-- the refinements to the left.  Example:
-		-- Suppose C :: forall a. T a -> a -> Foo
-		-- Pattern	C a p1 True
-		-- So p1 might refine 'a' to True, and the True 
-		-- pattern had better see it.
-
-	; (pat', tvs, res) <- tc_pat pstate pat pat_ty' thing_inside
-	; let final_pat = case mb_reft of
-				Nothing     -> pat'
-				Just (co,_) -> CoPat (WpCo co) pat' pat_ty
-	; return (L span final_pat, tvs, res) }
+    do	{ (pat', tvs, res) <- tc_pat pstate pat pat_ty thing_inside
+	; return (L span pat', tvs, res) }
 
 --------------------
 tc_pat	:: PatState
@@ -589,7 +572,7 @@ correct Core, this coercion needs to be used to case the type of the scrutinee
 from the family to the representation type.  This is achieved by
 unwrapFamInstScrutinee using a CoPat around the result pattern.
 
-Now it might appear seem as if we could have used the existing GADT type
+Now it might appear seem as if we could have used the previous GADT type
 refinement infrastructure of refineAlt and friends instead of the explicit
 unification and CoPat generation.  However, that would be wrong.  Why?  The
 whole point of GADT refinement is that the refinement is local to the case
@@ -602,11 +585,9 @@ instantiation of x with (a, b) must be global; ie, it must be valid in *all*
 alternatives of the case expression, whereas in the GADT case it might vary
 between alternatives.
 
-In fact, if we have a data instance declaration defining a GADT, eq_spec will
-be non-empty and we will get a mixture of global instantiations and local
-refinement from a single match.  This neatly reflects that, as soon as we
-have constrained the type of the scrutinee to the required type index, all
-further type refinement is local to the alternative.
+RIP GADT refinement: refinements have been replaced by the use of explicit
+equality constraints that are used in conjunction with implication constraints
+to express the local scope of GADT refinements.
 
 \begin{code}
 --	Running example:
@@ -689,8 +670,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 
 	; loc <- getInstLoc origin
 	; dicts <- newDictBndrs loc theta'
-	; dict_binds <- tcSimplifyCheckPat loc [] emptyRefinement
-			   ex_tvs' dicts lie_req
+	; dict_binds <- tcSimplifyCheckPat loc [] ex_tvs' dicts lie_req
 
         ; let res_pat = ConPatOut { pat_con = L con_span data_con, 
 			            pat_tvs = ex_tvs',
@@ -805,9 +785,6 @@ tcConArgs data_con arg_tys (RecCon (HsRecFields rpats dd)) pstate thing_inside
 tcConArg :: Checker (LPat Name, BoxySigmaType) (LPat Id)
 tcConArg (arg_pat, arg_ty) pstate thing_inside
   = tc_lpat arg_pat arg_ty pstate thing_inside
-	-- NB: the tc_lpat will refine pat_ty if necessary
-	--     based on the current pstate, which may include
-	--     refinements from peer argument patterns to the left
 \end{code}
 
 \begin{code}
@@ -849,69 +826,6 @@ simplification for such vanilla patterns so that it binds no
 constraints. Hence the 'fast path' in tcConPat; but it's also a good
 plan for ordinary vanilla patterns to bypass the constraint
 simplification step.
-
-
-%************************************************************************
-%*									*
-		Type refinement
-%*									*
-%************************************************************************
-
-\begin{code}
-refineAlt :: DataCon		-- For tracing only
-	  -> PatState 
-	  -> [TcTyVar]		-- Existentials
-	  -> [CoVar]		-- Equational constraints
-	  -> BoxySigmaType	-- Pattern type
-	  -> TcM PatState
-
-refineAlt con pstate ex_tvs [] pat_ty
-  | null $ dataConEqTheta con
-  = return pstate	-- Common case: no equational constraints
-
-refineAlt con pstate ex_tvs co_vars pat_ty
-  = -- See Note [Flags and equational constraints]
-    do	{ checkTc (isRigidTy pat_ty) (nonRigidMatch con)
-	-- We are matching against a GADT constructor with non-trivial
-	-- constraints, but pattern type is wobbly.  For now we fail.
-	-- We can make sense of this, however:
-	-- Suppose MkT :: forall a b. (a:=:[b]) => b -> T a
-	--	(\x -> case x of { MkT v -> v })
-	-- We can infer that x must have type T [c], for some wobbly 'c'
-	-- and translate to
-	--	(\(x::T [c]) -> case x of
-	--			  MkT b (g::([c]:=:[b])) (v::b) -> v `cast` sym g
-	-- To implement this, we'd first instantiate the equational
-	-- constraints with *wobbly* type variables for the existentials;
-	-- then unify these constraints to make pat_ty the right shape;
-	-- then proceed exactly as in the rigid case
-
-		-- In the rigid case, we perform type refinement
-	; case gadtRefine (pat_reft pstate) ex_tvs co_vars of {
-	    Failed msg     -> failWithTc (inaccessibleAlt msg) ;
-	    Succeeded reft -> do { traceTc trace_msg
-			  	 ; return (pstate { pat_reft = reft, pat_eqs = (pat_eqs pstate || not (null $ dataConEqTheta con)) }) }
-	 	    -- DO NOT refine the envt right away, because we 
-		    -- might be inside a lazy pattern.  Instead, refine pstate
-	        where
-		    
-		    trace_msg = text "refineAlt:match" <+> 
-				vcat [ ppr con <+> ppr ex_tvs,
-				       ppr [(v, tyVarKind v) | v <- co_vars],
-				       ppr reft]
-	} }
-\end{code}
-
-Note [Flags and equational constraints]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-If there are equational constraints, we take account of them
-regardless of flag settings; -XGADTs etc applies only to the
-*definition* of a data type.
-
-An alternative would be also to reject a program that *used*
-constructors with equational constraints.  But want we should avoid at
-all costs is simply to *ignore* the constraints, since that gives
-incomprehensible errors (Trac #2004).
 
 
 %************************************************************************
