@@ -6,7 +6,7 @@ rebindable6.hs:106:2:
       add (HasSeq (IO a -> t -> IO b)) to the context of
         the type signature for `test_do'
       or add an instance declaration for (HasSeq (IO a -> t -> IO b))
-    In a 'do' expression: f
+    In a stmt of a 'do' expression: f
     In the expression:
         do f
            Just (b :: b) <- g
@@ -22,7 +22,7 @@ rebindable6.hs:107:2:
       arising from a do statement at rebindable6.hs:107:2-17
     Possible fix:
       add an instance declaration for (HasFail ([Prelude.Char] -> t1))
-    In a 'do' expression: Just (b :: b) <- g
+    In a stmt of a 'do' expression: Just (b :: b) <- g
     In the expression:
         do f
            Just (b :: b) <- g
@@ -43,7 +43,7 @@ rebindable6.hs:107:2:
         the type signature for `test_do'
       or add an instance declaration for
          (HasBind (IO (Maybe b) -> (Maybe b -> t1) -> t))
-    In a 'do' expression: Just (b :: b) <- g
+    In a stmt of a 'do' expression: Just (b :: b) <- g
     In the expression:
         do f
            Just (b :: b) <- g

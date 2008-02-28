@@ -3,4 +3,4 @@
     No instance for (Show (t -> a))
       arising from a use of `print' at <interactive>:1:0
     Possible fix: add an instance declaration for (Show (t -> a))
-    In a 'do' expression: print it
+    In a stmt of a 'do' expression: print it
