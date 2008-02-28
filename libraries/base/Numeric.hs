@@ -16,45 +16,45 @@
 
 module Numeric (
 
-	-- * Showing
+        -- * Showing
 
-	showSigned,       -- :: (Real a) => (a -> ShowS) -> Int -> a -> ShowS
+        showSigned,       -- :: (Real a) => (a -> ShowS) -> Int -> a -> ShowS
 
         showIntAtBase,    -- :: Integral a => a -> (a -> Char) -> a -> ShowS
-	showInt,          -- :: Integral a => a -> ShowS
+        showInt,          -- :: Integral a => a -> ShowS
         showHex,          -- :: Integral a => a -> ShowS
         showOct,          -- :: Integral a => a -> ShowS
 
-	showEFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
-	showFFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
-	showGFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
-	showFloat,        -- :: (RealFloat a) => a -> ShowS
+        showEFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
+        showFFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
+        showGFloat,       -- :: (RealFloat a) => Maybe Int -> a -> ShowS
+        showFloat,        -- :: (RealFloat a) => a -> ShowS
 
-	floatToDigits,    -- :: (RealFloat a) => Integer -> a -> ([Int], Int)
+        floatToDigits,    -- :: (RealFloat a) => Integer -> a -> ([Int], Int)
 
-	-- * Reading
+        -- * Reading
 
-	-- | /NB:/ 'readInt' is the \'dual\' of 'showIntAtBase',
-	-- and 'readDec' is the \`dual\' of 'showInt'.
-	-- The inconsistent naming is a historical accident.
+        -- | /NB:/ 'readInt' is the \'dual\' of 'showIntAtBase',
+        -- and 'readDec' is the \`dual\' of 'showInt'.
+        -- The inconsistent naming is a historical accident.
 
-	readSigned,       -- :: (Real a) => ReadS a -> ReadS a
+        readSigned,       -- :: (Real a) => ReadS a -> ReadS a
 
-	readInt,          -- :: (Integral a) => a -> (Char -> Bool)
-			  --         -> (Char -> Int) -> ReadS a
-	readDec,          -- :: (Integral a) => ReadS a
-	readOct,          -- :: (Integral a) => ReadS a
-	readHex,          -- :: (Integral a) => ReadS a
+        readInt,          -- :: (Integral a) => a -> (Char -> Bool)
+                          --         -> (Char -> Int) -> ReadS a
+        readDec,          -- :: (Integral a) => ReadS a
+        readOct,          -- :: (Integral a) => ReadS a
+        readHex,          -- :: (Integral a) => ReadS a
 
-	readFloat,        -- :: (RealFloat a) => ReadS a
-	
-	lexDigits,        -- :: ReadS String
+        readFloat,        -- :: (RealFloat a) => ReadS a
+        
+        lexDigits,        -- :: ReadS String
 
-	-- * Miscellaneous
+        -- * Miscellaneous
 
         fromRat,          -- :: (RealFloat a) => Rational -> a
 
-	) where
+        ) where
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
@@ -81,9 +81,9 @@ import Hugs.Numeric
 
 -- | Reads an /unsigned/ 'Integral' value in an arbitrary base.
 readInt :: Num a
-  => a			-- ^ the base
-  -> (Char -> Bool)	-- ^ a predicate distinguishing valid digits in this base
-  -> (Char -> Int)	-- ^ a function converting a valid digit character to an 'Int'
+  => a                  -- ^ the base
+  -> (Char -> Bool)     -- ^ a predicate distinguishing valid digits in this base
+  -> (Char -> Int)      -- ^ a function converting a valid digit character to an 'Int'
   -> ReadS a
 readInt base isDigit valDigit = readP_to_S (L.readIntP base isDigit valDigit)
 
@@ -120,15 +120,15 @@ readFloatP =
 -- | Reads a /signed/ 'Real' value, given a reader for an unsigned value.
 readSigned :: (Real a) => ReadS a -> ReadS a
 readSigned readPos = readParen False read'
-		     where read' r  = read'' r ++
-				      (do
-				        ("-",s) <- lex r
-					(x,t)   <- read'' s
-					return (-x,t))
-			   read'' r = do
-			       (str,s) <- lex r
-		      	       (n,"")  <- readPos str
-			       return (n,s)
+                     where read' r  = read'' r ++
+                                      (do
+                                        ("-",s) <- lex r
+                                        (x,t)   <- read'' s
+                                        return (-x,t))
+                           read'' r = do
+                               (str,s) <- lex r
+                               (n,"")  <- readPos str
+                               return (n,s)
 
 -- -----------------------------------------------------------------------------
 -- Showing
@@ -152,14 +152,14 @@ showInt n cs
 -- mutual module deps.
 
 {-# SPECIALIZE showEFloat ::
-	Maybe Int -> Float  -> ShowS,
-	Maybe Int -> Double -> ShowS #-}
+        Maybe Int -> Float  -> ShowS,
+        Maybe Int -> Double -> ShowS #-}
 {-# SPECIALIZE showFFloat ::
-	Maybe Int -> Float  -> ShowS,
-	Maybe Int -> Double -> ShowS #-}
+        Maybe Int -> Float  -> ShowS,
+        Maybe Int -> Double -> ShowS #-}
 {-# SPECIALIZE showGFloat ::
-	Maybe Int -> Float  -> ShowS,
-	Maybe Int -> Double -> ShowS #-}
+        Maybe Int -> Float  -> ShowS,
+        Maybe Int -> Double -> ShowS #-}
 
 -- | Show a signed 'RealFloat' value
 -- using scientific (exponential) notation (e.g. @2.45e2@, @1.5e-3@).
@@ -205,7 +205,7 @@ showIntAtBase base toChr n r
     showIt (n,d) r = seq c $ -- stricter than necessary
       case n of
         0 -> r'
-	_ -> showIt (quotRem n base) r'
+        _ -> showIt (quotRem n base) r'
      where
       c  = toChr (fromIntegral d) 
       r' = c : r
