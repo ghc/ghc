@@ -46,7 +46,7 @@ module GHC.Conc
 	, threadWaitWrite	-- :: Int -> IO ()
 
 	-- * MVars
-	, MVar		-- abstract
+	, MVar(..)
 	, newMVar 	-- :: a -> IO (MVar a)
 	, newEmptyMVar  -- :: IO (MVar a)
 	, takeMVar 	-- :: MVar a -> IO a
@@ -57,14 +57,14 @@ module GHC.Conc
 	, addMVarFinalizer -- :: MVar a -> IO () -> IO ()
 
    	-- * TVars
-	, STM           -- abstract
+	, STM(..)
 	, atomically    -- :: STM a -> IO a
 	, retry         -- :: STM a
 	, orElse        -- :: STM a -> STM a -> STM a
         , catchSTM      -- :: STM a -> (Exception -> STM a) -> STM a
 	, alwaysSucceeds -- :: STM a -> STM ()
 	, always        -- :: STM Bool -> STM ()
-	, TVar          -- abstract
+	, TVar(..)
 	, newTVar 	-- :: a -> STM (TVar a)
 	, newTVarIO 	-- :: a -> STM (TVar a)
 	, readTVar	-- :: TVar a -> STM a
