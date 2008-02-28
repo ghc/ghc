@@ -334,6 +334,7 @@ eq_RDR 			= nameRdrName eqName
 ge_RDR 			= nameRdrName geName
 ne_RDR 			= varQual_RDR  gHC_BASE FSLIT("/=")
 le_RDR 			= varQual_RDR  gHC_BASE FSLIT("<=") 
+lt_RDR 			= varQual_RDR  gHC_BASE FSLIT("<") 
 gt_RDR 			= varQual_RDR  gHC_BASE FSLIT(">")  
 compare_RDR		= varQual_RDR  gHC_BASE FSLIT("compare") 
 ltTag_RDR		= dataQual_RDR gHC_BASE FSLIT("LT") 

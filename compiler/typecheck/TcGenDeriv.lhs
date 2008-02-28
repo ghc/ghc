@@ -305,6 +305,10 @@ JJQC-30-Nov-1997
 gen_Ord_binds :: TyCon -> (LHsBinds RdrName, DerivAuxBinds)
 
 gen_Ord_binds tycon
+  | Just (con, prim_tc) <- primWrapperType_maybe tycon
+  = gen_PrimOrd_binds con prim_tc
+
+  | otherwise 
   = (unitBag compare, aux_binds)
  	-- `AndMonoBinds` compare	
 	-- The default declaration in PrelBase handles this
@@ -375,7 +379,58 @@ gen_Ord_binds tycon
 		in  careful_compare_Case tycon ty eq_expr (nlHsVar a) (nlHsVar b)
 
 	  nested_compare_expr _ _ _ = panic "nested_compare_expr"	-- Args always equal length
+\end{code}
 
+Note [Comparision of primitive types]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The general plan does not work well for data types like
+	data T = MkT Int# deriving( Ord )
+The general plan defines the 'compare' method, gets (<) etc from it.  But
+that means we get silly code like:
+   instance Ord T where
+     (>) (I# x) (I# y) = case <# x y of
+                            True -> False
+                            False -> case ==# x y of 
+                                       True  -> False
+                                       False -> True
+We would prefer to use the (>#) primop.  See also Trac #2130
+                            
+
+\begin{code}
+gen_PrimOrd_binds :: DataCon -> TyCon ->  (LHsBinds RdrName, DerivAuxBinds)
+-- See Note [Comparison of primitive types]
+gen_PrimOrd_binds data_con prim_tc 
+  = (listToBag [mk_op lt_RDR lt_op, mk_op le_RDR le_op, 
+	        mk_op ge_RDR ge_op, mk_op gt_RDR gt_op], [])
+  where
+    mk_op op_RDR op = mk_FunBind (getSrcSpan data_con) op_RDR 
+				 [([apat, bpat], genOpApp a_Expr (primOpRdrName op) b_Expr)]
+    con_RDR = getRdrName data_con
+    apat = nlConVarPat con_RDR [a_RDR]
+    bpat = nlConVarPat con_RDR [b_RDR]
+
+    (lt_op, le_op, ge_op, gt_op)
+       | prim_tc == charPrimTyCon   = (CharLtOp,   CharLeOp,   CharGeOp,   CharGtOp)
+       | prim_tc == intPrimTyCon    = (IntLtOp,    IntLeOp,    IntGeOp,    IntGtOp)
+       | prim_tc == wordPrimTyCon   = (WordLtOp,   WordLeOp,   WordGeOp,   WordGtOp)
+       | prim_tc == addrPrimTyCon   = (AddrLtOp,   AddrLeOp,   AddrGeOp,   AddrGtOp)
+       | prim_tc == floatPrimTyCon  = (FloatLtOp,  FloatLeOp,  FloatGeOp,  FloatGtOp)
+       | prim_tc == doublePrimTyCon = (DoubleLtOp, DoubleLeOp, DoubleGeOp, DoubleGtOp)
+       | otherwise = pprPanic "Unexpected primitive tycon" (ppr prim_tc)
+
+
+primWrapperType_maybe :: TyCon -> Maybe (DataCon, TyCon)
+-- True of data types that are wrappers around prmitive types
+-- 	data T = MkT Word#
+-- For these we want to generate all the (<), (<=) etc operations individually
+primWrapperType_maybe tc 
+  | [con] <- tyConDataCons tc
+  , [ty]  <- dataConOrigArgTys con
+  , Just (prim_tc, []) <- tcSplitTyConApp_maybe ty
+  , isPrimTyCon prim_tc
+  = Just (con, prim_tc)
+  | otherwise
+  = Nothing
 \end{code}
 
 %************************************************************************
@@ -1300,9 +1355,10 @@ careful_compare_Case tycon ty eq a b
   | not (isUnLiftedType ty)
   = compare_gen_Case eq a b
   | otherwise      -- We have to do something special for primitive things...
-  = nlHsIf (genOpApp a relevant_eq_op b)
-	 eq
-	 (nlHsIf (genOpApp a relevant_lt_op b) ltTag_Expr gtTag_Expr)
+  = nlHsIf (genOpApp a relevant_lt_op b)	-- Test (<) first, not (==), becuase the latter
+	   ltTag_Expr				-- is true less often, so putting it first would
+						-- mean more tests (dynamically)
+	   (nlHsIf (genOpApp a relevant_eq_op b) eq gtTag_Expr)
   where
     relevant_eq_op = primOpRdrName (assoc_ty_id "Ord" tycon eq_op_tbl ty)
     relevant_lt_op = primOpRdrName (assoc_ty_id "Ord" tycon lt_op_tbl ty)
