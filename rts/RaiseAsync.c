@@ -944,21 +944,12 @@ raiseAsync(Capability *cap, StgTSO *tso, StgClosure *exception,
 	    //	     printObj((StgClosure *)ap);
 	    //	);
 
-	    // Replace the updatee with an indirection
-	    //
-	    // Warning: if we're in a loop, more than one update frame on
-	    // the stack may point to the same object.  Be careful not to
-	    // overwrite an IND_OLDGEN in this case, because we'll screw
-	    // up the mutable lists.  To be on the safe side, don't
-	    // overwrite any kind of indirection at all.  See also
-	    // threadSqueezeStack in GC.c, where we have to make a similar
-	    // check.
-	    //
-	    if (!closure_IND(((StgUpdateFrame *)frame)->updatee)) {
-		// revert the black hole
-		UPD_IND_NOLOCK(((StgUpdateFrame *)frame)->updatee,
-			       (StgClosure *)ap);
-	    }
+            // Perform the update
+            // TODO: this may waste some work, if the thunk has
+            // already been updated by another thread.
+            UPD_IND_NOLOCK(((StgUpdateFrame *)frame)->updatee,
+                           (StgClosure *)ap);
+
 	    sp += sizeofW(StgUpdateFrame) - 1;
 	    sp[0] = (W_)ap; // push onto stack
 	    frame = sp + 1;

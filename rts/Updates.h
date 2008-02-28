@@ -280,8 +280,9 @@ no_slop:
   {								\
     bdescr *bd;							\
 								\
-    /* cas(p1, 0, &stg_WHITEHOLE_info); */			\
-    ASSERT( (P_)p1 != (P_)p2 && !closure_IND(p1) );		\
+    ASSERT( (P_)p1 != (P_)p2 );                                 \
+    /* not necessarily true: ASSERT( !closure_IND(p1) ); */     \
+    /* occurs in RaiseAsync.c:raiseAsync() */                   \
     DEBUG_FILL_SLOP(p1);					\
     LDV_RECORD_DEAD_FILL_SLOP_DYNAMIC(p1);			\
     ((StgInd *)p1)->indirectee = p2;				\
