@@ -541,13 +541,18 @@ fruitless allocations.  Essentially, whenever we see a list literal
    
    If fusion fails to occur then build will get inlined and (since we
    defined a RULE for foldr (:) []) we will get back exactly the
-   normal desugaring for an explicit list! However, if it does occur
-   then we can potentially save quite a bit of allocation (up to 25\%
-   of the total in some nofib programs!)
+   normal desugaring for an explicit list.
+
+This optimisation can be worth a lot: up to 25% of the total
+allocation in some nofib programs. Specifically
+
+        Program           Size    Allocs   Runtime  CompTime
+        rewrite          +0.0%    -26.3%      0.02     -1.8%
+           ansi          -0.3%    -13.8%      0.00     +0.0%
+           lift          +0.0%     -8.7%      0.00     -2.3%
 
 Of course, if rules aren't turned on then there is pretty much no
 point doing this fancy stuff, and it may even be harmful.
-
 \begin{code}
 
 dsExplicitList :: PostTcType -> [LHsExpr Id] -> DsM CoreExpr
