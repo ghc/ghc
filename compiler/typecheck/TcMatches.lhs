@@ -599,6 +599,6 @@ checkArgs fun other = panic "TcPat.checkArgs"	-- Matches always non-empty
 matchCtxt ctxt match  = hang (ptext SLIT("In") <+> pprMatchContext ctxt <> colon) 
 			   4 (pprMatch ctxt match)
 
-stmtCtxt ctxt stmt = hang (ptext SLIT("In") <+> pprStmtContext ctxt <> colon)
+stmtCtxt ctxt stmt = hang (ptext SLIT("In a stmt of") <+> pprStmtContext ctxt <> colon)
 		  	4 (ppr stmt)
 \end{code}
