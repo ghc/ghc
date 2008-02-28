@@ -930,8 +930,7 @@ tcSimplifyCheckPat loc co_vars qtvs givens wanteds
   = ASSERT( all isTcTyVar qtvs && all isSkolemTyVar qtvs )
     do	{ traceTc (text "tcSimplifyCheckPat")
       	; (irreds, binds) <- gentleCheckLoop loc givens wanteds
-	; implic_bind <- bindIrredsR loc qtvs co_vars emptyRefinement 
-				    givens irreds
+	; implic_bind <- bindIrredsR loc qtvs co_vars givens irreds
 	; return (binds `unionBags` implic_bind) }
 
 -----------------------------------------------------------
@@ -939,14 +938,13 @@ bindIrreds :: InstLoc -> [TcTyVar]
 	   -> [Inst] -> [Inst]
 	   -> TcM TcDictBinds
 bindIrreds loc qtvs givens irreds 
-  = bindIrredsR loc qtvs [] emptyRefinement givens irreds
+  = bindIrredsR loc qtvs [] givens irreds
 
-bindIrredsR :: InstLoc -> [TcTyVar] -> [CoVar]
-	    -> Refinement -> [Inst] -> [Inst]
+bindIrredsR :: InstLoc -> [TcTyVar] -> [CoVar] -> [Inst] -> [Inst]
 	    -> TcM TcDictBinds	
 -- Make a binding that binds 'irreds', by generating an implication
 -- constraint for them, *and* throwing the constraint into the LIE
-bindIrredsR loc qtvs co_vars reft givens irreds
+bindIrredsR loc qtvs co_vars givens irreds
   | null irreds
   = return emptyBag
   | otherwise
@@ -956,11 +954,10 @@ bindIrredsR loc qtvs co_vars reft givens irreds
 		-- There should be no implicadtion constraints
 		-- See Note [Pruning the givens in an implication constraint]
 
-	   -- If there are no 'givens' *and* the refinement is empty
-	   -- (the refinement is like more givens), then it's safe to 
+	   -- If there are no 'givens', then it's safe to 
 	   -- partition the 'wanteds' by their qtvs, thereby trimming irreds
 	   -- See Note [Freeness and implications]
-	; irreds' <- if null givens' && isEmptyRefinement reft
+	; irreds' <- if null givens'
 	     	     then do
 	     	    	{ let qtv_set = mkVarSet qtvs
 	     	    	      (frees, real_irreds) = partition (isFreeWrtTyVars qtv_set) irreds
@@ -969,14 +966,14 @@ bindIrredsR loc qtvs co_vars reft givens irreds
 	     	     else return irreds
 	
 	; let all_tvs = qtvs ++ co_vars	-- Abstract over all these
-	; (implics, bind) <- makeImplicationBind loc all_tvs reft givens' irreds'
+	; (implics, bind) <- makeImplicationBind loc all_tvs givens' irreds'
 			-- This call does the real work
 			-- If irreds' is empty, it does something sensible
 	; extendLIEs implics
 	; return bind } 
 
 
-makeImplicationBind :: InstLoc -> [TcTyVar] -> Refinement
+makeImplicationBind :: InstLoc -> [TcTyVar]
 		    -> [Inst] -> [Inst]
 		    -> TcM ([Inst], TcDictBinds)
 -- Make a binding that binds 'irreds', by generating an implication
@@ -988,7 +985,7 @@ makeImplicationBind :: InstLoc -> [TcTyVar] -> Refinement
 -- qtvs includes coercion variables
 --
 -- This binding must line up the 'rhs' in reduceImplication
-makeImplicationBind loc all_tvs reft
+makeImplicationBind loc all_tvs
 		    givens 	-- Guaranteed all Dicts
 				-- or EqInsts
 		    irreds
@@ -1003,7 +1000,7 @@ makeImplicationBind loc all_tvs reft
 		-- 'givens' must be a simple CoVar.  This MUST be cleaned up.
 
 	; let name = mkInternalName uniq (mkVarOcc "ic") span
-	      implic_inst = ImplicInst { tci_name = name, tci_reft = reft,
+	      implic_inst = ImplicInst { tci_name = name, tci_reft = emptyRefinement,
 					 tci_tyvars = all_tvs, 
 					 tci_given = (eq_givens ++ dict_givens),
 					 tci_wanted = irreds, tci_loc = loc }
@@ -1664,8 +1661,6 @@ data RedEnv
 	   , red_givens :: [Inst]		-- All guaranteed rigid
 						-- Always dicts
 						-- but see Note [Rigidity]
-	   , red_reft :: Refinement		-- The refinement to apply to the 'givens'
-						-- You should think of it as 'given equalities'
 	   , red_stack  :: (Int, [Inst])	-- Recursion stack (for err msg)
 						-- See Note [RedStack]
   }
@@ -1688,7 +1683,6 @@ mkRedEnv :: SDoc -> (Inst -> WhatToDo) -> [Inst] -> RedEnv
 mkRedEnv doc try_me givens
   = RedEnv { red_doc = doc, red_try_me = try_me,
 	     red_givens = givens, 
-	     red_reft = emptyRefinement,
 	     red_stack = (0,[]),
 	     red_improve = True }	
 
@@ -1696,7 +1690,7 @@ mkNoImproveRedEnv :: SDoc -> (Inst -> WhatToDo) -> RedEnv
 -- Do not do improvement; no givens
 mkNoImproveRedEnv doc try_me
   = RedEnv { red_doc = doc, red_try_me = try_me,
-	     red_givens = [], red_reft = emptyRefinement,
+	     red_givens = [], 
 	     red_stack = (0,[]),
 	     red_improve = True }	
 
@@ -1782,13 +1776,10 @@ reduceContext env wanteds
                                                             given_dicts0
 
           -- 5. Build the Avail mapping from "given_dicts"
-	  --    Add dicts refined by the current type refinement
 	; (init_state, extra_givens) <- getLIE $ do 
 		{ init_state <- foldlM addGiven emptyAvails given_dicts
-		; let reft = red_reft env
-		; if isEmptyRefinement reft then return init_state
-		  else foldlM (addRefinedGiven reft)
-				    init_state given_dicts }
+		; return init_state
+                }
 
 	-- *** ToDo: what to do with the "extra_givens"?  For the
 	-- moment I'm simply discarding them, which is probably wrong
@@ -2117,13 +2108,10 @@ reduceImplication :: RedEnv
 
 Suppose we are simplifying the constraint
 	forall bs. extras => wanted
-in the context of an overall simplification problem with givens 'givens',
-and refinment 'reft'.
+in the context of an overall simplification problem with givens 'givens'.
 
 Note that
-  * The refinement is often empty
-
-  * The 'extra givens' need not mention any of the quantified type variables
+  * The 'givens' need not mention any of the quantified type variables
 	e.g. 	forall {}. Eq a => Eq [a]
 		forall {}. C Int => D (Tree Int)
 
@@ -2149,27 +2137,20 @@ Note that
 	--
 reduceImplication env
 	orig_implic@(ImplicInst { tci_name = name, tci_loc = inst_loc,
-		      	   	  tci_tyvars = tvs, tci_reft = reft,
+		      	   	  tci_tyvars = tvs, tci_reft = emptyRefinement,
 		      	   	  tci_given = extra_givens, tci_wanted = wanteds })
-  = do	{ 	-- Add refined givens, and the extra givens
-		-- Todo fix this 
---	  (refined_red_givens,refined_avails)
---		<- if isEmptyRefinement reft then return (red_givens env,orig_avails)
---		   else foldlM (addRefinedGiven reft) ([],orig_avails) (red_givens env)
---	Commented out SLPJ Sept 07; see comment with extractLocalResults below
-	  let refined_red_givens = []
-
-		-- Solve the sub-problem
-	; let try_me inst = ReduceMe AddSCs	-- Note [Freeness and implications]
+  = do	{ 	-- Solve the sub-problem
+	; let try_me inst = ReduceMe AddSCs  -- Note [Freeness and implications]
 	      env' = env { red_givens = extra_givens ++ red_givens env
-			 , red_reft = reft
-			 , red_doc = sep [ptext SLIT("reduceImplication for") <+> ppr name,
-					  nest 2 (parens $ ptext SLIT("within") <+> red_doc env)]
+			 , red_doc = sep [ptext SLIT("reduceImplication for") 
+                                            <+> ppr name,
+					  nest 2 (parens $ ptext SLIT("within")
+                                                           <+> red_doc env)]
 			 , red_try_me = try_me }
 
 	; traceTc (text "reduceImplication" <+> vcat
 			[ ppr (red_givens env), ppr extra_givens, 
-			  ppr reft, ppr wanteds])
+			  ppr wanteds])
 	; (irreds, binds) <- checkLoop env' wanteds
 	; let   (extra_eq_givens, extra_dict_givens) = partition isEqInst extra_givens
 			-- SLPJ Sept 07: I think this is bogus; currently
@@ -2198,11 +2179,12 @@ reduceImplication env
 		-- If there are any irreds, we back off and do nothing
 		return (emptyBag, [orig_implic])
 	  else do
-	{ (simpler_implic_insts, bind) <- makeImplicationBind inst_loc tvs reft extra_givens irreds
-			-- This binding is useless if the recursive simplification
-			-- made no progress; but currently we don't try to optimise that
-			-- case.  After all, we only try hard to reduce at top level, or
-			-- when inferring types.
+	{ (simpler_implic_insts, bind) 
+            <- makeImplicationBind inst_loc tvs extra_givens irreds
+		-- This binding is useless if the recursive simplification
+		-- made no progress; but currently we don't try to optimise that
+		-- case.  After all, we only try hard to reduce at top level, or
+		-- when inferring types.
 
 	; let	dict_wanteds = filter (not . isEqInst) wanteds
 		-- TOMDO: given equational constraints bug!
@@ -2446,45 +2428,7 @@ addGiven avails given = addAvailAndSCs AddSCs avails given (Given given)
 	-- No ASSERT( not (given `elemAvails` avails) ) because in an instance
 	-- decl for Ord t we can add both Ord t and Eq t as 'givens', 
 	-- so the assert isn't true
-
-addRefinedGiven :: Refinement -> Avails -> Inst -> TcM Avails
-addRefinedGiven reft avails given
-  | isDict given	-- We sometimes have 'given' methods, but they
-			-- are always optional, so we can drop them
-  , let pred = dictPred given
-  , isRefineablePred pred	-- See Note [ImplicInst rigidity]
-  , Just (co, pred) <- refinePred reft pred
-  = do 	{ new_given <- newDictBndr (instLoc given) pred
-	; let rhs = L (instSpan given) $
-		    HsWrap (WpCo co) (HsVar (instToId given))
-	; addAvailAndSCs AddSCs avails new_given (Rhs rhs [given]) }
-	    -- ToDo: the superclasses of the original given all exist in Avails 
-	    -- so we could really just cast them, but it's more awkward to do,
-	    -- and hopefully the optimiser will spot the duplicated work
-  | otherwise
-  = return avails
 \end{code}
-
-Note [ImplicInst rigidity]
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-Consider
-	C :: forall ab. (Eq a, Ord b) => b -> T a
-	
-	...(case x of C v -> <body>)...
-
-From the case (where x::T ty) we'll get an implication constraint
-	forall b. (Eq ty, Ord b) => <body-constraints>
-Now suppose <body-constraints> itself has an implication constraint 
-of form
-	forall c. <reft> => <payload>
-Then, we can certainly apply the refinement <reft> to the Ord b, becuase it is
-existential, but we probably should not apply it to the (Eq ty) because it may
-be wobbly. Hence the isRigidInst
-
-@Insts@ are ordered by their class/type info, rather than by their
-unique.  This allows the context-reduction mechanism to use standard finite
-maps to do their stuff.  It's horrible that this code is here, rather
-than with the Avails handling stuff in TcSimplify
 
 \begin{code}
 addIrred :: WantSCs -> Avails -> Inst -> TcM Avails
