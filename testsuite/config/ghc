@@ -36,8 +36,6 @@ if (ghc_with_profiling == 1):
 	if (ghc_with_native_codegen == 1):
 		config.compile_ways.append('profasm')
 		config.run_ways.append('profasm')
-        if (ghc_with_threaded_rts == 1):
-		config.run_ways.append('profthreaded')
 
 if (ghc_with_interpreter == 1):
 	config.run_ways.append('ghci')
@@ -100,3 +98,9 @@ def get_compiler_info():
     config.compiler_version = v[0]
     config.compiler_maj_version = re.sub('^([0-9]+\.[0-9]+).*',r'\1', v[0])
     config.compiler_tags = v[1:]
+
+    # enable profthreaded only for GHC 6.9+ with profiling & threaded RTS:
+    if version_ge(config.compiler_version, '6.9') \
+          and ghc_with_profiling == 1 \
+          and ghc_with_threaded_rts == 1:
+        config.run_ways.append('profthreaded')
