@@ -36,7 +36,6 @@ import TcRnMonad
 import Inst
 import TcEnv
 import InstEnv
-import TcGadt
 import TcType
 import TcMType
 import TcIface
@@ -921,16 +920,15 @@ tcSimplifyCheck loc qtvs givens wanteds
 -----------------------------------------------------------
 -- tcSimplifyCheckPat is used for existential pattern match
 tcSimplifyCheckPat :: InstLoc
-	 	   -> [CoVar]
 	 	   -> [TcTyVar]		-- Quantify over these
 	 	   -> [Inst]		-- Given
 	 	   -> [Inst]		-- Wanted
 	 	   -> TcM TcDictBinds	-- Bindings
-tcSimplifyCheckPat loc co_vars qtvs givens wanteds
+tcSimplifyCheckPat loc qtvs givens wanteds
   = ASSERT( all isTcTyVar qtvs && all isSkolemTyVar qtvs )
     do	{ traceTc (text "tcSimplifyCheckPat")
       	; (irreds, binds) <- gentleCheckLoop loc givens wanteds
-	; implic_bind <- bindIrredsR loc qtvs co_vars givens irreds
+	; implic_bind <- bindIrredsR loc qtvs givens irreds
 	; return (binds `unionBags` implic_bind) }
 
 -----------------------------------------------------------
@@ -938,13 +936,12 @@ bindIrreds :: InstLoc -> [TcTyVar]
 	   -> [Inst] -> [Inst]
 	   -> TcM TcDictBinds
 bindIrreds loc qtvs givens irreds 
-  = bindIrredsR loc qtvs [] givens irreds
+  = bindIrredsR loc qtvs givens irreds
 
-bindIrredsR :: InstLoc -> [TcTyVar] -> [CoVar] -> [Inst] -> [Inst]
-	    -> TcM TcDictBinds	
+bindIrredsR :: InstLoc -> [TcTyVar] -> [Inst] -> [Inst] -> TcM TcDictBinds	
 -- Make a binding that binds 'irreds', by generating an implication
 -- constraint for them, *and* throwing the constraint into the LIE
-bindIrredsR loc qtvs co_vars givens irreds
+bindIrredsR loc qtvs givens irreds
   | null irreds
   = return emptyBag
   | otherwise
@@ -965,8 +962,7 @@ bindIrredsR loc qtvs co_vars givens irreds
 	     	    	; return real_irreds }
 	     	     else return irreds
 	
-	; let all_tvs = qtvs ++ co_vars	-- Abstract over all these
-	; (implics, bind) <- makeImplicationBind loc all_tvs givens' irreds'
+	; (implics, bind) <- makeImplicationBind loc qtvs givens' irreds'
 			-- This call does the real work
 			-- If irreds' is empty, it does something sensible
 	; extendLIEs implics
@@ -1000,7 +996,7 @@ makeImplicationBind loc all_tvs
 		-- 'givens' must be a simple CoVar.  This MUST be cleaned up.
 
 	; let name = mkInternalName uniq (mkVarOcc "ic") span
-	      implic_inst = ImplicInst { tci_name = name, tci_reft = emptyRefinement,
+	      implic_inst = ImplicInst { tci_name = name,
 					 tci_tyvars = all_tvs, 
 					 tci_given = (eq_givens ++ dict_givens),
 					 tci_wanted = irreds, tci_loc = loc }
@@ -2137,7 +2133,7 @@ Note that
 	--
 reduceImplication env
 	orig_implic@(ImplicInst { tci_name = name, tci_loc = inst_loc,
-		      	   	  tci_tyvars = tvs, tci_reft = emptyRefinement,
+		      	   	  tci_tyvars = tvs,
 		      	   	  tci_given = extra_givens, tci_wanted = wanteds })
   = do	{ 	-- Solve the sub-problem
 	; let try_me inst = ReduceMe AddSCs  -- Note [Freeness and implications]

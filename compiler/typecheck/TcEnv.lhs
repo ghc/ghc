@@ -35,7 +35,6 @@ module TcEnv(
 	tcLookupId, tcLookupTyVar, getScopedTyVarBinds,
 	lclEnvElts, getInLocalScope, findGlobals, 
 	wrongThingErr, pprBinders,
-	refineEnvironment,
 
 	tcExtendRecEnv,    	-- For knot-tying
 
@@ -61,7 +60,6 @@ import IfaceEnv
 import TcRnMonad
 import TcMType
 import TcType
-import TcGadt
 -- import TcSuspension
 import qualified Type
 import Var
@@ -450,38 +448,6 @@ find_thing ignore_it tidy_env (ATyVar tv ty) = do
        return (tidy_env1, Just msg)
 
 find_thing _ _ thing = pprPanic "find_thing" (ppr thing)
-\end{code}
-
-\begin{code}
-refineEnvironment 
-	:: Refinement 
-	-> Bool			-- whether type equations are involved
-	-> TcM a 
-	-> TcM a
--- I don't think I have to refine the set of global type variables in scope
--- Reason: the refinement never increases that set
-refineEnvironment reft otherEquations thing_inside
-  | isEmptyRefinement reft 	-- Common case
-  , not otherEquations
-  = thing_inside
-  | otherwise
-  = do	{ env <- getLclEnv
-	; let le' = mapNameEnv refine (tcl_env env)
- 	; setLclEnv (env {tcl_env = le'}) thing_inside }
-  where
-    refine elt@(ATcId { tct_co = Rigid co, tct_type = ty })
-	| Just (co', ty') <- refineType reft ty
-	= elt { tct_co = Rigid (WpCo co' <.> co), tct_type = ty' }
-    refine elt@(ATcId { tct_co = Wobbly})
--- Main new idea: make wobbly things invisible whenever there 
---		  is a refinement of any sort
---	| otherEquations
-	= elt { tct_co = WobblyInvisible}
-    refine (ATyVar tv ty) 
-	| Just (_, ty') <- refineType reft ty
-	= ATyVar tv ty'	-- Ignore the coercion that refineType returns
-
-    refine elt = elt	-- Common case
 \end{code}
 
 %************************************************************************

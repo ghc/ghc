@@ -25,7 +25,6 @@ import {-# SOURCE #-}	TcExpr( tcSyntaxOp, tcInferRho, tcMonoExpr, tcPolyExpr )
 
 import HsSyn
 import TcRnMonad
-import TcGadt
 import Inst
 import TcEnv
 import TcPat

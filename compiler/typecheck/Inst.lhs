@@ -603,15 +603,13 @@ pprInst i@(EqInst {tci_left = ty1, tci_right = ty2, tci_co = co})
 		(\covar -> text "Wanted" <+> ppr (TyVarTy covar) <+> dcolon <+> ppr (EqPred ty1 ty2))
 		(\co    -> text "Given"  <+> ppr co              <+> dcolon <+> ppr (EqPred ty1 ty2))
 pprInst inst = ppr name <> braces (pprUnique (getUnique name)) <+> dcolon 
-		<+> (braces (ppr (instType inst) <> implicWantedEqs) $$
-		     ifPprDebug implic_stuff)
+		<+> braces (ppr (instType inst) <> implicWantedEqs)
   where
     name = instName inst
-    (implic_stuff, implicWantedEqs) 
-      | isImplicInst inst = (ppr (tci_reft inst),
-                            text " &" <+> 
-                            ppr (filter isEqInst (tci_wanted inst)))
-      | otherwise	  = (empty, empty)
+    implicWantedEqs
+      | isImplicInst inst = text " &" <+> 
+                            ppr (filter isEqInst (tci_wanted inst))
+      | otherwise	  = empty
 
 pprInstInFull inst@(EqInst {}) = pprInst inst
 pprInstInFull inst = sep [quotes (pprInst inst), nest 2 (pprInstArising inst)]

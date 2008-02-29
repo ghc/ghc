@@ -85,7 +85,6 @@ import DataCon
 import TcHsType
 import TcMType
 import TcMatches
-import TcGadt
 import RnTypes
 import RnExpr
 import IfaceEnv

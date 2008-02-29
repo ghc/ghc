@@ -656,7 +656,6 @@ mkRecordSelId tycon field_label
         --              T1 b' (c : [b]=[b']) (x:Maybe b') 
         --                      -> x `cast` Maybe (sym (right c))
 
-
                 -- Generate the refinement for b'=b, 
                 -- and apply to (Maybe b'), to get (Maybe b)
         Succeeded refinement = gadtRefine emptyRefinement ex_tvs co_tvs

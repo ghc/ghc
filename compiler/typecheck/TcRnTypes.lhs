@@ -53,7 +53,6 @@ import Packages
 import Type
 import Coercion
 import TcType
-import TcGadt
 import InstEnv
 import FamInstEnv
 import IOEnv
@@ -632,7 +631,7 @@ type Int, represented by
 	Method 34 doubleId [Int] origin
 
 In addition to the basic Haskell variants of 'Inst's, they can now also
-represent implication constraints 'forall tvs. (reft, given) => wanted'
+represent implication constraints 'forall tvs. given => wanted'
 and equality constraints 'co :: ty1 ~ ty2'.
 
 NB: Equalities occur in two flavours:
@@ -655,12 +654,9 @@ data Inst
     }
 
   | ImplicInst {	-- An implication constraint
-			-- forall tvs. (reft, given) => wanted
+			-- forall tvs. given => wanted
 	tci_name   :: Name,
 	tci_tyvars :: [TcTyVar],    -- Quantified type variables
-				    -- Includes coercion variables
-				    --   mentioned in tci_reft
-	tci_reft   :: Refinement,
 	tci_given  :: [Inst],	    -- Only Dicts and EqInsts
 				    --   (no Methods, LitInsts, ImplicInsts)
 	tci_wanted :: [Inst],	    -- Only Dicts, EqInst, and ImplicInsts
@@ -668,9 +664,7 @@ data Inst
 
 	tci_loc    :: InstLoc
     }
-	-- NB: the tci_given are not necessarily rigid,
-	--     although they will be if the tci_reft is non-trivial
-	-- NB: the tci_reft is already applied to tci_given and tci_wanted
+	-- NB: the tci_given are not necessarily rigid
 
   | Method {
 	tci_id :: TcId,		-- The Id for the Inst

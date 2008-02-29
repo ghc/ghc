@@ -36,7 +36,6 @@ import VarSet
 import TcUnify
 import TcHsType
 import TysWiredIn
-import TcGadt
 import Type
 import Coercion
 import StaticFlags
@@ -670,7 +669,7 @@ tcConPat pstate con_span data_con tycon pat_ty arg_pats thing_inside
 
 	; loc <- getInstLoc origin
 	; dicts <- newDictBndrs loc theta'
-	; dict_binds <- tcSimplifyCheckPat loc [] ex_tvs' dicts lie_req
+	; dict_binds <- tcSimplifyCheckPat loc ex_tvs' dicts lie_req
 
         ; let res_pat = ConPatOut { pat_con = L con_span data_con, 
 			            pat_tvs = ex_tvs',

@@ -27,7 +27,6 @@ import TcType
 import TcMType
 import TcBinds
 import TcSimplify
-import TcGadt
 import TcPat
 import TcUnify
 import TcRnMonad

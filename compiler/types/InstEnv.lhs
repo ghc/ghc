@@ -370,7 +370,7 @@ extendInstEnv inst_env ins_item@(Instance { is_cls = cls_nm, is_tcs = mb_tcs })
     add (ClsIE cur_insts cur_tyvar) _ = ClsIE (ins_item : cur_insts)
 					      (ins_tyvar || cur_tyvar)
     ins_tyvar = not (any isJust mb_tcs)
-\end{code}		      
+\end{code}
 
 
 %************************************************************************
@@ -483,7 +483,7 @@ lookupInstEnv (pkg_ie, home_ie) cls tys
 		-- They shouldn't because we allocate separate uniques for them
         case tcUnifyTys bind_fn tpl_tys tys of
 	    Just _   -> find ms (item:us) rest
-	    Nothing  -> find ms us	   rest
+	    Nothing  -> find ms us	  rest
 
 ---------------
 bind_fn :: TyVar -> BindFlag
