@@ -46,11 +46,8 @@ denounce:
 ifneq "$(GREPPED_PATH)" ""
 	@echo To use, add $(bindir) to your PATH.
 	@echo
-endif
-	@if test -f share/html/index.html; then \
+	@if test -f $(htmldir)/index.html; then \
 	   echo For documentation, see $(htmldir)/index.html ; \
-	elif test -d share/html ; then \
-	   echo Docs can be found in $(htmldir). ; \
 	else \
 	   echo "Warning: this binary distribution does NOT contain documentation!" ; \
 	fi
