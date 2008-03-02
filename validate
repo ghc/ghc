@@ -1,10 +1,10 @@
 #!/bin/sh
 
 # Flags:
-#   --no-clean:      don't make clean first, just carry on from
-#                    a previous interrupted validation run
-#   --testuite-only: don't build the compiler, just run
-#                    the test suite
+#   --no-clean:       don't make clean first, just carry on from
+#                     a previous interrupted validation run
+#   --testsuite-only: don't build the compiler, just run
+#                     the test suite
 
 set -e
 
