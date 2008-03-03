@@ -594,8 +594,8 @@ mkRecordSelId tycon field_label
         -- Allocate Ids.  We do it a funny way round because field_dict_tys is
         -- almost always empty.  Also note that we use max_dict_tys
         -- rather than n_dict_tys, because the latter gives an infinite loop:
-        -- n_dict tys depends on the_alts, which depens on arg_ids, which depends
-        -- on arity, which depends on n_dict tys.  Sigh!  Mega sigh!
+        -- n_dict tys depends on the_alts, which depens on arg_ids, which 
+        -- depends on arity, which depends on n_dict tys.  Sigh!  Mega sigh!
     stupid_dict_ids  = mkTemplateLocalsNum 1 stupid_dict_tys
     max_stupid_dicts = length (tyConStupidTheta tycon)
     field_dict_base  = max_stupid_dicts + 1
@@ -638,13 +638,15 @@ mkRecordSelId tycon field_label
         --      foo :: forall a. T -> a -> a
         --      foo = /\a. \t:T. case t of { MkT f -> f a }
 
-    mk_alt data_con 
-      =   ASSERT2( data_ty `tcEqType` field_ty, ppr data_con $$ ppr data_ty $$ ppr field_ty )
+    mk_alt data_con
+      =   ASSERT2( data_ty `tcEqType` field_ty, 
+                   ppr data_con $$ ppr data_ty $$ ppr field_ty )
           mkReboxingAlt rebox_uniqs data_con (ex_tvs ++ co_tvs ++ arg_vs) rhs
       where
            -- get pattern binders with types appropriately instantiated
         arg_uniqs = map mkBuiltinUnique [arg_base..]
-        (ex_tvs, co_tvs, arg_vs) = dataConOrigInstPat arg_uniqs data_con scrut_ty_args
+        (ex_tvs, co_tvs, arg_vs) = dataConOrigInstPat arg_uniqs data_con 
+                                                      scrut_ty_args
 
         rebox_base  = arg_base + length ex_tvs + length co_tvs + length arg_vs
         rebox_uniqs = map mkBuiltinUnique [rebox_base..]
@@ -658,14 +660,16 @@ mkRecordSelId tycon field_label
 
                 -- Generate the refinement for b'=b, 
                 -- and apply to (Maybe b'), to get (Maybe b)
-        Succeeded refinement = gadtRefine emptyRefinement ex_tvs co_tvs
-        the_arg_id_ty = idType the_arg_id
-        (rhs, data_ty) = case refineType refinement the_arg_id_ty of
-                          Just (co, data_ty) -> (Cast (Var the_arg_id) co, data_ty)
-                          Nothing            -> (Var the_arg_id, the_arg_id_ty)
+        reft           = matchRefine co_tvs
+        the_arg_id_ty  = idType the_arg_id
+        (rhs, data_ty) = 
+          case refineType reft the_arg_id_ty of
+            Just (co, data_ty) -> (Cast (Var the_arg_id) co, data_ty)
+            Nothing            -> (Var the_arg_id, the_arg_id_ty)
 
         field_vs    = filter (not . isPredTy . idType) arg_vs 
-        the_arg_id  = assoc "mkRecordSelId:mk_alt" (field_lbls `zip` field_vs) field_label
+        the_arg_id  = assoc "mkRecordSelId:mk_alt" 
+                            (field_lbls `zip` field_vs) field_label
         field_lbls  = dataConFieldLabels data_con
 
     error_expr = mkRuntimeErrorApp rEC_SEL_ERROR_ID field_ty full_msg

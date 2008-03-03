@@ -10,16 +10,9 @@
 %************************************************************************
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TcGadt (
 	Refinement, emptyRefinement, isEmptyRefinement, 
-	gadtRefine, 
+	matchRefine, 
 	refineType, refinePred, refineResType,
 	tcUnifyTys, BindFlag(..)
   ) where
@@ -39,7 +32,6 @@ import Maybes
 import Control.Monad
 import Outputable
 import TcType
-import Unique
 import UniqFM
 import FastString
 \end{code}
@@ -59,7 +51,7 @@ type InternalReft = TyVarEnv (Coercion, Type)
 -- Not necessarily idemopotent
 
 instance Outputable Refinement where
-  ppr (Reft in_scope env)
+  ppr (Reft _in_scope env)
     = ptext SLIT("Refinement") <+>
         braces (ppr env)
 
@@ -109,85 +101,72 @@ refineResType reft ty
 
 %************************************************************************
 %*									*
-		Generating a type refinement
+		Simple generation of a type refinement
 %*									*
 %************************************************************************
 
 \begin{code}
-gadtRefine :: Refinement
-	   -> [TyVar] 	-- Bind these by preference
-	   -> [CoVar]
-	   -> MaybeErr Message Refinement
+matchRefine :: [CoVar] -> Refinement
 \end{code}
 
-(gadtRefine cvs) takes a list of coercion variables, and returns a
-list of coercions, obtained by unifying the types equated by the
-incoming coercions.  The returned coercions all have kinds of form
-(a:=:ty), where a is a rigid type variable.
+Given a list of coercions, where for each coercion c::(ty1~ty2), the type ty2
+is a specialisation of ty1, produce a type refinement that maps the variables
+of ty1 to the corresponding sub-terms of ty2 using appropriate coercions; eg,
 
-Example:
-  gadtRefine [c :: (a,Int):=:(Bool,b)]
-  = [ right (left c) :: a:=:Bool,	
-      sym (right c)  :: b:=:Int ]
+  matchRefine (co :: [(a, b)] ~ [(c, Maybe d)])
+    = { right (left (right co)) :: a ~ c
+      , right (right co)        :: b ~ Maybe d
+      }
 
-That is, given evidence 'c' that (a,Int)=(Bool,b), it returns derived
-evidence in easy-to-use form.  In particular, given any e::ty, we know 
-that:
-	e `cast` ty[right (left c)/a, sym (right c)/b]
-	:: ty [Bool/a, Int/b]
-      
-Two refinements:
+Precondition: The rhs types must indeed be a specialisation of the lhs types;
+  i.e., some free variables of the lhs are replaced with either distinct free 
+  variables or proper type terms to obtain the rhs.  (We don't perform full
+  unification or type matching here!)
 
-- It can fail, if the coercion is unsatisfiable.
-
-- It's biased, by being given a set of type variables to bind
-  when there is a choice. Example:
-	MkT :: forall a. a -> T [a]
-	f :: forall b. T [b] -> b
-	f x = let v = case x of { MkT y -> y }
-	      in ...
-  Here we want to bind [a->b], not the other way round, because
-  in this example the return type is wobbly, and we want the
-  program to typecheck
-
-
--- E.g. (a, Bool, right (left c))
--- INVARIANT: in the triple (tv, ty, co), we have (co :: tv:=:ty)
--- The result is idempotent: the 
+NB: matchRefine does *not* expand the type synonyms.
 
 \begin{code}
-gadtRefine (Reft in_scope env1) 
-	   ex_tvs co_vars
--- Precondition: fvs( co_vars ) # env1
--- That is, the kinds of the co_vars are a
--- fixed point of the incoming refinement
-
-  = ASSERT2( not $ any (`elemVarEnv` env1) (varSetElems $ tyVarsOfTypes $ map tyVarKind co_vars),
-	     ppr env1 $$ ppr co_vars $$ ppr (map tyVarKind co_vars) )
-    initUM (tryToBind tv_set) $
-    do	{ 	-- Run the unifier, starting with an empty env
-	; env2 <- foldM do_one emptyInternalReft co_vars
-
-		-- Find the fixed point of the resulting 
-		-- non-idempotent substitution
-	; let tmp_env = env1 `plusVarEnv` env2
-              out_env = fixTvCoEnv in_scope' tmp_env
-	; WARN( not (null (badReftElts tmp_env)), ppr (badReftElts tmp_env) $$ ppr tmp_env )
-	  WARN( not (null (badReftElts out_env)), ppr (badReftElts out_env) $$ ppr out_env )
-	  return (Reft in_scope' out_env) }
+matchRefine co_vars 
+  = Reft in_scope (foldr plusVarEnv emptyVarEnv (map refineOne co_vars))
   where
-    tv_set = mkVarSet ex_tvs
-    in_scope' = foldr extend in_scope co_vars
+    in_scope = foldr extend emptyInScopeSet co_vars
 
 	-- For each co_var, add it *and* the tyvars it mentions, to in_scope
     extend co_var in_scope
-	= extendInScopeSetSet in_scope $
+      = extendInScopeSetSet in_scope $
 	  extendVarSet (tyVarsOfType (tyVarKind co_var)) co_var
-	
-    do_one reft co_var = unify reft (TyVarTy co_var) ty1 ty2
-	where
-	   (ty1,ty2) = splitCoercionKind (tyVarKind co_var)
+
+    refineOne co_var = refine (TyVarTy co_var) ty1 ty2
+      where
+        (ty1, ty2) = splitCoercionKind (tyVarKind co_var)
+
+    refine co (TyVarTy tv) ty                     = unitVarEnv tv (co, ty)
+    refine co (TyConApp _ tys) (TyConApp _ tys')  = refineArgs co tys tys'
+    refine co (NoteTy _ ty) ty'                   = refine co ty ty'
+    refine co ty (NoteTy _ ty')                   = refine co ty ty'
+    refine _  (PredTy _) (PredTy _)               = 
+      error "TcGadt.matchRefine: PredTy"
+    refine co (FunTy arg res) (FunTy arg' res')   =
+      refine (mkRightCoercion (mkLeftCoercion co)) arg arg' 
+      `plusVarEnv` 
+      refine (mkRightCoercion co) res res'
+    refine co (AppTy fun arg) (AppTy fun' arg')   = 
+      refine (mkLeftCoercion co) fun fun' 
+      `plusVarEnv`
+      refine (mkRightCoercion co) arg arg'
+    refine co (ForAllTy tv ty) (ForAllTy _tv ty') =
+      refine (mkForAllCoercion tv co) ty ty' `delVarEnv` tv
+    refine _ _ _ = error "RcGadt.matchRefine: mismatch"
+
+    refineArgs :: Coercion -> [Type] -> [Type] -> InternalReft
+    refineArgs co tys tys' = 
+      fst $ foldr refineArg (emptyVarEnv, id) (zip tys tys')
+      where
+        refineArg (ty, ty') (reft, coWrapper) 
+          = (refine (mkRightCoercion (coWrapper co)) ty ty' `plusVarEnv` reft, 
+             mkLeftCoercion . coWrapper)
 \end{code}
+
 
 %************************************************************************
 %*									*
@@ -221,23 +200,6 @@ tcUnifyTys bind_fn tys1 tys2
 
 
 ----------------------------
-fixTvCoEnv :: InScopeSet -> InternalReft -> InternalReft
-	-- Find the fixed point of a Refinement
-	-- (assuming it has no loops!)
-fixTvCoEnv in_scope env
-  = fixpt
-  where
-    fixpt         = mapVarEnv step env
-
-    step (co, ty) = case refineType (Reft in_scope fixpt) ty of
-			Nothing 	-> (co, 		    ty)
-			Just (co', ty') -> (mkTransCoercion co co', ty')
-      -- Apply fixpt one step:
-      -- Use refineType to get a substituted type, ty', and a coercion, co_fn,
-      -- which justifies the substitution.  If the coercion is not the identity
-      -- then use transitivity with the original coercion
-
------------------------------
 -- XXX Can we do this more nicely, by exploiting laziness?
 -- Or avoid needing it in the first place?
 fixTvSubstEnv :: InScopeSet -> TvSubstEnv -> TvSubstEnv
@@ -247,11 +209,6 @@ fixTvSubstEnv in_scope env = f env
           in if and $ eltsUFM $ intersectUFM_C tcEqType e e'
              then e
              else f e'
-
-----------------------------
-tryToBind :: TyVarSet -> TyVar -> BindFlag
-tryToBind tv_set tv | tv `elemVarSet` tv_set = BindMe
-		    | otherwise	             = AvoidMe
 
 \end{code}
 
@@ -263,19 +220,6 @@ tryToBind tv_set tv | tv `elemVarSet` tv_set = BindMe
 %************************************************************************
 
 \begin{code}
-badReftElts :: InternalReft -> [(Unique, (Coercion,Type))]
--- Return the BAD elements of the refinement
--- Should be empty; used in asserions only
-badReftElts env
-  = filter (not . ok) (ufmToList env)
-  where
-    ok :: (Unique, (Coercion, Type)) -> Bool
-    ok (u, (co, ty)) | Just tv <- tcGetTyVar_maybe ty1
-		     = varUnique tv == u && ty `tcEqType` ty2 
-		     | otherwise = False
-	where
-	  (ty1,ty2) = coercionKind co
-
 emptyInternalReft :: InternalReft
 emptyInternalReft = emptyVarEnv
 
