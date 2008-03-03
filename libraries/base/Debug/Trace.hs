@@ -13,9 +13,9 @@
 -----------------------------------------------------------------------------
 
 module Debug.Trace (
-	-- * Tracing
-	putTraceMsg,      -- :: String -> IO ()
-	trace,            -- :: String -> a -> a
+        -- * Tracing
+        putTraceMsg,      -- :: String -> IO ()
+        trace,            -- :: String -> a -> a
         traceShow
   ) where
 
