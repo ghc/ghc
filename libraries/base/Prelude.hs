@@ -36,16 +36,16 @@ module Prelude (
     fst, snd, curry, uncurry,
 
 #if defined(__NHC__)
-    []((:), []),	-- Not legal Haskell 98;
-			-- ... available through built-in syntax
-    module Data.Tuple,	-- Includes tuple types
-    ()(..),		-- Not legal Haskell 98
-    (->),		-- ... available through built-in syntax
+    []((:), []),        -- Not legal Haskell 98;
+                        -- ... available through built-in syntax
+    module Data.Tuple,  -- Includes tuple types
+    ()(..),             -- Not legal Haskell 98
+    (->),               -- ... available through built-in syntax
 #endif
 #ifdef __HUGS__
-    (:),		-- Not legal Haskell 98
+    (:),                -- Not legal Haskell 98
 #endif
-    
+
     -- ** Basic type classes
     Eq((==), (/=)),
     Ord(compare, (<), (<=), (>=), (>), max, min),
@@ -72,7 +72,7 @@ module Prelude (
               isInfinite, isDenormalized, isIEEE, isNegativeZero, atan2),
 
     -- *** Numeric functions
-    subtract, even, odd, gcd, lcm, (^), (^^), 
+    subtract, even, odd, gcd, lcm, (^), (^^),
     fromIntegral, realToFrac,
 
     -- ** Monads and functors
@@ -87,7 +87,7 @@ module Prelude (
 
     -- * List operations
     map, (++), filter,
-    head, last, tail, init, null, length, (!!), 
+    head, last, tail, init, null, length, (!!),
     reverse,
     -- ** Reducing lists (folds)
     foldl, foldl1, foldr, foldr1,
@@ -119,8 +119,8 @@ module Prelude (
     -- ** Converting from @String@
     ReadS,
     Read(readsPrec, readList),
-    reads, readParen, read, lex, 
-    
+    reads, readParen, read, lex,
+
     -- * Basic Input and output
     IO,
     -- ** Simple I\/O operations

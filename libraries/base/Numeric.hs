@@ -47,7 +47,7 @@ module Numeric (
         readHex,          -- :: (Integral a) => ReadS a
 
         readFloat,        -- :: (RealFloat a) => ReadS a
-        
+
         lexDigits,        -- :: ReadS String
 
         -- * Miscellaneous
@@ -207,7 +207,7 @@ showIntAtBase base toChr n r
         0 -> r'
         _ -> showIt (quotRem n base) r'
      where
-      c  = toChr (fromIntegral d) 
+      c  = toChr (fromIntegral d)
       r' = c : r
 
 -- | Show /non-negative/ 'Integral' numbers in base 16.

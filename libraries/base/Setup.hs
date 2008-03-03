@@ -53,7 +53,7 @@ build_primitive_sources f pd lbi uhs x
 maybeUpdateFile :: FilePath -> FilePath -> IO ()
 maybeUpdateFile source target = do
   r <- rawSystem "cmp" ["-s" {-quiet-}, source, target]
-  case r of 
+  case r of
     ExitSuccess   -> removeFile source
     ExitFailure _ -> do try (removeFile target); renameFile source target
 
