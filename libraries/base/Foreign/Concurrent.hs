@@ -15,22 +15,22 @@
 
 module Foreign.Concurrent
   (
-	-- * Concurrency-based 'ForeignPtr' operations
+        -- * Concurrency-based 'ForeignPtr' operations
 
-	-- | These functions generalize their namesakes in the portable
-	-- "Foreign.ForeignPtr" module by allowing arbitrary 'IO' actions
-	-- as finalizers.  These finalizers necessarily run in a separate
-	-- thread, cf. /Destructors, Finalizers and Synchronization/,
-	-- by Hans Boehm, /POPL/, 2003.
+        -- | These functions generalize their namesakes in the portable
+        -- "Foreign.ForeignPtr" module by allowing arbitrary 'IO' actions
+        -- as finalizers.  These finalizers necessarily run in a separate
+        -- thread, cf. /Destructors, Finalizers and Synchronization/,
+        -- by Hans Boehm, /POPL/, 2003.
 
-	newForeignPtr,
-	addForeignPtrFinalizer,
+        newForeignPtr,
+        addForeignPtrFinalizer,
   ) where
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.IOBase	( IO )
-import GHC.Ptr		( Ptr )
-import GHC.ForeignPtr	( ForeignPtr )
+import GHC.IOBase       ( IO )
+import GHC.Ptr          ( Ptr )
+import GHC.ForeignPtr   ( ForeignPtr )
 import qualified GHC.ForeignPtr
 #endif
 
