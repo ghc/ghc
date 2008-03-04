@@ -16,19 +16,19 @@
 
 module Control.Monad.ST
   (
-	-- * The 'ST' Monad
-	ST,		-- abstract, instance of Functor, Monad, Typeable.
-	runST,		-- :: (forall s. ST s a) -> a
-	fixST,		-- :: (a -> ST s a) -> ST s a
+        -- * The 'ST' Monad
+        ST,             -- abstract, instance of Functor, Monad, Typeable.
+        runST,          -- :: (forall s. ST s a) -> a
+        fixST,          -- :: (a -> ST s a) -> ST s a
 
-	-- * Converting 'ST' to 'IO'
-	RealWorld,		-- abstract
-	stToIO,			-- :: ST RealWorld a -> IO a
+        -- * Converting 'ST' to 'IO'
+        RealWorld,              -- abstract
+        stToIO,                 -- :: ST RealWorld a -> IO a
 
-	-- * Unsafe operations
-	unsafeInterleaveST,  	-- :: ST s a -> ST s a
-	unsafeIOToST,		-- :: IO a -> ST s a
-	unsafeSTToIO		-- :: ST s a -> IO a
+        -- * Unsafe operations
+        unsafeInterleaveST,     -- :: ST s a -> ST s a
+        unsafeIOToST,           -- :: IO a -> ST s a
+        unsafeSTToIO            -- :: ST s a -> IO a
       ) where
 
 import Prelude
@@ -54,11 +54,11 @@ unsafeInterleaveST =
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.ST		( ST, runST, fixST, unsafeInterleaveST )
-import GHC.Base		( RealWorld )
-import GHC.IOBase 	( stToIO, unsafeIOToST, unsafeSTToIO )
+import GHC.ST           ( ST, runST, fixST, unsafeInterleaveST )
+import GHC.Base         ( RealWorld )
+import GHC.IOBase       ( stToIO, unsafeIOToST, unsafeSTToIO )
 #endif
 
 instance MonadFix (ST s) where
-	mfix = fixST
+        mfix = fixST
 
