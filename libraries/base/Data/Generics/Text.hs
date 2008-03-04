@@ -14,10 +14,10 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Generics.Text ( 
+module Data.Generics.Text (
 
-	gshow,
-	gread
+        gshow,
+        gread
 
  ) where
 
@@ -86,39 +86,39 @@ gread = readP_to_S gread'
     -- The generic default for gread
     allButString =
       do
- 		-- Drop "  (  "
-         skipSpaces			-- Discard leading space
-         char '('			-- Parse '('
-         skipSpaces			-- Discard following space
+                -- Drop "  (  "
+         skipSpaces                     -- Discard leading space
+         char '('                       -- Parse '('
+         skipSpaces                     -- Discard following space
 
-		-- Do the real work
-	 str  <- parseConstr		-- Get a lexeme for the constructor
-         con  <- str2con str		-- Convert it to a Constr (may fail)
+                -- Do the real work
+         str  <- parseConstr            -- Get a lexeme for the constructor
+         con  <- str2con str            -- Convert it to a Constr (may fail)
          x    <- fromConstrM gread' con -- Read the children
 
-		-- Drop "  )  "
-         skipSpaces			-- Discard leading space
-         char ')'			-- Parse ')'
-         skipSpaces			-- Discard following space
+                -- Drop "  )  "
+         skipSpaces                     -- Discard leading space
+         char ')'                       -- Parse ')'
+         skipSpaces                     -- Discard following space
 
          return x
 
     -- Turn string into constructor driven by the requested result type,
     -- failing in the monad if it isn't a constructor of this data type
-    str2con :: String -> ReadP Constr	
+    str2con :: String -> ReadP Constr
     str2con = maybe mzero return
             . readConstr myDataType
 
     -- Get a Constr's string at the front of an input string
     parseConstr :: ReadP String
-    parseConstr =  
+    parseConstr =
                string "[]"     -- Compound lexeme "[]"
-          <++  infixOp	       -- Infix operator in parantheses
+          <++  infixOp         -- Infix operator in parantheses
           <++  readS_to_P lex  -- Ordinary constructors and literals
 
     -- Handle infix operators such as (:)
     infixOp :: ReadP String
     infixOp = do c1  <- char '('
                  str <- munch1 (not . (==) ')')
-	         c2  <- char ')'
+                 c2  <- char ')'
                  return $ [c1] ++ str ++ [c2]

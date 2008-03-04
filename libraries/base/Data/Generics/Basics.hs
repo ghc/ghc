@@ -14,79 +14,79 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Generics.Basics ( 
+module Data.Generics.Basics (
 
-	-- * Module Data.Typeable re-exported for convenience
-	module Data.Typeable,
+        -- * Module Data.Typeable re-exported for convenience
+        module Data.Typeable,
 
-	-- * The Data class for processing constructor applications
-	Data( 
-		gfoldl,		-- :: ... -> a -> c a
-		gunfold,	-- :: ... -> Constr -> c a
-		toConstr, 	-- :: a -> Constr
-		dataTypeOf,	-- :: a -> DataType
-		dataCast1,	-- mediate types and unary type constructors
-		dataCast2,	-- mediate types and binary type constructors
-		-- Generic maps defined in terms of gfoldl 
-		gmapT,
-		gmapQ, 
-		gmapQl,
-		gmapQr,
-		gmapQi,
-		gmapM,
-		gmapMp,
-		gmapMo
+        -- * The Data class for processing constructor applications
+        Data(
+                gfoldl,         -- :: ... -> a -> c a
+                gunfold,        -- :: ... -> Constr -> c a
+                toConstr,       -- :: a -> Constr
+                dataTypeOf,     -- :: a -> DataType
+                dataCast1,      -- mediate types and unary type constructors
+                dataCast2,      -- mediate types and binary type constructors
+                -- Generic maps defined in terms of gfoldl 
+                gmapT,
+                gmapQ,
+                gmapQl,
+                gmapQr,
+                gmapQi,
+                gmapM,
+                gmapMp,
+                gmapMo
             ),
 
-	-- * Datatype representations
-	DataType,	-- abstract, instance of: Show
-	-- ** Constructors
-	mkDataType,	-- :: String   -> [Constr] -> DataType
-	mkIntType,	-- :: String -> DataType
-	mkFloatType,	-- :: String -> DataType
-	mkStringType,	-- :: String -> DataType
-	mkNorepType,	-- :: String -> DataType
-	-- ** Observers
-	dataTypeName,	-- :: DataType -> String
-	DataRep(..),	-- instance of: Eq, Show
-	dataTypeRep,	-- :: DataType -> DataRep
-	-- ** Convenience functions
- 	repConstr,	-- :: DataType -> ConstrRep -> Constr
-	isAlgType,	-- :: DataType -> Bool
-	dataTypeConstrs,-- :: DataType -> [Constr]
-	indexConstr,	-- :: DataType -> ConIndex -> Constr
-	maxConstrIndex,	-- :: DataType -> ConIndex
-	isNorepType,	-- :: DataType -> Bool
+        -- * Datatype representations
+        DataType,       -- abstract, instance of: Show
+        -- ** Constructors
+        mkDataType,     -- :: String   -> [Constr] -> DataType
+        mkIntType,      -- :: String -> DataType
+        mkFloatType,    -- :: String -> DataType
+        mkStringType,   -- :: String -> DataType
+        mkNorepType,    -- :: String -> DataType
+        -- ** Observers
+        dataTypeName,   -- :: DataType -> String
+        DataRep(..),    -- instance of: Eq, Show
+        dataTypeRep,    -- :: DataType -> DataRep
+        -- ** Convenience functions
+        repConstr,      -- :: DataType -> ConstrRep -> Constr
+        isAlgType,      -- :: DataType -> Bool
+        dataTypeConstrs,-- :: DataType -> [Constr]
+        indexConstr,    -- :: DataType -> ConIndex -> Constr
+        maxConstrIndex, -- :: DataType -> ConIndex
+        isNorepType,    -- :: DataType -> Bool
 
-	-- * Data constructor representations
-	Constr,		-- abstract, instance of: Eq, Show
-	ConIndex,	-- alias for Int, start at 1
-	Fixity(..),	-- instance of: Eq, Show
-	-- ** Constructors
- 	mkConstr,	-- :: DataType -> String -> Fixity -> Constr
-	mkIntConstr,	-- :: DataType -> Integer -> Constr
-	mkFloatConstr,	-- :: DataType -> Double  -> Constr
-	mkStringConstr,	-- :: DataType -> String  -> Constr
-	-- ** Observers
- 	constrType,	-- :: Constr   -> DataType
-	ConstrRep(..),	-- instance of: Eq, Show
- 	constrRep,	-- :: Constr   -> ConstrRep
- 	constrFields,	-- :: Constr   -> [String]
- 	constrFixity,	-- :: Constr   -> Fixity
-	-- ** Convenience function: algebraic data types
-	constrIndex,	-- :: Constr   -> ConIndex
-	-- ** From strings to constructors and vice versa: all data types
-	showConstr, 	-- :: Constr   -> String
-	readConstr,	-- :: DataType -> String -> Maybe Constr
+        -- * Data constructor representations
+        Constr,         -- abstract, instance of: Eq, Show
+        ConIndex,       -- alias for Int, start at 1
+        Fixity(..),     -- instance of: Eq, Show
+        -- ** Constructors
+        mkConstr,       -- :: DataType -> String -> Fixity -> Constr
+        mkIntConstr,    -- :: DataType -> Integer -> Constr
+        mkFloatConstr,  -- :: DataType -> Double  -> Constr
+        mkStringConstr, -- :: DataType -> String  -> Constr
+        -- ** Observers
+        constrType,     -- :: Constr   -> DataType
+        ConstrRep(..),  -- instance of: Eq, Show
+        constrRep,      -- :: Constr   -> ConstrRep
+        constrFields,   -- :: Constr   -> [String]
+        constrFixity,   -- :: Constr   -> Fixity
+        -- ** Convenience function: algebraic data types
+        constrIndex,    -- :: Constr   -> ConIndex
+        -- ** From strings to constructors and vice versa: all data types
+        showConstr,     -- :: Constr   -> String
+        readConstr,     -- :: DataType -> String -> Maybe Constr
 
-	-- * Convenience functions: take type constructors apart
-	tyconUQname,	-- :: String -> String
-	tyconModule,	-- :: String -> String
+        -- * Convenience functions: take type constructors apart
+        tyconUQname,    -- :: String -> String
+        tyconModule,    -- :: String -> String
 
-	-- * Generic operations defined in terms of 'gunfold'
-        fromConstr,	-- :: Constr -> a
-        fromConstrB,	-- :: ... -> Constr -> a
-	fromConstrM	-- :: Monad m => ... -> Constr -> m a
+        -- * Generic operations defined in terms of 'gunfold'
+        fromConstr,     -- :: Constr -> a
+        fromConstrB,    -- :: ... -> Constr -> a
+        fromConstrM     -- :: Monad m => ... -> Constr -> m a
 
   ) where
 
@@ -103,7 +103,7 @@ import Control.Monad
 
 ------------------------------------------------------------------------------
 --
---	The Data class
+--      The Data class
 --
 ------------------------------------------------------------------------------
 
@@ -186,20 +186,20 @@ class Typeable a => Data a where
   -- The default definition for 'gfoldl' is @'const' 'id'@, which is
   -- suitable for abstract datatypes with no substructures.
   gfoldl  :: (forall a b. Data a => c (a -> b) -> a -> c b)
-		-- ^ defines how nonempty constructor applications are
-		-- folded.  It takes the folded tail of the constructor
-		-- application and its head, i.e., an immediate subterm,
-		-- and combines them in some way.
+                -- ^ defines how nonempty constructor applications are
+                -- folded.  It takes the folded tail of the constructor
+                -- application and its head, i.e., an immediate subterm,
+                -- and combines them in some way.
           -> (forall g. g -> c g)
-		-- ^ defines how the empty constructor application is
-		-- folded, like the neutral \/ start element for list
-		-- folding.
+                -- ^ defines how the empty constructor application is
+                -- folded, like the neutral \/ start element for list
+                -- folding.
           -> a
-		-- ^ structure to be folded.
-	  -> c a
-		-- ^ result, with a type defined in terms of @a@, but
-		-- variability is achieved by means of type constructor
-		-- @c@ for the construction of the actual result type.
+                -- ^ structure to be folded.
+          -> c a
+                -- ^ result, with a type defined in terms of @a@, but
+                -- variability is achieved by means of type constructor
+                -- @c@ for the construction of the actual result type.
 
   -- See the 'Data' instances in this file for an illustration of 'gfoldl'.
 
@@ -255,7 +255,7 @@ class Typeable a => Data a where
 
 ------------------------------------------------------------------------------
 --
---	Typical generic maps defined in terms of gfoldl
+--      Typical generic maps defined in terms of gfoldl
 --
 ------------------------------------------------------------------------------
 
@@ -280,7 +280,7 @@ class Typeable a => Data a where
   gmapQl :: (r -> r' -> r) -> r -> (forall a. Data a => a -> r') -> a -> r
   gmapQl o r f = unCONST . gfoldl k z
     where
-      k c x = CONST $ (unCONST c) `o` f x 
+      k c x = CONST $ (unCONST c) `o` f x
       z _   = CONST r
 
   -- | A generic query with a right-associative binary operator
@@ -299,9 +299,9 @@ class Typeable a => Data a where
 
   -- | A generic query that processes one child by index (zero-based)
   gmapQi :: Int -> (forall a. Data a => a -> u) -> a -> u
-  gmapQi i f x = case gfoldl k z x of { Qi _ q -> fromJust q } 
+  gmapQi i f x = case gfoldl k z x of { Qi _ q -> fromJust q }
     where
-      k (Qi i' q) a = Qi (i'+1) (if i==i' then Just (f a) else q) 
+      k (Qi i' q) a = Qi (i'+1) (if i==i' then Just (f a) else q)
       z f           = Qi 0 Nothing
 
 
@@ -339,7 +339,7 @@ this end, we couple the monadic computation with a Boolean.
     where
       z g = Mp (return (g,False))
       k (Mp c) x
-        = Mp ( c >>= \(h,b) -> 
+        = Mp ( c >>= \(h,b) ->
                  (f x >>= \x' -> return (h x',True))
                  `mplus` return (h x,b)
              )
@@ -362,7 +362,7 @@ was transformed successfully.
     where
       z g = Mp (return (g,False))
       k (Mp c) x
-        = Mp ( c >>= \(h,b) -> if b 
+        = Mp ( c >>= \(h,b) -> if b
                         then return (h x,b)
                         else (f x >>= \x' -> return (h x',True))
                              `mplus` return (h x,b)
@@ -392,7 +392,7 @@ newtype Mp m x = Mp { unMp :: m (x, Bool) }
 
 ------------------------------------------------------------------------------
 --
---	Generic unfolding
+--      Generic unfolding
 --
 ------------------------------------------------------------------------------
 
@@ -418,7 +418,7 @@ fromConstrM :: (Monad m, Data a)
             => (forall a. Data a => m a)
             -> Constr
             -> m a
-fromConstrM f = gunfold k z 
+fromConstrM f = gunfold k z
  where
   k c = do { c' <- c; b <- f; return (c' b) }
   z = return
@@ -427,7 +427,7 @@ fromConstrM f = gunfold k z
 
 ------------------------------------------------------------------------------
 --
---	Datatype and constructor representations
+--      Datatype and constructor representations
 --
 ------------------------------------------------------------------------------
 
@@ -437,21 +437,21 @@ fromConstrM f = gunfold k z
 -- A package of constructor representations with names of type and module.
 --
 data DataType = DataType
-			{ tycon   :: String
-			, datarep :: DataRep
-			}
+                        { tycon   :: String
+                        , datarep :: DataRep
+                        }
 
               deriving Show
 
 
 -- | Representation of constructors
 data Constr = Constr
-			{ conrep    :: ConstrRep
-			, constring :: String
-			, confields :: [String]	-- for AlgRep only
-			, confixity :: Fixity	-- for AlgRep only
-			, datatype  :: DataType
-			}
+                        { conrep    :: ConstrRep
+                        , constring :: String
+                        , confields :: [String] -- for AlgRep only
+                        , confixity :: Fixity   -- for AlgRep only
+                        , datatype  :: DataType
+                        }
 
 instance Show Constr where
  show = constring
@@ -465,21 +465,21 @@ instance Eq Constr where
 -- | Public representation of datatypes
 data DataRep = AlgRep [Constr]
              | IntRep
-	     | FloatRep
-	     | StringRep
+             | FloatRep
+             | StringRep
              | NoRep
 
-	    deriving (Eq,Show)
+            deriving (Eq,Show)
 -- The list of constructors could be an array, a balanced tree, or others.
 
 
 -- | Public representation of constructors
 data ConstrRep = AlgConstr    ConIndex
                | IntConstr    Integer
-    	       | FloatConstr  Double
-    	       | StringConstr String
+               | FloatConstr  Double
+               | StringConstr String
 
-	       deriving (Eq,Show)
+               deriving (Eq,Show)
 
 
 -- | Unique index for datatype constructors,
@@ -489,14 +489,14 @@ type ConIndex = Int
 
 -- | Fixity of constructors
 data Fixity = Prefix
-            | Infix	-- Later: add associativity and precedence
+            | Infix     -- Later: add associativity and precedence
 
-	    deriving (Eq,Show)
+            deriving (Eq,Show)
 
 
 ------------------------------------------------------------------------------
 --
---	Observers for datatype representations
+--      Observers for datatype representations
 --
 ------------------------------------------------------------------------------
 
@@ -526,17 +526,17 @@ constrRep = conrep
 repConstr :: DataType -> ConstrRep -> Constr
 repConstr dt cr =
       case (dataTypeRep dt, cr) of
-	(AlgRep cs, AlgConstr i)      -> cs !! (i-1)
-	(IntRep,    IntConstr i)      -> mkIntConstr dt i
-	(FloatRep,  FloatConstr f)    -> mkFloatConstr dt f
-	(StringRep, StringConstr str) -> mkStringConstr dt str
-	_ -> error "repConstr"
+        (AlgRep cs, AlgConstr i)      -> cs !! (i-1)
+        (IntRep,    IntConstr i)      -> mkIntConstr dt i
+        (FloatRep,  FloatConstr f)    -> mkFloatConstr dt f
+        (StringRep, StringConstr str) -> mkStringConstr dt str
+        _ -> error "repConstr"
 
 
 
 ------------------------------------------------------------------------------
 --
---	Representations of algebraic data types
+--      Representations of algebraic data types
 --
 ------------------------------------------------------------------------------
 
@@ -544,21 +544,21 @@ repConstr dt cr =
 -- | Constructs an algebraic datatype
 mkDataType :: String -> [Constr] -> DataType
 mkDataType str cs = DataType
-			{ tycon   = str
-			, datarep = AlgRep cs
-			}
+                        { tycon   = str
+                        , datarep = AlgRep cs
+                        }
 
 
 -- | Constructs a constructor
 mkConstr :: DataType -> String -> [String] -> Fixity -> Constr
 mkConstr dt str fields fix =
-	Constr
-		{ conrep    = AlgConstr idx
-		, constring = str
-		, confields = fields
-		, confixity = fix
-		, datatype  = dt 
-		}
+        Constr
+                { conrep    = AlgConstr idx
+                , constring = str
+                , confields = fields
+                , confixity = fix
+                , datatype  = dt
+                }
   where
     idx = head [ i | (c,i) <- dataTypeConstrs dt `zip` [1..],
                      showConstr c == str ]
@@ -566,9 +566,9 @@ mkConstr dt str fields fix =
 
 -- | Gets the constructors of an algebraic datatype
 dataTypeConstrs :: DataType -> [Constr]
-dataTypeConstrs dt = case datarep dt of 
-			(AlgRep cons) -> cons
-			_ -> error "dataTypeConstrs"
+dataTypeConstrs dt = case datarep dt of
+                        (AlgRep cons) -> cons
+                        _ -> error "dataTypeConstrs"
 
 
 -- | Gets the field labels of a constructor.  The list of labels
@@ -586,8 +586,8 @@ constrFixity = confixity
 
 ------------------------------------------------------------------------------
 --
---	From strings to constr's and vice versa: all data types
---	
+--      From strings to constr's and vice versa: all data types
+--      
 ------------------------------------------------------------------------------
 
 
@@ -600,22 +600,22 @@ showConstr = constring
 readConstr :: DataType -> String -> Maybe Constr
 readConstr dt str =
       case dataTypeRep dt of
-	AlgRep cons -> idx cons
-	IntRep      -> mkReadCon (\i -> (mkPrimCon dt str (IntConstr i)))
-	FloatRep    -> mkReadCon (\f -> (mkPrimCon dt str (FloatConstr f)))
-	StringRep   -> Just (mkStringConstr dt str)
+        AlgRep cons -> idx cons
+        IntRep      -> mkReadCon (\i -> (mkPrimCon dt str (IntConstr i)))
+        FloatRep    -> mkReadCon (\f -> (mkPrimCon dt str (FloatConstr f)))
+        StringRep   -> Just (mkStringConstr dt str)
         NoRep       -> Nothing
   where
 
     -- Read a value and build a constructor
     mkReadCon :: Read t => (t -> Constr) -> Maybe Constr
     mkReadCon f = case (reads str) of
-		    [(t,"")] -> Just (f t)
-		    _ -> Nothing
+                    [(t,"")] -> Just (f t)
+                    _ -> Nothing
 
     -- Traverse list of algebraic datatype constructors
     idx :: [Constr] -> Maybe Constr
-    idx cons = let fit = filter ((==) str . showConstr) cons 
+    idx cons = let fit = filter ((==) str . showConstr) cons
                 in if fit == []
                      then Nothing
                      else Just (head fit)
@@ -623,7 +623,7 @@ readConstr dt str =
 
 ------------------------------------------------------------------------------
 --
---	Convenience funtions: algebraic data types
+--      Convenience funtions: algebraic data types
 --
 ------------------------------------------------------------------------------
 
@@ -631,35 +631,35 @@ readConstr dt str =
 -- | Test for an algebraic type
 isAlgType :: DataType -> Bool
 isAlgType dt = case datarep dt of
-		 (AlgRep _) -> True
-		 _ -> False 
+                 (AlgRep _) -> True
+                 _ -> False
 
 
 -- | Gets the constructor for an index (algebraic datatypes only)
 indexConstr :: DataType -> ConIndex -> Constr
 indexConstr dt idx = case datarep dt of
-			(AlgRep cs) -> cs !! (idx-1)
-			_           -> error "indexConstr"
+                        (AlgRep cs) -> cs !! (idx-1)
+                        _           -> error "indexConstr"
 
 
 -- | Gets the index of a constructor (algebraic datatypes only)
 constrIndex :: Constr -> ConIndex
 constrIndex con = case constrRep con of
                     (AlgConstr idx) -> idx
- 		    _ -> error "constrIndex"
+                    _ -> error "constrIndex"
 
 
 -- | Gets the maximum constructor index of an algebraic datatype
 maxConstrIndex :: DataType -> ConIndex
 maxConstrIndex dt = case dataTypeRep dt of
-			AlgRep cs -> length cs
-			_ 	     -> error "maxConstrIndex"
+                        AlgRep cs -> length cs
+                        _            -> error "maxConstrIndex"
 
 
 
 ------------------------------------------------------------------------------
 --
---	Representation of primitive types
+--      Representation of primitive types
 --
 ------------------------------------------------------------------------------
 
@@ -682,43 +682,43 @@ mkStringType = mkPrimType StringRep
 -- | Helper for 'mkIntType', 'mkFloatType', 'mkStringType'
 mkPrimType :: DataRep -> String -> DataType
 mkPrimType dr str = DataType
-			{ tycon   = str
-			, datarep = dr
-			}
+                        { tycon   = str
+                        , datarep = dr
+                        }
 
 
 -- Makes a constructor for primitive types
 mkPrimCon :: DataType -> String -> ConstrRep -> Constr
-mkPrimCon dt str cr = Constr 
-			{ datatype  = dt
-			, conrep    = cr
-			, constring = str
-			, confields = error "constrFields"
-			, confixity = error "constrFixity"
-			}
+mkPrimCon dt str cr = Constr
+                        { datatype  = dt
+                        , conrep    = cr
+                        , constring = str
+                        , confields = error "constrFields"
+                        , confixity = error "constrFixity"
+                        }
 
 
 mkIntConstr :: DataType -> Integer -> Constr
 mkIntConstr dt i = case datarep dt of
-		  IntRep -> mkPrimCon dt (show i) (IntConstr i)
-		  _ -> error "mkIntConstr"
+                  IntRep -> mkPrimCon dt (show i) (IntConstr i)
+                  _ -> error "mkIntConstr"
 
 
 mkFloatConstr :: DataType -> Double -> Constr
 mkFloatConstr dt f = case datarep dt of
-		    FloatRep -> mkPrimCon dt (show f) (FloatConstr f)
-		    _ -> error "mkFloatConstr"
+                    FloatRep -> mkPrimCon dt (show f) (FloatConstr f)
+                    _ -> error "mkFloatConstr"
 
 
 mkStringConstr :: DataType -> String -> Constr
 mkStringConstr dt str = case datarep dt of
-		       StringRep -> mkPrimCon dt str (StringConstr str)
-		       _ -> error "mkStringConstr"
+                       StringRep -> mkPrimCon dt str (StringConstr str)
+                       _ -> error "mkStringConstr"
 
 
 ------------------------------------------------------------------------------
 --
---	Non-representations for non-presentable types
+--      Non-representations for non-presentable types
 --
 ------------------------------------------------------------------------------
 
@@ -726,22 +726,22 @@ mkStringConstr dt str = case datarep dt of
 -- | Constructs a non-representation for a non-presentable type
 mkNorepType :: String -> DataType
 mkNorepType str = DataType
-			{ tycon   = str
-			, datarep = NoRep
-			}
+                        { tycon   = str
+                        , datarep = NoRep
+                        }
 
 
 -- | Test for a non-representable type
 isNorepType :: DataType -> Bool
 isNorepType dt = case datarep dt of
-	 	   NoRep -> True
-		   _ -> False 
+                   NoRep -> True
+                   _ -> False
 
 
 
 ------------------------------------------------------------------------------
 --
---	Convenience for qualified type constructors
+--      Convenience for qualified type constructors
 --
 ------------------------------------------------------------------------------
 
@@ -759,7 +759,7 @@ tyconUQname x = let x' = dropWhile (not . (==) '.') x
 tyconModule :: String -> String
 tyconModule x = let (a,b) = break ((==) '.') x
                  in if b == ""
-                      then b 
+                      then b
                       else a ++ tyconModule' (tail b)
   where
     tyconModule' x = let x' = tyconModule x

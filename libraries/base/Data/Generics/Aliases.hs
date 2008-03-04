@@ -15,38 +15,38 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Generics.Aliases ( 
+module Data.Generics.Aliases (
 
-	-- * Combinators to \"make\" generic functions via cast
-	mkT, mkQ, mkM, mkMp, mkR,
-	ext0, extT, extQ, extM, extMp, extB, extR,
+        -- * Combinators to \"make\" generic functions via cast
+        mkT, mkQ, mkM, mkMp, mkR,
+        ext0, extT, extQ, extM, extMp, extB, extR,
 
-	-- * Type synonyms for generic function types
-	GenericT, 
-	GenericQ,
-	GenericM,
-	GenericB,
-	GenericR,
+        -- * Type synonyms for generic function types
+        GenericT,
+        GenericQ,
+        GenericM,
+        GenericB,
+        GenericR,
         Generic,
         Generic'(..),
         GenericT'(..),
         GenericQ'(..),
         GenericM'(..),
 
-	-- * Inredients of generic functions
-	orElse,
+        -- * Inredients of generic functions
+        orElse,
 
-	-- * Function combinators on generic functions
-	recoverMp,
-	recoverQ,
-	choiceMp,
-	choiceQ,
+        -- * Function combinators on generic functions
+        recoverMp,
+        recoverQ,
+        choiceMp,
+        choiceQ,
 
-	-- * Type extension for unary type constructors
-	ext1T, 
-	ext1M,
-	ext1Q,
-	ext1R
+        -- * Type extension for unary type constructors
+        ext1T,
+        ext1M,
+        ext1Q,
+        ext1R
 
   ) where
 
@@ -58,8 +58,8 @@ import Data.Generics.Basics
 
 ------------------------------------------------------------------------------
 --
---	Combinators to "make" generic functions
---	We use type-safe cast in a number of ways to make generic functions.
+--      Combinators to "make" generic functions
+--      We use type-safe cast in a number of ways to make generic functions.
 --
 ------------------------------------------------------------------------------
 
@@ -71,7 +71,7 @@ mkT :: ( Typeable a
        , Typeable b
        )
     => (b -> b)
-    -> a 
+    -> a
     -> a
 mkT = extT id
 
@@ -85,7 +85,7 @@ mkQ :: ( Typeable a
        )
     => r
     -> (b -> r)
-    -> a 
+    -> a
     -> r
 (r `mkQ` br) a = case cast a of
                         Just b  -> br b
@@ -101,7 +101,7 @@ mkM :: ( Monad m
        , Typeable b
        )
     => (b -> m b)
-    -> a 
+    -> a
     -> m a
 mkM = extM return
 
@@ -205,7 +205,7 @@ extR def ext = unR ((R def) `ext0` (R ext))
 
 ------------------------------------------------------------------------------
 --
---	Type synonyms for generic function types
+--      Type synonyms for generic function types
 --
 ------------------------------------------------------------------------------
 
@@ -301,7 +301,7 @@ recoverQ r f = f `choiceQ` const (return r)
 
 ------------------------------------------------------------------------------
 --
---	Type extension for unary type constructors
+--      Type extension for unary type constructors
 --
 ------------------------------------------------------------------------------
 
@@ -350,7 +350,7 @@ ext1R def ext = unR ((R def) `ext1` (R ext))
 
 ------------------------------------------------------------------------------
 --
---	Type constructors for type-level lambdas
+--      Type constructors for type-level lambdas
 --
 ------------------------------------------------------------------------------
 

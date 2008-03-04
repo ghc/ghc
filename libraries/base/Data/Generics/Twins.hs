@@ -15,24 +15,24 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Generics.Twins ( 
+module Data.Generics.Twins (
 
-	-- * Generic folds and maps that also accumulate
-	gfoldlAccum,
-	gmapAccumT,
-	gmapAccumM,
-	gmapAccumQl,
-	gmapAccumQr,
-	gmapAccumQ,
+        -- * Generic folds and maps that also accumulate
+        gfoldlAccum,
+        gmapAccumT,
+        gmapAccumM,
+        gmapAccumQl,
+        gmapAccumQr,
+        gmapAccumQ,
 
-	-- * Mapping combinators for twin traversal
-	gzipWithT,
-  	gzipWithM,
-  	gzipWithQ,
+        -- * Mapping combinators for twin traversal
+        gzipWithT,
+        gzipWithM,
+        gzipWithQ,
 
-	-- * Typical twin traversals
-	geq,
-	gzip
+        -- * Typical twin traversals
+        geq,
+        gzip
 
   ) where
 
@@ -54,7 +54,7 @@ import Prelude hiding ( GT )
 
 ------------------------------------------------------------------------------
 --
---	Generic folds and maps that also accumulate
+--      Generic folds and maps that also accumulate
 --
 ------------------------------------------------------------------------------
 
@@ -97,7 +97,7 @@ gmapAccumT :: Data d
 gmapAccumT f a d = let (a',d') = gfoldlAccum k z a d
                     in (a',unID d')
  where
-  k a (ID c) d = let (a',d') = f a d 
+  k a (ID c) d = let (a',d') = f a d
                   in (a', ID (c d'))
   z a x = (a, ID x)
 
@@ -108,35 +108,35 @@ gmapAccumM :: (Data d, Monad m)
            -> a -> d -> (a, m d)
 gmapAccumM f = gfoldlAccum k z
  where
-  k a c d = let (a',d') = f a d 
+  k a c d = let (a',d') = f a d
              in (a', d' >>= \d'' -> c >>= \c' -> return (c' d''))
   z a x = (a, return x)
 
 
 -- | gmapQl with accumulation
-gmapAccumQl :: Data d 
-            => (r -> r' -> r) 
+gmapAccumQl :: Data d
+            => (r -> r' -> r)
             -> r
             -> (forall d. Data d => a -> d -> (a,r'))
             -> a -> d -> (a, r)
 gmapAccumQl o r f a d = let (a',r) = gfoldlAccum k z a d
                          in (a',unCONST r)
  where
-  k a (CONST c) d = let (a',r') = f a d 
+  k a (CONST c) d = let (a',r') = f a d
                      in (a', CONST (c `o` r'))
   z a _ = (a, CONST r)
 
 
 -- | gmapQr with accumulation
-gmapAccumQr :: Data d 
-            => (r' -> r -> r) 
+gmapAccumQr :: Data d
+            => (r' -> r -> r)
             -> r
             -> (forall d. Data d => a -> d -> (a,r'))
             -> a -> d -> (a, r)
 gmapAccumQr o r f a d = let (a',l) = gfoldlAccum k z a d
                          in (a',unQr l r)
  where
-  k a (Qr c) d = let (a',r') = f a d 
+  k a (Qr c) d = let (a',r') = f a d
                   in (a', Qr (\r -> c (r' `o` r)))
   z a _ = (a, Qr id)
 
@@ -151,7 +151,7 @@ gmapAccumQ f = gmapAccumQr (:) [] f
 
 ------------------------------------------------------------------------------
 --
---	Helper type constructors
+--      Helper type constructors
 --
 ------------------------------------------------------------------------------
 
@@ -171,7 +171,7 @@ newtype Qr r a = Qr { unQr  :: r -> r }
 
 ------------------------------------------------------------------------------
 --
---	Mapping combinators for twin traversal
+--      Mapping combinators for twin traversal
 --
 ------------------------------------------------------------------------------
 
@@ -180,7 +180,7 @@ newtype Qr r a = Qr { unQr  :: r -> r }
 gzipWithT :: GenericQ (GenericT) -> GenericQ (GenericT)
 gzipWithT f x y = case gmapAccumT perkid funs y of
                     ([], c) -> c
-                    _       -> error "gzipWithT" 
+                    _       -> error "gzipWithT"
  where
   perkid a d = (tail a, unGT (head a) d)
   funs = gmapQ (\k -> GT (f k)) x
@@ -191,7 +191,7 @@ gzipWithT f x y = case gmapAccumT perkid funs y of
 gzipWithM :: Monad m => GenericQ (GenericM m) -> GenericQ (GenericM m)
 gzipWithM f x y = case gmapAccumM perkid funs y of
                     ([], c) -> c
-                    _       -> error "gzipWithM" 
+                    _       -> error "gzipWithM"
  where
   perkid a d = (tail a, unGM (head a) d)
   funs = gmapQ (\k -> GM (f k)) x
@@ -201,7 +201,7 @@ gzipWithM f x y = case gmapAccumM perkid funs y of
 gzipWithQ :: GenericQ (GenericQ r) -> GenericQ (GenericQ [r])
 gzipWithQ f x y = case gmapAccumQ perkid funs y of
                    ([], r) -> r
-                   _       -> error "gzipWithQ" 
+                   _       -> error "gzipWithQ"
  where
   perkid a d = (tail a, unGQ (head a) d)
   funs = gmapQ (\k -> GQ (f k)) x
@@ -210,7 +210,7 @@ gzipWithQ f x y = case gmapAccumQ perkid funs y of
 
 ------------------------------------------------------------------------------
 --
---	Typical twin traversals
+--      Typical twin traversals
 --
 ------------------------------------------------------------------------------
 
@@ -242,7 +242,7 @@ geq x y = geq' x y
 -- | Generic zip controlled by a function with type-specific branches
 gzip :: GenericQ (GenericM Maybe) -> GenericQ (GenericM Maybe)
 -- See testsuite/.../Generics/gzip.hs for an illustration
-gzip f x y = 
+gzip f x y =
   f x y
   `orElse`
   if toConstr x == toConstr y
