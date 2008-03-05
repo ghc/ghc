@@ -46,6 +46,7 @@ denounce:
 ifneq "$(GREPPED_PATH)" ""
 	@echo To use, add $(bindir) to your PATH.
 	@echo
+endif
 	@if test -f $(htmldir)/index.html; then \
 	   echo For documentation, see $(htmldir)/index.html ; \
 	else \
