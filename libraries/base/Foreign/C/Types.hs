@@ -14,62 +14,62 @@
 -----------------------------------------------------------------------------
 
 module Foreign.C.Types
-	( -- * Representations of C types
+        ( -- * Representations of C types
 #ifndef __NHC__
-	  -- $ctypes
+          -- $ctypes
 
-	  -- ** Integral types
-	  -- | These types are are represented as @newtype@s of
-	  -- types in "Data.Int" and "Data.Word", and are instances of
-	  -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
-	  -- 'Prelude.Show', 'Prelude.Enum', 'Typeable', 'Storable',
-	  -- 'Prelude.Bounded', 'Prelude.Real', 'Prelude.Integral' and
-	  -- 'Bits'.
-	  CChar,  CSChar,  CUChar
-	, CShort, CUShort, CInt,   CUInt
-	, CLong,  CULong
-	, CPtrdiff, CSize, CWchar, CSigAtomic
+          -- ** Integral types
+          -- | These types are are represented as @newtype@s of
+          -- types in "Data.Int" and "Data.Word", and are instances of
+          -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
+          -- 'Prelude.Show', 'Prelude.Enum', 'Typeable', 'Storable',
+          -- 'Prelude.Bounded', 'Prelude.Real', 'Prelude.Integral' and
+          -- 'Bits'.
+          CChar,  CSChar,  CUChar
+        , CShort, CUShort, CInt,   CUInt
+        , CLong,  CULong
+        , CPtrdiff, CSize, CWchar, CSigAtomic
         , CLLong, CULLong
-	, CIntPtr, CUIntPtr
-	, CIntMax, CUIntMax
+        , CIntPtr, CUIntPtr
+        , CIntMax, CUIntMax
 
-	  -- ** Numeric types
-	  -- | These types are are represented as @newtype@s of basic
-	  -- foreign types, and are instances of
-	  -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
-	  -- 'Prelude.Show', 'Prelude.Enum', 'Typeable' and 'Storable'.
-	, CClock,   CTime
+          -- ** Numeric types
+          -- | These types are are represented as @newtype@s of basic
+          -- foreign types, and are instances of
+          -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
+          -- 'Prelude.Show', 'Prelude.Enum', 'Typeable' and 'Storable'.
+        , CClock,   CTime
 
-	  -- ** Floating types
-	  -- | These types are are represented as @newtype@s of
-	  -- 'Prelude.Float' and 'Prelude.Double', and are instances of
-	  -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
-	  -- 'Prelude.Show', 'Prelude.Enum', 'Typeable', 'Storable',
-	  -- 'Prelude.Real', 'Prelude.Fractional', 'Prelude.Floating',
-	  -- 'Prelude.RealFrac' and 'Prelude.RealFloat'.
-	, CFloat,  CDouble, CLDouble
+          -- ** Floating types
+          -- | These types are are represented as @newtype@s of
+          -- 'Prelude.Float' and 'Prelude.Double', and are instances of
+          -- 'Prelude.Eq', 'Prelude.Ord', 'Prelude.Num', 'Prelude.Read',
+          -- 'Prelude.Show', 'Prelude.Enum', 'Typeable', 'Storable',
+          -- 'Prelude.Real', 'Prelude.Fractional', 'Prelude.Floating',
+          -- 'Prelude.RealFrac' and 'Prelude.RealFloat'.
+        , CFloat,  CDouble, CLDouble
 #else
-	  -- Exported non-abstractly in nhc98 to fix an interface file problem.
-	  CChar(..),    CSChar(..),  CUChar(..)
-	, CShort(..),   CUShort(..), CInt(..),   CUInt(..)
-	, CLong(..),    CULong(..)
-	, CPtrdiff(..), CSize(..),   CWchar(..), CSigAtomic(..)
+          -- Exported non-abstractly in nhc98 to fix an interface file problem.
+          CChar(..),    CSChar(..),  CUChar(..)
+        , CShort(..),   CUShort(..), CInt(..),   CUInt(..)
+        , CLong(..),    CULong(..)
+        , CPtrdiff(..), CSize(..),   CWchar(..), CSigAtomic(..)
         , CLLong(..),   CULLong(..)
-	, CClock(..),   CTime(..)
-	, CFloat(..),   CDouble(..), CLDouble(..)
+        , CClock(..),   CTime(..)
+        , CFloat(..),   CDouble(..), CLDouble(..)
 #endif
-	  -- ** Other types
+          -- ** Other types
 
           -- Instances of: Eq and Storable
-	, CFile,        CFpos,     CJmpBuf
-	) where
+        , CFile,        CFpos,     CJmpBuf
+        ) where
 
 #ifndef __NHC__
 
 import {-# SOURCE #-} Foreign.Storable
-import Data.Bits	( Bits(..) )
-import Data.Int		( Int8,  Int16,  Int32,  Int64  )
-import Data.Word	( Word8, Word16, Word32, Word64 )
+import Data.Bits        ( Bits(..) )
+import Data.Int         ( Int8,  Int16,  Int32,  Int64  )
+import Data.Word        ( Word8, Word16, Word32, Word64 )
 import {-# SOURCE #-} Data.Typeable
 
 #ifdef __GLASGOW_HASKELL__
@@ -81,11 +81,11 @@ import GHC.Show
 import GHC.Read
 import GHC.Num
 #else
-import Control.Monad	( liftM )
+import Control.Monad    ( liftM )
 #endif
 
 #ifdef __HUGS__
-import Hugs.Ptr		( castPtr )
+import Hugs.Ptr         ( castPtr )
 #endif
 
 #include "HsBaseConfig.h"
@@ -259,7 +259,7 @@ representing a C type @t@:
 
 -}
 
-#else	/* __NHC__ */
+#else   /* __NHC__ */
 
 import NHC.FFI
   ( CChar(..),    CSChar(..),  CUChar(..)
