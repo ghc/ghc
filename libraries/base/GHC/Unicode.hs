@@ -32,14 +32,14 @@ import GHC.Base
 import GHC.Real  (fromIntegral)
 import GHC.Int
 import GHC.Word
-import GHC.Num	 (fromInteger)
+import GHC.Num   (fromInteger)
 
 #include "HsBaseConfig.h"
 
 -- | Selects the first 128 characters of the Unicode character set,
 -- corresponding to the ASCII character set.
 isAscii                 :: Char -> Bool
-isAscii c	 	=  c <  '\x80'
+isAscii c               =  c <  '\x80'
 
 -- | Selects the first 256 characters of the Unicode character set,
 -- corresponding to the ISO 8859-1 (Latin-1) character set.
@@ -70,14 +70,14 @@ isSpace                 :: Char -> Bool
 -- isSpace includes non-breaking space
 -- Done with explicit equalities both for efficiency, and to avoid a tiresome
 -- recursion with GHC.List elem
-isSpace c		=  c == ' '	||
-			   c == '\t'	||
-			   c == '\n'	||
-			   c == '\r'	||
-			   c == '\f'	||
-			   c == '\v'	||
-			   c == '\xa0'  ||
-			   iswspace (fromIntegral (ord c)) /= 0
+isSpace c               =  c == ' '     ||
+                           c == '\t'    ||
+                           c == '\n'    ||
+                           c == '\r'    ||
+                           c == '\f'    ||
+                           c == '\v'    ||
+                           c == '\xa0'  ||
+                           iswspace (fromIntegral (ord c)) /= 0
 
 -- | Selects upper-case or title-case alphabetic Unicode characters (letters).
 -- Title case is used by a small number of letter ligatures like the
@@ -101,16 +101,16 @@ isAlphaNum              :: Char -> Bool
 
 -- | Selects ASCII digits, i.e. @\'0\'@..@\'9\'@.
 isDigit                 :: Char -> Bool
-isDigit c		=  c >= '0' && c <= '9'
+isDigit c               =  c >= '0' && c <= '9'
 
 -- | Selects ASCII octal digits, i.e. @\'0\'@..@\'7\'@.
 isOctDigit              :: Char -> Bool
-isOctDigit c		=  c >= '0' && c <= '7'
+isOctDigit c            =  c >= '0' && c <= '7'
 
 -- | Selects ASCII hexadecimal digits,
 -- i.e. @\'0\'@..@\'9\'@, @\'a\'@..@\'f\'@, @\'A\'@..@\'F\'@.
 isHexDigit              :: Char -> Bool
-isHexDigit c		=  isDigit c || c >= 'A' && c <= 'F' ||
+isHexDigit c            =  isDigit c || c >= 'A' && c <= 'F' ||
                                         c >= 'a' && c <= 'f'
 
 -- | Convert a letter to the corresponding upper-case letter, if any.
@@ -190,22 +190,22 @@ foreign import ccall unsafe "u_gencat"
 
 #else
 
-isControl c		=  c < ' ' || c >= '\DEL' && c <= '\x9f'
-isPrint c		=  not (isControl c)
+isControl c             =  c < ' ' || c >= '\DEL' && c <= '\x9f'
+isPrint c               =  not (isControl c)
 
 -- The upper case ISO characters have the multiplication sign dumped
 -- randomly in the middle of the range.  Go figure.
-isUpper c		=  c >= 'A' && c <= 'Z' || 
+isUpper c               =  c >= 'A' && c <= 'Z' ||
                            c >= '\xC0' && c <= '\xD6' ||
                            c >= '\xD8' && c <= '\xDE'
 -- The lower case ISO characters have the division sign dumped
 -- randomly in the middle of the range.  Go figure.
-isLower c		=  c >= 'a' && c <= 'z' ||
+isLower c               =  c >= 'a' && c <= 'z' ||
                            c >= '\xDF' && c <= '\xF6' ||
                            c >= '\xF8' && c <= '\xFF'
 
-isAlpha c		=  isLower c || isUpper c
-isAlphaNum c		=  isAlpha c || isDigit c
+isAlpha c               =  isLower c || isUpper c
+isAlphaNum c            =  isAlpha c || isDigit c
 
 -- Case-changing operations
 
@@ -213,7 +213,7 @@ toUpper c@(C# c#)
   | isAsciiLower c    = C# (chr# (ord# c# -# 32#))
   | isAscii c         = c
     -- fall-through to the slower stuff.
-  | isLower c	&& c /= '\xDF' && c /= '\xFF'
+  | isLower c   && c /= '\xDF' && c /= '\xFF'
   = unsafeChr (ord c `minusInt` ord 'a' `plusInt` ord 'A')
   | otherwise
   = c
@@ -222,8 +222,8 @@ toUpper c@(C# c#)
 toLower c@(C# c#)
   | isAsciiUpper c = C# (chr# (ord# c# +# 32#))
   | isAscii c      = c
-  | isUpper c	   = unsafeChr (ord c `minusInt` ord 'A' `plusInt` ord 'a')
-  | otherwise	   =  c
+  | isUpper c      = unsafeChr (ord c `minusInt` ord 'A' `plusInt` ord 'a')
+  | otherwise      =  c
 
 #endif
 

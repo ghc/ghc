@@ -14,16 +14,16 @@
 -----------------------------------------------------------------------------
 
 module Data.Word
-  ( 
-	-- * Unsigned integral types
+  (
+        -- * Unsigned integral types
 
-	Word,
-	Word8, Word16, Word32, Word64,
-	
-	-- * Notes
-	
-	-- $notes
-	) where
+        Word,
+        Word8, Word16, Word32, Word64,
+
+        -- * Notes
+
+        -- $notes
+        ) where
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Word
@@ -35,7 +35,7 @@ import Hugs.Word
 
 #ifdef __NHC__
 import NHC.FFI (Word8, Word16, Word32, Word64)
-import NHC.SizedTypes (Word8, Word16, Word32, Word64)	-- instances of Bits
+import NHC.SizedTypes (Word8, Word16, Word32, Word64)   -- instances of Bits
 type Word = Word32
 #endif
 

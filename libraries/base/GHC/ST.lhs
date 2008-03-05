@@ -26,9 +26,9 @@ default ()
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{The @ST@ monad}
-%*							*
+%*                                                      *
 %*********************************************************
 
 The state-transformer monad proper.  By default the monad is strict;
@@ -69,9 +69,9 @@ instance Monad (ST s) where
 
     (ST m) >>= k
       = ST (\ s ->
-	case (m s) of { (# new_s, r #) ->
-	case (k r) of { ST k2 ->
-	(k2 new_s) }})
+        case (m s) of { (# new_s, r #) ->
+        case (k r) of { ST k2 ->
+        (k2 new_s) }})
 
 data STret s a = STret (State# s) a
 
@@ -84,7 +84,7 @@ liftST (ST m) = \s -> case m s of (# s', r #) -> STret s' r
 unsafeInterleaveST :: ST s a -> ST s a
 unsafeInterleaveST (ST m) = ST ( \ s ->
     let
-	r = case m s of (# _, res #) -> res
+        r = case m s of (# _, res #) -> res
     in
     (# s, r #)
   )
@@ -95,13 +95,13 @@ unsafeInterleaveST (ST m) = ST ( \ s ->
 fixST :: (a -> ST s a) -> ST s a
 fixST k = ST $ \ s ->
     let ans       = liftST (k r) s
-	STret _ r = ans
+        STret _ r = ans
     in
     case ans of STret s' x -> (# s', x #)
 
 instance  Show (ST s a)  where
     showsPrec _ _  = showString "<<ST action>>"
-    showList	   = showList__ (showsPrec 0)
+    showList       = showList__ (showsPrec 0)
 \end{code}
 
 Definition of runST
@@ -111,16 +111,16 @@ SLPJ 95/04: Why @runST@ must not have an unfolding; consider:
 \begin{verbatim}
 f x =
   runST ( \ s -> let
-		    (a, s')  = newArray# 100 [] s
-		    (_, s'') = fill_in_array_or_something a x s'
-		  in
-		  freezeArray# a s'' )
+                    (a, s')  = newArray# 100 [] s
+                    (_, s'') = fill_in_array_or_something a x s'
+                  in
+                  freezeArray# a s'' )
 \end{verbatim}
 If we inline @runST@, we'll get:
 \begin{verbatim}
 f x = let
-	(a, s')  = newArray# 100 [] realWorld#{-NB-}
-	(_, s'') = fill_in_array_or_something a x s'
+        (a, s')  = newArray# 100 [] realWorld#{-NB-}
+        (_, s'') = fill_in_array_or_something a x s'
       in
       freezeArray# a s''
 \end{verbatim}
@@ -131,8 +131,8 @@ f = let
     (a, s')  = newArray# 100 [] realWorld#{-NB-} -- YIKES!!!
     in
     \ x ->
-	let (_, s'') = fill_in_array_or_something a x s' in
-	freezeArray# a s''
+        let (_, s'') = fill_in_array_or_something a x s' in
+        freezeArray# a s''
 \end{verbatim}
 All calls to @f@ will share a {\em single} array!  End SLPJ 95/04.
 
@@ -150,7 +150,7 @@ runST st = runSTRep (case st of { ST st_rep -> st_rep })
 
 -- I'm only letting runSTRep be inlined right at the end, in particular *after* full laziness
 -- That's what the "INLINE [0]" says.
--- 		SLPJ Apr 99
+--              SLPJ Apr 99
 -- {-# INLINE [0] runSTRep #-}
 
 -- SDM: further to the above, inline phase 0 is run *before*
@@ -161,5 +161,5 @@ runST st = runSTRep (case st of { ST st_rep -> st_rep })
 {-# NOINLINE runSTRep #-}
 runSTRep :: (forall s. STRep s a) -> a
 runSTRep st_rep = case st_rep realWorld# of
-	      		(# _, r #) -> r
+                        (# _, r #) -> r
 \end{code}

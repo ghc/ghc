@@ -17,26 +17,26 @@
 
 -- #hide
 module GHC.Show
-	(
-	Show(..), ShowS,
+        (
+        Show(..), ShowS,
 
-	-- Instances for Show: (), [], Bool, Ordering, Int, Char
+        -- Instances for Show: (), [], Bool, Ordering, Int, Char
 
-	-- Show support code
-	shows, showChar, showString, showParen, showList__, showSpace,
-	showLitChar, protectEsc, 
-	intToDigit, showSignedInt,
-	appPrec, appPrec1,
+        -- Show support code
+        shows, showChar, showString, showParen, showList__, showSpace,
+        showLitChar, protectEsc,
+        intToDigit, showSignedInt,
+        appPrec, appPrec1,
 
-	-- Character operations
-	asciiTab,
-  ) 
-	where
+        -- Character operations
+        asciiTab,
+  )
+        where
 
 import GHC.Base
 import Data.Maybe
 import Data.Either
-import GHC.List	( (!!), foldr1
+import GHC.List ( (!!), foldr1
 #ifdef USE_REPORT_PRELUDE
                 , concatMap
 #endif
@@ -46,9 +46,9 @@ import GHC.List	( (!!), foldr1
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{The @Show@ class}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -123,11 +123,11 @@ class  Show a  where
     -- That is, 'Text.Read.readsPrec' parses the string produced by
     -- 'showsPrec', and delivers the value that 'showsPrec' started with.
 
-    showsPrec :: Int	-- ^ the operator precedence of the enclosing
-			-- context (a number from @0@ to @11@).
-			-- Function application has precedence @10@.
-	      -> a	-- ^ the value to be converted to a 'String'
-	      -> ShowS
+    showsPrec :: Int    -- ^ the operator precedence of the enclosing
+                        -- context (a number from @0@ to @11@).
+                        -- Function application has precedence @10@.
+              -> a      -- ^ the value to be converted to a 'String'
+              -> ShowS
 
     -- | A specialised variant of 'showsPrec', using precedence context
     -- zero, and returning an ordinary 'String'.
@@ -152,16 +152,16 @@ showList__ showx (x:xs) s = '[' : showx x (showl xs)
     showl (y:ys) = ',' : showx y (showl ys)
 
 appPrec, appPrec1 :: Int
-	-- Use unboxed stuff because we don't have overloaded numerics yet
-appPrec = I# 10#	-- Precedence of application:
-			--   one more than the maximum operator precedence of 9
-appPrec1 = I# 11#	-- appPrec + 1
+        -- Use unboxed stuff because we don't have overloaded numerics yet
+appPrec = I# 10#        -- Precedence of application:
+                        --   one more than the maximum operator precedence of 9
+appPrec1 = I# 11#       -- appPrec + 1
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Simple Instances}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -186,13 +186,13 @@ instance  Show Char  where
     showsPrec _ c    = showChar '\'' . showLitChar c . showChar '\''
 
     showList cs = showChar '"' . showl cs
-		 where showl ""       s = showChar '"' s
-		       showl ('"':xs) s = showString "\\\"" (showl xs s)
-		       showl (x:xs)   s = showLitChar x (showl xs s)
-		-- Making 's' an explicit parameter makes it clear to GHC
-		-- that showl has arity 2, which avoids it allocating an extra lambda
-		-- The sticking point is the recursive call to (showl xs), which
-		-- it can't figure out would be ok with arity 2.
+                 where showl ""       s = showChar '"' s
+                       showl ('"':xs) s = showString "\\\"" (showl xs s)
+                       showl (x:xs)   s = showLitChar x (showl xs s)
+                -- Making 's' an explicit parameter makes it clear to GHC
+                -- that showl has arity 2, which avoids it allocating an extra lambda
+                -- The sticking point is the recursive call to (showl xs), which
+                -- it can't figure out would be ok with arity 2.
 
 instance Show Int where
     showsPrec = showSignedInt
@@ -201,31 +201,31 @@ instance Show a => Show (Maybe a) where
     showsPrec _p Nothing s = showString "Nothing" s
     showsPrec p (Just x) s
                           = (showParen (p > appPrec) $ 
-    			     showString "Just " . 
-			     showsPrec appPrec1 x) s
+                             showString "Just " . 
+                             showsPrec appPrec1 x) s
 
 instance (Show a, Show b) => Show (Either a b) where
     showsPrec p e s =
        (showParen (p > appPrec) $
         case e of
          Left  a -> showString "Left "  . showsPrec appPrec1 a
-	 Right b -> showString "Right " . showsPrec appPrec1 b)
+         Right b -> showString "Right " . showsPrec appPrec1 b)
        s
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Show instances for the first few tuples
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
 -- The explicit 's' parameters are important
 -- Otherwise GHC thinks that "shows x" might take a lot of work to compute
 -- and generates defns like
---	showsPrec _ (x,y) = let sx = shows x; sy = shows y in
---			    \s -> showChar '(' (sx (showChar ',' (sy (showChar ')' s))))
+--      showsPrec _ (x,y) = let sx = shows x; sy = shows y in
+--                          \s -> showChar '(' (sx (showChar ',' (sy (showChar ')' s))))
 
 instance  (Show a, Show b) => Show (a,b)  where
   showsPrec _ (a,b) s = show_tuple [shows a, shows b] s
@@ -243,72 +243,72 @@ instance (Show a, Show b, Show c, Show d, Show e, Show f) => Show (a,b,c,d,e,f) 
   showsPrec _ (a,b,c,d,e,f) s = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g)
-	=> Show (a,b,c,d,e,f,g) where
+        => Show (a,b,c,d,e,f,g) where
   showsPrec _ (a,b,c,d,e,f,g) s 
-	= show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g] s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h)
-	 => Show (a,b,c,d,e,f,g,h) where
+         => Show (a,b,c,d,e,f,g,h) where
   showsPrec _ (a,b,c,d,e,f,g,h) s 
-	= show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h] s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i)
-	 => Show (a,b,c,d,e,f,g,h,i) where
+         => Show (a,b,c,d,e,f,g,h,i) where
   showsPrec _ (a,b,c,d,e,f,g,h,i) s 
-	= show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
-		      shows i] s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
+                      shows i] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j)
-	 => Show (a,b,c,d,e,f,g,h,i,j) where
+         => Show (a,b,c,d,e,f,g,h,i,j) where
   showsPrec _ (a,b,c,d,e,f,g,h,i,j) s 
-	= show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
-		      shows i, shows j] s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
+                      shows i, shows j] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j, Show k)
-	 => Show (a,b,c,d,e,f,g,h,i,j,k) where
+         => Show (a,b,c,d,e,f,g,h,i,j,k) where
   showsPrec _ (a,b,c,d,e,f,g,h,i,j,k) s 
-	= show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
-		      shows i, shows j, shows k] s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
+                      shows i, shows j, shows k] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j, Show k,
-	  Show l)
-	 => Show (a,b,c,d,e,f,g,h,i,j,k,l) where
+          Show l)
+         => Show (a,b,c,d,e,f,g,h,i,j,k,l) where
   showsPrec _ (a,b,c,d,e,f,g,h,i,j,k,l) s 
-	= show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
-		      shows i, shows j, shows k, shows l] s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
+                      shows i, shows j, shows k, shows l] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j, Show k,
-	  Show l, Show m)
-	 => Show (a,b,c,d,e,f,g,h,i,j,k,l,m) where
+          Show l, Show m)
+         => Show (a,b,c,d,e,f,g,h,i,j,k,l,m) where
   showsPrec _ (a,b,c,d,e,f,g,h,i,j,k,l,m) s 
-	= show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
-		      shows i, shows j, shows k, shows l, shows m] s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
+                      shows i, shows j, shows k, shows l, shows m] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j, Show k,
-	  Show l, Show m, Show n)
-	 => Show (a,b,c,d,e,f,g,h,i,j,k,l,m,n) where
+          Show l, Show m, Show n)
+         => Show (a,b,c,d,e,f,g,h,i,j,k,l,m,n) where
   showsPrec _ (a,b,c,d,e,f,g,h,i,j,k,l,m,n) s 
-	= show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
-		      shows i, shows j, shows k, shows l, shows m, shows n] s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
+                      shows i, shows j, shows k, shows l, shows m, shows n] s
 
 instance (Show a, Show b, Show c, Show d, Show e, Show f, Show g, Show h, Show i, Show j, Show k,
-	  Show l, Show m, Show n, Show o)
-	 => Show (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) where
+          Show l, Show m, Show n, Show o)
+         => Show (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) where
   showsPrec _ (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) s 
-	= show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
-		      shows i, shows j, shows k, shows l, shows m, shows n, shows o] s
+        = show_tuple [shows a, shows b, shows c, shows d, shows e, shows f, shows g, shows h, 
+                      shows i, shows j, shows k, shows l, shows m, shows n, shows o] s
 
 show_tuple :: [ShowS] -> ShowS
 show_tuple ss = showChar '('
-	      .	foldr1 (\s r -> s . showChar ',' . r) ss
-	      .	showChar ')'
+              . foldr1 (\s r -> s . showChar ',' . r) ss
+              . showChar ')'
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Support code for @Show@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -343,38 +343,38 @@ Code specific for characters
 --
 -- > showLitChar '\n' s  =  "\\n" ++ s
 --
-showLitChar 		   :: Char -> ShowS
+showLitChar                :: Char -> ShowS
 showLitChar c s | c > '\DEL' =  showChar '\\' (protectEsc isDec (shows (ord c)) s)
-showLitChar '\DEL'	   s =  showString "\\DEL" s
-showLitChar '\\'	   s =  showString "\\\\" s
+showLitChar '\DEL'         s =  showString "\\DEL" s
+showLitChar '\\'           s =  showString "\\\\" s
 showLitChar c s | c >= ' '   =  showChar c s
-showLitChar '\a'	   s =  showString "\\a" s
-showLitChar '\b'	   s =  showString "\\b" s
-showLitChar '\f'	   s =  showString "\\f" s
-showLitChar '\n'	   s =  showString "\\n" s
-showLitChar '\r'	   s =  showString "\\r" s
-showLitChar '\t'	   s =  showString "\\t" s
-showLitChar '\v'	   s =  showString "\\v" s
-showLitChar '\SO'	   s =  protectEsc (== 'H') (showString "\\SO") s
-showLitChar c		   s =  showString ('\\' : asciiTab!!ord c) s
-	-- I've done manual eta-expansion here, becuase otherwise it's
-	-- impossible to stop (asciiTab!!ord) getting floated out as an MFE
+showLitChar '\a'           s =  showString "\\a" s
+showLitChar '\b'           s =  showString "\\b" s
+showLitChar '\f'           s =  showString "\\f" s
+showLitChar '\n'           s =  showString "\\n" s
+showLitChar '\r'           s =  showString "\\r" s
+showLitChar '\t'           s =  showString "\\t" s
+showLitChar '\v'           s =  showString "\\v" s
+showLitChar '\SO'          s =  protectEsc (== 'H') (showString "\\SO") s
+showLitChar c              s =  showString ('\\' : asciiTab!!ord c) s
+        -- I've done manual eta-expansion here, becuase otherwise it's
+        -- impossible to stop (asciiTab!!ord) getting floated out as an MFE
 
 isDec c = c >= '0' && c <= '9'
 
 protectEsc :: (Char -> Bool) -> ShowS -> ShowS
-protectEsc p f		   = f . cont
-			     where cont s@(c:_) | p c = "\\&" ++ s
-				   cont s	      = s
+protectEsc p f             = f . cont
+                             where cont s@(c:_) | p c = "\\&" ++ s
+                                   cont s             = s
 
 
 asciiTab :: [String]
 asciiTab = -- Using an array drags in the array module.  listArray ('\NUL', ' ')
-	   ["NUL", "SOH", "STX", "ETX", "EOT", "ENQ", "ACK", "BEL",
-	    "BS",  "HT",  "LF",  "VT",  "FF",  "CR",  "SO",  "SI", 
-	    "DLE", "DC1", "DC2", "DC3", "DC4", "NAK", "SYN", "ETB",
-	    "CAN", "EM",  "SUB", "ESC", "FS",  "GS",  "RS",  "US", 
-	    "SP"] 
+           ["NUL", "SOH", "STX", "ETX", "EOT", "ENQ", "ACK", "BEL",
+            "BS",  "HT",  "LF",  "VT",  "FF",  "CR",  "SO",  "SI", 
+            "DLE", "DC1", "DC2", "DC3", "DC4", "NAK", "SYN", "ETB",
+            "CAN", "EM",  "SUB", "ESC", "FS",  "GS",  "RS",  "US", 
+            "SP"] 
 \end{code}
 
 Code specific for Ints.
@@ -387,7 +387,7 @@ intToDigit :: Int -> Char
 intToDigit (I# i)
     | i >=# 0#  && i <=#  9# =  unsafeChr (ord '0' `plusInt` I# i)
     | i >=# 10# && i <=# 15# =  unsafeChr (ord 'a' `minusInt` ten `plusInt` I# i)
-    | otherwise		  =  error ("Char.intToDigit: not a digit " ++ show (I# i))
+    | otherwise           =  error ("Char.intToDigit: not a digit " ++ show (I# i))
 
 ten = I# 10#
 
@@ -399,17 +399,17 @@ showSignedInt (I# p) (I# n) r
 itos :: Int# -> String -> String
 itos n# cs
     | n# <# 0# =
-	let I# minInt# = minInt in
-	if n# ==# minInt#
-		-- negateInt# minInt overflows, so we can't do that:
-	   then '-' : itos' (negateInt# (n# `quotInt#` 10#))
+        let I# minInt# = minInt in
+        if n# ==# minInt#
+                -- negateInt# minInt overflows, so we can't do that:
+           then '-' : itos' (negateInt# (n# `quotInt#` 10#))
                              (itos' (negateInt# (n# `remInt#` 10#)) cs)
-	   else '-' : itos' (negateInt# n#) cs
+           else '-' : itos' (negateInt# n#) cs
     | otherwise = itos' n# cs
     where
     itos' :: Int# -> String -> String
     itos' n# cs
         | n# <# 10#  = C# (chr# (ord# '0'# +# n#)) : cs
         | otherwise = case chr# (ord# '0'# +# (n# `remInt#` 10#)) of { c# ->
-		      itos' (n# `quotInt#` 10#) (C# c# : cs) }
+                      itos' (n# `quotInt#` 10#) (C# c# : cs) }
 \end{code}

@@ -16,12 +16,12 @@
 -----------------------------------------------------------------------------
 
 -- #hide
-module GHC.Read 
+module GHC.Read
   ( Read(..)   -- class
-  
+
   -- ReadS type
   , ReadS      -- :: *; = String -> [(a,String)]
-  
+
   -- utility functions
   , reads      -- :: Read a => ReadS a
   , readp      -- :: Read a => ReadP a
@@ -29,11 +29,11 @@ module GHC.Read
   , read       -- :: Read a => String -> a
 
   -- H98 compatibility
-  , lex	        -- :: ReadS String
-  , lexLitChar	-- :: ReadS String
-  , readLitChar	-- :: ReadS Char
-  , lexDigits	-- :: ReadS String
-  
+  , lex         -- :: ReadS String
+  , lexLitChar  -- :: ReadS String
+  , readLitChar -- :: ReadS Char
+  , lexDigits   -- :: ReadS String
+
   -- defining readers
   , lexP       -- :: ReadPrec Lexeme
   , paren      -- :: ReadPrec a -> ReadPrec a
@@ -67,7 +67,7 @@ import Data.Maybe
 import Data.Either
 
 #ifndef __HADDOCK__
-import {-# SOURCE #-} GHC.Unicode	( isDigit )
+import {-# SOURCE #-} GHC.Unicode       ( isDigit )
 #endif
 import GHC.Num
 import GHC.Real
@@ -89,17 +89,17 @@ readParen       :: Bool -> ReadS a -> ReadS a
 readParen b g   =  if b then mandatory else optional
                    where optional r  = g r ++ mandatory r
                          mandatory r = do
-				("(",s) <- lex r
-				(x,t)   <- optional s
-				(")",u) <- lex t
-				return (x,u)
+                                ("(",s) <- lex r
+                                (x,t)   <- optional s
+                                (")",u) <- lex t
+                                return (x,u)
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{The @Read@ class}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -187,10 +187,10 @@ class Read a where
   -- 'Text.Show.showsPrec', and delivers the value that
   -- 'Text.Show.showsPrec' started with.
 
-  readsPrec    :: Int	-- ^ the operator precedence of the enclosing
-			-- context (a number from @0@ to @11@).
-			-- Function application has precedence @10@.
-	        -> ReadS a
+  readsPrec    :: Int   -- ^ the operator precedence of the enclosing
+                        -- context (a number from @0@ to @11@).
+                        -- Function application has precedence @10@.
+                -> ReadS a
 
   -- | The method 'readList' is provided to allow the programmer to
   -- give a specialised way of parsing lists of values.
@@ -238,8 +238,8 @@ readEither :: Read a => String -> Either String a
 readEither s =
   case [ x | (x,"") <- readPrec_to_S read' minPrec s ] of
     [x] -> Right x
-    []	-> Left "Prelude.read: no parse"
-    _	-> Left "Prelude.read: ambiguous parse"
+    []  -> Left "Prelude.read: no parse"
+    _   -> Left "Prelude.read: ambiguous parse"
  where
   read' =
     do x <- readPrec
@@ -269,7 +269,7 @@ read s = either error id (readEither s)
 -- * Octal and hexadecimal numerics are not recognized as a single token
 --
 -- * Comments are not treated properly
-lex :: ReadS String		-- As defined by H98
+lex :: ReadS String             -- As defined by H98
 lex s  = readP_to_S L.hsLex s
 
 -- | Read a string representation of a character, using Haskell
@@ -277,11 +277,11 @@ lex s  = readP_to_S L.hsLex s
 --
 -- > lexLitChar  "\\nHello"  =  [("\\n", "Hello")]
 --
-lexLitChar :: ReadS String	-- As defined by H98
+lexLitChar :: ReadS String      -- As defined by H98
 lexLitChar = readP_to_S (do { (s, _) <- P.gather L.lexChar ;
-			      return s })
-	-- There was a skipSpaces before the P.gather L.lexChar,
-	-- but that seems inconsistent with readLitChar
+                              return s })
+        -- There was a skipSpaces before the P.gather L.lexChar,
+        -- but that seems inconsistent with readLitChar
 
 -- | Read a string representation of a character, using Haskell
 -- source-language escape conventions, and convert it to the character
@@ -289,7 +289,7 @@ lexLitChar = readP_to_S (do { (s, _) <- P.gather L.lexChar ;
 --
 -- > readLitChar "\\nHello"  =  [('\n', "Hello")]
 --
-readLitChar :: ReadS Char	-- As defined by H98
+readLitChar :: ReadS Char       -- As defined by H98
 readLitChar = readP_to_S L.lexChar
 
 -- | Reads a non-empty string of decimal digits.
@@ -305,16 +305,16 @@ lexP = lift L.lex
 
 paren :: ReadPrec a -> ReadPrec a
 -- ^ @(paren p)@ parses \"(P0)\"
---	where @p@ parses \"P0\" in precedence context zero
+--      where @p@ parses \"P0\" in precedence context zero
 paren p = do L.Punc "(" <- lexP
-	     x          <- reset p
-	     L.Punc ")" <- lexP
-	     return x
+             x          <- reset p
+             L.Punc ")" <- lexP
+             return x
 
 parens :: ReadPrec a -> ReadPrec a
 -- ^ @(parens p)@ parses \"P\", \"(P0)\", \"((P0))\", etc, 
---	where @p@ parses \"P\"  in the current precedence context
---	    and parses \"P0\" in precedence context zero
+--      where @p@ parses \"P\"  in the current precedence context
+--          and parses \"P0\" in precedence context zero
 parens p = optional
  where
   optional  = p +++ mandatory
@@ -346,16 +346,16 @@ choose :: [(String, ReadPrec a)] -> ReadPrec a
 -- Esp useful for nullary constructors; e.g.
 --    @choose [(\"A\", return A), (\"B\", return B)]@
 choose sps = foldr ((+++) . try_one) pfail sps
-	   where
-	     try_one (s,p) = do { L.Ident s' <- lexP ;
-				  if s == s' then p else pfail }
+           where
+             try_one (s,p) = do { L.Ident s' <- lexP ;
+                                  if s == s' then p else pfail }
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Simple instances of Read}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -368,11 +368,11 @@ instance Read Char where
 
   readListPrec =
     parens
-    ( do L.String s <- lexP	-- Looks for "foo"
+    ( do L.String s <- lexP     -- Looks for "foo"
          return s
      +++
-      readListPrecDefault	-- Looks for ['f','o','o']
-    )				-- (more generous than H98 spec)
+      readListPrecDefault       -- Looks for ['f','o','o']
+    )                           -- (more generous than H98 spec)
 
   readList = readListDefault
 
@@ -406,9 +406,9 @@ instance Read Ordering where
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Structure instances of Read: Maybe, List etc}
-%*							*
+%*                                                      *
 %*********************************************************
 
 For structured instances of Read we start using the precedences.  The
@@ -440,7 +440,7 @@ instance Read a => Read (Maybe a) where
         return Nothing
      +++
      prec appPrec (
-	do L.Ident "Just" <- lexP
+        do L.Ident "Just" <- lexP
            x              <- step readPrec
            return (Just x))
     )
@@ -472,10 +472,10 @@ instance Read a => Read [a] where
 
 instance  (Ix a, Read a, Read b) => Read (Array a b)  where
     readPrec = parens $ prec appPrec $
-	       do L.Ident "array" <- lexP
-		  bounds <- step readPrec
-		  vals   <- step readPrec
-		  return (array bounds vals)
+               do L.Ident "array" <- lexP
+                  bounds <- step readPrec
+                  vals   <- step readPrec
+                  return (array bounds vals)
 
     readListPrec = readListPrecDefault
     readList     = readListDefault
@@ -488,9 +488,9 @@ instance Read L.Lexeme where
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Numeric instances of Read}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -554,9 +554,9 @@ instance (Integral a, Read a) => Read (Ratio a) where
 
 
 %*********************************************************
-%*							*
-	Tuple instances of Read, up to size 15
-%*							*
+%*                                                      *
+        Tuple instances of Read, up to size 15
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -585,29 +585,29 @@ read_comma = do { L.Punc "," <- lexP; return () }
 read_tup2 :: (Read a, Read b) => ReadPrec (a,b)
 -- Reads "a , b"  no parens!
 read_tup2 = do x <- readPrec
-	       read_comma
-	       y <- readPrec
-	       return (x,y)
+               read_comma
+               y <- readPrec
+               return (x,y)
 
 read_tup4 :: (Read a, Read b, Read c, Read d) => ReadPrec (a,b,c,d)
-read_tup4 = do	(a,b) <- read_tup2
-		read_comma
-		(c,d) <- read_tup2
-		return (a,b,c,d)
+read_tup4 = do  (a,b) <- read_tup2
+                read_comma
+                (c,d) <- read_tup2
+                return (a,b,c,d)
 
 
 read_tup8 :: (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h)
-	  => ReadPrec (a,b,c,d,e,f,g,h)
-read_tup8 = do	(a,b,c,d) <- read_tup4
-		read_comma
-		(e,f,g,h) <- read_tup4
-		return (a,b,c,d,e,f,g,h)
+          => ReadPrec (a,b,c,d,e,f,g,h)
+read_tup8 = do  (a,b,c,d) <- read_tup4
+                read_comma
+                (e,f,g,h) <- read_tup4
+                return (a,b,c,d,e,f,g,h)
 
 
 instance (Read a, Read b, Read c) => Read (a, b, c) where
   readPrec = wrap_tup (do { (a,b) <- read_tup2; read_comma 
-			  ; c <- readPrec 
-			  ; return (a,b,c) })
+                          ; c <- readPrec 
+                          ; return (a,b,c) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
@@ -618,99 +618,99 @@ instance (Read a, Read b, Read c, Read d) => Read (a, b, c, d) where
 
 instance (Read a, Read b, Read c, Read d, Read e) => Read (a, b, c, d, e) where
   readPrec = wrap_tup (do { (a,b,c,d) <- read_tup4; read_comma
-			  ; e <- readPrec
-			  ; return (a,b,c,d,e) })
+                          ; e <- readPrec
+                          ; return (a,b,c,d,e) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance (Read a, Read b, Read c, Read d, Read e, Read f)
-	=> Read (a, b, c, d, e, f) where
+        => Read (a, b, c, d, e, f) where
   readPrec = wrap_tup (do { (a,b,c,d) <- read_tup4; read_comma
-			  ; (e,f) <- read_tup2
-			  ; return (a,b,c,d,e,f) })
+                          ; (e,f) <- read_tup2
+                          ; return (a,b,c,d,e,f) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g)
-	=> Read (a, b, c, d, e, f, g) where
+        => Read (a, b, c, d, e, f, g) where
   readPrec = wrap_tup (do { (a,b,c,d) <- read_tup4; read_comma
-			  ; (e,f) <- read_tup2; read_comma
-			  ; g <- readPrec
-			  ; return (a,b,c,d,e,f,g) })
+                          ; (e,f) <- read_tup2; read_comma
+                          ; g <- readPrec
+                          ; return (a,b,c,d,e,f,g) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h)
-	=> Read (a, b, c, d, e, f, g, h) where
+        => Read (a, b, c, d, e, f, g, h) where
   readPrec     = wrap_tup read_tup8
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
-	  Read i)
-	=> Read (a, b, c, d, e, f, g, h, i) where
+          Read i)
+        => Read (a, b, c, d, e, f, g, h, i) where
   readPrec = wrap_tup (do { (a,b,c,d,e,f,g,h) <- read_tup8; read_comma
-			  ; i <- readPrec
-			  ; return (a,b,c,d,e,f,g,h,i) })
+                          ; i <- readPrec
+                          ; return (a,b,c,d,e,f,g,h,i) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
-	  Read i, Read j)
-	=> Read (a, b, c, d, e, f, g, h, i, j) where
+          Read i, Read j)
+        => Read (a, b, c, d, e, f, g, h, i, j) where
   readPrec = wrap_tup (do { (a,b,c,d,e,f,g,h) <- read_tup8; read_comma
-			  ; (i,j) <- read_tup2
-			  ; return (a,b,c,d,e,f,g,h,i,j) })
+                          ; (i,j) <- read_tup2
+                          ; return (a,b,c,d,e,f,g,h,i,j) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
-	  Read i, Read j, Read k)
-	=> Read (a, b, c, d, e, f, g, h, i, j, k) where
+          Read i, Read j, Read k)
+        => Read (a, b, c, d, e, f, g, h, i, j, k) where
   readPrec = wrap_tup (do { (a,b,c,d,e,f,g,h) <- read_tup8; read_comma
-			  ; (i,j) <- read_tup2; read_comma
-			  ; k <- readPrec
-			  ; return (a,b,c,d,e,f,g,h,i,j,k) })
+                          ; (i,j) <- read_tup2; read_comma
+                          ; k <- readPrec
+                          ; return (a,b,c,d,e,f,g,h,i,j,k) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
-	  Read i, Read j, Read k, Read l)
-	=> Read (a, b, c, d, e, f, g, h, i, j, k, l) where
+          Read i, Read j, Read k, Read l)
+        => Read (a, b, c, d, e, f, g, h, i, j, k, l) where
   readPrec = wrap_tup (do { (a,b,c,d,e,f,g,h) <- read_tup8; read_comma
-			  ; (i,j,k,l) <- read_tup4
-			  ; return (a,b,c,d,e,f,g,h,i,j,k,l) })
+                          ; (i,j,k,l) <- read_tup4
+                          ; return (a,b,c,d,e,f,g,h,i,j,k,l) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
-	  Read i, Read j, Read k, Read l, Read m)
-	=> Read (a, b, c, d, e, f, g, h, i, j, k, l, m) where
+          Read i, Read j, Read k, Read l, Read m)
+        => Read (a, b, c, d, e, f, g, h, i, j, k, l, m) where
   readPrec = wrap_tup (do { (a,b,c,d,e,f,g,h) <- read_tup8; read_comma
-			  ; (i,j,k,l) <- read_tup4; read_comma
-			  ; m <- readPrec
-			  ; return (a,b,c,d,e,f,g,h,i,j,k,l,m) })
+                          ; (i,j,k,l) <- read_tup4; read_comma
+                          ; m <- readPrec
+                          ; return (a,b,c,d,e,f,g,h,i,j,k,l,m) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
-	  Read i, Read j, Read k, Read l, Read m, Read n)
-	=> Read (a, b, c, d, e, f, g, h, i, j, k, l, m, n) where
+          Read i, Read j, Read k, Read l, Read m, Read n)
+        => Read (a, b, c, d, e, f, g, h, i, j, k, l, m, n) where
   readPrec = wrap_tup (do { (a,b,c,d,e,f,g,h) <- read_tup8; read_comma
-			  ; (i,j,k,l) <- read_tup4; read_comma
-			  ; (m,n) <- read_tup2
-			  ; return (a,b,c,d,e,f,g,h,i,j,k,l,m,n) })
+                          ; (i,j,k,l) <- read_tup4; read_comma
+                          ; (m,n) <- read_tup2
+                          ; return (a,b,c,d,e,f,g,h,i,j,k,l,m,n) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
 
 instance (Read a, Read b, Read c, Read d, Read e, Read f, Read g, Read h,
-	  Read i, Read j, Read k, Read l, Read m, Read n, Read o)
-	=> Read (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) where
+          Read i, Read j, Read k, Read l, Read m, Read n, Read o)
+        => Read (a, b, c, d, e, f, g, h, i, j, k, l, m, n, o) where
   readPrec = wrap_tup (do { (a,b,c,d,e,f,g,h) <- read_tup8; read_comma
-			  ; (i,j,k,l) <- read_tup4; read_comma
-			  ; (m,n) <- read_tup2; read_comma
-			  ; o <- readPrec
-			  ; return (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) })
+                          ; (i,j,k,l) <- read_tup4; read_comma
+                          ; (m,n) <- read_tup2; read_comma
+                          ; o <- readPrec
+                          ; return (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) })
   readListPrec = readListPrecDefault
   readList     = readListDefault
 \end{code}

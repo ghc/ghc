@@ -16,12 +16,12 @@
 module Text.Read.Lex
   -- lexing types
   ( Lexeme(..)  -- :: *; Show, Eq
-  		
-  -- lexer	
-  , lex         -- :: ReadP Lexeme	Skips leading spaces
-  , hsLex	-- :: ReadP String
-  , lexChar	-- :: ReadP Char	Reads just one char, with H98 escapes
-  
+
+  -- lexer      
+  , lex         -- :: ReadP Lexeme      Skips leading spaces
+  , hsLex       -- :: ReadP String
+  , lexChar     -- :: ReadP Char        Reads just one char, with H98 escapes
+
   , readIntP    -- :: Num a => a -> (Char -> Bool) -> (Char -> Int) -> ReadP a
   , readOctP    -- :: Num a => ReadP a 
   , readDecP    -- :: Num a => ReadP a
@@ -39,7 +39,7 @@ import GHC.Show( Show(..) )
 import {-# SOURCE #-} GHC.Unicode ( isSpace, isAlpha, isAlphaNum )
 #endif
 import GHC.Real( Ratio(..), Integral, Rational, (%), fromIntegral, 
-		 toInteger, (^), (^^), infinity, notANumber )
+                 toInteger, (^), (^^), infinity, notANumber )
 import GHC.List
 import GHC.Enum( maxBound )
 #else
@@ -58,13 +58,13 @@ import Control.Monad
 
 -- ^ Haskell lexemes.
 data Lexeme
-  = Char   Char		-- ^ Character literal
-  | String String	-- ^ String literal, with escapes interpreted
-  | Punc   String 	-- ^ Punctuation or reserved symbol, e.g. @(@, @::@
-  | Ident  String	-- ^ Haskell identifier, e.g. @foo@, @Baz@
-  | Symbol String	-- ^ Haskell symbol, e.g. @>>@, @:%@
-  | Int Integer		-- ^ Integer literal
-  | Rat Rational	-- ^ Floating point literal
+  = Char   Char         -- ^ Character literal
+  | String String       -- ^ String literal, with escapes interpreted
+  | Punc   String       -- ^ Punctuation or reserved symbol, e.g. @(@, @::@
+  | Ident  String       -- ^ Haskell identifier, e.g. @foo@, @Baz@
+  | Symbol String       -- ^ Haskell symbol, e.g. @>>@, @:%@
+  | Int Integer         -- ^ Integer literal
+  | Rat Rational        -- ^ Floating point literal
   | EOF
  deriving (Eq, Show)
 
@@ -77,25 +77,25 @@ lex = skipSpaces >> lexToken
 hsLex :: ReadP String
 -- ^ Haskell lexer: returns the lexed string, rather than the lexeme
 hsLex = do skipSpaces 
-	   (s,_) <- gather lexToken
-	   return s
+           (s,_) <- gather lexToken
+           return s
 
 lexToken :: ReadP Lexeme
 lexToken = lexEOF     +++
-      	   lexLitChar +++ 
-      	   lexString  +++ 
-      	   lexPunc    +++ 
-      	   lexSymbol  +++ 
-      	   lexId      +++ 
-      	   lexNumber
+           lexLitChar +++ 
+           lexString  +++ 
+           lexPunc    +++ 
+           lexSymbol  +++ 
+           lexId      +++ 
+           lexNumber
 
 
 -- ----------------------------------------------------------------------
 -- End of file
 lexEOF :: ReadP Lexeme
 lexEOF = do s <- look
-	    guard (null s)
-	    return EOF
+            guard (null s)
+            return EOF
 
 -- ---------------------------------------------------------------------------
 -- Single character lexemes
@@ -114,9 +114,9 @@ lexSymbol :: ReadP Lexeme
 lexSymbol =
   do s <- munch1 isSymbolChar
      if s `elem` reserved_ops then 
-	return (Punc s)		-- Reserved-ops count as punctuation
+        return (Punc s)         -- Reserved-ops count as punctuation
       else
-	return (Symbol s)
+        return (Symbol s)
  where
   isSymbolChar c = c `elem` "!@#$%&*+./<=>?\\^|:-~"
   reserved_ops   = ["..", "::", "=", "\\", "|", "<-", "->", "@", "~", "=>"]
@@ -127,16 +127,16 @@ lexSymbol =
 lexId :: ReadP Lexeme
 lexId = lex_nan <++ lex_id
   where
-	-- NaN and Infinity look like identifiers, so
-	-- we parse them first.  
+        -- NaN and Infinity look like identifiers, so
+        -- we parse them first.  
     lex_nan = (string "NaN"      >> return (Rat notANumber)) +++
-  	      (string "Infinity" >> return (Rat infinity))
+              (string "Infinity" >> return (Rat infinity))
   
     lex_id = do c <- satisfy isIdsChar
-  		s <- munch isIdfChar
-  		return (Ident (c:s))
+                s <- munch isIdfChar
+                return (Ident (c:s))
 
-  	  -- Identifiers can start with a '_'
+          -- Identifiers can start with a '_'
     isIdsChar c = isAlpha c || c == '_'
     isIdfChar c = isAlphaNum c || c `elem` "_'"
 
@@ -153,7 +153,7 @@ lexLitChar :: ReadP Lexeme
 lexLitChar =
   do char '\''
      (c,esc) <- lexCharE
-     guard (esc || c /= '\'')	-- Eliminate '' possibility
+     guard (esc || c /= '\'')   -- Eliminate '' possibility
      char '\''
      return (Char c)
 
@@ -235,9 +235,9 @@ lexCharE =
   lexAscii =
     do choice
          [ (string "SOH" >> return '\SOH') <++
-	   (string "SO"  >> return '\SO') 
-		-- \SO and \SOH need maximal-munch treatment
-		-- See the Haskell report Sect 2.6
+           (string "SO"  >> return '\SO') 
+                -- \SO and \SOH need maximal-munch treatment
+                -- See the Haskell report Sect 2.6
 
          , string "NUL" >> return '\NUL'
          , string "STX" >> return '\STX'
@@ -287,10 +287,10 @@ lexString =
        if c /= '"' || esc
          then body (f.(c:))
          else let s = f "" in
-	      return (String s)
+              return (String s)
 
   lexStrItem = (lexEmpty >> lexStrItem)
-	       +++ lexCharE
+               +++ lexCharE
   
   lexEmpty =
     do char '\\'
@@ -308,26 +308,26 @@ type Digits = [Int]
 
 lexNumber :: ReadP Lexeme
 lexNumber 
-  = lexHexOct  <++	-- First try for hex or octal 0x, 0o etc
-			-- If that fails, try for a decimal number
-    lexDecNumber 	-- Start with ordinary digits
-		
+  = lexHexOct  <++      -- First try for hex or octal 0x, 0o etc
+                        -- If that fails, try for a decimal number
+    lexDecNumber        -- Start with ordinary digits
+                
 lexHexOct :: ReadP Lexeme
 lexHexOct
-  = do	char '0'
-	base <- lexBaseChar
-	digits <- lexDigits base
-	return (Int (val (fromIntegral base) 0 digits))
+  = do  char '0'
+        base <- lexBaseChar
+        digits <- lexDigits base
+        return (Int (val (fromIntegral base) 0 digits))
 
 lexBaseChar :: ReadP Int
 -- Lex a single character indicating the base; fail if not there
 lexBaseChar = do { c <- get;
-		   case c of
-		   	'o' -> return 8
-	           	'O' -> return 8
-	           	'x' -> return 16
-        	   	'X' -> return 16
-	           	_   -> pfail } 
+                   case c of
+                        'o' -> return 8
+                        'O' -> return 8
+                        'x' -> return 16
+                        'X' -> return 16
+                        _   -> pfail } 
 
 lexDecNumber :: ReadP Lexeme
 lexDecNumber =
@@ -339,19 +339,19 @@ lexDecNumber =
   value xs mFrac mExp = valueFracExp (val 10 0 xs) mFrac mExp
   
   valueFracExp :: Integer -> Maybe Digits -> Maybe Integer 
-	       -> Lexeme
-  valueFracExp a Nothing Nothing	
-    = Int a						-- 43
+               -> Lexeme
+  valueFracExp a Nothing Nothing        
+    = Int a                                             -- 43
   valueFracExp a Nothing (Just exp)
-    | exp >= 0  = Int (a * (10 ^ exp))			-- 43e7
-    | otherwise = Rat (valExp (fromInteger a) exp)	-- 43e-7
+    | exp >= 0  = Int (a * (10 ^ exp))                  -- 43e7
+    | otherwise = Rat (valExp (fromInteger a) exp)      -- 43e-7
   valueFracExp a (Just fs) mExp 
      = case mExp of
-	 Nothing  -> Rat rat				-- 4.3
-	 Just exp -> Rat (valExp rat exp)		-- 4.3e-4
+         Nothing  -> Rat rat                            -- 4.3
+         Just exp -> Rat (valExp rat exp)               -- 4.3e-4
      where
-	rat :: Rational
-	rat = fromInteger a + frac 10 0 1 fs
+        rat :: Rational
+        rat = fromInteger a + frac 10 0 1 fs
 
   valExp :: Rational -> Integer -> Rational
   valExp rat exp = rat * (10 ^^ exp)
@@ -360,13 +360,13 @@ lexFrac :: ReadP (Maybe Digits)
 -- Read the fractional part; fail if it doesn't
 -- start ".d" where d is a digit
 lexFrac = do char '.'
-	     frac <- lexDigits 10
-	     return (Just frac)
+             frac <- lexDigits 10
+             return (Just frac)
 
 lexExp :: ReadP (Maybe Integer)
 lexExp = do char 'e' +++ char 'E'
             exp <- signedExp +++ lexInteger 10
-	    return (Just exp)
+            return (Just exp)
  where
    signedExp 
      = do c <- char '-' +++ char '+'

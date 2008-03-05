@@ -20,9 +20,9 @@ module Control.Monad
     , Monad((>>=), (>>), return, fail)
 
     , MonadPlus (   -- class context: Monad
-	  mzero     -- :: (MonadPlus m) => m a
-	, mplus     -- :: (MonadPlus m) => m a -> m a -> m a
-	)
+          mzero     -- :: (MonadPlus m) => m a
+        , mplus     -- :: (MonadPlus m) => m a -> m a -> m a
+        )
     -- * Functions
 
     -- ** Naming conventions
@@ -88,15 +88,15 @@ infixr 1 =<<
 -- | Same as '>>=', but with the arguments interchanged.
 {-# SPECIALISE (=<<) :: (a -> [b]) -> [a] -> [b] #-}
 (=<<)           :: Monad m => (a -> m b) -> m a -> m b
-f =<< x		= x >>= f
+f =<< x         = x >>= f
 
 -- | Evaluate each action in the sequence from left to right,
 -- and collect the results.
 sequence       :: Monad m => [m a] -> m [a] 
 {-# INLINE sequence #-}
 sequence ms = foldr k (return []) ms
-	    where
-	      k m m' = do { x <- m; xs <- m'; return (x:xs) }
+            where
+              k m m' = do { x <- m; xs <- m'; return (x:xs) }
 
 -- | Evaluate each action in the sequence from left to right,
 -- and ignore the results.
@@ -128,7 +128,7 @@ class Monad m => MonadPlus m where
    --
    -- (but the instance for 'System.IO.IO' defined in Control.Monad.Error
    -- in the mtl package does not satisfy the second one).
-   mzero :: m a	
+   mzero :: m a 
    -- | an associative operation
    mplus :: m a -> m a -> m a
 
@@ -219,15 +219,15 @@ the list arguments. This could be an issue where '(>>)' and the `folded
 function' are not commutative.
 
 
->	foldM f a1 [x1, x2, ..., xm ]
+>       foldM f a1 [x1, x2, ..., xm ]
 
 ==  
 
->	do
->	  a2 <- f a1 x1
->	  a3 <- f a2 x2
->	  ...
->	  f am xm
+>       do
+>         a2 <- f a1 x1
+>         a3 <- f a2 x2
+>         ...
+>         f am xm
 
 If right-to-left evaluation is required, the input list should be reversed.
 -}
@@ -251,7 +251,7 @@ replicateM_ n x   = sequence_ (replicate n x)
 
 {- | Conditional execution of monadic expressions. For example, 
 
->	when debug (putStr "Debugging\n")
+>       when debug (putStr "Debugging\n")
 
 will output the string @Debugging\\n@ if the Boolean value @debug@ is 'True',
 and otherwise do nothing.
@@ -272,8 +272,8 @@ liftM f m1              = do { x1 <- m1; return (f x1) }
 -- | Promote a function to a monad, scanning the monadic arguments from
 -- left to right.  For example,
 --
--- >	liftM2 (+) [0,1] [0,2] = [0,2,1,3]
--- >	liftM2 (+) (Just 1) Nothing = Nothing
+-- >    liftM2 (+) [0,1] [0,2] = [0,2,1,3]
+-- >    liftM2 (+) (Just 1) Nothing = Nothing
 --
 liftM2  :: (Monad m) => (a1 -> a2 -> r) -> m a1 -> m a2 -> m r
 liftM2 f m1 m2          = do { x1 <- m1; x2 <- m2; return (f x1 x2) }
@@ -296,11 +296,11 @@ liftM5 f m1 m2 m3 m4 m5 = do { x1 <- m1; x2 <- m2; x3 <- m3; x4 <- m4; x5 <- m5;
 {- | In many situations, the 'liftM' operations can be replaced by uses of
 'ap', which promotes function application. 
 
->	return f `ap` x1 `ap` ... `ap` xn
+>       return f `ap` x1 `ap` ... `ap` xn
 
 is equivalent to 
 
->	liftMn f x1 x2 ... xn
+>       liftMn f x1 x2 ... xn
 
 -}
 

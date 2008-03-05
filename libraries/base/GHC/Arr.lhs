@@ -32,9 +32,9 @@ default ()
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{The @Ix@ class}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -60,48 +60,48 @@ default ()
 --
 class (Ord a) => Ix a where
     -- | The list of values in the subrange defined by a bounding pair.
-    range		:: (a,a) -> [a]
+    range               :: (a,a) -> [a]
     -- | The position of a subscript in the subrange.
-    index		:: (a,a) -> a -> Int
+    index               :: (a,a) -> a -> Int
     -- | Like 'index', but without checking that the value is in range.
-    unsafeIndex		:: (a,a) -> a -> Int
+    unsafeIndex         :: (a,a) -> a -> Int
     -- | Returns 'True' the given subscript lies in the range defined
     -- the bounding pair.
-    inRange		:: (a,a) -> a -> Bool
+    inRange             :: (a,a) -> a -> Bool
     -- | The size of the subrange defined by a bounding pair.
-    rangeSize		:: (a,a) -> Int
+    rangeSize           :: (a,a) -> Int
     -- | like 'rangeSize', but without checking that the upper bound is
     -- in range.
     unsafeRangeSize     :: (a,a) -> Int
 
-	-- Must specify one of index, unsafeIndex
-    index b i | inRange b i = unsafeIndex b i	
-	      | otherwise   = error "Error in array index"
+        -- Must specify one of index, unsafeIndex
+    index b i | inRange b i = unsafeIndex b i   
+              | otherwise   = error "Error in array index"
     unsafeIndex b i = index b i
 
     rangeSize b@(_l,h) | inRange b h = unsafeIndex b h + 1
-		       | otherwise   = 0	-- This case is only here to
-						-- check for an empty range
-	-- NB: replacing (inRange b h) by (l <= h) fails for
-	--     tuples.  E.g.  (1,2) <= (2,1) but the range is empty
+                       | otherwise   = 0        -- This case is only here to
+                                                -- check for an empty range
+        -- NB: replacing (inRange b h) by (l <= h) fails for
+        --     tuples.  E.g.  (1,2) <= (2,1) but the range is empty
 
     unsafeRangeSize b@(_l,h) = unsafeIndex b h + 1
 \end{code}
 
 Note that the following is NOT right
-	rangeSize (l,h) | l <= h    = index b h + 1
-			| otherwise = 0
+        rangeSize (l,h) | l <= h    = index b h + 1
+                        | otherwise = 0
 
 Because it might be the case that l<h, but the range
 is nevertheless empty.  Consider
-	((1,2),(2,1))
+        ((1,2),(2,1))
 Here l<h, but the second index ranges from 2..1 and
 hence is empty
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Instances of @Ix@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -113,8 +113,8 @@ indexError :: Show a => (a,a) -> a -> String -> b
 indexError rng i tp
   = error (showString "Ix{" . showString tp . showString "}.index: Index " .
            showParen True (showsPrec 0 i) .
-	   showString " out of range " $
-	   showParen True (showsPrec 0 rng) "")
+           showString " out of range " $
+           showParen True (showsPrec 0 rng) "")
 
 ----------------------------------------------------------------------
 instance  Ix Char  where
@@ -125,22 +125,22 @@ instance  Ix Char  where
     unsafeIndex (m,_n) i = fromEnum i - fromEnum m
 
     index b i | inRange b i =  unsafeIndex b i
-	      | otherwise   =  indexError b i "Char"
+              | otherwise   =  indexError b i "Char"
 
-    inRange (m,n) i	=  m <= i && i <= n
+    inRange (m,n) i     =  m <= i && i <= n
 
 ----------------------------------------------------------------------
 instance  Ix Int  where
     {-# INLINE range #-}
-	-- The INLINE stops the build in the RHS from getting inlined,
-	-- so that callers can fuse with the result of range
+        -- The INLINE stops the build in the RHS from getting inlined,
+        -- so that callers can fuse with the result of range
     range (m,n) = [m..n]
 
     {-# INLINE unsafeIndex #-}
     unsafeIndex (m,_n) i = i - m
 
     index b i | inRange b i =  unsafeIndex b i
-	      | otherwise   =  indexError b i "Int"
+              | otherwise   =  indexError b i "Int"
 
     {-# INLINE inRange #-}
     inRange (I# m,I# n) (I# i) =  m <=# i && i <=# n
@@ -154,9 +154,9 @@ instance  Ix Integer  where
     unsafeIndex (m,_n) i   = fromInteger (i - m)
 
     index b i | inRange b i =  unsafeIndex b i
-	      | otherwise   =  indexError b i "Integer"
+              | otherwise   =  indexError b i "Integer"
 
-    inRange (m,n) i	=  m <= i && i <= n
+    inRange (m,n) i     =  m <= i && i <= n
 
 ----------------------------------------------------------------------
 instance Ix Bool where -- as derived
@@ -167,7 +167,7 @@ instance Ix Bool where -- as derived
     unsafeIndex (l,_) i = fromEnum i - fromEnum l
 
     index b i | inRange b i =  unsafeIndex b i
-	      | otherwise   =  indexError b i "Bool"
+              | otherwise   =  indexError b i "Bool"
 
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
@@ -180,7 +180,7 @@ instance Ix Ordering where -- as derived
     unsafeIndex (l,_) i = fromEnum i - fromEnum l
 
     index b i | inRange b i =  unsafeIndex b i
-	      | otherwise   =  indexError b i "Ordering"
+              | otherwise   =  indexError b i "Ordering"
 
     inRange (l,u) i = fromEnum i >= fromEnum l && fromEnum i <= fromEnum u
 
@@ -277,9 +277,9 @@ instance  (Ix a1, Ix a2, Ix a3, Ix a4, Ix a5) => Ix (a1,a2,a3,a4,a5)  where
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{The @Array@ types}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -312,8 +312,8 @@ data STArray s i e
                                        -- used to make sure an index is
                                        -- really in range
                    (MutableArray# s e) -- The actual elements
-	-- No Ix context for STArray.  They are stupid,
-	-- and force an Ix context on the equality instance.
+        -- No Ix context for STArray.  They are stupid,
+        -- and force an Ix context on the equality instance.
 
 -- Just pointer equality on mutable arrays:
 instance Eq (STArray s i e) where
@@ -323,9 +323,9 @@ instance Eq (STArray s i e) where
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Operations on immutable arrays}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -360,18 +360,18 @@ arrEleBottom = error "(Array.!): undefined array element"
 -- with which the array was constructed.
 {-# INLINE array #-}
 array :: Ix i
-	=> (i,i)	-- ^ a pair of /bounds/, each of the index type
-			-- of the array.  These bounds are the lowest and
-			-- highest indices in the array, in that order.
-			-- For example, a one-origin vector of length
-			-- '10' has bounds '(1,10)', and a one-origin '10'
-			-- by '10' matrix has bounds '((1,1),(10,10))'.
-	-> [(i, e)]	-- ^ a list of /associations/ of the form
-			-- (/index/, /value/).  Typically, this list will
-			-- be expressed as a comprehension.  An
-			-- association '(i, x)' defines the value of
-			-- the array at index 'i' to be 'x'.
-	-> Array i e
+        => (i,i)        -- ^ a pair of /bounds/, each of the index type
+                        -- of the array.  These bounds are the lowest and
+                        -- highest indices in the array, in that order.
+                        -- For example, a one-origin vector of length
+                        -- '10' has bounds '(1,10)', and a one-origin '10'
+                        -- by '10' matrix has bounds '((1,1),(10,10))'.
+        -> [(i, e)]     -- ^ a list of /associations/ of the form
+                        -- (/index/, /value/).  Typically, this list will
+                        -- be expressed as a comprehension.  An
+                        -- association '(i, x)' defines the value of
+                        -- the array at index 'i' to be 'x'.
+        -> Array i e
 array (l,u) ies
     = let n = safeRangeSize (l,u)
       in unsafeArray' (l,u) n
@@ -487,11 +487,11 @@ assocs arr@(Array l u _ _) =
 -- not in general be recursive.
 {-# INLINE accumArray #-}
 accumArray :: Ix i
-	=> (e -> a -> e)	-- ^ accumulating function
-	-> e			-- ^ initial value
-	-> (i,i)		-- ^ bounds of the array
-	-> [(i, a)]		-- ^ association list
-	-> Array i e
+        => (e -> a -> e)        -- ^ accumulating function
+        -> e                    -- ^ initial value
+        -> (i,i)                -- ^ bounds of the array
+        -> [(i, a)]             -- ^ association list
+        -> Array i e
 accumArray f init (l,u) ies =
     let n = safeRangeSize (l,u)
     in unsafeAccumArray' f init (l,u) n
@@ -600,9 +600,9 @@ cmpIntArray arr1@(Array l1 u1 n1 _) arr2@(Array l2 u2 n2 _) =
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Array instances}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -622,16 +622,16 @@ instance (Ix a, Show a, Show b) => Show (Array a b) where
         showsPrec appPrec1 (bounds a) .
         showChar ' ' .
         showsPrec appPrec1 (assocs a)
-	-- Precedence of 'array' is the precedence of application
+        -- Precedence of 'array' is the precedence of application
 
 -- The Read instance is in GHC.Read
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Operations on mutable arrays}
-%*							*
+%*                                                      *
 %*********************************************************
 
 Idle ADR question: What's the tradeoff here between flattening these
@@ -687,9 +687,9 @@ unsafeWriteSTArray (STArray _ _ _ marr#) (I# i#) e = ST $ \s1# ->
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Moving between mutable and immutable}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}

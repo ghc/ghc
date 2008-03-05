@@ -40,14 +40,14 @@ import GHC.Show
 infixl 7  *
 infixl 6  +, -
 
-default ()		-- Double isn't available yet, 
-			-- and we shouldn't be using defaults anyway
+default ()              -- Double isn't available yet, 
+                        -- and we shouldn't be using defaults anyway
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Standard numeric class}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -55,11 +55,11 @@ default ()		-- Double isn't available yet,
 --
 -- Minimal complete definition: all except 'negate' or @(-)@
 class  (Eq a, Show a) => Num a  where
-    (+), (-), (*)	:: a -> a -> a
+    (+), (-), (*)       :: a -> a -> a
     -- | Unary negation.
-    negate		:: a -> a
+    negate              :: a -> a
     -- | Absolute value.
-    abs			:: a -> a
+    abs                 :: a -> a
     -- | Sign of a number.
     -- The functions 'abs' and 'signum' should satisfy the law: 
     --
@@ -67,15 +67,15 @@ class  (Eq a, Show a) => Num a  where
     --
     -- For real numbers, the 'signum' is either @-1@ (negative), @0@ (zero)
     -- or @1@ (positive).
-    signum		:: a -> a
+    signum              :: a -> a
     -- | Conversion from an 'Integer'.
     -- An integer literal represents the application of the function
     -- 'fromInteger' to the appropriate value of type 'Integer',
     -- so such literals have type @('Num' a) => a@.
-    fromInteger		:: Integer -> a
+    fromInteger         :: Integer -> a
 
-    x - y		= x + negate y
-    negate x		= 0 - x
+    x - y               = x + negate y
+    negate x            = 0 - x
 
 -- | the same as @'flip' ('-')@.
 --
@@ -89,22 +89,22 @@ subtract x y = y - x
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Instances for @Int@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
 instance  Num Int  where
-    (+)	   = plusInt
-    (-)	   = minusInt
+    (+)    = plusInt
+    (-)    = minusInt
     negate = negateInt
-    (*)	   = timesInt
+    (*)    = timesInt
     abs n  = if n `geInt` 0 then n else negateInt n
 
     signum n | n `ltInt` 0 = negateInt 1
-	     | n `eqInt` 0 = 0
-	     | otherwise   = 1
+             | n `eqInt` 0 = 0
+             | otherwise   = 1
 
     fromInteger = integer2Int
 
@@ -118,17 +118,17 @@ divModInt x@(I# _) y@(I# _) = (x `divInt` y, x `modInt` y)
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{The @Integer@ type}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
 -- | Arbitrary-precision integers.
-data Integer	
-   = S# Int#				-- small integers
+data Integer    
+   = S# Int#                            -- small integers
 #ifndef ILX
-   | J# Int# ByteArray#			-- large integers
+   | J# Int# ByteArray#                 -- large integers
 #else
    | J# Void BigInteger                 -- .NET big ints
 
@@ -156,9 +156,9 @@ toBig i@(J# _ _) = i
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Dividing @Integers@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -170,8 +170,8 @@ quotRemInteger i1@(J# _ _) i2@(S# _) = quotRemInteger i1 (toBig i2)
 quotRemInteger i1@(S# _) i2@(J# _ _) = quotRemInteger (toBig i1) i2
 quotRemInteger (J# s1 d1) (J# s2 d2)
   = case (quotRemInteger# s1 d1 s2 d2) of
-	  (# s3, d3, s4, d4 #)
-	    -> (J# s3 d3, J# s4 d4)
+          (# s3, d3, s4, d4 #)
+            -> (J# s3 d3, J# s4 d4)
 
 divModInteger a@(S# (-LEFTMOST_BIT#)) b = divModInteger (toBig a) b
 divModInteger (S# i) (S# j)
@@ -180,8 +180,8 @@ divModInteger i1@(J# _ _) i2@(S# _) = divModInteger i1 (toBig i2)
 divModInteger i1@(S# _) i2@(J# _ _) = divModInteger (toBig i1) i2
 divModInteger (J# s1 d1) (J# s2 d2)
   = case (divModInteger# s1 d1 s2 d2) of
-	  (# s3, d3, s4, d4 #)
-	    -> (J# s3 d3, J# s4 d4)
+          (# s3, d3, s4, d4 #)
+            -> (J# s3 d3, J# s4 d4)
 
 remInteger :: Integer -> Integer -> Integer
 remInteger ia ib
@@ -267,9 +267,9 @@ divExact (J# sa a) (J# sb b)
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{The @Integer@ instances for @Eq@, @Ord@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -312,26 +312,26 @@ instance  Ord Integer  where
        | otherwise = GT
     compare (J# s d) (S# i)
        = case cmpIntegerInt# s d i of { res# ->
-	 if res# <# 0# then LT else 
-	 if res# ># 0# then GT else EQ
-	 }
+         if res# <# 0# then LT else 
+         if res# ># 0# then GT else EQ
+         }
     compare (S# i) (J# s d)
        = case cmpIntegerInt# s d i of { res# ->
-	 if res# ># 0# then LT else 
-	 if res# <# 0# then GT else EQ
-	 }
+         if res# ># 0# then LT else 
+         if res# <# 0# then GT else EQ
+         }
     compare (J# s1 d1) (J# s2 d2)
        = case cmpInteger# s1 d1 s2 d2 of { res# ->
-	 if res# <# 0# then LT else 
-	 if res# ># 0# then GT else EQ
-	 }
+         if res# <# 0# then LT else 
+         if res# ># 0# then GT else EQ
+         }
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{The @Integer@ instances for @Num@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -339,8 +339,8 @@ instance  Num Integer  where
     (+) = plusInteger
     (-) = minusInteger
     (*) = timesInteger
-    negate	   = negateInteger
-    fromInteger	x  =  x
+    negate         = negateInteger
+    fromInteger x  =  x
 
     -- ORIG: abs n = if n >= 0 then n else -n
     abs (S# (-LEFTMOST_BIT#)) = LEFTMOST_BIT
@@ -350,22 +350,22 @@ instance  Num Integer  where
     signum (S# i) = case signum (I# i) of I# j -> S# j
     signum (J# s d)
       = let
-	    cmp = cmpIntegerInt# s d 0#
-	in
-	if      cmp >#  0# then S# 1#
-	else if cmp ==# 0# then S# 0#
-	else			S# (negateInt# 1#)
+            cmp = cmpIntegerInt# s d 0#
+        in
+        if      cmp >#  0# then S# 1#
+        else if cmp ==# 0# then S# 0#
+        else                    S# (negateInt# 1#)
 
 plusInteger i1@(S# i) i2@(S# j)  = case addIntC# i j of { (# r, c #) ->
-				   if c ==# 0# then S# r
-				   else toBig i1 + toBig i2 }
+                                   if c ==# 0# then S# r
+                                   else toBig i1 + toBig i2 }
 plusInteger i1@(J# _ _) i2@(S# _) = i1 + toBig i2
 plusInteger i1@(S# _) i2@(J# _ _) = toBig i1 + i2
 plusInteger (J# s1 d1) (J# s2 d2) = case plusInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
 
 minusInteger i1@(S# i) i2@(S# j)   = case subIntC# i j of { (# r, c #) ->
-				     if c ==# 0# then S# r
-				     else toBig i1 - toBig i2 }
+                                     if c ==# 0# then S# r
+                                     else toBig i1 - toBig i2 }
 minusInteger i1@(J# _ _) i2@(S# _) = i1 - toBig i2
 minusInteger i1@(S# _) i2@(J# _ _) = toBig i1 - i2
 minusInteger (J# s1 d1) (J# s2 d2) = case minusInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
@@ -378,23 +378,23 @@ timesInteger i1@(S# _) i2@(J# _ _) = toBig i1 * i2
 timesInteger (J# s1 d1) (J# s2 d2) = case timesInteger# s1 d1 s2 d2 of (# s, d #) -> J# s d
 
 negateInteger (S# (-LEFTMOST_BIT#)) = LEFTMOST_BIT
-negateInteger (S# i)		  = S# (negateInt# i)
-negateInteger (J# s d)		  = J# (negateInt# s) d
+negateInteger (S# i)              = S# (negateInt# i)
+negateInteger (J# s d)            = J# (negateInt# s) d
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{The @Integer@ instance for @Enum@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
 instance  Enum Integer  where
-    succ x		 = x + 1
-    pred x		 = x - 1
-    toEnum n		 = int2Integer n
-    fromEnum n		 = integer2Int n
+    succ x               = x + 1
+    pred x               = x - 1
+    toEnum n             = int2Integer n
+    fromEnum n           = integer2Int n
 
     {-# INLINE enumFrom #-}
     {-# INLINE enumFromThen #-}
@@ -402,14 +402,14 @@ instance  Enum Integer  where
     {-# INLINE enumFromThenTo #-}
     enumFrom x             = enumDeltaInteger  x 1
     enumFromThen x y       = enumDeltaInteger  x (y-x)
-    enumFromTo x lim	   = enumDeltaToInteger x 1     lim
+    enumFromTo x lim       = enumDeltaToInteger x 1     lim
     enumFromThenTo x y lim = enumDeltaToInteger x (y-x) lim
 
 {-# RULES
-"enumDeltaInteger"	[~1] forall x y.  enumDeltaInteger x y     = build (\c _ -> enumDeltaIntegerFB c x y)
-"efdtInteger"		[~1] forall x y l.enumDeltaToInteger x y l = build (\c n -> enumDeltaToIntegerFB c n x y l)
-"enumDeltaInteger" 	[1] enumDeltaIntegerFB   (:)    = enumDeltaInteger
-"enumDeltaToInteger" 	[1] enumDeltaToIntegerFB (:) [] = enumDeltaToInteger
+"enumDeltaInteger"      [~1] forall x y.  enumDeltaInteger x y     = build (\c _ -> enumDeltaIntegerFB c x y)
+"efdtInteger"           [~1] forall x y l.enumDeltaToInteger x y l = build (\c n -> enumDeltaToIntegerFB c n x y l)
+"enumDeltaInteger"      [1] enumDeltaIntegerFB   (:)    = enumDeltaInteger
+"enumDeltaToInteger"    [1] enumDeltaToIntegerFB (:) [] = enumDeltaToInteger
  #-}
 
 enumDeltaIntegerFB :: (Integer -> b -> b) -> Integer -> Integer -> b
@@ -427,39 +427,39 @@ enumDeltaToInteger x delta lim
   | otherwise  = dn_list x delta lim
 
 up_fb c n x delta lim = go (x::Integer)
-		      where
-			go x | x > lim   = n
-			     | otherwise = x `c` go (x+delta)
+                      where
+                        go x | x > lim   = n
+                             | otherwise = x `c` go (x+delta)
 dn_fb c n x delta lim = go (x::Integer)
-		      where
-			go x | x < lim   = n
-			     | otherwise = x `c` go (x+delta)
+                      where
+                        go x | x < lim   = n
+                             | otherwise = x `c` go (x+delta)
 
 up_list x delta lim = go (x::Integer)
-		    where
-			go x | x > lim   = []
-			     | otherwise = x : go (x+delta)
+                    where
+                        go x | x > lim   = []
+                             | otherwise = x : go (x+delta)
 dn_list x delta lim = go (x::Integer)
-		    where
-			go x | x < lim   = []
-			     | otherwise = x : go (x+delta)
+                    where
+                        go x | x < lim   = []
+                             | otherwise = x : go (x+delta)
 
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{The @Integer@ instances for @Show@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
 instance Show Integer where
     showsPrec p n r
         | p > 6 && n < 0 = '(' : jtos n (')' : r)
-		-- Minor point: testing p first gives better code 
-		-- in the not-uncommon case where the p argument
-		-- is a constant
+                -- Minor point: testing p first gives better code 
+                -- in the not-uncommon case where the p argument
+                -- is a constant
         | otherwise      = jtos n r
     showList = showList__ (showsPrec 0)
 

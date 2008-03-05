@@ -169,7 +169,7 @@ instance Bits Word where
         | otherwise  = W# ((x# `uncheckedShiftL#` i'#) `or#` (x# `uncheckedShiftRL#` (wsib -# i'#)))
         where
         i'# = word2Int# (int2Word# i# `and#` int2Word# (wsib -# 1#))
-	wsib = WORD_SIZE_IN_BITS#  {- work around preprocessor problem (??) -}
+        wsib = WORD_SIZE_IN_BITS#  {- work around preprocessor problem (??) -}
     bitSize  _               = WORD_SIZE_IN_BITS
     isSigned _               = False
 
@@ -741,10 +741,10 @@ instance Bits Word64 where
 shiftL64#, shiftRL64# :: Word64# -> Int# -> Word64#
 
 a `shiftL64#` b  | b >=# 64#  = wordToWord64# (int2Word# 0#)
-	         | otherwise  = a `uncheckedShiftL64#` b
+                 | otherwise  = a `uncheckedShiftL64#` b
 
 a `shiftRL64#` b | b >=# 64#  = wordToWord64# (int2Word# 0#)
-		 | otherwise  = a `uncheckedShiftRL64#` b
+                 | otherwise  = a `uncheckedShiftRL64#` b
 
 
 foreign import ccall unsafe "hs_eqWord64"      eqWord64#      :: Word64# -> Word64# -> Bool
