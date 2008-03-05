@@ -1200,5 +1200,5 @@ missingSigWarn True  name ty
 	; addWarnTcM (env1, mk_msg tidy_ty) }
   where
     mk_msg ty = vcat [ptext SLIT("Definition but no type signature for") <+> quotes (ppr name),
-		      sep [ptext SLIT("Inferred type:") <+> ppr name <+> dcolon <+> ppr ty]]
+		      sep [ptext SLIT("Inferred type:") <+> pprHsVar name <+> dcolon <+> ppr ty]]
 \end{code}
