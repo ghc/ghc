@@ -14,10 +14,10 @@
 -----------------------------------------------------------------------------
 
 module Data.Tuple
-  ( fst		-- :: (a,b) -> a
-  , snd		-- :: (a,b) -> a
-  , curry	-- :: ((a, b) -> c) -> a -> b -> c
-  , uncurry	-- :: (a -> b -> c) -> ((a, b) -> c)
+  ( fst         -- :: (a,b) -> a
+  , snd         -- :: (a,b) -> a
+  , curry       -- :: ((a, b) -> c) -> a -> b -> c
+  , uncurry     -- :: (a -> b -> c) -> ((a, b) -> c)
 #ifdef __NHC__
   , (,)(..)
   , (,,)(..)
@@ -64,7 +64,7 @@ import Prelude
   )
 #endif
 
-default ()		-- Double isn't available yet
+default ()              -- Double isn't available yet
 
 #ifdef __GLASGOW_HASKELL__
 data (,) a b = (,) a b deriving (Eq, Ord)
@@ -259,12 +259,12 @@ data (,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
 
 #if !defined(__HUGS__) && !defined(__NHC__)
 -- | Extract the first component of a pair.
-fst			:: (a,b) -> a
-fst (x,_)		=  x
+fst                     :: (a,b) -> a
+fst (x,_)               =  x
 
 -- | Extract the second component of a pair.
-snd			:: (a,b) -> b
-snd (_,y)		=  y
+snd                     :: (a,b) -> b
+snd (_,y)               =  y
 
 -- | 'curry' converts an uncurried function to a curried function.
 curry                   :: ((a, b) -> c) -> a -> b -> c
