@@ -3,60 +3,60 @@
 The overall structure of the GHC Prelude is a bit tricky.
 
   a) We want to avoid "orphan modules", i.e. ones with instance
-	decls that don't belong either to a tycon or a class
-	defined in the same module
+        decls that don't belong either to a tycon or a class
+        defined in the same module
 
   b) We want to avoid giant modules
 
 So the rough structure is as follows, in (linearised) dependency order
 
 
-GHC.Prim		Has no implementation.  It defines built-in things, and
-		by importing it you bring them into scope.
-		The source file is GHC.Prim.hi-boot, which is just
-		copied to make GHC.Prim.hi
+GHC.Prim                Has no implementation.  It defines built-in things, and
+                by importing it you bring them into scope.
+                The source file is GHC.Prim.hi-boot, which is just
+                copied to make GHC.Prim.hi
 
-GHC.Base	Classes: Eq, Ord, Functor, Monad
-		Types:   list, (), Int, Bool, Ordering, Char, String
+GHC.Base        Classes: Eq, Ord, Functor, Monad
+                Types:   list, (), Int, Bool, Ordering, Char, String
 
-Data.Tuple	Types: tuples, plus instances for GHC.Base classes
+Data.Tuple      Types: tuples, plus instances for GHC.Base classes
 
-GHC.Show	Class: Show, plus instances for GHC.Base/GHC.Tup types
+GHC.Show        Class: Show, plus instances for GHC.Base/GHC.Tup types
 
-GHC.Enum	Class: Enum,  plus instances for GHC.Base/GHC.Tup types
+GHC.Enum        Class: Enum,  plus instances for GHC.Base/GHC.Tup types
 
-Data.Maybe	Type: Maybe, plus instances for GHC.Base classes
+Data.Maybe      Type: Maybe, plus instances for GHC.Base classes
 
-GHC.List	List functions
+GHC.List        List functions
 
-GHC.Num		Class: Num, plus instances for Int
-		Type:  Integer, plus instances for all classes so far (Eq, Ord, Num, Show)
+GHC.Num         Class: Num, plus instances for Int
+                Type:  Integer, plus instances for all classes so far (Eq, Ord, Num, Show)
 
-		Integer is needed here because it is mentioned in the signature
-		of 'fromInteger' in class Num
+                Integer is needed here because it is mentioned in the signature
+                of 'fromInteger' in class Num
 
-GHC.Real	Classes: Real, Integral, Fractional, RealFrac
-			 plus instances for Int, Integer
-		Types:  Ratio, Rational
-			plus intances for classes so far
+GHC.Real        Classes: Real, Integral, Fractional, RealFrac
+                         plus instances for Int, Integer
+                Types:  Ratio, Rational
+                        plus intances for classes so far
 
-		Rational is needed here because it is mentioned in the signature
-		of 'toRational' in class Real
+                Rational is needed here because it is mentioned in the signature
+                of 'toRational' in class Real
 
-GHC.ST	The ST monad, instances and a few helper functions
+GHC.ST  The ST monad, instances and a few helper functions
 
-Ix		Classes: Ix, plus instances for Int, Bool, Char, Integer, Ordering, tuples
+Ix              Classes: Ix, plus instances for Int, Bool, Char, Integer, Ordering, tuples
 
-GHC.Arr		Types: Array, MutableArray, MutableVar
+GHC.Arr         Types: Array, MutableArray, MutableVar
 
-		Arrays are used by a function in GHC.Float
+                Arrays are used by a function in GHC.Float
 
-GHC.Float	Classes: Floating, RealFloat
-		Types:   Float, Double, plus instances of all classes so far
+GHC.Float       Classes: Floating, RealFloat
+                Types:   Float, Double, plus instances of all classes so far
 
-		This module contains everything to do with floating point.
-		It is a big module (900 lines)
-		With a bit of luck, many modules can be compiled without ever reading GHC.Float.hi
+                This module contains everything to do with floating point.
+                It is a big module (900 lines)
+                With a bit of luck, many modules can be compiled without ever reading GHC.Float.hi
 
 
 Other Prelude modules are much easier with fewer complex dependencies.
@@ -82,12 +82,12 @@ Other Prelude modules are much easier with fewer complex dependencies.
 
 -- #hide
 module GHC.Base
-	(
-	module GHC.Base,
-	module GHC.Prim,	-- Re-export GHC.Prim and GHC.Err, to avoid lots
-	module GHC.Err          -- of people having to import it explicitly
+        (
+        module GHC.Base,
+        module GHC.Prim,        -- Re-export GHC.Prim and GHC.Err, to avoid lots
+        module GHC.Err          -- of people having to import it explicitly
   ) 
-	where
+        where
 
 import GHC.Prim
 import {-# SOURCE #-} GHC.Err
@@ -100,15 +100,15 @@ infixr 2  ||
 infixl 1  >>, >>=
 infixr 0  $
 
-default ()		-- Double isn't available yet
+default ()              -- Double isn't available yet
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{DEBUGGING STUFF}
 %*  (for use when compiling GHC.Base itself doesn't work)
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -141,9 +141,9 @@ unpackCStringUtf8# a = error "urk"
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Standard classes @Eq@, @Ord@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -156,10 +156,10 @@ unpackCStringUtf8# a = error "urk"
 -- Minimal complete definition: either '==' or '/='.
 --
 class  Eq a  where
-    (==), (/=)		 :: a -> a -> Bool
+    (==), (/=)           :: a -> a -> Bool
 
-    x /= y		 = not (x == y)
-    x == y		 = not (x /= y)
+    x /= y               = not (x == y)
+    x == y               = not (x /= y)
 
 -- | The 'Ord' class is used for totally ordered datatypes.
 --
@@ -173,32 +173,32 @@ class  Eq a  where
 -- Using 'compare' can be more efficient for complex types.
 --
 class  (Eq a) => Ord a  where
-    compare		 :: a -> a -> Ordering
+    compare              :: a -> a -> Ordering
     (<), (<=), (>), (>=) :: a -> a -> Bool
-    max, min		 :: a -> a -> a
+    max, min             :: a -> a -> a
 
     compare x y
-	| x == y    = EQ
-	| x <= y    = LT	-- NB: must be '<=' not '<' to validate the
-				-- above claim about the minimal things that
-				-- can be defined for an instance of Ord
-	| otherwise = GT
+        | x == y    = EQ
+        | x <= y    = LT        -- NB: must be '<=' not '<' to validate the
+                                -- above claim about the minimal things that
+                                -- can be defined for an instance of Ord
+        | otherwise = GT
 
-    x <	 y = case compare x y of { LT -> True;  _other -> False }
+    x <  y = case compare x y of { LT -> True;  _other -> False }
     x <= y = case compare x y of { GT -> False; _other -> True }
-    x >	 y = case compare x y of { GT -> True;  _other -> False }
+    x >  y = case compare x y of { GT -> True;  _other -> False }
     x >= y = case compare x y of { LT -> False; _other -> True }
 
-	-- These two default methods use '<=' rather than 'compare'
-	-- because the latter is often more expensive
+        -- These two default methods use '<=' rather than 'compare'
+        -- because the latter is often more expensive
     max x y = if x <= y then y else x
     min x y = if x <= y then x else y
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Monadic classes @Functor@, @Monad@ }
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -246,15 +246,15 @@ class  Monad m  where
     -- by the first, like sequencing operators (such as the semicolon)
     -- in imperative languages.
     (>>)        :: forall a b. m a -> m b -> m b
-	-- Explicit for-alls so that we know what order to
-	-- give type arguments when desugaring
+        -- Explicit for-alls so that we know what order to
+        -- give type arguments when desugaring
 
     -- | Inject a value into the monadic type.
     return      :: a -> m a
     -- | Fail with a message.  This operation is not part of the
     -- mathematical definition of a monad, but is invoked on pattern-match
     -- failure in a @do@ expression.
-    fail	:: String -> m a
+    fail        :: String -> m a
 
     m >> k      = m >>= \_ -> k
     fail s      = error s
@@ -262,14 +262,14 @@ class  Monad m  where
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{The list type}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
 data [] a = [] | a : [a]  -- do explicitly: deriving (Eq, Ord)
-			  -- to avoid weird names like con2tag_[]#
+                          -- to avoid weird names like con2tag_[]#
 
 
 instance (Eq a) => Eq [a] where
@@ -294,14 +294,14 @@ instance  Monad []  where
     m >>= k             = foldr ((++) . k) [] m
     m >> k              = foldr ((++) . (\ _ -> k)) [] m
     return x            = [x]
-    fail _		= []
+    fail _              = []
 \end{code}
 
 A few list functions that appear here because they are used here.
 The rest of the prelude list functions are in GHC.List.
 
 ----------------------------------------------
---	foldr/build/augment
+--      foldr/build/augment
 ----------------------------------------------
   
 \begin{code}
@@ -317,34 +317,34 @@ foldr            :: (a -> b -> b) -> b -> [a] -> b
 {-# INLINE [0] foldr #-}
 -- Inline only in the final stage, after the foldr/cons rule has had a chance
 foldr k z xs = go xs
-	     where
-	       go []     = z
-	       go (y:ys) = y `k` go ys
+             where
+               go []     = z
+               go (y:ys) = y `k` go ys
 
 -- | A list producer that can be fused with 'foldr'.
 -- This function is merely
 --
--- >	build g = g (:) []
+-- >    build g = g (:) []
 --
 -- but GHC's simplifier will transform an expression of the form
 -- @'foldr' k z ('build' g)@, which may arise after inlining, to @g k z@,
 -- which avoids producing an intermediate list.
 
-build 	:: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
+build   :: forall a. (forall b. (a -> b -> b) -> b -> b) -> [a]
 {-# INLINE [1] build #-}
-	-- The INLINE is important, even though build is tiny,
- 	-- because it prevents [] getting inlined in the version that
-	-- appears in the interface file.  If [] *is* inlined, it
-	-- won't match with [] appearing in rules in an importing module.
-	--
-	-- The "1" says to inline in phase 1
+        -- The INLINE is important, even though build is tiny,
+        -- because it prevents [] getting inlined in the version that
+        -- appears in the interface file.  If [] *is* inlined, it
+        -- won't match with [] appearing in rules in an importing module.
+        --
+        -- The "1" says to inline in phase 1
 
 build g = g (:) []
 
 -- | A list producer that can be fused with 'foldr'.
 -- This function is merely
 --
--- >	augment g xs = g (:) xs
+-- >    augment g xs = g (:) xs
 --
 -- but GHC's simplifier will transform an expression of the form
 -- @'foldr' k z ('augment' g xs)@, which may arise after inlining, to
@@ -355,42 +355,42 @@ augment :: forall a. (forall b. (a->b->b) -> b -> b) -> [a] -> [a]
 augment g xs = g (:) xs
 
 {-# RULES
-"fold/build" 	forall k z (g::forall b. (a->b->b) -> b -> b) . 
-		foldr k z (build g) = g k z
+"fold/build"    forall k z (g::forall b. (a->b->b) -> b -> b) . 
+                foldr k z (build g) = g k z
 
 "foldr/augment" forall k z xs (g::forall b. (a->b->b) -> b -> b) . 
-		foldr k z (augment g xs) = g k (foldr k z xs)
+                foldr k z (augment g xs) = g k (foldr k z xs)
 
-"foldr/id"    			  foldr (:) [] = \x  -> x
-"foldr/app"    	[1] forall ys. foldr (:) ys = \xs -> xs ++ ys
-	-- Only activate this from phase 1, because that's
-	-- when we disable the rule that expands (++) into foldr
+"foldr/id"                        foldr (:) [] = \x  -> x
+"foldr/app"     [1] forall ys. foldr (:) ys = \xs -> xs ++ ys
+        -- Only activate this from phase 1, because that's
+        -- when we disable the rule that expands (++) into foldr
 
 -- The foldr/cons rule looks nice, but it can give disastrously
 -- bloated code when commpiling
---	array (a,b) [(1,2), (2,2), (3,2), ...very long list... ]
+--      array (a,b) [(1,2), (2,2), (3,2), ...very long list... ]
 -- i.e. when there are very very long literal lists
 -- So I've disabled it for now. We could have special cases
 -- for short lists, I suppose.
--- "foldr/cons"	forall k z x xs. foldr k z (x:xs) = k x (foldr k z xs)
+-- "foldr/cons" forall k z x xs. foldr k z (x:xs) = k x (foldr k z xs)
 
-"foldr/single"	forall k z x. foldr k z [x] = k x z
-"foldr/nil"	forall k z.   foldr k z []  = z 
+"foldr/single"  forall k z x. foldr k z [x] = k x z
+"foldr/nil"     forall k z.   foldr k z []  = z 
 
 "augment/build" forall (g::forall b. (a->b->b) -> b -> b)
-		       (h::forall b. (a->b->b) -> b -> b) .
-		       augment g (build h) = build (\c n -> g c (h c n))
+                       (h::forall b. (a->b->b) -> b -> b) .
+                       augment g (build h) = build (\c n -> g c (h c n))
 "augment/nil"   forall (g::forall b. (a->b->b) -> b -> b) .
-			augment g [] = build g
+                        augment g [] = build g
  #-}
 
 -- This rule is true, but not (I think) useful:
---	augment g (augment h t) = augment (\cn -> g c (h c n)) t
+--      augment g (augment h t) = augment (\cn -> g c (h c n)) t
 \end{code}
 
 
 ----------------------------------------------
---		map	
+--              map     
 ----------------------------------------------
 
 \begin{code}
@@ -428,15 +428,15 @@ mapFB c f x ys = c (f x) ys
 -- e.g. append, filter, iterate, repeat, etc.
 
 {-# RULES
-"map"	    [~1] forall f xs.	map f xs		= build (\c n -> foldr (mapFB c f) n xs)
-"mapList"   [1]  forall f.	foldr (mapFB (:) f) []	= map f
-"mapFB"	    forall c f g.	mapFB (mapFB c f) g	= mapFB c (f.g) 
+"map"       [~1] forall f xs.   map f xs                = build (\c n -> foldr (mapFB c f) n xs)
+"mapList"   [1]  forall f.      foldr (mapFB (:) f) []  = map f
+"mapFB"     forall c f g.       mapFB (mapFB c f) g     = mapFB c (f.g) 
   #-}
 \end{code}
 
 
 ----------------------------------------------
---		append	
+--              append  
 ----------------------------------------------
 \begin{code}
 -- | Append two lists, i.e.,
@@ -451,16 +451,16 @@ mapFB c f x ys = c (f x) ys
 (++) (x:xs) ys = x : xs ++ ys
 
 {-# RULES
-"++"	[~1] forall xs ys. xs ++ ys = augment (\c n -> foldr c n xs) ys
+"++"    [~1] forall xs ys. xs ++ ys = augment (\c n -> foldr c n xs) ys
   #-}
 
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Type @Bool@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -469,38 +469,38 @@ mapFB c f x ys = c (f x) ys
 -- 'Prelude.fromEnum' 'False' the value zero, and
 -- 'Prelude.fromEnum' 'True' the value 1.
 data  Bool  =  False | True  deriving (Eq, Ord)
-	-- Read in GHC.Read, Show in GHC.Show
+        -- Read in GHC.Read, Show in GHC.Show
 
 -- Boolean functions
 
 -- | Boolean \"and\"
-(&&)			:: Bool -> Bool -> Bool
-True  && x		=  x
-False && _		=  False
+(&&)                    :: Bool -> Bool -> Bool
+True  && x              =  x
+False && _              =  False
 
 -- | Boolean \"or\"
-(||)			:: Bool -> Bool -> Bool
-True  || _		=  True
-False || x		=  x
+(||)                    :: Bool -> Bool -> Bool
+True  || _              =  True
+False || x              =  x
 
 -- | Boolean \"not\"
-not			:: Bool -> Bool
-not True		=  False
-not False		=  True
+not                     :: Bool -> Bool
+not True                =  False
+not False               =  True
 
 -- |'otherwise' is defined as the value 'True'.  It helps to make
 -- guards more readable.  eg.
 --
 -- >  f x | x < 0     = ...
 -- >      | otherwise = ...
-otherwise		:: Bool
-otherwise 		=  True
+otherwise               :: Bool
+otherwise               =  True
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{The @()@ type}
-%*							*
+%*                                                      *
 %*********************************************************
 
 The Unit type is here because virtually any program needs it (whereas
@@ -531,9 +531,9 @@ instance Ord () where
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Type @Ordering@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -541,14 +541,14 @@ instance Ord () where
 -- than, equal to, or greater than.  An 'Ordering' is returned by
 -- 'compare'.
 data Ordering = LT | EQ | GT deriving (Eq, Ord)
-	-- Read in GHC.Read, Show in GHC.Show
+        -- Read in GHC.Read, Show in GHC.Show
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Type @Char@ and @String@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -611,20 +611,20 @@ String equality is used when desugaring pattern-matches against strings.
 
 \begin{code}
 eqString :: String -> String -> Bool
-eqString []       []	   = True
+eqString []       []       = True
 eqString (c1:cs1) (c2:cs2) = c1 == c2 && cs1 `eqString` cs2
-eqString cs1      cs2	   = False
+eqString cs1      cs2      = False
 
 {-# RULES "eqString" (==) = eqString #-}
 -- eqString also has a BuiltInRule in PrelRules.lhs:
---	eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2) = s1==s2
+--      eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2) = s1==s2
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Type @Int@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -673,15 +673,15 @@ compareInt# x# y#
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{The function type}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
 -- | Identity function.
-id			:: a -> a
-id x			=  x
+id                      :: a -> a
+id x                    =  x
 
 -- | The call '(lazy e)' means the same as 'e', but 'lazy' has a 
 -- magical strictness property: it is lazy in its first argument, 
@@ -719,9 +719,9 @@ inline x = x
 -- argument to 'assert' is ignored, and the second argument is
 -- returned as the result.
 
--- 	SLPJ: in 5.04 etc 'assert' is in GHC.Prim,
---	but from Template Haskell onwards it's simply
---	defined here in Base.lhs
+--      SLPJ: in 5.04 etc 'assert' is in GHC.Prim,
+--      but from Template Haskell onwards it's simply
+--      defined here in Base.lhs
 assert :: Bool -> a -> a
 assert pred r = r
 
@@ -734,17 +734,17 @@ breakpointCond _ r = r
 data Opaque = forall a. O a
 
 -- | Constant function.
-const			:: a -> b -> a
-const x _		=  x
+const                   :: a -> b -> a
+const x _               =  x
 
 -- | Function composition.
 {-# INLINE (.) #-}
-(.)	  :: (b -> c) -> (a -> b) -> a -> c
-(.) f g	x = f (g x)
+(.)       :: (b -> c) -> (a -> b) -> a -> c
+(.) f g x = f (g x)
 
 -- | @'flip' f@ takes its (first) two arguments in the reverse order of @f@.
-flip			:: (a -> b -> c) -> b -> a -> c
-flip f x y		=  f y x
+flip                    :: (a -> b -> c) -> b -> a -> c
+flip f x y              =  f y x
 
 -- | Application operator.  This operator is redundant, since ordinary
 -- application @(f x)@ means the same as @(f '$' x)@. However, '$' has
@@ -756,25 +756,25 @@ flip f x y		=  f y x
 -- It is also useful in higher-order situations, such as @'map' ('$' 0) xs@,
 -- or @'Data.List.zipWith' ('$') fs xs@.
 {-# INLINE ($) #-}
-($)			:: (a -> b) -> a -> b
-f $ x			=  f x
+($)                     :: (a -> b) -> a -> b
+f $ x                   =  f x
 
 -- | @'until' p f@ yields the result of applying @f@ until @p@ holds.
-until			:: (a -> Bool) -> (a -> a) -> a -> a
-until p f x | p x	=  x
-	    | otherwise =  until p f (f x)
+until                   :: (a -> Bool) -> (a -> a) -> a -> a
+until p f x | p x       =  x
+            | otherwise =  until p f (f x)
 
 -- | 'asTypeOf' is a type-restricted version of 'const'.  It is usually
 -- used as an infix operator, and its typing forces its first argument
 -- (which is usually overloaded) to have the same type as the second.
-asTypeOf		:: a -> a -> a
-asTypeOf		=  const
+asTypeOf                :: a -> a -> a
+asTypeOf                =  const
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Generics}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -786,9 +786,9 @@ data (:*:) a b = a :*: b
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{@getTag@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 Returns the 'tag' of a constructor application; this function is used
@@ -810,17 +810,17 @@ getTag x = x `seq` dataToTag# x
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Numeric primops}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
 divInt# :: Int# -> Int# -> Int#
 x# `divInt#` y#
-	-- Be careful NOT to overflow if we do any additional arithmetic
-	-- on the arguments...  the following  previous version of this
-	-- code has problems with overflow:
+        -- Be careful NOT to overflow if we do any additional arithmetic
+        -- on the arguments...  the following  previous version of this
+        -- code has problems with overflow:
 --    | (x# ># 0#) && (y# <# 0#) = ((x# -# y#) -# 1#) `quotInt#` y#
 --    | (x# <# 0#) && (y# ># 0#) = ((x# -# y#) +# 1#) `quotInt#` y#
     | (x# ># 0#) && (y# <# 0#) = ((x# -# 1#) `quotInt#` y#) -# 1#
@@ -952,31 +952,31 @@ These are tested by num014.
 -- (which must be non-negative).
 shiftL# :: Word# -> Int# -> Word#
 a `shiftL#` b   | b >=# WORD_SIZE_IN_BITS# = int2Word# 0#
-	        | otherwise                = a `uncheckedShiftL#` b
+                | otherwise                = a `uncheckedShiftL#` b
 
 -- | Shift the argument right by the specified number of bits
 -- (which must be non-negative).
 shiftRL# :: Word# -> Int# -> Word#
 a `shiftRL#` b  | b >=# WORD_SIZE_IN_BITS# = int2Word# 0#
-	        | otherwise                = a `uncheckedShiftRL#` b
+                | otherwise                = a `uncheckedShiftRL#` b
 
 -- | Shift the argument left by the specified number of bits
 -- (which must be non-negative).
 iShiftL# :: Int# -> Int# -> Int#
 a `iShiftL#` b  | b >=# WORD_SIZE_IN_BITS# = 0#
-	        | otherwise                = a `uncheckedIShiftL#` b
+                | otherwise                = a `uncheckedIShiftL#` b
 
 -- | Shift the argument right (signed) by the specified number of bits
 -- (which must be non-negative).
 iShiftRA# :: Int# -> Int# -> Int#
 a `iShiftRA#` b | b >=# WORD_SIZE_IN_BITS# = if a <# 0# then (-1#) else 0#
-	        | otherwise                = a `uncheckedIShiftRA#` b
+                | otherwise                = a `uncheckedIShiftRA#` b
 
 -- | Shift the argument right (unsigned) by the specified number of bits
 -- (which must be non-negative).
 iShiftRL# :: Int# -> Int# -> Int#
 a `iShiftRL#` b | b >=# WORD_SIZE_IN_BITS# = 0#
-	        | otherwise                = a `uncheckedIShiftRL#` b
+                | otherwise                = a `uncheckedIShiftRL#` b
 
 #if WORD_SIZE_IN_BITS == 32
 {-# RULES
@@ -993,9 +993,9 @@ a `iShiftRL#` b | b >=# WORD_SIZE_IN_BITS# = 0#
 
 
 %********************************************************
-%*							*
+%*                                                      *
 \subsection{Unpacking C strings}
-%*							*
+%*                                                      *
 %********************************************************
 
 This code is needed for virtually all programs, since it's used for
@@ -1009,9 +1009,9 @@ unpackCString# addr
   where
     unpack nh
       | ch `eqChar#` '\0'# = []
-      | otherwise	   = C# ch : unpack (nh +# 1#)
+      | otherwise          = C# ch : unpack (nh +# 1#)
       where
-	ch = indexCharOffAddr# addr nh
+        ch = indexCharOffAddr# addr nh
 
 unpackAppendCString# :: Addr# -> [Char] -> [Char]
 unpackAppendCString# addr rest
@@ -1019,25 +1019,25 @@ unpackAppendCString# addr rest
   where
     unpack nh
       | ch `eqChar#` '\0'# = rest
-      | otherwise	   = C# ch : unpack (nh +# 1#)
+      | otherwise          = C# ch : unpack (nh +# 1#)
       where
-	ch = indexCharOffAddr# addr nh
+        ch = indexCharOffAddr# addr nh
 
 unpackFoldrCString# :: Addr# -> (Char  -> a -> a) -> a -> a 
 {-# NOINLINE [0] unpackFoldrCString# #-}
 -- Don't inline till right at the end;
 -- usually the unpack-list rule turns it into unpackCStringList
 -- It also has a BuiltInRule in PrelRules.lhs:
--- 	unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)
---	  =  unpackFoldrCString# "foobaz" c n
+--      unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)
+--        =  unpackFoldrCString# "foobaz" c n
 unpackFoldrCString# addr f z 
   = unpack 0#
   where
     unpack nh
       | ch `eqChar#` '\0'# = z
-      | otherwise	   = C# ch `f` unpack (nh +# 1#)
+      | otherwise          = C# ch `f` unpack (nh +# 1#)
       where
-	ch = indexCharOffAddr# addr nh
+        ch = indexCharOffAddr# addr nh
 
 unpackCStringUtf8# :: Addr# -> [Char]
 unpackCStringUtf8# addr 
@@ -1062,7 +1062,7 @@ unpackCStringUtf8# addr
                      (ord# (indexCharOffAddr# addr (nh +# 3#)) -# 0x80#))) :
           unpack (nh +# 4#)
       where
-	ch = indexCharOffAddr# addr nh
+        ch = indexCharOffAddr# addr nh
 
 unpackNBytes# :: Addr# -> Int# -> [Char]
 unpackNBytes# _addr 0#   = []
@@ -1071,16 +1071,16 @@ unpackNBytes#  addr len# = unpack [] (len# -# 1#)
      unpack acc i#
       | i# <# 0#  = acc
       | otherwise = 
-	 case indexCharOffAddr# addr i# of
-	    ch -> unpack (C# ch : acc) (i# -# 1#)
+         case indexCharOffAddr# addr i# of
+            ch -> unpack (C# ch : acc) (i# -# 1#)
 
 {-# RULES
-"unpack"       [~1] forall a   . unpackCString# a		   = build (unpackFoldrCString# a)
+"unpack"       [~1] forall a   . unpackCString# a                  = build (unpackFoldrCString# a)
 "unpack-list"  [1]  forall a   . unpackFoldrCString# a (:) [] = unpackCString# a
 "unpack-append"     forall a n . unpackFoldrCString# a (:) n  = unpackAppendCString# a n
 
 -- There's a built-in rule (in PrelRules.lhs) for
--- 	unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n
+--      unpackFoldr "foo" c (unpackFoldr "baz" c n)  =  unpackFoldr "foobaz" c n
 
   #-}
 \end{code}
