@@ -15,31 +15,31 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Generics ( 
+module Data.Generics (
 
   -- * All Data.Generics modules
-  module Data.Generics.Basics,	  -- primitives
+  module Data.Generics.Basics,    -- primitives
   module Data.Generics.Instances, -- instances of Data class
-  module Data.Generics.Aliases,	  -- aliases for type case, generic types
-  module Data.Generics.Schemes,	  -- traversal schemes (everywhere etc.)
-  module Data.Generics.Text,	  -- generic read and show
-  module Data.Generics.Twins,  	  -- twin traversal, e.g., generic eq
+  module Data.Generics.Aliases,   -- aliases for type case, generic types
+  module Data.Generics.Schemes,   -- traversal schemes (everywhere etc.)
+  module Data.Generics.Text,      -- generic read and show
+  module Data.Generics.Twins,     -- twin traversal, e.g., generic eq
 
 #ifndef __HADDOCK__
-	-- Data types for the sum-of-products type encoding;
+        -- Data types for the sum-of-products type encoding;
         -- included for backwards compatibility; maybe obsolete.
-	(:*:)(..), (:+:)(..), Unit(..)
+        (:*:)(..), (:+:)(..), Unit(..)
 #endif
 
  ) where
 
 ------------------------------------------------------------------------------
 
-import Prelude	-- So that 'make depend' works
+import Prelude  -- So that 'make depend' works
 
 #ifdef __GLASGOW_HASKELL__
 #ifndef __HADDOCK__
-	-- Data types for the sum-of-products type encoding;
+        -- Data types for the sum-of-products type encoding;
         -- included for backwards compatibility; maybe obsolete.
 import GHC.Base ( (:*:)(..), (:+:)(..), Unit(..) )
 #endif
