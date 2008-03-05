@@ -46,11 +46,17 @@ NOGLOB_O          = CRT_noglob.o
 else
 
 # We have two version: the inplace version compiled by the bootstrap compiler
-#   and the install version compiled by the stage 1 compiler
+# and the install version compiled by the stage 1 compiler.
+# When creating or using bindists we always want the final binary, as built
+# by the stage 1 compiler.
+ifeq "$(DOING_BIN_DIST)" "YES"
+HS_PROG           = ghc-pkg.bin
+else
 ifeq "$(stage)" "2"
 HS_PROG           = ghc-pkg.bin
 else
 HS_PROG           = ghc-pkg-inplace.bin
+endif
 endif
 INSTALL_LIBEXECS += $(HS_PROG)
 NOGLOB_O	  =
