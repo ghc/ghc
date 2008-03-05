@@ -114,7 +114,7 @@ instance Bits T where { \
 instance Fractional T where { \
    (T x) / (T y)  = T (x / y) ; \
    recip   (T x)  = T (recip x) ; \
-   fromRational	r = T (fromRational r) }
+   fromRational r = T (fromRational r) }
 
 #define INSTANCE_FLOATING(T) \
 instance Floating T where { \
@@ -197,14 +197,14 @@ INSTANCE_TYPEABLE0(T,C,S) ;
 
 #define INSTANCE_READ(T,B) \
 instance Read T where { \
-   readsPrec		= unsafeCoerce# (readsPrec :: Int -> ReadS B); \
-   readList		= unsafeCoerce# (readList  :: ReadS [B]); }
+   readsPrec            = unsafeCoerce# (readsPrec :: Int -> ReadS B); \
+   readList             = unsafeCoerce# (readList  :: ReadS [B]); }
 
 #define INSTANCE_SHOW(T,B) \
 instance Show T where { \
-   showsPrec		= unsafeCoerce# (showsPrec :: Int -> B -> ShowS); \
-   show			= unsafeCoerce# (show :: B -> String); \
-   showList		= unsafeCoerce# (showList :: [B] -> ShowS); }
+   showsPrec            = unsafeCoerce# (showsPrec :: Int -> B -> ShowS); \
+   show                 = unsafeCoerce# (show :: B -> String); \
+   showList             = unsafeCoerce# (showList :: [B] -> ShowS); }
 
 #endif /* __GLASGOW_HASKELL__ */
 

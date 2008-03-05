@@ -18,16 +18,16 @@
 -----------------------------------------------------------------------------
 
 module Data.HashTable (
-	-- * Basic hash table operations
-	HashTable, new, insert, delete, lookup, update,
-	-- * Converting to and from lists
-	fromList, toList,
-	-- * Hash functions
-	-- $hash_functions
-	hashInt, hashString,
-	prime,
-	-- * Diagnostics
-	longestChain
+        -- * Basic hash table operations
+        HashTable, new, insert, delete, lookup, update,
+        -- * Converting to and from lists
+        fromList, toList,
+        -- * Hash functions
+        -- $hash_functions
+        hashInt, hashString,
+        prime,
+        -- * Diagnostics
+        longestChain
  ) where
 
 -- This module is imported by Data.Dynamic, which is pretty low down in the
@@ -36,36 +36,36 @@ module Data.HashTable (
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
 #else
-import Prelude	hiding	( lookup )
+import Prelude  hiding  ( lookup )
 #endif
-import Data.Tuple	( fst )
+import Data.Tuple       ( fst )
 import Data.Bits
 import Data.Maybe
-import Data.List	( maximumBy, length, concat, foldl', partition )
-import Data.Int		( Int32 )
+import Data.List        ( maximumBy, length, concat, foldl', partition )
+import Data.Int         ( Int32 )
 
 #if defined(__GLASGOW_HASKELL__)
 import GHC.Num
-import GHC.Real		( fromIntegral )
-import GHC.Show		( Show(..) )
-import GHC.Int		( Int64 )
+import GHC.Real         ( fromIntegral )
+import GHC.Show         ( Show(..) )
+import GHC.Int          ( Int64 )
 
-import GHC.IOBase	( IO, IOArray, newIOArray,
-			  unsafeReadIOArray, unsafeWriteIOArray, unsafePerformIO,
-			  IORef, newIORef, readIORef, writeIORef )
+import GHC.IOBase       ( IO, IOArray, newIOArray,
+                          unsafeReadIOArray, unsafeWriteIOArray, unsafePerformIO,
+                          IORef, newIORef, readIORef, writeIORef )
 #else
-import Data.Char	( ord )
-import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
-import System.IO.Unsafe	( unsafePerformIO )
-import Data.Int		( Int64 )
+import Data.Char        ( ord )
+import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
+import System.IO.Unsafe ( unsafePerformIO )
+import Data.Int         ( Int64 )
 #  if defined(__HUGS__)
-import Hugs.IOArray	( IOArray, newIOArray,
-			  unsafeReadIOArray, unsafeWriteIOArray )
+import Hugs.IOArray     ( IOArray, newIOArray,
+                          unsafeReadIOArray, unsafeWriteIOArray )
 #  elif defined(__NHC__)
-import NHC.IOExtras	( IOArray, newIOArray, readIOArray, writeIOArray )
+import NHC.IOExtras     ( IOArray, newIOArray, readIOArray, writeIOArray )
 #  endif
 #endif
-import Control.Monad	( mapM, mapM_, sequence_ )
+import Control.Monad    ( mapM, mapM_, sequence_ )
 
 
 -----------------------------------------------------------------------
@@ -101,17 +101,17 @@ thawArray = return -- unsafeThaw
 #endif
 
 data HashTable key val = HashTable {
-	                             cmp     :: !(key -> key -> Bool),
-	                             hash_fn :: !(key -> Int32),
+                                     cmp     :: !(key -> key -> Bool),
+                                     hash_fn :: !(key -> Int32),
                                      tab     :: !(IORef (HT key val))
                                    }
 -- TODO: the IORef should really be an MVar.
 
 data HT key val
   = HT {
-	kcount  :: !Int32,              -- Total number of keys.
+        kcount  :: !Int32,              -- Total number of keys.
         bmask   :: !Int32,
-	buckets :: !(HTArray [(key,val)])
+        buckets :: !(HTArray [(key,val)])
        }
 
 -- ------------------------------------------------------------
@@ -278,7 +278,7 @@ hYSTERESIS = 64                 -- entries to ignore in load computation
 --
 new
   :: (key -> key -> Bool)    -- ^ @eq@: An equality comparison on keys
-  -> (key -> Int32)	     -- ^ @hash@: A hash function on keys
+  -> (key -> Int32)          -- ^ @hash@: A hash function on keys
   -> IO (HashTable key val)  -- ^ Returns: an empty hash table
 
 new cmpr hash = do

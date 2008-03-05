@@ -17,41 +17,41 @@
 
 -- #hide
 module GHC.Storable
-	( readWideCharOffPtr  
-	, readIntOffPtr       
-	, readWordOffPtr      
-	, readPtrOffPtr       
-	, readFunPtrOffPtr    
-	, readFloatOffPtr     
-	, readDoubleOffPtr    
-	, readStablePtrOffPtr 
-	, readInt8OffPtr      
-	, readInt16OffPtr     
-	, readInt32OffPtr     
-	, readInt64OffPtr     
-	, readWord8OffPtr     
-	, readWord16OffPtr    
-	, readWord32OffPtr    
-	, readWord64OffPtr    
-	, writeWideCharOffPtr 
-	, writeIntOffPtr      
-	, writeWordOffPtr     
-	, writePtrOffPtr      
-	, writeFunPtrOffPtr   
-	, writeFloatOffPtr    
-	, writeDoubleOffPtr   
-	, writeStablePtrOffPtr
-	, writeInt8OffPtr     
-	, writeInt16OffPtr    
-	, writeInt32OffPtr    
-	, writeInt64OffPtr    
-	, writeWord8OffPtr    
-	, writeWord16OffPtr   
-	, writeWord32OffPtr   
-	, writeWord64OffPtr   
+        ( readWideCharOffPtr  
+        , readIntOffPtr       
+        , readWordOffPtr      
+        , readPtrOffPtr       
+        , readFunPtrOffPtr    
+        , readFloatOffPtr     
+        , readDoubleOffPtr    
+        , readStablePtrOffPtr 
+        , readInt8OffPtr      
+        , readInt16OffPtr     
+        , readInt32OffPtr     
+        , readInt64OffPtr     
+        , readWord8OffPtr     
+        , readWord16OffPtr    
+        , readWord32OffPtr    
+        , readWord64OffPtr    
+        , writeWideCharOffPtr 
+        , writeIntOffPtr      
+        , writeWordOffPtr     
+        , writePtrOffPtr      
+        , writeFunPtrOffPtr   
+        , writeFloatOffPtr    
+        , writeDoubleOffPtr   
+        , writeStablePtrOffPtr
+        , writeInt8OffPtr     
+        , writeInt16OffPtr    
+        , writeInt32OffPtr    
+        , writeInt64OffPtr    
+        , writeWord8OffPtr    
+        , writeWord16OffPtr   
+        , writeWord32OffPtr   
+        , writeWord64OffPtr   
         ) where
 
-import GHC.Stable	( StablePtr(..) )
+import GHC.Stable       ( StablePtr(..) )
 import GHC.Int
 import GHC.Word
 import GHC.Ptr

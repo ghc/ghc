@@ -17,12 +17,12 @@
 
 -- #hide
 module GHC.Stable 
-	( StablePtr(..)
-	, newStablePtr		-- :: a -> IO (StablePtr a)    
-	, deRefStablePtr	-- :: StablePtr a -> a
-	, freeStablePtr   	-- :: StablePtr a -> IO ()
-	, castStablePtrToPtr 	-- :: StablePtr a -> Ptr ()
-	, castPtrToStablePtr	-- :: Ptr () -> StablePtr a
+        ( StablePtr(..)
+        , newStablePtr          -- :: a -> IO (StablePtr a)    
+        , deRefStablePtr        -- :: StablePtr a -> a
+        , freeStablePtr         -- :: StablePtr a -> IO ()
+        , castStablePtrToPtr    -- :: StablePtr a -> Ptr ()
+        , castPtrToStablePtr    -- :: Ptr () -> StablePtr a
    ) where
 
 import GHC.Ptr
@@ -101,7 +101,7 @@ castPtrToStablePtr (Ptr a) = StablePtr (unsafeCoerce# a)
 
 instance Eq (StablePtr a) where 
     (StablePtr sp1) == (StablePtr sp2) =
-	case eqStablePtr# sp1 sp2 of
-	   0# -> False
-	   _  -> True
+        case eqStablePtr# sp1 sp2 of
+           0# -> False
+           _  -> True
 \end{code}

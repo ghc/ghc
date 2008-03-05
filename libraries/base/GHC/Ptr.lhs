@@ -22,7 +22,7 @@ import GHC.Base
 import GHC.Show
 import GHC.Num
 import GHC.List ( length, replicate )
-import Numeric		( showHex )
+import Numeric          ( showHex )
 
 #include "MachDeps.h"
 
@@ -153,10 +153,10 @@ instance Show (Ptr a) where
      where
         -- want 0s prefixed to pad it out to a fixed length.
        pad_out ls rs = 
-	  '0':'x':(replicate (2*SIZEOF_HSPTR - length ls) '0') ++ ls ++ rs
+          '0':'x':(replicate (2*SIZEOF_HSPTR - length ls) '0') ++ ls ++ rs
        -- word2Integer :: Word# -> Integer (stolen from Word.lhs)
        word2Integer w = case word2Integer# w of
-			(# s, d #) -> J# s d
+                        (# s, d #) -> J# s d
 
 instance Show (FunPtr a) where
    showsPrec p = showsPrec p . castFunPtrToPtr

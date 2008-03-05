@@ -23,16 +23,16 @@
 -- #hide
 module GHC.Pack
        (
-	-- (**) - emitted by compiler.
+        -- (**) - emitted by compiler.
 
-	packCString#,      -- :: [Char] -> ByteArray#    (**)
-	unpackCString,
-	unpackCString#,    -- :: Addr# -> [Char]	 (**)
-	unpackNBytes#,     -- :: Addr# -> Int# -> [Char] (**)
-	unpackFoldrCString#,  -- (**)
-	unpackAppendCString#,  -- (**)
+        packCString#,      -- :: [Char] -> ByteArray#    (**)
+        unpackCString,
+        unpackCString#,    -- :: Addr# -> [Char]         (**)
+        unpackNBytes#,     -- :: Addr# -> Int# -> [Char] (**)
+        unpackFoldrCString#,  -- (**)
+        unpackAppendCString#,  -- (**)
        ) 
-	where
+        where
 
 import GHC.Base
 import GHC.Err ( error )
@@ -41,15 +41,15 @@ import GHC.ST
 import GHC.Num
 import GHC.Ptr
 
-data ByteArray ix      	       = ByteArray	  ix ix ByteArray#
+data ByteArray ix              = ByteArray        ix ix ByteArray#
 data MutableByteArray s ix     = MutableByteArray ix ix (MutableByteArray# s)
 
 unpackCString :: Ptr a -> [Char]
 unpackCString a@(Ptr addr)
   | a == nullPtr  = []
-  | otherwise	   = unpackCString# addr
+  | otherwise      = unpackCString# addr
 
-packCString#	     :: [Char]          -> ByteArray#
+packCString#         :: [Char]          -> ByteArray#
 packCString# str = case (packString str) of { ByteArray _ _ bytes -> bytes }
 
 packString :: [Char] -> ByteArray Int
@@ -78,23 +78,23 @@ packNBytesST (I# length#) str =
    return ()
 
   fill_in arr_in# idx (C# c : cs) =
-   write_ps_array arr_in# idx c	 >>
+   write_ps_array arr_in# idx c  >>
    fill_in arr_in# (idx +# 1#) cs
 
 -- (Very :-) ``Specialised'' versions of some CharArray things...
 
-new_ps_array	:: Int# -> ST s (MutableByteArray s Int)
-write_ps_array	:: MutableByteArray s Int -> Int# -> Char# -> ST s () 
+new_ps_array    :: Int# -> ST s (MutableByteArray s Int)
+write_ps_array  :: MutableByteArray s Int -> Int# -> Char# -> ST s () 
 freeze_ps_array :: MutableByteArray s Int -> Int# -> ST s (ByteArray Int)
 
 new_ps_array size = ST $ \ s ->
-    case (newByteArray# size s)	  of { (# s2#, barr# #) ->
+    case (newByteArray# size s)   of { (# s2#, barr# #) ->
     (# s2#, MutableByteArray bot bot barr# #) }
   where
     bot = error "new_ps_array"
 
 write_ps_array (MutableByteArray _ _ barr#) n ch = ST $ \ s# ->
-    case writeCharArray# barr# n ch s#	of { s2#   ->
+    case writeCharArray# barr# n ch s#  of { s2#   ->
     (# s2#, () #) }
 
 -- same as unsafeFreezeByteArray

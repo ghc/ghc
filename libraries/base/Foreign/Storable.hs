@@ -17,15 +17,15 @@
 -----------------------------------------------------------------------------
 
 module Foreign.Storable
-	( Storable(
-	     sizeOf,         -- :: a -> Int
-	     alignment,      -- :: a -> Int
-	     peekElemOff,    -- :: Ptr a -> Int      -> IO a
-	     pokeElemOff,    -- :: Ptr a -> Int -> a -> IO ()
-	     peekByteOff,    -- :: Ptr b -> Int      -> IO a
-	     pokeByteOff,    -- :: Ptr b -> Int -> a -> IO ()
-	     peek,           -- :: Ptr a             -> IO a
-	     poke)           -- :: Ptr a        -> a -> IO ()
+        ( Storable(
+             sizeOf,         -- :: a -> Int
+             alignment,      -- :: a -> Int
+             peekElemOff,    -- :: Ptr a -> Int      -> IO a
+             pokeElemOff,    -- :: Ptr a -> Int -> a -> IO ()
+             peekByteOff,    -- :: Ptr b -> Int      -> IO a
+             pokeByteOff,    -- :: Ptr b -> Int -> a -> IO ()
+             peek,           -- :: Ptr a             -> IO a
+             poke)           -- :: Ptr a        -> a -> IO ()
         ) where
 
 
@@ -34,14 +34,14 @@ import NHC.FFI (Storable(..),Ptr,FunPtr,StablePtr
                ,Int8,Int16,Int32,Int64,Word8,Word16,Word32,Word64)
 #else
 
-import Control.Monad		( liftM )
+import Control.Monad            ( liftM )
 
 #include "MachDeps.h"
 #include "HsBaseConfig.h"
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Storable
-import GHC.Stable	( StablePtr )
+import GHC.Stable       ( StablePtr )
 import GHC.Num
 import GHC.Int
 import GHC.Word
@@ -180,66 +180,66 @@ instance Storable Bool where
    peekElemOff p i   = liftM (/= (0::HTYPE_INT)) $ peekElemOff (castPtr p) i
    pokeElemOff p i x = pokeElemOff (castPtr p) i (if x then 1 else 0::HTYPE_INT)
 
-#define STORABLE(T,size,align,read,write)	\
-instance Storable (T) where {			\
-    sizeOf    _ = size;				\
-    alignment _ = align;			\
-    peekElemOff = read;				\
+#define STORABLE(T,size,align,read,write)       \
+instance Storable (T) where {                   \
+    sizeOf    _ = size;                         \
+    alignment _ = align;                        \
+    peekElemOff = read;                         \
     pokeElemOff = write }
 
 #ifdef __GLASGOW_HASKELL__
 STORABLE(Char,SIZEOF_INT32,ALIGNMENT_INT32,
-	 readWideCharOffPtr,writeWideCharOffPtr)
+         readWideCharOffPtr,writeWideCharOffPtr)
 #elif defined(__HUGS__)
 STORABLE(Char,SIZEOF_HSCHAR,ALIGNMENT_HSCHAR,
-	 readCharOffPtr,writeCharOffPtr)
+         readCharOffPtr,writeCharOffPtr)
 #endif
 
 STORABLE(Int,SIZEOF_HSINT,ALIGNMENT_HSINT,
-	 readIntOffPtr,writeIntOffPtr)
+         readIntOffPtr,writeIntOffPtr)
 
 #ifndef __NHC__
 STORABLE(Word,SIZEOF_HSWORD,ALIGNMENT_HSWORD,
-	 readWordOffPtr,writeWordOffPtr)
+         readWordOffPtr,writeWordOffPtr)
 #endif
 
 STORABLE((Ptr a),SIZEOF_HSPTR,ALIGNMENT_HSPTR,
-	 readPtrOffPtr,writePtrOffPtr)
+         readPtrOffPtr,writePtrOffPtr)
 
 STORABLE((FunPtr a),SIZEOF_HSFUNPTR,ALIGNMENT_HSFUNPTR,
-	 readFunPtrOffPtr,writeFunPtrOffPtr)
+         readFunPtrOffPtr,writeFunPtrOffPtr)
 
 STORABLE((StablePtr a),SIZEOF_HSSTABLEPTR,ALIGNMENT_HSSTABLEPTR,
-	 readStablePtrOffPtr,writeStablePtrOffPtr)
+         readStablePtrOffPtr,writeStablePtrOffPtr)
 
 STORABLE(Float,SIZEOF_HSFLOAT,ALIGNMENT_HSFLOAT,
-	 readFloatOffPtr,writeFloatOffPtr)
+         readFloatOffPtr,writeFloatOffPtr)
 
 STORABLE(Double,SIZEOF_HSDOUBLE,ALIGNMENT_HSDOUBLE,
-	 readDoubleOffPtr,writeDoubleOffPtr)
+         readDoubleOffPtr,writeDoubleOffPtr)
 
 STORABLE(Word8,SIZEOF_WORD8,ALIGNMENT_WORD8,
-	 readWord8OffPtr,writeWord8OffPtr)
+         readWord8OffPtr,writeWord8OffPtr)
 
 STORABLE(Word16,SIZEOF_WORD16,ALIGNMENT_WORD16,
-	 readWord16OffPtr,writeWord16OffPtr)
+         readWord16OffPtr,writeWord16OffPtr)
 
 STORABLE(Word32,SIZEOF_WORD32,ALIGNMENT_WORD32,
-	 readWord32OffPtr,writeWord32OffPtr)
+         readWord32OffPtr,writeWord32OffPtr)
 
 STORABLE(Word64,SIZEOF_WORD64,ALIGNMENT_WORD64,
-	 readWord64OffPtr,writeWord64OffPtr)
+         readWord64OffPtr,writeWord64OffPtr)
 
 STORABLE(Int8,SIZEOF_INT8,ALIGNMENT_INT8,
-	 readInt8OffPtr,writeInt8OffPtr)
+         readInt8OffPtr,writeInt8OffPtr)
 
 STORABLE(Int16,SIZEOF_INT16,ALIGNMENT_INT16,
-	 readInt16OffPtr,writeInt16OffPtr)
+         readInt16OffPtr,writeInt16OffPtr)
 
 STORABLE(Int32,SIZEOF_INT32,ALIGNMENT_INT32,
-	 readInt32OffPtr,writeInt32OffPtr)
+         readInt32OffPtr,writeInt32OffPtr)
 
 STORABLE(Int64,SIZEOF_INT64,ALIGNMENT_INT64,
-	 readInt64OffPtr,writeInt64OffPtr)
+         readInt64OffPtr,writeInt64OffPtr)
 
 #endif

@@ -13,7 +13,7 @@
 --
 -----------------------------------------------------------------------------
 
-module Data.Char 
+module Data.Char
     (
       Char
 
@@ -48,7 +48,7 @@ module Data.Char
 
     -- * String representations
     , showLitChar       -- :: Char -> ShowS
-    , lexLitChar	-- :: ReadS String
+    , lexLitChar        -- :: ReadS String
     , readLitChar       -- :: ReadS Char 
 
      -- Implementation checked wrt. Haskell 98 lib report, 1/99.
@@ -85,10 +85,10 @@ foreign import ccall unsafe "WCsubst.h u_gencat" wgencat :: CInt -> CInt
 -- (i.e. @\'0\'@..@\'9\'@, @\'a\'@..@\'f\'@, @\'A\'@..@\'F\'@).
 digitToInt :: Char -> Int
 digitToInt c
- | isDigit c		=  ord c - ord '0'
+ | isDigit c            =  ord c - ord '0'
  | c >= 'a' && c <= 'f' =  ord c - ord 'a' + 10
  | c >= 'A' && c <= 'F' =  ord c - ord 'A' + 10
- | otherwise	        =  error ("Char.digitToInt: not a digit " ++ show c) -- sigh
+ | otherwise            =  error ("Char.digitToInt: not a digit " ++ show c) -- sigh
 
 #ifndef __GLASGOW_HASKELL__
 isAsciiUpper, isAsciiLower :: Char -> Bool

@@ -15,26 +15,26 @@
 -----------------------------------------------------------------------------
 
 module Text.Show (
-   ShowS,	 	-- String -> String
+   ShowS,               -- String -> String
    Show(
-      showsPrec,	-- :: Int -> a -> ShowS
-      show,		-- :: a   -> String
-      showList		-- :: [a] -> ShowS 
+      showsPrec,        -- :: Int -> a -> ShowS
+      show,             -- :: a   -> String
+      showList          -- :: [a] -> ShowS 
     ),
-   shows,		-- :: (Show a) => a -> ShowS
-   showChar,		-- :: Char -> ShowS
-   showString,		-- :: String -> ShowS
-   showParen,		-- :: Bool -> ShowS -> ShowS
-   showListWith,	-- :: (a -> ShowS) -> [a] -> ShowS 
+   shows,               -- :: (Show a) => a -> ShowS
+   showChar,            -- :: Char -> ShowS
+   showString,          -- :: String -> ShowS
+   showParen,           -- :: Bool -> ShowS -> ShowS
+   showListWith,        -- :: (a -> ShowS) -> [a] -> ShowS 
  ) where
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Show
-#endif   
+#endif
 
 -- | Show a list (using square brackets and commas), given a function
 -- for showing elements.
-showListWith :: (a -> ShowS) -> [a] -> ShowS 
+showListWith :: (a -> ShowS) -> [a] -> ShowS
 showListWith = showList__
 
 #ifndef __GLASGOW_HASKELL__

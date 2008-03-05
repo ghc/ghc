@@ -18,22 +18,22 @@
 module Foreign.Ptr (
 
     -- * Data pointers
-    
+
     Ptr,      -- data Ptr a
     nullPtr,      -- :: Ptr a
     castPtr,      -- :: Ptr a -> Ptr b
     plusPtr,      -- :: Ptr a -> Int -> Ptr b
     alignPtr,     -- :: Ptr a -> Int -> Ptr a
     minusPtr,     -- :: Ptr a -> Ptr b -> Int
-    
+
     -- * Function pointers
-    
+
     FunPtr,      -- data FunPtr a
     nullFunPtr,      -- :: FunPtr a
     castFunPtr,      -- :: FunPtr a -> FunPtr b
     castFunPtrToPtr, -- :: FunPtr a -> Ptr b
     castPtrToFunPtr, -- :: Ptr a -> FunPtr b
-    
+
     freeHaskellFunPtr, -- :: FunPtr a -> IO ()
     -- Free the function pointer created by foreign export dynamic.
 
@@ -57,17 +57,17 @@ import GHC.Read
 import GHC.Real
 import GHC.Show
 import GHC.Enum
-import GHC.Word		( Word(..) )
+import GHC.Word         ( Word(..) )
 
 import Data.Int
 import Data.Word
 #else
-import Control.Monad	( liftM )
+import Control.Monad    ( liftM )
 import Foreign.C.Types
 #endif
 
 import Data.Bits
-import Data.Typeable 	( Typeable(..), mkTyCon, mkTyConApp )
+import Data.Typeable    ( Typeable(..), mkTyCon, mkTyConApp )
 import Foreign.Storable ( Storable(..) )
 
 #ifdef __NHC__
@@ -108,12 +108,12 @@ foreign import ccall unsafe "freeHaskellFunctionPtr"
 -- | An unsigned integral type that can be losslessly converted to and from
 -- @Ptr@.
 INTEGRAL_TYPE(WordPtr,tyConWordPtr,"WordPtr",Word)
-	-- Word and Int are guaranteed pointer-sized in GHC
+        -- Word and Int are guaranteed pointer-sized in GHC
 
 -- | A signed integral type that can be losslessly converted to and from
 -- @Ptr@.
 INTEGRAL_TYPE(IntPtr,tyConIntPtr,"IntPtr",Int)
-	-- Word and Int are guaranteed pointer-sized in GHC
+        -- Word and Int are guaranteed pointer-sized in GHC
 
 -- | casts a @Ptr@ to a @WordPtr@
 ptrToWordPtr :: Ptr a -> WordPtr
