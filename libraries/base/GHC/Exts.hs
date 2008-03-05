@@ -16,25 +16,25 @@ module GHC.Exts
        (
         -- * Representations of some basic types
         Int(..),Word(..),Float(..),Double(..),Integer(..),Char(..),
-	Ptr(..), FunPtr(..),
+        Ptr(..), FunPtr(..),
 
         -- * Primitive operations
         module GHC.Prim,
-	shiftL#, shiftRL#, iShiftL#, iShiftRA#, iShiftRL#,
+        shiftL#, shiftRL#, iShiftL#, iShiftRA#, iShiftRL#,
         uncheckedShiftL64#, uncheckedShiftRL64#,
         uncheckedIShiftL64#, uncheckedIShiftRA64#,
 
-	-- * Fusion
-	build, augment,
+        -- * Fusion
+        build, augment,
 
-	-- * Overloaded string literals
-	IsString(..),
+        -- * Overloaded string literals
+        IsString(..),
 
-	-- * Debugging
-	breakpoint, breakpointCond,
+        -- * Debugging
+        breakpoint, breakpointCond,
 
-	-- * Ids with special behaviour
-	lazy, inline,
+        -- * Ids with special behaviour
+        lazy, inline,
 
         -- * Transform comprehensions
         Down(..), groupWith, sortWith, the
@@ -67,7 +67,7 @@ instance Ord a => Ord (Down a) where
 -- | 'the' ensures that all the elements of the list are identical
 -- and then returns that unique element
 the :: Eq a => [a] -> a
-the (x:xs) 
+the (x:xs)
   | all (x ==) xs = x
   | otherwise     = error "GHC.Exts.the: non-identical elements"
 the []            = error "GHC.Exts.the: empty list"

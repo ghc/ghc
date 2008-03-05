@@ -22,9 +22,9 @@
 module GHC.Handle (
   withHandle, withHandle', withHandle_,
   wantWritableHandle, wantReadableHandle, wantSeekableHandle,
-  
+
   newEmptyBuffer, allocateBuffer, readCharFromBuffer, writeCharIntoBuffer,
-  flushWriteBufferOnly, flushWriteBuffer, flushReadBuffer, 
+  flushWriteBufferOnly, flushWriteBuffer, flushReadBuffer,
   fillReadBuffer, fillReadBufferWithoutBlocking,
   readRawBuffer, readRawBufferPtr,
   readRawBufferNoBlock, readRawBufferPtrNoBlock,
@@ -70,14 +70,14 @@ import GHC.Real
 
 import GHC.Arr
 import GHC.Base
-import GHC.Read		( Read )
+import GHC.Read         ( Read )
 import GHC.List
 import GHC.IOBase
 import GHC.Exception
 import GHC.Enum
-import GHC.Num		( Integer(..), Num(..) )
+import GHC.Num          ( Integer(..), Num(..) )
 import GHC.Show
-import GHC.Real		( toInteger )
+import GHC.Real         ( toInteger )
 #if defined(DEBUG_DUMP)
 import GHC.Pack
 #endif
@@ -92,7 +92,7 @@ import GHC.Conc
 -- unbuffered hGetLine is a bit dodgy
 
 -- hSetBuffering: can't change buffering on a stream, 
---	when the read buffer is non-empty? (no way to flush the buffer)
+--      when the read buffer is non-empty? (no way to flush the buffer)
 
 -- ---------------------------------------------------------------------------
 -- Are files opened by default in text or binary mode, if the user doesn't
@@ -104,7 +104,7 @@ dEFAULT_OPEN_IN_BINARY_MODE = False :: Bool
 -- Creating a new handle
 
 newFileHandle :: FilePath -> (MVar Handle__ -> IO ()) -> Handle__ -> IO Handle
-newFileHandle filepath finalizer hc = do 
+newFileHandle filepath finalizer hc = do
   m <- newMVar hc
   addMVarFinalizer m (finalizer m)
   return (FileHandle filepath m)
@@ -126,8 +126,8 @@ operation: in these cases we also want to relinquish the lock.
 There are three versions of @withHandle@: corresponding to the three
 possible combinations of:
 
-	- the operation may side-effect the handle
-	- the operation may return a result
+        - the operation may side-effect the handle
+        - the operation may return a result
 
 If the operation generates an error or an exception is raised, the
 original handle is always replaced [ this is the case at the moment,
@@ -141,15 +141,15 @@ withHandle fun h@(DuplexHandle _ m _) act = withHandle' fun h m act
 
 withHandle' :: String -> Handle -> MVar Handle__
    -> (Handle__ -> IO (Handle__,a)) -> IO a
-withHandle' fun h m act = 
+withHandle' fun h m act =
    block $ do
    h_ <- takeMVar m
    checkBufferInvariants h_
-   (h',v)  <- catchException (act h_) 
-		(\ err -> putMVar m h_ >>
-		          case err of
-		             IOException ex -> ioError (augmentIOError ex fun h)
-		             _ -> throw err)
+   (h',v)  <- catchException (act h_)
+                (\ err -> putMVar m h_ >>
+                          case err of
+                             IOException ex -> ioError (augmentIOError ex fun h)
+                             _ -> throw err)
    checkBufferInvariants h'
    putMVar m h'
    return v
@@ -160,15 +160,15 @@ withHandle_ fun h@(FileHandle _ m)     act = withHandle_' fun h m act
 withHandle_ fun h@(DuplexHandle _ m _) act = withHandle_' fun h m act
 
 withHandle_' :: String -> Handle -> MVar Handle__ -> (Handle__ -> IO a) -> IO a
-withHandle_' fun h m act = 
+withHandle_' fun h m act =
    block $ do
    h_ <- takeMVar m
    checkBufferInvariants h_
-   v  <- catchException (act h_) 
-		(\ err -> putMVar m h_ >>
-		          case err of
-		             IOException ex -> ioError (augmentIOError ex fun h)
-		             _ -> throw err)
+   v  <- catchException (act h_)
+                (\ err -> putMVar m h_ >>
+                          case err of
+                             IOException ex -> ioError (augmentIOError ex fun h)
+                             _ -> throw err)
    checkBufferInvariants h_
    putMVar m h_
    return v
@@ -179,15 +179,15 @@ withAllHandles__ fun h@(DuplexHandle _ r w) act = do
   withHandle__' fun h r act
   withHandle__' fun h w act
 
-withHandle__' fun h m act = 
+withHandle__' fun h m act =
    block $ do
    h_ <- takeMVar m
    checkBufferInvariants h_
    h'  <- catchException (act h_)
-		(\ err -> putMVar m h_ >>
-		          case err of
-		             IOException ex -> ioError (augmentIOError ex fun h)
-		             _ -> throw err)
+                (\ err -> putMVar m h_ >>
+                          case err of
+                             IOException ex -> ioError (augmentIOError ex fun h)
+                             _ -> throw err)
    checkBufferInvariants h'
    putMVar m h'
    return ()
@@ -195,10 +195,10 @@ withHandle__' fun h m act =
 augmentIOError (IOError _ iot _ str fp) fun h
   = IOError (Just h) iot fun str filepath
   where filepath
-	  | Just _ <- fp = fp
-	  | otherwise = case h of
-		    	  FileHandle fp _     -> Just fp
-		    	  DuplexHandle fp _ _ -> Just fp
+          | Just _ <- fp = fp
+          | otherwise = case h of
+                          FileHandle fp _     -> Just fp
+                          DuplexHandle fp _ _ -> Just fp
 
 -- ---------------------------------------------------------------------------
 -- Wrapper for write operations.
@@ -211,27 +211,27 @@ wantWritableHandle fun h@(DuplexHandle _ _ m) act
   -- ToDo: in the Duplex case, we don't need to checkWritableHandle
 
 wantWritableHandle'
-	:: String -> Handle -> MVar Handle__
-  	-> (Handle__ -> IO a) -> IO a
+        :: String -> Handle -> MVar Handle__
+        -> (Handle__ -> IO a) -> IO a
 wantWritableHandle' fun h m act
    = withHandle_' fun h m (checkWritableHandle act)
 
 checkWritableHandle act handle_
-  = case haType handle_ of 
-      ClosedHandle 	   -> ioe_closedHandle
-      SemiClosedHandle 	   -> ioe_closedHandle
-      ReadHandle 	   -> ioe_notWritable
-      ReadWriteHandle  	   -> do
-		let ref = haBuffer handle_
-		buf <- readIORef ref
-		new_buf <-
-		  if not (bufferIsWritable buf)
-		     then do b <- flushReadBuffer (haFD handle_) buf
-			     return b{ bufState=WriteBuffer }
-		     else return buf
-		writeIORef ref new_buf
-		act handle_
-      _other 		   -> act handle_
+  = case haType handle_ of
+      ClosedHandle         -> ioe_closedHandle
+      SemiClosedHandle     -> ioe_closedHandle
+      ReadHandle           -> ioe_notWritable
+      ReadWriteHandle      -> do
+                let ref = haBuffer handle_
+                buf <- readIORef ref
+                new_buf <-
+                  if not (bufferIsWritable buf)
+                     then do b <- flushReadBuffer (haFD handle_) buf
+                             return b{ bufState=WriteBuffer }
+                     else return buf
+                writeIORef ref new_buf
+                act handle_
+      _other               -> act handle_
 
 -- ---------------------------------------------------------------------------
 -- Wrapper for read operations.
@@ -244,79 +244,79 @@ wantReadableHandle fun h@(DuplexHandle _ m _) act
   -- ToDo: in the Duplex case, we don't need to checkReadableHandle
 
 wantReadableHandle'
-	:: String -> Handle -> MVar Handle__
-	-> (Handle__ -> IO a) -> IO a
+        :: String -> Handle -> MVar Handle__
+        -> (Handle__ -> IO a) -> IO a
 wantReadableHandle' fun h m act
   = withHandle_' fun h m (checkReadableHandle act)
 
-checkReadableHandle act handle_ = 
-    case haType handle_ of 
-      ClosedHandle 	   -> ioe_closedHandle
-      SemiClosedHandle 	   -> ioe_closedHandle
-      AppendHandle 	   -> ioe_notReadable
-      WriteHandle 	   -> ioe_notReadable
-      ReadWriteHandle	   -> do 
-	let ref = haBuffer handle_
-	buf <- readIORef ref
-	when (bufferIsWritable buf) $ do
-	   new_buf <- flushWriteBuffer (haFD handle_) (haIsStream handle_) buf
-	   writeIORef ref new_buf{ bufState=ReadBuffer }
-	act handle_
-      _other 		   -> act handle_
+checkReadableHandle act handle_ =
+    case haType handle_ of
+      ClosedHandle         -> ioe_closedHandle
+      SemiClosedHandle     -> ioe_closedHandle
+      AppendHandle         -> ioe_notReadable
+      WriteHandle          -> ioe_notReadable
+      ReadWriteHandle      -> do
+        let ref = haBuffer handle_
+        buf <- readIORef ref
+        when (bufferIsWritable buf) $ do
+           new_buf <- flushWriteBuffer (haFD handle_) (haIsStream handle_) buf
+           writeIORef ref new_buf{ bufState=ReadBuffer }
+        act handle_
+      _other               -> act handle_
 
 -- ---------------------------------------------------------------------------
 -- Wrapper for seek operations.
 
 wantSeekableHandle :: String -> Handle -> (Handle__ -> IO a) -> IO a
 wantSeekableHandle fun h@(DuplexHandle _ _ _) _act =
-  ioException (IOError (Just h) IllegalOperation fun 
-		   "handle is not seekable" Nothing)
+  ioException (IOError (Just h) IllegalOperation fun
+                   "handle is not seekable" Nothing)
 wantSeekableHandle fun h@(FileHandle _ m) act =
   withHandle_' fun h m (checkSeekableHandle act)
-  
-checkSeekableHandle act handle_ = 
-    case haType handle_ of 
-      ClosedHandle 	-> ioe_closedHandle
-      SemiClosedHandle	-> ioe_closedHandle
+
+checkSeekableHandle act handle_ =
+    case haType handle_ of
+      ClosedHandle      -> ioe_closedHandle
+      SemiClosedHandle  -> ioe_closedHandle
       AppendHandle      -> ioe_notSeekable
       _  | haIsBin handle_ || tEXT_MODE_SEEK_ALLOWED -> act handle_
          | otherwise                                 -> ioe_notSeekable_notBin
- 
+
 -- -----------------------------------------------------------------------------
 -- Handy IOErrors
 
-ioe_closedHandle, ioe_EOF, 
-  ioe_notReadable, ioe_notWritable, 
+ioe_closedHandle, ioe_EOF,
+  ioe_notReadable, ioe_notWritable,
   ioe_notSeekable, ioe_notSeekable_notBin :: IO a
 
-ioe_closedHandle = ioException 
-   (IOError Nothing IllegalOperation "" 
-	"handle is closed" Nothing)
-ioe_EOF = ioException 
+ioe_closedHandle = ioException
+   (IOError Nothing IllegalOperation ""
+        "handle is closed" Nothing)
+ioe_EOF = ioException
    (IOError Nothing EOF "" "" Nothing)
-ioe_notReadable = ioException 
-   (IOError Nothing IllegalOperation "" 
-	"handle is not open for reading" Nothing)
-ioe_notWritable = ioException 
-   (IOError Nothing IllegalOperation "" 
-	"handle is not open for writing" Nothing)
-ioe_notSeekable = ioException 
+ioe_notReadable = ioException
    (IOError Nothing IllegalOperation ""
-	"handle is not seekable" Nothing)
-ioe_notSeekable_notBin = ioException 
+        "handle is not open for reading" Nothing)
+ioe_notWritable = ioException
    (IOError Nothing IllegalOperation ""
-      "seek operations on text-mode handles are not allowed on this platform" 
+        "handle is not open for writing" Nothing)
+ioe_notSeekable = ioException
+   (IOError Nothing IllegalOperation ""
+        "handle is not seekable" Nothing)
+ioe_notSeekable_notBin = ioException
+   (IOError Nothing IllegalOperation ""
+      "seek operations on text-mode handles are not allowed on this platform"
         Nothing)
- 
+
 ioe_finalizedHandle fp = throw (IOException
-   (IOError Nothing IllegalOperation "" 
-	"handle is finalized" (Just fp)))
+   (IOError Nothing IllegalOperation ""
+        "handle is finalized" (Just fp)))
 
 ioe_bufsiz :: Int -> IO a
-ioe_bufsiz n = ioException 
+ioe_bufsiz n = ioException
    (IOError Nothing InvalidArgument "hSetBuffering"
-	("illegal buffer size " ++ showsPrec 9 n []) Nothing)
-				-- 9 => should be parens'ified.
+        ("illegal buffer size " ++ showsPrec 9 n []) Nothing)
+                                -- 9 => should be parens'ified.
 
 -- -----------------------------------------------------------------------------
 -- Handle Finalizers
@@ -343,13 +343,13 @@ stdHandleFinalizer fp m = do
 handleFinalizer :: FilePath -> MVar Handle__ -> IO ()
 handleFinalizer fp m = do
   handle_ <- takeMVar m
-  case haType handle_ of 
+  case haType handle_ of
       ClosedHandle -> return ()
       _ -> do flushWriteBufferOnly handle_ `catchException` \_ -> return ()
-		-- ignore errors and async exceptions, and close the
-		-- descriptor anyway...
-	      hClose_handle_ handle_
-	      return ()
+                -- ignore errors and async exceptions, and close the
+                -- descriptor anyway...
+              hClose_handle_ handle_
+              return ()
   putMVar m (ioe_finalizedHandle fp)
 
 -- ---------------------------------------------------------------------------
@@ -357,15 +357,15 @@ handleFinalizer fp m = do
 
 #ifdef DEBUG
 checkBufferInvariants h_ = do
- let ref = haBuffer h_ 
+ let ref = haBuffer h_
  Buffer{ bufWPtr=w, bufRPtr=r, bufSize=size, bufState=state } <- readIORef ref
  if not (
-  	size > 0
-  	&& r <= w
-  	&& w <= size
-  	&& ( r /= w || (r == 0 && w == 0) )
-  	&& ( state /= WriteBuffer || r == 0 )	
-  	&& ( state /= WriteBuffer || w < size ) -- write buffer is never full
+        size > 0
+        && r <= w
+        && w <= size
+        && ( r /= w || (r == 0 && w == 0) )
+        && ( state /= WriteBuffer || r == 0 )
+        && ( state /= WriteBuffer || w < size ) -- write buffer is never full
      )
    then error "buffer invariant violation"
    else return ()
@@ -387,12 +387,12 @@ allocateBuffer sz@(I# size) state = IO $ \s ->
 writeCharIntoBuffer :: RawBuffer -> Int -> Char -> IO Int
 writeCharIntoBuffer slab (I# off) (C# c)
   = IO $ \s -> case writeCharArray# slab off c s of 
-		 s -> (# s, I# (off +# 1#) #)
+                 s -> (# s, I# (off +# 1#) #)
 
 readCharFromBuffer :: RawBuffer -> Int -> IO (Char, Int)
 readCharFromBuffer slab (I# off)
   = IO $ \s -> case readCharArray# slab off s of 
-		 (# s, c #) -> (# s, (C# c, I# (off +# 1#)) #)
+                 (# s, c #) -> (# s, (C# c, I# (off +# 1#)) #)
 
 getBuffer :: FD -> BufferState -> IO (IORef Buffer, BufferMode)
 getBuffer fd state = do
@@ -418,8 +418,8 @@ flushWriteBufferOnly h_ = do
       ref = haBuffer h_
   buf <- readIORef ref
   new_buf <- if bufferIsWritable buf 
-		then flushWriteBuffer fd (haIsStream h_) buf 
-		else return buf
+                then flushWriteBuffer fd (haIsStream h_) buf 
+                else return buf
   writeIORef ref new_buf
 
 -- flushBuffer syncs the file with the buffer, including moving the
@@ -450,7 +450,7 @@ flushReadBuffer fd buf
      puts ("flushReadBuffer: new file offset = " ++ show off ++ "\n")
 #    endif
      throwErrnoIfMinus1Retry "flushReadBuffer"
-   	 (c_lseek fd (fromIntegral off) sEEK_CUR)
+         (c_lseek fd (fromIntegral off) sEEK_CUR)
      return buf{ bufWPtr=0, bufRPtr=0 }
 
 flushWriteBuffer :: FD -> Bool -> Buffer -> IO Buffer
@@ -464,7 +464,7 @@ flushWriteBuffer fd is_stream buf@Buffer{ bufBuf=b, bufRPtr=r, bufWPtr=w }  =
      then return (buf{ bufRPtr=0, bufWPtr=0 })
      else do
   res <- writeRawBuffer "flushWriteBuffer" fd is_stream b 
-  			(fromIntegral r) (fromIntegral bytes)
+                        (fromIntegral r) (fromIntegral bytes)
   let res' = fromIntegral res
   if res' < bytes 
      then flushWriteBuffer fd is_stream (buf{ bufRPtr = r + res' })
@@ -492,18 +492,18 @@ fillReadBufferLoop fd is_line is_stream buf b w size = do
   puts ("fillReadBufferLoop: bytes = " ++ show bytes ++ "\n")
 #endif
   res <- readRawBuffer "fillReadBuffer" fd is_stream b
-  		       (fromIntegral w) (fromIntegral bytes)
+                       (fromIntegral w) (fromIntegral bytes)
   let res' = fromIntegral res
 #ifdef DEBUG_DUMP
   puts ("fillReadBufferLoop:  res' = " ++ show res' ++ "\n")
 #endif
   if res' == 0
      then if w == 0
-	     then ioe_EOF
-	     else return buf{ bufRPtr=0, bufWPtr=w }
+             then ioe_EOF
+             else return buf{ bufRPtr=0, bufWPtr=w }
      else if res' < bytes && not is_line
-     	     then fillReadBufferLoop fd is_line is_stream buf b (w+res') size
-     	     else return buf{ bufRPtr=0, bufWPtr=w+res' }
+             then fillReadBufferLoop fd is_line is_stream buf b (w+res') size
+             else return buf{ bufRPtr=0, bufWPtr=w+res' }
  
 
 fillReadBufferWithoutBlocking :: FD -> Bool -> Buffer -> IO Buffer
@@ -515,7 +515,7 @@ fillReadBufferWithoutBlocking fd is_stream
   puts ("fillReadBufferLoopNoBlock: bytes = " ++ show size ++ "\n")
 #endif
   res <- readRawBufferNoBlock "fillReadBuffer" fd is_stream b
-  		       0 (fromIntegral size)
+                       0 (fromIntegral size)
   let res' = fromIntegral res
 #ifdef DEBUG_DUMP
   puts ("fillReadBufferLoopNoBlock:  res' = " ++ show res' ++ "\n")
@@ -612,7 +612,7 @@ writeRawBuffer loc fd is_nonblock buf off len
                         else do threadWaitWrite (fromIntegral fd); unsafe_write
   where  
     do_write call = throwErrnoIfMinus1RetryMayBlock loc call
-		        (threadWaitWrite (fromIntegral fd)) 
+                        (threadWaitWrite (fromIntegral fd)) 
     unsafe_write = do_write (write_rawBuffer fd buf off len)
     safe_write   = do_write (safe_write_rawBuffer (fromIntegral fd) buf off len)
 
@@ -626,7 +626,7 @@ writeRawBufferPtr loc fd is_nonblock buf off len
                         else do threadWaitWrite (fromIntegral fd); unsafe_write
   where
     do_write call = throwErrnoIfMinus1RetryMayBlock loc call
-		        (threadWaitWrite (fromIntegral fd)) 
+                        (threadWaitWrite (fromIntegral fd)) 
     unsafe_write  = do_write (write_off fd buf off len)
     safe_write    = do_write (safe_write_off (fromIntegral fd) buf off len)
 
@@ -677,15 +677,15 @@ readRawBufferPtrNoBlock = readRawBufferPtr
 
 asyncReadRawBuffer loc fd is_stream buf off len = do
     (l, rc) <- asyncReadBA (fromIntegral fd) (if is_stream then 1 else 0) 
-		 (fromIntegral len) off buf
+                 (fromIntegral len) off buf
     if l == (-1)
       then 
-	ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
+        ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
       else return (fromIntegral l)
 
 asyncReadRawBufferPtr loc fd is_stream buf off len = do
     (l, rc) <- asyncRead (fromIntegral fd) (if is_stream then 1 else 0) 
-			(fromIntegral len) (buf `plusPtr` off)
+                        (fromIntegral len) (buf `plusPtr` off)
     if l == (-1)
       then 
         ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
@@ -693,7 +693,7 @@ asyncReadRawBufferPtr loc fd is_stream buf off len = do
 
 asyncWriteRawBuffer loc fd is_stream buf off len = do
     (l, rc) <- asyncWriteBA (fromIntegral fd) (if is_stream then 1 else 0) 
-			(fromIntegral len) off buf
+                        (fromIntegral len) off buf
     if l == (-1)
       then 
         ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
@@ -701,7 +701,7 @@ asyncWriteRawBuffer loc fd is_stream buf off len = do
 
 asyncWriteRawBufferPtr loc fd is_stream buf off len = do
     (l, rc) <- asyncWrite (fromIntegral fd) (if is_stream then 1 else 0) 
-		  (fromIntegral len) (buf `plusPtr` off)
+                  (fromIntegral len) (buf `plusPtr` off)
     if l == (-1)
       then 
         ioError (errnoToIOError loc (Errno (fromIntegral rc)) Nothing Nothing)
@@ -868,18 +868,18 @@ openFile' filepath mode binary =
 
     let 
       oflags1 = case mode of
-	    	  ReadMode      -> read_flags
+                  ReadMode      -> read_flags
 #ifdef mingw32_HOST_OS
-	    	  WriteMode     -> write_flags .|. o_TRUNC
+                  WriteMode     -> write_flags .|. o_TRUNC
 #else
-	    	  WriteMode     -> write_flags
+                  WriteMode     -> write_flags
 #endif
-	    	  ReadWriteMode -> rw_flags
-	    	  AppendMode    -> append_flags
+                  ReadWriteMode -> rw_flags
+                  AppendMode    -> append_flags
 
       binary_flags
-	  | binary    = o_BINARY
-	  | otherwise = 0
+          | binary    = o_BINARY
+          | otherwise = 0
 
       oflags = oflags1 .|. binary_flags
     in do
@@ -890,22 +890,22 @@ openFile' filepath mode binary =
     -- always returns EISDIR if the file is a directory and was opened
     -- for writing, so I think we're ok with a single open() here...
     fd <- throwErrnoIfMinus1Retry "openFile"
- 	        (c_open f (fromIntegral oflags) 0o666)
+                (c_open f (fromIntegral oflags) 0o666)
 
     stat@(fd_type,_,_) <- fdStat fd
 
     h <- fdToHandle_stat fd (Just stat) False filepath mode binary
             `catchException` \e -> do c_close fd; throw e
-	-- NB. don't forget to close the FD if fdToHandle' fails, otherwise
-	-- this FD leaks.
-	-- ASSERT: if we just created the file, then fdToHandle' won't fail
-	-- (so we don't need to worry about removing the newly created file
-	--  in the event of an error).
+        -- NB. don't forget to close the FD if fdToHandle' fails, otherwise
+        -- this FD leaks.
+        -- ASSERT: if we just created the file, then fdToHandle' won't fail
+        -- (so we don't need to worry about removing the newly created file
+        --  in the event of an error).
 
 #ifndef mingw32_HOST_OS
-	-- we want to truncate() if this is an open in WriteMode, but only
-	-- if the target is a RegularFile.  ftruncate() fails on special files
-	-- like /dev/null.
+        -- we want to truncate() if this is an open in WriteMode, but only
+        -- if the target is a RegularFile.  ftruncate() fails on special files
+        -- like /dev/null.
     if mode == WriteMode && fd_type == RegularFile
       then throwErrnoIf (/=0) "openFile" 
               (c_ftruncate fd 0)
@@ -945,44 +945,44 @@ fdToHandle_stat fd mb_stat is_socket filepath mode binary = do
 #endif
 
     let (ha_type, write) =
-	  case mode of
-	    ReadMode      -> ( ReadHandle,      False )
-	    WriteMode     -> ( WriteHandle,     True )
-	    ReadWriteMode -> ( ReadWriteHandle, True )
-	    AppendMode    -> ( AppendHandle,    True )
+          case mode of
+            ReadMode      -> ( ReadHandle,      False )
+            WriteMode     -> ( WriteHandle,     True )
+            ReadWriteMode -> ( ReadWriteHandle, True )
+            AppendMode    -> ( AppendHandle,    True )
 
     -- open() won't tell us if it was a directory if we only opened for
     -- reading, so check again.
     (fd_type,dev,ino) <- 
       case mb_stat of
         Just x  -> return x
-	Nothing -> fdStat fd
+        Nothing -> fdStat fd
 
     case fd_type of
-	Directory -> 
-	   ioException (IOError Nothing InappropriateType "openFile"
-			   "is a directory" Nothing) 
+        Directory -> 
+           ioException (IOError Nothing InappropriateType "openFile"
+                           "is a directory" Nothing) 
 
-	-- regular files need to be locked
-	RegularFile -> do
+        -- regular files need to be locked
+        RegularFile -> do
 #ifndef mingw32_HOST_OS
-	   r <- lockFile fd dev ino (fromBool write)
-	   when (r == -1)  $
-		ioException (IOError Nothing ResourceBusy "openFile"
-				   "file is locked" Nothing)
+           r <- lockFile fd dev ino (fromBool write)
+           when (r == -1)  $
+                ioException (IOError Nothing ResourceBusy "openFile"
+                                   "file is locked" Nothing)
 #endif
-	   mkFileHandle fd is_stream filepath ha_type binary
+           mkFileHandle fd is_stream filepath ha_type binary
 
-	Stream
-	   -- only *Streams* can be DuplexHandles.  Other read/write
-	   -- Handles must share a buffer.
-	   | ReadWriteHandle <- ha_type -> 
-		mkDuplexHandle fd is_stream filepath binary
-	   | otherwise ->
-		mkFileHandle   fd is_stream filepath ha_type binary
+        Stream
+           -- only *Streams* can be DuplexHandles.  Other read/write
+           -- Handles must share a buffer.
+           | ReadWriteHandle <- ha_type -> 
+                mkDuplexHandle fd is_stream filepath binary
+           | otherwise ->
+                mkFileHandle   fd is_stream filepath ha_type binary
 
-	RawDevice -> 
-		mkFileHandle fd is_stream filepath ha_type binary
+        RawDevice -> 
+                mkFileHandle fd is_stream filepath ha_type binary
 
 -- | Old API kept to avoid breaking clients
 fdToHandle' :: FD -> Maybe FDType -> Bool -> FilePath  -> IOMode -> Bool
@@ -1013,19 +1013,19 @@ foreign import ccall unsafe "unlockFile"
 #endif
 
 mkStdHandle :: FD -> FilePath -> HandleType -> IORef Buffer -> BufferMode
-	-> IO Handle
+        -> IO Handle
 mkStdHandle fd filepath ha_type buf bmode = do
    spares <- newIORef BufferListNil
    newFileHandle filepath (stdHandleFinalizer filepath)
-	    (Handle__ { haFD = fd,
-			haType = ha_type,
+            (Handle__ { haFD = fd,
+                        haType = ha_type,
                         haIsBin = dEFAULT_OPEN_IN_BINARY_MODE,
-			haIsStream = False, -- means FD is blocking on Unix
-			haBufferMode = bmode,
-			haBuffer = buf,
-			haBuffers = spares,
-			haOtherSide = Nothing
-		      })
+                        haIsStream = False, -- means FD is blocking on Unix
+                        haBufferMode = bmode,
+                        haBuffer = buf,
+                        haBuffers = spares,
+                        haOtherSide = Nothing
+                      })
 
 mkFileHandle :: FD -> Bool -> FilePath -> HandleType -> Bool -> IO Handle
 mkFileHandle fd is_stream filepath ha_type binary = do
@@ -1037,50 +1037,50 @@ mkFileHandle fd is_stream filepath ha_type binary = do
   -- from read mode to write mode on a buffered text-mode handle, see bug
   -- \#679.
   bmode <- case ha_type of
-      		ReadWriteHandle | not binary -> return NoBuffering
-		_other			     -> return bmode
+                ReadWriteHandle | not binary -> return NoBuffering
+                _other                       -> return bmode
 #endif
 
   spares <- newIORef BufferListNil
   newFileHandle filepath (handleFinalizer filepath)
-	    (Handle__ { haFD = fd,
-			haType = ha_type,
+            (Handle__ { haFD = fd,
+                        haType = ha_type,
                         haIsBin = binary,
-			haIsStream = is_stream,
-			haBufferMode = bmode,
-			haBuffer = buf,
-			haBuffers = spares,
-		        haOtherSide = Nothing
-		      })
+                        haIsStream = is_stream,
+                        haBufferMode = bmode,
+                        haBuffer = buf,
+                        haBuffers = spares,
+                        haOtherSide = Nothing
+                      })
 
 mkDuplexHandle :: FD -> Bool -> FilePath -> Bool -> IO Handle
 mkDuplexHandle fd is_stream filepath binary = do
   (w_buf, w_bmode) <- getBuffer fd WriteBuffer
   w_spares <- newIORef BufferListNil
   let w_handle_ = 
-	     Handle__ { haFD = fd,
-			haType = WriteHandle,
+             Handle__ { haFD = fd,
+                        haType = WriteHandle,
                         haIsBin = binary,
-			haIsStream = is_stream,
-			haBufferMode = w_bmode,
-			haBuffer = w_buf,
-			haBuffers = w_spares,
-			haOtherSide = Nothing
-		      }
+                        haIsStream = is_stream,
+                        haBufferMode = w_bmode,
+                        haBuffer = w_buf,
+                        haBuffers = w_spares,
+                        haOtherSide = Nothing
+                      }
   write_side <- newMVar w_handle_
 
   (r_buf, r_bmode) <- getBuffer fd ReadBuffer
   r_spares <- newIORef BufferListNil
   let r_handle_ = 
-	     Handle__ { haFD = fd,
-			haType = ReadHandle,
+             Handle__ { haFD = fd,
+                        haType = ReadHandle,
                         haIsBin = binary,
-			haIsStream = is_stream,
-			haBufferMode = r_bmode,
-			haBuffer = r_buf,
-			haBuffers = r_spares,
-			haOtherSide = Just write_side
-		      }
+                        haIsStream = is_stream,
+                        haBufferMode = r_bmode,
+                        haBuffer = r_buf,
+                        haBuffers = r_spares,
+                        haOtherSide = Just write_side
+                      }
   read_side <- newMVar r_handle_
 
   addMVarFinalizer write_side (handleFinalizer filepath write_side)
@@ -1088,7 +1088,7 @@ mkDuplexHandle fd is_stream filepath binary = do
    
 
 initBufferState ReadHandle = ReadBuffer
-initBufferState _ 	   = WriteBuffer
+initBufferState _          = WriteBuffer
 
 -- ---------------------------------------------------------------------------
 -- Closing a handle
@@ -1127,7 +1127,7 @@ hClose_help handle_ =
   case haType handle_ of 
       ClosedHandle -> return (handle_,Nothing)
       _ -> do flushWriteBufferOnly handle_ -- interruptible
-	      hClose_handle_ handle_
+              hClose_handle_ handle_
 
 hClose_handle_ handle_ = do
     let fd = haFD handle_
@@ -1143,9 +1143,9 @@ hClose_handle_ handle_ = do
         Nothing -> (do
                       throwErrnoIfMinus1Retry_ "hClose" 
 #ifdef mingw32_HOST_OS
-	    			(closeFd (haIsStream handle_) fd)
+                                (closeFd (haIsStream handle_) fd)
 #else
-	    			(c_close fd)
+                                (c_close fd)
 #endif
                       return Nothing
                     )
@@ -1165,8 +1165,8 @@ hClose_handle_ handle_ = do
     -- we must set the fd to -1, because the finalizer is going
     -- to run eventually and try to close/unlock it.
     return (handle_{ haFD        = -1, 
-  		     haType      = ClosedHandle
-  		   },
+                     haType      = ClosedHandle
+                   },
             maybe_exception)
 
 {-# NOINLINE noBuffer #-}
@@ -1182,14 +1182,14 @@ hFileSize :: Handle -> IO Integer
 hFileSize handle =
     withHandle_ "hFileSize" handle $ \ handle_ -> do
     case haType handle_ of 
-      ClosedHandle 		-> ioe_closedHandle
-      SemiClosedHandle 		-> ioe_closedHandle
+      ClosedHandle              -> ioe_closedHandle
+      SemiClosedHandle          -> ioe_closedHandle
       _ -> do flushWriteBufferOnly handle_
-	      r <- fdFileSize (haFD handle_)
-	      if r /= -1
-		 then return r
-		 else ioException (IOError Nothing InappropriateType "hFileSize"
-				   "not a regular file" Nothing)
+              r <- fdFileSize (haFD handle_)
+              if r /= -1
+                 then return r
+                 else ioException (IOError Nothing InappropriateType "hFileSize"
+                                   "not a regular file" Nothing)
 
 
 -- | 'hSetFileSize' @hdl@ @size@ truncates the physical file with handle @hdl@ to @size@ bytes.
@@ -1198,12 +1198,12 @@ hSetFileSize :: Handle -> Integer -> IO ()
 hSetFileSize handle size =
     withHandle_ "hSetFileSize" handle $ \ handle_ -> do
     case haType handle_ of 
-      ClosedHandle 		-> ioe_closedHandle
-      SemiClosedHandle 		-> ioe_closedHandle
+      ClosedHandle              -> ioe_closedHandle
+      SemiClosedHandle          -> ioe_closedHandle
       _ -> do flushWriteBufferOnly handle_
-	      throwErrnoIf (/=0) "hSetFileSize" 
-	         (c_ftruncate (haFD handle_) (fromIntegral size))
-	      return ()
+              throwErrnoIf (/=0) "hSetFileSize" 
+                 (c_ftruncate (haFD handle_) (fromIntegral size))
+              return ()
 
 -- ---------------------------------------------------------------------------
 -- Detecting the End of Input
@@ -1249,8 +1249,8 @@ hLookAhead handle = do
 
   -- fill up the read buffer if necessary
   new_buf <- if bufferEmpty buf
-		then fillReadBuffer fd True (haIsStream handle_) buf
-		else return buf
+                then fillReadBuffer fd True (haIsStream handle_) buf
+                else return buf
   
   writeIORef ref new_buf
 
@@ -1286,49 +1286,49 @@ hSetBuffering handle mode =
   case haType handle_ of
     ClosedHandle -> ioe_closedHandle
     _ -> do
-	 {- Note:
-	    - we flush the old buffer regardless of whether
-	      the new buffer could fit the contents of the old buffer 
-	      or not.
-	    - allow a handle's buffering to change even if IO has
-	      occurred (ANSI C spec. does not allow this, nor did
-	      the previous implementation of IO.hSetBuffering).
-	    - a non-standard extension is to allow the buffering
-	      of semi-closed handles to change [sof 6/98]
-	  -}
-	  flushBuffer handle_
+         {- Note:
+            - we flush the old buffer regardless of whether
+              the new buffer could fit the contents of the old buffer 
+              or not.
+            - allow a handle's buffering to change even if IO has
+              occurred (ANSI C spec. does not allow this, nor did
+              the previous implementation of IO.hSetBuffering).
+            - a non-standard extension is to allow the buffering
+              of semi-closed handles to change [sof 6/98]
+          -}
+          flushBuffer handle_
 
-	  let state = initBufferState (haType handle_)
-	  new_buf <-
-	    case mode of
-		-- we always have a 1-character read buffer for 
-		-- unbuffered  handles: it's needed to 
-		-- support hLookAhead.
-	      NoBuffering            ->	allocateBuffer 1 ReadBuffer
-	      LineBuffering          -> allocateBuffer dEFAULT_BUFFER_SIZE state
-	      BlockBuffering Nothing ->	allocateBuffer dEFAULT_BUFFER_SIZE state
-	      BlockBuffering (Just n) | n <= 0    -> ioe_bufsiz n
-				      | otherwise -> allocateBuffer n state
-	  writeIORef (haBuffer handle_) new_buf
+          let state = initBufferState (haType handle_)
+          new_buf <-
+            case mode of
+                -- we always have a 1-character read buffer for 
+                -- unbuffered  handles: it's needed to 
+                -- support hLookAhead.
+              NoBuffering            -> allocateBuffer 1 ReadBuffer
+              LineBuffering          -> allocateBuffer dEFAULT_BUFFER_SIZE state
+              BlockBuffering Nothing -> allocateBuffer dEFAULT_BUFFER_SIZE state
+              BlockBuffering (Just n) | n <= 0    -> ioe_bufsiz n
+                                      | otherwise -> allocateBuffer n state
+          writeIORef (haBuffer handle_) new_buf
 
-	  -- for input terminals we need to put the terminal into
-	  -- cooked or raw mode depending on the type of buffering.
-	  is_tty <- fdIsTTY (haFD handle_)
-	  when (is_tty && isReadableHandleType (haType handle_)) $
-		case mode of
+          -- for input terminals we need to put the terminal into
+          -- cooked or raw mode depending on the type of buffering.
+          is_tty <- fdIsTTY (haFD handle_)
+          when (is_tty && isReadableHandleType (haType handle_)) $
+                case mode of
 #ifndef mingw32_HOST_OS
-	-- 'raw' mode under win32 is a bit too specialised (and troublesome
-	-- for most common uses), so simply disable its use here.
-		  NoBuffering -> setCooked (haFD handle_) False
+        -- 'raw' mode under win32 is a bit too specialised (and troublesome
+        -- for most common uses), so simply disable its use here.
+                  NoBuffering -> setCooked (haFD handle_) False
 #else
-		  NoBuffering -> return ()
+                  NoBuffering -> return ()
 #endif
-		  _           -> setCooked (haFD handle_) True
+                  _           -> setCooked (haFD handle_) True
 
- 	  -- throw away spare buffers, they might be the wrong size
-	  writeIORef (haBuffers handle_) BufferListNil
+          -- throw away spare buffers, they might be the wrong size
+          writeIORef (haBuffers handle_) BufferListNil
 
-	  return (handle_{ haBufferMode = mode })
+          return (handle_{ haBufferMode = mode })
 
 -- -----------------------------------------------------------------------------
 -- hFlush
@@ -1349,9 +1349,9 @@ hFlush handle =
    wantWritableHandle "hFlush" handle $ \ handle_ -> do
    buf <- readIORef (haBuffer handle_)
    if bufferIsWritable buf && not (bufferEmpty buf)
-	then do flushed_buf <- flushWriteBuffer (haFD handle_) (haIsStream handle_) buf
-		writeIORef (haBuffer handle_) flushed_buf
-	else return ()
+        then do flushed_buf <- flushWriteBuffer (haFD handle_) (haIsStream handle_) buf
+                writeIORef (haBuffer handle_) flushed_buf
+        else return ()
 
 
 -- -----------------------------------------------------------------------------
@@ -1364,7 +1364,7 @@ instance Eq HandlePosn where
 
 instance Show HandlePosn where
    showsPrec p (HandlePosn h pos) = 
-	showsPrec p h . showString " at position " . shows pos
+        showsPrec p h . showString " at position " . shows pos
 
   -- HandlePosition is the Haskell equivalent of POSIX' off_t.
   -- We represent it as an Integer on the Haskell side, but
@@ -1396,11 +1396,11 @@ hSetPosn (HandlePosn h i) = hSeek h AbsoluteSeek i
 
 -- | A mode that determines the effect of 'hSeek' @hdl mode i@, as follows:
 data SeekMode
-  = AbsoluteSeek	-- ^ the position of @hdl@ is set to @i@.
-  | RelativeSeek	-- ^ the position of @hdl@ is set to offset @i@
-			-- from the current position.
-  | SeekFromEnd		-- ^ the position of @hdl@ is set to offset @i@
-			-- from the end of the file.
+  = AbsoluteSeek        -- ^ the position of @hdl@ is set to @i@.
+  | RelativeSeek        -- ^ the position of @hdl@ is set to offset @i@
+                        -- from the current position.
+  | SeekFromEnd         -- ^ the position of @hdl@ is set to offset @i@
+                        -- from the end of the file.
     deriving (Eq, Ord, Ix, Enum, Read, Show)
 
 {- Note: 
@@ -1443,8 +1443,8 @@ hSeek handle mode offset =
         fd = haFD handle_
 
     let do_seek =
-	  throwErrnoIfMinus1Retry_ "hSeek"
-	    (c_lseek (haFD handle_) (fromIntegral offset) whence)
+          throwErrnoIfMinus1Retry_ "hSeek"
+            (c_lseek (haFD handle_) (fromIntegral offset) whence)
 
         whence :: CInt
         whence = case mode of
@@ -1453,14 +1453,14 @@ hSeek handle mode offset =
                    SeekFromEnd  -> sEEK_END
 
     if bufferIsWritable buf
-	then do new_buf <- flushWriteBuffer fd (haIsStream handle_) buf
-	        writeIORef ref new_buf
-	        do_seek
-	else do
+        then do new_buf <- flushWriteBuffer fd (haIsStream handle_) buf
+                writeIORef ref new_buf
+                do_seek
+        else do
 
     if mode == RelativeSeek && offset >= 0 && offset < fromIntegral (w - r)
-	then writeIORef ref buf{ bufRPtr = r + fromIntegral offset }
-	else do 
+        then writeIORef ref buf{ bufRPtr = r + fromIntegral offset }
+        else do 
 
     new_buf <- flushReadBuffer (haFD handle_) buf
     writeIORef ref new_buf
@@ -1472,22 +1472,22 @@ hTell handle =
     wantSeekableHandle "hGetPosn" handle $ \ handle_ -> do
 
 #if defined(mingw32_HOST_OS)
-	-- urgh, on Windows we have to worry about \n -> \r\n translation, 
-	-- so we can't easily calculate the file position using the
-	-- current buffer size.  Just flush instead.
+        -- urgh, on Windows we have to worry about \n -> \r\n translation, 
+        -- so we can't easily calculate the file position using the
+        -- current buffer size.  Just flush instead.
       flushBuffer handle_
 #endif
       let fd = haFD handle_
       posn <- fromIntegral `liftM`
-	        throwErrnoIfMinus1Retry "hGetPosn"
-		   (c_lseek fd 0 sEEK_CUR)
+                throwErrnoIfMinus1Retry "hGetPosn"
+                   (c_lseek fd 0 sEEK_CUR)
 
       let ref = haBuffer handle_
       buf <- readIORef ref
 
       let real_posn 
-	   | bufferIsWritable buf = posn + fromIntegral (bufWPtr buf)
-	   | otherwise = posn - fromIntegral (bufWPtr buf - bufRPtr buf)
+           | bufferIsWritable buf = posn + fromIntegral (bufWPtr buf)
+           | otherwise = posn - fromIntegral (bufWPtr buf - bufRPtr buf)
 #     ifdef DEBUG_DUMP
       puts ("\nhGetPosn: (fd, posn, real_posn) = " ++ show (fd, posn, real_posn) ++ "\n")
       puts ("   (bufWPtr, bufRPtr) = " ++ show (bufWPtr buf, bufRPtr buf) ++ "\n")
@@ -1507,14 +1507,14 @@ hIsOpen handle =
     case haType handle_ of 
       ClosedHandle         -> return False
       SemiClosedHandle     -> return False
-      _ 		   -> return True
+      _                    -> return True
 
 hIsClosed :: Handle -> IO Bool
 hIsClosed handle =
     withHandle_ "hIsClosed" handle $ \ handle_ -> do
     case haType handle_ of 
-      ClosedHandle 	   -> return True
-      _ 		   -> return False
+      ClosedHandle         -> return True
+      _                    -> return False
 
 {- not defined, nor exported, but mentioned
    here for documentation purposes:
@@ -1531,18 +1531,18 @@ hIsReadable (DuplexHandle _ _ _) = return True
 hIsReadable handle =
     withHandle_ "hIsReadable" handle $ \ handle_ -> do
     case haType handle_ of 
-      ClosedHandle 	   -> ioe_closedHandle
-      SemiClosedHandle 	   -> ioe_closedHandle
-      htype 		   -> return (isReadableHandleType htype)
+      ClosedHandle         -> ioe_closedHandle
+      SemiClosedHandle     -> ioe_closedHandle
+      htype                -> return (isReadableHandleType htype)
 
 hIsWritable :: Handle -> IO Bool
 hIsWritable (DuplexHandle _ _ _) = return True
 hIsWritable handle =
     withHandle_ "hIsWritable" handle $ \ handle_ -> do
     case haType handle_ of 
-      ClosedHandle 	   -> ioe_closedHandle
-      SemiClosedHandle 	   -> ioe_closedHandle
-      htype 		   -> return (isWritableHandleType htype)
+      ClosedHandle         -> ioe_closedHandle
+      SemiClosedHandle     -> ioe_closedHandle
+      htype                -> return (isWritableHandleType htype)
 
 -- | Computation 'hGetBuffering' @hdl@ returns the current buffering mode
 -- for @hdl@.
@@ -1551,19 +1551,19 @@ hGetBuffering :: Handle -> IO BufferMode
 hGetBuffering handle = 
     withHandle_ "hGetBuffering" handle $ \ handle_ -> do
     case haType handle_ of 
-      ClosedHandle 	   -> ioe_closedHandle
+      ClosedHandle         -> ioe_closedHandle
       _ -> 
-	   -- We're being non-standard here, and allow the buffering
-	   -- of a semi-closed handle to be queried.   -- sof 6/98
-	  return (haBufferMode handle_)  -- could be stricter..
+           -- We're being non-standard here, and allow the buffering
+           -- of a semi-closed handle to be queried.   -- sof 6/98
+          return (haBufferMode handle_)  -- could be stricter..
 
 hIsSeekable :: Handle -> IO Bool
 hIsSeekable handle =
     withHandle_ "hIsSeekable" handle $ \ handle_ -> do
     case haType handle_ of 
-      ClosedHandle 	   -> ioe_closedHandle
-      SemiClosedHandle 	   -> ioe_closedHandle
-      AppendHandle 	   -> return False
+      ClosedHandle         -> ioe_closedHandle
+      SemiClosedHandle     -> ioe_closedHandle
+      AppendHandle         -> return False
       _                    -> do t <- fdType (haFD handle_)
                                  return ((t == RegularFile    || t == RawDevice)
                                          && (haIsBin handle_  || tEXT_MODE_SEEK_ALLOWED))
@@ -1656,7 +1656,7 @@ dupHandleTo other_side hto_ h_ = do
   flushBuffer h_
   -- Windows' dup2 does not return the new descriptor, unlike Unix
   throwErrnoIfMinus1 "dupHandleTo" $ 
-	c_dup2 (haFD h_) (haFD hto_)
+        c_dup2 (haFD h_) (haFD hto_)
   dupHandle_ other_side h_ (haFD hto_)
 
 dupHandle_ :: Maybe (MVar Handle__) -> Handle__ -> FD
@@ -1667,9 +1667,9 @@ dupHandle_ other_side h_ new_fd = do
   ioref_buffers <- newIORef BufferListNil
 
   let new_handle_ = h_{ haFD = new_fd, 
-	         	haBuffer = ioref, 
-	          	haBuffers = ioref_buffers,
-	          	haOtherSide = other_side }
+                        haBuffer = ioref, 
+                        haBuffers = ioref_buffers,
+                        haOtherSide = other_side }
   return (h_, new_handle_)
 
 -- -----------------------------------------------------------------------------
@@ -1699,7 +1699,7 @@ hDuplicateTo h1@(DuplexHandle _ r1 w1) h2@(DuplexHandle _ r2 w2)  = do
    withHandle' "hDuplicateTo" h1 r1 (dupHandleTo (Just w1) r2_)
 hDuplicateTo h1 _ =
    ioException (IOError (Just h1) IllegalOperation "hDuplicateTo" 
-		"handles are incompatible" Nothing)
+                "handles are incompatible" Nothing)
 
 -- ---------------------------------------------------------------------------
 -- showing Handles.
@@ -1715,15 +1715,15 @@ showHandle' filepath is_duplex h =
   withHandle_ "showHandle" h $ \hdl_ ->
     let
      showType | is_duplex = showString "duplex (read-write)"
-	      | otherwise = shows (haType hdl_)
+              | otherwise = shows (haType hdl_)
     in
     return 
       (( showChar '{' . 
         showHdl (haType hdl_) 
-	    (showString "loc=" . showString filepath . showChar ',' .
-	     showString "type=" . showType . showChar ',' .
-	     showString "binary=" . shows (haIsBin hdl_) . showChar ',' .
-	     showString "buffering=" . showBufMode (unsafePerformIO (readIORef (haBuffer hdl_))) (haBufferMode hdl_) . showString "}" )
+            (showString "loc=" . showString filepath . showChar ',' .
+             showString "type=" . showType . showChar ',' .
+             showString "binary=" . shows (haIsBin hdl_) . showChar ',' .
+             showString "buffering=" . showBufMode (unsafePerformIO (readIORef (haBuffer hdl_))) (haBufferMode hdl_) . showString "}" )
       ) "")
    where
 
@@ -1731,15 +1731,15 @@ showHandle' filepath is_duplex h =
     showHdl ht cont = 
        case ht of
         ClosedHandle  -> shows ht . showString "}"
-	_ -> cont
+        _ -> cont
 
     showBufMode :: Buffer -> BufferMode -> ShowS
     showBufMode buf bmo =
       case bmo of
         NoBuffering   -> showString "none"
-	LineBuffering -> showString "line"
-	BlockBuffering (Just n) -> showString "block " . showParen True (shows n)
-	BlockBuffering Nothing  -> showString "block " . showParen True (shows def)
+        LineBuffering -> showString "line"
+        BlockBuffering (Just n) -> showString "block " . showParen True (shows n)
+        BlockBuffering Nothing  -> showString "block " . showParen True (shows def)
       where
        def :: Int 
        def = bufSize buf
@@ -1750,7 +1750,7 @@ showHandle' filepath is_duplex h =
 #if defined(DEBUG_DUMP)
 puts :: String -> IO ()
 puts s = do write_rawBuffer 1 (unsafeCoerce# (packCString# s)) 0 (fromIntegral (length s))
-	    return ()
+            return ()
 #endif
 
 -- -----------------------------------------------------------------------------
@@ -1762,11 +1762,11 @@ throwErrnoIfMinus1RetryOnBlock loc f on_block  =
     res <- f
     if (res :: CInt) == -1
       then do
-	err <- getErrno
-	if err == eINTR
-	  then throwErrnoIfMinus1RetryOnBlock loc f on_block
+        err <- getErrno
+        if err == eINTR
+          then throwErrnoIfMinus1RetryOnBlock loc f on_block
           else if err == eWOULDBLOCK || err == eAGAIN
-	         then do on_block
+                 then do on_block
                  else throwErrno loc
       else return res
 

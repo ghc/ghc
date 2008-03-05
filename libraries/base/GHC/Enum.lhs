@@ -17,23 +17,23 @@
 
 -- #hide
 module GHC.Enum(
-	Bounded(..), Enum(..),
-	boundedEnumFrom, boundedEnumFromThen,
+        Bounded(..), Enum(..),
+        boundedEnumFrom, boundedEnumFromThen,
 
-	-- Instances for Bounded and Enum: (), Char, Int
+        -- Instances for Bounded and Enum: (), Char, Int
 
    ) where
 
 import GHC.Base
-import Data.Tuple	()		-- for dependencies
-default ()		-- Double isn't available yet
+import Data.Tuple       ()              -- for dependencies
+default ()              -- Double isn't available yet
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Class declarations}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -73,17 +73,17 @@ class  Bounded a  where
 -- * 'enumFrom' and 'enumFromThen' should be defined with an implicit bound,
 --   thus:
 --
--- >	enumFrom     x   = enumFromTo     x maxBound
--- >	enumFromThen x y = enumFromThenTo x y bound
--- >	  where
--- >	    bound | fromEnum y >= fromEnum x = maxBound
--- >	          | otherwise                = minBound
+-- >    enumFrom     x   = enumFromTo     x maxBound
+-- >    enumFromThen x y = enumFromThenTo x y bound
+-- >      where
+-- >        bound | fromEnum y >= fromEnum x = maxBound
+-- >              | otherwise                = minBound
 --
-class  Enum a	where
+class  Enum a   where
     -- | the successor of a value.  For numeric types, 'succ' adds 1.
-    succ		:: a -> a
+    succ                :: a -> a
     -- | the predecessor of a value.  For numeric types, 'pred' subtracts 1.
-    pred		:: a -> a
+    pred                :: a -> a
     -- | Convert from an 'Int'.
     toEnum              :: Int -> a
     -- | Convert to an 'Int'.
@@ -92,18 +92,18 @@ class  Enum a	where
     fromEnum            :: a -> Int
 
     -- | Used in Haskell's translation of @[n..]@.
-    enumFrom		:: a -> [a]
+    enumFrom            :: a -> [a]
     -- | Used in Haskell's translation of @[n,n'..]@.
-    enumFromThen	:: a -> a -> [a]
+    enumFromThen        :: a -> a -> [a]
     -- | Used in Haskell's translation of @[n..m]@.
-    enumFromTo		:: a -> a -> [a]
+    enumFromTo          :: a -> a -> [a]
     -- | Used in Haskell's translation of @[n,n'..m]@.
-    enumFromThenTo	:: a -> a -> a -> [a]
+    enumFromThenTo      :: a -> a -> a -> [a]
 
-    succ		   = toEnum . (`plusInt` oneInt)  . fromEnum
-    pred		   = toEnum . (`minusInt` oneInt) . fromEnum
-    enumFrom x       	   = map toEnum [fromEnum x ..]
-    enumFromThen x y 	   = map toEnum [fromEnum x, fromEnum y ..]
+    succ                   = toEnum . (`plusInt` oneInt)  . fromEnum
+    pred                   = toEnum . (`minusInt` oneInt) . fromEnum
+    enumFrom x             = map toEnum [fromEnum x ..]
+    enumFromThen x y       = map toEnum [fromEnum x, fromEnum y ..]
     enumFromTo x y         = map toEnum [fromEnum x .. fromEnum y]
     enumFromThenTo x1 x2 y = map toEnum [fromEnum x1, fromEnum x2 .. fromEnum y]
 
@@ -122,9 +122,9 @@ boundedEnumFromThen n1 n2
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Tuples}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -140,9 +140,9 @@ instance Enum () where
              | otherwise    = error "Prelude.Enum.().toEnum: bad argument"
 
     fromEnum () = zeroInt
-    enumFrom () 	= [()]
-    enumFromThen () () 	= let many = ():many in many
-    enumFromTo () () 	= [()]
+    enumFrom ()         = [()]
+    enumFromThen () ()  = let many = ():many in many
+    enumFromTo () ()    = [()]
     enumFromThenTo () () () = let many = ():many in many
 \end{code}
 
@@ -165,83 +165,83 @@ instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e) => Bounded (a,b
    maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound)
 
 instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f)
-	=> Bounded (a,b,c,d,e,f) where
+        => Bounded (a,b,c,d,e,f) where
    minBound = (minBound, minBound, minBound, minBound, minBound, minBound)
    maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound)
 
 instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g)
-	=> Bounded (a,b,c,d,e,f,g) where
+        => Bounded (a,b,c,d,e,f,g) where
    minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound)
    maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound)
 
 instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
-	  Bounded h)
-	=> Bounded (a,b,c,d,e,f,g,h) where
+          Bounded h)
+        => Bounded (a,b,c,d,e,f,g,h) where
    minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound)
    maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound)
 
 instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
-	  Bounded h, Bounded i)
-	=> Bounded (a,b,c,d,e,f,g,h,i) where
+          Bounded h, Bounded i)
+        => Bounded (a,b,c,d,e,f,g,h,i) where
    minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound,
-	       minBound)
+               minBound)
    maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound,
-	       maxBound)
+               maxBound)
 
 instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
-	  Bounded h, Bounded i, Bounded j)
-	=> Bounded (a,b,c,d,e,f,g,h,i,j) where
+          Bounded h, Bounded i, Bounded j)
+        => Bounded (a,b,c,d,e,f,g,h,i,j) where
    minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound,
-	       minBound, minBound)
+               minBound, minBound)
    maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound,
-	       maxBound, maxBound)
+               maxBound, maxBound)
 
 instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
-	  Bounded h, Bounded i, Bounded j, Bounded k)
-	=> Bounded (a,b,c,d,e,f,g,h,i,j,k) where
+          Bounded h, Bounded i, Bounded j, Bounded k)
+        => Bounded (a,b,c,d,e,f,g,h,i,j,k) where
    minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound,
-	       minBound, minBound, minBound)
+               minBound, minBound, minBound)
    maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound,
-	       maxBound, maxBound, maxBound)
+               maxBound, maxBound, maxBound)
 
 instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
-	  Bounded h, Bounded i, Bounded j, Bounded k, Bounded l)
-	=> Bounded (a,b,c,d,e,f,g,h,i,j,k,l) where
+          Bounded h, Bounded i, Bounded j, Bounded k, Bounded l)
+        => Bounded (a,b,c,d,e,f,g,h,i,j,k,l) where
    minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound,
-	       minBound, minBound, minBound, minBound)
+               minBound, minBound, minBound, minBound)
    maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound,
-	       maxBound, maxBound, maxBound, maxBound)
+               maxBound, maxBound, maxBound, maxBound)
 
 instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
-	  Bounded h, Bounded i, Bounded j, Bounded k, Bounded l, Bounded m)
-	=> Bounded (a,b,c,d,e,f,g,h,i,j,k,l,m) where
+          Bounded h, Bounded i, Bounded j, Bounded k, Bounded l, Bounded m)
+        => Bounded (a,b,c,d,e,f,g,h,i,j,k,l,m) where
    minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound,
-	       minBound, minBound, minBound, minBound, minBound)
+               minBound, minBound, minBound, minBound, minBound)
    maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound,
-	       maxBound, maxBound, maxBound, maxBound, maxBound)
+               maxBound, maxBound, maxBound, maxBound, maxBound)
 
 instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
-	  Bounded h, Bounded i, Bounded j, Bounded k, Bounded l, Bounded m, Bounded n)
-	=> Bounded (a,b,c,d,e,f,g,h,i,j,k,l,m,n) where
+          Bounded h, Bounded i, Bounded j, Bounded k, Bounded l, Bounded m, Bounded n)
+        => Bounded (a,b,c,d,e,f,g,h,i,j,k,l,m,n) where
    minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound,
-	       minBound, minBound, minBound, minBound, minBound, minBound)
+               minBound, minBound, minBound, minBound, minBound, minBound)
    maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound,
-	       maxBound, maxBound, maxBound, maxBound, maxBound, maxBound)
+               maxBound, maxBound, maxBound, maxBound, maxBound, maxBound)
 
 instance (Bounded a, Bounded b, Bounded c, Bounded d, Bounded e, Bounded f, Bounded g,
-	  Bounded h, Bounded i, Bounded j, Bounded k, Bounded l, Bounded m, Bounded n, Bounded o)
-	=> Bounded (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) where
+          Bounded h, Bounded i, Bounded j, Bounded k, Bounded l, Bounded m, Bounded n, Bounded o)
+        => Bounded (a,b,c,d,e,f,g,h,i,j,k,l,m,n,o) where
    minBound = (minBound, minBound, minBound, minBound, minBound, minBound, minBound, minBound,
-	       minBound, minBound, minBound, minBound, minBound, minBound, minBound)
+               minBound, minBound, minBound, minBound, minBound, minBound, minBound)
    maxBound = (maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound,
-	       maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound)
+               maxBound, maxBound, maxBound, maxBound, maxBound, maxBound, maxBound)
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Type @Bool@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -257,8 +257,8 @@ instance Enum Bool where
   pred False  = error "Prelude.Enum.Bool.pred: bad argument"
 
   toEnum n | n == zeroInt = False
-	   | n == oneInt  = True
-	   | otherwise    = error "Prelude.Enum.Bool.toEnum: bad argument"
+           | n == oneInt  = True
+           | otherwise    = error "Prelude.Enum.Bool.toEnum: bad argument"
 
   fromEnum False = zeroInt
   fromEnum True  = oneInt
@@ -269,9 +269,9 @@ instance Enum Bool where
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Type @Ordering@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -289,8 +289,8 @@ instance Enum Ordering where
   pred LT = error "Prelude.Enum.Ordering.pred: bad argument"
 
   toEnum n | n == zeroInt = LT
-	   | n == oneInt  = EQ
-	   | n == twoInt  = GT
+           | n == oneInt  = EQ
+           | n == twoInt  = GT
   toEnum _ = error "Prelude.Enum.Ordering.toEnum: bad argument"
 
   fromEnum LT = zeroInt
@@ -303,9 +303,9 @@ instance Enum Ordering where
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Type @Char@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -316,17 +316,17 @@ instance  Bounded Char  where
 instance  Enum Char  where
     succ (C# c#)
        | not (ord# c# ==# 0x10FFFF#) = C# (chr# (ord# c# +# 1#))
-       | otherwise	        = error ("Prelude.Enum.Char.succ: bad argument")
+       | otherwise              = error ("Prelude.Enum.Char.succ: bad argument")
     pred (C# c#)
        | not (ord# c# ==# 0#)   = C# (chr# (ord# c# -# 1#))
-       | otherwise	        = error ("Prelude.Enum.Char.pred: bad argument")
+       | otherwise              = error ("Prelude.Enum.Char.pred: bad argument")
 
     toEnum   = chr
     fromEnum = ord
 
     {-# INLINE enumFrom #-}
     enumFrom (C# x) = eftChar (ord# x) 0x10FFFF#
-	-- Blarg: technically I guess enumFrom isn't strict!
+        -- Blarg: technically I guess enumFrom isn't strict!
 
     {-# INLINE enumFromTo #-}
     enumFromTo (C# x) (C# y) = eftChar (ord# x) (ord# y)
@@ -338,12 +338,12 @@ instance  Enum Char  where
     enumFromThenTo (C# x1) (C# x2) (C# y) = efdtChar (ord# x1) (ord# x2) (ord# y)
 
 {-# RULES
-"eftChar"	[~1] forall x y.	eftChar x y	  = build (\c n -> eftCharFB c n x y)
-"efdChar"	[~1] forall x1 x2.	efdChar x1 x2	  = build (\ c n -> efdCharFB c n x1 x2)
-"efdtChar"	[~1] forall x1 x2 l.	efdtChar x1 x2 l  = build (\ c n -> efdtCharFB c n x1 x2 l)
-"eftCharList"	[1]  eftCharFB  (:) [] = eftChar
-"efdCharList"	[1]  efdCharFB  (:) [] = efdChar
-"efdtCharList"	[1]  efdtCharFB (:) [] = efdtChar
+"eftChar"       [~1] forall x y.        eftChar x y       = build (\c n -> eftCharFB c n x y)
+"efdChar"       [~1] forall x1 x2.      efdChar x1 x2     = build (\ c n -> efdCharFB c n x1 x2)
+"efdtChar"      [~1] forall x1 x2 l.    efdtChar x1 x2 l  = build (\ c n -> efdtCharFB c n x1 x2 l)
+"eftCharList"   [1]  eftCharFB  (:) [] = eftChar
+"efdCharList"   [1]  efdCharFB  (:) [] = efdChar
+"efdtCharList"  [1]  efdtCharFB (:) [] = efdtChar
  #-}
 
 
@@ -351,12 +351,12 @@ instance  Enum Char  where
 -- have hassles about arithmetic overflow at maxBound
 {-# INLINE [0] eftCharFB #-}
 eftCharFB c n x y = go x
-		 where
-		    go x | x ># y    = n
-			 | otherwise = C# (chr# x) `c` go (x +# 1#)
+                 where
+                    go x | x ># y    = n
+                         | otherwise = C# (chr# x) `c` go (x +# 1#)
 
 eftChar x y | x ># y    = [] 
-	        | otherwise = C# (chr# x) : eftChar (x +# 1#) y
+                | otherwise = C# (chr# x) : eftChar (x +# 1#) y
 
 
 -- For enumFromThenTo we give up on inlining
@@ -390,41 +390,41 @@ go_up_char_fb c n x delta lim
   = go_up x
   where
     go_up x | x ># lim  = n
-	    | otherwise	= C# (chr# x) `c` go_up (x +# delta)
+            | otherwise = C# (chr# x) `c` go_up (x +# delta)
 
 go_dn_char_fb c n x delta lim
   = go_dn x
   where
     go_dn x | x <# lim  = n
-	    | otherwise	= C# (chr# x) `c` go_dn (x +# delta)
+            | otherwise = C# (chr# x) `c` go_dn (x +# delta)
 
 go_up_char_list x delta lim
   = go_up x
   where
     go_up x | x ># lim  = []
-	    | otherwise	= C# (chr# x) : go_up (x +# delta)
+            | otherwise = C# (chr# x) : go_up (x +# delta)
 
 go_dn_char_list x delta lim
   = go_dn x
   where
     go_dn x | x <# lim  = []
-	    | otherwise	= C# (chr# x) : go_dn (x +# delta)
+            | otherwise = C# (chr# x) : go_dn (x +# delta)
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Type @Int@}
-%*							*
+%*                                                      *
 %*********************************************************
 
 Be careful about these instances.  
-	(a) remember that you have to count down as well as up e.g. [13,12..0]
-	(b) be careful of Int overflow
-	(c) remember that Int is bounded, so [1..] terminates at maxInt
+        (a) remember that you have to count down as well as up e.g. [13,12..0]
+        (b) be careful of Int overflow
+        (c) remember that Int is bounded, so [1..] terminates at maxInt
 
 Also NB that the Num class isn't available in this module.
-	
+        
 \begin{code}
 instance  Bounded Int where
     minBound =  minInt
@@ -444,7 +444,7 @@ instance  Enum Int  where
     {-# INLINE enumFrom #-}
     enumFrom (I# x) = eftInt x maxInt#
         where I# maxInt# = maxInt
-	-- Blarg: technically I guess enumFrom isn't strict!
+        -- Blarg: technically I guess enumFrom isn't strict!
 
     {-# INLINE enumFromTo #-}
     enumFromTo (I# x) (I# y) = eftInt x y
@@ -462,27 +462,27 @@ instance  Enum Int  where
 -- In particular, we have rules for deforestation
 
 {-# RULES
-"eftInt"	[~1] forall x y. eftInt x y = build (\ c n -> eftIntFB c n x y)
-"eftIntList"	[1] eftIntFB  (:) [] = eftInt
+"eftInt"        [~1] forall x y. eftInt x y = build (\ c n -> eftIntFB c n x y)
+"eftIntList"    [1] eftIntFB  (:) [] = eftInt
  #-}
 
 eftInt :: Int# -> Int# -> [Int]
 -- [x1..x2]
 eftInt x y | x ># y    = []
-	   | otherwise = go x
-	       where
-		 go x = I# x : if x ==# y then [] else go (x +# 1#)
+           | otherwise = go x
+               where
+                 go x = I# x : if x ==# y then [] else go (x +# 1#)
 
 {-# INLINE [0] eftIntFB #-}
 eftIntFB :: (Int -> r -> r) -> r -> Int# -> Int# -> r
-eftIntFB c n x y | x ># y    = n	
-		 | otherwise = go x
-		 where
-		   go x = I# x `c` if x ==# y then n else go (x +# 1#)
-			-- Watch out for y=maxBound; hence ==, not >
-	-- Be very careful not to have more than one "c"
-	-- so that when eftInfFB is inlined we can inline
-	-- whatever is bound to "c"
+eftIntFB c n x y | x ># y    = n        
+                 | otherwise = go x
+                 where
+                   go x = I# x `c` if x ==# y then n else go (x +# 1#)
+                        -- Watch out for y=maxBound; hence ==, not >
+        -- Be very careful not to have more than one "c"
+        -- so that when eftInfFB is inlined we can inline
+        -- whatever is bound to "c"
 
 
 -----------------------------------------------------

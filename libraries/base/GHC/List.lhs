@@ -17,10 +17,10 @@
 
 -- #hide
 module GHC.List (
-   -- [] (..),		-- Not Haskell 98; built in syntax
+   -- [] (..),          -- Not Haskell 98; built in syntax
 
    map, (++), filter, concat,
-   head, last, tail, init, null, length, (!!), 
+   head, last, tail, init, null, length, (!!),
    foldl, scanl, scanl1, foldr, foldr1, scanr, scanr1,
    iterate, repeat, replicate, cycle,
    take, drop, splitAt, takeWhile, dropWhile, span, break,
@@ -38,7 +38,7 @@ module GHC.List (
 
  ) where
 
-import Data.Tuple()	-- Instances
+import Data.Tuple()     -- Instances
 import Data.Maybe
 import GHC.Base
 
@@ -47,9 +47,9 @@ infix  4 `elem`, `notElem`
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{List-manipulation functions}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -61,12 +61,12 @@ head []                 =  badHead
 badHead = errorEmptyList "head"
 
 -- This rule is useful in cases like 
---	head [y | (x,y) <- ps, x==t]
+--      head [y | (x,y) <- ps, x==t]
 {-# RULES
-"head/build"	forall (g::forall b.(a->b->b)->b->b) .
-		head (build g) = g (\x _ -> x) badHead
-"head/augment"	forall xs (g::forall b. (a->b->b) -> b -> b) . 
-		head (augment g xs) = g (\x _ -> x) (head xs)
+"head/build"    forall (g::forall b.(a->b->b)->b->b) .
+                head (build g) = g (\x _ -> x) badHead
+"head/augment"  forall xs (g::forall b. (a->b->b) -> b -> b) . 
+                head (augment g xs) = g (\x _ -> x) (head xs)
  #-}
 
 -- | Extract the elements after the head of a list, which must be non-empty.
@@ -82,10 +82,10 @@ last (_:xs)             =  last xs
 last []                 =  errorEmptyList "last"
 #else
 -- eliminate repeated cases
-last []     		=  errorEmptyList "last"
-last (x:xs) 		=  last' x xs
+last []                 =  errorEmptyList "last"
+last (x:xs)             =  last' x xs
   where last' y []     = y
-	last' _ (y:ys) = last' y ys
+        last' _ (y:ys) = last' y ys
 #endif
 
 -- | Return all the elements of a list except the last one.
@@ -100,7 +100,7 @@ init []                 =  errorEmptyList "init"
 init []                 =  errorEmptyList "init"
 init (x:xs)             =  init' x xs
   where init' _ []     = []
-	init' y (z:zs) = y : init' z zs
+        init' y (z:zs) = y : init' z zs
 #endif
 
 -- | Test whether a list is empty.
@@ -127,16 +127,16 @@ filter :: (a -> Bool) -> [a] -> [a]
 filter _pred []    = []
 filter pred (x:xs)
   | pred x         = x : filter pred xs
-  | otherwise	   = filter pred xs
+  | otherwise      = filter pred xs
 
 {-# NOINLINE [0] filterFB #-}
 filterFB c p x r | p x       = x `c` r
-		 | otherwise = r
+                 | otherwise = r
 
 {-# RULES
 "filter"     [~1] forall p xs.  filter p xs = build (\c n -> foldr (filterFB c p) n xs)
-"filterList" [1]  forall p.	foldr (filterFB (:) p) [] = filter p
-"filterFB"	  forall c p q. filterFB (filterFB c p) q = filterFB c (\x -> q x && p x)
+"filterList" [1]  forall p.     foldr (filterFB (:) p) [] = filter p
+"filterFB"        forall c p q. filterFB (filterFB c p) q = filterFB c (\x -> q x && p x)
  #-}
 
 -- Note the filterFB rule, which has p and q the "wrong way round" in the RHS.
@@ -163,9 +163,9 @@ filterFB c p x r | p x       = x `c` r
 
 foldl        :: (a -> b -> a) -> a -> [b] -> a
 foldl f z xs = lgo z xs
-	     where
-		lgo z []     =  z
-		lgo z (x:xs) = lgo (f z x) xs
+             where
+                lgo z []     =  z
+                lgo z (x:xs) = lgo (f z x) xs
 
 -- | 'scanl' is similar to 'foldl', but returns a list of successive
 -- reduced values from the left:
@@ -185,9 +185,9 @@ scanl f q ls            =  q : (case ls of
 --
 -- > scanl1 f [x1, x2, ...] == [x1, x1 `f` x2, ...]
 
-scanl1			:: (a -> a -> a) -> [a] -> [a]
-scanl1 f (x:xs)		=  scanl f x xs
-scanl1 _ []		=  []
+scanl1                  :: (a -> a -> a) -> [a] -> [a]
+scanl1 f (x:xs)         =  scanl f x xs
+scanl1 _ []             =  []
 
 -- foldr, foldr1, scanr, and scanr1 are the right-to-left duals of the
 -- above functions.
@@ -213,9 +213,9 @@ scanr f q0 (x:xs)       =  f x q : qs
 -- | 'scanr1' is a variant of 'scanr' that has no starting value argument.
 
 scanr1                  :: (a -> a -> a) -> [a] -> [a]
-scanr1 f []		=  []
-scanr1 f [x]		=  [x]
-scanr1 f (x:xs)		=  f x q : qs
+scanr1 f []             =  []
+scanr1 f [x]            =  [x]
+scanr1 f (x:xs)         =  f x q : qs
                            where qs@(q:_) = scanr1 f xs 
 
 -- | 'iterate' @f x@ returns an infinite list of repeated applications
@@ -230,8 +230,8 @@ iterateFB c f x = x `c` iterateFB c f (f x)
 
 
 {-# RULES
-"iterate"    [~1] forall f x.	iterate f x = build (\c _n -> iterateFB c f x)
-"iterateFB"  [1]		iterateFB (:) = iterate
+"iterate"    [~1] forall f x.   iterate f x = build (\c _n -> iterateFB c f x)
+"iterateFB"  [1]                iterateFB (:) = iterate
  #-}
 
 
@@ -241,13 +241,13 @@ repeat :: a -> [a]
 -- The pragma just gives the rules more chance to fire
 repeat x = xs where xs = x : xs
 
-{-# INLINE [0] repeatFB #-}	-- ditto
+{-# INLINE [0] repeatFB #-}     -- ditto
 repeatFB c x = xs where xs = x `c` xs
 
 
 {-# RULES
 "repeat"    [~1] forall x. repeat x = build (\c _n -> repeatFB c x)
-"repeatFB"  [1]  repeatFB (:)	    = repeat
+"repeatFB"  [1]  repeatFB (:)       = repeat
  #-}
 
 -- | 'replicate' @n x@ is a list of length @n@ with @x@ the value of
@@ -263,8 +263,8 @@ replicate n x           =  take n (repeat x)
 -- on infinite lists.
 
 cycle                   :: [a] -> [a]
-cycle []		= error "Prelude.cycle: empty list"
-cycle xs		= xs' where xs' = xs ++ xs'
+cycle []                = error "Prelude.cycle: empty list"
+cycle xs                = xs' where xs' = xs ++ xs'
 
 -- | 'takeWhile', applied to a predicate @p@ and a list @xs@, returns the
 -- longest prefix (possibly empty) of @xs@ of elements that satisfy @p@:
@@ -350,7 +350,7 @@ splitAt n xs           =  (take n xs, drop n xs)
 
 #else /* hack away */
 {-# RULES
-"take"	   [~1] forall n xs . take n xs = takeFoldr n xs 
+"take"     [~1] forall n xs . take n xs = takeFoldr n xs 
 "takeList"  [1] forall n xs . foldr (takeFB (:) []) (takeConst []) xs n = takeUInt n xs
  #-}
 
@@ -369,7 +369,7 @@ takeConst x _ = x
 {-# NOINLINE [0] takeFB #-}
 takeFB :: (a -> b -> b) -> b -> a -> (Int# -> b) -> Int# -> b
 takeFB c n x xs m | m <=# 1#  = x `c` n
-		  | otherwise = x `c` xs (m -# 1#)
+                  | otherwise = x `c` xs (m -# 1#)
 
 {-# INLINE [0] take #-}
 take (I# n#) xs = takeUInt n# xs
@@ -395,32 +395,32 @@ takeUInt_append n xs rs
   | n >=# 0#  =  take_unsafe_UInt_append n xs rs
   | otherwise =  []
 
-take_unsafe_UInt_append	:: Int# -> [b] -> [b] -> [b]
-take_unsafe_UInt_append	0#  _ rs  = rs
-take_unsafe_UInt_append	m  ls rs  =
+take_unsafe_UInt_append :: Int# -> [b] -> [b] -> [b]
+take_unsafe_UInt_append 0#  _ rs  = rs
+take_unsafe_UInt_append m  ls rs  =
   case ls of
     []     -> rs
     (x:xs) -> x : take_unsafe_UInt_append (m -# 1#) xs rs
 
 drop (I# n#) ls
-  | n# <# 0#	= ls
-  | otherwise	= drop# n# ls
+  | n# <# 0#    = ls
+  | otherwise   = drop# n# ls
     where
-	drop# :: Int# -> [a] -> [a]
-	drop# 0# xs      = xs
-	drop# _  xs@[]	 = xs
-	drop# m# (_:xs)  = drop# (m# -# 1#) xs
+        drop# :: Int# -> [a] -> [a]
+        drop# 0# xs      = xs
+        drop# _  xs@[]   = xs
+        drop# m# (_:xs)  = drop# (m# -# 1#) xs
 
 splitAt (I# n#) ls
-  | n# <# 0#	= ([], ls)
-  | otherwise	= splitAt# n# ls
+  | n# <# 0#    = ([], ls)
+  | otherwise   = splitAt# n# ls
     where
-	splitAt# :: Int# -> [a] -> ([a], [a])
-	splitAt# 0# xs	   = ([], xs)
-	splitAt# _  xs@[]  = (xs, xs)
-	splitAt# m# (x:xs) = (x:xs', xs'')
-	  where
-	    (xs', xs'') = splitAt# (m# -# 1#) xs
+        splitAt# :: Int# -> [a] -> ([a], [a])
+        splitAt# 0# xs     = ([], xs)
+        splitAt# _  xs@[]  = (xs, xs)
+        splitAt# m# (x:xs) = (x:xs', xs'')
+          where
+            (xs', xs'') = splitAt# (m# -# 1#) xs
 
 #endif /* USE_REPORT_PRELUDE */
 
@@ -455,10 +455,10 @@ break                   :: (a -> Bool) -> [a] -> ([a],[a])
 break p                 =  span (not . p)
 #else
 -- HBC version (stolen)
-break _ xs@[]		=  (xs, xs)
+break _ xs@[]           =  (xs, xs)
 break p xs@(x:xs')
-	   | p x	=  ([],xs)
-	   | otherwise	=  let (ys,zs) = break p xs' in (x:ys,zs)
+           | p x        =  ([],xs)
+           | otherwise  =  let (ys,zs) = break p xs' in (x:ys,zs)
 #endif
 
 -- | 'reverse' @xs@ returns the elements of @xs@ in reverse order.
@@ -486,16 +486,16 @@ or                      :: [Bool] -> Bool
 and                     =  foldr (&&) True
 or                      =  foldr (||) False
 #else
-and []		=  True
-and (x:xs)	=  x && and xs
-or []		=  False
-or (x:xs)	=  x || or xs
+and []          =  True
+and (x:xs)      =  x && and xs
+or []           =  False
+or (x:xs)       =  x || or xs
 
 {-# RULES
-"and/build"	forall (g::forall b.(Bool->b->b)->b->b) . 
-		and (build g) = g (&&) True
-"or/build"	forall (g::forall b.(Bool->b->b)->b->b) . 
-		or (build g) = g (||) False
+"and/build"     forall (g::forall b.(Bool->b->b)->b->b) . 
+                and (build g) = g (&&) True
+"or/build"      forall (g::forall b.(Bool->b->b)->b->b) . 
+                or (build g) = g (||) False
  #-}
 #endif
 
@@ -510,16 +510,16 @@ all                     :: (a -> Bool) -> [a] -> Bool
 any p                   =  or . map p
 all p                   =  and . map p
 #else
-any _ []	= False
-any p (x:xs)	= p x || any p xs
+any _ []        = False
+any p (x:xs)    = p x || any p xs
 
-all _ []	=  True
-all p (x:xs)	=  p x && all p xs
+all _ []        =  True
+all p (x:xs)    =  p x && all p xs
 {-# RULES
-"any/build"	forall p (g::forall b.(a->b->b)->b->b) . 
-		any p (build g) = g ((||) . p) False
-"all/build"	forall p (g::forall b.(a->b->b)->b->b) . 
-		all p (build g) = g ((&&) . p) True
+"any/build"     forall p (g::forall b.(a->b->b)->b->b) . 
+                any p (build g) = g ((||) . p) False
+"all/build"     forall p (g::forall b.(a->b->b)->b->b) . 
+                all p (build g) = g ((&&) . p) True
  #-}
 #endif
 
@@ -533,10 +533,10 @@ notElem                 :: (Eq a) => a -> [a] -> Bool
 elem x                  =  any (== x)
 notElem x               =  all (/= x)
 #else
-elem _ []	= False
-elem x (y:ys)	= x==y || elem x ys
+elem _ []       = False
+elem x (y:ys)   = x==y || elem x ys
 
-notElem	_ []	=  True
+notElem _ []    =  True
 notElem x (y:ys)=  x /= y && notElem x ys
 #endif
 
@@ -579,26 +579,26 @@ xs     !! n | n < 0 =  error "Prelude.!!: negative index"
 -- in the more efficient version.
 --
 xs !! (I# n) | n <# 0#   =  error "Prelude.(!!): negative index\n"
-	     | otherwise =  sub xs n
+             | otherwise =  sub xs n
                          where
-			    sub :: [a] -> Int# -> a
+                            sub :: [a] -> Int# -> a
                             sub []     _ = error "Prelude.(!!): index too large\n"
                             sub (y:ys) n = if n ==# 0#
-					   then y
-					   else sub ys (n -# 1#)
+                                           then y
+                                           else sub ys (n -# 1#)
 #endif
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{The zip family}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
-foldr2 _k z [] 	  _ys	 = z
-foldr2 _k z _xs   []	 = z
+foldr2 _k z []    _ys    = z
+foldr2 _k z _xs   []     = z
 foldr2 k z (x:xs) (y:ys) = k x y (foldr2 k z xs ys)
 
 foldr2_left _k  z _x _r []     = z
@@ -610,11 +610,11 @@ foldr2_right  k _z  y  r (x:xs) = k x y (r xs)
 -- foldr2 k z xs ys = foldr (foldr2_left k z)  (\_ -> z) xs ys
 -- foldr2 k z xs ys = foldr (foldr2_right k z) (\_ -> z) ys xs
 {-# RULES
-"foldr2/left"	forall k z ys (g::forall b.(a->b->b)->b->b) . 
-		  foldr2 k z (build g) ys = g (foldr2_left  k z) (\_ -> z) ys
+"foldr2/left"   forall k z ys (g::forall b.(a->b->b)->b->b) . 
+                  foldr2 k z (build g) ys = g (foldr2_left  k z) (\_ -> z) ys
 
-"foldr2/right"	forall k z xs (g::forall b.(a->b->b)->b->b) . 
-		  foldr2 k z xs (build g) = g (foldr2_right k z) (\_ -> z) xs
+"foldr2/right"  forall k z xs (g::forall b.(a->b->b)->b->b) . 
+                  foldr2 k z xs (build g) = g (foldr2_right k z) (\_ -> z) xs
  #-}
 \end{code}
 
@@ -643,8 +643,8 @@ zip _      _      = []
 zipFB c x y r = (x,y) `c` r
 
 {-# RULES
-"zip"	   [~1]	forall xs ys. zip xs ys	= build (\c n -> foldr2 (zipFB c) n xs ys)
-"zipList"  [1]	foldr2 (zipFB (:)) []   = zip
+"zip"      [~1] forall xs ys. zip xs ys = build (\c n -> foldr2 (zipFB c) n xs ys)
+"zipList"  [1]  foldr2 (zipFB (:)) []   = zip
  #-}
 \end{code}
 
@@ -677,8 +677,8 @@ zipWith _ _      _      = []
 zipWithFB c f x y r = (x `f` y) `c` r
 
 {-# RULES
-"zipWith"	[~1] forall f xs ys.	zipWith f xs ys = build (\c n -> foldr2 (zipWithFB c f) n xs ys)
-"zipWithList"	[1]  forall f. 	foldr2 (zipWithFB (:) f) [] = zipWith f
+"zipWith"       [~1] forall f xs ys.    zipWith f xs ys = build (\c n -> foldr2 (zipWithFB c f) n xs ys)
+"zipWithList"   [1]  forall f.  foldr2 (zipWithFB (:) f) [] = zipWith f
   #-}
 \end{code}
 
@@ -707,9 +707,9 @@ unzip3   =  foldr (\(a,b,c) ~(as,bs,cs) -> (a:as,b:bs,c:cs))
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Error code}
-%*							*
+%*                                                      *
 %*********************************************************
 
 Common up near identical calls to `error' to reduce the number

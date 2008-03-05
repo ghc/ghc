@@ -13,14 +13,14 @@
 -- 
 -----------------------------------------------------------------------------
 
-module GHC.Dotnet 
-	( Object
-	, unmarshalObject
-	, marshalObject
-	, unmarshalString
-	, marshalString
-	, checkResult
-	) where
+module GHC.Dotnet
+        ( Object
+        , unmarshalObject
+        , marshalObject
+        , unmarshalString
+        , marshalString
+        , checkResult
+        ) where
 
 import GHC.Prim
 import GHC.Base
@@ -32,17 +32,17 @@ import Foreign.Marshal.Alloc
 import Foreign.Storable
 import Foreign.C.String
 
-data Object a 
+data Object a
   = Object Addr#
 
 checkResult :: (State# RealWorld -> (# State# RealWorld, a, Addr# #))
-	    -> IO a
-checkResult fun = IO $ \ st -> 
+            -> IO a
+checkResult fun = IO $ \ st ->
   case fun st of
-    (# st1, res, err #) 
+    (# st1, res, err #)
       | err `eqAddr#` nullAddr# -> (# st1, res #)
       | otherwise               -> throw (IOException (raiseError err)) st1
-  
+
 -- ToDo: attach finaliser.
 unmarshalObject :: Addr# -> Object a
 unmarshalObject x = Object x
@@ -52,9 +52,9 @@ marshalObject (Object x) cont = cont x
 
 -- dotnet interop support passing and returning
 -- strings.
-marshalString :: String 
-	      -> (Addr# -> IO a)
-	      -> IO a
+marshalString :: String
+              -> (Addr# -> IO a)
+              -> IO a
 marshalString str cont = withCString str (\ (Ptr x) -> cont x)
 
 -- char** received back from a .NET interop layer.

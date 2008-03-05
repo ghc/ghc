@@ -24,68 +24,68 @@
 
 -- #not-home
 module GHC.Conc
-	( ThreadId(..)
+        ( ThreadId(..)
 
-	-- * Forking and suchlike
-	, forkIO	-- :: IO a -> IO ThreadId
-	, forkOnIO	-- :: Int -> IO a -> IO ThreadId
+        -- * Forking and suchlike
+        , forkIO        -- :: IO a -> IO ThreadId
+        , forkOnIO      -- :: Int -> IO a -> IO ThreadId
         , numCapabilities -- :: Int
-	, childHandler  -- :: Exception -> IO ()
-	, myThreadId 	-- :: IO ThreadId
-	, killThread	-- :: ThreadId -> IO ()
-	, throwTo       -- :: ThreadId -> Exception -> IO ()
-	, par  		-- :: a -> b -> b
-	, pseq 		-- :: a -> b -> b
-	, yield         -- :: IO ()
-	, labelThread	-- :: ThreadId -> String -> IO ()
+        , childHandler  -- :: Exception -> IO ()
+        , myThreadId    -- :: IO ThreadId
+        , killThread    -- :: ThreadId -> IO ()
+        , throwTo       -- :: ThreadId -> Exception -> IO ()
+        , par           -- :: a -> b -> b
+        , pseq          -- :: a -> b -> b
+        , yield         -- :: IO ()
+        , labelThread   -- :: ThreadId -> String -> IO ()
 
-	-- * Waiting
-	, threadDelay	  	-- :: Int -> IO ()
-	, registerDelay		-- :: Int -> IO (TVar Bool)
-	, threadWaitRead	-- :: Int -> IO ()
-	, threadWaitWrite	-- :: Int -> IO ()
+        -- * Waiting
+        , threadDelay           -- :: Int -> IO ()
+        , registerDelay         -- :: Int -> IO (TVar Bool)
+        , threadWaitRead        -- :: Int -> IO ()
+        , threadWaitWrite       -- :: Int -> IO ()
 
-	-- * MVars
-	, MVar(..)
-	, newMVar 	-- :: a -> IO (MVar a)
-	, newEmptyMVar  -- :: IO (MVar a)
-	, takeMVar 	-- :: MVar a -> IO a
-	, putMVar  	-- :: MVar a -> a -> IO ()
-	, tryTakeMVar   -- :: MVar a -> IO (Maybe a)
-	, tryPutMVar  	-- :: MVar a -> a -> IO Bool
-	, isEmptyMVar	-- :: MVar a -> IO Bool
-	, addMVarFinalizer -- :: MVar a -> IO () -> IO ()
+        -- * MVars
+        , MVar(..)
+        , newMVar       -- :: a -> IO (MVar a)
+        , newEmptyMVar  -- :: IO (MVar a)
+        , takeMVar      -- :: MVar a -> IO a
+        , putMVar       -- :: MVar a -> a -> IO ()
+        , tryTakeMVar   -- :: MVar a -> IO (Maybe a)
+        , tryPutMVar    -- :: MVar a -> a -> IO Bool
+        , isEmptyMVar   -- :: MVar a -> IO Bool
+        , addMVarFinalizer -- :: MVar a -> IO () -> IO ()
 
-   	-- * TVars
-	, STM(..)
-	, atomically    -- :: STM a -> IO a
-	, retry         -- :: STM a
-	, orElse        -- :: STM a -> STM a -> STM a
+        -- * TVars
+        , STM(..)
+        , atomically    -- :: STM a -> IO a
+        , retry         -- :: STM a
+        , orElse        -- :: STM a -> STM a -> STM a
         , catchSTM      -- :: STM a -> (Exception -> STM a) -> STM a
-	, alwaysSucceeds -- :: STM a -> STM ()
-	, always        -- :: STM Bool -> STM ()
-	, TVar(..)
-	, newTVar 	-- :: a -> STM (TVar a)
-	, newTVarIO 	-- :: a -> STM (TVar a)
-	, readTVar	-- :: TVar a -> STM a
-	, writeTVar	-- :: a -> TVar a -> STM ()
-	, unsafeIOToSTM	-- :: IO a -> STM a
+        , alwaysSucceeds -- :: STM a -> STM ()
+        , always        -- :: STM Bool -> STM ()
+        , TVar(..)
+        , newTVar       -- :: a -> STM (TVar a)
+        , newTVarIO     -- :: a -> STM (TVar a)
+        , readTVar      -- :: TVar a -> STM a
+        , writeTVar     -- :: a -> TVar a -> STM ()
+        , unsafeIOToSTM -- :: IO a -> STM a
 
-   	-- * Miscellaneous
+        -- * Miscellaneous
 #ifdef mingw32_HOST_OS
-	, asyncRead     -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
-	, asyncWrite    -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
-	, asyncDoProc   -- :: FunPtr (Ptr a -> IO Int) -> Ptr a -> IO Int
+        , asyncRead     -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
+        , asyncWrite    -- :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
+        , asyncDoProc   -- :: FunPtr (Ptr a -> IO Int) -> Ptr a -> IO Int
 
-	, asyncReadBA   -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
-	, asyncWriteBA  -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
+        , asyncReadBA   -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
+        , asyncWriteBA  -- :: Int -> Int -> Int -> Int -> MutableByteArray# RealWorld -> IO (Int, Int)
 #endif
 
 #ifndef mingw32_HOST_OS
         , signalHandlerLock
 #endif
 
-	, ensureIOManagerIsRunning
+        , ensureIOManagerIsRunning
 
 #ifdef mingw32_HOST_OS
         , ConsoleEvent(..)
@@ -109,29 +109,29 @@ import Data.Maybe
 
 import GHC.Base
 import GHC.IOBase
-import GHC.Num		( Num(..) )
-import GHC.Real		( fromIntegral, div )
+import GHC.Num          ( Num(..) )
+import GHC.Real         ( fromIntegral, div )
 #ifndef mingw32_HOST_OS
-import GHC.Base		( Int(..) )
+import GHC.Base         ( Int(..) )
 #endif
 #ifdef mingw32_HOST_OS
 import GHC.Read         ( Read )
 import GHC.Enum         ( Enum )
 #endif
 import GHC.Exception
-import GHC.Pack		( packCString# )
+import GHC.Pack         ( packCString# )
 import GHC.Ptr          ( Ptr(..), plusPtr, FunPtr(..) )
 import GHC.STRef
-import GHC.Show		( Show(..), showString )
+import GHC.Show         ( Show(..), showString )
 import Data.Typeable
 
 infixr 0 `par`, `pseq`
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{@ThreadId@, @par@, and @fork@}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -159,7 +159,7 @@ it defines 'ThreadId' as a synonym for ().
 
 instance Show ThreadId where
    showsPrec d t = 
-   	showString "ThreadId " . 
+        showString "ThreadId " . 
         showsPrec d (getThreadId (id2TSO t))
 
 foreign import ccall unsafe "rts_getThreadId" getThreadId :: ThreadId# -> CInt
@@ -239,14 +239,14 @@ childHandler err = catchException (real_handler err) childHandler
 real_handler :: Exception -> IO ()
 real_handler ex =
   case ex of
-	-- ignore thread GC and killThread exceptions:
-	BlockedOnDeadMVar            -> return ()
-	BlockedIndefinitely          -> return ()
-	AsyncException ThreadKilled  -> return ()
+        -- ignore thread GC and killThread exceptions:
+        BlockedOnDeadMVar            -> return ()
+        BlockedIndefinitely          -> return ()
+        AsyncException ThreadKilled  -> return ()
 
-	-- report all others:
-	AsyncException StackOverflow -> reportStackOverflow
-	other       -> reportError other
+        -- report all others:
+        AsyncException StackOverflow -> reportStackOverflow
+        other       -> reportError other
 
 {- | 'killThread' terminates the given thread (GHC only).
 Any work already done by the thread isn\'t
@@ -325,8 +325,8 @@ labelThread (ThreadId t) str = IO $ \ s ->
        adr = byteArrayContents# ps in
      case (labelThread# t adr s) of s1 -> (# s1, () #)
 
--- 	Nota Bene: 'pseq' used to be 'seq'
---		   but 'seq' is now defined in PrelGHC
+--      Nota Bene: 'pseq' used to be 'seq'
+--                 but 'seq' is now defined in PrelGHC
 --
 -- "pseq" is defined a bit weirdly (see below)
 --
@@ -347,9 +347,9 @@ par  x y = case (par# x) of { _ -> lazy y }
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[stm]{Transactional heap operations}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 TVars are shared memory locations which support atomic memory
@@ -372,7 +372,7 @@ instance  Monad STM  where
     {-# INLINE (>>)   #-}
     {-# INLINE (>>=)  #-}
     m >> k      = thenSTM m k
-    return x	= returnSTM x
+    return x    = returnSTM x
     m >>= k     = bindSTM m k
 
 bindSTM :: STM a -> (a -> STM b) -> STM b
@@ -457,13 +457,13 @@ data TVar a = TVar (TVar# RealWorld a)
 INSTANCE_TYPEABLE1(TVar,tvarTc,"TVar")
 
 instance Eq (TVar a) where
-	(TVar tvar1#) == (TVar tvar2#) = sameTVar# tvar1# tvar2#
+        (TVar tvar1#) == (TVar tvar2#) = sameTVar# tvar1# tvar2#
 
 -- |Create a new TVar holding a value supplied
 newTVar :: a -> STM (TVar a)
 newTVar val = STM $ \s1# ->
     case newTVar# val s1# of
-	 (# s2#, tvar# #) -> (# s2#, TVar tvar# #)
+         (# s2#, tvar# #) -> (# s2#, TVar tvar# #)
 
 -- |@IO@ version of 'newTVar'.  This is useful for creating top-level
 -- 'TVar's using 'System.IO.Unsafe.unsafePerformIO', because using
@@ -472,7 +472,7 @@ newTVar val = STM $ \s1# ->
 newTVarIO :: a -> IO (TVar a)
 newTVarIO val = IO $ \s1# ->
     case newTVar# val s1# of
-	 (# s2#, tvar# #) -> (# s2#, TVar tvar# #)
+         (# s2#, tvar# #) -> (# s2#, TVar tvar# #)
 
 -- |Return the current value stored in a TVar
 readTVar :: TVar a -> STM a
@@ -482,14 +482,14 @@ readTVar (TVar tvar#) = STM $ \s# -> readTVar# tvar# s#
 writeTVar :: TVar a -> a -> STM ()
 writeTVar (TVar tvar#) val = STM $ \s1# ->
     case writeTVar# tvar# val s1# of
-    	 s2# -> (# s2#, () #)
+         s2# -> (# s2#, () #)
   
 \end{code}
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection[mvars]{M-Structures}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 M-Vars are rendezvous points for concurrent threads.  They begin
@@ -512,8 +512,8 @@ newEmptyMVar = IO $ \ s# ->
 -- |Create an 'MVar' which contains the supplied value.
 newMVar :: a -> IO (MVar a)
 newMVar value =
-    newEmptyMVar	>>= \ mvar ->
-    putMVar mvar value	>>
+    newEmptyMVar        >>= \ mvar ->
+    putMVar mvar value  >>
     return mvar
 
 -- |Return the contents of the 'MVar'.  If the 'MVar' is currently
@@ -560,8 +560,8 @@ putMVar (MVar mvar#) x = IO $ \ s# ->
 tryTakeMVar :: MVar a -> IO (Maybe a)
 tryTakeMVar (MVar m) = IO $ \ s ->
     case tryTakeMVar# m s of
-	(# s, 0#, _ #) -> (# s, Nothing #)	-- MVar is empty
-	(# s, _,  a #) -> (# s, Just a  #)	-- MVar is full
+        (# s, 0#, _ #) -> (# s, Nothing #)      -- MVar is empty
+        (# s, _,  a #) -> (# s, Just a  #)      -- MVar is full
 
 -- |A non-blocking version of 'putMVar'.  The 'tryPutMVar' function
 -- attempts to put the value @a@ into the 'MVar', returning 'True' if
@@ -594,16 +594,16 @@ withMVar m io =
   block $ do
     a <- takeMVar m
     b <- catchException (unblock (io a))
-      	    (\e -> do putMVar m a; throw e)
+            (\e -> do putMVar m a; throw e)
     putMVar m a
     return b
 \end{code}
 
 
 %************************************************************************
-%*									*
+%*                                                                      *
 \subsection{Thread waiting}
-%*									*
+%*                                                                      *
 %************************************************************************
 
 \begin{code}
@@ -616,19 +616,19 @@ withMVar m io =
 asyncRead :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
 asyncRead  (I# fd) (I# isSock) (I# len) (Ptr buf) =
   IO $ \s -> case asyncRead# fd isSock len buf s of 
-  	       (# s, len#, err# #) -> (# s, (I# len#, I# err#) #)
+               (# s, len#, err# #) -> (# s, (I# len#, I# err#) #)
 
 asyncWrite :: Int -> Int -> Int -> Ptr a -> IO (Int, Int)
 asyncWrite  (I# fd) (I# isSock) (I# len) (Ptr buf) =
   IO $ \s -> case asyncWrite# fd isSock len buf s of 
-  	       (# s, len#, err# #) -> (# s, (I# len#, I# err#) #)
+               (# s, len#, err# #) -> (# s, (I# len#, I# err#) #)
 
 asyncDoProc :: FunPtr (Ptr a -> IO Int) -> Ptr a -> IO Int
 asyncDoProc (FunPtr proc) (Ptr param) = 
     -- the 'length' value is ignored; simplifies implementation of
     -- the async*# primops to have them all return the same result.
   IO $ \s -> case asyncDoProc# proc param s  of 
-  	       (# s, len#, err# #) -> (# s, I# err# #)
+               (# s, len#, err# #) -> (# s, I# err# #)
 
 -- to aid the use of these primops by the IO Handle implementation,
 -- provide the following convenience funs:
@@ -655,9 +655,9 @@ threadWaitRead fd
   | threaded  = waitForReadEvent fd
 #endif
   | otherwise = IO $ \s -> 
-	case fromIntegral fd of { I# fd# ->
-	case waitRead# fd# s of { s -> (# s, () #)
-	}}
+        case fromIntegral fd of { I# fd# ->
+        case waitRead# fd# s of { s -> (# s, () #)
+        }}
 
 -- | Block the current thread until data can be written to the
 -- given file descriptor (GHC only).
@@ -667,9 +667,9 @@ threadWaitWrite fd
   | threaded  = waitForWriteEvent fd
 #endif
   | otherwise = IO $ \s -> 
-	case fromIntegral fd of { I# fd# ->
-	case waitWrite# fd# s of { s -> (# s, () #)
-	}}
+        case fromIntegral fd of { I# fd# ->
+        case waitWrite# fd# s of { s -> (# s, () #)
+        }}
 
 -- | Suspends the current thread for a given number of microseconds
 -- (GHC only).
@@ -682,9 +682,9 @@ threadDelay :: Int -> IO ()
 threadDelay time
   | threaded  = waitForDelayEvent time
   | otherwise = IO $ \s -> 
-	case fromIntegral time of { I# time# ->
-	case delay# time# s of { s -> (# s, () #)
-	}}
+        case fromIntegral time of { I# time# ->
+        case delay# time# s of { s -> (# s, () #)
+        }}
 
 
 -- | Set the value of returned TVar to True after a given number of
@@ -737,20 +737,20 @@ calculateTarget usecs = do
 
 -- Issues, possible problems:
 --
---	- we might want bound threads to just do the blocking
---	  operation rather than communicating with the IO manager
---	  thread.  This would prevent simgle-threaded programs which do
---	  IO from requiring multiple OS threads.  However, it would also
---	  prevent bound threads waiting on IO from being killed or sent
---	  exceptions.
+--      - we might want bound threads to just do the blocking
+--        operation rather than communicating with the IO manager
+--        thread.  This would prevent simgle-threaded programs which do
+--        IO from requiring multiple OS threads.  However, it would also
+--        prevent bound threads waiting on IO from being killed or sent
+--        exceptions.
 --
---	- Apprently exec() doesn't work on Linux in a multithreaded program.
---	  I couldn't repeat this.
+--      - Apprently exec() doesn't work on Linux in a multithreaded program.
+--        I couldn't repeat this.
 --
--- 	- How do we handle signal delivery in the multithreaded RTS?
+--      - How do we handle signal delivery in the multithreaded RTS?
 --
---	- forkProcess will kill the IO manager thread.  Let's just
---	  hope we don't need to do any blocking IO between fork & exec.
+--      - forkProcess will kill the IO manager thread.  Let's just
+--        hope we don't need to do any blocking IO between fork & exec.
 
 #ifndef mingw32_HOST_OS
 data IOReq
@@ -766,7 +766,7 @@ data DelayReq
 pendingEvents :: IORef [IOReq]
 #endif
 pendingDelays :: IORef [DelayReq]
-	-- could use a strict list or array here
+        -- could use a strict list or array here
 {-# NOINLINE pendingEvents #-}
 {-# NOINLINE pendingDelays #-}
 (pendingEvents,pendingDelays) = unsafePerformIO $ do
@@ -774,8 +774,8 @@ pendingDelays :: IORef [DelayReq]
   reqs <- newIORef []
   dels <- newIORef []
   return (reqs, dels)
-	-- the first time we schedule an IO request, the service thread
-	-- will be created (cool, huh?)
+        -- the first time we schedule an IO request, the service thread
+        -- will be created (cool, huh?)
 
 ensureIOManagerIsRunning :: IO ()
 ensureIOManagerIsRunning 
@@ -838,11 +838,11 @@ service_loop wakeup old_delays = do
     0 -> do
         r <- c_readIOManagerEvent
         exit <- 
-	      case r of
-		_ | r == io_MANAGER_WAKEUP -> return False
-		_ | r == io_MANAGER_DIE    -> return True
+              case r of
+                _ | r == io_MANAGER_WAKEUP -> return False
+                _ | r == io_MANAGER_DIE    -> return True
                 0 -> return False -- spurious wakeup
-		r -> do start_console_handler (r `shiftR` 1); return False
+                r -> do start_console_handler (r `shiftR` 1); return False
         if exit
           then return ()
           else service_cont wakeup delays'
@@ -902,11 +902,11 @@ getDelay now [] = return ([], iNFINITE)
 getDelay now all@(d : rest) 
   = case d of
      Delay time m | now >= time -> do
-	putMVar m ()
-	getDelay now rest
+        putMVar m ()
+        getDelay now rest
      DelaySTM time t | now >= time -> do
-	atomically $ writeTVar t True
-	getDelay now rest
+        atomically $ writeTVar t True
+        getDelay now rest
      _otherwise ->
         -- delay is in millisecs for WaitForSingleObject
         let micro_seconds = delayTime d - now
@@ -943,20 +943,20 @@ foreign import stdcall "WaitForSingleObject"
 startIOManagerThread :: IO ()
 startIOManagerThread = do
         allocaArray 2 $ \fds -> do
-	throwErrnoIfMinus1 "startIOManagerThread" (c_pipe fds)
-	rd_end <- peekElemOff fds 0
-	wr_end <- peekElemOff fds 1
-	writeIORef stick (fromIntegral wr_end)
-	c_setIOManagerPipe wr_end
-	forkIO $ do
-	    allocaBytes sizeofFdSet   $ \readfds -> do
-	    allocaBytes sizeofFdSet   $ \writefds -> do 
-	    allocaBytes sizeofTimeVal $ \timeval -> do
-	    service_loop (fromIntegral rd_end) readfds writefds timeval [] []
-	return ()
+        throwErrnoIfMinus1 "startIOManagerThread" (c_pipe fds)
+        rd_end <- peekElemOff fds 0
+        wr_end <- peekElemOff fds 1
+        writeIORef stick (fromIntegral wr_end)
+        c_setIOManagerPipe wr_end
+        forkIO $ do
+            allocaBytes sizeofFdSet   $ \readfds -> do
+            allocaBytes sizeofFdSet   $ \writefds -> do 
+            allocaBytes sizeofTimeVal $ \timeval -> do
+            service_loop (fromIntegral rd_end) readfds writefds timeval [] []
+        return ()
 
 service_loop
-   :: Fd		-- listen to this for wakeup calls
+   :: Fd                -- listen to this for wakeup calls
    -> Ptr CFdSet
    -> Ptr CFdSet
    -> Ptr CTimeVal
@@ -981,28 +981,28 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
 
   -- perform the select()
   let do_select delays = do
-	  -- check the current time and wake up any thread in
-	  -- threadDelay whose timeout has expired.  Also find the
-	  -- timeout value for the select() call.
-	  now <- getUSecOfDay
-	  (delays', timeout) <- getDelay now ptimeval delays
+          -- check the current time and wake up any thread in
+          -- threadDelay whose timeout has expired.  Also find the
+          -- timeout value for the select() call.
+          now <- getUSecOfDay
+          (delays', timeout) <- getDelay now ptimeval delays
 
-	  res <- c_select (fromIntegral ((max wakeup maxfd)+1)) readfds writefds 
-			nullPtr timeout
-	  if (res == -1)
-	     then do
-		err <- getErrno
-		case err of
-		  _ | err == eINTR ->  do_select delays'
-			-- EINTR: just redo the select()
-		  _ | err == eBADF ->  return (True, delays)
-			-- EBADF: one of the file descriptors is closed or bad,
-			-- we don't know which one, so wake everyone up.
-		  _ | otherwise    ->  throwErrno "select"
-			-- otherwise (ENOMEM or EINVAL) something has gone
-			-- wrong; report the error.
-	     else
-		return (False,delays')
+          res <- c_select (fromIntegral ((max wakeup maxfd)+1)) readfds writefds 
+                        nullPtr timeout
+          if (res == -1)
+             then do
+                err <- getErrno
+                case err of
+                  _ | err == eINTR ->  do_select delays'
+                        -- EINTR: just redo the select()
+                  _ | err == eBADF ->  return (True, delays)
+                        -- EBADF: one of the file descriptors is closed or bad,
+                        -- we don't know which one, so wake everyone up.
+                  _ | otherwise    ->  throwErrno "select"
+                        -- otherwise (ENOMEM or EINVAL) something has gone
+                        -- wrong; report the error.
+             else
+                return (False,delays')
 
   (wakeup_all,delays') <- do_select delays
 
@@ -1013,24 +1013,24 @@ service_loop wakeup readfds writefds ptimeval old_reqs old_delays = do
         if b == 0 
           then return False
           else alloca $ \p -> do 
-	         c_read (fromIntegral wakeup) p 1; return ()
-		 s <- peek p		
-		 case s of
-		  _ | s == io_MANAGER_WAKEUP -> return False
-		  _ | s == io_MANAGER_DIE    -> return True
-		  _ -> withMVar signalHandlerLock $ \_ -> do
+                 c_read (fromIntegral wakeup) p 1; return ()
+                 s <- peek p            
+                 case s of
+                  _ | s == io_MANAGER_WAKEUP -> return False
+                  _ | s == io_MANAGER_DIE    -> return True
+                  _ -> withMVar signalHandlerLock $ \_ -> do
                           handler_tbl <- peek handlers
-		          sp <- peekElemOff handler_tbl (fromIntegral s)
+                          sp <- peekElemOff handler_tbl (fromIntegral s)
                           io <- deRefStablePtr sp
-		          forkIO io
-		          return False
+                          forkIO io
+                          return False
 
   if exit then return () else do
 
   atomicModifyIORef prodding (\_ -> (False,False))
 
   reqs' <- if wakeup_all then do wakeupAll reqs; return []
-			 else completeRequests reqs readfds writefds []
+                         else completeRequests reqs readfds writefds []
 
   service_loop wakeup readfds writefds ptimeval reqs' delays'
 
@@ -1065,13 +1065,13 @@ buildFdSets maxfd readfds writefds [] = return maxfd
 buildFdSets maxfd readfds writefds (Read fd m : reqs)
   | fd >= fD_SETSIZE =  error "buildFdSets: file descriptor out of range"
   | otherwise        =  do
-	fdSet fd readfds
+        fdSet fd readfds
         buildFdSets (max maxfd fd) readfds writefds reqs
 buildFdSets maxfd readfds writefds (Write fd m : reqs)
   | fd >= fD_SETSIZE =  error "buildFdSets: file descriptor out of range"
   | otherwise        =  do
-	fdSet fd writefds
-	buildFdSets (max maxfd fd) readfds writefds reqs
+        fdSet fd writefds
+        buildFdSets (max maxfd fd) readfds writefds reqs
 
 completeRequests [] _ _ reqs' = return reqs'
 completeRequests (Read fd m : reqs) readfds writefds reqs' = do
@@ -1114,14 +1114,14 @@ getDelay now ptimeval [] = return ([],nullPtr)
 getDelay now ptimeval all@(d : rest) 
   = case d of
      Delay time m | now >= time -> do
-	putMVar m ()
-	getDelay now ptimeval rest
+        putMVar m ()
+        getDelay now ptimeval rest
      DelaySTM time t | now >= time -> do
-	atomically $ writeTVar t True
-	getDelay now ptimeval rest
+        atomically $ writeTVar t True
+        getDelay now ptimeval rest
      _otherwise -> do
-	setTimevalTicks ptimeval (delayTime d - now)
-    	return (all,ptimeval)
+        setTimevalTicks ptimeval (delayTime d - now)
+        return (all,ptimeval)
 
 newtype CTimeVal = CTimeVal ()
 

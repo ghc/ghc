@@ -16,11 +16,11 @@
 -----------------------------------------------------------------------------
 
 -- #hide
-module GHC.Exception 
-	( module GHC.Exception, 
-	  Exception(..), AsyncException(..), 
-	  IOException(..), ArithException(..), ArrayException(..),
-	  throw, throwIO, ioError ) 
+module GHC.Exception
+        ( module GHC.Exception,
+          Exception(..), AsyncException(..),
+          IOException(..), ArithException(..), ArrayException(..),
+          throw, throwIO, ioError )
   where
 
 import GHC.Base
@@ -28,9 +28,9 @@ import GHC.IOBase
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Primitive catch}
-%*							*
+%*                                                      *
 %*********************************************************
 
 catchException used to handle the passing around of the state to the
@@ -68,16 +68,16 @@ catchException (IO m) k =  IO $ \s -> catch# m (\ex -> unIO (k ex)) s
 -- Non-I\/O exceptions are not caught by this variant; to catch all
 -- exceptions, use 'Control.Exception.catch' from "Control.Exception".
 catch           :: IO a -> (IOError -> IO a) -> IO a 
-catch m k	=  catchException m handler
+catch m k       =  catchException m handler
   where handler (IOException err)   = k err
-	handler other               = throw other
+        handler other               = throw other
 \end{code}
 
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Controlling asynchronous exception delivery}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}

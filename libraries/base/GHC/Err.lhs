@@ -21,7 +21,7 @@
 -----------------------------------------------------------------------------
 
 -- #hide
-module GHC.Err 
+module GHC.Err
        (
          irrefutPatError
        , noMethodBindingError
@@ -29,16 +29,16 @@ module GHC.Err
        , patError
        , recSelError
        , recConError
-       , runtimeError              -- :: Addr#  -> a	-- Addr# points to UTF8 encoded C string
+       , runtimeError              -- :: Addr#  -> a    -- Addr# points to UTF8 encoded C string
 
-       , absentErr	           -- :: a
-       , divZeroError		   -- :: a
-       , overflowError		   -- :: a
+       , absentErr                 -- :: a
+       , divZeroError              -- :: a
+       , overflowError             -- :: a
 
-       , error		           -- :: String -> a
-       , assertError		   -- :: String -> Bool -> a -> a
-       
-       , undefined		   -- :: a
+       , error                     -- :: String -> a
+       , assertError               -- :: String -> Bool -> a -> a
+
+       , undefined                 -- :: a
        ) where
 
 #ifndef __HADDOCK__
@@ -49,9 +49,9 @@ import GHC.Exception
 \end{code}
 
 %*********************************************************
-%*							*
+%*                                                      *
 \subsection{Error-ish functions}
-%*							*
+%*                                                      *
 %*********************************************************
 
 \begin{code}
@@ -69,9 +69,9 @@ undefined =  error "Prelude.undefined"
 \end{code}
 
 %*********************************************************
-%*							 *
+%*                                                       *
 \subsection{Compiler generated errors + local utils}
-%*							 *
+%*                                                       *
 %*********************************************************
 
 Used for compiler-generated error message;
@@ -85,17 +85,17 @@ absentErr = error "Oops! The program has entered an `absent' argument!\n"
 
 \begin{code}
 recSelError, recConError, irrefutPatError, runtimeError,
-	     nonExhaustiveGuardsError, patError, noMethodBindingError
-	:: Addr# -> a	-- All take a UTF8-encoded C string
+             nonExhaustiveGuardsError, patError, noMethodBindingError
+        :: Addr# -> a   -- All take a UTF8-encoded C string
 
-recSelError 		 s = throw (RecSelError (unpackCStringUtf8# s))	-- No location info unfortunately
-runtimeError		 s = error (unpackCStringUtf8# s)		-- No location info unfortunately
+recSelError              s = throw (RecSelError (unpackCStringUtf8# s)) -- No location info unfortunately
+runtimeError             s = error (unpackCStringUtf8# s)               -- No location info unfortunately
 
 nonExhaustiveGuardsError s = throw (PatternMatchFail (untangle s "Non-exhaustive guards in"))
-irrefutPatError		 s = throw (PatternMatchFail (untangle s "Irrefutable pattern failed for pattern"))
-recConError    		 s = throw (RecConError      (untangle s "Missing field in record construction"))
+irrefutPatError          s = throw (PatternMatchFail (untangle s "Irrefutable pattern failed for pattern"))
+recConError              s = throw (RecConError      (untangle s "Missing field in record construction"))
 noMethodBindingError     s = throw (NoMethodError    (untangle s "No instance nor default method for class operation"))
-patError 		 s = throw (PatternMatchFail (untangle s "Non-exhaustive patterns in"))
+patError                 s = throw (PatternMatchFail (untangle s "Non-exhaustive patterns in"))
 
 assertError :: Addr# -> Bool -> a -> a
 assertError str pred v 
@@ -106,11 +106,11 @@ assertError str pred v
 
 (untangle coded message) expects "coded" to be of the form 
 
-	"location|details"
+        "location|details"
 
 It prints
 
-	location message details
+        location message details
 
 \begin{code}
 untangle :: Addr# -> String -> String
@@ -125,10 +125,10 @@ untangle coded message
 
     (location, details)
       = case (span not_bar coded_str) of { (loc, rest) ->
-	case rest of
-	  ('|':det) -> (loc, ' ' : det)
-	  _	    -> (loc, "")
-	}
+        case rest of
+          ('|':det) -> (loc, ' ' : det)
+          _         -> (loc, "")
+        }
     not_bar c = c /= '|'
 \end{code}
 

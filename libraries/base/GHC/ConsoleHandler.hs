@@ -17,14 +17,14 @@
 
 module GHC.ConsoleHandler
 #if !defined(mingw32_HOST_OS) && !defined(__HADDOCK__)
-	where
+        where
 import Prelude -- necessary to get dependencies right
 #else /* whole file */
-	( Handler(..)
-	, installHandler
-	, ConsoleEvent(..)
-	, flushConsole
-	) where
+        ( Handler(..)
+        , installHandler
+        , ConsoleEvent(..)
+        , flushConsole
+        ) where
 
 {-
 #include "Signals.h"
@@ -65,10 +65,10 @@ data Handler
 -- it in one of these environments.
 --
 installHandler :: Handler -> IO Handler
-installHandler handler 
+installHandler handler
   | threaded =
     modifyMVar win32ConsoleHandler $ \old_h -> do
-      (new_h,rc) <- 
+      (new_h,rc) <-
         case handler of
           Default -> do
             r <- rts_installHandler STG_SIG_DFL nullPtr
@@ -79,7 +79,7 @@ installHandler handler
           Catch h -> do
             r <- rts_installHandler STG_SIG_HAN nullPtr
             return (h, r)
-      prev_handler <- 
+      prev_handler <-
         case rc of
           STG_SIG_DFL -> return Default
           STG_SIG_IGN -> return Ignore
@@ -88,25 +88,25 @@ installHandler handler
 
   | otherwise =
   alloca $ \ p_sp -> do
-   rc <- 
+   rc <-
     case handler of
      Default -> rts_installHandler STG_SIG_DFL p_sp
      Ignore  -> rts_installHandler STG_SIG_IGN p_sp
      Catch h -> do
         v <- newStablePtr (toHandler h)
-	poke p_sp v
-	rts_installHandler STG_SIG_HAN p_sp
+        poke p_sp v
+        rts_installHandler STG_SIG_HAN p_sp
    case rc of
      STG_SIG_DFL -> return Default
      STG_SIG_IGN -> return Ignore
      STG_SIG_HAN -> do
         osptr <- peek p_sp
         oldh  <- deRefStablePtr osptr
-	 -- stable pointer is no longer in use, free it.
-	freeStablePtr osptr
-	return (Catch (\ ev -> oldh (fromConsoleEvent ev)))
+         -- stable pointer is no longer in use, free it.
+        freeStablePtr osptr
+        return (Catch (\ ev -> oldh (fromConsoleEvent ev)))
   where
-   fromConsoleEvent ev = 
+   fromConsoleEvent ev =
      case ev of
        ControlC -> 0 {- CTRL_C_EVENT-}
        Break    -> 1 {- CTRL_BREAK_EVENT-}
@@ -116,10 +116,10 @@ installHandler handler
 
    toHandler hdlr ev = do
       case toWin32ConsoleEvent ev of
-	 -- see rts/win32/ConsoleHandler.c for comments as to why
-	 -- rts_ConsoleHandlerDone is called here.
+         -- see rts/win32/ConsoleHandler.c for comments as to why
+         -- rts_ConsoleHandlerDone is called here.
         Just x  -> hdlr x >> rts_ConsoleHandlerDone ev
-	Nothing -> return () -- silently ignore..
+        Nothing -> return () -- silently ignore..
 
    no_handler = error "win32ConsoleHandler"
 
@@ -132,11 +132,11 @@ foreign import ccall unsafe "RtsExternal.h rts_ConsoleHandlerDone"
 
 
 flushConsole :: Handle -> IO ()
-flushConsole h = 
-  wantReadableHandle "flushConsole" h $ \ h_ -> 
+flushConsole h =
+  wantReadableHandle "flushConsole" h $ \ h_ ->
      throwErrnoIfMinus1Retry_ "flushConsole"
       (flush_console_fd (fromIntegral (haFD h_)))
 
 foreign import ccall unsafe "consUtils.h flush_input_console__"
-	flush_console_fd :: CInt -> IO CInt
+        flush_console_fd :: CInt -> IO CInt
 #endif /* mingw32_HOST_OS */

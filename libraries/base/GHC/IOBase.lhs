@@ -21,37 +21,37 @@ module GHC.IOBase(
     unsafePerformIO, unsafeInterleaveIO,
     unsafeDupablePerformIO, unsafeDupableInterleaveIO,
     noDuplicate,
-  
-	-- To and from from ST
+
+        -- To and from from ST
     stToIO, ioToST, unsafeIOToST, unsafeSTToIO,
 
-	-- References
+        -- References
     IORef(..), newIORef, readIORef, writeIORef, 
     IOArray(..), newIOArray, readIOArray, writeIOArray, unsafeReadIOArray, unsafeWriteIOArray,
     MVar(..),
 
-    	-- Handles, file descriptors,
+        -- Handles, file descriptors,
     FilePath,  
     Handle(..), Handle__(..), HandleType(..), IOMode(..), FD, 
     isReadableHandleType, isWritableHandleType, isReadWriteHandleType, showHandle,
-  
-    	-- Buffers
+
+        -- Buffers
     Buffer(..), RawBuffer, BufferState(..), BufferList(..), BufferMode(..),
     bufferIsWritable, bufferEmpty, bufferFull, 
 
-    	-- Exceptions
+        -- Exceptions
     Exception(..), ArithException(..), AsyncException(..), ArrayException(..),
     stackOverflow, heapOverflow, throw, throwIO, ioException, 
     IOError, IOException(..), IOErrorType(..), ioError, userError,
     ExitCode(..) 
   ) where
-	
+
 import GHC.ST
-import GHC.Arr	-- to derive Ix class
+import GHC.Arr  -- to derive Ix class
 import GHC.Enum -- to derive Enum class
 import GHC.STRef
 import GHC.Base
---  import GHC.Num	-- To get fromInteger etc, needed because of -fno-implicit-prelude
+--  import GHC.Num      -- To get fromInteger etc, needed because of -fno-implicit-prelude
 import Data.Maybe  ( Maybe(..) )
 import GHC.Show
 import GHC.List
@@ -59,8 +59,8 @@ import GHC.Read
 import Foreign.C.Types (CInt)
 
 #ifndef __HADDOCK__
-import {-# SOURCE #-} Data.Typeable	( showsTypeRep )
-import {-# SOURCE #-} Data.Dynamic	( Dynamic, dynTypeRep )
+import {-# SOURCE #-} Data.Typeable     ( showsTypeRep )
+import {-# SOURCE #-} Data.Dynamic      ( Dynamic, dynTypeRep )
 #endif
 
 -- ---------------------------------------------------------------------------
@@ -76,13 +76,13 @@ system.  The following list may or may not be exhaustive:
 
 Compiler  - types of various primitives in PrimOp.lhs
 
-RTS 	  - forceIO (StgMiscClosures.hc)
-	  - catchzh_fast, (un)?blockAsyncExceptionszh_fast, raisezh_fast 
-	    (Exceptions.hc)
-	  - raiseAsync (Schedule.c)
+RTS       - forceIO (StgMiscClosures.hc)
+          - catchzh_fast, (un)?blockAsyncExceptionszh_fast, raisezh_fast 
+            (Exceptions.hc)
+          - raiseAsync (Schedule.c)
 
 Prelude   - GHC.IOBase.lhs, and several other places including
-	    GHC.Exception.lhs.
+            GHC.Exception.lhs.
 
 Libraries - parts of hslibs/lang.
 
@@ -115,10 +115,10 @@ instance  Monad IO  where
     {-# INLINE (>>)   #-}
     {-# INLINE (>>=)  #-}
     m >> k      =  m >>= \ _ -> k
-    return x	= returnIO x
+    return x    = returnIO x
 
     m >>= k     = bindIO m k
-    fail s	= failIO s
+    fail s      = failIO s
 
 failIO :: String -> IO a
 failIO s = ioError (userError s)
@@ -148,10 +148,10 @@ returnIO x = IO (\ s -> (# s, x #))
 -- monad.  The 'RealWorld' parameter indicates that the internal state
 -- used by the 'ST' computation is a special one supplied by the 'IO'
 -- monad, and thus distinct from those used by invocations of 'runST'.
-stToIO	      :: ST RealWorld a -> IO a
+stToIO        :: ST RealWorld a -> IO a
 stToIO (ST m) = IO m
 
-ioToST	      :: IO a -> ST RealWorld a
+ioToST        :: IO a -> ST RealWorld a
 ioToST (IO m) = (ST m)
 
 -- This relies on IO and ST having the same representation modulo the
@@ -179,26 +179,26 @@ effects take place (relative to the main I\/O trunk, or other calls to
 writing and compiling modules that use 'unsafePerformIO':
 
   * Use @{\-\# NOINLINE foo \#-\}@ as a pragma on any function @foo@
-	that calls 'unsafePerformIO'.  If the call is inlined,
-	the I\/O may be performed more than once.
+        that calls 'unsafePerformIO'.  If the call is inlined,
+        the I\/O may be performed more than once.
 
   * Use the compiler flag @-fno-cse@ to prevent common sub-expression
-	elimination being performed on the module, which might combine
-	two side effects that were meant to be separate.  A good example
-	is using multiple global variables (like @test@ in the example below).
+        elimination being performed on the module, which might combine
+        two side effects that were meant to be separate.  A good example
+        is using multiple global variables (like @test@ in the example below).
 
   * Make sure that the either you switch off let-floating, or that the 
-	call to 'unsafePerformIO' cannot float outside a lambda.  For example, 
-	if you say:
-	@
-	   f x = unsafePerformIO (newIORef [])
-	@
-	you may get only one reference cell shared between all calls to @f@.
-	Better would be
-	@
-	   f x = unsafePerformIO (newIORef [x])
-	@
-	because now it can't float outside the lambda.
+        call to 'unsafePerformIO' cannot float outside a lambda.  For example, 
+        if you say:
+        @
+           f x = unsafePerformIO (newIORef [])
+        @
+        you may get only one reference cell shared between all calls to @f@.
+        Better would be
+        @
+           f x = unsafePerformIO (newIORef [x])
+        @
+        because now it can't float outside the lambda.
 
 It is less well known that
 'unsafePerformIO' is not type safe.  For example:
@@ -207,9 +207,9 @@ It is less well known that
 >     test = unsafePerformIO $ newIORef []
 >     
 >     main = do
->     	      writeIORef test [42]
->     	      bang <- readIORef test
->     	      print (bang :: [Char])
+>             writeIORef test [42]
+>             bang <- readIORef test
+>             print (bang :: [Char])
 
 This program will core dump.  This problem with polymorphic references
 is well known in the ML community, and does not arise with normal
@@ -218,7 +218,7 @@ once you use 'unsafePerformIO'.  Indeed, it is
 possible to write @coerce :: a -> b@ with the
 help of 'unsafePerformIO'.  So be careful!
 -}
-unsafePerformIO	:: IO a -> a
+unsafePerformIO :: IO a -> a
 unsafePerformIO m = unsafeDupablePerformIO (noDuplicate >> m)
 
 {-| 
@@ -230,7 +230,7 @@ times (on a multiprocessor), and you should therefore ensure that
 it gives the same results each time.
 -}
 {-# NOINLINE unsafeDupablePerformIO #-}
-unsafeDupablePerformIO	:: IO a -> a
+unsafeDupablePerformIO  :: IO a -> a
 unsafeDupablePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
 
 -- Why do we NOINLINE unsafeDupablePerformIO?  See the comment with
@@ -243,16 +243,16 @@ unsafeDupablePerformIO (IO m) = lazy (case m realWorld# of (# _, r #) -> r)
 -- If we don't have it, the demand analyser discovers the following strictness
 -- for unsafeDupablePerformIO:  C(U(AV))
 -- But then consider
---	unsafeDupablePerformIO (\s -> let r = f x in 
---			       case writeIORef v r s of (# s1, _ #) ->
---			       (# s1, r #)
+--      unsafeDupablePerformIO (\s -> let r = f x in 
+--                             case writeIORef v r s of (# s1, _ #) ->
+--                             (# s1, r #)
 -- The strictness analyser will find that the binding for r is strict,
 -- (becuase of uPIO's strictness sig), and so it'll evaluate it before 
 -- doing the writeIORef.  This actually makes tests/lib/should_run/memo002
 -- get a deadlock!  
 --
 -- Solution: don't expose the strictness of unsafeDupablePerformIO,
---	     by hiding it with 'lazy'
+--           by hiding it with 'lazy'
 
 {-|
 'unsafeInterleaveIO' allows 'IO' computation to be deferred lazily.
@@ -272,9 +272,9 @@ unsafeInterleaveIO m = unsafeDupableInterleaveIO (noDuplicate >> m)
 unsafeDupableInterleaveIO :: IO a -> IO a
 unsafeDupableInterleaveIO (IO m)
   = IO ( \ s -> let
-		   r = case m s of (# _, res #) -> res
-		in
-		(# s, r #))
+                   r = case m s of (# _, res #) -> res
+                in
+                (# s, r #))
 
 {-| 
 Ensures that the suspensions under evaluation by the current thread
@@ -301,7 +301,7 @@ as a a box, which may be empty or full.
 
 -- pull in Eq (Mvar a) too, to avoid GHC.Conc being an orphan-instance module
 instance Eq (MVar a) where
-	(MVar mvar1#) == (MVar mvar2#) = sameMVar# mvar1# mvar2#
+        (MVar mvar1#) == (MVar mvar2#) = sameMVar# mvar1# mvar2#
 
 --  A Handle is represented by (a reference to) a record 
 --  containing the state of the I/O port/device. We record
@@ -312,7 +312,7 @@ instance Eq (MVar a) where
 --    * buffering mode 
 --    * buffer, and spare buffers
 --    * user-friendly name (usually the
---	FilePath used when IO.openFile was called)
+--      FilePath used when IO.openFile was called)
 
 -- Note: when a Handle is garbage collected, we want to flush its buffer
 -- and close the OS file handle, so as to free up a (precious) resource.
@@ -355,15 +355,15 @@ instance Eq (MVar a) where
 -- ensure that this doesn't happen.
 
 data Handle 
-  = FileHandle				-- A normal handle to a file
-	FilePath			-- the file (invariant)
-	!(MVar Handle__)
+  = FileHandle                          -- A normal handle to a file
+        FilePath                        -- the file (invariant)
+        !(MVar Handle__)
 
-  | DuplexHandle			-- A handle to a read/write stream
-	FilePath			-- file for a FIFO, otherwise some
-					--   descriptive string.
-	!(MVar Handle__)		-- The read side
-	!(MVar Handle__)		-- The write side
+  | DuplexHandle                        -- A handle to a read/write stream
+        FilePath                        -- file for a FIFO, otherwise some
+                                        --   descriptive string.
+        !(MVar Handle__)                -- The read side
+        !(MVar Handle__)                -- The write side
 
 -- NOTES:
 --    * A 'FileHandle' is seekable.  A 'DuplexHandle' may or may not be
@@ -378,16 +378,16 @@ type FD = CInt
 
 data Handle__
   = Handle__ {
-      haFD	    :: !FD,		     -- file descriptor
-      haType        :: HandleType,	     -- type (read/write/append etc.)
-      haIsBin       :: Bool,		     -- binary mode?
-      haIsStream    :: Bool,		     -- Windows : is this a socket?
+      haFD          :: !FD,                  -- file descriptor
+      haType        :: HandleType,           -- type (read/write/append etc.)
+      haIsBin       :: Bool,                 -- binary mode?
+      haIsStream    :: Bool,                 -- Windows : is this a socket?
                                              -- Unix    : is O_NONBLOCK set?
-      haBufferMode  :: BufferMode,	     -- buffer contains read/write data?
-      haBuffer	    :: !(IORef Buffer),	     -- the current buffer
+      haBufferMode  :: BufferMode,           -- buffer contains read/write data?
+      haBuffer      :: !(IORef Buffer),      -- the current buffer
       haBuffers     :: !(IORef BufferList),  -- spare buffers
       haOtherSide   :: Maybe (MVar Handle__) -- ptr to the write side of a 
-					     -- duplex handle.
+                                             -- duplex handle.
     }
 
 -- ---------------------------------------------------------------------------
@@ -427,11 +427,11 @@ type RawBuffer = MutableByteArray# RealWorld
 
 data Buffer 
   = Buffer {
-	bufBuf   :: RawBuffer,
-	bufRPtr  :: !Int,
-	bufWPtr  :: !Int,
-	bufSize  :: !Int,
-	bufState :: BufferState
+        bufBuf   :: RawBuffer,
+        bufRPtr  :: !Int,
+        bufWPtr  :: !Int,
+        bufSize  :: !Int,
+        bufState :: BufferState
   }
 
 data BufferState = ReadBuffer | WriteBuffer deriving (Eq)
@@ -468,12 +468,12 @@ data HandleType
 
 isReadableHandleType ReadHandle         = True
 isReadableHandleType ReadWriteHandle    = True
-isReadableHandleType _	       	        = False
+isReadableHandleType _                  = False
 
 isWritableHandleType AppendHandle    = True
 isWritableHandleType WriteHandle     = True
 isWritableHandleType ReadWriteHandle = True
-isWritableHandleType _	       	     = False
+isWritableHandleType _               = False
 
 isReadWriteHandleType ReadWriteHandle{} = True
 isReadWriteHandleType _                 = False
@@ -528,13 +528,13 @@ type FilePath = String
 -- and terminals will normally be line-buffered.
 
 data BufferMode  
- = NoBuffering	-- ^ buffering is disabled if possible.
+ = NoBuffering  -- ^ buffering is disabled if possible.
  | LineBuffering
-		-- ^ line-buffering should be enabled if possible.
+                -- ^ line-buffering should be enabled if possible.
  | BlockBuffering (Maybe Int)
-		-- ^ block-buffering should be enabled if possible.
-		-- The size of the buffer is @n@ items if the argument
-		-- is 'Just' @n@ and is otherwise implementation-dependent.
+                -- ^ block-buffering should be enabled if possible.
+                -- The size of the buffer is @n@ items if the argument
+                -- is 'Just' @n@ and is otherwise implementation-dependent.
    deriving (Eq, Ord, Read, Show)
 
 -- ---------------------------------------------------------------------------
@@ -631,85 +631,85 @@ showHandle file = showString "{handle: " . showString file . showString "}"
 -- 'Data.Dynamic.Dynamic' (see the section on Dynamic Exceptions:
 -- "Control.Exception\#DynamicExceptions").
 data Exception
-  = ArithException  	ArithException
-	-- ^Exceptions raised by arithmetic
-	-- operations.  (NOTE: GHC currently does not throw
-	-- 'ArithException's except for 'DivideByZero').
-  | ArrayException	ArrayException
-	-- ^Exceptions raised by array-related
-	-- operations.  (NOTE: GHC currently does not throw
-	-- 'ArrayException's).
-  | AssertionFailed	String
-	-- ^This exception is thrown by the
-	-- 'assert' operation when the condition
-	-- fails.  The 'String' argument contains the
-	-- location of the assertion in the source program.
-  | AsyncException	AsyncException
-	-- ^Asynchronous exceptions (see section on Asynchronous Exceptions: "Control.Exception\#AsynchronousExceptions").
+  = ArithException      ArithException
+        -- ^Exceptions raised by arithmetic
+        -- operations.  (NOTE: GHC currently does not throw
+        -- 'ArithException's except for 'DivideByZero').
+  | ArrayException      ArrayException
+        -- ^Exceptions raised by array-related
+        -- operations.  (NOTE: GHC currently does not throw
+        -- 'ArrayException's).
+  | AssertionFailed     String
+        -- ^This exception is thrown by the
+        -- 'assert' operation when the condition
+        -- fails.  The 'String' argument contains the
+        -- location of the assertion in the source program.
+  | AsyncException      AsyncException
+        -- ^Asynchronous exceptions (see section on Asynchronous Exceptions: "Control.Exception\#AsynchronousExceptions").
   | BlockedOnDeadMVar
-	-- ^The current thread was executing a call to
-	-- 'Control.Concurrent.MVar.takeMVar' that could never return,
-	-- because there are no other references to this 'MVar'.
+        -- ^The current thread was executing a call to
+        -- 'Control.Concurrent.MVar.takeMVar' that could never return,
+        -- because there are no other references to this 'MVar'.
   | BlockedIndefinitely
-	-- ^The current thread was waiting to retry an atomic memory transaction
-	-- that could never become possible to complete because there are no other
-	-- threads referring to any of the TVars involved.
+        -- ^The current thread was waiting to retry an atomic memory transaction
+        -- that could never become possible to complete because there are no other
+        -- threads referring to any of the TVars involved.
   | NestedAtomically
-	-- ^The runtime detected an attempt to nest one STM transaction
-	-- inside another one, presumably due to the use of 
-	-- 'unsafePeformIO' with 'atomically'.
+        -- ^The runtime detected an attempt to nest one STM transaction
+        -- inside another one, presumably due to the use of 
+        -- 'unsafePeformIO' with 'atomically'.
   | Deadlock
-	-- ^There are no runnable threads, so the program is
-	-- deadlocked.  The 'Deadlock' exception is
-	-- raised in the main thread only (see also: "Control.Concurrent").
-  | DynException	Dynamic
-	-- ^Dynamically typed exceptions (see section on Dynamic Exceptions: "Control.Exception\#DynamicExceptions").
-  | ErrorCall		String
-	-- ^The 'ErrorCall' exception is thrown by 'error'.  The 'String'
-	-- argument of 'ErrorCall' is the string passed to 'error' when it was
-	-- called.
-  | ExitException	ExitCode
-	-- ^The 'ExitException' exception is thrown by 'System.Exit.exitWith' (and
-	-- 'System.Exit.exitFailure').  The 'ExitCode' argument is the value passed 
-	-- to 'System.Exit.exitWith'.  An unhandled 'ExitException' exception in the
-	-- main thread will cause the program to be terminated with the given 
-	-- exit code.
-  | IOException 	IOException
-	-- ^These are the standard IO exceptions generated by
-  	-- Haskell\'s @IO@ operations.  See also "System.IO.Error".
+        -- ^There are no runnable threads, so the program is
+        -- deadlocked.  The 'Deadlock' exception is
+        -- raised in the main thread only (see also: "Control.Concurrent").
+  | DynException        Dynamic
+        -- ^Dynamically typed exceptions (see section on Dynamic Exceptions: "Control.Exception\#DynamicExceptions").
+  | ErrorCall           String
+        -- ^The 'ErrorCall' exception is thrown by 'error'.  The 'String'
+        -- argument of 'ErrorCall' is the string passed to 'error' when it was
+        -- called.
+  | ExitException       ExitCode
+        -- ^The 'ExitException' exception is thrown by 'System.Exit.exitWith' (and
+        -- 'System.Exit.exitFailure').  The 'ExitCode' argument is the value passed 
+        -- to 'System.Exit.exitWith'.  An unhandled 'ExitException' exception in the
+        -- main thread will cause the program to be terminated with the given 
+        -- exit code.
+  | IOException         IOException
+        -- ^These are the standard IO exceptions generated by
+        -- Haskell\'s @IO@ operations.  See also "System.IO.Error".
   | NoMethodError       String
-	-- ^An attempt was made to invoke a class method which has
-	-- no definition in this instance, and there was no default
-	-- definition given in the class declaration.  GHC issues a
-	-- warning when you compile an instance which has missing
-	-- methods.
+        -- ^An attempt was made to invoke a class method which has
+        -- no definition in this instance, and there was no default
+        -- definition given in the class declaration.  GHC issues a
+        -- warning when you compile an instance which has missing
+        -- methods.
   | NonTermination
-	-- ^The current thread is stuck in an infinite loop.  This
-	-- exception may or may not be thrown when the program is
-	-- non-terminating.
-  | PatternMatchFail	String
-	-- ^A pattern matching failure.  The 'String' argument should contain a
-	-- descriptive message including the function name, source file
-	-- and line number.
-  | RecConError		String
-	-- ^An attempt was made to evaluate a field of a record
-	-- for which no value was given at construction time.  The
-	-- 'String' argument gives the location of the
-	-- record construction in the source program.
-  | RecSelError		String
-	-- ^A field selection was attempted on a constructor that
-	-- doesn\'t have the requested field.  This can happen with
-	-- multi-constructor records when one or more fields are
-	-- missing from some of the constructors.  The
-	-- 'String' argument gives the location of the
-	-- record selection in the source program.
-  | RecUpdError		String
-	-- ^An attempt was made to update a field in a record,
-	-- where the record doesn\'t have the requested field.  This can
-	-- only occur with multi-constructor records, when one or more
-	-- fields are missing from some of the constructors.  The
-	-- 'String' argument gives the location of the
-	-- record update in the source program.
+        -- ^The current thread is stuck in an infinite loop.  This
+        -- exception may or may not be thrown when the program is
+        -- non-terminating.
+  | PatternMatchFail    String
+        -- ^A pattern matching failure.  The 'String' argument should contain a
+        -- descriptive message including the function name, source file
+        -- and line number.
+  | RecConError         String
+        -- ^An attempt was made to evaluate a field of a record
+        -- for which no value was given at construction time.  The
+        -- 'String' argument gives the location of the
+        -- record construction in the source program.
+  | RecSelError         String
+        -- ^A field selection was attempted on a constructor that
+        -- doesn\'t have the requested field.  This can happen with
+        -- multi-constructor records when one or more fields are
+        -- missing from some of the constructors.  The
+        -- 'String' argument gives the location of the
+        -- record selection in the source program.
+  | RecUpdError         String
+        -- ^An attempt was made to update a field in a record,
+        -- where the record doesn\'t have the requested field.  This can
+        -- only occur with multi-constructor records, when one or more
+        -- fields are missing from some of the constructors.  The
+        -- 'String' argument gives the location of the
+        -- record update in the source program.
 
 -- |The type of arithmetic exceptions
 data ArithException
@@ -724,34 +724,34 @@ data ArithException
 -- |Asynchronous exceptions
 data AsyncException
   = StackOverflow
-	-- ^The current thread\'s stack exceeded its limit.
-	-- Since an exception has been raised, the thread\'s stack
-	-- will certainly be below its limit again, but the
-	-- programmer should take remedial action
-	-- immediately.
+        -- ^The current thread\'s stack exceeded its limit.
+        -- Since an exception has been raised, the thread\'s stack
+        -- will certainly be below its limit again, but the
+        -- programmer should take remedial action
+        -- immediately.
   | HeapOverflow
-	-- ^The program\'s heap is reaching its limit, and
-	-- the program should take action to reduce the amount of
-	-- live data it has. Notes:
-	--
-	-- 	* It is undefined which thread receives this exception.
-	--
-	-- 	* GHC currently does not throw 'HeapOverflow' exceptions.
+        -- ^The program\'s heap is reaching its limit, and
+        -- the program should take action to reduce the amount of
+        -- live data it has. Notes:
+        --
+        --      * It is undefined which thread receives this exception.
+        --
+        --      * GHC currently does not throw 'HeapOverflow' exceptions.
   | ThreadKilled
-	-- ^This exception is raised by another thread
-	-- calling 'Control.Concurrent.killThread', or by the system
-	-- if it needs to terminate the thread for some
-	-- reason.
+        -- ^This exception is raised by another thread
+        -- calling 'Control.Concurrent.killThread', or by the system
+        -- if it needs to terminate the thread for some
+        -- reason.
   deriving (Eq, Ord)
 
 -- | Exceptions generated by array operations
 data ArrayException
-  = IndexOutOfBounds  	String
-	-- ^An attempt was made to index an array outside
-	-- its declared bounds.
-  | UndefinedElement	String
-	-- ^An attempt was made to evaluate an element of an
-	-- array that had not been initialized.
+  = IndexOutOfBounds    String
+        -- ^An attempt was made to index an array outside
+        -- its declared bounds.
+  | UndefinedElement    String
+        -- ^An attempt was made to evaluate an element of an
+        -- array that had not been initialized.
   deriving (Eq, Ord)
 
 stackOverflow, heapOverflow :: Exception -- for the RTS
@@ -772,31 +772,31 @@ instance Show AsyncException where
 
 instance Show ArrayException where
   showsPrec _ (IndexOutOfBounds s)
-	= showString "array index out of range"
-	. (if not (null s) then showString ": " . showString s
-			   else id)
+        = showString "array index out of range"
+        . (if not (null s) then showString ": " . showString s
+                           else id)
   showsPrec _ (UndefinedElement s)
-	= showString "undefined array element"
-	. (if not (null s) then showString ": " . showString s
-			   else id)
+        = showString "undefined array element"
+        . (if not (null s) then showString ": " . showString s
+                           else id)
 
 instance Show Exception where
-  showsPrec _ (IOException err)	         = shows err
+  showsPrec _ (IOException err)          = shows err
   showsPrec _ (ArithException err)       = shows err
   showsPrec _ (ArrayException err)       = shows err
-  showsPrec _ (ErrorCall err)	         = showString err
+  showsPrec _ (ErrorCall err)            = showString err
   showsPrec _ (ExitException err)        = showString "exit: " . shows err
   showsPrec _ (NoMethodError err)        = showString err
   showsPrec _ (PatternMatchFail err)     = showString err
-  showsPrec _ (RecSelError err)	         = showString err
-  showsPrec _ (RecConError err)	         = showString err
-  showsPrec _ (RecUpdError err)	         = showString err
+  showsPrec _ (RecSelError err)          = showString err
+  showsPrec _ (RecConError err)          = showString err
+  showsPrec _ (RecUpdError err)          = showString err
   showsPrec _ (AssertionFailed err)      = showString err
   showsPrec _ (DynException err)         = showString "exception :: " . showsTypeRep (dynTypeRep err)
-  showsPrec _ (AsyncException e)	 = shows e
-  showsPrec _ (BlockedOnDeadMVar)	 = showString "thread blocked indefinitely"
-  showsPrec _ (BlockedIndefinitely)	 = showString "thread blocked indefinitely"
-  showsPrec _ (NestedAtomically)	 = showString "Control.Concurrent.STM.atomically was nested"
+  showsPrec _ (AsyncException e)         = shows e
+  showsPrec _ (BlockedOnDeadMVar)        = showString "thread blocked indefinitely"
+  showsPrec _ (BlockedIndefinitely)      = showString "thread blocked indefinitely"
+  showsPrec _ (NestedAtomically)         = showString "Control.Concurrent.STM.atomically was nested"
   showsPrec _ (NonTermination)           = showString "<<loop>>"
   showsPrec _ (Deadlock)                 = showString "<<deadlock>>"
 
@@ -804,8 +804,8 @@ instance Eq Exception where
   IOException e1      == IOException e2      = e1 == e2
   ArithException e1   == ArithException e2   = e1 == e2
   ArrayException e1   == ArrayException e2   = e1 == e2
-  ErrorCall e1        == ErrorCall e2	     = e1 == e2
-  ExitException	e1    == ExitException e2    = e1 == e2
+  ErrorCall e1        == ErrorCall e2        = e1 == e2
+  ExitException e1    == ExitException e2    = e1 == e2
   NoMethodError e1    == NoMethodError e2    = e1 == e2
   PatternMatchFail e1 == PatternMatchFail e2 = e1 == e2
   RecSelError e1      == RecSelError e2      = e1 == e2
@@ -827,12 +827,12 @@ instance Eq Exception where
 -- Exception datatype (above).
 
 data ExitCode
-  = ExitSuccess	-- ^ indicates successful termination;
+  = ExitSuccess -- ^ indicates successful termination;
   | ExitFailure Int
-		-- ^ indicates program failure with an exit code.
-		-- The exact interpretation of the code is
-		-- operating-system dependent.	In particular, some values
-		-- may be prohibited (e.g. 0 on a POSIX-compliant system).
+                -- ^ indicates program failure with an exit code.
+                -- The exact interpretation of the code is
+                -- operating-system dependent.  In particular, some values
+                -- may be prohibited (e.g. 0 on a POSIX-compliant system).
   deriving (Eq, Ord, Read, Show)
 
 -- --------------------------------------------------------------------------
@@ -859,14 +859,14 @@ throw exception = raise# exception
 -- ordering with respect to other 'IO' operations, whereas 'throw'
 -- does not.
 throwIO         :: Exception -> IO a
-throwIO err	=  IO $ raiseIO# err
+throwIO err     =  IO $ raiseIO# err
 
-ioException	:: IOException -> IO a
+ioException     :: IOException -> IO a
 ioException err =  IO $ raiseIO# (IOException err)
 
 -- | Raise an 'IOError' in the 'IO' monad.
 ioError         :: IOError -> IO a 
-ioError		=  ioException
+ioError         =  ioException
 
 -- ---------------------------------------------------------------------------
 -- IOError type
@@ -886,9 +886,9 @@ type IOError = IOException
 data IOException
  = IOError {
      ioe_handle   :: Maybe Handle,   -- the handle used by the action flagging 
-				     -- the error.
+                                     -- the error.
      ioe_type     :: IOErrorType,    -- what it was.
-     ioe_location :: String,	     -- location.
+     ioe_location :: String,         -- location.
      ioe_description :: String,      -- error type specific information.
      ioe_filename :: Maybe FilePath  -- filename the error is related to.
    }
@@ -932,22 +932,22 @@ instance Show IOErrorType where
   showsPrec _ e =
     showString $
     case e of
-      AlreadyExists	-> "already exists"
+      AlreadyExists     -> "already exists"
       NoSuchThing       -> "does not exist"
       ResourceBusy      -> "resource busy"
       ResourceExhausted -> "resource exhausted"
-      EOF		-> "end of file"
-      IllegalOperation	-> "illegal operation"
+      EOF               -> "end of file"
+      IllegalOperation  -> "illegal operation"
       PermissionDenied  -> "permission denied"
-      UserError		-> "user error"
-      HardwareFault	-> "hardware fault"
+      UserError         -> "user error"
+      HardwareFault     -> "hardware fault"
       InappropriateType -> "inappropriate type"
       Interrupted       -> "interrupted"
       InvalidArgument   -> "invalid argument"
       OtherError        -> "failed"
       ProtocolError     -> "protocol error"
       ResourceVanished  -> "resource vanished"
-      SystemError	-> "system error"
+      SystemError       -> "system error"
       TimeExpired       -> "timeout"
       UnsatisfiedConstraints -> "unsatisified constraints" -- ultra-precise!
       UnsupportedOperation -> "unsupported operation"
@@ -962,7 +962,7 @@ instance Show IOErrorType where
 -- >   fail s = ioError (userError s)
 --
 userError       :: String  -> IOError
-userError str	=  IOError Nothing UserError "" str Nothing
+userError str   =  IOError Nothing UserError "" str Nothing
 
 -- ---------------------------------------------------------------------------
 -- Showing IOErrors
@@ -970,17 +970,17 @@ userError str	=  IOError Nothing UserError "" str Nothing
 instance Show IOException where
     showsPrec p (IOError hdl iot loc s fn) =
       (case fn of
-	 Nothing -> case hdl of
-		        Nothing -> id
-			Just h  -> showsPrec p h . showString ": "
-	 Just name -> showString name . showString ": ") .
+         Nothing -> case hdl of
+                        Nothing -> id
+                        Just h  -> showsPrec p h . showString ": "
+         Just name -> showString name . showString ": ") .
       (case loc of
          "" -> id
-	 _  -> showString loc . showString ": ") .
+         _  -> showString loc . showString ": ") .
       showsPrec p iot . 
       (case s of
-	 "" -> id
-	 _  -> showString " (" . showString s . showString ")")
+         "" -> id
+         _  -> showString " (" . showString s . showString ")")
 
 -- -----------------------------------------------------------------------------
 -- IOMode type
