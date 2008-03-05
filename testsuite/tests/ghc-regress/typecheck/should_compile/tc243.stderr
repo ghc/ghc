@@ -1,0 +1,4 @@
+
+tc243.hs:10:0:
+    Warning: Definition but no type signature for `.+.'
+             Inferred type: (.+.) :: forall a. a

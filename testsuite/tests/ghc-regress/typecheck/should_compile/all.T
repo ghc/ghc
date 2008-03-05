@@ -258,6 +258,7 @@ test('tc239', extra_clean(['Tc239_Help.hi', 'Tc239_Help.o']),
 test('tc240', if_compiler_lt('ghc', '6.9', skip), compile, [''])
 test('tc241', normal, compile, [''])
 test('tc242', normal, compile, [''])
+test('tc243', normal, compile, [''])
 
 test('FD1', normal, compile_fail, [''])
 test('FD2', normal, compile_fail, [''])
