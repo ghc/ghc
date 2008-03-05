@@ -279,51 +279,27 @@ This showed up when compiling Control.Concurrent.Chan.getChanContents.
 
 \begin{code}
 occAnalBind env (Rec pairs) body_usage
-  | not (any (`usedIn` body_usage) bndrs)       -- NB: look at body_usage, not total_usage
-  = (body_usage, [])                            -- Dead code
-  | otherwise
-  = (final_usage, map ({-# SCC "occAnalBind.dofinal" #-} do_final_bind) sccs)
+  = foldr occAnalRec (body_usage, []) sccs
+	-- For a recursive group, we 
+	--	* occ-analyse all the RHSs
+	--	* compute strongly-connected components
+	--	* feed those components to occAnalRec
   where
-    bndrs    = map fst pairs
-    bndr_set = mkVarSet bndrs
-
-        ---------------------------------------
-        -- See Note [Loop breaking]
-        ---------------------------------------
-
     -------------Dependency analysis ------------------------------
-    occ_anald :: [(Id, (UsageDetails, CoreExpr))]
-        -- The UsageDetails here are strictly those arising from the RHS
-        -- *not* from any rules in the Id
-    occ_anald = [(bndr, occAnalRhs env bndr rhs) | (bndr,rhs) <- pairs]
+    bndr_set = mkVarSet (map fst pairs)
 
-    total_usage        = foldl add_usage body_usage occ_anald
-    add_usage body_usage (bndr, (rhs_usage, _))
-        = body_usage +++ addRuleUsage rhs_usage bndr
-
-    (final_usage, tagged_bndrs) = tagBinders total_usage bndrs
-    final_bndrs | isEmptyVarSet all_rule_fvs = tagged_bndrs
-                | otherwise = map tag_rule_var tagged_bndrs
-
-    tag_rule_var bndr | bndr `elemVarSet` all_rule_fvs = makeLoopBreaker True bndr
-                      | otherwise                      = bndr
-    all_rule_fvs = bndr_set `intersectVarSet` foldr (unionVarSet . idRuleVars) emptyVarSet bndrs
-        -- Mark the binder with OccInfo saying "no preInlineUnconditionally" if
-        -- it is used in any rule (lhs or rhs) of the recursive group
-
-    ---- stuff for dependency analysis of binds -------------------------------
     sccs :: [SCC (Node Details)]
     sccs = {-# SCC "occAnalBind.scc" #-} stronglyConnCompR rec_edges
 
-    rec_edges :: [Node Details] -- The binders are tagged with correct occ-info
-    rec_edges = {-# SCC "occAnalBind.assoc" #-} zipWith make_node final_bndrs occ_anald
-    make_node tagged_bndr (_bndr, (rhs_usage, rhs))
-        = ((tagged_bndr, rhs, rhs_fvs), idUnique tagged_bndr, out_edges)
-        where
-          rhs_fvs = intersectUFM_C (\b _ -> b) bndr_set rhs_usage
-          out_edges = keysUFM (rhs_fvs `unionVarSet` idRuleVars tagged_bndr)
-
-
+    rec_edges :: [Node Details]
+    rec_edges = {-# SCC "occAnalBind.assoc" #-}  map make_node pairs
+    
+    make_node (bndr, rhs)
+	= (ND bndr rhs' rhs_usage rhs_fvs, idUnique bndr, out_edges)
+	where
+	  (rhs_usage, rhs') = occAnalRhs env bndr rhs
+	  rhs_fvs = intersectUFM_C (\b _ -> b) bndr_set rhs_usage
+	  out_edges = keysUFM (rhs_fvs `unionVarSet` idRuleVars bndr)
         -- (a -> b) means a mentions b
         -- Given the usage details (a UFM that gives occ info for each free var of
         -- the RHS) we can get the list of free vars -- or rather their Int keys --
@@ -334,17 +310,66 @@ occAnalBind env (Rec pairs) body_usage
         -- which has n**2 cost, and this meant that edges_from alone
         -- consumed 10% of total runtime!
 
-    ---- Stuff to "re-constitute" bindings from dependency-analysis info ------
-    do_final_bind (AcyclicSCC ((bndr, rhs, _), _, _)) = NonRec bndr rhs
-    do_final_bind (CyclicSCC cycle)
-        | no_rules  = Rec (reOrderCycle cycle)
-        | otherwise = Rec (concatMap reOrderRec (stronglyConnCompR loop_breaker_edges))
-        where   -- See Note [Choosing loop breakers] for looop_breker_edges
-          loop_breaker_edges = map mk_node cycle
-          mk_node (details@(_bndr, _rhs, rhs_fvs), k, _) = (details, k, new_ks)
-                where
-                  new_ks = keysUFM (extendFvs rule_fv_env rhs_fvs rhs_fvs)
+-----------------------------
+occAnalRec :: SCC (Node Details) -> (UsageDetails, [CoreBind])
+				 -> (UsageDetails, [CoreBind])
 
+	-- The NonRec case is just like a Let (NonRec ...) above
+occAnalRec (AcyclicSCC (ND bndr rhs rhs_usage _, _, _)) (body_usage, binds)
+  | not (bndr `usedIn` body_usage) 
+  = (body_usage, binds)
+
+  | otherwise			-- It's mentioned in the body
+  = (body_usage' +++ addRuleUsage rhs_usage bndr,	-- Note [Rules are extra RHSs]
+     NonRec tagged_bndr rhs : binds)
+  where
+    (body_usage', tagged_bndr) = tagBinder body_usage bndr
+
+
+	-- The Rec case is the interesting one
+	-- See Note [Loop breaking]
+occAnalRec (CyclicSCC nodes) (body_usage, binds)
+  | not (any (`usedIn` body_usage) bndrs)	-- NB: look at body_usage, not total_usage
+  = (body_usage, binds)				-- Dead code
+
+  | otherwise	-- At this point we always build a single Rec
+  = (final_usage, Rec pairs : binds)
+
+  where
+    bndrs    = [b | (ND b _ _ _, _, _) <- nodes]
+    bndr_set = mkVarSet bndrs
+
+	----------------------------
+	-- Tag the binders with their occurrence info
+    total_usage = foldl add_usage body_usage nodes
+    add_usage body_usage (ND bndr _ rhs_usage _, _, _)
+	= body_usage +++ addRuleUsage rhs_usage bndr
+    (final_usage, tagged_nodes) = mapAccumL tag_node total_usage nodes
+
+    tag_node :: UsageDetails -> Node Details -> (UsageDetails, Node Details)
+	-- (a) Tag the binders in the details with occ info
+	-- (b) Mark the binder with OccInfo saying "no preInlineUnconditionally" if
+	-- 	it is used in any rule (lhs or rhs) of the recursive group
+	--      See Note [Weak loop breakers]
+    tag_node usage (ND bndr rhs rhs_usage rhs_fvs, k, ks)
+      = (usage `delVarEnv` bndr, (ND bndr2 rhs rhs_usage rhs_fvs, k, ks))
+      where
+	bndr2 | bndr `elemVarSet` all_rule_fvs = makeLoopBreaker True bndr1
+	      | otherwise  		       = bndr1
+	bndr1 = setBinderOcc usage bndr
+    all_rule_fvs = bndr_set `intersectVarSet` foldr (unionVarSet . idRuleVars) 
+						    emptyVarSet bndrs
+
+	----------------------------
+	-- Now reconstruct the cycle
+    pairs | no_rules  = reOrderCycle tagged_nodes
+ 	  | otherwise = concatMap reOrderRec (stronglyConnCompR loop_breaker_edges)
+
+	-- See Note [Choosing loop breakers] for looop_breaker_edges
+    loop_breaker_edges = map mk_node tagged_nodes
+    mk_node (details@(ND _ _ _ rhs_fvs), k, _) = (details, k, new_ks)
+	where
+	  new_ks = keysUFM (extendFvs rule_fv_env rhs_fvs rhs_fvs)
 
     ------------------------------------
     rule_fv_env :: IdEnv IdSet  -- Variables from this group mentioned in RHS of rules
@@ -421,18 +446,20 @@ Perhaps something cleverer would suffice.
 
 
 \begin{code}
-type Node details = (details, Unique, [Unique]) -- The Ints are gotten from the Unique,
-                                                -- which is gotten from the Id.
-type Details = (Id,             -- Binder
-                CoreExpr,       -- RHS
-                IdSet)          -- RHS free vars (*not* include rules)
+type Node details = (details, Unique, [Unique])	-- The Ints are gotten from the Unique,
+						-- which is gotten from the Id.
+data Details = ND Id 		-- Binder
+		  CoreExpr	-- RHS
+		  UsageDetails	-- Full usage from RHS (*not* including rules)
+		  IdSet		-- Other binders from this Rec group mentioned on RHS
+				-- (derivable from UsageDetails but cached here)
 
 reOrderRec :: SCC (Node Details)
            -> [(Id,CoreExpr)]
 -- Sorted into a plausible order.  Enough of the Ids have
 --      IAmALoopBreaker pragmas that there are no loops left.
-reOrderRec (AcyclicSCC ((bndr, rhs, _), _, _)) = [(bndr, rhs)]
-reOrderRec (CyclicSCC cycle)                   = reOrderCycle cycle
+reOrderRec (AcyclicSCC (ND bndr rhs _ _, _, _)) = [(bndr, rhs)]
+reOrderRec (CyclicSCC cycle)  		        = reOrderCycle cycle
 
 reOrderCycle :: [Node Details] -> [(Id,CoreExpr)]
 reOrderCycle []
@@ -440,7 +467,7 @@ reOrderCycle []
 reOrderCycle [bind]     -- Common case of simple self-recursion
   = [(makeLoopBreaker False bndr, rhs)]
   where
-    ((bndr, rhs, _), _, _) = bind
+    (ND bndr rhs _ _, _, _) = bind
 
 reOrderCycle (bind : binds)
   =     -- Choose a loop breaker, mark it no-inline,
@@ -450,7 +477,7 @@ reOrderCycle (bind : binds)
 
   where
     (chosen_bind, unchosen) = choose_loop_breaker bind (score bind) [] binds
-    (bndr, rhs, _)  = chosen_bind
+    ND bndr rhs _ _ = chosen_bind
 
         -- This loop looks for the bind with the lowest score
         -- to pick as the loop  breaker.  The rest accumulate in
@@ -467,7 +494,7 @@ reOrderCycle (bind : binds)
           sc = score bind
 
     score :: Node Details -> Int        -- Higher score => less likely to be picked as loop breaker
-    score ((bndr, rhs, _), _, _)
+    score (ND bndr rhs _ _, _, _)
         | workerExists (idWorkerInfo bndr)      = 10
                 -- Note [Worker inline loop]
 
