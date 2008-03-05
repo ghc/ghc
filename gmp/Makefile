@@ -64,7 +64,8 @@ stamp.gmp.static:
 	mv $(GMP_DIR) gmpbuild
 	chmod +x ln
 	(set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
-	    export PATH=`pwd`:$$PATH; \
+	    PATH=`pwd`:$$PATH; \
+	    export PATH; \
 	    cd gmpbuild && \
 	    CC=$(WhatGccIsCalled) $(SHELL) configure \
 	          --enable-shared=no --host=$(PLATFORM) --build=$(PLATFORM)
@@ -76,7 +77,8 @@ stamp.gmp.shared:
 	mv $(GMP_DIR) gmpbuild-shared
 	chmod +x ln
 	(set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
-	    export PATH=`pwd`:$$PATH; \
+	    PATH=`pwd`:$$PATH; \
+	    export PATH; \
 	    cd gmpbuild-shared && \
 	    CC=$(WhatGccIsCalled) $(SHELL) configure \
 	          --enable-shared=yes --disable-static --host=$(PLATFORM) --build=$(PLATFORM)
