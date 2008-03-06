@@ -473,19 +473,20 @@ newMethod inst_loc id tys = do
 \begin{code}
 shortCutIntLit :: Integer -> TcType -> Maybe (HsExpr TcId)
 shortCutIntLit i ty
-  | isIntTy ty && inIntRange i 		-- Short cut for Int
-  = Just (HsLit (HsInt i))
-  | isIntegerTy ty 			-- Short cut for Integer
-  = Just (HsLit (HsInteger i ty))
-  | otherwise = Nothing
+  | isIntTy ty && inIntRange i = Just (HsLit (HsInt i))
+  | isIntegerTy ty 	       = Just (HsLit (HsInteger i ty))
+  | otherwise		       = shortCutFracLit (fromInteger i) ty
+	-- The 'otherwise' case is important
+	-- Consider (3 :: Float).  Syntactically it looks like an IntLit,
+	-- so we'll call shortCutIntLit, but of course it's a float
+	-- This can make a big difference for programs with a lot of
+	-- literals, compiled without -O
 
 shortCutFracLit :: Rational -> TcType -> Maybe (HsExpr TcId)
 shortCutFracLit f ty
-  | isFloatTy ty 
-  = Just (mk_lit floatDataCon (HsFloatPrim f))
-  | isDoubleTy ty
-  = Just (mk_lit doubleDataCon (HsDoublePrim f))
-  | otherwise = Nothing
+  | isFloatTy ty  = Just (mk_lit floatDataCon  (HsFloatPrim f))
+  | isDoubleTy ty = Just (mk_lit doubleDataCon (HsDoublePrim f))
+  | otherwise     = Nothing
   where
     mk_lit con lit = HsApp (nlHsVar (dataConWrapId con)) (nlHsLit lit)
 
