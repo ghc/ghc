@@ -423,7 +423,7 @@ tcIfaceDecl ignore_prags
     ; fds  <- mapM tc_fd rdr_fds
     ; ats' <- mapM (tcIfaceDecl ignore_prags) rdr_ats
     ; let ats = zipWith setTyThingPoss ats' (map ifTyVars rdr_ats)
-    ; cls  <- buildClass cls_name tyvars ctxt fds ats sigs tc_isrec
+    ; cls  <- buildClass ignore_prags cls_name tyvars ctxt fds ats sigs tc_isrec
     ; return (AClass cls) }
   where
    tc_sig (IfaceClassOp occ dm rdr_ty)

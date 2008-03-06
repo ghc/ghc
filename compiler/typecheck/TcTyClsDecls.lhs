@@ -776,7 +776,8 @@ tcTyClDecl1 calc_isrec
 		    tycon_name = tyConName (classTyCon clas)
 		    tc_isrec = calc_isrec tycon_name
 		in
-		buildClass class_name tvs' ctxt' fds' ats'
+		buildClass False {- Must include unfoldings for selectors -}
+			   class_name tvs' ctxt' fds' ats'
 			   sig_stuff tc_isrec)
   ; return (AClass clas : ats')
       -- NB: Order is important due to the call to `mkGlobalThings' when

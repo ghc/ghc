@@ -242,14 +242,17 @@ mkTyConSelIds tycon rhs
 
 ------------------------------------------------------
 \begin{code}
-buildClass :: Name -> [TyVar] -> ThetaType
+buildClass :: Bool			-- True <=> do not include unfoldings 
+					--	    on dict selectors
+					-- Used when importing a class without -O
+	   -> Name -> [TyVar] -> ThetaType
 	   -> [FunDep TyVar]		-- Functional dependencies
 	   -> [TyThing]			-- Associated types
 	   -> [(Name, DefMeth, Type)]	-- Method info
 	   -> RecFlag			-- Info for type constructor
 	   -> TcRnIf m n Class
 
-buildClass class_name tvs sc_theta fds ats sig_stuff tc_isrec
+buildClass no_unf class_name tvs sc_theta fds ats sig_stuff tc_isrec
   = do	{ traceIf (text "buildClass")
 	; tycon_name <- newImplicitBinder class_name mkClassTyConOcc
 	; datacon_name <- newImplicitBinder class_name mkClassDataConOcc
@@ -261,7 +264,7 @@ buildClass class_name tvs sc_theta fds ats sig_stuff tc_isrec
 
 	  let { rec_tycon  = classTyCon rec_clas
 	      ; op_tys	   = [ty | (_,_,ty) <- sig_stuff]
-	      ; op_items   = [ (mkDictSelId op_name rec_clas, dm_info)
+	      ; op_items   = [ (mkDictSelId no_unf op_name rec_clas, dm_info)
 			     | (op_name, dm_info, _) <- sig_stuff ] }
 	  		-- Build the selector id and default method id
 
@@ -283,7 +286,7 @@ buildClass class_name tvs sc_theta fds ats sig_stuff tc_isrec
 	      --      D_sc1, D_sc2
 	      -- (We used to call them D_C, but now we can have two different
 	      --  superclasses both called C!)
-        ; let sc_sel_ids = [mkDictSelId sc_name rec_clas | sc_name <- sc_sel_names]
+        ; let sc_sel_ids = [mkDictSelId no_unf sc_name rec_clas | sc_name <- sc_sel_names]
 
 		-- Use a newtype if the class constructor has exactly one field:
 		-- i.e. exactly one operation or superclass taken together

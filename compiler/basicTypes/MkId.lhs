@@ -827,8 +827,11 @@ at the outside.  When dealing with classes it's very convenient to
 recover the original type signature from the class op selector.
 
 \begin{code}
-mkDictSelId :: Name -> Class -> Id
-mkDictSelId name clas
+mkDictSelId :: Bool	-- True <=> don't include the unfolding
+			-- Little point on imports without -O, because the
+			-- dictionary itself won't be visible
+ 	    -> Name -> Class -> Id
+mkDictSelId no_unf name clas
   = mkGlobalId (ClassOpId clas) name sel_ty info
   where
     sel_ty = mkForAllTys tyvars (mkFunTy (idType dict_id) (idType the_arg_id))
@@ -840,8 +843,9 @@ mkDictSelId name clas
 
     info = noCafIdInfo
                 `setArityInfo`          1
-                `setUnfoldingInfo`      mkTopUnfolding rhs
                 `setAllStrictnessInfo`  Just strict_sig
+                `setUnfoldingInfo`      (if no_unf then noUnfolding
+						   else mkTopUnfolding rhs)
 
         -- We no longer use 'must-inline' on record selectors.  They'll
         -- inline like crazy if they scrutinise a constructor
