@@ -1325,6 +1325,15 @@
 	    </row>
 
 	    <row>
+	      <entry><option>-fspec-constr-count</option>=<replaceable>n</replaceable></entry>
+	      <entry>Set to <replaceable>n</replaceable> (default: 3) the maximum number of 
+		specialisations that will be created for any one function
+		by the SpecConstr transformation</entry>
+	      <entry>static</entry>
+	      <entry><option>-fno-spec-constr-count</option></entry>
+	    </row>
+
+	    <row>
 	      <entry><option>-fliberate-case</option></entry>
 	      <entry>Turn on the liberate-case transformation. Implied by <option>-O2</option>.</entry>
 	      <entry>dynamic</entry>

@@ -305,6 +305,7 @@ data DynFlags = DynFlags {
   ruleCheck		:: Maybe String,
 
   specConstrThreshold   :: Maybe Int,	-- Threshold for SpecConstr
+  specConstrCount	:: Maybe Int,	-- Max number of specialisations for any one function
   liberateCaseThreshold :: Maybe Int,   -- Threshold for LiberateCase 
 
   stolen_x86_regs	:: Int,		
@@ -496,6 +497,7 @@ defaultDynFlags =
         shouldDumpSimplPhase    = const False,
 	ruleCheck		= Nothing,
 	specConstrThreshold	= Just 200,
+	specConstrCount		= Just 3,
         liberateCaseThreshold   = Just 200,
 	stolen_x86_regs		= 4,
 	cmdlineHcIncludes	= [],
@@ -1185,6 +1187,10 @@ dynamic_flags = [
                 upd (\dfs -> dfs{ specConstrThreshold = Just n })))
   ,  ( "fno-spec-constr-threshold",   NoArg (
                 upd (\dfs -> dfs{ specConstrThreshold = Nothing })))
+  ,  ( "fspec-constr-count",   	      IntSuffix (\n ->
+                upd (\dfs -> dfs{ specConstrCount = Just n })))
+  ,  ( "fno-spec-constr-count",   NoArg (
+                upd (\dfs -> dfs{ specConstrCount = Nothing })))
   ,  ( "fliberate-case-threshold",    IntSuffix (\n ->
                 upd (\dfs -> dfs{ liberateCaseThreshold = Just n })))
   ,  ( "fno-liberate-case-threshold", NoArg (
