@@ -28,7 +28,7 @@ module PprTyThing (
 import qualified GHC
 
 import GHC	( TyThing(..) )
-import TyCon	( tyConFamInst_maybe )
+import TyCon	( tyConFamInst_maybe, isAlgTyCon, tyConStupidTheta )
 import Type	( TyThing(..), tidyTopType, pprTypeApp )
 import TcType	( tcMultiSplitSigmaTy, mkPhiTy )
 import SrcLoc	( SrcSpan )
@@ -86,7 +86,7 @@ pprTyConHdr pefas tyCon
   | Just (fam_tc, tys) <- tyConFamInst_maybe tyCon
   = ptext keyword <+> ptext SLIT("instance") <+> pprTypeApp tyCon (ppr_bndr tyCon) tys
   | otherwise
-  = ptext keyword <+> opt_family <+> ppr_bndr tyCon <+> hsep (map ppr vars)
+  = ptext keyword <+> opt_family <+> opt_stupid <+> ppr_bndr tyCon <+> hsep (map ppr vars)
   where
     vars | GHC.isPrimTyCon tyCon || 
 	   GHC.isFunTyCon tyCon = take (GHC.tyConArity tyCon) GHC.alphaTyVars
@@ -99,6 +99,10 @@ pprTyConHdr pefas tyCon
     opt_family
       | GHC.isOpenTyCon tyCon = ptext SLIT("family")
       | otherwise             = empty
+
+    opt_stupid 	-- The "stupid theta" part of the declaration
+	| isAlgTyCon tyCon = GHC.pprThetaArrow (tyConStupidTheta tyCon)
+	| otherwise	   = empty	-- Returns 'empty' if null theta
 
 pprDataConSig pefas dataCon =
   ppr_bndr dataCon <+> dcolon <+> pprTypeForUser pefas (GHC.dataConType dataCon)
