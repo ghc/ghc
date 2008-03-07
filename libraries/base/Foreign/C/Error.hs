@@ -17,7 +17,7 @@ module Foreign.C.Error (
 
   -- * Haskell representations of @errno@ values
 
-  Errno(..),		-- instance: Eq
+  Errno(..),            -- instance: Eq
 
   -- ** Common @errno@ symbols
   -- | Different operating systems and\/or C libraries often support
@@ -41,7 +41,7 @@ module Foreign.C.Error (
 
   -- ** 'Errno' functions
                         -- :: Errno
-  isValidErrno,		-- :: Errno -> Bool
+  isValidErrno,         -- :: Errno -> Bool
 
   -- access to the current thread's "errno" value
   --
@@ -67,16 +67,16 @@ module Foreign.C.Error (
   throwErrnoIfRetry,    -- :: (a -> Bool) -> String -> IO a       -> IO a
   throwErrnoIfRetry_,   -- :: (a -> Bool) -> String -> IO a       -> IO ()
   throwErrnoIfMinus1,   -- :: Num a 
-			-- =>                String -> IO a       -> IO a
+                        -- =>                String -> IO a       -> IO a
   throwErrnoIfMinus1_,  -- :: Num a 
-			-- =>                String -> IO a       -> IO ()
-  throwErrnoIfMinus1Retry,  
-			-- :: Num a 
-			-- =>                String -> IO a       -> IO a
+                        -- =>                String -> IO a       -> IO ()
+  throwErrnoIfMinus1Retry,
+                        -- :: Num a 
+                        -- =>                String -> IO a       -> IO a
   throwErrnoIfMinus1Retry_,  
-			-- :: Num a 
-			-- =>                String -> IO a       -> IO ()
-  throwErrnoIfNull,	-- ::                String -> IO (Ptr a) -> IO (Ptr a)
+                        -- :: Num a 
+                        -- =>                String -> IO a       -> IO ()
+  throwErrnoIfNull,     -- ::                String -> IO (Ptr a) -> IO (Ptr a)
   throwErrnoIfNullRetry,-- ::                String -> IO (Ptr a) -> IO (Ptr a)
 
   throwErrnoIfRetryMayBlock, 
@@ -118,7 +118,7 @@ import Foreign.Storable
 import Foreign.Ptr
 import Foreign.C.Types
 import Foreign.C.String
-import Foreign.Marshal.Error 	( void )
+import Foreign.Marshal.Error    ( void )
 import Data.Maybe
 
 #if __GLASGOW_HASKELL__
@@ -126,12 +126,12 @@ import GHC.IOBase
 import GHC.Num
 import GHC.Base
 #elif __HUGS__
-import Hugs.Prelude		( Handle, IOError, ioError )
-import System.IO.Unsafe		( unsafePerformIO )
+import Hugs.Prelude             ( Handle, IOError, ioError )
+import System.IO.Unsafe         ( unsafePerformIO )
 #else
-import System.IO		( Handle )
-import System.IO.Error		( IOError, ioError )
-import System.IO.Unsafe		( unsafePerformIO )
+import System.IO                ( Handle )
+import System.IO.Error          ( IOError, ioError )
+import System.IO.Unsafe         ( unsafePerformIO )
 #endif
 
 #ifdef __HUGS__
@@ -151,7 +151,7 @@ newtype Errno = Errno CInt
 instance Eq Errno where
   errno1@(Errno no1) == errno2@(Errno no2) 
     | isValidErrno errno1 && isValidErrno errno2 = no1 == no2
-    | otherwise					 = False
+    | otherwise                                  = False
 
 -- common "errno" symbols
 --
@@ -168,7 +168,7 @@ eOK, e2BIG, eACCES, eADDRINUSE, eADDRNOTAVAIL, eADV, eAFNOSUPPORT, eAGAIN,
   ePROGMISMATCH, ePROGUNAVAIL, ePROTO, ePROTONOSUPPORT, ePROTOTYPE, 
   eRANGE, eREMCHG, eREMOTE, eROFS, eRPCMISMATCH, eRREMOTE, eSHUTDOWN, 
   eSOCKTNOSUPPORT, eSPIPE, eSRCH, eSRMNT, eSTALE, eTIME, eTIMEDOUT, 
-  eTOOMANYREFS, eTXTBSY, eUSERS, eWOULDBLOCK, eXDEV		       :: Errno
+  eTOOMANYREFS, eTXTBSY, eUSERS, eWOULDBLOCK, eXDEV                    :: Errno
 --
 -- the cCONST_XXX identifiers are cpp symbols whose value is computed by
 -- configure 
@@ -178,103 +178,103 @@ eOK             = Errno 0
 #include "Errno.hs"
 #else
 e2BIG           = Errno (CONST_E2BIG)
-eACCES		= Errno (CONST_EACCES)
-eADDRINUSE	= Errno (CONST_EADDRINUSE)
-eADDRNOTAVAIL	= Errno (CONST_EADDRNOTAVAIL)
-eADV		= Errno (CONST_EADV)
-eAFNOSUPPORT	= Errno (CONST_EAFNOSUPPORT)
-eAGAIN		= Errno (CONST_EAGAIN)
-eALREADY	= Errno (CONST_EALREADY)
-eBADF		= Errno (CONST_EBADF)
-eBADMSG		= Errno (CONST_EBADMSG)
-eBADRPC		= Errno (CONST_EBADRPC)
-eBUSY		= Errno (CONST_EBUSY)
-eCHILD		= Errno (CONST_ECHILD)
-eCOMM		= Errno (CONST_ECOMM)
-eCONNABORTED	= Errno (CONST_ECONNABORTED)
-eCONNREFUSED	= Errno (CONST_ECONNREFUSED)
-eCONNRESET	= Errno (CONST_ECONNRESET)
-eDEADLK		= Errno (CONST_EDEADLK)
-eDESTADDRREQ	= Errno (CONST_EDESTADDRREQ)
-eDIRTY		= Errno (CONST_EDIRTY)
-eDOM		= Errno (CONST_EDOM)
-eDQUOT		= Errno (CONST_EDQUOT)
-eEXIST		= Errno (CONST_EEXIST)
-eFAULT		= Errno (CONST_EFAULT)
-eFBIG		= Errno (CONST_EFBIG)
-eFTYPE		= Errno (CONST_EFTYPE)
-eHOSTDOWN	= Errno (CONST_EHOSTDOWN)
-eHOSTUNREACH	= Errno (CONST_EHOSTUNREACH)
-eIDRM		= Errno (CONST_EIDRM)
-eILSEQ		= Errno (CONST_EILSEQ)
-eINPROGRESS	= Errno (CONST_EINPROGRESS)
-eINTR		= Errno (CONST_EINTR)
-eINVAL		= Errno (CONST_EINVAL)
-eIO		= Errno (CONST_EIO)
-eISCONN		= Errno (CONST_EISCONN)
-eISDIR		= Errno (CONST_EISDIR)
-eLOOP		= Errno (CONST_ELOOP)
-eMFILE		= Errno (CONST_EMFILE)
-eMLINK		= Errno (CONST_EMLINK)
-eMSGSIZE	= Errno (CONST_EMSGSIZE)
-eMULTIHOP	= Errno (CONST_EMULTIHOP)
-eNAMETOOLONG	= Errno (CONST_ENAMETOOLONG)
-eNETDOWN	= Errno (CONST_ENETDOWN)
-eNETRESET	= Errno (CONST_ENETRESET)
-eNETUNREACH	= Errno (CONST_ENETUNREACH)
-eNFILE		= Errno (CONST_ENFILE)
-eNOBUFS		= Errno (CONST_ENOBUFS)
-eNODATA		= Errno (CONST_ENODATA)
-eNODEV		= Errno (CONST_ENODEV)
-eNOENT		= Errno (CONST_ENOENT)
-eNOEXEC		= Errno (CONST_ENOEXEC)
-eNOLCK		= Errno (CONST_ENOLCK)
-eNOLINK		= Errno (CONST_ENOLINK)
-eNOMEM		= Errno (CONST_ENOMEM)
-eNOMSG		= Errno (CONST_ENOMSG)
-eNONET		= Errno (CONST_ENONET)
-eNOPROTOOPT	= Errno (CONST_ENOPROTOOPT)
-eNOSPC		= Errno (CONST_ENOSPC)
-eNOSR		= Errno (CONST_ENOSR)
-eNOSTR		= Errno (CONST_ENOSTR)
-eNOSYS		= Errno (CONST_ENOSYS)
-eNOTBLK		= Errno (CONST_ENOTBLK)
-eNOTCONN	= Errno (CONST_ENOTCONN)
-eNOTDIR		= Errno (CONST_ENOTDIR)
-eNOTEMPTY	= Errno (CONST_ENOTEMPTY)
-eNOTSOCK	= Errno (CONST_ENOTSOCK)
-eNOTTY		= Errno (CONST_ENOTTY)
-eNXIO		= Errno (CONST_ENXIO)
-eOPNOTSUPP	= Errno (CONST_EOPNOTSUPP)
-ePERM		= Errno (CONST_EPERM)
-ePFNOSUPPORT	= Errno (CONST_EPFNOSUPPORT)
-ePIPE		= Errno (CONST_EPIPE)
-ePROCLIM	= Errno (CONST_EPROCLIM)
-ePROCUNAVAIL	= Errno (CONST_EPROCUNAVAIL)
-ePROGMISMATCH	= Errno (CONST_EPROGMISMATCH)
-ePROGUNAVAIL	= Errno (CONST_EPROGUNAVAIL)
-ePROTO		= Errno (CONST_EPROTO)
+eACCES          = Errno (CONST_EACCES)
+eADDRINUSE      = Errno (CONST_EADDRINUSE)
+eADDRNOTAVAIL   = Errno (CONST_EADDRNOTAVAIL)
+eADV            = Errno (CONST_EADV)
+eAFNOSUPPORT    = Errno (CONST_EAFNOSUPPORT)
+eAGAIN          = Errno (CONST_EAGAIN)
+eALREADY        = Errno (CONST_EALREADY)
+eBADF           = Errno (CONST_EBADF)
+eBADMSG         = Errno (CONST_EBADMSG)
+eBADRPC         = Errno (CONST_EBADRPC)
+eBUSY           = Errno (CONST_EBUSY)
+eCHILD          = Errno (CONST_ECHILD)
+eCOMM           = Errno (CONST_ECOMM)
+eCONNABORTED    = Errno (CONST_ECONNABORTED)
+eCONNREFUSED    = Errno (CONST_ECONNREFUSED)
+eCONNRESET      = Errno (CONST_ECONNRESET)
+eDEADLK         = Errno (CONST_EDEADLK)
+eDESTADDRREQ    = Errno (CONST_EDESTADDRREQ)
+eDIRTY          = Errno (CONST_EDIRTY)
+eDOM            = Errno (CONST_EDOM)
+eDQUOT          = Errno (CONST_EDQUOT)
+eEXIST          = Errno (CONST_EEXIST)
+eFAULT          = Errno (CONST_EFAULT)
+eFBIG           = Errno (CONST_EFBIG)
+eFTYPE          = Errno (CONST_EFTYPE)
+eHOSTDOWN       = Errno (CONST_EHOSTDOWN)
+eHOSTUNREACH    = Errno (CONST_EHOSTUNREACH)
+eIDRM           = Errno (CONST_EIDRM)
+eILSEQ          = Errno (CONST_EILSEQ)
+eINPROGRESS     = Errno (CONST_EINPROGRESS)
+eINTR           = Errno (CONST_EINTR)
+eINVAL          = Errno (CONST_EINVAL)
+eIO             = Errno (CONST_EIO)
+eISCONN         = Errno (CONST_EISCONN)
+eISDIR          = Errno (CONST_EISDIR)
+eLOOP           = Errno (CONST_ELOOP)
+eMFILE          = Errno (CONST_EMFILE)
+eMLINK          = Errno (CONST_EMLINK)
+eMSGSIZE        = Errno (CONST_EMSGSIZE)
+eMULTIHOP       = Errno (CONST_EMULTIHOP)
+eNAMETOOLONG    = Errno (CONST_ENAMETOOLONG)
+eNETDOWN        = Errno (CONST_ENETDOWN)
+eNETRESET       = Errno (CONST_ENETRESET)
+eNETUNREACH     = Errno (CONST_ENETUNREACH)
+eNFILE          = Errno (CONST_ENFILE)
+eNOBUFS         = Errno (CONST_ENOBUFS)
+eNODATA         = Errno (CONST_ENODATA)
+eNODEV          = Errno (CONST_ENODEV)
+eNOENT          = Errno (CONST_ENOENT)
+eNOEXEC         = Errno (CONST_ENOEXEC)
+eNOLCK          = Errno (CONST_ENOLCK)
+eNOLINK         = Errno (CONST_ENOLINK)
+eNOMEM          = Errno (CONST_ENOMEM)
+eNOMSG          = Errno (CONST_ENOMSG)
+eNONET          = Errno (CONST_ENONET)
+eNOPROTOOPT     = Errno (CONST_ENOPROTOOPT)
+eNOSPC          = Errno (CONST_ENOSPC)
+eNOSR           = Errno (CONST_ENOSR)
+eNOSTR          = Errno (CONST_ENOSTR)
+eNOSYS          = Errno (CONST_ENOSYS)
+eNOTBLK         = Errno (CONST_ENOTBLK)
+eNOTCONN        = Errno (CONST_ENOTCONN)
+eNOTDIR         = Errno (CONST_ENOTDIR)
+eNOTEMPTY       = Errno (CONST_ENOTEMPTY)
+eNOTSOCK        = Errno (CONST_ENOTSOCK)
+eNOTTY          = Errno (CONST_ENOTTY)
+eNXIO           = Errno (CONST_ENXIO)
+eOPNOTSUPP      = Errno (CONST_EOPNOTSUPP)
+ePERM           = Errno (CONST_EPERM)
+ePFNOSUPPORT    = Errno (CONST_EPFNOSUPPORT)
+ePIPE           = Errno (CONST_EPIPE)
+ePROCLIM        = Errno (CONST_EPROCLIM)
+ePROCUNAVAIL    = Errno (CONST_EPROCUNAVAIL)
+ePROGMISMATCH   = Errno (CONST_EPROGMISMATCH)
+ePROGUNAVAIL    = Errno (CONST_EPROGUNAVAIL)
+ePROTO          = Errno (CONST_EPROTO)
 ePROTONOSUPPORT = Errno (CONST_EPROTONOSUPPORT)
-ePROTOTYPE	= Errno (CONST_EPROTOTYPE)
-eRANGE		= Errno (CONST_ERANGE)
-eREMCHG		= Errno (CONST_EREMCHG)
-eREMOTE		= Errno (CONST_EREMOTE)
-eROFS		= Errno (CONST_EROFS)
-eRPCMISMATCH	= Errno (CONST_ERPCMISMATCH)
-eRREMOTE	= Errno (CONST_ERREMOTE)
-eSHUTDOWN	= Errno (CONST_ESHUTDOWN)
+ePROTOTYPE      = Errno (CONST_EPROTOTYPE)
+eRANGE          = Errno (CONST_ERANGE)
+eREMCHG         = Errno (CONST_EREMCHG)
+eREMOTE         = Errno (CONST_EREMOTE)
+eROFS           = Errno (CONST_EROFS)
+eRPCMISMATCH    = Errno (CONST_ERPCMISMATCH)
+eRREMOTE        = Errno (CONST_ERREMOTE)
+eSHUTDOWN       = Errno (CONST_ESHUTDOWN)
 eSOCKTNOSUPPORT = Errno (CONST_ESOCKTNOSUPPORT)
-eSPIPE		= Errno (CONST_ESPIPE)
-eSRCH		= Errno (CONST_ESRCH)
-eSRMNT		= Errno (CONST_ESRMNT)
-eSTALE		= Errno (CONST_ESTALE)
-eTIME		= Errno (CONST_ETIME)
-eTIMEDOUT	= Errno (CONST_ETIMEDOUT)
-eTOOMANYREFS	= Errno (CONST_ETOOMANYREFS)
-eTXTBSY		= Errno (CONST_ETXTBSY)
-eUSERS		= Errno (CONST_EUSERS)
-eWOULDBLOCK	= Errno (CONST_EWOULDBLOCK)
-eXDEV		= Errno (CONST_EXDEV)
+eSPIPE          = Errno (CONST_ESPIPE)
+eSRCH           = Errno (CONST_ESRCH)
+eSRMNT          = Errno (CONST_ESRMNT)
+eSTALE          = Errno (CONST_ESTALE)
+eTIME           = Errno (CONST_ETIME)
+eTIMEDOUT       = Errno (CONST_ETIMEDOUT)
+eTOOMANYREFS    = Errno (CONST_ETOOMANYREFS)
+eTXTBSY         = Errno (CONST_ETXTBSY)
+eUSERS          = Errno (CONST_EUSERS)
+eWOULDBLOCK     = Errno (CONST_EWOULDBLOCK)
+eXDEV           = Errno (CONST_EXDEV)
 #endif
 
 -- | Yield 'True' if the given 'Errno' value is valid on the system.
@@ -323,8 +323,8 @@ foreign import ccall unsafe "HsBase.h __hscore_set_errno" set_errno :: CInt -> I
 
 -- | Throw an 'IOError' corresponding to the current value of 'getErrno'.
 --
-throwErrno     :: String	-- ^ textual description of the error location
-	       -> IO a
+throwErrno     :: String        -- ^ textual description of the error location
+               -> IO a
 throwErrno loc  =
   do
     errno <- getErrno
@@ -337,11 +337,11 @@ throwErrno loc  =
 -- | Throw an 'IOError' corresponding to the current value of 'getErrno'
 -- if the result value of the 'IO' action meets the given predicate.
 --
-throwErrnoIf    :: (a -> Bool)	-- ^ predicate to apply to the result value
-				-- of the 'IO' operation
-		-> String	-- ^ textual description of the location
-		-> IO a		-- ^ the 'IO' operation to be executed
-		-> IO a
+throwErrnoIf    :: (a -> Bool)  -- ^ predicate to apply to the result value
+                                -- of the 'IO' operation
+                -> String       -- ^ textual description of the location
+                -> IO a         -- ^ the 'IO' operation to be executed
+                -> IO a
 throwErrnoIf pred loc f  = 
   do
     res <- f
@@ -363,33 +363,33 @@ throwErrnoIfRetry pred loc f  =
     res <- f
     if pred res
       then do
-	err <- getErrno
-	if err == eINTR
-	  then throwErrnoIfRetry pred loc f
-	  else throwErrno loc
+        err <- getErrno
+        if err == eINTR
+          then throwErrnoIfRetry pred loc f
+          else throwErrno loc
       else return res
 
 -- | as 'throwErrnoIfRetry', but checks for operations that would block and
 -- executes an alternative action before retrying in that case.
 --
 throwErrnoIfRetryMayBlock
-		:: (a -> Bool)	-- ^ predicate to apply to the result value
-				-- of the 'IO' operation
-		-> String	-- ^ textual description of the location
-		-> IO a		-- ^ the 'IO' operation to be executed
-		-> IO b		-- ^ action to execute before retrying if
-				-- an immediate retry would block
-		-> IO a
+                :: (a -> Bool)  -- ^ predicate to apply to the result value
+                                -- of the 'IO' operation
+                -> String       -- ^ textual description of the location
+                -> IO a         -- ^ the 'IO' operation to be executed
+                -> IO b         -- ^ action to execute before retrying if
+                                -- an immediate retry would block
+                -> IO a
 throwErrnoIfRetryMayBlock pred loc f on_block  = 
   do
     res <- f
     if pred res
       then do
-	err <- getErrno
-	if err == eINTR
-	  then throwErrnoIfRetryMayBlock pred loc f on_block
+        err <- getErrno
+        if err == eINTR
+          then throwErrnoIfRetryMayBlock pred loc f on_block
           else if err == eWOULDBLOCK || err == eAGAIN
-	         then do on_block; throwErrnoIfRetryMayBlock pred loc f on_block
+                 then do on_block; throwErrnoIfRetryMayBlock pred loc f on_block
                  else throwErrno loc
       else return res
 
@@ -503,11 +503,11 @@ throwErrnoPathIfMinus1_  = throwErrnoPathIf_ (== -1)
 -- The optional information can be used to improve the accuracy of
 -- error messages.
 --
-errnoToIOError	:: String	-- ^ the location where the error occurred
-		-> Errno	-- ^ the error number
-		-> Maybe Handle	-- ^ optional handle associated with the error
-		-> Maybe String	-- ^ optional filename associated with the error
-		-> IOError
+errnoToIOError  :: String       -- ^ the location where the error occurred
+                -> Errno        -- ^ the error number
+                -> Maybe Handle -- ^ optional handle associated with the error
+                -> Maybe String -- ^ optional filename associated with the error
+                -> IOError
 errnoToIOError loc errno maybeHdl maybeName = unsafePerformIO $ do
     str <- strerror errno >>= peekCString
 #if __GLASGOW_HASKELL__
