@@ -228,10 +228,12 @@ orElseV :: VM a -> VM a -> VM a
 orElseV p q = maybe q return =<< tryV p
 
 fixV :: (a -> VM a) -> VM a
-fixV f = VM $ \bi genv lenv -> fixDs $
-               \r -> case r of
-                       Yes _ _ x -> runVM (f x) bi genv lenv
-                       No        -> return No
+fixV f = VM (\bi genv lenv -> fixDs $ \r -> runVM (f (unYes r)) bi genv lenv )
+  where
+    -- NOTE: It is essential that we are lazy in r above so do not replace
+    --       calls to this function by an explicit case.
+    unYes (Yes _ _ x) = x
+    unYes No          = panic "VectMonad.fixV: no result"
 
 localV :: VM a -> VM a
 localV p = do
