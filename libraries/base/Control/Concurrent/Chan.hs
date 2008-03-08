@@ -14,25 +14,25 @@
 
 module Control.Concurrent.Chan
   ( 
-	  -- * The 'Chan' type
-	Chan,			-- abstract
+          -- * The 'Chan' type
+        Chan,                   -- abstract
 
-	  -- * Operations
-	newChan,	 	-- :: IO (Chan a)
-	writeChan,	 	-- :: Chan a -> a -> IO ()
-	readChan,	 	-- :: Chan a -> IO a
-	dupChan,	 	-- :: Chan a -> IO (Chan a)
-	unGetChan,		-- :: Chan a -> a -> IO ()
-	isEmptyChan,		-- :: Chan a -> IO Bool
+          -- * Operations
+        newChan,                -- :: IO (Chan a)
+        writeChan,              -- :: Chan a -> a -> IO ()
+        readChan,               -- :: Chan a -> IO a
+        dupChan,                -- :: Chan a -> IO (Chan a)
+        unGetChan,              -- :: Chan a -> a -> IO ()
+        isEmptyChan,            -- :: Chan a -> IO Bool
 
-	  -- * Stream interface
-	getChanContents,	-- :: Chan a -> IO [a]
-	writeList2Chan,		-- :: Chan a -> [a] -> IO ()
+          -- * Stream interface
+        getChanContents,        -- :: Chan a -> IO [a]
+        writeList2Chan,         -- :: Chan a -> [a] -> IO ()
    ) where
 
 import Prelude
 
-import System.IO.Unsafe		( unsafeInterleaveIO )
+import System.IO.Unsafe         ( unsafeInterleaveIO )
 import Control.Concurrent.MVar
 import Data.Typeable
 
@@ -85,8 +85,8 @@ readChan :: Chan a -> IO a
 readChan (Chan read _write) = do
   modifyMVar read $ \read_end -> do
     (ChItem val new_read_end) <- readMVar read_end
-	-- Use readMVar here, not takeMVar,
-	-- else dupChan doesn't work
+        -- Use readMVar here, not takeMVar,
+        -- else dupChan doesn't work
     return (new_read_end, val)
 
 -- |Duplicate a 'Chan': the duplicate channel begins empty, but data written to
@@ -122,9 +122,9 @@ isEmptyChan (Chan read write) = do
 getChanContents :: Chan a -> IO [a]
 getChanContents ch
   = unsafeInterleaveIO (do
-	x  <- readChan ch
-    	xs <- getChanContents ch
-    	return (x:xs)
+        x  <- readChan ch
+        xs <- getChanContents ch
+        return (x:xs)
     )
 
 -- |Write an entire list of items to a 'Chan'.
