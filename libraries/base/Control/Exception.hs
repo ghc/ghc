@@ -27,155 +27,155 @@
 
 module Control.Exception (
 
-	-- * The Exception type
-	Exception(..),		-- instance Eq, Ord, Show, Typeable
-	IOException,		-- instance Eq, Ord, Show, Typeable
-	ArithException(..),	-- instance Eq, Ord, Show, Typeable
-	ArrayException(..),	-- instance Eq, Ord, Show, Typeable
-	AsyncException(..),	-- instance Eq, Ord, Show, Typeable
+        -- * The Exception type
+        Exception(..),          -- instance Eq, Ord, Show, Typeable
+        IOException,            -- instance Eq, Ord, Show, Typeable
+        ArithException(..),     -- instance Eq, Ord, Show, Typeable
+        ArrayException(..),     -- instance Eq, Ord, Show, Typeable
+        AsyncException(..),     -- instance Eq, Ord, Show, Typeable
 
-	-- * Throwing exceptions
-	throwIO,	-- :: Exception -> IO a
-	throw,		-- :: Exception -> a
-	ioError,	-- :: IOError -> IO a
+        -- * Throwing exceptions
+        throwIO,        -- :: Exception -> IO a
+        throw,          -- :: Exception -> a
+        ioError,        -- :: IOError -> IO a
 #ifdef __GLASGOW_HASKELL__
-	throwTo,	-- :: ThreadId -> Exception -> a
+        throwTo,        -- :: ThreadId -> Exception -> a
 #endif
 
-	-- * Catching Exceptions
+        -- * Catching Exceptions
 
-	-- |There are several functions for catching and examining
-    	-- exceptions; all of them may only be used from within the
-    	-- 'IO' monad.
+        -- |There are several functions for catching and examining
+        -- exceptions; all of them may only be used from within the
+        -- 'IO' monad.
 
-	-- ** The @catch@ functions
-	catch,     -- :: IO a -> (Exception -> IO a) -> IO a
-	catchJust, -- :: (Exception -> Maybe b) -> IO a -> (b -> IO a) -> IO a
+        -- ** The @catch@ functions
+        catch,     -- :: IO a -> (Exception -> IO a) -> IO a
+        catchJust, -- :: (Exception -> Maybe b) -> IO a -> (b -> IO a) -> IO a
 
-	-- ** The @handle@ functions
-	handle,	   -- :: (Exception -> IO a) -> IO a -> IO a
-	handleJust,-- :: (Exception -> Maybe b) -> (b -> IO a) -> IO a -> IO a
+        -- ** The @handle@ functions
+        handle,    -- :: (Exception -> IO a) -> IO a -> IO a
+        handleJust,-- :: (Exception -> Maybe b) -> (b -> IO a) -> IO a -> IO a
 
-	-- ** The @try@ functions
-	try,       -- :: IO a -> IO (Either Exception a)
-	tryJust,   -- :: (Exception -> Maybe b) -> a    -> IO (Either b a)
+        -- ** The @try@ functions
+        try,       -- :: IO a -> IO (Either Exception a)
+        tryJust,   -- :: (Exception -> Maybe b) -> a    -> IO (Either b a)
 
-	-- ** The @evaluate@ function
-	evaluate,  -- :: a -> IO a
+        -- ** The @evaluate@ function
+        evaluate,  -- :: a -> IO a
 
-	-- ** The @mapException@ function
-	mapException,		-- :: (Exception -> Exception) -> a -> a
+        -- ** The @mapException@ function
+        mapException,           -- :: (Exception -> Exception) -> a -> a
 
-	-- ** Exception predicates
-	
-	-- $preds
+        -- ** Exception predicates
+        
+        -- $preds
 
-	ioErrors,		-- :: Exception -> Maybe IOError
-	arithExceptions, 	-- :: Exception -> Maybe ArithException
-	errorCalls,		-- :: Exception -> Maybe String
-	dynExceptions,		-- :: Exception -> Maybe Dynamic
-	assertions,		-- :: Exception -> Maybe String
-	asyncExceptions, 	-- :: Exception -> Maybe AsyncException
-	userErrors,		-- :: Exception -> Maybe String
+        ioErrors,               -- :: Exception -> Maybe IOError
+        arithExceptions,        -- :: Exception -> Maybe ArithException
+        errorCalls,             -- :: Exception -> Maybe String
+        dynExceptions,          -- :: Exception -> Maybe Dynamic
+        assertions,             -- :: Exception -> Maybe String
+        asyncExceptions,        -- :: Exception -> Maybe AsyncException
+        userErrors,             -- :: Exception -> Maybe String
 
-	-- * Dynamic exceptions
+        -- * Dynamic exceptions
 
-	-- $dynamic
-	throwDyn, 	-- :: Typeable ex => ex -> b
+        -- $dynamic
+        throwDyn,       -- :: Typeable ex => ex -> b
 #ifdef __GLASGOW_HASKELL__
-	throwDynTo, 	-- :: Typeable ex => ThreadId -> ex -> b
+        throwDynTo,     -- :: Typeable ex => ThreadId -> ex -> b
 #endif
-	catchDyn, 	-- :: Typeable ex => IO a -> (ex -> IO a) -> IO a
-	
-	-- * Asynchronous Exceptions
+        catchDyn,       -- :: Typeable ex => IO a -> (ex -> IO a) -> IO a
+        
+        -- * Asynchronous Exceptions
 
-	-- $async
+        -- $async
 
-	-- ** Asynchronous exception control
+        -- ** Asynchronous exception control
 
-	-- |The following two functions allow a thread to control delivery of
-	-- asynchronous exceptions during a critical region.
+        -- |The following two functions allow a thread to control delivery of
+        -- asynchronous exceptions during a critical region.
 
         block,          -- :: IO a -> IO a
         unblock,        -- :: IO a -> IO a
 
-	-- *** Applying @block@ to an exception handler
+        -- *** Applying @block@ to an exception handler
 
-	-- $block_handler
+        -- $block_handler
 
-	-- *** Interruptible operations
+        -- *** Interruptible operations
 
-	-- $interruptible
+        -- $interruptible
 
-	-- * Assertions
+        -- * Assertions
 
-	assert,		-- :: Bool -> a -> a
+        assert,         -- :: Bool -> a -> a
 
-	-- * Utilities
+        -- * Utilities
 
-	bracket,  	-- :: IO a -> (a -> IO b) -> (a -> IO c) -> IO ()
-	bracket_, 	-- :: IO a -> IO b -> IO c -> IO ()
-	bracketOnError,
+        bracket,        -- :: IO a -> (a -> IO b) -> (a -> IO c) -> IO ()
+        bracket_,       -- :: IO a -> IO b -> IO c -> IO ()
+        bracketOnError,
 
-	finally, 	-- :: IO a -> IO b -> IO a
-	
+        finally,        -- :: IO a -> IO b -> IO a
+        
 #ifdef __GLASGOW_HASKELL__
-	setUncaughtExceptionHandler,      -- :: (Exception -> IO ()) -> IO ()
-	getUncaughtExceptionHandler       -- :: IO (Exception -> IO ())
+        setUncaughtExceptionHandler,      -- :: (Exception -> IO ()) -> IO ()
+        getUncaughtExceptionHandler       -- :: IO (Exception -> IO ())
 #endif
   ) where
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Base		( assert )
-import GHC.Exception 	as ExceptionBase hiding (catch)
-import GHC.Conc		( throwTo, ThreadId )
-import Data.IORef	( IORef, newIORef, readIORef, writeIORef )
+import GHC.Base         ( assert )
+import GHC.Exception    as ExceptionBase hiding (catch)
+import GHC.Conc         ( throwTo, ThreadId )
+import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
 import Foreign.C.String ( CString, withCString )
-import System.IO	( stdout, hFlush )
+import System.IO        ( stdout, hFlush )
 #endif
 
 #ifdef __HUGS__
-import Hugs.Exception	as ExceptionBase
+import Hugs.Exception   as ExceptionBase
 #endif
 
-import Prelude 		hiding ( catch )
-import System.IO.Error	hiding ( catch, try )
+import Prelude          hiding ( catch )
+import System.IO.Error  hiding ( catch, try )
 import System.IO.Unsafe (unsafePerformIO)
 import Data.Dynamic
 
 #ifdef __NHC__
 import System.IO.Error (catch, ioError)
 import IO              (bracket)
-import DIOError		-- defn of IOError type
+import DIOError         -- defn of IOError type
 
 -- minimum needed for nhc98 to pretend it has Exceptions
-type Exception	 = IOError
+type Exception   = IOError
 type IOException = IOError
 data ArithException
 data ArrayException
 data AsyncException
 
-throwIO	 :: Exception -> IO a
+throwIO  :: Exception -> IO a
 throwIO   = ioError
-throw	 :: Exception -> a
+throw    :: Exception -> a
 throw     = unsafePerformIO . throwIO
 
 evaluate :: a -> IO a
 evaluate x = x `seq` return x
 
-ioErrors	:: Exception -> Maybe IOError
+ioErrors        :: Exception -> Maybe IOError
 ioErrors e       = Just e
 arithExceptions :: Exception -> Maybe ArithException
 arithExceptions  = const Nothing
-errorCalls	:: Exception -> Maybe String
+errorCalls      :: Exception -> Maybe String
 errorCalls       = const Nothing
-dynExceptions	:: Exception -> Maybe Dynamic
+dynExceptions   :: Exception -> Maybe Dynamic
 dynExceptions    = const Nothing
-assertions	:: Exception -> Maybe String
+assertions      :: Exception -> Maybe String
 assertions       = const Nothing
 asyncExceptions :: Exception -> Maybe AsyncException
 asyncExceptions  = const Nothing
-userErrors	:: Exception -> Maybe String
+userErrors      :: Exception -> Maybe String
 userErrors (UserError _ s) = Just s
 userErrors  _              = Nothing
 
@@ -238,9 +238,9 @@ assert False _ = throw (UserError "" "Assertion failed")
 -- and then using @C.catch@
 --
 #ifndef __NHC__
-catch  	:: IO a 		-- ^ The computation to run
-  	-> (Exception -> IO a)	-- ^ Handler to invoke if an exception is raised
-  	-> IO a			
+catch   :: IO a                 -- ^ The computation to run
+        -> (Exception -> IO a)  -- ^ Handler to invoke if an exception is raised
+        -> IO a                 
 catch =  ExceptionBase.catchException
 #endif
 -- | The function 'catchJust' is like 'catch', but it takes an extra
@@ -256,21 +256,21 @@ catch =  ExceptionBase.catchException
 -- are re-raised, and may be caught by an enclosing
 -- 'catch' or 'catchJust'.
 catchJust
-	:: (Exception -> Maybe b) -- ^ Predicate to select exceptions
-	-> IO a		 	  -- ^ Computation to run
-	-> (b -> IO a)		  -- ^ Handler
-	-> IO a
+        :: (Exception -> Maybe b) -- ^ Predicate to select exceptions
+        -> IO a                   -- ^ Computation to run
+        -> (b -> IO a)            -- ^ Handler
+        -> IO a
 catchJust p a handler = catch a handler'
   where handler' e = case p e of 
-			Nothing -> throw e
-			Just b  -> handler b
+                        Nothing -> throw e
+                        Just b  -> handler b
 
 -- | A version of 'catch' with the arguments swapped around; useful in
 -- situations where the code for the handler is shorter.  For example:
 --
 -- >   do handle (\e -> exitWith (ExitFailure 1)) $
--- >	  ...
-handle	   :: (Exception -> IO a) -> IO a -> IO a
+-- >      ...
+handle     :: (Exception -> IO a) -> IO a -> IO a
 handle     =  flip catch
 
 -- | A version of 'catchJust' with the arguments swapped around (see
@@ -318,10 +318,10 @@ tryJust :: (Exception -> Maybe b) -> IO a -> IO (Either b a)
 tryJust p a = do
   r <- try a
   case r of
-	Right v -> return (Right v)
-	Left  e -> case p e of
-			Nothing -> throw e
-			Just b  -> return (Left b)
+        Right v -> return (Right v)
+        Left  e -> case p e of
+                        Nothing -> throw e
+                        Just b  -> return (Left b)
 
 -----------------------------------------------------------------------------
 -- Dynamic exceptions
@@ -358,15 +358,15 @@ throwDynTo t exception = throwTo t (DynException (toDyn exception))
 --
 catchDyn :: Typeable exception => IO a -> (exception -> IO a) -> IO a
 #ifdef __NHC__
-catchDyn m k = m 	-- can't catch dyn exceptions in nhc98
+catchDyn m k = m        -- can't catch dyn exceptions in nhc98
 #else
 catchDyn m k = catchException m handle
   where handle ex = case ex of
-  			   (DynException dyn) ->
-		  	  	case fromDynamic dyn of
-				    Just exception  -> k exception
-				    Nothing -> throw ex
-			   _ -> throw ex
+                           (DynException dyn) ->
+                                case fromDynamic dyn of
+                                    Just exception  -> k exception
+                                    Nothing -> throw ex
+                           _ -> throw ex
 #endif
 
 -----------------------------------------------------------------------------
@@ -377,13 +377,13 @@ catchDyn m k = catchException m handle
 -- 'catchJust', 'tryJust', or 'handleJust' to select certain common
 -- classes of exceptions.
 #ifndef __NHC__
-ioErrors		:: Exception -> Maybe IOError
-arithExceptions 	:: Exception -> Maybe ArithException
-errorCalls		:: Exception -> Maybe String
-assertions		:: Exception -> Maybe String
-dynExceptions		:: Exception -> Maybe Dynamic
-asyncExceptions 	:: Exception -> Maybe AsyncException
-userErrors		:: Exception -> Maybe String
+ioErrors                :: Exception -> Maybe IOError
+arithExceptions         :: Exception -> Maybe ArithException
+errorCalls              :: Exception -> Maybe String
+assertions              :: Exception -> Maybe String
+dynExceptions           :: Exception -> Maybe Dynamic
+asyncExceptions         :: Exception -> Maybe AsyncException
+userErrors              :: Exception -> Maybe String
 
 ioErrors (IOException e) = Just e
 ioErrors _ = Nothing
@@ -430,16 +430,16 @@ userErrors _ = Nothing
 --
 #ifndef __NHC__
 bracket 
-	:: IO a		-- ^ computation to run first (\"acquire resource\")
-	-> (a -> IO b)  -- ^ computation to run last (\"release resource\")
-	-> (a -> IO c)	-- ^ computation to run in-between
-	-> IO c		-- returns the value from the in-between computation
+        :: IO a         -- ^ computation to run first (\"acquire resource\")
+        -> (a -> IO b)  -- ^ computation to run last (\"release resource\")
+        -> (a -> IO c)  -- ^ computation to run in-between
+        -> IO c         -- returns the value from the in-between computation
 bracket before after thing =
   block (do
     a <- before 
     r <- catch 
-	   (unblock (thing a))
-	   (\e -> do { after a; throw e })
+           (unblock (thing a))
+           (\e -> do { after a; throw e })
     after a
     return r
  )
@@ -448,15 +448,15 @@ bracket before after thing =
 -- | A specialised variant of 'bracket' with just a computation to run
 -- afterward.
 -- 
-finally :: IO a		-- ^ computation to run first
-	-> IO b		-- ^ computation to run afterward (even if an exception 
-			-- was raised)
-	-> IO a		-- returns the value from the first computation
+finally :: IO a         -- ^ computation to run first
+        -> IO b         -- ^ computation to run afterward (even if an exception 
+                        -- was raised)
+        -> IO a         -- returns the value from the first computation
 a `finally` sequel =
   block (do
     r <- catch 
-	     (unblock a)
-	     (\e -> do { sequel; throw e })
+             (unblock a)
+             (\e -> do { sequel; throw e })
     sequel
     return r
   )
@@ -469,16 +469,16 @@ bracket_ before after thing = bracket before (const after) (const thing)
 -- | Like bracket, but only performs the final action if there was an 
 -- exception raised by the in-between computation.
 bracketOnError
-	:: IO a		-- ^ computation to run first (\"acquire resource\")
-	-> (a -> IO b)  -- ^ computation to run last (\"release resource\")
-	-> (a -> IO c)	-- ^ computation to run in-between
-	-> IO c		-- returns the value from the in-between computation
+        :: IO a         -- ^ computation to run first (\"acquire resource\")
+        -> (a -> IO b)  -- ^ computation to run last (\"release resource\")
+        -> (a -> IO c)  -- ^ computation to run in-between
+        -> IO c         -- returns the value from the in-between computation
 bracketOnError before after thing =
   block (do
     a <- before 
     catch 
-	(unblock (thing a))
-	(\e -> do { after a; throw e })
+        (unblock (thing a))
+        (\e -> do { after a; throw e })
  )
 
 -- -----------------------------------------------------------------------------

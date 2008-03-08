@@ -2,7 +2,7 @@
 -- |
 -- Module      :  Control.Monad.Fix
 -- Copyright   :  (c) Andy Gill 2001,
--- 		  (c) Oregon Graduate Institute of Science and Technology, 2002
+--                (c) Oregon Graduate Institute of Science and Technology, 2002
 -- License     :  BSD-style (see the file libraries/base/LICENSE)
 -- Maintainer  :  libraries@haskell.org
 -- Stability   :  experimental
@@ -16,10 +16,10 @@
 -----------------------------------------------------------------------------
 
 module Control.Monad.Fix (
-	MonadFix(
-	   mfix	-- :: (a -> m a) -> m a
+        MonadFix(
+           mfix -- :: (a -> m a) -> m a
          ),
-	fix	-- :: (a -> a) -> a
+        fix     -- :: (a -> a) -> a
   ) where
 
 import Prelude
@@ -35,26 +35,26 @@ import Hugs.Prelude (MonadFix(mfix))
 -- Instances of 'MonadFix' should satisfy the following laws:
 --
 -- [/purity/]
---	@'mfix' ('return' . h)  =  'return' ('fix' h)@
+--      @'mfix' ('return' . h)  =  'return' ('fix' h)@
 --
 -- [/left shrinking/ (or /tightening/)]
---	@'mfix' (\\x -> a >>= \\y -> f x y)  =  a >>= \\y -> 'mfix' (\\x -> f x y)@
+--      @'mfix' (\\x -> a >>= \\y -> f x y)  =  a >>= \\y -> 'mfix' (\\x -> f x y)@
 --
 -- [/sliding/]
---	@'mfix' ('Control.Monad.liftM' h . f)  =  'Control.Monad.liftM' h ('mfix' (f . h))@,
---	for strict @h@.
+--      @'mfix' ('Control.Monad.liftM' h . f)  =  'Control.Monad.liftM' h ('mfix' (f . h))@,
+--      for strict @h@.
 --
 -- [/nesting/]
---	@'mfix' (\\x -> 'mfix' (\\y -> f x y))  =  'mfix' (\\x -> f x x)@
+--      @'mfix' (\\x -> 'mfix' (\\y -> f x y))  =  'mfix' (\\x -> f x x)@
 --
 -- This class is used in the translation of the recursive @do@ notation
 -- supported by GHC and Hugs.
 class (Monad m) => MonadFix m where
-	-- | The fixed point of a monadic computation.
-	-- @'mfix' f@ executes the action @f@ only once, with the eventual
-	-- output fed back as the input.  Hence @f@ should not be strict,
-	-- for then @'mfix' f@ would diverge.
-	mfix :: (a -> m a) -> m a
+        -- | The fixed point of a monadic computation.
+        -- @'mfix' f@ executes the action @f@ only once, with the eventual
+        -- output fed back as the input.  Hence @f@ should not be strict,
+        -- for then @'mfix' f@ would diverge.
+        mfix :: (a -> m a) -> m a
 #endif /* !__HUGS__ */
 
 -- Instances of MonadFix for Prelude monads
