@@ -14,11 +14,11 @@
 -----------------------------------------------------------------------------
 
 module Control.Concurrent.QSemN
-	(  -- * General Quantity Semaphores
-	  QSemN,	-- abstract
-	  newQSemN,	-- :: Int   -> IO QSemN
-	  waitQSemN,	-- :: QSemN -> Int -> IO ()
-	  signalQSemN	-- :: QSemN -> Int -> IO ()
+        (  -- * General Quantity Semaphores
+          QSemN,        -- abstract
+          newQSemN,     -- :: Int   -> IO QSemN
+          waitQSemN,    -- :: QSemN -> Int -> IO ()
+          signalQSemN   -- :: QSemN -> Int -> IO ()
       ) where
 
 import Prelude
@@ -63,8 +63,8 @@ signalQSemN (QSemN sem) n = do
    free avail []    = return (avail,[])
    free avail ((req,block):blocked)
      | avail >= req = do
-	putMVar block ()
-	free (avail-req) blocked
+        putMVar block ()
+        free (avail-req) blocked
      | otherwise    = do
-	(avail',blocked') <- free avail blocked
+        (avail',blocked') <- free avail blocked
         return (avail',(req,block):blocked')

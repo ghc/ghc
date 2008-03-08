@@ -14,15 +14,15 @@
 
 module Control.Concurrent.SampleVar
        (
-	 -- * Sample Variables
+         -- * Sample Variables
          SampleVar,         -- :: type _ =
  
-	 newEmptySampleVar, -- :: IO (SampleVar a)
+         newEmptySampleVar, -- :: IO (SampleVar a)
          newSampleVar,      -- :: a -> IO (SampleVar a)
-	 emptySampleVar,    -- :: SampleVar a -> IO ()
-	 readSampleVar,	    -- :: SampleVar a -> IO a
-	 writeSampleVar,    -- :: SampleVar a -> a -> IO ()
-	 isEmptySampleVar,  -- :: SampleVar a -> IO Bool
+         emptySampleVar,    -- :: SampleVar a -> IO ()
+         readSampleVar,     -- :: SampleVar a -> IO a
+         writeSampleVar,    -- :: SampleVar a -> a -> IO ()
+         isEmptySampleVar,  -- :: SampleVar a -> IO Bool
 
        ) where
 
@@ -47,9 +47,9 @@ import Control.Concurrent.MVar
 --    (different from 'putMVar' on full 'MVar'.)
 
 type SampleVar a
- = MVar (Int,		-- 1  == full
-			-- 0  == empty
-			-- <0 no of readers blocked
+ = MVar (Int,           -- 1  == full
+                        -- 0  == empty
+                        -- <0 no of readers blocked
           MVar a)
 
 -- |Build a new, empty, 'SampleVar'
