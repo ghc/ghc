@@ -17,15 +17,15 @@
 
 module Foreign.StablePtr
         ( -- * Stable references to Haskell values
-	  StablePtr          -- abstract
+          StablePtr          -- abstract
         , newStablePtr       -- :: a -> IO (StablePtr a)
         , deRefStablePtr     -- :: StablePtr a -> IO a
         , freeStablePtr      -- :: StablePtr a -> IO ()
         , castStablePtrToPtr -- :: StablePtr a -> Ptr ()
         , castPtrToStablePtr -- :: Ptr () -> StablePtr a
-	, -- ** The C-side interface
+        , -- ** The C-side interface
 
-	  -- $cinterface
+          -- $cinterface
         ) where
 
 #ifdef __GLASGOW_HASKELL__

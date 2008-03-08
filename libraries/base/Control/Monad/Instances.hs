@@ -17,15 +17,15 @@ module Control.Monad.Instances (Functor(..),Monad(..)) where
 import Prelude
 
 instance Functor ((->) r) where
-	fmap = (.)
+        fmap = (.)
 
 instance Monad ((->) r) where
-	return = const
-	f >>= k = \ r -> k (f r) r
+        return = const
+        f >>= k = \ r -> k (f r) r
 
 instance Functor ((,) a) where
-	fmap f (x,y) = (x, f y)
+        fmap f (x,y) = (x, f y)
 
 instance Functor (Either a) where
-	fmap _ (Left x) = Left x
-	fmap f (Right y) = Right (f y)
+        fmap _ (Left x) = Left x
+        fmap f (Right y) = Right (f y)

@@ -214,8 +214,8 @@ peekCAString cp = do
   where
     loop s i = do
         xval <- peekElemOff cp i
-	let val = castCCharToChar xval
-	val `seq` if i <= 0 then return (val:s) else loop (val:s) (i-1)
+        let val = castCCharToChar xval
+        val `seq` if i <= 0 then return (val:s) else loop (val:s) (i-1)
 #endif
 
 -- | Marshal a C string with explicit length into a Haskell string.
@@ -232,11 +232,11 @@ peekCAStringLen (cp, len)
   where
     loop acc i = do
          xval <- peekElemOff cp i
-	 let val = castCCharToChar xval
-	   -- blow away the coercion ASAP.
-	 if (val `seq` (i == 0))
-	  then return (val:acc)
-	  else loop (val:acc) (i-1)
+         let val = castCCharToChar xval
+           -- blow away the coercion ASAP.
+         if (val `seq` (i == 0))
+          then return (val:acc)
+          else loop (val:acc) (i-1)
 #endif
 
 -- | Marshal a Haskell string into a NUL terminated C string.
@@ -254,8 +254,8 @@ newCAString  = newArray0 nUL . charsToCChars
 newCAString str = do
   ptr <- mallocArray0 (length str)
   let
-	go [] n     = pokeElemOff ptr n nUL
-    	go (c:cs) n = do pokeElemOff ptr n (castCharToCChar c); go cs (n+1)
+        go [] n     = pokeElemOff ptr n nUL
+        go (c:cs) n = do pokeElemOff ptr n (castCharToCChar c); go cs (n+1)
   go str 0
   return ptr
 #endif
@@ -276,8 +276,8 @@ newCAStringLen str  = do
 newCAStringLen str = do
   ptr <- mallocArray0 len
   let
-	go [] n     = n `seq` return ()	-- make it strict in n
-    	go (c:cs) n = do pokeElemOff ptr n (castCharToCChar c); go cs (n+1)
+        go [] n     = n `seq` return () -- make it strict in n
+        go (c:cs) n = do pokeElemOff ptr n (castCharToCChar c); go cs (n+1)
   go str 0
   return (ptr, len)
   where
@@ -300,8 +300,8 @@ withCAString  = withArray0 nUL . charsToCChars
 withCAString str f =
   allocaArray0 (length str) $ \ptr ->
       let
-	go [] n     = pokeElemOff ptr n nUL
-    	go (c:cs) n = do pokeElemOff ptr n (castCharToCChar c); go cs (n+1)
+        go [] n     = pokeElemOff ptr n nUL
+        go (c:cs) n = do pokeElemOff ptr n (castCharToCChar c); go cs (n+1)
       in do
       go str 0
       f ptr
@@ -321,8 +321,8 @@ withCAStringLen str act  = withArray (charsToCChars str) $ act . pairLength str
 withCAStringLen str f =
   allocaArray len $ \ptr ->
       let
-	go [] n     = n `seq` return ()	-- make it strict in n
-    	go (c:cs) n = do pokeElemOff ptr n (castCharToCChar c); go cs (n+1)
+        go [] n     = n `seq` return () -- make it strict in n
+        go (c:cs) n = do pokeElemOff ptr n (castCharToCChar c); go cs (n+1)
       in do
       go str 0
       f (ptr,len)

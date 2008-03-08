@@ -63,8 +63,8 @@ module Foreign.Marshal.Array (
 ) where
 
 import Control.Monad
-import Foreign.Ptr	(Ptr, plusPtr)
-import Foreign.Storable	(Storable(sizeOf,peekElemOff,pokeElemOff))
+import Foreign.Ptr      (Ptr, plusPtr)
+import Foreign.Storable (Storable(sizeOf,peekElemOff,pokeElemOff))
 import Foreign.Marshal.Alloc (mallocBytes, allocaBytes, reallocBytes)
 import Foreign.Marshal.Utils (copyBytes, moveBytes)
 
@@ -153,7 +153,7 @@ pokeArray ptr vals =  zipWithM_ (pokeElemOff ptr) [0..] vals
 #else
 pokeArray ptr vals = go vals 0#
   where go [] n#         = return ()
-	go (val:vals) n# = do pokeElemOff ptr (I# n#) val; go vals (n# +# 1#)
+        go (val:vals) n# = do pokeElemOff ptr (I# n#) val; go vals (n# +# 1#)
 #endif
 
 -- |Write the list elements consecutive into memory and terminate them with the
@@ -167,7 +167,7 @@ pokeArray0 marker ptr vals  = do
 #else
 pokeArray0 marker ptr vals = go vals 0#
   where go [] n#         = pokeElemOff ptr (I# n#) marker
-	go (val:vals) n# = do pokeElemOff ptr (I# n#) val; go vals (n# +# 1#)
+        go (val:vals) n# = do pokeElemOff ptr (I# n#) val; go vals (n# +# 1#)
 #endif
 
 

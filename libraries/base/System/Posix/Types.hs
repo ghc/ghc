@@ -197,5 +197,5 @@ type FileMode       = CMode
 type ProcessID      = CPid
 type FileOffset     = COff
 type ProcessGroupID = CPid
-type Limit	    = CLong
+type Limit          = CLong
 

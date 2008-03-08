@@ -15,7 +15,7 @@
 -- This library is built on *every* platform, including Win32.
 --
 -- Non-posix compliant in order to support the following features:
---	* S_ISSOCK (no sockets in POSIX)
+--      * S_ISSOCK (no sockets in POSIX)
 --
 -----------------------------------------------------------------------------
 
@@ -62,8 +62,8 @@ type CSigaction = ()
 type CSigset    = ()
 type CStat      = ()
 type CTermios   = ()
-type CTm	= ()
-type CTms	= ()
+type CTm        = ()
+type CTms       = ()
 type CUtimbuf   = ()
 type CUtsname   = ()
 
@@ -78,16 +78,16 @@ fdFileSize :: FD -> IO Integer
 fdFileSize fd = 
   allocaBytes sizeof_stat $ \ p_stat -> do
     throwErrnoIfMinus1Retry "fileSize" $
-	c_fstat fd p_stat
+        c_fstat fd p_stat
     c_mode <- st_mode p_stat :: IO CMode 
     if not (s_isreg c_mode)
-	then return (-1)
-	else do
+        then return (-1)
+        else do
     c_size <- st_size p_stat
     return (fromIntegral c_size)
 
 data FDType  = Directory | Stream | RegularFile | RawDevice
-	       deriving (Eq)
+               deriving (Eq)
 
 fileType :: FilePath -> IO FDType
 fileType file =
@@ -103,7 +103,7 @@ fdStat :: FD -> IO (FDType, CDev, CIno)
 fdStat fd = 
   allocaBytes sizeof_stat $ \ p_stat -> do
     throwErrnoIfMinus1Retry "fdType" $
-	c_fstat fd p_stat
+        c_fstat fd p_stat
     ty <- statGetType p_stat
     dev <- st_dev p_stat
     ino <- st_ino p_stat
@@ -115,17 +115,17 @@ fdType fd = do (ty,_,_) <- fdStat fd; return ty
 statGetType p_stat = do
   c_mode <- st_mode p_stat :: IO CMode
   case () of
-      _ | s_isdir c_mode    	-> return Directory
+      _ | s_isdir c_mode        -> return Directory
         | s_isfifo c_mode || s_issock c_mode || s_ischr  c_mode
-			  	-> return Stream
-	| s_isreg c_mode	-> return RegularFile
-	 -- Q: map char devices to RawDevice too?
-	| s_isblk c_mode        -> return RawDevice
-	| otherwise		-> ioError ioe_unknownfiletype
+                                -> return Stream
+        | s_isreg c_mode        -> return RegularFile
+         -- Q: map char devices to RawDevice too?
+        | s_isblk c_mode        -> return RawDevice
+        | otherwise             -> ioError ioe_unknownfiletype
     
 
 ioe_unknownfiletype = IOError Nothing UnsupportedOperation "fdType"
-			"unknown file type" Nothing
+                        "unknown file type" Nothing
 
 #if __GLASGOW_HASKELL__ && (defined(mingw32_HOST_OS) || defined(__MINGW32__))
 closeFd :: Bool -> CInt -> IO CInt
@@ -145,7 +145,7 @@ fdGetMode fd = do
     let flags = o_RDWR
 #else
     flags <- throwErrnoIfMinus1Retry "fdGetMode" 
-		(c_fcntl_read fd const_f_getfl)
+                (c_fcntl_read fd const_f_getfl)
 #endif
     let
        wH  = (flags .&. o_WRONLY) /= 0
@@ -153,11 +153,11 @@ fdGetMode fd = do
        rwH = (flags .&. o_RDWR) /= 0
 
        mode
-	 | wH && aH  = AppendMode
-	 | wH        = WriteMode
-	 | rwH       = ReadWriteMode
-	 | otherwise = ReadMode
-	  
+         | wH && aH  = AppendMode
+         | wH        = WriteMode
+         | rwH       = ReadWriteMode
+         | otherwise = ReadMode
+          
     return mode
 
 -- ---------------------------------------------------------------------------
@@ -173,8 +173,8 @@ setEcho fd on = do
   tcSetAttr fd $ \ p_tios -> do
     c_lflag <- c_lflag p_tios :: IO CTcflag
     let new_c_lflag
-	 | on        = c_lflag .|. fromIntegral const_echo
-	 | otherwise = c_lflag .&. complement (fromIntegral const_echo)
+         | on        = c_lflag .|. fromIntegral const_echo
+         | otherwise = c_lflag .&. complement (fromIntegral const_echo)
     poke_c_lflag p_tios (new_c_lflag :: CTcflag)
 
 getEcho :: FD -> IO Bool
@@ -190,49 +190,49 @@ setCooked fd cooked =
     -- turn on/off ICANON
     c_lflag <- c_lflag p_tios :: IO CTcflag
     let new_c_lflag | cooked    = c_lflag .|. (fromIntegral const_icanon)
-	            | otherwise = c_lflag .&. complement (fromIntegral const_icanon)
+                    | otherwise = c_lflag .&. complement (fromIntegral const_icanon)
     poke_c_lflag p_tios (new_c_lflag :: CTcflag)
 
     -- set VMIN & VTIME to 1/0 respectively
     when (not cooked) $ do
             c_cc <- ptr_c_cc p_tios
-	    let vmin  = (c_cc `plusPtr` (fromIntegral const_vmin))  :: Ptr Word8
-		vtime = (c_cc `plusPtr` (fromIntegral const_vtime)) :: Ptr Word8
-	    poke vmin  1
-	    poke vtime 0
+            let vmin  = (c_cc `plusPtr` (fromIntegral const_vmin))  :: Ptr Word8
+                vtime = (c_cc `plusPtr` (fromIntegral const_vtime)) :: Ptr Word8
+            poke vmin  1
+            poke vtime 0
 
 tcSetAttr :: FD -> (Ptr CTermios -> IO a) -> IO a
 tcSetAttr fd fun = do
      allocaBytes sizeof_termios  $ \p_tios -> do
-	throwErrnoIfMinus1Retry "tcSetAttr"
-	   (c_tcgetattr fd p_tios)
+        throwErrnoIfMinus1Retry "tcSetAttr"
+           (c_tcgetattr fd p_tios)
 
 #ifdef __GLASGOW_HASKELL__
-	-- Save a copy of termios, if this is a standard file descriptor.
-	-- These terminal settings are restored in hs_exit().
-	when (fd <= 2) $ do
-	  p <- get_saved_termios fd
-	  when (p == nullPtr) $ do
-	     saved_tios <- mallocBytes sizeof_termios
-	     copyBytes saved_tios p_tios sizeof_termios
-	     set_saved_termios fd saved_tios
+        -- Save a copy of termios, if this is a standard file descriptor.
+        -- These terminal settings are restored in hs_exit().
+        when (fd <= 2) $ do
+          p <- get_saved_termios fd
+          when (p == nullPtr) $ do
+             saved_tios <- mallocBytes sizeof_termios
+             copyBytes saved_tios p_tios sizeof_termios
+             set_saved_termios fd saved_tios
 #endif
 
-	-- tcsetattr() when invoked by a background process causes the process
-	-- to be sent SIGTTOU regardless of whether the process has TOSTOP set
-	-- in its terminal flags (try it...).  This function provides a
-	-- wrapper which temporarily blocks SIGTTOU around the call, making it
-	-- transparent.
-	allocaBytes sizeof_sigset_t $ \ p_sigset -> do
-	allocaBytes sizeof_sigset_t $ \ p_old_sigset -> do
-	     c_sigemptyset p_sigset
-	     c_sigaddset   p_sigset const_sigttou
-	     c_sigprocmask const_sig_block p_sigset p_old_sigset
-	     r <- fun p_tios  -- do the business
-	     throwErrnoIfMinus1Retry_ "tcSetAttr" $
-		 c_tcsetattr fd const_tcsanow p_tios
-	     c_sigprocmask const_sig_setmask p_old_sigset nullPtr
-	     return r
+        -- tcsetattr() when invoked by a background process causes the process
+        -- to be sent SIGTTOU regardless of whether the process has TOSTOP set
+        -- in its terminal flags (try it...).  This function provides a
+        -- wrapper which temporarily blocks SIGTTOU around the call, making it
+        -- transparent.
+        allocaBytes sizeof_sigset_t $ \ p_sigset -> do
+        allocaBytes sizeof_sigset_t $ \ p_old_sigset -> do
+             c_sigemptyset p_sigset
+             c_sigaddset   p_sigset const_sigttou
+             c_sigprocmask const_sig_block p_sigset p_old_sigset
+             r <- fun p_tios  -- do the business
+             throwErrnoIfMinus1Retry_ "tcSetAttr" $
+                 c_tcsetattr fd const_tcsanow p_tios
+             c_sigprocmask const_sig_setmask p_old_sigset nullPtr
+             return r
 
 #ifdef __GLASGOW_HASKELL__
 foreign import ccall unsafe "HsBase.h __hscore_get_saved_termios"
@@ -296,7 +296,7 @@ foreign import ccall unsafe "consUtils.h get_console_echo__"
 
 setNonBlockingFD fd = do
   flags <- throwErrnoIfMinus1Retry "setNonBlockingFD"
-		 (c_fcntl_read fd const_f_getfl)
+                 (c_fcntl_read fd const_f_getfl)
   -- An error when setting O_NONBLOCK isn't fatal: on some systems 
   -- there are certain file handles on which this will fail (eg. /dev/null
   -- on FreeBSD) so we throw away the return code from fcntl_write.
@@ -371,7 +371,7 @@ foreign import ccall unsafe "HsBase.h read"
 
 foreign import ccall unsafe "dirUtils.h __hscore_renameFile"
    c_rename :: CString -> CString -> IO CInt
-		     
+                     
 foreign import ccall unsafe "HsBase.h rewinddir"
    c_rewinddir :: Ptr CDir -> IO ()
 

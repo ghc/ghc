@@ -15,8 +15,8 @@
 
 module System.IO.Unsafe (
    -- * Unsafe 'System.IO.IO' operations
-   unsafePerformIO,	-- :: IO a -> a
-   unsafeInterleaveIO,	-- :: IO a -> IO a
+   unsafePerformIO,     -- :: IO a -> a
+   unsafeInterleaveIO,  -- :: IO a -> IO a
   ) where
 
 #ifdef __GLASGOW_HASKELL__

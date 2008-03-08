@@ -24,16 +24,16 @@ module Foreign.Marshal.Utils (
   -- ** Marshalling of Boolean values (non-zero corresponds to 'True')
   --
   fromBool,      -- :: Num a => Bool -> a
-  toBool,	 -- :: Num a => a -> Bool
+  toBool,        -- :: Num a => a -> Bool
 
   -- ** Marshalling of Maybe values
   --
   maybeNew,      -- :: (      a -> IO (Ptr a))
-		 -- -> (Maybe a -> IO (Ptr a))
+                 -- -> (Maybe a -> IO (Ptr a))
   maybeWith,     -- :: (      a -> (Ptr b -> IO c) -> IO c)
-		 -- -> (Maybe a -> (Ptr b -> IO c) -> IO c)
+                 -- -> (Maybe a -> (Ptr b -> IO c) -> IO c)
   maybePeek,     -- :: (Ptr a -> IO        b )
-		 -- -> (Ptr a -> IO (Maybe b))
+                 -- -> (Ptr a -> IO (Maybe b))
 
   -- ** Marshalling lists of storable objects
   --
@@ -47,20 +47,20 @@ module Foreign.Marshal.Utils (
 ) where
 
 import Data.Maybe
-import Foreign.Ptr	        ( Ptr, nullPtr )
-import Foreign.Storable		( Storable(poke) )
-import Foreign.C.Types    	( CSize )
-import Foreign.Marshal.Alloc 	( malloc, alloca )
+import Foreign.Ptr              ( Ptr, nullPtr )
+import Foreign.Storable         ( Storable(poke) )
+import Foreign.C.Types          ( CSize )
+import Foreign.Marshal.Alloc    ( malloc, alloca )
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.IOBase
-import GHC.Real			( fromIntegral )
+import GHC.Real                 ( fromIntegral )
 import GHC.Num
 import GHC.Base
 #endif
 
 #ifdef __NHC__
-import Foreign.C.Types		( CInt(..) )
+import Foreign.C.Types          ( CInt(..) )
 #endif
 
 -- combined allocation and marshalling
@@ -119,14 +119,14 @@ toBool  = (/= 0)
 -- * the 'nullPtr' is used to represent 'Nothing'
 --
 maybeNew :: (      a -> IO (Ptr a))
-	 -> (Maybe a -> IO (Ptr a))
+         -> (Maybe a -> IO (Ptr a))
 maybeNew  = maybe (return nullPtr)
 
 -- |Converts a @withXXX@ combinator into one marshalling a value wrapped
 -- into a 'Maybe', using 'nullPtr' to represent 'Nothing'.
 --
 maybeWith :: (      a -> (Ptr b -> IO c) -> IO c) 
-	  -> (Maybe a -> (Ptr b -> IO c) -> IO c)
+          -> (Maybe a -> (Ptr b -> IO c) -> IO c)
 maybeWith  = maybe ($ nullPtr)
 
 -- |Convert a peek combinator into a one returning 'Nothing' if applied to a
@@ -134,7 +134,7 @@ maybeWith  = maybe ($ nullPtr)
 --
 maybePeek                           :: (Ptr a -> IO b) -> Ptr a -> IO (Maybe b)
 maybePeek peek ptr | ptr == nullPtr  = return Nothing
-		   | otherwise       = do a <- peek ptr; return (Just a)
+                   | otherwise       = do a <- peek ptr; return (Just a)
 
 
 -- marshalling lists of storable objects
@@ -144,12 +144,12 @@ maybePeek peek ptr | ptr == nullPtr  = return Nothing
 -- marshalled objects
 --
 withMany :: (a -> (b -> res) -> res)  -- withXXX combinator for one object
-	 -> [a]			      -- storable objects
-	 -> ([b] -> res)	      -- action on list of marshalled obj.s
-	 -> res
+         -> [a]                       -- storable objects
+         -> ([b] -> res)              -- action on list of marshalled obj.s
+         -> res
 withMany _       []     f = f []
 withMany withFoo (x:xs) f = withFoo x $ \x' ->
-			      withMany withFoo xs (\xs' -> f (x':xs'))
+                              withMany withFoo xs (\xs' -> f (x':xs'))
 
 
 -- Haskellish interface to memcpy and memmove
