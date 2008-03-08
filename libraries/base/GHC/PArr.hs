@@ -72,74 +72,74 @@
 --
 
 module GHC.PArr (
-  -- [::],		-- Built-in syntax
+  -- [::],              -- Built-in syntax
 
-  mapP,			-- :: (a -> b) -> [:a:] -> [:b:]
-  (+:+),		-- :: [:a:] -> [:a:] -> [:a:]
-  filterP,		-- :: (a -> Bool) -> [:a:] -> [:a:]
-  concatP,		-- :: [:[:a:]:] -> [:a:]
-  concatMapP,		-- :: (a -> [:b:]) -> [:a:] -> [:b:]
+  mapP,                 -- :: (a -> b) -> [:a:] -> [:b:]
+  (+:+),                -- :: [:a:] -> [:a:] -> [:a:]
+  filterP,              -- :: (a -> Bool) -> [:a:] -> [:a:]
+  concatP,              -- :: [:[:a:]:] -> [:a:]
+  concatMapP,           -- :: (a -> [:b:]) -> [:a:] -> [:b:]
 --  head, last, tail, init,   -- it's not wise to use them on arrays
-  nullP,	        -- :: [:a:] -> Bool
-  lengthP,		-- :: [:a:] -> Int
-  (!:),			-- :: [:a:] -> Int -> a
-  foldlP,		-- :: (a -> b -> a) -> a -> [:b:] -> a
-  foldl1P,		-- :: (a -> a -> a) ->      [:a:] -> a
-  scanlP,		-- :: (a -> b -> a) -> a -> [:b:] -> [:a:]
-  scanl1P,		-- :: (a -> a -> a) ->      [:a:] -> [:a:]
-  foldrP,		-- :: (a -> b -> b) -> b -> [:a:] -> b
-  foldr1P,		-- :: (a -> a -> a) ->      [:a:] -> a
-  scanrP,		-- :: (a -> b -> b) -> b -> [:a:] -> [:b:]
-  scanr1P,		-- :: (a -> a -> a) ->      [:a:] -> [:a:]
---  iterate, repeat,	      -- parallel arrays must be finite
+  nullP,                -- :: [:a:] -> Bool
+  lengthP,              -- :: [:a:] -> Int
+  (!:),                 -- :: [:a:] -> Int -> a
+  foldlP,               -- :: (a -> b -> a) -> a -> [:b:] -> a
+  foldl1P,              -- :: (a -> a -> a) ->      [:a:] -> a
+  scanlP,               -- :: (a -> b -> a) -> a -> [:b:] -> [:a:]
+  scanl1P,              -- :: (a -> a -> a) ->      [:a:] -> [:a:]
+  foldrP,               -- :: (a -> b -> b) -> b -> [:a:] -> b
+  foldr1P,              -- :: (a -> a -> a) ->      [:a:] -> a
+  scanrP,               -- :: (a -> b -> b) -> b -> [:a:] -> [:b:]
+  scanr1P,              -- :: (a -> a -> a) ->      [:a:] -> [:a:]
+--  iterate, repeat,          -- parallel arrays must be finite
   singletonP,           -- :: a -> [:a:]
-  replicateP,		-- :: Int -> a -> [:a:]
---  cycle,		      -- parallel arrays must be finite
-  takeP,		-- :: Int -> [:a:] -> [:a:]
-  dropP,		-- :: Int -> [:a:] -> [:a:]
-  splitAtP,		-- :: Int -> [:a:] -> ([:a:],[:a:])
-  takeWhileP,		-- :: (a -> Bool) -> [:a:] -> [:a:]
-  dropWhileP,		-- :: (a -> Bool) -> [:a:] -> [:a:]
-  spanP,		-- :: (a -> Bool) -> [:a:] -> ([:a:], [:a:])
-  breakP,		-- :: (a -> Bool) -> [:a:] -> ([:a:], [:a:])
+  replicateP,           -- :: Int -> a -> [:a:]
+--  cycle,                    -- parallel arrays must be finite
+  takeP,                -- :: Int -> [:a:] -> [:a:]
+  dropP,                -- :: Int -> [:a:] -> [:a:]
+  splitAtP,             -- :: Int -> [:a:] -> ([:a:],[:a:])
+  takeWhileP,           -- :: (a -> Bool) -> [:a:] -> [:a:]
+  dropWhileP,           -- :: (a -> Bool) -> [:a:] -> [:a:]
+  spanP,                -- :: (a -> Bool) -> [:a:] -> ([:a:], [:a:])
+  breakP,               -- :: (a -> Bool) -> [:a:] -> ([:a:], [:a:])
 --  lines, words, unlines, unwords,  -- is string processing really needed
-  reverseP,	        -- :: [:a:] -> [:a:]
-  andP,			-- :: [:Bool:] -> Bool
-  orP, 			-- :: [:Bool:] -> Bool
-  anyP,			-- :: (a -> Bool) -> [:a:] -> Bool
-  allP,			-- :: (a -> Bool) -> [:a:] -> Bool
-  elemP,		-- :: (Eq a) => a -> [:a:] -> Bool
-  notElemP,		-- :: (Eq a) => a -> [:a:] -> Bool
-  lookupP,		-- :: (Eq a) => a -> [:(a, b):] -> Maybe b
-  sumP,			-- :: (Num a) => [:a:] -> a
-  productP, 		-- :: (Num a) => [:a:] -> a
-  maximumP,		-- :: (Ord a) => [:a:] -> a
-  minimumP,		-- :: (Ord a) => [:a:] -> a
-  zipP,			-- :: [:a:] -> [:b:]          -> [:(a, b)   :]
-  zip3P,		-- :: [:a:] -> [:b:] -> [:c:] -> [:(a, b, c):]
-  zipWithP,		-- :: (a -> b -> c)      -> [:a:] -> [:b:] -> [:c:]
-  zipWith3P,		-- :: (a -> b -> c -> d) -> [:a:]->[:b:]->[:c:]->[:d:]
-  unzipP,		-- :: [:(a, b)   :] -> ([:a:], [:b:])
-  unzip3P,		-- :: [:(a, b, c):] -> ([:a:], [:b:], [:c:])
+  reverseP,             -- :: [:a:] -> [:a:]
+  andP,                 -- :: [:Bool:] -> Bool
+  orP,                  -- :: [:Bool:] -> Bool
+  anyP,                 -- :: (a -> Bool) -> [:a:] -> Bool
+  allP,                 -- :: (a -> Bool) -> [:a:] -> Bool
+  elemP,                -- :: (Eq a) => a -> [:a:] -> Bool
+  notElemP,             -- :: (Eq a) => a -> [:a:] -> Bool
+  lookupP,              -- :: (Eq a) => a -> [:(a, b):] -> Maybe b
+  sumP,                 -- :: (Num a) => [:a:] -> a
+  productP,             -- :: (Num a) => [:a:] -> a
+  maximumP,             -- :: (Ord a) => [:a:] -> a
+  minimumP,             -- :: (Ord a) => [:a:] -> a
+  zipP,                 -- :: [:a:] -> [:b:]          -> [:(a, b)   :]
+  zip3P,                -- :: [:a:] -> [:b:] -> [:c:] -> [:(a, b, c):]
+  zipWithP,             -- :: (a -> b -> c)      -> [:a:] -> [:b:] -> [:c:]
+  zipWith3P,            -- :: (a -> b -> c -> d) -> [:a:]->[:b:]->[:c:]->[:d:]
+  unzipP,               -- :: [:(a, b)   :] -> ([:a:], [:b:])
+  unzip3P,              -- :: [:(a, b, c):] -> ([:a:], [:b:], [:c:])
 
   -- overloaded functions
   --
-  enumFromToP,		-- :: Enum a => a -> a      -> [:a:]
-  enumFromThenToP,	-- :: Enum a => a -> a -> a -> [:a:]
+  enumFromToP,          -- :: Enum a => a -> a      -> [:a:]
+  enumFromThenToP,      -- :: Enum a => a -> a -> a -> [:a:]
 
   -- the following functions are not available on lists
   --
-  toP,			-- :: [a] -> [:a:]
-  fromP,		-- :: [:a:] -> [a]
-  sliceP,		-- :: Int -> Int -> [:e:] -> [:e:]
-  foldP,		-- :: (e -> e -> e) -> e -> [:e:] -> e
-  fold1P,		-- :: (e -> e -> e) ->      [:e:] -> e
-  permuteP,		-- :: [:Int:] -> [:e:] ->          [:e:]
-  bpermuteP,		-- :: [:Int:] -> [:e:] ->          [:e:]
-  dpermuteP,		-- :: [:Int:] -> [:e:] -> [:e:] -> [:e:]
-  crossP,		-- :: [:a:] -> [:b:] -> [:(a, b):]
-  crossMapP,		-- :: [:a:] -> (a -> [:b:]) -> [:(a, b):]
-  indexOfP		-- :: (a -> Bool) -> [:a:] -> [:Int:]
+  toP,                  -- :: [a] -> [:a:]
+  fromP,                -- :: [:a:] -> [a]
+  sliceP,               -- :: Int -> Int -> [:e:] -> [:e:]
+  foldP,                -- :: (e -> e -> e) -> e -> [:e:] -> e
+  fold1P,               -- :: (e -> e -> e) ->      [:e:] -> e
+  permuteP,             -- :: [:Int:] -> [:e:] ->          [:e:]
+  bpermuteP,            -- :: [:Int:] -> [:e:] ->          [:e:]
+  dpermuteP,            -- :: [:Int:] -> [:e:] -> [:e:] -> [:e:]
+  crossP,               -- :: [:a:] -> [:b:] -> [:(a, b):]
+  crossMapP,            -- :: [:a:] -> (a -> [:b:]) -> [:(a, b):]
+  indexOfP              -- :: (a -> Bool) -> [:a:] -> [:Int:]
 ) where
 
 #ifndef __HADDOCK__
@@ -147,8 +147,8 @@ module GHC.PArr (
 import Prelude
 
 import GHC.ST   ( ST(..), STRep, runST )
-import GHC.Exts	( Int#, Array#, Int(I#), MutableArray#, newArray#,
-		  unsafeFreezeArray#, indexArray#, writeArray#, (<#), (>=#) )
+import GHC.Exts ( Int#, Array#, Int(I#), MutableArray#, newArray#,
+                  unsafeFreezeArray#, indexArray#, writeArray#, (<#), (>=#) )
 
 infixl 9  !:
 infixr 5  +:+
@@ -178,15 +178,15 @@ mapP f  = fst . loop (mapEFL f) noAL
 
 (+:+)     :: [:a:] -> [:a:] -> [:a:]
 a1 +:+ a2  = fst $ loop (mapEFL sel) noAL (enumFromToP 0 (len1 + len2 - 1))
-		       -- we can't use the [:x..y:] form here for tedious
-		       -- reasons to do with the typechecker and the fact that
-		       -- `enumFromToP' is defined in the same module
-	     where
-	       len1 = lengthP a1
-	       len2 = lengthP a2
-	       --
-	       sel i | i < len1  = a1!:i
-		     | otherwise = a2!:(i - len1)
+                       -- we can't use the [:x..y:] form here for tedious
+                       -- reasons to do with the typechecker and the fact that
+                       -- `enumFromToP' is defined in the same module
+             where
+               len1 = lengthP a1
+               len2 = lengthP a2
+               --
+               sel i | i < len1  = a1!:i
+                     | otherwise = a2!:(i - len1)
 
 filterP   :: (a -> Bool) -> [:a:] -> [:a:]
 filterP p  = fst . loop (filterEFL p) noAL
@@ -235,7 +235,7 @@ scanrP  = error "Prelude.scanrP: not implemented yet" -- FIXME
 scanr1P :: (a -> a -> a) -> [:a:] -> [:a:]
 scanr1P  = error "Prelude.scanr1P: not implemented yet" -- FIXME
 
---  iterate, repeat	      -- parallel arrays must be finite
+--  iterate, repeat           -- parallel arrays must be finite
 
 singletonP             :: a -> [:a:]
 {-# INLINE singletonP #-}
@@ -247,7 +247,7 @@ replicateP n e  = runST (do
   marr# <- newArray n e
   mkPArr n marr#)
 
---  cycle		      -- parallel arrays must be finite
+--  cycle                     -- parallel arrays must be finite
 
 takeP   :: Int -> [:a:] -> [:a:]
 takeP n  = sliceP 0 (n - 1)
@@ -274,11 +274,11 @@ breakP p  = spanP (not . p)
 
 reverseP   :: [:a:] -> [:a:]
 reverseP a  = permuteP (enumFromThenToP (len - 1) (len - 2) 0) a
-		       -- we can't use the [:x, y..z:] form here for tedious
-		       -- reasons to do with the typechecker and the fact that
-		       -- `enumFromThenToP' is defined in the same module
-	      where
-	        len = lengthP a
+                       -- we can't use the [:x, y..z:] form here for tedious
+                       -- reasons to do with the typechecker and the fact that
+                       -- `enumFromThenToP' is defined in the same module
+              where
+                len = lengthP a
 
 andP :: [:Bool:] -> Bool
 andP  = foldP (&&) True
@@ -323,53 +323,53 @@ zip3P  = zipWith3P (,,)
 
 zipWithP         :: (a -> b -> c) -> [:a:] -> [:b:] -> [:c:]
 zipWithP f a1 a2  = let 
-		      len1 = lengthP a1
-		      len2 = lengthP a2
-		      len  = len1 `min` len2
-		    in
-		    fst $ loopFromTo 0 (len - 1) combine 0 a1
-		    where
-		      combine e1 i = (Just $ f e1 (a2!:i), i + 1)
+                      len1 = lengthP a1
+                      len2 = lengthP a2
+                      len  = len1 `min` len2
+                    in
+                    fst $ loopFromTo 0 (len - 1) combine 0 a1
+                    where
+                      combine e1 i = (Just $ f e1 (a2!:i), i + 1)
 
 zipWith3P :: (a -> b -> c -> d) -> [:a:]->[:b:]->[:c:]->[:d:]
 zipWith3P f a1 a2 a3 = let 
-			len1 = lengthP a1
-			len2 = lengthP a2
-			len3 = lengthP a3
-			len  = len1 `min` len2 `min` len3
-		      in
-		      fst $ loopFromTo 0 (len - 1) combine 0 a1
-		      where
-			combine e1 i = (Just $ f e1 (a2!:i) (a3!:i), i + 1)
+                        len1 = lengthP a1
+                        len2 = lengthP a2
+                        len3 = lengthP a3
+                        len  = len1 `min` len2 `min` len3
+                      in
+                      fst $ loopFromTo 0 (len - 1) combine 0 a1
+                      where
+                        combine e1 i = (Just $ f e1 (a2!:i) (a3!:i), i + 1)
 
 unzipP   :: [:(a, b):] -> ([:a:], [:b:])
 unzipP a  = (fst $ loop (mapEFL fst) noAL a, fst $ loop (mapEFL snd) noAL a)
 -- FIXME: these two functions should be optimised using a tupled custom loop
 unzip3P   :: [:(a, b, c):] -> ([:a:], [:b:], [:c:])
 unzip3P a  = (fst $ loop (mapEFL fst3) noAL a, 
-	      fst $ loop (mapEFL snd3) noAL a,
-	      fst $ loop (mapEFL trd3) noAL a)
-	     where
-	       fst3 (a, _, _) = a
-	       snd3 (_, b, _) = b
-	       trd3 (_, _, c) = c
+              fst $ loop (mapEFL snd3) noAL a,
+              fst $ loop (mapEFL trd3) noAL a)
+             where
+               fst3 (a, _, _) = a
+               snd3 (_, b, _) = b
+               trd3 (_, _, c) = c
 
 -- instances
 --
 
 instance Eq a => Eq [:a:] where
   a1 == a2 | lengthP a1 == lengthP a2 = andP (zipWithP (==) a1 a2)
-	   | otherwise		      = False
+           | otherwise                = False
 
 instance Ord a => Ord [:a:] where
   compare a1 a2 = case foldlP combineOrdering EQ (zipWithP compare a1 a2) of
-		    EQ | lengthP a1 == lengthP a2 -> EQ
-		       | lengthP a1 <  lengthP a2 -> LT
-		       | otherwise		  -> GT
-		  where
-		    combineOrdering EQ    EQ    = EQ
-		    combineOrdering EQ    other = other
-		    combineOrdering other _     = other
+                    EQ | lengthP a1 == lengthP a2 -> EQ
+                       | lengthP a1 <  lengthP a2 -> LT
+                       | otherwise                -> GT
+                  where
+                    combineOrdering EQ    EQ    = EQ
+                    combineOrdering EQ    other = other
+                    combineOrdering other _     = other
 
 instance Functor [::] where
   fmap = mapP
@@ -393,16 +393,16 @@ instance Read a => Read [:a:]  where
   readsPrec _ a = [(toP v, rest) | (v, rest) <- readPArr a]
     where
       readPArr = readParen False (\r -> do
-					  ("[:",s) <- lex r
-					  readPArr1 s)
+                                          ("[:",s) <- lex r
+                                          readPArr1 s)
       readPArr1 s = 
-	(do { (":]", t) <- lex s; return ([], t) }) ++
-	(do { (x, t) <- reads s; (xs, u) <- readPArr2 t; return (x:xs, u) })
+        (do { (":]", t) <- lex s; return ([], t) }) ++
+        (do { (x, t) <- reads s; (xs, u) <- readPArr2 t; return (x:xs, u) })
 
       readPArr2 s = 
-	(do { (":]", t) <- lex s; return ([], t) }) ++
-	(do { (",", t) <- lex s; (x, u) <- reads t; (xs, v) <- readPArr2 u; 
-	      return (x:xs, v) })
+        (do { (":]", t) <- lex s; return ([], t) }) ++
+        (do { (",", t) <- lex s; (x, u) <- reads t; (xs, v) <- readPArr2 u; 
+              return (x:xs, v) })
 
 -- overloaded functions
 -- 
@@ -412,17 +412,17 @@ instance Read a => Read [:a:]  where
 -- for the moment, we hope that the compiler is sufficiently clever to
 -- properly fuse the following definitions.
 
-enumFromToP	:: Enum a => a -> a -> [:a:]
+enumFromToP     :: Enum a => a -> a -> [:a:]
 enumFromToP x y  = mapP toEnum (eftInt (fromEnum x) (fromEnum y))
   where
     eftInt x y = scanlP (+) x $ replicateP (y - x + 1) 1
 
-enumFromThenToP	      :: Enum a => a -> a -> a -> [:a:]
+enumFromThenToP       :: Enum a => a -> a -> a -> [:a:]
 enumFromThenToP x y z  = 
   mapP toEnum (efttInt (fromEnum x) (fromEnum y) (fromEnum z))
   where
     efttInt x y z = scanlP (+) x $ 
-		      replicateP (abs (z - x) `div` abs delta + 1) delta
+                      replicateP (abs (z - x) `div` abs delta + 1) delta
       where
        delta = y - x
 
@@ -433,8 +433,8 @@ enumFromThenToP x y z  =
 --
 toP   :: [a] -> [:a:]
 toP l  = fst $ loop store l (replicateP (length l) ())
-	 where
-	   store _ (x:xs) = (Just x, xs)
+         where
+           store _ (x:xs) = (Just x, xs)
 
 -- convert an array to a list (EXPORTED)
 --
@@ -468,13 +468,13 @@ permuteP       :: [:Int:] -> [:e:] -> [:e:]
 permuteP is es 
   | isLen /= esLen = error "GHC.PArr: arguments must be of the same length"
   | otherwise      = runST (do
-		       marr <- newArray isLen noElem
-		       permute marr is es
-		       mkPArr isLen marr)
+                       marr <- newArray isLen noElem
+                       permute marr is es
+                       mkPArr isLen marr)
   where
     noElem = error "GHC.PArr.permuteP: I do not exist!"
-	     -- unlike standard Haskell arrays, this value represents an
-	     -- internal error
+             -- unlike standard Haskell arrays, this value represents an
+             -- internal error
     isLen = lengthP is
     esLen = lengthP es
 
@@ -498,14 +498,14 @@ dpermuteP :: [:Int:] -> [:e:] -> [:e:] -> [:e:]
 dpermuteP is es dft
   | isLen /= esLen = error "GHC.PArr: arguments must be of the same length"
   | otherwise      = runST (do
-		       marr <- newArray dftLen noElem
-		       trans 0 (isLen - 1) marr dft copyOne noAL
-		       permute marr is es
-		       mkPArr dftLen marr)
+                       marr <- newArray dftLen noElem
+                       trans 0 (isLen - 1) marr dft copyOne noAL
+                       permute marr is es
+                       mkPArr dftLen marr)
   where
     noElem = error "GHC.PArr.permuteP: I do not exist!"
-	     -- unlike standard Haskell arrays, this value represents an
-	     -- internal error
+             -- unlike standard Haskell arrays, this value represents an
+             -- internal error
     isLen  = lengthP is
     esLen  = lengthP es
     dftLen = lengthP dft
@@ -516,15 +516,15 @@ dpermuteP is es dft
 --
 crossP       :: [:a:] -> [:b:] -> [:(a, b):]
 crossP a1 a2  = fst $ loop combine (0, 0) $ replicateP len ()
-		where
-		  len1 = lengthP a1
-		  len2 = lengthP a2
-		  len  = len1 * len2
-		  --
-		  combine _ (i, j) = (Just $ (a1!:i, a2!:j), next)
-				     where
-				       next | (i + 1) == len1 = (0    , j + 1)
-					    | otherwise       = (i + 1, j)
+                where
+                  len1 = lengthP a1
+                  len2 = lengthP a2
+                  len  = len1 * len2
+                  --
+                  combine _ (i, j) = (Just $ (a1!:i, a2!:j), next)
+                                     where
+                                       next | (i + 1) == len1 = (0    , j + 1)
+                                            | otherwise       = (i + 1, j)
 
 {- An alternative implementation
    * The one above is certainly better for flattened code, but here where we
@@ -532,12 +532,12 @@ crossP a1 a2  = fst $ loop combine (0, 0) $ replicateP len ()
      think, the above one is still better.
 
 crossP a1 a2  = let
-		  len1 = lengthP a1
-		  len2 = lengthP a2
-		  x1   = concatP $ mapP (replicateP len2) a1
-		  x2   = concatP $ replicateP len1 a2
-		in
-		zipP x1 x2
+                  len1 = lengthP a1
+                  len2 = lengthP a2
+                  x1   = concatP $ mapP (replicateP len2) a1
+                  x2   = concatP $ replicateP len1 a2
+                in
+                zipP x1 x2
  -}
 
 -- |Compute a cross of an array and the arrays produced by the given function
@@ -545,11 +545,11 @@ crossP a1 a2  = let
 --
 crossMapP :: [:a:] -> (a -> [:b:]) -> [:(a, b):]
 crossMapP a f = let
-		  bs   = mapP f a
-		  segd = mapP lengthP bs
-		  as   = zipWithP replicateP segd a
-	        in
-		zipP (concatP as) (concatP bs)
+                  bs   = mapP f a
+                  segd = mapP lengthP bs
+                  as   = zipWithP replicateP segd a
+                in
+                zipP (concatP as) (concatP bs)
 
 {- The following may seem more straight forward, but the above is very cheap
    with segmented arrays, as `mapP lengthP', `zipP', and `concatP' are
@@ -564,9 +564,9 @@ crossMapP a f = concatP $ mapP (\x -> mapP ((,) x) (f x)) a
 --
 indexOfP     :: (a -> Bool) -> [:a:] -> [:Int:]
 indexOfP p a  = fst $ loop calcIdx 0 a
-		where
-		  calcIdx e idx | p e       = (Just idx, idx + 1)
-				| otherwise = (Nothing , idx    )
+                where
+                  calcIdx e idx | p e       = (Just idx, idx + 1)
+                                | otherwise = (Nothing , idx    )
 
 
 -- auxiliary functions
@@ -598,20 +598,20 @@ mkPArr (I# n#) (MPArr _ marr#)  = ST $ \s1# ->
 --   Keller, ICFP 2001
 --
 loop :: (e -> acc -> (Maybe e', acc))    -- mapping & folding, once per element
-     -> acc				 -- initial acc value
-     -> [:e:]				 -- input array
+     -> acc                              -- initial acc value
+     -> [:e:]                            -- input array
      -> ([:e':], acc)
 {-# INLINE loop #-}
 loop mf acc arr = loopFromTo 0 (lengthP arr - 1) mf acc arr
 
 -- general array iterator with bounds
 --
-loopFromTo :: Int			 -- from index
-	   -> Int			 -- to index
-	   -> (e -> acc -> (Maybe e', acc))
-	   -> acc
-	   -> [:e:]
-	   -> ([:e':], acc)
+loopFromTo :: Int                        -- from index
+           -> Int                        -- to index
+           -> (e -> acc -> (Maybe e', acc))
+           -> acc
+           -> [:e:]
+           -> ([:e':], acc)
 {-# INLINE loopFromTo #-}
 loopFromTo from to mf start arr = runST (do
   marr      <- newArray (to - from + 1) noElem
@@ -620,8 +620,8 @@ loopFromTo from to mf start arr = runST (do
   return (arr, acc))
   where
     noElem = error "GHC.PArr.loopFromTo: I do not exist!"
-	     -- unlike standard Haskell arrays, this value represents an
-	     -- internal error
+             -- unlike standard Haskell arrays, this value represents an
+             -- internal error
 
 -- actual loop body of `loop'
 --
@@ -629,25 +629,25 @@ loopFromTo from to mf start arr = runST (do
 --   constructor specialisation phase "SpecConstr" switched on; as of GHC 5.03
 --   this requires an optimisation level of at least -O2
 --
-trans :: Int				-- index of first elem to process
-      -> Int				-- index of last elem to process
-      -> MPArr s e'			-- destination array
-      -> [:e:]				-- source array
-      -> (e -> acc -> (Maybe e', acc))	-- mutator
-      -> acc				-- initial accumulator
-      -> ST s (Int, acc)		-- final destination length/final acc
+trans :: Int                            -- index of first elem to process
+      -> Int                            -- index of last elem to process
+      -> MPArr s e'                     -- destination array
+      -> [:e:]                          -- source array
+      -> (e -> acc -> (Maybe e', acc))  -- mutator
+      -> acc                            -- initial accumulator
+      -> ST s (Int, acc)                -- final destination length/final acc
 {-# INLINE trans #-}
 trans from to marr arr mf start = trans' from 0 start
   where
     trans' arrOff marrOff acc 
       | arrOff > to = return (marrOff, acc)
       | otherwise   = do
-		        let (oe', acc') = mf (arr `indexPArr` arrOff) acc
-			marrOff' <- case oe' of
-				      Nothing -> return marrOff 
-				      Just e' -> do
-					writeMPArr marr marrOff e'
-					return $ marrOff + 1
+                        let (oe', acc') = mf (arr `indexPArr` arrOff) acc
+                        marrOff' <- case oe' of
+                                      Nothing -> return marrOff 
+                                      Just e' -> do
+                                        writeMPArr marr marrOff e'
+                                        return $ marrOff + 1
                         trans' (arrOff + 1) marrOff' acc'
 
 -- Permute the given elements into the mutable array.
@@ -705,8 +705,8 @@ indexPArr (PArr n# arr#) (I# i#)
   | i# >=# 0# && i# <# n# =
     case indexArray# arr# i# of (# e #) -> e
   | otherwise = error $ "indexPArr: out of bounds parallel array index; " ++
-			"idx = " ++ show (I# i#) ++ ", arr len = "
-			++ show (I# n#)
+                        "idx = " ++ show (I# i#) ++ ", arr len = "
+                        ++ show (I# n#)
 
 -- encapsulate writing into a mutable array into the `ST' monad
 --
@@ -717,8 +717,8 @@ writeMPArr (MPArr n# marr#) (I# i#) e
     ST $ \s# ->
     case writeArray# marr# i# e s# of s'# -> (# s'#, () #)
   | otherwise = error $ "writeMPArr: out of bounds parallel array index; " ++
-			"idx = " ++ show (I# i#) ++ ", arr len = "
-			++ show (I# n#)
+                        "idx = " ++ show (I# i#) ++ ", arr len = "
+                        ++ show (I# n#)
 
 #endif /* __HADDOCK__ */
 

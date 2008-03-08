@@ -27,7 +27,7 @@ import Prelude
 import System.IO
 import Control.Exception
 
-import Foreign.C	( CInt )
+import Foreign.C        ( CInt )
 import GHC.IOBase
 import GHC.Exception
 import GHC.Prim (unsafeCoerce#)
@@ -61,7 +61,7 @@ runIO main = catchException main topHandler
 --
 runIOFastExit :: IO a -> IO a
 runIOFastExit main = catchException main topHandlerFastExit
-	-- NB. this is used by the testsuite driver
+        -- NB. this is used by the testsuite driver
 
 -- | The same as 'runIO', but for non-IO computations.  Used for
 -- wrapping @foreign export@ and @foreign import \"wrapper\"@ when these
@@ -85,18 +85,18 @@ real_handler :: (Int -> IO a) -> Exception -> IO a
 real_handler exit exn =
   cleanUp >>
   case exn of
-	AsyncException StackOverflow -> do
-	   reportStackOverflow
-	   exit 2
+        AsyncException StackOverflow -> do
+           reportStackOverflow
+           exit 2
 
-	-- only the main thread gets ExitException exceptions
-	ExitException ExitSuccess     -> exit 0
-	ExitException (ExitFailure n) -> exit n
+        -- only the main thread gets ExitException exceptions
+        ExitException ExitSuccess     -> exit 0
+        ExitException (ExitFailure n) -> exit n
 
-	other -> do
-	   reportError other
-	   exit 1
-	   
+        other -> do
+           reportError other
+           exit 1
+           
 
 reportStackOverflow :: IO a
 reportStackOverflow = do callStackOverflowHook; return undefined
@@ -110,7 +110,7 @@ reportError ex = do
 -- SUP: Are the hooks allowed to re-enter Haskell land?  If so, remove
 -- the unsafe below.
 foreign import ccall unsafe "stackOverflow"
-	callStackOverflowHook :: IO ()
+        callStackOverflowHook :: IO ()
 
 -- try to flush stdout/stderr, but don't worry if we fail
 -- (these handles might have errors, and we don't want to go into

@@ -14,27 +14,27 @@
 
 module Data.IORef
   ( 
-	-- * IORefs
-	IORef,		      -- abstract, instance of: Eq, Typeable
-	newIORef,	      -- :: a -> IO (IORef a)
-        readIORef,	      -- :: IORef a -> IO a
-        writeIORef,	      -- :: IORef a -> a -> IO ()
-	modifyIORef,	      -- :: IORef a -> (a -> a) -> IO ()
-	atomicModifyIORef,    -- :: IORef a -> (a -> (a,b)) -> IO b
+        -- * IORefs
+        IORef,                -- abstract, instance of: Eq, Typeable
+        newIORef,             -- :: a -> IO (IORef a)
+        readIORef,            -- :: IORef a -> IO a
+        writeIORef,           -- :: IORef a -> a -> IO ()
+        modifyIORef,          -- :: IORef a -> (a -> a) -> IO ()
+        atomicModifyIORef,    -- :: IORef a -> (a -> (a,b)) -> IO b
 
 #if !defined(__PARALLEL_HASKELL__) && defined(__GLASGOW_HASKELL__)
-	mkWeakIORef,          -- :: IORef a -> IO () -> IO (Weak (IORef a))
+        mkWeakIORef,          -- :: IORef a -> IO () -> IO (Weak (IORef a))
 #endif
-	) where
+        ) where
 
-import Prelude	-- Explicit dependency helps 'make depend' do the right thing
+import Prelude  -- Explicit dependency helps 'make depend' do the right thing
 
 #ifdef __HUGS__
 import Hugs.IORef
 #endif
 
 #ifdef __GLASGOW_HASKELL__
-import GHC.Base		( mkWeak#, atomicModifyMutVar# )
+import GHC.Base         ( mkWeak#, atomicModifyMutVar# )
 import GHC.STRef
 import GHC.IOBase
 #if !defined(__PARALLEL_HASKELL__)
@@ -79,10 +79,10 @@ atomicModifyIORef :: IORef a -> (a -> (a,b)) -> IO b
 atomicModifyIORef (IORef (STRef r#)) f = IO $ \s -> atomicModifyMutVar# r# f s
 
 #elif defined(__HUGS__)
-atomicModifyIORef = plainModifyIORef	-- Hugs has no preemption
+atomicModifyIORef = plainModifyIORef    -- Hugs has no preemption
   where plainModifyIORef r f = do
-		a <- readIORef r
-		case f a of (a',b) -> writeIORef r a' >> return b
+                a <- readIORef r
+                case f a of (a',b) -> writeIORef r a' >> return b
 #elif defined(__NHC__)
 atomicModifyIORef r f =
   excludeFinalisers $ do

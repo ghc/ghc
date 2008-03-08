@@ -14,9 +14,9 @@
 
 module Data.Unique (
    -- * Unique objects
-   Unique,		-- instance (Eq, Ord)
-   newUnique, 		-- :: IO Unique
-   hashUnique 		-- :: Unique -> Int
+   Unique,              -- instance (Eq, Ord)
+   newUnique,           -- :: IO Unique
+   hashUnique           -- :: Unique -> Int
  ) where
 
 import Prelude
@@ -26,7 +26,7 @@ import System.IO.Unsafe (unsafePerformIO)
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.Num 	( Integer(..) )
+import GHC.Num  ( Integer(..) )
 #endif
 
 -- | An abstract unique object.  Objects of type 'Unique' may be
@@ -55,7 +55,7 @@ hashUnique :: Unique -> Int
 #ifdef __GLASGOW_HASKELL__ 
 hashUnique (Unique (S# i))   = I# i
 hashUnique (Unique (J# s d)) | s ==# 0#  = 0
-			     | otherwise = I# (indexIntArray# d 0#)
+                             | otherwise = I# (indexIntArray# d 0#)
 #else
 hashUnique (Unique u) = fromInteger (u `mod` (toInteger (maxBound :: Int) + 1))
 #endif

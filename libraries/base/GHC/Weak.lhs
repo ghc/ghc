@@ -20,8 +20,8 @@ module GHC.Weak where
 
 import GHC.Base
 import Data.Maybe
-import GHC.IOBase	( IO(..), unIO )
-import Data.Typeable	( Typeable1(..), mkTyCon, mkTyConApp )
+import GHC.IOBase       ( IO(..), unIO )
+import Data.Typeable    ( Typeable1(..), mkTyCon, mkTyConApp )
 
 {-|
 A weak pointer object with a key and a value.  The value has type @v@.
@@ -72,10 +72,10 @@ INSTANCE_TYPEABLE1(Weak,weakTc,"Weak")
 --
 -- This is the most general interface for building a weak pointer.
 --
-mkWeak  :: k				-- ^ key
-	-> v				-- ^ value
-	-> Maybe (IO ())		-- ^ finalizer
-	-> IO (Weak v)			-- ^ returns: a weak pointer object
+mkWeak  :: k                            -- ^ key
+        -> v                            -- ^ value
+        -> Maybe (IO ())                -- ^ finalizer
+        -> IO (Weak v)                  -- ^ returns: a weak pointer object
 
 mkWeak key val (Just finalizer) = IO $ \s ->
    case mkWeak# key val finalizer s of { (# s1, w #) -> (# s1, Weak w #) }
@@ -93,17 +93,17 @@ runs, hence it is in the 'IO' monad.
 deRefWeak :: Weak v -> IO (Maybe v)
 deRefWeak (Weak w) = IO $ \s ->
    case deRefWeak# w s of
-	(# s1, flag, p #) -> case flag of
-				0# -> (# s1, Nothing #)
-				_  -> (# s1, Just p #)
+        (# s1, flag, p #) -> case flag of
+                                0# -> (# s1, Nothing #)
+                                _  -> (# s1, Just p #)
 
 -- | Causes a the finalizer associated with a weak pointer to be run
 -- immediately.
 finalize :: Weak v -> IO ()
 finalize (Weak w) = IO $ \s ->
    case finalizeWeak# w s of
-	(# s1, 0#, _ #) -> (# s1, () #)	-- already dead, or no finaliser
-	(# s1, _,  f #) -> f s1
+        (# s1, 0#, _ #) -> (# s1, () #) -- already dead, or no finaliser
+        (# s1, _,  f #) -> f s1
 
 {-
 Instance Eq (Weak v) where
@@ -121,13 +121,13 @@ Instance Eq (Weak v) where
 runFinalizerBatch :: Int -> Array# (IO ()) -> IO ()
 runFinalizerBatch (I# n) arr = 
    let  go m  = IO $ \s ->
-		  case m of 
-		  0# -> (# s, () #)
-		  _  -> let m' = m -# 1# in
-			case indexArray# arr m' of { (# io #) -> 
-			case unIO io s of	   { (# s, _ #) -> 
-			unIO (go m') s
-			}}
+                  case m of 
+                  0# -> (# s, () #)
+                  _  -> let m' = m -# 1# in
+                        case indexArray# arr m' of { (# io #) -> 
+                        case unIO io s of          { (# s, _ #) -> 
+                        unIO (go m') s
+                        }}
    in
         go n
 
