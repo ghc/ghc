@@ -6585,7 +6585,7 @@ data S = S {-# UNPACK #-} !Int {-# UNPACK #-} !Int
 The programmer can specify rewrite rules as part of the source program
 (in a pragma).  GHC applies these rewrite rules wherever it can, provided (a) 
 the <option>-O</option> flag (<xref linkend="options-optimise"/>) is on, 
-and (b) the <option>-frules-off</option> flag
+and (b) the <option>-fno-rewrite-rules</option> flag
 (<xref linkend="options-f"/>) is not specified, and (c) the
 <option>-fglasgow-exts</option> (<xref linkend="options-language"/>)
 flag is active.
