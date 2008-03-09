@@ -44,7 +44,6 @@ module StaticFlags (
 	opt_IrrefutableTuples,
 	opt_Parallel,
 	opt_RuntimeTypes,
-	opt_Flatten,
 
 	-- optimisation opts
 	opt_NoMethodSharing, 
@@ -301,7 +300,6 @@ opt_Hpc				= lookUp FSLIT("-fhpc")
 opt_DictsStrict			= lookUp  FSLIT("-fdicts-strict")
 opt_IrrefutableTuples		= lookUp  FSLIT("-firrefutable-tuples")
 opt_Parallel			= lookUp  FSLIT("-fparallel")
-opt_Flatten			= lookUp  FSLIT("-fflatten")
 
 -- optimisation opts
 opt_SpecInlineJoinPoints	= lookUp  FSLIT("-fspec-inline-join-points")
@@ -367,7 +365,6 @@ isStaticFlag f =
 	"fspec-inline-join-points",
 	"firrefutable-tuples",
 	"fparallel",
-	"fflatten",
 	"fgransim",
 	"fno-hi-version-check",
 	"dno-black-holing",
@@ -604,7 +601,7 @@ way_details =
 
     (WayNDP, Way  "ndp" False "Nested data parallelism"
 	[ "-fparr"
-	, "-fflatten"]),
+	, "-fvectorise"]),
 
     (WayUser_a,  Way  "a"  False "User way 'a'"  ["$WAY_a_REAL_OPTS"]),	
     (WayUser_b,  Way  "b"  False "User way 'b'"  ["$WAY_b_REAL_OPTS"]),	

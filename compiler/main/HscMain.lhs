@@ -40,7 +40,6 @@ import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
 import Linker		( HValue, linkExpr )
 import CoreTidy		( tidyExpr )
 import CorePrep		( corePrepExpr )
-import Flattening	( flattenExpr )
 import Desugar          ( deSugarExpr )
 import SimplCore        ( simplifyExpr )
 import TcRnDriver	( tcRnStmt, tcRnExpr, tcRnType ) 
@@ -961,11 +960,8 @@ compileExpr hsc_env srcspan ds_expr
   = do	{ let { dflags  = hsc_dflags hsc_env ;
 		lint_on = dopt Opt_DoCoreLinting dflags }
 	      
-		-- Flatten it
-	; flat_expr <- flattenExpr hsc_env ds_expr
-
 		-- Simplify it
-	; simpl_expr <- simplifyExpr dflags flat_expr
+	; simpl_expr <- simplifyExpr dflags ds_expr
 
 		-- Tidy it (temporary, until coreSat does cloning)
 	; let tidy_expr = tidyExpr emptyTidyEnv simpl_expr

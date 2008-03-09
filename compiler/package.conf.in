@@ -94,9 +94,6 @@ exposed-modules:
 	FieldLabel
 	Finder
 	FiniteMap
-	FlattenInfo
-	FlattenMonad
-	Flattening
 	FloatIn
 	FloatOut
 	ForeignCall
@@ -150,7 +147,6 @@ exposed-modules:
 	MkIface
 	Module
 	NCGMonad
-	NDPCoreUtils
 	Name
 	NameEnv
 	NameSet
@@ -294,7 +290,6 @@ import-dirs:   FPTOOLS_TOP_ABS"/compiler/stage"STAGE"/utils",
 	       FPTOOLS_TOP_ABS"/compiler/stage"STAGE"/profiling",
 	       FPTOOLS_TOP_ABS"/compiler/stage"STAGE"/parser",
 	       FPTOOLS_TOP_ABS"/compiler/stage"STAGE"/cprAnalysis",
-	       FPTOOLS_TOP_ABS"/compiler/stage"STAGE"/ndpFlatten",
 	       FPTOOLS_TOP_ABS"/compiler/stage"STAGE"/iface",
 	       FPTOOLS_TOP_ABS"/compiler/stage"STAGE"/cmm",
 	       FPTOOLS_TOP_ABS"/compiler/stage"STAGE"/nativeGen"

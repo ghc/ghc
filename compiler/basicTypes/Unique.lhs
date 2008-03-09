@@ -286,7 +286,6 @@ Allocation of unique supply characters:
 	d	desugarer
 	f	AbsC flattener
 	g	SimplStg
-	l	ndpFlatten
 	n	Native codegen
 	r	Hsc name cache
 	s	simplifier
