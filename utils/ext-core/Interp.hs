@@ -50,7 +50,7 @@ data PrimValue =                -- values of the (unboxed) primitive types
 --  etc., etc.
   deriving (Eq,Show)
 
-type Menv = Env Mname Venv	-- modules
+type Menv = Env AnMname Venv	-- modules
 
 initialGlobalEnv :: Menv
 initialGlobalEnv =
@@ -60,8 +60,9 @@ initialGlobalEnv =
 {- Heap management. -}
 {- Nothing is said about garbage collection. -}
 
-data Heap = Heap Ptr (Env Ptr HeapValue) -- last cell allocated; environment of allocated cells
-  deriving (Show)
+data Heap = Heap Ptr (Env Ptr HeapValue) 
+    -- last cell allocated; environment of allocated cells
+  deriving Show
 
 hallocate :: Heap -> HeapValue -> (Heap,Ptr)
 hallocate (Heap last contents) v = 
@@ -137,7 +138,8 @@ evalProgram :: [Module] -> Value
 evalProgram modules =
  runE(
   do globalEnv <- foldM evalModule initialGlobalEnv modules
-     Vutuple [_,v] <- evalExp globalEnv eempty (App (Var ("Main","main")) (Var (primMname,"realWorldzh")))
+     Vutuple [_,v] <- evalExp globalEnv eempty (App (Var mainVar) 
+                        (Var (qual primMname "realWorldzh")))
      return v)
 
 {- Environments:
@@ -175,11 +177,10 @@ evalModule globalEnv (Module mn tdefs vdefgs) =
     evalVdef :: (Venv,Venv) -> Vdefg -> Eval (Venv,Venv)
     evalVdef (e_env,l_env) (Nonrec(Vdef((m,x),t,e))) =
      do p <- hallocateE (suspendExp l_env e)
-	let heaps = 
-	       if m == "" then 
-		 (e_env,eextend l_env (x,Vheap p))
-	       else 
-		 (eextend e_env (x,Vheap p),l_env)
+	let heaps =
+               case m of
+                 Nothing -> (e_env,eextend l_env (x,Vheap p))
+	         _       -> (eextend e_env (x,Vheap p),l_env)
 	return heaps
     evalVdef (e_env,l_env) (Rec vdefs) =
       do l_vs0 <- mapM preallocate l_xs
@@ -191,8 +192,8 @@ evalModule globalEnv (Module mn tdefs vdefgs) =
 	 let e_env' = foldl eextend e_env (zip e_xs e_vs)
 	 return (e_env',l_env')            
       where 
-	 (l_xs,l_es) = unzip [(x,e) | Vdef(("",x),_,e) <- vdefs]
-	 (e_xs,e_es) = unzip [(x,e) | Vdef((m,x),_,e) <- vdefs, m /= ""]
+	 (l_xs,l_es) = unzip [(x,e) | Vdef((Nothing,x),_,e) <- vdefs]
+	 (e_xs,e_es) = unzip [(x,e) | Vdef((Just m,x),_,e) <- vdefs]
 	 preallocate _ =
 	   do p <- hallocateE undefined
 	      return (Vheap p)
@@ -241,7 +242,7 @@ evalExp globalEnv env (App e1 e2) = evalApp env e1 [e2]
 	    {- allocate a thunk -}
      	    do p <- hallocateE (Hconstr c vs)
   	       return (Vheap p)
-    evalApp env (op @ (Var(m,p))) es | m == primMname =
+    evalApp env (op @ (Var(v@(_,p)))) es | isPrimVar v =
       do vs <- evalExps globalEnv env es
          case (p,vs) of
    	   ("raisezh",[exn]) -> raiseE exn
@@ -254,7 +255,7 @@ evalExp globalEnv env (App e1 e2) = evalApp env e1 [e2]
 	 evalExternal s vs
     evalApp env (Appt e _) es = evalApp env e es
     evalApp env (Lam (Tb _) e) es = evalApp env e es
-    evalApp env (Coerce _ e) es = evalApp env e es
+    evalApp env (Cast e _) es = evalApp env e es
     evalApp env (Note _ e) es = evalApp env e es
     evalApp env e es = 
       {- e must now evaluate to a closure -}
@@ -299,7 +300,7 @@ evalExp globalEnv env (Let vdef e) =
 	  do h <- hlookupE p
 	     hupdateE p0 h
 	
-evalExp globalEnv env (Case e (x,_) alts) =  
+evalExp globalEnv env (Case e (x,_) _ alts) =  
   do z <- evalExp globalEnv env e
      let env' = eextend env (x,z)
      case z of
@@ -345,7 +346,7 @@ evalExp globalEnv env (Case e (x,_) alts) =
     evalDefaultAlt :: Venv -> [Alt] -> Eval Value
     evalDefaultAlt env [Adefault e] = evalExp globalEnv env e
 
-evalExp globalEnv env (Coerce _ e) = evalExp globalEnv env e
+evalExp globalEnv env (Cast e _) = evalExp globalEnv env e
 evalExp globalEnv env (Note _ e) = evalExp globalEnv env e
 evalExp globalEnv env (External s t) = evalExternal s []
 
@@ -361,7 +362,7 @@ suspendExp globalEnv env (Lam (Vb(x,_)) e) =
    where env' = thin env (delete x (freevarsExp e))
 suspendExp globalEnv env (Lam _ e) = suspendExp globalEnv env e
 suspendExp globalEnv env (Appt e _) = suspendExp globalEnv env e
-suspendExp globalEnv env (Coerce _ e) = suspendExp globalEnv env e
+suspendExp globalEnv env (Cast e _) = suspendExp globalEnv env e
 suspendExp globalEnv env (Note _ e) = suspendExp globalEnv env e
 suspendExp globalEnv env (External s _) = evalExternal s []
 suspendExp globalEnv env e = 
@@ -373,11 +374,11 @@ suspendExps :: Menv -> Venv -> [Exp] -> Eval [Value]
 suspendExps globalEnv env = mapM (suspendExp globalEnv env)
 
 mlookup :: Menv -> Venv -> Mname -> Venv
-mlookup _          env       "" = env
-mlookup globalEnv  _         m  = 
+mlookup _          env       Nothing  = env
+mlookup globalEnv  _         (Just m) = 
     case elookup globalEnv m of
       Just env' -> env'
-      Nothing -> error ("undefined module name: " ++ m)
+      Nothing -> error ("undefined module name: " ++ show m)
 
 qlookup :: Menv -> Venv -> (Mname,Var) -> Value
 qlookup globalEnv env (m,k) =   
@@ -424,7 +425,7 @@ thin env vars = efilter env (`elem` vars)
 {- Return the free non-external variables in an expression. -}
 
 freevarsExp :: Exp -> [Var]
-freevarsExp (Var ("",v)) = [v]
+freevarsExp (Var (Nothing,v)) = [v]
 freevarsExp (Var qv) = []
 freevarsExp (Dcon _) = []
 freevarsExp (Lit _) = []
@@ -436,12 +437,12 @@ freevarsExp (Let vdefg e) = freevarsVdefg vdefg `union` freevarsExp e
   where freevarsVdefg (Rec vdefs) = (foldl union [] (map freevarsExp es)) \\ vs
             where (vs,es) = unzip [(v,e) | Vdef((_,v),_,e) <- vdefs]	
         freevarsVdefg (Nonrec (Vdef (_,_,e))) = freevarsExp e
-freevarsExp (Case e (v,_) as) = freevarsExp e `union` [v] `union` freevarsAlts as
+freevarsExp (Case e (v,_) _ as) = freevarsExp e `union` [v] `union` freevarsAlts as
   where freevarsAlts alts = foldl union [] (map freevarsAlt alts)
         freevarsAlt (Acon _ _ vbs e) = freevarsExp e \\ (map fst vbs) 
         freevarsAlt (Alit _ e) = freevarsExp e
         freevarsAlt (Adefault e) = freevarsExp e
-freevarsExp (Coerce _ e) = freevarsExp e
+freevarsExp (Cast e _) = freevarsExp e
 freevarsExp (Note _ e) =  freevarsExp e
 freevarsExp (External _ _) = []
 

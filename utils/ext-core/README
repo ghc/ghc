@@ -7,3 +7,5 @@ All can be built using, e.g.,
 happy -o Parser.hs Parser.y
 ghc --make -package text -fglasgow-exts  -o Driver Driver.hs
 
+Most recently tested with GHC 6.8.1. I make no claims of portability. --tjc
+

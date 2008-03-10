@@ -9,7 +9,7 @@ import Check
 
 initialEnv :: Menv
 initialEnv = efromlist [(primMname,primEnv),
-		     ("PrelErr",errorEnv)]
+		     (errMname,errorEnv)]
 
 primEnv :: Envs
 primEnv = Envs {tcenv_=efromlist primTcs,
@@ -93,10 +93,11 @@ dcUtuples = map ( \n -> (dcUtuple n, typ n)) [1..100]
 					     (tUtuple (map Tvar tvs)) tvs) tvs
 		      where tvs = map ( \i -> ("a" ++ (show i))) [1..n]
 
+pv = qual primMname
+pvz = (qual primMname) . (++ "zh")
 
 {- Addrzh -}
-
-tcAddrzh = (primMname,"Addrzh")
+tcAddrzh = pvz "Addr"
 tAddrzh = Tcon tcAddrzh
 ktAddrzh = Kunlifted
 
@@ -114,7 +115,7 @@ opsAddrzh = [
 
 {- Charzh -}
 
-tcCharzh = (primMname,"Charzh")
+tcCharzh = pvz "Char"
 tCharzh = Tcon tcCharzh
 ktCharzh = Kunlifted
 
@@ -130,7 +131,7 @@ opsCharzh = [
 
 {- Doublezh -}
 
-tcDoublezh = (primMname, "Doublezh")
+tcDoublezh = pvz "Double"
 tDoublezh = Tcon tcDoublezh
 ktDoublezh = Kunlifted
 
@@ -166,7 +167,7 @@ opsDoublezh = [
 
 {- Floatzh -}
 
-tcFloatzh = (primMname, "Floatzh")
+tcFloatzh = pvz "Float"
 tFloatzh = Tcon tcFloatzh
 ktFloatzh = Kunlifted
 
@@ -202,7 +203,7 @@ opsFloatzh = [
 
 {- Intzh -}
 
-tcIntzh = (primMname,"Intzh")
+tcIntzh = pvz "Int"
 tIntzh = Tcon tcIntzh
 ktIntzh = Kunlifted
 
@@ -236,7 +237,7 @@ opsIntzh = [
 
 {- Int32zh -}
 
-tcInt32zh = (primMname,"Int32zh")
+tcInt32zh = pvz "Int32"
 tInt32zh = Tcon tcInt32zh
 ktInt32zh = Kunlifted
 
@@ -247,7 +248,7 @@ opsInt32zh = [
 
 {- Int64zh -}
 
-tcInt64zh = (primMname,"Int64zh")
+tcInt64zh = pvz "Int64"
 tInt64zh = Tcon tcInt64zh
 ktInt64zh = Kunlifted
 
@@ -289,7 +290,7 @@ opsIntegerzh = [
 
 {- Wordzh -}
 
-tcWordzh = (primMname,"Wordzh")
+tcWordzh = pvz "Word"
 tWordzh = Tcon tcWordzh
 ktWordzh = Kunlifted
 
@@ -317,7 +318,7 @@ opsWordzh = [
 
 {- Word32zh -}
 
-tcWord32zh = (primMname,"Word32zh")
+tcWord32zh = pvz "Word32"
 tWord32zh = Tcon tcWord32zh
 ktWord32zh = Kunlifted
 
@@ -327,7 +328,7 @@ opsWord32zh = [
 
 {- Word64zh -}
 
-tcWord64zh = (primMname,"Word64zh")
+tcWord64zh = pvz "Word64"
 tWord64zh = Tcon tcWord64zh
 ktWord64zh = Kunlifted
 
@@ -346,19 +347,19 @@ opsSized = [
 
 {- Arrays -}
 
-tcArrayzh = (primMname,"Arrayzh")
+tcArrayzh = pvz "Array"
 tArrayzh t = Tapp (Tcon tcArrayzh) t
 ktArrayzh = Karrow Klifted Kunlifted
 
-tcByteArrayzh = (primMname,"ByteArrayzh")
+tcByteArrayzh = pvz "ByteArray"
 tByteArrayzh = Tcon tcByteArrayzh
 ktByteArrayzh = Kunlifted
 
-tcMutableArrayzh = (primMname,"MutableArrayzh")
+tcMutableArrayzh = pvz "MutableArray"
 tMutableArrayzh s t = Tapp (Tapp (Tcon tcMutableArrayzh) s) t
 ktMutableArrayzh = Karrow Klifted (Karrow Klifted Kunlifted)
 
-tcMutableByteArrayzh = (primMname,"MutableByteArrayzh")
+tcMutableByteArrayzh = pvz "MutableByteArray"
 tMutableByteArrayzh s = Tapp (Tcon tcMutableByteArrayzh) s
 ktMutableByteArrayzh = Karrow Klifted Kunlifted
 
@@ -588,7 +589,7 @@ opsArray = [
 
 {- MutVars -}
 
-tcMutVarzh = (primMname,"MutVarzh")
+tcMutVarzh = pvz "MutVar"
 tMutVarzh s t = Tapp (Tapp (Tcon tcMutVarzh) s) t
 ktMutVarzh = Karrow Klifted (Karrow Klifted Kunlifted)
 
@@ -617,11 +618,12 @@ opsMutVarzh = [
 
 {- Real world and state. -}
 
-tcRealWorld = (primMname,"RealWorld")
+-- tjc: why isn't this one unboxed?
+tcRealWorld = pv "RealWorld"
 tRealWorld = Tcon tcRealWorld
 ktRealWorld = Klifted
 
-tcStatezh = (primMname, "Statezh")
+tcStatezh = pvz "State"
 tStatezh t = Tapp (Tcon tcStatezh) t
 ktStatezh = Karrow Klifted Kunlifted
 
@@ -653,7 +655,7 @@ opsExn = [
 
 {- Mvars -} 
 
-tcMVarzh = (primMname, "MVarzh")
+tcMVarzh = pvz "MVar"
 tMVarzh s t = Tapp (Tapp (Tcon tcMVarzh) s) t
 ktMVarzh = Karrow Klifted (Karrow Klifted Kunlifted)
 
@@ -698,7 +700,7 @@ opsMVar = [
 
 {- Weak Objects -}
 
-tcWeakzh = (primMname, "Weakzh")
+tcWeakzh = pvz "Weak"
 tWeakzh t = Tapp (Tcon tcWeakzh) t
 ktWeakzh = Karrow Klifted Kunlifted
 
@@ -722,7 +724,7 @@ opsWeak = [
 
 {- Foreign Objects -}
 
-tcForeignObjzh = (primMname, "ForeignObjzh")
+tcForeignObjzh = pvz "ForeignObj"
 tForeignObjzh = Tcon tcForeignObjzh
 ktForeignObjzh = Kunlifted
 
@@ -741,7 +743,7 @@ opsForeignObjzh = [
 
 {- Stable Pointers (but not names) -}
 
-tcStablePtrzh = (primMname, "StablePtrzh")
+tcStablePtrzh = pvz "StablePtr"
 tStablePtrzh t = Tapp (Tcon tcStablePtrzh) t
 ktStablePtrzh = Karrow Klifted Kunlifted
 
@@ -758,7 +760,7 @@ opsStablePtrzh = [
 
 {- Concurrency  operations -}
 
-tcThreadIdzh = (primMname,"ThreadIdzh")
+tcThreadIdzh = pvz "ThreadId"
 tThreadIdzh = Tcon tcThreadIdzh
 ktThreadIdzh = Kunlifted
 
@@ -799,17 +801,19 @@ opsMisc =  [
    We just define the type constructors for the dictionaries
    corresponding to these pseudo-classes. -}
 
-tcZCTCCallable = (primMname,"ZCTCCallable")
+tcZCTCCallable = pv "ZCTCCallable"
 ktZCTCCallable = Karrow Kopen Klifted  -- ??
-tcZCTCReturnable = (primMname,"ZCTCReturnable")
+tcZCTCReturnable = pv "ZCTCReturnable"
 ktZCTCReturnable = Karrow Kopen Klifted  -- ??
 
 {- Non-primitive, but mentioned in the types of primitives. -}
 
-tcUnit = ("PrelBase","Unit")
+bv = qual baseMname
+
+tcUnit = bv "Unit"
 tUnit = Tcon tcUnit
 ktUnit = Klifted
-tcBool = ("PrelBase","Bool")
+tcBool = bv "Bool"
 tBool = Tcon tcBool
 ktBool = Klifted
 
@@ -819,10 +823,10 @@ errorVals = [
  ("irrefutPatError", Tforall ("a",Kopen) (tArrow tString (Tvar "a"))),
  ("patError", Tforall ("a",Kopen) (tArrow tString (Tvar "a")))]
   
-tcChar = ("PrelBase","Char")
+tcChar = bv "Char"
 tChar = Tcon tcChar
 ktChar = Klifted
-tcList = ("PrelBase","ZMZN")
+tcList = bv "ZMZN"
 tList t = Tapp (Tcon tcList) t
 ktList = Karrow Klifted Klifted
 tString = tList tChar

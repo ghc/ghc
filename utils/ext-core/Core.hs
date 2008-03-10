@@ -3,7 +3,7 @@ module Core where
 import List (elemIndex)
 
 data Module 
- = Module Mname [Tdef] [Vdefg]
+ = Module AnMname [Tdef] [Vdefg]
 
 data Tdef 
   = Data (Qual Tcon) [Tbind] [Cdef]
@@ -22,12 +22,16 @@ data Exp
   = Var (Qual Var)
   | Dcon (Qual Dcon)
   | Lit Lit
+-- Why were type apps and value apps distinguished,
+-- but not type lambdas and value lambdas?
   | App Exp Exp
   | Appt Exp Ty
   | Lam Bind Exp 	  
   | Let Vdefg Exp
-  | Case Exp Vbind [Alt] {- non-empty list -}
-  | Coerce Ty Exp 
+-- Ty is new
+  | Case Exp Vbind Ty [Alt] {- non-empty list -}
+-- Renamed to Cast; switched order
+  | Cast Exp Ty
   | Note String Exp
   | External String Ty
 
@@ -63,7 +67,19 @@ data Lit
   | Lstring String Ty
   deriving (Eq)  -- with nearlyEqualTy 
 
-type Mname = Id
+-- new: Pnames
+-- this requires at least one module name,
+-- and possibly other hierarchical names
+-- an alternative would be to flatten the
+-- module namespace, either when printing out
+-- Core or (probably preferably) in a 
+-- preprocessor.
+-- Maybe because the empty module name is a module name (represented as
+-- Nothing.)
+
+type Mname = Maybe AnMname
+type AnMname = (Pname, [Id], Id)
+type Pname = Id
 type Var = Id
 type Tvar = Id
 type Tcon = Id
@@ -71,7 +87,15 @@ type Dcon = Id
 
 type Qual t = (Mname,t)
 
+qual :: AnMname -> t -> Qual t
+qual mn t = (Just mn, t)
+
+unqual :: t -> Qual t
+unqual = (,) Nothing
+
 type Id = String
+
+--- tjc: I haven't looked at the rest of this file. ---
 
 {- Doesn't expand out fully applied newtype synonyms
    (for which an environment is needed). -}
@@ -100,24 +124,40 @@ baseKind :: Kind -> Bool
 baseKind (Karrow _ _ ) = False
 baseKind _ = True
 
-primMname = "PrelGHC"
+isPrimVar (Just mn,_) = mn == primMname
+isPrimVar _ = False
+
+primMname = mkBaseMname "Prim"
+errMname  = mkBaseMname "Err"
+mkBaseMname :: Id -> AnMname
+mkBaseMname mn = (basePkg, ghcPrefix, mn)
+basePkg = "base"
+mainPkg = "main"
+ghcPrefix = ["GHC"]
+mainPrefix = []
+baseMname = mkBaseMname "Base"
+mainVar = qual mainMname "main"
+mainMname = (mainPkg, mainPrefix, "Main")
 
 tcArrow :: Qual Tcon
-tcArrow = (primMname, "ZLzmzgZR")
+tcArrow = (Just primMname, "ZLzmzgZR")
 
 tArrow :: Ty -> Ty -> Ty
 tArrow t1 t2 = Tapp (Tapp (Tcon tcArrow) t1) t2
+
 
 ktArrow :: Kind
 ktArrow = Karrow Kopen (Karrow Kopen Klifted)
 
 {- Unboxed tuples -}
 
+-- tjc: not sure whether anything that follows is right
+
 maxUtuple :: Int
 maxUtuple = 100
 
 tcUtuple :: Int -> Qual Tcon
-tcUtuple n = (primMname,"Z"++ (show n) ++ "H")
+tcUtuple n = (Just primMname,"Z"++ (show n) ++ "H")
 
 ktUtuple :: Int -> Kind
 ktUtuple n = foldr Karrow Kunlifted (replicate n Kopen)
@@ -131,7 +171,7 @@ isUtupleTy (Tcon tc) = tc `elem` [tcUtuple n | n <- [1..maxUtuple]]
 isUtupleTy _ = False
 
 dcUtuple :: Int -> Qual Dcon
-dcUtuple n = (primMname,"ZdwZ" ++ (show n) ++ "H")
+dcUtuple n = (Just primMname,"ZdwZ" ++ (show n) ++ "H")
 
 isUtupleDc :: Qual Dcon -> Bool
 isUtupleDc dc = dc `elem` [dcUtuple n | n <- [1..maxUtuple]]

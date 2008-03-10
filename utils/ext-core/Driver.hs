@@ -44,6 +44,7 @@ main = do (_,modules) <- foldM process (initialEnv,[]) flist
 	  let result = evalProgram modules
 	  putStrLn ("Result = " ++ show result)
 	  putStrLn "All done"
+-- TODO
        where flist = 	 ["PrelBase.hcr",
 			  "PrelMaybe.hcr",
 			  "PrelTup.hcr",

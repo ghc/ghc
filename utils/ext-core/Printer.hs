@@ -1,9 +1,10 @@
 module Printer where
 
-import Pretty
-import Core
-import Char
+import Text.PrettyPrint.HughesPJ
 import Numeric (fromRat)
+import Char
+
+import Core
 
 instance Show Module where
   showsPrec d m = shows (pmodule m)
@@ -38,8 +39,10 @@ instance Show Lit where
 
 indent = nest 2
 
+-- seems like this is asking for a type class...
+
 pmodule (Module mname tdefs vdefgs) =
-  (text "%module" <+> text mname)
+  (text "%module" <+> panmname mname)
   $$ indent ((vcat (map ((<> char ';') . ptdef) tdefs))
 	     $$ (vcat (map ((<> char ';') . pvdefg) vdefgs)))
 
@@ -58,8 +61,14 @@ pcdef (Constr qdcon tbinds tys)  =
 
 pname id = text id
 
-pqname ("",id) = pname id
-pqname (m,id) = pname m <> char '.' <> pname id
+pqname (m,id) = pmname m <> char '.' <> pname id
+
+pmname Nothing = empty
+pmname (Just m) = panmname m
+
+panmname (pkgName, parents, name) = pname pkgName <> char ':' 
+  <> (sep (punctuate (char '.') (map pname parents)))
+  <> char '.' <> pname name
 
 ptbind (t,Klifted) = pname t
 ptbind (t,k) = parens (pname t <> text "::" <> pkind k)
@@ -122,10 +131,10 @@ pappexp e as = fsep (paexp e : map pa as)
 
 pexp (Lam b e) = char '\\' <+> plamexp [b] e
 pexp (Let vd e) = (text "%let" <+> pvdefg vd) $$ (text "%in" <+> pexp e)
-pexp (Case e vb alts) = sep [text "%case" <+> paexp e,
+pexp (Case e vb t alts) = sep [text "%case" <+> pty t <+> paexp e,
 			     text "%of" <+> pvbind vb]
 			$$ (indent (braces (vcat (punctuate (char ';') (map palt alts)))))
-pexp (Coerce t e) = (text "%coerce" <+> paty t) $$ pexp e
+pexp (Cast e t) = (text "%cast" <+> paty t) $$ pexp e
 pexp (Note s e) = (text "%note" <+> pstring s) $$ pexp e
 pexp (External n t) = (text "%extcall" <+> pstring n) $$ paty t
 pexp e = pfexp e

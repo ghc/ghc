@@ -25,7 +25,7 @@ data Token =
  | TKin 
  | TKcase 
  | TKof 
- | TKcoerce 
+ | TKcast
  | TKnote 
  | TKexternal
  | TKwild
@@ -42,6 +42,7 @@ data Token =
  | TKbiglambda
  | TKat 
  | TKdot
+ | TKcolon
  | TKquestion
  | TKsemicolon
  | TKname String 

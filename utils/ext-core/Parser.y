@@ -20,7 +20,7 @@ import Lex
  '%in'		{ TKin }
  '%case'	{ TKcase }
  '%of'		{ TKof }
- '%coerce'	{ TKcoerce }
+ '%cast'	{ TKcast }
  '%note'	{ TKnote }
  '%external'	{ TKexternal }
  '%_'		{ TKwild }
@@ -36,6 +36,7 @@ import Lex
  '\\'		{ TKlambda}
  '@'		{ TKat }
  '.'		{ TKdot }
+ ':'		{ TKcolon }
  '?'		{ TKquestion}
  ';'            { TKsemicolon }
  NAME		{ TKname $$ }
@@ -172,10 +173,10 @@ exp	:: { Exp }
 		{ foldr Lam $4 $2 }
 	| '%let' vdefg '%in' exp 
 		{ Let $2 $4 }
-	| '%case' aexp '%of' vbind '{' alts1 '}'
-		{ Case $2 $4 $6 }
-	| '%coerce' aty exp 
-		{ Coerce $2 $3 }
+	| '%case' ty aexp '%of' vbind '{' alts1 '}'
+		{ Case $3 $5 $2 $7 }
+	| '%cast' exp aty 
+		{ Cast $2 $3 }
 	| '%note' STRING exp 
 		{ Note $2 $3 }
         | '%external' STRING aty
@@ -209,17 +210,29 @@ name	:: { Id }
 cname	:: { Id }
 	: CNAME	{ $1 }
          
-mname	:: { Id }
-	: CNAME	{ $1 }
+mname	:: { AnMname }
+        : pkgName ':' mnames '.' name
+             { ($1, $3, $5) }
 
-qname	:: { (Id,Id) }
-	: name	{ ("",$1) }
+pkgName :: { Id }
+        : NAME { $1 }
+
+mnames :: { [Id] } 
+         : {- empty -} {[]}
+         | name '.' mnames {$1:$3}
+
+-- it sucks to have to repeat the Maybe-checking twice,
+-- but otherwise we get reduce/reduce conflicts
+
+qname	:: { (Mname,Id) }
+        : name { (Nothing, $1) }
 	| mname '.' name 
-		{ ($1,$3) }
+		{ (Just $1,$3) }
 
-qcname	:: { (Id,Id) }
-        : mname '.' cname 
-		{ ($1,$3) }
+qcname	:: { (Mname,Id) }
+        : cname { (Nothing, $1) }
+        | mname '.' cname 
+		{ (Just $1,$3) }
 
 
 {
