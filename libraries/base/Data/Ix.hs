@@ -16,12 +16,12 @@
 module Data.Ix
     (
     -- * The 'Ix' class
-	Ix
-	  ( range	-- :: (Ix a) => (a,a) -> [a]
-	  , index       -- :: (Ix a) => (a,a) -> a   -> Int
-	  , inRange     -- :: (Ix a) => (a,a) -> a   -> Bool
-	  , rangeSize	-- :: (Ix a) => (a,a) -> Int
-	  )
+        Ix
+          ( range       -- :: (Ix a) => (a,a) -> [a]
+          , index       -- :: (Ix a) => (a,a) -> a   -> Int
+          , inRange     -- :: (Ix a) => (a,a) -> a   -> Bool
+          , rangeSize   -- :: (Ix a) => (a,a) -> Int
+          )
     -- Ix instances:
     --
     --  Ix Char
@@ -46,13 +46,13 @@ module Data.Ix
     -- is the same numbering defined by the 'Enum' class. For example, given
     -- the datatype: 
     -- 
-    -- >	data Colour = Red | Orange | Yellow | Green | Blue | Indigo | Violet
+    -- >        data Colour = Red | Orange | Yellow | Green | Blue | Indigo | Violet
     -- 
     -- we would have: 
     -- 
-    -- >	range   (Yellow,Blue)        ==  [Yellow,Green,Blue]
-    -- >	index   (Yellow,Blue) Green  ==  1
-    -- >	inRange (Yellow,Blue) Red    ==  False
+    -- >        range   (Yellow,Blue)        ==  [Yellow,Green,Blue]
+    -- >        index   (Yellow,Blue) Green  ==  1
+    -- >        inRange (Yellow,Blue) Red    ==  False
     -- 
     -- * For single-constructor datatypes, the derived instance declarations
     -- are as shown for tuples in Figure 1

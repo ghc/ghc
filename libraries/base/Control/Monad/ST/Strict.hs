@@ -13,7 +13,7 @@
 -----------------------------------------------------------------------------
 
 module Control.Monad.ST.Strict (
- 	module Control.Monad.ST
+        module Control.Monad.ST
   ) where
 
 import Prelude

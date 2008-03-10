@@ -15,21 +15,21 @@
 -----------------------------------------------------------------------------
 
 module Control.Monad.ST.Lazy (
-	-- * The 'ST' monad
-	ST,
-	runST,
-	fixST,
+        -- * The 'ST' monad
+        ST,
+        runST,
+        fixST,
 
-	-- * Converting between strict and lazy 'ST'
-	strictToLazyST, lazyToStrictST,
+        -- * Converting between strict and lazy 'ST'
+        strictToLazyST, lazyToStrictST,
 
-	-- * Converting 'ST' To 'IO'
-	RealWorld,
-	stToIO,
+        -- * Converting 'ST' To 'IO'
+        RealWorld,
+        stToIO,
 
-	-- * Unsafe operations
-	unsafeInterleaveST,
-	unsafeIOToST
+        -- * Unsafe operations
+        unsafeInterleaveST,
+        unsafeIOToST
     ) where
 
 import Prelude
@@ -80,7 +80,7 @@ instance Monad (ST s) where
 
         return a = ST $ \ s -> (a,s)
         m >> k   =  m >>= \ _ -> k
-	fail s   = error s
+        fail s   = error s
 
         (ST m) >>= k
          = ST $ \ s ->
@@ -102,15 +102,15 @@ runST st = case st of ST the_st -> let (r,_) = the_st (S# realWorld#) in r
 -- Note that if @f@ is strict, @'fixST' f = _|_@.
 fixST :: (a -> ST s a) -> ST s a
 fixST m = ST (\ s -> 
-		let 
-		   ST m_r = m r
-		   (r,s') = m_r s
-		in
-		   (r,s'))
+                let 
+                   ST m_r = m r
+                   (r,s') = m_r s
+                in
+                   (r,s'))
 #endif
 
 instance MonadFix (ST s) where
-	mfix = fixST
+        mfix = fixST
 
 -- ---------------------------------------------------------------------------
 -- Strict <--> Lazy
@@ -124,11 +124,11 @@ the lazy state thread it returns is demanded.
 strictToLazyST :: ST.ST s a -> ST s a
 strictToLazyST m = ST $ \s ->
         let 
-  	   pr = case s of { S# s# -> GHC.ST.liftST m s# }
-	   r  = case pr of { GHC.ST.STret _ v -> v }
-	   s' = case pr of { GHC.ST.STret s2# _ -> S# s2# }
-	in
-	(r, s')
+           pr = case s of { S# s# -> GHC.ST.liftST m s# }
+           r  = case pr of { GHC.ST.STret _ v -> v }
+           s' = case pr of { GHC.ST.STret s2# _ -> S# s2# }
+        in
+        (r, s')
 
 {-| 
 Convert a lazy 'ST' computation into a strict one.

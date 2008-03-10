@@ -24,10 +24,10 @@
 -----------------------------------------------------------------------------
 
 module Data.Version (
-	-- * The @Version@ type
-	Version(..),
-	-- * A concrete representation of @Version@
-	showVersion, parseVersion,
+        -- * The @Version@ type
+        Version(..),
+        -- * A concrete representation of @Version@
+        showVersion, parseVersion,
   ) where
 
 import Prelude -- necessary to get dependencies right
@@ -44,16 +44,16 @@ import Distribution.Compat.ReadP
 #endif
 
 #if !__GLASGOW_HASKELL__
-import Data.Typeable 	( Typeable, TyCon, mkTyCon, mkTyConApp )
+import Data.Typeable    ( Typeable, TyCon, mkTyCon, mkTyConApp )
 #elif __GLASGOW_HASKELL__ < 602
-import Data.Dynamic	( Typeable(..), TyCon, mkTyCon, mkAppTy )
+import Data.Dynamic     ( Typeable(..), TyCon, mkTyCon, mkAppTy )
 #else
-import Data.Typeable 	( Typeable )
+import Data.Typeable    ( Typeable )
 #endif
 
-import Data.List	( intersperse, sort )
-import Control.Monad	( liftM )
-import Data.Char	( isDigit, isAlphaNum )
+import Data.List        ( intersperse, sort )
+import Control.Monad    ( liftM )
+import Data.Char        ( isDigit, isAlphaNum )
 
 {- |
 A 'Version' represents the version of a software entity.  
@@ -80,29 +80,29 @@ representation may be more appropriate.
 -}
 data Version = 
   Version { versionBranch :: [Int],
-		-- ^ The numeric branch for this version.  This reflects the
-		-- fact that most software versions are tree-structured; there
-		-- is a main trunk which is tagged with versions at various
-		-- points (1,2,3...), and the first branch off the trunk after
-		-- version 3 is 3.1, the second branch off the trunk after
-		-- version 3 is 3.2, and so on.  The tree can be branched
-		-- arbitrarily, just by adding more digits.
-		-- 
-		-- We represent the branch as a list of 'Int', so
-		-- version 3.2.1 becomes [3,2,1].  Lexicographic ordering
-		-- (i.e. the default instance of 'Ord' for @[Int]@) gives
-		-- the natural ordering of branches.
+                -- ^ The numeric branch for this version.  This reflects the
+                -- fact that most software versions are tree-structured; there
+                -- is a main trunk which is tagged with versions at various
+                -- points (1,2,3...), and the first branch off the trunk after
+                -- version 3 is 3.1, the second branch off the trunk after
+                -- version 3 is 3.2, and so on.  The tree can be branched
+                -- arbitrarily, just by adding more digits.
+                -- 
+                -- We represent the branch as a list of 'Int', so
+                -- version 3.2.1 becomes [3,2,1].  Lexicographic ordering
+                -- (i.e. the default instance of 'Ord' for @[Int]@) gives
+                -- the natural ordering of branches.
 
-	   versionTags :: [String]  -- really a bag
-		-- ^ A version can be tagged with an arbitrary list of strings.
-		-- The interpretation of the list of tags is entirely dependent
-		-- on the entity that this version applies to.
-	}
+           versionTags :: [String]  -- really a bag
+                -- ^ A version can be tagged with an arbitrary list of strings.
+                -- The interpretation of the list of tags is entirely dependent
+                -- on the entity that this version applies to.
+        }
   deriving (Read,Show
 #if __GLASGOW_HASKELL__ >= 602
-	,Typeable
+        ,Typeable
 #endif
-	)
+        )
 
 #if !__GLASGOW_HASKELL__
 versionTc :: TyCon

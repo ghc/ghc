@@ -13,30 +13,30 @@
 -----------------------------------------------------------------------------
 
 module Data.Complex
-	(
-	-- * Rectangular form
-	  Complex((:+))
+        (
+        -- * Rectangular form
+          Complex((:+))
 
-	, realPart	-- :: (RealFloat a) => Complex a -> a
-	, imagPart      -- :: (RealFloat a) => Complex a -> a
-	-- * Polar form
-	, mkPolar       -- :: (RealFloat a) => a -> a -> Complex a
-	, cis           -- :: (RealFloat a) => a -> Complex a
-	, polar         -- :: (RealFloat a) => Complex a -> (a,a)
-	, magnitude     -- :: (RealFloat a) => Complex a -> a
-	, phase         -- :: (RealFloat a) => Complex a -> a
-	-- * Conjugate
-	, conjugate     -- :: (RealFloat a) => Complex a -> Complex a
+        , realPart      -- :: (RealFloat a) => Complex a -> a
+        , imagPart      -- :: (RealFloat a) => Complex a -> a
+        -- * Polar form
+        , mkPolar       -- :: (RealFloat a) => a -> a -> Complex a
+        , cis           -- :: (RealFloat a) => a -> Complex a
+        , polar         -- :: (RealFloat a) => Complex a -> (a,a)
+        , magnitude     -- :: (RealFloat a) => Complex a -> a
+        , phase         -- :: (RealFloat a) => Complex a -> a
+        -- * Conjugate
+        , conjugate     -- :: (RealFloat a) => Complex a -> Complex a
 
-	-- Complex instances:
-	--
-	--  (RealFloat a) => Eq         (Complex a)
-	--  (RealFloat a) => Read       (Complex a)
-	--  (RealFloat a) => Show       (Complex a)
-	--  (RealFloat a) => Num        (Complex a)
-	--  (RealFloat a) => Fractional (Complex a)
-	--  (RealFloat a) => Floating   (Complex a)
-	-- 
+        -- Complex instances:
+        --
+        --  (RealFloat a) => Eq         (Complex a)
+        --  (RealFloat a) => Read       (Complex a)
+        --  (RealFloat a) => Show       (Complex a)
+        --  (RealFloat a) => Num        (Complex a)
+        --  (RealFloat a) => Fractional (Complex a)
+        --  (RealFloat a) => Floating   (Complex a)
+        -- 
         -- Implementation checked wrt. Haskell 98 lib report, 1/99.
 
         )  where
@@ -63,12 +63,12 @@ infix  6  :+
 -- but oriented in the positive real direction, whereas @'signum' z@
 -- has the phase of @z@, but unit magnitude.
 data (RealFloat a) => Complex a
-  = !a :+ !a	-- ^ forms a complex number from its real and imaginary
-		-- rectangular components.
+  = !a :+ !a    -- ^ forms a complex number from its real and imaginary
+                -- rectangular components.
 # if __GLASGOW_HASKELL__
-	deriving (Eq, Show, Read, Data)
+        deriving (Eq, Show, Read, Data)
 # else
-	deriving (Eq, Show, Read)
+        deriving (Eq, Show, Read)
 # endif
 
 -- -----------------------------------------------------------------------------
@@ -84,42 +84,42 @@ imagPart (_ :+ y) =  y
 
 -- | The conjugate of a complex number.
 {-# SPECIALISE conjugate :: Complex Double -> Complex Double #-}
-conjugate	 :: (RealFloat a) => Complex a -> Complex a
+conjugate        :: (RealFloat a) => Complex a -> Complex a
 conjugate (x:+y) =  x :+ (-y)
 
 -- | Form a complex number from polar components of magnitude and phase.
 {-# SPECIALISE mkPolar :: Double -> Double -> Complex Double #-}
-mkPolar		 :: (RealFloat a) => a -> a -> Complex a
-mkPolar r theta	 =  r * cos theta :+ r * sin theta
+mkPolar          :: (RealFloat a) => a -> a -> Complex a
+mkPolar r theta  =  r * cos theta :+ r * sin theta
 
 -- | @'cis' t@ is a complex value with magnitude @1@
 -- and phase @t@ (modulo @2*'pi'@).
 {-# SPECIALISE cis :: Double -> Complex Double #-}
-cis		 :: (RealFloat a) => a -> Complex a
-cis theta	 =  cos theta :+ sin theta
+cis              :: (RealFloat a) => a -> Complex a
+cis theta        =  cos theta :+ sin theta
 
 -- | The function 'polar' takes a complex number and
 -- returns a (magnitude, phase) pair in canonical form:
 -- the magnitude is nonnegative, and the phase in the range @(-'pi', 'pi']@;
 -- if the magnitude is zero, then so is the phase.
 {-# SPECIALISE polar :: Complex Double -> (Double,Double) #-}
-polar		 :: (RealFloat a) => Complex a -> (a,a)
-polar z		 =  (magnitude z, phase z)
+polar            :: (RealFloat a) => Complex a -> (a,a)
+polar z          =  (magnitude z, phase z)
 
 -- | The nonnegative magnitude of a complex number.
 {-# SPECIALISE magnitude :: Complex Double -> Double #-}
 magnitude :: (RealFloat a) => Complex a -> a
 magnitude (x:+y) =  scaleFloat k
-		     (sqrt ((scaleFloat mk x)^(2::Int) + (scaleFloat mk y)^(2::Int)))
-		    where k  = max (exponent x) (exponent y)
-		          mk = - k
+                     (sqrt ((scaleFloat mk x)^(2::Int) + (scaleFloat mk y)^(2::Int)))
+                    where k  = max (exponent x) (exponent y)
+                          mk = - k
 
 -- | The phase of a complex number, in the range @(-'pi', 'pi']@.
 -- If the magnitude is zero, then so is the phase.
 {-# SPECIALISE phase :: Complex Double -> Double #-}
 phase :: (RealFloat a) => Complex a -> a
-phase (0 :+ 0)   = 0		-- SLPJ July 97 from John Peterson
-phase (x:+y)	 = atan2 y x
+phase (0 :+ 0)   = 0            -- SLPJ July 97 from John Peterson
+phase (x:+y)     = atan2 y x
 
 
 -- -----------------------------------------------------------------------------
@@ -131,33 +131,33 @@ INSTANCE_TYPEABLE1(Complex,complexTc,"Complex")
 instance  (RealFloat a) => Num (Complex a)  where
     {-# SPECIALISE instance Num (Complex Float) #-}
     {-# SPECIALISE instance Num (Complex Double) #-}
-    (x:+y) + (x':+y')	=  (x+x') :+ (y+y')
-    (x:+y) - (x':+y')	=  (x-x') :+ (y-y')
-    (x:+y) * (x':+y')	=  (x*x'-y*y') :+ (x*y'+y*x')
-    negate (x:+y)	=  negate x :+ negate y
-    abs z		=  magnitude z :+ 0
-    signum (0:+0)	=  0
-    signum z@(x:+y)	=  x/r :+ y/r  where r = magnitude z
-    fromInteger n	=  fromInteger n :+ 0
+    (x:+y) + (x':+y')   =  (x+x') :+ (y+y')
+    (x:+y) - (x':+y')   =  (x-x') :+ (y-y')
+    (x:+y) * (x':+y')   =  (x*x'-y*y') :+ (x*y'+y*x')
+    negate (x:+y)       =  negate x :+ negate y
+    abs z               =  magnitude z :+ 0
+    signum (0:+0)       =  0
+    signum z@(x:+y)     =  x/r :+ y/r  where r = magnitude z
+    fromInteger n       =  fromInteger n :+ 0
 #ifdef __HUGS__
-    fromInt n		=  fromInt n :+ 0
+    fromInt n           =  fromInt n :+ 0
 #endif
 
 instance  (RealFloat a) => Fractional (Complex a)  where
     {-# SPECIALISE instance Fractional (Complex Float) #-}
     {-# SPECIALISE instance Fractional (Complex Double) #-}
-    (x:+y) / (x':+y')	=  (x*x''+y*y'') / d :+ (y*x''-x*y'') / d
-			   where x'' = scaleFloat k x'
-				 y'' = scaleFloat k y'
-				 k   = - max (exponent x') (exponent y')
-				 d   = x'*x'' + y'*y''
+    (x:+y) / (x':+y')   =  (x*x''+y*y'') / d :+ (y*x''-x*y'') / d
+                           where x'' = scaleFloat k x'
+                                 y'' = scaleFloat k y'
+                                 k   = - max (exponent x') (exponent y')
+                                 d   = x'*x'' + y'*y''
 
-    fromRational a	=  fromRational a :+ 0
+    fromRational a      =  fromRational a :+ 0
 #ifdef __HUGS__
-    fromDouble a	=  fromDouble a :+ 0
+    fromDouble a        =  fromDouble a :+ 0
 #endif
 
-instance  (RealFloat a) => Floating (Complex a)	where
+instance  (RealFloat a) => Floating (Complex a) where
     {-# SPECIALISE instance Floating (Complex Float) #-}
     {-# SPECIALISE instance Floating (Complex Double) #-}
     pi             =  pi :+ 0

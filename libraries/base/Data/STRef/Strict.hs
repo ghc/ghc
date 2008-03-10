@@ -13,7 +13,7 @@
 -----------------------------------------------------------------------------
 
 module Data.STRef.Strict (
- 	module Data.STRef
+        module Data.STRef
   ) where
 
 import Prelude

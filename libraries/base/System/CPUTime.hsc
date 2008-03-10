@@ -13,9 +13,9 @@
 -----------------------------------------------------------------------------
 
 module System.CPUTime 
-	(
+        (
          getCPUTime,       -- :: IO Integer
-	 cpuTimePrecision  -- :: Integer
+         cpuTimePrecision  -- :: Integer
         ) where
 
 import Prelude
@@ -67,7 +67,7 @@ getCPUTime = do
     let realToInteger = round . realToFrac :: Real a => a -> Integer
     return ((realToInteger u_sec * 1000000 + realToInteger u_usec + 
              realToInteger s_sec * 1000000 + realToInteger s_usec) 
-		* 1000000)
+                * 1000000)
 
 type CRUsage = ()
 foreign import ccall unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
@@ -79,15 +79,15 @@ foreign import ccall unsafe getrusage :: CInt -> Ptr CRUsage -> IO CInt
     s_ticks  <- (#peek struct tms,tms_stime) p_tms :: IO CClock
     let realToInteger = round . realToFrac :: Real a => a -> Integer
     return (( (realToInteger u_ticks + realToInteger s_ticks) * 1000000000000) 
-			`div` fromIntegral clockTicks)
+                        `div` fromIntegral clockTicks)
 
 type CTms = ()
 foreign import ccall unsafe times :: Ptr CTms -> IO CClock
 # else
     ioException (IOError Nothing UnsupportedOperation 
-			 "getCPUTime"
-		         "can't get CPU time"
-			 Nothing)
+                         "getCPUTime"
+                         "can't get CPU time"
+                         Nothing)
 # endif
 #endif
 
@@ -106,12 +106,12 @@ foreign import ccall unsafe times :: Ptr CTms -> IO CClock
       return (ut + kt)
      else return 0
   where 
-	ft2psecs :: Ptr FILETIME -> IO Integer
+        ft2psecs :: Ptr FILETIME -> IO Integer
         ft2psecs ft = do
           high <- (#peek FILETIME,dwHighDateTime) ft :: IO Word32
           low  <- (#peek FILETIME,dwLowDateTime)  ft :: IO Word32
-	    -- Convert 100-ns units to picosecs (10^-12) 
-	    -- => multiply by 10^5.
+            -- Convert 100-ns units to picosecs (10^-12) 
+            -- => multiply by 10^5.
           return (((fromIntegral high) * (2^32) + (fromIntegral low)) * 100000)
 
     -- ToDo: pin down elapsed times to just the OS thread(s) that
