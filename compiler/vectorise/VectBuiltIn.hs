@@ -226,6 +226,7 @@ preludeVars
     , mk nDP_PRELUDE_INT  FSLIT("plus") nDP_PRELUDE_INT FSLIT("plusV")
     , mk nDP_PRELUDE_INT  FSLIT("minus") nDP_PRELUDE_INT FSLIT("minusV")
     , mk nDP_PRELUDE_INT  FSLIT("mult")  nDP_PRELUDE_INT FSLIT("multV")
+    , mk nDP_PRELUDE_INT  FSLIT("intDiv")  nDP_PRELUDE_INT FSLIT("intDivV")
     , mk nDP_PRELUDE_INT  FSLIT("sumP")  nDP_PRELUDE_INT FSLIT("sumPA")
     , mk nDP_PRELUDE_INT  FSLIT("upToP") nDP_PRELUDE_INT FSLIT("upToPA")
 
