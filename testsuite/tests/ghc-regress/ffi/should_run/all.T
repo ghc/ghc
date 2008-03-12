@@ -66,16 +66,15 @@ test('ffi010', expect_fail_for(['extcore','optextcore']), compile_and_run, [''])
 
 test('ffi011', normal, compile_and_run, [''])
 
-# The stdcall calling convention only exists on i386,
-# so ffi012 should fail everywhere else.
+# The stdcall calling convention works on Windows, and sometimes on
+# Linux, and fails everywhhere else.  For now, we test only on Windows,
+# because it's difficult to discover whether a given Linux supports
+# it.
 
-if config.platform.startswith("i386-"):
-  if config.platform.startswith("i386-apple"):
-	f = expect_fail
-  else:
+if config.platform == 'i386-unknown-mingw32':
 	f = normal
 else:
-	f = expect_fail
+	f = skip
 
 test('ffi012', f, compile_and_run, [''])
 
