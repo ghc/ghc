@@ -55,7 +55,7 @@ test('ffi008', compose(expect_fail_for(['extcore','optextcore']),
 if config.platform == 'i386-unknown-openbsd':
 	ways = expect_fail_for(['extcore','optextcore'])
 elif config.platform.startswith('i386-'):
-	ways = only_ways(['optc','profc'])
+	ways = only_ways(['optc','profc','ghci'])
 else:
 	ways = expect_fail_for(['extcore','optextcore'])
 
