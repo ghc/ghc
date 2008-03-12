@@ -316,6 +316,11 @@ interactiveUI session srcs maybe_exprs = do
         is_tty <- hIsTerminalDevice stdin
         when is_tty $ do
             Readline.initialize
+
+            withGhcAppData
+                 (\dir -> Readline.readHistory (dir </> "ghci_history"))
+                 (return True)
+            
             Readline.setAttemptedCompletionFunction (Just completeWord)
             --Readline.parseAndBind "set show-all-if-ambiguous 1"
 
@@ -349,10 +354,21 @@ interactiveUI session srcs maybe_exprs = do
                  }
 
 #ifdef USE_READLINE
+   Readline.stifleHistory 100
+   withGhcAppData (\dir -> Readline.writeHistory (dir </> "ghci_history"))
+                  (return True)
    Readline.resetTerminal Nothing
 #endif
 
    return ()
+
+withGhcAppData :: (FilePath -> IO a) -> IO a -> IO a
+withGhcAppData right left = do
+   either_dir <- IO.try (getAppUserDataDirectory "ghc")
+   case either_dir of
+      Right dir -> right dir
+      _ -> left
+
 
 runGHCi :: [(FilePath, Maybe Phase)] -> Maybe [String] -> GHCi ()
 runGHCi paths maybe_exprs = do
@@ -361,11 +377,9 @@ runGHCi paths maybe_exprs = do
 
    current_dir = return (Just ".ghci")
 
-   app_user_dir = do
-    either_dir <- io $ IO.try (getAppUserDataDirectory "ghc")
-    case either_dir of
-      Right dir -> return (Just (dir </> "ghci.conf"))
-      _ -> return Nothing
+   app_user_dir = io $ withGhcAppData 
+                    (\dir -> return (Just (dir </> "ghci.conf")))
+                    (return Nothing)
 
    home_dir = do
     either_dir <- io $ IO.try (getEnv "HOME")
