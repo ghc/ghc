@@ -308,7 +308,7 @@ builtinPAs bi
   where
     mk name mod fs = (name, mod, fs)
 
-    tups = map mk_tup [2..3]
+    tups = map mk_tup [2..mAX_NDP_PROD]
     mk_tup n = mk (tyConName $ tupleTyCon Boxed n)
                   nDP_INSTANCES
                   (mkFastString $ "dPA_" ++ show n)
