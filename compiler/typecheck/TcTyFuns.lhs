@@ -8,7 +8,6 @@ module TcTyFuns (
 	normaliseGivenEqs, normaliseGivenDicts, 
 	normaliseWantedEqs, normaliseWantedDicts,
 	solveWantedEqs,
-	substEqInDictInsts,
 	
         -- errors
         misMatchMsg, failWithMisMatch

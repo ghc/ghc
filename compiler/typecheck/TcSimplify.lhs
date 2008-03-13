@@ -1785,12 +1785,14 @@ reduceContext env wanteds
 	  -- NB: normalisation includes zonking as part of what it does
 	  --     so it's important to do it after any unifications
 	  --     that happened as a result of the addGivens
-	; (wanted_dicts,normalise_binds1) <- normaliseWantedDicts given_eqs wanted_dicts0
+	; (wanted_dicts, normalise_binds1) 
+            <- normaliseWantedDicts given_eqs wanted_dicts0
 
           -- 6. Solve the *wanted* *dictionary* constraints (not implications)
 	  --    This may expose some further equational constraints...
 	; (avails, extra_eqs) <- getLIE (reduceList env wanted_dicts init_state)
-	; (dict_binds, bound_dicts, dict_irreds) <- extractResults avails wanted_dicts
+	; (dict_binds, bound_dicts, dict_irreds) 
+            <- extractResults avails wanted_dicts
 	; traceTc $ text "reduceContext extractresults" <+> vcat
 		      [ppr avails,ppr wanted_dicts,ppr dict_binds]
 
@@ -1801,8 +1803,10 @@ reduceContext env wanteds
 	  -- as "given"   all the dicts that were originally given, 
 	  --		  *or* for which we now have bindings, 
 	  --		  *or* which are now irreds
-	; let implic_env = env { red_givens = givens ++ bound_dicts ++ dict_irreds }
-	; (implic_binds_s, implic_irreds_s) <- mapAndUnzipM (reduceImplication implic_env) wanted_implics0
+	; let implic_env = env { red_givens = givens ++ bound_dicts 
+                                              ++ dict_irreds }
+	; (implic_binds_s, implic_irreds_s) 
+            <- mapAndUnzipM (reduceImplication implic_env) wanted_implics0
 	; let implic_binds  = unionManyBags implic_binds_s
 	      implic_irreds = concat implic_irreds_s
 
@@ -1813,28 +1817,33 @@ reduceContext env wanteds
 	  --    each other 
 	; eq_irreds <- normaliseWantedEqs eq_irreds0
 
-	  -- 8. Substitute the wanted *equations* in the wanted *dictionaries*
+	  -- 8. Normalise the wanted *dictionaries* wrt the wanted *equations* 
+          --    and top-level equalities
+          -- TODO: reduceList may have introduced dictionaries with type
+          --       terms as parameters that haven't be normalised wrt to the
+          --       given equalities yet...
 	; let irreds = dict_irreds ++ implic_irreds
-	; (norm_irreds, normalise_binds2) <- substEqInDictInsts True {-wanted-}
-                                                                eq_irreds irreds
+	; (norm_irreds, normalise_binds2) 
+            <- normaliseWantedDicts eq_irreds irreds
 		
-	  -- 9. eliminate the artificial skolem constants introduced in 1.
---	; eliminate_skolems	
-
-	  -- Figure out whether we should go round again
-  	  -- My current plan is to see if any of the mutable tyvars in
-	  -- givens or irreds has been filled in by improvement.  
-	  -- If so, there is merit in going around again, because
-	  -- we may make further progress
+	  -- Figure out whether we should go round again.  We do so in either
+          -- two cases:
+          -- (1) If any of the mutable tyvars in givens or irreds has been
+          --     filled in by improvement, there is merit in going around 
+          --     again, because we may make further progress.
+          -- (2) If we managed to normalise any dicts, there is merit in going
+          --     around gain, because reduceList may be able to get further.
 	  -- 
-	  -- ToDo: is it only mutable stuff?  We may have exposed new
+	  -- ToDo: We may have exposed new
 	  --	   equality constraints and should probably go round again
 	  --	   then as well.  But currently we are dropping them on the
 	  --	   floor anyway.
 
 	; let all_irreds = norm_irreds ++ eq_irreds
-	; improved <- anyM isFilledMetaTyVar $ varSetElems $
-		      tyVarsOfInsts (givens ++ all_irreds)
+	; improvedMetaTy <- anyM isFilledMetaTyVar $ varSetElems $
+		            tyVarsOfInsts (givens ++ all_irreds)
+        ; let improvedDicts = not $ isEmptyBag normalise_binds2
+              improved      = improvedMetaTy || improvedDicts
 
 	-- The old plan (fragile)
 	-- improveed   = availsImproved avails 
