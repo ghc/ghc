@@ -1,10 +1,4 @@
 
-FD3.hs:22:14:
-    Could not deduce (MkA (String, a) a) from the context ()
-      arising from a use of `mkA' at FD3.hs:22:14-18
-    Possible fix:
-      add (MkA (String, a) a) to the context of
-	the type signature for `translate'
-      or add an instance declaration for (MkA (String, a) a)
-    In the expression: mkA a
-    In the definition of `translate': translate a = mkA a
+FD3.hs:15:0:
+    Occurs check: cannot construct the infinite type: a = (String, a)
+    When generalising the type(s) for `translate'
