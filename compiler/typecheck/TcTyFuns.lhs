@@ -7,7 +7,6 @@ module TcTyFuns (
 
 	normaliseGivenEqs, normaliseGivenDicts, 
 	normaliseWantedEqs, normaliseWantedDicts,
-	solveWantedEqs,
 	
         -- errors
         misMatchMsg, failWithMisMatch
@@ -310,38 +309,12 @@ normaliseGivenEqs givens
 \end{code}
 
 \begin{code}
-normaliseWantedEqs :: [Inst] -> TcM [Inst]
-normaliseWantedEqs insts 
-  = do { traceTc (text "normaliseWantedEqs <-" <+> ppr insts)
-       ; result <- liftM fst $ rewriteToFixedPoint Nothing
-		     [ ("(ZONK)",    dontRerun $ zonkInsts)
-		     , ("(TRIVIAL)", dontRerun $ trivialRule)
-		     , ("(DECOMP)",  decompRule)
-		     , ("(TOP)",     topRule)
-		     , ("(UNIFY)",   unifyMetaRule)      -- incl. occurs check
-		     , ("(SUBST)",   substRule)          -- incl. occurs check
-                     ] insts
-       ; traceTc (text "normaliseWantedEqs ->" <+> ppr result)
-       ; return result
-       }
-\end{code}
-
-
-%************************************************************************
-%*									*
-\section{Solving of wanted constraints with respect to a given set}
-%*									*
-%************************************************************************
-
-The set of given equalities must have been normalised already.
-
-\begin{code}
-solveWantedEqs :: [Inst]        -- givens
-	     -> [Inst] 	        -- wanteds
-	     -> TcM [Inst]	-- irreducible wanteds
-solveWantedEqs givens wanteds 
-  = do { traceTc $ text "solveWantedEqs <-" <+> ppr wanteds <+> text "with" <+> 
-                   ppr givens
+normaliseWantedEqs :: [Inst]        -- givens
+	           -> [Inst] 	    -- wanteds
+	           -> TcM [Inst]    -- irreducible wanteds
+normaliseWantedEqs givens wanteds 
+  = do { traceTc $ text "normaliseWantedEqs <-" <+> ppr wanteds 
+                   <+> text "with" <+> ppr givens
        ; result <- liftM fst $ rewriteToFixedPoint Nothing
                      [ ("(ZONK)",    dontRerun $ zonkInsts)
                      , ("(TRIVIAL)", dontRerun $ trivialRule)
@@ -349,8 +322,9 @@ solveWantedEqs givens wanteds
                      , ("(TOP)",     topRule)
                      , ("(GIVEN)",   substGivens givens) -- incl. occurs check
                      , ("(UNIFY)",   unifyMetaRule)      -- incl. occurs check
+		     , ("(SUBST)",   substRule)          -- incl. occurs check
                      ] wanteds
-       ; traceTc (text "solveWantedEqs ->" <+> ppr result)
+       ; traceTc (text "normaliseWantedEqs ->" <+> ppr result)
        ; return result
        }
   where

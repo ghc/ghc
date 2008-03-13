@@ -1754,12 +1754,12 @@ reduceContext env wanteds
 	; let givens 		 	   = red_givens env
 	      (given_eqs0, given_dicts0)   = partition isEqInst givens
 	      (wanted_eqs0, wanted_non_eqs) = partition isEqInst wanteds
-	      (wanted_implics0, wanted_dicts0) = partition isImplicInst wanted_non_eqs
+	      (wanted_implics0, wanted_dicts) = partition isImplicInst wanted_non_eqs
 
           -- We want to add as wanted equalities those that (transitively) 
           -- occur in superclass contexts of wanted class constraints.
           -- See Note [Ancestor Equalities]
-	; ancestor_eqs <- ancestorEqualities wanted_dicts0
+	; ancestor_eqs <- ancestorEqualities wanted_dicts
         ; let wanted_eqs = wanted_eqs0 ++ ancestor_eqs
 	; traceTc $ text "reduceContext: ancestor eqs" <+> ppr ancestor_eqs
 
@@ -1780,24 +1780,13 @@ reduceContext env wanteds
 	-- *** ToDo: what to do with the "extra_givens"?  For the
 	-- moment I'm simply discarding them, which is probably wrong
 
-	  -- 7. Normalise the *wanted* *dictionary* constraints
-	  --    wrt. the toplevel and given equations
-	  -- NB: normalisation includes zonking as part of what it does
-	  --     so it's important to do it after any unifications
-	  --     that happened as a result of the addGivens
-	; (wanted_dicts, normalise_binds1) 
-            <- normaliseWantedDicts given_eqs wanted_dicts0
-
           -- 6. Solve the *wanted* *dictionary* constraints (not implications)
 	  --    This may expose some further equational constraints...
 	; (avails, extra_eqs) <- getLIE (reduceList env wanted_dicts init_state)
 	; (dict_binds, bound_dicts, dict_irreds) 
             <- extractResults avails wanted_dicts
 	; traceTc $ text "reduceContext extractresults" <+> vcat
-		      [ppr avails,ppr wanted_dicts,ppr dict_binds]
-
-	-- *** ToDo: what to do with the "extra_eqs"?  For the
-	-- moment I'm simply discarding them, which is probably wrong
+		      [ppr avails, ppr wanted_dicts, ppr dict_binds]
 
 	  -- Solve the wanted *implications*.  In doing so, we can provide
 	  -- as "given"   all the dicts that were originally given, 
@@ -1810,21 +1799,13 @@ reduceContext env wanteds
 	; let implic_binds  = unionManyBags implic_binds_s
 	      implic_irreds = concat implic_irreds_s
 
-	  -- 3. Solve the *wanted* *equation* constraints
-	; eq_irreds0 <- solveWantedEqs given_eqs wanted_eqs
+	  -- Normalise the wanted equality constraints
+	; eq_irreds <- normaliseWantedEqs given_eqs (wanted_eqs ++ extra_eqs)
 
-	  -- 4. Normalise the *wanted* equality constraints with respect to
-	  --    each other 
-	; eq_irreds <- normaliseWantedEqs eq_irreds0
-
-	  -- 8. Normalise the wanted *dictionaries* wrt the wanted *equations* 
-          --    and top-level equalities
-          -- TODO: reduceList may have introduced dictionaries with type
-          --       terms as parameters that haven't be normalised wrt to the
-          --       given equalities yet...
+	  -- Normalise the wanted dictionaries
 	; let irreds = dict_irreds ++ implic_irreds
-	; (norm_irreds, normalise_binds2) 
-            <- normaliseWantedDicts eq_irreds irreds
+              eqs    = eq_irreds ++ given_eqs
+	; (norm_irreds, normalise_binds) <- normaliseWantedDicts eqs irreds
 		
 	  -- Figure out whether we should go round again.  We do so in either
           -- two cases:
@@ -1842,7 +1823,7 @@ reduceContext env wanteds
 	; let all_irreds = norm_irreds ++ eq_irreds
 	; improvedMetaTy <- anyM isFilledMetaTyVar $ varSetElems $
 		            tyVarsOfInsts (givens ++ all_irreds)
-        ; let improvedDicts = not $ isEmptyBag normalise_binds2
+        ; let improvedDicts = not $ isEmptyBag normalise_binds
               improved      = improvedMetaTy || improvedDicts
 
 	-- The old plan (fragile)
@@ -1868,8 +1849,7 @@ reduceContext env wanteds
 	     ]))
 
 	; return (improved, 
-                  given_binds `unionBags` normalise_binds1 
-                              `unionBags` normalise_binds2 
+                  given_binds `unionBags` normalise_binds
                               `unionBags` dict_binds 
                               `unionBags` implic_binds, 
                   all_irreds,
