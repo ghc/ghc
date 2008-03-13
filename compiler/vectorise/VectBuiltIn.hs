@@ -42,7 +42,7 @@ import Control.Monad   ( liftM, zipWithM )
 import Data.List       ( unzip4 )
 
 mAX_NDP_PROD :: Int
-mAX_NDP_PROD = 4
+mAX_NDP_PROD = 5
 
 mAX_NDP_SUM :: Int
 mAX_NDP_SUM = 3
