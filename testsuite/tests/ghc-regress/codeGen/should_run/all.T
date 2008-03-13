@@ -64,3 +64,5 @@ test('cg059', exit_code(1), compile_and_run, [''])
 
 test('1852', normal, compile_and_run, [''])
 test('2080', normal, compile_and_run, [''])
+
+test('cg060', extra_run_opts('+RTS -K64k -RTS'), compile_and_run, [''])
