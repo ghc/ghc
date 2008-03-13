@@ -95,6 +95,8 @@ test('InstEqContext2', if_compiler_lt('ghc', '6.9', expect_fail),
                        compile, [''])
 test('InstEqContext3', normal, compile, [''])
 
+test('InstContextNorm', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
+
 test('HO', normal, compile, [''])
 
 test('GivenCheck', normal, compile, [''])
