@@ -2040,7 +2040,7 @@ breakSwitch :: Session -> [String] -> GHCi ()
 breakSwitch _session [] = do
    io $ putStrLn "The break command requires at least one argument."
 breakSwitch session (arg1:rest) 
-   | looksLikeModuleName arg1 = do
+   | looksLikeModuleName arg1 && not (null rest) = do
         mod <- wantInterpretedModule arg1
         breakByModule mod rest
    | all isDigit arg1 = do
