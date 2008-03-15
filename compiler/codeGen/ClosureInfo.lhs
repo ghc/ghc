@@ -978,7 +978,6 @@ getTyDescription ty
       AppTy fun _      	     -> getTyDescription fun
       FunTy _ res      	     -> '-' : '>' : fun_result res
       TyConApp tycon _ 	     -> getOccString tycon
-      NoteTy (FTVNote _) ty  -> getTyDescription ty
       PredTy sty	     -> getPredTyDescription sty
       ForAllTy _ ty          -> getTyDescription ty
     }

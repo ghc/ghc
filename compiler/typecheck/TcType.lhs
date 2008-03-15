@@ -812,7 +812,6 @@ tcInstHeadTyNotSynonym :: Type -> Bool
 -- are transparent, so we need a special function here
 tcInstHeadTyNotSynonym ty
   = case ty of
-        NoteTy _ ty     -> tcInstHeadTyNotSynonym ty
         TyConApp tc tys -> not (isSynTyCon tc)
         _ -> True
 
@@ -821,7 +820,6 @@ tcInstHeadTyAppAllTyVars :: Type -> Bool
 -- These must be a constructor applied to type variable arguments
 tcInstHeadTyAppAllTyVars ty
   = case ty of
-	NoteTy _ ty     -> tcInstHeadTyAppAllTyVars ty
 	TyConApp _ tys  -> ok tys
 	FunTy arg res   -> ok [arg, res]
 	other		-> False
@@ -832,7 +830,6 @@ tcInstHeadTyAppAllTyVars ty
 	   where
 	     tvs = mapCatMaybes get_tv tys
 
-    get_tv (NoteTy _ ty) = get_tv ty 	-- Again, do not look
     get_tv (TyVarTy tv)  = Just tv	-- through synonyms
     get_tv other  	 = Nothing
 \end{code}
@@ -1020,7 +1017,6 @@ tcTyVarsOfType :: Type -> TcTyVarSet
 tcTyVarsOfType (TyVarTy tv)	    = if isTcTyVar tv then unitVarSet tv
 						      else emptyVarSet
 tcTyVarsOfType (TyConApp tycon tys) = tcTyVarsOfTypes tys
-tcTyVarsOfType (NoteTy _ ty)	    = tcTyVarsOfType ty
 tcTyVarsOfType (PredTy sty)	    = tcTyVarsOfPred sty
 tcTyVarsOfType (FunTy arg res)	    = tcTyVarsOfType arg `unionVarSet` tcTyVarsOfType res
 tcTyVarsOfType (AppTy fun arg)	    = tcTyVarsOfType fun `unionVarSet` tcTyVarsOfType arg
@@ -1084,7 +1080,6 @@ exactTyVarsOfType ty
     go (AppTy fun arg)	    	  = go fun `unionVarSet` go arg
     go (ForAllTy tyvar ty)  	  = delVarSet (go ty) tyvar
                                     `unionVarSet` go_tv tyvar
-    go (NoteTy _ _) 		  = panic "exactTyVarsOfType"	-- Handled by tcView
 
     go_pred (IParam _ ty)    = go ty
     go_pred (ClassP _ tys)   = exactTyVarsOfTypes tys
@@ -1104,7 +1099,6 @@ end of the compiler.
 tyClsNamesOfType :: Type -> NameSet
 tyClsNamesOfType (TyVarTy tv)		    = emptyNameSet
 tyClsNamesOfType (TyConApp tycon tys)	    = unitNameSet (getName tycon) `unionNameSets` tyClsNamesOfTypes tys
-tyClsNamesOfType (NoteTy _ ty2) 	    = tyClsNamesOfType ty2
 tyClsNamesOfType (PredTy (IParam n ty))     = tyClsNamesOfType ty
 tyClsNamesOfType (PredTy (ClassP cl tys))   = unitNameSet (getName cl) `unionNameSets` tyClsNamesOfTypes tys
 tyClsNamesOfType (PredTy (EqPred ty1 ty2))  = tyClsNamesOfType ty1 `unionNameSets` tyClsNamesOfType ty2

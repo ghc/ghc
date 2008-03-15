@@ -177,7 +177,6 @@ make_ty (TyConApp tc ts) 	 = foldl C.Tapp (C.Tcon (make_con_qid (tyConName tc)))
 -- Maybe CoreTidy should know whether to expand newtypes or not?
 
 make_ty (PredTy p)	= make_ty (predTypeRep p)
-make_ty (NoteTy _ t) 	= make_ty t
 
 
 

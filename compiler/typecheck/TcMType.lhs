@@ -222,7 +222,6 @@ checkTauTvUpdate orig_tv orig_ty
 	| isSynTyCon tc  = go_syn tc tys
 	| otherwise	 = do { tys' <- mapM go tys
                               ; return $ occurs (TyConApp tc) tys' }
-    go (NoteTy _ ty2) 	 = go ty2	-- Discard free-tyvar annotations
     go (PredTy p)	 = do { p' <- go_pred p
                               ; return $ occurs1 PredTy p' }
     go (FunTy arg res)   = do { arg' <- go arg
@@ -888,8 +887,6 @@ zonkType :: (TcTyVar -> TcM Type) 	-- What to do with unbound mutable type varia
 zonkType unbound_var_fn ty
   = go ty
   where
-    go (NoteTy _ ty2) 	 = go ty2	-- Discard free-tyvar annotations
-
     go (TyConApp tc tys) = do tys' <- mapM go tys
                               return (TyConApp tc tys')
 
@@ -1111,9 +1108,6 @@ check_type rank ubx_tup ty@(FunTy arg_ty res_ty)
 check_type rank ubx_tup (AppTy ty1 ty2)
   = do	{ check_arg_type rank ty1
 	; check_arg_type rank ty2 }
-
-check_type rank ubx_tup (NoteTy other_note ty)
-  = check_type rank ubx_tup ty
 
 check_type rank ubx_tup ty@(TyConApp tc tys)
   | isSynTyCon tc
@@ -1754,7 +1748,6 @@ fvType :: Type -> [TyVar]
 fvType ty | Just exp_ty <- tcView ty = fvType exp_ty
 fvType (TyVarTy tv)        = [tv]
 fvType (TyConApp _ tys)    = fvTypes tys
-fvType (NoteTy _ ty)       = fvType ty
 fvType (PredTy pred)       = fvPred pred
 fvType (FunTy arg res)     = fvType arg ++ fvType res
 fvType (AppTy fun arg)     = fvType fun ++ fvType arg
@@ -1773,7 +1766,6 @@ sizeType :: Type -> Int
 sizeType ty | Just exp_ty <- tcView ty = sizeType exp_ty
 sizeType (TyVarTy _)       = 1
 sizeType (TyConApp _ tys)  = sizeTypes tys + 1
-sizeType (NoteTy _ ty)     = sizeType ty
 sizeType (PredTy pred)     = sizePred pred
 sizeType (FunTy arg res)   = sizeType arg + sizeType res + 1
 sizeType (AppTy fun arg)   = sizeType fun + sizeType arg

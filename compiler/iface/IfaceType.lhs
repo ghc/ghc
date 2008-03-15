@@ -297,8 +297,6 @@ toIfaceType (ForAllTy tv t) =
   IfaceForAllTy (toIfaceTvBndr tv) (toIfaceType t)
 toIfaceType (PredTy st) =
   IfacePredTy (toIfacePred st)
-toIfaceType (NoteTy other_note ty) =
-  toIfaceType ty
 
 ----------------
 -- A little bit of (perhaps optional) trickiness here.  When

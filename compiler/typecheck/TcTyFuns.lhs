@@ -229,10 +229,6 @@ tcGenericNormaliseFamInst fun (ForAllTy tyvar ty1)
   = do 	{ (coi,nty1) <- tcGenericNormaliseFamInst fun ty1
 	; return (mkForAllTyCoI tyvar coi, mkForAllTy tyvar nty1)
 	}
-tcGenericNormaliseFamInst fun (NoteTy note ty1)
-  = do	{ (coi,nty1) <- tcGenericNormaliseFamInst fun ty1
-	; return (coi, NoteTy note nty1)
-	}
 tcGenericNormaliseFamInst fun ty@(TyVarTy tv)
   | isTcTyVar tv
   = do	{ traceTc (text "tcGenericNormaliseFamInst" <+> ppr ty)

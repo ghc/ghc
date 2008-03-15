@@ -1637,7 +1637,6 @@ unBox :: BoxyType -> TcM TcType
 --
 -- For once, it's safe to treat synonyms as opaque!
 
-unBox (NoteTy n ty) 	= do { ty' <- unBox ty; return (NoteTy n ty') }
 unBox (TyConApp tc tys) = do { tys' <- mapM unBox tys; return (TyConApp tc tys') }
 unBox (AppTy f a)       = do { f' <- unBox f; a' <- unBox a; return (mkAppTy f' a') }
 unBox (FunTy f a)       = do { f' <- unBox f; a' <- unBox a; return (FunTy f' a') }

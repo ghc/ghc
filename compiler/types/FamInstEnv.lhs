@@ -428,9 +428,6 @@ normaliseType env (FunTy ty1 ty2)
 normaliseType env (ForAllTy tyvar ty1)
   = let (coi,nty1) = normaliseType env ty1
     in  (mkForAllTyCoI tyvar coi,ForAllTy tyvar nty1)
-normaliseType env (NoteTy note ty1)
-  = let (coi,nty1) = normaliseType env ty1
-    in  (coi,NoteTy note nty1)
 normaliseType _   ty@(TyVarTy _)
   = (IdCo,ty)
 normaliseType env (PredTy predty)

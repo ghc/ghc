@@ -186,7 +186,6 @@ importsType2 env (TyVarTy _) = importsNone
 importsType2 env (TyConApp tc args) =importsTyCon env tc . importsTypeArgs2 env args
 importsType2 env (FunTy arg res) =  importsType env arg .  importsType2 env res
 importsType2 env (ForAllTy tv body_ty) =  importsType2 env body_ty
-importsType2 env (NoteTy _ ty) = importsType2 env ty
 importsType2 _ _ = panic "IlxGen.lhs: importsType2 ty"
 importsTypeArgs2 env tys = foldR (importsType2 env) tys
 
@@ -211,7 +210,6 @@ importsTyConDataConType2 env (TyVarTy _) = importsNone
 importsTyConDataConType2 env (TyConApp tc args) = importsTyConDataConTypeTyCon env tc . importsTyConDataConTypeArgs2 env args
 importsTyConDataConType2 env (FunTy arg res) = importsTyConDataConType env arg .  importsTyConDataConType2 env res
 importsTyConDataConType2 env (ForAllTy tv body_ty) = importsTyConDataConType2 env body_ty
-importsTyConDataConType2 env (NoteTy _ ty) = importsTyConDataConType2 env ty
 importsTyConDataConType2 _ _ = panic "IlxGen.lhs: importsTyConDataConType2 ty"
 importsTyConDataConTypeArgs2 env tys = foldR (importsTyConDataConType2 env) tys
 
@@ -841,8 +839,6 @@ ilxFunAppArgs env num_sofar funty args tail_call known_clo
 
     -- This part strips off at most "max" term applications or one type application
     get_type_args 0 args env funty = ([],[],env,args,funty)
-    get_type_args max args env (NoteTy _ ty) = 
-          trace "IlxGen Internal Error: non representation type passed to get_args" (get_type_args max args env ty)
     get_type_args max ((arg@(StgTypeArg v)):rest) env (ForAllTy tv rem_funty) 
         = if isIlxTyVar tv then 
             let env2 = extendIlxEnvWithFormalTyVars env [tv] in 
@@ -855,9 +851,6 @@ ilxFunAppArgs env num_sofar funty args tail_call known_clo
     get_type_args _ (StgTypeArg _:_) _ _ = trace "IlxGen Internal Error: get_type_args could not get ForAllTy for corresponding arg" ([],[],env,[],funty)
     get_type_args _ args env funty = ([],[],env,args,funty)
 
-    get_term_args n max args env (NoteTy _ ty)
-       -- Skip NoteTy types 
-       = trace "IlxGen Internal Error: non representation type passed to get_term_args" (get_term_args n max args env ty)
     get_term_args n 0 args env funty
        -- Stop if we've hit the maximum number of ILX arguments to apply n one hit.
        = ([],[],env,args,funty)
@@ -1146,7 +1139,6 @@ pprIlxTopVar env v
 
 \begin{code}
 
-isVoidIlxRepType (NoteTy   _ ty) = isVoidIlxRepType ty
 isVoidIlxRepType (TyConApp tc _) | (tyConPrimRep tc == VoidRep) = True
 isVoidIlxRepType (TyConApp tc tys) 
   = isUnboxedTupleTyCon tc && null (filter (not. isVoidIlxRepType) tys)
@@ -1156,7 +1148,7 @@ isVoidIlxRepId id = isVoidIlxRepType (idType id)
 
 
 
--- Get rid of all NoteTy and NewTy artifacts
+-- Get rid of all NewTy artifacts
 deepIlxRepType :: Type -> Type
 deepIlxRepType (FunTy l r)
   = FunTy (deepIlxRepType l) (deepIlxRepType r)
@@ -1173,7 +1165,6 @@ deepIlxRepType ty@(TyConApp tc tys)
               TyConApp tc (map deepIlxRepType tys)
 deepIlxRepType (AppTy f x)     = AppTy (deepIlxRepType f) (deepIlxRepType x)
 deepIlxRepType (ForAllTy b ty) = ForAllTy b (deepIlxRepType ty)
-deepIlxRepType (NoteTy   _ ty) = deepIlxRepType ty
 deepIlxRepType (PredTy p)      = deepIlxRepType (predTypeRep p)
 deepIlxRepType ty@(TyVarTy tv) = ty
 
@@ -1226,11 +1217,6 @@ ilxTypeR env ty@(ForAllTy tv body_ty) | isIlxTyVar tv
 ilxTypeR env ty@(ForAllTy tv body_ty) | otherwise
   = ilxComment (text "higher order type var " <+> pprId tv) <+>
     pprIlxFunTy (text "class [mscorlib]System.Object") (ilxTypeR env body_ty)
-
-ilxTypeR env (NoteTy _ ty)       
-   = trace "WARNING! non-representation type given to ilxTypeR: see generated ILX for context where this occurs"
-     (vcat [text "/* WARNING! non-representation type given to ilxTypeR! */",
-           ilxTypeR env ty ])
 
 pprIlxFunTy dom ran = parens (hsep [text "func",parens dom,text "-->", ran])
 

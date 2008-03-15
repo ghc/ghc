@@ -7,7 +7,7 @@
 \begin{code}
 module TypeRep (
 	TyThing(..), 
-	Type(..), TyNote(..), 		-- Representation visible 
+	Type(..),
 	PredType(..),	 		-- to friends
 	
  	Kind, ThetaType,		-- Synonyms
@@ -49,7 +49,6 @@ import {-# SOURCE #-} DataCon( DataCon, dataConName )
 
 -- friends:
 import Var
-import VarSet
 import Name
 import OccName
 import BasicTypes
@@ -169,7 +168,6 @@ data Type
   | AppTy
 	Type		-- Function is *not* a TyConApp
 	Type		-- It must be another AppTy, or TyVarTy
-			-- (or NoteTy of these)
 
   | TyConApp		-- Application of a TyCon, including newtypes *and* synonyms
 	TyCon		--  *Invariant* saturated appliations of FunTyCon and
@@ -195,10 +193,6 @@ data Type
 	--     of a coercion variable; never as the argument or result
 	--     of a FunTy (unlike ClassP, IParam)
 
-  | NoteTy 		-- A type with a note attached
-	TyNote
-	Type		-- The expanded version
-
 type Kind = Type 	-- Invariant: a kind is always
 			--	FunTy k1 k2
 			-- or	TyConApp PrimTyCon [...]
@@ -207,8 +201,6 @@ type Kind = Type 	-- Invariant: a kind is always
 
 type SuperKind = Type   -- Invariant: a super kind is always 
                         --   TyConApp SuperKindTyCon ...
-
-data TyNote = FTVNote TyVarSet	-- The free type variables of the noted expression
 \end{code}
 
 -------------------------------------
@@ -395,12 +387,10 @@ tySuperKind = kindTyConType tySuperKindTyCon
 coSuperKind = kindTyConType coSuperKindTyCon 
 
 isTySuperKind :: SuperKind -> Bool
-isTySuperKind (NoteTy _ ty)    = isTySuperKind ty
 isTySuperKind (TyConApp kc []) = kc `hasKey` tySuperKindTyConKey
 isTySuperKind _                = False
 
 isCoSuperKind :: SuperKind -> Bool
-isCoSuperKind (NoteTy _ ty)    = isCoSuperKind ty
 isCoSuperKind (TyConApp kc []) = kc `hasKey` coSuperKindTyConKey
 isCoSuperKind _                = False
 
@@ -418,7 +408,6 @@ isCoercionKind :: Kind -> Bool
 -- All coercions are of form (ty1 ~ ty2)
 -- This function is here rather than in Coercion, 
 -- because it's used in a knot-tied way to enforce invariants in Var
-isCoercionKind (NoteTy _ k)         = isCoercionKind k
 isCoercionKind (PredTy (EqPred {})) = True
 isCoercionKind _                    = False
 
@@ -426,7 +415,7 @@ coVarPred :: CoVar -> PredType
 coVarPred tv
   = ASSERT( isCoVar tv )
     case tyVarKind tv of
-	PredTy eq -> eq		-- There shouldn't even be a NoteTy in the way
+	PredTy eq -> eq
 	other	  -> pprPanic "coVarPred" (ppr tv $$ ppr other)
 \end{code}
 
@@ -501,7 +490,6 @@ pprParendKind = pprParendType
 ppr_type :: Prec -> Type -> SDoc
 ppr_type _ (TyVarTy tv)       = ppr tv
 ppr_type _ (PredTy pred)      = ifPprDebug (ptext SLIT("<pred>")) <> (ppr pred)
-ppr_type p (NoteTy _ ty2)     = ifPprDebug (ptext SLIT("<note>")) <> ppr_type p ty2
 ppr_type p (TyConApp tc tys)  = ppr_tc_app p tc tys
 
 ppr_type p (AppTy t1 t2) = maybeParen p TyConPrec $
@@ -532,15 +520,11 @@ ppr_forall_type p ty
     -- equality predicates.
     split1 tvs (ForAllTy tv ty) 
       | not (isCoVar tv)     = split1 (tv:tvs) ty
-    split1 tvs (NoteTy _ ty) = split1 tvs ty
     split1 tvs ty	     = (reverse tvs, ty)
  
-    split2 ps (NoteTy _ arg 	-- Rather a disgusting case
-	       `FunTy` res) 	    = split2 ps (arg `FunTy` res)
     split2 ps (PredTy p `FunTy` ty) = split2 (p:ps) ty
     split2 ps (ForAllTy tv ty) 
 	| isCoVar tv		    = split2 (coVarPred tv : ps) ty
-    split2 ps (NoteTy _ ty) 	    = split2 ps ty
     split2 ps ty		    = (reverse ps, ty)
 
 ppr_tc_app :: Prec -> TyCon -> [Type] -> SDoc

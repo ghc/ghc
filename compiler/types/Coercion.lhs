@@ -50,7 +50,7 @@ module Coercion (
 	isIdentityCoercion,
 	mkSymCoI, mkTransCoI, 
 	mkTyConAppCoI, mkAppTyCoI, mkFunTyCoI,
-	mkNoteTyCoI, mkForAllTyCoI,
+	mkForAllTyCoI,
 	fromCoI, fromACo,
 	mkClassPPredCoI, mkIParamPredCoI, mkEqPredCoI
 
@@ -145,7 +145,6 @@ coercionKind (FunTy ty1 ty2)
 coercionKind (ForAllTy tv ty) 
   = let (ty1, ty2) = coercionKind ty in
     (ForAllTy tv ty1, ForAllTy tv ty2)
-coercionKind (NoteTy _ ty) = coercionKind ty
 coercionKind (PredTy (EqPred c1 c2)) 
   = let k1 = coercionKindPredTy c1
         k2 = coercionKindPredTy c2 in
@@ -543,10 +542,6 @@ mkFunTyCoI :: Type -> CoercionI -> Type -> CoercionI -> CoercionI
 mkFunTyCoI _   IdCo _   IdCo = IdCo
 mkFunTyCoI ty1 coi1 ty2 coi2 =
 	ACo $ FunTy (fromCoI coi1 ty1) (fromCoI coi2 ty2)
-
-mkNoteTyCoI :: TyNote -> CoercionI -> CoercionI
-mkNoteTyCoI _ IdCo = IdCo
-mkNoteTyCoI note (ACo co) = ACo $ NoteTy note co
 
 mkForAllTyCoI :: TyVar -> CoercionI -> CoercionI
 mkForAllTyCoI _ IdCo = IdCo

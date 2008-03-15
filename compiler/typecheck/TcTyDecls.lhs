@@ -99,7 +99,6 @@ synTyConsOfType ty
      go (FunTy a b)	  	  = go a `plusNameEnv` go b
      go (PredTy (IParam _ ty))    = go ty	
      go (PredTy (ClassP cls tys)) = go_s tys	-- Ignore class
-     go (NoteTy _ ty)		  = go ty	
      go (ForAllTy _ ty)	  	  = go ty
 
      go_tc tc tys | isSynTyCon tc = extendNameEnv (go_s tys) (tyConName tc) tc

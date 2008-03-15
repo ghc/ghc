@@ -130,7 +130,6 @@ import TyCon
 import StaticFlags
 import Util
 import Outputable
-import UniqSet
 
 import Data.List
 import Data.Maybe	( isJust )
@@ -167,7 +166,6 @@ coreView :: Type -> Maybe Type
 
 -- By being non-recursive and inlined, this case analysis gets efficiently
 -- joined onto the case analysis that the caller is already doing
-coreView (NoteTy _ ty) 	   = Just ty
 coreView (PredTy p)
   | isEqPred p             = Nothing
   | otherwise    	   = Just (predTypeRep p)
@@ -184,7 +182,6 @@ coreView _                 = Nothing
 {-# INLINE tcView #-}
 tcView :: Type -> Maybe Type
 -- Same, but for the type checker, which just looks through synonyms
-tcView (NoteTy _ ty) 	 = Just ty
 tcView (TyConApp tc tys) | Just (tenv, rhs, tys') <- tcExpandTyCon_maybe tc tys 
 			 = Just (mkAppTys (substTy (mkTopTvSubst tenv) rhs) tys')
 tcView _                 = Nothing
@@ -193,9 +190,7 @@ tcView _                 = Nothing
 rttiView :: Type -> Type
 -- Same, but for the RTTI system, which cannot deal with predicates nor polymorphism
 rttiView (ForAllTy _ ty) = rttiView ty
-rttiView (NoteTy   _ ty) = rttiView ty
 rttiView (FunTy PredTy{} ty) = rttiView ty
-rttiView (FunTy NoteTy{} ty) = rttiView ty
 rttiView ty@TyConApp{} | Just ty' <- coreView ty 
                            = rttiView ty'
 rttiView (TyConApp tc tys) = mkTyConApp tc (map rttiView tys)
@@ -206,7 +201,6 @@ rttiView ty = ty
 kindView :: Kind -> Maybe Kind
 -- C.f. coreView, tcView
 -- For the moment, we don't even handle synonyms in kinds
-kindView (NoteTy _ k) = Just k
 kindView _            = Nothing
 \end{code}
 
@@ -256,7 +250,6 @@ mkAppTy :: Type -> Type -> Type
 mkAppTy orig_ty1 orig_ty2
   = mk_app orig_ty1
   where
-    mk_app (NoteTy _ ty1)    = mk_app ty1
     mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ [orig_ty2])
     mk_app _                 = AppTy orig_ty1 orig_ty2
 	-- Note that the TyConApp could be an 
@@ -278,7 +271,6 @@ mkAppTys orig_ty1 []	    = orig_ty1
 mkAppTys orig_ty1 orig_tys2
   = mk_app orig_ty1
   where
-    mk_app (NoteTy _ ty1)    = mk_app ty1
     mk_app (TyConApp tc tys) = mkTyConApp tc (tys ++ orig_tys2)
 				-- mkTyConApp: see notes with mkAppTy
     mk_app _                 = foldl AppTy orig_ty1 orig_tys2
@@ -560,7 +552,6 @@ mkForAllTys :: [TyVar] -> Type -> Type
 mkForAllTys tyvars ty = foldr ForAllTy ty tyvars
 
 isForAllTy :: Type -> Bool
-isForAllTy (NoteTy _ ty)  = isForAllTy ty
 isForAllTy (ForAllTy _ _) = True
 isForAllTy _              = False
 
@@ -701,7 +692,6 @@ typeKind (TyConApp tycon tys) = ASSERT( not (isCoercionTyCon tycon) )
 				   -- We should be looking for the coercion kind,
 				   -- not the type kind
 				foldr (\_ k -> kindFunResult k) (tyConKind tycon) tys
-typeKind (NoteTy _ ty)	      = typeKind ty
 typeKind (PredTy pred)	      = predKind pred
 typeKind (AppTy fun _)        = kindFunResult (typeKind fun)
 typeKind (ForAllTy _ ty)      = typeKind ty
@@ -732,7 +722,6 @@ tyVarsOfType :: Type -> TyVarSet
 -- NB: for type synonyms tyVarsOfType does *not* expand the synonym
 tyVarsOfType (TyVarTy tv)		= unitVarSet tv
 tyVarsOfType (TyConApp _ tys)           = tyVarsOfTypes tys
-tyVarsOfType (NoteTy (FTVNote tvs) _)   = tvs
 tyVarsOfType (PredTy sty)		= tyVarsOfPred sty
 tyVarsOfType (FunTy arg res)		= tyVarsOfType arg `unionVarSet` tyVarsOfType res
 tyVarsOfType (AppTy fun arg)		= tyVarsOfType fun `unionVarSet` tyVarsOfType arg
@@ -824,15 +813,12 @@ tidyType env@(_, subst) ty
 				Just tv' -> TyVarTy tv'
     go (TyConApp tycon tys) = let args = map go tys
 			      in args `seqList` TyConApp tycon args
-    go (NoteTy note ty)     = (NoteTy $! (go_note note)) $! (go ty)
     go (PredTy sty)	    = PredTy (tidyPred env sty)
     go (AppTy fun arg)	    = (AppTy $! (go fun)) $! (go arg)
     go (FunTy fun arg)	    = (FunTy $! (go fun)) $! (go arg)
     go (ForAllTy tv ty)	    = ForAllTy tvp $! (tidyType envp ty)
 			      where
 			        (envp, tvp) = tidyTyVarBndr env tv
-
-    go_note note@(FTVNote _ftvs) = note	-- No need to tidy the free tyvars
 
 tidyTypes :: TidyEnv -> [Type] -> [Type]
 tidyTypes env tys = map (tidyType env) tys
@@ -957,7 +943,6 @@ seqType :: Type -> ()
 seqType (TyVarTy tv) 	  = tv `seq` ()
 seqType (AppTy t1 t2) 	  = seqType t1 `seq` seqType t2
 seqType (FunTy t1 t2) 	  = seqType t1 `seq` seqType t2
-seqType (NoteTy note t2)  = seqNote note `seq` seqType t2
 seqType (PredTy p) 	  = seqPred p
 seqType (TyConApp tc tys) = tc `seq` seqTypes tys
 seqType (ForAllTy tv ty)  = tv `seq` seqType ty
@@ -965,9 +950,6 @@ seqType (ForAllTy tv ty)  = tv `seq` seqType ty
 seqTypes :: [Type] -> ()
 seqTypes []       = ()
 seqTypes (ty:tys) = seqType ty `seq` seqTypes tys
-
-seqNote :: TyNote -> ()
-seqNote (FTVNote set) = sizeUniqSet set `seq` ()
 
 seqPred :: PredType -> ()
 seqPred (ClassP c tys)   = c `seq` seqTypes tys
@@ -1067,7 +1049,6 @@ tcPartOfType t1 (AppTy s2 t2)   = tcPartOfType t1 s2 || tcPartOfType t1 t2
 tcPartOfType t1 (FunTy s2 t2)   = tcPartOfType t1 s2 || tcPartOfType t1 t2
 tcPartOfType t1 (PredTy p2)     = tcPartOfPred t1 p2
 tcPartOfType t1 (TyConApp _ ts) = any (tcPartOfType t1) ts
-tcPartOfType t1 (NoteTy _ t2)   = tcPartOfType t1 t2
 
 tcPartOfPred :: Type -> PredType -> Bool
 tcPartOfPred t1 (IParam _ t2)  = tcPartOfType t1 t2
@@ -1103,7 +1084,6 @@ cmpTypeX env (AppTy s1 t1)       (AppTy s2 t2)       = cmpTypeX env s1 s2 `thenC
 cmpTypeX env (FunTy s1 t1)       (FunTy s2 t2)       = cmpTypeX env s1 s2 `thenCmp` cmpTypeX env t1 t2
 cmpTypeX env (PredTy p1)         (PredTy p2)         = cmpPredX env p1 p2
 cmpTypeX env (TyConApp tc1 tys1) (TyConApp tc2 tys2) = (tc1 `compare` tc2) `thenCmp` cmpTypesX env tys1 tys2
-cmpTypeX env t1			(NoteTy _ t2)	     = cmpTypeX env t1 t2
 
     -- Deal with the rest: TyVarTy < AppTy < FunTy < TyConApp < ForAllTy < PredTy
 cmpTypeX _ (AppTy _ _)    (TyVarTy _)    = GT
@@ -1398,8 +1378,6 @@ subst_ty subst ty
                                      in  args `seqList` TyConApp tc args
 
     go (PredTy p)                  = PredTy $! (substPred subst p)
-
-    go (NoteTy (FTVNote _) ty2)    = go ty2 -- Discard the free tyvar note
 
     go (FunTy arg res)             = (FunTy $! (go arg)) $! (go res)
     go (AppTy fun arg)             = mkAppTy (go fun) $! (go arg)
