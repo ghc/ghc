@@ -1,7 +1,7 @@
 
 {-# LANGUAGE RecordWildCards #-}
 
--- trac #1578
+-- trac #1491
 
 module Foo where
 
