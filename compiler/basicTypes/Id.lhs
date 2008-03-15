@@ -138,13 +138,13 @@ where it can easily be found.
 
 \begin{code}
 mkLocalIdWithInfo :: Name -> Type -> IdInfo -> Id
-mkLocalIdWithInfo name ty info = Var.mkLocalId name (addFreeTyVars ty) info
+mkLocalIdWithInfo name ty info = Var.mkLocalId name ty info
 
 mkExportedLocalId :: Name -> Type -> Id
-mkExportedLocalId name ty = Var.mkExportedLocalId name (addFreeTyVars ty) vanillaIdInfo
+mkExportedLocalId name ty = Var.mkExportedLocalId name ty vanillaIdInfo
 
 mkGlobalId :: GlobalIdDetails -> Name -> Type -> IdInfo -> Id
-mkGlobalId details name ty info = Var.mkGlobalId details name (addFreeTyVars ty) info
+mkGlobalId details name ty info = Var.mkGlobalId details name ty info
 \end{code}
 
 \begin{code}
@@ -202,7 +202,7 @@ mkTemplateLocal i ty = mkSysLocal FSLIT("tpl") (mkBuiltinUnique i) ty
 \begin{code}
 setIdType :: Id -> Type -> Id
 	-- Add free tyvar info to the type
-setIdType id ty = seqType ty `seq` Var.setIdType id (addFreeTyVars ty)
+setIdType id ty = seqType ty `seq` Var.setIdType id ty
 
 idPrimRep :: Id -> PrimRep
 idPrimRep id = typePrimRep (idType id)

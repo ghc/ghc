@@ -72,7 +72,7 @@ module Type (
 
 	-- Free variables
 	tyVarsOfType, tyVarsOfTypes, tyVarsOfPred, tyVarsOfTheta,
-	typeKind, addFreeTyVars,
+	typeKind,
 
         -- Type families
         tyFamInsts,
@@ -748,11 +748,6 @@ tyVarsOfPred (EqPred ty1 ty2) = tyVarsOfType ty1 `unionVarSet` tyVarsOfType ty2
 
 tyVarsOfTheta :: ThetaType -> TyVarSet
 tyVarsOfTheta = foldr (unionVarSet . tyVarsOfPred) emptyVarSet
-
--- Add a Note with the free tyvars to the top of the type
-addFreeTyVars :: Type -> Type
-addFreeTyVars ty@(NoteTy (FTVNote _) _)      = ty
-addFreeTyVars ty			     = NoteTy (FTVNote (tyVarsOfType ty)) ty
 \end{code}
 
 
