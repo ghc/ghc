@@ -74,6 +74,7 @@ test('rn061', normal, compile, [''])
 test('rn062', normal, compile, [''])
 test('rn063', expect_broken(2136), compile, [''])
 test('rn064', if_compiler_ge('ghc', '6.9', expect_broken(2137)), compile, [''])
+test('rn065', normal, multimod_compile, ['rn065', '-v0'])
 
 test('T1972', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
 
