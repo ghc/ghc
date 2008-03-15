@@ -36,7 +36,7 @@ endif
 # -----------------------------------------------------------------------------
 # RTS ways
 
-WAYS=$(GhcLibWays) $(GhcRTSWays)
+WAYS=$(strip $(GhcLibWays) $(GhcRTSWays))
 
 ifneq "$(findstring debug, $(way))" ""
 GhcRtsHcOpts=
