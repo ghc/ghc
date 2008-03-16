@@ -40,6 +40,7 @@ import SrcLoc		( srcSpanStart, noSrcSpan )
 import DynFlags		( DynFlags(..), DynFlag(..), dopt )
 import StaticFlags	( opt_ErrorSpans )
 
+import Control.Monad
 import System.Exit	( ExitCode(..), exitWith )
 import Data.Dynamic
 import Data.List
@@ -128,10 +129,13 @@ errorsFound dflags (warns, errs)
 
 printErrorsAndWarnings :: DynFlags -> Messages -> IO ()
 printErrorsAndWarnings dflags (warns, errs)
-  | no_errs && no_warns  = return ()
-  | no_errs		 = printBagOfWarnings dflags warns
-			    -- Don't print any warnings if there are errors
-  | otherwise		 = printBagOfErrors   dflags errs
+  | no_errs && no_warns = return ()
+  | no_errs             = do printBagOfWarnings dflags warns
+                             when (dopt Opt_WarnIsError dflags) $
+                                 errorMsg dflags $
+                                     text "\nFailing due to -Werror.\n"
+                          -- Don't print any warnings if there are errors
+  | otherwise           = printBagOfErrors dflags errs
   where
     no_warns = isEmptyBag warns
     no_errs  = isEmptyBag errs
