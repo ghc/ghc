@@ -771,6 +771,13 @@ endif
 
 SRC_LD_OPTS += -no-link-chk
 
+ifeq "$(GhcUnregisterised)" "NO"
+ifeq "$(HOSTPLATFORM)" "ia64-unknown-linux"
+# needed for generating proper relocation in large binaries: trac #856
+SRC_LD_OPTS += -optl-Wl,--relax
+endif
+endif
+
 # -----------------------------------------------------------------------------
 # create ghc-inplace, a convenient way to run ghc from the build tree...
 # See comments in $(FPTOOLS_TOP)/utils/ghc-pkg/Makefile for why we use
