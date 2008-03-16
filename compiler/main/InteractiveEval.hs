@@ -360,7 +360,7 @@ rethrow dflags io = Exception.catch io $ \e -> do -- NB. not catchDyn
 withInterruptsSentTo :: ThreadId -> IO r -> IO r
 withInterruptsSentTo thread get_result = do
   bracket (modifyMVar_ interruptTargetThread (return . (thread:)))
-          (\_ -> modifyMVar_ interruptTargetThread (return.tail))
+          (\_ -> modifyMVar_ interruptTargetThread (\tl -> return $! tail tl))
           (\_ -> get_result)
 
 -- This function sets up the interpreter for catching breakpoints, and
