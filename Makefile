@@ -353,7 +353,7 @@ binary-dist::
 	echo "HaveLibGmp = $(HaveLibGmp)"                            >> $(VARFILE)
 	echo "GhcLibsWithUnix = $(GhcLibsWithUnix)"                  >> $(VARFILE)
 	echo "GhcWithInterpreter = $(GhcWithInterpreter)"            >> $(VARFILE)
-	echo "GhcHasReadline = $(GhcHasReadline)"                    >> $(VARFILE)
+	echo "GhcHasEditline = $(GhcHasEditline)"                    >> $(VARFILE)
 	echo "BootingFromHc = $(BootingFromHc)"                      >> $(VARFILE)
 	echo "XMLDocWays = $(XMLDocWays)"                            >> $(VARFILE)
 	# We won't actually use xsltproc, but we need to know if it's "" or not

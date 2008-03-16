@@ -529,23 +529,23 @@ else
 EXCLUDED_SRCS += ghci/keepCAFsForGHCi.c
 endif
 
-# Enable readline if either:
-#   - we're building stage 1 and $(GhcHasReadline)="YES"
-#   - we're building stage 2/3, and we have built the readline package
+# Enable editline if either:
+#   - we're building stage 1 and $(GhcHasEditline)="YES"
+#   - we're building stage 2/3, and we have built the editline package
 #
-# But we don't enable readline on Windows, because readline is fairly
-# broken there.
+# But we don't enable editline on Windows, as Windows terminals have
+# editline-like support builtin.
 #
 ifneq "$(TARGETPLATFORM)" "i386-unknown-mingw32"
 ifeq "$(stage)" "1"
-ifeq "$(GhcHasReadline)" "YES"
-SRC_HC_OPTS += -package readline -DUSE_READLINE
-PKG_DEPENDS += readline
+ifeq "$(GhcHasEditline)" "YES"
+SRC_HC_OPTS += -package editline -DUSE_EDITLINE
+PKG_DEPENDS += editline
 endif
 else
-ifeq "$(wildcard $(FPTOOLS_TOP_ABS)/libraries/readline/unbuildable)" ""
-SRC_HC_OPTS += -package readline -DUSE_READLINE
-PKG_DEPENDS += readline
+ifeq "$(wildcard $(FPTOOLS_TOP_ABS)/libraries/editline/unbuildable)" ""
+SRC_HC_OPTS += -package editline -DUSE_EDITLINE
+PKG_DEPENDS += editline
 endif
 endif # stage=1
 endif # not windows

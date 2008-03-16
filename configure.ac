@@ -660,8 +660,8 @@ if test "$WithGhc" != ""; then
   AC_SUBST(ghc_ge_607)dnl
 fi
 
-# Check whether this GHC has readline installed
-FP_GHC_HAS_READLINE
+# Check whether this GHC has editline installed
+FP_GHC_HAS_EDITLINE
 
 AC_PATH_PROGS(NHC,nhc nhc98)
 AC_PATH_PROG(HBC,hbc)
@@ -1003,18 +1003,6 @@ AC_SYS_LARGEFILE
 
 dnl ** check for specific header (.h) files that we are interested in
 AC_CHECK_HEADERS([bfd.h ctype.h dirent.h dlfcn.h errno.h fcntl.h grp.h limits.h locale.h nlist.h pthread.h pwd.h signal.h sys/mman.h sys/resource.h sys/time.h sys/timeb.h sys/timers.h sys/times.h sys/utsname.h sys/wait.h termios.h time.h utime.h windows.h winsock.h])
-
-AC_CHECK_HEADER([readline/readline.h], [HaveReadlineReadlineH=YES], [HaveReadlineReadlineH=NO])
-AC_CHECK_HEADER([readline/history.h], [HaveReadlineHistoryH=YES], [HaveReadlineHistoryH=NO])
-
-if test $HaveReadlineReadlineH = YES && test $HaveReadlineHistoryH = YES ; then
-  GhcLibsWithReadline=YES
-  AC_DEFINE([HAVE_READLINE_HEADERS], [1], [Define to 1 if readline/readline.h and readline/history.h exist.])
-else
-  GhcLibsWithReadline=NO
-  AC_DEFINE([HAVE_READLINE_HEADERS], [0], [Define to 1 if readline/readline.h and readline/history.h exist.])
-fi
-AC_SUBST(GhcLibsWithReadline)
 
 dnl ** check if it is safe to include both <time.h> and <sys/time.h>
 AC_HEADER_TIME

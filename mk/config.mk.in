@@ -860,8 +860,8 @@ EXECUTABLE_FILE = chmod +x
 GHC		= @WithGhc@
 GhcDir          = $(dir $(GHC))
 
-# Set to YES if $(GHC) has the readline package installed
-GhcHasReadline	= @GhcHasReadline@
+# Set to YES if $(GHC) has the editline package installed
+GhcHasEditline	= @GhcHasEditline@
 
 HBC		= @HBC@
 NHC		= @NHC@

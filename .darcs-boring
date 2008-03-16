@@ -47,6 +47,7 @@
 ^libraries/concurrent(/|$)
 ^libraries/containers(/|$)
 ^libraries/directory(/|$)
+^libraries/editline(/|$)
 ^libraries/fgl(/|$)
 ^libraries/filepath(/|$)
 ^libraries/haskell-src(/|$)

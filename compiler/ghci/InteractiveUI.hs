@@ -24,7 +24,7 @@ import PprTyThing
 import DynFlags
 
 import Packages
-#ifdef USE_READLINE
+#ifdef USE_EDITLINE
 import PackageConfig
 import UniqFM
 #endif
@@ -56,9 +56,9 @@ import GHC.ConsoleHandler ( flushConsole )
 import qualified System.Win32
 #endif
 
-#ifdef USE_READLINE
+#ifdef USE_EDITLINE
 import Control.Concurrent	( yield )	-- Used in readline loop
-import System.Console.Readline as Readline
+import System.Console.Editline.Readline as Readline
 #endif
 
 --import SystemExts
@@ -89,7 +89,7 @@ import GHC.TopHandler
 
 import Data.IORef	( IORef, readIORef, writeIORef )
 
-#ifdef USE_READLINE
+#ifdef USE_EDITLINE
 import System.Posix.Internals ( setNonBlockingFD )
 #endif
 
@@ -161,7 +161,7 @@ builtin_commands = [
 -- 
 -- NOTE: in order for us to override the default correctly, any custom entry
 -- must be a SUBSET of word_break_chars.
-#ifdef USE_READLINE
+#ifdef USE_EDITLINE
 word_break_chars :: String
 word_break_chars = let symbols = "!#$%&*+/<=>?@\\^|-~"
                        specials = "(),;[]`{}"
@@ -312,14 +312,15 @@ interactiveUI session srcs maybe_exprs = do
         -- intended for the program, so unbuffer stdin.
         hSetBuffering stdin NoBuffering
 
-#ifdef USE_READLINE
+#ifdef USE_EDITLINE
         is_tty <- hIsTerminalDevice stdin
         when is_tty $ do
             Readline.initialize
 
+            -- XXX Should we be catching exceptions thrown by readHistory?
             withGhcAppData
                  (\dir -> Readline.readHistory (dir </> "ghci_history"))
-                 (return True)
+                 (return ())
             
             Readline.setAttemptedCompletionFunction (Just completeWord)
             --Readline.parseAndBind "set show-all-if-ambiguous 1"
@@ -353,10 +354,11 @@ interactiveUI session srcs maybe_exprs = do
                    remembered_ctx = []
                  }
 
-#ifdef USE_READLINE
+#ifdef USE_EDITLINE
    Readline.stifleHistory 100
+   -- XXX Should we be catching exceptions thrown by readHistory?
    withGhcAppData (\dir -> Readline.writeHistory (dir </> "ghci_history"))
-                  (return True)
+                  (return ())
    Readline.resetTerminal Nothing
 #endif
 
@@ -473,7 +475,7 @@ interactiveLoop is_tty show_prompt =
 		   -- exception handler above.
 
   -- read commands from stdin
-#ifdef USE_READLINE
+#ifdef USE_EDITLINE
   if (is_tty) 
 	then runCommands readlineLoop
 	else runCommands (fileLoop stdin show_prompt is_tty)
@@ -601,7 +603,7 @@ mkPrompt = do
   return (showSDoc (f (prompt st)))
 
 
-#ifdef USE_READLINE
+#ifdef USE_EDITLINE
 readlineLoop :: GHCi (Maybe String)
 readlineLoop = do
    io yield
@@ -1659,7 +1661,7 @@ completeMacro, completeIdentifier, completeModule,
     completeHomeModuleOrFile 
     :: String -> IO [String]
 
-#ifdef USE_READLINE
+#ifdef USE_EDITLINE
 completeWord :: String -> Int -> Int -> IO (Maybe (String, [String]))
 completeWord w start end = do
   line <- Readline.getLineBuffer

@@ -46,7 +46,7 @@ endif
 ifeq "$(Windows)" "YES"
 SUBDIRS += $(wildcard Win32)
 endif
-SUBDIRS += process pretty hpc template-haskell readline Cabal random haskell98
+SUBDIRS += process pretty hpc template-haskell editline Cabal random haskell98
 
 # Set GhcBootLibs=YES from the command line to work with just the libraries
 # needed to bootstrap GHC.

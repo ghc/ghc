@@ -32,4 +32,4 @@ doit package
 getMustBeBuildablePackages :: IO [String]
 getMustBeBuildablePackages
  = do xs <- readFile "../boot-packages"
-      return $ filter ("readline" /=) $ lines xs
+      return $ filter ("editline" /=) $ lines xs

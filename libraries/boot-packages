@@ -4,6 +4,7 @@ bytestring
 Cabal
 containers
 directory
+editline
 filepath
 haskell98
 old-locale
@@ -12,7 +13,6 @@ packedstring
 pretty
 process
 random
-readline
 template-haskell
 unix
 Win32
