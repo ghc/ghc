@@ -10,7 +10,7 @@
 -- 
 -- Binary interface file support.
 
-module BinIface ( writeBinIface, readBinIface, v_IgnoreHiWay ) where
+module BinIface ( writeBinIface, readBinIface, CheckHiWay(..) ) where
 
 #include "HsVersions.h"
 
@@ -48,18 +48,22 @@ import Data.IORef
 import Control.Exception
 import Control.Monad
 
+data CheckHiWay = CheckHiWay | IgnoreHiWay
+    deriving Eq
+
 -- ---------------------------------------------------------------------------
 -- Reading and writing binary interface files
 
-readBinIface :: FilePath -> TcRnIf a b ModIface
-readBinIface hi_path = do
+readBinIface :: CheckHiWay -> FilePath -> TcRnIf a b ModIface
+readBinIface checkHiWay hi_path = do
   nc <- getNameCache
-  (new_nc, iface) <- liftIO $ readBinIface_ hi_path nc
+  (new_nc, iface) <- liftIO $ readBinIface_ checkHiWay hi_path nc
   setNameCache new_nc
   return iface
 
-readBinIface_ :: FilePath -> NameCache -> IO (NameCache, ModIface)
-readBinIface_ hi_path nc = do
+readBinIface_ :: CheckHiWay -> FilePath -> NameCache
+              -> IO (NameCache, ModIface)
+readBinIface_ checkHiWay hi_path nc = do
   bh <- Binary.readBinMem hi_path
 
 	-- Read the magic number to check that this really is a GHC .hi file
@@ -88,9 +92,8 @@ readBinIface_ hi_path nc = do
         ++ our_ver ++ ", found " ++ check_ver))
 
   check_way <- get bh
-  ignore_way <- readIORef v_IgnoreHiWay
   way_descr <- getWayDescr
-  when (not ignore_way && check_way /= way_descr) $
+  when (checkHiWay == CheckHiWay && check_way /= way_descr) $
         -- This will be caught by readIface
         -- which will emit an error msg containing the iface module name.
      throwDyn (ProgramError (
@@ -366,8 +369,6 @@ instance Binary ModIface where
 		 mi_dep_fn    = mkIfaceDepCache deprecs,
 		 mi_fix_fn    = mkIfaceFixCache fixities,
 		 mi_ver_fn    = mkIfaceVerCache decls })
-
-GLOBAL_VAR(v_IgnoreHiWay, False, Bool)
 
 getWayDescr :: IO String
 getWayDescr = do

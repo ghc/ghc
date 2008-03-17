@@ -515,7 +515,7 @@ readIface :: Module -> FilePath -> IsBootInterface
 
 readIface wanted_mod file_path is_hi_boot_file
   = do	{ dflags <- getDOpts
-        ; res <- tryMostM $ readBinIface file_path
+        ; res <- tryMostM $ readBinIface CheckHiWay file_path
 	; case res of
 	    Right iface 
 		| wanted_mod == actual_mod -> return (Succeeded iface)
@@ -610,10 +610,9 @@ ifaceStats eps
 -- | Read binary interface, and print it out
 showIface :: HscEnv -> FilePath -> IO ()
 showIface hsc_env filename = do
-   -- skip the version check; we don't want to worry about profiled vs.
+   -- skip the hi way check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
-   writeIORef v_IgnoreHiWay True
-   iface <- initTcRnIf 's' hsc_env () () $ readBinIface  filename
+   iface <- initTcRnIf 's' hsc_env () () $ readBinIface IgnoreHiWay filename
    printDump (pprModIface iface)
 \end{code}
 
@@ -624,6 +623,7 @@ pprModIface iface
  = vcat [ ptext SLIT("interface")
 		<+> ppr (mi_module iface) <+> pp_boot 
 		<+> ppr (mi_mod_vers iface) <+> pp_sub_vers
+		<+> ppr (mi_mod_vers iface)
 		<+> (if mi_orphan iface then ptext SLIT("[orphan module]") else empty)
 		<+> (if mi_finsts iface then ptext SLIT("[family instance module]") else empty)
 		<+> (if mi_hpc    iface then ptext SLIT("[hpc]") else empty)
