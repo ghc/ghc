@@ -625,7 +625,6 @@ pprModIface iface
  = vcat [ ptext SLIT("interface")
 		<+> ppr (mi_module iface) <+> pp_boot 
 		<+> ppr (mi_mod_vers iface) <+> pp_sub_vers
-		<+> ppr (mi_mod_vers iface)
 		<+> (if mi_orphan iface then ptext SLIT("[orphan module]") else empty)
 		<+> (if mi_finsts iface then ptext SLIT("[family instance module]") else empty)
 		<+> (if mi_hpc    iface then ptext SLIT("[hpc]") else empty)
