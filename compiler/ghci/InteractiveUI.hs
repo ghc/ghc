@@ -317,10 +317,9 @@ interactiveUI session srcs maybe_exprs = do
         when is_tty $ do
             Readline.initialize
 
-            -- XXX Should we be catching exceptions thrown by readHistory?
             withGhcAppData
                  (\dir -> Readline.readHistory (dir </> "ghci_history"))
-                 (return ())
+                 (return True)
             
             Readline.setAttemptedCompletionFunction (Just completeWord)
             --Readline.parseAndBind "set show-all-if-ambiguous 1"
@@ -356,9 +355,8 @@ interactiveUI session srcs maybe_exprs = do
 
 #ifdef USE_EDITLINE
    Readline.stifleHistory 100
-   -- XXX Should we be catching exceptions thrown by readHistory?
    withGhcAppData (\dir -> Readline.writeHistory (dir </> "ghci_history"))
-                  (return ())
+                  (return True)
    Readline.resetTerminal Nothing
 #endif
 
