@@ -515,7 +515,8 @@ readIface :: Module -> FilePath -> IsBootInterface
 
 readIface wanted_mod file_path is_hi_boot_file
   = do	{ dflags <- getDOpts
-        ; res <- tryMostM $ readBinIface CheckHiWay file_path
+        ; res <- tryMostM $
+                 readBinIface CheckHiWay QuietBinIFaceReading file_path
 	; case res of
 	    Right iface 
 		| wanted_mod == actual_mod -> return (Succeeded iface)
@@ -612,7 +613,8 @@ showIface :: HscEnv -> FilePath -> IO ()
 showIface hsc_env filename = do
    -- skip the hi way check; we don't want to worry about profiled vs.
    -- non-profiled interfaces, for example.
-   iface <- initTcRnIf 's' hsc_env () () $ readBinIface IgnoreHiWay filename
+   iface <- initTcRnIf 's' hsc_env () () $
+       readBinIface IgnoreHiWay TraceBinIFaceReading filename
    printDump (pprModIface iface)
 \end{code}
 

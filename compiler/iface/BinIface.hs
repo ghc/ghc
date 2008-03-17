@@ -10,7 +10,8 @@
 -- 
 -- Binary interface file support.
 
-module BinIface ( writeBinIface, readBinIface, CheckHiWay(..) ) where
+module BinIface ( writeBinIface, readBinIface,
+                  CheckHiWay(..), TraceBinIFaceReading(..) ) where
 
 #include "HsVersions.h"
 
@@ -51,25 +52,40 @@ import Control.Monad
 data CheckHiWay = CheckHiWay | IgnoreHiWay
     deriving Eq
 
+data TraceBinIFaceReading = TraceBinIFaceReading | QuietBinIFaceReading
+    deriving Eq
+
 -- ---------------------------------------------------------------------------
 -- Reading and writing binary interface files
 
-readBinIface :: CheckHiWay -> FilePath -> TcRnIf a b ModIface
-readBinIface checkHiWay hi_path = do
+readBinIface :: CheckHiWay -> TraceBinIFaceReading -> FilePath
+             -> TcRnIf a b ModIface
+readBinIface checkHiWay traceBinIFaceReading hi_path = do
   nc <- getNameCache
-  (new_nc, iface) <- liftIO $ readBinIface_ checkHiWay hi_path nc
+  (new_nc, iface) <- liftIO $
+    readBinIface_ checkHiWay traceBinIFaceReading hi_path nc
   setNameCache new_nc
   return iface
 
-readBinIface_ :: CheckHiWay -> FilePath -> NameCache
+readBinIface_ :: CheckHiWay -> TraceBinIFaceReading -> FilePath -> NameCache
               -> IO (NameCache, ModIface)
-readBinIface_ checkHiWay hi_path nc = do
+readBinIface_ checkHiWay traceBinIFaceReading hi_path nc = do
+  let printer :: SDoc -> IO ()
+      printer = case traceBinIFaceReading of
+                TraceBinIFaceReading -> \sd -> printSDoc sd defaultDumpStyle
+                QuietBinIFaceReading -> \_ -> return ()
+      wantedGot :: Outputable a => String -> a -> a -> IO ()
+      wantedGot what wanted got
+          = printer (text what <> text ": " <>
+                     vcat [text "Wanted " <> ppr wanted <> text ",",
+                           text "got    " <> ppr got])
   bh <- Binary.readBinMem hi_path
 
 	-- Read the magic number to check that this really is a GHC .hi file
 	-- (This magic number does not change when we change 
 	--  GHC interface file format)
   magic <- get bh
+  wantedGot "Magic" binaryInterfaceMagic magic
   when (magic /= binaryInterfaceMagic) $
 	throwDyn (ProgramError (
 	   "magic number mismatch: old/corrupt interface file?"))
@@ -84,6 +100,7 @@ readBinIface_ checkHiWay hi_path nc = do
         -- Check the interface file version and ways.
   check_ver  <- get bh
   let our_ver = show opt_HiVersion
+  wantedGot "Version" our_ver check_ver
   when (check_ver /= our_ver) $
         -- This will be caught by readIface which will emit an error
         -- msg containing the iface module name.
@@ -93,6 +110,7 @@ readBinIface_ checkHiWay hi_path nc = do
 
   check_way <- get bh
   way_descr <- getWayDescr
+  wantedGot "Way" way_descr check_way
   when (checkHiWay == CheckHiWay && check_way /= way_descr) $
         -- This will be caught by readIface
         -- which will emit an error msg containing the iface module name.
