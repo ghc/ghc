@@ -2,13 +2,6 @@
 % (c) The University of Glasgow 2001-2006
 %
 \begin{code}
-{-# OPTIONS -fno-warn-incomplete-patterns #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module MkExternalCore (
 	emitExternalCore
 ) where
@@ -138,8 +131,13 @@ make_alt (DataAlt dcon, vs, e) =
            (map make_vbind vbs)
 	   (make_exp e)    
 	where (tbs,vbs) = span isTyVar vs
-make_alt (LitAlt l,_,e) = C.Alit (make_lit l) (make_exp e)
-make_alt (DEFAULT,[],e) = C.Adefault (make_exp e)
+make_alt (LitAlt l,_,e)   = C.Alit (make_lit l) (make_exp e)
+make_alt (DEFAULT,[],e)   = C.Adefault (make_exp e)
+-- This should never happen, as the DEFAULT alternative binds no variables,
+-- but we might as well check for it:
+make_alt a@(DEFAULT,_ ,_) = pprPanic ("MkExternalCore: make_alt: DEFAULT "
+             ++ "alternative had a non-empty var list") (ppr a)
+
 
 make_lit :: Literal -> C.Lit
 make_lit l = 
