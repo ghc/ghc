@@ -190,28 +190,26 @@ make_kind _ = error "MkExternalCore died: make_kind"
 
 {- Id generation. -}
 
-{- Use encoded strings.
-   Also, adjust casing to work around some badly-chosen internal names. -}
 make_id :: Bool -> Name -> C.Id
 make_id _is_var nm = (occNameString . nameOccName) nm
-
-{-	SIMON thinks this stuff isn't necessary
-make_id is_var nm = 
-  case n of
-    'Z':cs | is_var -> 'z':cs 
-    'z':cs | not is_var -> 'Z':cs 
-    c:cs | isUpper c && is_var -> 'z':'d':n
-    c:cs | isLower c && (not is_var) -> 'Z':'d':n
-    _ -> n
-  where n = (occNameString . nameOccName) nm
--}
 
 make_var_id :: Name -> C.Id
 make_var_id = make_id True
 
+-- It's important to encode the module name here, because in External Core,
+-- base:GHC.Base => base:GHCziBase
+-- We don't do this in pprExternalCore because we
+-- *do* want to keep the package name (we don't want baseZCGHCziBase,
+-- because that would just be ugly.)
+-- SIGH.
 make_mid :: Module -> C.Id
-make_mid = showSDoc . pprModule
-
+-- Super ugly code, but I can't find anything else that does quite what I
+-- want (encodes the hierarchical module name without encoding the colon
+-- that separates the package name from it.)
+make_mid m = (packageIdString (modulePackageId m)) ++
+             ":" ++
+             showSDoc (pprCode CStyle (pprModuleName (moduleName m)))
+               
 make_qid :: Bool -> Name -> C.Qual C.Id
 make_qid is_var n = (mname,make_id is_var n)
     where mname = 
