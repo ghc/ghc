@@ -518,8 +518,8 @@ INLINE time_t __hscore_st_mtime ( struct_stat* st ) { return st->st_mtime; }
 INLINE stsize_t __hscore_st_size  ( struct_stat* st ) { return st->st_size; }
 #if !defined(_MSC_VER)
 INLINE mode_t __hscore_st_mode  ( struct_stat* st ) { return st->st_mode; }
-INLINE mode_t __hscore_st_dev  ( struct_stat* st ) { return st->st_dev; }
-INLINE mode_t __hscore_st_ino  ( struct_stat* st ) { return st->st_ino; }
+INLINE dev_t  __hscore_st_dev  ( struct_stat* st ) { return st->st_dev; }
+INLINE ino_t  __hscore_st_ino  ( struct_stat* st ) { return st->st_ino; }
 #endif
 
 #if HAVE_TERMIOS_H
