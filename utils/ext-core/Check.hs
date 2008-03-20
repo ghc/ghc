@@ -398,7 +398,7 @@ mlookupM selector external_env _ (Just m) = do
        globalEnv <- getGlobalEnv
        case elookup globalEnv m of
          Just env' -> return (selector env')
-         Nothing -> fail ("undefined module name: " ++ show m)
+         Nothing -> fail ("Check: undefined module name: " ++ show m)
 
 qlookupM :: (Ord a, Show a) => (Envs -> Env a b) -> Env a b -> Env a b 
                   -> Qual a -> CheckResult b

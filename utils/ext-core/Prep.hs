@@ -127,7 +127,7 @@ prepModule globalEnv (Module mn tdefs vdefgs) =
     mlookup selector _  (Just m) =   
       case elookup globalEnv m of
         Just env -> selector env
-        Nothing -> error ("undefined module name: " ++ show m)
+        Nothing -> error ("Prep: undefined module name: " ++ show m)
 
     qlookup ::  (Ord a, Show a) => (Envs -> Env a b) -> Env a b -> (Mname,a) -> b
     qlookup selector local_env (m,k) =   

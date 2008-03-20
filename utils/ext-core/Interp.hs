@@ -378,7 +378,7 @@ mlookup _          env       Nothing  = env
 mlookup globalEnv  _         (Just m) = 
     case elookup globalEnv m of
       Just env' -> env'
-      Nothing -> error ("undefined module name: " ++ show m)
+      Nothing -> error ("Interp: undefined module name: " ++ show m)
 
 qlookup :: Menv -> Venv -> (Mname,Var) -> Value
 qlookup globalEnv env (m,k) =   

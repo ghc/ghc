@@ -1,7 +1,15 @@
 module ParseGlue where
 
+import Encoding
+
+import Data.List
+
 data ParseResult a = OkP a | FailP String
 type P a = String -> Int -> ParseResult a
+
+instance Show a => Show (ParseResult a)
+  where show (OkP r) = show r
+        show (FailP s) = s
 
 thenP :: P a -> (a -> P b) -> P b
 m `thenP`  k = \ s l -> 
@@ -53,7 +61,13 @@ data Token =
  | TKchar Char 
  | TKEOF
 
-
+-- ugh
+splitModuleName mn = 
+   let decoded = zDecodeString mn
+       parts   = filter (notElem '.') $ groupBy 
+                   (\ c1 c2 -> c1 /= '.' && c2 /= '.') 
+                 decoded in
+     (take (length parts - 1) parts, last parts)
 
 
 

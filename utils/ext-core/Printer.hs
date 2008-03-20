@@ -5,6 +5,7 @@ import Numeric (fromRat)
 import Char
 
 import Core
+import Encoding
 
 instance Show Module where
   showsPrec d m = shows (pmodule m)
@@ -61,14 +62,30 @@ pcdef (Constr qdcon tbinds tys)  =
 
 pname id = text id
 
-pqname (m,id) = pmname m <> char '.' <> pname id
+pqname (m,id) = pmname m <> pname id
 
+-- be sure to print the '.' here so we don't print out
+-- ".foo" for unqualified foo...
 pmname Nothing = empty
-pmname (Just m) = panmname m
+pmname (Just m) = panmname m <> char '.'
 
-panmname (pkgName, parents, name) = pname pkgName <> char ':' 
-  <> (sep (punctuate (char '.') (map pname parents)))
-  <> char '.' <> pname name
+panmname p@(pkgName, parents, name) =
+  let parentStrs = map pname parents in
+         pname pkgName <> char ':' <>
+         -- This is to be sure to not print out:
+         -- main:.Main for when there's a single module name
+         -- with no parents.
+             (case parentStrs of
+                [] -> empty
+                _  -> hcat (punctuate hierModuleSeparator 
+                        (map pname parents)) 
+                      <> hierModuleSeparator)
+             <> pname name
+
+-- note that this is not a '.' but a Z-encoded '.':
+-- GHCziIOBase.IO, not GHC.IOBase.IO.
+-- What a pain.
+hierModuleSeparator = text (zEncodeString ".")
 
 ptbind (t,Klifted) = pname t
 ptbind (t,k) = parens (pname t <> text "::" <> pkind k)

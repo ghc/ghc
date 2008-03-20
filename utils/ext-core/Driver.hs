@@ -5,6 +5,8 @@
 -}
 
 import Monad
+import System.Environment
+
 import Core
 import Printer
 import Parser
@@ -40,12 +42,20 @@ process (senv,modules) f =
             FailP s -> do putStrLn ("Parse failed: " ++ s)
                           error "quit"
 
-main = do (_,modules) <- foldM process (initialEnv,[]) flist
+main = do fname <- getSingleArg
+          (_,modules) <- foldM process (initialEnv,[]) [fname] -- flist
 	  let result = evalProgram modules
 	  putStrLn ("Result = " ++ show result)
 	  putStrLn "All done"
 -- TODO
-       where flist = 	 ["PrelBase.hcr",
+-- see what breaks
+       where flist = ["Main.hcr"]
+             getSingleArg = getArgs >>= (\ a ->
+                                           case a of
+                                             (f:_) -> return f
+                                             _ -> error $ "usage: ./Driver [filename]")
+{-
+	 ["PrelBase.hcr",
 			  "PrelMaybe.hcr",
 			  "PrelTup.hcr",
 			  "PrelList.hcr", 
@@ -85,3 +95,4 @@ main = do (_,modules) <- foldM process (initialEnv,[]) flist
 			  "Prelude.hcr",
 			  "Main.hcr" ] 
 
+-}

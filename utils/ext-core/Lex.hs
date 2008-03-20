@@ -33,6 +33,7 @@ lexer cont ('/':'\\':cs) = cont TKbiglambda cs
 lexer cont ('@':cs) = cont TKat cs
 lexer cont ('?':cs) = cont TKquestion cs
 lexer cont (';':cs) = cont TKsemicolon cs
+lexer cont (':':cs) = cont TKcolon cs
 lexer cont (c:cs) = failP "invalid character" [c]
 
 lexChar cont ('\\':'x':h1:h0:'\'':cs)

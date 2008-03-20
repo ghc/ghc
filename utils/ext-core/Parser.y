@@ -173,8 +173,8 @@ exp	:: { Exp }
 		{ foldr Lam $4 $2 }
 	| '%let' vdefg '%in' exp 
 		{ Let $2 $4 }
-	| '%case' ty aexp '%of' vbind '{' alts1 '}'
-		{ Case $3 $5 $2 $7 }
+	| '%case' '(' ty ')' aexp '%of' vbind '{' alts1 '}'
+		{ Case $5 $7 $3 $9 }
 	| '%cast' exp aty 
 		{ Cast $2 $3 }
 	| '%note' STRING exp 
@@ -211,15 +211,23 @@ cname	:: { Id }
 	: CNAME	{ $1 }
          
 mname	:: { AnMname }
-        : pkgName ':' mnames '.' name
-             { ($1, $3, $5) }
+        : pkgName ':' cname
+             { let (parentNames, childName) = splitModuleName $3 in
+                 ($1, parentNames, childName) }
 
 pkgName :: { Id }
         : NAME { $1 }
 
+-- TODO: Clean this up. Now hierarchical names are z-encoded.
+
+-- note that a sequence of mnames is either:
+-- empty, or a series of cnames separated by
+-- dots, with a leading dot
+-- See the definition of mnames: the "name" part
+-- is required.
 mnames :: { [Id] } 
          : {- empty -} {[]}
-         | name '.' mnames {$1:$3}
+         | '.' cname mnames {$2:$3}
 
 -- it sucks to have to repeat the Maybe-checking twice,
 -- but otherwise we get reduce/reduce conflicts
