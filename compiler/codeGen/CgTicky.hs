@@ -373,8 +373,6 @@ showTypeCategory ty
 	  else if utc == intDataConKey     then 'I'
 	  else if utc == floatDataConKey   then 'F'
 	  else if utc == doubleDataConKey  then 'D'
-	  else if utc == smallIntegerDataConKey ||
-		  utc == largeIntegerDataConKey   then 'J'
 	  else if utc == charPrimTyConKey  then 'c'
 	  else if (utc == intPrimTyConKey || utc == wordPrimTyConKey
 		|| utc == addrPrimTyConKey)		   then 'i'
