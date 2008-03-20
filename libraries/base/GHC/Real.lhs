@@ -403,13 +403,14 @@ odd             =  not . even
         Integer -> Integer -> Integer,
         Integer -> Int -> Integer,
         Int -> Int -> Int #-}
-(^)             :: (Num a, Integral b) => a -> b -> a
-x ^ y | y < 0     = error "Negative exponent"
-      | y == 0    = 1
-      | y == 1    = x
-      | odd y     = x * (x ^ (y - 1))
-      | otherwise = let x' = x ^ (y `div` 2)
-                    in x' * x'
+(^) :: (Num a, Integral b) => a -> b -> a
+x0 ^ y0 | y0 < 0    = error "Negative exponent"
+        | y0 == 0   = 1
+        | otherwise = f x0 y0 1
+    where -- x0 ^ y0 = (x ^ y) * z
+          f x y z | even y = f (x * x) (y `quot` 2) z
+                  | y == 1 = x * z
+                  | otherwise = f (x * x) ((y - 1) `quot` 2) (x * z)
 
 -- | raise a number to an integral power
 {-# SPECIALISE (^^) ::
