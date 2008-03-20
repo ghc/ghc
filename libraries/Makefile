@@ -12,7 +12,7 @@
 #
 # or the following is equivalent:
 #
-#   make rebuild.library.<package>
+#   make remake.library.<package>
 #
 # To add a new library to the tree, do
 #
@@ -215,9 +215,13 @@ all: doc
 endif
 
 .PHONY: rebuild.library.%
+.PHONY: remake.library.%
 
 $(foreach SUBDIR,$(SUBDIRS),rebuild.library.$(SUBDIR)):\
-rebuild.library.%: clean.library.% make.library.%
+rebuild.library.%: clean.library.% build.library.%
+
+$(foreach SUBDIR,$(SUBDIRS),remake.library.$(SUBDIR)):\
+remake.library.%: clean.library.% make.library.%
 
 # NB. we're depending on make chasing dependencies from left to right here.
 # This bit goes wrong with 'make -j'.
