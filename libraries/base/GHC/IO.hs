@@ -944,7 +944,7 @@ foreign import ccall unsafe "__hscore_memcpy_dst_off"
 -- Internal Utils
 
 illegalBufferSize :: Handle -> String -> Int -> IO a
-illegalBufferSize handle fn (sz :: Int) = 
+illegalBufferSize handle fn sz =
         ioException (IOError (Just handle)
                             InvalidArgument  fn
                             ("illegal buffer size " ++ showsPrec 9 sz [])
