@@ -144,7 +144,7 @@ srtExpr table (StgLetNoEscape live1 live2 bind body)
     StgLetNoEscape live1 live2 bind' body'
 
 #ifdef DEBUG
-srtExpr table expr = pprPanic "srtExpr" (ppr expr)
+srtExpr _table expr = pprPanic "srtExpr" (ppr expr)
 #endif
 
 srtAlt :: IdEnv Int -> StgAlt -> StgAlt
