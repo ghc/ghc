@@ -228,6 +228,8 @@ active language flags:
 active package flags: none
 packages currently loaded:
   base
+  integer
+  ghc-prim
   rts
 -- :set -package ghc
 active package flags:
