@@ -1,7 +1,7 @@
 -- test :browse! functionality
 :browse! *T
 -- defined locally
-T.length :: GHC.Integer.Integer
+T.length :: GHC.Num.Integer
 class N a
 class S a
 class C a b where
@@ -34,8 +34,8 @@ class Monad m where
 catMaybes :: [Maybe a] -> [a]
 fromJust :: Maybe a -> a
 fromMaybe :: a -> Maybe a -> a
-isJust :: Maybe a -> GHC.Bool.Bool
-isNothing :: Maybe a -> GHC.Bool.Bool
+isJust :: Maybe a -> GHC.Base.Bool
+isNothing :: Maybe a -> GHC.Base.Bool
 listToMaybe :: [a] -> Maybe a
 mapMaybe :: (a -> Maybe b) -> [a] -> [b]
 maybe :: b -> (a -> b) -> Maybe a -> b
@@ -48,15 +48,15 @@ Nothing :: Maybe a
 (+) :: (GHC.Num.Num a) => a -> a -> a
 (=<<) :: (Monad m) => (a -> m b) -> m a -> m b
 class Eq a where
-  (GHC.Base.==) :: a -> a -> GHC.Bool.Bool
-  (GHC.Base./=) :: a -> a -> GHC.Bool.Bool
+  (GHC.Base.==) :: a -> a -> GHC.Base.Bool
+  (GHC.Base./=) :: a -> a -> GHC.Base.Bool
 -- imported via Prelude, T
 Prelude.length :: [a] -> GHC.Base.Int
 -- imported via T
 T.length :: Data.ByteString.Internal.ByteString -> GHC.Base.Int
 :browse! T
 -- defined locally
-T.length :: GHC.Integer.Integer
+T.length :: GHC.Num.Integer
 class N a
 class S a
 class C a b where
@@ -70,7 +70,7 @@ c3 :: (C a b) => a1 -> b
 c4 :: (C a b) => a1 -> b
 :browse! T -- with -fglasgow-exts
 -- defined locally
-T.length :: GHC.Integer.Integer
+T.length :: GHC.Num.Integer
 class N a
 class S a
 class C a b where
