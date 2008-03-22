@@ -65,6 +65,12 @@ Library {
             GHC.Weak,
             GHC.Word,
             System.Timeout
+        extensions: MagicHash, ExistentialQuantification, Rank2Types,
+                    ScopedTypeVariables, UnboxedTuples,
+                    ForeignFunctionInterface, UnliftedFFITypes,
+                    DeriveDataTypeable, GeneralizedNewtypeDeriving,
+                    FlexibleInstances, PatternSignatures, StandaloneDeriving,
+                    PatternGuards
     }
     exposed-modules:
         Control.Applicative,
@@ -166,10 +172,9 @@ Library {
     if os(windows) {
         extra-libraries: wsock32, msvcrt, kernel32, user32, shell32
     }
-    extensions:    CPP
-    -- XXX is there an extension for using # in varids?
+    extensions: CPP
     -- We need to set the package name to base (without a version number)
     -- as it's magic.
-    ghc-options: -fglasgow-exts -package-name base
+    ghc-options: -package-name base
     nhc98-options: -H4M -K3M
 }
