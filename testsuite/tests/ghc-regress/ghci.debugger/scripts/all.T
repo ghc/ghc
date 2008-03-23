@@ -1,7 +1,7 @@
 setTestOpts(composes([extra_run_opts('-ignore-dot-ghci'), normalise_slashes]))
 
 test('print001', normal, ghci_script, ['print001.script'])
-test('print002', normal, ghci_script, ['print002.script'])
+test('print002', if_compiler_ge('ghc','6.9', expect_broken(2174)), ghci_script, ['print002.script'])
 test('print003', normal, ghci_script, ['print003.script'])
 test('print004', normal, ghci_script, ['print004.script'])
 test('print005', normal, ghci_script, ['print005.script'])
