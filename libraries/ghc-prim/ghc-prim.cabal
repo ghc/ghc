@@ -1,0 +1,21 @@
+name:           ghc-prim
+version:        0.1
+license:        BSD3
+license-file:   LICENSE
+maintainer:     libraries@haskell.org
+synopsis:       GHC primitives
+description:
+    GHC primitives.
+cabal-version:  >=1.2
+build-type: Custom
+
+Library {
+    exposed-modules:
+        GHC.Bool
+        GHC.Generics
+        GHC.PrimopWrappers
+    extensions: CPP, MagicHash
+    -- We need to set the package name to ghc-prim (without a version number)
+    -- as it's magic.
+    ghc-options: -package-name ghc-prim
+}
