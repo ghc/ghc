@@ -1,0 +1,20 @@
+name:           integer
+version:        0.1
+license:        BSD3
+license-file:   LICENSE
+maintainer:     libraries@haskell.org
+synopsis:       Integer library based on GMP
+description:
+    This package contains an Integer library based on GMP.
+cabal-version:  >=1.2
+build-type: Simple
+
+Library {
+    build-depends: ghc-prim
+    exposed-modules: GHC.Integer
+    extensions: CPP, MagicHash, UnboxedTuples,
+                ForeignFunctionInterface, UnliftedFFITypes
+    -- We need to set the package name to integer (without a version number)
+    -- as it's magic.
+    ghc-options: -package-name integer -Wall -Werror
+}
