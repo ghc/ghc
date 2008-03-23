@@ -9,7 +9,7 @@ description:
     and a large collection of useful libraries ranging from data
     structures to parsing combinators and debugging utilities.
 cabal-version:  >=1.2
-build-type: Custom
+build-type: Configure
 extra-tmp-files:
                 config.log config.status autom4te.cache
                 include/HsBaseConfig.h
