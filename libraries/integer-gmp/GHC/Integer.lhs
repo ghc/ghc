@@ -149,8 +149,8 @@ divModInteger (S# i) (S# j) = (# S# (i `divInt#` j), S# (i `modInt#` j) #)
 
       modInt# :: Int# -> Int# -> Int#
       x# `modInt#` y#
-       = if (x# ># 0#) && (y# <# 0#) ||
-            (x# <# 0#) && (y# ># 0#)
+       = if ((x# ># 0#) && (y# <# 0#)) ||
+            ((x# <# 0#) && (y# ># 0#))
          then if r# /=# 0# then r# +# y# else 0#
          else r#
           where r# = x# `remInt#` y#
