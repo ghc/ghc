@@ -380,10 +380,12 @@ findWiredInPackages dflags pkgs preload this_package = do
   -- their canonical names (eg. base-1.0 ==> base).
   --
   let
-	wired_in_pkgids = [ basePackageId,
-			    rtsPackageId,
-			    haskell98PackageId,
-			    thPackageId,
+        wired_in_pkgids = [ primPackageId,
+                            integerPackageId,
+                            basePackageId,
+                            rtsPackageId,
+                            haskell98PackageId,
+                            thPackageId,
                             ndpPackageId ]
 
 	wired_in_names = map packageIdString wired_in_pkgids

@@ -28,6 +28,8 @@ module Module
         packageIdString,
 
 	-- * Wired-in PackageIds
+	primPackageId,
+	integerPackageId,
 	basePackageId,
 	rtsPackageId,
 	haskell98PackageId,
@@ -277,8 +279,11 @@ packageIdString = unpackFS . packageIdFS
 -- package that depends directly or indirectly on it (much as if you
 -- had used -ignore-package).
 
-basePackageId, rtsPackageId, haskell98PackageId, 
+integerPackageId, primPackageId,
+  basePackageId, rtsPackageId, haskell98PackageId,
   thPackageId, ndpPackageId, mainPackageId  :: PackageId
+primPackageId      = fsToPackageId FSLIT("ghc-prim")
+integerPackageId   = fsToPackageId FSLIT("integer")
 basePackageId      = fsToPackageId FSLIT("base")
 rtsPackageId	   = fsToPackageId FSLIT("rts")
 haskell98PackageId = fsToPackageId FSLIT("haskell98")

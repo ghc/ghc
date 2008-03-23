@@ -467,6 +467,14 @@ instance (Binary a, Binary b) => Binary (Either a b) where
 -- yes, we need Binary Integer and Binary Rational in basicTypes/Literal.lhs
 
 instance Binary Integer where
+    -- XXX This is hideous
+    put_ bh i = put_ bh (show i)
+    get bh = do str <- get bh
+                case reads str of
+                    [(i, "")] -> return i
+                    _ -> fail ("Binary Integer: got " ++ show str)
+
+    {-
     put_ bh (S# i#) = do putByte bh 0; put_ bh (I# i#)
     put_ bh (J# s# a#) = do
         putByte bh 1
@@ -484,6 +492,7 @@ instance Binary Integer where
                   sz <- get bh
                   (BA a#) <- getByteArray bh sz
                   return (J# s# a#)
+-}
 
 -- As for the rest of this code, even though this module
 -- exports it, it doesn't seem to be used anywhere else

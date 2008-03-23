@@ -155,9 +155,9 @@ charDataConName   = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("C#") charDat
 intTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE FSLIT("Int") intTyConKey   intTyCon
 intDataConName	  = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("I#") intDataConKey  intDataCon
 						  
-boolTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE FSLIT("Bool") boolTyConKey boolTyCon
-falseDataConName  = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("False") falseDataConKey falseDataCon
-trueDataConName	  = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("True")  trueDataConKey  trueDataCon 
+boolTyConName	  = mkWiredInTyConName   UserSyntax gHC_BOOL FSLIT("Bool") boolTyConKey boolTyCon
+falseDataConName  = mkWiredInDataConName UserSyntax gHC_BOOL FSLIT("False") falseDataConKey falseDataCon
+trueDataConName	  = mkWiredInDataConName UserSyntax gHC_BOOL FSLIT("True")  trueDataConKey  trueDataCon 
 listTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_BASE FSLIT("[]") listTyConKey listTyCon
 nilDataConName 	  = mkWiredInDataConName BuiltInSyntax gHC_BASE FSLIT("[]") nilDataConKey nilDataCon 
 consDataConName	  = mkWiredInDataConName BuiltInSyntax gHC_BASE FSLIT(":") consDataConKey consDataCon

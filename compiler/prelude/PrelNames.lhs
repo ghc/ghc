@@ -118,7 +118,7 @@ basicKnownKeyNames
 	stringTyConName,
 	ratioDataConName,
 	ratioTyConName,
-	integerTyConName, smallIntegerDataConName, largeIntegerDataConName,
+	integerTyConName, smallIntegerName,
 
 	--  Classes.  *Must* include:
 	--  	classes that are grabbed by key (e.g., eqClassKey)
@@ -236,12 +236,15 @@ genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 --MetaHaskell Extension Add a new module here
 \begin{code}
 pRELUDE		= mkBaseModule_ pRELUDE_NAME
-gHC_PRIM	= mkBaseModule FSLIT("GHC.Prim")   -- Primitive types and values
+gHC_PRIM	= mkPrimModule FSLIT("GHC.Prim")   -- Primitive types and values
+gHC_BOOL	= mkPrimModule FSLIT("GHC.Bool")
+gHC_GENERICS	= mkPrimModule FSLIT("GHC.Generics")
 gHC_BASE	= mkBaseModule FSLIT("GHC.Base")
 gHC_ENUM	= mkBaseModule FSLIT("GHC.Enum")
 gHC_SHOW	= mkBaseModule FSLIT("GHC.Show")
 gHC_READ	= mkBaseModule FSLIT("GHC.Read")
 gHC_NUM		= mkBaseModule FSLIT("GHC.Num")
+gHC_INTEGER	= mkIntegerModule FSLIT("GHC.Integer")
 gHC_LIST	= mkBaseModule FSLIT("GHC.List")
 gHC_PARR	= mkBaseModule FSLIT("GHC.PArr")
 dATA_TUP	= mkBaseModule FSLIT("Data.Tuple")
@@ -287,6 +290,12 @@ thFAKE         = mkMainModule FSLIT(":THFake")
 
 pRELUDE_NAME   = mkModuleNameFS FSLIT("Prelude")
 mAIN_NAME      = mkModuleNameFS FSLIT("Main")
+
+mkPrimModule :: FastString -> Module
+mkPrimModule m = mkModule primPackageId (mkModuleNameFS m)
+
+mkIntegerModule :: FastString -> Module
+mkIntegerModule m = mkModule integerPackageId (mkModuleNameFS m)
 
 mkBaseModule :: FastString -> Module
 mkBaseModule m = mkModule basePackageId (mkModuleNameFS m)
@@ -439,10 +448,10 @@ mkTyConRep_RDR = varQual_RDR tYPEABLE FSLIT("mkTyCon")
 
 undefined_RDR = varQual_RDR gHC_ERR FSLIT("undefined")
 
-crossDataCon_RDR   = dataQual_RDR gHC_BASE FSLIT(":*:")
-inlDataCon_RDR     = dataQual_RDR gHC_BASE FSLIT("Inl")
-inrDataCon_RDR     = dataQual_RDR gHC_BASE FSLIT("Inr")
-genUnitDataCon_RDR = dataQual_RDR gHC_BASE FSLIT("Unit")
+crossDataCon_RDR   = dataQual_RDR gHC_GENERICS FSLIT(":*:")
+inlDataCon_RDR     = dataQual_RDR gHC_GENERICS FSLIT("Inl")
+inrDataCon_RDR     = dataQual_RDR gHC_GENERICS FSLIT("Inr")
+genUnitDataCon_RDR = dataQual_RDR gHC_GENERICS FSLIT("Unit")
 
 ----------------------
 varQual_RDR  mod str = mkOrig mod (mkOccNameFS varName str)
@@ -475,9 +484,9 @@ leftDataConName   = conName dATA_EITHER FSLIT("Left")   leftDataConKey
 rightDataConName  = conName dATA_EITHER FSLIT("Right")  rightDataConKey
 
 -- Generics
-crossTyConName     = tcQual   gHC_BASE FSLIT(":*:") crossTyConKey
-plusTyConName      = tcQual   gHC_BASE FSLIT(":+:") plusTyConKey
-genUnitTyConName   = tcQual   gHC_BASE FSLIT("Unit") genUnitTyConKey
+crossTyConName     = tcQual   gHC_GENERICS FSLIT(":*:") crossTyConKey
+plusTyConName      = tcQual   gHC_GENERICS FSLIT(":+:") plusTyConKey
+genUnitTyConName   = tcQual   gHC_GENERICS FSLIT("Unit") genUnitTyConKey
 
 -- Base strings Strings
 unpackCStringName       = varQual gHC_BASE FSLIT("unpackCString#") unpackCStringIdKey
@@ -548,11 +557,10 @@ numClassName	  = clsQual  gHC_NUM FSLIT("Num") numClassKey
 fromIntegerName   = methName gHC_NUM FSLIT("fromInteger") fromIntegerClassOpKey
 minusName	  = methName gHC_NUM FSLIT("-") minusClassOpKey
 negateName	  = methName gHC_NUM FSLIT("negate") negateClassOpKey
-plusIntegerName   = varQual  gHC_NUM FSLIT("plusInteger") plusIntegerIdKey
-timesIntegerName  = varQual  gHC_NUM FSLIT("timesInteger") timesIntegerIdKey
-integerTyConName  = tcQual   gHC_NUM FSLIT("Integer") integerTyConKey
-smallIntegerDataConName = conName gHC_NUM FSLIT("S#") smallIntegerDataConKey
-largeIntegerDataConName = conName gHC_NUM FSLIT("J#") largeIntegerDataConKey
+plusIntegerName   = varQual  gHC_INTEGER FSLIT("plusInteger") plusIntegerIdKey
+timesIntegerName  = varQual  gHC_INTEGER FSLIT("timesInteger") timesIntegerIdKey
+integerTyConName  = tcQual   gHC_INTEGER FSLIT("Integer") integerTyConKey
+smallIntegerName = varQual gHC_INTEGER FSLIT("smallInteger") smallIntegerIdKey
 
 -- PrelReal types and classes
 rationalTyConName   = tcQual  gHC_REAL FSLIT("Rational") rationalTyConKey
@@ -889,8 +897,6 @@ doubleDataConKey			= mkPreludeDataConUnique  3
 falseDataConKey				= mkPreludeDataConUnique  4
 floatDataConKey				= mkPreludeDataConUnique  5
 intDataConKey				= mkPreludeDataConUnique  6
-smallIntegerDataConKey			= mkPreludeDataConUnique  7
-largeIntegerDataConKey			= mkPreludeDataConUnique  8
 nilDataConKey				= mkPreludeDataConUnique 11
 ratioDataConKey				= mkPreludeDataConUnique 12
 stableNameDataConKey			= mkPreludeDataConUnique 14
@@ -957,6 +963,7 @@ bindIOIdKey		      = mkPreludeMiscIdUnique 36
 returnIOIdKey		      = mkPreludeMiscIdUnique 37
 deRefStablePtrIdKey	      = mkPreludeMiscIdUnique 38
 newStablePtrIdKey	      = mkPreludeMiscIdUnique 39
+smallIntegerIdKey			= mkPreludeMiscIdUnique  40
 plusIntegerIdKey	      = mkPreludeMiscIdUnique 41
 timesIntegerIdKey	      = mkPreludeMiscIdUnique 42
 printIdKey		      = mkPreludeMiscIdUnique 43

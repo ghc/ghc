@@ -515,8 +515,8 @@ mkCharExpr c = mkConApp charDataCon [mkLit (MachChar c)]
 
 mkIntegerExpr i
   | inIntRange i        -- Small enough, so start from an Int
-    = do integer_dc <- dsLookupDataCon  smallIntegerDataConName
-         return (mkSmallIntegerLit integer_dc i)
+    = do integer_id <- dsLookupGlobalId smallIntegerName
+         return (mkSmallIntegerLit integer_id i)
 
 -- Special case for integral literals with a large magnitude:
 -- They are transformed into an expression involving only smaller
@@ -525,9 +525,9 @@ mkIntegerExpr i
   | otherwise = do       -- Big, so start from a string
       plus_id <- dsLookupGlobalId plusIntegerName
       times_id <- dsLookupGlobalId timesIntegerName
-      integer_dc <- dsLookupDataCon  smallIntegerDataConName
+      integer_id <- dsLookupGlobalId smallIntegerName
       let
-           lit i = mkSmallIntegerLit integer_dc i
+           lit i = mkSmallIntegerLit integer_id i
            plus a b  = Var plus_id  `App` a `App` b
            times a b = Var times_id `App` a `App` b
 
@@ -543,8 +543,8 @@ mkIntegerExpr i
 
       return (horner tARGET_MAX_INT i)
 
-mkSmallIntegerLit :: DataCon -> Integer -> CoreExpr
-mkSmallIntegerLit small_integer_data_con i = mkConApp small_integer_data_con [mkIntLit i]
+mkSmallIntegerLit :: Id -> Integer -> CoreExpr
+mkSmallIntegerLit small_integer i = mkApps (Var small_integer) [mkIntLit i]
 
 mkStringExpr str = mkStringExprFS (mkFastString str)
 

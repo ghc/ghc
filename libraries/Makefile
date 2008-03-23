@@ -38,7 +38,7 @@ show:
 TOP=..
 include $(TOP)/mk/boilerplate.mk
 
-SUBDIRS  = base array packedstring containers bytestring
+SUBDIRS  = ghc-prim integer-gmp base array packedstring containers bytestring
 SUBDIRS += old-locale old-time filepath directory
 ifeq "$(GhcLibsWithUnix)" "YES"
 SUBDIRS += unix
@@ -322,7 +322,8 @@ doc.library.%: stamp/configure.library.build$(CONFIGURE_STAMP_EXTRAS).% \
 	                               $(CABAL_HADDOCK_FLAGS); \
 	fi
 ifneq "$(HSCOLOUR)" ""
-	if ifBuildable/ifBuildable $*; then cp hscolour.css $*/dist/doc/html/$*/src/; fi
+# We use */src rather than $*/src due to the integer-gmp/integer mismatch
+	if ifBuildable/ifBuildable $*; then cp hscolour.css $*/dist/doc/html/*/src/; fi
 endif
 
 .PHONY: distclean clean clean.library.%

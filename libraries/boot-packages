@@ -6,7 +6,10 @@ containers
 directory
 editline
 filepath
+ghc-prim
 haskell98
+hpc
+integer-gmp
 old-locale
 old-time
 packedstring
@@ -16,4 +19,3 @@ random
 template-haskell
 unix
 Win32
-hpc

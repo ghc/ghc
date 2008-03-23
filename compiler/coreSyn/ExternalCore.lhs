@@ -81,7 +81,7 @@ type Qual t = (Mname,t)
 type Id = String
 
 primMname :: Mname
-primMname = "base:GHC.Prim"
+primMname = "ghc-prim:GHC.Prim"
 
 tcArrow :: Qual Tcon
 tcArrow = (primMname, "(->)")

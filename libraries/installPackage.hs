@@ -40,7 +40,7 @@ doRegisterInplace verbosity =
        do lbi <- getConfig verbosity
           let registerFlags = defaultRegisterFlags { regInPlace = toFlag True }
               pd = localPkgDescr lbi
-              pd_reg = if pkgName (package pd) == "base"
+              pd_reg = if pkgName (package pd) == "ghc-prim"
                        then case library pd of
                             Just lib ->
                                 let ems = "GHC.Prim" : exposedModules lib
@@ -75,9 +75,9 @@ doInstall verbosity ghcpkg ghcpkgconf destdir topdir
           let pd = localPkgDescr lbi
               i = installDirTemplates lbi
               -- This is an almighty hack. We need to register
-              -- base:GHC.Prim, but it doesn't exist, get built, get
+              -- ghc-prim:GHC.Prim, but it doesn't exist, get built, get
               -- haddocked, get copied, etc.
-              pd_reg = if pkgName (package pd) == "base"
+              pd_reg = if pkgName (package pd) == "ghc-prim"
                        then case library pd of
                             Just lib ->
                                 let ems = "GHC.Prim" : exposedModules lib
