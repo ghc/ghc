@@ -229,7 +229,7 @@ instance  Real Int  where
     toRational x        =  toInteger x % 1
 
 instance  Integral Int  where
-    toInteger i = int2Integer i  -- give back a full-blown Integer
+    toInteger (I# i) = smallInteger i
 
     a `quot` b
      | b == 0                     = divZeroError
@@ -283,10 +283,12 @@ instance  Integral Integer where
     n `rem`  d = n `remInteger`  d
 
     a `divMod` 0 = divZeroError
-    a `divMod` b = a `divModInteger` b
+    a `divMod` b = case a `divModInteger` b of
+                   (# x, y #) -> (x, y)
 
     a `quotRem` 0 = divZeroError
-    a `quotRem` b = a `quotRemInteger` b
+    a `quotRem` b = case a `quotRemInteger` b of
+                    (# q, r #) -> (q, r)
 
     -- use the defaults for div & mod
 \end{code}
@@ -342,7 +344,7 @@ instance  (Integral a)  => Enum (Ratio a)  where
     succ x              =  x + 1
     pred x              =  x - 1
 
-    toEnum n            =  fromInteger (int2Integer n) :% 1
+    toEnum n            =  fromIntegral n :% 1
     fromEnum            =  fromInteger . truncate
 
     enumFrom            =  numericEnumFrom
@@ -436,12 +438,15 @@ lcm _ 0         =  0
 lcm 0 _         =  0
 lcm x y         =  abs ((x `quot` (gcd x y)) * y)
 
-
 {-# RULES
 "gcd/Int->Int->Int"             gcd = gcdInt
-"gcd/Integer->Integer->Integer" gcd = gcdInteger
+"gcd/Integer->Integer->Integer" gcd = gcdInteger'
 "lcm/Integer->Integer->Integer" lcm = lcmInteger
  #-}
+
+gcdInteger' :: Integer -> Integer -> Integer
+gcdInteger' 0 0 = error "GHC.Real.gcdInteger': gcd 0 0 is undefined"
+gcdInteger' a b = gcdInteger a b
 
 integralEnumFrom :: (Integral a, Bounded a) => a -> [a]
 integralEnumFrom n = map fromInteger [toInteger n .. toInteger (maxBound `asTypeOf` n)]

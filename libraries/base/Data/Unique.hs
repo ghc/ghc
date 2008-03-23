@@ -26,7 +26,7 @@ import System.IO.Unsafe (unsafePerformIO)
 
 #ifdef __GLASGOW_HASKELL__
 import GHC.Base
-import GHC.Num  ( Integer(..) )
+import GHC.Num
 #endif
 
 -- | An abstract unique object.  Objects of type 'Unique' may be
@@ -52,10 +52,8 @@ newUnique = do
 -- same value, although in practice this is unlikely.  The 'Int'
 -- returned makes a good hash key.
 hashUnique :: Unique -> Int
-#ifdef __GLASGOW_HASKELL__ 
-hashUnique (Unique (S# i))   = I# i
-hashUnique (Unique (J# s d)) | s ==# 0#  = 0
-                             | otherwise = I# (indexIntArray# d 0#)
+#if defined(__GLASGOW_HASKELL__)
+hashUnique (Unique i) = I# (hashInteger i)
 #else
 hashUnique (Unique u) = fromInteger (u `mod` (toInteger (maxBound :: Int) + 1))
 #endif

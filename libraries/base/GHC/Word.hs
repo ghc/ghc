@@ -83,8 +83,7 @@ instance Num Word where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger (S# i#)    = W# (int2Word# i#)
-    fromInteger (J# s# d#) = W# (integer2Word# s# d#)
+    fromInteger i          = W# (integerToWord i)
 
 instance Real Word where
     toRational x = toInteger x % 1
@@ -128,8 +127,8 @@ instance Integral Word where
         | y /= 0                = (W# (x# `quotWord#` y#), W# (x# `remWord#` y#))
         | otherwise             = divZeroError
     toInteger (W# x#)
-        | i# >=# 0#             = S# i#
-        | otherwise             = case word2Integer# x# of (# s, d #) -> J# s d
+        | i# >=# 0#             = smallInteger i#
+        | otherwise             = wordToInteger x#
         where
         i# = word2Int# x#
 
@@ -200,8 +199,7 @@ instance Num Word8 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger (S# i#)    = W8# (narrow8Word# (int2Word# i#))
-    fromInteger (J# s# d#) = W8# (narrow8Word# (integer2Word# s# d#))
+    fromInteger i          = W8# (narrow8Word# (integerToWord i))
 
 instance Real Word8 where
     toRational x = toInteger x % 1
@@ -240,7 +238,7 @@ instance Integral Word8 where
     divMod  x@(W8# x#) y@(W8# y#)
         | y /= 0                  = (W8# (x# `quotWord#` y#), W8# (x# `remWord#` y#))
         | otherwise               = divZeroError
-    toInteger (W8# x#)            = S# (word2Int# x#)
+    toInteger (W8# x#)            = smallInteger (word2Int# x#)
 
 instance Bounded Word8 where
     minBound = 0
@@ -301,8 +299,7 @@ instance Num Word16 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger (S# i#)    = W16# (narrow16Word# (int2Word# i#))
-    fromInteger (J# s# d#) = W16# (narrow16Word# (integer2Word# s# d#))
+    fromInteger i          = W16# (narrow16Word# (integerToWord i))
 
 instance Real Word16 where
     toRational x = toInteger x % 1
@@ -341,7 +338,7 @@ instance Integral Word16 where
     divMod  x@(W16# x#) y@(W16# y#)
         | y /= 0                    = (W16# (x# `quotWord#` y#), W16# (x# `remWord#` y#))
         | otherwise                 = divZeroError
-    toInteger (W16# x#)             = S# (word2Int# x#)
+    toInteger (W16# x#)             = smallInteger (word2Int# x#)
 
 instance Bounded Word16 where
     minBound = 0
@@ -524,8 +521,7 @@ instance Num Word32 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger (S# i#)    = W32# (narrow32Word# (int2Word# i#))
-    fromInteger (J# s# d#) = W32# (narrow32Word# (integer2Word# s# d#))
+    fromInteger i          = W32# (narrow32Word# (integerToWord i))
 
 instance Enum Word32 where
     succ x
@@ -577,12 +573,12 @@ instance Integral Word32 where
         | otherwise                 = divZeroError
     toInteger (W32# x#)
 #if WORD_SIZE_IN_BITS == 32
-        | i# >=# 0#                 = S# i#
-        | otherwise                 = case word2Integer# x# of (# s, d #) -> J# s d
+        | i# >=# 0#                 = smallInteger i#
+        | otherwise                 = word2Integer x#
         where
         i# = word2Int# x#
 #else
-                                    = S# (word2Int# x#)
+                                    = smallInteger (word2Int# x#)
 #endif
 
 instance Bits Word32 where
@@ -799,8 +795,7 @@ instance Num Word64 where
     abs x                  = x
     signum 0               = 0
     signum _               = 1
-    fromInteger (S# i#)    = W64# (int2Word# i#)
-    fromInteger (J# s# d#) = W64# (integer2Word# s# d#)
+    fromInteger i          = W64# (integerToWord i)
 
 instance Enum Word64 where
     succ x
@@ -841,8 +836,8 @@ instance Integral Word64 where
         | y /= 0                    = (W64# (x# `quotWord#` y#), W64# (x# `remWord#` y#))
         | otherwise                 = divZeroError
     toInteger (W64# x#)
-        | i# >=# 0#                 = S# i#
-        | otherwise                 = case word2Integer# x# of (# s, d #) -> J# s d
+        | i# >=# 0#                 = smallInteger i#
+        | otherwise                 = wordToInteger x#
         where
         i# = word2Int# x#
 

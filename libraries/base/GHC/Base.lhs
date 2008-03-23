@@ -84,11 +84,15 @@ Other Prelude modules are much easier with fewer complex dependencies.
 module GHC.Base
         (
         module GHC.Base,
+        module GHC.Bool,
+        module GHC.Generics,
         module GHC.Prim,        -- Re-export GHC.Prim and GHC.Err, to avoid lots
         module GHC.Err          -- of people having to import it explicitly
   ) 
         where
 
+import GHC.Bool
+import GHC.Generics
 import GHC.Prim
 import {-# SOURCE #-} GHC.Err
 
@@ -468,8 +472,25 @@ mapFB c f x ys = c (f x) ys
 -- first so that the corresponding 'Prelude.Enum' instance will give
 -- 'Prelude.fromEnum' 'False' the value zero, and
 -- 'Prelude.fromEnum' 'True' the value 1.
-data  Bool  =  False | True  deriving (Eq, Ord)
-        -- Read in GHC.Read, Show in GHC.Show
+-- The actual definition is in the ghc-prim package.
+
+-- XXX These don't work:
+-- deriving instance Eq Bool
+-- deriving instance Ord Bool
+-- <wired into compiler>:
+--     Illegal binding of built-in syntax: con2tag_Bool#
+
+instance Eq Bool where
+    True  == True  = True
+    False == False = True
+    _     == _     = False
+
+instance Ord Bool where
+    compare False True  = LT
+    compare True  False = GT
+    compare _     _     = EQ
+
+-- Read is in GHC.Read, Show in GHC.Show
 
 -- Boolean functions
 
@@ -769,20 +790,6 @@ until p f x | p x       =  x
 -- (which is usually overloaded) to have the same type as the second.
 asTypeOf                :: a -> a -> a
 asTypeOf                =  const
-\end{code}
-
-%*********************************************************
-%*                                                      *
-\subsection{Generics}
-%*                                                      *
-%*********************************************************
-
-\begin{code}
-data Unit = Unit
-#ifndef __HADDOCK__
-data (:+:) a b = Inl a | Inr b
-data (:*:) a b = a :*: b
-#endif
 \end{code}
 
 %*********************************************************

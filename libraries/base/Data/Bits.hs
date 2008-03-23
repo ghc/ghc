@@ -259,30 +259,11 @@ foreign import ccall nhc_primIntCompl :: Int -> Int
 #endif /* __NHC__ */
 
 instance Bits Integer where
-#ifdef __GLASGOW_HASKELL__
-   (S# x) .&. (S# y) = S# (word2Int# (int2Word# x `and#` int2Word# y))
-   x@(S# _) .&. y = toBig x .&. y
-   x .&. y@(S# _) = x .&. toBig y
-   (J# s1 d1) .&. (J# s2 d2) = 
-        case andInteger# s1 d1 s2 d2 of
-          (# s, d #) -> J# s d
-
-   (S# x) .|. (S# y) = S# (word2Int# (int2Word# x `or#` int2Word# y))
-   x@(S# _) .|. y = toBig x .|. y
-   x .|. y@(S# _) = x .|. toBig y
-   (J# s1 d1) .|. (J# s2 d2) = 
-        case orInteger# s1 d1 s2 d2 of
-          (# s, d #) -> J# s d
-   
-   (S# x) `xor` (S# y) = S# (word2Int# (int2Word# x `xor#` int2Word# y))
-   x@(S# _) `xor` y = toBig x `xor` y
-   x `xor` y@(S# _) = x `xor` toBig y
-   (J# s1 d1) `xor` (J# s2 d2) =
-        case xorInteger# s1 d1 s2 d2 of
-          (# s, d #) -> J# s d
-   
-   complement (S# x) = S# (word2Int# (int2Word# x `xor#` int2Word# (0# -# 1#)))
-   complement (J# s d) = case complementInteger# s d of (# s, d #) -> J# s d
+#if defined(__GLASGOW_HASKELL__)
+   (.&.) = andInteger
+   (.|.) = orInteger
+   xor = xorInteger
+   complement = complementInteger
 #else
    -- reduce bitwise binary operations to special cases we can handle
 
@@ -309,7 +290,7 @@ instance Bits Integer where
    bitSize _  = error "Data.Bits.bitSize(Integer)"
    isSigned _ = True
 
-#ifndef __GLASGOW_HASKELL__
+#if !defined(__GLASGOW_HASKELL__)
 -- Crude implementation of bitwise operations on Integers: convert them
 -- to finite lists of Ints (least significant first), zip and convert
 -- back again.

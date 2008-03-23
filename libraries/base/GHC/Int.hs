@@ -56,8 +56,7 @@ instance Num Int8 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger (S# i#)    = I8# (narrow8Int# i#)
-    fromInteger (J# s# d#) = I8# (narrow8Int# (integer2Int# s# d#))
+    fromInteger i          = I8# (narrow8Int# (toInt# i))
 
 instance Real Int8 where
     toRational x = toInteger x % 1
@@ -104,7 +103,7 @@ instance Integral Int8 where
         | x == minBound && y == (-1) = overflowError
         | otherwise                  = (I8# (narrow8Int# (x# `divInt#` y#)),
                                        I8# (narrow8Int# (x# `modInt#` y#)))
-    toInteger (I8# x#)               = S# x#
+    toInteger (I8# x#)               = smallInteger x#
 
 instance Bounded Int8 where
     minBound = -0x80
@@ -169,8 +168,7 @@ instance Num Int16 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger (S# i#)    = I16# (narrow16Int# i#)
-    fromInteger (J# s# d#) = I16# (narrow16Int# (integer2Int# s# d#))
+    fromInteger i          = I16# (narrow16Int# (toInt# i))
 
 instance Real Int16 where
     toRational x = toInteger x % 1
@@ -217,7 +215,7 @@ instance Integral Int16 where
         | x == minBound && y == (-1) = overflowError
         | otherwise                  = (I16# (narrow16Int# (x# `divInt#` y#)),
                                         I16# (narrow16Int# (x# `modInt#` y#)))
-    toInteger (I16# x#)              = S# x#
+    toInteger (I16# x#)              = smallInteger x#
 
 instance Bounded Int16 where
     minBound = -0x8000
@@ -342,7 +340,7 @@ instance Integral Int32 where
                                      I32# (x# `modInt32#` y#))
     toInteger x@(I32# x#)
 	| x >= fromIntegral (minBound::Int) && x <= fromIntegral (maxBound::Int)
-                                  = S# (int32ToInt# x#)
+                                  = smallInteger (int32ToInt# x#)
         | otherwise               = case int32ToInteger# x# of (# s, d #) -> J# s d
 
 divInt32#, modInt32# :: Int32# -> Int32# -> Int32#
@@ -445,8 +443,7 @@ instance Num Int32 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger (S# i#)    = I32# (narrow32Int# i#)
-    fromInteger (J# s# d#) = I32# (narrow32Int# (integer2Int# s# d#))
+    fromInteger i          = I32# (narrow32Int# (toInt# i))
 
 instance Enum Int32 where
     succ x
@@ -494,7 +491,7 @@ instance Integral Int32 where
         | x == minBound && y == (-1) = overflowError
         | otherwise                  = (I32# (narrow32Int# (x# `divInt#` y#)),
                                      I32# (narrow32Int# (x# `modInt#` y#)))
-    toInteger (I32# x#)              = S# x#
+    toInteger (I32# x#)              = smallInteger x#
 
 instance Read Int32 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]
@@ -627,7 +624,7 @@ instance Integral Int64 where
     toInteger x@(I64# x#)
 	| x >= fromIntegral (minBound::Int) &&
           x <= fromIntegral (maxBound::Int)
-                                     = S# (int64ToInt# x#)
+                                     = smallInteger (int64ToInt# x#)
         | otherwise                  = case int64ToInteger# x# of
                                            (# s, d #) -> J# s d
 
@@ -749,8 +746,7 @@ instance Num Int64 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger (S# i#)    = I64# i#
-    fromInteger (J# s# d#) = I64# (integer2Int# s# d#)
+    fromInteger i          = I64# (toInt# i)
 
 instance Enum Int64 where
     succ x
@@ -789,7 +785,7 @@ instance Integral Int64 where
         | y == 0                     = divZeroError
         | x == minBound && y == (-1) = overflowError
         | otherwise                  = (I64# (x# `divInt#` y#), I64# (x# `modInt#` y#))
-    toInteger (I64# x#)              = S# x#
+    toInteger (I64# x#)              = smallInteger x#
 
 instance Read Int64 where
     readsPrec p s = [(fromIntegral (x::Int), r) | (x, r) <- readsPrec p s]

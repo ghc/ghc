@@ -190,13 +190,7 @@ instance  Num Float  where
              | otherwise = negate 1
 
     {-# INLINE fromInteger #-}
-    fromInteger (S# i#)    = case (int2Float# i#) of { d# -> F# d# }
-    fromInteger (J# s# d#) = encodeFloat# s# d# 0
-        -- previous code: fromInteger n = encodeFloat n 0
-        -- doesn't work too well, because encodeFloat is defined in
-        -- terms of ccalls which can never be simplified away.  We
-        -- want simple literals like (fromInteger 3 :: Float) to turn
-        -- into (F# 3.0), hence the special case for S# here.
+    fromInteger i = F# (floatFromInteger i)
 
 instance  Real Float  where
     toRational x        =  (m%1)*(b%1)^^n
@@ -278,12 +272,10 @@ instance  RealFloat Float  where
     floatDigits _       =  FLT_MANT_DIG     -- ditto
     floatRange _        =  (FLT_MIN_EXP, FLT_MAX_EXP) -- ditto
 
-    decodeFloat (F# f#)
-      = case decodeFloat# f#    of
-          (# exp#, s#, d# #) -> (J# s# d#, I# exp#)
+    decodeFloat (F# f#) = case decodeFloatInteger f# of
+                          (# i, e #) -> (i, I# e)
 
-    encodeFloat (S# i) j     = int_encodeFloat# i j
-    encodeFloat (J# s# d#) e = encodeFloat# s# d# e
+    encodeFloat i (I# e) = F# (encodeFloatInteger i e)
 
     exponent x          = case decodeFloat x of
                             (m,n) -> if m == 0 then 0 else n + floatDigits x
@@ -336,9 +328,7 @@ instance  Num Double  where
              | otherwise = negate 1
 
     {-# INLINE fromInteger #-}
-        -- See comments with Num Float
-    fromInteger (S# i#)    = case (int2Double# i#) of { d# -> D# d# }
-    fromInteger (J# s# d#) = encodeDouble# s# d# 0
+    fromInteger i = D# (doubleFromInteger i)
 
 
 instance  Real Double  where
@@ -422,11 +412,10 @@ instance  RealFloat Double  where
     floatRange _        =  (DBL_MIN_EXP, DBL_MAX_EXP) -- ditto
 
     decodeFloat (D# x#)
-      = case decodeDouble# x#   of
-          (# exp#, s#, d# #) -> (J# s# d#, I# exp#)
+      = case decodeDoubleInteger x#   of
+          (# i, j #) -> (i, I# j)
 
-    encodeFloat (S# i) j     = int_encodeDouble# i j
-    encodeFloat (J# s# d#) e = encodeDouble# s# d# e
+    encodeFloat i (I# j) = D# (encodeDoubleInteger i j)
 
     exponent x          = case decodeFloat x of
                             (m,n) -> if m == 0 then 0 else n + floatDigits x
@@ -645,7 +634,7 @@ floatToDigits base x =
         (p - 1 + e0) * 3 `div` 10
      else
         ceiling ((log (fromInteger (f+1)) +
-                 fromInteger (int2Integer e) * log (fromInteger b)) /
+                 fromIntegral e * log (fromInteger b)) /
                    log (fromInteger base))
 --WAS:            fromInt e * log (fromInteger b))
 
@@ -936,8 +925,6 @@ foreign import ccall unsafe "isFloatNegativeZero" isFloatNegativeZero :: Float -
 
 foreign import ccall unsafe "__encodeDouble"
         encodeDouble# :: Int# -> ByteArray# -> Int -> Double
-foreign import ccall unsafe "__int_encodeDouble"
-        int_encodeDouble# :: Int# -> Int -> Double
 
 foreign import ccall unsafe "isDoubleNaN" isDoubleNaN :: Double -> Int
 foreign import ccall unsafe "isDoubleInfinite" isDoubleInfinite :: Double -> Int

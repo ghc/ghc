@@ -15,7 +15,8 @@
 module GHC.Exts
        (
         -- * Representations of some basic types
-        Int(..),Word(..),Float(..),Double(..),Integer(..),Char(..),
+        Int(..),Word(..),Float(..),Double(..),
+        Char(..),
         Ptr(..), FunPtr(..),
 
         -- * Primitive operations
