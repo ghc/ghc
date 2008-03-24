@@ -48,7 +48,6 @@ Library {
             GHC.Num,
             GHC.PArr,
             GHC.Pack,
-            GHC.PrimopWrappers,
             GHC.Ptr,
             GHC.Read,
             GHC.Real,
