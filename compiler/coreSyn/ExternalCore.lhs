@@ -81,7 +81,9 @@ type Qual t = (Mname,t)
 type Id = String
 
 primMname :: Mname
-primMname = "base:GHC.Prim"
+-- For truly horrible reasons, this must be z-encoded.
+-- With any hope, the z-encoding will die soon.
+primMname = "ghc-prim:GHCziPrim"
 
 tcArrow :: Qual Tcon
 tcArrow = (primMname, "(->)")
