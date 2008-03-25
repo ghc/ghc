@@ -24,6 +24,13 @@ module GHC.Int (
 
 import Data.Bits
 
+#if WORD_SIZE_IN_BITS < 32
+import GHC.IntWord32
+#endif
+#if WORD_SIZE_IN_BITS < 64
+import GHC.IntWord64
+#endif
+
 import GHC.Base
 import GHC.Enum
 import GHC.Num
@@ -383,32 +390,6 @@ instance Bits Int32 where
     bitSize  _                 = 32
     isSigned _                 = True
 
-foreign import "stg_eqInt32"       unsafe eqInt32#       :: Int32# -> Int32# -> Bool
-foreign import "stg_neInt32"       unsafe neInt32#       :: Int32# -> Int32# -> Bool
-foreign import "stg_ltInt32"       unsafe ltInt32#       :: Int32# -> Int32# -> Bool
-foreign import "stg_leInt32"       unsafe leInt32#       :: Int32# -> Int32# -> Bool
-foreign import "stg_gtInt32"       unsafe gtInt32#       :: Int32# -> Int32# -> Bool
-foreign import "stg_geInt32"       unsafe geInt32#       :: Int32# -> Int32# -> Bool
-foreign import "stg_plusInt32"     unsafe plusInt32#     :: Int32# -> Int32# -> Int32#
-foreign import "stg_minusInt32"    unsafe minusInt32#    :: Int32# -> Int32# -> Int32#
-foreign import "stg_timesInt32"    unsafe timesInt32#    :: Int32# -> Int32# -> Int32#
-foreign import "stg_negateInt32"   unsafe negateInt32#   :: Int32# -> Int32#
-foreign import "stg_quotInt32"     unsafe quotInt32#     :: Int32# -> Int32# -> Int32#
-foreign import "stg_remInt32"      unsafe remInt32#      :: Int32# -> Int32# -> Int32#
-foreign import "stg_intToInt32"    unsafe intToInt32#    :: Int# -> Int32#
-foreign import "stg_int32ToInt"    unsafe int32ToInt#    :: Int32# -> Int#
-foreign import "stg_wordToWord32"  unsafe wordToWord32#  :: Word# -> Word32#
-foreign import "stg_int32ToWord32" unsafe int32ToWord32# :: Int32# -> Word32#
-foreign import "stg_word32ToInt32" unsafe word32ToInt32# :: Word32# -> Int32#
-foreign import "stg_and32"         unsafe and32#         :: Word32# -> Word32# -> Word32#
-foreign import "stg_or32"          unsafe or32#          :: Word32# -> Word32# -> Word32#
-foreign import "stg_xor32"         unsafe xor32#         :: Word32# -> Word32# -> Word32#
-foreign import "stg_not32"         unsafe not32#         :: Word32# -> Word32#
-foreign import "stg_iShiftL32"     unsafe iShiftL32#     :: Int32# -> Int# -> Int32#
-foreign import "stg_iShiftRA32"    unsafe iShiftRA32#    :: Int32# -> Int# -> Int32#
-foreign import "stg_shiftL32"      unsafe shiftL32#      :: Word32# -> Int# -> Word32#
-foreign import "stg_shiftRL32"     unsafe shiftRL32#     :: Word32# -> Int# -> Word32#
-
 {-# RULES
 "fromIntegral/Int->Int32"    fromIntegral = \(I#   x#) -> I32# (intToInt32# x#)
 "fromIntegral/Word->Int32"   fromIntegral = \(W#   x#) -> I32# (word32ToInt32# (wordToWord32# x#))
@@ -574,8 +555,7 @@ instance Num Int64 where
     signum x | x > 0       = 1
     signum 0               = 0
     signum _               = -1
-    fromInteger (S# i#)    = I64# (intToInt64# i#)
-    fromInteger (J# s# d#) = I64# (integerToInt64# s# d#)
+    fromInteger i          = I64# (integerToInt64 i)
 
 instance Enum Int64 where
     succ x
@@ -621,12 +601,7 @@ instance Integral Int64 where
         | x == minBound && y == (-1) = overflowError
         | otherwise                  = (I64# (x# `divInt64#` y#),
                                         I64# (x# `modInt64#` y#))
-    toInteger x@(I64# x#)
-	| x >= fromIntegral (minBound::Int) &&
-          x <= fromIntegral (maxBound::Int)
-                                     = smallInteger (int64ToInt# x#)
-        | otherwise                  = case int64ToInteger# x# of
-                                           (# s, d #) -> J# s d
+    toInteger (I64# x)               = int64ToInteger x
 
 
 divInt64#, modInt64# :: Int64# -> Int64# -> Int64#
@@ -684,35 +659,6 @@ a `iShiftRA64#` b | b >=# 64# = if a `ltInt64#` (intToInt64# 0#)
 					then intToInt64# (-1#) 
 					else intToInt64# 0#
 		  | otherwise = a `uncheckedIShiftRA64#` b
-
-
-foreign import ccall unsafe "hs_eqInt64"       eqInt64#       :: Int64# -> Int64# -> Bool
-foreign import ccall unsafe "hs_neInt64"       neInt64#       :: Int64# -> Int64# -> Bool
-foreign import ccall unsafe "hs_ltInt64"       ltInt64#       :: Int64# -> Int64# -> Bool
-foreign import ccall unsafe "hs_leInt64"       leInt64#       :: Int64# -> Int64# -> Bool
-foreign import ccall unsafe "hs_gtInt64"       gtInt64#       :: Int64# -> Int64# -> Bool
-foreign import ccall unsafe "hs_geInt64"       geInt64#       :: Int64# -> Int64# -> Bool
-foreign import ccall unsafe "hs_plusInt64"     plusInt64#     :: Int64# -> Int64# -> Int64#
-foreign import ccall unsafe "hs_minusInt64"    minusInt64#    :: Int64# -> Int64# -> Int64#
-foreign import ccall unsafe "hs_timesInt64"    timesInt64#    :: Int64# -> Int64# -> Int64#
-foreign import ccall unsafe "hs_negateInt64"   negateInt64#   :: Int64# -> Int64#
-foreign import ccall unsafe "hs_quotInt64"     quotInt64#     :: Int64# -> Int64# -> Int64#
-foreign import ccall unsafe "hs_remInt64"      remInt64#      :: Int64# -> Int64# -> Int64#
-foreign import ccall unsafe "hs_intToInt64"    intToInt64#    :: Int# -> Int64#
-foreign import ccall unsafe "hs_int64ToInt"    int64ToInt#    :: Int64# -> Int#
-foreign import ccall unsafe "hs_wordToWord64"  wordToWord64#  :: Word# -> Word64#
-foreign import ccall unsafe "hs_int64ToWord64" int64ToWord64# :: Int64# -> Word64#
-foreign import ccall unsafe "hs_word64ToInt64" word64ToInt64# :: Word64# -> Int64#
-foreign import ccall unsafe "hs_and64"         and64#         :: Word64# -> Word64# -> Word64#
-foreign import ccall unsafe "hs_or64"          or64#          :: Word64# -> Word64# -> Word64#
-foreign import ccall unsafe "hs_xor64"         xor64#         :: Word64# -> Word64# -> Word64#
-foreign import ccall unsafe "hs_not64"         not64#         :: Word64# -> Word64#
-foreign import ccall unsafe "hs_uncheckedShiftL64"      uncheckedShiftL64#      :: Word64# -> Int# -> Word64#
-foreign import ccall unsafe "hs_uncheckedShiftRL64"     uncheckedShiftRL64#     :: Word64# -> Int# -> Word64#
-foreign import ccall unsafe "hs_uncheckedIShiftL64"     uncheckedIShiftL64#     :: Int64# -> Int# -> Int64#
-foreign import ccall unsafe "hs_uncheckedIShiftRA64"    uncheckedIShiftRA64#    :: Int64# -> Int# -> Int64#
-
-foreign import ccall unsafe "hs_integerToInt64"  integerToInt64#  :: Int# -> ByteArray# -> Int64#
 
 {-# RULES
 "fromIntegral/Int->Int64"    fromIntegral = \(I#   x#) -> I64# (intToInt64# x#)

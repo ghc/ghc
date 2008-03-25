@@ -160,7 +160,6 @@ Library {
         cbits/consUtils.c
         cbits/dirUtils.c
         cbits/inputReady.c
-        cbits/longlong.c
         cbits/selectUtils.c
     include-dirs: include
     includes:    HsBase.h
