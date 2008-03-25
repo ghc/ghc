@@ -6,13 +6,6 @@
 --
 -- -----------------------------------------------------------------------------
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module InteractiveEval (
 #ifdef GHCI
         RunResult(..), Status(..), Resume(..), History(..),
@@ -74,9 +67,9 @@ import Util
 import SrcLoc
 import BreakArray
 import RtClosureInspect
-import Packages
 import BasicTypes
 import Outputable
+import FastString
 
 import Data.Dynamic
 import Data.List (find)
@@ -134,6 +127,7 @@ data SingleStep
    | SingleStep
    | RunAndLogSteps
 
+isStep :: SingleStep -> Bool
 isStep RunToCompletion = False
 isStep _ = True
 
@@ -225,9 +219,12 @@ runStmt (Session ref) expr step
                         handleRunStatus expr ref bindings ids
                                         breakMVar statusMVar status emptyHistory
 
-
+emptyHistory :: BoundedList History
 emptyHistory = nilBL 50 -- keep a log of length 50
 
+handleRunStatus :: String -> IORef HscEnv -> ([Id], TyVarSet) -> [Id]
+                -> MVar () -> MVar Status -> Status -> BoundedList History
+                -> IO RunResult
 handleRunStatus expr ref bindings final_ids breakMVar statusMVar status 
                 history =
    case status of  
@@ -260,7 +257,9 @@ handleRunStatus expr ref bindings final_ids breakMVar statusMVar status
                 writeIORef ref hsc_env' 
                 return (RunOk final_names)
 
-
+traceRunStatus :: String -> IORef HscEnv -> ([Id], TyVarSet) -> [Id]
+               -> MVar () -> MVar Status -> Status -> BoundedList History
+               -> IO RunResult
 traceRunStatus expr ref bindings final_ids
                breakMVar statusMVar status history = do
   hsc_env <- readIORef ref
@@ -304,7 +303,9 @@ isBreakEnabled hsc_env inf =
 foreign import ccall "&rts_stop_next_breakpoint" stepFlag      :: Ptr CInt
 foreign import ccall "&rts_stop_on_exception"    exceptionFlag :: Ptr CInt
 
-setStepFlag   = poke stepFlag 1
+setStepFlag :: IO ()
+setStepFlag = poke stepFlag 1
+resetStepFlag :: IO ()
 resetStepFlag = poke stepFlag 0
 
 -- this points to the IO action that is executed when a breakpoint is hit
@@ -367,6 +368,7 @@ withInterruptsSentTo thread get_result = do
 -- resets everything when the computation has stopped running.  This
 -- is a not-very-good way to ensure that only the interactive
 -- evaluation should generate breakpoints.
+withBreakAction :: Bool -> DynFlags -> MVar () -> MVar Status -> IO a -> IO a
 withBreakAction step dflags breakMVar statusMVar io
  = bracket setBreakAction resetBreakAction (\_ -> io)
  where
@@ -391,10 +393,12 @@ withBreakAction step dflags breakMVar statusMVar io
      resetStepFlag
      freeStablePtr stablePtr
 
+noBreakStablePtr :: StablePtr (Bool -> BreakInfo -> HValue -> IO ())
 noBreakStablePtr = unsafePerformIO $ newStablePtr noBreakAction
 
-noBreakAction False info apStack = putStrLn "*** Ignoring breakpoint"
-noBreakAction True  info apStack = return () -- exception: just continue
+noBreakAction :: Bool -> BreakInfo -> HValue -> IO ()
+noBreakAction False _ _ = putStrLn "*** Ignoring breakpoint"
+noBreakAction True  _ _ = return () -- exception: just continue
 
 resume :: Session -> SingleStep -> IO RunResult
 resume (Session ref) step
@@ -451,6 +455,7 @@ back  = moveHist (+1)
 forward :: Session -> IO ([Name], Int, SrcSpan)
 forward  = moveHist (subtract 1)
 
+moveHist :: (Int -> Int) -> Session -> IO ([Name], Int, SrcSpan)
 moveHist fn (Session ref) = do
   hsc_env <- readIORef ref
   case ic_resume (hsc_IC hsc_env) of
@@ -491,8 +496,9 @@ moveHist fn (Session ref) = do
 
 -- -----------------------------------------------------------------------------
 -- After stopping at a breakpoint, add free variables to the environment
+result_fs :: FastString
 result_fs = FSLIT("_result")
-       
+
 bindLocalsAtBreakpoint
         :: HscEnv
         -> HValue
@@ -548,7 +554,7 @@ bindLocalsAtBreakpoint hsc_env apStack (Just info) = do
    -- So that we don't fall over in a heap when this happens, just don't
    -- bind any free variables instead, and we emit a warning.
    mb_hValues <- mapM (getIdValFromApStack apStack) offsets
-   let filtered_ids = [ id | (id, Just hv) <- zip ids mb_hValues ]
+   let filtered_ids = [ id | (id, Just _hv) <- zip ids mb_hValues ]
    when (any isNothing mb_hValues) $
       debugTraceMsg (hsc_dflags hsc_env) 1 $
 	  text "Warning: _result has been evaluated, some bindings have been lost"
@@ -616,6 +622,7 @@ rttiEnvironment hsc_env@HscEnv{hsc_IC=ic} = do
                            (map skolemiseSubst substs)
    return hsc_env{hsc_IC=ic'}
 
+skolemiseSubst :: TvSubst -> TvSubst
 skolemiseSubst subst = subst `setTvSubstEnv` 
                         mapVarEnv (fst.skolemiseTy) (getTvSubstEnv subst)
 
@@ -700,13 +707,16 @@ data BoundedList a = BL
 nilBL :: Int -> BoundedList a
 nilBL bound = BL 0 bound [] []
 
+consBL :: a -> BoundedList a -> BoundedList a
 consBL a (BL len bound left right)
   | len < bound = BL (len+1) bound (a:left) right
   | null right  = BL len     bound [a]      $! tail (reverse left)
   | otherwise   = BL len     bound (a:left) $! tail right
 
+toListBL :: BoundedList a -> [a]
 toListBL (BL _ _ left right) = left ++ reverse right
 
+fromListBL :: Int -> [a] -> BoundedList a
 fromListBL bound l = BL (length l) bound l []
 
 -- lenBL (BL len _ _ _) = len
@@ -721,7 +731,7 @@ setContext :: Session
 	   -> [Module]	-- entire top level scope of these modules
 	   -> [Module]	-- exports only of these modules
 	   -> IO ()
-setContext sess@(Session ref) toplev_mods export_mods = do 
+setContext (Session ref) toplev_mods export_mods = do 
   hsc_env <- readIORef ref
   let old_ic  = hsc_IC     hsc_env
       hpt     = hsc_HPT    hsc_env
@@ -899,7 +909,7 @@ compileExpr s expr = withSession s $ \hsc_env -> do
 		hvals <- (unsafeCoerce# hval) :: IO [HValue]
 
 		case (ids,hvals) of
-		  ([n],[hv]) -> return (Just hv)
+		  ([_],[hv]) -> return (Just hv)
 		  _ 	     -> panic "compileExpr"
 
 -- -----------------------------------------------------------------------------
