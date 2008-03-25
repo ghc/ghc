@@ -29,6 +29,10 @@
 module GHC.Integer (
     Integer,
     smallInteger, wordToInteger, integerToWord, toInt#,
+#if WORD_SIZE_IN_BITS < 64
+    integerToWord64, word64ToInteger,
+    integerToInt64, int64ToInteger,
+#endif
     plusInteger, minusInteger, timesInteger, negateInteger,
     eqInteger, neqInteger, absInteger, signumInteger,
     leInteger, gtInteger, ltInteger, geInteger, compareInteger,
@@ -59,7 +63,19 @@ import GHC.Prim (
     decodeDouble#, decodeFloat#,
     int2Integer#, integer2Int#, word2Integer#, integer2Word#,
     andInteger#, orInteger#, xorInteger#, complementInteger#,
+#if WORD_SIZE_IN_BITS < 64
+    int64ToInteger#, word64ToInteger#,
+#endif
  )
+
+#if WORD_SIZE_IN_BITS < 64
+import GHC.IntWord64 (
+            Int64#, Word64#,
+            int64ToWord64#, intToInt64#, integerToWord64#,
+            int64ToInt#, word64ToInt64#, integerToInt64#,
+            geInt64#, leInt64#, leWord64#,
+       )
+#endif
 
 import GHC.Bool
 
@@ -101,6 +117,33 @@ wordToInteger w = case word2Integer# w of (# s, d #) -> J# s d
 integerToWord :: Integer -> Word#
 integerToWord (S# i) = int2Word# i
 integerToWord (J# s d) = integer2Word# s d
+
+#if WORD_SIZE_IN_BITS < 64
+{-# INLINE integerToWord64 #-}
+integerToWord64 :: Integer -> Word64#
+integerToWord64 (S# i) = int64ToWord64# (intToInt64# i)
+integerToWord64 (J# s d) = integerToWord64# s d
+
+word64ToInteger :: Word64# -> Integer
+word64ToInteger w = if w `leWord64#` int64ToWord64# (intToInt64# 0x7FFFFFFF#)
+                    then S# (int64ToInt# (word64ToInt64# w))
+                    else case word64ToInteger# w of
+                         (# s, d #) -> J# s d
+
+integerToInt64 :: Integer -> Int64#
+integerToInt64 (S# i) = intToInt64# i
+integerToInt64 (J# s d) = integerToInt64# s d
+
+int64ToInteger :: Int64# -> Integer
+int64ToInteger i = if ((i `leInt64#` intToInt64# 0x7FFFFFFF#) && 
+                       (i `geInt64#` intToInt64# -0x80000000#))
+                   then smallInteger (int64ToInt# i)
+                   else case int64ToInteger# i of
+                        (# s, d #) -> J# s d
+    where -- XXX Move the (&&) definition below us?
+          True && True = True
+          _ && _ = False
+#endif
 
 toInt# :: Integer -> Int#
 toInt# (S# i)   = i
