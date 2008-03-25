@@ -40,8 +40,9 @@
 #endif
 
 #if defined(GEN_HASKELL)
-#define def_offset(str, offset) \
-    printf("oFFSET_" str " = %" SIZET_FMT "::Int\n", offset);
+#define def_offset(str, offset)                          \
+    printf("oFFSET_" str " :: Int\n");                   \
+    printf("oFFSET_" str " = %" SIZET_FMT "\n", offset);
 #else
 #define def_offset(str, offset) \
     printf("#define OFFSET_" str " %" SIZET_FMT "\n", offset);
@@ -87,8 +88,9 @@
     struct_field_macro(str)
 
 #if defined(GEN_HASKELL)
-#define def_size(str, size) \
-    printf("sIZEOF_" str " = %d::Int\n", size);
+#define def_size(str, size)                \
+    printf("sIZEOF_" str " :: Int\n");     \
+    printf("sIZEOF_" str " = %d\n", size);
 #else
 #define def_size(str, size) \
     printf("#define SIZEOF_" str " %d\n", size);
