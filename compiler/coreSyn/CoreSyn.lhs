@@ -138,7 +138,7 @@ Invariant: The remaining cases are in order of increasing
 Invariant: The list of alternatives is ALWAYS EXHAUSTIVE,
 	   meaning that it covers all cases that can occur
 
-    An "exhausive" case does not necessarily mention all constructors:
+    An "exhaustive" case does not necessarily mention all constructors:
 	data Foo = Red | Green | Blue
 
 	...case x of 

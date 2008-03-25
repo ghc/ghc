@@ -5,10 +5,12 @@
 \begin{code}
 module PprExternalCore () where
 
-import Pretty
 import ExternalCore
-import Char
 import Encoding
+
+import Pretty
+import Char
+
 
 instance Show Module where
   showsPrec _ m = shows (pmodule m)
@@ -52,11 +54,20 @@ ptdef (Data tcon tbinds cdefs) =
   (text "%data" <+> pqname tcon <+> (hsep (map ptbind tbinds)) <+> char '=')
   $$ indent (braces ((vcat (punctuate (char ';') (map pcdef cdefs)))))
 
-ptdef (Newtype tcon tbinds rep ) =
-  text "%newtype" <+> pqname tcon <+> (hsep (map ptbind tbinds)) <+> repclause
-       where repclause = case rep of
-                           Just ty -> char '=' <+> pty ty 
-			   Nothing -> empty
+ptdef (Newtype tcon tbinds (coercion,k) rep) =
+-- Here we take apart the newtype tycon in order to get the newtype coercion,
+-- which needs to be represented in the External Core file because it's not
+-- straightforward to derive its definition from the newtype declaration alone.
+-- At the same time, we need the newtype decl to declare the tycon itself.
+-- Sigh.
+  text "%newtype" <+> pqname tcon <+> (hsep (map ptbind tbinds)) 
+    <+> axiomclause <+> repclause
+       where  axiomclause = char '^' <+> parens (pqname coercion <+> text "::"
+                                     <+> pkind k)
+              repclause   = case rep of
+                              Just ty -> char '=' <+> pty ty 
+			      Nothing -> empty
+             
 
 pcdef :: Cdef -> Doc
 pcdef (Constr dcon tbinds tys)  =
@@ -84,7 +95,8 @@ pakind (Kopen) = char '?'
 pakind k = parens (pkind k)
 
 pkind (Karrow k1 k2) = parens (pakind k1 <> text "->" <> pkind k2)
-pkind (Keq t1 t2) = parens (pty t1 <> text ":=:" <> pty t2)
+pkind (Keq t1 t2) = parens (parens (pty t1) <+> text ":=:" <+> 
+                            parens (pty t2))
 pkind k = pakind k
 
 paty, pbty, pty :: Ty -> Doc
@@ -113,12 +125,11 @@ pvdefg (Rec vdefs) = text "%rec" $$ braces (indent (vcat (punctuate (char ';') (
 pvdefg (Nonrec vdef) = pvdef vdef
 
 pvdef :: Vdef -> Doc
-pvdef (l,v,t,e) = sep [plocal l <+> pname v <+> text "::" <+> pty t <+> char '=',
+-- note: at one point every vdef was getting printed out as "local".
+-- I think that's manifestly wrong. Right now, the "%local" keyword
+-- is never used.
+pvdef (_l,v,t,e) = sep [pname v <+> text "::" <+> pty t <+> char '=',
 		    indent (pexp e)]
-
-plocal :: Bool -> Doc
-plocal True  = text "%local"
-plocal False = empty
 
 paexp, pfexp, pexp :: Exp -> Doc
 paexp (Var x) = pqname x

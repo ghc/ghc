@@ -186,7 +186,7 @@ data TyCon
         tyConName   :: Name,
 	tyConArity  :: Arity,
 	coKindFun   :: [Type] -> (Type,Type)
-    }		-- INVARAINT: coKindFun is always applied to exactly 'arity' args
+    }		-- INVARIANT: coKindFun is always applied to exactly 'arity' args
 		-- E.g. for trans (c1 :: ta=tb) (c2 :: tb=tc), the coKindFun returns 
 		--	the kind as a pair of types: (ta,tc)
 	
@@ -372,7 +372,7 @@ Source code:
 	w2 :: Foo T
 	w2 = MkFoo (\(MkT x) -> case w1 of MkFoo f -> f x)
 
-After desugaring, and discading the data constructors for the newtypes,
+After desugaring, and discarding the data constructors for the newtypes,
 we get:
 	w2 :: Foo T
 	w2 = w1

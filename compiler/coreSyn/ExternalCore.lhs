@@ -10,11 +10,14 @@ data Module
 
 data Tdef 
   = Data (Qual Tcon) [Tbind] [Cdef]
-  | Newtype (Qual Tcon) [Tbind] (Maybe Ty)
+  | Newtype (Qual Tcon) [Tbind] Axiom (Maybe Ty)
 
 data Cdef 
   = Constr Dcon [Tbind] [Ty]
   | GadtConstr Dcon Ty
+
+-- Newtype coercion
+type Axiom = (Qual Tcon, Kind)
 
 data Vdefg 
   = Rec [Vdef]

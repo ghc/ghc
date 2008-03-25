@@ -61,15 +61,32 @@ collect_tdefs tcon tdefs
   | isAlgTyCon tcon = tdef: tdefs
   where
     tdef | isNewTyCon tcon = 
-                C.Newtype (make_con_qid (tyConName tcon)) (map make_tbind tyvars) repclause 
+                C.Newtype (qtc tcon) (map make_tbind tyvars) 
+                  (case newTyConCo_maybe tcon of
+                     Just coercion -> (qtc coercion, 
+                       make_kind $ (uncurry mkCoKind) $  
+                                  case isCoercionTyCon_maybe coercion of
+                                    -- See Note [Newtype coercions] in 
+                                    -- types/TyCon
+                                    Just (arity,coKindFun) -> coKindFun $
+                                       map mkTyVarTy $ take arity tyvars
+                                    Nothing -> pprPanic ("MkExternalCore:\
+                                      coercion tcon should have a kind fun")
+                                        (ppr tcon))
+                     Nothing       -> pprPanic ("MkExternalCore: newtype tcon\
+                                       should have a coercion: ") (ppr tcon))
+                   repclause 
          | otherwise = 
-                C.Data (make_con_qid (tyConName tcon)) (map make_tbind tyvars) (map make_cdef (tyConDataCons tcon)) 
+                C.Data (qtc tcon) (map make_tbind tyvars) (map make_cdef (tyConDataCons tcon)) 
          where repclause | isRecursiveTyCon tcon || isOpenTyCon tcon= Nothing
 		         | otherwise = Just (make_ty (repType rhs))
                                            where (_, rhs) = newTyConRhs tcon
     tyvars = tyConTyVars tcon
 
 collect_tdefs _ tdefs = tdefs
+
+qtc :: TyCon -> C.Qual C.Tcon
+qtc = make_con_qid . tyConName
 
 
 make_cdef :: DataCon -> C.Cdef
@@ -160,7 +177,7 @@ make_ty (TyVarTy tv)    	 = C.Tvar (make_var_id (tyVarName tv))
 make_ty (AppTy t1 t2) 		 = C.Tapp (make_ty t1) (make_ty t2)
 make_ty (FunTy t1 t2) 		 = make_ty (TyConApp funTyCon [t1,t2])
 make_ty (ForAllTy tv t) 	 = C.Tforall (make_tbind tv) (make_ty t)
-make_ty (TyConApp tc ts) 	 = foldl C.Tapp (C.Tcon (make_con_qid (tyConName tc))) 
+make_ty (TyConApp tc ts) 	 = foldl C.Tapp (C.Tcon (qtc tc)) 
 					 (map make_ty ts)
 -- Newtypes are treated just like any other type constructor; not expanded
 -- Reason: predTypeRep does substitution and, while substitution deals
