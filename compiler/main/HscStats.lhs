@@ -4,23 +4,20 @@
 \section[GHC_Stats]{Statistics for per-module compilations}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module HscStats ( ppSourceStats ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import HsSyn
 import Outputable
-import SrcLoc		( unLoc, Located(..) )
-import Char		( isSpace )
-import Bag		( bagToList )
-import Util             ( count )
+import SrcLoc
+import Char
+import Bag
+import Util
+import Pretty ( Doc )
+import RdrName
 \end{code}
 
 %************************************************************************
@@ -30,6 +27,7 @@ import Util             ( count )
 %************************************************************************
 
 \begin{code}
+ppSourceStats :: Bool -> Located (HsModule RdrName) -> PprStyle -> Doc
 ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _ _))
  = (if short then hcat else vcat)
         (map pp_val
@@ -71,7 +69,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _ _))
   where
     decls = map unLoc ldecls
 
-    pp_val (str, 0) = empty
+    pp_val (_, 0) = empty
     pp_val (str, n) 
       | not short   = hcat [text str, int n]
       | otherwise   = hcat [text (trim str), equals, int n, semi]
@@ -97,7 +95,7 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _ _))
     export_ms  	 = count (\ e -> case unLoc e of { IEModuleContents{} -> True;_ -> False})
                          real_exports
     export_ds  	 = n_exports - export_ms
-    export_all 	 = case exports of { Nothing -> 1; other -> 0 }
+    export_all 	 = case exports of { Nothing -> 1; _ -> 0 }
 
     (val_bind_ds, fn_bind_ds)
 	= foldr add2 (0,0) (map count_bind val_decls)
@@ -111,9 +109,10 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _ _))
     (inst_method_ds, method_specs, method_inlines, inst_type_ds, inst_data_ds)
 	= foldr add5 (0,0,0,0,0) (map inst_info inst_decls)
 
-    count_bind (PatBind { pat_lhs = L _ (VarPat n) }) = (1,0)
+    count_bind (PatBind { pat_lhs = L _ (VarPat _) }) = (1,0)
     count_bind (PatBind {})                           = (0,1)
     count_bind (FunBind {})                           = (0,1)
+    count_bind b = pprPanic "count_bind: Unhandled binder" (ppr b)
 
     count_sigs sigs = foldr add4 (0,0,0,0) (map sig_info sigs)
 
@@ -136,13 +135,13 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _ _))
     data_info (TyData {tcdCons = cs, tcdDerivs = derivs})
 	= (length cs, case derivs of Nothing -> 0
 				     Just ds -> length ds)
-    data_info other = (0,0)
+    data_info _ = (0,0)
 
     class_info decl@(ClassDecl {})
 	= case count_sigs (map unLoc (tcdSigs decl)) of
 	    (_,classops,_,_) ->
 	       (classops, addpr (foldr add2 (0,0) (map (count_bind.unLoc) (bagToList (tcdMeths decl)))))
-    class_info other = (0,0)
+    class_info _ = (0,0)
 
     inst_info (InstDecl _ inst_meths inst_sigs ats)
 	= case count_sigs (map unLoc inst_sigs) of
@@ -155,17 +154,17 @@ ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _ _))
         where
 	  countATDecl (TyData    {}) = (0, 1)
 	  countATDecl (TySynonym {}) = (1, 0)
+	  countATDecl d              = pprPanic "countATDecl: Unhandled decl"
+                                            (ppr d)
 
     addpr :: (Int,Int) -> Int
     add2  :: (Int,Int) -> (Int,Int) -> (Int, Int)
-    add3  :: (Int,Int,Int) -> (Int,Int,Int) -> (Int, Int, Int)
     add4  :: (Int,Int,Int,Int) -> (Int,Int,Int,Int) -> (Int, Int, Int, Int)
     add5  :: (Int,Int,Int,Int,Int) -> (Int,Int,Int,Int,Int) -> (Int, Int, Int, Int, Int)
     add6  :: (Int,Int,Int,Int,Int,Int) -> (Int,Int,Int,Int,Int,Int) -> (Int, Int, Int, Int, Int, Int)
 
     addpr (x,y) = x+y
     add2 (x1,x2) (y1,y2) = (x1+y1,x2+y2)
-    add3 (x1,x2,x3) (y1,y2,y3) = (x1+y1,x2+y2,x3+y3)
     add4 (x1,x2,x3,x4) (y1,y2,y3,y4) = (x1+y1,x2+y2,x3+y3,x4+y4)
     add5 (x1,x2,x3,x4,x5) (y1,y2,y3,y4,y5) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5)
     add6 (x1,x2,x3,x4,x5,x6) (y1,y2,y3,y4,y5,y6) = (x1+y1,x2+y2,x3+y3,x4+y4,x5+y5,x6+y6)
