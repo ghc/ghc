@@ -32,8 +32,9 @@ you will screw up the layout where they are used in case expressions!
  * but we need them currently! so the conditional on GLASGOW won't do. */
 #if defined(__GLASGOW_HASKELL__) || !defined(__GLASGOW_HASKELL__)
 #define GLOBAL_VAR(name,value,ty)  \
-name = Util.global (value) :: IORef (ty); \
-{-# NOINLINE name #-}
+{-# NOINLINE name #-};             \
+name :: IORef (ty);                \
+name = Util.global (value);
 #endif
 
 #define COMMA ,

@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --
 -- Static flags
@@ -204,10 +197,13 @@ static_flags = [
   ,  ( "f", 			AnySuffixPred (isStaticFlag) addOpt )
   ]
 
+addOpt :: String -> IO ()
 addOpt = consIORef v_opt_C
 
+addWay :: WayName -> IO ()
 addWay = consIORef v_Ways
 
+removeOpt :: String -> IO ()
 removeOpt f = do
   fs <- readIORef v_opt_C
   writeIORef v_opt_C $! filter (/= f) fs    
@@ -221,6 +217,8 @@ lookup_str       :: String -> Maybe String
 -- being unsafely read by unpacked_static_opts below.
 GLOBAL_VAR(v_opt_C, defaultStaticOpts, [String])
 GLOBAL_VAR(v_opt_C_ready, False, Bool)
+
+staticFlags :: [String]
 staticFlags = unsafePerformIO $ do
   ready <- readIORef v_opt_C_ready
   if (not ready)
@@ -228,8 +226,10 @@ staticFlags = unsafePerformIO $ do
         else readIORef v_opt_C
 
 -- -static is the default
+defaultStaticOpts :: [String]
 defaultStaticOpts = ["-static"]
 
+packed_static_opts :: [FastString]
 packed_static_opts   = map mkFastString staticFlags
 
 lookUp     sw = sw `elem` packed_static_opts
@@ -278,75 +278,110 @@ unpacked_opts =
    expandAts l = [l]
 -}
 
-
+opt_IgnoreDotGhci :: Bool
 opt_IgnoreDotGhci		= lookUp FSLIT("-ignore-dot-ghci")
 
 -- debugging opts
+opt_SuppressUniques :: Bool
 opt_SuppressUniques		= lookUp  FSLIT("-dsuppress-uniques")
+opt_PprStyle_Debug :: Bool
 opt_PprStyle_Debug		= lookUp  FSLIT("-dppr-debug")
+opt_PprUserLength :: Int
 opt_PprUserLength	        = lookup_def_int "-dppr-user-length" 5 --ToDo: give this a name
 
 -- profiling opts
+opt_AutoSccsOnAllToplevs :: Bool
 opt_AutoSccsOnAllToplevs	= lookUp  FSLIT("-fauto-sccs-on-all-toplevs")
+opt_AutoSccsOnExportedToplevs :: Bool
 opt_AutoSccsOnExportedToplevs	= lookUp  FSLIT("-fauto-sccs-on-exported-toplevs")
+opt_AutoSccsOnIndividualCafs :: Bool
 opt_AutoSccsOnIndividualCafs	= lookUp  FSLIT("-fauto-sccs-on-individual-cafs")
+opt_SccProfilingOn :: Bool
 opt_SccProfilingOn		= lookUp  FSLIT("-fscc-profiling")
+opt_DoTickyProfiling :: Bool
 opt_DoTickyProfiling            = WayTicky `elem` (unsafePerformIO $ readIORef v_Ways)
 
 -- Hpc opts
+opt_Hpc :: Bool
 opt_Hpc				= lookUp FSLIT("-fhpc")  
 
 -- language opts
+opt_DictsStrict :: Bool
 opt_DictsStrict			= lookUp  FSLIT("-fdicts-strict")
+opt_IrrefutableTuples :: Bool
 opt_IrrefutableTuples		= lookUp  FSLIT("-firrefutable-tuples")
+opt_Parallel :: Bool
 opt_Parallel			= lookUp  FSLIT("-fparallel")
 
 -- optimisation opts
+opt_SpecInlineJoinPoints :: Bool
 opt_SpecInlineJoinPoints	= lookUp  FSLIT("-fspec-inline-join-points")
+opt_NoStateHack :: Bool
 opt_NoStateHack			= lookUp  FSLIT("-fno-state-hack")
+opt_NoMethodSharing :: Bool
 opt_NoMethodSharing		= lookUp  FSLIT("-fno-method-sharing")
+opt_CprOff :: Bool
 opt_CprOff			= lookUp  FSLIT("-fcpr-off")
 	-- Switch off CPR analysis in the new demand analyser
+opt_MaxWorkerArgs :: Int
 opt_MaxWorkerArgs		= lookup_def_int "-fmax-worker-args" (10::Int)
 
+opt_GranMacros :: Bool
 opt_GranMacros			= lookUp  FSLIT("-fgransim")
+opt_HiVersion :: Integer
 opt_HiVersion			= read (cProjectVersionInt ++ cProjectPatchLevel) :: Integer
+opt_HistorySize :: Int
 opt_HistorySize			= lookup_def_int "-fhistory-size" 20
+opt_OmitBlackHoling :: Bool
 opt_OmitBlackHoling		= lookUp  FSLIT("-dno-black-holing")
+opt_RuntimeTypes :: Bool
 opt_RuntimeTypes		= lookUp  FSLIT("-fruntime-types")
 
 -- Simplifier switches
+opt_SimplNoPreInlining :: Bool
 opt_SimplNoPreInlining		= lookUp  FSLIT("-fno-pre-inlining")
 	-- NoPreInlining is there just to see how bad things
 	-- get if you don't do it!
+opt_SimplExcessPrecision :: Bool
 opt_SimplExcessPrecision	= lookUp  FSLIT("-fexcess-precision")
 
 -- Unfolding control
+opt_UF_CreationThreshold :: Int
 opt_UF_CreationThreshold	= lookup_def_int "-funfolding-creation-threshold"  (45::Int)
+opt_UF_UseThreshold :: Int
 opt_UF_UseThreshold		= lookup_def_int "-funfolding-use-threshold"	   (8::Int)	-- Discounts can be big
+opt_UF_FunAppDiscount :: Int
 opt_UF_FunAppDiscount		= lookup_def_int "-funfolding-fun-discount"	   (6::Int)	-- It's great to inline a fn
+opt_UF_KeenessFactor :: Float
 opt_UF_KeenessFactor		= lookup_def_float "-funfolding-keeness-factor"	   (1.5::Float)
 
+opt_UF_DearOp :: Int
 opt_UF_DearOp   = ( 4 :: Int)
-			
+
+opt_PIC :: Bool
 #if darwin_TARGET_OS && x86_64_TARGET_ARCH
 opt_PIC                         = True
 #else
 opt_PIC                         = lookUp FSLIT("-fPIC")
 #endif
+opt_Static :: Bool
 opt_Static			= lookUp  FSLIT("-static")
+opt_Unregisterised :: Bool
 opt_Unregisterised		= lookUp  FSLIT("-funregisterised")
 
 -- Derived, not a real option.  Determines whether we will be compiling
 -- info tables that reside just before the entry code, or with an
 -- indirection to the entry code.  See TABLES_NEXT_TO_CODE in 
 -- includes/InfoTables.h.
+tablesNextToCode :: Bool
 tablesNextToCode 		= not opt_Unregisterised
 		 		  && cGhcEnableTablesNextToCode == "YES"
 
+opt_EmitExternalCore :: Bool
 opt_EmitExternalCore		= lookUp  FSLIT("-fext-core")
 
 -- Include full span info in error messages, instead of just the start position.
+opt_ErrorSpans :: Bool
 opt_ErrorSpans			= lookUp FSLIT("-ferror-spans")
 
 
@@ -355,6 +390,7 @@ opt_ErrorSpans			= lookUp FSLIT("-ferror-spans")
 -- how to do it though --SDM.
 GLOBAL_VAR(v_Ld_inputs,	[],      [String])
 
+isStaticFlag :: String -> Bool
 isStaticFlag f =
   f `elem` [
 	"fauto-sccs-on-all-toplevs",
@@ -477,6 +513,7 @@ data WayName
 
 GLOBAL_VAR(v_Ways, [] ,[WayName])
 
+allowed_combination :: [WayName] -> Bool
 allowed_combination way = and [ x `allowedWith` y 
 			      | x <- way, y <- way, x < y ]
   where
@@ -517,11 +554,13 @@ findBuildTag = do
 mkBuildTag :: [Way] -> String
 mkBuildTag ways = concat (intersperse "_" (map wayTag ways))
 
+lkupWay :: WayName -> Way
 lkupWay w = 
    case lookup w way_details of
 	Nothing -> error "findBuildTag"
 	Just details -> details
 
+isRTSWay :: WayName -> Bool
 isRTSWay = wayRTSOnly . lkupWay 
 
 data Way = Way {
@@ -622,6 +661,7 @@ way_details =
     (WayUser_B,  Way  "B"  False "User way 'B'"  ["$WAY_B_REAL_OPTS"]) 
   ]
 
+unregFlags :: [String]
 unregFlags = 
    [ "-optc-DNO_REGS"
    , "-optc-DUSE_MINIINTERPRETER"
