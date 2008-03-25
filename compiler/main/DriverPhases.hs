@@ -1,10 +1,3 @@
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 -----------------------------------------------------------------------------
 --  $Id: DriverPhases.hs,v 1.38 2005/05/17 11:01:59 simonmar Exp $
 --
@@ -71,7 +64,7 @@ hscSourceString ExtCoreFile = "[ext core]"
 
 isHsBoot :: HscSource -> Bool
 isHsBoot HsBootFile = True
-isHsBoot other      = False
+isHsBoot _          = False
 
 data Phase 
 	= Unlit HscSource
@@ -98,7 +91,7 @@ anyHsc = Hsc (panic "anyHsc")
 
 isStopLn :: Phase -> Bool
 isStopLn StopLn = True
-isStopLn other  = False
+isStopLn _      = False
 
 eqPhase :: Phase -> Phase -> Bool
 -- Equality of constructors, ignoring the HscSource field
@@ -122,7 +115,8 @@ eqPhase _	    _		= False
 -- Partial ordering on phases: we want to know which phases will occur before 
 -- which others.  This is used for sanity checking, to ensure that the
 -- pipeline will stop at some point (see DriverPipeline.runPipeline).
-StopLn `happensBefore` y = False
+happensBefore :: Phase -> Phase -> Bool
+StopLn `happensBefore` _ = False
 x      `happensBefore` y = after_x `eqPhase` y || after_x `happensBefore` y
 	where
 	  after_x = nextPhase x
@@ -132,7 +126,7 @@ nextPhase :: Phase -> Phase
 nextPhase (Unlit sf)	= Cpp  sf
 nextPhase (Cpp   sf)	= HsPp sf
 nextPhase (HsPp  sf)	= Hsc  sf
-nextPhase (Hsc   sf)	= HCc
+nextPhase (Hsc   _)	= HCc
 nextPhase HCc		= Mangle
 nextPhase Mangle	= SplitMangle
 nextPhase SplitMangle	= As
@@ -146,6 +140,7 @@ nextPhase StopLn	= panic "nextPhase: nothing after StopLn"
 
 -- the first compilation phase for a given file is determined
 -- by its suffix.
+startPhase :: String -> Phase
 startPhase "lhs"      = Unlit HsSrcFile
 startPhase "lhs-boot" = Unlit HsBootFile
 startPhase "hs"       = Cpp   HsSrcFile
@@ -171,6 +166,7 @@ startPhase _          = StopLn	   -- all unknown file types
 -- This is used to determine the extension for the output from the
 -- current phase (if it generates a new file).  The extension depends
 -- on the next phase in the pipeline.
+phaseInputExt :: Phase -> String
 phaseInputExt (Unlit HsSrcFile)   = "lhs"
 phaseInputExt (Unlit HsBootFile)  = "lhs-boot"
 phaseInputExt (Unlit ExtCoreFile) = "lhcr"
@@ -191,14 +187,19 @@ phaseInputExt CmmCpp	  	  = "cmm"
 phaseInputExt Cmm	  	  = "cmmcpp"
 phaseInputExt StopLn          	  = "o"
 
+haskellish_src_suffixes, haskellish_suffixes, cish_suffixes,
+    extcoreish_suffixes, haskellish_user_src_suffixes
+ :: [String]
 haskellish_src_suffixes      = haskellish_user_src_suffixes ++
-			       [ "hspp", "hscpp", "hcr", "cmm" ]
+                               [ "hspp", "hscpp", "hcr", "cmm" ]
 haskellish_suffixes          = haskellish_src_suffixes ++ ["hc", "raw_s"]
 cish_suffixes                = [ "c", "cpp", "C", "cc", "cxx", "s", "S" ]
 extcoreish_suffixes          = [ "hcr" ]
-haskellish_user_src_suffixes = [ "hs", "lhs", "hs-boot", "lhs-boot" ]	-- Will not be deleted as temp files
+-- Will not be deleted as temp files:
+haskellish_user_src_suffixes = [ "hs", "lhs", "hs-boot", "lhs-boot" ]
 
--- Use the appropriate suffix for the system on which 
+objish_suffixes :: [String]
+-- Use the appropriate suffix for the system on which
 -- the GHC-compiled code will run
 #if mingw32_TARGET_OS || cygwin32_TARGET_OS
 objish_suffixes     = [ "o", "O", "obj", "OBJ" ]
@@ -206,6 +207,7 @@ objish_suffixes     = [ "o", "O", "obj", "OBJ" ]
 objish_suffixes     = [ "o" ]
 #endif
 
+dynlib_suffixes :: [String]
 #ifdef mingw32_TARGET_OS
 dynlib_suffixes = ["dll", "DLL"]
 #elif defined(darwin_TARGET_OS)
@@ -214,6 +216,9 @@ dynlib_suffixes = ["dylib"]
 dynlib_suffixes = ["so"]
 #endif
 
+isHaskellishSuffix, isHaskellSrcSuffix, isCishSuffix, isExtCoreSuffix,
+    isObjectSuffix, isHaskellUserSrcSuffix, isDynLibSuffix
+ :: String -> Bool
 isHaskellishSuffix     s = s `elem` haskellish_suffixes
 isHaskellSrcSuffix     s = s `elem` haskellish_src_suffixes
 isCishSuffix           s = s `elem` cish_suffixes
@@ -222,8 +227,13 @@ isObjectSuffix         s = s `elem` objish_suffixes
 isHaskellUserSrcSuffix s = s `elem` haskellish_user_src_suffixes
 isDynLibSuffix         s = s `elem` dynlib_suffixes
 
+isSourceSuffix :: String -> Bool
 isSourceSuffix suff  = isHaskellishSuffix suff || isCishSuffix suff
 
+isHaskellishFilename, isHaskellSrcFilename, isCishFilename,
+    isExtCoreFilename, isObjectFilename, isHaskellUserSrcFilename,
+    isDynLibFilename, isSourceFilename
+ :: FilePath -> Bool
 -- takeExtension return .foo, so we drop 1 to get rid of the .
 isHaskellishFilename     f = isHaskellishSuffix     (drop 1 $ takeExtension f)
 isHaskellSrcFilename     f = isHaskellSrcSuffix     (drop 1 $ takeExtension f)
