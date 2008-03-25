@@ -14,7 +14,11 @@ Library {
         GHC.Bool
         GHC.Generics
         GHC.PrimopWrappers
-    extensions: CPP, MagicHash
+        GHC.IntWord32
+        GHC.IntWord64
+    c-sources:
+        cbits/longlong.c
+    extensions: CPP, MagicHash, ForeignFunctionInterface, UnliftedFFITypes
     -- We need to set the package name to ghc-prim (without a version number)
     -- as it's magic.
     ghc-options: -package-name ghc-prim
