@@ -4,13 +4,6 @@
 % Package manipulation
 %
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module Packages (
 	module PackageConfig,
 
@@ -53,6 +46,7 @@ import Util
 import Maybes		( expectJust, MaybeErr(..) )
 import Panic
 import Outputable
+import Pretty ( Doc )
 
 import System.Environment ( getEnv )
 import Distribution.InstalledPackageInfo
@@ -289,6 +283,7 @@ applyPackageFlag pkgs flag =
         ExposePackage str ->
 	   case matchingPackages str pkgs of
 		Nothing -> missingPackageErr str
+		Just ([], _) -> panic "applyPackageFlag"
 		Just (p:ps,qs) -> return (p':ps')
 		  where p' = p {exposed=True}
 		        ps' = hideAll (pkgName (package p)) (ps++qs)
@@ -302,7 +297,7 @@ applyPackageFlag pkgs flag =
 	IgnorePackage str ->
            case matchingPackages str pkgs of
                 Nothing -> return pkgs
-                Just (ps,qs) -> return qs
+                Just (_, qs) -> return qs
 		-- missing package is not an error for -ignore-package,
 		-- because a common usage is to -ignore-package P as
 		-- a preventative measure just in case P exists.
@@ -327,11 +322,14 @@ matchingPackages str pkgs
 		=  str == showPackageId (package p)
 		|| str == pkgName (package p)
 
-
+pickPackages :: [PackageConfig] -> [String] -> [PackageConfig]
 pickPackages pkgs strs = 
-  [ p | p <- strs, Just (p:ps,_) <- [matchingPackages p pkgs] ]
+  [ p | p <- strs, Just (p:_, _) <- [matchingPackages p pkgs] ]
 
+sortByVersion :: [InstalledPackageInfo_ m] -> [InstalledPackageInfo_ m]
 sortByVersion = sortBy (flip (comparing (pkgVersion.package)))
+
+comparing :: Ord a => (t -> a) -> t -> t -> Ordering
 comparing f a b = f a `compare` f b
 
 -- -----------------------------------------------------------------------------
@@ -536,7 +534,6 @@ mkPackageState dflags orig_pkg_db preload0 this_package = do
   pkgs <- elimDanglingDeps dflags pkgs3 ignored
 
   let pkg_db = extendPackageConfigMap emptyPackageConfigMap pkgs
-      pkgids = map packageConfigId pkgs
 
       -- add base & rts to the preload packages
       basicLinkedPackages = filter (flip elemUFM pkg_db)
@@ -695,9 +692,13 @@ add_package pkg_db ps (p, mb_parent)
     	   ps' <- foldM (add_package pkg_db) ps (zip deps (repeat (Just p)))
     	   return (p : ps')
 
+missingPackageErr :: String -> IO [PackageConfig]
 missingPackageErr p = throwDyn (CmdLineError (showSDoc (missingPackageMsg p)))
+
+missingPackageMsg :: String -> PprStyle -> Doc
 missingPackageMsg p = ptext SLIT("unknown package:") <+> text p
 
+missingDependencyMsg :: Maybe PackageId -> PprStyle -> Doc
 missingDependencyMsg Nothing = empty
 missingDependencyMsg (Just parent)
   = space <> parens (ptext SLIT("dependency of") <+> ftext (packageIdFS parent))
