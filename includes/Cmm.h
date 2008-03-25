@@ -407,9 +407,12 @@
 #define BITMAP_BITS(bitmap) ((bitmap) >> BITMAP_BITS_SHIFT)
 
 /* Debugging macros */
-#define LOOKS_LIKE_INFO_PTR(p)				\
-   ((p) != NULL && 					\
-     (TO_W_(%INFO_TYPE(%STD_INFO(p))) != INVALID_OBJECT) &&	\
+#define LOOKS_LIKE_INFO_PTR(p)                                  \
+   ((p) != NULL &&                                              \
+    LOOKS_LIKE_INFO_PTR_NOT_NULL(p))
+
+#define LOOKS_LIKE_INFO_PTR_NOT_NULL(p)                         \
+   ( (TO_W_(%INFO_TYPE(%STD_INFO(p))) != INVALID_OBJECT) &&     \
      (TO_W_(%INFO_TYPE(%STD_INFO(p))) <  N_CLOSURE_TYPES))
 
 #define LOOKS_LIKE_CLOSURE_PTR(p) (LOOKS_LIKE_INFO_PTR(GET_INFO(UNTAG(p))))

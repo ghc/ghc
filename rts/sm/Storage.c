@@ -116,7 +116,8 @@ initStorage( void )
   /* Sanity check to make sure the LOOKS_LIKE_ macros appear to be
    * doing something reasonable.
    */
-  ASSERT(LOOKS_LIKE_INFO_PTR(&stg_BLACKHOLE_info));
+  /* We use the NOT_NULL variant or gcc warns that the test is always true */
+  ASSERT(LOOKS_LIKE_INFO_PTR_NOT_NULL(&stg_BLACKHOLE_info));
   ASSERT(LOOKS_LIKE_CLOSURE_PTR(&stg_dummy_ret_closure));
   ASSERT(!HEAP_ALLOCED(&stg_dummy_ret_closure));
   

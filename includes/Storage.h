@@ -304,7 +304,10 @@ void dirty_MUT_VAR(StgRegTable *reg, StgClosure *p);
    -------------------------------------------------------------------------- */
 
 #define LOOKS_LIKE_INFO_PTR(p) \
-   (p && ((StgInfoTable *)(INFO_PTR_TO_STRUCT(p)))->type != INVALID_OBJECT && \
+   (p && LOOKS_LIKE_INFO_PTR_NOT_NULL(p))
+
+#define LOOKS_LIKE_INFO_PTR_NOT_NULL(p) \
+   (((StgInfoTable *)(INFO_PTR_TO_STRUCT(p)))->type != INVALID_OBJECT && \
     ((StgInfoTable *)(INFO_PTR_TO_STRUCT(p)))->type < N_CLOSURE_TYPES)
 
 #define LOOKS_LIKE_CLOSURE_PTR(p) \
