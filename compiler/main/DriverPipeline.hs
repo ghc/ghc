@@ -1625,6 +1625,5 @@ hscMaybeAdjustTarget dflags stop _ current_hsc_lang
 		-- otherwise, stick to the plan
 		 | otherwise = current_hsc_lang
 
-v_Split_info :: IORef (String, Int)
 GLOBAL_VAR(v_Split_info, ("",0), (String,Int))
 	-- The split prefix and number of files
