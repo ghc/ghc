@@ -1,5 +1,7 @@
 Just 1.2
 f = Just 1.2
+i = Just (_t1::Integer)
+10
 i = Just 10
 'a'
 s = S1 'a' 'b' 'c'

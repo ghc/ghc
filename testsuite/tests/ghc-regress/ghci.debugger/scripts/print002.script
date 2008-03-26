@@ -8,6 +8,9 @@ f
 let i = Just (10::Integer)
 :p i
 
+case i of Just j -> Control.Exception.evaluate j
+:p i
+
 :l ../Test.hs
 
 let s = S1 'a' 'b' 'c'
