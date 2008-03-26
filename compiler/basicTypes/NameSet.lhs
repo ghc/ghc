@@ -4,13 +4,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module NameSet (
 	-- Sets of Names
 	NameSet,
@@ -29,6 +22,8 @@ module NameSet (
 	findUses, duDefs, duUses, allUses
     ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import Name
@@ -104,6 +99,7 @@ mkFVs	 :: [Name] -> FreeVars
 delFV    :: Name -> FreeVars -> FreeVars
 delFVs   :: [Name] -> FreeVars -> FreeVars
 
+isEmptyFVs :: NameSet -> Bool
 isEmptyFVs  = isEmptyNameSet
 emptyFVs    = emptyNameSet
 plusFVs     = unionManyNameSets
@@ -154,14 +150,14 @@ plusDU = (++)
 duDefs :: DefUses -> Defs
 duDefs dus = foldr get emptyNameSet dus
   where
-    get (Nothing, u1) d2 = d2
-    get (Just d1, u1) d2 = d1 `unionNameSets` d2
+    get (Nothing, _u1) d2 = d2
+    get (Just d1, _u1) d2 = d1 `unionNameSets` d2
 
 duUses :: DefUses -> Uses
 -- Just like allUses, but defs are not eliminated
 duUses dus = foldr get emptyNameSet dus
   where
-    get (d1, u1) u2 = u1 `unionNameSets` u2
+    get (_d1, u1) u2 = u1 `unionNameSets` u2
 
 allUses :: DefUses -> Uses
 -- Collect all uses, regardless of
