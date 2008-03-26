@@ -5,13 +5,6 @@
 \section[NameEnv]{@NameEnv@: name environments}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module NameEnv (
 	NameEnv, mkNameEnv,
 	emptyNameEnv, unitNameEnv, nameEnvElts, nameEnvUniqueElts,
@@ -23,10 +16,12 @@ module NameEnv (
 	elemNameEnv, mapNameEnv
     ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import Name
-import Unique(Unique)
+import Unique
 import LazyUniqFM
 import Maybes
 import Outputable
@@ -71,12 +66,10 @@ lookupNameEnv (A x) y = lookupUFM x y
 mkNameEnv     l    = A $ listToUFM l
 elemNameEnv x (A y) 	 = elemUFM x y
 foldNameEnv a b (A c)	 = foldUFM a b c 
-occEnvElts (A x)	 = eltsUFM x
 plusNameEnv (A x) (A y)	 = A $ plusUFM x y 
 plusNameEnv_C f (A x) (A y)	 = A $ plusUFM_C f x y 
 extendNameEnv_C f (A x) y z   = A $ addToUFM_C f x y z
 mapNameEnv f (A x)	 = A $ mapUFM f x
-mkNameEnv_C comb l = A $ addListToUFM_C comb emptyUFM l
 nameEnvUniqueElts (A x)  = ufmToList x
 extendNameEnv_Acc x y (A z) a b  = A $ addToUFM_Acc x y z a b
 extendNameEnvList_C x (A y) z = A $ addListToUFM_C x y z
