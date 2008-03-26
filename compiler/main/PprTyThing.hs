@@ -27,7 +27,6 @@ import TcType
 import Var
 import Name
 import Outputable
-import Pretty ( Doc )
 
 -- -----------------------------------------------------------------------------
 -- Pretty-printing entities that we get from the GHC API
@@ -75,7 +74,7 @@ pprTyThingHdr pefas (ADataCon dataCon) = pprDataConSig pefas dataCon
 pprTyThingHdr pefas (ATyCon tyCon)     = pprTyConHdr   pefas tyCon
 pprTyThingHdr pefas (AClass cls)       = pprClassHdr   pefas cls
 
-pprTyConHdr :: PrintExplicitForalls -> TyCon -> PprStyle -> Doc
+pprTyConHdr :: PrintExplicitForalls -> TyCon -> SDoc
 pprTyConHdr _ tyCon
   | Just (_fam_tc, tys) <- tyConFamInst_maybe tyCon
   = ptext keyword <+> ptext SLIT("instance") <+> pprTypeApp tyCon (ppr_bndr tyCon) tys
@@ -98,11 +97,11 @@ pprTyConHdr _ tyCon
 	| isAlgTyCon tyCon = GHC.pprThetaArrow (tyConStupidTheta tyCon)
 	| otherwise	   = empty	-- Returns 'empty' if null theta
 
-pprDataConSig :: PrintExplicitForalls -> GHC.DataCon -> PprStyle -> Doc
+pprDataConSig :: PrintExplicitForalls -> GHC.DataCon -> SDoc
 pprDataConSig pefas dataCon =
   ppr_bndr dataCon <+> dcolon <+> pprTypeForUser pefas (GHC.dataConType dataCon)
 
-pprClassHdr :: PrintExplicitForalls -> GHC.Class -> PprStyle -> Doc
+pprClassHdr :: PrintExplicitForalls -> GHC.Class -> SDoc
 pprClassHdr _ cls =
   let (tyVars, funDeps) = GHC.classTvsFds cls
   in ptext SLIT("class") <+> 
@@ -111,13 +110,13 @@ pprClassHdr _ cls =
      hsep (map ppr tyVars) <+>
      GHC.pprFundeps funDeps
 
-pprIdInContext :: PrintExplicitForalls -> Var -> PprStyle -> Doc
+pprIdInContext :: PrintExplicitForalls -> Var -> SDoc
 pprIdInContext pefas id
   | GHC.isRecordSelector id  		  = pprRecordSelector pefas id
   | Just cls <- GHC.isClassOpId_maybe id  = pprClassOneMethod pefas cls id
   | otherwise				  = pprId pefas id
 
-pprRecordSelector :: PrintExplicitForalls -> Id -> PprStyle -> Doc
+pprRecordSelector :: PrintExplicitForalls -> Id -> SDoc
 pprRecordSelector pefas id
   = pprAlgTyCon pefas tyCon show_con show_label
   where
@@ -146,7 +145,7 @@ pprTypeForUser print_foralls ty
     tidy_ty     = tidyTopType ty
     (ctxt, ty') = tcMultiSplitSigmaTy tidy_ty
 
-pprTyCon :: PrintExplicitForalls -> TyCon -> PprStyle -> Doc
+pprTyCon :: PrintExplicitForalls -> TyCon -> SDoc
 pprTyCon pefas tyCon
   | GHC.isSynTyCon tyCon
   = if GHC.isOpenTyCon tyCon
@@ -159,8 +158,7 @@ pprTyCon pefas tyCon
   = pprAlgTyCon pefas tyCon (const True) (const True)
 
 pprAlgTyCon :: PrintExplicitForalls -> TyCon -> (GHC.DataCon -> Bool)
-            -> (FieldLabel -> Bool) -> PprStyle
-            -> Doc
+            -> (FieldLabel -> Bool) -> SDoc
 pprAlgTyCon pefas tyCon ok_con ok_label
   | gadt      = pprTyConHdr pefas tyCon <+> ptext SLIT("where") $$ 
 		   nest 2 (vcat (ppr_trim show_con datacons))
@@ -174,13 +172,12 @@ pprAlgTyCon pefas tyCon ok_con ok_label
       | ok_con dataCon = Just (pprDataConDecl pefas gadt ok_label dataCon)
       | otherwise      = Nothing
 
-pprDataCon :: PrintExplicitForalls -> GHC.DataCon -> PprStyle -> Doc
+pprDataCon :: PrintExplicitForalls -> GHC.DataCon -> SDoc
 pprDataCon pefas dataCon = pprAlgTyCon pefas tyCon (== dataCon) (const True)
   where tyCon = GHC.dataConTyCon dataCon
 
 pprDataConDecl :: PrintExplicitForalls -> Bool -> (FieldLabel -> Bool)
-               -> GHC.DataCon -> PprStyle
-               -> Doc
+               -> GHC.DataCon -> SDoc
 pprDataConDecl _ gadt_style show_label dataCon
   | not gadt_style = ppr_fields tys_w_strs
   | otherwise      = ppr_bndr dataCon <+> dcolon <+> 
@@ -225,7 +222,7 @@ pprDataConDecl _ gadt_style show_label dataCon
 		braces (sep (punctuate comma (ppr_trim maybe_show_label 
 					(zip labels fields))))
 
-pprClass :: PrintExplicitForalls -> GHC.Class -> PprStyle -> Doc
+pprClass :: PrintExplicitForalls -> GHC.Class -> SDoc
 pprClass pefas cls
   | null methods = 
 	pprClassHdr pefas cls
@@ -235,7 +232,7 @@ pprClass pefas cls
   where
 	methods = GHC.classMethods cls
 
-pprClassOneMethod :: PrintExplicitForalls -> GHC.Class -> Id -> PprStyle -> Doc
+pprClassOneMethod :: PrintExplicitForalls -> GHC.Class -> Id -> SDoc
 pprClassOneMethod pefas cls this_one
   = hang (pprClassHdr pefas cls <+> ptext SLIT("where"))
 	 2 (vcat (ppr_trim show_meth methods))
@@ -244,7 +241,7 @@ pprClassOneMethod pefas cls this_one
 	show_meth id | id == this_one = Just (pprClassMethod pefas id)
 		     | otherwise      = Nothing
 
-pprClassMethod :: PrintExplicitForalls -> Id -> PprStyle -> Doc
+pprClassMethod :: PrintExplicitForalls -> Id -> SDoc
 pprClassMethod pefas id
   = hang (ppr_bndr id <+> dcolon) 2 (pprTypeForUser pefas op_ty)
   where
@@ -272,7 +269,7 @@ ppr_trim show xs
 	| otherwise = if eliding then (True, so_far)
 		                 else (True, ptext SLIT("...") : so_far)
 
-add_bars :: [SDoc] -> PprStyle -> Doc
+add_bars :: [SDoc] -> SDoc
 add_bars []      = empty
 add_bars [c]     = equals <+> c
 add_bars (c:cs)  = sep ((equals <+> c) : map (char '|' <+>) cs)

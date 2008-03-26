@@ -16,7 +16,6 @@ import SrcLoc
 import Char
 import Bag
 import Util
-import Pretty ( Doc )
 import RdrName
 \end{code}
 
@@ -27,7 +26,7 @@ import RdrName
 %************************************************************************
 
 \begin{code}
-ppSourceStats :: Bool -> Located (HsModule RdrName) -> PprStyle -> Doc
+ppSourceStats :: Bool -> Located (HsModule RdrName) -> SDoc
 ppSourceStats short (L _ (HsModule _ exports imports ldecls _ _ _))
  = (if short then hcat else vcat)
         (map pp_val

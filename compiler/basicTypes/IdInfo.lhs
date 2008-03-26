@@ -92,7 +92,6 @@ import ForeignCall
 import NewDemand
 import Outputable	
 import Module
-import Pretty (Doc)
 
 import Data.Maybe
 
@@ -153,7 +152,7 @@ seqNewStrictnessInfo :: Maybe StrictSig -> ()
 seqNewStrictnessInfo Nothing = ()
 seqNewStrictnessInfo (Just ty) = seqStrictSig ty
 
-pprNewStrictness :: Maybe StrictSig -> PprStyle -> Doc
+pprNewStrictness :: Maybe StrictSig -> SDoc
 pprNewStrictness Nothing = empty
 pprNewStrictness (Just sig) = ftext FSLIT("Str:") <+> ppr sig
 
@@ -451,7 +450,7 @@ type ArityInfo = Arity
 unknownArity :: Arity
 unknownArity = 0 :: Arity
 
-ppArityInfo :: Int -> PprStyle -> Doc
+ppArityInfo :: Int -> SDoc
 ppArityInfo 0 = empty
 ppArityInfo n = hsep [ptext SLIT("Arity"), int n]
 \end{code}
@@ -558,7 +557,7 @@ seqWorker :: WorkerInfo -> ()
 seqWorker (HasWorker id a) = id `seq` a `seq` ()
 seqWorker NoWorker	   = ()
 
-ppWorkerInfo :: WorkerInfo -> PprStyle -> Doc
+ppWorkerInfo :: WorkerInfo -> SDoc
 ppWorkerInfo NoWorker            = empty
 ppWorkerInfo (HasWorker wk_id _) = ptext SLIT("Worker") <+> ppr wk_id
 
@@ -604,7 +603,7 @@ mayHaveCafRefs _	       = False
 seqCaf :: CafInfo -> ()
 seqCaf c = c `seq` ()
 
-ppCafInfo :: CafInfo -> PprStyle -> Doc
+ppCafInfo :: CafInfo -> SDoc
 ppCafInfo NoCafRefs = ptext SLIT("NoCafRefs")
 ppCafInfo MayHaveCafRefs = empty
 \end{code}
@@ -694,7 +693,7 @@ hasNoLBVarInfo IsOneShotLambda = False
 noLBVarInfo :: LBVarInfo
 noLBVarInfo = NoLBVarInfo
 
-pprLBVarInfo :: LBVarInfo -> PprStyle -> Doc
+pprLBVarInfo :: LBVarInfo -> SDoc
 pprLBVarInfo NoLBVarInfo     = empty
 pprLBVarInfo IsOneShotLambda = ptext SLIT("OneShot")
 

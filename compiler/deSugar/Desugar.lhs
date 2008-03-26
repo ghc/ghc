@@ -39,7 +39,6 @@ import Outputable
 import SrcLoc
 import Maybes
 import FastString
-import Pretty      ( Doc )
 import Coverage
 import Data.IORef
 \end{code}
@@ -232,7 +231,7 @@ addExportFlags target exports keep_alive prs rules
     is_exported | target == HscInterpreted = isExternalName
 		| otherwise 		   = (`elemNameSet` exports)
 
-ppr_ds_rules :: [CoreRule] -> PprStyle -> Doc
+ppr_ds_rules :: [CoreRule] -> SDoc
 ppr_ds_rules [] = empty
 ppr_ds_rules rules
   = text "" $$ text "-------------- DESUGARED RULES -----------------" $$

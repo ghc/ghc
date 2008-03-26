@@ -46,7 +46,6 @@ import Util
 import Maybes		( expectJust, MaybeErr(..) )
 import Panic
 import Outputable
-import Pretty ( Doc )
 
 import System.Environment ( getEnv )
 import Distribution.InstalledPackageInfo
@@ -695,10 +694,10 @@ add_package pkg_db ps (p, mb_parent)
 missingPackageErr :: String -> IO [PackageConfig]
 missingPackageErr p = throwDyn (CmdLineError (showSDoc (missingPackageMsg p)))
 
-missingPackageMsg :: String -> PprStyle -> Doc
+missingPackageMsg :: String -> SDoc
 missingPackageMsg p = ptext SLIT("unknown package:") <+> text p
 
-missingDependencyMsg :: Maybe PackageId -> PprStyle -> Doc
+missingDependencyMsg :: Maybe PackageId -> SDoc
 missingDependencyMsg Nothing = empty
 missingDependencyMsg (Just parent)
   = space <> parens (ptext SLIT("dependency of") <+> ftext (packageIdFS parent))
