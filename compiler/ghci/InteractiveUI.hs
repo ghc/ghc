@@ -102,7 +102,6 @@ ghciWelcomeMsg = "GHCi, version " ++ cProjectVersion ++
 cmdName :: Command -> String
 cmdName (n,_,_,_) = n
 
-macros_ref :: IORef [Command]
 GLOBAL_VAR(macros_ref, [], [Command])
 
 builtin_commands :: [Command]
