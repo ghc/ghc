@@ -4,13 +4,6 @@
 \section[RnSource]{Main pass of renamer}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module RnTypes ( 
 	-- Type related stuff
 	rnHsType, rnLHsType, rnLHsTypes, rnContext,
@@ -24,25 +17,19 @@ module RnTypes (
 import DynFlags
 import HsSyn
 import RdrHsSyn		( extractHsRhoRdrTyVars )
-import RnHsSyn		( extractHsTyNames, parrTyCon_name, tupleTyCon_name, 
-			  listTyCon_name
-			)
+import RnHsSyn		( extractHsTyNames )
 import RnHsDoc          ( rnLHsDoc )
 import RnEnv
 import TcRnMonad
-import ErrUtils
 import RdrName
 import PrelNames
 import TypeRep		( funTyCon )
-import Constants	( mAX_TUPLE_SIZE )
 import Name
 import SrcLoc
 import NameSet
 
-import Literal		( inIntRange, inCharRange )
 import BasicTypes	( compareFixity, funTyFixity, negateFixity, 
 			  Fixity(..), FixityDirection(..) )
-import ListSetOps	( removeDups, minusList )
 import Outputable
 
 #include "HsVersions.h"
@@ -110,7 +97,7 @@ rnHsType doc (HsForAllTy Explicit forall_tyvars ctxt tau) = do
     mapM_ (forAllWarn doc tau) warn_guys
     rnForAll doc Explicit forall_tyvars ctxt tau
 
-rnHsType doc (HsTyVar tyvar) = do
+rnHsType _ (HsTyVar tyvar) = do
     tyvar' <- lookupOccRn tyvar
     return (HsTyVar tyvar')
 
@@ -138,7 +125,7 @@ rnHsType doc (HsBangTy b ty) = do
     ty' <- rnLHsType doc ty
     return (HsBangTy b ty')
 
-rnHsType doc (HsNumTy i)
+rnHsType _ (HsNumTy i)
   | i == 1    = return (HsNumTy i)
   | otherwise = addErr err_msg >> return (HsNumTy i)
   where
@@ -182,7 +169,7 @@ rnHsType doc (HsPredTy pred) = do
     pred' <- rnPred doc pred
     return (HsPredTy pred')
 
-rnHsType doc (HsSpliceTy _) = do
+rnHsType _ (HsSpliceTy _) = do
     addErr (ptext SLIT("Type splices are not yet implemented"))
     failM
 
@@ -191,6 +178,8 @@ rnHsType doc (HsDocTy ty haddock_doc) = do
     haddock_doc' <- rnLHsDoc haddock_doc
     return (HsDocTy ty' haddock_doc')
 
+rnLHsTypes :: SDoc -> [LHsType RdrName]
+           -> IOEnv (Env TcGblEnv TcLclEnv) [LHsType Name]
 rnLHsTypes doc tys = mapM (rnLHsType doc) tys
 \end{code}
 
@@ -199,7 +188,7 @@ rnLHsTypes doc tys = mapM (rnLHsType doc) tys
 rnForAll :: SDoc -> HsExplicitForAll -> [LHsTyVarBndr RdrName]
 	 -> LHsContext RdrName -> LHsType RdrName -> RnM (HsType Name)
 
-rnForAll doc exp [] (L _ []) (L _ ty) = rnHsType doc ty
+rnForAll doc _ [] (L _ []) (L _ ty) = rnHsType doc ty
 	-- One reason for this case is that a type like Int#
 	-- starts off as (HsForAllTy Nothing [] Int), in case
 	-- there is some quantification.  Now that we have quantified
@@ -233,6 +222,8 @@ rnContext' doc ctxt = mapM (rnLPred doc) ctxt
 rnLPred :: SDoc -> LHsPred RdrName -> RnM (LHsPred Name)
 rnLPred doc  = wrapLocM (rnPred doc)
 
+rnPred :: SDoc -> HsPred RdrName
+       -> IOEnv (Env TcGblEnv TcLclEnv) (HsPred Name)
 rnPred doc (HsClassP clas tys)
   = do { clas_name <- lookupOccRn clas
        ; tys' <- rnLHsTypes doc tys
@@ -288,11 +279,11 @@ mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsOpTy ty21 op2 ty22))
 		      (\t1 t2 -> HsOpTy t1 op2 t2)
 		      (ppr op2) fix2 ty21 ty22 loc2 }
 
-mkHsOpTyRn mk1 pp_op1 fix1 ty1 ty2@(L loc2 (HsFunTy ty21 ty22))
+mkHsOpTyRn mk1 pp_op1 fix1 ty1 (L loc2 (HsFunTy ty21 ty22))
   = mk_hs_op_ty mk1 pp_op1 fix1 ty1 
 		HsFunTy (ppr funTyCon) funTyFixity ty21 ty22 loc2
 
-mkHsOpTyRn mk1 pp_op1 fix1 ty1 ty2 		-- Default case, no rearrangment
+mkHsOpTyRn mk1 _ _ ty1 ty2 		-- Default case, no rearrangment
   = return (mk1 ty1 ty2)
 
 ---------------
@@ -350,7 +341,7 @@ mkOpAppRn e1@(L _ (NegApp neg_arg neg_name)) op2 fix2 e2
 
 ---------------------------
 --	e1 `op` - neg_arg
-mkOpAppRn e1 op1 fix1 e2@(L _ (NegApp neg_arg _))	-- NegApp can occur on the right
+mkOpAppRn e1 op1 fix1 e2@(L _ (NegApp _ _))	-- NegApp can occur on the right
   | not associate_right= do			-- We *want* right association
     addErr (precParseErr (ppr_op op1, fix1) (pp_prefix_minus, negateFixity))
     return (OpApp e1 op1 fix1 e2)
@@ -368,11 +359,12 @@ mkOpAppRn e1 op fix e2 			-- Default case, no rearrangment
 -- Parser left-associates everything, but 
 -- derived instances may have correctly-associated things to
 -- in the right operarand.  So we just check that the right operand is OK
+right_op_ok :: Fixity -> HsExpr Name -> Bool
 right_op_ok fix1 (OpApp _ _ fix2 _)
   = not error_please && associate_right
   where
     (error_please, associate_right) = compareFixity fix1 fix2
-right_op_ok fix1 other
+right_op_ok _ _
   = True
 
 -- Parser initially makes negation bind more tightly than any other operator
@@ -382,8 +374,9 @@ mkNegAppRn neg_arg neg_name
   = ASSERT( not_op_app (unLoc neg_arg) )
     return (NegApp neg_arg neg_name)
 
+not_op_app :: HsExpr id -> Bool
 not_op_app (OpApp _ _ _ _) = False
-not_op_app other	   = True
+not_op_app _    	   = True
 
 ---------------------------
 mkOpFormRn :: LHsCmdTop Name		-- Left operand; already rearranged
@@ -428,19 +421,20 @@ mkConOpPatRn op2 fix2 p1@(L loc (ConPatIn op1 (InfixCon p11 p12))) p2
 		; return (ConPatIn op1 (InfixCon p11 (L loc new_p))) } -- XXX loc right?
 	  else return (ConPatIn op2 (InfixCon p1 p2)) }
 
-mkConOpPatRn op fix p1 p2 			-- Default case, no rearrangment
+mkConOpPatRn op _ p1 p2 			-- Default case, no rearrangment
   = ASSERT( not_op_pat (unLoc p2) )
     return (ConPatIn op (InfixCon p1 p2))
 
+not_op_pat :: Pat Name -> Bool
 not_op_pat (ConPatIn _ (InfixCon _ _)) = False
-not_op_pat other   	               = True
+not_op_pat _        	               = True
 
 --------------------------------------
 checkPrecMatch :: Bool -> Name -> MatchGroup Name -> RnM ()
 	-- True indicates an infix lhs
 	-- See comments with rnExpr (OpApp ...) about "deriving"
 
-checkPrecMatch False fn match 
+checkPrecMatch False _ _
   = return ()
 checkPrecMatch True op (MatchGroup ms _)	
   = mapM_ check ms			 	
@@ -458,6 +452,7 @@ checkPrecMatch True op (MatchGroup ms _)
 	-- until the type checker).  So we don't want to crash on the
 	-- second eqn.
 
+checkPrec :: Name -> Pat Name -> Bool -> IOEnv (Env TcGblEnv TcLclEnv) ()
 checkPrec op (ConPatIn op1 (InfixCon _ _)) right = do
     op_fix@(Fixity op_prec  op_dir) <- lookupFixityRn op
     op1_fix@(Fixity op1_prec op1_dir) <- lookupFixityRn (unLoc op1)
@@ -473,7 +468,7 @@ checkPrec op (ConPatIn op1 (InfixCon _ _)) right = do
 
     checkErr inf_ok (precParseErr infol infor)
 
-checkPrec op pat right
+checkPrec _ _ _
   = return ()
 
 -- Check precedence of (arg op) or (op arg) respectively
@@ -486,7 +481,7 @@ checkSectionPrec direction section op arg
   = case unLoc arg of
 	OpApp _ op fix _ -> go_for_it (ppr_op op)     fix
 	NegApp _ _	 -> go_for_it pp_prefix_minus negateFixity
-	other		 -> return ()
+	_    		 -> return ()
   where
     L _ (HsVar op_name) = op
     go_for_it pp_arg_op arg_fix@(Fixity arg_prec assoc) = do
@@ -500,19 +495,24 @@ checkSectionPrec direction section op arg
 Precedence-related error messages
 
 \begin{code}
+precParseErr :: (SDoc, Fixity) -> (SDoc, Fixity) -> SDoc
 precParseErr op1 op2 
   = hang (ptext SLIT("precedence parsing error"))
       4 (hsep [ptext SLIT("cannot mix"), ppr_opfix op1, ptext SLIT("and"), 
 	       ppr_opfix op2,
 	       ptext SLIT("in the same infix expression")])
 
+sectionPrecErr :: (SDoc, Fixity) -> (SDoc, Fixity) -> HsExpr RdrName -> SDoc
 sectionPrecErr op arg_op section
  = vcat [ptext SLIT("The operator") <+> ppr_opfix op <+> ptext SLIT("of a section"),
 	 nest 4 (ptext SLIT("must have lower precedence than the operand") <+> ppr_opfix arg_op),
 	 nest 4 (ptext SLIT("in the section:") <+> quotes (ppr section))]
 
+pp_prefix_minus :: SDoc
 pp_prefix_minus = ptext SLIT("prefix `-'")
+ppr_op :: Outputable a => a -> SDoc
 ppr_op op = quotes (ppr op)	-- Here, op can be a Name or a (Var n), where n is a Name
+ppr_opfix :: (SDoc, Fixity) -> SDoc
 ppr_opfix (pp_op, fixity) = pp_op <+> brackets (ppr fixity)
 \end{code}
 
@@ -523,6 +523,8 @@ ppr_opfix (pp_op, fixity) = pp_op <+> brackets (ppr fixity)
 %*********************************************************
 
 \begin{code}
+forAllWarn :: SDoc -> LHsType RdrName -> Located RdrName
+           -> TcRnIf TcGblEnv TcLclEnv ()
 forAllWarn doc ty (L loc tyvar)
   = ifOptM Opt_WarnUnusedMatches 	$
     addWarnAt loc (sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),
@@ -530,7 +532,8 @@ forAllWarn doc ty (L loc tyvar)
 		   $$
 		   doc)
 
-opTyErr op ty@(HsOpTy ty1 _ ty2)
+opTyErr :: RdrName -> HsType RdrName -> SDoc
+opTyErr op ty@(HsOpTy ty1 _ _)
   = hang (ptext SLIT("Illegal operator") <+> quotes (ppr op) <+> ptext SLIT("in type") <+> quotes (ppr ty))
 	 2 extra
   where
@@ -542,4 +545,5 @@ opTyErr op ty@(HsOpTy ty1 _ ty2)
     forall_head (L _ (HsTyVar tv))   = tv == forall_tv_RDR
     forall_head (L _ (HsAppTy ty _)) = forall_head ty
     forall_head _other		     = False
+opTyErr _ ty = pprPanic "opTyErr: Not an op" (ppr ty)
 \end{code}
