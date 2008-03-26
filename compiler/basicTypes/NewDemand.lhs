@@ -5,13 +5,6 @@
 \section[Demand]{@Demand@: the amount of demand on a value}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module NewDemand(
 	Demand(..), 
 	topDmd, lazyDmd, seqDmd, evalDmd, errDmd, isStrictDmd, 
@@ -30,6 +23,8 @@ module NewDemand(
 	pprIfaceStrictSig, appIsBottom, isBottomingSig, seqStrictSig,
      ) where
 
+-- XXX This define is a bit of a hack, and should be done more nicely
+#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import StaticFlags
@@ -69,14 +64,17 @@ data Demands = Poly Demand	-- Polymorphic case
 	     | Prod [Demand]	-- Product case
 	     deriving( Eq )
 
+allTop :: Demands -> Bool
 allTop (Poly d)  = isTop d
 allTop (Prod ds) = all isTop ds
 
+isTop :: Demand -> Bool
 isTop Top = True
-isTop d   = False 
+isTop _   = False 
 
+isAbsent :: Demand -> Bool
 isAbsent Abs = True
-isAbsent d   = False 
+isAbsent _   = False 
 
 mapDmds :: (Demand -> Demand) -> Demands -> Demands
 mapDmds f (Poly d)  = Poly (f d)
@@ -95,7 +93,7 @@ zipWithDmds f (Prod ds1) (Prod ds2)
 	--     case f y of (a,b,c) -> ...
 	-- Here the two demands on f are C(LL) and C(LLL)!
 
-topDmd, lazyDmd, seqDmd :: Demand
+topDmd, lazyDmd, seqDmd, evalDmd, errDmd :: Demand
 topDmd  = Top			-- The most uninformative demand
 lazyDmd = Box Abs
 seqDmd  = Eval (Poly Abs)	-- Polymorphic seq demand
@@ -107,7 +105,7 @@ isStrictDmd Bot      = True
 isStrictDmd (Eval _) = True
 isStrictDmd (Call _) = True
 isStrictDmd (Box d)  = isStrictDmd d
-isStrictDmd other    = False
+isStrictDmd _        = False
 
 seqDemand :: Demand -> ()
 seqDemand (Call d)   = seqDemand d
@@ -135,6 +133,7 @@ instance Outputable Demand where
     ppr (Box (Eval ds)) = char 'S' <> ppr ds
     ppr (Box Abs)	= char 'L'
     ppr (Box Bot)	= char 'X'
+    ppr d@(Box _)	= pprPanic "ppr: Bad boxed demand" (ppr d)
 
     ppr (Call d)	= char 'C' <> parens (ppr d)
 
@@ -180,10 +179,12 @@ data DmdType = DmdType
 -- by making sure that everything uses TopRes instead of RetCPR
 -- Assuming, of course, that they don't mention RetCPR by name.
 -- They should onlyu use retCPR
+retCPR :: DmdResult
 retCPR | opt_CprOff = TopRes
        | otherwise  = RetCPR
 
-seqDmdType (DmdType env ds res) = 
+seqDmdType :: DmdType -> ()
+seqDmdType (DmdType _env ds res) = 
   {- ??? env `seq` -} seqDemandList ds `seq` res `seq` ()
 
 type DmdEnv = VarEnv Demand
@@ -217,8 +218,10 @@ instance Outputable DmdResult where
   ppr BotRes = char 'b'   --    dddr
 			  -- without ambiguity
 
+emptyDmdEnv :: VarEnv Demand
 emptyDmdEnv = emptyVarEnv
 
+topDmdType, botDmdType, cprDmdType :: DmdType
 topDmdType = DmdType emptyDmdEnv [] TopRes
 botDmdType = DmdType emptyDmdEnv [] BotRes
 cprDmdType = DmdType emptyVarEnv [] retCPR
@@ -226,11 +229,11 @@ cprDmdType = DmdType emptyVarEnv [] retCPR
 isTopDmdType :: DmdType -> Bool
 -- Only used on top-level types, hence the assert
 isTopDmdType (DmdType env [] TopRes) = ASSERT( isEmptyVarEnv env) True	
-isTopDmdType other		     = False
+isTopDmdType _                       = False
 
 isBotRes :: DmdResult -> Bool
 isBotRes BotRes = True
-isBotRes other  = False
+isBotRes _      = False
 
 resTypeArgDmd :: DmdResult -> Demand
 -- TopRes and BotRes are polymorphic, so that
@@ -246,7 +249,7 @@ resTypeArgDmd BotRes = Bot
 
 returnsCPR :: DmdResult -> Bool
 returnsCPR RetCPR = True
-returnsCPR other  = False
+returnsCPR _      = False
 
 mkDmdType :: DmdEnv -> [Demand] -> DmdResult -> DmdType
 mkDmdType fv ds res = DmdType fv ds res
@@ -306,6 +309,7 @@ mkStrictSig dmd_ty = StrictSig dmd_ty
 splitStrictSig :: StrictSig -> ([Demand], DmdResult)
 splitStrictSig (StrictSig (DmdType _ dmds res)) = (dmds, res)
 
+isTopSig :: StrictSig -> Bool
 isTopSig (StrictSig ty) = isTopDmdType ty
 
 topSig, botSig, cprSig :: StrictSig
@@ -315,12 +319,15 @@ cprSig = StrictSig cprDmdType
 	
 
 -- appIsBottom returns true if an application to n args would diverge
+appIsBottom :: StrictSig -> Int -> Bool
 appIsBottom (StrictSig (DmdType _ ds BotRes)) n = listLengthCmp ds n /= GT
 appIsBottom _				      _ = False
 
+isBottomingSig :: StrictSig -> Bool
 isBottomingSig (StrictSig (DmdType _ _ BotRes)) = True
 isBottomingSig _				= False
 
+seqStrictSig :: StrictSig -> ()
 seqStrictSig (StrictSig ty) = seqDmdType ty
 
 pprIfaceStrictSig :: StrictSig -> SDoc
