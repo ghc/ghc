@@ -4,13 +4,6 @@
 %
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module VarEnv (
 	VarEnv, IdEnv, TyVarEnv,
 	emptyVarEnv, unitVarEnv, mkVarEnv,
@@ -50,7 +43,6 @@ import UniqFM
 import Unique
 import Util
 import Maybes
-import StaticFlags
 import Outputable
 import FastTypes
 \end{code}
@@ -69,7 +61,7 @@ data InScopeSet = InScope (VarEnv Var) FastInt
 	-- INVARIANT: it's not zero; we use it as a multiplier in uniqAway
 
 instance Outputable InScopeSet where
-  ppr (InScope s i) = ptext SLIT("InScope") <+> ppr s
+  ppr (InScope s _) = ptext SLIT("InScope") <+> ppr s
 
 emptyInScopeSet :: InScopeSet
 emptyInScopeSet = InScope emptyVarSet (_ILIT(1))
@@ -104,7 +96,7 @@ mapInScopeSet :: (Var -> Var) -> InScopeSet -> InScopeSet
 mapInScopeSet f (InScope in_scope n) = InScope (mapVarEnv f in_scope) n
 
 elemInScopeSet :: Var -> InScopeSet -> Bool
-elemInScopeSet v (InScope in_scope n) = v `elemVarEnv` in_scope
+elemInScopeSet v (InScope in_scope _) = v `elemVarEnv` in_scope
 
 lookupInScope :: InScopeSet -> Var -> Maybe Var
 -- It's important to look for a fixed point
@@ -112,7 +104,7 @@ lookupInScope :: InScopeSet -> Var -> Maybe Var
 -- we add  [x -> y] to the in-scope set (Simplify.simplCaseBinder).
 -- When we lookup up an occurrence of x, we map to y, but then
 -- we want to look up y in case it has acquired more evaluation information by now.
-lookupInScope (InScope in_scope n) v 
+lookupInScope (InScope in_scope _) v 
   = go v
   where
     go v = case lookupVarEnv in_scope v of
@@ -363,7 +355,9 @@ lookupVarEnv_Directly = lookupUFM_Directly
 filterVarEnv_Directly = filterUFM_Directly
 
 zipVarEnv tyvars tys   = mkVarEnv (zipEqual "zipVarEnv" tyvars tys)
-lookupVarEnv_NF env id = case (lookupVarEnv env id) of { Just xx -> xx }
+lookupVarEnv_NF env id = case lookupVarEnv env id of
+                         Just xx -> xx
+                         Nothing -> panic "lookupVarEnv_NF: Nothing"
 \end{code}
 
 @modifyVarEnv@: Look up a thing in the VarEnv, 
@@ -375,6 +369,7 @@ modifyVarEnv mangle_fn env key
       Nothing -> env
       Just xx -> extendVarEnv env key (mangle_fn xx)
 
+modifyVarEnv_Directly :: (a -> a) -> UniqFM a -> Unique -> UniqFM a
 modifyVarEnv_Directly mangle_fn env key
   = case (lookupUFM_Directly env key) of
       Nothing -> env
