@@ -8,13 +8,6 @@
 Haskell. [WDP 94/11])
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module IdInfo (
 	GlobalIdDetails(..), notGlobalId, 	-- Not abstract
 
@@ -99,6 +92,7 @@ import ForeignCall
 import NewDemand
 import Outputable	
 import Module
+import Pretty (Doc)
 
 import Data.Maybe
 
@@ -137,8 +131,8 @@ infixl 	1 `setSpecInfo`,
 To be removed later
 
 \begin{code}
--- setAllStrictnessInfo :: IdInfo -> Maybe StrictSig -> IdInfo
 -- Set old and new strictness info
+setAllStrictnessInfo :: IdInfo -> Maybe StrictSig -> IdInfo
 setAllStrictnessInfo info Nothing
   = info { newStrictnessInfo = Nothing
 #ifdef OLD_STRICTNESS
@@ -155,9 +149,11 @@ setAllStrictnessInfo info (Just sig)
 #endif
          }
 
+seqNewStrictnessInfo :: Maybe StrictSig -> ()
 seqNewStrictnessInfo Nothing = ()
 seqNewStrictnessInfo (Just ty) = seqStrictSig ty
 
+pprNewStrictness :: Maybe StrictSig -> PprStyle -> Doc
 pprNewStrictness Nothing = empty
 pprNewStrictness (Just sig) = ftext FSLIT("Str:") <+> ppr sig
 
@@ -219,6 +215,7 @@ oldDemand (Call _)         = WwStrict
 
 
 \begin{code}
+seqNewDemandInfo :: Maybe Demand -> ()
 seqNewDemandInfo Nothing    = ()
 seqNewDemandInfo (Just dmd) = seqDemand dmd
 \end{code}
@@ -262,6 +259,7 @@ data GlobalIdDetails
 
   | NotGlobalId			-- Used as a convenient extra return value from globalIdDetails
     
+notGlobalId :: GlobalIdDetails
 notGlobalId = NotGlobalId
 
 instance Outputable GlobalIdDetails where
@@ -359,19 +357,25 @@ megaSeqIdInfo info
 Setters
 
 \begin{code}
+setWorkerInfo :: IdInfo -> WorkerInfo -> IdInfo
 setWorkerInfo     info wk = wk `seq` info { workerInfo = wk }
+setSpecInfo :: IdInfo -> SpecInfo -> IdInfo
 setSpecInfo 	  info sp = sp `seq` info { specInfo = sp }
+setInlinePragInfo :: IdInfo -> InlinePragInfo -> IdInfo
 setInlinePragInfo info pr = pr `seq` info { inlinePragInfo = pr }
+setOccInfo :: IdInfo -> OccInfo -> IdInfo
 setOccInfo	  info oc = oc `seq` info { occInfo = oc }
 #ifdef OLD_STRICTNESS
 setStrictnessInfo info st = st `seq` info { strictnessInfo = st }
 #endif
 	-- Try to avoid spack leaks by seq'ing
 
+setUnfoldingInfoLazily :: IdInfo -> Unfolding -> IdInfo
 setUnfoldingInfoLazily info uf 	-- Lazy variant to avoid looking at the
   =				-- unfolding of an imported Id unless necessary
     info { unfoldingInfo = uf }	-- (In this case the demand-zapping is redundant.)
 
+setUnfoldingInfo :: IdInfo -> Unfolding -> IdInfo
 setUnfoldingInfo info uf 
 	-- We do *not* seq on the unfolding info, For some reason, doing so 
 	-- actually increases residency significantly. 
@@ -382,12 +386,17 @@ setDemandInfo	  info dd = info { demandInfo = dd }
 setCprInfo        info cp = info { cprInfo = cp }
 #endif
 
+setArityInfo :: IdInfo -> ArityInfo -> IdInfo
 setArityInfo	  info ar  = info { arityInfo = ar  }
+setCafInfo :: IdInfo -> CafInfo -> IdInfo
 setCafInfo        info caf = info { cafInfo = caf }
 
+setLBVarInfo :: IdInfo -> LBVarInfo -> IdInfo
 setLBVarInfo      info lb = {-lb `seq`-} info { lbvarInfo = lb }
 
+setNewDemandInfo :: IdInfo -> Maybe Demand -> IdInfo
 setNewDemandInfo     info dd = dd `seq` info { newDemandInfo = dd }
+setNewStrictnessInfo :: IdInfo -> Maybe StrictSig -> IdInfo
 setNewStrictnessInfo info dd = dd `seq` info { newStrictnessInfo = dd }
 \end{code}
 
@@ -413,6 +422,7 @@ vanillaIdInfo
 	    newStrictnessInfo   = Nothing
 	   }
 
+noCafIdInfo :: IdInfo
 noCafIdInfo  = vanillaIdInfo `setCafInfo`    NoCafRefs
 	-- Used for built-in type Ids in MkId.
 \end{code}
@@ -438,8 +448,10 @@ type ArityInfo = Arity
 	-- The arity might increase later in the compilation process, if
 	-- an extra lambda floats up to the binding site.
 
+unknownArity :: Arity
 unknownArity = 0 :: Arity
 
+ppArityInfo :: Int -> PprStyle -> Doc
 ppArityInfo 0 = empty
 ppArityInfo n = hsep [ptext SLIT("Arity"), int n]
 \end{code}
@@ -497,6 +509,7 @@ setSpecInfoHead fn (SpecInfo rules fvs)
   where
     set_head rule = rule { ru_fn = fn }
 
+seqSpecInfo :: SpecInfo -> ()
 seqSpecInfo (SpecInfo rules fvs) = seqRules rules `seq` seqVarSet fvs
 \end{code}
 
@@ -545,6 +558,7 @@ seqWorker :: WorkerInfo -> ()
 seqWorker (HasWorker id a) = id `seq` a `seq` ()
 seqWorker NoWorker	   = ()
 
+ppWorkerInfo :: WorkerInfo -> PprStyle -> Doc
 ppWorkerInfo NoWorker            = empty
 ppWorkerInfo (HasWorker wk_id _) = ptext SLIT("Worker") <+> ppr wk_id
 
@@ -554,9 +568,11 @@ workerExists (HasWorker _ _) = True
 
 workerId :: WorkerInfo -> Id
 workerId (HasWorker id _) = id
+workerId NoWorker = panic "workerId: NoWorker"
 
 wrapperArity :: WorkerInfo -> Arity
 wrapperArity (HasWorker _ a) = a
+wrapperArity NoWorker = panic "wrapperArity: NoWorker"
 \end{code}
 
 
@@ -578,13 +594,17 @@ data CafInfo
 	| NoCafRefs			-- A function or static constructor
 				        -- that refers to no CAFs.
 
+vanillaCafInfo :: CafInfo
 vanillaCafInfo = MayHaveCafRefs		-- Definitely safe
 
+mayHaveCafRefs :: CafInfo -> Bool
 mayHaveCafRefs  MayHaveCafRefs = True
 mayHaveCafRefs _	       = False
 
+seqCaf :: CafInfo -> ()
 seqCaf c = c `seq` ()
 
+ppCafInfo :: CafInfo -> PprStyle -> Doc
 ppCafInfo NoCafRefs = ptext SLIT("NoCafRefs")
 ppCafInfo MayHaveCafRefs = empty
 \end{code}
@@ -662,15 +682,19 @@ work.
 data LBVarInfo = NoLBVarInfo 
 	       | IsOneShotLambda	-- The lambda is applied at most once).
 
+seqLBVar :: LBVarInfo -> ()
 seqLBVar l = l `seq` ()
 \end{code}
 
 \begin{code}
+hasNoLBVarInfo :: LBVarInfo -> Bool
 hasNoLBVarInfo NoLBVarInfo     = True
 hasNoLBVarInfo IsOneShotLambda = False
 
+noLBVarInfo :: LBVarInfo
 noLBVarInfo = NoLBVarInfo
 
+pprLBVarInfo :: LBVarInfo -> PprStyle -> Doc
 pprLBVarInfo NoLBVarInfo     = empty
 pprLBVarInfo IsOneShotLambda = ptext SLIT("OneShot")
 
