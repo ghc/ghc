@@ -25,6 +25,7 @@ import Name
 import NameSet
 import UniqSet
 import Outputable
+import Encoding
 import ForeignCall
 import DynFlags
 import StaticFlags
@@ -219,13 +220,16 @@ make_var_id = make_id True
 -- *do* want to keep the package name (we don't want baseZCGHCziBase,
 -- because that would just be ugly.)
 -- SIGH.
+-- We encode the package name as well.
 make_mid :: Module -> C.Id
 -- Super ugly code, but I can't find anything else that does quite what I
 -- want (encodes the hierarchical module name without encoding the colon
 -- that separates the package name from it.)
-make_mid m = (packageIdString (modulePackageId m)) ++
-             ":" ++
-             showSDoc (pprCode CStyle (pprModuleName (moduleName m)))
+make_mid m = showSDoc $
+              (text $ zEncodeString $ packageIdString $ modulePackageId m)
+              <> text ":"
+              <> (pprEncoded $ pprModuleName $ moduleName m)
+     where pprEncoded = pprCode CStyle
                
 make_qid :: Bool -> Name -> C.Qual C.Id
 make_qid is_var n = (mname,make_id is_var n)
