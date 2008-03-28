@@ -190,7 +190,9 @@ palt (Adefault e) =
 
 plit :: Lit -> Doc
 plit (Lint i t) = parens (integer i <> text "::" <> pty t)
-plit (Lrational r t) = parens (rational r <>  text "::" <> pty t)  -- might be better to print as two integers
+-- we use (text (show r)) because "(rational r)" was printing out things
+-- like "2.0e-2" (which isn't External Core)
+plit (Lrational r t) = parens (text (show r) <>  text "::" <> pty t)
 plit (Lchar c t) = parens (text ("\'" ++ escape [c] ++ "\'") <> text "::" <> pty t)
 plit (Lstring s t) = parens (pstring s <> text "::" <> pty t)
 
