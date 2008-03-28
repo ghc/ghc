@@ -61,7 +61,7 @@ ptdef (Newtype tcon tbinds (coercion,k) rep) =
 -- At the same time, we need the newtype decl to declare the tycon itself.
 -- Sigh.
   text "%newtype" <+> pqname tcon <+> (hsep (map ptbind tbinds)) 
-    <+> axiomclause <+> repclause
+    $$ indent (axiomclause $$ repclause)
        where  axiomclause = char '^' <+> parens (pqname coercion <+> text "::"
                                      <+> pkind k)
               repclause   = case rep of

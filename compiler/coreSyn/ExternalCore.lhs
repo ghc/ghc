@@ -86,7 +86,7 @@ type Id = String
 primMname :: Mname
 -- For truly horrible reasons, this must be z-encoded.
 -- With any hope, the z-encoding will die soon.
-primMname = "ghc-prim:GHCziPrim"
+primMname = "ghczmprim:GHCziPrim"
 
 tcArrow :: Qual Tcon
 tcArrow = (primMname, "(->)")
