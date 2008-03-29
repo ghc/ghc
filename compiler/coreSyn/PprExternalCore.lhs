@@ -162,7 +162,7 @@ pappexp e as = fsep (paexp e : map pa as)
 
 pexp (Lam b e) = char '\\' <+> plamexp [b] e
 pexp (Let vd e) = (text "%let" <+> pvdefg vd) $$ (text "%in" <+> pexp e)
-pexp (Case e vb ty alts) = sep [text "%case" <+> parens (paty ty) <+> paexp e,
+pexp (Case e vb ty alts) = sep [text "%case" <+> paty ty <+> paexp e,
 			     text "%of" <+> pvbind vb]
 			$$ (indent (braces (vcat (punctuate (char ';') (map palt alts)))))
 pexp (Cast e co) = (text "%cast" <+> parens (pexp e)) $$ paty co
