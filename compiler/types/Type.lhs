@@ -1272,11 +1272,9 @@ mkOpenTvSubst env = TvSubst (mkInScopeSet (tyVarsOfTypes (varEnvElts env))) env
 
 zipOpenTvSubst :: [TyVar] -> [Type] -> TvSubst
 zipOpenTvSubst tyvars tys 
-#ifdef DEBUG
-  | length tyvars /= length tys
+  | debugIsOn && (length tyvars /= length tys)
   = pprTrace "zipOpenTvSubst" (ppr tyvars $$ ppr tys) emptyTvSubst
   | otherwise
-#endif
   = TvSubst (mkInScopeSet (tyVarsOfTypes tys)) (zipTyEnv tyvars tys)
 
 -- mkTopTvSubst is called when doing top-level substitutions.
@@ -1287,20 +1285,16 @@ mkTopTvSubst prs = TvSubst emptyInScopeSet (mkVarEnv prs)
 
 zipTopTvSubst :: [TyVar] -> [Type] -> TvSubst
 zipTopTvSubst tyvars tys 
-#ifdef DEBUG
-  | length tyvars /= length tys
+  | debugIsOn && (length tyvars /= length tys)
   = pprTrace "zipTopTvSubst" (ppr tyvars $$ ppr tys) emptyTvSubst
   | otherwise
-#endif
   = TvSubst emptyInScopeSet (zipTyEnv tyvars tys)
 
 zipTyEnv :: [TyVar] -> [Type] -> TvSubstEnv
 zipTyEnv tyvars tys
-#ifdef DEBUG
-  | length tyvars /= length tys
+  | debugIsOn && (length tyvars /= length tys)
   = pprTrace "mkTopTvSubst" (ppr tyvars $$ ppr tys) emptyVarEnv
   | otherwise
-#endif
   = zip_ty_env tyvars tys emptyVarEnv
 
 -- Later substitutions in the list over-ride earlier ones, 
