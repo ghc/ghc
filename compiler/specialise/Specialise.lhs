@@ -47,8 +47,7 @@ import ErrUtils		( dumpIfSet_dyn )
 import BasicTypes	( Activation( AlwaysActive ) )
 import Bag
 import List		( partition )
-import Util		( zipEqual, zipWithEqual, cmpList, lengthIs,
-			  equalLength, lengthAtLeast, notNull )
+import Util
 import Outputable
 import FastString
 
@@ -900,14 +899,13 @@ specDefn subst calls (fn, rhs)
 
       where
 	my_zipEqual doc xs ys 
-#ifdef DEBUG
-	 | not (equalLength xs ys) = pprPanic "my_zipEqual" (vcat 
+	 | debugIsOn && not (equalLength xs ys)
+             = pprPanic "my_zipEqual" (vcat 
 						[ ppr xs, ppr ys
 						, ppr fn <+> ppr call_ts
 						, ppr (idType fn), ppr theta
 						, ppr n_dicts, ppr rhs_dicts 
 						, ppr rhs])
-#endif
 	 | otherwise		   = zipEqual doc xs ys
 \end{code}
 
