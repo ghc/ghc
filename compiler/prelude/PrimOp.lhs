@@ -398,20 +398,20 @@ primOpNeedsWrapper :: PrimOp -> Bool
 \begin{code}
 primOpType :: PrimOp -> Type  -- you may want to use primOpSig instead
 primOpType op
-  = case (primOpInfo op) of
-      Dyadic occ ty ->	    dyadic_fun_ty ty
-      Monadic occ ty ->	    monadic_fun_ty ty
-      Compare occ ty ->	    compare_fun_ty ty
+  = case primOpInfo op of
+    Dyadic  _occ ty -> dyadic_fun_ty ty
+    Monadic _occ ty -> monadic_fun_ty ty
+    Compare _occ ty -> compare_fun_ty ty
 
-      GenPrimOp occ tyvars arg_tys res_ty -> 
-	mkForAllTys tyvars (mkFunTys arg_tys res_ty)
+    GenPrimOp _occ tyvars arg_tys res_ty -> 
+        mkForAllTys tyvars (mkFunTys arg_tys res_ty)
 
 primOpOcc :: PrimOp -> OccName
-primOpOcc op = case (primOpInfo op) of
-		Dyadic    occ _	    -> occ
-		Monadic   occ _	    -> occ
-		Compare   occ _	    -> occ
-		GenPrimOp occ _ _ _ -> occ
+primOpOcc op = case primOpInfo op of
+               Dyadic    occ _     -> occ
+               Monadic   occ _     -> occ
+               Compare   occ _     -> occ
+               GenPrimOp occ _ _ _ -> occ
 
 -- primOpSig is like primOpType but gives the result split apart:
 -- (type variables, argument types, result type)
@@ -424,11 +424,10 @@ primOpSig op
     arity = length arg_tys
     (tyvars, arg_tys, res_ty)
       = case (primOpInfo op) of
-	  Monadic   occ ty -> ([],     [ty],    ty    )
-	  Dyadic    occ ty -> ([],     [ty,ty], ty    )
-	  Compare   occ ty -> ([],     [ty,ty], boolTy)
-	  GenPrimOp occ tyvars arg_tys res_ty
-                           -> (tyvars, arg_tys, res_ty)
+        Monadic   _occ ty                    -> ([],     [ty],    ty    )
+        Dyadic    _occ ty                    -> ([],     [ty,ty], ty    )
+        Compare   _occ ty                    -> ([],     [ty,ty], boolTy)
+        GenPrimOp _occ tyvars arg_tys res_ty -> (tyvars, arg_tys, res_ty)
 \end{code}
 
 \begin{code}
@@ -445,7 +444,7 @@ getPrimOpResultInfo op
   = case (primOpInfo op) of
       Dyadic  _ ty		 	  -> ReturnsPrim (typePrimRep ty)
       Monadic _ ty		 	  -> ReturnsPrim (typePrimRep ty)
-      Compare _ ty		 	  -> ReturnsAlg boolTyCon
+      Compare _ _		 	  -> ReturnsAlg boolTyCon
       GenPrimOp _ _ _ ty | isPrimTyCon tc -> ReturnsPrim (tyConPrimRep tc)
 			 | otherwise      -> ReturnsAlg tc
 			 where
