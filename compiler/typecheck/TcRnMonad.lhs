@@ -49,6 +49,7 @@ import DynFlags
 import StaticFlags
 import FastString
 import Panic
+import Util
  
 import System.IO
 import Data.IORef
@@ -815,11 +816,9 @@ debugTc is useful for monadic debugging code
 
 \begin{code}
 debugTc :: TcM () -> TcM ()
-#ifdef DEBUG
-debugTc thing = thing
-#else
-debugTc thing = return ()
-#endif
+debugTc thing
+ | debugIsOn = thing
+ | otherwise = return ()
 \end{code}
 
  %************************************************************************
