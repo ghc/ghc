@@ -48,10 +48,6 @@ import FastString
 import FastBool		( isFastTrue )
 import Constants	( wORD_SIZE )
 
-#ifdef DEBUG
-import Outputable	( assertPanic )
-import Debug.Trace	( trace )
-#endif
 import Debug.Trace	( trace )
 
 import Control.Monad	( mapAndUnzipM )
