@@ -65,6 +65,7 @@ import UniqSet
 import SrcLoc
 import DynFlags
 
+import Control.Monad
 import Data.List
 \end{code}
 
@@ -1905,12 +1906,9 @@ reduceList :: RedEnv -> [Inst] -> Avails -> TcM Avails
 reduceList env@(RedEnv {red_stack = (n,stk)}) wanteds state
   = do	{ traceTc (text "reduceList " <+> (ppr wanteds $$ ppr state))
 	; dopts <- getDOpts
-#ifdef DEBUG
-	; if n > 8 then
+	; when (debugIsOn && (n > 8)) $ do
 		dumpTcRn (hang (ptext SLIT("Interesting! Context reduction stack depth") <+> int n) 
 			     2 (ifPprDebug (nest 2 (pprStack stk))))
-	  else return ()
-#endif
 	; if n >= ctxtStkDepth dopts then
 	    failWithTc (reduceDepthErr n stk)
 	  else
@@ -2927,14 +2925,13 @@ report_no_instances tidy_env mb_what insts
 	| not (isClassDict wanted) = Left wanted
 	| otherwise
 	= case lookupInstEnv inst_envs clas tys of
+		([], _) -> Left wanted		-- No match
 		-- The case of exactly one match and no unifiers means a
 		-- successful lookup.  That can't happen here, because dicts
 		-- only end up here if they didn't match in Inst.lookupInst
-#ifdef DEBUG
-		([m],[]) -> pprPanic "reportNoInstance" (ppr wanted)
-#endif
-		([], _)  -> Left wanted		-- No match
-		res	 -> Right (mk_overlap_msg wanted res)
+		([m],[])
+		 | debugIsOn -> pprPanic "reportNoInstance" (ppr wanted)
+		res -> Right (mk_overlap_msg wanted res)
 	  where
 	    (clas,tys) = getDictClassTys wanted
 
