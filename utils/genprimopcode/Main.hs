@@ -408,7 +408,7 @@ gen_switch_from_attribs attrib_name fn_name (Info defaults entries)
             Nothing -> error ("gen_switch_from: " ++ attrib_name)
             Just xx 
                -> unlines alternatives
-                  ++ fn_name ++ " other = " ++ getAltRhs xx ++ "\n"
+                  ++ fn_name ++ " _ = " ++ getAltRhs xx ++ "\n"
 
 ------------------------------------------------------------------
 -- Create PrimOpInfo text from PrimOpSpecs -----------------------
