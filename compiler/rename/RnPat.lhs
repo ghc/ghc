@@ -612,6 +612,6 @@ bogusCharError c
   = ptext SLIT("character literal out of range: '\\") <> char c  <> char '\''
 
 badViewPat pat = vcat [ptext SLIT("Illegal view pattern: ") <+> ppr pat,
-                       ptext SLIT("Use -XViewPatterns to enalbe view patterns")]
+                       ptext SLIT("Use -XViewPatterns to enable view patterns")]
 
 \end{code}
