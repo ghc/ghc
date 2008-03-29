@@ -814,10 +814,8 @@ tcIfaceAlt _ _ (IfaceLitAlt lit, names, rhs)
 -- work them out.  True enough, but its not that easy!
 tcIfaceAlt scrut (tycon, inst_tys) (IfaceDataAlt data_occ, arg_strs, rhs)
   = do	{ con <- tcIfaceDataCon data_occ
-#ifdef DEBUG
-	; when (not (con `elem` tyConDataCons tycon))
+	; when (debugIsOn && not (con `elem` tyConDataCons tycon))
 	       (failIfM (ppr scrut $$ ppr con $$ ppr tycon $$ ppr (tyConDataCons tycon)))
-#endif
 	; tcIfaceDataAlt con inst_tys arg_strs rhs }
 		  
 tcIfaceAlt _ (tycon, inst_tys) (IfaceTupleAlt boxity, arg_occs, rhs)
