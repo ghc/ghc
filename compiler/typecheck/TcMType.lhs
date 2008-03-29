@@ -506,14 +506,12 @@ isFilledMetaTyVar tv
   | otherwise = return False
 
 writeMetaTyVar :: TcTyVar -> TcType -> TcM ()
-#ifndef DEBUG
-writeMetaTyVar tyvar ty = writeMutVar (metaTvRef tyvar) (Indirect ty)
-#else
+writeMetaTyVar tyvar ty
+  | not debugIsOn = writeMutVar (metaTvRef tyvar) (Indirect ty)
 writeMetaTyVar tyvar ty
   | not (isMetaTyVar tyvar)
   = pprTrace "writeMetaTyVar" (ppr tyvar) $
     return ()
-
   | otherwise
   = ASSERT( isMetaTyVar tyvar )
     -- TOM: It should also work for coercions
@@ -523,7 +521,6 @@ writeMetaTyVar tyvar ty
   where
     k1 = tyVarKind tyvar
     k2 = typeKind ty
-#endif
 \end{code}
 
 
