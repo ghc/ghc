@@ -39,6 +39,7 @@ import StaticFlags	( opt_RuntimeTypes )
 import Module
 import Outputable
 import MonadUtils
+import Util
 \end{code}
 
 %************************************************************************
@@ -636,16 +637,12 @@ coreToStgLet let_no_escape bind body = do
 
 	no_binder_escapes = isEmptyVarSet (set_of_binders `intersectVarSet` all_escs)
 
-#ifdef DEBUG
 	-- Debugging code as requested by Andrew Kennedy
 	checked_no_binder_escapes
-		| not no_binder_escapes && any is_join_var binders
+		| debugIsOn && not no_binder_escapes && any is_join_var binders
 		= pprTrace "Interesting!  A join var that isn't let-no-escaped" (ppr binders)
 		  False
 		| otherwise = no_binder_escapes
-#else
-	checked_no_binder_escapes = no_binder_escapes
-#endif
 			    
 		-- Mustn't depend on the passed-in let_no_escape flag, since
 		-- no_binder_escapes is used by the caller to derive the flag!
