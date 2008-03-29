@@ -41,6 +41,8 @@ import Util
 import FastString
 import OrdList
 import Outputable
+
+import Control.Monad
 \end{code}
 
 %************************************************************************
@@ -275,12 +277,10 @@ pushUpdateFrame :: CmmExpr -> Code -> Code
 
 pushUpdateFrame updatee code
   = do	{
-#ifdef DEBUG
-	  EndOfBlockInfo _ sequel <- getEndOfBlockInfo ;
-	  ASSERT(case sequel of { OnStack -> True; _ -> False})
-#endif
-
-	  allocStackTop (fixedHdrSize + 
+      when debugIsOn $ do
+    	{ EndOfBlockInfo _ sequel <- getEndOfBlockInfo ;
+    	; MASSERT(case sequel of { OnStack -> True; _ -> False}) }
+	; allocStackTop (fixedHdrSize + 
 			   sIZEOF_StgUpdateFrame_NoHdr `quot` wORD_SIZE)
 	; vsp <- getVirtSp
 	; setStackFrame vsp
