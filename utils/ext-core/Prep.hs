@@ -46,7 +46,7 @@ prepModule globalEnv (Module mn tdefs vdefgs) =
     prepExp (venv,tvenv) (Lam (Vb vb) e) = Lam (Vb vb) (prepExp (eextend venv vb,tvenv) e)
     prepExp (venv,tvenv) (Lam (Tb tb) e) = Lam (Tb tb) (prepExp (venv,eextend tvenv tb) e)
     prepExp env@(venv,tvenv) (Let (Nonrec(Vdef((Nothing,x),t,b))) e) 
-        | kindof tvenv t == Kunlifted && suspends b =
+        | kindof tvenv t `eqKind` Kunlifted && suspends b =
             -- There are two places where we call the typechecker, one of them
             -- here.
             -- We need to know the type of the let body in order to construct
@@ -86,7 +86,7 @@ prepModule globalEnv (Module mn tdefs vdefgs) =
 	  where g e (v,t) = Lam (Vb(v,t)) (App e (Var (unqual v)))
 
     rewindApp env e [] = e
-    rewindApp env@(venv,tvenv) e1 (Left e2:as) | kindof tvenv t == Kunlifted && suspends e2 =
+    rewindApp env@(venv,tvenv) e1 (Left e2:as) | kindof tvenv t `eqKind` Kunlifted && suspends e2 =
        -- This is the other place where we call the typechecker.
 	Case (prepExp env' e2) (v,t) (typeOfExp env rhs) [Adefault rhs]
         where rhs = (rewindApp env' (App e1 (Var (unqual v))) as)

@@ -2,10 +2,14 @@ A set of example programs for handling external core format.
 
 In particular, typechecker and interpreter give a precise semantics.
 
-All can be built using, e.g.,
+To build, run "make".
 
-happy -o Parser.hs Parser.y
-ghc --make -package text -fglasgow-exts  -o Driver Driver.hs
+To run the checker and interpreter (which currently aren't working anyway),
+you need to generate External Core for all the base, integer and ghc-prim
+libraries. This can be done by adding "-fext-core" to the GhcLibHcOpts in
+your build.mk file, then running "make" under libraries/.
+Then you need to edit Driver.hs and change "baseDir" to point to your GHC
+libraries directory.
 
-Most recently tested with GHC 6.8.1. I make no claims of portability. --tjc
+Most recently tested with GHC 6.8.2. I make no claims of portability. --tjc
 

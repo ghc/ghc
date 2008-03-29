@@ -37,6 +37,8 @@ instance Show Kind where
 instance Show Lit where
   showsPrec d l = shows (plit l)
 
+instance Show CoreLit where
+  showsPrec d l = shows (pclit l)
 
 indent = nest 2
 
@@ -46,16 +48,21 @@ pmodule (Module mname tdefs vdefgs) =
   (text "%module" <+> panmname mname)
   $$ indent ((vcat (map ((<> char ';') . ptdef) tdefs))
 	     $$ (vcat (map ((<> char ';') . pvdefg) vdefgs)))
+  <> (if ((not.null) tdefs) || ((not.null) vdefgs) then char '\n' else empty)
+         -- add final newline; sigh.
 
 ptdef (Data qtcon tbinds cdefs) =
   (text "%data" <+> pqname qtcon <+> (hsep (map ptbind tbinds)) <+> char '=')
   $$ indent (braces ((vcat (punctuate (char ';') (map pcdef cdefs)))))
 
-ptdef (Newtype qtcon tbinds tyopt ) =
-  text "%newtype" <+> pqname qtcon <+> (hsep (map ptbind tbinds)) <+> 
-	(case tyopt of
-           Just ty -> char '=' <+> pty ty 
-           Nothing -> empty)
+ptdef (Newtype qtcon tbinds (coercion,k) tyopt) =
+  text "%newtype" <+> pqname qtcon <+> (hsep (map ptbind tbinds))
+    $$ indent (axiomclause $$ repclause)
+       where axiomclause = char '^' <+> parens (pqname coercion <+> text "::"
+                                    <+> pkind k)
+	     repclause = case tyopt of
+                           Just ty -> char '=' <+> pty ty 
+                           Nothing -> empty
 
 pcdef (Constr qdcon tbinds tys)  =
   (pqname qdcon) <+> (sep [hsep (map pattbind tbinds),sep (map paty tys)])
@@ -67,7 +74,9 @@ pqname (m,id) = pmname m <> pname id
 -- be sure to print the '.' here so we don't print out
 -- ".foo" for unqualified foo...
 pmname Nothing = empty
-pmname (Just m) = panmname m <> char '.'
+-- Notice that we print the "^" here; this is so that
+-- "%module foo" doesn't get printed as "%module ^foo"
+pmname (Just m) = char '^' <> panmname m <> char '.'
 
 panmname p@(pkgName, parents, name) =
   let parentStrs = map pname parents in
@@ -98,6 +107,7 @@ pakind (Kopen) = char '?'
 pakind k = parens (pkind k)
 
 pkind (Karrow k1 k2) = parens (pakind k1 <> text "->" <> pkind k2)
+pkind (Keq t1 t2) = parens (parens (pty t1) <+> text ":=:" <+> parens (pty t2)) 
 pkind k = pakind k
 
 paty (Tvar n) = pname n
@@ -148,12 +158,13 @@ pappexp e as = fsep (paexp e : map pa as)
 
 pexp (Lam b e) = char '\\' <+> plamexp [b] e
 pexp (Let vd e) = (text "%let" <+> pvdefg vd) $$ (text "%in" <+> pexp e)
-pexp (Case e vb t alts) = sep [text "%case" <+> pty t <+> paexp e,
+pexp (Case e vb t alts) = sep [text "%case" <+> paty t <+> paexp e,
 			     text "%of" <+> pvbind vb]
 			$$ (indent (braces (vcat (punctuate (char ';') (map palt alts)))))
-pexp (Cast e t) = (text "%cast" <+> paty t) $$ pexp e
+pexp (Cast e t) = (text "%cast" <+> parens (pexp e)) $$ paty t
 pexp (Note s e) = (text "%note" <+> pstring s) $$ pexp e
-pexp (External n t) = (text "%extcall" <+> pstring n) $$ paty t
+-- TODO: ccall shouldn't really be there
+pexp (External n t) = (text "%external ccall" <+> pstring n) $$ paty t
 pexp e = pfexp e
 
 
@@ -171,19 +182,28 @@ palt (Adefault e) =
 	(text "%_ ->")
 	$$ indent (pexp e)
 
-plit (Lint i t) = parens (integer i <> text "::" <> pty t)
-plit (Lrational r t) = parens (text (show (fromRat r)) <>  text "::" <> pty t)
-plit (Lchar c t) = parens (text ("\'" ++ escape [c] ++ "\'") <> text "::" <> pty t)
-plit (Lstring s t) = parens (pstring s <> text "::" <> pty t)
+plit (Literal cl t) = parens (pclit cl <> text "::" <> pty t)
+
+pclit (Lint i) = integer i
+-- makes sure to print it out as n % d
+pclit (Lrational r) = text (show r)
+pclit (Lchar c) = text ("\'" ++ escape [c] ++ "\'")
+pclit (Lstring s) = pstring s
 
 pstring s = doubleQuotes(text (escape s))
 
+escape :: String -> String
 escape s = foldr f [] (map ord s)
     where 
-     f cv rest | (cv < 0x20 || cv > 0x7e || cv == 0x22 || cv == 0x27 || cv == 0x5c) = 
+     f cv rest
+	| cv > 0xFF = '\\':'x':hs ++ rest
+	| (cv < 0x20 || cv > 0x7e || cv == 0x22 || cv == 0x27 || cv == 0x5c) = 
 	 '\\':'x':h1:h0:rest
            where (q1,r1) = quotRem cv 16
 		 h1 = intToDigit q1
                  h0 = intToDigit r1
+		 hs = dropWhile (=='0') $ reverse $ mkHex cv
+		 mkHex 0 = ""
+		 mkHex cv = intToDigit r : mkHex q
+		    where (q,r) = quotRem cv 16
      f cv rest = (chr cv):rest
-

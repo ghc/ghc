@@ -81,7 +81,8 @@ checkTdef0 (tcenv,tsenv) tdef = ch tdef
 	       tcenv' <- extendM tcenv (c,k)
 	       return (tcenv',tsenv)
 	    where k = foldr Karrow Klifted (map snd tbs)
-	ch (Newtype (m,c) tbs rhs) = 
+        -- TODO
+	ch (Newtype (m,c) tbs axiom rhs) = 
 	    do mn <- getMname
                requireModulesEq m mn "newtype declaration" tdef False
 	       tcenv' <- extendM tcenv (c,k)
@@ -112,12 +113,13 @@ checkTdef tcenv cenv = ch
 				  (foldr tArrow
 					  (foldl Tapp (Tcon (Just mn,c))
 						 (map (Tvar . fst) utbs)) ts) tbs
-	 ch (tdef@(Newtype c tbs (Just t))) =  
+         -- TODO
+	 ch (tdef@(Newtype c tbs axiom (Just t))) =  
 	    do tvenv <- foldM extendM eempty tbs
 	       k <- checkTy (tcenv,tvenv) t
-	       require (k==Klifted) ("bad kind:\n" ++ show tdef) 
+	       require (k `eqKind` Klifted) ("bad kind:\n" ++ show tdef) 
 	       return cenv
-	 ch (tdef@(Newtype c tbs Nothing)) =
+	 ch (tdef@(Newtype c tbs axiom Nothing)) =
 	    {- should only occur for recursive Newtypes -}
 	    return cenv
 
@@ -147,7 +149,7 @@ checkVdefg top_level (tcenv,tsenv,tvenv,cenv) (e_venv,l_venv) vdefg =
 			    do mn <- getMname
                                requireModulesEq m mn "value definition" vdef True
 			       k <- checkTy (tcenv,tvenv) t
-			       require (k==Klifted) ("unlifted kind in:\n" ++ show vdef)
+			       require (k `eqKind` Klifted) ("unlifted kind in:\n" ++ show vdef)
 			       t' <- checkExp env' e
 			       requireM (equalTy tsenv t t') 
 					("declared type doesn't match expression type in:\n"  ++ show vdef ++ "\n" ++  
@@ -160,8 +162,8 @@ checkVdefg top_level (tcenv,tsenv,tvenv,cenv) (e_venv,l_venv) vdefg =
 	    do mn <- getMname
                requireModulesEq m mn "value definition" vdef True
 	       k <- checkTy (tcenv,tvenv) t 
-	       require (k /= Kopen) ("open kind in:\n" ++ show vdef)
-	       require ((not top_level) || (k /= Kunlifted)) ("top-level unlifted kind in:\n" ++ show vdef) 
+	       require (not (k `eqKind` Kopen)) ("open kind in:\n" ++ show vdef)
+	       require ((not top_level) || (not (k `eqKind` Kunlifted))) ("top-level unlifted kind in:\n" ++ show vdef) 
 	       t' <- checkExp (tcenv,tsenv,tvenv,cenv,e_venv,l_venv) e
 	       requireM (equalTy tsenv t t') 
 			("declared type doesn't match expression type in:\n" ++ show vdef  ++ "\n"  ++
@@ -199,7 +201,7 @@ checkExp (tcenv,tsenv,tvenv,cenv,e_venv,l_venv) = ch
 		 k' <- checkTy (tcenv,tvenv) t
 		 case t' of
 		   Tforall (tv,k) t0 ->
-		     do require (k' <= k) 
+		     do require (k' `subKindOf` k) 
 				("kind doesn't match at type application in:\n" ++ show e0 ++ "\n" ++
 				 "operator kind: " ++ show k ++ "\n" ++
 				 "operand kind: " ++ show k') 
@@ -301,7 +303,8 @@ checkAlt (env@(tcenv,tsenv,tvenv,cenv,e_venv,l_venv)) t0 = ch
 		 {- check existentials -}
 		 let (etvs,eks) = unzip etbs
 		 let (etvs',eks') = unzip etbs'
-		 require (eks == eks')  
+		 require (all (uncurry eqKind)
+                            (zip eks eks'))  
 			 ("existential kinds don't match in:\n" ++ show a0 ++ "\n" ++
 			  "kinds declared in data constructor: " ++ show eks ++
 			  "kinds declared in case alternative: " ++ show eks') 
@@ -350,7 +353,7 @@ checkTy (tcenv,tvenv) = ch
 	      k2 <- ch t2
 	      case k1 of
 		 Karrow k11 k12 ->
-		   do require (k2 <= k11) 
+		   do require (k2 `subKindOf` k11) 
 			     ("kinds don't match in type application: " ++ show t ++ "\n" ++
 			      "operator kind: " ++ show k11 ++ "\n" ++
 			      "operand kind: " ++ show k2) 		
@@ -408,21 +411,22 @@ qlookupM selector external_env local_env (m,k) =
 
 
 checkLit :: Lit -> CheckResult Ty
-checkLit lit =
+checkLit (Literal lit t) =
   case lit of
-    Lint _ t -> 
+      -- TODO: restore commented-out stuff.
+    Lint _ -> 
 	  do {- require (elem t [tIntzh, {- tInt32zh,tInt64zh, -} tWordzh, {- tWord32zh,tWord64zh, -} tAddrzh, tCharzh]) 
 		     ("invalid int literal: " ++ show lit ++ "\n" ++ "type: " ++ show t) -}
 	     return t
-    Lrational _ t ->
+    Lrational _ ->
 	  do {- require (elem t [tFloatzh,tDoublezh]) 
 		     ("invalid rational literal: " ++ show lit ++ "\n" ++ "type: " ++ show t) -}
 	     return t
-    Lchar _ t -> 
+    Lchar _ -> 
 	  do {- require (t == tCharzh) 
 		     ("invalid char literal: " ++ show lit ++ "\n" ++ "type: " ++ show t)  -}
 	     return t	
-    Lstring _ t ->
+    Lstring _ ->
 	  do {- require (t == tAddrzh) 
 		     ("invalid string literal: " ++ show lit ++ "\n" ++ "type: " ++ show t)  -}
 	     return t

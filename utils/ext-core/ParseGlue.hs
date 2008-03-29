@@ -64,7 +64,14 @@ data Token =
 -- ugh
 splitModuleName mn = 
    let decoded = zDecodeString mn
-       parts   = filter (notElem '.') $ groupBy 
+       -- Triple ugh.
+       -- We re-encode the individual parts so that:
+       -- main:Foo_Bar.Quux.baz
+       -- prints as:
+       -- main:FoozuBarziQuux.baz
+       -- and not:
+       -- main:Foo_BarziQuux.baz
+       parts   = map zEncodeString $ filter (notElem '.') $ groupBy 
                    (\ c1 c2 -> c1 /= '.' && c2 /= '.') 
                  decoded in
      (take (length parts - 1) parts, last parts)

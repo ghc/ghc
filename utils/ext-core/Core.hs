@@ -7,10 +7,13 @@ data Module
 
 data Tdef 
   = Data (Qual Tcon) [Tbind] [Cdef]
-  | Newtype (Qual Tcon) [Tbind] (Maybe Ty)
+  | Newtype (Qual Tcon) [Tbind] Axiom (Maybe Ty)
 
 data Cdef 
   = Constr (Qual Dcon) [Tbind] [Ty]
+
+-- Newtype coercion
+type Axiom = (Qual Tcon, Kind)
 
 data Vdefg 
   = Rec [Vdef]
@@ -22,15 +25,11 @@ data Exp
   = Var (Qual Var)
   | Dcon (Qual Dcon)
   | Lit Lit
--- Why were type apps and value apps distinguished,
--- but not type lambdas and value lambdas?
   | App Exp Exp
   | Appt Exp Ty
   | Lam Bind Exp 	  
   | Let Vdefg Exp
--- Ty is new
   | Case Exp Vbind Ty [Alt] {- non-empty list -}
--- Renamed to Cast; switched order
   | Cast Exp Ty
   | Note String Exp
   | External String Ty
@@ -58,24 +57,25 @@ data Kind
   | Kunlifted
   | Kopen
   | Karrow Kind Kind
-  deriving (Eq)
+  | Keq Ty Ty
 
-data Lit 
-  = Lint Integer Ty
-  | Lrational Rational Ty
-  | Lchar Char Ty
-  | Lstring String Ty
-  deriving (Eq)  -- with nearlyEqualTy 
+data Lit = Literal CoreLit Ty
+  deriving Eq   -- with nearlyEqualTy 
 
--- new: Pnames
--- this requires at least one module name,
--- and possibly other hierarchical names
--- an alternative would be to flatten the
+data CoreLit = Lint Integer
+  | Lrational Rational
+  | Lchar Char
+  | Lstring String 
+  deriving Eq
+
+-- Right now we represent module names as triples:
+-- (package name, hierarchical names, leaf name)
+-- An alternative to this would be to flatten the
 -- module namespace, either when printing out
 -- Core or (probably preferably) in a 
 -- preprocessor.
--- Maybe because the empty module name is a module name (represented as
--- Nothing.)
+-- The empty module name (as in an unqualified name)
+-- is represented as Nothing.
 
 type Mname = Maybe AnMname
 type AnMname = (Pname, [Id], Id)
@@ -95,6 +95,15 @@ unqual = (,) Nothing
 
 type Id = String
 
+eqKind :: Kind -> Kind -> Bool
+eqKind Klifted Klifted = True
+eqKind Kunlifted Kunlifted = True
+eqKind Kopen Kopen = True
+eqKind (Karrow k1 k2) (Karrow l1 l2) = k1 `eqKind` l1
+                                   &&  k2 `eqKind` l2
+eqKind _ _ = False -- no Keq kind is ever equal to any other...
+                   -- maybe ok for now?
+
 --- tjc: I haven't looked at the rest of this file. ---
 
 {- Doesn't expand out fully applied newtype synonyms
@@ -109,16 +118,14 @@ nearlyEqualTy t1 t2 =  eqTy [] [] t1 t2
         eqTy e1 e2 (Tapp t1a t1b) (Tapp t2a t2b) =
 	      eqTy e1 e2 t1a t2a && eqTy e1 e2 t1b t2b
         eqTy e1 e2 (Tforall (tv1,tk1) t1) (Tforall (tv2,tk2) t2) =
-	      tk1 == tk2 && eqTy (tv1:e1) (tv2:e2) t1 t2 
+	      tk1 `eqKind` tk2 && eqTy (tv1:e1) (tv2:e2) t1 t2 
 	eqTy _ _ _ _ = False
 instance Eq Ty where (==) = nearlyEqualTy
 
 
 subKindOf :: Kind -> Kind -> Bool
 _ `subKindOf` Kopen = True
-k1 `subKindOf` k2 = k1 == k2  -- doesn't worry about higher kinds
-
-instance Ord Kind where (<=) = subKindOf
+k1 `subKindOf` k2 = k1 `eqKind` k2  -- doesn't worry about higher kinds
 
 baseKind :: Kind -> Bool
 baseKind (Karrow _ _ ) = False

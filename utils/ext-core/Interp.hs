@@ -1,3 +1,4 @@
+{-# OPTIONS -XPatternGuards #-}
 {- 
 Interprets the subset of well-typed Core programs for which
 	(a) All constructor and primop applications are saturated
@@ -400,16 +401,16 @@ evalExternal :: String -> [Value] -> Eval Value
 evalExternal s vs = error "evalExternal undefined for now"  -- etc.,etc.
     
 evalLit :: Lit -> PrimValue
-evalLit l = 
+evalLit (Literal l t) = 
     case l of
-      Lint i (Tcon(_,"Intzh")) -> PIntzh i
-      Lint i (Tcon(_,"Wordzh")) -> PWordzh i
-      Lint i (Tcon(_,"Addrzh")) -> PAddrzh i
-      Lint i (Tcon(_,"Charzh")) -> PCharzh i
-      Lrational r (Tcon(_,"Floatzh")) -> PFloatzh r
-      Lrational r (Tcon(_,"Doublezh")) -> PDoublezh r
-      Lchar c (Tcon(_,"Charzh")) -> PCharzh (toEnum (ord c))
-      Lstring s (Tcon(_,"Addrzh")) -> PAddrzh 0	 -- should really be address of non-heap copy of C-format string s
+      Lint i | (Tcon(_,"Intzh")) <- t -> PIntzh i
+      Lint i | (Tcon(_,"Wordzh")) <- t -> PWordzh i
+      Lint i | (Tcon(_,"Addrzh")) <- t -> PAddrzh i
+      Lint i | (Tcon(_,"Charzh"))<- t -> PCharzh i
+      Lrational r | (Tcon(_,"Floatzh"))  <- t -> PFloatzh r
+      Lrational r | (Tcon(_,"Doublezh")) <- t -> PDoublezh r
+      Lchar c | (Tcon(_,"Charzh")) <- t       -> PCharzh (toEnum (ord c))
+      Lstring s | (Tcon(_,"Addrzh")) <- t     -> PAddrzh 0	 -- should really be address of non-heap copy of C-format string s
 
 {- Utilities -}
 

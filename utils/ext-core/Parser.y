@@ -175,7 +175,9 @@ exp	:: { Exp }
 		{ Let $2 $4 }
 	| '%case' '(' ty ')' aexp '%of' vbind '{' alts1 '}'
 		{ Case $5 $7 $3 $9 }
-	| '%cast' exp aty 
+-- Note: ty, not aty! You can cast something to a forall type
+-- Though now we have shift/reduce conflicts like woah
+	| '%cast' exp ty
 		{ Cast $2 $3 }
 	| '%note' STRING exp 
 		{ Note $2 $3 }
@@ -232,6 +234,12 @@ mnames :: { [Id] }
 -- it sucks to have to repeat the Maybe-checking twice,
 -- but otherwise we get reduce/reduce conflicts
 
+-- TODO: this is the ambiguity here. mname '.' name --
+-- but by maximal-munch, in GHC.Base.Bool the entire 
+-- thing gets counted as the module name. What to do,
+-- besides z-encoding the dots in the hierarchy again?
+-- (Or using syntax other than a dot to separate the
+-- module name from the variable name...)
 qname	:: { (Mname,Id) }
         : name { (Nothing, $1) }
 	| mname '.' name 
