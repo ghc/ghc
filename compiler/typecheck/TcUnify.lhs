@@ -1488,17 +1488,17 @@ uMetaVar outer swapped tv1 BoxTv ref1 ps_ty2 non_var_ty2
 	-- 
 	-- It should not be the case that tv1 occurs in ty2
 	-- (i.e. no occurs check should be needed), but if perchance
-	-- it does, the unbox operation will fill it, and the DEBUG
+	-- it does, the unbox operation will fill it, and the debug code
 	-- checks for that.
-    do 	{ final_ty <- unBox ps_ty2
-#ifdef DEBUG
-	; meta_details <- readMutVar ref1
-	; case meta_details of
-	    Indirect ty -> WARN( True, ppr tv1 <+> ppr ty )
-			   return ()	-- This really should *not* happen
-	    Flexi -> return ()
-#endif
-	; checkUpdateMeta swapped tv1 ref1 final_ty
+    do { final_ty <- unBox ps_ty2
+       ; when debugIsOn $ do
+           { meta_details <- readMutVar ref1
+           ; case meta_details of
+                 Indirect ty -> WARN( True, ppr tv1 <+> ppr ty )
+                                return () -- This really should *not* happen
+                 Flexi -> return ()
+           }
+        ; checkUpdateMeta swapped tv1 ref1 final_ty
         ; return IdCo
         }
 
