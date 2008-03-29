@@ -1108,12 +1108,9 @@ pprStats code statss
 -- -----------------------------------------------------------------------------
 -- Utils
 
-#ifdef DEBUG
-my_fromJust s p Nothing  = pprPanic ("fromJust: " ++ s) p
+my_fromJust :: String -> SDoc -> Maybe a -> a
 my_fromJust _ _ (Just x) = x
-#else
-my_fromJust _ _ = fromJust
-#endif
+my_fromJust s p Nothing = pprPanic ("fromJust: " ++ s) p
 
 lookItUp :: Uniquable b => String -> UniqFM a -> b -> a
 lookItUp str fm x = my_fromJust str (ppr (getUnique x)) (lookupUFM fm x)
