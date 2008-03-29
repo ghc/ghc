@@ -57,7 +57,9 @@ import StaticFlags
 import Outputable
 import BinIface
 import Panic
+import Util
 
+import Control.Monad
 import Data.List
 import Data.Maybe
 import Data.IORef
@@ -114,14 +116,14 @@ loadOrphanModules mods isFamInstMod
 -- | Loads the interface for a given Name.
 loadInterfaceForName :: SDoc -> Name -> TcRn ModIface
 loadInterfaceForName doc name
-  = do	{ 
-#ifdef DEBUG
-		-- Should not be called with a name from the module being compiled
-	  this_mod <- getModule
-	; ASSERT2( not (nameIsLocalOrFrom this_mod name), ppr name <+> parens doc )
-#endif
-	  initIfaceTcRn $ loadSysInterface doc (nameModule name)
-    }
+  = do { 
+    when debugIsOn $ do
+        -- Should not be called with a name from the module being compiled
+        { this_mod <- getModule
+        ; MASSERT2( not (nameIsLocalOrFrom this_mod name), ppr name <+> parens doc )
+        }
+  ; initIfaceTcRn $ loadSysInterface doc (nameModule name)
+  }
 
 -- | An 'IfM' function to load the home interface for a wired-in thing,
 -- so that we're sure that we see its instance declarations and rules
