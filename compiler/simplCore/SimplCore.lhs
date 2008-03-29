@@ -57,10 +57,12 @@ import StrictAnal	( saBinds )
 import CprAnalyse       ( cprAnalyse )
 #endif
 import Vectorise        ( vectorise )
+import Util
 
 import UniqSupply	( UniqSupply, mkSplitUniqSupply, splitUniqSupply )
 import IO		( hPutStr, stderr )
 import Outputable
+import Control.Monad
 import List		( partition, intersperse )
 import Maybes
 \end{code}
@@ -479,17 +481,13 @@ simplifyPgm mode switches hsc_env us imp_rule_base guts
 	-- about to begin, with '1' for the first
       | iteration_no > max_iterations	-- Stop if we've run out of iterations
       = do {
-#ifdef DEBUG
-	    if  max_iterations > 2 then
-		hPutStr stderr ("NOTE: Simplifier still going after " ++ 
+	    when (debugIsOn && (max_iterations > 2)) $
+		    hPutStr stderr ("NOTE: Simplifier still going after " ++ 
 				show max_iterations ++ 
 			    	" iterations; bailing out.  Size = " ++ show (coreBindsSize binds) ++ "\n" )
-	    else 
-		return ();
-#endif
 		-- Subtract 1 from iteration_no to get the
 		-- number of iterations we actually completed
-	    return ("Simplifier bailed out", iteration_no - 1, counts, binds)
+	    ; return ("Simplifier bailed out", iteration_no - 1, counts, binds)
 	}
 
       -- Try and force thunks off the binds; significantly reduces
