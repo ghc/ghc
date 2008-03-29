@@ -1240,7 +1240,7 @@ primop  CatchOp "catch#" GenPrimOp
 primop  RaiseOp "raise#" GenPrimOp
    a -> b
    with
-   strictness  = { \ arity -> mkStrictSig (mkTopDmdType [lazyDmd] BotRes) }
+   strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [lazyDmd] BotRes) }
       -- NB: result is bottom
    out_of_line = True
 
@@ -1660,7 +1660,7 @@ section "Tag to enum stuff"
 primop  DataToTagOp "dataToTag#" GenPrimOp
    a -> Int#
    with
-   strictness  = { \ arity -> mkStrictSig (mkTopDmdType [seqDmd] TopRes) }
+   strictness  = { \ _arity -> mkStrictSig (mkTopDmdType [seqDmd] TopRes) }
 	-- dataToTag# must have an evaluated argument
 
 primop  TagToEnumOp "tagToEnum#" GenPrimOp     
