@@ -4,7 +4,7 @@
 \section[PrimOp]{Primitive operations (machine-level)}
 
 \begin{code}
-{-# OPTIONS -w #-}
+{-# OPTIONS -fno-warn-unused-binds #-}
 -- The above warning supression flag is a temporary kludge.
 -- While working on this module you are encouraged to remove it and fix
 -- any warnings in the module. See
@@ -39,6 +39,7 @@ import BasicTypes	( Arity, Boxity(..) )
 import Unique		( Unique, mkPrimOpIdUnique )
 import Outputable
 import FastTypes
+import FastString
 \end{code}
 
 %************************************************************************
@@ -130,9 +131,12 @@ data PrimOpInfo
 		[Type] 
 		Type 
 
+mkDyadic, mkMonadic, mkCompare :: FastString -> Type -> PrimOpInfo
 mkDyadic str  ty = Dyadic  (mkVarOccFS str) ty
 mkMonadic str ty = Monadic (mkVarOccFS str) ty
 mkCompare str ty = Compare (mkVarOccFS str) ty
+
+mkGenPrimOp :: FastString -> [TyVar] -> [Type] -> Type -> PrimOpInfo
 mkGenPrimOp str tvs tys ty = GenPrimOp (mkVarOccFS str) tvs tys ty
 \end{code}
 
@@ -464,6 +468,7 @@ commutableOp :: PrimOp -> Bool
 
 Utils:
 \begin{code}
+dyadic_fun_ty, monadic_fun_ty, compare_fun_ty :: Type -> Type
 dyadic_fun_ty  ty = mkFunTys [ty, ty] ty
 monadic_fun_ty ty = mkFunTy  ty ty
 compare_fun_ty ty = mkFunTys [ty, ty] boolTy

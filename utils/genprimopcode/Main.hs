@@ -376,12 +376,14 @@ gen_primop_list (Info _ entries)
 
 gen_primop_tag :: Info -> String
 gen_primop_tag (Info _ entries)
-   = unlines (max_def : zipWith f primop_entries [1 :: Int ..])
+   = unlines (max_def_type : max_def :
+              tagOf_type : zipWith f primop_entries [1 :: Int ..])
      where
-	primop_entries = filter is_primop entries
-        f i n = "tagOf_PrimOp " ++ cons i 
-                ++ " = _ILIT(" ++ show n ++ ") :: FastInt"
-	max_def = "maxPrimOpTag = " ++ show (length primop_entries) ++ " :: Int"
+        primop_entries = filter is_primop entries
+        tagOf_type = "tagOf_PrimOp :: PrimOp -> FastInt"
+        f i n = "tagOf_PrimOp " ++ cons i ++ " = _ILIT(" ++ show n ++ ")"
+        max_def_type = "maxPrimOpTag :: Int"
+        max_def      = "maxPrimOpTag = " ++ show (length primop_entries)
 
 gen_data_decl :: Info -> String
 gen_data_decl (Info _ entries)
