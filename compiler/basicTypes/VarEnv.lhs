@@ -45,6 +45,7 @@ import Util
 import Maybes
 import Outputable
 import FastTypes
+import StaticFlags
 \end{code}
 
 
@@ -130,16 +131,12 @@ uniqAway' (InScope set n) var
   where
     orig_unique = getUnique var
     try k 
-#ifdef DEBUG
-	  | k ># _ILIT(1000)
+	  | debugIsOn && (k ># _ILIT(1000))
 	  = pprPanic "uniqAway loop:" (ppr (iBox k) <+> text "tries" <+> ppr var <+> int (iBox n)) 
-#endif			    
 	  | uniq `elemVarSetByKey` set = try (k +# _ILIT(1))
-#ifdef DEBUG
-	  | opt_PprStyle_Debug && k ># _ILIT(3)
+	  | debugIsOn && opt_PprStyle_Debug && (k ># _ILIT(3))
 	  = pprTrace "uniqAway:" (ppr (iBox k) <+> text "tries" <+> ppr var <+> int (iBox n)) 
 	    setVarUnique var uniq
-#endif			    
 	  | otherwise = setVarUnique var uniq
 	  where
 	    uniq = deriveUnique orig_unique (iBox (n *# k))
