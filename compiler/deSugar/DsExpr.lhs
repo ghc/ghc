@@ -505,10 +505,8 @@ dsExpr (HsBinTick ixT ixF e) = do
 
 \begin{code}
 
-#ifdef DEBUG
 -- HsSyn constructs that just shouldn't be here:
 dsExpr (ExprWithTySig _ _)  = panic "dsExpr:ExprWithTySig"
-#endif
 
 
 findField :: [HsRecField Id arg] -> Name -> [arg]
