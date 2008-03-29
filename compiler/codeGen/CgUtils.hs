@@ -543,10 +543,8 @@ baseRegOffset CurrentNursery	  = oFFSET_StgRegTable_rCurrentNursery
 baseRegOffset HpAlloc		  = oFFSET_StgRegTable_rHpAlloc
 baseRegOffset GCEnter1		  = oFFSET_stgGCEnter1
 baseRegOffset GCFun		  = oFFSET_stgGCFun
-#ifdef DEBUG
 baseRegOffset BaseReg		  = panic "baseRegOffset:BaseReg"
 baseRegOffset _			  = panic "baseRegOffset:other"
-#endif
 
 
 -------------------------------------------------------------------------
