@@ -268,8 +268,7 @@ findBest target (rule,ans)   [] = (rule,ans)
 findBest target (rule1,ans1) ((rule2,ans2):prs)
   | rule1 `isMoreSpecific` rule2 = findBest target (rule1,ans1) prs
   | rule2 `isMoreSpecific` rule1 = findBest target (rule2,ans2) prs
-#ifdef DEBUG
-  | otherwise = let pp_rule rule 
+  | debugIsOn = let pp_rule rule
 			| opt_PprStyle_Debug = ppr rule
 			| otherwise          = doubleQuotes (ftext (ru_name rule))
 		in pprTrace "Rules.findBest: rule overlap (Rule 1 wins)"
@@ -279,9 +278,7 @@ findBest target (rule1,ans1) ((rule2,ans2):prs)
 				ptext SLIT("Rule 1:") <+> pp_rule rule1, 
 				ptext SLIT("Rule 2:") <+> pp_rule rule2]) $
 		findBest target (rule1,ans1) prs
-#else
   | otherwise = findBest target (rule1,ans1) prs
-#endif
   where
     (fn,args) = target
 
