@@ -27,9 +27,7 @@ import VarEnv
 import Maybes		( orElse, expectJust )
 import Bitmap
 
-#ifdef DEBUG
 import Outputable
-#endif
 
 import List
 
@@ -143,9 +141,7 @@ srtExpr table (StgLetNoEscape live1 live2 bind body)
     srtExpr table body		   =: \ body' ->
     StgLetNoEscape live1 live2 bind' body'
 
-#ifdef DEBUG
 srtExpr _table expr = pprPanic "srtExpr" (ppr expr)
-#endif
 
 srtAlt :: IdEnv Int -> StgAlt -> StgAlt
 srtAlt table (con,args,used,rhs)
