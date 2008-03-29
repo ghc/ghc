@@ -32,6 +32,8 @@ import StaticFlags
 import IO
 import FastString
 
+import Data.Char
+
 emitExternalCore :: DynFlags -> NameSet -> CgGuts -> IO ()
 emitExternalCore dflags exports cg_guts
  | opt_EmitExternalCore 
@@ -160,7 +162,12 @@ make_alt a@(DEFAULT,_ ,_) = pprPanic ("MkExternalCore: make_alt: DEFAULT "
 make_lit :: Literal -> C.Lit
 make_lit l = 
   case l of
-    MachChar i -> C.Lchar i t
+    -- Note that we need to check whether the character is "big".
+    -- External Core only allows character literals up to '\xff'.
+    MachChar i | i <= chr 0xff -> C.Lchar i t
+    -- For a character bigger than 0xff, we represent it in ext-core
+    -- as an int lit with a char type.
+    MachChar i             -> C.Lint (fromIntegral $ ord i) t 
     MachStr s -> C.Lstring (unpackFS s) t
     MachNullAddr -> C.Lint 0 t
     MachInt i -> C.Lint i t
