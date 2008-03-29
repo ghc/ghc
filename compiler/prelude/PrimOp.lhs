@@ -286,12 +286,6 @@ These primops are pretty wierd.
 The constraints aren't currently checked by the front end, but the
 code generator will fall over if they aren't satisfied.
 
-\begin{code}
-#ifdef DEBUG
-primOpInfo op = pprPanic "primOpInfo:" (ppr op)
-#endif
-\end{code}
-
 %************************************************************************
 %*									*
 \subsubsection[PrimOp-ool]{Which PrimOps are out-of-line}
