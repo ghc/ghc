@@ -61,6 +61,7 @@ import Unique
 import Panic
 import UniqFM
 import FastMutInt
+import Util
 
 import Foreign
 import Data.Array.IO
@@ -234,9 +235,8 @@ expandBin (BinMem _ _ sz_r arr_r) off = do
              | i <- [ 0 .. sz-1 ] ]
    writeFastMutInt sz_r sz'
    writeIORef arr_r arr'
-#ifdef DEBUG
-   hPutStrLn stderr ("Binary: expanding to size: " ++ show sz')
-#endif
+   when debugIsOn $
+      hPutStrLn stderr ("Binary: expanding to size: " ++ show sz')
    return ()
 expandBin (BinIO _ _ _) _ = return ()
 -- no need to expand a file, we'll assume they expand by themselves.
