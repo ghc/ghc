@@ -6,6 +6,7 @@
 
 \begin{code}
 module Util (
+        debugIsOn,
 
         -- general list processing
         zipEqual, zipWithEqual, zipWith3Equal, zipWith4Equal,
@@ -103,6 +104,21 @@ import Data.Ratio       ( (%) )
 import System.Time      ( ClockTime )
 
 infixr 9 `thenCmp`
+\end{code}
+
+%************************************************************************
+%*                                                                      *
+\subsection{-DDEBUG}
+%*                                                                      *
+%************************************************************************
+
+\begin{code}
+debugIsOn :: Bool
+#ifdef DEBUG
+debugIsOn = True
+#else
+debugIsOn = False
+#endif
 \end{code}
 
 %************************************************************************

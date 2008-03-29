@@ -15,6 +15,7 @@ import Outputable
 import Unique
 import UniqFM
 import UniqSupply
+import Util
 
 import Prelude hiding (zip, unzip, last)
 

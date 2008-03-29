@@ -28,6 +28,7 @@ import MachOp
 import qualified ZipDataflow0 as DF
 import ZipCfg 
 import MkZipCfg
+import Util
 
 import Maybes
 import Outputable
