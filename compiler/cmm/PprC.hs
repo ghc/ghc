@@ -54,11 +54,6 @@ import Data.Char
 import System.IO
 import Data.Word
 
-#ifdef DEBUG
-import PprCmm		() -- instances only
--- import Debug.Trace
-#endif
-
 import Data.Array.ST
 import Control.Monad.ST
 
