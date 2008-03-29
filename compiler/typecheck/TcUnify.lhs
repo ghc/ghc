@@ -904,12 +904,13 @@ tcGen expected_ty extra_tvs thing_inside	-- We expect expected_ty to be a forall
 		   ; let skol_info = GenSkol forall_tvs (mkPhiTy theta rho_ty)
 		   ; return ((forall_tvs, theta, rho_ty), skol_info) })
 
-#ifdef DEBUG
-	; traceTc (text "tcGen" <+> vcat [text "extra_tvs" <+> ppr extra_tvs,
-				    text "expected_ty" <+> ppr expected_ty,
-				    text "inst ty" <+> ppr tvs' <+> ppr theta' <+> ppr rho',
-				    text "free_tvs" <+> ppr free_tvs])
-#endif
+        ; when debugIsOn $
+              traceTc (text "tcGen" <+> vcat [
+                           text "extra_tvs" <+> ppr extra_tvs,
+                           text "expected_ty" <+> ppr expected_ty,
+                           text "inst ty" <+> ppr tvs' <+> ppr theta'
+                               <+> ppr rho',
+                           text "free_tvs" <+> ppr free_tvs])
 
 	-- Type-check the arg and unify with poly type
 	; (result, lie) <- getLIE (thing_inside tvs' rho')
