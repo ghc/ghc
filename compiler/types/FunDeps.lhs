@@ -27,6 +27,8 @@ import VarSet
 import VarEnv
 import Outputable
 import Util
+import FastString
+
 import Data.Maybe	( isJust )
 \end{code}
 

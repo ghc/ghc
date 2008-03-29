@@ -53,6 +53,7 @@ import MachOp
 import StaticFlags
 import Constants
 import Outputable
+import FastString
 
 import Data.Word
 \end{code}

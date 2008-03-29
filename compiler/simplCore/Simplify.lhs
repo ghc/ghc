@@ -34,6 +34,7 @@ import BasicTypes       ( TopLevelFlag(..), isTopLevel,
 import Maybes           ( orElse )
 import Data.List        ( mapAccumL )
 import Outputable
+import FastString
 \end{code}
 
 

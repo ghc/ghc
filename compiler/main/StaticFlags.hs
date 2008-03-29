@@ -75,7 +75,7 @@ module StaticFlags (
 
 import CmdLineParser
 import Config
-import FastString	( FastString, mkFastString )
+import FastString
 import Util
 import Maybes		( firstJust )
 import Panic

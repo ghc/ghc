@@ -46,6 +46,7 @@ import SrcLoc
 import Util
 import ListSetOps
 import Outputable
+import FastString
 import Bag
 \end{code}
 

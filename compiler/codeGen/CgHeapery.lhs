@@ -52,6 +52,7 @@ import Util
 import Constants
 import PackageConfig
 import Outputable
+import FastString
 
 import Data.List
 \end{code}

@@ -27,6 +27,7 @@ import Name
 import BasicTypes
 import Unique
 import Outputable
+import FastString
 \end{code}
 
 %************************************************************************

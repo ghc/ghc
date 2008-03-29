@@ -90,6 +90,7 @@ module MachOp 	(
 
 import Constants
 import Outputable
+import FastString
 
 -- -----------------------------------------------------------------------------
 -- MachRep

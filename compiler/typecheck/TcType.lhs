@@ -165,6 +165,7 @@ import Util
 import Maybes
 import ListSetOps
 import Outputable
+import FastString
 
 import Data.List
 import Data.IORef

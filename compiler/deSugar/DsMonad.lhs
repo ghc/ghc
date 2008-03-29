@@ -59,6 +59,7 @@ import OccName
 import DynFlags
 import ErrUtils
 import MonadUtils
+import FastString
 
 import Data.IORef
 \end{code}

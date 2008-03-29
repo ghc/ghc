@@ -101,6 +101,7 @@ import UniqFM
 import UniqSupply
 import Outputable
 import State
+import FastString
 
 import Data.Maybe
 import Data.List

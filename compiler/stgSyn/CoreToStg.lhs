@@ -39,6 +39,7 @@ import StaticFlags	( opt_RuntimeTypes )
 import Module
 import Outputable
 import MonadUtils
+import FastString
 import Util
 \end{code}
 

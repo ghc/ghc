@@ -574,5 +574,3 @@ isComparisonExpr _other 	    = False
 isPicReg (CmmReg (CmmGlobal PicBaseReg)) = True
 isPicReg _ = False
 
-_unused :: FS.FastString -- stops a warning
-_unused = undefined

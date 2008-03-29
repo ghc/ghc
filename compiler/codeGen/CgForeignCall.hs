@@ -43,6 +43,7 @@ import ClosureInfo
 import Constants
 import StaticFlags
 import Outputable
+import FastString
 
 import Control.Monad
 

@@ -39,7 +39,6 @@ module FastTypes (
     FastPtr, pBox, pUnbox, castFastPtr
   ) where
 
-#define COMPILING_FAST_STRING
 #include "HsVersions.h"
 
 #if defined(__GLASGOW_HASKELL__)

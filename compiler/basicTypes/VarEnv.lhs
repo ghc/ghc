@@ -46,6 +46,7 @@ import Maybes
 import Outputable
 import FastTypes
 import StaticFlags
+import FastString
 \end{code}
 
 

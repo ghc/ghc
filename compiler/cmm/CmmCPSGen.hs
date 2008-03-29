@@ -33,6 +33,7 @@ import StaticFlags
 import Unique
 import Maybe
 import List
+import FastString
 
 import Panic
 

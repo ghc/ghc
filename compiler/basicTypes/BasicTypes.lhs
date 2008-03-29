@@ -58,7 +58,7 @@ module BasicTypes(
 
 #include "HsVersions.h"
 
-import FastString( FastString )
+import FastString
 import Outputable
 \end{code}
 

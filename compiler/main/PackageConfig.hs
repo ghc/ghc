@@ -22,10 +22,6 @@ import Distribution.Package
 import Distribution.Version
 import Distribution.Compat.ReadP ( readP_to_S )
 
--- warning suppression
-_unused :: FS.FastString
-_unused = FSLIT("")
-
 -- -----------------------------------------------------------------------------
 -- Our PackageConfig type is just InstalledPackageInfo from Cabal.  Later we
 -- might need to extend it with some GHC-specific stuff, but for now it's fine.

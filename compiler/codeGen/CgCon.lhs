@@ -52,6 +52,7 @@ import PrelInfo
 import Outputable
 import ListSetOps
 import Util
+import FastString
 \end{code}
 
 

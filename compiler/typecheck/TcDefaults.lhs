@@ -29,6 +29,7 @@ import DynFlags
 import SrcLoc
 import Maybe
 import Outputable
+import FastString
 \end{code}
 
 \begin{code}

@@ -53,6 +53,7 @@ import BasicTypes
 import SrcLoc
 import UniqSupply
 import Outputable
+import FastString
 
 import Control.Monad
 \end{code}

@@ -49,6 +49,7 @@ import NameEnv
 import LazyUniqFM
 import OccName 
 import Outputable
+import FastString
 import SrcLoc		( Located(..), unLoc, noLoc )
 import DynFlags	( DynFlag(..) )
 import Maybe            ( isNothing )

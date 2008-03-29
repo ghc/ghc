@@ -48,6 +48,7 @@ import Type
 import PrelNames
 import Bag
 import FastTypes
+import FastString
 import Outputable
 
 \end{code}

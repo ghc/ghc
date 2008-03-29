@@ -31,6 +31,7 @@ import SetLevels	( Level(..), LevelledExpr, LevelledBind,
 import UniqSupply       ( UniqSupply )
 import List		( partition )
 import Outputable
+import FastString
 \end{code}
 
 	-----------------

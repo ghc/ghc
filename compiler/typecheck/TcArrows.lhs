@@ -40,6 +40,7 @@ import Type
 
 import SrcLoc
 import Outputable
+import FastString
 import Util
 
 import Control.Monad

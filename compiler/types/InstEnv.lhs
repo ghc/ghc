@@ -33,6 +33,7 @@ import Outputable
 import BasicTypes
 import UniqFM
 import Id
+import FastString
 
 import Data.Maybe	( isJust, isNothing )
 \end{code}

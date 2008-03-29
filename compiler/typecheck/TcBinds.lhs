@@ -56,6 +56,7 @@ import List
 import Util
 import BasicTypes
 import Outputable
+import FastString
 
 import Control.Monad
 \end{code}

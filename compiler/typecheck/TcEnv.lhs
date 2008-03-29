@@ -81,6 +81,7 @@ import HscTypes
 import SrcLoc
 import Outputable
 import Maybes
+import FastString
 \end{code}
 
 

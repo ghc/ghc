@@ -34,6 +34,7 @@ import TyCon            ( isAlgTyCon, isNewTyCon, tyConDataCons )
 import Util             ( zipEqual, equalLength )
 import SrcLoc           ( srcLocSpan )
 import Outputable
+import FastString
 import Control.Monad
 \end{code}
 

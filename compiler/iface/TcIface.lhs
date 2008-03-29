@@ -58,8 +58,9 @@ import Maybes
 import SrcLoc
 import DynFlags
 import Util
-import Control.Monad
+import FastString
 
+import Control.Monad
 import Data.List
 import Data.Maybe
 \end{code}

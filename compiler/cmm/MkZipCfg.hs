@@ -360,5 +360,3 @@ Emitting a Branch at this point is fine:
 freshBlockId :: String -> UniqSM BlockId
 freshBlockId _ = do { u <- getUniqueUs; return $ BlockId u }
 
-_unused :: FS.FastString
-_unused = undefined

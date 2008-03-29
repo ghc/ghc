@@ -27,6 +27,7 @@ import TcType
 import Var
 import Name
 import Outputable
+import FastString
 
 -- -----------------------------------------------------------------------------
 -- Pretty-printing entities that we get from the GHC API

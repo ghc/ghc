@@ -39,6 +39,7 @@ import StaticFlags
 import ListSetOps
 import DynFlags
 import Outputable
+import FastString
 import Util
 import Data.Maybe
 \end{code}

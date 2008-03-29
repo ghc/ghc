@@ -60,7 +60,7 @@ module Inst (
 import {-# SOURCE #-}	TcExpr( tcPolyExpr )
 import {-# SOURCE #-}	TcUnify( boxyUnify, unifyType )
 
-import FastString(FastString)
+import FastString
 import HsSyn
 import TcHsSyn
 import TcRnMonad

@@ -51,6 +51,7 @@ import SrcLoc
 import ListSetOps
 import Digraph
 import DynFlags
+import FastString
 
 import Data.List
 import Control.Monad    ( mplus )

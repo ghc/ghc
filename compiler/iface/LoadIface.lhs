@@ -58,6 +58,7 @@ import Outputable
 import BinIface
 import Panic
 import Util
+import FastString
 
 import Control.Monad
 import Data.List

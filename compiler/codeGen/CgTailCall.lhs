@@ -474,8 +474,3 @@ adjustSpAndHp newRealSp
 	}
 \end{code}
 
-Some things are unused.
-\begin{code}
-_unused :: FS.FastString
-_unused = undefined
-\end{code}

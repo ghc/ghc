@@ -266,6 +266,7 @@ import BasicTypes
 import Maybes		( expectJust, mapCatMaybes )
 import HaddockParse
 import HaddockLex       ( tokenise )
+import FastString
 
 import Control.Concurrent
 import System.Directory ( getModificationTime, doesFileExist,

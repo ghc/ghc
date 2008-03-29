@@ -45,9 +45,6 @@ import FastBool hiding ( fastOr )
 import Data.List	( partition )
 import Data.Maybe	( isJust )
 import Data.IORef	( IORef, readIORef, writeIORef )
-
-_dummy :: FS.FastString
-_dummy = FSLIT("")
 \end{code}
 
 

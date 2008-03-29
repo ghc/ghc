@@ -23,6 +23,7 @@ import StaticFlags	( opt_PprStyle_Debug )
 import BasicTypes	( isAlwaysActive )
 import Util		( lengthExceeds )
 import UniqFM
+import FastString
 
 import Data.List
 \end{code}

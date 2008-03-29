@@ -43,6 +43,7 @@ import Maybes
 import Util
 import Name
 import Outputable
+import FastString
 \end{code}
 
 This function is a wrapper of @match@, it must be called from all the parts where 

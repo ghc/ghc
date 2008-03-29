@@ -13,8 +13,6 @@ import Data.Bits (shiftL)
 -- we want; if we just hope a -I... will get the right one, we could
 -- be in trouble.
 
--- XXX This define is a bit of a hack, and should be done more nicely
-#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 #include "../includes/MachRegs.h"
 #include "../includes/Constants.h"

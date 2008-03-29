@@ -43,6 +43,7 @@ import UniqSupply
 import Maybes
 import Outputable
 import PprCore		()		-- Instances
+import FastString
 
 import Data.List
 \end{code}

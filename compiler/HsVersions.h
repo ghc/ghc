@@ -60,21 +60,12 @@ name = Util.global (value);
 #define WARN(e,msg)    if False && (e) then pprPanic "WARN" (msg) else
 #endif
 
--- This conditional lets us switch off the "import FastString"
--- when compiling FastString itself, or when compiling modules that
--- don't use it (and would otherwise get warnings, which we treat
--- as errors). Can we do this more nicely?
-#if !defined(COMPILING_FAST_STRING) && !defined(FAST_STRING_NOT_NEEDED)
--- 
-import qualified FastString as FS 
-#endif
-
 #if defined(__GLASGOW_HASKELL__)
-#define SLIT(x)	 (FS.mkLitString# (x#))
-#define FSLIT(x) (FS.mkFastString# (x#))
+#define SLIT(x)	 (FastString.mkLitString# (x#))
+#define FSLIT(x) (FastString.mkFastString# (x#))
 #else
-#define SLIT(x)  (FS.mkLitString (x))
-#define FSLIT(x) (FS.mkFastString (x))
+#define SLIT(x)  (FastString.mkLitString (x))
+#define FSLIT(x) (FastString.mkFastString (x))
 #endif
 
 -- Useful for declaring arguments to be strict

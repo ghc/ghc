@@ -58,6 +58,7 @@ import BasicTypes
 import Util
 import MonadUtils
 import Outputable
+import FastString
 
 import List( nub )
 \end{code}

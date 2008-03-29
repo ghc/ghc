@@ -71,9 +71,6 @@ module FastString
         ptrStrLength
        ) where
 
--- This #define suppresses the "import FastString" that
--- HsVersions otherwise produces
-#define COMPILING_FAST_STRING
 #include "HsVersions.h"
 
 import Encoding

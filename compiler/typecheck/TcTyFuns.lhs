@@ -35,6 +35,7 @@ import Bag
 import Outputable
 import SrcLoc	( Located(..) )
 import Maybes
+import FastString
 
 -- standard
 import Data.List

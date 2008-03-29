@@ -49,6 +49,7 @@ import ErrUtils
 import BasicTypes	( DeprecTxt, Fixity )
 import DriverPhases	( isHsBoot )
 import Util
+import FastString
 import ListSetOps
 import Data.List        ( partition, concatMap, (\\), delete )
 import IO		( openFile, IOMode(..) )

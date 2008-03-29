@@ -35,6 +35,7 @@ import SrcLoc
 import Util
 import Var
 import Bag
+import FastString
 \end{code}
 
 %************************************************************************

@@ -74,7 +74,7 @@ import CString		( CString, peekCString )
 
 import System.Process	( runInteractiveProcess, getProcessExitCode )
 import Control.Concurrent( forkIO, newChan, readChan, writeChan )
-import FastString       ( mkFastString )
+import FastString
 import SrcLoc           ( SrcLoc, mkSrcLoc, noSrcSpan, mkSrcSpan )
 \end{code}
 

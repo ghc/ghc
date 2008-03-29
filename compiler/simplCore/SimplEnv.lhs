@@ -66,6 +66,7 @@ import DynFlags
 import Util
 import MonadUtils
 import Outputable
+import FastString
 
 import Data.List
 \end{code}

@@ -35,6 +35,7 @@ import DynFlags
 import Util
 import Outputable
 import MonadUtils
+import FastString
 \end{code}
 
 -- ---------------------------------------------------------------------------

@@ -45,6 +45,7 @@ import Util              ( singleton )
 import Digraph           ( SCC(..), stronglyConnComp )
 
 import Outputable
+import FastString
 
 import Control.Monad  ( liftM, liftM2, zipWithM, zipWithM_, mapAndUnzipM )
 import Data.List      ( inits, tails, zipWith4, zipWith5 )

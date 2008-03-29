@@ -6,8 +6,6 @@
 \begin{code}
 module SimplStg ( stg2stg ) where
 
--- XXX This define is a bit of a hack, and should be done more nicely
-#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import StgSyn

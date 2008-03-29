@@ -68,7 +68,7 @@ import SrcLoc
 import Unique		( mkAlphaTyVarUnique, pprUnique )
 import PrelNames
 import StaticFlags
-import FastString	( FastString, mkFastString )
+import FastString
 import Outputable
 
 import Char 		( ord, chr )

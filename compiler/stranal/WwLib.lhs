@@ -28,6 +28,7 @@ import UniqSupply
 import Unique
 import Util		( zipWithEqual, notNull )
 import Outputable
+import FastString
 import List		( zipWith4 )
 \end{code}
 

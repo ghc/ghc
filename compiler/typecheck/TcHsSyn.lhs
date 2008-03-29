@@ -57,6 +57,7 @@ import SrcLoc
 import Util
 import Bag
 import Outputable
+import FastString
 \end{code}
 
 \begin{code}

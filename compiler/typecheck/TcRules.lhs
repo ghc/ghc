@@ -30,6 +30,7 @@ import Id
 import Name
 import SrcLoc
 import Outputable
+import FastString
 \end{code}
 
 \begin{code}

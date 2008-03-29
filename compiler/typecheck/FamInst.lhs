@@ -27,6 +27,7 @@ import SrcLoc
 import Outputable
 import LazyUniqFM
 import FiniteMap
+import FastString
 
 import Maybe
 import Monad

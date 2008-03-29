@@ -1088,10 +1088,6 @@ subAnalysis' m =
   where pprFacts env = nest 2 $ vcat $ map pprFact $ ufmToList env
         pprFact (id, a) = hang (ppr id <> colon) 4 (ppr a)
 
-
-_unused :: FS.FastString
-_unused = undefined
-
 null_b_ft = BComp "do nothing" Nothing no2 no2 no2
     where no2 _ _ = Nothing
 

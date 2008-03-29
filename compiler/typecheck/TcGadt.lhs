@@ -41,6 +41,7 @@ import Outputable
 import TcType
 import Unique
 import UniqFM
+import FastString
 \end{code}
 
 

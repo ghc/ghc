@@ -111,6 +111,6 @@ rev_app :: [a] -> [a] -> [a]
 rev_app [] xs = xs
 rev_app (y:ys) xs = rev_app ys (y:xs)
 
-          
-_unused :: FS.FastString
+_unused :: ()
 _unused = undefined i_min i_lim overlaps contains
+

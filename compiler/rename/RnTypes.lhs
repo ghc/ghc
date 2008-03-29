@@ -31,6 +31,7 @@ import NameSet
 import BasicTypes	( compareFixity, funTyFixity, negateFixity, 
 			  Fixity(..), FixityDirection(..) )
 import Outputable
+import FastString
 
 #include "HsVersions.h"
 \end{code}

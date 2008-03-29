@@ -37,6 +37,7 @@ import UniqFM
 import Outputable
 import Maybes
 import Util
+import FastString
 
 import Maybe
 \end{code}

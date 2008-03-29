@@ -48,11 +48,6 @@ oneLessFuel f = f
 diffFuel _ _ = 0
 #endif
 
--- stop warnings about things that aren't used
-_unused :: {-State#-} () -> FS.FastString
-_unused = undefined panic
-
-
 data FuelState = FuelState { fs_fuellimit :: OptimizationFuel, fs_lastpass :: String }
 newtype FuelMonad a = FuelMonad (FuelState -> (a, FuelState))
 

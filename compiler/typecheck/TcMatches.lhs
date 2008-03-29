@@ -42,6 +42,7 @@ import TysPrim
 import Outputable
 import Util
 import SrcLoc
+import FastString
 
 import Control.Monad
 \end{code}

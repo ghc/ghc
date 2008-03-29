@@ -74,6 +74,7 @@ import Bag
 import Outputable
 import ListSetOps
 import FiniteMap
+import FastString
 
 import Data.Maybe
 import Data.List

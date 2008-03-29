@@ -12,7 +12,6 @@ module FastFunctions (
     global, Global
   ) where
 
-#define COMPILING_FAST_STRING
 #include "HsVersions.h"
 
 import FastTypes

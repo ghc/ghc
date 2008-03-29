@@ -26,7 +26,7 @@ module ForeignCall (
 
 #include "HsVersions.h"
 
-import FastString	( FastString, unpackFS )
+import FastString
 import Char		( isAlphaNum )
 import Binary
 import Outputable

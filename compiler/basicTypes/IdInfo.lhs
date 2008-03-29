@@ -92,6 +92,7 @@ import ForeignCall
 import NewDemand
 import Outputable	
 import Module
+import FastString
 
 import Data.Maybe
 

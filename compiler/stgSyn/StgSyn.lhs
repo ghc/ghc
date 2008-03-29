@@ -67,6 +67,7 @@ import Unique		( Unique )
 import Bitmap
 import StaticFlags	( opt_SccProfilingOn )
 import Module
+import FastString
 \end{code}
 
 %************************************************************************

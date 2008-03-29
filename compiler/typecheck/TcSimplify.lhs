@@ -64,6 +64,7 @@ import Util
 import UniqSet
 import SrcLoc
 import DynFlags
+import FastString
 
 import Control.Monad
 import Data.List

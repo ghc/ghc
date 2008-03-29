@@ -70,7 +70,7 @@ import Util
 import Unique
 import BasicTypes
 import Outputable
-
+import FastString
 
 type Coercion     = Type
 type CoercionKind = Kind	-- A CoercionKind is always of form (ty1 :=: ty2)
@@ -438,7 +438,7 @@ unsafeCoercionTyCon
 --------------------------------------
 -- ...and their names
 
-mkCoConName :: FS.FastString -> Unique -> TyCon -> Name
+mkCoConName :: FastString -> Unique -> TyCon -> Name
 mkCoConName occ key coCon = mkWiredInName gHC_PRIM (mkOccNameFS tcName occ)
                             key (ATyCon coCon) BuiltInSyntax
 

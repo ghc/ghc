@@ -46,6 +46,7 @@ import IfaceSyn		( IfaceBinding )
 import Outputable
 import SrcLoc		( Located(..) )
 import Module		( Module, ModuleName )
+import FastString
 \end{code}
 
 All we actually declare here is the top-level structure for a module.

@@ -276,6 +276,3 @@ mkStdInfoTable type_descr closure_descr cl_type srt_len layout_lit
 
     type_lit = packHalfWordsCLit cl_type srt_len
 
-
-_unused :: FS.FastString -- stops a warning
-_unused = undefined

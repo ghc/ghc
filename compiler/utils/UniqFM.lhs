@@ -839,7 +839,3 @@ use_snd :: a -> b -> b
 use_snd _ b = b
 \end{code}
 
-\begin{code}
-_unused :: FS.FastString
-_unused = undefined
-\end{code}

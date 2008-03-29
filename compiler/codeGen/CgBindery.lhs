@@ -62,6 +62,7 @@ import StgSyn
 import Unique
 import UniqSet
 import Outputable
+import FastString
 
 \end{code}
 

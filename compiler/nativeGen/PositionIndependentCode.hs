@@ -76,6 +76,7 @@ import qualified Outputable
 
 import Panic            ( panic )
 import DynFlags
+import FastString
 
 
 -- The most important function here is cmmMakeDynamicReference.

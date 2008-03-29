@@ -112,7 +112,7 @@ import BreakArray
 import SrcLoc		( SrcSpan, Located )
 import LazyUniqFM		( lookupUFM, eltsUFM, emptyUFM )
 import UniqSupply	( UniqSupply )
-import FastString	( FastString )
+import FastString
 import StringBuffer	( StringBuffer )
 
 import System.FilePath

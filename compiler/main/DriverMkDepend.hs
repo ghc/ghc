@@ -35,6 +35,7 @@ import Panic
 import SrcLoc
 import Data.List
 import CmdLineParser
+import FastString
 
 import ErrUtils         ( debugTraceMsg, putMsg )
 

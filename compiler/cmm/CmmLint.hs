@@ -27,6 +27,7 @@ import Outputable
 import PprCmm
 import Unique
 import Constants
+import FastString
 
 import Control.Monad
 

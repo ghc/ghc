@@ -25,8 +25,6 @@ This is now a sort-of-normal STG-to-STG pass (WDP 94/06), run by stg2stg.
 \begin{code}
 module SCCfinal ( stgMassageForProfiling ) where
 
--- XXX This define is a bit of a hack, and should be done more nicely
-#define FAST_STRING_NOT_NEEDED 1
 #include "HsVersions.h"
 
 import StgSyn

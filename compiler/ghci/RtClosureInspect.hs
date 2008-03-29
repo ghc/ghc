@@ -68,6 +68,7 @@ import PrelNames
 import TysWiredIn
 
 import Outputable
+import FastString
 import Panic
 
 #ifndef GHCI_TABLES_NEXT_TO_CODE

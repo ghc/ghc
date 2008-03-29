@@ -60,6 +60,7 @@ import BasicTypes
 import Util
 import Outputable
 import Unique
+import FastString
 
 import Control.Monad
 \end{code}

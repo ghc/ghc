@@ -60,6 +60,7 @@ import BasicTypes	( RecFlag(..) )
 import Digraph		( SCC(..), stronglyConnComp )
 import Bag
 import Outputable
+import FastString
 import Maybes		( orElse )
 import Util		( filterOut )
 import Monad		( foldM, unless )

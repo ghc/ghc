@@ -23,7 +23,6 @@ module Encoding (
 	zDecodeString
   ) where
 
-#define COMPILING_FAST_STRING
 #include "HsVersions.h"
 import Foreign
 import Data.Char	( ord, chr, isDigit, digitToInt, intToDigit,

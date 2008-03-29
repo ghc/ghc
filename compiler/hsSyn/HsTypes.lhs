@@ -38,6 +38,7 @@ import BasicTypes
 import SrcLoc
 import StaticFlags
 import Outputable
+import FastString
 \end{code}
 
 

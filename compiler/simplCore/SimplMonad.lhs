@@ -43,7 +43,7 @@ import StaticFlags	( opt_PprStyle_Debug, opt_HistorySize )
 import Unique		( Unique )
 import Maybes		( expectJust )
 import FiniteMap	( FiniteMap, emptyFM, isEmptyFM, lookupFM, addToFM, plusFM_C, fmToList )
-import FastString	( FastString )
+import FastString
 import Outputable
 import FastTypes
 

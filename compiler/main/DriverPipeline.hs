@@ -45,6 +45,7 @@ import Maybes		( expectJust )
 import ParserCoreUtils	( getCoreModuleName )
 import SrcLoc		( unLoc )
 import SrcLoc		( Located(..) )
+import FastString
 
 import Control.Exception as Exception
 import Data.IORef	( readIORef, writeIORef, IORef )

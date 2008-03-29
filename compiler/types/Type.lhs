@@ -130,6 +130,7 @@ import TyCon
 import StaticFlags
 import Util
 import Outputable
+import FastString
 
 import Data.List
 import Data.Maybe	( isJust )

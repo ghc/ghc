@@ -88,6 +88,7 @@ import ListSetOps
 import UniqSupply
 import SrcLoc
 import Outputable
+import FastString
 
 import Control.Monad	( when, unless )
 import Data.List	( (\\) )

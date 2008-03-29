@@ -35,6 +35,7 @@ import PrimOp
 import SMRep
 import Constants
 import Outputable
+import FastString
 
 -- ---------------------------------------------------------------------------
 -- Code generation for PrimOps

@@ -49,6 +49,7 @@ import Outputable
 import SrcLoc
 import Bag
 import Unique
+import FastString
 \end{code}
 
 \begin{code}

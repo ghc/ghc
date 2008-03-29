@@ -707,5 +707,3 @@ pprGraph (Graph tail blockenv) =
     where pprBlock (Block id tail) = ppr id <> colon $$ ppr tail
           blocks = postorder_dfs_from blockenv tail
 
-_unused :: FS.FastString
-_unused = undefined

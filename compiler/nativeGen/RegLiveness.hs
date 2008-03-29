@@ -46,6 +46,7 @@ import UniqFM
 import UniqSupply
 import Bag
 import State
+import FastString
 
 import Data.List
 import Data.Maybe
