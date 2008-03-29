@@ -57,6 +57,7 @@ import ErrUtils
 import Maybes
 import SrcLoc
 import DynFlags
+import Util
 import Control.Monad
 
 import Data.List
@@ -1037,13 +1038,11 @@ tcIfaceTyCon (IfaceTupTc bx ar) = tcWiredInTyCon (tupleTyCon bx ar)
 tcIfaceTyCon (IfaceTc name)     = do { thing <- tcIfaceGlobal name 
 				     ; return (check_tc (tyThingTyCon thing)) }
   where
-#ifdef DEBUG
-    check_tc tc = case toIfaceTyCon tc of
-		   IfaceTc _ -> tc
-		   other     -> pprTrace "check_tc" (ppr tc) tc
-#else
-    check_tc tc = tc
-#endif
+    check_tc tc
+     | debugIsOn = case toIfaceTyCon tc of
+                   IfaceTc _ -> tc
+                   other     -> pprTrace "check_tc" (ppr tc) tc
+     | otherwise = tc
 -- we should be okay just returning Kind constructors without extra loading
 tcIfaceTyCon IfaceLiftedTypeKindTc   = return liftedTypeKindTyCon
 tcIfaceTyCon IfaceOpenTypeKindTc     = return openTypeKindTyCon
