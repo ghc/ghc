@@ -82,3 +82,6 @@ test('TH_scopedTvs', normal, compile_fail, ['-v0'])
 test('TH_runIO', if_compiler_lt('ghc','6.9', namebase('TH_runIO-6.8')), compile_fail, ['-v0'])
 
 test('TH_ghci1', normal, ghci_script, ['TH_ghci1.script'])
+
+test('TH_scope', expect_broken(2188), multimod_compile, ['TH_scope', '-v0'])
+
