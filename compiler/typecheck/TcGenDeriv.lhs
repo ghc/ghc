@@ -730,7 +730,11 @@ gen_Ix_binds tycon
       = mk_easy_FunBind tycon_loc unsafeIndex_RDR 
 		[nlTuplePat [con_pat as_needed, con_pat bs_needed] Boxed, 
 		 con_pat cs_needed] 
-		(mk_index (zip3 as_needed bs_needed cs_needed))
+        -- We need to reverse the order we consider the components in
+        -- so that
+        --     range (l,u) !! index (l,u) i == i   -- when i is in range
+        -- (from http://haskell.org/onlinereport/ix.html) holds.
+		(mk_index (reverse $ zip3 as_needed bs_needed cs_needed))
       where
 	-- index (l1,u1) i1 + rangeSize (l1,u1) * (index (l2,u2) i2 + ...)
 	mk_index [] 	   = nlHsIntLit 0
