@@ -66,6 +66,8 @@ register double fake_f9 __asm__("$f9");
 /* include Stg.h first because we want real machine regs in here: we
  * have to get the value of R1 back from Stg land to C land intact.
  */
+// yeuch
+#define IN_STGCRUN 1
 #include "Stg.h"
 #include "Rts.h"
 #include "StgRun.h"

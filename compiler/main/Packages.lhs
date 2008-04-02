@@ -19,7 +19,6 @@ module Packages (
 
 	-- * Inspecting the set of packages in scope
 	getPackageIncludePath,
-	getPackageCIncludes,
 	getPackageLibraryPath,
 	getPackageLinkOpts,
 	getPackageExtraCcOpts,
@@ -592,11 +591,6 @@ getPackageIncludePath :: DynFlags -> [PackageId] -> IO [String]
 getPackageIncludePath dflags pkgs = do
   ps <- getPreloadPackagesAnd dflags pkgs
   return (nub (filter notNull (concatMap includeDirs ps)))
-
-	-- includes are in reverse dependency order (i.e. rts first)
-getPackageCIncludes :: [PackageConfig] -> IO [String]
-getPackageCIncludes pkg_configs = do
-  return (reverse (nub (filter notNull (concatMap includes pkg_configs))))
 
 getPackageLibraryPath :: DynFlags -> [PackageId] -> IO [String]
 getPackageLibraryPath dflags pkgs = do 

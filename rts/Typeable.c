@@ -6,8 +6,8 @@
  *
  * ---------------------------------------------------------------------------*/
 
-#include "RtsTypeable.h"
 #include "Rts.h"
+#include "RtsTypeable.h"
 
 static StgPtr typeableStore = 0;
 #ifdef THREADED_RTS

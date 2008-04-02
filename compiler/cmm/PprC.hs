@@ -201,25 +201,24 @@ pprStmt stmt = case stmt of
 	  rep = cmmExprRep src
 
     CmmCall (CmmCallee fn cconv) results args safety _ret ->
-	-- Controversial: leave this out for now.
-	-- pprUndef fn $$
-
+        maybe_proto $$
 	pprCall ppr_fn cconv results args safety
 	where
-    	ppr_fn = case fn of
-		   CmmLit (CmmLabel lbl) -> pprCLabel lbl
-		   _ -> parens (cCast (pprCFunType cconv results args) fn)
-			-- for a dynamic call, cast the expression to
-			-- a function of the right type (we hope).
+        ppr_fn = parens (cCast (pprCFunType (char '*') cconv results args) fn)
 
-	-- we #undef a function before calling it: the FFI is supposed to be
-	-- an interface specifically to C, not to C+CPP.  For one thing, this
-	-- makes the via-C route more compatible with the NCG.  If macros
-	-- are being used for optimisation, then inline functions are probably
-	-- better anyway.
-	pprUndef (CmmLit (CmmLabel lbl)) = 
-	   ptext SLIT("#undef") <+> pprCLabel lbl
-	pprUndef _ = empty
+    	maybe_proto = 
+            case fn of
+	      CmmLit (CmmLabel lbl) | not (isMathFun lbl) -> 
+                  ptext SLIT(";EI_(") <+> pprCLabel lbl <> char ')' <> semi
+                        -- we declare all called functions as data labels,
+                        -- and then cast them to the right type when calling.
+                        -- This is because the label might already have a 
+                        -- declaration as a data label in the same file,
+                        -- e.g. Foreign.Marshal.Alloc declares 'free' as
+                        -- both a data label and a function label.
+	      _ -> 
+                   empty {- no proto -}
+			-- for a dynamic call, no declaration is necessary.
 
     CmmCall (CmmPrim op) results args safety _ret ->
 	pprCall ppr_fn CCallConv results args safety
@@ -231,13 +230,11 @@ pprStmt stmt = case stmt of
     CmmJump lbl _params      -> mkJMP_(pprExpr lbl) <> semi
     CmmSwitch arg ids        -> pprSwitch arg ids
 
-pprCFunType :: CCallConv -> CmmFormals -> CmmActuals -> SDoc
-pprCFunType cconv ress args
-  = hcat [
-	res_type ress,
-	parens (text (ccallConvAttribute cconv) <>  char '*'),
-	parens (commafy (map arg_type args))
-   ]
+pprCFunType :: SDoc -> CCallConv -> CmmFormals -> CmmActuals -> SDoc
+pprCFunType ppr_fn cconv ress args
+  = res_type ress <+>
+    parens (text (ccallConvAttribute cconv) <>  ppr_fn) <>
+    parens (commafy (map arg_type args))
   where
 	res_type [] = ptext SLIT("void")
 	res_type [CmmHinted one hint] = machRepHintCType (localRegRep one) hint
@@ -755,13 +752,12 @@ pprCall ppr_fn cconv results args _
 		 <> pprUnHint hint (localRegRep one) <> rhs
      ppr_assign _other _rhs = panic "pprCall: multiple results"
 
-     pprArg (CmmHinted expr PtrHint)
-   	= cCast (ptext SLIT("void *")) expr
+     pprArg (CmmHinted expr hint)
+         | hint `elem` [PtrHint,SignedHint]
+         = cCast (machRepHintCType (cmmExprRep expr) hint) expr
 	-- see comment by machRepHintCType below
-     pprArg (CmmHinted expr SignedHint)
-	= cCast (machRepSignedCType (cmmExprRep expr)) expr
      pprArg (CmmHinted expr _other)
-	= pprExpr expr
+         = pprExpr expr
 
      pprUnHint PtrHint    rep = parens (machRepCType rep)
      pprUnHint SignedHint rep = parens (machRepCType rep)

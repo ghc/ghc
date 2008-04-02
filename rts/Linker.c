@@ -482,7 +482,7 @@ typedef struct _RtsSymbolVal {
 
 #define RTS_SYMBOLS				\
       Maybe_Stable_Names			\
-      Sym(StgReturn)				\
+      SymX(StgReturn)				\
       SymX(stg_enter_info)			\
       SymX(stg_gc_void_info)			\
       SymX(__stg_gc_enter_1)			\

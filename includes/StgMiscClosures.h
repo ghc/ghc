@@ -493,6 +493,12 @@ RTS_FUN(stg_threadFinished);
 RTS_FUN(stg_init_finish);
 RTS_FUN(stg_init);
 
+RTS_FUN(StgReturn);
+
+extern int rts_stop_next_breakpoint;
+extern int rts_stop_on_exception;
+extern void *rts_breakpoint_io_action;
+
 /* -----------------------------------------------------------------------------
    PrimOps
    -------------------------------------------------------------------------- */
@@ -597,5 +603,43 @@ RTS_FUN(unpackClosurezh_fast);
 RTS_FUN(getApStackValzh_fast);
 
 RTS_FUN(noDuplicatezh_fast);
+
+/* Other misc stuff */
+
+#if IN_STG_CODE && !IN_STGCRUN
+
+// Schedule.c
+extern int RTS_VAR(context_switch);
+extern StgWord RTS_VAR(blocked_queue_hd), RTS_VAR(blocked_queue_tl);
+extern StgWord RTS_VAR(sleeping_queue);
+extern StgWord RTS_VAR(blackhole_queue);
+extern StgWord RTS_VAR(sched_mutex);
+
+// Apply.cmm
+// canned bitmap for each arg type
+extern StgWord stg_arg_bitmaps[];
+
+// Storage.c
+extern unsigned int RTS_VAR(alloc_blocks);
+extern unsigned int RTS_VAR(alloc_blocks_lim);
+extern StgWord RTS_VAR(weak_ptr_list);
+extern StgWord RTS_VAR(atomic_modify_mutvar_mutex);
+
+// RtsFlags
+extern StgWord RTS_VAR(RtsFlags); // bogus type
+
+// Stable.c
+extern StgWord RTS_VAR(stable_ptr_table);
+
+// Profiling.c
+extern unsigned int RTS_VAR(era);
+extern StgWord      RTS_VAR(CCCS);	        /* current CCS */
+extern unsigned int RTS_VAR(entering_PAP);
+extern StgWord      RTS_VAR(CC_LIST);               /* registered CC list */
+extern StgWord      RTS_VAR(CCS_LIST);         /* registered CCS list */
+extern unsigned int RTS_VAR(CC_ID);	/* global ids */
+extern unsigned int RTS_VAR(CCS_ID);
+
+#endif
 
 #endif /* STGMISCCLOSURES_H */

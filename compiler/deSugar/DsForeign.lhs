@@ -76,27 +76,26 @@ dsForeigns []
 dsForeigns fos = do
     fives <- mapM do_ldecl fos
     let
-        (hs, cs, hdrs, idss, bindss) = unzip5 fives
+        (hs, cs, idss, bindss) = unzip4 fives
         fe_ids = concat idss
         fe_init_code = map foreignExportInitialiser fe_ids
     --
     return (ForeignStubs 
              (vcat hs)
-             (vcat cs $$ vcat fe_init_code)
-             (nub (concat hdrs)),
+             (vcat cs $$ vcat fe_init_code),
            (concat bindss))
   where
    do_ldecl (L loc decl) = putSrcSpanDs loc (do_decl decl)
             
    do_decl (ForeignImport id _ spec) = do
       traceIf (text "fi start" <+> ppr id)
-      (bs, h, c, mbhd) <- dsFImport (unLoc id) spec
+      (bs, h, c) <- dsFImport (unLoc id) spec
       traceIf (text "fi end" <+> ppr id)
-      return (h, c, maybeToList mbhd, [], bs)
+      return (h, c, [], bs)
 
    do_decl (ForeignExport (L _ id) _ (CExport (CExportStatic ext_nm cconv))) = do
       (h, c, _, _) <- dsFExport id (idType id) ext_nm cconv False
-      return (h, c, [], [id], [])
+      return (h, c, [id], [])
 \end{code}
 
 
@@ -127,51 +126,32 @@ because it exposes the boxing to the call site.
 \begin{code}
 dsFImport :: Id
 	  -> ForeignImport
-	  -> DsM ([Binding], SDoc, SDoc, Maybe FastString)
+	  -> DsM ([Binding], SDoc, SDoc)
 dsFImport id (CImport cconv safety header lib spec) = do
-    (ids, h, c) <- dsCImport id spec cconv safety no_hdrs
-    return (ids, h, c, if no_hdrs then Nothing else Just header)
-  where
-    no_hdrs = nullFS header
+    (ids, h, c) <- dsCImport id spec cconv safety
+    return (ids, h, c)
 
   -- FIXME: the `lib' field is needed for .NET ILX generation when invoking
   --	    routines that are external to the .NET runtime, but GHC doesn't
   --	    support such calls yet; if `nullFastString lib', the value was not given
 dsFImport id (DNImport spec) = do
-    (ids, h, c) <- dsFCall id (DNCall spec) True {- No headers -}
-    return (ids, h, c, Nothing)
+    (ids, h, c) <- dsFCall id (DNCall spec)
+    return (ids, h, c)
 
 dsCImport :: Id
 	  -> CImportSpec
 	  -> CCallConv
 	  -> Safety
-	  -> Bool	-- True <=> no headers in the f.i decl
 	  -> DsM ([Binding], SDoc, SDoc)
-dsCImport id (CLabel cid) _ _ no_hdrs = do
+dsCImport id (CLabel cid) _ _ = do
    (resTy, foRhs) <- resultWrapper (idType id)
    ASSERT(fromJust resTy `coreEqType` addrPrimTy)    -- typechecker ensures this
     let rhs = foRhs (mkLit (MachLabel cid Nothing)) in
-    return ([(setImpInline no_hdrs id, rhs)], empty, empty)
-dsCImport id (CFunction target) cconv safety no_hdrs
-  = dsFCall id (CCall (CCallSpec target cconv safety)) no_hdrs
-dsCImport id CWrapper cconv _ _
+    return ([(id, rhs)], empty, empty)
+dsCImport id (CFunction target) cconv safety
+  = dsFCall id (CCall (CCallSpec target cconv safety))
+dsCImport id CWrapper cconv _
   = dsFExportDynamic id cconv
-
-setImpInline :: Bool 	-- True <=> No #include headers 
-			-- in the foreign import declaration
-	     -> Id -> Id
--- If there is a #include header in the foreign import
--- we make the worker non-inlinable, because we currently
--- don't keep the #include stuff in the CCallId, and hence
--- it won't be visible in the importing module, which can be
--- fatal. 
--- (The #include stuff is just collected from the foreign import
---  decls in a module.)
--- If you want to do cross-module inlining of the c-calls themselves,
--- put the #include stuff in the package spec, not the foreign 
--- import decl.
-setImpInline True  id = id
-setImpInline False id = id `setInlinePragma` NeverActive
 \end{code}
 
 
@@ -182,7 +162,7 @@ setImpInline False id = id `setInlinePragma` NeverActive
 %************************************************************************
 
 \begin{code}
-dsFCall fn_id fcall no_hdrs = do
+dsFCall fn_id fcall = do
     let
         ty                   = idType fn_id
         (tvs, fun_ty)        = tcSplitForAllTys ty
@@ -229,8 +209,7 @@ dsFCall fn_id fcall no_hdrs = do
         worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
         the_ccall_app = mkFCall ccall_uniq fcall val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
-        work_id       = setImpInline no_hdrs $  -- See comments with setImpInline
-                        mkSysLocal FSLIT("$wccall") work_uniq worker_ty
+        work_id       = mkSysLocal FSLIT("$wccall") work_uniq worker_ty
 
         -- Build the wrapper
         work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args

@@ -18,6 +18,9 @@ extern "C" {
 #endif
 #include "Stg.h"
 
+// ToDo: move RtsExternal stuff elsewhere
+#include "RtsExternal.h"
+
 // Turn off inlining when debugging - it obfuscates things
 #ifdef DEBUG
 # undef  STATIC_INLINE
@@ -165,7 +168,8 @@ TAG_CLOSURE(StgWord tag,StgClosure * p)
 /* Parallel information */
 #include "Parallel.h"
 #include "OSThreads.h"
-#include "SMP.h"
+#include "SMPClosureOps.h"
+#include "SpinLock.h"
 
 /* GNU mp library */
 #if defined(HAVE_FRAMEWORK_GMP)

@@ -24,7 +24,6 @@ import PprC		( writeCs )
 import CmmLint		( cmmLint )
 import Packages
 import Util
-import FastString	( unpackFS )
 import Cmm		( RawCmm )
 import HscTypes
 import DynFlags
@@ -32,7 +31,6 @@ import DynFlags
 import ErrUtils		( dumpIfSet_dyn, showPass, ghcExit )
 import Outputable
 import Module
-import List		( nub )
 import Maybes		( firstJust )
 
 import Distribution.Package	( showPackageId )
@@ -81,9 +79,7 @@ codeOutput dflags this_mod location foreign_stubs pkg_deps flat_abstractC
 	; case hscTarget dflags of {
              HscInterpreted -> return ();
              HscAsm         -> outputAsm dflags filenm flat_abstractC;
-             HscC           -> outputC dflags filenm this_mod location 
-				 flat_abstractC stubs_exist pkg_deps
-				 foreign_stubs;
+             HscC           -> outputC dflags filenm flat_abstractC pkg_deps;
              HscJava        -> 
 #ifdef JAVA
 			       outputJava dflags filenm mod_name tycons core_binds;
@@ -108,15 +104,12 @@ doOutput filenm io_action = bracket (openFile filenm WriteMode) hClose io_action
 
 \begin{code}
 outputC :: DynFlags
-        -> FilePath -> Module -> ModLocation
+        -> FilePath
         -> [RawCmm]
-        -> (Bool, Bool)
         -> [PackageId]
-        -> ForeignStubs
         -> IO ()
 
-outputC dflags filenm mod location flat_absC 
-	(stub_h_exists, _) packages foreign_stubs
+outputC dflags filenm flat_absC packages
   = do 
        -- figure out which header files to #include in the generated .hc file:
        --
@@ -124,38 +117,22 @@ outputC dflags filenm mod location flat_absC
        --   * -#include options from the cmdline and OPTIONS pragmas
        --   * the _stub.h file, if there is one.
        --
-       pkg_configs <- getPreloadPackagesAnd dflags packages
-       let pkg_names = map (showPackageId.package) pkg_configs
-
-       c_includes <- getPackageCIncludes pkg_configs
-       let cmdline_includes = cmdlineHcIncludes dflags -- -#include options
-       
-	   ffi_decl_headers 
-	      = case foreign_stubs of
-		  NoStubs 		-> []
-		  ForeignStubs _ _ fdhs -> map unpackFS (nub fdhs)
-			-- Remove duplicates, because distinct foreign import decls
-			-- may cite the same #include.  Order doesn't matter.
-
-           all_headers =  c_includes
-		       ++ reverse cmdline_includes
-		       ++ ffi_decl_headers
+       let rts = getPackageDetails (pkgState dflags) rtsPackageId
                        
-       let cc_injects = unlines (map mk_include all_headers)
+       let cc_injects = unlines (map mk_include (includes rts))
        	   mk_include h_file = 
        	    case h_file of 
        	       '"':_{-"-} -> "#include "++h_file
        	       '<':_      -> "#include "++h_file
        	       _          -> "#include \""++h_file++"\""
 
+       pkg_configs <- getPreloadPackagesAnd dflags packages
+       let pkg_names = map (showPackageId.package) pkg_configs
+
        doOutput filenm $ \ h -> do
 	  hPutStr h ("/* GHC_PACKAGES " ++ unwords pkg_names ++ "\n*/\n")
 	  hPutStr h cc_injects
-	  when stub_h_exists $ 
-	     hPutStrLn h ("#include \"" ++ inc_stub_h ++ "\"")
 	  writeCs dflags h flat_absC
-  where
-    (_, _, inc_stub_h) = mkStubPaths dflags (moduleName mod) location
 \end{code}
 
 
@@ -226,7 +203,7 @@ outputForeignStubs dflags mod location stubs
 	stub_h_exists <- doesFileExist stub_h
 	return (stub_h_exists, stub_c_exists)
 
-   ForeignStubs h_code c_code _ -> do
+   ForeignStubs h_code c_code -> do
 	let
 	    stub_c_output_d = pprCode CStyle c_code
 	    stub_c_output_w = showSDoc stub_c_output_d

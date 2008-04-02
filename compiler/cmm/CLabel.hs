@@ -105,6 +105,7 @@ module CLabel (
 
 	infoLblToEntryLbl, entryLblToInfoLbl,
 	needsCDecl, isAsmTemp, maybeAsmTemp, externallyVisibleCLabel,
+        isMathFun,
 	CLabelType(..), labelType, labelDynamic,
 
 	pprCLabel
@@ -462,7 +463,11 @@ needsCDecl ModuleRegdLabel		= False
 needsCDecl (StringLitLabel _)		= False
 needsCDecl (AsmTempLabel _)		= False
 needsCDecl (RtsLabel _)			= False
-needsCDecl (ForeignLabel _ _ _)		= False
+  -- RTS labels are declared in RTS header files.  Otherwise we'd need
+  -- to give types for each label reference in the RTS .cmm files
+  -- somehow; when generating .cmm code we know the types of labels (info, 
+  -- entry etc.) but for hand-written .cmm code we don't.
+needsCDecl l@(ForeignLabel _ _ _)	= not (isMathFun l)
 needsCDecl (CC_Label _)			= True
 needsCDecl (CCS_Label _)		= True
 needsCDecl (HpcTicksLabel _)            = True
@@ -477,6 +482,25 @@ isAsmTemp _ 	    	   = False
 maybeAsmTemp :: CLabel -> Maybe Unique
 maybeAsmTemp (AsmTempLabel uq) = Just uq
 maybeAsmTemp _ 	    	       = Nothing
+
+-- some labels have C prototypes in scope when compiling via C, because
+-- they are builtin to the C compiler.  For these labels we avoid
+-- generating our own C prototypes.
+isMathFun :: CLabel -> Bool
+isMathFun (ForeignLabel fs _ _) = fs `elem` math_funs
+  where
+  math_funs = [
+        FSLIT("pow"),    FSLIT("sin"),   FSLIT("cos"),
+        FSLIT("tan"),    FSLIT("sinh"),  FSLIT("cosh"),
+        FSLIT("tanh"),   FSLIT("asin"),  FSLIT("acos"),
+        FSLIT("atan"),   FSLIT("log"),   FSLIT("exp"),
+        FSLIT("sqrt"),   FSLIT("powf"),  FSLIT("sinf"),
+        FSLIT("cosf"),   FSLIT("tanf"),  FSLIT("sinhf"),
+        FSLIT("coshf"),  FSLIT("tanhf"), FSLIT("asinf"),
+        FSLIT("acosf"),  FSLIT("atanf"), FSLIT("logf"),
+        FSLIT("expf"),   FSLIT("sqrtf")
+   ]
+isMathFun _ = False
 
 -- -----------------------------------------------------------------------------
 -- Is a CLabel visible outside this object file or not?

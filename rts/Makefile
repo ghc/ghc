@@ -152,6 +152,8 @@ SRC_CC_OPTS += $(STANDARD_OPTS)
 SRC_CC_OPTS += $(GhcRtsCcOpts)
 SRC_HC_OPTS += $(GhcRtsHcOpts) $(STANDARD_OPTS) -package-name rts
 
+SRC_HC_OPTS += -fvia-C
+
 ifneq "$(GhcWithSMP)" "YES"
 SRC_CC_OPTS += -DNOSMP
 SRC_HC_OPTS += -optc-DNOSMP
@@ -366,13 +368,7 @@ endif
 # Compiling the cmm files
 
 # ToDo: should we really include Rts.h here?  Required for GNU_ATTRIBUTE().
-SRC_HC_OPTS += -I. -\#include HCIncludes.h
-
-ifeq "$(Windows)" "YES"
-PrimOps_HC_OPTS += -\#include '<windows.h>' -\#include win32/AsyncIO.h
-else
-PrimOps_HC_OPTS += -\#include posix/Itimer.h
-endif
+SRC_HC_OPTS += -I.
 
 # Otherwise the stack-smash handler gets triggered.
 ifeq "$(TargetOS_CPP)" "openbsd"

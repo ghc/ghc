@@ -46,10 +46,10 @@ import __gmpz_xor;
 import __gmpz_ior;
 import __gmpz_com;
 #endif
-import base_GHCziIOBase_NestedAtomically_closure;
 import pthread_mutex_lock;
 import pthread_mutex_unlock;
 #endif
+import base_GHCziIOBase_NestedAtomically_closure;
 import EnterCriticalSection;
 import LeaveCriticalSection;
 

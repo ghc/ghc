@@ -11,6 +11,4 @@
 
 extern StgRegTable * StgRun(StgFunPtr f, StgRegTable *basereg);
 
-RTS_FUN(StgReturn);
-
 #endif /* STGRUN_H */

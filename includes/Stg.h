@@ -41,6 +41,11 @@
 #include "ghcconfig.h"
 #include "RtsConfig.h"
 
+/* The code generator calls the math functions directly in .hc code.
+   NB. after configuration stuff above, because this sets #defines
+   that depend on config info, such as __USE_FILE_OFFSET64 */
+#include <math.h>
+
 /* -----------------------------------------------------------------------------
    Useful definitions
    -------------------------------------------------------------------------- */
@@ -148,7 +153,6 @@ typedef StgWord StgWordArray[];
 #include "StgDLL.h"
 #include "MachRegs.h"
 #include "Regs.h"
-#include "StgProf.h"  /* ToDo: separate out RTS-only stuff from here */
 
 #if IN_STG_CODE
 /*
@@ -158,8 +162,7 @@ typedef StgWord StgWordArray[];
 #include "StgMiscClosures.h"
 #endif
 
-/* RTS external interface */
-#include "RtsExternal.h"
+#include "SMP.h" // write_barrier() inline is required 
 
 /* -----------------------------------------------------------------------------
    Moving Floats and Doubles

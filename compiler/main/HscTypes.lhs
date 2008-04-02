@@ -629,9 +629,6 @@ data ForeignStubs = NoStubs
                                       	-- 	"foreign exported" functions
 			SDoc 		-- C stubs to use when calling
                                         -- 	"foreign exported" functions
-			[FastString] 	-- Headers that need to be included
-				        -- 	into C code generated for this module
-
 \end{code}
 
 \begin{code}
