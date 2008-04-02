@@ -886,7 +886,7 @@ checkShadowedNames doc_str (global_env,local_env) loc_rdr_names
 	; mappM_ check_shadow loc_rdr_names }
   where
     check_shadow (loc, occ)
-	| Just n <- mb_local = complain [ptext SLIT("bound at") <+> ppr loc]
+	| Just n <- mb_local = complain [ptext SLIT("bound at") <+> ppr (nameSrcLoc n)]
 	| not (null gres)    = complain (map pprNameProvenance gres)
 	| otherwise	     = return ()
 	where
