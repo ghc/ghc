@@ -18,3 +18,6 @@ test('simplrun006', expect_broken(149), compile_and_run, [''])
 test('simplrun007', normal, compile_and_run, [''])
 test('simplrun008', normal, compile_and_run, [''])
 test('simplrun009', normal, compile_and_run, [''])
+test('simplrun010', composes([extra_run_opts('24 16 8'),
+                              exit_code(1)])
+                  , compile_and_run, [''])
