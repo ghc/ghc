@@ -886,22 +886,22 @@ rn_rec_stmts_and_then :: [LStmt RdrName]
                          -- the FreeVars of the Segments
                       -> ([Segment (LStmt Name)] -> RnM (a, FreeVars))
                       -> RnM (a, FreeVars)
-rn_rec_stmts_and_then s cont = do
-  -- (A) make the mini fixity env for all of the stmts
-  fix_env <- makeMiniFixityEnv (collectRecStmtsFixities s)
+rn_rec_stmts_and_then s cont
+  = do	{ -- (A) Make the mini fixity env for all of the stmts
+	  fix_env <- makeMiniFixityEnv (collectRecStmtsFixities s)
 
-  -- (B) do the LHSes
-  new_lhs_and_fv <- rn_rec_stmts_lhs fix_env s
+	  -- (B) Do the LHSes
+	; new_lhs_and_fv <- rn_rec_stmts_lhs fix_env s
 
-  --    bring them and their fixities into scope
-  let bound_names = map unLoc $ collectLStmtsBinders (map fst new_lhs_and_fv)
-  bindLocalNamesFV_WithFixities bound_names fix_env $ 
-    warnUnusedLocalBinds bound_names $ do
+	  --    ...bring them and their fixities into scope
+	; let bound_names = map unLoc $ collectLStmtsBinders (map fst new_lhs_and_fv)
+	; bindLocalNamesFV_WithFixities bound_names fix_env $ do
 
-  -- (C) do the right-hand-sides and thing-inside
-  segs <- rn_rec_stmts bound_names new_lhs_and_fv
-  cont segs
-
+	  -- (C) do the right-hand-sides and thing-inside
+	{ segs <- rn_rec_stmts bound_names new_lhs_and_fv
+	; (res, fvs) <- cont segs 
+	; warnUnusedLocalBinds bound_names fvs
+	; return (res, fvs) }}
 
 -- get all the fixity decls in any Let stmt
 collectRecStmtsFixities l = 

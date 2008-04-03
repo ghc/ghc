@@ -105,9 +105,10 @@ matchNameMaker :: NameMaker
 matchNameMaker
   = NM (\ rdr_name thing_inside -> 
 	do { names@[name] <- newLocalsRn [rdr_name]
-	   ; bindLocalNamesFV names $
-	     warnUnusedMatches names $
-	     thing_inside name })
+	   ; bindLocalNamesFV names $ do
+	   { (res, fvs) <- thing_inside name
+	   ; warnUnusedMatches names fvs
+	   ; return (res, fvs) }})
 			  
 topRecNameMaker, localRecNameMaker
   :: UniqFM (Located Fixity) -- mini fixity env for the names we're about to bind

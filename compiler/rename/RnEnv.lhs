@@ -949,19 +949,13 @@ warnUnusedImports, warnUnusedTopBinds :: [GlobalRdrElt] -> RnM ()
 warnUnusedImports gres  = ifOptM Opt_WarnUnusedImports (warnUnusedGREs gres)
 warnUnusedTopBinds gres = ifOptM Opt_WarnUnusedBinds   (warnUnusedGREs gres)
 
-warnUnusedLocalBinds, warnUnusedMatches :: [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
+warnUnusedLocalBinds, warnUnusedMatches :: [Name] -> FreeVars -> RnM ()
 warnUnusedLocalBinds = check_unused Opt_WarnUnusedBinds
 warnUnusedMatches    = check_unused Opt_WarnUnusedMatches
 
-check_unused :: DynFlag -> [Name] -> RnM (a, FreeVars) -> RnM (a, FreeVars)
-check_unused flag names thing_inside
- =  do	{ (res, res_fvs) <- thing_inside
-	
-	-- Warn about unused names
-	; ifOptM flag (warnUnusedLocals (filterOut (`elemNameSet` res_fvs) names))
-
-	-- And return
-	; return (res, res_fvs) }
+check_unused :: DynFlag -> [Name] -> FreeVars -> RnM ()
+check_unused flag bound_names used_names
+ = ifOptM flag (warnUnusedLocals (filterOut (`elemNameSet` used_names) bound_names))
 
 -------------------------
 --	Helpers

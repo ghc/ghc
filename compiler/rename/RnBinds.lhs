@@ -343,12 +343,12 @@ rnValBindsRHSGen trim bound_names binds@(ValBindsIn mbinds sigs) = do
    check_sigs (okBindSig (duDefs anal_dus)) sigs'                       
    return (valbind', valbind'_dus)
 
--- wrapper for local binds
+-- Wrapper for local binds
 --
--- the *client* of this function is responsible for checking for unused binders;
+-- The *client* of this function is responsible for checking for unused binders;
 -- it doesn't (and can't: we don't have the thing inside the binds) happen here
 --
--- the client is also responsible for bringing the fixities into scope
+-- The client is also responsible for bringing the fixities into scope
 rnValBindsRHS :: [Name]  -- names bound by the LHSes
               -> HsValBindsLR Name RdrName
               -> RnM (HsValBinds Name, DefUses)
@@ -365,42 +365,53 @@ rnValBindsRHS bound_names binds =
 rnValBindsAndThen :: HsValBinds RdrName
                   -> (HsValBinds Name -> RnM (result, FreeVars))
                   -> RnM (result, FreeVars)
-rnValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside = 
-    let 
-       (original_bndrs, doc) = bindersAndDoc binds
+rnValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside
+ = do	{ let (original_bndrs, doc) = bindersAndDoc binds
 
-    in do
-      -- (A) create the local fixity environment 
-      new_fixities <- makeMiniFixityEnv [L loc sig | L loc (FixSig sig) <- sigs]
+	      -- (A) Create the local fixity environment 
+	; new_fixities <- makeMiniFixityEnv [L loc sig | L loc (FixSig sig) <- sigs]
 
-      -- (B) rename the LHSes 
-      new_lhs <- rnValBindsLHSFromDoc_Local original_bndrs doc new_fixities binds
-      let bound_names = map unLoc $ collectHsValBinders new_lhs
+	      -- (B) Rename the LHSes 
+	; new_lhs <- rnValBindsLHSFromDoc_Local original_bndrs doc new_fixities binds
+	; let bound_names = map unLoc $ collectHsValBinders new_lhs
 
-      --     and bring them (and their fixities) into scope
-      bindLocalNamesFV_WithFixities bound_names new_fixities $ 
-        warnUnusedLocalBinds bound_names $ do
+	      --     ...and bring them (and their fixities) into scope
+	; bindLocalNamesFV_WithFixities bound_names new_fixities $ do
 
-      -- (C) do the RHS and thing inside
-      (binds', dus) <- rnValBindsRHS bound_names new_lhs 
-      (result, result_fvs) <- thing_inside binds'
+	{      -- (C) Do the RHS and thing inside
+	  (binds', dus) <- rnValBindsRHS bound_names new_lhs 
+        ; (result, result_fvs) <- thing_inside binds'
 
-      let 
-            -- the variables used in the val binds are: 
-            --   (1) the uses of the binds 
+		-- Report unused bindings based on the (accurate) 
+		-- findUses.  E.g.
+		-- 	let x = x in 3
+		-- should report 'x' unused
+	; let real_uses = findUses dus result_fvs
+	; warnUnusedLocalBinds bound_names real_uses
+
+	; let
+            -- The variables "used" in the val binds are: 
+            --   (1) the uses of the binds (duUses)
             --   (2) the FVs of the thing-inside
-            all_uses = (duUses dus) `plusFV` result_fvs
-                -- duUses: It's important to return all the uses.  Otherwise consider:
+            all_uses = duUses dus `plusFV` result_fvs
+		-- Note [Unused binding hack]
+		-- ~~~~~~~~~~~~~~~~~~~~~~~~~~
+		-- Note that *in contrast* to the above reporting of
+		-- unused bindings, (1) above uses duUses to return *all* 
+		-- the uses, even if the binding is unused.  Otherwise consider:
                 --	x = 3
                 --	y = let p = x in 'x'	-- NB: p not used
                 -- If we don't "see" the dependency of 'y' on 'x', we may put the
                 -- bindings in the wrong order, and the type checker will complain
                 -- that x isn't in scope
+		--
+		-- But note that this means we won't report 'x' as unused, 
+		-- whereas we would if we had { x = 3; p = x; y = 'x' }
 
-      return (result, 
-              -- the bound names are pruned out of all_uses
-              -- by the bindLocalNamesFV call above
-              all_uses)
+	; return (result, all_uses) }}
+         	-- The bound names are pruned out of all_uses
+	        -- by the bindLocalNamesFV call above
+	              
 
 
 -- Process the fixity declarations, making a FastString -> (Located Fixity) map
