@@ -36,7 +36,6 @@ PLATFORM := $(shell echo $(HOSTPLATFORM) | sed 's/i[567]86/i486/g')
 
 GMP_TARBALL := $(firstword $(wildcard gmp*.tar.gz))
 GMP_DIR := $(subst .tar.gz,,$(GMP_TARBALL))
-BMP_BUILD_DIR := build
 
 ifeq "$(findstring dyn, $(GhcRTSWays))" "dyn"
 BUILD_SHARED=yes
