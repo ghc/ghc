@@ -353,6 +353,11 @@ mkArgInfo :: Id
 	  -> ArgInfo
 
 mkArgInfo fun n_val_args call_cont
+  | n_val_args < idArity fun		-- Note [Unsaturated functions]
+  = ArgInfo { ai_rules = False
+	    , ai_strs = vanilla_stricts 
+	    , ai_discs = vanilla_discounts }
+  | otherwise
   = ArgInfo { ai_rules = interestingArgContext fun call_cont
 	    , ai_strs  = arg_stricts
 	    , ai_discs = arg_discounts }
@@ -383,7 +388,20 @@ mkArgInfo fun n_val_args call_cont
 		   else
 			map isStrictDmd demands ++ vanilla_stricts
 
-	  other -> vanilla_stricts	-- Not enough args, or no strictness
+	       | otherwise
+	       -> WARN( True, text "More demands than arity" <+> ppr fun <+> ppr (idArity fun) 
+				<+> ppr n_val_args <+> ppr demands ) 
+		   vanilla_stricts	-- Not enough args, or no strictness
+
+{- Note [Unsaturated functions]
+  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Consider (test eyeball/inline4)
+	x = a:as
+	y = f x
+where f has arity 2.  Then we do not want to inline 'x', because
+it'll just be floated out again.  Even if f has lots of discounts
+on its first argument -- it must be saturated for these to kick in
+-}
 
 interestingArgContext :: Id -> SimplCont -> Bool
 -- If the argument has form (f x y), where x,y are boring,
@@ -748,7 +766,7 @@ activeInline env id
   = case getMode env of
       SimplGently -> False
 	-- No inlining at all when doing gentle stuff,
-	-- except for local things that occur once
+	-- except for local things that occur once (pre/postInlineUnconditionally)
 	-- The reason is that too little clean-up happens if you 
 	-- don't inline use-once things.   Also a bit of inlining is *good* for
 	-- full laziness; it can expose constant sub-expressions.
