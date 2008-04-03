@@ -58,6 +58,7 @@ import MkIface
 import IfaceSyn
 import TcSimplify
 import TcTyClsDecls
+import TcUnify	( withBox )
 import LoadIface
 import RnNames
 import RnEnv
@@ -74,6 +75,7 @@ import Name
 import NameEnv
 import NameSet
 import TyCon
+import TysWiredIn
 import SrcLoc
 import HscTypes
 import ListSetOps
@@ -89,7 +91,6 @@ import RnTypes
 import RnExpr
 import IfaceEnv
 import MkId
-import TysWiredIn
 import IdInfo
 import {- Kind parts of -} Type
 import BasicTypes
@@ -772,19 +773,25 @@ check_main dflags tcg_env
 	     Just main_name -> do
 
 	{ traceTc (text "checkMain found" <+> ppr main_mod <+> ppr main_fn)
-	; let { rhs = nlHsApp (nlHsVar runMainIOName) (nlHsVar main_name) }
-		   	-- :Main.main :: IO () = runMainIO main 
-
-	; (main_expr, ty) <- addErrCtxt mainCtxt			$
-   			     setSrcSpan (srcLocSpan (getSrcLoc main_name)) $
-			     tcInferRho rhs
+	; let loc = srcLocSpan (getSrcLoc main_name)
+	; ioTyCon <- tcLookupTyCon ioTyConName
+	; (main_expr, res_ty) 
+		<- addErrCtxt mainCtxt	  $
+		   withBox liftedTypeKind $ \res_ty -> 
+		   tcMonoExpr (L loc (HsVar main_name)) (mkTyConApp ioTyCon [res_ty])
 
 		-- See Note [Root-main Id]
+	   	-- Construct the binding
+		-- 	:Main.main :: IO res_ty = runMainIO res_ty main 
+	; run_main_id <- tcLookupId runMainIOName
 	; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN 
 				   (mkVarOccFS FSLIT("main")) 
 				   (getSrcSpan main_name)
-	      ; root_main_id = Id.mkExportedLocalId root_main_name ty
-	      ; main_bind    = noLoc (VarBind root_main_id main_expr) }
+	      ; root_main_id = Id.mkExportedLocalId root_main_name 
+						    (mkTyConApp ioTyCon [res_ty])
+	      ; co  = mkWpTyApps [res_ty]
+	      ; rhs = nlHsApp (mkLHsWrap co (nlHsVar run_main_id)) main_expr
+	      ; main_bind = noLoc (VarBind root_main_id rhs) }
 
 	; return (tcg_env { tcg_binds = tcg_binds tcg_env 
 					`snocBag` main_bind,
