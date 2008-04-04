@@ -50,7 +50,6 @@ import HsSyn
 import TcRnMonad
 import RnEnv
 import HscTypes         ( availNames )
-import RnNames		( getLocalDeclBinders, extendRdrEnvRn )
 import RnTypes		( rnHsTypeFVs, 
 			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec, mkConOpPatRn
 			   )
@@ -111,9 +110,7 @@ matchNameMaker
 	   ; return (res, fvs) }})
 			  
 topRecNameMaker, localRecNameMaker
-  :: UniqFM (Located Fixity) -- mini fixity env for the names we're about to bind
-                             -- these fixities need to be brought into scope with the names
-  -> NameMaker
+  :: MiniFixityEnv -> NameMaker
 
 -- topNameMaker and localBindMaker do not check for unused binding
 localRecNameMaker fix_env

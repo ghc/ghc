@@ -34,7 +34,6 @@ import HsSyn
 import TcRnMonad
 import RnEnv
 import HscTypes         ( availNames )
-import RnNames		( getLocalDeclBinders, extendRdrEnvRn )
 import RnTypes		( rnHsTypeFVs, 
 			  mkOpFormRn, mkOpAppRn, mkNegAppRn, checkSectionPrec)
 import RnPat            (rnQuasiQuote, rnOverLit, rnPatsAndThen_LocalRightwards, rnBindPat,
@@ -914,8 +913,7 @@ collectRecStmtsFixities l =
                              
 -- left-hand sides
 
-rn_rec_stmt_lhs :: UniqFM (Located Fixity) -- mini fixity env for the names we're about to bind
-                                           -- these fixities need to be brought into scope with the names
+rn_rec_stmt_lhs :: MiniFixityEnv
                 -> LStmt RdrName
                    -- rename LHS, and return its FVs
                    -- Warning: we will only need the FreeVars below in the case of a BindStmt,
@@ -956,8 +954,7 @@ rn_rec_stmt_lhs _ stmt@(L _ (TransformStmt _ _ _))	-- Syntactically illegal in m
 rn_rec_stmt_lhs _ stmt@(L _ (GroupStmt _ _))	-- Syntactically illegal in mdo
   = pprPanic "rn_rec_stmt" (ppr stmt)
   
-rn_rec_stmts_lhs :: UniqFM (Located Fixity) -- mini fixity env for the names we're about to bind
-                                            -- these fixities need to be brought into scope with the names
+rn_rec_stmts_lhs :: MiniFixityEnv
                  -> [LStmt RdrName] 
                  -> RnM [(LStmtLR Name RdrName, FreeVars)]
 rn_rec_stmts_lhs fix_env stmts = 

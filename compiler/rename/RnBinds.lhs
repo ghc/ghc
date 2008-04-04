@@ -20,7 +20,7 @@ module RnBinds (rnTopBinds, rnTopBindsLHS, rnTopBindsRHS, -- use these for top-l
                 rnLocalBindsAndThen, rnValBindsLHS, rnValBindsRHS, -- or these for local bindings
                 rnMethodBinds, renameSigs, mkSigTvFn,
                 rnMatchGroup, rnGRHSs,
-                makeMiniFixityEnv
+                makeMiniFixityEnv, MiniFixityEnv
    ) where
 
 #include "HsVersions.h"
@@ -36,16 +36,7 @@ import RnPat          (rnPatsAndThen_LocalRightwards, rnBindPat,
                        NameMaker, localRecNameMaker, topRecNameMaker, applyNameMaker, 
                        patSigErr)
                       
-import RnEnv		( lookupLocatedBndrRn, 
-                          lookupInstDeclBndr, newIPNameRn,
-                          lookupLocatedSigOccRn, bindPatSigTyVarsFV,
-                          bindLocalFixities, bindSigTyVarsFV, 
-                          warnUnusedLocalBinds, mapFvRn, extendTyVarEnvFVRn,
-                          bindLocatedLocalsFV, bindLocalNames, bindLocalNamesFV,
-                          bindLocalNamesFV_WithFixities,
-                          bindLocatedLocalsRn,
-                          checkDupAndShadowedRdrNames
-			)
+import RnEnv
 import DynFlags	( DynFlag(..) )
 import HscTypes		(FixItem(..))
 import Name
@@ -175,8 +166,7 @@ it expects the global environment to contain bindings for the binders
 \begin{code}
 -- for top-level bindings, we need to make top-level names,
 -- so we have a different entry point than for local bindings
-rnTopBindsLHS :: UniqFM (Located Fixity) -- mini fixity env for the names we're about to bind
-                                         -- these fixities need to be brought into scope with the names
+rnTopBindsLHS :: MiniFixityEnv
               -> HsValBinds RdrName 
               -> RnM (HsValBindsLR Name RdrName)
 rnTopBindsLHS fix_env binds = 
@@ -200,7 +190,7 @@ rnTopBindsRHS bound_names binds =
 rnTopBinds :: HsValBinds RdrName 
            -> RnM (HsValBinds Name, DefUses)
 rnTopBinds b = 
-  do nl <- rnTopBindsLHS emptyUFM b
+  do nl <- rnTopBindsLHS emptyOccEnv b
      let bound_names = map unLoc (collectHsValBinders nl)
      bindLocalNames bound_names  $ rnTopBindsRHS bound_names nl
        
@@ -262,8 +252,7 @@ rnIPBind (IPBind n expr) = do
 \begin{code}
 -- wrapper for local binds
 -- creates the documentation info and calls the helper below
-rnValBindsLHS :: UniqFM (Located Fixity) -- mini fixity env for the names we're about to bind
-                                         -- these fixities need to be brought into scope with the names
+rnValBindsLHS :: MiniFixityEnv
               -> HsValBinds RdrName
               -> RnM (HsValBindsLR Name RdrName)
 rnValBindsLHS fix_env binds = 
@@ -274,8 +263,7 @@ rnValBindsLHS fix_env binds =
 -- just so we don't forget to do it somewhere
 rnValBindsLHSFromDoc_Local :: [Located RdrName] -- RdrNames of the LHS (so we don't have to gather them twice)
                            -> SDoc              -- doc string for dup names and shadowing
-                           -> UniqFM (Located Fixity) -- mini fixity env for the names we're about to bind
-                                                      -- these fixities need to be brought into scope with the names
+                           -> MiniFixityEnv
                            -> HsValBinds RdrName
                            -> RnM (HsValBindsLR Name RdrName)
 
@@ -332,6 +320,8 @@ rnValBindsRHSGen :: (FreeVars -> FreeVars)  -- for trimming free var sets
 
 rnValBindsRHSGen trim bound_names binds@(ValBindsIn mbinds sigs) = do
    -- rename the sigs
+   env <- getGblEnv
+   traceRn (ptext SLIT("Rename sigs") <+> ppr (tcg_rdr_env env))
    sigs' <- rename_sigs sigs
    -- rename the RHSes
    binds_w_dus <- mapBagM (rnBind (mkSigTvFn sigs') trim) mbinds
@@ -420,11 +410,10 @@ rnValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside
 -- Checks for duplicates, but not that only locally defined things are fixed.
 -- Note: for local fixity declarations, duplicates would also be checked in
 --       check_sigs below.  But we also use this function at the top level.
-makeMiniFixityEnv :: [LFixitySig RdrName]
-              -> RnM (UniqFM (Located Fixity)) -- key is the FastString of the OccName
-                                               -- of the fixity declaration it came from
-                                               
-makeMiniFixityEnv decls = foldlM add_one emptyUFM decls
+
+makeMiniFixityEnv :: [LFixitySig RdrName] -> RnM MiniFixityEnv
+
+makeMiniFixityEnv decls = foldlM add_one emptyOccEnv decls
  where
    add_one env (L loc (FixitySig (L name_loc name) fixity)) = do
      { -- this fixity decl is a duplicate iff
@@ -432,14 +421,13 @@ makeMiniFixityEnv decls = foldlM add_one emptyUFM decls
        -- (we only need to check the local fix_env because
        --  definitions of non-local will be caught elsewhere)
        let {occ = rdrNameOcc name;
-            curKey = occNameFS occ;
             fix_item = L loc fixity};
 
-       case lookupUFM env curKey of
-         Nothing -> return $ addToUFM env curKey fix_item
+       case lookupOccEnv env occ of
+         Nothing -> return $ extendOccEnv env occ fix_item
          Just (L loc' _) -> do
            { setSrcSpan loc $ 
-                        addLocErr (L name_loc name) (dupFixityDecl loc')
+             addLocErr (L name_loc name) (dupFixityDecl loc')
            ; return env}
      }
 

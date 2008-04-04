@@ -12,9 +12,8 @@
 -- for details
 
 module RnNames (
-	rnImports, importsFromLocalDecls,
-	rnExports,
-	getLocalDeclBinders, extendRdrEnvRn,
+	rnImports, getLocalNonValBinders,
+	rnExports, extendGlobalRdrEnvRn,
 	reportUnusedNames, finishDeprecations,
     ) where
 
@@ -275,82 +274,70 @@ From the top-level declarations of this module produce
 	* the ImportAvails
 created by its bindings.  
 	
+Note [Shadowing in extendRdrEnvRn]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Usually when etending the GlobalRdrEnv we complain if a new binding
+duplicates an existing one.  By adding the bindings one at a time, 
+this check also complains if we add two new bindings for the same name.
+(Remember that in Template Haskell the duplicates might *already be* 
+in the GlobalRdrEnv from higher up the module.)
+
+But with a Template Haskell quotation we want to *shadow*:
+	f x = h [d| f = 3 |]
+Here the inner binding for 'f' simply shadows the outer one.
+And that applies even if the binding for 'f' is in a where-clause,
+and hence is in the *local* RdrEnv not the *global* RdrEnv.
+
+Hence the shadowP boolean passed in. 
+
 \begin{code}
--- Bool determines shadowing:
---    true: names in the group should shadow other UnQuals
---          with the same OccName (used in Template Haskell)
---    false: duplicates should be reported as an error
---
--- The UniqFM (OccName -> FixItem) associates a Name's OccName's
--- FastString with a fixity declaration (that needs the actual OccName
--- to be plugged in).  This fixity must be brought into scope when such
--- a Name is.
-importsFromLocalDecls :: Bool -> HsGroup RdrName -> UniqFM (Located Fixity) -> RnM TcGblEnv
-importsFromLocalDecls shadowP group fixities
-  = do	{ gbl_env  <- getGblEnv
+extendGlobalRdrEnvRn :: Bool	-- Note [Shadowing in extendGlobalRdrEnvRn]
+               	     -> [AvailInfo]
+	       	     -> MiniFixityEnv
+	       	     -> RnM (TcGblEnv, TcLclEnv)
+  -- Updates both the GlobalRdrEnv and the FixityEnv
+  -- We return a new TcLclEnv only becuase we might have to
+  -- delete some bindings from it; see Note [Shadowing in extendGlobalRdrEnvRn]
 
-	; avails <- getLocalDeclBinders gbl_env group
+extendGlobalRdrEnvRn shadowP avails new_fixities
+  = do	{ (gbl_env, lcl_env) <- getEnvs
+	; let rdr_env = tcg_rdr_env gbl_env
+	      fix_env = tcg_fix_env gbl_env
 
-	; (rdr_env', fix_env') <- extendRdrEnvRn shadowP (tcg_rdr_env gbl_env,
-                                                          tcg_fix_env gbl_env)
-                                     avails fixities
+		-- Delete new_occs from global and local envs
+		-- We are going to shadow them
+	      new_occs = map (nameOccName . gre_name) gres
+	      rdr_env1 = hideSomeUnquals rdr_env new_occs
+	      lcl_env1 = lcl_env { tcl_rdr = delListFromOccEnv (tcl_rdr lcl_env) new_occs }
+	
+ 		-- Note [Shadowing in extendGlobalRdrEnvRn]
+	      (rdr_env2, lcl_env2) | shadowP   = (rdr_env1, lcl_env1)
+				   | otherwise = (rdr_env,  lcl_env)
 
-        ; traceRn (text "local avails: " <> ppr avails)
+	; (rdr_env', fix_env') <- foldlM extend (rdr_env2, fix_env) gres
+	
+	; let gbl_env' = gbl_env { tcg_rdr_env = rdr_env', tcg_fix_env = fix_env' }
+	; return (gbl_env', lcl_env2) }
+  where
+    gres = gresFromAvails LocalDef avails
 
-	; return (gbl_env { tcg_rdr_env = rdr_env',
-                             tcg_fix_env = fix_env'})
-	}
+    extend envs@(cur_rdr_env, cur_fix_env) gre
+	= let gres = lookupGlobalRdrEnv cur_rdr_env (nameOccName (gre_name gre)) 
+          in case filter isLocalGRE gres of -- Check for existing *local* defns 
+                  dup_gre:_ -> do { addDupDeclErr (gre_name dup_gre) (gre_name gre)
+	                          ; return envs }
+                  [] -> return (simple_extend envs gre)
 
--- Bool determines shadowing as in importsFromLocalDecls.
--- UniqFM FixItem is the same as in importsFromLocalDecls.
---
--- Add the new locally-bound names one by one, checking for duplicates as
--- we do so.  Remember that in Template Haskell the duplicates
--- might *already be* in the GlobalRdrEnv from higher up the module.
---
--- Also update the FixityEnv with the fixities for the names brought into scope.
---
--- Note that the return values are the extensions of the two inputs,
--- not the extras relative to them.  
-extendRdrEnvRn :: Bool -> (GlobalRdrEnv, NameEnv FixItem)  
-                  -> [AvailInfo] -> UniqFM (Located Fixity) -> RnM (GlobalRdrEnv, NameEnv FixItem)
-extendRdrEnvRn shadowP (rdr_env, fix_env) avails fixities = 
-    let --  if there is a fixity decl for the gre,
+    simple_extend (rdr_env, fix_env) gre 
+      = (extendGlobalRdrEnv rdr_env gre, fix_env')
+      where
+     	--  If there is a fixity decl for the gre,
         --  add it to the fixity env
-        extendFixEnv env gre = 
-            let name = gre_name gre 
-                occ = nameOccName name
-                curKey = occNameFS occ in
-            case lookupUFM fixities curKey of
-              Nothing -> env
-              Just (L _ fi) -> extendNameEnv env name (FixItem occ fi)
-
-        (rdr_env_to_extend, extender) = 
-            if shadowP 
-            then -- when shadowing is on, 
-                 -- (1) we need to remove the existing Unquals for the
-                 --     names we're extending the env with
-                 -- (2) but extending the env is simple
-                let names = concatMap availNames avails
-                    new_occs = map nameOccName names
-                    trimmed_rdr_env = hideSomeUnquals rdr_env new_occs
-                in 
-                  (trimmed_rdr_env, 
-                   \(cur_rdr_env, cur_fix_env) -> \gre -> 
-                      return (extendGlobalRdrEnv cur_rdr_env gre,
-                              extendFixEnv cur_fix_env gre))
-            else -- when shadowing is off,
-                 -- (1) we don't munge the incoming env
-                 -- (2) but we need to check for dups when extending
-                 (rdr_env, 
-                  \(cur_rdr_env, cur_fix_env) -> \gre -> 
-                    let gres = lookupGlobalRdrEnv cur_rdr_env (nameOccName (gre_name gre)) 
-                    in case filter isLocalGRE gres of -- Check for existing *local* defns 
-                         dup_gre:_ -> do { addDupDeclErr (gre_name dup_gre) (gre_name gre)
-	                                  ; return (cur_rdr_env, cur_fix_env) }
-                         [] -> return (extendGlobalRdrEnv cur_rdr_env gre,
-                                      extendFixEnv cur_fix_env gre))
-    in foldlM extender (rdr_env_to_extend, fix_env) (gresFromAvails LocalDef avails)
+	name = gre_name gre
+        occ = nameOccName name
+        fix_env' = case lookupOccEnv new_fixities occ of
+                     Nothing       -> fix_env
+                     Just (L _ fi) -> extendNameEnv fix_env name (FixItem occ fi)
 \end{code}
 
 @getLocalDeclBinders@ returns the names for an @HsDecl@.  It's
@@ -370,13 +357,24 @@ raising a duplicate declaration error.  So, we make a new name for it, but
 don't return it in the 'AvailInfo'.
 
 \begin{code}
--- Note: this function does NOT get the binders of the ValBinds that
--- will be bound during renaming
-getLocalDeclBinders :: TcGblEnv -> HsGroup RdrName -> RnM [AvailInfo]
-getLocalDeclBinders gbl_env (HsGroup {hs_valds = ValBindsIn val_decls val_sigs,
-				         hs_tyclds = tycl_decls, 
-				         hs_instds = inst_decls,
-				         hs_fords = foreign_decls })
+getLocalNonValBinders :: HsGroup RdrName -> RnM [AvailInfo]
+-- Get all the top-level binders bound the group *except* 
+-- for value bindings, which are treated separately
+-- Specificaly we return AvailInfo for
+--	type decls
+--	class decls
+--	associated types
+--	foreign imports
+--	(in hs-boot files) value signatures
+
+getLocalNonValBinders group
+  = do 	{ gbl_env <- getGblEnv
+	; get_local_binders gbl_env group }
+
+get_local_binders gbl_env (HsGroup {hs_valds  = ValBindsIn _ val_sigs,
+				    hs_tyclds = tycl_decls, 
+				    hs_instds = inst_decls,
+				    hs_fords  = foreign_decls })
   = do	{ tc_names_s <- mapM new_tc tycl_decls
 	; at_names_s <- mapM inst_ats inst_decls
 	; val_names  <- mapM new_simple val_bndrs
@@ -1264,7 +1262,7 @@ warnDuplicateImports gres
 	--
 	-- NOTE: currently the test does not warn about
 	--		import M( x )
-	--		imoprt N( x )
+	--		import N( x )
 	-- even if the same underlying 'x' is involved, because dropping
 	-- either import would change the qualified names in scope (M.x, N.x)
 	-- But if the qualified names aren't used, the import is indeed redundant

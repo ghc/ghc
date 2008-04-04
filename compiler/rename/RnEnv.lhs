@@ -25,7 +25,8 @@ module RnEnv (
 	getLookupOccRn,
 
 	newLocalsRn, newIPNameRn,
-	bindLocalNames, bindLocalNamesFV, bindLocalNamesFV_WithFixities,
+	bindLocalNames, bindLocalNamesFV, 
+	MiniFixityEnv, bindLocalNamesFV_WithFixities,
 	bindLocatedLocalsFV, bindLocatedLocalsRn,
 	bindSigTyVarsFV, bindPatSigTyVars, bindPatSigTyVarsFV,
 	bindTyVarsRn, extendTyVarEnvFVRn,
@@ -57,8 +58,7 @@ import NameSet
 import NameEnv
 import LazyUniqFM
 import DataCon		( dataConFieldLabels )
-import OccName		( OccName, tcName, isDataOcc, pprNonVarNameSpace, occNameSpace,
-			  reportIfUnused, occNameFS )
+import OccName
 import Module		( Module, ModuleName )
 import PrelNames	( mkUnboundName, rOOT_MAIN, iNTERACTIVE, 
 			  consDataConKey, hasKey, forall_tv_RDR )
@@ -547,6 +547,13 @@ lookupLocalDataTcNames rdr_name
     }
 
 --------------------------------
+type MiniFixityEnv = OccEnv (Located Fixity)
+	-- Mini fixity env for the names we're about 
+	-- to bind, in a single binding group
+	--
+	-- We keep the location so that if we find
+	-- a duplicate, we can report it sensibly
+
 bindLocalFixities :: [FixitySig RdrName] -> (UniqFM (Located Fixity) -> RnM a) -> RnM a
 -- Used for nested fixity decls:
 --   bind the names that are in scope already;
@@ -580,7 +587,7 @@ bindLocalFixities fixes thing_inside
 -- the fixities are given as a UFM from an OccName's FastString to a fixity decl
 -- Also check for unused binders
 bindLocalNamesFV_WithFixities :: [Name]
-			      -> UniqFM (Located Fixity)
+			      -> MiniFixityEnv
 			      -> RnM (a, FreeVars) -> RnM (a, FreeVars)
 bindLocalNamesFV_WithFixities names fixities thing_inside
   = bindLocalNamesFV names $
@@ -591,7 +598,7 @@ bindLocalNamesFV_WithFixities names fixities thing_inside
     boundFixities = foldr 
                         (\ name -> \ acc -> 
                          -- check whether this name has a fixity decl
-                          case lookupUFM fixities (occNameFS (nameOccName name)) of
+                          case lookupOccEnv fixities (nameOccName name) of
                                Just (L _ fix) -> (name, FixItem (nameOccName name) fix) : acc
                                Nothing -> acc) [] names
     -- bind the names; extend the fixity env; do the thing inside

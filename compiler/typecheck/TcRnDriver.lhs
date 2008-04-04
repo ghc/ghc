@@ -290,10 +290,11 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
        --          (b) tcExtCoreBindings doesn't need anything
        --              (in fact, it might not even need to be in the scope of
        --               this tcg_env at all)
-   tcg_env  <- importsFromLocalDecls False (mkFakeGroup ldecls) 
-               emptyUFM {- no fixity decls -} ;
+   avails  <- getLocalNonValBinders (mkFakeGroup ldecls) ;
+   tc_envs <- extendGlobalRdrEnvRn False avails 
+			           emptyOccEnv {- no fixity decls -} ;
 
-   setGblEnv tcg_env $ do {
+   setEnvs tc_envs $ do {
 
    rn_decls <- checkNoErrs $ rnTyClDecls ldecls ;
 

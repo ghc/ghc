@@ -36,8 +36,8 @@ import RnEnv		( lookupLocalDataTcNames,
 			  bindTyVarsRn, extendTyVarEnvFVRn,
 			  bindLocalNames, checkDupRdrNames, mapFvRn, lookupGreLocalRn,
 			)
-import RnNames       (importsFromLocalDecls, extendRdrEnvRn)
-import HscTypes      (GenAvailInfo(..))
+import RnNames       	( getLocalNonValBinders, extendGlobalRdrEnvRn )
+import HscTypes      	( GenAvailInfo(..) )
 import RnHsDoc          ( rnHsDoc, rnMbLHsDoc )
 import TcRnMonad
 
@@ -98,10 +98,10 @@ Checks the @(..)@ etc constraints in the export list.
 
 
 \begin{code}
--- brings the binders of the group into scope in the appropriate places;
+-- Brings the binders of the group into scope in the appropriate places;
 -- does NOT assume that anything is in scope already
 --
--- the Bool determines whether (True) names in the group shadow existing
+-- The Bool determines whether (True) names in the group shadow existing
 -- Unquals in the global environment (used in Template Haskell) or
 -- (False) whether duplicates are reported as an error
 rnSrcDecls :: Bool -> HsGroup RdrName -> RnM (TcGblEnv, HsGroup Name)
@@ -123,8 +123,10 @@ rnSrcDecls shadowP group@(HsGroup {hs_valds  = val_decls,
    local_fix_env <- makeMiniFixityEnv fix_decls;
 
    -- (B) Bring top level binders (and their fixities) into scope,
-   --     except for the value bindings, which get brought in below.
-   inNewEnv (importsFromLocalDecls shadowP group local_fix_env) $ \ tcg_env -> do {
+   --     *except* for the value bindings, which get brought in below.
+   avails <- getLocalNonValBinders group ;
+   tc_envs <- extendGlobalRdrEnvRn shadowP avails local_fix_env ;
+   setEnvs tc_envs $ do {
 
    failIfErrsM ; -- No point in continuing if (say) we have duplicate declarations
 
@@ -132,7 +134,7 @@ rnSrcDecls shadowP group@(HsGroup {hs_valds  = val_decls,
    --     extend the record field env.
    --     This depends on the data constructors and field names being in
    --     scope from (B) above
-   inNewEnv (extendRecordFieldEnv tycl_decls) $ \ tcg_env -> do {
+   inNewEnv (extendRecordFieldEnv tycl_decls) $ \ _ -> do {
 
    -- (D) Rename the left-hand sides of the value bindings.
    --     This depends on everything from (B) being in scope,
@@ -143,12 +145,8 @@ rnSrcDecls shadowP group@(HsGroup {hs_valds  = val_decls,
    let { lhs_binders = map unLoc $ collectHsValBinders new_lhs;
          lhs_avails = map Avail lhs_binders
        } ;
-   inNewEnv (extendRdrEnvRn shadowP (tcg_rdr_env tcg_env, tcg_fix_env tcg_env)
-                             lhs_avails local_fix_env
-              >>= \ (new_rdr_env, new_fix_env) -> 
-                         return (tcg_env { tcg_rdr_env = new_rdr_env,
-                                           tcg_fix_env = new_fix_env
-                                         })) $ \tcg_env -> do {
+   (tcg_env, tcl_env) <- extendGlobalRdrEnvRn shadowP lhs_avails local_fix_env ;
+   setEnvs (tcg_env, tcl_env) $ do {
 
    --  Now everything is in scope, as the remaining renaming assumes.
 
@@ -637,7 +635,7 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 	; (derivs', deriv_fvs) <- rn_derivs derivs
 	; condecls' <- rnConDecls (unLoc tycon') condecls
 		-- No need to check for duplicate constructor decls
-		-- since that is done by RnNames.extendRdrEnvRn
+		-- since that is done by RnNames.extendGlobalRdrEnvRn
 	; returnM (TyData {tcdND = new_or_data, tcdCtxt = context', 
 			   tcdLName = tycon', tcdTyVars = tyvars', 
 			   tcdTyPats = typats', tcdKindSig = Nothing, 
@@ -665,7 +663,7 @@ rnTyClDecl (tydecl@TyData {tcdND = new_or_data, tcdCtxt = context,
 	; (derivs', deriv_fvs) <- rn_derivs derivs
 	; condecls' <- rnConDecls (unLoc tycon') condecls
 		-- No need to check for duplicate constructor decls
-		-- since that is done by RnNames.extendRdrEnvRn
+		-- since that is done by RnNames.extendGlobalRdrEnvRn
 	; returnM (TyData {tcdND = new_or_data, tcdCtxt = noLoc [], 
 			   tcdLName = tycon', tcdTyVars = tyvars', 
 			   tcdTyPats = Nothing, tcdKindSig = sig,
@@ -730,7 +728,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	     ; return   (tyvars', context', fds', ats', ats_fvs, sigs') }
 
 	-- No need to check for duplicate associated type decls
-	-- since that is done by RnNames.extendRdrEnvRn
+	-- since that is done by RnNames.extendGlobalRdrEnvRn
 
 	-- Check the signatures
 	-- First process the class op sigs (op_sigs), then the fixity sigs (non_op_sigs).
@@ -756,7 +754,7 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
 	          gen_rdr_tyvars_w_locs = [ tv | tv <- extractGenericPatTyVars mbinds,
 	    		 		         not (unLoc tv `elemLocalRdrEnv` name_env) ]
 		-- No need to check for duplicate method signatures
-		-- since that is done by RnNames.extendRdrEnvRn
+		-- since that is done by RnNames.extendGlobalRdrEnvRn
 		-- and the methods are already in scope
 	    ; gen_tyvars <- newLocalsRn gen_rdr_tyvars_w_locs
 	    ; rnMethodBinds (unLoc cname') (mkSigTvFn sigs') gen_tyvars mbinds }
@@ -858,7 +856,7 @@ rnConDeclDetails doc (InfixCon ty1 ty2)
 rnConDeclDetails doc (RecCon fields)
   = do	{ new_fields <- mappM (rnField doc) fields
 		-- No need to check for duplicate fields
-		-- since that is done by RnNames.extendRdrEnvRn
+		-- since that is done by RnNames.extendGlobalRdrEnvRn
 	; return (RecCon new_fields) }
 
 rnField doc (ConDeclField name ty haddock_doc)
