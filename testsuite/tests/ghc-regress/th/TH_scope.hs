@@ -1,9 +1,8 @@
+-- Test for Trac #2188
 
 module TH_scope where
 
-import TH_scope_helper
-
-x :: ()
-x = ()
-    where hold = $( wibble [d| hold :: ()
-                               hold = () |] )
+f g = [d| f :: Int
+          f = g
+          g :: Int
+          g = 4 |]
