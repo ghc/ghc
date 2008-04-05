@@ -39,6 +39,8 @@ import Data.IORef
 import Data.List
 import Data.Typeable
 import System.CPUTime
+import System.Directory
+import System.Environment
 import System.IO
 import Control.Monad as Monad
 import GHC.Exts
@@ -68,13 +70,14 @@ data GHCiState = GHCiState
         -- remember is here:
         last_command   :: Maybe Command,
         cmdqueue       :: [String],
-        remembered_ctx :: [(CtxtCmd, [String], [String])]
+        remembered_ctx :: [(CtxtCmd, [String], [String])],
              -- we remember the :module commands between :loads, so that
              -- on a :reload we can replay them.  See bugs #2049,
              -- #1873, #1360. Previously we tried to remember modules that
              -- were supposed to be in the context but currently had errors,
              -- but this was complicated.  Just replaying the :module commands
              -- seems to be the right thing.
+        virtual_path   :: FilePath
      }
 
 data CtxtCmd
@@ -192,6 +195,30 @@ printForUserPartWay doc = do
   session <- getSession
   unqual <- io (GHC.getPrintUnqual session)
   io $ Outputable.printForUserPartWay stdout opt_PprUserLength unqual doc
+
+withVirtualPath :: GHCi a -> GHCi a
+withVirtualPath m = do
+  ghci_wd <- io getCurrentDirectory                -- Store the cwd of GHCi
+  st  <- getGHCiState
+  io$ setCurrentDirectory (virtual_path st)
+  result <- m                                  -- Evaluate in the virtual wd..
+  vwd <- io getCurrentDirectory
+  setGHCiState (st{ virtual_path = vwd})       -- Update the virtual path
+  io$ setCurrentDirectory ghci_wd                  -- ..and restore GHCi wd
+  return result
+
+runStmt :: String -> GHC.SingleStep -> GHCi GHC.RunResult
+runStmt expr step = withVirtualPath$ do
+  session <- getSession
+  st      <- getGHCiState
+  io$ withProgName (progname st) $ withArgs (args st) $
+                    GHC.runStmt session expr step
+
+resume :: GHC.SingleStep -> GHCi GHC.RunResult
+resume step = withVirtualPath$ do
+  session <- getSession
+  io$ GHC.resume session step
+
 
 -- --------------------------------------------------------------------------
 -- timing & statistics

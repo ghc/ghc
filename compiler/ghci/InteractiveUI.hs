@@ -11,12 +11,13 @@ module InteractiveUI ( interactiveUI, ghciWelcomeMsg ) where
 
 #include "HsVersions.h"
 
-import GhciMonad
+import qualified GhciMonad
+import GhciMonad hiding (runStmt)
 import GhciTags
 import Debugger
 
 -- The GHC interface
-import qualified GHC
+import qualified GHC hiding (resume, runStmt)
 import GHC              ( Session, LoadHowMuch(..), Target(..),  TargetId(..),
                           Module, ModuleName, TyThing(..), Phase,
                           BreakIndex, SrcSpan, Resume, SingleStep )
@@ -335,6 +336,8 @@ interactiveUI session srcs maybe_exprs = do
 
    default_editor <- findEditor
 
+   cwd <- getCurrentDirectory
+
    startGHCi (runGHCi srcs maybe_exprs)
         GHCiState{ progname = "<interactive>",
                    args = [],
@@ -349,7 +352,8 @@ interactiveUI session srcs maybe_exprs = do
                    tickarrays = emptyModuleEnv,
                    last_command = Nothing,
                    cmdqueue = [],
-                   remembered_ctx = []
+                   remembered_ctx = [],
+                   virtual_path   = cwd
                  }
 
 #ifdef USE_EDITLINE
@@ -685,12 +689,8 @@ runStmt stmt step
  | null (filter (not.isSpace) stmt) = return False
  | ["import", mod] <- words stmt    = keepGoing setContext ('+':mod)
  | otherwise
- = do st <- getGHCiState
-      session <- getSession
-      result <- io $ withProgName (progname st) $ withArgs (args st) $
-	     	     GHC.runStmt session stmt step
+ = do result <- GhciMonad.runStmt stmt step
       afterRunStmt (const True) result
-
 
 --afterRunStmt :: GHC.RunResult -> GHCi Bool
                                  -- False <=> the statement failed to compile
@@ -719,7 +719,7 @@ afterRunStmt step_here run_result = do
                st <- getGHCiState
                enqueueCommands [stop st]
                return ()
-         | otherwise -> io(GHC.resume session GHC.SingleStep) >>= 
+         | otherwise -> resume GHC.SingleStep >>=
                         afterRunStmt step_here >> return ()
      _ -> return ()
 
@@ -1946,8 +1946,7 @@ continueCmd = noArgs $ doContinue (const True) GHC.RunToCompletion
 -- doContinue :: SingleStep -> GHCi ()
 doContinue :: (SrcSpan -> Bool) -> SingleStep -> GHCi ()
 doContinue pred step = do 
-  session <- getSession
-  runResult <- io $ GHC.resume session step
+  runResult <- resume step
   afterRunStmt pred runResult
   return ()
 
