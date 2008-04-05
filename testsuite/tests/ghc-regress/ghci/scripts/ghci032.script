@@ -1,0 +1,8 @@
+
+import System.FilePath
+import System.Directory
+wd1 <- getCurrentDirectory
+setCurrentDirectory ".."
+wd2 <- getCurrentDirectory
+wd1_parent <- canonicalizePath (wd1 </> "..") 
+wd1_parent `equalFilePath` wd2
