@@ -1898,8 +1898,9 @@ summariseModule hsc_env old_summary_map is_boot (L loc wanted_mod) maybe_buf exc
 
 	when (mod_name /= wanted_mod) $
 		throwDyn $ mkPlainErrMsg mod_loc $ 
-			      text "file name does not match module name"
-			      <+> quotes (ppr mod_name)
+			      text "File name does not match module name:" 
+			      $$ text "Saw:" <+> quotes (ppr mod_name)
+                              $$ text "Expected:" <+> quotes (ppr wanted_mod)
 
 		-- Find the object timestamp, and return the summary
 	obj_timestamp <- getObjTimestamp location is_boot
