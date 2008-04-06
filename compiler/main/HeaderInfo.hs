@@ -196,8 +196,9 @@ checkExtension (L l ext)
 
 languagePragParseError :: SrcSpan -> a
 languagePragParseError loc =
-  pgmError (showSDoc (mkLocMessage loc (
-                text "cannot parse LANGUAGE pragma")))
+  pgmError 
+   (showSDoc (mkLocMessage loc (
+     text "cannot parse LANGUAGE pragma: comma-separated list expected")))
 
 unsupportedExtnError :: SrcSpan -> String -> a
 unsupportedExtnError loc unsup =
