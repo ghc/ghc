@@ -618,6 +618,8 @@ extern StgWord RTS_VAR(sched_mutex);
 // Apply.cmm
 // canned bitmap for each arg type
 extern StgWord stg_arg_bitmaps[];
+extern StgWord stg_ap_stack_entries[];
+extern StgWord stg_stack_save_entries[];
 
 // Storage.c
 extern unsigned int RTS_VAR(alloc_blocks);
