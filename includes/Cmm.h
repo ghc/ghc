@@ -102,18 +102,8 @@
 #endif
 
 /*
- * The RTS must UNTAG a pointer before dereferencing it.
- * The use of UNTAG follows the following rules of thumb:
- *
- * - Any pointer might be tagged.
- * - Except the pointers that are passed in R1 to RTS functions.
- * - R1 is also untagged when entering constructor code.
- * 
- * TODO:
- *
- * - Remove redundancies of tagging and untagging in code generation.
- * - Optimize getTag or dataToTag# ?
- *
+ * The RTS must sometimes UNTAG a pointer before dereferencing it.
+ * See the wiki page Commentary/Rts/HaskellExecution/PointerTagging 
  */
 #define TAG_MASK ((1 << TAG_BITS) - 1)
 #define UNTAG(p) (p & ~TAG_MASK)
