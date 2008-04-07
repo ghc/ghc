@@ -54,8 +54,8 @@ import TcRnMonad
 import TcType
 import TcMType
 import TcUnify
-import TcGadt
 import TcEnv
+import Unify
 import DriverPhases
 import TyCon
 import Name

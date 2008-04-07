@@ -1151,7 +1151,7 @@ Given the FD of Modular in this example, class improvement will instantiate
 t_a to 'a', where 'a' is the skolem from test5's signatures (due to the
 Modular s a predicate in that signature).  If we don't zonk (Modular s t_a) in
 the givens, we will get into a loop as improveOne uses the unification engine
-TcGadt.tcUnifyTys, which doesn't know about mutable type variables.
+Unify.tcUnifyTys, which doesn't know about mutable type variables.
 
 
 Note [LOOP]

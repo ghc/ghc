@@ -27,7 +27,6 @@ import VarSet
 import Name
 import TcType
 import TyCon
-import TcGadt
 import Unify
 import Outputable
 import BasicTypes

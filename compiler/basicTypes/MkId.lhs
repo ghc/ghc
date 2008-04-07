@@ -50,9 +50,9 @@ import Rules
 import TysPrim
 import TysWiredIn
 import PrelRules
+import Unify
 import Type
 import TypeRep
-import TcGadt
 import Coercion
 import TcType
 import CoreUtils

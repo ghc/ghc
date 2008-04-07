@@ -23,9 +23,8 @@ module FamInstEnv (
 #include "HsVersions.h"
 
 import InstEnv
-import Unify
-import TcGadt
 import TcType
+import Unify
 import Type
 import TypeRep
 import TyCon

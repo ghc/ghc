@@ -20,8 +20,8 @@ module FunDeps (
 import Name
 import Var
 import Class
-import TcGadt
 import TcType
+import Unify
 import InstEnv
 import VarSet
 import VarEnv
