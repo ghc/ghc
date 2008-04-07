@@ -49,7 +49,7 @@ Mailing lists
 -------------
 
    Ask on glasgow-haskell-users@haskell.org if you have difficulties.
-   If you're working with the current CVS sources of GHC, then
+   If you're working with the current darcs sources of GHC, then
    cvs-ghc@haskell.org might be a more appropriate (developers hang
    out here).  See http://www.haskell.org/mailman/listinfo for
    subscription.
