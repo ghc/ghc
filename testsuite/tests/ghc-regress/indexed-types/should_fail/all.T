@@ -29,7 +29,7 @@ test('TyFamUndec', normal, compile_fail, [''])
 
 test('GADTwrong1', if_compiler_lt('ghc', '6.9', expect_fail), compile_fail, [''])
 
-test('Over', normal, multimod_compile_fail, ['OverD', '-no-hs-main -no-link'])
+test('Over', normal, multimod_compile_fail, ['OverD', '-no-hs-main -no-link -v0'])
 clean(['OverA.hi', 'OverA.o', 'OverB.hi', 'OverB.o', 'OverC.hi', 'OverC.o'])
 
 test('SkolemOccursLoop', if_compiler_lt('ghc', '6.9', skip), compile_fail, [''])
