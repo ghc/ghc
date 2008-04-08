@@ -176,7 +176,7 @@ int copyfile(const char *oldpath, const char *newpath) {
     char buf[BUFSIZE];
 
 #ifdef SYMLINKS
-    if (copy) {
+    if (copy == 0) {
         return symlink(oldpath, newpath);
     } else {
 #endif
