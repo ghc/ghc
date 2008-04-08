@@ -12,6 +12,14 @@
 #include "Hpc.h"
 #include "Trace.h"
 
+#ifdef HAVE_SYS_TYPES_H
+#include <sys/types.h>
+#endif
+
+#ifdef HAVE_SYS_STAT_H
+#include <sys/stat.h>
+#endif
+
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
@@ -165,14 +173,26 @@ readTix(void) {
 }
 
 static void hpc_init(void) {
+  char *hpc_tixdir;
   if (hpc_inited != 0) {
     return;
   }
   hpc_inited = 1;
   hpc_pid    = getpid();
+  hpc_tixdir = getenv("HPCTIXDIR");
 
-  tixFilename = (char *) malloc(strlen(prog_name) + 6);
-  sprintf(tixFilename, "%s.tix", prog_name);
+  if (hpc_tixdir != NULL) {
+    /* Make sure the directory is present
+     */
+    mkdir(hpc_tixdir,0777);
+    /* Then, try open the file
+     */
+    tixFilename = (char *) malloc(strlen(hpc_tixdir) + strlen(prog_name) + 12);
+    sprintf(tixFilename,"%s/%s-%d.tix",hpc_tixdir,prog_name,hpc_pid);
+  } else {
+    tixFilename = (char *) malloc(strlen(prog_name) + 6);
+    sprintf(tixFilename, "%s.tix", prog_name);
+  }
 
   if (init_open(fopen(tixFilename,"r"))) {
     readTix();
