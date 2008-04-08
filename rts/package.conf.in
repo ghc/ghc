@@ -25,11 +25,13 @@ library-dirs:		FPTOOLS_TOP_ABS"/rts" GMP_LIB_DIRS
 # if !defined(HAVE_LIBGMP) && !defined(HAVE_FRAMEWORK_GMP)
 			, FPTOOLS_TOP_ABS"/gmp"
 # endif
+                        , FPTOOLS_TOP_ABS"/libffi"
 #endif
 
 hs-libraries:   "HSrts"
 
 extra-libraries:		"m"		/* for ldexp() */
+			      , "ffi"
 #ifndef HAVE_FRAMEWORK_GMP
 			      , "gmp"
 #ifdef HAVE_LIBDL
@@ -55,9 +57,6 @@ extra-libraries:		"m"		/* for ldexp() */
 #endif
 #if USE_PAPI
 			     , "papi"
-#endif
-#ifdef USE_LIBFFI
-			      , "ffi"
 #endif
 
 #ifdef INSTALLING

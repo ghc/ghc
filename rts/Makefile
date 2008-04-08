@@ -159,9 +159,8 @@ SRC_CC_OPTS += -DNOSMP
 SRC_HC_OPTS += -optc-DNOSMP
 endif
 
-ifeq "$(UseLibFFI)" "YES"
-SRC_CC_OPTS += -DUSE_LIBFFI
-PACKAGE_CPP_OPTS += -DUSE_LIBFFI
+ifeq "$(UseLibFFIForAdjustors)" "YES"
+SRC_CC_OPTS += -DUSE_LIBFFI_FOR_ADJUSTORS
 endif
 
 ifneq "$(DYNAMIC_RTS)" "YES"
@@ -201,6 +200,9 @@ RtsUtils_CC_OPTS += -DBuildPlatform=$(DQ)$(BUILDPLATFORM)$(DQ)
 RtsUtils_CC_OPTS += -DTargetPlatform=$(DQ)$(TARGETPLATFORM)$(DQ)
 RtsUtils_CC_OPTS += -DGhcUnregisterised=$(DQ)$(GhcUnregisterised)$(DQ)
 RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=$(DQ)$(GhcEnableTablesNextToCode)$(DQ)
+
+# ffi.h triggers prototype warnings, so disable them here:
+Interpreter_CC_OPTS += -Wno-strict-prototypes
 
 StgCRun_CC_OPTS += -w
 Typeable_CC_OPTS += -w
@@ -312,12 +314,6 @@ CLEAN_FILES += $(AUTO_APPLY_CMM)
 endif
 
 # -----------------------------------------------------------------------------
-# Compile GMP only if we don't have it already
-#
-# We use GMP's own configuration stuff, because it's all rather hairy
-# and not worth re-implementing in our Makefile framework.
-
-CLEAN_FILES += gmp/libgmp.a
 
 # Need to get the GMP vars in through CPP to package.conf.in, and put
 # quotes around each element.
@@ -341,6 +337,14 @@ SRC_CC_OPTS += -I../gmp/gmpbuild
 SRC_HC_OPTS += -I../gmp/gmpbuild
 SRC_HSC2HS_OPTS += -I../gmp/gmpbuild
 SRC_LD_OPTS += -L../gmp/gmpbuild
+
+#-----------------------------------------------------------------------------
+# libffi stuff
+
+SRC_CC_OPTS     += -I../libffi/build/include
+SRC_HC_OPTS     += -I../libffi/build/include
+SRC_HSC2HS_OPTS += -I../libffi/build/include
+SRC_LD_OPTS     += -L../libffi/build/include
 
 #-----------------------------------------------------------------------------
 #
@@ -429,7 +433,6 @@ endif
 
 binary-dist:
 	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/rts
-	$(INSTALL_DIR)                         $(BIN_DIST_DIR)/rts/gmp
 	$(INSTALL_DATA)    Makefile            $(BIN_DIST_DIR)/rts/
 	$(INSTALL_DATA)    package.conf.in     $(BIN_DIST_DIR)/rts/
 ifneq "$(INSTALL_LIBS)" ""

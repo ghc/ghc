@@ -441,6 +441,22 @@ typedef struct _RtsSymbolVal {
    SymX(console_handler)
 #endif
 
+#define RTS_LIBFFI_SYMBOLS                      \
+     Sym(ffi_prep_cif)                          \
+     Sym(ffi_call)                              \
+     Sym(ffi_type_void)                         \
+     Sym(ffi_type_float)                        \
+     Sym(ffi_type_double)                       \
+     Sym(ffi_type_sint64)                       \
+     Sym(ffi_type_uint64)                       \
+     Sym(ffi_type_sint32)                       \
+     Sym(ffi_type_uint32)                       \
+     Sym(ffi_type_sint16)                       \
+     Sym(ffi_type_uint16)                       \
+     Sym(ffi_type_sint8)                        \
+     Sym(ffi_type_uint8)                        \
+     Sym(ffi_type_pointer)
+
 #ifdef TABLES_NEXT_TO_CODE
 #define RTS_RET_SYMBOLS /* nothing */
 #else
@@ -828,6 +844,7 @@ RTS_MINGW_ONLY_SYMBOLS
 RTS_CYGWIN_ONLY_SYMBOLS
 RTS_DARWIN_ONLY_SYMBOLS
 RTS_LIBGCC_SYMBOLS
+RTS_LIBFFI_SYMBOLS
 #undef Sym
 #undef SymX
 #undef SymX_redirect
@@ -860,6 +877,7 @@ static RtsSymbolVal rtsSyms[] = {
       RTS_CYGWIN_ONLY_SYMBOLS
       RTS_DARWIN_ONLY_SYMBOLS
       RTS_LIBGCC_SYMBOLS
+      RTS_LIBFFI_SYMBOLS
 #if defined(darwin_HOST_OS) && defined(i386_HOST_ARCH)
       // dyld stub code contains references to this,
       // but it should never be called because we treat

@@ -28,9 +28,7 @@
 #include <errno.h>
 #endif
 
-#ifdef USE_LIBFFI
-#include <ffi.h>
-#endif
+#include "ffi.h"
 
 /* --------------------------------------------------------------------------
  * The bytecode interpreter
@@ -1347,7 +1345,6 @@ run_BCO:
                So we make a copy of the argument block.
             */
 
-#ifdef USE_LIBFFI
 #define ROUND_UP_WDS(p)  ((((StgWord)(p)) + sizeof(W_)-1)/sizeof(W_))
 
             ffi_cif *cif = (ffi_cif *)marshall_fn;
@@ -1384,10 +1381,6 @@ run_BCO:
 
             // this is the function we're going to call
             fn = (void(*)(void))Sp[ret_size];
-#else
-	    W_ arguments[stk_offset];
-	    memcpy(arguments, Sp, sizeof(W_) * stk_offset);
-#endif
 
 	    // Restore the Haskell thread's current value of errno
 	    errno = cap->r.rCurrentTSO->saved_errno;
@@ -1415,11 +1408,7 @@ run_BCO:
 	    tok = suspendThread(&cap->r);
 
 	    // We already made a copy of the arguments above.
-#ifdef USE_LIBFFI
             ffi_call(cif, fn, ret, argptrs);
-#else
-	    marshall_fn ( arguments );
-#endif
 
 	    // And restart the thread again, popping the RET_DYN frame.
 	    cap = (Capability *)((void *)((unsigned char*)resumeThread(tok) - sizeof(StgFunTable)));
@@ -1441,11 +1430,7 @@ run_BCO:
 		
 	    // Copy the return value back to the TSO stack.  It is at
             // most 2 words large, and resides at arguments[0].
-#ifdef USE_LIBFFI
             memcpy(Sp, ret, sizeof(W_) * stg_min(stk_offset,ret_size));
-#else
-	    memcpy(Sp, arguments, sizeof(W_) * stg_min(stk_offset,2));
-#endif
 
 	    goto nextInsn;
 	}

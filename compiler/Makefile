@@ -308,7 +308,7 @@ else
 	@echo "cRelocatableBuild     = False"                 >> $(CONFIG_HS)
 endif
 	@echo "cLibFFI               :: Bool"                 >> $(CONFIG_HS)
-ifeq "$(UseLibFFI)" "YES"
+ifeq "$(UseLibFFIForAdjustors)" "YES"
 	@echo "cLibFFI               = True"                  >> $(CONFIG_HS)
 else
 	@echo "cLibFFI               = False"                 >> $(CONFIG_HS)
@@ -457,11 +457,6 @@ ALL_DIRS += javaGen
 SRC_HC_OPTS += -DJAVA
 endif
 
-ifeq ($(UseLibFFI),YES)
-SRC_HC_OPTS += -DUSE_LIBFFI
-SRC_HSC2HS_OPTS += -DUSE_LIBFFI
-endif
-
 ifeq "$(BootingFromHc)" "YES"
 # HC files are always from a self-booted compiler
 bootstrapped = YES
@@ -516,6 +511,9 @@ endif
 ifeq "$(GhcDebugged)" "YES"
 SRC_LD_OPTS += -debug
 endif
+
+SRC_HC_OPTS     += -I$(FPTOOLS_TOP)/libffi/build/include
+SRC_HSC2HS_OPTS += -I$(FPTOOLS_TOP)/libffi/build/include
 
 ALL_DIRS += ghci
 

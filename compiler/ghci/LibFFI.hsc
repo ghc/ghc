@@ -6,12 +6,6 @@
 --
 -----------------------------------------------------------------------------
 
-#ifndef USE_LIBFFI
-
-module LibFFI () where
-
-#else
-
 #include <ffi.h>
 
 module LibFFI (
@@ -142,5 +136,3 @@ foreign import ccall "ffi_prep_cif"
 --            -> Ptr ()                    -- put result here
 --            -> Ptr (Ptr ())              -- arg values
 --            -> IO ()
-
-#endif

@@ -21,9 +21,7 @@ import ByteCodeItbls
 import ByteCodeAsm
 import ByteCodeLink
 import ByteCodeFFI
-#ifdef USE_LIBFFI
 import LibFFI
-#endif
 
 import Outputable
 import Name
@@ -1063,19 +1061,11 @@ generateCCall d0 s p ccall_spec@(CCallSpec target cconv safety) fn args_r_to_l
 	 stk_offset   = d_after_r - s
 
      -- in
-#if !defined(USE_LIBFFI)
-     -- In the native case, we build marshalling code and attach the
-     -- address of that to the CCALL instruction
-     addr_of_marshaller <- ioToBc (mkMarshalCode cconv
-                                (r_offW, r_rep) addr_offW
-                                (zip args_offW a_reps))
-#else
      -- the only difference in libffi mode is that we prepare a cif
      -- describing the call type by calling libffi, and we attach the
      -- address of this to the CCALL instruction.
      token <- ioToBc $ prepForeignCall cconv a_reps r_rep
      let addr_of_marshaller = castPtrToFunPtr token
-#endif
 
      recordItblMallocBc (ItblPtr (castFunPtrToPtr addr_of_marshaller))
      let

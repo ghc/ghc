@@ -42,9 +42,9 @@ Haskell side.
 #include "RtsUtils.h"
 #include <stdlib.h>
 
-#if defined(USE_LIBFFI)
+#if defined(USE_LIBFFI_FOR_ADJUSTORS)
 
-#include <ffi.h>
+#include "ffi.h"
 #include <string.h>
 
 void
@@ -1172,4 +1172,4 @@ if ( *(unsigned char*)ptr != 0xe8 ) {
  freeExec(ptr);
 }
 
-#endif // !USE_LIBFFI
+#endif // !USE_LIBFFI_FOR_ADJUSTORS

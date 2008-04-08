@@ -67,12 +67,12 @@ include $(TOP)/mk/boilerplate.mk
 
 # We can't 'make boot' in libraries until stage1 is built
 ifeq "$(BootingFromHc)" "YES"
-SUBDIRS_BUILD = gmp includes rts compat compiler docs utils driver
+SUBDIRS_BUILD = gmp libffi includes rts compat compiler docs utils driver
 else
-SUBDIRS_BUILD = gmp includes compat utils driver docs compiler rts libraries/Cabal/doc
+SUBDIRS_BUILD = gmp libffi includes compat utils driver docs compiler rts libraries/Cabal/doc
 endif
 
-SUBDIRS = gmp includes compat utils driver docs rts libraries compiler libraries/Cabal/doc
+SUBDIRS = gmp libffi includes compat utils driver docs rts libraries compiler libraries/Cabal/doc
 
 # Sanity check that all the boot libraries are in the tree, to catch
 # failure to run darcs-all.
