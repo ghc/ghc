@@ -773,15 +773,15 @@ typedef struct _RtsSymbolVal {
       SymX(writeTVarzh_fast)			\
       SymX(xorIntegerzh_fast)			\
       SymX(yieldzh_fast)                        \
-      SymX(stg_interp_constr_entry)             \
+      Sym(stg_interp_constr_entry)              \
       SymX(allocateExec)	                \
       SymX(freeExec)		                \
       SymX(getAllocations)                      \
       SymX(revertCAFs)                          \
       SymX(RtsFlags)                            \
-      SymX(rts_breakpoint_io_action)		\
-      SymX(rts_stop_next_breakpoint)		\
-      SymX(rts_stop_on_exception)		\
+      Sym(rts_breakpoint_io_action)		\
+      Sym(rts_stop_next_breakpoint)		\
+      Sym(rts_stop_on_exception)		\
       SymX(stopTimer)				\
       SymX(n_capabilities)			\
       RTS_USER_SIGNALS_SYMBOLS

@@ -48,8 +48,12 @@ RTS_RET_INFO(stg_catch_stm_frame_info);
 RTS_ENTRY(stg_upd_frame_ret);
 RTS_ENTRY(stg_marked_upd_frame_ret);
 
-/* Entry code for constructors created by the bytecode interpreter */
-RTS_FUN(stg_interp_constr_entry);
+// RTS_FUN(stg_interp_constr_entry);
+//
+// This is referenced using the FFI in the compiler (ByteCodeItbls),
+// so we can't give it the correct type here because the prototypes
+// would clash (FFI references are always declared with type StgWord[]
+// in the generated C code).
 
 /* Magic glue code for when compiled code returns a value in R1/F1/D1
    or a VoidRep to the interpreter. */
@@ -495,10 +499,6 @@ RTS_FUN(stg_init);
 
 RTS_FUN(StgReturn);
 
-extern int rts_stop_next_breakpoint;
-extern int rts_stop_on_exception;
-extern void *rts_breakpoint_io_action;
-
 /* -----------------------------------------------------------------------------
    PrimOps
    -------------------------------------------------------------------------- */
@@ -605,8 +605,14 @@ RTS_FUN(getApStackValzh_fast);
 RTS_FUN(noDuplicatezh_fast);
 
 /* Other misc stuff */
+// See wiki:Commentary/Compiler/Backends/PprC#Prototypes
 
 #if IN_STG_CODE && !IN_STGCRUN
+
+// Interpreter.c
+extern StgWord rts_stop_next_breakpoint[];
+extern StgWord rts_stop_on_exception[];
+extern StgWord rts_breakpoint_io_action[];
 
 // Schedule.c
 extern int RTS_VAR(context_switch);
