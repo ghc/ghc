@@ -446,6 +446,8 @@ entryLblToInfoLbl l = pprPanic "CLabel.entryLblToInfoLbl" (pprCLabel l)
 
 -- -----------------------------------------------------------------------------
 -- Does a CLabel need declaring before use or not?
+--
+-- See wiki:Commentary/Compiler/Backends/PprC#Prototypes
 
 needsCDecl :: CLabel -> Bool
   -- False <=> it's pre-declared; don't bother
@@ -463,10 +465,6 @@ needsCDecl ModuleRegdLabel		= False
 needsCDecl (StringLitLabel _)		= False
 needsCDecl (AsmTempLabel _)		= False
 needsCDecl (RtsLabel _)			= False
-  -- RTS labels are declared in RTS header files.  Otherwise we'd need
-  -- to give types for each label reference in the RTS .cmm files
-  -- somehow; when generating .cmm code we know the types of labels (info, 
-  -- entry etc.) but for hand-written .cmm code we don't.
 needsCDecl l@(ForeignLabel _ _ _)	= not (isMathFun l)
 needsCDecl (CC_Label _)			= True
 needsCDecl (CCS_Label _)		= True

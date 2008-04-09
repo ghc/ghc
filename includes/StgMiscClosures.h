@@ -8,6 +8,8 @@
  * our Cmm code generator doesn't know how to generate local symbols
  * for the RTS bits (it assumes all RTS symbols are external).
  *
+ * See wiki:Commentary/Compiler/Backends/PprC#Prototypes
+ *
  * --------------------------------------------------------------------------*/
 
 #ifndef STGMISCCLOSURES_H

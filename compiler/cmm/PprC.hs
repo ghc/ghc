@@ -16,6 +16,8 @@
 --
 -- Print Cmm as real C, for -fvia-C
 --
+-- See wiki:Commentary/Compiler/Backends/PprC
+--
 -- This is simpler than the old PprAbsC, because Cmm is "macro-expanded"
 -- relative to the old AbstractC, and many oddities/decorations have
 -- disappeared from the data type.
@@ -206,6 +208,7 @@ pprStmt stmt = case stmt of
 	where
         ppr_fn = parens (cCast (pprCFunType (char '*') cconv results args) fn)
 
+        -- See wiki:Commentary/Compiler/Backends/PprC#Prototypes
     	maybe_proto = 
             case fn of
 	      CmmLit (CmmLabel lbl) | not (isMathFun lbl) -> 
