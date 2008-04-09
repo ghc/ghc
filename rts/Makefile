@@ -203,6 +203,7 @@ RtsUtils_CC_OPTS += -DGhcEnableTablesNextToCode=$(DQ)$(GhcEnableTablesNextToCode
 
 # ffi.h triggers prototype warnings, so disable them here:
 Interpreter_CC_OPTS += -Wno-strict-prototypes
+Adjustor_CC_OPTS += -Wno-strict-prototypes
 
 StgCRun_CC_OPTS += -w
 Typeable_CC_OPTS += -w
