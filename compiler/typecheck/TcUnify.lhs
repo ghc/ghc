@@ -616,6 +616,12 @@ boxy_match tmpl_tvs orig_tmpl_ty boxy_tvs orig_boxy_ty subst
 			Nothing -> orig_boxy_ty
 			Just ty -> ty `boxyLub` orig_boxy_ty
 
+    go _ (TyVarTy tv) | isMetaTyVar tv
+	= subst		-- Don't fail if the template has more info than the target!
+			-- Otherwise, with tmpl_tvs = [a], matching (a -> Int) ~ (Bool -> beta)
+			-- would fail to instantiate 'a', because the meta-type-variable
+			-- beta is as yet un-filled-in
+	
     go _ _ = emptyTvSubst	-- It's important to *fail* by returning the empty substitution
 	-- Example:  Tree a ~ Maybe Int
 	-- We do not want to bind (a |-> Int) in pre-matching, because that can give very
@@ -643,6 +649,10 @@ boxyLub orig_ty1 orig_ty2
     go (TyVarTy tv1) ty2		-- This is the whole point; 
       | isTcTyVar tv1, isBoxyTyVar tv1 	-- choose ty2 if ty2 is a box
       = orig_ty2	
+
+    go ty1 (TyVarTy tv2) 		-- Symmetrical case
+      | isTcTyVar tv2, isBoxyTyVar tv2
+      = orig_ty1	
 
 	-- Look inside type synonyms, but only if the naive version fails
     go ty1 ty2 | Just ty1' <- tcView ty1 = go ty1' ty2
