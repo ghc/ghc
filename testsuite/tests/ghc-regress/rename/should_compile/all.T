@@ -77,6 +77,7 @@ test('rn064', normal, compile, [''])
 test('rn065', normal, multimod_compile, ['rn065', '-v0'])
 
 test('T1972', if_compiler_lt('ghc', '6.9', expect_fail), compile, [''])
+test('T2205', normal, compile, [''])
 
 test('timing001', normal, compile, [''])
 test('timing002', normal, compile, [''])
