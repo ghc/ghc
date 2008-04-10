@@ -13,17 +13,19 @@ data Tdef
   | Newtype (Qual Tcon) [Tbind] Axiom (Maybe Ty)
 
 data Cdef 
-  = Constr Dcon [Tbind] [Ty]
-  | GadtConstr Dcon Ty
+  = Constr (Qual Dcon) [Tbind] [Ty]
+  | GadtConstr (Qual Dcon) Ty
 
 -- Newtype coercion
-type Axiom = (Qual Tcon, Kind)
+type Axiom = (Qual Tcon, [Tbind], Kind)
 
 data Vdefg 
   = Rec [Vdef]
   | Nonrec Vdef
 
-type Vdef = (Bool,Var,Ty,Exp) 	-- Top level bindings are unqualified now
+-- Top-level bindings are qualified, so that the printer doesn't have to pass
+-- around the module name.
+type Vdef = (Bool,Qual Var,Ty,Exp)
 
 data Exp 
   = Var (Qual Var)

@@ -291,7 +291,7 @@ lifted type, and back.
 
 It's also used to instantiate un-constrained type variables after type
 checking.  For example
-	lenth Any []
+	length Any []
 Annoyingly, we sometimes need Anys of other kinds, such as (*->*) etc.
 This is a bit like tuples.   We define a couple of useful ones here,
 and make others up on the fly.  If any of these others end up being exported

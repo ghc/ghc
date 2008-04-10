@@ -54,7 +54,7 @@ ptdef (Data tcon tbinds cdefs) =
   (text "%data" <+> pqname tcon <+> (hsep (map ptbind tbinds)) <+> char '=')
   $$ indent (braces ((vcat (punctuate (char ';') (map pcdef cdefs)))))
 
-ptdef (Newtype tcon tbinds (coercion,k) rep) =
+ptdef (Newtype tcon tbinds (coercion,tbs,k) rep) =
 -- Here we take apart the newtype tycon in order to get the newtype coercion,
 -- which needs to be represented in the External Core file because it's not
 -- straightforward to derive its definition from the newtype declaration alone.
@@ -62,8 +62,10 @@ ptdef (Newtype tcon tbinds (coercion,k) rep) =
 -- Sigh.
   text "%newtype" <+> pqname tcon <+> (hsep (map ptbind tbinds)) 
     $$ indent (axiomclause $$ repclause)
-       where  axiomclause = char '^' <+> parens (pqname coercion <+> text "::"
-                                     <+> pkind k)
+       where  axiomclause = char '^' 
+                 <+> parens (pqname coercion <+> (hsep (map ptbind tbs))
+                              <+> text "::"
+                              <+> pkind k)
               repclause   = case rep of
                               Just ty -> char '=' <+> pty ty 
 			      Nothing -> empty
@@ -71,9 +73,9 @@ ptdef (Newtype tcon tbinds (coercion,k) rep) =
 
 pcdef :: Cdef -> Doc
 pcdef (Constr dcon tbinds tys)  =
-  (pname dcon) <+> (sep [hsep (map pattbind tbinds),sep (map paty tys)])
+  (pqname dcon) <+> (sep [hsep (map pattbind tbinds),sep (map paty tys)])
 pcdef (GadtConstr dcon ty)  =
-  (pname dcon) <+> text "::" <+> pty ty
+  (pqname dcon) <+> text "::" <+> pty ty
 
 pname :: Id -> Doc
 pname id = text (zEncodeString id)
@@ -128,10 +130,10 @@ pvdefg (Rec vdefs) = text "%rec" $$ braces (indent (vcat (punctuate (char ';') (
 pvdefg (Nonrec vdef) = pvdef vdef
 
 pvdef :: Vdef -> Doc
--- note: at one point every vdef was getting printed out as "local".
--- I think that's manifestly wrong. Right now, the "%local" keyword
--- is never used.
-pvdef (_l,v,t,e) = sep [pname v <+> text "::" <+> pty t <+> char '=',
+-- TODO: Think about whether %local annotations are actually needed.
+-- Right now, the local flag is never used, because the Core doc doesn't
+-- explain the meaning of %local.
+pvdef (_l,v,t,e) = sep [(pqname v <+> text "::" <+> pty t <+> char '='),
 		    indent (pexp e)]
 
 paexp, pfexp, pexp :: Exp -> Doc

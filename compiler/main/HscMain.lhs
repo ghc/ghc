@@ -577,7 +577,10 @@ hscNormalIface simpl_result
 		<- {-# SCC "MkFinalIface" #-}
 		   mkIface hsc_env maybe_old_iface details simpl_result
 	-- Emit external core
-       emitExternalCore (hsc_dflags hsc_env) (availsToNameSet (mg_exports simpl_result)) cg_guts -- Move this? --Lemmih 03/07/2006
+       -- This should definitely be here and not after CorePrep,
+       -- because CorePrep produces unqualified constructor wrapper declarations,
+       -- so its output isn't valid External Core (without some preprocessing).
+       emitExternalCore (hsc_dflags hsc_env) cg_guts 
        dumpIfaceStats hsc_env
 
  	    -------------------
