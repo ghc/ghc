@@ -1314,10 +1314,14 @@ pcMiscPrelId name ty info
     -- will be in "the right place" to be in scope.
 
 pc_bottoming_Id :: Name -> Type -> Id
+-- Function of arity 1, which diverges after being given one argument
 pc_bottoming_Id name ty
  = pcMiscPrelId name ty bottoming_info
  where
     bottoming_info = vanillaIdInfo `setAllStrictnessInfo` Just strict_sig
+				   `setArityInfo`         1
+			-- Make arity and strictness agree
+
         -- Do *not* mark them as NoCafRefs, because they can indeed have
         -- CAF refs.  For example, pAT_ERROR_ID calls GHC.Err.untangle,
         -- which has some CAFs
@@ -1327,7 +1331,7 @@ pc_bottoming_Id name ty
         -- any pc_bottoming_Id will itself have CafRefs, which bloats
         -- SRTs.
 
-    strict_sig     = mkStrictSig (mkTopDmdType [evalDmd] BotRes)
+    strict_sig = mkStrictSig (mkTopDmdType [evalDmd] BotRes)
         -- These "bottom" out, no matter what their arguments
 \end{code}
 
