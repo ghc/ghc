@@ -1179,10 +1179,10 @@ check_arg_type rank ty
 	; checkTc (not (isUnLiftedType ty)) (unliftedArgErr ty) }
 
 ----------------------------------------
-forAllTyErr     ty = ptext SLIT("Illegal polymorphic or qualified type:") <+> ppr ty
-unliftedArgErr  ty = ptext SLIT("Illegal unlifted type:") <+> ppr ty
-ubxArgTyErr     ty = ptext SLIT("Illegal unboxed tuple type as function argument:") <+> ppr ty
-kindErr kind       = ptext SLIT("Expecting an ordinary type, but found a type of kind") <+> ppr kind
+forAllTyErr     ty = sep [ptext SLIT("Illegal polymorphic or qualified type:"), ppr ty]
+unliftedArgErr  ty = sep [ptext SLIT("Illegal unlifted type:"), ppr ty]
+ubxArgTyErr     ty = sep [ptext SLIT("Illegal unboxed tuple type as function argument:"), ppr ty]
+kindErr kind       = sep [ptext SLIT("Expecting an ordinary type, but found a type of kind"), ppr kind]
 \end{code}
 
 Note [Liberal type synonyms]
