@@ -292,7 +292,7 @@ tcRnExtCore hsc_env (HsExtCore this_mod decls src_binds)
        --               this tcg_env at all)
    avails  <- getLocalNonValBinders (mkFakeGroup ldecls) ;
    tc_envs <- extendGlobalRdrEnvRn False avails 
-			           emptyOccEnv {- no fixity decls -} ;
+			           emptyFsEnv {- no fixity decls -} ;
 
    setEnvs tc_envs $ do {
 

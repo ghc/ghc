@@ -190,7 +190,7 @@ rnTopBindsRHS bound_names binds =
 rnTopBinds :: HsValBinds RdrName 
            -> RnM (HsValBinds Name, DefUses)
 rnTopBinds b = 
-  do nl <- rnTopBindsLHS emptyOccEnv b
+  do nl <- rnTopBindsLHS emptyFsEnv b
      let bound_names = map unLoc (collectHsValBinders nl)
      bindLocalNames bound_names  $ rnTopBindsRHS bound_names nl
        
@@ -413,18 +413,18 @@ rnValBindsAndThen binds@(ValBindsIn _ sigs) thing_inside
 
 makeMiniFixityEnv :: [LFixitySig RdrName] -> RnM MiniFixityEnv
 
-makeMiniFixityEnv decls = foldlM add_one emptyOccEnv decls
+makeMiniFixityEnv decls = foldlM add_one emptyFsEnv decls
  where
    add_one env (L loc (FixitySig (L name_loc name) fixity)) = do
      { -- this fixity decl is a duplicate iff
        -- the ReaderName's OccName's FastString is already in the env
        -- (we only need to check the local fix_env because
        --  definitions of non-local will be caught elsewhere)
-       let {occ = rdrNameOcc name;
-            fix_item = L loc fixity};
+       let { fs = occNameFS (rdrNameOcc name)
+           ; fix_item = L loc fixity };
 
-       case lookupOccEnv env occ of
-         Nothing -> return $ extendOccEnv env occ fix_item
+       case lookupFsEnv env fs of
+         Nothing -> return $ extendFsEnv env fs fix_item
          Just (L loc' _) -> do
            { setSrcSpan loc $ 
              addLocErr (L name_loc name) (dupFixityDecl loc')

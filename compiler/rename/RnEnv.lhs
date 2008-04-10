@@ -26,11 +26,11 @@ module RnEnv (
 
 	newLocalsRn, newIPNameRn,
 	bindLocalNames, bindLocalNamesFV, 
-	MiniFixityEnv, bindLocalNamesFV_WithFixities,
+	MiniFixityEnv, emptyFsEnv, extendFsEnv, lookupFsEnv,
+	bindLocalNamesFV_WithFixities,
 	bindLocatedLocalsFV, bindLocatedLocalsRn,
 	bindSigTyVarsFV, bindPatSigTyVars, bindPatSigTyVarsFV,
 	bindTyVarsRn, extendTyVarEnvFVRn,
-	bindLocalFixities,
 
 	checkDupRdrNames, checkDupNames, checkShadowedNames, 
 	checkDupAndShadowedRdrNames,
@@ -528,61 +528,31 @@ lookupQualifiedName rdr_name
 %*********************************************************
 
 \begin{code}
-lookupLocalDataTcNames :: RdrName -> RnM [Name]
--- GHC extension: look up both the tycon and data con 
--- for con-like things
--- Complain if neither is in scope
-lookupLocalDataTcNames rdr_name
-  | Just n <- isExact_maybe rdr_name	
-	-- Special case for (:), which doesn't get into the GlobalRdrEnv
-  = return [n]	-- For this we don't need to try the tycon too
-  | otherwise
-  = do	{ mb_gres <- mapM lookupGreLocalRn (dataTcOccs rdr_name)
-	; case [gre_name gre | Just gre <- mb_gres] of
-	    [] -> do { 
-                      -- run for error reporting
-                    ; unboundName rdr_name
-		      ; return [] }
-	    names -> return names
-    }
+--------------------------------
+type FastStringEnv a = UniqFM a		-- Keyed by FastString
+
+
+emptyFsEnv  :: FastStringEnv a
+lookupFsEnv :: FastStringEnv a -> FastString -> Maybe a
+extendFsEnv :: FastStringEnv a -> FastString -> a -> FastStringEnv a
+
+emptyFsEnv  = emptyUFM
+lookupFsEnv = lookupUFM
+extendFsEnv = addToUFM
 
 --------------------------------
-type MiniFixityEnv = OccEnv (Located Fixity)
+type MiniFixityEnv = FastStringEnv (Located Fixity)
 	-- Mini fixity env for the names we're about 
 	-- to bind, in a single binding group
+	--
+	-- It is keyed by the *FastString*, not the *OccName*, because
+	-- the single fixity decl	infix 3 T
+	-- affects both the data constructor T and the type constrctor T
 	--
 	-- We keep the location so that if we find
 	-- a duplicate, we can report it sensibly
 
-bindLocalFixities :: [FixitySig RdrName] -> (UniqFM (Located Fixity) -> RnM a) -> RnM a
--- Used for nested fixity decls:
---   bind the names that are in scope already;
---   pass the rest to the continuation for later
---      as a FastString->(Located Fixity) map
---
--- No need to worry about type constructors here,
--- Should check for duplicates?
-bindLocalFixities fixes thing_inside
-  | null fixes = thing_inside emptyUFM
-  | otherwise  = do ls <- mappM rn_sig fixes
-                    let (now, later) = nowAndLater ls
-                    extendFixityEnv now $ thing_inside later
-  where
-    rn_sig (FixitySig lv@(L loc v) fix) = do
-      vopt <- lookupBndrRn_maybe v
-      case vopt of 
-        Just new_v -> returnM (Left (new_v, (FixItem (rdrNameOcc v) fix)))
-        Nothing -> returnM (Right (occNameFS $ rdrNameOcc v, (L loc fix)))
-
-    nowAndLater :: [Either (Name, FixItem) (FastString, Located Fixity)]
-                       -> ([(Name,FixItem)], UniqFM (Located Fixity))
-    nowAndLater ls =
-        foldr (\ cur -> \ (now, later) ->
-                        case cur of 
-                          Left (n, f) -> ((n, f) : now, later)
-                          Right (fs, f) -> (now, addToUFM later fs f))
-              ([], emptyUFM) ls
-
+--------------------------------
 -- Used for nested fixity decls to bind names along with their fixities.
 -- the fixities are given as a UFM from an OccName's FastString to a fixity decl
 -- Also check for unused binders
@@ -598,7 +568,7 @@ bindLocalNamesFV_WithFixities names fixities thing_inside
     boundFixities = foldr 
                         (\ name -> \ acc -> 
                          -- check whether this name has a fixity decl
-                          case lookupOccEnv fixities (nameOccName name) of
+                          case lookupFsEnv fixities (occNameFS (nameOccName name)) of
                                Just (L _ fix) -> (name, FixItem (nameOccName name) fix) : acc
                                Nothing -> acc) [] names
     -- bind the names; extend the fixity env; do the thing inside
@@ -658,6 +628,24 @@ lookupTyFixityRn :: Located Name -> RnM Fixity
 lookupTyFixityRn (L loc n) = lookupFixityRn n
 
 ---------------
+lookupLocalDataTcNames :: RdrName -> RnM [Name]
+-- GHC extension: look up both the tycon and data con 
+-- for con-like things
+-- Complain if neither is in scope
+lookupLocalDataTcNames rdr_name
+  | Just n <- isExact_maybe rdr_name	
+	-- Special case for (:), which doesn't get into the GlobalRdrEnv
+  = return [n]	-- For this we don't need to try the tycon too
+  | otherwise
+  = do	{ mb_gres <- mapM lookupGreLocalRn (dataTcOccs rdr_name)
+	; case [gre_name gre | Just gre <- mb_gres] of
+	    [] -> do { 
+                      -- run for error reporting
+                    ; unboundName rdr_name
+		      ; return [] }
+	    names -> return names
+    }
+
 dataTcOccs :: RdrName -> [RdrName]
 -- If the input is a data constructor, return both it and a type
 -- constructor.  This is useful when we aren't sure which we are

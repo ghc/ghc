@@ -274,8 +274,8 @@ From the top-level declarations of this module produce
 	* the ImportAvails
 created by its bindings.  
 	
-Note [Shadowing in extendRdrEnvRn]
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Note [Shadowing in extendGlobalRdrEnvRn]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Usually when etending the GlobalRdrEnv we complain if a new binding
 duplicates an existing one.  By adding the bindings one at a time, 
 this check also complains if we add two new bindings for the same name.
@@ -306,6 +306,7 @@ extendGlobalRdrEnvRn shadowP avails new_fixities
 
 		-- Delete new_occs from global and local envs
 		-- We are going to shadow them
+		-- See Note [Shadowing in extendGlobalRdrEnvRn]
 	      new_occs = map (nameOccName . gre_name) gres
 	      rdr_env1 = hideSomeUnquals rdr_env new_occs
 	      lcl_env1 = lcl_env { tcl_rdr = delListFromOccEnv (tcl_rdr lcl_env) new_occs }
@@ -317,6 +318,7 @@ extendGlobalRdrEnvRn shadowP avails new_fixities
 	; (rdr_env', fix_env') <- foldlM extend (rdr_env2, fix_env) gres
 	
 	; let gbl_env' = gbl_env { tcg_rdr_env = rdr_env', tcg_fix_env = fix_env' }
+	; traceRn (text "extendGlobalRdrEnvRn" <+> (ppr new_fixities $$ ppr fix_env $$ ppr fix_env'))
 	; return (gbl_env', lcl_env2) }
   where
     gres = gresFromAvails LocalDef avails
@@ -331,11 +333,10 @@ extendGlobalRdrEnvRn shadowP avails new_fixities
     simple_extend (rdr_env, fix_env) gre 
       = (extendGlobalRdrEnv rdr_env gre, fix_env')
       where
-     	--  If there is a fixity decl for the gre,
-        --  add it to the fixity env
+     	--  If there is a fixity decl for the gre, add it to the fixity env
 	name = gre_name gre
-        occ = nameOccName name
-        fix_env' = case lookupOccEnv new_fixities occ of
+        occ  = nameOccName name
+        fix_env' = case lookupFsEnv new_fixities (occNameFS occ) of
                      Nothing       -> fix_env
                      Just (L _ fi) -> extendNameEnv fix_env name (FixItem occ fi)
 \end{code}

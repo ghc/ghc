@@ -190,15 +190,15 @@ rnSrcDecls shadowP group@(HsGroup {hs_valds  = val_decls,
 
    -- (I) Compute the results and return
    let {rn_group = HsGroup { hs_valds  = rn_val_decls,
-			    	hs_tyclds = rn_tycl_decls,
-			    	hs_instds = rn_inst_decls,
+			     hs_tyclds = rn_tycl_decls,
+			     hs_instds = rn_inst_decls,
                              hs_derivds = rn_deriv_decls,
-			    	hs_fixds  = rn_fix_decls,
-			    	hs_depds  = [], -- deprecs are returned in the tcg_env (see below)
-                                             -- not in the HsGroup
-			    	hs_fords  = rn_foreign_decls,
-			    	hs_defds  = rn_default_decls,
-			    	hs_ruleds = rn_rule_decls,
+			     hs_fixds  = rn_fix_decls,
+			     hs_depds  = [], -- deprecs are returned in the tcg_env
+	                                     -- (see below) not in the HsGroup
+			     hs_fords  = rn_foreign_decls,
+			     hs_defds  = rn_default_decls,
+			     hs_ruleds = rn_rule_decls,
                              hs_docs   = rn_docs } ;
 
 	other_fvs = plusFVs [src_fvs1, src_fvs2, src_fvs6, src_fvs3, 
@@ -272,6 +272,9 @@ rnSrcFixityDecls :: [LFixitySig RdrName] -> RnM [LFixitySig Name]
 -- Rename the fixity decls, so we can put
 -- the renamed decls in the renamed syntax tree
 -- Errors if the thing being fixed is not defined locally.
+--
+-- The returned FixitySigs are not actually used for anything,
+-- except perhaps the GHCi API
 rnSrcFixityDecls fix_decls
   = do fix_decls <- mapM rn_decl fix_decls
        return (concat fix_decls)
@@ -280,7 +283,7 @@ rnSrcFixityDecls fix_decls
         -- GHC extension: look up both the tycon and data con 
 	-- for con-like things; hence returning a list
 	-- If neither are in scope, report an error; otherwise
-	-- add both to the fixity env
+	-- return a fixity sig for each (slightly odd)
     rn_decl (L loc (FixitySig (L name_loc rdr_name) fixity))
       = setSrcSpan name_loc $
                     -- this lookup will fail if the definition isn't local
