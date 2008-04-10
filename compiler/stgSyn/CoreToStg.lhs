@@ -189,7 +189,7 @@ coreTopBindToStg this_pkg env body_fvs (NonRec id rhs)
 	bind = StgNonRec id stg_rhs
     in
     ASSERT2(manifestArity rhs == stgRhsArity stg_rhs, ppr id $$ (ptext SLIT("rhs:")) <+> ppr rhs $$ (ptext SLIT("stg_rhs:"))<+> ppr stg_rhs $$ (ptext SLIT("Manifest:")) <+> (ppr $ manifestArity rhs) $$ (ptext SLIT("STG:")) <+>(ppr $ stgRhsArity stg_rhs) )
-    ASSERT2(consistentCafInfo id bind, ppr id)
+    ASSERT2(consistentCafInfo id bind, ppr id $$ ppr rhs $$ ppr bind)
 --    WARN(not (consistent caf_info bind), ppr id <+> ppr cafs <+> ppCafInfo caf_info)
     (env', fvs' `unionFVInfo` body_fvs, bind)
 

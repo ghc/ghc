@@ -1204,6 +1204,7 @@ eta_expand n us expr ty
 	-- This *can* legitmately happen: e.g. 	coerce Int (\x. x)
 	-- Essentially the programmer is playing fast and loose with types
 	-- (Happy does this a lot).  So we simply decline to eta-expand.
+	-- Otherwise we'd end up with an explicit lambda having a non-function type
 	expr
     	}}}
 \end{code}
@@ -1232,23 +1233,51 @@ And in any case it seems more robust to have exprArity be a bit more intelligent
 But note that 	(\x y z -> f x y z)
 should have arity 3, regardless of f's arity.
 
+Note [exprArity invariant]
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+exprArity has the following invariant:
+	(exprArity e) = n, then manifestArity (etaExpand e n) = n
+
+That is, if exprArity says "the arity is n" then etaExpand really can get
+"n" manifest lambdas to the top.
+
+Why is this important?  Because 
+  - In TidyPgm we use exprArity to fix the *final arity* of 
+    each top-level Id, and in
+  - In CorePrep we use etaExpand on each rhs, so that the visible lambdas
+    actually match that arity, which in turn means
+    that the StgRhs has the right number of lambdas
+
+An alternative would be to do the eta-expansion in TidyPgm, at least
+for top-level bindings, in which case we would not need the trim_arity
+in exprArity.  That is a less local change, so I'm going to leave it for today!
+
+
 \begin{code}
 exprArity :: CoreExpr -> Arity
 exprArity e = go e
-	    where
-	      go (Var v) 	       	   = idArity v
-	      go (Lam x e) | isId x    	   = go e + 1
-			   | otherwise 	   = go e
-              go (Note _ e)                = go e
-              go (Cast e _)                = go e
-              go (App e (Type _))          = go e
-	      go (App f a) | exprIsCheap a = (go f - 1) `max` 0
-		-- NB: exprIsCheap a!  
-		--	f (fac x) does not have arity 2, 
-		-- 	even if f has arity 3!
-		-- NB: `max 0`!  (\x y -> f x) has arity 2, even if f is
-		--		 unknown, hence arity 0
-	      go _		       	   = 0
+  where
+    go (Var v) 	       	         = idArity v
+    go (Lam x e) | isId x    	 = go e + 1
+    		 | otherwise 	 = go e
+    go (Note _ e)                = go e
+    go (Cast e co)               = trim_arity (go e) 0 (snd (coercionKind co))
+    go (App e (Type _))          = go e
+    go (App f a) | exprIsCheap a = (go f - 1) `max` 0
+    	-- NB: exprIsCheap a!  
+    	--	f (fac x) does not have arity 2, 
+    	-- 	even if f has arity 3!
+    	-- NB: `max 0`!  (\x y -> f x) has arity 2, even if f is
+    	--		 unknown, hence arity 0
+    go _		       	   = 0
+
+	-- Note [exprArity invariant]
+    trim_arity n a ty
+	| n==a					      = a
+	| Just (_, ty') <- splitForAllTy_maybe ty     = trim_arity n a     ty'
+	| Just (_, ty') <- splitFunTy_maybe ty        = trim_arity n (a+1) ty'
+	| Just (ty',_)  <- splitNewTypeRepCo_maybe ty = trim_arity n a     ty'
+	| otherwise				      = a
 \end{code}
 
 %************************************************************************

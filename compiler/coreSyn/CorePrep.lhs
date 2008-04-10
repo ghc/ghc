@@ -634,7 +634,7 @@ mkBinds (Floats _ binds) body
 etaExpandRhs :: CoreBndr -> CoreExpr -> UniqSM CoreExpr
 etaExpandRhs bndr rhs = do
    	-- Eta expand to match the arity claimed by the binder
-	-- Remember, after CorePrep we must not change arity
+	-- Remember, CorePrep must not change arity
 	--
 	-- Eta expansion might not have happened already, 
 	-- because it is done by the simplifier only when 
@@ -663,7 +663,12 @@ etaExpandRhs bndr rhs = do
 	--		f = /\a -> \y -> let s = h 3 in g s y
 	--
     us <- getUniquesM
-    return (etaExpand arity us rhs (idType bndr))
+    let eta_rhs = etaExpand arity us rhs (idType bndr)
+
+    ASSERT2( manifestArity eta_rhs == arity, (ppr bndr <+> ppr arity <+> ppr (exprArity rhs)) 
+					      $$ ppr rhs $$ ppr eta_rhs )
+	-- Assertion checks that eta expansion was successful
+      return eta_rhs
   where
 	-- For a GlobalId, take the Arity from the Id.
 	-- It was set in CoreTidy and must not change
