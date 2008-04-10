@@ -67,6 +67,7 @@ test('set', normal, compile, [''])
 
 test('scoped', expect_broken(1823), compile, [''])
 
+test('gadt-escape1', normal, compile_fail, [''])
 
 # New ones from Dimitrios
 
