@@ -192,7 +192,7 @@ subFunTys error_herald n_pats res_ty thing_inside
 
     loop n args_so_far res_ty = bale_out args_so_far
 
-         -- build a template type a1 -> ... -> an -> b and defer an equality
+         -- Build a template type a1 -> ... -> an -> b and defer an equality
          -- between that template and the expected result type res_ty; then,
          -- use the template to type the thing_inside
     defer n args_so_far ty
@@ -202,7 +202,7 @@ subFunTys error_herald n_pats res_ty thing_inside
                  err    = error_herald <> comma $$
                           text "which does not match its type"
            ; coi <- addErrCtxt err $
-                      defer_unification False False fun_ty ty
+                    defer_unification (Unify False fun_ty ty) False fun_ty ty
            ; res <- thing_inside (reverse args_so_far ++ arg_tys) res_ty'
            ; return (coiToHsWrapper coi, res)
            }
@@ -364,19 +364,17 @@ boxySplitAppTy orig_ty
     mk_res_ty _other             = panic "TcUnify.mk_res_ty2"
 
 ------------------
-boxySplitFailure actual_ty expected_ty
-  = unifyMisMatch False False actual_ty expected_ty
-	-- "outer" is False, so we don't pop the context
-	-- which is what we want since we have not pushed one!
+boxySplitFailure actual_ty expected_ty = failWithMisMatch actual_ty expected_ty
 
 ------------------
 boxySplitDefer :: [Kind]                   -- kinds of required arguments
                -> ([TcType] -> TcTauType)  -- construct lhs from argument tyvars
                -> BoxyRhoType              -- type to split
                -> TcM ([TcType], CoercionI)
-boxySplitDefer kinds mkTy orig_ty
+boxySplitDefer kinds mk_ty orig_ty
   = do { tau_tys <- mapM newFlexiTyVarTy kinds
-       ; coi <- defer_unification False False (mkTy tau_tys) orig_ty
+       ; let ty1 = mk_ty tau_tys
+       ; coi <- defer_unification (Unify False ty1 orig_ty) False ty1 orig_ty
        ; return (tau_tys, coi)
        }
 \end{code}
@@ -749,7 +747,7 @@ tc_sub1 orig act_sty act_ty exp_ib exp_sty exp_ty
 tc_sub1 orig act_sty (TyVarTy tv) exp_ib exp_sty exp_ty
   = do	{ traceTc (text "tc_sub1 - case 1")
 	; coi <- addSubCtxt orig act_sty exp_sty $
-		 uVar True False tv exp_ib exp_sty exp_ty
+		 uVar (Unify True act_sty exp_sty) False tv exp_ib exp_sty exp_ty
 	; traceTc (case coi of 
 			IdCo   -> text "tc_sub1 (Rule SBOXY) IdCo"
 			ACo co -> text "tc_sub1 (Rule SBOXY) ACo" <+> ppr co)
@@ -856,7 +854,8 @@ tc_sub1 orig act_sty actual_ty exp_ib exp_sty expected_ty
 -----------------------------------
 defer_to_boxy_matching orig act_sty actual_ty exp_ib exp_sty expected_ty
   = do	{ coi <- addSubCtxt orig act_sty exp_sty $
-		 u_tys True False act_sty actual_ty exp_ib exp_sty expected_ty
+		 u_tys (Unify True act_sty exp_sty) 
+		       False act_sty actual_ty exp_ib exp_sty expected_ty
 	; return $ coiToHsWrapper coi }
 
 -----------------------------------
@@ -967,9 +966,8 @@ non-exported generic functions.
 \begin{code}
 boxyUnify :: BoxyType -> BoxyType -> TcM CoercionI
 -- Acutal and expected, respectively
-boxyUnify ty1 ty2 
-  = addErrCtxtM (unifyCtxt ty1 ty2) $
-    uTysOuter False ty1 False ty2
+boxyUnify ty1 ty2 = addErrCtxtM (unifyCtxt ty1 ty2) $
+    		    uTysOuter False ty1 False ty2
 
 ---------------
 boxyUnifyList :: [BoxyType] -> [BoxyType] -> TcM [CoercionI] 
@@ -990,8 +988,7 @@ unifyType ty1 ty2 	-- ty1 expected, ty2 inferred
 ---------------
 unifyPred :: PredType -> PredType -> TcM CoercionI
 -- Acutal and expected types
-unifyPred p1 p2 = addErrCtxtM (unifyCtxt (mkPredTy p1) (mkPredTy p2)) $
-		  	uPred True True p1 True p2
+unifyPred p1 p2 = uPred (Unify False (mkPredTy p1) (mkPredTy p2)) True p1 True p2
 
 unifyTheta :: TcThetaType -> TcThetaType -> TcM [CoercionI]
 -- Acutal and expected types
@@ -1054,23 +1051,32 @@ type InBox = Bool	-- True  <=> we are inside a box
 	-- we must not allow polytypes.  But if we are in a box on
 	-- just one side, then we can allow polytypes
 
-type Outer = Bool	-- True <=> this is the outer level of a unification
-			--	    so that the types being unified are the
-			--	    very ones we began with, not some sub
-			--	    component or synonym expansion
--- The idea is that if Outer is true then unifyMisMatch should
--- pop the context to remove the "Expected/Acutal" context
+data Outer = Unify Bool TcType TcType	
+	-- If there is a unification error, report these types as mis-matching
+	-- Bool = True <=> the context says "Expected = ty1, Acutal = ty2"
+	--		   for this particular ty1,ty2
 
-uTysOuter, uTys
-     :: InBox -> TcType	-- ty1 is the *actual*   type
-     -> InBox -> TcType	-- ty2 is the *expected* type
-     -> TcM CoercionI
+instance Outputable Outer where
+  ppr (Unify c ty1 ty2) = pp_c <+> pprParendType ty1 <+> ptext SLIT("~")
+			       <+> pprParendType ty2
+	where
+	  pp_c = if c then ptext SLIT("Top") else ptext SLIT("NonTop")
+	      
+
+-------------------------
+uTysOuter :: InBox -> TcType	-- ty1 is the *actual*   type
+	  -> InBox -> TcType	-- ty2 is the *expected* type
+	  -> TcM CoercionI	
+-- We've just pushed a context describing ty1,ty2
 uTysOuter nb1 ty1 nb2 ty2 
 	= do { traceTc (text "uTysOuter" <+> ppr ty1 <+> ppr ty2)
-	     ; u_tys True nb1 ty1 ty1 nb2 ty2 ty2 }
+	     ; u_tys (Unify True ty1 ty2) nb1 ty1 ty1 nb2 ty2 ty2 }
+
+uTys :: InBox -> TcType -> InBox -> TcType -> TcM CoercionI
+-- The context does not describe ty1,ty2
 uTys nb1 ty1 nb2 ty2 
-	= do { traceTc (text "uTys" <+> ppr ty1 <+> ppr ty2)
-	     ; u_tys False nb1 ty1 ty1 nb2 ty2 ty2 }
+  = do { traceTc (text "uTys" <+> ppr ty1 <+> ppr ty2)
+       ; u_tys (Unify False ty1 ty2) nb1 ty1 ty1 nb2 ty2 ty2 }
 
 
 --------------
@@ -1080,8 +1086,7 @@ uTys_s :: InBox -> [TcType]	-- tys1 are the *actual*   types
 uTys_s nb1 []	      nb2 []	     = return []
 uTys_s nb1 (ty1:tys1) nb2 (ty2:tys2) = do { coi <- uTys nb1 ty1 nb2 ty2
 					  ; cois <- uTys_s nb1 tys1 nb2 tys2 
-					  ; return (coi:cois)
-					  }
+					  ; return (coi:cois) }
 uTys_s nb1 ty1s nb2 ty2s = panic "Unify.uTys_s: mismatched type lists!"
 
 --------------
@@ -1091,43 +1096,48 @@ u_tys :: Outer
       -> TcM CoercionI
 
 u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
-  = do { traceTc (text "u_tys " <+> ppr ty1 <+> text " " <+> ppr ty2)
-       ; coi <- go outer ty1 ty2
+  = do { traceTc (text "u_tys " <+> vcat [sep [ braces (ppr orig_ty1 <+> text "/" <+> ppr ty1),
+					  text "~",
+					  braces (ppr orig_ty2 <+> text "/" <+> ppr ty2)], 
+					  ppr outer])
+       ; coi <- go outer orig_ty1 ty1 orig_ty2 ty2
        ; traceTc (case coi of
-		        ACo co -> text "u_tys yields coercion: " <+> ppr co	
+		        ACo co -> text "u_tys yields coercion:" <+> ppr co	
 			IdCo   -> text "u_tys yields no coercion")
        ; return coi
        }
   where 
+    bale_out :: Outer -> TcM a
+    bale_out outer = unifyMisMatch outer
+	-- We report a mis-match in terms of the original arugments to
+	-- u_tys, even though 'go' has recursed inwards somewhat
+	--
+	-- Note [Unifying AppTy]
+	-- A case in point is unifying  (m Int) ~ (IO Int)
+	-- where m is a unification variable that is now bound to (say) (Bool ->)
+	-- Then we want to report "Can't unify (Bool -> Int) with (IO Int)
+	-- and not "Can't unify ((->) Bool) with IO"
 
-    go :: Outer -> TcType -> TcType -> TcM CoercionI
-    go outer ty1 ty2 =
-	do { traceTc (text "go " <+> ppr orig_ty1 <+> text "/" <+> ppr ty1
-			 <+> ppr orig_ty2 <+> text "/" <+>  ppr ty2)
-	   ; go1 outer ty1 ty2
-	   }
-           
-    go1 :: Outer -> TcType -> TcType -> TcM CoercionI
+    go :: Outer -> TcType -> TcType -> TcType -> TcType -> TcM CoercionI
 	-- Always expand synonyms: see Note [Unification and synonyms]
         -- (this also throws away FTVs)
-    go1 outer ty1 ty2 
-      | Just ty1' <- tcView ty1 = go False ty1' ty2
-      | Just ty2' <- tcView ty2 = go False ty1 ty2'
+    go outer sty1 ty1 sty2 ty2 
+      | Just ty1' <- tcView ty1 = go (Unify False ty1' ty2 ) sty1 ty1' sty2 ty2
+      | Just ty2' <- tcView ty2 = go (Unify False ty1  ty2') sty1 ty1  sty2 ty2'
 
 	-- Variables; go for uVar
-    go1 outer (TyVarTy tyvar1) ty2 = uVar outer False tyvar1 nb2 orig_ty2 ty2
-    go1 outer ty1 (TyVarTy tyvar2) = uVar outer True  tyvar2 nb1 orig_ty1 ty1
+    go outer sty1 (TyVarTy tyvar1) sty2 ty2 = uVar outer False tyvar1 nb2 sty2 ty2
+    go outer sty1 ty1 sty2 (TyVarTy tyvar2) = uVar outer True  tyvar2 nb1 sty1 ty1
 				-- "True" means args swapped
 
 	-- The case for sigma-types must *follow* the variable cases
 	-- because a boxy variable can be filed with a polytype;
 	-- but must precede FunTy, because ((?x::Int) => ty) look
 	-- like a FunTy; there isn't necy a forall at the top
-    go1 _ ty1 ty2
+    go _ _ ty1 _ ty2
       | isSigmaTy ty1 || isSigmaTy ty2
       = do   { traceTc (text "We have sigma types: equalLength" <+> ppr tvs1 <+> ppr tvs2)
-	     ; unless (equalLength tvs1 tvs2)
-		      (unifyMisMatch outer False orig_ty1 orig_ty2)
+	     ; unless (equalLength tvs1 tvs2) (bale_out outer)
 	     ; traceTc (text "We're past the first length test")
 	     ; tvs <- tcInstSkolTyVars UnkSkol tvs1	-- Not a helpful SkolemInfo
 			-- Get location from monad, not from tvs1
@@ -1139,10 +1149,8 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 		   (theta2,tau2) = tcSplitPhiTy phi2
 
 	     ; addErrCtxtM (unifyForAllCtxt tvs phi1 phi2) $ do
-	     { unless (equalLength theta1 theta2)
-		      (unifyMisMatch outer False orig_ty1 orig_ty2)
-	     
-	     ; cois <- uPreds False nb1 theta1 nb2 theta2 -- TOMDO: do something with these pred_cois
+	     { unless (equalLength theta1 theta2) (bale_out outer)
+	     ; cois <- uPreds outer nb1 theta1 nb2 theta2 -- TOMDO: do something with these pred_cois
 	     ; traceTc (text "TOMDO!")
 	     ; coi <- uTys nb1 tau1 nb2 tau2
 
@@ -1165,11 +1173,11 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 	(tvs2, body2) = tcSplitForAllTys ty2
 
 	-- Predicates
-    go1 outer (PredTy p1) (PredTy p2) 
-	= uPred False nb1 p1 nb2 p2
+    go outer _ (PredTy p1) _ (PredTy p2) 
+	= uPred outer nb1 p1 nb2 p2
 
 	-- Type constructors must match
-    go1 _ (TyConApp con1 tys1) (TyConApp con2 tys2)
+    go _ _ (TyConApp con1 tys1) _ (TyConApp con2 tys2)
       | con1 == con2 && not (isOpenSynTyCon con1)
       = do { cois <- uTys_s nb1 tys1 nb2 tys2
            ; return $ mkTyConAppCoI con1 tys1 cois
@@ -1187,7 +1195,7 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 	-- See Note [OpenSynTyCon app]
 
 	-- Functions; just check the two parts
-    go1 _ (FunTy fun1 arg1) (FunTy fun2 arg2)
+    go _ _ (FunTy fun1 arg1) _ (FunTy fun2 arg2)
       = do { coi_l <- uTys nb1 fun1 nb2 fun2
 	   ; coi_r <- uTys nb1 arg1 nb2 arg2 
 	   ; return $ mkFunTyCoI fun1 coi_l arg1 coi_r
@@ -1197,22 +1205,24 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 	-- They can match FunTy and TyConApp, so use splitAppTy_maybe
 	-- NB: we've already dealt with type variables and Notes,
 	-- so if one type is an App the other one jolly well better be too
-    go1 outer (AppTy s1 t1) ty2
+    go outer _ (AppTy s1 t1) _ ty2
       | Just (s2,t2) <- tcSplitAppTy_maybe ty2
-      = do { coi_s <- uTys nb1 s1 nb2 s2; coi_t <- uTys nb1 t1 nb2 t2
+      = do { coi_s <- go outer s1 s1 s2 s2	-- NB recurse into go
+	   ; coi_t <- uTys nb1 t1 nb2 t2	-- See Note [Unifying AppTy]
 	   ; return $ mkAppTyCoI s1 coi_s t1 coi_t }
 
 	-- Now the same, but the other way round
 	-- Don't swap the types, because the error messages get worse
-    go1 outer ty1 (AppTy s2 t2)
+    go outer _ ty1 _ (AppTy s2 t2)
       | Just (s1,t1) <- tcSplitAppTy_maybe ty1
-      = do { coi_s <- uTys nb1 s1 nb2 s2; coi_t <- uTys nb1 t1 nb2 t2 
+      = do { coi_s <- go outer s1 s1 s2 s2
+	   ; coi_t <- uTys nb1 t1 nb2 t2 
 	   ; return $ mkAppTyCoI s1 coi_s t1 coi_t }
 
         -- One or both outermost constructors are type family applications.
         -- If we can normalise them away, proceed as usual; otherwise, we
         -- need to defer unification by generating a wanted equality constraint.
-    go1 outer ty1 ty2
+    go outer sty1 ty1 sty2 ty2
       | ty1_is_fun || ty2_is_fun
       = do { (coi1, ty1') <- if ty1_is_fun then tcNormaliseFamInst ty1 
                                            else return (IdCo, ty1)
@@ -1229,7 +1239,7 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 			        defer_unification outer False orig_ty1 orig_ty2
 			    }
 		     else -- unification can proceed
-			  go outer ty1' ty2'
+			  go outer sty1 ty1' sty2 ty2'
 	   ; return $ coi1 `mkTransCoI` coi `mkTransCoI` (mkSymCoI coi2)
 	   }
 	where
@@ -1237,8 +1247,7 @@ u_tys outer nb1 orig_ty1 ty1 nb2 orig_ty2 ty2
 	  ty2_is_fun = isOpenSynTyConApp ty2
 
 	-- Anything else fails	
-    go1 outer _ _ = unifyMisMatch outer False orig_ty1 orig_ty2
-
+    go outer _ _ _ _ = bale_out outer 
 
 ----------
 uPred outer nb1 (IParam n1 t1) nb2 (IParam n2 t2)
@@ -1251,15 +1260,15 @@ uPred outer nb1 (ClassP c1 tys1) nb2 (ClassP c2 tys2)
 	do { cois <- uTys_s nb1 tys1 nb2 tys2		-- Guaranteed equal lengths because the kinds check
 	   ; return $ mkClassPPredCoI c1 tys1 cois
 	   }
-uPred outer _ p1 _ p2 = unifyMisMatch outer False (mkPredTy p1) (mkPredTy p2)
+uPred outer _ p1 _ p2 = unifyMisMatch outer
 
 uPreds outer nb1 []       nb2 []       = return []
 uPreds outer nb1 (p1:ps1) nb2 (p2:ps2) = 
-	do { coi  <- uPred outer nb1 p1 nb2 p2
+	do { coi  <- uPred  outer nb1 p1 nb2 p2
            ; cois <- uPreds outer nb1 ps1 nb2 ps2
 	   ; return (coi:cois)
 	   }
-uPreds outer nb1 ps1      nb2 ps2      = panic "uPreds"
+uPreds outer nb1 ps1 nb2 ps2  = panic "uPreds"
 \end{code}
 
 Note [TyCon app]
@@ -1359,7 +1368,7 @@ uVar :: Outer
 uVar outer swapped tv1 nb2 ps_ty2 ty2
   = do 	{ let expansion | showSDoc (ppr ty2) == showSDoc (ppr ps_ty2) = empty
 			| otherwise = brackets (equals <+> ppr ty2)
-	; traceTc (text "uVar" <+> ppr swapped <+> 
+	; traceTc (text "uVar" <+> ppr outer <+> ppr swapped <+> 
 			sep [ppr tv1 <+> dcolon <+> ppr (tyVarKind tv1 ),
 				nest 2 (ptext SLIT(" <-> ")),
 			     ppr ps_ty2 <+> dcolon <+> ppr (typeKind ty2) <+> expansion])
@@ -1383,7 +1392,9 @@ uUnfilledVar :: Outer
 uUnfilledVar outer swapped tv1 details1 ps_ty2 ty2
   | Just ty2' <- tcView ty2
   = 	-- Expand synonyms; ignore FTVs
-    uUnfilledVar False swapped tv1 details1 ps_ty2 ty2'
+    let outer' | swapped   = Unify False ty2' (mkTyVarTy tv1) 
+	       | otherwise = Unify False (mkTyVarTy tv1) ty2' 
+    in uUnfilledVar outer' swapped tv1 details1 ps_ty2 ty2'
 
 uUnfilledVar outer swapped tv1 details1 ps_ty2 (TyVarTy tv2)
   | tv1 == tv2	-- Same type variable => no-op (but watch out for the boxy case)
@@ -1407,8 +1418,7 @@ uUnfilledVar outer swapped tv1 details1 ps_ty2 non_var_ty2
   =     -- ty2 is not a type variable
     case details1 of	
       MetaTv (SigTv _) _ -> rigid_variable
-      MetaTv info ref1   -> 
-        uMetaVar outer swapped tv1 info ref1 ps_ty2 non_var_ty2 
+      MetaTv info ref1   -> uMetaVar outer swapped tv1 info ref1 ps_ty2 non_var_ty2 
       SkolemTv _         -> rigid_variable
   where
     rigid_variable 
@@ -1430,7 +1440,7 @@ uUnfilledVar outer swapped tv1 details1 ps_ty2 non_var_ty2
            }
       | SkolemTv RuntimeUnkSkol <- details1
                    -- runtime unknown will never match
-      = unifyMisMatch outer swapped (TyVarTy tv1) ps_ty2
+      = unifyMisMatch outer 
       | otherwise  -- defer as a given equality may still resolve this
       = defer_unification outer swapped (TyVarTy tv1) ps_ty2
 \end{code}
@@ -1465,7 +1475,7 @@ type.  We need to zonk as the types go into the kind of the coercion variable
 to zonk in zonInst instead.  Would that be sufficient?)
 
 \begin{code}
-defer_unification :: Bool               -- pop innermost context?
+defer_unification :: Outer
                   -> SwapFlag
 	          -> TcType
 	          -> TcType
@@ -1479,13 +1489,13 @@ defer_unification outer False ty1 ty2
 	; cotv <- newMetaCoVar ty1' ty2'
 		-- put ty1 ~ ty2 in LIE
 		-- Left means "wanted"
-	; inst <- (if outer then popErrCtxt else id) $
+	; inst <- popUnifyCtxt outer $
                   mkEqInst (EqPred ty1' ty2') (Left cotv)
 	; extendLIE inst 
 	; return $ ACo $ TyVarTy cotv  }
 
 ----------------
-uMetaVar :: Bool               -- pop innermost context?
+uMetaVar :: Outer
          -> SwapFlag
 	 -> TcTyVar -> BoxInfo -> IORef MetaDetails
 	 -> TcType -> TcType
@@ -1678,14 +1688,21 @@ unBoxPred (EqPred ty1 ty2) = do { ty1' <- unBox ty1; ty2' <- unBox ty2; return (
 
 %************************************************************************
 %*									*
-\subsection[Unify-context]{Errors and contexts}
+	Errors and contexts
 %*									*
 %************************************************************************
 
-Errors
-~~~~~~
-
 \begin{code}
+unifyMisMatch :: Outer -> TcM a
+unifyMisMatch (Unify is_outer ty1 ty2) 
+  | is_outer  = popErrCtxt $ failWithMisMatch ty1 ty2  -- This is the whole point of the 'outer' stuff
+  | otherwise = failWithMisMatch ty1 ty2
+
+popUnifyCtxt :: Outer -> TcM a -> TcM a
+popUnifyCtxt (Unify True  _ _) thing = popErrCtxt thing
+popUnifyCtxt (Unify False _ _) thing = thing
+
+-----------------------
 unifyCtxt act_ty exp_ty tidy_env
   = do	{ act_ty' <- zonkTcType act_ty
 	; exp_ty' <- zonkTcType exp_ty
@@ -1736,13 +1753,8 @@ unifyForAllCtxt tvs phi1 phi2 env
     (env2, phi2') = tidyOpenType env1 phi2
     msg = vcat [ptext SLIT("When matching") <+> quotes (ppr (mkForAllTys tvs' phi1')),
 	        ptext SLIT("          and") <+> quotes (ppr (mkForAllTys tvs' phi2'))]
-
------------------------
-unifyMisMatch outer swapped ty1 ty2
-  | swapped   = unifyMisMatch outer False ty2 ty1
-  | outer     = popErrCtxt $ unifyMisMatch False swapped ty1 ty2  -- This is the whole point of the 'outer' stuff
-  | otherwise = failWithMisMatch ty1 ty2
 \end{code}
+
 
 
 %************************************************************************
