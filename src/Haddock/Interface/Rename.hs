@@ -29,8 +29,8 @@ import Control.Arrow
 import Control.Monad hiding (mapM)
 
 
-renameInterface :: LinkEnv -> Interface -> ErrMsgM Interface
-renameInterface renamingEnv mod =
+renameInterface :: LinkEnv -> Bool -> Interface -> ErrMsgM Interface
+renameInterface renamingEnv warnings mod =
 
   -- first create the local env, where every name exported by this module
   -- is mapped to itself, and everything else comes from the global renaming
@@ -66,10 +66,10 @@ renameInterface renamingEnv mod =
   in do
     -- report things that we couldn't link to. Only do this for non-hidden
     -- modules.
-    when (OptHide `notElem` ifaceOptions mod && not (null strings)) $
-	  tell ["Warning: " ++ show (ppr (ifaceMod mod) defaultUserStyle) ++ 
-		": could not find link destinations for:\n"++
-		"   " ++ concat (map (' ':) strings) ]
+    unless (OptHide `elem` ifaceOptions mod || null strings || not warnings) $
+      tell ["Warning: " ++ show (ppr (ifaceMod mod) defaultUserStyle) ++
+            ": could not find link destinations for:\n"++
+            "   " ++ concat (map (' ':) strings) ]
 
     return $ mod { ifaceRnDoc = finalModuleDoc,
                    ifaceRnDocMap = rnDocMap,

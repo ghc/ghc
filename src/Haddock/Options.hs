@@ -83,6 +83,7 @@ data Flag
   | Flag_OptGhc String
   | Flag_GhcLibDir String
   | Flag_GhcVersion
+  | Flag_NoWarnings
   deriving (Eq)
 
 
@@ -149,5 +150,6 @@ options backwardsCompat =
     Option [] ["optghc"] (ReqArg Flag_OptGhc "OPTION")
  	"Forward option to GHC",
     Option []  ["ghc-version"]  (NoArg Flag_GhcVersion)
-	"output GHC version in numeric format"
+	"output GHC version in numeric format",
+    Option ['w'] ["no-warnings"] (NoArg Flag_NoWarnings) "turn off all warnings"
    ]

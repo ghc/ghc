@@ -50,7 +50,8 @@ createInterfaces modules externalLinks flags = (interfaces, homeLinks, messages)
       let interfaces' = attachInstances interfaces allNames
  
       -- part 3, rename the interfaces
-      interfaces'' <- mapM (renameInterface links) interfaces'
+      let warnings = Flag_NoWarnings `notElem` flags
+      interfaces'' <- mapM (renameInterface links warnings) interfaces'
 
       return (interfaces'', homeLinks)
   

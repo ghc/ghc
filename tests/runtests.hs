@@ -61,7 +61,7 @@ testDir libdir dir = do
   let mods' = map (dir </>) mods
   let outdir = "output" </> dir
   createDirectoryIfMissing True outdir
-  code <- system $ printf "../dist/build/haddock/haddock -B %s -o %s -h --optghc=-fglasgow-exts --optghc=-w %s" libdir outdir (unwords mods')
+  code <- system $ printf "../dist/build/haddock/haddock -B %s -w -o %s -h --optghc=-fglasgow-exts --optghc=-w %s" libdir outdir (unwords mods')
   unless (code == ExitSuccess) $ error "Haddock run failed! Exiting."
   check mods'
   walkDirs libdir dir
