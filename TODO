@@ -20,6 +20,11 @@
 -----------------------------------------------------------------------------
 -- bugs
 
+* parenthises are sometimes dropped in data declarations, e.g.
+    data Improving a = IV a (a -> Ordering)
+  becomes
+    data Improving a = IV a a -> Ordering
+
 * parser doesn't support doc comments on types in type aliases:
     type MyInt = Int -- ^ comment
 
