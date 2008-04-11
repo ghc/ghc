@@ -182,9 +182,14 @@ static void hpc_init(void) {
   hpc_tixdir = getenv("HPCTIXDIR");
 
   if (hpc_tixdir != NULL) {
-    /* Make sure the directory is present
+    /* Make sure the directory is present;
+     * conditional code for mkdir lifted from lndir.c
      */
+#ifdef WIN32
+    mkdir(hpc_tixdir);
+#else
     mkdir(hpc_tixdir,0777);
+#endif
     /* Then, try open the file
      */
     tixFilename = (char *) malloc(strlen(hpc_tixdir) + strlen(prog_name) + 12);
