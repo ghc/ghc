@@ -173,6 +173,8 @@ package.conf.installed$
 # Common log file names; testlog is made by validate
 ^testlog
 ^log*
+^utils/ext-core/Driver
+^utils/ext-core/PrimEnv.hs
 ^utils/genapply/genapply
 ^utils/genprimopcode/Lexer.hs
 ^utils/genprimopcode/Parser.hs
