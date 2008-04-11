@@ -1341,6 +1341,13 @@
 	    </row>
 
 	    <row>
+	      <entry><option>-fstatic-argument-transformation</option></entry>
+	      <entry>Turn on the static argument transformation. Implied by <option>-O2</option>.</entry>
+	      <entry>dynamic</entry>
+	      <entry>-fno-static-argument-transformation</entry>
+	    </row>
+
+	    <row>
 	      <entry><option>-fliberate-case-threshold</option>=<replaceable>n</replaceable></entry>
 	      <entry>Set the size threshold for the liberate-case transformation to <replaceable>n</replaceable> (default: 200)</entry>
 	      <entry>static</entry>

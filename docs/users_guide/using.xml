@@ -1522,15 +1522,31 @@ f "2"    = 2
 
 	<varlistentry>
 	  <term>
-            <option>-fno-state-hack</option>
-            <indexterm><primary><option>-fno-state-hack</option></primary></indexterm>
+            <option>-fspec-constr</option>
+            <indexterm><primary><option>-fspec-constr</option></primary></indexterm>
           </term>
 	  <listitem>
-	    <para>Turn off the "state hack" whereby any lambda with a
-	      <literal>State#</literal> token as argument is considered to be
-	      single-entry, hence it is considered OK to inline things inside
-	      it.  This can improve performance of IO and ST monad code, but it
-	    runs the risk of reducing sharing.</para> 
+	    <para>Turn on call-pattern specialisation.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <option>-fliberate-case</option>
+            <indexterm><primary><option>-fliberate-case</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Turn on the liberate-case transformation.</para>
+	  </listitem>
+	</varlistentry>
+
+	<varlistentry>
+	  <term>
+            <option>-fstatic-argument-transformation</option>
+            <indexterm><primary><option>-fstatic-argument-transformation</option></primary></indexterm>
+          </term>
+	  <listitem>
+	    <para>Turn on the static argument transformation.</para>
 	  </listitem>
 	</varlistentry>
 

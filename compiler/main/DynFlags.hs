@@ -237,6 +237,7 @@ data DynFlag
    -- optimisation opts
    | Opt_Strictness
    | Opt_FullLaziness
+   | Opt_StaticArgumentTransformation
    | Opt_CSE
    | Opt_LiberateCase
    | Opt_SpecConstr
@@ -708,6 +709,7 @@ optLevelFlags
 
     , ([2],	Opt_LiberateCase)
     , ([2],	Opt_SpecConstr)
+    , ([2],	Opt_StaticArgumentTransformation)
 
     , ([0,1,2], Opt_DoLambdaEtaExpansion)
 		-- This one is important for a tiresome reason:
@@ -827,6 +829,7 @@ getCoreToDo dflags
     liberate_case = dopt Opt_LiberateCase dflags
     rule_check    = ruleCheck dflags
     vectorisation = dopt Opt_Vectorise dflags
+    static_args   = dopt Opt_StaticArgumentTransformation dflags
 
     maybe_rule_check phase = runMaybe rule_check (CoreDoRuleCheck phase)
 
@@ -874,6 +877,12 @@ getCoreToDo dflags
      if opt_level == 0 then
        [simpl_phase 0 ["final"] max_iter]
      else {- opt_level >= 1 -} [ 
+
+    -- We want to do the static argument transform before full laziness as it
+    -- may expose extra opportunities to float things outwards. However, to fix
+    -- up the output of the transformation we need at do at least one simplify
+    -- after this before anything else
+	    runWhen static_args CoreDoStaticArgs,
 
 	-- initial simplify: mk specialiser happy: minimum effort please
         simpl_gently,
@@ -1249,6 +1258,7 @@ fFlags = [
   ( "warn-tabs",                        Opt_WarnTabs ),
   ( "print-explicit-foralls",           Opt_PrintExplicitForalls ),
   ( "strictness",                       Opt_Strictness ),
+  ( "static-argument-transformation",   Opt_StaticArgumentTransformation ),
   ( "full-laziness",                    Opt_FullLaziness ),
   ( "liberate-case",                    Opt_LiberateCase ),
   ( "spec-constr",                      Opt_SpecConstr ),
