@@ -1661,14 +1661,21 @@ scavenge_stack(StgPtr p, StgPtr stack_end)
 	// the indirection into an IND_PERM, so that evacuate will
 	// copy the indirection into the old generation instead of
 	// discarding it.
-	if (get_itbl(((StgUpdateFrame *)p)->updatee)->type == IND) {
+    {
+        nat type;
+        type = get_itbl(((StgUpdateFrame *)p)->updatee)->type;
+	if (type == IND) {
 	    ((StgUpdateFrame *)p)->updatee->header.info = 
 		(StgInfoTable *)&stg_IND_PERM_info;
-	}
+	} else if (type == IND_OLDGEN) {
+	    ((StgUpdateFrame *)p)->updatee->header.info = 
+		(StgInfoTable *)&stg_IND_OLDGEN_PERM_info;
+        }            
 	((StgUpdateFrame *)p)->updatee 
 	    = evacuate(((StgUpdateFrame *)p)->updatee);
 	p += sizeofW(StgUpdateFrame);
 	continue;
+    }
 
       // small bitmap (< 32 entries, or 64 on a 64-bit machine) 
     case CATCH_STM_FRAME:
