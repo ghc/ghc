@@ -471,9 +471,8 @@ packLiftingContext len shape tag fvs vty lty p
           (vexpr, lexpr) <- p
           empty <- emptyPA vty
           return (vexpr, Let (NonRec sel_var sel_expr)
-                         . mkLets (concat bnds)
                          $ Case len lc_var lty
-                             [(DEFAULT, [], lexpr),
+                             [(DEFAULT, [], mkLets (concat bnds) lexpr),
                               (LitAlt (mkMachInt 0), [], empty)])
 
 packFreeVar :: CoreExpr -> CoreExpr -> Var -> VM [CoreBind]
