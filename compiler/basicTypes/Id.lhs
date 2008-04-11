@@ -22,7 +22,7 @@ module Id (
 	-- Modifying an Id
 	setIdName, setIdUnique, Id.setIdType, setIdExported, setIdNotExported, 
 	setIdInfo, lazySetIdInfo, modifyIdInfo, maybeModifyIdInfo,
-	zapLamIdInfo, zapDemandIdInfo, zapFragileIdInfo,
+	zapLamIdInfo, zapDemandIdInfo, zapFragileIdInfo, transferPolyIdInfo,
 
 	-- Predicates
 	isImplicitId, isDeadBinder, isDictId, isStrictId,
@@ -583,5 +583,37 @@ zapDemandIdInfo = zapInfo zapDemandInfo
 
 zapFragileIdInfo :: Id -> Id
 zapFragileIdInfo = zapInfo zapFragileInfo 
+\end{code}
+
+Note [transferPolyIdInfo]
+~~~~~~~~~~~~~~~~~~~~~~~~~
+Suppose we have
+
+   f = /\a. let g = rhs in ...
+
+where g has interesting strictness information.  Then if we float thus
+
+   g' = /\a. rhs
+   f = /\a. ...[g' a/g]
+
+we *do not* want to lose the strictness information on g.  Nor arity.
+
+It's simple to retain strictness and arity, but not so simple to retain
+	worker info
+	rules
+so we simply discard those.  Sooner or later this may bite us.
+
+This transfer is used in two places: 
+	FloatOut (long-distance let-floating)
+	SimplUtils.abstractFloats (short-distance let-floating)
+
+\begin{code}
+transferPolyIdInfo :: Id -> Id -> Id
+transferPolyIdInfo old_id new_id
+  = modifyIdInfo transfer new_id
+  where
+    old_info = idInfo old_id
+    transfer new_info = new_info `setNewStrictnessInfo` (newStrictnessInfo old_info)
+			         `setArityInfo` (arityInfo old_info)
 \end{code}
 

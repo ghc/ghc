@@ -62,16 +62,18 @@ module SetLevels (
 
 import CoreSyn
 
-import DynFlags	( FloatOutSwitches(..) )
+import DynFlags		( FloatOutSwitches(..) )
 import CoreUtils	( exprType, exprIsTrivial, mkPiTypes )
 import CoreFVs		-- all of it
 import CoreSubst	( Subst, emptySubst, extendInScope, extendIdSubst,
 			  cloneIdBndr, cloneRecIdBndrs )
 import Id		( Id, idType, mkSysLocal, isOneShotLambda,
-			  zapDemandIdInfo,
+			  zapDemandIdInfo, transferPolyIdInfo,
 			  idSpecialisation, idWorkerInfo, setIdInfo
 			)
-import IdInfo		( workerExists, vanillaIdInfo, isEmptySpecInfo )
+import IdInfo		( workerExists, vanillaIdInfo, isEmptySpecInfo,
+                          setNewStrictnessInfo, newStrictnessInfo,
+			  setArityInfo, arityInfo )
 import Var
 import VarSet
 import VarEnv
@@ -831,17 +833,18 @@ type LvlM result = UniqSM result
 initLvl		= initUs_
 \end{code}
 
+
 \begin{code}
 newPolyBndrs dest_lvl env abs_vars bndrs = do
     uniqs <- getUniquesM
     let new_bndrs = zipWith mk_poly_bndr bndrs uniqs
     return (extendPolyLvlEnv dest_lvl env abs_vars (bndrs `zip` new_bndrs), new_bndrs)
   where
-    mk_poly_bndr bndr uniq = mkSysLocal (mkFastString str) uniq poly_ty
+    mk_poly_bndr bndr uniq = transferPolyIdInfo bndr $ 	-- Note [transferPolyIdInfo] in Id.lhs
+			     mkSysLocal (mkFastString str) uniq poly_ty
 			   where
 			     str     = "poly_" ++ occNameString (getOccName bndr)
 			     poly_ty = mkPiTypes abs_vars (idType bndr)
-	
 
 newLvlVar :: String 
 	  -> [CoreBndr] -> Type 	-- Abstract wrt these bndrs

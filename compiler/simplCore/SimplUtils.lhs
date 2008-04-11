@@ -1165,7 +1165,8 @@ abstractFloats main_tvs body_env body
       = do { uniq <- getUniqueM
 	   ; let  poly_name = setNameUnique (idName var) uniq		-- Keep same name
 		  poly_ty   = mkForAllTys tvs_here (idType var)	-- But new type of course
-		  poly_id   = mkLocalId poly_name poly_ty 
+		  poly_id   = transferPolyIdInfo var $ 	-- Note [transferPolyIdInfo] in Id.lhs
+			      mkLocalId poly_name poly_ty 
 	   ; return (poly_id, mkTyApps (Var poly_id) (mkTyVarTys tvs_here)) }
 		-- In the olden days, it was crucial to copy the occInfo of the original var, 
 		-- because we were looking at occurrence-analysed but as yet unsimplified code!
