@@ -130,7 +130,7 @@ rnHsType _ (HsNumTy i)
   | i == 1    = return (HsNumTy i)
   | otherwise = addErr err_msg >> return (HsNumTy i)
   where
-    err_msg = ptext SLIT("Only unit numeric type pattern is valid")
+    err_msg = ptext (sLit "Only unit numeric type pattern is valid")
 			   
 
 rnHsType doc (HsFunTy ty1 ty2) = do
@@ -171,7 +171,7 @@ rnHsType doc (HsPredTy pred) = do
     return (HsPredTy pred')
 
 rnHsType _ (HsSpliceTy _) = do
-    addErr (ptext SLIT("Type splices are not yet implemented"))
+    addErr (ptext (sLit "Type splices are not yet implemented"))
     failM
 
 rnHsType doc (HsDocTy ty haddock_doc) = do
@@ -498,19 +498,19 @@ Precedence-related error messages
 \begin{code}
 precParseErr :: (SDoc, Fixity) -> (SDoc, Fixity) -> SDoc
 precParseErr op1 op2 
-  = hang (ptext SLIT("precedence parsing error"))
-      4 (hsep [ptext SLIT("cannot mix"), ppr_opfix op1, ptext SLIT("and"), 
+  = hang (ptext (sLit "precedence parsing error"))
+      4 (hsep [ptext (sLit "cannot mix"), ppr_opfix op1, ptext (sLit "and"), 
 	       ppr_opfix op2,
-	       ptext SLIT("in the same infix expression")])
+	       ptext (sLit "in the same infix expression")])
 
 sectionPrecErr :: (SDoc, Fixity) -> (SDoc, Fixity) -> HsExpr RdrName -> SDoc
 sectionPrecErr op arg_op section
- = vcat [ptext SLIT("The operator") <+> ppr_opfix op <+> ptext SLIT("of a section"),
-	 nest 4 (ptext SLIT("must have lower precedence than the operand") <+> ppr_opfix arg_op),
-	 nest 4 (ptext SLIT("in the section:") <+> quotes (ppr section))]
+ = vcat [ptext (sLit "The operator") <+> ppr_opfix op <+> ptext (sLit "of a section"),
+	 nest 4 (ptext (sLit "must have lower precedence than the operand") <+> ppr_opfix arg_op),
+	 nest 4 (ptext (sLit "in the section:") <+> quotes (ppr section))]
 
 pp_prefix_minus :: SDoc
-pp_prefix_minus = ptext SLIT("prefix `-'")
+pp_prefix_minus = ptext (sLit "prefix `-'")
 ppr_op :: Outputable a => a -> SDoc
 ppr_op op = quotes (ppr op)	-- Here, op can be a Name or a (Var n), where n is a Name
 ppr_opfix :: (SDoc, Fixity) -> SDoc
@@ -528,20 +528,20 @@ forAllWarn :: SDoc -> LHsType RdrName -> Located RdrName
            -> TcRnIf TcGblEnv TcLclEnv ()
 forAllWarn doc ty (L loc tyvar)
   = ifOptM Opt_WarnUnusedMatches 	$
-    addWarnAt loc (sep [ptext SLIT("The universally quantified type variable") <+> quotes (ppr tyvar),
-		 	nest 4 (ptext SLIT("does not appear in the type") <+> quotes (ppr ty))]
+    addWarnAt loc (sep [ptext (sLit "The universally quantified type variable") <+> quotes (ppr tyvar),
+		 	nest 4 (ptext (sLit "does not appear in the type") <+> quotes (ppr ty))]
 		   $$
 		   doc)
 
 opTyErr :: RdrName -> HsType RdrName -> SDoc
 opTyErr op ty@(HsOpTy ty1 _ _)
-  = hang (ptext SLIT("Illegal operator") <+> quotes (ppr op) <+> ptext SLIT("in type") <+> quotes (ppr ty))
+  = hang (ptext (sLit "Illegal operator") <+> quotes (ppr op) <+> ptext (sLit "in type") <+> quotes (ppr ty))
 	 2 extra
   where
     extra | op == dot_tv_RDR && forall_head ty1
-	  = ptext SLIT("Perhaps you intended to use -XRankNTypes or similar flag")
+	  = ptext (sLit "Perhaps you intended to use -XRankNTypes or similar flag")
 	  | otherwise 
-	  = ptext SLIT("Use -XTypeOperators to allow operators in types")
+	  = ptext (sLit "Use -XTypeOperators to allow operators in types")
 
     forall_head (L _ (HsTyVar tv))   = tv == forall_tv_RDR
     forall_head (L _ (HsAppTy ty _)) = forall_head ty
