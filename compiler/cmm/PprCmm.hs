@@ -44,8 +44,6 @@ module PprCmm
     )
 where
 
-#include "HsVersions.h"
-
 import Cmm
 import CmmExpr
 import CmmUtils
@@ -64,7 +62,7 @@ import Data.Maybe
 pprCmms :: (Outputable info, Outputable g) => [GenCmm CmmStatic info g] -> SDoc
 pprCmms cmms = pprCode CStyle (vcat (intersperse separator $ map ppr cmms))
         where
-          separator = space $$ ptext SLIT("-------------------") $$ space
+          separator = space $$ ptext (sLit "-------------------") $$ space
 
 writeCmms :: Handle -> [Cmm] -> IO ()
 writeCmms handle cmms = printForC handle (pprCmms cmms)
@@ -137,7 +135,7 @@ pprTop (CmmData section ds) =
 
 -- --------------------------------------------------------------------------
 instance Outputable CmmSafety where
-  ppr CmmUnsafe = ptext SLIT("_unsafe_call_")
+  ppr CmmUnsafe = ptext (sLit "_unsafe_call_")
   ppr (CmmSafe srt) = ppr srt
 
 -- --------------------------------------------------------------------------
@@ -148,49 +146,49 @@ instance Outputable CmmSafety where
 -- style of C--'s 'stackdata' declaration, just inside the proc body,
 -- and were labelled with the procedure name ++ "_info".
 pprInfo (CmmInfo gc_target update_frame CmmNonInfoTable) =
-    vcat [{-ptext SLIT("gc_target: ") <>
-                maybe (ptext SLIT("<none>")) pprBlockId gc_target,-}
-          ptext SLIT("update_frame: ") <>
-                maybe (ptext SLIT("<none>")) pprUpdateFrame update_frame]
+    vcat [{-ptext (sLit "gc_target: ") <>
+                maybe (ptext (sLit "<none>")) pprBlockId gc_target,-}
+          ptext (sLit "update_frame: ") <>
+                maybe (ptext (sLit "<none>")) pprUpdateFrame update_frame]
 pprInfo (CmmInfo gc_target update_frame
          (CmmInfoTable (ProfilingInfo closure_type closure_desc) tag info)) =
-    vcat [{-ptext SLIT("gc_target: ") <>
-                maybe (ptext SLIT("<none>")) pprBlockId gc_target,-}
-          ptext SLIT("update_frame: ") <>
-                maybe (ptext SLIT("<none>")) pprUpdateFrame update_frame,
-          ptext SLIT("type: ") <> pprLit closure_type,
-          ptext SLIT("desc: ") <> pprLit closure_desc,
-          ptext SLIT("tag: ") <> integer (toInteger tag),
+    vcat [{-ptext (sLit "gc_target: ") <>
+                maybe (ptext (sLit "<none>")) pprBlockId gc_target,-}
+          ptext (sLit "update_frame: ") <>
+                maybe (ptext (sLit "<none>")) pprUpdateFrame update_frame,
+          ptext (sLit "type: ") <> pprLit closure_type,
+          ptext (sLit "desc: ") <> pprLit closure_desc,
+          ptext (sLit "tag: ") <> integer (toInteger tag),
           pprTypeInfo info]
 
 pprTypeInfo (ConstrInfo layout constr descr) =
-    vcat [ptext SLIT("ptrs: ") <> integer (toInteger (fst layout)),
-          ptext SLIT("nptrs: ") <> integer (toInteger (snd layout)),
-          ptext SLIT("constructor: ") <> integer (toInteger constr),
+    vcat [ptext (sLit "ptrs: ") <> integer (toInteger (fst layout)),
+          ptext (sLit "nptrs: ") <> integer (toInteger (snd layout)),
+          ptext (sLit "constructor: ") <> integer (toInteger constr),
           pprLit descr]
 pprTypeInfo (FunInfo layout srt fun_type arity args slow_entry) =
-    vcat [ptext SLIT("ptrs: ") <> integer (toInteger (fst layout)),
-          ptext SLIT("nptrs: ") <> integer (toInteger (snd layout)),
-          ptext SLIT("srt: ") <> ppr srt,
-          ptext SLIT("fun_type: ") <> integer (toInteger fun_type),
-          ptext SLIT("arity: ") <> integer (toInteger arity),
-          --ptext SLIT("args: ") <> ppr args, -- TODO: needs to be printed
-          ptext SLIT("slow: ") <> pprLit slow_entry
+    vcat [ptext (sLit "ptrs: ") <> integer (toInteger (fst layout)),
+          ptext (sLit "nptrs: ") <> integer (toInteger (snd layout)),
+          ptext (sLit "srt: ") <> ppr srt,
+          ptext (sLit "fun_type: ") <> integer (toInteger fun_type),
+          ptext (sLit "arity: ") <> integer (toInteger arity),
+          --ptext (sLit "args: ") <> ppr args, -- TODO: needs to be printed
+          ptext (sLit "slow: ") <> pprLit slow_entry
          ]
 pprTypeInfo (ThunkInfo layout srt) =
-    vcat [ptext SLIT("ptrs: ") <> integer (toInteger (fst layout)),
-          ptext SLIT("nptrs: ") <> integer (toInteger (snd layout)),
-          ptext SLIT("srt: ") <> ppr srt]
+    vcat [ptext (sLit "ptrs: ") <> integer (toInteger (fst layout)),
+          ptext (sLit "nptrs: ") <> integer (toInteger (snd layout)),
+          ptext (sLit "srt: ") <> ppr srt]
 pprTypeInfo (ThunkSelectorInfo offset srt) =
-    vcat [ptext SLIT("ptrs: ") <> integer (toInteger offset),
-          ptext SLIT("srt: ") <> ppr srt]
+    vcat [ptext (sLit "ptrs: ") <> integer (toInteger offset),
+          ptext (sLit "srt: ") <> ppr srt]
 pprTypeInfo (ContInfo stack srt) =
-    vcat [ptext SLIT("stack: ") <> ppr stack,
-          ptext SLIT("srt: ") <> ppr srt]
+    vcat [ptext (sLit "stack: ") <> ppr stack,
+          ptext (sLit "srt: ") <> ppr srt]
 
 pprUpdateFrame :: UpdateFrame -> SDoc
 pprUpdateFrame (UpdateFrame expr args) = 
-    hcat [ ptext SLIT("jump")
+    hcat [ ptext (sLit "jump")
          , space
          , if isTrivialCmmExpr expr
                 then pprExpr expr
@@ -234,13 +232,13 @@ pprStmt stmt = case stmt of
         hcat [ if null results
                   then empty
                   else parens (commafy $ map ppr results) <>
-                       ptext SLIT(" = "),
-               ptext SLIT("foreign"), space, 
+                       ptext (sLit " = "),
+               ptext (sLit "foreign"), space, 
                doubleQuotes(ppr cconv), space,
                target fn, parens  ( commafy $ map ppr args ),
                brackets (ppr safety), 
                case ret of CmmMayReturn -> empty
-                           CmmNeverReturns -> ptext SLIT(" never returns"),
+                           CmmNeverReturns -> ptext (sLit " never returns"),
                semi ]
         where
             target (CmmLit lit) = pprLit lit
@@ -265,7 +263,7 @@ pprStmt stmt = case stmt of
 --
 genBranch :: BlockId -> SDoc
 genBranch ident = 
-    ptext SLIT("goto") <+> pprBlockId ident <> semi
+    ptext (sLit "goto") <+> pprBlockId ident <> semi
 
 -- --------------------------------------------------------------------------
 -- Conditional. [1], section 6.4
@@ -274,9 +272,9 @@ genBranch ident =
 --
 genCondBranch :: CmmExpr -> BlockId -> SDoc
 genCondBranch expr ident =
-    hsep [ ptext SLIT("if")
+    hsep [ ptext (sLit "if")
          , parens(ppr expr)
-         , ptext SLIT("goto")
+         , ptext (sLit "goto")
          , pprBlockId ident <> semi ]
 
 -- --------------------------------------------------------------------------
@@ -287,7 +285,7 @@ genCondBranch expr ident =
 genJump :: CmmExpr -> [CmmHinted CmmExpr] -> SDoc
 genJump expr args = 
 
-    hcat [ ptext SLIT("jump")
+    hcat [ ptext (sLit "jump")
          , space
          , if isTrivialCmmExpr expr
                 then pprExpr expr
@@ -312,7 +310,7 @@ pprHinted (CmmHinted a FloatHint)  = quotes(text "float")   <+> ppr a
 genReturn :: [CmmHinted CmmExpr] -> SDoc
 genReturn args = 
 
-    hcat [ ptext SLIT("return")
+    hcat [ ptext (sLit "return")
          , space
          , parens  ( commafy $ map ppr args )
          , semi ]
@@ -329,13 +327,13 @@ genSwitch expr maybe_ids
 
     = let pairs = groupBy snds (zip [0 .. ] maybe_ids )
 
-      in hang (hcat [ ptext SLIT("switch [0 .. ") 
+      in hang (hcat [ ptext (sLit "switch [0 .. ") 
                     , int (length maybe_ids - 1)
-                    , ptext SLIT("] ")
+                    , ptext (sLit "] ")
                     , if isTrivialCmmExpr expr
                         then pprExpr expr
                         else parens (pprExpr expr)
-                    , ptext SLIT(" {") 
+                    , ptext (sLit " {") 
                     ]) 
             4 (vcat ( map caseify pairs )) $$ rbrace
 
@@ -344,13 +342,13 @@ genSwitch expr maybe_ids
 
       caseify :: [(Int,Maybe BlockId)] -> SDoc
       caseify ixs@((i,Nothing):_)
-        = ptext SLIT("/* impossible: ") <> hcat (intersperse comma (map (int.fst) ixs))
-		<> ptext SLIT(" */")
+        = ptext (sLit "/* impossible: ") <> hcat (intersperse comma (map (int.fst) ixs))
+		<> ptext (sLit " */")
       caseify as 
         = let (is,ids) = unzip as 
-          in hsep [ ptext SLIT("case")
+          in hsep [ ptext (sLit "case")
                   , hcat (punctuate comma (map int is))
-                  , ptext SLIT(": goto")
+                  , ptext (sLit ": goto")
                   , pprBlockId (head [ id | Just id <- ids]) <> semi ]
 
 -- --------------------------------------------------------------------------
@@ -385,12 +383,12 @@ pprExpr1 (CmmMachOp op [x,y]) | Just doc <- infixMachOp1 op
    = pprExpr7 x <+> doc <+> pprExpr7 y
 pprExpr1 e = pprExpr7 e
 
-infixMachOp1 (MO_Eq     _) = Just (ptext SLIT("=="))
-infixMachOp1 (MO_Ne     _) = Just (ptext SLIT("!="))
-infixMachOp1 (MO_Shl    _) = Just (ptext SLIT("<<"))
-infixMachOp1 (MO_U_Shr  _) = Just (ptext SLIT(">>"))
-infixMachOp1 (MO_U_Ge   _) = Just (ptext SLIT(">="))
-infixMachOp1 (MO_U_Le   _) = Just (ptext SLIT("<="))
+infixMachOp1 (MO_Eq     _) = Just (ptext (sLit "=="))
+infixMachOp1 (MO_Ne     _) = Just (ptext (sLit "!="))
+infixMachOp1 (MO_Shl    _) = Just (ptext (sLit "<<"))
+infixMachOp1 (MO_U_Shr  _) = Just (ptext (sLit ">>"))
+infixMachOp1 (MO_U_Ge   _) = Just (ptext (sLit ">="))
+infixMachOp1 (MO_U_Le   _) = Just (ptext (sLit "<="))
 infixMachOp1 (MO_U_Gt   _) = Just (char '>')
 infixMachOp1 (MO_U_Lt   _) = Just (char '<')
 infixMachOp1 _             = Nothing
@@ -497,7 +495,7 @@ ppr_offset i
 --
 pprStatic :: CmmStatic -> SDoc
 pprStatic s = case s of
-    CmmStaticLit lit   -> nest 4 $ ptext SLIT("const") <+> pprLit lit <> semi
+    CmmStaticLit lit   -> nest 4 $ ptext (sLit "const") <+> pprLit lit <> semi
     CmmUninitialised i -> nest 4 $ text "I8" <> brackets (int i)
     CmmAlign i         -> nest 4 $ text "align" <+> int i
     CmmDataLabel clbl  -> pprCLabel clbl <> colon
@@ -534,34 +532,34 @@ pprGlobalReg gr
         FloatReg   n   -> char 'F' <> int n
         DoubleReg  n   -> char 'D' <> int n
         LongReg    n   -> char 'L' <> int n
-        Sp             -> ptext SLIT("Sp")
-        SpLim          -> ptext SLIT("SpLim")
-        Hp             -> ptext SLIT("Hp")
-        HpLim          -> ptext SLIT("HpLim")
-        CurrentTSO     -> ptext SLIT("CurrentTSO")
-        CurrentNursery -> ptext SLIT("CurrentNursery")
-        HpAlloc        -> ptext SLIT("HpAlloc")
-        GCEnter1       -> ptext SLIT("stg_gc_enter_1")
-        GCFun          -> ptext SLIT("stg_gc_fun")
-        BaseReg        -> ptext SLIT("BaseReg")
-        PicBaseReg     -> ptext SLIT("PicBaseReg")
+        Sp             -> ptext (sLit "Sp")
+        SpLim          -> ptext (sLit "SpLim")
+        Hp             -> ptext (sLit "Hp")
+        HpLim          -> ptext (sLit "HpLim")
+        CurrentTSO     -> ptext (sLit "CurrentTSO")
+        CurrentNursery -> ptext (sLit "CurrentNursery")
+        HpAlloc        -> ptext (sLit "HpAlloc")
+        GCEnter1       -> ptext (sLit "stg_gc_enter_1")
+        GCFun          -> ptext (sLit "stg_gc_fun")
+        BaseReg        -> ptext (sLit "BaseReg")
+        PicBaseReg     -> ptext (sLit "PicBaseReg")
 
 -- --------------------------------------------------------------------------
 -- data sections
 --
 pprSection :: Section -> SDoc
 pprSection s = case s of
-    Text              -> section <+> doubleQuotes (ptext SLIT("text"))
-    Data              -> section <+> doubleQuotes (ptext SLIT("data"))
-    ReadOnlyData      -> section <+> doubleQuotes (ptext SLIT("readonly"))
-    ReadOnlyData16    -> section <+> doubleQuotes (ptext SLIT("readonly16"))
+    Text              -> section <+> doubleQuotes (ptext (sLit "text"))
+    Data              -> section <+> doubleQuotes (ptext (sLit "data"))
+    ReadOnlyData      -> section <+> doubleQuotes (ptext (sLit "readonly"))
+    ReadOnlyData16    -> section <+> doubleQuotes (ptext (sLit "readonly16"))
     RelocatableReadOnlyData
-                      -> section <+> doubleQuotes (ptext SLIT("relreadonly"))
-    UninitialisedData -> section <+> doubleQuotes (ptext SLIT("uninitialised"))
+                      -> section <+> doubleQuotes (ptext (sLit "relreadonly"))
+    UninitialisedData -> section <+> doubleQuotes (ptext (sLit "uninitialised"))
     OtherSection s'   -> section <+> doubleQuotes (text s')
  where
-    section = ptext SLIT("section")
-       
+    section = ptext (sLit "section")
+
 -- --------------------------------------------------------------------------
 -- Basic block ids
 --
