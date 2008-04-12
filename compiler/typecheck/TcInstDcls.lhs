@@ -15,8 +15,6 @@ TcInstDecls: Typechecking instance declarations
 
 module TcInstDcls ( tcInstDecls1, tcInstDecls2 ) where
 
-#include "HsVersions.h"
-
 import HsSyn
 import TcBinds
 import TcTyClsDecls
@@ -217,8 +215,8 @@ tcInstDecls1 tycl_decls inst_decls deriv_decls
     isAssocFamily Nothing               = False
 
 assocInClassErr name = 
-  ptext SLIT("Associated type") <+> quotes (ppr name) <+> 
-  ptext SLIT("must be inside a class instance")
+  ptext (sLit "Associated type") <+> quotes (ppr name) <+> 
+  ptext (sLit "must be inside a class instance")
 
 addInsts :: [InstInfo] -> TcM a -> TcM a
 addInsts infos thing_inside
@@ -556,8 +554,8 @@ tcInstDecl2 (InstInfo { iSpec = ispec, iBinds = NewTypeDerived })
 	| null sc_dicts		-- Case (a)
 	= return coerced_rep_dict
 	| otherwise 		-- Case (b)
- 	= do { op_ids		 <- newSysLocalIds FSLIT("op") op_tys
-	     ; dummy_sc_dict_ids <- newSysLocalIds FSLIT("sc") (map idType sc_dict_ids)
+ 	= do { op_ids		 <- newSysLocalIds (fsLit "op") op_tys
+	     ; dummy_sc_dict_ids <- newSysLocalIds (fsLit "sc") (map idType sc_dict_ids)
 	     ; let the_pat = ConPatOut { pat_con = noLoc cls_data_con, pat_tvs = [],
 				    	 pat_dicts = dummy_sc_dict_ids,
 				    	 pat_binds = emptyLHsBinds,
@@ -865,22 +863,22 @@ instDeclCtxt2 dfun_ty
   where
     (_,_,cls,tys) = tcSplitDFunTy dfun_ty
 
-inst_decl_ctxt doc = ptext SLIT("In the instance declaration for") <+> quotes doc
+inst_decl_ctxt doc = ptext (sLit "In the instance declaration for") <+> quotes doc
 
-superClassCtxt = ptext SLIT("When checking the super-classes of an instance declaration")
+superClassCtxt = ptext (sLit "When checking the super-classes of an instance declaration")
 
-atInstCtxt name = ptext SLIT("In the associated type instance for") <+> 
+atInstCtxt name = ptext (sLit "In the associated type instance for") <+> 
 		  quotes (ppr name)
 
 mustBeVarArgErr ty = 
-  sep [ ptext SLIT("Arguments that do not correspond to a class parameter") <+>
-        ptext SLIT("must be variables")
-      , ptext SLIT("Instead of a variable, found") <+> ppr ty
+  sep [ ptext (sLit "Arguments that do not correspond to a class parameter") <+>
+        ptext (sLit "must be variables")
+      , ptext (sLit "Instead of a variable, found") <+> ppr ty
       ]
 
 wrongATArgErr ty instTy =
-  sep [ ptext SLIT("Type indexes must match class instance head")
-      , ptext SLIT("Found") <+> ppr ty <+> ptext SLIT("but expected") <+>
+  sep [ ptext (sLit "Type indexes must match class instance head")
+      , ptext (sLit "Found") <+> ppr ty <+> ptext (sLit "but expected") <+>
          ppr instTy
       ]
 \end{code}
