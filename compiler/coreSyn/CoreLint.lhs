@@ -193,9 +193,9 @@ lintCoreBindings dflags whoDunnit binds
     display bad_news
       = vcat [  text ("*** Core Lint Errors: in result of " ++ whoDunnit ++ " ***"),
 		bad_news,
-		ptext SLIT("*** Offending Program ***"),
+		ptext (sLit "*** Offending Program ***"),
 		pprCoreBindings binds,
-		ptext SLIT("*** End of Offense ***")
+		ptext (sLit "*** End of Offense ***")
 	]
 \end{code}
 
@@ -282,7 +282,7 @@ lintCoreExpr :: CoreExpr -> LintM OutType
 
 lintCoreExpr (Var var)
   = do	{ checkL (not (var == oneTupleDataConId))
-		 (ptext SLIT("Illegal one-tuple"))
+		 (ptext (sLit "Illegal one-tuple"))
 	; var' <- lookupIdInScope var
         ; return (idType var')
         }
@@ -679,7 +679,7 @@ addErr subst errs_so_far msg locs
    (loc, cxt1) = dumpLoc (head locs)
    cxts        = [snd (dumpLoc loc) | loc <- locs]   
    context     | opt_PprStyle_Debug = vcat (reverse cxts) $$ cxt1 $$
-				      ptext SLIT("Substitution:") <+> ppr subst
+				      ptext (sLit "Substitution:") <+> ppr subst
 	       | otherwise	    = cxt1
  
    mk_msg msg = mkLocMessage (mkSrcSpan loc loc) (context $$ msg)
@@ -724,7 +724,7 @@ lookupIdInScope id
 		Nothing -> do { addErrL out_of_scope
 			      ; return id } }
   where
-    out_of_scope = ppr id <+> ptext SLIT("is out of scope")
+    out_of_scope = ppr id <+> ptext (sLit "is out of scope")
 
 
 oneTupleDataConId :: Id	-- Should not happen
@@ -734,11 +734,11 @@ checkBndrIdInScope :: Var -> Var -> LintM ()
 checkBndrIdInScope binder id 
   = checkInScope msg id
     where
-     msg = ptext SLIT("is out of scope inside info for") <+> 
+     msg = ptext (sLit "is out of scope inside info for") <+> 
 	   ppr binder
 
 checkTyVarInScope :: TyVar -> LintM ()
-checkTyVarInScope tv = checkInScope (ptext SLIT("is out of scope")) tv
+checkTyVarInScope tv = checkInScope (ptext (sLit "is out of scope")) tv
 
 checkInScope :: SDoc -> Var -> LintM ()
 checkInScope loc_msg var =
@@ -763,16 +763,16 @@ checkTys ty1 ty2 msg = checkL (ty1 `coreEqType` ty2) msg
 dumpLoc :: LintLocInfo -> (SrcLoc, SDoc)
 
 dumpLoc (RhsOf v)
-  = (getSrcLoc v, brackets (ptext SLIT("RHS of") <+> pp_binders [v]))
+  = (getSrcLoc v, brackets (ptext (sLit "RHS of") <+> pp_binders [v]))
 
 dumpLoc (LambdaBodyOf b)
-  = (getSrcLoc b, brackets (ptext SLIT("in body of lambda with binder") <+> pp_binder b))
+  = (getSrcLoc b, brackets (ptext (sLit "in body of lambda with binder") <+> pp_binder b))
 
 dumpLoc (BodyOfLetRec [])
-  = (noSrcLoc, brackets (ptext SLIT("In body of a letrec with no binders")))
+  = (noSrcLoc, brackets (ptext (sLit "In body of a letrec with no binders")))
 
 dumpLoc (BodyOfLetRec bs@(_:_))
-  = ( getSrcLoc (head bs), brackets (ptext SLIT("in body of letrec with binders") <+> pp_binders bs))
+  = ( getSrcLoc (head bs), brackets (ptext (sLit "in body of letrec with binders") <+> pp_binders bs))
 
 dumpLoc (AnExpr e)
   = (noSrcLoc, text "In the expression:" <+> ppr e)
@@ -784,7 +784,7 @@ dumpLoc (CasePat (con, args, _))
   = (noSrcLoc, text "In the pattern of a case alternative:" <+> parens (ppr con <+> pp_binders args))
 
 dumpLoc (ImportedUnfolding locn)
-  = (locn, brackets (ptext SLIT("in an imported unfolding")))
+  = (locn, brackets (ptext (sLit "in an imported unfolding")))
 dumpLoc TopLevelBindings
   = (noSrcLoc, empty)
 
@@ -820,7 +820,7 @@ mkScrutMsg var var_ty scrut_ty subst
   = vcat [text "Result binder in case doesn't match scrutinee:" <+> ppr var,
 	  text "Result binder type:" <+> ppr var_ty,--(idType var),
 	  text "Scrutinee type:" <+> ppr scrut_ty,
-     hsep [ptext SLIT("Current TV subst"), ppr subst]]
+     hsep [ptext (sLit "Current TV subst"), ppr subst]]
 
 mkNonDefltMsg, mkNonIncreasingAltsMsg :: CoreExpr -> Message
 mkNonDefltMsg e
@@ -866,87 +866,87 @@ mkNewTyDataConAltMsg scrut_ty alt
 
 mkAppMsg :: Type -> Type -> CoreExpr -> Message
 mkAppMsg fun_ty arg_ty arg
-  = vcat [ptext SLIT("Argument value doesn't match argument type:"),
-	      hang (ptext SLIT("Fun type:")) 4 (ppr fun_ty),
-	      hang (ptext SLIT("Arg type:")) 4 (ppr arg_ty),
-	      hang (ptext SLIT("Arg:")) 4 (ppr arg)]
+  = vcat [ptext (sLit "Argument value doesn't match argument type:"),
+	      hang (ptext (sLit "Fun type:")) 4 (ppr fun_ty),
+	      hang (ptext (sLit "Arg type:")) 4 (ppr arg_ty),
+	      hang (ptext (sLit "Arg:")) 4 (ppr arg)]
 
 mkNonFunAppMsg :: Type -> Type -> CoreExpr -> Message
 mkNonFunAppMsg fun_ty arg_ty arg
-  = vcat [ptext SLIT("Non-function type in function position"),
-	      hang (ptext SLIT("Fun type:")) 4 (ppr fun_ty),
-	      hang (ptext SLIT("Arg type:")) 4 (ppr arg_ty),
-	      hang (ptext SLIT("Arg:")) 4 (ppr arg)]
+  = vcat [ptext (sLit "Non-function type in function position"),
+	      hang (ptext (sLit "Fun type:")) 4 (ppr fun_ty),
+	      hang (ptext (sLit "Arg type:")) 4 (ppr arg_ty),
+	      hang (ptext (sLit "Arg:")) 4 (ppr arg)]
 
 mkKindErrMsg :: TyVar -> Type -> Message
 mkKindErrMsg tyvar arg_ty
-  = vcat [ptext SLIT("Kinds don't match in type application:"),
-	  hang (ptext SLIT("Type variable:"))
+  = vcat [ptext (sLit "Kinds don't match in type application:"),
+	  hang (ptext (sLit "Type variable:"))
 		 4 (ppr tyvar <+> dcolon <+> ppr (tyVarKind tyvar)),
-	  hang (ptext SLIT("Arg type:"))   
+	  hang (ptext (sLit "Arg type:"))   
 	         4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
 
 mkTyAppMsg :: Type -> Type -> Message
 mkTyAppMsg ty arg_ty
   = vcat [text "Illegal type application:",
-	      hang (ptext SLIT("Exp type:"))
+	      hang (ptext (sLit "Exp type:"))
 		 4 (ppr ty <+> dcolon <+> ppr (typeKind ty)),
-	      hang (ptext SLIT("Arg type:"))   
+	      hang (ptext (sLit "Arg type:"))   
 	         4 (ppr arg_ty <+> dcolon <+> ppr (typeKind arg_ty))]
 
 mkRhsMsg :: Id -> Type -> Message
 mkRhsMsg binder ty
   = vcat
-    [hsep [ptext SLIT("The type of this binder doesn't match the type of its RHS:"),
+    [hsep [ptext (sLit "The type of this binder doesn't match the type of its RHS:"),
 	    ppr binder],
-     hsep [ptext SLIT("Binder's type:"), ppr (idType binder)],
-     hsep [ptext SLIT("Rhs type:"), ppr ty]]
+     hsep [ptext (sLit "Binder's type:"), ppr (idType binder)],
+     hsep [ptext (sLit "Rhs type:"), ppr ty]]
 
 mkRhsPrimMsg :: Id -> CoreExpr -> Message
 mkRhsPrimMsg binder _rhs
-  = vcat [hsep [ptext SLIT("The type of this binder is primitive:"),
+  = vcat [hsep [ptext (sLit "The type of this binder is primitive:"),
 		     ppr binder],
-	      hsep [ptext SLIT("Binder's type:"), ppr (idType binder)]
+	      hsep [ptext (sLit "Binder's type:"), ppr (idType binder)]
 	     ]
 
 mkStrictMsg :: Id -> Message
 mkStrictMsg binder
-  = vcat [hsep [ptext SLIT("Recursive or top-level binder has strict demand info:"),
+  = vcat [hsep [ptext (sLit "Recursive or top-level binder has strict demand info:"),
 		     ppr binder],
-	      hsep [ptext SLIT("Binder's demand info:"), ppr (idNewDemandInfo binder)]
+	      hsep [ptext (sLit "Binder's demand info:"), ppr (idNewDemandInfo binder)]
 	     ]
 
 mkArityMsg :: Id -> Message
 mkArityMsg binder
-  = vcat [hsep [ptext SLIT("Demand type has "),
+  = vcat [hsep [ptext (sLit "Demand type has "),
                      ppr (dmdTypeDepth dmd_ty),
-                     ptext SLIT(" arguments, rhs has "),
+                     ptext (sLit " arguments, rhs has "),
                      ppr (idArity binder),
-                     ptext SLIT("arguments, "),
+                     ptext (sLit "arguments, "),
 		     ppr binder],
-	      hsep [ptext SLIT("Binder's strictness signature:"), ppr dmd_ty]
+	      hsep [ptext (sLit "Binder's strictness signature:"), ppr dmd_ty]
 
          ]
            where (StrictSig dmd_ty) = idNewStrictness binder
 
 mkUnboxedTupleMsg :: Id -> Message
 mkUnboxedTupleMsg binder
-  = vcat [hsep [ptext SLIT("A variable has unboxed tuple type:"), ppr binder],
-	  hsep [ptext SLIT("Binder's type:"), ppr (idType binder)]]
+  = vcat [hsep [ptext (sLit "A variable has unboxed tuple type:"), ppr binder],
+	  hsep [ptext (sLit "Binder's type:"), ppr (idType binder)]]
 
 mkCastErr :: Type -> Type -> Message
 mkCastErr from_ty expr_ty
-  = vcat [ptext SLIT("From-type of Cast differs from type of enclosed expression"),
-	  ptext SLIT("From-type:") <+> ppr from_ty,
-	  ptext SLIT("Type of enclosed expr:") <+> ppr expr_ty
+  = vcat [ptext (sLit "From-type of Cast differs from type of enclosed expression"),
+	  ptext (sLit "From-type:") <+> ppr from_ty,
+	  ptext (sLit "Type of enclosed expr:") <+> ppr expr_ty
     ]
 
 dupVars :: [[Var]] -> Message
 dupVars vars
-  = hang (ptext SLIT("Duplicate variables brought into scope"))
+  = hang (ptext (sLit "Duplicate variables brought into scope"))
        2 (ppr vars)
 
 mkStrangeTyMsg :: CoreExpr -> Message
 mkStrangeTyMsg e
-  = ptext SLIT("Type where expression expected:") <+> ppr e
+  = ptext (sLit "Type where expression expected:") <+> ppr e
 \end{code}
