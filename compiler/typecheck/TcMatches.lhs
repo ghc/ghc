@@ -19,8 +19,6 @@ module TcMatches ( tcMatchesFun, tcGRHSsPat, tcMatchesCase, tcMatchLambda,
 		   tcDoStmt, tcMDoStmt, tcGuardStmt
        ) where
 
-#include "HsVersions.h"
-
 import {-# SOURCE #-}	TcExpr( tcSyntaxOp, tcInferRho, tcMonoExpr, tcPolyExpr )
 
 import HsSyn
@@ -84,8 +82,8 @@ tcMatchesFun fun_name inf matches exp_ty
 	  tcMatches match_ctxt pat_tys rhs_ty matches
 	}
   where
-    doc = ptext SLIT("The equation(s) for") <+> quotes (ppr fun_name)
-	  <+> ptext SLIT("have") <+> speakNOf n_pats (ptext SLIT("argument"))
+    doc = ptext (sLit "The equation(s) for") <+> quotes (ppr fun_name)
+	  <+> ptext (sLit "have") <+> speakNOf n_pats (ptext (sLit "argument"))
     n_pats = matchGroupArity matches
     match_ctxt = MC { mc_what = FunRhs fun_name inf, mc_body = tcBody }
 \end{code}
@@ -109,10 +107,10 @@ tcMatchLambda match res_ty
     tcMatches match_ctxt pat_tys rhs_ty match
   where
     n_pats = matchGroupArity match
-    doc = sep [ ptext SLIT("The lambda expression")
+    doc = sep [ ptext (sLit "The lambda expression")
 		 <+> quotes (pprSetDepth 1 $ pprMatches (LambdaExpr :: HsMatchContext Name) match),
 			-- The pprSetDepth makes the abstraction print briefly
-		ptext SLIT("has") <+> speakNOf n_pats (ptext SLIT("argument"))]
+		ptext (sLit "has") <+> speakNOf n_pats (ptext (sLit "argument"))]
     match_ctxt = MC { mc_what = LambdaExpr,
 		      mc_body = tcBody }
 \end{code}
@@ -174,7 +172,7 @@ tcMatch ctxt pat_tys rhs_ty match
 
 	-- Result type sigs are no longer supported
     tc_grhss ctxt (Just res_sig) grhss rhs_ty
-      = do { addErr (ptext SLIT("Ignoring (deprecated) result type signature")
+      = do { addErr (ptext (sLit "Ignoring (deprecated) result type signature")
 			<+> ppr res_sig)
     	   ; tcGRHSs ctxt grhss rhs_ty }
 
@@ -508,7 +506,7 @@ tcDoStmt ctxt (ExprStmt rhs then_op _) res_ty thing_inside
 	; return (ExprStmt rhs' then_op' rhs_ty, thing) }
 
 tcDoStmt ctxt (RecStmt {}) res_ty thing_inside
-  = failWithTc (ptext SLIT("Illegal 'rec' stmt in") <+> pprStmtContext ctxt)
+  = failWithTc (ptext (sLit "Illegal 'rec' stmt in") <+> pprStmtContext ctxt)
 	-- This case can't be caught in the renamer
 	-- see RnExpr.checkRecStmt
 
@@ -582,8 +580,8 @@ checkArgs :: Name -> MatchGroup Name -> TcM ()
 checkArgs fun (MatchGroup (match1:matches) _)
     | null bad_matches = return ()
     | otherwise
-    = failWithTc (vcat [ptext SLIT("Equations for") <+> quotes (ppr fun) <+> 
-			  ptext SLIT("have different numbers of arguments"),
+    = failWithTc (vcat [ptext (sLit "Equations for") <+> quotes (ppr fun) <+> 
+			  ptext (sLit "have different numbers of arguments"),
 			nest 2 (ppr (getLoc match1)),
 			nest 2 (ppr (getLoc (head bad_matches)))])
   where
@@ -596,9 +594,9 @@ checkArgs fun other = panic "TcPat.checkArgs"	-- Matches always non-empty
 \end{code}
 
 \begin{code}
-matchCtxt ctxt match  = hang (ptext SLIT("In") <+> pprMatchContext ctxt <> colon) 
+matchCtxt ctxt match  = hang (ptext (sLit "In") <+> pprMatchContext ctxt <> colon) 
 			   4 (pprMatch ctxt match)
 
-stmtCtxt ctxt stmt = hang (ptext SLIT("In a stmt of") <+> pprStmtContext ctxt <> colon)
+stmtCtxt ctxt stmt = hang (ptext (sLit "In a stmt of") <+> pprStmtContext ctxt <> colon)
 		  	4 (ppr stmt)
 \end{code}
