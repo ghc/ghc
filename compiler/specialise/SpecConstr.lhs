@@ -514,7 +514,7 @@ data Value    = ConVal AltCon [CoreArg]	-- *Saturated* constructors
 
 instance Outputable Value where
    ppr (ConVal con args) = ppr con <+> interpp'SP args
-   ppr LambdaVal	 = ptext SLIT("<Lambda>")
+   ppr LambdaVal	 = ptext (sLit "<Lambda>")
 
 ---------------------
 initScEnv :: DynFlags -> ScEnv
@@ -685,10 +685,10 @@ A pattern binds b, x::a, y::b, z::b->a, but not 'a'!
 -}
 
 instance Outputable ArgOcc where
-  ppr (ScrutOcc xs) = ptext SLIT("scrut-occ") <> ppr xs
-  ppr UnkOcc 	    = ptext SLIT("unk-occ")
-  ppr BothOcc 	    = ptext SLIT("both-occ")
-  ppr NoOcc    	    = ptext SLIT("no-occ")
+  ppr (ScrutOcc xs) = ptext (sLit "scrut-occ") <> ppr xs
+  ppr UnkOcc 	    = ptext (sLit "unk-occ")
+  ppr BothOcc 	    = ptext (sLit "both-occ")
+  ppr NoOcc    	    = ptext (sLit "no-occ")
 
 -- Experimentally, this vesion of combineOcc makes ScrutOcc "win", so
 -- that if the thing is scrutinised anywhere then we get to see that
@@ -1024,8 +1024,8 @@ specialise env bind_calls (fn, arg_bndrs, body, arg_occs)
 	; case sc_count env of
 	    Just max | spec_count' > max
 		-> pprTrace "SpecConstr: too many specialisations for one function (see -fspec-constr-count):" 
-			 (vcat [ptext SLIT("Function:") <+> ppr fn,
-				ptext SLIT("Specialisations:") <+> ppr (pats ++ [p | OS p _ _ _ <- specs])])
+			 (vcat [ptext (sLit "Function:") <+> ppr fn,
+				ptext (sLit "Specialisations:") <+> ppr (pats ++ [p | OS p _ _ _ <- specs])])
 			 return (nullUsage, spec_info)
 
 	    _normal_case -> do
@@ -1218,7 +1218,7 @@ argToPat in_scope val_env (Cast arg co) arg_occ
 	  else do
 	{ -- Make a wild-card pattern for the coercion
 	  uniq <- getUniqueUs
-	; let co_name = mkSysTvName uniq FSLIT("sg")
+	; let co_name = mkSysTvName uniq (fsLit "sg")
 	      co_var = mkCoVar co_name (mkCoKind ty1 ty2)
 	; return (interesting, Cast arg' (mkTyVarTy co_var)) } }
 
@@ -1288,7 +1288,7 @@ argToPat _in_scope _val_env arg _arg_occ
 
 wildCardPat :: Type -> UniqSM (Bool, CoreArg)
 wildCardPat ty = do { uniq <- getUniqueUs
-		    ; let id = mkSysLocal FSLIT("sc") uniq ty
+		    ; let id = mkSysLocal (fsLit "sc") uniq ty
 		    ; return (False, Var id) }
 
 argsToPats :: InScopeSet -> ValueEnv
