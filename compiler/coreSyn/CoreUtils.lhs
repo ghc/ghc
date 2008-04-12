@@ -678,9 +678,9 @@ app_is_value _          _  = False
 dataConRepInstPat, dataConOrigInstPat :: [Unique] -> DataCon -> [Type] -> ([TyVar], [CoVar], [Id])
 dataConRepFSInstPat :: [FastString] -> [Unique] -> DataCon -> [Type] -> ([TyVar], [CoVar], [Id])
 -- These InstPat functions go here to avoid circularity between DataCon and Id
-dataConRepInstPat   = dataConInstPat dataConRepArgTys (repeat (FSLIT("ipv")))
+dataConRepInstPat   = dataConInstPat dataConRepArgTys (repeat ((fsLit "ipv")))
 dataConRepFSInstPat = dataConInstPat dataConRepArgTys
-dataConOrigInstPat  = dataConInstPat dc_arg_tys       (repeat (FSLIT("ipv")))
+dataConOrigInstPat  = dataConInstPat dc_arg_tys       (repeat ((fsLit "ipv")))
   where 
     dc_arg_tys dc = map mkPredTy (dataConEqTheta dc) ++ map mkPredTy (dataConDictTheta dc) ++ dataConOrigArgTys dc
 	-- Remember to include the existential dictionaries
@@ -1179,7 +1179,7 @@ eta_expand n us expr ty
 
               Lam lam_tv (eta_expand n us2 (App expr (Type (mkTyVarTy lam_tv))) (substTyWith [tv] [mkTyVarTy lam_tv] ty'))
                   where 
-                    lam_tv = setVarName tv (mkSysTvName uniq FSLIT("etaT"))
+                    lam_tv = setVarName tv (mkSysTvName uniq (fsLit "etaT"))
 			-- Using tv as a base retains its tyvar/covar-ness
                     (uniq:us2) = us 
  	; Nothing ->
@@ -1187,7 +1187,7 @@ eta_expand n us expr ty
     	case splitFunTy_maybe ty of {
  	  Just (arg_ty, res_ty) -> Lam arg1 (eta_expand (n-1) us2 (App expr (Var arg1)) res_ty)
 				where
-				   arg1	      = mkSysLocal FSLIT("eta") uniq arg_ty
+				   arg1	      = mkSysLocal (fsLit "eta") uniq arg_ty
  				   (uniq:us2) = us
 				   
 	; Nothing ->
