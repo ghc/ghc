@@ -1386,9 +1386,9 @@ tcSimplifyRestricted doc top_lvl bndrs tau_tvs wanteds
 	-- Warn in the mono
 	; warn_mono <- doptM Opt_WarnMonomorphism
 	; warnTc (warn_mono && (constrained_tvs' `intersectsVarSet` qtvs1))
-		 (vcat[ ptext SLIT("the Monomorphism Restriction applies to the binding")
-				<> plural bndrs <+> ptext SLIT("for") <+> pp_bndrs,
-			ptext SLIT("Consider giving a type signature for") <+> pp_bndrs])
+		 (vcat[ ptext (sLit "the Monomorphism Restriction applies to the binding")
+				<> plural bndrs <+> ptext (sLit "for") <+> pp_bndrs,
+			ptext (sLit "Consider giving a type signature for") <+> pp_bndrs])
 
 	; traceTc (text "tcSimplifyRestricted" <+> vcat [
 		pprInsts wanteds, pprInsts constrained_dicts',
@@ -1879,7 +1879,7 @@ unifyEqns :: [(Equation,(PredType,SDoc),(PredType,SDoc))]
 	  -> TcM ImprovementDone
 unifyEqns [] = return False
 unifyEqns eqns
-  = do	{ traceTc (ptext SLIT("Improve:") <+> vcat (map pprEquationDoc eqns))
+  = do	{ traceTc (ptext (sLit "Improve:") <+> vcat (map pprEquationDoc eqns))
         ; mapM_ unify eqns
 	; return True }
   where
@@ -1894,7 +1894,7 @@ pprEquationDoc (eqn, (p1,w1), (p2,w2)) = vcat [pprEquation eqn, nest 2 (ppr p1),
 mkEqnMsg (pred1,from1) (pred2,from2) tidy_env
   = do	{ pred1' <- zonkTcPredType pred1; pred2' <- zonkTcPredType pred2
 	; let { pred1'' = tidyPred tidy_env pred1'; pred2'' = tidyPred tidy_env pred2' }
-	; let msg = vcat [ptext SLIT("When using functional dependencies to combine"),
+	; let msg = vcat [ptext (sLit "When using functional dependencies to combine"),
 			  nest 2 (sep [ppr pred1'' <> comma, nest 2 from1]), 
 			  nest 2 (sep [ppr pred2'' <> comma, nest 2 from2])]
 	; return (tidy_env, msg) }
@@ -1908,7 +1908,7 @@ reduceList env@(RedEnv {red_stack = (n,stk)}) wanteds state
   = do	{ traceTc (text "reduceList " <+> (ppr wanteds $$ ppr state))
 	; dopts <- getDOpts
 	; when (debugIsOn && (n > 8)) $ do
-		dumpTcRn (hang (ptext SLIT("Interesting! Context reduction stack depth") <+> int n) 
+		dumpTcRn (hang (ptext (sLit "Interesting! Context reduction stack depth") <+> int n) 
 			     2 (ifPprDebug (nest 2 (pprStack stk))))
 	; if n >= ctxtStkDepth dopts then
 	    failWithTc (reduceDepthErr n stk)
@@ -2126,9 +2126,9 @@ reduceImplication env
   = do	{ 	-- Solve the sub-problem
 	; let try_me inst = ReduceMe AddSCs  -- Note [Freeness and implications]
 	      env' = env { red_givens = extra_givens ++ red_givens env
-			 , red_doc = sep [ptext SLIT("reduceImplication for") 
+			 , red_doc = sep [ptext (sLit "reduceImplication for") 
                                             <+> ppr name,
-					  nest 2 (parens $ ptext SLIT("within")
+					  nest 2 (parens $ ptext (sLit "within")
                                                            <+> red_doc env)]
 			 , red_try_me = try_me }
 
@@ -2281,7 +2281,7 @@ instance Outputable Avails where
   ppr = pprAvails
 
 pprAvails (Avails imp avails)
-  = vcat [ ptext SLIT("Avails") <> (if imp then ptext SLIT("[improved]") else empty)
+  = vcat [ ptext (sLit "Avails") <> (if imp then ptext (sLit "[improved]") else empty)
 	 , nest 2 $ braces $ 
 	   vcat [ sep [ppr inst, nest 2 (equals <+> ppr avail)]
 		| (inst,avail) <- fmToList avails ]]
@@ -2569,9 +2569,9 @@ tc_simplify_top doc interactive wanteds
 
 	; return (binds1 `unionBags` binds2 `unionBags` binds3) }
   where
-    doc1 = doc <+> ptext SLIT("(first round)")
-    doc2 = doc <+> ptext SLIT("(approximate)")
-    doc3 = doc <+> ptext SLIT("(disambiguate)")
+    doc1 = doc <+> ptext (sLit "(first round)")
+    doc2 = doc <+> ptext (sLit "(approximate)")
+    doc3 = doc <+> ptext (sLit "(disambiguate)")
 \end{code}
 
 If a dictionary constrains a type variable which is
@@ -2791,7 +2791,7 @@ tcSimplifyDeriv orig tyvars theta
 
 	; return simpl_theta }
   where
-    doc = ptext SLIT("deriving classes for a data type")
+    doc = ptext (sLit "deriving classes for a data type")
 
     ok dict | isDict dict = validDerivPred (dictPred dict)
 	    | otherwise	  = False
@@ -2813,9 +2813,9 @@ tcSimplifyDefault theta = do
     if null irreds then
 	return ()
      else
-	traceTc (ptext SLIT("tcSimplifyDefault failing")) >> failM
+	traceTc (ptext (sLit "tcSimplifyDefault failing")) >> failM
   where
-    doc = ptext SLIT("default declaration")
+    doc = ptext (sLit "default declaration")
 \end{code}
 
 
@@ -2864,9 +2864,9 @@ addTopIPErrs bndrs ips
   where
     (tidy_env, tidy_ips) = tidyInsts ips
     mk_msg dflags ips 
-	= vcat [sep [ptext SLIT("Implicit parameters escape from"),
-	        nest 2 (ptext SLIT("the monomorphic top-level binding") 
-					    <> plural bndrs <+> ptext SLIT("of")
+	= vcat [sep [ptext (sLit "Implicit parameters escape from"),
+	        nest 2 (ptext (sLit "the monomorphic top-level binding") 
+					    <> plural bndrs <+> ptext (sLit "of")
 					    <+> pprBinders bndrs <> colon)],
 		nest 2 (vcat (map ppr_ip ips)),
 		monomorphism_fix dflags]
@@ -2878,7 +2878,7 @@ topIPErrs dicts
   where
     (tidy_env, tidy_dicts) = tidyInsts dicts
     report dicts = addErrTcM (tidy_env, mk_msg dicts)
-    mk_msg dicts = addInstLoc dicts (ptext SLIT("Unbound implicit parameter") <> 
+    mk_msg dicts = addInstLoc dicts (ptext (sLit "Unbound implicit parameter") <> 
 				     plural tidy_dicts <+> pprDictsTheta tidy_dicts)
 
 addNoInstanceErrs :: [Inst]	-- Wanted (can include implications)
@@ -2938,19 +2938,19 @@ report_no_instances tidy_env mb_what insts
 
     mk_overlap_msg dict (matches, unifiers)
       = ASSERT( not (null matches) )
-        vcat [	addInstLoc [dict] ((ptext SLIT("Overlapping instances for") 
+        vcat [	addInstLoc [dict] ((ptext (sLit "Overlapping instances for") 
 					<+> pprPred (dictPred dict))),
-    		sep [ptext SLIT("Matching instances") <> colon,
+    		sep [ptext (sLit "Matching instances") <> colon,
     		     nest 2 (vcat [pprInstances ispecs, pprInstances unifiers])],
 		if not (isSingleton matches)
     		then 	-- Two or more matches
 		     empty
     		else 	-- One match, plus some unifiers
 		ASSERT( not (null unifiers) )
-		parens (vcat [ptext SLIT("The choice depends on the instantiation of") <+>
+		parens (vcat [ptext (sLit "The choice depends on the instantiation of") <+>
 	    		         quotes (pprWithCommas ppr (varSetElems (tyVarsOfInst dict))),
-			      ptext SLIT("To pick the first instance above, use -fallow-incoherent-instances"),
-			      ptext SLIT("when compiling the other instance declarations")])]
+			      ptext (sLit "To pick the first instance above, use -fallow-incoherent-instances"),
+			      ptext (sLit "when compiling the other instance declarations")])]
       where
     	ispecs = [ispec | (ispec, _) <- matches]
 
@@ -2963,25 +2963,25 @@ report_no_instances tidy_env mb_what insts
       | Just (loc, givens) <- mb_what,   -- Nested (type signatures, instance decls)
 	not (isEmptyVarSet (tyVarsOfInsts insts))
       = vcat [ addInstLoc insts $
-	       sep [ ptext SLIT("Could not deduce") <+> pprDictsTheta insts
-	           , nest 2 $ ptext SLIT("from the context") <+> pprDictsTheta givens]
+	       sep [ ptext (sLit "Could not deduce") <+> pprDictsTheta insts
+	           , nest 2 $ ptext (sLit "from the context") <+> pprDictsTheta givens]
 	     , show_fixes (fix1 loc : fixes2) ]
 
       | otherwise	-- Top level 
       = vcat [ addInstLoc insts $
-	       ptext SLIT("No instance") <> plural insts
-		    <+> ptext SLIT("for") <+> pprDictsTheta insts
+	       ptext (sLit "No instance") <> plural insts
+		    <+> ptext (sLit "for") <+> pprDictsTheta insts
 	     , show_fixes fixes2 ]
 
       where
-    	fix1 loc = sep [ ptext SLIT("add") <+> pprDictsTheta insts
-				 <+> ptext SLIT("to the context of"),
+    	fix1 loc = sep [ ptext (sLit "add") <+> pprDictsTheta insts
+				 <+> ptext (sLit "to the context of"),
 			 nest 2 (ppr (instLocOrigin loc)) ]
 			 -- I'm not sure it helps to add the location
-			 -- nest 2 (ptext SLIT("at") <+> ppr (instLocSpan loc)) ]
+			 -- nest 2 (ptext (sLit "at") <+> ppr (instLocSpan loc)) ]
 
     	fixes2 | null instance_dicts = []
-	       | otherwise	     = [sep [ptext SLIT("add an instance declaration for"),
+	       | otherwise	     = [sep [ptext (sLit "add an instance declaration for"),
 				        pprDictsTheta instance_dicts]]
 	instance_dicts = [d | d <- insts, isClassDict d, not (isTyVarDict d)]
 		-- Insts for which it is worth suggesting an adding an instance declaration
@@ -2989,8 +2989,8 @@ report_no_instances tidy_env mb_what insts
 
 	show_fixes :: [SDoc] -> SDoc
 	show_fixes []     = empty
-	show_fixes (f:fs) = sep [ptext SLIT("Possible fix:"), 
-				 nest 2 (vcat (f : map (ptext SLIT("or") <+>) fs))]
+	show_fixes (f:fs) = sep [ptext (sLit "Possible fix:"), 
+				 nest 2 (vcat (f : map (ptext (sLit "or") <+>) fs))]
 
 addTopAmbigErrs dicts
 -- Divide into groups that share a common set of ambiguous tyvars
@@ -3030,24 +3030,24 @@ mkMonomorphismMsg tidy_env inst_tvs
 	; return (tidy_env, mk_msg dflags docs) }
   where
     mk_msg _ _ | any isRuntimeUnk inst_tvs
-        =  vcat [ptext SLIT("Cannot resolve unknown runtime types:") <+>
+        =  vcat [ptext (sLit "Cannot resolve unknown runtime types:") <+>
                    (pprWithCommas ppr inst_tvs),
-                ptext SLIT("Use :print or :force to determine these types")]
-    mk_msg _ []   = ptext SLIT("Probable fix: add a type signature that fixes these type variable(s)")
+                ptext (sLit "Use :print or :force to determine these types")]
+    mk_msg _ []   = ptext (sLit "Probable fix: add a type signature that fixes these type variable(s)")
 			-- This happens in things like
 			--	f x = show (read "foo")
 			-- where monomorphism doesn't play any role
     mk_msg dflags docs 
-	= vcat [ptext SLIT("Possible cause: the monomorphism restriction applied to the following:"),
+	= vcat [ptext (sLit "Possible cause: the monomorphism restriction applied to the following:"),
 		nest 2 (vcat docs),
 		monomorphism_fix dflags]
 
 monomorphism_fix :: DynFlags -> SDoc
 monomorphism_fix dflags
-  = ptext SLIT("Probable fix:") <+> vcat
-	[ptext SLIT("give these definition(s) an explicit type signature"),
+  = ptext (sLit "Probable fix:") <+> vcat
+	[ptext (sLit "give these definition(s) an explicit type signature"),
 	 if dopt Opt_MonomorphismRestriction dflags
-           then ptext SLIT("or use -fno-monomorphism-restriction")
+           then ptext (sLit "or use -fno-monomorphism-restriction")
            else empty]	-- Only suggest adding "-fno-monomorphism-restriction"
 			-- if it is not already set!
     
@@ -3059,13 +3059,13 @@ warnDefault ups default_ty = do
 
 	-- Tidy them first
     (_, tidy_dicts) = tidyInsts dicts
-    warn_msg  = vcat [ptext SLIT("Defaulting the following constraint(s) to type") <+>
+    warn_msg  = vcat [ptext (sLit "Defaulting the following constraint(s) to type") <+>
 				quotes (ppr default_ty),
 		      pprDictsInFull tidy_dicts]
 
 reduceDepthErr n stack
-  = vcat [ptext SLIT("Context reduction stack overflow; size =") <+> int n,
-	  ptext SLIT("Use -fcontext-stack=N to increase stack size to N"),
+  = vcat [ptext (sLit "Context reduction stack overflow; size =") <+> int n,
+	  ptext (sLit "Use -fcontext-stack=N to increase stack size to N"),
 	  nest 4 (pprStack stack)]
 
 pprStack stack = vcat (map pprInstInFull stack)
