@@ -66,8 +66,6 @@ module OccName (
 	startsVarSym, startsVarId, startsConSym, startsConId
     ) where
 
-#include "HsVersions.h"
-
 import Util
 import Unique
 import BasicTypes
@@ -149,10 +147,10 @@ isVarName VarName = True
 isVarName _       = False
 
 pprNameSpace :: NameSpace -> SDoc
-pprNameSpace DataName  = ptext SLIT("data constructor")
-pprNameSpace VarName   = ptext SLIT("variable")
-pprNameSpace TvName    = ptext SLIT("type variable")
-pprNameSpace TcClsName = ptext SLIT("type constructor or class")
+pprNameSpace DataName  = ptext (sLit "data constructor")
+pprNameSpace VarName   = ptext (sLit "variable")
+pprNameSpace TvName    = ptext (sLit "type variable")
+pprNameSpace TcClsName = ptext (sLit "type constructor or class")
 
 pprNonVarNameSpace :: NameSpace -> SDoc
 pprNonVarNameSpace VarName = empty
@@ -161,8 +159,8 @@ pprNonVarNameSpace ns = pprNameSpace ns
 pprNameSpaceBrief :: NameSpace -> SDoc
 pprNameSpaceBrief DataName  = char 'd'
 pprNameSpaceBrief VarName   = char 'v'
-pprNameSpaceBrief TvName    = ptext SLIT("tv")
-pprNameSpaceBrief TcClsName = ptext SLIT("tc")
+pprNameSpaceBrief TvName    = ptext (sLit "tv")
+pprNameSpaceBrief TcClsName = ptext (sLit "tc")
 \end{code}
 
 
@@ -662,18 +660,18 @@ isLexSym cs = isLexConSym cs || isLexVarSym cs
 -------------
 
 isLexConId cs				-- Prefix type or data constructors
-  | nullFS cs	      = False		-- 	e.g. "Foo", "[]", "(,)" 
-  | cs == FSLIT("[]") = True
-  | otherwise	      = startsConId (headFS cs)
+  | nullFS cs	       = False		-- 	e.g. "Foo", "[]", "(,)" 
+  | cs == (fsLit "[]") = True
+  | otherwise	       = startsConId (headFS cs)
 
 isLexVarId cs				-- Ordinary prefix identifiers
   | nullFS cs	      = False		-- 	e.g. "x", "_x"
   | otherwise         = startsVarId (headFS cs)
 
 isLexConSym cs				-- Infix type or data constructors
-  | nullFS cs	      = False		--	e.g. ":-:", ":", "->"
-  | cs == FSLIT("->") = True
-  | otherwise	      = startsConSym (headFS cs)
+  | nullFS cs	       = False		--	e.g. ":-:", ":", "->"
+  | cs == (fsLit "->") = True
+  | otherwise	       = startsConSym (headFS cs)
 
 isLexVarSym cs				-- Infix identifiers
   | nullFS cs	      = False		-- 	e.g. "+"
