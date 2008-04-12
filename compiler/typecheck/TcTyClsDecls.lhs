@@ -1153,46 +1153,46 @@ checkValidClass cls
 
 ---------------------------------------------------------------------
 resultTypeMisMatch field_name con1 con2
-  = vcat [sep [ptext SLIT("Constructors") <+> ppr con1 <+> ptext SLIT("and") <+> ppr con2, 
-		ptext SLIT("have a common field") <+> quotes (ppr field_name) <> comma],
-	  nest 2 $ ptext SLIT("but have different result types")]
+  = vcat [sep [ptext (sLit "Constructors") <+> ppr con1 <+> ptext (sLit "and") <+> ppr con2, 
+		ptext (sLit "have a common field") <+> quotes (ppr field_name) <> comma],
+	  nest 2 $ ptext (sLit "but have different result types")]
 fieldTypeMisMatch field_name con1 con2
-  = sep [ptext SLIT("Constructors") <+> ppr con1 <+> ptext SLIT("and") <+> ppr con2, 
-	 ptext SLIT("give different types for field"), quotes (ppr field_name)]
+  = sep [ptext (sLit "Constructors") <+> ppr con1 <+> ptext (sLit "and") <+> ppr con2, 
+	 ptext (sLit "give different types for field"), quotes (ppr field_name)]
 
-dataConCtxt con = ptext SLIT("In the definition of data constructor") <+> quotes (ppr con)
+dataConCtxt con = ptext (sLit "In the definition of data constructor") <+> quotes (ppr con)
 
-classOpCtxt sel_id tau = sep [ptext SLIT("When checking the class method:"),
+classOpCtxt sel_id tau = sep [ptext (sLit "When checking the class method:"),
 			      nest 2 (ppr sel_id <+> dcolon <+> ppr tau)]
 
 nullaryClassErr cls
-  = ptext SLIT("No parameters for class")  <+> quotes (ppr cls)
+  = ptext (sLit "No parameters for class")  <+> quotes (ppr cls)
 
 classArityErr cls
-  = vcat [ptext SLIT("Too many parameters for class") <+> quotes (ppr cls),
-	  parens (ptext SLIT("Use -XMultiParamTypeClasses to allow multi-parameter classes"))]
+  = vcat [ptext (sLit "Too many parameters for class") <+> quotes (ppr cls),
+	  parens (ptext (sLit "Use -XMultiParamTypeClasses to allow multi-parameter classes"))]
 
 classFunDepsErr cls
-  = vcat [ptext SLIT("Fundeps in class") <+> quotes (ppr cls),
-	  parens (ptext SLIT("Use -XFunctionalDependencies to allow fundeps"))]
+  = vcat [ptext (sLit "Fundeps in class") <+> quotes (ppr cls),
+	  parens (ptext (sLit "Use -XFunctionalDependencies to allow fundeps"))]
 
 noClassTyVarErr clas op
-  = sep [ptext SLIT("The class method") <+> quotes (ppr op),
-	 ptext SLIT("mentions none of the type variables of the class") <+> 
+  = sep [ptext (sLit "The class method") <+> quotes (ppr op),
+	 ptext (sLit "mentions none of the type variables of the class") <+> 
 		ppr clas <+> hsep (map ppr (classTyVars clas))]
 
 genericMultiParamErr clas
-  = ptext SLIT("The multi-parameter class") <+> quotes (ppr clas) <+> 
-    ptext SLIT("cannot have generic methods")
+  = ptext (sLit "The multi-parameter class") <+> quotes (ppr clas) <+> 
+    ptext (sLit "cannot have generic methods")
 
 badGenericMethodType op op_ty
-  = hang (ptext SLIT("Generic method type is too complex"))
+  = hang (ptext (sLit "Generic method type is too complex"))
        4 (vcat [ppr op <+> dcolon <+> ppr op_ty,
-		ptext SLIT("You can only use type variables, arrows, lists, and tuples")])
+		ptext (sLit "You can only use type variables, arrows, lists, and tuples")])
 
 recSynErr syn_decls
   = setSrcSpan (getLoc (head sorted_decls)) $
-    addErr (sep [ptext SLIT("Cycle in type synonym declarations:"),
+    addErr (sep [ptext (sLit "Cycle in type synonym declarations:"),
 		 nest 2 (vcat (map ppr_decl sorted_decls))])
   where
     sorted_decls = sortLocated syn_decls
@@ -1200,7 +1200,7 @@ recSynErr syn_decls
 
 recClsErr cls_decls
   = setSrcSpan (getLoc (head sorted_decls)) $
-    addErr (sep [ptext SLIT("Cycle in class declarations (via superclasses):"),
+    addErr (sep [ptext (sLit "Cycle in class declarations (via superclasses):"),
 		 nest 2 (vcat (map ppr_decl sorted_decls))])
   where
     sorted_decls = sortLocated cls_decls
@@ -1212,81 +1212,81 @@ sortLocated things = sortLe le things
     le (L l1 _) (L l2 _) = l1 <= l2
 
 badDataConTyCon data_con
-  = hang (ptext SLIT("Data constructor") <+> quotes (ppr data_con) <+>
-		ptext SLIT("returns type") <+> quotes (ppr (dataConTyCon data_con)))
-       2 (ptext SLIT("instead of its parent type"))
+  = hang (ptext (sLit "Data constructor") <+> quotes (ppr data_con) <+>
+		ptext (sLit "returns type") <+> quotes (ppr (dataConTyCon data_con)))
+       2 (ptext (sLit "instead of its parent type"))
 
 badGadtDecl tc_name
-  = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+> quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Use -XGADTs to allow GADTs")) ]
+  = vcat [ ptext (sLit "Illegal generalised algebraic data declaration for") <+> quotes (ppr tc_name)
+	 , nest 2 (parens $ ptext (sLit "Use -XGADTs to allow GADTs")) ]
 
 badExistential con_name
-  = hang (ptext SLIT("Data constructor") <+> quotes (ppr con_name) <+>
-		ptext SLIT("has existential type variables, or a context"))
-       2 (parens $ ptext SLIT("Use -XExistentialQuantification or -XGADTs to allow this"))
+  = hang (ptext (sLit "Data constructor") <+> quotes (ppr con_name) <+>
+		ptext (sLit "has existential type variables, or a context"))
+       2 (parens $ ptext (sLit "Use -XExistentialQuantification or -XGADTs to allow this"))
 
 badStupidTheta tc_name
-  = ptext SLIT("A data type declared in GADT style cannot have a context:") <+> quotes (ppr tc_name)
+  = ptext (sLit "A data type declared in GADT style cannot have a context:") <+> quotes (ppr tc_name)
 
 newtypeConError tycon n
-  = sep [ptext SLIT("A newtype must have exactly one constructor,"),
-	 nest 2 $ ptext SLIT("but") <+> quotes (ppr tycon) <+> ptext SLIT("has") <+> speakN n ]
+  = sep [ptext (sLit "A newtype must have exactly one constructor,"),
+	 nest 2 $ ptext (sLit "but") <+> quotes (ppr tycon) <+> ptext (sLit "has") <+> speakN n ]
 
 newtypeExError con
-  = sep [ptext SLIT("A newtype constructor cannot have an existential context,"),
-	 nest 2 $ ptext SLIT("but") <+> quotes (ppr con) <+> ptext SLIT("does")]
+  = sep [ptext (sLit "A newtype constructor cannot have an existential context,"),
+	 nest 2 $ ptext (sLit "but") <+> quotes (ppr con) <+> ptext (sLit "does")]
 
 newtypeStrictError con
-  = sep [ptext SLIT("A newtype constructor cannot have a strictness annotation,"),
-	 nest 2 $ ptext SLIT("but") <+> quotes (ppr con) <+> ptext SLIT("does")]
+  = sep [ptext (sLit "A newtype constructor cannot have a strictness annotation,"),
+	 nest 2 $ ptext (sLit "but") <+> quotes (ppr con) <+> ptext (sLit "does")]
 
 newtypePredError con
-  = sep [ptext SLIT("A newtype constructor must have a return type of form T a1 ... an"),
-	 nest 2 $ ptext SLIT("but") <+> quotes (ppr con) <+> ptext SLIT("does not")]
+  = sep [ptext (sLit "A newtype constructor must have a return type of form T a1 ... an"),
+	 nest 2 $ ptext (sLit "but") <+> quotes (ppr con) <+> ptext (sLit "does not")]
 
 newtypeFieldErr con_name n_flds
-  = sep [ptext SLIT("The constructor of a newtype must have exactly one field"), 
-	 nest 2 $ ptext SLIT("but") <+> quotes (ppr con_name) <+> ptext SLIT("has") <+> speakN n_flds]
+  = sep [ptext (sLit "The constructor of a newtype must have exactly one field"), 
+	 nest 2 $ ptext (sLit "but") <+> quotes (ppr con_name) <+> ptext (sLit "has") <+> speakN n_flds]
 
 badSigTyDecl tc_name
-  = vcat [ ptext SLIT("Illegal kind signature") <+>
+  = vcat [ ptext (sLit "Illegal kind signature") <+>
 	   quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Use -XKindSignatures to allow kind signatures")) ]
+	 , nest 2 (parens $ ptext (sLit "Use -XKindSignatures to allow kind signatures")) ]
 
 badFamInstDecl tc_name
-  = vcat [ ptext SLIT("Illegal family instance for") <+>
+  = vcat [ ptext (sLit "Illegal family instance for") <+>
 	   quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Use -XTypeFamilies to allow indexed type families")) ]
+	 , nest 2 (parens $ ptext (sLit "Use -XTypeFamilies to allow indexed type families")) ]
 
 badGadtIdxTyDecl tc_name
-  = vcat [ ptext SLIT("Illegal generalised algebraic data declaration for") <+>
+  = vcat [ ptext (sLit "Illegal generalised algebraic data declaration for") <+>
 	   quotes (ppr tc_name)
-	 , nest 2 (parens $ ptext SLIT("Family instances can not yet use GADT declarations")) ]
+	 , nest 2 (parens $ ptext (sLit "Family instances can not yet use GADT declarations")) ]
 
 tooManyParmsErr tc_name
-  = ptext SLIT("Family instance has too many parameters:") <+> 
+  = ptext (sLit "Family instance has too many parameters:") <+> 
     quotes (ppr tc_name)
 
 tooFewParmsErr arity
-  = ptext SLIT("Family instance has too few parameters; expected") <+> 
+  = ptext (sLit "Family instance has too few parameters; expected") <+> 
     ppr arity
 
 wrongNumberOfParmsErr exp_arity
-  = ptext SLIT("Number of parameters must match family declaration; expected")
+  = ptext (sLit "Number of parameters must match family declaration; expected")
     <+> ppr exp_arity
 
 badBootFamInstDeclErr = 
-  ptext SLIT("Illegal family instance in hs-boot file")
+  ptext (sLit "Illegal family instance in hs-boot file")
 
 wrongKindOfFamily family =
-  ptext SLIT("Wrong category of family instance; declaration was for a") <+>
+  ptext (sLit "Wrong category of family instance; declaration was for a") <+>
   kindOfFamily
   where
-    kindOfFamily | isSynTyCon family = ptext SLIT("type synonym")
-		 | isAlgTyCon family = ptext SLIT("data type")
+    kindOfFamily | isSynTyCon family = ptext (sLit "type synonym")
+		 | isAlgTyCon family = ptext (sLit "data type")
 		 | otherwise = pprPanic "wrongKindOfFamily" (ppr family)
 
 emptyConDeclsErr tycon
-  = sep [quotes (ppr tycon) <+> ptext SLIT("has no constructors"),
-	 nest 2 $ ptext SLIT("(-XEmptyDataDecls permits this)")]
+  = sep [quotes (ppr tycon) <+> ptext (sLit "has no constructors"),
+	 nest 2 $ ptext (sLit "(-XEmptyDataDecls permits this)")]
 \end{code}
