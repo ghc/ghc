@@ -13,8 +13,6 @@
 
 module StgLint ( lintStgBindings ) where
 
-#include "HsVersions.h"
-
 import StgSyn
 
 import Bag              ( Bag, emptyBag, isEmptyBag, snocBag, bagToList )
@@ -70,12 +68,12 @@ lintStgBindings whodunnit binds
     case (initL (lint_binds binds)) of
       Nothing  -> binds
       Just msg -> pprPanic "" (vcat [
-                        ptext SLIT("*** Stg Lint ErrMsgs: in") <+>
-                              text whodunnit <+> ptext SLIT("***"),
+                        ptext (sLit "*** Stg Lint ErrMsgs: in") <+>
+                              text whodunnit <+> ptext (sLit "***"),
                         msg,
-                        ptext SLIT("*** Offending Program ***"),
+                        ptext (sLit "*** Offending Program ***"),
                         pprStgBindings binds,
-                        ptext SLIT("*** End of Offense ***")])
+                        ptext (sLit "*** End of Offense ***")])
   where
     lint_binds :: [StgBinding] -> LintM ()
 
@@ -178,7 +176,7 @@ lintStgExpr e@(StgOpApp (StgPrimOp op) args _) = runMaybeT $ do
     op_ty = primOpType op
 
 lintStgExpr (StgLam _ bndrs _) = do
-    addErrL (ptext SLIT("Unexpected StgLam") <+> ppr bndrs)
+    addErrL (ptext (sLit "Unexpected StgLam") <+> ppr bndrs)
     return Nothing
 
 lintStgExpr (StgLet binds body) = do
@@ -295,12 +293,12 @@ data LintLocInfo
   | BodyOfLetRec [Id]   -- One of the binders
 
 dumpLoc (RhsOf v) =
-  (srcLocSpan (getSrcLoc v), ptext SLIT(" [RHS of ") <> pp_binders [v] <> char ']' )
+  (srcLocSpan (getSrcLoc v), ptext (sLit " [RHS of ") <> pp_binders [v] <> char ']' )
 dumpLoc (LambdaBodyOf bs) =
-  (srcLocSpan (getSrcLoc (head bs)), ptext SLIT(" [in body of lambda with binders ") <> pp_binders bs <> char ']' )
+  (srcLocSpan (getSrcLoc (head bs)), ptext (sLit " [in body of lambda with binders ") <> pp_binders bs <> char ']' )
 
 dumpLoc (BodyOfLetRec bs) =
-  (srcLocSpan (getSrcLoc (head bs)), ptext SLIT(" [in body of letrec with binders ") <> pp_binders bs <> char ']' )
+  (srcLocSpan (getSrcLoc (head bs)), ptext (sLit " [in body of letrec with binders ") <> pp_binders bs <> char ']' )
 
 
 pp_binders :: [Id] -> SDoc
@@ -415,7 +413,7 @@ checkFunApp fun_ty arg_tys msg = LintM checkFunApp'
 checkInScope :: Id -> LintM ()
 checkInScope id = LintM $ \loc scope errs
  -> if isLocalId id && not (id `elemVarSet` scope) then
-        ((), addErr errs (hsep [ppr id, ptext SLIT("is out of scope")]) loc)
+        ((), addErr errs (hsep [ppr id, ptext (sLit "is out of scope")]) loc)
     else
         ((), errs)
 
@@ -434,21 +432,21 @@ mkCaseAltMsg alts
 
 mkDefltMsg :: Id -> Message
 mkDefltMsg bndr
-  = ($$) (ptext SLIT("Binder of a case expression doesn't match type of scrutinee:"))
+  = ($$) (ptext (sLit "Binder of a case expression doesn't match type of scrutinee:"))
             (panic "mkDefltMsg")
 
 mkFunAppMsg :: Type -> [Type] -> StgExpr -> Message
 mkFunAppMsg fun_ty arg_tys expr
   = vcat [text "In a function application, function type doesn't match arg types:",
-              hang (ptext SLIT("Function type:")) 4 (ppr fun_ty),
-              hang (ptext SLIT("Arg types:")) 4 (vcat (map (ppr) arg_tys)),
-              hang (ptext SLIT("Expression:")) 4 (ppr expr)]
+              hang (ptext (sLit "Function type:")) 4 (ppr fun_ty),
+              hang (ptext (sLit "Arg types:")) 4 (vcat (map (ppr) arg_tys)),
+              hang (ptext (sLit "Expression:")) 4 (ppr expr)]
 
 mkRhsConMsg :: Type -> [Type] -> Message
 mkRhsConMsg fun_ty arg_tys
   = vcat [text "In a RHS constructor application, con type doesn't match arg types:",
-              hang (ptext SLIT("Constructor type:")) 4 (ppr fun_ty),
-              hang (ptext SLIT("Arg types:")) 4 (vcat (map (ppr) arg_tys))]
+              hang (ptext (sLit "Constructor type:")) 4 (ppr fun_ty),
+              hang (ptext (sLit "Arg types:")) 4 (vcat (map (ppr) arg_tys))]
 
 mkAltMsg1 :: Type -> Message
 mkAltMsg1 ty
@@ -485,15 +483,15 @@ mkCaseOfCaseMsg e
 
 mkRhsMsg :: Id -> Type -> Message
 mkRhsMsg binder ty
-  = vcat [hsep [ptext SLIT("The type of this binder doesn't match the type of its RHS:"),
+  = vcat [hsep [ptext (sLit "The type of this binder doesn't match the type of its RHS:"),
                      ppr binder],
-              hsep [ptext SLIT("Binder's type:"), ppr (idType binder)],
-              hsep [ptext SLIT("Rhs type:"), ppr ty]
+              hsep [ptext (sLit "Binder's type:"), ppr (idType binder)],
+              hsep [ptext (sLit "Rhs type:"), ppr ty]
              ]
 
 mkUnLiftedTyMsg binder rhs
-  = (ptext SLIT("Let(rec) binder") <+> quotes (ppr binder) <+>
-     ptext SLIT("has unlifted type") <+> quotes (ppr (idType binder)))
+  = (ptext (sLit "Let(rec) binder") <+> quotes (ppr binder) <+>
+     ptext (sLit "has unlifted type") <+> quotes (ppr (idType binder)))
     $$
-    (ptext SLIT("RHS:") <+> ppr rhs)
+    (ptext (sLit "RHS:") <+> ppr rhs)
 \end{code}
