@@ -56,8 +56,6 @@ module TysWiredIn (
 	parrTyCon_RDR, parrTyConName
     ) where
 
-#include "HsVersions.h"
-
 import {-# SOURCE #-} MkId( mkDataConIds )
 
 -- friends:
@@ -150,25 +148,25 @@ mkWiredInDataConName built_in mod fs uniq datacon
 		  (ADataCon datacon)	-- Relevant DataCon
 		  built_in
 
-charTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE FSLIT("Char") charTyConKey charTyCon
-charDataConName   = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("C#") charDataConKey charDataCon
-intTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE FSLIT("Int") intTyConKey   intTyCon
-intDataConName	  = mkWiredInDataConName UserSyntax gHC_BASE FSLIT("I#") intDataConKey  intDataCon
+charTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE (fsLit "Char") charTyConKey charTyCon
+charDataConName   = mkWiredInDataConName UserSyntax gHC_BASE (fsLit "C#") charDataConKey charDataCon
+intTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE (fsLit "Int") intTyConKey   intTyCon
+intDataConName	  = mkWiredInDataConName UserSyntax gHC_BASE (fsLit "I#") intDataConKey  intDataCon
 						  
-boolTyConName	  = mkWiredInTyConName   UserSyntax gHC_BOOL FSLIT("Bool") boolTyConKey boolTyCon
-falseDataConName  = mkWiredInDataConName UserSyntax gHC_BOOL FSLIT("False") falseDataConKey falseDataCon
-trueDataConName	  = mkWiredInDataConName UserSyntax gHC_BOOL FSLIT("True")  trueDataConKey  trueDataCon 
-listTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_BASE FSLIT("[]") listTyConKey listTyCon
-nilDataConName 	  = mkWiredInDataConName BuiltInSyntax gHC_BASE FSLIT("[]") nilDataConKey nilDataCon 
-consDataConName	  = mkWiredInDataConName BuiltInSyntax gHC_BASE FSLIT(":") consDataConKey consDataCon
+boolTyConName	  = mkWiredInTyConName   UserSyntax gHC_BOOL (fsLit "Bool") boolTyConKey boolTyCon
+falseDataConName  = mkWiredInDataConName UserSyntax gHC_BOOL (fsLit "False") falseDataConKey falseDataCon
+trueDataConName	  = mkWiredInDataConName UserSyntax gHC_BOOL (fsLit "True")  trueDataConKey  trueDataCon 
+listTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_BASE (fsLit "[]") listTyConKey listTyCon
+nilDataConName 	  = mkWiredInDataConName BuiltInSyntax gHC_BASE (fsLit "[]") nilDataConKey nilDataCon 
+consDataConName	  = mkWiredInDataConName BuiltInSyntax gHC_BASE (fsLit ":") consDataConKey consDataCon
 
-floatTyConName	   = mkWiredInTyConName   UserSyntax gHC_FLOAT FSLIT("Float") floatTyConKey floatTyCon
-floatDataConName   = mkWiredInDataConName UserSyntax gHC_FLOAT FSLIT("F#") floatDataConKey floatDataCon
-doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_FLOAT FSLIT("Double") doubleTyConKey doubleTyCon
-doubleDataConName  = mkWiredInDataConName UserSyntax gHC_FLOAT FSLIT("D#") doubleDataConKey doubleDataCon
+floatTyConName	   = mkWiredInTyConName   UserSyntax gHC_FLOAT (fsLit "Float") floatTyConKey floatTyCon
+floatDataConName   = mkWiredInDataConName UserSyntax gHC_FLOAT (fsLit "F#") floatDataConKey floatDataCon
+doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_FLOAT (fsLit "Double") doubleTyConKey doubleTyCon
+doubleDataConName  = mkWiredInDataConName UserSyntax gHC_FLOAT (fsLit "D#") doubleDataConKey doubleDataCon
 
-parrTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_PARR FSLIT("[::]") parrTyConKey parrTyCon 
-parrDataConName   = mkWiredInDataConName UserSyntax    gHC_PARR FSLIT("PArr") parrDataConKey parrDataCon
+parrTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_PARR (fsLit "[::]") parrTyConKey parrTyCon 
+parrDataConName   = mkWiredInDataConName UserSyntax    gHC_PARR (fsLit "PArr") parrDataConKey parrDataCon
 
 boolTyCon_RDR   = nameRdrName boolTyConName
 false_RDR	= nameRdrName falseDataConName
