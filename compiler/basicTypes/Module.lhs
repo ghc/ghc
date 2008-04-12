@@ -64,7 +64,6 @@ module Module
 	elemModuleSet
     ) where
 
-#include "HsVersions.h"
 import Outputable
 import qualified Pretty
 import Unique
@@ -282,18 +281,18 @@ packageIdString = unpackFS . packageIdFS
 integerPackageId, primPackageId,
   basePackageId, rtsPackageId, haskell98PackageId,
   thPackageId, ndpPackageId, mainPackageId  :: PackageId
-primPackageId      = fsToPackageId FSLIT("ghc-prim")
-integerPackageId   = fsToPackageId FSLIT("integer")
-basePackageId      = fsToPackageId FSLIT("base")
-rtsPackageId	   = fsToPackageId FSLIT("rts")
-haskell98PackageId = fsToPackageId FSLIT("haskell98")
-thPackageId        = fsToPackageId FSLIT("template-haskell")
-ndpPackageId       = fsToPackageId FSLIT("ndp")
+primPackageId      = fsToPackageId (fsLit "ghc-prim")
+integerPackageId   = fsToPackageId (fsLit "integer")
+basePackageId      = fsToPackageId (fsLit "base")
+rtsPackageId	   = fsToPackageId (fsLit "rts")
+haskell98PackageId = fsToPackageId (fsLit "haskell98")
+thPackageId        = fsToPackageId (fsLit "template-haskell")
+ndpPackageId       = fsToPackageId (fsLit "ndp")
 
 -- This is the package Id for the program.  It is the default package
 -- Id if you don't specify a package name.  We don't add this prefix
 -- to symbol name, since there can be only one main package per program.
-mainPackageId	   = fsToPackageId FSLIT("main")
+mainPackageId	   = fsToPackageId (fsLit "main")
 \end{code}
 
 %************************************************************************
