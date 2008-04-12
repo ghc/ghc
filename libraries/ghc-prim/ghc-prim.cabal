@@ -13,6 +13,7 @@ Library {
     exposed-modules:
         GHC.Bool
         GHC.Generics
+        GHC.Ordering
         GHC.PrimopWrappers
         GHC.IntWord32
         GHC.IntWord64
