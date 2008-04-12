@@ -8,8 +8,6 @@ The Desugarer: turning HsSyn into Core.
 \begin{code}
 module Desugar ( deSugar, deSugarExpr ) where
 
-#include "HsVersions.h"
-
 import DynFlags
 import StaticFlags
 import HscTypes
@@ -273,6 +271,6 @@ dsRule (L loc (HsRule name act vars lhs _tv_lhs rhs _fv_rhs))
 	; return (Just rule)
 	} } }
   where
-    msg = hang (ptext SLIT("RULE left-hand side too complicated to desugar; ignored"))
+    msg = hang (ptext (sLit "RULE left-hand side too complicated to desugar; ignored"))
 	     2 (ppr lhs)
 \end{code}
