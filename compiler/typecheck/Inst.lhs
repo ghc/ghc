@@ -728,11 +728,11 @@ traceDFuns ispecs
 
 funDepErr ispec ispecs
   = addDictLoc ispec $
-    addErr (hang (ptext SLIT("Functional dependencies conflict between instance declarations:"))
+    addErr (hang (ptext (sLit "Functional dependencies conflict between instance declarations:"))
 	       2 (pprInstances (ispec:ispecs)))
 dupInstErr ispec dup_ispec
   = addDictLoc ispec $
-    addErr (hang (ptext SLIT("Duplicate instance declarations:"))
+    addErr (hang (ptext (sLit "Duplicate instance declarations:"))
 	       2 (pprInstances [ispec, dup_ispec]))
 
 addDictLoc ispec thing_inside
@@ -824,7 +824,7 @@ lookupSimpleInst (Dict {tci_pred = pred, tci_loc = loc})
 	    Just (dfun_id, mb_inst_tys) -> do
 
     { use_stage <- getStage
-    ; checkWellStaged (ptext SLIT("instance for") <+> quotes (ppr pred))
+    ; checkWellStaged (ptext (sLit "instance for") <+> quotes (ppr pred))
     		      (topIdLvl dfun_id) use_stage
 
  	-- It's possible that not all the tyvars are in
@@ -965,10 +965,10 @@ tcSyntaxName orig ty (std_nm, user_nm_expr) = do
 syntaxNameCtxt name orig ty tidy_env = do
     inst_loc <- getInstLoc orig
     let
-	msg = vcat [ptext SLIT("When checking that") <+> quotes (ppr name) <+> 
-				ptext SLIT("(needed by a syntactic construct)"),
-		    nest 2 (ptext SLIT("has the required type:") <+> ppr (tidyType tidy_env ty)),
-		    nest 2 (ptext SLIT("arising from") <+> pprInstLoc inst_loc)]
+	msg = vcat [ptext (sLit "When checking that") <+> quotes (ppr name) <+> 
+				ptext (sLit "(needed by a syntactic construct)"),
+		    nest 2 (ptext (sLit "has the required type:") <+> ppr (tidyType tidy_env ty)),
+		    nest 2 (ptext (sLit "arising from") <+> pprInstLoc inst_loc)]
     
     return (tidy_env, msg)
 \end{code}
