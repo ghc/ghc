@@ -42,8 +42,6 @@ module Lexer (
    addWarning
   ) where
 
-#include "HsVersions.h"
-
 import Bag
 import ErrUtils
 import Outputable
@@ -1705,8 +1703,8 @@ srcParseErr
   -> Message
 srcParseErr buf len
   = hcat [ if null token 
-	     then ptext SLIT("parse error (possibly incorrect indentation)")
-	     else hcat [ptext SLIT("parse error on input "),
+	     then ptext (sLit "parse error (possibly incorrect indentation)")
+	     else hcat [ptext (sLit "parse error on input "),
           	  	char '`', text token, char '\'']
     ]
   where token = lexemeToString (offsetBytes (-len) buf) len
