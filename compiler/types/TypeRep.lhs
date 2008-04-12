@@ -286,10 +286,10 @@ pprTyThing :: TyThing -> SDoc
 pprTyThing thing = pprTyThingCategory thing <+> quotes (ppr (getName thing))
 
 pprTyThingCategory :: TyThing -> SDoc
-pprTyThingCategory (ATyCon _) 	= ptext SLIT("Type constructor")
-pprTyThingCategory (AClass _)   = ptext SLIT("Class")
-pprTyThingCategory (AnId   _)   = ptext SLIT("Identifier")
-pprTyThingCategory (ADataCon _) = ptext SLIT("Data constructor")
+pprTyThingCategory (ATyCon _) 	= ptext (sLit "Type constructor")
+pprTyThingCategory (AClass _)   = ptext (sLit "Class")
+pprTyThingCategory (AnId   _)   = ptext (sLit "Identifier")
+pprTyThingCategory (ADataCon _) = ptext (sLit "Data constructor")
 
 instance NamedThing TyThing where	-- Can't put this with the type
   getName (AnId id)     = getName id	-- decl, because the DataCon instance
@@ -345,14 +345,14 @@ mkKindTyCon name = mkVoidPrimTyCon name tySuperKind 0
 --------------------------
 -- ... and now their names
 
-tySuperKindTyConName      = mkPrimTyConName FSLIT("BOX") tySuperKindTyConKey tySuperKindTyCon
-coSuperKindTyConName      = mkPrimTyConName FSLIT("COERCION") coSuperKindTyConKey coSuperKindTyCon
-liftedTypeKindTyConName   = mkPrimTyConName FSLIT("*") liftedTypeKindTyConKey liftedTypeKindTyCon
-openTypeKindTyConName     = mkPrimTyConName FSLIT("?") openTypeKindTyConKey openTypeKindTyCon
-unliftedTypeKindTyConName = mkPrimTyConName FSLIT("#") unliftedTypeKindTyConKey unliftedTypeKindTyCon
-ubxTupleKindTyConName     = mkPrimTyConName FSLIT("(#)") ubxTupleKindTyConKey ubxTupleKindTyCon
-argTypeKindTyConName      = mkPrimTyConName FSLIT("??") argTypeKindTyConKey argTypeKindTyCon
-funTyConName              = mkPrimTyConName FSLIT("(->)") funTyConKey funTyCon
+tySuperKindTyConName      = mkPrimTyConName (fsLit "BOX") tySuperKindTyConKey tySuperKindTyCon
+coSuperKindTyConName      = mkPrimTyConName (fsLit "COERCION") coSuperKindTyConKey coSuperKindTyCon
+liftedTypeKindTyConName   = mkPrimTyConName (fsLit "*") liftedTypeKindTyConKey liftedTypeKindTyCon
+openTypeKindTyConName     = mkPrimTyConName (fsLit "?") openTypeKindTyConKey openTypeKindTyCon
+unliftedTypeKindTyConName = mkPrimTyConName (fsLit "#") unliftedTypeKindTyConKey unliftedTypeKindTyCon
+ubxTupleKindTyConName     = mkPrimTyConName (fsLit "(#)") ubxTupleKindTyConKey ubxTupleKindTyCon
+argTypeKindTyConName      = mkPrimTyConName (fsLit "??") argTypeKindTyConKey argTypeKindTyCon
+funTyConName              = mkPrimTyConName (fsLit "(->)") funTyConKey funTyCon
 
 mkPrimTyConName :: FastString -> Unique -> TyCon -> Name
 mkPrimTyConName occ key tycon = mkWiredInName gHC_PRIM (mkOccNameFS tcName occ) 
@@ -458,7 +458,7 @@ pprTypeApp tc pp_tc tys = ppr_type_app TopPrec (getName tc) pp_tc tys
 pprPred :: PredType -> SDoc
 pprPred (ClassP cls tys) = pprClassPred cls tys
 pprPred (IParam ip ty)   = ppr ip <> dcolon <> pprType ty
-pprPred (EqPred ty1 ty2) = sep [ppr ty1, nest 2 (ptext SLIT("~")), ppr ty2]
+pprPred (EqPred ty1 ty2) = sep [ppr ty1, nest 2 (ptext (sLit "~")), ppr ty2]
 pprClassPred :: Class -> [Type] -> SDoc
 pprClassPred clas tys = ppr_type_app TopPrec (getName clas) (ppr clas) tys
 
@@ -468,7 +468,7 @@ pprTheta theta = parens (sep (punctuate comma (map pprPred theta)))
 pprThetaArrow :: ThetaType -> SDoc
 pprThetaArrow theta 
   | null theta = empty
-  | otherwise  = parens (sep (punctuate comma (map pprPred theta))) <+> ptext SLIT("=>")
+  | otherwise  = parens (sep (punctuate comma (map pprPred theta))) <+> ptext (sLit "=>")
 
 ------------------
 instance Outputable Type where
@@ -489,7 +489,7 @@ pprParendKind = pprParendType
 
 ppr_type :: Prec -> Type -> SDoc
 ppr_type _ (TyVarTy tv)       = ppr tv
-ppr_type _ (PredTy pred)      = ifPprDebug (ptext SLIT("<pred>")) <> (ppr pred)
+ppr_type _ (PredTy pred)      = ifPprDebug (ptext (sLit "<pred>")) <> (ppr pred)
 ppr_type p (TyConApp tc tys)  = ppr_tc_app p tc tys
 
 ppr_type p (AppTy t1 t2) = maybeParen p TyConPrec $
@@ -532,12 +532,12 @@ ppr_tc_app _ tc []
   = ppr_tc tc
 ppr_tc_app _ tc [ty]
   | tc `hasKey` listTyConKey = brackets (pprType ty)
-  | tc `hasKey` parrTyConKey = ptext SLIT("[:") <> pprType ty <> ptext SLIT(":]")
-  | tc `hasKey` liftedTypeKindTyConKey   = ptext SLIT("*")
-  | tc `hasKey` unliftedTypeKindTyConKey = ptext SLIT("#")
-  | tc `hasKey` openTypeKindTyConKey     = ptext SLIT("(?)")
-  | tc `hasKey` ubxTupleKindTyConKey     = ptext SLIT("(#)")
-  | tc `hasKey` argTypeKindTyConKey      = ptext SLIT("??")
+  | tc `hasKey` parrTyConKey = ptext (sLit "[:") <> pprType ty <> ptext (sLit ":]")
+  | tc `hasKey` liftedTypeKindTyConKey   = ptext (sLit "*")
+  | tc `hasKey` unliftedTypeKindTyConKey = ptext (sLit "#")
+  | tc `hasKey` openTypeKindTyConKey     = ptext (sLit "(?)")
+  | tc `hasKey` ubxTupleKindTyConKey     = ptext (sLit "(#)")
+  | tc `hasKey` argTypeKindTyConKey      = ptext (sLit "??")
 
 ppr_tc_app p tc tys
   | isTupleTyCon tc && tyConArity tc == length tys
@@ -566,14 +566,14 @@ ppr_naked_tc tc
   = pp_nt_debug <> ppr tc
   where
    pp_nt_debug | isNewTyCon tc = ifPprDebug (if isRecursiveTyCon tc 
-				             then ptext SLIT("<recnt>")
-					     else ptext SLIT("<nt>"))
+				             then ptext (sLit "<recnt>")
+					     else ptext (sLit "<nt>"))
 	       | otherwise     = empty
 
 -------------------
 pprForAll :: [TyVar] -> SDoc
 pprForAll []  = empty
-pprForAll tvs = ptext SLIT("forall") <+> sep (map pprTvBndr tvs) <> dot
+pprForAll tvs = ptext (sLit "forall") <+> sep (map pprTvBndr tvs) <> dot
 
 pprTvBndr :: TyVar -> SDoc
 pprTvBndr tv | isLiftedTypeKind kind = ppr tv
