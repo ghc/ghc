@@ -58,8 +58,6 @@ module RdrHsSyn (
 	parseError,	      -- String -> Pa
     ) where
 
-#include "HsVersions.h"
-
 import HsSyn		-- Lots of it
 import Class            ( FunDep )
 import TypeRep          ( Kind )
@@ -737,8 +735,8 @@ checkAPat loc e = case e of
    _                  -> patFail loc
 
 plus_RDR, bang_RDR :: RdrName
-plus_RDR = mkUnqual varName FSLIT("+")	-- Hack
-bang_RDR = mkUnqual varName FSLIT("!")	-- Hack
+plus_RDR = mkUnqual varName (fsLit "+")	-- Hack
+bang_RDR = mkUnqual varName (fsLit "!")	-- Hack
 
 checkPatField :: HsRecField RdrName (LHsExpr RdrName) -> P (HsRecField RdrName (LPat RdrName))
 checkPatField fld = do	{ p <- checkLPat (hsRecFieldArg fld)
@@ -777,7 +775,7 @@ checkFunBind :: SrcSpan
 checkFunBind lhs_loc fun is_infix pats opt_sig (L rhs_span grhss)
   | isQual (unLoc fun)
   = parseErrorSDoc (getLoc fun) 
-	(ptext SLIT("Qualified name in function definition:") <+> ppr (unLoc fun))
+	(ptext (sLit "Qualified name in function definition:") <+> ppr (unLoc fun))
   | otherwise
   = do	ps <- checkPatterns pats
 	let match_span = combineSrcSpans lhs_loc rhs_span
@@ -959,9 +957,9 @@ parseCImport :: Located FastString
 	     -> P ForeignImport
 parseCImport (L loc entity) cconv safety v
   -- FIXME: we should allow white space around `dynamic' and `wrapper' -=chak
-  | entity == FSLIT ("dynamic") = 
+  | entity == fsLit "dynamic" = 
     return $ CImport cconv safety nilFS nilFS (CFunction DynamicTarget)
-  | entity == FSLIT ("wrapper") =
+  | entity == fsLit "wrapper" =
     return $ CImport cconv safety nilFS nilFS CWrapper
   | otherwise		       = parse0 (unpackFS entity)
     where
