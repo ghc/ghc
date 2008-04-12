@@ -24,9 +24,6 @@ module PprMach (
 	pprInstr, pprSize, pprUserReg
   ) where
 
-
-#include "HsVersions.h"
-
 import Cmm
 import MachOp		( MachRep(..), wordRep, isFloatingRep )
 import MachRegs		-- may differ per-platform
@@ -129,39 +126,39 @@ pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
     ppr_reg_no :: Int -> Doc
     ppr_reg_no i = ptext
       (case i of {
-	 0 -> SLIT("$0");    1 -> SLIT("$1");
-	 2 -> SLIT("$2");    3 -> SLIT("$3");
-	 4 -> SLIT("$4");    5 -> SLIT("$5");
-	 6 -> SLIT("$6");    7 -> SLIT("$7");
-	 8 -> SLIT("$8");    9 -> SLIT("$9");
-	10 -> SLIT("$10");  11 -> SLIT("$11");
-	12 -> SLIT("$12");  13 -> SLIT("$13");
-	14 -> SLIT("$14");  15 -> SLIT("$15");
-	16 -> SLIT("$16");  17 -> SLIT("$17");
-	18 -> SLIT("$18");  19 -> SLIT("$19");
-	20 -> SLIT("$20");  21 -> SLIT("$21");
-	22 -> SLIT("$22");  23 -> SLIT("$23");
-	24 -> SLIT("$24");  25 -> SLIT("$25");
-	26 -> SLIT("$26");  27 -> SLIT("$27");
-	28 -> SLIT("$28");  29 -> SLIT("$29");
-	30 -> SLIT("$30");  31 -> SLIT("$31");
-	32 -> SLIT("$f0");  33 -> SLIT("$f1");
-	34 -> SLIT("$f2");  35 -> SLIT("$f3");
-	36 -> SLIT("$f4");  37 -> SLIT("$f5");
-	38 -> SLIT("$f6");  39 -> SLIT("$f7");
-	40 -> SLIT("$f8");  41 -> SLIT("$f9");
-	42 -> SLIT("$f10"); 43 -> SLIT("$f11");
-	44 -> SLIT("$f12"); 45 -> SLIT("$f13");
-	46 -> SLIT("$f14"); 47 -> SLIT("$f15");
-	48 -> SLIT("$f16"); 49 -> SLIT("$f17");
-	50 -> SLIT("$f18"); 51 -> SLIT("$f19");
-	52 -> SLIT("$f20"); 53 -> SLIT("$f21");
-	54 -> SLIT("$f22"); 55 -> SLIT("$f23");
-	56 -> SLIT("$f24"); 57 -> SLIT("$f25");
-	58 -> SLIT("$f26"); 59 -> SLIT("$f27");
-	60 -> SLIT("$f28"); 61 -> SLIT("$f29");
-	62 -> SLIT("$f30"); 63 -> SLIT("$f31");
-	_  -> SLIT("very naughty alpha register")
+	 0 -> sLit "$0";    1 -> sLit "$1";
+	 2 -> sLit "$2";    3 -> sLit "$3";
+	 4 -> sLit "$4";    5 -> sLit "$5";
+	 6 -> sLit "$6";    7 -> sLit "$7";
+	 8 -> sLit "$8";    9 -> sLit "$9";
+	10 -> sLit "$10";  11 -> sLit "$11";
+	12 -> sLit "$12";  13 -> sLit "$13";
+	14 -> sLit "$14";  15 -> sLit "$15";
+	16 -> sLit "$16";  17 -> sLit "$17";
+	18 -> sLit "$18";  19 -> sLit "$19";
+	20 -> sLit "$20";  21 -> sLit "$21";
+	22 -> sLit "$22";  23 -> sLit "$23";
+	24 -> sLit "$24";  25 -> sLit "$25";
+	26 -> sLit "$26";  27 -> sLit "$27";
+	28 -> sLit "$28";  29 -> sLit "$29";
+	30 -> sLit "$30";  31 -> sLit "$31";
+	32 -> sLit "$f0";  33 -> sLit "$f1";
+	34 -> sLit "$f2";  35 -> sLit "$f3";
+	36 -> sLit "$f4";  37 -> sLit "$f5";
+	38 -> sLit "$f6";  39 -> sLit "$f7";
+	40 -> sLit "$f8";  41 -> sLit "$f9";
+	42 -> sLit "$f10"; 43 -> sLit "$f11";
+	44 -> sLit "$f12"; 45 -> sLit "$f13";
+	46 -> sLit "$f14"; 47 -> sLit "$f15";
+	48 -> sLit "$f16"; 49 -> sLit "$f17";
+	50 -> sLit "$f18"; 51 -> sLit "$f19";
+	52 -> sLit "$f20"; 53 -> sLit "$f21";
+	54 -> sLit "$f22"; 55 -> sLit "$f23";
+	56 -> sLit "$f24"; 57 -> sLit "$f25";
+	58 -> sLit "$f26"; 59 -> sLit "$f27";
+	60 -> sLit "$f28"; 61 -> sLit "$f29";
+	62 -> sLit "$f30"; 63 -> sLit "$f31";
+	_  -> sLit "very naughty alpha register"
       })
 #endif
 #if i386_TARGET_ARCH
@@ -172,30 +169,30 @@ pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
 
     ppr_reg_byte i = ptext
       (case i of {
-	 0 -> SLIT("%al");     1 -> SLIT("%bl");
-	 2 -> SLIT("%cl");     3 -> SLIT("%dl");
-	_  -> SLIT("very naughty I386 byte register")
+	 0 -> sLit "%al";     1 -> sLit "%bl";
+	 2 -> sLit "%cl";     3 -> sLit "%dl";
+	_  -> sLit "very naughty I386 byte register"
       })
 
     ppr_reg_word i = ptext
       (case i of {
-	 0 -> SLIT("%ax");     1 -> SLIT("%bx");
-	 2 -> SLIT("%cx");     3 -> SLIT("%dx");
-	 4 -> SLIT("%si");     5 -> SLIT("%di");
-	 6 -> SLIT("%bp");     7 -> SLIT("%sp");
-	_  -> SLIT("very naughty I386 word register")
+	 0 -> sLit "%ax";     1 -> sLit "%bx";
+	 2 -> sLit "%cx";     3 -> sLit "%dx";
+	 4 -> sLit "%si";     5 -> sLit "%di";
+	 6 -> sLit "%bp";     7 -> sLit "%sp";
+	_  -> sLit "very naughty I386 word register"
       })
 
     ppr_reg_long i = ptext
       (case i of {
-	 0 -> SLIT("%eax");    1 -> SLIT("%ebx");
-	 2 -> SLIT("%ecx");    3 -> SLIT("%edx");
-	 4 -> SLIT("%esi");    5 -> SLIT("%edi");
-	 6 -> SLIT("%ebp");    7 -> SLIT("%esp");
-	 8 -> SLIT("%fake0");  9 -> SLIT("%fake1");
-	10 -> SLIT("%fake2"); 11 -> SLIT("%fake3");
-	12 -> SLIT("%fake4"); 13 -> SLIT("%fake5");
-	_  -> SLIT("very naughty I386 register")
+	 0 -> sLit "%eax";    1 -> sLit "%ebx";
+	 2 -> sLit "%ecx";    3 -> sLit "%edx";
+	 4 -> sLit "%esi";    5 -> sLit "%edi";
+	 6 -> sLit "%ebp";    7 -> sLit "%esp";
+	 8 -> sLit "%fake0";  9 -> sLit "%fake1";
+	10 -> sLit "%fake2"; 11 -> sLit "%fake3";
+	12 -> sLit "%fake4"; 13 -> sLit "%fake5";
+	_  -> sLit "very naughty I386 register"
       })
 #endif
 
@@ -208,62 +205,62 @@ pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
 
     ppr_reg_byte i = ptext
       (case i of {
-	 0 -> SLIT("%al");     1 -> SLIT("%bl");
-	 2 -> SLIT("%cl");     3 -> SLIT("%dl");
-	 4 -> SLIT("%sil");    5 -> SLIT("%dil"); -- new 8-bit regs!
-	 6 -> SLIT("%bpl");    7 -> SLIT("%spl");
-	 8 -> SLIT("%r8b");    9  -> SLIT("%r9b");
-	10 -> SLIT("%r10b");   11 -> SLIT("%r11b");
-	12 -> SLIT("%r12b");   13 -> SLIT("%r13b");
-	14 -> SLIT("%r14b");   15 -> SLIT("%r15b");
-	_  -> SLIT("very naughty x86_64 byte register")
+	 0 -> sLit "%al";     1 -> sLit "%bl";
+	 2 -> sLit "%cl";     3 -> sLit "%dl";
+	 4 -> sLit "%sil";    5 -> sLit "%dil"; -- new 8-bit regs!
+	 6 -> sLit "%bpl";    7 -> sLit "%spl";
+	 8 -> sLit "%r8b";    9  -> sLit "%r9b";
+	10 -> sLit "%r10b";   11 -> sLit "%r11b";
+	12 -> sLit "%r12b";   13 -> sLit "%r13b";
+	14 -> sLit "%r14b";   15 -> sLit "%r15b";
+	_  -> sLit "very naughty x86_64 byte register"
       })
 
     ppr_reg_word i = ptext
       (case i of {
-	 0 -> SLIT("%ax");     1 -> SLIT("%bx");
-	 2 -> SLIT("%cx");     3 -> SLIT("%dx");
-	 4 -> SLIT("%si");     5 -> SLIT("%di");
-	 6 -> SLIT("%bp");     7 -> SLIT("%sp");
-	 8 -> SLIT("%r8w");    9  -> SLIT("%r9w");
-	10 -> SLIT("%r10w");   11 -> SLIT("%r11w");
-	12 -> SLIT("%r12w");   13 -> SLIT("%r13w");
-	14 -> SLIT("%r14w");   15 -> SLIT("%r15w");
-	_  -> SLIT("very naughty x86_64 word register")
+	 0 -> sLit "%ax";     1 -> sLit "%bx";
+	 2 -> sLit "%cx";     3 -> sLit "%dx";
+	 4 -> sLit "%si";     5 -> sLit "%di";
+	 6 -> sLit "%bp";     7 -> sLit "%sp";
+	 8 -> sLit "%r8w";    9  -> sLit "%r9w";
+	10 -> sLit "%r10w";   11 -> sLit "%r11w";
+	12 -> sLit "%r12w";   13 -> sLit "%r13w";
+	14 -> sLit "%r14w";   15 -> sLit "%r15w";
+	_  -> sLit "very naughty x86_64 word register"
       })
 
     ppr_reg_long i = ptext
       (case i of {
-	 0 -> SLIT("%eax");    1  -> SLIT("%ebx");
-	 2 -> SLIT("%ecx");    3  -> SLIT("%edx");
-	 4 -> SLIT("%esi");    5  -> SLIT("%edi");
-	 6 -> SLIT("%ebp");    7  -> SLIT("%esp");
-	 8 -> SLIT("%r8d");    9  -> SLIT("%r9d");
-	10 -> SLIT("%r10d");   11 -> SLIT("%r11d");
-	12 -> SLIT("%r12d");   13 -> SLIT("%r13d");
-	14 -> SLIT("%r14d");   15 -> SLIT("%r15d");
-	_  -> SLIT("very naughty x86_64 register")
+	 0 -> sLit "%eax";    1  -> sLit "%ebx";
+	 2 -> sLit "%ecx";    3  -> sLit "%edx";
+	 4 -> sLit "%esi";    5  -> sLit "%edi";
+	 6 -> sLit "%ebp";    7  -> sLit "%esp";
+	 8 -> sLit "%r8d";    9  -> sLit "%r9d";
+	10 -> sLit "%r10d";   11 -> sLit "%r11d";
+	12 -> sLit "%r12d";   13 -> sLit "%r13d";
+	14 -> sLit "%r14d";   15 -> sLit "%r15d";
+	_  -> sLit "very naughty x86_64 register"
       })
 
     ppr_reg_quad i = ptext
       (case i of {
-	 0 -> SLIT("%rax");	1 -> SLIT("%rbx");
-	 2 -> SLIT("%rcx");	3 -> SLIT("%rdx");
-	 4 -> SLIT("%rsi");	5 -> SLIT("%rdi");
-	 6 -> SLIT("%rbp");	7 -> SLIT("%rsp");
-	 8 -> SLIT("%r8");  	9 -> SLIT("%r9");
-	10 -> SLIT("%r10");    11 -> SLIT("%r11");
-	12 -> SLIT("%r12");    13 -> SLIT("%r13");
-	14 -> SLIT("%r14");    15 -> SLIT("%r15");
-	16 -> SLIT("%xmm0");   17 -> SLIT("%xmm1");
-	18 -> SLIT("%xmm2");   19 -> SLIT("%xmm3");
-	20 -> SLIT("%xmm4");   21 -> SLIT("%xmm5");
-	22 -> SLIT("%xmm6");   23 -> SLIT("%xmm7");
-	24 -> SLIT("%xmm8");   25 -> SLIT("%xmm9");
-	26 -> SLIT("%xmm10");  27 -> SLIT("%xmm11");
-	28 -> SLIT("%xmm12");  29 -> SLIT("%xmm13");
-	30 -> SLIT("%xmm14");  31 -> SLIT("%xmm15");
-	_  -> SLIT("very naughty x86_64 register")
+	 0 -> sLit "%rax";	1 -> sLit "%rbx";
+	 2 -> sLit "%rcx";	3 -> sLit "%rdx";
+	 4 -> sLit "%rsi";	5 -> sLit "%rdi";
+	 6 -> sLit "%rbp";	7 -> sLit "%rsp";
+	 8 -> sLit "%r8";  	9 -> sLit "%r9";
+	10 -> sLit "%r10";    11 -> sLit "%r11";
+	12 -> sLit "%r12";    13 -> sLit "%r13";
+	14 -> sLit "%r14";    15 -> sLit "%r15";
+	16 -> sLit "%xmm0";   17 -> sLit "%xmm1";
+	18 -> sLit "%xmm2";   19 -> sLit "%xmm3";
+	20 -> sLit "%xmm4";   21 -> sLit "%xmm5";
+	22 -> sLit "%xmm6";   23 -> sLit "%xmm7";
+	24 -> sLit "%xmm8";   25 -> sLit "%xmm9";
+	26 -> sLit "%xmm10";  27 -> sLit "%xmm11";
+	28 -> sLit "%xmm12";  29 -> sLit "%xmm13";
+	30 -> sLit "%xmm14";  31 -> sLit "%xmm15";
+	_  -> sLit "very naughty x86_64 register"
       })
 #endif
 
@@ -271,39 +268,39 @@ pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
     ppr_reg_no :: Int -> Doc
     ppr_reg_no i = ptext
       (case i of {
-	 0 -> SLIT("%g0");   1 -> SLIT("%g1");
-	 2 -> SLIT("%g2");   3 -> SLIT("%g3");
-	 4 -> SLIT("%g4");   5 -> SLIT("%g5");
-	 6 -> SLIT("%g6");   7 -> SLIT("%g7");
-	 8 -> SLIT("%o0");   9 -> SLIT("%o1");
-	10 -> SLIT("%o2");  11 -> SLIT("%o3");
-	12 -> SLIT("%o4");  13 -> SLIT("%o5");
-	14 -> SLIT("%o6");  15 -> SLIT("%o7");
-	16 -> SLIT("%l0");  17 -> SLIT("%l1");
-	18 -> SLIT("%l2");  19 -> SLIT("%l3");
-	20 -> SLIT("%l4");  21 -> SLIT("%l5");
-	22 -> SLIT("%l6");  23 -> SLIT("%l7");
-	24 -> SLIT("%i0");  25 -> SLIT("%i1");
-	26 -> SLIT("%i2");  27 -> SLIT("%i3");
-	28 -> SLIT("%i4");  29 -> SLIT("%i5");
-	30 -> SLIT("%i6");  31 -> SLIT("%i7");
-	32 -> SLIT("%f0");  33 -> SLIT("%f1");
-	34 -> SLIT("%f2");  35 -> SLIT("%f3");
-	36 -> SLIT("%f4");  37 -> SLIT("%f5");
-	38 -> SLIT("%f6");  39 -> SLIT("%f7");
-	40 -> SLIT("%f8");  41 -> SLIT("%f9");
-	42 -> SLIT("%f10"); 43 -> SLIT("%f11");
-	44 -> SLIT("%f12"); 45 -> SLIT("%f13");
-	46 -> SLIT("%f14"); 47 -> SLIT("%f15");
-	48 -> SLIT("%f16"); 49 -> SLIT("%f17");
-	50 -> SLIT("%f18"); 51 -> SLIT("%f19");
-	52 -> SLIT("%f20"); 53 -> SLIT("%f21");
-	54 -> SLIT("%f22"); 55 -> SLIT("%f23");
-	56 -> SLIT("%f24"); 57 -> SLIT("%f25");
-	58 -> SLIT("%f26"); 59 -> SLIT("%f27");
-	60 -> SLIT("%f28"); 61 -> SLIT("%f29");
-	62 -> SLIT("%f30"); 63 -> SLIT("%f31");
-	_  -> SLIT("very naughty sparc register")
+	 0 -> sLit "%g0";   1 -> sLit "%g1";
+	 2 -> sLit "%g2";   3 -> sLit "%g3";
+	 4 -> sLit "%g4";   5 -> sLit "%g5";
+	 6 -> sLit "%g6";   7 -> sLit "%g7";
+	 8 -> sLit "%o0";   9 -> sLit "%o1";
+	10 -> sLit "%o2";  11 -> sLit "%o3";
+	12 -> sLit "%o4";  13 -> sLit "%o5";
+	14 -> sLit "%o6";  15 -> sLit "%o7";
+	16 -> sLit "%l0";  17 -> sLit "%l1";
+	18 -> sLit "%l2";  19 -> sLit "%l3";
+	20 -> sLit "%l4";  21 -> sLit "%l5";
+	22 -> sLit "%l6";  23 -> sLit "%l7";
+	24 -> sLit "%i0";  25 -> sLit "%i1";
+	26 -> sLit "%i2";  27 -> sLit "%i3";
+	28 -> sLit "%i4";  29 -> sLit "%i5";
+	30 -> sLit "%i6";  31 -> sLit "%i7";
+	32 -> sLit "%f0";  33 -> sLit "%f1";
+	34 -> sLit "%f2";  35 -> sLit "%f3";
+	36 -> sLit "%f4";  37 -> sLit "%f5";
+	38 -> sLit "%f6";  39 -> sLit "%f7";
+	40 -> sLit "%f8";  41 -> sLit "%f9";
+	42 -> sLit "%f10"; 43 -> sLit "%f11";
+	44 -> sLit "%f12"; 45 -> sLit "%f13";
+	46 -> sLit "%f14"; 47 -> sLit "%f15";
+	48 -> sLit "%f16"; 49 -> sLit "%f17";
+	50 -> sLit "%f18"; 51 -> sLit "%f19";
+	52 -> sLit "%f20"; 53 -> sLit "%f21";
+	54 -> sLit "%f22"; 55 -> sLit "%f23";
+	56 -> sLit "%f24"; 57 -> sLit "%f25";
+	58 -> sLit "%f26"; 59 -> sLit "%f27";
+	60 -> sLit "%f28"; 61 -> sLit "%f29";
+	62 -> sLit "%f30"; 63 -> sLit "%f31";
+	_  -> sLit "very naughty sparc register"
       })
 #endif
 #if powerpc_TARGET_ARCH
@@ -311,45 +308,45 @@ pprReg IF_ARCH_i386(s,) IF_ARCH_x86_64(s,) r
     ppr_reg_no :: Int -> Doc
     ppr_reg_no i = ptext
       (case i of {
-	 0 -> SLIT("r0");   1 -> SLIT("r1");
-	 2 -> SLIT("r2");   3 -> SLIT("r3");
-	 4 -> SLIT("r4");   5 -> SLIT("r5");
-	 6 -> SLIT("r6");   7 -> SLIT("r7");
-	 8 -> SLIT("r8");   9 -> SLIT("r9");
-	10 -> SLIT("r10");  11 -> SLIT("r11");
-	12 -> SLIT("r12");  13 -> SLIT("r13");
-	14 -> SLIT("r14");  15 -> SLIT("r15");
-	16 -> SLIT("r16");  17 -> SLIT("r17");
-	18 -> SLIT("r18");  19 -> SLIT("r19");
-	20 -> SLIT("r20");  21 -> SLIT("r21");
-	22 -> SLIT("r22");  23 -> SLIT("r23");
-	24 -> SLIT("r24");  25 -> SLIT("r25");
-	26 -> SLIT("r26");  27 -> SLIT("r27");
-	28 -> SLIT("r28");  29 -> SLIT("r29");
-	30 -> SLIT("r30");  31 -> SLIT("r31");
-	32 -> SLIT("f0");  33 -> SLIT("f1");
-	34 -> SLIT("f2");  35 -> SLIT("f3");
-	36 -> SLIT("f4");  37 -> SLIT("f5");
-	38 -> SLIT("f6");  39 -> SLIT("f7");
-	40 -> SLIT("f8");  41 -> SLIT("f9");
-	42 -> SLIT("f10"); 43 -> SLIT("f11");
-	44 -> SLIT("f12"); 45 -> SLIT("f13");
-	46 -> SLIT("f14"); 47 -> SLIT("f15");
-	48 -> SLIT("f16"); 49 -> SLIT("f17");
-	50 -> SLIT("f18"); 51 -> SLIT("f19");
-	52 -> SLIT("f20"); 53 -> SLIT("f21");
-	54 -> SLIT("f22"); 55 -> SLIT("f23");
-	56 -> SLIT("f24"); 57 -> SLIT("f25");
-	58 -> SLIT("f26"); 59 -> SLIT("f27");
-	60 -> SLIT("f28"); 61 -> SLIT("f29");
-	62 -> SLIT("f30"); 63 -> SLIT("f31");
-	_  -> SLIT("very naughty powerpc register")
+	 0 -> sLit "r0";   1 -> sLit "r1";
+	 2 -> sLit "r2";   3 -> sLit "r3";
+	 4 -> sLit "r4";   5 -> sLit "r5";
+	 6 -> sLit "r6";   7 -> sLit "r7";
+	 8 -> sLit "r8";   9 -> sLit "r9";
+	10 -> sLit "r10";  11 -> sLit "r11";
+	12 -> sLit "r12";  13 -> sLit "r13";
+	14 -> sLit "r14";  15 -> sLit "r15";
+	16 -> sLit "r16";  17 -> sLit "r17";
+	18 -> sLit "r18";  19 -> sLit "r19";
+	20 -> sLit "r20";  21 -> sLit "r21";
+	22 -> sLit "r22";  23 -> sLit "r23";
+	24 -> sLit "r24";  25 -> sLit "r25";
+	26 -> sLit "r26";  27 -> sLit "r27";
+	28 -> sLit "r28";  29 -> sLit "r29";
+	30 -> sLit "r30";  31 -> sLit "r31";
+	32 -> sLit "f0";  33 -> sLit "f1";
+	34 -> sLit "f2";  35 -> sLit "f3";
+	36 -> sLit "f4";  37 -> sLit "f5";
+	38 -> sLit "f6";  39 -> sLit "f7";
+	40 -> sLit "f8";  41 -> sLit "f9";
+	42 -> sLit "f10"; 43 -> sLit "f11";
+	44 -> sLit "f12"; 45 -> sLit "f13";
+	46 -> sLit "f14"; 47 -> sLit "f15";
+	48 -> sLit "f16"; 49 -> sLit "f17";
+	50 -> sLit "f18"; 51 -> sLit "f19";
+	52 -> sLit "f20"; 53 -> sLit "f21";
+	54 -> sLit "f22"; 55 -> sLit "f23";
+	56 -> sLit "f24"; 57 -> sLit "f25";
+	58 -> sLit "f26"; 59 -> sLit "f27";
+	60 -> sLit "f28"; 61 -> sLit "f29";
+	62 -> sLit "f30"; 63 -> sLit "f31";
+	_  -> sLit "very naughty powerpc register"
       })
 #else
     ppr_reg_no :: Int -> Doc
     ppr_reg_no i | i <= 31 = int i	-- GPRs
                  | i <= 63 = int (i-32) -- FPRs
-		 | otherwise = ptext SLIT("very naughty powerpc register")
+		 | otherwise = ptext sLit "very naughty powerpc register"
 #endif
 #endif
 
@@ -365,54 +362,54 @@ pprSize :: Size -> Doc
 
 pprSize x = ptext (case x of
 #if alpha_TARGET_ARCH
-	 B  -> SLIT("b")
-	 Bu -> SLIT("bu")
---	 W  -> SLIT("w") UNUSED
---	 Wu -> SLIT("wu") UNUSED
-	 L  -> SLIT("l")
-	 Q  -> SLIT("q")
---	 FF -> SLIT("f") UNUSED
---	 DF -> SLIT("d") UNUSED
---	 GF -> SLIT("g") UNUSED
---	 SF -> SLIT("s") UNUSED
-	 TF -> SLIT("t")
+	 B  -> sLit "b"
+	 Bu -> sLit "bu"
+--	 W  -> sLit "w" UNUSED
+--	 Wu -> sLit "wu" UNUSED
+	 L  -> sLit "l"
+	 Q  -> sLit "q"
+--	 FF -> sLit "f" UNUSED
+--	 DF -> sLit "d" UNUSED
+--	 GF -> sLit "g" UNUSED
+--	 SF -> sLit "s" UNUSED
+	 TF -> sLit "t"
 #endif
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
-	I8   -> SLIT("b")
-	I16  -> SLIT("w")
-	I32  -> SLIT("l")
-	I64  -> SLIT("q")
+	I8   -> sLit "b"
+	I16  -> sLit "w"
+	I32  -> sLit "l"
+	I64  -> sLit "q"
 #endif
 #if i386_TARGET_ARCH
-	F32  -> SLIT("s")
-	F64  -> SLIT("l")
-	F80  -> SLIT("t")
+	F32  -> sLit "s"
+	F64  -> sLit "l"
+	F80  -> sLit "t"
 #endif
 #if x86_64_TARGET_ARCH
-	F32  -> SLIT("ss")	-- "scalar single-precision float" (SSE2)
-	F64  -> SLIT("sd")	-- "scalar double-precision float" (SSE2)
+	F32  -> sLit "ss"	-- "scalar single-precision float" (SSE2)
+	F64  -> sLit "sd"	-- "scalar double-precision float" (SSE2)
 #endif
 #if sparc_TARGET_ARCH
-	I8   -> SLIT("sb")
-        I16   -> SLIT("sh")
-	I32   -> SLIT("")
-	F32   -> SLIT("")
-	F64  -> SLIT("d")
+	I8   -> sLit "sb"
+        I16   -> sLit "sh"
+	I32   -> sLit ""
+	F32   -> sLit ""
+	F64  -> sLit "d"
     )
 pprStSize :: MachRep -> Doc
 pprStSize x = ptext (case x of
-	I8   -> SLIT("b")
-	I16  -> SLIT("h")
-	I32  -> SLIT("")
-	F32  -> SLIT("")
-	F64  -> SLIT("d")
+	I8   -> sLit "b"
+	I16  -> sLit "h"
+	I32  -> sLit ""
+	F32  -> sLit ""
+	F64  -> sLit "d"
 #endif
 #if powerpc_TARGET_ARCH
-	I8   -> SLIT("b")
-        I16  -> SLIT("h")
-	I32  -> SLIT("w")
-	F32  -> SLIT("fs")
-	F64  -> SLIT("fd")
+	I8   -> sLit "b"
+        I16  -> sLit "h"
+	I32  -> sLit "w"
+	F32  -> sLit "fs"
+	F64  -> sLit "fd"
 #endif
     )
 
@@ -423,43 +420,43 @@ pprCond :: Cond -> Doc
 
 pprCond c = ptext (case c of {
 #if alpha_TARGET_ARCH
-	EQQ  -> SLIT("eq");
-	LTT  -> SLIT("lt");
-	LE  -> SLIT("le");
-	ULT -> SLIT("ult");
-	ULE -> SLIT("ule");
-	NE  -> SLIT("ne");
-	GTT  -> SLIT("gt");
-	GE  -> SLIT("ge")
+	EQQ  -> sLit "eq";
+	LTT  -> sLit "lt";
+	LE  -> sLit "le";
+	ULT -> sLit "ult";
+	ULE -> sLit "ule";
+	NE  -> sLit "ne";
+	GTT  -> sLit "gt";
+	GE  -> sLit "ge"
 #endif
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
-	GEU	-> SLIT("ae");	LU    -> SLIT("b");
-	EQQ	-> SLIT("e");	GTT   -> SLIT("g");
-	GE	-> SLIT("ge");	GU    -> SLIT("a");
-	LTT	-> SLIT("l");	LE    -> SLIT("le");
-	LEU	-> SLIT("be");	NE    -> SLIT("ne");
-	NEG	-> SLIT("s");	POS   -> SLIT("ns");
-        CARRY   -> SLIT("c");   OFLO  -> SLIT("o");
-	PARITY  -> SLIT("p");   NOTPARITY -> SLIT("np");
-	ALWAYS	-> SLIT("mp")	-- hack
+	GEU	-> sLit "ae";	LU    -> sLit "b";
+	EQQ	-> sLit "e";	GTT   -> sLit "g";
+	GE	-> sLit "ge";	GU    -> sLit "a";
+	LTT	-> sLit "l";	LE    -> sLit "le";
+	LEU	-> sLit "be";	NE    -> sLit "ne";
+	NEG	-> sLit "s";	POS   -> sLit "ns";
+        CARRY   -> sLit "c";   OFLO  -> sLit "o";
+	PARITY  -> sLit "p";   NOTPARITY -> sLit "np";
+	ALWAYS	-> sLit "mp"	-- hack
 #endif
 #if sparc_TARGET_ARCH
-	ALWAYS	-> SLIT("");	NEVER -> SLIT("n");
-	GEU	-> SLIT("geu");	LU    -> SLIT("lu");
-	EQQ	-> SLIT("e");	GTT   -> SLIT("g");
-	GE	-> SLIT("ge");	GU    -> SLIT("gu");
-	LTT	-> SLIT("l");	LE    -> SLIT("le");
-	LEU	-> SLIT("leu");	NE    -> SLIT("ne");
-	NEG	-> SLIT("neg");	POS   -> SLIT("pos");
-	VC	-> SLIT("vc");	VS    -> SLIT("vs")
+	ALWAYS	-> sLit "";	NEVER -> sLit "n";
+	GEU	-> sLit "geu";	LU    -> sLit "lu";
+	EQQ	-> sLit "e";	GTT   -> sLit "g";
+	GE	-> sLit "ge";	GU    -> sLit "gu";
+	LTT	-> sLit "l";	LE    -> sLit "le";
+	LEU	-> sLit "leu";	NE    -> sLit "ne";
+	NEG	-> sLit "neg";	POS   -> sLit "pos";
+	VC	-> sLit "vc";	VS    -> sLit "vs"
 #endif
 #if powerpc_TARGET_ARCH
-	ALWAYS  -> SLIT("");
-	EQQ	-> SLIT("eq");	NE    -> SLIT("ne");
-	LTT     -> SLIT("lt");  GE    -> SLIT("ge");
-	GTT     -> SLIT("gt");  LE    -> SLIT("le");
-	LU      -> SLIT("lt");  GEU   -> SLIT("ge");
-	GU      -> SLIT("gt");  LEU   -> SLIT("le");
+	ALWAYS  -> sLit "";
+	EQQ	-> sLit "eq";	NE    -> sLit "ne";
+	LTT     -> sLit "lt";  GE    -> sLit "ge";
+	GTT     -> sLit "gt";  LE    -> sLit "le";
+	LU      -> sLit "lt";  GEU   -> sLit "ge";
+	GU      -> sLit "gt";  LEU   -> sLit "le";
 #endif
     })
 
@@ -475,8 +472,8 @@ pprImm (ImmCLbl l)    = pprCLabel_asm l
 pprImm (ImmIndex l i) = pprCLabel_asm l <> char '+' <> int i
 pprImm (ImmLit s)     = s
 
-pprImm (ImmFloat _) = ptext SLIT("naughty float immediate")
-pprImm (ImmDouble _) = ptext SLIT("naughty double immediate")
+pprImm (ImmFloat _) = ptext (sLit "naughty float immediate")
+pprImm (ImmDouble _) = ptext (sLit "naughty double immediate")
 
 pprImm (ImmConstantSum a b) = pprImm a <> char '+' <> pprImm b
 #if sparc_TARGET_ARCH
@@ -563,7 +560,7 @@ pprAddr (AddrBaseIndex base index displacement)
     case (base,index) of
       (EABaseNone,  EAIndexNone) -> pp_disp
       (EABaseReg b, EAIndexNone) -> pp_off (pp_reg b)
-      (EABaseRip,   EAIndexNone) -> pp_off (ptext SLIT("%rip"))
+      (EABaseRip,   EAIndexNone) -> pp_off (ptext (sLit "%rip"))
       (EABaseNone,  EAIndex r i) -> pp_off (comma <> pp_reg r <> comma <> int i)
       (EABaseReg b, EAIndex r i) -> pp_off (pp_reg b <> comma <> pp_reg r 
                                        <> comma <> int i)
@@ -602,7 +599,7 @@ pprAddr (AddrRegImm r1 imm)
 
 #if powerpc_TARGET_ARCH
 pprAddr (AddrRegReg r1 r2)
-  = pprReg r1 <+> ptext SLIT(", ") <+> pprReg r2
+  = pprReg r1 <+> ptext sLit ", " <+> pprReg r2
 
 pprAddr (AddrRegImm r1 (ImmInt i)) = hcat [ int i, char '(', pprReg r1, char ')' ]
 pprAddr (AddrRegImm r1 (ImmInteger i)) = hcat [ integer i, char '(', pprReg r1, char ')' ]
@@ -615,69 +612,69 @@ pprAddr (AddrRegImm r1 imm) = hcat [ pprImm imm, char '(', pprReg r1, char ')' ]
 
 pprSectionHeader Text
     = ptext
-	IF_ARCH_alpha(SLIT("\t.text\n\t.align 3") {-word boundary-}
-       ,IF_ARCH_sparc(SLIT(".text\n\t.align 4") {-word boundary-}
-       ,IF_ARCH_i386(IF_OS_darwin(SLIT(".text\n\t.align 2"),
-                                  SLIT(".text\n\t.align 4,0x90"))
+	(IF_ARCH_alpha(sLit "\t.text\n\t.align 3" {-word boundary-}
+       ,IF_ARCH_sparc(sLit ".text\n\t.align 4" {-word boundary-}
+       ,IF_ARCH_i386(IF_OS_darwin(sLit ".text\n\t.align 2",
+                                  sLit ".text\n\t.align 4,0x90")
                                   {-needs per-OS variation!-}
-       ,IF_ARCH_x86_64(IF_OS_darwin(SLIT(".text\n.align 3"),
-                                    SLIT(".text\n\t.align 8"))
-       ,IF_ARCH_powerpc(SLIT(".text\n.align 2")
-       ,)))))
+       ,IF_ARCH_x86_64(IF_OS_darwin(sLit ".text\n.align 3",
+                                    sLit ".text\n\t.align 8")
+       ,IF_ARCH_powerpc(sLit ".text\n.align 2"
+       ,))))))
 pprSectionHeader Data
     = ptext
-	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
-	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
-	,IF_ARCH_i386(IF_OS_darwin(SLIT(".data\n\t.align 2"),
-                                   SLIT(".data\n\t.align 4"))
-	,IF_ARCH_x86_64(IF_OS_darwin(SLIT(".data\n.align 3"),
-	                             SLIT(".data\n\t.align 8"))
-        ,IF_ARCH_powerpc(SLIT(".data\n.align 2")
-	,)))))
+	 (IF_ARCH_alpha(sLit "\t.data\n\t.align 3"
+	,IF_ARCH_sparc(sLit ".data\n\t.align 8" {-<8 will break double constants -}
+	,IF_ARCH_i386(IF_OS_darwin(sLit ".data\n\t.align 2",
+                                   sLit ".data\n\t.align 4")
+	,IF_ARCH_x86_64(IF_OS_darwin(sLit ".data\n.align 3",
+	                             sLit ".data\n\t.align 8")
+        ,IF_ARCH_powerpc(sLit ".data\n.align 2"
+	,))))))
 pprSectionHeader ReadOnlyData
     = ptext
-	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
-	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
-	,IF_ARCH_i386(IF_OS_darwin(SLIT(".const\n.align 2"),
-                                   SLIT(".section .rodata\n\t.align 4"))
-	,IF_ARCH_x86_64(IF_OS_darwin(SLIT(".const\n.align 3"),
-	                             SLIT(".section .rodata\n\t.align 8"))
-        ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const\n.align 2"),
-                                      SLIT(".section .rodata\n\t.align 2"))
-	,)))))
+	 (IF_ARCH_alpha(sLit "\t.data\n\t.align 3"
+	,IF_ARCH_sparc(sLit ".data\n\t.align 8" {-<8 will break double constants -}
+	,IF_ARCH_i386(IF_OS_darwin(sLit ".const\n.align 2",
+                                   sLit ".section .rodata\n\t.align 4")
+	,IF_ARCH_x86_64(IF_OS_darwin(sLit ".const\n.align 3",
+	                             sLit ".section .rodata\n\t.align 8")
+        ,IF_ARCH_powerpc(IF_OS_darwin(sLit ".const\n.align 2",
+                                      sLit ".section .rodata\n\t.align 2")
+	,))))))
 pprSectionHeader RelocatableReadOnlyData
     = ptext
-	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 3")
-	,IF_ARCH_sparc(SLIT(".data\n\t.align 8") {-<8 will break double constants -}
-	,IF_ARCH_i386(IF_OS_darwin(SLIT(".const_data\n.align 2"),
-                                   SLIT(".section .data\n\t.align 4"))
-	,IF_ARCH_x86_64(IF_OS_darwin(SLIT(".const_data\n.align 3"),
-                                     SLIT(".section .data\n\t.align 8"))
-        ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const_data\n.align 2"),
-                                      SLIT(".data\n\t.align 2"))
-	,)))))
+	 (IF_ARCH_alpha(sLit "\t.data\n\t.align 3"
+	,IF_ARCH_sparc(sLit ".data\n\t.align 8" {-<8 will break double constants -}
+	,IF_ARCH_i386(IF_OS_darwin(sLit ".const_data\n.align 2",
+                                   sLit ".section .data\n\t.align 4")
+	,IF_ARCH_x86_64(IF_OS_darwin(sLit ".const_data\n.align 3",
+                                     sLit ".section .data\n\t.align 8")
+        ,IF_ARCH_powerpc(IF_OS_darwin(sLit ".const_data\n.align 2",
+                                      sLit ".data\n\t.align 2")
+	,))))))
 pprSectionHeader UninitialisedData
     = ptext
-	 IF_ARCH_alpha(SLIT("\t.bss\n\t.align 3")
-	,IF_ARCH_sparc(SLIT(".bss\n\t.align 8") {-<8 will break double constants -}
-	,IF_ARCH_i386(IF_OS_darwin(SLIT(".data\n\t.align 2"),
-                                   SLIT(".section .bss\n\t.align 4"))
-	,IF_ARCH_x86_64(IF_OS_darwin(SLIT(".data\n\t.align 3"),
-                                     SLIT(".section .bss\n\t.align 8"))
-        ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const_data\n.align 2"),
-                                      SLIT(".section .bss\n\t.align 2"))
-	,)))))
+	 (IF_ARCH_alpha(sLit "\t.bss\n\t.align 3"
+	,IF_ARCH_sparc(sLit ".bss\n\t.align 8" {-<8 will break double constants -}
+	,IF_ARCH_i386(IF_OS_darwin(sLit ".data\n\t.align 2",
+                                   sLit ".section .bss\n\t.align 4")
+	,IF_ARCH_x86_64(IF_OS_darwin(sLit ".data\n\t.align 3",
+                                     sLit ".section .bss\n\t.align 8")
+        ,IF_ARCH_powerpc(IF_OS_darwin(sLit ".const_data\n.align 2",
+                                      sLit ".section .bss\n\t.align 2")
+	,))))))
 pprSectionHeader ReadOnlyData16
     = ptext
-	 IF_ARCH_alpha(SLIT("\t.data\n\t.align 4")
-	,IF_ARCH_sparc(SLIT(".data\n\t.align 16")
-	,IF_ARCH_i386(IF_OS_darwin(SLIT(".const\n.align 4"),
-                                   SLIT(".section .rodata\n\t.align 16"))
-	,IF_ARCH_x86_64(IF_OS_darwin(SLIT(".const\n.align 4"),
-	                             SLIT(".section .rodata.cst16\n\t.align 16"))
-        ,IF_ARCH_powerpc(IF_OS_darwin(SLIT(".const\n.align 4"),
-                                      SLIT(".section .rodata\n\t.align 4"))
-	,)))))
+	 (IF_ARCH_alpha(sLit "\t.data\n\t.align 4"
+	,IF_ARCH_sparc(sLit ".data\n\t.align 16"
+	,IF_ARCH_i386(IF_OS_darwin(sLit ".const\n.align 4",
+                                   sLit ".section .rodata\n\t.align 16")
+	,IF_ARCH_x86_64(IF_OS_darwin(sLit ".const\n.align 4",
+	                             sLit ".section .rodata.cst16\n\t.align 16")
+        ,IF_ARCH_powerpc(IF_OS_darwin(sLit ".const\n.align 4",
+                                      sLit ".section .rodata\n\t.align 4")
+	,))))))
 
 pprSectionHeader (OtherSection sec)
     = panic "PprMach.pprSectionHeader: unknown section"
@@ -686,22 +683,22 @@ pprData :: CmmStatic -> Doc
 pprData (CmmAlign bytes)         = pprAlign bytes
 pprData (CmmDataLabel lbl)       = pprLabel lbl
 pprData (CmmString str)          = pprASCII str
-pprData (CmmUninitialised bytes) = ptext SLIT(".space ") <> int bytes
+pprData (CmmUninitialised bytes) = ptext (sLit ".space ") <> int bytes
 pprData (CmmStaticLit lit)       = pprDataItem lit
 
 pprGloblDecl :: CLabel -> Doc
 pprGloblDecl lbl
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext IF_ARCH_sparc(SLIT(".global "), 
-				    SLIT(".globl ")) <>
+  | otherwise = ptext IF_ARCH_sparc((sLit ".global "), 
+				    (sLit ".globl ")) <>
 		pprCLabel_asm lbl
 
 pprTypeAndSizeDecl :: CLabel -> Doc
 pprTypeAndSizeDecl lbl
 #if linux_TARGET_OS
   | not (externallyVisibleCLabel lbl) = empty
-  | otherwise = ptext SLIT(".type ") <>
-		pprCLabel_asm lbl <> ptext SLIT(", @object")
+  | otherwise = ptext (sLit ".type ") <>
+		pprCLabel_asm lbl <> ptext (sLit ", @object")
 #else
   = empty
 #endif
@@ -714,14 +711,14 @@ pprASCII str
   = vcat (map do1 str) $$ do1 0
     where
        do1 :: Word8 -> Doc
-       do1 w = ptext SLIT("\t.byte\t") <> int (fromIntegral w)
+       do1 w = ptext (sLit "\t.byte\t") <> int (fromIntegral w)
 
 pprAlign bytes =
 	IF_ARCH_alpha(ptextSLIT(".align ") <> int pow2,
-	IF_ARCH_i386(ptext SLIT(".align ") <> int IF_OS_darwin(pow2,bytes),
-	IF_ARCH_x86_64(ptext SLIT(".align ") <> int IF_OS_darwin(pow2,bytes),
-	IF_ARCH_sparc(ptext SLIT(".align ") <> int bytes,
-	IF_ARCH_powerpc(ptext SLIT(".align ") <> int pow2,)))))
+	IF_ARCH_i386(ptext (sLit ".align ") <> int IF_OS_darwin(pow2,bytes),
+	IF_ARCH_x86_64(ptext (sLit ".align ") <> int IF_OS_darwin(pow2,bytes),
+	IF_ARCH_sparc(ptext (sLit ".align ") <> int bytes,
+	IF_ARCH_powerpc(ptext (sLit ".align ") <> int pow2,)))))
   where
 	pow2 = log2 bytes
 	
@@ -740,33 +737,33 @@ pprDataItem lit
 	imm = litToImm lit
 
 	-- These seem to be common:
-	ppr_item I8   x = [ptext SLIT("\t.byte\t") <> pprImm imm]
-	ppr_item I32  x = [ptext SLIT("\t.long\t") <> pprImm imm]
+	ppr_item I8   x = [ptext (sLit "\t.byte\t") <> pprImm imm]
+	ppr_item I32  x = [ptext (sLit "\t.long\t") <> pprImm imm]
 	ppr_item F32  (CmmFloat r _)
            = let bs = floatToBytes (fromRational r)
-             in  map (\b -> ptext SLIT("\t.byte\t") <> pprImm (ImmInt b)) bs
+             in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
     	ppr_item F64 (CmmFloat r _)
            = let bs = doubleToBytes (fromRational r)
-             in  map (\b -> ptext SLIT("\t.byte\t") <> pprImm (ImmInt b)) bs
+             in  map (\b -> ptext (sLit "\t.byte\t") <> pprImm (ImmInt b)) bs
 
 #if sparc_TARGET_ARCH
         -- copy n paste of x86 version
-	ppr_item I16  x = [ptext SLIT("\t.short\t") <> pprImm imm]
-	ppr_item I64  x = [ptext SLIT("\t.quad\t") <> pprImm imm]
+	ppr_item I16  x = [ptext (sLit "\t.short\t") <> pprImm imm]
+	ppr_item I64  x = [ptext (sLit "\t.quad\t") <> pprImm imm]
 #endif
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
-	ppr_item I16  x = [ptext SLIT("\t.word\t") <> pprImm imm]
+	ppr_item I16  x = [ptext (sLit "\t.word\t") <> pprImm imm]
 #endif
 #if i386_TARGET_ARCH && darwin_TARGET_OS
         ppr_item I64 (CmmInt x _)  =
-                [ptext SLIT("\t.long\t")
+                [ptext (sLit "\t.long\t")
                     <> int (fromIntegral (fromIntegral x :: Word32)),
-                 ptext SLIT("\t.long\t")
+                 ptext (sLit "\t.long\t")
                     <> int (fromIntegral
                         (fromIntegral (x `shiftR` 32) :: Word32))]
 #endif
 #if i386_TARGET_ARCH || (darwin_TARGET_OS && x86_64_TARGET_ARCH)
-	ppr_item I64  x = [ptext SLIT("\t.quad\t") <> pprImm imm]
+	ppr_item I64  x = [ptext (sLit "\t.quad\t") <> pprImm imm]
 #endif
 #if x86_64_TARGET_ARCH && !darwin_TARGET_OS
 	-- x86_64: binutils can't handle the R_X86_64_PC64 relocation
@@ -779,21 +776,21 @@ pprDataItem lit
 	-- 
 	ppr_item I64  x 
 	   | isRelativeReloc x =
-		[ptext SLIT("\t.long\t") <> pprImm imm,
-		 ptext SLIT("\t.long\t0")]
+		[ptext (sLit "\t.long\t") <> pprImm imm,
+		 ptext (sLit "\t.long\t0")]
 	   | otherwise =
-		[ptext SLIT("\t.quad\t") <> pprImm imm]
+		[ptext (sLit "\t.quad\t") <> pprImm imm]
 	   where
 		isRelativeReloc (CmmLabelDiffOff _ _ _) = True
 		isRelativeReloc _ = False
 #endif
 #if powerpc_TARGET_ARCH
-	ppr_item I16 x = [ptext SLIT("\t.short\t") <> pprImm imm]
+	ppr_item I16 x = [ptext (sLit "\t.short\t") <> pprImm imm]
         ppr_item I64 (CmmInt x _)  =
-                [ptext SLIT("\t.long\t")
+                [ptext (sLit "\t.long\t")
                     <> int (fromIntegral 
                         (fromIntegral (x `shiftR` 32) :: Word32)),
-                 ptext SLIT("\t.long\t")
+                 ptext (sLit "\t.long\t")
                     <> int (fromIntegral (fromIntegral x :: Word32))]
 #endif
 
@@ -809,13 +806,13 @@ pprInstr :: Instr -> Doc
 
 --pprInstr (COMMENT s) = empty -- nuke 'em
 pprInstr (COMMENT s)
-   =  IF_ARCH_alpha( ((<>) (ptext SLIT("\t# ")) (ftext s))
-     ,IF_ARCH_sparc( ((<>) (ptext SLIT("! "))   (ftext s))
-     ,IF_ARCH_i386( ((<>) (ptext SLIT("# "))   (ftext s))
-     ,IF_ARCH_x86_64( ((<>) (ptext SLIT("# "))   (ftext s))
+   =  IF_ARCH_alpha( ((<>) (ptext (sLit "\t# ")) (ftext s))
+     ,IF_ARCH_sparc( ((<>) (ptext (sLit "! "))   (ftext s))
+     ,IF_ARCH_i386( ((<>) (ptext (sLit "# "))   (ftext s))
+     ,IF_ARCH_x86_64( ((<>) (ptext (sLit "# "))   (ftext s))
      ,IF_ARCH_powerpc( IF_OS_linux(
-        ((<>) (ptext SLIT("# ")) (ftext s)),
-        ((<>) (ptext SLIT("; ")) (ftext s)))
+        ((<>) (ptext (sLit "# ")) (ftext s)),
+        ((<>) (ptext (sLit "; ")) (ftext s)))
      ,)))))
 
 pprInstr (DELTA d)
@@ -834,23 +831,23 @@ pprInstr (LDATA _ _)
 
 pprInstr (SPILL reg slot)
    = hcat [
-   	ptext SLIT("\tSPILL"),
+   	ptext (sLit "\tSPILL"),
 	char '\t',
 	pprReg reg,
 	comma,
-	ptext SLIT("SLOT") <> parens (int slot)]
+	ptext (sLit "SLOT") <> parens (int slot)]
 
 pprInstr (RELOAD slot reg)
    = hcat [
-   	ptext SLIT("\tRELOAD"),
+   	ptext (sLit "\tRELOAD"),
 	char '\t',
-	ptext SLIT("SLOT") <> parens (int slot),
+	ptext (sLit "SLOT") <> parens (int slot),
 	comma,
 	pprReg reg]
 
 pprInstr (LD size reg addr)
   = hcat [
-	ptext SLIT("\tld"),
+	ptext (sLit "\tld"),
 	pprSize size,
 	char '\t',
 	pprReg reg,
@@ -860,7 +857,7 @@ pprInstr (LD size reg addr)
 
 pprInstr (LDA reg addr)
   = hcat [
-	ptext SLIT("\tlda\t"),
+	ptext (sLit "\tlda\t"),
 	pprReg reg,
 	comma,
 	pprAddr addr
@@ -868,7 +865,7 @@ pprInstr (LDA reg addr)
 
 pprInstr (LDAH reg addr)
   = hcat [
-	ptext SLIT("\tldah\t"),
+	ptext (sLit "\tldah\t"),
 	pprReg reg,
 	comma,
 	pprAddr addr
@@ -876,7 +873,7 @@ pprInstr (LDAH reg addr)
 
 pprInstr (LDGP reg addr)
   = hcat [
-	ptext SLIT("\tldgp\t"),
+	ptext (sLit "\tldgp\t"),
 	pprReg reg,
 	comma,
 	pprAddr addr
@@ -884,7 +881,7 @@ pprInstr (LDGP reg addr)
 
 pprInstr (LDI size reg imm)
   = hcat [
-	ptext SLIT("\tldi"),
+	ptext (sLit "\tldi"),
 	pprSize size,
 	char '\t',
 	pprReg reg,
@@ -894,7 +891,7 @@ pprInstr (LDI size reg imm)
 
 pprInstr (ST size reg addr)
   = hcat [
-	ptext SLIT("\tst"),
+	ptext (sLit "\tst"),
 	pprSize size,
 	char '\t',
 	pprReg reg,
@@ -904,13 +901,13 @@ pprInstr (ST size reg addr)
 
 pprInstr (CLR reg)
   = hcat [
-	ptext SLIT("\tclr\t"),
+	ptext (sLit "\tclr\t"),
 	pprReg reg
     ]
 
 pprInstr (ABS size ri reg)
   = hcat [
-	ptext SLIT("\tabs"),
+	ptext (sLit "\tabs"),
 	pprSize size,
 	char '\t',
 	pprRI ri,
@@ -920,9 +917,9 @@ pprInstr (ABS size ri reg)
 
 pprInstr (NEG size ov ri reg)
   = hcat [
-	ptext SLIT("\tneg"),
+	ptext (sLit "\tneg"),
 	pprSize size,
-	if ov then ptext SLIT("v\t") else char '\t',
+	if ov then ptext (sLit "v\t") else char '\t',
 	pprRI ri,
 	comma,
 	pprReg reg
@@ -930,9 +927,9 @@ pprInstr (NEG size ov ri reg)
 
 pprInstr (ADD size ov reg1 ri reg2)
   = hcat [
-	ptext SLIT("\tadd"),
+	ptext (sLit "\tadd"),
 	pprSize size,
-	if ov then ptext SLIT("v\t") else char '\t',
+	if ov then ptext (sLit "v\t") else char '\t',
 	pprReg reg1,
 	comma,
 	pprRI ri,
@@ -942,8 +939,8 @@ pprInstr (ADD size ov reg1 ri reg2)
 
 pprInstr (SADD size scale reg1 ri reg2)
   = hcat [
-	ptext (case scale of {{-UNUSED:L -> SLIT("\ts4");-} Q -> SLIT("\ts8")}),
-	ptext SLIT("add"),
+	ptext (case scale of {{-UNUSED:L -> (sLit "\ts4");-} Q -> (sLit "\ts8")}),
+	ptext (sLit "add"),
 	pprSize size,
 	char '\t',
 	pprReg reg1,
@@ -955,9 +952,9 @@ pprInstr (SADD size scale reg1 ri reg2)
 
 pprInstr (SUB size ov reg1 ri reg2)
   = hcat [
-	ptext SLIT("\tsub"),
+	ptext (sLit "\tsub"),
 	pprSize size,
-	if ov then ptext SLIT("v\t") else char '\t',
+	if ov then ptext (sLit "v\t") else char '\t',
 	pprReg reg1,
 	comma,
 	pprRI ri,
@@ -967,8 +964,8 @@ pprInstr (SUB size ov reg1 ri reg2)
 
 pprInstr (SSUB size scale reg1 ri reg2)
   = hcat [
-	ptext (case scale of {{-UNUSED:L -> SLIT("\ts4");-} Q -> SLIT("\ts8")}),
-	ptext SLIT("sub"),
+	ptext (case scale of {{-UNUSED:L -> (sLit "\ts4");-} Q -> (sLit "\ts8")}),
+	ptext (sLit "sub"),
 	pprSize size,
 	char '\t',
 	pprReg reg1,
@@ -980,9 +977,9 @@ pprInstr (SSUB size scale reg1 ri reg2)
 
 pprInstr (MUL size ov reg1 ri reg2)
   = hcat [
-	ptext SLIT("\tmul"),
+	ptext (sLit "\tmul"),
 	pprSize size,
-	if ov then ptext SLIT("v\t") else char '\t',
+	if ov then ptext (sLit "v\t") else char '\t',
 	pprReg reg1,
 	comma,
 	pprRI ri,
@@ -992,9 +989,9 @@ pprInstr (MUL size ov reg1 ri reg2)
 
 pprInstr (DIV size uns reg1 ri reg2)
   = hcat [
-	ptext SLIT("\tdiv"),
+	ptext (sLit "\tdiv"),
 	pprSize size,
-	if uns then ptext SLIT("u\t") else char '\t',
+	if uns then ptext (sLit "u\t") else char '\t',
 	pprReg reg1,
 	comma,
 	pprRI ri,
@@ -1004,9 +1001,9 @@ pprInstr (DIV size uns reg1 ri reg2)
 
 pprInstr (REM size uns reg1 ri reg2)
   = hcat [
-	ptext SLIT("\trem"),
+	ptext (sLit "\trem"),
 	pprSize size,
-	if uns then ptext SLIT("u\t") else char '\t',
+	if uns then ptext (sLit "u\t") else char '\t',
 	pprReg reg1,
 	comma,
 	pprRI ri,
@@ -1016,32 +1013,32 @@ pprInstr (REM size uns reg1 ri reg2)
 
 pprInstr (NOT ri reg)
   = hcat [
-	ptext SLIT("\tnot"),
+	ptext (sLit "\tnot"),
 	char '\t',
 	pprRI ri,
 	comma,
 	pprReg reg
     ]
 
-pprInstr (AND reg1 ri reg2) = pprRegRIReg SLIT("and") reg1 ri reg2
-pprInstr (ANDNOT reg1 ri reg2) = pprRegRIReg SLIT("andnot") reg1 ri reg2
-pprInstr (OR reg1 ri reg2) = pprRegRIReg SLIT("or") reg1 ri reg2
-pprInstr (ORNOT reg1 ri reg2) = pprRegRIReg SLIT("ornot") reg1 ri reg2
-pprInstr (XOR reg1 ri reg2) = pprRegRIReg SLIT("xor") reg1 ri reg2
-pprInstr (XORNOT reg1 ri reg2) = pprRegRIReg SLIT("xornot") reg1 ri reg2
+pprInstr (AND reg1 ri reg2) = pprRegRIReg (sLit "and") reg1 ri reg2
+pprInstr (ANDNOT reg1 ri reg2) = pprRegRIReg (sLit "andnot") reg1 ri reg2
+pprInstr (OR reg1 ri reg2) = pprRegRIReg (sLit "or") reg1 ri reg2
+pprInstr (ORNOT reg1 ri reg2) = pprRegRIReg (sLit "ornot") reg1 ri reg2
+pprInstr (XOR reg1 ri reg2) = pprRegRIReg (sLit "xor") reg1 ri reg2
+pprInstr (XORNOT reg1 ri reg2) = pprRegRIReg (sLit "xornot") reg1 ri reg2
 
-pprInstr (SLL reg1 ri reg2) = pprRegRIReg SLIT("sll") reg1 ri reg2
-pprInstr (SRL reg1 ri reg2) = pprRegRIReg SLIT("srl") reg1 ri reg2
-pprInstr (SRA reg1 ri reg2) = pprRegRIReg SLIT("sra") reg1 ri reg2
+pprInstr (SLL reg1 ri reg2) = pprRegRIReg (sLit "sll") reg1 ri reg2
+pprInstr (SRL reg1 ri reg2) = pprRegRIReg (sLit "srl") reg1 ri reg2
+pprInstr (SRA reg1 ri reg2) = pprRegRIReg (sLit "sra") reg1 ri reg2
 
-pprInstr (ZAP reg1 ri reg2) = pprRegRIReg SLIT("zap") reg1 ri reg2
-pprInstr (ZAPNOT reg1 ri reg2) = pprRegRIReg SLIT("zapnot") reg1 ri reg2
+pprInstr (ZAP reg1 ri reg2) = pprRegRIReg (sLit "zap") reg1 ri reg2
+pprInstr (ZAPNOT reg1 ri reg2) = pprRegRIReg (sLit "zapnot") reg1 ri reg2
 
-pprInstr (NOP) = ptext SLIT("\tnop")
+pprInstr (NOP) = ptext (sLit "\tnop")
 
 pprInstr (CMP cond reg1 ri reg2)
   = hcat [
-	ptext SLIT("\tcmp"),
+	ptext (sLit "\tcmp"),
 	pprCond cond,
 	char '\t',
 	pprReg reg1,
@@ -1053,13 +1050,13 @@ pprInstr (CMP cond reg1 ri reg2)
 
 pprInstr (FCLR reg)
   = hcat [
-	ptext SLIT("\tfclr\t"),
+	ptext (sLit "\tfclr\t"),
 	pprReg reg
     ]
 
 pprInstr (FABS reg1 reg2)
   = hcat [
-	ptext SLIT("\tfabs\t"),
+	ptext (sLit "\tfabs\t"),
 	pprReg reg1,
 	comma,
 	pprReg reg2
@@ -1067,7 +1064,7 @@ pprInstr (FABS reg1 reg2)
 
 pprInstr (FNEG size reg1 reg2)
   = hcat [
-	ptext SLIT("\tneg"),
+	ptext (sLit "\tneg"),
 	pprSize size,
 	char '\t',
 	pprReg reg1,
@@ -1075,16 +1072,16 @@ pprInstr (FNEG size reg1 reg2)
 	pprReg reg2
     ]
 
-pprInstr (FADD size reg1 reg2 reg3) = pprSizeRegRegReg SLIT("add") size reg1 reg2 reg3
-pprInstr (FDIV size reg1 reg2 reg3) = pprSizeRegRegReg SLIT("div") size reg1 reg2 reg3
-pprInstr (FMUL size reg1 reg2 reg3) = pprSizeRegRegReg SLIT("mul") size reg1 reg2 reg3
-pprInstr (FSUB size reg1 reg2 reg3) = pprSizeRegRegReg SLIT("sub") size reg1 reg2 reg3
+pprInstr (FADD size reg1 reg2 reg3) = pprSizeRegRegReg (sLit "add") size reg1 reg2 reg3
+pprInstr (FDIV size reg1 reg2 reg3) = pprSizeRegRegReg (sLit "div") size reg1 reg2 reg3
+pprInstr (FMUL size reg1 reg2 reg3) = pprSizeRegRegReg (sLit "mul") size reg1 reg2 reg3
+pprInstr (FSUB size reg1 reg2 reg3) = pprSizeRegRegReg (sLit "sub") size reg1 reg2 reg3
 
 pprInstr (CVTxy size1 size2 reg1 reg2)
   = hcat [
-	ptext SLIT("\tcvt"),
+	ptext (sLit "\tcvt"),
 	pprSize size1,
-	case size2 of {Q -> ptext SLIT("qc"); _ -> pprSize size2},
+	case size2 of {Q -> ptext (sLit "qc"); _ -> pprSize size2},
 	char '\t',
 	pprReg reg1,
 	comma,
@@ -1093,7 +1090,7 @@ pprInstr (CVTxy size1 size2 reg1 reg2)
 
 pprInstr (FCMP size cond reg1 reg2 reg3)
   = hcat [
-	ptext SLIT("\tcmp"),
+	ptext (sLit "\tcmp"),
 	pprSize size,
 	pprCond cond,
 	char '\t',
@@ -1106,7 +1103,7 @@ pprInstr (FCMP size cond reg1 reg2 reg3)
 
 pprInstr (FMOV reg1 reg2)
   = hcat [
-	ptext SLIT("\tfmov\t"),
+	ptext (sLit "\tfmov\t"),
 	pprReg reg1,
 	comma,
 	pprReg reg2
@@ -1118,7 +1115,7 @@ pprInstr (BI NEVER reg lab) = empty
 
 pprInstr (BI cond reg lab)
   = hcat [
-	ptext SLIT("\tb"),
+	ptext (sLit "\tb"),
 	pprCond cond,
 	char '\t',
 	pprReg reg,
@@ -1128,7 +1125,7 @@ pprInstr (BI cond reg lab)
 
 pprInstr (BF cond reg lab)
   = hcat [
-	ptext SLIT("\tfb"),
+	ptext (sLit "\tfb"),
 	pprCond cond,
 	char '\t',
 	pprReg reg,
@@ -1137,11 +1134,11 @@ pprInstr (BF cond reg lab)
     ]
 
 pprInstr (BR lab)
-  = (<>) (ptext SLIT("\tbr\t")) (pprImm lab)
+  = (<>) (ptext (sLit "\tbr\t")) (pprImm lab)
 
 pprInstr (JMP reg addr hint)
   = hcat [
-	ptext SLIT("\tjmp\t"),
+	ptext (sLit "\tjmp\t"),
 	pprReg reg,
 	comma,
 	pprAddr addr,
@@ -1150,11 +1147,11 @@ pprInstr (JMP reg addr hint)
     ]
 
 pprInstr (BSR imm n)
-  = (<>) (ptext SLIT("\tbsr\t")) (pprImm imm)
+  = (<>) (ptext (sLit "\tbsr\t")) (pprImm imm)
 
 pprInstr (JSR reg addr n)
   = hcat [
-	ptext SLIT("\tjsr\t"),
+	ptext (sLit "\tjsr\t"),
 	pprReg reg,
 	comma,
 	pprAddr addr
@@ -1163,10 +1160,10 @@ pprInstr (JSR reg addr n)
 pprInstr (FUNBEGIN clab)
   = hcat [
 	if (externallyVisibleCLabel clab) then
-	    hcat [ptext SLIT("\t.globl\t"), pp_lab, char '\n']
+	    hcat [ptext (sLit "\t.globl\t"), pp_lab, char '\n']
 	else
 	    empty,
-	ptext SLIT("\t.ent "),
+	ptext (sLit "\t.ent "),
 	pp_lab,
 	char '\n',
 	pp_lab,
@@ -1178,14 +1175,14 @@ pprInstr (FUNBEGIN clab)
 	pp_lab = pprCLabel_asm clab
 
         -- NEVER use commas within those string literals, cpp will ruin your day
-	pp_ldgp  = hcat [ ptext SLIT(":\n\tldgp $29"), char ',', ptext SLIT("0($27)\n") ]
-	pp_frame = hcat [ ptext SLIT("..ng:\n\t.frame $30"), char ',',
-                          ptext SLIT("4240"), char ',',
-                          ptext SLIT("$26"), char ',',
-                          ptext SLIT("0\n\t.prologue 1") ]
+	pp_ldgp  = hcat [ ptext (sLit ":\n\tldgp $29"), char ',', ptext (sLit "0($27)\n") ]
+	pp_frame = hcat [ ptext (sLit "..ng:\n\t.frame $30"), char ',',
+                          ptext (sLit "4240"), char ',',
+                          ptext (sLit "$26"), char ',',
+                          ptext (sLit "0\n\t.prologue 1") ]
 
 pprInstr (FUNEND clab)
-  = (<>) (ptext SLIT("\t.align 4\n\t.end ")) (pprCLabel_asm clab)
+  = (<>) (ptext (sLit "\t.align 4\n\t.end ")) (pprCLabel_asm clab)
 \end{code}
 
 Continue with Alpha-only printing bits and bobs:
@@ -1232,59 +1229,59 @@ pprSizeRegRegReg name size reg1 reg2 reg3
 
 pprInstr (SPILL reg slot)
    = hcat [
-   	ptext SLIT("\tSPILL"),
+   	ptext (sLit "\tSPILL"),
 	char ' ',
 	pprUserReg reg,
 	comma,
-	ptext SLIT("SLOT") <> parens (int slot)]
+	ptext (sLit "SLOT") <> parens (int slot)]
 
 pprInstr (RELOAD slot reg)
    = hcat [
-   	ptext SLIT("\tRELOAD"),
+   	ptext (sLit "\tRELOAD"),
 	char ' ',
-	ptext SLIT("SLOT") <> parens (int slot),
+	ptext (sLit "SLOT") <> parens (int slot),
 	comma,
 	pprUserReg reg]
 
 pprInstr (MOV size src dst)
-  = pprSizeOpOp SLIT("mov") size src dst
+  = pprSizeOpOp (sLit "mov") size src dst
 
-pprInstr (MOVZxL I32 src dst) = pprSizeOpOp SLIT("mov") I32 src dst
+pprInstr (MOVZxL I32 src dst) = pprSizeOpOp (sLit "mov") I32 src dst
 	-- 32-to-64 bit zero extension on x86_64 is accomplished by a simple
 	-- movl.  But we represent it as a MOVZxL instruction, because
 	-- the reg alloc would tend to throw away a plain reg-to-reg
 	-- move, and we still want it to do that.
 
-pprInstr (MOVZxL sizes src dst) = pprSizeOpOpCoerce SLIT("movz") sizes I32 src dst
+pprInstr (MOVZxL sizes src dst) = pprSizeOpOpCoerce (sLit "movz") sizes I32 src dst
 	-- zero-extension only needs to extend to 32 bits: on x86_64, 
 	-- the remaining zero-extension to 64 bits is automatic, and the 32-bit
 	-- instruction is shorter.
 
-pprInstr (MOVSxL sizes src dst) = pprSizeOpOpCoerce SLIT("movs") sizes wordRep src dst
+pprInstr (MOVSxL sizes src dst) = pprSizeOpOpCoerce (sLit "movs") sizes wordRep src dst
 
 -- here we do some patching, since the physical registers are only set late
 -- in the code generation.
 pprInstr (LEA size (OpAddr (AddrBaseIndex src1@(EABaseReg reg1) (EAIndex reg2 1) (ImmInt 0))) dst@(OpReg reg3))
   | reg1 == reg3
-  = pprSizeOpOp SLIT("add") size (OpReg reg2) dst
+  = pprSizeOpOp (sLit "add") size (OpReg reg2) dst
 pprInstr (LEA size (OpAddr (AddrBaseIndex src1@(EABaseReg reg1) (EAIndex reg2 1) (ImmInt 0))) dst@(OpReg reg3))
   | reg2 == reg3
-  = pprSizeOpOp SLIT("add") size (OpReg reg1) dst
+  = pprSizeOpOp (sLit "add") size (OpReg reg1) dst
 pprInstr (LEA size (OpAddr (AddrBaseIndex src1@(EABaseReg reg1) EAIndexNone displ)) dst@(OpReg reg3))
   | reg1 == reg3
   = pprInstr (ADD size (OpImm displ) dst)
-pprInstr (LEA size src dst) = pprSizeOpOp SLIT("lea") size src dst
+pprInstr (LEA size src dst) = pprSizeOpOp (sLit "lea") size src dst
 
 pprInstr (ADD size (OpImm (ImmInt (-1))) dst)
-  = pprSizeOp SLIT("dec") size dst
+  = pprSizeOp (sLit "dec") size dst
 pprInstr (ADD size (OpImm (ImmInt 1)) dst)
-  = pprSizeOp SLIT("inc") size dst
+  = pprSizeOp (sLit "inc") size dst
 pprInstr (ADD size src dst)
-  = pprSizeOpOp SLIT("add") size src dst
+  = pprSizeOpOp (sLit "add") size src dst
 pprInstr (ADC size src dst)
-  = pprSizeOpOp SLIT("adc") size src dst
-pprInstr (SUB size src dst) = pprSizeOpOp SLIT("sub") size src dst
-pprInstr (IMUL size op1 op2) = pprSizeOpOp SLIT("imul") size op1 op2
+  = pprSizeOpOp (sLit "adc") size src dst
+pprInstr (SUB size src dst) = pprSizeOpOp (sLit "sub") size src dst
+pprInstr (IMUL size op1 op2) = pprSizeOpOp (sLit "imul") size op1 op2
 
 {- A hack.  The Intel documentation says that "The two and three
    operand forms [of IMUL] may also be used with unsigned operands
@@ -1293,74 +1290,74 @@ pprInstr (IMUL size op1 op2) = pprSizeOpOp SLIT("imul") size op1 op2
    however, cannot be used to determine if the upper half of the
    result is non-zero."  So there.  
 -} 
-pprInstr (AND size src dst) = pprSizeOpOp SLIT("and") size src dst
-pprInstr (OR  size src dst) = pprSizeOpOp SLIT("or")  size src dst
+pprInstr (AND size src dst) = pprSizeOpOp (sLit "and") size src dst
+pprInstr (OR  size src dst) = pprSizeOpOp (sLit "or")  size src dst
 
-pprInstr (XOR F32 src dst)  = pprOpOp SLIT("xorps") F32 src dst
-pprInstr (XOR F64 src dst)  = pprOpOp SLIT("xorpd") F64 src dst
-pprInstr (XOR size src dst) = pprSizeOpOp SLIT("xor")  size src dst
+pprInstr (XOR F32 src dst)  = pprOpOp (sLit "xorps") F32 src dst
+pprInstr (XOR F64 src dst)  = pprOpOp (sLit "xorpd") F64 src dst
+pprInstr (XOR size src dst) = pprSizeOpOp (sLit "xor")  size src dst
 
-pprInstr (NOT size op) = pprSizeOp SLIT("not") size op
-pprInstr (NEGI size op) = pprSizeOp SLIT("neg") size op
+pprInstr (NOT size op) = pprSizeOp (sLit "not") size op
+pprInstr (NEGI size op) = pprSizeOp (sLit "neg") size op
 
-pprInstr (SHL size src dst) = pprShift SLIT("shl") size src dst
-pprInstr (SAR size src dst) = pprShift SLIT("sar") size src dst
-pprInstr (SHR size src dst) = pprShift SLIT("shr") size src dst
+pprInstr (SHL size src dst) = pprShift (sLit "shl") size src dst
+pprInstr (SAR size src dst) = pprShift (sLit "sar") size src dst
+pprInstr (SHR size src dst) = pprShift (sLit "shr") size src dst
 
-pprInstr (BT  size imm src) = pprSizeImmOp SLIT("bt") size imm src
+pprInstr (BT  size imm src) = pprSizeImmOp (sLit "bt") size imm src
 
 pprInstr (CMP size src dst) 
-  | isFloatingRep size =  pprSizeOpOp SLIT("ucomi")  size src dst -- SSE2
-  | otherwise          =  pprSizeOpOp SLIT("cmp")  size src dst
+  | isFloatingRep size =  pprSizeOpOp (sLit "ucomi")  size src dst -- SSE2
+  | otherwise          =  pprSizeOpOp (sLit "cmp")  size src dst
 
-pprInstr (TEST size src dst) = pprSizeOpOp SLIT("test")  size src dst
-pprInstr (PUSH size op) = pprSizeOp SLIT("push") size op
-pprInstr (POP size op) = pprSizeOp SLIT("pop") size op
+pprInstr (TEST size src dst) = pprSizeOpOp (sLit "test")  size src dst
+pprInstr (PUSH size op) = pprSizeOp (sLit "push") size op
+pprInstr (POP size op) = pprSizeOp (sLit "pop") size op
 
 -- both unused (SDM):
--- pprInstr PUSHA = ptext SLIT("\tpushal")
--- pprInstr POPA = ptext SLIT("\tpopal")
+-- pprInstr PUSHA = ptext (sLit "\tpushal")
+-- pprInstr POPA = ptext (sLit "\tpopal")
 
-pprInstr NOP = ptext SLIT("\tnop")
-pprInstr (CLTD I32) = ptext SLIT("\tcltd")
-pprInstr (CLTD I64) = ptext SLIT("\tcqto")
+pprInstr NOP = ptext (sLit "\tnop")
+pprInstr (CLTD I32) = ptext (sLit "\tcltd")
+pprInstr (CLTD I64) = ptext (sLit "\tcqto")
 
-pprInstr (SETCC cond op) = pprCondInstr SLIT("set") cond (pprOperand I8 op)
+pprInstr (SETCC cond op) = pprCondInstr (sLit "set") cond (pprOperand I8 op)
 
 pprInstr (JXX cond (BlockId id)) 
-  = pprCondInstr SLIT("j") cond (pprCLabel_asm lab)
+  = pprCondInstr (sLit "j") cond (pprCLabel_asm lab)
   where lab = mkAsmTempLabel id
 
-pprInstr (JXX_GBL cond imm) = pprCondInstr SLIT("j") cond (pprImm imm)
+pprInstr (JXX_GBL cond imm) = pprCondInstr (sLit "j") cond (pprImm imm)
 
-pprInstr (JMP (OpImm imm)) = (<>) (ptext SLIT("\tjmp ")) (pprImm imm)
-pprInstr (JMP op)          = (<>) (ptext SLIT("\tjmp *")) (pprOperand wordRep op)
+pprInstr (JMP (OpImm imm)) = (<>) (ptext (sLit "\tjmp ")) (pprImm imm)
+pprInstr (JMP op)          = (<>) (ptext (sLit "\tjmp *")) (pprOperand wordRep op)
 pprInstr (JMP_TBL op ids)  = pprInstr (JMP op)
-pprInstr (CALL (Left imm) _)    = (<>) (ptext SLIT("\tcall ")) (pprImm imm)
-pprInstr (CALL (Right reg) _)   = (<>) (ptext SLIT("\tcall *")) (pprReg wordRep reg)
+pprInstr (CALL (Left imm) _)    = (<>) (ptext (sLit "\tcall ")) (pprImm imm)
+pprInstr (CALL (Right reg) _)   = (<>) (ptext (sLit "\tcall *")) (pprReg wordRep reg)
 
-pprInstr (IDIV sz op)	= pprSizeOp SLIT("idiv") sz op
-pprInstr (DIV sz op)    = pprSizeOp SLIT("div")  sz op
-pprInstr (IMUL2 sz op)  = pprSizeOp SLIT("imul") sz op
+pprInstr (IDIV sz op)	= pprSizeOp (sLit "idiv") sz op
+pprInstr (DIV sz op)    = pprSizeOp (sLit "div")  sz op
+pprInstr (IMUL2 sz op)  = pprSizeOp (sLit "imul") sz op
 
 #if x86_64_TARGET_ARCH
-pprInstr (MUL size op1 op2) = pprSizeOpOp SLIT("mul") size op1 op2
+pprInstr (MUL size op1 op2) = pprSizeOpOp (sLit "mul") size op1 op2
 
-pprInstr (FDIV size op1 op2) = pprSizeOpOp SLIT("div") size op1 op2
+pprInstr (FDIV size op1 op2) = pprSizeOpOp (sLit "div") size op1 op2
 
-pprInstr (CVTSS2SD from to)   = pprRegReg SLIT("cvtss2sd") from to
-pprInstr (CVTSD2SS from to)   = pprRegReg SLIT("cvtsd2ss") from to
-pprInstr (CVTTSS2SIQ from to) = pprOpReg  SLIT("cvttss2siq") from to
-pprInstr (CVTTSD2SIQ from to) = pprOpReg  SLIT("cvttsd2siq") from to
-pprInstr (CVTSI2SS from to)   = pprOpReg  SLIT("cvtsi2ssq") from to
-pprInstr (CVTSI2SD from to)   = pprOpReg  SLIT("cvtsi2sdq") from to
+pprInstr (CVTSS2SD from to)   = pprRegReg (sLit "cvtss2sd") from to
+pprInstr (CVTSD2SS from to)   = pprRegReg (sLit "cvtsd2ss") from to
+pprInstr (CVTTSS2SIQ from to) = pprOpReg  (sLit "cvttss2siq") from to
+pprInstr (CVTTSD2SIQ from to) = pprOpReg  (sLit "cvttsd2siq") from to
+pprInstr (CVTSI2SS from to)   = pprOpReg  (sLit "cvtsi2ssq") from to
+pprInstr (CVTSI2SD from to)   = pprOpReg  (sLit "cvtsi2sdq") from to
 #endif
 
     -- FETCHGOT for PIC on ELF platforms
 pprInstr (FETCHGOT reg)
-   = vcat [ ptext SLIT("\tcall 1f"),
-            hcat [ ptext SLIT("1:\tpopl\t"), pprReg I32 reg ],
-            hcat [ ptext SLIT("\taddl\t$_GLOBAL_OFFSET_TABLE_+(.-1b), "),
+   = vcat [ ptext (sLit "\tcall 1f"),
+            hcat [ ptext (sLit "1:\tpopl\t"), pprReg I32 reg ],
+            hcat [ ptext (sLit "\taddl\t$_GLOBAL_OFFSET_TABLE_+(.-1b), "),
                    pprReg I32 reg ]
           ]
 
@@ -1369,8 +1366,8 @@ pprInstr (FETCHGOT reg)
     -- (Terminology note: the IP is called Program Counter on PPC,
     --  and it's a good thing to use the same name on both platforms)
 pprInstr (FETCHPC reg)
-   = vcat [ ptext SLIT("\tcall 1f"),
-            hcat [ ptext SLIT("1:\tpopl\t"), pprReg I32 reg ]
+   = vcat [ ptext (sLit "\tcall 1f"),
+            hcat [ ptext (sLit "1:\tpopl\t"), pprReg I32 reg ]
           ]
 
 
@@ -1582,8 +1579,8 @@ pprInstr g@(GDIV sz src1 src2 dst)
 
 
 pprInstr GFREE 
-   = vcat [ ptext SLIT("\tffree %st(0) ;ffree %st(1) ;ffree %st(2) ;ffree %st(3)"),
-            ptext SLIT("\tffree %st(4) ;ffree %st(5) ;ffree %st(6) ;ffree %st(7)") 
+   = vcat [ ptext (sLit "\tffree %st(0) ;ffree %st(1) ;ffree %st(2) ;ffree %st(3)"),
+            ptext (sLit "\tffree %st(4) ;ffree %st(5) ;ffree %st(6) ;ffree %st(7)") 
           ]
 
 --------------------------
@@ -1610,31 +1607,31 @@ pprG :: Instr -> Doc -> Doc
 pprG fake actual
    = (char '#' <> pprGInstr fake) $$ actual
 
-pprGInstr (GMOV src dst)   = pprSizeRegReg SLIT("gmov") F64 src dst
-pprGInstr (GLD sz src dst) = pprSizeAddrReg SLIT("gld") sz src dst
-pprGInstr (GST sz src dst) = pprSizeRegAddr SLIT("gst") sz src dst
+pprGInstr (GMOV src dst)   = pprSizeRegReg (sLit "gmov") F64 src dst
+pprGInstr (GLD sz src dst) = pprSizeAddrReg (sLit "gld") sz src dst
+pprGInstr (GST sz src dst) = pprSizeRegAddr (sLit "gst") sz src dst
 
-pprGInstr (GLDZ dst) = pprSizeReg SLIT("gldz") F64 dst
-pprGInstr (GLD1 dst) = pprSizeReg SLIT("gld1") F64 dst
+pprGInstr (GLDZ dst) = pprSizeReg (sLit "gldz") F64 dst
+pprGInstr (GLD1 dst) = pprSizeReg (sLit "gld1") F64 dst
 
-pprGInstr (GFTOI src dst) = pprSizeSizeRegReg SLIT("gftoi") F32 I32  src dst
-pprGInstr (GDTOI src dst) = pprSizeSizeRegReg SLIT("gdtoi") F64 I32 src dst
+pprGInstr (GFTOI src dst) = pprSizeSizeRegReg (sLit "gftoi") F32 I32  src dst
+pprGInstr (GDTOI src dst) = pprSizeSizeRegReg (sLit "gdtoi") F64 I32 src dst
 
-pprGInstr (GITOF src dst) = pprSizeSizeRegReg SLIT("gitof") I32 F32  src dst
-pprGInstr (GITOD src dst) = pprSizeSizeRegReg SLIT("gitod") I32 F64 src dst
+pprGInstr (GITOF src dst) = pprSizeSizeRegReg (sLit "gitof") I32 F32  src dst
+pprGInstr (GITOD src dst) = pprSizeSizeRegReg (sLit "gitod") I32 F64 src dst
 
-pprGInstr (GCMP co src dst) = pprCondRegReg SLIT("gcmp_") F64 co src dst
-pprGInstr (GABS sz src dst) = pprSizeRegReg SLIT("gabs") sz src dst
-pprGInstr (GNEG sz src dst) = pprSizeRegReg SLIT("gneg") sz src dst
-pprGInstr (GSQRT sz src dst) = pprSizeRegReg SLIT("gsqrt") sz src dst
-pprGInstr (GSIN sz src dst) = pprSizeRegReg SLIT("gsin") sz src dst
-pprGInstr (GCOS sz src dst) = pprSizeRegReg SLIT("gcos") sz src dst
-pprGInstr (GTAN sz src dst) = pprSizeRegReg SLIT("gtan") sz src dst
+pprGInstr (GCMP co src dst) = pprCondRegReg (sLit "gcmp_") F64 co src dst
+pprGInstr (GABS sz src dst) = pprSizeRegReg (sLit "gabs") sz src dst
+pprGInstr (GNEG sz src dst) = pprSizeRegReg (sLit "gneg") sz src dst
+pprGInstr (GSQRT sz src dst) = pprSizeRegReg (sLit "gsqrt") sz src dst
+pprGInstr (GSIN sz src dst) = pprSizeRegReg (sLit "gsin") sz src dst
+pprGInstr (GCOS sz src dst) = pprSizeRegReg (sLit "gcos") sz src dst
+pprGInstr (GTAN sz src dst) = pprSizeRegReg (sLit "gtan") sz src dst
 
-pprGInstr (GADD sz src1 src2 dst) = pprSizeRegRegReg SLIT("gadd") sz src1 src2 dst
-pprGInstr (GSUB sz src1 src2 dst) = pprSizeRegRegReg SLIT("gsub") sz src1 src2 dst
-pprGInstr (GMUL sz src1 src2 dst) = pprSizeRegRegReg SLIT("gmul") sz src1 src2 dst
-pprGInstr (GDIV sz src1 src2 dst) = pprSizeRegRegReg SLIT("gdiv") sz src1 src2 dst
+pprGInstr (GADD sz src1 src2 dst) = pprSizeRegRegReg (sLit "gadd") sz src1 src2 dst
+pprGInstr (GSUB sz src1 src2 dst) = pprSizeRegRegReg (sLit "gsub") sz src1 src2 dst
+pprGInstr (GMUL sz src1 src2 dst) = pprSizeRegRegReg (sLit "gmul") sz src1 src2 dst
+pprGInstr (GDIV sz src1 src2 dst) = pprSizeRegRegReg (sLit "gdiv") sz src1 src2 dst
 #endif
 
 #if i386_TARGET_ARCH || x86_64_TARGET_ARCH
@@ -1643,7 +1640,7 @@ pprGInstr (GDIV sz src1 src2 dst) = pprSizeRegRegReg SLIT("gdiv") sz src1 src2 d
 
 pprDollImm :: Imm -> Doc
 
-pprDollImm i =  ptext SLIT("$") <> pprImm i
+pprDollImm i =  ptext (sLit "$") <> pprImm i
 
 pprOperand :: MachRep -> Operand -> Doc
 pprOperand s (OpReg r)   = pprReg s r
@@ -1818,17 +1815,17 @@ pprCondInstr name cond arg
 
 pprInstr (SPILL reg slot)
    = hcat [
-   	ptext SLIT("\tSPILL"),
+   	ptext (sLit "\tSPILL"),
 	char '\t',
 	pprReg reg,
 	comma,
-	ptext SLIT("SLOT") <> parens (int slot)]
+	ptext (sLit "SLOT") <> parens (int slot)]
 
 pprInstr (RELOAD slot reg)
    = hcat [
-   	ptext SLIT("\tRELOAD"),
+   	ptext (sLit "\tRELOAD"),
 	char '\t',
-	ptext SLIT("SLOT") <> parens (int slot),
+	ptext (sLit "SLOT") <> parens (int slot),
 	comma,
 	pprReg reg]
 
@@ -1840,10 +1837,10 @@ pprInstr (RELOAD slot reg)
 
 pprInstr (LD F64 (AddrRegReg g1 g2) reg)
   = vcat [
-       hcat [ptext SLIT("\tadd\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1],
+       hcat [ptext (sLit "\tadd\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1],
        hcat [pp_ld_lbracket, pprReg g1, pp_rbracket_comma, pprReg reg],
-       hcat [pp_ld_lbracket, pprReg g1, ptext SLIT("+4]"), comma, pprReg (fPair reg)],
-       hcat [ptext SLIT("\tsub\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1]
+       hcat [pp_ld_lbracket, pprReg g1, ptext (sLit "+4]"), comma, pprReg (fPair reg)],
+       hcat [ptext (sLit "\tsub\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1]
     ]
 
 -- Translate to
@@ -1861,7 +1858,7 @@ pprInstr (LD F64 addr reg) | isJust off_addr
 
 pprInstr (LD size addr reg)
   = hcat [
-       ptext SLIT("\tld"),
+       ptext (sLit "\tld"),
        pprSize size,
        char '\t',
        lbrack,
@@ -1879,12 +1876,12 @@ pprInstr (LD size addr reg)
 --    sub g1,g2,g1           -- to restore g1
 pprInstr (ST F64 reg (AddrRegReg g1 g2))
  = vcat [
-       hcat [ptext SLIT("\tadd\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1],
-       hcat [ptext SLIT("\tst\t"), pprReg reg, pp_comma_lbracket, 
+       hcat [ptext (sLit "\tadd\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1],
+       hcat [ptext (sLit "\tst\t"), pprReg reg, pp_comma_lbracket, 
              pprReg g1,	rbrack],
-       hcat [ptext SLIT("\tst\t"), pprReg (fPair reg), pp_comma_lbracket,
-             pprReg g1, ptext SLIT("+4]")],
-       hcat [ptext SLIT("\tsub\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1]
+       hcat [ptext (sLit "\tst\t"), pprReg (fPair reg), pp_comma_lbracket,
+             pprReg g1, ptext (sLit "+4]")],
+       hcat [ptext (sLit "\tsub\t"), pprReg g1,comma,pprReg g2,comma,pprReg g1]
     ]
 
 -- Translate to
@@ -1892,9 +1889,9 @@ pprInstr (ST F64 reg (AddrRegReg g1 g2))
 --    st  %f(n+1),[addr+4]
 pprInstr (ST F64 reg addr) | isJust off_addr 
  = vcat [
-      hcat [ptext SLIT("\tst\t"), pprReg reg, pp_comma_lbracket, 
+      hcat [ptext (sLit "\tst\t"), pprReg reg, pp_comma_lbracket, 
             pprAddr addr, rbrack],
-      hcat [ptext SLIT("\tst\t"), pprReg (fPair reg), pp_comma_lbracket,
+      hcat [ptext (sLit "\tst\t"), pprReg (fPair reg), pp_comma_lbracket,
             pprAddr addr2, rbrack]
     ]
   where
@@ -1907,7 +1904,7 @@ pprInstr (ST F64 reg addr) | isJust off_addr
 
 pprInstr (ST size reg addr)
   = hcat [
-       ptext SLIT("\tst"),
+       ptext (sLit "\tst"),
        pprStSize size,
        char '\t',
        pprReg reg,
@@ -1918,106 +1915,106 @@ pprInstr (ST size reg addr)
 
 pprInstr (ADD x cc reg1 ri reg2)
   | not x && not cc && riZero ri
-  = hcat [ ptext SLIT("\tmov\t"), pprReg reg1, comma, pprReg reg2 ]
+  = hcat [ ptext (sLit "\tmov\t"), pprReg reg1, comma, pprReg reg2 ]
   | otherwise
-  = pprRegRIReg (if x then SLIT("addx") else SLIT("add")) cc reg1 ri reg2
+  = pprRegRIReg (if x then sLit "addx" else sLit "add") cc reg1 ri reg2
 
 pprInstr (SUB x cc reg1 ri reg2)
   | not x && cc && reg2 == g0
-  = hcat [ ptext SLIT("\tcmp\t"), pprReg reg1, comma, pprRI ri ]
+  = hcat [ ptext (sLit "\tcmp\t"), pprReg reg1, comma, pprRI ri ]
   | not x && not cc && riZero ri
-  = hcat [ ptext SLIT("\tmov\t"), pprReg reg1, comma, pprReg reg2 ]
+  = hcat [ ptext (sLit "\tmov\t"), pprReg reg1, comma, pprReg reg2 ]
   | otherwise
-  = pprRegRIReg (if x then SLIT("subx") else SLIT("sub")) cc reg1 ri reg2
+  = pprRegRIReg (if x then sLit "subx" else sLit "sub") cc reg1 ri reg2
 
-pprInstr (AND  b reg1 ri reg2) = pprRegRIReg SLIT("and")  b reg1 ri reg2
-pprInstr (ANDN b reg1 ri reg2) = pprRegRIReg SLIT("andn") b reg1 ri reg2
+pprInstr (AND  b reg1 ri reg2) = pprRegRIReg (sLit "and")  b reg1 ri reg2
+pprInstr (ANDN b reg1 ri reg2) = pprRegRIReg (sLit "andn") b reg1 ri reg2
 
 pprInstr (OR b reg1 ri reg2)
   | not b && reg1 == g0
-  = let doit = hcat [ ptext SLIT("\tmov\t"), pprRI ri, comma, pprReg reg2 ]
+  = let doit = hcat [ ptext (sLit "\tmov\t"), pprRI ri, comma, pprReg reg2 ]
     in  case ri of
            RIReg rrr | rrr == reg2 -> empty
            other                   -> doit
   | otherwise
-  = pprRegRIReg SLIT("or") b reg1 ri reg2
+  = pprRegRIReg (sLit "or") b reg1 ri reg2
 
-pprInstr (ORN b reg1 ri reg2) = pprRegRIReg SLIT("orn") b reg1 ri reg2
+pprInstr (ORN b reg1 ri reg2) = pprRegRIReg (sLit "orn") b reg1 ri reg2
 
-pprInstr (XOR  b reg1 ri reg2) = pprRegRIReg SLIT("xor")  b reg1 ri reg2
-pprInstr (XNOR b reg1 ri reg2) = pprRegRIReg SLIT("xnor") b reg1 ri reg2
+pprInstr (XOR  b reg1 ri reg2) = pprRegRIReg (sLit "xor")  b reg1 ri reg2
+pprInstr (XNOR b reg1 ri reg2) = pprRegRIReg (sLit "xnor") b reg1 ri reg2
 
-pprInstr (SLL reg1 ri reg2) = pprRegRIReg SLIT("sll") False reg1 ri reg2
-pprInstr (SRL reg1 ri reg2) = pprRegRIReg SLIT("srl") False reg1 ri reg2
-pprInstr (SRA reg1 ri reg2) = pprRegRIReg SLIT("sra") False reg1 ri reg2
+pprInstr (SLL reg1 ri reg2) = pprRegRIReg (sLit "sll") False reg1 ri reg2
+pprInstr (SRL reg1 ri reg2) = pprRegRIReg (sLit "srl") False reg1 ri reg2
+pprInstr (SRA reg1 ri reg2) = pprRegRIReg (sLit "sra") False reg1 ri reg2
 
-pprInstr (RDY rd) = ptext SLIT("\trd\t%y,") <> pprReg rd
-pprInstr (SMUL b reg1 ri reg2) = pprRegRIReg SLIT("smul")  b reg1 ri reg2
-pprInstr (UMUL b reg1 ri reg2) = pprRegRIReg SLIT("umul")  b reg1 ri reg2
+pprInstr (RDY rd) = ptext (sLit "\trd\t%y,") <> pprReg rd
+pprInstr (SMUL b reg1 ri reg2) = pprRegRIReg (sLit "smul")  b reg1 ri reg2
+pprInstr (UMUL b reg1 ri reg2) = pprRegRIReg (sLit "umul")  b reg1 ri reg2
 
 pprInstr (SETHI imm reg)
   = hcat [
-	ptext SLIT("\tsethi\t"),
+	ptext (sLit "\tsethi\t"),
 	pprImm imm,
 	comma,
 	pprReg reg
     ]
 
-pprInstr NOP = ptext SLIT("\tnop")
+pprInstr NOP = ptext (sLit "\tnop")
 
-pprInstr (FABS F32 reg1 reg2) = pprSizeRegReg SLIT("fabs") F32 reg1 reg2
+pprInstr (FABS F32 reg1 reg2) = pprSizeRegReg (sLit "fabs") F32 reg1 reg2
 pprInstr (FABS F64 reg1 reg2)
-  = (<>) (pprSizeRegReg SLIT("fabs") F32 reg1 reg2)
+  = (<>) (pprSizeRegReg (sLit "fabs") F32 reg1 reg2)
     (if (reg1 == reg2) then empty
      else (<>) (char '\n')
-    	  (pprSizeRegReg SLIT("fmov") F32 (fPair reg1) (fPair reg2)))
+    	  (pprSizeRegReg (sLit "fmov") F32 (fPair reg1) (fPair reg2)))
 
 pprInstr (FADD size reg1 reg2 reg3)
-  = pprSizeRegRegReg SLIT("fadd") size reg1 reg2 reg3
+  = pprSizeRegRegReg (sLit "fadd") size reg1 reg2 reg3
 pprInstr (FCMP e size reg1 reg2)
-  = pprSizeRegReg (if e then SLIT("fcmpe") else SLIT("fcmp")) size reg1 reg2
+  = pprSizeRegReg (if e then sLit "fcmpe" else sLit "fcmp") size reg1 reg2
 pprInstr (FDIV size reg1 reg2 reg3)
-  = pprSizeRegRegReg SLIT("fdiv") size reg1 reg2 reg3
+  = pprSizeRegRegReg (sLit "fdiv") size reg1 reg2 reg3
 
-pprInstr (FMOV F32 reg1 reg2) = pprSizeRegReg SLIT("fmov") F32 reg1 reg2
+pprInstr (FMOV F32 reg1 reg2) = pprSizeRegReg (sLit "fmov") F32 reg1 reg2
 pprInstr (FMOV F64 reg1 reg2)
-  = (<>) (pprSizeRegReg SLIT("fmov") F32 reg1 reg2)
+  = (<>) (pprSizeRegReg (sLit "fmov") F32 reg1 reg2)
     (if (reg1 == reg2) then empty
      else (<>) (char '\n')
-    	  (pprSizeRegReg SLIT("fmov") F32 (fPair reg1) (fPair reg2)))
+    	  (pprSizeRegReg (sLit "fmov") F32 (fPair reg1) (fPair reg2)))
 
 pprInstr (FMUL size reg1 reg2 reg3)
-  = pprSizeRegRegReg SLIT("fmul") size reg1 reg2 reg3
+  = pprSizeRegRegReg (sLit "fmul") size reg1 reg2 reg3
 
-pprInstr (FNEG F32 reg1 reg2) = pprSizeRegReg SLIT("fneg") F32 reg1 reg2
+pprInstr (FNEG F32 reg1 reg2) = pprSizeRegReg (sLit "fneg") F32 reg1 reg2
 pprInstr (FNEG F64 reg1 reg2)
-  = (<>) (pprSizeRegReg SLIT("fneg") F32 reg1 reg2)
+  = (<>) (pprSizeRegReg (sLit "fneg") F32 reg1 reg2)
     (if (reg1 == reg2) then empty
      else (<>) (char '\n')
-    	  (pprSizeRegReg SLIT("fmov") F32 (fPair reg1) (fPair reg2)))
+    	  (pprSizeRegReg (sLit "fmov") F32 (fPair reg1) (fPair reg2)))
 
-pprInstr (FSQRT size reg1 reg2)     = pprSizeRegReg SLIT("fsqrt") size reg1 reg2
-pprInstr (FSUB size reg1 reg2 reg3) = pprSizeRegRegReg SLIT("fsub") size reg1 reg2 reg3
+pprInstr (FSQRT size reg1 reg2)     = pprSizeRegReg (sLit "fsqrt") size reg1 reg2
+pprInstr (FSUB size reg1 reg2 reg3) = pprSizeRegRegReg (sLit "fsub") size reg1 reg2 reg3
 pprInstr (FxTOy size1 size2 reg1 reg2)
   = hcat [
-    	ptext SLIT("\tf"),
+    	ptext (sLit "\tf"),
 	ptext
     	(case size1 of
-    	    I32  -> SLIT("ito")
-    	    F32  -> SLIT("sto")
-    	    F64  -> SLIT("dto")),
+    	    I32  -> sLit "ito"
+    	    F32  -> sLit "sto"
+    	    F64  -> sLit "dto"),
 	ptext
     	(case size2 of
-    	    I32  -> SLIT("i\t")
-    	    F32  -> SLIT("s\t")
-    	    F64  -> SLIT("d\t")),
+    	    I32  -> sLit "i\t"
+    	    F32  -> sLit "s\t"
+    	    F64  -> sLit "d\t"),
 	pprReg reg1, comma, pprReg reg2
     ]
 
 
 pprInstr (BI cond b lab)
   = hcat [
-	ptext SLIT("\tb"), pprCond cond,
+	ptext (sLit "\tb"), pprCond cond,
 	if b then pp_comma_a else empty,
 	char '\t',
 	pprImm lab
@@ -2025,18 +2022,18 @@ pprInstr (BI cond b lab)
 
 pprInstr (BF cond b lab)
   = hcat [
-	ptext SLIT("\tfb"), pprCond cond,
+	ptext (sLit "\tfb"), pprCond cond,
 	if b then pp_comma_a else empty,
 	char '\t',
 	pprImm lab
     ]
 
-pprInstr (JMP addr) = (<>) (ptext SLIT("\tjmp\t")) (pprAddr addr)
+pprInstr (JMP addr) = (<>) (ptext (sLit "\tjmp\t")) (pprAddr addr)
 
 pprInstr (CALL (Left imm) n _)
-  = hcat [ ptext SLIT("\tcall\t"), pprImm imm, comma, int n ]
+  = hcat [ ptext (sLit "\tcall\t"), pprImm imm, comma, int n ]
 pprInstr (CALL (Right reg) n _)
-  = hcat [ ptext SLIT("\tcall\t"), pprReg reg, comma, int n ]
+  = hcat [ ptext (sLit "\tcall\t"), pprReg reg, comma, int n ]
 
 pprRI :: RI -> Doc
 pprRI (RIReg r) = pprReg r
@@ -2048,8 +2045,8 @@ pprSizeRegReg name size reg1 reg2
     	char '\t',
 	ptext name,
     	(case size of
-    	    F32  -> ptext SLIT("s\t")
-    	    F64 -> ptext SLIT("d\t")),
+    	    F32  -> ptext (sLit "s\t")
+    	    F64 -> ptext (sLit "d\t")),
 	pprReg reg1,
 	comma,
 	pprReg reg2
@@ -2061,8 +2058,8 @@ pprSizeRegRegReg name size reg1 reg2 reg3
     	char '\t',
 	ptext name,
     	(case size of
-    	    F32  -> ptext SLIT("s\t")
-    	    F64  -> ptext SLIT("d\t")),
+    	    F32  -> ptext (sLit "s\t")
+    	    F64  -> ptext (sLit "d\t")),
 	pprReg reg1,
 	comma,
 	pprReg reg2,
@@ -2075,7 +2072,7 @@ pprRegRIReg name b reg1 ri reg2
   = hcat [
 	char '\t',
 	ptext name,
-	if b then ptext SLIT("cc\t") else char '\t',
+	if b then ptext (sLit "cc\t") else char '\t',
 	pprReg reg1,
 	comma,
 	pprRI ri,
@@ -2088,13 +2085,13 @@ pprRIReg name b ri reg1
   = hcat [
 	char '\t',
 	ptext name,
-	if b then ptext SLIT("cc\t") else char '\t',
+	if b then ptext (sLit "cc\t") else char '\t',
 	pprRI ri,
 	comma,
 	pprReg reg1
     ]
 
-pp_ld_lbracket    = ptext SLIT("\tld\t[")
+pp_ld_lbracket    = ptext (sLit "\tld\t[")
 pp_rbracket_comma = text "],"
 pp_comma_lbracket = text ",["
 pp_comma_a	  = text ",a"
@@ -2109,88 +2106,88 @@ pp_comma_a	  = text ",a"
 
 pprInstr (SPILL reg slot)
    = hcat [
-   	ptext SLIT("\tSPILL"),
+   	ptext (sLit "\tSPILL"),
 	char '\t',
 	pprReg reg,
 	comma,
-	ptext SLIT("SLOT") <> parens (int slot)]
+	ptext (sLit "SLOT") <> parens (int slot)]
 
 pprInstr (RELOAD slot reg)
    = hcat [
-   	ptext SLIT("\tRELOAD"),
+   	ptext (sLit "\tRELOAD"),
 	char '\t',
-	ptext SLIT("SLOT") <> parens (int slot),
+	ptext (sLit "SLOT") <> parens (int slot),
 	comma,
 	pprReg reg]
 
 pprInstr (LD sz reg addr) = hcat [
 	char '\t',
-	ptext SLIT("l"),
+	ptext (sLit "l"),
 	ptext (case sz of
-	    I8  -> SLIT("bz")
-	    I16 -> SLIT("hz")
-	    I32 -> SLIT("wz")
-	    F32 -> SLIT("fs")
-	    F64 -> SLIT("fd")),
+	    I8  -> sLit "bz"
+	    I16 -> sLit "hz"
+	    I32 -> sLit "wz"
+	    F32 -> sLit "fs"
+	    F64 -> sLit "fd"),
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
 	char '\t',
 	pprReg reg,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprAddr addr
     ]
 pprInstr (LA sz reg addr) = hcat [
 	char '\t',
-	ptext SLIT("l"),
+	ptext (sLit "l"),
 	ptext (case sz of
-	    I8  -> SLIT("ba")
-	    I16 -> SLIT("ha")
-	    I32 -> SLIT("wa")
-	    F32 -> SLIT("fs")
-	    F64 -> SLIT("fd")),
+	    I8  -> sLit "ba"
+	    I16 -> sLit "ha"
+	    I32 -> sLit "wa"
+	    F32 -> sLit "fs"
+	    F64 -> sLit "fd"),
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
 	char '\t',
 	pprReg reg,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprAddr addr
     ]
 pprInstr (ST sz reg addr) = hcat [
 	char '\t',
-	ptext SLIT("st"),
+	ptext (sLit "st"),
 	pprSize sz,
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
 	char '\t',
 	pprReg reg,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprAddr addr
     ]
 pprInstr (STU sz reg addr) = hcat [
 	char '\t',
-	ptext SLIT("st"),
+	ptext (sLit "st"),
 	pprSize sz,
-	ptext SLIT("u\t"),
+	ptext (sLit "u\t"),
         case addr of AddrRegImm _ _ -> empty
                      AddrRegReg _ _ -> char 'x',
 	pprReg reg,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprAddr addr
     ]
 pprInstr (LIS reg imm) = hcat [
 	char '\t',
-	ptext SLIT("lis"),
+	ptext (sLit "lis"),
 	char '\t',
 	pprReg reg,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprImm imm
     ]
 pprInstr (LI reg imm) = hcat [
 	char '\t',
-	ptext SLIT("li"),
+	ptext (sLit "li"),
 	char '\t',
 	pprReg reg,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprImm imm
     ]
 pprInstr (MR reg1 reg2) 
@@ -2198,11 +2195,11 @@ pprInstr (MR reg1 reg2)
     | otherwise = hcat [
 	char '\t',
 	case regClass reg1 of
-	    RcInteger -> ptext SLIT("mr")
-	    _ -> ptext SLIT("fmr"),
+	    RcInteger -> ptext (sLit "mr")
+	    _ -> ptext (sLit "fmr"),
 	char '\t',
 	pprReg reg1,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprReg reg2
     ]
 pprInstr (CMP sz reg ri) = hcat [
@@ -2210,12 +2207,12 @@ pprInstr (CMP sz reg ri) = hcat [
 	op,
 	char '\t',
 	pprReg reg,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprRI ri
     ]
     where
 	op = hcat [
-		ptext SLIT("cmp"),
+		ptext (sLit "cmp"),
 		pprSize sz,
 		case ri of
 		    RIReg _ -> empty
@@ -2226,12 +2223,12 @@ pprInstr (CMPL sz reg ri) = hcat [
 	op,
 	char '\t',
 	pprReg reg,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprRI ri
     ]
     where
 	op = hcat [
-		ptext SLIT("cmpl"),
+		ptext (sLit "cmpl"),
 		pprSize sz,
 		case ri of
 		    RIReg _ -> empty
@@ -2239,7 +2236,7 @@ pprInstr (CMPL sz reg ri) = hcat [
 	    ]
 pprInstr (BCC cond (BlockId id)) = hcat [
 	char '\t',
-	ptext SLIT("b"),
+	ptext (sLit "b"),
 	pprCond cond,
 	char '\t',
 	pprCLabel_asm lbl
@@ -2248,12 +2245,12 @@ pprInstr (BCC cond (BlockId id)) = hcat [
 
 pprInstr (BCCFAR cond (BlockId id)) = vcat [
         hcat [
-            ptext SLIT("\tb"),
+            ptext (sLit "\tb"),
             pprCond (condNegate cond),
-            ptext SLIT("\t$+8")
+            ptext (sLit "\t$+8")
         ],
         hcat [
-            ptext SLIT("\tb\t"),
+            ptext (sLit "\tb\t"),
             pprCLabel_asm lbl
         ]
     ]
@@ -2261,165 +2258,165 @@ pprInstr (BCCFAR cond (BlockId id)) = vcat [
 
 pprInstr (JMP lbl) = hcat [ -- an alias for b that takes a CLabel
 	char '\t',
-	ptext SLIT("b"),
+	ptext (sLit "b"),
 	char '\t',
 	pprCLabel_asm lbl
     ]
 
 pprInstr (MTCTR reg) = hcat [
 	char '\t',
-	ptext SLIT("mtctr"),
+	ptext (sLit "mtctr"),
 	char '\t',
 	pprReg reg
     ]
 pprInstr (BCTR _) = hcat [
 	char '\t',
-	ptext SLIT("bctr")
+	ptext (sLit "bctr")
     ]
 pprInstr (BL lbl _) = hcat [
-	ptext SLIT("\tbl\t"),
+	ptext (sLit "\tbl\t"),
         pprCLabel_asm lbl
     ]
 pprInstr (BCTRL _) = hcat [
 	char '\t',
-	ptext SLIT("bctrl")
+	ptext (sLit "bctrl")
     ]
-pprInstr (ADD reg1 reg2 ri) = pprLogic SLIT("add") reg1 reg2 ri
+pprInstr (ADD reg1 reg2 ri) = pprLogic (sLit "add") reg1 reg2 ri
 pprInstr (ADDIS reg1 reg2 imm) = hcat [
 	char '\t',
-	ptext SLIT("addis"),
+	ptext (sLit "addis"),
 	char '\t',
 	pprReg reg1,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprReg reg2,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprImm imm
     ]
 
-pprInstr (ADDC reg1 reg2 reg3) = pprLogic SLIT("addc") reg1 reg2 (RIReg reg3)
-pprInstr (ADDE reg1 reg2 reg3) = pprLogic SLIT("adde") reg1 reg2 (RIReg reg3)
-pprInstr (SUBF reg1 reg2 reg3) = pprLogic SLIT("subf") reg1 reg2 (RIReg reg3)
-pprInstr (MULLW reg1 reg2 ri@(RIReg _)) = pprLogic SLIT("mullw") reg1 reg2 ri
-pprInstr (MULLW reg1 reg2 ri@(RIImm _)) = pprLogic SLIT("mull") reg1 reg2 ri
-pprInstr (DIVW reg1 reg2 reg3) = pprLogic SLIT("divw") reg1 reg2 (RIReg reg3)
-pprInstr (DIVWU reg1 reg2 reg3) = pprLogic SLIT("divwu") reg1 reg2 (RIReg reg3)
+pprInstr (ADDC reg1 reg2 reg3) = pprLogic (sLit "addc") reg1 reg2 (RIReg reg3)
+pprInstr (ADDE reg1 reg2 reg3) = pprLogic (sLit "adde") reg1 reg2 (RIReg reg3)
+pprInstr (SUBF reg1 reg2 reg3) = pprLogic (sLit "subf") reg1 reg2 (RIReg reg3)
+pprInstr (MULLW reg1 reg2 ri@(RIReg _)) = pprLogic (sLit "mullw") reg1 reg2 ri
+pprInstr (MULLW reg1 reg2 ri@(RIImm _)) = pprLogic (sLit "mull") reg1 reg2 ri
+pprInstr (DIVW reg1 reg2 reg3) = pprLogic (sLit "divw") reg1 reg2 (RIReg reg3)
+pprInstr (DIVWU reg1 reg2 reg3) = pprLogic (sLit "divwu") reg1 reg2 (RIReg reg3)
 
 pprInstr (MULLW_MayOflo reg1 reg2 reg3) = vcat [
-         hcat [ ptext SLIT("\tmullwo\t"), pprReg reg1, ptext SLIT(", "),
-                                          pprReg reg2, ptext SLIT(", "),
+         hcat [ ptext (sLit "\tmullwo\t"), pprReg reg1, ptext (sLit ", "),
+                                          pprReg reg2, ptext (sLit ", "),
                                           pprReg reg3 ],
-         hcat [ ptext SLIT("\tmfxer\t"),  pprReg reg1 ],
-         hcat [ ptext SLIT("\trlwinm\t"), pprReg reg1, ptext SLIT(", "),
-                                          pprReg reg1, ptext SLIT(", "),
-                                          ptext SLIT("2, 31, 31") ]
+         hcat [ ptext (sLit "\tmfxer\t"),  pprReg reg1 ],
+         hcat [ ptext (sLit "\trlwinm\t"), pprReg reg1, ptext (sLit ", "),
+                                          pprReg reg1, ptext (sLit ", "),
+                                          ptext (sLit "2, 31, 31") ]
     ]
 
     	-- for some reason, "andi" doesn't exist.
 	-- we'll use "andi." instead.
 pprInstr (AND reg1 reg2 (RIImm imm)) = hcat [
 	char '\t',
-	ptext SLIT("andi."),
+	ptext (sLit "andi."),
 	char '\t',
 	pprReg reg1,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprReg reg2,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprImm imm
     ]
-pprInstr (AND reg1 reg2 ri) = pprLogic SLIT("and") reg1 reg2 ri
+pprInstr (AND reg1 reg2 ri) = pprLogic (sLit "and") reg1 reg2 ri
 
-pprInstr (OR reg1 reg2 ri) = pprLogic SLIT("or") reg1 reg2 ri
-pprInstr (XOR reg1 reg2 ri) = pprLogic SLIT("xor") reg1 reg2 ri
+pprInstr (OR reg1 reg2 ri) = pprLogic (sLit "or") reg1 reg2 ri
+pprInstr (XOR reg1 reg2 ri) = pprLogic (sLit "xor") reg1 reg2 ri
 
 pprInstr (XORIS reg1 reg2 imm) = hcat [
 	char '\t',
-	ptext SLIT("xoris"),
+	ptext (sLit "xoris"),
 	char '\t',
 	pprReg reg1,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprReg reg2,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprImm imm
     ]
 
 pprInstr (EXTS sz reg1 reg2) = hcat [
 	char '\t',
-	ptext SLIT("exts"),
+	ptext (sLit "exts"),
 	pprSize sz,
 	char '\t',
 	pprReg reg1,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprReg reg2
     ]
 
-pprInstr (NEG reg1 reg2) = pprUnary SLIT("neg") reg1 reg2
-pprInstr (NOT reg1 reg2) = pprUnary SLIT("not") reg1 reg2
+pprInstr (NEG reg1 reg2) = pprUnary (sLit "neg") reg1 reg2
+pprInstr (NOT reg1 reg2) = pprUnary (sLit "not") reg1 reg2
 
-pprInstr (SLW reg1 reg2 ri) = pprLogic SLIT("slw") reg1 reg2 (limitShiftRI ri)
-pprInstr (SRW reg1 reg2 ri) = pprLogic SLIT("srw") reg1 reg2 (limitShiftRI ri)
-pprInstr (SRAW reg1 reg2 ri) = pprLogic SLIT("sraw") reg1 reg2 (limitShiftRI ri)
+pprInstr (SLW reg1 reg2 ri) = pprLogic (sLit "slw") reg1 reg2 (limitShiftRI ri)
+pprInstr (SRW reg1 reg2 ri) = pprLogic (sLit "srw") reg1 reg2 (limitShiftRI ri)
+pprInstr (SRAW reg1 reg2 ri) = pprLogic (sLit "sraw") reg1 reg2 (limitShiftRI ri)
 pprInstr (RLWINM reg1 reg2 sh mb me) = hcat [
-        ptext SLIT("\trlwinm\t"),
+        ptext (sLit "\trlwinm\t"),
         pprReg reg1,
-        ptext SLIT(", "),
+        ptext (sLit ", "),
         pprReg reg2,
-        ptext SLIT(", "),
+        ptext (sLit ", "),
         int sh,
-        ptext SLIT(", "),
+        ptext (sLit ", "),
         int mb,
-        ptext SLIT(", "),
+        ptext (sLit ", "),
         int me
     ]
     
-pprInstr (FADD sz reg1 reg2 reg3) = pprBinaryF SLIT("fadd") sz reg1 reg2 reg3
-pprInstr (FSUB sz reg1 reg2 reg3) = pprBinaryF SLIT("fsub") sz reg1 reg2 reg3
-pprInstr (FMUL sz reg1 reg2 reg3) = pprBinaryF SLIT("fmul") sz reg1 reg2 reg3
-pprInstr (FDIV sz reg1 reg2 reg3) = pprBinaryF SLIT("fdiv") sz reg1 reg2 reg3
-pprInstr (FNEG reg1 reg2) = pprUnary SLIT("fneg") reg1 reg2
+pprInstr (FADD sz reg1 reg2 reg3) = pprBinaryF (sLit "fadd") sz reg1 reg2 reg3
+pprInstr (FSUB sz reg1 reg2 reg3) = pprBinaryF (sLit "fsub") sz reg1 reg2 reg3
+pprInstr (FMUL sz reg1 reg2 reg3) = pprBinaryF (sLit "fmul") sz reg1 reg2 reg3
+pprInstr (FDIV sz reg1 reg2 reg3) = pprBinaryF (sLit "fdiv") sz reg1 reg2 reg3
+pprInstr (FNEG reg1 reg2) = pprUnary (sLit "fneg") reg1 reg2
 
 pprInstr (FCMP reg1 reg2) = hcat [
 	char '\t',
-	ptext SLIT("fcmpu\tcr0, "),
+	ptext (sLit "fcmpu\tcr0, "),
 	    -- Note: we're using fcmpu, not fcmpo
 	    -- The difference is with fcmpo, compare with NaN is an invalid operation.
 	    -- We don't handle invalid fp ops, so we don't care
 	pprReg reg1,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprReg reg2
     ]
 
-pprInstr (FCTIWZ reg1 reg2) = pprUnary SLIT("fctiwz") reg1 reg2
-pprInstr (FRSP reg1 reg2) = pprUnary SLIT("frsp") reg1 reg2
+pprInstr (FCTIWZ reg1 reg2) = pprUnary (sLit "fctiwz") reg1 reg2
+pprInstr (FRSP reg1 reg2) = pprUnary (sLit "frsp") reg1 reg2
 
 pprInstr (CRNOR dst src1 src2) = hcat [
-        ptext SLIT("\tcrnor\t"),
+        ptext (sLit "\tcrnor\t"),
         int dst,
-        ptext SLIT(", "),
+        ptext (sLit ", "),
         int src1,
-        ptext SLIT(", "),
+        ptext (sLit ", "),
         int src2
     ]
 
 pprInstr (MFCR reg) = hcat [
 	char '\t',
-	ptext SLIT("mfcr"),
+	ptext (sLit "mfcr"),
 	char '\t',
 	pprReg reg
     ]
 
 pprInstr (MFLR reg) = hcat [
 	char '\t',
-	ptext SLIT("mflr"),
+	ptext (sLit "mflr"),
 	char '\t',
 	pprReg reg
     ]
 
 pprInstr (FETCHPC reg) = vcat [
-        ptext SLIT("\tbcl\t20,31,1f"),
-        hcat [ ptext SLIT("1:\tmflr\t"), pprReg reg ]
+        ptext (sLit "\tbcl\t20,31,1f"),
+        hcat [ ptext (sLit "1:\tmflr\t"), pprReg reg ]
     ]
 
-pprInstr LWSYNC = ptext SLIT("\tlwsync")
+pprInstr LWSYNC = ptext (sLit "\tlwsync")
 
 pprInstr _ = panic "pprInstr (ppc)"
 
@@ -2431,9 +2428,9 @@ pprLogic op reg1 reg2 ri = hcat [
 	    RIImm _ -> char 'i',
 	char '\t',
 	pprReg reg1,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprReg reg2,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprRI ri
     ]
     
@@ -2442,7 +2439,7 @@ pprUnary op reg1 reg2 = hcat [
 	ptext op,
 	char '\t',
 	pprReg reg1,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprReg reg2
     ]
     
@@ -2452,9 +2449,9 @@ pprBinaryF op sz reg1 reg2 reg3 = hcat [
 	pprFSize sz,
 	char '\t',
 	pprReg reg1,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprReg reg2,
-	ptext SLIT(", "),
+	ptext (sLit ", "),
 	pprReg reg3
     ]
     
