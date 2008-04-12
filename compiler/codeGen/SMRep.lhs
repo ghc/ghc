@@ -43,7 +43,6 @@ module SMRep (
 	rET_SMALL, rET_BIG
     ) where
 
-#include "HsVersions.h"
 #include "../includes/MachDeps.h"
 
 import Id
@@ -130,12 +129,12 @@ data CgRep
   deriving Eq
 
 instance Outputable CgRep where
-    ppr VoidArg   = ptext SLIT("V_")
-    ppr PtrArg    = ptext SLIT("P_")
-    ppr NonPtrArg = ptext SLIT("I_")
-    ppr LongArg   = ptext SLIT("L_")
-    ppr FloatArg  = ptext SLIT("F_")
-    ppr DoubleArg = ptext SLIT("D_")
+    ppr VoidArg   = ptext (sLit "V_")
+    ppr PtrArg    = ptext (sLit "P_")
+    ppr NonPtrArg = ptext (sLit "I_")
+    ppr LongArg   = ptext (sLit "L_")
+    ppr FloatArg  = ptext (sLit "F_")
+    ppr DoubleArg = ptext (sLit "D_")
 
 argMachRep :: CgRep -> MachRep
 argMachRep PtrArg    = wordRep
