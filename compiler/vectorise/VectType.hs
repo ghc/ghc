@@ -11,8 +11,6 @@ module VectType ( vectTyCon, vectType, vectTypeEnv,
                   fromVect )
 where
 
-#include "HsVersions.h"
-
 import VectMonad
 import VectUtils
 import VectCore
@@ -372,7 +370,7 @@ sumShapeTys = do
 
 
 arrShapeVars :: Repr -> VM [Var]
-arrShapeVars repr = mapM (newLocalVar FSLIT("sh")) =<< arrShapeTys repr
+arrShapeVars repr = mapM (newLocalVar (fsLit "sh")) =<< arrShapeTys repr
 
 replicateShape :: Repr -> CoreExpr -> CoreExpr -> VM [CoreExpr]
 replicateShape (ProdRepr {}) len _   = return [len]
@@ -427,7 +425,7 @@ arrReprTys' repr = liftM singleton $ arrReprTys repr
 
 arrReprVars :: Repr -> VM [[Var]]
 arrReprVars repr
-  = mapM (mapM (newLocalVar FSLIT("rs"))) =<< arrReprTys' repr
+  = mapM (mapM (newLocalVar (fsLit "rs"))) =<< arrReprTys' repr
 
 mkRepr :: TyCon -> VM Repr
 mkRepr vect_tc
@@ -443,7 +441,7 @@ buildPReprType = liftM reprType . mkRepr
 buildToPRepr :: Repr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildToPRepr repr vect_tc prepr_tc _
   = do
-      arg    <- newLocalVar FSLIT("x") arg_ty
+      arg    <- newLocalVar (fsLit "x") arg_ty
       result <- to_repr repr (Var arg)
 
       return . Lam arg
@@ -485,12 +483,12 @@ buildToPRepr repr vect_tc prepr_tc _
     to_unboxed (ProdRepr { prod_components = tys
                          , prod_data_con   = data_con })
       = do
-          vars <- mapM (newLocalVar FSLIT("r")) tys
+          vars <- mapM (newLocalVar (fsLit "r")) tys
           return (vars, mkConApp data_con (map Type tys ++ map Var vars))
 
     to_unboxed (IdRepr ty)
       = do
-          var <- newLocalVar FSLIT("y") ty
+          var <- newLocalVar (fsLit "y") ty
           return ([var], Var var)
 
     to_unboxed (VoidRepr { void_bottom = bottom })
@@ -501,7 +499,7 @@ buildFromPRepr :: Repr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildFromPRepr repr vect_tc prepr_tc _
   = do
       arg_ty <- mkPReprType res_ty
-      arg    <- newLocalVar FSLIT("x") arg_ty
+      arg    <- newLocalVar (fsLit "x") arg_ty
 
       liftM (Lam arg)
            . from_repr repr
@@ -517,7 +515,7 @@ buildFromPRepr repr vect_tc prepr_tc _
                             , sum_tycon      = tycon })
               expr
       = do
-          vars   <- mapM (newLocalVar FSLIT("x")) (map reprType prods)
+          vars   <- mapM (newLocalVar (fsLit "x")) (map reprType prods)
           bodies <- sequence . zipWith3 from_unboxed prods cons
                              $ map Var vars
           return . Case expr (mkWildId (reprType repr)) res_ty
@@ -527,7 +525,7 @@ buildFromPRepr repr vect_tc prepr_tc _
 
     from_repr repr@(EnumRepr { enum_data_con = data_con }) expr
       = do
-          var <- newLocalVar FSLIT("n") intPrimTy
+          var <- newLocalVar (fsLit "n") intPrimTy
 
           let res = Case (Var var) (mkWildId intPrimTy) res_ty
                   $ (DEFAULT, [], error_expr)
@@ -549,7 +547,7 @@ buildFromPRepr repr vect_tc prepr_tc _
               con
               expr
       = do
-          vars <- mapM (newLocalVar FSLIT("y")) tys
+          vars <- mapM (newLocalVar (fsLit "y")) tys
           return $ Case expr (mkWildId (reprType prod)) res_ty
                    [(DataAlt data_con, vars, con `mkVarApps` vars)]
 
@@ -563,7 +561,7 @@ buildToArrPRepr :: Repr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildToArrPRepr repr vect_tc prepr_tc arr_tc
   = do
       arg_ty     <- mkPArrayType el_ty
-      arg        <- newLocalVar FSLIT("xs") arg_ty
+      arg        <- newLocalVar (fsLit "xs") arg_ty
 
       res_ty     <- mkPArrayType (reprType repr)
 
@@ -640,7 +638,7 @@ buildFromArrPRepr :: Repr -> TyCon -> TyCon -> TyCon -> VM CoreExpr
 buildFromArrPRepr repr vect_tc prepr_tc arr_tc
   = do
       arg_ty     <- mkPArrayType =<< mkPReprType el_ty
-      arg        <- newLocalVar FSLIT("xs") arg_ty
+      arg        <- newLocalVar (fsLit "xs") arg_ty
 
       res_ty     <- mkPArrayType el_ty
 
@@ -676,7 +674,7 @@ buildFromArrPRepr repr vect_tc prepr_tc arr_tc
               res_ty
               body
       = do
-          vars <- mapM (newLocalVar FSLIT("xs")) =<< mapM arrReprType prods
+          vars <- mapM (newLocalVar (fsLit "xs")) =<< mapM arrReprType prods
           result <- go prods repr_vars vars body
 
           let scrut = unwrapFamInstScrut tycon ty_args expr
@@ -689,7 +687,7 @@ buildFromArrPRepr repr vect_tc prepr_tc arr_tc
         go [] [] [] body = return body
         go (prod : prods) (repr_vars : rss) (var : vars) body
           = do
-              shape_vars <- mapM (newLocalVar FSLIT("s")) =<< arrShapeTys prod
+              shape_vars <- mapM (newLocalVar (fsLit "s")) =<< arrShapeTys prod
 
               from_prod prod (Var var) shape_vars repr_vars res_ty
                 =<< go prods rss vars body
@@ -882,7 +880,7 @@ vectDataConWorkers repr orig_tc vect_tc arr_tc
     lift_data_con tys pre_reprs post_reprs tag
       = do
           len  <- builtin liftingContext
-          args <- mapM (newLocalVar FSLIT("xs"))
+          args <- mapM (newLocalVar (fsLit "xs"))
                   =<< mapM mkPArrayType tys
 
           shape <- replicateShape repr (Var len) tag
@@ -939,11 +937,11 @@ buildPADict repr vect_tc prepr_tc arr_tc dfun
           var  <- newLocalVar name (exprType body)
           return (var, mkInlineMe body)
 
-paMethods = [(FSLIT("toPRepr"),      buildToPRepr),
-             (FSLIT("fromPRepr"),    buildFromPRepr),
-             (FSLIT("toArrPRepr"),   buildToArrPRepr),
-             (FSLIT("fromArrPRepr"), buildFromArrPRepr),
-             (FSLIT("dictPRepr"),    buildPRDict)]
+paMethods = [(fsLit "toPRepr",      buildToPRepr),
+             (fsLit "fromPRepr",    buildFromPRepr),
+             (fsLit "toArrPRepr",   buildToArrPRepr),
+             (fsLit "fromArrPRepr", buildFromArrPRepr),
+             (fsLit "dictPRepr",    buildPRDict)]
 
 -- | Split the given tycons into two sets depending on whether they have to be
 -- converted (first list) or not (second list). The first argument contains
@@ -1017,7 +1015,7 @@ fromVect :: Type -> CoreExpr -> VM CoreExpr
 fromVect ty expr | Just ty' <- coreView ty = fromVect ty' expr
 fromVect (FunTy arg_ty res_ty) expr
   = do
-      arg     <- newLocalVar FSLIT("x") arg_ty
+      arg     <- newLocalVar (fsLit "x") arg_ty
       varg    <- toVect arg_ty (Var arg)
       varg_ty <- vectType arg_ty
       vres_ty <- vectType res_ty
