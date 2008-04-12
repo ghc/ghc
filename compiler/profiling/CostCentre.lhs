@@ -36,8 +36,6 @@ module CostCentre (
 	cmpCostCentre	-- used for removing dups in a list
     ) where
 
-#include "HsVersions.h"
-
 import Var		( Id )
 import Name
 import Module		( Module )
@@ -333,15 +331,15 @@ non-constant C expression.
 
 \begin{code}
 instance Outputable CostCentreStack where
-  ppr NoCCS		= ptext SLIT("NO_CCS")
-  ppr CurrentCCS	= ptext SLIT("CCCS")
-  ppr OverheadCCS	= ptext SLIT("CCS_OVERHEAD")
-  ppr DontCareCCS	= ptext SLIT("CCS_DONT_CARE")
-  ppr SubsumedCCS	= ptext SLIT("CCS_SUBSUMED")
-  ppr (PushCC cc NoCCS) = ppr cc <> ptext SLIT("_ccs")
-  ppr (PushCC cc ccs)   = ptext SLIT("PushCostCentre") <> 
+  ppr NoCCS		= ptext (sLit "NO_CCS")
+  ppr CurrentCCS	= ptext (sLit "CCCS")
+  ppr OverheadCCS	= ptext (sLit "CCS_OVERHEAD")
+  ppr DontCareCCS	= ptext (sLit "CCS_DONT_CARE")
+  ppr SubsumedCCS	= ptext (sLit "CCS_SUBSUMED")
+  ppr (PushCC cc NoCCS) = ppr cc <> ptext (sLit "_ccs")
+  ppr (PushCC cc ccs)   = ptext (sLit "PushCostCentre") <> 
 			   parens (ppr ccs <> comma <> 
-			   parens(ptext SLIT("void *")) <> ppr cc)
+			   parens(ptext (sLit "void *")) <> ppr cc)
 \end{code}
 
 -----------------------------------------------------------------------------
