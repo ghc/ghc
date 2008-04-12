@@ -20,16 +20,8 @@
 -----------------------------------------------------------------------------
 -- bugs
 
-* parenthises are sometimes dropped in data declarations, e.g.
-    data Improving a = IV a (a -> Ordering)
-  becomes
-    data Improving a = IV a a -> Ordering
-
 * parser doesn't support doc comments on types in type aliases:
     type MyInt = Int -- ^ comment
-
-* Haddock generates links to hidden modules (e.g. uses of IO point at 
-  GHC.IOBase.IO).
 
 * HsParser bug: starting the module with '-- | doc' followed by a declaration
   doesn't parse, because the '-- | doc' is interpreted as the module
