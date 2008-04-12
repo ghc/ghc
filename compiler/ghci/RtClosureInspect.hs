@@ -377,7 +377,7 @@ ppr_termM1 Prim{value=words, ty=ty} =
     return$ text$ repPrim (tyConAppTyCon ty) words
 ppr_termM1 Suspension{bound_to=Nothing} = return$ char '_'
 ppr_termM1 Suspension{ty=ty, bound_to=Just n}
-  | Just _ <- splitFunTy_maybe ty = return$ ptext SLIT("<function>")
+  | Just _ <- splitFunTy_maybe ty = return$ ptext (sLit "<function>")
   | otherwise = return$ parens$ ppr n <> text "::" <> ppr ty
 ppr_termM1 Term{}        = panic "ppr_termM1 - Term"
 ppr_termM1 RefWrap{}     = panic "ppr_termM1 - RefWrap"
@@ -670,11 +670,11 @@ cvObtainTerm hsc_env bound force mb_ty hval = runTR hsc_env $ do
   reOrderTerms _ _ [] = []
   reOrderTerms pointed unpointed (ty:tys) 
    | isPointed ty = ASSERT2(not(null pointed)
-                            , ptext SLIT("reOrderTerms") $$ 
+                            , ptext (sLit "reOrderTerms") $$ 
                                         (ppr pointed $$ ppr unpointed))
                     let (t:tt) = pointed in t : reOrderTerms tt unpointed tys
    | otherwise    = ASSERT2(not(null unpointed)
-                           , ptext SLIT("reOrderTerms") $$ 
+                           , ptext (sLit "reOrderTerms") $$ 
                                        (ppr pointed $$ ppr unpointed))
                     let (t:tt) = unpointed in t : reOrderTerms pointed tt tys
   
