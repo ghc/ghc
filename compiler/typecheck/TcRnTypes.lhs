@@ -479,15 +479,15 @@ instance Outputable TcTyThing where	-- Debugging only
 
 pprTcTyThingCategory :: TcTyThing -> SDoc
 pprTcTyThingCategory (AGlobal thing) = pprTyThingCategory thing
-pprTcTyThingCategory (ATyVar {})     = ptext SLIT("Type variable")
-pprTcTyThingCategory (ATcId {})      = ptext SLIT("Local identifier")
-pprTcTyThingCategory (AThing {})     = ptext SLIT("Kinded thing")
+pprTcTyThingCategory (ATyVar {})     = ptext (sLit "Type variable")
+pprTcTyThingCategory (ATcId {})      = ptext (sLit "Local identifier")
+pprTcTyThingCategory (AThing {})     = ptext (sLit "Kinded thing")
 
 instance Outputable RefinementVisibility where
-    ppr Unrefineable	      = ptext SLIT("unrefineable")
-    ppr (Rigid co)	      = ptext SLIT("rigid") <+> ppr co
-    ppr	Wobbly		      = ptext SLIT("wobbly")
-    ppr WobblyInvisible	      = ptext SLIT("wobbly-invisible")
+    ppr Unrefineable	      = ptext (sLit "unrefineable")
+    ppr (Rigid co)	      = ptext (sLit "rigid") <+> ppr co
+    ppr	Wobbly		      = ptext (sLit "wobbly")
+    ppr WobblyInvisible	      = ptext (sLit "wobbly-invisible")
 
 \end{code}
 
@@ -611,9 +611,9 @@ data WhereFrom
   | ImportBySystem			-- Non user import.
 
 instance Outputable WhereFrom where
-  ppr (ImportByUser is_boot) | is_boot     = ptext SLIT("{- SOURCE -}")
+  ppr (ImportByUser is_boot) | is_boot     = ptext (sLit "{- SOURCE -}")
 			     | otherwise   = empty
-  ppr ImportBySystem     		   = ptext SLIT("{- SYSTEM -}")
+  ppr ImportBySystem     		   = ptext (sLit "{- SYSTEM -}")
 \end{code}
 
 
@@ -842,7 +842,7 @@ instLocOrigin :: InstLoc -> InstOrigin
 instLocOrigin (InstLoc o _ _) = o
 
 pprInstArising :: Inst -> SDoc
-pprInstArising loc = ptext SLIT("arising from") <+> pprInstLoc (tci_loc loc)
+pprInstArising loc = ptext (sLit "arising from") <+> pprInstLoc (tci_loc loc)
 
 pprInstLoc :: InstLoc -> SDoc
 pprInstLoc (InstLoc orig span _) = sep [ppr orig, text "at" <+> ppr span]
@@ -886,25 +886,25 @@ data InstOrigin
   | EqOrigin		-- A type equality
 
 instance Outputable InstOrigin where
-    ppr (OccurrenceOf name)   = hsep [ptext SLIT("a use of"), quotes (ppr name)]
-    ppr (SpecPragOrigin name) = hsep [ptext SLIT("a specialisation pragma for"), quotes (ppr name)]
-    ppr (IPOccOrigin name)    = hsep [ptext SLIT("a use of implicit parameter"), quotes (ppr name)]
-    ppr (IPBindOrigin name)   = hsep [ptext SLIT("a binding for implicit parameter"), quotes (ppr name)]
-    ppr RecordUpdOrigin       = ptext SLIT("a record update")
-    ppr ExprSigOrigin         = ptext SLIT("an expression type signature")
-    ppr ViewPatOrigin         = ptext SLIT("a view pattern")
-    ppr (LiteralOrigin lit)   = hsep [ptext SLIT("the literal"), quotes (ppr lit)]
-    ppr (ArithSeqOrigin seq)  = hsep [ptext SLIT("the arithmetic sequence"), quotes (ppr seq)]
-    ppr (PArrSeqOrigin seq)   = hsep [ptext SLIT("the parallel array sequence"), quotes (ppr seq)]
-    ppr TupleOrigin	      = ptext SLIT("a tuple")
-    ppr NegateOrigin	      = ptext SLIT("a use of syntactic negation")
-    ppr InstScOrigin	      = ptext SLIT("the superclasses of an instance declaration")
-    ppr DerivOrigin	      = ptext SLIT("the 'deriving' clause of a data type declaration")
-    ppr StandAloneDerivOrigin = ptext SLIT("a 'deriving' declaration")
-    ppr DefaultOrigin	      = ptext SLIT("a 'default' declaration")
-    ppr DoOrigin	      = ptext SLIT("a do statement")
-    ppr ProcOrigin	      = ptext SLIT("a proc expression")
+    ppr (OccurrenceOf name)   = hsep [ptext (sLit "a use of"), quotes (ppr name)]
+    ppr (SpecPragOrigin name) = hsep [ptext (sLit "a specialisation pragma for"), quotes (ppr name)]
+    ppr (IPOccOrigin name)    = hsep [ptext (sLit "a use of implicit parameter"), quotes (ppr name)]
+    ppr (IPBindOrigin name)   = hsep [ptext (sLit "a binding for implicit parameter"), quotes (ppr name)]
+    ppr RecordUpdOrigin       = ptext (sLit "a record update")
+    ppr ExprSigOrigin         = ptext (sLit "an expression type signature")
+    ppr ViewPatOrigin         = ptext (sLit "a view pattern")
+    ppr (LiteralOrigin lit)   = hsep [ptext (sLit "the literal"), quotes (ppr lit)]
+    ppr (ArithSeqOrigin seq)  = hsep [ptext (sLit "the arithmetic sequence"), quotes (ppr seq)]
+    ppr (PArrSeqOrigin seq)   = hsep [ptext (sLit "the parallel array sequence"), quotes (ppr seq)]
+    ppr TupleOrigin	      = ptext (sLit "a tuple")
+    ppr NegateOrigin	      = ptext (sLit "a use of syntactic negation")
+    ppr InstScOrigin	      = ptext (sLit "the superclasses of an instance declaration")
+    ppr DerivOrigin	      = ptext (sLit "the 'deriving' clause of a data type declaration")
+    ppr StandAloneDerivOrigin = ptext (sLit "a 'deriving' declaration")
+    ppr DefaultOrigin	      = ptext (sLit "a 'default' declaration")
+    ppr DoOrigin	      = ptext (sLit "a do statement")
+    ppr ProcOrigin	      = ptext (sLit "a proc expression")
     ppr (ImplicOrigin doc)    = doc
     ppr (SigOrigin info)      = pprSkolInfo info
-    ppr EqOrigin	      = ptext SLIT("a type equality")
+    ppr EqOrigin	      = ptext (sLit "a type equality")
 \end{code}
