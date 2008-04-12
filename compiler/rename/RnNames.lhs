@@ -123,7 +123,7 @@ mkPrelImports this_mod implicit_prelude import_decls
 	       Nothing	{- No "as" -}
 	       Nothing	{- No import list -}
 
-      loc = mkGeneralSrcSpan FSLIT("Implicit import declaration")         
+      loc = mkGeneralSrcSpan (fsLit "Implicit import declaration")         
 
 
 rnImportDecl  :: Module
@@ -139,7 +139,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
 	-- file not found) we get lots of spurious errors from 'filterImports'
     let
 	imp_mod_name = unLoc loc_imp_mod_name
-	doc = ppr imp_mod_name <+> ptext SLIT("is directly imported")
+	doc = ppr imp_mod_name <+> ptext (sLit "is directly imported")
 
     iface <- loadSrcInterface doc imp_mod_name want_boot
 
@@ -258,7 +258,7 @@ rnImportDecl this_mod (L loc (ImportDecl loc_imp_mod_name want_boot
     )
 
 warnRedundantSourceImport mod_name
-  = ptext SLIT("Unnecessary {-# SOURCE #-} in the import of module")
+  = ptext (sLit "Unnecessary {-# SOURCE #-} in the import of module")
           <+> quotes (ppr mod_name)
 \end{code}
 
@@ -1001,7 +1001,7 @@ finishDeprecations dflags mod_deprec tcg_env
       | name `elemNameSet` used_names
       ,	Just deprec_txt <- lookupImpDeprec dflags hpt pit gre
       = addWarnAt (importSpecLoc imp_spec)
-		  (sep [ptext SLIT("Deprecated use of") <+> 
+		  (sep [ptext (sLit "Deprecated use of") <+> 
 			pprNonVarNameSpace (occNameSpace (nameOccName name)) <+> 
 		 	quotes (ppr name),
 		      (parens imp_msg) <> colon,
@@ -1009,9 +1009,9 @@ finishDeprecations dflags mod_deprec tcg_env
 	where
 	  name_mod = nameModule name
 	  imp_mod  = importSpecModule imp_spec
-	  imp_msg  = ptext SLIT("imported from") <+> ppr imp_mod <> extra
+	  imp_msg  = ptext (sLit "imported from") <+> ppr imp_mod <> extra
 	  extra | imp_mod == moduleName name_mod = empty
-		| otherwise = ptext SLIT(", but defined in") <+> ppr name_mod
+		| otherwise = ptext (sLit ", but defined in") <+> ppr name_mod
 
     check hpt pit ok_gre = return ()	-- Local, or not used, or not deprectated
 	    -- The Imported pattern-match: don't deprecate locally defined names
@@ -1237,8 +1237,8 @@ warnDuplicateImports gres
   where
     warn name (red_imp, cov_imp)
 	= addWarnAt (importSpecLoc red_imp)
-	    (vcat [ptext SLIT("Redundant import of:") <+> quotes pp_name,
-	           ptext SLIT("It is also") <+> ppr cov_imp])
+	    (vcat [ptext (sLit "Redundant import of:") <+> quotes pp_name,
+	           ptext (sLit "It is also") <+> ppr cov_imp])
 	where
 	  pp_name | is_qual red_decl = ppr (is_as red_decl) <> dot <> ppr occ
 		  | otherwise	    = ppr occ
@@ -1313,9 +1313,9 @@ printMinimalImports imps
 	| mod_name == moduleName pRELUDE
 	= empty
 	| null ies	-- Nothing except instances comes from here
-	= ptext SLIT("import") <+> ppr mod_name <> ptext SLIT("()    -- Instances only")
+	= ptext (sLit "import") <+> ppr mod_name <> ptext (sLit "()    -- Instances only")
 	| otherwise
-	= ptext SLIT("import") <+> ppr mod_name <> 
+	= ptext (sLit "import") <+> ppr mod_name <> 
 		    parens (fsep (punctuate comma (map ppr ies)))
 
     to_ies (mod, avail_env) = do ies <- mapM to_ie (availEnvElts avail_env)
@@ -1353,39 +1353,39 @@ printMinimalImports imps
 
 \begin{code}
 badImportItemErr iface decl_spec ie
-  = sep [ptext SLIT("Module"), quotes (ppr (is_mod decl_spec)), source_import,
-	 ptext SLIT("does not export"), quotes (ppr ie)]
+  = sep [ptext (sLit "Module"), quotes (ppr (is_mod decl_spec)), source_import,
+	 ptext (sLit "does not export"), quotes (ppr ie)]
   where
-    source_import | mi_boot iface = ptext SLIT("(hi-boot interface)")
+    source_import | mi_boot iface = ptext (sLit "(hi-boot interface)")
 		  | otherwise     = empty
 
-illegalImportItemErr = ptext SLIT("Illegal import item")
+illegalImportItemErr = ptext (sLit "Illegal import item")
 
-dodgyImportWarn item = dodgyMsg (ptext SLIT("import")) item
-dodgyExportWarn item = dodgyMsg (ptext SLIT("export")) item
+dodgyImportWarn item = dodgyMsg (ptext (sLit "import")) item
+dodgyExportWarn item = dodgyMsg (ptext (sLit "export")) item
 
 dodgyMsg kind tc
-  = sep [ ptext SLIT("The") <+> kind <+> ptext SLIT("item") <+> quotes (ppr (IEThingAll tc)),
-	  ptext SLIT("suggests that") <+> quotes (ppr tc) <+> ptext SLIT("has constructors or class methods,"),
-	  ptext SLIT("but it has none") ]
+  = sep [ ptext (sLit "The") <+> kind <+> ptext (sLit "item") <+> quotes (ppr (IEThingAll tc)),
+	  ptext (sLit "suggests that") <+> quotes (ppr tc) <+> ptext (sLit "has constructors or class methods,"),
+	  ptext (sLit "but it has none") ]
 	  
 exportItemErr export_item
-  = sep [ ptext SLIT("The export item") <+> quotes (ppr export_item),
-	  ptext SLIT("attempts to export constructors or class methods that are not visible here") ]
+  = sep [ ptext (sLit "The export item") <+> quotes (ppr export_item),
+	  ptext (sLit "attempts to export constructors or class methods that are not visible here") ]
 
 typeItemErr name wherestr
-  = sep [ ptext SLIT("Using 'type' tag on") <+> quotes (ppr name) <+> wherestr,
-	  ptext SLIT("Use -XTypeFamilies to enable this extension") ]
+  = sep [ ptext (sLit "Using 'type' tag on") <+> quotes (ppr name) <+> wherestr,
+	  ptext (sLit "Use -XTypeFamilies to enable this extension") ]
 
 exportClashErr :: GlobalRdrEnv -> Name -> Name -> IE RdrName -> IE RdrName
                -> Message
 exportClashErr global_env name1 name2 ie1 ie2
-  = vcat [ ptext SLIT("Conflicting exports for") <+> quotes (ppr occ) <> colon
+  = vcat [ ptext (sLit "Conflicting exports for") <+> quotes (ppr occ) <> colon
 	 , ppr_export ie1' name1'
 	 , ppr_export ie2' name2' ]
   where
     occ = nameOccName name1
-    ppr_export ie name = nest 2 (quotes (ppr ie) <+> ptext SLIT("exports") <+> 
+    ppr_export ie name = nest 2 (quotes (ppr ie) <+> ptext (sLit "exports") <+> 
 			 	 quotes (ppr name) <+> pprNameProvenance (get_gre name))
 
 	-- get_gre finds a GRE for the Name, so that we can show its provenance
@@ -1401,8 +1401,8 @@ exportClashErr global_env name1 name2 ie1 ie2
 addDupDeclErr :: Name -> Name -> TcRn ()
 addDupDeclErr name_a name_b
   = addErrAt (srcLocSpan loc2) $
-    vcat [ptext SLIT("Multiple declarations of") <+> quotes (ppr name1),
-	  ptext SLIT("Declared at:") <+> vcat [ppr (nameSrcLoc name1), ppr loc2]]
+    vcat [ptext (sLit "Multiple declarations of") <+> quotes (ppr name1),
+	  ptext (sLit "Declared at:") <+> vcat [ppr (nameSrcLoc name1), ppr loc2]]
   where
     loc2 = nameSrcLoc name2
     (name1,name2) | nameSrcLoc name_a > nameSrcLoc name_b = (name_b,name_a)
@@ -1411,26 +1411,26 @@ addDupDeclErr name_a name_b
 
 dupExportWarn occ_name ie1 ie2
   = hsep [quotes (ppr occ_name), 
-          ptext SLIT("is exported by"), quotes (ppr ie1),
-          ptext SLIT("and"),            quotes (ppr ie2)]
+          ptext (sLit "is exported by"), quotes (ppr ie1),
+          ptext (sLit "and"),            quotes (ppr ie2)]
 
 dupModuleExport mod
-  = hsep [ptext SLIT("Duplicate"),
-	  quotes (ptext SLIT("Module") <+> ppr mod), 
-          ptext SLIT("in export list")]
+  = hsep [ptext (sLit "Duplicate"),
+	  quotes (ptext (sLit "Module") <+> ppr mod), 
+          ptext (sLit "in export list")]
 
 moduleNotImported :: ModuleName -> SDoc
 moduleNotImported mod
-  = ptext SLIT("The export item `module") <+> ppr mod <>
-    ptext SLIT("' is not imported")
+  = ptext (sLit "The export item `module") <+> ppr mod <>
+    ptext (sLit "' is not imported")
 
 nullModuleExport mod
-  = ptext SLIT("The export item `module") <+> ppr mod <> ptext SLIT("' exports nothing")
+  = ptext (sLit "The export item `module") <+> ppr mod <> ptext (sLit "' exports nothing")
 
 moduleDeprec mod txt
-  = sep [ ptext SLIT("Module") <+> quotes (ppr mod) <+> ptext SLIT("is deprecated:"), 
+  = sep [ ptext (sLit "Module") <+> quotes (ppr mod) <+> ptext (sLit "is deprecated:"), 
 	  nest 4 (ppr txt) ]	  
 
 implicitPreludeWarn
-  = ptext SLIT("Module `Prelude' implicitly imported")
+  = ptext (sLit "Module `Prelude' implicitly imported")
 \end{code}
