@@ -12,8 +12,6 @@ module FamInst (
         checkFamInstConsistency, tcExtendLocalFamInstEnv
     ) where
 
-#include "HsVersions.h"
-
 import HscTypes
 import FamInstEnv
 import TcMType
@@ -212,7 +210,7 @@ checkForConflicts inst_envs famInst
 
 conflictInstErr famInst conflictingFamInst
   = addFamInstLoc famInst $
-    addErr (hang (ptext SLIT("Conflicting family instance declarations:"))
+    addErr (hang (ptext (sLit "Conflicting family instance declarations:"))
 	       2 (pprFamInsts [famInst, conflictingFamInst]))
 
 addFamInstLoc famInst thing_inside
