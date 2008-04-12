@@ -44,8 +44,6 @@ module StgSyn (
 #endif
     ) where
 
-#include "HsVersions.h"
-
 import CostCentre	( CostCentreStack, CostCentre )
 import VarSet		( IdSet, isEmptyVarSet )
 import Var		( isId )
@@ -464,7 +462,7 @@ combineStgBinderInfo _            _            = NoStgBinderInfo
 --------------
 pp_binder_info :: StgBinderInfo -> SDoc
 pp_binder_info NoStgBinderInfo = empty
-pp_binder_info SatCallsOnly    = ptext SLIT("sat-only")
+pp_binder_info SatCallsOnly    = ptext (sLit "sat-only")
 \end{code}
 
 %************************************************************************
@@ -591,7 +589,7 @@ nonEmptySRT (SRTEntries vs) = not (isEmptyVarSet vs)
 nonEmptySRT _               = True
 
 pprSRT :: SRT -> SDoc
-pprSRT (NoSRT)          = ptext SLIT("_no_srt_")
+pprSRT (NoSRT)          = ptext (sLit "_no_srt_")
 pprSRT (SRTEntries ids) = text "SRT:" <> ppr ids
 pprSRT (SRT off _ _)    = parens (ppr off <> comma <> text "*bitmap*")
 \end{code}
@@ -614,8 +612,8 @@ pprGenStgBinding (StgNonRec bndr rhs)
     	4 ((<>) (ppr rhs) semi)
 
 pprGenStgBinding (StgRec pairs)
-  = vcat ((ifPprDebug (ptext SLIT("{- StgRec (begin) -}"))) :
-	   (map (ppr_bind) pairs) ++ [(ifPprDebug (ptext SLIT("{- StgRec (end) -}")))])
+  = vcat ((ifPprDebug (ptext (sLit "{- StgRec (begin) -}"))) :
+	   (map (ppr_bind) pairs) ++ [(ifPprDebug (ptext (sLit "{- StgRec (end) -}")))])
   where
     ppr_bind (bndr, expr)
       = hang (hsep [ppr bndr, equals])
@@ -634,7 +632,7 @@ pprGenStgBindingWithSRT
 pprGenStgBindingWithSRT (bind,srts)
   = vcat (pprGenStgBinding bind : map pprSRT srts)
   where pprSRT (id,srt) = 
-	   ptext SLIT("SRT") <> parens (ppr id) <> ptext SLIT(": ") <> ppr srt
+	   ptext (sLit "SRT") <> parens (ppr id) <> ptext (sLit ": ") <> ppr srt
 
 pprStgBindingsWithSRTs :: [(StgBinding,[(Id,[Id])])] -> SDoc
 pprStgBindingsWithSRTs binds = vcat (map pprGenStgBindingWithSRT binds)
@@ -685,7 +683,7 @@ pprStgExpr (StgOpApp op args _)
   = hsep [ pprStgOp op, brackets (interppSP args)]
 
 pprStgExpr (StgLam _ bndrs body)
-  =sep [ char '\\' <+> ppr bndrs <+> ptext SLIT("->"),
+  =sep [ char '\\' <+> ppr bndrs <+> ptext (sLit "->"),
 	 pprStgExpr body ]
 \end{code}
 
@@ -702,13 +700,13 @@ pprStgExpr (StgLam _ bndrs body)
 pprStgExpr (StgLet srt (StgNonRec bndr (StgRhsClosure cc bi free_vars upd_flag args rhs))
 		    	expr@(StgLet _ _))
   = ($$)
-      (hang (hcat [ptext SLIT("let { "), ppr bndr, ptext SLIT(" = "),
+      (hang (hcat [ptext (sLit "let { "), ppr bndr, ptext (sLit " = "),
 			  ppr cc,
 			  pp_binder_info bi,
-			  ptext SLIT(" ["), ifPprDebug (interppSP free_vars), ptext SLIT("] \\"),
-			  ppr upd_flag, ptext SLIT(" ["),
+			  ptext (sLit " ["), ifPprDebug (interppSP free_vars), ptext (sLit "] \\"),
+			  ppr upd_flag, ptext (sLit " ["),
 			  interppSP args, char ']'])
-	    8 (sep [hsep [ppr rhs, ptext SLIT("} in")]]))
+	    8 (sep [hsep [ppr rhs, ptext (sLit "} in")]]))
       (ppr expr)
 -}
 
@@ -716,44 +714,44 @@ pprStgExpr (StgLet srt (StgNonRec bndr (StgRhsClosure cc bi free_vars upd_flag a
 
 pprStgExpr (StgLet bind expr@(StgLet _ _))
   = ($$)
-      (sep [hang (ptext SLIT("let {"))
-	 	2 (hsep [pprGenStgBinding bind, ptext SLIT("} in")])])
+      (sep [hang (ptext (sLit "let {"))
+	 	2 (hsep [pprGenStgBinding bind, ptext (sLit "} in")])])
       (ppr expr)
 
 -- general case
 pprStgExpr (StgLet bind expr)
-  = sep [hang (ptext SLIT("let {")) 2 (pprGenStgBinding bind),
-	   hang (ptext SLIT("} in ")) 2 (ppr expr)]
+  = sep [hang (ptext (sLit "let {")) 2 (pprGenStgBinding bind),
+	   hang (ptext (sLit "} in ")) 2 (ppr expr)]
 
 pprStgExpr (StgLetNoEscape lvs_whole lvs_rhss bind expr)
-  = sep [hang (ptext SLIT("let-no-escape {"))
+  = sep [hang (ptext (sLit "let-no-escape {"))
 	    	2 (pprGenStgBinding bind),
-	   hang ((<>) (ptext SLIT("} in "))
+	   hang ((<>) (ptext (sLit "} in "))
 		   (ifPprDebug (
 		    nest 4 (
-		      hcat [ptext  SLIT("-- lvs: ["), interppSP (uniqSetToList lvs_whole),
-			     ptext SLIT("]; rhs lvs: ["), interppSP (uniqSetToList lvs_rhss),
+		      hcat [ptext  (sLit "-- lvs: ["), interppSP (uniqSetToList lvs_whole),
+			     ptext (sLit "]; rhs lvs: ["), interppSP (uniqSetToList lvs_rhss),
 			     char ']']))))
 		2 (ppr expr)]
 
 pprStgExpr (StgSCC cc expr)
-  = sep [ hsep [ptext SLIT("_scc_"), ppr cc],
+  = sep [ hsep [ptext (sLit "_scc_"), ppr cc],
 	  pprStgExpr expr ]
 
 pprStgExpr (StgTick m n expr)
-  = sep [ hsep [ptext SLIT("_tick_"),  pprModule m,text (show n)],
+  = sep [ hsep [ptext (sLit "_tick_"),  pprModule m,text (show n)],
 	  pprStgExpr expr ]
 
 pprStgExpr (StgCase expr lvs_whole lvs_rhss bndr srt alt_type alts)
-  = sep [sep [ptext SLIT("case"),
+  = sep [sep [ptext (sLit "case"),
 	   nest 4 (hsep [pprStgExpr expr,
 	     ifPprDebug (dcolon <+> ppr alt_type)]),
-	   ptext SLIT("of"), ppr bndr, char '{'],
+	   ptext (sLit "of"), ppr bndr, char '{'],
 	   ifPprDebug (
 	   nest 4 (
-	     hcat [ptext  SLIT("-- lvs: ["), interppSP (uniqSetToList lvs_whole),
-		    ptext SLIT("]; rhs lvs: ["), interppSP (uniqSetToList lvs_rhss),
-		    ptext SLIT("]; "),
+	     hcat [ptext  (sLit "-- lvs: ["), interppSP (uniqSetToList lvs_whole),
+		    ptext (sLit "]; rhs lvs: ["), interppSP (uniqSetToList lvs_rhss),
+		    ptext (sLit "]; "),
 		    pprMaybeSRT srt])),
 	   nest 2 (vcat (map pprStgAlt alts)),
 	   char '}']
@@ -761,7 +759,7 @@ pprStgExpr (StgCase expr lvs_whole lvs_rhss bndr srt alt_type alts)
 pprStgAlt :: (Outputable bndr, Outputable occ, Ord occ)
           => GenStgAlt bndr occ -> SDoc
 pprStgAlt (con, params, _use_mask, expr)
-  = hang (hsep [ppr con, interppSP params, ptext SLIT("->")])
+  = hang (hsep [ppr con, interppSP params, ptext (sLit "->")])
 	 4 (ppr expr <> semi)
 
 pprStgOp :: StgOp -> SDoc
@@ -769,10 +767,10 @@ pprStgOp (StgPrimOp  op)   = ppr op
 pprStgOp (StgFCallOp op _) = ppr op
 
 instance Outputable AltType where
-  ppr PolyAlt 	     = ptext SLIT("Polymorphic")
-  ppr (UbxTupAlt tc) = ptext SLIT("UbxTup") <+> ppr tc
-  ppr (AlgAlt tc)    = ptext SLIT("Alg")    <+> ppr tc
-  ppr (PrimAlt tc)   = ptext SLIT("Prim")   <+> ppr tc
+  ppr PolyAlt 	     = ptext (sLit "Polymorphic")
+  ppr (UbxTupAlt tc) = ptext (sLit "UbxTup") <+> ppr tc
+  ppr (AlgAlt tc)    = ptext (sLit "Alg")    <+> ppr tc
+  ppr (PrimAlt tc)   = ptext (sLit "Prim")   <+> ppr tc
 \end{code}
 
 \begin{code}
@@ -796,7 +794,7 @@ pprStgRhs (StgRhsClosure cc bi [free_var] upd_flag srt [{-no args-}] (StgApp fun
   = hcat [ ppr cc,
 	   pp_binder_info bi,
 	   brackets (ifPprDebug (ppr free_var)),
-	   ptext SLIT(" \\"), ppr upd_flag, pprMaybeSRT srt, ptext SLIT(" [] "), ppr func ]
+	   ptext (sLit " \\"), ppr upd_flag, pprMaybeSRT srt, ptext (sLit " [] "), ppr func ]
 
 -- general case
 pprStgRhs (StgRhsClosure cc bi free_vars upd_flag srt args body)
@@ -808,9 +806,9 @@ pprStgRhs (StgRhsClosure cc bi free_vars upd_flag srt args body)
 
 pprStgRhs (StgRhsCon cc con args)
   = hcat [ ppr cc,
-	   space, ppr con, ptext SLIT("! "), brackets (interppSP args)]
+	   space, ppr con, ptext (sLit "! "), brackets (interppSP args)]
 
 pprMaybeSRT :: SRT -> SDoc
 pprMaybeSRT (NoSRT) = empty
-pprMaybeSRT srt     = ptext SLIT("srt:") <> pprSRT srt
+pprMaybeSRT srt     = ptext (sLit "srt:") <> pprSRT srt
 \end{code}
