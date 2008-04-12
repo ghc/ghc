@@ -34,8 +34,6 @@ module DsMonad (
 	CanItFail(..), orFail
     ) where
 
-#include "HsVersions.h"
-
 import TcRnMonad
 import CoreSyn
 import HsSyn
@@ -196,7 +194,7 @@ mkDsEnvs :: DynFlags -> Module -> GlobalRdrEnv -> TypeEnv -> IORef Messages -> I
 mkDsEnvs dflags mod rdr_env type_env msg_var
   = do -- TODO: unnecessarily monadic
        let     if_genv = IfGblEnv { if_rec_types = Just (mod, return type_env) }
-               if_lenv = mkIfLclEnv mod (ptext SLIT("GHC error in desugarer lookup in") <+> ppr mod)
+               if_lenv = mkIfLclEnv mod (ptext (sLit "GHC error in desugarer lookup in") <+> ppr mod)
                gbl_env = DsGblEnv { ds_mod = mod, 
     			            ds_if_env = (if_genv, if_lenv),
     			            ds_unqual = mkPrintUnqualified dflags rdr_env,
@@ -234,14 +232,14 @@ duplicateLocalDs old_local = do
 newSysLocalDs, newFailLocalDs :: Type -> DsM Id
 newSysLocalDs ty = do
     uniq <- newUnique
-    return (mkSysLocal FSLIT("ds") uniq ty)
+    return (mkSysLocal (fsLit "ds") uniq ty)
 
 newSysLocalsDs :: [Type] -> DsM [Id]
 newSysLocalsDs tys = mapM newSysLocalDs tys
 
 newFailLocalDs ty = do
     uniq <- newUnique
-    return (mkSysLocal FSLIT("fail") uniq ty)
+    return (mkSysLocal (fsLit "fail") uniq ty)
 	-- The UserLocal bit just helps make the code a little clearer
 \end{code}
 
@@ -278,7 +276,7 @@ warnDs :: SDoc -> DsM ()
 warnDs warn = do { env <- getGblEnv 
 		 ; loc <- getSrcSpanDs
 		 ; let msg = mkWarnMsg loc (ds_unqual env) 
-				      (ptext SLIT("Warning:") <+> warn)
+				      (ptext (sLit "Warning:") <+> warn)
 		 ; updMutVar (ds_msgs env) (\ (w,e) -> (w `snocBag` msg, e)) }
 	    where
 
