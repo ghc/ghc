@@ -15,8 +15,6 @@
 
 module FloatOut ( floatOutwards ) where
 
-#include "HsVersions.h"
-
 import CoreSyn
 import CoreUtils
 
@@ -137,9 +135,9 @@ floatOutwards float_sws dflags us pgm
 	let { (tlets, ntlets, lams) = get_stats (sum_stats fss) };
 
 	dumpIfSet_dyn dflags Opt_D_dump_simpl_stats "FloatOut stats:"
-		(hcat [	int tlets,  ptext SLIT(" Lets floated to top level; "),
-			int ntlets, ptext SLIT(" Lets floated elsewhere; from "),
-			int lams,   ptext SLIT(" Lambda groups")]);
+		(hcat [	int tlets,  ptext (sLit " Lets floated to top level; "),
+			int ntlets, ptext (sLit " Lets floated elsewhere; from "),
+			int lams,   ptext (sLit " Lambda groups")]);
 
 	endPass dflags float_msg  Opt_D_verbose_core2core (concat binds_s')
 			{- no specific flag for dumping float-out -} 
