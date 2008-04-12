@@ -27,8 +27,6 @@ module DsMeta( dsBracket,
 	       quoteExpName, quotePatName
 	        ) where
 
-#include "HsVersions.h"
-
 import {-# SOURCE #-}	DsExpr ( dsExpr )
 
 import MatchLit
@@ -287,7 +285,7 @@ repSafety PlayRisky = rep2 unsafeName []
 repSafety (PlaySafe False) = rep2 safeName []
 repSafety (PlaySafe True) = rep2 threadsafeName []
 
-ds_msg = ptext SLIT("Cannot desugar this Template Haskell declaration:")
+ds_msg = ptext (sLit "Cannot desugar this Template Haskell declaration:")
 
 -------------------------------------------------------
 -- 			Constructors
@@ -897,7 +895,7 @@ lookupBinder n
 	    Just (Bound x) -> return (coreVar x)
 	    other	   -> failWithDs msg }
   where
-    msg = ptext SLIT("DsMeta: failed binder lookup when desugaring a TH bracket:") <+> ppr n
+    msg = ptext (sLit "DsMeta: failed binder lookup when desugaring a TH bracket:") <+> ppr n
 
 -- Look up a name that is either locally bound or a global name
 --
@@ -927,8 +925,8 @@ lookupTvOcc n
 		other	        -> failWithDs msg
     }
   where
-    msg = vcat  [ ptext SLIT("Illegal lexically-scoped type variable") <+> quotes (ppr n)
-		, ptext SLIT("Lexically scoped type variables are not supported by Template Haskell") ]
+    msg = vcat  [ ptext (sLit "Illegal lexically-scoped type variable") <+> quotes (ppr n)
+		, ptext (sLit "Lexically scoped type variables are not supported by Template Haskell") ]
 
 globalVar :: Name -> DsM (Core TH.Name)
 -- Not bound by the meta-env
@@ -1345,7 +1343,7 @@ coreVar id = MkC (Var id)
 notHandled :: String -> SDoc -> DsM a
 notHandled what doc = failWithDs msg
   where
-    msg = hang (text what <+> ptext SLIT("not (yet) handled by Template Haskell")) 
+    msg = hang (text what <+> ptext (sLit "not (yet) handled by Template Haskell")) 
 	     2 doc
 
 
@@ -1432,9 +1430,9 @@ templateHaskellNames = [
     quoteExpName, quotePatName]
 
 thSyn :: Module
-thSyn = mkTHModule FSLIT("Language.Haskell.TH.Syntax")
-thLib = mkTHModule FSLIT("Language.Haskell.TH.Lib")
-qqLib = mkTHModule FSLIT("Language.Haskell.TH.Quote")
+thSyn = mkTHModule (fsLit "Language.Haskell.TH.Syntax")
+thLib = mkTHModule (fsLit "Language.Haskell.TH.Lib")
+qqLib = mkTHModule (fsLit "Language.Haskell.TH.Quote")
 
 mkTHModule m = mkModule thPackageId (mkModuleNameFS m)
 
@@ -1445,173 +1443,173 @@ thTc   = mk_known_key_name OccName.tcName  thSyn
 qqFun  = mk_known_key_name OccName.varName qqLib
 
 -------------------- TH.Syntax -----------------------
-qTyConName        = thTc FSLIT("Q")            qTyConKey
-nameTyConName     = thTc FSLIT("Name")         nameTyConKey
-fieldExpTyConName = thTc FSLIT("FieldExp")     fieldExpTyConKey
-patTyConName      = thTc FSLIT("Pat")          patTyConKey
-fieldPatTyConName = thTc FSLIT("FieldPat")     fieldPatTyConKey
-expTyConName      = thTc FSLIT("Exp")          expTyConKey
-decTyConName      = thTc FSLIT("Dec")          decTyConKey
-typeTyConName     = thTc FSLIT("Type")         typeTyConKey
-matchTyConName    = thTc FSLIT("Match")        matchTyConKey
-clauseTyConName   = thTc FSLIT("Clause")       clauseTyConKey
-funDepTyConName   = thTc FSLIT("FunDep")       funDepTyConKey
+qTyConName        = thTc (fsLit "Q")            qTyConKey
+nameTyConName     = thTc (fsLit "Name")         nameTyConKey
+fieldExpTyConName = thTc (fsLit "FieldExp")     fieldExpTyConKey
+patTyConName      = thTc (fsLit "Pat")          patTyConKey
+fieldPatTyConName = thTc (fsLit "FieldPat")     fieldPatTyConKey
+expTyConName      = thTc (fsLit "Exp")          expTyConKey
+decTyConName      = thTc (fsLit "Dec")          decTyConKey
+typeTyConName     = thTc (fsLit "Type")         typeTyConKey
+matchTyConName    = thTc (fsLit "Match")        matchTyConKey
+clauseTyConName   = thTc (fsLit "Clause")       clauseTyConKey
+funDepTyConName   = thTc (fsLit "FunDep")       funDepTyConKey
 
-returnQName   = thFun FSLIT("returnQ")   returnQIdKey
-bindQName     = thFun FSLIT("bindQ")     bindQIdKey
-sequenceQName = thFun FSLIT("sequenceQ") sequenceQIdKey
-newNameName    = thFun FSLIT("newName")   newNameIdKey
-liftName      = thFun FSLIT("lift")      liftIdKey
-mkNameName     = thFun FSLIT("mkName")     mkNameIdKey
-mkNameG_vName  = thFun FSLIT("mkNameG_v")  mkNameG_vIdKey
-mkNameG_dName  = thFun FSLIT("mkNameG_d")  mkNameG_dIdKey
-mkNameG_tcName = thFun FSLIT("mkNameG_tc") mkNameG_tcIdKey
-mkNameLName    = thFun FSLIT("mkNameL")    mkNameLIdKey
+returnQName   = thFun (fsLit "returnQ")   returnQIdKey
+bindQName     = thFun (fsLit "bindQ")     bindQIdKey
+sequenceQName = thFun (fsLit "sequenceQ") sequenceQIdKey
+newNameName    = thFun (fsLit "newName")   newNameIdKey
+liftName      = thFun (fsLit "lift")      liftIdKey
+mkNameName     = thFun (fsLit "mkName")     mkNameIdKey
+mkNameG_vName  = thFun (fsLit "mkNameG_v")  mkNameG_vIdKey
+mkNameG_dName  = thFun (fsLit "mkNameG_d")  mkNameG_dIdKey
+mkNameG_tcName = thFun (fsLit "mkNameG_tc") mkNameG_tcIdKey
+mkNameLName    = thFun (fsLit "mkNameL")    mkNameLIdKey
 
 
 -------------------- TH.Lib -----------------------
 -- data Lit = ...
-charLName       = libFun FSLIT("charL")       charLIdKey
-stringLName     = libFun FSLIT("stringL")     stringLIdKey
-integerLName    = libFun FSLIT("integerL")    integerLIdKey
-intPrimLName    = libFun FSLIT("intPrimL")    intPrimLIdKey
-floatPrimLName  = libFun FSLIT("floatPrimL")  floatPrimLIdKey
-doublePrimLName = libFun FSLIT("doublePrimL") doublePrimLIdKey
-rationalLName   = libFun FSLIT("rationalL")     rationalLIdKey
+charLName       = libFun (fsLit "charL")       charLIdKey
+stringLName     = libFun (fsLit "stringL")     stringLIdKey
+integerLName    = libFun (fsLit "integerL")    integerLIdKey
+intPrimLName    = libFun (fsLit "intPrimL")    intPrimLIdKey
+floatPrimLName  = libFun (fsLit "floatPrimL")  floatPrimLIdKey
+doublePrimLName = libFun (fsLit "doublePrimL") doublePrimLIdKey
+rationalLName   = libFun (fsLit "rationalL")     rationalLIdKey
 
 -- data Pat = ...
-litPName   = libFun FSLIT("litP")   litPIdKey
-varPName   = libFun FSLIT("varP")   varPIdKey
-tupPName   = libFun FSLIT("tupP")   tupPIdKey
-conPName   = libFun FSLIT("conP")   conPIdKey
-infixPName = libFun FSLIT("infixP") infixPIdKey
-tildePName = libFun FSLIT("tildeP") tildePIdKey
-asPName    = libFun FSLIT("asP")    asPIdKey
-wildPName  = libFun FSLIT("wildP")  wildPIdKey
-recPName   = libFun FSLIT("recP")   recPIdKey
-listPName  = libFun FSLIT("listP")  listPIdKey
-sigPName   = libFun FSLIT("sigP")   sigPIdKey
+litPName   = libFun (fsLit "litP")   litPIdKey
+varPName   = libFun (fsLit "varP")   varPIdKey
+tupPName   = libFun (fsLit "tupP")   tupPIdKey
+conPName   = libFun (fsLit "conP")   conPIdKey
+infixPName = libFun (fsLit "infixP") infixPIdKey
+tildePName = libFun (fsLit "tildeP") tildePIdKey
+asPName    = libFun (fsLit "asP")    asPIdKey
+wildPName  = libFun (fsLit "wildP")  wildPIdKey
+recPName   = libFun (fsLit "recP")   recPIdKey
+listPName  = libFun (fsLit "listP")  listPIdKey
+sigPName   = libFun (fsLit "sigP")   sigPIdKey
 
 -- type FieldPat = ...
-fieldPatName = libFun FSLIT("fieldPat") fieldPatIdKey
+fieldPatName = libFun (fsLit "fieldPat") fieldPatIdKey
 
 -- data Match = ...
-matchName = libFun FSLIT("match") matchIdKey
+matchName = libFun (fsLit "match") matchIdKey
 
 -- data Clause = ...	 
-clauseName = libFun FSLIT("clause") clauseIdKey
+clauseName = libFun (fsLit "clause") clauseIdKey
 
 -- data Exp = ...
-varEName        = libFun FSLIT("varE")        varEIdKey
-conEName        = libFun FSLIT("conE")        conEIdKey
-litEName        = libFun FSLIT("litE")        litEIdKey
-appEName        = libFun FSLIT("appE")        appEIdKey
-infixEName      = libFun FSLIT("infixE")      infixEIdKey
-infixAppName    = libFun FSLIT("infixApp")    infixAppIdKey
-sectionLName    = libFun FSLIT("sectionL")    sectionLIdKey
-sectionRName    = libFun FSLIT("sectionR")    sectionRIdKey
-lamEName        = libFun FSLIT("lamE")        lamEIdKey
-tupEName        = libFun FSLIT("tupE")        tupEIdKey
-condEName       = libFun FSLIT("condE")       condEIdKey
-letEName        = libFun FSLIT("letE")        letEIdKey
-caseEName       = libFun FSLIT("caseE")       caseEIdKey
-doEName         = libFun FSLIT("doE")         doEIdKey
-compEName       = libFun FSLIT("compE")       compEIdKey
+varEName        = libFun (fsLit "varE")        varEIdKey
+conEName        = libFun (fsLit "conE")        conEIdKey
+litEName        = libFun (fsLit "litE")        litEIdKey
+appEName        = libFun (fsLit "appE")        appEIdKey
+infixEName      = libFun (fsLit "infixE")      infixEIdKey
+infixAppName    = libFun (fsLit "infixApp")    infixAppIdKey
+sectionLName    = libFun (fsLit "sectionL")    sectionLIdKey
+sectionRName    = libFun (fsLit "sectionR")    sectionRIdKey
+lamEName        = libFun (fsLit "lamE")        lamEIdKey
+tupEName        = libFun (fsLit "tupE")        tupEIdKey
+condEName       = libFun (fsLit "condE")       condEIdKey
+letEName        = libFun (fsLit "letE")        letEIdKey
+caseEName       = libFun (fsLit "caseE")       caseEIdKey
+doEName         = libFun (fsLit "doE")         doEIdKey
+compEName       = libFun (fsLit "compE")       compEIdKey
 -- ArithSeq skips a level
-fromEName       = libFun FSLIT("fromE")       fromEIdKey
-fromThenEName   = libFun FSLIT("fromThenE")   fromThenEIdKey
-fromToEName     = libFun FSLIT("fromToE")     fromToEIdKey
-fromThenToEName = libFun FSLIT("fromThenToE") fromThenToEIdKey
+fromEName       = libFun (fsLit "fromE")       fromEIdKey
+fromThenEName   = libFun (fsLit "fromThenE")   fromThenEIdKey
+fromToEName     = libFun (fsLit "fromToE")     fromToEIdKey
+fromThenToEName = libFun (fsLit "fromThenToE") fromThenToEIdKey
 -- end ArithSeq
-listEName       = libFun FSLIT("listE")       listEIdKey
-sigEName        = libFun FSLIT("sigE")        sigEIdKey
-recConEName     = libFun FSLIT("recConE")     recConEIdKey
-recUpdEName     = libFun FSLIT("recUpdE")     recUpdEIdKey
+listEName       = libFun (fsLit "listE")       listEIdKey
+sigEName        = libFun (fsLit "sigE")        sigEIdKey
+recConEName     = libFun (fsLit "recConE")     recConEIdKey
+recUpdEName     = libFun (fsLit "recUpdE")     recUpdEIdKey
 
 -- type FieldExp = ...
-fieldExpName = libFun FSLIT("fieldExp") fieldExpIdKey
+fieldExpName = libFun (fsLit "fieldExp") fieldExpIdKey
 
 -- data Body = ...
-guardedBName = libFun FSLIT("guardedB") guardedBIdKey
-normalBName  = libFun FSLIT("normalB")  normalBIdKey
+guardedBName = libFun (fsLit "guardedB") guardedBIdKey
+normalBName  = libFun (fsLit "normalB")  normalBIdKey
 
 -- data Guard = ...
-normalGEName = libFun FSLIT("normalGE") normalGEIdKey
-patGEName    = libFun FSLIT("patGE")    patGEIdKey
+normalGEName = libFun (fsLit "normalGE") normalGEIdKey
+patGEName    = libFun (fsLit "patGE")    patGEIdKey
 
 -- data Stmt = ...
-bindSName   = libFun FSLIT("bindS")   bindSIdKey
-letSName    = libFun FSLIT("letS")    letSIdKey
-noBindSName = libFun FSLIT("noBindS") noBindSIdKey
-parSName    = libFun FSLIT("parS")    parSIdKey
+bindSName   = libFun (fsLit "bindS")   bindSIdKey
+letSName    = libFun (fsLit "letS")    letSIdKey
+noBindSName = libFun (fsLit "noBindS") noBindSIdKey
+parSName    = libFun (fsLit "parS")    parSIdKey
 
 -- data Dec = ...
-funDName      = libFun FSLIT("funD")      funDIdKey
-valDName      = libFun FSLIT("valD")      valDIdKey
-dataDName     = libFun FSLIT("dataD")     dataDIdKey
-newtypeDName  = libFun FSLIT("newtypeD")  newtypeDIdKey
-tySynDName    = libFun FSLIT("tySynD")    tySynDIdKey
-classDName    = libFun FSLIT("classD")    classDIdKey
-instanceDName = libFun FSLIT("instanceD") instanceDIdKey
-sigDName      = libFun FSLIT("sigD")      sigDIdKey
-forImpDName   = libFun FSLIT("forImpD")   forImpDIdKey
+funDName      = libFun (fsLit "funD")      funDIdKey
+valDName      = libFun (fsLit "valD")      valDIdKey
+dataDName     = libFun (fsLit "dataD")     dataDIdKey
+newtypeDName  = libFun (fsLit "newtypeD")  newtypeDIdKey
+tySynDName    = libFun (fsLit "tySynD")    tySynDIdKey
+classDName    = libFun (fsLit "classD")    classDIdKey
+instanceDName = libFun (fsLit "instanceD") instanceDIdKey
+sigDName      = libFun (fsLit "sigD")      sigDIdKey
+forImpDName   = libFun (fsLit "forImpD")   forImpDIdKey
 
 -- type Ctxt = ...
-cxtName = libFun FSLIT("cxt") cxtIdKey
+cxtName = libFun (fsLit "cxt") cxtIdKey
 
 -- data Strict = ...
-isStrictName      = libFun  FSLIT("isStrict")      isStrictKey
-notStrictName     = libFun  FSLIT("notStrict")     notStrictKey
+isStrictName      = libFun  (fsLit "isStrict")      isStrictKey
+notStrictName     = libFun  (fsLit "notStrict")     notStrictKey
 
 -- data Con = ...	 
-normalCName = libFun FSLIT("normalC") normalCIdKey
-recCName    = libFun FSLIT("recC")    recCIdKey
-infixCName  = libFun FSLIT("infixC")  infixCIdKey
-forallCName  = libFun FSLIT("forallC")  forallCIdKey
+normalCName = libFun (fsLit "normalC") normalCIdKey
+recCName    = libFun (fsLit "recC")    recCIdKey
+infixCName  = libFun (fsLit "infixC")  infixCIdKey
+forallCName  = libFun (fsLit "forallC")  forallCIdKey
 			 
 -- type StrictType = ...
-strictTypeName    = libFun  FSLIT("strictType")    strictTKey
+strictTypeName    = libFun  (fsLit "strictType")    strictTKey
 
 -- type VarStrictType = ...
-varStrictTypeName = libFun  FSLIT("varStrictType") varStrictTKey
+varStrictTypeName = libFun  (fsLit "varStrictType") varStrictTKey
 
 -- data Type = ...
-forallTName = libFun FSLIT("forallT") forallTIdKey
-varTName    = libFun FSLIT("varT")    varTIdKey
-conTName    = libFun FSLIT("conT")    conTIdKey
-tupleTName  = libFun FSLIT("tupleT") tupleTIdKey
-arrowTName  = libFun FSLIT("arrowT") arrowTIdKey
-listTName   = libFun FSLIT("listT")  listTIdKey
-appTName    = libFun FSLIT("appT")    appTIdKey
+forallTName = libFun (fsLit "forallT") forallTIdKey
+varTName    = libFun (fsLit "varT")    varTIdKey
+conTName    = libFun (fsLit "conT")    conTIdKey
+tupleTName  = libFun (fsLit "tupleT") tupleTIdKey
+arrowTName  = libFun (fsLit "arrowT") arrowTIdKey
+listTName   = libFun (fsLit "listT")  listTIdKey
+appTName    = libFun (fsLit "appT")    appTIdKey
 			 
 -- data Callconv = ...
-cCallName = libFun FSLIT("cCall") cCallIdKey
-stdCallName = libFun FSLIT("stdCall") stdCallIdKey
+cCallName = libFun (fsLit "cCall") cCallIdKey
+stdCallName = libFun (fsLit "stdCall") stdCallIdKey
 
 -- data Safety = ...
-unsafeName     = libFun FSLIT("unsafe") unsafeIdKey
-safeName       = libFun FSLIT("safe") safeIdKey
-threadsafeName = libFun FSLIT("threadsafe") threadsafeIdKey
+unsafeName     = libFun (fsLit "unsafe") unsafeIdKey
+safeName       = libFun (fsLit "safe") safeIdKey
+threadsafeName = libFun (fsLit "threadsafe") threadsafeIdKey
              
 -- data FunDep = ...
-funDepName     = libFun FSLIT("funDep") funDepIdKey
+funDepName     = libFun (fsLit "funDep") funDepIdKey
 
-matchQTyConName         = libTc FSLIT("MatchQ")        matchQTyConKey
-clauseQTyConName        = libTc FSLIT("ClauseQ")       clauseQTyConKey
-expQTyConName           = libTc FSLIT("ExpQ")          expQTyConKey
-stmtQTyConName          = libTc FSLIT("StmtQ")         stmtQTyConKey
-decQTyConName           = libTc FSLIT("DecQ")          decQTyConKey
-conQTyConName           = libTc FSLIT("ConQ")          conQTyConKey
-strictTypeQTyConName    = libTc FSLIT("StrictTypeQ")    strictTypeQTyConKey
-varStrictTypeQTyConName = libTc FSLIT("VarStrictTypeQ") varStrictTypeQTyConKey
-typeQTyConName          = libTc FSLIT("TypeQ")          typeQTyConKey
-fieldExpQTyConName      = libTc FSLIT("FieldExpQ")      fieldExpQTyConKey
-patQTyConName           = libTc FSLIT("PatQ")           patQTyConKey
-fieldPatQTyConName      = libTc FSLIT("FieldPatQ")      fieldPatQTyConKey
+matchQTyConName         = libTc (fsLit "MatchQ")        matchQTyConKey
+clauseQTyConName        = libTc (fsLit "ClauseQ")       clauseQTyConKey
+expQTyConName           = libTc (fsLit "ExpQ")          expQTyConKey
+stmtQTyConName          = libTc (fsLit "StmtQ")         stmtQTyConKey
+decQTyConName           = libTc (fsLit "DecQ")          decQTyConKey
+conQTyConName           = libTc (fsLit "ConQ")          conQTyConKey
+strictTypeQTyConName    = libTc (fsLit "StrictTypeQ")    strictTypeQTyConKey
+varStrictTypeQTyConName = libTc (fsLit "VarStrictTypeQ") varStrictTypeQTyConKey
+typeQTyConName          = libTc (fsLit "TypeQ")          typeQTyConKey
+fieldExpQTyConName      = libTc (fsLit "FieldExpQ")      fieldExpQTyConKey
+patQTyConName           = libTc (fsLit "PatQ")           patQTyConKey
+fieldPatQTyConName      = libTc (fsLit "FieldPatQ")      fieldPatQTyConKey
 
 -- quasiquoting
-quoteExpName	    = qqFun FSLIT("quoteExp") quoteExpKey
-quotePatName	    = qqFun FSLIT("quotePat") quotePatKey
+quoteExpName	    = qqFun (fsLit "quoteExp") quoteExpKey
+quotePatName	    = qqFun (fsLit "quotePat") quotePatKey
 
 --	TyConUniques available: 100-129
 -- 	Check in PrelNames if you want to change this
