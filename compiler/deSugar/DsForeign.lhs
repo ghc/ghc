@@ -209,7 +209,7 @@ dsFCall fn_id fcall = do
         worker_ty     = mkForAllTys tvs (mkFunTys (map idType work_arg_ids) ccall_result_ty)
         the_ccall_app = mkFCall ccall_uniq fcall val_args ccall_result_ty
         work_rhs      = mkLams tvs (mkLams work_arg_ids the_ccall_app)
-        work_id       = mkSysLocal FSLIT("$wccall") work_uniq worker_ty
+        work_id       = mkSysLocal (fsLit "$wccall") work_uniq worker_ty
 
         -- Build the wrapper
         work_app     = mkApps (mkVarApps (Var work_id) tvs) val_args
@@ -344,7 +344,7 @@ dsFExportDynamic id cconv = do
                         ]
           -- name of external entry point providing these services.
           -- (probably in the RTS.) 
-        adjustor   = FSLIT("createAdjustor")
+        adjustor   = fsLit "createAdjustor"
         
           -- Determine the number of bytes of arguments to the stub function,
           -- so that we can attach the '@N' suffix to its label if it is a
@@ -425,7 +425,7 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   arg_cname n stg_ty
         | libffi    = char '*' <> parens (stg_ty <> char '*') <> 
-                      ptext SLIT("args") <> brackets (int (n-1))
+                      ptext (sLit "args") <> brackets (int (n-1))
         | otherwise = text ('a':show n)
 
   -- generate a libffi-style stub if this is a "wrapper" and libffi is enabled
@@ -460,7 +460,7 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 		CCallConv   -> empty
 		StdCallConv -> text (ccallConvAttribute cc)
 
-  header_bits = ptext SLIT("extern") <+> fun_proto <> semi
+  header_bits = ptext (sLit "extern") <+> fun_proto <> semi
 
   fun_args
     | null aug_arg_info = text "void"
@@ -469,8 +469,8 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
 
   fun_proto
     | libffi
-      = ptext SLIT("void") <+> ftext c_nm <> 
-          parens (ptext SLIT("void *cif STG_UNUSED, void* resp, void** args, void* the_stableptr"))
+      = ptext (sLit "void") <+> ftext c_nm <> 
+          parens (ptext (sLit "void *cif STG_UNUSED, void* resp, void** args, void* the_stableptr"))
     | otherwise
       = cResType <+> pprCconv <+> ftext c_nm <> parens fun_args
 
@@ -513,33 +513,33 @@ mkFExportCBits c_nm maybe_target arg_htys res_hty is_IO_res_ty cc
     fun_proto  $$
     vcat 
      [ lbrace
-     ,   ptext SLIT("Capability *cap;")
+     ,   ptext (sLit "Capability *cap;")
      ,   declareResult
      ,   declareCResult
      ,   text "cap = rts_lock();"
 	  -- create the application + perform it.
-     ,   ptext SLIT("cap=rts_evalIO") <> parens (
+     ,   ptext (sLit "cap=rts_evalIO") <> parens (
 		cap <>
-		ptext SLIT("rts_apply") <> parens (
+		ptext (sLit "rts_apply") <> parens (
 		    cap <>
 		    text "(HaskellObj)"
 	         <> ptext (if is_IO_res_ty 
-				then SLIT("runIO_closure")
-				else SLIT("runNonIO_closure"))
+				then (sLit "runIO_closure")
+				else (sLit "runNonIO_closure"))
 		 <> comma
         	 <> expr_to_run
 		) <+> comma
 	       <> text "&ret"
 	     ) <> semi
-     ,   ptext SLIT("rts_checkSchedStatus") <> parens (doubleQuotes (ftext c_nm)
+     ,   ptext (sLit "rts_checkSchedStatus") <> parens (doubleQuotes (ftext c_nm)
 						<> comma <> text "cap") <> semi
      ,   assignCResult
-     ,   ptext SLIT("rts_unlock(cap);")
+     ,   ptext (sLit "rts_unlock(cap);")
      ,   if res_hty_is_unit then empty
             else if libffi 
                   then char '*' <> parens (cResType <> char '*') <> 
-                       ptext SLIT("resp = cret;")
-                  else ptext SLIT("return cret;")
+                       ptext (sLit "resp = cret;")
+                  else ptext (sLit "return cret;")
      , rbrace
      ]
 
