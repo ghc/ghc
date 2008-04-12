@@ -86,6 +86,7 @@ module GHC.Base
         module GHC.Base,
         module GHC.Bool,
         module GHC.Generics,
+        module GHC.Ordering,
         module GHC.Prim,        -- Re-export GHC.Prim and GHC.Err, to avoid lots
         module GHC.Err          -- of people having to import it explicitly
   ) 
@@ -93,6 +94,7 @@ module GHC.Base
 
 import GHC.Bool
 import GHC.Generics
+import GHC.Ordering
 import GHC.Prim
 import {-# SOURCE #-} GHC.Err
 
@@ -561,8 +563,23 @@ instance Ord () where
 -- | Represents an ordering relationship between two values: less
 -- than, equal to, or greater than.  An 'Ordering' is returned by
 -- 'compare'.
-data Ordering = LT | EQ | GT deriving (Eq, Ord)
+-- XXX These don't work:
+-- deriving instance Eq Ordering
+-- deriving instance Ord Ordering
+-- Illegal binding of built-in syntax: con2tag_Ordering#
+instance Eq Ordering where
+    EQ == EQ = True
+    LT == LT = True
+    GT == GT = True
+    _  == _  = False
         -- Read in GHC.Read, Show in GHC.Show
+
+instance Ord Ordering where
+    LT <= _  = True
+    _  <= LT = False
+    EQ <= _  = True
+    _  <= EQ = False
+    GT <= GT = True
 \end{code}
 
 

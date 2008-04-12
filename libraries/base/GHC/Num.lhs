@@ -134,12 +134,7 @@ instance Ord Integer where
     (>)  = gtInteger
     (<)  = ltInteger
     (>=) = geInteger
-
-    i `compare` j = case i `compareInteger` j of
-                    -1# -> LT
-                    0#  -> EQ
-                    1#  -> GT
-                    _   -> error "compareInteger: Bad result"
+    compare = compareInteger
 \end{code}
 
 
