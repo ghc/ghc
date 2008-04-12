@@ -162,11 +162,11 @@ importDecl name
 	    Nothing    -> return (Failed not_found_msg)
     }}}
   where
-    nd_doc = ptext SLIT("Need decl for") <+> ppr name
-    not_found_msg = hang (ptext SLIT("Can't find interface-file declaration for") <+>
+    nd_doc = ptext (sLit "Need decl for") <+> ppr name
+    not_found_msg = hang (ptext (sLit "Can't find interface-file declaration for") <+>
 				pprNameSpace (occNameSpace (nameOccName name)) <+> ppr name)
-	  	       2 (vcat [ptext SLIT("Probable cause: bug in .hi-boot file, or inconsistent .hi file"),
-		                ptext SLIT("Use -ddump-if-trace to get an idea of which file caused the error")])
+	  	       2 (vcat [ptext (sLit "Probable cause: bug in .hi-boot file, or inconsistent .hi file"),
+		                ptext (sLit "Use -ddump-if-trace to get an idea of which file caused the error")])
 \end{code}
 
 %************************************************************************
@@ -290,13 +290,13 @@ tcHiBootIface hsc_src mod
 		Succeeded (iface, _path) -> typecheckIface iface
     }}}}
   where
-    need = ptext SLIT("Need the hi-boot interface for") <+> ppr mod
-		 <+> ptext SLIT("to compare against the Real Thing")
+    need = ptext (sLit "Need the hi-boot interface for") <+> ppr mod
+		 <+> ptext (sLit "to compare against the Real Thing")
 
-    moduleLoop = ptext SLIT("Circular imports: module") <+> quotes (ppr mod) 
-		     <+> ptext SLIT("depends on itself")
+    moduleLoop = ptext (sLit "Circular imports: module") <+> quotes (ppr mod) 
+		     <+> ptext (sLit "depends on itself")
 
-    elaborate err = hang (ptext SLIT("Could not find hi-boot interface for") <+> 
+    elaborate err = hang (ptext (sLit "Could not find hi-boot interface for") <+> 
 		          quotes (ppr mod) <> colon) 4 err
 \end{code}
 
@@ -436,7 +436,7 @@ tcIfaceDecl ignore_prags
 		-- it mentions unless it's necessray to do so
 	  ; return (op_name, dm, op_ty) }
 
-   mk_doc op_name op_ty = ptext SLIT("Class op") <+> sep [ppr op_name, ppr op_ty]
+   mk_doc op_name op_ty = ptext (sLit "Class op") <+> sep [ppr op_name, ppr op_ty]
 
    tc_fd (tvs1, tvs2) = do { tvs1' <- mapM tcIfaceTyVar tvs1
 			   ; tvs2' <- mapM tcIfaceTyVar tvs2
@@ -499,7 +499,7 @@ tcIfaceDataCons tycon_name tycon tc_tyvars if_cons
                        eq_spec theta 
 		       arg_tys tycon
 	}
-    mk_doc con_name = ptext SLIT("Constructor") <+> ppr con_name
+    mk_doc con_name = ptext (sLit "Constructor") <+> ppr con_name
 
 tcIfaceEqSpec spec
   = mapM do_item spec
@@ -521,7 +521,7 @@ tcIfaceInst :: IfaceInst -> IfL Instance
 tcIfaceInst (IfaceInst { ifDFun = dfun_occ, ifOFlag = oflag,
 			 ifInstCls = cls, ifInstTys = mb_tcs,
 			 ifInstOrph = orph })
-  = do	{ dfun    <- forkM (ptext SLIT("Dict fun") <+> ppr dfun_occ) $
+  = do	{ dfun    <- forkM (ptext (sLit "Dict fun") <+> ppr dfun_occ) $
 		     tcIfaceExtId dfun_occ
         ; let mb_tcs' = map (fmap ifaceTyConName) mb_tcs
 	; return (mkImportedInstance cls mb_tcs' dfun oflag) }
@@ -529,7 +529,7 @@ tcIfaceInst (IfaceInst { ifDFun = dfun_occ, ifOFlag = oflag,
 tcIfaceFamInst :: IfaceFamInst -> IfL FamInst
 tcIfaceFamInst (IfaceFamInst { ifFamInstTyCon = tycon, 
 			       ifFamInstFam = fam, ifFamInstTys = mb_tcs })
---	{ tycon'  <- forkM (ptext SLIT("Inst tycon") <+> ppr tycon) $
+--	{ tycon'  <- forkM (ptext (sLit "Inst tycon") <+> ppr tycon) $
 -- ^^^this line doesn't work, but vvv this does => CPP in Haskell = evil!
     = do tycon'  <- forkM (text ("Inst tycon") <+> ppr tycon) $
                     tcIfaceTyCon tycon
@@ -562,7 +562,7 @@ tcIfaceRule (IfaceRule {ifRuleName = name, ifActivation = act, ifRuleBndrs = bnd
 			ifRuleOrph = orph })
   = do	{ ~(bndrs', args', rhs') <- 
 		-- Typecheck the payload lazily, in the hope it'll never be looked at
-		forkM (ptext SLIT("Rule") <+> ftext name) $
+		forkM (ptext (sLit "Rule") <+> ftext name) $
 		bindIfaceBndrs bndrs 			  $ \ bndrs' ->
 		do { args' <- mapM tcIfaceExpr args
 		   ; rhs'  <- tcIfaceExpr rhs
