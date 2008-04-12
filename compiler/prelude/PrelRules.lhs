@@ -328,7 +328,7 @@ litEq :: Name
       -> [CoreRule]
 litEq op_name is_eq
   = [BuiltinRule { ru_name = occNameFS (nameOccName op_name) 
-				`appendFS` FSLIT("->case"),
+				`appendFS` (fsLit "->case"),
 		   ru_fn = op_name, 
 		   ru_nargs = 2, ru_try = rule_fn }]
   where
@@ -488,11 +488,11 @@ are explicit.)
 builtinRules :: [CoreRule]
 -- Rules for non-primops that can't be expressed using a RULE pragma
 builtinRules
-  = [ BuiltinRule { ru_name = FSLIT("AppendLitString"), ru_fn = unpackCStringFoldrName,
+  = [ BuiltinRule { ru_name = fsLit "AppendLitString", ru_fn = unpackCStringFoldrName,
 		    ru_nargs = 4, ru_try = match_append_lit },
-      BuiltinRule { ru_name = FSLIT("EqString"), ru_fn = eqStringName,
+      BuiltinRule { ru_name = fsLit "EqString", ru_fn = eqStringName,
 		    ru_nargs = 2, ru_try = match_eq_string },
-      BuiltinRule { ru_name = FSLIT("Inline"), ru_fn = inlineIdName,
+      BuiltinRule { ru_name = fsLit "Inline", ru_fn = inlineIdName,
 		    ru_nargs = 2, ru_try = match_inline }
     ]
 
