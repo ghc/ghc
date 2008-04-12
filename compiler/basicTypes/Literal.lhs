@@ -33,8 +33,6 @@ module Literal
 	, nullAddrLit, float2DoubleLit, double2FloatLit
 	) where
 
-#include "HsVersions.h"
-
 import TysPrim
 import Type
 import Outputable
@@ -366,13 +364,13 @@ pprLit :: Literal -> SDoc
 pprLit (MachChar ch)  	= pprHsChar ch
 pprLit (MachStr s)    	= pprHsString s
 pprLit (MachInt i)    	= pprIntVal i
-pprLit (MachInt64 i)  	= ptext SLIT("__int64") <+> integer i
-pprLit (MachWord w)   	= ptext SLIT("__word") <+> integer w
-pprLit (MachWord64 w) 	= ptext SLIT("__word64") <+> integer w
-pprLit (MachFloat f)  	= ptext SLIT("__float") <+> rational f
+pprLit (MachInt64 i)  	= ptext (sLit "__int64") <+> integer i
+pprLit (MachWord w)   	= ptext (sLit "__word") <+> integer w
+pprLit (MachWord64 w) 	= ptext (sLit "__word64") <+> integer w
+pprLit (MachFloat f)  	= ptext (sLit "__float") <+> rational f
 pprLit (MachDouble d) 	= rational d
-pprLit (MachNullAddr) 	= ptext SLIT("__NULL")
-pprLit (MachLabel l mb) = ptext SLIT("__label") <+> 
+pprLit (MachNullAddr) 	= ptext (sLit "__NULL")
+pprLit (MachLabel l mb) = ptext (sLit "__label") <+> 
 			     case mb of
 			       Nothing -> pprHsString l
 			       Just x  -> doubleQuotes (text (unpackFS l ++ '@':show x))
