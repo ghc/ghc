@@ -706,7 +706,7 @@ afterRunStmt step_here run_result = do
      GHC.RunBreak _ names mb_info 
          | isNothing  mb_info || 
            step_here (GHC.resumeSpan $ head resumes) -> do
-               printForUser $ ptext SLIT("Stopped at") <+> 
+               printForUser $ ptext (sLit "Stopped at") <+> 
                        ppr (GHC.resumeSpan $ head resumes)
 --               printTypeOfNames session names
                let namesSorted = sortBy compareNames names
@@ -1623,8 +1623,8 @@ showContext = do
    printForUser $ vcat (map pp_resume (reverse resumes))
   where
    pp_resume resume =
-        ptext SLIT("--> ") <> text (GHC.resumeStmt resume)
-        $$ nest 2 (ptext SLIT("Stopped at") <+> ppr (GHC.resumeSpan resume))
+        ptext (sLit "--> ") <> text (GHC.resumeStmt resume)
+        $$ nest 2 (ptext (sLit "Stopped at") <+> ppr (GHC.resumeSpan resume))
 
 showPackages :: GHCi ()
 showPackages = do
@@ -2010,7 +2010,7 @@ backCmd :: String -> GHCi ()
 backCmd = noArgs $ do
   s <- getSession
   (names, _, span) <- io $ GHC.back s
-  printForUser $ ptext SLIT("Logged breakpoint at") <+> ppr span
+  printForUser $ ptext (sLit "Logged breakpoint at") <+> ppr span
   printTypeOfNames s names
    -- run the command set with ":set stop <cmd>"
   st <- getGHCiState
@@ -2021,8 +2021,8 @@ forwardCmd = noArgs $ do
   s <- getSession
   (names, ix, span) <- io $ GHC.forward s
   printForUser $ (if (ix == 0)
-                    then ptext SLIT("Stopped at")
-                    else ptext SLIT("Logged breakpoint at")) <+> ppr span
+                    then ptext (sLit "Stopped at")
+                    else ptext (sLit "Logged breakpoint at")) <+> ppr span
   printTypeOfNames s names
    -- run the command set with ":set stop <cmd>"
   st <- getGHCiState
