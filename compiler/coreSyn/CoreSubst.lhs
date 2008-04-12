@@ -179,7 +179,7 @@ lookupIdSubst (Subst in_scope ids _) v
   | Just e  <- lookupVarEnv ids       v = e
   | Just v' <- lookupInScope in_scope v = Var v'
 	-- Vital! See Note [Extending the Subst]
-  | otherwise = WARN( True, ptext SLIT("CoreSubst.lookupIdSubst") <+> ppr v ) 
+  | otherwise = WARN( True, ptext (sLit "CoreSubst.lookupIdSubst") <+> ppr v ) 
 		Var v
 
 lookupTvSubst :: Subst -> TyVar -> Type
@@ -210,9 +210,9 @@ Pretty printing, for debugging only
 \begin{code}
 instance Outputable Subst where
   ppr (Subst in_scope ids tvs) 
-	=  ptext SLIT("<InScope =") <+> braces (fsep (map ppr (varEnvElts (getInScopeVars in_scope))))
-	$$ ptext SLIT(" IdSubst   =") <+> ppr ids
-	$$ ptext SLIT(" TvSubst   =") <+> ppr tvs
+	=  ptext (sLit "<InScope =") <+> braces (fsep (map ppr (varEnvElts (getInScopeVars in_scope))))
+	$$ ptext (sLit " IdSubst   =") <+> ppr ids
+	$$ ptext (sLit " TvSubst   =") <+> ppr tvs
  	 <> char '>'
 \end{code}
 
