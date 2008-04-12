@@ -28,8 +28,6 @@ module HsTypes (
 	pprParendHsType, pprHsForAll, pprHsContext, ppr_hs_context, pprHsTyVarBndr
     ) where
 
-#include "HsVersions.h"
-
 import {-# SOURCE #-} HsExpr ( HsSplice, pprSplice )
 
 import Type
@@ -76,7 +74,7 @@ data HsBang = HsNoBang	-- Only used as a return value for getBangStrictness,
 instance Outputable HsBang where
     ppr (HsNoBang) = empty
     ppr (HsStrict) = char '!'
-    ppr (HsUnbox)  = ptext SLIT("!!")
+    ppr (HsUnbox)  = ptext (sLit "!!")
 
 getBangType :: LHsType a -> LHsType a
 getBangType (L _ (HsBangTy _ ty)) = ty
@@ -284,7 +282,7 @@ instance (Outputable name) => Outputable (HsTyVarBndr name) where
 
 instance OutputableBndr name => Outputable (HsPred name) where
     ppr (HsClassP clas tys) = ppr clas <+> hsep (map pprLHsType tys)
-    ppr (HsEqualP t1 t2)    = hsep [pprLHsType t1, ptext SLIT("~"), 
+    ppr (HsEqualP t1 t2)    = hsep [pprLHsType t1, ptext (sLit "~"), 
 				    pprLHsType t2]
     ppr (HsIParam n ty)     = hsep [ppr n, dcolon, ppr ty]
 
@@ -303,11 +301,11 @@ pprHsForAll exp tvs cxt
     show_forall =  opt_PprStyle_Debug
 		|| (not (null tvs) && is_explicit)
     is_explicit = case exp of {Explicit -> True; Implicit -> False}
-    forall_part = ptext SLIT("forall") <+> interppSP tvs <> dot
+    forall_part = ptext (sLit "forall") <+> interppSP tvs <> dot
 
 pprHsContext :: (OutputableBndr name) => HsContext name -> SDoc
 pprHsContext []	 = empty
-pprHsContext cxt = ppr_hs_context cxt <+> ptext SLIT("=>")
+pprHsContext cxt = ppr_hs_context cxt <+> ptext (sLit "=>")
 
 ppr_hs_context :: (OutputableBndr name) => HsContext name -> SDoc
 ppr_hs_context []  = empty
@@ -388,11 +386,11 @@ ppr_fun_ty ctxt_prec ty1 ty2
 	p2 = ppr_mono_lty pREC_TOP ty2
     in
     maybeParen ctxt_prec pREC_FUN $
-    sep [p1, ptext SLIT("->") <+> p2]
+    sep [p1, ptext (sLit "->") <+> p2]
 
 --------------------------
 pabrackets :: SDoc -> SDoc
-pabrackets p = ptext SLIT("[:") <> p <> ptext SLIT(":]")
+pabrackets p = ptext (sLit "[:") <> p <> ptext (sLit ":]")
 \end{code}
 
 
