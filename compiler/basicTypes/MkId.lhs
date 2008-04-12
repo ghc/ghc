@@ -355,7 +355,7 @@ mkDataConIds wrap_name wkr_name data_con
 
     mkCoVarLocals i []     = ([],i)
     mkCoVarLocals i (x:xs) = let (ys,j) = mkCoVarLocals (i+1) xs
-                                 y      = mkCoVar (mkSysTvName (mkBuiltinUnique i) FSLIT("dc_co")) x
+                                 y      = mkCoVar (mkSysTvName (mkBuiltinUnique i) (fsLit "dc_co")) x
                              in (y:ys,j)
 
     mk_case 
@@ -729,7 +729,7 @@ reboxProduct us ty
  
         us' = dropList con_arg_tys us
 
-        arg_ids  = zipWith (mkSysLocal FSLIT("rb")) us con_arg_tys
+        arg_ids  = zipWith (mkSysLocal (fsLit "rb")) us con_arg_tys
 
         bind_rhs = mkProductBox arg_ids ty
 
@@ -877,7 +877,7 @@ mkDictSelId no_unf name clas
 
     mkCoVarLocals i []     = ([],i)
     mkCoVarLocals i (x:xs) = let (ys,j) = mkCoVarLocals (i+1) xs
-                                 y      = mkCoVar (mkSysTvName (mkBuiltinUnique i) FSLIT("dc_co")) x
+                                 y      = mkCoVar (mkSysTvName (mkBuiltinUnique i) (fsLit "dc_co")) x
                              in (y:ys,j)
 
     rhs = mkLams tyvars  (Lam dict_id   rhs_body)
@@ -1134,22 +1134,22 @@ another gun with which to shoot yourself in the foot.
 mkWiredInIdName mod fs uniq id
  = mkWiredInName mod (mkOccNameFS varName fs) uniq (AnId id) UserSyntax
 
-unsafeCoerceName = mkWiredInIdName gHC_PRIM FSLIT("unsafeCoerce#") unsafeCoerceIdKey  unsafeCoerceId
-nullAddrName     = mkWiredInIdName gHC_PRIM FSLIT("nullAddr#")     nullAddrIdKey      nullAddrId
-seqName          = mkWiredInIdName gHC_PRIM FSLIT("seq")           seqIdKey           seqId
-realWorldName    = mkWiredInIdName gHC_PRIM FSLIT("realWorld#")    realWorldPrimIdKey realWorldPrimId
-lazyIdName       = mkWiredInIdName gHC_BASE FSLIT("lazy")         lazyIdKey           lazyId
+unsafeCoerceName = mkWiredInIdName gHC_PRIM (fsLit "unsafeCoerce#") unsafeCoerceIdKey  unsafeCoerceId
+nullAddrName     = mkWiredInIdName gHC_PRIM (fsLit "nullAddr#")     nullAddrIdKey      nullAddrId
+seqName          = mkWiredInIdName gHC_PRIM (fsLit "seq")           seqIdKey           seqId
+realWorldName    = mkWiredInIdName gHC_PRIM (fsLit "realWorld#")    realWorldPrimIdKey realWorldPrimId
+lazyIdName       = mkWiredInIdName gHC_BASE (fsLit "lazy")         lazyIdKey           lazyId
 
-errorName                = mkWiredInIdName gHC_ERR FSLIT("error")            errorIdKey eRROR_ID
-recSelErrorName          = mkWiredInIdName gHC_ERR FSLIT("recSelError")     recSelErrorIdKey rEC_SEL_ERROR_ID
-runtimeErrorName         = mkWiredInIdName gHC_ERR FSLIT("runtimeError")    runtimeErrorIdKey rUNTIME_ERROR_ID
-irrefutPatErrorName      = mkWiredInIdName gHC_ERR FSLIT("irrefutPatError") irrefutPatErrorIdKey iRREFUT_PAT_ERROR_ID
-recConErrorName          = mkWiredInIdName gHC_ERR FSLIT("recConError")     recConErrorIdKey rEC_CON_ERROR_ID
-patErrorName             = mkWiredInIdName gHC_ERR FSLIT("patError")         patErrorIdKey pAT_ERROR_ID
-noMethodBindingErrorName = mkWiredInIdName gHC_ERR FSLIT("noMethodBindingError")
+errorName                = mkWiredInIdName gHC_ERR (fsLit "error")            errorIdKey eRROR_ID
+recSelErrorName          = mkWiredInIdName gHC_ERR (fsLit "recSelError")     recSelErrorIdKey rEC_SEL_ERROR_ID
+runtimeErrorName         = mkWiredInIdName gHC_ERR (fsLit "runtimeError")    runtimeErrorIdKey rUNTIME_ERROR_ID
+irrefutPatErrorName      = mkWiredInIdName gHC_ERR (fsLit "irrefutPatError") irrefutPatErrorIdKey iRREFUT_PAT_ERROR_ID
+recConErrorName          = mkWiredInIdName gHC_ERR (fsLit "recConError")     recConErrorIdKey rEC_CON_ERROR_ID
+patErrorName             = mkWiredInIdName gHC_ERR (fsLit "patError")         patErrorIdKey pAT_ERROR_ID
+noMethodBindingErrorName = mkWiredInIdName gHC_ERR (fsLit "noMethodBindingError")
                                            noMethodBindingErrorIdKey nO_METHOD_BINDING_ERROR_ID
 nonExhaustiveGuardsErrorName 
-  = mkWiredInIdName gHC_ERR FSLIT("nonExhaustiveGuardsError") 
+  = mkWiredInIdName gHC_ERR (fsLit "nonExhaustiveGuardsError") 
                     nonExhaustiveGuardsErrorIdKey nON_EXHAUSTIVE_GUARDS_ERROR_ID
 \end{code}
 
@@ -1231,7 +1231,7 @@ realWorldPrimId -- :: State# RealWorld
 
 voidArgId :: Id
 voidArgId       -- :: State# RealWorld
-  = mkSysLocal FSLIT("void") voidArgIdKey realWorldStatePrimTy
+  = mkSysLocal (fsLit "void") voidArgIdKey realWorldStatePrimTy
 \end{code}
 
 
