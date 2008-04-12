@@ -18,8 +18,6 @@ module TcBinds ( tcLocalBinds, tcTopBinds,
 		 TcSigInfo(..), TcSigFun, mkTcSigFun,
 		 badBootDeclErr ) where
 
-#include "HsVersions.h"
-
 import {-# SOURCE #-} TcMatches ( tcGRHSsPat, tcMatchesFun )
 import {-# SOURCE #-} TcExpr  ( tcMonoExpr )
 
@@ -118,7 +116,7 @@ tcHsBootSigs (ValBindsOut binds sigs)
 tcHsBootSigs groups = pprPanic "tcHsBootSigs" (ppr groups)
 
 badBootDeclErr :: Message
-badBootDeclErr = ptext SLIT("Illegal declarations in an hs-boot file")
+badBootDeclErr = ptext (sLit "Illegal declarations in an hs-boot file")
 
 ------------------------
 tcLocalBinds :: HsLocalBinds Name -> TcM thing
@@ -316,8 +314,8 @@ tcPolyBinds top_lvl sig_fn prag_fn rec_group rec_tc binds
     setSrcSpan loc				$
     recoverM (recoveryCode binder_names sig_fn)	$ do 
 
-  { traceTc (ptext SLIT("------------------------------------------------"))
-  ; traceTc (ptext SLIT("Bindings for") <+> ppr binder_names)
+  { traceTc (ptext (sLit "------------------------------------------------"))
+  ; traceTc (ptext (sLit "Bindings for") <+> ppr binder_names)
 
    	-- TYPECHECK THE BINDINGS
   ; ((binds', mono_bind_infos), lie_req) 
@@ -415,7 +413,7 @@ tcPrags poly_id prags = mapM (wrapLocM tc_prag) prags
     tc_prag prag = addErrCtxt (pragSigCtxt prag) $ 
 		   tcPrag poly_id prag
 
-pragSigCtxt prag = hang (ptext SLIT("In the pragma")) 2 (ppr prag)
+pragSigCtxt prag = hang (ptext (sLit "In the pragma")) 2 (ppr prag)
 
 tcPrag :: TcId -> Sig Name -> TcM Prag
 -- Pre-condition: the poly_id is zonked
@@ -479,18 +477,18 @@ checkStrictBinds top_lvl rec_group mbind mono_tys infos
     check_sig other	       = return ()
 
 strictBindErr flavour unlifted mbind
-  = hang (text flavour <+> msg <+> ptext SLIT("aren't allowed:")) 
+  = hang (text flavour <+> msg <+> ptext (sLit "aren't allowed:")) 
 	 4 (pprLHsBinds mbind)
   where
-    msg | unlifted  = ptext SLIT("bindings for unlifted types")
-	| otherwise = ptext SLIT("bang-pattern bindings")
+    msg | unlifted  = ptext (sLit "bindings for unlifted types")
+	| otherwise = ptext (sLit "bang-pattern bindings")
 
 badStrictSig unlifted sig
-  = hang (ptext SLIT("Illegal polymorphic signature in") <+> msg)
+  = hang (ptext (sLit "Illegal polymorphic signature in") <+> msg)
 	 4 (ppr sig)
   where
-    msg | unlifted  = ptext SLIT("an unlifted binding")
-	| otherwise = ptext SLIT("a bang-pattern binding")
+    msg | unlifted  = ptext (sLit "an unlifted binding")
+	| otherwise = ptext (sLit "a bang-pattern binding")
 \end{code}
 
 
@@ -754,7 +752,7 @@ generalise dflags top_lvl bind_list sig_fn mono_infos lie_req
 	    | otherwise		 = exactTyVarsOfType
     tau_tvs = foldr (unionVarSet . get_tvs . getMonoType) emptyVarSet mono_infos
     is_mono_sig sig = null (sig_theta sig)
-    doc = ptext SLIT("type signature(s) for") <+> pprBinders bndrs
+    doc = ptext (sLit "type signature(s) for") <+> pprBinders bndrs
 
     mkMethInst (TcSigInfo { sig_id = poly_id, sig_tvs = tvs, 
 		            sig_theta = theta, sig_loc = loc }) mono_id
@@ -796,7 +794,7 @@ unifyCtxts (sig1 : sigs) 	-- Argument is always non-empty
 	       -- Then unification might succeed with a coercion.  But it's much
 	       -- much simpler to require that such signatures have identical contexts
 	       checkTc (all isIdentityCoercion cois)
-		       (ptext SLIT("Mutually dependent functions have syntactically distinct contexts"))
+		       (ptext (sLit "Mutually dependent functions have syntactically distinct contexts"))
 	     }
 
 checkSigsTyVars :: [TcTyVar] -> [TcSigInfo] -> TcM [TcTyVar]
@@ -818,7 +816,7 @@ checkSigsTyVars qtvs sigs
   where
     check_sig gbl_tvs (TcSigInfo {sig_id = id, sig_tvs = tvs, 
 				  sig_theta = theta, sig_tau = tau})
-      = addErrCtxt (ptext SLIT("In the type signature for") <+> quotes (ppr id))	$
+      = addErrCtxt (ptext (sLit "In the type signature for") <+> quotes (ppr id))	$
 	addErrCtxtM (sigCtxt id tvs theta tau)						$
 	do { tvs' <- checkDistinctTyVars tvs
 	   ; when (any (`elemVarSet` gbl_tvs) tvs')
@@ -853,8 +851,8 @@ checkDistinctTyVars sig_tvs
        = do { env0 <- tcInitTidyEnv
 	    ; let (env1, tidy_tv1) = tidyOpenTyVar env0 sig_tv1
 		  (env2, tidy_tv2) = tidyOpenTyVar env1 sig_tv2
-	          msg = ptext SLIT("Quantified type variable") <+> quotes (ppr tidy_tv1) 
-		         <+> ptext SLIT("is unified with another quantified type variable") 
+	          msg = ptext (sLit "Quantified type variable") <+> quotes (ppr tidy_tv1) 
+		         <+> ptext (sLit "is unified with another quantified type variable") 
 		         <+> quotes (ppr tidy_tv2)
 	    ; failWithTcM (env2, msg) }
        where
@@ -1074,7 +1072,7 @@ data TcSigInfo
 
 instance Outputable TcSigInfo where
     ppr (TcSigInfo { sig_id = id, sig_tvs = tyvars, sig_theta = theta, sig_tau = tau})
-	= ppr id <+> ptext SLIT("::") <+> ppr tyvars <+> ppr theta <+> ptext SLIT("=>") <+> ppr tau
+	= ppr id <+> ptext (sLit "::") <+> ppr tyvars <+> ppr theta <+> ptext (sLit "=>") <+> ppr tau
 \end{code}
 
 \begin{code}
@@ -1167,14 +1165,14 @@ isRestrictedGroup dflags binds sig_fn
 -- This one is called on LHS, when pat and grhss are both Name 
 -- and on RHS, when pat is TcId and grhss is still Name
 patMonoBindsCtxt pat grhss
-  = hang (ptext SLIT("In a pattern binding:")) 4 (pprPatBind pat grhss)
+  = hang (ptext (sLit "In a pattern binding:")) 4 (pprPatBind pat grhss)
 
 -----------------------------------------------
 sigContextsCtxt sig1 sig2
-  = vcat [ptext SLIT("When matching the contexts of the signatures for"), 
+  = vcat [ptext (sLit "When matching the contexts of the signatures for"), 
 	  nest 2 (vcat [ppr id1 <+> dcolon <+> ppr (idType id1),
 			ppr id2 <+> dcolon <+> ppr (idType id2)]),
-	  ptext SLIT("The signature contexts in a mutually recursive group should all be identical")]
+	  ptext (sLit "The signature contexts in a mutually recursive group should all be identical")]
   where
     id1 = sig_id sig1
     id2 = sig_id sig2
@@ -1182,17 +1180,17 @@ sigContextsCtxt sig1 sig2
 
 -----------------------------------------------
 unboxedTupleErr name ty
-  = hang (ptext SLIT("Illegal binding of unboxed tuple"))
+  = hang (ptext (sLit "Illegal binding of unboxed tuple"))
 	 4 (ppr name <+> dcolon <+> ppr ty)
 
 -----------------------------------------------
 restrictedBindCtxtErr binder_names
-  = hang (ptext SLIT("Illegal overloaded type signature(s)"))
-       4 (vcat [ptext SLIT("in a binding group for") <+> pprBinders binder_names,
-		ptext SLIT("that falls under the monomorphism restriction")])
+  = hang (ptext (sLit "Illegal overloaded type signature(s)"))
+       4 (vcat [ptext (sLit "in a binding group for") <+> pprBinders binder_names,
+		ptext (sLit "that falls under the monomorphism restriction")])
 
 genCtxt binder_names
-  = ptext SLIT("When generalising the type(s) for") <+> pprBinders binder_names
+  = ptext (sLit "When generalising the type(s) for") <+> pprBinders binder_names
 
 missingSigWarn False name ty = return ()
 missingSigWarn True  name ty
@@ -1200,6 +1198,6 @@ missingSigWarn True  name ty
 	; let (env1, tidy_ty) = tidyOpenType env0 ty
 	; addWarnTcM (env1, mk_msg tidy_ty) }
   where
-    mk_msg ty = vcat [ptext SLIT("Definition but no type signature for") <+> quotes (ppr name),
-		      sep [ptext SLIT("Inferred type:") <+> pprHsVar name <+> dcolon <+> ppr ty]]
+    mk_msg ty = vcat [ptext (sLit "Definition but no type signature for") <+> quotes (ppr name),
+		      sep [ptext (sLit "Inferred type:") <+> pprHsVar name <+> dcolon <+> ppr ty]]
 \end{code}
