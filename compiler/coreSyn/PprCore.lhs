@@ -19,8 +19,6 @@ module PprCore (
 	pprRules
     ) where
 
-#include "HsVersions.h"
-
 import CoreSyn
 import CostCentre
 import Var
@@ -80,9 +78,9 @@ pprTopBind (NonRec binder expr)
  = ppr_binding (binder,expr) $$ text ""
 
 pprTopBind (Rec binds)
-  = vcat [ptext SLIT("Rec {"),
+  = vcat [ptext (sLit "Rec {"),
 	  vcat (map ppr_binding binds),
-	  ptext SLIT("end Rec }"),
+	  ptext (sLit "end Rec }"),
 	  text ""]
 \end{code}
 
@@ -113,7 +111,7 @@ ppr_expr :: OutputableBndr b => (SDoc -> SDoc) -> Expr b -> SDoc
 	-- The function adds parens in context that need
 	-- an atomic value (e.g. function args)
 
-ppr_expr add_par (Type ty)  = add_par (ptext SLIT("TYPE") <+> ppr ty)	-- Wierd
+ppr_expr add_par (Type ty)  = add_par (ptext (sLit "TYPE") <+> ppr ty)	-- Wierd
 	           
 ppr_expr add_par (Var name) = ppr name
 ppr_expr add_par (Lit lit)  = ppr lit
@@ -121,7 +119,7 @@ ppr_expr add_par (Lit lit)  = ppr lit
 ppr_expr add_par (Cast expr co) 
   = add_par $
     sep [pprParendExpr expr, 
-	 ptext SLIT("`cast`") <+> parens (pprCo co)]
+	 ptext (sLit "`cast`") <+> parens (pprCo co)]
   where
     pprCo co = sep [ppr co, dcolon <+> ppr (coercionKindPredTy co)]
 	 
@@ -131,7 +129,7 @@ ppr_expr add_par expr@(Lam _ _)
 	(bndrs, body) = collectBinders expr
     in
     add_par $
-    hang (ptext SLIT("\\") <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow)
+    hang (ptext (sLit "\\") <+> sep (map (pprBndr LambdaBind) bndrs) <+> arrow)
 	 2 (pprCoreExpr body)
 
 ppr_expr add_par expr@(App fun arg)
@@ -158,9 +156,9 @@ ppr_expr add_par expr@(App fun arg)
 
 ppr_expr add_par (Case expr var ty [(con,args,rhs)])
   = add_par $
-    sep [sep [ptext SLIT("case") <+> pprCoreExpr expr,
+    sep [sep [ptext (sLit "case") <+> pprCoreExpr expr,
 	      ifPprDebug (braces (ppr ty)),
-	      sep [ptext SLIT("of") <+> ppr_bndr var, 
+	      sep [ptext (sLit "of") <+> ppr_bndr var, 
 		   char '{' <+> ppr_case_pat con args]
 	  ],
 	 pprCoreExpr rhs,
@@ -171,10 +169,10 @@ ppr_expr add_par (Case expr var ty [(con,args,rhs)])
 
 ppr_expr add_par (Case expr var ty alts)
   = add_par $
-    sep [sep [ptext SLIT("case")
+    sep [sep [ptext (sLit "case")
 		<+> pprCoreExpr expr
 		<+> ifPprDebug (braces (ppr ty)),
-	      ptext SLIT("of") <+> ppr_bndr var <+> char '{'],
+	      ptext (sLit "of") <+> ppr_bndr var <+> char '{'],
 	 nest 2 (sep (punctuate semi (map pprCoreAlt alts))),
 	 char '}'
     ]
@@ -189,16 +187,16 @@ ppr_expr add_par (Case expr var ty alts)
 ppr_expr add_par (Let bind@(NonRec val_bdr rhs@(Let _ _)) body)
   = add_par $
     vcat [
-      hsep [ptext SLIT("let {"), (pprBndr LetBind val_bdr $$ ppr val_bndr), equals],
+      hsep [ptext (sLit "let {"), (pprBndr LetBind val_bdr $$ ppr val_bndr), equals],
       nest 2 (pprCoreExpr rhs),
-      ptext SLIT("} in"),
+      ptext (sLit "} in"),
       pprCoreExpr body ]
 
 ppr_expr add_par (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
   = add_par
-    (hang (ptext SLIT("let {"))
+    (hang (ptext (sLit "let {"))
 	  2 (hsep [ppr_binding (val_bdr,rhs),
-		   ptext SLIT("} in")])
+		   ptext (sLit "} in")])
      $$
      pprCoreExpr expr)
 -}
@@ -206,22 +204,22 @@ ppr_expr add_par (Let bind@(NonRec val_bdr rhs) expr@(Let _ _))
 -- General case (recursive case, too)
 ppr_expr add_par (Let bind expr)
   = add_par $
-    sep [hang (ptext keyword) 2 (ppr_bind bind <+> ptext SLIT("} in")),
+    sep [hang (ptext keyword) 2 (ppr_bind bind <+> ptext (sLit "} in")),
 	 pprCoreExpr expr]
   where
     keyword = case bind of
-		Rec _      -> SLIT("letrec {")
-		NonRec _ _ -> SLIT("let {")
+		Rec _      -> (sLit "letrec {")
+		NonRec _ _ -> (sLit "let {")
 
 ppr_expr add_par (Note (SCC cc) expr)
   = add_par (sep [pprCostCentreCore cc, pprCoreExpr expr])
 
 ppr_expr add_par (Note InlineMe expr)
-  = add_par $ ptext SLIT("__inline_me") <+> pprParendExpr expr
+  = add_par $ ptext (sLit "__inline_me") <+> pprParendExpr expr
 
 ppr_expr add_par (Note (CoreNote s) expr)
   = add_par $ 
-    sep [sep [ptext SLIT("__core_note"), pprHsString (mkFastString s)],
+    sep [sep [ptext (sLit "__core_note"), pprHsString (mkFastString s)],
          pprParendExpr expr]
 
 pprCoreAlt (con, args, rhs) 
@@ -239,7 +237,7 @@ ppr_case_pat con args
   where
     ppr_bndr = pprBndr CaseBind
 
-pprArg (Type ty) = ptext SLIT("@") <+> pprParendType ty
+pprArg (Type ty) = ptext (sLit "@") <+> pprParendType ty
 pprArg expr      = pprParendExpr expr
 \end{code}
 
@@ -269,11 +267,11 @@ pprCoreBinder CaseBind bndr
 	pprUntypedBinder bndr
 
 pprUntypedBinder binder
-  | isTyVar binder = ptext SLIT("@") <+> ppr binder	-- NB: don't print kind
+  | isTyVar binder = ptext (sLit "@") <+> ppr binder	-- NB: don't print kind
   | otherwise      = pprIdBndr binder
 
 pprTypedBinder binder
-  | isTyVar binder  = ptext SLIT("@") <+> pprTyVarBndr binder
+  | isTyVar binder  = ptext (sLit "@") <+> pprTyVarBndr binder
   | otherwise	    = pprIdBndr binder <+> dcolon <+> pprType (idType binder)
 
 pprTyVarBndr :: TyVar -> SDoc
@@ -317,7 +315,7 @@ pprIdBndrInfo info
 \begin{code}
 pprIdDetails :: Id -> SDoc
 pprIdDetails id | isGlobalId id     = ppr (globalIdDetails id)
-		| isExportedId id   = ptext SLIT("[Exported]")
+		| isExportedId id   = ptext (sLit "[Exported]")
 		| otherwise	    = empty
 
 ppIdInfo :: Id -> IdInfo -> SDoc
@@ -332,7 +330,7 @@ ppIdInfo b info
 #endif
 	    pprNewStrictness (newStrictnessInfo info),
 	    if null rules then empty
-	    else ptext SLIT("RULES:") <+> vcat (map pprRule rules)
+	    else ptext (sLit "RULES:") <+> vcat (map pprRule rules)
 	-- Inline pragma, occ, demand, lbvar info
 	-- printed out with all binders (when debug is on); 
 	-- see PprCore.pprIdBndr
@@ -356,14 +354,14 @@ pprRules rules = vcat (map pprRule rules)
 
 pprRule :: CoreRule -> SDoc
 pprRule (BuiltinRule { ru_fn = fn, ru_name = name})
-  = ptext SLIT("Built in rule for") <+> ppr fn <> colon <+> doubleQuotes (ftext name)
+  = ptext (sLit "Built in rule for") <+> ppr fn <> colon <+> doubleQuotes (ftext name)
 
 pprRule (Rule { ru_name = name, ru_act = act, ru_fn = fn,
 		ru_bndrs = tpl_vars, ru_args = tpl_args,
 		ru_rhs = rhs })
   = hang (doubleQuotes (ftext name) <+> ppr act)
-       4 (sep [ptext SLIT("forall") <+> braces (sep (map pprTypedBinder tpl_vars)),
+       4 (sep [ptext (sLit "forall") <+> braces (sep (map pprTypedBinder tpl_vars)),
 	       nest 2 (ppr fn <+> sep (map pprArg tpl_args)),
-	       nest 2 (ptext SLIT("=") <+> pprCoreExpr rhs)
+	       nest 2 (ptext (sLit "=") <+> pprCoreExpr rhs)
 	    ])
 \end{code}
