@@ -438,7 +438,7 @@ find_thing ignore_it tidy_env (ATcId { tct_id = id }) = do
      else let
 	(tidy_env', tidy_ty) = tidyOpenType tidy_env id_ty
 	msg = sep [ppr id <+> dcolon <+> ppr tidy_ty, 
-		   nest 2 (parens (ptext SLIT("bound at") <+>
+		   nest 2 (parens (ptext (sLit "bound at") <+>
 			 	   ppr (getSrcLoc id)))]
      in
       return (tidy_env', Just msg)
@@ -450,13 +450,13 @@ find_thing ignore_it tidy_env (ATyVar tv ty) = do
      else let
 	-- The name tv is scoped, so we don't need to tidy it
 	(tidy_env1, tidy_ty) = tidyOpenType  tidy_env tv_ty
-	msg = sep [ptext SLIT("Scoped type variable") <+> quotes (ppr tv) <+> eq_stuff, nest 2 bound_at]
+	msg = sep [ptext (sLit "Scoped type variable") <+> quotes (ppr tv) <+> eq_stuff, nest 2 bound_at]
 
 	eq_stuff | Just tv' <- Type.getTyVar_maybe tv_ty, 
 		   getOccName tv == getOccName tv' = empty
 		 | otherwise = equals <+> ppr tidy_ty
 		-- It's ok to use Type.getTyVar_maybe because ty is zonked by now
-	bound_at = parens $ ptext SLIT("bound at:") <+> ppr (getSrcLoc tv)
+	bound_at = parens $ ptext (sLit "bound at:") <+> ppr (getSrcLoc tv)
      in
        return (tidy_env1, Just msg)
 
@@ -539,14 +539,14 @@ checkWellStaged pp_thing bind_lvl use_stage
 
   | bind_lvl == topLevel	-- GHC restriction on top level splices
   = failWithTc $ 
-    sep [ptext SLIT("GHC stage restriction:") <+>  pp_thing,
-	 nest 2 (ptext SLIT("is used in a top-level splice, and must be imported, not defined locally"))]
+    sep [ptext (sLit "GHC stage restriction:") <+>  pp_thing,
+	 nest 2 (ptext (sLit "is used in a top-level splice, and must be imported, not defined locally"))]
 
   | otherwise			-- Badly staged
   = failWithTc $ 		-- E.g.  \x -> $(f x)
-    ptext SLIT("Stage error:") <+> pp_thing <+> 
-	hsep   [ptext SLIT("is bound at stage") <+> ppr bind_lvl,
-		ptext SLIT("but used at stage") <+> ppr use_lvl]
+    ptext (sLit "Stage error:") <+> pp_thing <+> 
+	hsep   [ptext (sLit "is bound at stage") <+> ppr bind_lvl,
+		ptext (sLit "but used at stage") <+> ppr use_lvl]
   where
     use_lvl = thLevel use_stage
 
@@ -624,7 +624,7 @@ data InstBindings
 				-- witness dictionary is identical to the argument 
 				-- dictionary.  Hence no bindings, no pragmas.
 
-pprInstInfo info = vcat [ptext SLIT("InstInfo:") <+> ppr (idType (iDFunId info))]
+pprInstInfo info = vcat [ptext (sLit "InstInfo:") <+> ppr (idType (iDFunId info))]
 
 pprInstInfoDetails info = pprInstInfo info $$ nest 2 (details (iBinds info))
   where
@@ -690,12 +690,12 @@ pprBinders [bndr] = quotes (ppr bndr)
 pprBinders bndrs  = pprWithCommas ppr bndrs
 
 notFound name env
-  = failWithTc (vcat[ptext SLIT("GHC internal error:") <+> quotes (ppr name) <+> 
-                     ptext SLIT("is not in scope during type checking, but it passed the renamer"),
-                     ptext SLIT("tcg_type_env of environment:") <+> ppr (tcg_type_env env)]
+  = failWithTc (vcat[ptext (sLit "GHC internal error:") <+> quotes (ppr name) <+> 
+                     ptext (sLit "is not in scope during type checking, but it passed the renamer"),
+                     ptext (sLit "tcg_type_env of environment:") <+> ppr (tcg_type_env env)]
                     )
 
 wrongThingErr expected thing name
   = failWithTc (pprTcTyThingCategory thing <+> quotes (ppr name) <+> 
-		ptext SLIT("used as a") <+> text expected)
+		ptext (sLit "used as a") <+> text expected)
 \end{code}
