@@ -278,7 +278,7 @@ applyToVars vars fn = mkVarApps fn vars
 
 mk_wrap_arg :: Unique -> Type -> NewDemand.Demand -> Bool -> Id
 mk_wrap_arg uniq ty dmd one_shot 
-  = set_one_shot one_shot (setIdNewDemandInfo (mkSysLocal FSLIT("w") uniq ty) dmd)
+  = set_one_shot one_shot (setIdNewDemandInfo (mkSysLocal (fsLit "w") uniq ty) dmd)
   where
     set_one_shot True  id = setOneShotLambda id
     set_one_shot False id = id
@@ -502,5 +502,5 @@ sanitiseCaseBndr :: Id -> Id
 sanitiseCaseBndr id = id `setIdInfo` vanillaIdInfo
 
 mk_ww_local :: Unique -> Type -> Id
-mk_ww_local uniq ty = mkSysLocal FSLIT("ww") uniq ty
+mk_ww_local uniq ty = mkSysLocal (fsLit "ww") uniq ty
 \end{code}
