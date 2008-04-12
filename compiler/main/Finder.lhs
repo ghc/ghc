@@ -25,8 +25,6 @@ module Finder (
 
   ) where
 
-#include "HsVersions.h"
-
 import Module
 import HscTypes
 import Packages
@@ -535,15 +533,15 @@ findObjectLinkable mod obj_fn obj_time = do
 -- Error messages
 
 cannotFindModule :: DynFlags -> ModuleName -> FindResult -> SDoc
-cannotFindModule = cantFindErr SLIT("Could not find module")
+cannotFindModule = cantFindErr (sLit "Could not find module")
 
 cannotFindInterface  :: DynFlags -> ModuleName -> FindResult -> SDoc
-cannotFindInterface = cantFindErr SLIT("Failed to load interface for")
+cannotFindInterface = cantFindErr (sLit "Failed to load interface for")
 
 cantFindErr :: LitString -> DynFlags -> ModuleName -> FindResult -> SDoc
 cantFindErr cannot_find _dflags mod_name (FoundMultiple pkgs)
   = hang (ptext cannot_find <+> quotes (ppr mod_name) <> colon) 2 (
-       sep [ptext SLIT("it was found in multiple packages:"),
+       sep [ptext (sLit "it was found in multiple packages:"),
 		hsep (map (text.packageIdString) pkgs)]
     )
 cantFindErr cannot_find dflags mod_name find_result
@@ -553,34 +551,34 @@ cantFindErr cannot_find dflags mod_name find_result
     more_info
       = case find_result of
 	    PackageHidden pkg 
-		-> ptext SLIT("it is a member of package") <+> ppr pkg <> comma
-		   <+> ptext SLIT("which is hidden")
+		-> ptext (sLit "it is a member of package") <+> ppr pkg <> comma
+		   <+> ptext (sLit "which is hidden")
 
 	    ModuleHidden pkg
-		-> ptext SLIT("it is hidden") <+> parens (ptext SLIT("in package")
+		-> ptext (sLit "it is hidden") <+> parens (ptext (sLit "in package")
 		   <+> ppr pkg)
 
 	    NoPackage pkg
-		-> ptext SLIT("no package matching") <+> ppr pkg <+>
-		   ptext SLIT("was found")
+		-> ptext (sLit "no package matching") <+> ppr pkg <+>
+		   ptext (sLit "was found")
 
 	    NotFound files mb_pkg
 		| null files
-		-> ptext SLIT("it is not a module in the current program, or in any known package.")
+		-> ptext (sLit "it is not a module in the current program, or in any known package.")
 		| Just pkg <- mb_pkg, pkg /= thisPackage dflags, build_tag /= ""
 		-> let 
 		     build = if build_tag == "p" then "profiling" 
 						 else "\"" ++ build_tag ++ "\""
 		   in
-		   ptext SLIT("Perhaps you haven't installed the ") <> text build <>
-		   ptext SLIT(" libraries for package ") <> ppr pkg <> char '?' $$
+		   ptext (sLit "Perhaps you haven't installed the ") <> text build <>
+		   ptext (sLit " libraries for package ") <> ppr pkg <> char '?' $$
 		   not_found files
 
 		| otherwise
 		-> not_found files
 
 	    NotFoundInPackage pkg
-		-> ptext SLIT("it is not in package") <+> ppr pkg
+		-> ptext (sLit "it is not in package") <+> ppr pkg
 
 	    _ -> panic "cantFindErr"
 
@@ -588,7 +586,7 @@ cantFindErr cannot_find dflags mod_name find_result
 
     not_found files
 	| verbosity dflags < 3
-	= ptext SLIT("Use -v to see a list of the files searched for.")
+	= ptext (sLit "Use -v to see a list of the files searched for.")
 	| otherwise 
-	= hang (ptext SLIT("locations searched:")) 2 (vcat (map text files))
+	= hang (ptext (sLit "locations searched:")) 2 (vcat (map text files))
 \end{code}
