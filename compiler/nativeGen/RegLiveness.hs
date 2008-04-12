@@ -30,8 +30,6 @@ module RegLiveness (
 
   ) where
 
-#include "HsVersions.h"
-
 import MachRegs
 import MachInstrs
 import PprMach
@@ -113,9 +111,9 @@ instance Outputable LiveInstr where
 	 =  ppr instr
 		$$ (nest 8
 			$ vcat
-			[ pprRegs (ptext SLIT("# born:    ")) (liveBorn live)
-			, pprRegs (ptext SLIT("# r_dying: ")) (liveDieRead live)
-			, pprRegs (ptext SLIT("# w_dying: ")) (liveDieWrite live) ]
+			[ pprRegs (ptext (sLit "# born:    ")) (liveBorn live)
+			, pprRegs (ptext (sLit "# r_dying: ")) (liveDieRead live)
+			, pprRegs (ptext (sLit "# w_dying: ")) (liveDieWrite live) ]
 		    $+$ space)
 
 	 where 	pprRegs :: SDoc -> RegSet -> SDoc
