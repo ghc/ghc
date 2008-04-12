@@ -38,8 +38,6 @@ module SrcLoc (
         leftmost_smallest, leftmost_largest, rightmost, spans, isSubspanOf
     ) where
 
-#include "HsVersions.h"
-
 import Util
 import Outputable
 import FastString
@@ -77,9 +75,9 @@ mkSrcLoc :: FastString -> Int -> Int -> SrcLoc
 mkSrcLoc x line col = SrcLoc x line col
 
 noSrcLoc, generatedSrcLoc, interactiveSrcLoc :: SrcLoc
-noSrcLoc	  = UnhelpfulLoc FSLIT("<no location info>")
-generatedSrcLoc   = UnhelpfulLoc FSLIT("<compiler-generated code>")
-interactiveSrcLoc = UnhelpfulLoc FSLIT("<interactive session>")
+noSrcLoc	  = UnhelpfulLoc (fsLit "<no location info>")
+generatedSrcLoc   = UnhelpfulLoc (fsLit "<compiler-generated code>")
+interactiveSrcLoc = UnhelpfulLoc (fsLit "<interactive session>")
 
 mkGeneralSrcLoc :: FastString -> SrcLoc
 mkGeneralSrcLoc = UnhelpfulLoc 
@@ -90,7 +88,7 @@ isGoodSrcLoc _other         = False
 
 srcLocFile :: SrcLoc -> FastString
 srcLocFile (SrcLoc fname _ _) = fname
-srcLocFile _other	      = FSLIT("<unknown file")
+srcLocFile _other	      = (fsLit "<unknown file")
 
 srcLocLine :: SrcLoc -> Int
 srcLocLine (SrcLoc _ l _) = l
@@ -204,8 +202,8 @@ instance Ord SrcSpan where
      (srcSpanEnd   a `compare` srcSpanEnd   b)
 
 noSrcSpan, wiredInSrcSpan :: SrcSpan
-noSrcSpan      = UnhelpfulSpan FSLIT("<no location info>")
-wiredInSrcSpan = UnhelpfulSpan FSLIT("<wired into compiler>")
+noSrcSpan      = UnhelpfulSpan (fsLit "<no location info>")
+wiredInSrcSpan = UnhelpfulSpan (fsLit "<wired into compiler>")
 
 mkGeneralSrcSpan :: FastString -> SrcSpan
 mkGeneralSrcSpan = UnhelpfulSpan
@@ -313,7 +311,7 @@ combineSrcSpans	start end
 pprDefnLoc :: SrcSpan -> SDoc
 -- "defined at ..."
 pprDefnLoc loc
-  | isGoodSrcSpan loc = ptext SLIT("Defined at") <+> ppr loc
+  | isGoodSrcSpan loc = ptext (sLit "Defined at") <+> ppr loc
   | otherwise	      = ppr loc
 
 instance Outputable SrcSpan where
