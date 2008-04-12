@@ -32,8 +32,6 @@ module HscMain
     , makeSimpleDetails
     ) where
 
-#include "HsVersions.h"
-
 #ifdef GHCI
 import CodeOutput	( outputForeignStubs )
 import ByteCodeGen	( byteCodeGen, coreExprToBCOs )
@@ -929,7 +927,7 @@ hscParseThing parser dflags str
 
       buf <- stringToStringBuffer str
 
-      let loc  = mkSrcLoc FSLIT("<interactive>") 1 0
+      let loc  = mkSrcLoc (fsLit "<interactive>") 1 0
 
       case unP parser (mkPState buf loc dflags) of {
 
