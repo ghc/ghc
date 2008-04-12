@@ -15,8 +15,6 @@ which deal with the intantiated versions are located elsewhere:
 \begin{code}
 module HsUtils where
 
-#include "HsVersions.h"
-
 import HsBinds
 import HsExpr
 import HsPat
@@ -173,7 +171,7 @@ mkHsSplice :: LHsExpr RdrName -> HsSplice RdrName
 mkHsSplice e = HsSplice unqualSplice e
 
 unqualSplice :: RdrName
-unqualSplice = mkRdrUnqual (mkVarOccFS FSLIT("splice"))
+unqualSplice = mkRdrUnqual (mkVarOccFS (fsLit "splice"))
 		-- A name (uniquified later) to
 		-- identify the splice
 
@@ -181,7 +179,7 @@ mkHsQuasiQuote :: RdrName -> SrcSpan -> FastString -> HsQuasiQuote RdrName
 mkHsQuasiQuote quoter span quote = HsQuasiQuote unqualQuasiQuote quoter span quote
 
 unqualQuasiQuote :: RdrName
-unqualQuasiQuote = mkRdrUnqual (mkVarOccFS FSLIT("quasiquote"))
+unqualQuasiQuote = mkRdrUnqual (mkVarOccFS (fsLit "quasiquote"))
 		-- A name (uniquified later) to
 		-- identify the quasi-quote
 
