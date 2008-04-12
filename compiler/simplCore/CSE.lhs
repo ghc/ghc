@@ -329,7 +329,7 @@ extendCSEnv (CS cs in_scope sub) expr expr'
 	= WARN( result `lengthExceeds` 4, short_msg $$ nest 2 long_msg ) result
 	where
 	  result = new ++ old
-	  short_msg = ptext SLIT("extendCSEnv: long list, length") <+> int (length result)
+	  short_msg = ptext (sLit "extendCSEnv: long list, length") <+> int (length result)
 	  long_msg | opt_PprStyle_Debug = (text "hash code" <+> text (show hash)) $$ ppr result 
 		   | otherwise	        = empty
 
