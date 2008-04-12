@@ -1323,9 +1323,9 @@ zip_ty_env tvs      tys      env   = pprTrace "Var/Type length mismatch: " (ppr 
 
 instance Outputable TvSubst where
   ppr (TvSubst ins env) 
-    = brackets $ sep[ ptext SLIT("TvSubst"),
-		      nest 2 (ptext SLIT("In scope:") <+> ppr ins), 
-		      nest 2 (ptext SLIT("Env:") <+> ppr env) ]
+    = brackets $ sep[ ptext (sLit "TvSubst"),
+		      nest 2 (ptext (sLit "In scope:") <+> ppr ins), 
+		      nest 2 (ptext (sLit "Env:") <+> ppr env) ]
 \end{code}
 
 %************************************************************************
