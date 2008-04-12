@@ -238,6 +238,7 @@ genericTyConNames = [crossTyConName, plusTyConName, genUnitTyConName]
 pRELUDE		= mkBaseModule_ pRELUDE_NAME
 gHC_PRIM	= mkPrimModule FSLIT("GHC.Prim")   -- Primitive types and values
 gHC_BOOL	= mkPrimModule FSLIT("GHC.Bool")
+gHC_ORDERING	= mkPrimModule FSLIT("GHC.Ordering")
 gHC_GENERICS	= mkPrimModule FSLIT("GHC.Generics")
 gHC_BASE	= mkBaseModule FSLIT("GHC.Base")
 gHC_ENUM	= mkBaseModule FSLIT("GHC.Enum")
@@ -346,9 +347,9 @@ le_RDR 			= varQual_RDR  gHC_BASE FSLIT("<=")
 lt_RDR 			= varQual_RDR  gHC_BASE FSLIT("<") 
 gt_RDR 			= varQual_RDR  gHC_BASE FSLIT(">")  
 compare_RDR		= varQual_RDR  gHC_BASE FSLIT("compare") 
-ltTag_RDR		= dataQual_RDR gHC_BASE FSLIT("LT") 
-eqTag_RDR		= dataQual_RDR gHC_BASE FSLIT("EQ")
-gtTag_RDR		= dataQual_RDR gHC_BASE FSLIT("GT")
+ltTag_RDR		= dataQual_RDR gHC_ORDERING FSLIT("LT") 
+eqTag_RDR		= dataQual_RDR gHC_ORDERING FSLIT("EQ")
+gtTag_RDR		= dataQual_RDR gHC_ORDERING FSLIT("GT")
 
 eqClass_RDR		= nameRdrName eqClassName
 numClass_RDR 		= nameRdrName numClassName
@@ -477,7 +478,7 @@ and it's convenient to write them all down in one place.
 \begin{code}
 runMainIOName = varQual gHC_TOP_HANDLER FSLIT("runMainIO") runMainKey
 
-orderingTyConName = tcQual   gHC_BASE FSLIT("Ordering") orderingTyConKey
+orderingTyConName = tcQual   gHC_ORDERING FSLIT("Ordering") orderingTyConKey
 
 eitherTyConName	  = tcQual  dATA_EITHER FSLIT("Either") eitherTyConKey
 leftDataConName   = conName dATA_EITHER FSLIT("Left")   leftDataConKey
