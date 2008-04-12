@@ -1211,9 +1211,9 @@ misMatchMsg :: TidyEnv -> (TcType, TcType) -> (TidyEnv, SDoc)
 misMatchMsg env0 (ty_act, ty_exp)
   = let (env1, pp_exp, extra_exp) = ppr_ty env0 ty_exp
 	(env2, pp_act, extra_act) = ppr_ty env1 ty_act
-        msg = sep [sep [ptext SLIT("Couldn't match expected type") <+> pp_exp, 
+        msg = sep [sep [ptext (sLit "Couldn't match expected type") <+> pp_exp, 
 			nest 7 $
-                              ptext SLIT("against inferred type") <+> pp_act],
+                              ptext (sLit "against inferred type") <+> pp_act],
 		   nest 2 (extra_exp $$ extra_act)]
     in
     (env2, msg)
