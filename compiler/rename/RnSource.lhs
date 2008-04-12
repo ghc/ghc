@@ -329,8 +329,8 @@ rnSrcDeprecDecls decls
                      (map (\ (L loc (Deprecation rdr_name _)) -> L loc rdr_name) decls)
                
 dupDeprecDecl (L loc _) rdr_name
-  = vcat [ptext SLIT("Multiple deprecation declarations for") <+> quotes (ppr rdr_name),
-          ptext SLIT("also at ") <+> ppr loc]
+  = vcat [ptext (sLit "Multiple deprecation declarations for") <+> quotes (ppr rdr_name),
+          ptext (sLit "also at ") <+> ppr loc]
 
 \end{code}
 
@@ -368,7 +368,7 @@ rnHsForeignDecl (ForeignExport name ty spec)
 	--     we add it to the free-variable list.  It might, for example,
 	--     be imported from another module
 
-fo_decl_msg name = ptext SLIT("In the foreign declaration for") <+> ppr name
+fo_decl_msg name = ptext (sLit "In the foreign declaration for") <+> ppr name
 \end{code}
 
 
@@ -520,9 +520,9 @@ rnHsRuleDecl (HsRule rule_name act vars lhs fv_lhs rhs fv_rhs)
 	  returnM (RuleBndrSig (L loc id) t', fvs)
 
 badRuleVar name var
-  = sep [ptext SLIT("Rule") <+> doubleQuotes (ftext name) <> colon,
-	 ptext SLIT("Forall'd variable") <+> quotes (ppr var) <+> 
-		ptext SLIT("does not appear on left hand side")]
+  = sep [ptext (sLit "Rule") <+> doubleQuotes (ftext name) <> colon,
+	 ptext (sLit "Forall'd variable") <+> quotes (ppr var) <+> 
+		ptext (sLit "does not appear on left hand side")]
 \end{code}
 
 Note [Rule LHS validity checking]
@@ -583,11 +583,11 @@ validRuleLhs foralls lhs
 -}
 
 badRuleLhsErr name lhs bad_e
-  = sep [ptext SLIT("Rule") <+> ftext name <> colon,
-	 nest 4 (vcat [ptext SLIT("Illegal expression:") <+> ppr bad_e, 
-		       ptext SLIT("in left-hand side:") <+> ppr lhs])]
+  = sep [ptext (sLit "Rule") <+> ftext name <> colon,
+	 nest 4 (vcat [ptext (sLit "Illegal expression:") <+> ppr bad_e, 
+		       ptext (sLit "in left-hand side:") <+> ppr lhs])]
     $$
-    ptext SLIT("LHS must be of form (f e1 .. en) where f is not forall'd")
+    ptext (sLit "LHS must be of form (f e1 .. en) where f is not forall'd")
 \end{code}
 
 
@@ -782,8 +782,8 @@ rnTyClDecl (ClassDecl {tcdCtxt = context, tcdLName = cname,
     at_doc   = text "In the associated types for class"	<+> ppr cname
 
 badGadtStupidTheta tycon
-  = vcat [ptext SLIT("No context is allowed on a GADT-style data declaration"),
-	  ptext SLIT("(You can put a context on each contructor, though.)")]
+  = vcat [ptext (sLit "No context is allowed on a GADT-style data declaration"),
+	  ptext (sLit "(You can put a context on each contructor, though.)")]
 \end{code}
 
 %*********************************************************
@@ -942,7 +942,7 @@ rnATs ats = mapFvRn (wrapLocFstM rn_at) ats
 noPatterns = text "Default definition for an associated synonym cannot have"
 	     <+> text "type pattern"
 
-repeatedTyVar tv = ptext SLIT("Illegal repeated type variable") <+>
+repeatedTyVar tv = ptext (sLit "Illegal repeated type variable") <+>
 		   quotes (ppr tv)
 
 -- This data decl will parse OK
@@ -958,7 +958,7 @@ repeatedTyVar tv = ptext SLIT("Illegal repeated type variable") <+>
 checkConName name = checkErr (isRdrDataCon name) (badDataCon name)
 
 badDataCon name
-   = hsep [ptext SLIT("Illegal data constructor name"), quotes (ppr name)]
+   = hsep [ptext (sLit "Illegal data constructor name"), quotes (ppr name)]
 \end{code}
 
 
@@ -1065,8 +1065,8 @@ rnSplice (HsSplice n expr)
 checkTH e what = returnM ()	-- OK
 #else
 checkTH e what 	-- Raise an error in a stage-1 compiler
-  = addErr (vcat [ptext SLIT("Template Haskell") <+> text what <+>  
-	          ptext SLIT("illegal in a stage-1 compiler"),
+  = addErr (vcat [ptext (sLit "Template Haskell") <+> text what <+>  
+	          ptext (sLit "illegal in a stage-1 compiler"),
 	          nest 2 (ppr e)])
 #endif   
 \end{code}
