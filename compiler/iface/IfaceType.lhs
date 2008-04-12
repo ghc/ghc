@@ -30,8 +30,6 @@ module IfaceType (
 
     ) where
 
-#include "HsVersions.h"
-
 import TypeRep
 import TyCon
 import Var
@@ -221,7 +219,7 @@ pprIfaceForAllPart tvs ctxt doc
   = sep [ppr_tvs, pprIfaceContext ctxt, doc]
   where
     ppr_tvs | null tvs  = empty
-	    | otherwise = ptext SLIT("forall") <+> pprIfaceTvBndrs tvs <> dot
+	    | otherwise = ptext (sLit "forall") <+> pprIfaceTvBndrs tvs <> dot
 
 -------------------
 ppr_tc_app ctxt_prec tc 	 []   = ppr_tc tc
@@ -242,7 +240,7 @@ ppr_tc tc		   = ppr tc
 -------------------
 instance Outputable IfacePredType where
 	-- Print without parens
-  ppr (IfaceEqPred ty1 ty2)= hsep [ppr ty1, ptext SLIT(":=:"), ppr ty2]
+  ppr (IfaceEqPred ty1 ty2)= hsep [ppr ty1, ptext (sLit ":=:"), ppr ty2]
   ppr (IfaceIParam ip ty)  = hsep [ppr ip, dcolon, ppr ty]
   ppr (IfaceClassP cls ts) = parenSymOcc (getOccName cls) (ppr cls)
 			     <+> sep (map pprParendIfaceType ts)
@@ -255,13 +253,13 @@ instance Outputable IfaceTyCon where
 pprIfaceContext :: IfaceContext -> SDoc
 -- Prints "(C a, D b) =>", including the arrow
 pprIfaceContext []     = empty
-pprIfaceContext theta = ppr_preds theta <+> ptext SLIT("=>")
+pprIfaceContext theta = ppr_preds theta <+> ptext (sLit "=>")
 
 ppr_preds [pred] = ppr pred	-- No parens
 ppr_preds preds  = parens (sep (punctuate comma (map ppr preds))) 
 			 
 -------------------
-pabrackets p = ptext SLIT("[:") <> p <> ptext SLIT(":]")
+pabrackets p = ptext (sLit "[:") <> p <> ptext (sLit ":]")
 \end{code}
 
 %************************************************************************
