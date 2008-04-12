@@ -333,16 +333,16 @@ dumpModCycles dflags mod_summaries
   = return ()
 
   | null cycles
-  = putMsg dflags (ptext SLIT("No module cycles"))
+  = putMsg dflags (ptext (sLit "No module cycles"))
 
   | otherwise
-  = putMsg dflags (hang (ptext SLIT("Module cycles found:")) 2 pp_cycles)
+  = putMsg dflags (hang (ptext (sLit "Module cycles found:")) 2 pp_cycles)
   where
 
     cycles :: [[ModSummary]]
     cycles = [ c | CyclicSCC c <- GHC.topSortModuleGraph True mod_summaries Nothing ]
 
-    pp_cycles = vcat [ (ptext SLIT("---------- Cycle") <+> int n <+> ptext SLIT("----------")) 
+    pp_cycles = vcat [ (ptext (sLit "---------- Cycle") <+> int n <+> ptext (sLit "----------")) 
 			$$ pprCycle c $$ text ""
 		     | (n,c) <- [1..] `zip` cycles ]
 
@@ -372,7 +372,7 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
 
     pp_ms summary = text mod_str <> text (take (20 - length mod_str) (repeat ' '))
 		       <+> (pp_imps empty (ms_imps summary) $$
-			    pp_imps (ptext SLIT("{-# SOURCE #-}")) (ms_srcimps summary))
+			    pp_imps (ptext (sLit "{-# SOURCE #-}")) (ms_srcimps summary))
 	where
 	  mod_str = moduleNameString (moduleName (ms_mod summary))
 
@@ -381,7 +381,7 @@ pprCycle summaries = pp_group (CyclicSCC summaries)
     pp_imps what lms 
 	= case [m | L _ m <- lms, m `elem` cycle_mods] of
 	    [] -> empty
-	    ms -> what <+> ptext SLIT("imports") <+> 
+	    ms -> what <+> ptext (sLit "imports") <+> 
 				pprWithCommas ppr ms
 
 -----------------------------------------------------------------
