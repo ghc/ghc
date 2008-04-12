@@ -1606,7 +1606,7 @@ warnUnnecessarySourceImports dflags sccs =
 	warn :: Located ModuleName -> WarnMsg
 	warn (L loc mod) = 
 	   mkPlainErrMsg loc
-		(ptext SLIT("Warning: {-# SOURCE #-} unnecessary in import of ")
+		(ptext (sLit "Warning: {-# SOURCE #-} unnecessary in import of ")
 		 <+> quotes (ppr mod))
 
 -----------------------------------------------------------------------------
@@ -1663,7 +1663,7 @@ downsweep hsc_env old_summaries excl_mods allow_dup_roots
 		   Nothing -> packageModErr modl
 		   Just s  -> return s
 
-	rootLoc = mkGeneralSrcSpan FSLIT("<command line>")
+	rootLoc = mkGeneralSrcSpan (fsLit "<command line>")
 
 	-- In a root module, the filename is allowed to diverge from the module
 	-- name, so we have to check that there aren't multiple root files
@@ -1986,11 +1986,11 @@ multiRootsErr summs@(summ1:_)
 
 cyclicModuleErr :: [ModSummary] -> SDoc
 cyclicModuleErr ms
-  = hang (ptext SLIT("Module imports form a cycle for modules:"))
+  = hang (ptext (sLit "Module imports form a cycle for modules:"))
        2 (vcat (map show_one ms))
   where
     show_one ms = sep [ show_mod (ms_hsc_src ms) (ms_mod ms),
-			nest 2 $ ptext SLIT("imports:") <+> 
+			nest 2 $ ptext (sLit "imports:") <+> 
 				   (pp_imps HsBootFile (ms_srcimps ms)
 				   $$ pp_imps HsSrcFile  (ms_imps ms))]
     show_mod hsc_src mod = ppr mod <> text (hscSourceString hsc_src)
