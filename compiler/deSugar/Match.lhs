@@ -112,11 +112,11 @@ dsShadowWarn ctx@(DsMatchContext kind loc) qs
   = putSrcSpanDs loc (warnDs warn)
   where
     warn | qs `lengthExceeds` maximum_output
-         = pp_context ctx (ptext SLIT("are overlapped"))
+         = pp_context ctx (ptext (sLit "are overlapped"))
 		      (\ f -> vcat (map (ppr_eqn f kind) (take maximum_output qs)) $$
-		      ptext SLIT("..."))
+		      ptext (sLit "..."))
 	 | otherwise
-         = pp_context ctx (ptext SLIT("are overlapped"))
+         = pp_context ctx (ptext (sLit "are overlapped"))
 	              (\ f -> vcat $ map (ppr_eqn f kind) qs)
 
 
@@ -124,19 +124,19 @@ dsIncompleteWarn :: DsMatchContext -> [ExhaustivePat] -> DsM ()
 dsIncompleteWarn ctx@(DsMatchContext kind loc) pats 
   = putSrcSpanDs loc (warnDs warn)
 	where
-	  warn = pp_context ctx (ptext SLIT("are non-exhaustive"))
-                            (\_ -> hang (ptext SLIT("Patterns not matched:"))
+	  warn = pp_context ctx (ptext (sLit "are non-exhaustive"))
+                            (\_ -> hang (ptext (sLit "Patterns not matched:"))
 		                   4 ((vcat $ map (ppr_incomplete_pats kind)
 						  (take maximum_output pats))
 		                      $$ dots))
 
-	  dots | pats `lengthExceeds` maximum_output = ptext SLIT("...")
+	  dots | pats `lengthExceeds` maximum_output = ptext (sLit "...")
 	       | otherwise                           = empty
 
 pp_context :: DsMatchContext -> SDoc -> ((SDoc -> SDoc) -> SDoc) -> SDoc
 pp_context (DsMatchContext kind _loc) msg rest_of_msg_fun
-  = vcat [ptext SLIT("Pattern match(es)") <+> msg,
-	  sep [ptext SLIT("In") <+> ppr_match <> char ':', nest 4 (rest_of_msg_fun pref)]]
+  = vcat [ptext (sLit "Pattern match(es)") <+> msg,
+	  sep [ptext (sLit "In") <+> ppr_match <> char ':', nest 4 (rest_of_msg_fun pref)]]
   where
     (ppr_match, pref)
 	= case kind of
@@ -148,16 +148,16 @@ ppr_pats pats = sep (map ppr pats)
 
 ppr_shadow_pats :: HsMatchContext Name -> [Pat Id] -> SDoc
 ppr_shadow_pats kind pats
-  = sep [ppr_pats pats, matchSeparator kind, ptext SLIT("...")]
+  = sep [ppr_pats pats, matchSeparator kind, ptext (sLit "...")]
 
 ppr_incomplete_pats :: HsMatchContext Name -> ExhaustivePat -> SDoc
 ppr_incomplete_pats _ (pats,[]) = ppr_pats pats
 ppr_incomplete_pats _ (pats,constraints) =
-	                 sep [ppr_pats pats, ptext SLIT("with"), 
+	                 sep [ppr_pats pats, ptext (sLit "with"), 
 	                      sep (map ppr_constraint constraints)]
 
 ppr_constraint :: (Name,[HsLit]) -> SDoc
-ppr_constraint (var,pats) = sep [ppr var, ptext SLIT("`notElem`"), ppr pats]
+ppr_constraint (var,pats) = sep [ppr var, ptext (sLit "`notElem`"), ppr pats]
 
 ppr_eqn :: (SDoc -> SDoc) -> HsMatchContext Name -> EquationInfo -> SDoc
 ppr_eqn prefixF kind eqn = prefixF (ppr_shadow_pats kind (eqn_pats eqn))
