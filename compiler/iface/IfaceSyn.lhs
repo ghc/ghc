@@ -433,17 +433,17 @@ pprIfaceDecl (IfaceId {ifName = var, ifType = ty, ifIdInfo = info})
 	  nest 2 (ppr info) ]
 
 pprIfaceDecl (IfaceForeign {ifName = tycon})
-  = hsep [ptext SLIT("foreign import type dotnet"), ppr tycon]
+  = hsep [ptext (sLit "foreign import type dotnet"), ppr tycon]
 
 pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, 
 		        ifOpenSyn = False, ifSynRhs = mono_ty, 
                         ifFamInst = mbFamInst})
-  = hang (ptext SLIT("type") <+> pprIfaceDeclHead [] tycon tyvars)
+  = hang (ptext (sLit "type") <+> pprIfaceDeclHead [] tycon tyvars)
        4 (vcat [equals <+> ppr mono_ty, pprFamily mbFamInst])
 
 pprIfaceDecl (IfaceSyn {ifName = tycon, ifTyVars = tyvars, 
 		        ifOpenSyn = True, ifSynRhs = mono_ty})
-  = hang (ptext SLIT("type family") <+> pprIfaceDeclHead [] tycon tyvars)
+  = hang (ptext (sLit "type family") <+> pprIfaceDeclHead [] tycon tyvars)
        4 (dcolon <+> ppr mono_ty)
 
 pprIfaceDecl (IfaceData {ifName = tycon, ifGeneric = gen, ifCtxt = context,
@@ -454,25 +454,25 @@ pprIfaceDecl (IfaceData {ifName = tycon, ifGeneric = gen, ifCtxt = context,
 	        pprFamily mbFamInst])
   where
     pp_nd = case condecls of
-		IfAbstractTyCon -> ptext SLIT("data")
-		IfOpenDataTyCon -> ptext SLIT("data family")
-		IfDataTyCon _   -> ptext SLIT("data")
-		IfNewTyCon _  	-> ptext SLIT("newtype")
+		IfAbstractTyCon -> ptext (sLit "data")
+		IfOpenDataTyCon -> ptext (sLit "data family")
+		IfDataTyCon _   -> ptext (sLit "data")
+		IfNewTyCon _  	-> ptext (sLit "newtype")
 
 pprIfaceDecl (IfaceClass {ifCtxt = context, ifName = clas, ifTyVars = tyvars, 
 			  ifFDs = fds, ifATs = ats, ifSigs = sigs, 
 			  ifRec = isrec})
-  = hang (ptext SLIT("class") <+> pprIfaceDeclHead context clas tyvars <+> pprFundeps fds)
+  = hang (ptext (sLit "class") <+> pprIfaceDeclHead context clas tyvars <+> pprFundeps fds)
        4 (vcat [pprRec isrec,
 	        sep (map ppr ats),
 		sep (map ppr sigs)])
 
-pprRec isrec = ptext SLIT("RecFlag") <+> ppr isrec
-pprGen True  = ptext SLIT("Generics: yes")
-pprGen False = ptext SLIT("Generics: no")
+pprRec isrec = ptext (sLit "RecFlag") <+> ppr isrec
+pprGen True  = ptext (sLit "Generics: yes")
+pprGen False = ptext (sLit "Generics: no")
 
-pprFamily Nothing        = ptext SLIT("FamilyInstance: none")
-pprFamily (Just famInst) = ptext SLIT("FamilyInstance:") <+> ppr famInst
+pprFamily Nothing        = ptext (sLit "FamilyInstance: none")
+pprFamily (Just famInst) = ptext (sLit "FamilyInstance:") <+> ppr famInst
 
 instance Outputable IfaceClassOp where
    ppr (IfaceClassOp n dm ty) = ppr n <+> ppr dm <+> dcolon <+> ppr ty
@@ -482,10 +482,10 @@ pprIfaceDeclHead context thing tyvars
   = hsep [pprIfaceContext context, parenSymOcc thing (ppr thing), 
 	  pprIfaceTvBndrs tyvars]
 
-pp_condecls tc IfAbstractTyCon  = ptext SLIT("{- abstract -}")
+pp_condecls tc IfAbstractTyCon  = ptext (sLit "{- abstract -}")
 pp_condecls tc (IfNewTyCon c)   = equals <+> pprIfaceConDecl tc c
 pp_condecls tc IfOpenDataTyCon  = empty
-pp_condecls tc (IfDataTyCon cs) = equals <+> sep (punctuate (ptext SLIT(" |"))
+pp_condecls tc (IfDataTyCon cs) = equals <+> sep (punctuate (ptext (sLit " |"))
 							     (map (pprIfaceConDecl tc) cs))
 
 pprIfaceConDecl :: OccName -> IfaceConDecl -> SDoc
@@ -495,11 +495,11 @@ pprIfaceConDecl tc
 		 ifConEqSpec = eq_spec, ifConCtxt = ctxt, ifConArgTys = arg_tys, 
 		 ifConStricts = strs, ifConFields = fields })
   = sep [main_payload,
-	 if is_infix then ptext SLIT("Infix") else empty,
+	 if is_infix then ptext (sLit "Infix") else empty,
 	 if null strs then empty 
-	      else nest 4 (ptext SLIT("Stricts:") <+> hsep (map ppr strs)),
+	      else nest 4 (ptext (sLit "Stricts:") <+> hsep (map ppr strs)),
 	 if null fields then empty
-	      else nest 4 (ptext SLIT("Fields:") <+> hsep (map ppr fields))]
+	      else nest 4 (ptext (sLit "Fields:") <+> hsep (map ppr fields))]
   where
     main_payload = ppr name <+> dcolon <+> 
 		   pprIfaceForAllPart (univ_tvs ++ ex_tvs) (eq_ctxt ++ ctxt) pp_tau
@@ -519,22 +519,22 @@ instance Outputable IfaceRule where
   ppr (IfaceRule { ifRuleName = name, ifActivation = act, ifRuleBndrs = bndrs,
 		   ifRuleHead = fn, ifRuleArgs = args, ifRuleRhs = rhs }) 
     = sep [hsep [doubleQuotes (ftext name), ppr act,
-		 ptext SLIT("forall") <+> pprIfaceBndrs bndrs],
+		 ptext (sLit "forall") <+> pprIfaceBndrs bndrs],
 	   nest 2 (sep [ppr fn <+> sep (map (pprIfaceExpr parens) args),
-		        ptext SLIT("=") <+> ppr rhs])
+		        ptext (sLit "=") <+> ppr rhs])
       ]
 
 instance Outputable IfaceInst where
   ppr (IfaceInst {ifDFun = dfun_id, ifOFlag = flag, 
 		  ifInstCls = cls, ifInstTys = mb_tcs})
-    = hang (ptext SLIT("instance") <+> ppr flag 
+    = hang (ptext (sLit "instance") <+> ppr flag 
 		<+> ppr cls <+> brackets (pprWithCommas ppr_rough mb_tcs))
          2 (equals <+> ppr dfun_id)
 
 instance Outputable IfaceFamInst where
   ppr (IfaceFamInst {ifFamInstFam = fam, ifFamInstTys = mb_tcs,
 		     ifFamInstTyCon = tycon_id})
-    = hang (ptext SLIT("family instance") <+> 
+    = hang (ptext (sLit "family instance") <+> 
 	    ppr fam <+> brackets (pprWithCommas ppr_rough mb_tcs))
          2 (equals <+> ppr tycon_id)
 
@@ -573,32 +573,32 @@ pprIfaceExpr add_par e@(IfaceLam _ _)
     collect bs e              = (reverse bs, e)
 
 pprIfaceExpr add_par (IfaceCase scrut bndr ty [(con, bs, rhs)])
-  = add_par (sep [ptext SLIT("case") <+> char '@' <+> pprParendIfaceType ty
-			<+> pprIfaceExpr noParens scrut <+> ptext SLIT("of") 
+  = add_par (sep [ptext (sLit "case") <+> char '@' <+> pprParendIfaceType ty
+			<+> pprIfaceExpr noParens scrut <+> ptext (sLit "of") 
 			<+> ppr bndr <+> char '{' <+> ppr_con_bs con bs <+> arrow,
   		  pprIfaceExpr noParens rhs <+> char '}'])
 
 pprIfaceExpr add_par (IfaceCase scrut bndr ty alts)
-  = add_par (sep [ptext SLIT("case") <+> char '@' <+> pprParendIfaceType ty
-		 	<+> pprIfaceExpr noParens scrut <+> ptext SLIT("of") 
+  = add_par (sep [ptext (sLit "case") <+> char '@' <+> pprParendIfaceType ty
+		 	<+> pprIfaceExpr noParens scrut <+> ptext (sLit "of") 
 			<+> ppr bndr <+> char '{',
   		  nest 2 (sep (map ppr_alt alts)) <+> char '}'])
 
 pprIfaceExpr add_par (IfaceCast expr co)
   = sep [pprIfaceExpr parens expr,
-	 nest 2 (ptext SLIT("`cast`")),
+	 nest 2 (ptext (sLit "`cast`")),
 	 pprParendIfaceType co]
 
 pprIfaceExpr add_par (IfaceLet (IfaceNonRec b rhs) body)
-  = add_par (sep [ptext SLIT("let {"), 
+  = add_par (sep [ptext (sLit "let {"), 
 		  nest 2 (ppr_bind (b, rhs)),
-		  ptext SLIT("} in"), 
+		  ptext (sLit "} in"), 
 		  pprIfaceExpr noParens body])
 
 pprIfaceExpr add_par (IfaceLet (IfaceRec pairs) body)
-  = add_par (sep [ptext SLIT("letrec {"),
+  = add_par (sep [ptext (sLit "letrec {"),
 		  nest 2 (sep (map ppr_bind pairs)), 
-		  ptext SLIT("} in"),
+		  ptext (sLit "} in"),
 		  pprIfaceExpr noParens body])
 
 pprIfaceExpr add_par (IfaceNote note body) = add_par (ppr note <+> pprIfaceExpr parens body)
@@ -620,8 +620,8 @@ pprIfaceApp fun	 	       args = sep (pprIfaceExpr parens fun : args)
 ------------------
 instance Outputable IfaceNote where
     ppr (IfaceSCC cc)     = pprCostCentreCore cc
-    ppr IfaceInlineMe     = ptext SLIT("__inline_me")
-    ppr (IfaceCoreNote s) = ptext SLIT("__core_note") <+> pprHsString (mkFastString s)
+    ppr IfaceInlineMe     = ptext (sLit "__inline_me")
+    ppr (IfaceCoreNote s) = ptext (sLit "__core_note") <+> pprHsString (mkFastString s)
 
 
 instance Outputable IfaceConAlt where
@@ -634,16 +634,16 @@ instance Outputable IfaceConAlt where
 ------------------
 instance Outputable IfaceIdInfo where
   ppr NoInfo       = empty
-  ppr (HasInfo is) = ptext SLIT("{-") <+> fsep (map ppr is) <+> ptext SLIT("-}")
+  ppr (HasInfo is) = ptext (sLit "{-") <+> fsep (map ppr is) <+> ptext (sLit "-}")
 
 instance Outputable IfaceInfoItem where
-  ppr (HsUnfold unf)  	 = ptext SLIT("Unfolding:") <+>
+  ppr (HsUnfold unf)  	 = ptext (sLit "Unfolding:") <+>
 				  	parens (pprIfaceExpr noParens unf)
-  ppr (HsInline act)     = ptext SLIT("Inline:") <+> ppr act
-  ppr (HsArity arity)    = ptext SLIT("Arity:") <+> int arity
-  ppr (HsStrictness str) = ptext SLIT("Strictness:") <+> pprIfaceStrictSig str
-  ppr HsNoCafRefs	 = ptext SLIT("HasNoCafRefs")
-  ppr (HsWorker w a)	 = ptext SLIT("Worker:") <+> ppr w <+> int a
+  ppr (HsInline act)     = ptext (sLit "Inline:") <+> ppr act
+  ppr (HsArity arity)    = ptext (sLit "Arity:") <+> int arity
+  ppr (HsStrictness str) = ptext (sLit "Strictness:") <+> pprIfaceStrictSig str
+  ppr HsNoCafRefs	 = ptext (sLit "HasNoCafRefs")
+  ppr (HsWorker w a)	 = ptext (sLit "Worker:") <+> ppr w <+> int a
 \end{code}
 
 
@@ -669,9 +669,9 @@ data GenIfaceEq a
 type IfaceEq = GenIfaceEq Name
 
 instance Outputable a => Outputable (GenIfaceEq a) where
-  ppr Equal          = ptext SLIT("Equal")
-  ppr NotEqual       = ptext SLIT("NotEqual")
-  ppr (EqBut occset) = ptext SLIT("EqBut") <+> ppr (uniqSetToList occset)
+  ppr Equal          = ptext (sLit "Equal")
+  ppr NotEqual       = ptext (sLit "NotEqual")
+  ppr (EqBut occset) = ptext (sLit "EqBut") <+> ppr (uniqSetToList occset)
 
 bool :: Bool -> IfaceEq
 bool True  = Equal
