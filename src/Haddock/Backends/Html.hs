@@ -1019,11 +1019,11 @@ ppShortConstr :: Bool -> ConDecl DocName -> Html
 ppShortConstr summary con = case con_res con of 
 
   ResTyH98 -> case con_details con of 
-    PrefixCon args -> header +++ hsep (ppBinder summary occ : map ppLType args)
+    PrefixCon args -> header +++ hsep (ppBinder summary occ : map ppLParendType args)
     RecCon fields -> header +++ ppBinder summary occ <+>
       braces (vanillaTable << aboves (map (ppShortField summary) fields))
     InfixCon arg1 arg2 -> header +++ 
-      hsep [ppLType arg1, ppBinder summary occ, ppLType arg2]    
+      hsep [ppLParendType arg1, ppBinder summary occ, ppLParendType arg2]    
 
   ResTyGADT resTy -> case con_details con of 
     PrefixCon args -> doGADTCon args resTy
@@ -1060,7 +1060,7 @@ ppSideBySideConstr (L _ con) = case con_res con of
   ResTyH98 -> case con_details con of 
 
     PrefixCon args -> 
-      argBox (hsep ((header +++ ppBinder False occ) : map ppLType args)) 
+      argBox (hsep ((header +++ ppBinder False occ) : map ppLParendType args)) 
       <-> maybeRDocBox mbLDoc  
 
     RecCon fields -> 
@@ -1070,7 +1070,7 @@ ppSideBySideConstr (L _ con) = case con_res con of
       aboves (map ppSideBySideField fields))
 
     InfixCon arg1 arg2 -> 
-      argBox (hsep [header+++ppLType arg1, ppBinder False occ, ppLType arg2])
+      argBox (hsep [header+++ppLParendType arg1, ppBinder False occ, ppLParendType arg2])
       <-> maybeRDocBox mbLDoc
  
   ResTyGADT resTy -> case con_details con of
