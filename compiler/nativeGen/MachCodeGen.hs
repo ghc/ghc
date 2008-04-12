@@ -589,30 +589,30 @@ getRegister (StPrim primop [x]) -- unary PrimOps
       other_op -> getRegister (StCall fn CCallConv F64 [x])
 	where
 	  fn = case other_op of
-		 FloatExpOp    -> FSLIT("exp")
-		 FloatLogOp    -> FSLIT("log")
-		 FloatSqrtOp   -> FSLIT("sqrt")
-		 FloatSinOp    -> FSLIT("sin")
-		 FloatCosOp    -> FSLIT("cos")
-		 FloatTanOp    -> FSLIT("tan")
-		 FloatAsinOp   -> FSLIT("asin")
-		 FloatAcosOp   -> FSLIT("acos")
-		 FloatAtanOp   -> FSLIT("atan")
-		 FloatSinhOp   -> FSLIT("sinh")
-		 FloatCoshOp   -> FSLIT("cosh")
-		 FloatTanhOp   -> FSLIT("tanh")
-		 DoubleExpOp   -> FSLIT("exp")
-		 DoubleLogOp   -> FSLIT("log")
-		 DoubleSqrtOp  -> FSLIT("sqrt")
-		 DoubleSinOp   -> FSLIT("sin")
-		 DoubleCosOp   -> FSLIT("cos")
-		 DoubleTanOp   -> FSLIT("tan")
-		 DoubleAsinOp  -> FSLIT("asin")
-		 DoubleAcosOp  -> FSLIT("acos")
-		 DoubleAtanOp  -> FSLIT("atan")
-		 DoubleSinhOp  -> FSLIT("sinh")
-		 DoubleCoshOp  -> FSLIT("cosh")
-		 DoubleTanhOp  -> FSLIT("tanh")
+		 FloatExpOp    -> fsLit "exp"
+		 FloatLogOp    -> fsLit "log"
+		 FloatSqrtOp   -> fsLit "sqrt"
+		 FloatSinOp    -> fsLit "sin"
+		 FloatCosOp    -> fsLit "cos"
+		 FloatTanOp    -> fsLit "tan"
+		 FloatAsinOp   -> fsLit "asin"
+		 FloatAcosOp   -> fsLit "acos"
+		 FloatAtanOp   -> fsLit "atan"
+		 FloatSinhOp   -> fsLit "sinh"
+		 FloatCoshOp   -> fsLit "cosh"
+		 FloatTanhOp   -> fsLit "tanh"
+		 DoubleExpOp   -> fsLit "exp"
+		 DoubleLogOp   -> fsLit "log"
+		 DoubleSqrtOp  -> fsLit "sqrt"
+		 DoubleSinOp   -> fsLit "sin"
+		 DoubleCosOp   -> fsLit "cos"
+		 DoubleTanOp   -> fsLit "tan"
+		 DoubleAsinOp  -> fsLit "asin"
+		 DoubleAcosOp  -> fsLit "acos"
+		 DoubleAtanOp  -> fsLit "atan"
+		 DoubleSinhOp  -> fsLit "sinh"
+		 DoubleCoshOp  -> fsLit "cosh"
+		 DoubleTanhOp  -> fsLit "tanh"
   where
     pr = panic "MachCode.getRegister: no primrep needed for Alpha"
 
@@ -696,8 +696,8 @@ getRegister (StPrim primop [x, y]) -- dyadic PrimOps
       ISraOp -> trivialCode SRA x y -- was: panic "AlphaGen:isra"
       ISrlOp -> trivialCode SRL x y -- was: panic "AlphaGen:isrl"
 
-      FloatPowerOp  -> getRegister (StCall FSLIT("pow") CCallConv F64 [x,y])
-      DoublePowerOp -> getRegister (StCall FSLIT("pow") CCallConv F64 [x,y])
+      FloatPowerOp  -> getRegister (StCall (fsLit "pow") CCallConv F64 [x,y])
+      DoublePowerOp -> getRegister (StCall (fsLit "pow") CCallConv F64 [x,y])
   where
     {- ------------------------------------------------------------
 	Some bizarre special code for getting condition codes into
@@ -1498,10 +1498,10 @@ getRegister (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_S_MulMayOflo rep -> imulMayOflo rep x y
 {-
       -- ToDo: teach about V8+ SPARC div instructions
-      MO_S_Quot I32 -> idiv FSLIT(".div")  x y
-      MO_S_Rem I32  -> idiv FSLIT(".rem")  x y
-      MO_U_Quot I32 -> idiv FSLIT(".udiv")  x y
-      MO_U_Rem I32  -> idiv FSLIT(".urem")  x y
+      MO_S_Quot I32 -> idiv (fsLit ".div")  x y
+      MO_S_Rem I32  -> idiv (fsLit ".rem")  x y
+      MO_U_Quot I32 -> idiv (fsLit ".udiv")  x y
+      MO_U_Rem I32  -> idiv (fsLit ".urem")  x y
 -}
       MO_Add F32  -> trivialFCode F32 FADD  x y
       MO_Sub F32   -> trivialFCode F32  FSUB x y
@@ -1524,10 +1524,10 @@ getRegister (CmmMachOp mop [x, y]) -- dyadic PrimOps
       MO_S_Shr rep   -> trivialCode rep SRA x y
 
 {-
-      MO_F32_Pwr  -> getRegister (StCall (Left FSLIT("pow")) CCallConv F64 
+      MO_F32_Pwr  -> getRegister (StCall (Left (fsLit "pow")) CCallConv F64 
                                          [promote x, promote y])
 		       where promote x = CmmMachOp MO_F32_to_Dbl [x]
-      MO_F64_Pwr -> getRegister (StCall (Left FSLIT("pow")) CCallConv F64 
+      MO_F64_Pwr -> getRegister (StCall (Left (fsLit "pow")) CCallConv F64 
                                         [x, y])
 -}
       other -> pprPanic "getRegister(sparc) - binary CmmMachOp (1)" (pprMachOp mop)
@@ -3221,37 +3221,37 @@ outOfLineFloatOp mop res args
 	lbl = mkForeignLabel fn Nothing False
 
 	fn = case mop of
-	      MO_F32_Sqrt  -> FSLIT("sqrtf")
-	      MO_F32_Sin   -> FSLIT("sinf")
-	      MO_F32_Cos   -> FSLIT("cosf")
-	      MO_F32_Tan   -> FSLIT("tanf")
-	      MO_F32_Exp   -> FSLIT("expf")
-	      MO_F32_Log   -> FSLIT("logf")
+	      MO_F32_Sqrt  -> fsLit "sqrtf"
+	      MO_F32_Sin   -> fsLit "sinf"
+	      MO_F32_Cos   -> fsLit "cosf"
+	      MO_F32_Tan   -> fsLit "tanf"
+	      MO_F32_Exp   -> fsLit "expf"
+	      MO_F32_Log   -> fsLit "logf"
 
-	      MO_F32_Asin  -> FSLIT("asinf")
-	      MO_F32_Acos  -> FSLIT("acosf")
-	      MO_F32_Atan  -> FSLIT("atanf")
+	      MO_F32_Asin  -> fsLit "asinf"
+	      MO_F32_Acos  -> fsLit "acosf"
+	      MO_F32_Atan  -> fsLit "atanf"
 
-	      MO_F32_Sinh  -> FSLIT("sinhf")
-	      MO_F32_Cosh  -> FSLIT("coshf")
-	      MO_F32_Tanh  -> FSLIT("tanhf")
-	      MO_F32_Pwr   -> FSLIT("powf")
+	      MO_F32_Sinh  -> fsLit "sinhf"
+	      MO_F32_Cosh  -> fsLit "coshf"
+	      MO_F32_Tanh  -> fsLit "tanhf"
+	      MO_F32_Pwr   -> fsLit "powf"
 
-	      MO_F64_Sqrt  -> FSLIT("sqrt")
-	      MO_F64_Sin   -> FSLIT("sin")
-	      MO_F64_Cos   -> FSLIT("cos")
-	      MO_F64_Tan   -> FSLIT("tan")
-	      MO_F64_Exp   -> FSLIT("exp")
-	      MO_F64_Log   -> FSLIT("log")
+	      MO_F64_Sqrt  -> fsLit "sqrt"
+	      MO_F64_Sin   -> fsLit "sin"
+	      MO_F64_Cos   -> fsLit "cos"
+	      MO_F64_Tan   -> fsLit "tan"
+	      MO_F64_Exp   -> fsLit "exp"
+	      MO_F64_Log   -> fsLit "log"
 
-	      MO_F64_Asin  -> FSLIT("asin")
-	      MO_F64_Acos  -> FSLIT("acos")
-	      MO_F64_Atan  -> FSLIT("atan")
+	      MO_F64_Asin  -> fsLit "asin"
+	      MO_F64_Acos  -> fsLit "acos"
+	      MO_F64_Atan  -> fsLit "atan"
 
-	      MO_F64_Sinh  -> FSLIT("sinh")
-	      MO_F64_Cosh  -> FSLIT("cosh")
-	      MO_F64_Tanh  -> FSLIT("tanh")
-	      MO_F64_Pwr   -> FSLIT("pow")
+	      MO_F64_Sinh  -> fsLit "sinh"
+	      MO_F64_Cosh  -> fsLit "cosh"
+	      MO_F64_Tanh  -> fsLit "tanh"
+	      MO_F64_Pwr   -> fsLit "pow"
 
 #endif /* i386_TARGET_ARCH || x86_64_TARGET_ARCH */
 
@@ -3569,37 +3569,37 @@ outOfLineFloatOp mop =
       return (mopLabelOrExpr, reduce)
             where
                 (reduce, functionName) = case mop of
-	          MO_F32_Exp    -> (True,  FSLIT("exp"))
-	          MO_F32_Log    -> (True,  FSLIT("log"))
-	          MO_F32_Sqrt   -> (True,  FSLIT("sqrt"))
+	          MO_F32_Exp    -> (True,  fsLit "exp")
+	          MO_F32_Log    -> (True,  fsLit "log")
+	          MO_F32_Sqrt   -> (True,  fsLit "sqrt")
 
-	          MO_F32_Sin    -> (True,  FSLIT("sin"))
-	          MO_F32_Cos    -> (True,  FSLIT("cos"))
-	          MO_F32_Tan    -> (True,  FSLIT("tan"))
+	          MO_F32_Sin    -> (True,  fsLit "sin")
+	          MO_F32_Cos    -> (True,  fsLit "cos")
+	          MO_F32_Tan    -> (True,  fsLit "tan")
 
-	          MO_F32_Asin   -> (True,  FSLIT("asin"))
-	          MO_F32_Acos   -> (True,  FSLIT("acos"))
-	          MO_F32_Atan   -> (True,  FSLIT("atan"))
+	          MO_F32_Asin   -> (True,  fsLit "asin")
+	          MO_F32_Acos   -> (True,  fsLit "acos")
+	          MO_F32_Atan   -> (True,  fsLit "atan")
 
-	          MO_F32_Sinh   -> (True,  FSLIT("sinh"))
-	          MO_F32_Cosh   -> (True,  FSLIT("cosh"))
-	          MO_F32_Tanh   -> (True,  FSLIT("tanh"))
+	          MO_F32_Sinh   -> (True,  fsLit "sinh")
+	          MO_F32_Cosh   -> (True,  fsLit "cosh")
+	          MO_F32_Tanh   -> (True,  fsLit "tanh")
 
-	          MO_F64_Exp    -> (False, FSLIT("exp"))
-	          MO_F64_Log    -> (False, FSLIT("log"))
-	          MO_F64_Sqrt   -> (False, FSLIT("sqrt"))
+	          MO_F64_Exp    -> (False, fsLit "exp")
+	          MO_F64_Log    -> (False, fsLit "log")
+	          MO_F64_Sqrt   -> (False, fsLit "sqrt")
 
-	          MO_F64_Sin    -> (False, FSLIT("sin"))
-	          MO_F64_Cos    -> (False, FSLIT("cos"))
-	          MO_F64_Tan    -> (False, FSLIT("tan"))
+	          MO_F64_Sin    -> (False, fsLit "sin")
+	          MO_F64_Cos    -> (False, fsLit "cos")
+	          MO_F64_Tan    -> (False, fsLit "tan")
 
-	          MO_F64_Asin   -> (False, FSLIT("asin"))
-	          MO_F64_Acos   -> (False, FSLIT("acos"))
-	          MO_F64_Atan   -> (False, FSLIT("atan"))
+	          MO_F64_Asin   -> (False, fsLit "asin")
+	          MO_F64_Acos   -> (False, fsLit "acos")
+	          MO_F64_Atan   -> (False, fsLit "atan")
 
-	          MO_F64_Sinh   -> (False, FSLIT("sinh"))
-	          MO_F64_Cosh   -> (False, FSLIT("cosh"))
-	          MO_F64_Tanh   -> (False, FSLIT("tanh"))
+	          MO_F64_Sinh   -> (False, fsLit "sinh")
+	          MO_F64_Cosh   -> (False, fsLit "cosh")
+	          MO_F64_Tanh   -> (False, fsLit "tanh")
 
                   other -> pprPanic "outOfLineFloatOp(sparc) "
                                 (pprCallishMachOp mop)
@@ -3825,39 +3825,39 @@ genCCall target dest_regs argsAndHints
                 return (mopLabelOrExpr, reduce)
             where
                 (functionName, reduce) = case mop of
-                    MO_F32_Exp   -> (FSLIT("exp"), True)
-                    MO_F32_Log   -> (FSLIT("log"), True)
-                    MO_F32_Sqrt  -> (FSLIT("sqrt"), True)
+                    MO_F32_Exp   -> (fsLit "exp", True)
+                    MO_F32_Log   -> (fsLit "log", True)
+                    MO_F32_Sqrt  -> (fsLit "sqrt", True)
                         
-                    MO_F32_Sin   -> (FSLIT("sin"), True)
-                    MO_F32_Cos   -> (FSLIT("cos"), True)
-                    MO_F32_Tan   -> (FSLIT("tan"), True)
+                    MO_F32_Sin   -> (fsLit "sin", True)
+                    MO_F32_Cos   -> (fsLit "cos", True)
+                    MO_F32_Tan   -> (fsLit "tan", True)
                     
-                    MO_F32_Asin  -> (FSLIT("asin"), True)
-                    MO_F32_Acos  -> (FSLIT("acos"), True)
-                    MO_F32_Atan  -> (FSLIT("atan"), True)
+                    MO_F32_Asin  -> (fsLit "asin", True)
+                    MO_F32_Acos  -> (fsLit "acos", True)
+                    MO_F32_Atan  -> (fsLit "atan", True)
                     
-                    MO_F32_Sinh  -> (FSLIT("sinh"), True)
-                    MO_F32_Cosh  -> (FSLIT("cosh"), True)
-                    MO_F32_Tanh  -> (FSLIT("tanh"), True)
-                    MO_F32_Pwr   -> (FSLIT("pow"), True)
+                    MO_F32_Sinh  -> (fsLit "sinh", True)
+                    MO_F32_Cosh  -> (fsLit "cosh", True)
+                    MO_F32_Tanh  -> (fsLit "tanh", True)
+                    MO_F32_Pwr   -> (fsLit "pow", True)
                         
-                    MO_F64_Exp   -> (FSLIT("exp"), False)
-                    MO_F64_Log   -> (FSLIT("log"), False)
-                    MO_F64_Sqrt  -> (FSLIT("sqrt"), False)
+                    MO_F64_Exp   -> (fsLit "exp", False)
+                    MO_F64_Log   -> (fsLit "log", False)
+                    MO_F64_Sqrt  -> (fsLit "sqrt", False)
                         
-                    MO_F64_Sin   -> (FSLIT("sin"), False)
-                    MO_F64_Cos   -> (FSLIT("cos"), False)
-                    MO_F64_Tan   -> (FSLIT("tan"), False)
+                    MO_F64_Sin   -> (fsLit "sin", False)
+                    MO_F64_Cos   -> (fsLit "cos", False)
+                    MO_F64_Tan   -> (fsLit "tan", False)
                      
-                    MO_F64_Asin  -> (FSLIT("asin"), False)
-                    MO_F64_Acos  -> (FSLIT("acos"), False)
-                    MO_F64_Atan  -> (FSLIT("atan"), False)
+                    MO_F64_Asin  -> (fsLit "asin", False)
+                    MO_F64_Acos  -> (fsLit "acos", False)
+                    MO_F64_Atan  -> (fsLit "atan", False)
                     
-                    MO_F64_Sinh  -> (FSLIT("sinh"), False)
-                    MO_F64_Cosh  -> (FSLIT("cosh"), False)
-                    MO_F64_Tanh  -> (FSLIT("tanh"), False)
-                    MO_F64_Pwr   -> (FSLIT("pow"), False)
+                    MO_F64_Sinh  -> (fsLit "sinh", False)
+                    MO_F64_Cosh  -> (fsLit "cosh", False)
+                    MO_F64_Tanh  -> (fsLit "tanh", False)
+                    MO_F64_Pwr   -> (fsLit "pow", False)
                     other -> pprPanic "genCCall(ppc): unknown callish op"
                                     (pprCallishMachOp other)
 
