@@ -4,7 +4,7 @@
 ><HEAD
 ><META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8"
 ><TITLE
->TypeOperators</TITLE
+>Bug6</TITLE
 ><LINK HREF="haddock.css" REL="stylesheet" TYPE="text/css"
 ><SCRIPT SRC="haddock-util.js" TYPE="text/javascript"
 ></SCRIPT
@@ -38,7 +38,7 @@
 ><TR
 ><TD
 ><FONT SIZE="6"
->TypeOperators</FONT
+>Bug6</FONT
 ></TD
 ></TR
 ></TABLE
@@ -49,31 +49,13 @@
 ></TD
 ></TR
 ><TR
-><TD
-><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
-><TR
-><TD CLASS="section4"
-><B
->Contents</B
-></TD
+><TD CLASS="section1"
+>Description</TD
 ></TR
 ><TR
-><TD
-><DL
-><DT
-><A HREF="#1"
->stuff
-</A
-></DT
-></DL
-></TD
-></TR
-></TABLE
-></TD
-></TR
-><TR
-><TD CLASS="s15"
-></TD
+><TD CLASS="doc"
+>Exporting records.
+</TD
 ></TR
 ><TR
 ><TD CLASS="s15"
@@ -94,9 +76,11 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  a <A HREF="#t%3A%3A-%3A"
->:-:</A
-> b</TD
+>  <A HREF="#t%3AA"
+>A</A
+>  = <A HREF="#v%3AA"
+>A</A
+> Int</TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -106,40 +90,16 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  (a <A HREF="#t%3A%3A%2B%3A"
->:+:</A
-> b) c</TD
-></TR
-><TR
-><TD CLASS="s8"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><SPAN CLASS="keyword"
->data</SPAN
->  <A HREF="#t%3AOp"
->Op</A
-> a b</TD
-></TR
-><TR
-><TD CLASS="s8"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><SPAN CLASS="keyword"
->newtype</SPAN
->  <A HREF="#t%3AO"
->O</A
-> g f a = <A HREF="#v%3AO"
->O</A
+>  <A HREF="#t%3AB"
+>B</A
+>  = <A HREF="#v%3AB"
+>B</A
 > {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
 ><TR
 ><TD CLASS="recfield"
-><A HREF="#v%3AunO"
->unO</A
-> :: g (f a)</TD
+><A HREF="#v%3Ab"
+>b</A
+> :: Int</TD
 ></TR
 ></TABLE
 >}</TD
@@ -150,11 +110,53 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A HREF="#v%3AbiO"
->biO</A
-> ::  (g `<A HREF="TypeOperators.html#t%3AO"
->O</A
->` f) a</TD
+><A HREF="#v%3Ab"
+>b</A
+> :: <A HREF="Bug6.html#t%3AB"
+>B</A
+> -&gt; Int</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A HREF="#t%3AC"
+>C</A
+>  = <A HREF="#v%3AC"
+>C</A
+> {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3Ac1"
+>c1</A
+> :: Int</TD
+></TR
+><TR
+><TD CLASS="recfield"
+><A HREF="#v%3Ac2"
+>c2</A
+> :: Int</TD
+></TR
+></TABLE
+>}</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A HREF="#t%3AD"
+>D</A
+>  = <A HREF="#v%3AD"
+>D</A
+> Int Int</TD
 ></TR
 ><TR
 ><TD CLASS="s8"
@@ -164,25 +166,13 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >newtype</SPAN
->  <A HREF="#t%3AFlip"
->Flip</A
-> (~&gt;) b a = <A HREF="#v%3AFlip"
->Flip</A
-> {<TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
-><TR
-><TD CLASS="recfield"
-><A HREF="#v%3AunFlip"
->unFlip</A
-> :: a ~&gt; b</TD
+>  <A HREF="#t%3AE"
+>E</A
+>  = <A HREF="#v%3AE"
+>E</A
+> Int</TD
 ></TR
 ></TABLE
->}</TD
-></TR
-></TABLE
-></TD
-></TR
-><TR
-><TD CLASS="s15"
 ></TD
 ></TR
 ><TR
@@ -191,10 +181,7 @@
 ></TR
 ><TR
 ><TD CLASS="section1"
-><A NAME="1"
->stuff
-</A
-></TD
+>Documentation</TD
 ></TR
 ><TR
 ><TD CLASS="s15"
@@ -204,57 +191,66 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  a <A NAME="t%3A%3A-%3A"
+>  <A NAME="t%3AA"
 ></A
 ><B
->:-:</B
-> b </TD
-></TR
-><TR
-><TD CLASS="s15"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><SPAN CLASS="keyword"
->data</SPAN
->  (a <A NAME="t%3A%3A%2B%3A"
-></A
-><B
->:+:</B
-> b) c </TD
-></TR
-><TR
-><TD CLASS="s15"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><SPAN CLASS="keyword"
->data</SPAN
->  <A NAME="t%3AOp"
-></A
-><B
->Op</B
-> a b </TD
-></TR
-><TR
-><TD CLASS="s15"
-></TD
-></TR
-><TR
-><TD CLASS="decl"
-><SPAN CLASS="keyword"
->newtype</SPAN
->  <A NAME="t%3AO"
-></A
-><B
->O</B
-> g f a </TD
+>A</B
+>  </TD
 ></TR
 ><TR
 ><TD CLASS="body"
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>This record is exported without its field
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AA"
+></A
+><B
+>A</B
+> Int</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t%3AB"
+></A
+><B
+>B</B
+>  </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>.. with its field, but the field is named separately in the export list
+ (should still be visible as a field name)
+</TD
+></TR
 ><TR
 ><TD CLASS="section4"
 >Constructors</TD
@@ -264,10 +260,10 @@
 ><TABLE CLASS="vanilla" CELLSPACING="5" CELLPADDING="0"
 ><TR
 ><TD CLASS="arg"
-><A NAME="v%3AO"
+><A NAME="v%3AB"
 ></A
 ><B
->O</B
+>B</B
 ></TD
 ><TD CLASS="rdoc"
 ></TD
@@ -277,11 +273,11 @@
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
 ><TD CLASS="arg"
-><A NAME="v%3AunO"
+><A NAME="v%3Ab"
 ></A
 ><B
->unO</B
-> :: g (f a)</TD
+>b</B
+> :: Int</TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR
@@ -300,13 +296,13 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A NAME="v%3AbiO"
+><A NAME="v%3Ab"
 ></A
 ><B
->biO</B
-> ::  (g `<A HREF="TypeOperators.html#t%3AO"
->O</A
->` f) a</TD
+>b</B
+> :: <A HREF="Bug6.html#t%3AB"
+>B</A
+> -&gt; Int</TD
 ></TR
 ><TR
 ><TD CLASS="s15"
@@ -315,16 +311,21 @@
 ><TR
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
->newtype</SPAN
->  <A NAME="t%3AFlip"
+>data</SPAN
+>  <A NAME="t%3AC"
 ></A
 ><B
->Flip</B
-> (~&gt;) b a </TD
+>C</B
+>  </TD
 ></TR
 ><TR
 ><TD CLASS="body"
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>.. with fields names as subordinate names in the export
+</TD
+></TR
 ><TR
 ><TD CLASS="section4"
 >Constructors</TD
@@ -334,10 +335,10 @@
 ><TABLE CLASS="vanilla" CELLSPACING="5" CELLPADDING="0"
 ><TR
 ><TD CLASS="arg"
-><A NAME="v%3AFlip"
+><A NAME="v%3AC"
 ></A
 ><B
->Flip</B
+>C</B
 ></TD
 ><TD CLASS="rdoc"
 ></TD
@@ -347,15 +348,116 @@
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
 ><TD CLASS="arg"
-><A NAME="v%3AunFlip"
+><A NAME="v%3Ac1"
 ></A
 ><B
->unFlip</B
-> :: a ~&gt; b</TD
+>c1</B
+> :: Int</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+><TR
+><TD CLASS="arg"
+><A NAME="v%3Ac2"
+></A
+><B
+>c2</B
+> :: Int</TD
 ><TD CLASS="rdoc"
 ></TD
 ></TR
 ></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t%3AD"
+></A
+><B
+>D</B
+>  </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>.. with only some of the fields exported (we can't handle this one -
+ how do we render the declaration?)
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AD"
+></A
+><B
+>D</B
+> Int Int</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>newtype</SPAN
+>  <A NAME="t%3AE"
+></A
+><B
+>E</B
+>  </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="ndoc"
+>a newtype with a field
+</TD
+></TR
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v%3AE"
+></A
+><B
+>E</B
+> Int</TD
+><TD CLASS="rdoc"
 ></TD
 ></TR
 ></TABLE
@@ -372,7 +474,7 @@
 ><TD CLASS="botbar"
 >Produced by <A HREF="http://www.haskell.org/haddock/"
 >Haddock</A
-> version 2.0.0.0</TD
+> version 2.1.0</TD
 ></TR
 ></TABLE
 ></BODY

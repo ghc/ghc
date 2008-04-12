@@ -8,12 +8,13 @@ import Control.Monad
 import Text.Printf
 import Text.Regex
 
+
 main = do
   args <- getArgs
   when (null args) $ error "You must give the path to the GHC lib dir as an argument"  
   putStrLn "Running tests..."
   let libdir = head args
-  walkDirs libdir "."
+  test libdir
   putStrLn "All tests passed!"
 
 
@@ -21,20 +22,14 @@ haddockEq file1 file2 = (stripLinks file1) == (stripLinks file2)
   where
     stripLinks f = subRegex (mkRegexWithOpts "<A HREF=[^>]*>" False False) f "<A HREF=\"\">"
 
-
-allModules dir = do
-  contents <- getDirectoryContents dir
-  return $ filter ((==) ".hs" . takeExtension) contents
-
-
 check modules = do
   forM_ modules $ \mod -> do
     let outfile = "output" </> (dropExtension mod ++ ".html")
-    let reffile = dropExtension mod ++ ".html.ref"
+    let reffile = "tests" </> dropExtension mod ++ ".html.ref"
     b <- doesFileExist reffile
     if b 
       then do
-        copyFile reffile ("output" </> reffile)
+        copyFile reffile ("output" </> takeFileName reffile)
         out <- readFile outfile
         ref <- readFile reffile
         if not $ haddockEq out ref
@@ -48,20 +43,11 @@ check modules = do
         putStrLn $ "Pass: " ++ mod ++ " (no .ref file)"
  
 
-walkDirs libdir basedir = do
-  contents <- getDirectoryContents basedir
-  dirs <- filterM doesDirectoryExist . 
-          map (basedir </>) .
-          filter (`notElem` [".", "..", "output"]) $ contents
-  mapM_ (testDir libdir) dirs
-
-
-testDir libdir dir = do
-  mods <- allModules dir
-  let mods' = map (dir </>) mods
-  let outdir = "output" </> dir
-  createDirectoryIfMissing True outdir
-  code <- system $ printf "../dist/build/haddock/haddock -B %s -w -o %s -h --optghc=-fglasgow-exts --optghc=-w %s" libdir outdir (unwords mods')
+test libdir = do
+  contents <- getDirectoryContents "tests"
+  let mods = filter ((==) ".hs" . takeExtension) contents
+  let outdir = "output"
+  let mods' = map ("tests" </>) mods
+  code <- system $ printf "haddock -B %s -w -o %s -h --optghc=-fglasgow-exts --optghc=-w %s" libdir outdir (unwords mods')
   unless (code == ExitSuccess) $ error "Haddock run failed! Exiting."
-  check mods'
-  walkDirs libdir dir
+  check mods

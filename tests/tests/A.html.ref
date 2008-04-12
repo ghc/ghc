@@ -4,7 +4,7 @@
 ><HEAD
 ><META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8"
 ><TITLE
->Bug1</TITLE
+>A</TITLE
 ><LINK HREF="haddock.css" REL="stylesheet" TYPE="text/css"
 ><SCRIPT SRC="haddock-util.js" TYPE="text/javascript"
 ></SCRIPT
@@ -38,7 +38,7 @@
 ><TR
 ><TD
 ><FONT SIZE="6"
->Bug1</FONT
+>A</FONT
 ></TD
 ></TR
 ></TABLE
@@ -50,30 +50,6 @@
 ></TR
 ><TR
 ><TD CLASS="s15"
-></TD
-></TR
-><TR
-><TD CLASS="section1"
->Synopsis</TD
-></TR
-><TR
-><TD CLASS="s15"
-></TD
-></TR
-><TR
-><TD CLASS="body"
-><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
-><TR
-><TD CLASS="decl"
-><SPAN CLASS="keyword"
->data</SPAN
->  <A HREF="#t%3AT"
->T</A
->  = <A HREF="#v%3AT"
->T</A
-></TD
-></TR
-></TABLE
 ></TD
 ></TR
 ><TR
@@ -92,25 +68,15 @@
 ><TD CLASS="decl"
 ><SPAN CLASS="keyword"
 >data</SPAN
->  <A NAME="t%3AT"
+>  <A NAME="t%3AA"
 ></A
 ><B
->T</B
+>A</B
 >  </TD
 ></TR
 ><TR
 ><TD CLASS="body"
 ><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
-><TR
-><TD CLASS="ndoc"
->We should have different anchors for constructors and types/classes.  This
- hyperlink should point to the type constructor by default: <TT
-><A HREF="Bug1.html#t%3AT"
->T</A
-></TT
->.
-</TD
-></TR
 ><TR
 ><TD CLASS="section4"
 >Constructors</TD
@@ -120,10 +86,10 @@
 ><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
 ><TR
 ><TD CLASS="arg"
-><A NAME="v%3AT"
+><A NAME="v%3AA"
 ></A
 ><B
->T</B
+>A</B
 ></TD
 ><TD CLASS="rdoc"
 ></TD
@@ -142,7 +108,7 @@
 ><TD CLASS="botbar"
 >Produced by <A HREF="http://www.haskell.org/haddock/"
 >Haddock</A
-> version 2.0.0.0</TD
+> version 2.1.0</TD
 ></TR
 ></TABLE
 ></BODY

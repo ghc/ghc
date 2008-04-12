@@ -4,7 +4,7 @@
 ><HEAD
 ><META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8"
 ><TITLE
->Bug2</TITLE
+>NoLayout</TITLE
 ><LINK HREF="haddock.css" REL="stylesheet" TYPE="text/css"
 ><SCRIPT SRC="haddock-util.js" TYPE="text/javascript"
 ></SCRIPT
@@ -38,7 +38,7 @@
 ><TR
 ><TD
 ><FONT SIZE="6"
->Bug2</FONT
+>NoLayout</FONT
 ></TD
 ></TR
 ></TABLE
@@ -50,6 +50,26 @@
 ></TR
 ><TR
 ><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+>Synopsis</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A HREF="#v%3Ag"
+>g</A
+> :: Int</TD
+></TR
+></TABLE
 ></TD
 ></TR
 ><TR
@@ -66,13 +86,16 @@
 ></TR
 ><TR
 ><TD CLASS="decl"
-><A NAME="v%3Ax"
+><A NAME="v%3Ag"
 ></A
 ><B
->x</B
-> :: <A HREF="A.html#t%3AA"
->A</A
-></TD
+>g</B
+> :: Int</TD
+></TR
+><TR
+><TD CLASS="doc"
+>the class C
+</TD
 ></TR
 ><TR
 ><TD CLASS="s15"
@@ -82,7 +105,7 @@
 ><TD CLASS="botbar"
 >Produced by <A HREF="http://www.haskell.org/haddock/"
 >Haddock</A
-> version 2.0.0.0</TD
+> version 2.1.0</TD
 ></TR
 ></TABLE
 ></BODY
