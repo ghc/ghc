@@ -39,6 +39,10 @@ isNameSym :: Name -> Bool
 isNameSym = isSymOcc . nameOccName
 
 
+isVarSym :: OccName -> Bool
+isVarSym = isLexVarSym . occNameFS
+
+
 getMainDeclBinder :: HsDecl name -> Maybe name
 getMainDeclBinder (TyClD d) = Just (tcdName d)
 getMainDeclBinder (ValD d)

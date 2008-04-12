@@ -1292,7 +1292,7 @@ ppr_fun_ty ctxt_prec ty1 ty2
 -- Names
 
 ppOccName :: OccName -> Html
-ppOccName name = toHtml $ occNameString name
+ppOccName = toHtml . occNameString
 
 ppRdrName :: RdrName -> Html
 ppRdrName = ppOccName . rdrNameOcc
@@ -1311,16 +1311,18 @@ linkTarget n = namedAnchor (anchorNameStr n) << toHtml ""
 ppName :: Name -> Html
 ppName name = toHtml (getOccString name)
 
+
 ppBinder :: Bool -> OccName -> Html
 -- The Bool indicates whether we are generating the summary, in which case
 -- the binder will be a link to the full definition.
 ppBinder True n = linkedAnchor (anchorNameStr n) << ppBinder' n
 ppBinder False n = linkTarget n +++ bold << ppBinder' n
 
+
 ppBinder' :: OccName -> Html
 ppBinder' n
-  | isSymOcc n = parens $ toHtml (occNameString n)
-  | otherwise  = toHtml (occNameString n)             
+  | isVarSym n = parens $ ppOccName n
+  | otherwise  = ppOccName n
 
 
 linkId mod mbName = linkIdOcc mod (fmap nameOccName mbName)
