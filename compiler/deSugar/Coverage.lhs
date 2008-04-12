@@ -7,8 +7,6 @@
 \begin{code}
 module Coverage (addCoverageTicksToBinds) where
 
-#include "HsVersions.h"
-
 import HsSyn
 import Module
 import Outputable
@@ -737,7 +735,7 @@ mkHpcPos pos
 		     )
 
 hpcSrcSpan :: SrcSpan
-hpcSrcSpan = mkGeneralSrcSpan (FSLIT("Haskell Program Coverage internals"))
+hpcSrcSpan = mkGeneralSrcSpan (fsLit "Haskell Program Coverage internals")
 \end{code}
 
 
