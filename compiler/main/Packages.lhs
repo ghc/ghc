@@ -345,9 +345,9 @@ hideOldPackages dflags pkgs = mapM maybe_hide pkgs
 	   | not (exposed p) = return p
 	   | (p' : _) <- later_versions = do
 		debugTraceMsg dflags 2 $
-		   (ptext SLIT("hiding package") <+> 
+		   (ptext (sLit "hiding package") <+> 
                     text (showPackageId (package p)) <+>
-		    ptext SLIT("to avoid conflict with later version") <+>
+		    ptext (sLit "to avoid conflict with later version") <+>
 		    text (showPackageId (package p')))
 		return (p {exposed=False})
 	   | otherwise = return p
@@ -408,15 +408,15 @@ findWiredInPackages dflags pkgs preload this_package = do
           where
                 notfound = do
 			  debugTraceMsg dflags 2 $
-			    ptext SLIT("wired-in package ")
+			    ptext (sLit "wired-in package ")
 				 <> text wired_pkg
-				 <> ptext SLIT(" not found.")
+				 <> ptext (sLit " not found.")
 			  return Nothing
                 pick pkg = do
                         debugTraceMsg dflags 2 $
-			    ptext SLIT("wired-in package ")
+			    ptext (sLit "wired-in package ")
 				 <> text wired_pkg
-				 <> ptext SLIT(" mapped to ")
+				 <> ptext (sLit " mapped to ")
 				 <> text (showPackageId (package pkg))
 			return (Just (package pkg))
 
@@ -483,8 +483,8 @@ elimDanglingDeps dflags pkgs ignored = go [] pkgs'
 
    reportElim (p, deps) = 
         debugTraceMsg dflags 2 $
-             (ptext SLIT("package") <+> pprPkg p <+> 
-                  ptext SLIT("will be ignored due to missing or recursive dependencies:") $$ 
+             (ptext (sLit "package") <+> pprPkg p <+> 
+                  ptext (sLit "will be ignored due to missing or recursive dependencies:") $$ 
 	      nest 2 (hsep (map (text.showPackageId) deps)))
 
 -- -----------------------------------------------------------------------------
@@ -689,12 +689,12 @@ missingPackageErr :: String -> IO [PackageConfig]
 missingPackageErr p = throwDyn (CmdLineError (showSDoc (missingPackageMsg p)))
 
 missingPackageMsg :: String -> SDoc
-missingPackageMsg p = ptext SLIT("unknown package:") <+> text p
+missingPackageMsg p = ptext (sLit "unknown package:") <+> text p
 
 missingDependencyMsg :: Maybe PackageId -> SDoc
 missingDependencyMsg Nothing = empty
 missingDependencyMsg (Just parent)
-  = space <> parens (ptext SLIT("dependency of") <+> ftext (packageIdFS parent))
+  = space <> parens (ptext (sLit "dependency of") <+> ftext (packageIdFS parent))
 
 -- -----------------------------------------------------------------------------
 
