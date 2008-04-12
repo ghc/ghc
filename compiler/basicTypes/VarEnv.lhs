@@ -34,8 +34,6 @@ module VarEnv (
 	TidyEnv, emptyTidyEnv
     ) where
 
-#include "HsVersions.h"
-
 import OccName
 import Var
 import VarSet
@@ -63,7 +61,7 @@ data InScopeSet = InScope (VarEnv Var) FastInt
 	-- INVARIANT: it's not zero; we use it as a multiplier in uniqAway
 
 instance Outputable InScopeSet where
-  ppr (InScope s _) = ptext SLIT("InScope") <+> ppr s
+  ppr (InScope s _) = ptext (sLit "InScope") <+> ppr s
 
 emptyInScopeSet :: InScopeSet
 emptyInScopeSet = InScope emptyVarSet (_ILIT(1))
