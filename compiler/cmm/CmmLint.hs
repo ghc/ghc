@@ -17,8 +17,6 @@ module CmmLint (
   cmmLint, cmmLintTop
   ) where
 
-#include "HsVersions.h"
-
 import Cmm
 import CLabel
 import MachOp
@@ -43,7 +41,7 @@ cmmLintTop top = runCmmLint $ lintCmmTop top
 runCmmLint :: CmmLint a -> Maybe SDoc
 runCmmLint l = 
    case unCL l of
-	Left err -> Just (ptext SLIT("Cmm lint error:") $$ nest 2 err)
+	Left err -> Just (ptext (sLit "Cmm lint error:") $$ nest 2 err)
 	Right _  -> Nothing
 
 lintCmmTop :: (GenCmmTop h i (ListGraph CmmStmt)) -> CmmLint ()
