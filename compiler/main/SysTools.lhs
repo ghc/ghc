@@ -619,7 +619,7 @@ getTempDir dflags@(DynFlags{tmpDir=tmp_dir})
                          in do createDirectory dirname
                                let mapping' = addToFM mapping tmp_dir dirname
                                writeIORef v_DirsToClean mapping'
-                               debugTraceMsg dflags 2 (ptext SLIT("Created temporary directory:") <+> text dirname)
+                               debugTraceMsg dflags 2 (ptext (sLit "Created temporary directory:") <+> text dirname)
                                return dirname
                             `IO.catch` \e ->
                                     if isAlreadyExistsError e
@@ -663,8 +663,8 @@ removeWith :: DynFlags -> (FilePath -> IO ()) -> FilePath -> IO ()
 removeWith dflags remover f = remover f `IO.catch`
   (\e ->
    let msg = if isDoesNotExistError e
-             then ptext SLIT("Warning: deleting non-existent") <+> text f
-             else ptext SLIT("Warning: exception raised when deleting")
+             then ptext (sLit "Warning: deleting non-existent") <+> text f
+             else ptext (sLit "Warning: exception raised when deleting")
                                             <+> text f <> colon
                $$ text (show e)
    in debugTraceMsg dflags 2 msg
@@ -858,7 +858,7 @@ traceCmd dflags phase_name cmd_line action
 	}}
   where
     handle_exn verb exn = do { debugTraceMsg dflags 2 (char '\n')
-			     ; debugTraceMsg dflags 2 (ptext SLIT("Failed:") <+> text cmd_line <+> text (show exn))
+			     ; debugTraceMsg dflags 2 (ptext (sLit "Failed:") <+> text cmd_line <+> text (show exn))
 	          	     ; throwDyn (PhaseFailed phase_name (ExitFailure 1)) }
 \end{code}
 
