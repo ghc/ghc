@@ -185,7 +185,7 @@ rnPatsAndThen_LocalRightwards ctxt pats thing_inside
 				 [(nameSrcSpan name, nameOccName name) | name <- names]
             ; thing_inside pats' } }
   where
-    doc_pat = ptext SLIT("In") <+> pprMatchContext ctxt
+    doc_pat = ptext (sLit "In") <+> pprMatchContext ctxt
 
 
 -- entry point 2:
@@ -463,13 +463,13 @@ rnHsRecFieldsAndThen choice rn_thing (HsRecFields fields dd) cont =
                                       \ fields2 -> 
                                           cont (HsRecFields (fields1 ++ fields2) dd)
 
-needFlagDotDot str = vcat [ptext SLIT("Illegal `..' in record") <+> text str,
-			  ptext SLIT("Use -XRecordWildCards to permit this")]
+needFlagDotDot str = vcat [ptext (sLit "Illegal `..' in record") <+> text str,
+			  ptext (sLit "Use -XRecordWildCards to permit this")]
 
-badDotDot str = ptext SLIT("You cannot use `..' in record") <+> text str
+badDotDot str = ptext (sLit "You cannot use `..' in record") <+> text str
 
-badPun fld = vcat [ptext SLIT("Illegal use of punning for field") <+> quotes (ppr fld),
-		   ptext SLIT("Use -XRecordPuns to permit this")]
+badPun fld = vcat [ptext (sLit "Illegal use of punning for field") <+> quotes (ppr fld),
+		   ptext (sLit "Use -XRecordPuns to permit this")]
 
 
 -- wrappers
@@ -593,23 +593,23 @@ checkTupSize tup_size
   | tup_size <= mAX_TUPLE_SIZE 
   = return ()
   | otherwise		       
-  = addErr (sep [ptext SLIT("A") <+> int tup_size <> ptext SLIT("-tuple is too large for GHC"),
-		 nest 2 (parens (ptext SLIT("max size is") <+> int mAX_TUPLE_SIZE)),
-		 nest 2 (ptext SLIT("Workaround: use nested tuples or define a data type"))])
+  = addErr (sep [ptext (sLit "A") <+> int tup_size <> ptext (sLit "-tuple is too large for GHC"),
+		 nest 2 (parens (ptext (sLit "max size is") <+> int mAX_TUPLE_SIZE)),
+		 nest 2 (ptext (sLit "Workaround: use nested tuples or define a data type"))])
 
 patSigErr ty
-  =  (ptext SLIT("Illegal signature in pattern:") <+> ppr ty)
-	$$ nest 4 (ptext SLIT("Use -XPatternSignatures to permit it"))
+  =  (ptext (sLit "Illegal signature in pattern:") <+> ppr ty)
+	$$ nest 4 (ptext (sLit "Use -XPatternSignatures to permit it"))
 
 dupFieldErr str dup
-  = hsep [ptext SLIT("duplicate field name"), 
+  = hsep [ptext (sLit "duplicate field name"), 
           quotes (ppr dup),
-	  ptext SLIT("in record"), text str]
+	  ptext (sLit "in record"), text str]
 
 bogusCharError c
-  = ptext SLIT("character literal out of range: '\\") <> char c  <> char '\''
+  = ptext (sLit "character literal out of range: '\\") <> char c  <> char '\''
 
-badViewPat pat = vcat [ptext SLIT("Illegal view pattern: ") <+> ppr pat,
-                       ptext SLIT("Use -XViewPatterns to enable view patterns")]
+badViewPat pat = vcat [ptext (sLit "Illegal view pattern: ") <+> ppr pat,
+                       ptext (sLit "Use -XViewPatterns to enable view patterns")]
 
 \end{code}
