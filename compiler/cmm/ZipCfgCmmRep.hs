@@ -11,8 +11,6 @@ module ZipCfgCmmRep
   )
 where
 
-#include "HsVersions.h"
-
 import CmmExpr
 import Cmm ( GenCmm(..), GenCmmTop(..), CmmStatic, CmmInfo
            , CmmCallTarget(..), CmmActuals, CmmFormals, CmmHinted(..)
@@ -205,12 +203,12 @@ pprMiddle :: Middle -> SDoc
 pprMiddle stmt = (case stmt of
 
     CopyIn conv args _ ->
-        if null args then ptext SLIT("empty CopyIn")
+        if null args then ptext (sLit "empty CopyIn")
         else commafy (map pprHinted args) <+> equals <+>
-             ptext SLIT("foreign") <+> doubleQuotes(ppr conv) <+> ptext SLIT("...")
+             ptext (sLit "foreign") <+> doubleQuotes(ppr conv) <+> ptext (sLit "...")
 
     CopyOut conv args ->
-        ptext SLIT("next, pass") <+> doubleQuotes(ppr conv) <+>
+        ptext (sLit "next, pass") <+> doubleQuotes(ppr conv) <+>
         parens (commafy (map pprHinted args))
 
     --  // text
@@ -230,8 +228,8 @@ pprMiddle stmt = (case stmt of
         hcat [ if null results
                   then empty
                   else parens (commafy $ map ppr results) <>
-                       ptext SLIT(" = "),
-               ptext SLIT("call"), space, 
+                       ptext (sLit " = "),
+               ptext (sLit "call"), space, 
                doubleQuotes(ppr cconv), space,
                ppr_target fn, parens  ( commafy $ map ppr args ),
                semi ]
@@ -242,7 +240,7 @@ pprMiddle stmt = (case stmt of
           lbl = CmmLabel (mkForeignLabel (mkFastString (show op)) Nothing False)
 
     MidAddToContext ra args ->
-        hcat [ ptext SLIT("return via ")
+        hcat [ ptext (sLit "return via ")
              , ppr_target ra, parens (commafy $ map ppr args), semi ]
 
   ) <>
@@ -271,12 +269,12 @@ pprHinted (CmmHinted a FloatHint)  = doubleQuotes (text "float")   <+> ppr a
 
 pprLast :: Last -> SDoc    
 pprLast stmt = (case stmt of
-    LastBranch ident          -> ptext SLIT("goto") <+> ppr ident <> semi
+    LastBranch ident          -> ptext (sLit "goto") <+> ppr ident <> semi
     LastCondBranch expr t f   -> genFullCondBranch expr t f
-    LastJump expr             -> hcat [ ptext SLIT("jump"), space, pprFun expr
-                                      , ptext SLIT("(...)"), semi]
-    LastReturn                -> hcat [ ptext SLIT("return"), space 
-                                      , ptext SLIT("(...)"), semi]
+    LastJump expr             -> hcat [ ptext (sLit "jump"), space, pprFun expr
+                                      , ptext (sLit "(...)"), semi]
+    LastReturn                -> hcat [ ptext (sLit "return"), space 
+                                      , ptext (sLit "(...)"), semi]
     LastSwitch arg ids        -> ppr $ CmmSwitch arg ids
     LastCall tgt k            -> genBareCall tgt k
   ) <>
@@ -292,10 +290,10 @@ pprLast stmt = (case stmt of
 
 genBareCall :: CmmExpr -> Maybe BlockId -> SDoc
 genBareCall fn k =
-        hcat [ ptext SLIT("call"), space
-             , pprFun fn, ptext SLIT("(...)"), space
-             , case k of Nothing -> ptext SLIT("never returns")
-                         Just k -> ptext SLIT("returns to") <+> ppr k
+        hcat [ ptext (sLit "call"), space
+             , pprFun fn, ptext (sLit "(...)"), space
+             , case k of Nothing -> ptext (sLit "never returns")
+                         Just k -> ptext (sLit "returns to") <+> ppr k
              , semi ]
         where
 
@@ -305,11 +303,11 @@ pprFun f = parens (ppr f)
 
 genFullCondBranch :: Outputable id => CmmExpr -> id -> id -> SDoc
 genFullCondBranch expr t f =
-    hsep [ ptext SLIT("if")
+    hsep [ ptext (sLit "if")
          , parens(ppr expr)
-         , ptext SLIT("goto")
+         , ptext (sLit "goto")
          , ppr t <> semi
-         , ptext SLIT("else goto")
+         , ptext (sLit "else goto")
          , ppr f <> semi
          ]
 
