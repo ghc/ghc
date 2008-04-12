@@ -117,32 +117,32 @@ mkPrimTc fs uniq tycon
 		  (ATyCon tycon)	-- Relevant TyCon
 		  UserSyntax		-- None are built-in syntax
 
-charPrimTyConName    	      = mkPrimTc FSLIT("Char#") charPrimTyConKey charPrimTyCon
-intPrimTyConName     	      = mkPrimTc FSLIT("Int#") intPrimTyConKey  intPrimTyCon
-int32PrimTyConName	      = mkPrimTc FSLIT("Int32#") int32PrimTyConKey int32PrimTyCon
-int64PrimTyConName   	      = mkPrimTc FSLIT("Int64#") int64PrimTyConKey int64PrimTyCon
-wordPrimTyConName    	      = mkPrimTc FSLIT("Word#") wordPrimTyConKey wordPrimTyCon
-word32PrimTyConName  	      = mkPrimTc FSLIT("Word32#") word32PrimTyConKey word32PrimTyCon
-word64PrimTyConName  	      = mkPrimTc FSLIT("Word64#") word64PrimTyConKey word64PrimTyCon
-addrPrimTyConName    	      = mkPrimTc FSLIT("Addr#") addrPrimTyConKey addrPrimTyCon
-floatPrimTyConName   	      = mkPrimTc FSLIT("Float#") floatPrimTyConKey floatPrimTyCon
-doublePrimTyConName  	      = mkPrimTc FSLIT("Double#") doublePrimTyConKey doublePrimTyCon
-statePrimTyConName   	      = mkPrimTc FSLIT("State#") statePrimTyConKey statePrimTyCon
-realWorldTyConName   	      = mkPrimTc FSLIT("RealWorld") realWorldTyConKey realWorldTyCon
-arrayPrimTyConName   	      = mkPrimTc FSLIT("Array#") arrayPrimTyConKey arrayPrimTyCon
-byteArrayPrimTyConName	      = mkPrimTc FSLIT("ByteArray#") byteArrayPrimTyConKey byteArrayPrimTyCon
-mutableArrayPrimTyConName     = mkPrimTc FSLIT("MutableArray#") mutableArrayPrimTyConKey mutableArrayPrimTyCon
-mutableByteArrayPrimTyConName = mkPrimTc FSLIT("MutableByteArray#") mutableByteArrayPrimTyConKey mutableByteArrayPrimTyCon
-mutVarPrimTyConName	      = mkPrimTc FSLIT("MutVar#") mutVarPrimTyConKey mutVarPrimTyCon
-mVarPrimTyConName	      = mkPrimTc FSLIT("MVar#") mVarPrimTyConKey mVarPrimTyCon
-tVarPrimTyConName	      = mkPrimTc FSLIT("TVar#") tVarPrimTyConKey tVarPrimTyCon
-stablePtrPrimTyConName        = mkPrimTc FSLIT("StablePtr#") stablePtrPrimTyConKey stablePtrPrimTyCon
-stableNamePrimTyConName       = mkPrimTc FSLIT("StableName#") stableNamePrimTyConKey stableNamePrimTyCon
-bcoPrimTyConName 	      = mkPrimTc FSLIT("BCO#") bcoPrimTyConKey bcoPrimTyCon
-weakPrimTyConName  	      = mkPrimTc FSLIT("Weak#") weakPrimTyConKey weakPrimTyCon
-threadIdPrimTyConName  	      = mkPrimTc FSLIT("ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
-anyPrimTyConName	      = mkPrimTc FSLIT("Any") anyPrimTyConKey anyPrimTyCon
-anyPrimTyCon1Name	      = mkPrimTc FSLIT("Any1") anyPrimTyCon1Key anyPrimTyCon
+charPrimTyConName    	      = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
+intPrimTyConName     	      = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
+int32PrimTyConName	      = mkPrimTc (fsLit "Int32#") int32PrimTyConKey int32PrimTyCon
+int64PrimTyConName   	      = mkPrimTc (fsLit "Int64#") int64PrimTyConKey int64PrimTyCon
+wordPrimTyConName    	      = mkPrimTc (fsLit "Word#") wordPrimTyConKey wordPrimTyCon
+word32PrimTyConName  	      = mkPrimTc (fsLit "Word32#") word32PrimTyConKey word32PrimTyCon
+word64PrimTyConName  	      = mkPrimTc (fsLit "Word64#") word64PrimTyConKey word64PrimTyCon
+addrPrimTyConName    	      = mkPrimTc (fsLit "Addr#") addrPrimTyConKey addrPrimTyCon
+floatPrimTyConName   	      = mkPrimTc (fsLit "Float#") floatPrimTyConKey floatPrimTyCon
+doublePrimTyConName  	      = mkPrimTc (fsLit "Double#") doublePrimTyConKey doublePrimTyCon
+statePrimTyConName   	      = mkPrimTc (fsLit "State#") statePrimTyConKey statePrimTyCon
+realWorldTyConName   	      = mkPrimTc (fsLit "RealWorld") realWorldTyConKey realWorldTyCon
+arrayPrimTyConName   	      = mkPrimTc (fsLit "Array#") arrayPrimTyConKey arrayPrimTyCon
+byteArrayPrimTyConName	      = mkPrimTc (fsLit "ByteArray#") byteArrayPrimTyConKey byteArrayPrimTyCon
+mutableArrayPrimTyConName     = mkPrimTc (fsLit "MutableArray#") mutableArrayPrimTyConKey mutableArrayPrimTyCon
+mutableByteArrayPrimTyConName = mkPrimTc (fsLit "MutableByteArray#") mutableByteArrayPrimTyConKey mutableByteArrayPrimTyCon
+mutVarPrimTyConName	      = mkPrimTc (fsLit "MutVar#") mutVarPrimTyConKey mutVarPrimTyCon
+mVarPrimTyConName	      = mkPrimTc (fsLit "MVar#") mVarPrimTyConKey mVarPrimTyCon
+tVarPrimTyConName	      = mkPrimTc (fsLit "TVar#") tVarPrimTyConKey tVarPrimTyCon
+stablePtrPrimTyConName        = mkPrimTc (fsLit "StablePtr#") stablePtrPrimTyConKey stablePtrPrimTyCon
+stableNamePrimTyConName       = mkPrimTc (fsLit "StableName#") stableNamePrimTyConKey stableNamePrimTyCon
+bcoPrimTyConName 	      = mkPrimTc (fsLit "BCO#") bcoPrimTyConKey bcoPrimTyCon
+weakPrimTyConName  	      = mkPrimTc (fsLit "Weak#") weakPrimTyConKey weakPrimTyCon
+threadIdPrimTyConName  	      = mkPrimTc (fsLit "ThreadId#") threadIdPrimTyConKey threadIdPrimTyCon
+anyPrimTyConName	      = mkPrimTc (fsLit "Any") anyPrimTyConKey anyPrimTyCon
+anyPrimTyCon1Name	      = mkPrimTc (fsLit "Any1") anyPrimTyCon1Key anyPrimTyCon
 \end{code}
 
 %************************************************************************
@@ -312,7 +312,7 @@ anyPrimTyCon1 = mkLiftedPrimTyCon anyPrimTyCon1Name kind 0 PtrRep
 mkAnyPrimTyCon :: Unique -> Kind -> TyCon
 -- Grotesque hack alert: the client gives the unique; so equality won't work
 mkAnyPrimTyCon uniq kind 
-  = WARN( opt_PprStyle_Debug, ptext SLIT("Urk! Inventing strangely-kinded Any TyCon:") <+> ppr uniq <+> ppr kind )
+  = WARN( opt_PprStyle_Debug, ptext (sLit "Urk! Inventing strangely-kinded Any TyCon:") <+> ppr uniq <+> ppr kind )
 	-- See Note [Strangely-kinded void TyCons] in TcHsSyn
     tycon
   where
