@@ -117,7 +117,7 @@ lookupEvidence :: [(Name, Id)] -> Name -> Id
 lookupEvidence prs std_name
   = assocDefault (mk_panic std_name) prs std_name
   where
-    mk_panic std_name = pprPanic "dsSyntaxTable" (ptext SLIT("Not found:") <+> ppr std_name)
+    mk_panic std_name = pprPanic "dsSyntaxTable" (ptext (sLit "Not found:") <+> ppr std_name)
 \end{code}
 
 
@@ -872,7 +872,7 @@ mkTupleCase uniqs vars body scrut_var scrut
     
     one_tuple_case chunk_vars (us, vs, body)
       = let (us1, us2) = splitUniqSupply us
-            scrut_var = mkSysLocal FSLIT("ds") (uniqFromSupply us1)
+            scrut_var = mkSysLocal (fsLit "ds") (uniqFromSupply us1)
               (mkCoreTupTy (map idType chunk_vars))
             body' = mkSmallTupleCase chunk_vars body scrut_var (Var scrut_var)
         in (us2, scrut_var:vs, body')
@@ -1059,7 +1059,7 @@ mkTickBox ix vars e = do
 mkBinaryTickBox :: Int -> Int -> CoreExpr -> DsM CoreExpr
 mkBinaryTickBox ixT ixF e = do
        uq <- newUnique 	
-       let bndr1 = mkSysLocal FSLIT("t1") uq boolTy 
+       let bndr1 = mkSysLocal (fsLit "t1") uq boolTy 
        falseBox <- mkTickBox ixF [] $ Var falseDataConId
        trueBox  <- mkTickBox ixT [] $ Var trueDataConId
        return $ Case e bndr1 boolTy
