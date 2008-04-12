@@ -15,8 +15,6 @@ TcRules: Typechecking transformation rules
 
 module TcRules ( tcRules ) where
 
-#include "HsVersions.h"
-
 import HsSyn
 import TcRnMonad
 import TcSimplify
@@ -40,7 +38,7 @@ tcRules decls = mapM (wrapLocM tcRule) decls
 tcRule :: RuleDecl Name -> TcM (RuleDecl TcId)
 tcRule (HsRule name act vars lhs fv_lhs rhs fv_rhs)
   = addErrCtxt (ruleCtxt name)			$ do
-    traceTc (ptext SLIT("---- Rule ------") <+> ppr name)
+    traceTc (ptext (sLit "---- Rule ------") <+> ppr name)
     rule_ty <- newFlexiTyVarTy openTypeKind
 
 	-- Deal with the tyvars mentioned in signatures
@@ -115,7 +113,7 @@ tcRuleBndrs (RuleBndrSig var rn_ty : vars) thing_inside
 	  tcExtendIdEnv [id] $
 	  tcRuleBndrs vars (\ids -> thing_inside (id:ids)) }
 
-ruleCtxt name = ptext SLIT("When checking the transformation rule") <+> 
+ruleCtxt name = ptext (sLit "When checking the transformation rule") <+> 
 		doubleQuotes (ftext name)
 \end{code}
 
