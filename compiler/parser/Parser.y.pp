@@ -18,9 +18,6 @@
 module Parser ( parseModule, parseStmt, parseIdentifier, parseType,
 		parseHeader ) where
 
-#define INCLUDE #include 
-INCLUDE "HsVersions.h"
-
 import HsSyn
 import RdrHsSyn
 import HscTypes		( IsBootInterface, DeprecTxt )
@@ -1756,9 +1753,9 @@ tyvarop : '`' tyvarid '`'	{ LL (unLoc $2) }
 tyvarid	:: { Located RdrName }
 	: VARID			{ L1 $! mkUnqual tvName (getVARID $1) }
 	| special_id		{ L1 $! mkUnqual tvName (unLoc $1) }
-	| 'unsafe' 		{ L1 $! mkUnqual tvName FSLIT("unsafe") }
-	| 'safe' 		{ L1 $! mkUnqual tvName FSLIT("safe") }
-	| 'threadsafe' 		{ L1 $! mkUnqual tvName FSLIT("threadsafe") }
+	| 'unsafe' 		{ L1 $! mkUnqual tvName (fsLit "unsafe") }
+	| 'safe' 		{ L1 $! mkUnqual tvName (fsLit "safe") }
+	| 'threadsafe' 		{ L1 $! mkUnqual tvName (fsLit "threadsafe") }
 
 tyvarsym :: { Located RdrName }
 -- Does not include "!", because that is used for strictness marks
@@ -1787,15 +1784,15 @@ qvarid :: { Located RdrName }
 
 varid :: { Located RdrName }
 	: varid_no_unsafe 	{ $1 }
-	| 'unsafe'		{ L1 $! mkUnqual varName FSLIT("unsafe") }
-	| 'safe'		{ L1 $! mkUnqual varName FSLIT("safe") }
-	| 'threadsafe'		{ L1 $! mkUnqual varName FSLIT("threadsafe") }
+	| 'unsafe'		{ L1 $! mkUnqual varName (fsLit "unsafe") }
+	| 'safe'		{ L1 $! mkUnqual varName (fsLit "safe") }
+	| 'threadsafe'		{ L1 $! mkUnqual varName (fsLit "threadsafe") }
 
 varid_no_unsafe :: { Located RdrName }
 	: VARID			{ L1 $! mkUnqual varName (getVARID $1) }
 	| special_id		{ L1 $! mkUnqual varName (unLoc $1) }
-	| 'forall'		{ L1 $! mkUnqual varName FSLIT("forall") }
-	| 'family'              { L1 $! mkUnqual varName FSLIT("family") }
+	| 'forall'		{ L1 $! mkUnqual varName (fsLit "forall") }
+	| 'family'              { L1 $! mkUnqual varName (fsLit "family") }
 
 qvarsym :: { Located RdrName }
 	: varsym		{ $1 }
@@ -1810,7 +1807,7 @@ qvarsym1 : QVARSYM		{ L1 $ mkQual varName (getQVARSYM $1) }
 
 varsym :: { Located RdrName }
 	: varsym_no_minus 	{ $1 }
-	| '-'			{ L1 $ mkUnqual varName FSLIT("-") }
+	| '-'			{ L1 $ mkUnqual varName (fsLit "-") }
 
 varsym_no_minus :: { Located RdrName } -- varsym not including '-'
 	: VARSYM		{ L1 $ mkUnqual varName (getVARSYM $1) }
@@ -1823,19 +1820,19 @@ varsym_no_minus :: { Located RdrName } -- varsym not including '-'
 -- depending on context 
 special_id :: { Located FastString }
 special_id
-	: 'as'			{ L1 FSLIT("as") }
-	| 'qualified'		{ L1 FSLIT("qualified") }
-	| 'hiding'		{ L1 FSLIT("hiding") }
-	| 'export'		{ L1 FSLIT("export") }
-	| 'label'		{ L1 FSLIT("label")  }
-	| 'dynamic'		{ L1 FSLIT("dynamic") }
-	| 'stdcall'             { L1 FSLIT("stdcall") }
-	| 'ccall'               { L1 FSLIT("ccall") }
+	: 'as'			{ L1 (fsLit "as") }
+	| 'qualified'		{ L1 (fsLit "qualified") }
+	| 'hiding'		{ L1 (fsLit "hiding") }
+	| 'export'		{ L1 (fsLit "export") }
+	| 'label'		{ L1 (fsLit "label")  }
+	| 'dynamic'		{ L1 (fsLit "dynamic") }
+	| 'stdcall'             { L1 (fsLit "stdcall") }
+	| 'ccall'               { L1 (fsLit "ccall") }
 
 special_sym :: { Located FastString }
-special_sym : '!'	{ L1 FSLIT("!") }
-	    | '.' 	{ L1 FSLIT(".") }
- 	    | '*' 	{ L1 FSLIT("*") }
+special_sym : '!'	{ L1 (fsLit "!") }
+	    | '.' 	{ L1 (fsLit ".") }
+ 	    | '*' 	{ L1 (fsLit "*") }
 
 -----------------------------------------------------------------------------
 -- Data constructors
