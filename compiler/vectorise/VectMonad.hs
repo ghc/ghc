@@ -174,7 +174,7 @@ emptyLocalEnv = LocalEnv {
                    local_vars     = emptyVarEnv
                  , local_tyvars   = []
                  , local_tyvar_pa = emptyVarEnv
-                 , local_bind_name  = FSLIT("fn")
+                 , local_bind_name  = fsLit "fn"
                  }
 
 -- FIXME
@@ -331,7 +331,7 @@ newLocalVar fs ty
       return $ mkSysLocal fs u ty
 
 newDummyVar :: Type -> VM Var
-newDummyVar = newLocalVar FSLIT("ds")
+newDummyVar = newLocalVar (fsLit "ds")
 
 newTyVar :: FastString -> Kind -> VM Var
 newTyVar fs k
