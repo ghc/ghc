@@ -575,7 +575,7 @@ saveClobberedTemps clobbered dying =  do
 	recordSpill (SpillClobber temp)
 
 	let new_assign	= addToUFM assig temp (InBoth reg slot)
-	clobber new_assign (spill : COMMENT FSLIT("spill clobber") : instrs) rest
+	clobber new_assign (spill : COMMENT (fsLit "spill clobber") : instrs) rest
 
 clobberRegs :: [RegNo] -> RegM ()
 clobberRegs [] = return () -- common case
@@ -692,7 +692,7 @@ allocateRegsAndSpill reading keep spills alloc (r:rs) = do
 
     	        (spill_insn, slot) <- spillR (RealReg my_reg) temp_to_push_out
 		let spill_store	 = (if reading then id else reverse)
-					[ COMMENT FSLIT("spill alloc") 
+					[ COMMENT (fsLit "spill alloc") 
 					, spill_insn ]
 
 		-- record that this temp was spilled
@@ -724,7 +724,7 @@ loadTemp True vreg (Just (InMem slot)) hreg spills
  = do
  	insn <- loadR (RealReg hreg) slot
 	recordSpill (SpillLoad $ getUnique vreg)
-	return	$  COMMENT FSLIT("spill load") : insn : spills
+	return	$  COMMENT (fsLit "spill load") : insn : spills
 
 loadTemp _ _ _ _ spills =
    return spills
@@ -909,7 +909,7 @@ handleComponent delta instr (CyclicSCC ((vreg, (InReg sreg),dsts):rest))
 	 = do
 		restoreToReg 	<- loadR (RealReg reg) slot
 		moveInstr	<- makeMove delta vreg r mem
-		return $ [COMMENT FSLIT("spill join move"), restoreToReg, moveInstr]
+		return $ [COMMENT (fsLit "spill join move"), restoreToReg, moveInstr]
 
 	getRestoreMoves [InReg reg] slot
 		= loadR (RealReg reg) slot >>= return . (:[])
