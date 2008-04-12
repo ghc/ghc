@@ -27,8 +27,6 @@ module HsSyn (
 	emptyHaddockModInfo,
 ) where
 
-#include "HsVersions.h"
-
 -- friends:
 import HsDecls		
 import HsBinds
@@ -105,11 +103,11 @@ instance (OutputableBndr name)
       = vcat [
 	    pp_mb mbDoc,
 	    case exports of
-	      Nothing -> pp_header (ptext SLIT("where"))
+	      Nothing -> pp_header (ptext (sLit "where"))
 	      Just es -> vcat [
 			   pp_header lparen,
 			   nest 8 (fsep (punctuate comma (map ppr es))),
-			   nest 4 (ptext SLIT(") where"))
+			   nest 4 (ptext (sLit ") where"))
 			  ],
 	    pp_nonnull imports,
 	    pp_nonnull decls
@@ -119,7 +117,7 @@ instance (OutputableBndr name)
            Nothing -> pp_modname <+> rest
            Just d -> vcat [ pp_modname, ppr d, rest ]
 
-	pp_modname = ptext SLIT("module") <+> ppr name
+	pp_modname = ptext (sLit "module") <+> ppr name
 
 pp_mb :: Outputable t => Maybe t -> SDoc
 pp_mb (Just x) = ppr x 
