@@ -192,7 +192,7 @@ tc_hs_deriv tv_names1 (HsForAllTy _ tv_names2 (L _ []) (L _ ty))
     tc_hs_deriv (tv_names1 ++ tv_names2) ty
 
 tc_hs_deriv _ other
-  = failWithTc (ptext SLIT("Illegal deriving item") <+> ppr other)
+  = failWithTc (ptext (sLit "Illegal deriving item") <+> ppr other)
 \end{code}
 
 	These functions are used during knot-tying in
@@ -374,7 +374,7 @@ kc_hs_type (HsBangTy b ty) = do
     return (HsBangTy b ty', kind)
 
 kc_hs_type ty@(HsSpliceTy _)
-  = failWithTc (ptext SLIT("Unexpected type splice:") <+> ppr ty)
+  = failWithTc (ptext (sLit "Unexpected type splice:") <+> ppr ty)
 
 -- remove the doc nodes here, no need to worry about the location since
 -- its the same for a doc node and it's child type node
@@ -400,8 +400,8 @@ kcApps fun_kind ppr_fun args = do
 
     kc_arg arg arg_kind = kcCheckHsType arg arg_kind
 
-    too_many_args = ptext SLIT("Kind error:") <+> quotes ppr_fun <+>
-		    ptext SLIT("is applied to too many type arguments")
+    too_many_args = ptext (sLit "Kind error:") <+> quotes ppr_fun <+>
+		    ptext (sLit "is applied to too many type arguments")
 
 ---------------------------
 kcHsContext :: LHsContext Name -> TcM (LHsContext Name)
@@ -488,7 +488,7 @@ ds_type (HsParTy ty)		-- Remove the parentheses markers
   = dsHsType ty
 
 ds_type ty@(HsBangTy _ _)	-- No bangs should be here
-  = failWithTc (ptext SLIT("Unexpected strictness annotation:") <+> ppr ty)
+  = failWithTc (ptext (sLit "Unexpected strictness annotation:") <+> ppr ty)
 
 ds_type (HsKindSig ty k)
   = dsHsType ty	-- Kind checking done already
@@ -619,10 +619,10 @@ tcLHsConResTy (L span res_ty)
     get_args ty  	     		  args = (ty, args)
 
 badGadtDecl ty
-  = hang (ptext SLIT("Malformed constructor result type:"))
+  = hang (ptext (sLit "Malformed constructor result type:"))
        2 (ppr ty)
 
-typeCtxt ty = ptext SLIT("In the type") <+> quotes (ppr ty)
+typeCtxt ty = ptext (sLit "In the type") <+> quotes (ppr ty)
 \end{code}
 
 %************************************************************************
@@ -658,7 +658,7 @@ tcTyVarBndrs bndrs thing_inside = do
   where
     zonk (KindedTyVar name kind) = do { kind' <- zonkTcKindToKind kind
 				      ; return (mkTyVar name kind') }
-    zonk (UserTyVar name) = WARN( True, ptext SLIT("Un-kinded tyvar") <+> ppr name )
+    zonk (UserTyVar name) = WARN( True, ptext (sLit "Un-kinded tyvar") <+> ppr name )
 			    return (mkTyVar name liftedTypeKind)
 
 -----------------------------------
@@ -688,7 +688,7 @@ tcDataKindSig (Just kind)
 
 badKindSig :: Kind -> SDoc
 badKindSig kind 
- = hang (ptext SLIT("Kind signature on data type declaration has non-* return kind"))
+ = hang (ptext (sLit "Kind signature on data type declaration has non-* return kind"))
 	2 (ppr kind)
 \end{code}
 
@@ -833,7 +833,7 @@ tcPatSig ctxt sig res_ty
 
 \begin{code}
 pprHsSigCtxt :: UserTypeCtxt -> LHsType Name -> SDoc
-pprHsSigCtxt ctxt hs_ty = vcat [ ptext SLIT("In") <+> pprUserTypeCtxt ctxt <> colon, 
+pprHsSigCtxt ctxt hs_ty = vcat [ ptext (sLit "In") <+> pprUserTypeCtxt ctxt <> colon, 
 				 nest 2 (pp_sig ctxt) ]
   where
     pp_sig (FunSigCtxt n)  = pp_n_colon n
@@ -845,19 +845,19 @@ pprHsSigCtxt ctxt hs_ty = vcat [ ptext SLIT("In") <+> pprUserTypeCtxt ctxt <> co
 
 
 wobblyPatSig sig_tvs
-  = hang (ptext SLIT("A pattern type signature cannot bind scoped type variables") 
+  = hang (ptext (sLit "A pattern type signature cannot bind scoped type variables") 
 		<+> pprQuotedList sig_tvs)
-       2 (ptext SLIT("unless the pattern has a rigid type context"))
+       2 (ptext (sLit "unless the pattern has a rigid type context"))
 		
 scopedNonVar n ty
-  = vcat [sep [ptext SLIT("The scoped type variable") <+> quotes (ppr n),
-	       nest 2 (ptext SLIT("is bound to the type") <+> quotes (ppr ty))],
-	  nest 2 (ptext SLIT("You can only bind scoped type variables to type variables"))]
+  = vcat [sep [ptext (sLit "The scoped type variable") <+> quotes (ppr n),
+	       nest 2 (ptext (sLit "is bound to the type") <+> quotes (ppr ty))],
+	  nest 2 (ptext (sLit "You can only bind scoped type variables to type variables"))]
 
 dupInScope n n' ty
-  = hang (ptext SLIT("The scoped type variables") <+> quotes (ppr n) <+> ptext SLIT("and") <+> quotes (ppr n'))
-       2 (vcat [ptext SLIT("are bound to the same type (variable)"),
-		ptext SLIT("Distinct scoped type variables must be distinct")])
+  = hang (ptext (sLit "The scoped type variables") <+> quotes (ppr n) <+> ptext (sLit "and") <+> quotes (ppr n'))
+       2 (vcat [ptext (sLit "are bound to the same type (variable)"),
+		ptext (sLit "Distinct scoped type variables must be distinct")])
 
 wrongEqualityErr
   = failWithTc (text "Equality predicate used as a type")
