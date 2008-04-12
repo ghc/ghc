@@ -50,8 +50,7 @@ module PositionIndependentCode (
       by GCC are left intact by the mangler (so far only on ppc-darwin
       and ppc-linux).
 -}
-     
-#include "HsVersions.h"
+
 #include "nativeGen/NCG.h"
 
 import Cmm
@@ -367,12 +366,12 @@ needImportedSymbols = True
 pprGotDeclaration
     | opt_PIC
     = vcat [
-        ptext SLIT(".section __TEXT,__textcoal_nt,coalesced,no_toc"),
-        ptext SLIT(".weak_definition ___i686.get_pc_thunk.ax"),
-        ptext SLIT(".private_extern ___i686.get_pc_thunk.ax"),
-        ptext SLIT("___i686.get_pc_thunk.ax:"),
-            ptext SLIT("\tmovl (%esp), %eax"),
-            ptext SLIT("\tret")
+        ptext (sLit ".section __TEXT,__textcoal_nt,coalesced,no_toc"),
+        ptext (sLit ".weak_definition ___i686.get_pc_thunk.ax"),
+        ptext (sLit ".private_extern ___i686.get_pc_thunk.ax"),
+        ptext (sLit "___i686.get_pc_thunk.ax:"),
+            ptext (sLit "\tmovl (%esp), %eax"),
+            ptext (sLit "\tret")
     ]
     | otherwise = Pretty.empty
 #else
@@ -391,94 +390,94 @@ pprImportedSymbol importedLbl
     = case opt_PIC of
         False ->
             vcat [
-                ptext SLIT(".symbol_stub"),
-                ptext SLIT("L") <> pprCLabel_asm lbl <> ptext SLIT("$stub:"),
-                    ptext SLIT("\t.indirect_symbol") <+> pprCLabel_asm lbl,
-                    ptext SLIT("\tlis r11,ha16(L") <> pprCLabel_asm lbl
-                        <> ptext SLIT("$lazy_ptr)"),
-                    ptext SLIT("\tlwz r12,lo16(L") <> pprCLabel_asm lbl
-                        <> ptext SLIT("$lazy_ptr)(r11)"),
-                    ptext SLIT("\tmtctr r12"),
-                    ptext SLIT("\taddi r11,r11,lo16(L") <> pprCLabel_asm lbl
-                        <> ptext SLIT("$lazy_ptr)"),
-                    ptext SLIT("\tbctr")
+                ptext (sLit ".symbol_stub"),
+                ptext (sLit "L") <> pprCLabel_asm lbl <> ptext (sLit "$stub:"),
+                    ptext (sLit "\t.indirect_symbol") <+> pprCLabel_asm lbl,
+                    ptext (sLit "\tlis r11,ha16(L") <> pprCLabel_asm lbl
+                        <> ptext (sLit "$lazy_ptr)"),
+                    ptext (sLit "\tlwz r12,lo16(L") <> pprCLabel_asm lbl
+                        <> ptext (sLit "$lazy_ptr)(r11)"),
+                    ptext (sLit "\tmtctr r12"),
+                    ptext (sLit "\taddi r11,r11,lo16(L") <> pprCLabel_asm lbl
+                        <> ptext (sLit "$lazy_ptr)"),
+                    ptext (sLit "\tbctr")
             ]
         True ->
             vcat [
-                ptext SLIT(".section __TEXT,__picsymbolstub1,")
-                  <> ptext SLIT("symbol_stubs,pure_instructions,32"),
-                ptext SLIT("\t.align 2"),
-                ptext SLIT("L") <> pprCLabel_asm lbl <> ptext SLIT("$stub:"),
-                    ptext SLIT("\t.indirect_symbol") <+> pprCLabel_asm lbl,
-                    ptext SLIT("\tmflr r0"),
-                    ptext SLIT("\tbcl 20,31,L0$") <> pprCLabel_asm lbl,
-                ptext SLIT("L0$") <> pprCLabel_asm lbl <> char ':',
-                    ptext SLIT("\tmflr r11"),
-                    ptext SLIT("\taddis r11,r11,ha16(L") <> pprCLabel_asm lbl
-                        <> ptext SLIT("$lazy_ptr-L0$") <> pprCLabel_asm lbl <> char ')',
-                    ptext SLIT("\tmtlr r0"),
-                    ptext SLIT("\tlwzu r12,lo16(L") <> pprCLabel_asm lbl
-                        <> ptext SLIT("$lazy_ptr-L0$") <> pprCLabel_asm lbl
-                        <> ptext SLIT(")(r11)"),
-                    ptext SLIT("\tmtctr r12"),
-                    ptext SLIT("\tbctr")
+                ptext (sLit ".section __TEXT,__picsymbolstub1,")
+                  <> ptext (sLit "symbol_stubs,pure_instructions,32"),
+                ptext (sLit "\t.align 2"),
+                ptext (sLit "L") <> pprCLabel_asm lbl <> ptext (sLit "$stub:"),
+                    ptext (sLit "\t.indirect_symbol") <+> pprCLabel_asm lbl,
+                    ptext (sLit "\tmflr r0"),
+                    ptext (sLit "\tbcl 20,31,L0$") <> pprCLabel_asm lbl,
+                ptext (sLit "L0$") <> pprCLabel_asm lbl <> char ':',
+                    ptext (sLit "\tmflr r11"),
+                    ptext (sLit "\taddis r11,r11,ha16(L") <> pprCLabel_asm lbl
+                        <> ptext (sLit "$lazy_ptr-L0$") <> pprCLabel_asm lbl <> char ')',
+                    ptext (sLit "\tmtlr r0"),
+                    ptext (sLit "\tlwzu r12,lo16(L") <> pprCLabel_asm lbl
+                        <> ptext (sLit "$lazy_ptr-L0$") <> pprCLabel_asm lbl
+                        <> ptext (sLit ")(r11)"),
+                    ptext (sLit "\tmtctr r12"),
+                    ptext (sLit "\tbctr")
             ]
     $+$ vcat [
-        ptext SLIT(".lazy_symbol_pointer"),
-        ptext SLIT("L") <> pprCLabel_asm lbl <> ptext SLIT("$lazy_ptr:"),
-            ptext SLIT("\t.indirect_symbol") <+> pprCLabel_asm lbl,
-            ptext SLIT("\t.long dyld_stub_binding_helper")
+        ptext (sLit ".lazy_symbol_pointer"),
+        ptext (sLit "L") <> pprCLabel_asm lbl <> ptext (sLit "$lazy_ptr:"),
+            ptext (sLit "\t.indirect_symbol") <+> pprCLabel_asm lbl,
+            ptext (sLit "\t.long dyld_stub_binding_helper")
     ]
 #elif i386_TARGET_ARCH
     | Just (CodeStub, lbl) <- dynamicLinkerLabelInfo importedLbl
     = case opt_PIC of
         False ->
             vcat [
-                ptext SLIT(".symbol_stub"),
-                ptext SLIT("L") <> pprCLabel_asm lbl <> ptext SLIT("$stub:"),
-                    ptext SLIT("\t.indirect_symbol") <+> pprCLabel_asm lbl,
-                    ptext SLIT("\tjmp *L") <> pprCLabel_asm lbl
-                        <> ptext SLIT("$lazy_ptr"),
-                ptext SLIT("L") <> pprCLabel_asm lbl
-                    <> ptext SLIT("$stub_binder:"),
-                    ptext SLIT("\tpushl $L") <> pprCLabel_asm lbl
-                        <> ptext SLIT("$lazy_ptr"),
-                    ptext SLIT("\tjmp dyld_stub_binding_helper")
+                ptext (sLit ".symbol_stub"),
+                ptext (sLit "L") <> pprCLabel_asm lbl <> ptext (sLit "$stub:"),
+                    ptext (sLit "\t.indirect_symbol") <+> pprCLabel_asm lbl,
+                    ptext (sLit "\tjmp *L") <> pprCLabel_asm lbl
+                        <> ptext (sLit "$lazy_ptr"),
+                ptext (sLit "L") <> pprCLabel_asm lbl
+                    <> ptext (sLit "$stub_binder:"),
+                    ptext (sLit "\tpushl $L") <> pprCLabel_asm lbl
+                        <> ptext (sLit "$lazy_ptr"),
+                    ptext (sLit "\tjmp dyld_stub_binding_helper")
             ]
         True ->
             vcat [
-                ptext SLIT(".section __TEXT,__picsymbolstub2,")
-                    <> ptext SLIT("symbol_stubs,pure_instructions,25"),
-                ptext SLIT("L") <> pprCLabel_asm lbl <> ptext SLIT("$stub:"),
-                    ptext SLIT("\t.indirect_symbol") <+> pprCLabel_asm lbl,
-                    ptext SLIT("\tcall ___i686.get_pc_thunk.ax"),
-                ptext SLIT("1:"),
-                    ptext SLIT("\tmovl L") <> pprCLabel_asm lbl
-                        <> ptext SLIT("$lazy_ptr-1b(%eax),%edx"),
-                    ptext SLIT("\tjmp *%edx"),
-                ptext SLIT("L") <> pprCLabel_asm lbl
-                    <> ptext SLIT("$stub_binder:"),
-                    ptext SLIT("\tlea L") <> pprCLabel_asm lbl
-                        <> ptext SLIT("$lazy_ptr-1b(%eax),%eax"),
-                    ptext SLIT("\tpushl %eax"),
-                    ptext SLIT("\tjmp dyld_stub_binding_helper")
+                ptext (sLit ".section __TEXT,__picsymbolstub2,")
+                    <> ptext (sLit "symbol_stubs,pure_instructions,25"),
+                ptext (sLit "L") <> pprCLabel_asm lbl <> ptext (sLit "$stub:"),
+                    ptext (sLit "\t.indirect_symbol") <+> pprCLabel_asm lbl,
+                    ptext (sLit "\tcall ___i686.get_pc_thunk.ax"),
+                ptext (sLit "1:"),
+                    ptext (sLit "\tmovl L") <> pprCLabel_asm lbl
+                        <> ptext (sLit "$lazy_ptr-1b(%eax),%edx"),
+                    ptext (sLit "\tjmp *%edx"),
+                ptext (sLit "L") <> pprCLabel_asm lbl
+                    <> ptext (sLit "$stub_binder:"),
+                    ptext (sLit "\tlea L") <> pprCLabel_asm lbl
+                        <> ptext (sLit "$lazy_ptr-1b(%eax),%eax"),
+                    ptext (sLit "\tpushl %eax"),
+                    ptext (sLit "\tjmp dyld_stub_binding_helper")
             ]
-    $+$ vcat [        ptext SLIT(".section __DATA, __la_sym_ptr")
+    $+$ vcat [        ptext (sLit ".section __DATA, __la_sym_ptr")
                     <> (if opt_PIC then int 2 else int 3)
-                    <> ptext SLIT(",lazy_symbol_pointers"),
-        ptext SLIT("L") <> pprCLabel_asm lbl <> ptext SLIT("$lazy_ptr:"),
-            ptext SLIT("\t.indirect_symbol") <+> pprCLabel_asm lbl,
-            ptext SLIT("\t.long L") <> pprCLabel_asm lbl
-                    <> ptext SLIT("$stub_binder")
+                    <> ptext (sLit ",lazy_symbol_pointers"),
+        ptext (sLit "L") <> pprCLabel_asm lbl <> ptext (sLit "$lazy_ptr:"),
+            ptext (sLit "\t.indirect_symbol") <+> pprCLabel_asm lbl,
+            ptext (sLit "\t.long L") <> pprCLabel_asm lbl
+                    <> ptext (sLit "$stub_binder")
     ]
 #endif
 -- We also have to declare our symbol pointers ourselves:
     | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
     = vcat [
-        ptext SLIT(".non_lazy_symbol_pointer"),
-        char 'L' <> pprCLabel_asm lbl <> ptext SLIT("$non_lazy_ptr:"),
-	    ptext SLIT("\t.indirect_symbol") <+> pprCLabel_asm lbl,
-            ptext SLIT("\t.long\t0")
+        ptext (sLit ".non_lazy_symbol_pointer"),
+        char 'L' <> pprCLabel_asm lbl <> ptext (sLit "$non_lazy_ptr:"),
+	    ptext (sLit "\t.indirect_symbol") <+> pprCLabel_asm lbl,
+            ptext (sLit "\t.long\t0")
     ]
 
     | otherwise = empty
@@ -525,7 +524,7 @@ needImportedSymbols = not opt_Static && not opt_PIC
 -- The label used to refer to our "fake GOT" from
 -- position-independent code.
 gotLabel = mkForeignLabel -- HACK: it's not really foreign
-                           FSLIT(".LCTOC1") Nothing False
+                           (fsLit ".LCTOC1") Nothing False
 
 -- pprGotDeclaration
 -- Output whatever needs to be output once per .s file.
@@ -536,8 +535,8 @@ gotLabel = mkForeignLabel -- HACK: it's not really foreign
 pprGotDeclaration
     | not opt_PIC = Pretty.empty
     | otherwise = vcat [
-        ptext SLIT(".section \".got2\",\"aw\""),
-        ptext SLIT(".LCTOC1 = .+32768")
+        ptext (sLit ".section \".got2\",\"aw\""),
+        ptext (sLit ".LCTOC1 = .+32768")
     ]
 
 -- We generate one .long/.quad literal for every symbol we import;
@@ -546,8 +545,8 @@ pprGotDeclaration
 pprImportedSymbol importedLbl
     | Just (SymbolPtr, lbl) <- dynamicLinkerLabelInfo importedLbl
     = vcat [
-        ptext SLIT(".section \".got2\", \"aw\""),
-        ptext SLIT(".LC_") <> pprCLabel_asm lbl <> char ':',
+        ptext (sLit ".section \".got2\", \"aw\""),
+        ptext (sLit ".LC_") <> pprCLabel_asm lbl <> char ':',
         ptext symbolSize <+> pprCLabel_asm lbl
     ]
 
@@ -555,8 +554,8 @@ pprImportedSymbol importedLbl
     | otherwise = empty
     where
       symbolSize = case wordRep of
-		     I32 -> SLIT("\t.long")
-		     I64 -> SLIT("\t.quad")
+		     I32 -> sLit "\t.long"
+		     I64 -> sLit "\t.quad"
 		     _ -> panic "Unknown wordRep in pprImportedSymbol"
 
 #else
