@@ -126,14 +126,14 @@ data MachRep
   | F80		-- extended double-precision, used in x86 native codegen only.
   deriving (Eq, Ord, Show)
 
-mrStr I8   = SLIT("I8")
-mrStr I16  = SLIT("I16")
-mrStr I32  = SLIT("I32")
-mrStr I64  = SLIT("I64")
-mrStr I128 = SLIT("I128")
-mrStr F32  = SLIT("F32")
-mrStr F64  = SLIT("F64")
-mrStr F80  = SLIT("F80")
+mrStr I8   = sLit "I8"
+mrStr I16  = sLit "I16"
+mrStr I32  = sLit "I32"
+mrStr I64  = sLit "I64"
+mrStr I128 = sLit "I128"
+mrStr F32  = sLit "F32"
+mrStr F64  = sLit "F64"
+mrStr F80  = sLit "F80"
 
 instance Outputable MachRep where
    ppr rep = ptext (mrStr rep)
@@ -284,10 +284,10 @@ data MachHint
   | FloatHint
   deriving Eq
 
-mhStr NoHint     = SLIT("NoHint")
-mhStr PtrHint    = SLIT("PtrHint")
-mhStr SignedHint = SLIT("SignedHint")
-mhStr FloatHint  = SLIT("FloatHint")
+mhStr NoHint     = sLit "NoHint"
+mhStr PtrHint    = sLit "PtrHint"
+mhStr SignedHint = sLit "SignedHint"
+mhStr FloatHint  = sLit "FloatHint"
 
 instance Outputable MachHint where
    ppr hint = ptext (mhStr hint)
