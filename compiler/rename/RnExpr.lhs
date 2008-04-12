@@ -562,18 +562,18 @@ rnBracket (VarBr n) = do { name <- lookupOccRn n
 			      ; return () }				-- only way that is going to happen
 			 ; returnM (VarBr name, unitFV name) }
 		    where
-		      msg = ptext SLIT("Need interface for Template Haskell quoted Name")
+		      msg = ptext (sLit "Need interface for Template Haskell quoted Name")
 
 rnBracket (ExpBr e) = do { (e', fvs) <- rnLExpr e
 			 ; return (ExpBr e', fvs) }
 
-rnBracket (PatBr p) = do { addErr (ptext SLIT("Tempate Haskell pattern brackets are not supported yet"));
+rnBracket (PatBr p) = do { addErr (ptext (sLit "Tempate Haskell pattern brackets are not supported yet"));
                            failM }
 
 rnBracket (TypBr t) = do { (t', fvs) <- rnHsTypeFVs doc t
 			 ; return (TypBr t', fvs) }
 		    where
-		      doc = ptext SLIT("In a Template-Haskell quoted type")
+		      doc = ptext (sLit "In a Template-Haskell quoted type")
 rnBracket (DecBr group) 
   = do { gbl_env  <- getGblEnv
 
@@ -814,7 +814,7 @@ rnParallelStmts ctxt segs thing_inside = do
             return (((seg':segs'), thing), delListFromNameSet fvs bndrs)
 
         cmpByOcc n1 n2 = nameOccName n1 `compare` nameOccName n2
-        dupErr vs = addErr (ptext SLIT("Duplicate binding in parallel list comprehension for:")
+        dupErr vs = addErr (ptext (sLit "Duplicate binding in parallel list comprehension for:")
                     <+> quotes (ppr (head vs)))
 \end{code}
 
@@ -932,7 +932,7 @@ rn_rec_stmt_lhs fix_env (L loc (BindStmt pat expr a b))
                fv_pat)]
 
 rn_rec_stmt_lhs fix_env (L loc (LetStmt binds@(HsIPBinds _)))
-  = do	{ addErr (badIpBinds (ptext SLIT("an mdo expression")) binds)
+  = do	{ addErr (badIpBinds (ptext (sLit "an mdo expression")) binds)
 	; failM }
 
 rn_rec_stmt_lhs fix_env (L loc (LetStmt (HsValBinds binds))) 
@@ -992,7 +992,7 @@ rn_rec_stmt all_bndrs (L loc (BindStmt pat' expr _ _)) fv_pat
 	      L loc (BindStmt pat' expr' bind_op fail_op))]
 
 rn_rec_stmt all_bndrs (L loc (LetStmt binds@(HsIPBinds _))) _
-  = do	{ addErr (badIpBinds (ptext SLIT("an mdo expression")) binds)
+  = do	{ addErr (badIpBinds (ptext (sLit "an mdo expression")) binds)
 	; failM }
 
 rn_rec_stmt all_bndrs (L loc (LetStmt (HsValBinds binds'))) _ = do 
@@ -1152,7 +1152,7 @@ mkAssertErrorExpr
 ---------------------- 
 -- Checking when a particular Stmt is ok
 checkLetStmt :: HsStmtContext Name -> HsLocalBinds RdrName -> RnM ()
-checkLetStmt (ParStmtCtxt _) (HsIPBinds binds) = addErr (badIpBinds (ptext SLIT("a parallel list comprehension:")) binds)
+checkLetStmt (ParStmtCtxt _) (HsIPBinds binds) = addErr (badIpBinds (ptext (sLit "a parallel list comprehension:")) binds)
 checkLetStmt _ctxt 	     _binds	       = return ()
   	-- We do not allow implicit-parameter bindings in a parallel
 	-- list comprehension.  I'm not sure what it might mean.
@@ -1166,7 +1166,7 @@ checkRecStmt (DoExpr {})  = return ()	-- ..and in 'do' but only because of arrow
 					--	so we leave it to the type checker
 checkRecStmt ctxt	  = addErr msg
   where
-    msg = ptext SLIT("Illegal 'rec' stmt in") <+> pprStmtContext ctxt
+    msg = ptext (sLit "Illegal 'rec' stmt in") <+> pprStmtContext ctxt
 
 ---------
 checkParStmt :: HsStmtContext Name -> RnM ()
@@ -1174,7 +1174,7 @@ checkParStmt ctxt
   = do	{ parallel_list_comp <- doptM Opt_ParallelListComp
 	; checkErr parallel_list_comp msg }
   where
-    msg = ptext SLIT("Illegal parallel list comprehension: use -XParallelListComp")
+    msg = ptext (sLit "Illegal parallel list comprehension: use -XParallelListComp")
 
 ---------
 checkTransformStmt :: HsStmtContext Name -> RnM ()
@@ -1183,19 +1183,19 @@ checkTransformStmt ListComp  -- Ensure we are really within a list comprehension
   = do	{ transform_list_comp <- doptM Opt_TransformListComp
 	; checkErr transform_list_comp msg }
   where
-    msg = ptext SLIT("Illegal transform or grouping list comprehension: use -XTransformListComp")
+    msg = ptext (sLit "Illegal transform or grouping list comprehension: use -XTransformListComp")
 checkTransformStmt (ParStmtCtxt       ctxt) = checkTransformStmt ctxt	-- Ok to nest inside a parallel comprehension
 checkTransformStmt (TransformStmtCtxt ctxt) = checkTransformStmt ctxt	-- Ok to nest inside a parallel comprehension
 checkTransformStmt ctxt = addErr msg
   where
-    msg = ptext SLIT("Illegal transform or grouping in") <+> pprStmtContext ctxt
+    msg = ptext (sLit "Illegal transform or grouping in") <+> pprStmtContext ctxt
     
 ---------
-patSynErr e = do { addErr (sep [ptext SLIT("Pattern syntax in expression context:"),
+patSynErr e = do { addErr (sep [ptext (sLit "Pattern syntax in expression context:"),
 			 	nest 4 (ppr e)])
 		 ; return (EWildPat, emptyFVs) }
 
 badIpBinds what binds
-  = hang (ptext SLIT("Implicit-parameter bindings illegal in") <+> what)
+  = hang (ptext (sLit "Implicit-parameter bindings illegal in") <+> what)
 	 2 (ppr binds)
 \end{code}
