@@ -15,8 +15,6 @@ HsImpExp: Abstract syntax: imports, exports, interfaces
 
 module HsImpExp where
 
-#include "HsVersions.h"
-
 import Module		( ModuleName )
 import HsDoc		( HsDoc )
 
@@ -47,24 +45,24 @@ data ImportDecl name
 \begin{code}
 instance (Outputable name) => Outputable (ImportDecl name) where
     ppr (ImportDecl mod from qual as spec)
-      = hang (hsep [ptext SLIT("import"), ppr_imp from, 
+      = hang (hsep [ptext (sLit "import"), ppr_imp from, 
                     pp_qual qual, ppr mod, pp_as as])
 	     4 (pp_spec spec)
       where
 	pp_qual False   = empty
-	pp_qual True	= ptext SLIT("qualified")
+	pp_qual True	= ptext (sLit "qualified")
 
 	pp_as Nothing   = empty
-	pp_as (Just a)  = ptext SLIT("as ") <+> ppr a
+	pp_as (Just a)  = ptext (sLit "as ") <+> ppr a
 
-	ppr_imp True  = ptext SLIT("{-# SOURCE #-}")
+	ppr_imp True  = ptext (sLit "{-# SOURCE #-}")
 	ppr_imp False = empty
 
 	pp_spec Nothing = empty
 	pp_spec (Just (False, spec))
 			= parens (interpp'SP spec)
 	pp_spec (Just (True, spec))
-			= ptext SLIT("hiding") <+> parens (interpp'SP spec)
+			= ptext (sLit "hiding") <+> parens (interpp'SP spec)
 
 ideclName :: ImportDecl name -> Located ModuleName
 ideclName (ImportDecl mod_nm _ _ _ _) = mod_nm
@@ -116,7 +114,7 @@ instance (Outputable name) => Outputable (IE name) where
     ppr (IEThingWith thing withs)
 	= ppr thing <> parens (fsep (punctuate comma (map pprHsVar withs)))
     ppr (IEModuleContents mod)
-	= ptext SLIT("module") <+> ppr mod
+	= ptext (sLit "module") <+> ppr mod
     ppr (IEGroup n _)           = text ("<IEGroup: " ++ (show n) ++ ">")
     ppr (IEDoc doc)             = ppr doc
     ppr (IEDocNamed string)     = text ("<IEDocNamed: " ++ string ++ ">")
