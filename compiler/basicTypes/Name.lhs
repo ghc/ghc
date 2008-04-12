@@ -35,8 +35,6 @@ module Name (
 	getSrcLoc, getSrcSpan, getOccString
     ) where
 
-#include "HsVersions.h"
-
 import {-# SOURCE #-} TypeRep( TyThing )
 
 import OccName
@@ -361,7 +359,7 @@ pprExternal sty uniq mod occ is_wired is_builtin
 	-- ToDo: maybe we could print all wired-in things unqualified
 	-- 	 in code style, to reduce symbol table bloat?
  | debugStyle sty       = ppr mod <> dot <> ppr_occ_name occ
-		<> braces (hsep [if is_wired then ptext SLIT("(w)") else empty,
+		<> braces (hsep [if is_wired then ptext (sLit "(w)") else empty,
 				 pprNameSpaceBrief (occNameSpace occ), 
 		 		 pprUnique uniq])
   | BuiltInSyntax <- is_builtin  = ppr_occ_name occ
@@ -411,8 +409,8 @@ pprNameLoc :: Name -> SDoc
 pprNameLoc name
   | isGoodSrcSpan loc = pprDefnLoc loc
   | isInternalName name || isSystemName name 
-                      = ptext SLIT("<no location info>")
-  | otherwise         = ptext SLIT("Defined in ") <> ppr (nameModule name)
+                      = ptext (sLit "<no location info>")
+  | otherwise         = ptext (sLit "Defined in ") <> ppr (nameModule name)
   where loc = nameSrcSpan name
 \end{code}
 
