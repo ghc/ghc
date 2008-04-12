@@ -538,9 +538,9 @@ checkNonStdWay dflags srcspan = do
 	else return (Just default_osuf)
 
 failNonStd srcspan = dieWith srcspan $
-  ptext SLIT("Dynamic linking required, but this is a non-standard build (eg. prof).") $$
-  ptext SLIT("You need to build the program twice: once the normal way, and then") $$
-  ptext SLIT("in the desired way using -osuf to set the object file suffix.")
+  ptext (sLit "Dynamic linking required, but this is a non-standard build (eg. prof).") $$
+  ptext (sLit "You need to build the program twice: once the normal way, and then") $$
+  ptext (sLit "in the desired way using -osuf to set the object file suffix.")
   
 
 getLinkDeps :: HscEnv -> HomePackageTable -> PackageIfaceTable
@@ -618,15 +618,15 @@ getLinkDeps hsc_env hpt pit maybe_normal_osuf span mods
     get_iface mod = case lookupIfaceByModule dflags hpt pit mod of
 			    Just iface -> iface
 			    Nothing    -> pprPanic "getLinkDeps" (no_iface mod)
-    no_iface mod = ptext SLIT("No iface for") <+> ppr mod
+    no_iface mod = ptext (sLit "No iface for") <+> ppr mod
 	-- This one is a GHC bug
 
     no_obj mod = dieWith span $
-		     ptext SLIT("cannot find object file for module ") <> 
+		     ptext (sLit "cannot find object file for module ") <> 
 			quotes (ppr mod) $$
 		     while_linking_expr
 		
-    while_linking_expr = ptext SLIT("while linking an interpreted expression")
+    while_linking_expr = ptext (sLit "while linking an interpreted expression")
 
 	-- This one is a build-system bug
 
@@ -662,7 +662,7 @@ getLinkDeps hsc_env hpt pit maybe_normal_osuf span mods
 		ok <- doesFileExist new_file
 		if (not ok)
 		   then dieWith span $
-			  ptext SLIT("cannot find normal object file ")
+			  ptext (sLit "cannot find normal object file ")
 				<> quotes (text new_file) $$ while_linking_expr
 		   else return (DotO new_file)
 \end{code}
