@@ -88,16 +88,16 @@ instance Outputable FamInst where
 pprFamInst :: FamInst -> SDoc
 pprFamInst famInst
   = hang (pprFamInstHdr famInst)
-	2 (ptext SLIT("--") <+> pprNameLoc (getName famInst))
+	2 (ptext (sLit "--") <+> pprNameLoc (getName famInst))
 
 pprFamInstHdr :: FamInst -> SDoc
 pprFamInstHdr (FamInst {fi_fam = fam, fi_tys = tys, fi_tycon = tycon})
   = pprTyConSort <+> pprHead
   where
     pprHead = pprTypeApp fam (ppr fam) tys
-    pprTyConSort | isDataTyCon tycon = ptext SLIT("data instance")
-		 | isNewTyCon  tycon = ptext SLIT("newtype instance")
-		 | isSynTyCon  tycon = ptext SLIT("type instance")
+    pprTyConSort | isDataTyCon tycon = ptext (sLit "data instance")
+		 | isNewTyCon  tycon = ptext (sLit "newtype instance")
+		 | isSynTyCon  tycon = ptext (sLit "type instance")
 		 | otherwise	     = panic "FamInstEnv.pprFamInstHdr"
 
 pprFamInsts :: [FamInst] -> SDoc
