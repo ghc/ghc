@@ -518,7 +518,7 @@ addVersionInfo ver_fn Nothing new_iface new_decls
 						  new_decls)
 	       },
      False, 
-     ptext SLIT("No old interface file"),
+     ptext (sLit "No old interface file"),
      pprOrphans orph_insts orph_rules)
   where
     orph_insts = filter (isNothing . ifInstOrph) (mi_insts new_iface)
@@ -534,9 +534,9 @@ addVersionInfo ver_fn (Just old_iface@(ModIface {
 	       new_iface@(ModIface { mi_fix_fn = new_fixities })
 	       new_decls
  | no_change_at_all
- = (old_iface,  True,   ptext SLIT("Interface file unchanged"), pp_orphs)
+ = (old_iface,  True,   ptext (sLit "Interface file unchanged"), pp_orphs)
  | otherwise
- = (final_iface, False, vcat [ptext SLIT("Interface file has changed"),
+ = (final_iface, False, vcat [ptext (sLit "Interface file has changed"),
 			      nest 2 pp_diffs], pp_orphs)
  where
     final_iface = new_iface { 
@@ -594,7 +594,7 @@ addVersionInfo ver_fn (Just old_iface@(ModIface {
  		     pp_change no_other_changes  "Usages" empty,
 		     pp_decl_diffs]
     pp_change True  what info = empty
-    pp_change False what info = text what <+> ptext SLIT("changed") <+> info
+    pp_change False what info = text what <+> ptext (sLit "changed") <+> info
 
     -------------------
     old_decl_env = mkOccEnv [(ifName decl, decl) | (_,decl) <- old_decls]
@@ -656,8 +656,8 @@ addVersionInfo ver_fn (Just old_iface@(ModIface {
     pp_decl_diffs 
 	| isEmptyOccSet changed_occs = empty
 	| otherwise 
-	= vcat [ptext SLIT("Changed occs:") <+> ppr (occSetElts changed_occs),
-		ptext SLIT("Version change for these decls:"),
+	= vcat [ptext (sLit "Changed occs:") <+> ppr (occSetElts changed_occs),
+		ptext (sLit "Version change for these decls:"),
 		nest 2 (vcat (map show_change new_decls))]
 
     eq_env = mkOccEnv eq_info
@@ -669,16 +669,16 @@ addVersionInfo ver_fn (Just old_iface@(ModIface {
 	where
 	  occ = ifName new_decl
 	  why = case lookupOccEnv eq_env occ of
-		    Just (EqBut names) -> sep [ppr occ <> colon, ptext SLIT("Free vars (only) changed:") <> ppr names,
+		    Just (EqBut names) -> sep [ppr occ <> colon, ptext (sLit "Free vars (only) changed:") <> ppr names,
 					      nest 2 (braces (fsep (map ppr (occSetElts 
 						(occs `intersectOccSet` changed_occs)))))]
                            where occs = mkOccSet (map nameOccName (nameSetToList names))
 		    Just NotEqual  
 			| Just old_decl <- lookupOccEnv old_decl_env occ 
-			-> vcat [ptext SLIT("Old:") <+> ppr old_decl,
-			 ptext SLIT("New:") <+> ppr new_decl]
+			-> vcat [ptext (sLit "Old:") <+> ppr old_decl,
+			 ptext (sLit "New:") <+> ppr new_decl]
 			| otherwise 
-			-> ppr occ <+> ptext SLIT("only in new interface")
+			-> ppr occ <+> ptext (sLit "only in new interface")
 		    other -> pprPanic "MkIface.show_change" (ppr occ)
 	
     pp_orphs = pprOrphans new_orph_insts new_orph_rules
@@ -689,10 +689,10 @@ pprOrphans insts rules
   | otherwise
   = Just $ vcat [
 	if null insts then empty else
-	     hang (ptext SLIT("Warning: orphan instances:"))
+	     hang (ptext (sLit "Warning: orphan instances:"))
 		2 (vcat (map ppr insts)),
 	if null rules then empty else
-	     hang (ptext SLIT("Warning: orphan rules:"))
+	     hang (ptext (sLit "Warning: orphan rules:"))
 		2 (vcat (map ppr rules))
     ]
 
@@ -715,7 +715,7 @@ computeChangedOccs ver_fn this_module old_usages eq_info
           Just v    <- lookupUFM ents parent_occ
         = v < new_version
         | modulePackageId mod == this_pkg
-        = WARN(True, ptext SLIT("computeChangedOccs") <+> ppr nm) True
+        = WARN(True, ptext (sLit "computeChangedOccs") <+> ppr nm) True
         -- should really be a panic, see #1959.  The problem is that the usages doesn't
         -- contain all the names that might be referred to by unfoldings.  So as a
         -- conservative workaround we just assume these names have changed.
@@ -1139,7 +1139,7 @@ checkModUsage this_pkg (Usage { usg_name = mod_name, usg_mod = old_mod_vers,
 		       		usg_exports = maybe_old_export_vers, 
 		       		usg_entities = old_decl_vers })
   = do	-- Load the imported interface is possible
-    let doc_str = sep [ptext SLIT("need version info for"), ppr mod_name]
+    let doc_str = sep [ptext (sLit "need version info for"), ppr mod_name]
     traceHiDiffs (text "Checking usages for module" <+> ppr mod_name)
 
     let mod = mkModule this_pkg mod_name
@@ -1149,7 +1149,7 @@ checkModUsage this_pkg (Usage { usg_name = mod_name, usg_mod = old_mod_vers,
 	-- Instead, get an Either back which we can test
 
     case mb_iface of {
-	Failed exn ->  (out_of_date (sep [ptext SLIT("Can't find version number for module"), 
+	Failed exn ->  (out_of_date (sep [ptext (sLit "Can't find version number for module"), 
 				       ppr mod_name]));
 		-- Couldn't find or parse a module mentioned in the
 		-- old interface file.  Don't complain -- it might just be that
@@ -1170,14 +1170,14 @@ checkModUsage this_pkg (Usage { usg_name = mod_name, usg_mod = old_mod_vers,
 				 
 	-- CHECK EXPORT LIST
     if checkExportList maybe_old_export_vers new_export_vers then
-	out_of_date_vers (ptext SLIT("  Export list changed"))
+	out_of_date_vers (ptext (sLit "  Export list changed"))
 		         (expectJust "checkModUsage" maybe_old_export_vers) 
 		         new_export_vers
     else
 
 	-- CHECK RULES
     if old_rule_vers /= new_rule_vers then
-	out_of_date_vers (ptext SLIT("  Rules changed")) 
+	out_of_date_vers (ptext (sLit "  Rules changed")) 
 			 old_rule_vers new_rule_vers
     else
 
@@ -1186,16 +1186,16 @@ checkModUsage this_pkg (Usage { usg_name = mod_name, usg_mod = old_mod_vers,
     if recompile then
 	return outOfDate	-- This one failed, so just bail out now
     else
-	up_to_date (ptext SLIT("  Great!  The bits I use are up to date"))
+	up_to_date (ptext (sLit "  Great!  The bits I use are up to date"))
     }
 
 ------------------------
 checkModuleVersion old_mod_vers new_mod_vers
   | new_mod_vers == old_mod_vers
-  = up_to_date (ptext SLIT("Module version unchanged"))
+  = up_to_date (ptext (sLit "Module version unchanged"))
 
   | otherwise
-  = out_of_date_vers (ptext SLIT("  Module version has changed"))
+  = out_of_date_vers (ptext (sLit "  Module version has changed"))
 		     old_mod_vers new_mod_vers
 
 ------------------------
@@ -1207,18 +1207,18 @@ checkEntityUsage new_vers (name,old_vers)
   = case new_vers name of
 
 	Nothing       -> 	-- We used it before, but it ain't there now
-			  out_of_date (sep [ptext SLIT("No longer exported:"), ppr name])
+			  out_of_date (sep [ptext (sLit "No longer exported:"), ppr name])
 
 	Just (_, new_vers) 	-- It's there, but is it up to date?
 	  | new_vers == old_vers -> do traceHiDiffs (text "  Up to date" <+> ppr name <+> parens (ppr new_vers))
 			  	       return upToDate
-	  | otherwise	 	 -> out_of_date_vers (ptext SLIT("  Out of date:") <+> ppr name)
+	  | otherwise	 	 -> out_of_date_vers (ptext (sLit "  Out of date:") <+> ppr name)
 						     old_vers new_vers
 
 up_to_date  msg = traceHiDiffs msg >> return upToDate
 out_of_date msg = traceHiDiffs msg >> return outOfDate
 out_of_date_vers msg old_vers new_vers 
-  = out_of_date (hsep [msg, ppr old_vers, ptext SLIT("->"), ppr new_vers])
+  = out_of_date (hsep [msg, ppr old_vers, ptext (sLit "->"), ppr new_vers])
 
 ----------------------
 checkList :: [IfG RecompileRequired] -> IfG RecompileRequired
@@ -1496,7 +1496,7 @@ coreRuleToIfaceRule mod (Rule { ru_name = name, ru_fn = fn,
 
 bogusIfaceRule :: Name -> IfaceRule
 bogusIfaceRule id_name
-  = IfaceRule { ifRuleName = FSLIT("bogus"), ifActivation = NeverActive,  
+  = IfaceRule { ifRuleName = fsLit "bogus", ifActivation = NeverActive,  
 	ifRuleBndrs = [], ifRuleHead = id_name, ifRuleArgs = [], 
 	ifRuleRhs = IfaceExt id_name, ifRuleOrph = Nothing }
 
