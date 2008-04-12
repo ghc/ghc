@@ -110,7 +110,7 @@ coreExprToBCOs dflags expr
 
       -- create a totally bogus name for the top-level BCO; this
       -- should be harmless, since it's never used for anything
-      let invented_name  = mkSystemVarName (mkPseudoUniqueE 0) FSLIT("ExprTopLevel")
+      let invented_name  = mkSystemVarName (mkPseudoUniqueE 0) (fsLit "ExprTopLevel")
           invented_id    = Id.mkLocalId invented_name (panic "invented_id's type")
 	  
       -- the uniques are needed to generate fresh variables when we introduce new
@@ -1536,5 +1536,5 @@ newId ty = do
     uniq <- newUnique
     return $ mkSysLocal tickFS uniq ty
 
-tickFS = FSLIT("ticked")
+tickFS = fsLit "ticked"
 \end{code}
