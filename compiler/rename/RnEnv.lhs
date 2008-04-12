@@ -270,7 +270,7 @@ lookupInstDeclBndr :: Name -> Located RdrName -> RnM (Located Name)
 -- an instance decl
 lookupInstDeclBndr cls rdr = lookup_located_sub_bndr is_op doc rdr
   where
-    doc = ptext SLIT("method of class") <+> quotes (ppr cls)
+    doc = ptext (sLit "method of class") <+> quotes (ppr cls)
     is_op gre@(GRE {gre_par = ParentIs n}) = n == cls
     is_op other			           = False
 
@@ -292,7 +292,7 @@ lookupRecordBndr (Just (L _ data_con)) rdr_name
 	; lookup_located_sub_bndr is_field doc rdr_name
 	}}
    where
-     doc = ptext SLIT("field of constructor") <+> quotes (ppr data_con)
+     doc = ptext (sLit "field of constructor") <+> quotes (ppr data_con)
 
 
 lookupConstructorFields :: Name -> RnM [Name]
@@ -439,7 +439,7 @@ unboundName rdr_name
   = do	{ addErr (unknownNameErr rdr_name)
 	; env <- getGlobalRdrEnv;
 	; traceRn (vcat [unknownNameErr rdr_name, 
-			 ptext SLIT("Global envt is:"),
+			 ptext (sLit "Global envt is:"),
 			 nest 3 (pprGlobalRdrEnv env)])
 	; returnM (mkUnboundName rdr_name) }
 
@@ -518,7 +518,7 @@ lookupQualifiedName rdr_name
   | otherwise
   = pprPanic "RnEnv.lookupQualifiedName" (ppr rdr_name)
   where
-    doc = ptext SLIT("Need to find") <+> ppr rdr_name
+    doc = ptext (sLit "Need to find") <+> ppr rdr_name
 \end{code}
 
 %*********************************************************
@@ -621,7 +621,7 @@ lookupFixityRn name
 	   returnM (mi_fix_fn iface (nameOccName name))
                                                            }
   where
-    doc = ptext SLIT("Checking fixity for") <+> ppr name
+    doc = ptext (sLit "Checking fixity for") <+> ppr name
 
 ---------------
 lookupTyFixityRn :: Located Name -> RnM Fixity
@@ -881,7 +881,7 @@ checkShadowedNames doc_str (global_env,local_env) loc_rdr_names
 	; mappM_ check_shadow loc_rdr_names }
   where
     check_shadow (loc, occ)
-	| Just n <- mb_local = complain [ptext SLIT("bound at") <+> ppr (nameSrcLoc n)]
+	| Just n <- mb_local = complain [ptext (sLit "bound at") <+> ppr (nameSrcLoc n)]
 	| not (null gres)    = complain (map pprNameProvenance gres)
 	| otherwise	     = return ()
 	where
@@ -932,12 +932,12 @@ warnUnusedModules mods
   = ifOptM Opt_WarnUnusedImports (mappM_ bleat mods)
   where
     bleat (mod,loc) = addWarnAt loc (mk_warn mod)
-    mk_warn m = vcat [ptext SLIT("Module") <+> quotes (ppr m)
+    mk_warn m = vcat [ptext (sLit "Module") <+> quotes (ppr m)
 			<+> text "is imported, but nothing from it is used,",
-		      nest 2 (ptext SLIT("except perhaps instances visible in") 
+		      nest 2 (ptext (sLit "except perhaps instances visible in") 
 			<+> quotes (ppr m)),
-		      ptext SLIT("To suppress this warning, use:") 
-			<+> ptext SLIT("import") <+> ppr m <> parens empty ]
+		      ptext (sLit "To suppress this warning, use:") 
+			<+> ptext (sLit "import") <+> ppr m <> parens empty ]
 
 
 warnUnusedImports, warnUnusedTopBinds :: [GlobalRdrElt] -> RnM ()
@@ -973,7 +973,7 @@ warnUnusedBinds names  = mappM_ warnUnusedName (filter reportable names)
 warnUnusedName :: (Name, Provenance) -> RnM ()
 warnUnusedName (name, LocalDef)
   = addUnusedWarning name (srcLocSpan (nameSrcLoc name)) 
-		     (ptext SLIT("Defined but not used"))
+		     (ptext (sLit "Defined but not used"))
 
 warnUnusedName (name, Imported is)
   = mapM_ warn is
@@ -982,7 +982,7 @@ warnUnusedName (name, Imported is)
 	where
 	   span = importSpecLoc spec
 	   pp_mod = quotes (ppr (importSpecModule spec))
-	   msg = ptext SLIT("Imported from") <+> pp_mod <+> ptext SLIT("but not used")
+	   msg = ptext (sLit "Imported from") <+> pp_mod <+> ptext (sLit "but not used")
 
 addUnusedWarning name span msg
   = addWarnAt span $
@@ -993,51 +993,51 @@ addUnusedWarning name span msg
 
 \begin{code}
 addNameClashErrRn rdr_name names
-  = addErr (vcat [ptext SLIT("Ambiguous occurrence") <+> quotes (ppr rdr_name),
-		  ptext SLIT("It could refer to") <+> vcat (msg1 : msgs)])
+  = addErr (vcat [ptext (sLit "Ambiguous occurrence") <+> quotes (ppr rdr_name),
+		  ptext (sLit "It could refer to") <+> vcat (msg1 : msgs)])
   where
     (np1:nps) = names
-    msg1 = ptext  SLIT("either") <+> mk_ref np1
-    msgs = [ptext SLIT("    or") <+> mk_ref np | np <- nps]
+    msg1 = ptext  (sLit "either") <+> mk_ref np1
+    msgs = [ptext (sLit "    or") <+> mk_ref np | np <- nps]
     mk_ref gre = quotes (ppr (gre_name gre)) <> comma <+> pprNameProvenance gre
 
 shadowedNameWarn doc occ shadowed_locs
-  = sep [ptext SLIT("This binding for") <+> quotes (ppr occ)
-	    <+> ptext SLIT("shadows the existing binding") <> plural shadowed_locs,
+  = sep [ptext (sLit "This binding for") <+> quotes (ppr occ)
+	    <+> ptext (sLit "shadows the existing binding") <> plural shadowed_locs,
 	 nest 2 (vcat shadowed_locs)]
     $$ doc
 
 unknownNameErr rdr_name
-  = vcat [ hang (ptext SLIT("Not in scope:")) 
+  = vcat [ hang (ptext (sLit "Not in scope:")) 
 	      2 (pprNonVarNameSpace (occNameSpace (rdrNameOcc rdr_name))
 			  <+> quotes (ppr rdr_name))
 	 , extra ]
   where
     extra | rdr_name == forall_tv_RDR 
-	  = ptext SLIT("Perhaps you intended to use -XRankNTypes or similar flag")
+	  = ptext (sLit "Perhaps you intended to use -XRankNTypes or similar flag")
 	  | otherwise = empty
 
 unknownSubordinateErr doc op	-- Doc is "method of class" or 
 				-- "field of constructor"
-  = quotes (ppr op) <+> ptext SLIT("is not a (visible)") <+> doc
+  = quotes (ppr op) <+> ptext (sLit "is not a (visible)") <+> doc
 
 badOrigBinding name
-  = ptext SLIT("Illegal binding of built-in syntax:") <+> ppr (rdrNameOcc name)
+  = ptext (sLit "Illegal binding of built-in syntax:") <+> ppr (rdrNameOcc name)
 	-- The rdrNameOcc is because we don't want to print Prelude.(,)
 
 dupNamesErr :: Outputable n => (n -> SrcSpan) -> SDoc -> [n] -> RnM ()
 dupNamesErr get_loc descriptor names
   = addErrAt big_loc $
-    vcat [ptext SLIT("Conflicting definitions for") <+> quotes (ppr (head names)),
+    vcat [ptext (sLit "Conflicting definitions for") <+> quotes (ppr (head names)),
 	  locations, descriptor]
   where
     locs      = map get_loc names
     big_loc   = foldr1 combineSrcSpans locs
     one_line  = isOneLineSpan big_loc
     locations | one_line  = empty 
-	      | otherwise = ptext SLIT("Bound at:") <+> 
+	      | otherwise = ptext (sLit "Bound at:") <+> 
 			    vcat (map ppr (sortLe (<=) locs))
 
 badQualBndrErr rdr_name
-  = ptext SLIT("Qualified name in binding position:") <+> ppr rdr_name
+  = ptext (sLit "Qualified name in binding position:") <+> ppr rdr_name
 \end{code}
