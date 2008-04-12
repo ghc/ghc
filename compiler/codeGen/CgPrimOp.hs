@@ -17,8 +17,6 @@ module CgPrimOp (
    cgPrimOp
  ) where
 
-#include "HsVersions.h"
-
 import ForeignCall
 import ClosureInfo
 import StgSyn
@@ -132,7 +130,7 @@ emitPrimOp [res] ParOp [arg] live
         NoC_SRT -- No SRT b/c we do PlayRisky
         CmmMayReturn
   where
-	newspark = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("newSpark")))
+	newspark = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "newSpark")))
 
 emitPrimOp [res] ReadMutVarOp [mutv] live
    = stmtC (CmmAssign (CmmLocal res) (cmmLoadIndexW mutv fixedHdrSize))
