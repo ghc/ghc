@@ -43,7 +43,6 @@ module CgTicky (
        staticTickyHdr,
   ) where
 
-#include "HsVersions.h"
 #include "../includes/DerivedConstants.h"
 	-- For REP_xxx constants, which are MachReps
 
@@ -121,17 +120,17 @@ ppr_for_ticky_name mod_name name
 -- -----------------------------------------------------------------------------
 -- Ticky stack frames
 
-tickyPushUpdateFrame    = ifTicky $ bumpTickyCounter SLIT("UPDF_PUSHED_ctr")
-tickyUpdateFrameOmitted = ifTicky $ bumpTickyCounter SLIT("UPDF_OMITTED_ctr")
+tickyPushUpdateFrame    = ifTicky $ bumpTickyCounter (sLit "UPDF_PUSHED_ctr")
+tickyUpdateFrameOmitted = ifTicky $ bumpTickyCounter (sLit "UPDF_OMITTED_ctr")
 
 -- -----------------------------------------------------------------------------
 -- Ticky entries
 
-tickyEnterDynCon      = ifTicky $ bumpTickyCounter SLIT("ENT_DYN_CON_ctr")
-tickyEnterDynThunk    = ifTicky $ bumpTickyCounter SLIT("ENT_DYN_THK_ctr")
-tickyEnterStaticCon   = ifTicky $ bumpTickyCounter SLIT("ENT_STATIC_CON_ctr")
-tickyEnterStaticThunk = ifTicky $ bumpTickyCounter SLIT("ENT_STATIC_THK_ctr")
-tickyEnterViaNode     = ifTicky $ bumpTickyCounter SLIT("ENT_VIA_NODE_ctr")
+tickyEnterDynCon      = ifTicky $ bumpTickyCounter (sLit "ENT_DYN_CON_ctr")
+tickyEnterDynThunk    = ifTicky $ bumpTickyCounter (sLit "ENT_DYN_THK_ctr")
+tickyEnterStaticCon   = ifTicky $ bumpTickyCounter (sLit "ENT_STATIC_CON_ctr")
+tickyEnterStaticThunk = ifTicky $ bumpTickyCounter (sLit "ENT_STATIC_THK_ctr")
+tickyEnterViaNode     = ifTicky $ bumpTickyCounter (sLit "ENT_VIA_NODE_ctr")
 
 tickyEnterThunk :: ClosureInfo -> Code
 tickyEnterThunk cl_info
@@ -142,14 +141,14 @@ tickyBlackHole :: Bool{-updatable-} -> Code
 tickyBlackHole updatable
   = ifTicky (bumpTickyCounter ctr)
   where
-    ctr | updatable = SLIT("UPD_BH_SINGLE_ENTRY_ctr")
-	| otherwise = SLIT("UPD_BH_UPDATABLE_ctr")
+    ctr | updatable = sLit "UPD_BH_SINGLE_ENTRY_ctr"
+	| otherwise = sLit "UPD_BH_UPDATABLE_ctr"
 
 tickyUpdateBhCaf cl_info
   = ifTicky (bumpTickyCounter ctr)
   where
-    ctr | closureUpdReqd cl_info = SLIT("UPD_CAF_BH_SINGLE_ENTRY_ctr")
-	| otherwise	         = SLIT("UPD_CAF_BH_UPDATABLE_ctr")
+    ctr | closureUpdReqd cl_info = sLit "UPD_CAF_BH_SINGLE_ENTRY_ctr"
+	| otherwise	         = sLit "UPD_CAF_BH_UPDATABLE_ctr"
 
 tickyEnterFun :: ClosureInfo -> Code
 tickyEnterFun cl_info
@@ -160,8 +159,8 @@ tickyEnterFun cl_info
 	; bumpTickyCounter' (cmmLabelOffB fun_ctr_lbl oFFSET_StgEntCounter_entry_count)
         }
   where
-    ctr | isStaticClosure cl_info = SLIT("ENT_STATIC_FUN_DIRECT_ctr")
-	| otherwise		  = SLIT("ENT_DYN_FUN_DIRECT_ctr")
+    ctr | isStaticClosure cl_info = sLit "ENT_STATIC_FUN_DIRECT_ctr"
+	| otherwise		  = sLit "ENT_DYN_FUN_DIRECT_ctr"
 
 registerTickyCtr :: CLabel -> Code
 -- Register a ticky counter
@@ -184,36 +183,36 @@ registerTickyCtr ctr_lbl
 	, CmmStore (CmmLit (cmmLabelOffB ctr_lbl 
 				oFFSET_StgEntCounter_registeredp))
 		   (CmmLit (mkIntCLit 1)) ]
-    ticky_entry_ctrs = mkLblExpr (mkRtsDataLabel SLIT("ticky_entry_ctrs"))
+    ticky_entry_ctrs = mkLblExpr (mkRtsDataLabel (sLit "ticky_entry_ctrs"))
 
 tickyReturnOldCon, tickyReturnNewCon :: Arity -> Code
 tickyReturnOldCon arity 
-  = ifTicky $ do { bumpTickyCounter SLIT("RET_OLD_ctr")
-	         ; bumpHistogram SLIT("RET_OLD_hst") arity }
+  = ifTicky $ do { bumpTickyCounter (sLit "RET_OLD_ctr")
+	         ; bumpHistogram (sLit "RET_OLD_hst") arity }
 tickyReturnNewCon arity 
   | not opt_DoTickyProfiling = nopC
   | otherwise
-  = ifTicky $ do { bumpTickyCounter SLIT("RET_NEW_ctr")
-	         ; bumpHistogram SLIT("RET_NEW_hst") arity }
+  = ifTicky $ do { bumpTickyCounter (sLit "RET_NEW_ctr")
+	         ; bumpHistogram (sLit "RET_NEW_hst") arity }
 
 tickyUnboxedTupleReturn :: Int -> Code
 tickyUnboxedTupleReturn arity
-  = ifTicky $ do { bumpTickyCounter SLIT("RET_UNBOXED_TUP_ctr")
- 	         ; bumpHistogram SLIT("RET_UNBOXED_TUP_hst") arity }
+  = ifTicky $ do { bumpTickyCounter (sLit "RET_UNBOXED_TUP_ctr")
+ 	         ; bumpHistogram (sLit "RET_UNBOXED_TUP_hst") arity }
 
 tickyVectoredReturn :: Int -> Code
 tickyVectoredReturn family_size 
-  = ifTicky $ do { bumpTickyCounter SLIT("VEC_RETURN_ctr")
-		 ; bumpHistogram SLIT("RET_VEC_RETURN_hst") family_size }
+  = ifTicky $ do { bumpTickyCounter (sLit "VEC_RETURN_ctr")
+		 ; bumpHistogram (sLit "RET_VEC_RETURN_hst") family_size }
 
 -- -----------------------------------------------------------------------------
 -- Ticky calls
 
 -- Ticks at a *call site*:
-tickyKnownCallTooFewArgs = ifTicky $ bumpTickyCounter SLIT("KNOWN_CALL_TOO_FEW_ARGS_ctr")
-tickyKnownCallExact = ifTicky $ bumpTickyCounter SLIT("KNOWN_CALL_ctr")
-tickyKnownCallExtraArgs = ifTicky $ bumpTickyCounter SLIT("KNOWN_CALL_EXTRA_ARGS_ctr")
-tickyUnknownCall = ifTicky $ bumpTickyCounter SLIT("UNKNOWN_CALL_ctr")
+tickyKnownCallTooFewArgs = ifTicky $ bumpTickyCounter (sLit "KNOWN_CALL_TOO_FEW_ARGS_ctr")
+tickyKnownCallExact = ifTicky $ bumpTickyCounter (sLit "KNOWN_CALL_ctr")
+tickyKnownCallExtraArgs = ifTicky $ bumpTickyCounter (sLit "KNOWN_CALL_EXTRA_ARGS_ctr")
+tickyUnknownCall = ifTicky $ bumpTickyCounter (sLit "UNKNOWN_CALL_ctr")
 
 -- Tick for the call pattern at slow call site (i.e. in addition to
 -- tickyUnknownCall, tickyKnownCallExtraArgs, etc.)
@@ -222,7 +221,7 @@ tickySlowCallPat args = return ()
 {- LATER: (introduces recursive module dependency now).
   case callPattern args of
     (str, True)  -> bumpTickyCounter' (mkRtsSlowTickyCtrLabel pat)
-    (str, False) -> bumpTickyCounter  SLIT("TICK_SLOW_CALL_OTHER")
+    (str, False) -> bumpTickyCounter  (sLit "TICK_SLOW_CALL_OTHER")
 
 callPattern :: [CgRep] -> (String,Bool)
 callPattern reps 
@@ -293,9 +292,9 @@ tickyAllocHeap hp
 			(CmmLit (cmmLabelOffB ticky_ctr 
 				oFFSET_StgEntCounter_allocs)) hp,
 		-- Bump ALLOC_HEAP_ctr
-	    addToMemLbl cLongRep (mkRtsDataLabel SLIT("ALLOC_HEAP_ctr")) 1,
+	    addToMemLbl cLongRep (mkRtsDataLabel (sLit "ALLOC_HEAP_ctr")) 1,
 		-- Bump ALLOC_HEAP_tot
-	    addToMemLbl cLongRep (mkRtsDataLabel SLIT("ALLOC_HEAP_tot")) hp] }
+	    addToMemLbl cLongRep (mkRtsDataLabel (sLit "ALLOC_HEAP_tot")) hp] }
 
 -- -----------------------------------------------------------------------------
 -- Ticky utils
