@@ -17,8 +17,6 @@ module Class (
 	classBigSig, classExtraBigSig, classTvsFds, classSCTheta
     ) where
 
-#include "HsVersions.h"
-
 import {-# SOURCE #-} TyCon	( TyCon )
 import {-# SOURCE #-} TypeRep	( PredType )
 
@@ -176,9 +174,9 @@ instance Outputable DefMeth where
 
 pprFundeps :: Outputable a => [FunDep a] -> SDoc
 pprFundeps []  = empty
-pprFundeps fds = hsep (ptext SLIT("|") : punctuate comma (map ppr_fd fds))
+pprFundeps fds = hsep (ptext (sLit "|") : punctuate comma (map ppr_fd fds))
 	       where
-		 ppr_fd (us, vs) = hsep [interppSP us, ptext SLIT("->"), 
+		 ppr_fd (us, vs) = hsep [interppSP us, ptext (sLit "->"), 
 					 interppSP vs]
 \end{code}
 
