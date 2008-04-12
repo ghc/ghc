@@ -8,8 +8,6 @@
 module Vectorise( vectorise )
 where
 
-#include "HsVersions.h"
-
 import VectMonad
 import VectUtils
 import VectType
@@ -376,7 +374,7 @@ vectAlgCase tycon ty_args scrut bndr ty [(DataAlt dc, bndrs, body)]
       return . vLet (vNonRec vbndr vexpr)
              $ vCaseProd vscrut vty lty vect_dc arr_dc shape_bndrs vbndrs vbody
   where
-    vect_scrut_bndr | isDeadBinder bndr = vectBndrNewIn bndr FSLIT("scrut")
+    vect_scrut_bndr | isDeadBinder bndr = vectBndrNewIn bndr (fsLit "scrut")
                     | otherwise         = vectBndrIn bndr
 
 vectAlgCase tycon ty_args scrut bndr ty alts
@@ -410,7 +408,7 @@ vectAlgCase tycon ty_args scrut bndr ty alts
       return . vLet (vNonRec vbndr vexpr)
              $ (vect_case, lift_case)
   where
-    vect_scrut_bndr | isDeadBinder bndr = vectBndrNewIn bndr FSLIT("scrut")
+    vect_scrut_bndr | isDeadBinder bndr = vectBndrNewIn bndr (fsLit "scrut")
                     | otherwise         = vectBndrIn bndr
 
     alts' = sortBy (\(alt1, _, _) (alt2, _, _) -> cmp alt1 alt2) alts
@@ -437,7 +435,7 @@ vectAlgCase tycon ty_args scrut bndr ty alts
           void_tc <- builtin voidTyCon
           let void_ty = mkTyConApp void_tc []
           arr_ty <- mkPArrayType void_ty
-          bndr   <- newLocalVar FSLIT("voids") arr_ty
+          bndr   <- newLocalVar (fsLit "voids") arr_ty
           len    <- lengthPA void_ty (Var bndr)
           e      <- p len
           return ([], [bndr], e)
@@ -461,7 +459,7 @@ packLiftingContext len shape tag fvs vty lty p
   = do
       select <- builtin selectPAIntPrimVar
       let sel_expr = mkApps (Var select) [shape, tag]
-      sel_var <- newLocalVar FSLIT("sel#") (exprType sel_expr)
+      sel_var <- newLocalVar (fsLit "sel#") (exprType sel_expr)
       lc_var <- builtin liftingContext
       localV $
         do
