@@ -323,7 +323,7 @@ data Parent = NoParent | ParentIs Name
 
 instance Outputable Parent where
    ppr NoParent     = empty
-   ppr (ParentIs n) = ptext SLIT("parent:") <> ppr n
+   ppr (ParentIs n) = ptext (sLit "parent:") <> ppr n
    
 
 plusParent :: Parent -> Parent -> Parent
@@ -334,11 +334,11 @@ plusParent p1 p2 = ASSERT2( p1 == p2, parens (ppr p1) <+> parens (ppr p2) )
 plusParent :: Parent -> Parent -> Parent
 plusParent NoParent     rel = 
   ASSERT2( case rel of { NoParent -> True; other -> False }, 
-	   ptext SLIT("plusParent[NoParent]: ") <+> ppr rel )    
+	   ptext (sLit "plusParent[NoParent]: ") <+> ppr rel )    
   NoParent
 plusParent (ParentIs n) rel = 
   ASSERT2( case rel of { ParentIs m -> n==m;  other -> False }, 
-	   ptext SLIT("plusParent[ParentIs]:") <+> ppr n <> comma <+> ppr rel )
+	   ptext (sLit "plusParent[ParentIs]:") <+> ppr n <> comma <+> ppr rel )
   ParentIs n
  -}
 
@@ -610,7 +610,7 @@ plusProv (Imported is1)  (Imported is2)  = Imported (is1++is2)
 pprNameProvenance :: GlobalRdrElt -> SDoc
 -- Print out the place where the name was imported
 pprNameProvenance (GRE {gre_name = name, gre_prov = LocalDef})
-  = ptext SLIT("defined at") <+> ppr (nameSrcLoc name)
+  = ptext (sLit "defined at") <+> ppr (nameSrcLoc name)
 pprNameProvenance (GRE {gre_name = name, gre_prov = Imported whys})
   = case whys of
 	(why:_) -> sep [ppr why, nest 2 (ppr_defn (nameSrcLoc name))]
@@ -619,13 +619,13 @@ pprNameProvenance (GRE {gre_name = name, gre_prov = Imported whys})
 -- If we know the exact definition point (which we may do with GHCi)
 -- then show that too.  But not if it's just "imported from X".
 ppr_defn :: SrcLoc -> SDoc
-ppr_defn loc | isGoodSrcLoc loc = parens (ptext SLIT("defined at") <+> ppr loc)
+ppr_defn loc | isGoodSrcLoc loc = parens (ptext (sLit "defined at") <+> ppr loc)
 	     | otherwise	= empty
 
 instance Outputable ImportSpec where
    ppr imp_spec
-     = ptext SLIT("imported from") <+> ppr (importSpecModule imp_spec) 
-	<+> if isGoodSrcSpan loc then ptext SLIT("at") <+> ppr loc
+     = ptext (sLit "imported from") <+> ppr (importSpecModule imp_spec) 
+	<+> if isGoodSrcSpan loc then ptext (sLit "at") <+> ppr loc
 				 else empty
      where
        loc = importSpecLoc imp_spec
