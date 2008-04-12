@@ -25,8 +25,6 @@ module TcRnDriver (
 	tcRnExtCore
     ) where
 
-#include "HsVersions.h"
-
 import IO
 #ifdef GHCI
 import {-# SOURCE #-} TcSplice ( tcSpliceDecls )
@@ -503,7 +501,7 @@ tcRnHsBootDecls decls
    }}}}
 
 spliceInHsBootErr (SpliceDecl (L loc _), _)
-  = addErrAt loc (ptext SLIT("Splices are not allowed in hs-boot files"))
+  = addErrAt loc (ptext (sLit "Splices are not allowed in hs-boot files"))
 \end{code}
 
 Once we've typechecked the body of the module, we want to compare what
@@ -608,17 +606,17 @@ checkHiBootIface
 
 ----------------
 missingBootThing thing what
-  = ppr thing <+> ptext SLIT("is exported by the hs-boot file, but not") 
-	      <+> text what <+> ptext SLIT("the module")
+  = ppr thing <+> ptext (sLit "is exported by the hs-boot file, but not") 
+	      <+> text what <+> ptext (sLit "the module")
 
 bootMisMatch thing boot_decl real_decl
-  = vcat [ppr thing <+> ptext SLIT("has conflicting definitions in the module and its hs-boot file"),
-	  ptext SLIT("Main module:") <+> ppr real_decl,
-	  ptext SLIT("Boot file:  ") <+> ppr boot_decl]
+  = vcat [ppr thing <+> ptext (sLit "has conflicting definitions in the module and its hs-boot file"),
+	  ptext (sLit "Main module:") <+> ppr real_decl,
+	  ptext (sLit "Boot file:  ") <+> ppr boot_decl]
 
 instMisMatch inst
   = hang (ppr inst)
-       2 (ptext SLIT("is defined in the hs-boot file, but not in the module itself"))
+       2 (ptext (sLit "is defined in the hs-boot file, but not in the module itself"))
 \end{code}
 
 
@@ -786,7 +784,7 @@ check_main dflags tcg_env
 		-- 	:Main.main :: IO res_ty = runMainIO res_ty main 
 	; run_main_id <- tcLookupId runMainIOName
 	; let { root_main_name =  mkExternalName rootMainKey rOOT_MAIN 
-				   (mkVarOccFS FSLIT("main")) 
+				   (mkVarOccFS (fsLit "main")) 
 				   (getSrcSpan main_name)
 	      ; root_main_id = Id.mkExportedLocalId root_main_name 
 						    (mkTyConApp ioTyCon [res_ty])
@@ -817,11 +815,11 @@ check_main dflags tcg_env
 	-- In other modes, fail altogether, so that we don't go on
 	-- and complain a second time when processing the export list.
 
-    mainCtxt  = ptext SLIT("When checking the type of the") <+> pp_main_fn
-    noMainMsg = ptext SLIT("The") <+> pp_main_fn
-		<+> ptext SLIT("is not defined in module") <+> quotes (ppr main_mod)
-    pp_main_fn | isJust main_is_flag = ptext SLIT("main function") <+> quotes (ppr main_fn)
-	       | otherwise 	     = ptext SLIT("function") <+> quotes (ppr main_fn)
+    mainCtxt  = ptext (sLit "When checking the type of the") <+> pp_main_fn
+    noMainMsg = ptext (sLit "The") <+> pp_main_fn
+		<+> ptext (sLit "is not defined in module") <+> quotes (ppr main_mod)
+    pp_main_fn | isJust main_is_flag = ptext (sLit "main function") <+> quotes (ppr main_fn)
+	       | otherwise 	     = ptext (sLit "function") <+> quotes (ppr main_fn)
 \end{code}
 
 Note [Root-main Id]
@@ -934,7 +932,7 @@ tcRnStmt hsc_env ictxt rdr_stmt
     return (global_ids, zonked_expr)
     }
   where
-    bad_unboxed id = addErr (sep [ptext SLIT("GHCi can't bind a variable of unlifted type:"),
+    bad_unboxed id = addErr (sep [ptext (sLit "GHCi can't bind a variable of unlifted type:"),
 				  nest 2 (ppr id <+> dcolon <+> ppr (idType id))])
 
 globaliseAndTidy :: Id -> Id
@@ -1131,7 +1129,7 @@ tcRnExpr hsc_env ictxt rdr_expr
     zonkTcType all_expr_ty
     }
   where
-    smpl_doc = ptext SLIT("main expression")
+    smpl_doc = ptext (sLit "main expression")
 \end{code}
 
 tcRnType just finds the kind of a type
@@ -1153,7 +1151,7 @@ tcRnType hsc_env ictxt rdr_type
     return kind
     }
   where
-    doc = ptext SLIT("In GHCi input")
+    doc = ptext (sLit "In GHCi input")
 
 #endif /* GHCi */
 \end{code}
@@ -1185,7 +1183,7 @@ getModuleExports hsc_env mod
 -- argument).
 tcGetModuleExports :: Module -> [Module] -> TcM [AvailInfo]
 tcGetModuleExports mod directlyImpMods
-  = do { let doc = ptext SLIT("context for compiling statements")
+  = do { let doc = ptext (sLit "context for compiling statements")
        ; iface <- initIfaceTcRn $ loadSysInterface doc mod
 
   		-- Load any orphan-module and family instance-module
@@ -1314,7 +1312,7 @@ loadUnqualIfaces ictxt
                     not (isInternalName name),
 		    isTcOcc (nameOccName name),  -- Types and classes only
 		    unQualOK gre ]		 -- In scope unqualified
-    doc = ptext SLIT("Need interface for module whose export(s) are in scope unqualified")
+    doc = ptext (sLit "Need interface for module whose export(s) are in scope unqualified")
 #endif /* GHCI */
 \end{code}
 
@@ -1369,8 +1367,8 @@ pprTcGblEnv (TcGblEnv { tcg_type_env  = type_env,
 	 , ppr_fam_insts fam_insts
 	 , vcat (map ppr rules)
 	 , ppr_gen_tycons (typeEnvTyCons type_env)
-	 , ptext SLIT("Dependent modules:") <+> ppr (eltsUFM (imp_dep_mods imports))
-	 , ptext SLIT("Dependent packages:") <+> ppr (imp_dep_pkgs imports)]
+	 , ptext (sLit "Dependent modules:") <+> ppr (eltsUFM (imp_dep_mods imports))
+	 , ptext (sLit "Dependent packages:") <+> ppr (imp_dep_pkgs imports)]
 
 pprModGuts :: ModGuts -> SDoc
 pprModGuts (ModGuts { mg_types = type_env,
@@ -1428,16 +1426,16 @@ ppr_tydecls tycons
   where
     le_sig tycon1 tycon2 = getOccName tycon1 <= getOccName tycon2
     ppr_tycon tycon 
-      | isCoercionTyCon tycon = ptext SLIT("coercion") <+> ppr tycon
+      | isCoercionTyCon tycon = ptext (sLit "coercion") <+> ppr tycon
       | otherwise             = ppr (tyThingToIfaceDecl (ATyCon tycon))
 
 ppr_rules :: [CoreRule] -> SDoc
 ppr_rules [] = empty
-ppr_rules rs = vcat [ptext SLIT("{-# RULES"),
+ppr_rules rs = vcat [ptext (sLit "{-# RULES"),
 		      nest 4 (pprRules rs),
-		      ptext SLIT("#-}")]
+		      ptext (sLit "#-}")]
 
 ppr_gen_tycons []  = empty
-ppr_gen_tycons tcs = vcat [ptext SLIT("Tycons with generics:"),
+ppr_gen_tycons tcs = vcat [ptext (sLit "Tycons with generics:"),
 			   nest 2 (fsep (map ppr (filter tyConHasGenerics tcs)))]
 \end{code}
