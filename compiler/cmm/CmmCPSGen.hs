@@ -13,8 +13,6 @@ module CmmCPSGen (
   ContinuationFormat(..),
 ) where
 
-#include "HsVersions.h"
-
 import Cmm
 import CLabel
 import CmmBrokenBlock -- Data types only
@@ -265,8 +263,8 @@ foreignCall uniques call results arguments =
 -- -----------------------------------------------------------------------------
 -- Save/restore the thread state in the TSO
 
-suspendThread = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("suspendThread")))
-resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("resumeThread")))
+suspendThread = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "suspendThread")))
+resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "resumeThread")))
 
 -- This stuff can't be done in suspendThread/resumeThread, because it
 -- refers to global registers which aren't available in the C world.
