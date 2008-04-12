@@ -24,8 +24,6 @@ module CgForeignCall (
   emitOpenNursery,
  ) where
 
-#include "HsVersions.h"
-
 import StgSyn
 import CgProf
 import CgBindery
@@ -153,8 +151,8 @@ emitForeignCall' safety results target args vols srt ret
     stmtsC caller_load
     emitLoadThreadState
 
-suspendThread = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("suspendThread")))
-resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("resumeThread")))
+suspendThread = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "suspendThread")))
+resumeThread  = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "resumeThread")))
 
 
 -- we might need to load arguments into temporaries before
