@@ -678,7 +678,7 @@ dataConInstArgTys dc@(MkData {dcRepArgTys = rep_arg_tys,
 			      dcUnivTyVars = univ_tvs, dcEqSpec = eq_spec,
 			      dcExTyVars = ex_tvs}) inst_tys
  = ASSERT2 ( length univ_tvs == length inst_tys 
-           , ptext SLIT("dataConInstArgTys") <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys)
+           , ptext (sLit "dataConInstArgTys") <+> ppr dc $$ ppr univ_tvs $$ ppr inst_tys)
    ASSERT2 ( null ex_tvs && null eq_spec, ppr dc )        
    map (substTyWith univ_tvs inst_tys) rep_arg_tys
 
@@ -693,7 +693,7 @@ dataConInstOrigArgTys dc@(MkData {dcOrigArgTys = arg_tys,
 			          dcUnivTyVars = univ_tvs, 
 			          dcExTyVars = ex_tvs}) inst_tys
   = ASSERT2( length tyvars == length inst_tys
-          , ptext SLIT("dataConInstOrigArgTys") <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
+          , ptext (sLit "dataConInstOrigArgTys") <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
     map (substTyWith tyvars inst_tys) arg_tys
   where
     tyvars = univ_tvs ++ ex_tvs
@@ -708,7 +708,7 @@ dataConInstOrigDictsAndArgTys dc@(MkData {dcOrigArgTys = arg_tys,
 			          dcUnivTyVars = univ_tvs, 
 			          dcExTyVars = ex_tvs}) inst_tys
   = ASSERT2( length tyvars == length inst_tys
-          , ptext SLIT("dataConInstOrigDictsAndArgTys") <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
+          , ptext (sLit "dataConInstOrigDictsAndArgTys") <+> ppr dc $$ ppr tyvars $$ ppr inst_tys )
     map (substTyWith tyvars inst_tys) (mkPredTys dicts ++ arg_tys)
   where
     tyvars = univ_tvs ++ ex_tvs
