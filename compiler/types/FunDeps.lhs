@@ -201,8 +201,8 @@ type Equation = (TyVarSet, [(Type, Type)])
 
 pprEquation :: Equation -> SDoc
 pprEquation (qtvs, pairs) 
-  = vcat [ptext SLIT("forall") <+> braces (pprWithCommas ppr (varSetElems qtvs)),
-	  nest 2 (vcat [ ppr t1 <+> ptext SLIT(":=:") <+> ppr t2 | (t1,t2) <- pairs])]
+  = vcat [ptext (sLit "forall") <+> braces (pprWithCommas ppr (varSetElems qtvs)),
+	  nest 2 (vcat [ ppr t1 <+> ptext (sLit ":=:") <+> ppr t2 | (t1,t2) <- pairs])]
 \end{code}
 
 Given a bunch of predicates that must hold, such as
@@ -293,7 +293,7 @@ improveOne inst_env pred@(ClassP cls tys, _) preds
 	, not (instanceCantMatch inst_tcs trimmed_tcs)
 	, eqn <- checkClsFD qtvs fd cls_tvs tys_inst tys
 	, let p_inst = (mkClassPred cls tys_inst, 
-		        ptext SLIT("arising from the instance declaration at")
+		        ptext (sLit "arising from the instance declaration at")
 			<+> ppr (getSrcLoc ispec))
 	]
 
