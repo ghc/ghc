@@ -31,8 +31,6 @@ module CoreUnfold (
 
     ) where
 
-#include "HsVersions.h"
-
 import StaticFlags
 import DynFlags
 import CoreSyn
@@ -86,11 +84,11 @@ mkUnfolding top_lvl expr
 	-- it gets fixed up next round
 
 instance Outputable Unfolding where
-  ppr NoUnfolding = ptext SLIT("No unfolding")
-  ppr (OtherCon cs) = ptext SLIT("OtherCon") <+> ppr cs
-  ppr (CompulsoryUnfolding e) = ptext SLIT("Compulsory") <+> ppr e
+  ppr NoUnfolding = ptext (sLit "No unfolding")
+  ppr (OtherCon cs) = ptext (sLit "OtherCon") <+> ppr cs
+  ppr (CompulsoryUnfolding e) = ptext (sLit "Compulsory") <+> ppr e
   ppr (CoreUnfolding e top hnf cheap g) 
-	= ptext SLIT("Unf") <+> sep [ppr top <+> ppr hnf <+> ppr cheap <+> ppr g, 
+	= ptext (sLit "Unf") <+> sep [ppr top <+> ppr hnf <+> ppr cheap <+> ppr g, 
 				     ppr e]
 
 mkCompulsoryUnfolding :: CoreExpr -> Unfolding
@@ -107,9 +105,9 @@ mkCompulsoryUnfolding expr	-- Used for things that absolutely must be unfolded
 
 \begin{code}
 instance Outputable UnfoldingGuidance where
-    ppr UnfoldNever	= ptext SLIT("NEVER")
+    ppr UnfoldNever	= ptext (sLit "NEVER")
     ppr (UnfoldIfGoodArgs v cs size discount)
-      = hsep [ ptext SLIT("IF_ARGS"), int v,
+      = hsep [ ptext (sLit "IF_ARGS"), int v,
 	       brackets (hsep (map int cs)),
 	       int size,
 	       int discount ]
@@ -530,9 +528,9 @@ data CallCtxt = BoringCtxt
 				-- that decomposes its scrutinee
 
 instance Outputable CallCtxt where
-  ppr BoringCtxt    = ptext SLIT("BoringCtxt")
-  ppr (ArgCtxt _ _) = ptext SLIT("ArgCtxt")
-  ppr CaseCtxt 	    = ptext SLIT("CaseCtxt")
+  ppr BoringCtxt    = ptext (sLit "BoringCtxt")
+  ppr (ArgCtxt _ _) = ptext (sLit "ArgCtxt")
+  ppr CaseCtxt 	    = ptext (sLit "CaseCtxt")
 
 callSiteInline dflags active_inline id lone_variable arg_infos cont_info
   = case idUnfolding id of {
