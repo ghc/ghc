@@ -459,7 +459,7 @@ mkEqnHelp orig tvs cls cls_tys tc_app mtheta
 			     tycon tc_args rep_tc rep_tc_args mtheta }
   | otherwise
   = baleOut (derivingThingErr cls cls_tys tc_app
-		(ptext SLIT("Last argument of the instance must be a type application")))
+		(ptext (sLit "Last argument of the instance must be a type application")))
 
 baleOut :: Message -> TcM (Maybe a)
 baleOut err = do { addErrTc err;  return Nothing }
@@ -561,13 +561,13 @@ mk_typeable_eqn orig tvs cls tycon tc_args rep_tc _rep_tc_args mtheta
 	--	Typeable; it depends on the arity of the type
   | isNothing mtheta	-- deriving on a data type decl
   = do	{ checkTc (cls `hasKey` typeableClassKey)
-		  (ptext SLIT("Use deriving( Typeable ) on a data type declaration"))
+		  (ptext (sLit "Use deriving( Typeable ) on a data type declaration"))
 	; real_cls <- tcLookupClass (typeableClassNames !! tyConArity tycon)
 	; mk_typeable_eqn orig tvs real_cls tycon [] rep_tc [] (Just []) }
 
   | otherwise		-- standaone deriving
   = do	{ checkTc (null tc_args)
-		  (ptext SLIT("Derived typeable instance must be of form (Typeable") 
+		  (ptext (sLit "Derived typeable instance must be of form (Typeable") 
 			<> int (tyConArity tycon) <+> ppr tycon <> rparen)
 	; dfun_name <- new_dfun_name cls tycon
   	; loc <- getSrcSpanM
@@ -593,8 +593,8 @@ checkSideConditions mayDeriveDataTypeable cls cls_tys rep_tc
 	Just cond -> cond (mayDeriveDataTypeable, rep_tc)
 	Nothing   -> Just non_std_why
   where
-    ty_args_why	= quotes (ppr (mkClassPred cls cls_tys)) <+> ptext SLIT("is not a class")
-    non_std_why = quotes (ppr cls) <+> ptext SLIT("is not a derivable class")
+    ty_args_why	= quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "is not a class")
+    non_std_why = quotes (ppr cls) <+> ptext (sLit "is not a derivable class")
 
 sideConditions :: Class -> Maybe Condition
 sideConditions cls
@@ -623,7 +623,7 @@ orCond c1 c2 tc
 	Nothing -> Nothing		-- c1 succeeds
 	Just x  -> case c2 tc of	-- c1 fails
 		     Nothing -> Nothing
-		     Just y  -> Just (x $$ ptext SLIT("  and") $$ y)
+		     Just y  -> Just (x $$ ptext (sLit "  and") $$ y)
 					-- Both fail
 
 andCond :: Condition -> Condition -> Condition
@@ -639,9 +639,9 @@ cond_std (_, rep_tc)
   where
     data_cons       = tyConDataCons rep_tc
     no_cons_why	    = quotes (pprSourceTyCon rep_tc) <+> 
-		      ptext SLIT("has no data constructors")
+		      ptext (sLit "has no data constructors")
     existential_why = quotes (pprSourceTyCon rep_tc) <+> 
-		      ptext SLIT("has non-Haskell-98 constructor(s)")
+		      ptext (sLit "has non-Haskell-98 constructor(s)")
   
 cond_isEnumeration :: Condition
 cond_isEnumeration (_, rep_tc)
@@ -649,7 +649,7 @@ cond_isEnumeration (_, rep_tc)
   | otherwise		      = Just why
   where
     why = quotes (pprSourceTyCon rep_tc) <+> 
-	  ptext SLIT("has non-nullary constructors")
+	  ptext (sLit "has non-nullary constructors")
 
 cond_isProduct :: Condition
 cond_isProduct (_, rep_tc)
@@ -657,7 +657,7 @@ cond_isProduct (_, rep_tc)
   | otherwise	          = Just why
   where
     why = quotes (pprSourceTyCon rep_tc) <+> 
-	  ptext SLIT("has more than one constructor")
+	  ptext (sLit "has more than one constructor")
 
 cond_typeableOK :: Condition
 -- OK for Typeable class
@@ -671,18 +671,18 @@ cond_typeableOK (_, rep_tc)
   | otherwise	  		= Nothing
   where
     too_many = quotes (pprSourceTyCon rep_tc) <+> 
-	       ptext SLIT("has too many arguments")
+	       ptext (sLit "has too many arguments")
     bad_kind = quotes (pprSourceTyCon rep_tc) <+> 
-	       ptext SLIT("has arguments of kind other than `*'")
+	       ptext (sLit "has arguments of kind other than `*'")
     fam_inst = quotes (pprSourceTyCon rep_tc) <+> 
-	       ptext SLIT("is a type family")
+	       ptext (sLit "is a type family")
 
 cond_mayDeriveDataTypeable :: Condition
 cond_mayDeriveDataTypeable (mayDeriveDataTypeable, _)
  | mayDeriveDataTypeable = Nothing
  | otherwise = Just why
   where
-    why  = ptext SLIT("You need -XDeriveDataTypeable to derive an instance for this class")
+    why  = ptext (sLit "You need -XDeriveDataTypeable to derive an instance for this class")
 
 std_class_via_iso :: Class -> Bool
 std_class_via_iso clas	-- These standard classes can be derived for a newtype
@@ -759,7 +759,7 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 	mb_std_err = checkSideConditions mayDeriveDataTypeable cls cls_tys rep_tycon
 	std_err = derivingThingErr cls cls_tys tc_app $
 		  vcat [fromJust mb_std_err,
-			ptext SLIT("Try -XGeneralizedNewtypeDeriving for GHC's newtype-deriving extension")]
+			ptext (sLit "Try -XGeneralizedNewtypeDeriving for GHC's newtype-deriving extension")]
 
 	-- Here is the plan for newtype derivings.  We see
 	--	  newtype T a1...an = MkT (t ak+1...an) deriving (.., C s1 .. sm, ...)
@@ -893,19 +893,19 @@ mkNewTypeEqn orig mayDeriveDataTypeable newtype_deriving tvs
 		--      arguments must be type variables (not more complex indexes)
 
 	cant_derive_err = derivingThingErr cls cls_tys tc_app
-				(vcat [ptext SLIT("even with cunning newtype deriving:"),
+				(vcat [ptext (sLit "even with cunning newtype deriving:"),
 					if isRecursiveTyCon tycon then
-					  ptext SLIT("the newtype may be recursive")
+					  ptext (sLit "the newtype may be recursive")
 					else empty,
 					if not right_arity then 
-					  quotes (ppr (mkClassPred cls cls_tys)) <+> ptext SLIT("does not have arity 1")
+					  quotes (ppr (mkClassPred cls cls_tys)) <+> ptext (sLit "does not have arity 1")
 					else empty,
 					if not (n_tyargs_to_keep >= 0) then 
-					  ptext SLIT("the type constructor has wrong kind")
+					  ptext (sLit "the type constructor has wrong kind")
 					else if not (n_args_to_keep >= 0) then
-					  ptext SLIT("the representation type has wrong kind")
+					  ptext (sLit "the representation type has wrong kind")
 					else if not eta_ok then 
-					  ptext SLIT("the eta-reduction property does not hold")
+					  ptext (sLit "the eta-reduction property does not hold")
 					else empty
 				      ])
 \end{code}
@@ -1158,7 +1158,7 @@ genDerivBinds clas fix_env tycon
 \begin{code}
 derivingThingErr :: Class -> [Type] -> Type -> Message -> Message
 derivingThingErr clas tys ty why
-  = sep [hsep [ptext SLIT("Can't make a derived instance of"), 
+  = sep [hsep [ptext (sLit "Can't make a derived instance of"), 
 	       quotes (ppr pred)],
 	 nest 2 (parens why)]
   where
@@ -1166,28 +1166,28 @@ derivingThingErr clas tys ty why
 
 derivingHiddenErr :: TyCon -> SDoc
 derivingHiddenErr tc
-  = hang (ptext SLIT("The data constructors of") <+> quotes (ppr tc) <+> ptext SLIT("are not all in scope"))
-       2 (ptext SLIT("so you cannot derive an instance for it"))
+  = hang (ptext (sLit "The data constructors of") <+> quotes (ppr tc) <+> ptext (sLit "are not all in scope"))
+       2 (ptext (sLit "so you cannot derive an instance for it"))
 
 standaloneCtxt :: LHsType Name -> SDoc
-standaloneCtxt ty = hang (ptext SLIT("In the stand-alone deriving instance for")) 
+standaloneCtxt ty = hang (ptext (sLit "In the stand-alone deriving instance for")) 
 		       2 (quotes (ppr ty))
 
 derivInstCtxt :: Class -> [Type] -> Message
 derivInstCtxt clas inst_tys
-  = ptext SLIT("When deriving the instance for") <+> parens (pprClassPred clas inst_tys)
+  = ptext (sLit "When deriving the instance for") <+> parens (pprClassPred clas inst_tys)
 
 badDerivedPred :: PredType -> Message
 badDerivedPred pred
-  = vcat [ptext SLIT("Can't derive instances where the instance context mentions"),
-	  ptext SLIT("type variables that are not data type parameters"),
-	  nest 2 (ptext SLIT("Offending constraint:") <+> ppr pred)]
+  = vcat [ptext (sLit "Can't derive instances where the instance context mentions"),
+	  ptext (sLit "type variables that are not data type parameters"),
+	  nest 2 (ptext (sLit "Offending constraint:") <+> ppr pred)]
 
 famInstNotFound :: TyCon -> [Type] -> Bool -> TcM a
 famInstNotFound tycon tys notExact
   = failWithTc (msg <+> quotes (pprTypeApp tycon (ppr tycon) tys))
   where
     msg = ptext $ if notExact
-		  then SLIT("No family instance exactly matching")
-		  else SLIT("More than one family instance for")
+		  then sLit "No family instance exactly matching"
+		  else sLit "More than one family instance for"
 \end{code}
