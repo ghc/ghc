@@ -133,13 +133,13 @@ pprInstance :: Instance -> SDoc
 -- Prints the Instance as an instance declaration
 pprInstance ispec
   = hang (pprInstanceHdr ispec)
-	2 (ptext SLIT("--") <+> pprNameLoc (getName ispec))
+	2 (ptext (sLit "--") <+> pprNameLoc (getName ispec))
 
 -- * pprInstanceHdr is used in VStudio to populate the ClassView tree
 pprInstanceHdr :: Instance -> SDoc
 -- Prints the Instance as an instance declaration
 pprInstanceHdr ispec@(Instance { is_flag = flag })
-  = ptext SLIT("instance") <+> ppr flag
+  = ptext (sLit "instance") <+> ppr flag
     <+> sep [pprThetaArrow theta, pprClassPred clas tys]
   where
     (_, theta, clas, tys) = instanceHead ispec
