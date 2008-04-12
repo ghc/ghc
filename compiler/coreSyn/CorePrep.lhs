@@ -846,5 +846,5 @@ newVar :: Type -> UniqSM Id
 newVar ty
  = seqType ty `seq` do
      uniq <- getUniqueM
-     return (mkSysLocal FSLIT("sat") uniq ty)
+     return (mkSysLocal (fsLit "sat") uniq ty)
 \end{code}
