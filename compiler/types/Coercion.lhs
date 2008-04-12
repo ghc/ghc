@@ -444,12 +444,12 @@ mkCoConName occ key coCon = mkWiredInName gHC_PRIM (mkOccNameFS tcName occ)
 
 transCoercionTyConName, symCoercionTyConName, leftCoercionTyConName, rightCoercionTyConName, instCoercionTyConName, unsafeCoercionTyConName :: Name
 
-transCoercionTyConName = mkCoConName FSLIT("trans") transCoercionTyConKey transCoercionTyCon
-symCoercionTyConName   = mkCoConName FSLIT("sym") symCoercionTyConKey symCoercionTyCon
-leftCoercionTyConName  = mkCoConName FSLIT("left") leftCoercionTyConKey leftCoercionTyCon
-rightCoercionTyConName = mkCoConName FSLIT("right") rightCoercionTyConKey rightCoercionTyCon
-instCoercionTyConName  = mkCoConName FSLIT("inst") instCoercionTyConKey instCoercionTyCon
-unsafeCoercionTyConName = mkCoConName FSLIT("CoUnsafe") unsafeCoercionTyConKey unsafeCoercionTyCon
+transCoercionTyConName = mkCoConName (fsLit "trans") transCoercionTyConKey transCoercionTyCon
+symCoercionTyConName   = mkCoConName (fsLit "sym") symCoercionTyConKey symCoercionTyCon
+leftCoercionTyConName  = mkCoConName (fsLit "left") leftCoercionTyConKey leftCoercionTyCon
+rightCoercionTyConName = mkCoConName (fsLit "right") rightCoercionTyConKey rightCoercionTyCon
+instCoercionTyConName  = mkCoConName (fsLit "inst") instCoercionTyConKey instCoercionTyCon
+unsafeCoercionTyConName = mkCoConName (fsLit "CoUnsafe") unsafeCoercionTyConKey unsafeCoercionTyCon
 
 
 
