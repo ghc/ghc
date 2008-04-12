@@ -142,8 +142,8 @@ int64ToInteger i = if ((i `leInt64#` intToInt64# 0x7FFFFFFF#) &&
                    else case int64ToInteger# i of
                         (# s, d #) -> J# s d
     where -- XXX Move the (&&) definition below us?
-          True && True = True
-          _ && _ = False
+          True  && x = x
+          False && _ = False
 #endif
 
 toInt# :: Integer -> Int#
