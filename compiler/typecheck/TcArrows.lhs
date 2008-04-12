@@ -14,8 +14,6 @@ Typecheck arrow notation
 
 module TcArrows ( tcProc ) where
 
-#include "HsVersions.h"
-
 import {-# SOURCE #-}	TcExpr( tcMonoExpr, tcInferRho )
 
 import HsSyn
@@ -319,8 +317,8 @@ tc_cmd env cmd@(HsArrForm expr fixity cmd_args) (cmd_stk, res_ty)
 -- This is where expressions that aren't commands get rejected
 
 tc_cmd env cmd _
-  = failWithTc (vcat [ptext SLIT("The expression"), nest 2 (ppr cmd), 
-		      ptext SLIT("was found where an arrow command was expected")])
+  = failWithTc (vcat [ptext (sLit "The expression"), nest 2 (ppr cmd), 
+		      ptext (sLit "was found where an arrow command was expected")])
 \end{code}
 
 
@@ -346,20 +344,20 @@ arrowTyConKind = mkArrowKinds [liftedTypeKind, liftedTypeKind] liftedTypeKind
 %************************************************************************
 
 \begin{code}
-cmdCtxt cmd = ptext SLIT("In the command:") <+> ppr cmd
+cmdCtxt cmd = ptext (sLit "In the command:") <+> ppr cmd
 
 caseScrutCtxt cmd
-  = hang (ptext SLIT("In the scrutinee of a case command:")) 4 (ppr cmd)
+  = hang (ptext (sLit "In the scrutinee of a case command:")) 4 (ppr cmd)
 
 nonEmptyCmdStkErr cmd
-  = hang (ptext SLIT("Non-empty command stack at command:"))
+  = hang (ptext (sLit "Non-empty command stack at command:"))
 	 4 (ppr cmd)
 
 kappaUnderflow cmd
-  = hang (ptext SLIT("Command stack underflow at command:"))
+  = hang (ptext (sLit "Command stack underflow at command:"))
 	 4 (ppr cmd)
 
 badFormFun i tup_ty'
- = hang (ptext SLIT("The type of the") <+> speakNth i <+> ptext SLIT("argument of a command form has the wrong shape"))
-	4 (ptext SLIT("Argument type:") <+> ppr tup_ty')
+ = hang (ptext (sLit "The type of the") <+> speakNth i <+> ptext (sLit "argument of a command form has the wrong shape"))
+	4 (ptext (sLit "Argument type:") <+> ppr tup_ty')
 \end{code}
