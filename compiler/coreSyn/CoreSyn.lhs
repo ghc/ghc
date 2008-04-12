@@ -388,7 +388,7 @@ neverUnfold _                                   = False
 instance Outputable AltCon where
   ppr (DataAlt dc) = ppr dc
   ppr (LitAlt lit) = ppr lit
-  ppr DEFAULT      = ptext SLIT("__DEFAULT")
+  ppr DEFAULT      = ptext (sLit "__DEFAULT")
 
 instance Show AltCon where
   showsPrec p con = showsPrecSDoc p (ppr con)
