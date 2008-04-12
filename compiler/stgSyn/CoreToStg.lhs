@@ -187,7 +187,7 @@ coreTopBindToStg this_pkg env body_fvs (NonRec id rhs)
 	
 	bind = StgNonRec id stg_rhs
     in
-    ASSERT2(manifestArity rhs == stgRhsArity stg_rhs, ppr id $$ (ptext SLIT("rhs:")) <+> ppr rhs $$ (ptext SLIT("stg_rhs:"))<+> ppr stg_rhs $$ (ptext SLIT("Manifest:")) <+> (ppr $ manifestArity rhs) $$ (ptext SLIT("STG:")) <+>(ppr $ stgRhsArity stg_rhs) )
+    ASSERT2(manifestArity rhs == stgRhsArity stg_rhs, ppr id $$ (ptext (sLit "rhs:")) <+> ppr rhs $$ (ptext (sLit "stg_rhs:"))<+> ppr stg_rhs $$ (ptext (sLit "Manifest:")) <+> (ppr $ manifestArity rhs) $$ (ptext (sLit "STG:")) <+>(ppr $ stgRhsArity stg_rhs) )
     ASSERT2(consistentCafInfo id bind, ppr id $$ ppr rhs $$ ppr bind)
 --    WARN(not (consistent caf_info bind), ppr id <+> ppr cafs <+> ppCafInfo caf_info)
     (env', fvs' `unionFVInfo` body_fvs, bind)
@@ -217,7 +217,7 @@ coreTopBindToStg this_pkg env body_fvs (Rec pairs)
 -- CafInfo will be exact in all cases except when CorePrep has
 -- floated out a binding, in which case it will be approximate.
 consistentCafInfo id bind
-  | occNameFS (nameOccName (idName id)) == FSLIT("sat")
+  | occNameFS (nameOccName (idName id)) == fsLit "sat"
   = safe
   | otherwise
   = WARN (not exact, ppr id) safe
@@ -565,7 +565,7 @@ coreToStgArgs (arg : args) = do         -- Non-type argument
 	-- we complain.
 	-- We also want to check if a pointer is cast to a non-ptr etc
 
-    WARN( bad_args, ptext SLIT("Dangerous-looking argument. Probable cause: bad unsafeCoerce#") $$ ppr arg )
+    WARN( bad_args, ptext (sLit "Dangerous-looking argument. Probable cause: bad unsafeCoerce#") $$ ppr arg )
      return (stg_arg : stg_args, fvs)
 
 
