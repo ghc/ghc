@@ -30,8 +30,6 @@ module PprC (
         pprStringInCStyle 
   ) where
 
-#include "HsVersions.h"
-
 -- Cmm stuff
 import Cmm
 import CLabel
@@ -75,7 +73,7 @@ pprCs dflags cmms
  = pprCode CStyle (vcat $ map (\c -> split_marker $$ pprC c) cmms)
  where
    split_marker
-     | dopt Opt_SplitObjs dflags = ptext SLIT("__STG_SPLIT_MARKER")
+     | dopt Opt_SplitObjs dflags = ptext (sLit "__STG_SPLIT_MARKER")
      | otherwise     	         = empty
 
 writeCs :: DynFlags -> Handle -> [RawCmm] -> IO ()
@@ -125,13 +123,13 @@ pprTop (CmmProc info clbl _params (ListGraph blocks)) =
 
 pprTop (CmmData _section _ds@[CmmDataLabel lbl, CmmString str]) = 
   hcat [
-    pprLocalness lbl, ptext SLIT("char "), pprCLabel lbl,
-    ptext SLIT("[] = "), pprStringInCStyle str, semi
+    pprLocalness lbl, ptext (sLit "char "), pprCLabel lbl,
+    ptext (sLit "[] = "), pprStringInCStyle str, semi
   ]
 
 pprTop (CmmData _section _ds@[CmmDataLabel lbl, CmmUninitialised size]) = 
   hcat [
-    pprLocalness lbl, ptext SLIT("char "), pprCLabel lbl,
+    pprLocalness lbl, ptext (sLit "char "), pprCLabel lbl,
     brackets (int size), semi
   ]
 
@@ -164,16 +162,16 @@ pprBBlock (BasicBlock lbl stmts) =
 
 pprWordArray :: CLabel -> [CmmStatic] -> SDoc
 pprWordArray lbl ds
-  = hcat [ pprLocalness lbl, ptext SLIT("StgWord")
-         , space, pprCLabel lbl, ptext SLIT("[] = {") ] 
+  = hcat [ pprLocalness lbl, ptext (sLit "StgWord")
+         , space, pprCLabel lbl, ptext (sLit "[] = {") ] 
     $$ nest 8 (commafy (pprStatics ds))
-    $$ ptext SLIT("};")
+    $$ ptext (sLit "};")
 
 --
 -- has to be static, if it isn't globally visible
 --
 pprLocalness :: CLabel -> SDoc
-pprLocalness lbl | not $ externallyVisibleCLabel lbl = ptext SLIT("static ")
+pprLocalness lbl | not $ externallyVisibleCLabel lbl = ptext (sLit "static ")
                  | otherwise = empty
 
 -- --------------------------------------------------------------------------
@@ -184,17 +182,17 @@ pprStmt :: CmmStmt -> SDoc
 
 pprStmt stmt = case stmt of
     CmmNop       -> empty
-    CmmComment s -> (hang (ptext SLIT("/*")) 3 (ftext s)) $$ ptext SLIT("*/")
+    CmmComment s -> (hang (ptext (sLit "/*")) 3 (ftext s)) $$ ptext (sLit "*/")
 
     CmmAssign dest src -> pprAssign dest src
 
     CmmStore  dest src
 	| rep == I64 && wordRep /= I64
-	-> ptext SLIT("ASSIGN_Word64") <> 
+	-> ptext (sLit "ASSIGN_Word64") <> 
 		parens (mkP_ <> pprExpr1 dest <> comma <> pprExpr src) <> semi
 
 	| rep == F64 && wordRep /= I64
-	-> ptext SLIT("ASSIGN_DBL") <> 
+	-> ptext (sLit "ASSIGN_DBL") <> 
 		parens (mkP_ <> pprExpr1 dest <> comma <> pprExpr src) <> semi
 
  	| otherwise
@@ -212,7 +210,7 @@ pprStmt stmt = case stmt of
     	maybe_proto = 
             case fn of
 	      CmmLit (CmmLabel lbl) | not (isMathFun lbl) -> 
-                  ptext SLIT(";EI_(") <+> pprCLabel lbl <> char ')' <> semi
+                  ptext (sLit ";EI_(") <+> pprCLabel lbl <> char ')' <> semi
                         -- we declare all called functions as data labels,
                         -- and then cast them to the right type when calling.
                         -- This is because the label might already have a 
@@ -239,7 +237,7 @@ pprCFunType ppr_fn cconv ress args
     parens (text (ccallConvAttribute cconv) <>  ppr_fn) <>
     parens (commafy (map arg_type args))
   where
-	res_type [] = ptext SLIT("void")
+	res_type [] = ptext (sLit "void")
 	res_type [CmmHinted one hint] = machRepHintCType (localRegRep one) hint
 
 	arg_type (CmmHinted expr hint) = machRepHintCType (cmmExprRep expr) hint
@@ -247,15 +245,15 @@ pprCFunType ppr_fn cconv ress args
 -- ---------------------------------------------------------------------
 -- unconditional branches
 pprBranch :: BlockId -> SDoc
-pprBranch ident = ptext SLIT("goto") <+> pprBlockId ident <> semi
+pprBranch ident = ptext (sLit "goto") <+> pprBlockId ident <> semi
 
 
 -- ---------------------------------------------------------------------
 -- conditional branches to local labels
 pprCondBranch :: CmmExpr -> BlockId -> SDoc
 pprCondBranch expr ident 
-        = hsep [ ptext SLIT("if") , parens(pprExpr expr) ,
-                        ptext SLIT("goto") , (pprBlockId ident) <> semi ]
+        = hsep [ ptext (sLit "if") , parens(pprExpr expr) ,
+                        ptext (sLit "goto") , (pprBlockId ident) <> semi ]
 
 
 -- ---------------------------------------------------------------------
@@ -272,7 +270,7 @@ pprSwitch e maybe_ids
   = let pairs  = [ (ix, ident) | (ix,Just ident) <- zip [0..] maybe_ids ]
 	pairs2 = [ (map fst as, snd (head as)) | as <- groupBy sndEq pairs ]
     in 
-        (hang (ptext SLIT("switch") <+> parens ( pprExpr e ) <+> lbrace)
+        (hang (ptext (sLit "switch") <+> parens ( pprExpr e ) <+> lbrace)
                 4 (vcat ( map caseify pairs2 )))
         $$ rbrace
 
@@ -283,12 +281,12 @@ pprSwitch e maybe_ids
     caseify (ix:ixs, ident) = vcat (map do_fallthrough ixs) $$ final_branch ix
 	where 
 	do_fallthrough ix =
-                 hsep [ ptext SLIT("case") , pprHexVal ix wordRep <> colon ,
-                        ptext SLIT("/* fall through */") ]
+                 hsep [ ptext (sLit "case") , pprHexVal ix wordRep <> colon ,
+                        ptext (sLit "/* fall through */") ]
 
 	final_branch ix = 
-	        hsep [ ptext SLIT("case") , pprHexVal ix wordRep <> colon ,
-                       ptext SLIT("goto") , (pprBlockId ident) <> semi ]
+	        hsep [ ptext (sLit "case") , pprHexVal ix wordRep <> colon ,
+                       ptext (sLit "goto") , (pprBlockId ident) <> semi ]
 
 -- ---------------------------------------------------------------------
 -- Expressions.
@@ -309,10 +307,10 @@ pprExpr e = case e of
     CmmLit lit -> pprLit lit
 
     CmmLoad e I64 | wordRep /= I64
-	-> ptext SLIT("PK_Word64") <> parens (mkP_ <> pprExpr1 e)
+	-> ptext (sLit "PK_Word64") <> parens (mkP_ <> pprExpr1 e)
 
     CmmLoad e F64 | wordRep /= I64
-	-> ptext SLIT("PK_DBL") <> parens (mkP_ <> pprExpr1 e)
+	-> ptext (sLit "PK_DBL") <> parens (mkP_ <> pprExpr1 e)
 
     CmmLoad (CmmReg r) rep 
 	| isPtrReg r && rep == wordRep
@@ -355,7 +353,7 @@ pprMachOpApp :: MachOp -> [CmmExpr] -> SDoc
 
 pprMachOpApp op args
   | isMulMayOfloOp op
-  = ptext SLIT("mulIntMayOflo") <> parens (commafy (map pprExpr args))
+  = ptext (sLit "mulIntMayOflo") <> parens (commafy (map pprExpr args))
   where isMulMayOfloOp (MO_U_MulMayOflo _) = True
 	isMulMayOfloOp (MO_S_MulMayOflo _) = True
 	isMulMayOfloOp _ = False
@@ -452,7 +450,7 @@ pprStatic :: CmmStatic -> SDoc
 pprStatic s = case s of
 
     CmmStaticLit lit   -> nest 4 (pprLit lit)
-    CmmAlign i         -> nest 4 (ptext SLIT("/* align */") <+> int i)
+    CmmAlign i         -> nest 4 (ptext (sLit "/* align */") <+> int i)
     CmmDataLabel clbl  -> pprCLabel clbl <> colon
     CmmUninitialised i -> nest 4 (mkC_ <> brackets (int i))
 
@@ -477,8 +475,8 @@ pprMachOp_for_C mop = case mop of
         -- Integer operations
         MO_Add          _ -> char '+'
         MO_Sub          _ -> char '-'
-        MO_Eq           _ -> ptext SLIT("==")
-        MO_Ne           _ -> ptext SLIT("!=")
+        MO_Eq           _ -> ptext (sLit "==")
+        MO_Ne           _ -> ptext (sLit "!=")
         MO_Mul          _ -> char '*'
 
         MO_S_Quot       _ -> char '/'
@@ -490,13 +488,13 @@ pprMachOp_for_C mop = case mop of
 
         -- Signed comparisons (floating-point comparisons also use these)
         -- & Unsigned comparisons
-        MO_S_Ge         _ -> ptext SLIT(">=")
-        MO_S_Le         _ -> ptext SLIT("<=")
+        MO_S_Ge         _ -> ptext (sLit ">=")
+        MO_S_Le         _ -> ptext (sLit "<=")
         MO_S_Gt         _ -> char '>'
         MO_S_Lt         _ -> char '<'
 
-        MO_U_Ge         _ -> ptext SLIT(">=")
-        MO_U_Le         _ -> ptext SLIT("<=")
+        MO_U_Ge         _ -> ptext (sLit ">=")
+        MO_U_Le         _ -> ptext (sLit "<=")
         MO_U_Gt         _ -> char '>'
         MO_U_Lt         _ -> char '<'
 
@@ -506,9 +504,9 @@ pprMachOp_for_C mop = case mop of
         MO_Or           _ -> char '|'
         MO_Xor          _ -> char '^'
         MO_Not          _ -> char '~'
-        MO_Shl          _ -> ptext SLIT("<<")
-        MO_U_Shr        _ -> ptext SLIT(">>") -- unsigned shift right
-        MO_S_Shr        _ -> ptext SLIT(">>") -- signed shift right
+        MO_Shl          _ -> ptext (sLit "<<")
+        MO_U_Shr        _ -> ptext (sLit ">>") -- unsigned shift right
+        MO_S_Shr        _ -> ptext (sLit ">>") -- signed shift right
 
 -- Conversions.  Some of these will be NOPs.
 -- Floating-point conversions use the signed variant.
@@ -551,33 +549,33 @@ pprCallishMachOp_for_C :: CallishMachOp -> SDoc
 
 pprCallishMachOp_for_C mop 
     = case mop of
-        MO_F64_Pwr  -> ptext SLIT("pow")
-        MO_F64_Sin  -> ptext SLIT("sin")
-        MO_F64_Cos  -> ptext SLIT("cos")
-        MO_F64_Tan  -> ptext SLIT("tan")
-        MO_F64_Sinh -> ptext SLIT("sinh")
-        MO_F64_Cosh -> ptext SLIT("cosh")
-        MO_F64_Tanh -> ptext SLIT("tanh")
-        MO_F64_Asin -> ptext SLIT("asin")
-        MO_F64_Acos -> ptext SLIT("acos")
-        MO_F64_Atan -> ptext SLIT("atan")
-        MO_F64_Log  -> ptext SLIT("log")
-        MO_F64_Exp  -> ptext SLIT("exp")
-        MO_F64_Sqrt -> ptext SLIT("sqrt")
-        MO_F32_Pwr  -> ptext SLIT("powf")
-        MO_F32_Sin  -> ptext SLIT("sinf")
-        MO_F32_Cos  -> ptext SLIT("cosf")
-        MO_F32_Tan  -> ptext SLIT("tanf")
-        MO_F32_Sinh -> ptext SLIT("sinhf")
-        MO_F32_Cosh -> ptext SLIT("coshf")
-        MO_F32_Tanh -> ptext SLIT("tanhf")
-        MO_F32_Asin -> ptext SLIT("asinf")
-        MO_F32_Acos -> ptext SLIT("acosf")
-        MO_F32_Atan -> ptext SLIT("atanf")
-        MO_F32_Log  -> ptext SLIT("logf")
-        MO_F32_Exp  -> ptext SLIT("expf")
-        MO_F32_Sqrt -> ptext SLIT("sqrtf")
-	MO_WriteBarrier -> ptext SLIT("write_barrier")
+        MO_F64_Pwr  -> ptext (sLit "pow")
+        MO_F64_Sin  -> ptext (sLit "sin")
+        MO_F64_Cos  -> ptext (sLit "cos")
+        MO_F64_Tan  -> ptext (sLit "tan")
+        MO_F64_Sinh -> ptext (sLit "sinh")
+        MO_F64_Cosh -> ptext (sLit "cosh")
+        MO_F64_Tanh -> ptext (sLit "tanh")
+        MO_F64_Asin -> ptext (sLit "asin")
+        MO_F64_Acos -> ptext (sLit "acos")
+        MO_F64_Atan -> ptext (sLit "atan")
+        MO_F64_Log  -> ptext (sLit "log")
+        MO_F64_Exp  -> ptext (sLit "exp")
+        MO_F64_Sqrt -> ptext (sLit "sqrt")
+        MO_F32_Pwr  -> ptext (sLit "powf")
+        MO_F32_Sin  -> ptext (sLit "sinf")
+        MO_F32_Cos  -> ptext (sLit "cosf")
+        MO_F32_Tan  -> ptext (sLit "tanf")
+        MO_F32_Sinh -> ptext (sLit "sinhf")
+        MO_F32_Cosh -> ptext (sLit "coshf")
+        MO_F32_Tanh -> ptext (sLit "tanhf")
+        MO_F32_Asin -> ptext (sLit "asinf")
+        MO_F32_Acos -> ptext (sLit "acosf")
+        MO_F32_Atan -> ptext (sLit "atanf")
+        MO_F32_Log  -> ptext (sLit "logf")
+        MO_F32_Exp  -> ptext (sLit "expf")
+        MO_F32_Sqrt -> ptext (sLit "sqrtf")
+	MO_WriteBarrier -> ptext (sLit "write_barrier")
 
 -- ---------------------------------------------------------------------
 -- Useful #defines
@@ -585,32 +583,32 @@ pprCallishMachOp_for_C mop
 
 mkJMP_, mkFN_, mkIF_ :: SDoc -> SDoc
 
-mkJMP_ i = ptext SLIT("JMP_") <> parens i
-mkFN_  i = ptext SLIT("FN_")  <> parens i -- externally visible function
-mkIF_  i = ptext SLIT("IF_")  <> parens i -- locally visible
+mkJMP_ i = ptext (sLit "JMP_") <> parens i
+mkFN_  i = ptext (sLit "FN_")  <> parens i -- externally visible function
+mkIF_  i = ptext (sLit "IF_")  <> parens i -- locally visible
 
 
 mkFB_, mkFE_ :: SDoc
-mkFB_ = ptext SLIT("FB_") -- function code begin
-mkFE_ = ptext SLIT("FE_") -- function code end
+mkFB_ = ptext (sLit "FB_") -- function code begin
+mkFE_ = ptext (sLit "FE_") -- function code end
 
 -- from includes/Stg.h
 --
 mkC_,mkW_,mkP_,mkPP_,mkI_,mkA_,mkD_,mkF_,mkB_,mkL_,mkLI_,mkLW_ :: SDoc
 
-mkC_  = ptext SLIT("(C_)")        -- StgChar
-mkW_  = ptext SLIT("(W_)")        -- StgWord
-mkP_  = ptext SLIT("(P_)")        -- StgWord*
-mkPP_ = ptext SLIT("(PP_)")       -- P_*
-mkI_  = ptext SLIT("(I_)")        -- StgInt
-mkA_  = ptext SLIT("(A_)")        -- StgAddr
-mkD_  = ptext SLIT("(D_)")        -- const StgWord*
-mkF_  = ptext SLIT("(F_)")        -- StgFunPtr
-mkB_  = ptext SLIT("(B_)")        -- StgByteArray
-mkL_  = ptext SLIT("(L_)")        -- StgClosurePtr
+mkC_  = ptext (sLit "(C_)")        -- StgChar
+mkW_  = ptext (sLit "(W_)")        -- StgWord
+mkP_  = ptext (sLit "(P_)")        -- StgWord*
+mkPP_ = ptext (sLit "(PP_)")       -- P_*
+mkI_  = ptext (sLit "(I_)")        -- StgInt
+mkA_  = ptext (sLit "(A_)")        -- StgAddr
+mkD_  = ptext (sLit "(D_)")        -- const StgWord*
+mkF_  = ptext (sLit "(F_)")        -- StgFunPtr
+mkB_  = ptext (sLit "(B_)")        -- StgByteArray
+mkL_  = ptext (sLit "(L_)")        -- StgClosurePtr
 
-mkLI_ = ptext SLIT("(LI_)")       -- StgInt64
-mkLW_ = ptext SLIT("(LW_)")       -- StgWord64
+mkLI_ = ptext (sLit "(LI_)")       -- StgInt64
+mkLW_ = ptext (sLit "(LW_)")       -- StgWord64
 
 
 -- ---------------------------------------------------------------------
@@ -644,8 +642,8 @@ pprAssign r1 r2
   | Just ty <- strangeRegType r1 = mkAssign (parens ty <> pprExpr1 r2)
   | otherwise                    = mkAssign (pprExpr r2)
     where mkAssign x = if r1 == CmmGlobal BaseReg
-                       then ptext SLIT("ASSIGN_BaseReg") <> parens x <> semi
-                       else pprReg r1 <> ptext SLIT(" = ") <> x <> semi
+                       then ptext (sLit "ASSIGN_BaseReg") <> parens x <> semi
+                       else pprReg r1 <> ptext (sLit " = ") <> x <> semi
 
 -- ---------------------------------------------------------------------
 -- Registers
@@ -688,9 +686,9 @@ isStrangeTypeGlobal BaseReg	 	= True
 isStrangeTypeGlobal r 			= isFixedPtrGlobalReg r
 
 strangeRegType :: CmmReg -> Maybe SDoc
-strangeRegType (CmmGlobal CurrentTSO) = Just (ptext SLIT("struct StgTSO_ *"))
-strangeRegType (CmmGlobal CurrentNursery) = Just (ptext SLIT("struct bdescr_ *"))
-strangeRegType (CmmGlobal BaseReg) = Just (ptext SLIT("struct StgRegTable_ *"))
+strangeRegType (CmmGlobal CurrentTSO) = Just (ptext (sLit "struct StgTSO_ *"))
+strangeRegType (CmmGlobal CurrentNursery) = Just (ptext (sLit "struct bdescr_ *"))
+strangeRegType (CmmGlobal BaseReg) = Just (ptext (sLit "struct StgRegTable_ *"))
 strangeRegType _ = Nothing
 
 -- pprReg just prints the register name.
@@ -701,25 +699,25 @@ pprReg r = case r of
         CmmGlobal global -> pprGlobalReg global
 		
 pprAsPtrReg :: CmmReg -> SDoc
-pprAsPtrReg (CmmGlobal (VanillaReg n)) = char 'R' <> int n <> ptext SLIT(".p")
+pprAsPtrReg (CmmGlobal (VanillaReg n)) = char 'R' <> int n <> ptext (sLit ".p")
 pprAsPtrReg other_reg = pprReg other_reg
 
 pprGlobalReg :: GlobalReg -> SDoc
 pprGlobalReg gr = case gr of
-    VanillaReg n   -> char 'R' <> int n  <> ptext SLIT(".w")
+    VanillaReg n   -> char 'R' <> int n  <> ptext (sLit ".w")
     FloatReg   n   -> char 'F' <> int n
     DoubleReg  n   -> char 'D' <> int n
     LongReg    n   -> char 'L' <> int n
-    Sp             -> ptext SLIT("Sp")
-    SpLim          -> ptext SLIT("SpLim")
-    Hp             -> ptext SLIT("Hp")
-    HpLim          -> ptext SLIT("HpLim")
-    CurrentTSO     -> ptext SLIT("CurrentTSO")
-    CurrentNursery -> ptext SLIT("CurrentNursery")
-    HpAlloc        -> ptext SLIT("HpAlloc")
-    BaseReg        -> ptext SLIT("BaseReg")
-    GCEnter1       -> ptext SLIT("stg_gc_enter_1")
-    GCFun          -> ptext SLIT("stg_gc_fun")
+    Sp             -> ptext (sLit "Sp")
+    SpLim          -> ptext (sLit "SpLim")
+    Hp             -> ptext (sLit "Hp")
+    HpLim          -> ptext (sLit "HpLim")
+    CurrentTSO     -> ptext (sLit "CurrentTSO")
+    CurrentNursery -> ptext (sLit "CurrentNursery")
+    HpAlloc        -> ptext (sLit "HpAlloc")
+    BaseReg        -> ptext (sLit "BaseReg")
+    GCEnter1       -> ptext (sLit "stg_gc_enter_1")
+    GCFun          -> ptext (sLit "stg_gc_fun")
 
 pprLocalReg :: LocalReg -> SDoc
 pprLocalReg (LocalReg uniq _ _) = char '_' <> ppr uniq
@@ -744,14 +742,14 @@ pprCall ppr_fn cconv results args _
 	-- machine registers that are also used for passing arguments in the
 	-- C calling convention.
     (if (not opt_Unregisterised) 
-	then ptext SLIT("__DISCARD__();") 
+	then ptext (sLit "__DISCARD__();") 
 	else empty) $$
 #endif
     ppr_assign results (ppr_fn <> parens (commafy (map pprArg args))) <> semi
   where 
      ppr_assign []           rhs = rhs
      ppr_assign [CmmHinted one hint] rhs
-	 = pprLocalReg one <> ptext SLIT(" = ")
+	 = pprLocalReg one <> ptext (sLit " = ")
 		 <> pprUnHint hint (localRegRep one) <> rhs
      ppr_assign _other _rhs = panic "pprCall: multiple results"
 
@@ -803,8 +801,8 @@ pprExternDecl in_srt lbl
 	hcat [ visibility, label_type (labelType lbl), 
 	       lparen, pprCLabel lbl, text ");" ]
  where
-  label_type CodeLabel = ptext SLIT("F_")
-  label_type DataLabel = ptext SLIT("I_")
+  label_type CodeLabel = ptext (sLit "F_")
+  label_type DataLabel = ptext (sLit "I_")
 
   visibility
      | externallyVisibleCLabel lbl = char 'E'
@@ -871,11 +869,11 @@ cCast ty expr = parens ty <> pprExpr1 expr
 cLoad :: CmmExpr -> MachRep -> SDoc
 #ifdef BEWARE_LOAD_STORE_ALIGNMENT
 cLoad expr rep =
-    let decl = machRepCType rep <+> ptext SLIT("x") <> semi
-        struct = ptext SLIT("struct") <+> braces (decl)
-        packed_attr = ptext SLIT("__attribute__((packed))")
+    let decl = machRepCType rep <+> ptext (sLit "x") <> semi
+        struct = ptext (sLit "struct") <+> braces (decl)
+        packed_attr = ptext (sLit "__attribute__((packed))")
         cast = parens (struct <+> packed_attr <> char '*')
-    in parens (cast <+> pprExpr1 expr) <> ptext SLIT("->x")
+    in parens (cast <+> pprExpr1 expr) <> ptext (sLit "->x")
 #else
 cLoad expr rep = char '*' <> parens (cCast (machRepPtrCType rep) expr)
 #endif
@@ -884,36 +882,36 @@ cLoad expr rep = char '*' <> parens (cCast (machRepPtrCType rep) expr)
 -- argument, we always cast the argument to (void *), to avoid warnings from
 -- the C compiler.
 machRepHintCType :: MachRep -> MachHint -> SDoc
-machRepHintCType rep PtrHint    = ptext SLIT("void *")
+machRepHintCType rep PtrHint    = ptext (sLit "void *")
 machRepHintCType rep SignedHint = machRepSignedCType rep
 machRepHintCType rep _other     = machRepCType rep
 
 machRepPtrCType :: MachRep -> SDoc
-machRepPtrCType r | r == wordRep = ptext SLIT("P_")
+machRepPtrCType r | r == wordRep = ptext (sLit "P_")
 	          | otherwise    = machRepCType r <> char '*'
 
 machRepCType :: MachRep -> SDoc
-machRepCType r | r == wordRep = ptext SLIT("W_")
+machRepCType r | r == wordRep = ptext (sLit "W_")
 	       | otherwise    = sized_type
   where sized_type = case r of
-			I8	-> ptext SLIT("StgWord8")
-			I16	-> ptext SLIT("StgWord16")
-			I32	-> ptext SLIT("StgWord32")
-			I64	-> ptext SLIT("StgWord64")
-			F32	-> ptext SLIT("StgFloat") -- ToDo: correct?
-			F64	-> ptext SLIT("StgDouble")
+			I8	-> ptext (sLit "StgWord8")
+			I16	-> ptext (sLit "StgWord16")
+			I32	-> ptext (sLit "StgWord32")
+			I64	-> ptext (sLit "StgWord64")
+			F32	-> ptext (sLit "StgFloat") -- ToDo: correct?
+			F64	-> ptext (sLit "StgDouble")
 			_  -> panic "machRepCType"
 
 machRepSignedCType :: MachRep -> SDoc
-machRepSignedCType r | r == wordRep = ptext SLIT("I_")
+machRepSignedCType r | r == wordRep = ptext (sLit "I_")
                      | otherwise    = sized_type
   where sized_type = case r of
-			I8	-> ptext SLIT("StgInt8")
-			I16	-> ptext SLIT("StgInt16")
-			I32	-> ptext SLIT("StgInt32")
-			I64	-> ptext SLIT("StgInt64")
-			F32	-> ptext SLIT("StgFloat") -- ToDo: correct?
-			F64	-> ptext SLIT("StgDouble")
+			I8	-> ptext (sLit "StgInt8")
+			I16	-> ptext (sLit "StgInt16")
+			I32	-> ptext (sLit "StgInt32")
+			I64	-> ptext (sLit "StgInt64")
+			F32	-> ptext (sLit "StgFloat") -- ToDo: correct?
+			F64	-> ptext (sLit "StgDouble")
 			_ -> panic "machRepCType"
 
 -- ---------------------------------------------------------------------
@@ -997,10 +995,10 @@ commafy xs = hsep $ punctuate comma xs
 
 -- Print in C hex format: 0x13fa
 pprHexVal :: Integer -> MachRep -> SDoc
-pprHexVal 0 _ = ptext SLIT("0x0")
+pprHexVal 0 _ = ptext (sLit "0x0")
 pprHexVal w rep
-  | w < 0     = parens (char '-' <> ptext SLIT("0x") <> go (-w) <> repsuffix rep)
-  | otherwise = ptext SLIT("0x") <> go w <> repsuffix rep
+  | w < 0     = parens (char '-' <> ptext (sLit "0x") <> go (-w) <> repsuffix rep)
+  | otherwise = ptext (sLit "0x") <> go w <> repsuffix rep
   where
   	-- type suffix for literals:
 	-- Integer literals are unsigned in Cmm/C.  We explicitly cast to
@@ -1009,9 +1007,9 @@ pprHexVal w rep
 	-- warnings about integer overflow from gcc.
 
 	-- on 32-bit platforms, add "ULL" to 64-bit literals
-      repsuffix I64 | wORD_SIZE == 4 = ptext SLIT("ULL")
+      repsuffix I64 | wORD_SIZE == 4 = ptext (sLit "ULL")
       	-- on 64-bit platforms with 32-bit int, add "L" to 64-bit literals
-      repsuffix I64 | cINT_SIZE == 4 = ptext SLIT("UL")
+      repsuffix I64 | cINT_SIZE == 4 = ptext (sLit "UL")
       repsuffix _ = char 'U'
       
       go 0 = empty
