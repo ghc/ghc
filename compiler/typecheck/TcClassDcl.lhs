@@ -743,57 +743,57 @@ tcAddDeclCtxt decl thing_inside
      maybeInst | isFamInstDecl decl = " instance"
 	       | otherwise          = ""
 
-     ctxt = hsep [ptext SLIT("In the"), text thing, 
-		  ptext SLIT("declaration for"), quotes (ppr (tcdName decl))]
+     ctxt = hsep [ptext (sLit "In the"), text thing, 
+		  ptext (sLit "declaration for"), quotes (ppr (tcdName decl))]
 
 defltMethCtxt clas
-  = ptext SLIT("When checking the default methods for class") <+> quotes (ppr clas)
+  = ptext (sLit "When checking the default methods for class") <+> quotes (ppr clas)
 
 methodCtxt sel_id
-  = ptext SLIT("In the definition for method") <+> quotes (ppr sel_id)
+  = ptext (sLit "In the definition for method") <+> quotes (ppr sel_id)
 
 badMethodErr clas op
-  = hsep [ptext SLIT("Class"), quotes (ppr clas), 
-	  ptext SLIT("does not have a method"), quotes (ppr op)]
+  = hsep [ptext (sLit "Class"), quotes (ppr clas), 
+	  ptext (sLit "does not have a method"), quotes (ppr op)]
 
 badATErr clas at
-  = hsep [ptext SLIT("Class"), quotes (ppr clas), 
-	  ptext SLIT("does not have an associated type"), quotes (ppr at)]
+  = hsep [ptext (sLit "Class"), quotes (ppr clas), 
+	  ptext (sLit "does not have an associated type"), quotes (ppr at)]
 
 omittedMethodWarn sel_id
-  = ptext SLIT("No explicit method nor default method for") <+> quotes (ppr sel_id)
+  = ptext (sLit "No explicit method nor default method for") <+> quotes (ppr sel_id)
 
 omittedATWarn at
-  = ptext SLIT("No explicit AT declaration for") <+> quotes (ppr at)
+  = ptext (sLit "No explicit AT declaration for") <+> quotes (ppr at)
 
 badGenericInstance sel_id because
-  = sep [ptext SLIT("Can't derive generic code for") <+> quotes (ppr sel_id),
+  = sep [ptext (sLit "Can't derive generic code for") <+> quotes (ppr sel_id),
 	 because]
 
 notSimple inst_tys
-  = vcat [ptext SLIT("because the instance type(s)"), 
+  = vcat [ptext (sLit "because the instance type(s)"), 
 	  nest 2 (ppr inst_tys),
-	  ptext SLIT("is not a simple type of form (T a1 ... an)")]
+	  ptext (sLit "is not a simple type of form (T a1 ... an)")]
 
 notGeneric tycon
-  = vcat [ptext SLIT("because the instance type constructor") <+> quotes (ppr tycon) <+> 
-	  ptext SLIT("was not compiled with -fgenerics")]
+  = vcat [ptext (sLit "because the instance type constructor") <+> quotes (ppr tycon) <+> 
+	  ptext (sLit "was not compiled with -fgenerics")]
 
 badGenericInstanceType binds
-  = vcat [ptext SLIT("Illegal type pattern in the generic bindings"),
+  = vcat [ptext (sLit "Illegal type pattern in the generic bindings"),
 	  nest 4 (ppr binds)]
 
 missingGenericInstances missing
-  = ptext SLIT("Missing type patterns for") <+> pprQuotedList missing
+  = ptext (sLit "Missing type patterns for") <+> pprQuotedList missing
 	  
 dupGenericInsts tc_inst_infos
-  = vcat [ptext SLIT("More than one type pattern for a single generic type constructor:"),
+  = vcat [ptext (sLit "More than one type pattern for a single generic type constructor:"),
 	  nest 4 (vcat (map ppr_inst_ty tc_inst_infos)),
-	  ptext SLIT("All the type patterns for a generic type constructor must be identical")
+	  ptext (sLit "All the type patterns for a generic type constructor must be identical")
     ]
   where 
     ppr_inst_ty (_,inst) = ppr (simpleInstInfoTy inst)
 
 mixedGenericErr op
-  = ptext SLIT("Can't mix generic and non-generic equations for class method") <+> quotes (ppr op)
+  = ptext (sLit "Can't mix generic and non-generic equations for class method") <+> quotes (ppr op)
 \end{code}
