@@ -14,8 +14,6 @@
 
 module TcDefaults ( tcDefaults ) where
 
-#include "HsVersions.h"
-
 import HsSyn
 import Name
 import Class
@@ -87,19 +85,19 @@ check_instance ty cls
   = do	{ (_, mb_res) <- tryTc (tcSimplifyDefault [mkClassPred cls [ty]])
 	; return (isJust mb_res) }
     
-defaultDeclCtxt = ptext SLIT("When checking the types in a default declaration")
+defaultDeclCtxt = ptext (sLit "When checking the types in a default declaration")
 
 dupDefaultDeclErr (L _ (DefaultDecl _) : dup_things)
-  = hang (ptext SLIT("Multiple default declarations"))
+  = hang (ptext (sLit "Multiple default declarations"))
       4  (vcat (map pp dup_things))
   where
-    pp (L locn (DefaultDecl _)) = ptext SLIT("here was another default declaration") <+> ppr locn
+    pp (L locn (DefaultDecl _)) = ptext (sLit "here was another default declaration") <+> ppr locn
 
 polyDefErr ty 
-  = hang (ptext SLIT("Illegal polymorphic type in default declaration") <> colon) 4 (ppr ty) 
+  = hang (ptext (sLit "Illegal polymorphic type in default declaration") <> colon) 4 (ppr ty) 
 
 badDefaultTy ty deflt_clss
-  = hang (ptext SLIT("The default type") <+> quotes (ppr ty) <+> ptext SLIT("is not an instance of"))
-       2 (foldr1 (\a b -> a <+> ptext SLIT("or") <+> b) (map (quotes. ppr) deflt_clss))
+  = hang (ptext (sLit "The default type") <+> quotes (ppr ty) <+> ptext (sLit "is not an instance of"))
+       2 (foldr1 (\a b -> a <+> ptext (sLit "or") <+> b) (map (quotes. ppr) deflt_clss))
 \end{code}
 
