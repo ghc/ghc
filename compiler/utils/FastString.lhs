@@ -62,13 +62,15 @@ module FastString
         LitString,
 #if defined(__GLASGOW_HASKELL__)
         mkLitString#,
-#else
-        mkLitString,
 #endif
+        mkLitString,
         unpackLitString,
         strLength,
 
-        ptrStrLength
+        ptrStrLength,
+
+        sLit,
+        fsLit,
        ) where
 
 #include "HsVersions.h"
@@ -85,12 +87,13 @@ import System.IO
 import System.IO.Unsafe ( unsafePerformIO )
 import Data.IORef       ( IORef, newIORef, readIORef, writeIORef )
 import Data.Maybe       ( isJust )
-#if !defined(__GLASGOW_HASKELL__)
 import Data.Char        ( ord )
-#endif
 
 import GHC.IOBase       ( IO(..) )
 import GHC.Ptr          ( Ptr(..) )
+#if defined(__GLASGOW_HASKELL__)
+import GHC.Base         ( unpackCString# )
+#endif
 
 #define hASH_TBL_SIZE          4091
 #define hASH_TBL_SIZE_UNBOXED  4091#
@@ -500,7 +503,7 @@ type LitString = Ptr Word8
 #if defined(__GLASGOW_HASKELL__)
 mkLitString# :: Addr# -> LitString
 mkLitString# a# = Ptr a#
-#else
+#endif
 --can/should we use FastTypes here?
 --Is this likely to be memory-preserving if only used on constant strings?
 --should we inline it? If lucky, that would make a CAF that wouldn't
@@ -519,10 +522,12 @@ mkLitString s =
      loop n (c:cs) = do
         pokeByteOff p n (fromIntegral (ord c) :: Word8)
         loop (1+n) cs
+     -- XXX GHC isn't smart enough to know that we have already covered
+     -- this case.
+     loop _ [] = panic "mkLitString"
    loop 0 s
    return p
  )
-#endif
 
 unpackLitString :: LitString -> String
 unpackLitString p_ = case pUnbox p_ of
@@ -571,4 +576,17 @@ pokeCAString ptr str =
 #if defined(__GLASGOW_HASKELL__) && __GLASGOW_HASKELL__ <= 602
 peekCAStringLen = peekCStringLen
 #endif
+
+{-# NOINLINE sLit #-}
+sLit :: String -> LitString
+sLit x  = mkLitString x
+
+{-# NOINLINE fsLit #-}
+fsLit :: String -> FastString
+fsLit x = mkFastString x
+
+{-# RULES "slit"
+    forall x . sLit  (unpackCString# x) = mkLitString#  x #-}
+{-# RULES "fslit"
+    forall x . fsLit (unpackCString# x) = mkFastString# x #-}
 \end{code}

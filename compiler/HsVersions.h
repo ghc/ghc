@@ -60,14 +60,6 @@ name = Util.global (value);
 #define WARN(e,msg)    if False && (e) then pprPanic "WARN" (msg) else
 #endif
 
-#if defined(__GLASGOW_HASKELL__)
-#define SLIT(x)	 (FastString.mkLitString# (x#))
-#define FSLIT(x) (FastString.mkFastString# (x#))
-#else
-#define SLIT(x)  (FastString.mkLitString (x))
-#define FSLIT(x) (FastString.mkFastString (x))
-#endif
-
 -- Useful for declaring arguments to be strict
 #define STRICT1(f) f a | a `seq` False = undefined
 #define STRICT2(f) f a b | a `seq` b `seq` False = undefined
