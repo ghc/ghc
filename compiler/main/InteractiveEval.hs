@@ -37,8 +37,6 @@ module InteractiveEval (
 
 #ifdef GHCI
 
-#include "HsVersions.h"
-
 import HscMain          hiding (compileExpr)
 import HscTypes
 import TcRnDriver
@@ -497,7 +495,7 @@ moveHist fn (Session ref) = do
 -- -----------------------------------------------------------------------------
 -- After stopping at a breakpoint, add free variables to the environment
 result_fs :: FastString
-result_fs = FSLIT("_result")
+result_fs = fsLit "_result"
 
 bindLocalsAtBreakpoint
         :: HscEnv
@@ -510,9 +508,9 @@ bindLocalsAtBreakpoint
 -- bind, all we can do is bind a local variable to the exception
 -- value.
 bindLocalsAtBreakpoint hsc_env apStack Nothing = do
-   let exn_fs    = FSLIT("_exception")
+   let exn_fs    = fsLit "_exception"
        exn_name  = mkInternalName (getUnique exn_fs) (mkVarOccFS exn_fs) span
-       e_fs      = FSLIT("e")
+       e_fs      = fsLit "e"
        e_name    = mkInternalName (getUnique e_fs) (mkTyVarOcc e_fs) span
        e_tyvar   = mkTcTyVar e_name liftedTypeKind (SkolemTv RuntimeUnkSkol)
        exn_id    = Id.mkGlobalId VanillaGlobal exn_name (mkTyVarTy e_tyvar)
@@ -522,7 +520,7 @@ bindLocalsAtBreakpoint hsc_env apStack Nothing = do
        ictxt0 = hsc_IC hsc_env
        ictxt1 = extendInteractiveContext ictxt0 [exn_id] new_tyvars
 
-       span = mkGeneralSrcSpan FSLIT("<exception thrown>")
+       span = mkGeneralSrcSpan (fsLit "<exception thrown>")
    --
    Linker.extendLinkEnv [(exn_name, unsafeCoerce# apStack)]
    return (hsc_env{ hsc_IC = ictxt1 }, [exn_name], span)
