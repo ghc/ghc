@@ -175,8 +175,6 @@ module Pretty (
         render, fullRender, printDoc, showDocWith
   ) where
 
-#include "HsVersions.h"
-
 import BufWrite
 import FastString
 import FastTypes
@@ -974,7 +972,7 @@ display mode page_width ribbon_width txt end doc
         lay2 _ _                   = panic "display/lay2: Unhandled case"
 
         -- optimise long indentations using LitString chunks of 8 spaces
-        indent n r | n >=# _ILIT(8) = LStr SLIT("        ") (_ILIT(8)) `txt`
+        indent n r | n >=# _ILIT(8) = LStr (sLit "        ") (_ILIT(8)) `txt`
                                       indent (n -# _ILIT(8)) r
                    | otherwise      = Str (spaces n) `txt` r
     in
