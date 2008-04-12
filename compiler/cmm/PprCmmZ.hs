@@ -4,8 +4,6 @@ module PprCmmZ
     )
 where
 
-#include "HsVersions.h"
-
 import Cmm
 import CmmExpr
 import ForeignCall
@@ -83,7 +81,7 @@ pprCmmGraphLikeCmm g = vcat (swallow blocks)
                          let call = CmmCall tgt' ress args (CmmSafe srt) CmmMayReturn
                              tgt' = CmmCallee tgt (cconv_of_conv conv)
                              delayed =
-                                 ptext SLIT("// delayed CopyIn follows previous call")
+                                 ptext (sLit "// delayed CopyIn follows previous call")
                          in  tail id (delayed : ppr call : prev') Nothing t bs
                    | otherwise -> endblock $ with_out out l
           findCopyIn (Z.ZTail (G.CopyIn _ ress srt) _) = Just (ress, srt)
@@ -112,14 +110,14 @@ pprCmmGraphLikeCmm g = vcat (swallow blocks)
           cconv_of_conv (G.ConventionPrivate {}) = CmmCallConv -- XXX totally bogus
 
 with_out :: Maybe (G.Convention, CmmActuals) -> G.Last -> SDoc
-with_out Nothing l = ptext SLIT("??no-arguments??") <+> ppr l
+with_out Nothing l = ptext (sLit "??no-arguments??") <+> ppr l
 with_out (Just (conv, args)) l = last l
     where last (G.LastCall e k) =
-              hcat [ptext SLIT("... = foreign "),
+              hcat [ptext (sLit "... = foreign "),
                     doubleQuotes(ppr conv), space,
                     ppr_target e, parens ( commafy $ map ppr args ),
-                    ptext SLIT(" \"safe\""),
-                    case k of Nothing -> ptext SLIT(" never returns")
+                    ptext (sLit " \"safe\""),
+                    case k of Nothing -> ptext (sLit " never returns")
                               Just _ -> empty,
                     semi ]
           last (G.LastReturn) = ppr (CmmReturn args)
