@@ -31,8 +31,6 @@ module SimplMonad (
 	isAmongSimpl, intSwitchSet, switchIsOn
     ) where
 
-#include "HsVersions.h"
-
 import Id		( Id, mkSysLocal )
 import Type             ( Type )
 import FamInstEnv	( FamInstEnv )
@@ -254,15 +252,15 @@ plusSimplCount sc1@(SimplCount { ticks = tks1, details = dts1 })
 plusSimplCount VerySimplZero VerySimplZero = VerySimplZero
 plusSimplCount sc1	     sc2	   = VerySimplNonZero
 
-pprSimplCount VerySimplZero    = ptext SLIT("Total ticks: ZERO!")
-pprSimplCount VerySimplNonZero = ptext SLIT("Total ticks: NON-ZERO!")
+pprSimplCount VerySimplZero    = ptext (sLit "Total ticks: ZERO!")
+pprSimplCount VerySimplNonZero = ptext (sLit "Total ticks: NON-ZERO!")
 pprSimplCount (SimplCount { ticks = tks, details = dts, log1 = l1, log2 = l2 })
-  = vcat [ptext SLIT("Total ticks:    ") <+> int tks,
+  = vcat [ptext (sLit "Total ticks:    ") <+> int tks,
 	  text "",
 	  pprTickCounts (fmToList dts),
 	  if verboseSimplStats then
 		vcat [text "",
-		      ptext SLIT("Log (most recent first)"),
+		      ptext (sLit "Log (most recent first)"),
 		      nest 4 (vcat (map ppr l1) $$ vcat (map ppr l2))]
 	  else empty
     ]
