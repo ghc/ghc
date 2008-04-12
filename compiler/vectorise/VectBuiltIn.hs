@@ -8,8 +8,6 @@ module VectBuiltIn (
   primMethod, primPArray
 ) where
 
-#include "HsVersions.h"
-
 import DsMonad
 import IfaceEnv        ( lookupOrig )
 
@@ -65,18 +63,18 @@ nDP_UARR,
   nDP_PRELUDE_DOUBLE,
   nDP_PRELUDE_TUPLE :: Module
 
-nDP_UARR        = mkNDPModule FSLIT("Data.Array.Parallel.Unlifted.Flat.UArr")
-nDP_PARRAY      = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.PArray")
-nDP_REPR        = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Repr")
-nDP_CLOSURE     = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Closure")
-nDP_UNBOXED     = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Unboxed")
-nDP_INSTANCES   = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Instances")
-nDP_COMBINATORS = mkNDPModule FSLIT("Data.Array.Parallel.Lifted.Combinators")
+nDP_UARR        = mkNDPModule (fsLit "Data.Array.Parallel.Unlifted.Flat.UArr")
+nDP_PARRAY      = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.PArray")
+nDP_REPR        = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.Repr")
+nDP_CLOSURE     = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.Closure")
+nDP_UNBOXED     = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.Unboxed")
+nDP_INSTANCES   = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.Instances")
+nDP_COMBINATORS = mkNDPModule (fsLit "Data.Array.Parallel.Lifted.Combinators")
 
-nDP_PRELUDE_PARR = mkNDPModule FSLIT("Data.Array.Parallel.Prelude.Base.PArr")
-nDP_PRELUDE_INT  = mkNDPModule FSLIT("Data.Array.Parallel.Prelude.Base.Int")
-nDP_PRELUDE_DOUBLE = mkNDPModule FSLIT("Data.Array.Parallel.Prelude.Base.Double")
-nDP_PRELUDE_TUPLE  = mkNDPModule FSLIT("Data.Array.Parallel.Prelude.Base.Tuple")
+nDP_PRELUDE_PARR = mkNDPModule (fsLit "Data.Array.Parallel.Prelude.Base.PArr")
+nDP_PRELUDE_INT  = mkNDPModule (fsLit "Data.Array.Parallel.Prelude.Base.Int")
+nDP_PRELUDE_DOUBLE = mkNDPModule (fsLit "Data.Array.Parallel.Prelude.Base.Double")
+nDP_PRELUDE_TUPLE  = mkNDPModule (fsLit "Data.Array.Parallel.Prelude.Base.Tuple")
 
 data Builtins = Builtins {
                   parrayTyCon      :: TyCon
@@ -134,44 +132,44 @@ combinePAVar n bi
 initBuiltins :: DsM Builtins
 initBuiltins
   = do
-      parrayTyCon  <- externalTyCon nDP_PARRAY FSLIT("PArray")
-      paTyCon      <- externalTyCon nDP_PARRAY FSLIT("PA")
+      parrayTyCon  <- externalTyCon nDP_PARRAY (fsLit "PArray")
+      paTyCon      <- externalTyCon nDP_PARRAY (fsLit "PA")
       let [paDataCon] = tyConDataCons paTyCon
-      preprTyCon   <- externalTyCon nDP_PARRAY FSLIT("PRepr")
-      prTyCon      <- externalTyCon nDP_PARRAY FSLIT("PR")
+      preprTyCon   <- externalTyCon nDP_PARRAY (fsLit "PRepr")
+      prTyCon      <- externalTyCon nDP_PARRAY (fsLit "PR")
       let [prDataCon] = tyConDataCons prTyCon
-      uarrTyCon    <- externalTyCon nDP_UARR   FSLIT("UArr")
-      closureTyCon <- externalTyCon nDP_CLOSURE FSLIT(":->")
+      uarrTyCon    <- externalTyCon nDP_UARR   (fsLit "UArr")
+      closureTyCon <- externalTyCon nDP_CLOSURE (fsLit ":->")
 
-      voidTyCon    <- externalTyCon nDP_REPR FSLIT("Void")
-      wrapTyCon    <- externalTyCon nDP_REPR FSLIT("Wrap")
-      enumerationTyCon <- externalTyCon nDP_REPR FSLIT("Enumeration")
+      voidTyCon    <- externalTyCon nDP_REPR (fsLit "Void")
+      wrapTyCon    <- externalTyCon nDP_REPR (fsLit "Wrap")
+      enumerationTyCon <- externalTyCon nDP_REPR (fsLit "Enumeration")
       sum_tcs <- mapM (externalTyCon nDP_REPR)
                       [mkFastString ("Sum" ++ show i) | i <- [2..mAX_NDP_SUM]]
 
       let sumTyCons = listArray (2, mAX_NDP_SUM) sum_tcs
 
-      voidVar          <- externalVar nDP_REPR FSLIT("void")
-      mkPRVar          <- externalVar nDP_PARRAY FSLIT("mkPR")
-      mkClosureVar     <- externalVar nDP_CLOSURE FSLIT("mkClosure")
-      applyClosureVar  <- externalVar nDP_CLOSURE FSLIT("$:")
-      mkClosurePVar    <- externalVar nDP_CLOSURE FSLIT("mkClosureP")
-      applyClosurePVar <- externalVar nDP_CLOSURE FSLIT("$:^")
-      replicatePAIntPrimVar <- externalVar nDP_UNBOXED FSLIT("replicatePA_Int#")
-      upToPAIntPrimVar <- externalVar nDP_UNBOXED FSLIT("upToPA_Int#")
-      selectPAIntPrimVar <- externalVar nDP_UNBOXED FSLIT("selectPA_Int#")
-      truesPABoolPrimVar <- externalVar nDP_UNBOXED FSLIT("truesPA_Bool#")
-      lengthPAVar      <- externalVar nDP_PARRAY FSLIT("lengthPA#")
-      replicatePAVar   <- externalVar nDP_PARRAY FSLIT("replicatePA#")
-      emptyPAVar       <- externalVar nDP_PARRAY FSLIT("emptyPA")
-      packPAVar        <- externalVar nDP_PARRAY FSLIT("packPA#")
+      voidVar          <- externalVar nDP_REPR (fsLit "void")
+      mkPRVar          <- externalVar nDP_PARRAY (fsLit "mkPR")
+      mkClosureVar     <- externalVar nDP_CLOSURE (fsLit "mkClosure")
+      applyClosureVar  <- externalVar nDP_CLOSURE (fsLit "$:")
+      mkClosurePVar    <- externalVar nDP_CLOSURE (fsLit "mkClosureP")
+      applyClosurePVar <- externalVar nDP_CLOSURE (fsLit "$:^")
+      replicatePAIntPrimVar <- externalVar nDP_UNBOXED (fsLit "replicatePA_Int#")
+      upToPAIntPrimVar <- externalVar nDP_UNBOXED (fsLit "upToPA_Int#")
+      selectPAIntPrimVar <- externalVar nDP_UNBOXED (fsLit "selectPA_Int#")
+      truesPABoolPrimVar <- externalVar nDP_UNBOXED (fsLit "truesPA_Bool#")
+      lengthPAVar      <- externalVar nDP_PARRAY (fsLit "lengthPA#")
+      replicatePAVar   <- externalVar nDP_PARRAY (fsLit "replicatePA#")
+      emptyPAVar       <- externalVar nDP_PARRAY (fsLit "emptyPA")
+      packPAVar        <- externalVar nDP_PARRAY (fsLit "packPA#")
 
       combines <- mapM (externalVar nDP_PARRAY)
                        [mkFastString ("combine" ++ show i ++ "PA#")
                           | i <- [2..mAX_NDP_COMBINE]]
       let combinePAVars = listArray (2, mAX_NDP_COMBINE) combines
 
-      liftingContext <- liftM (\u -> mkSysLocal FSLIT("lc") u intPrimTy)
+      liftingContext <- liftM (\u -> mkSysLocal (fsLit "lc") u intPrimTy)
                               newUnique
 
       return $ Builtins {
@@ -231,54 +229,54 @@ preludeDataCons
 preludeVars :: [(Module, FastString, Module, FastString)]
 preludeVars
   = [
-      mk gHC_PARR FSLIT("mapP")       nDP_COMBINATORS FSLIT("mapPA")
-    , mk gHC_PARR FSLIT("zipWithP")   nDP_COMBINATORS FSLIT("zipWithPA")
-    , mk gHC_PARR FSLIT("zipP")       nDP_COMBINATORS FSLIT("zipPA")
-    , mk gHC_PARR FSLIT("unzipP")     nDP_COMBINATORS FSLIT("unzipPA")
-    , mk gHC_PARR FSLIT("filterP")    nDP_COMBINATORS FSLIT("filterPA")
-    , mk gHC_PARR FSLIT("lengthP")    nDP_COMBINATORS FSLIT("lengthPA")
-    , mk gHC_PARR FSLIT("replicateP") nDP_COMBINATORS FSLIT("replicatePA")
-    , mk gHC_PARR FSLIT("!:")         nDP_COMBINATORS FSLIT("indexPA")
-    , mk gHC_PARR FSLIT("crossMapP")  nDP_COMBINATORS FSLIT("crossMapPA")
-    , mk gHC_PARR FSLIT("singletonP") nDP_COMBINATORS FSLIT("singletonPA")
-    , mk gHC_PARR FSLIT("concatP")    nDP_COMBINATORS FSLIT("concatPA")
-    , mk gHC_PARR FSLIT("+:+")        nDP_COMBINATORS FSLIT("appPA")
+      mk gHC_PARR (fsLit "mapP")       nDP_COMBINATORS (fsLit "mapPA")
+    , mk gHC_PARR (fsLit "zipWithP")   nDP_COMBINATORS (fsLit "zipWithPA")
+    , mk gHC_PARR (fsLit "zipP")       nDP_COMBINATORS (fsLit "zipPA")
+    , mk gHC_PARR (fsLit "unzipP")     nDP_COMBINATORS (fsLit "unzipPA")
+    , mk gHC_PARR (fsLit "filterP")    nDP_COMBINATORS (fsLit "filterPA")
+    , mk gHC_PARR (fsLit "lengthP")    nDP_COMBINATORS (fsLit "lengthPA")
+    , mk gHC_PARR (fsLit "replicateP") nDP_COMBINATORS (fsLit "replicatePA")
+    , mk gHC_PARR (fsLit "!:")         nDP_COMBINATORS (fsLit "indexPA")
+    , mk gHC_PARR (fsLit "crossMapP")  nDP_COMBINATORS (fsLit "crossMapPA")
+    , mk gHC_PARR (fsLit "singletonP") nDP_COMBINATORS (fsLit "singletonPA")
+    , mk gHC_PARR (fsLit "concatP")    nDP_COMBINATORS (fsLit "concatPA")
+    , mk gHC_PARR (fsLit "+:+")        nDP_COMBINATORS (fsLit "appPA")
 
-    , mk nDP_PRELUDE_INT  FSLIT("plus") nDP_PRELUDE_INT FSLIT("plusV")
-    , mk nDP_PRELUDE_INT  FSLIT("minus") nDP_PRELUDE_INT FSLIT("minusV")
-    , mk nDP_PRELUDE_INT  FSLIT("mult")  nDP_PRELUDE_INT FSLIT("multV")
-    , mk nDP_PRELUDE_INT  FSLIT("intDiv")  nDP_PRELUDE_INT FSLIT("intDivV")
-    , mk nDP_PRELUDE_INT  FSLIT("sumP")  nDP_PRELUDE_INT FSLIT("sumPA")
-    , mk nDP_PRELUDE_INT  FSLIT("upToP") nDP_PRELUDE_INT FSLIT("upToPA")
+    , mk nDP_PRELUDE_INT  (fsLit "plus") nDP_PRELUDE_INT (fsLit "plusV")
+    , mk nDP_PRELUDE_INT  (fsLit "minus") nDP_PRELUDE_INT (fsLit "minusV")
+    , mk nDP_PRELUDE_INT  (fsLit "mult")  nDP_PRELUDE_INT (fsLit "multV")
+    , mk nDP_PRELUDE_INT  (fsLit "intDiv")  nDP_PRELUDE_INT (fsLit "intDivV")
+    , mk nDP_PRELUDE_INT  (fsLit "sumP")  nDP_PRELUDE_INT (fsLit "sumPA")
+    , mk nDP_PRELUDE_INT  (fsLit "upToP") nDP_PRELUDE_INT (fsLit "upToPA")
 
-    , mk nDP_PRELUDE_INT  FSLIT("eq") nDP_PRELUDE_INT FSLIT("eqV")
-    , mk nDP_PRELUDE_INT  FSLIT("neq") nDP_PRELUDE_INT FSLIT("neqV")
-    , mk nDP_PRELUDE_INT  FSLIT("le")  nDP_PRELUDE_INT FSLIT("leV")
-    , mk nDP_PRELUDE_INT  FSLIT("lt") nDP_PRELUDE_INT FSLIT("ltV")
-    , mk nDP_PRELUDE_INT  FSLIT("ge") nDP_PRELUDE_INT FSLIT("geV")
-    , mk nDP_PRELUDE_INT  FSLIT("gt")  nDP_PRELUDE_INT FSLIT("gtV")
+    , mk nDP_PRELUDE_INT  (fsLit "eq") nDP_PRELUDE_INT (fsLit "eqV")
+    , mk nDP_PRELUDE_INT  (fsLit "neq") nDP_PRELUDE_INT (fsLit "neqV")
+    , mk nDP_PRELUDE_INT  (fsLit "le")  nDP_PRELUDE_INT (fsLit "leV")
+    , mk nDP_PRELUDE_INT  (fsLit "lt") nDP_PRELUDE_INT (fsLit "ltV")
+    , mk nDP_PRELUDE_INT  (fsLit "ge") nDP_PRELUDE_INT (fsLit "geV")
+    , mk nDP_PRELUDE_INT  (fsLit "gt")  nDP_PRELUDE_INT (fsLit "gtV")
 
-    , mk nDP_PRELUDE_DOUBLE  FSLIT("plus") nDP_PRELUDE_DOUBLE FSLIT("plusV")
-    , mk nDP_PRELUDE_DOUBLE  FSLIT("minus") nDP_PRELUDE_DOUBLE FSLIT("minusV")
-    , mk nDP_PRELUDE_DOUBLE  FSLIT("mult")  nDP_PRELUDE_DOUBLE FSLIT("multV")
-    , mk nDP_PRELUDE_DOUBLE  FSLIT("divide")  nDP_PRELUDE_DOUBLE FSLIT("divideV")
-    , mk nDP_PRELUDE_DOUBLE  FSLIT("sumP")  nDP_PRELUDE_DOUBLE FSLIT("sumPA")
-    , mk nDP_PRELUDE_DOUBLE  FSLIT("minIndexP") 
-         nDP_PRELUDE_DOUBLE  FSLIT("minIndexPA")
-    , mk nDP_PRELUDE_DOUBLE  FSLIT("maxIndexP")
-         nDP_PRELUDE_DOUBLE  FSLIT("maxIndexPA")
+    , mk nDP_PRELUDE_DOUBLE  (fsLit "plus") nDP_PRELUDE_DOUBLE (fsLit "plusV")
+    , mk nDP_PRELUDE_DOUBLE  (fsLit "minus") nDP_PRELUDE_DOUBLE (fsLit "minusV")
+    , mk nDP_PRELUDE_DOUBLE  (fsLit "mult")  nDP_PRELUDE_DOUBLE (fsLit "multV")
+    , mk nDP_PRELUDE_DOUBLE  (fsLit "divide")  nDP_PRELUDE_DOUBLE (fsLit "divideV")
+    , mk nDP_PRELUDE_DOUBLE  (fsLit "sumP")  nDP_PRELUDE_DOUBLE (fsLit "sumPA")
+    , mk nDP_PRELUDE_DOUBLE  (fsLit "minIndexP") 
+         nDP_PRELUDE_DOUBLE  (fsLit "minIndexPA")
+    , mk nDP_PRELUDE_DOUBLE  (fsLit "maxIndexP")
+         nDP_PRELUDE_DOUBLE  (fsLit "maxIndexPA")
 
-    , mk nDP_PRELUDE_DOUBLE  FSLIT("eq") nDP_PRELUDE_DOUBLE FSLIT("eqV")
-    , mk nDP_PRELUDE_DOUBLE  FSLIT("neq") nDP_PRELUDE_DOUBLE FSLIT("neqV")
-    , mk nDP_PRELUDE_DOUBLE  FSLIT("le")  nDP_PRELUDE_DOUBLE FSLIT("leV")
-    , mk nDP_PRELUDE_DOUBLE  FSLIT("lt") nDP_PRELUDE_DOUBLE FSLIT("ltV")
-    , mk nDP_PRELUDE_DOUBLE  FSLIT("ge") nDP_PRELUDE_DOUBLE FSLIT("geV")
-    , mk nDP_PRELUDE_DOUBLE  FSLIT("gt")  nDP_PRELUDE_DOUBLE FSLIT("gtV")
+    , mk nDP_PRELUDE_DOUBLE  (fsLit "eq") nDP_PRELUDE_DOUBLE (fsLit "eqV")
+    , mk nDP_PRELUDE_DOUBLE  (fsLit "neq") nDP_PRELUDE_DOUBLE (fsLit "neqV")
+    , mk nDP_PRELUDE_DOUBLE  (fsLit "le")  nDP_PRELUDE_DOUBLE (fsLit "leV")
+    , mk nDP_PRELUDE_DOUBLE  (fsLit "lt") nDP_PRELUDE_DOUBLE (fsLit "ltV")
+    , mk nDP_PRELUDE_DOUBLE  (fsLit "ge") nDP_PRELUDE_DOUBLE (fsLit "geV")
+    , mk nDP_PRELUDE_DOUBLE  (fsLit "gt")  nDP_PRELUDE_DOUBLE (fsLit "gtV")
 
     -- FIXME: temporary
-    , mk nDP_PRELUDE_PARR FSLIT("fromPArrayP") nDP_PRELUDE_PARR FSLIT("fromPArrayPA")
-    , mk nDP_PRELUDE_PARR FSLIT("toPArrayP") nDP_PRELUDE_PARR FSLIT("toPArrayPA")
-    , mk nDP_PRELUDE_PARR FSLIT("fromNestedPArrayP") nDP_PRELUDE_PARR FSLIT("fromNestedPArrayPA")
+    , mk nDP_PRELUDE_PARR (fsLit "fromPArrayP") nDP_PRELUDE_PARR (fsLit "fromPArrayPA")
+    , mk nDP_PRELUDE_PARR (fsLit "toPArrayP") nDP_PRELUDE_PARR (fsLit "toPArrayPA")
+    , mk nDP_PRELUDE_PARR (fsLit "fromNestedPArrayP") nDP_PRELUDE_PARR (fsLit "fromNestedPArrayPA")
     ]
   where
     mk = (,,,)
@@ -286,7 +284,7 @@ preludeVars
 initBuiltinTyCons :: Builtins -> DsM [(Name, TyCon)]
 initBuiltinTyCons bi
   = do
-      -- parr <- externalTyCon nDP_PRELUDE_PARR FSLIT("PArr")
+      -- parr <- externalTyCon nDP_PRELUDE_PARR (fsLit "PArr")
       return $ (tyConName funTyCon, closureTyCon bi)
              : (parrTyConName,      parrayTyCon bi)
 
@@ -318,14 +316,14 @@ initBuiltinPAs = initBuiltinDicts . builtinPAs
 builtinPAs :: Builtins -> [(Name, Module, FastString)]
 builtinPAs bi
   = [
-      mk (tyConName $ closureTyCon bi)  nDP_CLOSURE     FSLIT("dPA_Clo")
-    , mk (tyConName $ voidTyCon bi)     nDP_REPR        FSLIT("dPA_Void")
-    , mk (tyConName $ parrayTyCon bi)   nDP_INSTANCES   FSLIT("dPA_PArray")
-    , mk unitTyConName                  nDP_INSTANCES   FSLIT("dPA_Unit")
+      mk (tyConName $ closureTyCon bi)  nDP_CLOSURE     (fsLit "dPA_Clo")
+    , mk (tyConName $ voidTyCon bi)     nDP_REPR        (fsLit "dPA_Void")
+    , mk (tyConName $ parrayTyCon bi)   nDP_INSTANCES   (fsLit "dPA_PArray")
+    , mk unitTyConName                  nDP_INSTANCES   (fsLit "dPA_Unit")
 
-    , mk intTyConName                   nDP_INSTANCES   FSLIT("dPA_Int")
-    , mk doubleTyConName                nDP_INSTANCES   FSLIT("dPA_Double")
-    , mk boolTyConName                  nDP_INSTANCES   FSLIT("dPA_Bool")
+    , mk intTyConName                   nDP_INSTANCES   (fsLit "dPA_Int")
+    , mk doubleTyConName                nDP_INSTANCES   (fsLit "dPA_Double")
+    , mk boolTyConName                  nDP_INSTANCES   (fsLit "dPA_Bool")
     ]
     ++ tups
   where
@@ -342,15 +340,15 @@ initBuiltinPRs = initBuiltinDicts . builtinPRs
 builtinPRs :: Builtins -> [(Name, Module, FastString)]
 builtinPRs bi =
   [
-    mk (tyConName unitTyCon)          nDP_REPR      FSLIT("dPR_Unit")
-  , mk (tyConName $ voidTyCon bi)     nDP_REPR      FSLIT("dPR_Void")
-  , mk (tyConName $ wrapTyCon bi)     nDP_REPR      FSLIT("dPR_Wrap")
-  , mk (tyConName $ enumerationTyCon bi) nDP_REPR   FSLIT("dPR_Enumeration")
-  , mk (tyConName $ closureTyCon bi)  nDP_CLOSURE   FSLIT("dPR_Clo")
+    mk (tyConName unitTyCon)          nDP_REPR      (fsLit "dPR_Unit")
+  , mk (tyConName $ voidTyCon bi)     nDP_REPR      (fsLit "dPR_Void")
+  , mk (tyConName $ wrapTyCon bi)     nDP_REPR      (fsLit "dPR_Wrap")
+  , mk (tyConName $ enumerationTyCon bi) nDP_REPR   (fsLit "dPR_Enumeration")
+  , mk (tyConName $ closureTyCon bi)  nDP_CLOSURE   (fsLit "dPR_Clo")
 
     -- temporary
-  , mk intTyConName          nDP_INSTANCES FSLIT("dPR_Int")
-  , mk doubleTyConName       nDP_INSTANCES FSLIT("dPR_Double")
+  , mk intTyConName          nDP_INSTANCES (fsLit "dPR_Int")
+  , mk doubleTyConName       nDP_INSTANCES (fsLit "dPR_Double")
   ]
 
   ++ map mk_sum  [2..mAX_NDP_SUM]
