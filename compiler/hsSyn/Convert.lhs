@@ -16,8 +16,6 @@ This module converts Template Haskell syntax into HsSyn
 module Convert( convertToHsExpr, convertToPat, convertToHsDecls,
                 convertToHsType, thRdrName ) where
 
-#include "HsVersions.h"
-
 import HsSyn as Hs
 import qualified Class
 import RdrName
@@ -53,14 +51,14 @@ convertToHsDecls loc ds = initCvt loc (mapM cvtTop ds)
 convertToHsExpr :: SrcSpan -> TH.Exp -> Either Message (LHsExpr RdrName)
 convertToHsExpr loc e 
   = case initCvt loc (cvtl e) of
-	Left msg  -> Left (msg $$ (ptext SLIT("When converting TH expression")
+	Left msg  -> Left (msg $$ (ptext (sLit "When converting TH expression")
 				    <+> text (show e)))
 	Right res -> Right res
 
 convertToPat :: SrcSpan -> TH.Pat -> Either Message (LPat RdrName)
 convertToPat loc e
   = case initCvt loc (cvtPat e) of
-        Left msg  -> Left (msg $$ (ptext SLIT("When converting TH pattern")
+        Left msg  -> Left (msg $$ (ptext (sLit "When converting TH pattern")
                                     <+> text (show e)))
         Right res -> Right res
 
@@ -97,7 +95,7 @@ force a = a `seq` return a
 failWith :: Message -> CvtM a
 failWith m = CvtM (\_ -> Left full_msg)
    where
-     full_msg = m $$ ptext SLIT("When splicing generated code into the program")
+     full_msg = m $$ ptext (sLit "When splicing generated code into the program")
 
 returnL :: a -> CvtM (Located a)
 returnL x = CvtM (\loc -> Right (L loc x))
@@ -239,7 +237,7 @@ cvtForD (ImportF callconv safety from nm ty)
 	; return $ ForeignImport nm' ty' i }
 
   | otherwise
-  = failWith $ text (show from)<+> ptext SLIT("is not a valid ccall impent")
+  = failWith $ text (show from)<+> ptext (sLit "is not a valid ccall impent")
   where 
     safety' = case safety of
                      Unsafe     -> PlayRisky
@@ -341,7 +339,7 @@ cvtBind (TH.ValD p body ds)
 			      pat_rhs_ty = void, bind_fvs = placeHolderNames } }
 
 cvtBind d 
-  = failWith (sep [ptext SLIT("Illegal kind of declaration in where clause"),
+  = failWith (sep [ptext (sLit "Illegal kind of declaration in where clause"),
 		   nest 2 (text (TH.pprint d))])
 
 cvtClause :: TH.Clause -> CvtM (Hs.LMatch RdrName)
@@ -512,7 +510,7 @@ cvtPred ty
 	; case head of
 	    ConT tc -> do { tc' <- tconName tc; returnL $ HsClassP tc' tys' }
 	    VarT tv -> do { tv' <- tName tv;    returnL $ HsClassP tv' tys' }
-	    _       -> failWith (ptext SLIT("Malformed predicate") <+> text (TH.pprint ty)) }
+	    _       -> failWith (ptext (sLit "Malformed predicate") <+> text (TH.pprint ty)) }
 
 cvtType :: TH.Type -> CvtM (LHsType RdrName)
 cvtType ty = do { (head, tys') <- split_ty_app ty
@@ -529,7 +527,7 @@ cvtType ty = do { (head, tys') <- split_ty_app ty
 							 ; cxt' <- cvtContext cxt
 							 ; ty'  <- cvtType ty
 							 ; returnL $ mkExplicitHsForAllTy tvs' cxt' ty' }
-		    _       -> failWith (ptext SLIT("Malformed type") <+> text (show ty))
+		    _       -> failWith (ptext (sLit "Malformed type") <+> text (show ty))
 	     }
   where
     mk_apps head []       = returnL head
@@ -593,8 +591,8 @@ okOcc ns str@(c:_)
 
 badOcc :: OccName.NameSpace -> String -> SDoc
 badOcc ctxt_ns occ 
-  = ptext SLIT("Illegal") <+> pprNameSpace ctxt_ns
-	<+> ptext SLIT("name:") <+> quotes (text occ)
+  = ptext (sLit "Illegal") <+> pprNameSpace ctxt_ns
+	<+> ptext (sLit "name:") <+> quotes (text occ)
 
 thRdrName :: OccName.NameSpace -> String -> TH.NameFlavour -> RdrName
 -- This turns a Name into a RdrName
