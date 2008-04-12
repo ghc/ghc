@@ -128,8 +128,8 @@ data SimplEnv
 pprSimplEnv :: SimplEnv -> SDoc
 -- Used for debugging; selective
 pprSimplEnv env
-  = vcat [ptext SLIT("TvSubst:") <+> ppr (seTvSubst env),
- 	  ptext SLIT("IdSubst:") <+> ppr (seIdSubst env) ]
+  = vcat [ptext (sLit "TvSubst:") <+> ppr (seTvSubst env),
+ 	  ptext (sLit "IdSubst:") <+> ppr (seIdSubst env) ]
 
 type SimplIdSubst = IdEnv SimplSR	-- IdId |--> OutExpr
 	-- See Note [Extending the Subst] in CoreSubst
@@ -142,9 +142,9 @@ data SimplSR
 	   InExpr 	 
 
 instance Outputable SimplSR where
-  ppr (DoneEx e) = ptext SLIT("DoneEx") <+> ppr e
-  ppr (DoneId v) = ptext SLIT("DoneId") <+> ppr v
-  ppr (ContEx tv id e) = vcat [ptext SLIT("ContEx") <+> ppr e {-,
+  ppr (DoneEx e) = ptext (sLit "DoneEx") <+> ppr e
+  ppr (DoneId v) = ptext (sLit "DoneId") <+> ppr v
+  ppr (ContEx tv id e) = vcat [ptext (sLit "ContEx") <+> ppr e {-,
 				ppr (filter_env tv), ppr (filter_env id) -}]
 	-- where
 	-- fvs = exprFreeVars e
@@ -345,9 +345,9 @@ instance Outputable Floats where
   ppr (Floats binds ff) = ppr ff $$ ppr (fromOL binds)
 
 instance Outputable FloatFlag where
-  ppr FltLifted = ptext SLIT("FltLifted")
-  ppr FltOkSpec = ptext SLIT("FltOkSpec")
-  ppr FltCareful = ptext SLIT("FltCareful")
+  ppr FltLifted = ptext (sLit "FltLifted")
+  ppr FltOkSpec = ptext (sLit "FltOkSpec")
+  ppr FltCareful = ptext (sLit "FltCareful")
    
 andFF :: FloatFlag -> FloatFlag -> FloatFlag
 andFF FltCareful _ 	    = FltCareful
