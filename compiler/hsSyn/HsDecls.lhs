@@ -37,8 +37,6 @@ module HsDecls (
 	collectRuleBndrSigTys, 
     ) where
 
-#include "HsVersions.h"
-
 -- friends:
 import {-# SOURCE #-}	HsExpr( HsExpr, pprExpr )
 	-- Because Expr imports Decls via HsBracket
@@ -206,7 +204,7 @@ instance OutputableBndr name => Outputable (HsGroup name) where
 data SpliceDecl id = SpliceDecl (Located (HsExpr id))	-- Top level splice
 
 instance OutputableBndr name => Outputable (SpliceDecl name) where
-   ppr (SpliceDecl e) = ptext SLIT("$") <> parens (pprExpr (unLoc e))
+   ppr (SpliceDecl e) = ptext (sLit "$") <> parens (pprExpr (unLoc e))
 \end{code}
 
 
@@ -539,15 +537,15 @@ instance OutputableBndr name
 	      => Outputable (TyClDecl name) where
 
     ppr (ForeignType {tcdLName = ltycon})
-	= hsep [ptext SLIT("foreign import type dotnet"), ppr ltycon]
+	= hsep [ptext (sLit "foreign import type dotnet"), ppr ltycon]
 
     ppr (TyFamily {tcdFlavour = flavour, tcdLName = ltycon, 
 		   tcdTyVars = tyvars, tcdKind = mb_kind})
       = pp_flavour <+> pp_decl_head [] ltycon tyvars Nothing <+> pp_kind
         where
 	  pp_flavour = case flavour of
-		         TypeFamily -> ptext SLIT("type family")
-			 DataFamily -> ptext SLIT("data family")
+		         TypeFamily -> ptext (sLit "type family")
+			 DataFamily -> ptext (sLit "data family")
 
           pp_kind = case mb_kind of
 		      Nothing   -> empty
@@ -555,8 +553,8 @@ instance OutputableBndr name
 
     ppr (TySynonym {tcdLName = ltycon, tcdTyVars = tyvars, tcdTyPats = typats,
 		    tcdSynRhs = mono_ty})
-      = hang (ptext SLIT("type") <+> 
-	      (if isJust typats then ptext SLIT("instance") else empty) <+>
+      = hang (ptext (sLit "type") <+> 
+	      (if isJust typats then ptext (sLit "instance") else empty) <+>
 	      pp_decl_head [] ltycon tyvars typats <+> 
 	      equals)
 	     4 (ppr mono_ty)
@@ -566,7 +564,7 @@ instance OutputableBndr name
 		 tcdCons = condecls, tcdDerivs = derivings})
       = pp_tydecl (null condecls && isJust mb_sig) 
                   (ppr new_or_data <+> 
-		   (if isJust typats then ptext SLIT("instance") else empty) <+>
+		   (if isJust typats then ptext (sLit "instance") else empty) <+>
 		   pp_decl_head (unLoc context) ltycon tyvars typats <+> 
 		   ppr_sig mb_sig)
 		  (pp_condecls condecls)
@@ -582,13 +580,13 @@ instance OutputableBndr name
       = top_matter
 
       | otherwise	-- Laid out
-      = sep [hsep [top_matter, ptext SLIT("where {")],
+      = sep [hsep [top_matter, ptext (sLit "where {")],
 	     nest 4 (sep [ sep (map ppr_semi ats)
 			 , sep (map ppr_semi sigs)
 			 , pprLHsBinds methods
 			 , char '}'])]
       where
-        top_matter    =     ptext SLIT("class") 
+        top_matter    =     ptext (sLit "class") 
 		        <+> pp_decl_head (unLoc context) lclas tyvars Nothing
 		        <+> pprFundeps (map unLoc fds)
 	ppr_semi decl = ppr decl <> semi
@@ -607,9 +605,9 @@ pp_decl_head context thing _      (Just typats) -- explicit type patterns
 
 pp_condecls :: OutputableBndr name => [LConDecl name] -> SDoc
 pp_condecls cs@(L _ ConDecl{ con_res = ResTyGADT _ } : _) -- In GADT syntax
-  = hang (ptext SLIT("where")) 2 (vcat (map ppr cs))
+  = hang (ptext (sLit "where")) 2 (vcat (map ppr cs))
 pp_condecls cs 			  -- In H98 syntax
-  = equals <+> sep (punctuate (ptext SLIT(" |")) (map ppr cs))
+  = equals <+> sep (punctuate (ptext (sLit " |")) (map ppr cs))
 
 pp_tydecl :: OutputableBndr name => Bool -> SDoc -> SDoc -> Maybe [LHsType name] -> SDoc
 pp_tydecl True  pp_head _ _
@@ -619,12 +617,12 @@ pp_tydecl False pp_head pp_decl_rhs derivings
       pp_decl_rhs,
       case derivings of
         Nothing -> empty
-	Just ds -> hsep [ptext SLIT("deriving"), parens (interpp'SP ds)]
+	Just ds -> hsep [ptext (sLit "deriving"), parens (interpp'SP ds)]
     ])
 
 instance Outputable NewOrData where
-  ppr NewType  = ptext SLIT("newtype")
-  ppr DataType = ptext SLIT("data")
+  ppr NewType  = ptext (sLit "newtype")
+  ppr DataType = ptext (sLit "data")
 \end{code}
 
 
@@ -761,7 +759,7 @@ data InstDecl name
 instance (OutputableBndr name) => Outputable (InstDecl name) where
 
     ppr (InstDecl inst_ty binds uprags ats)
-      = vcat [hsep [ptext SLIT("instance"), ppr inst_ty, ptext SLIT("where")]
+      = vcat [hsep [ptext (sLit "instance"), ppr inst_ty, ptext (sLit "where")]
              , nest 4 $ vcat (map ppr ats)
  	     , nest 4 $ vcat (map ppr uprags)
 	     , nest 4 $ pprLHsBinds binds ]
@@ -785,7 +783,7 @@ data DerivDecl name = DerivDecl (LHsType name)
 
 instance (OutputableBndr name) => Outputable (DerivDecl name) where
     ppr (DerivDecl ty) 
-        = hsep [ptext SLIT("derived instance"), ppr ty]
+        = hsep [ptext (sLit "derived instance"), ppr ty]
 \end{code}
 
 %************************************************************************
@@ -808,7 +806,7 @@ instance (OutputableBndr name)
 	      => Outputable (DefaultDecl name) where
 
     ppr (DefaultDecl tys)
-      = ptext SLIT("default") <+> parens (interpp'SP tys)
+      = ptext (sLit "default") <+> parens (interpp'SP tys)
 \end{code}
 
 %************************************************************************
@@ -882,28 +880,28 @@ data FoType = DNType 		-- In due course we'll add subtype stuff
 
 instance OutputableBndr name => Outputable (ForeignDecl name) where
   ppr (ForeignImport n ty fimport) =
-    hang (ptext SLIT("foreign import") <+> ppr fimport <+> ppr n)
+    hang (ptext (sLit "foreign import") <+> ppr fimport <+> ppr n)
        2 (dcolon <+> ppr ty)
   ppr (ForeignExport n ty fexport) =
-    hang (ptext SLIT("foreign export") <+> ppr fexport <+> ppr n)
+    hang (ptext (sLit "foreign export") <+> ppr fexport <+> ppr n)
        2 (dcolon <+> ppr ty)
 
 instance Outputable ForeignImport where
   ppr (DNImport			        spec) = 
-    ptext SLIT("dotnet") <+> ppr spec
+    ptext (sLit "dotnet") <+> ppr spec
   ppr (CImport  cconv safety header lib spec) =
     ppr cconv <+> ppr safety <+> 
     char '"' <> pprCEntity header lib spec <> char '"'
     where
       pprCEntity header lib (CLabel lbl) = 
-        ptext SLIT("static") <+> ftext header <+> char '&' <>
+        ptext (sLit "static") <+> ftext header <+> char '&' <>
 	pprLib lib <> ppr lbl
       pprCEntity header lib (CFunction (StaticTarget lbl)) = 
-        ptext SLIT("static") <+> ftext header <+> char '&' <>
+        ptext (sLit "static") <+> ftext header <+> char '&' <>
 	pprLib lib <> ppr lbl
       pprCEntity _      _   (CFunction (DynamicTarget)) =
-        ptext SLIT("dynamic")
-      pprCEntity _      _   (CWrapper) = ptext SLIT("wrapper")
+        ptext (sLit "dynamic")
+      pprCEntity _      _   (CWrapper) = ptext (sLit "wrapper")
       --
       pprLib lib | nullFS lib = empty
 		 | otherwise  = char '[' <> ppr lib <> char ']'
@@ -912,10 +910,10 @@ instance Outputable ForeignExport where
   ppr (CExport  (CExportStatic lbl cconv)) = 
     ppr cconv <+> char '"' <> ppr lbl <> char '"'
   ppr (DNExport                          ) = 
-    ptext SLIT("dotnet") <+> ptext SLIT("\"<unused>\"")
+    ptext (sLit "dotnet") <+> ptext (sLit "\"<unused>\"")
 
 instance Outputable FoType where
-  ppr DNType = ptext SLIT("type dotnet")
+  ppr DNType = ptext (sLit "type dotnet")
 \end{code}
 
 
