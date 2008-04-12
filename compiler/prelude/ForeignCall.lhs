@@ -24,8 +24,6 @@ module ForeignCall (
 	withDNTypes
     ) where
 
-#include "HsVersions.h"
-
 import FastString
 import Char		( isAlphaNum )
 import Binary
@@ -72,9 +70,9 @@ data Safety
   {-! derive: Binary !-}
 
 instance Outputable Safety where
-  ppr (PlaySafe False) = ptext SLIT("safe")
-  ppr (PlaySafe True)  = ptext SLIT("threadsafe")
-  ppr PlayRisky = ptext SLIT("unsafe")
+  ppr (PlaySafe False) = ptext (sLit "safe")
+  ppr (PlaySafe True)  = ptext (sLit "threadsafe")
+  ppr PlayRisky = ptext (sLit "unsafe")
 
 playSafe :: Safety -> Bool
 playSafe PlaySafe{} = True
@@ -140,9 +138,9 @@ data CCallConv = CCallConv | StdCallConv | CmmCallConv
   {-! derive: Binary !-}
 
 instance Outputable CCallConv where
-  ppr StdCallConv = ptext SLIT("stdcall")
-  ppr CCallConv   = ptext SLIT("ccall")
-  ppr CmmCallConv = ptext SLIT("C--")
+  ppr StdCallConv = ptext (sLit "stdcall")
+  ppr CCallConv   = ptext (sLit "ccall")
+  ppr CmmCallConv = ptext (sLit "C--")
 
 defaultCCallConv :: CCallConv
 defaultCCallConv = CCallConv
