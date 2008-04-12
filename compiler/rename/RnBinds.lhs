@@ -23,8 +23,6 @@ module RnBinds (rnTopBinds, rnTopBindsLHS, rnTopBindsRHS, -- use these for top-l
                 makeMiniFixityEnv, MiniFixityEnv
    ) where
 
-#include "HsVersions.h"
-
 import {-# SOURCE #-} RnExpr( rnLExpr, rnStmts )
 
 import HsSyn
@@ -321,7 +319,7 @@ rnValBindsRHSGen :: (FreeVars -> FreeVars)  -- for trimming free var sets
 rnValBindsRHSGen trim bound_names binds@(ValBindsIn mbinds sigs) = do
    -- rename the sigs
    env <- getGblEnv
-   traceRn (ptext SLIT("Rename sigs") <+> ppr (tcg_rdr_env env))
+   traceRn (ptext (sLit "Rename sigs") <+> ppr (tcg_rdr_env env))
    sigs' <- rename_sigs sigs
    -- rename the RHSes
    binds_w_dus <- mapBagM (rnBind (mkSigTvFn sigs') trim) mbinds
@@ -437,8 +435,8 @@ pprFixEnv env
 		  (nameEnvElts env)
 
 dupFixityDecl loc rdr_name
-  = vcat [ptext SLIT("Multiple fixity declarations for") <+> quotes (ppr rdr_name),
-	  ptext SLIT("also at ") <+> ppr loc]
+  = vcat [ptext (sLit "Multiple fixity declarations for") <+> quotes (ppr rdr_name),
+	  ptext (sLit "also at ") <+> ppr loc]
 
 ---------------------
 
@@ -832,7 +830,7 @@ rnGRHS' ctxt (GRHS guards rhs)
 \begin{code}
 dupSigDeclErr sigs@(L loc sig : _)
   = addErrAt loc $
-	vcat [ptext SLIT("Duplicate") <+> what_it_is <> colon,
+	vcat [ptext (sLit "Duplicate") <+> what_it_is <> colon,
 	      nest 2 (vcat (map ppr_sig sigs))]
   where
     what_it_is = hsSigDoc sig
@@ -841,28 +839,28 @@ dupSigDeclErr sigs@(L loc sig : _)
 unknownSigErr (L loc sig)
   = do	{ mod <- getModule
 	; addErrAt loc $
-		vcat [sep [ptext SLIT("Misplaced") <+> what_it_is <> colon, ppr sig],
+		vcat [sep [ptext (sLit "Misplaced") <+> what_it_is <> colon, ppr sig],
 		      extra_stuff mod sig] }
   where
     what_it_is = hsSigDoc sig
     extra_stuff mod  (TypeSig (L _ n) _)
 	| nameIsLocalOrFrom mod n
-	= ptext SLIT("The type signature must be given where")
-		<+> quotes (ppr n) <+> ptext SLIT("is declared")
+	= ptext (sLit "The type signature must be given where")
+		<+> quotes (ppr n) <+> ptext (sLit "is declared")
 	| otherwise
-	= ptext SLIT("You cannot give a type signature for an imported value")
+	= ptext (sLit "You cannot give a type signature for an imported value")
 
     extra_stuff mod other = empty
 
 methodBindErr mbind
- =  hang (ptext SLIT("Pattern bindings (except simple variables) not allowed in instance declarations"))
+ =  hang (ptext (sLit "Pattern bindings (except simple variables) not allowed in instance declarations"))
        2 (ppr mbind)
 
 bindsInHsBootFile mbinds
-  = hang (ptext SLIT("Bindings in hs-boot files are not allowed"))
+  = hang (ptext (sLit "Bindings in hs-boot files are not allowed"))
        2 (ppr mbinds)
 
 nonStdGuardErr guards
-  = hang (ptext SLIT("accepting non-standard pattern guards (use -XPatternGuards to suppress this message)"))
+  = hang (ptext (sLit "accepting non-standard pattern guards (use -XPatternGuards to suppress this message)"))
        4 (interpp'SP guards)
 \end{code}
