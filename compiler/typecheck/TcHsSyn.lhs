@@ -1023,10 +1023,10 @@ mkArbitraryType warn tv
     (args,res) = splitKindFunTys kind
     tup_tc     = tupleTyCon Boxed (length args)
 		
-    msg = vcat [ hang (ptext SLIT("Inventing strangely-kinded Any TyCon"))
-		    2 (ptext SLIT("of kind") <+> quotes (ppr kind))
-	       , nest 2 (ptext SLIT("from an instantiation of type variable") <+> quotes (ppr tv))
-	       , ptext SLIT("This warning can be suppressed by a type signature fixing") <+> quotes (ppr tv)
-	       , nest 2 (ptext SLIT("but is harmless without -O (and usually harmless anyway)."))
-	       , ptext SLIT("See http://hackage.haskell.org/trac/ghc/ticket/959 for details")  ]
+    msg = vcat [ hang (ptext (sLit "Inventing strangely-kinded Any TyCon"))
+		    2 (ptext (sLit "of kind") <+> quotes (ppr kind))
+	       , nest 2 (ptext (sLit "from an instantiation of type variable") <+> quotes (ppr tv))
+	       , ptext (sLit "This warning can be suppressed by a type signature fixing") <+> quotes (ppr tv)
+	       , nest 2 (ptext (sLit "but is harmless without -O (and usually harmless anyway)."))
+	       , ptext (sLit "See http://hackage.haskell.org/trac/ghc/ticket/959 for details")  ]
 \end{code}
