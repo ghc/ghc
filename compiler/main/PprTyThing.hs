@@ -16,8 +16,6 @@ module PprTyThing (
   	pprTypeForUser
   ) where
 
-#include "HsVersions.h"
-
 import qualified GHC
 
 import GHC ( TyThing(..) )
@@ -78,7 +76,7 @@ pprTyThingHdr pefas (AClass cls)       = pprClassHdr   pefas cls
 pprTyConHdr :: PrintExplicitForalls -> TyCon -> SDoc
 pprTyConHdr _ tyCon
   | Just (_fam_tc, tys) <- tyConFamInst_maybe tyCon
-  = ptext keyword <+> ptext SLIT("instance") <+> pprTypeApp tyCon (ppr_bndr tyCon) tys
+  = ptext keyword <+> ptext (sLit "instance") <+> pprTypeApp tyCon (ppr_bndr tyCon) tys
   | otherwise
   = ptext keyword <+> opt_family <+> opt_stupid <+> ppr_bndr tyCon <+> hsep (map ppr vars)
   where
@@ -86,12 +84,12 @@ pprTyConHdr _ tyCon
 	   GHC.isFunTyCon tyCon = take (GHC.tyConArity tyCon) GHC.alphaTyVars
 	 | otherwise = GHC.tyConTyVars tyCon
 
-    keyword | GHC.isSynTyCon tyCon = SLIT("type")
-            | GHC.isNewTyCon tyCon = SLIT("newtype")
-            | otherwise            = SLIT("data")
+    keyword | GHC.isSynTyCon tyCon = sLit "type"
+            | GHC.isNewTyCon tyCon = sLit "newtype"
+            | otherwise            = sLit "data"
 
     opt_family
-      | GHC.isOpenTyCon tyCon = ptext SLIT("family")
+      | GHC.isOpenTyCon tyCon = ptext (sLit "family")
       | otherwise             = empty
 
     opt_stupid 	-- The "stupid theta" part of the declaration
@@ -105,7 +103,7 @@ pprDataConSig pefas dataCon =
 pprClassHdr :: PrintExplicitForalls -> GHC.Class -> SDoc
 pprClassHdr _ cls =
   let (tyVars, funDeps) = GHC.classTvsFds cls
-  in ptext SLIT("class") <+> 
+  in ptext (sLit "class") <+> 
      GHC.pprThetaArrow (GHC.classSCTheta cls) <+>
      ppr_bndr cls <+>
      hsep (map ppr tyVars) <+>
@@ -161,7 +159,7 @@ pprTyCon pefas tyCon
 pprAlgTyCon :: PrintExplicitForalls -> TyCon -> (GHC.DataCon -> Bool)
             -> (FieldLabel -> Bool) -> SDoc
 pprAlgTyCon pefas tyCon ok_con ok_label
-  | gadt      = pprTyConHdr pefas tyCon <+> ptext SLIT("where") $$ 
+  | gadt      = pprTyConHdr pefas tyCon <+> ptext (sLit "where") $$ 
 		   nest 2 (vcat (ppr_trim show_con datacons))
   | otherwise = hang (pprTyConHdr pefas tyCon)
     		   2 (add_bars (ppr_trim show_con datacons))
@@ -193,7 +191,7 @@ pprDataConDecl _ gadt_style show_label dataCon
 
     ppr_tvs 
 	| null qualVars = empty
-	| otherwise     = ptext SLIT("forall") <+> 
+	| otherwise     = ptext (sLit "forall") <+> 
 				hsep (map ppr qualVars) <> dot
 
 	-- printing out the dataCon as a type signature, in GADT style
@@ -228,14 +226,14 @@ pprClass pefas cls
   | null methods = 
 	pprClassHdr pefas cls
   | otherwise = 
-	hang (pprClassHdr pefas cls <+> ptext SLIT("where"))
+	hang (pprClassHdr pefas cls <+> ptext (sLit "where"))
 	    2 (vcat (map (pprClassMethod pefas) methods))
   where
 	methods = GHC.classMethods cls
 
 pprClassOneMethod :: PrintExplicitForalls -> GHC.Class -> Id -> SDoc
 pprClassOneMethod pefas cls this_one
-  = hang (pprClassHdr pefas cls <+> ptext SLIT("where"))
+  = hang (pprClassHdr pefas cls <+> ptext (sLit "where"))
 	 2 (vcat (ppr_trim show_meth methods))
   where
 	methods = GHC.classMethods cls
@@ -268,7 +266,7 @@ ppr_trim show xs
     go x (eliding, so_far)
 	| Just doc <- show x = (False, doc : so_far)
 	| otherwise = if eliding then (True, so_far)
-		                 else (True, ptext SLIT("...") : so_far)
+		                 else (True, ptext (sLit "...") : so_far)
 
 add_bars :: [SDoc] -> SDoc
 add_bars []      = empty
@@ -284,5 +282,5 @@ showWithLoc loc doc
     = hang doc 2 (char '\t' <> comment <+> loc)
 		-- The tab tries to make them line up a bit
   where
-    comment = ptext SLIT("--")
+    comment = ptext (sLit "--")
 
