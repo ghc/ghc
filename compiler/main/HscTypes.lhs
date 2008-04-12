@@ -330,8 +330,8 @@ hptRules hsc_env deps
     , let rules = case lookupUFM hpt mod of
 		    Just info -> md_rules (hm_details info)
 		    Nothing -> pprTrace "WARNING in hptRules" msg [] 
-	  msg = vcat [ptext SLIT("missing module") <+> ppr mod,
-		      ptext SLIT("Probable cause: out-of-date interface files")]
+	  msg = vcat [ptext (sLit "missing module") <+> ppr mod,
+		      ptext (sLit "Probable cause: out-of-date interface files")]
 			-- This really shouldn't happen, but see Trac #962
 
 	-- And get its dfuns
