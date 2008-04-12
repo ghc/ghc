@@ -127,9 +127,9 @@ instance Outputable Var where
   ppr var = ppr (varName var) <+> ifPprDebug (brackets extra)
 	where
 	  extra = case var of
-			GlobalId {} -> ptext SLIT("gid")
-			LocalId  {} -> ptext SLIT("lid")
-			TyVar    {} -> ptext SLIT("tv")
+			GlobalId {} -> ptext (sLit "gid")
+			LocalId  {} -> ptext (sLit "lid")
+			TyVar    {} -> ptext (sLit "tv")
 			TcTyVar {tcTyVarDetails = details} -> pprTcTyVarDetails details
 
 instance Show Var where
@@ -247,7 +247,7 @@ mkWildCoVar :: Kind -> TyVar
 -- so its unique doesn't matter
 mkWildCoVar kind 
   = ASSERT( isCoercionKind kind )
-    TyVar { varName = mkSysTvName wild_uniq FSLIT("co_wild"),
+    TyVar { varName = mkSysTvName wild_uniq (fsLit "co_wild"),
             realUnique = _ILIT(1),
             varType = kind,
             isCoercionVar = True }
