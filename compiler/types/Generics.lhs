@@ -563,8 +563,8 @@ bimapList [ep]
 
 -------------------
 a_RDR, b_RDR :: RdrName
-a_RDR	= mkVarUnqual FSLIT("a")
-b_RDR	= mkVarUnqual FSLIT("b")
+a_RDR	= mkVarUnqual (fsLit "a")
+b_RDR	= mkVarUnqual (fsLit "b")
 
 gs_RDR :: [RdrName]
 gs_RDR	= [ mkVarUnqual (mkFastString ("g"++show i)) | i <- [(1::Int) .. ] ]
