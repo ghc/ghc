@@ -50,9 +50,6 @@ module Outputable (
 	trace, pgmError, panic, panicFastInt, assertPanic
     ) where
 
-#include "HsVersions.h"
-
-
 import {-# SOURCE #-} 	Module( Module, ModuleName, moduleName )
 import {-# SOURCE #-} 	OccName( OccName )
 
@@ -382,8 +379,8 @@ comma _sty  = Pretty.comma
 colon _sty  = Pretty.colon
 equals _sty = Pretty.equals
 space _sty  = Pretty.space
-dcolon _sty = Pretty.ptext SLIT("::")
-arrow  _sty = Pretty.ptext SLIT("->")
+dcolon _sty = Pretty.ptext (sLit "::")
+arrow  _sty = Pretty.ptext (sLit "->")
 underscore  = char '_'
 dot	    = char '.'
 lparen _sty = Pretty.lparen
@@ -439,8 +436,8 @@ class Outputable a where
 
 \begin{code}
 instance Outputable Bool where
-    ppr True  = ptext SLIT("True")
-    ppr False = ptext SLIT("False")
+    ppr True  = ptext (sLit "True")
+    ppr False = ptext (sLit "False")
 
 instance Outputable Int where
    ppr n = int n
@@ -458,12 +455,12 @@ instance (Outputable a, Outputable b) => Outputable (a, b) where
     ppr (x,y) = parens (sep [ppr x <> comma, ppr y])
 
 instance Outputable a => Outputable (Maybe a) where
-  ppr Nothing = ptext SLIT("Nothing")
-  ppr (Just x) = ptext SLIT("Just") <+> ppr x
+  ppr Nothing = ptext (sLit "Nothing")
+  ppr (Just x) = ptext (sLit "Just") <+> ppr x
 
 instance (Outputable a, Outputable b) => Outputable (Either a b) where
-  ppr (Left x)  = ptext SLIT("Left")  <+> ppr x
-  ppr (Right y) = ptext SLIT("Right") <+> ppr y
+  ppr (Left x)  = ptext (sLit "Left")  <+> ppr x
+  ppr (Right y) = ptext (sLit "Right") <+> ppr y
 
 -- ToDo: may not be used
 instance (Outputable a, Outputable b, Outputable c) => Outputable (a, b, c) where
@@ -570,12 +567,12 @@ pprQuotedList xs = hsep (punctuate comma (map (quotes . ppr) xs))
 
 \begin{code}
 speakNth :: Int -> SDoc
-speakNth 1 = ptext SLIT("first")
-speakNth 2 = ptext SLIT("second")
-speakNth 3 = ptext SLIT("third")
-speakNth 4 = ptext SLIT("fourth")
-speakNth 5 = ptext SLIT("fifth")
-speakNth 6 = ptext SLIT("sixth")
+speakNth 1 = ptext (sLit "first")
+speakNth 2 = ptext (sLit "second")
+speakNth 3 = ptext (sLit "third")
+speakNth 4 = ptext (sLit "fourth")
+speakNth 5 = ptext (sLit "fifth")
+speakNth 6 = ptext (sLit "sixth")
 speakNth n = hcat [ int n, text suffix ]
   where
     suffix | n <= 20       = "th"	-- 11,12,13 are non-std
@@ -587,24 +584,24 @@ speakNth n = hcat [ int n, text suffix ]
     last_dig = n `rem` 10
 
 speakN :: Int -> SDoc
-speakN 0 = ptext SLIT("none")	-- E.g.  "he has none"
-speakN 1 = ptext SLIT("one")	-- E.g.  "he has one"
-speakN 2 = ptext SLIT("two")
-speakN 3 = ptext SLIT("three")
-speakN 4 = ptext SLIT("four")
-speakN 5 = ptext SLIT("five")
-speakN 6 = ptext SLIT("six")
+speakN 0 = ptext (sLit "none")	-- E.g.  "he has none"
+speakN 1 = ptext (sLit "one")	-- E.g.  "he has one"
+speakN 2 = ptext (sLit "two")
+speakN 3 = ptext (sLit "three")
+speakN 4 = ptext (sLit "four")
+speakN 5 = ptext (sLit "five")
+speakN 6 = ptext (sLit "six")
 speakN n = int n
 
 speakNOf :: Int -> SDoc -> SDoc
-speakNOf 0 d = ptext SLIT("no") <+> d <> char 's'	-- E.g. "no arguments"
-speakNOf 1 d = ptext SLIT("one") <+> d			-- E.g. "one argument"
+speakNOf 0 d = ptext (sLit "no") <+> d <> char 's'	-- E.g. "no arguments"
+speakNOf 1 d = ptext (sLit "one") <+> d			-- E.g. "one argument"
 speakNOf n d = speakN n <+> d <> char 's'		-- E.g. "three arguments"
 
 speakNTimes :: Int {- >=1 -} -> SDoc
-speakNTimes t | t == 1 	   = ptext SLIT("once")
-              | t == 2 	   = ptext SLIT("twice")
-              | otherwise  = speakN t <+> ptext SLIT("times")
+speakNTimes t | t == 1 	   = ptext (sLit "once")
+              | t == 2 	   = ptext (sLit "twice")
+              | otherwise  = speakN t <+> ptext (sLit "times")
 
 plural :: [a] -> SDoc
 plural [_] = empty  -- a bit frightening, but there you are
