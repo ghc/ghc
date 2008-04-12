@@ -78,6 +78,7 @@ import GHC.IntWord64 (
 #endif
 
 import GHC.Bool
+import GHC.Ordering
 
 default ()              -- Double isn't available yet,
                         -- and we shouldn't be using defaults anyway
@@ -341,29 +342,25 @@ geInteger (J# s d)   (S# i)     = cmpIntegerInt# s d i >=# 0#
 geInteger (S# i)     (J# s d)   = cmpIntegerInt# s d i <=# 0#
 geInteger (J# s1 d1) (J# s2 d2) = (cmpInteger# s1 d1 s2 d2) >=# 0#
 
--- GT => 1
--- EQ => 0
--- LT => -1
--- XXX Should we just define Ordering higher up?
-compareInteger :: Integer -> Integer -> Int#
+compareInteger :: Integer -> Integer -> Ordering
 compareInteger (S# i)  (S# j)
-   =      if i ==# j then 0#
-     else if i <=# j then -1#
-     else                 1#
+   =      if i ==# j then EQ
+     else if i <=# j then LT
+     else                 GT
 compareInteger (J# s d) (S# i)
    = case cmpIntegerInt# s d i of { res# ->
-     if res# <# 0# then -1# else
-     if res# ># 0# then 1# else 0#
+     if res# <# 0# then LT else
+     if res# ># 0# then GT else EQ
      }
 compareInteger (S# i) (J# s d)
    = case cmpIntegerInt# s d i of { res# ->
-     if res# ># 0# then -1# else
-     if res# <# 0# then 1# else 0#
+     if res# ># 0# then LT else
+     if res# <# 0# then GT else EQ
      }
 compareInteger (J# s1 d1) (J# s2 d2)
    = case cmpInteger# s1 d1 s2 d2 of { res# ->
-     if res# <# 0# then -1# else
-     if res# ># 0# then 1# else 0#
+     if res# <# 0# then LT else
+     if res# ># 0# then GT else EQ
      }
 \end{code}
 
