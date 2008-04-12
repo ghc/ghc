@@ -18,8 +18,6 @@ module VectUtils (
   mkClosureApp
 ) where
 
-#include "HsVersions.h"
-
 import VectCore
 import VectMonad
 
@@ -163,7 +161,7 @@ paDictArgType tv = go (TyVarTy tv) (tyVarKind tv)
     go ty k | Just k' <- kindView k = go ty k'
     go ty (FunTy k1 k2)
       = do
-          tv   <- newTyVar FSLIT("a") k1
+          tv   <- newTyVar (fsLit "a") k1
           mty1 <- go (TyVarTy tv) k1
           case mty1 of
             Just ty1 -> do
@@ -288,7 +286,7 @@ polyAbstract tvs p
     mk_dict_var tv = do
                        r <- paDictArgType tv
                        case r of
-                         Just ty -> liftM Just (newLocalVar FSLIT("dPA") ty)
+                         Just ty -> liftM Just (newLocalVar (fsLit "dPA") ty)
                          Nothing -> return Nothing
 
     mk_lams mdicts = mkLams (tvs ++ [dict | Just dict <- mdicts])
@@ -378,7 +376,7 @@ buildClosures tvs vars [arg_ty] res_ty mk_body
 buildClosures tvs vars (arg_ty : arg_tys) res_ty mk_body
   = do
       res_ty' <- mkClosureTypes arg_tys res_ty
-      arg <- newLocalVVar FSLIT("x") arg_ty
+      arg <- newLocalVVar (fsLit "x") arg_ty
       buildClosure tvs vars arg_ty res_ty'
         . hoistPolyVExpr tvs
         $ do
@@ -395,8 +393,8 @@ buildClosure :: [TyVar] -> [VVar] -> Type -> Type -> VM VExpr -> VM VExpr
 buildClosure tvs vars arg_ty res_ty mk_body
   = do
       (env_ty, env, bind) <- buildEnv vars
-      env_bndr <- newLocalVVar FSLIT("env") env_ty
-      arg_bndr <- newLocalVVar FSLIT("arg") arg_ty
+      env_bndr <- newLocalVVar (fsLit "env") env_ty
+      arg_bndr <- newLocalVVar (fsLit "arg") arg_ty
 
       fn <- hoistPolyVExpr tvs
           $ do
