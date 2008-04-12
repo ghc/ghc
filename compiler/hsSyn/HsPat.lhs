@@ -28,8 +28,6 @@ module HsPat (
 	patsAreAllLits,	isLitPat, isIrrefutableHsPat
     ) where
 
-#include "HsVersions.h"
-
 import {-# SOURCE #-} HsExpr		(SyntaxExpr, LHsExpr, pprLExpr)
 
 -- friends:
@@ -263,9 +261,9 @@ pprPat (NPat l (Just _) _)  = char '-' <> ppr l
 pprPat (NPlusKPat n k _ _)    = hcat [ppr n, char '+', ppr k]
 pprPat (QuasiQuotePat (HsQuasiQuote name quoter _ quote)) 
     = char '$' <> brackets (ppr name) <>
-      ptext SLIT("[:") <> ppr quoter <> ptext SLIT("|") <>
-      ppr quote <> ptext SLIT("|]")
-pprPat (TypePat ty)	      = ptext SLIT("{|") <> ppr ty <> ptext SLIT("|}")
+      ptext (sLit "[:") <> ppr quoter <> ptext (sLit "|") <>
+      ppr quote <> ptext (sLit "|]")
+pprPat (TypePat ty)	      = ptext (sLit "{|") <> ppr ty <> ptext (sLit "|}")
 pprPat (CoPat co pat _)	      = parens (pprHsWrapper (ppr pat) co)
 pprPat (SigPatIn pat ty)      = ppr pat <+> dcolon <+> ppr ty
 pprPat (SigPatOut pat ty)     = ppr pat <+> dcolon <+> ppr ty
@@ -286,7 +284,7 @@ instance (OutputableBndr id, Outputable arg)
   ppr (HsRecFields { rec_flds = flds, rec_dotdot = Just n })
 	= braces (fsep (punctuate comma (map ppr (take n flds) ++ [dotdot])))
 	where
-	  dotdot = ptext SLIT("..") <+> ifPprDebug (ppr (drop n flds))
+	  dotdot = ptext (sLit "..") <+> ifPprDebug (ppr (drop n flds))
 
 instance (OutputableBndr id, Outputable arg)
       => Outputable (HsRecField id arg) where
@@ -297,7 +295,7 @@ instance (OutputableBndr id, Outputable arg)
 -- add parallel array brackets around a document
 --
 pabrackets   :: SDoc -> SDoc
-pabrackets p  = ptext SLIT("[:") <> p <> ptext SLIT(":]")
+pabrackets p  = ptext (sLit "[:") <> p <> ptext (sLit ":]")
 \end{code}
 
 
