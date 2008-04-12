@@ -56,8 +56,6 @@ module BasicTypes(
 	SuccessFlag(..), succeeded, failed, successIf
    ) where
 
-#include "HsVersions.h"
-
 import FastString
 import Outputable
 \end{code}
@@ -146,9 +144,9 @@ data FixityDirection = InfixL | InfixR | InfixN
 		     deriving(Eq)
 
 instance Outputable FixityDirection where
-    ppr InfixL = ptext SLIT("infixl")
-    ppr InfixR = ptext SLIT("infixr")
-    ppr InfixN = ptext SLIT("infix")
+    ppr InfixL = ptext (sLit "infixl")
+    ppr InfixR = ptext (sLit "infixr")
+    ppr InfixN = ptext (sLit "infix")
 
 ------------------------
 maxPrecedence :: Int
@@ -209,8 +207,8 @@ isTopLevel TopLevel	= True
 isTopLevel NotTopLevel  = False
 
 instance Outputable TopLevelFlag where
-  ppr TopLevel    = ptext SLIT("<TopLevel>")
-  ppr NotTopLevel = ptext SLIT("<NotTopLevel>")
+  ppr TopLevel    = ptext (sLit "<TopLevel>")
+  ppr NotTopLevel = ptext (sLit "<NotTopLevel>")
 \end{code}
 
 
@@ -256,8 +254,8 @@ boolToRecFlag True  = Recursive
 boolToRecFlag False = NonRecursive
 
 instance Outputable RecFlag where
-  ppr Recursive    = ptext SLIT("Recursive")
-  ppr NonRecursive = ptext SLIT("NonRecursive")
+  ppr Recursive    = ptext (sLit "Recursive")
+  ppr NonRecursive = ptext (sLit "NonRecursive")
 \end{code}
 
 %************************************************************************
@@ -296,8 +294,8 @@ data OverlapFlag
 
 instance Outputable OverlapFlag where
    ppr NoOverlap  = empty
-   ppr OverlapOk  = ptext SLIT("[overlap ok]")
-   ppr Incoherent = ptext SLIT("[incoherent]")
+   ppr OverlapOk  = ptext (sLit "[overlap ok]")
+   ppr Incoherent = ptext (sLit "[incoherent]")
 
 \end{code}
 
@@ -315,7 +313,7 @@ instance Eq TupCon where
    
 tupleParens :: Boxity -> SDoc -> SDoc
 tupleParens Boxed   p = parens p
-tupleParens Unboxed p = ptext SLIT("(#") <+> p <+> ptext SLIT("#)")
+tupleParens Unboxed p = ptext (sLit "(#") <+> p <+> ptext (sLit "#)")
 \end{code}
 
 %************************************************************************
@@ -452,10 +450,10 @@ isFragileOcc _              = False
 instance Outputable OccInfo where
   -- only used for debugging; never parsed.  KSW 1999-07
   ppr NoOccInfo  	   = empty
-  ppr (IAmALoopBreaker ro) = ptext SLIT("LoopBreaker") <> if ro then char '!' else empty
-  ppr IAmDead		   = ptext SLIT("Dead")
+  ppr (IAmALoopBreaker ro) = ptext (sLit "LoopBreaker") <> if ro then char '!' else empty
+  ppr IAmDead		   = ptext (sLit "Dead")
   ppr (OneOcc inside_lam one_branch int_cxt)
-	= ptext SLIT("Once") <> pp_lam <> pp_br <> pp_args
+	= ptext (sLit "Once") <> pp_lam <> pp_br <> pp_args
 	where
 	  pp_lam | inside_lam = char 'L'
 		 | otherwise  = empty
@@ -493,9 +491,9 @@ isMarkedStrict NotMarkedStrict = False
 isMarkedStrict _               = True   -- All others are strict
 
 instance Outputable StrictnessMark where
-  ppr MarkedStrict     = ptext SLIT("!")
-  ppr MarkedUnboxed    = ptext SLIT("!!")
-  ppr NotMarkedStrict  = ptext SLIT("_")
+  ppr MarkedStrict     = ptext (sLit "!")
+  ppr MarkedUnboxed    = ptext (sLit "!!")
+  ppr NotMarkedStrict  = ptext (sLit "_")
 \end{code}
 
 
@@ -509,8 +507,8 @@ instance Outputable StrictnessMark where
 data SuccessFlag = Succeeded | Failed
 
 instance Outputable SuccessFlag where
-    ppr Succeeded = ptext SLIT("Succeeded")
-    ppr Failed    = ptext SLIT("Failed")
+    ppr Succeeded = ptext (sLit "Succeeded")
+    ppr Failed    = ptext (sLit "Failed")
 
 successIf :: Bool -> SuccessFlag
 successIf True  = Succeeded
@@ -558,18 +556,18 @@ alwaysInlineSpec  = Inline AlwaysActive True	-- INLINE always
 neverInlineSpec   = Inline NeverActive  False	-- NOINLINE 
 
 instance Outputable Activation where
-   ppr NeverActive      = ptext SLIT("NEVER")
-   ppr AlwaysActive     = ptext SLIT("ALWAYS")
+   ppr NeverActive      = ptext (sLit "NEVER")
+   ppr AlwaysActive     = ptext (sLit "ALWAYS")
    ppr (ActiveBefore n) = brackets (char '~' <> int n)
    ppr (ActiveAfter n)  = brackets (int n)
     
 instance Outputable InlineSpec where
    ppr (Inline act is_inline)  
-	| is_inline = ptext SLIT("INLINE")
+	| is_inline = ptext (sLit "INLINE")
 		      <> case act of
 			    AlwaysActive -> empty
 			    _            -> ppr act
-	| otherwise = ptext SLIT("NOINLINE")
+	| otherwise = ptext (sLit "NOINLINE")
 		      <> case act of
 			    NeverActive  -> empty
 			    _            -> ppr act
