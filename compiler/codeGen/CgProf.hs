@@ -74,7 +74,7 @@ curCCS = CmmLoad curCCSAddr wordRep
 
 -- Address of current CCS variable, for storing into
 curCCSAddr :: CmmExpr
-curCCSAddr = CmmLit (CmmLabel (mkRtsDataLabel SLIT("CCCS")))
+curCCSAddr = CmmLit (CmmLabel (mkRtsDataLabel (sLit "CCCS")))
 
 mkCCostCentre :: CostCentre -> CmmLit
 mkCCostCentre cc = CmmLabel (mkCCLabel cc)
@@ -267,7 +267,7 @@ enterCostCentreThunk closure =
   ifProfiling $ do 
     stmtC $ CmmStore curCCSAddr (costCentreFrom closure)
 
-enter_ccs_fun stack = emitRtsCall SLIT("EnterFunCCS") [CmmHinted stack PtrHint] False
+enter_ccs_fun stack = emitRtsCall (sLit "EnterFunCCS") [CmmHinted stack PtrHint] False
 			-- ToDo: vols
 
 enter_ccs_fsub = enteringPAP 0
@@ -279,7 +279,7 @@ enter_ccs_fsub = enteringPAP 0
 -- entering via a PAP.
 enteringPAP :: Integer -> Code
 enteringPAP n
-  = stmtC (CmmStore (CmmLit (CmmLabel (mkRtsDataLabel SLIT("entering_PAP"))))
+  = stmtC (CmmStore (CmmLit (CmmLabel (mkRtsDataLabel (sLit "entering_PAP"))))
 		(CmmLit (CmmInt n cIntRep)))
 
 ifProfiling :: Code -> Code
@@ -392,11 +392,11 @@ emitRegisterCCS ccs = do
     ccs_lit = CmmLit (CmmLabel (mkCCSLabel ccs))
 
 
-cC_LIST = CmmLit (CmmLabel (mkRtsDataLabel SLIT("CC_LIST")))
-cC_ID   = CmmLit (CmmLabel (mkRtsDataLabel SLIT("CC_ID")))
+cC_LIST = CmmLit (CmmLabel (mkRtsDataLabel (sLit "CC_LIST")))
+cC_ID   = CmmLit (CmmLabel (mkRtsDataLabel (sLit "CC_ID")))
 
-cCS_LIST = CmmLit (CmmLabel (mkRtsDataLabel SLIT("CCS_LIST")))
-cCS_ID   = CmmLit (CmmLabel (mkRtsDataLabel SLIT("CCS_ID")))
+cCS_LIST = CmmLit (CmmLabel (mkRtsDataLabel (sLit "CCS_LIST")))
+cCS_ID   = CmmLit (CmmLabel (mkRtsDataLabel (sLit "CCS_ID")))
 
 -- ---------------------------------------------------------------------------
 -- Set the current cost centre stack
@@ -415,7 +415,7 @@ emitSetCCC cc
 pushCostCentre :: LocalReg -> CmmExpr -> CostCentre -> Code
 pushCostCentre result ccs cc
   = emitRtsCallWithResult result PtrHint
-	SLIT("PushCostCentre") [CmmHinted ccs PtrHint, 
+	(sLit "PushCostCentre") [CmmHinted ccs PtrHint, 
 				CmmHinted (CmmLit (mkCCostCentre cc)) PtrHint]
         False
 
@@ -481,7 +481,7 @@ ldvEnter cl_ptr
 
 loadEra :: CmmExpr 
 loadEra = CmmMachOp (MO_U_Conv cIntRep wordRep)
-	  [CmmLoad (mkLblExpr (mkRtsDataLabel SLIT("era"))) cIntRep]
+	  [CmmLoad (mkLblExpr (mkRtsDataLabel (sLit "era"))) cIntRep]
 
 ldvWord :: CmmExpr -> CmmExpr
 -- Takes the address of a closure, and returns 
