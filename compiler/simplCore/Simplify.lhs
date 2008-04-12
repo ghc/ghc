@@ -521,7 +521,7 @@ makeTrivial env expr
   | exprIsTrivial expr
   = return (env, expr)
   | otherwise           -- See Note [Take care] below
-  = do  { var <- newId FSLIT("a") (exprType expr)
+  = do  { var <- newId (fsLit "a") (exprType expr)
         ; env' <- completeNonRecX env False var var expr
         ; return (env', substExpr env' (Var var)) }
 \end{code}
@@ -1485,7 +1485,7 @@ simplCaseBinder env0 scrut0 case_bndr0 alts
 
     improve_seq fam_envs env scrut case_bndr case_bndr1 [(DEFAULT,_,_)]
         | Just (co, ty2) <- topNormaliseType fam_envs (idType case_bndr1)
-        =  do { case_bndr2 <- newId FSLIT("nt") ty2
+        =  do { case_bndr2 <- newId (fsLit "nt") ty2
               ; let rhs  = DoneEx (Var case_bndr2 `Cast` mkSymCoercion co)
                     env2 = extendIdSubst env case_bndr rhs
               ; return (env2, scrut `Cast` co, case_bndr2) }
@@ -1876,10 +1876,10 @@ mkDupableAlt env case_bndr' (con, bndrs', rhs')
         ; (final_bndrs', final_args)    -- Note [Join point abstraction]
                 <- if (any isId used_bndrs')
                    then return (used_bndrs', varsToCoreExprs used_bndrs')
-                    else do { rw_id <- newId FSLIT("w") realWorldStatePrimTy
+                    else do { rw_id <- newId (fsLit "w") realWorldStatePrimTy
                             ; return ([rw_id], [Var realWorldPrimId]) }
 
-        ; join_bndr <- newId FSLIT("$j") (mkPiTypes final_bndrs' rhs_ty')
+        ; join_bndr <- newId (fsLit "$j") (mkPiTypes final_bndrs' rhs_ty')
                 -- Note [Funky mkPiTypes]
 
         ; let   -- We make the lambdas into one-shot-lambdas.  The
