@@ -16,8 +16,6 @@ module TcRnMonad(
 	module IOEnv
   ) where
 
-#include "HsVersions.h"
-
 import TcRnTypes	-- Re-export all
 import IOEnv		-- Re-export all
 
@@ -124,7 +122,7 @@ initTc hsc_env hsc_src keep_rn_syntax mod do_this
 	     } ;
 	     lcl_env = TcLclEnv {
 		tcl_errs       = errs_var,
-		tcl_loc	       = mkGeneralSrcSpan FSLIT("Top level"),
+		tcl_loc	       = mkGeneralSrcSpan (fsLit "Top level"),
 		tcl_ctxt       = [],
 		tcl_rdr	       = emptyLocalRdrEnv,
 		tcl_th_ctxt    = topStage,
@@ -475,7 +473,7 @@ addErrAt loc msg = addLongErrAt loc msg empty
 
 addLongErrAt :: SrcSpan -> Message -> Message -> TcRn ()
 addLongErrAt loc msg extra
-  = do { traceTc (ptext SLIT("Adding error:") <+> (mkLocMessage loc (msg $$ extra))) ;	
+  = do { traceTc (ptext (sLit "Adding error:") <+> (mkLocMessage loc (msg $$ extra))) ;	
 	 errs_var <- getErrsVar ;
 	 rdr_env <- getGlobalRdrEnv ;
          dflags <- getDOpts ;
@@ -501,10 +499,10 @@ addReportAt loc msg
   	 writeMutVar errs_var (warns `snocBag` warn, errs) }
 
 addWarn :: Message -> TcRn ()
-addWarn msg = addReport (ptext SLIT("Warning:") <+> msg)
+addWarn msg = addReport (ptext (sLit "Warning:") <+> msg)
 
 addWarnAt :: SrcSpan -> Message -> TcRn ()
-addWarnAt loc msg = addReportAt loc (ptext SLIT("Warning:") <+> msg)
+addWarnAt loc msg = addReportAt loc (ptext (sLit "Warning:") <+> msg)
 
 addLocWarn :: Located e -> (e -> Message) -> TcRn ()
 addLocWarn (L loc e) fn = addReportAt loc (fn e)
@@ -761,7 +759,7 @@ addWarnTcM :: (TidyEnv, Message) -> TcM ()
 addWarnTcM (env0, msg)
  = do { ctxt <- getErrCtxt ;
 	ctxt_msgs <- do_ctxt env0 ctxt ;
-	addReport (vcat (ptext SLIT("Warning:") <+> msg : ctxt_to_use ctxt_msgs)) }
+	addReport (vcat (ptext (sLit "Warning:") <+> msg : ctxt_to_use ctxt_msgs)) }
 
 warnTc :: Bool -> Message -> TcM ()
 warnTc warn_if_true warn_msg
@@ -945,7 +943,7 @@ initIfaceExtCore :: IfL a -> TcRn a
 initIfaceExtCore thing_inside
   = do  { tcg_env <- getGblEnv 
 	; let { mod = tcg_mod tcg_env
-	      ; doc = ptext SLIT("External Core file for") <+> quotes (ppr mod)
+	      ; doc = ptext (sLit "External Core file for") <+> quotes (ppr mod)
 	      ; if_env = IfGblEnv { 
 			if_rec_types = Just (mod, return (tcg_type_env tcg_env)) }
 	      ; if_lenv = mkIfLclEnv mod doc
@@ -973,7 +971,7 @@ initIfaceTc iface do_this
     }
   where
     mod = mi_module iface
-    doc = ptext SLIT("The interface for") <+> quotes (ppr mod)
+    doc = ptext (sLit "The interface for") <+> quotes (ppr mod)
 
 initIfaceRules :: HscEnv -> ModGuts -> IfG a -> IO a
 -- Used when sucking in new Rules in SimplCore
