@@ -244,8 +244,8 @@ tcExpr in_expr@(SectionR lop@(L loc op) arg2) res_ty
 				   tcApp op 2 (tc_args arg1_ty') res_ty'
 	; return (mkHsWrap co_fn (SectionR (L loc op') arg2')) }
   where
-    doc = ptext SLIT("The section") <+> quotes (ppr in_expr)
-		<+> ptext SLIT("takes one argument")
+    doc = ptext (sLit "The section") <+> quotes (ppr in_expr)
+		<+> ptext (sLit "takes one argument")
     tc_args arg1_ty' qtvs qtys [arg1_ty, arg2_ty] 
 	= do { boxyUnify arg1_ty' (substTyWith qtvs qtys arg1_ty)
 	     ; arg2' <- tcArg lop 2 arg2 qtvs qtys arg2_ty 
@@ -329,12 +329,12 @@ tcExpr (HsProc pat cmd) res_ty
 	; return $ mkHsWrapCoI coi (HsProc pat' cmd') }
 
 tcExpr e@(HsArrApp _ _ _ _ _) _
-  = failWithTc (vcat [ptext SLIT("The arrow command"), nest 2 (ppr e), 
-                      ptext SLIT("was found where an expression was expected")])
+  = failWithTc (vcat [ptext (sLit "The arrow command"), nest 2 (ppr e), 
+                      ptext (sLit "was found where an expression was expected")])
 
 tcExpr e@(HsArrForm _ _ _) _
-  = failWithTc (vcat [ptext SLIT("The arrow command"), nest 2 (ppr e), 
-                      ptext SLIT("was found where an expression was expected")])
+  = failWithTc (vcat [ptext (sLit "The arrow command"), nest 2 (ppr e), 
+                      ptext (sLit "was found where an expression was expected")])
 \end{code}
 
 %************************************************************************
@@ -947,12 +947,12 @@ doStupidChecks fun tv_theta_prs
 				      
 
 tagToEnumError tys
-  = hang (ptext SLIT("Bad call to tagToEnum#") <+> at_type)
-	 2 (vcat [ptext SLIT("Specify the type by giving a type signature"),
-		  ptext SLIT("e.g. (tagToEnum# x) :: Bool")])
+  = hang (ptext (sLit "Bad call to tagToEnum#") <+> at_type)
+	 2 (vcat [ptext (sLit "Specify the type by giving a type signature"),
+		  ptext (sLit "e.g. (tagToEnum# x) :: Bool")])
   where
     at_type | null tys = empty	-- Probably never happens
-	    | otherwise = ptext SLIT("at type") <+> ppr (head tys)
+	    | otherwise = ptext (sLit "at type") <+> ppr (head tys)
 \end{code}
 
 %************************************************************************
@@ -982,10 +982,10 @@ lookupFun orig id_name
 			  Unrefineable    -> return (HsVar id, ty)
 			  Rigid co        -> return (mkHsWrap co (HsVar id), ty) 	
 			  Wobbly 	  -> traceTc (text "lookupFun" <+> ppr id) >> return (HsVar id, ty)	-- Wobbly, or no free vars
-			  WobblyInvisible -> failWithTc (ppr id_name <+> ptext SLIT(" not in scope because it has a wobbly type (solution: add a type annotation)"))
+			  WobblyInvisible -> failWithTc (ppr id_name <+> ptext (sLit " not in scope because it has a wobbly type (solution: add a type annotation)"))
 		      }
 
-    	    other -> failWithTc (ppr other <+> ptext SLIT("used where a value identifer was expected"))
+    	    other -> failWithTc (ppr other <+> ptext (sLit "used where a value identifer was expected"))
     }
 
 #ifndef GHCI  /* GHCI and TH is off */
@@ -1151,38 +1151,38 @@ checkMissingFields data_con rbinds
 Boring and alphabetical:
 \begin{code}
 caseScrutCtxt expr
-  = hang (ptext SLIT("In the scrutinee of a case expression:")) 4 (ppr expr)
+  = hang (ptext (sLit "In the scrutinee of a case expression:")) 4 (ppr expr)
 
 exprCtxt expr
-  = hang (ptext SLIT("In the expression:")) 4 (ppr expr)
+  = hang (ptext (sLit "In the expression:")) 4 (ppr expr)
 
 fieldCtxt field_name
-  = ptext SLIT("In the") <+> quotes (ppr field_name) <+> ptext SLIT("field of a record")
+  = ptext (sLit "In the") <+> quotes (ppr field_name) <+> ptext (sLit "field of a record")
 
 funAppCtxt fun arg arg_no
-  = hang (hsep [ ptext SLIT("In the"), speakNth arg_no, ptext SLIT("argument of"), 
+  = hang (hsep [ ptext (sLit "In the"), speakNth arg_no, ptext (sLit "argument of"), 
 		    quotes (ppr fun) <> text ", namely"])
 	 4 (quotes (ppr arg))
 
 predCtxt expr
-  = hang (ptext SLIT("In the predicate expression:")) 4 (ppr expr)
+  = hang (ptext (sLit "In the predicate expression:")) 4 (ppr expr)
 
 nonVanillaUpd tycon
-  = vcat [ptext SLIT("Record update for the non-Haskell-98 data type") 
+  = vcat [ptext (sLit "Record update for the non-Haskell-98 data type") 
 		<+> quotes (pprSourceTyCon tycon)
-		<+> ptext SLIT("is not (yet) supported"),
-	  ptext SLIT("Use pattern-matching instead")]
+		<+> ptext (sLit "is not (yet) supported"),
+	  ptext (sLit "Use pattern-matching instead")]
 badFieldsUpd rbinds
-  = hang (ptext SLIT("No constructor has all these fields:"))
+  = hang (ptext (sLit "No constructor has all these fields:"))
 	 4 (pprQuotedList (hsRecFields rbinds))
 
 naughtyRecordSel sel_id
-  = ptext SLIT("Cannot use record selector") <+> quotes (ppr sel_id) <+> 
-    ptext SLIT("as a function due to escaped type variables") $$ 
-    ptext SLIT("Probably fix: use pattern-matching syntax instead")
+  = ptext (sLit "Cannot use record selector") <+> quotes (ppr sel_id) <+> 
+    ptext (sLit "as a function due to escaped type variables") $$ 
+    ptext (sLit "Probably fix: use pattern-matching syntax instead")
 
 notSelector field
-  = hsep [quotes (ppr field), ptext SLIT("is not a record selector")]
+  = hsep [quotes (ppr field), ptext (sLit "is not a record selector")]
 
 missingStrictFields :: DataCon -> [FieldLabel] -> SDoc
 missingStrictFields con fields
@@ -1192,19 +1192,19 @@ missingStrictFields con fields
 				-- with strict fields
 	 | otherwise   = colon <+> pprWithCommas ppr fields
 
-    header = ptext SLIT("Constructor") <+> quotes (ppr con) <+> 
-	     ptext SLIT("does not have the required strict field(s)") 
+    header = ptext (sLit "Constructor") <+> quotes (ppr con) <+> 
+	     ptext (sLit "does not have the required strict field(s)") 
 	  
 missingFields :: DataCon -> [FieldLabel] -> SDoc
 missingFields con fields
-  = ptext SLIT("Fields of") <+> quotes (ppr con) <+> ptext SLIT("not initialised:") 
+  = ptext (sLit "Fields of") <+> quotes (ppr con) <+> ptext (sLit "not initialised:") 
 	<+> pprWithCommas ppr fields
 
--- callCtxt fun args = ptext SLIT("In the call") <+> parens (ppr (foldl mkHsApp fun args))
+-- callCtxt fun args = ptext (sLit "In the call") <+> parens (ppr (foldl mkHsApp fun args))
 
 #ifdef GHCI
 polySpliceErr :: Id -> SDoc
 polySpliceErr id
-  = ptext SLIT("Can't splice the polymorphic local variable") <+> quotes (ppr id)
+  = ptext (sLit "Can't splice the polymorphic local variable") <+> quotes (ppr id)
 #endif
 \end{code}
