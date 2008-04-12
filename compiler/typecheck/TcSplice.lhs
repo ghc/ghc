@@ -262,11 +262,11 @@ tc_bracket use_lvl (DecBr decls)
     }
 
 tc_bracket use_lvl (PatBr _)
-  = failWithTc (ptext SLIT("Tempate Haskell pattern brackets are not supported yet"))
+  = failWithTc (ptext (sLit "Tempate Haskell pattern brackets are not supported yet"))
 
 quotedNameStageErr v 
-  = sep [ ptext SLIT("Stage error: the non-top-level quoted name") <+> ppr (VarBr v)
-	, ptext SLIT("must be used at the same stage at which is is bound")]
+  = sep [ ptext (sLit "Stage error: the non-top-level quoted name") <+> ppr (VarBr v)
+	, ptext (sLit "must be used at the same stage at which is is bound")]
 \end{code}
 
 
@@ -431,8 +431,8 @@ runQuasiQuotePat quasiquote
     = runQuasiQuote quasiquote quotePatName "pattern" patQTyConName convertToPat
 
 quoteStageError quoter
-  = sep [ptext SLIT("GHC stage restriction:") <+> ppr quoter,
-         nest 2 (ptext SLIT("is used in a quasiquote, and must be imported, not defined locally"))]
+  = sep [ptext (sLit "GHC stage restriction:") <+> ppr quoter,
+         nest 2 (ptext (sLit "is used in a quasiquote, and must be imported, not defined locally"))]
 \end{code}
 
 
@@ -491,7 +491,7 @@ kcTopSpliceType expr
 
 	-- Rename it, but bale out if there are errors
 	-- otherwise the type checker just gives more spurious errors
-	; let doc = ptext SLIT("In the spliced type") <+> ppr hs_ty2
+	; let doc = ptext (sLit "In the spliced type") <+> ppr hs_ty2
 	; hs_ty3 <- checkNoErrs (rnLHsType doc hs_ty2)
 
 	; kcHsType hs_ty3 }
@@ -688,10 +688,10 @@ showSplice what before after = do
 				    nest 2 after])])
 
 illegalBracket level
-  = ptext SLIT("Illegal bracket at level") <+> ppr level
+  = ptext (sLit "Illegal bracket at level") <+> ppr level
 
 illegalSplice level
-  = ptext SLIT("Illegal splice at level") <+> ppr level
+  = ptext (sLit "Illegal splice at level") <+> ppr level
 
 #endif 	/* GHCI */
 \end{code}
@@ -770,12 +770,12 @@ tcLookupTh name
 
 notInScope :: TH.Name -> SDoc
 notInScope th_name = quotes (text (TH.pprint th_name)) <+> 
-		     ptext SLIT("is not in scope at a reify")
+		     ptext (sLit "is not in scope at a reify")
 	-- Ugh! Rather an indirect way to display the name
 
 notInEnv :: Name -> SDoc
 notInEnv name = quotes (ppr name) <+> 
-		     ptext SLIT("is not in the type environment at a reify")
+		     ptext (sLit "is not in the type environment at a reify")
 
 ------------------------------
 reifyThing :: TcTyThing -> TcM TH.Info
@@ -853,7 +853,7 @@ reifyDataCon tys dc
 	  else
 	     return (TH.NormalC name (stricts `zip` arg_tys)) }
   | otherwise
-  = failWithTc (ptext SLIT("Can't reify a non-Haskell-98 data constructor:") 
+  = failWithTc (ptext (sLit "Can't reify a non-Haskell-98 data constructor:") 
 		<+> quotes (ppr dc))
 
 ------------------------------
@@ -894,7 +894,7 @@ reify_tc_app tc tys = do { tys' <- reifyTypes tys
 
 reifyPred :: TypeRep.PredType -> TcM TH.Type
 reifyPred (ClassP cls tys) = reify_tc_app (reifyName cls) tys
-reifyPred p@(IParam _ _)   = noTH SLIT("implicit parameters") (ppr p)
+reifyPred p@(IParam _ _)   = noTH (sLit "implicit parameters") (ppr p)
 
 
 ------------------------------
@@ -936,7 +936,7 @@ reifyStrict NotMarkedStrict = TH.NotStrict
 
 ------------------------------
 noTH :: LitString -> SDoc -> TcM a
-noTH s d = failWithTc (hsep [ptext SLIT("Can't represent") <+> ptext s <+> 
-				ptext SLIT("in Template Haskell:"),
+noTH s d = failWithTc (hsep [ptext (sLit "Can't represent") <+> ptext s <+> 
+				ptext (sLit "in Template Haskell:"),
 		 	     nest 2 d])
 \end{code}
