@@ -405,23 +405,23 @@ kind_var_occ = mkOccName tvName "k"
 \begin{code}
 pprTcTyVarDetails :: TcTyVarDetails -> SDoc
 -- For debugging
-pprTcTyVarDetails (SkolemTv _)         = ptext SLIT("sk")
-pprTcTyVarDetails (MetaTv BoxTv _)     = ptext SLIT("box")
-pprTcTyVarDetails (MetaTv TauTv _)     = ptext SLIT("tau")
-pprTcTyVarDetails (MetaTv (SigTv _) _) = ptext SLIT("sig")
+pprTcTyVarDetails (SkolemTv _)         = ptext (sLit "sk")
+pprTcTyVarDetails (MetaTv BoxTv _)     = ptext (sLit "box")
+pprTcTyVarDetails (MetaTv TauTv _)     = ptext (sLit "tau")
+pprTcTyVarDetails (MetaTv (SigTv _) _) = ptext (sLit "sig")
 
 pprUserTypeCtxt :: UserTypeCtxt -> SDoc
-pprUserTypeCtxt (FunSigCtxt n)  = ptext SLIT("the type signature for") <+> quotes (ppr n)
-pprUserTypeCtxt ExprSigCtxt     = ptext SLIT("an expression type signature")
-pprUserTypeCtxt (ConArgCtxt c)  = ptext SLIT("the type of the constructor") <+> quotes (ppr c)
-pprUserTypeCtxt (TySynCtxt c)   = ptext SLIT("the RHS of the type synonym") <+> quotes (ppr c)
-pprUserTypeCtxt GenPatCtxt      = ptext SLIT("the type pattern of a generic definition")
-pprUserTypeCtxt LamPatSigCtxt   = ptext SLIT("a pattern type signature")
-pprUserTypeCtxt BindPatSigCtxt  = ptext SLIT("a pattern type signature")
-pprUserTypeCtxt ResSigCtxt      = ptext SLIT("a result type signature")
-pprUserTypeCtxt (ForSigCtxt n)  = ptext SLIT("the foreign declaration for") <+> quotes (ppr n)
-pprUserTypeCtxt DefaultDeclCtxt = ptext SLIT("a type in a `default' declaration")
-pprUserTypeCtxt SpecInstCtxt    = ptext SLIT("a SPECIALISE instance pragma")
+pprUserTypeCtxt (FunSigCtxt n)  = ptext (sLit "the type signature for") <+> quotes (ppr n)
+pprUserTypeCtxt ExprSigCtxt     = ptext (sLit "an expression type signature")
+pprUserTypeCtxt (ConArgCtxt c)  = ptext (sLit "the type of the constructor") <+> quotes (ppr c)
+pprUserTypeCtxt (TySynCtxt c)   = ptext (sLit "the RHS of the type synonym") <+> quotes (ppr c)
+pprUserTypeCtxt GenPatCtxt      = ptext (sLit "the type pattern of a generic definition")
+pprUserTypeCtxt LamPatSigCtxt   = ptext (sLit "a pattern type signature")
+pprUserTypeCtxt BindPatSigCtxt  = ptext (sLit "a pattern type signature")
+pprUserTypeCtxt ResSigCtxt      = ptext (sLit "a result type signature")
+pprUserTypeCtxt (ForSigCtxt n)  = ptext (sLit "the foreign declaration for") <+> quotes (ppr n)
+pprUserTypeCtxt DefaultDeclCtxt = ptext (sLit "a type in a `default' declaration")
+pprUserTypeCtxt SpecInstCtxt    = ptext (sLit "a SPECIALISE instance pragma")
 
 
 --------------------------------
@@ -453,26 +453,26 @@ pprSkolTvBinding tv
   = ASSERT ( isTcTyVar tv )
     quotes (ppr tv) <+> ppr_details (tcTyVarDetails tv)
   where
-    ppr_details (MetaTv TauTv _)   	= ptext SLIT("is a meta type variable")
-    ppr_details (MetaTv BoxTv _)   	= ptext SLIT("is a boxy type variable")
+    ppr_details (MetaTv TauTv _)   	= ptext (sLit "is a meta type variable")
+    ppr_details (MetaTv BoxTv _)   	= ptext (sLit "is a boxy type variable")
     ppr_details (MetaTv (SigTv info) _) = ppr_skol info
     ppr_details (SkolemTv info)		= ppr_skol info
 
-    ppr_skol UnkSkol	    = ptext SLIT("is an unknown type variable")	-- Unhelpful
-    ppr_skol RuntimeUnkSkol = ptext SLIT("is an unknown runtime type")
-    ppr_skol info           = sep [ptext SLIT("is a rigid type variable bound by"),
+    ppr_skol UnkSkol	    = ptext (sLit "is an unknown type variable")	-- Unhelpful
+    ppr_skol RuntimeUnkSkol = ptext (sLit "is an unknown runtime type")
+    ppr_skol info           = sep [ptext (sLit "is a rigid type variable bound by"),
 				   sep [pprSkolInfo info, 
-					 nest 2 (ptext SLIT("at") <+> ppr (getSrcLoc tv))]]
+					 nest 2 (ptext (sLit "at") <+> ppr (getSrcLoc tv))]]
  
 pprSkolInfo :: SkolemInfo -> SDoc
 pprSkolInfo (SigSkol ctxt)   = pprUserTypeCtxt ctxt
-pprSkolInfo (ClsSkol cls)    = ptext SLIT("the class declaration for") <+> quotes (ppr cls)
-pprSkolInfo InstSkol         = ptext SLIT("the instance declaration")
-pprSkolInfo FamInstSkol      = ptext SLIT("the family instance declaration")
-pprSkolInfo (RuleSkol name)  = ptext SLIT("the RULE") <+> doubleQuotes (ftext name)
-pprSkolInfo ArrowSkol        = ptext SLIT("the arrow form")
-pprSkolInfo (PatSkol dc)     = sep [ptext SLIT("the constructor") <+> quotes (ppr dc)]
-pprSkolInfo (GenSkol tvs ty) = sep [ptext SLIT("the polymorphic type"), 
+pprSkolInfo (ClsSkol cls)    = ptext (sLit "the class declaration for") <+> quotes (ppr cls)
+pprSkolInfo InstSkol         = ptext (sLit "the instance declaration")
+pprSkolInfo FamInstSkol      = ptext (sLit "the family instance declaration")
+pprSkolInfo (RuleSkol name)  = ptext (sLit "the RULE") <+> doubleQuotes (ftext name)
+pprSkolInfo ArrowSkol        = ptext (sLit "the arrow form")
+pprSkolInfo (PatSkol dc)     = sep [ptext (sLit "the constructor") <+> quotes (ppr dc)]
+pprSkolInfo (GenSkol tvs ty) = sep [ptext (sLit "the polymorphic type"), 
 				    nest 2 (quotes (ppr (mkForAllTys tvs ty)))]
 
 -- UnkSkol
@@ -482,8 +482,8 @@ pprSkolInfo UnkSkol = panic "UnkSkol"
 pprSkolInfo RuntimeUnkSkol = panic "RuntimeUnkSkol"
 
 instance Outputable MetaDetails where
-  ppr Flexi         = ptext SLIT("Flexi")
-  ppr (Indirect ty) = ptext SLIT("Indirect") <+> ppr ty
+  ppr Flexi         = ptext (sLit "Flexi")
+  ppr (Indirect ty) = ptext (sLit "Indirect") <+> ppr ty
 \end{code}
 
 
