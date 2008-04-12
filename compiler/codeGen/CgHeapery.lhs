@@ -354,7 +354,7 @@ altHeapCheck alt_type code
 	; setRealHp hpHw
 	; code }
   where
-    rts_label PolyAlt = CmmLit (CmmLabel (mkRtsCodeLabel SLIT( "stg_gc_unpt_r1")))
+    rts_label PolyAlt = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "stg_gc_unpt_r1")))
       	-- Do *not* enter R1 after a heap check in
 	-- a polymorphic case.  It might be a function
 	-- and the entry code for a function (currently)
@@ -368,14 +368,14 @@ altHeapCheck alt_type code
     rts_label (PrimAlt tc)
       = CmmLit $ CmmLabel $ 
 	case primRepToCgRep (tyConPrimRep tc) of
-	  VoidArg   -> mkRtsCodeLabel SLIT( "stg_gc_noregs")
-	  FloatArg  -> mkRtsCodeLabel SLIT( "stg_gc_f1")
-	  DoubleArg -> mkRtsCodeLabel SLIT( "stg_gc_d1")
-	  LongArg   -> mkRtsCodeLabel SLIT( "stg_gc_l1")
+	  VoidArg   -> mkRtsCodeLabel (sLit "stg_gc_noregs")
+	  FloatArg  -> mkRtsCodeLabel (sLit "stg_gc_f1")
+	  DoubleArg -> mkRtsCodeLabel (sLit "stg_gc_d1")
+	  LongArg   -> mkRtsCodeLabel (sLit "stg_gc_l1")
 				-- R1 is boxed but unlifted: 
-	  PtrArg    -> mkRtsCodeLabel SLIT( "stg_gc_unpt_r1")
+	  PtrArg    -> mkRtsCodeLabel (sLit "stg_gc_unpt_r1")
 				-- R1 is unboxed:
-	  NonPtrArg -> mkRtsCodeLabel SLIT( "stg_gc_unbx_r1")
+	  NonPtrArg -> mkRtsCodeLabel (sLit "stg_gc_unbx_r1")
 
     rts_label (UbxTupAlt _) = panic "altHeapCheck"
 \end{code}
@@ -413,7 +413,7 @@ unbxTupleHeapCheck regs ptrs nptrs fail_code code
     assign_liveness = CmmAssign (CmmGlobal (VanillaReg 9)) 	-- Ho ho ho!
 				(CmmLit (mkWordCLit liveness))
     liveness 	    = mkRegLiveness regs ptrs nptrs
-    rts_label	    = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("stg_gc_ut")))
+    rts_label	    = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "stg_gc_ut")))
 
 \end{code}
 
@@ -520,7 +520,7 @@ stkChkNodePoints :: CmmExpr -> Code
 stkChkNodePoints bytes
   = do_checks' bytes (CmmLit (mkIntCLit 0)) True False noStmts stg_gc_enter1
 
-stg_gc_gen = CmmLit (CmmLabel (mkRtsCodeLabel SLIT("stg_gc_gen")))
+stg_gc_gen = CmmLit (CmmLabel (mkRtsCodeLabel (sLit "stg_gc_gen")))
 stg_gc_enter1 = CmmReg (CmmGlobal GCEnter1)
 \end{code}
 
