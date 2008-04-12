@@ -295,13 +295,13 @@ dsSpec all_tvs dicts tvs poly_id mono_id mono_bind
 
     void_tvs = all_tvs \\ tvs
 
-    dead_msg bs = vcat [ sep [ptext SLIT("Useless constraint") <> plural bs
-				 <+> ptext SLIT("in specialied type:"),
+    dead_msg bs = vcat [ sep [ptext (sLit "Useless constraint") <> plural bs
+				 <+> ptext (sLit "in specialied type:"),
 			     nest 2 (pprTheta (map get_pred bs))]
-		       , ptext SLIT("SPECIALISE pragma ignored")]
+		       , ptext (sLit "SPECIALISE pragma ignored")]
     get_pred b = ASSERT( isId b ) expectJust "dsSpec" (tcSplitPredTy_maybe (idType b))
 
-    decomp_msg = hang (ptext SLIT("Specialisation too complicated to desugar; ignored"))
+    decomp_msg = hang (ptext (sLit "Specialisation too complicated to desugar; ignored"))
 		    2 (ppr spec_expr)
 
 dsMkArbitraryType :: TcTyVar -> DsM Type
