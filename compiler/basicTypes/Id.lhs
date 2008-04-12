@@ -183,7 +183,7 @@ instantiated before use.
 \begin{code}
 -- "Wild Id" typically used when you need a binder that you don't expect to use
 mkWildId :: Type -> Id
-mkWildId ty = mkSysLocal FSLIT("wild") (mkBuiltinUnique 1) ty
+mkWildId ty = mkSysLocal (fsLit "wild") (mkBuiltinUnique 1) ty
 
 mkWorkerId :: Unique -> Id -> Type -> Id
 -- A worker gets a local name.  CoreTidy will externalise it if necessary.
@@ -201,7 +201,7 @@ mkTemplateLocalsNum :: Int -> [Type] -> [Id]
 mkTemplateLocalsNum n tys = zipWith mkTemplateLocal [n..] tys
 
 mkTemplateLocal :: Int -> Type -> Id
-mkTemplateLocal i ty = mkSysLocal FSLIT("tpl") (mkBuiltinUnique i) ty
+mkTemplateLocal i ty = mkSysLocal (fsLit "tpl") (mkBuiltinUnique i) ty
 \end{code}
 
 
