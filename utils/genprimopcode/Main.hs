@@ -580,7 +580,7 @@ mkPOI_RHS_text i
                       ++ "(" ++ ppType resTy ++ ")"
 
 sl_name :: Entry -> String
-sl_name i = "FSLIT(\"" ++ name i ++ "\") "
+sl_name i = "(fsLit \"" ++ name i ++ "\") "
 
 ppTyVar :: String -> String
 ppTyVar "a" = "alphaTyVar"
