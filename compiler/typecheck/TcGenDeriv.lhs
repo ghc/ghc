@@ -1237,15 +1237,15 @@ gen_Data_binds fix_env tycon
 	  fixity | is_infix  = infix_RDR
 		 | otherwise = prefix_RDR
 
-gfoldl_RDR     = varQual_RDR gENERICS FSLIT("gfoldl")
-gunfold_RDR    = varQual_RDR gENERICS FSLIT("gunfold")
-toConstr_RDR   = varQual_RDR gENERICS FSLIT("toConstr")
-dataTypeOf_RDR = varQual_RDR gENERICS FSLIT("dataTypeOf")
-mkConstr_RDR   = varQual_RDR gENERICS FSLIT("mkConstr")
-mkDataType_RDR = varQual_RDR gENERICS FSLIT("mkDataType")
-conIndex_RDR   = varQual_RDR gENERICS FSLIT("constrIndex")
-prefix_RDR     = dataQual_RDR gENERICS FSLIT("Prefix")
-infix_RDR      = dataQual_RDR gENERICS FSLIT("Infix")
+gfoldl_RDR     = varQual_RDR gENERICS (fsLit "gfoldl")
+gunfold_RDR    = varQual_RDR gENERICS (fsLit "gunfold")
+toConstr_RDR   = varQual_RDR gENERICS (fsLit "toConstr")
+dataTypeOf_RDR = varQual_RDR gENERICS (fsLit "dataTypeOf")
+mkConstr_RDR   = varQual_RDR gENERICS (fsLit "mkConstr")
+mkDataType_RDR = varQual_RDR gENERICS (fsLit "mkDataType")
+conIndex_RDR   = varQual_RDR gENERICS (fsLit "constrIndex")
+prefix_RDR     = dataQual_RDR gENERICS (fsLit "Prefix")
+infix_RDR      = dataQual_RDR gENERICS (fsLit "Infix")
 \end{code}
 
 %************************************************************************
@@ -1511,17 +1511,17 @@ genOpApp e1 op e2 = nlHsPar (nlHsOpApp e1 op e2)
 \end{code}
 
 \begin{code}
-a_RDR		= mkVarUnqual FSLIT("a")
-b_RDR		= mkVarUnqual FSLIT("b")
-c_RDR		= mkVarUnqual FSLIT("c")
-d_RDR		= mkVarUnqual FSLIT("d")
-k_RDR		= mkVarUnqual FSLIT("k")
-z_RDR		= mkVarUnqual FSLIT("z")
-ah_RDR		= mkVarUnqual FSLIT("a#")
-bh_RDR		= mkVarUnqual FSLIT("b#")
-ch_RDR		= mkVarUnqual FSLIT("c#")
-dh_RDR		= mkVarUnqual FSLIT("d#")
-cmp_eq_RDR	= mkVarUnqual FSLIT("cmp_eq")
+a_RDR		= mkVarUnqual (fsLit "a")
+b_RDR		= mkVarUnqual (fsLit "b")
+c_RDR		= mkVarUnqual (fsLit "c")
+d_RDR		= mkVarUnqual (fsLit "d")
+k_RDR		= mkVarUnqual (fsLit "k")
+z_RDR		= mkVarUnqual (fsLit "z")
+ah_RDR		= mkVarUnqual (fsLit "a#")
+bh_RDR		= mkVarUnqual (fsLit "b#")
+ch_RDR		= mkVarUnqual (fsLit "c#")
+dh_RDR		= mkVarUnqual (fsLit "d#")
+cmp_eq_RDR	= mkVarUnqual (fsLit "cmp_eq")
 
 as_RDRs		= [ mkVarUnqual (mkFastString ("a"++show i)) | i <- [(1::Int) .. ] ]
 bs_RDRs		= [ mkVarUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) .. ] ]
