@@ -305,11 +305,11 @@ link LinkBinary dflags batch_attempt_linking hpt
                                Right t -> any (t <) other_times
 
         if not (dopt Opt_ForceRecomp dflags) && not linking_needed
-           then do debugTraceMsg dflags 2 (text exe_file <+> ptext SLIT("is up to date, linking not required."))
+           then do debugTraceMsg dflags 2 (text exe_file <+> ptext (sLit "is up to date, linking not required."))
                    return Succeeded
            else do
 
-        debugTraceMsg dflags 1 (ptext SLIT("Linking") <+> text exe_file
+        debugTraceMsg dflags 1 (ptext (sLit "Linking") <+> text exe_file
                                  <+> text "...")
 
         -- Don't showPass in Batch mode; doLink will do that for us.
