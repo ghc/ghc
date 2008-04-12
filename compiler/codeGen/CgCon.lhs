@@ -174,7 +174,7 @@ buildDynCon binder cc con [arg_amode]
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_INTLIKE && val_int >= mIN_INTLIKE
-  = do 	{ let intlike_lbl   = mkRtsDataLabel SLIT("stg_INTLIKE_closure")
+  = do 	{ let intlike_lbl   = mkRtsDataLabel (sLit "stg_INTLIKE_closure")
 	      offsetW = (val_int - mIN_INTLIKE) * (fixedHdrSize + 1)
 		-- INTLIKE closures consist of a header and one word payload
 	      intlike_amode = CmmLit (cmmLabelOffW intlike_lbl offsetW)
@@ -185,7 +185,7 @@ buildDynCon binder cc con [arg_amode]
   , (_, CmmLit (CmmInt val _)) <- arg_amode
   , let val_int = (fromIntegral val) :: Int
   , val_int <= mAX_CHARLIKE && val_int >= mIN_CHARLIKE
-  = do 	{ let charlike_lbl   = mkRtsDataLabel SLIT("stg_CHARLIKE_closure")
+  = do 	{ let charlike_lbl   = mkRtsDataLabel (sLit "stg_CHARLIKE_closure")
 	      offsetW = (val_int - mIN_CHARLIKE) * (fixedHdrSize + 1)
 		-- CHARLIKE closures consist of a header and one word payload
 	      charlike_amode = CmmLit (cmmLabelOffW charlike_lbl offsetW)
