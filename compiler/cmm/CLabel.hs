@@ -111,9 +111,6 @@ module CLabel (
 	pprCLabel
     ) where
 
-
-#include "HsVersions.h"
-
 import StaticFlags
 import Packages
 import DataCon
@@ -337,19 +334,19 @@ mkPlainModuleInitLabel mod       = PlainModuleInitLabel mod
 
 	-- Some fixed runtime system labels
 
-mkSplitMarkerLabel		= RtsLabel (RtsCode SLIT("__stg_split_marker"))
-mkDirty_MUT_VAR_Label		= RtsLabel (RtsCode SLIT("dirty_MUT_VAR"))
-mkUpdInfoLabel			= RtsLabel (RtsInfo SLIT("stg_upd_frame"))
-mkIndStaticInfoLabel		= RtsLabel (RtsInfo SLIT("stg_IND_STATIC"))
-mkMainCapabilityLabel		= RtsLabel (RtsData SLIT("MainCapability"))
-mkMAP_FROZEN_infoLabel		= RtsLabel (RtsInfo SLIT("stg_MUT_ARR_PTRS_FROZEN0"))
-mkMAP_DIRTY_infoLabel		= RtsLabel (RtsInfo SLIT("stg_MUT_ARR_PTRS_DIRTY"))
-mkEMPTY_MVAR_infoLabel		= RtsLabel (RtsInfo SLIT("stg_EMPTY_MVAR"))
+mkSplitMarkerLabel		= RtsLabel (RtsCode (sLit "__stg_split_marker"))
+mkDirty_MUT_VAR_Label		= RtsLabel (RtsCode (sLit "dirty_MUT_VAR"))
+mkUpdInfoLabel			= RtsLabel (RtsInfo (sLit "stg_upd_frame"))
+mkIndStaticInfoLabel		= RtsLabel (RtsInfo (sLit "stg_IND_STATIC"))
+mkMainCapabilityLabel		= RtsLabel (RtsData (sLit "MainCapability"))
+mkMAP_FROZEN_infoLabel		= RtsLabel (RtsInfo (sLit "stg_MUT_ARR_PTRS_FROZEN0"))
+mkMAP_DIRTY_infoLabel		= RtsLabel (RtsInfo (sLit "stg_MUT_ARR_PTRS_DIRTY"))
+mkEMPTY_MVAR_infoLabel		= RtsLabel (RtsInfo (sLit "stg_EMPTY_MVAR"))
 
-mkTopTickyCtrLabel		= RtsLabel (RtsData SLIT("top_ct"))
-mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsInfo SLIT("stg_CAF_BLACKHOLE"))
+mkTopTickyCtrLabel		= RtsLabel (RtsData (sLit "top_ct"))
+mkCAFBlackHoleInfoTableLabel	= RtsLabel (RtsInfo (sLit "stg_CAF_BLACKHOLE"))
 mkSECAFBlackHoleInfoTableLabel	= if opt_DoTickyProfiling then
-                                    RtsLabel (RtsInfo SLIT("stg_SE_CAF_BLACKHOLE"))
+                                    RtsLabel (RtsInfo (sLit "stg_SE_CAF_BLACKHOLE"))
                                   else  -- RTS won't have info table unless -ticky is on
                                     panic "mkSECAFBlackHoleInfoTableLabel requires -ticky"
 mkRtsPrimOpLabel primop		= RtsLabel (RtsPrimOp primop)
@@ -488,15 +485,15 @@ isMathFun :: CLabel -> Bool
 isMathFun (ForeignLabel fs _ _) = fs `elem` math_funs
   where
   math_funs = [
-        FSLIT("pow"),    FSLIT("sin"),   FSLIT("cos"),
-        FSLIT("tan"),    FSLIT("sinh"),  FSLIT("cosh"),
-        FSLIT("tanh"),   FSLIT("asin"),  FSLIT("acos"),
-        FSLIT("atan"),   FSLIT("log"),   FSLIT("exp"),
-        FSLIT("sqrt"),   FSLIT("powf"),  FSLIT("sinf"),
-        FSLIT("cosf"),   FSLIT("tanf"),  FSLIT("sinhf"),
-        FSLIT("coshf"),  FSLIT("tanhf"), FSLIT("asinf"),
-        FSLIT("acosf"),  FSLIT("atanf"), FSLIT("logf"),
-        FSLIT("expf"),   FSLIT("sqrtf")
+        (fsLit "pow"),    (fsLit "sin"),   (fsLit "cos"),
+        (fsLit "tan"),    (fsLit "sinh"),  (fsLit "cosh"),
+        (fsLit "tanh"),   (fsLit "asin"),  (fsLit "acos"),
+        (fsLit "atan"),   (fsLit "log"),   (fsLit "exp"),
+        (fsLit "sqrt"),   (fsLit "powf"),  (fsLit "sinf"),
+        (fsLit "cosf"),   (fsLit "tanf"),  (fsLit "sinhf"),
+        (fsLit "coshf"),  (fsLit "tanhf"), (fsLit "asinf"),
+        (fsLit "acosf"),  (fsLit "atanf"), (fsLit "logf"),
+        (fsLit "expf"),   (fsLit "sqrtf")
    ]
 isMathFun _ = False
 
@@ -662,10 +659,10 @@ pprCLabel (DynamicLinkerLabel info lbl)
    = pprDynamicLinkerAsmLabel info lbl
    
 pprCLabel PicBaseLabel
-   = ptext SLIT("1b")
+   = ptext (sLit "1b")
    
 pprCLabel (DeadStripPreventer lbl)
-   = pprCLabel lbl <> ptext SLIT("_dsp")
+   = pprCLabel lbl <> ptext (sLit "_dsp")
 #endif
 
 pprCLabel lbl = 
@@ -691,19 +688,19 @@ pprAsmCLbl lbl
    = pprCLbl lbl
 
 pprCLbl (StringLitLabel u)
-  = pprUnique u <> ptext SLIT("_str")
+  = pprUnique u <> ptext (sLit "_str")
 
 pprCLbl (CaseLabel u CaseReturnPt)
-  = hcat [pprUnique u, ptext SLIT("_ret")]
+  = hcat [pprUnique u, ptext (sLit "_ret")]
 pprCLbl (CaseLabel u CaseReturnInfo)
-  = hcat [pprUnique u, ptext SLIT("_info")]
+  = hcat [pprUnique u, ptext (sLit "_info")]
 pprCLbl (CaseLabel u (CaseAlt tag))
-  = hcat [pprUnique u, pp_cSEP, int tag, ptext SLIT("_alt")]
+  = hcat [pprUnique u, pp_cSEP, int tag, ptext (sLit "_alt")]
 pprCLbl (CaseLabel u CaseDefault)
-  = hcat [pprUnique u, ptext SLIT("_dflt")]
+  = hcat [pprUnique u, ptext (sLit "_dflt")]
 
-pprCLbl (LargeSRTLabel u)  = pprUnique u <> pp_cSEP <> ptext SLIT("srtd")
-pprCLbl (LargeBitmapLabel u)  = text "b" <> pprUnique u <> pp_cSEP <> ptext SLIT("btm")
+pprCLbl (LargeSRTLabel u)  = pprUnique u <> pp_cSEP <> ptext (sLit "srtd")
+pprCLbl (LargeBitmapLabel u)  = text "b" <> pprUnique u <> pp_cSEP <> ptext (sLit "btm")
 -- Some bitsmaps for tuple constructors have a numeric tag (e.g. '7')
 -- until that gets resolved we'll just force them to start
 -- with a letter so the label will be legal assmbly code.
@@ -714,68 +711,68 @@ pprCLbl (RtsLabel (RtsData str))   = ptext str
 pprCLbl (RtsLabel (RtsCodeFS str)) = ftext str
 pprCLbl (RtsLabel (RtsDataFS str)) = ftext str
 
-pprCLbl (RtsLabel (RtsApFast str)) = ptext str <> ptext SLIT("_fast")
+pprCLbl (RtsLabel (RtsApFast str)) = ptext str <> ptext (sLit "_fast")
 
 pprCLbl (RtsLabel (RtsSelectorInfoTable upd_reqd offset))
-  = hcat [ptext SLIT("stg_sel_"), text (show offset),
+  = hcat [ptext (sLit "stg_sel_"), text (show offset),
 		ptext (if upd_reqd 
-			then SLIT("_upd_info") 
-			else SLIT("_noupd_info"))
+			then (sLit "_upd_info") 
+			else (sLit "_noupd_info"))
 	]
 
 pprCLbl (RtsLabel (RtsSelectorEntry upd_reqd offset))
-  = hcat [ptext SLIT("stg_sel_"), text (show offset),
+  = hcat [ptext (sLit "stg_sel_"), text (show offset),
 		ptext (if upd_reqd 
-			then SLIT("_upd_entry") 
-			else SLIT("_noupd_entry"))
+			then (sLit "_upd_entry") 
+			else (sLit "_noupd_entry"))
 	]
 
 pprCLbl (RtsLabel (RtsApInfoTable upd_reqd arity))
-  = hcat [ptext SLIT("stg_ap_"), text (show arity),
+  = hcat [ptext (sLit "stg_ap_"), text (show arity),
 		ptext (if upd_reqd 
-			then SLIT("_upd_info") 
-			else SLIT("_noupd_info"))
+			then (sLit "_upd_info") 
+			else (sLit "_noupd_info"))
 	]
 
 pprCLbl (RtsLabel (RtsApEntry upd_reqd arity))
-  = hcat [ptext SLIT("stg_ap_"), text (show arity),
+  = hcat [ptext (sLit "stg_ap_"), text (show arity),
 		ptext (if upd_reqd 
-			then SLIT("_upd_entry") 
-			else SLIT("_noupd_entry"))
+			then (sLit "_upd_entry") 
+			else (sLit "_noupd_entry"))
 	]
 
 pprCLbl (RtsLabel (RtsInfo fs))
-  = ptext fs <> ptext SLIT("_info")
+  = ptext fs <> ptext (sLit "_info")
 
 pprCLbl (RtsLabel (RtsEntry fs))
-  = ptext fs <> ptext SLIT("_entry")
+  = ptext fs <> ptext (sLit "_entry")
 
 pprCLbl (RtsLabel (RtsRetInfo fs))
-  = ptext fs <> ptext SLIT("_info")
+  = ptext fs <> ptext (sLit "_info")
 
 pprCLbl (RtsLabel (RtsRet fs))
-  = ptext fs <> ptext SLIT("_ret")
+  = ptext fs <> ptext (sLit "_ret")
 
 pprCLbl (RtsLabel (RtsInfoFS fs))
-  = ftext fs <> ptext SLIT("_info")
+  = ftext fs <> ptext (sLit "_info")
 
 pprCLbl (RtsLabel (RtsEntryFS fs))
-  = ftext fs <> ptext SLIT("_entry")
+  = ftext fs <> ptext (sLit "_entry")
 
 pprCLbl (RtsLabel (RtsRetInfoFS fs))
-  = ftext fs <> ptext SLIT("_info")
+  = ftext fs <> ptext (sLit "_info")
 
 pprCLbl (RtsLabel (RtsRetFS fs))
-  = ftext fs <> ptext SLIT("_ret")
+  = ftext fs <> ptext (sLit "_ret")
 
 pprCLbl (RtsLabel (RtsPrimOp primop)) 
-  = ppr primop <> ptext SLIT("_fast")
+  = ppr primop <> ptext (sLit "_fast")
 
 pprCLbl (RtsLabel (RtsSlowTickyCtr pat)) 
-  = ptext SLIT("SLOW_CALL_") <> text pat <> ptext SLIT("_ctr")
+  = ptext (sLit "SLOW_CALL_") <> text pat <> ptext (sLit "_ctr")
 
 pprCLbl ModuleRegdLabel
-  = ptext SLIT("_module_registered")
+  = ptext (sLit "_module_registered")
 
 pprCLbl (ForeignLabel str _ _)
   = ftext str
@@ -786,31 +783,31 @@ pprCLbl (CC_Label cc) 		= ppr cc
 pprCLbl (CCS_Label ccs) 	= ppr ccs
 
 pprCLbl (ModuleInitLabel mod way)
-   = ptext SLIT("__stginit_") <> ppr mod
+   = ptext (sLit "__stginit_") <> ppr mod
 	<> char '_' <> text way
 pprCLbl (PlainModuleInitLabel mod)
-   = ptext SLIT("__stginit_") <> ppr mod
+   = ptext (sLit "__stginit_") <> ppr mod
 
 pprCLbl (HpcTicksLabel mod)
-  = ptext SLIT("_hpc_tickboxes_")  <> ppr mod <> ptext SLIT("_hpc")
+  = ptext (sLit "_hpc_tickboxes_")  <> ppr mod <> ptext (sLit "_hpc")
 
 pprCLbl HpcModuleNameLabel
-  = ptext SLIT("_hpc_module_name_str")
+  = ptext (sLit "_hpc_module_name_str")
 
 ppIdFlavor :: IdLabelInfo -> SDoc
 ppIdFlavor x = pp_cSEP <>
 	       (case x of
-		       Closure	    	-> ptext SLIT("closure")
-		       SRT		-> ptext SLIT("srt")
-		       InfoTable    	-> ptext SLIT("info")
-		       Entry	    	-> ptext SLIT("entry")
-		       Slow	    	-> ptext SLIT("slow")
-		       RednCounts	-> ptext SLIT("ct")
-		       ConEntry	    	-> ptext SLIT("con_entry")
-		       ConInfoTable    	-> ptext SLIT("con_info")
-		       StaticConEntry  	-> ptext SLIT("static_entry")
-		       StaticInfoTable 	-> ptext SLIT("static_info")
-		       ClosureTable     -> ptext SLIT("closure_tbl")
+		       Closure	    	-> ptext (sLit "closure")
+		       SRT		-> ptext (sLit "srt")
+		       InfoTable    	-> ptext (sLit "info")
+		       Entry	    	-> ptext (sLit "entry")
+		       Slow	    	-> ptext (sLit "slow")
+		       RednCounts	-> ptext (sLit "ct")
+		       ConEntry	    	-> ptext (sLit "con_entry")
+		       ConInfoTable    	-> ptext (sLit "con_info")
+		       StaticConEntry  	-> ptext (sLit "static_entry")
+		       StaticInfoTable 	-> ptext (sLit "static_info")
+		       ClosureTable     -> ptext (sLit "closure_tbl")
 		      )
 
 
@@ -829,11 +826,11 @@ asmTempLabelPrefix =
 	instead of L123.  (Don't toss the L, because then Lf28
 	turns into $f28.)
      -}
-     SLIT("$")
+     (sLit "$")
 #elif darwin_TARGET_OS
-     SLIT("L")
+     (sLit "L")
 #else
-     SLIT(".L")
+     (sLit ".L")
 #endif
 
 pprDynamicLinkerAsmLabel :: DynamicLinkerLabelInfo -> CLabel -> SDoc
