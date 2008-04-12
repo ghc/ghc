@@ -275,10 +275,10 @@ findBest target (rule1,ans1) ((rule2,ans2):prs)
 			| otherwise          = doubleQuotes (ftext (ru_name rule))
 		in pprTrace "Rules.findBest: rule overlap (Rule 1 wins)"
 			 (vcat [if opt_PprStyle_Debug then 
-				   ptext SLIT("Expression to match:") <+> ppr fn <+> sep (map ppr args)
+				   ptext (sLit "Expression to match:") <+> ppr fn <+> sep (map ppr args)
 				else empty,
-				ptext SLIT("Rule 1:") <+> pp_rule rule1, 
-				ptext SLIT("Rule 2:") <+> pp_rule rule2]) $
+				ptext (sLit "Rule 1:") <+> pp_rule rule1, 
+				ptext (sLit "Rule 2:") <+> pp_rule rule2]) $
 		findBest target (rule1,ans1) prs
   | otherwise = findBest target (rule1,ans1) prs
   where
@@ -832,9 +832,9 @@ ruleAppCheck_help phase fn args rules
     check_rule rule = rule_herald rule <> colon <+> rule_info rule
 
     rule_herald (BuiltinRule { ru_name = name })
-	= ptext SLIT("Builtin rule") <+> doubleQuotes (ftext name)
+	= ptext (sLit "Builtin rule") <+> doubleQuotes (ftext name)
     rule_herald (Rule { ru_name = name })
-	= ptext SLIT("Rule") <+> doubleQuotes (ftext name)
+	= ptext (sLit "Rule") <+> doubleQuotes (ftext name)
 
     rule_info rule
 	| Just _ <- matchRule noBlackList emptyInScopeSet args rough_args rule
