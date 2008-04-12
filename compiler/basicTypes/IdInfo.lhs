@@ -77,8 +77,6 @@ module IdInfo (
         TickBoxOp(..), TickBoxId,
     ) where
 
-#include "HsVersions.h"
-
 import CoreSyn
 import Class
 import PrimOp
@@ -155,7 +153,7 @@ seqNewStrictnessInfo (Just ty) = seqStrictSig ty
 
 pprNewStrictness :: Maybe StrictSig -> SDoc
 pprNewStrictness Nothing = empty
-pprNewStrictness (Just sig) = ftext FSLIT("Str:") <+> ppr sig
+pprNewStrictness (Just sig) = ftext (fsLit "Str:") <+> ppr sig
 
 #ifdef OLD_STRICTNESS
 oldStrictnessFromNew :: StrictSig -> Demand.StrictnessInfo
@@ -263,15 +261,15 @@ notGlobalId :: GlobalIdDetails
 notGlobalId = NotGlobalId
 
 instance Outputable GlobalIdDetails where
-    ppr NotGlobalId       = ptext SLIT("[***NotGlobalId***]")
-    ppr VanillaGlobal     = ptext SLIT("[GlobalId]")
-    ppr (DataConWorkId _) = ptext SLIT("[DataCon]")
-    ppr (DataConWrapId _) = ptext SLIT("[DataConWrapper]")
-    ppr (ClassOpId _)     = ptext SLIT("[ClassOp]")
-    ppr (PrimOpId _)      = ptext SLIT("[PrimOp]")
-    ppr (FCallId _)       = ptext SLIT("[ForeignCall]")
-    ppr (TickBoxOpId _)   = ptext SLIT("[TickBoxOp]")
-    ppr (RecordSelId {})  = ptext SLIT("[RecSel]")
+    ppr NotGlobalId       = ptext (sLit "[***NotGlobalId***]")
+    ppr VanillaGlobal     = ptext (sLit "[GlobalId]")
+    ppr (DataConWorkId _) = ptext (sLit "[DataCon]")
+    ppr (DataConWrapId _) = ptext (sLit "[DataConWrapper]")
+    ppr (ClassOpId _)     = ptext (sLit "[ClassOp]")
+    ppr (PrimOpId _)      = ptext (sLit "[PrimOp]")
+    ppr (FCallId _)       = ptext (sLit "[ForeignCall]")
+    ppr (TickBoxOpId _)   = ptext (sLit "[TickBoxOp]")
+    ppr (RecordSelId {})  = ptext (sLit "[RecSel]")
 \end{code}
 
 
@@ -453,7 +451,7 @@ unknownArity = 0 :: Arity
 
 ppArityInfo :: Int -> SDoc
 ppArityInfo 0 = empty
-ppArityInfo n = hsep [ptext SLIT("Arity"), int n]
+ppArityInfo n = hsep [ptext (sLit "Arity"), int n]
 \end{code}
 
 %************************************************************************
@@ -560,7 +558,7 @@ seqWorker NoWorker	   = ()
 
 ppWorkerInfo :: WorkerInfo -> SDoc
 ppWorkerInfo NoWorker            = empty
-ppWorkerInfo (HasWorker wk_id _) = ptext SLIT("Worker") <+> ppr wk_id
+ppWorkerInfo (HasWorker wk_id _) = ptext (sLit "Worker") <+> ppr wk_id
 
 workerExists :: WorkerInfo -> Bool
 workerExists NoWorker        = False
@@ -605,7 +603,7 @@ seqCaf :: CafInfo -> ()
 seqCaf c = c `seq` ()
 
 ppCafInfo :: CafInfo -> SDoc
-ppCafInfo NoCafRefs = ptext SLIT("NoCafRefs")
+ppCafInfo NoCafRefs = ptext (sLit "NoCafRefs")
 ppCafInfo MayHaveCafRefs = empty
 \end{code}
 
@@ -653,7 +651,7 @@ seqCpr NoCPRInfo  = ()
 noCprInfo       = NoCPRInfo
 
 ppCprInfo NoCPRInfo  = empty
-ppCprInfo ReturnsCPR = ptext SLIT("__M")
+ppCprInfo ReturnsCPR = ptext (sLit "__M")
 
 instance Outputable CprInfo where
     ppr = ppCprInfo
@@ -696,7 +694,7 @@ noLBVarInfo = NoLBVarInfo
 
 pprLBVarInfo :: LBVarInfo -> SDoc
 pprLBVarInfo NoLBVarInfo     = empty
-pprLBVarInfo IsOneShotLambda = ptext SLIT("OneShot")
+pprLBVarInfo IsOneShotLambda = ptext (sLit "OneShot")
 
 instance Outputable LBVarInfo where
     ppr = pprLBVarInfo
@@ -769,5 +767,5 @@ data TickBoxOp
           -- ^Tick box for Hpc-style coverage
 
 instance Outputable TickBoxOp where
-    ppr (TickBox mod n)         = ptext SLIT("tick") <+> ppr (mod,n)
+    ppr (TickBox mod n)         = ptext (sLit "tick") <+> ppr (mod,n)
 \end{code}
