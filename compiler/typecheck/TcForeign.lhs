@@ -25,8 +25,6 @@ module TcForeign
         , tcForeignExports
 	) where
 
-#include "HsVersions.h"
-
 import HsSyn
 
 import TcRnMonad
@@ -184,7 +182,7 @@ checkFEDArgs arg_tys
     integral_args = sum [ (machRepByteWidth . argMachRep . primRepToCgRep) prim_rep
 			| prim_rep <- map typePrimRep arg_tys,
 			  primRepHint prim_rep /= FloatHint ]
-    err = ptext SLIT("On Alpha, I can only handle 32 bytes of non-floating-point arguments to foreign export dynamic")
+    err = ptext (sLit "On Alpha, I can only handle 32 bytes of non-floating-point arguments to foreign export dynamic")
 #else
 checkFEDArgs arg_tys = return ()
 #endif
@@ -347,8 +345,8 @@ check True _	   = return ()
 check _    the_err = addErrTc the_err
 
 illegalForeignTyErr arg_or_res ty
-  = hang (hsep [ptext SLIT("Unacceptable"), arg_or_res, 
-                ptext SLIT("type in foreign declaration:")])
+  = hang (hsep [ptext (sLit "Unacceptable"), arg_or_res, 
+                ptext (sLit "type in foreign declaration:")])
 	 4 (hsep [ppr ty])
 
 -- Used for 'arg_or_res' argument to illegalForeignTyErr
@@ -357,14 +355,14 @@ result   = text "result"
 
 badCName :: CLabelString -> Message
 badCName target 
-   = sep [quotes (ppr target) <+> ptext SLIT("is not a valid C identifier")]
+   = sep [quotes (ppr target) <+> ptext (sLit "is not a valid C identifier")]
 
 foreignDeclCtxt fo
-  = hang (ptext SLIT("When checking declaration:"))
+  = hang (ptext (sLit "When checking declaration:"))
          4 (ppr fo)
 
 illegalDNMethodSig 
-  = ptext SLIT("'This pointer' expected as last argument")
+  = ptext (sLit "'This pointer' expected as last argument")
 
 \end{code}
 
