@@ -116,7 +116,7 @@ data CCallTarget
 
 isDynamicTarget :: CCallTarget -> Bool
 isDynamicTarget DynamicTarget = True
-isDynamicTarget other	      = False
+isDynamicTarget _             = False
 \end{code}
 
 
