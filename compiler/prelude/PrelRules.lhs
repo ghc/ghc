@@ -15,13 +15,6 @@ ToDo:
 
 {-# OPTIONS -optc-DNON_POSIX_SOURCE #-}
 
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module PrelRules ( primOpRules, builtinRules ) where
 
 #include "HsVersions.h"
@@ -186,7 +179,7 @@ primOpRules op op_name = primop_rule op
     primop_rule WordEqOp	= relop (==)
     primop_rule WordNeOp	= relop (/=)
 
-    primop_rule other		= []
+    primop_rule _    		= []
 
 
 \end{code}
@@ -227,7 +220,7 @@ cmpOp cmp l1 l2
     go (MachWord64 i1) (MachWord64 i2) = done (i1 `compare` i2)
     go (MachFloat i1)  (MachFloat i2)  = done (i1 `compare` i2)
     go (MachDouble i1) (MachDouble i2) = done (i1 `compare` i2)
-    go l1	       l2	       = Nothing
+    go _               _               = Nothing
 
 --------------------------
 
@@ -237,23 +230,23 @@ negOp (MachFloat f)    = Just (mkFloatVal (-f))
 negOp (MachDouble 0.0) = Nothing
 negOp (MachDouble d)   = Just (mkDoubleVal (-d))
 negOp (MachInt i)      = intResult (-i)
-negOp l		       = Nothing
+negOp _                = Nothing
 
 --------------------------
 intOp2 :: (Integer->Integer->Integer) -> Literal -> Literal -> Maybe CoreExpr
 intOp2 op (MachInt i1) (MachInt i2) = intResult (i1 `op` i2)
-intOp2 op l1	       l2	    = Nothing		-- Could find LitLit
+intOp2 _  _            _            = Nothing -- Could find LitLit
 
 intOp2Z :: (Integer->Integer->Integer) -> Literal -> Literal -> Maybe CoreExpr
 -- Like intOp2, but Nothing if i2=0
 intOp2Z op (MachInt i1) (MachInt i2)
   | i2 /= 0 = intResult (i1 `op` i2)
-intOp2Z op l1 l2 = Nothing		-- LitLit or zero dividend
+intOp2Z _ _ _ = Nothing		-- LitLit or zero dividend
 
 intShiftOp2 :: (Integer->Int->Integer) -> Literal -> Literal -> Maybe CoreExpr
 	-- Shifts take an Int; hence second arg of op is Int
 intShiftOp2 op (MachInt i1) (MachInt i2) = intResult (i1 `op` fromInteger i2)
-intShiftOp2 op l1           l2           = Nothing 
+intShiftOp2 _  _            _            = Nothing 
 
 shiftRightLogical :: Integer -> Int -> Integer
 -- Shift right, putting zeros in rather than sign-propagating as Bits.shiftR would do
@@ -266,41 +259,51 @@ shiftRightLogical x n = fromIntegral (fromInteger x `shiftR` n :: Word)
 wordOp2 :: (Integer->Integer->Integer) -> Literal -> Literal -> Maybe CoreExpr
 wordOp2 op (MachWord w1) (MachWord w2)
   = wordResult (w1 `op` w2)
-wordOp2 op l1 l2 = Nothing		-- Could find LitLit
+wordOp2 _ _ _ = Nothing		-- Could find LitLit
 
 wordOp2Z :: (Integer->Integer->Integer) -> Literal -> Literal -> Maybe CoreExpr
 wordOp2Z op (MachWord w1) (MachWord w2)
   | w2 /= 0 = wordResult (w1 `op` w2)
-wordOp2Z op l1 l2 = Nothing	-- LitLit or zero dividend
+wordOp2Z _ _ _ = Nothing	-- LitLit or zero dividend
 
-wordBitOp2 op l1@(MachWord w1) l2@(MachWord w2)
+wordBitOp2 :: (Integer->Integer->Integer) -> Literal -> Literal
+           -> Maybe CoreExpr
+wordBitOp2 op (MachWord w1) (MachWord w2)
   = wordResult (w1 `op` w2)
-wordBitOp2 op l1 l2 = Nothing		-- Could find LitLit
+wordBitOp2 _ _ _ = Nothing		-- Could find LitLit
 
 wordShiftOp2 :: (Integer->Int->Integer) -> Literal -> Literal -> Maybe CoreExpr
 	-- Shifts take an Int; hence second arg of op is Int
 wordShiftOp2 op (MachWord x) (MachInt n) 
   = wordResult (x `op` fromInteger n)
 	-- Do the shift at type Integer
-wordShiftOp2 op l1 l2 = Nothing	
+wordShiftOp2 _ _ _ = Nothing	
 
 --------------------------
+floatOp2 :: (Rational -> Rational -> Rational) -> Literal -> Literal
+         -> Maybe (Expr CoreBndr)
 floatOp2  op (MachFloat f1) (MachFloat f2)
   = Just (mkFloatVal (f1 `op` f2))
-floatOp2  op l1 l2 = Nothing
+floatOp2 _ _ _ = Nothing
 
+floatOp2Z :: (Rational -> Rational -> Rational) -> Literal -> Literal
+          -> Maybe (Expr CoreBndr)
 floatOp2Z op (MachFloat f1) (MachFloat f2)
   | f2 /= 0   = Just (mkFloatVal (f1 `op` f2))
-floatOp2Z op l1 l2 = Nothing
+floatOp2Z _ _ _ = Nothing
 
 --------------------------
+doubleOp2 :: (Rational -> Rational -> Rational) -> Literal -> Literal
+          -> Maybe (Expr CoreBndr)
 doubleOp2  op (MachDouble f1) (MachDouble f2)
   = Just (mkDoubleVal (f1 `op` f2))
-doubleOp2 op l1 l2 = Nothing
+doubleOp2 _ _ _ = Nothing
 
+doubleOp2Z :: (Rational -> Rational -> Rational) -> Literal -> Literal
+           -> Maybe (Expr CoreBndr)
 doubleOp2Z op (MachDouble f1) (MachDouble f2)
   | f2 /= 0   = Just (mkDoubleVal (f1 `op` f2))
-doubleOp2Z op l1 l2 = Nothing
+doubleOp2Z _ _ _ = Nothing
 
 
 --------------------------
@@ -334,7 +337,7 @@ litEq op_name is_eq
   where
     rule_fn [Lit lit, expr] = do_lit_eq lit expr
     rule_fn [expr, Lit lit] = do_lit_eq lit expr
-    rule_fn other	    = Nothing
+    rule_fn _    	    = Nothing
     
     do_lit_eq lit expr
       = Just (Case expr (mkWildId (literalType lit)) boolTy
@@ -400,11 +403,16 @@ convFloating (MachDouble d) | not opt_SimplExcessPrecision =
    MachDouble (toRational ((fromRational d) :: Double))
 convFloating l = l
 
+trueVal, falseVal :: Expr CoreBndr
 trueVal       = Var trueDataConId
 falseVal      = Var falseDataConId
+mkIntVal :: Integer -> Expr CoreBndr
 mkIntVal    i = Lit (mkMachInt  i)
+mkWordVal :: Integer -> Expr CoreBndr
 mkWordVal   w = Lit (mkMachWord w)
+mkFloatVal :: Rational -> Expr CoreBndr
 mkFloatVal  f = Lit (convFloating (MachFloat  f))
+mkDoubleVal :: Rational -> Expr CoreBndr
 mkDoubleVal d = Lit (convFloating (MachDouble d))
 \end{code}
 
@@ -416,6 +424,7 @@ mkDoubleVal d = Lit (convFloating (MachDouble d))
 %************************************************************************
 
 \begin{code}
+tagToEnumRule :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
 tagToEnumRule [Type ty, Lit (MachInt i)]
   = ASSERT( isEnumerationTyCon tycon ) 
     case filter correct_tag (tyConDataCons_maybe tycon `orElse` []) of
@@ -429,7 +438,7 @@ tagToEnumRule [Type ty, Lit (MachInt i)]
     tag   = fromInteger i
     tycon = tyConAppTyCon ty
 
-tagToEnumRule other = Nothing
+tagToEnumRule _ = Nothing
 \end{code}
 
 For dataToTag#, we can reduce if either 
@@ -438,6 +447,7 @@ For dataToTag#, we can reduce if either
 	(b) the argument is a variable whose unfolding is a known constructor
 
 \begin{code}
+dataToTagRule :: [Expr CoreBndr] -> Maybe (Arg CoreBndr)
 dataToTagRule [Type ty1, Var tag_to_enum `App` Type ty2 `App` tag]
   | tag_to_enum `hasKey` tagToEnumKey
   , ty1 `coreEqType` ty2
@@ -448,7 +458,7 @@ dataToTagRule [_, val_arg]
   = ASSERT( not (isNewTyCon (dataConTyCon dc)) )
     Just (mkIntVal (toInteger (dataConTag dc - fIRST_TAG)))
 
-dataToTagRule other = Nothing
+dataToTagRule _ = Nothing
 \end{code}
 
 %************************************************************************
@@ -501,6 +511,7 @@ builtinRules
 -- The rule is this:
 -- 	unpackFoldrCString# "foo" c (unpackFoldrCString# "baz" c n)  =  unpackFoldrCString# "foobaz" c n
 
+match_append_lit :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
 match_append_lit [Type ty1,
 		   Lit (MachStr s1),
 		   c1,
@@ -517,19 +528,20 @@ match_append_lit [Type ty1,
 		   `App` c1
 		   `App` n)
 
-match_append_lit other = Nothing
+match_append_lit _ = Nothing
 
 ---------------------------------------------------
 -- The rule is this:
 -- 	eqString (unpackCString# (Lit s1)) (unpackCString# (Lit s2) = s1==s2
 
+match_eq_string :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
 match_eq_string [Var unpk1 `App` Lit (MachStr s1),
 		 Var unpk2 `App` Lit (MachStr s2)]
   | unpk1 `hasKey` unpackCStringIdKey,
     unpk2 `hasKey` unpackCStringIdKey
   = Just (if s1 == s2 then trueVal else falseVal)
 
-match_eq_string other = Nothing
+match_eq_string _ = Nothing
 
 
 ---------------------------------------------------
@@ -545,10 +557,11 @@ match_eq_string other = Nothing
 --     programmer can't avoid
 --
 -- Also, don't forget about 'inline's type argument!
+match_inline :: [Expr CoreBndr] -> Maybe (Expr CoreBndr)
 match_inline (Type _ : e : _)
   | (Var f, args1) <- collectArgs e,
     Just unf <- maybeUnfoldingTemplate (idUnfolding f)
   = Just (mkApps unf args1)
 
-match_inline other = Nothing
+match_inline _ = Nothing
 \end{code}		
