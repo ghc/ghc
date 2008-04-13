@@ -10,13 +10,6 @@ This module tracks the ``state interface'' document, ``GHC prelude:
 types and operations.''
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TysWiredIn (
 	wiredInTyCons, 
 
@@ -65,13 +58,13 @@ import TysPrim
 -- others:
 import Constants	( mAX_TUPLE_SIZE )
 import Module		( Module )
-import RdrName		( nameRdrName )
+import RdrName
 import Name		( Name, BuiltInSyntax(..), nameUnique, nameOccName, 
 			  nameModule, mkWiredInName )
 import OccName		( mkOccNameFS, tcName, dataName, mkTupleOcc,
 			  mkDataConWorkerOcc )
 import DataCon		( DataCon, mkDataCon, dataConWorkId, dataConSourceArity )
-import Var		( TyVar, tyVarKind )
+import Var
 import TyCon		( TyCon, AlgTyConRhs(DataTyCon), tyConDataCons,
 			  mkTupleTyCon, mkAlgTyCon, tyConName,
 			  TyConParent(NoParentTyCon) )
@@ -91,8 +84,11 @@ import Array
 import FastString
 import Outputable
 
+alpha_tyvar :: [TyVar]
 alpha_tyvar = [alphaTyVar]
-alpha_ty    = [alphaTy]
+
+alpha_ty :: [Type]
+alpha_ty = [alphaTy]
 \end{code}
 
 
@@ -137,37 +133,45 @@ wiredInTyCons = [ unitTyCon	-- Not treated like other tuples, because
 
 \begin{code}
 mkWiredInTyConName :: BuiltInSyntax -> Module -> FastString -> Unique -> TyCon -> Name
-mkWiredInTyConName built_in mod fs uniq tycon
-  = mkWiredInName mod (mkOccNameFS tcName fs) uniq
+mkWiredInTyConName built_in modu fs unique tycon
+  = mkWiredInName modu (mkOccNameFS tcName fs) unique
 		  (ATyCon tycon)	-- Relevant TyCon
 		  built_in
 
 mkWiredInDataConName :: BuiltInSyntax -> Module -> FastString -> Unique -> DataCon -> Name
-mkWiredInDataConName built_in mod fs uniq datacon
-  = mkWiredInName mod (mkOccNameFS dataName fs) uniq
+mkWiredInDataConName built_in modu fs unique datacon
+  = mkWiredInName modu (mkOccNameFS dataName fs) unique
 		  (ADataCon datacon)	-- Relevant DataCon
 		  built_in
 
+charTyConName, charDataConName, intTyConName, intDataConName :: Name
 charTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE (fsLit "Char") charTyConKey charTyCon
 charDataConName   = mkWiredInDataConName UserSyntax gHC_BASE (fsLit "C#") charDataConKey charDataCon
 intTyConName	  = mkWiredInTyConName   UserSyntax gHC_BASE (fsLit "Int") intTyConKey   intTyCon
 intDataConName	  = mkWiredInDataConName UserSyntax gHC_BASE (fsLit "I#") intDataConKey  intDataCon
-						  
+
+boolTyConName, falseDataConName, trueDataConName :: Name
 boolTyConName	  = mkWiredInTyConName   UserSyntax gHC_BOOL (fsLit "Bool") boolTyConKey boolTyCon
 falseDataConName  = mkWiredInDataConName UserSyntax gHC_BOOL (fsLit "False") falseDataConKey falseDataCon
 trueDataConName	  = mkWiredInDataConName UserSyntax gHC_BOOL (fsLit "True")  trueDataConKey  trueDataCon 
+
+listTyConName, nilDataConName, consDataConName :: Name
 listTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_BASE (fsLit "[]") listTyConKey listTyCon
 nilDataConName 	  = mkWiredInDataConName BuiltInSyntax gHC_BASE (fsLit "[]") nilDataConKey nilDataCon 
 consDataConName	  = mkWiredInDataConName BuiltInSyntax gHC_BASE (fsLit ":") consDataConKey consDataCon
 
+floatTyConName, floatDataConName, doubleTyConName, doubleDataConName :: Name
 floatTyConName	   = mkWiredInTyConName   UserSyntax gHC_FLOAT (fsLit "Float") floatTyConKey floatTyCon
 floatDataConName   = mkWiredInDataConName UserSyntax gHC_FLOAT (fsLit "F#") floatDataConKey floatDataCon
 doubleTyConName    = mkWiredInTyConName   UserSyntax gHC_FLOAT (fsLit "Double") doubleTyConKey doubleTyCon
 doubleDataConName  = mkWiredInDataConName UserSyntax gHC_FLOAT (fsLit "D#") doubleDataConKey doubleDataCon
 
+parrTyConName, parrDataConName :: Name
 parrTyConName	  = mkWiredInTyConName   BuiltInSyntax gHC_PARR (fsLit "[::]") parrTyConKey parrTyCon 
 parrDataConName   = mkWiredInDataConName UserSyntax    gHC_PARR (fsLit "PArr") parrDataConKey parrDataCon
 
+boolTyCon_RDR, false_RDR, true_RDR, intTyCon_RDR, charTyCon_RDR,
+    intDataCon_RDR, listTyCon_RDR, consDataCon_RDR, parrTyCon_RDR:: RdrName
 boolTyCon_RDR   = nameRdrName boolTyConName
 false_RDR	= nameRdrName falseDataConName
 true_RDR	= nameRdrName trueDataConName
@@ -197,9 +201,12 @@ funKindTyCon_RDR          = nameRdrName funKindTyConName
 %************************************************************************
 
 \begin{code}
+pcNonRecDataTyCon :: Name -> [TyVar] -> [DataCon] -> TyCon
 pcNonRecDataTyCon = pcTyCon False NonRecursive
+pcRecDataTyCon :: Name -> [TyVar] -> [DataCon] -> TyCon
 pcRecDataTyCon    = pcTyCon False Recursive
 
+pcTyCon :: Bool -> RecFlag -> Name -> [TyVar] -> [DataCon] -> TyCon
 pcTyCon is_enum is_rec name tyvars cons
   = tycon
   where
@@ -240,10 +247,10 @@ pcDataConWithFixity declared_infix dc_name tyvars arg_tys tycon
 		(mkDataConIds bogus_wrap_name wrk_name data_con)
 		
 
-    mod      = nameModule dc_name
+    modu      = nameModule dc_name
     wrk_occ  = mkDataConWorkerOcc (nameOccName dc_name)
     wrk_key  = incrUnique (nameUnique dc_name)
-    wrk_name = mkWiredInName mod wrk_occ wrk_key
+    wrk_name = mkWiredInName modu wrk_occ wrk_key
 			     (AnId (dataConWorkId data_con)) UserSyntax
     bogus_wrap_name = pprPanic "Wired-in data wrapper id" (ppr dc_name)
 	-- Wired-in types are too simple to need wrappers
@@ -275,8 +282,8 @@ mk_tuple :: Boxity -> Int -> (TyCon,DataCon)
 mk_tuple boxity arity = (tycon, tuple_con)
   where
 	tycon   = mkTupleTyCon tc_name tc_kind arity tyvars tuple_con boxity gen_info 
-	mod	= mkTupleModule boxity arity
-	tc_name = mkWiredInName mod (mkTupleOcc tcName boxity arity) tc_uniq
+	modu	= mkTupleModule boxity arity
+	tc_name = mkWiredInName modu (mkTupleOcc tcName boxity arity) tc_uniq
 				(ATyCon tycon) BuiltInSyntax
     	tc_kind = mkArrowKinds (map tyVarKind tyvars) res_kind
 	res_kind | isBoxed boxity = liftedTypeKind
@@ -287,23 +294,31 @@ mk_tuple boxity arity = (tycon, tuple_con)
 
 	tuple_con = pcDataCon dc_name tyvars tyvar_tys tycon
 	tyvar_tys = mkTyVarTys tyvars
-	dc_name   = mkWiredInName mod (mkTupleOcc dataName boxity arity) dc_uniq
+	dc_name   = mkWiredInName modu (mkTupleOcc dataName boxity arity) dc_uniq
 				  (ADataCon tuple_con) BuiltInSyntax
  	tc_uniq   = mkTupleTyConUnique   boxity arity
 	dc_uniq   = mkTupleDataConUnique boxity arity
 	gen_info  = True		-- Tuples all have generics..
 					-- hmm: that's a *lot* of code
 
+unitTyCon :: TyCon
 unitTyCon     = tupleTyCon Boxed 0
+unitDataCon :: DataCon
 unitDataCon   = head (tyConDataCons unitTyCon)
+unitDataConId :: Id
 unitDataConId = dataConWorkId unitDataCon
 
+pairTyCon :: TyCon
 pairTyCon = tupleTyCon Boxed 2
 
+unboxedSingletonTyCon :: TyCon
 unboxedSingletonTyCon   = tupleTyCon Unboxed 1
+unboxedSingletonDataCon :: DataCon
 unboxedSingletonDataCon = tupleCon   Unboxed 1
 
+unboxedPairTyCon :: TyCon
 unboxedPairTyCon   = tupleTyCon Unboxed 2
+unboxedPairDataCon :: DataCon
 unboxedPairDataCon = tupleCon   Unboxed 2
 \end{code}
 
@@ -314,33 +329,47 @@ unboxedPairDataCon = tupleCon   Unboxed 2
 %************************************************************************
 
 \begin{code}
+charTy :: Type
 charTy = mkTyConTy charTyCon
 
+charTyCon :: TyCon
 charTyCon   = pcNonRecDataTyCon charTyConName [] [charDataCon]
+charDataCon :: DataCon
 charDataCon = pcDataCon charDataConName [] [charPrimTy] charTyCon
 
+stringTy :: Type
 stringTy = mkListTy charTy -- convenience only
 \end{code}
 
 \begin{code}
+intTy :: Type
 intTy = mkTyConTy intTyCon 
 
+intTyCon :: TyCon
 intTyCon = pcNonRecDataTyCon intTyConName [] [intDataCon]
+intDataCon :: DataCon
 intDataCon = pcDataCon intDataConName [] [intPrimTy] intTyCon
 \end{code}
 
 \begin{code}
+floatTy :: Type
 floatTy	= mkTyConTy floatTyCon
 
+floatTyCon :: TyCon
 floatTyCon   = pcNonRecDataTyCon floatTyConName   [] [floatDataCon]
+floatDataCon :: DataCon
 floatDataCon = pcDataCon         floatDataConName [] [floatPrimTy] floatTyCon
 \end{code}
 
 \begin{code}
+doubleTy :: Type
 doubleTy = mkTyConTy doubleTyCon
 
-doubleTyCon   = pcNonRecDataTyCon doubleTyConName   [] [doubleDataCon]
-doubleDataCon = pcDataCon	  doubleDataConName [] [doublePrimTy] doubleTyCon
+doubleTyCon :: TyCon
+doubleTyCon = pcNonRecDataTyCon doubleTyConName [] [doubleDataCon]
+
+doubleDataCon :: DataCon
+doubleDataCon = pcDataCon doubleDataConName [] [doublePrimTy] doubleTyCon
 \end{code}
 
 
@@ -393,14 +422,18 @@ primitive counterpart.
 {\em END IDLE SPECULATION BY SIMON}
 
 \begin{code}
+boolTy :: Type
 boolTy = mkTyConTy boolTyCon
 
+boolTyCon :: TyCon
 boolTyCon = pcTyCon True NonRecursive boolTyConName
 		    [] [falseDataCon, trueDataCon]
 
+falseDataCon, trueDataCon :: DataCon
 falseDataCon = pcDataCon falseDataConName [] [] boolTyCon
 trueDataCon  = pcDataCon trueDataConName  [] [] boolTyCon
 
+falseDataConId, trueDataConId :: Id
 falseDataConId = dataConWorkId falseDataCon
 trueDataConId  = dataConWorkId trueDataCon
 \end{code}
@@ -424,9 +457,12 @@ data (,) a b = (,,) a b
 mkListTy :: Type -> Type
 mkListTy ty = mkTyConApp listTyCon [ty]
 
+listTyCon :: TyCon
 listTyCon = pcRecDataTyCon listTyConName alpha_tyvar [nilDataCon, consDataCon]
 
+nilDataCon :: DataCon
 nilDataCon  = pcDataCon nilDataConName alpha_tyvar [] listTyCon
+consDataCon :: DataCon
 consDataCon = pcDataConWithFixity True {- Declared infix -}
 	       consDataConName
  	       alpha_tyvar [alphaTy, mkTyConApp listTyCon alpha_ty] listTyCon
@@ -485,6 +521,7 @@ done by enumeration\srcloc{lib/prelude/InTup?.hs}.
 mkTupleTy :: Boxity -> Int -> [Type] -> Type
 mkTupleTy boxity arity tys = mkTyConApp (tupleTyCon boxity arity) tys
 
+unitTy :: Type
 unitTy = mkTupleTy Boxed 0 []
 \end{code}
 
@@ -555,9 +592,9 @@ mkPArrFakeCon arity  = data_con
 	tyvar     = head alphaTyVars
 	tyvarTys  = replicate arity $ mkTyVarTy tyvar
         nameStr   = mkFastString ("MkPArr" ++ show arity)
-	name      = mkWiredInName gHC_PARR (mkOccNameFS dataName nameStr) uniq
+	name      = mkWiredInName gHC_PARR (mkOccNameFS dataName nameStr) unique
 				  (ADataCon data_con) UserSyntax
-	uniq      = mkPArrDataConUnique arity
+	unique      = mkPArrDataConUnique arity
 
 -- checks whether a data constructor is a fake constructor for parallel arrays
 --
