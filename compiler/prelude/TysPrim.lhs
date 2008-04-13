@@ -4,13 +4,6 @@
 \section[TysPrim]{Wired-in knowledge about primitive types}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module TysPrim(
 	alphaTyVars, betaTyVars, alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar,
 	alphaTy, betaTy, gammaTy, deltaTy,
@@ -58,12 +51,7 @@ import Name		( Name, BuiltInSyntax(..), mkInternalName, mkWiredInName )
 import OccName		( mkOccNameFS, tcName, mkTyVarOcc )
 import TyCon		( TyCon, mkPrimTyCon, mkLiftedPrimTyCon,
 			  PrimRep(..) )
-import Type		( mkTyConApp, mkTyConTy, mkTyVarTys, mkTyVarTy,
-			  unliftedTypeKind, 
-			  liftedTypeKind, openTypeKind, 
-			  Kind, mkArrowKinds, mkArrowKind,
-			  TyThing(..)
-			)
+import Type
 import SrcLoc
 import Unique		( mkAlphaTyVarUnique, pprUnique )
 import PrelNames
@@ -111,12 +99,13 @@ primTyCons
     ]
 
 mkPrimTc :: FastString -> Unique -> TyCon -> Name
-mkPrimTc fs uniq tycon
+mkPrimTc fs unique tycon
   = mkWiredInName gHC_PRIM (mkOccNameFS tcName fs) 
-		  uniq
+		  unique
 		  (ATyCon tycon)	-- Relevant TyCon
 		  UserSyntax		-- None are built-in syntax
 
+charPrimTyConName, intPrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, realWorldTyConName, arrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, anyPrimTyConName, anyPrimTyCon1Name :: Name
 charPrimTyConName    	      = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
 intPrimTyConName     	      = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
 int32PrimTyConName	      = mkPrimTc (fsLit "Int32#") int32PrimTyConKey int32PrimTyCon
@@ -168,20 +157,25 @@ tyVarList kind = [ mkTyVar (mkInternalName (mkAlphaTyVarUnique u)
 alphaTyVars :: [TyVar]
 alphaTyVars = tyVarList liftedTypeKind
 
+betaTyVars :: [TyVar]
 betaTyVars = tail alphaTyVars
 
-alphaTyVar, betaTyVar, gammaTyVar :: TyVar
+alphaTyVar, betaTyVar, gammaTyVar, deltaTyVar :: TyVar
 (alphaTyVar:betaTyVar:gammaTyVar:deltaTyVar:_) = alphaTyVars
 
+alphaTys :: [Type]
 alphaTys = mkTyVarTys alphaTyVars
+alphaTy, betaTy, gammaTy, deltaTy :: Type
 (alphaTy:betaTy:gammaTy:deltaTy:_) = alphaTys
 
 	-- openAlphaTyVar is prepared to be instantiated
 	-- to a lifted or unlifted type variable.  It's used for the 
 	-- result type for "error", so that we can have (error Int# "Help")
 openAlphaTyVars :: [TyVar]
+openAlphaTyVar, openBetaTyVar :: TyVar
 openAlphaTyVars@(openAlphaTyVar:openBetaTyVar:_) = tyVarList openTypeKind
 
+openAlphaTy, openBetaTy :: Type
 openAlphaTy = mkTyVarTy openAlphaTyVar
 openBetaTy   = mkTyVarTy openBetaTyVar
 \end{code}
@@ -208,34 +202,54 @@ pcPrimTyCon0 name rep
   where
     result_kind = unliftedTypeKind
 
+charPrimTy :: Type
 charPrimTy	= mkTyConTy charPrimTyCon
+charPrimTyCon :: TyCon
 charPrimTyCon	= pcPrimTyCon0 charPrimTyConName WordRep
 
+intPrimTy :: Type
 intPrimTy	= mkTyConTy intPrimTyCon
+intPrimTyCon :: TyCon
 intPrimTyCon	= pcPrimTyCon0 intPrimTyConName IntRep
 
+int32PrimTy :: Type
 int32PrimTy	= mkTyConTy int32PrimTyCon
+int32PrimTyCon :: TyCon
 int32PrimTyCon	= pcPrimTyCon0 int32PrimTyConName IntRep
 
+int64PrimTy :: Type
 int64PrimTy	= mkTyConTy int64PrimTyCon
+int64PrimTyCon :: TyCon
 int64PrimTyCon	= pcPrimTyCon0 int64PrimTyConName Int64Rep
 
+wordPrimTy :: Type
 wordPrimTy	= mkTyConTy wordPrimTyCon
+wordPrimTyCon :: TyCon
 wordPrimTyCon	= pcPrimTyCon0 wordPrimTyConName WordRep
 
+word32PrimTy :: Type
 word32PrimTy	= mkTyConTy word32PrimTyCon
+word32PrimTyCon :: TyCon
 word32PrimTyCon	= pcPrimTyCon0 word32PrimTyConName WordRep
 
+word64PrimTy :: Type
 word64PrimTy	= mkTyConTy word64PrimTyCon
+word64PrimTyCon :: TyCon
 word64PrimTyCon	= pcPrimTyCon0 word64PrimTyConName Word64Rep
 
+addrPrimTy :: Type
 addrPrimTy	= mkTyConTy addrPrimTyCon
+addrPrimTyCon :: TyCon
 addrPrimTyCon	= pcPrimTyCon0 addrPrimTyConName AddrRep
 
+floatPrimTy	:: Type
 floatPrimTy	= mkTyConTy floatPrimTyCon
+floatPrimTyCon :: TyCon
 floatPrimTyCon	= pcPrimTyCon0 floatPrimTyConName FloatRep
 
+doublePrimTy :: Type
 doublePrimTy	= mkTyConTy doublePrimTyCon
+doublePrimTyCon	:: TyCon
 doublePrimTyCon	= pcPrimTyCon0 doublePrimTyConName DoubleRep
 \end{code}
 
@@ -256,7 +270,9 @@ where s is a type variable. The only purpose of the type parameter is to
 keep different state threads separate.  It is represented by nothing at all.
 
 \begin{code}
+mkStatePrimTy :: Type -> Type
 mkStatePrimTy ty = mkTyConApp statePrimTyCon [ty]
+statePrimTyCon :: TyCon
 statePrimTyCon	 = pcPrimTyCon statePrimTyConName 1 VoidRep
 \end{code}
 
@@ -265,8 +281,11 @@ RealWorld is deeply magical.  It is *primitive*, but it is not
 RealWorld; it's only used in the type system, to parameterise State#.
 
 \begin{code}
+realWorldTyCon :: TyCon
 realWorldTyCon = mkLiftedPrimTyCon realWorldTyConName liftedTypeKind 0 PtrRep
+realWorldTy :: Type
 realWorldTy	     = mkTyConTy realWorldTyCon
+realWorldStatePrimTy :: Type
 realWorldStatePrimTy = mkStatePrimTy realWorldTy	-- State# RealWorld
 \end{code}
 
@@ -299,6 +318,7 @@ into interface files, we'll get a crash; at least until we add interface-file
 syntax to support them.
 
 \begin{code}
+anyPrimTy :: Type
 anyPrimTy = mkTyConApp anyPrimTyCon []
 
 anyPrimTyCon :: TyCon 	-- Kind *
@@ -311,12 +331,12 @@ anyPrimTyCon1 = mkLiftedPrimTyCon anyPrimTyCon1Name kind 0 PtrRep
 				  
 mkAnyPrimTyCon :: Unique -> Kind -> TyCon
 -- Grotesque hack alert: the client gives the unique; so equality won't work
-mkAnyPrimTyCon uniq kind 
-  = WARN( opt_PprStyle_Debug, ptext (sLit "Urk! Inventing strangely-kinded Any TyCon:") <+> ppr uniq <+> ppr kind )
+mkAnyPrimTyCon unique kind 
+  = WARN( opt_PprStyle_Debug, ptext (sLit "Urk! Inventing strangely-kinded Any TyCon:") <+> ppr unique <+> ppr kind )
 	-- See Note [Strangely-kinded void TyCons] in TcHsSyn
     tycon
   where
-     name  = mkPrimTc (mkFastString ("Any" ++ showSDoc (pprUnique uniq))) uniq tycon
+     name  = mkPrimTc (mkFastString ("Any" ++ showSDoc (pprUnique unique))) unique tycon
      tycon = mkLiftedPrimTyCon name kind 0 PtrRep
 \end{code}
 
@@ -328,14 +348,20 @@ mkAnyPrimTyCon uniq kind
 %************************************************************************
 
 \begin{code}
+arrayPrimTyCon, mutableArrayPrimTyCon, mutableByteArrayPrimTyCon,
+    byteArrayPrimTyCon :: TyCon
 arrayPrimTyCon		  = pcPrimTyCon  arrayPrimTyConName	       1 PtrRep
 mutableArrayPrimTyCon	  = pcPrimTyCon  mutableArrayPrimTyConName     2 PtrRep
 mutableByteArrayPrimTyCon = pcPrimTyCon  mutableByteArrayPrimTyConName 1 PtrRep
 byteArrayPrimTyCon	  = pcPrimTyCon0 byteArrayPrimTyConName	         PtrRep
 
+mkArrayPrimTy :: Type -> Type
 mkArrayPrimTy elt    	    = mkTyConApp arrayPrimTyCon [elt]
+byteArrayPrimTy :: Type
 byteArrayPrimTy	    	    = mkTyConTy byteArrayPrimTyCon
+mkMutableArrayPrimTy :: Type -> Type -> Type
 mkMutableArrayPrimTy s elt  = mkTyConApp mutableArrayPrimTyCon [s, elt]
+mkMutableByteArrayPrimTy :: Type -> Type
 mkMutableByteArrayPrimTy s  = mkTyConApp mutableByteArrayPrimTyCon [s]
 \end{code}
 
@@ -346,8 +372,10 @@ mkMutableByteArrayPrimTy s  = mkTyConApp mutableByteArrayPrimTyCon [s]
 %************************************************************************
 
 \begin{code}
+mutVarPrimTyCon :: TyCon
 mutVarPrimTyCon = pcPrimTyCon mutVarPrimTyConName 2 PtrRep
 
+mkMutVarPrimTy :: Type -> Type -> Type
 mkMutVarPrimTy s elt 	    = mkTyConApp mutVarPrimTyCon [s, elt]
 \end{code}
 
@@ -358,8 +386,10 @@ mkMutVarPrimTy s elt 	    = mkTyConApp mutVarPrimTyCon [s, elt]
 %************************************************************************
 
 \begin{code}
+mVarPrimTyCon :: TyCon
 mVarPrimTyCon = pcPrimTyCon mVarPrimTyConName 2 PtrRep
 
+mkMVarPrimTy :: Type -> Type -> Type
 mkMVarPrimTy s elt 	    = mkTyConApp mVarPrimTyCon [s, elt]
 \end{code}
 
@@ -370,9 +400,11 @@ mkMVarPrimTy s elt 	    = mkTyConApp mVarPrimTyCon [s, elt]
 %************************************************************************
 
 \begin{code}
+tVarPrimTyCon :: TyCon
 tVarPrimTyCon = pcPrimTyCon tVarPrimTyConName 2 PtrRep
 
-mkTVarPrimTy s elt 	    = mkTyConApp tVarPrimTyCon [s, elt]
+mkTVarPrimTy :: Type -> Type -> Type
+mkTVarPrimTy s elt = mkTyConApp tVarPrimTyCon [s, elt]
 \end{code}
 
 %************************************************************************
@@ -382,8 +414,10 @@ mkTVarPrimTy s elt 	    = mkTyConApp tVarPrimTyCon [s, elt]
 %************************************************************************
 
 \begin{code}
+stablePtrPrimTyCon :: TyCon
 stablePtrPrimTyCon = pcPrimTyCon stablePtrPrimTyConName 1 AddrRep
 
+mkStablePtrPrimTy :: Type -> Type
 mkStablePtrPrimTy ty = mkTyConApp stablePtrPrimTyCon [ty]
 \end{code}
 
@@ -394,8 +428,10 @@ mkStablePtrPrimTy ty = mkTyConApp stablePtrPrimTyCon [ty]
 %************************************************************************
 
 \begin{code}
+stableNamePrimTyCon :: TyCon
 stableNamePrimTyCon = pcPrimTyCon stableNamePrimTyConName 1 PtrRep
 
+mkStableNamePrimTy :: Type -> Type
 mkStableNamePrimTy ty = mkTyConApp stableNamePrimTyCon [ty]
 \end{code}
 
@@ -406,7 +442,9 @@ mkStableNamePrimTy ty = mkTyConApp stableNamePrimTyCon [ty]
 %************************************************************************
 
 \begin{code}
+bcoPrimTy    :: Type
 bcoPrimTy    = mkTyConTy bcoPrimTyCon
+bcoPrimTyCon :: TyCon
 bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName PtrRep
 \end{code}
   
@@ -417,8 +455,10 @@ bcoPrimTyCon = pcPrimTyCon0 bcoPrimTyConName PtrRep
 %************************************************************************
 
 \begin{code}
+weakPrimTyCon :: TyCon
 weakPrimTyCon = pcPrimTyCon weakPrimTyConName 1 PtrRep
 
+mkWeakPrimTy :: Type -> Type
 mkWeakPrimTy v = mkTyConApp weakPrimTyCon [v]
 \end{code}
 
@@ -438,6 +478,8 @@ Hence the programmer API for thread manipulation uses a weak pointer
 to the thread id internally.
 
 \begin{code}
+threadIdPrimTy :: Type
 threadIdPrimTy    = mkTyConTy threadIdPrimTyCon
+threadIdPrimTyCon :: TyCon
 threadIdPrimTyCon = pcPrimTyCon0 threadIdPrimTyConName PtrRep
 \end{code}
