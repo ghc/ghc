@@ -4,13 +4,6 @@
 \section[PrelInfo]{The @PrelInfo@ interface to the compiler's prelude knowledge}
 
 \begin{code}
-{-# OPTIONS -w #-}
--- The above warning supression flag is a temporary kludge.
--- While working on this module you are encouraged to remove it and fix
--- any warnings in the module. See
---     http://hackage.haskell.org/trac/ghc/wiki/Commentary/CodingStyle#Warnings
--- for details
-
 module PrelInfo (
 	module MkId,
 
@@ -160,5 +153,7 @@ isNumericClass, isStandardClass :: Class -> Bool
 
 isNumericClass     clas = classKey clas `is_elem` numericClassKeys
 isStandardClass    clas = classKey clas `is_elem` standardClassKeys
+
+is_elem :: Eq a => a -> [a] -> Bool
 is_elem = isIn "is_X_Class"
 \end{code}
