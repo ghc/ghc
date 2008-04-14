@@ -95,7 +95,11 @@ collect_tdefs tcon tdefs
         -- See Note [Newtype coercions] in 
         -- types/TyCon
         Just (arity,coKindFun) | (l,r) <- (coKindFun $ map mkTyVarTy vs) -> 
-            (vs,l,r) where vs = take arity tyvars
+             -- Here we eta-expand the newtype coercion,
+             -- which makes the ext-core typechecker somewhat simpler.
+            (tyvars,mkAppTys l extraVs,mkAppTys r extraVs)
+               where (vs, extraVs) = (take arity tyvars,
+                        map mkTyVarTy $ drop arity tyvars)
         Nothing -> pprPanic "MkExternalCore: coercion tcon lacks a kind fun"
                      (ppr tcon)
 
