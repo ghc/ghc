@@ -53,11 +53,16 @@ endif
 
 install all :: $(INSTALL_HEADERS) $(INSTALL_LIBS) $(INSTALL_PROGS)
 
+# We have to fake a non-working ln for configure, so that the fallback
+# option (cp -p) gets used instead.  Otherwise the libffi build system
+# will use cygwin symbolic linkks which cannot be read by mingw gcc.
+# The same trick is played by the GMP build in ../gmp.
+
 stamp.ffi.static:
 	$(RM) -rf $(LIBFFI_DIR) build
 	$(TAR) -zxf $(LIBFFI_TARBALL)
 	mv $(LIBFFI_DIR) build
-#	chmod +x ln
+	chmod +x ln
 	(set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
 	    PATH=`pwd`:$$PATH; \
 	    export PATH; \
@@ -70,7 +75,7 @@ stamp.ffi.shared:
 	$(RM) -rf $(LIBFFI_DIR) build-shared
 	$(TAR) -zxf $(LIBFFI_TARBALL)
 	mv $(LIBFFI_DIR) build-shared
-#	chmod +x ln
+	chmod +x ln
 	(set -o igncr 2>/dev/null) && set -o igncr; export SHELLOPTS; \
 	    PATH=`pwd`:$$PATH; \
 	    export PATH; \
