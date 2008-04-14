@@ -160,6 +160,7 @@ other dynamic, non-language, flag settings:
   -fno-warn-orphans
   -fno-warn-tabs
   -fno-strictness
+  -fno-static-argument-transformation
   -fno-full-laziness
   -fno-liberate-case
   -fno-spec-constr
