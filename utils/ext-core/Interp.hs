@@ -15,7 +15,7 @@ The only major omission is garbage collection.
 Just a sampling of primitive types and operators are included.
 -}
 
-module Interp where
+module Interp ( evalProgram ) where
 
 import Core
 import Printer

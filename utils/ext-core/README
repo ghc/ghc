@@ -3,13 +3,44 @@ A set of example programs for handling external core format.
 In particular, typechecker and interpreter give a precise semantics.
 
 To build, run "make".
+---------------------
+tjc April 2008:
 
-To run the checker and interpreter (which currently aren't working anyway),
-you need to generate External Core for all the base, integer and ghc-prim
-libraries. This can be done by adding "-fext-core" to the GhcLibHcOpts in
-your build.mk file, then running "make" under libraries/.
+==== Notes ====
+
+The checker should work on most programs. Bugs I'm aware of:
+1. GHC generates some questionable coercion applications involving
+   partially-applied function arrows (for details, see:
+   http://www.haskell.org/pipermail/cvs-ghc/2008-April/041949.html)
+   This shows up when typechecking a few of the library modules.
+
+2. There's some weirdness involving funny character literals. This can
+   be fixed by writing a new lexer for chars rather than using Parsec's
+   built-in charLiteral lexer. But I haven't done that.
+
+Typechecking all the GHC libraries eats about a gig of heap and takes a
+long time. I blame Parsec. (Someone who was bored, or understood happy
+better than I do, could update the old happy parser, which is still in the
+repo.)
+
+The interpreter is not working yet.
+
+==== Building ====
+
+To run the checker and interpreter, you need to generate External Core
+for all the base, integer and ghc-prim libraries. This can be done by
+adding "-fext-core" to the GhcLibHcOpts in your build.mk file, then
+running "make" under libraries/.
+
 Then you need to edit Driver.hs and change "baseDir" to point to your GHC
 libraries directory.
 
-Most recently tested with GHC 6.8.2. I make no claims of portability. --tjc
+Once you've done that:
+1. make prims (to generate the primops file)
+2. make
+3. make nofibtest (to run the parser/checker on all nofib programs...
+   for example.)
+
+Tested with GHC 6.8.2. I make no claims of portability.
+
 

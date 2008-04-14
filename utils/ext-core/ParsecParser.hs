@@ -1,10 +1,14 @@
+{-# OPTIONS -Wall -Werror -fno-warn-missing-signatures #-}
+
 module ParsecParser where
 
 import Core
 import ParseGlue
+import Check
+import PrimCoercions
 
 import Text.ParserCombinators.Parsec
-import Text.ParserCombinators.Parsec.Expr
+--import Text.ParserCombinators.Parsec.Expr
 import qualified Text.ParserCombinators.Parsec.Token as P
 import Text.ParserCombinators.Parsec.Language
 import Data.Ratio
@@ -31,7 +35,9 @@ coreModuleName = do
    return (pkgName, modHierarchy, baseName)
 
 corePackageName :: Parser Pname
-corePackageName = identifier
+-- Package names can be lowercase or uppercase!
+-- TODO: update docs
+corePackageName = identifier <|> upperName
 
 coreHierModuleNames :: Parser ([Id], Id)
 coreHierModuleNames = do
@@ -83,7 +89,7 @@ coreNewtypeDecl = do
 
 coreQualifiedCon :: Parser (Mname, Id)
 coreQualifiedCon = coreQualifiedGen upperName
-
+ 
 coreQualifiedName = coreQualifiedGen identifier
 
 coreQualifiedGen p = do
@@ -110,10 +116,12 @@ coreAxiom :: Parser Axiom
 coreAxiom = parens (do
               coercionName <- coreQualifiedCon
               whiteSpace
+              tbs <- coreTbinds
+              whiteSpace
               symbol "::"
               whiteSpace
-              coercionKind <- coreKind
-              return (coercionName, coercionKind))
+              coercionK <- try equalityKind <|> parens equalityKind
+              return (coercionName, tbs, coercionK))
 
 coreTbinds :: Parser [Tbind]
 coreTbinds = many coreTbind 
@@ -145,7 +153,7 @@ coreCdef = do
   tBinds      <- try $ coreTbindsGen (symbol "@")
   -- This should be equivalent to (many coreAty)
   -- But it isn't. WHY??
-  tys         <- sepBy coreAty whiteSpace
+  tys         <- sepBy coreAtySaturated whiteSpace
   return $ Constr dataConName tBinds tys
 
 coreTRep :: Parser (Maybe Ty)
@@ -168,43 +176,71 @@ coreType = coreForallTy <|> (do
                          stuff -> foldl Tapp (Tcon tcArrow) (hd:stuff))
 
 coreBty :: Parser Ty
-coreBty = arrowThing coreAty coreAty whiteSpace Tapp
-
-arrowThing :: Parser a -> Parser a -> Parser b -> (a -> a -> a) -> Parser a
-arrowThing hdThing restThing sep op = do
-  hd <- hdThing
+coreBty = do
+  hd <- coreAty
                          -- The "try" is necessary:
                          -- otherwise, parsing "T " fails rather
                          -- than returning "T".
-  maybeRest <- option [] (many1 (try (sep >> restThing)))
-  return $ case maybeRest of 
-             [] -> hd
-             stuff -> foldl op hd maybeRest
+  maybeRest <- option [] (many1 (try (whiteSpace >> coreAtySaturated)))
+  return $ (case hd of
+             -- so I'm not sure I like this... it's basically doing
+             -- typechecking (kind-checking?) in the parser.
+             -- However, the type syntax as defined in Core.hs sort of
+             -- forces it.
+             ATy t     -> foldl Tapp t maybeRest
+             Trans k   -> app k 2 maybeRest "trans"
+             Sym k     -> app k 1 maybeRest "sym"
+             Unsafe k  -> app k 2 maybeRest "unsafe"
+             LeftCo k  -> app k 1 maybeRest "left"
+             RightCo k -> app k 1 maybeRest "right")
+                 where app k arity args _ | length args == arity = k args
+                       app _ _ args err = 
+                           primCoercionError (err ++ 
+                             ("Args were: " ++ show args))
 
-coreAppTy :: Parser Ty
-coreAppTy = do 
-  bTy <- try coreBty
-  whiteSpace
-  aTy <- try coreAty
-  return $ Tapp bTy aTy
+coreAtySaturated :: Parser Ty
+coreAtySaturated = do
+   t <- coreAty
+   case t of
+     ATy ty -> return ty
+     _     -> unexpected "coercion ty"
 
-coreAty = try coreTcon <|> try coreTvar <|> parens coreType
-
+coreAty :: Parser ATyOp
+coreAty = try coreTcon <|> ((try coreTvar <|> parens coreType)
+                             >>= return . ATy)
 coreTvar :: Parser Ty
 coreTvar = try identifier >>= (return . Tvar)
 
-coreTcon :: Parser Ty
+coreTcon :: Parser ATyOp
 -- TODO: Change the grammar
 -- A Tcon can be an uppercase type constructor
 -- or a lowercase (always qualified) coercion variable
-coreTcon = (try coreQualifiedCon <|> coreRequiredQualifiedName) 
-             >>= (return . Tcon)
+coreTcon =  
+         -- Special case is first so that (CoUnsafe .. ..) gets parsed as
+         -- a prim. coercion app and not a Tcon app.
+         -- But the whole thing is so bogus.
+        try (do
+                                    -- the "try"s are crucial; they force
+                                    -- backtracking
+           maybeCoercion <- choice [try symCo, try transCo, try unsafeCo,
+                                    try leftCo, rightCo]
+           return $ case maybeCoercion of
+              TransC  -> Trans (\ [x,y] -> TransCoercion x y)
+              SymC    -> Sym (\ [x] -> SymCoercion x)
+              UnsafeC -> Unsafe (\ [x,y] -> UnsafeCoercion x y)
+              LeftC   -> LeftCo (\ [x] -> LeftCoercion x)
+              RightC  -> RightCo (\ [x] -> RightCoercion x))
+    <|> (coreQualifiedCon >>= (return . ATy . Tcon))
 
-coreTyApp :: Parser Ty
-coreTyApp = do
-  operTy <- coreType
-  randTy <- coreType
-  return $ Tapp operTy randTy
+data CoercionTy = TransC | SymC | UnsafeC | LeftC | RightC
+
+symCo, transCo, unsafeCo :: Parser CoercionTy
+-- Would be better not to wire these in quite this way. Sigh
+symCo    = string "^ghczmprim:GHCziPrim.sym"      >> return SymC
+transCo  = string "^ghczmprim:GHCziPrim.trans"    >> return TransC 
+unsafeCo = string "^ghczmprim:GHCziPrim.CoUnsafe" >> return UnsafeC
+leftCo   = string "^ghczmprim:GHCziPrim.left"     >> return LeftC
+rightCo  = string "^ghczmprim:GHCziPrim.right"    >> return RightC
 
 coreFunTy :: Parser Ty
 coreFunTy = do
@@ -228,12 +264,10 @@ coreKind :: Parser Kind
 coreKind = do
   hd <- coreAtomicKind 
   maybeRest <- option [] (many1 (symbol "->" >> coreKind))
-  return $ case maybeRest of
-             [] -> hd
-             stuff -> foldl Karrow hd maybeRest
+  return $ foldl Karrow hd maybeRest
 
 coreAtomicKind = try liftedKind <|> try unliftedKind 
-       <|> try openKind <|> try (parens equalityKind) 
+       <|> try openKind {- <|> try (parens equalityKind) -}
        <|> try (parens coreKind)
 
 liftedKind = do
@@ -252,7 +286,19 @@ equalityKind = do
   ty1 <- coreBty
   symbol ":=:"
   ty2 <- coreBty
-  return $ Keq ty1 ty2
+  return (ty1, ty2)
+
+-- Only used internally within the parser:
+-- represents either a Tcon, or a continuation
+-- for a primitive coercion
+data ATyOp = 
+   ATy Ty
+ | Trans ([Ty] -> Ty)
+ | Sym ([Ty] -> Ty)
+ | Unsafe ([Ty] -> Ty)
+ | LeftCo ([Ty] -> Ty)
+ | RightCo ([Ty] -> Ty)
+
 coreVdefGroups :: Parser [Vdefg]
 coreVdefGroups = option [] (do
   theFirstVdef <- coreVdefg
@@ -290,7 +336,7 @@ coreAtomicExp = do
   return res
 
 coreFullExp = (choice [coreLam, coreLet,
-  coreCase, coreCast, coreNote, coreExternal]) <|> (try coreAppExp)
+  coreCase, coreCast, coreNote, coreExternal, coreLabel]) <|> (try coreAppExp)
 -- The "try" is necessary so that we backtrack
 -- when we see a var (that is not an app)
     <|> coreAtomicExp
@@ -306,7 +352,7 @@ coreAppExp = do
     args <- many1 (whiteSpace >> ((coreAtomicExp >>= (return . Left)) <|>
              -- note this MUST be coreAty, not coreType, because otherwise:
              -- "A @ B c" gets parsed as "A @ (B c)"
-             ((symbol "@" >> coreAty) >>= (return . Right))))
+             ((symbol "@" >> coreAtySaturated) >>= (return . Right))))
     return $ foldl (\ op ->
                      either (App op) (Appt op)) oper args
 
@@ -339,7 +385,7 @@ coreLet = do
   return $ Let vdefg body 
 coreCase = do
   reserved "case"
-  ty <- coreAty
+  ty <- coreAtySaturated
   scrut <- coreAtomicExp
   reserved "of"
   vBind <- parens lambdaBind
@@ -351,21 +397,33 @@ coreCast = do
 -- The parens are CRUCIAL, o/w it's ambiguous
   body <- try (parens coreFullExp)
   whiteSpace
-  ty <- try coreAty
+  ty <- try coreAtySaturated
   return $ Cast body ty
 coreNote = do
   reserved "note"
   s <- stringLiteral
   e <- coreFullExp
   return $ Note s e
-coreExternal = do
+coreExternal = (do
   reserved "external"
   -- TODO: This isn't in the grammar, but GHC
   -- always prints "external ccall". investigate...
   symbol "ccall"
   s <- stringLiteral
-  t <- coreAty
-  return $ External s t
+  t <- coreAtySaturated
+  return $ External s t) <|>
+    -- TODO: I don't really understand what this does
+                (do
+    reserved "dynexternal"
+    symbol "ccall"
+    t <- coreAtySaturated
+    return $ External "[dynamic]" t)
+coreLabel = do
+-- TODO: Totally punting this, but it needs to go in the grammar
+-- or not at all
+  reserved "label"
+  s <- stringLiteral
+  return $ External s tAddrzh
 
 coreLambdaBinds = many1 coreBind
 

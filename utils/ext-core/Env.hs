@@ -1,6 +1,6 @@
 {- Environments.
-   Uses lists for simplicity and to make the semantics clear.
-   A real implementation should use balanced trees or hash tables.
+  The original version used lists. I changed it to use Data.Map.
+  Sadly it doesn't seem to matter much. --tjc
 -}
 
 module Env (Env,
@@ -9,36 +9,41 @@ module Env (Env,
 	    eextend,
             edomain,
 	    efromlist,
+            etolist,
 	    efilter,
 	    eremove)
 where
 
-import List
+import qualified Data.Map as M
+import Data.List
 
-data Env a b = Env [(a,b)] 
- deriving (Show)
+data Env a b = Env (M.Map a b)
+ deriving Show
 
 eempty :: Env a b 
-eempty = Env []
+eempty = Env M.empty
 
 {- In case of duplicates, returns most recently added entry. -}
-elookup :: (Eq a) => Env a b -> a -> Maybe b
-elookup (Env l) k = lookup k l 
+elookup :: (Eq a, Ord a) => Env a b -> a -> Maybe b
+elookup (Env l) k = M.lookup k l 
 
 {- May hide existing entries. -}
-eextend :: Env a b -> (a,b) -> Env a b
-eextend (Env l) (k,d) = Env ((k,d):l)
+eextend :: Ord a => Env a b -> (a,b) -> Env a b
+eextend (Env l) (k,d) = Env (M.insert k d l)
 
 edomain :: (Eq a) => Env a b -> [a]
-edomain (Env l) = nub (map fst l)
+edomain (Env l) = M.keys l
 
 {- In case of duplicates, first entry hides others. -}
-efromlist :: [(a,b)] -> Env a b
-efromlist l = Env l
+efromlist :: Ord a => [(a,b)] -> Env a b
+efromlist = Env . M.fromList
 
-eremove :: (Eq a)  => Env a b -> a -> Env a b
-eremove (Env l) k = Env (filter ((/= k).fst) l)
+etolist :: Env a b -> [(a,b)]
+etolist (Env l) = M.toList l
 
-efilter :: Env a b -> (a -> Bool) -> Env a b
-efilter (Env l) p = Env (filter (p.fst) l)
+eremove :: (Eq a, Ord a)  => Env a b -> a -> Env a b
+eremove (Env l) k = Env (M.delete k l)
+
+efilter :: Ord a => Env a b -> (a -> Bool) -> Env a b
+efilter (Env l) p = Env (M.filterWithKey (\ k a -> p k) l)
 

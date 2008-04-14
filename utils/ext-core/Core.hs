@@ -1,5 +1,7 @@
 module Core where
 
+import Encoding
+
 import List (elemIndex)
 
 data Module 
@@ -13,7 +15,7 @@ data Cdef
   = Constr (Qual Dcon) [Tbind] [Ty]
 
 -- Newtype coercion
-type Axiom = (Qual Tcon, Kind)
+type Axiom = (Qual Tcon, [Tbind], (Ty,Ty))
 
 data Vdefg 
   = Rec [Vdef]
@@ -51,6 +53,15 @@ data Ty
   | Tcon (Qual Tcon)
   | Tapp Ty Ty
   | Tforall Tbind Ty 
+-- Wired-in coercions:
+-- These are primitive tycons in GHC, but in ext-core,
+-- we make them explicit, to make the typechecker
+-- somewhat more clear. 
+  | TransCoercion Ty Ty
+  | SymCoercion Ty
+  | UnsafeCoercion Ty Ty
+  | LeftCoercion Ty
+  | RightCoercion Ty
 
 data Kind 
   = Klifted
@@ -59,6 +70,25 @@ data Kind
   | Karrow Kind Kind
   | Keq Ty Ty
 
+-- A CoercionKind isn't really a Kind at all, but rather,
+-- corresponds to an arbitrary user-declared axiom.
+-- A tycon whose CoercionKind is (DefinedCoercion <tbs> (from, to))
+-- represents a tycon with arity (length tbs), whose kind is
+-- (from :=: to) (modulo substituting type arguments.
+-- It's not a Kind because a coercion must always be fully applied:
+-- whenever we see a tycon that has such a CoercionKind, it must
+-- be fully applied if it's to be assigned an actual Kind.
+-- So, a CoercionKind *only* appears in the environment (mapping
+-- newtype axioms onto CoercionKinds).
+-- Was that clear??
+data CoercionKind = 
+   DefinedCoercion [Tbind] (Ty,Ty)
+
+-- The type constructor environment maps names that are
+-- either type constructors or coercion names onto either
+-- kinds or coercion kinds.
+data KindOrCoercion = Kind Kind | Coercion CoercionKind
+  
 data Lit = Literal CoreLit Ty
   deriving Eq   -- with nearlyEqualTy 
 
@@ -74,8 +104,8 @@ data CoreLit = Lint Integer
 -- module namespace, either when printing out
 -- Core or (probably preferably) in a 
 -- preprocessor.
--- The empty module name (as in an unqualified name)
--- is represented as Nothing.
+-- We represent the empty module name (as in an unqualified name)
+-- with Nothing.
 
 type Mname = Maybe AnMname
 type AnMname = (Pname, [Id], Id)
@@ -104,8 +134,18 @@ eqKind (Karrow k1 k2) (Karrow l1 l2) = k1 `eqKind` l1
 eqKind _ _ = False -- no Keq kind is ever equal to any other...
                    -- maybe ok for now?
 
---- tjc: I haven't looked at the rest of this file. ---
 
+splitTyConApp_maybe :: Ty -> Maybe (Qual Tcon,[Ty])
+splitTyConApp_maybe (Tvar _) = Nothing
+splitTyConApp_maybe (Tcon t) = Just (t,[])
+splitTyConApp_maybe (Tapp rator rand) = 
+   case (splitTyConApp_maybe rator) of
+      Just (r,rs) -> Just (r,rs++[rand])
+      Nothing     -> case rator of
+                       Tcon tc -> Just (tc,[rand])
+                       _       -> Nothing
+splitTyConApp_maybe t@(Tforall _ _) = Nothing
+           
 {- Doesn't expand out fully applied newtype synonyms
    (for which an environment is needed). -}
 nearlyEqualTy t1 t2 =  eqTy [] [] t1 t2 
@@ -125,6 +165,8 @@ instance Eq Ty where (==) = nearlyEqualTy
 
 subKindOf :: Kind -> Kind -> Bool
 _ `subKindOf` Kopen = True
+(Karrow a1 r1) `subKindOf` (Karrow a2 r2) = 
+  a2 `subKindOf` a1 && (r1 `subKindOf` r2)
 k1 `subKindOf` k2 = k1 `eqKind` k2  -- doesn't worry about higher kinds
 
 baseKind :: Kind -> Bool
@@ -134,17 +176,21 @@ baseKind _ = True
 isPrimVar (Just mn,_) = mn == primMname
 isPrimVar _ = False
 
-primMname = mkBaseMname "Prim"
+primMname = mkPrimMname "Prim"
 errMname  = mkBaseMname "Err"
-mkBaseMname :: Id -> AnMname
+mkBaseMname,mkPrimMname :: Id -> AnMname
 mkBaseMname mn = (basePkg, ghcPrefix, mn)
+mkPrimMname mn = (primPkg, ghcPrefix, mn)
 basePkg = "base"
 mainPkg = "main"
+primPkg = zEncodeString "ghc-prim"
 ghcPrefix = ["GHC"]
 mainPrefix = []
 baseMname = mkBaseMname "Base"
+boolMname = mkPrimMname "Bool"
 mainVar = qual mainMname "main"
 mainMname = (mainPkg, mainPrefix, "Main")
+wrapperMainMname = Just (mainPkg, mainPrefix, "ZCMain")
 
 tcArrow :: Qual Tcon
 tcArrow = (Just primMname, "ZLzmzgZR")
@@ -157,8 +203,6 @@ ktArrow :: Kind
 ktArrow = Karrow Kopen (Karrow Kopen Klifted)
 
 {- Unboxed tuples -}
-
--- tjc: not sure whether anything that follows is right
 
 maxUtuple :: Int
 maxUtuple = 100
@@ -178,7 +222,9 @@ isUtupleTy (Tcon tc) = tc `elem` [tcUtuple n | n <- [1..maxUtuple]]
 isUtupleTy _ = False
 
 dcUtuple :: Int -> Qual Dcon
-dcUtuple n = (Just primMname,"ZdwZ" ++ (show n) ++ "H")
+-- TODO: Seems like Z2H etc. appears in ext-core files,
+-- not $wZ2H etc. Is this right?
+dcUtuple n = (Just primMname,"Z" ++ (show n) ++ "H")
 
 isUtupleDc :: Qual Dcon -> Bool
 isUtupleDc dc = dc `elem` [dcUtuple n | n <- [1..maxUtuple]]

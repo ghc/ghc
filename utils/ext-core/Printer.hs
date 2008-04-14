@@ -1,44 +1,52 @@
+{-# OPTIONS -Werror -Wall -fno-warn-missing-signatures #-}
+
 module Printer where
 
 import Text.PrettyPrint.HughesPJ
-import Numeric (fromRat)
 import Char
 
 import Core
 import Encoding
+import PrimCoercions
 
 instance Show Module where
-  showsPrec d m = shows (pmodule m)
+  showsPrec _ m = shows (pmodule m)
 
 instance Show Tdef where
-  showsPrec d t = shows (ptdef t)
+  showsPrec _ t = shows (ptdef t)
 
 instance Show Cdef where
-  showsPrec d c = shows (pcdef c)
+  showsPrec _ c = shows (pcdef c)
 
 instance Show Vdefg where
-  showsPrec d v = shows (pvdefg v)
+  showsPrec _ v = shows (pvdefg v)
 
 instance Show Vdef where
-  showsPrec d v = shows (pvdef v)
+  showsPrec _ v = shows (pvdef v)
 
 instance Show Exp where
-  showsPrec d e = shows (pexp e)
+  showsPrec _ e = shows (pexp e)
 
 instance Show Alt where
-  showsPrec d a = shows (palt a)
+  showsPrec _ a = shows (palt a)
 
 instance Show Ty where
-  showsPrec d t = shows (pty t)
+  showsPrec _ t = shows (pty t)
 
 instance Show Kind where
-  showsPrec d k = shows (pkind k)
+  showsPrec _ k = shows (pkind k)
 
 instance Show Lit where
-  showsPrec d l = shows (plit l)
+  showsPrec _ l = shows (plit l)
 
 instance Show CoreLit where
-  showsPrec d l = shows (pclit l)
+  showsPrec _ l = shows (pclit l)
+
+instance Show KindOrCoercion where
+  showsPrec _ (Kind k) = shows (text "<K" <+> pkind k <> text ">")
+  showsPrec _ (Coercion (DefinedCoercion tbs (t1,t2))) = 
+     shows (text "<C" <+> hsep (map ptbind tbs) <+>
+              parens (pkind (Keq t1 t2)) <> text ">") 
 
 indent = nest 2
 
@@ -55,11 +63,13 @@ ptdef (Data qtcon tbinds cdefs) =
   (text "%data" <+> pqname qtcon <+> (hsep (map ptbind tbinds)) <+> char '=')
   $$ indent (braces ((vcat (punctuate (char ';') (map pcdef cdefs)))))
 
-ptdef (Newtype qtcon tbinds (coercion,k) tyopt) =
+ptdef (Newtype qtcon tbinds (coercion,cTbs,k) tyopt) =
   text "%newtype" <+> pqname qtcon <+> (hsep (map ptbind tbinds))
     $$ indent (axiomclause $$ repclause)
-       where axiomclause = char '^' <+> parens (pqname coercion <+> text "::"
-                                    <+> pkind k)
+       where axiomclause = char '^' <+> parens (pqname coercion <+> 
+                                          (hsep (map ptbind cTbs)) <+>
+                                          text "::"
+                                      <+> peqkind k)
 	     repclause = case tyopt of
                            Just ty -> char '=' <+> pty ty 
                            Nothing -> empty
@@ -67,9 +77,9 @@ ptdef (Newtype qtcon tbinds (coercion,k) tyopt) =
 pcdef (Constr qdcon tbinds tys)  =
   (pqname qdcon) <+> (sep [hsep (map pattbind tbinds),sep (map paty tys)])
 
-pname id = text id
+pname = text
 
-pqname (m,id) = pmname m <> pname id
+pqname (m,v) = pmname m <> pname v
 
 -- be sure to print the '.' here so we don't print out
 -- ".foo" for unqualified foo...
@@ -78,7 +88,7 @@ pmname Nothing = empty
 -- "%module foo" doesn't get printed as "%module ^foo"
 pmname (Just m) = char '^' <> panmname m <> char '.'
 
-panmname p@(pkgName, parents, name) =
+panmname (pkgName, parents, name) =
   let parentStrs = map pname parents in
          pname pkgName <> char ':' <>
          -- This is to be sure to not print out:
@@ -107,11 +117,23 @@ pakind (Kopen) = char '?'
 pakind k = parens (pkind k)
 
 pkind (Karrow k1 k2) = parens (pakind k1 <> text "->" <> pkind k2)
-pkind (Keq t1 t2) = parens (parens (pty t1) <+> text ":=:" <+> parens (pty t2)) 
+pkind (Keq from to) = peqkind (from,to)
 pkind k = pakind k
+
+peqkind (t1, t2) = parens (parens (pty t1) <+> text ":=:" <+> parens (pty t2)) 
 
 paty (Tvar n) = pname n
 paty (Tcon c) = pqname c
+paty (TransCoercion t1 t2) = 
+    parens (sep ([pqname transCoercion, pbty t1, pbty t2]))
+paty (SymCoercion t) = 
+    parens (sep [pqname symCoercion, paty t])
+paty (UnsafeCoercion t1 t2) = 
+    parens (sep [pqname unsafeCoercion, pbty t1, pbty t2])
+paty (LeftCoercion t) = 
+    parens (pqname leftCoercion <+> paty t)
+paty (RightCoercion t) = 
+    parens (pqname rightCoercion <+> paty t)
 paty t = parens (pty t)
 
 pbty (Tapp(Tapp(Tcon tc) t1) t2) | tc == tcArrow = parens(fsep [pbty t1, text "->",pty t2])
@@ -153,7 +175,7 @@ pfexp e = paexp e
 pappexp (App e1 e2) as = pappexp e1 (Left e2:as)
 pappexp (Appt e t) as = pappexp e (Right t:as)
 pappexp e as = fsep (paexp e : map pa as)
-           where pa (Left e) = paexp e
+           where pa (Left ex) = paexp ex
 		 pa (Right t) = char '@' <+> paty t
 
 pexp (Lam b e) = char '\\' <+> plamexp [b] e
@@ -204,6 +226,6 @@ escape s = foldr f [] (map ord s)
                  h0 = intToDigit r1
 		 hs = dropWhile (=='0') $ reverse $ mkHex cv
 		 mkHex 0 = ""
-		 mkHex cv = intToDigit r : mkHex q
-		    where (q,r) = quotRem cv 16
+		 mkHex num = intToDigit r : mkHex q
+		    where (q,r) = quotRem num 16
      f cv rest = (chr cv):rest
