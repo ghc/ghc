@@ -92,7 +92,7 @@ documentation</ulink> describes all the libraries that come with GHC.
           Haskell 98 described in <xref
           linkend="ghc-language-features"/>, except where otherwise
           noted. We are trying to move away from this portmanteau flag, 
-	  and towards enabling features individaully.</para>
+	  and towards enabling features individually.</para>
 
 	  <para>New reserved words: <literal>forall</literal> (only in
 	  types), <literal>mdo</literal>.</para>
@@ -333,7 +333,7 @@ the result of such processing is part of the description of the
       url="http://www.haskell.org/ghc/docs/papers/core.ps.gz">External
 	 Core language</ulink>.
 So that document is a good place to look for a type-set version.
-We would be very happy if someone wanted to volunteer to produce an SGML
+We would be very happy if someone wanted to volunteer to produce an XML
 back end to the program that processes <filename>primops.txt</filename> so that
 we could include the results here in the User Guide.</para>
 
@@ -753,7 +753,7 @@ view :: Type -> TypeView
 </programlisting>
 
 The representation of Typ is held abstract, permitting implementations
-to use a fancy representation (e.g., hash-consing to managage sharing).
+to use a fancy representation (e.g., hash-consing to manage sharing).
 
 Without view patterns, using this signature a little inconvenient: 
 <programlisting>
@@ -1113,7 +1113,7 @@ In this example, the list <literal>output</literal> would take on
 (The function <literal>sortWith</literal> is not a keyword; it is an ordinary
 function that is exported by <literal>GHC.Exts</literal>.)</para>
 
-<para>There are five new forms of compehension qualifier,
+<para>There are five new forms of comprehension qualifier,
 all introduced by the (existing) keyword <literal>then</literal>:
     <itemizedlist>
     <listitem>
@@ -1160,7 +1160,7 @@ then group by e using f
     is a function supplied to f by the compiler which lets it compute e on every
     element of the list being transformed. However, unlike the non-grouping case,
     f additionally partitions the list into a number of sublists: this means that
-    at every point after this statement, binders occuring before it in the comprehension
+    at every point after this statement, binders occurring before it in the comprehension
     refer to <emphasis>lists</emphasis> of possible values, not single values. To help understand
     this, let's look at an example:</para>
     
@@ -1296,7 +1296,7 @@ output = [ x
 	      </para></listitem>
 	    </itemizedlist>
 In all cases (apart from arrow notation), the static semantics should be that of the desugared form,
-even if that is a little unexpected. For emample, the 
+even if that is a little unexpected. For example, the 
 static semantics of the literal <literal>368</literal>
 is exactly that of <literal>fromInteger (368::Integer)</literal>; it's fine for
 <literal>fromInteger</literal> to have any of the types:
@@ -1537,11 +1537,12 @@ For example, in a <literal>let</literal>, it applies in the right-hand
 sides of other <literal>let</literal>-bindings and the body of the
 <literal>let</literal>C. Or, in recursive <literal>do</literal>
 expressions (<xref linkend="mdo-notation"/>), the local fixity
-declarations of aA <literal>let</literal> statement scope over other
+declarations of a <literal>let</literal> statement scope over other
 statements in the group, just as the bound name does.
 </para>
 
-Moreover, a local fixity declatation *must* accompany a local binding of
+<para>
+Moreover, a local fixity declaration *must* accompany a local binding of
 that name: it is not possible to revise the fixity of name bound
 elsewhere, as in
 <programlisting>
@@ -1550,6 +1551,7 @@ let infixr 9 $ in ...
 
 Because local fixity declarations are technically Haskell 98, no flag is
 necessary to enable them.
+</para>
 </sect2>
 
 </sect1>
@@ -1829,7 +1831,7 @@ apply <function>fn</function> to <literal>val</literal> to get a boolean.  For e
 </para>
 
 <para>
-What this allows us to do is to package heterogenous values
+What this allows us to do is to package heterogeneous values
 together with a bunch of functions that manipulate them, and then treat
 that collection of packages in a uniform manner.  You can express
 quite a bit of object-oriented-like programming this way.
@@ -2210,9 +2212,9 @@ like this:
    data NumInst a 
       = Num a => MkNumInst (NumInst a)
 </programlisting>
-Notice that, unlike the situation when declaring an existental, there is 
+Notice that, unlike the situation when declaring an existential, there is 
 no <literal>forall</literal>, because the <literal>Num</literal> constrains the
-data type's univerally quantified type variable <literal>a</literal>.  
+data type's universally quantified type variable <literal>a</literal>.  
 A constructor may have both universal and existential type variables: for example,
 the following two declarations are equivalent:
 <programlisting>
@@ -3648,8 +3650,8 @@ in GHC, you can give the foralls if you want.  See <xref linkend="universal-quan
  <emphasis>Each universally quantified type variable
 <literal>tvi</literal> must be reachable from <literal>type</literal></emphasis>.
 
-A type variable <literal>a</literal> is "reachable" if it it appears
-in the same constraint as either a type variable free in in
+A type variable <literal>a</literal> is "reachable" if it appears
+in the same constraint as either a type variable free in
 <literal>type</literal>, or another reachable type variable.  
 A value with a type that does not obey 
 this reachability restriction cannot be used without introducing
@@ -4252,7 +4254,7 @@ it has rank-2 types on the left of a function arrow.
 GHC has three flags to control higher-rank types:
 <itemizedlist>
 <listitem><para>
- <option>-XPolymorphicComponents</option>: data constructors (only) can have polymorphic argment types.
+ <option>-XPolymorphicComponents</option>: data constructors (only) can have polymorphic argument types.
 </para></listitem>
 <listitem><para>
  <option>-XRank2Types</option>: any function (including data constructors) can have a rank-2 type.
@@ -4592,7 +4594,7 @@ In Haskell, a programmer-written type signature is implicitly quantified over
 its free type variables (<ulink
 url="http://www.haskell.org/onlinereport/decls.html#sect4.1.2">Section
 4.1.2</ulink> 
-of the Haskel Report).
+of the Haskell Report).
 Lexically scoped type variables affect this implicit quantification rules
 as follows: any type variable that is in scope is <emphasis>not</emphasis> universally
 quantified. For example, if type variable <literal>a</literal> is in scope,
@@ -4690,8 +4692,8 @@ already in scope (i.e. bound by the enclosing context), matters are simple: the
 signature simply constrains the type of the pattern in the obvious way.
 </para>
 <para>
-Unlike expression and declaration type signatures, pattern type signatures are not implictly generalised.
-The pattern in a <emphasis>patterm binding</emphasis> may only mention type variables
+Unlike expression and declaration type signatures, pattern type signatures are not implicitly generalised.
+The pattern in a <emphasis>pattern binding</emphasis> may only mention type variables
 that are already in scope.  For example:
 <programlisting>
   f :: forall a. [a] -> (Int, [a])
@@ -5015,14 +5017,14 @@ Wiki page</ulink>.
 		  That is, <literal>''</literal><replaceable>thing</replaceable> interprets <replaceable>thing</replaceable> in a type context.
 		     </para></listitem> 
 		  </itemizedlist>
-	          These <literal>Names</literal> can be used to construct Template Haskell expressions, patterns, delarations etc.  They
+	          These <literal>Names</literal> can be used to construct Template Haskell expressions, patterns, declarations etc.  They
 	          may also be given as an argument to the <literal>reify</literal> function.
 	         </para>
 		</listitem>
 
 		  
 	</itemizedlist>
-(Compared to the original paper, there are many differnces of detail.
+(Compared to the original paper, there are many differences of detail.
 The syntax for a declaration splice uses "<literal>$</literal>" not "<literal>splice</literal>".
 The type of the enclosed expression must be  <literal>Q [Dec]</literal>, not  <literal>[Q Dec]</literal>.
 Type splices are not implemented, and neither are pattern splices or quotations.
@@ -6220,7 +6222,7 @@ key_function :: Int -> String -> (Bool, Double)
 	function "<literal>f</literal>" has a number of other effects:
 <itemizedlist>
 <listitem><para>
-No funtions are inlined into <literal>f</literal>.  Otherwise
+No functions are inlined into <literal>f</literal>.  Otherwise
 GHC might inline a big function into <literal>f</literal>'s right hand side, 
 making <literal>f</literal> big; and then inline <literal>f</literal> blindly.
 </para></listitem>
@@ -7194,7 +7196,7 @@ g x = show x
 </para>
 
 <para>
-  However, when external for is generated (via
+  However, when external core is generated (via
   <option>-fext-core</option>), there will be Notes attached to the
   expressions <function>show</function> and <varname>x</varname>.
   The core function declaration for <function>f</function> is:
@@ -7545,6 +7547,7 @@ standard behaviour.
      ;;; Local Variables: ***
      ;;; mode: xml ***
      ;;; sgml-parent-document: ("users_guide.xml" "book" "chapter" "sect1") ***
+     ;;; ispell-local-dictionary: "british" ***
      ;;; End: ***
  -->
 
