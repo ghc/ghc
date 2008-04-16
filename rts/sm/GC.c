@@ -248,8 +248,8 @@ GarbageCollect ( rtsBool force_major_gc )
   } else {
       n_gc_threads = RtsFlags.ParFlags.gcThreads;
   }
-  trace(TRACE_gc|DEBUG_gc, "GC: %dk to collect, using %d thread(s)",
-        n * (BLOCK_SIZE / 1024), n_gc_threads);
+  trace(TRACE_gc|DEBUG_gc, "GC (gen %d): %dKB to collect, using %d thread(s)",
+        N, n * (BLOCK_SIZE / 1024), n_gc_threads);
 #else
   n_gc_threads = 1;
 #endif
@@ -661,7 +661,7 @@ GarbageCollect ( rtsBool force_major_gc )
   IF_DEBUG(sanity, checkSanity());
 
   // extra GC trace info 
-  if (traceClass(TRACE_gc)) statDescribeGens();
+  if (traceClass(TRACE_gc|DEBUG_gc)) statDescribeGens();
 
 #ifdef DEBUG
   // symbol-table based profiling 

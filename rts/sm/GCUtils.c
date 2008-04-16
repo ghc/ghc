@@ -89,7 +89,7 @@ push_todo_block (bdescr *bd, step *stp)
         stp->todos_last = bd;
     }
     stp->n_todos++;
-    trace(TRACE_gc, "step %d, n_todos: %d", stp->abs_no, stp->n_todos);
+    trace(TRACE_gc|DEBUG_gc, "step %d, n_todos: %d", stp->abs_no, stp->n_todos);
     RELEASE_SPIN_LOCK(&stp->sync_todo);
 }
 
