@@ -1590,15 +1590,9 @@ takeMVarzh_fast
           foreign "C" dirty_TSO(MyCapability(), tso);
       }
 
-#if defined(GRAN) || defined(PAR)
-      /* ToDo: check 2nd arg (mvar) is right */
-      ("ptr" tso) = foreign "C" unblockOne(StgMVar_head(mvar),mvar) [];
-      StgMVar_head(mvar) = tso;
-#else
       ("ptr" tso) = foreign "C" unblockOne_(MyCapability() "ptr", 
                                             StgMVar_head(mvar) "ptr", 1) [];
       StgMVar_head(mvar) = tso;
-#endif
 
       if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	  StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
@@ -1672,15 +1666,9 @@ tryTakeMVarzh_fast
             foreign "C" dirty_TSO(MyCapability(), tso);
         }
 
-#if defined(GRAN) || defined(PAR)
-	/* ToDo: check 2nd arg (mvar) is right */
-	("ptr" tso) = foreign "C" unblockOne(StgMVar_head(mvar) "ptr", mvar "ptr") [];
-	StgMVar_head(mvar) = tso;
-#else
         ("ptr" tso) = foreign "C" unblockOne_(MyCapability() "ptr", 
                                               StgMVar_head(mvar) "ptr", 1) [];
 	StgMVar_head(mvar) = tso;
-#endif
 
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
@@ -1751,15 +1739,9 @@ putMVarzh_fast
             foreign "C" dirty_TSO(MyCapability(), tso);
         }
       
-#if defined(GRAN) || defined(PAR)
-	/* ToDo: check 2nd arg (mvar) is right */
-	("ptr" tso) = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr",mvar "ptr") [];
-	StgMVar_head(mvar) = tso;
-#else
         ("ptr" tso) = foreign "C" unblockOne_(MyCapability() "ptr", 
                                               StgMVar_head(mvar) "ptr", 1) [];
 	StgMVar_head(mvar) = tso;
-#endif
 
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
@@ -1826,15 +1808,9 @@ tryPutMVarzh_fast
             foreign "C" dirty_TSO(MyCapability(), tso);
         }
       
-#if defined(GRAN) || defined(PAR)
-	/* ToDo: check 2nd arg (mvar) is right */
-	("ptr" tso) = foreign "C" unblockOne(MyCapability() "ptr", StgMVar_head(mvar) "ptr",mvar "ptr") [];
-	StgMVar_head(mvar) = tso;
-#else
         ("ptr" tso) = foreign "C" unblockOne_(MyCapability() "ptr", 
                                               StgMVar_head(mvar) "ptr", 1) [];
 	StgMVar_head(mvar) = tso;
-#endif
 
 	if (StgMVar_head(mvar) == stg_END_TSO_QUEUE_closure) {
 	    StgMVar_tail(mvar) = stg_END_TSO_QUEUE_closure;
