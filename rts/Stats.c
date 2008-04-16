@@ -68,8 +68,8 @@ static lnat ResidencySamples = 0; // for stats only
 
 static lnat GC_start_faults = 0, GC_end_faults = 0;
 
-static Ticks *GC_coll_times;
-static Ticks *GC_coll_etimes;
+static Ticks *GC_coll_times = NULL;
+static Ticks *GC_coll_etimes = NULL;
 
 static void statsFlush( void );
 static void statsClose( void );
@@ -638,29 +638,33 @@ stat_exit(int alloc)
 		    TICK_TO_DBL(GC_tot_time), TICK_TO_DBL(GCe_tot_time));
 	}
 
+#if defined(THREADED_RTS) && defined(PROF_SPIN)
+        {
+            nat g, s;
+            
+            statsPrintf("recordMutableGen_sync: %"FMT_Word64"\n", recordMutableGen_sync.spin);
+            statsPrintf("gc_alloc_block_sync: %"FMT_Word64"\n", gc_alloc_block_sync.spin);
+            statsPrintf("static_objects_sync: %"FMT_Word64"\n", static_objects_sync.spin);
+            statsPrintf("whitehole_spin: %"FMT_Word64"\n", whitehole_spin);
+            for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+                for (s = 0; s < generations[g].n_steps; s++) {
+                    statsPrintf("gen[%d].steps[%d].sync_todo: %"FMT_Word64"\n", g, s, generations[g].steps[s].sync_todo.spin);
+                    statsPrintf("gen[%d].steps[%d].sync_large_objects: %"FMT_Word64"\n", g, s, generations[g].steps[s].sync_large_objects.spin);
+                }
+            }
+        }
+#endif
+
 	statsFlush();
 	statsClose();
     }
+
     if (GC_coll_times)
       stgFree(GC_coll_times);
     GC_coll_times = NULL;
-
-#if defined(THREADED_RTS) && defined(PROF_SPIN)
-    {
-	nat g, s;
-
-	statsPrintf("recordMutableGen_sync: %"FMT_Word64"\n", recordMutableGen_sync.spin);
-	statsPrintf("gc_alloc_block_sync: %"FMT_Word64"\n", gc_alloc_block_sync.spin);
-	statsPrintf("static_objects_sync: %"FMT_Word64"\n", static_objects_sync.spin);
-	statsPrintf("whitehole_spin: %"FMT_Word64"\n", whitehole_spin);
-	for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
-	    for (s = 0; s < generations[g].n_steps; s++) {
-		statsPrintf("gen[%d].steps[%d].sync_todo: %"FMT_Word64"\n", g, s, generations[g].steps[s].sync_todo.spin);
-		statsPrintf("gen[%d].steps[%d].sync_large_objects: %"FMT_Word64"\n", g, s, generations[g].steps[s].sync_large_objects.spin);
-	    }
-	}
-    }
-#endif
+    if (GC_coll_etimes)
+      stgFree(GC_coll_etimes);
+    GC_coll_etimes = NULL;
 }
 
 /* -----------------------------------------------------------------------------
