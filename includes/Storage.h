@@ -91,6 +91,9 @@ typedef struct step_ {
     bdescr *     todos_last;
     unsigned int n_todos;               // count of above
 
+    bdescr *     part_blocks;           // partially-full scanned blocks
+    unsigned int n_part_blocks;         // count of above
+
     bdescr *     scavenged_large_objects;  // live large objs after GC (d-link)
     unsigned int n_scavenged_large_blocks; // size (not count) of above
 

@@ -20,18 +20,18 @@ extern SpinLock gc_alloc_block_sync;
 bdescr *allocBlock_sync(void);
 void    freeChain_sync(bdescr *bd);
 
-void    push_scan_block      (bdescr *bd, step_workspace *ws);
+void    push_scanned_block   (bdescr *bd, step_workspace *ws);
 bdescr *grab_todo_block      (step_workspace *ws);
-StgPtr  gc_alloc_todo_block  (step_workspace *ws);
-bdescr *gc_alloc_scavd_block (step_workspace *ws);
+StgPtr  todo_block_full      (nat size, step_workspace *ws);
+StgPtr  alloc_todo_block     (step_workspace *ws, nat size);
 
-// Returns true if a block is 3/4 full.  This predicate is used to try
+// Returns true if a block is partially full.  This predicate is used to try
 // to re-use partial blocks wherever possible, and to reduce wastage.
 // We might need to tweak the actual value.
 INLINE_HEADER rtsBool
 isPartiallyFull(bdescr *bd)
 {
-    return (bd->free + BLOCK_SIZE_W/4 < bd->start + BLOCK_SIZE_W);
+    return (bd->free + WORK_UNIT_WORDS < bd->start + BLOCK_SIZE_W);
 }
 
 

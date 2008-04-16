@@ -54,6 +54,7 @@ typedef struct bdescr_ {
   union { 
       struct bdescr_ *back;	/* used (occasionally) for doubly-linked lists*/
       StgWord *bitmap;
+      StgPtr  scan;             /* scan pointer for copying GC */
   } u;
   unsigned int gen_no;		/* generation */
   struct step_ *step;		/* step */

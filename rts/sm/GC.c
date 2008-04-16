@@ -422,22 +422,34 @@ GarbageCollect ( rtsBool force_major_gc )
               ws = &thr->steps[s];
               // Not true?
               // ASSERT( ws->scan_bd == ws->todo_bd );
-              ASSERT( ws->scan_bd ? ws->scan == ws->scan_bd->free : 1 );
+              ASSERT( ws->scan_bd ? ws->scan_bd->u.scan == ws->scan_bd->free : 1 );
 
               // Push the final block
-              if (ws->scan_bd) { push_scan_block(ws->scan_bd, ws); }
+              if (ws->scan_bd) { push_scanned_block(ws->scan_bd, ws); }
               
               ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks);
               
-              prev = ws->scavd_list;
+              prev = ws->part_list;
+              for (bd = ws->part_list; bd != NULL; bd = bd->link) {
+                  bd->flags &= ~BF_EVACUATED;	 // now from-space 
+                  prev = bd;
+              }
+              if (prev != NULL) {
+                  prev->link = ws->scavd_list;
+              }
               for (bd = ws->scavd_list; bd != NULL; bd = bd->link) {
                   bd->flags &= ~BF_EVACUATED;	 // now from-space 
                   prev = bd;
               }
-              prev->link = ws->stp->blocks;
-              ws->stp->blocks = ws->scavd_list;
-              ws->stp->n_blocks += ws->n_scavd_blocks;
-              ASSERT(countBlocks(ws->stp->blocks) == ws->stp->n_blocks);
+              prev->link = ws->step->blocks;
+              if (ws->part_list != NULL) {
+                  ws->step->blocks = ws->part_list;
+              } else {
+                  ws->step->blocks = ws->scavd_list;
+              }
+              ws->step->n_blocks += ws->n_part_blocks;
+              ws->step->n_blocks += ws->n_scavd_blocks;
+              ASSERT(countBlocks(ws->step->blocks) == ws->step->n_blocks);
 	  }
       }
   }
@@ -981,16 +993,18 @@ alloc_gc_thread (int n)
     for (s = 0; s < total_steps; s++)
     {
         ws = &t->steps[s];
-        ws->stp = &all_steps[s];
-        ASSERT(s == ws->stp->abs_no);
+        ws->step = &all_steps[s];
+        ASSERT(s == ws->step->abs_no);
         ws->gct = t;
         
         ws->scan_bd = NULL;
-        ws->scan = NULL;
 
         ws->todo_bd = NULL;
         ws->buffer_todo_bd = NULL;
         
+        ws->part_list = NULL;
+        ws->n_part_blocks = 0;
+
         ws->scavd_list = NULL;
         ws->n_scavd_blocks = 0;
     }
@@ -1304,15 +1318,17 @@ init_collected_gen (nat g, nat n_threads)
 	    ws = &gc_threads[t]->steps[g * RtsFlags.GcFlags.steps + s];
 
 	    ws->scan_bd = NULL;
-	    ws->scan = NULL;
 
 	    ws->todo_large_objects = NULL;
+
+            ws->part_list = NULL;
+            ws->n_part_blocks = 0;
 
 	    // allocate the first to-space block; extra blocks will be
 	    // chained on as necessary.
 	    ws->todo_bd = NULL;
 	    ws->buffer_todo_bd = NULL;
-	    gc_alloc_todo_block(ws);
+	    alloc_todo_block(ws,0);
 
 	    ws->scavd_list = NULL;
 	    ws->n_scavd_blocks = 0;
@@ -1343,10 +1359,13 @@ init_uncollected_gen (nat g, nat threads)
 	for (s = 0; s < generations[g].n_steps; s++) {
 	    
 	    ws = &gc_threads[t]->steps[g * RtsFlags.GcFlags.steps + s];
-	    stp = ws->stp;
+	    stp = ws->step;
 	    
 	    ws->buffer_todo_bd = NULL;
 	    ws->todo_large_objects = NULL;
+
+            ws->part_list = NULL;
+            ws->n_part_blocks = 0;
 
 	    ws->scavd_list = NULL;
 	    ws->n_scavd_blocks = 0;
@@ -1365,7 +1384,7 @@ init_uncollected_gen (nat g, nat threads)
 		// this block is also the scan block; we must scan
 		// from the current end point.
 		ws->scan_bd = ws->todo_bd;
-		ws->scan = ws->scan_bd->free;
+		ws->scan_bd->u.scan = ws->scan_bd->free;
 
 		// subtract the contents of this block from the stats,
 		// because we'll count the whole block later.
@@ -1374,9 +1393,8 @@ init_uncollected_gen (nat g, nat threads)
 	    else
 	    {
 		ws->scan_bd = NULL;
-		ws->scan = NULL;
 		ws->todo_bd = NULL;
-		gc_alloc_todo_block(ws);
+		alloc_todo_block(ws,0);
 	    }
 	}
     }

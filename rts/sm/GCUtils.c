@@ -51,7 +51,7 @@ grab_todo_block (step_workspace *ws)
     bdescr *bd;
     step *stp;
 
-    stp = ws->stp;
+    stp = ws->step;
     bd = NULL;
 
     if (ws->buffer_todo_bd)
@@ -76,90 +76,144 @@ grab_todo_block (step_workspace *ws)
     return bd;
 }
 
-static void
-push_todo_block (bdescr *bd, step *stp)
-{
-    ASSERT(bd->link == NULL);
-    ACQUIRE_SPIN_LOCK(&stp->sync_todo);
-    if (stp->todos_last == NULL) {
-        stp->todos_last = bd;
-        stp->todos = bd;
-    } else {
-        stp->todos_last->link = bd;
-        stp->todos_last = bd;
-    }
-    stp->n_todos++;
-    trace(TRACE_gc|DEBUG_gc, "step %d, n_todos: %d", stp->abs_no, stp->n_todos);
-    RELEASE_SPIN_LOCK(&stp->sync_todo);
-}
-
 void
-push_scan_block (bdescr *bd, step_workspace *ws)
+push_scanned_block (bdescr *bd, step_workspace *ws)
 {
     ASSERT(bd != NULL);
     ASSERT(bd->link == NULL);
+    ASSERT(bd->step == ws->step);
+    ASSERT(bd->u.scan == bd->free);
 
-    // update stats: this is a block that has been copied & scavenged
-    gct->copied += bd->free - bd->start;
-
-    // put the scan block on the ws->scavd_list.
-    bd->link = ws->scavd_list;
-    ws->scavd_list = bd;
-    ws->n_scavd_blocks ++;
-
-    IF_DEBUG(sanity, 
-	     ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks));
+    if (bd->start + BLOCK_SIZE_W - bd->free > WORK_UNIT_WORDS)
+    {
+        // a partially full block: put it on the part_list list.
+        bd->link = ws->part_list;
+        ws->part_list = bd;
+        ws->n_part_blocks++;
+        IF_DEBUG(sanity, 
+                 ASSERT(countBlocks(ws->part_list) == ws->n_part_blocks));
+    }
+    else
+    {
+        // put the scan block on the ws->scavd_list.
+        bd->link = ws->scavd_list;
+        ws->scavd_list = bd;
+        ws->n_scavd_blocks ++;
+        IF_DEBUG(sanity, 
+                 ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks));
+    }
 }
 
 StgPtr
-gc_alloc_todo_block (step_workspace *ws)
+todo_block_full (nat size, step_workspace *ws)
 {
     bdescr *bd;
 
-    if (ws->todo_bd != NULL) {
-        ws->todo_bd->free = ws->todo_free;
+    bd = ws->todo_bd;
+
+    ASSERT(bd != NULL);
+    ASSERT(bd->link == NULL);
+    ASSERT(bd->step == ws->step);
+
+    bd->free = ws->todo_free;
+
+    // If the global list is not empty, or there's not much work in
+    // this block to push, and there's enough room in
+    // this block to evacuate the current object, then just increase
+    // the limit.
+    if (ws->step->todos != NULL || 
+        (bd->free - bd->u.scan < WORK_UNIT_WORDS / 2)) {
+        if (bd->free + size < bd->start + BLOCK_SIZE_W) {
+            debugTrace(DEBUG_gc, "increasing limit for %p", bd->start);
+            ws->todo_lim = stg_min(bd->start + BLOCK_SIZE_W,
+                                   ws->todo_lim + stg_max(WORK_UNIT_WORDS,size));
+            return ws->todo_free;
+        }
+    }
+    
+    ASSERT(bd->u.scan >= bd->start && bd->u.scan <= bd->free);
+
+    // If this block is not the scan block, we want to push it out and
+    // make room for a new todo block.
+    if (bd != ws->scan_bd)
+    {
+        // If this block does not have enough space to allocate the
+        // current object, but it also doesn't have any work to push, then 
+        // push it on to the scanned list.  It cannot be empty, because
+        // then there would be enough room to copy the current object.
+        if (bd->u.scan == bd->free)
+        {
+            ASSERT(bd->free != bd->start);
+            push_scanned_block(bd, ws);
+        }
+        // Otherwise, push this block out to the global list.
+        else 
+        {
+            step *stp;
+            stp = ws->step;
+            trace(TRACE_gc|DEBUG_gc, "push todo block %p (%d words), step %d, n_todos: %d", 
+                  bd->start, bd->free - bd->u.scan, stp->abs_no, stp->n_todos);
+            // ToDo: use buffer_todo
+            ACQUIRE_SPIN_LOCK(&stp->sync_todo);
+            if (stp->todos_last == NULL) {
+                stp->todos_last = bd;
+                stp->todos = bd;
+            } else {
+                stp->todos_last->link = bd;
+                stp->todos_last = bd;
+            }
+            stp->n_todos++;
+            RELEASE_SPIN_LOCK(&stp->sync_todo);
+        }
     }
 
-    // If we already have a todo block, it must be full, so we push it
-    // out: first to the buffer_todo_bd, then to the step.  BUT, don't
-    // push out the block out if it is already the scan block.
-    if (ws->todo_bd != NULL && ws->scan_bd != ws->todo_bd) {
-	ASSERT(ws->todo_bd->link == NULL);
-        if (ws->buffer_todo_bd == NULL) {
-            // If the global todo list is empty, push this block
-            // out immediately rather than caching it in
-            // buffer_todo_bd, because there might be other threads
-            // waiting for work.
-            if (ws->stp->todos == NULL) {
-                push_todo_block(ws->todo_bd, ws->stp);
-            } else {
-                ws->buffer_todo_bd = ws->todo_bd;
-            }
-        } else {            
-	    ASSERT(ws->buffer_todo_bd->link == NULL);
-	    push_todo_block(ws->buffer_todo_bd, ws->stp);
-            ws->buffer_todo_bd = ws->todo_bd;
+    ws->todo_bd   = NULL;
+    ws->todo_free = NULL;
+    ws->todo_lim  = NULL;
+
+    alloc_todo_block(ws, size);
+
+    return ws->todo_free;
+}
+
+StgPtr
+alloc_todo_block (step_workspace *ws, nat size)
+{
+    bdescr *bd;
+
+    // Grab a part block if we have one, and it has enough room
+    if (ws->part_list != NULL && 
+        ws->part_list->start + BLOCK_SIZE_W - ws->part_list->free > (int)size)
+    {
+        bd = ws->part_list;
+        ws->part_list = bd->link;
+        ws->n_part_blocks--;
+    }
+    else
+    {
+        bd = allocBlock_sync();
+        bd->gen_no = ws->step->gen_no;
+        bd->step = ws->step;
+        bd->u.scan = bd->start;
+
+        // blocks in to-space in generations up to and including N
+        // get the BF_EVACUATED flag.
+        if (ws->step->gen_no <= N) {
+            bd->flags = BF_EVACUATED;
+        } else {
+            bd->flags = 0;
         }
-	ws->todo_bd = NULL;
-    }	    
+    }
 
-    bd = allocBlock_sync();
-
-    bd->gen_no = ws->stp->gen_no;
-    bd->step = ws->stp;
     bd->link = NULL;
 
-    // blocks in to-space in generations up to and including N
-    // get the BF_EVACUATED flag.
-    if (ws->stp->gen_no <= N) {
-	bd->flags = BF_EVACUATED;
-    } else {
-	bd->flags = 0;
-    }
-	
     ws->todo_bd = bd;
-    ws->todo_free = bd->start;
-    ws->todo_lim  = bd->start + BLOCK_SIZE_W;
+    ws->todo_free = bd->free;
+    ws->todo_lim  = stg_min(bd->start + BLOCK_SIZE_W,
+                            bd->free + stg_max(WORK_UNIT_WORDS,size));
+
+    debugTrace(DEBUG_gc, "alloc new todo block %p for step %d", 
+               bd->start, ws->step->abs_no);
 
     return ws->todo_free;
 }

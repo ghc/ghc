@@ -1355,7 +1355,7 @@ scavenge_large (step_workspace *ws)
     bdescr *bd;
     StgPtr p;
 
-    gct->evac_step = ws->stp;
+    gct->evac_step = ws->step;
 
     bd = ws->todo_large_objects;
     
@@ -1367,15 +1367,15 @@ scavenge_large (step_workspace *ws)
 	// the front when evacuating.
 	ws->todo_large_objects = bd->link;
 	
-	ACQUIRE_SPIN_LOCK(&ws->stp->sync_large_objects);
-	dbl_link_onto(bd, &ws->stp->scavenged_large_objects);
-	ws->stp->n_scavenged_large_blocks += bd->blocks;
-	RELEASE_SPIN_LOCK(&ws->stp->sync_large_objects);
+	ACQUIRE_SPIN_LOCK(&ws->step->sync_large_objects);
+	dbl_link_onto(bd, &ws->step->scavenged_large_objects);
+	ws->step->n_scavenged_large_blocks += bd->blocks;
+	RELEASE_SPIN_LOCK(&ws->step->sync_large_objects);
 	
 	p = bd->start;
 	if (scavenge_one(p)) {
-	    if (ws->stp->gen_no > 0) {
-		recordMutableGen_GC((StgClosure *)p, ws->stp->gen);
+	    if (ws->step->gen_no > 0) {
+		recordMutableGen_GC((StgClosure *)p, ws->step->gen);
 	    }
 	}
     }
@@ -1439,30 +1439,27 @@ loop:
         if (ws->scan_bd == NULL && ws->todo_bd != NULL)
         {
             ws->scan_bd = ws->todo_bd;
-            ws->scan = ws->scan_bd->start;
         }
         
         // If we have a scan block with some work to do,
         // scavenge everything up to the free pointer.
-        if (ws->scan != NULL && ws->scan < ws->scan_bd->free)
+        if (ws->scan_bd != NULL && ws->scan_bd->u.scan < ws->scan_bd->free)
         {
             if (n_gc_threads == 1) {
-                scavenge_block1(ws->scan_bd, ws->scan);
+                scavenge_block1(ws->scan_bd);
             } else {
-                scavenge_block(ws->scan_bd, ws->scan);
+                scavenge_block(ws->scan_bd);
             }
-            ws->scan = ws->scan_bd->free;
             did_something = rtsTrue;
         }
         
-        if (ws->scan_bd != NULL && ws->scan == ws->scan_bd->free
-            && ws->scan_bd != ws->todo_bd)
+        if (ws->scan_bd != NULL && ws->scan_bd != ws->todo_bd)
         {
+            ASSERT(ws->scan_bd->u.scan == ws->scan_bd->free);
             // we're not going to evac any more objects into
             // this block, so push it now.
-            push_scan_block(ws->scan_bd, ws);
+            push_scanned_block(ws->scan_bd, ws);
             ws->scan_bd = NULL;
-            ws->scan = NULL;
             // we might be able to scan the todo block now.
             did_something = rtsTrue; 
         }
@@ -1482,11 +1479,11 @@ loop:
             // our scavd list.  This saves pushing out the
             // scan_bd block, which might be partial.
             if (n_gc_threads == 1) {
-                scavenge_block1(bd, bd->start);
+                scavenge_block1(bd);
             } else {
-                scavenge_block(bd, bd->start);
+                scavenge_block(bd);
             }
-            push_scan_block(bd, ws);
+            push_scanned_block(bd, ws);
             did_something = rtsTrue;
             break;
         }
@@ -1561,7 +1558,7 @@ any_work (void)
         }
         ws = &gct->steps[s];
         if (ws->todo_large_objects) return rtsTrue;
-        if (ws->stp->todos) return rtsTrue;
+        if (ws->step->todos) return rtsTrue;
     }
 
     gct->no_work++;

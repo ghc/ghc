@@ -15,7 +15,7 @@
 // defined, the second time without.
 
 #ifndef PARALLEL_GC
-#define scavenge_block(a,b) scavenge_block1(a,b)
+#define scavenge_block(a) scavenge_block1(a)
 #define evacuate(a) evacuate1(a)
 #define recordMutableGen_GC(a,b) recordMutableGen(a,b)
 #else
@@ -24,7 +24,7 @@
 #undef recordMutableGen_GC
 #endif
 
-static void scavenge_block (bdescr *bd, StgPtr scan);
+static void scavenge_block (bdescr *bd);
 
 /* -----------------------------------------------------------------------------
    Scavenge a block from the given scan pointer up to bd->free.
@@ -39,7 +39,7 @@ static void scavenge_block (bdescr *bd, StgPtr scan);
    -------------------------------------------------------------------------- */
 
 static void
-scavenge_block (bdescr *bd, StgPtr scan)
+scavenge_block (bdescr *bd)
 {
   StgPtr p, q;
   StgInfoTable *info;
@@ -47,10 +47,10 @@ scavenge_block (bdescr *bd, StgPtr scan)
   rtsBool saved_eager_promotion;
   step_workspace *ws;
 
-  p = scan;
+  p = bd->u.scan;
   
   debugTrace(DEBUG_gc, "scavenging block %p (gen %d, step %d) @ %p",
-	     bd->start, bd->gen_no, bd->step->no, scan);
+	     bd->start, bd->gen_no, bd->step->no, p);
 
   gct->evac_step = bd->step;
   saved_evac_step = gct->evac_step;
@@ -448,7 +448,12 @@ scavenge_block (bdescr *bd, StgPtr scan)
   }
 
   debugTrace(DEBUG_gc, "   scavenged %ld bytes",
-             (unsigned long)((bd->free - scan) * sizeof(W_)));
+             (unsigned long)((bd->free - bd->u.scan) * sizeof(W_)));
+
+  // update stats: this is a block that has been copied & scavenged
+  gct->copied += bd->free - bd->u.scan;
+
+  bd->u.scan = bd->free;
 }
 
 #undef scavenge_block

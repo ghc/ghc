@@ -73,12 +73,11 @@
    ------------------------------------------------------------------------- */
 
 typedef struct step_workspace_ {
-    step * stp;			// the step for this workspace 
+    step * step;		// the step for this workspace 
     struct gc_thread_ * gct;    // the gc_thread that contains this workspace
 
     // block that is currently being scanned
     bdescr *     scan_bd;
-    StgPtr       scan;               // the scan pointer
 
     // where objects to be scavenged go
     bdescr *     todo_bd;
@@ -91,9 +90,13 @@ typedef struct step_workspace_ {
     // where large objects to be scavenged go
     bdescr *     todo_large_objects;
 
-    // Objects that need not be, or have already been, scavenged.
+    // Objects that have already been, scavenged.
     bdescr *     scavd_list;
     lnat         n_scavd_blocks;     // count of blocks in this list
+
+    // Partially-full, scavenged, blocks
+    bdescr *     part_list;
+    unsigned int n_part_blocks;      // count of above
 
 } step_workspace;
 
@@ -137,7 +140,7 @@ typedef struct gc_thread_ {
                                    // variable).
 
     rtsBool failed_to_evac;        // failure to evacuate an object typically 
-                                   // causes it to be recorded in the mutable 
+                                   // Causes it to be recorded in the mutable 
                                    // object list
 
     rtsBool eager_promotion;       // forces promotion to the evac gen
@@ -193,5 +196,7 @@ extern nat mutlist_MUTVARS, mutlist_MUTARRS, mutlist_MVARS, mutlist_OTHERS;
 #endif
 
 StgClosure * isAlive(StgClosure *p);
+
+#define WORK_UNIT_WORDS 128
 
 #endif /* GC_H */
