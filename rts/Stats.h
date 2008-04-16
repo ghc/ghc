@@ -17,7 +17,7 @@ void      stat_endInit(void);
 void      stat_startGC(void);
 void      stat_endGC (lnat alloc, lnat live, 
 		      lnat copied, lnat gen,
-                      lnat max_copied, lnat avg_copied);
+                      lnat max_copied, lnat avg_copied, lnat slop);
 
 #ifdef PROFILING
 void      stat_startRP(void);
@@ -39,7 +39,8 @@ void      stat_endExit(void);
 void      stat_exit(int alloc);
 void      stat_workerStop(void);
 
-void      initStats(void);
+void      initStats0(void);
+void      initStats1(void);
 
 double    mut_user_time_during_GC(void);
 double    mut_user_time(void);

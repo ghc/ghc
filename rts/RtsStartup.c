@@ -140,16 +140,19 @@ hs_init(int *argc, char **argv[])
 	return;
     }
 
-#if defined(DEBUG)
-    /* Start off by initialising the allocator debugging so we can
-     * use it anywhere */
-    initAllocator();
-#endif
+    /* Initialise the stats department, phase 0 */
+    initStats0();
 
     /* Next we do is grab the start time...just in case we're
      * collecting timing statistics.
      */
     stat_startInit();
+
+#if defined(DEBUG)
+    /* Start off by initialising the allocator debugging so we can
+     * use it anywhere */
+    initAllocator();
+#endif
 
 #ifdef PAR
     /*
@@ -180,6 +183,9 @@ hs_init(int *argc, char **argv[])
 	setupRtsFlags(argc, *argv, &rts_argc, rts_argv);
 	setProgArgv(*argc,*argv);
     }
+
+    /* Initialise the stats department, phase 1 */
+    initStats1();
 
 #ifdef USE_PAPI
     papi_init();
@@ -234,9 +240,6 @@ hs_init(int *argc, char **argv[])
     /* start the virtual timer 'subsystem'. */
     initTimer();
     startTimer();
-
-    /* Initialise the stats department */
-    initStats();
 
 #if defined(RTS_USER_SIGNALS)
     if (RtsFlags.MiscFlags.install_signal_handlers) {

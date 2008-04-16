@@ -68,6 +68,7 @@ static Ticks HCe_start_time, HCe_tot_time = 0;   // heap census prof elap time
 static lnat MaxResidency = 0;     // in words; for stats only
 static lnat AvgResidency = 0;
 static lnat ResidencySamples = 0; // for stats only
+static lnat MaxSlop = 0;
 
 static lnat GC_start_faults = 0, GC_end_faults = 0;
 
@@ -132,8 +133,56 @@ mut_user_time_during_heap_census( void )
 }
 #endif /* PROFILING */
 
+// initStats0() has no dependencies, it can be called right at the beginning
 void
-initStats(void)
+initStats0(void)
+{
+    ElapsedTimeStart = 0;
+
+    InitUserTime     = 0;
+    InitElapsedTime  = 0;
+    InitElapsedStamp = 0;
+
+    MutUserTime      = 0;
+    MutElapsedTime   = 0;
+    MutElapsedStamp  = 0;
+
+    ExitUserTime     = 0;
+    ExitElapsedTime  = 0;
+
+    GC_tot_alloc     = 0;
+    GC_tot_copied    = 0;
+    GC_par_max_copied = 0;
+    GC_par_avg_copied = 0;
+    GC_start_time = 0;
+    GC_tot_time  = 0;
+    GCe_start_time = 0;
+    GCe_tot_time = 0;
+
+#ifdef PROFILING
+    RP_start_time  = 0;
+    RP_tot_time  = 0;
+    RPe_start_time = 0;
+    RPe_tot_time = 0;
+
+    HC_start_time = 0;
+    HC_tot_time = 0;
+    HCe_start_time = 0;
+    HCe_tot_time = 0;
+#endif
+
+    MaxResidency = 0;
+    AvgResidency = 0;
+    ResidencySamples = 0;
+    MaxSlop = 0;
+
+    GC_start_faults = 0;
+    GC_end_faults = 0;
+}    
+
+// initStats1() can be called after setupRtsFlags()
+void
+initStats1 (void)
 {
     nat i;
   
@@ -153,7 +202,7 @@ initStats(void)
 	GC_coll_times[i] = 0;
 	GC_coll_etimes[i] = 0;
     }
-}    
+}
 
 /* -----------------------------------------------------------------------------
    Initialisation time...
@@ -298,7 +347,7 @@ stat_startGC(void)
 
 void
 stat_endGC (lnat alloc, lnat live, lnat copied, lnat gen,
-            lnat max_copied, lnat avg_copied)
+            lnat max_copied, lnat avg_copied, lnat slop)
 {
     if (RtsFlags.GcFlags.giveStats != NO_GC_STATS) {
 	Ticks time, etime, gc_time, gc_etime;
@@ -353,6 +402,8 @@ stat_endGC (lnat alloc, lnat live, lnat copied, lnat gen,
 	    ResidencySamples++;
 	    AvgResidency += live;
 	}
+
+        if (slop > MaxSlop) MaxSlop = slop;
     }
 
     if (rub_bell) {
@@ -545,6 +596,10 @@ stat_exit(int alloc)
 		statsPrintf("%16s bytes maximum residency (%ld sample(s))\n",
 			temp, ResidencySamples);
 	    }
+
+	    ullong_format_string(MaxSlop*sizeof(W_), temp, rtsTrue/*commas*/);
+	    statsPrintf("%16s bytes maximum slop\n", temp);
+
 	    statsPrintf("%16ld MB total memory in use\n\n", 
 		    mblocks_allocated * MBLOCK_SIZE / (1024 * 1024));
 

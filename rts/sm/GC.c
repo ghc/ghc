@@ -181,7 +181,7 @@ GarbageCollect ( rtsBool force_major_gc )
 {
   bdescr *bd;
   step *stp;
-  lnat live, allocated, max_copied, avg_copied;
+  lnat live, allocated, max_copied, avg_copied, slop;
   lnat oldgen_saved_blocks = 0;
   gc_thread *saved_gct;
   nat g, s, t, n;
@@ -722,7 +722,8 @@ GarbageCollect ( rtsBool force_major_gc )
 #endif
 
   // ok, GC over: tell the stats department what happened. 
-  stat_endGC(allocated, live, copied, N, max_copied, avg_copied);
+  slop = calcLiveBlocks() * BLOCK_SIZE_W - live;
+  stat_endGC(allocated, live, copied, N, max_copied, avg_copied, slop);
 
 #if defined(RTS_USER_SIGNALS)
   if (RtsFlags.MiscFlags.install_signal_handlers) {
