@@ -408,9 +408,7 @@ GarbageCollect ( rtsBool force_major_gc )
       }
   }
 
-  // For each workspace, in each thread:
-  //    * clear the BF_EVACUATED flag from each copied block
-  //    * move the copied blocks to the step
+  // For each workspace, in each thread, move the copied blocks to the step
   {
       gc_thread *thr;
       step_workspace *ws;
@@ -446,6 +444,23 @@ GarbageCollect ( rtsBool force_major_gc )
                   ws->step->blocks = ws->scavd_list;
               } 
               ws->step->n_blocks += ws->n_scavd_blocks;
+          }
+      }
+
+      // Add all the partial blocks *after* we've added all the full
+      // blocks.  This is so that we can grab the partial blocks back
+      // again and try to fill them up in the next GC.
+      for (t = 0; t < n_gc_threads; t++) {
+	  thr = gc_threads[t];
+
+          // not step 0
+          if (RtsFlags.GcFlags.generations == 1) {
+              s = 0;
+          } else {
+              s = 1;
+          }
+          for (; s < total_steps; s++) {
+              ws = &thr->steps[s];
 
               prev = NULL;
               for (bd = ws->part_list; bd != NULL; bd = next) {
@@ -1181,11 +1196,12 @@ init_uncollected_gen (nat g, nat threads)
 	stp->n_scavenged_large_blocks = 0;
     }
     
-    for (t = 0; t < threads; t++) {
-	for (s = 0; s < generations[g].n_steps; s++) {
+    for (s = 0; s < generations[g].n_steps; s++) {
 	    
+        stp = &generations[g].steps[s];
+
+        for (t = 0; t < threads; t++) {
 	    ws = &gc_threads[t]->steps[g * RtsFlags.GcFlags.steps + s];
-	    stp = ws->step;
 	    
 	    ws->buffer_todo_bd = NULL;
 	    ws->todo_large_objects = NULL;
@@ -1216,7 +1232,25 @@ init_uncollected_gen (nat g, nat threads)
 		alloc_todo_block(ws,0);
 	    }
 	}
+
+        // deal out any more partial blocks to the threads' part_lists
+        t = 0;
+        while (stp->blocks && isPartiallyFull(stp->blocks))
+        {
+            bd = stp->blocks;
+            stp->blocks = bd->link;
+	    ws = &gc_threads[t]->steps[g * RtsFlags.GcFlags.steps + s];
+            bd->link = ws->part_list;
+            ws->part_list = bd;
+            ws->n_part_blocks += 1;
+            bd->u.scan = bd->free;
+            stp->n_blocks -= 1;
+            stp->n_words -= bd->free - bd->start;
+            t++;
+            if (t == n_gc_threads) t = 0;
+        }
     }
+
 
     // Move the private mutable lists from each capability onto the
     // main mutable list for the generation.
