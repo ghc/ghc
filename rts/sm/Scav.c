@@ -1417,7 +1417,7 @@ scavenge_find_work (void)
     rtsBool did_something, did_anything;
     bdescr *bd;
 
-    gct->scav_local_work++;
+    gct->scav_find_work++;
 
     did_anything = rtsFalse;
 
