@@ -978,7 +978,8 @@ alloc_gc_thread (int n)
     t->id = 0;
     initCondition(&t->wake_cond);
     initMutex(&t->wake_mutex);
-    t->wakeup = rtsFalse;
+    t->wakeup = rtsTrue;  // starts true, so we can wait for the
+                          // thread to start up, see wakeup_gc_threads
     t->exit   = rtsFalse;
 #endif
 
@@ -1189,7 +1190,16 @@ wakeup_gc_threads (nat n_threads USED_IF_THREADS)
     nat i;
     for (i=1; i < n_threads; i++) {
 	inc_running();
-	ACQUIRE_LOCK(&gc_threads[i]->wake_mutex);
+        debugTrace(DEBUG_gc, "waking up gc thread %d", i);
+        do {
+            ACQUIRE_LOCK(&gc_threads[i]->wake_mutex);
+            if (gc_threads[i]->wakeup) {
+                RELEASE_LOCK(&gc_threads[i]->wake_mutex);
+                continue;
+            } else {
+                break;
+            }
+        } while (1);
 	gc_threads[i]->wakeup = rtsTrue;
 	signalCondition(&gc_threads[i]->wake_cond);
 	RELEASE_LOCK(&gc_threads[i]->wake_mutex);
