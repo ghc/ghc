@@ -253,8 +253,8 @@ GarbageCollect ( rtsBool force_major_gc )
 #else
   n_gc_threads = 1;
 #endif
-  trace(TRACE_gc|DEBUG_gc, "GC (gen %d): %dKB to collect, using %d thread(s)",
-        N, n * (BLOCK_SIZE / 1024), n_gc_threads);
+  trace(TRACE_gc|DEBUG_gc, "GC (gen %d): %d KB to collect, %ld MB in use, using %d thread(s)",
+        N, n * (BLOCK_SIZE / 1024), mblocks_allocated, n_gc_threads);
 
 #ifdef RTS_GTK_FRONTPANEL
   if (RtsFlags.GcFlags.frontpanel) {
