@@ -461,7 +461,7 @@ GarbageCollect ( rtsBool force_major_gc )
   { 
       nat i;
       for (i=0; i < n_gc_threads; i++) {
-          if (major_gc) {
+          if (n_gc_threads > 1) {
               trace(TRACE_gc,"thread %d:", i);
               trace(TRACE_gc,"   copied           %ld", gc_threads[i]->copied * sizeof(W_));
               trace(TRACE_gc,"   any_work         %ld", gc_threads[i]->any_work);
