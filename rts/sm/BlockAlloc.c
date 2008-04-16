@@ -331,6 +331,14 @@ allocGroup (nat n)
     }
 
     if (ln == MAX_FREE_LIST) {
+#if 0
+        if ((mblocks_allocated * MBLOCK_SIZE_W - n_alloc_blocks * BLOCK_SIZE_W) > (1024*1024)/sizeof(W_)) {
+            debugBelch("Fragmentation, wanted %d blocks:", n);
+            RtsFlags.DebugFlags.block_alloc = 1;
+            checkFreeListSanity();
+        }
+#endif
+
         bd = alloc_mega_group(1);
         bd->blocks = n;
         initGroup(n,bd);		         // we know the group will fit
