@@ -1197,6 +1197,7 @@ init_collected_gen (nat g, nat n_threads)
 
 	// we don't have any to-be-scavenged blocks yet
 	stp->todos = NULL;
+        stp->todos_last = NULL;
 	stp->n_todos = 0;
 
 	// initialise the large object queues.

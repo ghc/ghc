@@ -65,6 +65,9 @@ grab_todo_block (step_workspace *ws)
     ACQUIRE_SPIN_LOCK(&stp->sync_todo);
     if (stp->todos) {
 	bd = stp->todos;
+        if (stp->todos == stp->todos_last) {
+            stp->todos_last = NULL;
+        }
 	stp->todos = bd->link;
         stp->n_todos--;
 	bd->link = NULL;
@@ -78,8 +81,13 @@ push_todo_block (bdescr *bd, step *stp)
 {
     ASSERT(bd->link == NULL);
     ACQUIRE_SPIN_LOCK(&stp->sync_todo);
-    bd->link = stp->todos;
-    stp->todos = bd;
+    if (stp->todos_last == NULL) {
+        stp->todos_last = bd;
+        stp->todos = bd;
+    } else {
+        stp->todos_last->link = bd;
+        stp->todos_last = bd;
+    }
     stp->n_todos++;
     trace(TRACE_gc, "step %d, n_todos: %d", stp->abs_no, stp->n_todos);
     RELEASE_SPIN_LOCK(&stp->sync_todo);
