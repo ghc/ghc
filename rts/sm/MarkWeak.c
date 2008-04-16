@@ -303,9 +303,8 @@ traverseBlackholeQueue (void)
                     continue;
                 }
             }
-            tmp = t;
-            evacuate((StgClosure **)&tmp);
-            if (prev) prev->_link = t; 
+            evacuate((StgClosure **)&t);
+            if (prev) prev->_link = t;
                  // no write barrier when on the blackhole queue,
                  // because we traverse the whole queue on every GC.
             flag = rtsTrue;
