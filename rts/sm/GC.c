@@ -274,12 +274,6 @@ GarbageCollect ( rtsBool force_major_gc )
   static_objects = END_OF_STATIC_LIST;
   scavenged_static_objects = END_OF_STATIC_LIST;
 
-#ifdef THREADED_RTS
-  initSpinLock(&static_objects_sync);
-  initSpinLock(&recordMutableGen_sync);
-  initSpinLock(&gc_alloc_block_sync);
-#endif
-
   // Initialise all the generations/steps that we're collecting.
   for (g = 0; g <= N; g++) {
       init_collected_gen(g,n_gc_threads);

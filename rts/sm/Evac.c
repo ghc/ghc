@@ -21,6 +21,10 @@
 #include "Prelude.h"
 #include "LdvProfile.h"
 
+#if defined(PROF_SPIN) && defined(THREADED_RTS)
+StgWord64 whitehole_spin = 0;
+#endif
+
 /* Used to avoid long recursion due to selector thunks
  */
 #define MAX_THUNK_SELECTOR_DEPTH 16
@@ -93,8 +97,11 @@ STATIC_INLINE void
 evacuate_large(StgPtr p)
 {
   bdescr *bd = Bdescr(p);
-  step *stp;
+  step *stp, *new_stp;
   step_workspace *ws;
+    
+  stp = bd->step;
+  ACQUIRE_SPIN_LOCK(&stp->sync_large_objects);
 
   // object must be at the beginning of the block (or be a ByteArray)
   ASSERT(get_itbl((StgClosure *)p)->type == ARR_WORDS ||
@@ -105,16 +112,14 @@ evacuate_large(StgPtr p)
     /* Don't forget to set the gct->failed_to_evac flag if we didn't get
      * the desired destination (see comments in evacuate()).
      */
-    if (bd->step < gct->evac_step) {
-      gct->failed_to_evac = rtsTrue;
-      TICK_GC_FAILED_PROMOTION();
+    if (stp < gct->evac_step) {
+	gct->failed_to_evac = rtsTrue;
+	TICK_GC_FAILED_PROMOTION();
     }
+    RELEASE_SPIN_LOCK(&stp->sync_large_objects);
     return;
   }
 
-  stp = bd->step;
-
-  ACQUIRE_SPIN_LOCK(&stp->sync_large_objects);
   // remove from large_object list 
   if (bd->u.back) {
     bd->u.back->link = bd->link;
@@ -124,25 +129,26 @@ evacuate_large(StgPtr p)
   if (bd->link) {
     bd->link->u.back = bd->u.back;
   }
-  RELEASE_SPIN_LOCK(&stp->sync_large_objects);
   
   /* link it on to the evacuated large object list of the destination step
    */
-  stp = bd->step->to;
-  if (stp < gct->evac_step) {
+  new_stp = stp->to;
+  if (new_stp < gct->evac_step) {
       if (gct->eager_promotion) {
-	  stp = gct->evac_step;
+	  new_stp = gct->evac_step;
       } else {
 	  gct->failed_to_evac = rtsTrue;
       }
   }
 
-  ws = &gct->steps[stp->gen_no][stp->no];
-  bd->step = stp;
-  bd->gen_no = stp->gen_no;
+  ws = &gct->steps[new_stp->gen_no][new_stp->no];
+  bd->flags |= BF_EVACUATED;
+  bd->step = new_stp;
+  bd->gen_no = new_stp->gen_no;
   bd->link = ws->todo_large_objects;
   ws->todo_large_objects = bd;
-  bd->flags |= BF_EVACUATED;
+
+  RELEASE_SPIN_LOCK(&stp->sync_large_objects);
 }
 
 /* -----------------------------------------------------------------------------

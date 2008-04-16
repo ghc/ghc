@@ -77,4 +77,8 @@
 #define RTS_USER_SIGNALS 1
 #endif
 
+/* Profile spin locks */
+
+#define PROF_SPIN
+
 #endif /* RTSCONFIG_H */

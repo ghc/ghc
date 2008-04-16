@@ -16,6 +16,9 @@
 #include "ParTicky.h"                       /* ToDo: move into Rts.h */
 #include "Profiling.h"
 #include "GetTime.h"
+#include "GC.h"
+#include "GCUtils.h"
+#include "Evac.h"
 
 #if USE_PAPI
 #include "Papi.h"
@@ -641,6 +644,23 @@ stat_exit(int alloc)
     if (GC_coll_times)
       stgFree(GC_coll_times);
     GC_coll_times = NULL;
+
+#if defined(THREADED_RTS) && defined(PROF_SPIN)
+    {
+	nat g, s;
+
+	statsPrintf("recordMutableGen_sync: %"FMT_Word64"\n", recordMutableGen_sync.spin);
+	statsPrintf("gc_alloc_block_sync: %"FMT_Word64"\n", gc_alloc_block_sync.spin);
+	statsPrintf("static_objects_sync: %"FMT_Word64"\n", static_objects_sync.spin);
+	statsPrintf("whitehole_spin: %"FMT_Word64"\n", whitehole_spin);
+	for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+	    for (s = 0; s < generations[g].n_steps; s++) {
+		statsPrintf("gen[%d].steps[%d].sync_todo: %"FMT_Word64"\n", g, s, generations[g].steps[s].sync_todo.spin);
+		statsPrintf("gen[%d].steps[%d].sync_large_objects: %"FMT_Word64"\n", g, s, generations[g].steps[s].sync_large_objects.spin);
+	    }
+	}
+    }
+#endif
 }
 
 /* -----------------------------------------------------------------------------

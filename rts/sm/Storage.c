@@ -31,6 +31,7 @@
 #include "Trace.h"
 #include "GC.h"
 #include "GCUtils.h"
+#include "Evac.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -256,6 +257,9 @@ initStorage( void )
 
 #ifdef THREADED_RTS
   initSpinLock(&gc_alloc_block_sync);
+  initSpinLock(&static_objects_sync);
+  initSpinLock(&recordMutableGen_sync);
+  whitehole_spin = 0;
 #endif
 
   IF_DEBUG(gc, statDescribeGens());
