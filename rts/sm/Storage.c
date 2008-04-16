@@ -87,6 +87,7 @@ initStep (step *stp, int g, int s)
     stp->abs_no = RtsFlags.GcFlags.steps * g + s;
     stp->blocks = NULL;
     stp->n_blocks = 0;
+    stp->n_words = 0;
     stp->old_blocks = NULL;
     stp->n_old_blocks = 0;
     stp->gen = &generations[g];
@@ -999,7 +1000,7 @@ calcLiveWords(void)
     step *stp;
     
     if (RtsFlags.GcFlags.generations == 1) {
-        return countOccupied(g0s0->blocks) + countOccupied(g0s0->large_objects);
+        return g0s0->n_words + countOccupied(g0s0->large_objects);
     }
     
     live = 0;
@@ -1007,8 +1008,7 @@ calcLiveWords(void)
         for (s = 0; s < generations[g].n_steps; s++) {
             if (g == 0 && s == 0) continue; 
             stp = &generations[g].steps[s];
-            live += countOccupied(stp->blocks) + 
-                    countOccupied(stp->large_objects);
+            live += stp->n_words + countOccupied(stp->large_objects);
         } 
     }
     return live;

@@ -62,6 +62,7 @@ typedef struct step_ {
 
     bdescr *             blocks;	// blocks in this step
     unsigned int         n_blocks;	// number of blocks
+    unsigned int         n_words;       // number of words
 
     struct step_ *       to;		// destination step for live objects
 

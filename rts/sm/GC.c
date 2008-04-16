@@ -195,8 +195,6 @@ GarbageCollect ( rtsBool force_major_gc )
 
   ACQUIRE_SM_LOCK;
 
-  debugTrace(DEBUG_gc, "starting GC");
-
 #if defined(RTS_USER_SIGNALS)
   if (RtsFlags.MiscFlags.install_signal_handlers) {
     // block signals
@@ -248,11 +246,11 @@ GarbageCollect ( rtsBool force_major_gc )
   } else {
       n_gc_threads = RtsFlags.ParFlags.gcThreads;
   }
-  trace(TRACE_gc|DEBUG_gc, "GC (gen %d): %dKB to collect, using %d thread(s)",
-        N, n * (BLOCK_SIZE / 1024), n_gc_threads);
 #else
   n_gc_threads = 1;
 #endif
+  trace(TRACE_gc|DEBUG_gc, "GC (gen %d): %dKB to collect, using %d thread(s)",
+        N, n * (BLOCK_SIZE / 1024), n_gc_threads);
 
 #ifdef RTS_GTK_FRONTPANEL
   if (RtsFlags.GcFlags.frontpanel) {
@@ -432,6 +430,7 @@ GarbageCollect ( rtsBool force_major_gc )
               prev = ws->part_list;
               for (bd = ws->part_list; bd != NULL; bd = bd->link) {
                   bd->flags &= ~BF_EVACUATED;	 // now from-space 
+                  ws->step->n_words += bd->free - bd->start;
                   prev = bd;
               }
               if (prev != NULL) {
@@ -439,6 +438,7 @@ GarbageCollect ( rtsBool force_major_gc )
               }
               for (bd = ws->scavd_list; bd != NULL; bd = bd->link) {
                   bd->flags &= ~BF_EVACUATED;	 // now from-space 
+                  ws->step->n_words += bd->free - bd->start;
                   prev = bd;
               }
               prev->link = ws->step->blocks;
@@ -450,6 +450,7 @@ GarbageCollect ( rtsBool force_major_gc )
               ws->step->n_blocks += ws->n_part_blocks;
               ws->step->n_blocks += ws->n_scavd_blocks;
               ASSERT(countBlocks(ws->step->blocks) == ws->step->n_blocks);
+              ASSERT(countOccupied(ws->step->blocks) == ws->step->n_words);
 	  }
       }
   }
@@ -523,6 +524,7 @@ GarbageCollect ( rtsBool force_major_gc )
 		// onto the front of the now-compacted existing blocks.
 		for (bd = stp->blocks; bd != NULL; bd = bd->link) {
 		    bd->flags &= ~BF_EVACUATED;  // now from-space 
+                    stp->n_words += bd->free - bd->start;
 		}
 		// tack the new blocks on the end of the existing blocks
 		if (stp->old_blocks != NULL) {
@@ -542,6 +544,7 @@ GarbageCollect ( rtsBool force_major_gc )
 		// add the new blocks to the block tally
 		stp->n_blocks += stp->n_old_blocks;
 		ASSERT(countBlocks(stp->blocks) == stp->n_blocks);
+                ASSERT(countOccupied(stp->blocks) == stp->n_words);
 	    }
 	    else // not copacted
 	    {
@@ -591,10 +594,8 @@ GarbageCollect ( rtsBool force_major_gc )
   // update the max size of older generations after a major GC
   resize_generations();
   
-  // Guess the amount of live data for stats.
-  live = calcLiveBlocks() * BLOCK_SIZE_W;
-  debugTrace(DEBUG_gc, "Slop: %ldKB", 
-             (live - calcLiveWords()) / (1024/sizeof(W_)));
+  // Calculate the amount of live data for stats.
+  live = calcLiveWords();
 
   // Free the small objects allocated via allocate(), since this will
   // all have been copied into G0S1 now.  
@@ -604,6 +605,7 @@ GarbageCollect ( rtsBool force_major_gc )
           g0s0->blocks = NULL;
       }
       g0s0->n_blocks = 0;
+      g0s0->n_words = 0;
   }
   alloc_blocks = 0;
   alloc_blocks_lim = RtsFlags.GcFlags.minAllocAreaSize;
@@ -941,7 +943,7 @@ initialise_N (rtsBool force_major_gc)
     for (g = RtsFlags.GcFlags.generations - 1; g >= 0; g--) {
         blocks = 0;
         for (s = 0; s < generations[g].n_steps; s++) {
-            blocks += generations[g].steps[s].n_blocks;
+            blocks += generations[g].steps[s].n_words / BLOCK_SIZE_W;
             blocks += generations[g].steps[s].n_large_blocks;
         }
         if (blocks >= generations[g].max_blocks) {
@@ -1254,6 +1256,7 @@ init_collected_gen (nat g, nat n_threads)
 	stp->n_old_blocks = stp->n_blocks;
 	stp->blocks       = NULL;
 	stp->n_blocks     = 0;
+	stp->n_words      = 0;
 
 	// we don't have any to-be-scavenged blocks yet
 	stp->todos = NULL;
@@ -1379,6 +1382,7 @@ init_uncollected_gen (nat g, nat threads)
                 ws->todo_lim = ws->todo_bd->start + BLOCK_SIZE_W;
 		stp->blocks = stp->blocks->link;
 		stp->n_blocks -= 1;
+                stp->n_words -= ws->todo_bd->free - ws->todo_bd->start;
 		ws->todo_bd->link = NULL;
 
 		// this block is also the scan block; we must scan
@@ -1549,7 +1553,7 @@ resize_generations (void)
 	nat gens = RtsFlags.GcFlags.generations;
 	
 	// live in the oldest generations
-	live = oldest_gen->steps[0].n_blocks +
+	live = (oldest_gen->steps[0].n_words + BLOCK_SIZE_W - 1) / BLOCK_SIZE_W+
 	    oldest_gen->steps[0].n_large_blocks;
 	
 	// default max size for all generations except zero

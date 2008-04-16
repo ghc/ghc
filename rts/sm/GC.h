@@ -92,7 +92,7 @@ typedef struct step_workspace_ {
 
     // Objects that have already been, scavenged.
     bdescr *     scavd_list;
-    lnat         n_scavd_blocks;     // count of blocks in this list
+    nat          n_scavd_blocks;     // count of blocks in this list
 
     // Partially-full, scavenged, blocks
     bdescr *     part_list;

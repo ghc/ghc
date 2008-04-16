@@ -675,40 +675,46 @@ void
 statDescribeGens(void)
 {
   nat g, s, mut, lge;
-  lnat live;
+  lnat live, slop;
+  lnat tot_live, tot_slop;
   bdescr *bd;
   step *step;
 
   debugBelch(
-"     Gen    Steps      Max  Mut-list  Step   Blocks     Live    Large\n"
-"                    Blocks     Bytes                          Objects\n");
+"-----------------------------------------------------------------\n"
+"  Gen     Max  Mut-list  Step   Blocks    Large     Live     Slop\n"
+"       Blocks     Bytes                 Objects                  \n"
+"-----------------------------------------------------------------\n");
 
-  mut = 0;
+  tot_live = 0;
+  tot_slop = 0;
   for (g = 0; g < RtsFlags.GcFlags.generations; g++) {
+      mut = 0;
       for (bd = generations[g].mut_list; bd != NULL; bd = bd->link) {
 	  mut += (bd->free - bd->start) * sizeof(W_);
       }
 
-    debugBelch("%8d %8d %8d %9d", g, generations[g].n_steps,
-	    generations[g].max_blocks, mut);
+    debugBelch("%5d %7d %9d", g, generations[g].max_blocks, mut);
 
     for (s = 0; s < generations[g].n_steps; s++) {
       step = &generations[g].steps[s];
-      live = 0;
       for (bd = step->large_objects, lge = 0; bd; bd = bd->link) {
 	lge++;
       }
-      // This live figure will be slightly less that the "live" figure
-      // given by +RTS -Sstderr, because we take don't count the
-      // slop at the end of each block.
-      live += countOccupied(step->blocks) + countOccupied(step->large_objects);
+      live = step->n_words + countOccupied(step->large_objects);
       if (s != 0) {
-	debugBelch("%36s","");
+	debugBelch("%23s","");
       }
-      debugBelch("%6d %8d %8ld %8d\n", s, step->n_blocks,
-	      live, lge);
+      slop = (step->n_blocks + step->n_large_blocks) * BLOCK_SIZE_W - live;
+      debugBelch("%6d %8d %8d %8ld %8ld\n", s, step->n_blocks, lge,
+                 live*sizeof(W_), slop*sizeof(W_));
+      tot_live += live;
+      tot_slop += slop;
     }
   }
+  debugBelch("-----------------------------------------------------------------\n");
+  debugBelch("%48s%8ld %8ld\n","",tot_live*sizeof(W_),tot_slop*sizeof(W_));
+  debugBelch("-----------------------------------------------------------------\n");
   debugBelch("\n");
 }
 
