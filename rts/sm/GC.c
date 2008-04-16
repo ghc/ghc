@@ -144,7 +144,7 @@ static void update_task_list        (void);
 static void resize_generations      (void);
 static void resize_nursery          (void);
 static void start_gc_threads        (void);
-static void gc_thread_work          (void);
+static void scavenge_until_all_done (void);
 static nat  inc_running             (void);
 static nat  dec_running             (void);
 static void wakeup_gc_threads       (nat n_threads);
@@ -350,7 +350,7 @@ GarbageCollect ( rtsBool force_major_gc )
    */
   for (;;)
   {
-      gc_thread_work();
+      scavenge_until_all_done();
       // The other threads are now stopped.  We might recurse back to
       // here, but from now on this is the only thread.
       
@@ -883,25 +883,12 @@ dec_running (void)
     return n_running;
 }
 
-//
-// gc_thread_work(): Scavenge until there's no work left to do and all
-// the running threads are idle.
-//
 static void
-gc_thread_work (void)
+scavenge_until_all_done (void)
 {
     nat r;
 	
     debugTrace(DEBUG_gc, "GC thread %d working", gct->thread_index);
-
-    // gc_running_threads has already been incremented for us; either
-    // this is the main thread and we incremented it inside
-    // GarbageCollect(), or this is a worker thread and the main
-    // thread bumped gc_running_threads before waking us up.
-
-    // Every thread evacuates some roots.
-    gct->evac_step = 0;
-    markSomeCapabilities(mark_root, gct, gct->thread_index, n_gc_threads);
 
 loop:
     scavenge_loop();
@@ -927,8 +914,26 @@ loop:
     debugTrace(DEBUG_gc, "GC thread %d finished.", gct->thread_index);
 }
 
-
 #if defined(THREADED_RTS)
+//
+// gc_thread_work(): Scavenge until there's no work left to do and all
+// the running threads are idle.
+//
+static void
+gc_thread_work (void)
+{
+    // gc_running_threads has already been incremented for us; this is
+    // a worker thread and the main thread bumped gc_running_threads
+    // before waking us up.
+
+    // Every thread evacuates some roots.
+    gct->evac_step = 0;
+    markSomeCapabilities(mark_root, gct, gct->thread_index, n_gc_threads);
+
+    scavenge_until_all_done();
+}
+
+
 static void
 gc_thread_mainloop (void)
 {
