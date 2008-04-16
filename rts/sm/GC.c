@@ -410,7 +410,7 @@ GarbageCollect ( rtsBool force_major_gc )
   {
       gc_thread *thr;
       step_workspace *ws;
-      bdescr *prev;
+      bdescr *prev, *next;
 
       for (t = 0; t < n_gc_threads; t++) {
 	  thr = gc_threads[t];
@@ -427,28 +427,41 @@ GarbageCollect ( rtsBool force_major_gc )
               ASSERT(gct->scan_bd == NULL);
               ASSERT(countBlocks(ws->scavd_list) == ws->n_scavd_blocks);
               
-              prev = ws->part_list;
-              for (bd = ws->part_list; bd != NULL; bd = bd->link) {
-                  bd->flags &= ~BF_EVACUATED;	 // now from-space 
-                  ws->step->n_words += bd->free - bd->start;
-                  prev = bd;
-              }
-              if (prev != NULL) {
-                  prev->link = ws->scavd_list;
-              }
+              prev = NULL;
               for (bd = ws->scavd_list; bd != NULL; bd = bd->link) {
                   bd->flags &= ~BF_EVACUATED;	 // now from-space 
                   ws->step->n_words += bd->free - bd->start;
                   prev = bd;
               }
-              prev->link = ws->step->blocks;
-              if (ws->part_list != NULL) {
-                  ws->step->blocks = ws->part_list;
-              } else {
+              if (prev != NULL) {
+                  prev->link = ws->step->blocks;
                   ws->step->blocks = ws->scavd_list;
+              } 
+              ws->step->n_blocks += ws->n_scavd_blocks;
+
+              prev = NULL;
+              for (bd = ws->part_list; bd != NULL; bd = next) {
+                  next = bd->link;
+                  if (bd->free == bd->start) {
+                      if (prev == NULL) {
+                          ws->part_list = next;
+                      } else {
+                          prev->link = next;
+                      }
+                      freeGroup(bd);
+                      ws->n_part_blocks--;
+                  } else {
+                      bd->flags &= ~BF_EVACUATED;	 // now from-space 
+                      ws->step->n_words += bd->free - bd->start;
+                      prev = bd;
+                  }
+              }
+              if (prev != NULL) {
+                  prev->link = ws->step->blocks;
+                  ws->step->blocks = ws->part_list;
               }
               ws->step->n_blocks += ws->n_part_blocks;
-              ws->step->n_blocks += ws->n_scavd_blocks;
+
               ASSERT(countBlocks(ws->step->blocks) == ws->step->n_blocks);
               ASSERT(countOccupied(ws->step->blocks) == ws->step->n_words);
 	  }
